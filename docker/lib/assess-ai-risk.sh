@@ -277,17 +277,96 @@ jq --arg ctx "$CTX" --arg lang "$LANG_TAG" --slurpfile kb "$KB" '
   # never contaminates a different model verdict. Keyed by bom-ref, the id
   # dependencies[] uses. A model with no dataset edges gets no datasets axis —
   # the links are not guessed. datasets_axis($ref) is called per model below.
-  ( [ .components[]? | select(.type == "data")
-      | { key: (.["bom-ref"] // .name // ""), value: ({ name: (.name // "(unnamed)") } + data_parts) }
-      | select(.key != "") ] | from_entries ) as $dmap
+  # A dataset scanned on its own is the document root (metadata.component);
+  # it is judged with its sources the same way as one a model card names.
+  ( [ ([ .metadata.component? // empty | select(type == "object") ] + [ .components[]? ])[]
+      | select(.type == "data")
+      | { key: (.["bom-ref"] // .name // ""),
+          value: ({ name: (.name // "(unnamed)"),
+                    unread: ([ (.properties // [])[] | select(.name == "bomlens:dataset:unresolved") ] | length > 0),
+                    lic: ([ .licenses[]? | (.license.id // .license.name // .expression // empty) ] | join(", ")),
+                    limited: ([ (.properties // [])[] | select(.name == "bomlens:dataset:sourceTrace" and .value == "depth-limit") ] | length > 0),
+                    unverified: [ (.properties // [])[]
+                                  | select(.name == "bomlens:dataset:sourceDataset:unverified") | .value ] }
+                  + data_parts) }
+      | select(.key != "") ] | from_entries ) as $own
   | ( reduce (.dependencies[]? | select(type == "object"))
         as $d ({}; .[$d.ref] += ($d.dependsOn // [])) ) as $deps
+  # A dataset built from other datasets carries their terms too. A data
+  # component has dependsOn edges that point at the sources enrich-aibom.sh
+  # traced; the worst verdict anywhere below a dataset is what the dataset is
+  # judged by. Only recorded licences and signals are read: a source that could
+  # not be read, has no licence, names its own sources only in words, or whose
+  # sources were past the depth limit reads review, never clean.
+  #
+  # Reachability is computed once per dataset (a breadth-first walk with one
+  # visited set), not per path, so a densely linked graph stays linear in its
+  # edges instead of growing with the number of paths through it.
+  | def kids($r): [ ($deps[$r] // [])[] | select($own[.] != null) ] | unique;
+  def reach($start):
+      { seen: [], frontier: kids($start) }
+      | until((.frontier | length) == 0;
+          .seen as $s
+          | ([ .frontier[] | select(. as $x | $s | any(.[]; . == $x) | not) ] | unique) as $new
+          | .seen += $new
+          | .frontier = ([ $new[] | kids(.)[] ] | unique))
+      | .seen;
+  ( $own | with_entries(.value = reach(.key)) ) as $reach
+  # The contribution of one node: its licence and signals, raised to review when it
+  # names sources in words or stopped at the depth limit.
+  | def self_of($k):
+      $own[$k] as $o
+      | ([ $o.overall ]
+         + (if ($o.unverified | length) > 0 then ["review"] else [] end)
+         + (if $o.limited then ["review"] else [] end)) | max_by(vrank[.]) as $v
+      | { v: $v,
+          why: (if $o.unread then T(": could not be read"; ": 읽을 수 없음")
+                elif vrank[$v] > vrank[$o.overall] and ($o.unverified | length) > 0
+                  then T(": names its own sources only in words"; ": 자신의 원천을 문장으로만 적음")
+                elif vrank[$v] > vrank[$o.overall]
+                  then T(": its sources past the depth limit were not read"; ": 깊이 상한 아래 원천은 읽지 않음")
+                elif $o.lic == "" then T(": no license declared"; ": 라이선스 미선언")
+                else ": " + $o.lic end) };
+  def sources_axis($ref):
+      ([ kids($ref)[] | select(. != $ref) as $k
+         | ([$k] + ($reach[$k] // []) | map(select(. != $ref)) | unique)
+         | map(. as $n | self_of($n) + { n: $n })
+         | max_by(vrank[.v]) + { through: $k } ]) as $per_kid
+      | ($own[$ref].unverified // []) as $txt
+      | ([ (if ($per_kid | length) > 0 then
+              ($per_kid | max_by(vrank[.v])) as $w
+              | { v: $w.v,
+                  r: (T("source \($own[$w.n].name)"; "원천 \($own[$w.n].name)")
+                      + (if $w.n != $w.through
+                         then T(" (through \($own[$w.through].name))"; " (\($own[$w.through].name)를 거쳐)")
+                         else "" end)
+                      + $w.why + " (" + VW($w.v) + ")") }
+            else empty end) ]
+         + [ $txt[] | { v: "review",
+                        r: T("source \"\(.)\": not a hub reference, needs checking (review)";
+                             "원천 \"\(.)\": 허브 참조가 아니라 확인 필요 (" + VW("review") + ")") } ]
+         + (if $own[$ref].limited then
+              [{ v: "review", r: T("sources past the depth limit were not read (review)";
+                                   "깊이 상한 아래 원천은 읽지 않음 (" + VW("review") + ")") }]
+            else [] end)) as $per
+      | if ($per | length) == 0 then null
+        else { verdict: ($per | map(.v) | max_by(vrank[.])), reasons: ($per | map(.r)) }
+        end;
+  ( $own | with_entries(
+      (sources_axis(.key)) as $sx
+      | .value += { src: $sx,
+                    overall: (([.value.overall] + (if $sx != null then [$sx.verdict] else [] end))
+                              | max_by(vrank[.])) } ) ) as $dmap
   | def datasets_axis($ref):
       [ ($deps[$ref] // [])[] | $dmap[.] // empty ] as $mds
       | if ($mds | length) == 0 then null
         else ($mds | map(.overall) | max_by(vrank[.])) as $w
            | (if $w == "ok" then ""
-              else " (" + (([ $mds[] | select(.overall == $w) | .name ][0:3]) | join(", ")) + ")"
+              else " (" + (([ $mds[] | select(.overall == $w)
+                               | .name + (if .src != null and vrank[.src.verdict] > vrank[.a.verdict]
+                                             and (.s == null or vrank[.src.verdict] > vrank[.s.verdict])
+                                          then T(", via its sources"; ", 원천 때문") else "" end) ][0:3])
+                             | join(", ")) + ")"
               end) as $named
            | { verdict: $w,
                reasons: [ T("datasets: \($mds | length) referenced, worst \($w)" + $named;
@@ -361,18 +440,21 @@ jq --arg ctx "$CTX" --arg lang "$LANG_TAG" --slurpfile kb "$KB" '
                        + (if $tdx != null then $tdx.reasons else [] end))[0:8] | join("; ")) }
           ])
       elif .type == "data" then
-        (data_parts) as $d
-        | (["license"] + (if $d.s != null then ["signals"] else [] end)) as $axes
+        ($dmap[.["bom-ref"] // .name // ""] // ({ src: null } + data_parts)) as $d
+        | (["license"] + (if $d.s != null then ["signals"] else [] end)
+                       + (if $d.src != null then ["sources"] else [] end)) as $axes
         | .properties = (strip_assessment + [
             { name: "bomlens:assessment:axes",         value: ($axes | join(",")) },
             { name: "bomlens:assessment:license",      value: $d.a.verdict },
             { name: "bomlens:assessment:license:keys", value: ($d.a.keys | join(",")) }
           ]
           + (if $d.s != null then [{ name: "bomlens:assessment:signals", value: $d.s.verdict }] else [] end)
+          + (if $d.src != null then [{ name: "bomlens:assessment:sources", value: $d.src.verdict }] else [] end)
           + [
             { name: "bomlens:assessment:overall",      value: $d.overall },
             { name: "bomlens:assessment:reasons",
-              value: (($d.a.reasons + (if $d.s != null then $d.s.reasons else [] end))[0:8] | join("; ")) }
+              value: (($d.a.reasons + (if $d.s != null then $d.s.reasons else [] end)
+                       + (if $d.src != null then $d.src.reasons else [] end))[0:8] | join("; ")) }
           ])
       else . end;
 

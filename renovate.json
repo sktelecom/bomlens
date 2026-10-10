@@ -27,6 +27,13 @@
     },
     {
       "customType": "regex",
+      "description": "Security overrides for pip packages pulled in by the opt-in images' tools (docker/*-overrides.txt). The `# replaces` note on each line names the upstream pin, not this version, so a bump here needs no other edit.",
+      "fileMatch": ["(^|/)docker/[\\w-]+-overrides\\.txt$"],
+      "matchStrings": ["(?:^|\\n)(?<depName>[A-Za-z0-9][A-Za-z0-9._-]*)==(?<currentValue>[^\\s#]+)"],
+      "datasourceTemplate": "pypi"
+    },
+    {
+      "customType": "regex",
       "description": "Tools pinned as a workflow env value and downloaded at run time (invisible to Dependabot).",
       "fileMatch": ["^\\.github/workflows/[^/]+\\.yml$"],
       "matchStrings": [
@@ -38,7 +45,7 @@
       "description": "cdxgen language-image tag and all-in-one image pinned as shell vars in source-detect.sh.",
       "fileMatch": ["(^|/)docker/lib/source-detect\\.sh$"],
       "matchStrings": [
-        "# renovate: datasource=(?<datasource>\\S+) depName=(?<depName>\\S+)\\nCDXGEN_\\w+=\"\\$\\{CDXGEN_\\w+:-(?:ghcr\\.io/cyclonedx/cdxgen:)?(?<currentValue>[^}\"]+)\\}\""
+        "# renovate: datasource=(?<datasource>\\S+) depName=(?<depName>\\S+)\\nCDXGEN_\\w+=\"\\$\\{CDXGEN_\\w+:-(?:ghcr\\.io/(?:cyclonedx|cdxgen)/cdxgen:)?(?<currentValue>[^}\"]+)\\}\""
       ]
     },
     {
@@ -88,7 +95,7 @@
       "fileMatch": ["(^|/)docs/reference/docker-image\\.md$", "(^|/)docs/reference/docker-image\\.ko\\.md$"],
       "matchStrings": ["\\| cdxgen \\| (?<currentValue>v?[\\d.]+) \\|"],
       "datasourceTemplate": "npm",
-      "depNameTemplate": "@cyclonedx/cdxgen"
+      "depNameTemplate": "@cdxgen/cdxgen"
     }
   ]
 }

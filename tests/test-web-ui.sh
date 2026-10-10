@@ -480,6 +480,25 @@ rc = server.run_sibling_scan(
 assert rc == 0, rc
 assert not any(a.startswith("AI_USAGE_CONTEXT") for a in captured["args"]), captured["args"]
 
+# The dataset-source walk limits are operator environment variables: forwarded
+# to the AIBOM sibling only as whole numbers, never as raw text.
+_saved_ds = {k: os.environ.get(k) for k in ("AIBOM_DATASET_DEPTH", "AIBOM_DATASET_MAX_LOOKUPS")}
+os.environ["AIBOM_DATASET_DEPTH"] = "0"
+os.environ["AIBOM_DATASET_MAX_LOOKUPS"] = "5; rm -rf /"
+captured.clear()
+rc = server.run_sibling_scan(
+    "ghcr.io/sktelecom/bomlens-aibom:1.5.0", "AIBOM", run_out,
+    lambda ln: None, model_id="openai/clip",
+)
+assert rc == 0, rc
+assert "AIBOM_DATASET_DEPTH=0" in captured["args"], captured["args"]
+assert not any(a.startswith("AIBOM_DATASET_MAX_LOOKUPS") for a in captured["args"]), captured["args"]
+for _k, _v in _saved_ds.items():
+    if _v is None:
+        os.environ.pop(_k, None)
+    else:
+        os.environ[_k] = _v
+
 # CONFORMANCE_PROFILE reaches the deep-cve sibling ANALYZE runs on when the base
 # image lacks grype: a missed forward would silently re-grade a submission
 # under review against the wrong thresholds. Forwarded only as one of the two
@@ -989,6 +1008,154 @@ assert any(f['name'].endswith('_bom.spdx.json') for f in d['results']), d
 else
     fail "/spdx-export idempotent case failed" "$spdx_body"
 fi
+
+echo "== SPDX 3.0.1 AI document and the publisher's declaration =="
+# The document is written from the finished CycloneDX BOM plus a declaration the
+# UI saves after the scan. A saved declaration is checked against the scan
+# first (422 with the reasons when refused), and the document is rebuilt only
+# when the BOM or the declaration is newer than it.
+FIX3="$ROOT_DIR/tests/fixtures/spdx3"
+mkdir -p "$OUT/aidecl_1.0" "$OUT/plain_1.0"
+cp "$FIX3/bom-ai-sample.json" "$OUT/aidecl_1.0/aidecl_1.0_bom.json"
+echo '{"bomFormat":"CycloneDX","specVersion":"1.7","components":[{"type":"library","name":"x"}]}' > "$OUT/plain_1.0/plain_1.0_bom.json"
+code=$(curl -s -o /dev/null -w '%{http_code}' "$BASE/spdx3-export?id=../etc")
+[ "$code" = "400" ] && pass "/spdx3-export rejects a traversal id (400)" || fail "/spdx3-export bad id returned $code"
+code=$(curl -s -o /dev/null -w '%{http_code}' "$BASE/spdx3-export?id=no_such_scan")
+[ "$code" = "404" ] && pass "/spdx3-export 404s a scan with no BOM" || fail "/spdx3-export missing scan returned $code"
+code=$(curl -s -o /dev/null -w '%{http_code}' "$BASE/spdx3-export?id=plain_1.0")
+[ "$code" = "409" ] && pass "/spdx3-export refuses a scan with no model or dataset (409)" || fail "/spdx3-export non-AI scan returned $code"
+code=$(curl -s -o /dev/null -w '%{http_code}' -H "Origin: http://evil.example" "$BASE/spdx3-export?id=aidecl_1.0")
+[ "$code" = "403" ] && pass "/spdx3-export checks the Origin (403)" || fail "/spdx3-export cross-site returned $code"
+body=$(curl -fsS "$BASE/spdx3-export?id=aidecl_1.0" 2>/dev/null)
+if echo "$body" | python3 -c "
+import sys, json
+d = json.load(sys.stdin)
+assert d['name'] == 'aidecl_1.0_bom.spdx3.json', d
+names = {f['name'] for f in d['results']}
+assert {'aidecl_1.0_bom.spdx3.json', 'aidecl_1.0_spdx3-check.json', 'aidecl_1.0_spdx3-check.md'} <= names, names
+assert d['spdx3']['draft'] is True and d['spdx3']['counts']['missingRequired'] > 0, d['spdx3']
+" 2>/dev/null; then pass "/spdx3-export writes the document and its check, a draft without a declaration"
+else fail "/spdx3-export first write" "$body"; fi
+m1=$(python3 -c "import os,sys;print(os.stat(sys.argv[1]).st_mtime_ns)" "$OUT/aidecl_1.0/aidecl_1.0_bom.spdx3.json")
+curl -fsS "$BASE/spdx3-export?id=aidecl_1.0" >/dev/null 2>&1
+m2=$(python3 -c "import os,sys;print(os.stat(sys.argv[1]).st_mtime_ns)" "$OUT/aidecl_1.0/aidecl_1.0_bom.spdx3.json")
+[ "$m1" = "$m2" ] && pass "/spdx3-export does not rebuild an up-to-date document" || fail "/spdx3-export rebuilt without a change"
+
+post_decl() { curl -s -o "${2:-/dev/null}" -w '%{http_code}' -X POST -H "Content-Type: application/json" --data-binary "$1" "$BASE/ai-declaration?id=${3:-aidecl_1.0}"; }
+[ "$(post_decl '{}' /dev/null '../../etc')" = "400" ] && pass "/ai-declaration blocks a traversal id (400)" || fail "traversal id on /ai-declaration"
+[ "$(post_decl '{"schema":"bomlens-ai-declaration/1","model":{"license":"my own terms"}}' "$WORK/decl-bad.json")" = "422" ] \
+    && python3 -c "import json,sys; r=json.load(open(sys.argv[1]))['reasons']; assert any('license' in x for x in r), r" "$WORK/decl-bad.json" 2>/dev/null \
+    && pass "/ai-declaration refuses a value it cannot take, with the reason (422)" || fail "bad value on /ai-declaration" "$(cat "$WORK/decl-bad.json" 2>/dev/null)"
+[ ! -f "$OUT/aidecl_1.0/aidecl_1.0_ai-declaration.json" ] && pass "a refused declaration is not saved" || fail "a refused declaration was saved"
+python3 -c "print('{\"pad\":\"' + 'x' * 1100000 + '\"}')" > "$WORK/big-decl.json"
+big=$(curl -s -o /dev/null -w '%{http_code}' -X POST -H "Content-Type: application/json" --data-binary "@$WORK/big-decl.json" "$BASE/ai-declaration?id=aidecl_1.0")
+[ "$big" = "413" ] && pass "/ai-declaration rejects a body over the size cap (413)" || fail "oversized declaration returned $big"
+cross=$(curl -s -o /dev/null -w '%{http_code}' -X POST -H "Origin: http://evil.example" -H "Content-Type: application/json" -d '{}' "$BASE/ai-declaration?id=aidecl_1.0")
+[ "$cross" = "403" ] && pass "a cross-site Origin on /ai-declaration is rejected (403)" || fail "cross-site /ai-declaration returned $cross"
+code=$(post_decl "$(cat "$FIX3/declaration-complete.json")" "$WORK/decl-ok.json")
+if [ "$code" = "200" ] && python3 -c "
+import json, sys
+d = json.load(open(sys.argv[1]))
+assert d['spdx3']['draft'] is False, d['spdx3']
+assert any(f['name'] == 'aidecl_1.0_ai-declaration.json' for f in d['results']), d['results']
+" "$WORK/decl-ok.json" 2>/dev/null; then pass "/ai-declaration saves a valid declaration and the document is no longer a draft"
+else fail "/ai-declaration valid save returned $code" "$(cat "$WORK/decl-ok.json" 2>/dev/null)"; fi
+python3 -c "import json,sys; assert json.load(open(sys.argv[1])) == json.load(open(sys.argv[2]))" "$FIX3/declaration-complete.json" "$OUT/aidecl_1.0/aidecl_1.0_ai-declaration.json" 2>/dev/null \
+    && pass "the declaration is saved as sent" || fail "the saved declaration differs from the request"
+detail=$(curl -fsS "$BASE/scan?id=aidecl_1.0" 2>/dev/null)
+echo "$detail" | python3 -c "import json,sys; d=json.load(sys.stdin); assert d['spdx3']['draft'] is False and d['spdx3']['name']=='aidecl_1.0_bom.spdx3.json' and d['spdx3']['upToDate'] is True, d.get('spdx3')" 2>/dev/null \
+    && pass "/scan carries the SPDX 3.0.1 summary, up to date after a save" || fail "/scan spdx3 summary" "$(echo "$detail" | head -c 300)"
+tpl=$(curl -fsS "$BASE/ai-declaration-template?id=aidecl_1.0" 2>/dev/null)
+{ echo "$tpl" | python3 -c "import json,sys; d=json.load(sys.stdin); assert d['name']=='aidecl_1.0_ai-declaration.template.json'" 2>/dev/null \
+  && [ -f "$OUT/aidecl_1.0/aidecl_1.0_ai-declaration.template.json" ]; } && pass "/ai-declaration-template writes the empty declaration" || fail "/ai-declaration-template" "$tpl"
+map=$(curl -fsS "$BASE/spdx3-map" 2>/dev/null)
+echo "$map" | python3 -c "import json,sys; assert json.load(sys.stdin)['schema']=='bomlens-spdx3-ai-map/1'" 2>/dev/null \
+    && pass "/spdx3-map serves the field mapping" || fail "/spdx3-map" "$(echo "$map" | head -c 200)"
+curl -fsS "$BASE/capabilities" 2>/dev/null | python3 -c "import json,sys; assert json.load(sys.stdin)['spdx3'] is True" 2>/dev/null \
+    && pass "/capabilities reports spdx3" || fail "/capabilities spdx3 missing"
+# The rest needs the server module itself: a running scan (_scan_active) and an
+# image without the converter (LIB_DIR) cannot be set up over HTTP.
+if SBOM_OUTPUT_DIR="$OUT" python3 - "$ROOT_DIR" "$FIX3/declaration-complete.json" "$WORK" <<'PY'
+import http.server, os, shutil, sys, threading, urllib.error, urllib.request
+sys.path.insert(0, os.path.join(sys.argv[1], "docker", "web"))
+import server
+httpd = http.server.ThreadingHTTPServer(("127.0.0.1", 0), server.Handler)
+threading.Thread(target=httpd.serve_forever, daemon=True).start()
+base = "http://127.0.0.1:%d" % httpd.server_address[1]
+def call(path, body=None):
+    req = urllib.request.Request(base + path, data=body, method="POST" if body is not None else "GET",
+                                 headers={"Content-Type": "application/json"})
+    try:
+        with urllib.request.urlopen(req, timeout=60) as r:
+            return r.status
+    except urllib.error.HTTPError as e:
+        return e.code
+decl = os.path.join(os.environ["SBOM_OUTPUT_DIR"], "aidecl_1.0", "aidecl_1.0_ai-declaration.json")
+kept = open(decl, "rb").read()
+server._scan_active.add("aidecl_1.0")
+try:
+    body = b'{"schema":"bomlens-ai-declaration/1"}'
+    assert call("/ai-declaration?id=aidecl_1.0", body) == 409
+    assert open(decl, "rb").read() == kept, "a refused save changed the kept declaration"
+    assert call("/spdx3-export?id=aidecl_1.0") == 409
+    assert call("/ai-declaration-template?id=aidecl_1.0") == 409
+finally:
+    server._scan_active.discard("aidecl_1.0")
+# An image without the converter: 503, and the capability says so.
+empty = os.path.join(sys.argv[3], "emptylib"); os.makedirs(empty, exist_ok=True)
+server.LIB_DIR = empty
+assert server.spdx3_usable() is False
+assert call("/spdx3-export?id=aidecl_1.0") == 503
+assert call("/ai-declaration?id=aidecl_1.0", b"{}") == 503
+httpd.shutdown()
+PY
+then pass "a running scan's folder is left alone (409) and an image without the converter answers 503"
+else fail "running-scan or no-converter handling"; fi
+tmp_left=$(find "$OUT/aidecl_1.0" -name '*.tmp' | head -1)
+[ -z "$tmp_left" ] && pass "no temporary file is left after a refused or accepted save" || fail "a temporary file was left in the run folder: $tmp_left"
+code=$(curl -s -o /dev/null -w '%{http_code}' -H "Origin: http://evil.example" "$BASE/ai-declaration-template?id=aidecl_1.0")
+[ "$code" = "403" ] && pass "/ai-declaration-template checks the Origin (403)" || fail "/ai-declaration-template cross-site returned $code"
+code=$(curl -s -o /dev/null -w '%{http_code}' "$BASE/ai-declaration-template?id=plain_1.0")
+[ "$code" = "409" ] && pass "/ai-declaration-template refuses a scan with no model or dataset (409)" || fail "/ai-declaration-template non-AI returned $code"
+mkdir -p "$OUT/broken_1.0"; echo '{not json' > "$OUT/broken_1.0/broken_1.0_bom.json"
+code=$(curl -s -o /dev/null -w '%{http_code}' "$BASE/spdx3-export?id=broken_1.0")
+[ "$code" = "500" ] && pass "a converter fault is a 500, not 'no AI model'" || fail "/spdx3-export broken SBOM returned $code"
+
+# Staleness is by content: a deleted declaration, or one restored with an old
+# modification time, still changes the document.
+spdx3_state() { curl -fsS "$BASE/spdx3-export?id=aidecl_1.0" 2>/dev/null | python3 -c "import json,sys; d=json.load(sys.stdin)['spdx3']; print(d['draft'], d['declaration']['state'])"; }
+cp "$OUT/aidecl_1.0/aidecl_1.0_ai-declaration.json" "$WORK/kept-decl.json"
+rm -f "$OUT/aidecl_1.0/aidecl_1.0_ai-declaration.json"
+curl -fsS "$BASE/scan?id=aidecl_1.0" 2>/dev/null | python3 -c "import json,sys; assert json.load(sys.stdin)['spdx3']['upToDate'] is False" 2>/dev/null \
+    && pass "/scan says the document is behind a declaration changed outside the screens" || fail "upToDate not false after the declaration changed"
+[ "$(spdx3_state)" = "True none" ] && pass "deleting the declaration rebuilds the document as a draft" || fail "deleted declaration not noticed: $(spdx3_state)"
+cp "$WORK/kept-decl.json" "$OUT/aidecl_1.0/aidecl_1.0_ai-declaration.json"
+touch -t 200001010000 "$OUT/aidecl_1.0/aidecl_1.0_ai-declaration.json"
+[ "$(spdx3_state)" = "False applied" ] && pass "a declaration restored with an old modification time is applied" || fail "old-mtime declaration ignored: $(spdx3_state)"
+# A kept declaration the scan no longer matches: the document is written without
+# it, and the refusal keeps being reported on later calls.
+python3 -c "
+import json, sys
+d = json.load(open(sys.argv[1])); d['model']['license'] = 'my own terms'
+json.dump(d, open(sys.argv[1], 'w'))" "$OUT/aidecl_1.0/aidecl_1.0_ai-declaration.json"
+r1=$(curl -fsS "$BASE/spdx3-export?id=aidecl_1.0" 2>/dev/null)
+r2=$(curl -fsS "$BASE/spdx3-export?id=aidecl_1.0" 2>/dev/null)
+for r in "$r1" "$r2"; do echo "$r" | python3 -c "
+import json, sys
+d = json.load(sys.stdin)['spdx3']
+assert d['draft'] is True and d['declaration']['state'] == 'refused', d
+assert any('license' in x for x in d['declaration']['reasons']), d
+"; done 2>/dev/null && pass "a kept declaration that no longer fits is reported refused, on every call" || fail "refusal not reported" "$r2"
+# A signature over the earlier document no longer verifies once it changes.
+cp "$WORK/kept-decl.json" "$WORK/resave.json"
+echo sig > "$OUT/aidecl_1.0/aidecl_1.0_bom.spdx3.json.sig"
+code=$(curl -s -o /dev/null -w '%{http_code}' -X POST -H "Content-Type: application/json" --data-binary "@$WORK/resave.json" "$BASE/ai-declaration?id=aidecl_1.0")
+{ [ "$code" = "200" ] && [ ! -f "$OUT/aidecl_1.0/aidecl_1.0_bom.spdx3.json.sig" ]; } \
+    && pass "rewriting the document removes the signature made over the earlier one" || fail "stale signature kept (code $code)"
+# A project named only in Korean gets the prefix "_1.0".
+mkdir -p "$OUT/_1.0"; cp "$FIX3/bom-ai-sample.json" "$OUT/_1.0/_1.0_bom.json"
+code=$(curl -s -o /dev/null -w '%{http_code}' "$BASE/spdx3-export?id=_1.0")
+{ [ "$code" = "200" ] && [ -f "$OUT/_1.0/_1.0_bom.spdx3.json" ]; } && pass "a scan whose prefix starts with _ gets its document" || fail "_1.0 export returned $code"
 
 if SBOM_OUTPUT_DIR="$OUT" python3 - "$ROOT_DIR" <<'PY'
 import sys, os
@@ -3306,6 +3473,8 @@ echo "[stub] scanning ${PROJECT_NAME} ${PROJECT_VERSION} (mode=$mode)"
   echo "TARGET_DIR=${TARGET_DIR:-}"
   echo "ANALYZE_SBOM=${ANALYZE_SBOM:-}"
   echo "YOCTO_BUILD_DIR=${YOCTO_BUILD_DIR:-}"
+  echo "DATASET_REF=${DATASET_REF:-}"
+  echo "AI_DECLARATION_FILE=${AI_DECLARATION_FILE:-}"
   # Counted here, while the scan is running: an extracted upload tree is removed
   # once the scan finishes, so a later check would always find it empty.
   echo "TARGET_DIR_FILES=$([ -n "${TARGET_DIR:-}" ] && find "$TARGET_DIR" -type f 2>/dev/null | wc -l | tr -d ' ' || echo 0)"; } > "${STUB_ENV_FILE:-/dev/null}"
@@ -3450,6 +3619,8 @@ assert d['mode'] == 'SOURCE', d['mode']
 assert any(r['name'] == 'demo_1.0_bom.json' for r in d['results']), d['results']
 assert d['sbom'] and d['sbom'].get('components') == 2, d.get('sbom')
 assert d['scanConfig']['source'] == 'current-dir', d['scanConfig']
+# Not an AI scan: the key is there (the frontend reads it) and empty.
+assert 'spdx3' in d and d['spdx3'] is None, d.get('spdx3')
 assert evs[-1]['event'] == 'done', 'done is not the terminal event'
 "; then
     pass "happy path: log events then a single terminal done (ok, id, results, sbom, scanConfig)"
@@ -4057,6 +4228,75 @@ else
     fail "done id is not the timestamped run id" "$events"
 fi
 
+echo "== a model described from its declaration alone (source=ai-declare) =="
+# The declaration is uploaded (kind=declaration), checked against the SBOM it
+# would produce before the scan starts, and handed to the scanner as
+# AI_DECLARATION_FILE with MODE=AIDECLARE. No Docker: this server has none.
+echo ok > "$STUB_MODE_FILE"
+FIX3D="$ROOT_DIR/tests/fixtures/spdx3"
+echo "not a declaration" > "$WORK/decl.txt"
+c=$(curl -s -o /dev/null -w '%{http_code}' -F "kind=declaration" -F "file=@$WORK/decl.txt" "$BASE2/upload?kind=declaration")
+[ "$c" = "415" ] && pass "a declaration upload takes .json only (415)" || fail "declaration upload accepted a non-JSON file ($c)"
+# This server runs without the library: the input is unavailable, not refused.
+dtoken=$(curl -fsS -F "kind=declaration" -F "file=@$FIX3D/declaration-complete.json" "$BASE2/upload?kind=declaration" 2>/dev/null \
+         | python3 -c "import sys,json;print(json.load(sys.stdin).get('token',''))" 2>/dev/null)
+rm -f "$WORK/stub-env"
+sse_events "project=decl&version=1.0&source=ai-declare&token=$dtoken" | grep -q "not available in this image" \
+    && [ ! -f "$WORK/stub-env" ] && pass "without the scripts the declaration input says it is unavailable" \
+    || fail "ai-declare without the library was not reported as unavailable"
+curl -fsS "$BASE2/capabilities" | python3 -c "import json,sys; assert json.load(sys.stdin)['aiDeclare'] is False" 2>/dev/null \
+    && pass "/capabilities reports aiDeclare false without the scripts" || fail "aiDeclare capability"
+# A third server with the library, same stub scanner.
+PORT3=$((PORT + 2)); BASE3="http://127.0.0.1:${PORT3}"; OUT3="$WORK/out3"; mkdir -p "$OUT3"
+SBOM_OUTPUT_DIR="$OUT3" UI_PORT="$PORT3" SBOM_RUN_SCAN="$WORK/bin/run-scan" SBOM_DOCKER_SOCK="$WORK/no-such.sock" \
+    STUB_MODE_FILE="$STUB_MODE_FILE" STUB_HEARTBEAT="$STUB_HEARTBEAT" STUB_ENV_FILE="$WORK/stub-env" \
+    python3 "$SERVER" > "$WORK/server3.log" 2>&1 &
+SRV3_PID=$!
+trap 'kill "$SRV3_PID" 2>/dev/null; cleanup2; cleanup' EXIT
+for _ in $(seq 1 30); do curl -fsS "$BASE3/capabilities" >/dev/null 2>&1 && break; sleep 0.3; done
+sse3() { curl -sN "$BASE3/scan-stream?$1"; }
+up3() { curl -fsS -F "kind=declaration" -F "file=@$1" "$BASE3/upload?kind=declaration" 2>/dev/null \
+        | python3 -c "import sys,json;print(json.load(sys.stdin).get('token',''))" 2>/dev/null; }
+rm -f "$WORK/stub-env"
+sse3 "project=decl&version=1.0&source=ai-declare&token=$(up3 "$FIX3D/declaration-complete.json")" >/dev/null
+if [ "$(sed -n 's/^MODE=//p' "$WORK/stub-env")" = "AIDECLARE" ] \
+   && grep -q '^AI_DECLARATION_FILE=.*declaration-complete\.json$' "$WORK/stub-env"; then
+    pass "source=ai-declare -> MODE=AIDECLARE with the uploaded declaration"
+else
+    fail "ai-declare did not route to AIDECLARE" "$(cat "$WORK/stub-env" 2>/dev/null; tail -3 "$WORK/server3.log")"
+fi
+echo '{"schema":"bomlens-ai-declaration/1","model":{"license":"my own terms"}}' > "$WORK/bad-decl.json"
+rm -f "$WORK/stub-env"
+events=$(sse3 "project=decl&version=1.0&source=ai-declare&token=$(up3 "$WORK/bad-decl.json")")
+if echo "$events" | grep -q "The AI declaration was refused" && echo "$events" | grep -q "license" \
+   && [ ! -f "$WORK/stub-env" ]; then
+    pass "a refused declaration is answered with its reasons before any scan"
+else
+    fail "a refused declaration reached the scanner" "$events"
+fi
+curl -fsS "$BASE3/capabilities" | python3 -c "import json,sys; assert json.load(sys.stdin)['aiDeclare'] is True" 2>/dev/null \
+    && pass "/capabilities reports aiDeclare with the scripts" || fail "aiDeclare capability true"
+# The same check, asked while the questions are still open.
+chk() { curl -s -o "$WORK/chk.out" -w '%{http_code}' -X POST -H "Content-Type: application/json" \
+        --data-binary "@$1" "$BASE3/ai-declaration-check?$2"; }
+[ "$(chk "$FIX3D/declaration-complete.json" "project=decl&version=1.0")" = "200" ] \
+    && pass "/ai-declaration-check accepts a declaration that fits" || fail "/ai-declaration-check valid" "$(cat "$WORK/chk.out")"
+[ "$(chk "$WORK/bad-decl.json" "project=decl&version=1.0")" = "422" ] \
+    && python3 -c "import json,sys; r=json.load(open(sys.argv[1]))['reasons']; assert any('license' in x for x in r), r" "$WORK/chk.out" 2>/dev/null \
+    && pass "/ai-declaration-check answers 422 with the reasons" || fail "/ai-declaration-check refused" "$(cat "$WORK/chk.out")"
+echo '{"model":{"baseModels":5}}' > "$WORK/odd-decl.json"
+[ "$(chk "$WORK/odd-decl.json" "project=decl&version=1.0")" = "422" ] \
+    && grep -q "expected a list" "$WORK/chk.out" && ! grep -q "Traceback\|TypeError" "$WORK/chk.out" \
+    && pass "a malformed declaration is refused with a reason, never a traceback" || fail "odd declaration" "$(cat "$WORK/chk.out")"
+[ "$(chk "$FIX3D/declaration-complete.json" "project=&version=1.0")" = "400" ] \
+    && pass "/ai-declaration-check needs a project and version" || fail "/ai-declaration-check without project"
+[ "$(curl -s -o /dev/null -w '%{http_code}' -X POST -H "Origin: http://evil.example" -H "Content-Type: application/json" -d '{}' "$BASE3/ai-declaration-check?project=a&version=1")" = "403" ] \
+    && pass "/ai-declaration-check checks the Origin (403)" || fail "/ai-declaration-check cross-site"
+code=$(curl -s -o /dev/null -w '%{http_code}' -X POST -H "Content-Type: application/json" --data-binary "@$FIX3D/declaration-complete.json" "$BASE2/ai-declaration-check?project=a&version=1")
+[ "$code" = "503" ] && pass "/ai-declaration-check without the scripts is 503" || fail "/ai-declaration-check no lib returned $code"
+kill "$SRV3_PID" 2>/dev/null
+trap 'cleanup2; cleanup' EXIT
+
 echo "== model upload: the file is read where it lies, as MODELFILE =="
 # The one AI input that needs no image and no network: the scan runs in this
 # container, so the mode has to arrive with the uploaded file's own path.
@@ -4336,6 +4576,34 @@ if [ -z "$(sed -n 's/^API_KEY=//p' "$WORK/stub-env")" ] \
     pass "upload credId is single-use (reuse carries no token, upload stays off)"
 else
     fail "upload credId was reusable (token leaked to a second scan)" "$(cat "$WORK/stub-env")"
+fi
+
+echo "== a HuggingFace dataset in the AI-model field runs as DATASET here =="
+# A dataset id has the model id's owner/name form, so the address or the
+# "datasets/" prefix tells them apart, as in scan-sbom.sh. It needs neither
+# Docker nor the AI image: this server has neither and the scan still starts.
+echo ok > "$STUB_MODE_FILE"
+for pair in "datasets%2Fallenai%2Ftulu-3-sft-mixture|hf:allenai/tulu-3-sft-mixture" \
+            "https%3A%2F%2Fhuggingface.co%2Fdatasets%2Forg%2Fds%2Ftree%2Fmain|hf:org/ds" \
+            "huggingface.co%2Fdatasets%2Forg%2Fds|hf:org/ds" \
+            "hf%3Aorg%2Fds|hf:org/ds" \
+            "datasets%2Fsquad|hf:squad"; do
+    q="${pair%%|*}"; want="${pair##*|}"
+    rm -f "$WORK/stub-env"
+    sse_events "project=hfds&version=1.0&source=ai-model&target=$q" >/dev/null
+    if [ "$(sed -n 's/^MODE=//p' "$WORK/stub-env")" = "DATASET" ] \
+       && [ "$(sed -n 's/^DATASET_REF=//p' "$WORK/stub-env")" = "$want" ]; then
+        pass "source=ai-model with $want runs as DATASET (no Docker needed)"
+    else
+        fail "dataset reference not routed: $q" "$(cat "$WORK/stub-env" 2>/dev/null)"
+    fi
+done
+rm -f "$WORK/stub-env"
+events=$(sse_events "project=hfds&version=1.0&source=ai-model&target=datasets%2F..%2Fetc")
+if echo "$events" | grep -q "Unsupported HuggingFace dataset reference" && [ ! -f "$WORK/stub-env" ]; then
+    pass "a malformed dataset reference is refused before any scan"
+else
+    fail "malformed dataset reference was not refused" "$events"
 fi
 
 echo "== AI usage scenario param (usage= -> AI_USAGE_CONTEXT) =="

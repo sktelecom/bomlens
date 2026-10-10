@@ -89,6 +89,19 @@ export interface DatasetRef {
   hasIntegrity: boolean;
   /** Upstream datasets this one derives from, as the card declares them. */
   sources: string[];
+  /** The component's bom-ref, which the source links below point at. */
+  ref?: string;
+  /** How far below the model card this dataset was reached: 0 is a dataset the
+   *  card names, 1 and deeper are sources traced from it. Absent when the
+   *  pipeline did not trace sources. */
+  depth?: number;
+  /** Sources the pipeline read and linked (`bomlens:dataset:derivedFrom`). */
+  derivedFrom: { relation: string; ref: string }[];
+  /** Sources the card names in words rather than as a dataset id: kept verbatim
+   *  and never looked up, so a person has to check them. */
+  unverifiedSources: string[];
+  /** Why the walk stopped at this dataset, when it did ("depth-limit", "cycle"). */
+  trace?: string;
   /** The repository the pipeline read this dataset from ("huggingface",
    *  "figshare"). Absent for a dataset a model card only named. */
   collectedBy?: string;
@@ -240,6 +253,8 @@ function readDatasets(modelParameters: Obj): DatasetRef[] {
       licenses: [],
       hasIntegrity: false,
       sources: [],
+      derivedFrom: [],
+      unverifiedSources: [],
       unresolved: false,
     });
   }
@@ -257,8 +272,20 @@ function readDataComponent(c: Obj): DatasetRef | null {
   const { one, all } = propReader(c);
   const cdata = arr(c.data).map((d) => obj(d))[0] ?? {};
   const refs = arr(c.externalReferences).map((r) => obj(r));
+  const depth = Number.parseInt(one("bomlens:dataset:depth") ?? "", 10);
+  const derivedFrom = all("bomlens:dataset:derivedFrom")
+    .map((v) => {
+      const cut = v.indexOf(" ");
+      return cut > 0 ? { relation: v.slice(0, cut), ref: v.slice(cut + 1) } : null;
+    })
+    .filter((d): d is { relation: string; ref: string } => d !== null);
   return {
     name,
+    ref: str(c["bom-ref"]),
+    depth: Number.isNaN(depth) ? undefined : depth,
+    derivedFrom,
+    unverifiedSources: all("bomlens:dataset:sourceDataset:unverified"),
+    trace: one("bomlens:dataset:sourceTrace"),
     url: str(obj(cdata.contents).url) ?? str(refs.map((r) => str(r.url)).find(Boolean)),
     version: str(c.version),
     licenses: readLicenses(c.licenses),
@@ -327,6 +354,54 @@ function parseModel(component: Obj): ModelCard {
       trainingProcess: limitations.length > 0,
     },
   };
+}
+
+/** One row of the datasets table: a dataset and how far it is indented under
+ *  the dataset it was traced from. */
+export interface DatasetRow {
+  dataset: DatasetRef;
+  level: number;
+  /** How the row above it names this one ("extended", "listed"); root rows have none. */
+  relation?: string;
+  /** This dataset already has its full row further up (a source two datasets
+   *  share, or one that leads back up a cycle): shown here by name only. */
+  repeat?: boolean;
+}
+
+/**
+ * Order datasets as a tree: each dataset the card names, then the sources
+ * traced from it, indented beneath it. A dataset gets its full row once, under
+ * the first dataset that reaches it; every later mention (a shared source, or a
+ * link back up a cycle) is a short row marked as a repeat, which never expands
+ * again. So every source a dataset names has a row under it, and the table
+ * stays as long as the graph has links, however densely they connect.
+ * Datasets nobody links to keep their original order.
+ */
+export function datasetTreeRows(datasets: DatasetRef[]): DatasetRow[] {
+  const byRef = new Map<string, DatasetRef>();
+  for (const d of datasets) if (d.ref) byRef.set(d.ref, d);
+  const linked = new Set<string>();
+  for (const d of datasets) for (const s of d.derivedFrom) linked.add(s.ref);
+  const shown = new Set<DatasetRef>();
+  const rows: DatasetRow[] = [];
+  const visit = (d: DatasetRef, level: number, relation?: string) => {
+    if (shown.has(d)) {
+      if (level > 0) rows.push({ dataset: d, level, relation, repeat: true });
+      return;
+    }
+    shown.add(d);
+    rows.push({ dataset: d, level, relation });
+    for (const s of d.derivedFrom) {
+      const child = byRef.get(s.ref);
+      if (child) visit(child, level + 1, s.relation);
+    }
+  };
+  for (const d of datasets) {
+    const isRoot = d.depth === undefined ? !(d.ref && linked.has(d.ref)) : d.depth === 0;
+    if (isRoot) visit(d, 0);
+  }
+  for (const d of datasets) visit(d, 0);
+  return rows;
 }
 
 /** Extract model cards and the datasets they reference from a raw SBOM. */

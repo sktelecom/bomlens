@@ -96,6 +96,28 @@ jobs:
           SBOM_ANDROID_IMAGE: ghcr.io/sktelecom/bomlens-android-sdk34:latest
         run: bash tests/test-android-scope.sh
 
+  # The SPDX 3.0.1 AI documents against the official validator (SHACL model and
+  # JSON schema). It is a third-party package from PyPI, so it runs here with
+  # hash-pinned dependencies rather than in every PR; the PR tests check the
+  # same documents against the JSON schema.
+  spdx3-official:
+    name: SPDX 3.0.1 official validation
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - name: Install the validator (hash-pinned)
+        run: |
+          python3 -m venv "$RUNNER_TEMP/spdx3"
+          "$RUNNER_TEMP/spdx3/bin/pip" install --quiet --require-hashes -r tests/spdx3-validate-requirements.txt
+
+      - name: Validate the documents
+        run: SPDX3_VALIDATE="$RUNNER_TEMP/spdx3/bin/spdx3-validate" bash tests/test-spdx3-official.sh
+
   # External links rot on their own schedule, so they are checked here (with
   # retries and a cache) rather than on PRs — matching the split anticipated in
   # scripts/check-doc-links.sh, which covers internal links on every PR.
@@ -210,7 +232,7 @@ jobs:
             "ghcr.io/${{ github.repository_owner }}/${{ matrix.image }}:latest"
 
       - name: Upload results
-        uses: github/codeql-action/upload-sarif@6f5948dfacef28e207b48d0905cf90c03365536d # v3
+        uses: github/codeql-action/upload-sarif@faaca9a8f6edddba5725ffe5adefdab6669a2eca # v3
         with:
           sarif_file: "trivy-${{ matrix.image }}.sarif"
           category: "nightly-image-${{ matrix.image }}"
@@ -247,7 +269,7 @@ jobs:
             --skip-dirs examples --skip-dirs tests/test-workspace .
 
       - name: Upload results
-        uses: github/codeql-action/upload-sarif@6f5948dfacef28e207b48d0905cf90c03365536d # v3
+        uses: github/codeql-action/upload-sarif@faaca9a8f6edddba5725ffe5adefdab6669a2eca # v3
         with:
           sarif_file: trivy-deps.sarif
           category: nightly-deps
@@ -384,7 +406,7 @@ jobs:
   report-failure:
     name: Open issue on failure
     runs-on: ubuntu-latest
-    needs: [heavy-e2e, published-user-journey, android-scope, doc-links, desktop]
+    needs: [heavy-e2e, published-user-journey, android-scope, doc-links, desktop, spdx3-official]
     if: failure()
     permissions:
       contents: read
@@ -400,6 +422,7 @@ jobs:
           ANDROID: ${{ needs.android-scope.result }}
           LINKS: ${{ needs.doc-links.result }}
           DESKTOP: ${{ needs.desktop.result }}
+          SPDX3: ${{ needs.spdx3-official.result }}
         run: |
           title="Nightly checks are failing"
           body="Nightly run failed: ${RUN_URL}
@@ -408,6 +431,7 @@ jobs:
           - Android release scope: ${ANDROID}
           - External doc links: ${LINKS}
           - Desktop: ${DESKTOP}
+          - SPDX 3.0.1 official validation: ${SPDX3}
           (macOS real scan is best-effort and excluded from this alarm.)"
           num=$(gh issue list --repo "$REPO" --state open --search "in:title \"$title\"" \
                 --json number --jq '.[0].number // empty')

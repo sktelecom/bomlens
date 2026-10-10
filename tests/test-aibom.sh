@@ -27,6 +27,33 @@ fi
 WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
 
+# Datasets are read through docker/lib/hf_dataset.py, which serves a file://
+# base from <dir>/datasets/<id>.json and treats a missing file as the hub's 401.
+# Every dataset lookup in this file is offline because of this line; a section
+# that needs its own datasets writes them with mk_ds.
+HFAPI="$WORK/hfapi"
+mkdir -p "$HFAPI/datasets"
+export BOMLENS_HF_API_BASE="file://$HFAPI"
+mk_ds() {  # $1 = dataset id, $2 = REST answer as JSON
+    mkdir -p "$(dirname "$HFAPI/datasets/$1.json")"
+    printf '%s\n' "$2" > "$HFAPI/datasets/$1.json"
+}
+mk_ds org/open-ds '{"id":"org/open-ds","sha":"deadbeef1234567890","private":false,"gated":false,
+  "description":"A stub corpus.",
+  "siblings":[{"rfilename":"data/train.parquet","lfs":{"sha256":"'"$(printf 'b%.0s' $(seq 64))"'"}},{"rfilename":"README.md"}],
+  "cardData":{"license":"cc-by-sa-4.0","task_categories":["text-classification"],
+              "size_categories":["10K<n<100K"],"source_datasets":["extended|org/upstream"]}}'
+mk_ds org/upstream '{"id":"org/upstream","sha":"0badc0de00000000","private":false,"gated":false,
+  "siblings":[],"cardData":{"license":"cc-by-sa-4.0","source_datasets":["original"]}}'
+mk_ds org/pii-ds '{"id":"org/pii-ds","sha":"feedface12345678","private":false,"gated":false,
+  "tags":["pii","language:en"],
+  "siblings":[{"rfilename":"data.parquet","lfs":{"sha256":"'"$(printf 'b%.0s' $(seq 64))"'"}}],
+  "cardData":{"license":"cc-by-4.0"}}'
+mk_ds org/gated-ds '{"id":"org/gated-ds","sha":"0123456789abcdef","private":false,"gated":"manual",
+  "siblings":[],"cardData":{"license":"cc-by-4.0"}}'
+# Datasets the card names directly (depth 0), as opposed to the sources traced from them.
+ROOT_DS='select(.type=="data" and (((.properties // []) | map(select(.name=="bomlens:dataset:depth" and .value!="0")) | length) == 0))'
+
 echo "== fixture is a CycloneDX 1.7 AI SBOM with a model card =="
 cp "$FIX/aibom-owasp-1_7.json" "$WORK/a.json"
 spec=$(jq -r '.specVersion' "$WORK/a.json")
@@ -388,7 +415,7 @@ STUB
 cp "$FIX/aibom-owasp-1_7.json" "$WORK/enrich-ds.json"
 ENRICH_CDXGEN=false PYTHONPATH="$WORK/hfstub" \
     bash "$LIB/enrich-aibom.sh" "$WORK/enrich-ds.json" google-bert/bert-base-uncased >/dev/null 2>&1
-edn=$(jq '[.components[] | select(.type=="data")] | length' "$WORK/enrich-ds.json")
+edn=$(jq '[.components[] | '"$ROOT_DS"'] | length' "$WORK/enrich-ds.json")
 [ "$edn" -eq 2 ] && pass "both declared datasets become data components" || fail "data components=$edn, expected 2"
 edlic=$(jq -r '[.components[] | select(.name=="org/open-ds") | .licenses[]?.license.name] | join(",")' "$WORK/enrich-ds.json")
 [ "$edlic" = "cc-by-sa-4.0" ] && pass "the resolved dataset carries its declared license" || fail "resolved dataset license='$edlic'"
@@ -406,7 +433,7 @@ edauth=$(jq -r '[.components[] | select(.type=="data") | .authors[]?.name] | uni
 # Re-running must not append a second copy of anything.
 ENRICH_CDXGEN=false PYTHONPATH="$WORK/hfstub" \
     bash "$LIB/enrich-aibom.sh" "$WORK/enrich-ds.json" google-bert/bert-base-uncased >/dev/null 2>&1
-edn2=$(jq '[.components[] | select(.type=="data")] | length' "$WORK/enrich-ds.json")
+edn2=$(jq '[.components[] | '"$ROOT_DS"'] | length' "$WORK/enrich-ds.json")
 eddep2=$(jq '[.dependencies[] | select(.ref|startswith("pkg:huggingface")) | .dependsOn[]] | length' "$WORK/enrich-ds.json")
 { [ "$edn2" -eq 2 ] && [ "$eddep2" -eq 2 ]; } && pass "enriching twice is idempotent" || fail "after re-run: components=$edn2 edges=$eddep2, expected 2/2"
 
@@ -935,6 +962,329 @@ ENRICH_CDXGEN=false PYTHONPATH="$WORK/hfstub" \
     bash "$LIB/enrich-aibom.sh" "$WORK/lin.json" acme/llama-finetune >/dev/null 2>&1
 [ "$(lprop bomlens:lineage:conflict)" = "" ] && pass "a correctly declared family license raises no conflict" || fail "conflict='$(lprop bomlens:lineage:conflict)' on the aligned case"
 
+echo "== enrichment keeps the repository facts a later step needs =="
+# Weight file names next to their digests, the gate kind, the revision time,
+# how the model relates to its base, a merge's other parents, the distributed
+# weights scope when the hub's signals agree, and a pedigree built from the
+# chain. The base model's current head revision is read by the walk and must
+# not be written anywhere: it is not the revision this model was trained from.
+mk_fact_stub() {  # $1 = tags (python list), $2 = files (python list of (name, sha)), $3 = library
+    cat > "$WORK/hfstub/huggingface_hub.py" <<STUB
+import datetime
+
+
+class _S:
+    def __init__(self, rfilename, sha=None):
+        self.rfilename = rfilename
+        self.lfs = {"sha256": sha} if sha else None
+
+
+class _Info:
+    def __init__(self, **kw):
+        self.__dict__.update(kw)
+
+
+MODEL = _Info(
+    siblings=[_S(n, s) for n, s in $2], gated="manual", private=False, tags=$1,
+    last_modified=datetime.datetime(2025, 4, 15, 9, 30, tzinfo=datetime.timezone.utc),
+    card_data={"license": "llama3", "base_model": ["org/base", "org/other"], "library_name": "$3"},
+)
+BASE = _Info(
+    siblings=[], gated=False, private=False, tags=[], sha="f00dfeed" * 5,
+    card_data={"license": "llama3", "base_model": None},
+)
+
+
+class HfApi:
+    def model_info(self, mid, files_metadata=False, securityStatus=False):
+        return BASE if mid == "org/base" else MODEL
+
+    def dataset_info(self, did, files_metadata=False):
+        raise RuntimeError("404 not found")
+STUB
+}
+fact_run() {
+    cp "$FIX/aibom-owasp-1_7.json" "$WORK/fact.json"
+    ENRICH_HF_SECURITY=false ENRICH_CDXGEN=false PYTHONPATH="$WORK/hfstub" \
+        bash "$LIB/enrich-aibom.sh" "$WORK/fact.json" acme/support-adapter >/dev/null 2>&1
+}
+fprop() { jq -r --arg n "$1" '[([.metadata.component // empty] + [.components[]?])[] | select(.type=="machine-learning-model") | .properties[]? | select(.name==$n) | .value] | join("|")' "$WORK/fact.json"; }
+fmodel() { jq -c '[([.metadata.component // empty] + [.components[]?])[] | select(.type=="machine-learning-model")] | first' "$WORK/fact.json"; }
+ADAPTER_SHA="$(printf 'c%.0s' $(seq 64))"
+mk_fact_stub '["base_model:adapter:org/base"]' "[(\"adapter_config.json\", None), (\"adapter_model.safetensors\", \"$ADAPTER_SHA\")]" peft
+fact_run
+[ "$(fprop bomlens:weights:file)" = "$ADAPTER_SHA  adapter_model.safetensors" ] && pass "each weight file keeps its name next to its digest" || fail "weights:file='$(fprop bomlens:weights:file)'"
+[ "$(fprop bomlens:hf:gated)" = "manual" ] && pass "the gate kind is recorded" || fail "hf:gated='$(fprop bomlens:hf:gated)'"
+case "$(fprop bomlens:hf:revisionTime)" in 2025-04-15T09:30:00*) pass "the revision time is recorded" ;; *) fail "revisionTime='$(fprop bomlens:hf:revisionTime)'" ;; esac
+mkdir -p "$WORK/cdx"; cp "$WORK/fact.json" "$WORK/cdx/enrich-facts.json"
+[ "$(fprop bomlens:lineage:relation)" = "adapter" ] && pass "the hub's relation to the base model is recorded" || fail "relation='$(fprop bomlens:lineage:relation)'"
+[ "$(fprop bomlens:lineage:otherParents)" = "org/other" ] && pass "a second base model is recorded, not dropped" || fail "otherParents='$(fprop bomlens:lineage:otherParents)'"
+[ "$(fprop bomlens:weights:scope)" = "adapter" ] && pass "agreeing signals give the adapter scope" || fail "weights:scope='$(fprop bomlens:weights:scope)'"
+anc=$(fmodel | jq -c '[.pedigree.ancestors[]? | {n:.name, p:.purl, l:([.licenses[]?.license.name]|join(",")), v:(.version // "")}]')
+[ "$anc" = '[{"n":"org/base","p":"pkg:huggingface/org/base","l":"llama3","v":""},{"n":"org/other","p":"pkg:huggingface/org/other","l":"","v":""}]' ] \
+    && pass "the pedigree lists both parents with no version" || fail "ancestors=$anc"
+if grep -q "f00dfeed" "$WORK/fact.json"; then
+    fail "the base model's current head revision leaked into the SBOM"
+else
+    pass "the base model's current head revision is written nowhere"
+fi
+fact_twice=$(cp "$WORK/fact.json" "$WORK/fact-1.json"; ENRICH_HF_SECURITY=false ENRICH_CDXGEN=false PYTHONPATH="$WORK/hfstub" \
+    bash "$LIB/enrich-aibom.sh" "$WORK/fact.json" acme/support-adapter >/dev/null 2>&1; diff <(jq -S . "$WORK/fact-1.json") <(jq -S . "$WORK/fact.json") >/dev/null && echo same)
+[ "$fact_twice" = "same" ] && pass "enriching twice leaves the facts unchanged" || fail "a second run changed the document"
+# Disagreeing signals: the tag says quantized, the files say adapter.
+mk_fact_stub '["base_model:quantized:org/base"]' "[(\"adapter_config.json\", None), (\"adapter_model.safetensors\", \"$ADAPTER_SHA\")]" ""
+fact_run
+{ [ -z "$(fprop bomlens:weights:scope)" ] && [ "$(fprop bomlens:weights:scopeSignals)" = "files:adapter, tag:quantized" ]; } \
+    && pass "disagreeing signals leave the scope unset and record why" || fail "scope='$(fprop bomlens:weights:scope)' signals='$(fprop bomlens:weights:scopeSignals)'"
+# A fine-tune that ships full weights.
+mk_fact_stub '["base_model:finetune:org/base"]' "[(\"model.safetensors\", \"$ADAPTER_SHA\"), (\"config.json\", None)]" transformers
+fact_run
+[ "$(fprop bomlens:weights:scope)" = "full" ] && pass "a fine-tune shipping full weights reads full" || fail "weights:scope='$(fprop bomlens:weights:scope)'"
+# No relation tag and nothing else: no scope is guessed.
+mk_fact_stub '[]' "[(\"model.safetensors\", \"$ADAPTER_SHA\")]" transformers
+fact_run
+{ [ -z "$(fprop bomlens:weights:scope)" ] && [ -z "$(fprop bomlens:lineage:relation)" ]; } \
+    && pass "without a signal neither the scope nor the relation is guessed" || fail "scope='$(fprop bomlens:weights:scope)' relation='$(fprop bomlens:lineage:relation)'"
+
+echo "== a dataset's sources are read and judged with it =="
+# A dataset card can name the datasets it was built from. They are read like
+# the dataset itself, within a depth and a lookup budget, linked to it through
+# dependencies[], and their terms reach the dataset's verdict and the model's.
+# Only something shaped like a hub id is looked up; any other wording is kept
+# and marked for review. Each scenario gets its own offline hub directory.
+cat > "$WORK/hfstub/huggingface_hub.py" <<'STUB'
+import json, os
+
+
+class _Info:
+    def __init__(self, **kw):
+        self.__dict__.update(kw)
+
+
+class HfApi:
+    def model_info(self, mid, files_metadata=False, securityStatus=False):
+        return _Info(siblings=[], gated=False, private=False, tags=[],
+                     card_data={"datasets": json.loads(os.environ["STUB_DATASETS"]),
+                                "license": "apache-2.0"})
+
+    def dataset_info(self, did, files_metadata=False):
+        raise AssertionError("datasets are read through hf_dataset.py, not huggingface_hub")
+STUB
+SRC=""
+src_hub() {  # fresh hub directory for one scenario
+    SRC="$WORK/srchub-$1"; rm -rf "$SRC"; mkdir -p "$SRC/datasets"
+}
+src_ds() {  # $1 id, $2 license, $3 source_datasets JSON list, [$4 canonical id]
+    mkdir -p "$(dirname "$SRC/datasets/$1.json")"
+    jq -n --arg id "${4:-$1}" --arg lic "$2" --argjson src "$3" \
+        '{id:$id, sha:"5eed5eed00000000", private:false, gated:false, siblings:[],
+          cardData:({license:$lic} + (if ($src|length)>0 then {source_datasets:$src} else {} end))}' \
+        > "$SRC/datasets/$1.json"
+}
+src_run() {  # $1 datasets JSON list, then extra env assignments
+    local ds="$1"; shift
+    cp "$FIX/aibom-owasp-1_7.json" "$WORK/src.json"
+    rm -f "$SRC/calls.log"
+    env "$@" STUB_DATASETS="$ds" BOMLENS_HF_API_BASE="file://$SRC" ENRICH_HF_SECURITY=false \
+        ENRICH_CDXGEN=false PYTHONPATH="$WORK/hfstub" \
+        bash "$LIB/enrich-aibom.sh" "$WORK/src.json" acme/model >/dev/null 2>"$WORK/src.err"
+}
+sprop() { jq -r --arg c "$1" --arg n "$2" '[.components[] | select(.name==$c) | .properties[]? | select(.name==$n) | .value] | join("|")' "$WORK/src.json"; }
+sdeps() { jq -r --arg r "dataset:huggingface/$1" '[.dependencies[] | select(.ref==$r) | .dependsOn[]] | join(",")' "$WORK/src.json"; }
+smodel_deps() { jq -r '[.metadata.component["bom-ref"]] as $m | [.dependencies[] | select(.ref==$m[0]) | .dependsOn[]] | join(",")' "$WORK/src.json"; }
+sdata() { jq '[.components[] | select(.type=="data")] | length' "$WORK/src.json"; }
+
+# A mixture whose source carries a non-commercial licence.
+src_hub ref
+src_ds org/mix odc-by '["extended|org/nc"]'
+src_ds org/nc cc-by-nc-4.0 '["original"]'
+src_run '["org/mix"]'
+cp "$WORK/src.json" "$WORK/cdx/enrich-sources.json"
+{ [ "$(sdata)" -eq 2 ] && [ "$(sdeps org/mix)" = "dataset:huggingface/org/nc" ]; } \
+    && pass "a referenced source becomes a component linked from its dataset" || fail "data=$(sdata) mix->'$(sdeps org/mix)'"
+[ "$(sprop org/mix bomlens:dataset:derivedFrom)" = "extended dataset:huggingface/org/nc" ] && pass "the dataset records what it was derived from and how" || fail "derivedFrom='$(sprop org/mix bomlens:dataset:derivedFrom)'"
+{ [ "$(sprop org/nc bomlens:dataset:depth)" = "1" ] && [ "$(sprop org/nc bomlens:dataset:sourceDataset)" = "original" ]; } \
+    && pass "the source carries its depth and its own declaration" || fail "nc depth='$(sprop org/nc bomlens:dataset:depth)' src='$(sprop org/nc bomlens:dataset:sourceDataset)'"
+[ "$(smodel_deps)" = "dataset:huggingface/org/mix" ] && pass "the model depends only on the dataset its card names" || fail "model dependsOn='$(smodel_deps)'"
+bash "$LIB/assess-ai-risk.sh" "$WORK/src.json" >/dev/null 2>&1
+{ [ "$(sprop org/mix bomlens:assessment:sources)" = "caution" ] && [ "$(sprop org/mix bomlens:assessment:overall)" = "caution" ]; } \
+    && pass "the source's non-commercial terms reach the dataset verdict" || fail "mix sources='$(sprop org/mix bomlens:assessment:sources)' overall='$(sprop org/mix bomlens:assessment:overall)'"
+case "$(sprop org/mix bomlens:assessment:reasons)" in *"source org/nc: cc-by-nc-4.0 (caution)"*) pass "the reason names the source and its licence" ;; *) fail "mix reasons='$(sprop org/mix bomlens:assessment:reasons)'" ;; esac
+mdv=$(jq -r '.metadata.component.properties[] | select(.name=="bomlens:assessment:datasets") | .value' "$WORK/src.json")
+[ "$mdv" = "caution" ] && pass "and the model's datasets axis" || fail "model datasets axis='$mdv'"
+# Re-running replaces, never appends.
+cp "$WORK/src.json" "$WORK/src-1.json"
+env STUB_DATASETS='["org/mix"]' BOMLENS_HF_API_BASE="file://$SRC" ENRICH_HF_SECURITY=false ENRICH_CDXGEN=false \
+    PYTHONPATH="$WORK/hfstub" bash "$LIB/enrich-aibom.sh" "$WORK/src.json" acme/model >/dev/null 2>&1
+{ [ "$(sdata)" -eq 2 ] && [ "$(jq '[.dependencies[] | select(.ref=="dataset:huggingface/org/mix")] | length' "$WORK/src.json")" -eq 1 ]; } \
+    && pass "enriching twice keeps one copy of every source and edge" || fail "after re-run data=$(sdata)"
+# A permissive source changes nothing.
+src_ds org/nc mit '["original"]'
+src_run '["org/mix"]'
+bash "$LIB/assess-ai-risk.sh" "$WORK/src.json" >/dev/null 2>&1
+[ "$(sprop org/mix bomlens:assessment:sources)" = "ok" ] && pass "a permissive source leaves the sources axis ok" || fail "sources='$(sprop org/mix bomlens:assessment:sources)'"
+
+# Bare ids and a shared source.
+src_hub bare
+src_ds org/a mit '["org/c", "org/d"]'
+src_ds org/b mit '["org/c"]'
+src_ds org/c mit '[]'
+src_ds org/d mit '[]'
+src_run '["org/a", "org/b"]'
+{ [ "$(sdata)" -eq 4 ] && [ "$(sdeps org/a)" = "dataset:huggingface/org/c,dataset:huggingface/org/d" ] \
+  && [ "$(sdeps org/b)" = "dataset:huggingface/org/c" ]; } \
+    && pass "a bare id list is followed and a shared source is read once" || fail "data=$(sdata) a->'$(sdeps org/a)' b->'$(sdeps org/b)'"
+[ "$(grep -c '^org/c$' "$SRC/calls.log")" -eq 1 ] && pass "the shared source was looked up once" || fail "org/c lookups=$(grep -c '^org/c$' "$SRC/calls.log")"
+case "$(sprop org/a bomlens:dataset:derivedFrom)" in "listed dataset:huggingface/org/c|listed dataset:huggingface/org/d") pass "a bare id is recorded as listed" ;; *) fail "derivedFrom='$(sprop org/a bomlens:dataset:derivedFrom)'" ;; esac
+
+# A cycle ends.
+src_hub cyc
+src_ds org/x mit '["extended|org/y"]'
+src_ds org/y mit '["extended|org/x"]'
+src_run '["org/x"]'
+{ [ "$(sdata)" -eq 2 ] && [ "$(sdeps org/y)" = "dataset:huggingface/org/x" ] \
+  && [ "$(sprop org/y bomlens:dataset:sourceTrace)" = "cycle" ] && [ "$(sprop org/x bomlens:dataset:sourceTrace)" = "cycle" ]; } \
+    && pass "a cycle is recorded on the datasets in it and the walk stops" || fail "data=$(sdata) y->'$(sdeps org/y)' trace='$(sprop org/y bomlens:dataset:sourceTrace)'"
+bash "$LIB/assess-ai-risk.sh" "$WORK/src.json" >/dev/null 2>&1
+[ -n "$(sprop org/x bomlens:assessment:overall)" ] && pass "a cycle does not stop the assessment" || fail "no verdict on a cyclic graph"
+# A cycle that closes through a branch read later: A->[B, X], B->D, X->C, D->C, C->B.
+src_hub cyc2
+src_ds org/A mit '["org/B", "org/X"]'
+src_ds org/B mit '["org/D"]'
+src_ds org/X mit '["org/C"]'
+src_ds org/D mit '["org/C"]'
+src_ds org/C mit '["org/B"]'
+src_run '["org/A"]'
+{ [ "$(sprop org/B bomlens:dataset:sourceTrace)" = "cycle" ] && [ "$(sprop org/C bomlens:dataset:sourceTrace)" = "cycle" ] \
+  && [ "$(sprop org/D bomlens:dataset:sourceTrace)" = "cycle" ] && [ -z "$(sprop org/A bomlens:dataset:sourceTrace)" ] \
+  && [ -z "$(sprop org/X bomlens:dataset:sourceTrace)" ]; } \
+    && pass "a cycle closed through a later branch is found, and only its members are marked" || fail "B='$(sprop org/B bomlens:dataset:sourceTrace)' C='$(sprop org/C bomlens:dataset:sourceTrace)' D='$(sprop org/D bomlens:dataset:sourceTrace)' A='$(sprop org/A bomlens:dataset:sourceTrace)'"
+
+# A densely linked graph is judged in time: twelve datasets that all name each other.
+src_hub dense
+all=$(jq -nc '[range(0;12) | "org/n\(.)"]')
+for i in $(seq 0 11); do src_ds "org/n$i" mit "$all"; done
+src_run '["org/n0"]' AIBOM_DATASET_DEPTH=3
+t0=$(date +%s)
+bash "$LIB/assess-ai-risk.sh" "$WORK/src.json" >/dev/null 2>&1
+t1=$(date +%s)
+{ [ "$(sdata)" -eq 12 ] && [ $((t1 - t0)) -lt 20 ] && [ -n "$(sprop org/n0 bomlens:assessment:overall)" ]; } \
+    && pass "a densely linked graph is assessed in $((t1 - t0))s" || fail "dense graph: data=$(sdata) took $((t1 - t0))s"
+
+# Depth limit, and the way back to the old behaviour.
+src_hub depth
+for i in 0 1 2 3 4 5; do src_ds "org/l$i" mit "[\"extended|org/l$((i + 1))\"]"; done
+src_ds org/l6 mit '[]'
+src_run '["org/l0"]' AIBOM_DATASET_DEPTH=3
+{ [ "$(sdata)" -eq 4 ] && [ "$(sprop org/l3 bomlens:dataset:sourceTrace)" = "depth-limit" ] \
+  && [ "$(sprop org/l3 bomlens:dataset:sourceDataset)" = "extended|org/l4" ]; } \
+    && pass "the walk stops at the depth limit and says so" || fail "data=$(sdata) trace='$(sprop org/l3 bomlens:dataset:sourceTrace)'"
+src_run '["org/l0"]' AIBOM_DATASET_DEPTH=0
+{ [ "$(sdata)" -eq 1 ] && [ -z "$(jq -r '[.components[].properties[]? | select(.name|test("dataset:(depth|derivedFrom|sourceTrace|canonicalId)"))] | length | select(.>0)' "$WORK/src.json")" ] \
+  && [ "$(sprop org/l0 bomlens:dataset:sourceDataset)" = "extended|org/l1" ]; } \
+    && pass "depth 0 reads only the card's datasets and writes nothing new" || fail "depth0 data=$(sdata)"
+src_run '["org/l0"]' AIBOM_DATASET_DEPTH=-1
+case "$(cat "$WORK/src.err")" in *"AIBOM_DATASET_DEPTH"*) pass "a bad depth value is reported, not obeyed" ;; *) fail "no warning for AIBOM_DATASET_DEPTH=-1" ;; esac
+
+# Depth 0 keeps the old single-level behaviour exactly: every name is tried,
+# no merge by canonical id, no budget.
+src_hub depth0
+src_ds lambada cc-by-4.0 '[]' cimec/lambada
+src_ds cimec/lambada cc-by-4.0 '[]'
+src_run '["lambada", "cimec/lambada"]' AIBOM_DATASET_DEPTH=0
+[ "$(sdata)" -eq 2 ] && pass "depth 0 keeps two names the hub resolves to one dataset" || fail "depth0 canonical merge: data=$(sdata)"
+list45=$(jq -nc '[range(0;45) | "org/r\(.)"]')
+for i in $(seq 0 44); do src_ds "org/r$i" mit '[]'; done
+src_run "$list45" AIBOM_DATASET_DEPTH=0
+{ [ "$(sdata)" -eq 45 ] && [ "$(jq '[.components[].properties[]? | select(.name=="bomlens:dataset:unresolved")] | length' "$WORK/src.json")" -eq 0 ]; } \
+    && pass "depth 0 reads every dataset the card names, with no budget" || fail "depth0 budget: data=$(sdata)"
+
+# Lookup budget.
+src_hub budget
+list=$(jq -nc '[range(0;50) | "org/s\(.)"]')
+src_ds org/wide mit "$list"
+for i in $(seq 0 49); do src_ds "org/s$i" mit '[]'; done
+src_run '["org/wide"]' AIBOM_DATASET_MAX_LOOKUPS=10
+{ [ "$(grep -c '^org/' "$SRC/calls.log")" -eq 10 ] \
+  && [ "$(jq '[.components[].properties[]? | select(.name=="bomlens:dataset:unresolved" and .value=="lookup-budget")] | length' "$WORK/src.json")" -eq 41 ]; } \
+    && pass "the lookup budget caps the reads and names what was left" || fail "lookups=$(grep -c '^org/' "$SRC/calls.log") over-budget=$(jq '[.components[].properties[]? | select(.value=="lookup-budget")] | length' "$WORK/src.json")"
+
+# A source that cannot be read, and sources named in words.
+src_hub unread
+src_ds org/m mit '["extended|org/gone", "extended|other", "Wikipedia dump 2023-01", "other-80-Million-Tiny-Images"]'
+src_run '["org/m"]'
+{ [ "$(sprop org/gone bomlens:dataset:unresolved)" = "not-readable" ] \
+  && [ "$(jq '[.components[] | select(.name=="org/gone") | .licenses // empty] | length' "$WORK/src.json")" -eq 0 ] \
+  && [ -z "$(sprop org/gone bomlens:dataset:visibility)" ]; } \
+    && pass "an unreadable source keeps its name and no guessed licence or visibility" || fail "gone unresolved='$(sprop org/gone bomlens:dataset:unresolved)'"
+[ "$(grep '^org/' "$SRC/calls.log" | sort | tr '\n' ' ')" = "org/gone org/m " ] && pass "words are never looked up" || fail "lookups='$(tr '\n' ' ' < "$SRC/calls.log")'"
+[ "$(sprop org/m bomlens:dataset:sourceDataset:unverified)" = "extended|other|Wikipedia dump 2023-01|other-80-Million-Tiny-Images" ] \
+    && pass "a source named in words is kept verbatim for review" || fail "unverified='$(sprop org/m bomlens:dataset:sourceDataset:unverified)'"
+bash "$LIB/assess-ai-risk.sh" "$WORK/src.json" >/dev/null 2>&1
+cp "$WORK/src.json" "$WORK/cdx/assessed-sources.json"
+mr=$(sprop org/m bomlens:assessment:reasons)
+{ [ "$(sprop org/m bomlens:assessment:sources)" = "review" ] && case "$mr" in *"not a hub reference"*"could not be read"*|*"could not be read"*"not a hub reference"*) true ;; *) false ;; esac; } \
+    && pass "unread and unverified sources read review with their reasons" || fail "sources='$(sprop org/m bomlens:assessment:sources)' reasons='$mr'"
+
+# Words that fill the slot without naming a dataset are not looked up.
+src_hub words
+src_ds org/w mit '["extended", "unknown", "N/A", "crowdsourced"]'
+src_ds extended mit '[]'
+src_run '["org/w"]'
+{ [ "$(grep -v -e '^org/w$' -e '^bookcorpus$' -e '^wikipedia$' "$SRC/calls.log" | wc -l | tr -d ' ')" -eq 0 ] \
+  && [ "$(sdata)" -eq 1 ] && [ "$(sprop org/w bomlens:dataset:sourceDataset:unverified)" = "extended|unknown|N/A|crowdsourced" ]; } \
+    && pass "markers and placeholders are kept for review, never looked up" || fail "data=$(sdata) lookups='$(tr '\n' ' ' < "$SRC/calls.log")'"
+
+# A free-text source two levels down still reaches the top, and the reason
+# names the culprit first.
+src_hub deep
+src_ds org/top mit '["extended|org/mid"]'
+src_ds org/mid mit '["extended|org/low"]'
+src_ds org/low mit '["Wikipedia dump 2023-01"]'
+src_run '["org/top"]'
+bash "$LIB/assess-ai-risk.sh" "$WORK/src.json" >/dev/null 2>&1
+{ [ "$(sprop org/top bomlens:assessment:sources)" = "review" ] \
+  && case "$(sprop org/top bomlens:assessment:reasons)" in *"source org/low (through org/mid): names its own sources only in words (review)"*) true ;; *) false ;; esac; } \
+    && pass "an unverified source deep down reads review at the top, culprit first" || fail "top sources='$(sprop org/top bomlens:assessment:sources)' reasons='$(sprop org/top bomlens:assessment:reasons)'"
+src_ds org/low cc-by-nc-4.0 '[]'
+src_run '["org/top"]'
+bash "$LIB/assess-ai-risk.sh" "$WORK/src.json" >/dev/null 2>&1
+case "$(sprop org/top bomlens:assessment:reasons)" in *"source org/low (through org/mid): cc-by-nc-4.0 (caution)"*) pass "a deep licence is named with the dataset it came through" ;; *) fail "reasons='$(sprop org/top bomlens:assessment:reasons)'" ;; esac
+# Sources past the depth limit are unknown, not clean.
+src_run '["org/top"]' AIBOM_DATASET_DEPTH=1
+bash "$LIB/assess-ai-risk.sh" "$WORK/src.json" >/dev/null 2>&1
+{ [ "$(sprop org/top bomlens:assessment:sources)" = "review" ] && [ -z "$(sprop org/mid bomlens:dataset:derivedFrom)" ]; } \
+    && pass "a depth-limited dataset reads review and links to nothing it did not read" || fail "sources='$(sprop org/top bomlens:assessment:sources)' mid derivedFrom='$(sprop org/mid bomlens:dataset:derivedFrom)'"
+
+# An answer of an unexpected shape costs the datasets, not the rest.
+src_hub odd
+mkdir -p "$SRC/datasets/org"
+printf '%s\n' '["not", "an", "object"]' > "$SRC/datasets/org/list.json"
+printf '%s\n' '{"id":"org/weird","siblings":7,"tags":"pii","cardData":{"license":"mit"}}' > "$SRC/datasets/org/weird.json"
+src_run '["org/list", "org/weird"]'
+{ [ "$(sprop org/list bomlens:dataset:unresolved)" = "not-readable" ] && [ "$(sprop org/weird bomlens:dataset:fileCount)" = "" ] \
+  && [ -n "$(jq -r '.metadata.component.properties[]? | select(.name=="openness:weights") | .value' "$WORK/src.json")" ]; } \
+    && pass "a non-object answer is unreadable and odd field types are ignored, enrichment goes on" || fail "list='$(sprop org/list bomlens:dataset:unresolved)'"
+
+# A dataset that was a root and is now only a source loses its model edge.
+src_hub reroot
+src_ds org/p mit '["org/q"]'
+src_ds org/q mit '[]'
+src_run '["org/p", "org/q"]'
+cp "$WORK/src.json" "$WORK/src-keep.json"
+cp "$WORK/src-keep.json" "$WORK/src.json"
+env STUB_DATASETS='["org/p"]' BOMLENS_HF_API_BASE="file://$SRC" ENRICH_HF_SECURITY=false ENRICH_CDXGEN=false \
+    PYTHONPATH="$WORK/hfstub" bash "$LIB/enrich-aibom.sh" "$WORK/src.json" acme/model >/dev/null 2>&1
+[ "$(smodel_deps)" = "dataset:huggingface/org/p" ] && pass "a former root that is now only a source keeps no model edge" || fail "model dependsOn='$(smodel_deps)'"
+
+# The hub answers a short id with its canonical one.
+src_hub canon
+src_ds lambada cc-by-4.0 '[]' cimec/lambada
+src_run '["lambada", "cimec/lambada"]'
+{ [ "$(sdata)" -eq 1 ] && [ "$(sprop lambada bomlens:dataset:canonicalId)" = "cimec/lambada" ] \
+  && [ "$(grep -c 'lambada' "$SRC/calls.log")" -eq 1 ]; } \
+    && pass "a canonical id is recorded and the same dataset is read once" || fail "data=$(sdata) canonical='$(sprop lambada bomlens:dataset:canonicalId)'"
+
 echo "== resolved dataset components carry the dataset cluster =="
 # enrich-aibom.sh resolves every dataset the model card names into a CycloneDX
 # `data` component (license, digests, upstream) linked through dependencies[].
@@ -1229,8 +1579,8 @@ famcov=$(jq -r '
   | [ .licenseTerms[] ] as $T
   | [ $probes[] | . as $n
       | select(([ $T[] | select((any(.ids[]?; norm(.) == $n))
-                                or (((.match // "") != "") and (($n | test(.match)) // false))) ] | length) == 0) ]
-  | join(" ")' "$KBJ")
+                                or ((.match // "") as $rx | ($rx != "") and ($n | test($rx)))) ] | length) == 0) ]
+  | join(" ")' "$KBJ" 2>&1) || famcov="jq failed: $famcov"
 [ -z "$famcov" ] && pass "every license_flag family resolves to a registry entry" || fail "flagged family without a registry entry" "$famcov"
 
 echo "== assess-ai-risk.sh stamps verdicts from the license-terms registry =="
@@ -1685,6 +2035,331 @@ AI_USAGE_CONTEXT=product bash "$LIB/assess-ai-risk.sh" "$WORK/fs-bom.json" >/dev
 got=$(jq -r '[.metadata.component.properties[] | select(.name == "bomlens:assessment:overall") | .value] | first // ""' "$WORK/fs-bom.json")
 [ -n "$got" ] && pass "a collected dataset is assessed (overall=$got)" \
     || fail "the dataset was not assessed"
+
+echo "== a HuggingFace dataset on its own becomes the root, with its sources =="
+# The same reading a model scan does for each dataset its card names, applied to
+# one dataset: the root data component and its traced sources carry the same
+# properties, and the assessment reaches the sources the same way.
+HFDS_PY="$LIB/scan-hf-dataset.py"
+for pair in \
+    "hf:org/mix|org/mix" \
+    "https://huggingface.co/datasets/org/mix|org/mix" \
+    "https://huggingface.co/datasets/org/mix/tree/main/data|org/mix" \
+    "huggingface.co/datasets/org/mix|org/mix" \
+    "datasets/org/mix|org/mix" \
+    "datasets/single|single" \
+    "org/mix|-" \
+    "https://huggingface.co/org/mix|-" \
+    "datasets/../etc|-" \
+    "datasets/-x/y|-"; do
+    ref="${pair%%|*}"; want="${pair##*|}"
+    got=$(python3 -I -c "
+import importlib.util, sys
+spec = importlib.util.spec_from_file_location('h', sys.argv[1]); m = importlib.util.module_from_spec(spec)
+sys.path.insert(0, sys.argv[2]); spec.loader.exec_module(m)
+print(m.parse_reference(sys.argv[3]) or '-')" "$HFDS_PY" "$LIB" "$ref")
+    [ "$got" = "$want" ] && pass "dataset reference '$ref' -> $want" || fail "dataset reference '$ref' -> '$got', expected '$want'"
+done
+src_hub hfds
+src_ds org/mix odc-by '["extended|org/nc"]'
+src_ds org/nc cc-by-nc-4.0 '["original"]'
+BOMLENS_HF_API_BASE="file://$SRC" python3 -I "$HFDS_PY" "datasets/org/mix" "$WORK/hfds.json" 1.0 >/dev/null 2>"$WORK/hfds.err"
+rc=$?
+if [ "$rc" -eq 0 ] && jq -e '
+      .metadata.component.type == "data" and .metadata.component.name == "org/mix"
+      and .metadata.component.version == "1.0"
+      and .metadata.component["bom-ref"] == "dataset:huggingface/org/mix"
+      and ([.metadata.component.properties[] | select(.name == "bomlens:dataset:revision")] | length == 1)
+      and ([.metadata.component.properties[] | select(.name == "bomlens:dataset:derivedFrom") | .value]
+           == ["extended dataset:huggingface/org/nc"])
+      and ([.components[] | .name] == ["org/nc"])
+      and ([.components[0].properties[] | select(.name == "bomlens:dataset:depth") | .value] == ["1"])
+      and ([.dependencies[] | select(.ref == "dataset:huggingface/org/mix") | .dependsOn[]]
+           == ["dataset:huggingface/org/nc"])' "$WORK/hfds.json" >/dev/null; then
+    pass "the dataset is the root data component and its source is linked below it"
+else
+    fail "standalone dataset SBOM (rc=$rc)" "$(cat "$WORK/hfds.err"; jq -c '{root: .metadata.component.name, comps: [.components[].name], deps: .dependencies}' "$WORK/hfds.json" 2>/dev/null)"
+fi
+AI_USAGE_CONTEXT=product bash "$LIB/assess-ai-risk.sh" "$WORK/hfds.json" >/dev/null 2>&1
+{ [ "$(jq -r '[.metadata.component.properties[] | select(.name=="bomlens:assessment:sources") | .value] | first // ""' "$WORK/hfds.json")" = "caution" ] \
+  && [ "$(jq -r '[.metadata.component.properties[] | select(.name=="bomlens:assessment:overall") | .value] | first // ""' "$WORK/hfds.json")" = "caution" ]; } \
+    && pass "the non-commercial source reaches the root dataset's verdict" \
+    || fail "root verdict: $(jq -c '[.metadata.component.properties[] | select(.name|startswith("bomlens:assessment"))]' "$WORK/hfds.json")"
+cp "$WORK/hfds.json" "$WORK/cdx/hf-dataset.json"
+AIBOM_DATASET_DEPTH=0 BOMLENS_HF_API_BASE="file://$SRC" python3 -I "$HFDS_PY" "hf:org/mix" "$WORK/hfds0.json" >/dev/null 2>&1
+[ "$(jq '.components | length' "$WORK/hfds0.json")" = "0" ] && pass "depth 0 reads the dataset alone" || fail "depth 0 traced sources"
+BOMLENS_HF_API_BASE="file://$SRC" python3 -I "$HFDS_PY" "datasets/org/missing" "$WORK/hfds-miss.json" >/dev/null 2>"$WORK/hfds-miss.err"
+rc=$?
+{ [ "$rc" -eq 1 ] && [ ! -s "$WORK/hfds-miss.json" ] && grep -q "could not be read (not-readable)" "$WORK/hfds-miss.err" \
+  && grep -q "HF_TOKEN" "$WORK/hfds-miss.err"; } \
+    && pass "a dataset that cannot be read is an error with the reason, not an empty SBOM" \
+    || fail "unreadable dataset rc=$rc" "$(cat "$WORK/hfds-miss.err")"
+python3 -I "$HFDS_PY" "org/mix" "$WORK/hfds-bad.json" >/dev/null 2>&1
+[ $? -eq 1 ] && pass "a bare owner/name is refused here (it is a model id)" || fail "bare id accepted"
+mkdir -p "$SRC/datasets/org"; echo '{"__status": 429}' > "$SRC/datasets/org/busy.json"
+BOMLENS_HF_API_BASE="file://$SRC" python3 -I "$HFDS_PY" "datasets/org/busy" "$WORK/hfds-busy.json" >/dev/null 2>"$WORK/hfds-busy.err"
+{ [ $? -eq 1 ] && grep -q "(rate-limited)" "$WORK/hfds-busy.err" && grep -q "try again later" "$WORK/hfds-busy.err"; } \
+    && pass "a rate-limited hub is reported as such" || fail "rate limit" "$(cat "$WORK/hfds-busy.err")"
+src_ds org/self odc-by '["extended|org/self", "extended|org/nc"]'
+BOMLENS_HF_API_BASE="file://$SRC" python3 -I "$HFDS_PY" "datasets/org/self" "$WORK/hfds-self.json" >/dev/null 2>&1
+{ jq -e '[.dependencies[] | select(.ref as $r | .dependsOn | index($r))] | length == 0' "$WORK/hfds-self.json" >/dev/null \
+  && [ "$(jq -r '[.metadata.component.properties[] | select(.name=="bomlens:dataset:derivedFrom") | .value] | join("|")' "$WORK/hfds-self.json")" = "extended dataset:huggingface/org/nc" ]; } \
+    && pass "a card that names itself among its sources gets no self-dependency" || fail "self source" "$(jq -c .dependencies "$WORK/hfds-self.json")"
+AIBOM_DATASET_MAX_LOOKUPS=0 BOMLENS_HF_API_BASE="file://$SRC" python3 -I "$HFDS_PY" "datasets/org/mix" "$WORK/hfds-b0.json" >/dev/null 2>&1
+{ [ $? -eq 0 ] && [ "$(jq -r .metadata.component.name "$WORK/hfds-b0.json")" = "org/mix" ]; } \
+    && pass "a lookup budget of 0 still reads the dataset asked for" || fail "budget 0 failed the scan"
+
+echo "== a model described from its publisher's declaration alone (AIDECLARE) =="
+# No hub repository and no file: the declaration names the base models and the
+# datasets, which are read from the hub by id the way a model scan reads them.
+# Declared values (dates, makers) never enter the CycloneDX SBOM.
+DECL_PY="$LIB/declare-ai-model.py"
+src_hub decl
+mkdir -p "$SRC/models/org"
+echo '{"id":"org/base-instruct","cardData":{"license":"llama3.1","base_model":"org/base"}}' > "$SRC/models/org/base-instruct.json"
+echo '{"id":"org/base","cardData":{"license":"apache-2.0"}}' > "$SRC/models/org/base.json"
+src_ds org/open-ds cc-by-4.0 '["extended|org/upstream"]'
+src_ds org/upstream cc-by-nc-4.0 '["original"]'
+src_ds org/pii-ds cc-by-4.0 '[]'
+BOMLENS_HF_API_BASE="file://$SRC" python3 -I "$DECL_PY" "$ROOT_DIR/tests/fixtures/spdx3/declaration-complete.json" "$WORK/decl.json" acme 1.0 >/dev/null 2>"$WORK/decl.err"
+rc=$?
+if [ "$rc" -eq 0 ] && jq -e '
+      .metadata.component.type == "machine-learning-model" and .metadata.component.name == "acme"
+      and .metadata.component.version == "1.0"
+      and ([.metadata.component.properties[] | select(.name == "bomlens:origin") | .value] == ["declared-input"])
+      and ([.metadata.component.properties[] | select(.name == "bomlens:lineage:chain") | .value]
+           == ["org/base-instruct:llama3.1 > org/base:apache-2.0"])
+      and ([.components[].name] | sort == ["org/open-ds", "org/pii-ds", "org/upstream"])
+      and ([.dependencies[] | select(.ref == "dataset:huggingface/org/open-ds") | .dependsOn[]] == ["dataset:huggingface/org/upstream"])' \
+      "$WORK/decl.json" >/dev/null; then
+    pass "the declared model is the root, its base models are walked and its datasets traced"
+else
+    fail "declared model SBOM (rc=$rc)" "$(cat "$WORK/decl.err"; jq -c '{root: .metadata.component, comps: [.components[].name]}' "$WORK/decl.json" 2>/dev/null)"
+fi
+# The chain is written in the model-scan format, so assess-ai-risk.sh reads it alike.
+grep -q 'chain.append(f"{cur}:{blic or '"'"'none'"'"'}")' "$LIB/enrich-aibom.sh" \
+    && grep -q 'chain.append(f"{cur}:{lic or '"'"'none'"'"'}")' "$DECL_PY" \
+    && pass "the lineage chain uses the same id:license format as a model scan" || fail "lineage chain format diverged"
+jq -e '[.metadata.component.properties[] | select(.name == "bomlens:lineage:conflict") | .value] == ["true"]' "$WORK/decl.json" >/dev/null \
+    && pass "an ancestor whose terms pass to derivatives is flagged on the declared model" || fail "lineage conflict not flagged"
+{ ! grep -q "Acme AI Lab" "$WORK/decl.json" && ! grep -q "2025-04-15" "$WORK/decl.json"; } \
+    && pass "declared makers and dates stay out of the CycloneDX SBOM" || fail "declared values leaked into the CycloneDX SBOM"
+jq -e '.metadata.component | has("licenses") | not' "$WORK/decl.json" >/dev/null \
+    && pass "with no licence declared the model has none" || fail "a licence appeared without a declaration"
+# The model's own licence is the one declared value the SBOM carries: the whole
+# SBOM is the publisher's statement, and without it the model is only "review".
+jq '.model.license = "llama3.1"' "$ROOT_DIR/tests/fixtures/spdx3/declaration-complete.json" > "$WORK/decl-lic.json"
+BOMLENS_HF_API_BASE="file://$SRC" python3 -I "$DECL_PY" "$WORK/decl-lic.json" "$WORK/decl-lic-bom.json" acme 1.0 >/dev/null 2>&1
+{ jq -e '.metadata.component.licenses == [{"license": {"name": "llama3.1"}}]' "$WORK/decl-lic-bom.json" >/dev/null \
+  && jq -e '[.metadata.component.properties[] | select(.name == "bomlens:lineage:conflict")] | length == 0' "$WORK/decl-lic-bom.json" >/dev/null; } \
+    && pass "a declared licence is the model's, and an ancestor under the same terms is no conflict" \
+    || fail "declared model licence" "$(jq -c '.metadata.component | {licenses, properties}' "$WORK/decl-lic-bom.json")"
+AI_USAGE_CONTEXT=product bash "$LIB/assess-ai-risk.sh" "$WORK/decl-lic-bom.json" >/dev/null 2>&1
+lic_axis=$(jq -r '[.metadata.component.properties[] | select(.name=="bomlens:assessment:license") | .value] | first // ""' "$WORK/decl-lic-bom.json")
+{ [ -n "$lic_axis" ] && [ "$lic_axis" != "review" ]; } \
+    && pass "the declared licence is judged ($lic_axis), not left for review" || fail "declared licence axis=$lic_axis"
+cp "$WORK/decl-lic-bom.json" "$WORK/cdx/declared-model-license.json"
+jq '.model.license = "apache-2.0"' "$ROOT_DIR/tests/fixtures/spdx3/declaration-complete.json" > "$WORK/decl-lic3.json"
+BOMLENS_HF_API_BASE="file://$SRC" python3 -I "$DECL_PY" "$WORK/decl-lic3.json" "$WORK/decl-lic3-bom.json" acme 1.0 >/dev/null 2>&1
+jq -e '[.metadata.component.properties[] | select(.name == "bomlens:lineage:conflict") | .value] == ["true"]' "$WORK/decl-lic3-bom.json" >/dev/null \
+    && pass "a declared licence on other terms than an inheriting ancestor is still flagged" || fail "lineage conflict lost with a declared licence"
+jq '.model.license = "  "' "$ROOT_DIR/tests/fixtures/spdx3/declaration-complete.json" > "$WORK/decl-lic4.json"
+python3 -I "$DECL_PY" "$WORK/decl-lic4.json" "$WORK/decl-lic4-bom.json" acme 1.0 --offline >/dev/null 2>&1
+{ [ $? -eq 0 ] && jq -e '.metadata.component | has("licenses") | not' "$WORK/decl-lic4-bom.json" >/dev/null; } \
+    && pass "a licence of only spaces is no licence" || fail "blank declared licence"
+jq '.model.license = "apache-2.0"' "$ROOT_DIR/tests/fixtures/spdx3/declaration-complete.json" > "$WORK/decl-lic2.json"
+BOMLENS_HF_API_BASE="file://$SRC" python3 -I "$DECL_PY" "$WORK/decl-lic2.json" "$WORK/decl-lic2-bom.json" acme 1.0 >/dev/null 2>&1
+python3 -I "$LIB/convert-to-spdx3-ai.py" check --bom "$WORK/decl-lic2-bom.json" --declaration "$WORK/decl-lic2.json" > "$WORK/decl-lic2-check.json" 2>/dev/null
+jq -e '[.relationships[] | select(.type == "hasDeclaredLicense")] | first | .status == "declared"' "$WORK/decl-lic2-check.json" >/dev/null \
+    && pass "the SPDX 3.0.1 document records the licence as declared, not as read" \
+    || fail "declared licence status" "$(jq -c '[.relationships[] | select(.type == "hasDeclaredLicense")]' "$WORK/decl-lic2-check.json")"
+cp "$WORK/decl.json" "$WORK/cdx/declared-model.json"
+python3 -I "$LIB/convert-to-spdx3-ai.py" check --bom "$WORK/decl.json" \
+    --declaration "$ROOT_DIR/tests/fixtures/spdx3/declaration-complete.json" > "$WORK/decl-check.json" 2>/dev/null
+[ "$(jq -c '[.elements[] | .label as $l | .fields[] | select(.status == "missingRequired") | "\($l):\(.id)"]' "$WORK/decl-check.json")" = '["acme:downloadLocation","acme:suppliedBy"]' ] \
+    && pass "the declaration fits the SBOM built from it; only the model's address and supplier stay open" \
+    || fail "declaration against its own SBOM" "$(head -c 400 "$WORK/decl-check.json")"
+# Who writes the document: in AIDECLARE the declaration's document.createdBy
+# already names it, so with no SBOM_AUTHOR it becomes the SBOM author (marked as
+# coming from the declaration). An explicit SBOM_AUTHOR wins, and a scanned
+# model (AIBOM with --ai-declare) gets no author from the declaration.
+DECL_FIX="$ROOT_DIR/tests/fixtures/spdx3/declaration-complete.json"
+cp "$WORK/decl.json" "$WORK/decl-author.json"
+env -u SBOM_AUTHOR AI_DECLARATION_FILE="$DECL_FIX" bash "$LIB/stamp-document-metadata.sh" "$WORK/decl-author.json" AIDECLARE > "$WORK/decl-author.log" 2>&1
+{ jq -e '.metadata.authors == [{"name": "Acme AI Lab"}]
+         and ([.metadata.properties[] | select(.name == "bomlens:sbom-author-source") | .value] == ["declaration"])' \
+      "$WORK/decl-author.json" >/dev/null \
+  && grep -q "SBOM author taken from the declaration's document.createdBy: Acme AI Lab" "$WORK/decl-author.log" \
+  && ! grep -q "no SBOM author declared" "$WORK/decl-author.log"; } \
+    && pass "AIDECLARE: the declaration's createdBy is the SBOM author, and the log says so" \
+    || fail "AIDECLARE author from the declaration" "$(cat "$WORK/decl-author.log"; jq -c '.metadata | {authors, properties}' "$WORK/decl-author.json")"
+SBOM_AUTHOR="Example Corp" AI_DECLARATION_FILE="$DECL_FIX" bash "$LIB/stamp-document-metadata.sh" "$WORK/decl-author.json" AIDECLARE >/dev/null 2>&1
+jq -e '.metadata.authors == [{"name": "Example Corp"}]
+       and ([.metadata.properties[] | select(.name == "bomlens:sbom-author-source")] | length == 0)' "$WORK/decl-author.json" >/dev/null \
+    && pass "AIDECLARE: an explicit SBOM_AUTHOR wins over the declaration" \
+    || fail "SBOM_AUTHOR did not win in AIDECLARE" "$(jq -c '.metadata | {authors, properties}' "$WORK/decl-author.json")"
+jq '.document.createdBy = [{"type": "Organization", "name": "Acme AI Lab"}, {"type": "Person", "name": "  Jane Doe "},
+                           {"type": "Person", "name": "   "}, {"type": "Person", "name": "Acme AI Lab"}]' \
+    "$DECL_FIX" > "$WORK/decl-two-authors.json"
+cp "$WORK/decl.json" "$WORK/decl-author2.json"
+env -u SBOM_AUTHOR AI_DECLARATION_FILE="$WORK/decl-two-authors.json" bash "$LIB/stamp-document-metadata.sh" "$WORK/decl-author2.json" AIDECLARE >/dev/null 2>&1
+jq -e '.metadata.authors == [{"name": "Acme AI Lab"}, {"name": "Jane Doe"}]' "$WORK/decl-author2.json" >/dev/null \
+    && pass "AIDECLARE: every declared author is kept once, trimmed, and a blank name is skipped" \
+    || fail "several declared authors" "$(jq -c '.metadata.authors' "$WORK/decl-author2.json")"
+cp "$WORK/decl.json" "$WORK/decl-author3.json"
+env -u SBOM_AUTHOR AI_DECLARATION_FILE="$DECL_FIX" bash "$LIB/stamp-document-metadata.sh" "$WORK/decl-author3.json" AIBOM > "$WORK/decl-author3.log" 2>&1
+{ jq -e '(.metadata | has("authors") | not)
+         and ([.metadata.properties[] | select(.name == "bomlens:sbom-author-source")] | length == 0)' "$WORK/decl-author3.json" >/dev/null \
+  && grep -q "no SBOM author declared" "$WORK/decl-author3.log"; } \
+    && pass "a scanned model (AIBOM with --ai-declare) takes no author from the declaration" \
+    || fail "AIBOM took the declaration's author" "$(jq -c '.metadata.authors' "$WORK/decl-author3.json")"
+AI_USAGE_CONTEXT=product bash "$LIB/assess-ai-risk.sh" "$WORK/decl.json" >/dev/null 2>&1
+[ "$(jq -r '[.metadata.component.properties[] | select(.name=="bomlens:assessment:datasets") | .value] | first // ""' "$WORK/decl.json")" = "caution" ] \
+    && pass "the declared model's datasets are judged, sources included" || fail "declared model datasets axis"
+# Offline: ids only, nothing read (the web UI checks a declaration this way).
+rm -f "$SRC/calls.log"
+BOMLENS_HF_API_BASE="file://$SRC" python3 -I "$DECL_PY" "$ROOT_DIR/tests/fixtures/spdx3/declaration-complete.json" "$WORK/decl-off.json" acme 1.0 --offline >/dev/null 2>&1
+{ [ ! -s "$SRC/calls.log" ] && [ "$(jq '.components | length' "$WORK/decl-off.json")" = "3" ] \
+  && [ "$(jq -r '[.metadata.component.properties[] | select(.name=="bomlens:lineage:chain") | .value] | first' "$WORK/decl-off.json")" = "org/base-instruct:unread" ]; } \
+    && pass "--offline reads nothing and still names every base model and dataset" || fail "--offline read the hub"
+python3 -I "$LIB/convert-to-spdx3-ai.py" check --bom "$WORK/decl-off.json" \
+    --declaration "$ROOT_DIR/tests/fixtures/spdx3/declaration-complete.json" >/dev/null 2>&1
+[ $? -eq 0 ] && pass "an offline SBOM is enough to check a declaration before a scan" || fail "offline check refused"
+# A base model the hub cannot open is recorded, not guessed.
+echo '{"schema":"bomlens-ai-declaration/1","model":{"baseModels":[{"ref":"org/missing"}]}}' > "$WORK/decl-miss.json"
+BOMLENS_HF_API_BASE="file://$SRC" python3 -I "$DECL_PY" "$WORK/decl-miss.json" "$WORK/decl-miss-bom.json" acme 1.0 >/dev/null 2>&1
+[ "$(jq -r '[.metadata.component.properties[] | select(.name=="bomlens:lineage:chain") | .value] | first' "$WORK/decl-miss-bom.json")" = "org/missing:unreadable" ] \
+    && pass "an unreadable base model is recorded as unreadable" || fail "unreadable base model"
+# A declared dataset that is a traced source of another declared one is that
+# dataset's source, not a direct dependency of the model.
+[ "$(jq -c '[.dependencies[] | select(.ref == "model:declared/acme@1.0") | .dependsOn[]] | sort' "$WORK/decl.json")" \
+  = '["dataset:huggingface/org/open-ds","dataset:huggingface/org/pii-ds"]' ] \
+    && pass "a declared dataset reached as another's source is not a direct dependency" \
+    || fail "model dependsOn: $(jq -c '[.dependencies[] | select(.ref == "model:declared/acme@1.0") | .dependsOn]' "$WORK/decl.json")"
+# The chain becomes pedigree.ancestors as in a model scan; an ancestor the walk
+# reached is not "another parent" even when it is also declared.
+echo '{"schema":"bomlens-ai-declaration/1","model":{"baseModels":[{"ref":"org/base-instruct"},{"ref":"org/base"}]}}' > "$WORK/decl-chain.json"
+BOMLENS_HF_API_BASE="file://$SRC" python3 -I "$DECL_PY" "$WORK/decl-chain.json" "$WORK/decl-chain-bom.json" acme 1.0 >/dev/null 2>&1
+{ jq -e '[.metadata.component.pedigree.ancestors[].name] == ["org/base-instruct", "org/base"]' "$WORK/decl-chain-bom.json" >/dev/null \
+  && jq -e '[.metadata.component.properties[] | select(.name == "bomlens:lineage:otherParents")] | length == 0' "$WORK/decl-chain-bom.json" >/dev/null; } \
+    && pass "the walked chain is the pedigree, and a declared grandparent is not another parent" \
+    || fail "pedigree/otherParents" "$(jq -c '{p: .metadata.component.pedigree, props: .metadata.component.properties}' "$WORK/decl-chain-bom.json")"
+cp "$WORK/decl-chain-bom.json" "$WORK/cdx/declared-model-pedigree.json"
+# Two declared ids the hub answers as one dataset (a renamed repository).
+src_ds org/renamed odc-by '[]' org/open-ds
+echo '{"schema":"bomlens-ai-declaration/1","datasets":[{"ref":"huggingface:org/open-ds"},{"ref":"huggingface:org/renamed"}]}' > "$WORK/decl-dup.json"
+BOMLENS_HF_API_BASE="file://$SRC" python3 -I "$DECL_PY" "$WORK/decl-dup.json" "$WORK/decl-dup-bom.json" acme 1.0 >/dev/null 2>"$WORK/decl-dup.err"
+{ [ $? -eq 2 ] && grep -q "same hub dataset as another declared one" "$WORK/decl-dup.err"; } \
+    && pass "two declared ids that are one hub dataset are refused, not silently merged" \
+    || fail "renamed-dataset collision" "$(cat "$WORK/decl-dup.err")"
+python3 -I "$DECL_PY" "$ROOT_DIR/tests/fixtures/spdx3/declaration-complete.json" "$WORK/decl-name.json" --offline 1.0 >/dev/null 2>&1
+[ "$(jq -r .metadata.component.name "$WORK/decl-name.json" 2>/dev/null)" = "--offline" ] \
+    && pass "a project named --offline is still a project name" || fail "--offline as a project name"
+for bad in '[]' '{"model":{"baseModels":[{"ref":"../etc"}]}}' '{"datasets":[{"ref":"huggingface:a b"}]}' 'not json' \
+           '{"model":{"baseModels":5}}' '{"datasets":7}' '{"model":{"license":"my own terms"}}' '{"model":{"license":5}}' '{"model":{"license":[]}}'; do
+    printf '%s' "$bad" > "$WORK/decl-bad.json"
+    python3 -I "$DECL_PY" "$WORK/decl-bad.json" "$WORK/decl-bad-bom.json" acme 1.0 --offline >/dev/null 2>&1
+    [ $? -eq 2 ] && pass "refused before writing: $bad" || fail "not refused: $bad"
+done
+
+echo "== sources the publisher declares by hub id are read and judged =="
+# A card that lists no sources leaves them unknown; a declaration can name them
+# by hub id. They are read from the hub before the assessment, so the verdict
+# reflects their recorded licence, and linked as declared.
+APPLY_PY="$LIB/apply-declared-sources.py"
+src_hub declsrc
+src_ds org/plain odc-by '[]'
+src_ds org/nc cc-by-nc-4.0 '["original"]'
+BOMLENS_HF_API_BASE="file://$SRC" python3 -I "$HFDS_PY" "datasets/org/plain" "$WORK/ds-plain.json" 1.0 >/dev/null 2>&1
+cat > "$WORK/decl-sources.json" <<'JSON'
+{"schema": "bomlens-ai-declaration/1",
+ "datasets": [{"ref": "huggingface:org/plain",
+               "sources": [{"ref": "huggingface:org/nc", "relation": "extended"},
+                           {"name": "Old crawl", "license": "cc-by-4.0", "relation": "other"}]}]}
+JSON
+BOMLENS_HF_API_BASE="file://$SRC" python3 -I "$APPLY_PY" "$WORK/ds-plain.json" "$WORK/decl-sources.json" >/dev/null 2>&1
+if jq -e '
+      ([.components[].name] == ["org/nc"])
+      and ([.components[0].properties[] | select(.name == "bomlens:dataset:depth") | .value] == ["1"])
+      and ([.metadata.component.properties[] | select(.name == "bomlens:dataset:derivedFrom:declared") | .value]
+           == ["extended dataset:huggingface/org/nc"])
+      and ([.metadata.component.properties[] | select(.name == "bomlens:dataset:derivedFrom") | .value]
+           == ["extended dataset:huggingface/org/nc"])
+      and ([.dependencies[] | select(.ref == "dataset:huggingface/org/plain") | .dependsOn[]] == ["dataset:huggingface/org/nc"])' \
+      "$WORK/ds-plain.json" >/dev/null; then
+    pass "a source declared by hub id is read, placed one level below, and linked as declared"
+else
+    fail "declared hub source" "$(jq -c '{comps: [.components[] | {name, properties}], deps: .dependencies}' "$WORK/ds-plain.json")"
+fi
+AI_USAGE_CONTEXT=product bash "$LIB/assess-ai-risk.sh" "$WORK/ds-plain.json" >/dev/null 2>&1
+[ "$(jq -r '[.metadata.component.properties[] | select(.name=="bomlens:assessment:sources") | .value] | first // ""' "$WORK/ds-plain.json")" = "caution" ] \
+    && pass "the declared source's licence reaches the dataset's verdict" || fail "declared source not judged"
+cp "$WORK/ds-plain.json" "$WORK/cdx/declared-sources.json"
+cp "$WORK/ds-plain.json" "$WORK/ds-plain-again.json"
+BOMLENS_HF_API_BASE="file://$SRC" python3 -I "$APPLY_PY" "$WORK/ds-plain-again.json" "$WORK/decl-sources.json" >/dev/null 2>&1
+[ "$(jq '[.metadata.component.properties[] | select(.name == "bomlens:dataset:derivedFrom:declared")] | length' "$WORK/ds-plain-again.json")" = "1" ] \
+    && [ "$(jq '.components | length' "$WORK/ds-plain-again.json")" = "1" ] \
+    && pass "applying the same declaration twice changes nothing" || fail "declared sources applied twice"
+python3 -I "$LIB/convert-to-spdx3-ai.py" check --bom "$WORK/ds-plain.json" --declaration "$WORK/decl-sources.json" > "$WORK/ds-plain-check.json" 2>/dev/null
+{ [ $? -eq 0 ] && grep -q "source 'Old crawl' declared by the publisher, not verified" "$WORK/ds-plain-check.json"; } \
+    && pass "the converter takes the same declaration: the hub source as read, the named one as declared" \
+    || fail "declared sources in the SPDX check" "$(head -c 400 "$WORK/ds-plain-check.json")"
+# Through the converter: the source read from the hub is recorded as declared,
+# not as something the card said.
+python3 -I "$LIB/convert-to-spdx3-ai.py" convert --bom "$WORK/ds-plain.json" --declaration "$WORK/decl-sources.json" \
+    --out-dir "$WORK" --prefix=dsplain >/dev/null 2>&1
+jq -e '[.relationships[] | select(.type == "descendantOf")] | length == 2 and all(.status == "declared")' "$WORK/dsplain_spdx3-check.json" >/dev/null \
+    && grep -q "declared by the publisher: extended" "$WORK/dsplain_bom.spdx3.json" \
+    && pass "a declared source read from the hub keeps its declared status in the SPDX document" \
+    || fail "declared source status" "$(jq -c '.relationships' "$WORK/dsplain_spdx3-check.json")"
+# A declaration the converter refuses is not applied at all.
+jq '.datasets[0].sources += [{"name": "Y", "license": "my own terms"}]' "$WORK/decl-sources.json" > "$WORK/decl-src-bad.json"
+BOMLENS_HF_API_BASE="file://$SRC" python3 -I "$HFDS_PY" "datasets/org/plain" "$WORK/ds-plain-r.json" 1.0 >/dev/null 2>&1
+BOMLENS_HF_API_BASE="file://$SRC" python3 -I "$APPLY_PY" "$WORK/ds-plain-r.json" "$WORK/decl-src-bad.json" >/dev/null 2>&1
+[ "$(jq '.components | length' "$WORK/ds-plain-r.json")" = "0" ] \
+    && pass "a refused declaration's sources are not read" || fail "refused declaration was applied"
+# A source declared for a dataset this scan does not have is not read.
+echo '{"schema":"bomlens-ai-declaration/1","datasets":[{"ref":"huggingface:org/gone","sources":[{"ref":"huggingface:org/nc"}]}]}' > "$WORK/decl-gone.json"
+cp "$WORK/ds-plain-r.json" "$WORK/ds-plain-g.json"
+BOMLENS_HF_API_BASE="file://$SRC" python3 -I "$APPLY_PY" "$WORK/ds-plain-g.json" "$WORK/decl-gone.json" >/dev/null 2>&1
+[ "$(jq '.components | length' "$WORK/ds-plain-g.json")" = "0" ] \
+    && pass "a source of a dataset not in the scan is not read" || fail "orphan source components added"
+# The same dataset under another spelling is not added twice.
+src_ds org/mixsrc odc-by '["extended|org/nc"]'
+BOMLENS_HF_API_BASE="file://$SRC" python3 -I "$HFDS_PY" "datasets/org/mixsrc" "$WORK/ds-mix.json" 1.0 >/dev/null 2>&1
+echo '{"schema":"bomlens-ai-declaration/1","datasets":[{"ref":"huggingface:org/mixsrc","sources":[{"ref":"huggingface:org/NC","relation":"extended"}]}]}' > "$WORK/decl-case.json"
+BOMLENS_HF_API_BASE="file://$SRC" python3 -I "$APPLY_PY" "$WORK/ds-mix.json" "$WORK/decl-case.json" >/dev/null 2>&1
+[ "$(jq '[.components[] | select(.name | ascii_downcase == "org/nc")] | length' "$WORK/ds-mix.json")" = "1" ] \
+    && pass "a declared source under another spelling is the dataset already read" || fail "case-different source added twice"
+# A declared source that closes a loop with a card is marked as a cycle.
+src_ds org/loop-a odc-by '[]'
+src_ds org/loop-b odc-by '["extended|org/loop-a"]'
+BOMLENS_HF_API_BASE="file://$SRC" python3 -I "$HFDS_PY" "datasets/org/loop-a" "$WORK/ds-loop.json" 1.0 >/dev/null 2>&1
+echo '{"schema":"bomlens-ai-declaration/1","datasets":[{"ref":"huggingface:org/loop-a","sources":[{"ref":"huggingface:org/loop-b"}]}]}' > "$WORK/decl-loop.json"
+BOMLENS_HF_API_BASE="file://$SRC" python3 -I "$APPLY_PY" "$WORK/ds-loop.json" "$WORK/decl-loop.json" >/dev/null 2>&1
+[ "$(jq '[.metadata.component, .components[] | .properties[]? | select(.name == "bomlens:dataset:sourceTrace" and .value == "cycle")] | length' "$WORK/ds-loop.json")" = "2" ] \
+    && pass "a loop through a declared source is marked as a cycle on both datasets" \
+    || fail "declared cycle not marked" "$(jq -c '[.metadata.component, .components[] | {name, p: [.properties[]? | select(.name|test("sourceTrace|derivedFrom"))]}]' "$WORK/ds-loop.json")"
+printf 'not json' > "$WORK/decl-junk.json"
+cp "$WORK/hfds.json" "$WORK/hfds-junk.json"
+python3 -I "$APPLY_PY" "$WORK/hfds-junk.json" "$WORK/decl-junk.json"; rc=$?
+{ [ "$rc" -eq 0 ] && cmp -s "$WORK/hfds.json" "$WORK/hfds-junk.json"; } \
+    && pass "an unreadable declaration leaves the SBOM as it was" || fail "junk declaration changed the SBOM (rc=$rc)"
+
+echo "== what enrichment writes is valid CycloneDX 1.7 =="
+# The new properties, the pedigree built from the lineage chain and the traced
+# dataset sources must not cost the document its schema validity. Runs with the
+# pinned CycloneDX CLI (scripts/check-cdx-schema.sh downloads and verifies it);
+# CI sets BOMLENS_CDX_SCHEMA=1 so a missing CLI fails there instead of skipping.
+if [ "${BOMLENS_CDX_SCHEMA:-}" = "1" ] || command -v cyclonedx >/dev/null 2>&1 || [ -n "${CYCLONEDX_CLI:-}" ]; then
+    if cdxout=$(bash "$ROOT_DIR/scripts/check-cdx-schema.sh" "$WORK"/cdx/*.json 2>&1); then
+        pass "enriched and assessed AI SBOMs validate against the CycloneDX 1.7 schema"
+    else
+        fail "an enriched AI SBOM fails the CycloneDX 1.7 schema" "$cdxout"
+    fi
+else
+    echo "  SKIP: CycloneDX CLI not available (set BOMLENS_CDX_SCHEMA=1 to download the pinned one)"
+fi
 
 echo ""
 echo "Results: ${PASS} passed, ${FAIL} failed"

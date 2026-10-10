@@ -15,11 +15,13 @@
  */
 import {
   BadgeCheck,
+  BrainCircuit,
   ClipboardCheck,
   Cpu,
   FileJson,
   FileSignature,
   FileText,
+  PencilLine,
   ScrollText,
   ShieldAlert,
   ShieldCheck,
@@ -29,8 +31,9 @@ import {
 import type { ResultFile } from "./api";
 
 export interface ArtifactFormat {
-  /** Lowercase extension: "html" | "md" | "json" | "txt" | "sig", or the
-   *  pseudo-extension "spdx" for the `.spdx.json` export. */
+  /** Lowercase extension: "html" | "md" | "json" | "txt" | "sig", or a
+   *  pseudo-extension: "spdx" for the `.spdx.json` export, "spdx3" for the
+   *  SPDX 3.0.1 AI document, "template" for the empty AI declaration. */
   ext: string;
   /** Full filename (download/view target). */
   name: string;
@@ -81,6 +84,22 @@ const GROUPS: GroupSpec[] = [
     // The SPDX export rides on the SBOM card as an extra format chip, whether the
     // CLI's --spdx wrote it during the scan or the user exported it from here.
     match: (n) => n.endsWith("_bom.json") || n.endsWith("_bom.spdx.json"),
+  },
+  {
+    // The SPDX 3.0.1 AI document (AI scans) with the check of what it holds.
+    key: "spdx3",
+    Icon: BrainCircuit,
+    primary: false,
+    rank: 1.5,
+    match: (n) => n.endsWith("_bom.spdx3.json") || n.endsWith("_spdx3-check.json") || n.endsWith("_spdx3-check.md"),
+  },
+  {
+    // What the publisher declared for that document, and the empty form.
+    key: "aiDeclaration",
+    Icon: PencilLine,
+    primary: false,
+    rank: 1.6,
+    match: (n) => n.endsWith("_ai-declaration.json") || n.endsWith("_ai-declaration.template.json"),
   },
   {
     key: "notice",
@@ -143,12 +162,14 @@ const GROUPS: GroupSpec[] = [
 ];
 
 // Preferred chip order within a card: rich/human formats first.
-const FORMAT_RANK: Record<string, number> = { html: 0, md: 1, txt: 2, json: 3, spdx: 4, cdx: 5 };
+const FORMAT_RANK: Record<string, number> = { spdx3: -1, html: 0, md: 1, txt: 2, json: 3, spdx: 4, cdx: 5, template: 6 };
 
 function extOf(name: string): string {
   // The SPDX export is also .json; a distinct pseudo-extension keeps its chip
   // distinguishable from the CycloneDX one ("SPDX" vs "JSON").
   if (name.endsWith(".spdx.json")) return "spdx";
+  if (name.endsWith(".spdx3.json")) return "spdx3";
+  if (name.endsWith(".template.json")) return "template";
   // Same for the CycloneDX VEX export next to the plain judgements file.
   if (name.endsWith(".cdx.json")) return "cdx";
   const i = name.lastIndexOf(".");
@@ -161,7 +182,7 @@ function toFormat(f: ResultFile): ArtifactFormat {
     ext,
     name: f.name,
     size: f.size,
-    viewable: ext !== "sig" && ["html", "json", "txt", "md", "spdx", "cdx"].includes(ext),
+    viewable: ext !== "sig" && ["html", "json", "txt", "md", "spdx", "cdx", "spdx3", "template"].includes(ext),
   };
 }
 
@@ -171,10 +192,12 @@ function byFormatPref(a: ArtifactFormat, b: ArtifactFormat): number {
 
 export function groupArtifacts(results: ResultFile[]): LogicalArtifact[] {
   // With --sign + --spdx two signatures exist; the card carries the CycloneDX
-  // one (the primary SBOM). The SPDX .sig stays in the download-all ZIP.
+  // one (the primary SBOM). The SPDX .sig stays in the download-all ZIP. The
+  // SPDX 3.0.1 document's own signature rides on that document's card.
   const sig =
     results.find((r) => r.name.endsWith("_bom.json.sig")) ??
-    results.find((r) => r.name.endsWith(".sig"));
+    results.find((r) => r.name.endsWith(".sig") && !r.name.endsWith(".spdx3.json.sig"));
+  const sig3 = results.find((r) => r.name.endsWith("_bom.spdx3.json.sig"));
   const out: LogicalArtifact[] = [];
 
   for (const spec of GROUPS) {
@@ -190,7 +213,7 @@ export function groupArtifacts(results: ResultFile[]): LogicalArtifact[] {
       primary: spec.primary,
       rank: spec.rank,
       formats: members.map(toFormat).sort(byFormatPref),
-      signature: spec.key === "sbom" ? sig : undefined,
+      signature: spec.key === "sbom" ? sig : spec.key === "spdx3" ? sig3 : undefined,
       spdxExportable:
         spec.key === "sbom" && !members.some((m) => m.name.endsWith(".spdx.json")),
     });
@@ -212,7 +235,14 @@ export function groupArtifacts(results: ResultFile[]): LogicalArtifact[] {
   return out.sort((a, b) => a.rank - b.rank);
 }
 
+/** The check of an SPDX 3.0.1 AI document (which fields are filled), as
+ *  opposed to the document itself: its chips are labelled as check results. */
+export function isSpdx3Check(name: string): boolean {
+  return name.endsWith("_spdx3-check.json") || name.endsWith("_spdx3-check.md");
+}
+
 /** Format label shown on a download chip (e.g. "HTML", "JSON"). */
 export function formatLabel(ext: string): string {
+  if (ext === "spdx3") return "SPDX 3.0.1";
   return ext === "cdx" ? "CycloneDX" : ext.toUpperCase();
 }

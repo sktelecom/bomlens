@@ -613,6 +613,10 @@ export interface DoneEvent {
    *  both the SSE `done` event and the `/scan` detail (loadScan), kept in sync
    *  server-side. Drives the AI compliance summary card. */
   aiProfile?: AiProfile | null;
+  /** The SPDX 3.0.1 AI document's check (AI scans only; null otherwise): draft
+   *  or complete, and the counts by where values came from. Present on both the
+   *  SSE `done` event and the `/scan` detail; a saved declaration refreshes it. */
+  spdx3?: Spdx3Summary | null;
   /** SCANOSS vendored-ID outcome, present only when vendored ID ran.
    *  status: "unavailable" (search blocked) | "no-match" | "matched". */
   scanoss?: { status: string | null; count: number } | null;
@@ -656,6 +660,9 @@ export type SourceType =
   // one needs no account and no network, and works on a model that was never
   // published.
   | "model-upload"
+  // A model described from its publisher's declaration alone (MODE AIDECLARE).
+  // The form opens the questions; their answers are uploaded as the declaration.
+  | "ai-declare"
   | "docker-image";
 
 export const SOURCE_TYPES: SourceType[] = [
@@ -668,6 +675,7 @@ export const SOURCE_TYPES: SourceType[] = [
   "firmware-upload",
   "ai-model",
   "model-upload",
+  "ai-declare",
   "docker-image",
 ];
 
@@ -682,7 +690,7 @@ export function formSourceOf(source: SourceType): SourceType {
   return source === "yocto-build-dir" ? "rootfs-dir" : source;
 }
 
-export type UploadKind = "zip" | "sbom" | "firmware" | "package" | "model";
+export type UploadKind = "zip" | "sbom" | "firmware" | "package" | "model" | "declaration";
 
 /** How the user intends to use a scanned AI model. Sent with the scan start so
  *  the pipeline grades the license assessment against this use, and stamped
@@ -894,6 +902,11 @@ export interface Capabilities {
   /** The results screen can convert a finished BOM to SPDX 2.3 (syft here, or a
    *  sibling scanner container). False hides the export action. */
   spdxExport?: boolean;
+  /** The image carries the SPDX 3.0.1 AI converter, so the AI document, its
+   *  check and the declaration screens are available. */
+  spdx3?: boolean;
+  /** A model can be described from its declaration alone (new-scan tile). */
+  aiDeclare?: boolean;
   /** SPDX export goes through a sibling container, so the first export may pull
    *  the scanner image — worth saying before the wait. */
   spdxSibling?: boolean;
@@ -1080,6 +1093,160 @@ export async function exportSpdx(
     const res = await fetch(`/spdx-export?id=${encodeURIComponent(id)}`);
     if (!res.ok) return null;
     return (await res.json()) as { name: string; results: ResultFile[] };
+  } catch {
+    return null;
+  }
+}
+
+/** Where the fields of a scan's SPDX 3.0.1 AI document came from, as counted
+ *  by the converter's check (`_spdx3-check.json`). */
+export interface Spdx3Counts {
+  /** Filled from the scan (the CycloneDX SBOM or a fixed rule over it). */
+  auto: number;
+  /** Declared by the model's publisher. */
+  declared: number;
+  /** Optional fields nobody filled. */
+  optional: number;
+  /** Fields only the publisher can decide (personal data, safety risk, autonomy). */
+  judgment: number;
+  /** Required fields still empty: while any are, the document is a draft. */
+  missingRequired: number;
+  /** Set to the vocabulary's own "unknown" because no signal said otherwise. */
+  noAssertion: number;
+  omitted: number;
+  /** Relationships and sources a person should check. */
+  review: number;
+}
+
+export interface Spdx3Summary {
+  draft: boolean;
+  counts: Partial<Spdx3Counts>;
+  /** The document's file name, null when only the check exists. */
+  name: string | null;
+  /** The check's file name, for reading the per-field detail via /file. */
+  check: string;
+  /** Whether the saved declaration went into the document. "refused" (with
+   *  the reasons) means it no longer fits the scan and the document was
+   *  written without it; this holds until the declaration is fixed. */
+  declaration?: { state: "none" | "applied" | "refused"; reasons: string[] };
+  /** The document still matches the SBOM, the saved declaration and this
+   *  converter. False when rebuilding it would change it (a declaration
+   *  edited outside the screens, a newer BomLens). */
+  upToDate?: boolean;
+}
+
+/** Outcome of writing the AI document or saving a declaration. */
+export interface Spdx3Written {
+  name: string;
+  results: ResultFile[];
+  spdx3: Spdx3Summary | null;
+}
+
+export type Spdx3Failure = {
+  ok: false;
+  /** 409: no model or dataset, or the scan is still running; 500: the
+   *  converter failed; 503: this image has no converter; 0: network. */
+  status: number;
+  error: string;
+  /** On a 422 from a save: each reason the declaration was refused. */
+  reasons?: string[];
+};
+
+async function spdx3Failure(res: Response, fallback: string): Promise<Spdx3Failure> {
+  const j = await res.json().catch(() => ({}));
+  return {
+    ok: false,
+    status: res.status,
+    error: typeof j.error === "string" ? j.error : `${fallback} (${res.status})`,
+    reasons: Array.isArray(j.reasons) ? (j.reasons as unknown[]).map(String) : undefined,
+  };
+}
+
+/**
+ * Write (or refresh) a scan's SPDX 3.0.1 AI document. The server rebuilds it
+ * only when it no longer matches the SBOM, the saved declaration or the
+ * converter. Resolves to the outcome instead of throwing, so the caller can
+ * say why it failed.
+ */
+export async function exportSpdx3(id: string): Promise<({ ok: true } & Spdx3Written) | Spdx3Failure> {
+  if (IS_STATIC_DEMO) return { ok: false, status: 0, error: "demo" };
+  try {
+    const res = await fetch(`/spdx3-export?id=${encodeURIComponent(id)}`);
+    if (!res.ok) return await spdx3Failure(res, "could not write the document");
+    return { ok: true, ...((await res.json()) as Spdx3Written) };
+  } catch {
+    return { ok: false, status: 0, error: "network" };
+  }
+}
+
+/** Write the empty declaration for a scan (rebuilt on each call). Null on failure. */
+export async function makeDeclarationTemplate(
+  id: string,
+): Promise<{ name: string; results: ResultFile[] } | null> {
+  if (IS_STATIC_DEMO) return null;
+  try {
+    const res = await fetch(`/ai-declaration-template?id=${encodeURIComponent(id)}`);
+    if (!res.ok) return null;
+    return (await res.json()) as { name: string; results: ResultFile[] };
+  } catch {
+    return null;
+  }
+}
+
+export type AiDeclarationOutcome = ({ ok: true } & Spdx3Written) | Spdx3Failure;
+
+/**
+ * Save the publisher's declaration for a scan and rewrite its SPDX 3.0.1
+ * document. A refusal (422 with reasons, 409 for a scan still running) and a
+ * network failure resolve as an outcome for the caller to show. Like every
+ * write, it throws in the static demo, which has no server to save to.
+ */
+export async function saveAiDeclaration(id: string, declaration: unknown): Promise<AiDeclarationOutcome> {
+  if (IS_STATIC_DEMO) demoWriteRefused();
+  try {
+    const res = await fetch(`/ai-declaration?id=${encodeURIComponent(id)}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(declaration),
+    });
+    if (!res.ok) return await spdx3Failure(res, "could not save");
+    return { ok: true, ...((await res.json()) as Spdx3Written) };
+  } catch {
+    return { ok: false, status: 0, error: "network" };
+  }
+}
+
+/**
+ * Check a declaration for a model described from it alone, before it is
+ * uploaded and the scan started: the server's own scan-start check, answered
+ * while the questions are still open. Resolves null when it is accepted.
+ */
+export async function checkAiDeclaration(
+  project: string,
+  version: string,
+  declaration: unknown,
+): Promise<Spdx3Failure | null> {
+  try {
+    const q = `project=${encodeURIComponent(project)}&version=${encodeURIComponent(version)}`;
+    const res = await fetch(`/ai-declaration-check?${q}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(declaration),
+    });
+    return res.ok ? null : await spdx3Failure(res, "could not check");
+  } catch {
+    return { ok: false, status: 0, error: "network" };
+  }
+}
+
+/** The field mapping the declaration screens draw their questions from
+ *  (`docker/lib/spdx3-ai-map.json`). Null when the server has none. */
+export async function fetchSpdx3Map(): Promise<unknown | null> {
+  if (IS_STATIC_DEMO) return null;
+  try {
+    const res = await fetch("/spdx3-map");
+    if (!res.ok) return null;
+    return (await res.json()) as unknown;
   } catch {
     return null;
   }

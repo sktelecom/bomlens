@@ -14,6 +14,7 @@ import {
   Lock,
   type LucideIcon,
   Package,
+  PencilLine,
 } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
@@ -65,6 +66,7 @@ const SOURCE_META: Record<SourceType, { labelKey: string; icon: LucideIcon }> = 
   "sbom-upload": { labelKey: "source.sbomUpload", icon: FileJson },
   "ai-model": { labelKey: "source.aiModel", icon: Brain },
   "model-upload": { labelKey: "source.modelUpload", icon: FileBox },
+  "ai-declare": { labelKey: "source.aiDeclare", icon: PencilLine },
 };
 
 // Grouped tiles: scan source code, scan a built artifact, analyze an SBOM, or
@@ -73,7 +75,7 @@ const SOURCE_GROUPS: Array<{ key: string; sources: SourceType[] }> = [
   { key: "catCode", sources: ["current-dir", "rootfs-dir", "git-url", "zip-upload"] },
   { key: "catArtifact", sources: ["docker-image", "package-upload", "firmware-upload"] },
   { key: "catSbom", sources: ["sbom-upload"] },
-  { key: "catAiModel", sources: ["ai-model", "model-upload"] },
+  { key: "catAiModel", sources: ["ai-model", "model-upload", "ai-declare"] },
 ];
 
 const SECTION_LABEL =
@@ -183,7 +185,8 @@ export function NewScan({
                       const active = state.source === s;
                       const locked =
                         (s === "firmware-upload" && !capabilities.firmware) ||
-                        (s === "ai-model" && !capabilities.aibom);
+                        (s === "ai-model" && !capabilities.aibom) ||
+                        (s === "ai-declare" && !capabilities.aiDeclare);
                       return (
                         <button
                           key={s}
@@ -266,8 +269,18 @@ export function NewScan({
                   autoFocus
                   aria-required
                   aria-invalid={state.errors.project ? true : undefined}
-                  aria-describedby={state.errors.project ? "project-error" : undefined}
+                  aria-describedby={
+                    [state.errors.project && "project-error", state.source === "ai-declare" && "project-hint"]
+                      .filter(Boolean)
+                      .join(" ") || undefined
+                  }
                 />
+                {/* A declared model has no hub name: the project becomes its name. */}
+                {state.source === "ai-declare" && (
+                  <p id="project-hint" className="text-xs text-muted-foreground">
+                    {t("form.projectHintDeclare")}
+                  </p>
+                )}
                 <FieldError id="project-error" msgKey={state.errors.project} />
               </div>
               <div className="space-y-2">

@@ -1,5 +1,5 @@
 Third-party Open Source Licenses for FlaskDataService
-Generated: 2026-09-15T12:43:18Z
+Generated: 2026-09-23T00:54:24Z
 Total components: 39 · Distinct licenses: 9
 
 This product includes the following open source software.
@@ -9,152 +9,111 @@ Each component lists its source/download location and copyright/attribution.
 License: Apache-2.0
 Components (4):
   - coverage@7.15.2
-      Source: https://files.pythonhosted.org/packages/10/03/060ce69008ac97bbc01b1411b3e55b61f6f015659400b46749b662107831/coverage-7.15.2-cp310-cp310-macosx_10_9_x86_64.whl
-      Copyright: holders not captured in SBOM — see source (https://files.pythonhosted.org/packages/10/03/060ce69008ac97bbc01b1411b3e55b61f6f015659400b46749b662107831/coverage-7.15.2-cp310-cp310-macosx_10_9_x86_64.whl)
+      Source: https://pypi.org/project/coverage/7.15.2/
   - python-dateutil@2.9.0.post0
-      Source: https://files.pythonhosted.org/packages/ec/57/56b9bcc3c9c6a792fcbaf139543cee77261f3651ca9da0c93f5c1221264b/python_dateutil-2.9.0.post0-py2.py3-none-any.whl
-      Copyright: holders not captured in SBOM — see source (https://files.pythonhosted.org/packages/ec/57/56b9bcc3c9c6a792fcbaf139543cee77261f3651ca9da0c93f5c1221264b/python_dateutil-2.9.0.post0-py2.py3-none-any.whl)
+      Source: https://pypi.org/project/python-dateutil/2.9.0.post0/
   - requests@2.31.0
-      Source: https://files.pythonhosted.org/packages/70/8e/0e2d847013cb52cd35b38c009bb167a1a26b2ce6cd6965bf26b47bc0bf44/requests-2.31.0-py3-none-any.whl
-      Copyright: holders not captured in SBOM — see source (https://files.pythonhosted.org/packages/70/8e/0e2d847013cb52cd35b38c009bb167a1a26b2ce6cd6965bf26b47bc0bf44/requests-2.31.0-py3-none-any.whl)
+      Source: https://pypi.org/project/requests/2.31.0/
   - tzdata@2026.3
-      Source: https://files.pythonhosted.org/packages/e5/6d/b53b99a9f2766d095985947a5782f1702cabb129a34f7a802d7197af832f/tzdata-2026.3-py2.py3-none-any.whl
-      Copyright: holders not captured in SBOM — see source (https://files.pythonhosted.org/packages/e5/6d/b53b99a9f2766d095985947a5782f1702cabb129a34f7a802d7197af832f/tzdata-2026.3-py2.py3-none-any.whl)
+      Source: https://pypi.org/project/tzdata/2026.3/
 
 License: Apache-2.0 OR BSD-2-Clause
 Components (1):
   - packaging@26.2
-      Source: https://files.pythonhosted.org/packages/df/b2/87e62e8c3e2f4b32e5fe99e0b86d576da1312593b39f47d8ceef365e95ed/packaging-26.2-py3-none-any.whl
-      Copyright: holders not captured in SBOM — see source (https://files.pythonhosted.org/packages/df/b2/87e62e8c3e2f4b32e5fe99e0b86d576da1312593b39f47d8ceef365e95ed/packaging-26.2-py3-none-any.whl)
+      Source: https://pypi.org/project/packaging/26.2/
 
 License: BSD License  [unverified name — not an SPDX identifier; confirm against the component's license file]
 Components (1):
   - python-dateutil@2.9.0.post0
-      Source: https://files.pythonhosted.org/packages/ec/57/56b9bcc3c9c6a792fcbaf139543cee77261f3651ca9da0c93f5c1221264b/python_dateutil-2.9.0.post0-py2.py3-none-any.whl
-      Copyright: holders not captured in SBOM — see source (https://files.pythonhosted.org/packages/ec/57/56b9bcc3c9c6a792fcbaf139543cee77261f3651ca9da0c93f5c1221264b/python_dateutil-2.9.0.post0-py2.py3-none-any.whl)
+      Source: https://pypi.org/project/python-dateutil/2.9.0.post0/
 
 License: BSD-3-Clause
 Components (10):
   - Flask@3.0.0
-      Source: https://files.pythonhosted.org/packages/36/42/015c23096649b908c809c69388a805a571a3bea44362fe87e33fc3afa01f/flask-3.0.0-py3-none-any.whl
-      Copyright: holders not captured in SBOM — see source (https://files.pythonhosted.org/packages/36/42/015c23096649b908c809c69388a805a571a3bea44362fe87e33fc3afa01f/flask-3.0.0-py3-none-any.whl)
+      Source: https://pypi.org/project/flask/3.0.0/
   - Jinja2@3.1.6
-      Source: https://files.pythonhosted.org/packages/62/a1/3d680cbfd5f4b8f15abc1d571870c5fc3e594bb582bc3b64ea099db13e56/jinja2-3.1.6-py3-none-any.whl
-      Copyright: holders not captured in SBOM — see source (https://files.pythonhosted.org/packages/62/a1/3d680cbfd5f4b8f15abc1d571870c5fc3e594bb582bc3b64ea099db13e56/jinja2-3.1.6-py3-none-any.whl)
+      Source: https://pypi.org/project/jinja2/3.1.6/
   - MarkupSafe@3.0.3
-      Source: https://files.pythonhosted.org/packages/e8/4b/3541d44f3937ba468b75da9eebcae497dcf67adb65caa16760b0a6807ebb/markupsafe-3.0.3-cp310-cp310-macosx_10_9_x86_64.whl
-      Copyright: holders not captured in SBOM — see source (https://files.pythonhosted.org/packages/e8/4b/3541d44f3937ba468b75da9eebcae497dcf67adb65caa16760b0a6807ebb/markupsafe-3.0.3-cp310-cp310-macosx_10_9_x86_64.whl)
+      Source: https://pypi.org/project/markupsafe/3.0.3/
   - Werkzeug@3.0.1
-      Source: https://files.pythonhosted.org/packages/c3/fc/254c3e9b5feb89ff5b9076a23218dafbc99c96ac5941e900b71206e6313b/werkzeug-3.0.1-py3-none-any.whl
-      Copyright: holders not captured in SBOM — see source (https://files.pythonhosted.org/packages/c3/fc/254c3e9b5feb89ff5b9076a23218dafbc99c96ac5941e900b71206e6313b/werkzeug-3.0.1-py3-none-any.whl)
+      Source: https://pypi.org/project/werkzeug/3.0.1/
   - click@8.1.7
-      Source: https://files.pythonhosted.org/packages/00/2e/d53fa4befbf2cfa713304affc7ca780ce4fc1fd8710527771b58311a3229/click-8.1.7-py3-none-any.whl
-      Copyright: holders not captured in SBOM — see source (https://files.pythonhosted.org/packages/00/2e/d53fa4befbf2cfa713304affc7ca780ce4fc1fd8710527771b58311a3229/click-8.1.7-py3-none-any.whl)
+      Source: https://pypi.org/project/click/8.1.7/
   - idna@3.18
-      Source: https://files.pythonhosted.org/packages/1e/5e/d4e9f1a599fb8e573b7b87160658329fbf28d19eac2718f51fc3def3aa5a/idna-3.18-py3-none-any.whl
-      Copyright: holders not captured in SBOM — see source (https://files.pythonhosted.org/packages/1e/5e/d4e9f1a599fb8e573b7b87160658329fbf28d19eac2718f51fc3def3aa5a/idna-3.18-py3-none-any.whl)
+      Source: https://pypi.org/project/idna/3.18/
   - itsdangerous@2.2.0
-      Source: https://files.pythonhosted.org/packages/04/96/92447566d16df59b2a776c0fb82dbc4d9e07cd95062562af01e408583fc4/itsdangerous-2.2.0-py3-none-any.whl
-      Copyright: holders not captured in SBOM — see source (https://files.pythonhosted.org/packages/04/96/92447566d16df59b2a776c0fb82dbc4d9e07cd95062562af01e408583fc4/itsdangerous-2.2.0-py3-none-any.whl)
+      Source: https://pypi.org/project/itsdangerous/2.2.0/
   - numpy@1.26.2
-      Source: https://files.pythonhosted.org/packages/76/ac/dea2939dfc3c591a2494121669455fd7d049248ef284c9542904ddbe05d5/numpy-1.26.2-cp310-cp310-macosx_10_9_x86_64.whl
-      Copyright: holders not captured in SBOM — see source (https://files.pythonhosted.org/packages/76/ac/dea2939dfc3c591a2494121669455fd7d049248ef284c9542904ddbe05d5/numpy-1.26.2-cp310-cp310-macosx_10_9_x86_64.whl)
+      Source: https://pypi.org/project/numpy/1.26.2/
   - pandas@2.1.4
-      Source: https://files.pythonhosted.org/packages/e3/cc/ad068419c245c504315ace4e19cc17b1205e162ad51957485b048ffadb80/pandas-2.1.4-cp310-cp310-macosx_10_9_x86_64.whl
-      Copyright: holders not captured in SBOM — see source (https://files.pythonhosted.org/packages/e3/cc/ad068419c245c504315ace4e19cc17b1205e162ad51957485b048ffadb80/pandas-2.1.4-cp310-cp310-macosx_10_9_x86_64.whl)
+      Source: https://pypi.org/project/pandas/2.1.4/
   - python-dotenv@1.0.0
-      Source: https://files.pythonhosted.org/packages/44/2f/62ea1c8b593f4e093cc1a7768f0d46112107e790c3e478532329e434f00b/python_dotenv-1.0.0-py3-none-any.whl
-      Copyright: holders not captured in SBOM — see source (https://files.pythonhosted.org/packages/44/2f/62ea1c8b593f4e093cc1a7768f0d46112107e790c3e478532329e434f00b/python_dotenv-1.0.0-py3-none-any.whl)
+      Source: https://pypi.org/project/python-dotenv/1.0.0/
 
 License: Dual License  [unverified name — not an SPDX identifier; confirm against the component's license file]
 Components (1):
   - python-dateutil@2.9.0.post0
-      Source: https://files.pythonhosted.org/packages/ec/57/56b9bcc3c9c6a792fcbaf139543cee77261f3651ca9da0c93f5c1221264b/python_dateutil-2.9.0.post0-py2.py3-none-any.whl
-      Copyright: holders not captured in SBOM — see source (https://files.pythonhosted.org/packages/ec/57/56b9bcc3c9c6a792fcbaf139543cee77261f3651ca9da0c93f5c1221264b/python_dateutil-2.9.0.post0-py2.py3-none-any.whl)
+      Source: https://pypi.org/project/python-dateutil/2.9.0.post0/
 
 License: MIT
 Components (20):
   - SQLAlchemy@2.0.23
-      Source: https://files.pythonhosted.org/packages/53/ce/d7262dcc228f66c4d805c8975f71deca581e8a56b46612eb35708ec5cb51/SQLAlchemy-2.0.23-cp310-cp310-macosx_10_9_x86_64.whl
-      Copyright: holders not captured in SBOM — see source (https://files.pythonhosted.org/packages/53/ce/d7262dcc228f66c4d805c8975f71deca581e8a56b46612eb35708ec5cb51/SQLAlchemy-2.0.23-cp310-cp310-macosx_10_9_x86_64.whl)
+      Source: https://pypi.org/project/sqlalchemy/2.0.23/
   - annotated-types@0.8.0
-      Source: https://files.pythonhosted.org/packages/99/91/8acff4f5e50511b911bbccb72b8628a49c68ce14148cd9f6431094859a90/annotated_types-0.8.0-py3-none-any.whl
-      Copyright: holders not captured in SBOM — see source (https://files.pythonhosted.org/packages/99/91/8acff4f5e50511b911bbccb72b8628a49c68ce14148cd9f6431094859a90/annotated_types-0.8.0-py3-none-any.whl)
+      Source: https://pypi.org/project/annotated-types/0.8.0/
   - black@23.12.1
-      Source: https://files.pythonhosted.org/packages/fb/58/677da52d845b59505a8a787ff22eff9cfd9046b5789aa2bd387b236db5c5/black-23.12.1-cp310-cp310-macosx_10_9_x86_64.whl
-      Copyright: holders not captured in SBOM — see source (https://files.pythonhosted.org/packages/fb/58/677da52d845b59505a8a787ff22eff9cfd9046b5789aa2bd387b236db5c5/black-23.12.1-cp310-cp310-macosx_10_9_x86_64.whl)
+      Source: https://pypi.org/project/black/23.12.1/
   - blinker@1.9.0
-      Source: https://files.pythonhosted.org/packages/10/cb/f2ad4230dc2eb1a74edf38f1a38b9b52277f75bef262d8908e60d957e13c/blinker-1.9.0-py3-none-any.whl
-      Copyright: holders not captured in SBOM — see source (https://files.pythonhosted.org/packages/10/cb/f2ad4230dc2eb1a74edf38f1a38b9b52277f75bef262d8908e60d957e13c/blinker-1.9.0-py3-none-any.whl)
+      Source: https://pypi.org/project/blinker/1.9.0/
   - charset-normalizer@3.4.9
-      Source: https://files.pythonhosted.org/packages/ad/81/8e983840c6e5b93b33c2ba81aa3d52c2e42f0e9a690ce7607a2e61da4a5c/charset_normalizer-3.4.9-cp310-cp310-macosx_10_9_universal2.whl
-      Copyright: holders not captured in SBOM — see source (https://files.pythonhosted.org/packages/ad/81/8e983840c6e5b93b33c2ba81aa3d52c2e42f0e9a690ce7607a2e61da4a5c/charset_normalizer-3.4.9-cp310-cp310-macosx_10_9_universal2.whl)
+      Source: https://pypi.org/project/charset-normalizer/3.4.9/
   - flake8@6.1.0
-      Source: https://files.pythonhosted.org/packages/b0/24/bbf7175ffc47cb3d3e1eb523ddb23272968359dfcf2e1294707a2bf12fc4/flake8-6.1.0-py2.py3-none-any.whl
-      Copyright: holders not captured in SBOM — see source (https://files.pythonhosted.org/packages/b0/24/bbf7175ffc47cb3d3e1eb523ddb23272968359dfcf2e1294707a2bf12fc4/flake8-6.1.0-py2.py3-none-any.whl)
+      Source: https://pypi.org/project/flake8/6.1.0/
   - iniconfig@2.3.0
-      Source: https://files.pythonhosted.org/packages/cb/b1/3846dd7f199d53cb17f49cba7e651e9ce294d8497c8c150530ed11865bb8/iniconfig-2.3.0-py3-none-any.whl
-      Copyright: holders not captured in SBOM — see source (https://files.pythonhosted.org/packages/cb/b1/3846dd7f199d53cb17f49cba7e651e9ce294d8497c8c150530ed11865bb8/iniconfig-2.3.0-py3-none-any.whl)
+      Source: https://pypi.org/project/iniconfig/2.3.0/
   - mccabe@0.7.0
-      Source: https://files.pythonhosted.org/packages/27/1a/1f68f9ba0c207934b35b86a8ca3aad8395a3d6dd7921c0686e23853ff5a9/mccabe-0.7.0-py2.py3-none-any.whl
-      Copyright: holders not captured in SBOM — see source (https://files.pythonhosted.org/packages/27/1a/1f68f9ba0c207934b35b86a8ca3aad8395a3d6dd7921c0686e23853ff5a9/mccabe-0.7.0-py2.py3-none-any.whl)
+      Source: https://pypi.org/project/mccabe/0.7.0/
   - mypy-extensions@1.1.0
-      Source: https://files.pythonhosted.org/packages/79/7b/2c79738432f5c924bef5071f933bcc9efd0473bac3b4aa584a6f7c1c8df8/mypy_extensions-1.1.0-py3-none-any.whl
-      Copyright: holders not captured in SBOM — see source (https://files.pythonhosted.org/packages/79/7b/2c79738432f5c924bef5071f933bcc9efd0473bac3b4aa584a6f7c1c8df8/mypy_extensions-1.1.0-py3-none-any.whl)
+      Source: https://pypi.org/project/mypy-extensions/1.1.0/
   - platformdirs@4.11.0
-      Source: https://files.pythonhosted.org/packages/7d/68/d8d58938dfb1370b266a1a729e6d77a985be23689a0496498ee17b2cbf90/platformdirs-4.11.0-py3-none-any.whl
-      Copyright: holders not captured in SBOM — see source (https://files.pythonhosted.org/packages/7d/68/d8d58938dfb1370b266a1a729e6d77a985be23689a0496498ee17b2cbf90/platformdirs-4.11.0-py3-none-any.whl)
+      Source: https://pypi.org/project/platformdirs/4.11.0/
   - pluggy@1.6.0
-      Source: https://files.pythonhosted.org/packages/54/20/4d324d65cc6d9205fabedc306948156824eb9f0ee1633355a8f7ec5c66bf/pluggy-1.6.0-py3-none-any.whl
-      Copyright: holders not captured in SBOM — see source (https://files.pythonhosted.org/packages/54/20/4d324d65cc6d9205fabedc306948156824eb9f0ee1633355a8f7ec5c66bf/pluggy-1.6.0-py3-none-any.whl)
+      Source: https://pypi.org/project/pluggy/1.6.0/
   - pycodestyle@2.11.1
-      Source: https://files.pythonhosted.org/packages/b1/90/a998c550d0ddd07e38605bb5c455d00fcc177a800ff9cc3dafdcb3dd7b56/pycodestyle-2.11.1-py2.py3-none-any.whl
-      Copyright: holders not captured in SBOM — see source (https://files.pythonhosted.org/packages/b1/90/a998c550d0ddd07e38605bb5c455d00fcc177a800ff9cc3dafdcb3dd7b56/pycodestyle-2.11.1-py2.py3-none-any.whl)
+      Source: https://pypi.org/project/pycodestyle/2.11.1/
   - pydantic-core@2.14.5
-      Source: https://files.pythonhosted.org/packages/c0/d2/b31c030802f29c35fa0c8ab92891bee9dcedd2793df560041b6d38f5fd49/pydantic_core-2.14.5-cp310-cp310-macosx_10_7_x86_64.whl
-      Copyright: holders not captured in SBOM — see source (https://files.pythonhosted.org/packages/c0/d2/b31c030802f29c35fa0c8ab92891bee9dcedd2793df560041b6d38f5fd49/pydantic_core-2.14.5-cp310-cp310-macosx_10_7_x86_64.whl)
+      Source: https://pypi.org/project/pydantic-core/2.14.5/
   - pydantic@2.5.2
-      Source: https://files.pythonhosted.org/packages/0a/2b/64066de1c4cf3d4ed623beeb3bbf3f8d0cc26661f1e7d180ec5eb66b75a5/pydantic-2.5.2-py3-none-any.whl
-      Copyright: holders not captured in SBOM — see source (https://files.pythonhosted.org/packages/0a/2b/64066de1c4cf3d4ed623beeb3bbf3f8d0cc26661f1e7d180ec5eb66b75a5/pydantic-2.5.2-py3-none-any.whl)
+      Source: https://pypi.org/project/pydantic/2.5.2/
   - pyflakes@3.1.0
-      Source: https://files.pythonhosted.org/packages/00/e9/1e1fd7fae559bfd07704991e9a59dd1349b72423c904256c073ce88a9940/pyflakes-3.1.0-py2.py3-none-any.whl
-      Copyright: holders not captured in SBOM — see source (https://files.pythonhosted.org/packages/00/e9/1e1fd7fae559bfd07704991e9a59dd1349b72423c904256c073ce88a9940/pyflakes-3.1.0-py2.py3-none-any.whl)
+      Source: https://pypi.org/project/pyflakes/3.1.0/
   - pytest-cov@4.1.0
-      Source: https://files.pythonhosted.org/packages/a7/4b/8b78d126e275efa2379b1c2e09dc52cf70df16fc3b90613ef82531499d73/pytest_cov-4.1.0-py3-none-any.whl
-      Copyright: holders not captured in SBOM — see source (https://files.pythonhosted.org/packages/a7/4b/8b78d126e275efa2379b1c2e09dc52cf70df16fc3b90613ef82531499d73/pytest_cov-4.1.0-py3-none-any.whl)
+      Source: https://pypi.org/project/pytest-cov/4.1.0/
   - pytest@7.4.3
-      Source: https://files.pythonhosted.org/packages/f3/8c/f16efd81ca8e293b2cc78f111190a79ee539d0d5d36ccd49975cb3beac60/pytest-7.4.3-py3-none-any.whl
-      Copyright: holders not captured in SBOM — see source (https://files.pythonhosted.org/packages/f3/8c/f16efd81ca8e293b2cc78f111190a79ee539d0d5d36ccd49975cb3beac60/pytest-7.4.3-py3-none-any.whl)
+      Source: https://pypi.org/project/pytest/7.4.3/
   - pytz@2026.3.post1
-      Source: https://files.pythonhosted.org/packages/0f/7b/39c34ca613b0b198cb866466651b26b045e2009864c5183c979a3b83f383/pytz-2026.3.post1-py2.py3-none-any.whl
-      Copyright: holders not captured in SBOM — see source (https://files.pythonhosted.org/packages/0f/7b/39c34ca613b0b198cb866466651b26b045e2009864c5183c979a3b83f383/pytz-2026.3.post1-py2.py3-none-any.whl)
+      Source: https://pypi.org/project/pytz/2026.3.post1/
   - six@1.17.0
-      Source: https://files.pythonhosted.org/packages/b7/ce/149a00dd41f10bc29e5921b496af8b574d8413afcd5e30dfa0ed46c2cc5e/six-1.17.0-py2.py3-none-any.whl
-      Copyright: holders not captured in SBOM — see source (https://files.pythonhosted.org/packages/b7/ce/149a00dd41f10bc29e5921b496af8b574d8413afcd5e30dfa0ed46c2cc5e/six-1.17.0-py2.py3-none-any.whl)
+      Source: https://pypi.org/project/six/1.17.0/
   - urllib3@2.1.0
-      Source: https://files.pythonhosted.org/packages/96/94/c31f58c7a7f470d5665935262ebd7455c7e4c7782eb525658d3dbf4b9403/urllib3-2.1.0-py3-none-any.whl
-      Copyright: holders not captured in SBOM — see source (https://files.pythonhosted.org/packages/96/94/c31f58c7a7f470d5665935262ebd7455c7e4c7782eb525658d3dbf4b9403/urllib3-2.1.0-py3-none-any.whl)
+      Source: https://pypi.org/project/urllib3/2.1.0/
 
 License: MIT AND PSF-2.0
 Components (1):
   - greenlet@3.5.4
-      Source: https://files.pythonhosted.org/packages/f7/9d/58f80897f4121f5c218bb931cf6d3b6514873f02ad0b729f744352926b9f/greenlet-3.5.4-cp310-cp310-macosx_11_0_universal2.whl
-      Copyright: holders not captured in SBOM — see source (https://files.pythonhosted.org/packages/f7/9d/58f80897f4121f5c218bb931cf6d3b6514873f02ad0b729f744352926b9f/greenlet-3.5.4-cp310-cp310-macosx_11_0_universal2.whl)
+      Source: https://pypi.org/project/greenlet/3.5.4/
 
 License: MPL-2.0
 Components (2):
   - certifi@2026.7.22
-      Source: https://files.pythonhosted.org/packages/0b/a7/71ac2cff56fec219ed242bb11b8efb69fcc4bec75db06fb7bfe35de520e6/certifi-2026.7.22-py3-none-any.whl
-      Copyright: holders not captured in SBOM — see source (https://files.pythonhosted.org/packages/0b/a7/71ac2cff56fec219ed242bb11b8efb69fcc4bec75db06fb7bfe35de520e6/certifi-2026.7.22-py3-none-any.whl)
+      Source: https://pypi.org/project/certifi/2026.7.22/
   - pathspec@1.1.1
-      Source: https://files.pythonhosted.org/packages/f1/d9/7fb5aa316bc299258e68c73ba3bddbc499654a07f151cba08f6153988714/pathspec-1.1.1-py3-none-any.whl
-      Copyright: holders not captured in SBOM — see source (https://files.pythonhosted.org/packages/f1/d9/7fb5aa316bc299258e68c73ba3bddbc499654a07f151cba08f6153988714/pathspec-1.1.1-py3-none-any.whl)
+      Source: https://pypi.org/project/pathspec/1.1.1/
 
 License: PSF-2.0
 Components (1):
   - typing-extensions@4.16.0
-      Source: https://files.pythonhosted.org/packages/49/d3/b8441a820a491ddfc024b0b0cf0393375b75ea13866d9c66727e54c2fc80/typing_extensions-4.16.0-py3-none-any.whl
-      Copyright: holders not captured in SBOM — see source (https://files.pythonhosted.org/packages/49/d3/b8441a820a491ddfc024b0b0cf0393375b75ea13866d9c66727e54c2fc80/typing_extensions-4.16.0-py3-none-any.whl)
+      Source: https://pypi.org/project/typing-extensions/4.16.0/
 
 ================================================================================
 License texts (SPDX standard)

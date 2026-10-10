@@ -4529,6 +4529,75 @@ else
     echo "  SKIP: node unavailable — skipping node production-filter test"
 fi
 
+echo "== install-dir: license-file components under package-manager install dirs are dropped =="
+# Guards docker/lib/build-prep.sh's install-directory filter. Newer cdxgen
+# reports every directory with a LICENSE file as an unversioned pkg:generic
+# component (cdx:vendored:path) and every CMake subproject as another
+# (cdx:cmake:subprojectDir), including the ones inside node_modules/, Composer's
+# vendor/ and SwiftPM's .build/ (examples/nodejs went from 120 to 554
+# components). Those must go, with their graph edges; vendored code in the
+# project's own tree, and BomLens's own vendored results, must stay.
+if command -v node >/dev/null 2>&1; then
+    IDF="$WORK/instdir-filter.js"
+    sed -n "/<<'INSTDIR_JS'/,/^INSTDIR_JS\$/p" "$ROOT_DIR/docker/lib/build-prep.sh" \
+        | sed '1d;$d' > "$IDF"
+    if [ -s "$IDF" ]; then
+        IDR="$WORK/instdir-root"
+        mkdir -p "$IDR/vendor/psr/container" "$IDR/cproj/vendor/zlib" "$IDR/third_party/zlib"
+        echo '{}' > "$IDR/composer.json"
+        cat > "$WORK/instdir-bom.json" <<'JSON'
+{"bomFormat":"CycloneDX","specVersion":"1.6",
+ "metadata":{"component":{"name":"app","version":"1.0.0","bom-ref":"root"}},
+ "components":[
+   {"name":"accepts","version":"1.3.8","purl":"pkg:npm/accepts@1.3.8","bom-ref":"pkg:npm/accepts@1.3.8"},
+   {"name":"accepts","purl":"pkg:generic/accepts#node_modules/accepts","bom-ref":"pkg:generic/accepts#node_modules/accepts",
+    "properties":[{"name":"cdx:vendored","value":"true"},{"name":"cdx:vendored:path","value":"node_modules/accepts"}]},
+   {"name":"x","purl":"pkg:generic/x#packages/web/node_modules/x","bom-ref":"nested-nm",
+    "properties":[{"name":"cdx:vendored:path","value":"packages/web/node_modules/x"}]},
+   {"name":"container","purl":"pkg:generic/container#vendor/psr/container","bom-ref":"composer-vendor",
+    "properties":[{"name":"cdx:vendored:path","value":"vendor/psr/container"}]},
+   {"name":"swift-log","purl":"pkg:generic/swift-log","bom-ref":"pkg:generic/swift-log",
+    "properties":[{"name":"cdx:cmake:subprojectDir","value":".build/checkouts/swift-log"}]},
+   {"name":"zlib","purl":"pkg:generic/zlib#third_party/zlib","bom-ref":"own-zlib",
+    "properties":[{"name":"cdx:vendored:path","value":"third_party/zlib"}]},
+   {"name":"zlib","purl":"pkg:generic/zlib#cproj/vendor/zlib","bom-ref":"c-vendor-zlib",
+    "properties":[{"name":"cdx:vendored:path","value":"cproj/vendor/zlib"}]},
+   {"name":"openssl","version":"3.0.0","purl":"pkg:generic/openssl@3.0.0","bom-ref":"scanoss-openssl",
+    "properties":[{"name":"bomlens:layer","value":"vendored"},{"name":"bomlens:identifiedBy","value":"scanoss"}]}
+ ],
+ "dependencies":[
+   {"ref":"root","dependsOn":["pkg:npm/accepts@1.3.8","pkg:generic/accepts#node_modules/accepts","pkg:generic/swift-log","own-zlib"]},
+   {"ref":"pkg:generic/accepts#node_modules/accepts","dependsOn":[]},
+   {"ref":"pkg:generic/swift-log","dependsOn":[]},
+   {"ref":"own-zlib","dependsOn":[]}
+ ]}
+JSON
+        node "$IDF" "$WORK/instdir-bom.json" "$IDR" 2>/dev/null
+        refs=$(jq -r '[.components[]."bom-ref"]|sort|join(",")' "$WORK/instdir-bom.json")
+        [ "$refs" = "c-vendor-zlib,own-zlib,pkg:npm/accepts@1.3.8,scanoss-openssl" ] \
+            && pass "install-dir components dropped; npm, own-tree vendored and scanoss results kept (got: $refs)" \
+            || fail "unexpected components after the install-dir filter" "$refs"
+        deps=$(jq -r '[.dependencies[].ref]|sort|join(",")' "$WORK/instdir-bom.json")
+        [ "$deps" = "own-zlib,root" ] \
+            && pass "dropped components' dependency entries removed (got: $deps)" \
+            || fail "dangling dependency entries after the install-dir filter" "$deps"
+        rootdeps=$(jq -r '.dependencies[]|select(.ref=="root")|.dependsOn|sort|join(",")' "$WORK/instdir-bom.json")
+        [ "$rootdeps" = "own-zlib,pkg:npm/accepts@1.3.8" ] \
+            && pass "root dependsOn pruned to kept refs (got: $rootdeps)" \
+            || fail "root dependsOn still names a dropped component" "$rootdeps"
+        # A BOM with nothing to drop is left byte-for-byte alone.
+        cp "$WORK/instdir-bom.json" "$WORK/instdir-bom2.json"
+        node "$IDF" "$WORK/instdir-bom2.json" "$IDR" 2>/dev/null
+        cmp -s "$WORK/instdir-bom.json" "$WORK/instdir-bom2.json" \
+            && pass "a BOM with nothing under an install dir is not rewritten" \
+            || fail "the install-dir filter rewrote a BOM it had nothing to drop from"
+    else
+        fail "could not extract INSTDIR_JS from build-prep.sh"
+    fi
+else
+    echo "  SKIP: node unavailable, skipping the install-dir filter test"
+fi
+
 echo "== php-scope: composer scope filter drops require-dev, keeps require (shared with maven) =="
 # Guards docker/lib/build-prep.sh's run_scope_filter(): cdxgen already tags each
 # composer component with its resolved scope (require -> required, require-dev

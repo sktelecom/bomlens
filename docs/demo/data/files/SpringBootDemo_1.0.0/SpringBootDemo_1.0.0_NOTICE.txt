@@ -1,5 +1,5 @@
 Third-party Open Source Licenses for SpringBootDemo
-Generated: 2026-09-15T12:44:32Z
+Generated: 2026-09-23T00:56:18Z
 Total components: 64 · Distinct licenses: 10
 
 This product includes the following open source software.
@@ -10,235 +10,167 @@ License: Apache-2.0
 Components (45):
   - HikariCP@5.0.1
       Source: https://repo1.maven.org/maven2/com/zaxxer/HikariCP/5.0.1/
-      Copyright: holders not captured in SBOM — see source (https://repo1.maven.org/maven2/com/zaxxer/HikariCP/5.0.1/)
   - byte-buddy@1.14.7
       Source: https://repo1.maven.org/maven2/net/bytebuddy/byte-buddy/1.14.7/
-      Copyright: holders not captured in SBOM — see source (https://repo1.maven.org/maven2/net/bytebuddy/byte-buddy/1.14.7/)
   - classmate@1.5.1
       Source: https://github.com/FasterXML/java-classmate
-      Copyright: holders not captured in SBOM — see source (https://github.com/FasterXML/java-classmate)
   - commons-lang3@3.14.0
       Source: https://gitbox.apache.org/repos/asf?p=commons-lang.git
-      Copyright: holders not captured in SBOM — see source (https://gitbox.apache.org/repos/asf?p=commons-lang.git)
   - jackson-annotations@2.16.0
       Source: https://github.com/FasterXML/jackson-annotations
-      Copyright: holders not captured in SBOM — see source (https://github.com/FasterXML/jackson-annotations)
   - jackson-core@2.16.0
       Source: https://github.com/FasterXML/jackson-core
-      Copyright: holders not captured in SBOM — see source (https://github.com/FasterXML/jackson-core)
   - jackson-databind@2.16.0
       Source: https://github.com/FasterXML/jackson-databind
-      Copyright: holders not captured in SBOM — see source (https://github.com/FasterXML/jackson-databind)
   - jackson-datatype-jdk8@2.15.3
       Source: http://github.com/FasterXML/jackson-modules-java8
-      Copyright: holders not captured in SBOM — see source (http://github.com/FasterXML/jackson-modules-java8)
   - jackson-datatype-jsr310@2.15.3
       Source: http://github.com/FasterXML/jackson-modules-java8
-      Copyright: holders not captured in SBOM — see source (http://github.com/FasterXML/jackson-modules-java8)
   - jackson-module-parameter-names@2.15.3
       Source: http://github.com/FasterXML/jackson-modules-java8
-      Copyright: holders not captured in SBOM — see source (http://github.com/FasterXML/jackson-modules-java8)
   - jakarta.inject-api@2.0.1
       Source: https://github.com/eclipse-ee4j/injection-api
-      Copyright: holders not captured in SBOM — see source (https://github.com/eclipse-ee4j/injection-api)
   - jandex@3.1.2
       Source: https://github.com/smallrye/jandex/
-      Copyright: holders not captured in SBOM — see source (https://github.com/smallrye/jandex/)
   - jboss-logging@3.5.0.Final
       Source: https://github.com/jboss-logging/jboss-logging
-      Copyright: holders not captured in SBOM — see source (https://github.com/jboss-logging/jboss-logging)
   - log4j-api@2.21.1
       Source: https://repo1.maven.org/maven2/org/apache/logging/log4j/log4j-api/2.21.1/
-      Copyright: holders not captured in SBOM — see source (https://repo1.maven.org/maven2/org/apache/logging/log4j/log4j-api/2.21.1/)
   - log4j-to-slf4j@2.21.1
       Source: https://repo1.maven.org/maven2/org/apache/logging/log4j/log4j-to-slf4j/2.21.1/
-      Copyright: holders not captured in SBOM — see source (https://repo1.maven.org/maven2/org/apache/logging/log4j/log4j-to-slf4j/2.21.1/)
   - micrometer-commons@1.12.0
       Source: https://repo1.maven.org/maven2/io/micrometer/micrometer-commons/1.12.0/
-      Copyright: holders not captured in SBOM — see source (https://repo1.maven.org/maven2/io/micrometer/micrometer-commons/1.12.0/)
   - micrometer-observation@1.12.0
       Source: https://repo1.maven.org/maven2/io/micrometer/micrometer-observation/1.12.0/
-      Copyright: holders not captured in SBOM — see source (https://repo1.maven.org/maven2/io/micrometer/micrometer-observation/1.12.0/)
   - snakeyaml@2.2
       Source: https://bitbucket.org/snakeyaml/snakeyaml/src
-      Copyright: holders not captured in SBOM — see source (https://bitbucket.org/snakeyaml/snakeyaml/src)
   - spring-aop@6.1.1
       Source: https://github.com/spring-projects/spring-framework
-      Copyright: holders not captured in SBOM — see source (https://github.com/spring-projects/spring-framework)
   - spring-aspects@6.1.1
       Source: https://github.com/spring-projects/spring-framework
-      Copyright: holders not captured in SBOM — see source (https://github.com/spring-projects/spring-framework)
   - spring-beans@6.1.1
       Source: https://github.com/spring-projects/spring-framework
-      Copyright: holders not captured in SBOM — see source (https://github.com/spring-projects/spring-framework)
   - spring-boot-autoconfigure@3.2.0
       Source: https://github.com/spring-projects/spring-boot
-      Copyright: holders not captured in SBOM — see source (https://github.com/spring-projects/spring-boot)
   - spring-boot-starter-aop@3.2.0
       Source: https://github.com/spring-projects/spring-boot
-      Copyright: holders not captured in SBOM — see source (https://github.com/spring-projects/spring-boot)
   - spring-boot-starter-data-jpa@3.2.0
       Source: https://github.com/spring-projects/spring-boot
-      Copyright: holders not captured in SBOM — see source (https://github.com/spring-projects/spring-boot)
   - spring-boot-starter-jdbc@3.2.0
       Source: https://github.com/spring-projects/spring-boot
-      Copyright: holders not captured in SBOM — see source (https://github.com/spring-projects/spring-boot)
   - spring-boot-starter-json@3.2.0
       Source: https://github.com/spring-projects/spring-boot
-      Copyright: holders not captured in SBOM — see source (https://github.com/spring-projects/spring-boot)
   - spring-boot-starter-logging@3.2.0
       Source: https://github.com/spring-projects/spring-boot
-      Copyright: holders not captured in SBOM — see source (https://github.com/spring-projects/spring-boot)
   - spring-boot-starter-tomcat@3.2.0
       Source: https://github.com/spring-projects/spring-boot
-      Copyright: holders not captured in SBOM — see source (https://github.com/spring-projects/spring-boot)
   - spring-boot-starter-web@3.2.0
       Source: https://github.com/spring-projects/spring-boot
-      Copyright: holders not captured in SBOM — see source (https://github.com/spring-projects/spring-boot)
   - spring-boot-starter@3.2.0
       Source: https://github.com/spring-projects/spring-boot
-      Copyright: holders not captured in SBOM — see source (https://github.com/spring-projects/spring-boot)
   - spring-boot@3.2.0
       Source: https://github.com/spring-projects/spring-boot
-      Copyright: holders not captured in SBOM — see source (https://github.com/spring-projects/spring-boot)
   - spring-context@6.1.1
       Source: https://github.com/spring-projects/spring-framework
-      Copyright: holders not captured in SBOM — see source (https://github.com/spring-projects/spring-framework)
   - spring-core@6.1.1
       Source: https://github.com/spring-projects/spring-framework
-      Copyright: holders not captured in SBOM — see source (https://github.com/spring-projects/spring-framework)
   - spring-data-commons@3.2.0
       Source: https://github.com/spring-projects/spring-data-commons
-      Copyright: holders not captured in SBOM — see source (https://github.com/spring-projects/spring-data-commons)
   - spring-data-jpa@3.2.0
       Source: https://github.com/spring-projects/spring-data-jpa
-      Copyright: holders not captured in SBOM — see source (https://github.com/spring-projects/spring-data-jpa)
   - spring-expression@6.1.1
       Source: https://github.com/spring-projects/spring-framework
-      Copyright: holders not captured in SBOM — see source (https://github.com/spring-projects/spring-framework)
   - spring-jcl@6.1.1
       Source: https://github.com/spring-projects/spring-framework
-      Copyright: holders not captured in SBOM — see source (https://github.com/spring-projects/spring-framework)
   - spring-jdbc@6.1.1
       Source: https://github.com/spring-projects/spring-framework
-      Copyright: holders not captured in SBOM — see source (https://github.com/spring-projects/spring-framework)
   - spring-orm@6.1.0
       Source: https://github.com/spring-projects/spring-framework
-      Copyright: holders not captured in SBOM — see source (https://github.com/spring-projects/spring-framework)
   - spring-tx@6.1.0
       Source: https://github.com/spring-projects/spring-framework
-      Copyright: holders not captured in SBOM — see source (https://github.com/spring-projects/spring-framework)
   - spring-web@6.1.1
       Source: https://github.com/spring-projects/spring-framework
-      Copyright: holders not captured in SBOM — see source (https://github.com/spring-projects/spring-framework)
   - spring-webmvc@6.1.1
       Source: https://github.com/spring-projects/spring-framework
-      Copyright: holders not captured in SBOM — see source (https://github.com/spring-projects/spring-framework)
   - tomcat-embed-core@10.1.16
       Source: https://repo1.maven.org/maven2/org/apache/tomcat/embed/tomcat-embed-core/10.1.16/
-      Copyright: holders not captured in SBOM — see source (https://repo1.maven.org/maven2/org/apache/tomcat/embed/tomcat-embed-core/10.1.16/)
   - tomcat-embed-el@10.1.16
       Source: https://repo1.maven.org/maven2/org/apache/tomcat/embed/tomcat-embed-el/10.1.16/
-      Copyright: holders not captured in SBOM — see source (https://repo1.maven.org/maven2/org/apache/tomcat/embed/tomcat-embed-el/10.1.16/)
   - tomcat-embed-websocket@10.1.16
       Source: https://repo1.maven.org/maven2/org/apache/tomcat/embed/tomcat-embed-websocket/10.1.16/
-      Copyright: holders not captured in SBOM — see source (https://repo1.maven.org/maven2/org/apache/tomcat/embed/tomcat-embed-websocket/10.1.16/)
 
 License: BSD-2-Clause
 Components (1):
   - antlr4-runtime@4.10.1
       Source: https://github.com/antlr/antlr4/tree/master
-      Copyright: holders not captured in SBOM — see source (https://github.com/antlr/antlr4/tree/master)
 
 License: BSD-3-Clause
 Components (8):
   - angus-activation@2.0.0
       Source: https://github.com/eclipse-ee4j/angus-activation
-      Copyright: holders not captured in SBOM — see source (https://github.com/eclipse-ee4j/angus-activation)
   - istack-commons-runtime@4.1.1
       Source: https://github.com/eclipse-ee4j/jaxb-istack-commons
-      Copyright: holders not captured in SBOM — see source (https://github.com/eclipse-ee4j/jaxb-istack-commons)
   - jakarta.activation-api@2.1.2
       Source: https://github.com/jakartaee/jaf-api
-      Copyright: holders not captured in SBOM — see source (https://github.com/jakartaee/jaf-api)
   - jakarta.persistence-api@3.1.0
       Source: https://github.com/eclipse-ee4j/jpa-api.git
-      Copyright: holders not captured in SBOM — see source (https://github.com/eclipse-ee4j/jpa-api.git)
   - jakarta.xml.bind-api@4.0.1
       Source: https://github.com/eclipse-ee4j/jaxb-api.git
-      Copyright: holders not captured in SBOM — see source (https://github.com/eclipse-ee4j/jaxb-api.git)
   - jaxb-core@4.0.2
       Source: https://github.com/eclipse-ee4j/jaxb-ri.git
-      Copyright: holders not captured in SBOM — see source (https://github.com/eclipse-ee4j/jaxb-ri.git)
   - jaxb-runtime@4.0.2
       Source: https://repo1.maven.org/maven2/org/glassfish/jaxb/jaxb-runtime/4.0.2/
-      Copyright: holders not captured in SBOM — see source (https://repo1.maven.org/maven2/org/glassfish/jaxb/jaxb-runtime/4.0.2/)
   - txw2@4.0.2
       Source: https://repo1.maven.org/maven2/org/glassfish/jaxb/txw2/4.0.2/
-      Copyright: holders not captured in SBOM — see source (https://repo1.maven.org/maven2/org/glassfish/jaxb/txw2/4.0.2/)
 
 License: EPL-1.0
 Components (3):
   - h2@2.2.224
       Source: https://github.com/h2database/h2database
-      Copyright: holders not captured in SBOM — see source (https://github.com/h2database/h2database)
   - logback-classic@1.4.11
       Source: https://github.com/qos-ch/logback
-      Copyright: holders not captured in SBOM — see source (https://github.com/qos-ch/logback)
   - logback-core@1.4.11
       Source: https://github.com/qos-ch/logback
-      Copyright: holders not captured in SBOM — see source (https://github.com/qos-ch/logback)
 
 License: EPL-2.0
 Components (2):
   - aspectjweaver@1.9.20.1
       Source: https://github.com/eclipse/org.aspectj
-      Copyright: holders not captured in SBOM — see source (https://github.com/eclipse/org.aspectj)
   - jakarta.persistence-api@3.1.0
       Source: https://github.com/eclipse-ee4j/jpa-api.git
-      Copyright: holders not captured in SBOM — see source (https://github.com/eclipse-ee4j/jpa-api.git)
 
 License: GPL-2.0-or-later OR Classpath-exception-2.0
 Components (2):
   - jakarta.annotation-api@2.1.1
       Source: https://github.com/eclipse-ee4j/common-annotations-api
-      Copyright: holders not captured in SBOM — see source (https://github.com/eclipse-ee4j/common-annotations-api)
   - jakarta.transaction-api@2.0.1
       Source: https://github.com/eclipse-ee4j/jta-api
-      Copyright: holders not captured in SBOM — see source (https://github.com/eclipse-ee4j/jta-api)
 
 License: LGPL-2.1-only
 Components (2):
   - logback-classic@1.4.11
       Source: https://github.com/qos-ch/logback
-      Copyright: holders not captured in SBOM — see source (https://github.com/qos-ch/logback)
   - logback-core@1.4.11
       Source: https://github.com/qos-ch/logback
-      Copyright: holders not captured in SBOM — see source (https://github.com/qos-ch/logback)
 
 License: LGPL-2.1-or-later
 Components (2):
   - hibernate-commons-annotations@6.0.6.Final
       Source: http://github.com/hibernate/hibernate-commons-annotations
-      Copyright: holders not captured in SBOM — see source (http://github.com/hibernate/hibernate-commons-annotations)
   - hibernate-core@6.3.1.Final
       Source: https://github.com/hibernate/hibernate-orm
-      Copyright: holders not captured in SBOM — see source (https://github.com/hibernate/hibernate-orm)
 
 License: MIT
 Components (2):
   - jul-to-slf4j@2.0.9
       Source: https://repo1.maven.org/maven2/org/slf4j/jul-to-slf4j/2.0.9/
-      Copyright: holders not captured in SBOM — see source (https://repo1.maven.org/maven2/org/slf4j/jul-to-slf4j/2.0.9/)
   - slf4j-api@2.0.2
       Source: https://github.com/qos-ch/slf4j
-      Copyright: holders not captured in SBOM — see source (https://github.com/qos-ch/slf4j)
 
 License: MPL-2.0
 Components (1):
   - h2@2.2.224
       Source: https://github.com/h2database/h2database
-      Copyright: holders not captured in SBOM — see source (https://github.com/h2database/h2database)
 
 ================================================================================
 License texts (SPDX standard)

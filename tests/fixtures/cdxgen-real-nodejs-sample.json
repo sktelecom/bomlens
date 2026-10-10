@@ -1,19 +1,19 @@
 {
   "bomFormat": "CycloneDX",
   "specVersion": "1.6",
-  "serialNumber": "urn:uuid:8faa5104-5262-405e-a134-e91b519313a6",
+  "serialNumber": "urn:uuid:34ea25c4-c76f-4e1a-90f0-cf6b0f525e1c",
   "version": 1,
   "metadata": {
-    "timestamp": "2026-09-19T05:56:10Z",
+    "timestamp": "2026-10-10T03:30:41Z",
     "tools": {
       "components": [
         {
           "group": "@cdxgen",
           "name": "cdxgen",
-          "version": "13.1.0",
-          "purl": "pkg:npm/%40cdxgen/cdxgen@13.1.0",
+          "version": "13.2.0",
+          "purl": "pkg:npm/%40cdxgen/cdxgen@13.2.0",
           "type": "application",
-          "bom-ref": "pkg:npm/@cdxgen/cdxgen@13.1.0",
+          "bom-ref": "pkg:npm/@cdxgen/cdxgen@13.2.0",
           "publisher": "OWASP Foundation",
           "authors": [
             {
@@ -37,7 +37,7 @@
       "name": "sbom-example-nodejs",
       "group": "",
       "version": "1.0.0",
-      "description": "SBOM \uc0dd\uc131 \ud14c\uc2a4\ud2b8\ub97c \uc704\ud55c Express.js \uc608\uc81c \uc560\ud50c\ub9ac\ucf00\uc774\uc158",
+      "description": "SBOM 생성 테스트를 위한 Express.js 예제 애플리케이션",
       "purl": "pkg:npm/sbom-example-nodejs@1.0.0",
       "bom-ref": "pkg:npm/sbom-example-nodejs@1.0.0",
       "author": "SK Telecom",
@@ -5282,7 +5282,7 @@
         },
         {
           "name": "cdx:npm:binPaths",
-          "value": "/private/tmp/claude-296035173/-Users-1112821-projects-bomlens/f3e68732-8b6c-4eae-8d51-3cdbf154e70c/scratchpad/nodejs-capture/node_modules/.bin/mime"
+          "value": "/app/node_modules/.bin/mime"
         },
         {
           "name": "cdx:npm:has_binary",
@@ -6410,12 +6410,12 @@
     {
       "group": "",
       "name": "follow-redirects",
-      "version": "1.16.0",
+      "version": "1.16.1",
       "scope": "optional",
       "hashes": [
         {
           "alg": "SHA-512",
-          "content": "cb9acdfee3ac69d153fc97d8c21c514b947b41c7be837cc6f7bf89aed159942f64957fd6e610fb8a22f349c2389d9a944bb0cd51d84f830e3123c5b62ee5e553"
+          "content": "14dbc51b3a0c2d6984e988fdb296ffce377bca23421e2016f7f4e0f425eb43cc2ebb7d87b6524ec163b5d4e25a7e5e457d8dc3c53750d2f8f8db353592fbf98e"
         }
       ],
       "licenses": [
@@ -6448,15 +6448,15 @@
           }
         }
       ],
-      "purl": "pkg:npm/follow-redirects@1.16.0",
+      "purl": "pkg:npm/follow-redirects@1.16.1",
       "externalReferences": [
         {
           "type": "distribution",
-          "url": "https://registry.npmjs.org/follow-redirects/-/follow-redirects-1.16.0.tgz"
+          "url": "https://registry.npmjs.org/follow-redirects/-/follow-redirects-1.16.1.tgz"
         }
       ],
       "type": "library",
-      "bom-ref": "pkg:npm/follow-redirects@1.16.0",
+      "bom-ref": "pkg:npm/follow-redirects@1.16.1",
       "properties": [
         {
           "name": "cdx:license:category",
@@ -6464,7 +6464,7 @@
         },
         {
           "name": "internal:ResolvedUrl",
-          "value": "https://registry.npmjs.org/follow-redirects/-/follow-redirects-1.16.0.tgz"
+          "value": "https://registry.npmjs.org/follow-redirects/-/follow-redirects-1.16.1.tgz"
         },
         {
           "name": "internal:SrcFile",
@@ -10396,7 +10396,7 @@
       "dependsOn": []
     },
     {
-      "ref": "pkg:npm/follow-redirects@1.16.0",
+      "ref": "pkg:npm/follow-redirects@1.16.1",
       "dependsOn": []
     },
     {
@@ -10464,7 +10464,7 @@
     {
       "ref": "pkg:npm/axios@1.20.0",
       "dependsOn": [
-        "pkg:npm/follow-redirects@1.16.0",
+        "pkg:npm/follow-redirects@1.16.1",
         "pkg:npm/form-data@4.0.6",
         "pkg:npm/https-proxy-agent@5.0.1",
         "pkg:npm/proxy-from-env@2.1.0"
@@ -10680,10 +10680,10 @@
         "component": {
           "group": "@cdxgen",
           "name": "cdxgen",
-          "version": "13.1.0",
-          "purl": "pkg:npm/%40cdxgen/cdxgen@13.1.0",
+          "version": "13.2.0",
+          "purl": "pkg:npm/%40cdxgen/cdxgen@13.2.0",
           "type": "application",
-          "bom-ref": "pkg:npm/@cdxgen/cdxgen@13.1.0",
+          "bom-ref": "pkg:npm/@cdxgen/cdxgen@13.2.0",
           "publisher": "OWASP Foundation",
           "authors": [
             {
@@ -10692,8 +10692,8 @@
           ]
         }
       },
-      "timestamp": "2026-09-19T05:56:10Z",
-      "text": "This Software Bill-of-Materials (SBOM) document was created on Saturday, September 19, 2026 with cdxgen. The data was captured during the build lifecycle phase. The document describes an application named 'sbom-example-nodejs' with version '1.0.0'. The package type in this SBOM is npm with 4 purl namespaces described under components. The components were identified from the source files: package-lock.json."
+      "timestamp": "2026-10-10T03:30:41Z",
+      "text": "This Software Bill-of-Materials (SBOM) document was created on Saturday, October 10, 2026 with cdxgen. The data was captured during the build lifecycle phase. The document describes an application named 'sbom-example-nodejs' with version '1.0.0'. The package type in this SBOM is npm with 4 purl namespaces described under components. The components were identified from the source files: package-lock.json."
     }
   ]
 }

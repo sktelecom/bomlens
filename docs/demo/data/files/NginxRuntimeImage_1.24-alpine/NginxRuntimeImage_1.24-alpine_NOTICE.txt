@@ -1,5 +1,5 @@
 Third-party Open Source Licenses for NginxRuntimeImage
-Generated: 2026-09-15T12:44:48Z
+Generated: 2026-09-23T00:56:41Z
 Total components: 1885 · Distinct licenses: 30
 
 This product includes the following open source software.
@@ -10,339 +10,256 @@ License: 2-clause
 Components (5):
   - nginx-module-geoip@1.24.0-r1
       Source: https://nginx.org/
-      Copyright: holders not captured in SBOM — see source (https://nginx.org/)
   - nginx-module-image-filter@1.24.0-r1
       Source: https://nginx.org/
-      Copyright: holders not captured in SBOM — see source (https://nginx.org/)
   - nginx-module-njs@1.24.0.0.7.12-r1
       Source: https://nginx.org/
-      Copyright: holders not captured in SBOM — see source (https://nginx.org/)
   - nginx-module-xslt@1.24.0-r1
       Source: https://nginx.org/
-      Copyright: holders not captured in SBOM — see source (https://nginx.org/)
   - nginx@1.24.0-r1
       Source: https://nginx.org/
-      Copyright: holders not captured in SBOM — see source (https://nginx.org/)
 
 License: AND
 Components (2):
   - aom-libs@3.5.0-r0
       Source: https://aomedia.org/
-      Copyright: holders not captured in SBOM — see source (https://aomedia.org/)
   - xz-libs@5.2.9-r0
       Source: https://tukaani.org/xz
-      Copyright: holders not captured in SBOM — see source (https://tukaani.org/xz)
 
 License: Apache-2.0
 Components (2):
   - libcrypto3@3.0.12-r4
       Source: https://www.openssl.org/
-      Copyright: holders not captured in SBOM — see source (https://www.openssl.org/)
   - libssl3@3.0.12-r4
       Source: https://www.openssl.org/
-      Copyright: holders not captured in SBOM — see source (https://www.openssl.org/)
 
 License: BSD-2-Clause
 Components (3):
   - aom-libs@3.5.0-r0
       Source: https://aomedia.org/
-      Copyright: holders not captured in SBOM — see source (https://aomedia.org/)
   - libavif@0.11.1-r0
       Source: https://aomediacodec.github.io/av1-avif/
-      Copyright: holders not captured in SBOM — see source (https://aomediacodec.github.io/av1-avif/)
   - libdav1d@1.0.0-r2
       Source: https://code.videolan.org/videolan/dav1d
-      Copyright: holders not captured in SBOM — see source (https://code.videolan.org/videolan/dav1d)
 
 License: BSD-2-Clause AND BSD-3-Clause
 Components (1):
   - libc-utils@0.7.2-r3
       Source: https://alpinelinux.org
-      Copyright: holders not captured in SBOM — see source (https://alpinelinux.org)
 
 License: BSD-3-Clause
 Components (6):
   - libbsd@0.11.7-r0
       Source: https://libbsd.freedesktop.org/
-      Copyright: holders not captured in SBOM — see source (https://libbsd.freedesktop.org/)
   - libedit@20221030.3.1-r0
       Source: https://www.thrysoee.dk/editline
-      Copyright: holders not captured in SBOM — see source (https://www.thrysoee.dk/editline)
   - libuuid@2.38.1-r1
       Source: https://git.kernel.org/cgit/utils/util-linux/util-linux.git
-      Copyright: holders not captured in SBOM — see source (https://git.kernel.org/cgit/utils/util-linux/util-linux.git)
   - libwebp@1.2.4-r3
       Source: https://developers.google.com/speed/webp
-      Copyright: holders not captured in SBOM — see source (https://developers.google.com/speed/webp)
   - pcre2@10.42-r0
       Source: https://pcre.org/
-      Copyright: holders not captured in SBOM — see source (https://pcre.org/)
   - zstd-libs@1.5.5-r0
       Source: https://www.zstd.net/
-      Copyright: holders not captured in SBOM — see source (https://www.zstd.net/)
 
 License: BSD-3-Clause AND IJG AND Zlib
 Components (1):
   - libjpeg-turbo@2.1.4-r0
       Source: https://libjpeg-turbo.org/
-      Copyright: holders not captured in SBOM — see source (https://libjpeg-turbo.org/)
 
 License: BSD-like
 Components (5):
   - nginx-module-geoip@1.24.0-r1
       Source: https://nginx.org/
-      Copyright: holders not captured in SBOM — see source (https://nginx.org/)
   - nginx-module-image-filter@1.24.0-r1
       Source: https://nginx.org/
-      Copyright: holders not captured in SBOM — see source (https://nginx.org/)
   - nginx-module-njs@1.24.0.0.7.12-r1
       Source: https://nginx.org/
-      Copyright: holders not captured in SBOM — see source (https://nginx.org/)
   - nginx-module-xslt@1.24.0-r1
       Source: https://nginx.org/
-      Copyright: holders not captured in SBOM — see source (https://nginx.org/)
   - nginx@1.24.0-r1
       Source: https://nginx.org/
-      Copyright: holders not captured in SBOM — see source (https://nginx.org/)
 
 License: Domain
 Components (1):
   - libmd@1.0.4-r0
       Source: https://www.hadrons.org/software/libmd/
-      Copyright: holders not captured in SBOM — see source (https://www.hadrons.org/software/libmd/)
 
 License: FTL
 Components (1):
   - freetype@2.12.1-r0
       Source: https://www.freetype.org/
-      Copyright: holders not captured in SBOM — see source (https://www.freetype.org/)
 
 License: GPL
 Components (1):
   - geoip@1.6.12-r3
       Source: http://www.maxmind.com/app/ip-location
-      Copyright: holders not captured in SBOM — see source (http://www.maxmind.com/app/ip-location)
 
 License: GPL-2.0-only
 Components (7):
   - alpine-baselayout-data@3.4.0-r0
       Source: https://git.alpinelinux.org/cgit/aports/tree/main/alpine-baselayout
-      Copyright: holders not captured in SBOM — see source (https://git.alpinelinux.org/cgit/aports/tree/main/alpine-baselayout)
   - alpine-baselayout@3.4.0-r0
       Source: https://git.alpinelinux.org/cgit/aports/tree/main/alpine-baselayout
-      Copyright: holders not captured in SBOM — see source (https://git.alpinelinux.org/cgit/aports/tree/main/alpine-baselayout)
   - apk-tools@2.12.10-r1
       Source: https://gitlab.alpinelinux.org/alpine/apk-tools
-      Copyright: holders not captured in SBOM — see source (https://gitlab.alpinelinux.org/alpine/apk-tools)
   - busybox-binsh@1.35.0-r29
       Source: https://busybox.net/
-      Copyright: holders not captured in SBOM — see source (https://busybox.net/)
   - busybox@1.35.0-r29
       Source: https://busybox.net/
-      Copyright: holders not captured in SBOM — see source (https://busybox.net/)
   - scanelf@1.3.5-r1
       Source: https://wiki.gentoo.org/wiki/Hardened/PaX_Utilities
-      Copyright: holders not captured in SBOM — see source (https://wiki.gentoo.org/wiki/Hardened/PaX_Utilities)
   - ssl_client@1.35.0-r29
       Source: https://busybox.net/
-      Copyright: holders not captured in SBOM — see source (https://busybox.net/)
 
 License: GPL-2.0-or-later
 Components (4):
   - freetype@2.12.1-r0
       Source: https://www.freetype.org/
-      Copyright: holders not captured in SBOM — see source (https://www.freetype.org/)
   - libgpg-error@1.46-r1
       Source: https://www.gnupg.org/
-      Copyright: holders not captured in SBOM — see source (https://www.gnupg.org/)
   - xz-libs@5.2.9-r0
       Source: https://tukaani.org/xz
-      Copyright: holders not captured in SBOM — see source (https://tukaani.org/xz)
   - zstd-libs@1.5.5-r0
       Source: https://www.zstd.net/
-      Copyright: holders not captured in SBOM — see source (https://www.zstd.net/)
 
 License: LGPL-2.1-or-later
 Components (4):
   - libgcrypt@1.10.1-r0
       Source: https://www.gnupg.org/
-      Copyright: holders not captured in SBOM — see source (https://www.gnupg.org/)
   - libgpg-error@1.46-r1
       Source: https://www.gnupg.org/
-      Copyright: holders not captured in SBOM — see source (https://www.gnupg.org/)
   - libintl@0.21.1-r1
       Source: https://www.gnu.org/software/gettext/gettext.html
-      Copyright: holders not captured in SBOM — see source (https://www.gnu.org/software/gettext/gettext.html)
   - xz-libs@5.2.9-r0
       Source: https://tukaani.org/xz
-      Copyright: holders not captured in SBOM — see source (https://tukaani.org/xz)
 
 License: Libpng
 Components (1):
   - libpng@1.6.39-r0
       Source: http://www.libpng.org
-      Copyright: holders not captured in SBOM — see source (http://www.libpng.org)
 
 License: MIT
 Components (14):
   - alpine-keys@2.4-r1
       Source: https://alpinelinux.org
-      Copyright: holders not captured in SBOM — see source (https://alpinelinux.org)
   - brotli-libs@1.0.9-r9
       Source: https://github.com/google/brotli
-      Copyright: holders not captured in SBOM — see source (https://github.com/google/brotli)
   - fontconfig@2.14.1-r0
       Source: https://www.freedesktop.org/wiki/Software/fontconfig
-      Copyright: holders not captured in SBOM — see source (https://www.freedesktop.org/wiki/Software/fontconfig)
   - libexpat@2.6.2-r0
       Source: https://libexpat.github.io/
-      Copyright: holders not captured in SBOM — see source (https://libexpat.github.io/)
   - libsm@1.2.3-r1
       Source: https://xorg.freedesktop.org/
-      Copyright: holders not captured in SBOM — see source (https://xorg.freedesktop.org/)
   - libxau@1.0.10-r0
       Source: http://xorg.freedesktop.org/
-      Copyright: holders not captured in SBOM — see source (http://xorg.freedesktop.org/)
   - libxcb@1.15-r0
       Source: https://xcb.freedesktop.org
-      Copyright: holders not captured in SBOM — see source (https://xcb.freedesktop.org)
   - libxdmcp@1.1.4-r0
       Source: http://xorg.freedesktop.org/
-      Copyright: holders not captured in SBOM — see source (http://xorg.freedesktop.org/)
   - libxext@1.3.5-r0
       Source: http://xorg.freedesktop.org/
-      Copyright: holders not captured in SBOM — see source (http://xorg.freedesktop.org/)
   - libxml2@2.10.4-r0
       Source: http://www.xmlsoft.org/
-      Copyright: holders not captured in SBOM — see source (http://www.xmlsoft.org/)
   - musl@1.2.3-r5
       Source: https://musl.libc.org/
-      Copyright: holders not captured in SBOM — see source (https://musl.libc.org/)
   - ncurses-libs@6.3_p20221119-r1
       Source: https://invisible-island.net/ncurses/
-      Copyright: holders not captured in SBOM — see source (https://invisible-island.net/ncurses/)
   - ncurses-terminfo-base@6.3_p20221119-r1
       Source: https://invisible-island.net/ncurses/
-      Copyright: holders not captured in SBOM — see source (https://invisible-island.net/ncurses/)
   - nghttp2-libs@1.51.0-r2
       Source: https://nghttp2.org
-      Copyright: holders not captured in SBOM — see source (https://nghttp2.org)
 
 License: MIT AND BSD-2-Clause AND GPL-2.0-or-later
 Components (1):
   - musl-utils@1.2.3-r5
       Source: https://musl.libc.org/
-      Copyright: holders not captured in SBOM — see source (https://musl.libc.org/)
 
 License: MPL-2.0 AND MIT
 Components (2):
   - ca-certificates-bundle@20230506-r0
       Source: https://www.mozilla.org/en-US/about/governance/policies/security-group/certs/
-      Copyright: holders not captured in SBOM — see source (https://www.mozilla.org/en-US/about/governance/policies/security-group/certs/)
   - ca-certificates@20230506-r0
       Source: https://www.mozilla.org/en-US/about/governance/policies/security-group/certs/
-      Copyright: holders not captured in SBOM — see source (https://www.mozilla.org/en-US/about/governance/policies/security-group/certs/)
 
 License: NOASSERTION
 Components (1823):
   - Catalogued files (1822) — paths recorded by the scan, listed in the SBOM, not components
-      Copyright: holders not captured in SBOM — see source
   - alpine@3.17.7
       Source: https://alpinelinux.org/
-      Copyright: holders not captured in SBOM — see source (https://alpinelinux.org/)
 
 License: Public
 Components (1):
   - libmd@1.0.4-r0
       Source: https://www.hadrons.org/software/libmd/
-      Copyright: holders not captured in SBOM — see source (https://www.hadrons.org/software/libmd/)
 
 License: Public-Domain
 Components (2):
   - tzdata@2024a-r0
       Source: https://www.iana.org/time-zones
-      Copyright: holders not captured in SBOM — see source (https://www.iana.org/time-zones)
   - xz-libs@5.2.9-r0
       Source: https://tukaani.org/xz
-      Copyright: holders not captured in SBOM — see source (https://tukaani.org/xz)
 
 License: X11
 Components (1):
   - libice@1.0.10-r1
       Source: http://xorg.freedesktop.org/
-      Copyright: holders not captured in SBOM — see source (http://xorg.freedesktop.org/)
 
 License: Zlib
 Components (1):
   - zlib@1.2.13-r0
       Source: https://zlib.net/
-      Copyright: holders not captured in SBOM — see source (https://zlib.net/)
 
 License: bzip2-1.0.6
 Components (1):
   - libbz2@1.0.8-r4
       Source: https://sourceware.org/bzip2/
-      Copyright: holders not captured in SBOM — see source (https://sourceware.org/bzip2/)
 
 License: curl
 Components (2):
   - curl@8.5.0-r0
       Source: https://curl.se/
-      Copyright: holders not captured in SBOM — see source (https://curl.se/)
   - libcurl@8.5.0-r0
       Source: https://curl.se/
-      Copyright: holders not captured in SBOM — see source (https://curl.se/)
 
 License: custom
 Components (4):
   - aom-libs@3.5.0-r0
       Source: https://aomedia.org/
-      Copyright: holders not captured in SBOM — see source (https://aomedia.org/)
   - libgd@2.3.3-r3
       Source: https://libgd.github.io/
-      Copyright: holders not captured in SBOM — see source (https://libgd.github.io/)
   - libxslt@1.1.37-r1
       Source: http://xmlsoft.org/XSLT/
-      Copyright: holders not captured in SBOM — see source (http://xmlsoft.org/XSLT/)
   - libxt@1.2.1-r0
       Source: http://xorg.freedesktop.org/
-      Copyright: holders not captured in SBOM — see source (http://xorg.freedesktop.org/)
 
 License: custom:BELL  [unverified name — not an SPDX identifier; confirm against the component's license file]
 Components (1):
   - libxpm@3.5.15-r0
       Source: http://xorg.freedesktop.org/
-      Copyright: holders not captured in SBOM — see source (http://xorg.freedesktop.org/)
 
 License: custom:XFREE86  [unverified name — not an SPDX identifier; confirm against the component's license file]
 Components (1):
   - libx11@1.8.7-r0
       Source: http://xorg.freedesktop.org/
-      Copyright: holders not captured in SBOM — see source (http://xorg.freedesktop.org/)
 
 License: libtiff
 Components (1):
   - tiff@4.4.0-r4
       Source: https://gitlab.com/libtiff/libtiff
-      Copyright: holders not captured in SBOM — see source (https://gitlab.com/libtiff/libtiff)
 
 License: license
 Components (5):
   - nginx-module-geoip@1.24.0-r1
       Source: https://nginx.org/
-      Copyright: holders not captured in SBOM — see source (https://nginx.org/)
   - nginx-module-image-filter@1.24.0-r1
       Source: https://nginx.org/
-      Copyright: holders not captured in SBOM — see source (https://nginx.org/)
   - nginx-module-njs@1.24.0.0.7.12-r1
       Source: https://nginx.org/
-      Copyright: holders not captured in SBOM — see source (https://nginx.org/)
   - nginx-module-xslt@1.24.0-r1
       Source: https://nginx.org/
-      Copyright: holders not captured in SBOM — see source (https://nginx.org/)
   - nginx@1.24.0-r1
       Source: https://nginx.org/
-      Copyright: holders not captured in SBOM — see source (https://nginx.org/)
 
 ================================================================================
 License texts (SPDX standard)

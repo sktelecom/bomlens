@@ -14,7 +14,7 @@
 # ========================================================
 
 ARG ANDROID_API=35
-FROM ghcr.io/cdxgen/cdxgen-temurin-java21:v13@sha256:a55db42a0c361d0d51a7915557ff171daef8397c00f1822f28478c33092400a2
+FROM ghcr.io/cdxgen/cdxgen-temurin-java21:13.2.0@sha256:d9803514c874f53b02509593822d6d5185b44eb65fc4c84cdbffc4309ed7b622
 
 ARG ANDROID_API=35
 ARG ANDROID_BUILD_TOOLS=${ANDROID_API}.0.0

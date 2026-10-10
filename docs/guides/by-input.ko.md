@@ -54,7 +54,8 @@ SBOM=/path/to/bomlens/scripts/scan-sbom.sh
 | 펌웨어 `.bin` | FIRMWARE | `$SBOM --target dev.bin --firmware --all --generate-only` | 〃 |
 | AI 모델(HuggingFace) | AIBOM | `$SBOM --model owner/name --generate-only` | 고지문, ML-BOM(1.7), 위험분석보고서(보안 없음) |
 | AI 모델 파일(GGUF, safetensors 등) | MODELFILE | `$SBOM --model-file ./model.gguf --generate-only` | 고지문, ML-BOM(1.7), 위험분석보고서(보안 없음) |
-| 공개 데이터셋(Figshare) | DATASET | `$SBOM --model <항목 주소> --generate-only` | 고지문, ML-BOM(1.7), 위험분석보고서(보안 없음) |
+| 공개 데이터셋(Figshare, HuggingFace) | DATASET | `$SBOM --model <항목 주소 또는 datasets/owner/name> --generate-only` | 고지문, ML-BOM(1.7), 위험분석보고서(보안 없음) |
+| 아직 공개하지 않은 모델(선언만 있음) | AIDECLARE | `$SBOM --ai-declare declaration.json --generate-only` | 고지문, ML-BOM(1.7), 위험분석보고서(보안 없음), SPDX 3.0.1 AI 문서 |
 
 > 모든 명령에 `--project <이름> --version <버전>`이 필요합니다(아래 예시 참고).
 >
@@ -189,9 +190,31 @@ $SBOM --project cell-imaging-data --version 1.0.0 \
   --usage product --generate-only
 ```
 
-페이지 주소, DOI, 항목 번호 모두 되고, 계정도 별도 이미지도 필요 없습니다. 버전 지정 방법, 라이선스를 SPDX로 옮기는 규칙, 비공개·엠바고 항목 처리는 AI 모델 가이드의 [공개된 데이터셋 스캔](ai-model.ko.md#공개된-데이터셋-스캔)을 참고하세요.
+페이지 주소, DOI, 항목 번호 모두 되고, 계정도 별도 이미지도 필요 없습니다.
+
+HuggingFace에 있는 데이터셋도 같은 방법으로 스캔합니다. `datasets/<owner>/<name>`, `https://huggingface.co/datasets/<owner>/<name>` 주소, `hf:<owner>/<name>` 중 하나로 주면 됩니다. 앞에 아무것도 붙이지 않은 `owner/name`은 모델 id로 읽습니다. HuggingFace가 모델과 데이터셋에 같은 형식을 쓰기 때문입니다.
+
+```bash
+$SBOM --project tulu --version 1.0 \
+  --model datasets/allenai/tulu-3-sft-mixture --generate-only
+```
+
+버전 지정 방법, 라이선스를 SPDX로 옮기는 규칙, 비공개·엠바고 항목 처리, HuggingFace 데이터셋의 원천을 따라가는 방식은 AI 모델 가이드의 [공개된 데이터셋 스캔](ai-model.ko.md#공개된-데이터셋-스캔)을 참고하세요.
 
 **산출물**: 고지문, ML-BOM(CycloneDX 1.7), 위험분석보고서, 적합성 검사
+
+### 모델에 아직 저장소도 파일도 없다면
+
+출시를 준비 중인 모델에는 HuggingFace 저장소도 읽을 파일도 없습니다. 이때는 `--model`, `--model-file`, `--target` 없이 모델 공개자의 선언 파일만 줍니다.
+
+```bash
+./scripts/scan-sbom.sh --project support-bot --version 1.0 \
+  --ai-declare support-bot-declaration.json --generate-only
+```
+
+선언 파일에는 기반 모델(`model.baseModels[].ref`)과 HuggingFace 데이터셋(`datasets[].ref`, `huggingface:<owner>/<name>` 형식)을 적고, 이들은 모델 스캔과 같은 방식으로 허브에서 id로 읽어 옵니다. 허브에 없는 데이터는 `datasets[].local`에 적습니다. 스캔은 기본 이미지에서 실행되며, `HF_TOKEN`이 설정되어 있으면 함께 넘깁니다. 웹 UI에서는 AI 모델 묶음의 **모델 정보 직접 입력** 타일이 같은 내용을 단계별로 묻고, 그 답을 선언으로 씁니다. 자세한 내용은 AI 모델 가이드의 [SPDX 3.0.1 AI 문서](ai-model.ko.md#spdx-301-ai-문서)를 참고하세요.
+
+**산출물**: 고지문, ML-BOM(CycloneDX 1.7), 위험분석보고서, G7 적합성, SPDX 3.0.1 AI 문서
 
 ### 모델 id가 아니라 모델 파일을 받았다면
 
@@ -236,9 +259,10 @@ UI 상단에서 스캔 대상을 고르고 각 형태에 맞게 입력합니다.
 | Docker 이미지 | 이미지명 입력 |
 | AI 모델 | HuggingFace 모델 id 입력 — Docker 엔진이 켜져 있으면 타일이 자동으로 나타남 |
 | 모델 파일 | `.gguf`, `.safetensors`, `.pt` 등 업로드(최대 8GB) |
-| 공개 데이터셋 | Figshare 아이템의 페이지 URL, DOI, 또는 아이템 번호를 모델 id와 같은 입력란에 입력 |
+| 공개 데이터셋 | Figshare 아이템(페이지 URL, DOI, 아이템 번호) 또는 HuggingFace 데이터셋(`datasets/<owner>/<name>`이나 `https://huggingface.co/datasets/...` 주소)을 모델 id와 같은 입력란에 입력 |
+| 모델 정보 직접 입력 | 저장소나 파일이 아직 없는 모델에 대한 질문(기반 모델, 학습 데이터, 출시일 등)에 답함 |
 
-이 표는 이 가이드가 다루는 시나리오 기준입니다. 전체 11개 스캔 대상은 [웹 UI 레퍼런스](../reference/ui.ko.md#새-스캔)를 참고하세요.
+이 표는 이 가이드가 다루는 시나리오 기준입니다. 전체 12개 스캔 대상은 [웹 UI 레퍼런스](../reference/ui.ko.md#새-스캔)를 참고하세요.
 
 소스 코드 스캔(현재 폴더, GitHub URL, ZIP 업로드)에서는 **고급 스캔 옵션** 섹션이 어떤 파일을 만들지가 아니라 소스를 어떻게 분석할지를 바꾸는 토글(라이선스 스캔/ScanCode, 파일 단위 식별/SCANOSS)을 제공하며, 둘 다 기본은 꺼져 있습니다. 각 토글이 하는 일과 스캔 대상별 제공 여부는 [웹 UI 레퍼런스](../reference/ui.ko.md#새-스캔)의 고급 스캔 옵션 설명을 참고하세요.
 

@@ -4,7 +4,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { ResultFile } from "./api";
-import { formatLabel, groupArtifacts } from "./artifacts";
+import { formatLabel, groupArtifacts, isSpdx3Check } from "./artifacts";
 
 const file = (name: string, size = 100): ResultFile => ({ name, size });
 
@@ -53,6 +53,34 @@ describe("groupArtifacts", () => {
     const profile = groups.find((g) => g.key === "aiProfile")!;
     expect(profile.formats.map((f) => f.ext)).toEqual(["md", "json"]);
     expect(profile.formats.every((f) => f.viewable)).toBe(true);
+  });
+
+  it("gives the SPDX 3.0.1 AI document and the AI declaration cards of their own", () => {
+    const groups = groupArtifacts([
+      file(`${PREFIX}_bom.json`),
+      file(`${PREFIX}_bom.json.sig`),
+      file(`${PREFIX}_bom.spdx3.json`),
+      file(`${PREFIX}_bom.spdx3.json.sig`),
+      file(`${PREFIX}_spdx3-check.md`),
+      file(`${PREFIX}_spdx3-check.json`),
+      file(`${PREFIX}_ai-declaration.template.json`),
+      file(`${PREFIX}_ai-declaration.json`),
+    ]);
+    expect(groups.map((g) => g.key)).toEqual(["sbom", "spdx3", "aiDeclaration"]);
+    const sbom = groups[0];
+    // The SBOM card holds only the CycloneDX file, not the SPDX 3.0.1 one.
+    expect(sbom.formats.map((f) => f.name)).toEqual([`${PREFIX}_bom.json`]);
+    expect(sbom.signature?.name).toBe(`${PREFIX}_bom.json.sig`);
+    const spdx3 = groups[1];
+    expect(spdx3.formats.map((f) => f.ext)).toEqual(["spdx3", "md", "json"]);
+    expect(spdx3.signature?.name).toBe(`${PREFIX}_bom.spdx3.json.sig`);
+    expect(groups[2].formats.map((f) => f.ext)).toEqual(["json", "template"]);
+    expect(groups[2].formats.every((f) => f.viewable)).toBe(true);
+  });
+
+  it("never puts the SPDX 3.0.1 signature on the SBOM card", () => {
+    const groups = groupArtifacts([file(`${PREFIX}_bom.json`), file(`${PREFIX}_bom.spdx3.json`), file(`${PREFIX}_bom.spdx3.json.sig`)]);
+    expect(groups.find((g) => g.key === "sbom")?.signature).toBeUndefined();
   });
 
   it("groups the recorded judgements and their VEX export on one card, apart from the Yocto file", () => {
@@ -173,6 +201,15 @@ describe("formatLabel", () => {
     expect(formatLabel("json")).toBe("JSON");
     expect(formatLabel("sig")).toBe("SIG");
     expect(formatLabel("spdx")).toBe("SPDX");
+    expect(formatLabel("spdx3")).toBe("SPDX 3.0.1");
     expect(formatLabel("")).toBe("");
+  });
+});
+
+describe("isSpdx3Check", () => {
+  it("tells the check files from the SPDX 3.0.1 document itself", () => {
+    expect(isSpdx3Check("m_1.0_spdx3-check.json")).toBe(true);
+    expect(isSpdx3Check("m_1.0_spdx3-check.md")).toBe(true);
+    expect(isSpdx3Check("m_1.0_bom.spdx3.json")).toBe(false);
   });
 });

@@ -1147,6 +1147,82 @@ PREPAPPLIED_JS
     rm -f "$_pa"
 fi
 
+# Install-directory filter. cdxgen 13.3.x and later (the nightly-rebuilt v13
+# images since 2026-10-05) report every directory holding a LICENSE or COPYING
+# file as an unversioned pkg:generic component (cdx:vendored:path), and every
+# CMake subproject as another (cdx:cmake:subprojectDir). Under a package
+# manager's install directory (node_modules/, Composer's or Go's vendor/,
+# SwiftPM's .build/, CocoaPods' Pods/, a Python virtualenv ...) each of those is
+# a package the ecosystem's own cataloger already reported with its name and
+# version, so it only doubled the list (examples/nodejs went from 120 to 554
+# components). Drop those, and their dependency entries. A directory in the
+# project's own tree (third_party/zlib, a C project's vendor/ with no package
+# manager behind it) is real vendored code and stays. BomLens's own vendored
+# identification runs later and marks its results bomlens:layer=vendored, so it
+# is not affected by this.
+if [ "${rc:-1}" -eq 0 ] && [ -f "$OUT" ] && command -v node >/dev/null 2>&1; then
+    _idb=$(mktemp)
+    _idf="$_idb.js"
+    cat > "$_idf" <<'INSTDIR_JS'
+const fs = require('fs');
+const path = require('path');
+const [bomPath, root] = process.argv.slice(2);
+let bom;
+try { bom = JSON.parse(fs.readFileSync(bomPath, 'utf8')); } catch (e) { process.exit(0); }
+if (!Array.isArray(bom.components)) process.exit(0);
+// Directory names that only ever hold what a package manager installed.
+const ALWAYS = new Set(['node_modules', 'bower_components', 'jspm_packages', '.build',
+  'Pods', 'Carthage', '.venv', 'site-packages', 'dist-packages', '__pypackages__',
+  '.tox', '.gradle', '.m2']);
+const exists = p => { try { fs.statSync(p); return true; } catch (e) { return false; } };
+// vendor/ is an install directory only when a package manager owns it:
+// Composer (composer.json next to it, or its autoloader inside), Go
+// (vendor/modules.txt) or Bundler (vendor/bundle).
+const managedVendor = (parent, next) => {
+  const base = path.join(root || '.', ...parent);
+  return next === 'bundle'
+    || exists(path.join(base, 'composer.json')) || exists(path.join(base, 'composer.lock'))
+    || exists(path.join(base, 'vendor', 'autoload.php'))
+    || exists(path.join(base, 'vendor', 'composer', 'installed.json'))
+    || exists(path.join(base, 'vendor', 'modules.txt'));
+};
+const underInstallDir = v => {
+  const seg = String(v || '').replace(/\\/g, '/').replace(/^\.\//, '').split('/').filter(Boolean);
+  for (let i = 0; i < seg.length; i++) {
+    if (ALWAYS.has(seg[i])) return true;
+    if (seg[i] === 'vendor' && managedVendor(seg.slice(0, i), seg[i + 1])) return true;
+  }
+  return false;
+};
+const drop = c => (c.properties || []).some(p =>
+  (p.name === 'cdx:vendored:path' || p.name === 'cdx:cmake:subprojectDir') && underInstallDir(p.value));
+const before = bom.components.length;
+const dropped = new Set();
+bom.components = bom.components.filter(c => {
+  if (!drop(c)) return true;
+  if (c['bom-ref']) dropped.add(c['bom-ref']);
+  if (c.purl) dropped.add(c.purl);
+  return false;
+});
+if (bom.components.length === before) process.exit(0);
+const refOf = c => c['bom-ref'] || c.purl;
+const kept = new Set(bom.components.map(refOf));
+const gone = r => dropped.has(r) && !kept.has(r);
+if (Array.isArray(bom.dependencies)) {
+  bom.dependencies = bom.dependencies
+    .filter(d => !gone(d.ref))
+    .map(d => Array.isArray(d.dependsOn)
+      ? Object.assign({}, d, { dependsOn: d.dependsOn.filter(r => !gone(r)) })
+      : d);
+}
+fs.writeFileSync(bomPath, JSON.stringify(bom, null, 2));
+process.stderr.write('[build-prep] dropped ' + (before - bom.components.length)
+  + ' license-file/subproject component(s) found inside package-manager install directories\n');
+INSTDIR_JS
+    node "$_idf" "$OUT" "$SRC" || log "install-dir filter skipped (non-fatal)"
+    rm -f "$_idb" "$_idf"
+fi
+
 # Android release-scope filter: keep only components in the deployable release
 # runtime classpath resolved earlier; drop the build/test toolchain and the
 # pre-resolution duplicate versions cdxgen emits from the other configurations.

@@ -69,7 +69,7 @@ ARG TARGETARCH=amd64
 # docker CLI (client only) — lets the web UI source scan launch cdxgen language
 # images as sibling containers via the mounted host socket (transitive deps).
 # renovate: datasource=github-tags depName=docker/cli extractVersion=^v(?<version>.+)$
-ARG DOCKER_CLI_VERSION=29.7.2
+ARG DOCKER_CLI_VERSION=29.8.1
 
 # Firmware analysis (opt-in image `sbom-scanner-firmware`). The GPL analysis
 # tools are isolated here so the base image carries only permissively licensed
@@ -114,7 +114,7 @@ ARG AIBOM_GENERATOR_REF=c5a3f2f647b801ab4ab7569aade4a6cdaf1f9591
 # harvest model pedigree / performance metrics that the OWASP tool omits. Opt-in
 # with the aibom image only; enrich-aibom.sh degrades gracefully when it is absent.
 # renovate: datasource=npm depName=@cdxgen/cdxgen
-ARG CDXGEN_VERSION=13.1.0
+ARG CDXGEN_VERSION=13.2.0
 # cdxgen 13 requires Node.js >= 24; Debian's own nodejs package (bundled in the
 # python:3.12-slim base) is still on the 20.x line, so Node is installed from
 # the official upstream release tarball instead of apt. Pinned like syft/trivy/
@@ -122,6 +122,11 @@ ARG CDXGEN_VERSION=13.1.0
 # arch-mapped via uname -m.
 # renovate: datasource=github-releases depName=nodejs/node
 ARG NODE_VERSION=v24.21.0
+# npm as bundled with that Node release carries its own vulnerable copies of
+# tar, ip-address and brace-expansion, and npm stays in the image (it installs
+# cdxgen), so it is replaced by a pinned release with those fixed.
+# renovate: datasource=npm depName=npm
+ARG NPM_VERSION=11.20.0
 
 # NOTICE PDF rendering (opt-in: --build-arg SBOM_PDF=true). weasyprint renders the
 # generated _NOTICE.html to _NOTICE.pdf. It is Python-based (consistent with onot)
@@ -284,6 +289,10 @@ RUN pip3 install --no-cache-dir "picklescan==${PICKLESCAN_VERSION}" \
 #   binutils is named for readelf, which identify-elf-presence.py reads SONAME and
 #   NEEDED with. It was already arriving as somebody else's dependency, which is
 #   how a runtime file goes missing from a release without any build failing.
+#
+#   firmware-pip-overrides.txt then raises two packages gsutil (a cve-bin-tool
+#   dependency) pins at vulnerable versions; the file records why that is safe.
+COPY firmware-pip-overrides.txt /tmp/firmware-pip-overrides.txt
 RUN if [ "$SBOM_FIRMWARE" = "true" ]; then \
       apt-get update && apt-get install -y --no-install-recommends \
         squashfs-tools e2fsprogs p7zip-full unar cpio cabextract \
@@ -292,6 +301,7 @@ RUN if [ "$SBOM_FIRMWARE" = "true" ]; then \
         "unblob==${UNBLOB_VERSION}" \
         "cve-bin-tool==${CVE_BIN_TOOL_VERSION}" \
         "ubi_reader==${UBI_READER_VERSION}" \
+      && pip3 install --no-cache-dir -r /tmp/firmware-pip-overrides.txt \
       && arch="$(dpkg --print-architecture)" \
       && curl -fsSL -o /tmp/sasquatch.deb \
          "https://github.com/onekey-sec/sasquatch/releases/download/${SASQUATCH_VERSION}/sasquatch_1.0_${arch}.deb" \
@@ -303,7 +313,8 @@ RUN if [ "$SBOM_FIRMWARE" = "true" ]; then \
       && readelf --version | head -1; \
     else \
       echo "[build] firmware tools skipped (SBOM_FIRMWARE=false)"; \
-    fi
+    fi \
+    && rm -f /tmp/firmware-pip-overrides.txt
 
 # Deep-CVE: grype + its vulnerability DB, baked in for offline use (opt-in image
 # bomlens-deep-cve). scan-nvd-cpe.py runs grype's CPE matcher over the maven CPEs
@@ -394,10 +405,20 @@ RUN if [ "$SBOM_FIRMWARE" = "true" ]; then \
 # release yet). Cloned into /opt/aibom-generator and run as `python -m src.cli`
 # from there: a bare `pip install` drops the tool's data files (model-field
 # registry, SPDX schema), so we keep the repo layout. git is in the base layer.
+#
+# The commit's requirements.txt pins exact versions, some with known
+# vulnerabilities. apply-pip-overrides.sh swaps in the fixed versions listed in
+# aibom-requirements-overrides.txt, and fails the build when a pin it expected
+# has moved upstream (see both files).
+COPY apply-pip-overrides.sh aibom-requirements-overrides.txt /tmp/aibom-overrides/
 RUN if [ "$SBOM_AIBOM" = "true" ]; then \
       git clone --quiet https://github.com/GenAI-Security-Project/aibom-generator /opt/aibom-generator \
       && git -C /opt/aibom-generator checkout --quiet "${AIBOM_GENERATOR_REF}" \
-      && pip3 install --no-cache-dir -r /opt/aibom-generator/requirements.txt \
+      && sh /tmp/aibom-overrides/apply-pip-overrides.sh \
+           /opt/aibom-generator/requirements.txt \
+           /tmp/aibom-overrides/aibom-requirements-overrides.txt \
+           > /tmp/aibom-overrides/requirements.txt \
+      && pip3 install --no-cache-dir -r /tmp/aibom-overrides/requirements.txt \
       && ( cd /opt/aibom-generator && python3 -m src.cli --help >/dev/null ) \
       && case "$(uname -m)" in \
            x86_64)  NODE_ARCH="x64" ;; \
@@ -407,12 +428,14 @@ RUN if [ "$SBOM_AIBOM" = "true" ]; then \
       && curl -sSfL "https://nodejs.org/dist/${NODE_VERSION}/node-${NODE_VERSION}-linux-${NODE_ARCH}.tar.gz" -o /tmp/node.tgz \
       && tar -C /usr/local --strip-components=1 -xzf /tmp/node.tgz "node-${NODE_VERSION}-linux-${NODE_ARCH}" \
       && rm /tmp/node.tgz \
+      && npm install -g "npm@${NPM_VERSION}" \
       && node --version && npm --version \
       && npm install -g "@cdxgen/cdxgen@${CDXGEN_VERSION}" \
       && cdxgen --version >/dev/null; \
     else \
       echo "[build] aibom generator skipped (SBOM_AIBOM=false)"; \
-    fi
+    fi \
+    && rm -rf /tmp/aibom-overrides
 
 # NOTICE PDF renderer (opt-in: --build-arg SBOM_PDF=true). weasyprint (BSD-3-Clause)
 # plus its native deps (libpango/cairo/gdk-pixbuf, ~50-60 MB). generate-notice.sh

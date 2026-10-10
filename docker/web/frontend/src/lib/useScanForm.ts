@@ -42,6 +42,7 @@ export const ACCEPT: Record<UploadKind, string> = {
     ".bin,.img,.squashfs,.sqsh,.ubi,.ubifs,.trx,.chk,.fw,.rom,.dlf," +
     ".gz,.tgz,.tar,.xz,.bz2,.lzma,.zst,.img.gz,.tar.gz",
   model: ".gguf,.safetensors,.pt,.pth,.ckpt,.pkl,.pickle,.onnx,.npz,.npy",
+  declaration: ".json",
 };
 
 /** Free-text inputs: the single `target` field, with per-source i18n keys. */
@@ -229,7 +230,7 @@ export function useScanForm({
   // report (Trivy → 0 results) and deep-license (needs /src) don't apply. True
   // of both AI inputs: the model named on HuggingFace and the model file read
   // from its own header.
-  const isAiModel = source === "ai-model" || source === "model-upload";
+  const isAiModel = source === "ai-model" || source === "model-upload" || source === "ai-declare";
   // OSV.dev advisories are only fetched for firmware scans (cve-bin-tool), and
   // the osv.dev DB is not in the image, so it downloads on this run when on.
   const isFirmware = source === "firmware-upload";
@@ -278,7 +279,9 @@ export function useScanForm({
     showDeepLicense || showVendored || showIncludeOsv || showByteStable ||
     showOutboundLicense || showSbomAuthor || showDeepCve || showConformanceProfile;
   // Any scan produces an SBOM, so upload is offered for every source.
-  const showUpload = true;
+  // A declaration opens questions before any scan; a credential stashed now
+  // would sit on the server if they were cancelled, so it is not offered here.
+  const showUpload = source !== "ai-declare";
   const busy = running || uploading;
 
   /** A user edit owns the field from then on — even when cleared to empty,

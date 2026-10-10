@@ -11,8 +11,12 @@ import {
   downloadAllUrl,
   fileUrl,
   exportSpdx,
+  exportSpdx3,
   exportVex,
+  fetchSpdx3Map,
   importVex,
+  makeDeclarationTemplate,
+  saveAiDeclaration,
   formSourceOf,
   getCapabilities,
   getDiagnostics,
@@ -336,6 +340,61 @@ describe("network functions", () => {
     expect(await exportVex("app_1.0")).toBeNull();
     fetchMock.mockRejectedValue(new Error("network"));
     expect(await exportVex("app_1.0")).toBeNull();
+  });
+
+  it("exportSpdx3 and the declaration template build by id, and return null on any failure", async () => {
+    const written = {
+      name: "m_1.0_bom.spdx3.json",
+      results: [{ name: "m_1.0_bom.spdx3.json", size: 10 }],
+      spdx3: { draft: true, counts: { missingRequired: 2 }, name: "m_1.0_bom.spdx3.json", check: "m_1.0_spdx3-check.json" },
+    };
+    fetchMock.mockResolvedValue(ok(written));
+    expect(await exportSpdx3("m_1.0")).toEqual({ ok: true, ...written });
+    expect(fetchMock.mock.calls[0][0]).toBe("/spdx3-export?id=m_1.0");
+    // The cause comes back with the failure: "no model" and "converter failed"
+    // read differently on screen.
+    fetchMock.mockResolvedValue(fail(409, { error: "this scan holds no AI model or dataset" }));
+    expect(await exportSpdx3("m_1.0")).toEqual({
+      ok: false,
+      status: 409,
+      error: "this scan holds no AI model or dataset",
+      reasons: undefined,
+    });
+    fetchMock.mockRejectedValue(new Error("network"));
+    expect(await exportSpdx3("m_1.0")).toMatchObject({ ok: false, status: 0 });
+
+    fetchMock.mockResolvedValue(ok({ name: "m_1.0_ai-declaration.template.json", results: [] }));
+    expect(await makeDeclarationTemplate("m 1")).toMatchObject({ name: "m_1.0_ai-declaration.template.json" });
+    expect(fetchMock.mock.calls.at(-1)?.[0]).toBe("/ai-declaration-template?id=m%201");
+    fetchMock.mockRejectedValue(new Error("network"));
+    expect(await makeDeclarationTemplate("m_1.0")).toBeNull();
+    expect(await fetchSpdx3Map()).toBeNull();
+  });
+
+  it("saveAiDeclaration posts the declaration and reports a refusal with its reasons", async () => {
+    const written = { name: "m_1.0_bom.spdx3.json", results: [], spdx3: null };
+    fetchMock.mockResolvedValue(ok(written));
+    const decl = { schema: "bomlens-ai-declaration/1" };
+    expect(await saveAiDeclaration("m_1.0", decl)).toEqual({ ok: true, ...written });
+    expect(fetchMock.mock.calls[0][0]).toBe("/ai-declaration?id=m_1.0");
+    expect(fetchMock.mock.calls[0][1]).toMatchObject({ method: "POST", body: JSON.stringify(decl) });
+
+    fetchMock.mockResolvedValue({
+      ok: false,
+      status: 422,
+      json: async () => ({ error: "declaration refused", reasons: ["model.license: unknown field", 7] }),
+    });
+    expect(await saveAiDeclaration("m_1.0", decl)).toEqual({
+      ok: false,
+      status: 422,
+      error: "declaration refused",
+      reasons: ["model.license: unknown field", "7"],
+    });
+
+    fetchMock.mockResolvedValue(fail(409));
+    expect(await saveAiDeclaration("m_1.0", decl)).toMatchObject({ ok: false, status: 409, reasons: undefined });
+    fetchMock.mockRejectedValue(new Error("network"));
+    expect(await saveAiDeclaration("m_1.0", decl)).toMatchObject({ ok: false, status: 0 });
   });
 
   it("exportSpdx converts by id, and returns null on any failure", async () => {

@@ -15,11 +15,13 @@ import { useTranslation } from "react-i18next";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { EmptyState, ErrorState, LoadingState } from "@/components/ui/state";
-import type { ConformanceSummary } from "@/lib/api";
+import type { ConformanceSummary, DoneEvent, ResultFile, Spdx3Summary } from "@/lib/api";
 import { checkKind, groupG7ByCluster, registryTally, splitChecks } from "@/lib/conformance";
 import {
   type AiModelData,
   type AssessmentGrade,
+  type DatasetRef,
+  datasetTreeRows,
   GradeBadge,
   type ModelAssessment,
   type ModelCard,
@@ -28,6 +30,7 @@ import {
 } from "@/lib/models";
 import { loadSbom } from "@/lib/sbomGraph";
 import { CheckGroup } from "./ConformancePanel";
+import { Spdx3Panel } from "./Spdx3Panel";
 import { cn } from "@/lib/utils";
 
 /**
@@ -37,6 +40,61 @@ import { cn } from "@/lib/utils";
  * and the datasets the models reference. Only reachable for AI/ANALYZE scans.
  */
 export function ModelsDatasets({
+  scanId,
+  sbomFile,
+  conformance,
+  spdx3,
+  results,
+  title,
+  onResultPatch,
+  declaredScan,
+  autoFill,
+  onAutoFill,
+}: {
+  scanId: string | null;
+  sbomFile: string;
+  conformance?: ConformanceSummary | null;
+  /** The SPDX 3.0.1 AI document's check summary, when this scan has one. */
+  spdx3?: Spdx3Summary | null;
+  /** The scan's artifacts, to find a declaration saved earlier. */
+  results: ResultFile[];
+  /** Project and version, shown above the question flow's steps. */
+  title: string;
+  /** A save or a write changed the result (its listing, its SPDX 3 summary). */
+  onResultPatch?: (patch: Partial<DoneEvent>) => void;
+  /** The scan was made from a declaration alone (its input is that file). */
+  declaredScan?: boolean;
+  /** Open the SPDX 3.0.1 questions on arrival (the Overview's "fill" link). */
+  autoFill?: boolean;
+  onAutoFill?: () => void;
+}) {
+  // While the publisher answers the questions, the flow takes the whole
+  // screen; the model cards come back when it closes.
+  const [filling, setFilling] = useState(false);
+  const panel = (
+    <Spdx3Panel
+      scanId={scanId}
+      title={title}
+      summary={spdx3}
+      results={results}
+      onPatch={onResultPatch}
+      onFillingChange={setFilling}
+      declaredScan={declaredScan}
+      autoFill={autoFill}
+      onAutoFill={onAutoFill}
+    />
+  );
+  // The panel stays at the same place in the tree either way, so it keeps its
+  // state (the open flow) when the body around it goes away.
+  return (
+    <div className="space-y-6">
+      {panel}
+      {!filling && <ModelsDatasetsBody scanId={scanId} sbomFile={sbomFile} conformance={conformance} />}
+    </div>
+  );
+}
+
+function ModelsDatasetsBody({
   scanId,
   sbomFile,
   conformance,
@@ -130,9 +188,23 @@ export function ModelsDatasets({
                 </tr>
               </thead>
               <tbody>
-                {data.datasets.map((d) => (
-                  <tr key={d.name} className="border-b last:border-0">
-                    <td className="px-3 py-2 align-top">
+                {datasetTreeRows(data.datasets).map(({ dataset: d, level, relation, repeat }, i) => (
+                  <tr key={`${d.ref ?? d.name}-${i}`} className="border-b last:border-0">
+                    <td
+                      className="px-3 py-2 align-top"
+                      // A traced source sits under the dataset it came from.
+                      style={level > 0 ? { paddingLeft: `${0.75 + level * 1.25}rem` } : undefined}
+                    >
+                      {level > 0 && (
+                        <span className="mr-1 text-muted-foreground" aria-hidden>
+                          └
+                        </span>
+                      )}
+                      {relation && (
+                        <span className="sr-only">
+                          {t("models.dsSourceOf", { relation: t(`models.dsRelation.${relation}`, relation) })}
+                        </span>
+                      )}
                       <span className="font-mono">{d.name}</span>
                       {d.version && (
                         <span className="text-muted-foreground">@{d.version}</span>
@@ -141,6 +213,14 @@ export function ModelsDatasets({
                         <Badge variant="outline" className="ml-1.5 align-middle">
                           {d.collectedBy}
                         </Badge>
+                      )}
+                      {relation && (
+                        <Badge variant="muted" className="ml-1.5 align-middle">
+                          {t(`models.dsRelation.${relation}`, relation)}
+                        </Badge>
+                      )}
+                      {repeat && (
+                        <span className="ml-1.5 text-muted-foreground">{t("models.dsListedAbove")}</span>
                       )}
                       {d.url && (
                         <a
@@ -185,10 +265,11 @@ export function ModelsDatasets({
                       </span>
                     </td>
                     <td className="px-3 py-2 align-top">
-                      {d.sources.length > 0 ? (
-                        <span className="break-all">{d.sources.join(", ")}</span>
-                      ) : (
+                      {/* A repeat row's sources are on its full row above. */}
+                      {repeat ? (
                         <span className="text-muted-foreground">—</span>
+                      ) : (
+                        <DatasetSources dataset={d} />
                       )}
                     </td>
                   </tr>
@@ -202,6 +283,48 @@ export function ModelsDatasets({
         <p className="text-xs text-muted-foreground">{t("models.disclaimer")}</p>
       )}
       {conformance ? <G7Disclosure conformance={conformance} /> : null}
+    </div>
+  );
+}
+
+/**
+ * The "Derived from" cell. When the pipeline traced sources, the traced ones are
+ * rows of their own beneath this one, so the cell only counts them and adds what
+ * the rows cannot show: a card that calls the data original, sources named in
+ * words (kept verbatim, never looked up, so marked for checking), and why the
+ * walk stopped here. Without tracing it lists the card's values as before.
+ */
+function DatasetSources({ dataset: d }: { dataset: DatasetRef }) {
+  const { t } = useTranslation();
+  const traced = d.depth !== undefined;
+  if (!traced) {
+    return d.sources.length > 0 ? (
+      <span className="break-all">{d.sources.join(", ")}</span>
+    ) : (
+      <span className="text-muted-foreground">—</span>
+    );
+  }
+  const original = d.sources.some((s) => s.trim().toLowerCase() === "original");
+  const parts = d.derivedFrom.length + d.unverifiedSources.length + (original ? 1 : 0);
+  if (parts === 0 && !d.trace) return <span className="text-muted-foreground">—</span>;
+  return (
+    <div className="space-y-1">
+      {d.derivedFrom.length > 0 && (
+        <div>{t("models.dsSourceCount", { count: d.derivedFrom.length })}</div>
+      )}
+      {original && <div>{t("models.dsSourceOriginal")}</div>}
+      {d.unverifiedSources.map((s) => (
+        <div key={s} className="flex flex-wrap items-center gap-1.5">
+          <span className="break-all">{s}</span>
+          <Badge variant="muted">{t("models.dsSourceUnverified")}</Badge>
+        </div>
+      ))}
+      {d.trace === "depth-limit" && (
+        <div className="text-muted-foreground">{t("models.dsTraceDepthLimit")}</div>
+      )}
+      {d.trace === "cycle" && (
+        <div className="text-muted-foreground">{t("models.dsTraceCycle")}</div>
+      )}
     </div>
   );
 }

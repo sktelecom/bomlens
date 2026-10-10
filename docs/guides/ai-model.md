@@ -14,6 +14,8 @@ The model is the subject of the document: it sits in `metadata.component`, which
 
 A model card names its training datasets and stops there. BomLens looks each one up on HuggingFace and records what it finds — the declared license, the upstream datasets it derives from, and a content digest — as its own entry in the SBOM, linked to the model as a dependency. A dataset that cannot be read (withdrawn, renamed, or private to someone else) is kept in the SBOM as a name marked unreadable; no license is invented for it. This is also what decides the training-data disclosure axis: `open-data` needs at least one dataset that actually opened, and a card naming datasets nobody can retrieve reads `declared-unverified` instead.
 
+A dataset card can in turn name the datasets it was built from (`source_datasets`). BomLens follows those too, the same way, up to three levels down and at most 40 dataset lookups per scan (`AIBOM_DATASET_DEPTH`, `AIBOM_DATASET_MAX_LOOKUPS`; a depth of 0 reads only the datasets the model card names). Each source becomes its own entry linked to the dataset it came from, so a mixture published under a permissive license shows the source inside it that carries narrower terms. Only a value shaped like a HuggingFace dataset id is looked up, at the hub `HF_ENDPOINT` names when it is set. A source the card names in words ("Wikipedia dump 2023-01", `extended|other`) or with a placeholder (`extended` alone, `unknown`, `N/A`) is kept as written and marked for review; nothing is matched to it by name or guessed. Most dataset cards name no sources at all, so this adds information for a minority of datasets, typically training mixtures.
+
 The full tool flow is in [Pipeline by input type](../concepts/pipeline-by-input.md#ai-model).
 
 ## Before you start
@@ -140,13 +142,22 @@ The item becomes a CycloneDX `data` component carrying its licence, its DOI, its
 
 An institutional DOI that does not carry "figshare" (`10.25916/sut.33412285.v1`) cannot be told apart from any other DOI, so give the item URL for those. A private, embargoed or withdrawn item cannot be read without an account, and is reported as an error rather than described as a dataset with no licence.
 
+A dataset on HuggingFace is scanned the same way, also in the base image with no account. Give it as `datasets/<owner>/<name>`, as `https://huggingface.co/datasets/<owner>/<name>` (anything after the name, such as `/tree/main`, is ignored), or as `hf:<owner>/<name>`. A bare `owner/name` stays a model id, because the hub uses the same form for both, so the prefix or the address is what marks a dataset:
+
+```bash
+./scripts/scan-sbom.sh --project tulu --version 1.0 \
+  --model datasets/allenai/tulu-3-sft-mixture --generate-only
+```
+
+The dataset becomes the SBOM's root `data` component with its licence, the hub revision it was read at (`bomlens:dataset:revision`) and a SHA-256 digest per file. The datasets its card lists under `source_datasets` are traced the same way as the datasets a model card names (same `AIBOM_DATASET_DEPTH` and `AIBOM_DATASET_MAX_LOOKUPS` limits), appear as rows under it in Models & datasets, and their risk verdicts reach the root. A gated or private dataset needs `HF_TOKEN`, and a dataset that cannot be read is reported as an error rather than written as an empty SBOM.
+
 **Deliverables**: notice, ML-BOM (CycloneDX 1.7), risk report, conformance check.
 
 ## Reading the result
 
 In the web UI, an AI/ML SBOM adds two sections to the left rail.
 
-**Models & datasets** — each model card's identifier, architecture, task, license, supplier and integrity, a four-axis disclosure panel (weights / architecture / training data / training process, as documented in the BOM), and a table of the datasets the model references with each one's license, content digest and upstream.
+**Models & datasets** — each model card's identifier, architecture, task, license, supplier and integrity, a four-axis disclosure panel (weights / architecture / training data / training process, as documented in the BOM), and a table of the datasets the model references with each one's license, content digest and upstream. A traced source appears as its own row, indented under the dataset it was traced from, with its own grade and license, so the dataset and the source it inherits terms from read side by side.
 
 ![Models & datasets — model card and disclosure axes](../images/web-ui-models.png)
 
@@ -155,6 +166,40 @@ In the web UI, an AI/ML SBOM adds two sections to the left rail.
 ![Conformance — the G7 advisory sub-block for an AI SBOM](../images/web-ui-g7.png)
 
 The same data is in the artifacts: the ML-BOM (`_bom.json`, CycloneDX 1.7) and the conformance report (`_conformance.*`).
+
+## The SPDX 3.0.1 AI document
+
+Every AI model and dataset scan also writes the result as an SPDX 3.0.1 document with the AI and Dataset profiles, `{Project}_{Version}_bom.spdx3.json`, next to the CycloneDX ML-BOM. The CycloneDX file stays the primary record; the SPDX document is built from it, plus whatever the model's publisher declares.
+
+A scan can fill what it reads: the model's name, revision, download address, publisher on the hub, licence, architecture, limitations and weight files with their digests; each dataset's address, licence and data type where its card says; the base models and the datasets the card names. It cannot know when the model was released, who made it, which datasets trained it and which only tested it, or the revision of the base model it started from. SPDX 3.0.1 makes several of these required and gives them no "unknown" value, so until they are declared the document is a draft: it says so in its comment, and `{Project}_{Version}_spdx3-check.md` lists each open field.
+
+To fill them, edit the empty declaration the scan writes, `{Project}_{Version}_ai-declaration.template.json`, and scan again with it:
+
+```bash
+./scripts/scan-sbom.sh --project my-llm --version 1.0 \
+  --model "acme/support-adapter" --ai-declare my-llm_1.0_ai-declaration.template.json --generate-only
+```
+
+The declared values go into the SPDX document only, each marked as declared, and never into the CycloneDX SBOM. A declaration that names a dataset or base model the scan did not find, a value outside a field's list, or a date not written as `YYYY-MM-DDThh:mm:ssZ` is refused with the reasons. Some fields are a judgement the tool never makes for you: whether the model uses sensitive personal information, its safety risk level, and its autonomy. The check lists them as needing a decision, and leaving them empty is allowed. `model.license` (a HuggingFace licence tag or an SPDX licence id) gives the model's own licence when the scan read none, or only `other`; one that differs from the licence the scan read is listed for review, and the scan's is kept. It is written as an SPDX expression only when it is a hub tag that names exactly one SPDX licence, or a `LicenseRef-`; anything else is kept in words, with `NoAssertionLicense` as the expression.
+
+In the web UI there is no file to edit: **Models & datasets** shows the document's state and a **Fill in empty fields** button that asks for the open fields one step at a time and saves them as the declaration (see [the web UI reference](../reference/ui.md#ai-surfaces)). The saved declaration is the same `{Project}_{Version}_ai-declaration.json` file, so a re-scan applies it again, from the CLI as well.
+
+![Fill in empty fields: the model step of the questions](../images/web-ui-ai-declaration.png)
+
+A model being prepared for release has no repository or file to scan, so it can be described from the declaration alone: give `--ai-declare <file>` without `--model` or `--model-file`, or pick **Enter model information** on the web UI's New scan screen, which asks the same questions and starts the scan with the answers.
+
+```bash
+./scripts/scan-sbom.sh --project support-bot --version 1.0 \
+  --ai-declare support-bot-declaration.json --generate-only
+```
+
+The model becomes the SBOM's subject under the project name and version, marked `bomlens:origin=declared-input`. The base models listed in `model.baseModels[].ref` and the datasets in `datasets[].ref` (`huggingface:<owner>/<name>`) are read from the hub by id, so their lineage, licences and traced sources are the same as in a model scan, and `datasets[].local` holds data the hub does not have. The risk assessment, the G7 check and this document follow as usual. No hub supplies the download address and supplier, so the document stays a draft until they are declared.
+
+Here the whole SBOM is the publisher's statement, so two declared values enter it. The names in `document.createdBy` become the SBOM author when `--sbom-author` is not given, marked `bomlens:sbom-author-source=declaration`. The model's own licence, `model.license`, is the other: the risk assessment judges the model on it, and an ancestor under the same terms is not flagged as a mismatch. Without it the model has no licence and its verdict reads `review`. It enters the SBOM when the scan runs, so a licence changed later with **Fill in empty fields** is listed for review until the model is scanned again.
+
+A dataset's card often lists no sources, so the scan cannot trace them. The declaration can name them for each dataset (`sources[]`, and a "Where this data came from" row in the web UI's questions). A source given by its HuggingFace id is read from the hub on the next scan, before the risk assessment, so its recorded licence counts in the dataset's verdict just as a traced source's does. A source known only by name is written to the SPDX 3.0.1 document with the licence you give, marked as declared and not verified, and does not change the verdict. A declaration the converter refuses is not applied here either. A dataset the model card names (or the dataset a scan describes) with no source on record anywhere is listed in the check for review.
+
+Two rules apply. A value that is not in the scan and not declared is left out rather than estimated, and a base model is written by its id and licence only, so nothing the publisher declares about the model is copied onto it. `--no-spdx3` skips the document.
 
 ## Reading the conformance report
 
@@ -272,6 +317,8 @@ Two further checks deepen the license verdict. For a model tagged `other`, BomLe
 
 The datasets axis rolls the referenced datasets up into the model's verdict. Each dataset entry is judged on its own license and on its declared risk markers: a publisher tag such as `pii` (personally identifiable information) or `not-for-all-audiences`, and an access restriction (gated or private repository). The model takes the worst dataset verdict, with the offending datasets named. These markers are the publisher's own declarations — their absence proves nothing, so they only ever raise a verdict, never clear one.
 
+A dataset's traced sources are judged the same way and carried into the dataset's own verdict: the strictest verdict anywhere below a dataset decides it, and the reason names the source and its license (for example `source org/nc: cc-by-nc-4.0 (caution)`). A source that could not be read, declares no license, or is named only in words reads review, and so does a dataset whose sources lie past the depth limit, since those were not read. The rule reads recorded licenses and nothing else; whether a source's owner relicensed the derived data on other terms is not something it can see.
+
 The verdict can be tailored to how you will actually use the model. Pass `--usage` with one of `internal` (in-house review and research), `product` (shipping in a product or service), `redistribute` (fine-tuning and redistribution) or `outputs-only` (using only what the model generates), and only the license conditions that bind that scenario decide the verdict — a non-commercial model, for example, reads conditional for internal research but caution for product use. The report always states which scenario it judged for; without `--usage` every condition counts.
 
 ```bash
@@ -285,7 +332,7 @@ The verdicts are guidance, not legal advice, and every report that prints them s
 
 - A model the tool cannot read produces no SBOM at all. The generator fills the card with generic defaults when a fetch fails, so BomLens checks its log and refuses the run rather than handing back an inventory of placeholders that would read as a pass.
 - The result is only as complete as the HuggingFace model card. A sparse card yields a sparse ML-BOM, and the G7 checks reflect what the card documents — not an audit of the model.
-- Dataset entries record what a dataset declares about itself. Whether the declared license is the right one, and whether a derived dataset is compatible with the ones it came from, is a judgement the report leaves to a reviewer.
+- Dataset entries record what a dataset declares about itself. The verdict now shows when a source's recorded terms are stricter than the derived dataset's, but whether the declared license is the right one, and whether the source was relicensed for the derived use, is a judgement the report leaves to a reviewer. Sources a card does not name cannot be traced.
 - A compound SPDX license expression (`MIT OR Apache-2.0`) is assessed as a whole rather than by resolving the choice, so a dual-licensed model can read `review` where either option alone would be `ok`. The direction is deliberately cautious — it never under-warns — but it may over-flag; the report names the exact expression so a reviewer can confirm.
 - The conformance report does not certify compliance with the EU AI Act, the Korean AI Framework Act, or any other regulation. It makes documentation gaps visible so a person can close them.
 - It fetches metadata over the network, so offline use is not supported. Private and gated models need `HF_TOKEN` (see [Private and gated models](#private-and-gated-models)).

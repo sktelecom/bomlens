@@ -39,6 +39,12 @@ bom.json
 *_vex.json
 *_vex.cdx.json
 *_vex_imported.json
+*_bom.spdx3.json
+*_bom.spdx3.json.sig
+*_spdx3-check.json
+*_spdx3-check.md
+*_ai-declaration.json
+*_ai-declaration.template.json
 *_security_cvebintool.json
 *_security_grype.json
 *.wfp

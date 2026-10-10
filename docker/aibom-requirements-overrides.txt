@@ -1,0 +1,29 @@
+# Security overrides for the OWASP AIBOM Generator's pinned requirements.txt
+# (opt-in image bomlens-aibom). The generator is pinned to a commit
+# (AIBOM_GENERATOR_REF in docker/Dockerfile) whose uv-compiled requirements.txt
+# pins exact versions with known vulnerabilities. apply-pip-overrides.sh swaps
+# each line named here into that file before `pip install`, so pip still
+# resolves the whole set at once and fails on an incompatible combination.
+#
+# Format: `<name>==<version>  # replaces <name>==<upstream pin> (<reason>)`.
+# The build fails if the upstream file no longer pins exactly the `replaces`
+# version, so moving AIBOM_GENERATOR_REF forces a review of every line here
+# instead of silently downgrading a package the new commit already raised.
+# Delete a line once the upstream pin reaches or passes it.
+#
+# Each version is the lowest release that clears the alert and is at least
+# 14 days old (renovate.json minimumReleaseAge), checked against the GitHub
+# Advisory Database before it was added.
+aiohttp==3.14.3  # replaces aiohttp==3.13.5 (CVE-2026-69244 and older aiohttp advisories)
+anyio==4.14.2  # replaces anyio==4.13.0 (CVE-2026-63374, CVE-2026-64847)
+datasets==5.0.1  # replaces datasets==4.8.4 (CVE-2026-66007; datasets 4.x caps fsspec at 2026.2.0)
+fsspec==2026.6.0  # replaces fsspec==2026.2.0 (CVE-2026-104851)
+idna==3.15  # replaces idna==3.11 (CVE-2026-45409)
+multidict==6.9.1  # replaces multidict==6.7.1 (CVE-2026-104874)
+python-multipart==0.0.31  # replaces python-multipart==0.0.26 (CVE-2026-42561, CVE-2026-53539, CVE-2026-53537, CVE-2026-53538, CVE-2026-53540)
+setuptools==83.0.0  # replaces setuptools==81.0.0 (CVE-2026-59890; torch below 2.13 caps setuptools under 82)
+soupsieve==2.9  # replaces soupsieve==2.8.3 (CVE-2026-49476, CVE-2026-49477, CVE-2026-85999, CVE-2026-86000)
+starlette==1.3.1  # replaces starlette==1.0.0 (CVE-2026-48818, CVE-2026-54283, CVE-2026-54282, CVE-2026-48710, CVE-2026-48817)
+torch==2.13.0  # replaces torch==2.11.0 (CVE-2025-3000; also lifts the setuptools<82 cap)
+transformers==5.10.4  # replaces transformers==5.5.4 (CVE-2026-9856; 5.10.0 itself was yanked)
+urllib3==2.8.0  # replaces urllib3==2.6.3 (CVE-2026-44431, CVE-2026-44432, CVE-2026-97687, CVE-2026-97688, CVE-2026-97689)

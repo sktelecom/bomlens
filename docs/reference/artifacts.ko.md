@@ -4,7 +4,7 @@ description: BomLens가 생성하는 산출물 파일 목록과 생성 조건, �
 
 # 산출물 레퍼런스
 
-생성된 SBOM은 CycloneDX 1.6 JSON 형식입니다. 최종 CycloneDX SBOM을 변환한 SPDX 2.3 JSON 파일은 CLI 스캔에서 `--spdx`로 만들거나, UI에서는 스캔이 끝난 뒤 결과 화면에서 내보냅니다. 두 경로 모두 같은 변환을 거치므로 결과 파일은 동일합니다. 이때도 정본은 CycloneDX이며, CycloneDX에만 있는 데이터(취약점, `bomlens:*` 속성)는 SPDX 파일로 옮겨지지 않습니다.
+생성된 SBOM은 CycloneDX 1.6 JSON 형식입니다. 최종 CycloneDX SBOM을 변환한 SPDX 2.3 JSON 파일은 CLI 스캔에서 `--spdx`로 만들거나, UI에서는 스캔이 끝난 뒤 결과 화면에서 내보냅니다. 두 경로 모두 같은 변환을 거치므로 결과 파일은 동일합니다. 이때도 정본은 CycloneDX이며, CycloneDX에만 있는 데이터(취약점, `bomlens:*` 속성)는 SPDX 파일로 옮겨지지 않습니다. AI 모델과 데이터셋 스캔은 AI와 Dataset 프로파일을 쓴 SPDX 3.0.1 문서(`_bom.spdx3.json`, 아래 표)도 만듭니다.
 
 파일명은 `{Project}_{Version}_bom.json`입니다(예: `MyApp_1.0.0_bom.json`).
 
@@ -14,6 +14,10 @@ description: BomLens가 생성하는 산출물 파일 목록과 생성 조건, �
 |------|----------|------|
 | `{Project}_{Version}_bom.json` | 항상 | SBOM (CycloneDX 1.6) |
 | `{Project}_{Version}_bom.spdx.json` | `--spdx` / `--all`, 또는 UI의 SPDX 2.3으로 내보내기 | SBOM (SPDX 2.3, CycloneDX 결과를 변환) |
+| `{Project}_{Version}_bom.spdx3.json` | AI 모델과 데이터셋 스캔(`--model`, `--model-file`, 데이터셋), `--no-spdx3`를 주지 않은 경우 | AI SBOM을 AI와 Dataset 프로파일을 쓴 SPDX 3.0.1 문서(JSON-LD)로 담은 파일. 값은 CycloneDX 결과, 그 결과에 대한 고정 규칙, 모델 공개자의 선언(`--ai-declare`)에서만 가져오며 추정하지 않는다. SPDX에 "알 수 없음" 값이 없는 필수 필드(모델과 데이터의 공급 주체와 제작 주체, 출시일과 생성일, 내려받기 주소, 문서 작성자)는 선언하기 전까지 비어 있고, 그동안 문서에 초안이라고 표시한다. 기반 모델은 id와 라이선스로만 식별한다. 배포 가중치 범위는 CycloneDX 속성 확장의 `bomlens:weights:scope`(`full`, `adapter`, `quantized`, `merged`)로 담는다. `--analyze` 입력으로는 쓸 수 없다 |
+| `{Project}_{Version}_spdx3-check.json` / `.md` | SPDX 3.0.1 문서와 함께 | 요소마다 각 필드가 스캔에서 왔는지, 선언에서 왔는지, 비어 있는지와, 채워지지 않은 필수 필드, 모델 공개자가 판단해야 할 항목(개인정보, 안전 위험, 자율성)을 정리한 검사 결과. 법적 자문이 아닌 안내 |
+| `{Project}_{Version}_ai-declaration.template.json` | SPDX 3.0.1 문서와 함께 | 이 스캔의 빈 선언 양식. 모델과 데이터셋, 스캔이 찾은 기반 모델마다 사람이 채울 필드가 들어 있다. 채워서 `--ai-declare`로 다시 넘긴다 |
+| `{Project}_{Version}_ai-declaration.json` | `--ai-declare <file>`(받아들인 파일), 또는 웹 UI에서 저장한 선언 | 모델 공개자가 선언한 내용. `_vex.json`처럼 같은 프로젝트와 버전을 다시 스캔해도 지워지지 않고, 다시 스캔하면 다시 적용된다. 새 스캔에 없는 데이터셋이나 기반 모델을 적은 파일은 거부하며, 그 경우 문서는 초안으로 남는다. 데이터셋 항목에는 `sources[]`를 적을 수 있다. 허브 데이터셋은 `{"ref": "huggingface:<id>", "relation": "extended"}`로 적으며 다음 스캔에서 허브에서 읽어 그 데이터셋과 함께 판정한다. 문장으로만 아는 원천은 `{"name": "...", "license": "<허브 라이선스 태그나 SPDX ID>", "relation": "other"}`로 적으며 SPDX 3.0.1 문서에만 기록되고 확인되지 않은 것으로 표시된다. SPDX ID가 아닌 라이선스는 문장으로만 남는다. 허브에 없는 데이터에는 문장으로 적는 원천만 넣을 수 있다. `model.license`(허브 라이선스 태그나 SPDX ID)는 모델 자체의 라이선스다. 스캔이 라이선스를 읽지 못했거나 `other`만 읽었을 때 SPDX 문서에 들어가고(SPDX 라이선스 하나에 대응하는 허브 태그나 `LicenseRef-`일 때만 SPDX 식으로 기록), 선언만으로 만든 모델은 SBOM에도 이 라이선스가 들어가 이것으로 판정한다 |
 | `{Project}_{Version}_NOTICE.txt` / `.html` | `--notice` / `--all` / 위험분석보고서 기본 | 오픈소스 고지문 |
 | `{Project}_{Version}_NOTICE.pdf` | 위와 동일한 조건, 이미지에 PDF 렌더러가 포함된 경우(`--build-arg SBOM_PDF=true`) | 고지문을 PDF로 렌더링한 파일. 렌더러가 없으면 로그만 남기고 건너뜀 |
 | `{Project}_{Version}_security.json` / `.md` / `.html` | `--security` / `--all` / 위험분석보고서 기본 | Trivy 보안보고서 |
@@ -30,7 +34,7 @@ description: BomLens가 생성하는 산출물 파일 목록과 생성 조건, �
 | `{Project}_{Version}_vex_imported.json` | CLI의 `--vex <file>`, 또는 웹 UI 취약점 화면의 **VEX 가져오기**에 CycloneDX VEX 문서를 줄 때 생긴다 | 공급사가 보낸 VEX 문서 중 이 스캔 SBOM의 컴포넌트에 해당하는 진술과, 그 문서가 설명하는 제품이다. 직접 남긴 판단(`_vex.json`)과는 따로 보관한다. 받은 진술이 내 판단을 덮어쓰지 않으며 화면도 둘을 다른 이름으로 표시한다. CycloneDX `analysis.state`는 네 가지 상태로 옮긴다(`exploitable`은 영향 있음, `not_affected`와 `false_positive`는 영향 없음, `resolved`와 `resolved_with_pedigree`는 이미 고침, `in_triage`는 조사 중). 그 밖의 상태는 무시한다. 문서의 제품이나 버전이 스캔한 SBOM의 루트와 다르면 거부하고 아무것도 저장하지 않는다. 가져오기에 성공하면 이 파일을 교체하고, 거부되거나 적용할 진술이 없는 가져오기는 이전 파일을 그대로 둔다. 제품 자체를 가리키는 진술은 컴포넌트 없이 한 번만 저장하며, 그 CVE의 발견 항목 중 자기 진술이 없는 것 모두에 적용한다. `_vex.json`처럼 같은 프로젝트와 버전을 재스캔해도 지워지지 않는다 |
 | `{Project}_{Version}_vendored.cdx.json` | 소스 스캔에서 `--identify-vendored`, opt-in SCANOSS 이미지 필요 | 소스 트리 안에서 식별한 번들 오픈소스 컴포넌트(SCANOSS) |
 | `{Project}_{Version}_security_epss.json` | 보안보고서를 생성할 때마다 | 취약점별 EPSS 점수와 KEV 여부(오프라인 생성 시 null/false), 보안보고서 우선순위 산정에 사용 |
-| `{Project}_{Version}_bom.json.sig` | `--sign` | cosign 서명 (`--spdx`와 함께 쓰면 `_bom.spdx.json.sig`도 생성) |
+| `{Project}_{Version}_bom.json.sig` | `--sign` | cosign 서명 (`--spdx`와 함께 쓰면 `_bom.spdx.json.sig`도 생성). AI 스캔에는 `_bom.spdx3.json.sig`도 추가되며, 초안도 서명한다. 서명은 파일의 출처를 보증할 뿐 완성 여부를 뜻하지 않는다 |
 | `{new}_model-diff.json` | `--diff <old.json> <new.json>` | 이미 생성한 SBOM 두 개를 비교한 AI 모델 변동 보고서. 매칭된 모델의 판정·라이선스·해시 변화와, 한쪽 파일에만 있는 컴포넌트를 담는다. 새 쪽 입력 파일 이름을 따르며(`<new>_bom.json` → `<new>_model-diff.json`), `{Project}_{Version}`이 아니다 — `--diff`는 프로젝트나 버전을 따로 받지 않는다 |
 
 `{P}`=프로젝트 이름, `{V}`=버전 (특수문자는 `_`로 정규화).

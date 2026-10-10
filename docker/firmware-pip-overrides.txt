@@ -1,0 +1,17 @@
+# Security overrides for the firmware image (bomlens-firmware), installed right
+# after unblob / cve-bin-tool / ubi_reader.
+#
+# Both packages arrive through gsutil, which cve-bin-tool requires and which
+# pins httplib2==0.20.4 and caps pyOpenSSL at 26.0.0. pyOpenSSL 26.0.0 itself
+# caps cryptography below 47, which would pull a cryptography with three HIGH
+# advisories of its own, so the override goes past gsutil's cap to a pyOpenSSL
+# that accepts the current cryptography. pip reports the gsutil conflict as a
+# warning and installs anyway. gsutil runs only in cve-bin-tool's OSV database
+# download, which this image never performs (the CVE matching uses the bundled
+# NVD index instead; see the firmware CVE build step in docker/Dockerfile).
+#
+# Each version is the lowest release that clears the alert and is at least 14
+# days old, checked against the GitHub Advisory Database before it was added.
+# Delete a line once gsutil's own pin reaches or passes it.
+httplib2==0.32.0  # replaces httplib2==0.20.4 (CVE-2026-59939)
+pyOpenSSL==26.4.0  # replaces pyOpenSSL==22.0.0 (CVE-2026-27459, CVE-2026-27448)

@@ -4,7 +4,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { DoneEvent } from "./api";
-import { parseModelCards } from "./models";
+import { datasetTreeRows, parseModelCards } from "./models";
 import { isAiScan } from "./results";
 
 // Mirrors the verified OWASP AIBOM Generator 1.7 shape
@@ -355,6 +355,102 @@ describe("parseModelCards", () => {
     const partial = parseModelCards({ components: [{ type: "machine-learning-model" }] });
     expect(partial.models[0].name).toBe("(unnamed model)");
     expect(partial.models[0].disclosure.architecture).toBe(false);
+  });
+});
+
+// The shape enrich-aibom.sh writes when it traces a dataset's sources: each
+// source is a top-level data component, the dataset names it in
+// bomlens:dataset:derivedFrom ("<relation> <bom-ref>"), and depth says how far
+// below the model card it was reached.
+const ds = (name: string, depth: number, props: [string, string][] = []) => ({
+  type: "data",
+  "bom-ref": `dataset:huggingface/${name}`,
+  name,
+  properties: [["bomlens:dataset:depth", String(depth)], ...props].map(([n, v]) => ({
+    name: n,
+    value: v,
+  })),
+});
+
+describe("dataset source tree", () => {
+  it("reads the traced-source fields", () => {
+    const { datasets } = parseModelCards({
+      components: [
+        ds("org/mix", 0, [
+          ["bomlens:dataset:derivedFrom", "extended dataset:huggingface/org/nc"],
+          ["bomlens:dataset:sourceDataset:unverified", "Wikipedia dump 2023-01"],
+          ["bomlens:dataset:sourceTrace", "depth-limit"],
+        ]),
+      ],
+    });
+    expect(datasets[0]).toMatchObject({
+      ref: "dataset:huggingface/org/mix",
+      depth: 0,
+      derivedFrom: [{ relation: "extended", ref: "dataset:huggingface/org/nc" }],
+      unverifiedSources: ["Wikipedia dump 2023-01"],
+      trace: "depth-limit",
+    });
+  });
+
+  it("indents each source under the dataset it was traced from", () => {
+    const { datasets } = parseModelCards({
+      components: [
+        ds("org/nc", 1),
+        ds("org/mix", 0, [["bomlens:dataset:derivedFrom", "extended dataset:huggingface/org/nc"]]),
+        ds("org/other", 0),
+      ],
+    });
+    const rows = datasetTreeRows(datasets).map((r) => [r.dataset.name, r.level, r.relation]);
+    expect(rows).toEqual([
+      ["org/mix", 0, undefined],
+      ["org/nc", 1, "extended"],
+      ["org/other", 0, undefined],
+    ]);
+  });
+
+  it("gives a shared source one full row and a repeat row, and survives a cycle", () => {
+    const { datasets } = parseModelCards({
+      components: [
+        ds("org/a", 0, [["bomlens:dataset:derivedFrom", "listed dataset:huggingface/org/c"]]),
+        ds("org/b", 0, [["bomlens:dataset:derivedFrom", "listed dataset:huggingface/org/c"]]),
+        ds("org/c", 1, [["bomlens:dataset:derivedFrom", "extended dataset:huggingface/org/a"]]),
+      ],
+    });
+    const rows = datasetTreeRows(datasets).map((r) => [r.dataset.name, r.level, Boolean(r.repeat)]);
+    expect(rows).toEqual([
+      ["org/a", 0, false],
+      ["org/c", 1, false],
+      ["org/a", 2, true],
+      ["org/b", 0, false],
+      ["org/c", 1, true],
+    ]);
+  });
+
+  it("keeps the old flat order when nothing was traced", () => {
+    const { datasets } = parseModelCards(ML_BOM);
+    const rows = datasetTreeRows(datasets);
+    expect(rows.map((r) => r.dataset.name)).toEqual(datasets.map((d) => d.name));
+    expect(rows.every((r) => r.level === 0)).toBe(true);
+  });
+
+  it("stays as long as the links on a densely connected graph", () => {
+    const names = Array.from({ length: 12 }, (_, i) => `org/d${i}`);
+    const comps = names.map((n, i) =>
+      ds(
+        n,
+        i === 0 ? 0 : 1,
+        names.filter((m) => m !== n).map((m) => ["bomlens:dataset:derivedFrom", `listed dataset:huggingface/${m}`] as [string, string]),
+      ),
+    );
+    const rows = datasetTreeRows(parseModelCards({ components: comps }).datasets);
+    expect(rows.filter((r) => !r.repeat)).toHaveLength(12);
+    expect(rows.length).toBeLessThanOrEqual(12 + 12 * 11);
+  });
+
+  it("shows a source whose parent link is missing as a root", () => {
+    const rows = datasetTreeRows(parseModelCards({ components: [ds("org/orphan", 2)] }).datasets);
+    expect(rows).toHaveLength(1);
+    expect(rows[0].level).toBe(0);
   });
 });
 

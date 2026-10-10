@@ -33,8 +33,8 @@ docker pull ghcr.io/sktelecom/bomlens:latest
 | cosign | v3.1.3 | SBOM 서명 |
 | jq | — | SBOM 정규화와 고지문 생성 |
 | ScanCode Toolkit | 32.5.0 | 정밀 라이선스 탐지 (opt-in 빌드에만 포함) |
-| docker CLI | 29.7.2 | 웹 UI가 소스 스캔에서 cdxgen 컨테이너를 sibling으로 띄울 때 사용 |
-| cdxgen | 13.1.0 | 모델 계보 정보 보강(`bomlens-aibom` 이미지 전용) |
+| docker CLI | 29.8.1 | 웹 UI가 소스 스캔에서 cdxgen 컨테이너를 sibling으로 띄울 때 사용 |
+| cdxgen | 13.2.0 | 모델 계보 정보 보강(`bomlens-aibom` 이미지 전용) |
 
 도구 버전은 `docker/Dockerfile`의 `ARG`로 고정됩니다.
 

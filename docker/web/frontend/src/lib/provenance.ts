@@ -28,7 +28,9 @@ export type ProvenanceKind =
   | "image"
   | "file"
   | "sbom"
-  | "model";
+  | "model"
+  // A model described from a declaration file, not read from anything.
+  | "declaration";
 
 export interface Provenance {
   kind: ProvenanceKind;
@@ -53,6 +55,7 @@ const KIND_BY_SOURCE: Record<SourceType, ProvenanceKind> = {
   "sbom-upload": "sbom",
   "ai-model": "model",
   "model-upload": "model",
+  "ai-declare": "declaration",
 };
 
 const LABEL_KEY: Record<ProvenanceKind, string> = {
@@ -63,6 +66,7 @@ const LABEL_KEY: Record<ProvenanceKind, string> = {
   file: "provenance.file",
   sbom: "provenance.sbom",
   model: "provenance.model",
+  declaration: "provenance.declaration",
 };
 
 /**

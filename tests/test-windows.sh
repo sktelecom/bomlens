@@ -197,7 +197,7 @@ for flag in --project --version --target --git --branch --firmware --analyze \
             --byte-stable --sign --output-dir --timestamp --ui \
             --license --sbom-author --model --model-file --usage --merge --merge-root \
             --diff --trusca --upload-target --deep-cve --identify-vendored --verify-weights --spdx --lang \
-            --conformance-profile --fail-on-conformance --fail-on --vex; do
+            --conformance-profile --fail-on-conformance --fail-on --vex --ai-declare --no-spdx3; do
   if printf '%s' "$HELP" | grep -q -- "$flag"; then pass "help documents $flag"
   else fail "help documents $flag"; fi
 done
@@ -496,12 +496,12 @@ scan_in "$d" --project Pdotnetsub --version 1.0.0 --generate-only
 # Unknown (no manifest) and mixed (two manifests) both fall back to all-in-one.
 d="$(new_proj unknown)"; printf 'hello\n' > "$d/README"
 scan_in "$d" --project Punknown --version 1.0.0 --generate-only
-{ in_out "Language: unknown" && in_out "No package manifest" && in_log "cdxgen/cdxgen:v13"; } \
+{ in_out "Language: unknown" && in_out "No package manifest" && in_log "ghcr.io/cdxgen/cdxgen:"; } \
   && pass "no manifest → unknown → all-in-one image + warning" || { fail "no manifest → all-in-one"; show; }
 
 d="$(new_proj mixed)"; printf '{}' > "$d/package.json"; printf 'module x\ngo 1.21\n' > "$d/go.mod"
 scan_in "$d" --project Pmixed --version 1.0.0 --generate-only
-{ in_out "Language: mixed" && in_log "cdxgen/cdxgen:v13"; } \
+{ in_out "Language: mixed" && in_log "ghcr.io/cdxgen/cdxgen:"; } \
   && pass "two manifests → mixed → all-in-one image" || { fail "mixed → all-in-one"; show; }
 
 # A completed source scan must print success and leave the SBOM on the host,
@@ -667,6 +667,9 @@ guard "--fail-on is refused with --diff"       "--fail-on cannot be combined wit
 guard "--vex file must exist"           "--vex file not found" --project p --version 1 --target z --vex no-such-vex.json
 guard "--vex is refused with --diff"    "--vex cannot be combined with --diff" --project p --version 1 --diff a.json b.json --vex v.json
 guard "--vex is refused with --ui"      "--vex is not offered with --ui" --ui --vex v.json
+guard "--ai-declare file must exist"    "--ai-declare file not found" --project p --version 1 --model o/r --ai-declare no-such.json
+guard "--ai-declare is refused with --diff" "--ai-declare cannot be combined with --diff" --project p --version 1 --diff a.json b.json --ai-declare d.json
+guard "--ai-declare is refused with --ui" "--ai-declare is not offered with --ui" --ui --ai-declare d.json
 guard "--merge needs >=2 files"         "needs at least 2" --project p --version 1 --merge one.json
 guard "--merge-root without --merge"    "only applies with --merge" --project p --version 1 --merge-root x.json
 guard "--merge-root not in --merge list" "must be one of the --merge input files" \
@@ -756,6 +759,61 @@ d="$(new_proj usage_bad)"; printf 'x' > "$d/w.gguf"
 scan_in "$d" --project MU --version 1 --model-file w.gguf --usage bogus --generate-only
 { [ "$RC" -ne 0 ] && in_out "internal, product, redistribute, outputs-only"; } \
   && pass "--usage rejects an unknown scenario" || { fail "--usage rejects unknown scenario"; show; }
+
+d="$(new_proj ai_declare)"; mkdir -p "$d/dir with space"; printf '{}\n' > "$d/dir with space/my decl.json"
+DOCKER_STUB_ARGV_DUMP=1 \
+  scan_in "$d" --project MAD --version 1 --model owner/repo --generate-only --ai-declare "dir with space/my decl.json"
+{ in_log "<AI_DECLARATION_FILE=/declare-in/declaration.json>" && in_log "/dir with space/my decl.json:/declare-in/declaration.json:ro>"; } \
+  && pass "--ai-declare mounts the file alone, read-only, at a fixed path, across a space in its path" \
+  || { fail "--ai-declare is not mounted as one read-only file"; show; cat "$LOG"; }
+in_log "<GENERATE_SPDX3=true>" && pass "AI scans write the SPDX 3.0.1 document by default" \
+  || { fail "GENERATE_SPDX3 default not forwarded"; show; cat "$LOG"; }
+
+d="$(new_proj hf_dataset)"
+DOCKER_STUB_ARGV_DUMP=1 HF_TOKEN=hf_secret_value \
+  scan_in "$d" --project D --version 1 --model "https://huggingface.co/datasets/allenai/tulu-3-sft-mixture/tree/main" --generate-only
+{ in_out "Mode: DATASET" && in_log "<DATASET_REF=hf:allenai/tulu-3-sft-mixture>" && in_log "<HF_TOKEN>" \
+  && ! in_log "hf_secret_value"; } \
+  && pass "--model <dataset address> -> DATASET with hf:<id>, HF_TOKEN by name only" \
+  || { fail "--model <dataset address> not routed to DATASET"; show; cat "$LOG"; }
+d="$(new_proj hf_dataset_notoken)"
+DOCKER_STUB_ARGV_DUMP=1 HF_TOKEN='' HUGGING_FACE_HUB_TOKEN='' \
+  scan_in "$d" --project D --version 1 --model "datasets/org/ds" --generate-only
+{ in_log "<DATASET_REF=hf:org/ds>" && ! in_log "<HF_TOKEN>"; } \
+  && pass "no token set: HF_TOKEN is not passed at all" || { fail "HF_TOKEN passed without a token"; cat "$LOG"; }
+d="$(new_proj hf_dataset_oldname)"
+DOCKER_STUB_ARGV_DUMP=1 HF_TOKEN='' HUGGING_FACE_HUB_TOKEN=hf_old_name_value \
+  scan_in "$d" --project D --version 1 --model "datasets/org/ds" --generate-only
+{ in_log "<HF_TOKEN>" && ! in_log "hf_old_name_value"; } \
+  && pass "a token under the older name is passed as HF_TOKEN, by name only" || { fail "older token name not passed"; cat "$LOG"; }
+
+d="$(new_proj no_spdx3)"
+DOCKER_STUB_ARGV_DUMP=1 scan_in "$d" --project MNS --version 1 --model owner/repo --generate-only --no-spdx3
+in_log "<GENERATE_SPDX3=false>" && pass "--no-spdx3 reaches the container" || { fail "--no-spdx3 not forwarded"; show; cat "$LOG"; }
+
+d="$(new_proj ai_declare_source)"; printf '{"name":"x","version":"1.0.0"}\n' > "$d/package.json"; printf '{}\n' > "$d/d.json"
+scan_in "$d" --project ADS --version 1 --generate-only --target . --ai-declare d.json
+{ [ "$RC" -ne 0 ] && in_out "--ai-declare applies to AI model and dataset scans only"; } \
+  && pass "--ai-declare is refused for a source scan" || { fail "--ai-declare accepted for a source scan"; show; }
+d="$(new_proj ai_declare_alone)"; printf '{}\n' > "$d/d.json"
+DOCKER_STUB_ARGV_DUMP=1 HF_TOKEN='' HUGGING_FACE_HUB_TOKEN='' \
+  scan_in "$d" --project ADA --version 1 --generate-only --ai-declare d.json
+{ in_out "Mode: AIDECLARE" && in_log "<MODE=AIDECLARE>" && in_log "<AI_DECLARATION_FILE=/declare-in/declaration.json>" \
+  && ! in_log "<HF_TOKEN>"; } \
+  && pass "--ai-declare alone describes the model from the declaration (AIDECLARE, file mounted)" \
+  || { fail "--ai-declare alone did not select AIDECLARE"; show; cat "$LOG"; }
+DOCKER_STUB_ARGV_DUMP=1 HF_TOKEN=hf_decl_value \
+  scan_in "$d" --project ADA --version 1 --generate-only --ai-declare d.json
+{ in_log "<HF_TOKEN>" && ! in_log "hf_decl_value"; } \
+  && pass "a declared model passes HF_TOKEN by name only" || { fail "HF_TOKEN not passed for AIDECLARE"; cat "$LOG"; }
+scan_in "$d" --project ADA --version 1 --generate-only --ai-declare d.json --no-spdx3
+{ [ "$RC" -ne 0 ] && in_out "--no-spdx3 cannot be used when --ai-declare is the input"; } \
+  && pass "--no-spdx3 is refused when the declaration is the input" || { fail "--no-spdx3 accepted for AIDECLARE"; show; }
+scan_in "$d" --project ADA --version 1 --generate-only --ai-declare d.json --usage product
+in_out "Mode: AIDECLARE" && pass "--usage applies to a declared model too" || { fail "--usage refused for AIDECLARE"; show; }
+scan_in "$d" --project ADS --version 1 --generate-only --no-spdx3
+{ [ "$RC" -ne 0 ] && in_out "--no-spdx3 applies to AI model and dataset scans only"; } \
+  && pass "--no-spdx3 is refused for a source scan" || { fail "--no-spdx3 accepted for a source scan"; show; }
 
 d="$(new_proj verify_weights)"
 scan_in "$d" --project MVW --version 1 --model owner/repo --verify-weights --generate-only

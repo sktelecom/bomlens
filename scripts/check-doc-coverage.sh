@@ -72,6 +72,7 @@ ANALYZE :: --analyze|ANALYZE :: --analyze|ANALYZE :: by-input,ui,cli,architectur
 AIBOM :: --model|AI model :: --model|AI 모델 :: by-input,ui,cli,architecture,readme,pipeline-by-input
 MODELFILE :: --model-file|model file :: --model-file|모델 파일 :: by-input,ui,cli,architecture,readme,pipeline-by-input
 DATASET :: Figshare|figshare :: Figshare|figshare :: by-input,ui,cli,architecture,readme,pipeline-by-input
+AIDECLARE :: --ai-declare|declaration :: --ai-declare|직접 입력 :: by-input,ui,cli,architecture,readme,pipeline-by-input
 "
 
 # 1) Pull the authoritative mode list from entrypoint.sh.

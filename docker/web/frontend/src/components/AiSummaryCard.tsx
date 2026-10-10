@@ -5,8 +5,9 @@ import { Cpu } from "lucide-react";
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 
+import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
-import type { DoneEvent } from "@/lib/api";
+import type { DoneEvent, Spdx3Summary } from "@/lib/api";
 import { computeAiSummary, type AiSummaryRisk } from "@/lib/aiSummary";
 import { GRADE_LABEL_KEY, GRADE_SEVERITY_ORDER, GradeBadge, type AssessmentGrade } from "@/lib/models";
 import { inputSbomFileName } from "@/lib/results";
@@ -107,6 +108,8 @@ export function AiSummaryCard({
 
         {risk?.single && <p className="text-sm text-foreground">{risk.single.summary}</p>}
 
+        {result.spdx3 && <Spdx3Line spdx3={result.spdx3} scanId={scanId} />}
+
         <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1">
           {scanId && (
             <a href={scanHash(scanId, "models")} className={LINK_CLASS}>
@@ -128,6 +131,34 @@ export function AiSummaryCard({
         {disclaimer && <p className="text-xs text-muted-foreground">{disclaimer}</p>}
       </CardContent>
     </Card>
+  );
+}
+
+/** The SPDX 3.0.1 AI document in one line: draft or complete, how many
+ *  required fields are left, and the way to Models & datasets to fill them. */
+function Spdx3Line({ spdx3, scanId }: { spdx3: Spdx3Summary; scanId: string | null }) {
+  const { t } = useTranslation();
+  const missing = spdx3.counts.missingRequired ?? 0;
+  return (
+    <div className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-md border p-3" data-testid="ai-summary-spdx3">
+      <span className="text-xs font-medium text-muted-foreground">{t("spdx3.band.title")}</span>
+      {spdx3.draft ? (
+        <Badge tone="warning">{t("spdx3.draft")}</Badge>
+      ) : (
+        <Badge tone="success">{t("spdx3.complete")}</Badge>
+      )}
+      <span className="text-xs text-foreground">
+        {spdx3.draft ? t("aiSummary.spdx3Open", { count: missing }) : t("aiSummary.spdx3Done")}
+      </span>
+      {scanId && (
+        <a
+          href={spdx3.draft ? scanHash(scanId, "models", { fill: "1" }) : scanHash(scanId, "models")}
+          className={cn(LINK_CLASS, "ml-auto")}
+        >
+          {spdx3.draft ? t("aiSummary.spdx3Fill") : t("aiSummary.spdx3View")}
+        </a>
+      )}
+    </div>
   );
 }
 

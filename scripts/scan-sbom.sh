@@ -114,6 +114,7 @@ fail_on_bad_coverage() {
     exit 1
 }
 FORCE_FIRMWARE="false"; ANALYZE_SBOM=""; MODEL=""; MODEL_FILE=""; VEX_FILE=""
+AI_DECLARE_FILE=""; GENERATE_SPDX3="true"
 # Set when --target turned out to be a Yocto build directory: the folder the
 # user pointed at, while ANALYZE_SBOM holds the image SBOM found inside it.
 YOCTO_BUILD_DIR=""
@@ -126,6 +127,32 @@ SCANOSS_API_URL="${SCANOSS_API_URL:-}"; SCANOSS_API_KEY="${SCANOSS_API_KEY:-}"
 # Passed to docker as a bare `-e HF_TOKEN` (name, no value) so the secret never
 # lands in argv where `ps` could read it.
 HF_TOKEN="${HF_TOKEN:-${HUGGING_FACE_HUB_TOKEN:-}}"
+# Exported: `docker run -e HF_TOKEN` reads the value from this process's
+# environment, which a plain assignment from the older name does not reach.
+[ -n "$HF_TOKEN" ] && export HF_TOKEN
+
+# Whether a --model value names a HuggingFace dataset: hf:<id>, datasets/<id>
+# or its huggingface.co/datasets/<id> address (prefix in any case, anything
+# after the name ignored). Sets HF_DATASET_ID and returns 0 for a dataset, 2
+# for a dataset prefix with an id the hub could not hold, 1 otherwise. The
+# same rule as hf_dataset_ref in docker/web/server.py; the id is checked as a
+# whole string, so a newline cannot slip a second line past it.
+hf_dataset_ref() {
+    HF_DATASET_ID=""
+    local rest first after matched=1
+    shopt -s nocasematch
+    if [[ "$1" =~ ^(hf:|(https?://)?(www\.)?huggingface\.co/datasets/|datasets/)(.*)$ ]]; then
+        matched=0; rest="${BASH_REMATCH[4]}"
+    fi
+    shopt -u nocasematch
+    [ "$matched" -eq 0 ] || return 1
+    first="${rest%%/*}"
+    if [ "$first" != "$rest" ]; then after="${rest#*/}"; HF_DATASET_ID="$first/${after%%/*}"; else HF_DATASET_ID="$first"; fi
+    if [[ "$HF_DATASET_ID" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*(/[A-Za-z0-9][A-Za-z0-9._-]*)?$ ]] && [[ "$HF_DATASET_ID" != *..* ]]; then
+        return 0
+    fi
+    return 2
+}
 GIT_URL=""; GIT_REF=""; NO_REPORT="false"; GENERATE_REPORT="false"
 INGEST_SOURCE="false"; INGEST_ROOTFS="false"; INGEST_ARCHIVE=""; SCAN_INPUT_DIR=""; CLEANUP_DIRS=()
 MERGE_FILES=()
@@ -150,6 +177,8 @@ while [[ "$#" -gt 0 ]]; do
         # The statements attach to vulnerability rows, which come from the security
         # report, so asking for a VEX asks for that report too (as --deep-cve does).
         --vex) VEX_FILE="$2"; GENERATE_SECURITY="true"; shift ;;
+        --ai-declare) AI_DECLARE_FILE="$2"; shift ;;
+        --no-spdx3) GENERATE_SPDX3="false" ;;
         --usage) USAGE_CONTEXT="$2"; shift ;;
         --merge)
             # Variadic: absorb every following token until the next option (a
@@ -243,6 +272,25 @@ Options:
                          statements are shown on its findings. A document for a
                          different product or version, or one that is not
                          CycloneDX VEX, is reported and skipped.
+  --ai-declare <file>    For an AI model or dataset scan: the publisher's
+                         declaration (JSON) of what a scan cannot read, such as
+                         release dates, who made the model and the data, and
+                         which datasets trained or tested it. Written into the
+                         SPDX 3.0.1 AI document only; the CycloneDX SBOM is not
+                         changed. Every AI scan writes an empty one to start
+                         from, <Project>_<Version>_ai-declaration.template.json.
+                         A file that names a field, value or dataset the scan
+                         does not have is refused and the document stays a
+                         draft. The accepted file is kept with the results and
+                         applied again on the next scan of the same version.
+                         Given alone (no --model, --model-file or --target), it
+                         describes a model that has no hub repository or file
+                         yet: its base models (model.baseModels) and datasets
+                         (datasets[].ref) are read from the hub by id, and the
+                         rest comes from the declaration (base image).
+  --no-spdx3             For an AI model or dataset scan: do not write the
+                         SPDX 3.0.1 AI document (<Project>_<Version>_bom.spdx3.json)
+                         and its check
   --sbom-author <name>   Entity that generated this SBOM — the organisation or
                          person running the scan, not the tool and not whoever
                          wrote the software. Use the full name, no acronyms.
@@ -279,6 +327,11 @@ Options:
                          image. An institutional DOI that does not carry
                          "figshare" cannot be told apart from any other DOI, so
                          give the item URL for those.
+                         A HuggingFace dataset is taken as datasets/<owner>/<name>,
+                         its https://huggingface.co/datasets/... address, or
+                         hf:<owner>/<name>, and is described in the base image
+                         with the sources its card names. A bare owner/name is
+                         always a model.
                          Mutually exclusive with --target/--analyze/--git/--merge.
   --model-file <path>    Read one AI model FILE (GGUF, safetensors, PyTorch,
                          pickle, npz, npy, ONNX) and describe it from its own
@@ -422,6 +475,14 @@ Environment:
                          (ClamAV + picklescan) for --model scans and record
                          them in the ML-BOM (default: true; metadata only, no
                          file download; set false to skip the lookup)
+  AIBOM_DATASET_DEPTH    For --model: how many levels of a dataset's own
+                         sources (source_datasets on its card) to read and judge
+                         with it (default: 3; 0 reads only the datasets the
+                         model card names, as before)
+  AIBOM_DATASET_MAX_LOOKUPS
+                         For --model: the most datasets one scan reads,
+                         sources included (default: 40); the rest are recorded
+                         by name as not read
   GIT_TOKEN              Token for cloning private --git repos
   HF_TOKEN               HuggingFace read token for --model; required for a
                          private or gated repo (e.g. reviewing a model before
@@ -564,6 +625,7 @@ SBOM_PULL="${SBOM_PULL:-missing}"
 # ========================================================
 if [ "$UI_MODE" = "true" ]; then
     [ -z "$VEX_FILE" ] || { echo "[ERROR] --vex is not offered with --ui (import a VEX from the Vulnerabilities screen instead)."; exit 1; }
+    [ -z "$AI_DECLARE_FILE" ] || { echo "[ERROR] --ai-declare is not offered with --ui (fill the declaration on the Models & datasets screen instead)."; exit 1; }
     [ "${#FAIL_ON[@]}" -eq 0 ] || { echo "[ERROR] --fail-on is not offered with --ui (it exits on one scan's result; the UI runs many)."; exit 1; }
     [ "$FAIL_ON_CONFORMANCE" = "true" ] && { echo "[ERROR] --fail-on-conformance is not offered with --ui (it exits on one scan's result; the UI runs many)."; exit 1; }
     docker_check
@@ -649,6 +711,7 @@ fi
 if [ -n "$DIFF_OLD" ]; then
     [ "${#FAIL_ON[@]}" -eq 0 ] || { echo "[ERROR] --fail-on cannot be combined with --diff (a diff judges no scan)."; exit 1; }
     [ -z "$VEX_FILE" ] || { echo "[ERROR] --vex cannot be combined with --diff (a diff writes no SBOM to attach statements to)."; exit 1; }
+    [ -z "$AI_DECLARE_FILE" ] || { echo "[ERROR] --ai-declare cannot be combined with --diff (a diff writes no AI document to declare into)."; exit 1; }
     docker_check
     [ -f "$DIFF_OLD" ] || { echo "[ERROR] --diff: old SBOM not found: $DIFF_OLD"; exit 1; }
     [ -f "$DIFF_NEW" ] || { echo "[ERROR] --diff: new SBOM not found: $DIFF_NEW"; exit 1; }
@@ -930,8 +993,8 @@ pp_env() {
     # secret never lands on the `docker run` argv where a local `ps` could read
     # it. Their values ride the exported shell env (see the export before each
     # `docker run`), matching the web-server path. Non-secret fields keep =value.
-    printf ' -e GENERATE_NOTICE=%s -e GENERATE_SECURITY=%s -e GENERATE_SPDX=%s -e SECURITY_ENRICH=%s -e GENERATE_REPORT=%s -e DEEP_LICENSE=%s -e IDENTIFY_VENDORED=%s -e SCANOSS_API_URL=%q -e SCANOSS_API_KEY -e SIGN_SBOM=%s -e BYTE_STABLE=%s -e REPORT_LANG=%s -e UPLOAD_ENABLED=%s -e PROJECT_NAME=%q -e PROJECT_VERSION=%q -e HOST_OUTPUT_DIR=/host-output -e HOST_UID=%s -e HOST_GID=%s -e API_KEY -e API_URL=%q -e UPLOAD_TARGET=%q -e TRUSCA_PROJECT_ID=%q -e TRUSCA_REF=%q -e TRUSCA_RELEASE=%q -e ENRICH_CDXGEN=%s -e ENRICH_EOL=%s -e ENRICH_MALICIOUS=%s -e STALENESS_ENRICH=%s -e DEEP_CVE=%s -e SECURITY_NVD_VERIFY=%s -e ENRICH_HF_SECURITY=%s -e VERIFY_MODEL_WEIGHTS=%s -e AIBOM_VERIFY_MAX_FILES=%q -e AIBOM_VERIFY_MAX_BYTES=%q -e AI_USAGE_CONTEXT=%q -e PROJECT_LICENSE=%q -e SBOM_AUTHOR=%q -e SRC_TREE_EXCLUDE=%q -e SOURCE_TREE_MAX=%q -e SOURCE_SNAPSHOT_MAX_TOTAL=%q -e SOURCE_SNAPSHOT_MAX_FILE=%q -e SOURCE_SNAPSHOT_MAX_FILES=%q -e FW_VERSTR_MAX_FILES=%q -e FW_VERSTR_MAX_BYTES=%q -e FW_ELF_MAX_FILES=%q -e FW_KERNEL_MAX_FILES=%q -e FW_KERNEL_MAX_BYTES=%q -e FW_KERNEL_MAX_VERSIONS=%q -e FW_EXTRA_ROOTS=%q -e FW_MAX_EXTRA_ROOTS=%q -e FW_CONTAINER_MEMBERSHIP=%q -e PURL_MIN_PCT=%q -e LICENSE_MIN_PCT=%q -e HASH_MIN_PCT=%q -e FIELD_MIN_PCT=%q -e CONFORMANCE_PROFILE=%s -e PURL_RESOLVE=%s -e PURL_RESOLVE_IGNORE -e PURL_RESOLVE_BUDGET' \
-        "$GENERATE_NOTICE" "$GENERATE_SECURITY" "$GENERATE_SPDX" "$SECURITY_ENRICH" "$GENERATE_REPORT" "$DEEP_LICENSE" "$IDENTIFY_VENDORED" "$SCANOSS_API_URL" "$SIGN_SBOM" "$BYTE_STABLE" "$REPORT_LANG" "$UPLOAD_VAR" "$PROJECT_NAME" "$PROJECT_VERSION" "$(id -u)" "$(id -g)" "$SERVER_URL" "$UPLOAD_TARGET" "$TRUSCA_PROJECT_ID" "$TRUSCA_REF" "$TRUSCA_RELEASE" "${ENRICH_CDXGEN:-true}" "${ENRICH_EOL:-true}" "${ENRICH_MALICIOUS:-true}" "${STALENESS_ENRICH:-false}" "$DEEP_CVE" "${SECURITY_NVD_VERIFY:-false}" "${ENRICH_HF_SECURITY:-true}" "$VERIFY_WEIGHTS" "${AIBOM_VERIFY_MAX_FILES:-}" "${AIBOM_VERIFY_MAX_BYTES:-}" "${USAGE_CONTEXT:-${AI_USAGE_CONTEXT:-}}" "${PROJECT_LICENSE:-}" "${SBOM_AUTHOR:-}" "${SRC_TREE_EXCLUDE:-}" \
+    printf ' -e GENERATE_NOTICE=%s -e GENERATE_SECURITY=%s -e GENERATE_SPDX=%s -e SECURITY_ENRICH=%s -e GENERATE_REPORT=%s -e DEEP_LICENSE=%s -e IDENTIFY_VENDORED=%s -e SCANOSS_API_URL=%q -e SCANOSS_API_KEY -e SIGN_SBOM=%s -e BYTE_STABLE=%s -e REPORT_LANG=%s -e UPLOAD_ENABLED=%s -e PROJECT_NAME=%q -e PROJECT_VERSION=%q -e HOST_OUTPUT_DIR=/host-output -e HOST_UID=%s -e HOST_GID=%s -e API_KEY -e API_URL=%q -e UPLOAD_TARGET=%q -e TRUSCA_PROJECT_ID=%q -e TRUSCA_REF=%q -e TRUSCA_RELEASE=%q -e ENRICH_CDXGEN=%s -e ENRICH_EOL=%s -e ENRICH_MALICIOUS=%s -e STALENESS_ENRICH=%s -e DEEP_CVE=%s -e SECURITY_NVD_VERIFY=%s -e ENRICH_HF_SECURITY=%s -e VERIFY_MODEL_WEIGHTS=%s -e AIBOM_VERIFY_MAX_FILES=%q -e AIBOM_VERIFY_MAX_BYTES=%q -e AIBOM_DATASET_DEPTH=%q -e AIBOM_DATASET_MAX_LOOKUPS=%q -e GENERATE_SPDX3=%s -e AI_USAGE_CONTEXT=%q -e PROJECT_LICENSE=%q -e SBOM_AUTHOR=%q -e SRC_TREE_EXCLUDE=%q -e SOURCE_TREE_MAX=%q -e SOURCE_SNAPSHOT_MAX_TOTAL=%q -e SOURCE_SNAPSHOT_MAX_FILE=%q -e SOURCE_SNAPSHOT_MAX_FILES=%q -e FW_VERSTR_MAX_FILES=%q -e FW_VERSTR_MAX_BYTES=%q -e FW_ELF_MAX_FILES=%q -e FW_KERNEL_MAX_FILES=%q -e FW_KERNEL_MAX_BYTES=%q -e FW_KERNEL_MAX_VERSIONS=%q -e FW_EXTRA_ROOTS=%q -e FW_MAX_EXTRA_ROOTS=%q -e FW_CONTAINER_MEMBERSHIP=%q -e PURL_MIN_PCT=%q -e LICENSE_MIN_PCT=%q -e HASH_MIN_PCT=%q -e FIELD_MIN_PCT=%q -e CONFORMANCE_PROFILE=%s -e PURL_RESOLVE=%s -e PURL_RESOLVE_IGNORE -e PURL_RESOLVE_BUDGET' \
+        "$GENERATE_NOTICE" "$GENERATE_SECURITY" "$GENERATE_SPDX" "$SECURITY_ENRICH" "$GENERATE_REPORT" "$DEEP_LICENSE" "$IDENTIFY_VENDORED" "$SCANOSS_API_URL" "$SIGN_SBOM" "$BYTE_STABLE" "$REPORT_LANG" "$UPLOAD_VAR" "$PROJECT_NAME" "$PROJECT_VERSION" "$(id -u)" "$(id -g)" "$SERVER_URL" "$UPLOAD_TARGET" "$TRUSCA_PROJECT_ID" "$TRUSCA_REF" "$TRUSCA_RELEASE" "${ENRICH_CDXGEN:-true}" "${ENRICH_EOL:-true}" "${ENRICH_MALICIOUS:-true}" "${STALENESS_ENRICH:-false}" "$DEEP_CVE" "${SECURITY_NVD_VERIFY:-false}" "${ENRICH_HF_SECURITY:-true}" "$VERIFY_WEIGHTS" "${AIBOM_VERIFY_MAX_FILES:-}" "${AIBOM_VERIFY_MAX_BYTES:-}" "${AIBOM_DATASET_DEPTH:-}" "${AIBOM_DATASET_MAX_LOOKUPS:-}" "$GENERATE_SPDX3" "${USAGE_CONTEXT:-${AI_USAGE_CONTEXT:-}}" "${PROJECT_LICENSE:-}" "${SBOM_AUTHOR:-}" "${SRC_TREE_EXCLUDE:-}" \
         "${SOURCE_TREE_MAX:-}" "${SOURCE_SNAPSHOT_MAX_TOTAL:-}" "${SOURCE_SNAPSHOT_MAX_FILE:-}" "${SOURCE_SNAPSHOT_MAX_FILES:-}" \
         "${FW_VERSTR_MAX_FILES:-}" "${FW_VERSTR_MAX_BYTES:-}" "${FW_ELF_MAX_FILES:-}" \
         "${FW_KERNEL_MAX_FILES:-}" "${FW_KERNEL_MAX_BYTES:-}" "${FW_KERNEL_MAX_VERSIONS:-}" \
@@ -970,6 +1033,16 @@ vex_run() {
     local d f
     d="$(cd "$(dirname "$VEX_FILE")" && pwd)"; f="$(basename "$VEX_FILE")"
     printf ' -v %q:/vex-in/vex.json:ro -e VEX_FILE=/vex-in/vex.json' "$(hostpath "$d/$f")"
+}
+
+# --ai-declare: mounted the same way as --vex, one file, read-only, at a fixed
+# container path (see the comment above for why the user's name is kept out of
+# the env value).
+declare_run() {
+    [ -n "$AI_DECLARE_FILE" ] || return 0
+    local d f
+    d="$(cd "$(dirname "$AI_DECLARE_FILE")" && pwd)"; f="$(basename "$AI_DECLARE_FILE")"
+    printf ' -v %q:/declare-in/declaration.json:ro -e AI_DECLARATION_FILE=/declare-in/declaration.json' "$(hostpath "$d/$f")"
 }
 
 # --fail-on: the conditions travel to the container as one comma-separated value.
@@ -1455,6 +1528,10 @@ if [ -z "$GIT_URL" ] && [ -n "$TARGET" ] && is_git_url "$TARGET"; then
     GIT_URL="$TARGET"; TARGET=""
 fi
 # Host-only check, made before anything is cloned or downloaded.
+if [ -n "$AI_DECLARE_FILE" ] && [ ! -f "$AI_DECLARE_FILE" ]; then
+    echo "[ERROR] --ai-declare file not found: $AI_DECLARE_FILE"
+    echo "[ERROR] Pass the path of a declaration (JSON). Every AI scan writes an empty one to start from: <Project>_<Version>_ai-declaration.template.json."; exit 1
+fi
 if [ -n "$VEX_FILE" ] && [ ! -f "$VEX_FILE" ]; then
     echo "[ERROR] --vex file not found: $VEX_FILE"
     echo "[ERROR] Pass the path of a CycloneDX VEX document (JSON), e.g. --vex supplier-vex.json."; exit 1
@@ -1533,6 +1610,15 @@ elif [ -n "$ANALYZE_SBOM" ]; then
     MODE="ANALYZE"
     # The risk report needs both license and vulnerability data, so enable them.
     GENERATE_NOTICE="true"; GENERATE_SECURITY="true"
+elif [ -n "$AI_DECLARE_FILE" ] && [ -z "$MODEL" ] && [ -z "$MODEL_FILE" ] && [ -z "$TARGET" ]; then
+    # The declaration alone: a model described by its publisher before it has a
+    # hub repository or a file to read. Its base models and datasets are read
+    # from the hub by id; everything else comes from the declaration.
+    MODE="AIDECLARE"
+    case "${USAGE_CONTEXT:-}" in
+        ""|internal|product|redistribute|outputs-only) : ;;
+        *) echo "[ERROR] --usage must be one of: internal, product, redistribute, outputs-only."; exit 1 ;;
+    esac
 elif [ -n "$MODEL" ]; then
     # AI model SBOM via the OWASP AIBOM Generator (opt-in bomlens-aibom image).
     [ -z "$TARGET" ]      || { echo "[ERROR] --model is mutually exclusive with --target."; exit 1; }
@@ -1544,7 +1630,15 @@ elif [ -n "$MODEL" ]; then
     # handed a link to", so one option takes both and the reference decides which
     # path runs. An institutional DOI carrying no "figshare" (10.25916/sut.…)
     # cannot be told apart from any other DOI: give the item url for those.
-    case "$MODEL" in
+    # A HuggingFace dataset needs its "datasets/" prefix (or its address): a bare
+    # owner/name is a model id, and the hub uses the same form for both.
+    # The dataset forms are decided first, so a dataset whose name contains
+    # "figshare" is still read from the hub.
+    hf_rc=0; hf_dataset_ref "$MODEL" || hf_rc=$?
+    case "$hf_rc:$MODEL" in
+        0:*) MODEL="hf:$HF_DATASET_ID"; MODE="DATASET" ;;
+        2:*) echo "[ERROR] --model: not a HuggingFace dataset reference. Use datasets/<owner>/<name> or https://huggingface.co/datasets/<owner>/<name>."
+             exit 1 ;;
         *figshare*) MODE="DATASET" ;;
         *)          MODE="AIBOM" ;;
     esac
@@ -1555,7 +1649,9 @@ elif [ -n "$MODEL" ]; then
     # Default the project name to the model's last segment (owner/name -> name).
     # A Figshare reference has no such name, so the item number stands in until
     # the fetch replaces the root component with the item's real title.
-    if [ "$MODE" = "DATASET" ]; then
+    if [ "$MODE" = "DATASET" ] && [ -n "${HF_DATASET_ID:-}" ]; then
+        [ -n "$PROJECT_NAME" ] || PROJECT_NAME="${HF_DATASET_ID##*/}"
+    elif [ "$MODE" = "DATASET" ]; then
         [ -n "$PROJECT_NAME" ] || PROJECT_NAME="figshare-$(printf '%s' "$MODEL" | tr -cd '0-9' | tail -c 12)"
     else
         [ -n "$PROJECT_NAME" ] || PROJECT_NAME="${MODEL##*/}"
@@ -1746,8 +1842,18 @@ elif [ "$FORCE_FIRMWARE" = "true" ]; then
     echo "[ERROR] --firmware requires '--target <firmware-file>'."; exit 1
 fi
 
-if [ -n "${USAGE_CONTEXT:-}" ] && [ "$MODE" != "AIBOM" ] && [ "$MODE" != "MODELFILE" ] && [ "$MODE" != "DATASET" ]; then
+if [ -n "${USAGE_CONTEXT:-}" ] && [ "$MODE" != "AIBOM" ] && [ "$MODE" != "MODELFILE" ] && [ "$MODE" != "DATASET" ] && [ "$MODE" != "AIDECLARE" ]; then
     echo "[ERROR] --usage applies to AI model and dataset scans only (use it with --model or --model-file)."; exit 1
+fi
+
+if { [ -n "$AI_DECLARE_FILE" ] || [ "$GENERATE_SPDX3" = "false" ]; } \
+   && [ "$MODE" != "AIBOM" ] && [ "$MODE" != "MODELFILE" ] && [ "$MODE" != "DATASET" ] && [ "$MODE" != "AIDECLARE" ]; then
+    _flag="--ai-declare"; [ -n "$AI_DECLARE_FILE" ] || _flag="--no-spdx3"
+    echo "[ERROR] $_flag applies to AI model and dataset scans only (use it with --model or --model-file)."; exit 1
+fi
+
+if [ "$MODE" = "AIDECLARE" ] && [ "$GENERATE_SPDX3" = "false" ]; then
+    echo "[ERROR] --no-spdx3 cannot be used when --ai-declare is the input: the declared values are written only to the SPDX 3.0.1 document."; exit 1
 fi
 
 if [ "$VERIFY_WEIGHTS" = "true" ] && [ "$MODE" != "AIBOM" ]; then
@@ -1783,7 +1889,7 @@ fi
 # every mode; the risk report still renders from the notice, as it does in the
 # UI. Announce the skip only when the user actually asked (--security / --all),
 # so an ordinary --model run stays quiet instead of explaining a default.
-if [ "$MODE" = "AIBOM" ] || [ "$MODE" = "MODELFILE" ] || [ "$MODE" = "DATASET" ]; then
+if [ "$MODE" = "AIBOM" ] || [ "$MODE" = "MODELFILE" ] || [ "$MODE" = "DATASET" ] || [ "$MODE" = "AIDECLARE" ]; then
     for fo in "${FAIL_ON[@]:-}"; do
         case "$fo" in
             vulnerability=*)
@@ -1795,7 +1901,7 @@ if [ "$MODE" = "AIBOM" ] || [ "$MODE" = "MODELFILE" ] || [ "$MODE" = "DATASET" ]
         esac
     done
 fi
-if { [ "$MODE" = "AIBOM" ] || [ "$MODE" = "MODELFILE" ] || [ "$MODE" = "DATASET" ]; } && [ "$GENERATE_SECURITY" = "true" ]; then
+if { [ "$MODE" = "AIBOM" ] || [ "$MODE" = "MODELFILE" ] || [ "$MODE" = "DATASET" ] || [ "$MODE" = "AIDECLARE" ]; } && [ "$GENERATE_SECURITY" = "true" ]; then
     [ "$SECURITY_REQUESTED" = "true" ] && \
         echo "[INFO] Skipping the security report: this input has no package dependencies to scan."
     GENERATE_SECURITY="false"
@@ -1818,6 +1924,7 @@ json_escape() { printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g'; }
 case "$MODE" in
     AIBOM)    META_SOURCE="ai-model";        META_TARGET="$MODEL";  META_LABEL="" ;;
     MODELFILE) META_SOURCE="model-upload";   META_TARGET="";        META_LABEL="$(basename "$MODEL_FILE")" ;;
+    AIDECLARE) META_SOURCE="ai-declare";     META_TARGET="";        META_LABEL="$(basename "$AI_DECLARE_FILE")" ;;
     ANALYZE)
         # Two inputs reach ANALYZE: an SBOM the user handed us, and a Yocto build
         # directory whose SBOM we found. Record which, so the result page says
@@ -2094,7 +2201,7 @@ FALLBACK_SH
         -v "\"$(hostpath "$SCAN_INPUT_DIR")\"":/src -v "\"$(hostpath "$OUTPUT_HOST_DIR")\"":/host-output \
         -w /host-output \
         --add-host=host.docker.internal:host-gateway \
-        -e MODE=POSTPROCESS -e BOMLENS_RUN_INPUT="$OUTPUT_FILE" -e NESTED_ROOTFS_HINT="\"$NESTED_ROOTFS_HINT\"" $(pp_env)$(cosign_run)$(vex_run)$(gate_run) \
+        -e MODE=POSTPROCESS -e BOMLENS_RUN_INPUT="$OUTPUT_FILE" -e NESTED_ROOTFS_HINT="\"$NESTED_ROOTFS_HINT\"" $(pp_env)$(cosign_run)$(vex_run)$(declare_run)$(gate_run) \
         "\"$POSTPROCESS_IMAGE\""
 else
     # image / binary / rootfs / firmware / aibom / analyze / merge: scanner image
@@ -2118,9 +2225,15 @@ else
                 # own environment instead. AIBOM only — no other mode needs it.
                 [ -n "$HF_TOKEN" ] && ENVV="$ENVV -e HF_TOKEN"
                 RUN_IMAGE="$AIBOM_IMAGE" ;;
-        # Base image: reading a Figshare item is one stdlib Python script and one
-        # public API call, so this needs neither the generator image nor an account.
-        DATASET) VOL="-v \"$(hostpath "$OUTPUT_HOST_DIR")\":/host-output"; ENVV="-e DATASET_REF=\"$MODEL\"" ;;
+        # Base image: reading a Figshare item or a HuggingFace dataset is one
+        # stdlib Python script against a public API, so this needs neither the
+        # generator image nor an account. A HuggingFace token, when set, is
+        # passed by name only (as for AIBOM) so a gated dataset can be read.
+        # The declaration itself is mounted by declare_run, as for any AI scan.
+        AIDECLARE) VOL="-v \"$(hostpath "$OUTPUT_HOST_DIR")\":/host-output"; ENVV=""
+                   [ -n "$HF_TOKEN" ] && ENVV="-e HF_TOKEN" ;;
+        DATASET) VOL="-v \"$(hostpath "$OUTPUT_HOST_DIR")\":/host-output"; ENVV="-e DATASET_REF=\"$MODEL\""
+                 case "$MODEL" in hf:*) [ -n "$HF_TOKEN" ] && ENVV="$ENVV -e HF_TOKEN" ;; esac ;;
         ANALYZE)
             if [ -z "$ANALYZE_SBOM" ]; then
                 # A Yocto build directory with no SPDX document: the build tree is
@@ -2175,7 +2288,7 @@ else
     # shellcheck disable=SC2046
     eval "$DOCKER_MSYS"docker run --rm $VOL \
         --add-host=host.docker.internal:host-gateway \
-        -e MODE="$MODE" -e BOMLENS_ARTIFACT_CLEANUP=1 $ENVV $(pp_env)$(cosign_run)$(vex_run)$(gate_run) \
+        -e MODE="$MODE" -e BOMLENS_ARTIFACT_CLEANUP=1 $ENVV $(pp_env)$(cosign_run)$(vex_run)$(declare_run)$(gate_run) \
         "\"$RUN_IMAGE\""
 fi
 
@@ -2229,6 +2342,18 @@ if [ "$GENERATE_ONLY" = "true" ]; then
     if [ "$GENERATE_SPDX" = "true" ]; then
         summary_line "SPDX:" "${P}_bom.spdx.json" || note_missing "SPDX export"
     fi
+    if { [ "$MODE" = "AIBOM" ] || [ "$MODE" = "MODELFILE" ] || [ "$MODE" = "DATASET" ] || [ "$MODE" = "AIDECLARE" ]; } \
+       && [ "$GENERATE_SPDX3" = "true" ]; then
+        summary_line "SPDX 3.0.1 AI:" "${P}_bom.spdx3.json" "${P}_spdx3-check.md" \
+            || note_missing "SPDX 3.0.1 AI document"
+        summary_line "AI declaration template:" "${P}_ai-declaration.template.json" || true
+        # An accepted --ai-declare file is kept next to the results; when it is
+        # missing the declaration was refused, and the document is a draft.
+        if [ -n "$AI_DECLARE_FILE" ]; then
+            summary_line "AI declaration:" "${P}_ai-declaration.json" \
+                || note_missing "AI declaration (refused, see the reasons above; the SPDX 3.0.1 document is a draft)"
+        fi
+    fi
     # Conformance comes from both modes that can validate a BOM: ANALYZE (format
     # checks on a supplier SBOM) and AIBOM (the G7 minimum-element checklist).
     # It used to be announced for ANALYZE only, so an AI-model scan produced the
@@ -2243,7 +2368,7 @@ if [ "$GENERATE_ONLY" = "true" ]; then
     # conformance report" and pointed at `docker pull`/a log warning that never
     # existed.
     if { [ "$MODE" = "ANALYZE" ] && ! { [ -n "${YOCTO_BUILD_DIR:-}" ] && [ -z "$ANALYZE_SBOM" ]; }; } \
-        || [ "$MODE" = "AIBOM" ] || [ "$MODE" = "DATASET" ]; then
+        || [ "$MODE" = "AIBOM" ] || [ "$MODE" = "DATASET" ] || [ "$MODE" = "AIDECLARE" ]; then
         summary_line "Conformance:" "${P}_conformance.json" "${P}_conformance.md" "${P}_conformance.html" \
             || note_missing "conformance report"
     fi

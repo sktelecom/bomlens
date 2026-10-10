@@ -42,6 +42,7 @@ export function ResultSection({
   onQueryChange,
   onPick,
   onResultsChange,
+  onResultPatch,
 }: {
   section: SectionId;
   result: DoneEvent;
@@ -73,6 +74,9 @@ export function ResultSection({
   /** An artifact was produced after the scan (the on-demand SPDX export), so
    *  the owner can refresh the result it holds. */
   onResultsChange?: (files: ResultFile[]) => void;
+  /** A later action changed more of the result than its listing (saving an AI
+   *  declaration also refreshes the SPDX 3.0.1 summary). */
+  onResultPatch?: (patch: Partial<DoneEvent>) => void;
 }) {
   const { t } = useTranslation();
 
@@ -189,6 +193,7 @@ export function ResultSection({
           result={result}
           scanId={scanId}
           onResultsChange={onResultsChange}
+          onResultPatch={onResultPatch}
         />
       );
 
@@ -203,6 +208,19 @@ export function ResultSection({
           scanId={scanId}
           sbomFile={sbomFile}
           conformance={supplied ? null : result.conformance}
+          spdx3={result.spdx3}
+          results={result.results}
+          title={
+            result.scanConfig
+              ? `${result.scanConfig.project} ${result.scanConfig.version}`
+              : (scanId ?? "")
+          }
+          onResultPatch={onResultPatch}
+          declaredScan={result.scanConfig?.source === "ai-declare"}
+          // The Overview's "fill" link carries ?fill=1; dropped once the
+          // questions open, so a reload does not open them again.
+          autoFill={query?.fill === "1"}
+          onAutoFill={() => onQueryChange?.({})}
         />
       ) : null;
     }

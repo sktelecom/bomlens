@@ -36,6 +36,7 @@ describe("UPLOAD_KIND", () => {
 describe("ACCEPT", () => {
   it("offers an accept list for every upload kind", () => {
     expect(Object.keys(ACCEPT).sort()).toEqual([
+      "declaration",
       "firmware",
       "model",
       "package",
@@ -62,12 +63,14 @@ describe("ACCEPT", () => {
     expect(ACCEPT.package).not.toContain(".gem");
     expect(ACCEPT.firmware).toContain(".bin");
     expect(ACCEPT.firmware).toContain(".squashfs");
+    // The declaration the questions write, uploaded for a declared-model scan.
+    expect(ACCEPT.declaration).toBe(".json");
   });
 
   it("is a comma-separated list with no empty entries", () => {
     for (const list of Object.values(ACCEPT)) {
       const parts = list.split(",");
-      expect(parts.length).toBeGreaterThan(1);
+      expect(parts.every((p) => p.length > 1)).toBe(true);
       expect(parts.every((p) => p.startsWith("."))).toBe(true);
     }
   });

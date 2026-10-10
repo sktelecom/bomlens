@@ -203,7 +203,8 @@ flowchart TD
 | `IMAGE` | `--target <image name>` | syft | docker.sock mount |
 | `AIBOM` | `--model <owner/name>` | OWASP AIBOM Generator | **Opt-in image** `bomlens-aibom`. CycloneDX 1.7 ML-BOM from a HuggingFace model card; adds a G7 conformance check |
 | `MODELFILE` | `--model-file <path>` | `identify-model-file.py` (stdlib) | Base image, offline. CycloneDX 1.7 ML-BOM read from a model file's own header (GGUF, safetensors, PyTorch, pickle, npz, npy, ONNX); adds the same G7 check |
-| `DATASET` | `--model <Figshare item>` | `scan-figshare.py` (stdlib) | Base image. A published research dataset read from the public Figshare item endpoint (no account): licence, DOI, authors and a per-file MD5 digest become a CycloneDX 1.7 `data` component |
+| `DATASET` | `--model <Figshare item>` or `--model datasets/<owner>/<name>` | `scan-figshare.py`, `scan-hf-dataset.py` (stdlib) | Base image. A published research dataset read from the public Figshare item endpoint (no account): licence, DOI, authors and a per-file MD5 digest become a CycloneDX 1.7 `data` component. A HuggingFace dataset (`datasets/<owner>/<name>`, `https://huggingface.co/datasets/<owner>/<name>` or `hf:<owner>/<name>`) becomes the same `data` component with its licence, hub revision and per-file SHA-256 digests, and the datasets its card lists under `source_datasets` are read with it |
+| `AIDECLARE` | `--ai-declare <file>` alone (no `--model`, `--model-file` or `--target`) | `declare-ai-model.py` (stdlib) | Base image. A model that has no hub repository or file yet, described from its publisher's declaration: the model is `metadata.component`, named by the project and version and marked `bomlens:origin=declared-input`; the base models and HuggingFace datasets the declaration names are read from the hub by id, as in a model scan. Declared values go only into the SPDX 3.0.1 AI document |
 | `UI` | `--ui` | — | Browser UI; runs every scan target type through the form or file upload |
 
 ---
@@ -224,7 +225,8 @@ How CLI flags translate into environment variables and which steps they enable (
 | `--firmware` | `MODE=FIRMWARE` (firmware image) | Unpack, then syft + cve-bin-tool |
 | `--model <owner/name>` | `MODE=AIBOM` (aibom image) | Generate an ML-BOM from a HuggingFace model, plus a G7 check |
 | `--model-file <path>` | `MODE=MODELFILE` | Read one model file's header into an ML-BOM, offline, plus a G7 check |
-| `--model <Figshare item>` | `MODE=DATASET` | Describe a published dataset from its Figshare item, no account needed |
+| `--model <Figshare item>`, `--model datasets/<owner>/<name>` | `MODE=DATASET` | Describe a published dataset from its Figshare item or its HuggingFace dataset page, no account needed for a public one |
+| `--ai-declare <file>` alone | `MODE=AIDECLARE` | Describe a model not yet published from its declaration, plus a G7 check and the SPDX 3.0.1 AI document |
 | `--deep-license` | `DEEP_LICENSE=true` | ② scancode |
 | `--byte-stable` | `BYTE_STABLE=true` | ① deterministic normalization (also the UI's Reproducible output toggle) |
 | `--sign` | `SIGN_SBOM=true` (plus `COSIGN_KEY`/`COSIGN_PASSWORD`) | ⑤ signing |

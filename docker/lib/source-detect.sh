@@ -13,10 +13,14 @@
 # Defaults use ${VAR:-default} so a caller that already exported these (the CLI)
 # keeps its values; a caller that did not (the UI) gets the defaults.
 
+# Exact release tags, not the floating major tag: cdxgen rebuilds its v13
+# images nightly from the main branch, so a "v13" pull can change the SBOM
+# between two scans of the same tree (the 2026-10-05 build began listing every
+# LICENSE file under node_modules/ as a component). Bump both together.
 # renovate: datasource=docker depName=ghcr.io/cdxgen/cdxgen
-CDXGEN_TAG="${CDXGEN_TAG:-v13}"                                  # cdxgen language image tag
+CDXGEN_TAG="${CDXGEN_TAG:-13.2.0}"                               # cdxgen language image tag
 # renovate: datasource=docker depName=ghcr.io/cdxgen/cdxgen
-CDXGEN_ALLINONE="${CDXGEN_ALLINONE:-ghcr.io/cdxgen/cdxgen:v13.1}"
+CDXGEN_ALLINONE="${CDXGEN_ALLINONE:-ghcr.io/cdxgen/cdxgen:13.2.0}"
 # A local name, not a registry one: the Android SDK is not open source and its
 # terms bar redistributing it, so this image is built on the machine that uses
 # it rather than published. scan-sbom.sh prints the build command when it is

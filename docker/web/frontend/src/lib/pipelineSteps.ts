@@ -27,6 +27,7 @@ const STEP_LABEL_KEY: Record<string, string> = {
   "enrich-eol": "pipelineSteps.enrichEol",
   "enrich-malicious": "pipelineSteps.enrichMalicious",
   "enrich-staleness": "pipelineSteps.enrichStaleness",
+  "declared-sources": "pipelineSteps.declaredSources",
   "assess-ai-risk": "pipelineSteps.assessAiRisk",
   "source-file-tree": "pipelineSteps.sourceFileTree",
   "source-snapshot": "pipelineSteps.sourceSnapshot",

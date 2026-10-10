@@ -1,0 +1,810 @@
+{
+  "schema": "bomlens-spdx3-ai-map/1",
+  "spec": {
+    "version": "3.0.1",
+    "context": "https://spdx.org/rdf/3.0.1/spdx-context.jsonld",
+    "cardinalitySource": "SPDX 3.0.1 specification pages, class 'All properties' tables, checked 2026-10-09. The published SHACL model and JSON schema do not carry the narrowed 1..1 constraints of ai_AIPackage and dataset_DatasetPackage, so convert-to-spdx3-ai.py enforces these numbers itself.",
+    "jsonldKeysChecked": "2026-10-09 against spdx-context.jsonld: locator is an array; extension items may be inline objects; Agent-typed properties take an element reference.",
+    "profilesNote": "The extension profile is not claimed in profileConformance: in the 3.0.1 JSON-LD context the bare value 'extension' expands to the Core extension property, not ProfileIdentifierType/extension, and the official SHACL validation (spdx3-validate) refuses it. The CdxPropertiesExtension the document uses needs no claim.",
+    "jsonArrayNote":"A field narrowed to one value on the specification page can still be an array in the JSON schema (dataset originatedBy); jsonArray: true writes it as a one-element array."
+  },
+  "idPrefix": "https://github.com/sktelecom/bomlens/spdxdocs/{prefix}/spdx3/",
+  "profiles": [
+    "core",
+    "software",
+    "ai",
+    "dataset",
+    "simpleLicensing",
+    "expandedLicensing"
+  ],
+  "elements": {
+    "document": {
+      "fields": [
+        {
+          "id": "createdBy",
+          "json": "createdBy",
+          "type": "Agent",
+          "min": 1,
+          "max": "*",
+          "noAssertion": false,
+          "source": {
+            "kind": "cdx",
+            "from": "documentAuthors"
+          },
+          "declarable": true
+        }
+      ]
+    },
+    "ai_AIPackage": {
+      "fields": [
+        {
+          "id": "name",
+          "json": "name",
+          "type": "string",
+          "min": 1,
+          "max": 1,
+          "noAssertion": false,
+          "source": {
+            "kind": "cdx",
+            "from": "name"
+          }
+        },
+        {
+          "id": "packageVersion",
+          "json": "software_packageVersion",
+          "type": "string",
+          "min": 1,
+          "max": 1,
+          "noAssertion": false,
+          "source": {
+            "kind": "cdx",
+            "from": "version"
+          },
+          "declarable": true
+        },
+        {
+          "id": "downloadLocation",
+          "json": "software_downloadLocation",
+          "type": "anyURI",
+          "min": 1,
+          "max": 1,
+          "noAssertion": false,
+          "source": {
+            "kind": "cdx",
+            "from": "modelDownload"
+          },
+          "declarable": true
+        },
+        {
+          "id": "primaryPurpose",
+          "json": "software_primaryPurpose",
+          "type": "SoftwarePurpose",
+          "min": 1,
+          "max": 1,
+          "noAssertion": false,
+          "source": {
+            "kind": "const",
+            "value": "model"
+          }
+        },
+        {
+          "id": "suppliedBy",
+          "json": "suppliedBy",
+          "type": "Agent",
+          "min": 1,
+          "max": 1,
+          "noAssertion": false,
+          "source": {
+            "kind": "cdx",
+            "from": "supplier",
+            "meaning": "huggingface-publisher"
+          },
+          "declarable": true
+        },
+        {
+          "id": "releaseTime",
+          "json": "releaseTime",
+          "type": "DateTime",
+          "min": 1,
+          "max": 1,
+          "noAssertion": false,
+          "source": {
+            "kind": "user"
+          }
+        },
+        {
+          "id": "builtTime",
+          "json": "builtTime",
+          "type": "DateTime",
+          "min": 0,
+          "max": 1,
+          "noAssertion": false,
+          "source": {
+            "kind": "user"
+          }
+        },
+        {
+          "id": "originatedBy",
+          "json": "originatedBy",
+          "type": "Agent",
+          "min": 0,
+          "max": "*",
+          "noAssertion": false,
+          "source": {
+            "kind": "user"
+          }
+        },
+        {
+          "id": "packageUrl",
+          "json": "software_packageUrl",
+          "type": "anyURI",
+          "min": 0,
+          "max": 1,
+          "noAssertion": false,
+          "source": {
+            "kind": "cdx",
+            "from": "purl"
+          }
+        },
+        {
+          "id": "homePage",
+          "json": "software_homePage",
+          "type": "anyURI",
+          "min": 0,
+          "max": 1,
+          "noAssertion": false,
+          "source": {
+            "kind": "cdx",
+            "from": "homePage"
+          }
+        },
+        {
+          "id": "description",
+          "json": "description",
+          "type": "string",
+          "min": 0,
+          "max": 1,
+          "noAssertion": false,
+          "source": {
+            "kind": "cdx",
+            "from": "description"
+          }
+        },
+        {
+          "id": "typeOfModel",
+          "json": "ai_typeOfModel",
+          "type": "string",
+          "min": 0,
+          "max": "*",
+          "noAssertion": false,
+          "source": {
+            "kind": "cdx",
+            "from": "architecture"
+          }
+        },
+        {
+          "id": "limitation",
+          "json": "ai_limitation",
+          "type": "string",
+          "min": 0,
+          "max": 1,
+          "noAssertion": false,
+          "source": {
+            "kind": "cdx",
+            "from": "limitations",
+            "join": "lines"
+          }
+        },
+        {
+          "id": "metric",
+          "json": "ai_metric",
+          "type": "DictionaryEntry",
+          "min": 0,
+          "max": "*",
+          "noAssertion": false,
+          "source": {
+            "kind": "cdx",
+            "from": "metrics"
+          }
+        },
+        {
+          "id": "domain",
+          "json": "ai_domain",
+          "type": "string",
+          "min": 0,
+          "max": "*",
+          "noAssertion": false,
+          "source": {
+            "kind": "user"
+          }
+        },
+        {
+          "id": "informationAboutApplication",
+          "json": "ai_informationAboutApplication",
+          "type": "string",
+          "min": 0,
+          "max": 1,
+          "noAssertion": false,
+          "source": {
+            "kind": "user"
+          }
+        },
+        {
+          "id": "informationAboutTraining",
+          "json": "ai_informationAboutTraining",
+          "type": "string",
+          "min": 0,
+          "max": 1,
+          "noAssertion": false,
+          "source": {
+            "kind": "user"
+          }
+        },
+        {
+          "id": "hyperparameter",
+          "json": "ai_hyperparameter",
+          "type": "DictionaryEntry",
+          "min": 0,
+          "max": "*",
+          "noAssertion": false,
+          "source": {
+            "kind": "user"
+          }
+        },
+        {
+          "id": "modelDataPreprocessing",
+          "json": "ai_modelDataPreprocessing",
+          "type": "string",
+          "min": 0,
+          "max": "*",
+          "noAssertion": false,
+          "source": {
+            "kind": "user"
+          }
+        },
+        {
+          "id": "modelExplainability",
+          "json": "ai_modelExplainability",
+          "type": "string",
+          "min": 0,
+          "max": "*",
+          "noAssertion": false,
+          "source": {
+            "kind": "user"
+          }
+        },
+        {
+          "id": "standardCompliance",
+          "json": "ai_standardCompliance",
+          "type": "string",
+          "min": 0,
+          "max": "*",
+          "noAssertion": false,
+          "source": {
+            "kind": "user"
+          }
+        },
+        {
+          "id": "useSensitivePersonalInformation",
+          "json": "ai_useSensitivePersonalInformation",
+          "type": "PresenceType",
+          "enum": [
+            "yes",
+            "no",
+            "noAssertion"
+          ],
+          "min": 0,
+          "max": 1,
+          "noAssertion": true,
+          "source": {
+            "kind": "user"
+          },
+          "judgment": true
+        },
+        {
+          "id": "autonomyType",
+          "json": "ai_autonomyType",
+          "type": "PresenceType",
+          "enum": [
+            "yes",
+            "no",
+            "noAssertion"
+          ],
+          "min": 0,
+          "max": 1,
+          "noAssertion": true,
+          "source": {
+            "kind": "user"
+          },
+          "judgment": true
+        },
+        {
+          "id": "safetyRiskAssessment",
+          "json": "ai_safetyRiskAssessment",
+          "type": "SafetyRiskAssessmentType",
+          "enum": [
+            "low",
+            "medium",
+            "high",
+            "serious"
+          ],
+          "min": 0,
+          "max": 1,
+          "noAssertion": false,
+          "source": {
+            "kind": "user"
+          },
+          "judgment": true
+        },
+        {
+          "id": "weightsScope",
+          "json": "extension:bomlens:weights:scope",
+          "type": "CdxProperty",
+          "enum": [
+            "full",
+            "adapter",
+            "quantized",
+            "merged"
+          ],
+          "min": 0,
+          "max": 1,
+          "noAssertion": false,
+          "source": {
+            "kind": "cdx",
+            "from": "weightsScope"
+          },
+          "declarable": true
+        }
+      ]
+    },
+    "dataset_DatasetPackage": {
+      "fields": [
+        {
+          "id": "name",
+          "json": "name",
+          "type": "string",
+          "min": 1,
+          "max": 1,
+          "noAssertion": false,
+          "source": {
+            "kind": "cdx",
+            "from": "name"
+          }
+        },
+        {
+          "id": "downloadLocation",
+          "json": "software_downloadLocation",
+          "type": "anyURI",
+          "min": 1,
+          "max": 1,
+          "noAssertion": false,
+          "source": {
+            "kind": "cdx",
+            "from": "datasetDownload"
+          },
+          "declarable": true
+        },
+        {
+          "id": "primaryPurpose",
+          "json": "software_primaryPurpose",
+          "type": "SoftwarePurpose",
+          "min": 1,
+          "max": 1,
+          "noAssertion": false,
+          "source": {
+            "kind": "const",
+            "value": "data"
+          }
+        },
+        {
+          "id": "originatedBy",
+          "json": "originatedBy",
+          "type": "Agent",
+          "min": 1,
+          "max": 1,
+          "noAssertion": false,
+          "source": {
+            "kind": "user"
+          },
+          "jsonArray": true
+        },
+        {
+          "id": "suppliedBy",
+          "json": "suppliedBy",
+          "type": "Agent",
+          "min": 0,
+          "max": 1,
+          "noAssertion": false,
+          "source": {
+            "kind": "cdx",
+            "from": "supplier",
+            "meaning": "huggingface-publisher"
+          },
+          "declarable": true
+        },
+        {
+          "id": "builtTime",
+          "json": "builtTime",
+          "type": "DateTime",
+          "min": 1,
+          "max": 1,
+          "noAssertion": false,
+          "source": {
+            "kind": "user"
+          }
+        },
+        {
+          "id": "releaseTime",
+          "json": "releaseTime",
+          "type": "DateTime",
+          "min": 1,
+          "max": 1,
+          "noAssertion": false,
+          "source": {
+            "kind": "user"
+          }
+        },
+        {
+          "id": "datasetType",
+          "json": "dataset_datasetType",
+          "type": "DatasetType",
+          "enum": [
+            "audio",
+            "categorical",
+            "graph",
+            "image",
+            "noAssertion",
+            "numeric",
+            "other",
+            "sensor",
+            "structured",
+            "syntactic",
+            "text",
+            "timeseries",
+            "timestamp",
+            "video"
+          ],
+          "min": 1,
+          "max": "*",
+          "noAssertion": true,
+          "source": {
+            "kind": "rule",
+            "rule": "datasetType",
+            "fallback": "noAssertion"
+          },
+          "declarable": true
+        },
+        {
+          "id": "packageVersion",
+          "json": "software_packageVersion",
+          "type": "string",
+          "min": 0,
+          "max": 1,
+          "noAssertion": false,
+          "source": {
+            "kind": "cdx",
+            "from": "version"
+          }
+        },
+        {
+          "id": "description",
+          "json": "description",
+          "type": "string",
+          "min": 0,
+          "max": 1,
+          "noAssertion": false,
+          "source": {
+            "kind": "cdx",
+            "from": "description"
+          }
+        },
+        {
+          "id": "hasSensitivePersonalInformation",
+          "json": "dataset_hasSensitivePersonalInformation",
+          "type": "PresenceType",
+          "enum": [
+            "yes",
+            "no",
+            "noAssertion"
+          ],
+          "min": 0,
+          "max": 1,
+          "noAssertion": true,
+          "source": {
+            "kind": "rule",
+            "rule": "piiSignal",
+            "onlyValue": "yes"
+          },
+          "declarable": true,
+          "judgment": true
+        },
+        {
+          "id": "datasetAvailability",
+          "json": "dataset_datasetAvailability",
+          "type": "DatasetAvailabilityType",
+          "enum": [
+            "clickthrough",
+            "directDownload",
+            "query",
+            "registration",
+            "scrapingScript"
+          ],
+          "min": 0,
+          "max": 1,
+          "noAssertion": false,
+          "source": {
+            "kind": "rule",
+            "rule": "availability"
+          }
+        },
+        {
+          "id": "intendedUse",
+          "json": "dataset_intendedUse",
+          "type": "string",
+          "min": 0,
+          "max": 1,
+          "noAssertion": false,
+          "source": {
+            "kind": "user"
+          }
+        },
+        {
+          "id": "knownBias",
+          "json": "dataset_knownBias",
+          "type": "string",
+          "min": 0,
+          "max": "*",
+          "noAssertion": false,
+          "source": {
+            "kind": "user"
+          }
+        },
+        {
+          "id": "confidentialityLevel",
+          "json": "dataset_confidentialityLevel",
+          "type": "ConfidentialityLevelType",
+          "enum": [
+            "clear",
+            "green",
+            "amber",
+            "red"
+          ],
+          "min": 0,
+          "max": 1,
+          "noAssertion": false,
+          "source": {
+            "kind": "user"
+          }
+        },
+        {
+          "id": "dataCollectionProcess",
+          "json": "dataset_dataCollectionProcess",
+          "type": "string",
+          "min": 0,
+          "max": 1,
+          "noAssertion": false,
+          "source": {
+            "kind": "user"
+          }
+        },
+        {
+          "id": "anonymizationMethodUsed",
+          "json": "dataset_anonymizationMethodUsed",
+          "type": "string",
+          "min": 0,
+          "max": "*",
+          "noAssertion": false,
+          "source": {
+            "kind": "user"
+          }
+        },
+        {
+          "id": "dataPreprocessing",
+          "json": "dataset_dataPreprocessing",
+          "type": "string",
+          "min": 0,
+          "max": "*",
+          "noAssertion": false,
+          "source": {
+            "kind": "user"
+          }
+        },
+        {
+          "id": "datasetNoise",
+          "json": "dataset_datasetNoise",
+          "type": "string",
+          "min": 0,
+          "max": 1,
+          "noAssertion": false,
+          "source": {
+            "kind": "user"
+          }
+        },
+        {
+          "id": "datasetUpdateMechanism",
+          "json": "dataset_datasetUpdateMechanism",
+          "type": "string",
+          "min": 0,
+          "max": 1,
+          "noAssertion": false,
+          "source": {
+            "kind": "user"
+          }
+        }
+      ]
+    }
+  },
+  "rules": {
+    "datasetType": [
+      {
+        "facet": "hf:task_categories",
+        "prefix": "text",
+        "value": "text"
+      },
+      {
+        "facet": "hf:task_categories",
+        "equals": "question-answering",
+        "value": "text"
+      },
+      {
+        "facet": "hf:task_categories",
+        "equals": "summarization",
+        "value": "text"
+      },
+      {
+        "facet": "hf:task_categories",
+        "equals": "translation",
+        "value": "text"
+      },
+      {
+        "facet": "hf:task_categories",
+        "equals": "fill-mask",
+        "value": "text"
+      },
+      {
+        "facet": "hf:task_categories",
+        "equals": "token-classification",
+        "value": "text"
+      },
+      {
+        "facet": "hf:task_categories",
+        "prefix": "image",
+        "value": "image"
+      },
+      {
+        "facet": "hf:task_categories",
+        "equals": "object-detection",
+        "value": "image"
+      },
+      {
+        "facet": "hf:task_categories",
+        "prefix": "audio",
+        "value": "audio"
+      },
+      {
+        "facet": "hf:task_categories",
+        "equals": "automatic-speech-recognition",
+        "value": "audio"
+      },
+      {
+        "facet": "hf:task_categories",
+        "prefix": "tabular",
+        "value": "structured"
+      },
+      {
+        "facet": "hf:task_categories",
+        "prefix": "video",
+        "value": "video"
+      },
+      {
+        "facet": "hf:task_categories",
+        "prefix": "time-series",
+        "value": "timeseries"
+      },
+      {
+        "facet": "hf:tags",
+        "equals": "modality:text",
+        "value": "text"
+      },
+      {
+        "facet": "hf:tags",
+        "equals": "modality:image",
+        "value": "image"
+      },
+      {
+        "facet": "hf:tags",
+        "equals": "modality:audio",
+        "value": "audio"
+      },
+      {
+        "facet": "hf:tags",
+        "equals": "modality:tabular",
+        "value": "structured"
+      },
+      {
+        "facet": "hf:tags",
+        "equals": "modality:video",
+        "value": "video"
+      },
+      {
+        "facet": "hf:tags",
+        "equals": "modality:timeseries",
+        "value": "timeseries"
+      }
+    ],
+    "piiSignal": {
+      "property": "bomlens:dataset:signal",
+      "equals": "pii",
+      "value": "yes"
+    },
+    "availability": {
+      "value": "directDownload",
+      "unless": [
+        "bomlens:dataset:visibility",
+        "bomlens:dataset:unresolved"
+      ]
+    },
+    "hubLicenseToSpdx": {
+      "_note": "HuggingFace licence tags that name exactly one SPDX licence. Tags with no SPDX counterpart (llama3, openrail, other) or an ambiguous version (gpl-3.0: -only or -or-later; odc-by, odbl) are absent on purpose and are written as NoAssertionLicense with the tag kept in an annotation.",
+      "map": {
+        "apache-2.0": "Apache-2.0",
+        "mit": "MIT",
+        "afl-3.0": "AFL-3.0",
+        "artistic-2.0": "Artistic-2.0",
+        "bsl-1.0": "BSL-1.0",
+        "bsd-2-clause": "BSD-2-Clause",
+        "bsd-3-clause": "BSD-3-Clause",
+        "bsd-3-clause-clear": "BSD-3-Clause-Clear",
+        "cc0-1.0": "CC0-1.0",
+        "cc-by-2.0": "CC-BY-2.0",
+        "cc-by-2.5": "CC-BY-2.5",
+        "cc-by-3.0": "CC-BY-3.0",
+        "cc-by-4.0": "CC-BY-4.0",
+        "cc-by-sa-3.0": "CC-BY-SA-3.0",
+        "cc-by-sa-4.0": "CC-BY-SA-4.0",
+        "cc-by-nc-2.0": "CC-BY-NC-2.0",
+        "cc-by-nc-3.0": "CC-BY-NC-3.0",
+        "cc-by-nc-4.0": "CC-BY-NC-4.0",
+        "cc-by-nd-4.0": "CC-BY-ND-4.0",
+        "cc-by-nc-nd-3.0": "CC-BY-NC-ND-3.0",
+        "cc-by-nc-nd-4.0": "CC-BY-NC-ND-4.0",
+        "cc-by-nc-sa-2.0": "CC-BY-NC-SA-2.0",
+        "cc-by-nc-sa-3.0": "CC-BY-NC-SA-3.0",
+        "cc-by-nc-sa-4.0": "CC-BY-NC-SA-4.0",
+        "ecl-2.0": "ECL-2.0",
+        "epl-1.0": "EPL-1.0",
+        "epl-2.0": "EPL-2.0",
+        "eupl-1.1": "EUPL-1.1",
+        "isc": "ISC",
+        "lppl-1.3c": "LPPL-1.3c",
+        "ms-pl": "MS-PL",
+        "mpl-2.0": "MPL-2.0",
+        "ncsa": "NCSA",
+        "ofl-1.1": "OFL-1.1",
+        "osl-3.0": "OSL-3.0",
+        "pddl": "PDDL-1.0",
+        "postgresql": "PostgreSQL",
+        "unlicense": "Unlicense",
+        "wtfpl": "WTFPL",
+        "zlib": "Zlib"
+      }
+    },
+    "baseModel": {
+      "_note": "How a base model found in the lineage chain is identified. {id} is the hub id; {revision} only when the publisher declared one.",
+      "packageUrl": "pkg:huggingface/{id}",
+      "packageUrlAtRevision": "pkg:huggingface/{id}@{revision}",
+      "downloadLocation": "https://huggingface.co/{id}",
+      "downloadLocationAtRevision": "https://huggingface.co/{id}/tree/{revision}"
+    }
+  },
+  "relationships": {
+    "cardDataset": {
+      "default": "other",
+      "declarable": [
+        "trainedOn",
+        "testedOn",
+        "other"
+      ]
+    }
+  }
+}

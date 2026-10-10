@@ -53566,7 +53566,7 @@
         },
         {
           "license": {
-            "id": "BSD-3-Clause"
+            "name": "BSD-3-clause-with-weird-numbering"
           }
         },
         {
@@ -68775,7 +68775,7 @@
         },
         {
           "license": {
-            "id": "MIT"
+            "name": "Expat-with-advertising-restriction"
           }
         },
         {
@@ -68926,7 +68926,7 @@
         },
         {
           "license": {
-            "id": "MIT"
+            "name": "Expat-with-advertising-restriction"
           }
         },
         {
@@ -69085,7 +69085,7 @@
         },
         {
           "license": {
-            "id": "MIT"
+            "name": "Expat-with-advertising-restriction"
           }
         },
         {
@@ -70247,7 +70247,7 @@
         },
         {
           "license": {
-            "id": "BSD-3-Clause"
+            "name": "BSD-3-clause-with-weird-numbering"
           }
         },
         {
@@ -70454,7 +70454,7 @@
         },
         {
           "license": {
-            "id": "BSD-3-Clause"
+            "name": "BSD-3-clause-with-weird-numbering"
           }
         },
         {
@@ -70677,7 +70677,7 @@
         },
         {
           "license": {
-            "id": "BSD-3-Clause"
+            "name": "BSD-3-clause-with-weird-numbering"
           }
         },
         {
@@ -83089,7 +83089,7 @@
         },
         {
           "license": {
-            "id": "MIT"
+            "name": "Expat-with-advertising-restriction"
           }
         },
         {
@@ -1552019,7 +1552019,7 @@
         "value": "unknown-to-author"
       }
     ],
-    "timestamp": "2026-09-15T12:45:21Z",
+    "timestamp": "2026-09-23T00:57:25Z",
     "tools": {
       "components": [
         {
@@ -1552030,7 +1552030,7 @@
         {
           "name": "syft",
           "type": "application",
-          "version": "v1.51.0"
+          "version": "v1.52.0"
         },
         {
           "name": "cve-bin-tool",
@@ -1552041,7 +1552041,7 @@
           "name": "BomLens",
           "publisher": "SK Telecom",
           "type": "application",
-          "version": "1.12.0"
+          "version": "1.12.1"
         }
       ]
     }

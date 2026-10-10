@@ -97,6 +97,7 @@ const PROVENANCE_ICON: Record<ProvenanceKind, LucideIcon> = {
   file: FileText,
   sbom: FileJson,
   model: Cpu,
+  declaration: FileText,
 };
 
 /** Which body copy explains why cdxgen fell back to a direct-deps-only scan. */
@@ -1142,17 +1143,24 @@ export function ArtifactsSection({
   result,
   scanId,
   onResultsChange,
+  onResultPatch,
 }: {
   result: DoneEvent;
   scanId: string | null;
   /** Passed through so an on-demand SPDX export updates the owning result. */
   onResultsChange?: (files: ResultFile[]) => void;
+  /** The SPDX 3.0.1 actions also refresh the document's summary. */
+  onResultPatch?: (patch: Partial<DoneEvent>) => void;
 }) {
   return (
     <ResultsList
       results={result.results}
       scanId={scanId}
       onResultsChange={onResultsChange}
+      aiScan={isAiScan(result)}
+      uploadedSbom={result.scanConfig?.source === "sbom-upload"}
+      spdx3={result.spdx3}
+      onResultPatch={onResultPatch}
     />
   );
 }

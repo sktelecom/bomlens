@@ -203,7 +203,8 @@ flowchart TD
 | `IMAGE` | `--target <이미지명>` | syft | docker.sock 마운트 |
 | `AIBOM` | `--model <owner/name>` | OWASP AIBOM Generator | **opt-in 이미지** `bomlens-aibom`. HuggingFace 모델 카드로 CycloneDX 1.7 ML-BOM 생성, G7 적합성 검사 추가 |
 | `MODELFILE` | `--model-file <경로>` | `identify-model-file.py`(표준 라이브러리) | 기본 이미지, 오프라인. 모델 파일 헤더로 CycloneDX 1.7 ML-BOM 생성(GGUF, safetensors, PyTorch, pickle, npz, npy, ONNX), 같은 G7 검사 추가 |
-| `DATASET` | `--model <Figshare 항목>` | `scan-figshare.py`(표준 라이브러리) | 기본 이미지. 공개 Figshare 항목 조회로 연구 데이터셋을 읽는다(계정 불필요). 라이선스, DOI, 저자, 파일별 MD5 값이 CycloneDX 1.7 `data` 컴포넌트가 된다 |
+| `DATASET` | `--model <Figshare 항목>` 또는 `--model datasets/<owner>/<name>` | `scan-figshare.py`, `scan-hf-dataset.py`(표준 라이브러리) | 기본 이미지. 공개 Figshare 항목 조회로 연구 데이터셋을 읽는다(계정 불필요). 라이선스, DOI, 저자, 파일별 MD5 값이 CycloneDX 1.7 `data` 컴포넌트가 된다. HuggingFace 데이터셋(`datasets/<owner>/<name>`, `https://huggingface.co/datasets/<owner>/<name>`, `hf:<owner>/<name>`)도 같은 `data` 컴포넌트가 되어 라이선스, 허브 리비전, 파일별 SHA-256 값을 담고, 카드의 `source_datasets`에 적힌 데이터셋도 함께 읽는다 |
+| `AIDECLARE` | `--ai-declare <파일>`만 지정(`--model`, `--model-file`, `--target` 없음) | `declare-ai-model.py`(표준 라이브러리) | 기본 이미지. 허브 저장소나 파일이 아직 없는 모델을 공개자의 선언으로 기술한다. 모델은 프로젝트 이름과 버전을 붙인 `metadata.component`가 되고 `bomlens:origin=declared-input`으로 표시한다. 선언에 적은 기반 모델과 HuggingFace 데이터셋은 모델 스캔과 같은 방식으로 허브에서 id로 읽는다. 선언한 값은 SPDX 3.0.1 AI 문서에만 들어간다 |
 | `UI` | `--ui` | — | 브라우저 UI, 모든 스캔 대상을 폼/업로드로 실행 |
 
 ---
@@ -224,7 +225,8 @@ CLI 플래그가 어떤 환경변수로 변환되어 어느 단계를 켜는지 
 | `--firmware` | `MODE=FIRMWARE` (펌웨어 이미지) | 언팩 → syft + cve-bin-tool |
 | `--model <owner/name>` | `MODE=AIBOM` (aibom 이미지) | HuggingFace 모델로 ML-BOM 생성 + G7 검사 |
 | `--model-file <경로>` | `MODE=MODELFILE` | 모델 파일 헤더를 오프라인으로 읽어 ML-BOM 생성 + G7 검사 |
-| `--model <Figshare 항목>` | `MODE=DATASET` | 공개된 데이터셋을 Figshare 항목에서 기술, 계정 불필요 |
+| `--model <Figshare 항목>`, `--model datasets/<owner>/<name>` | `MODE=DATASET` | 공개된 데이터셋을 Figshare 항목이나 HuggingFace 데이터셋 페이지에서 기술, 공개 데이터셋은 계정 불필요 |
+| `--ai-declare <파일>`만 지정 | `MODE=AIDECLARE` | 아직 공개하지 않은 모델을 선언으로 기술 + G7 검사, SPDX 3.0.1 AI 문서 |
 | `--deep-license` | `DEEP_LICENSE=true` | ② scancode |
 | `--byte-stable` | `BYTE_STABLE=true` | ① 결정론적 정규화 (웹 UI의 Reproducible output 토글도 동일) |
 | `--sign` | `SIGN_SBOM=true` (+ `COSIGN_KEY`/`COSIGN_PASSWORD`) | ⑤ 서명 |

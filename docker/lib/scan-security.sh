@@ -34,18 +34,22 @@ HTML="${OUT_PREFIX}_security.html"
 GEN_AT=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 
 echo "[security] running Trivy SBOM scan..."
+# Trivy's stderr goes to a file of this run's own: a shared /tmp/trivy.err let
+# two scans at once read each other's errors and pick the wrong retry.
+TRIVY_ERR=$(mktemp)
+trap 'rm -f "$TRIVY_ERR"' EXIT
 # --exit-code 0: report-only (never fail the scan pipeline on findings).
 trivy_ok=""
 trivy_in="$SBOM"
 trivy_in_tmp=""
 for _attempt in 1 2; do
-    if trivy sbom --quiet --format json --output "$JSON" --exit-code 0 "$trivy_in" 2>/tmp/trivy.err; then
+    if trivy sbom --quiet --format json --output "$JSON" --exit-code 0 "$trivy_in" 2>"$TRIVY_ERR"; then
         trivy_ok=1
         break
     fi
     command -v jq >/dev/null 2>&1 || break
     next="$(mktemp)"
-    if grep -qi "invalid specification version" /tmp/trivy.err \
+    if grep -qi "invalid specification version" "$TRIVY_ERR" \
        && jq '
            (.specVersion // "") as $s
            # A supplier-submitted SBOM can carry a malformed specVersion (observed:
@@ -56,7 +60,7 @@ for _attempt in 1 2; do
                               else "1.6" end)
          ' "$trivy_in" > "$next" 2>/dev/null; then
         echo "[security] Trivy rejected the SBOM's specVersion (\"$(jq -r '.specVersion' "$trivy_in")\"); re-ran with it normalized for Trivy input (delivered SBOM unchanged)."
-    elif grep -qi "unmarshal component type\|unsupported type" /tmp/trivy.err \
+    elif grep -qi "unmarshal component type\|unsupported type" "$TRIVY_ERR" \
        && jq '.metadata.component.type = "application"' "$trivy_in" > "$next" 2>/dev/null; then
         # Trivy 0.70's CycloneDX decoder rejects some valid-but-newer ROOT component
         # types ("firmware" from a firmware scan is CycloneDX 1.4+), failing the whole
@@ -75,7 +79,7 @@ for _attempt in 1 2; do
 done
 [ -n "$trivy_in_tmp" ] && rm -f "$trivy_in_tmp"
 
-if [ -z "$trivy_ok" ] && grep -qi "multiple types of OS packages" /tmp/trivy.err && command -v jq >/dev/null 2>&1; then
+if [ -z "$trivy_ok" ] && grep -qi "multiple types of OS packages" "$TRIVY_ERR" && command -v jq >/dev/null 2>&1; then
     # Trivy's SBOM decoder refuses a CycloneDX document whose OS packages span more
     # than one package-manager family (e.g. an rpm base merged with a deb or apk
     # layer) — it can't tell which single OS the packages belong to. merge-sbom.sh
@@ -98,7 +102,7 @@ if [ -z "$trivy_ok" ] && grep -qi "multiple types of OS packages" /tmp/trivy.err
                     | select((((.purl // "") | test("^pkg:(rpm|deb|apk)/")) | not)
                               or ((.purl // "") | test("^pkg:" + $t + "/"))) ]
             ' "$SBOM" > "$split_in" 2>/dev/null
-            if trivy sbom --quiet --format json --output "$split_out" --exit-code 0 "$split_in" 2>>/tmp/trivy.err; then
+            if trivy sbom --quiet --format json --output "$split_out" --exit-code 0 "$split_in" 2>>"$TRIVY_ERR"; then
                 split_outs+=("$split_out")
             else
                 rm -f "$split_out"
@@ -130,13 +134,13 @@ if [ -z "$trivy_ok" ] && grep -qi "multiple types of OS packages" /tmp/trivy.err
 fi
 if [ -z "$trivy_ok" ]; then
     echo "[security] WARN: Trivy scan failed:" >&2
-    cat /tmp/trivy.err >&2
+    cat "$TRIVY_ERR" >&2
     # Emit an empty-but-valid report so downstream steps don't break, but record
     # the failure in the report itself (ScanError): an empty Results array is
     # otherwise indistinguishable from a clean "0 vulnerabilities" result, and
     # consumers have misread failed scans (DB download failure, undecodable
     # SBOM) as a pass. Trivy prints its fatal reason as the last stderr line.
-    ERR_MSG=$(tr -d '\000\r' < /tmp/trivy.err | grep -v '^[[:space:]]*$' | tail -n 1 | cut -c1-400)
+    ERR_MSG=$(tr -d '\000\r' < "$TRIVY_ERR" | grep -v '^[[:space:]]*$' | tail -n 1 | cut -c1-400)
     jq -n --arg msg "${ERR_MSG:-trivy sbom exited with an error}" \
         '{Results: [], ScanError: {Engine: "Trivy", Message: $msg}}' > "$JSON"
 fi

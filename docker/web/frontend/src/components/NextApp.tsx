@@ -6,6 +6,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { AppShell } from "./AppShell";
+import { DeclareFlow } from "./DeclareFlow";
 import { ExternalLookup } from "./ExternalLookup";
 import { GlobalSearch } from "./GlobalSearch";
 import { NewScan } from "./NewScan";
@@ -17,6 +18,7 @@ import { ScanRunning } from "./ScanRunning";
 import { ConfirmDialog } from "./ui/dialog";
 import {
   deleteScan,
+  fileUrl,
   getCapabilities,
   listScans,
   loadScan,
@@ -143,6 +145,14 @@ export function NextApp() {
   // New scan form can seed itself from it. The form reads it once on mount and
   // clears it, so a subsequent plain New scan starts blank.
   const [pendingRescan, setPendingRescan] = useState<ScanConfig | null>(null);
+  // A model described from its declaration: the form's settings wait here while
+  // the questions are answered. `saved` is the declaration of a scan being
+  // re-run, read when Re-scan was pressed.
+  const [declaring, setDeclaring] = useState<{ params: ScanParams; saved?: Promise<unknown> } | null>(null);
+  // The declaration read for a Re-scan, as the request itself: the questions
+  // wait for it however late it lands, and it is used once. A newer Re-scan
+  // replaces it; leaving for another screen drops it.
+  const savedDeclarationRef = useRef<Promise<unknown> | undefined>(undefined);
   // The active section's filter and sort state, read from the URL hash. Keeping
   // it here rather than inside each table is what makes a filtered view
   // linkable and lets it survive a reload: the hash is the one source, and a
@@ -252,6 +262,10 @@ export function NextApp() {
   const enterHome = useCallback(
     (kind: "recent" | "new") => {
       setHomeView(kind);
+      // Open questions belong to the form they were started from; any other
+      // way into the home screens starts over.
+      setDeclaring(null);
+      if (kind === "recent") savedDeclarationRef.current = undefined;
       if (loadedIdRef.current !== null || status !== "idle") resetToHome();
     },
     [status, resetToHome],
@@ -294,6 +308,7 @@ export function NextApp() {
   // `#/new` and a normal navigation otherwise (harmless if it re-triggers the
   // router — state is already reset, so that second pass does nothing further).
   const goToNewScan = useCallback(() => {
+    savedDeclarationRef.current = undefined;
     enterHome("new");
     if (window.location.hash !== newHash()) window.location.hash = newHash();
   }, [enterHome]);
@@ -377,6 +392,15 @@ export function NextApp() {
   }, [result, scan, activeSection]);
 
   const run = (params: ScanParams) => {
+    // The declaration input has nothing to scan until its questions are
+    // answered: open them, and start the scan from there with the uploaded
+    // declaration's token.
+    if (params.source === "ai-declare" && !params.token) {
+      setDeclaring({ params, saved: savedDeclarationRef.current });
+      savedDeclarationRef.current = undefined;
+      return;
+    }
+    savedDeclarationRef.current = undefined;
     closeStream(); // drop any previous stream before starting a new one
     loadedIdRef.current = null;
     runningIdRef.current = null;
@@ -425,6 +449,15 @@ export function NextApp() {
   // consumes the parked config once and clears it.
   const handleRescan = (config: ScanConfig) => {
     setPendingRescan(config);
+    savedDeclarationRef.current = undefined;
+    // A declared model re-runs from its own declaration: read it now, while the
+    // scan it belongs to is the one on screen.
+    const decl = result?.results.find((f) => f.name.endsWith("_ai-declaration.json"));
+    if (config.source === "ai-declare" && decl && loadedIdRef.current) {
+      savedDeclarationRef.current = fetch(fileUrl(loadedIdRef.current, decl.name))
+        .then((r) => (r.ok ? (r.json() as Promise<unknown>) : undefined))
+        .catch(() => undefined);
+    }
     window.location.hash = newHash();
   };
 
@@ -550,6 +583,16 @@ export function NextApp() {
               initialQuery={sectionQuery.q}
               onQueryChange={handleLookupQueryChange}
             />
+          ) : declaring ? (
+            <DeclareFlow
+              params={declaring.params}
+              saved={declaring.saved}
+              onCancel={() => setDeclaring(null)}
+              onStart={(params) => {
+                setDeclaring(null);
+                run(params);
+              }}
+            />
           ) : (
             <NewScan
               running={false}
@@ -635,6 +678,8 @@ export function NextApp() {
             onResultsChange={(files) =>
               setResult((r) => (r ? { ...r, results: files } : r))
             }
+            // Saving an AI declaration also refreshes the SPDX 3.0.1 summary.
+            onResultPatch={(patch) => setResult((r) => (r ? { ...r, ...patch } : r))}
           />
 
           {/* The run log is reference material for the run you just watched.

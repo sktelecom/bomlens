@@ -38,6 +38,7 @@ const UPLOAD_LABEL: Record<UploadKind, string> = {
   package: "source.packageUpload",
   firmware: "source.firmwareUpload",
   model: "source.modelUpload",
+  declaration: "source.aiDeclare",
 };
 
 /** i18n label key per conformance-profile value. */
@@ -250,7 +251,15 @@ export function SourceControls({ state }: { state: ScanFormState }) {
         </div>
       )}
 
-      {(source === "ai-model" || source === "model-upload") && <UsageContextSelect state={state} />}
+      {source === "ai-declare" && (
+        <p className="text-sm text-muted-foreground" data-testid="ai-declare-hint">
+          {t("source.aiDeclareHint")}
+        </p>
+      )}
+
+      {(source === "ai-model" || source === "model-upload" || source === "ai-declare") && (
+        <UsageContextSelect state={state} />
+      )}
 
       <SiblingPullNotice state={state} />
       <HfAuthNotice state={state} />
@@ -718,7 +727,9 @@ export function RunButton({ state, running }: { state: ScanFormState; running: b
       ) : (
         <>
           <Play className="h-4 w-4" />
-          {t("form.run")}
+          {/* A declaration has no input to scan yet: the button opens the
+              questions, and the scan starts when they are answered. */}
+          {state.source === "ai-declare" ? t("newscan.startQuestions") : t("form.run")}
         </>
       )}
     </Button>

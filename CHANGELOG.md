@@ -7,6 +7,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v1.13.0] - 2026-10-10
+
+### Upgrade note
+
+- An AI model scan now reads the datasets a dataset's card names as its sources (`source_datasets`) and judges them with it, so a model whose training data contains a source under stricter terms can grade lower than before (for example `caution` where it was `ok`). Compare with an earlier result using `--diff`. `AIBOM_DATASET_DEPTH=0` restores the previous behaviour.
+
+### Added
+
+- An AI model scan follows the sources a dataset's card names (`source_datasets`), up to three levels and 40 dataset lookups per scan (`AIBOM_DATASET_DEPTH`, `AIBOM_DATASET_MAX_LOOKUPS`). Each source becomes its own `data` component linked from the dataset in `dependencies[]`, with `bomlens:dataset:derivedFrom` on the dataset and `bomlens:dataset:depth` on every traced dataset. Only a value shaped like a HuggingFace dataset id is looked up; a source named in words is kept verbatim as `bomlens:dataset:sourceDataset:unverified`. A cycle, the depth limit and the lookup limit are recorded on the dataset where the walk stopped. The strictest verdict among a dataset's sources becomes part of that dataset's verdict (`bomlens:assessment:sources`), and through it the model's datasets axis. A source that could not be read, declares no license or is named only in words, and a dataset whose sources lie past the depth limit, read review. Placeholders such as `extended` alone, `unknown` or `N/A` are not looked up. Dataset lookups use `HF_ENDPOINT` and `REQUESTS_CA_BUNDLE` when they are set. The web UI shows traced sources as indented rows in the datasets table.
+- AI model and dataset scans also write the result as an SPDX 3.0.1 document with the AI and Dataset profiles (`{Project}_{Version}_bom.spdx3.json`), with a check of where each field came from and which required fields are still open (`_spdx3-check.json`, `_spdx3-check.md`) and an empty declaration for the publisher to fill (`_ai-declaration.template.json`). The documents pass the official SPDX 3 validator (SHACL model), checked nightly. Values the scan does not hold are not estimated: until the required ones are declared the document is marked a draft. `--sign` covers it, and `--no-spdx3` skips it. The CycloneDX ML-BOM stays the primary record.
+- `--ai-declare <file>` applies the publisher's declaration (release dates, makers, how each dataset was used, base model revisions, the distributed weights, and the judgments only the publisher can make) to the SPDX 3.0.1 document. A declaration that names something the scan did not find, or a value outside a field's list, is refused with the reasons and the document stays a draft. An accepted declaration is kept as `_ai-declaration.json` and applied again on a re-scan.
+- The web UI shows the SPDX 3.0.1 document's state on Models & datasets and asks for the open fields step by step (**Fill in empty fields**), saving them as the declaration (`POST /ai-declaration`). The Artifacts screen gains cards for the document and the declaration, with actions to write the document (`GET /spdx3-export`) and to upload an edited declaration. A declaration saved earlier that no longer fits the scan is reported until it is fixed.
+- A model that has no hub repository or file yet can be described from its publisher's declaration alone: `--ai-declare <file>` without `--model`, `--model-file` or `--target`, or the web UI's **Enter model information** tile, which asks the questions and starts the scan with the answers. Its base models and datasets are read from the hub by id; the declared values go into the SPDX 3.0.1 document. The SBOM's lifecycle phase is `design`, and without `--sbom-author` its author is the declaration's `document.createdBy`. A declaration that does not fit is refused before the scan, with the reasons.
+- The AI declaration can name a dataset's sources (`datasets[].sources[]`, and a "Where this data came from" row in the web UI's questions). A source given by its HuggingFace id is read from the hub on the next scan, before the risk assessment, and judged with the dataset; one known only by name is written to the SPDX 3.0.1 document with the licence given, marked as not verified. A dataset with no source on record is listed in the SPDX check for review.
+- The AI declaration takes the model's own licence (`model.license`, a hub licence tag or SPDX id, and a "Licence of the model" question in the web UI). A model described from the declaration alone carries it in its SBOM and is judged on it instead of reading `review`; for a scanned model it fills the SPDX 3.0.1 document only when the scan read no licence or only `other`, and one that differs from the scanned licence is listed for review.
+- `--model` and the web UI's AI-model field take a HuggingFace dataset as `datasets/<owner>/<name>`, its `https://huggingface.co/datasets/...` address or `hf:<owner>/<name>`, and describe it as the SBOM's root `data` component in the base image, with its sources traced and judged the same way as a model's datasets. A bare `owner/name` is still a model id. `HF_TOKEN` is passed by name for a gated dataset, and a dataset that cannot be read ends the scan with the reason.
+- An AI model scan records each weight file's name next to its SHA-256 (`bomlens:weights:file`), the gate kind, the time of the revision it read, the hub's relation to the base model (`bomlens:lineage:relation`), a merged model's other parents, and the distributed weights scope (`bomlens:weights:scope`: full, adapter, quantized or merged) when the hub's signals agree. When no other tool supplied a pedigree, the base-model chain is written to `pedigree.ancestors[]` without a version.
+
+### Fixed
+
+- The note that names dataset names dropped from a model card's prose no longer disappears when the same SBOM is enriched a second time.
+- Source scans no longer list an extra unversioned component for every licence file inside a package manager's install directory (`node_modules/`, a Composer or Go `vendor/`, SwiftPM's `.build/` and the like). The cdxgen language images were pulled by the `v13` tag, which cdxgen rebuilds nightly, and builds since 2026-10-05 began reporting those files; `examples/nodejs` went from 120 to 554 components. The images are now pinned to the 13.2.0 release, and such components are also dropped after generation. Vendored code in the project's own tree is kept.
+- Two scans running at once no longer read each other's vulnerability-scanner errors: each run keeps them in a file of its own instead of a shared `/tmp/trivy.err`, so a retry is decided on the run's own error.
+
+### Security
+
+- Every image bundles docker CLI 29.8.1, whose newer Go toolchain fixes eight high-severity standard-library vulnerabilities.
+- The AI SBOM image upgrades npm to 11.20.0 and cdxgen to 13.2.0, and overrides vulnerable pins in the OWASP AIBOM Generator's requirements (among them anyio 4.14.2 for critical CVE-2026-63374, urllib3 2.8.0, starlette 1.3.1, python-multipart 0.0.31, aiohttp 3.14.3, fsspec 2026.6.0 with datasets 5.0.1, transformers 5.10.4 and torch 2.13.0). The build fails if an upstream pin it replaces has moved, so an override never downgrades a package.
+- The firmware image raises httplib2 to 0.32.0 and pyOpenSSL to 26.4.0.
+- Rebuilt images pick up Debian security updates for OpenSSL, PCRE2, libheif, jq, xz and libpng.
+
 ## [v1.12.1] - 2026-09-23
 
 ### Upgrade note

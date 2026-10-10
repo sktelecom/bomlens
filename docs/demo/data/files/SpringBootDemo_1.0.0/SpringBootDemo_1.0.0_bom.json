@@ -8,21 +8,21 @@
               "name": "OWASP Foundation"
             }
           ],
-          "bom-ref": "pkg:npm/@cyclonedx/cdxgen@12.8.3",
-          "group": "@cyclonedx",
+          "bom-ref": "pkg:npm/@cdxgen/cdxgen@13.2.0",
+          "group": "@cdxgen",
           "name": "cdxgen",
           "publisher": "OWASP Foundation",
-          "purl": "pkg:npm/%40cyclonedx/cdxgen@12.8.3",
+          "purl": "pkg:npm/%40cdxgen/cdxgen@13.2.0",
           "type": "application",
-          "version": "12.8.3"
+          "version": "13.2.0"
         }
       },
       "bom-ref": "metadata-annotations",
       "subjects": [
         "pkg:maven/com.example/sbom-example-app@1.0.0?type=jar"
       ],
-      "text": "This Software Bill-of-Materials (SBOM) document was created on Tuesday, September 15, 2026 with cdxgen. The data was captured during the build lifecycle phase. The document describes an application named 'sbom-example-app' with version '1.0.0'. The package type in this SBOM is maven with 48 purl namespaces described under components. The components were identified from the source files: pom.xml.",
-      "timestamp": "2026-09-15T12:44:29Z"
+      "text": "This Software Bill-of-Materials (SBOM) document was created on Wednesday, September 23, 2026 with cdxgen. The data was captured during the build lifecycle phase. The document describes an application named 'sbom-example-app' with version '1.0.0'. The package type in this SBOM is maven with 48 purl namespaces described under components. The components were identified from the source files: pom.xml.",
+      "timestamp": "2026-09-23T00:56:12Z"
     }
   ],
   "bomFormat": "CycloneDX",
@@ -114,12 +114,12 @@
       "name": "logback-classic",
       "properties": [
         {
-          "name": "SrcFile",
-          "value": "pom.xml"
-        },
-        {
           "name": "cdx:license:category",
           "value": "Copyleft Limited"
+        },
+        {
+          "name": "internal:SrcFile",
+          "value": "pom.xml"
         },
         {
           "name": "bomlens:licenseClass",
@@ -236,12 +236,12 @@
       "name": "logback-core",
       "properties": [
         {
-          "name": "SrcFile",
-          "value": "pom.xml"
-        },
-        {
           "name": "cdx:license:category",
           "value": "Copyleft Limited"
+        },
+        {
+          "name": "internal:SrcFile",
+          "value": "pom.xml"
         },
         {
           "name": "bomlens:licenseClass",
@@ -330,12 +330,12 @@
       "name": "jackson-annotations",
       "properties": [
         {
-          "name": "SrcFile",
-          "value": "pom.xml"
-        },
-        {
           "name": "cdx:license:category",
           "value": "Permissive"
+        },
+        {
+          "name": "internal:SrcFile",
+          "value": "pom.xml"
         },
         {
           "name": "bomlens:licenseClass",
@@ -424,12 +424,12 @@
       "name": "jackson-core",
       "properties": [
         {
-          "name": "SrcFile",
-          "value": "pom.xml"
-        },
-        {
           "name": "cdx:license:category",
           "value": "Permissive"
+        },
+        {
+          "name": "internal:SrcFile",
+          "value": "pom.xml"
         },
         {
           "name": "bomlens:licenseClass",
@@ -517,12 +517,12 @@
       "name": "jackson-databind",
       "properties": [
         {
-          "name": "SrcFile",
-          "value": "pom.xml"
-        },
-        {
           "name": "cdx:license:category",
           "value": "Permissive"
+        },
+        {
+          "name": "internal:SrcFile",
+          "value": "pom.xml"
         },
         {
           "name": "bomlens:licenseClass",
@@ -610,12 +610,12 @@
       "name": "jackson-datatype-jdk8",
       "properties": [
         {
-          "name": "SrcFile",
-          "value": "pom.xml"
-        },
-        {
           "name": "cdx:license:category",
           "value": "Permissive"
+        },
+        {
+          "name": "internal:SrcFile",
+          "value": "pom.xml"
         },
         {
           "name": "bomlens:licenseClass",
@@ -703,12 +703,12 @@
       "name": "jackson-datatype-jsr310",
       "properties": [
         {
-          "name": "SrcFile",
-          "value": "pom.xml"
-        },
-        {
           "name": "cdx:license:category",
           "value": "Permissive"
+        },
+        {
+          "name": "internal:SrcFile",
+          "value": "pom.xml"
         },
         {
           "name": "bomlens:licenseClass",
@@ -796,12 +796,12 @@
       "name": "jackson-module-parameter-names",
       "properties": [
         {
-          "name": "SrcFile",
-          "value": "pom.xml"
-        },
-        {
           "name": "cdx:license:category",
           "value": "Permissive"
+        },
+        {
+          "name": "internal:SrcFile",
+          "value": "pom.xml"
         },
         {
           "name": "bomlens:licenseClass",
@@ -889,12 +889,12 @@
       "name": "classmate",
       "properties": [
         {
-          "name": "SrcFile",
-          "value": "pom.xml"
-        },
-        {
           "name": "cdx:license:category",
           "value": "Permissive"
+        },
+        {
+          "name": "internal:SrcFile",
+          "value": "pom.xml"
         },
         {
           "name": "bomlens:licenseClass",
@@ -1011,12 +1011,12 @@
       "name": "h2",
       "properties": [
         {
-          "name": "SrcFile",
-          "value": "pom.xml"
-        },
-        {
           "name": "cdx:license:category",
           "value": "Copyleft Limited"
+        },
+        {
+          "name": "internal:SrcFile",
+          "value": "pom.xml"
         },
         {
           "name": "bomlens:licenseClass",
@@ -1084,12 +1084,12 @@
       "name": "istack-commons-runtime",
       "properties": [
         {
-          "name": "SrcFile",
-          "value": "pom.xml"
-        },
-        {
           "name": "cdx:license:category",
           "value": "Unstated License"
+        },
+        {
+          "name": "internal:SrcFile",
+          "value": "pom.xml"
         },
         {
           "name": "bomlens:licenseClass",
@@ -1171,12 +1171,12 @@
       "name": "HikariCP",
       "properties": [
         {
-          "name": "SrcFile",
-          "value": "pom.xml"
-        },
-        {
           "name": "cdx:license:category",
           "value": "Permissive"
+        },
+        {
+          "name": "internal:SrcFile",
+          "value": "pom.xml"
         },
         {
           "name": "bomlens:licenseClass",
@@ -1262,12 +1262,12 @@
       "name": "micrometer-commons",
       "properties": [
         {
-          "name": "SrcFile",
-          "value": "pom.xml"
-        },
-        {
           "name": "cdx:license:category",
           "value": "Permissive"
+        },
+        {
+          "name": "internal:SrcFile",
+          "value": "pom.xml"
         },
         {
           "name": "bomlens:licenseClass",
@@ -1349,12 +1349,12 @@
       "name": "micrometer-observation",
       "properties": [
         {
-          "name": "SrcFile",
-          "value": "pom.xml"
-        },
-        {
           "name": "cdx:license:category",
           "value": "Permissive"
+        },
+        {
+          "name": "internal:SrcFile",
+          "value": "pom.xml"
         },
         {
           "name": "bomlens:licenseClass",
@@ -1441,12 +1441,12 @@
       "name": "jandex",
       "properties": [
         {
-          "name": "SrcFile",
-          "value": "pom.xml"
-        },
-        {
           "name": "cdx:license:category",
           "value": "Permissive"
+        },
+        {
+          "name": "internal:SrcFile",
+          "value": "pom.xml"
         },
         {
           "name": "bomlens:licenseClass",
@@ -1514,12 +1514,12 @@
       "name": "jakarta.activation-api",
       "properties": [
         {
-          "name": "SrcFile",
-          "value": "pom.xml"
-        },
-        {
           "name": "cdx:license:category",
           "value": "Unstated License"
+        },
+        {
+          "name": "internal:SrcFile",
+          "value": "pom.xml"
         },
         {
           "name": "bomlens:licenseClass",
@@ -1583,7 +1583,7 @@
       "name": "jakarta.annotation-api",
       "properties": [
         {
-          "name": "SrcFile",
+          "name": "internal:SrcFile",
           "value": "pom.xml"
         },
         {
@@ -1673,12 +1673,12 @@
       "name": "jakarta.inject-api",
       "properties": [
         {
-          "name": "SrcFile",
-          "value": "pom.xml"
-        },
-        {
           "name": "cdx:license:category",
           "value": "Permissive"
+        },
+        {
+          "name": "internal:SrcFile",
+          "value": "pom.xml"
         },
         {
           "name": "bomlens:licenseClass",
@@ -1772,12 +1772,12 @@
       "name": "jakarta.persistence-api",
       "properties": [
         {
-          "name": "SrcFile",
-          "value": "pom.xml"
-        },
-        {
           "name": "cdx:license:category",
           "value": "Copyleft Limited, Unstated License"
+        },
+        {
+          "name": "internal:SrcFile",
+          "value": "pom.xml"
         },
         {
           "name": "bomlens:licenseClass",
@@ -1841,7 +1841,7 @@
       "name": "jakarta.transaction-api",
       "properties": [
         {
-          "name": "SrcFile",
+          "name": "internal:SrcFile",
           "value": "pom.xml"
         },
         {
@@ -1908,12 +1908,12 @@
       "name": "jakarta.xml.bind-api",
       "properties": [
         {
-          "name": "SrcFile",
-          "value": "pom.xml"
-        },
-        {
           "name": "cdx:license:category",
           "value": "Unstated License"
+        },
+        {
+          "name": "internal:SrcFile",
+          "value": "pom.xml"
         },
         {
           "name": "bomlens:licenseClass",
@@ -1998,12 +1998,12 @@
       "name": "byte-buddy",
       "properties": [
         {
-          "name": "SrcFile",
-          "value": "pom.xml"
-        },
-        {
           "name": "cdx:license:category",
           "value": "Permissive"
+        },
+        {
+          "name": "internal:SrcFile",
+          "value": "pom.xml"
         },
         {
           "name": "bomlens:licenseClass",
@@ -2091,12 +2091,12 @@
       "name": "antlr4-runtime",
       "properties": [
         {
-          "name": "SrcFile",
-          "value": "pom.xml"
-        },
-        {
           "name": "cdx:license:category",
           "value": "Permissive"
+        },
+        {
+          "name": "internal:SrcFile",
+          "value": "pom.xml"
         },
         {
           "name": "bomlens:licenseClass",
@@ -2185,12 +2185,12 @@
       "name": "commons-lang3",
       "properties": [
         {
-          "name": "SrcFile",
-          "value": "pom.xml"
-        },
-        {
           "name": "cdx:license:category",
           "value": "Permissive"
+        },
+        {
+          "name": "internal:SrcFile",
+          "value": "pom.xml"
         },
         {
           "name": "bomlens:licenseClass",
@@ -2275,12 +2275,12 @@
       "name": "log4j-api",
       "properties": [
         {
-          "name": "SrcFile",
-          "value": "pom.xml"
-        },
-        {
           "name": "cdx:license:category",
           "value": "Permissive"
+        },
+        {
+          "name": "internal:SrcFile",
+          "value": "pom.xml"
         },
         {
           "name": "bomlens:licenseClass",
@@ -2365,12 +2365,12 @@
       "name": "log4j-to-slf4j",
       "properties": [
         {
-          "name": "SrcFile",
-          "value": "pom.xml"
-        },
-        {
           "name": "cdx:license:category",
           "value": "Permissive"
+        },
+        {
+          "name": "internal:SrcFile",
+          "value": "pom.xml"
         },
         {
           "name": "bomlens:licenseClass",
@@ -2457,12 +2457,12 @@
       "name": "tomcat-embed-core",
       "properties": [
         {
-          "name": "SrcFile",
-          "value": "pom.xml"
-        },
-        {
           "name": "cdx:license:category",
           "value": "Permissive"
+        },
+        {
+          "name": "internal:SrcFile",
+          "value": "pom.xml"
         },
         {
           "name": "bomlens:licenseClass",
@@ -2548,12 +2548,12 @@
       "name": "tomcat-embed-el",
       "properties": [
         {
-          "name": "SrcFile",
-          "value": "pom.xml"
-        },
-        {
           "name": "cdx:license:category",
           "value": "Permissive"
+        },
+        {
+          "name": "internal:SrcFile",
+          "value": "pom.xml"
         },
         {
           "name": "bomlens:licenseClass",
@@ -2639,12 +2639,12 @@
       "name": "tomcat-embed-websocket",
       "properties": [
         {
-          "name": "SrcFile",
-          "value": "pom.xml"
-        },
-        {
           "name": "cdx:license:category",
           "value": "Permissive"
+        },
+        {
+          "name": "internal:SrcFile",
+          "value": "pom.xml"
         },
         {
           "name": "bomlens:licenseClass",
@@ -2736,12 +2736,12 @@
       "name": "aspectjweaver",
       "properties": [
         {
-          "name": "SrcFile",
-          "value": "pom.xml"
-        },
-        {
           "name": "cdx:license:category",
           "value": "Copyleft Limited"
+        },
+        {
+          "name": "internal:SrcFile",
+          "value": "pom.xml"
         },
         {
           "name": "bomlens:licenseClass",
@@ -2806,12 +2806,12 @@
       "name": "angus-activation",
       "properties": [
         {
-          "name": "SrcFile",
-          "value": "pom.xml"
-        },
-        {
           "name": "cdx:license:category",
           "value": "Unstated License"
+        },
+        {
+          "name": "internal:SrcFile",
+          "value": "pom.xml"
         },
         {
           "name": "bomlens:licenseClass",
@@ -2876,12 +2876,12 @@
       "name": "jaxb-core",
       "properties": [
         {
-          "name": "SrcFile",
-          "value": "pom.xml"
-        },
-        {
           "name": "cdx:license:category",
           "value": "Unstated License"
+        },
+        {
+          "name": "internal:SrcFile",
+          "value": "pom.xml"
         },
         {
           "name": "bomlens:licenseClass",
@@ -2963,12 +2963,12 @@
       "name": "jaxb-runtime",
       "properties": [
         {
-          "name": "SrcFile",
-          "value": "pom.xml"
-        },
-        {
           "name": "cdx:license:category",
           "value": "Permissive"
+        },
+        {
+          "name": "internal:SrcFile",
+          "value": "pom.xml"
         },
         {
           "name": "bomlens:licenseClass",
@@ -3050,12 +3050,12 @@
       "name": "txw2",
       "properties": [
         {
-          "name": "SrcFile",
-          "value": "pom.xml"
-        },
-        {
           "name": "cdx:license:category",
           "value": "Permissive"
+        },
+        {
+          "name": "internal:SrcFile",
+          "value": "pom.xml"
         },
         {
           "name": "bomlens:licenseClass",
@@ -3123,7 +3123,7 @@
       "name": "hibernate-commons-annotations",
       "properties": [
         {
-          "name": "SrcFile",
+          "name": "internal:SrcFile",
           "value": "pom.xml"
         },
         {
@@ -3193,7 +3193,7 @@
       "name": "hibernate-core",
       "properties": [
         {
-          "name": "SrcFile",
+          "name": "internal:SrcFile",
           "value": "pom.xml"
         },
         {
@@ -3287,12 +3287,12 @@
       "name": "jboss-logging",
       "properties": [
         {
-          "name": "SrcFile",
-          "value": "pom.xml"
-        },
-        {
           "name": "cdx:license:category",
           "value": "Permissive"
+        },
+        {
+          "name": "internal:SrcFile",
+          "value": "pom.xml"
         },
         {
           "name": "bomlens:licenseClass",
@@ -3356,7 +3356,7 @@
       "name": "jul-to-slf4j",
       "properties": [
         {
-          "name": "SrcFile",
+          "name": "internal:SrcFile",
           "value": "pom.xml"
         },
         {
@@ -3454,12 +3454,12 @@
       "name": "slf4j-api",
       "properties": [
         {
-          "name": "SrcFile",
-          "value": "pom.xml"
-        },
-        {
           "name": "cdx:license:category",
           "value": "Permissive"
+        },
+        {
+          "name": "internal:SrcFile",
+          "value": "pom.xml"
         },
         {
           "name": "bomlens:licenseClass",
@@ -3552,12 +3552,12 @@
       "name": "spring-boot-autoconfigure",
       "properties": [
         {
-          "name": "SrcFile",
-          "value": "pom.xml"
-        },
-        {
           "name": "cdx:license:category",
           "value": "Permissive"
+        },
+        {
+          "name": "internal:SrcFile",
+          "value": "pom.xml"
         },
         {
           "name": "bomlens:licenseClass",
@@ -3597,7 +3597,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-09-15"
+          "value": "endoflife.date@2026-09-23"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -3677,12 +3677,12 @@
       "name": "spring-boot-starter-aop",
       "properties": [
         {
-          "name": "SrcFile",
-          "value": "pom.xml"
-        },
-        {
           "name": "cdx:license:category",
           "value": "Permissive"
+        },
+        {
+          "name": "internal:SrcFile",
+          "value": "pom.xml"
         },
         {
           "name": "bomlens:licenseClass",
@@ -3722,7 +3722,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-09-15"
+          "value": "endoflife.date@2026-09-23"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -3803,12 +3803,12 @@
       "name": "spring-boot-starter-data-jpa",
       "properties": [
         {
-          "name": "SrcFile",
-          "value": "pom.xml"
-        },
-        {
           "name": "cdx:license:category",
           "value": "Permissive"
+        },
+        {
+          "name": "internal:SrcFile",
+          "value": "pom.xml"
         },
         {
           "name": "bomlens:licenseClass",
@@ -3848,7 +3848,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-09-15"
+          "value": "endoflife.date@2026-09-23"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -3928,12 +3928,12 @@
       "name": "spring-boot-starter-jdbc",
       "properties": [
         {
-          "name": "SrcFile",
-          "value": "pom.xml"
-        },
-        {
           "name": "cdx:license:category",
           "value": "Permissive"
+        },
+        {
+          "name": "internal:SrcFile",
+          "value": "pom.xml"
         },
         {
           "name": "bomlens:licenseClass",
@@ -3973,7 +3973,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-09-15"
+          "value": "endoflife.date@2026-09-23"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -4054,12 +4054,12 @@
       "name": "spring-boot-starter-json",
       "properties": [
         {
-          "name": "SrcFile",
-          "value": "pom.xml"
-        },
-        {
           "name": "cdx:license:category",
           "value": "Permissive"
+        },
+        {
+          "name": "internal:SrcFile",
+          "value": "pom.xml"
         },
         {
           "name": "bomlens:licenseClass",
@@ -4099,7 +4099,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-09-15"
+          "value": "endoflife.date@2026-09-23"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -4179,12 +4179,12 @@
       "name": "spring-boot-starter-logging",
       "properties": [
         {
-          "name": "SrcFile",
-          "value": "pom.xml"
-        },
-        {
           "name": "cdx:license:category",
           "value": "Permissive"
+        },
+        {
+          "name": "internal:SrcFile",
+          "value": "pom.xml"
         },
         {
           "name": "bomlens:licenseClass",
@@ -4224,7 +4224,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-09-15"
+          "value": "endoflife.date@2026-09-23"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -4305,12 +4305,12 @@
       "name": "spring-boot-starter-tomcat",
       "properties": [
         {
-          "name": "SrcFile",
-          "value": "pom.xml"
-        },
-        {
           "name": "cdx:license:category",
           "value": "Permissive"
+        },
+        {
+          "name": "internal:SrcFile",
+          "value": "pom.xml"
         },
         {
           "name": "bomlens:licenseClass",
@@ -4350,7 +4350,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-09-15"
+          "value": "endoflife.date@2026-09-23"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -4431,12 +4431,12 @@
       "name": "spring-boot-starter-web",
       "properties": [
         {
-          "name": "SrcFile",
-          "value": "pom.xml"
-        },
-        {
           "name": "cdx:license:category",
           "value": "Permissive"
+        },
+        {
+          "name": "internal:SrcFile",
+          "value": "pom.xml"
         },
         {
           "name": "bomlens:licenseClass",
@@ -4476,7 +4476,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-09-15"
+          "value": "endoflife.date@2026-09-23"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -4558,12 +4558,12 @@
       "name": "spring-boot-starter",
       "properties": [
         {
-          "name": "SrcFile",
-          "value": "pom.xml"
-        },
-        {
           "name": "cdx:license:category",
           "value": "Permissive"
+        },
+        {
+          "name": "internal:SrcFile",
+          "value": "pom.xml"
         },
         {
           "name": "bomlens:licenseClass",
@@ -4603,7 +4603,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-09-15"
+          "value": "endoflife.date@2026-09-23"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -4684,12 +4684,12 @@
       "name": "spring-boot",
       "properties": [
         {
-          "name": "SrcFile",
-          "value": "pom.xml"
-        },
-        {
           "name": "cdx:license:category",
           "value": "Permissive"
+        },
+        {
+          "name": "internal:SrcFile",
+          "value": "pom.xml"
         },
         {
           "name": "bomlens:licenseClass",
@@ -4729,7 +4729,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-09-15"
+          "value": "endoflife.date@2026-09-23"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -4809,12 +4809,12 @@
       "name": "spring-data-commons",
       "properties": [
         {
-          "name": "SrcFile",
-          "value": "pom.xml"
-        },
-        {
           "name": "cdx:license:category",
           "value": "Permissive"
+        },
+        {
+          "name": "internal:SrcFile",
+          "value": "pom.xml"
         },
         {
           "name": "bomlens:licenseClass",
@@ -4910,12 +4910,12 @@
       "name": "spring-data-jpa",
       "properties": [
         {
-          "name": "SrcFile",
-          "value": "pom.xml"
-        },
-        {
           "name": "cdx:license:category",
           "value": "Permissive"
+        },
+        {
+          "name": "internal:SrcFile",
+          "value": "pom.xml"
         },
         {
           "name": "bomlens:licenseClass",
@@ -5010,12 +5010,12 @@
       "name": "spring-aop",
       "properties": [
         {
-          "name": "SrcFile",
-          "value": "pom.xml"
-        },
-        {
           "name": "cdx:license:category",
           "value": "Permissive"
+        },
+        {
+          "name": "internal:SrcFile",
+          "value": "pom.xml"
         },
         {
           "name": "bomlens:licenseClass",
@@ -5059,7 +5059,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-09-15"
+          "value": "endoflife.date@2026-09-23"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -5139,12 +5139,12 @@
       "name": "spring-aspects",
       "properties": [
         {
-          "name": "SrcFile",
-          "value": "pom.xml"
-        },
-        {
           "name": "cdx:license:category",
           "value": "Permissive"
+        },
+        {
+          "name": "internal:SrcFile",
+          "value": "pom.xml"
         },
         {
           "name": "bomlens:licenseClass",
@@ -5188,7 +5188,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-09-15"
+          "value": "endoflife.date@2026-09-23"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -5268,12 +5268,12 @@
       "name": "spring-beans",
       "properties": [
         {
-          "name": "SrcFile",
-          "value": "pom.xml"
-        },
-        {
           "name": "cdx:license:category",
           "value": "Permissive"
+        },
+        {
+          "name": "internal:SrcFile",
+          "value": "pom.xml"
         },
         {
           "name": "bomlens:licenseClass",
@@ -5317,7 +5317,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-09-15"
+          "value": "endoflife.date@2026-09-23"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -5397,12 +5397,12 @@
       "name": "spring-context",
       "properties": [
         {
-          "name": "SrcFile",
-          "value": "pom.xml"
-        },
-        {
           "name": "cdx:license:category",
           "value": "Permissive"
+        },
+        {
+          "name": "internal:SrcFile",
+          "value": "pom.xml"
         },
         {
           "name": "bomlens:licenseClass",
@@ -5446,7 +5446,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-09-15"
+          "value": "endoflife.date@2026-09-23"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -5526,12 +5526,12 @@
       "name": "spring-core",
       "properties": [
         {
-          "name": "SrcFile",
-          "value": "pom.xml"
-        },
-        {
           "name": "cdx:license:category",
           "value": "Permissive"
+        },
+        {
+          "name": "internal:SrcFile",
+          "value": "pom.xml"
         },
         {
           "name": "bomlens:licenseClass",
@@ -5575,7 +5575,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-09-15"
+          "value": "endoflife.date@2026-09-23"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -5655,12 +5655,12 @@
       "name": "spring-expression",
       "properties": [
         {
-          "name": "SrcFile",
-          "value": "pom.xml"
-        },
-        {
           "name": "cdx:license:category",
           "value": "Permissive"
+        },
+        {
+          "name": "internal:SrcFile",
+          "value": "pom.xml"
         },
         {
           "name": "bomlens:licenseClass",
@@ -5704,7 +5704,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-09-15"
+          "value": "endoflife.date@2026-09-23"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -5784,12 +5784,12 @@
       "name": "spring-jcl",
       "properties": [
         {
-          "name": "SrcFile",
-          "value": "pom.xml"
-        },
-        {
           "name": "cdx:license:category",
           "value": "Permissive"
+        },
+        {
+          "name": "internal:SrcFile",
+          "value": "pom.xml"
         },
         {
           "name": "bomlens:licenseClass",
@@ -5833,7 +5833,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-09-15"
+          "value": "endoflife.date@2026-09-23"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -5914,12 +5914,12 @@
       "name": "spring-jdbc",
       "properties": [
         {
-          "name": "SrcFile",
-          "value": "pom.xml"
-        },
-        {
           "name": "cdx:license:category",
           "value": "Permissive"
+        },
+        {
+          "name": "internal:SrcFile",
+          "value": "pom.xml"
         },
         {
           "name": "bomlens:licenseClass",
@@ -5963,7 +5963,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-09-15"
+          "value": "endoflife.date@2026-09-23"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -6043,12 +6043,12 @@
       "name": "spring-orm",
       "properties": [
         {
-          "name": "SrcFile",
-          "value": "pom.xml"
-        },
-        {
           "name": "cdx:license:category",
           "value": "Permissive"
+        },
+        {
+          "name": "internal:SrcFile",
+          "value": "pom.xml"
         },
         {
           "name": "bomlens:licenseClass",
@@ -6092,7 +6092,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-09-15"
+          "value": "endoflife.date@2026-09-23"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -6172,12 +6172,12 @@
       "name": "spring-tx",
       "properties": [
         {
-          "name": "SrcFile",
-          "value": "pom.xml"
-        },
-        {
           "name": "cdx:license:category",
           "value": "Permissive"
+        },
+        {
+          "name": "internal:SrcFile",
+          "value": "pom.xml"
         },
         {
           "name": "bomlens:licenseClass",
@@ -6221,7 +6221,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-09-15"
+          "value": "endoflife.date@2026-09-23"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -6301,12 +6301,12 @@
       "name": "spring-web",
       "properties": [
         {
-          "name": "SrcFile",
-          "value": "pom.xml"
-        },
-        {
           "name": "cdx:license:category",
           "value": "Permissive"
+        },
+        {
+          "name": "internal:SrcFile",
+          "value": "pom.xml"
         },
         {
           "name": "bomlens:licenseClass",
@@ -6350,7 +6350,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-09-15"
+          "value": "endoflife.date@2026-09-23"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -6430,12 +6430,12 @@
       "name": "spring-webmvc",
       "properties": [
         {
-          "name": "SrcFile",
-          "value": "pom.xml"
-        },
-        {
           "name": "cdx:license:category",
           "value": "Permissive"
+        },
+        {
+          "name": "internal:SrcFile",
+          "value": "pom.xml"
         },
         {
           "name": "bomlens:licenseClass",
@@ -6479,7 +6479,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-09-15"
+          "value": "endoflife.date@2026-09-23"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -6560,12 +6560,12 @@
       "name": "snakeyaml",
       "properties": [
         {
-          "name": "SrcFile",
-          "value": "pom.xml"
-        },
-        {
           "name": "cdx:license:category",
           "value": "Permissive"
+        },
+        {
+          "name": "internal:SrcFile",
+          "value": "pom.xml"
         },
         {
           "name": "bomlens:licenseClass",
@@ -6954,7 +6954,7 @@
       "name": "SpringBootDemo",
       "properties": [
         {
-          "name": "SrcFile",
+          "name": "internal:SrcFile",
           "value": "/app/pom.xml"
         }
       ],
@@ -6968,16 +6968,16 @@
     ],
     "properties": [
       {
-        "name": "cdx:bom:componentTypes",
-        "value": "maven"
-      },
-      {
         "name": "cdx:bom:componentNamespaces",
         "value": "ch.qos.logback\\ncom.fasterxml\\ncom.fasterxml.jackson.core\\ncom.fasterxml.jackson.datatype\\ncom.fasterxml.jackson.module\\ncom.h2database\\ncom.jayway.jsonpath\\ncom.sun.istack\\ncom.vaadin.external.google\\ncom.zaxxer\\nio.micrometer\\nio.smallrye\\njakarta.activation\\njakarta.annotation\\njakarta.inject\\njakarta.persistence\\njakarta.transaction\\njakarta.xml.bind\\nnet.bytebuddy\\nnet.minidev\\norg.antlr\\norg.apache.commons\\norg.apache.logging.log4j\\norg.apache.tomcat.embed\\norg.apiguardian\\norg.aspectj\\norg.assertj\\norg.awaitility\\norg.eclipse.angus\\norg.glassfish.jaxb\\norg.hamcrest\\norg.hibernate.common\\norg.hibernate.orm\\norg.jboss.logging\\norg.junit.jupiter\\norg.junit.platform\\norg.mockito\\norg.objenesis\\norg.opentest4j\\norg.ow2.asm\\norg.projectlombok\\norg.skyscreamer\\norg.slf4j\\norg.springframework\\norg.springframework.boot\\norg.springframework.data\\norg.xmlunit\\norg.yaml"
       },
       {
         "name": "cdx:bom:componentSrcFiles",
         "value": "pom.xml"
+      },
+      {
+        "name": "cdx:bom:componentTypes",
+        "value": "maven"
       },
       {
         "name": "bomlens:excluded-paths",
@@ -6988,7 +6988,7 @@
         "value": "unknown-to-author"
       }
     ],
-    "timestamp": "2026-09-15T12:44:29Z",
+    "timestamp": "2026-09-23T00:56:12Z",
     "tools": {
       "components": [
         {
@@ -6997,24 +6997,24 @@
               "name": "OWASP Foundation"
             }
           ],
-          "bom-ref": "pkg:npm/@cyclonedx/cdxgen@12.8.3",
-          "group": "@cyclonedx",
+          "bom-ref": "pkg:npm/@cdxgen/cdxgen@13.2.0",
+          "group": "@cdxgen",
           "name": "cdxgen",
           "publisher": "OWASP Foundation",
-          "purl": "pkg:npm/%40cyclonedx/cdxgen@12.8.3",
+          "purl": "pkg:npm/%40cdxgen/cdxgen@13.2.0",
           "type": "application",
-          "version": "12.8.3"
+          "version": "13.2.0"
         },
         {
           "name": "BomLens",
           "publisher": "SK Telecom",
           "type": "application",
-          "version": "1.12.0"
+          "version": "1.12.1"
         }
       ]
     }
   },
-  "serialNumber": "urn:uuid:a33c2bdf-c08e-4b99-bfcb-da0e9bc45dbb",
+  "serialNumber": "urn:uuid:6b77fd10-a4ec-456a-8b4b-2897a95d744f",
   "services": [],
   "specVersion": "1.6",
   "version": 1,

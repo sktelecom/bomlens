@@ -168,6 +168,20 @@ if [ -n "$outdir_leaf" ] && [ -f docs/start/no-cli.md ] && ! grep -q "$outdir_le
     FAIL=$((FAIL + 1))
 fi
 
+# --- Check 6b: HuggingFace dataset input documented ---------------------------
+# --model also takes a HuggingFace dataset (MODE=DATASET, scan-hf-dataset.py).
+# Each page that lists the DATASET input has to name the dataset address form,
+# or it goes back to describing that input as a Figshare item only.
+if [ -f docker/lib/scan-hf-dataset.py ]; then
+    for page in docs/guides/by-input.md docs/reference/ui.md docs/reference/cli.md \
+                docs/concepts/architecture.md docs/concepts/pipeline-by-input.md docs/guides/ai-model.md; do
+        if [ -f "$page" ] && ! grep -qF 'huggingface.co/datasets' "$page"; then
+            echo "  DRIFT[hf-dataset]: $page does not name the HuggingFace dataset input (huggingface.co/datasets/...)"
+            FAIL=$((FAIL + 1))
+        fi
+    done
+fi
+
 # --- Check 7: CycloneDX spec-version literals --------------------------------
 # The docs promise concrete spec versions ("CycloneDX 1.6", ML-BOM "1.7",
 # "specVersion": "1.6"). When the tooling bumps, every stale literal must fail
@@ -190,6 +204,15 @@ elif [ "$PY_MLSPEC_MODEL" != "$MLSPEC" ] || [ "$PY_MLSPEC_FIGSHARE" != "$MLSPEC"
     echo "  DRIFT[spec]: AI/dataset CDX_SPEC_VERSION disagrees across producers (scan-aibom.sh: $MLSPEC, identify-model-file.py: $PY_MLSPEC_MODEL, scan-figshare.py: $PY_MLSPEC_FIGSHARE)"
     FAIL=$((FAIL + 1))
 fi
+# Later AI/dataset producers restate the same 1.7 constant.
+for pyf in docker/lib/scan-hf-dataset.py docker/lib/declare-ai-model.py; do
+    [ -f "$pyf" ] || continue
+    pyspec="$(grep -oE '^CDX_SPEC_VERSION = "[0-9.]+"' "$pyf" | head -1 | grep -oE '[0-9]+\.[0-9]+')"
+    if [ "$pyspec" != "$MLSPEC" ]; then
+        echo "  DRIFT[spec]: $pyf CDX_SPEC_VERSION '${pyspec:-missing}' disagrees with scan-aibom.sh ($MLSPEC)"
+        FAIL=$((FAIL + 1))
+    fi
+done
 # The non-AI Python producers restate the BASH constant's value (1.6), not the
 # AI/dataset one -- nothing in Python can source cdx-version.sh, so each of
 # these three files carries its own CDX_SPEC_VERSION line that must still

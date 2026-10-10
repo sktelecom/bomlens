@@ -14,7 +14,8 @@
     "run": "Run scan",
     "running": "Scanning…",
     "demoRunDisabled": "This demo cannot run a scan — it is a static page with no machine behind it.",
-    "demoRunDisabledCta": "Run it on your own code"
+    "demoRunDisabledCta": "Run it on your own code",
+    "projectHintDeclare": "With Enter model information, the project name becomes the model's name and the version its version."
   },
   "source": {
     "label": "Scan target",
@@ -50,8 +51,8 @@
     "dockerHint": "Scans a local/remote Docker image (Docker socket required).",
     "dockerPlaceholder": "nginx:latest",
     "aiModel": "AI model or dataset",
-    "aiModelPlaceholder": "google-bert/bert-base-uncased or figshare.com/articles/.../33412285",
-    "aiModelHint": "A HuggingFace model ID as 'org/model' (e.g. Qwen/Qwen2.5-0.5B), or a Figshare item: its page URL, its DOI, or the item number. Fetched over the network to build a CycloneDX ML-BOM.",
+    "aiModelPlaceholder": "google-bert/bert-base-uncased, datasets/allenai/tulu-3-sft-mixture or figshare.com/articles/.../33412285",
+    "aiModelHint": "A HuggingFace model ID as 'org/model' (e.g. Qwen/Qwen2.5-0.5B), a HuggingFace dataset as 'datasets/org/name' or its address, or a Figshare item: its page URL, its DOI, or the item number. A dataset needs the 'datasets/' prefix; without it the id is read as a model. Fetched over the network to build a CycloneDX ML-BOM and an SPDX 3.0.1 AI document.",
     "aiModelUnavailable": "AI-model SBOMs need Docker running (the AIBOM image runs as a sibling container).",
     "modelUpload": "Model file",
     "modelUploadHint": "Reads the model file's own header — no HuggingFace account and no network, so a model that was never published can be scanned. What can be filled depends on the format: GGUF carries a name, a license and an architecture, while safetensors usually carries only tensor shapes. Files over 8 GB: use the CLI (--model-file), which reads them in place.",
@@ -71,7 +72,9 @@
     "browse": "Choose file",
     "replaceFile": "Replace",
     "removeFile": "Remove the chosen file",
-    "uploadingPercent": "Uploading… {{percent}}%"
+    "uploadingPercent": "Uploading… {{percent}}%",
+    "aiDeclare": "Enter model information",
+    "aiDeclareHint": "For a model that has no HuggingFace repository or file to read yet. Answer a few questions about it (its base models, the data it was trained on, its release date and the like) and BomLens builds the SBOM and the SPDX 3.0.1 AI document from them. Base models and datasets you name by their HuggingFace id are read from the hub."
   },
   "options": {
     "notice": "Notice",
@@ -230,6 +233,18 @@
       "signature": {
         "title": "SBOM signature",
         "desc": "Cosign signature for verifying the SBOM."
+      },
+      "spdx3": {
+        "title": "SPDX 3.0.1 AI document",
+        "desc": "The model, its datasets and lineage in SPDX 3.0.1 with the AI and Dataset profiles, and a check of which fields are filled.",
+        "draftNote_one": "{{count}} required field is empty, so it does not pass SPDX validation yet.",
+        "draftNote_other": "{{count}} required fields are empty, so it does not pass SPDX validation yet.",
+        "uploadNote": "It cannot be uploaded back as an SBOM input.",
+        "behindNote": "The saved declaration or BomLens changed after the document was written; rebuild it to bring it up to date."
+      },
+      "aiDeclaration": {
+        "title": "AI declaration",
+        "desc": "Only the values you entered; nothing the scan filled. Edit it on screen with Fill in empty fields on Models & datasets, or edit the file and upload it again here, or pass it to the CLI with --ai-declare."
       }
     },
     "download": "Download",
@@ -380,7 +395,13 @@
     "csvEpss": "EPSS",
     "csvKev": "Known exploited",
     "csvTitle": "Title",
-    "artifactFiles": "({{count}} files)"
+    "artifactFiles": "({{count}} files)",
+    "emptyForm": "Empty form",
+    "declarationUpload": "Upload declaration",
+    "declarationNotJson": "That file is not JSON.",
+    "declarationRefused": "The declaration was refused: {{reason}}",
+    "checkFormat": "Check {{format}}",
+    "spdx3Rebuild": "Rebuild with the saved declaration"
   },
   "deps": {
     "loading": "Loading dependencies…",
@@ -580,7 +601,8 @@
     "catCode": "Code",
     "catArtifact": "Artifact",
     "catSbom": "SBOM",
-    "catAiModel": "AI model"
+    "catAiModel": "AI model",
+    "startQuestions": "Start the questions"
   },
   "run": {
     "stageGenerate": "Generate SBOM",
@@ -678,7 +700,8 @@
     "cargoLicenseMetadata": "Rust crate license lookup",
     "composerInstall": "PHP Composer dependency resolution",
     "pnpmWorkspaceTree": "pnpm workspace dependency tree resolution",
-    "enrichDistroSupplier": "OS package supplier enrichment"
+    "enrichDistroSupplier": "OS package supplier enrichment",
+    "declaredSources": "Dataset sources named in the AI declaration"
   },
   "pipelineNote": {
     "titleScan": "Some data may be incomplete",
@@ -716,6 +739,18 @@
     "dsIntegrity": "Integrity",
     "dsSource": "Derived from",
     "dsUnresolved": "Not readable",
+    "dsSourceOf": "Source, {{relation}}",
+    "dsRelation": {
+      "extended": "extended",
+      "listed": "listed"
+    },
+    "dsSourceCount_one": "{{count}} source",
+    "dsSourceCount_other": "{{count}} sources",
+    "dsListedAbove": "listed above",
+    "dsSourceOriginal": "The card says this data is original",
+    "dsSourceUnverified": "needs checking",
+    "dsTraceDepthLimit": "Sources below this level were not read (depth limit)",
+    "dsTraceCycle": "Its sources lead back to a dataset above it",
     "dsNoLicense": "None declared",
     "dsHashed": "Content digest recorded",
     "dsNotHashed": "No content digest",
@@ -766,7 +801,12 @@
     "countLine": "{{models}} model(s), {{datasets}} dataset(s)",
     "viewModels": "View model details",
     "viewConformance": "View conformance checks",
-    "disclaimer": "Documentation-preparation guidance, not a legal or compliance verdict."
+    "disclaimer": "Documentation-preparation guidance, not a legal or compliance verdict.",
+    "spdx3Open_one": "{{count}} required field left",
+    "spdx3Open_other": "{{count}} required fields left",
+    "spdx3Done": "Every required field is filled",
+    "spdx3Fill": "Fill in empty fields in Models & datasets",
+    "spdx3View": "View in Models & datasets"
   },
   "g7": {
     "empty": "No conformance checks were recorded.",
@@ -1198,7 +1238,8 @@
     "image": "Container image",
     "file": "Uploaded file",
     "sbom": "Received SBOM",
-    "model": "AI model"
+    "model": "AI model",
+    "declaration": "Declaration"
   },
   "image": {
     "ready": "The image for this input is already downloaded.",
@@ -1260,5 +1301,462 @@
     "logHint": "Copies the log exactly as shown above. Credential-shaped text is already masked, but read it before you paste it: paths and names are not.",
     "ready": "The diagnostics summary is ready below.",
     "logCopyFailed": "Copying was blocked here. Select the log above and copy it by hand."
+  },
+  "spdx3": {
+    "draft": "Draft",
+    "complete": "Complete",
+    "notAi": "This scan holds no AI model or dataset to describe.",
+    "writeFailed": "The SPDX 3.0.1 document could not be written.",
+    "openFailed": "The questions could not be loaded. Try again.",
+    "savedDraft": "Saved. The document is still a draft: some required fields are open.",
+    "savedComplete": "Saved. Every required field is filled.",
+    "band": {
+      "title": "SPDX 3.0.1 AI document",
+      "none": "This scan has no SPDX 3.0.1 document yet. Write it from the SBOM to see which fields are filled and which are open.",
+      "unavailable": "This scan has no SPDX 3.0.1 document, and this BomLens cannot write one.",
+      "write": "Write the SPDX 3.0.1 document",
+      "fill": "Fill in empty fields",
+      "draftNote_one": "{{count}} required field is still empty, so the document does not pass SPDX validation yet. BomLens does not guess values to fill it.",
+      "draftNote_other": "{{count}} required fields are still empty, so the document does not pass SPDX validation yet. BomLens does not guess values to fill them.",
+      "completeNote": "Every required field is filled. Values come from the scan or from your declaration; none are guessed.",
+      "refused": "The saved declaration no longer fits this scan, so the document was written without it. Fill the fields again or fix the file.",
+      "consumerNote": "For a model someone else published, you need to fill these only if you distribute this document yourself.",
+      "missingAt": "Required fields still empty: {{list}}",
+      "missingItem_one": "{{label}} ({{count}})",
+      "missingItem_other": "{{label}} ({{count}})",
+      "documentLabel": "Document"
+    },
+    "segment": {
+      "filled": "Filled",
+      "optional": "Optional",
+      "judgment": "Your decision",
+      "missingRequired": "Required, empty"
+    },
+    "status": {
+      "auto": "From the scan",
+      "declared": "Declared",
+      "noAssertion": "Unknown",
+      "missingRequired": "Required, empty",
+      "judgment": "Your decision",
+      "optional": "Optional",
+      "omitted": "Not recorded",
+      "review": "To check"
+    },
+    "table": {
+      "field": "Field",
+      "value": "Value",
+      "status": "Status",
+      "notFilled": "Not filled",
+      "hubPublisher": "(HuggingFace publisher)",
+      "optionalHidden_one": "{{count}} optional field is not filled and not listed.",
+      "optionalHidden_other": "{{count}} optional fields are not filled and not listed.",
+      "cardDatasets": "Datasets named on the model card",
+      "roleOpen": "Training or evaluation not stated",
+      "caption": "In the SPDX 3.0.1 document",
+      "datasetFields_one": "Fields of {{count}} dataset",
+      "datasetFields_other": "Fields of {{count}} datasets",
+      "notLegalAdvice": "This check is guidance, not legal advice.",
+      "toggle": "Show the document's fields",
+      "declaredDatasets": "Datasets named in the declaration",
+      "datasetMissing_one": "{{count}} required, empty",
+      "datasetMissing_other": "{{count}} required, empty"
+    }
+  },
+  "aiDecl": {
+    "stepsLabel": "Steps",
+    "step": {
+      "base": "Base models",
+      "model": "Model",
+      "data": "Training data",
+      "legal": "Your decisions",
+      "preview": "Review"
+    },
+    "question": {
+      "base": "Which revision of each base model did you start from?",
+      "model": "Tell us about the model",
+      "data": "What data did you use?",
+      "legal": "Your decisions",
+      "preview": "Review and save"
+    },
+    "questionHint": {
+      "base": "The scan found these base models. A revision makes the lineage reproducible; leave it empty if you do not know it.",
+      "model": "Only the fields the scan could not fill are asked.",
+      "data": "Say how the model used each dataset and add data the hub does not hold.",
+      "legal": "These are judgments, not facts the scan can read. Answer only what you have checked.",
+      "preview": "Saving checks the declaration against this scan and rewrites the SPDX 3.0.1 document."
+    },
+    "remaining_one": "{{count}} required field left",
+    "remaining_other": "{{count}} required fields left",
+    "cancel": "Cancel",
+    "prev": "Back",
+    "save": "Save",
+    "next": "Next: {{step}}",
+    "whyTitle": "Why this is asked",
+    "why": {
+      "base": "SPDX records which model this one was built from. The revision says exactly which version, so someone else can get the same base weights.",
+      "model": "The SPDX AI profile requires who wrote the document and when the model was released. Neither can be read from the hub.",
+      "data": "The AI document records what data the model was made from. Whoever receives it uses this to check sources and terms of use.",
+      "legal": "Whether personal data was used and how risky the model is are judgments. The tool never fills them for you.",
+      "preview": "The file holds only what you entered. Required fields still empty keep the document a draft, which you can finish later.",
+      "baseCreate": "SPDX records which model this one was built from. Naming the base model lets the scan read its licence, and a licence that passes to derivatives shows up in the risk verdict."
+    },
+    "side": {
+      "baseTitle": "Base models",
+      "baseNote": "Recorded on the base models only; nothing is copied into this model."
+    },
+    "requiredFailsValidation": "Leaving this empty fails SPDX validation. It has no \"unknown\" value.",
+    "examplePrefix": "e.g. {{example}}",
+    "agentPlaceholder": "Name of the organization or person",
+    "agentType": "Kind",
+    "agent": {
+      "Organization": "Organization",
+      "Person": "Person",
+      "Agent": "Other"
+    },
+    "addAgent": "Add another",
+    "addPair": "Add a setting",
+    "addLine": "Add a line",
+    "removeRow": "Remove {{name}}",
+    "pairKey": "Name",
+    "pairValue": "Value",
+    "problem": {
+      "date": "Pick a real date.",
+      "uri": "Enter a full address such as https://...",
+      "uriScheme": "Use an address that starts with http, https, s3, gs, ftp, sftp, git or hf.",
+      "tooLong": "This is too long (up to 4,000 characters).",
+      "agentName": "Each entry needs a name.",
+      "duplicateKey": "A setting name appears twice.",
+      "emptyKey": "Each setting needs a name.",
+      "revision": "Use a commit hash or a tag (letters, digits, '.', '_' and '-').",
+      "noAssertionMixed": "\"Unknown\" cannot be chosen together with other values.",
+      "localIncomplete": "Give this data a name and an address, or remove it. Without them the declaration cannot be saved.",
+      "hubId": "Use a HuggingFace id such as owner/name.",
+      "sourceName": "A licence needs the source's name.",
+      "sourceLicense": "Use a HuggingFace licence tag or an SPDX licence id, such as cc-by-4.0.",
+      "sourceTwice": "The same source is listed twice.",
+      "sourceSelf": "A dataset cannot be its own source.",
+      "sourceHubOnLocal": "Data the hub does not hold takes sources named in words only.",
+      "license": "Use a HuggingFace licence tag or an SPDX licence id, such as apache-2.0."
+    },
+    "base": {
+      "revision": {
+        "label": "Revision (commit or tag, optional)",
+        "example": "a8b602d9dafd3a75d382e62757d83d89fca3be54",
+        "hint": "The commit hash or tag in the model card or your training script. Leave it empty if you do not know it."
+      },
+      "add": {
+        "label": "Base model (HuggingFace id)",
+        "button": "Add",
+        "hint": "The model this one was fine-tuned, quantized or merged from. Its lineage and licence are read from the hub when the scan runs."
+      }
+    },
+    "group": {
+      "use": "Use and scope (optional)",
+      "training": "How it was trained (optional)",
+      "moreData": "More about this data (optional)"
+    },
+    "role": {
+      "label": "How did the model use it?",
+      "hint": "Training means the model learned from it; evaluation means it was only tested on it.",
+      "trainedOn": "Training",
+      "testedOn": "Evaluation",
+      "other": "Other"
+    },
+    "localTitle": "Data the hub does not hold",
+    "addLocal": "Add data the hub does not hold",
+    "removeLocal": "Remove",
+    "autoSupplier": "Published by {{value}}",
+    "preview": {
+      "complete": "Every required field is filled. Saving makes the document complete.",
+      "open_one": "{{count}} item is still open.",
+      "open_other": "{{count}} items are still open.",
+      "openInStep_one": "{{count}} open",
+      "openInStep_other": "{{count}} open",
+      "draftOk": "You can save now and finish later; the document stays a draft until then.",
+      "file": "The declaration file that will be saved",
+      "blocked": "Fix the items marked above before saving; the server would refuse them.",
+      "stepDone": "Nothing left",
+      "nothing": "Nothing entered.",
+      "noBase": "No base model",
+      "revision": "revision {{revision}}",
+      "noRevision": "no revision",
+      "role": "How the model used it"
+    },
+    "saveRefused": "The declaration was refused. Nothing was saved.",
+    "saveBusy": "This scan is running again. Save after it finishes.",
+    "saveFailed": "The declaration could not be saved.",
+    "enum": {
+      "yes": "Yes",
+      "no": "No",
+      "noAssertion": "Unknown",
+      "full": "Full weights",
+      "adapter": "Adapter only",
+      "quantized": "Quantized",
+      "merged": "Merged",
+      "low": "Low",
+      "medium": "Medium",
+      "high": "High",
+      "serious": "Serious",
+      "clear": "Clear",
+      "green": "Green",
+      "amber": "Amber",
+      "red": "Red",
+      "audio": "Audio",
+      "categorical": "Categories",
+      "graph": "Graph",
+      "image": "Image",
+      "numeric": "Numbers",
+      "other": "Other",
+      "sensor": "Sensor readings",
+      "structured": "Tables",
+      "syntactic": "Sentence structure",
+      "text": "Text",
+      "timeseries": "Time series",
+      "timestamp": "Dates and times",
+      "video": "Video",
+      "model": "Model",
+      "data": "Data",
+      "clickthrough": "After accepting terms",
+      "directDownload": "Direct download",
+      "query": "By query",
+      "registration": "After registering",
+      "scrapingScript": "With a scraping script"
+    },
+    "document": {
+      "createdBy": {
+        "label": "Who is writing this document",
+        "hint": "The organization or person responsible for this AI document.",
+        "example": "Acme AI Lab"
+      }
+    },
+    "model": {
+      "name": {
+        "label": "Name"
+      },
+      "packageVersion": {
+        "label": "Version",
+        "example": "1.0.0"
+      },
+      "downloadLocation": {
+        "label": "Download address",
+        "example": "https://huggingface.co/acme/model"
+      },
+      "primaryPurpose": {
+        "label": "Kind"
+      },
+      "suppliedBy": {
+        "label": "Supplier",
+        "hint": "Who distributes the model."
+      },
+      "releaseTime": {
+        "label": "Release date",
+        "hint": "If you have not published it, the date it was first put to use."
+      },
+      "builtTime": {
+        "label": "Date it was built"
+      },
+      "originatedBy": {
+        "label": "Who made the model",
+        "hint": "Leave empty if it is the same as the writer of this document."
+      },
+      "packageUrl": {
+        "label": "Package URL"
+      },
+      "homePage": {
+        "label": "Home page"
+      },
+      "description": {
+        "label": "Description"
+      },
+      "typeOfModel": {
+        "label": "Model type"
+      },
+      "limitation": {
+        "label": "Known limitations"
+      },
+      "metric": {
+        "label": "Evaluation metrics"
+      },
+      "domain": {
+        "label": "Domains it is meant for",
+        "example": "customer support"
+      },
+      "informationAboutApplication": {
+        "label": "What it is used for",
+        "example": "Answering customer questions in Korean"
+      },
+      "informationAboutTraining": {
+        "label": "How it was trained",
+        "example": "LoRA supervised fine-tuning on ultrachat_200k and internal support logs, 3 epochs"
+      },
+      "hyperparameter": {
+        "label": "Training settings",
+        "hint": "For example learning_rate 2e-5, epochs 3, lora_rank 16."
+      },
+      "modelDataPreprocessing": {
+        "label": "Data preprocessing",
+        "example": "Personal data masked, then de-duplicated"
+      },
+      "modelExplainability": {
+        "label": "Explainability measures"
+      },
+      "standardCompliance": {
+        "label": "Standards it follows",
+        "example": "ISO/IEC 42001"
+      },
+      "useSensitivePersonalInformation": {
+        "label": "Was sensitive personal information used?",
+        "hint": "Answer \"No\" only if you have checked."
+      },
+      "autonomyType": {
+        "label": "Does it act without a person checking?",
+        "hint": "\"Yes\" if its output is used without human review."
+      },
+      "safetyRiskAssessment": {
+        "label": "Safety risk level",
+        "hint": "Your own assessment, for example under the EU AI Act's categories."
+      },
+      "weightsScope": {
+        "label": "Which weights do you distribute?",
+        "hint": "An adapter needs the base model's weights to run, and this is recorded as a dependency."
+      },
+      "license": {
+        "label": "Licence of the model",
+        "hint": "Recorded in the SPDX 3.0.1 document only; the scanned model's risk verdict does not use it. Use a HuggingFace licence tag or an SPDX licence id, or pick one from the list.",
+        "example": "apache-2.0",
+        "hintCreate": "Used for this model's risk verdict; left empty, the verdict reads \"Needs review\". Use a HuggingFace licence tag or an SPDX licence id, or pick one from the list.",
+        "hintDeclared": "The risk verdict uses it from this model's next scan; until then the document lists it for review."
+      }
+    },
+    "dataset": {
+      "name": {
+        "label": "Name",
+        "example": "Support logs 2025"
+      },
+      "downloadLocation": {
+        "label": "Address",
+        "hint": "Where the data can be obtained, even an internal address.",
+        "example": "https://data.example.com/support-logs"
+      },
+      "primaryPurpose": {
+        "label": "Kind"
+      },
+      "originatedBy": {
+        "label": "Who made this data",
+        "hint": "HuggingFace only tells the publisher. If the maker is the publisher, enter it as is."
+      },
+      "suppliedBy": {
+        "label": "Supplier"
+      },
+      "builtTime": {
+        "label": "Date it was made"
+      },
+      "releaseTime": {
+        "label": "Date it was first released",
+        "hint": "If it was never published, the date it was first used internally."
+      },
+      "datasetType": {
+        "label": "Kind of data",
+        "hint": "You can pick more than one. Rest the pointer on a choice to see what it means."
+      },
+      "packageVersion": {
+        "label": "Version"
+      },
+      "description": {
+        "label": "Description"
+      },
+      "hasSensitivePersonalInformation": {
+        "label": "Does it contain personal information?",
+        "hint": "\"Yes\" if any information identifies a person, such as names, phone numbers or accounts. Choose \"No\" only if you have checked."
+      },
+      "datasetAvailability": {
+        "label": "How it can be obtained"
+      },
+      "intendedUse": {
+        "label": "What it is meant for"
+      },
+      "knownBias": {
+        "label": "Known bias"
+      },
+      "confidentialityLevel": {
+        "label": "Confidentiality (TLP)"
+      },
+      "dataCollectionProcess": {
+        "label": "How it was collected"
+      },
+      "anonymizationMethodUsed": {
+        "label": "Anonymization methods"
+      },
+      "dataPreprocessing": {
+        "label": "Preprocessing"
+      },
+      "datasetNoise": {
+        "label": "Known noise or errors"
+      },
+      "datasetUpdateMechanism": {
+        "label": "How it is updated"
+      }
+    },
+    "hub": {
+      "add": {
+        "label": "Dataset on HuggingFace (id)",
+        "button": "Add"
+      }
+    },
+    "readAtScan": "Read at scan",
+    "startScan": "Start the scan",
+    "questionHintCreate": {
+      "base": "Say whether you trained it from scratch or built it from another model by fine-tuning, quantizing or merging. If it started from a base model, add that model's id.",
+      "model": "What the hub cannot say about a model that is not published there.",
+      "data": "Add the datasets the model was trained or evaluated on: by HuggingFace id, or as data the hub does not hold.",
+      "legal": "These are judgments, not facts a scan can read. Answer only what you have checked.",
+      "preview": "Starting the scan reads the base models and datasets you named from the hub, then writes the SBOM and the SPDX 3.0.1 document."
+    },
+    "sources": {
+      "label": "Where this data came from",
+      "onRecord": "Already on record: {{list}}",
+      "none": "No source is on record for this data.",
+      "name": "Source named in words",
+      "licensePlaceholder": "e.g. cc-by-4.0",
+      "rel": {
+        "extended": "Extended from it",
+        "other": "Other"
+      },
+      "addHub": "Source on HuggingFace (id)",
+      "addNamed": "Add a source named in words",
+      "addButton": "Add source",
+      "nameN": "Source named in words {{n}}",
+      "licenseN": "Licence of source {{n}}",
+      "relationN": "How source {{n}} was used"
+    },
+    "questionCreate": {
+      "base": "Did this model start from another model?"
+    },
+    "origin": {
+      "scratch": "Trained from scratch",
+      "base": "Started from a base model",
+      "scratchNote": "Recorded with no base model: the document says nothing about a model this one was built from."
+    },
+    "pendingBlocked": "This id is not in the right form, so you stayed on this step. Fix it or clear it, then move on.",
+    "fallbackHint": "Left empty, it is recorded as \"Unknown\".",
+    "adapterNoBase": {
+      "create": "An adapter needs its base model's weights to run. Add the base model in the Base models step; otherwise the document lists this for review.",
+      "fill": "An adapter needs its base model's weights to run, and the scan found no base model. The document lists this for review."
+    },
+    "enumHint": {
+      "audio": "Sound recordings such as speech or music",
+      "categorical": "Values from a fixed set of classes, such as country or product type",
+      "graph": "Nodes and the links between them, such as a knowledge graph",
+      "image": "Photos or drawings",
+      "numeric": "Numbers such as measurements or counts",
+      "other": "Data that fits none of the other kinds",
+      "sensor": "Values a sensor measured, such as temperature or acceleration",
+      "structured": "Tables of rows and columns",
+      "syntactic": "Text marked up with its structure, such as part-of-speech tags or parse trees",
+      "text": "Sentences or documents",
+      "timeseries": "Values recorded over time",
+      "timestamp": "Records of dates and times",
+      "video": "Video recordings"
+    }
   }
 }

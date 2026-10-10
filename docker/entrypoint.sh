@@ -26,6 +26,7 @@ set -e
 #   - IMAGE/BINARY/ROOTFS : syft scan -> SBOM
 #   - FIRMWARE    : unpack firmware -> syft + cve-bin-tool -> SBOM (opt-in image)
 #   - MODELFILE   : read one AI model file's own header -> ML-BOM (offline)
+#   - AIDECLARE   : an AI model described from the publisher's declaration alone
 #   - ANALYZE     : validate + convert a supplier SBOM -> conformance + risk report
 #   - MERGE       : combine several CycloneDX SBOMs (layered server delivery)
 #   - DIFF        : compare two already-generated AI-model SBOMs (drift report)
@@ -98,6 +99,7 @@ KNOWN_ARTIFACT_SUFFIXES=(
     _scancode.json _files.json _source.json _input.json
     _yocto_vex.json _security_epss.json _vendored.cdx.json _gate.result
     _ai-profile.json _ai-profile.md _vex.cdx.json
+    _bom.spdx3.json _bom.spdx3.json.sig _spdx3-check.json _spdx3-check.md _ai-declaration.template.json
     _modelica.cdx.json _cocoapods.cdx.json _conda.cdx.json
     _security_cvebintool.json _security_grype.json _security_yocto.json
 )
@@ -490,7 +492,7 @@ generate_sbom_cdxgen() {
 # inter-package or static-linked dependencies) -- these stay `unknown` unless a
 # failure signal is present, then `incomplete`.
 #
-# AIBOM/MODELFILE/DATASET/MERGE: no signal this design defines a value for --
+# AIBOM/MODELFILE/DATASET/AIDECLARE/MERGE: no signal this design defines a value for --
 # fixed `unknown`. ANALYZE with no compositions of its own is the same
 # (`unknown`); ANALYZE that already carries a supplier's own compositions is
 # never reached here at all (the early return below).
@@ -531,7 +533,7 @@ mark_compositions_aggregate() {
                 aggregate="unknown"
             fi
             ;;
-        AIBOM|MODELFILE|DATASET|MERGE|ANALYZE)
+        AIBOM|MODELFILE|DATASET|AIDECLARE|MERGE|ANALYZE)
             aggregate="unknown"
             ;;
         *)
@@ -557,12 +559,13 @@ mark_compositions_aggregate() {
 
 # Modes whose SBOM describes an AI asset rather than a software project: the
 # model-card path (AIBOM, from a HuggingFace id), the model-file path
-# (MODELFILE, from the file itself) and the dataset path (DATASET, from a
-# published research item). They share the AI post-processing — risk assessment,
+# (MODELFILE, from the file itself), the dataset path (DATASET, from a
+# published research item) and the declaration path (AIDECLARE, from what the
+# publisher states). They share the AI post-processing — risk assessment,
 # G7 conformance, the AI profile — and skip the package-oriented enrichments,
 # which have no purl, no CPE and no release cycle to match on.
 case "$SCAN_MODE" in
-    AIBOM|MODELFILE|DATASET) AI_MODEL_SCAN=true ;;
+    AIBOM|MODELFILE|DATASET|AIDECLARE) AI_MODEL_SCAN=true ;;
     *) AI_MODEL_SCAN=false ;;
 esac
 
@@ -750,9 +753,18 @@ EOF
         # public item endpoint needs no account, so this is one stdlib script in the
         # base image: no generator, no opt-in image, and it works for whoever can
         # reach the API. It writes its own metadata.component, like AIBOM.
+        # A HuggingFace dataset (hf:<owner>/<name>, as scan-sbom.sh and the web
+        # UI normalize it) is read the way a model scan reads each dataset its
+        # card names, sources included, by the same module.
         if [ -z "$DATASET_REF" ]; then echo "[ERROR] DATASET_REF required for DATASET mode."; exit 1; fi
-        echo "[1/2] figshare: describe $DATASET_REF"
-        python3 "$LIBDIR/scan-figshare.py" "$DATASET_REF" "$OUTPUT_FILE" "$PROJECT_VERSION"
+        case "$DATASET_REF" in
+            hf:*)
+                echo "[1/2] huggingface: describe dataset ${DATASET_REF#hf:}"
+                python3 "$LIBDIR/scan-hf-dataset.py" "$DATASET_REF" "$OUTPUT_FILE" "$PROJECT_VERSION" ;;
+            *)
+                echo "[1/2] figshare: describe $DATASET_REF"
+                python3 "$LIBDIR/scan-figshare.py" "$DATASET_REF" "$OUTPUT_FILE" "$PROJECT_VERSION" ;;
+        esac
         ;;
 
     MODELFILE)
@@ -780,6 +792,24 @@ EOF
         # as "not scanned" rather than as safe.
         run_optional_step model-security python3 "$LIBDIR/scan-model-file-security.py" \
             "$OUTPUT_FILE" "$TARGET_FILE"
+        ;;
+
+    AIDECLARE)
+        # A model with no hub repository and no file to read yet: the
+        # publisher's declaration is the input. declare-ai-model.py writes the
+        # model component and reads only what the declaration points at on the
+        # hub (its base models' lineage, its datasets and their sources), so the
+        # assessment and G7 run as for any AI scan. The declared values
+        # themselves go into the SPDX 3.0.1 document below, not into this SBOM.
+        if [ -z "${AI_DECLARATION_FILE:-}" ] || [ ! -f "$AI_DECLARATION_FILE" ]; then
+            echo "[ERROR] AI_DECLARATION_FILE required for AIDECLARE mode."; exit 1
+        fi
+        echo "[1/2] declaration: describe $PROJECT_NAME $PROJECT_VERSION"
+        if ! python3 "$LIBDIR/declare-ai-model.py" "$AI_DECLARATION_FILE" "$OUTPUT_FILE" \
+                "$PROJECT_NAME" "$PROJECT_VERSION"; then
+            echo "[ERROR] The AI declaration could not be read (reason above). Fix the file and run again."
+            exit 1
+        fi
         ;;
 
     MERGE)
@@ -896,7 +926,7 @@ EOF
         ;;
 
     *)
-        echo "[ERROR] Unknown MODE: $SCAN_MODE (expected SOURCE/IMAGE/BINARY/ROOTFS/FIRMWARE/AIBOM/MODELFILE/DATASET/ANALYZE/MERGE/POSTPROCESS/UI/DIFF)"
+        echo "[ERROR] Unknown MODE: $SCAN_MODE (expected SOURCE/IMAGE/BINARY/ROOTFS/FIRMWARE/AIBOM/MODELFILE/DATASET/AIDECLARE/ANALYZE/MERGE/POSTPROCESS/UI/DIFF)"
         exit 1
         ;;
 esac
@@ -1171,7 +1201,7 @@ case "$SCAN_MODE" in
     BINARY|FIRMWARE|MODELFILE)
         run_optional_step docmeta bash "$LIBDIR/stamp-document-metadata.sh" "$OUTPUT_FILE" "$SCAN_MODE" "$TARGET_FILE"
         ;;
-    SOURCE|POSTPROCESS|ROOTFS|IMAGE|AIBOM|DATASET|MERGE)
+    SOURCE|POSTPROCESS|ROOTFS|IMAGE|AIBOM|DATASET|AIDECLARE|MERGE)
         run_optional_step docmeta bash "$LIBDIR/stamp-document-metadata.sh" "$OUTPUT_FILE" "$SCAN_MODE"
         ;;
 esac
@@ -1309,6 +1339,16 @@ fi
 # registry's not-legal-advice disclaimer. Self-gates on the presence of a
 # machine-learning-model component, so ANALYZE of a plain SBOM is a no-op.
 if [ "$AI_MODEL_SCAN" = "true" ] || [ "$SCAN_MODE" = "ANALYZE" ]; then
+    # Sources the publisher named by hub id are read from the hub first, so the
+    # assessment judges them with the dataset (the SPDX 3.0.1 block below
+    # records them as declared). The same declaration that block applies.
+    DECL_FOR_SOURCES="${AI_DECLARATION_FILE:-}"
+    if [ -z "$DECL_FOR_SOURCES" ] && [ -n "${HOST_OUTPUT_DIR:-}" ]; then
+        DECL_FOR_SOURCES="$HOST_OUTPUT_DIR/${OUT_PREFIX}_ai-declaration.json"
+    fi
+    if [ "$AI_MODEL_SCAN" = "true" ] && [ -n "$DECL_FOR_SOURCES" ] && [ -f "$DECL_FOR_SOURCES" ]; then
+        run_optional_step declared-sources python3 "$LIBDIR/apply-declared-sources.py" "$OUTPUT_FILE" "$DECL_FOR_SOURCES"
+    fi
     run_optional_step assess-ai-risk bash "$LIBDIR/assess-ai-risk.sh" "$OUTPUT_FILE"
 fi
 
@@ -1598,6 +1638,71 @@ if [ "${GENERATE_SPDX:-false}" = "true" ]; then
     fi
 fi
 
+# SPDX 3.0.1 AI document (AI scans, on unless GENERATE_SPDX3=false): the
+# finished CycloneDX BOM written with the AI and Dataset profiles, plus a check
+# saying which fields came from the scan, which from the publisher's declaration,
+# and which required ones are still open. The declaration is the file given with
+# --ai-declare, or else the one a previous run or the web UI left in the output
+# folder. A refused declaration is reported and the document is written without
+# it, as a draft. Like the SPDX 2.3 export, a failure here leaves the CycloneDX
+# SBOM and everything else untouched. Before signing, so --sign covers it.
+SPDX3_FILE="${OUT_PREFIX}_bom.spdx3.json"
+if [ "$AI_MODEL_SCAN" = "true" ] && [ "${GENERATE_SPDX3:-true}" != "false" ]; then
+    SPDX3_DECL=""
+    if [ -n "${AI_DECLARATION_FILE:-}" ]; then
+        if [ -f "$AI_DECLARATION_FILE" ]; then
+            SPDX3_DECL="$AI_DECLARATION_FILE"
+        else
+            echo "[WARN] --ai-declare: the declaration is not visible inside the container ($AI_DECLARATION_FILE). If it is a symbolic link, pass the real file." >&2
+        fi
+    elif [ -n "$HOST_OUTPUT_DIR" ] && [ -f "$HOST_OUTPUT_DIR/${OUT_PREFIX}_ai-declaration.json" ]; then
+        SPDX3_DECL="$HOST_OUTPUT_DIR/${OUT_PREFIX}_ai-declaration.json"
+        echo "[INFO] SPDX 3.0.1: applying the declaration kept in the output folder (${OUT_PREFIX}_ai-declaration.json)."
+    fi
+    # --prefix= keeps a prefix that begins with "-" from reading as an option.
+    SPDX3_ARGS=(convert --bom "$OUTPUT_FILE" --out-dir . "--prefix=$OUT_PREFIX")
+    [ "${BYTE_STABLE:-false}" = "true" ] && SPDX3_ARGS+=(--stable)
+    spdx3_rc=0
+    if [ -n "$SPDX3_DECL" ]; then
+        # With --declaration-fallback a refused declaration still gives the
+        # document (exit 2), and the check records the refusal for the web UI.
+        python3 "$LIBDIR/convert-to-spdx3-ai.py" "${SPDX3_ARGS[@]}" --declaration "$SPDX3_DECL" \
+            --declaration-fallback || spdx3_rc=$?
+        if [ "$spdx3_rc" -eq 2 ] && [ "$SCAN_MODE" = "AIDECLARE" ]; then
+            # Here the declaration is the input, not a supplement: without it
+            # the result is a model with a name and nothing else.
+            echo "[ERROR] The AI declaration was refused (reasons above). Fix the file and run again." >&2
+            exit 1
+        fi
+        if [ "$spdx3_rc" -eq 2 ]; then
+            echo "[ERROR] The AI declaration was refused (reasons above). The SPDX 3.0.1 document is written without it, as a draft. Fix the file and run again." >&2
+            SPDX3_DECL=""
+            spdx3_rc=0
+        fi
+    else
+        python3 "$LIBDIR/convert-to-spdx3-ai.py" "${SPDX3_ARGS[@]}" || spdx3_rc=$?
+    fi
+    if [ "$spdx3_rc" -eq 0 ] && [ -f "$SPDX3_FILE" ]; then
+        ARTIFACTS+=("$SPDX3_FILE" "${OUT_PREFIX}_spdx3-check.json" "${OUT_PREFIX}_spdx3-check.md")
+        # The empty declaration for this scan: the fields a person fills, for
+        # the datasets and base models this scan found. Edit it and pass it
+        # back with --ai-declare.
+        if python3 "$LIBDIR/convert-to-spdx3-ai.py" template --bom "$OUTPUT_FILE" --out-dir . \
+               "--prefix=$OUT_PREFIX" 2>/dev/null; then
+            ARTIFACTS+=("${OUT_PREFIX}_ai-declaration.template.json")
+        fi
+        # Keep an accepted --ai-declare file with the results, so a re-scan and
+        # the web UI start from it. A file already in the output folder is
+        # that same file and is left where it is.
+        if [ -n "${AI_DECLARATION_FILE:-}" ] && [ "$SPDX3_DECL" = "$AI_DECLARATION_FILE" ]; then
+            cp "$AI_DECLARATION_FILE" "${OUT_PREFIX}_ai-declaration.json" \
+                && ARTIFACTS+=("${OUT_PREFIX}_ai-declaration.json")
+        fi
+    else
+        echo "[WARN] SPDX 3.0.1 AI document failed; the CycloneDX SBOM and other artifacts are unaffected."
+    fi
+fi
+
 if [ "${SIGN_SBOM:-false}" = "true" ]; then
     if command -v cosign >/dev/null 2>&1 && [ -n "${COSIGN_KEY:-}" ]; then
         echo "[INFO] Signing SBOM with cosign..."
@@ -1623,6 +1728,16 @@ if [ "${SIGN_SBOM:-false}" = "true" ]; then
                 ARTIFACTS+=("${SPDX_FILE}.sig")
             else
                 echo "[ERROR] cosign could not sign the SPDX SBOM."; SIGN_FAILED=1
+            fi
+        fi
+        # A draft is signed too: the signature says this file came from this
+        # scan, not that the document is complete.
+        if [ -f "$SPDX3_FILE" ]; then
+            if cosign sign-blob "${COSIGN_SIGN_FLAGS[@]}" --key "$COSIGN_KEY" \
+                   --output-signature "${SPDX3_FILE}.sig" "$SPDX3_FILE"; then
+                ARTIFACTS+=("${SPDX3_FILE}.sig")
+            else
+                echo "[ERROR] cosign could not sign the SPDX 3.0.1 AI document."; SIGN_FAILED=1
             fi
         fi
         # The conformance sidecar files (generated earlier, before signing could

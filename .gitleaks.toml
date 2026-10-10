@@ -16,3 +16,11 @@ regexes = [
   # string that appears in a Dockerfile or a README is a name pair, not a key.
   '''id=[A-Za-z0-9_-]+,env=[A-Za-z0-9_]+''',
 ]
+# The demo's security reports are Trivy output: public CVE records whose
+# references and descriptions quote upstream commit hashes, and a 40-digit
+# hex hash has the shape of a legacy Sourcegraph token (56,350 such matches
+# in one firmware report). No credential is ever written there.
+paths = [
+  # docs/demo on main; demo/ at the root of the published demo site's branch.
+  '''^(docs/)?demo/data/files/[^/]+/[^/]+_security\.json$''',
+]

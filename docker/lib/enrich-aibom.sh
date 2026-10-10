@@ -67,10 +67,12 @@ fi
 # Everything runs inside one Python pass so the SBOM JSON is parsed/written once.
 # Each feature is guarded independently; a failure in one leaves the others (and
 # the original SBOM) intact.
-python3 - "$SBOM" "$MODEL_ID" "$CDXGEN_BIN" <<'PY' || echo "[enrich] enrichment skipped (python/network/tool unavailable)" >&2
+python3 - "$SBOM" "$MODEL_ID" "$CDXGEN_BIN" "$(dirname "$0")" <<'PY' || echo "[enrich] enrichment skipped (python/network/tool unavailable)" >&2
 import json, os, re, subprocess, sys, tempfile
 
 sbom_path, model_id, cdxgen_bin = sys.argv[1], sys.argv[2], sys.argv[3]
+sys.path.insert(0, sys.argv[4])
+import hf_dataset  # noqa: E402  (shared dataset reader, same directory)
 
 WEIGHT_EXTS = (".safetensors", ".bin", ".gguf", ".pt", ".pth", ".onnx", ".h5", ".ckpt", ".msgpack")
 
@@ -240,180 +242,44 @@ def card_get(info, key):
 # the gap visible is the point — a fabricated license would read as a reviewed
 # dataset. Same contract as the rest of this file.
 
-# Marks the components this step wrote, so a re-run can drop its own previous
-# output instead of appending a second copy of every dataset.
-DATASET_MARK = "bomlens:dataset:collectedBy"
-# A dataset repo can hold thousands of shards. The component hash list is
-# evidence that content digests exist and are recorded, not a manifest, so it is
-# capped and the true file count is recorded alongside it.
-DATASET_HASH_CAP = 64
+# The lookup, the component shape and the source walk live in hf_dataset.py, a
+# standard-library module shared with the dataset-only scan and the declaration
+# path, so every route reads a dataset the same way.
+DATASET_MARK = hf_dataset.DATASET_MARK
 
 
-def dataset_ref(ds_id):
-    return "dataset:huggingface/" + ds_id
-
-
-def build_dataset_component(api, ds_id):
-    """CycloneDX `data` component for one HuggingFace dataset id.
-
-    Returns (component, resolved). `resolved` is False when the repository could
-    not be read, in which case the component holds the name and nothing else.
-    """
-    url = "https://huggingface.co/datasets/" + ds_id
-    props = [{"name": DATASET_MARK, "value": "huggingface"}]
-    # The repository owner is this dataset's producer and the id already carries
-    # it, so it is recorded before the API call: a dataset that cannot be opened
-    # still says who published it. It goes on the component itself and not only
-    # in componentData.governance below, because that is where the G7 dataset
-    # cluster and the 2026 minimum elements look for a producer — a model that
-    # declares its training data was otherwise scored down for the datasets it
-    # added, each one counting as a component with no producer.
-    owner = ds_id.split("/")[0] if "/" in ds_id else None
-    comp = {
-        "type": "data",
-        "bom-ref": dataset_ref(ds_id),
-        "name": ds_id,
-        "externalReferences": [
-            {"type": "distribution", "url": url, "comment": "Dataset repository"}
-        ],
-        "properties": props,
-    }
-    if owner:
-        comp["authors"] = [{"name": owner}]
-        comp["supplier"] = {"name": owner, "url": ["https://huggingface.co/" + owner]}
-    # componentData (spec: component.data[]) is where CycloneDX describes what a
-    # data component actually holds.
-    cdata = {"type": "dataset", "name": ds_id, "contents": {"url": url}}
-    if owner:
-        cdata["governance"] = {"owners": [{"organization": {"name": owner}}]}
-
-    if api is None:
-        props.append({"name": "bomlens:dataset:unresolved", "value": "huggingface-unavailable"})
-        comp["data"] = [cdata]
-        return comp, False
-
+def _env_count(name, default):
+    raw = os.environ.get(name, "")
+    if raw == "":
+        return default
     try:
-        info = api.dataset_info(ds_id, files_metadata=True)
-    except Exception as e:
-        # Never put the exception text in the SBOM: it can carry request detail.
-        # The reason goes to the log, the fact goes to the BOM.
-        print(f"[enrich] dataset {ds_id} could not be read: {e}", file=sys.stderr)
-        props.append({"name": "bomlens:dataset:unresolved", "value": "not-readable"})
-        comp["data"] = [cdata]
-        return comp, False
-
-    # A dataset repo has no release version, only a commit. Recording it pins the
-    # snapshot that was read, which is what makes the hashes below meaningful.
-    # Short form in `version` to match the model component the generator writes;
-    # the full revision rides along as a property.
-    rev = getattr(info, "sha", None)
-    if rev:
-        comp["version"] = str(rev)[:8]
-        props.append({"name": "bomlens:dataset:revision", "value": str(rev)})
-
-    lic = card_get(info, "license")
-    if isinstance(lic, list):
-        lic = lic[0] if lic else None
-    if lic:
-        # Raw HuggingFace spelling ("cc-by-sa-4.0"). normalize-sbom.sh maps it to
-        # an SPDX id downstream, so it is recorded as a name rather than guessed
-        # into an id here.
-        comp["licenses"] = [{"license": {"name": str(lic)}}]
-
-    desc = getattr(info, "description", None) or card_get(info, "pretty_name")
-    if desc:
-        comp["description"] = str(desc)[:500]
-        cdata["description"] = comp["description"]
-
-    # Content digests: LFS-tracked files are the only ones exposing a SHA-256.
-    shas, total_files = [], 0
-    for s in (getattr(info, "siblings", None) or []):
-        total_files += 1
-        lfs = getattr(s, "lfs", None) or (s.get("lfs") if isinstance(s, dict) else None)
-        if lfs is None:
-            continue
-        sha = getattr(lfs, "sha256", None) or (lfs.get("sha256") if isinstance(lfs, dict) else None)
-        if sha and sha not in shas:
-            shas.append(sha)
-    if shas:
-        comp["hashes"] = [{"alg": "SHA-256", "content": s} for s in shas[:DATASET_HASH_CAP]]
-        props.append({"name": "bomlens:dataset:hashedFiles",
-                      "value": f"{min(len(shas), DATASET_HASH_CAP)} of {len(shas)}"})
-    if total_files:
-        props.append({"name": "bomlens:dataset:fileCount", "value": str(total_files)})
-
-    # What the dataset holds — the card's declared facets, recorded as-is.
-    facets = []
-    for key in ("task_categories", "size_categories", "language", "annotations_creators",
-                "multilinguality", "configs"):
-        val = card_get(info, key)
-        if not val:
-            continue
-        if isinstance(val, list):
-            val = ", ".join(str(v) for v in val if v is not None)
-        facets.append({"name": "hf:" + key, "value": str(val)[:200]})
-    # Risk-relevant card tags: recorded verbatim as a facet, and matched
-    # against the registry's tag signals (pii, not-for-all-audiences, …) so
-    # the assessment can read them. A tag is the publisher's own marker — its
-    # absence proves nothing, so only presence is ever stamped.
-    all_tags = [str(t) for t in (getattr(info, "tags", None) or []) if t is not None]
-    card_tags = card_get(info, "tags")
-    if isinstance(card_tags, list):
-        all_tags += [str(t) for t in card_tags if t is not None]
-    all_tags = list(dict.fromkeys(all_tags))
-    if all_tags:
-        facets.append({"name": "hf:tags", "value": ", ".join(all_tags)[:300]})
-    for tag in dict.fromkeys(t.lower() for t in all_tags):
-        sig = TAG_SIGNALS.get(tag)
-        if sig:
-            props.append({"name": "bomlens:dataset:signal", "value": sig})
-    if facets:
-        cdata["contents"]["properties"] = facets
-
-    # Provenance: the upstream this dataset derives from. HuggingFace allows both
-    # a bare marker ("original") and a reference ("extended|other/name"), so the
-    # values are carried verbatim rather than reinterpreted as ids.
-    for src in (card_get(info, "source_datasets") or []):
-        props.append({"name": "bomlens:dataset:sourceDataset", "value": str(src)[:200]})
-
-    # A bare id ("squad") carries no owner, but the API names one; taking it here
-    # is the only way such a dataset gets a producer at all.
-    if not owner:
-        api_owner = getattr(info, "author", None)
-        if api_owner:
-            comp["authors"] = [{"name": str(api_owner)}]
-            comp["supplier"] = {"name": str(api_owner),
-                                "url": ["https://huggingface.co/" + str(api_owner)]}
-            cdata["governance"] = {"owners": [{"organization": {"name": str(api_owner)}}]}
-
-    if getattr(info, "private", False):
-        props.append({"name": "bomlens:dataset:visibility", "value": "private"})
-    elif getattr(info, "gated", None):
-        props.append({"name": "bomlens:dataset:visibility", "value": "gated"})
-
-    comp["data"] = [cdata]
-    return comp, True
+        val = int(raw)
+        if val < 0:
+            raise ValueError
+        return val
+    except ValueError:
+        print(f"[enrich] {name}={raw!r} is not a whole number of zero or more; using {default}.",
+              file=sys.stderr)
+        return default
 
 
-def collect_datasets(api, declared):
-    """Resolve every dataset the model card declares.
+# How many levels of a dataset's own sources to follow, and how many datasets
+# one scan may read in total. 0 depth reads only what the card names.
+DATASET_DEPTH = _env_count("AIBOM_DATASET_DEPTH", 3)
+DATASET_MAX_LOOKUPS = _env_count("AIBOM_DATASET_MAX_LOOKUPS", 40)
 
-    Returns (components, bom-refs, resolved_count).
+
+def collect_datasets(declared):
+    """Read every dataset the model card declares, and their sources.
+
+    Returns (components, root bom-refs, resolved_root_count, source edges).
     """
     if not declared:
-        return [], [], 0
+        return [], [], 0, []
     ids = declared if isinstance(declared, list) else [declared]
-    seen, comps, refs, resolved = set(), [], [], 0
-    for raw in ids:
-        ds_id = str(raw).strip()
-        if not ds_id or ds_id in seen:
-            continue
-        seen.add(ds_id)
-        comp, ok = build_dataset_component(api, ds_id)
-        comps.append(comp)
-        refs.append(comp["bom-ref"])
-        resolved += 1 if ok else 0
-    return comps, refs, resolved
+    return hf_dataset.trace([str(i).strip() for i in ids if str(i or "").strip()],
+                            max_depth=DATASET_DEPTH, budget=DATASET_MAX_LOOKUPS,
+                            tag_signals=TAG_SIGNALS)
 
 
 def _card_dataset_name(entry):
@@ -463,11 +329,7 @@ def prune_prose_dataset_names(models, api, declared):
                 kept.append(entry)
                 continue
             if name not in checked:
-                try:
-                    api.dataset_info(name)
-                    checked[name] = True
-                except Exception:
-                    checked[name] = False
+                checked[name] = hf_dataset.dataset_exists(name)
             if checked[name]:
                 kept.append(entry)
             elif name not in dropped:
@@ -477,6 +339,13 @@ def prune_prose_dataset_names(models, api, declared):
         else:
             params.pop("datasets", None)
     return dropped
+
+# Filled by the lineage walk below and read after the cdxgen harvest; empty when
+# the hub could not be read.
+lineage_items, _bases, relation = [], [], None
+# Marks a pedigree this step built, so a re-run replaces its own and never a
+# pedigree that came from cdxgen or from the generator.
+PEDIGREE_MARK = "bomlens:lineage:source"
 
 if hf_info is not None:
     siblings = getattr(hf_info, "siblings", None) or []
@@ -500,6 +369,13 @@ if hf_info is not None:
         for name, sha in file_sha.items()
         if name.lower().endswith(WEIGHT_EXTS)
     ]
+    # hashes[] above keeps the digests and drops the names, so a reader cannot
+    # tell which digest belongs to which file. The pairs are kept here as well,
+    # one property per file in sha256sum's "<digest>  <path>" layout, so a later
+    # step can describe each weight file on its own. Capped like the dataset
+    # digests; the true count rides along.
+    WEIGHT_FILE_CAP = 256
+    weight_files = sorted((n, s) for n, s in file_sha.items() if n.lower().endswith(WEIGHT_EXTS))
 
     gated = getattr(hf_info, "gated", None)          # False | "auto" | "manual" | None
     private = bool(getattr(hf_info, "private", False))
@@ -507,7 +383,13 @@ if hf_info is not None:
     has_config = any(n.lower() == "config.json" for n in filenames)
     datasets = card_get(hf_info, "datasets")
     has_datasets = bool(datasets)
-    dataset_comps, dataset_refs, resolved_datasets = collect_datasets(hf_api, datasets)
+    try:
+        dataset_comps, dataset_refs, resolved_datasets, source_edges = collect_datasets(datasets)
+    except Exception as e:
+        # A dataset answer of a shape nobody expected must not cost the model
+        # the rest of its enrichment. The datasets stay as the card named them.
+        print(f"[enrich] datasets skipped: {type(e).__name__}: {e}", file=sys.stderr)
+        dataset_comps, dataset_refs, resolved_datasets, source_edges = [], [], 0, []
     # Names the generator scraped out of the card's prose are removed here, before
     # the openness axis and the conformance report read them as disclosed training
     # data. The fact of the removal is stamped so the report can be traced back.
@@ -555,6 +437,27 @@ if hf_info is not None:
     if weight_fmts:
         weights_props.append({"name": "bomlens:weights:formats", "value": ",".join(weight_fmts)})
         weights_props.append({"name": "bomlens:weights:pickleFiles", "value": str(pickle_files)})
+    for name, sha in weight_files[:WEIGHT_FILE_CAP]:
+        weights_props.append({"name": "bomlens:weights:file", "value": f"{sha}  {name}"})
+    if len(weight_files) > WEIGHT_FILE_CAP:
+        weights_props.append({"name": "bomlens:weights:filesRecorded",
+                              "value": f"{WEIGHT_FILE_CAP} of {len(weight_files)}"})
+
+    # ---- Repository facts kept for later steps ------------------------------
+    # The gate kind (auto-approved or manually reviewed) and the time of the
+    # revision that was read. Neither is a judgement: the time is when the
+    # repository last changed, not when the model was released, and nothing
+    # downstream may read it as a release date.
+    repo_props = []
+    if gated in ("auto", "manual"):
+        repo_props.append({"name": "bomlens:hf:gated", "value": str(gated)})
+    _rev_time = getattr(hf_info, "last_modified", None)
+    if _rev_time:
+        try:
+            _rev_time = _rev_time.isoformat()
+        except AttributeError:
+            pass
+        repo_props.append({"name": "bomlens:hf:revisionTime", "value": str(_rev_time)[:40]})
 
     # ---- File security: HuggingFace's own scan results ----------------------
     # HuggingFace runs ClamAV and picklescan over every repository and exposes
@@ -777,8 +680,26 @@ if hf_info is not None:
     # flag an ancestor whose license the registry marks inheritable when this
     # model declares something else.
     lineage_props = []
+    # (id, license, unreadable) per ancestor walked, nearest first. Kept for the pedigree
+    # built after the cdxgen harvest, which may supply its own.
+    lineage_items = []
     _base = card_get(hf_info, "base_model")
     _bases = _base if isinstance(_base, list) else ([_base] if _base else [])
+    _bases = [str(b).strip() for b in _bases if str(b or "").strip()]
+    # How this model relates to its direct parent, as the hub tags it:
+    # base_model:<relation>:<id>. Only the four relations the hub documents are
+    # read; a bare base_model:<id> tag says nothing about the relation.
+    LINEAGE_RELATIONS = ("finetune", "quantized", "adapter", "merge")
+    relation = None
+    if _bases:
+        rels = set()
+        for t in tags:
+            parts = str(t).split(":", 2)
+            if len(parts) == 3 and parts[0] == "base_model" and parts[1] in LINEAGE_RELATIONS \
+               and parts[2] == _bases[0]:
+                rels.add(parts[1])
+        # Two relations to the same parent is a contradiction, not a choice.
+        relation = rels.pop() if len(rels) == 1 else None
     if _bases:
         chain, visited = [], {model_id}
         own_term = _match_term(model_license)
@@ -792,11 +713,13 @@ if hf_info is not None:
             except Exception as e:
                 print(f"[enrich] lineage: {cur} unreadable: {e}", file=sys.stderr)
                 chain.append(f"{cur}:unreadable")
+                lineage_items.append((cur, None, True))
                 break
             blic = card_get(binfo, "license")
             if isinstance(blic, list):
                 blic = blic[0] if blic else None
             chain.append(f"{cur}:{blic or 'none'}")
+            lineage_items.append((cur, str(blic) if blic else None, False))
             bterm = _match_term(blic)
             if conflict is None and bterm and bterm.get("inheritable") \
                and (own_term is None or own_term.get("key") != bterm.get("key")):
@@ -815,6 +738,46 @@ if hf_info is not None:
                                       "value": f"{conflict[0]} ({conflict[1]})"})
             print(f"[enrich] lineage: {len(chain)} ancestor(s), "
                   f"conflict={'yes' if conflict else 'no'}.", file=sys.stderr)
+        if relation:
+            lineage_props.append({"name": "bomlens:lineage:relation", "value": relation})
+        # The chain follows the first parent only. A merge names several; the
+        # others are recorded by id so they are not silently lost, and are not
+        # walked (their licenses are not read).
+        if len(_bases) > 1:
+            lineage_props.append({"name": "bomlens:lineage:otherParents",
+                                  "value": ", ".join(dict.fromkeys(_bases[1:]))[:500]})
+
+    # ---- Distributed weights scope (observed signals only) ------------------
+    # Whether the repository ships full weights, an adapter that needs its base
+    # model to run, a quantized copy, or a merge. Read from what the hub states:
+    # the base_model relation tag, the file list, and the declared library. A
+    # value is written only when the signals agree; when they disagree the
+    # signals themselves are recorded and the scope is left for a person.
+    scope_signals = {}
+    if relation == "adapter":
+        scope_signals["tag"] = "adapter"
+    elif relation == "quantized":
+        scope_signals["tag"] = "quantized"
+    elif relation == "merge":
+        scope_signals["tag"] = "merged"
+    base_names = [n.rsplit("/", 1)[-1].lower() for n in filenames]
+    adapter_files = any(b == "adapter_config.json" for b in base_names) and \
+        any(b.startswith("adapter_model.") for b in base_names)
+    full_weights = any(n.lower().endswith(WEIGHT_EXTS)
+                       and not n.rsplit("/", 1)[-1].lower().startswith("adapter_model.")
+                       for n in filenames)
+    if adapter_files and not full_weights:
+        scope_signals["files"] = "adapter"
+    if str(library or "").lower() == "peft":
+        scope_signals["library"] = "adapter"
+    if relation == "finetune" and full_weights and not adapter_files:
+        scope_signals["tag"] = "full"
+    scope_values = set(scope_signals.values())
+    if len(scope_values) == 1:
+        weights_props.append({"name": "bomlens:weights:scope", "value": scope_values.pop()})
+    elif len(scope_values) > 1:
+        weights_props.append({"name": "bomlens:weights:scopeSignals",
+                              "value": ", ".join(f"{k}:{v}" for k, v in sorted(scope_signals.items()))})
 
     # A card that says "other" leaves the generator with no id to copy, so it
     # guesses one from the LICENSE text by substring — "limited" or "submit" in an
@@ -844,22 +807,28 @@ if hf_info is not None:
                     existing.append(h)
                     seen.add((h["alg"], h["content"]))
             m["hashes"] = existing
+        # A second run finds the prose names already gone, so it drops nothing;
+        # the note from the first run is carried over instead of being erased.
+        prior_dropped = [str(p.get("value")) for p in (m.get("properties") or [])
+                         if p.get("name") == "bomlens:card:datasetNameDropped" and p.get("value")]
+        dropped_note = ", ".join(prose_dropped)[:300] if prose_dropped else (prior_dropped[0] if prior_dropped else "")
         # Replace any prior openness/scan/weights properties so re-runs stay
         # idempotent (same contract as the DATASET_MARK components below).
         props = [p for p in (m.get("properties") or [])
                  if not str(p.get("name", "")).startswith(
                      ("openness:", "bomlens:hf:scan:", "bomlens:weights:",
                       "bomlens:license:", "bomlens:lineage:",
+                      "bomlens:hf:gated", "bomlens:hf:revisionTime",
                       "bomlens:card:datasetName"))]
         for name, value in openness.items():
             props.append({"name": name, "value": value})
         props.extend(scan_props)
         props.extend(weights_props)
+        props.extend(repo_props)
         props.extend(lic_props)
         props.extend(lineage_props)
-        if prose_dropped:
-            props.append({"name": "bomlens:card:datasetNameDropped",
-                          "value": ", ".join(prose_dropped)[:300]})
+        if dropped_note:
+            props.append({"name": "bomlens:card:datasetNameDropped", "value": dropped_note})
         m["properties"] = props
     print(f"[enrich] HuggingFace: {len(weight_hashes)} weight hash(es), openness assessed "
           f"(weights={openness['openness:weights']}).", file=sys.stderr)
@@ -873,16 +842,24 @@ if hf_info is not None:
                 p.get("name") == DATASET_MARK for p in (c.get("properties") or [])
             )
 
+        removed = {c.get("bom-ref") for c in comps if ours(c) and c.get("bom-ref")}
         comps[:] = [c for c in comps if not ours(c)]
         comps.extend(dataset_comps)
         sbom["components"] = comps
 
         # dependencies[]: the model depends on the data it was trained on. This
         # is the relationship the G7 dataset cluster names, and what makes the
-        # dependency graph in the UI show the training data.
+        # dependency graph in the UI show the training data. Only the datasets
+        # the card names hang off the model; a dataset's sources hang off that
+        # dataset, so the model reaches them through it.
+        new_refs = {c["bom-ref"] for c in dataset_comps}
         deps = sbom.get("dependencies") or []
-        stale = set(dataset_refs)
+        stale = removed | new_refs
         deps = [d for d in deps if not (isinstance(d, dict) and d.get("ref") in stale)]
+        gone = removed - new_refs
+        for d in deps:
+            if isinstance(d, dict) and isinstance(d.get("dependsOn"), list):
+                d["dependsOn"] = [x for x in d["dependsOn"] if x not in gone]
         by_ref = {d.get("ref"): d for d in deps if isinstance(d, dict)}
         for m in models:
             mref = m.get("bom-ref")
@@ -893,17 +870,32 @@ if hf_info is not None:
                 entry = {"ref": mref, "dependsOn": []}
                 deps.append(entry)
                 by_ref[mref] = entry
-            on = entry.get("dependsOn") or []
-            for r in dataset_refs:
-                if r not in on:
-                    on.append(r)
-            entry["dependsOn"] = on
+            # The model's dataset edges are exactly the datasets its card names:
+            # a dataset that was a root on an earlier run and is now only a
+            # source must not keep its edge from the model.
+            on = [x for x in (entry.get("dependsOn") or []) if x not in removed and x not in new_refs]
+            entry["dependsOn"] = on + [r for r in dataset_refs if r not in on]
         # Every referenced ref needs its own node, even a leaf one.
-        for r in dataset_refs:
-            deps.append({"ref": r, "dependsOn": []})
+        for c in dataset_comps:
+            ref = c["bom-ref"]
+            deps.append({"ref": ref, "dependsOn": [t for f, t in source_edges if f == ref]})
         sbom["dependencies"] = deps
-        print(f"[enrich] datasets: {len(dataset_comps)} referenced, {resolved_datasets} resolved "
+        print(f"[enrich] datasets: {len(dataset_refs)} referenced, {resolved_datasets} resolved, "
+              f"{len(dataset_comps) - len(dataset_refs)} source(s) traced "
               f"(training-data={training_data}).", file=sys.stderr)
+
+def _ours(pedigree):
+    anc = (pedigree or {}).get("ancestors") if isinstance(pedigree, dict) else None
+    return bool(anc) and all(
+        any(p.get("name") == PEDIGREE_MARK for p in (a.get("properties") or []))
+        for a in anc if isinstance(a, dict))
+
+
+# A pedigree this step wrote on an earlier run is dropped first, so the harvest
+# below and the rebuild after it see the document as the generator left it.
+for m in models:
+    if _ours(m.get("pedigree")):
+        m.pop("pedigree", None)
 
 # ---- cdxgen -t ai: pedigree / performance metrics ---------------------------
 # Gated on the HuggingFace fetch having succeeded: cdxgen hits the same API over
@@ -948,6 +940,47 @@ elif cdxgen_bin:
     print("[enrich] cdxgen harvest skipped (HuggingFace unreachable, so it would fail too).", file=sys.stderr)
 else:
     print("[enrich] cdxgen harvest disabled or not present; skipping pedigree/metrics.", file=sys.stderr)
+
+# ---- Pedigree from the lineage chain ----------------------------------------
+# CycloneDX records where a component came from in pedigree.ancestors[]. When
+# cdxgen supplied none, the chain walked above is turned into ancestor
+# components: the id, a purl without a version, and the license the ancestor's
+# own card declares. No version is written. The revision the walk saw is the
+# ancestor's current head, not the one this model was trained from, and writing
+# it would read as that.
+def _lineage_ancestor(idx, anc_id, lic, rel, unreadable=False):
+    props = [{"name": PEDIGREE_MARK, "value": "chain"}]
+    if idx == 0 and rel:
+        props.append({"name": "bomlens:lineage:relation", "value": rel})
+    if unreadable:
+        props.append({"name": "bomlens:lineage:unreadable", "value": "true"})
+    comp = {
+        "type": "machine-learning-model",
+        "bom-ref": "lineage:huggingface/" + anc_id,
+        "name": anc_id,
+        "purl": "pkg:huggingface/" + anc_id,
+        "properties": props,
+    }
+    if lic and lic != "none":
+        comp["licenses"] = [{"license": {"name": lic}}]
+    return comp
+
+
+if lineage_items or len(_bases) > 1:
+    ancestors = [_lineage_ancestor(i, a, lic, relation, unreadable=bad)
+                 for i, (a, lic, bad) in enumerate(lineage_items)]
+    seen_ids = {a for a, _, _ in lineage_items}
+    for other in _bases[1:]:
+        if other not in seen_ids:
+            seen_ids.add(other)
+            ancestors.append(_lineage_ancestor(len(ancestors), other, None, None))
+    built = 0
+    for m in models:
+        if not m.get("pedigree") and ancestors:
+            m["pedigree"] = {"ancestors": [dict(a) for a in ancestors]}
+            built += 1
+    if built:
+        print(f"[enrich] pedigree: {len(ancestors)} ancestor(s) from the lineage chain.", file=sys.stderr)
 
 # ---- The document's subject is the model ------------------------------------
 # CycloneDX names what an SBOM is about in metadata.component. The generator puts

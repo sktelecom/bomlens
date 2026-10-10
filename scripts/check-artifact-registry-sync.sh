@@ -87,6 +87,12 @@ _conda.cdx.json         :: no  :: yes :: skip
 _security_cvebintool.json :: no :: yes :: skip
 _security_grype.json    :: no  :: yes :: skip
 _security_yocto.json    :: no  :: yes :: skip
+_bom.spdx3.json         :: yes :: yes :: _bom\.spdx3\.json
+_bom.spdx3.json.sig     :: yes :: yes :: _bom\.spdx3\.json
+_spdx3-check.json       :: yes :: yes :: _spdx3-check
+_spdx3-check.md         :: yes :: yes :: _spdx3-check
+_ai-declaration.json    :: yes :: yes :: _ai-declaration\.json
+_ai-declaration.template.json :: yes :: yes :: _ai-declaration\.template\.json
 "
 
 # _vex.json and _vex_imported.json are deliberately absent from entrypoint.sh's
@@ -99,9 +105,12 @@ _security_yocto.json    :: no  :: yes :: skip
 # document they sent, against last week's scan of this project/version has to
 # survive scanning it again today; every other suffix here is regenerated
 # fresh each run, which is exactly why the cleanup sweeps it first.
+# _ai-declaration.json is the same kind of file: what the model's publisher
+# declared (with --ai-declare or in the web UI), applied again on a re-scan.
 CLEANUP_EXEMPT="
 _vex.json
 _vex_imported.json
+_ai-declaration.json
 "
 
 [ -f "$SERVER" ] || { echo "ERROR: $SERVER not found"; exit 2; }

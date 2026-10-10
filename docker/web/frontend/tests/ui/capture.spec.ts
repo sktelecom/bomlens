@@ -1,6 +1,11 @@
 // Copyright 2026 SK Telecom Co., Ltd.
 // SPDX-License-Identifier: Apache-2.0
 
+import { execFileSync } from "node:child_process";
+import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
 import { test, type Page } from "@playwright/test";
 
 // `npm run test:ui` already excludes this file by tag (--grep-invert
@@ -26,7 +31,10 @@ test.skip(process.env.CAPTURE !== "1", "opt-in via CAPTURE=1 (npm run capture:ui
 const IMAGES = "../../../docs/images";
 
 type Lang = "en" | "ko";
-type Caps = { firmware: boolean; scanoss?: boolean; docker: boolean; aibom?: boolean; spdxExport?: boolean };
+type Caps = {
+  firmware: boolean; scanoss?: boolean; docker: boolean; aibom?: boolean; aiDeclare?: boolean;
+  spdxExport?: boolean; spdx3?: boolean;
+};
 
 // UI copy a capture needs to locate on screen, kept in one place so it stays in
 // sync with src/locales/{en,ko}/common.json instead of being retyped per test.
@@ -303,7 +311,8 @@ for (const lang of ["en", "ko"] as Lang[]) {
   test(`@capture new scan screen — ${lang}`, async ({ page }) => {
     await page.setViewportSize({ width: 1040, height: 664 });
     await seedLang(page, lang);
-    await stub(page, { firmware: false, scanoss: true, docker: true });
+    // The scanner image's own capabilities, so the AI tiles read as available.
+    await stub(page, { firmware: false, scanoss: true, docker: true, aibom: true, aiDeclare: true });
     await page.goto("/#/new");
     await page.locator("#project").waitFor();
     // SCANOSS is the same token in every locale — a stable anchor that the
@@ -408,12 +417,20 @@ for (const lang of ["en", "ko"] as Lang[]) {
 
   test(`@capture models section (content) - ${lang}`, async ({ page }) => {
     await seedLang(page, lang);
-    await stub(page, { firmware: false, scanoss: false, docker: true }, { done: AI_DONE, sbom: AI_SBOM });
+    // A real AI scan always has its SPDX 3.0.1 document, whose band and field
+    // table open the section (web-ui-spdx3.png); this image is the model card
+    // below them, so scroll it to the top.
+    await stubSpdx3(page);
     await runScan(page, "model", "1.0");
     await NAV(page, "models").click();
-    await page.getByText("bert-base-uncased").first().waitFor();
+    const header = page.locator("main span.font-mono", { hasText: "google-bert / " }).first();
+    await header.waitFor();
     await killAnim(page);
     await settleMain(page);
+    await header.evaluate((el) => {
+      const main = el.closest("main")!;
+      main.scrollTop += el.getBoundingClientRect().top - main.getBoundingClientRect().top - 40;
+    });
     await page.locator("main").screenshot({ path: `${IMAGES}/${withLang("web-ui-models.png", lang)}` });
   });
 }
@@ -562,5 +579,89 @@ for (const lang of ["en", "ko"] as Lang[]) {
     await killAnim(page);
     await settleMain(page);
     await page.screenshot({ path: `${IMAGES}/${withLang("web-ui-g7.png", lang)}` });
+  });
+}
+
+// ===========================================================================
+// SPDX 3.0.1 AI document: the band on Models & datasets and the questions
+// behind "Fill in empty fields". The check and the declaration template come
+// from running the real converter over AI_SBOM, so the screen shows exactly
+// the fields the scan leaves open for that model.
+// ===========================================================================
+
+const LIB = new URL("../../../../lib/", import.meta.url).pathname;
+
+function spdx3Files() {
+  const dir = mkdtempSync(join(tmpdir(), "bomlens-capture-"));
+  const bom = join(dir, "model_1.0_bom.json");
+  writeFileSync(bom, JSON.stringify({ ...AI_SBOM, metadata: { ...AI_SBOM.metadata, timestamp: "2026-10-10T00:00:00Z" } }));
+  // `check` prints the check; `template` writes the form into --out-dir.
+  const run = (cmd: string) =>
+    execFileSync("python3", [join(LIB, "convert-to-spdx3-ai.py"), cmd, "--bom", bom, "--out-dir", dir,
+                             "--prefix", "model_1.0", "--stable"], { encoding: "utf-8", stdio: ["ignore", "pipe", "ignore"] });
+  const check = JSON.parse(run("check"));
+  run("template");
+  return {
+    check,
+    template: JSON.parse(readFileSync(join(dir, "model_1.0_ai-declaration.template.json"), "utf-8")),
+    map: readFileSync(join(LIB, "spdx3-ai-map.json"), "utf-8"),
+  };
+}
+
+async function stubSpdx3(page: Page) {
+  const { check, template, map } = spdx3Files();
+  const done = {
+    ...AI_DONE,
+    results: [
+      ...AI_DONE.results,
+      { name: "model_1.0_bom.spdx3.json", size: 300 },
+      { name: "model_1.0_spdx3-check.json", size: 100 },
+      { name: "model_1.0_ai-declaration.template.json", size: 100 },
+    ],
+    spdx3: { draft: check.draft, counts: check.counts, name: "model_1.0_bom.spdx3.json",
+             check: "model_1.0_spdx3-check.json", declaration: { state: "none", reasons: [] } },
+  };
+  await stub(page, { firmware: false, scanoss: false, docker: true, aibom: true, spdx3: true }, { done });
+  await page.route("**/file**", (r) => {
+    const name = new URL(r.request().url()).searchParams.get("name") ?? "";
+    const body = name.endsWith("_spdx3-check.json") ? check : name.endsWith(".template.json") ? template : AI_SBOM;
+    return r.fulfill({ contentType: "application/json", body: JSON.stringify(body) });
+  });
+  await page.route("**/spdx3-map", (r) => r.fulfill({ contentType: "application/json", body: map }));
+  await page.route("**/ai-declaration-template**", (r) =>
+    r.fulfill({ contentType: "application/json",
+                body: JSON.stringify({ name: "model_1.0_ai-declaration.template.json", results: done.results }) }),
+  );
+}
+
+const FILL: Record<Lang, string> = { en: "Fill in empty fields", ko: "빈 항목 채우기" };
+const FIELDS_TOGGLE: Record<Lang, string> = { en: "Show the document's fields", ko: "문서 항목 보기" };
+
+for (const lang of ["en", "ko"] as Lang[]) {
+  test(`@capture SPDX 3.0.1 band - ${lang}`, async ({ page }) => {
+    await seedLang(page, lang);
+    await stubSpdx3(page);
+    await runScan(page, "model", "1.0");
+    await NAV(page, "models").click();
+    await page.getByTestId("spdx3-band").waitFor();
+    // The field table is folded for a scanned model; the image shows it open.
+    await page.getByText(FIELDS_TOGGLE[lang]).click();
+    await page.locator('tr[data-field="releaseTime"]').first().waitFor();
+    await killAnim(page);
+    await settleMain(page);
+    await page.locator("main").screenshot({ path: `${IMAGES}/${withLang("web-ui-spdx3.png", lang)}` });
+  });
+
+  test(`@capture AI declaration questions - ${lang}`, async ({ page }) => {
+    await seedLang(page, lang);
+    await stubSpdx3(page);
+    await runScan(page, "model", "1.0");
+    await NAV(page, "models").click();
+    await page.getByRole("button", { name: FILL[lang] }).click();
+    await page.getByTestId("ai-declaration").waitFor();
+    await page.locator('[data-question="model.releaseTime"]').waitFor();
+    await killAnim(page);
+    await settleMain(page);
+    await page.locator("main").screenshot({ path: `${IMAGES}/${withLang("web-ui-ai-declaration.png", lang)}` });
   });
 }

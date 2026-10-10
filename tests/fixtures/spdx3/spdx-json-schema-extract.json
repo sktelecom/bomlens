@@ -1,0 +1,952 @@
+{
+ "classes": {
+  "Agent": {
+   "arrays": [
+    "extension",
+    "externalIdentifier",
+    "externalRef",
+    "verifiedUsing"
+   ],
+   "properties": [
+    "comment",
+    "creationInfo",
+    "description",
+    "extension",
+    "externalIdentifier",
+    "externalRef",
+    "name",
+    "summary",
+    "type",
+    "verifiedUsing"
+   ],
+   "required": [
+    "creationInfo",
+    "type"
+   ]
+  },
+  "Annotation": {
+   "arrays": [
+    "extension",
+    "externalIdentifier",
+    "externalRef",
+    "verifiedUsing"
+   ],
+   "properties": [
+    "annotationType",
+    "comment",
+    "contentType",
+    "creationInfo",
+    "description",
+    "extension",
+    "externalIdentifier",
+    "externalRef",
+    "name",
+    "statement",
+    "subject",
+    "summary",
+    "type",
+    "verifiedUsing"
+   ],
+   "required": [
+    "annotationType",
+    "creationInfo",
+    "subject",
+    "type"
+   ]
+  },
+  "CreationInfo": {
+   "arrays": [
+    "createdBy",
+    "createdUsing"
+   ],
+   "properties": [
+    "comment",
+    "created",
+    "createdBy",
+    "createdUsing",
+    "specVersion",
+    "type"
+   ],
+   "required": [
+    "created",
+    "createdBy",
+    "specVersion",
+    "type"
+   ]
+  },
+  "DictionaryEntry": {
+   "arrays": [],
+   "properties": [
+    "key",
+    "type",
+    "value"
+   ],
+   "required": [
+    "key",
+    "type"
+   ]
+  },
+  "ExternalRef": {
+   "arrays": [
+    "locator"
+   ],
+   "properties": [
+    "comment",
+    "contentType",
+    "externalRefType",
+    "locator",
+    "type"
+   ],
+   "required": [
+    "type"
+   ]
+  },
+  "Hash": {
+   "arrays": [],
+   "properties": [
+    "algorithm",
+    "comment",
+    "hashValue",
+    "type"
+   ],
+   "required": [
+    "algorithm",
+    "hashValue",
+    "type"
+   ]
+  },
+  "LifecycleScopedRelationship": {
+   "arrays": [
+    "extension",
+    "externalIdentifier",
+    "externalRef",
+    "to",
+    "verifiedUsing"
+   ],
+   "properties": [
+    "comment",
+    "completeness",
+    "creationInfo",
+    "description",
+    "endTime",
+    "extension",
+    "externalIdentifier",
+    "externalRef",
+    "from",
+    "name",
+    "relationshipType",
+    "scope",
+    "startTime",
+    "summary",
+    "to",
+    "type",
+    "verifiedUsing"
+   ],
+   "required": [
+    "creationInfo",
+    "from",
+    "relationshipType",
+    "to",
+    "type"
+   ]
+  },
+  "Organization": {
+   "arrays": [
+    "extension",
+    "externalIdentifier",
+    "externalRef",
+    "verifiedUsing"
+   ],
+   "properties": [
+    "comment",
+    "creationInfo",
+    "description",
+    "extension",
+    "externalIdentifier",
+    "externalRef",
+    "name",
+    "summary",
+    "type",
+    "verifiedUsing"
+   ],
+   "required": [
+    "creationInfo",
+    "type"
+   ]
+  },
+  "Person": {
+   "arrays": [
+    "extension",
+    "externalIdentifier",
+    "externalRef",
+    "verifiedUsing"
+   ],
+   "properties": [
+    "comment",
+    "creationInfo",
+    "description",
+    "extension",
+    "externalIdentifier",
+    "externalRef",
+    "name",
+    "summary",
+    "type",
+    "verifiedUsing"
+   ],
+   "required": [
+    "creationInfo",
+    "type"
+   ]
+  },
+  "Relationship": {
+   "arrays": [
+    "extension",
+    "externalIdentifier",
+    "externalRef",
+    "to",
+    "verifiedUsing"
+   ],
+   "properties": [
+    "comment",
+    "completeness",
+    "creationInfo",
+    "description",
+    "endTime",
+    "extension",
+    "externalIdentifier",
+    "externalRef",
+    "from",
+    "name",
+    "relationshipType",
+    "startTime",
+    "summary",
+    "to",
+    "type",
+    "verifiedUsing"
+   ],
+   "required": [
+    "creationInfo",
+    "from",
+    "relationshipType",
+    "to",
+    "type"
+   ]
+  },
+  "SpdxDocument": {
+   "arrays": [
+    "element",
+    "extension",
+    "externalIdentifier",
+    "externalRef",
+    "import",
+    "namespaceMap",
+    "profileConformance",
+    "rootElement",
+    "verifiedUsing"
+   ],
+   "properties": [
+    "comment",
+    "creationInfo",
+    "dataLicense",
+    "description",
+    "element",
+    "extension",
+    "externalIdentifier",
+    "externalRef",
+    "import",
+    "name",
+    "namespaceMap",
+    "profileConformance",
+    "rootElement",
+    "summary",
+    "type",
+    "verifiedUsing"
+   ],
+   "required": [
+    "creationInfo",
+    "type"
+   ]
+  },
+  "Tool": {
+   "arrays": [
+    "extension",
+    "externalIdentifier",
+    "externalRef",
+    "verifiedUsing"
+   ],
+   "properties": [
+    "comment",
+    "creationInfo",
+    "description",
+    "extension",
+    "externalIdentifier",
+    "externalRef",
+    "name",
+    "summary",
+    "type",
+    "verifiedUsing"
+   ],
+   "required": [
+    "creationInfo",
+    "type"
+   ]
+  },
+  "ai_AIPackage": {
+   "arrays": [
+    "ai_domain",
+    "ai_hyperparameter",
+    "ai_metric",
+    "ai_metricDecisionThreshold",
+    "ai_modelDataPreprocessing",
+    "ai_modelExplainability",
+    "ai_standardCompliance",
+    "ai_typeOfModel",
+    "extension",
+    "externalIdentifier",
+    "externalRef",
+    "originatedBy",
+    "software_additionalPurpose",
+    "software_attributionText",
+    "software_contentIdentifier",
+    "standardName",
+    "supportLevel",
+    "verifiedUsing"
+   ],
+   "properties": [
+    "ai_autonomyType",
+    "ai_domain",
+    "ai_energyConsumption",
+    "ai_hyperparameter",
+    "ai_informationAboutApplication",
+    "ai_informationAboutTraining",
+    "ai_limitation",
+    "ai_metric",
+    "ai_metricDecisionThreshold",
+    "ai_modelDataPreprocessing",
+    "ai_modelExplainability",
+    "ai_safetyRiskAssessment",
+    "ai_standardCompliance",
+    "ai_typeOfModel",
+    "ai_useSensitivePersonalInformation",
+    "builtTime",
+    "comment",
+    "creationInfo",
+    "description",
+    "extension",
+    "externalIdentifier",
+    "externalRef",
+    "name",
+    "originatedBy",
+    "releaseTime",
+    "software_additionalPurpose",
+    "software_attributionText",
+    "software_contentIdentifier",
+    "software_copyrightText",
+    "software_downloadLocation",
+    "software_homePage",
+    "software_packageUrl",
+    "software_packageVersion",
+    "software_primaryPurpose",
+    "software_sourceInfo",
+    "standardName",
+    "summary",
+    "suppliedBy",
+    "supportLevel",
+    "type",
+    "validUntilTime",
+    "verifiedUsing"
+   ],
+   "required": [
+    "creationInfo",
+    "type"
+   ]
+  },
+  "dataset_DatasetPackage": {
+   "arrays": [
+    "dataset_anonymizationMethodUsed",
+    "dataset_dataPreprocessing",
+    "dataset_datasetType",
+    "dataset_knownBias",
+    "dataset_sensor",
+    "extension",
+    "externalIdentifier",
+    "externalRef",
+    "originatedBy",
+    "software_additionalPurpose",
+    "software_attributionText",
+    "software_contentIdentifier",
+    "standardName",
+    "supportLevel",
+    "verifiedUsing"
+   ],
+   "properties": [
+    "builtTime",
+    "comment",
+    "creationInfo",
+    "dataset_anonymizationMethodUsed",
+    "dataset_confidentialityLevel",
+    "dataset_dataCollectionProcess",
+    "dataset_dataPreprocessing",
+    "dataset_datasetAvailability",
+    "dataset_datasetNoise",
+    "dataset_datasetSize",
+    "dataset_datasetType",
+    "dataset_datasetUpdateMechanism",
+    "dataset_hasSensitivePersonalInformation",
+    "dataset_intendedUse",
+    "dataset_knownBias",
+    "dataset_sensor",
+    "description",
+    "extension",
+    "externalIdentifier",
+    "externalRef",
+    "name",
+    "originatedBy",
+    "releaseTime",
+    "software_additionalPurpose",
+    "software_attributionText",
+    "software_contentIdentifier",
+    "software_copyrightText",
+    "software_downloadLocation",
+    "software_homePage",
+    "software_packageUrl",
+    "software_packageVersion",
+    "software_primaryPurpose",
+    "software_sourceInfo",
+    "standardName",
+    "summary",
+    "suppliedBy",
+    "supportLevel",
+    "type",
+    "validUntilTime",
+    "verifiedUsing"
+   ],
+   "required": [
+    "creationInfo",
+    "dataset_datasetType",
+    "type"
+   ]
+  },
+  "extension_CdxPropertiesExtension": {
+   "arrays": [
+    "extension_cdxProperty"
+   ],
+   "properties": [
+    "extension_cdxProperty",
+    "type"
+   ],
+   "required": [
+    "extension_cdxProperty",
+    "type"
+   ]
+  },
+  "extension_CdxPropertyEntry": {
+   "arrays": [],
+   "properties": [
+    "extension_cdxPropName",
+    "extension_cdxPropValue",
+    "type"
+   ],
+   "required": [
+    "extension_cdxPropName",
+    "type"
+   ]
+  },
+  "simplelicensing_LicenseExpression": {
+   "arrays": [
+    "extension",
+    "externalIdentifier",
+    "externalRef",
+    "simplelicensing_customIdToUri",
+    "verifiedUsing"
+   ],
+   "properties": [
+    "comment",
+    "creationInfo",
+    "description",
+    "extension",
+    "externalIdentifier",
+    "externalRef",
+    "name",
+    "simplelicensing_customIdToUri",
+    "simplelicensing_licenseExpression",
+    "simplelicensing_licenseListVersion",
+    "summary",
+    "type",
+    "verifiedUsing"
+   ],
+   "required": [
+    "creationInfo",
+    "simplelicensing_licenseExpression",
+    "type"
+   ]
+  },
+  "software_File": {
+   "arrays": [
+    "extension",
+    "externalIdentifier",
+    "externalRef",
+    "originatedBy",
+    "software_additionalPurpose",
+    "software_attributionText",
+    "software_contentIdentifier",
+    "standardName",
+    "supportLevel",
+    "verifiedUsing"
+   ],
+   "properties": [
+    "builtTime",
+    "comment",
+    "contentType",
+    "creationInfo",
+    "description",
+    "extension",
+    "externalIdentifier",
+    "externalRef",
+    "name",
+    "originatedBy",
+    "releaseTime",
+    "software_additionalPurpose",
+    "software_attributionText",
+    "software_contentIdentifier",
+    "software_copyrightText",
+    "software_fileKind",
+    "software_primaryPurpose",
+    "standardName",
+    "summary",
+    "suppliedBy",
+    "supportLevel",
+    "type",
+    "validUntilTime",
+    "verifiedUsing"
+   ],
+   "required": [
+    "creationInfo",
+    "type"
+   ]
+  },
+  "software_Package": {
+   "arrays": [
+    "extension",
+    "externalIdentifier",
+    "externalRef",
+    "originatedBy",
+    "software_additionalPurpose",
+    "software_attributionText",
+    "software_contentIdentifier",
+    "standardName",
+    "supportLevel",
+    "verifiedUsing"
+   ],
+   "properties": [
+    "builtTime",
+    "comment",
+    "creationInfo",
+    "description",
+    "extension",
+    "externalIdentifier",
+    "externalRef",
+    "name",
+    "originatedBy",
+    "releaseTime",
+    "software_additionalPurpose",
+    "software_attributionText",
+    "software_contentIdentifier",
+    "software_copyrightText",
+    "software_downloadLocation",
+    "software_homePage",
+    "software_packageUrl",
+    "software_packageVersion",
+    "software_primaryPurpose",
+    "software_sourceInfo",
+    "standardName",
+    "summary",
+    "suppliedBy",
+    "supportLevel",
+    "type",
+    "validUntilTime",
+    "verifiedUsing"
+   ],
+   "required": [
+    "creationInfo",
+    "type"
+   ]
+  }
+ },
+ "enums": {
+  "prop_Annotation_annotationType": [
+   "other",
+   "review"
+  ],
+  "prop_Artifact_supportLevel": [
+   "deployed",
+   "development",
+   "endOfSupport",
+   "limitedSupport",
+   "noAssertion",
+   "noSupport",
+   "support"
+  ],
+  "prop_ElementCollection_profileConformance": [
+   "ai",
+   "build",
+   "core",
+   "dataset",
+   "expandedLicensing",
+   "extension",
+   "lite",
+   "security",
+   "simpleLicensing",
+   "software"
+  ],
+  "prop_ExternalIdentifier_externalIdentifierType": [
+   "cpe22",
+   "cpe23",
+   "cve",
+   "email",
+   "gitoid",
+   "other",
+   "packageUrl",
+   "securityOther",
+   "swhid",
+   "swid",
+   "urlScheme"
+  ],
+  "prop_ExternalRef_externalRefType": [
+   "altDownloadLocation",
+   "altWebPage",
+   "binaryArtifact",
+   "bower",
+   "buildMeta",
+   "buildSystem",
+   "certificationReport",
+   "chat",
+   "componentAnalysisReport",
+   "cwe",
+   "documentation",
+   "dynamicAnalysisReport",
+   "eolNotice",
+   "exportControlAssessment",
+   "funding",
+   "issueTracker",
+   "license",
+   "mailingList",
+   "mavenCentral",
+   "metrics",
+   "npm",
+   "nuget",
+   "other",
+   "privacyAssessment",
+   "productMetadata",
+   "purchaseOrder",
+   "qualityAssessmentReport",
+   "releaseHistory",
+   "releaseNotes",
+   "riskAssessment",
+   "runtimeAnalysisReport",
+   "secureSoftwareAttestation",
+   "securityAdversaryModel",
+   "securityAdvisory",
+   "securityFix",
+   "securityOther",
+   "securityPenTestReport",
+   "securityPolicy",
+   "securityThreatModel",
+   "socialMedia",
+   "sourceArtifact",
+   "staticAnalysisReport",
+   "support",
+   "vcs",
+   "vulnerabilityDisclosureReport",
+   "vulnerabilityExploitabilityAssessment"
+  ],
+  "prop_Hash_algorithm": [
+   "adler32",
+   "blake2b256",
+   "blake2b384",
+   "blake2b512",
+   "blake3",
+   "crystalsDilithium",
+   "crystalsKyber",
+   "falcon",
+   "md2",
+   "md4",
+   "md5",
+   "md6",
+   "other",
+   "sha1",
+   "sha224",
+   "sha256",
+   "sha384",
+   "sha3_224",
+   "sha3_256",
+   "sha3_384",
+   "sha3_512",
+   "sha512"
+  ],
+  "prop_LifecycleScopedRelationship_scope": [
+   "build",
+   "design",
+   "development",
+   "other",
+   "runtime",
+   "test"
+  ],
+  "prop_PackageVerificationCode_algorithm": [
+   "adler32",
+   "blake2b256",
+   "blake2b384",
+   "blake2b512",
+   "blake3",
+   "crystalsDilithium",
+   "crystalsKyber",
+   "falcon",
+   "md2",
+   "md4",
+   "md5",
+   "md6",
+   "other",
+   "sha1",
+   "sha224",
+   "sha256",
+   "sha384",
+   "sha3_224",
+   "sha3_256",
+   "sha3_384",
+   "sha3_512",
+   "sha512"
+  ],
+  "prop_Relationship_completeness": [
+   "complete",
+   "incomplete",
+   "noAssertion"
+  ],
+  "prop_Relationship_relationshipType": [
+   "affects",
+   "amendedBy",
+   "ancestorOf",
+   "availableFrom",
+   "configures",
+   "contains",
+   "coordinatedBy",
+   "copiedTo",
+   "delegatedTo",
+   "dependsOn",
+   "descendantOf",
+   "describes",
+   "doesNotAffect",
+   "expandsTo",
+   "exploitCreatedBy",
+   "fixedBy",
+   "fixedIn",
+   "foundBy",
+   "generates",
+   "hasAddedFile",
+   "hasAssessmentFor",
+   "hasAssociatedVulnerability",
+   "hasConcludedLicense",
+   "hasDataFile",
+   "hasDeclaredLicense",
+   "hasDeletedFile",
+   "hasDependencyManifest",
+   "hasDistributionArtifact",
+   "hasDocumentation",
+   "hasDynamicLink",
+   "hasEvidence",
+   "hasExample",
+   "hasHost",
+   "hasInput",
+   "hasMetadata",
+   "hasOptionalComponent",
+   "hasOptionalDependency",
+   "hasOutput",
+   "hasPrerequisite",
+   "hasProvidedDependency",
+   "hasRequirement",
+   "hasSpecification",
+   "hasStaticLink",
+   "hasTest",
+   "hasTestCase",
+   "hasVariant",
+   "invokedBy",
+   "modifiedBy",
+   "other",
+   "packagedBy",
+   "patchedBy",
+   "publishedBy",
+   "reportedBy",
+   "republishedBy",
+   "serializedInArtifact",
+   "testedOn",
+   "trainedOn",
+   "underInvestigationFor",
+   "usesTool"
+  ],
+  "prop_ai_AIPackage_ai_autonomyType": [
+   "no",
+   "noAssertion",
+   "yes"
+  ],
+  "prop_ai_AIPackage_ai_safetyRiskAssessment": [
+   "high",
+   "low",
+   "medium",
+   "serious"
+  ],
+  "prop_ai_AIPackage_ai_useSensitivePersonalInformation": [
+   "no",
+   "noAssertion",
+   "yes"
+  ],
+  "prop_ai_EnergyConsumptionDescription_ai_energyUnit": [
+   "kilowattHour",
+   "megajoule",
+   "other"
+  ],
+  "prop_dataset_DatasetPackage_dataset_confidentialityLevel": [
+   "amber",
+   "clear",
+   "green",
+   "red"
+  ],
+  "prop_dataset_DatasetPackage_dataset_datasetAvailability": [
+   "clickthrough",
+   "directDownload",
+   "query",
+   "registration",
+   "scrapingScript"
+  ],
+  "prop_dataset_DatasetPackage_dataset_datasetType": [
+   "audio",
+   "categorical",
+   "graph",
+   "image",
+   "noAssertion",
+   "numeric",
+   "other",
+   "sensor",
+   "structured",
+   "syntactic",
+   "text",
+   "timeseries",
+   "timestamp",
+   "video"
+  ],
+  "prop_dataset_DatasetPackage_dataset_hasSensitivePersonalInformation": [
+   "no",
+   "noAssertion",
+   "yes"
+  ],
+  "prop_security_CvssV3VulnAssessmentRelationship_security_severity": [
+   "critical",
+   "high",
+   "low",
+   "medium",
+   "none"
+  ],
+  "prop_security_CvssV4VulnAssessmentRelationship_security_severity": [
+   "critical",
+   "high",
+   "low",
+   "medium",
+   "none"
+  ],
+  "prop_security_ExploitCatalogVulnAssessmentRelationship_security_catalogType": [
+   "kev",
+   "other"
+  ],
+  "prop_security_SsvcVulnAssessmentRelationship_security_decisionType": [
+   "act",
+   "attend",
+   "track",
+   "trackStar"
+  ],
+  "prop_security_VexNotAffectedVulnAssessmentRelationship_security_justificationType": [
+   "componentNotPresent",
+   "inlineMitigationsAlreadyExist",
+   "vulnerableCodeCannotBeControlledByAdversary",
+   "vulnerableCodeNotInExecutePath",
+   "vulnerableCodeNotPresent"
+  ],
+  "prop_software_ContentIdentifier_software_contentIdentifierType": [
+   "gitoid",
+   "swhid"
+  ],
+  "prop_software_File_software_fileKind": [
+   "directory",
+   "file"
+  ],
+  "prop_software_Sbom_software_sbomType": [
+   "analyzed",
+   "build",
+   "deployed",
+   "design",
+   "runtime",
+   "source"
+  ],
+  "prop_software_SoftwareArtifact_software_additionalPurpose": [
+   "application",
+   "archive",
+   "bom",
+   "configuration",
+   "container",
+   "data",
+   "device",
+   "deviceDriver",
+   "diskImage",
+   "documentation",
+   "evidence",
+   "executable",
+   "file",
+   "filesystemImage",
+   "firmware",
+   "framework",
+   "install",
+   "library",
+   "manifest",
+   "model",
+   "module",
+   "operatingSystem",
+   "other",
+   "patch",
+   "platform",
+   "requirement",
+   "source",
+   "specification",
+   "test"
+  ],
+  "prop_software_SoftwareArtifact_software_primaryPurpose": [
+   "application",
+   "archive",
+   "bom",
+   "configuration",
+   "container",
+   "data",
+   "device",
+   "deviceDriver",
+   "diskImage",
+   "documentation",
+   "evidence",
+   "executable",
+   "file",
+   "filesystemImage",
+   "firmware",
+   "framework",
+   "install",
+   "library",
+   "manifest",
+   "model",
+   "module",
+   "operatingSystem",
+   "other",
+   "patch",
+   "platform",
+   "requirement",
+   "source",
+   "specification",
+   "test"
+  ]
+ },
+ "source": "https://spdx.org/schema/3.0.1/spdx-json-schema.json",
+ "sourceSha256": "582c64e809d5b3ef9bd0c4de13a32391b47b0284a3e8d199569fb96f649234b1"
+}

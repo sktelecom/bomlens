@@ -388,7 +388,7 @@ echo "== --model routes a Figshare item to the dataset path =="
 # itself decides which path runs. The server applies the same rule on the string
 # it receives, which is what keeps the CLI and the UI from disagreeing about
 # what a given input means.
-route_rule=$(awk '/^    case "\$MODEL" in$/,/^    esac$/' "$SCRIPT")
+route_rule=$(awk '/^    case "\$hf_rc:\$MODEL" in$/,/^    esac$/' "$SCRIPT")
 if printf '%s' "$route_rule" | grep -q '\*figshare\*) MODE="DATASET"'; then
     pass "a reference carrying figshare selects DATASET"
 else
@@ -399,6 +399,82 @@ if printf '%s' "$route_rule" | grep -q '\*)          MODE="AIBOM"'; then
 else
     fail "the default model route changed"
 fi
+echo "== --model routes a HuggingFace dataset to the dataset path =="
+# A dataset id looks like a model id (owner/name), so only its address or a
+# "datasets/" prefix tells it apart. The rule above is run as written, on each
+# form a person would paste.
+hf_func=$(awk '/^hf_dataset_ref\(\) \{$/,/^}$/' "$SCRIPT")
+route() {  # $1 = --model value; prints "MODE MODEL" or "error"
+    # shellcheck disable=SC2034  # hf_rc is read by the eval'd case block
+    ( eval "$hf_func"; MODEL="$1"; hf_rc=0; hf_dataset_ref "$MODEL" || hf_rc=$?
+      eval "$route_rule" >/dev/null 2>&1; printf '%s %s' "$MODE" "$MODEL" ) || printf 'error'
+}
+for pair in \
+    "datasets/allenai/tulu-3-sft-mixture|DATASET hf:allenai/tulu-3-sft-mixture" \
+    "https://huggingface.co/datasets/allenai/tulu-3-sft-mixture|DATASET hf:allenai/tulu-3-sft-mixture" \
+    "https://huggingface.co/datasets/allenai/tulu-3-sft-mixture/tree/main/data|DATASET hf:allenai/tulu-3-sft-mixture" \
+    "huggingface.co/datasets/org/ds|DATASET hf:org/ds" \
+    "hf:org/ds|DATASET hf:org/ds" \
+    "datasets/squad|DATASET hf:squad" \
+    "allenai/tulu-3-sft-mixture|AIBOM allenai/tulu-3-sft-mixture" \
+    "https://figshare.com/articles/dataset/x/1|DATASET https://figshare.com/articles/dataset/x/1" \
+    "datasets/../etc|error" \
+    "datasets/-x/y|error" \
+    "HF:org/ds|DATASET hf:org/ds" \
+    "Datasets/Org/DS|DATASET hf:Org/DS" \
+    "https://HuggingFace.co/datasets/org/ds|DATASET hf:org/ds" \
+    "https://huggingface.co/datasets/org/figshare-abstracts|DATASET hf:org/figshare-abstracts" \
+    "$(printf 'datasets/a/b\n$(id)')|error"; do
+    ref="${pair%%|*}"; want="${pair##*|}"
+    got="$(route "$ref")"
+    [ "$got" = "$want" ] && pass "--model $ref -> $want" || fail "--model $ref -> '$got', expected '$want'"
+done
+if grep -q 'case "$MODEL" in hf:\*) \[ -n "$HF_TOKEN" \] && ENVV="$ENVV -e HF_TOKEN"' "$SCRIPT"; then
+    pass "a HuggingFace dataset carries HF_TOKEN by name, for a gated dataset"
+else
+    fail "HF_TOKEN is not passed to the dataset path"
+fi
+# The server's rule, run on the same inputs: a value the CLI routes one way
+# must not be routed another way in the browser.
+parity_fail=""
+while IFS= read -r ref; do
+    cli="$(route "$ref")"
+    srv="$(python3 -I - "$ROOT_DIR/docker/web/server.py" "$ref" <<'PY'
+import re, sys
+src = open(sys.argv[1]).read()
+ns = {"re": re}
+start = src.index("_HF_DATASET_PREFIX = ")
+end = src.index("def output_prefix(")
+exec(src[start:end], ns)
+ok, ref = ns["hf_dataset_ref"](sys.argv[2])
+t = sys.argv[2]
+print("error" if ok and not ref else f"DATASET {ref}" if ok else
+      f"DATASET {t}" if "figshare" in t.lower() else f"AIBOM {t}")
+PY
+)"
+    [ "$cli" = "$srv" ] || parity_fail="$parity_fail [$ref: cli='$cli' server='$srv']"
+done <<'REFS'
+datasets/allenai/tulu-3-sft-mixture
+https://huggingface.co/datasets/allenai/tulu-3-sft-mixture/tree/main
+huggingface.co/datasets/org/ds
+www.huggingface.co/datasets/org/ds
+hf:org/ds
+HF:org/ds
+Datasets/Org/DS
+https://HuggingFace.co/datasets/org/ds
+datasets/squad
+datasets/../etc
+datasets/-x/y
+datasets/
+hf://datasets/org/ds
+https://huggingface.co/datasets/org/figshare-abstracts
+allenai/tulu-3-sft-mixture
+https://figshare.com/articles/dataset/x/1
+10.6084/m9.figshare.33413521.v1
+REFS
+[ -z "$parity_fail" ] && pass "the CLI and the web server route every reference form the same way" \
+    || fail "CLI and server disagree:$parity_fail"
+
 if grep -q 'DATASET) VOL=.*ENVV="-e DATASET_REF' "$SCRIPT"; then
     pass "the dataset path passes the reference and needs no opt-in image"
 else

@@ -1,0 +1,105 @@
+{
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.7",
+  "version": 1,
+  "metadata": {
+    "timestamp": "2026-06-23T13:18:25+00:00",
+    "tools": {
+      "components": [
+        { "type": "application", "name": "BomLens", "version": "1.12.1" },
+        { "type": "application", "name": "owasp-aibom-generator", "version": "1.0.2" }
+      ]
+    },
+    "component": {
+      "type": "machine-learning-model",
+      "bom-ref": "pkg:huggingface/acme/support-adapter@1a2b3c4d",
+      "name": "support-adapter",
+      "version": "1a2b3c4d",
+      "purl": "pkg:huggingface/acme/support-adapter@1a2b3c4d",
+      "description": "An adapter for customer support answers.",
+      "supplier": { "name": "acme" },
+      "licenses": [ { "license": { "id": "Apache-2.0" } } ],
+      "externalReferences": [
+        { "type": "website", "url": "https://huggingface.co/acme/support-adapter" },
+        { "type": "distribution", "url": "https://huggingface.co/acme/support-adapter/tree/main" },
+        { "type": "vcs", "url": "https://huggingface.co/acme/support-adapter/commit/1a2b3c4d5e6f" },
+        { "type": "distribution", "url": "https://huggingface.co/datasets/org/open-ds" },
+        { "type": "documentation", "url": "https://arxiv.org/abs/2401.00001" }
+      ],
+      "modelCard": {
+        "modelParameters": { "task": "text-generation", "modelArchitecture": "llama" },
+        "considerations": { "technicalLimitations": ["Answers only in English.", "Not for medical advice."] },
+        "quantitativeAnalysis": { "performanceMetrics": [ { "type": "accuracy", "value": "0.81" } ] },
+        "properties": [ { "name": "safetyRiskAssessment", "value": "The model can produce wrong answers; review before use." } ]
+      },
+      "properties": [
+        { "name": "bomlens:weights:formats", "value": "safetensors" },
+        { "name": "bomlens:weights:file", "value": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc  adapter_model.safetensors" },
+        { "name": "bomlens:weights:scope", "value": "adapter" },
+        { "name": "bomlens:hf:gated", "value": "manual" },
+        { "name": "bomlens:hf:revisionTime", "value": "2025-04-15T09:30:00+00:00" },
+        { "name": "bomlens:lineage:chain", "value": "org/base-instruct:apache-2.0 > org/base:llama3" },
+        { "name": "bomlens:lineage:relation", "value": "adapter" },
+        { "name": "bomlens:lineage:otherParents", "value": "org/other" }
+      ]
+    }
+  },
+  "components": [
+    {
+      "type": "data",
+      "bom-ref": "dataset:huggingface/org/open-ds",
+      "name": "org/open-ds",
+      "version": "deadbeef",
+      "supplier": { "name": "org" },
+      "licenses": [ { "license": { "id": "CC-BY-SA-4.0" } } ],
+      "externalReferences": [ { "type": "distribution", "url": "https://huggingface.co/datasets/org/open-ds" } ],
+      "data": [ { "type": "dataset", "name": "org/open-ds",
+                  "contents": { "url": "https://huggingface.co/datasets/org/open-ds",
+                                "properties": [ { "name": "hf:task_categories", "value": "text-classification" } ] } } ],
+      "properties": [
+        { "name": "bomlens:dataset:collectedBy", "value": "huggingface" },
+        { "name": "bomlens:dataset:depth", "value": "0" },
+        { "name": "bomlens:dataset:sourceDataset", "value": "extended|org/upstream" },
+        { "name": "bomlens:dataset:sourceDataset", "value": "Wikipedia dump 2023-01" },
+        { "name": "bomlens:dataset:sourceDataset:unverified", "value": "Wikipedia dump 2023-01" },
+        { "name": "bomlens:dataset:derivedFrom", "value": "extended dataset:huggingface/org/upstream" }
+      ]
+    },
+    {
+      "type": "data",
+      "bom-ref": "dataset:huggingface/org/pii-ds",
+      "name": "org/pii-ds",
+      "supplier": { "name": "org" },
+      "licenses": [ { "license": { "name": "llama3" } } ],
+      "externalReferences": [ { "type": "distribution", "url": "https://huggingface.co/datasets/org/pii-ds" } ],
+      "data": [ { "type": "dataset", "name": "org/pii-ds",
+                  "contents": { "url": "https://huggingface.co/datasets/org/pii-ds",
+                                "properties": [ { "name": "hf:tags", "value": "pii, modality:audio" } ] } } ],
+      "properties": [
+        { "name": "bomlens:dataset:collectedBy", "value": "huggingface" },
+        { "name": "bomlens:dataset:depth", "value": "0" },
+        { "name": "bomlens:dataset:signal", "value": "pii" },
+        { "name": "bomlens:dataset:visibility", "value": "gated" }
+      ]
+    },
+    {
+      "type": "data",
+      "bom-ref": "dataset:huggingface/org/upstream",
+      "name": "org/upstream",
+      "supplier": { "name": "org" },
+      "externalReferences": [ { "type": "distribution", "url": "https://huggingface.co/datasets/org/upstream" } ],
+      "properties": [
+        { "name": "bomlens:dataset:collectedBy", "value": "huggingface" },
+        { "name": "bomlens:dataset:depth", "value": "1" },
+        { "name": "bomlens:dataset:unresolved", "value": "not-readable" }
+      ]
+    }
+  ],
+  "dependencies": [
+    { "ref": "pkg:huggingface/acme/support-adapter@1a2b3c4d",
+      "dependsOn": [ "dataset:huggingface/org/open-ds", "dataset:huggingface/org/pii-ds" ] },
+    { "ref": "dataset:huggingface/org/open-ds", "dependsOn": [ "dataset:huggingface/org/upstream" ] },
+    { "ref": "dataset:huggingface/org/pii-ds", "dependsOn": [] },
+    { "ref": "dataset:huggingface/org/upstream", "dependsOn": [] }
+  ]
+}
