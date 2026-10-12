@@ -334,7 +334,7 @@ fi
 CODE_RUNENV="$(grep -rhoE '\b[A-Z][A-Z0-9_]{2,}\b' \
     docker/entrypoint.sh docker/lib/*.sh docker/web/server.py scripts/scan-sbom.sh 2>/dev/null | sort -u)"
 MODE_REQS="
-IMAGE::TARGET_IMAGE /var/run/docker.sock
+IMAGE::TARGET_IMAGE
 BINARY::TARGET_FILE
 ROOTFS::TARGET_DIR
 FIRMWARE::TARGET_FILE

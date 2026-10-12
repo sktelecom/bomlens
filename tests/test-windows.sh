@@ -28,6 +28,8 @@ SCAN="$REPO/scripts/scan-sbom.sh"
 VERBOSE="${VERBOSE:-false}"
 
 WORK="$(mktemp -d "${TMPDIR:-/tmp}/sbom-win.XXXXXX")"
+# A mirror set by whoever runs this must not change the image names checked.
+unset CDXGEN_IMAGE_PREFIX
 BIN="$WORK/bin"; mkdir -p "$BIN"
 cleanup() { cd "$REPO" 2>/dev/null || true; rm -rf "$WORK"; }
 trap cleanup EXIT INT TERM
@@ -69,7 +71,15 @@ case "${1:-}" in
     # value cannot be read would.
     [ -z "${DOCKER_STUB_MEMTOTAL:-}" ] || echo "$DOCKER_STUB_MEMTOTAL"
     exit 0 ;;
-  version|pull|image|stop|rm) exit 0 ;;
+  version|pull|stop|rm) exit 0 ;;
+  image)
+    # `docker image inspect -f '{{index .Config.Labels "com.sktelecom.sbom.engine-contract"}}'`:
+    # the stub models an image as new as this CLI. DOCKER_STUB_OLD_IMAGE=1
+    # models one from before the engine contract (no label).
+    case "$*" in
+      *engine-contract*) [ "${DOCKER_STUB_OLD_IMAGE:-0}" = "1" ] || echo "1.0.0" ;;
+    esac
+    exit 0 ;;
   ps)
     # `docker ps -aq --filter label=bomlens.scan=cli --filter status=exited`:
     # the startup sweep for a scan container an earlier, killed run left
@@ -324,6 +334,22 @@ BOMLENS_CANCEL_GRACE=45 scan_in "$d" --ui --output-dir "$d"
 in_log "-e BOMLENS_CANCEL_GRACE" \
   && pass "BOMLENS_CANCEL_GRACE passed to the web UI container" \
   || { fail "BOMLENS_CANCEL_GRACE passed to the web UI container" "rc=$RC"; show; }
+
+d="$(new_proj ui_mirror)"
+CDXGEN_IMAGE_PREFIX=registry.example/mirror/cdxgen/ scan_in "$d" --ui --output-dir "$d"
+in_log "-e CDXGEN_IMAGE_PREFIX" && in_log "-e BOMLENS_OS_LICENSES" \
+  && pass "CDXGEN_IMAGE_PREFIX and BOMLENS_OS_LICENSES passed to the web UI container" \
+  || { fail "CDXGEN_IMAGE_PREFIX passed to the web UI container" "rc=$RC"; show; }
+
+# The UI's security scans keep Trivy's database in SBOM_TRIVY_CACHE too, and a
+# proxy at the host's loopback address is not passed into the container.
+d="$(new_proj ui_trivy_cache)"
+DOCKER_STUB_ARGV_DUMP=1 SBOM_TRIVY_CACHE="$WORK/ui trivy cache" HTTPS_PROXY=http://127.0.0.1:3128 HTTP_PROXY=http://proxy.example:8080 \
+  scan_in "$d" --ui --output-dir "$d"
+{ in_log "ui trivy cache:/trivy-cache>" && in_log "<TRIVY_CACHE_DIR=/trivy-cache>" \
+  && in_log "<HTTP_PROXY>" && ! in_log "<HTTPS_PROXY>"; } \
+  && pass "--ui mounts SBOM_TRIVY_CACHE; a loopback proxy is left out, another proxy is passed" \
+  || { fail "--ui trivy cache / proxy"; show; cat "$LOG"; }
 
 # --------------------------------------------------------
 section "Startup sweep for a killed scan's leftover container"
@@ -768,6 +794,36 @@ DOCKER_STUB_ARGV_DUMP=1 \
   || { fail "--ai-declare is not mounted as one read-only file"; show; cat "$LOG"; }
 in_log "<GENERATE_SPDX3=true>" && pass "AI scans write the SPDX 3.0.1 document by default" \
   || { fail "GENERATE_SPDX3 default not forwarded"; show; cat "$LOG"; }
+
+# An image archive given as the target is mounted read-only and named by its
+# path in the container; registry credentials go by name only.
+d="$(new_proj image_archive)"; : > "$d/img.tar"
+DOCKER_STUB_ARGV_DUMP=1 SYFT_REGISTRY_AUTH_PASSWORD=reg_secret_value \
+  scan_in "$d" --project IA --version 1 --target "docker-archive:$d/img.tar" --generate-only
+{ in_out "Mode: IMAGE" && in_log "<TARGET_IMAGE=docker-archive:/target/img.tar>" && in_log ":/target:ro>" \
+  && in_log "<SYFT_REGISTRY_AUTH_PASSWORD>" && ! in_log "reg_secret_value"; } \
+  && pass "an image archive target is mounted read-only and named in the container; credentials by name only" \
+  || { fail "image archive target not mounted"; show; cat "$LOG"; }
+# Network settings reach the post-processing container by name: the proxy, the
+# Trivy database settings (any TRIVY_* set), EPSS/KEV mirrors; a host path in
+# TRIVY_CACHE_DIR does not, SBOM_TRIVY_CACHE is mounted instead.
+d="$(new_proj netenv)"; printf '{"name":"a","dependencies":{"x":"1"}}' > "$d/package.json"
+DOCKER_STUB_ARGV_DUMP=1 HTTPS_PROXY=http://proxy.example:3128 TRIVY_DB_REPOSITORY=mirror.example/trivy-db \
+  TRIVY_SOMETHING_NEW=1 TRIVY_CACHE_DIR=/host/only/path KEV_URL=https://mirror.example/kev.json \
+  SBOM_TRIVY_CACHE="$WORK/trivy cache" \
+  scan_in "$d" --project NE --version 1
+{ in_log "<HTTPS_PROXY>" && in_log "<TRIVY_DB_REPOSITORY>" && in_log "<TRIVY_SOMETHING_NEW>" && in_log "<KEV_URL>" \
+  && ! in_log "proxy.example" && ! in_log "mirror.example" && ! in_log "<TRIVY_CACHE_DIR>" \
+  && in_log "trivy cache:/trivy-cache>" && in_log "<TRIVY_CACHE_DIR=/trivy-cache>" && [ -d "$WORK/trivy cache" ]; } \
+  && pass "network settings go by name, a host TRIVY_CACHE_DIR does not, SBOM_TRIVY_CACHE is mounted (space in path)" \
+  || { fail "network settings not passed as expected"; show; cat "$LOG"; }
+
+# A registry mirror for the cdxgen images.
+d="$(new_proj mirror)"; printf '{"name":"a","dependencies":{"x":"1"}}' > "$d/package.json"
+CDXGEN_IMAGE_PREFIX=registry.example/mirror/cdxgen/ scan_in "$d" --project MI --version 1 --generate-only
+{ in_log "registry.example/mirror/cdxgen/cdxgen-alpine-node24:" && ! in_log "ghcr.io/cdxgen/cdxgen-alpine-node24"; } \
+  && pass "CDXGEN_IMAGE_PREFIX: the source scan's cdxgen image comes from the mirror" \
+  || { fail "cdxgen image not taken from CDXGEN_IMAGE_PREFIX"; show; cat "$LOG"; }
 
 d="$(new_proj hf_dataset)"
 DOCKER_STUB_ARGV_DUMP=1 HF_TOKEN=hf_secret_value \

@@ -281,7 +281,7 @@ df -h
 
 #### 오류: "Cannot connect to the Docker daemon"
 
-원인: Docker 소켓이 마운트되지 않음 (IMAGE 모드)
+원인: Docker 소켓이 마운트되지 않음. IMAGE 모드는 데몬에 있는 이미지(로컬에서 빌드하거나 받은 이미지)를 소켓으로 읽습니다. 레지스트리에 있는 이미지는 소켓 없이 읽습니다.
 
 해결:
 ```bash

@@ -5,7 +5,7 @@
   "counts": {
     "auto": 24,
     "declared": 0,
-    "optional": 26,
+    "optional": 31,
     "judgment": 5,
     "missingRequired": 8,
     "noAssertion": 0,
@@ -144,6 +144,26 @@
         },
         {
           "id": "weightsScope",
+          "status": "optional"
+        },
+        {
+          "id": "inputModality",
+          "status": "optional"
+        },
+        {
+          "id": "outputModality",
+          "status": "optional"
+        },
+        {
+          "id": "trainingComputeFlops",
+          "status": "optional"
+        },
+        {
+          "id": "trainingComputeBasis",
+          "status": "optional"
+        },
+        {
+          "id": "adversarialTesting",
           "status": "optional"
         }
       ],
@@ -421,10 +441,13 @@
       "text": "This check is guidance, not legal advice."
     }
   ],
+  "service": {
+    "state": "none"
+  },
   "inputs": {
-    "bom": "af1e4ed808d74b29c4405d879729cddf1430f29f888bdf8d353b9023cd7552c2",
+    "bom": "335cad7f4d3e56563496c9c5d41dbfb363382e9b3a6d328f913cc72908105d6d",
     "declaration": null,
-    "tool": "c977c9853e4cfcd094e56230da5ba8f41bd966b2ba864b34deb1f4b4cbcd1c7a"
+    "tool": "e2253ce9ed5c642dc2bd6a50ded34dccc2905df1497cc182b0416b0a7024fd22"
   },
   "declaration": {
     "state": "none"

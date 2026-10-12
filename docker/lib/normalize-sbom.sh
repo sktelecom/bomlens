@@ -356,6 +356,20 @@ def src_props($sn; $sv; $sr; $se):
     else . end
 ) else . end)'
 
+# OS package PURLs in the form Trivy and the purl-spec use (os-purl-form.jq):
+# a deb epoch as a qualifier, apk distro as the bare release id, qualifiers
+# sorted, and the syft `upstream` qualifier dropped from a component whose
+# source package OS_SRC_FIX above has already kept in
+# aquasecurity:trivy:SrcName (which is what Trivy matches on). A component
+# without SrcName (nested, or with no version) keeps its upstream. Applied to
+# every deb, rpm and apk PURL in the document.
+OS_PURL_FORM="$(cat "$SCRIPT_DIR/os-purl-form.jq")"'
+(.. | objects | select((.purl? | type) == "string" and (.purl | test("^pkg:(deb|rpm|apk)/"; "i"))))
+  |= ((if (.properties | type) == "array"
+       then any(.properties[]; type == "object" and .name == "aquasecurity:trivy:SrcName")
+       else false end) as $src
+      | .purl |= os_purl_form($src))'
+
 # Always: normalize component license aliases to SPDX ids. cdxgen records some
 # licenses as non-SPDX free text ("Expat license", "Apache License 2.0"); the v1.3
 # web UI surfaces (license filter, distribution card, dependency tree) read these
@@ -474,6 +488,7 @@ if [ "$MODE" = "--stable" ]; then
         | ${PURL_FIX}
         | ${VENDORED_CPE_FIX}
         | ${OS_SRC_FIX}
+        | ${OS_PURL_FORM}
         | ${LICENSE_FIX}
         | ${LICENSE_REVIEW_FIX}
         | ${LICENSE_CLASS_FIX}
@@ -490,7 +505,7 @@ if [ "$MODE" = "--stable" ]; then
         | del(.serialNumber)
     " "$SBOM" > "$TMP"
 else
-    jq -S --argjson vmap "$VMAP_JSON" --argjson compat "$COMPAT_JSON" "${LICENSE_FLAGS_DEF} ${NORMALIZE_DEF} ${NULL_FIX} | ${UNKNOWN_VERSION_FIX} | ${VERSION_EVR_CONTAMINATION_FIX} | ${DROP_EMPTY_FILES} | ${NAME_VERSION_DEDUP} | ${PYRANGE_DEDUP} | ${SWIFT_DUP_FIX} | ${PURL_FIX} | ${VENDORED_CPE_FIX} | ${OS_SRC_FIX} | ${LICENSE_FIX} | ${LICENSE_REVIEW_FIX} | ${LICENSE_CLASS_FIX} | ${LICENSE_CONFLICT_FIX} | ${FILENAME_FILTER} | ${SORT_FILTER}" "$SBOM" > "$TMP"
+    jq -S --argjson vmap "$VMAP_JSON" --argjson compat "$COMPAT_JSON" "${LICENSE_FLAGS_DEF} ${NORMALIZE_DEF} ${NULL_FIX} | ${UNKNOWN_VERSION_FIX} | ${VERSION_EVR_CONTAMINATION_FIX} | ${DROP_EMPTY_FILES} | ${NAME_VERSION_DEDUP} | ${PYRANGE_DEDUP} | ${SWIFT_DUP_FIX} | ${PURL_FIX} | ${VENDORED_CPE_FIX} | ${OS_SRC_FIX} | ${OS_PURL_FORM} | ${LICENSE_FIX} | ${LICENSE_REVIEW_FIX} | ${LICENSE_CLASS_FIX} | ${LICENSE_CONFLICT_FIX} | ${FILENAME_FILTER} | ${SORT_FILTER}" "$SBOM" > "$TMP"
 fi
 
 mv "$TMP" "$SBOM"

@@ -88,7 +88,7 @@ docker images | grep sbom-example
 
 ### Docker socket permission denied
 
-The scanner needs access to `/var/run/docker.sock`.
+The image built above exists only in the local Docker daemon, so the scanner reads it through `/var/run/docker.sock`.
 
 ```bash
 ls -la /var/run/docker.sock

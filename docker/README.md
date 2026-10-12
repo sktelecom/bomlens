@@ -281,7 +281,7 @@ df -h
 
 #### Error: "Cannot connect to the Docker daemon"
 
-Cause: the Docker socket is not mounted (IMAGE mode).
+Cause: the Docker socket is not mounted. IMAGE mode reads an image the daemon has (one built or pulled locally) through the socket; an image in a registry is read without it.
 
 Fix:
 ```bash

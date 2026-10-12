@@ -59,12 +59,19 @@ mark_pipeline_warning() {
 # Run a best-effort post-process step. On failure, log a WARN and stamp the
 # SBOM ($OUTPUT_FILE, set by the caller) so the failure is observable, then
 # return 0 so the run continues with a valid SBOM.
+# When the run keeps a result manifest (engine-result.sh), the step's outcome
+# and time span are recorded there too.
 run_optional_step() {
     local label="$1"; shift
+    local _started=""
+    declare -F er_record >/dev/null && _started="$(er_now)"
+    declare -F er_event >/dev/null && er_event step.start "$label"
     if "$@"; then
+        [ -n "$_started" ] && er_record "$label" ok "" "" "$_started"
         return 0
     fi
     echo "[WARN] post-process step '$label' failed; continuing with a valid SBOM, but this step's output may be missing or incomplete." >&2
     mark_pipeline_warning "${OUTPUT_FILE:-}" "$label"
+    [ -n "$_started" ] && er_record "$label" failed failed "" "$_started"
     return 0
 }

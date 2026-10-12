@@ -10,7 +10,7 @@ BomLens(Apache-2.0)는 자체 코드를 셸 스크립트로 두고, SBOM 생성�
 - 다만 도구 바이너리를 이미지로 재배포하므로, 라이선스 전문과 (GPL 도구의) 대응 소스 접근 경로를 제공합니다. SPDX 라이선스 전문(Apache-2.0, MIT, GPL-2.0, GPL-3.0 등)은 이미지 안 `/usr/local/lib/sbom/licenses/`에 동봉되며, 각 도구의 소스는 아래 표의 Source URL에서 받습니다.
 - BomLens 자신의 이용 조건도 배포물에 함께 나갑니다. 이미지에서는 `/usr/local/lib/sbom/notices/`에 `LICENSE`와 `NOTICE`, 이 문서가 들어 있고, 릴리스 번들에서는 압축을 풀면 최상위에, 데스크톱 설치본에서는 앱 리소스 폴더에 있습니다. 이미지나 번들을 다시 배포하실 때 이 파일들을 함께 전달하시면 Apache-2.0 §4의 요구가 충족됩니다.
 - AGPL 라이선스 도구는 포함하지 않습니다. 따라서 웹 UI(`--ui`)를 써도 AGPL §13 네트워크 조항은 트리거되지 않습니다.
-- GPL 라이선스 분석 도구는 별도 opt-in 이미지(`bomlens-firmware`)에만 들어갑니다. 기본 이미지(`bomlens`)와 다른 opt-in 이미지(`bomlens-aibom`, `bomlens-deep-cve`)에 BomLens가 설치하는 도구는 permissive 라이선스입니다.
+- GPL 라이선스 분석 도구는 별도 opt-in 이미지(`bomlens-firmware`)에만 들어갑니다. 기본 이미지(`bomlens`)와 opt-in 이미지 `bomlens-aibom`, `bomlens-deep-cve`에 BomLens가 설치하는 도구는 permissive 라이선스입니다. opt-in 이미지 `bomlens-deep-license`에는 LGPL 구성요소(linux/amd64의 7-Zip, intbitset, chardet)가 더 들어가며, 그 소스는 이미지 안에 있습니다. [해당 절](#deep-license-이미지-ghcriosktelecombomlens-deep-license-lgpl-포함-opt-in)을 보세요.
 - 기본 이미지를 포함한 모든 이미지는 `python:3.12-slim` 위에 빌드되므로, GPL과 LGPL을 비롯한 여러 라이선스의 Debian 시스템 패키지도 함께 들어 있습니다. 리눅스 기반 이미지라면 어디나 해당하는 성질이고 GPL이 없는 베이스 이미지는 없습니다. 무엇이 들어 있고 소스는 어디서 받는지는 아래 [모든 이미지의 Debian 패키지](#모든-이미지의-debian-패키지)를 보세요.
 
 ## 기본 이미지 — `ghcr.io/sktelecom/bomlens` (BomLens가 설치하는 도구, Debian 베이스는 아래 참조)
@@ -22,7 +22,7 @@ BomLens(Apache-2.0)는 자체 코드를 셸 스크립트로 두고, SBOM 생성�
 | Trivy | 보안 취약점 스캔 | Apache-2.0 | https://github.com/aquasecurity/trivy |
 | trivy-db | 취약점 DB | Apache-2.0 | https://github.com/aquasecurity/trivy-db |
 | cosign | SBOM 서명 | Apache-2.0 | https://github.com/sigstore/cosign |
-| scancode-toolkit | 정밀 라이선스 검출. 빌드 시 opt-in(`SBOM_DEEP_LICENSE=true`)이며 기본값 `false`로 빌드되는 **발행 이미지에는 들어 있지 않습니다** | Apache-2.0 (데이터셋 일부 CC-BY-4.0 등) | https://github.com/aboutcode-org/scancode-toolkit |
+| scancode-toolkit | 정밀 라이선스 검출. 이 이미지에는 없고 opt-in 이미지 `bomlens-deep-license`에만 들어갑니다. 아래 참조 | Apache-2.0 AND CC-BY-4.0 | https://github.com/aboutcode-org/scancode-toolkit |
 | scanoss (scanoss.py) | vendored 오픈소스 식별(기본 포함, 끄려면 `SBOM_SCANOSS=false`) | MIT (동봉 데이터셋 `osadl-copyleft.json`은 CC-BY-4.0) | https://github.com/scanoss/scanoss.py |
 | owasp-aibom-generator | AI 모델 SBOM 생성(opt-in `SBOM_AIBOM`, 별도 이미지 `bomlens-aibom`; HuggingFace API 호출) | Apache-2.0 | https://github.com/GenAI-Security-Project/aibom-generator |
 | jq | SBOM 가공(헬퍼) | MIT (일부 컴포넌트 BSD/ICU/Lucent) | https://github.com/jqlang/jq |
@@ -157,6 +157,63 @@ Windows 배포물이 담겨 오는 컨테이너 형식용 7z, 그다음 binwalk�
 | grype | v0.119.0 (`GRYPE_VERSION`) | CPE 기반 NVD CVE 매칭 | Apache-2.0 | permissive | https://github.com/anchore/grype |
 
 > 데이터: 빌드 시 이미지에 굽는 grype 취약점 DB는 Anchore가 공개 취약점 출처를 모아 만든 것입니다 — NVD(public domain), GitHub Security Advisories(CC-BY-4.0), 배포판 보안 DB(각 배포판 조건). DB는 `GRYPE_DB_AUTO_UPDATE=false`로 고정되어 스캔 중 네트워크를 쓰지 않습니다.
+
+## deep-license 이미지: `ghcr.io/sktelecom/bomlens-deep-license` (LGPL 포함, opt-in)
+
+`--deep-license`용 별도 opt-in 이미지입니다. 프로젝트 자체 파일에서 라이선스와 저작권 표기를 읽는 scancode-toolkit을 더합니다. scancode와 필요한 네이티브 라이브러리가 커서 기본 이미지에서 분리했습니다.
+빌드: `docker build --build-arg SBOM_DEEP_LICENSE=true -t bomlens-deep-license ./docker`.
+
+아래 버전은 `docker/Dockerfile`의 빌드 ARG 기본값과 일치합니다(고정, ARG로 바꿀 수 있음).
+
+| 도구 | 고정 버전 (ARG) | 용도 | 라이선스 (SPDX) | Copyleft | Source |
+|------|------|------|------------------|----------|--------|
+| scancode-toolkit | 32.5.0 (`SCANCODE_VERSION`) | 소스 파일의 라이선스와 저작권 검출 | Apache-2.0(코드) AND CC-BY-4.0(검출 데이터) | permissive | https://github.com/aboutcode-org/scancode-toolkit |
+| chardet | 6.0.0.post1 (`CHARDET_VERSION`) | 문자 인코딩 판별(scancode 의존성), 순수 파이썬 | LGPL-2.1-or-later | 약한 copyleft (LGPL) | https://github.com/chardet/chardet |
+| intbitset | 4.1.2 (`INTBITSET_VERSION`) | 컴파일된 정수 집합 확장 모듈(scancode 의존성) | LGPL-3.0-or-later | 약한 copyleft (LGPL) | https://github.com/inveniosoftware-contrib/intbitset |
+| extractcode-7z | 16.5.210531 (`EXTRACTCODE_7Z_VERSION`, linux/amd64) | scancode가 압축 파일을 풀 때 쓰는 미리 빌드된 7-Zip(p7zip 16.02) | Apache-2.0(패키지). 7-Zip은 LGPL-2.1-or-later이고, RAR 코드에는 unRAR 제한이 더 붙음 | 약한 copyleft (LGPL) | https://github.com/aboutcode-org/scancode-plugins |
+
+데이터: scancode의 라이선스와 저작권 검출 데이터는 CC-BY-4.0(https://creativecommons.org/licenses/by/4.0/legalcode)으로 수정 없이 동봉됩니다. Copyright (c) nexB Inc. and others. All rights reserved. ScanCode is a trademark of nexB Inc.
+
+### scancode-toolkit과 함께 설치되는 파이썬 패키지
+
+scancode-toolkit의 나머지 의존성은 이미지를 빌드할 때 pip이 정하므로 정확한 버전은 빌드에 따라 달라집니다. 아래 표는 작성 시점의 해석 결과입니다. 가지고 있는 이미지의 기록은 그 이미지의 패키지 목록과, 이미지에 첨부된 CycloneDX SBOM입니다.
+
+```bash
+docker run --rm --entrypoint python3 ghcr.io/sktelecom/bomlens-deep-license:latest -m pip list
+```
+
+각 패키지의 라이선스 원문은 이미지 안 `/usr/local/lib/python3.12/site-packages/`의 `*.dist-info/` 디렉터리에 그대로 남아 있습니다.
+
+| 라이선스 (SPDX) | 패키지 |
+|----------------|--------|
+| Apache-2.0 | commoncode, container-inspector, cyseq, extractcode, fasteners, ftfy, importlib-metadata, license-expression, parameter-expansion-patched, plugincode, pygmars, pymaven-patch, requests, saneyaml, spdx-tools, typecode |
+| Apache-2.0 OR BSD (Apache-2.0으로 사용) | cryptography, packaging, packvers |
+| Apache-2.0 AND BSD-3-Clause AND MIT | debian-inspector |
+| MIT | attrs, banal, beartype, beautifulsoup4, binaryornot, charset-normalizer, dparse2, fingerprints, html5lib, jaraco.functools, javaproperties, jsonstreams, more-itertools, normality, packageurl-python, pdfminer.six, pefile, pip-requirements-parser, pkginfo2, pluggy, pyparsing, PyYAML, six, soupsieve, toml, uritools, urllib3, urlpy, wcwidth, xmltodict, zipp |
+| MIT-0 | cffi |
+| BSD-2-Clause | boolean.py, Pygments |
+| BSD-3-Clause | click, colorama, dockerfile-parse, idna, Jinja2, lxml, MarkupSafe, multiregex, ply, pycparser, rdflib, semantic-version, webencodings |
+| BSD-3-Clause AND public domain | pyahocorasick |
+| PSF-2.0 | typing_extensions |
+| MPL-2.0 | certifi, publicsuffix2(MIT AND MPL-2.0). 둘 다 수정 없이 소스 형태로 들어 있음 |
+| GPL-3.0-or-later OR MIT (MIT로 사용) | gemfileparser2 |
+| Artistic-1.0-Perl OR GPL-2.0-or-later (Artistic-1.0-Perl로 사용) | text-unidecode |
+| LGPL | chardet, intbitset (위 표 참조) |
+
+linux/amd64에서는 scancode 플러그인 두 개가 미리 빌드된 네이티브 라이브러리를 더 담고 있으며, 각 패키지의 `licenses/` 디렉터리에 라이선스 파일이 있습니다. extractcode-libarchive(libarchive 3.5.1과 bzip2, expat, libb2, lz4, xz, zlib, zstd. BSD-2-Clause 등 permissive 조건이며 zstd는 BSD-3-Clause로 사용)와 typecode-libmagic(file 5.39의 libmagic과 zlib. BSD-2-Clause 등 permissive 조건)입니다. linux/arm64에서는 이 패키지들과 extractcode-7z에 바이너리가 들어 있지 않습니다.
+
+이 이미지는 기본 이미지에 Debian 패키지 libarchive13t64(BSD-2-Clause 등 permissive 조건), libxml2(MIT), libicu(Unicode-3.0)를 더합니다. 소스는 Debian 소스 패키지입니다. [모든 이미지의 Debian 패키지](#모든-이미지의-debian-패키지)를 보세요.
+
+### LGPL 구성요소와 그 소스
+
+7-Zip(linux/amd64), intbitset, chardet은 수정 없이 재배포됩니다. chardet은 파이썬 소스 형태로 들어 있습니다. 7-Zip 실행 파일은 별도 프로세스로 실행되고 intbitset은 실행 중에 불러오는 확장 모듈이므로, 어느 쪽이든 직접 빌드한 것으로 바꿀 수 있습니다. 라이선스 원문은 이미지 안 `/usr/local/lib/sbom/licenses/`에 있습니다.
+
+7-Zip과 intbitset의 소스는 이미지 안 `/usr/share/bomlens/sources/`에 있습니다.
+
+- `p7zip-16.02/`: p7zip 16.02 원본 소스, Homebrew p7zip 16.02 포뮬러(플러그인 자신의 `INSTALL_RECEIPT.json`이 가리키는 빌드)가 적용하는 Debian 보안 패치와 AES 패치, 빌드 절차를 적은 README.
+- `intbitset-4.1.2/`: 설치된 intbitset 버전의 PyPI 소스 배포본.
+
+각 파일은 이미지를 빌드할 때 고정된 sha256으로 확인하며, 설치된 7-Zip이나 intbitset의 버전이 동봉한 소스와 다르면 빌드가 실패합니다.
 
 ## Android SDK 이미지 — 사용자가 직접 빌드, 배포하지 않음
 

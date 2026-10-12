@@ -149,6 +149,13 @@ jobs:
             ${{ env.REGISTRY }}/${{ env.PUBLISH_OWNER }}/bomlens
             ${{ env.REGISTRY }}/${{ env.PUBLISH_OWNER }}/sbom-generator
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          # The repository the image comes from is the publishing owner's, not
+          # the caller's: release-upstream.yml runs this workflow from the fork,
+          # and metadata-action would otherwise label sktelecom's images with
+          # the fork's address (GHCR links a package to its repository by it).
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ env.PUBLISH_OWNER }}/bomlens
+            org.opencontainers.image.url=https://github.com/${{ env.PUBLISH_OWNER }}/bomlens
           tags: |
             type=semver,pattern={{version}},value=${{ inputs.version }}
             type=semver,pattern={{major}}.{{minor}},value=${{ inputs.version }}
@@ -385,6 +392,13 @@ jobs:
           images: |
             ${{ env.REGISTRY }}/${{ env.PUBLISH_OWNER }}/bomlens-firmware
             ${{ env.REGISTRY }}/${{ env.PUBLISH_OWNER }}/sbom-scanner-firmware
+          # The repository the image comes from is the publishing owner's, not
+          # the caller's: release-upstream.yml runs this workflow from the fork,
+          # and metadata-action would otherwise label sktelecom's images with
+          # the fork's address (GHCR links a package to its repository by it).
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ env.PUBLISH_OWNER }}/bomlens
+            org.opencontainers.image.url=https://github.com/${{ env.PUBLISH_OWNER }}/bomlens
           tags: |
             type=semver,pattern={{version}},value=${{ inputs.version }}
             type=semver,pattern={{major}}.{{minor}},value=${{ inputs.version }}
@@ -596,6 +610,13 @@ jobs:
           images: |
             ${{ env.REGISTRY }}/${{ env.PUBLISH_OWNER }}/bomlens-aibom
             ${{ env.REGISTRY }}/${{ env.PUBLISH_OWNER }}/sbom-scanner-aibom
+          # The repository the image comes from is the publishing owner's, not
+          # the caller's: release-upstream.yml runs this workflow from the fork,
+          # and metadata-action would otherwise label sktelecom's images with
+          # the fork's address (GHCR links a package to its repository by it).
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ env.PUBLISH_OWNER }}/bomlens
+            org.opencontainers.image.url=https://github.com/${{ env.PUBLISH_OWNER }}/bomlens
           tags: |
             type=semver,pattern={{version}},value=${{ inputs.version }}
             type=semver,pattern={{major}}.{{minor}},value=${{ inputs.version }}
@@ -729,6 +750,13 @@ jobs:
         with:
           images: |
             ${{ env.REGISTRY }}/${{ env.PUBLISH_OWNER }}/bomlens-deep-cve
+          # The repository the image comes from is the publishing owner's, not
+          # the caller's: release-upstream.yml runs this workflow from the fork,
+          # and metadata-action would otherwise label sktelecom's images with
+          # the fork's address (GHCR links a package to its repository by it).
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ env.PUBLISH_OWNER }}/bomlens
+            org.opencontainers.image.url=https://github.com/${{ env.PUBLISH_OWNER }}/bomlens
           tags: |
             type=semver,pattern={{version}},value=${{ inputs.version }}
             type=semver,pattern={{major}}.{{minor}},value=${{ inputs.version }}
@@ -855,10 +883,173 @@ jobs:
           category: trivy-image-deep-cve
         continue-on-error: true
 
+  build-deep-license:
+    name: Build deep-license image
+    runs-on: ${{ fromJSON(vars.CI_LINUX_RUNNER || '["self-hosted","linux","bomlens-wsl"]') }}
+    # scancode installs per platform, and the arm64 half runs under
+    # emulation, so a cache-cold multi-arch build is slow. The smoke test
+    # first adds two amd64 image builds and three small source scans. 90
+    # minutes leaves room for a cold cache on both platforms.
+    timeout-minutes: 90
+    permissions:
+      contents: read
+      packages: write
+      id-token: write   # keyless cosign signing
+      security-events: write   # upload-sarif below needs this
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+      - name: Resolve publish flag
+        id: flags
+        run: echo "push=${{ github.event_name != 'pull_request' && (startsWith(github.ref, 'refs/tags/v') || github.event_name == 'release' || inputs.push == true || github.ref == 'refs/heads/main') }}" >> "$GITHUB_OUTPUT"
+      - name: Login to GHCR
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.PUBLISH_TOKEN || secrets.GITHUB_TOKEN }}
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5
+        with:
+          images: |
+            ${{ env.REGISTRY }}/${{ env.PUBLISH_OWNER }}/bomlens-deep-license
+          # The repository the image comes from is the publishing owner's, not
+          # the caller's: release-upstream.yml runs this workflow from the fork,
+          # and metadata-action would otherwise label sktelecom's images with
+          # the fork's address (GHCR links a package to its repository by it).
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ env.PUBLISH_OWNER }}/bomlens
+            org.opencontainers.image.url=https://github.com/${{ env.PUBLISH_OWNER }}/bomlens
+          tags: |
+            type=semver,pattern={{version}},value=${{ inputs.version }}
+            type=semver,pattern={{major}}.{{minor}},value=${{ inputs.version }}
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=sha,prefix=sha-,format=short
+      - name: Resolve BOMLENS_VERSION
+        id: version
+        run: |
+          v="${{ steps.meta.outputs.version }}"
+          [ "$v" = "latest" ] && v="latest-$(git rev-parse --short HEAD)"
+          echo "value=$v" >> "$GITHUB_OUTPUT"
+      # Before anything is pushed: the amd64 image, loaded locally, must work
+      # as a scan engine (a real --deep-license source scan records the
+      # deep-license step as ok in bomlens-result.json with the scancode
+      # output listed; the base image records it as skipped/not_installed, or
+      # disabled without the flag), carry the LGPL sources, and hold no
+      # GPL-family package THIRD_PARTY_LICENSES.md does not account for. The
+      # build action (not a run step) is what can read the gha cache.
+      - name: Build deep-license image for the smoke test (amd64, load)
+        uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25 # v5
+        with:
+          context: ./docker
+          platforms: linux/amd64
+          load: true
+          push: false
+          build-args: |
+            SBOM_DEEP_LICENSE=true
+            BOMLENS_VERSION=${{ steps.version.outputs.value }}
+          tags: bomlens-deep-license-smoke
+          cache-from: type=gha,scope=deep-license
+      - name: Build base image for the smoke test (amd64, load)
+        uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25 # v5
+        with:
+          context: ./docker
+          platforms: linux/amd64
+          load: true
+          push: false
+          build-args: |
+            BOMLENS_VERSION=${{ steps.version.outputs.value }}
+          tags: bomlens-base-smoke
+          cache-from: type=gha
+      - name: Smoke test (result manifest, LGPL sources, licence inventory)
+        run: bash tests/test-deep-license-image.sh bomlens-deep-license-smoke bomlens-base-smoke
+      - name: Remove the smoke-test images
+        if: always()
+        run: docker image rm -f bomlens-deep-license-smoke bomlens-base-smoke >/dev/null 2>&1 || true
+      # The Dockerfile's scancode block runs a real licence scan as a build
+      # gate, on each platform, so a missing native library fails here.
+      - name: Build and push
+        id: build
+        uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25 # v5
+        with:
+          context: ./docker
+          platforms: linux/amd64,linux/arm64
+          push: ${{ steps.flags.outputs.push == 'true' }}
+          build-args: |
+            SBOM_DEEP_LICENSE=true
+            BOMLENS_VERSION=${{ steps.version.outputs.value }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: |
+            ${{ steps.meta.outputs.labels }}
+            org.opencontainers.image.version=${{ steps.version.outputs.value }}
+          cache-from: type=gha,scope=deep-license
+          cache-to: type=gha,mode=max,scope=deep-license
+      - name: Install cosign
+        if: steps.flags.outputs.push == 'true'
+        uses: sigstore/cosign-installer@7e8b541eb2e61bf99390e1afd4be13a184e9ebc5 # v3.10.1
+        with:
+          # renovate: datasource=github-releases depName=sigstore/cosign
+          cosign-release: v2.6.5
+      - name: Sign deep-license image
+        if: steps.flags.outputs.push == 'true'
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+          OWNER: ${{ env.PUBLISH_OWNER }}
+        run: |
+          set -euo pipefail
+          cosign sign --yes "${REGISTRY}/${OWNER}/bomlens-deep-license@${DIGEST}"
+      - name: Install syft (pinned release tarball)
+        if: steps.flags.outputs.push == 'true'
+        run: |
+          SYFT_VERSION=$(grep -oP 'ARG SYFT_VERSION=\K\S+' docker/Dockerfile)
+          ver="${SYFT_VERSION#v}"
+          curl -sSfL "https://github.com/anchore/syft/releases/download/${SYFT_VERSION}/syft_${ver}_linux_amd64.tar.gz" -o /tmp/syft.tgz
+          sudo tar -C /usr/local/bin -xzf /tmp/syft.tgz syft
+          syft version
+      - name: Attest deep-license image SBOM
+        if: steps.flags.outputs.push == 'true'
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+          OWNER: ${{ env.PUBLISH_OWNER }}
+        run: |
+          set -euo pipefail
+          bl="${REGISTRY}/${OWNER}/bomlens-deep-license@${DIGEST}"
+          syft "$bl" -o cyclonedx-json=sbom-deep-license.cdx.json
+          cosign attest --yes --predicate sbom-deep-license.cdx.json --type cyclonedx "$bl"
+      - name: Install Trivy (pinned release tarball)
+        if: steps.flags.outputs.push == 'true'
+        run: |
+          TRIVY_VERSION=$(grep -oP 'ARG TRIVY_VERSION=\K\S+' docker/Dockerfile)
+          ver="${TRIVY_VERSION#v}"
+          curl -sSfL "https://github.com/aquasecurity/trivy/releases/download/${TRIVY_VERSION}/trivy_${ver}_Linux-64bit.tar.gz" -o /tmp/trivy.tgz
+          sudo tar -C /usr/local/bin -xzf /tmp/trivy.tgz trivy
+          trivy --version
+      # Report-only, as for the other opt-in images: the base publish gate
+      # covers the shared layers, and scancode's own added surface has not
+      # been observed here yet.
+      - name: Scan published deep-license image with Trivy
+        if: steps.flags.outputs.push == 'true'
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+          OWNER: ${{ env.PUBLISH_OWNER }}
+        continue-on-error: true
+        run: trivy image --quiet --scanners vuln --ignore-unfixed --format sarif --output trivy-image-deep-license.sarif --exit-code 0 "${REGISTRY}/${OWNER}/bomlens-deep-license@${DIGEST}"
+      - name: Upload deep-license image scan results
+        if: steps.flags.outputs.push == 'true'
+        uses: github/codeql-action/upload-sarif@faaca9a8f6edddba5725ffe5adefdab6669a2eca # v3
+        with:
+          sarif_file: 'trivy-image-deep-license.sarif'
+          category: trivy-image-deep-license
+        continue-on-error: true
+
   summary:
     name: Build summary
     runs-on: ${{ fromJSON(vars.CI_LINUX_RUNNER || '["self-hosted","linux","bomlens-wsl"]') }}
-    needs: [ build-postprocess, build-firmware, build-aibom, build-deep-cve ]
+    needs: [ build-postprocess, build-firmware, build-aibom, build-deep-cve, build-deep-license ]
     # always(): the opt-in images are skipped on plain main pushes — still summarize.
     if: ${{ always() && github.event_name != 'pull_request' && needs.build-postprocess.result == 'success' }}
     timeout-minutes: 5
@@ -871,5 +1062,6 @@ jobs:
           echo "- \`${{ env.REGISTRY }}/${{ env.PUBLISH_OWNER }}/bomlens-firmware\` (firmware unpack/ID, GPL tools; legacy alias: sbom-scanner-firmware)" >> $GITHUB_STEP_SUMMARY
           echo "- \`${{ env.REGISTRY }}/${{ env.PUBLISH_OWNER }}/bomlens-aibom\` (AI-model SBOM, OWASP AIBOM Generator; legacy alias: sbom-scanner-aibom)" >> $GITHUB_STEP_SUMMARY
           echo "- \`${{ env.REGISTRY }}/${{ env.PUBLISH_OWNER }}/bomlens-deep-cve\` (maven CPE matching against NVD via grype; ~1.8 GB DB)" >> $GITHUB_STEP_SUMMARY
+          echo "- \`${{ env.REGISTRY }}/${{ env.PUBLISH_OWNER }}/bomlens-deep-license\` (scancode licence detection in the project's own files, for --deep-license)" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "Language SBOM generation uses cdxgen official images (pulled on-demand by scan-sbom.sh)." >> $GITHUB_STEP_SUMMARY

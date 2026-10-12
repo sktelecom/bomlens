@@ -48,8 +48,9 @@ BomLens의 전체 옵션과 분석 모드, CI/CD 통합 방법, 트러블슈팅�
 | `--no-report` | false | 오픈소스위험분석보고서(risk-report) 생략 (아래 참고) |
 | `--lang <en\|ko>` | `en` | 사람이 읽는 적합성·AI 준수 개요 보고서(`.md`/`.html`)의 언어. SBOM과 JSON 보고서는 언어와 무관하게 영어로 유지 |
 | `--conformance-profile <default\|skt-submission>` | `default` | 적합성 검사 엄격도. `skt-submission`은 PURL 포함률 100%를 요구하고 `pkg:generic` 식별자가 하나라도 있으면 실패로 판정한다(SKT 공급사 제출 심사 기준과 동일). 웹 UI의 제출 전 점검 화면은 `skt-submission`이 기본값이지만 CLI는 아니므로, `--analyze`와 함께 명시적으로 지정해야 한다 |
+| `--license-registry` | 꺼짐 | 라이선스가 없는 컴포넌트의 라이선스를 패키지 레지스트리(deps.dev)에 조회하고, 하나뿐인 강한 카피레프트나 비상업 라이선스(GPL, AGPL, SSPL, BUSL, CC-BY-NC)를 레지스트리와 대조한다. 레지스트리 답이 다르면 그 답으로 바꾸고 원래 값은 `bomlens:license:superseded`에 남긴다. 이렇게 쓴 라이선스에는 `bomlens:licenseSource` = `registry (deps.dev)`가 붙는다. 본문, URL, concluded 판정이 붙은 라이선스는 대조하지 않고, `--analyze`에서는 빠진 라이선스만 채운다. 네트워크를 사용 |
 | `--resolve-purl` | 꺼짐 | `--analyze` 전용. 제출된 SBOM의 식별자가 실제 있는 패키지를 가리키는지 각 패키지 저장소에 조회해 적합성 보고서에 권고 항목으로 덧붙인다. 적합성 검사에서 네트워크를 쓰는 유일한 부분이다. 조회되지 않는 식별자는 보고만 하고 실패로 보지 않는다. 사내 저장소에만 올린 패키지도 같은 결과가 나오기 때문이다. 사내 네임스페이스는 `PURL_RESOLVE_IGNORE`로 제외한다 |
-| `--deep-license` | false | scancode 정밀 라이선스 탐지 (opt-in 이미지) |
+| `--deep-license` | false | scancode로 프로젝트 자체 파일의 라이선스 정밀 탐지 (opt-in `bomlens-deep-license` 이미지, 자동으로 내려받음. 내려받을 수 없으면 라이선스 탐지 없이 기본 이미지로 스캔) |
 | `--deep-cve` | false | grype의 NVD CPE 매칭으로 두 번째 대조를 더한다 (opt-in `bomlens-deep-cve` 이미지, 자동으로 내려받음). BomLens는 Maven 컴포넌트에만 NVD 대조가 가능한 CPE를 붙여 주므로, Trivy가 놓치는 NVD 전용 CVE는 대부분 오래된 Maven 라이브러리에서 나온다. `--security`를 자동으로 켠다. NVD 실시간 버전 범위로 확인하지 못한 결과는 보고서에 버전 미검증으로 표시된다 — [정밀 CVE 대조 가이드](../guides/reports.ko.md) 참고 |
 | `--identify-vendored` | false | 패키지 매니저가 없는 C/C++ 소스에 복사돼 들어간(vendored) 오픈소스를 식별. 파일 지문을 OSSKB 서비스와 대조 (발행 이미지에 포함; 소스가 아니라 해시 전송). [내장 오픈소스 식별 가이드](../guides/identify-vendored.ko.md) 참고 |
 | `--verify-weights` | false | `--model`과 함께 쓰면 저장소의 pickle 계열 가중치 파일(`.bin`/`.pt`/`.pth`/`.ckpt`, 로드 시 코드를 실행할 수 있는 형식)을 내려받아 `--model-file`이 실행하는 것과 같은 로컬 picklescan 검증을 돌린다. HuggingFace 자체 스캔 결과(`bomlens:hf:scan:*`)만 믿는 대신 독립적으로 확인하는 것이다. safetensors·GGUF·ONNX 가중치는 내려받지 않는다. 로드 시 코드를 실행하지 않는 형식이라 picklescan으로 확인할 대상이 없기 때문이다. 실제 네트워크·디스크 비용이 들고(`AIBOM_VERIFY_MAX_FILES`/`AIBOM_VERIFY_MAX_BYTES`로 상한, 기본 5개 파일 · 각 2GiB) 메타데이터만 읽는 `ENRICH_HF_SECURITY` 조회와 달리 옵트인이다. AI 모델 스캔 전용 |
@@ -71,11 +72,13 @@ BomLens의 전체 옵션과 분석 모드, CI/CD 통합 방법, 트러블슈팅�
 | `SBOM_FIRMWARE_IMAGE` | `ghcr.io/sktelecom/bomlens-firmware:latest` | 펌웨어 분석용 이미지 지정 |
 | `SBOM_AIBOM_IMAGE` | `ghcr.io/sktelecom/bomlens-aibom:latest` | AI 모델(ML-BOM) 생성용 이미지 지정 |
 | `SBOM_DEEP_CVE_IMAGE` | `ghcr.io/sktelecom/bomlens-deep-cve:latest` | `--deep-cve`(grype CPE 매칭)용 이미지 지정. 웹 UI의 같은 토글도 이 이미지를 쓴다 |
+| `SBOM_DEEP_LICENSE_IMAGE` | `SBOM_SCANNER_IMAGE`가 있으면 그 값, 없으면 `ghcr.io/sktelecom/bomlens-deep-license:latest` | `--deep-license`(scancode)일 때 소스 스캔의 후처리 단계를 실행할 이미지 |
 | `SBOM_OUTPUT_FLAT` | — | `1`로 두면 실행별 하위 폴더 없이 산출물을 베이스에 평면으로 저장(격리 이전 배치, 옛 경로를 기대하는 CI용) |
 | `SBOM_OUTPUT_DIR` | `~/sbom-output` | 데스크톱 앱과 웹 UI의 산출물 베이스(CLI는 대신 `--output-dir` 사용). 스캔마다 그 아래 `{Project}_{Version}/` 하위 폴더에 저장 |
 | `SBOM_UI_MOUNT_DIR` | — | CLI 인자를 받지 않는 Windows 실행 파일 `sbom-ui.bat`용: 웹 UI의 디렉터리 경로 입력에 읽기 전용 대상으로 추가할 폴더 하나(`--ui --mount`의 더블클릭 대응). `& ^ | < >` 가 없는 경로를 쓸 것 — 런처는 이런 문자가 있으면 잘못된 마운트를 Docker에 넘기는 대신 거부한다 |
 | `SBOM_LANG` | 시스템 로캘 | Windows 런처와 데스크톱 앱의 언어. `en` 또는 `ko`. 한국어가 아니면 영어로 표시된다 |
 | `SBOM_BASH` | 자동 감지 | `scan-sbom.bat`용: Git Bash의 `bash.exe` 경로를 직접 지정(예: `C:\Program Files\Git\bin\bash.exe`). 런처가 PATH의 git으로 자동 감지를 시도했으나 WSL이나 WindowsApps 별칭이 아닌 실제 Git Bash를 못 찾았을 때 쓴다 |
+| `CDXGEN_IMAGE_PREFIX` | `ghcr.io/cdxgen/` | 소스 스캔의 cdxgen 이미지(언어 이미지와 올인원 이미지)를 받아 오는 곳으로, 이미지 이름 앞부분 전체다. ghcr.io에 접속할 수 없는 네트워크에서는 같은 이미지를 둔 레지스트리 미러로 지정한다(예: `registry.example/mirror/cdxgen/`). 이미지 이름과 태그는 그대로다. 웹 UI의 소스 스캔(`--ui`, `sbom-ui.bat`, 데스크톱 앱)에도 전달하고, Android SDK 이미지를 빌드할 때는 `--build-arg`로 넘긴다(이 빌드는 기반 이미지를 다이제스트로 고정하므로, 미러는 pull-through 캐시이거나 모든 플랫폼을 복사한 것이어야 한다) |
 | `SBOM_PULL` | `missing` | 스캐너 이미지 다운로드 정책. `scan-sbom.sh`와 Windows 런처 모두에 적용된다. `missing`(기본)은 이미지가 없을 때만 받고, 이미 있으면 백그라운드에서 조용히 최신 여부를 확인한다(시간 상한을 두고 최선을 다하는 방식이라, 확인이 멎거나 오프라인이면 그냥 포기하고 로컬 이미지로 진행한다). `always`는 매번 멈춰서 다시 받고, 실패하면 실행 자체를 중단한다. `never`는 네트워크를 전혀 쓰지 않고, 이미지가 없으면 실행을 중단한다 |
 | `SBOM_IMAGE_TAR` | — | `docker save`로 만든 이미지 tar 경로. Windows 런처가 pull 대신 이 파일을 불러온다. 스크립트 옆에 `bomlens-image.tar`가 있으면 자동으로 사용한다. `SBOM_PULL=never`와 함께 쓰면 완전 오프라인 설치가 된다 |
 | `CVE_BIN_TOOL_MODE` | `auto` | 펌웨어 CVE 매칭 방식. `auto`는 번들 CVE 데이터베이스가 있으면 그걸 쓰고, 없으면 네트워크에 닿을 때 NVD에서 내려받음. `offline`은 번들 데이터베이스로만 매칭. `online`은 항상 네트워크에서 갱신. `components-only`는 CVE 매칭을 건너뛰고 구성요소만 담은 SBOM을 생성 |
@@ -98,8 +101,13 @@ BomLens의 전체 옵션과 분석 모드, CI/CD 통합 방법, 트러블슈팅�
 | `PROJECT_LICENSE` | — | `--license`와 같다. 프로젝트의 배포 라이선스를 SPDX 식별자로 지정한다. `bomlens:licenseConflict` 판정과 위험 보고서의 충돌 절을 만든다 |
 | `SBOM_AUTHOR` | — | `--sbom-author`와 같다. SBOM을 생성한 주체를 `metadata.authors`에 기록한다 |
 | `SECURITY_ENRICH` | `true` | 보안 보고서에 EPSS와 CISA KEV 신호를 보강. 폐쇄망에서는 `false`로 외부 조회 생략 |
+| `HTTP_PROXY`, `HTTPS_PROXY`, `NO_PROXY` | — | 스캔 컨테이너에 이름으로 전달(소문자 이름도). 이 컴퓨터의 루프백 주소(`127.0.0.1`, `localhost`)에 있는 프록시는 넘기지 않는다. 컨테이너 안에서는 그 주소가 컨테이너 자신이기 때문이다. 이때는 Docker의 프록시 설정이 적용된다 |
+| `TRIVY_*` | — | Trivy 설정을 이름으로 그대로 전달. 예: 데이터베이스 미러 `TRIVY_DB_REPOSITORY`, 오프라인 `TRIVY_SKIP_DB_UPDATE=true`. `TRIVY_CACHE_DIR`은 호스트 경로라 전달하지 않으므로 `SBOM_TRIVY_CACHE`를 쓴다 |
+| `SBOM_TRIVY_CACHE` | — | Trivy 캐시로 쓸 호스트 폴더. 취약점 데이터베이스를 스캔마다 받지 않고 한 번만 받는다(웹 UI의 스캔도). 오프라인 호스트에서는 데이터베이스를 여기에 넣고 `TRIVY_SKIP_DB_UPDATE=true`로 둔다. Linux에서는 안의 파일이 root 소유가 된다 |
+| `EPSS_API`, `KEV_URL` | 공개 엔드포인트 | EPSS와 CISA KEV 조회용 미러 |
 | `SECURITY_NVD_VERIFY` | `false` | `--deep-cve`와 함께: grype의 `nvd:cpe` 결과를 NVD 실시간 버전 범위와 대조해 범위 밖 오탐을 걸러낸다 (`NVD_API_KEY`와 네트워크 필요, 수 분 추가). 기본은 꺼짐 — 결과를 버리지 않고 버전 미검증으로 표시한다 |
 | `NVD_API_KEY` | — | `SECURITY_NVD_VERIFY`에 쓰는 NVD API 키. 컨테이너에 이름으로만 전달하며 명령줄에 노출하지 않는다 |
+| `SYFT_REGISTRY_AUTH_USERNAME`, `SYFT_REGISTRY_AUTH_PASSWORD`, `SYFT_REGISTRY_AUTH_TOKEN`, `SYFT_REGISTRY_AUTH_AUTHORITY` | — | 로컬 Docker 데몬에 없는 이미지를 스캔할 때 쓰는 비공개 레지스트리 자격 증명(`docker pull`로 받을 수 있는 이미지에는 필요 없다). `SYFT_REGISTRY_INSECURE_SKIP_TLS_VERIFY`, `SYFT_REGISTRY_INSECURE_USE_HTTP`, `SYFT_PLATFORM`도 함께 전달한다. 이름으로만 전달한다 |
 | `API_URL` | — | 업로드 서버 주소(DT 서버 또는 TRUSCA base) |
 | `API_KEY` | — | 업로드 자격. DT는 `X-Api-Key`, TRUSCA는 Bearer 토큰으로 쓰임 |
 | `UPLOAD_TARGET` | `dependency-track` | 업로드 대상: `dependency-track` 또는 `trusca` |

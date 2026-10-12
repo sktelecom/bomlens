@@ -29,6 +29,10 @@ if ! command -v trivy >/dev/null 2>&1; then
 fi
 
 JSON="${OUT_PREFIX}_security.json"
+# Trivy's own result, kept apart below only when another engine is merged in.
+# A copy left by an earlier run in the same folder is not this run's.
+TRIVY_ONLY="${OUT_PREFIX}_security_trivy.json"
+rm -f "$TRIVY_ONLY"
 MD="${OUT_PREFIX}_security.md"
 HTML="${OUT_PREFIX}_security.html"
 GEN_AT=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
@@ -180,6 +184,11 @@ for engine in cvebintool grype yocto; do
     [ -f "$SIDECAR" ] && jq -e '.Results' "$SIDECAR" >/dev/null 2>&1 || continue
     SIDE_N=$(jq '[.Results[].Vulnerabilities[]?] | length' "$SIDECAR" 2>/dev/null || echo 0)
     [ "${SIDE_N:-0}" -gt 0 ] || continue
+    # Keep Trivy's own output apart before the first merge: a program that runs
+    # this image as its scan engine reads one engine's results (the
+    # vulnerabilities.trivy output in bomlens-result.json). Without a sidecar
+    # there is no copy, and _security.json itself is Trivy's output.
+    [ -f "$TRIVY_ONLY" ] || cp "$JSON" "$TRIVY_ONLY"
     tmp_m="$(mktemp)"
     # Append the sidecar's Results but drop any (purl-or-name, cve) already present
     # in the accumulated report, so the raw _security.json is de-duplicated at the

@@ -1,0 +1,16 @@
+{
+  "_comment": "Digests of the cdxgen language images, for the image tag in source-detect.sh (CDXGEN_TAG). The execution plan (MODE=PLAN) names each stage-1 image by this digest, so a caller runs exactly the image this BomLens release was tested with. scripts/update-cdxgen-digests.sh refreshes the table after a tag bump; tests/test-engine-contract.sh checks it covers every image img_for_lang can return.",
+  "tag": "13.2.0",
+  "digests": {
+    "ghcr.io/cdxgen/cdxgen": "sha256:d58a9241bc4ae4a56c02476841f556f785af7be1d3f65e0cacd78b974bffaafc",
+    "ghcr.io/cdxgen/cdxgen-debian-rust": "sha256:f52e5d47dcf552005c86eaff1f3c8114601b6f806a3b9c2189fbeb194386d4c2",
+    "ghcr.io/cdxgen/cdxgen-debian-golang124": "sha256:3c77c6bb36850d31d5cc25da26c38ffe9711f242d163a68a71b357de1ea9c03d",
+    "ghcr.io/cdxgen/cdxgen-debian-ruby34": "sha256:f70ba7433467c96fce10151906318f725e8c33e06b4ebacb69c300cde2925915",
+    "ghcr.io/cdxgen/cdxgen-temurin-java21": "sha256:5d89e73e158897088fa854764df951078f967f9780c487b53cafe6c06fed0e60",
+    "ghcr.io/cdxgen/cdxgen-python312": "sha256:76ced67acb28c9573bc3f3f30038fe9667131749ad747cd0b2a9353e69494935",
+    "ghcr.io/cdxgen/cdxgen-alpine-node24": "sha256:1e46a41c801bfdb572a8226c49143831af4ee5ed954b2bd9cf55e58eda71a957",
+    "ghcr.io/cdxgen/cdxgen-debian-php84": "sha256:043a3447555e9240d45128f0c658d2b675201f82453e02696260c4c034cdbb3e",
+    "ghcr.io/cdxgen/cdxgen-debian-dotnet9": "sha256:97eae403222f35f25fdaa48e99e4f65a4dd78c9004f756b5eab178aa92dbacf9",
+    "ghcr.io/cdxgen/cdxgen-debian-swift": "sha256:94c38a154e0e3b3957d6f12747b17a66630cdc898a8d3553366c0f81156fe1e8"
+  }
+}

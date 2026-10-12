@@ -480,6 +480,10 @@ export class UiContainer {
       `SBOM_FIRMWARE_IMAGE=${this.firmwareImage}`,
       "-e",
       `SBOM_AIBOM_IMAGE=${this.aibomImage}`,
+      // A registry mirror for the source scans' cdxgen images, by name only:
+      // docker takes the value from this process's environment, if set.
+      "-e",
+      "CDXGEN_IMAGE_PREFIX",
       this.image,
     ];
     const r = await run(dockerBin, args);

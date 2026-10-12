@@ -145,13 +145,13 @@ The basic notice covers the licenses of dependencies (third-party). `--deep-lice
 ./scripts/scan-sbom.sh --project "MyApp" --version "1.0.0" --notice --deep-license --generate-only
 ```
 
-In the web UI, deep license detection is one of the Generation options. Either way it relies on scancode, which is heavy and slow (minutes to tens of minutes for a large repo) and is not in the base image. To use it, run from an image that bundles scancode:
+scancode is heavy and slow (minutes to tens of minutes for a large repo), so it is not in the base image. The CLI runs a source scan's post-process step on the opt-in `ghcr.io/sktelecom/bomlens-deep-license:latest` image when the flag is set, and pulls it automatically (override with `SBOM_DEEP_LICENSE_IMAGE`). In the web UI, deep license detection is one of the Generation options and needs the UI itself to run from that image:
 
 > ```bash
-> docker build --build-arg SBOM_DEEP_LICENSE=true -t bomlens:deep ./docker
-> # CLI:    SBOM_SCANNER_IMAGE=bomlens:deep ./scripts/scan-sbom.sh ... --deep-license
-> # Web UI: SBOM_SCANNER_IMAGE=bomlens:deep ./scripts/scan-sbom.sh --ui
+> SBOM_SCANNER_IMAGE=ghcr.io/sktelecom/bomlens-deep-license:latest ./scripts/scan-sbom.sh --ui
 > ```
+
+Only the project's own files are scanned: dependency folders (`node_modules`, `vendor`, virtual environments), build output and tool folders are left out, since their licences come from the package managers. A tree with more than 20,000 such files is not scanned, and scancode is stopped after 600 seconds; `DEEP_LICENSE_MAX_FILES` and `DEEP_LICENSE_TIMEOUT` change the limits ([Docker image environment variables](../reference/docker-image.md#environment-variables)). Either case is noted in the log and in the run's [result manifest](../reference/engine-contract.md).
 
 Additional output: `MyApp_1.0.0_scancode.json`
 
@@ -210,7 +210,7 @@ The private key is mounted read-only into the container. Additional output: `MyA
 | Symptom | Cause / fix |
 |---------|-------------|
 | `trivy not installed ... skipping` | old image. Pull the latest image with `docker pull`. |
-| `--deep-license requested but scancode not in image` | build the image with `--build-arg SBOM_DEEP_LICENSE=true`. |
+| `--deep-license requested but scancode not in image` | run with the `bomlens-deep-license` image (the CLI does this for a source scan unless `SBOM_SCANNER_IMAGE` names another image), or build one with `--build-arg SBOM_DEEP_LICENSE=true`. |
 | `Docker is not running` in the UI | start the Docker engine (Rancher Desktop/Docker Desktop, etc.) and run it again. |
 | Many `NOASSERTION` in the notice | the dependencies have no license metadata. Supplement with `--deep-license` or check manually. |
 | Port conflict (`--ui`) | specify a different port with `UI_PORT`. |

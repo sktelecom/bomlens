@@ -1896,7 +1896,7 @@ else
         fi
 
         if [ "$libn" -gt 0 ] 2>/dev/null && jq -e --arg pt "pkg:$purl_type/" --arg dv "distro=$distro_value" \
-            '[.components[]? | select(.type=="library") | select((.purl // "") | (startswith($pt) and contains($dv)) | not)] | length == 0' \
+            '[.components[]? | select(.type=="library") | select((.purl // "") | (startswith($pt) and ((split("#")[0] | split("?")[1] // "" | split("&")) | index([$dv]) != null)) | not)] | length == 0' \
             "$bom" >/dev/null 2>&1; then
             pass "rootfs ($label): every library purl is pkg:$purl_type/... with distro=$distro_value"
         else
@@ -1978,7 +1978,7 @@ else
     }
 
     rootfs_distro_case "debian" "$ROOTFS_DEBIAN_IMG" "deb" "debian-12.15" "debian" "12.15" 40 200
-    rootfs_distro_case "alpine" "$ROOTFS_ALPINE_IMG" "apk" "alpine-3.20.10" "alpine" "3.20.10" 5 40
+    rootfs_distro_case "alpine" "$ROOTFS_ALPINE_IMG" "apk" "3.20.10" "alpine" "3.20.10" 5 40
     rootfs_distro_case "rocky" "$ROOTFS_ROCKY_IMG" "rpm" "rocky-9.3" "rocky" "9" 50 250
 
     # A rootfs with no apk/dpkg/rpm database still routes to ROOTFS (etc/ plus

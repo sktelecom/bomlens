@@ -81,6 +81,9 @@ fi
 # becomes a non-unique codelocation in some SBOM import platforms and blocks unrelated imports. We
 # reach here only after a successful stamp, so a mismatch means the write silently
 # did not take — and src/app means the caller itself passed a colliding name.
+# The collision happens on upload only: with UPLOAD_ENABLED=false (an execution
+# plan's caller keeps the SBOM for itself, and may well call a project "app")
+# the name is used as given, with a warning.
 ACTUAL="$(jq -r '.metadata.component.name // ""' "$SBOM" 2>/dev/null)"
 if [ "$ACTUAL" != "$NAME" ]; then
     echo "[stamp] ERROR: metadata.component.name is '${ACTUAL}', expected '${NAME}' — stamp did not take." >&2
@@ -88,7 +91,11 @@ if [ "$ACTUAL" != "$NAME" ]; then
 fi
 case "$ACTUAL" in
     src|app)
-        echo "[stamp] ERROR: metadata.component.name is the generic placeholder '${ACTUAL}', which collides across submissions. Pass a distinct --project name." >&2
-        exit 1
+        if [ "${UPLOAD_ENABLED:-true}" = "false" ]; then
+            echo "[stamp] WARN: the project name '${ACTUAL}' is also the name scanners give a project they cannot name; an SBOM import platform may confuse it with others. Kept, since nothing is uploaded." >&2
+        else
+            echo "[stamp] ERROR: metadata.component.name is the generic placeholder '${ACTUAL}', which collides across submissions. Pass a distinct --project name." >&2
+            exit 1
+        fi
         ;;
 esac

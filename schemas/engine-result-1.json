@@ -1,0 +1,98 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/sktelecom/bomlens/blob/main/schemas/engine-result-1.json",
+  "title": "BomLens engine result manifest (contract 1.x)",
+  "description": "bomlens-result.json, written to the output folder by every scan. See docs/reference/engine-contract.md.",
+  "type": "object",
+  "required": ["contract", "engine", "input", "run", "steps", "outputs"],
+  "properties": {
+    "contract": {
+      "type": "object",
+      "required": ["name", "version"],
+      "properties": {
+        "name": { "const": "bomlens-engine" },
+        "version": { "type": "string", "pattern": "^1\\.\\d+\\.\\d+(-[0-9A-Za-z.-]+)?$" }
+      }
+    },
+    "engine": {
+      "type": "object",
+      "required": ["version", "image", "image_digest"],
+      "properties": {
+        "version": { "type": ["string", "null"] },
+        "image": { "type": ["string", "null"] },
+        "image_digest": { "type": ["string", "null"] }
+      }
+    },
+    "input": {
+      "type": "object",
+      "required": ["kind", "mode"],
+      "properties": {
+        "kind": { "enum": ["source", "image", "sbom", "binary", "rootfs", "firmware", "ai-model", "dataset", "unknown"] },
+        "mode": { "type": "string" },
+        "target": { "type": ["string", "null"] }
+      }
+    },
+    "run": {
+      "type": "object",
+      "required": ["status", "started_at", "ended_at", "exit_code"],
+      "properties": {
+        "status": { "enum": ["succeeded", "succeeded_degraded", "failed", "cancelled"] },
+        "reason": { "enum": ["exit_code", "cancelled", "step_failed_or_degraded", null] },
+        "started_at": { "type": "string", "format": "date-time" },
+        "ended_at": { "type": "string", "format": "date-time" },
+        "exit_code": { "type": "integer" }
+      }
+    },
+    "steps": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "status", "reason", "stage", "started_at", "ended_at"],
+        "properties": {
+          "id": { "type": "string", "pattern": "^[a-z0-9-]+$" },
+          "stage": { "enum": [1, 2] },
+          "status": { "enum": ["ok", "degraded", "failed", "skipped", "disabled"] },
+          "reason": { "enum": ["failed", "timeout", "not_installed", "too_large", "fallback", "unavailable", "budget_exhausted", "no_input", "no_components", null] },
+          "detail": { "type": ["string", "null"], "maxLength": 500 },
+          "started_at": { "type": "string", "format": "date-time" },
+          "ended_at": { "type": "string", "format": "date-time" },
+          "counts": { "type": "object", "additionalProperties": { "type": "integer" } }
+        }
+      }
+    },
+    "tools": {
+      "type": "object",
+      "additionalProperties": { "type": "string" }
+    },
+    "engines": {
+      "type": "array",
+      "items": { "enum": ["trivy", "grype", "cve-bin-tool", "yocto"] }
+    },
+    "data_sources": {
+      "type": "object",
+      "properties": {
+        "trivy_db": {
+          "type": ["object", "null"],
+          "properties": {
+            "schema_version": { "type": ["integer", "null"] },
+            "updated_at": { "type": ["string", "null"] },
+            "downloaded_at": { "type": ["string", "null"] }
+          }
+        }
+      }
+    },
+    "outputs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["role", "path", "sha256", "bytes"],
+        "properties": {
+          "role": { "enum": ["sbom.cyclonedx", "sbom.spdx", "sbom.spdx3", "vulnerabilities.trivy", "vulnerabilities.all", "vulnerabilities.other", "license-scan.scancode", "vendored.cyclonedx", "conformance", "input-description", "plan", "events", "other"] },
+          "path": { "type": "string", "pattern": "^[^/]+$" },
+          "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+          "bytes": { "type": "integer", "minimum": 0 }
+        }
+      }
+    }
+  }
+}

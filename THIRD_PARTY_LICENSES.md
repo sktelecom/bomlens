@@ -10,7 +10,7 @@ BomLens (Apache-2.0) keeps its own code in shell scripts and bundles several ope
 - The tool binaries are still redistributed inside the images, so the license texts and, for GPL tools, a path to the corresponding source are provided. The SPDX license texts (Apache-2.0, MIT, GPL-2.0, GPL-3.0, and others) ship inside the images at `/usr/local/lib/sbom/licenses/`, and each tool's source is available from the Source URL in the tables below.
 - BomLens ships its own terms with every distribution. In the images they are at `/usr/local/lib/sbom/notices/`, holding `LICENSE`, `NOTICE`, and this document; in the release bundles they sit at the top of the extracted tree; in the desktop installer they are in the app's resources folder. Passing those files along when you redistribute an image or a bundle is what Apache-2.0 §4 asks for.
 - No AGPL-licensed tool is included. Running the web UI (`--ui`) therefore does not trigger the AGPL §13 network clause.
-- The GPL-licensed analysis tools live only in a separate opt-in image (`bomlens-firmware`). The tools installed into the base image (`bomlens`) and into the other opt-in images (`bomlens-aibom`, `bomlens-deep-cve`) are permissive.
+- The GPL-licensed analysis tools live only in a separate opt-in image (`bomlens-firmware`). The tools installed into the base image (`bomlens`) and into the opt-in images `bomlens-aibom` and `bomlens-deep-cve` are permissive. The opt-in `bomlens-deep-license` image adds LGPL components (7-Zip on linux/amd64, intbitset, chardet); their source is inside that image, see [its section](#deep-license-image-ghcriosktelecombomlens-deep-license-contains-lgpl-opt-in).
 - Every image, the base one included, is built on `python:3.12-slim` and therefore also contains Debian system packages under the GPL, the LGPL and other licenses. That is inherent to any Linux base image; there is no GPL-free one. See [Debian packages in every image](#debian-packages-in-every-image) below for what this means and where the source is.
 
 ## Base image — `ghcr.io/sktelecom/bomlens` (BomLens tools; see also the Debian base below)
@@ -22,7 +22,7 @@ BomLens (Apache-2.0) keeps its own code in shell scripts and bundles several ope
 | Trivy | Vulnerability scanning | Apache-2.0 | https://github.com/aquasecurity/trivy |
 | trivy-db | Vulnerability database | Apache-2.0 | https://github.com/aquasecurity/trivy-db |
 | cosign | SBOM signing | Apache-2.0 | https://github.com/sigstore/cosign |
-| scancode-toolkit | Detailed license detection. Build-time opt-in (`SBOM_DEEP_LICENSE=true`); **not present in the published images**, which are built with the default `false` | Apache-2.0 (parts of the dataset CC-BY-4.0 and others) | https://github.com/aboutcode-org/scancode-toolkit |
+| scancode-toolkit | Detailed license detection. Not in this image; it ships only in the opt-in `bomlens-deep-license` image, see below | Apache-2.0 AND CC-BY-4.0 | https://github.com/aboutcode-org/scancode-toolkit |
 | scanoss (scanoss.py) | Vendored open-source identification (bundled by default; disable with `SBOM_SCANOSS=false`) | MIT (the bundled `osadl-copyleft.json` dataset is CC-BY-4.0) | https://github.com/scanoss/scanoss.py |
 | owasp-aibom-generator | AI model SBOM generation (opt-in `SBOM_AIBOM`, separate image `bomlens-aibom`; calls the HuggingFace API) | Apache-2.0 | https://github.com/GenAI-Security-Project/aibom-generator |
 | picklescan | Pickle analysis for scanned AI model files — whether loading the weights would run code (always installed; pure Python, no network) | MIT | https://github.com/mmaitre314/picklescan |
@@ -163,6 +163,63 @@ The version below matches the build ARG default in `docker/Dockerfile` (pinned; 
 | grype | v0.119.0 (`GRYPE_VERSION`) | CPE-based NVD CVE matching | Apache-2.0 | permissive | https://github.com/anchore/grype |
 
 Data: the grype vulnerability database baked into the image at build time is assembled by Anchore from public vulnerability sources — NVD (public domain), GitHub Security Advisories (CC-BY-4.0), and distribution security databases (each under its own terms). The database is pinned with `GRYPE_DB_AUTO_UPDATE=false`, so no network access happens during a scan.
+
+## deep-license image: `ghcr.io/sktelecom/bomlens-deep-license` (contains LGPL, opt-in)
+
+This is a separate opt-in image for `--deep-license`. It adds scancode-toolkit, which reads license and copyright statements from the project's own files. scancode and the native libraries it needs are large, so they are kept out of the base image.
+Build: `docker build --build-arg SBOM_DEEP_LICENSE=true -t bomlens-deep-license ./docker`.
+
+The versions below match the build ARG defaults in `docker/Dockerfile` (pinned; overridable through the ARG).
+
+| Tool | Pinned version (ARG) | Purpose | License (SPDX) | Copyleft | Source |
+|------|----------------------|---------|----------------|----------|--------|
+| scancode-toolkit | 32.5.0 (`SCANCODE_VERSION`) | License and copyright detection in source files | Apache-2.0 (code) AND CC-BY-4.0 (detection data) | permissive | https://github.com/aboutcode-org/scancode-toolkit |
+| chardet | 6.0.0.post1 (`CHARDET_VERSION`) | Character encoding detection (a scancode dependency), pure Python | LGPL-2.1-or-later | weak (LGPL) | https://github.com/chardet/chardet |
+| intbitset | 4.1.2 (`INTBITSET_VERSION`) | Compiled integer-set extension (a scancode dependency) | LGPL-3.0-or-later | weak (LGPL) | https://github.com/inveniosoftware-contrib/intbitset |
+| extractcode-7z | 16.5.210531 (`EXTRACTCODE_7Z_VERSION`, linux/amd64) | Prebuilt 7-Zip (p7zip 16.02) used by scancode to extract archives | Apache-2.0 (package); 7-Zip is LGPL-2.1-or-later, its RAR code also under the unRAR restriction | weak (LGPL) | https://github.com/aboutcode-org/scancode-plugins |
+
+Data: scancode's license and copyright detection data is bundled unmodified under CC-BY-4.0 (https://creativecommons.org/licenses/by/4.0/legalcode). Copyright (c) nexB Inc. and others. All rights reserved. ScanCode is a trademark of nexB Inc.
+
+### Python packages installed with scancode-toolkit
+
+pip resolves the rest of scancode-toolkit's dependencies when the image is built, so their exact versions follow the build. The table below is the resolution at the time of writing; for the image you hold, the record is its own package list and the CycloneDX SBOM attested to it:
+
+```bash
+docker run --rm --entrypoint python3 ghcr.io/sktelecom/bomlens-deep-license:latest -m pip list
+```
+
+Each package's license text stays in the image in its `*.dist-info/` directory under `/usr/local/lib/python3.12/site-packages/`.
+
+| License (SPDX) | Packages |
+|----------------|----------|
+| Apache-2.0 | commoncode, container-inspector, cyseq, extractcode, fasteners, ftfy, importlib-metadata, license-expression, parameter-expansion-patched, plugincode, pygmars, pymaven-patch, requests, saneyaml, spdx-tools, typecode |
+| Apache-2.0 OR BSD (used under Apache-2.0) | cryptography, packaging, packvers |
+| Apache-2.0 AND BSD-3-Clause AND MIT | debian-inspector |
+| MIT | attrs, banal, beartype, beautifulsoup4, binaryornot, charset-normalizer, dparse2, fingerprints, html5lib, jaraco.functools, javaproperties, jsonstreams, more-itertools, normality, packageurl-python, pdfminer.six, pefile, pip-requirements-parser, pkginfo2, pluggy, pyparsing, PyYAML, six, soupsieve, toml, uritools, urllib3, urlpy, wcwidth, xmltodict, zipp |
+| MIT-0 | cffi |
+| BSD-2-Clause | boolean.py, Pygments |
+| BSD-3-Clause | click, colorama, dockerfile-parse, idna, Jinja2, lxml, MarkupSafe, multiregex, ply, pycparser, rdflib, semantic-version, webencodings |
+| BSD-3-Clause AND public domain | pyahocorasick |
+| PSF-2.0 | typing_extensions |
+| MPL-2.0 | certifi; publicsuffix2 (MIT AND MPL-2.0). Both are shipped unmodified in source form |
+| GPL-3.0-or-later OR MIT (used under MIT) | gemfileparser2 |
+| Artistic-1.0-Perl OR GPL-2.0-or-later (used under Artistic-1.0-Perl) | text-unidecode |
+| LGPL | chardet, intbitset (see the table above) |
+
+On linux/amd64 two more scancode plugins carry prebuilt native libraries, with their license files under each package's `licenses/` directory: extractcode-libarchive (libarchive 3.5.1 with bzip2, expat, libb2, lz4, xz, zlib and zstd; BSD-2-Clause and other permissive terms, zstd used under BSD-3-Clause) and typecode-libmagic (libmagic from file 5.39 and zlib; BSD-2-Clause and other permissive terms). On linux/arm64 these packages, and extractcode-7z, carry no binaries.
+
+The image adds these Debian packages to the base: libarchive13t64 (BSD-2-Clause and other permissive terms), libxml2 (MIT) and libicu (Unicode-3.0). Their source is the Debian source package; see [Debian packages in every image](#debian-packages-in-every-image).
+
+### LGPL components and their source
+
+7-Zip (linux/amd64), intbitset and chardet are redistributed unmodified. chardet ships as Python source. The 7-Zip executable runs as a separate process, and intbitset is an extension module loaded at run time, so either can be replaced with your own build. Their license texts ship inside the image at `/usr/local/lib/sbom/licenses/`.
+
+The source for 7-Zip and intbitset is inside the image, under `/usr/share/bomlens/sources/`:
+
+- `p7zip-16.02/`: the upstream p7zip 16.02 source, the Debian security patches and the AES patch that the Homebrew p7zip 16.02 formula applies (the build named in the plugin's own `INSTALL_RECEIPT.json`), and a README with the build steps.
+- `intbitset-4.1.2/`: the source distribution of the installed intbitset version, from PyPI.
+
+Each file is checked against a pinned sha256 when the image is built, and the build fails if the installed 7-Zip or intbitset is not the version the bundled source is for.
 
 ## Android SDK image — built by you, not published
 

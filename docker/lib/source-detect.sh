@@ -21,6 +21,12 @@
 CDXGEN_TAG="${CDXGEN_TAG:-13.2.0}"                               # cdxgen language image tag
 # renovate: datasource=docker depName=ghcr.io/cdxgen/cdxgen
 CDXGEN_ALLINONE="${CDXGEN_ALLINONE:-ghcr.io/cdxgen/cdxgen:13.2.0}"
+# Where the cdxgen images are pulled from: everything before the image name.
+# A registry mirror (a network with no route to ghcr.io) sets its own, for
+# example registry.example/mirror/cdxgen/; the names, the tag and, in the
+# execution plan, the digests stay the same.
+CDXGEN_IMAGE_PREFIX="${CDXGEN_IMAGE_PREFIX:-ghcr.io/cdxgen/}"
+case "$CDXGEN_IMAGE_PREFIX" in */) ;; *) CDXGEN_IMAGE_PREFIX="$CDXGEN_IMAGE_PREFIX/" ;; esac
 # A local name, not a registry one: the Android SDK is not open source and its
 # terms bar redistributing it, so this image is built on the machine that uses
 # it rather than published. scan-sbom.sh prints the build command when it is
@@ -38,14 +44,64 @@ FETCH_LICENSE="${FETCH_LICENSE:-true}"
 # container, so every path that starts it (scan-sbom.sh stage 1, the web UI
 # container, generate_sbom_cdxgen in entrypoint.sh) passes these on by name.
 # docker skips a name-only -e whose variable is unset.
+# The proxy variables reach the package managers cdxgen runs; passed on with
+# the options above.
+PROXY_ENV_NAMES="HTTP_PROXY HTTPS_PROXY NO_PROXY http_proxy https_proxy no_proxy"
 BUILD_PREP_ENV_NAMES="BOMLENS_KEEP_BUILD_OUTPUT BOMLENS_MAVEN_FULL_GRAPH BOMLENS_ANDROID_FULL_GRAPH BOMLENS_NODE_FULL_GRAPH BOMLENS_PHP_FULL_GRAPH BOMLENS_INCLUDE_NON_SHIPPED BOMLENS_NO_COPYRIGHT BOMLENS_NO_CARGO_LICENSE BOMLENS_PREP_TIMEOUT"
+
+# Settings for the network the post-processing container reaches: the proxy,
+# where Trivy gets its vulnerability database (a mirror, or a cache with the
+# update skipped) and the EPSS and KEV lookups (off, or a mirror). Passed on
+# by name, so a value is never on a command line.
+STAGE2_NETWORK_ENV_NAMES="$PROXY_ENV_NAMES TRIVY_DB_REPOSITORY TRIVY_JAVA_DB_REPOSITORY TRIVY_SKIP_DB_UPDATE TRIVY_SKIP_JAVA_DB_UPDATE TRIVY_OFFLINE_SCAN TRIVY_USERNAME TRIVY_PASSWORD TRIVY_REGISTRY_TOKEN TRIVY_INSECURE BOMLENS_TRIVY_DB_MAX_AGE_DAYS KEV_URL EPSS_API"
+
+# Prints "-e NAME" for the names above and for any other TRIVY_* variable set
+# here, except TRIVY_CACHE_DIR: a path on this host means nothing in the
+# container (the CLI mounts a cache folder with SBOM_TRIVY_CACHE instead).
+# Names only, safe inside the eval'd docker command.
+stage2_network_env_args() {
+    local n out=""
+    for n in $(_passable_names $STAGE2_NETWORK_ENV_NAMES) $(compgen -e | grep '^TRIVY_' | grep -vx 'TRIVY_CACHE_DIR' || true); do
+        case " $out " in *" -e $n "*) ;; *) out="$out -e $n" ;; esac
+    done
+    printf '%s' "${out# }"
+}
+
+# The names given, less a proxy set to this machine's own loopback address
+# (a local authenticating proxy at 127.0.0.1 or localhost): inside a container
+# that address is the container itself, so the proxy Docker sets up for its
+# containers is left to apply instead.
+_passable_names() {
+    local n v
+    for n in "$@"; do
+        case "$n" in
+            HTTP_PROXY|HTTPS_PROXY|http_proxy|https_proxy)
+                v="${!n:-}"
+                case "$v" in
+                    *://127.*|127.*|*://localhost|*://localhost[:/]*|localhost|localhost[:/]*|*://\[::1\]*|\[::1\]*) continue ;;
+                esac ;;
+        esac
+        printf '%s\n' "$n"
+    done
+}
 
 # Prints "-e NAME" for each name above. Names only, never values, so the output
 # is safe to splice into the eval'd docker command in scan-sbom.sh.
 build_prep_env_args() {
     local n out=""
-    for n in $BUILD_PREP_ENV_NAMES; do out="$out -e $n"; done
+    for n in $BUILD_PREP_ENV_NAMES $(_passable_names $PROXY_ENV_NAMES); do out="$out -e $n"; done
     printf '%s' "${out# }"
+}
+
+# The SBOM_TRIVY_CACHE folder as "-v <host path>:/trivy-cache -e TRIVY_CACHE_DIR"
+# arguments, one per line, or nothing when it is unset or cannot be made.
+trivy_cache_args() {
+    [ -n "${SBOM_TRIVY_CACHE:-}" ] || return 0
+    if ! mkdir -p "$SBOM_TRIVY_CACHE" 2>/dev/null || [ ! -d "$SBOM_TRIVY_CACHE" ]; then
+        echo "[WARN] SBOM_TRIVY_CACHE=$SBOM_TRIVY_CACHE is not a folder that can be created; Trivy keeps its database in the container." >&2
+        return 0
+    fi
+    printf '%s\n' -v "$(cd "$SBOM_TRIVY_CACHE" && pwd):/trivy-cache" -e TRIVY_CACHE_DIR=/trivy-cache
 }
 
 # Folders whose manifests a source scan leaves out by default: test suites and
@@ -54,13 +110,122 @@ build_prep_env_args() {
 # product. build-prep.sh runs alone in the cdxgen container and keeps its own
 # copy of both lists; tests/test-postprocess.sh checks the copies stay equal.
 # BOMLENS_INCLUDE_NON_SHIPPED=1 (or true) keeps everything.
-NON_SHIPPED_DIRS="test tests spec fixtures testdata __tests__ e2e example examples benches benchmarks playground samples"
+NON_SHIPPED_DIRS="test tests spec fixtures testdata __tests__ e2e example examples sample samples bench benches benchmark benchmarks demo demos playground"
 NON_SHIPPED_MANIFEST_RE='(^|/)(package\.json|package-lock\.json|npm-shrinkwrap\.json|yarn\.lock|pnpm-lock\.yaml|bun\.lockb?|requirements[^/]*\.txt|pyproject\.toml|poetry\.lock|uv\.lock|Pipfile|Pipfile\.lock|setup\.py|setup\.cfg|environment\.ya?ml|pom\.xml|build\.gradle(\.kts)?|settings\.gradle(\.kts)?|gradle\.lockfile|go\.mod|go\.sum|Cargo\.toml|Cargo\.lock|Gemfile|Gemfile\.lock|[^/]+\.gemspec|composer\.json|composer\.lock|[^/]+\.(cs|fs|vb)proj|packages\.config|packages\.lock\.json|Directory\.Packages\.props|Package\.swift|Package\.resolved|Podfile|Podfile\.lock|conanfile\.txt|conanfile\.py|vcpkg\.json|METADATA|PKG-INFO)$'
 
 # True unless BOMLENS_INCLUDE_NON_SHIPPED asks to keep the non-shipped trees.
 non_shipped_enabled() {
     case "${BOMLENS_INCLUDE_NON_SHIPPED:-}" in 1|true) return 1 ;; esac
     return 0
+}
+
+# _declares_deps <file>: true when a manifest or lock file lists at least one
+# dependency. A file whose format this does not know counts as declaring.
+# Development-only dependencies do not count for package.json: a source scan
+# leaves them out, so an empty result is then correct.
+_declares_deps() {
+    local f="$1"
+    case "$f" in
+        */package.json|package.json)
+            jq -e '[.dependencies, .optionalDependencies, .peerDependencies]
+                   | map(select(type == "object") | length) | add // 0 | . > 0' "$f" >/dev/null 2>&1 ;;
+        */package-lock.json|package-lock.json|*/npm-shrinkwrap.json|npm-shrinkwrap.json)
+            jq -e '(.packages // {} | keys | map(select(. != "")) | length) + (.dependencies // {} | length) > 0' "$f" >/dev/null 2>&1 ;;
+        */yarn.lock|yarn.lock|*/pnpm-lock.yaml|pnpm-lock.yaml)
+            grep -Eq '^[^#[:space:]][^:]*:[[:space:]]*$|^  [^ #][^:]*:[[:space:]]*$' "$f" 2>/dev/null \
+                && grep -Eq 'version|resolution' "$f" 2>/dev/null ;;
+        */pyproject.toml|pyproject.toml)
+            awk '
+                /^\[project\][[:space:]]*$/ { sec="project"; next }
+                /^\[tool\.poetry\.(group\.[^]]+\.)?dependencies\][[:space:]]*$/ { sec="poetry"; next }
+                /^\[/ { sec=""; inarr=0; next }
+                sec=="project" && /^[[:space:]]*dependencies[[:space:]]*=[[:space:]]*\[/ {
+                    line=$0; sub(/^[^[]*\[/, "", line)
+                    if (line ~ /["'"'"']/) found=1; else inarr=1; next }
+                inarr && /["'"'"']/ { found=1 }
+                inarr && /\]/ { inarr=0 }
+                sec=="poetry" && /^[[:space:]]*[A-Za-z0-9_.-]+[[:space:]]*=/ {
+                    k=$0; sub(/[[:space:]]*=.*/, "", k); gsub(/[[:space:]]/, "", k)
+                    if (tolower(k) != "python") found=1 }
+                END { exit !found }' "$f" ;;
+        */Cargo.toml|Cargo.toml)
+            awk '/^\[(.*\.)?(dev-|build-)?dependencies\][[:space:]]*$/{t=1; next} /^\[(.*\.)?(dev-|build-)?dependencies\.[^]]+\]/{found=1} /^\[/{t=0} t && /^[A-Za-z0-9_-]+[[:space:]]*=/{found=1} END{exit !found}' "$f" ;;
+        */Cargo.lock|Cargo.lock)
+            [ "$(grep -c '^\[\[package\]\]' "$f" 2>/dev/null)" -gt 1 ] ;;
+        */go.mod|go.mod)
+            grep -Eq '^[[:space:]]*require[[:space:]]' "$f" 2>/dev/null ;;
+        */go.sum|go.sum)
+            [ -s "$f" ] ;;
+        */requirements*.txt|requirements*.txt)
+            grep -Eq '^[[:space:]]*[A-Za-z0-9]' "$f" 2>/dev/null ;;
+        */Pipfile|Pipfile)
+            awk '/^\[packages\]/{t=1; next} /^\[/{t=0} t && /^[A-Za-z0-9_.-]+[[:space:]]*=/{found=1} END{exit !found}' "$f" ;;
+        */pom.xml|pom.xml)
+            grep -q '<dependency>' "$f" 2>/dev/null ;;
+        */build.gradle|build.gradle|*/build.gradle.kts|build.gradle.kts)
+            grep -Eq '^[[:space:]]*(implementation|api|compile|runtimeOnly|compileOnly)[[:space:](]' "$f" 2>/dev/null ;;
+        */settings.gradle|settings.gradle|*/settings.gradle.kts|settings.gradle.kts)
+            return 1 ;;
+        */Gemfile|Gemfile)
+            grep -Eq '^[[:space:]]*gem[[:space:]]' "$f" 2>/dev/null ;;
+        */Gemfile.lock|Gemfile.lock)
+            grep -Eq '^    [A-Za-z0-9]' "$f" 2>/dev/null ;;
+        *.csproj|*.fsproj|*.vbproj)
+            grep -q 'PackageReference' "$f" 2>/dev/null ;;
+        */packages.config|packages.config)
+            grep -q '<package ' "$f" 2>/dev/null ;;
+        */composer.json|composer.json)
+            jq -e '(.require // {}) | keys | map(select(. != "php" and (startswith("ext-") | not))) | length > 0' "$f" >/dev/null 2>&1 ;;
+        */Package.swift|Package.swift)
+            grep -q '\.package(' "$f" 2>/dev/null ;;
+        */Podfile|Podfile)
+            grep -Eq '^[[:space:]]*pod[[:space:]]' "$f" 2>/dev/null ;;
+        *) return 0 ;;
+    esac
+}
+
+# source_manifests <dir> [max]: the dependency manifests and lock files in a
+# source tree that declare at least one dependency (_declares_deps), as paths
+# relative to <dir> joined with ", " (at most [max], default 5). Dependency,
+# VCS and non-shipped folders are skipped; an installed package's own
+# METADATA/PKG-INFO is not a manifest. The tree is listed once and filtered by
+# name in one grep, so a large source tree costs a single walk.
+source_manifests() {
+    local dir="$1" max="${2:-5}" f rel out="" n=0
+    local -a prune=(-name .git -o -name node_modules -o -name vendor -o -name .venv -o -name site-packages)
+    if non_shipped_enabled; then
+        for f in $NON_SHIPPED_DIRS; do prune+=(-o -name "$f"); done
+    fi
+    while IFS= read -r f; do
+        [ -n "$f" ] || continue
+        rel="${f#"$dir"/}"
+        case "$rel" in */METADATA|METADATA|*/PKG-INFO|PKG-INFO) continue ;; esac
+        _declares_deps "$f" || continue
+        out="$out, $rel"
+        n=$((n + 1))
+        [ "$n" -ge "$max" ] && break
+    done < <(find "$dir" \( -type d \( "${prune[@]}" \) -prune \) -o -type f -print 2>/dev/null \
+             | grep -E "$NON_SHIPPED_MANIFEST_RE" | LC_ALL=C sort)
+    printf '%s' "${out#, }"
+}
+
+# stage1_fail_reason <oom> [log] [exit code]: why stage 1 (cdxgen) gave no
+# SBOM, in the words bomlens:sbom-tool-degraded uses: oom (the container was
+# killed for memory), cdxgen-unavailable (exit 127, the shell's "command not
+# found": stage 1 never started, or a caller of an unsupported plan says it
+# did not run), disk-space, network, or cdxgen-crash. The CLI and the
+# post-processing step both classify with this.
+stage1_fail_reason() {
+    if [ "${1:-}" = "true" ]; then echo oom; return; fi
+    if [ "${3:-}" = "127" ]; then echo cdxgen-unavailable; return; fi
+    local log="${2:-}"
+    if [ -n "$log" ] && [ -f "$log" ]; then
+        if grep -qi "no space left on device" "$log"; then echo disk-space; return; fi
+        if grep -qEi "temporary failure in name resolution|could not resolve host|network is unreachable|connection timed out|connect timed out|no route to host|ENOTFOUND|ETIMEDOUT" "$log"; then
+            echo network; return
+        fi
+    fi
+    echo cdxgen-crash
 }
 
 # The glob patterns applied, relative to the scan root, joined with ", ".
@@ -329,17 +494,23 @@ detect_lang() {
 }
 
 img_for_lang() {
+    local p="$CDXGEN_IMAGE_PREFIX"
     case "$1" in
-        rust)   echo "ghcr.io/cdxgen/cdxgen-debian-rust:$CDXGEN_TAG" ;;
-        go)     echo "ghcr.io/cdxgen/cdxgen-debian-golang124:$CDXGEN_TAG" ;;
-        ruby)   echo "ghcr.io/cdxgen/cdxgen-debian-ruby34:$CDXGEN_TAG" ;;
-        java)   echo "ghcr.io/cdxgen/cdxgen-temurin-java21:$CDXGEN_TAG" ;;
-        python) echo "ghcr.io/cdxgen/cdxgen-python312:$CDXGEN_TAG" ;;
-        node)   echo "ghcr.io/cdxgen/cdxgen-alpine-node24:$CDXGEN_TAG" ;;
-        php)    echo "ghcr.io/cdxgen/cdxgen-debian-php84:$CDXGEN_TAG" ;;
-        dotnet) echo "ghcr.io/cdxgen/cdxgen-debian-dotnet9:$CDXGEN_TAG" ;;
-        swift)  echo "ghcr.io/cdxgen/cdxgen-debian-swift:$CDXGEN_TAG" ;;
-        *)      echo "$CDXGEN_ALLINONE" ;;   # mixed / unknown
+        rust)   echo "${p}cdxgen-debian-rust:$CDXGEN_TAG" ;;
+        go)     echo "${p}cdxgen-debian-golang124:$CDXGEN_TAG" ;;
+        ruby)   echo "${p}cdxgen-debian-ruby34:$CDXGEN_TAG" ;;
+        java)   echo "${p}cdxgen-temurin-java21:$CDXGEN_TAG" ;;
+        python) echo "${p}cdxgen-python312:$CDXGEN_TAG" ;;
+        node)   echo "${p}cdxgen-alpine-node24:$CDXGEN_TAG" ;;
+        php)    echo "${p}cdxgen-debian-php84:$CDXGEN_TAG" ;;
+        dotnet) echo "${p}cdxgen-debian-dotnet9:$CDXGEN_TAG" ;;
+        swift)  echo "${p}cdxgen-debian-swift:$CDXGEN_TAG" ;;
+        # mixed / unknown: the all-in-one image, from the mirror too unless
+        # CDXGEN_ALLINONE names another
+        *)      case "$CDXGEN_ALLINONE" in
+                    ghcr.io/cdxgen/*) echo "${p}${CDXGEN_ALLINONE#ghcr.io/cdxgen/}" ;;
+                    *) echo "$CDXGEN_ALLINONE" ;;
+                esac ;;
     esac
 }
 

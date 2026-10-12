@@ -120,10 +120,15 @@ if [ "$valid" -eq 0 ]; then
 fi
 
 # Merge all per-layer component files, dedupe by purl (fallback name@version).
-# `jq -s` slurps each file as one array element; `add` concatenates them.
-jq -s '
+# `jq -s` slurps each file as one array element; `add` concatenates them. An OS
+# package's purl is compared in the form normalize-sbom.sh writes it
+# (os-purl-form.jq), so a layer from an older BomLens SBOM (epoch in the
+# version, an upstream qualifier) and one from a newer one name the same
+# package once. The kept component's own purl is not changed here; normalize
+# rewrites it later.
+jq -s "$(cat "$SCRIPT_DIR/os-purl-form.jq")"'
     add
-    | group_by(.purl // ((.name // "") + "@" + (.version // "")))
+    | group_by(if (.purl | type) == "string" then (.purl | os_purl_form(true)) else ((.name // "") + "@" + (.version // "")) end)
     | map(.[0])
     | sort_by(.purl // ((.name // "") + "@" + (.version // "")))
 ' "$WORK"/comps-*.json > "$WORK/merged.json"

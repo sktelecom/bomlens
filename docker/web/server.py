@@ -3628,8 +3628,8 @@ def run_sibling_scan(image, mode, out_dir, on_log, *, upload_file=None, model_id
         "-e", "GENERATE_REPORT=%s" % _bool_env("GENERATE_REPORT"),
         # Deep license (ScanCode) and reproducible output are plain form
         # toggles (see server's own env dict above), not gated to one sibling
-        # mode here: entrypoint.sh already scopes DEEP_LICENSE to a present
-        # /src tree and skips it with a WARN when scancode isn't in the image
+        # mode here: entrypoint.sh already scopes DEEP_LICENSE to a source
+        # scan with a present tree and skips it with a WARN when scancode isn't in the image
         # (it currently is not, in the published deep-cve image -- see
         # SBOM_DEEP_LICENSE in docker/Dockerfile), and BYTE_STABLE's
         # normalize-sbom.sh --stable runs unconditionally for every mode.
@@ -3664,6 +3664,20 @@ def run_sibling_scan(image, mode, out_dir, on_log, *, upload_file=None, model_id
     # Passed by name so the value never reaches the argv, like API_KEY above,
     # and only when the host set them.
     for _k in ("PURL_RESOLVE_IGNORE", "PURL_RESOLVE_BUDGET"):
+        if env.get(_k):
+            args += ["-e", _k]
+    # The deep-license limits, the same way: an operator's own settings,
+    # passed by name and only when set.
+    for _k in ("DEEP_LICENSE_MAX_FILES", "DEEP_LICENSE_TIMEOUT", "BOMLENS_DEEP_LICENSE_ALL"):
+        if env.get(_k):
+            args += ["-e", _k]
+    # Where the cdxgen images come from (a registry mirror) and the network
+    # settings: proxy, Trivy's database, EPSS/KEV endpoints. By name, when set.
+    for _k in ("CDXGEN_IMAGE_PREFIX", "CDXGEN_TAG", "CDXGEN_ALLINONE", "BOMLENS_OS_LICENSES",
+               "HTTP_PROXY", "HTTPS_PROXY", "NO_PROXY", "http_proxy", "https_proxy", "no_proxy",
+               "TRIVY_DB_REPOSITORY", "TRIVY_JAVA_DB_REPOSITORY", "TRIVY_SKIP_DB_UPDATE",
+               "TRIVY_SKIP_JAVA_DB_UPDATE", "TRIVY_OFFLINE_SCAN", "TRIVY_USERNAME", "TRIVY_PASSWORD",
+               "TRIVY_REGISTRY_TOKEN", "TRIVY_INSECURE", "KEV_URL", "EPSS_API"):
         if env.get(_k):
             args += ["-e", _k]
     # The profile the caller resolved (see the main handler's per-mode default),

@@ -145,13 +145,13 @@ SECURITY_NVD_VERIFY=true NVD_API_KEY="your-key" \
 ./scripts/scan-sbom.sh --project "MyApp" --version "1.0.0" --notice --deep-license --generate-only
 ```
 
-웹 UI에서는 정밀 라이선스 탐지가 생성 옵션 중 하나로 제공됩니다. 어느 쪽이든 scancode에 의존하는데, scancode는 무겁고 느리며(대형 저장소는 수 분~수십 분) 기본 이미지에는 포함되지 않습니다. 쓰려면 scancode가 포함된 이미지로 실행해야 합니다.
+scancode는 무겁고 느려서(대형 저장소는 수 분에서 수십 분) 기본 이미지에는 넣지 않았습니다. CLI는 이 옵션을 켜면 소스 스캔의 후처리 단계를 opt-in 이미지 `ghcr.io/sktelecom/bomlens-deep-license:latest`로 실행하며, 이미지는 자동으로 내려받습니다(`SBOM_DEEP_LICENSE_IMAGE`로 지정 가능). 웹 UI에서는 정밀 라이선스 탐지가 생성 옵션 중 하나이며, UI 자체를 이 이미지로 실행해야 합니다.
 
 > ```bash
-> docker build --build-arg SBOM_DEEP_LICENSE=true -t bomlens:deep ./docker
-> # CLI:    SBOM_SCANNER_IMAGE=bomlens:deep ./scripts/scan-sbom.sh ... --deep-license
-> # 웹 UI:  SBOM_SCANNER_IMAGE=bomlens:deep ./scripts/scan-sbom.sh --ui
+> SBOM_SCANNER_IMAGE=ghcr.io/sktelecom/bomlens-deep-license:latest ./scripts/scan-sbom.sh --ui
 > ```
+
+프로젝트 자체 파일만 검사합니다. 의존성 폴더(`node_modules`, `vendor`, 가상 환경), 빌드 결과물, 도구 폴더는 라이선스를 패키지 관리자에서 얻으므로 제외합니다. 검사 대상 파일이 20,000개를 넘는 트리는 검사하지 않고, scancode는 600초가 지나면 멈춥니다. 한도는 `DEEP_LICENSE_MAX_FILES`와 `DEEP_LICENSE_TIMEOUT`으로 바꿀 수 있습니다([Docker 이미지 환경 변수](../reference/docker-image.ko.md#환경-변수)). 어느 경우든 로그와 실행 [결과 매니페스트](../reference/engine-contract.ko.md)에 남습니다.
 
 추가 산출물: `MyApp_1.0.0_scancode.json`
 
@@ -210,7 +210,7 @@ docker run --rm -v "$PWD":/w -w /w --entrypoint cosign \
 | 증상 | 원인 / 해결 |
 |------|------------|
 | `trivy not installed ... skipping` | 구버전 이미지. `docker pull`로 최신 이미지를 받으세요. |
-| `--deep-license requested but scancode not in image` | `--build-arg SBOM_DEEP_LICENSE=true`로 이미지를 빌드하세요. |
+| `--deep-license requested but scancode not in image` | `bomlens-deep-license` 이미지로 실행하세요(`SBOM_SCANNER_IMAGE`로 다른 이미지를 지정하지 않았다면 소스 스캔은 CLI가 자동으로 고릅니다). 직접 빌드하려면 `--build-arg SBOM_DEEP_LICENSE=true`를 쓰세요. |
 | UI에서 `Docker is not running` | Docker 엔진(Rancher Desktop/Docker Desktop 등)을 시작한 뒤 다시 실행하세요. |
 | 고지문에 `NOASSERTION`이 많음 | 의존성에 라이선스 메타데이터가 없는 경우입니다. `--deep-license`로 보완하거나 수동 확인하세요. |
 | 포트 충돌(`--ui`) | `UI_PORT`로 다른 포트를 지정하세요. |

@@ -58,6 +58,9 @@ GRYPE_SEVERITY_TO_VENDOR = {"critical": 4, "high": 3, "medium": 2, "low": 1}
 
 
 # ---- version comparison (maven/NVD, best-effort numeric) -------------------
+OS_PURL = re.compile(r"^pkg:(deb|rpm|apk|alpm)/")
+
+
 def _ver_tuple(v):
     v = re.sub(r"[^0-9.].*$", "", str(v))  # 1.8.7-r2 / 5.0.0.RELEASE -> numeric head
     out = []
@@ -331,6 +334,13 @@ def build_sidecar(sbom_path, out_prefix):
         art = m.get("artifact", {})
         ver = art.get("version", "")
         purl = art.get("purl", "")
+        # Distribution packages are Trivy's: it matches them against the
+        # distribution's own advisories, which know what the distribution
+        # patched. A CPE match on one compares the distribution's version with
+        # upstream NVD ranges and reports CVEs the distribution already fixed,
+        # so this pass leaves them out entirely.
+        if OS_PURL.match(purl):
+            continue
         cpes = art.get("cpes") or []
         product = _cpe_product(cpes[0]) if cpes else ""
         dedup_key = (purl or art.get("name", ""), cve)

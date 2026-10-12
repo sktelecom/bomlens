@@ -139,7 +139,7 @@ sequenceDiagram
 
 | MODE | 입력 | syft 호출 |
 |------|------|-----------|
-| `IMAGE` | Docker 이미지 | `syft <image> -o cyclonedx-json` (docker.sock 마운트 필요) |
+| `IMAGE` | Docker 이미지 | `syft <image> -o cyclonedx-json` (docker.sock을 마운트하면 Docker 데몬에서, 아니면 레지스트리나 아카이브에서 읽음) |
 | `BINARY` | 단일 파일 | `syft file:<path> -o cyclonedx-json` (실패 시 최소 SBOM 폴백) |
 | `ROOTFS` | 디렉터리 | `syft dir:<path> -o cyclonedx-json` |
 
@@ -200,7 +200,7 @@ flowchart TD
 | `FIRMWARE` | `--target <file> --firmware` 또는 펌웨어 확장자 | unblob + syft + cve-bin-tool | **opt-in 이미지** `bomlens-firmware`. 상세 [펌웨어 분석 가이드](../guides/firmware.ko.md) |
 | `BINARY` | `--target <파일>` | syft | `file:` 스킴 |
 | `ROOTFS` | `--target <디렉터리>` | syft | `dir:` 스킴 |
-| `IMAGE` | `--target <이미지명>` | syft | docker.sock 마운트 |
+| `IMAGE` | `--target <이미지명>` | syft | Docker 데몬(docker.sock 마운트) 또는 레지스트리 |
 | `AIBOM` | `--model <owner/name>` | OWASP AIBOM Generator | **opt-in 이미지** `bomlens-aibom`. HuggingFace 모델 카드로 CycloneDX 1.7 ML-BOM 생성, G7 적합성 검사 추가 |
 | `MODELFILE` | `--model-file <경로>` | `identify-model-file.py`(표준 라이브러리) | 기본 이미지, 오프라인. 모델 파일 헤더로 CycloneDX 1.7 ML-BOM 생성(GGUF, safetensors, PyTorch, pickle, npz, npy, ONNX), 같은 G7 검사 추가 |
 | `DATASET` | `--model <Figshare 항목>` 또는 `--model datasets/<owner>/<name>` | `scan-figshare.py`, `scan-hf-dataset.py`(표준 라이브러리) | 기본 이미지. 공개 Figshare 항목 조회로 연구 데이터셋을 읽는다(계정 불필요). 라이선스, DOI, 저자, 파일별 MD5 값이 CycloneDX 1.7 `data` 컴포넌트가 된다. HuggingFace 데이터셋(`datasets/<owner>/<name>`, `https://huggingface.co/datasets/<owner>/<name>`, `hf:<owner>/<name>`)도 같은 `data` 컴포넌트가 되어 라이선스, 허브 리비전, 파일별 SHA-256 값을 담고, 카드의 `source_datasets`에 적힌 데이터셋도 함께 읽는다 |

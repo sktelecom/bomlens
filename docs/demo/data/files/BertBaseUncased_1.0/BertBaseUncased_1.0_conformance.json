@@ -2,7 +2,7 @@
   "project": "BertBaseUncased",
   "format": "CycloneDX",
   "result": "pass",
-  "generatedAt": "2026-10-10T06:33:24Z",
+  "generatedAt": "2026-10-10T15:04:58Z",
   "profile": "default",
   "untraceableComponents": 0,
   "checks": [
@@ -30,7 +30,7 @@
       "label": "Timestamp (metadata.timestamp)",
       "required": true,
       "status": "pass",
-      "detail": "2026-10-10T06:33:21+00:00",
+      "detail": "2026-10-10T15:04:55+00:00",
       "missing": [],
       "regulations": [
         {
@@ -42,7 +42,7 @@
         }
       ],
       "label_ko": "타임스탬프 (metadata.timestamp)",
-      "detail_ko": "2026-10-10T06:33:21+00:00"
+      "detail_ko": "2026-10-10T15:04:55+00:00"
     },
     {
       "id": "tools",
@@ -622,8 +622,8 @@
       "source": "na",
       "role": "system-producer",
       "reviewGuide": {
-        "how": "Write down how data moves through the system: where an input comes from, what the model receives, and where its output goes. Confirm the description matches how the system is actually deployed.",
-        "how_ko": "데이터가 시스템 안에서 어떻게 흐르는지 적습니다. 입력이 어디서 오고, 모델이 무엇을 받고, 출력이 어디로 가는지입니다. 적어 둔 내용이 실제 배포 구성과 맞는지 확인합니다.",
+        "how": "Describe how data moves through the system: where an input comes from, what the model receives, and where its output goes. In BomLens, declare it with the service in the AI declaration (service.dataFlows: the direction, a classification, and the source and destination addresses); the next scan writes it to the SBOM as CycloneDX services[].data, marked as the publisher's declaration. An SBOM from another tool counts when its services carry serviceData. Confirm the description matches how the system is actually deployed.",
+        "how_ko": "데이터가 시스템 안에서 어떻게 흐르는지 적습니다. 입력이 어디서 오고, 모델이 무엇을 받고, 출력이 어디로 가는지입니다. BomLens에서는 AI 선언의 서비스 항목(service.dataFlows: 방향, 분류, 보내는 곳과 받는 곳의 주소)에 적으면 다음 스캔에서 SBOM의 CycloneDX services[].data에 발행자 선언으로 표시되어 들어갑니다. 다른 도구가 만든 SBOM도 서비스에 serviceData가 있으면 충족으로 봅니다. 적어 둔 내용이 실제 배포 구성과 맞는지 확인합니다.",
         "docUrl": "https://www.bsi.bund.de/SharedDocs/Downloads/EN/BSI/KI/SBOM-for-AI_minimum-elements.pdf?__blob=publicationFile&v=4"
       },
       "regulations": [
@@ -657,8 +657,8 @@
       "source": "na",
       "role": "system-producer",
       "reviewGuide": {
-        "how": "State what the system does with the data it receives — whether it is stored, passed to another component, or used for further training. Check this against the privacy notice you publish.",
-        "how_ko": "시스템이 받은 데이터를 어떻게 쓰는지 밝힙니다. 저장하는지, 다른 구성요소로 넘기는지, 추가 학습에 쓰는지입니다. 공개하는 개인정보 처리방침과 어긋나지 않는지 확인합니다.",
+        "how": "State what the system does with the data it receives: whether it is stored, passed to another component, or used for further training. In BomLens, write it as the description of each data flow of the declared service (service.dataFlows[].description); the next scan writes it to the SBOM, marked as the publisher's declaration. Check this against the privacy notice you publish.",
+        "how_ko": "시스템이 받은 데이터를 어떻게 쓰는지 밝힙니다. 저장하는지, 다른 구성요소로 넘기는지, 추가 학습에 쓰는지입니다. BomLens에서는 선언한 서비스의 데이터 흐름마다 설명(service.dataFlows[].description)으로 적으면 다음 스캔에서 SBOM에 발행자 선언으로 표시되어 들어갑니다. 공개하는 개인정보 처리방침과 어긋나지 않는지 확인합니다.",
         "docUrl": "https://www.bsi.bund.de/SharedDocs/Downloads/EN/BSI/KI/SBOM-for-AI_minimum-elements.pdf?__blob=publicationFile&v=4"
       },
       "regulations": [
@@ -692,8 +692,8 @@
       "source": "na",
       "role": "system-producer",
       "reviewGuide": {
-        "how": "Describe the input and output the system accepts and produces — formats, size limits, and anything it refuses. A person confirms this because a model card lists modalities, not the system's actual interface.",
-        "how_ko": "시스템이 받는 입력과 내놓는 출력을 적습니다. 형식과 크기 제한, 받지 않는 입력까지 포함합니다. 모델 카드에는 처리 방식만 적히고 시스템의 실제 인터페이스는 드러나지 않아 사람이 확인해야 합니다.",
+        "how": "Describe the input and output the system accepts and produces: formats, size limits, and anything it refuses. In BomLens, declare the service's input and output kinds (service.inputModality, service.outputModality); the next scan records them on the service, marked as the publisher's declaration. A person confirms the rest, because a model card lists modalities, not the system's actual interface.",
+        "how_ko": "시스템이 받는 입력과 내놓는 출력을 적습니다. 형식과 크기 제한, 받지 않는 입력까지 포함합니다. BomLens에서는 서비스의 입력과 출력 종류(service.inputModality, service.outputModality)를 선언하면 다음 스캔에서 서비스에 발행자 선언으로 기록됩니다. 모델 카드에는 처리 방식만 적히고 시스템의 실제 인터페이스는 드러나지 않으므로 나머지는 사람이 확인합니다.",
         "docUrl": "https://www.bsi.bund.de/SharedDocs/Downloads/EN/BSI/KI/SBOM-for-AI_minimum-elements.pdf?__blob=publicationFile&v=4"
       },
       "regulations": [
@@ -720,8 +720,8 @@
       "source": "na",
       "role": "system-producer",
       "reviewGuide": {
-        "how": "State the field the system is intended for and the uses that are out of scope. This is a decision, not a fact a tool can read, and regulators ask for it directly.",
-        "how_ko": "시스템을 어느 분야에 쓰려고 만들었는지, 쓰지 말아야 할 용도는 무엇인지 밝힙니다. 도구가 읽어낼 수 있는 사실이 아니라 판단이며, 규제에서 직접 요구하는 항목입니다.",
+        "how": "State the field the system is intended for and the uses that are out of scope. This is a decision, not a fact a tool can read, and regulators ask for it directly. In BomLens, declare the service's field and what it is for (service.domain, service.informationAboutApplication); the next scan records them on the service, marked as the publisher's declaration.",
+        "how_ko": "시스템을 어느 분야에 쓰려고 만들었는지, 쓰지 말아야 할 용도는 무엇인지 밝힙니다. 도구가 읽어낼 수 있는 사실이 아니라 판단이며, 규제에서 직접 요구하는 항목입니다. BomLens에서는 서비스의 적용 분야와 용도(service.domain, service.informationAboutApplication)를 선언하면 다음 스캔에서 서비스에 발행자 선언으로 기록됩니다.",
         "docUrl": "https://www.bsi.bund.de/SharedDocs/Downloads/EN/BSI/KI/SBOM-for-AI_minimum-elements.pdf?__blob=publicationFile&v=4"
       },
       "regulations": [
@@ -2534,7 +2534,7 @@
             "label": "Timestamp (metadata.timestamp)",
             "status": "pass",
             "source": null,
-            "detail": "2026-10-10T06:33:21+00:00",
+            "detail": "2026-10-10T15:04:55+00:00",
             "refs": [
               "Section 5.2.1"
             ]

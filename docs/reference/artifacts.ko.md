@@ -33,6 +33,9 @@ description: BomLens가 생성하는 산출물 파일 목록과 생성 조건, �
 | `{Project}_{Version}_vex.cdx.json` | 웹 UI 전용, 취약점 화면에서 **VEX 내보내기**를 누를 때 만들어진다(저장된 판단이 하나 이상 필요) | `_vex.json`의 판단을 다른 도구가 읽을 수 있는 독립된 CycloneDX 1.6 VEX 문서로 담는다. 네 가지 상태는 CycloneDX `analysis.state` 값으로 바뀌어 기록되고(영향 있음은 `exploitable`, 영향 없음은 `not_affected`, 이미 고침은 `resolved`, 조사 중은 `in_triage`), 메모는 `analysis.detail`에 들어간다. 화면이 자유 서술을 받는 반면 CycloneDX는 정해진 목록만 허용하므로 `justification`은 쓰지 않는다. 각 항목은 문서 안에 들어 있는 해당 컴포넌트의 사본(이름, 버전, PURL)을 가리키므로 파일 하나로 완결된다. 컴포넌트가 SBOM에 없는 판단은 제외하고 화면이 그 건수를 알려 주며, 펌웨어 발견 항목은 이름과 버전이 바이너리에서 오므로 대표적인 경우다. 내보낼 때마다 새로 만들고, 같은 프로젝트와 버전을 재스캔하면 지워지므로 그 뒤에는 다시 내보낸다 |
 | `{Project}_{Version}_vex_imported.json` | CLI의 `--vex <file>`, 또는 웹 UI 취약점 화면의 **VEX 가져오기**에 CycloneDX VEX 문서를 줄 때 생긴다 | 공급사가 보낸 VEX 문서 중 이 스캔 SBOM의 컴포넌트에 해당하는 진술과, 그 문서가 설명하는 제품이다. 직접 남긴 판단(`_vex.json`)과는 따로 보관한다. 받은 진술이 내 판단을 덮어쓰지 않으며 화면도 둘을 다른 이름으로 표시한다. CycloneDX `analysis.state`는 네 가지 상태로 옮긴다(`exploitable`은 영향 있음, `not_affected`와 `false_positive`는 영향 없음, `resolved`와 `resolved_with_pedigree`는 이미 고침, `in_triage`는 조사 중). 그 밖의 상태는 무시한다. 문서의 제품이나 버전이 스캔한 SBOM의 루트와 다르면 거부하고 아무것도 저장하지 않는다. 가져오기에 성공하면 이 파일을 교체하고, 거부되거나 적용할 진술이 없는 가져오기는 이전 파일을 그대로 둔다. 제품 자체를 가리키는 진술은 컴포넌트 없이 한 번만 저장하며, 그 CVE의 발견 항목 중 자기 진술이 없는 것 모두에 적용한다. `_vex.json`처럼 같은 프로젝트와 버전을 재스캔해도 지워지지 않는다 |
 | `{Project}_{Version}_vendored.cdx.json` | 소스 스캔에서 `--identify-vendored`, opt-in SCANOSS 이미지 필요 | 소스 트리 안에서 식별한 번들 오픈소스 컴포넌트(SCANOSS) |
+| `{Project}_{Version}_security_trivy.json` | 보안보고서를 생성할 때, 다른 엔진(grype, cve-bin-tool, Yocto)이 결과를 더한 경우 | `_security.json`으로 병합하기 전에 따로 남긴 Trivy 자체 결과 |
+| `bomlens-events.jsonl` | `BOMLENS_EVENTS=file` | 진행 이벤트, 한 줄에 JSON 객체 하나. [엔진 계약](engine-contract.ko.md#진행-이벤트) 참고 |
+| `bomlens-result.json` | 항상 | 실행 결과 매니페스트. 실행이 어떻게 끝났는지, 단계별 결과, 출력 파일별 역할을 담습니다. [엔진 계약](engine-contract.ko.md) 참고 |
 | `{Project}_{Version}_security_epss.json` | 보안보고서를 생성할 때마다 | 취약점별 EPSS 점수와 KEV 여부(오프라인 생성 시 null/false), 보안보고서 우선순위 산정에 사용 |
 | `{Project}_{Version}_bom.json.sig` | `--sign` | cosign 서명 (`--spdx`와 함께 쓰면 `_bom.spdx.json.sig`도 생성). AI 스캔에는 `_bom.spdx3.json.sig`도 추가되며, 초안도 서명한다. 서명은 파일의 출처를 보증할 뿐 완성 여부를 뜻하지 않는다 |
 | `{new}_model-diff.json` | `--diff <old.json> <new.json>` | 이미 생성한 SBOM 두 개를 비교한 AI 모델 변동 보고서. 매칭된 모델의 판정·라이선스·해시 변화와, 한쪽 파일에만 있는 컴포넌트를 담는다. 새 쪽 입력 파일 이름을 따르며(`<new>_bom.json` → `<new>_model-diff.json`), `{Project}_{Version}`이 아니다 — `--diff`는 프로젝트나 버전을 따로 받지 않는다 |
@@ -112,7 +115,7 @@ compositions[]     의존성 그래프 완전성 (아래 참고)
 | 값 | 의미 |
 |----|------|
 | `complete` | 그래프가 완전히 해석됐다는 적극적인 근거를 찾았습니다. 생태계의 lock/resolve 단계가 성공했거나 lock 파일이 이미 커밋돼 있었고, 의존 엣지가 하나 이상 있는 경우입니다. |
-| `incomplete` | 스캔에 알려진 실패가 있었습니다. cdxgen 대신 syft 폴백이 돌았거나, 펌웨어 패키지 목록화 단계가 실패한 경우입니다. |
+| `incomplete` | 스캔에 알려진 실패가 있었습니다. cdxgen 대신 syft 폴백이 돌았거나, 펌웨어 패키지 목록화 단계가 실패했거나, `poetry.lock`이 없는 Poetry 프로젝트를 일부만 변환했거나 그 의존성을 풀지 못한 경우입니다. |
 | `unknown` | 그래프가 완전하다고 확인해 주는 근거가 SBOM에 없습니다. 어느 쪽으로도 적극적인 근거가 없을 때의 기본값이며, 예를 들면 image/rootfs/firmware/binary 스캔(syft 혼자서는 패키지 사이 의존 관계를 못 봄), AI 모델·데이터셋·병합 SBOM, Maven 소스 스캔(해석이 됐는지 저하됐는지 가릴 신뢰할 수 있는 신호가 없음)이 여기 해당합니다. `unknown`은 결함이 아닙니다. 도구가 판단할 근거를 찾지 못했다는 뜻일 뿐, 뭔가 잘못됐다는 뜻이 아닙니다. |
 
 분석 대상 공급사 SBOM이 자체 `compositions` 선언을 이미 가지고 있다면 절대 덮어쓰지 않습니다.

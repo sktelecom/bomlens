@@ -1552174,7 +1552174,7 @@
         "value": "unknown-to-author"
       }
     ],
-    "timestamp": "2026-10-10T06:33:48Z",
+    "timestamp": "2026-10-10T15:05:27Z",
     "tools": {
       "components": [
         {
@@ -1552196,7 +1552196,7 @@
           "name": "BomLens",
           "publisher": "SK Telecom",
           "type": "application",
-          "version": "1.13.0"
+          "version": "1.13.1"
         }
       ]
     }

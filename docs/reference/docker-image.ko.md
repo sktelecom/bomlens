@@ -14,9 +14,10 @@ description: BomLens 스캐너 Docker 이미지를 docker run으로 직접 호�
 | `ghcr.io/sktelecom/sbom-generator`, `ghcr.io/sktelecom/sbom-scanner` | 같은 이미지의 별칭 (이전 이름, 같은 다이제스트) |
 | `ghcr.io/sktelecom/bomlens-firmware` | 펌웨어 분석용 (GPL 도구 포함, opt-in) (legacy alias: sbom-scanner-firmware) |
 | `ghcr.io/sktelecom/bomlens-deep-cve` | 심층 CVE 매칭용 grype 포함 (opt-in). CLI의 `--deep-cve`와 웹 UI의 심층 CVE 매칭 토글이 쓰며, 둘 다 지금 실행 중인 이미지가 이 이미지가 아니면 곁들임 컨테이너로 자동으로 내려받습니다 |
+| `ghcr.io/sktelecom/bomlens-deep-license` | 프로젝트 자체 파일의 라이선스 탐지용 scancode 포함 (opt-in). 소스 스캔에서 CLI의 `--deep-license`가 쓰며, 자동으로 내려받습니다. LGPL 구성요소(linux/amd64의 7-Zip, intbitset, chardet)가 들어 있습니다. 7-Zip과 intbitset의 소스는 이미지 안 `/usr/share/bomlens/sources/`에 있고, chardet은 파이썬 소스 형태로 들어 있습니다 |
 | `ghcr.io/sktelecom/bomlens-aibom` | AI 모델 ML-BOM 생성용 (opt-in, legacy alias: sbom-scanner-aibom). `--model`/`--model-file`과 웹 UI의 AI 모델 타일이 쓰며, 곁들임 컨테이너로 자동으로 내려받습니다 |
 
-`latest`와 버전 태그를 제공합니다. 발행되는 모든 이미지(`ghcr.io/sktelecom/bomlens`, `bomlens-firmware`, `bomlens-deep-cve`, `bomlens-aibom` 및 별칭)가 `linux/amd64`와 `linux/arm64`를 모두 지원하므로, `arm64` 호스트(Apple Silicon 맥, Arm 서버)에서도 그대로 pull해 쓸 수 있습니다. 이미지는 cosign으로 서명되어 발행됩니다.
+`latest`와 버전 태그를 제공합니다. 발행되는 모든 이미지(`ghcr.io/sktelecom/bomlens`, `bomlens-firmware`, `bomlens-deep-cve`, `bomlens-deep-license`, `bomlens-aibom` 및 별칭)가 `linux/amd64`와 `linux/arm64`를 모두 지원하므로, `arm64` 호스트(Apple Silicon 맥, Arm 서버)에서도 그대로 pull해 쓸 수 있습니다. 이미지는 cosign으로 서명되어 발행됩니다.
 
 ```bash
 docker pull ghcr.io/sktelecom/bomlens:latest
@@ -127,22 +128,32 @@ MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL='*' docker run --rm \
 
 | 환경 변수 | 필수 | 기본값 | 설명 |
 |-----------|------|--------|------|
-| `MODE` | X | `POSTPROCESS` | 분석 모드: `SOURCE`, `IMAGE`, `BINARY`, `ROOTFS`, `FIRMWARE`, `ANALYZE`. 지정하지 않으면 출력 디렉터리에 이미 있는 SBOM을 후처리만 한다 — 실제로 무언가를 스캔하려면 명시적으로 지정해야 한다. |
+| `MODE` | X | `POSTPROCESS` | 분석 모드: `SOURCE`, `IMAGE`, `BINARY`, `ROOTFS`, `FIRMWARE`, `ANALYZE`, 또는 `PLAN`(소스 스캔의 실행 계획 작성, [엔진 계약](engine-contract.ko.md#실행-계획) 참조). 지정하지 않으면 출력 디렉터리에 이미 있는 SBOM을 후처리만 한다 — 실제로 무언가를 스캔하려면 명시적으로 지정해야 한다. |
 | `PROJECT_NAME` | O | — | 프로젝트 이름 |
 | `PROJECT_VERSION` | O | — | 프로젝트 버전 |
-| `TARGET_IMAGE` | 모드별 | — | `IMAGE` 모드의 이미지명 (docker.sock 마운트 필요) |
+| `TARGET_IMAGE` | 모드별 | — | `IMAGE` 모드의 이미지. docker.sock을 마운트하면 Docker 데몬에서 읽고, 마운트하지 않으면 레지스트리에서 읽거나 형식 접두사가 붙은 아카이브(`docker-archive:`, `oci-archive:`, `oci-dir:`, 컨테이너에 마운트한 경로)에서 읽음 |
+| `SYFT_REGISTRY_AUTH_USERNAME`, `SYFT_REGISTRY_AUTH_PASSWORD`, `SYFT_REGISTRY_AUTH_TOKEN`, `SYFT_REGISTRY_AUTH_AUTHORITY` | — | — | `IMAGE` 모드: 비공개 레지스트리의 자격 증명. docker 설정 파일을 마운트하고 `DOCKER_CONFIG`로 지정해도 됨. `SYFT_REGISTRY_INSECURE_SKIP_TLS_VERIFY`와 `SYFT_REGISTRY_INSECURE_USE_HTTP`는 자체 서명 인증서나 HTTP 레지스트리에 접속할 때 씀. `SYFT_PLATFORM`은 여러 플랫폼 이미지에서 플랫폼을 고름 |
 | `TARGET_FILE` | 모드별 | — | `BINARY`/`FIRMWARE` 모드의 파일 경로 (컨테이너 내부 경로) |
 | `TARGET_DIR` | 모드별 | — | `ROOTFS` 모드의 디렉터리 경로 |
 | `UPLOAD_ENABLED` | — | `true` | `false`면 업로드 없이 로컬 저장만 (CLI `--generate-only`와 동일) |
 | `HOST_OUTPUT_DIR` | — | — | 산출물을 복사할 마운트 경로 |
+| `BOMLENS_STAGE1_EXIT`, `BOMLENS_STAGE1_OOM`, `BOMLENS_STAGE1_LOG`, `BOMLENS_STAGE1_REASON` | — | — | 1단계를 직접 실행한 뒤의 `POSTPROCESS`: 그 종료 코드, 메모리 부족으로 종료됐으면 `true`, 출력 폴더에 둔 로그 파일 이름. 뒤의 두 값 대신 이미 분류한 사유(`oom`, `disk-space`, `network`, `cdxgen-crash`, `cdxgen-unavailable`)를 넘겨도 됨. 종료 코드 127은 `cdxgen-unavailable`로 읽으므로, 1단계를 실행하지 않는 `unsupported` 계획에서는 이 값을 넘김. 1단계가 SBOM을 남기지 않았으면 2단계가 syft 스캔으로 대신함([엔진 계약](engine-contract.ko.md#실행-계획) 참조) |
+| `BOMLENS_EVENTS` | — | — | `file` 또는 `stderr`: 진행 이벤트를 한 줄에 JSON 객체 하나씩 출력 폴더의 `bomlens-events.jsonl` 또는 표준 오류에 씀([엔진 계약](engine-contract.ko.md#진행-이벤트) 참조) |
+| `BOMLENS_IMAGE_REF`, `BOMLENS_IMAGE_DIGEST` | — | — | 호출자가 실행한 이미지 참조와 다이제스트. `bomlens-result.json`에 그대로 적습니다([엔진 계약](engine-contract.ko.md) 참고) |
 | `GENERATE_NOTICE` | — | `false` | 오픈소스 고지문 생성 (CLI `--notice`) |
 | `GENERATE_SECURITY` | — | `false` | Trivy 보안 보고서 생성 (CLI `--security`) |
+| `DEEP_LICENSE` | — | `false` | scancode로 프로젝트 자체 파일의 라이선스 탐지 (CLI `--deep-license`, 이미지에 scancode 필요) |
+| `DEEP_LICENSE_MAX_FILES` | — | `20000` | `DEEP_LICENSE`: 프로젝트 자체 파일이 이보다 많은 트리는 검사하지 않음 |
+| `DEEP_LICENSE_TIMEOUT` | — | `600` | `DEEP_LICENSE`: scancode를 멈출 때까지의 초 |
+| `BOMLENS_DEEP_LICENSE_ALL` | — | — | `DEEP_LICENSE`: `1`이면 의존성, 빌드, 도구 폴더까지 검사 (기본은 제외) |
 | `GENERATE_REPORT` | — | `false` | 오픈소스위험분석보고서 생성 (CLI 기본값과 달리 직접 실행은 꺼짐) |
 | `ENRICH_MAVEN_CPE` | — | `true` | maven 컴포넌트에 groupId로 유도한 NVD 매칭용 `cpe:2.3`을 부여해 CPE 기반 엔진이 NVD 전용 CVE를 찾게 함. 매핑 불가한 group은 CPE를 붙이지 않음 (AI SBOM은 건너뜀) |
 | `ENRICH_GITHUB_CPE` | — | `true` | 소수의 손검증된 `pkg:github/` 컴포넌트(패키지 매니저 생태계가 없는 대형 C/C++ 프로젝트에 흔한, 소스 저장소 좌표로만 식별되는 컴포넌트)에 NVD 매칭용 `cpe:2.3`을 부여해 CPE 기반 엔진이 NVD 전용 CVE를 찾게 함. 큐레이션 목록에 없으면 CPE를 붙이지 않음 (AI SBOM은 건너뜀) |
 | `ENRICH_INTERPRETER_CPE` | — | `true` | 소수의 손검증된 인터프리터 컴포넌트(예: conda나 NuGet 패키지로 배포된 Python)에 NVD 매칭용 `cpe:2.3`을 부여해 CPE 기반 엔진이 NVD 전용 CVE를 찾게 함. 큐레이션 목록에 없으면 CPE를 붙이지 않음 (AI SBOM은 건너뜀) |
 | `SECURITY_NVD_VERIFY` | — | `false` | `--deep-cve` 사용 시: grype `nvd:cpe` 결과를 실시간 NVD 버전 범위로 검증해 범위 밖 오탐을 제거 (`NVD_API_KEY`·네트워크 필요, 수 분 추가). 기본 off — 결과는 유지하되 버전 미검증으로 표시 |
 | `NVD_API_KEY` | `SECURITY_NVD_VERIFY`에 필요 | — | deep-cve 버전 필터가 쓰는 NVD API 키. 컨테이너에 이름으로만 전달(값은 인라인하지 않음) |
+| `BOMLENS_OS_LICENSES` | — | `true` | `IMAGE`와 `ROOTFS` 모드: Debian 패키지의 라이선스를 Trivy로 읽음. syft가 해시로 남기는 copyright 파일에서 Trivy가 라이선스 이름, common-licenses 참조, 라이선스 본문을 읽음. 이미지를 한 번 더 읽으며, `false`로 끔(해시는 그대로 지움) |
+| `BOMLENS_TRIVY_DB_MAX_AGE_DAYS` | — | `7` | `/trivy-db`에 Trivy 데이터베이스를 마운트했을 때(갱신 없이 오프라인으로 읽음), 보안 단계를 열화로 기록하는 경과 일수 |
 | `ENRICH_EOL` | — | `true` | 번들된 오프라인 스냅샷으로 upstream end-of-life가 지난 컴포넌트를 표시 (AI SBOM은 건너뜀) |
 | `ENRICH_MALICIOUS` | — | `true` | 번들된 오프라인 OSV 스냅샷으로 악성 패키지(오타 도용, 계정 탈취 배포본)를 표시. 취약점과 별개 신호이며, 대응도 업그레이드가 아니라 제거와 자격 증명 교체다 |
 | `ENRICH_OS_CONTEXT` | — | `true` | 배포판 패키지 PURL(rpm·deb·apk)에서 `operating-system` 컴포넌트를 합성. Trivy가 이 컴포넌트를 보고 배포판 취약점 피드를 고르므로, 없으면 공급사 SBOM이나 rootfs 스캔의 OS 패키지는 OS CVE 매칭이 전혀 안 됨. 인식 가능한 배포판 패키지가 없으면 아무 동작도 하지 않음. Trivy가 피드를 제공하지 않는 배포판(예: OpenWRT)도 대상에서 제외 (AI SBOM은 건너뜀) |
@@ -173,6 +184,10 @@ MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL='*' docker run --rm \
 | `FIELD_MIN_PCT` | — | `80` | 적합성 검사: 규제 대응용 컴포넌트별 필드의 참고 기준 커버리지. CLI든 웹 UI든 `--deep-cve` 스캔에도 적용됨 |
 | `PURL_TYPES_FILE` | — | `docker/lib/purl-types.json` | 적합성 검사: 어떤 purl 타입이 있고 그중 어떤 타입이 네임스페이스를 요구하는지 담은 purl-spec 데이터 |
 | `NS_ADVISORY_TYPES` | — | `golang huggingface` | 적합성 검사: 네임스페이스가 없어도 실패로 보지 않고 권고 항목으로만 보고할 타입(공백 구분) |
+| `LICENSE_REGISTRY` | — | `false` | 스크립트의 `--license-registry`. 빠진 라이선스를 조회하고, 하나뿐인 강한 카피레프트나 비상업 라이선스를 패키지 레지스트리(deps.dev)와 대조한다. 네트워크를 사용 |
+| `LICENSE_REGISTRY_VERIFY` | — | GPL, AGPL, SSPL-1.0, BUSL-1.1, CC-BY-NC 식별자 | 하나뿐일 때 레지스트리와 대조할 SPDX 식별자(공백 또는 쉼표 구분) |
+| `LICENSE_REGISTRY_BUDGET` | — | `240` | 조회 전체에 허용하는 시간(초). 시간 안에 조회하지 못한 컴포넌트는 그대로 두고 단계를 degraded로 기록한다 |
+| `LICENSE_REGISTRY_API` | — | `https://api.deps.dev/v3` | deps.dev v3 버전 조회에 같은 형식으로 답하는 서버의 기본 URL. 레지스트리에 자체 미러나 프록시로만 닿는 네트워크용. 응답이 없으면 컴포넌트는 그대로 두고 단계를 degraded(`unavailable`)로 기록한다 |
 | `PURL_RESOLVE` | — | `false` | `--analyze` 전용(스크립트의 `--resolve-purl`). 각 식별자를 패키지 저장소(deps.dev)에 조회해 적합성 보고서에 권고 항목으로 덧붙인다. 네트워크를 사용 |
 | `PURL_RESOLVE_IGNORE` | — | — | 조회에서 제외할 네임스페이스 접두사(공백 또는 쉼표 구분). 사내 저장소에만 올리는 네임스페이스에 쓴다. 잘못된 식별자와 구분할 수 없기 때문이다 |
 | `PURL_RESOLVE_BUDGET` | — | `240` | 조회 전체에 허용하는 시간(초). 시간 안에 조회하지 못한 식별자는 없음이 아니라 확인 불가로 보고한다 |

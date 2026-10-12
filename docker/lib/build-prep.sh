@@ -65,14 +65,20 @@ GUARD_DIR=""
 # node_modules are pruned because nothing we run resolves inside them.
 # The name set grows over time: 1 = original, 2 adds vendor/obj/bin directories,
 # 3 adds composer.json (rewritten during the PHP resolve), 4 adds *.egg-info
-# directories (left by a Python source install). guard_paths takes the
+# directories (left by a Python source install), 5 adds requirements.txt
+# (written for a Poetry project with no lock). guard_paths takes the
 # version to list, so a snapshot is always compared with the names it was written
 # under.
-GUARD_NAMES_VERSION=4
+GUARD_NAMES_VERSION=5
 guard_paths() {  # guard_paths f|d [version]
     _gv="${2:-$GUARD_NAMES_VERSION}"
     if [ "$1" = "f" ]; then
-        if [ "$_gv" -ge 3 ]; then
+        if [ "$_gv" -ge 5 ]; then
+            find . -maxdepth 4 \( -name .git -o -name node_modules -o -name vendor \) -prune -o -type f \
+                \( -name go.mod -o -name go.sum -o -name Cargo.lock -o -name Gemfile.lock \
+                   -o -name Package.resolved -o -name package-lock.json \
+                   -o -name composer.lock -o -name composer.json -o -name requirements.txt \) -print 2>/dev/null | LC_ALL=C sort
+        elif [ "$_gv" -ge 3 ]; then
             find . -maxdepth 4 \( -name .git -o -name node_modules -o -name vendor \) -prune -o -type f \
                 \( -name go.mod -o -name go.sum -o -name Cargo.lock -o -name Gemfile.lock \
                    -o -name Package.resolved -o -name package-lock.json \
@@ -345,6 +351,15 @@ prep_step() {
 # Gemfile.lock/Package.resolved/composer.lock/packages.lock.json), not a
 # command whose failure prep_step would capture. Never touches PREP_FAILED --
 # there is nothing here that can fail.
+# Record a step as failed that does not run through prep_step (one that
+# decides failure itself). Same list, recorded on the SBOM the same way.
+mark_prep_failed() {
+    case " $PREP_FAILED " in
+        *" $1 "*) ;;
+        *) PREP_FAILED="${PREP_FAILED:+$PREP_FAILED }$1" ;;
+    esac
+}
+
 mark_prep_applied() {
     case " $PREP_APPLIED " in
         *" $1 "*) ;;
@@ -368,9 +383,10 @@ if opted_out "${BOMLENS_GUARD_RESTORE_ONLY:-}"; then
 fi
 
 guard_snapshot
-trap 'stop_supervised; guard_restore' EXIT
-trap 'stop_supervised; guard_restore; exit 130' INT
-trap 'stop_supervised; guard_restore; exit 143' TERM
+# _pg_dir: the Poetry dependency-graph run's scratch folder, while it exists.
+trap 'stop_supervised; guard_restore; [ -z "${_pg_dir:-}" ] || rm -rf "$_pg_dir"' EXIT
+trap 'stop_supervised; guard_restore; [ -z "${_pg_dir:-}" ] || rm -rf "$_pg_dir"; exit 130' INT
+trap 'stop_supervised; guard_restore; [ -z "${_pg_dir:-}" ] || rm -rf "$_pg_dir"; exit 143' TERM
 
 # Non-shipped trees: manifests under test, fixture, example, benchmark and demo
 # folders, and the GitHub Actions workflows, are left out of the SBOM because
@@ -381,7 +397,7 @@ trap 'stop_supervised; guard_restore; exit 143' TERM
 # ahead of every ecosystem block below, because the lock-evidence check each
 # one may run (mark_prep_applied / _lock_evidence_found) needs it too, not
 # just the cdxgen --exclude flags built from it further down.
-NON_SHIPPED_DIRS="test tests spec fixtures testdata __tests__ e2e example examples benches benchmarks playground samples"
+NON_SHIPPED_DIRS="test tests spec fixtures testdata __tests__ e2e example examples sample samples bench benches benchmark benchmarks demo demos playground"
 NON_SHIPPED_MANIFEST_RE='(^|/)(package\.json|package-lock\.json|npm-shrinkwrap\.json|yarn\.lock|pnpm-lock\.yaml|bun\.lockb?|requirements[^/]*\.txt|pyproject\.toml|poetry\.lock|uv\.lock|Pipfile|Pipfile\.lock|setup\.py|setup\.cfg|environment\.ya?ml|pom\.xml|build\.gradle(\.kts)?|settings\.gradle(\.kts)?|gradle\.lockfile|go\.mod|go\.sum|Cargo\.toml|Cargo\.lock|Gemfile|Gemfile\.lock|[^/]+\.gemspec|composer\.json|composer\.lock|[^/]+\.(cs|fs|vb)proj|packages\.config|packages\.lock\.json|Directory\.Packages\.props|Package\.swift|Package\.resolved|Podfile|Podfile\.lock|conanfile\.txt|conanfile\.py|vcpkg\.json|METADATA|PKG-INFO)$'
 EXCLUDE_NON_SHIPPED=1
 if opted_out "${BOMLENS_INCLUDE_NON_SHIPPED:-}"; then
@@ -408,10 +424,18 @@ _lock_evidence_found() {
     find . \( "$@" \) -prune -o -type f -name "$_lef_name" -print 2>/dev/null | grep -q .
 }
 
-# Rust — cdxgen does NOT auto-run cargo; lockfile is essential for transitive deps
-if [ -f Cargo.toml ] && command -v cargo >/dev/null 2>&1; then
-    log "cargo generate-lockfile"
-    prep_step cargo-lockfile "$PREP_TIMEOUT_DEFAULT" cargo generate-lockfile
+# Rust — cdxgen does NOT auto-run cargo; lockfile is essential for transitive deps.
+# A committed Cargo.lock is used as it is: `cargo generate-lockfile` resolves
+# afresh and moves every crate to the newest compatible release, so the SBOM
+# would list versions the project does not build with. Like a committed
+# Gemfile.lock, it is recorded as lock evidence without being re-resolved.
+if [ -f Cargo.toml ]; then
+    if [ -f Cargo.lock ]; then
+        mark_prep_applied cargo-lock-committed
+    elif command -v cargo >/dev/null 2>&1; then
+        log "cargo generate-lockfile (no committed Cargo.lock)"
+        prep_step cargo-lockfile "$PREP_TIMEOUT_DEFAULT" cargo generate-lockfile
+    fi
 fi
 
 # Go — complete go.sum so cdxgen's default-readonly `go list -deps` resolves the
@@ -544,6 +568,20 @@ fi
 ANDROID_RELEASE_SET=""
 if { [ -f build.gradle ] || [ -f build.gradle.kts ]; } && command -v gradle >/dev/null 2>&1; then
     if [ -x ./gradlew ]; then GRADLEW="./gradlew"; else GRADLEW="gradle"; fi
+    # Gradle keeps its files under ~/.gradle, where ~ is the account's home
+    # from the password file (/root), not HOME. With a read-only root it
+    # cannot unpack its native library there and every Gradle build fails at
+    # once (cdxgen too, with an empty SBOM). Then it uses $HOME/.gradle. A
+    # writable ~/.gradle (the CLI mounts the host's Gradle cache there) is
+    # kept.
+    if [ -z "${GRADLE_USER_HOME:-}" ]; then
+        _acct_home="$( (getent passwd "$(id -u)" 2>/dev/null || true) | cut -d: -f6)"
+        [ -n "$_acct_home" ] || _acct_home=/root
+        if ! { mkdir -p "$_acct_home/.gradle" 2>/dev/null && [ -w "$_acct_home/.gradle" ]; }; then
+            export GRADLE_USER_HOME="${HOME:-/tmp}/.gradle"
+            log "gradle: $_acct_home/.gradle cannot be written; using $GRADLE_USER_HOME"
+        fi
+    fi
 
     # Android scope fix: cdxgen resolves EVERY Gradle configuration, so an AGP
     # project drags its build/test toolchain (androidTestUtil, Unified Test
@@ -703,6 +741,66 @@ fi
 exit 0
 PIPSCRIPT
 
+# Poetry with no lock file. cdxgen reads [tool.poetry.dependencies] only by
+# running `poetry`, which the image does not have, so a Poetry project without
+# poetry.lock came back with no components at all. The exact pins in that
+# table (`requests = "2.31.0"` or "==2.31.0") are written to a requirements.txt
+# that the step below and cdxgen both read; ranges, table forms (git, path,
+# extras) and the python constraint are left out rather than guessed. Only when
+# there is no poetry.lock and no requirements.txt; the source-tree guard removes
+# the file again after the scan.
+if [ -f pyproject.toml ] && [ ! -f poetry.lock ] && [ ! -f requirements.txt ] \
+   && command -v python3 >/dev/null 2>&1; then
+    _poetry_n=$(python3 - <<'PYEOF' 2>/dev/null
+import re, sys
+try:
+    import tomllib
+except ImportError:
+    print("notoml")
+    sys.exit(0)
+try:
+    with open("pyproject.toml", "rb") as fh:
+        data = tomllib.load(fh)
+except (OSError, ValueError):
+    sys.exit(0)
+tool = data.get("tool") if isinstance(data.get("tool"), dict) else {}
+poetry = tool.get("poetry") if isinstance(tool.get("poetry"), dict) else {}
+deps = poetry.get("dependencies") if isinstance(poetry.get("dependencies"), dict) else {}
+lines, skipped = [], 0
+for name, spec in deps.items():
+    if name.lower() == "python":
+        continue
+    version = spec.strip() if isinstance(spec, str) else ""
+    if version.startswith("=="):
+        version = version[2:].strip()
+    elif version.startswith("="):
+        version = version[1:].strip()
+    if re.fullmatch(r"[0-9][0-9A-Za-z.\-+!]*", version):
+        lines.append(f"{name}=={version}")
+    else:
+        skipped += 1
+if lines:
+    with open("requirements.txt", "w", encoding="utf-8") as fh:
+        fh.write("\n".join(lines) + "\n")
+print(f"{len(lines)} {skipped}")
+PYEOF
+)
+    case "$_poetry_n" in
+        notoml)
+            log "poetry: no poetry.lock, and this image's python3 cannot read pyproject.toml (no tomllib); dependencies not resolved" ;;
+        [0-9]*)
+            _poetry_pins="${_poetry_n% *}"; _poetry_skip="${_poetry_n#* }"
+            if [ "$_poetry_pins" -gt 0 ] 2>/dev/null; then
+                log "poetry: no poetry.lock; $_poetry_pins exact pin(s) from [tool.poetry.dependencies] written to requirements.txt, $_poetry_skip range or table dependenc(ies) not resolved"
+                mark_prep_applied poetry-requirements
+                [ "$_poetry_skip" -gt 0 ] 2>/dev/null && mark_prep_applied poetry-requirements-partial
+                POETRY_REQUIREMENTS_WRITTEN=1
+            elif [ "$_poetry_skip" -gt 0 ] 2>/dev/null; then
+                log "poetry: no poetry.lock and no exact pins; $_poetry_skip range or table dependenc(ies) not resolved"
+            fi ;;
+    esac
+fi
+
 if [ -f requirements.txt ] && command -v pip3 >/dev/null 2>&1; then
     log "pip install requirements"
     prep_step pip-install "$PREP_TIMEOUT_DEFAULT" sh "$_pip_script"
@@ -738,13 +836,35 @@ fi
 # post-filter cdxgen's BOM to it near the end, mirroring the Android release-scope
 # filter. BOMLENS_NODE_FULL_GRAPH=1 opts out (keep the dev+prod superset).
 NODE_PROD_SET=""
-if [ -f package.json ] && ! opted_out "${BOMLENS_NODE_FULL_GRAPH:-}" \
+# A workspace root with no package-lock.json (yarn, pnpm or bun workspaces):
+# only the root package.json reaches the scratch resolve, so the members'
+# production dependencies would be missing from the set and filtered out.
+# Keep the full graph there.
+_node_ws_nolock=""
+if [ -f package.json ] && [ ! -f package-lock.json ] \
+   && { [ -f pnpm-workspace.yaml ] || { command -v node >/dev/null 2>&1 \
+        && node -e 'const p=JSON.parse(require("fs").readFileSync("package.json","utf8")); process.exit(p.workspaces ? 0 : 1)' 2>/dev/null; }; }; then
+    _node_ws_nolock=1
+    log "node: workspace root with no package-lock.json; keeping the full graph (production filter not applied)"
+fi
+if [ -f package.json ] && [ -z "$_node_ws_nolock" ] && ! opted_out "${BOMLENS_NODE_FULL_GRAPH:-}" \
    && command -v npm >/dev/null 2>&1 && command -v node >/dev/null 2>&1; then
     log "node: resolving production dependency set"
     _npmtmp=$(mktemp -d)
     cp package.json "$_npmtmp/" 2>/dev/null
     # Copy a committed lockfile too so the prod resolve pins the same versions cdxgen sees.
     [ -f package-lock.json ] && cp package-lock.json "$_npmtmp/" 2>/dev/null
+    # Without one (a yarn, pnpm or bun project), npm resolves package.json's
+    # ranges to the newest releases while cdxgen reads the project's own lock,
+    # so the versions differ and a version match would drop the production
+    # packages themselves (measured: lodash 4.17.20 from yarn.lock, 4.17.21 from
+    # npm, "kept 0 of 1"). The set is then compared by name only. An
+    # npm-shrinkwrap.json alone counts the same: it is not copied, so npm's
+    # versions would not be its versions. Name matching has known limits: a
+    # dev tool sharing a name with a production package is kept, and a package
+    # only an older locked version needs can be dropped.
+    _node_by_name=""
+    [ -f package-lock.json ] || _node_by_name=1
     _nodeset=$(mktemp)
     if prep_step npm-production-set "$PREP_TIMEOUT_DEFAULT" sh -c "cd \"$_npmtmp\" && npm install --omit=dev --package-lock-only --no-audit --no-fund --ignore-scripts" >/dev/null \
        && [ -f "$_npmtmp/package-lock.json" ]; then
@@ -756,14 +876,16 @@ if [ -f package.json ] && ! opted_out "${BOMLENS_NODE_FULL_GRAPH:-}" \
           for (const [k,v] of Object.entries(pkgs)) {
             if (!k.startsWith("node_modules/")) continue;
             if (v.dev===true || !v.version) continue;
-            out.push(k.replace(/^.*node_modules\//,"")+"@"+v.version);
+            const name=k.replace(/^.*node_modules\//,"");
+            out.push(process.argv[2]==="name" ? name : name+"@"+v.version);
           }
-          process.stdout.write([...new Set(out)].join("\n"));
-        ' "$_npmtmp/package-lock.json" > "$_nodeset" 2>/dev/null
+          const set=[...new Set(out)];
+          process.stdout.write(set.join("\n")+(set.length?"\n":""));
+        ' "$_npmtmp/package-lock.json" "${_node_by_name:+name}" > "$_nodeset" 2>/dev/null
     fi
     if [ -s "$_nodeset" ]; then
         NODE_PROD_SET="$_nodeset"
-        log "node: production set = $(wc -l < "$_nodeset") components"
+        log "node: production set = $(wc -l < "$_nodeset" | tr -d ' ') components${_node_by_name:+ (matched by name: no package-lock.json)}"
     else
         log "node: could not resolve production set; using full graph"
         rm -f "$_nodeset"
@@ -974,6 +1096,161 @@ elif [ -f /opt/bin/cdxgen ]; then
 else
     echo "[build-prep] ERROR: cdxgen not found in image" >&2
     exit 1
+fi
+
+# Poetry with no lock file, second half. With pyproject.toml present cdxgen
+# takes the Poetry route (`poetry install`, which this image lacks) and never
+# reads the requirements.txt written above for the dependency tree: the pins
+# came through as components, with no link from the project root and none of
+# their own dependencies. cdxgen reads a requirements.txt on its own fully
+# (root link and dependencies), so it is run once more on a scratch folder
+# holding only that file, and its dependency graph is added to the SBOM:
+# components it found that the SBOM lacks, their dependencies, and the root's
+# links to the pins. The source tree is not touched. Recorded as poetry-graph;
+# when that run fails or finds nothing (no network, for one) the SBOM stays as
+# the first run left it and poetry-graph is recorded as failed, so the graph is
+# not declared complete. Not when conda took over the python cataloger above.
+if [ -n "${POETRY_REQUIREMENTS_WRITTEN:-}" ] && [ "${CONDA_N:-0}" -eq 0 ] 2>/dev/null \
+   && [ "${rc:-1}" -eq 0 ] && [ -f "$OUT" ] \
+   && [ -f requirements.txt ] && command -v node >/dev/null 2>&1; then
+    mark_prep_applied poetry-graph
+    _pg_ok=""
+    _pg_dir=$(mktemp -d 2>/dev/null) || _pg_dir=""
+    if [ -z "$_pg_dir" ] || ! mkdir -p "$_pg_dir/project" || ! cp requirements.txt "$_pg_dir/project/"; then
+        log "poetry: dependency graph not resolved (could not prepare a scratch folder)"
+    else
+        if command -v cdxgen >/dev/null 2>&1; then _pg_cmd="cdxgen"
+        elif [ -f /opt/cdxgen/bin/cdxgen.js ]; then _pg_cmd="node /opt/cdxgen/bin/cdxgen.js"
+        else _pg_cmd="/opt/bin/cdxgen"
+        fi
+        log "poetry: resolving the dependency graph of the exact pins (cdxgen on requirements.txt alone)"
+        # shellcheck disable=SC2086  # _pg_cmd is a command and its script path
+        run_supervised_timeout "$PREP_TIMEOUT_DEFAULT" $_pg_cmd -r -t python --spec-version "$SPEC" \
+            -o "$_pg_dir/graph.json" "$_pg_dir/project" > "$_pg_dir/log" 2>&1
+        _pg_rc=$?
+        if [ "$_pg_rc" -eq 0 ] && [ -s "$_pg_dir/graph.json" ]; then
+            node - "$OUT" "$_pg_dir/graph.json" "$(basename "$_pg_dir")" <<'POETRY_GRAPH_JS'
+const fs = require("fs");
+const [outPath, graphPath, scratchName] = process.argv.slice(2);
+let main, graph;
+try { main = JSON.parse(fs.readFileSync(outPath, "utf8")); }
+catch (e) { process.stderr.write("[build-prep] poetry: could not read the SBOM: " + e.message + "\n"); process.exit(1); }
+try { graph = JSON.parse(fs.readFileSync(graphPath, "utf8")); }
+catch (e) { process.stderr.write("[build-prep] poetry: could not read the second run's SBOM: " + e.message + "\n"); process.exit(1); }
+const mainRoot = main.metadata && main.metadata.component && main.metadata.component["bom-ref"];
+const graphRoot = graph.metadata && graph.metadata.component && graph.metadata.component["bom-ref"];
+const rootEntry = (graph.dependencies || []).find(d => d.ref === graphRoot);
+const graphRefs = new Set((graph.components || []).map(c => c["bom-ref"]).filter(Boolean));
+const rootLinks = (rootEntry ? (rootEntry.dependsOn || []) : []).filter(r => graphRefs.has(r));
+if (!mainRoot || !rootLinks.length) {
+  process.stderr.write("[build-prep] poetry: the second run found no dependency graph; SBOM left as it was\n");
+  process.exit(2);
+}
+// File locations name the scratch copy of requirements.txt, written absolute
+// or relative; the file sits at the top of the source tree, which is what
+// the first run writes too.
+const scratchPath = new RegExp("[^\"]*" + scratchName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "/project/", "g");
+const clean = c => JSON.parse(JSON.stringify(c).replace(scratchPath, ""));
+// bom-refs anywhere in the SBOM, nested components included.
+const have = new Set();
+const walk = list => { for (const c of list || []) { if (c["bom-ref"]) have.add(c["bom-ref"]); walk(c.components); } };
+main.components = main.components || [];
+walk(main.components);
+let added = 0;
+for (const c of graph.components || []) {
+  if (!c["bom-ref"] || have.has(c["bom-ref"])) continue;
+  main.components.push(clean(c));
+  have.add(c["bom-ref"]);
+  added++;
+}
+main.dependencies = main.dependencies || [];
+const byRef = new Map(main.dependencies.map(d => [d.ref, d]));
+let edges = 0;
+const link = (ref, targets) => {
+  targets = targets.filter(t => have.has(t));
+  let d = byRef.get(ref);
+  if (!d) { d = { ref, dependsOn: [] }; main.dependencies.push(d); byRef.set(ref, d); }
+  const before = (d.dependsOn || []).length;
+  d.dependsOn = [...new Set([...(d.dependsOn || []), ...targets])].sort();
+  edges += d.dependsOn.length - before;
+};
+for (const d of graph.dependencies || []) {
+  if (d.ref === graphRoot || !have.has(d.ref)) continue;
+  link(d.ref, d.dependsOn || []);
+}
+link(mainRoot, rootLinks);
+// Written next to the SBOM and moved over it, so a failed write cannot leave
+// it cut short.
+try {
+  fs.writeFileSync(outPath + ".poetry-graph.tmp", JSON.stringify(main, null, 2));
+  fs.renameSync(outPath + ".poetry-graph.tmp", outPath);
+} catch (e) {
+  process.stderr.write("[build-prep] poetry: could not write the SBOM: " + e.message + "\n");
+  process.exit(1);
+}
+process.stderr.write("[build-prep] poetry: dependency graph added (" + added + " component(s), " + edges + " new edge(s))\n");
+POETRY_GRAPH_JS
+            [ $? -eq 0 ] && _pg_ok=1
+            rm -f "$OUT.poetry-graph.tmp"
+        else
+            log "poetry: dependency graph not resolved (cdxgen on requirements.txt exited $_pg_rc); the pins stay without their dependencies"
+        fi
+        # Why the second run gave nothing (offline, cdxgen exits 0 with an
+        # empty graph): the end of its own log.
+        [ -n "$_pg_ok" ] || tail -5 "$_pg_dir/log" 2>/dev/null | sed 's/^/[build-prep]   /' >&2
+    fi
+    [ -n "$_pg_ok" ] || mark_prep_failed poetry-graph
+    [ -z "$_pg_dir" ] || rm -rf "$_pg_dir"
+    _pg_dir=""
+fi
+
+# cdxgen's pyproject.toml route reads its own virtual environment when it
+# cannot install the project, and writes a package it could not name there
+# as pkg:pypi/unknown@latest, linked from the root. It is no package of the
+# project: a real one has a version. Dropped with every link to it, after the
+# Poetry graph above so that cannot bring it back, and the count kept on the
+# SBOM (bomlens:unnamed-packages-dropped) so the result manifest says that
+# something cdxgen saw could not be named.
+if [ "${rc:-1}" -eq 0 ] && [ -f "$OUT" ] && command -v node >/dev/null 2>&1 \
+   && grep -q '"pkg:pypi/unknown@latest"' "$OUT" 2>/dev/null; then
+    node - "$OUT" <<'PYPI_UNKNOWN_JS' || log "python: could not drop pkg:pypi/unknown@latest (non-fatal)"
+const fs = require("fs");
+const p = process.argv[2];
+const bom = JSON.parse(fs.readFileSync(p, "utf8"));
+const ref = "pkg:pypi/unknown@latest";
+const root = (bom.metadata && bom.metadata.component) || {};
+// A project cdxgen itself could only call that is left alone.
+if (root.purl === ref || root["bom-ref"] === ref) process.exit(0);
+const gone = new Set([ref]);
+let dropped = 0;
+const keep = list => (list || []).filter(c => {
+  if (c.purl === ref || c["bom-ref"] === ref) {
+    if (c["bom-ref"]) gone.add(c["bom-ref"]);
+    dropped++;
+    return false;
+  }
+  if (c.components) c.components = keep(c.components);
+  return true;
+});
+bom.components = keep(bom.components);
+let links = 0;
+bom.dependencies = (bom.dependencies || []).filter(d => !gone.has(d.ref) || (links++, false))
+  .map(d => {
+    const on = (d.dependsOn || []).filter(x => !gone.has(x));
+    links += (d.dependsOn || []).length - on.length;
+    return { ...d, dependsOn: on };
+  });
+if (dropped === 0 && links === 0) process.exit(0);
+if (dropped > 0) {
+  bom.metadata = bom.metadata || {};
+  bom.metadata.properties = (bom.metadata.properties || []).filter(x => x.name !== "bomlens:unnamed-packages-dropped");
+  bom.metadata.properties.push({ name: "bomlens:unnamed-packages-dropped", value: String(dropped) });
+}
+fs.writeFileSync(p + ".unknown.tmp", JSON.stringify(bom, null, 2));
+fs.renameSync(p + ".unknown.tmp", p);
+process.stderr.write("[build-prep] python: dropped pkg:pypi/unknown@latest (" + dropped + " component(s), " + links + " link(s)), a package cdxgen could not name in its own environment\n");
+PYPI_UNKNOWN_JS
+    rm -f "$OUT.unknown.tmp"
 fi
 
 # Rust licenses. cdxgen reads only Cargo.lock for a Rust project, and a lock file
@@ -1289,9 +1566,12 @@ if (!prod.size || !Array.isArray(bom.components)) process.exit(0);
 const mc = bom.metadata && bom.metadata.component;
 const rootRef = mc && (mc['bom-ref'] || mc.purl);
 const nameOf = c => (c.group ? c.group + '/' + c.name : c.name);
+// A set written by name only (no package-lock.json to pin versions) holds no
+// '@' after the first character; match those by name.
+const byName = [...prod].every(e => e.lastIndexOf('@') <= 0);
 const keep = c => {
   if (!(c.purl || '').startsWith('pkg:npm/')) return true;   // non-npm: leave alone
-  return prod.has(nameOf(c) + '@' + (c.version || ''));
+  return byName ? prod.has(nameOf(c)) : prod.has(nameOf(c) + '@' + (c.version || ''));
 };
 const before = bom.components.length;
 bom.components = bom.components.filter(keep);

@@ -87,6 +87,7 @@ _conda.cdx.json         :: no  :: yes :: skip
 _security_cvebintool.json :: no :: yes :: skip
 _security_grype.json    :: no  :: yes :: skip
 _security_yocto.json    :: no  :: yes :: skip
+_security_trivy.json    :: no  :: yes :: _security_trivy\.json
 _bom.spdx3.json         :: yes :: yes :: _bom\.spdx3\.json
 _bom.spdx3.json.sig     :: yes :: yes :: _bom\.spdx3\.json
 _spdx3-check.json       :: yes :: yes :: _spdx3-check

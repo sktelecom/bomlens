@@ -58,18 +58,19 @@ case "$(uname -s 2>/dev/null)" in
         # A POSIX path this shell can mkdir/read directly; hostpath() (above)
         # still does the cygpath -m conversion when this needs to reach a
         # docker -v flag, same as every other mount in this script.
-        GUARD_STATE_DIR="$(cygpath -u "${LOCALAPPDATA:-$HOME/AppData/Local}" 2>/dev/null)/bomlens/guard"
-        SCRATCH_DIR="$(cygpath -u "${LOCALAPPDATA:-$HOME/AppData/Local}" 2>/dev/null)/bomlens/tmp" ;;
+        GUARD_STATE_DIR="$(cygpath -u "${LOCALAPPDATA:-$HOME/AppData/Local}" 2>/dev/null)/bomlens/guard" ;;
     *)
         hostpath() { printf '%s' "$1"; }
-        GUARD_STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/bomlens/guard"
-        SCRATCH_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/bomlens/tmp" ;;
+        GUARD_STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/bomlens/guard" ;;
 esac
 
 POSTPROCESS_IMAGE="${SBOM_SCANNER_IMAGE:-ghcr.io/sktelecom/bomlens:latest}"           # legacy aliases: sbom-generator, sbom-scanner
 FIRMWARE_IMAGE="${SBOM_FIRMWARE_IMAGE:-ghcr.io/sktelecom/bomlens-firmware:latest}"     # opt-in (unblob/cve-bin-tool); legacy alias: sbom-scanner-firmware
 AIBOM_IMAGE="${SBOM_AIBOM_IMAGE:-ghcr.io/sktelecom/bomlens-aibom:latest}"               # opt-in (OWASP AIBOM Generator; HuggingFace network)
 DEEP_CVE_IMAGE="${SBOM_DEEP_CVE_IMAGE:-ghcr.io/sktelecom/bomlens-deep-cve:latest}"      # opt-in (grype + bundled NVD DB for maven CPE matching)
+# opt-in (scancode, for --deep-license). A caller who already points
+# SBOM_SCANNER_IMAGE at their own build keeps using it, as before this image existed.
+DEEP_LICENSE_IMAGE="${SBOM_DEEP_LICENSE_IMAGE:-${SBOM_SCANNER_IMAGE:-ghcr.io/sktelecom/bomlens-deep-license:latest}}"
 # Language detection + cdxgen image selection are shared with the web UI source
 # path (docker/entrypoint.sh) so both resolve transitive deps identically.
 # shellcheck source=docker/lib/source-detect.sh
@@ -105,6 +106,8 @@ CONFORMANCE_PROFILE="${CONFORMANCE_PROFILE:-default}"
 # Repository resolution for a submitted SBOM (--resolve-purl). Off unless asked:
 # it is the only part of the conformance check that uses the network.
 PURL_RESOLVE="${PURL_RESOLVE:-false}"
+# Registry licences (--license-registry). Off unless asked: it uses the network.
+LICENSE_REGISTRY="${LICENSE_REGISTRY:-false}"
 # CI gate: exit non-zero when this scan's own conformance report says "fail".
 # Host-only logic (see the check near the end of this script); nothing is
 # passed to the container for it.
@@ -238,6 +241,7 @@ while [[ "$#" -gt 0 ]]; do
         --lang) REPORT_LANG="$2"; shift ;;
         --conformance-profile) CONFORMANCE_PROFILE="$2"; shift ;;
         --resolve-purl) PURL_RESOLVE="true" ;;
+        --license-registry) LICENSE_REGISTRY="true" ;;
         --firmware) FORCE_FIRMWARE="true" ;;
         --output-dir|-o) OUTPUT_BASE="$2"; shift ;;
         --timestamp) TIMESTAMP="true" ;;
@@ -434,6 +438,12 @@ Options:
                          PURL coverage, pkg:generic advisory). skt-submission
                          requires 100% PURL coverage and fails on pkg:generic,
                          matching the SKT supplier submission review.
+  --license-registry     Ask the package registry (deps.dev) for the licence of a
+                         component that has none, and check a single
+                         strong-copyleft or non-commercial licence against it,
+                         replacing it when the registry says otherwise (the old
+                         value is kept in bomlens:license:superseded). Off by
+                         default; uses the network.
   --resolve-purl         --analyze only: ask each package repository whether the
                          identifiers in the submitted SBOM name packages that
                          exist, and add the answer to the conformance report as
@@ -464,6 +474,9 @@ Environment:
                          (default: true; set false to skip and run faster)
   SECURITY_ENRICH        Enrich the security report with EPSS + CISA KEV
                          signals (default: true; set false for air-gapped)
+  SBOM_TRIVY_CACHE       Host folder kept as Trivy's cache (database downloaded
+                         once); HTTP(S)_PROXY, NO_PROXY, TRIVY_*, EPSS_API and
+                         KEV_URL are passed on to the containers by name
   ENRICH_EOL             Flag components past their end-of-life from a bundled
                          endoflife.date snapshot (default: true; runs OFFLINE,
                          so it is air-gap safe; set false to skip)
@@ -498,12 +511,22 @@ Environment:
                          usual. always: block and re-pull every run. never:
                          touch no network; fail if the image is absent
   SBOM_SCANNER_IMAGE     Override the scanner image
+  CDXGEN_IMAGE_PREFIX    Where the cdxgen images come from (language and
+                         all-in-one), everything before the image name (default
+                         ghcr.io/cdxgen/); set it to a registry mirror's path
   SBOM_FIRMWARE_IMAGE    Override the firmware image
   SBOM_AIBOM_IMAGE       Override the AI SBOM (OWASP AIBOM Generator) image
   SBOM_DEEP_CVE_IMAGE    Override the deep-cve (grype) image
+  SBOM_DEEP_LICENSE_IMAGE
+                         Override the deep-license (scancode) image
   SECURITY_NVD_VERIFY    With --deep-cve: true drops loose-version false positives
                          via live NVD lookups (needs NVD_API_KEY, network/minutes)
   NVD_API_KEY            NVD API key for SECURITY_NVD_VERIFY (passed by name only)
+  SYFT_REGISTRY_AUTH_USERNAME
+                         Image scan: private-registry credentials for an image
+                         the Docker daemon does not have, with
+                         SYFT_REGISTRY_AUTH_PASSWORD (or _TOKEN, _AUTHORITY);
+                         passed by name only
   SCANOSS_API_URL        Vendored-OSS endpoint for --identify-vendored
                          (default: the free OSSKB API; set to a self-hosted
                          SCANOSS endpoint for air-gapped or high-volume use)
@@ -681,11 +704,17 @@ if [ "$UI_MODE" = "true" ]; then
     GO_ENV_FLAGS=(-e GOTOOLCHAIN -e GOPROXY -e GOSUMDB)
     # Source-scan options for build-prep.sh; the UI container's entrypoint passes
     # them on to the cdxgen container.
-    read -ra PREP_ENV_FLAGS <<< "$(build_prep_env_args)"
+    read -ra PREP_ENV_FLAGS <<< "$(build_prep_env_args) $(stage2_network_env_args)"
+    # The Trivy cache folder (SBOM_TRIVY_CACHE) for the UI's security scans too.
+    TRIVY_CACHE_FLAGS=()
+    while IFS= read -r _l; do TRIVY_CACHE_FLAGS+=("$_l"); done < <(trivy_cache_args)
+    [ "${#TRIVY_CACHE_FLAGS[@]}" -eq 4 ] && TRIVY_CACHE_FLAGS[1]="$(hostpath "${TRIVY_CACHE_FLAGS[1]%:/trivy-cache}"):/trivy-cache"
     # Name-only, same reason: a host override of the scan-cancel grace period
     # must reach server.py inside the UI container (it reads the env var
     # itself; a host-side default here would never be seen there).
     CANCEL_ENV_FLAGS=(-e BOMLENS_CANCEL_GRACE)
+    # The web UI's source scans pull the cdxgen images from the same mirror.
+    CDXGEN_ENV_FLAGS=(-e CDXGEN_IMAGE_PREFIX -e BOMLENS_OS_LICENSES)
     # /bomlens-state: the same host-persistent guard-state directory
     # the CLI path uses, so a directory scan launched through --ui can also
     # recover a source tree a prior, too-hard-killed scan left dirty. entrypoint.sh
@@ -696,7 +725,7 @@ if [ "$UI_MODE" = "true" ]; then
     ensure_image_fresh "$POSTPROCESS_IMAGE"
     exec "${DOCKER_ENV[@]}" docker run --rm "${TTY_FLAGS[@]}" -p "${UI_BIND_ADDRESS}:${UI_PORT}:8080" \
         -v "$(hostpath "$UI_BASE")":/src -v "$(hostpath "$UI_BASE")":/host-output \
-        "${MOUNT_FLAGS[@]}" "${HF_FLAGS[@]}" "${GO_ENV_FLAGS[@]}" "${PREP_ENV_FLAGS[@]}" "${CANCEL_ENV_FLAGS[@]}" \
+        "${MOUNT_FLAGS[@]}" "${HF_FLAGS[@]}" "${GO_ENV_FLAGS[@]}" "${PREP_ENV_FLAGS[@]}" "${CANCEL_ENV_FLAGS[@]}" "${TRIVY_CACHE_FLAGS[@]}" "${CDXGEN_ENV_FLAGS[@]}" \
         "${UI_GUARD_FLAGS[@]}" \
         -v /var/run/docker.sock:/var/run/docker.sock \
         -e MODE=UI -e UI_PORT=8080 -e SBOM_UI_HOST_DIR="$(hostpath "$UI_BASE")" \
@@ -827,6 +856,9 @@ rm -f "$SUMMARY_RESULT_FILE"
 # is told that file's name (BOMLENS_RUN_INPUT, below) so it skips it rather
 # than mistaking it for a stale one.
 rm -f "${OUTPUT_HOST_DIR}/${OUTPUT_FILE}"
+# The conda sidecar stage 1 may write beside it is kept by stage 2's cleanup
+# for the same reason, so an old one is cleared here too.
+rm -f "${OUTPUT_HOST_DIR}/${OUTPUT_FILE%_bom.json}_conda.cdx.json"
 
 # Temp dirs (git clone / archive extract) are cleaned on any exit. A container
 # build step (e.g. npm install during a source scan) can leave root-owned files
@@ -855,21 +887,9 @@ cleanup() {
         # not leave it behind. A no-op if stage 1 already removed it itself.
         "${DOCKER_ENV[@]}" docker rm -f "$RUNNING_CONTAINER_NAME" >/dev/null 2>&1 || true
     fi
-    # The syft-fallback helper script (stage 1's cdxgen-crash path): a no-op
-    # once stage 1 has already removed it, so this only matters when a
-    # cancel lands while the fallback container is running. `if`, not a bare
-    # `&&`: this is the last statement cleanup() runs, and since the script
-    # itself never calls a final `exit N` (bash returns the last command's own
-    # status when it falls off the end), a false `[ -n ... ]` here would leak
-    # its own exit 1 out as the whole script's exit code on every ordinary
-    # run -- an `if` with no `else` returns 0 on a false condition instead.
-    if [ -n "$STAGE1_FALLBACK_SCRIPT" ]; then
-        rm -f "$STAGE1_FALLBACK_SCRIPT"
-    fi
 }
 trap cleanup EXIT INT TERM
 RUNNING_CONTAINER_NAME=""
-STAGE1_FALLBACK_SCRIPT=""
 
 # Host-persistent guard state: when a scan is interrupted hard
 # enough that build-prep.sh's own trap never runs (SIGKILL, OOM, a host
@@ -996,13 +1016,23 @@ pp_env() {
     # secret never lands on the `docker run` argv where a local `ps` could read
     # it. Their values ride the exported shell env (see the export before each
     # `docker run`), matching the web-server path. Non-secret fields keep =value.
-    printf ' -e GENERATE_NOTICE=%s -e GENERATE_SECURITY=%s -e GENERATE_SPDX=%s -e SECURITY_ENRICH=%s -e GENERATE_REPORT=%s -e DEEP_LICENSE=%s -e IDENTIFY_VENDORED=%s -e SCANOSS_API_URL=%q -e SCANOSS_API_KEY -e SIGN_SBOM=%s -e BYTE_STABLE=%s -e REPORT_LANG=%s -e UPLOAD_ENABLED=%s -e PROJECT_NAME=%q -e PROJECT_VERSION=%q -e HOST_OUTPUT_DIR=/host-output -e HOST_UID=%s -e HOST_GID=%s -e API_KEY -e API_URL=%q -e UPLOAD_TARGET=%q -e TRUSCA_PROJECT_ID=%q -e TRUSCA_REF=%q -e TRUSCA_RELEASE=%q -e ENRICH_CDXGEN=%s -e ENRICH_EOL=%s -e ENRICH_MALICIOUS=%s -e STALENESS_ENRICH=%s -e DEEP_CVE=%s -e SECURITY_NVD_VERIFY=%s -e ENRICH_HF_SECURITY=%s -e VERIFY_MODEL_WEIGHTS=%s -e AIBOM_VERIFY_MAX_FILES=%q -e AIBOM_VERIFY_MAX_BYTES=%q -e AIBOM_DATASET_DEPTH=%q -e AIBOM_DATASET_MAX_LOOKUPS=%q -e GENERATE_SPDX3=%s -e AI_USAGE_CONTEXT=%q -e PROJECT_LICENSE=%q -e SBOM_AUTHOR=%q -e SRC_TREE_EXCLUDE=%q -e SOURCE_TREE_MAX=%q -e SOURCE_SNAPSHOT_MAX_TOTAL=%q -e SOURCE_SNAPSHOT_MAX_FILE=%q -e SOURCE_SNAPSHOT_MAX_FILES=%q -e FW_VERSTR_MAX_FILES=%q -e FW_VERSTR_MAX_BYTES=%q -e FW_ELF_MAX_FILES=%q -e FW_KERNEL_MAX_FILES=%q -e FW_KERNEL_MAX_BYTES=%q -e FW_KERNEL_MAX_VERSIONS=%q -e FW_EXTRA_ROOTS=%q -e FW_MAX_EXTRA_ROOTS=%q -e FW_CONTAINER_MEMBERSHIP=%q -e PURL_MIN_PCT=%q -e LICENSE_MIN_PCT=%q -e HASH_MIN_PCT=%q -e FIELD_MIN_PCT=%q -e CONFORMANCE_PROFILE=%s -e PURL_RESOLVE=%s -e PURL_RESOLVE_IGNORE -e PURL_RESOLVE_BUDGET' \
+    printf ' -e GENERATE_NOTICE=%s -e GENERATE_SECURITY=%s -e GENERATE_SPDX=%s -e SECURITY_ENRICH=%s -e GENERATE_REPORT=%s -e DEEP_LICENSE=%s -e IDENTIFY_VENDORED=%s -e SCANOSS_API_URL=%q -e SCANOSS_API_KEY -e SIGN_SBOM=%s -e BYTE_STABLE=%s -e REPORT_LANG=%s -e UPLOAD_ENABLED=%s -e PROJECT_NAME=%q -e PROJECT_VERSION=%q -e HOST_OUTPUT_DIR=/host-output -e HOST_UID=%s -e HOST_GID=%s -e API_KEY -e API_URL=%q -e UPLOAD_TARGET=%q -e TRUSCA_PROJECT_ID=%q -e TRUSCA_REF=%q -e TRUSCA_RELEASE=%q -e ENRICH_CDXGEN=%s -e ENRICH_EOL=%s -e ENRICH_MALICIOUS=%s -e STALENESS_ENRICH=%s -e DEEP_CVE=%s -e SECURITY_NVD_VERIFY=%s -e ENRICH_HF_SECURITY=%s -e VERIFY_MODEL_WEIGHTS=%s -e AIBOM_VERIFY_MAX_FILES=%q -e AIBOM_VERIFY_MAX_BYTES=%q -e AIBOM_DATASET_DEPTH=%q -e AIBOM_DATASET_MAX_LOOKUPS=%q -e GENERATE_SPDX3=%s -e AI_USAGE_CONTEXT=%q -e PROJECT_LICENSE=%q -e SBOM_AUTHOR=%q -e SRC_TREE_EXCLUDE=%q -e SOURCE_TREE_MAX=%q -e SOURCE_SNAPSHOT_MAX_TOTAL=%q -e SOURCE_SNAPSHOT_MAX_FILE=%q -e SOURCE_SNAPSHOT_MAX_FILES=%q -e FW_VERSTR_MAX_FILES=%q -e FW_VERSTR_MAX_BYTES=%q -e FW_ELF_MAX_FILES=%q -e FW_KERNEL_MAX_FILES=%q -e FW_KERNEL_MAX_BYTES=%q -e FW_KERNEL_MAX_VERSIONS=%q -e FW_EXTRA_ROOTS=%q -e FW_MAX_EXTRA_ROOTS=%q -e FW_CONTAINER_MEMBERSHIP=%q -e PURL_MIN_PCT=%q -e LICENSE_MIN_PCT=%q -e HASH_MIN_PCT=%q -e FIELD_MIN_PCT=%q -e CONFORMANCE_PROFILE=%s -e PURL_RESOLVE=%s -e PURL_RESOLVE_IGNORE -e PURL_RESOLVE_BUDGET -e LICENSE_REGISTRY=%s -e LICENSE_REGISTRY_VERIFY -e LICENSE_REGISTRY_BUDGET -e LICENSE_REGISTRY_API -e DEEP_LICENSE_MAX_FILES -e DEEP_LICENSE_TIMEOUT -e BOMLENS_DEEP_LICENSE_ALL' \
         "$GENERATE_NOTICE" "$GENERATE_SECURITY" "$GENERATE_SPDX" "$SECURITY_ENRICH" "$GENERATE_REPORT" "$DEEP_LICENSE" "$IDENTIFY_VENDORED" "$SCANOSS_API_URL" "$SIGN_SBOM" "$BYTE_STABLE" "$REPORT_LANG" "$UPLOAD_VAR" "$PROJECT_NAME" "$PROJECT_VERSION" "$(id -u)" "$(id -g)" "$SERVER_URL" "$UPLOAD_TARGET" "$TRUSCA_PROJECT_ID" "$TRUSCA_REF" "$TRUSCA_RELEASE" "${ENRICH_CDXGEN:-true}" "${ENRICH_EOL:-true}" "${ENRICH_MALICIOUS:-true}" "${STALENESS_ENRICH:-false}" "$DEEP_CVE" "${SECURITY_NVD_VERIFY:-false}" "${ENRICH_HF_SECURITY:-true}" "$VERIFY_WEIGHTS" "${AIBOM_VERIFY_MAX_FILES:-}" "${AIBOM_VERIFY_MAX_BYTES:-}" "${AIBOM_DATASET_DEPTH:-}" "${AIBOM_DATASET_MAX_LOOKUPS:-}" "$GENERATE_SPDX3" "${USAGE_CONTEXT:-${AI_USAGE_CONTEXT:-}}" "${PROJECT_LICENSE:-}" "${SBOM_AUTHOR:-}" "${SRC_TREE_EXCLUDE:-}" \
         "${SOURCE_TREE_MAX:-}" "${SOURCE_SNAPSHOT_MAX_TOTAL:-}" "${SOURCE_SNAPSHOT_MAX_FILE:-}" "${SOURCE_SNAPSHOT_MAX_FILES:-}" \
         "${FW_VERSTR_MAX_FILES:-}" "${FW_VERSTR_MAX_BYTES:-}" "${FW_ELF_MAX_FILES:-}" \
         "${FW_KERNEL_MAX_FILES:-}" "${FW_KERNEL_MAX_BYTES:-}" "${FW_KERNEL_MAX_VERSIONS:-}" \
         "${FW_EXTRA_ROOTS:-}" "${FW_MAX_EXTRA_ROOTS:-}" "${FW_CONTAINER_MEMBERSHIP:-}" \
-        "${PURL_MIN_PCT:-}" "${LICENSE_MIN_PCT:-}" "${HASH_MIN_PCT:-}" "${FIELD_MIN_PCT:-}" "$CONFORMANCE_PROFILE" "${PURL_RESOLVE:-false}"
+        "${PURL_MIN_PCT:-}" "${LICENSE_MIN_PCT:-}" "${HASH_MIN_PCT:-}" "${FIELD_MIN_PCT:-}" "$CONFORMANCE_PROFILE" "${PURL_RESOLVE:-false}" "${LICENSE_REGISTRY:-false}"
+    # Proxy, Trivy database and EPSS/KEV settings, by name.
+    printf ' %s' "$(stage2_network_env_args)"
+    # Debian package licenses from Trivy (image/rootfs scans), on unless set false.
+    printf ' -e BOMLENS_OS_LICENSES'
+    # SBOM_TRIVY_CACHE: a host folder kept as Trivy's cache, so its database
+    # is downloaded once rather than on every scan (or put there for an
+    # offline host, with TRIVY_SKIP_DB_UPDATE=true).
+    local _tc=() _l
+    while IFS= read -r _l; do _tc+=("$_l"); done < <(trivy_cache_args)
+    [ "${#_tc[@]}" -eq 4 ] && printf ' -v %q -e TRIVY_CACHE_DIR=/trivy-cache' "$(hostpath "${_tc[1]%:/trivy-cache}"):/trivy-cache"
 }
 
 # The docker CLI forwards a name-only `-e VAR` from its own environment, so the
@@ -2023,6 +2053,7 @@ if [ "$MODE" = "SOURCE" ]; then
             echo "        and its terms do not allow us to redistribute it. Build it once:"
             echo ""
             echo "          docker build --build-arg ANDROID_API=$API \\"
+            [ "$CDXGEN_IMAGE_PREFIX" = "ghcr.io/cdxgen/" ] || echo "            --build-arg CDXGEN_IMAGE_PREFIX=$CDXGEN_IMAGE_PREFIX \\"
             echo "            -t $CDX_IMG $REPO_DIR/docker/android"
             echo ""
             echo "        Building it means accepting Google's SDK terms yourself:"
@@ -2133,58 +2164,34 @@ if [ "$MODE" = "SOURCE" ]; then
     wait "$STAGE1_PID" || true
     RUNNING_CONTAINER_NAME=""
     STAGE1_RC=$("${DOCKER_ENV[@]}" docker wait "$STAGE1_CONTAINER" 2>/dev/null || echo 1)
-    if [ "$STAGE1_RC" -ne 0 ] || [ ! -f "$OUTPUT_HOST_DIR/$OUTPUT_FILE" ]; then
-        if [ "$("${DOCKER_ENV[@]}" docker inspect -f '{{.State.OOMKilled}}' "$STAGE1_CONTAINER" 2>/dev/null)" = "true" ]; then
-            STAGE1_FAIL_REASON="oom"
-            echo "[WARN] cdxgen was killed for running out of memory (rc=$STAGE1_RC). Give the Docker engine more memory and re-scan for full transitive dependencies. Full cdxgen log: $STAGE1_LOG"
-        elif grep -qi "no space left on device" "$STAGE1_LOG"; then
-            STAGE1_FAIL_REASON="disk-space"
-            echo "[WARN] cdxgen failed: Docker is out of disk space (rc=$STAGE1_RC). Free space (e.g. 'docker system prune'). Full cdxgen log: $STAGE1_LOG"
-        elif grep -qEi "temporary failure in name resolution|could not resolve host|network is unreachable|connection timed out|connect timed out|no route to host|ENOTFOUND|ETIMEDOUT" "$STAGE1_LOG"; then
-            STAGE1_FAIL_REASON="network"
-            echo "[WARN] cdxgen couldn't reach the network while resolving dependencies (rc=$STAGE1_RC). Check proxy/firewall access to the package registries. Full cdxgen log: $STAGE1_LOG"
-        else
-            STAGE1_FAIL_REASON="cdxgen-crash"
-            echo "[WARN] cdxgen failed processing the dependency data (rc=$STAGE1_RC); see $STAGE1_LOG for the full log. Falling back to a manifest-only scan (direct dependencies only)."
-        fi
+    # When stage 1 left no SBOM, stage 2 takes its place with the manifest-only
+    # syft scan: the same fallback a caller running the execution plan gets
+    # (entrypoint.sh, POSTPROCESS), so the CLI and that path cannot drift
+    # apart. The reason is classified here, with the same rules
+    # (stage1_fail_reason), so the guidance below can name it, and handed on.
+    # The exit code goes to stage 2 either way, as the plan's callers pass it,
+    # so both decide "no SBOM" the same way (an empty file counts as none).
+    STAGE1_FALLBACK_ENV=" -e BOMLENS_STAGE1_EXIT=$STAGE1_RC -e _BOMLENS_CLI_FALLBACK=1"
+    STAGE1_FAILED=""
+    if [ "$STAGE1_RC" -ne 0 ] || [ ! -s "$OUTPUT_HOST_DIR/$OUTPUT_FILE" ]; then
+        STAGE1_FAILED=1
+        STAGE1_OOM="$("${DOCKER_ENV[@]}" docker inspect -f '{{.State.OOMKilled}}' "$STAGE1_CONTAINER" 2>/dev/null || true)"
+        STAGE1_FAIL_REASON="$(stage1_fail_reason "$STAGE1_OOM" "$STAGE1_LOG" "$STAGE1_RC")"
+        case "$STAGE1_FAIL_REASON" in
+            oom)
+                echo "[WARN] cdxgen was killed for running out of memory (rc=$STAGE1_RC). Give the Docker engine more memory and re-scan for full transitive dependencies. Full cdxgen log: $STAGE1_LOG" ;;
+            disk-space)
+                echo "[WARN] cdxgen failed: Docker is out of disk space (rc=$STAGE1_RC). Free space (e.g. 'docker system prune'). Full cdxgen log: $STAGE1_LOG" ;;
+            network)
+                echo "[WARN] cdxgen couldn't reach the network while resolving dependencies (rc=$STAGE1_RC). Check proxy/firewall access to the package registries. Full cdxgen log: $STAGE1_LOG" ;;
+            cdxgen-unavailable)
+                echo "[WARN] cdxgen could not be started in its image (rc=$STAGE1_RC, command not found); see $STAGE1_LOG. Falling back to a manifest-only scan (direct dependencies only)." ;;
+            *)
+                echo "[WARN] cdxgen failed processing the dependency data (rc=$STAGE1_RC); see $STAGE1_LOG for the full log. Falling back to a manifest-only scan (direct dependencies only)." ;;
+        esac
         "${DOCKER_ENV[@]}" docker rm -f "$STAGE1_CONTAINER" >/dev/null 2>&1
         rm -f "$OUTPUT_HOST_DIR/$OUTPUT_FILE"
-        ensure_image_fresh "$POSTPROCESS_IMAGE"
-        # A bind-mounted script file (matching build-prep.sh's own pattern),
-        # not a `-c` string built by host-side interpolation: the same
-        # MSYS_NO_PATHCONV mount-path rewriting that protects every other
-        # docker call in this script would otherwise also mangle a `-c`
-        # argument that happens to contain "/"-separated words on Windows
-        # Git Bash. Written under SCRATCH_DIR, not OUTPUT_HOST_DIR: that is
-        # the user's own output folder, and a script left behind there (a
-        # crash between writing it and the rm below) would linger among the
-        # scan's real artifacts. Not the system tmpdir either: a Linux VM
-        # Docker backend (Colima, some Docker Desktop setups) mounts only
-        # specific host paths into itself, and silently substitutes an empty
-        # directory for a source it cannot see.
-        mkdir -p "$SCRATCH_DIR" 2>/dev/null
-        STAGE1_FALLBACK_SCRIPT="$SCRATCH_DIR/.fallback-$$-$RANDOM.sh"
-        cat > "$STAGE1_FALLBACK_SCRIPT" <<'FALLBACK_SH'
-set -e
-. /usr/local/lib/sbom/source-detect.sh
-read -ra SYFT_EXCLUDE <<< "$(non_shipped_syft_args)"
-syft "dir:/src" "${SYFT_EXCLUDE[@]}" -o "cyclonedx-json@$1" > "/out/$2" 2>/dev/null
-apply_node_fallback_quality_gate "/out/$2" /src 2 || { echo "[ERROR] fallback SBOM discarded (see above)." >&2; exit 1; }
-mark_sbom_degraded "/out/$2" "$3"
-mark_sbom_excluded "/out/$2" /src
-FALLBACK_SH
-        if ! eval "$DOCKER_MSYS"docker run --rm --label bomlens.scan=cli --entrypoint bash \
-            -v "\"$(hostpath "$SCAN_INPUT_DIR")\"":/src:ro \
-            -v "\"$(hostpath "$OUTPUT_HOST_DIR")\"":/out \
-            -v "\"$(hostpath "$STAGE1_FALLBACK_SCRIPT")\"":/tmp/fallback.sh:ro \
-            "\"$POSTPROCESS_IMAGE\"" \
-            /tmp/fallback.sh "$CDX_SPEC_VERSION" "$OUTPUT_FILE" "$STAGE1_FAIL_REASON"; then
-            rm -f "$STAGE1_FALLBACK_SCRIPT"; STAGE1_FALLBACK_SCRIPT=""
-            echo "[ERROR] SBOM generation failed (stage 1), and the manifest-only fallback also failed or was discarded (see the guidance above, if any). Full cdxgen log: $STAGE1_LOG"
-            exit 1
-        fi
-        rm -f "$STAGE1_FALLBACK_SCRIPT"; STAGE1_FALLBACK_SCRIPT=""
-        echo "[WARN] Manifest-only fallback used (direct dependencies only, no transitive resolution). Full cdxgen log: $STAGE1_LOG"
+        STAGE1_FALLBACK_ENV="$STAGE1_FALLBACK_ENV -e BOMLENS_STAGE1_REASON=$STAGE1_FAIL_REASON"
     else
         "${DOCKER_ENV[@]}" docker rm -f "$STAGE1_CONTAINER" >/dev/null 2>&1
         rm -f "$STAGE1_LOG"
@@ -2197,22 +2204,73 @@ FALLBACK_SH
     # scanned tree (/src) is never written to.
     # pp_env/cosign_run intentionally expand to several -e KEY=VAL tokens, so the
     # word splitting SC2046 flags here is required, not a bug.
-    ensure_image_fresh "$POSTPROCESS_IMAGE"
+    # --deep-license: the post-process step runs scancode over /src, and scancode
+    # is only in the deep-license image (the base image stays small).
+    # When that image is not here and cannot be pulled (not published yet, an
+    # offline host, SBOM_PULL=never), the scan still runs on the base image and
+    # records the licence step as not installed, as it did before this image.
+    PP_IMAGE="$POSTPROCESS_IMAGE"
+    if [ "$DEEP_LICENSE" = "true" ] && [ "$DEEP_LICENSE_IMAGE" != "$POSTPROCESS_IMAGE" ]; then
+        PP_IMAGE="$DEEP_LICENSE_IMAGE"
+        if ! docker image inspect "$PP_IMAGE" >/dev/null 2>&1 \
+           && { [ "$SBOM_PULL" = "never" ] || ! docker pull "$PP_IMAGE" >/dev/null 2>&1; }; then
+            echo "[WARN] --deep-license: the scancode image $PP_IMAGE is not available; continuing on $POSTPROCESS_IMAGE without the licence scan."
+            DEEP_LICENSE_FALLBACK_FROM="$PP_IMAGE"
+            PP_IMAGE="$POSTPROCESS_IMAGE"
+        fi
+    fi
+    ensure_image_fresh "$PP_IMAGE"
+    # The fallback runs inside this image, which takes the hand-off only from
+    # the engine contract on (an image older than this CLI ignores it and
+    # stops with "SBOM not found"). Checked only when it is needed.
+    if [ -n "$STAGE1_FAILED" ] \
+       && [ -z "$("${DOCKER_ENV[@]}" docker image inspect -f '{{index .Config.Labels "com.sktelecom.sbom.engine-contract"}}' "$PP_IMAGE" 2>/dev/null | grep -v '<no value>')" ]; then
+        echo "[ERROR] cdxgen produced no SBOM, and the post-processing image $PP_IMAGE is older than this CLI: it cannot run the manifest-only fallback."
+        echo "        Use the image of the same BomLens version as this CLI (docker pull $PP_IMAGE, or set SBOM_SCANNER_IMAGE to it). Full cdxgen log: $STAGE1_LOG"
+        exit 1
+    fi
     export_scan_secrets
     # shellcheck disable=SC2046
     eval "$DOCKER_MSYS"docker run --rm \
         -v "\"$(hostpath "$SCAN_INPUT_DIR")\"":/src -v "\"$(hostpath "$OUTPUT_HOST_DIR")\"":/host-output \
         -w /host-output \
         --add-host=host.docker.internal:host-gateway \
-        -e MODE=POSTPROCESS -e BOMLENS_RUN_INPUT="$OUTPUT_FILE" -e NESTED_ROOTFS_HINT="\"$NESTED_ROOTFS_HINT\"" $(pp_env)$(cosign_run)$(vex_run)$(declare_run)$(gate_run) \
-        "\"$POSTPROCESS_IMAGE\""
+        -e MODE=POSTPROCESS -e BOMLENS_RUN_INPUT="$OUTPUT_FILE" -e NESTED_ROOTFS_HINT="\"$NESTED_ROOTFS_HINT\"" -e BOMLENS_DEEP_LICENSE_FALLBACK="\"${DEEP_LICENSE_FALLBACK_FROM:-}\"" -e BOMLENS_INCLUDE_NON_SHIPPED${STAGE1_FALLBACK_ENV} $(pp_env)$(cosign_run)$(vex_run)$(declare_run)$(gate_run) \
+        "\"$PP_IMAGE\"" || {
+        _pp_rc=$?
+        if [ -n "$STAGE1_FAILED" ] && [ ! -s "$OUTPUT_HOST_DIR/$OUTPUT_FILE" ]; then
+            echo "[ERROR] SBOM generation failed (stage 1), and the manifest-only fallback also failed or was discarded (see the guidance above, if any). Full cdxgen log: $STAGE1_LOG"
+        fi
+        exit "$_pp_rc"
+    }
+    if [ -n "$STAGE1_FAILED" ]; then
+        echo "[WARN] Manifest-only fallback used (direct dependencies only, no transitive resolution). Full cdxgen log: $STAGE1_LOG"
+    fi
 else
     # image / binary / rootfs / firmware / aibom / analyze / merge: scanner image
     # runs the generation step + common pipeline in one shot. Firmware and aibom
     # need their heavier opt-in images; others use the base image.
     VOL=""; ENVV=""; RUN_IMAGE="$POSTPROCESS_IMAGE"
     case "$MODE" in
-        IMAGE)  VOL="-v \"$(hostpath "$OUTPUT_HOST_DIR")\":/host-output -v /var/run/docker.sock:/var/run/docker.sock"; ENVV="-e TARGET_IMAGE=\"$TARGET\"" ;;
+        IMAGE)  VOL="-v \"$(hostpath "$OUTPUT_HOST_DIR")\":/host-output -v /var/run/docker.sock:/var/run/docker.sock"; ENVV="-e TARGET_IMAGE=\"$TARGET\""
+                # Registry access for an image the daemon does not have. Names
+                # only: docker reads the values from this environment, so a
+                # password does not show in `ps`.
+                # An archive (docker-archive:/oci-archive:/oci-dir:<host path>)
+                # is mounted read-only and named by its path in the container.
+                case "$TARGET" in
+                    docker-archive:*|oci-archive:*|oci-dir:*)
+                        _ar_path="${TARGET#*:}"
+                        if [ -e "$_ar_path" ]; then
+                            _ar_dir="$(cd "$(dirname "$_ar_path")" && pwd)"
+                            VOL="$VOL -v \"$(hostpath "$_ar_dir")\":/target:ro"
+                            ENVV="-e TARGET_IMAGE=\"${TARGET%%:*}:/target/$(basename "$_ar_path")\""
+                        fi ;;
+                esac
+                for _rv in SYFT_REGISTRY_AUTH_AUTHORITY SYFT_REGISTRY_AUTH_USERNAME SYFT_REGISTRY_AUTH_PASSWORD \
+                           SYFT_REGISTRY_AUTH_TOKEN SYFT_REGISTRY_INSECURE_SKIP_TLS_VERIFY SYFT_REGISTRY_INSECURE_USE_HTTP SYFT_PLATFORM; do
+                    [ -n "${!_rv:-}" ] && ENVV="$ENVV -e $_rv"
+                done ;;
         BINARY) FD="$(cd "$(dirname "$TARGET")" && pwd)"; FN="$(basename "$TARGET")"; VOL="-v \"$(hostpath "$FD")\":/target -v \"$(hostpath "$OUTPUT_HOST_DIR")\":/host-output"; ENVV="-e TARGET_FILE=\"/target/$FN\"" ;;
         ROOTFS) TD="$(cd "$TARGET" && pwd)"; VOL="-v \"$(hostpath "$TD")\":/target -v \"$(hostpath "$OUTPUT_HOST_DIR")\":/host-output"; ENVV="-e TARGET_DIR=/target" ;;
         FIRMWARE) FD="$(cd "$(dirname "$TARGET")" && pwd)"; FN="$(basename "$TARGET")"; VOL="-v \"$(hostpath "$FD")\":/target -v \"$(hostpath "$OUTPUT_HOST_DIR")\":/host-output"; ENVV="-e TARGET_FILE=\"/target/$FN\""; RUN_IMAGE="$FIRMWARE_IMAGE" ;;
@@ -2392,7 +2450,7 @@ fi
 # measurement (validate-sbom.sh), not from a count made here. Absent (an older
 # image, an AI SBOM) it prints nothing.
 if [ -f "$SUMMARY_RESULT_FILE" ]; then
-    sum_components=""; sum_licensed=""; sum_license_pct=""; sum_purl_pct=""; sum_reduced=""; sum_failed=""
+    sum_components=""; sum_licensed=""; sum_license_pct=""; sum_purl_pct=""; sum_reduced=""; sum_failed=""; sum_empty_manifests=""
     while IFS=$'\t' read -r sum_key sum_val; do
         case "$sum_key" in
             components)     sum_components="$sum_val" ;;
@@ -2400,6 +2458,7 @@ if [ -f "$SUMMARY_RESULT_FILE" ]; then
             licensePercent) sum_license_pct="$sum_val" ;;
             purlPercent)    sum_purl_pct="$sum_val" ;;
             reduced)        sum_reduced="$sum_val" ;;
+            emptyManifests) sum_empty_manifests="$sum_val" ;;
             failedSteps)    sum_failed="$sum_val" ;;
         esac
     done < "$SUMMARY_RESULT_FILE"
@@ -2432,6 +2491,7 @@ if [ -f "$SUMMARY_RESULT_FILE" ]; then
                     esac
                     echo "[WARN] Reduced analysis: ${sum_why}, so only direct dependencies were identified."
                 fi
+                [ -z "$sum_empty_manifests" ] || [ "${sum_components:-}" != "0" ] || echo "[WARN] No components were found, though these declare dependencies: ${sum_empty_manifests}. Commit a lock file, or check the log above for why resolution failed."
                 [ -z "$sum_failed" ] || echo "[WARN] Steps that failed: ${sum_failed} (details in the log above)"
             fi
             ;;

@@ -18,6 +18,11 @@
     "autonomyType": "",
     "safetyRiskAssessment": "",
     "weightsScope": "",
+    "inputModality": [],
+    "outputModality": [],
+    "trainingComputeFlops": "",
+    "trainingComputeBasis": "",
+    "adversarialTesting": "",
     "baseModels": []
   },
   "datasets": [
@@ -56,5 +61,21 @@
       "datasetUpdateMechanism": ""
     }
   ],
+  "service": {
+    "name": "",
+    "packageVersion": "",
+    "downloadLocation": "",
+    "suppliedBy": null,
+    "releaseTime": "",
+    "informationAboutApplication": "",
+    "domain": [],
+    "autonomyType": "",
+    "inputModality": [],
+    "outputModality": [],
+    "dataFlows": [],
+    "standardCompliance": [],
+    "disclosureUrl": "",
+    "externalModels": []
+  },
   "relationships": []
 }

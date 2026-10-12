@@ -310,6 +310,34 @@ jobs:
       - name: Merge-mode unit tests
         run: bash tests/test-merge.sh
 
+      # syft for the engine contract's stage 2 fallback cases (the test fails
+      # in CI rather than skip when it is missing). The version pinned in
+      # docker/Dockerfile, checked against the release's checksum list, into
+      # the job's own temp dir, so the self-hosted runner's system is left as
+      # it was.
+      - name: Install syft (pinned release tarball)
+        run: |
+          SYFT_VERSION=$(grep -oP 'ARG SYFT_VERSION=\K\S+' docker/Dockerfile)
+          ver="${SYFT_VERSION#v}"
+          mkdir -p "$RUNNER_TEMP/syft-bin"
+          base="https://github.com/anchore/syft/releases/download/${SYFT_VERSION}"
+          tgz="syft_${ver}_linux_amd64.tar.gz"
+          curl -sSfL "$base/$tgz" -o "$RUNNER_TEMP/$tgz"
+          # The release's own checksum list, the same check syft's install.sh
+          # makes for the image build: a tarball that does not match stops here.
+          curl -sSfL "$base/syft_${ver}_checksums.txt" -o "$RUNNER_TEMP/syft_checksums.txt"
+          ( cd "$RUNNER_TEMP" && grep " ${tgz}\$" syft_checksums.txt | sha256sum -c - )
+          tar -C "$RUNNER_TEMP/syft-bin" -xzf "$RUNNER_TEMP/$tgz" syft
+          echo "$RUNNER_TEMP/syft-bin" >> "$GITHUB_PATH"
+          "$RUNNER_TEMP/syft-bin/syft" version
+
+      # The engine contract: bomlens-result.json from entrypoint.sh run against
+      # this checkout's docker/lib, with Trivy stubbed (success, injected
+      # failure, early exit), validated against schemas/engine-result-1.json;
+      # the execution plan (MODE=PLAN) and the stage 2 fallback.
+      - name: Engine contract tests
+        run: bash tests/test-engine-contract.sh
+
       # No Docker: checks that an archive is routed by what it holds, not by its
       # extension. A root filesystem or a `docker save` tar scanned as source
       # reports nothing, and nothing is indistinguishable from a clean result.

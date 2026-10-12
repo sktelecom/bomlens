@@ -116,10 +116,12 @@ def _classify(purl):
         return None
 
     if purl.startswith("pkg:apk/") or purl.startswith("pkg:deb/"):
-        # apk/deb PURLs from syft carry `distro=<id>-<versionId>` (e.g.
-        # alpine-3.17.10, debian-11, ubuntu-18.04). The version is required — no
-        # qualifier means no matchable OS version, so we skip rather than guess.
-        dq = re.search(r"[?&]distro=([a-z][a-z0-9]*)-([0-9][0-9.]*)", purl)
+        # apk/deb PURLs carry `distro=<id>-<versionId>` (e.g. alpine-3.17.10,
+        # debian-11, ubuntu-18.04), or for apk the bare release id Trivy and
+        # BomLens's normalize step write (`distro=3.17.10`; the namespace names
+        # the distro). The version is required: no qualifier means no matchable
+        # OS version, so we skip rather than guess.
+        dq = re.search(r"[?&]distro=(?:([a-z][a-z0-9]*)-)?([0-9][0-9.]*)", purl)
         table = APK_TO_OS if purl.startswith("pkg:apk/") else DEB_TO_OS
         ns = _ns(purl, "pkg:apk/" if purl.startswith("pkg:apk/") else "pkg:deb/")
         did = dq.group(1) if dq else None

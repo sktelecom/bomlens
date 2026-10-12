@@ -1215,6 +1215,33 @@ test("Overview warns when the SBOM degraded to syft (scan tool crash)", async ({
   expect(axe.violations).toEqual([]);
 });
 
+test("Overview says the dependency analysis gave no result (cdxgen-unavailable)", async ({ page }) => {
+  await page.route("**/capabilities", (r) =>
+    r.fulfill({ contentType: "application/json", body: JSON.stringify({ firmware: false, scanoss: false, docker: true }) }),
+  );
+  await page.route("**/results", (r) => r.fulfill({ contentType: "application/json", body: "[]" }));
+  const degraded = { ...DONE, sbom: { ...DONE.sbom, sbomToolDegraded: "cdxgen-unavailable" } };
+  await page.route("**/scan-stream**", (r) =>
+    r.fulfill({ contentType: "text/event-stream", body: `event: done\ndata: ${JSON.stringify(degraded)}\n\n` }),
+  );
+  await page.goto("/?ui=next#/new");
+  await page.fill("#project", "demo");
+  await page.fill("#version", "1.0");
+  await page.getByTestId("run-scan").click();
+
+  // cdxgen-unavailable covers a scan with no Docker access and a cdxgen run
+  // that left no SBOM, so Docker is named only as a condition, and the tool
+  // not at all.
+  await expect(page.getByText(/gave no result, so this SBOM was built from its manifests only/)).toBeVisible();
+  await expect(page.getByText(/If the scan could not reach Docker/)).toBeVisible();
+  await expect(page.getByText("cdxgen", { exact: false })).toHaveCount(0);
+
+  const axe = await new AxeBuilder({ page })
+    .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
+    .analyze();
+  expect(axe.violations).toEqual([]);
+});
+
 // Result-section visuals run across light/dark × en/ko. The setup navigates and
 // waits on language-agnostic anchors — section links by href, the Tree toggle by
 // test id, and data values (package names, scores, licence ids) that don't

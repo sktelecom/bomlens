@@ -56,6 +56,7 @@ describe("pipelineStepLabelKey", () => {
       for (const m of text.matchAll(call)) if (!/^["$]/.test(m[1])) ids.add(m[1]);
     };
     collect(code("lib/build-prep.sh"), /\bprep_step (\S+) /g);
+    collect(code("lib/build-prep.sh"), /\bmark_prep_failed (\S+)$/gm);
     collect(code("entrypoint.sh"), /\brun_optional_step (\S+) /g);
     // scan-firmware.sh names its step as the last argument of catalog_packages.
     collect(code("lib/scan-firmware.sh"), /\bcatalog_packages "[^"]*" "[^"]*" (\S+)(?:;|$)/gm);

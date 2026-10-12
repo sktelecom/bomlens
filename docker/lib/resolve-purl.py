@@ -246,21 +246,24 @@ def main():
             continue
         by_coordinate.setdefault(coord, []).append(purl)
 
+    # The budget bounds the wait for answers, not only the submitting (every
+    # submit returns at once): what has not answered when it runs out is
+    # reported as unchecked. A request in flight still ends within
+    # REQUEST_TIMEOUT.
     deadline = time.monotonic() + budget
     results = {}
-    skipped = []
-    with concurrent.futures.ThreadPoolExecutor(max_workers=MAX_WORKERS) as pool:
-        futures = {}
-        for coord in by_coordinate:
-            if time.monotonic() > deadline:
-                skipped.append(coord)
-                continue
-            futures[pool.submit(fetch, *coord)] = coord
-        for fut in concurrent.futures.as_completed(futures):
+    pool = concurrent.futures.ThreadPoolExecutor(max_workers=MAX_WORKERS)
+    futures = {pool.submit(fetch, *coord): coord for coord in by_coordinate}
+    try:
+        for fut in concurrent.futures.as_completed(futures, timeout=max(deadline - time.monotonic(), 0)):
             try:
                 results[futures[fut]] = fut.result()
             except Exception:  # noqa: BLE001 — best-effort, never abort a scan
                 results[futures[fut]] = None
+    except concurrent.futures.TimeoutError:
+        pass
+    pool.shutdown(wait=False, cancel_futures=True)
+    skipped = [c for c in by_coordinate if c not in results]
 
     found = missing = errored = 0
     missing_purls = []

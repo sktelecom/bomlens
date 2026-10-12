@@ -139,7 +139,7 @@ Two steps run inside the image:
 
 | MODE | Input | syft invocation |
 |------|------|-----------|
-| `IMAGE` | Docker image | `syft <image> -o cyclonedx-json` (requires the docker.sock mount) |
+| `IMAGE` | Docker image | `syft <image> -o cyclonedx-json` (from the Docker daemon with the docker.sock mount, otherwise from the registry or an archive) |
 | `BINARY` | Single file | `syft file:<path> -o cyclonedx-json` (falls back to a minimal SBOM on failure) |
 | `ROOTFS` | Directory | `syft dir:<path> -o cyclonedx-json` |
 
@@ -200,7 +200,7 @@ flowchart TD
 | `FIRMWARE` | `--target <file> --firmware`, or a firmware file extension | unblob + syft + cve-bin-tool | **Opt-in image** `bomlens-firmware`. Details in the [firmware analysis guide](../guides/firmware.md) |
 | `BINARY` | `--target <file>` | syft | `file:` scheme |
 | `ROOTFS` | `--target <directory>` | syft | `dir:` scheme |
-| `IMAGE` | `--target <image name>` | syft | docker.sock mount |
+| `IMAGE` | `--target <image name>` | syft | Docker daemon (docker.sock mount), or the registry |
 | `AIBOM` | `--model <owner/name>` | OWASP AIBOM Generator | **Opt-in image** `bomlens-aibom`. CycloneDX 1.7 ML-BOM from a HuggingFace model card; adds a G7 conformance check |
 | `MODELFILE` | `--model-file <path>` | `identify-model-file.py` (stdlib) | Base image, offline. CycloneDX 1.7 ML-BOM read from a model file's own header (GGUF, safetensors, PyTorch, pickle, npz, npy, ONNX); adds the same G7 check |
 | `DATASET` | `--model <Figshare item>` or `--model datasets/<owner>/<name>` | `scan-figshare.py`, `scan-hf-dataset.py` (stdlib) | Base image. A published research dataset read from the public Figshare item endpoint (no account): licence, DOI, authors and a per-file MD5 digest become a CycloneDX 1.7 `data` component. A HuggingFace dataset (`datasets/<owner>/<name>`, `https://huggingface.co/datasets/<owner>/<name>` or `hf:<owner>/<name>`) becomes the same `data` component with its licence, hub revision and per-file SHA-256 digests, and the datasets its card lists under `source_datasets` are read with it |

@@ -31,6 +31,10 @@ LABEL org.opencontainers.image.title="BomLens (post-process)"
 LABEL org.opencontainers.image.description="syft + Trivy + notice + signing + UI; SBOM generation delegated to cdxgen language images"
 LABEL org.opencontainers.image.vendor="SK Telecom"
 LABEL org.opencontainers.image.licenses="Apache-2.0"
+# The engine contract this image follows (docs/reference/engine-contract.md),
+# the same value as ENGINE_CONTRACT_VERSION in docker/lib/engine-result.sh.
+# The CLI reads it to tell an image too old for the stage 1 hand-off.
+LABEL com.sktelecom.sbom.engine-contract="1.2.0"
 
 ENV DEBIAN_FRONTEND=noninteractive
 
@@ -55,6 +59,13 @@ ARG TRIVY_VERSION=v0.74.0
 ARG COSIGN_VERSION=v3.1.3
 # renovate: datasource=pypi depName=scancode-toolkit
 ARG SCANCODE_VERSION=32.5.0
+# Pinned beside scancode in the deep-license image: chardet stays on 6.x, and
+# intbitset and the amd64 7-Zip plugin match the source bundled for them
+# (deep-license-sources.sh, which checks both at build time).
+ARG CHARDET_VERSION=6.0.0.post1
+ARG INTBITSET_VERSION=4.1.2
+ARG INTBITSET_SDIST_SHA256=f82fafe0bcb4fe7a010d942099b5a84d721d37c897538ed632f788962c1411f8
+ARG EXTRACTCODE_7Z_VERSION=16.5.210531
 ARG SBOM_DEEP_LICENSE=false
 # Vendored-OSS identification (on by default; disable with --build-arg SBOM_SCANOSS=false).
 # scanoss.py is MIT, so unlike the firmware GPL tools it can live in the base image.
@@ -217,6 +228,7 @@ RUN case "$(uname -m)" in \
 #      the system libmagic1 and its compiled magic database.
 # A real license scan runs as a build gate so any missing native dep fails the build
 # instead of silently shipping a scancode that dies on the first scan.
+COPY deep-license-sources.sh /tmp/deep-license-sources.sh
 ENV EXTRACTCODE_LIBARCHIVE_PATH=/usr/local/lib/libarchive.so \
     TYPECODE_LIBMAGIC_PATH=/usr/local/lib/libmagic.so \
     TYPECODE_LIBMAGIC_DB_PATH=/usr/share/misc/magic.mgc
@@ -224,20 +236,26 @@ RUN if [ "$SBOM_DEEP_LICENSE" = "true" ]; then \
       apt-get update && apt-get install -y --no-install-recommends \
         build-essential libicu-dev pkg-config python3-dev \
         libarchive13 libmagic1 \
+      && sevenzip_pin="" \
+      && if [ "$(uname -m)" = "x86_64" ]; then sevenzip_pin="extractcode-7z==${EXTRACTCODE_7Z_VERSION}"; fi \
       && pip3 install --no-cache-dir "scancode-toolkit==${SCANCODE_VERSION}" \
+           "chardet==${CHARDET_VERSION}" "intbitset==${INTBITSET_VERSION}" ${sevenzip_pin} \
       && ln -sf "$(find /usr/lib -name 'libarchive.so.13' | head -1)" /usr/local/lib/libarchive.so \
       && ln -sf "$(find /usr/lib -name 'libmagic.so.1' | head -1)" /usr/local/lib/libmagic.so \
       && mkdir -p /tmp/sc-probe \
       && printf 'Permission is hereby granted, free of charge (MIT License).\n' > /tmp/sc-probe/LICENSE \
       && scancode --license --json-pp /tmp/sc-probe.json /tmp/sc-probe \
       && rm -rf /tmp/sc-probe /tmp/sc-probe.json \
+      && INTBITSET_VERSION="${INTBITSET_VERSION}" INTBITSET_SDIST_SHA256="${INTBITSET_SDIST_SHA256}" \
+           sh /tmp/deep-license-sources.sh \
       && apt-mark manual $(dpkg-query -W -f='${Package}\n' 'libicu[0-9]*') \
       && apt-get purge -y build-essential libicu-dev pkg-config python3-dev \
       && apt-get autoremove -y \
       && rm -rf /var/lib/apt/lists/*; \
     else \
       echo "[build] scancode-toolkit skipped (SBOM_DEEP_LICENSE=false)"; \
-    fi
+    fi \
+    && rm -f /tmp/deep-license-sources.sh
 
 # scanoss.py (vendored-OSS identification, on by default: --build-arg SBOM_SCANOSS=false to skip).
 # MIT-licensed client; talks to the hosted OSSKB API (or SCANOSS_API_URL). It does
@@ -458,6 +476,7 @@ LABEL com.sktelecom.sbom.firmware-tools="${SBOM_FIRMWARE}" \
       com.sktelecom.sbom.scanoss-tools="${SBOM_SCANOSS}" \
       com.sktelecom.sbom.aibom-tools="${SBOM_AIBOM}" \
       com.sktelecom.sbom.pdf-tools="${SBOM_PDF}" \
+      com.sktelecom.sbom.deep-license-tools="${SBOM_DEEP_LICENSE}" \
       com.sktelecom.sbom.gpl-source-offer="https://github.com/sktelecom/bomlens/blob/main/THIRD_PARTY_LICENSES.md"
 
 COPY entrypoint.sh /usr/local/bin/run-scan

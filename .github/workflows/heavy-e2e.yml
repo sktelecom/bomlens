@@ -117,6 +117,13 @@ jobs:
         if: inputs.deep_license
         run: docker build --build-arg SBOM_DEEP_LICENSE=true -t sbom-scanner-deep-license:test ./docker
 
+      # The deep-license image as a scan engine: deep-license ok with the
+      # scancode output in bomlens-result.json, and on the base image
+      # skipped/not_installed with the flag, disabled without it.
+      - name: Deep-license image result manifest
+        if: inputs.deep_license
+        run: bash tests/test-deep-license-image.sh sbom-scanner-deep-license:test sbom-scanner:test
+
       - name: Run comprehensive CLI e2e (test-e2e.sh)
         run: bash tests/test-e2e.sh
 

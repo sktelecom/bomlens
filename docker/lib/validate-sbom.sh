@@ -394,6 +394,7 @@ cdx_checks() {
         detail:((if \$dep_edges==0 and \$tot==0 then \"nothing to relate\"
                  else \"\(\$dep_edges) edge(s)\" end)
                 + (if \$agg==\"\" then \"\"
+                   elif \$agg==\"unknown\" and \$dep_edges==0 and \$tot>0 then \", graph completeness unknown\"
                    elif \$agg==\"unknown\" then \", graph completeness unknown (no positive evidence found, not a defect)\"
                    else \", declared \(\$agg)\" end)), missing:[]},
        {id:\"license\", label:\"License coverage (>= \(\$licmin)%, recommended)\", required:false,
@@ -1298,6 +1299,9 @@ if [ "${IS_AI:-false}" != true ] && printf '%s' "$SIGNAL" | jq -e 'has("software
         # reach a terminal.
         jq -r '((.metadata.properties // [])[]? | select(.name == "bomlens:sbom-tool-degraded") | .value)
                | select(type == "string") | gsub("\\p{Cc}"; " ") | .[0:100] | "reduced\t\(.)"' "$SBOM" 2>/dev/null | head -n 1
+        # Manifests that declare dependencies, in a scan that found none.
+        jq -r '((.metadata.properties // [])[]? | select(.name == "bomlens:sbom-empty-with-manifests") | .value)
+               | select(type == "string") | gsub("\\p{Cc}"; " ") | .[0:200] | "emptyManifests\t\(.)"' "$SBOM" 2>/dev/null | head -n 1
         printf '%s' "$PIPELINE_STEPS_FAILED" | jq -r --argjson more "${PIPELINE_STEPS_FAILED_MORE:-0}" '
             if length > 0 then "failedSteps\t\(map(gsub("\\p{Cc}"; " ") | .[0:100]) | join(", "))\(if $more > 0 then " (and \($more) more)" else "" end)" else empty end' 2>/dev/null
     } > "${OUT_PREFIX}_summary.result" 2>/dev/null

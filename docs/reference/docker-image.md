@@ -14,9 +14,10 @@ For everyday use we recommend the [`scan-sbom.sh`](../reference/cli.md) script, 
 | `ghcr.io/sktelecom/sbom-generator`, `ghcr.io/sktelecom/sbom-scanner` | Aliases of the same image (former names, same digest) |
 | `ghcr.io/sktelecom/bomlens-firmware` | Firmware analysis (includes GPL tools, opt-in) (legacy alias: sbom-scanner-firmware) |
 | `ghcr.io/sktelecom/bomlens-deep-cve` | Bundles grype for deep CVE matching (opt-in). Used by the CLI's `--deep-cve` and by the web UI's Deep CVE matching toggle, both of which pull it automatically as a sibling container when it is not already the running image |
+| `ghcr.io/sktelecom/bomlens-deep-license` | Bundles scancode for licence detection in the project's own files (opt-in). Used by the CLI's `--deep-license` for a source scan, pulled automatically. Carries LGPL components (7-Zip on linux/amd64, intbitset, chardet); the source for 7-Zip and intbitset is in the image under `/usr/share/bomlens/sources/`, and chardet ships as Python source |
 | `ghcr.io/sktelecom/bomlens-aibom` | Generates an AI-model ML-BOM (opt-in, legacy alias: sbom-scanner-aibom). Used by `--model`/`--model-file` and the web UI's AI model tile, pulled automatically as a sibling container |
 
-`latest` and version tags are available. All published images (`ghcr.io/sktelecom/bomlens`, `bomlens-firmware`, `bomlens-deep-cve`, `bomlens-aibom`, and their aliases) support both `linux/amd64` and `linux/arm64`, so pulling any of them on an `arm64` host (an Apple Silicon Mac, an Arm server) works natively. Images are signed with cosign before publishing.
+`latest` and version tags are available. All published images (`ghcr.io/sktelecom/bomlens`, `bomlens-firmware`, `bomlens-deep-cve`, `bomlens-deep-license`, `bomlens-aibom`, and their aliases) support both `linux/amd64` and `linux/arm64`, so pulling any of them on an `arm64` host (an Apple Silicon Mac, an Arm server) works natively. Images are signed with cosign before publishing.
 
 ```bash
 docker pull ghcr.io/sktelecom/bomlens:latest
@@ -127,22 +128,32 @@ MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL='*' docker run --rm \
 
 | Variable | Required | Default | Description |
 |-----------|------|--------|------|
-| `MODE` | No | `POSTPROCESS` | Analysis mode: `SOURCE`, `IMAGE`, `BINARY`, `ROOTFS`, `FIRMWARE`, `ANALYZE`. Left unset, the container only post-processes an SBOM already sitting in the output directory — set it explicitly to actually scan something. |
+| `MODE` | No | `POSTPROCESS` | Analysis mode: `SOURCE`, `IMAGE`, `BINARY`, `ROOTFS`, `FIRMWARE`, `ANALYZE`, or `PLAN` (write the execution plan of a source scan, see [Engine contract](engine-contract.md#execution-plan)). Left unset, the container only post-processes an SBOM already sitting in the output directory — set it explicitly to actually scan something. |
 | `PROJECT_NAME` | Yes | — | Project name |
 | `PROJECT_VERSION` | Yes | — | Project version |
-| `TARGET_IMAGE` | Per mode | — | Image name for `IMAGE` mode (requires the docker.sock mount) |
+| `TARGET_IMAGE` | Per mode | — | Image for `IMAGE` mode. With the docker.sock mount it is read from the Docker daemon; without it, from the registry, or from an archive named with its scheme (`docker-archive:`, `oci-archive:`, `oci-dir:`) at a path mounted into the container |
+| `SYFT_REGISTRY_AUTH_USERNAME`, `SYFT_REGISTRY_AUTH_PASSWORD`, `SYFT_REGISTRY_AUTH_TOKEN`, `SYFT_REGISTRY_AUTH_AUTHORITY` | — | — | `IMAGE` mode: credentials for a private registry. A docker config file mounted and named in `DOCKER_CONFIG` works too. `SYFT_REGISTRY_INSECURE_SKIP_TLS_VERIFY` and `SYFT_REGISTRY_INSECURE_USE_HTTP` reach a registry with a self-signed certificate or plain HTTP. `SYFT_PLATFORM` picks the platform of a multi-platform image |
 | `TARGET_FILE` | Per mode | — | File path for `BINARY`/`FIRMWARE` mode (path inside the container) |
 | `TARGET_DIR` | Per mode | — | Directory path for `ROOTFS` mode |
 | `UPLOAD_ENABLED` | — | `true` | If `false`, save locally without uploading (same as CLI `--generate-only`) |
 | `HOST_OUTPUT_DIR` | — | — | Mounted path to copy the outputs to |
+| `BOMLENS_STAGE1_EXIT`, `BOMLENS_STAGE1_OOM`, `BOMLENS_STAGE1_LOG`, `BOMLENS_STAGE1_REASON` | — | — | `POSTPROCESS` after a stage 1 you ran yourself: its exit code, `true` if it was killed for memory, and its log's file name in the output folder; or, instead of the last two, the reason already classified (`oom`, `disk-space`, `network`, `cdxgen-crash`, `cdxgen-unavailable`). Exit code 127 is read as `cdxgen-unavailable`: pass it for an `unsupported` plan, where no stage 1 ran. Stage 2 then falls back to a syft scan when stage 1 left no SBOM (see [Engine contract](engine-contract.md#execution-plan)) |
+| `BOMLENS_EVENTS` | — | — | `file` or `stderr`: write progress events, one JSON object per line, to `bomlens-events.jsonl` in the output folder or to stderr (see [Engine contract](engine-contract.md#progress-events)) |
+| `BOMLENS_IMAGE_REF`, `BOMLENS_IMAGE_DIGEST` | — | — | The image reference and digest the caller ran, repeated in `bomlens-result.json` (see [Engine contract](engine-contract.md)) |
 | `GENERATE_NOTICE` | — | `false` | Generate the open-source notice (CLI `--notice`) |
 | `GENERATE_SECURITY` | — | `false` | Generate the Trivy security report (CLI `--security`) |
+| `DEEP_LICENSE` | — | `false` | Detect licences in the project's own files with scancode (CLI `--deep-license`; needs scancode in the image) |
+| `DEEP_LICENSE_MAX_FILES` | — | `20000` | `DEEP_LICENSE`: a tree with more of the project's own files than this is not scanned |
+| `DEEP_LICENSE_TIMEOUT` | — | `600` | `DEEP_LICENSE`: seconds before scancode is stopped |
+| `BOMLENS_DEEP_LICENSE_ALL` | — | — | `DEEP_LICENSE`: set `1` to scan dependency, build and tool folders too (left out by default) |
 | `GENERATE_REPORT` | — | `false` | Generate the open-source risk analysis report (off in direct runs, unlike the CLI default) |
 | `ENRICH_MAVEN_CPE` | — | `true` | Attach an NVD-matchable `cpe:2.3` to maven components (derived from the groupId) so a CPE-aware engine can reach their NVD-only CVEs; unmapped groups get no CPE (skipped for AI SBOMs) |
 | `ENRICH_GITHUB_CPE` | — | `true` | Attach an NVD-matchable `cpe:2.3` to a small, hand-verified set of `pkg:github/` components (source-repository-only coordinates, typical for large C/C++ projects with no package-manager ecosystem) so a CPE-aware engine can reach their NVD-only CVEs; anything not in the curated list gets no CPE (skipped for AI SBOMs) |
 | `ENRICH_INTERPRETER_CPE` | — | `true` | Attach an NVD-matchable `cpe:2.3` to a small, hand-verified set of interpreter components (e.g. Python packaged as a conda or NuGet artifact) so a CPE-aware engine can reach their NVD-only CVEs; anything not in the curated list gets no CPE (skipped for AI SBOMs) |
 | `SECURITY_NVD_VERIFY` | — | `false` | With `--deep-cve`: verify each grype `nvd:cpe` finding against the live NVD version range and drop out-of-range false positives (needs `NVD_API_KEY` + network; adds minutes). Off by default — findings are kept and flagged version-unverified |
 | `NVD_API_KEY` | For `SECURITY_NVD_VERIFY` | — | NVD API key used by the deep-cve version filter; passed to the container by name only (never inlined) |
+| `BOMLENS_OS_LICENSES` | — | `true` | `IMAGE` and `ROOTFS` modes: read the licenses of Debian packages with Trivy, which reads the license names, common-licenses references and license text in the copyright files syft leaves as a hash. It reads the image a second time; `false` turns it off (the hashes are still removed) |
+| `BOMLENS_TRIVY_DB_MAX_AGE_DAYS` | — | `7` | With a Trivy database mounted at `/trivy-db` (read as it is, offline): the age in days past which the security step is recorded as degraded |
 | `ENRICH_EOL` | — | `true` | Flag components past their upstream end-of-life from a bundled offline snapshot (skipped for AI SBOMs) |
 | `ENRICH_MALICIOUS` | — | `true` | Flag components that are known-malicious packages (typosquats, hijacked accounts) from a bundled offline OSV snapshot. A separate signal from vulnerabilities: the response is removal and credential rotation, not an upgrade |
 | `ENRICH_OS_CONTEXT` | — | `true` | Synthesize an `operating-system` component from distro package PURLs (rpm, deb, and apk). Trivy selects the distro vulnerability feed from that component, so without it the OS packages in a supplier SBOM or rootfs scan would get no OS CVE matches at all. No-op when the SBOM has no recognizable distro packages — including a distro Trivy carries no feed for, such as OpenWRT (skipped for AI SBOMs) |
@@ -173,6 +184,10 @@ MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL='*' docker run --rm \
 | `FIELD_MIN_PCT` | — | `80` | Conformance check: minimum percentage coverage for advisory per-component regulatory fields. Applies to a `--deep-cve` scan too, CLI or web UI |
 | `PURL_TYPES_FILE` | — | `docker/lib/purl-types.json` | Conformance check: the purl-spec type data that says which types exist and which of them require a namespace |
 | `NS_ADVISORY_TYPES` | — | `golang huggingface` | Conformance check: types whose missing namespace is reported on the advisory row instead of failing the SBOM (space-separated) |
+| `LICENSE_REGISTRY` | — | `false` | The script's `--license-registry`: look up missing licences, and check a single strong-copyleft or non-commercial licence, in the package registry (deps.dev). Uses the network |
+| `LICENSE_REGISTRY_VERIFY` | — | GPL, AGPL, SSPL-1.0, BUSL-1.1 and CC-BY-NC ids | SPDX ids whose single occurrence is checked against the registry, space- or comma-separated |
+| `LICENSE_REGISTRY_BUDGET` | — | `240` | Seconds the lookups may take in total. Components it does not reach are left as they were, and the step is recorded as degraded |
+| `LICENSE_REGISTRY_API` | — | `https://api.deps.dev/v3` | Base URL of a server that answers the deps.dev v3 version lookup, for a network that reaches the registries only through its own mirror or proxy. When nothing answers, the components stay as they were and the step is recorded as degraded (`unavailable`) |
 | `PURL_RESOLVE` | — | `false` | `--analyze` only (the script's `--resolve-purl`): look each identifier up in its package repository (deps.dev) and add the answer to the conformance report as an advisory row. Uses the network |
 | `PURL_RESOLVE_IGNORE` | — | — | Namespace prefixes to leave out of that lookup, space- or comma-separated. Use it for namespaces published only to an internal repository, which cannot be told apart from a wrong identifier |
 | `PURL_RESOLVE_BUDGET` | — | `240` | Seconds the lookup may take in total. Identifiers it does not reach are reported as unchecked, never as missing |

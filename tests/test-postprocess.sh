@@ -193,10 +193,19 @@ echo "== final net: stamp fails closed on the placeholder name and on bad input 
 # The engine-agnostic net must reject 'src'/'app' as the stamped name (a colliding
 # codelocation), not silently pass it through.
 cp "$FIX/src-latest-root.json" "$WORK/g.json"
-if bash "$LIB/stamp-metadata.sh" "$WORK/g.json" "src" "1.0.0" >/dev/null 2>&1; then
+if env -u UPLOAD_ENABLED bash "$LIB/stamp-metadata.sh" "$WORK/g.json" "src" "1.0.0" >/dev/null 2>&1; then
     fail "stamp accepted the generic placeholder 'src' as a project name"
 else
-    pass "stamp rejects 'src' as a project name (exit != 0)"
+    pass "stamp rejects 'src' as a project name when the SBOM may be uploaded (exit != 0)"
+fi
+# Nothing uploaded (an execution plan's caller): a project the user named
+# "app" keeps its name, with a warning.
+cp "$FIX/src-latest-root.json" "$WORK/g2.json"
+if UPLOAD_ENABLED=false bash "$LIB/stamp-metadata.sh" "$WORK/g2.json" "app" "1.0.0" > "$WORK/g2.log" 2>&1 \
+   && [ "$(jq -r .metadata.component.name "$WORK/g2.json")" = app ] && grep -q 'WARN: the project name .app.' "$WORK/g2.log"; then
+    pass "with UPLOAD_ENABLED=false a project named 'app' is kept, with a warning"
+else
+    fail "UPLOAD_ENABLED=false and 'app': $(cat "$WORK/g2.log")"
 fi
 # A missing jq or invalid JSON is a build/runtime defect; stamp must fail closed so a
 # mis-named SBOM is never delivered, rather than warn-and-exit-0 as before.
@@ -1574,6 +1583,13 @@ cat > "$WORK/osc-apk.json" <<'JSON'
 JSON
 python3 "$OSCTX" "$WORK/osc-apk.json" >/dev/null 2>&1
 [ "$(osc_of "$WORK/osc-apk.json")" = "alpine 3.17.10" ] && pass "apk PURL (distro=alpine-3.17.10) -> operating-system alpine 3.17.10" || fail "apk OS='$(osc_of "$WORK/osc-apk.json")', expected 'alpine 3.17.10'"
+# The bare release id Trivy writes and normalize-sbom.sh produces (distro=3.17.10).
+cat > "$WORK/osc-apk2.json" <<'JSON'
+{"bomFormat":"CycloneDX","specVersion":"1.6","components":[
+ {"type":"library","name":"musl","version":"1.2.3-r5","purl":"pkg:apk/alpine/musl@1.2.3-r5?arch=x86_64&distro=3.17.10"}]}
+JSON
+python3 "$OSCTX" "$WORK/osc-apk2.json" >/dev/null 2>&1
+[ "$(osc_of "$WORK/osc-apk2.json")" = "alpine 3.17.10" ] && pass "apk PURL (distro=3.17.10) -> operating-system alpine 3.17.10" || fail "apk OS='$(osc_of "$WORK/osc-apk2.json")', expected 'alpine 3.17.10'"
 cat > "$WORK/osc-debian.json" <<'JSON'
 {"bomFormat":"CycloneDX","specVersion":"1.6","components":[
  {"type":"library","name":"bash","version":"5.1-2+deb11u1","purl":"pkg:deb/debian/bash@5.1-2+deb11u1?arch=amd64&distro=debian-11"}]}
@@ -3933,6 +3949,93 @@ bash "$LIB/normalize-sbom.sh" "$WORK/os.json" >/dev/null 2>&1
 total_src=$(jq '[.components[].properties[]? | select(.name=="aquasecurity:trivy:SrcName")] | length' "$WORK/os.json")
 [ "$total_src" = "7" ] && pass "idempotent: second normalize adds no duplicate properties" || fail "SrcName count after 2nd run = $total_src, expected 7"
 
+echo "== os-purl: deb/rpm/apk PURLs take the form Trivy and the purl-spec use =="
+# A container scan's identifiers must join the same packages from a Trivy scan:
+# deb epoch as a qualifier, no syft `upstream` qualifier (its content is in
+# SrcName by now), apk distro as the bare release id, qualifiers sorted.
+purl_of() { jq -r --arg n "$1" '[.components[] | select(.name==$n) | .purl] | first' "$WORK/os.json"; }
+p_dash="$(purl_of dash)"
+case "$p_dash" in
+    *@0.5.12-2\?*epoch=1*) pass "deb: the epoch moves from the version into an epoch qualifier ($p_dash)" ;;
+    *) fail "dash purl is $p_dash" ;;
+esac
+p_ssl="$(purl_of libssl3)"
+case "$p_ssl" in
+    *upstream=*) fail "libssl3 purl still carries upstream: $p_ssl" ;;
+    *) pass "deb: the upstream qualifier is dropped ($p_ssl)" ;;
+esac
+p_crypto="$(purl_of libcrypto3)"
+case "$p_crypto" in
+    *distro=alpine-*|*upstream=*) fail "libcrypto3 purl is $p_crypto" ;;
+    *distro=3.*) pass "apk: distro is the bare release id ($p_crypto)" ;;
+    *) fail "libcrypto3 purl has no distro: $p_crypto" ;;
+esac
+p_rpm="$(purl_of openssl-libs)"
+q_rpm="${p_rpm#*\?}"
+[ "$q_rpm" = "$(printf '%s' "$q_rpm" | tr '&' '\n' | sort | paste -sd '&' -)" ] && [ "${p_rpm#*upstream=}" = "$p_rpm" ] \
+    && pass "rpm: qualifiers sorted, upstream dropped, epoch kept ($p_rpm)" || fail "openssl-libs purl is $p_rpm"
+[ "$(purl_of lodash)" = "$(jq -r '.components[] | select(.name=="lodash") | .purl' "$FIX/os-pkgs-src.json")" ] \
+    && pass "a non-OS purl (npm) is not touched" || fail "lodash purl changed to $(purl_of lodash)"
+[ "$(srcprop libssl3 SrcName)" = "openssl" ] && pass "the source package survives in SrcName after upstream is dropped" || fail "libssl3 SrcName is $(srcprop libssl3 SrcName)"
+# Edge cases: an epoch qualifier already there leaves the version alone (no
+# second cut), a component without SrcName (nested here) keeps its upstream,
+# and a second normalize changes nothing.
+cat > "$WORK/os-edge.json" <<'OEOF'
+{"bomFormat":"CycloneDX","specVersion":"1.6","components":[
+ {"type":"library","name":"twocolon","version":"1:2:3-1","purl":"pkg:deb/debian/twocolon@1:2:3-1?distro=debian-12"},
+ {"type":"library","name":"hasepoch","version":"2.0","purl":"pkg:deb/debian/hasepoch@1:2.0?epoch=2&distro=debian-12"},
+ {"type":"library","name":"outer","version":"1.0","purl":"pkg:npm/outer@1.0","components":[
+   {"type":"library","name":"inner","purl":"pkg:deb/debian/inner?upstream=innersrc&distro=debian-12"}]}]}
+OEOF
+bash "$LIB/normalize-sbom.sh" "$WORK/os-edge.json" >/dev/null 2>&1
+cp "$WORK/os-edge.json" "$WORK/os-edge-1.json"
+bash "$LIB/normalize-sbom.sh" "$WORK/os-edge.json" >/dev/null 2>&1
+edge() { jq -r --arg n "$1" '[.. | objects | select(.name? == $n) | .purl] | first' "$WORK/os-edge.json"; }
+[ "$(edge twocolon)" = "pkg:deb/debian/twocolon@2:3-1?distro=debian-12&epoch=1" ] \
+    && pass "a version with a second colon loses only its epoch, once" || fail "twocolon purl is $(edge twocolon)"
+[ "$(edge hasepoch)" = "pkg:deb/debian/hasepoch@1:2.0?distro=debian-12&epoch=2" ] \
+    && pass "an existing epoch qualifier leaves the version as it is" || fail "hasepoch purl is $(edge hasepoch)"
+[ "$(edge inner)" = "pkg:deb/debian/inner?distro=debian-12&upstream=innersrc" ] \
+    && pass "a component with no SrcName keeps its upstream (qualifiers still sorted)" || fail "inner purl is $(edge inner)"
+cmp -s "$WORK/os-edge.json" "$WORK/os-edge-1.json" && pass "a second normalize changes no PURL" || fail "the second normalize changed the document"
+
+echo "== os-purl: merging an older and a newer BomLens SBOM names an OS package once =="
+cat > "$WORK/merge-old.json" <<'OEOF'
+{"bomFormat":"CycloneDX","specVersion":"1.6","metadata":{"component":{"type":"application","name":"old","version":"1"}},"components":[
+ {"type":"library","name":"bsdutils","version":"1:2.38.1-5","bom-ref":"a","purl":"pkg:deb/debian/bsdutils@1%3A2.38.1-5?arch=amd64&distro=debian-12&upstream=util-linux"}]}
+OEOF
+cat > "$WORK/merge-new.json" <<'OEOF'
+{"bomFormat":"CycloneDX","specVersion":"1.6","metadata":{"component":{"type":"application","name":"new","version":"1"}},"components":[
+ {"type":"library","name":"bsdutils","version":"1:2.38.1-5","bom-ref":"a","purl":"pkg:deb/debian/bsdutils@2.38.1-5?arch=amd64&distro=debian-12&epoch=1"}]}
+OEOF
+bash "$LIB/merge-sbom.sh" "$WORK/merged-os.json" srv 1.0 "$WORK/merge-old.json" "$WORK/merge-new.json" >/dev/null 2>&1
+bash "$LIB/normalize-sbom.sh" "$WORK/merged-os.json" >/dev/null 2>&1
+[ "$(jq '[.components[] | select(.name=="bsdutils")] | length' "$WORK/merged-os.json")" = "1" ] \
+    && pass "the old-form and new-form PURL are one component after merge and normalize" \
+    || fail "bsdutils appears $(jq '[.components[] | select(.name=="bsdutils")] | length' "$WORK/merged-os.json") times"
+
+echo "== deep-cve: distribution packages are left to Trivy =="
+# A CPE match on a deb/rpm/apk compares the distribution's version with upstream
+# NVD ranges and reports CVEs the distribution already patched; the deep-CVE
+# pass keeps only the other packages' matches.
+cat > "$WORK/grype-stub" <<'GEOF'
+#!/bin/sh
+case "$*" in
+  *sbom:*) cat <<'JSON'
+{"matches":[
+ {"vulnerability":{"id":"CVE-2022-28391","namespace":"nvd:cpe","severity":"High"},"artifact":{"name":"busybox","version":"1.35.0-r29","purl":"pkg:apk/alpine/busybox@1.35.0-r29?distro=3.17.0","cpes":["cpe:2.3:a:busybox:busybox:1.35.0:*:*:*:*:*:*:*"]}},
+ {"vulnerability":{"id":"CVE-2021-44228","namespace":"nvd:cpe","severity":"Critical"},"artifact":{"name":"log4j-core","version":"2.14.1","purl":"pkg:maven/org.apache.logging.log4j/log4j-core@2.14.1","cpes":["cpe:2.3:a:apache:log4j:2.14.1:*:*:*:*:*:*:*"]}}]}
+JSON
+  ;;
+  *) echo '{"matches":[]}' ;;
+esac
+GEOF
+chmod +x "$WORK/grype-stub"
+echo '{"bomFormat":"CycloneDX","specVersion":"1.6","components":[]}' > "$WORK/dc.json"
+GRYPE_BIN="$WORK/grype-stub" SECURITY_NVD_VERIFY=false python3 "$LIB/scan-nvd-cpe.py" "$WORK/dc.json" "$WORK/dc-out" >/dev/null 2>&1
+dc_ids="$(jq -r '[.Results[]?.Vulnerabilities[]?.VulnerabilityID] | sort | join(" ")' "$WORK/dc-out_security_grype.json" 2>/dev/null)"
+[ "$dc_ids" = "CVE-2021-44228" ] && pass "the apk match is dropped, the maven one kept" || fail "deep-cve sidecar holds: '$dc_ids'"
+
 echo "== sec-fail: a failed Trivy run is recorded in the report, not passed off as 0 findings =="
 # Regression for the SCA-benchmark follow-up report: any Trivy failure (SBOM
 # decode error, vulnerability-DB download failure) was swallowed as a WARN and
@@ -4522,6 +4625,23 @@ JSON
         jq -e '.dependencies[] | select(.ref=="root") | .dependsOn | index("express@4.18.2")' "$WORK/node-bom.json" >/dev/null 2>&1 \
             && pass "kept production edge (root -> express) preserved" \
             || fail "production edge wrongly dropped"
+        # A yarn/pnpm project has no package-lock.json: the set is written by
+        # name, since npm's own versions differ from the project's lock (the
+        # measured regression: lodash 4.17.20 in yarn.lock, 4.17.21 from npm,
+        # every production package dropped).
+        cat > "$WORK/node-bom-yarn.json" <<'JSON'
+{"bomFormat":"CycloneDX","specVersion":"1.6","metadata":{"component":{"name":"app","version":"1.0.0","bom-ref":"root"}},
+ "components":[
+   {"name":"lodash","version":"4.17.20","purl":"pkg:npm/lodash@4.17.20","bom-ref":"lodash"},
+   {"group":"@scope","name":"pkg","version":"1.0.0","purl":"pkg:npm/%40scope/pkg@1.0.0","bom-ref":"scoped"},
+   {"name":"jest","version":"29.7.0","purl":"pkg:npm/jest@29.7.0","bom-ref":"jest"}]}
+JSON
+        printf 'lodash\n@scope/pkg\n' > "$WORK/node-prod-names.set"
+        node "$NFLT" "$WORK/node-bom-yarn.json" "$WORK/node-prod-names.set" 2>/dev/null
+        names=$(jq -r '[.components[] | (if .group then .group + "/" else "" end) + .name + "@" + .version] | sort | join(",")' "$WORK/node-bom-yarn.json")
+        [ "$names" = "@scope/pkg@1.0.0,lodash@4.17.20" ] \
+            && pass "a by-name set keeps the lock's own versions (lodash 4.17.20, a scoped package) and drops the dev tree" \
+            || fail "by-name filter left: $names"
     else
         fail "could not extract NFILTER_JS from build-prep.sh"
     fi
@@ -6214,6 +6334,249 @@ else
     fail "a nested packages.lock.json was not recorded" "$(jq -c '.metadata.properties' "$CA2_ROOT/dotnet-monorepo/out/bom.json" 2>&1)"
 fi
 
+echo "== cargo: a committed Cargo.lock is used as it is, not re-resolved =="
+# generate-lockfile re-resolves to the newest compatible crates, so a committed
+# lock (syn 3.0.6) came out as syn 3.0.7 in the SBOM. With a lock present,
+# cargo must not be run at all.
+CL_ROOT="$WORK/cargo-lock"
+mkdir -p "$CL_ROOT/bin" "$CL_ROOT/src" "$CL_ROOT/out"
+printf '[package]\nname = "x"\nversion = "0.1.0"\n' > "$CL_ROOT/src/Cargo.toml"
+printf '# committed\nversion = 3\n' > "$CL_ROOT/src/Cargo.lock"
+cp "$PREP_FAIL_ROOT/bin/cdxgen" "$CL_ROOT/bin/cdxgen"
+cat > "$CL_ROOT/bin/cargo" <<STUB
+#!/bin/sh
+echo "\$*" >> "$CL_ROOT/cargo-calls"
+printf '# regenerated\n' > Cargo.lock
+STUB
+chmod +x "$CL_ROOT/bin/cargo"
+PATH="$CL_ROOT/bin:$PATH" sh "$LIB/build-prep.sh" "$CL_ROOT/src" "$CL_ROOT/out/bom.json" > "$CL_ROOT/log" 2>&1
+grep -q 'generate-lockfile' "$CL_ROOT/cargo-calls" 2>/dev/null \
+    && fail "cargo generate-lockfile ran over a committed Cargo.lock" "$(cat "$CL_ROOT/cargo-calls")" \
+    || pass "cargo generate-lockfile is not run when Cargo.lock is committed"
+[ "$(head -1 "$CL_ROOT/src/Cargo.lock")" = "# committed" ] \
+    && pass "the committed Cargo.lock is left as it was" || fail "Cargo.lock changed: $(head -1 "$CL_ROOT/src/Cargo.lock")"
+jq -e '[.metadata.properties[]? | select(.name=="bomlens:prep-step-applied" and .value=="cargo-lock-committed")] | length == 1' \
+    "$CL_ROOT/out/bom.json" >/dev/null 2>&1 \
+    && pass "the committed lock is recorded as lock evidence (cargo-lock-committed)" \
+    || fail "no cargo-lock-committed evidence" "$(jq -c '.metadata.properties' "$CL_ROOT/out/bom.json" 2>&1)"
+
+echo "== node-scope: build-prep writes the production set the filter reads (stub npm and cdxgen, real node) =="
+# The set writer runs inside build-prep; this drives it end to end. The stub
+# npm writes the resolved lock a real npm would; the stub cdxgen reports what a
+# project's own lock pins.
+if command -v node >/dev/null 2>&1; then
+    NS_ROOT="$WORK/node-set"
+    mkdir -p "$NS_ROOT/bin"
+    cat > "$NS_ROOT/bin/npm" <<'STUB'
+#!/bin/sh
+case "$*" in *--package-lock-only*)
+cat > package-lock.json <<'JSON'
+{"lockfileVersion":3,"packages":{"":{"name":"app"},
+ "node_modules/lodash":{"version":"4.17.21"},
+ "node_modules/@scope/pkg":{"version":"1.0.1"},
+ "node_modules/lodash/node_modules/inner":{"version":"2.0.0"},
+ "node_modules/jest":{"version":"29.7.0","dev":true}}}
+JSON
+;; esac
+exit 0
+STUB
+    cat > "$NS_ROOT/bin/cdxgen" <<'STUB'
+#!/bin/sh
+out=""; prev=""
+for a in "$@"; do [ "$prev" = "-o" ] && out="$a"; prev="$a"; done
+cat > "$out" <<'JSON'
+{"bomFormat":"CycloneDX","specVersion":"1.6","metadata":{"component":{"name":"app","version":"1","bom-ref":"root"}},
+ "components":[
+  {"name":"lodash","version":"4.17.20","purl":"pkg:npm/lodash@4.17.20","bom-ref":"l"},
+  {"group":"@scope","name":"pkg","version":"1.0.0","purl":"pkg:npm/%40scope/pkg@1.0.0","bom-ref":"s"},
+  {"name":"inner","version":"2.0.0","purl":"pkg:npm/inner@2.0.0","bom-ref":"i"},
+  {"name":"jest","version":"29.7.0","purl":"pkg:npm/jest@29.7.0","bom-ref":"j"}]}
+JSON
+STUB
+    chmod +x "$NS_ROOT/bin/npm" "$NS_ROOT/bin/cdxgen"
+    ns_run() {  # ns_run <case> -> kept component names, sorted
+        PATH="$NS_ROOT/bin:$PATH" sh "$LIB/build-prep.sh" "$NS_ROOT/$1" "$NS_ROOT/$1.bom.json" > "$NS_ROOT/$1.log" 2>&1
+        jq -r '[.components[] | (if .group then .group + "/" else "" end) + .name] | sort | join(",")' "$NS_ROOT/$1.bom.json"
+    }
+    mkdir -p "$NS_ROOT/yarn" "$NS_ROOT/plock" "$NS_ROOT/ws"
+    echo '{"name":"app","dependencies":{"lodash":"^4.17.0","@scope/pkg":"^1.0.0"}}' > "$NS_ROOT/yarn/package.json"
+    printf '# yarn lockfile v1\n' > "$NS_ROOT/yarn/yarn.lock"
+    [ "$(ns_run yarn)" = "@scope/pkg,inner,lodash" ] \
+        && pass "no package-lock.json: production packages kept at the project's own versions, dev dropped" \
+        || fail "yarn case kept: $(ns_run yarn)" "$(grep 'node:' "$NS_ROOT/yarn.log")"
+    cp "$NS_ROOT/yarn/package.json" "$NS_ROOT/plock/"
+    echo '{"lockfileVersion":3,"packages":{}}' > "$NS_ROOT/plock/package-lock.json"
+    [ "$(ns_run plock)" = "inner" ] \
+        && pass "with package-lock.json the exact-version match still applies (4.17.20 vs the resolved 4.17.21 is dropped)" \
+        || fail "package-lock case kept: $(ns_run plock)" "$(grep 'node:' "$NS_ROOT/plock.log")"
+    echo '{"name":"root","private":true,"workspaces":["packages/*"]}' > "$NS_ROOT/ws/package.json"
+    [ "$(ns_run ws)" = "@scope/pkg,inner,jest,lodash" ] \
+        && pass "a workspace root with no package-lock.json keeps the full graph" \
+        || fail "workspace case kept: $(ns_run ws)" "$(grep 'node:' "$NS_ROOT/ws.log")"
+else
+    echo "  SKIP: node unavailable"
+fi
+
+echo "== poetry: exact pins of a lock-less Poetry project reach cdxgen as requirements.txt =="
+PO_ROOT="$WORK/poetry-nolock"
+mkdir -p "$PO_ROOT/bin" "$PO_ROOT/src" "$PO_ROOT/out"
+printf '[tool.poetry]\nname = "x"\nversion = "0.1.0"\n\n[tool.poetry.dependencies]\npython = "^3.11"\nrequests = "2.31.0"\nflask = "^2.0"\nlocal = { path = "../local" }\nclick = "==8.1.7"\n' > "$PO_ROOT/src/pyproject.toml"
+# cdxgen stub. On the source tree: record the requirements.txt it sees and
+# write what cdxgen writes with pyproject.toml present (the pin as a
+# component, nothing linked). On any other folder (the second run, on
+# requirements.txt alone): the graph cdxgen resolves from it.
+cat > "$PO_ROOT/bin/cdxgen" <<STUB
+#!/bin/sh
+out=""; prev=""; last=""
+for a in "\$@"; do [ "\$prev" = "-o" ] && out="\$a"; prev="\$a"; last="\$a"; done
+if [ "\$last" != "$PO_ROOT/src" ]; then
+    [ "\$(cat "\$last/requirements.txt")" = "\$(cat "$PO_ROOT/seen-requirements")" ] || exit 3
+    [ -f "$PO_ROOT/graph-fails" ] && exit 1
+    if [ -f "$PO_ROOT/graph-empty" ]; then
+        printf '{"metadata":{"component":{"bom-ref":"r"}},"components":[],"dependencies":[{"ref":"r","dependsOn":[]}]}' > "\$out"
+        exit 0
+    fi
+    scratch="\$(basename "\$(dirname "\$last")")"
+    cat > "\$out" <<JSON
+{"bomFormat":"CycloneDX","specVersion":"1.6","version":1,"metadata":{"component":{"name":"project","bom-ref":"pkg:pypi/project@latest"}},
+ "components":[{"name":"requests","version":"2.31.0","purl":"pkg:pypi/requests@2.31.0","bom-ref":"pkg:pypi/requests@2.31.0"},
+               {"name":"idna","version":"3.7","purl":"pkg:pypi/idna@3.7","bom-ref":"pkg:pypi/idna@3.7",
+                "properties":[{"name":"internal:SrcFile","value":"\$last/requirements.txt"},{"name":"SrcFileRel","value":"\$scratch/project/requirements.txt"}]},
+               {"name":"unknown","version":"latest","purl":"pkg:pypi/unknown@latest","bom-ref":"pkg:pypi/unknown@latest"}],
+ "dependencies":[{"ref":"pkg:pypi/project@latest","dependsOn":["pkg:pypi/requests@2.31.0","pkg:pypi/unknown@latest"]},
+                 {"ref":"pkg:pypi/requests@2.31.0","dependsOn":["pkg:pypi/idna@3.7"]},
+                 {"ref":"pkg:pypi/idna@3.7","dependsOn":[]}]}
+JSON
+    exit 0
+fi
+cat requirements.txt > "$PO_ROOT/seen-requirements" 2>/dev/null || echo NONE > "$PO_ROOT/seen-requirements"
+cat > "\$out" <<'JSON'
+{"bomFormat":"CycloneDX","specVersion":"1.6","version":1,"metadata":{"component":{"name":"x","version":"0.1.0","bom-ref":"pkg:pypi/x@0.1.0"}},
+ "components":[{"name":"requests","version":"2.31.0","purl":"pkg:pypi/requests@2.31.0","bom-ref":"pkg:pypi/requests@2.31.0"}],
+ "dependencies":[{"ref":"pkg:pypi/x@0.1.0","dependsOn":[]}]}
+JSON
+STUB
+printf '#!/bin/sh\nexit 0\n' > "$PO_ROOT/bin/pip3"
+chmod +x "$PO_ROOT/bin/cdxgen" "$PO_ROOT/bin/pip3"
+if python3 -c "import tomllib" 2>/dev/null; then
+    PATH="$PO_ROOT/bin:$PATH" sh "$LIB/build-prep.sh" "$PO_ROOT/src" "$PO_ROOT/out/bom.json" > "$PO_ROOT/log" 2>&1
+    grep -q 'poetry: no poetry.lock; 2 exact pin(s).*2 range or table' "$PO_ROOT/log" \
+        && pass "the log says how many dependencies were left out (a range and a path entry)" \
+        || fail "poetry log: $(grep poetry "$PO_ROOT/log")"
+    jq -e '[.metadata.properties[]? | select(.name=="bomlens:prep-step-applied" and .value=="poetry-requirements-partial")] | length == 1' \
+        "$PO_ROOT/out/bom.json" >/dev/null 2>&1 \
+        && pass "a partial conversion is recorded as poetry-requirements-partial" \
+        || fail "no poetry-requirements-partial record" "$(jq -c '.metadata.properties' "$PO_ROOT/out/bom.json" 2>&1)"
+    [ "$(cat "$PO_ROOT/seen-requirements")" = "$(printf 'requests==2.31.0\nclick==8.1.7')" ] \
+        && pass "cdxgen sees the exact pins only (no python, range or path entries)" \
+        || fail "cdxgen saw: $(cat "$PO_ROOT/seen-requirements" | tr '\n' ' ')" "$(tail -5 "$PO_ROOT/log")"
+    [ ! -f "$PO_ROOT/src/requirements.txt" ] && pass "the written requirements.txt is removed after the scan" \
+        || fail "requirements.txt was left in the source tree"
+    # cdxgen skips requirements.txt for the tree when pyproject.toml is there;
+    # the second run on the file alone supplies the root links and the pins'
+    # own dependencies.
+    jq -e '([.dependencies[] | select(.ref=="pkg:pypi/x@0.1.0") | .dependsOn[]] == ["pkg:pypi/requests@2.31.0"])
+           and ([.dependencies[] | select(.ref=="pkg:pypi/requests@2.31.0") | .dependsOn[]] == ["pkg:pypi/idna@3.7"])
+           and ([.dependencies[].dependsOn[]] | length == 2)
+           and ([.metadata.properties[]? | select(.name=="bomlens:pipeline-step-failed") | .value] | index("poetry-graph") == null)
+           and ([.components[] | .purl] | sort == ["pkg:pypi/idna@3.7", "pkg:pypi/requests@2.31.0"])' \
+        "$PO_ROOT/out/bom.json" >/dev/null 2>&1 \
+        && pass "the pins are linked from the root, with their own dependencies (2 edges, idna added once)" \
+        || fail "poetry graph" "$(jq -c '{c: [.components[].purl], d: .dependencies}' "$PO_ROOT/out/bom.json" 2>&1)"
+    [ "$(jq -c '[.components[] | select(.name=="idna") | .properties[].value]' "$PO_ROOT/out/bom.json" 2>/dev/null)" = '["requirements.txt","requirements.txt"]' ] \
+        && pass "the second run's scratch folder is not named in the SBOM (absolute or relative)" \
+        || fail "scratch path left: $(jq -c '[.components[] | select(.name=="idna") | .properties]' "$PO_ROOT/out/bom.json" 2>&1)"
+    bash "$LIB/validate-sbom.sh" "$PO_ROOT/out/bom.json" "$PO_ROOT/cf" >/dev/null 2>&1
+    [ "$(jq -r '.checks[] | select(.id=="transitive") | .status' "$PO_ROOT/cf_conformance.json" 2>/dev/null)" = "pass" ] \
+        && pass "the conformance check on transitive dependencies passes" \
+        || fail "transitive check" "$(jq -c '.checks[] | select(.id=="transitive")' "$PO_ROOT/cf_conformance.json" 2>&1)"
+    # The second run failing (no network) leaves the SBOM as the first run wrote it.
+    : > "$PO_ROOT/graph-fails"
+    PATH="$PO_ROOT/bin:$PATH" sh "$LIB/build-prep.sh" "$PO_ROOT/src" "$PO_ROOT/out/bom.json" > "$PO_ROOT/log-gf" 2>&1
+    rm -f "$PO_ROOT/graph-fails"
+    jq -e '([.dependencies[].dependsOn[]] | length == 0)
+           and any(.metadata.properties[]; .name=="bomlens:pipeline-step-failed" and .value=="poetry-graph")' "$PO_ROOT/out/bom.json" >/dev/null 2>&1 \
+        && grep -q 'poetry: dependency graph not resolved' "$PO_ROOT/log-gf" \
+        && pass "a failed second run leaves the SBOM as the first run wrote it, says so and records poetry-graph as failed" \
+        || fail "graph failure case" "$(grep poetry "$PO_ROOT/log-gf"; jq -c .metadata.properties "$PO_ROOT/out/bom.json")"
+    # A second run that resolves nothing (no network: cdxgen still exits 0).
+    : > "$PO_ROOT/graph-empty"
+    PATH="$PO_ROOT/bin:$PATH" sh "$LIB/build-prep.sh" "$PO_ROOT/src" "$PO_ROOT/out/bom.json" > "$PO_ROOT/log-ge" 2>&1
+    rm -f "$PO_ROOT/graph-empty"
+    jq -e 'any(.metadata.properties[]; .name=="bomlens:pipeline-step-failed" and .value=="poetry-graph")' "$PO_ROOT/out/bom.json" >/dev/null 2>&1 \
+        && grep -q 'second run found no dependency graph' "$PO_ROOT/log-ge" \
+        && pass "a second run that resolves nothing is recorded as failed too" \
+        || fail "empty graph case" "$(grep poetry "$PO_ROOT/log-ge")"
+    jq -e '[.metadata.properties[]? | select(.name=="bomlens:prep-step-applied" and .value=="poetry-requirements")] | length == 1' \
+        "$PO_ROOT/out/bom.json" >/dev/null 2>&1 \
+        && pass "the step is recorded as poetry-requirements" || fail "no poetry-requirements record" "$(jq -c '.metadata.properties' "$PO_ROOT/out/bom.json" 2>&1)"
+    # A committed requirements.txt is the project's own and is never replaced.
+    printf 'django==4.2\n' > "$PO_ROOT/src/requirements.txt"
+    PATH="$PO_ROOT/bin:$PATH" sh "$LIB/build-prep.sh" "$PO_ROOT/src" "$PO_ROOT/out/bom.json" > "$PO_ROOT/log2" 2>&1
+    [ "$(cat "$PO_ROOT/seen-requirements")" = "django==4.2" ] && [ "$(cat "$PO_ROOT/src/requirements.txt")" = "django==4.2" ] \
+        && pass "an existing requirements.txt is used and left as it was" \
+        || fail "seen: $(cat "$PO_ROOT/seen-requirements"), file: $(cat "$PO_ROOT/src/requirements.txt")"
+else
+    echo "  SKIP: this host's python3 has no tomllib (3.11+)"
+fi
+
+echo "== python: cdxgen's pkg:pypi/unknown@latest is dropped =="
+PU_ROOT="$WORK/pypi-unknown"; mkdir -p "$PU_ROOT/bin" "$PU_ROOT/src" "$PU_ROOT/out"
+printf '[project]\nname = "x"\nversion = "1"\n' > "$PU_ROOT/src/pyproject.toml"
+cat > "$PU_ROOT/bin/cdxgen" <<'STUB'
+#!/bin/sh
+out=""; prev=""
+for a in "$@"; do [ "$prev" = "-o" ] && out="$a"; prev="$a"; done
+r="${PU_REF:-pkg:pypi/unknown@latest}"
+cat > "$out" <<JSON
+{"bomFormat":"CycloneDX","specVersion":"1.6","version":1,"metadata":{"component":{"name":"x","bom-ref":"pkg:pypi/x@1"}},
+ "components":[{"name":"unknown","version":"latest","purl":"pkg:pypi/unknown@latest","bom-ref":"$r"},
+               {"name":"requests","version":"2.31.0","purl":"pkg:pypi/requests@2.31.0","bom-ref":"pkg:pypi/requests@2.31.0"}],
+ "dependencies":[{"ref":"pkg:pypi/x@1","dependsOn":["pkg:pypi/requests@2.31.0","$r"]},
+                 {"ref":"$r","dependsOn":[]}]}
+JSON
+STUB
+chmod +x "$PU_ROOT/bin/cdxgen"
+if command -v node >/dev/null 2>&1; then
+    PATH="$PU_ROOT/bin:$PATH" PU_REF=unk-1 sh "$LIB/build-prep.sh" "$PU_ROOT/src" "$PU_ROOT/out/bom2.json" > "$PU_ROOT/log2" 2>&1
+    jq -e '([.components[].purl] == ["pkg:pypi/requests@2.31.0"]) and ([.dependencies[] | .ref, .dependsOn[]] | index("unk-1") == null)' \
+        "$PU_ROOT/out/bom2.json" >/dev/null 2>&1 \
+        && pass "with a bom-ref of its own, every link to it goes too" \
+        || fail "pypi unknown (bom-ref): $(jq -c '{c: [.components[].purl], d: .dependencies}' "$PU_ROOT/out/bom2.json" 2>&1)"
+    PATH="$PU_ROOT/bin:$PATH" sh "$LIB/build-prep.sh" "$PU_ROOT/src" "$PU_ROOT/out/bom.json" > "$PU_ROOT/log" 2>&1
+    jq -e '([.components[].purl] == ["pkg:pypi/requests@2.31.0"]) and (.dependencies == [{"ref":"pkg:pypi/x@1","dependsOn":["pkg:pypi/requests@2.31.0"]}])
+           and ([.metadata.properties[]? | select(.name == "bomlens:unnamed-packages-dropped") | .value] == ["1"])' \
+        "$PU_ROOT/out/bom.json" >/dev/null 2>&1 \
+        && grep -q 'dropped pkg:pypi/unknown@latest' "$PU_ROOT/log" \
+        && pass "pkg:pypi/unknown@latest is dropped with its links; the rest is left as it was" \
+        || fail "pypi unknown: $(jq -c '{c: [.components[].purl], d: .dependencies}' "$PU_ROOT/out/bom.json" 2>&1)" "$(tail -3 "$PU_ROOT/log")"
+else
+    echo "  SKIP: node unavailable"
+fi
+
+echo "== gradle: a read-only account home moves Gradle's files to HOME =="
+GU_ROOT="$WORK/gradle-home"; mkdir -p "$GU_ROOT/bin" "$GU_ROOT/src" "$GU_ROOT/out" "$GU_ROOT/acct" "$GU_ROOT/home"
+printf "plugins { id 'java' }\n" > "$GU_ROOT/src/build.gradle"
+printf '#!/bin/sh\necho "root:x:0:0:root:%s:/bin/sh"\n' "$GU_ROOT/acct" > "$GU_ROOT/bin/getent"
+printf '#!/bin/sh\necho "${GRADLE_USER_HOME:-unset}" >> "%s/seen"\nexit 0\n' "$GU_ROOT" > "$GU_ROOT/bin/gradle"
+printf '#!/bin/sh\nout=""; prev=""; for a in "$@"; do [ "$prev" = "-o" ] && out="$a"; prev="$a"; done\necho "${GRADLE_USER_HOME:-unset}" >> "%s/seen-cdxgen"\nprintf %s > "$out"\n' "$GU_ROOT" "'{\"bomFormat\":\"CycloneDX\",\"specVersion\":\"1.6\",\"version\":1,\"metadata\":{},\"components\":[]}'" > "$GU_ROOT/bin/cdxgen"
+chmod +x "$GU_ROOT/bin/getent" "$GU_ROOT/bin/gradle" "$GU_ROOT/bin/cdxgen"
+if [ "$(id -u)" = 0 ]; then
+    echo "  SKIP: running as root, which can write any folder"
+else
+    chmod 555 "$GU_ROOT/acct"
+    env -u GRADLE_USER_HOME PATH="$GU_ROOT/bin:$PATH" HOME="$GU_ROOT/home" sh "$LIB/build-prep.sh" "$GU_ROOT/src" "$GU_ROOT/out/bom.json" > "$GU_ROOT/log" 2>&1
+    chmod 755 "$GU_ROOT/acct"
+    [ "$(sort -u "$GU_ROOT/seen" 2>/dev/null)" = "$GU_ROOT/home/.gradle" ] && [ "$(sort -u "$GU_ROOT/seen-cdxgen")" = "$GU_ROOT/home/.gradle" ] \
+        && pass "Gradle and cdxgen get GRADLE_USER_HOME under HOME when ~/.gradle cannot be written" \
+        || fail "gradle home: gradle $(sort -u "$GU_ROOT/seen" 2>&1 | tr '\n' ' '), cdxgen $(sort -u "$GU_ROOT/seen-cdxgen" 2>&1 | tr '\n' ' ')" "$(grep gradle "$GU_ROOT/log")"
+    rm -f "$GU_ROOT/seen" "$GU_ROOT/seen-cdxgen"
+    env -u GRADLE_USER_HOME PATH="$GU_ROOT/bin:$PATH" HOME="$GU_ROOT/home" sh "$LIB/build-prep.sh" "$GU_ROOT/src" "$GU_ROOT/out/bom.json" > "$GU_ROOT/log2" 2>&1
+    [ "$(sort -u "$GU_ROOT/seen" 2>/dev/null)" = "unset" ] \
+        && pass "a writable ~/.gradle (the CLI's mounted cache) is left in use" \
+        || fail "writable account home: gradle saw $(sort -u "$GU_ROOT/seen" 2>&1 | tr '\n' ' ')"
+fi
+
 echo "== prep_step: every resolution step runs through it (no bare invocation left) =="
 # The pre-prep_step patterns (silently discarded stderr, no time limit) must
 # not reappear alongside prep_step for the same command.
@@ -7545,6 +7908,18 @@ _bp=$(grep -m1 '^NON_SHIPPED_DIRS=' "$PREP"); _sd=$(grep -m1 '^NON_SHIPPED_DIRS=
 [ -n "$_bp" ] && [ "$_bp" = "$_sd" ] \
     && pass "NON_SHIPPED_DIRS is the same in build-prep.sh and source-detect.sh" \
     || fail "NON_SHIPPED_DIRS differs" "build-prep [$_bp] source-detect [$_sd]"
+# Singular and short spellings of the sample/benchmark/demo folders are left out
+# too, not only the plural forms.
+_missing=""
+for _d in sample samples bench benches benchmark benchmarks demo demos; do
+    case " $(printf '%s' "$_sd" | sed 's/^NON_SHIPPED_DIRS="\(.*\)"$/\1/') " in
+        *" $_d "*) ;;
+        *) _missing="$_missing $_d" ;;
+    esac
+done
+[ -z "$_missing" ] \
+    && pass "NON_SHIPPED_DIRS covers sample/bench/benchmark/demo spellings" \
+    || fail "NON_SHIPPED_DIRS is missing:$_missing"
 _bp=$(grep -m1 '^NON_SHIPPED_MANIFEST_RE=' "$PREP"); _sd=$(grep -m1 '^NON_SHIPPED_MANIFEST_RE=' "$DETECT")
 [ -n "$_bp" ] && [ "$_bp" = "$_sd" ] \
     && pass "NON_SHIPPED_MANIFEST_RE is the same in build-prep.sh and source-detect.sh" \
@@ -8865,6 +9240,44 @@ JSON
         && pass "SOURCE with lock evidence but zero edges still declares unknown" \
         || fail "expected unknown" "$(mca_agg "$WORK/mca-source-noedges.json")"
 
+    # SOURCE, a Poetry project converted only in part: dependencies are
+    # missing by construction, whatever the graph that was resolved.
+    cat > "$WORK/mca-source-poetry-partial.json" <<'JSON'
+{"metadata":{"properties":[{"name":"bomlens:prep-step-applied","value":"poetry-requirements"},
+                            {"name":"bomlens:prep-step-applied","value":"poetry-requirements-partial"},
+                            {"name":"bomlens:prep-step-applied","value":"pip-install"}]},
+ "components":[{"name":"a"},{"name":"b"}],
+ "dependencies":[{"ref":"root","dependsOn":["a"]},{"ref":"a","dependsOn":["b"]}]}
+JSON
+    SCAN_MODE=SOURCE mark_compositions_aggregate "$WORK/mca-source-poetry-partial.json"
+    [ "$(mca_agg "$WORK/mca-source-poetry-partial.json")" = "incomplete" ] \
+        && pass "SOURCE with a partial Poetry conversion declares incomplete, even with lock evidence and edges" \
+        || fail "expected incomplete" "$(mca_agg "$WORK/mca-source-poetry-partial.json")"
+
+    cat > "$WORK/mca-source-poetry-graph-ok.json" <<'JSON'
+{"metadata":{"properties":[{"name":"bomlens:prep-step-applied","value":"poetry-requirements"},
+                            {"name":"bomlens:prep-step-applied","value":"pip-install"},
+                            {"name":"bomlens:prep-step-applied","value":"poetry-graph"}]},
+ "components":[{"name":"a"},{"name":"b"}],
+ "dependencies":[{"ref":"root","dependsOn":["a"]},{"ref":"a","dependsOn":["b"]}]}
+JSON
+    SCAN_MODE=SOURCE mark_compositions_aggregate "$WORK/mca-source-poetry-graph-ok.json"
+    [ "$(mca_agg "$WORK/mca-source-poetry-graph-ok.json")" = "complete" ] \
+        && pass "SOURCE whose Poetry pins were all resolved declares complete" \
+        || fail "expected complete" "$(mca_agg "$WORK/mca-source-poetry-graph-ok.json")"
+    cat > "$WORK/mca-source-poetry-graph-failed.json" <<'JSON'
+{"metadata":{"properties":[{"name":"bomlens:prep-step-applied","value":"poetry-requirements"},
+                            {"name":"bomlens:prep-step-applied","value":"pip-install"},
+                            {"name":"bomlens:prep-step-applied","value":"poetry-graph"},
+                            {"name":"bomlens:pipeline-step-failed","value":"poetry-graph"}]},
+ "components":[{"name":"a"},{"name":"b"}],
+ "dependencies":[{"ref":"a","dependsOn":["b"]}]}
+JSON
+    SCAN_MODE=SOURCE mark_compositions_aggregate "$WORK/mca-source-poetry-graph-failed.json"
+    [ "$(mca_agg "$WORK/mca-source-poetry-graph-failed.json")" = "incomplete" ] \
+        && pass "SOURCE whose Poetry pins could not be resolved further declares incomplete" \
+        || fail "expected incomplete" "$(mca_agg "$WORK/mca-source-poetry-graph-failed.json")"
+
     # SOURCE, syft fallback (bomlens:sbom-tool-degraded): incomplete outranks
     # a lock-evidence label that happens to also be present.
     cat > "$WORK/mca-source-degraded.json" <<'JSON'
@@ -9002,6 +9415,15 @@ cu=$(jq -r '.checks[] | select(.id=="transitive") | "\(.status)\t\(.detail)"' "$
 case "$cu" in
     pass*"not a defect"*) pass "an unknown declaration gets a not-a-defect note, status unaffected" ;;
     *) fail "transitive check detail/status wrong for an unknown declaration" "$cu" ;;
+esac
+
+jq '.compositions = [{"aggregate":"unknown"}] | .dependencies = []' "$FIX/good-cyclonedx.json" > "$WORK/comp-unknown-noedge.json"
+bash "$LIB/validate-sbom.sh" "$WORK/comp-unknown-noedge.json" "$WORK/compun" "supplier" >/dev/null 2>&1
+cun=$(jq -r '.checks[] | select(.id=="transitive") | "\(.status)\t\(.detail)"' "$WORK/compun_conformance.json")
+case "$cun" in
+    fail*"not a defect"*) fail "a failed transitive check must not carry the not-a-defect note" "$cun" ;;
+    fail*"graph completeness unknown") pass "a failed transitive check with an unknown declaration leaves out the not-a-defect note" ;;
+    *) fail "transitive check detail/status wrong for an unknown declaration with no edges" "$cun" ;;
 esac
 
 bash "$LIB/validate-sbom.sh" "$FIX/good-cyclonedx.json" "$WORK/compnone" "supplier" >/dev/null 2>&1

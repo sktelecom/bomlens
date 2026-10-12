@@ -47,6 +47,9 @@ bom.json
 *_ai-declaration.template.json
 *_security_cvebintool.json
 *_security_grype.json
+*_security_trivy.json
+bomlens-result.json
+bomlens-events.jsonl
 *.wfp
 .scanmeta.json
 

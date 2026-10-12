@@ -1,0 +1,82 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/sktelecom/bomlens/blob/main/schemas/engine-plan-1.json",
+  "title": "BomLens execution plan (contract 1.x)",
+  "description": "bomlens-plan.json, written by MODE=PLAN for a source scan. See docs/reference/engine-contract.md.",
+  "type": "object",
+  "required": ["contract", "engine", "input", "status", "reason", "detail", "output_file", "stages"],
+  "properties": {
+    "contract": {
+      "type": "object",
+      "required": ["name", "version"],
+      "properties": {
+        "name": { "const": "bomlens-engine-plan" },
+        "version": { "type": "string", "pattern": "^1\\.\\d+\\.\\d+(-[0-9A-Za-z.-]+)?$" }
+      }
+    },
+    "engine": {
+      "type": "object",
+      "required": ["version", "image", "image_digest"],
+      "properties": {
+        "version": { "type": ["string", "null"] },
+        "image": { "type": ["string", "null"] },
+        "image_digest": { "type": ["string", "null"] }
+      }
+    },
+    "input": {
+      "type": "object",
+      "required": ["kind", "detected_ecosystem"],
+      "properties": {
+        "kind": { "const": "source" },
+        "detected_ecosystem": { "type": "string" }
+      }
+    },
+    "status": { "enum": ["ok", "unsupported"] },
+    "reason": { "enum": ["android-sdk-image", "no-pinned-digest", null] },
+    "detail": { "type": ["string", "null"] },
+    "output_file": { "type": "string", "pattern": "^[^/]+_bom\\.json$" },
+    "stages": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "stage", "image", "image_digest", "args", "workdir", "mounts", "env"],
+        "properties": {
+          "id": { "enum": ["generate", "postprocess"] },
+          "stage": { "enum": [1, 2] },
+          "image": { "type": ["string", "null"] },
+          "image_digest": { "type": ["string", "null"], "pattern": "^sha256:[0-9a-f]{64}$" },
+          "user": { "type": ["string", "null"] },
+          "entrypoint": { "type": ["array", "null"], "items": { "type": "string" } },
+          "args": { "type": "array", "items": { "type": "string" } },
+          "workdir": { "type": ["string", "null"] },
+          "mounts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["role", "target", "mode"],
+              "properties": {
+                "role": { "enum": ["source", "output", "plan-file", "guard-state", "cache-maven", "cache-gradle", "trivy-db"] },
+                "source": { "type": "string" },
+                "target": { "type": "string" },
+                "mode": { "enum": ["ro", "rw"] },
+                "optional": { "type": "boolean" }
+              }
+            }
+          },
+          "env": { "type": "object", "additionalProperties": { "type": "string" } },
+          "env_passthrough": { "type": "array", "items": { "type": "string" } },
+          "env_from_stage1": { "type": "object", "additionalProperties": { "type": "string" } },
+          "env_from_caller": { "type": "object", "additionalProperties": { "type": "string" } },
+          "on_kill": { "type": "string" },
+          "network": {
+            "type": "object",
+            "required": ["required"],
+            "properties": { "required": { "type": "boolean" }, "purpose": { "type": "string" } }
+          },
+          "resources": { "type": "object" },
+          "on_exit": { "type": "string" }
+        }
+      }
+    }
+  }
+}

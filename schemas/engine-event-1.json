@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/sktelecom/bomlens/blob/main/schemas/engine-event-1.json",
+  "title": "BomLens progress event (contract 1.x)",
+  "description": "One line of bomlens-events.jsonl (BOMLENS_EVENTS=file) or of stderr (BOMLENS_EVENTS=stderr). See docs/reference/engine-contract.md.",
+  "type": "object",
+  "required": ["v", "seq", "ts", "type"],
+  "properties": {
+    "v": { "const": 1 },
+    "seq": { "type": "integer", "minimum": 1 },
+    "ts": { "type": "string", "format": "date-time" },
+    "type": { "enum": ["run.start", "step.start", "step.end", "run.end"] },
+    "step": { "type": "string", "pattern": "^[a-z0-9-]+$" },
+    "stage": { "enum": [1, 2] },
+    "status": { "type": "string" },
+    "reason": { "type": ["string", "null"] },
+    "detail": { "type": "string", "maxLength": 500 }
+  },
+  "allOf": [
+    { "if": { "properties": { "type": { "enum": ["step.start", "step.end"] } } }, "then": { "required": ["step", "stage"] } },
+    { "if": { "properties": { "type": { "const": "step.end" } } }, "then": { "required": ["status", "reason"] } },
+    { "if": { "properties": { "type": { "const": "run.end" } } }, "then": { "required": ["status"] } }
+  ]
+}

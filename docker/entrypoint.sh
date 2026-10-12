@@ -35,13 +35,47 @@ set -e
 # ========================================================
 
 SCAN_MODE="${MODE:-POSTPROCESS}"
-LIBDIR="/usr/local/lib/sbom"
+# BOMLENS_LIBDIR lets tests/test-engine-contract.sh run this script from a
+# checkout against the repository's docker/lib, without building the image.
+LIBDIR="${BOMLENS_LIBDIR:-/usr/local/lib/sbom}"
+# Any user (a Kubernetes job's runAsUser) with a read-only root: such a user
+# has no home of its own, so HOME is / or a folder it cannot write, while the
+# tools keep their caches under it (scancode; Trivy's database when no
+# trivy-db mount holds one). A home it cannot write becomes a fresh folder in
+# the temporary directory, unless something is mounted under it (a cache the
+# caller provides, such as ~/.cache/trivy): then HOME stays, and only
+# scancode's cache folder, which must be creatable, moves.
+if ! { [ -n "${HOME:-}" ] && [ -d "$HOME" ] && [ -w "$HOME" ]; }; then
+    if _bomlens_tmp="$(mktemp -d "${TMPDIR:-/tmp}/bomlens-home.XXXXXX" 2>/dev/null)"; then
+        if [ -n "${HOME:-}" ] && [ "$HOME" != "/" ] && grep -q " ${HOME%/}/" /proc/mounts 2>/dev/null; then
+            export SCANCODE_CACHE="${SCANCODE_CACHE:-$_bomlens_tmp}"
+        else
+            export HOME="$_bomlens_tmp"
+        fi
+    else
+        echo "[WARN] no writable home folder and no writable ${TMPDIR:-/tmp}: tools that keep a cache (scancode, Trivy) may fail. Mount a writable ${TMPDIR:-/tmp}." >&2
+    fi
+fi
 
 # --- UI mode: hand off to the web server, no project metadata needed ---
 if [ "$SCAN_MODE" = "UI" ]; then
     echo "[INFO] Starting BomLens Web UI on port ${UI_PORT:-8080}..."
     exec python3 /usr/local/lib/sbom-web/server.py
 fi
+
+# Result manifest (bomlens-result.json) for a program that runs this image as
+# its scan engine: each step is recorded as it runs, and the manifest is written
+# on exit, also when the run stops early (a missing PROJECT_NAME included).
+# The trap keeps the exit code: er_finish runs with errexit off, and the code
+# is passed to exit again. INT and TERM exit with their own codes so the EXIT
+# trap sees 130/143 and records the run as cancelled; generate_sbom_cdxgen
+# replaces these two while its sibling container runs, then restores them.
+# shellcheck source=docker/lib/engine-result.sh
+. "$LIBDIR/engine-result.sh"
+er_init
+trap er_exit_trap EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
 
 # --- DIFF mode: compare two already-generated SBOMs, no project metadata or
 # common pipeline needed — it reads two files and writes one report. Kept out
@@ -67,6 +101,26 @@ SAFE_PROJECT=$(echo "${PROJECT_NAME}" | sed 's/[^a-zA-Z0-9.-]/_/g' | sed 's/__*/
 SAFE_VERSION=$(echo "${PROJECT_VERSION}" | sed 's/[^a-zA-Z0-9.-]/_/g' | sed 's/__*/_/g' | sed 's/^_//; s/_$//')
 OUTPUT_FILE="${SAFE_PROJECT}_${SAFE_VERSION}_bom.json"
 OUT_PREFIX="${SAFE_PROJECT}_${SAFE_VERSION}"
+
+# --- PLAN mode: the execution plan of a source scan (bomlens-plan.json) for a
+# program that runs the two stages itself; nothing is scanned here. See
+# make-plan.sh.
+if [ "$SCAN_MODE" = "PLAN" ]; then
+    er_phase plan
+    _plan_rc=0
+    bash "$LIBDIR/make-plan.sh" "${SOURCE_ROOT:-/src}" "${HOST_OUTPUT_DIR:-.}" "$OUTPUT_FILE" || _plan_rc=$?
+    ARTIFACTS=("bomlens-plan.json")
+    case "$_plan_rc" in
+        0) er_record plan ok "" "" "$ER_PHASE_STARTED"; er_phase_end; exit 0 ;;
+        3) _plan_reason="$(jq -r '.reason // empty' "${HOST_OUTPUT_DIR:-.}/bomlens-plan.json" 2>/dev/null)"
+           er_record plan skipped "$([ "$_plan_reason" = "android-sdk-image" ] && echo not_installed || echo unavailable)" \
+               "$(jq -r '.detail // empty' "${HOST_OUTPUT_DIR:-.}/bomlens-plan.json" 2>/dev/null)" "$ER_PHASE_STARTED"
+           # Not a failure: the plan says why there is nothing to run, and
+           # the skipped step leaves the run succeeded_degraded.
+           er_phase_end; exit 0 ;;
+        *) exit "$_plan_rc" ;;
+    esac
+fi
 
 # Stale-artifact cleanup. A re-scan of the same project/version reuses this
 # folder (mkdir -p, never recreated: scan-sbom.sh and server.py's
@@ -102,6 +156,7 @@ KNOWN_ARTIFACT_SUFFIXES=(
     _bom.spdx3.json _bom.spdx3.json.sig _spdx3-check.json _spdx3-check.md _ai-declaration.template.json
     _modelica.cdx.json _cocoapods.cdx.json _conda.cdx.json
     _security_cvebintool.json _security_grype.json _security_yocto.json
+    _security_trivy.json
 )
 # Only a caller that knows about this cleanup runs it at all. An old
 # scan-sbom.sh or server.py (built before this existed) sends neither signal
@@ -138,6 +193,11 @@ if [ -n "${BOMLENS_RUN_INPUT:-}" ] || [ "${BOMLENS_ARTIFACT_CLEANUP:-}" = "1" ];
         for _suf in "${KNOWN_ARTIFACT_SUFFIXES[@]}"; do
             _f="$HOST_OUTPUT_DIR/${OUT_PREFIX}${_suf}"
             [ -n "$_run_input" ] && [ "$(basename "$_f")" = "$_run_input" ] && continue
+            # Stage 1 also leaves the conda sidecar (build-prep.sh parses
+            # environment.yml there and drops cdxgen's python cataloger when it
+            # does); it is this run's input too, and scan-sbom.sh clears an old
+            # one before stage 1 for the same reason as the SBOM itself.
+            [ -n "$_run_input" ] && [ "$_suf" = "_conda.cdx.json" ] && continue
             if [ -f "$_f" ]; then
                 rm -f "$_f"
                 _cleaned+=("$(basename "$_f")")
@@ -157,6 +217,8 @@ fi
 # and never aborts the run.
 case "${REPORT_LANG:-en}" in ko) REPORT_LANG="ko" ;; *) REPORT_LANG="en" ;; esac
 export REPORT_LANG
+
+er_phase generate
 
 # Shared language detection + cdxgen image selection (also used by the CLI).
 # shellcheck source=docker/lib/source-detect.sh
@@ -333,7 +395,7 @@ generate_sbom_cdxgen() {
         if ! docker image inspect "$img" >/dev/null 2>&1; then
             echo "[ERROR] Android SDK image not found: $img"
             echo "        Build it on the host once, then re-run:"
-            echo "          docker build --build-arg ANDROID_API=$api -t $img docker/android"
+            echo "          docker build --build-arg ANDROID_API=$api$([ "$CDXGEN_IMAGE_PREFIX" = "ghcr.io/cdxgen/" ] || printf ' --build-arg CDXGEN_IMAGE_PREFIX=%s' "$CDXGEN_IMAGE_PREFIX") -t $img docker/android"
             echo "        (accepting https://developer.android.com/studio/terms), or set"
             echo "        ANDROID_IMAGE_PREFIX to an image built elsewhere."
             return 1
@@ -429,7 +491,8 @@ generate_sbom_cdxgen() {
     trap 'stop_sibling; exit 130' INT
     trap 'stop_sibling; exit 143' TERM
     wait "$pipe_pid" || true
-    trap - INT TERM
+    trap 'exit 130' INT
+    trap 'exit 143' TERM
     rc=$(cat "$rcf" 2>/dev/null || echo 1)
     rm -f "$rcf"
     SIBLING_CID=""
@@ -511,7 +574,12 @@ mark_compositions_aggregate() {
                 | (.metadata.properties // []) as $props
                 | ([$props[] | select(.name=="bomlens:prep-step-applied") | .value]) as $applied
                 | ([$props[] | select(.name=="bomlens:pipeline-step-failed") | .value]) as $failed
-                | (($props | map(select(.name=="bomlens:sbom-tool-degraded")) | length) > 0) as $degraded
+                # A Poetry project converted only in part (ranges and table
+                # entries left out) is missing dependencies by construction,
+                # and so is one whose pins could not be resolved further.
+                | ((($props | map(select(.name=="bomlens:sbom-tool-degraded")) | length) > 0)
+                   or ($applied | index("poetry-requirements-partial") != null)
+                   or ($failed | index("poetry-graph") != null)) as $degraded
                 | (([$known[] | select(. as $l | ($applied|index($l)) and (($failed|index($l))|not))] | length) > 0) as $lock_ok
                 | ((.components // []) | length) as $components
                 | ([(.dependencies // [])[]?.dependsOn[]?] | length) as $edges
@@ -651,13 +719,29 @@ case "$SCAN_MODE" in
 
     IMAGE)
         if [ -z "$TARGET_IMAGE" ]; then echo "[ERROR] TARGET_IMAGE required for IMAGE mode."; exit 1; fi
-        if [ ! -S /var/run/docker.sock ]; then
-            echo "[ERROR] Docker socket not mounted: -v /var/run/docker.sock:/var/run/docker.sock"; exit 1
+        # With the Docker socket mounted syft reads the image from the daemon;
+        # without it, straight from the registry (no daemon needed, as in a
+        # Kubernetes job), or from an archive named with its scheme
+        # (docker-archive:, oci-archive:, oci-dir:). A private registry takes
+        # SYFT_REGISTRY_AUTH_* or a docker config file (DOCKER_CONFIG).
+        if [ -S /var/run/docker.sock ]; then
+            echo "[1/2] syft: Docker image $TARGET_IMAGE"
+        else
+            echo "[1/2] syft: image $TARGET_IMAGE (no Docker socket: read from the registry or the archive)"
         fi
-        echo "[1/2] syft: Docker image $TARGET_IMAGE"
-        if ! syft "$TARGET_IMAGE" -o "cyclonedx-json@$CDX_SPEC_VERSION" > "$OUTPUT_FILE" 2>/dev/null; then
-            echo "[ERROR] syft failed (image missing or inaccessible)."; exit 1
+        IMAGE_SYFT_LOG=$(mktemp)
+        if ! syft "$TARGET_IMAGE" -o "cyclonedx-json@$CDX_SPEC_VERSION" > "$OUTPUT_FILE" 2>"$IMAGE_SYFT_LOG"; then
+            case "$TARGET_IMAGE" in
+                docker-archive:*|oci-archive:*|oci-dir:*)
+                    echo "[ERROR] syft could not read the image archive $TARGET_IMAGE: check that the path is mounted into the container and holds an image in that format." ;;
+                *)
+                    echo "[ERROR] syft could not read the image $TARGET_IMAGE: it does not exist, or the registry needs credentials (SYFT_REGISTRY_AUTH_USERNAME and SYFT_REGISTRY_AUTH_PASSWORD, or a docker config file in DOCKER_CONFIG). With the CLI, pulling it first (docker pull) also works." ;;
+            esac
+            [ -s "$IMAGE_SYFT_LOG" ] && tail -5 "$IMAGE_SYFT_LOG" >&2
+            rm -f "$IMAGE_SYFT_LOG"
+            exit 1
         fi
+        rm -f "$IMAGE_SYFT_LOG"
         ;;
 
     BINARY)
@@ -827,8 +911,39 @@ EOF
         ;;
 
     POSTPROCESS)
-        # SBOM was already generated by a cdxgen language image (scan-sbom.sh).
+        # SBOM was already generated by a cdxgen language image (scan-sbom.sh,
+        # or a caller that ran stage 1 from the execution plan).
         echo "[1/2] Post-processing existing SBOM: $OUTPUT_FILE"
+        # A caller that ran stage 1 from the execution plan passes its exit
+        # code. When stage 1 failed or left no SBOM, the manifest-only syft
+        # scan takes its place, the same fallback the CLI runs, and the SBOM
+        # carries the reason (bomlens:sbom-tool-degraded).
+        if [ -n "${BOMLENS_STAGE1_EXIT:-}" ] && { [ "$BOMLENS_STAGE1_EXIT" != "0" ] || [ ! -s "$OUTPUT_FILE" ]; }; then
+            _s1_log="${BOMLENS_STAGE1_LOG:-}"
+            case "$_s1_log" in ''|*/*|.*) _s1_log="" ;; esac
+            # A caller that already classified the failure (the CLI does, with
+            # the same stage1_fail_reason) passes the reason itself. One that
+            # never ran stage 1 (an unsupported plan) passes cdxgen-unavailable,
+            # or exit code 127.
+            case "${BOMLENS_STAGE1_REASON:-}" in
+                oom|disk-space|network|cdxgen-crash|cdxgen-unavailable) _s1_reason="$BOMLENS_STAGE1_REASON" ;;
+                *) _s1_reason="$(stage1_fail_reason "${BOMLENS_STAGE1_OOM:-}" "${_s1_log:+$HOST_OUTPUT_DIR/$_s1_log}" "$BOMLENS_STAGE1_EXIT")" ;;
+            esac
+            # The CLI prints its own guidance for this, before and after.
+            [ -n "${_BOMLENS_CLI_FALLBACK:-}" ] || \
+                echo "[WARN] stage 1 (cdxgen) did not produce an SBOM (exit ${BOMLENS_STAGE1_EXIT}, ${_s1_reason}); falling back to a manifest-only scan (direct dependencies only)."
+            rm -f "$OUTPUT_FILE"
+            read -ra _s1_exclude <<< "$(non_shipped_syft_args)"
+            if ! syft "dir:${SOURCE_ROOT:-/src}" "${_s1_exclude[@]}" -o "cyclonedx-json@$CDX_SPEC_VERSION" > "$OUTPUT_FILE" 2>/dev/null \
+               || ! apply_node_fallback_quality_gate "$OUTPUT_FILE" "${SOURCE_ROOT:-/src}" 2; then
+                rm -f "$OUTPUT_FILE"
+                [ -n "${_BOMLENS_CLI_FALLBACK:-}" ] || \
+                    echo "[ERROR] SBOM generation failed (stage 1), and the manifest-only fallback also failed or was discarded."
+                exit 1
+            fi
+            mark_sbom_degraded "$OUTPUT_FILE" "$_s1_reason"
+            mark_sbom_excluded "$OUTPUT_FILE" "${SOURCE_ROOT:-/src}"
+        fi
         if [ ! -s "$OUTPUT_FILE" ]; then
             echo "[ERROR] SBOM not found for post-processing: $OUTPUT_FILE"
             echo "        (stage 1 — cdxgen language image — may have failed)"
@@ -935,6 +1050,71 @@ esac
 rm -f "$(dirname "$OUTPUT_FILE")"/.sbom-xml.*.json* "$(dirname "$OUT_PREFIX")"/.sbom-xml.*.json* 2>/dev/null || true
 if [ ! -s "$OUTPUT_FILE" ]; then echo "[ERROR] SBOM file is empty: $OUTPUT_FILE"; exit 1; fi
 echo "[INFO] SBOM ready: $OUTPUT_FILE"
+_gen_count="$(jq '[.components[]?] | length' "$OUTPUT_FILE" 2>/dev/null || echo 0)"
+_gen_degraded="$(jq -r '[.metadata.properties[]? | select(.name == "bomlens:sbom-tool-degraded") | .value] | first // empty' "$OUTPUT_FILE" 2>/dev/null)"
+# A Poetry project with no poetry.lock is scanned from its exact pins only
+# (build-prep.sh); when it also has ranged or table dependencies those are not
+# in the SBOM, which is a partial result and is recorded as one.
+_gen_poetry_partial=""; _gen_poetry_graph_failed=""
+case "$SCAN_MODE" in SOURCE|POSTPROCESS)
+_gen_poetry_partial="$(jq -r 'any(.metadata.properties[]?; .name == "bomlens:prep-step-applied" and .value == "poetry-requirements-partial")' "$OUTPUT_FILE" 2>/dev/null)"
+# The pins' own dependencies are resolved by a second cdxgen run
+# (poetry-graph); when it failed (no network, for one) they are missing too.
+_gen_poetry_graph_failed="$(jq -r 'any(.metadata.properties[]?; .name == "bomlens:pipeline-step-failed" and .value == "poetry-graph")' "$OUTPUT_FILE" 2>/dev/null)"
+;; esac
+# A package cdxgen saw but could not name (build-prep.sh drops it): said in
+# generate's detail and counted as unresolved, whatever the status.
+_gen_unnamed="$(jq -r '[.metadata.properties[]? | select(.name == "bomlens:unnamed-packages-dropped") | .value] | first // empty' "$OUTPUT_FILE" 2>/dev/null)"
+case "$_gen_unnamed" in ''|*[!0-9]*) _gen_unnamed="" ;; esac
+_gen_counts="{\"components\":${_gen_count:-0}${_gen_unnamed:+,\"unresolved\":$_gen_unnamed}}"
+_gen_unnamed_detail="${_gen_unnamed:+$_gen_unnamed package(s) cdxgen could not name were left out (pkg:pypi/unknown@latest)}"
+if [ -n "$_gen_degraded" ]; then
+    er_record generate degraded fallback "$_gen_degraded" "$ER_PHASE_STARTED" "" "$_gen_counts"
+elif [ "$_gen_poetry_partial" = "true" ] || [ "$_gen_poetry_graph_failed" = "true" ]; then
+    _gen_poetry_detail="Poetry project with no poetry.lock:"
+    [ "$_gen_poetry_partial" = "true" ] && _gen_poetry_detail="$_gen_poetry_detail only exact pins resolved, ranged and table dependencies are missing;"
+    [ "$_gen_poetry_graph_failed" = "true" ] && _gen_poetry_detail="$_gen_poetry_detail the dependencies of the pins could not be resolved (poetry-graph failed);"
+    _gen_poetry_detail="${_gen_poetry_detail%;}"
+    er_record generate degraded fallback "$_gen_poetry_detail${_gen_unnamed_detail:+; $_gen_unnamed_detail}" "$ER_PHASE_STARTED" "" "$_gen_counts"
+else
+    er_record generate ok "" "${_gen_unnamed_detail}" "$ER_PHASE_STARTED" "" "$_gen_counts"
+fi
+er_phase_end
+
+# Debian packages of an image or a root filesystem take their licenses from
+# Trivy, which reads the copyright files syft leaves as a hash
+# (os-licenses.sh). Recorded as its own step, after generate. BOMLENS_OS_LICENSES=false turns it off (the second read
+# of the image costs time); any hash is then still dropped. When Trivy cannot
+# read the target, the hashes are dropped and the step is degraded.
+case "$SCAN_MODE" in
+    IMAGE|ROOTFS)
+        _osl_target="${TARGET_IMAGE:-}"; [ "$SCAN_MODE" = ROOTFS ] && _osl_target="$TARGET_DIR"
+        _osl_started="$(er_now)"; _osl_rc=0
+        if [ "${BOMLENS_OS_LICENSES:-true}" = "false" ]; then
+            bash "$LIBDIR/os-licenses.sh" "$OUTPUT_FILE" "$SCAN_MODE" "$_osl_target" >/dev/null || true
+            er_record os-licenses disabled
+        else
+            _osl_out="$(bash "$LIBDIR/os-licenses.sh" "$OUTPUT_FILE" "$SCAN_MODE" "$_osl_target")" || _osl_rc=$?
+            _osl_counts="$(printf '%s' "$_osl_out" | awk 'NF==2 {printf "{\"replaced\":%d,\"hashes_dropped\":%d}", $1, $2}')"
+            case "$_osl_rc" in
+                0)
+                    [ -n "$_osl_counts" ] && echo "[os-licenses] $(printf '%s' "$_osl_out" | awk '{print $1" Debian package(s) from Trivy, "$2" with a file hash cleaned"}')"
+                    er_record os-licenses ok "" "" "$_osl_started" "" "$_osl_counts" ;;
+                1)
+                    echo "[WARN] Debian package licenses: Trivy could not read the target; syft's licenses are kept, less any file hash." >&2
+                    er_record os-licenses degraded unavailable "Trivy's license scan could not read the target" "$_osl_started" "" "$_osl_counts" ;;
+                3)
+                    echo "[WARN] Debian package licenses: Trivy is not installed; syft's licenses are kept, less any file hash." >&2
+                    er_record os-licenses skipped not_installed "" "$_osl_started" "" "$_osl_counts" ;;
+                4)
+                    echo "[WARN] Debian package licenses: Trivy read the target but gave no Debian package a license; syft's are kept, less any file hash." >&2
+                    er_record os-licenses degraded unavailable "Trivy gave no Debian package a license" "$_osl_started" "" "$_osl_counts" ;;
+                *)
+                    echo "[WARN] Debian package licenses: the step failed; the SBOM is left as syft wrote it." >&2
+                    er_record os-licenses failed failed "" "$_osl_started" ;;
+            esac
+        fi ;;
+esac
 
 # Warn (don't fail) when the SBOM has no components. A genuine no-dependency
 # project can legitimately be empty, but more often this means the scan saw
@@ -989,7 +1169,10 @@ VENDORED_SRC="${SOURCE_ROOT:-/src}"
 if [ "$SOURCE_SCAN" = "true" ] && [ "${IDENTIFY_VENDORED:-false}" = "true" ] && [ -d "$VENDORED_SRC" ]; then
     echo "[INFO] Identifying vendored open source (SCANOSS)..."
     VEND_SBOM="${OUT_PREFIX}_vendored.cdx.json"
+    _vend_started="$(er_now)"
+    _vend_status=failed
     if bash "$LIBDIR/identify-vendored.sh" "$VENDORED_SRC" "$VEND_SBOM" "$PROJECT_VERSION"; then
+        _vend_status=ok
         VEND_N=$(jq '[.components[]?] | length' "$VEND_SBOM" 2>/dev/null || echo 0)
         # Reconcile against the package-manager scan before merging: drop vendored
         # matches whose name a cdxgen/syft component already carries (see
@@ -1006,14 +1189,21 @@ if [ "$SOURCE_SCAN" = "true" ] && [ "${IDENTIFY_VENDORED:-false}" = "true" ] && 
                 mv "${OUTPUT_FILE}.merged" "$OUTPUT_FILE"
             else
                 echo "[WARN] merge of vendored components failed; keeping the original SBOM." >&2
+                _vend_status=failed
                 rm -f "${OUTPUT_FILE}.merged"
             fi
         else
             echo "[INFO] no new vendored open source to add (after reconciliation)."
         fi
     fi
-elif [ "$SOURCE_SCAN" = "true" ] && [ -d "$VENDORED_SRC" ]; then
-    run_optional_step suggest-vendored bash "$LIBDIR/suggest-vendored.sh" "$OUTPUT_FILE" "$VENDORED_SRC"
+    er_record vendored "$_vend_status" "$([ "$_vend_status" = failed ] && echo failed)" "" "$_vend_started"
+elif [ "$SOURCE_SCAN" = "true" ] && [ "${IDENTIFY_VENDORED:-false}" = "true" ]; then
+    er_record vendored skipped no_input "no source tree at $VENDORED_SRC"
+elif [ "$SOURCE_SCAN" = "true" ]; then
+    er_record vendored disabled
+    if [ -d "$VENDORED_SRC" ]; then
+        run_optional_step suggest-vendored bash "$LIBDIR/suggest-vendored.sh" "$OUTPUT_FILE" "$VENDORED_SRC"
+    fi
 fi
 
 # ========================================================
@@ -1031,7 +1221,10 @@ if [ "$SOURCE_SCAN" = "true" ] && [ -d "$COCOA_SRC" ] \
     if [ "${HAS_COCOA:-0}" -eq 0 ]; then
         echo "[INFO] Identifying CocoaPods dependencies from Podfile.lock (syft)..."
         COCOA_SBOM="${OUT_PREFIX}_cocoapods.cdx.json"
+        _cocoa_started="$(er_now)"
+        _cocoa_status=failed
         if bash "$LIBDIR/identify-cocoapods.sh" "$COCOA_SRC" "$COCOA_SBOM" "$PROJECT_VERSION"; then
+            _cocoa_status=ok
             COCOA_N=$(jq '[.components[]?] | length' "$COCOA_SBOM" 2>/dev/null || echo 0)
             if [ "${COCOA_N:-0}" -gt 0 ]; then
                 echo "[INFO] CocoaPods components identified: $COCOA_N — merging into SBOM."
@@ -1039,10 +1232,12 @@ if [ "$SOURCE_SCAN" = "true" ] && [ -d "$COCOA_SRC" ] \
                     mv "${OUTPUT_FILE}.merged" "$OUTPUT_FILE"
                 else
                     echo "[WARN] merge of CocoaPods components failed; keeping the original SBOM." >&2
+                    _cocoa_status=failed
                     rm -f "${OUTPUT_FILE}.merged"
                 fi
             fi
         fi
+        er_record cocoapods "$_cocoa_status" "$([ "$_cocoa_status" = failed ] && echo failed)" "" "$_cocoa_started"
     fi
 fi
 
@@ -1105,6 +1300,28 @@ if [ "$SOURCE_SCAN" = "true" ] && [ -d "$MODELICA_SRC" ] \
                 fi
             fi
         fi
+    fi
+fi
+
+# ========================================================
+# A source tree that declares dependencies (a manifest or lock file that lists
+# some, outside the non-shipped folders) yet ends with no component did not get
+# scanned the way it asked: a Poetry project with no lock file is the measured
+# case. Decided here, after every step that can still add components
+# (vendored, CocoaPods, conda, Modelica), on the final count. It reads the same
+# as a project with nothing to declare unless it is said, so it is recorded on
+# the SBOM (bomlens:sbom-empty-with-manifests) and in the result manifest.
+# ========================================================
+if [ "$SOURCE_SCAN" = "true" ] && [ -d "${SOURCE_ROOT:-/src}" ] \
+   && [ "$(jq '[.components[]?] | length' "$OUTPUT_FILE" 2>/dev/null || echo 1)" = "0" ]; then
+    _empty_manifests="$(source_manifests "${SOURCE_ROOT:-/src}" 5)"
+    if [ -n "$_empty_manifests" ]; then
+        echo "[WARN] the source declares dependencies ($_empty_manifests) but the SBOM has no components; the scan did not resolve them."
+        mark_document_status "$OUTPUT_FILE" "bomlens:sbom-empty-with-manifests" "$_empty_manifests"
+        # The resolver steps that failed, which are most often why (a Gradle
+        # or pip step that could not run), from the SBOM build-prep stamped.
+        _empty_failed="$(jq -r '[.metadata.properties[]? | select(.name == "bomlens:pipeline-step-failed") | .value] | unique | join(", ")' "$OUTPUT_FILE" 2>/dev/null)"
+        er_record generate degraded no_components "manifests found: $_empty_manifests${_empty_failed:+; steps that failed: $_empty_failed}" "" "" "{\"components\":0}"
     fi
 fi
 
@@ -1177,7 +1394,15 @@ case "$SCAN_MODE" in
         # No `|| true`: a stamp failure means the SBOM still carries a leaked/placeholder
         # root name (e.g. src@latest), which collides in some SBOM import platforms. Fail closed under
         # set -e so a mis-named SBOM is never normalized, signed, or uploaded.
+        er_phase stamp-metadata
         bash "$LIBDIR/stamp-metadata.sh" "$OUTPUT_FILE" "$PROJECT_NAME" "$PROJECT_VERSION"
+        # A name scanners also give a project they cannot name, kept because
+        # nothing is uploaded: the run is complete, so ok, with the warning.
+        case "$PROJECT_NAME" in
+            src|app) er_record stamp-metadata ok "" "the project name '$PROJECT_NAME' is also the name scanners give a project they cannot name; kept, since nothing is uploaded" "$ER_PHASE_STARTED" ;;
+            *) er_record stamp-metadata ok "" "" "$ER_PHASE_STARTED" ;;
+        esac
+        er_phase_end
         ;;
 esac
 
@@ -1212,6 +1437,45 @@ else
     run_optional_step normalize bash "$LIBDIR/normalize-sbom.sh" "$OUTPUT_FILE"
 fi
 
+# Registry licences (opt-in, network): fill a component that has no licence,
+# and check a single strong-copyleft or non-commercial licence against the
+# registry, replacing it when the registry says otherwise. After normalize, so
+# a licence written as free text has its SPDX id by now and is checked too;
+# when anything changed, normalize runs again to classify what was written. A
+# supplier's own SBOM (ANALYZE) only has missing licences filled: its declared
+# ones are never overwritten. The counts go to the result manifest; a lookup
+# that failed or ran out of time leaves the step degraded, since those
+# components were not checked.
+if [ "${LICENSE_REGISTRY:-false}" = "true" ] && [ "$AI_MODEL_SCAN" != "true" ]; then
+    echo "[INFO] Looking up licences in the package registries (deps.dev)..."
+    _lr_started="$(er_now)"
+    _lr_rc=0
+    _lr_args=()
+    [ "$SCAN_MODE" = "ANALYZE" ] && _lr_args=(--fill-only)
+    _lr_counts="$(python3 "$LIBDIR/enrich-license-registry.py" "${_lr_args[@]}" "$OUTPUT_FILE")" || _lr_rc=$?
+    if [ "$_lr_rc" -ne 0 ] || ! printf '%s' "$_lr_counts" | jq -e 'type == "object"' >/dev/null 2>&1; then
+        mark_pipeline_warning "$OUTPUT_FILE" license-registry
+        er_record license-registry failed failed "" "$_lr_started"
+    else
+        if printf '%s' "$_lr_counts" | jq -e '(.budget_reached // 0) > 0' >/dev/null; then
+            er_record license-registry degraded budget_exhausted "" "$_lr_started" "" "$_lr_counts"
+        elif printf '%s' "$_lr_counts" | jq -e '(.lookup_failed // 0) > 0' >/dev/null; then
+            er_record license-registry degraded unavailable "" "$_lr_started" "" "$_lr_counts"
+        else
+            er_record license-registry ok "" "" "$_lr_started" "" "$_lr_counts"
+        fi
+        if printf '%s' "$_lr_counts" | jq -e '(.filled // 0) + (.superseded // 0) > 0' >/dev/null; then
+            if [ "${BYTE_STABLE:-false}" = "true" ]; then
+                run_optional_step normalize bash "$LIBDIR/normalize-sbom.sh" "$OUTPUT_FILE" --stable
+            else
+                run_optional_step normalize bash "$LIBDIR/normalize-sbom.sh" "$OUTPUT_FILE"
+            fi
+        fi
+    fi
+elif [ "$AI_MODEL_SCAN" != "true" ]; then
+    er_record license-registry disabled
+fi
+
 # The component/dependency graph is final as of the normalize pass above; every
 # step below this point only enriches metadata (CPE, EOL, risk, ...) and must
 # not change compositions.aggregate's answer, so this runs once, here.
@@ -1227,6 +1491,8 @@ mark_compositions_aggregate "$OUTPUT_FILE"
 # disabled with ENRICH_CPE=false. Generic across modes; best-effort (|| true).
 if [ "${ENRICH_CPE:-true}" != "false" ] && [ "$AI_MODEL_SCAN" != "true" ]; then
     run_optional_step enrich-cpe bash "$LIBDIR/enrich-cpe.sh" "$OUTPUT_FILE"
+elif [ "$AI_MODEL_SCAN" != "true" ]; then
+    er_record enrich-cpe disabled
 fi
 
 # OS-context enrichment: a supplier SBOM can list every rpm/deb/apk package yet
@@ -1241,6 +1507,8 @@ fi
 # distro= version). Runs before the security scan; best-effort, never aborts.
 if [ "${ENRICH_OS_CONTEXT:-true}" != "false" ] && [ "$AI_MODEL_SCAN" != "true" ]; then
     run_optional_step enrich-os-context python3 "$LIBDIR/enrich-os-context.py" "$OUTPUT_FILE"
+elif [ "$AI_MODEL_SCAN" != "true" ]; then
+    er_record enrich-os-context disabled
 fi
 
 # Distro supplier enrichment: an rpm/deb/apk component carries `publisher` but
@@ -1257,6 +1525,8 @@ fi
 # supplier name yet. Best-effort, never aborts.
 if [ "${ENRICH_DISTRO_SUPPLIER:-true}" != "false" ] && [ "$AI_MODEL_SCAN" != "true" ]; then
     run_optional_step enrich-distro-supplier python3 "$LIBDIR/enrich-distro-supplier.py" "$OUTPUT_FILE"
+elif [ "$AI_MODEL_SCAN" != "true" ]; then
+    er_record enrich-distro-supplier disabled
 fi
 
 # Maven CPE enrichment: maven libraries carry a PURL but no CPE, so a CPE-aware
@@ -1269,6 +1539,8 @@ fi
 # ENRICH_MAVEN_CPE=false; a no-op when the SBOM has no maven components.
 if [ "${ENRICH_MAVEN_CPE:-true}" != "false" ] && [ "$AI_MODEL_SCAN" != "true" ]; then
     run_optional_step enrich-maven-cpe python3 "$LIBDIR/enrich-maven-cpe.py" "$OUTPUT_FILE"
+elif [ "$AI_MODEL_SCAN" != "true" ]; then
+    er_record enrich-maven-cpe disabled
 fi
 
 # GitHub-coordinate CPE enrichment: a component identified only by its source
@@ -1284,6 +1556,8 @@ fi
 # has no pkg:github/ component in the map.
 if [ "${ENRICH_GITHUB_CPE:-true}" != "false" ] && [ "$AI_MODEL_SCAN" != "true" ]; then
     run_optional_step enrich-github-cpe python3 "$LIBDIR/enrich-github-cpe.py" "$OUTPUT_FILE"
+elif [ "$AI_MODEL_SCAN" != "true" ]; then
+    er_record enrich-github-cpe disabled
 fi
 
 # Interpreter CPE enrichment: a language interpreter distributed AS a package
@@ -1297,6 +1571,8 @@ fi
 # ENRICH_INTERPRETER_CPE=false; a no-op when the SBOM has no matching component.
 if [ "${ENRICH_INTERPRETER_CPE:-true}" != "false" ] && [ "$AI_MODEL_SCAN" != "true" ]; then
     run_optional_step enrich-interpreter-cpe python3 "$LIBDIR/enrich-interpreter-cpe.py" "$OUTPUT_FILE"
+elif [ "$AI_MODEL_SCAN" != "true" ]; then
+    er_record enrich-interpreter-cpe disabled
 fi
 
 # EOL enrichment: flag components whose release cycle is past its published
@@ -1308,6 +1584,8 @@ fi
 # (e.g. an image built without the dataset). Best-effort; never aborts the scan.
 if [ "${ENRICH_EOL:-true}" != "false" ] && [ "$AI_MODEL_SCAN" != "true" ]; then
     run_optional_step enrich-eol bash "$LIBDIR/enrich-eol.sh" "$OUTPUT_FILE"
+elif [ "$AI_MODEL_SCAN" != "true" ]; then
+    er_record enrich-eol disabled
 fi
 
 # Malicious-package check: flag components that are known-malicious packages
@@ -1320,6 +1598,8 @@ fi
 # with ENRICH_MALICIOUS=false. Best-effort; never aborts the scan.
 if [ "${ENRICH_MALICIOUS:-true}" != "false" ]; then
     run_optional_step enrich-malicious bash "$LIBDIR/enrich-malicious.sh" "$OUTPUT_FILE"
+else
+    er_record enrich-malicious disabled
 fi
 
 # Staleness enrichment (OPT-IN, default off): query deps.dev for absolute version
@@ -1329,6 +1609,8 @@ fi
 # and bounded (per-request timeout + wall-clock budget); never aborts the scan.
 if [ "${STALENESS_ENRICH:-false}" = "true" ] && [ "$AI_MODEL_SCAN" != "true" ]; then
     run_optional_step enrich-staleness python3 "$LIBDIR/enrich-staleness.py" "$OUTPUT_FILE"
+elif [ "$AI_MODEL_SCAN" != "true" ]; then
+    er_record enrich-staleness disabled
 fi
 
 # AI model risk assessment: stamp every model/dataset component with a
@@ -1382,18 +1664,45 @@ if [ "${GENERATE_REPORT:-false}" != "true" ] && [ -f "${OUT_PREFIX}_summary.resu
 fi
 
 # Deep license detection (scancode, opt-in). Only meaningful for source trees.
-if [ "${DEEP_LICENSE:-false}" = "true" ] && [ -d /src ]; then
-    if command -v scancode >/dev/null 2>&1; then
-        echo "[INFO] Running scancode deep license detection..."
-        if scancode --license --json-pp /tmp/scancode.json /src >/dev/null 2>&1; then
-            cp /tmp/scancode.json "${OUT_PREFIX}_scancode.json"
+DEEP_SRC="${SOURCE_ROOT:-/src}"
+if [ "$SOURCE_SCAN" = "true" ] && [ "${DEEP_LICENSE:-false}" = "true" ] && [ -d "$DEEP_SRC" ]; then
+    echo "[INFO] Running scancode deep license detection..."
+    _dl_started="$(er_now)"
+    _dl_rc=0
+    # This run's own output folder, when it sits inside the scanned tree (a
+    # CLI scan of the current folder), is not the project's source.
+    DEEP_LICENSE_EXCLUDE="${SRC_TREE_EXCLUDE:-} $OUT_PREFIX" \
+        bash "$LIBDIR/deep-license.sh" "$DEEP_SRC" "${OUT_PREFIX}_scancode.json" || _dl_rc=$?
+    case "$_dl_rc" in
+        0)
             ARTIFACTS+=("${OUT_PREFIX}_scancode.json")
-        else
+            er_record deep-license ok "" "" "$_dl_started" ;;
+        6)
+            ARTIFACTS+=("${OUT_PREFIX}_scancode.json")
+            er_record deep-license degraded failed "scancode reported errors on some files" "$_dl_started" ;;
+        3)
+            echo "[WARN] --deep-license requested but scancode not in image (use the bomlens-deep-license image, or rebuild with --build-arg SBOM_DEEP_LICENSE=true)."
+            # The CLI ran this step here because the scancode image could not
+            # be pulled; say so, rather than that this image lacks a tool.
+            if [ -n "${BOMLENS_DEEP_LICENSE_FALLBACK:-}" ]; then
+                er_record deep-license skipped fallback "the scancode image was not available: ${BOMLENS_DEEP_LICENSE_FALLBACK}" "$_dl_started"
+            else
+                er_record deep-license skipped not_installed "scancode is not in this image" "$_dl_started"
+            fi ;;
+        4)
+            er_record deep-license skipped too_large "more than ${DEEP_LICENSE_MAX_FILES:-20000} source files" "$_dl_started" ;;
+        5)
+            er_record deep-license failed timeout "stopped after ${DEEP_LICENSE_TIMEOUT:-600}s" "$_dl_started" ;;
+        *)
             echo "[WARN] scancode run failed."
-        fi
-    else
-        echo "[WARN] --deep-license requested but scancode not in image (rebuild with --build-arg SBOM_DEEP_LICENSE=true)."
-    fi
+            er_record deep-license failed failed "" "$_dl_started" ;;
+    esac
+elif [ "$SOURCE_SCAN" = "true" ] && [ "${DEEP_LICENSE:-false}" = "true" ]; then
+    er_record deep-license skipped no_input "no source tree at $DEEP_SRC"
+elif [ "$SOURCE_SCAN" = "true" ]; then
+    er_record deep-license disabled
+elif [ "${DEEP_LICENSE:-false}" = "true" ]; then
+    er_record deep-license skipped no_input "not a source scan"
 fi
 
 # Where this mode's scanned files sit on disk. SOURCE (web UI) and POSTPROCESS
@@ -1504,6 +1813,9 @@ fi
 # sync now so an interruption in either still leaves a complete, usable BOM.
 sync_artifacts
 
+if [ "${GENERATE_NOTICE:-false}" != "true" ]; then
+    er_record generate-notice disabled
+fi
 if [ "${GENERATE_NOTICE:-false}" = "true" ]; then
     run_optional_step generate-notice bash "$LIBDIR/generate-notice.sh" "$OUTPUT_FILE" "$OUT_PREFIX" "$PROJECT_NAME"
     [ -f "${OUT_PREFIX}_NOTICE.txt" ] && ARTIFACTS+=("${OUT_PREFIX}_NOTICE.txt")
@@ -1513,9 +1825,39 @@ if [ "${GENERATE_NOTICE:-false}" = "true" ]; then
     sync_artifacts
 fi
 
-if [ "${GENERATE_SECURITY:-false}" = "true" ]; then
+if [ "${GENERATE_SECURITY:-false}" != "true" ]; then
+    er_record scan-security disabled
+fi
+# A Trivy database mounted at /trivy-db (the plan's trivy-db mount, read-only):
+# Trivy reads it as it is, with no update, no download and no write, so the
+# scan runs with no network and a read-only root. A mount with no database in
+# it fails the step with that reason rather than a download error, and a
+# database older than BOMLENS_TRIVY_DB_MAX_AGE_DAYS (7) days degrades it.
+TRIVY_DB_MOUNT="/trivy-db"
+_trivy_db_ready=true; _trivy_db_age=""
+if [ "${GENERATE_SECURITY:-false}" = "true" ] && [ -d "$TRIVY_DB_MOUNT" ]; then
+    if [ -f "$TRIVY_DB_MOUNT/db/trivy.db" ]; then
+        export TRIVY_CACHE_DIR="$TRIVY_DB_MOUNT" TRIVY_SKIP_DB_UPDATE=true TRIVY_SKIP_JAVA_DB_UPDATE=true TRIVY_OFFLINE_SCAN=true
+        _trivy_db_age="$(jq -r '(.UpdatedAt // empty) | sub("\\.[0-9]+"; "") | ((now - fromdateiso8601) / 86400 | floor)' "$TRIVY_DB_MOUNT/db/metadata.json" 2>/dev/null || true)"
+        echo "[security] Trivy database: $TRIVY_DB_MOUNT (read as it is, no update${_trivy_db_age:+; $_trivy_db_age day(s) old})"
+    else
+        _trivy_db_ready=false
+        echo "[WARN] security scan skipped: $TRIVY_DB_MOUNT is mounted but holds no Trivy database (db/trivy.db)." >&2
+        mark_pipeline_warning "$OUTPUT_FILE" scan-security
+        er_record scan-security failed failed "no Trivy database in the trivy-db mount ($TRIVY_DB_MOUNT/db/trivy.db)"
+    fi
+fi
+if [ "${GENERATE_SECURITY:-false}" = "true" ] && [ "$_trivy_db_ready" = true ]; then
     run_optional_step scan-security bash "$LIBDIR/scan-security.sh" "$OUTPUT_FILE" "$OUT_PREFIX" "$PROJECT_NAME"
+    _trivy_db_max="${BOMLENS_TRIVY_DB_MAX_AGE_DAYS:-7}"
+    case "$_trivy_db_max" in ''|*[!0-9]*) _trivy_db_max=7 ;; esac
+    if [[ "$_trivy_db_age" =~ ^[0-9]+$ ]] && [ "$_trivy_db_age" -gt "$_trivy_db_max" ] \
+       && jq -e 'has("Results") and (.ScanError | not)' "${OUT_PREFIX}_security.json" >/dev/null 2>&1; then
+        echo "[WARN] the Trivy database in $TRIVY_DB_MOUNT is $_trivy_db_age days old; vulnerabilities published since are not reported." >&2
+        er_record scan-security degraded unavailable "the Trivy database is $_trivy_db_age days old (over $_trivy_db_max)"
+    fi
     [ -f "${OUT_PREFIX}_security.json" ] && ARTIFACTS+=("${OUT_PREFIX}_security.json")
+    [ -f "${OUT_PREFIX}_security_trivy.json" ] && ARTIFACTS+=("${OUT_PREFIX}_security_trivy.json")
     [ -f "${OUT_PREFIX}_security.md" ] && ARTIFACTS+=("${OUT_PREFIX}_security.md")
     [ -f "${OUT_PREFIX}_security.html" ] && ARTIFACTS+=("${OUT_PREFIX}_security.html")
     sync_artifacts
@@ -1711,6 +2053,7 @@ fi
 if [ "${SIGN_SBOM:-false}" = "true" ]; then
     if command -v cosign >/dev/null 2>&1 && [ -n "${COSIGN_KEY:-}" ]; then
         echo "[INFO] Signing SBOM with cosign..."
+        _sign_started="$(er_now)"
         SIGN_FAILED=0
         # COSIGN_SIGN_FLAGS keeps the detached `.sig` next to the SBOM and keeps
         # the signature local. cosign 3 defaults to the Sigstore bundle format and
@@ -1763,6 +2106,7 @@ if [ "${SIGN_SBOM:-false}" = "true" ]; then
         # supply-chain tool. Do not exit 0 leaving the user to believe their
         # SBOM is signed when no .sig exists.
         if [ "$SIGN_FAILED" != "0" ]; then
+            er_record sign failed failed "" "$_sign_started"
             echo "[ERROR] --sign was requested but a signature could not be produced. The SBOM and other artifacts were still written."
             # The refreshed conformance report above only lives in the container;
             # the next sync_artifacts pass (near the end of this script) is what
@@ -1774,9 +2118,16 @@ if [ "${SIGN_SBOM:-false}" = "true" ]; then
             sync_artifacts
             exit 1
         fi
+        er_record sign ok "" "" "$_sign_started"
+    elif ! command -v cosign >/dev/null 2>&1; then
+        echo "[WARN] --sign requested but cosign/COSIGN_KEY unavailable; skipping."
+        er_record sign skipped not_installed "cosign is not in this image"
     else
         echo "[WARN] --sign requested but cosign/COSIGN_KEY unavailable; skipping."
+        er_record sign skipped no_input "COSIGN_KEY is not set"
     fi
+else
+    er_record sign disabled
 fi
 
 # AI compliance profile (AI SBOMs only): a governance one-pager that re-aggregates

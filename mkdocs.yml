@@ -118,6 +118,7 @@ plugins:
             Advanced: 고급
             CLI reference: CLI 레퍼런스
             Docker image: Docker 이미지
+            Engine contract: 엔진 계약
             Ecosystems: 지원 생태계
             About: 프로젝트 정보
             Architecture: 아키텍처
@@ -210,6 +211,7 @@ nav:
   - Advanced:
       - CLI reference: reference/cli.md
       - Docker image: reference/docker-image.md
+      - Engine contract: reference/engine-contract.md
       - Ecosystems: reference/ecosystems.md
   - About:
       - Architecture: concepts/architecture.md
