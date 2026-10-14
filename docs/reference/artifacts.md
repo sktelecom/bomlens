@@ -103,11 +103,14 @@ components[]
   ├── name         component name
   ├── version      version
   ├── purl         Package URL (unique identifier)
+  ├── supplier     who supplied the component (when the package metadata names one)
   └── licenses[]   license info (SPDX ID)
 compositions[]     dependency-graph completeness (see below)
 ```
 
 For the per-language PURL format, see [Supported ecosystems](ecosystems.md).
+
+A component's `supplier.name` comes from what its package metadata already says, and from nothing else: the `publisher` the generator read (a Maven POM's `<organization>`, an npm publisher, a distribution package's maintainer), the `authors` it read (PyPI, RubyGems, Composer), or the older `author` field, in that order. A trailing email address is dropped and several authors are joined with commas. The property `bomlens:supplierSource` names the field used (`publisher`, `authors` or `author`). A component with none of these has no supplier, and one that already has a supplier keeps it. A supplier's own SBOM under `--analyze` is left as it was written.
 
 ## Dependency-graph completeness
 

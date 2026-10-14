@@ -103,11 +103,14 @@ components[]
   ├── name         컴포넌트 이름
   ├── version      버전
   ├── purl         Package URL (고유 식별자)
+  ├── supplier     컴포넌트 공급자 (패키지 메타데이터에 있을 때)
   └── licenses[]   라이선스 정보 (SPDX ID)
 compositions[]     의존성 그래프 완전성 (아래 참고)
 ```
 
 언어별 PURL 형식은 [지원 생태계](ecosystems.ko.md)를 참고하세요.
+
+컴포넌트의 `supplier.name`은 패키지 메타데이터에 이미 적힌 값으로만 채웁니다. 생성 도구가 읽은 `publisher`(Maven POM의 `<organization>`, npm 게시자, 배포판 패키지의 관리자), `authors`(PyPI, RubyGems, Composer), 예전 형식의 `author` 필드 순서로 처음 있는 값을 씁니다. 끝에 붙은 이메일 주소는 빼고, 작성자가 여럿이면 쉼표로 잇습니다. 어느 필드에서 왔는지는 `bomlens:supplierSource` 속성(`publisher`, `authors`, `author`)에 남습니다. 세 필드가 모두 없는 컴포넌트에는 공급자를 넣지 않고, 이미 공급자가 있는 컴포넌트는 그대로 둡니다. `--analyze`로 받은 공급사 SBOM은 작성된 그대로 둡니다.
 
 ## 의존성 그래프 완전성
 
