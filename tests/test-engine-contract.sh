@@ -588,6 +588,20 @@ P="$(plan_run stale "$PSRC")"
     && pass "PLAN removes an earlier run's SBOM and conda sidecar, and replaces the plan" \
     || fail "left: $(ls "$P")"
 
+# The CycloneDX version (--spec-version): stage 1 gets it as build-prep.sh's
+# argument and stage 2 as CYCLONEDX_SPEC_VERSION, so its fallback and its own
+# input fingerprint use the version the plan was made for.
+P="$(plan_run spec17 "$PSRC" CYCLONEDX_SPEC_VERSION=1.7)"
+P16="$WORK/plan-node"
+[ "$(jq -r '"\(.stages[0].args[3]) \(.stages[1].env.CYCLONEDX_SPEC_VERSION)"' "$P/bomlens-plan.json")" = "1.7 1.7" ] \
+    && [ "$(jq -r '.stages[1].env.CYCLONEDX_SPEC_VERSION' "$P16/bomlens-plan.json")" = "1.6" ] \
+    && [ "$(jq -r '.input_fingerprint.components[] | select(.name == "CDX_SPEC_VERSION") | .sha256' "$P/bomlens-plan.json")" \
+         != "$(jq -r '.input_fingerprint.components[] | select(.name == "CDX_SPEC_VERSION") | .sha256' "$P16/bomlens-plan.json")" ] \
+    && pass "CYCLONEDX_SPEC_VERSION reaches both stages of the plan and its input fingerprint" \
+    || fail "spec in plan: $(jq -c '[.stages[0].args, .stages[1].env, .input_fingerprint]' "$P/bomlens-plan.json")"
+err="$(plan_schema_errors "$P/bomlens-plan.json")"
+[ -z "$err" ] && pass "the 1.7 plan validates against schemas/engine-plan-1.json" || fail "1.7 plan schema errors" "$err"
+
 # A registry mirror: the image is named from it, the digest is the published one.
 P0="$(plan_run mirror-default "$PSRC")"
 for pfx in registry.example/mirror/cdxgen/ registry.example/mirror/cdxgen; do
@@ -650,6 +664,11 @@ elif command -v syft >/dev/null 2>&1; then
     [ "$(jq -r '[.steps[] | select(.id=="generate")][0] | "\(.status) \(.reason) \(.stage)"' "$D/bomlens-result.json")" = "degraded fallback 1" ] \
         && pass "generate is recorded as degraded (fallback)" \
         || fail "generate is $(jq -c '[.steps[] | select(.id=="generate")]' "$D/bomlens-result.json")"
+    D="$(new_run fallback-spec17 empty)"
+    run_engine "$D" "$ROOT_DIR/docker/lib" SOURCE_ROOT="$FB" BOMLENS_STAGE1_EXIT=1 CYCLONEDX_SPEC_VERSION=1.7
+    [ "$(jq -r '"\(.specVersion) \([.components[] | select(.type=="library") | .name] | join(","))"' "$D/demo_1.0_bom.json" 2>/dev/null)" = "1.7 requests" ] \
+        && pass "the stage 2 fallback writes the CycloneDX version it is asked for (1.7)" \
+        || fail "fallback 1.7: $(jq -c '[.specVersion, [.components[]?.name]]' "$D/demo_1.0_bom.json" 2>&1)" "$(tail -5 "$D.log")"
     D="$(new_run fallback-oom empty)"
     run_engine "$D" "$ROOT_DIR/docker/lib" SOURCE_ROOT="$FB" BOMLENS_STAGE1_EXIT=137 BOMLENS_STAGE1_OOM=true
     [ "$(jq -r '[.metadata.properties[]? | select(.name=="bomlens:sbom-tool-degraded") | .value] | first' "$D/demo_1.0_bom.json" 2>/dev/null)" = "oom" ] \
