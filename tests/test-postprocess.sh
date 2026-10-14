@@ -8527,6 +8527,51 @@ EOF_TOML
     [ "$_pyk" = " requests,urllib3 requests,urllib3,pytest,pluggy requests,urllib3,pytest,pluggy" ] \
         && pass "Poetry main dependencies count as production; an unread or missing pyproject.toml drops no Python package" \
         || fail "Python production list or its fallback unexpected" "got [$_pyk]"
+    # Production dependencies declared outside pyproject.toml (requirements
+    # files, setup.py, setup.cfg, Pipfile) turn the Python markers off: here
+    # [project] dependencies is empty, the dev group lists requests, and
+    # requirements.txt names requests and idna for production. The same file
+    # only under a non-shipped folder or vendor/ does not count.
+    cat > "$WORK/devf-pyreq.json" <<'EOF_DEV'
+{"bomFormat":"CycloneDX","metadata":{"component":{"bom-ref":"pkg:pypi/root@1.0.0"}},
+ "components":[
+  {"bom-ref":"pkg:pypi/requests@2.32.3","purl":"pkg:pypi/requests@2.32.3","scope":"optional",
+   "properties":[{"name":"cdx:pyproject:group","value":"dev"}]},
+  {"bom-ref":"pkg:pypi/idna@3.10","purl":"pkg:pypi/idna@3.10"}],
+ "dependencies":[
+  {"ref":"pkg:pypi/root@1.0.0","dependsOn":["pkg:pypi/requests@2.32.3"]},
+  {"ref":"pkg:pypi/requests@2.32.3","dependsOn":["pkg:pypi/idna@3.10"]},
+  {"ref":"pkg:pypi/idna@3.10","dependsOn":[]}]}
+EOF_DEV
+    _pyr=""
+    for _d in req setuppy setupcfg pipfile nested tests vendor; do
+        mkdir -p "$WORK/devf-pyreq-$_d"
+        printf '[project]\nname = "root"\nversion = "1.0.0"\ndependencies = []\n\n[dependency-groups]\ndev = ["requests>=2"]\n' \
+            > "$WORK/devf-pyreq-$_d/pyproject.toml"
+        printf 'version = 1\n' > "$WORK/devf-pyreq-$_d/uv.lock"
+        case "$_d" in
+            req) printf 'requests\nidna\n' > "$WORK/devf-pyreq-$_d/requirements.txt" ;;
+            setuppy) printf 'from setuptools import setup\nsetup(install_requires=["requests"])\n' > "$WORK/devf-pyreq-$_d/setup.py" ;;
+            setupcfg) printf '[options]\ninstall_requires = requests\n' > "$WORK/devf-pyreq-$_d/setup.cfg" ;;
+            pipfile) printf '[packages]\nrequests = "*"\n' > "$WORK/devf-pyreq-$_d/Pipfile" ;;
+            nested) mkdir -p "$WORK/devf-pyreq-$_d/svc/api"
+                    printf 'requests\n' > "$WORK/devf-pyreq-$_d/svc/api/requirements-prod.txt" ;;
+            tests) mkdir -p "$WORK/devf-pyreq-$_d/tests/e2e"
+                   printf 'requests\n' > "$WORK/devf-pyreq-$_d/tests/e2e/requirements.txt" ;;
+            vendor) mkdir -p "$WORK/devf-pyreq-$_d/vendor/lib"
+                    printf 'requests\n' > "$WORK/devf-pyreq-$_d/vendor/lib/requirements.txt" ;;
+        esac
+        cp "$WORK/devf-pyreq.json" "$WORK/devf-pyreq-$_d.json"
+        (cd "$WORK/devf-pyreq-$_d" && node "$WORK/devf.js" "$WORK/devf-pyreq-$_d.json" 0 "" "tests examples" 2>"$WORK/devf-pyreq-$_d.log")
+        _pyr="$_pyr $(jq -r '[.components[].purl | sub("^pkg:pypi/"; "") | sub("@.*"; "")] | join(",")' "$WORK/devf-pyreq-$_d.json")"
+    done
+    if [ "$_pyr" = " requests,idna requests,idna requests,idna requests,idna requests,idna  " ] \
+       && grep -q 'requirements.txt' "$WORK/devf-pyreq-req.log"; then
+        pass "a requirements file, setup.py, setup.cfg or Pipfile outside the non-shipped folders turns the Python markers off, with the reason logged"
+    else
+        fail "dev filter dropped a Python package production may declare outside pyproject.toml" \
+            "got [$_pyr] log=[$(cat "$WORK/devf-pyreq-req.log" 2>/dev/null)]"
+    fi
     # A crate that is both a dependency and a dev-dependency (cdxgen without a
     # Cargo.lock writes both scopes) stays; a dev-only crate goes.
     cat > "$WORK/devf-cargo.json" <<'EOF_DEV'
@@ -8543,9 +8588,10 @@ EOF_DEV
     [ "$(jq -c '[.components[].purl]' "$WORK/devf-cargo.json")" = '["pkg:cargo/itoa@1.0.11"]' ] \
         && pass "a crate in both [dependencies] and [dev-dependencies] stays, a dev-only crate goes" \
         || fail "dev filter (cargo normal+dev) output unexpected" "$(jq -c '[.components[].purl]' "$WORK/devf-cargo.json" 2>&1)"
-    # A workspace member's own dependency stays even when the root lists the
-    # same package in a dev group or as a dev-dependency (those markers are
-    # not per member).
+    # A uv workspace member's own dependency stays even when the root lists the
+    # same package in a dev group, and a Cargo workspace member crate (cdxgen
+    # lists it as a library under a pkg:cargo/<name>@workspace root) keeps its
+    # dev-dependencies: the edges from a member are followed.
     cat > "$WORK/devf-member.json" <<'EOF_DEV'
 {"bomFormat":"CycloneDX","metadata":{"component":{"bom-ref":"pkg:pypi/root@1.0.0"}},
  "components":[
@@ -8553,22 +8599,33 @@ EOF_DEV
    "properties":[{"name":"internal:is_workspace","value":"true"}]},
   {"bom-ref":"pkg:pypi/pytest@8.3.3","purl":"pkg:pypi/pytest@8.3.3",
    "properties":[{"name":"cdx:pyproject:group","value":"dev"}]},
-  {"bom-ref":"pkg:pypi/pluggy@1.5.0","purl":"pkg:pypi/pluggy@1.5.0"},
-  {"bom-ref":"pkg:cargo/member-crate@0.1.0","purl":"pkg:cargo/member-crate@0.1.0","type":"application"},
-  {"bom-ref":"pkg:cargo/criterion@0.5.1","purl":"pkg:cargo/criterion@0.5.1",
-   "properties":[{"name":"cdx:cargo:scope","value":"dev"}]}],
+  {"bom-ref":"pkg:pypi/pluggy@1.5.0","purl":"pkg:pypi/pluggy@1.5.0"}],
  "dependencies":[
-  {"ref":"pkg:pypi/root@1.0.0","dependsOn":["pkg:pypi/member@1.0.0","pkg:pypi/pytest@8.3.3","pkg:cargo/member-crate@0.1.0"]},
+  {"ref":"pkg:pypi/root@1.0.0","dependsOn":["pkg:pypi/member@1.0.0","pkg:pypi/pytest@8.3.3"]},
   {"ref":"pkg:pypi/member@1.0.0","dependsOn":["pkg:pypi/pytest@8.3.3"]},
-  {"ref":"pkg:pypi/pytest@8.3.3","dependsOn":["pkg:pypi/pluggy@1.5.0"]},
-  {"ref":"pkg:cargo/member-crate@0.1.0","dependsOn":["pkg:cargo/criterion@0.5.1"]}]}
+  {"ref":"pkg:pypi/pytest@8.3.3","dependsOn":["pkg:pypi/pluggy@1.5.0"]}]}
+EOF_DEV
+    cat > "$WORK/devf-member-cargo.json" <<'EOF_DEV'
+{"bomFormat":"CycloneDX","metadata":{"component":{"bom-ref":"pkg:cargo/app@workspace","purl":"pkg:cargo/app@workspace","type":"application"}},
+ "components":[
+  {"bom-ref":"pkg:cargo/member-crate@0.1.0","purl":"pkg:cargo/member-crate@0.1.0","type":"library"},
+  {"bom-ref":"pkg:cargo/criterion@0.5.1","purl":"pkg:cargo/criterion@0.5.1","type":"library",
+   "properties":[{"name":"cdx:cargo:scope","value":"dev"}]},
+  {"bom-ref":"pkg:cargo/plotters@0.3.7","purl":"pkg:cargo/plotters@0.3.7","type":"library"}],
+ "dependencies":[
+  {"ref":"pkg:cargo/app@workspace","dependsOn":["pkg:cargo/member-crate@0.1.0"]},
+  {"ref":"pkg:cargo/member-crate@0.1.0","dependsOn":["pkg:cargo/criterion@0.5.1"]},
+  {"ref":"pkg:cargo/criterion@0.5.1","dependsOn":["pkg:cargo/plotters@0.3.7"]}]}
 EOF_DEV
     mkdir -p "$WORK/devf-member"
     printf '[project]\nname = "root"\n[dependency-groups]\ndev = ["pytest"]\n' > "$WORK/devf-member/pyproject.toml"
     (cd "$WORK/devf-member" && node "$WORK/devf.js" "$WORK/devf-member.json" 1 2>/dev/null)
-    [ "$(jq '.components | length' "$WORK/devf-member.json")" = "5" ] \
-        && pass "a workspace member's dependency stays though the root marks it development-only" \
-        || fail "dev filter dropped a workspace member's dependency" "$(jq -c '[.components[].purl]' "$WORK/devf-member.json" 2>&1)"
+    node "$WORK/devf.js" "$WORK/devf-member-cargo.json" 1 2>/dev/null
+    [ "$(jq '.components | length' "$WORK/devf-member.json")" = "3" ] \
+        && [ "$(jq '.components | length' "$WORK/devf-member-cargo.json")" = "3" ] \
+        && pass "a uv member's dependency and a Cargo member crate's dev-dependency stay though they carry a development marker" \
+        || fail "dev filter dropped a workspace member's dependency" \
+            "uv=$(jq -c '[.components[].purl]' "$WORK/devf-member.json" 2>&1) cargo=$(jq -c '[.components[].purl]' "$WORK/devf-member-cargo.json" 2>&1)"
     # A production subtree the root does not reach (the graph is not one tree)
     # keeps what it shares with a dropped dev-only crate.
     cat > "$WORK/devf-island.json" <<'EOF_DEV'
@@ -8615,6 +8672,18 @@ EOF_DEV
         fail "dev filter block: opt-out or excluded-components record unexpected" \
             "on=$(jq -c '[.components[].purl], .metadata.properties' "$WORK/devf-block/on.json" 2>&1) off=$(jq -c '.components | length' "$WORK/devf-block/off.json" 2>&1)"
     fi
+    # An earlier record that was already cut short keeps its (+N more) count:
+    # one cut at 50 entries, and one cut shorter than that.
+    _dv50=$(seq 1 50 | sed 's|^|pkg:cargo/c|; s|$|@1.0.0|' | paste -sd, - | sed 's/,/, /g')
+    jq --arg v "$_dv50 (+3 more)" '.metadata.properties[0].value = $v' "$WORK/devf-block/in.json" > "$WORK/devf-block/more50.json"
+    jq '.metadata.properties[0].value = "pkg:cargo/fixture@0.1.0 (+3 more)"' "$WORK/devf-block/in.json" > "$WORK/devf-block/more.json"
+    node "$WORK/devf.js" "$WORK/devf-block/more50.json" 1 2>/dev/null
+    node "$WORK/devf.js" "$WORK/devf-block/more.json" 1 2>/dev/null
+    _dvm50=$(jq -r '[.metadata.properties[] | select(.name=="bomlens:excluded-components") | .value][0]' "$WORK/devf-block/more50.json" 2>/dev/null)
+    _dvm=$(jq -r '[.metadata.properties[] | select(.name=="bomlens:excluded-components") | .value][0]' "$WORK/devf-block/more.json" 2>/dev/null)
+    [ "$_dvm50" = "$_dv50 (+4 more)" ] && [ "$_dvm" = "pkg:cargo/fixture@0.1.0, pkg:cargo/ryu@1.0.18 (+3 more)" ] \
+        && pass "the development-marker filter keeps the (+N more) count of an earlier record" \
+        || fail "the development-marker filter lost the hidden count of an earlier record" "got [$_dvm] [${_dvm50##*@1.0.0}]"
 else
     echo "  SKIP: node not installed; development-marker filter not exercised"
 fi
@@ -8671,9 +8740,13 @@ EOF_GEM
     _gs1=$(node "$WORK/gemdev.js" "$WORK/gemsub/Gemfile" "$WORK/gemsub/Gemfile.lock" 2>/dev/null)
     _gs2=$(node "$WORK/gemdev.js" "$WORK/gemspec/Gemfile" "$WORK/gemspec/Gemfile.lock" 2>/dev/null)
     rm "$WORK/gemsub/engine/Gemfile.lock"
+    # Installed gems under vendor/bundle and node_modules are not manifests.
+    mkdir -p "$WORK/gemsub/vendor/bundle/ruby/3.3.0/gems/rspec-3.13.0" "$WORK/gemsub/node_modules/x"
+    printf 'Gem::Specification.new\n' > "$WORK/gemsub/vendor/bundle/ruby/3.3.0/gems/rspec-3.13.0/rspec.gemspec"
+    printf 'gem "rspec"\n' > "$WORK/gemsub/node_modules/x/Gemfile"
     _gs3=$(node "$WORK/gemdev.js" "$WORK/gemsub/Gemfile" "$WORK/gemsub/Gemfile.lock" 2>/dev/null)
     [ -z "$_gs1" ] && [ -z "$_gs2" ] && [ "$_gs3" = "rspec" ] \
-        && pass "Gemfile reader reports nothing when another Gemfile.lock or a gemspec is in the tree" \
+        && pass "Gemfile reader reports nothing when another Gemfile.lock or a gemspec is in the tree; vendor/bundle and node_modules do not count" \
         || fail "Gemfile reader ignored another Bundler manifest" "lock=[$_gs1] gemspec=[$_gs2] alone=[$_gs3]"
     # The filter with that list: rspec and what only it reaches go, a gem a
     # production gem also uses stays.
@@ -8812,7 +8885,16 @@ POM
   ]
 }
 JSON
+    jq '.metadata.properties = [{"name":"bomlens:excluded-components","value":"pkg:pypi/earlier@1.0 (+3 more)"}]' \
+        "$WORK/mndf-bom.json" > "$WORK/mndf-prior.json"
     ( cd "$MR" && node "$WORK/mndf.js" "$WORK/mndf-bom.json" ) >/dev/null 2>&1
+    ( cd "$MR" && node "$WORK/mndf.js" "$WORK/mndf-prior.json" ) >/dev/null 2>&1
+    _mp=$(jq -r '[.metadata.properties[] | select(.name=="bomlens:excluded-components") | .value][0]' "$WORK/mndf-prior.json" 2>/dev/null)
+    case "$_mp" in
+        "pkg:pypi/earlier@1.0, "*orphan-lib*" (+3 more)")
+            pass "an earlier filter's (+N more) count is kept when the Maven filter adds its own entries" ;;
+        *) fail "Maven filter lost the hidden count an earlier filter recorded" "got [$_mp]" ;;
+    esac
     if jq -e '
         ([.components[].purl]) as $kept
         | ($kept | index("pkg:maven/org.example/orphan-lib@1.0.0") | not)
