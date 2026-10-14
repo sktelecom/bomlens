@@ -599,6 +599,9 @@ export interface ScanConfig {
   /** The SBOM author declared for this scan (CycloneDX metadata.authors).
    *  Empty or absent means none was declared. */
   sbomAuthor?: string;
+  /** The CycloneDX version this scan was asked to write ("1.6" or "1.7").
+   *  Absent on scans that predate the option, which wrote 1.6. */
+  specVersion?: string;
   /** Match components against NVD-only (CPE) advisories too, catching
    *  vulnerabilities other matching paths miss. Offered for any scan that
    *  produces or reads a package SBOM (not firmware or an AI model — see
@@ -732,6 +735,13 @@ export const CONFORMANCE_PROFILES: ConformanceProfile[] = [
   "skt-submission",
 ];
 
+/** CycloneDX version the scan writes the SBOM as (the CLI's --spec-version).
+ *  "1.6" is the default. AI model and dataset SBOMs are 1.7 whatever is
+ *  chosen. server.py refuses any other value with a 400. */
+export type CdxSpecVersion = "1.6" | "1.7";
+
+export const CDX_SPEC_VERSIONS: CdxSpecVersion[] = ["1.6", "1.7"];
+
 export interface ScanParams {
   project: string;
   version: string;
@@ -758,6 +768,11 @@ export interface ScanParams {
    *  for ANALYZE (see showSbomAuthor): that mode converts a document someone
    *  else authored. */
   sbomAuthor?: string;
+  /** CycloneDX version of the SBOM. Read server-side as the exact
+   *  `spec_version` parameter; empty means the default, 1.6, and any value
+   *  other than "1.6"/"1.7" is refused with a 400. Hidden for ANALYZE (see
+   *  showSpecVersion), like sbomAuthor. */
+  specVersion?: CdxSpecVersion;
   /** Which language the pipeline's own generated prose (notice, conformance,
    *  security, AI-profile reports; the model/dataset risk assessment's reason
    *  sentences) renders in. Read server-side as the exact `lang` parameter;
@@ -1556,6 +1571,7 @@ export function startScan(params: ScanParams, handlers: ScanHandlers): EventSour
     conformance_profile: params.conformanceProfile ?? "",
     license: params.license ?? "",
     sbom_author: params.sbomAuthor ?? "",
+    spec_version: params.specVersion ?? "",
     lang: params.lang ?? "",
     usage: params.usage ?? "",
     deep_cve: String(params.deepCve),

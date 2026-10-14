@@ -3454,6 +3454,10 @@ _SIBLING_MODES = ("FIRMWARE", "AIBOM", "ANALYZE", "SOURCE", "IMAGE", "ROOTFS", "
 # environment or a docker-run argv.
 _USAGE_CONTEXTS = ("internal", "product", "redistribute", "outputs-only")
 _CONFORMANCE_PROFILES = ("default", "skt-submission")
+# CycloneDX versions a scan may be asked to write (the CLI's --spec-version,
+# docker/lib/cdx-version.sh). The same closed-allowlist rule as _USAGE_CONTEXTS:
+# only one of these literals reaches the scan environment or a docker-run argv.
+_CDX_SPEC_VERSIONS = ("1.6", "1.7")
 _REPORT_LANGS = ("en", "ko")
 _PCT_ENV_NAMES = ("PURL_MIN_PCT", "LICENSE_MIN_PCT", "HASH_MIN_PCT", "FIELD_MIN_PCT")
 
@@ -3770,6 +3774,11 @@ def run_sibling_scan(image, mode, out_dir, on_log, *, upload_file=None, model_id
     # with.
     if env.get("CONFORMANCE_PROFILE") in _CONFORMANCE_PROFILES:
         args += ["-e", "CONFORMANCE_PROFILE=%s" % env["CONFORMANCE_PROFILE"]]
+    # The CycloneDX version the request asked for, re-derived from the closed
+    # allowlist the same way. Anything else forwards nothing and the sibling's
+    # cdx-version.sh writes its own default, 1.6.
+    if env.get("CYCLONEDX_SPEC_VERSION") in _CDX_SPEC_VERSIONS:
+        args += ["-e", "CYCLONEDX_SPEC_VERSION=%s" % env["CYCLONEDX_SPEC_VERSION"]]
     # Same closed-allowlist re-derive as CONFORMANCE_PROFILE above, not the raw
     # env string: this decides which language the sibling's own generated
     # reports (notice, conformance, security, AI profile) render in.
@@ -5852,6 +5861,19 @@ class Handler(BaseHTTPRequestHandler):
         # own docmeta dispatch is what actually excludes ANALYZE.
         sbom_author = g("sbom_author").strip()[:128]
 
+        # CycloneDX version of the SBOM (--spec-version on the CLI): 1.6 (the
+        # default, also when the field is not sent) or 1.7. Anything else is
+        # refused before the stream starts, and the allowlist literal, not the
+        # request string, is what reaches the scan environment. The frontend
+        # hides the choice for ANALYZE, which converts a document someone else
+        # wrote; the value is harmless there.
+        spec_version = g("spec_version").strip() or "1.6"
+        if spec_version not in _CDX_SPEC_VERSIONS:
+            self._send(400, json.dumps(
+                {"error": "invalid spec_version (expected 1.6|1.7)"}))
+            return
+        spec_version = _CDX_SPEC_VERSIONS[_CDX_SPEC_VERSIONS.index(spec_version)]
+
         # Optional AI usage scenario (--usage on the CLI) scoping the model risk
         # assessment. Closed allowlist: an out-of-list value is refused before
         # the stream starts, and the literal REBOUND from _USAGE_CONTEXTS (never
@@ -5970,6 +5992,7 @@ class Handler(BaseHTTPRequestHandler):
                 "byteStable": g("byte_stable") == "true",
                 "deepCve": g("deep_cve") == "true",
                 "sbomAuthor": sbom_author,
+                "specVersion": spec_version,
             }
             write_scanmeta(run_out, scan_config)
 
@@ -6053,6 +6076,10 @@ class Handler(BaseHTTPRequestHandler):
             "PROJECT_VERSION": version,
             "PROJECT_LICENSE": outbound_license,
             "SBOM_AUTHOR": sbom_author,
+            # Allowlisted above. Always set, so an operator's own
+            # CYCLONEDX_SPEC_VERSION in this container does not override the
+            # version the form shows.
+            "CYCLONEDX_SPEC_VERSION": spec_version,
             "REPORT_LANG": report_lang,
             "UPLOAD_ENABLED": "false",
             "HOST_OUTPUT_DIR": run_out,

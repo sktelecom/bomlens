@@ -531,6 +531,15 @@ describe("startScan", () => {
     expect(qs.get("deep_cve")).toBe("false");
   });
 
+  it("sends the CycloneDX version as spec_version, empty when not chosen", () => {
+    startScan({ ...PARAMS, specVersion: "1.7" }, handlers());
+    let qs = new URLSearchParams(FakeEventSource.last!.url.split("?")[1]);
+    expect(qs.get("spec_version")).toBe("1.7");
+    startScan(PARAMS, handlers());
+    qs = new URLSearchParams(FakeEventSource.last!.url.split("?")[1]);
+    expect(qs.get("spec_version")).toBe("");
+  });
+
   it("parses log lines (JSON and raw fallback)", () => {
     const h = handlers();
     startScan(PARAMS, h);

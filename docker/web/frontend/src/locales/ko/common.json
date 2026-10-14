@@ -105,7 +105,11 @@
     "outboundLicense": "배포 라이선스 (선택)",
     "outboundLicenseHint": "프로젝트를 배포하는 SPDX 식별자입니다(예: Apache-2.0). 지정하면 조건이 충돌하는 의존성을 표시합니다. 소스 스캔으로는 알아낼 수 없어 지정하지 않으면 검사하지 않습니다.",
     "sbomAuthor": "SBOM 작성자 (선택)",
-    "sbomAuthorHint": "이 스캔을 실행하는 조직이나 개인입니다. 도구도 아니고 소프트웨어를 만든 쪽도 아닙니다. 약칭 없이 정식 명칭을 씁니다. 비워 두면 SBOM에서 빠집니다."
+    "sbomAuthorHint": "이 스캔을 실행하는 조직이나 개인입니다. 도구도 아니고 소프트웨어를 만든 쪽도 아닙니다. 약칭 없이 정식 명칭을 씁니다. 비워 두면 SBOM에서 빠집니다.",
+    "specVersion": "CycloneDX 버전",
+    "specVersionDefault": "CycloneDX 1.6 (기본값)",
+    "specVersion17": "CycloneDX 1.7",
+    "specVersionHint": "SBOM을 기록할 CycloneDX 버전입니다. 받는 쪽 시스템이 1.7을 요구할 때 1.7을 고릅니다. AI 모델과 데이터셋 SBOM은 항상 1.7입니다."
   },
   "upload": {
     "target": "대상",

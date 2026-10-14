@@ -509,6 +509,26 @@ rc = server.run_sibling_scan(
 assert rc == 0, rc
 assert not any(a.startswith("CONFORMANCE_PROFILE") for a in captured["args"]), captured["args"]
 
+# CYCLONEDX_SPEC_VERSION (the form's CycloneDX version) reaches a sibling the
+# same way: only as 1.6 or 1.7, and nothing at all for any other value.
+for _sv in ("1.6", "1.7"):
+    captured.clear()
+    rc = server.run_sibling_scan(
+        "ghcr.io/sktelecom/bomlens-deep-cve:1.5.0", "ANALYZE", run_out,
+        lambda ln: None, upload_file=up_file,
+        extra_env={"CYCLONEDX_SPEC_VERSION": _sv},
+    )
+    assert rc == 0, rc
+    assert "CYCLONEDX_SPEC_VERSION=%s" % _sv in captured["args"], captured["args"]
+captured.clear()
+rc = server.run_sibling_scan(
+    "ghcr.io/sktelecom/bomlens-deep-cve:1.5.0", "ANALYZE", run_out,
+    lambda ln: None, upload_file=up_file,
+    extra_env={"CYCLONEDX_SPEC_VERSION": "1.7; rm -rf /"},
+)
+assert rc == 0, rc
+assert not any(a.startswith("CYCLONEDX_SPEC_VERSION") for a in captured["args"]), captured["args"]
+
 # PURL/LICENSE/HASH/FIELD_MIN_PCT: an operator's environment variable on this
 # server's own container (docs/reference/docker-image.md), not a request field
 # -- so _pct_env reads os.environ directly, and the test sets it there too
@@ -3551,6 +3571,7 @@ echo "[stub] scanning ${PROJECT_NAME} ${PROJECT_VERSION} (mode=$mode)"
   echo "CONFORMANCE_PROFILE=${CONFORMANCE_PROFILE:-}"
   echo "PROJECT_LICENSE=${PROJECT_LICENSE:-}"
   echo "SBOM_AUTHOR=${SBOM_AUTHOR:-}"
+  echo "CYCLONEDX_SPEC_VERSION=${CYCLONEDX_SPEC_VERSION:-}"
   echo "REPORT_LANG=${REPORT_LANG:-}"
   echo "MODE=${MODE:-}"
   echo "TARGET_FILE=${TARGET_FILE:-}"
@@ -4634,6 +4655,38 @@ if [ "$(sed -n 's/^SBOM_AUTHOR=//p' "$WORK/stub-env")" = "(주)에스케이 & �
 else
     fail "(주)에스케이 & 파트너스 was mangled" "$(cat "$WORK/stub-env")"
 fi
+
+echo "== spec_version: the CycloneDX version reaches the scan env as 1.6 or 1.7, anything else is a 400 =="
+rm -f "$WORK/stub-env"
+sse_events "project=sv1&version=1.0&source=current-dir&spec_version=1.7" >/dev/null
+if grep -q '^CYCLONEDX_SPEC_VERSION=1.7$' "$WORK/stub-env" 2>/dev/null; then
+    pass "spec_version=1.7 -> CYCLONEDX_SPEC_VERSION=1.7 in the run-scan env"
+else
+    fail "spec_version=1.7 did not reach the scan env" "$(cat "$WORK/stub-env" 2>&1)"
+fi
+if [ "$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1])).get("specVersion"))' "$OUT2/sv1_1.0/.scanmeta.json" 2>/dev/null)" = "1.7" ]; then
+    pass "the scan config records specVersion 1.7 for a re-scan"
+else
+    fail "scan config specVersion" "$(cat "$OUT2/sv1_1.0/.scanmeta.json" 2>&1)"
+fi
+rm -f "$WORK/stub-env"
+sse_events "project=sv2&version=1.0&source=current-dir" >/dev/null
+if grep -q '^CYCLONEDX_SPEC_VERSION=1.6$' "$WORK/stub-env" 2>/dev/null; then
+    pass "no spec_version param -> CYCLONEDX_SPEC_VERSION=1.6 (the default)"
+else
+    fail "default spec version not set" "$(cat "$WORK/stub-env" 2>&1)"
+fi
+rm -f "$WORK/stub-env"
+for bad in 1.5 2.0 "1.7%3B%20rm%20-rf%20%2F"; do
+    code=$(curl -s -o "$WORK/sv-400" -w '%{http_code}' \
+        "$BASE2/scan-stream?project=sv3&version=1.0&source=current-dir&spec_version=$bad")
+    if [ "$code" = "400" ] && python3 -c "import json,sys; json.load(open(sys.argv[1]))" "$WORK/sv-400" 2>/dev/null \
+       && [ ! -f "$WORK/stub-env" ]; then
+        pass "spec_version=$bad is rejected pre-stream (400 JSON)"
+    else
+        fail "spec_version=$bad returned $code (expected 400 JSON, no scan)"
+    fi
+done
 
 echo "== lang: the request's language decides REPORT_LANG, not this server's own locale =="
 rm -f "$WORK/stub-env"

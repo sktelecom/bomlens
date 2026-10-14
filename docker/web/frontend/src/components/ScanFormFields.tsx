@@ -13,8 +13,10 @@ import { FileDropzone } from "@/components/FileDropzone";
 import { SiblingImagePanel } from "@/components/SiblingImagePanel";
 import { Switch } from "@/components/ui/switch";
 import {
+  CDX_SPEC_VERSIONS,
   CONFORMANCE_PROFILES,
   USAGE_CONTEXTS,
+  type CdxSpecVersion,
   type ConformanceProfile,
   type UploadKind,
   type UsageContext,
@@ -395,6 +397,8 @@ export function ScanOptions({ state }: { state: ScanFormState }) {
     setOutboundLicense,
     sbomAuthor,
     setSbomAuthor,
+    specVersion,
+    setSpecVersion,
     scanossToken,
     setScanossToken,
     showVendored,
@@ -403,6 +407,7 @@ export function ScanOptions({ state }: { state: ScanFormState }) {
     showByteStable,
     showOutboundLicense,
     showSbomAuthor,
+    showSpecVersion,
     showConformanceProfile,
     capabilities,
     busy,
@@ -537,6 +542,27 @@ export function ScanOptions({ state }: { state: ScanFormState }) {
           />
           <p id="sbom-author-hint" className="text-xs text-muted-foreground">
             {t("options.sbomAuthorHint")}
+          </p>
+        </div>
+      )}
+      {showSpecVersion && (
+        <div className="space-y-1.5">
+          <Label htmlFor="spec-version">{t("options.specVersion")}</Label>
+          <Select
+            id="spec-version"
+            value={specVersion}
+            onChange={(e) => setSpecVersion(e.target.value as CdxSpecVersion)}
+            disabled={busy}
+            aria-describedby="spec-version-hint"
+          >
+            {CDX_SPEC_VERSIONS.map((v) => (
+              <option key={v} value={v}>
+                {t(v === "1.6" ? "options.specVersionDefault" : "options.specVersion17")}
+              </option>
+            ))}
+          </Select>
+          <p id="spec-version-hint" className="text-xs text-muted-foreground">
+            {t("options.specVersionHint")}
           </p>
         </div>
       )}
