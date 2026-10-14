@@ -364,10 +364,65 @@ mark_prep_failed() {
 # the Gradle user home this scan uses: the cache-gradle mount or, when that
 # cannot be written, $GRADLE_USER_HOME. A file the home already has is left
 # as it is and the mounted one is not used (cache-gradle may be a user's own
-# ~/.gradle). Each copy is listed with its checksum in .bomlens-settings-copied
-# and removed at the end, on any exit (or at the start of the next run, after
-# a kill), and only when it still holds what was copied.
+# ~/.gradle), unless it is a copy another scan made of the same content: then
+# this scan shares it. Each scan lists the files it uses, with their checksums
+# and its start time, in its own .bomlens-settings-copied.<run id>. At the end,
+# on any exit, it removes its list and each listed file that still holds what
+# was copied and no other scan's list names. Several scans can share one
+# Gradle home at once, so these decisions are taken under a lock (a folder,
+# .bomlens-settings.lock, taken over when older than two minutes). A list
+# whose scan was killed cannot be told from one still running, so only a list
+# older than a day is cleaned up as if its scan had ended.
 GRADLE_SETTINGS_HOME=""
+GRADLE_SETTINGS_RUN_ID=""
+GRADLE_SETTINGS_STALE_SECS=86400
+GRADLE_SETTINGS_LOCK_SECS=120
+
+gradle_settings_lock() {
+    _gl_dir="$GRADLE_SETTINGS_HOME/.bomlens-settings.lock"
+    _gl_tries=0
+    while ! mkdir "$_gl_dir" 2>/dev/null; do
+        _gl_tries=$((_gl_tries + 1))
+        if [ -n "$(find "$_gl_dir" -maxdepth 0 -mmin +$((GRADLE_SETTINGS_LOCK_SECS / 60)) 2>/dev/null)" ] \
+            || [ "$_gl_tries" -ge "$GRADLE_SETTINGS_LOCK_SECS" ]; then
+            log "gradle: taking over a settings lock left in $GRADLE_SETTINGS_HOME"
+            rmdir "$_gl_dir" 2>/dev/null
+            mkdir "$_gl_dir" 2>/dev/null && return 0
+        fi
+        sleep 1
+    done
+}
+
+gradle_settings_unlock() {
+    rmdir "$GRADLE_SETTINGS_HOME/.bomlens-settings.lock" 2>/dev/null || true
+}
+
+# Whether a list other than $1 names the file $2.
+gradle_settings_shared() {
+    for _gh_m in "$GRADLE_SETTINGS_HOME"/.bomlens-settings-copied.*; do
+        [ -f "$_gh_m" ] && [ "$_gh_m" != "$1" ] || continue
+        awk -v p="$2" 'NR > 1 && $2 == p { f = 1 } END { exit !f }' "$_gh_m" && return 0
+    done
+    return 1
+}
+
+# Drop the list $1 and remove each file it names that still holds what was
+# copied and that no other list names. Called under the lock.
+gradle_settings_release() {
+    [ -f "$1" ] || return 0
+    awk 'NR > 1 { print $1 " " $2 }' "$1" | while IFS=' ' read -r _gr_sum _gr_f; do
+        case "$_gr_f" in ""|/*|*..*) continue ;; esac
+        [ -f "$GRADLE_SETTINGS_HOME/$_gr_f" ] || continue
+        gradle_settings_shared "$1" "$_gr_f" && continue
+        if [ "$(cksum < "$GRADLE_SETTINGS_HOME/$_gr_f" | tr ' ' '-')" = "$_gr_sum" ]; then
+            rm -f "$GRADLE_SETTINGS_HOME/$_gr_f"
+        else
+            log "gradle: $GRADLE_SETTINGS_HOME/$_gr_f changed since it was copied; left in place"
+        fi
+    done
+    rm -f "$1"
+}
+
 gradle_settings_copy() {
     [ -z "$GRADLE_SETTINGS_HOME" ] || return 0
     GRADLE_SETTINGS_HOME="${GRADLE_USER_HOME:-}"
@@ -375,45 +430,62 @@ gradle_settings_copy() {
         _gs_acct="$( (getent passwd "$(id -u)" 2>/dev/null || true) | cut -d: -f6)"
         GRADLE_SETTINGS_HOME="${_gs_acct:-/root}/.gradle"
     fi
-    # Copies a killed run left, whether or not settings are mounted this time.
-    gradle_settings_remove
-    [ -d "${SETTINGS_ROOT:-}/gradle" ] || return 0
+    # Nothing mounted and no list to look at: nothing to do.
+    if [ ! -d "${SETTINGS_ROOT:-}/gradle" ]; then
+        set -- "$GRADLE_SETTINGS_HOME"/.bomlens-settings-copied.*
+        [ -f "$1" ] || return 0
+    fi
     if ! mkdir -p "$GRADLE_SETTINGS_HOME" 2>/dev/null; then
         log "gradle: $GRADLE_SETTINGS_HOME cannot be written; the mounted Gradle settings are not used"
         return 0
     fi
-    for _gs_p in "$SETTINGS_ROOT/gradle/gradle.properties" "$SETTINGS_ROOT/gradle/init.gradle" \
-            "$SETTINGS_ROOT/gradle/init.gradle.kts" "$SETTINGS_ROOT/gradle/init.d/"*; do
-        [ -f "$_gs_p" ] || continue
-        _gs_f="${_gs_p#"$SETTINGS_ROOT/gradle/"}"
-        if [ -e "$GRADLE_SETTINGS_HOME/$_gs_f" ]; then
-            log "gradle: $GRADLE_SETTINGS_HOME/$_gs_f already exists; the mounted one is not used"
-        elif mkdir -p "$(dirname "$GRADLE_SETTINGS_HOME/$_gs_f")" 2>/dev/null \
-            && cp "$_gs_p" "$GRADLE_SETTINGS_HOME/$_gs_f" 2>/dev/null; then
-            printf '%s %s\n' "$(cksum < "$GRADLE_SETTINGS_HOME/$_gs_f" | tr ' ' '-')" "$_gs_f" \
-                >> "$GRADLE_SETTINGS_HOME/.bomlens-settings-copied"
-            log "gradle: using the mounted $_gs_f"
-        else
-            log "gradle: could not copy the mounted $_gs_f into $GRADLE_SETTINGS_HOME; it is not used"
-        fi
+    GRADLE_SETTINGS_RUN_ID="$(hostname 2>/dev/null || echo h).$$.$(date +%s).$(od -An -N4 -tu4 /dev/urandom 2>/dev/null | tr -d ' ')"
+    _gs_list="$GRADLE_SETTINGS_HOME/.bomlens-settings-copied.$GRADLE_SETTINGS_RUN_ID"
+    _gs_now=$(date +%s)
+    gradle_settings_lock
+    # Lists a day old: their scans are taken to have ended.
+    for _gs_m in "$GRADLE_SETTINGS_HOME"/.bomlens-settings-copied.*; do
+        [ -f "$_gs_m" ] || continue
+        _gs_t=$(awk 'NR == 1 && $1 == "time" { print $2 }' "$_gs_m")
+        case "$_gs_t" in ""|*[!0-9]*) _gs_t=0 ;; esac
+        [ $((_gs_now - _gs_t)) -gt "$GRADLE_SETTINGS_STALE_SECS" ] && gradle_settings_release "$_gs_m"
     done
+    if [ -d "${SETTINGS_ROOT:-}/gradle" ]; then
+        printf 'time %s\n' "$_gs_now" > "$_gs_list"
+        for _gs_p in "$SETTINGS_ROOT/gradle/gradle.properties" "$SETTINGS_ROOT/gradle/init.gradle" \
+                "$SETTINGS_ROOT/gradle/init.gradle.kts" "$SETTINGS_ROOT/gradle/init.d/"*; do
+            [ -f "$_gs_p" ] || continue
+            _gs_f="${_gs_p#"$SETTINGS_ROOT/gradle/"}"
+            _gs_sum=$(cksum < "$_gs_p" | tr ' ' '-')
+            if [ -e "$GRADLE_SETTINGS_HOME/$_gs_f" ]; then
+                if gradle_settings_shared "$_gs_list" "$_gs_f" \
+                    && [ "$(cksum < "$GRADLE_SETTINGS_HOME/$_gs_f" | tr ' ' '-')" = "$_gs_sum" ]; then
+                    printf '%s %s\n' "$_gs_sum" "$_gs_f" >> "$_gs_list"
+                    log "gradle: using the mounted $_gs_f (copied by a scan running alongside)"
+                else
+                    log "gradle: $GRADLE_SETTINGS_HOME/$_gs_f already exists; the mounted one is not used"
+                fi
+            elif mkdir -p "$(dirname "$GRADLE_SETTINGS_HOME/$_gs_f")" 2>/dev/null \
+                && cp "$_gs_p" "$GRADLE_SETTINGS_HOME/$_gs_f" 2>/dev/null; then
+                printf '%s %s\n' "$_gs_sum" "$_gs_f" >> "$_gs_list"
+                log "gradle: using the mounted $_gs_f"
+            else
+                log "gradle: could not copy the mounted $_gs_f into $GRADLE_SETTINGS_HOME; it is not used"
+            fi
+        done
+    fi
+    gradle_settings_unlock
 }
 
-# Remove the copies listed in GRADLE_SETTINGS_HOME/.bomlens-settings-copied
-# that still hold what was copied; a file changed since is kept. Safe to call
-# more than once.
+# This scan's part of the clean-up: its own list only. Safe to call more
+# than once.
 gradle_settings_remove() {
-    [ -n "${GRADLE_SETTINGS_HOME:-}" ] && [ -f "$GRADLE_SETTINGS_HOME/.bomlens-settings-copied" ] || return 0
-    while IFS=' ' read -r _gr_sum _gr_f; do
-        case "$_gr_f" in ""|/*|*..*) continue ;; esac
-        [ -f "$GRADLE_SETTINGS_HOME/$_gr_f" ] || continue
-        if [ "$(cksum < "$GRADLE_SETTINGS_HOME/$_gr_f" | tr ' ' '-')" = "$_gr_sum" ]; then
-            rm -f "$GRADLE_SETTINGS_HOME/$_gr_f"
-        else
-            log "gradle: $GRADLE_SETTINGS_HOME/$_gr_f changed since it was copied; left in place"
-        fi
-    done < "$GRADLE_SETTINGS_HOME/.bomlens-settings-copied"
-    rm -f "$GRADLE_SETTINGS_HOME/.bomlens-settings-copied"
+    [ -n "${GRADLE_SETTINGS_RUN_ID:-}" ] || return 0
+    _gs_list="$GRADLE_SETTINGS_HOME/.bomlens-settings-copied.$GRADLE_SETTINGS_RUN_ID"
+    [ -f "$_gs_list" ] || return 0
+    gradle_settings_lock
+    gradle_settings_release "$_gs_list"
+    gradle_settings_unlock
 }
 
 mark_prep_applied() {

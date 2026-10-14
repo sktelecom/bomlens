@@ -5419,7 +5419,7 @@ grep -q 'role: "cache-maven", target: "/tmp/sbomhome/.m2"' "$ROOT_DIR/docker/lib
 echo "== stage1-settings: mounted Maven and Gradle settings are used without writing into the caches =="
 PREP="$ROOT_DIR/docker/lib/build-prep.sh"
 _ss_block=$(sed -n '/^# User settings mounted read-only outside the caches/,/^# Maven component hashes/p' "$PREP" | sed '$d')
-_gs_fn=$(sed -n '/^GRADLE_SETTINGS_HOME=""$/,/^}$/p' "$PREP"; sed -n '/^gradle_settings_remove() {/,/^}$/p' "$PREP")
+_gs_fn=$(sed -n '/^GRADLE_SETTINGS_HOME=""$/,/^mark_prep_applied() {/p' "$PREP" | sed '$d')
 if [ -z "$_ss_block" ] || [ -z "$_gs_fn" ]; then
     fail "could not extract the settings blocks from build-prep.sh"
 else
@@ -5436,29 +5436,55 @@ else
         && pass "Maven gets the mounted settings on the jar fetch's command line, in MVN_ARGS for cdxgen and in MAVEN_ARGS" \
         || fail "Maven settings: [$_ss_out]"
     _ss_gh="$WORK/ss-gradle-home"; mkdir -p "$_ss_gh"; echo own > "$_ss_gh/init.gradle"
-    _ss_run() { SETTINGS_ROOT="$_ss_root" GRADLE_USER_HOME="$_ss_gh" \
-        bash -c 'log() { echo "[build-prep] $*"; }; '"$_gs_fn"'; '"$1"; }
-    _ss_run 'gradle_settings_copy' >/dev/null
+    # One scan's copy (prints its run id) and its clean-up (<run id>).
+    _ss_copy() { SETTINGS_ROOT="${1:-$_ss_root}" GRADLE_USER_HOME="$_ss_gh" \
+        bash -c 'log() { :; }; '"$_gs_fn"'; gradle_settings_copy; echo "$GRADLE_SETTINGS_RUN_ID"'; }
+    _ss_done() { GRADLE_SETTINGS_HOME="$_ss_gh" GRADLE_SETTINGS_RUN_ID="$1" \
+        bash -c 'log() { echo "[build-prep] $*"; }; '"$_gs_fn"'; GRADLE_SETTINGS_HOME="$0"; GRADLE_SETTINGS_RUN_ID="$1"; gradle_settings_remove; gradle_settings_remove' "$_ss_gh" "$1"; }
+    _ss_lists() { find "$_ss_gh" -maxdepth 1 -name '.bomlens-settings-copied.*' | wc -l | tr -d ' '; }
+    _ss_a=$(_ss_copy)
     { [ "$(cat "$_ss_gh/gradle.properties" 2>/dev/null)" = mounted ] && [ "$(cat "$_ss_gh/init.d/a.gradle" 2>/dev/null)" = mounted ] \
-        && [ "$(cat "$_ss_gh/init.gradle")" = own ]; } \
-        && pass "the mounted Gradle settings are copied into the Gradle home, a file it already has kept" \
-        || fail "Gradle settings copy: $(ls -R "$_ss_gh" | tr '\n' ' ')"
-    _ss_run 'GRADLE_SETTINGS_HOME="$GRADLE_USER_HOME"; gradle_settings_remove; gradle_settings_remove' >/dev/null
+        && [ "$(cat "$_ss_gh/init.gradle")" = own ] && [ "$(_ss_lists)" = 1 ]; } \
+        && pass "the mounted Gradle settings are copied into the Gradle home under this scan's own list, a file it already has kept" \
+        || fail "Gradle settings copy: $(ls -aR "$_ss_gh" | tr '\n' ' ')"
+    # A second scan starts while the first runs, and ends first.
+    _ss_b=$(_ss_copy)
+    { [ -n "$_ss_b" ] && [ "$_ss_b" != "$_ss_a" ] && [ "$(_ss_lists)" = 2 ] \
+        && grep -q ' gradle.properties$' "$_ss_gh/.bomlens-settings-copied.$_ss_b"; } \
+        && pass "a scan starting alongside shares the copies, under its own list" \
+        || fail "second scan: a=[$_ss_a] b=[$_ss_b] $(ls -a "$_ss_gh" | tr '\n' ' ')"
+    _ss_done "$_ss_b" >/dev/null
+    { [ "$(cat "$_ss_gh/gradle.properties" 2>/dev/null)" = mounted ] && [ -f "$_ss_gh/init.d/a.gradle" ] && [ "$(_ss_lists)" = 1 ]; } \
+        && pass "the scan that ends first leaves the copies the other still uses" \
+        || fail "the first scan to end removed copies still in use: $(ls -aR "$_ss_gh" | tr '\n' ' ')"
+    _ss_done "$_ss_a" >/dev/null
     { [ ! -e "$_ss_gh/gradle.properties" ] && [ ! -e "$_ss_gh/init.d/a.gradle" ] && [ "$(cat "$_ss_gh/init.gradle")" = own ] \
-        && [ ! -e "$_ss_gh/.bomlens-settings-copied" ]; } \
-        && pass "the copies are removed (twice is harmless) and the home's own file stays" \
+        && [ "$(_ss_lists)" = 0 ] && [ ! -d "$_ss_gh/.bomlens-settings.lock" ]; } \
+        && pass "when both have ended the copies are gone (removing twice is harmless), the home's own file stays" \
         || fail "Gradle settings removal: $(ls -aR "$_ss_gh" | tr '\n' ' ')"
-    _ss_run 'gradle_settings_copy' >/dev/null; echo "user edit" >> "$_ss_gh/gradle.properties"
-    _ss_run 'GRADLE_SETTINGS_HOME="$GRADLE_USER_HOME"; gradle_settings_remove' >/dev/null
+    _ss_a=$(_ss_copy); echo "user edit" >> "$_ss_gh/gradle.properties"
+    _ss_done "$_ss_a" >/dev/null
     { grep -q "user edit" "$_ss_gh/gradle.properties" 2>/dev/null && [ ! -e "$_ss_gh/init.d/a.gradle" ]; } \
         && pass "a copied file changed since is left in place, an unchanged one removed" \
         || fail "a changed copy was removed, or an unchanged one kept: $(ls -aR "$_ss_gh" | tr '\n' ' ')"
-    rm -f "$_ss_gh/gradle.properties"
-    _ss_run 'gradle_settings_copy' >/dev/null; mv "$_ss_root/gradle" "$_ss_root/gradle.off"
-    _ss_run 'gradle_settings_copy' >/dev/null; mv "$_ss_root/gradle.off" "$_ss_root/gradle"
-    [ ! -e "$_ss_gh/gradle.properties" ] && [ ! -e "$_ss_gh/.bomlens-settings-copied" ] \
-        && pass "copies a killed run left are removed when the next run starts, even with nothing mounted" \
-        || fail "a stale copy survived the next run"
+    _ss_a=$(_ss_copy)
+    { grep -q "user edit" "$_ss_gh/gradle.properties" && ! grep -q ' gradle.properties$' "$_ss_gh/.bomlens-settings-copied.$_ss_a"; } \
+        && pass "a file in the home that no list names is the user's: not shared, not replaced" \
+        || fail "the user's gradle.properties was taken over"
+    _ss_done "$_ss_a" >/dev/null; rm -f "$_ss_gh/gradle.properties"
+    # A killed scan's list: kept while it may still be running, cleaned up a
+    # day later, even with nothing mounted.
+    _ss_a=$(_ss_copy)
+    _ss_b=$(_ss_copy "$WORK/ss-none")
+    [ -f "$_ss_gh/gradle.properties" ] && [ "$(_ss_lists)" = 1 ] \
+        && pass "a recent list whose scan may still run is left alone" \
+        || fail "a recent list was cleaned up"
+    sed -i.bak '1s/.*/time 1/' "$_ss_gh/.bomlens-settings-copied.$_ss_a" && rm -f "$_ss_gh/.bomlens-settings-copied.$_ss_a.bak"
+    mkdir "$_ss_gh/.bomlens-settings.lock"; touch -t 202001010000 "$_ss_gh/.bomlens-settings.lock"
+    _ss_b=$(_ss_copy "$WORK/ss-none")
+    { [ ! -e "$_ss_gh/gradle.properties" ] && [ "$(_ss_lists)" = 0 ] && [ ! -d "$_ss_gh/.bomlens-settings.lock" ]; } \
+        && pass "a list over a day old is cleaned up by the next scan, past a lock left behind" \
+        || fail "stale list or lock: $(ls -aR "$_ss_gh" | tr '\n' ' ')"
     # The whole script: the settings are in place before build-prep's own
     # first Gradle run, and gone afterwards.
     _sg="$WORK/ss-full"; mkdir -p "$_sg/bin" "$_sg/src" "$_sg/out" "$_sg/gh"
