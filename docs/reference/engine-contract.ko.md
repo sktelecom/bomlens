@@ -71,7 +71,7 @@ BomLens 이미지를 스캔 엔진으로 쓰는 프로그램은 모든 스캔이
 | 단계 | 하는 일 |
 |---|---|
 | `plan` | 실행 계획 작성(`MODE=PLAN`, 아래 참조) |
-| `generate` | SBOM 생성(소스 스캔은 언어 이미지가 먼저 돌므로 1단계). 생성 중에 실패한 단계(펌웨어 스캔의 syft 실행, 소스 스캔의 해석 단계)가 SBOM의 `bomlens:pipeline-step-failed`에만 남았으면 `degraded`(`failed`)로 기록하고 그 단계 이름을 `detail`에 적음. amd64 이미지가 arm64 호스트에서 에뮬레이션으로 돌았으면 그 사실도 `detail`에 적음 |
+| `generate` | SBOM 생성(소스 스캔은 언어 이미지가 먼저 돌므로 1단계). 생성 중에 실패한 단계(펌웨어 스캔의 syft 실행, 소스 스캔의 해석 단계)가 SBOM의 `bomlens:pipeline-step-failed`에만 남았으면 `degraded`(`failed`)로 기록하고 그 단계 이름을 `detail`에 적음. 그 단계에 펌웨어 syft 실행이 있고 amd64 이미지가 ARM 호스트에서 에뮬레이션으로 돌았으면 그 사실도 `detail`에 적고, arm64 호스트이면 대신 쓸 `linux/arm64` 이미지를 안내함. 후처리 단계(이 표에 따로 있는 단계)의 이름은 이전 실행이 남긴 SBOM에 있더라도 여기에 세지 않음 |
 | `os-licenses` | 이미지·루트 파일시스템 스캔에서 Debian 패키지의 라이선스를 Trivy로 채움. syft가 해시로 남기는 copyright 파일에서 Trivy가 라이선스 이름, common-licenses 참조, 라이선스 본문을 읽음. `counts`에 `replaced`, `hashes_dropped`를 기록하고, Trivy가 대상을 읽지 못하거나 어떤 Debian 패키지에도 라이선스를 주지 못하면 `degraded`(`unavailable`), Trivy가 없으면 `skipped`(`not_installed`), `BOMLENS_OS_LICENSES=false`이면 `disabled` |
 | `vendored` | 소스에 복사해 넣은 오픈소스 식별(`--identify-vendored`) |
 | `suggest-vendored` | C/C++ 프로젝트 스캔 결과가 거의 비었을 때 위 식별을 권함 |

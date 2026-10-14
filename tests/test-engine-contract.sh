@@ -1952,6 +1952,75 @@ run_engine "$D" "$MUT4"
     && pass "negative control: without the rule the same run reads succeeded" \
     || fail "the mutant run is $(jq -r .run.status "$D/bomlens-result.json" 2>/dev/null); the check does not isolate the rule"
 
+# The emulation notice is about the firmware syft passes: a resolver step that
+# failed in the same container says nothing about it.
+D="$(new_run gen-step-failed-emulated-nonfw)"
+add_props "$D/demo_1.0_bom.json" '[{"name":"bomlens:pipeline-step-failed","value":"cargo-lockfile"}]'
+run_engine "$D" "$ROOT_DIR/docker/lib" BOMLENS_UNAME_M=x86_64 BOMLENS_CPUINFO_FILE="$WORK/cpuinfo-arm"
+[ "$(gen_line "$D")" = "succeeded_degraded degraded failed steps that failed: cargo-lockfile" ] \
+    && pass "under emulation, a failed cargo-lockfile alone gets no emulation notice" \
+    || fail "non-firmware label under emulation: $(gen_line "$D")"
+# On an armv7 host there is no linux/arm64 image to point to: the detail says
+# the image ran under emulation and nothing more.
+printf 'processor\t: 0\nmodel name\t: ARMv7 Processor rev 4 (v7l)\nCPU implementer\t: 0x41\nCPU architecture: 7\n' > "$WORK/cpuinfo-armv7"
+D="$(new_run gen-step-failed-armv7)"
+add_props "$D/demo_1.0_bom.json" '[{"name":"bomlens:pipeline-step-failed","value":"firmware-extra-roots"}]'
+run_engine "$D" "$ROOT_DIR/docker/lib" BOMLENS_UNAME_M=x86_64 BOMLENS_CPUINFO_FILE="$WORK/cpuinfo-armv7"
+[ "$(gen_line "$D")" = "succeeded_degraded degraded failed steps that failed: firmware-extra-roots; this amd64 image ran under emulation on an arm host" ] \
+    && pass "on an armv7 host the detail names the emulation without pointing to linux/arm64" \
+    || fail "armv7: $(gen_line "$D")"
+D="$(new_run gen-step-failed-arm64-hint)"
+add_props "$D/demo_1.0_bom.json" '[{"name":"bomlens:pipeline-step-failed","value":"firmware-packages"}]'
+run_engine "$D" "$ROOT_DIR/docker/lib" BOMLENS_UNAME_M=x86_64 BOMLENS_CPUINFO_FILE="$WORK/cpuinfo-arm"
+case "$(gen_line "$D")" in
+    *"on an arm64 host, use the linux/arm64 image instead") pass "on an arm64 host the detail points to the linux/arm64 image" ;;
+    *) fail "arm64 hint: $(gen_line "$D")" ;;
+esac
+# POSTPROCESS: a build-prep label from stage 1 makes generate degraded and the
+# run succeeded_degraded, and the recorded fingerprint says stage1-degraded.
+P="$(plan_run gen-pp-prep "$FPA")"
+cp "$FIX/good-cyclonedx.json" "$P/demo_1.0_bom.json"
+add_props "$P/demo_1.0_bom.json" '[{"name":"bomlens:pipeline-step-failed","value":"go-mod-tidy"}]'
+run_engine "$P" "$ROOT_DIR/docker/lib" SOURCE_ROOT="$FPA" BOMLENS_STAGE1_EXIT=0
+[ "$(jq -c '[.run.status, ([.steps[] | select(.id == "generate")][0] | .status, .reason, .detail, .stage, .input_fingerprint.reasons)]' "$P/bomlens-result.json" 2>/dev/null)" \
+    = '["succeeded_degraded","degraded","failed","steps that failed: go-mod-tidy",1,["stage1-degraded"]]' ] \
+    && pass "POSTPROCESS: a stage-1 build-prep label reaches both run.status and input_fingerprint.reasons" \
+    || fail "POSTPROCESS build-prep: $(jq -c '[.run.status, [.steps[] | select(.id == "generate")][0]]' "$P/bomlens-result.json" 2>&1)" "$(tail -5 "$P.log")"
+# A reused SBOM carries the post-process record of the run that left it. A
+# label of a post-process step this run did not run (resolve-purl is opt-in)
+# is neither a generation failure nor a short stage 1.
+P="$(plan_run gen-pp-reused-postprocess "$FPA")"
+cp "$FIX/good-cyclonedx.json" "$P/demo_1.0_bom.json"
+add_props "$P/demo_1.0_bom.json" '[{"name":"bomlens:pipeline-step-failed","value":"resolve-purl"},{"name":"bomlens:pipeline-step-failed","value":"verify-weights"}]'
+run_engine "$P" "$ROOT_DIR/docker/lib" SOURCE_ROOT="$FPA" BOMLENS_STAGE1_EXIT=0 BOMLENS_STAGE1_REUSED=1
+[ "$(jq -c '[.run.status, ([.steps[] | select(.id == "generate")][0] | .status, (.input_fingerprint.reasons | index("stage1-degraded")), .reuse_unsafe)]' "$P/bomlens-result.json" 2>/dev/null)" \
+    = '["succeeded","ok",null,false]' ] \
+    && pass "a reused SBOM's post-process labels (resolve-purl) leave generate ok and stage 1 reusable" \
+    || fail "reused post-process label: $(jq -c '[.run.status, [.steps[] | select(.id == "generate")][0]]' "$P/bomlens-result.json" 2>&1)" "$(tail -5 "$P.log")"
+# MERGE reads supplier SBOMs: their labels are their own runs' records.
+# merge-sbom.sh writes fresh metadata, so a copy of the library whose merge
+# keeps the first input as it is puts the label in front of the rule.
+MERGE_LIB="$WORK/lib-merge-keeps-metadata"
+cp -R "$ROOT_DIR/docker/lib" "$MERGE_LIB"
+printf '#!/bin/bash\ncp "$4" "$1"\n' > "$MERGE_LIB/merge-sbom.sh"
+D="$(new_run gen-step-failed-merge empty)"
+jq '.metadata.properties = ((.metadata.properties // []) + [{"name":"bomlens:pipeline-step-failed","value":"firmware-packages"}])' \
+    "$FIX/good-cyclonedx.json" > "$D/part-a.json"
+cp "$FIX/good-cyclonedx.json" "$D/part-b.json"
+run_engine "$D" "$MERGE_LIB" MODE=MERGE MERGE_FILES="$D/part-a.json $D/part-b.json"
+jq -e 'any(.metadata.properties[]?; .name == "bomlens:pipeline-step-failed" and .value == "firmware-packages")' "$D/demo_1.0_bom.json" >/dev/null 2>&1 \
+    && [ "$(jq -r '[.steps[] | select(.id=="generate")][0].status' "$D/bomlens-result.json" 2>/dev/null)" = "ok" ] \
+    && pass "MERGE: a failed label carried into the merged SBOM leaves generate ok" \
+    || fail "MERGE: $(gen_line "$D")" "$(tail -5 "$D.log")"
+
+echo "== the post-process step list in engine-result.sh matches entrypoint.sh =="
+# shellcheck disable=SC1091
+pp_listed="$( . "$ROOT_DIR/docker/lib/engine-result.sh"; printf '%s\n' $ER_POSTPROCESS_STEPS | sort -u)"
+pp_used="$(grep -v '^[[:space:]]*#' "$ENTRY" | grep -oE '(run_optional_step|er_record|er_phase) [a-z][a-z0-9-]+' | awk '{print $2}' | grep -vxE 'generate|plan' | sort -u)"
+[ "$pp_listed" = "$pp_used" ] \
+    && pass "ER_POSTPROCESS_STEPS lists every step entrypoint.sh records after generation, and no other" \
+    || fail "ER_POSTPROCESS_STEPS differs from entrypoint.sh" "$(diff <(printf '%s\n' "$pp_listed") <(printf '%s\n' "$pp_used"))"
+
 echo "== every step label in entrypoint.sh is documented =="
 missing=""
 for id in $(grep -v '^[[:space:]]*#' "$ENTRY" | grep -oE '(run_optional_step|er_record|er_phase) [a-z][a-z0-9-]+' | awk '{print $2}' | sort -u); do

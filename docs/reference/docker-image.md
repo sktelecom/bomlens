@@ -19,7 +19,7 @@ For everyday use we recommend the [`scan-sbom.sh`](../reference/cli.md) script, 
 
 `latest` and version tags are available. All published images (`ghcr.io/sktelecom/bomlens`, `bomlens-firmware`, `bomlens-deep-cve`, `bomlens-deep-license`, `bomlens-aibom`, and their aliases) support both `linux/amd64` and `linux/arm64`, so pulling any of them on an `arm64` host (an Apple Silicon Mac, an Arm server) works natively. Images are signed with cosign before publishing.
 
-On an `arm64` host, do not force `linux/amd64` (`--platform linux/amd64` or `DOCKER_DEFAULT_PLATFORM=linux/amd64`): the image then runs under emulation, where syft in the firmware image can crash. A firmware scan tries a failed syft pass once more, says in the log that it runs under emulation, and records `generate` as `degraded` in `bomlens-result.json` when the second try also fails.
+On an `arm64` host, do not force `linux/amd64` (`--platform linux/amd64` or `DOCKER_DEFAULT_PLATFORM=linux/amd64`): the image then runs under emulation, where syft in the firmware image can crash. A firmware scan tries a failed syft pass once more (not one that ran out of its time limit or was killed for memory), says in the log that it runs under emulation, and records `generate` as `degraded` in `bomlens-result.json` when the second try also fails.
 
 ```bash
 docker pull ghcr.io/sktelecom/bomlens:latest

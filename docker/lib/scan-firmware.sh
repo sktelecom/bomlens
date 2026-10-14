@@ -415,26 +415,81 @@ fi
 # file, not /dev/null, so a failure leaves its cause in the scan log. A failure
 # writes an empty component list, so the scan goes on with the binary passes,
 # and queues $3 in SYFT_FAILED for the SBOM signal written with the SBOM below.
-# A failed pass is tried once more. When the container is the amd64 image under
-# emulation on an arm64 host, syft crashes in its garbage collector or hangs
-# there (measured with syft 1.52 on the busybox rootfs: every plain run crashed,
-# every run with GOGC=off completed), so it runs with the collector off and a
-# time limit; a pass that still fails says how to run the native image instead.
+# A failed pass is tried once more, unless it ran out of time (124) or was
+# killed, the way the kernel ends a process out of memory (137): the same run
+# would only end the same way. When the container is the amd64 image under
+# emulation on an ARM host, syft crashes in its garbage collector or hangs there
+# (measured with syft 1.52 on the busybox rootfs: every plain run crashed, every
+# run with GOGC=off completed), so it runs with the collector off, a memory
+# limit that turns it back on before the container runs out, and a time limit.
+# There, once a pass has failed for good, the passes after it (the extra roots)
+# run once each, so a bad host costs one time limit per tree, not two. A pass
+# that still fails says how to run the native image instead.
 SYFT_FAILED=""
+SYFT_SINGLE_TRY=""
+
+# The memory syft may use with the collector off: 75% of the container's limit
+# (cgroup v2 memory.max, or v1 memory.limit_in_bytes) when that is a number
+# below the machine's memory, otherwise 75% of MemTotal. Printed for GOMEMLIMIT
+# in KiB, empty when neither can be read. BOMLENS_CGROUP_ROOT and
+# BOMLENS_MEMINFO_FILE stand in for /sys/fs/cgroup and /proc/meminfo in tests.
+syft_memory_limit() {
+    local cg="${BOMLENS_CGROUP_ROOT:-/sys/fs/cgroup}" f v limit_kib="" total_kib=""
+    total_kib="$(awk '$1 == "MemTotal:" { print $2; exit }' "${BOMLENS_MEMINFO_FILE:-/proc/meminfo}" 2>/dev/null)"
+    case "$total_kib" in ''|*[!0-9]*) total_kib="" ;; esac
+    for f in "$cg/memory.max" "$cg/memory/memory.limit_in_bytes"; do
+        [ -r "$f" ] || continue
+        v="$(head -1 "$f" 2>/dev/null | tr -d '[:space:]')"
+        # "max" is no limit; v1 writes a number near 2^63 for the same.
+        case "$v" in ''|*[!0-9]*) continue ;; esac
+        [ "${#v}" -le 18 ] || continue
+        limit_kib=$((v / 1024))
+        break
+    done
+    if [ -n "$limit_kib" ] && { [ -z "$total_kib" ] || [ "$limit_kib" -lt "$total_kib" ]; }; then
+        :
+    else
+        limit_kib="$total_kib"
+    fi
+    [ -n "$limit_kib" ] && [ "$limit_kib" -gt 0 ] || return 0
+    echo "$((limit_kib * 3 / 4))KiB"
+}
+
+# The tag of the firmware image matching this one: its release version, or
+# latest for a build from main or a local build.
+firmware_image_tag() {
+    local v="${BOMLENS_VERSION:-}"
+    v="${v#v}"
+    case "$v" in
+        [0-9]*.[0-9]*.[0-9]*) case "$v" in *[!0-9A-Za-z._-]*) echo latest ;; *) echo "$v" ;; esac ;;
+        *) echo latest ;;
+    esac
+}
+
 catalog_packages() {
-    local dir="$1" out="$2" label="$3" err attempt emulated=""
+    local dir="$1" out="$2" label="$3" err attempt tries=2 rc=0 emulated="" memlimit=""
     local -a run=(env)
     if declare -F emulated_host_arch >/dev/null; then
         emulated="$(emulated_host_arch 2>/dev/null)" || emulated=""
     fi
     if [ -n "$emulated" ]; then
+        memlimit="$(syft_memory_limit)"
         run=(env GOGC=off)
-        command -v timeout >/dev/null 2>&1 && run=(timeout -k 10 1800 env GOGC=off)
-        echo "[firmware] this amd64 image runs under emulation on an $emulated host; syft runs with GOGC=off and a 30-minute limit." >&2
+        [ -z "$memlimit" ] || run+=("GOMEMLIMIT=$memlimit")
+        if command -v timeout >/dev/null 2>&1; then
+            run=(timeout -k 10 1800 "${run[@]}")
+            echo "[firmware] this amd64 image runs under emulation on an $emulated host; syft runs with GOGC=off${memlimit:+, GOMEMLIMIT=$memlimit} and a 30-minute limit." >&2
+        else
+            echo "[firmware] this amd64 image runs under emulation on an $emulated host; syft runs with GOGC=off${memlimit:+, GOMEMLIMIT=$memlimit} (no time limit: timeout is not installed)." >&2
+        fi
+        [ -z "$SYFT_SINGLE_TRY" ] || tries=1
     fi
     err=$(mktemp)
-    for attempt in 1 2; do
-        if "${run[@]}" syft "dir:$dir" -o "cyclonedx-json@$CDX_SPEC_VERSION" > "$out" 2>"$err"; then
+    attempt=1
+    while :; do
+        rc=0
+        "${run[@]}" syft "dir:$dir" -o "cyclonedx-json@$CDX_SPEC_VERSION" > "$out" 2>"$err" || rc=$?
+        if [ "$rc" -eq 0 ]; then
             rm -f "$err"
             [ "$attempt" = 1 ] || echo "[firmware] syft: the second try succeeded." >&2
             return 0
@@ -443,16 +498,22 @@ catalog_packages() {
             echo "[firmware] syft said (last 20 lines):" >&2
             tail -20 "$err" | sed 's/^/[firmware]   /' >&2
         fi
-        if [ "$attempt" = 1 ]; then
-            echo "[firmware] syft failed; trying once more." >&2
-        fi
+        case "$rc" in
+            124) echo "[firmware] syft ran out of its time limit; not trying again." >&2; break ;;
+            137) echo "[firmware] syft was killed (exit 137, often out of memory); not trying again." >&2; break ;;
+        esac
+        [ "$attempt" -lt "$tries" ] || break
+        echo "[firmware] syft failed (exit $rc); trying once more." >&2
+        attempt=$((attempt + 1))
     done
     rm -f "$err"
     echo '{"components":[]}' > "$out"
     if [ -n "$emulated" ]; then
+        SYFT_SINGLE_TRY=1
         echo "[firmware] WARN: this container is the amd64 image running under emulation on an $emulated host, where syft can crash or hang." >&2
-        echo "[firmware]       Run the native image instead: docker pull --platform linux/$emulated ghcr.io/sktelecom/bomlens-firmware:latest" >&2
-        echo "[firmware]       (and do not set DOCKER_DEFAULT_PLATFORM=linux/amd64 or --platform linux/amd64 for the scan)." >&2
+        if [ "$emulated" = arm64 ]; then
+            echo "[firmware]       Use the linux/arm64 image instead (for example docker pull --platform linux/arm64 ghcr.io/sktelecom/bomlens-firmware:$(firmware_image_tag)), and do not force linux/amd64 for the scan." >&2
+        fi
     fi
     case " $SYFT_FAILED " in
         *" $label "*) ;;

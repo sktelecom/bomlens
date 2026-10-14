@@ -76,19 +76,25 @@ run_optional_step() {
     return 0
 }
 
-# Print "arm64" and return 0 when this container is an amd64 image run under
-# user-mode emulation on an arm64 host (uname says x86_64, but the kernel's
-# /proc/cpuinfo describes ARM cores); return 1 otherwise. Go programs such as
-# syft can crash at random there, in the garbage collector. BOMLENS_UNAME_M and
-# BOMLENS_CPUINFO_FILE stand in for uname and /proc/cpuinfo in tests.
+# Print the host's architecture and return 0 when this container is an amd64
+# image run under user-mode emulation on an ARM host (uname says x86_64, but the
+# kernel's /proc/cpuinfo describes ARM cores); return 1 otherwise. A core of
+# architecture 8 or later is "arm64", for which a native linux/arm64 image
+# exists; an older one (armv7) is "arm", which has none. Go programs such as
+# syft can crash at random under this emulation, in the garbage collector.
+# BOMLENS_UNAME_M and BOMLENS_CPUINFO_FILE stand in for uname and /proc/cpuinfo
+# in tests.
 emulated_host_arch() {
-    local m cpuinfo="${BOMLENS_CPUINFO_FILE:-/proc/cpuinfo}"
+    local m arch cpuinfo="${BOMLENS_CPUINFO_FILE:-/proc/cpuinfo}"
     m="${BOMLENS_UNAME_M:-$(uname -m 2>/dev/null)}"
     case "$m" in x86_64|amd64|i?86) ;; *) return 1 ;; esac
     [ -r "$cpuinfo" ] || return 1
-    if grep -q '^CPU implementer' "$cpuinfo" 2>/dev/null; then
+    grep -q '^CPU implementer' "$cpuinfo" 2>/dev/null || return 1
+    arch="$(sed -n 's/^CPU architecture[[:space:]]*:[[:space:]]*\([0-9][0-9]*\).*/\1/p' "$cpuinfo" 2>/dev/null | head -1)"
+    if [ -n "$arch" ] && [ "$arch" -ge 8 ] 2>/dev/null; then
         echo arm64
-        return 0
+    else
+        echo arm
     fi
-    return 1
+    return 0
 }
