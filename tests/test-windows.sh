@@ -75,6 +75,12 @@ case "${1:-}" in
     # DOCKER_STUB_MISSING_IMAGE names one image that is neither present nor
     # pullable (not published, an offline host).
     [ -n "${DOCKER_STUB_MISSING_IMAGE:-}" ] && [ "${2:-}" = "$DOCKER_STUB_MISSING_IMAGE" ] && exit 1
+    # DOCKER_STUB_MISSING_PULL names an image that is present but cannot be
+    # pulled now (an offline host).
+    [ -n "${DOCKER_STUB_MISSING_PULL:-}" ] && [ "${2:-}" = "$DOCKER_STUB_MISSING_PULL" ] && exit 1
+    # DOCKER_STUB_PULL_SLEEP: seconds a pull prints nothing first, as a large
+    # layer downloading with no terminal does.
+    [ -z "${DOCKER_STUB_PULL_SLEEP:-}" ] || sleep "$DOCKER_STUB_PULL_SLEEP"
     echo "${2:-}: Pull complete"
     exit 0 ;;
   version|stop|rm) exit 0 ;;
@@ -109,6 +115,11 @@ case "${1:-}" in
     if [ "$has_label" = 1 ] && [ "$has_exited" = 1 ] && [ -n "${DOCKER_STUB_EXITED_CLI_CONTAINERS:-}" ]; then
       printf '%s\n' $DOCKER_STUB_EXITED_CLI_CONTAINERS
     fi
+    # DOCKER_STUB_RUNNING_DL_CONTAINERS: a licence scan an earlier run left
+    # running, found by its output-file label.
+    case "$*" in
+      *label=bomlens.deep-license-out=*) [ -z "${DOCKER_STUB_RUNNING_DL_CONTAINERS:-}" ] || printf '%s\n' $DOCKER_STUB_RUNNING_DL_CONTAINERS ;;
+    esac
     exit 0 ;;
   inspect)
     # -f '{{.State.OOMKilled}}' (stage 1's fallback classification): the stub
@@ -122,6 +133,15 @@ case "${1:-}" in
     # instead of 0; unset/empty means the ordinary successful-run case below.
     echo "${DOCKER_STUB_RUN_RC:-0}"; exit 0 ;;
   run)
+    # `docker run --rm --entrypoint sh <image> -c 'command -v grype'`: grype
+    # is only in the images DOCKER_STUB_GRYPE_IMAGES names.
+    case "$*" in
+      *"command -v grype"*)
+        for a in "$@"; do
+          case " ${DOCKER_STUB_GRYPE_IMAGES:-} " in *" $a "*) exit 0 ;; esac
+        done
+        exit 1 ;;
+    esac
     # Drop the SBOM where the real container would: the host dir bind-mounted to
     # /host-output (post-process / single-shot) or /out (source stage 1) — i.e.
     # the per-run subfolder scan-sbom.sh now creates. Falls back to cwd so the
@@ -1220,7 +1240,7 @@ optin_scan ghcr.io/sktelecom/bomlens:1.13.1 "$d" --project SC --version 1 --targ
 optin_scan registry.example/team/scanner:2.0 "$d" --project SC --version 1 --target . --generate-only --deep-cve
 { pp_line | grep -qE ' registry.example/team/scanner:2.0$' && ! in_log "bomlens-deep-cve" \
     && pp_line | grep -qF 'is not a BomLens image name and SBOM_DEEP_CVE_IMAGE is not set' \
-    && [ "$(grep -c -- '--deep-cve' "$OUT")" = 1 ] && in_out "runs only if it has grype"; } \
+    && [ "$(grep -c -- '--deep-cve' "$OUT")" = 1 ] && in_out "has no grype"; } \
   && pass "another scanner image name keeps post-processing on it, says so in one line, and hands the reason on" \
   || { fail "non-BomLens SBOM_SCANNER_IMAGE with --deep-cve" "rc=$RC $(pp_line)"; show; }
 OPT_DC=registry.example/team/dc:7 optin_scan bomlens:dev "$d" --project SC --version 1 --target . --generate-only --deep-cve
@@ -1238,6 +1258,61 @@ SBOM_PULL=always optin_scan "" "$d" --project SC --version 1 --target . --genera
 [ "$(grep -c -F -- 'docker pull ghcr.io/sktelecom/bomlens-deep-cve:latest' "$LOG")" = 1 ] \
   && pass "SBOM_PULL=always pulls the deep-cve image once" \
   || { fail "SBOM_PULL=always and the deep-cve image" "$(grep -F 'docker pull' "$LOG" | tr '\n' ' ')"; show; }
+# A scanner image of one's own that has grype keeps it with --deep-license:
+# grype is looked for before the stage could move to the deep-license image.
+DOCKER_STUB_GRYPE_IMAGES=registry.example/team/scanner:2.0 OPT_DL=ghcr.io/sktelecom/bomlens-deep-license:1.13.2 \
+  optin_scan registry.example/team/scanner:2.0 "$d" --project SC --version 1 --target . --generate-only --deep-cve --deep-license
+{ pp_line | grep -qE ' registry.example/team/scanner:2.0$' && pp_line | grep -qF 'BOMLENS_DEEP_CVE_FALLBACK= ' \
+    && dl_line | grep -qF -- 'ghcr.io/sktelecom/bomlens-deep-license:1.13.2 ' && in_log "command -v grype" && ! in_out "has no grype"; } \
+  && pass "a scanner image of one's own with grype keeps post-processing with --deep-license, the licence scan running first" \
+  || { fail "SBOM_SCANNER_IMAGE with grype and --deep-license" "rc=$RC $(dl_line) / $(pp_line)"; show; }
+OPT_DL=ghcr.io/sktelecom/bomlens-deep-license:1.13.2 \
+  optin_scan registry.example/team/scanner:2.0 "$d" --project SC --version 1 --target . --generate-only --deep-cve --deep-license
+{ pp_line | grep -qE ' ghcr.io/sktelecom/bomlens-deep-license:1.13.2$' && [ -z "$(dl_line)" ] && in_out "has no grype" \
+    && pp_line | grep -qF 'is not a BomLens image name and SBOM_DEEP_CVE_IMAGE is not set'; } \
+  && pass "a scanner image of one's own without grype moves to the deep-license image and records deep-cve as fallback" \
+  || { fail "SBOM_SCANNER_IMAGE without grype and --deep-license" "rc=$RC $(pp_line)"; show; }
+# The licence scan's container: --init so a stop signal reaches the script, a
+# name of its own per run and the scan label so cleanup() and the next run's
+# sweep find it, and the calling user's ids.
+optin_scan "" "$d" --project SC --version 1 --target . --generate-only --deep-cve --deep-license
+_dl_name1="$(dl_line | sed -n 's/.*--name \(bomlens-deep-license-[0-9]*-[0-9]*\) .*/\1/p')"
+{ dl_line | grep -qF -- 'run --rm --init ' && [ -n "$_dl_name1" ] && dl_line | grep -qF -- '--label bomlens.scan=cli' \
+    && dl_line | grep -qF -- '--label bomlens.deep-license-out=' && dl_line | grep -qF -- "-e HOST_UID=$(id -u) " \
+    && pp_line | grep -qE -- '-e BOMLENS_DEEP_LICENSE_ENDED=[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9:]{8}Z'; } \
+  && pass "the licence scan runs with --init, a run-specific name, the scan label and HOST_UID, and its end time is handed on" \
+  || { fail "licence scan container options" "$(dl_line)"; show; }
+optin_scan "" "$d" --project SC --version 1 --target . --generate-only --deep-cve --deep-license
+_dl_name2="$(dl_line | sed -n 's/.*--name \(bomlens-deep-license-[0-9]*-[0-9]*\) .*/\1/p')"
+[ -n "$_dl_name2" ] && [ "$_dl_name1" != "$_dl_name2" ] \
+  && pass "each run's licence scan container has its own name" \
+  || { fail "licence scan container name is not per run" "$_dl_name1 / $_dl_name2"; show; }
+DOCKER_STUB_RUNNING_DL_CONTAINERS=oldscan1 \
+  optin_scan "" "$d" --project SC --version 1 --target . --generate-only --deep-cve --deep-license
+{ in_log "docker stop -t 5 oldscan1" \
+    && [ "$(grep -n -F -- 'docker stop -t 5 oldscan1' "$LOG" | head -1 | cut -d: -f1)" -lt "$(grep -n -F -- 'deep-license.sh' "$LOG" | head -1 | cut -d: -f1)" ]; } \
+  && pass "a licence scan an earlier run left running on the same output is stopped first" \
+  || { fail "earlier licence scan container not stopped" "$(grep -F 'docker stop' "$LOG" | tr '\n' ' ')"; show; }
+# A first pull that prints nothing for a while (a large layer, no terminal)
+# is not stopped: there is no limit on silence, only an optional total one.
+DOCKER_STUB_ABSENT_IMAGE=ghcr.io/sktelecom/bomlens-deep-cve:latest DOCKER_STUB_PULL_SLEEP=3 _SBOM_OPTIN_PULL_STALL_SECS=1 \
+  optin_scan "" "$d" --project SC --version 1 --target . --generate-only --deep-cve
+{ pp_line | grep -qE ' ghcr.io/sktelecom/bomlens-deep-cve:latest$' && ! in_out "stopped" && ! in_out "not available"; } \
+  && pass "a deep-cve image pull that prints nothing for a while runs to the end" \
+  || { fail "silent deep-cve pull was stopped" "rc=$RC $(pp_line)"; show; }
+DOCKER_STUB_ABSENT_IMAGE=ghcr.io/sktelecom/bomlens-deep-cve:latest DOCKER_STUB_PULL_SLEEP=5 _SBOM_OPTIN_PULL_MAX_SECS=1 \
+  optin_scan "" "$d" --project SC --version 1 --target . --generate-only --deep-cve
+{ pp_line | grep -qE ' ghcr.io/sktelecom/bomlens:latest$' && in_out "did not finish within 1s" \
+    && pp_line | grep -qF 'BOMLENS_DEEP_CVE_FALLBACK=the grype image was not available'; } \
+  && pass "_SBOM_OPTIN_PULL_MAX_SECS stops a pull after that long in all, and says so" \
+  || { fail "_SBOM_OPTIN_PULL_MAX_SECS" "rc=$RC $(pp_line)"; show; }
+# SBOM_PULL=always with a pull that fails: an opt-in image already here is used.
+DOCKER_STUB_MISSING_PULL=ghcr.io/sktelecom/bomlens-deep-cve:latest SBOM_PULL=always \
+  optin_scan "" "$d" --project SC --version 1 --target . --generate-only --deep-cve
+{ pp_line | grep -qE ' ghcr.io/sktelecom/bomlens-deep-cve:latest$' && in_out "using the copy already here" \
+    && [ "$(grep -c -F -- 'docker pull ghcr.io/sktelecom/bomlens-deep-cve:latest' "$LOG")" = 1 ]; } \
+  && pass "SBOM_PULL=always offline uses a deep-cve image already here" \
+  || { fail "SBOM_PULL=always offline with a local deep-cve image" "rc=$RC $(pp_line)"; show; }
 # A firmware scan has no use for grype: no swap and DEEP_CVE=false.
 d="$(new_proj optin_fw_cve)"; printf 'FW\n' > "$d/router.bin"
 optin_scan "" "$d" --project FC --version 1 --target router.bin --generate-only --deep-cve

@@ -441,9 +441,10 @@ echo "== deep-license run before stage 2 (BOMLENS_DEEP_LICENSE_RC) =="
 # sweep) and records the step from the exit code.
 D="$(new_run dl-handed)"; echo '{"files":[{"path":"LICENSE","type":"file"}]}' > "$D/demo_1.0_scancode.json"
 PATH="$WORK/grype-bin:$PATH" run_engine "$D" "$ROOT_DIR/docker/lib" SOURCE_ROOT="$SRCT" DEEP_CVE=true DEEP_LICENSE=true \
-    BOMLENS_SCANCODE=/nonexistent/scancode BOMLENS_DEEP_LICENSE_RC=0 BOMLENS_DEEP_LICENSE_STARTED=2026-01-02T03:04:05Z
+    BOMLENS_SCANCODE=/nonexistent/scancode BOMLENS_DEEP_LICENSE_RC=0 BOMLENS_DEEP_LICENSE_STARTED=2026-01-02T03:04:05Z \
+    BOMLENS_DEEP_LICENSE_ENDED=2026-01-02T03:09:05Z
 { [ "$(dl_step "$D")" = "ok null" ] && [ "$(dc_step "$D")" = "ok null" ] && [ -f "$D/demo_1.0_scancode.json" ] \
-    && [ "$(jq -r '[.steps[] | select(.id=="deep-license")][0].started_at' "$D/bomlens-result.json")" = 2026-01-02T03:04:05Z ] \
+    && [ "$(jq -r '[.steps[] | select(.id=="deep-license")][0] | "\(.started_at) \(.ended_at)"' "$D/bomlens-result.json")" = "2026-01-02T03:04:05Z 2026-01-02T03:09:05Z" ] \
     && jq -e '[.outputs[]? | select(.role=="license-scan.scancode")] | length == 1' "$D/bomlens-result.json" >/dev/null \
     && [ "$(jq -r .run.status "$D/bomlens-result.json")" = succeeded ]; } \
     && pass "a handed-on licence scan: deep-license and deep-cve both ok, _scancode.json kept and listed, the run succeeded" \
@@ -455,6 +456,54 @@ D="$(new_run dl-handed-3)"
 PATH="$WORK/grype-bin:$PATH" run_engine "$D" "$ROOT_DIR/docker/lib" SOURCE_ROOT="$SRCT" DEEP_CVE=true DEEP_LICENSE=true BOMLENS_DEEP_LICENSE_RC=3
 { [ "$(dl_step "$D")" = "skipped not_installed" ] && grep -qF "scancode was not in the image the licence scan ran on" "$D.log"; } \
     && pass "exit code 3 handed on: not_installed, said of the image the licence scan ran on" || fail "deep-license is $(dl_step "$D")"
+# A handed-on code other than 0 or 6: an earlier run's _scancode.json is
+# removed with the other leftovers rather than reported as this run's.
+D="$(new_run dl-handed-5)"; echo '{"files":[{"path":"OLD","type":"file"}]}' > "$D/demo_1.0_scancode.json"
+PATH="$WORK/grype-bin:$PATH" run_engine "$D" "$ROOT_DIR/docker/lib" SOURCE_ROOT="$SRCT" DEEP_CVE=true DEEP_LICENSE=true BOMLENS_DEEP_LICENSE_RC=5
+{ [ "$(dl_step "$D")" = "failed timeout" ] && [ ! -f "$D/demo_1.0_scancode.json" ] \
+    && jq -e '[.outputs[]? | select(.role=="license-scan.scancode")] | length == 0' "$D/bomlens-result.json" >/dev/null; } \
+    && pass "exit code 5 handed on: failed (timeout), and an earlier _scancode.json is removed, not listed" \
+    || fail "deep-license is $(dl_step "$D"), _scancode.json present: $([ -f "$D/demo_1.0_scancode.json" ] && echo yes || echo no)"
+D="$(new_run dl-handed-bad)"; echo '{"files":[]}' > "$D/demo_1.0_scancode.json"
+PATH="$WORK/grype-bin:$PATH" run_engine "$D" "$ROOT_DIR/docker/lib" SOURCE_ROOT="$SRCT" DEEP_CVE=true DEEP_LICENSE=true BOMLENS_SCANCODE=/nonexistent/scancode \
+    BOMLENS_DEEP_LICENSE_RC="$(printf '0\nx')"
+{ [ "$(dl_step "$D")" = "skipped not_installed" ] && [ ! -f "$D/demo_1.0_scancode.json" ]; } \
+    && pass "a handed-on code with a second line is not taken as one" || fail "deep-license is $(dl_step "$D")"
+
+# deep-license.sh alone, as a caller runs it before stage 2: a run that does
+# not finish removes the output file an earlier run left.
+dl_alone() {
+    local out="$WORK/dl-alone/out_scancode.json"
+    mkdir -p "$WORK/dl-alone"; echo '{"files":[]}' > "$out"
+    env BOMLENS_SCANCODE="$WORK/bin/scancode-stub" SCANCODE_STUB_ARGS="$WORK/args-alone" "$@" \
+        bash "$ROOT_DIR/docker/lib/deep-license.sh" "$SRCT" "$out" >/dev/null 2>&1
+    DL_ALONE_RC=$?
+    [ -f "$out" ] && DL_ALONE_LEFT=yes || DL_ALONE_LEFT=no
+}
+dl_alone SCANCODE_STUB_RC=2
+[ "$DL_ALONE_RC $DL_ALONE_LEFT" = "1 no" ] && pass "deep-license.sh failing (1) removes an earlier output" || fail "exit $DL_ALONE_RC, earlier output left: $DL_ALONE_LEFT"
+dl_alone DEEP_LICENSE_MAX_FILES=1
+[ "$DL_ALONE_RC $DL_ALONE_LEFT" = "4 no" ] && pass "deep-license.sh over the file limit (4) removes an earlier output" || fail "exit $DL_ALONE_RC, earlier output left: $DL_ALONE_LEFT"
+if command -v timeout >/dev/null 2>&1; then
+    dl_alone SCANCODE_STUB_SLEEP=5 DEEP_LICENSE_TIMEOUT=1
+    [ "$DL_ALONE_RC $DL_ALONE_LEFT" = "5 no" ] && pass "deep-license.sh timed out (5) removes an earlier output" || fail "exit $DL_ALONE_RC, earlier output left: $DL_ALONE_LEFT"
+else
+    echo "  SKIP: no timeout command on this host"
+fi
+dl_alone
+[ "$DL_ALONE_RC $DL_ALONE_LEFT" = "0 yes" ] && pass "deep-license.sh done (0) writes its output" || fail "exit $DL_ALONE_RC, output: $DL_ALONE_LEFT"
+# SIGTERM (docker stop with --init, a web UI cancel): the script stops
+# scancode at once, exits 143 and leaves no output.
+mkdir -p "$WORK/dl-term"; echo '{"files":[]}' > "$WORK/dl-term/out.json"
+env BOMLENS_SCANCODE="$WORK/bin/scancode-stub" SCANCODE_STUB_ARGS="$WORK/args-term" SCANCODE_STUB_SLEEP=20 \
+    bash "$ROOT_DIR/docker/lib/deep-license.sh" "$SRCT" "$WORK/dl-term/out.json" >/dev/null 2>&1 &
+_term_pid=$!
+for _i in 1 2 3 4 5 6 7 8 9 10; do [ -s "$WORK/args-term" ] && break; sleep 0.5; done
+_term_t0=$(date +%s); kill -TERM "$_term_pid"; wait "$_term_pid"; _term_rc=$?; _term_t1=$(date +%s)
+{ [ "$_term_rc" = 143 ] && [ $((_term_t1 - _term_t0)) -lt 5 ] && [ ! -f "$WORK/dl-term/out.json" ]; } \
+    && pass "deep-license.sh stops on SIGTERM at once with exit 143 and no output" \
+    || fail "SIGTERM: exit $_term_rc after $((_term_t1 - _term_t0))s, output left: $([ -f "$WORK/dl-term/out.json" ] && echo yes || echo no)"
+
 # Stage 2 on the deep-cve image with no licence scan handed on: the message
 # and the manifest name the deep-cve image, not a missing deep-license image.
 D="$(new_run dl-on-dc)"

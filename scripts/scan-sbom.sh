@@ -745,18 +745,10 @@ ensure_image_fresh() {
 #
 # $1: image ref
 _refresh_image_quietly() {
-    _pull_bounded "$1" "" "${_SBOM_PULL_STALL_SECS:-12}" || true
-    return 0
-}
-
-# _pull_bounded <image> [show] [stall seconds]: docker pull, stopped once it
-# has printed nothing for the stall seconds or run _SBOM_PULL_MAX_SECS. With
-# "show", docker's lines are printed as they come. Returns the pull's exit
-# code, 1 when it was stopped.
-_pull_bounded() {
-    local img="$1" show="${2:-}" stall="${3:-12}" max log pid elapsed idle last size shown=0 lines rc=0 stopped=""
+    local img="$1" stall max log pid elapsed idle last size
+    stall="${_SBOM_PULL_STALL_SECS:-12}"
     max="${_SBOM_PULL_MAX_SECS:-2700}"
-    log="$(mktemp)" || return 1
+    log="$(mktemp)" || return 0
     docker pull "$img" >"$log" 2>&1 &
     pid=$!
     elapsed=0; idle=0; last=0
@@ -770,32 +762,37 @@ _pull_bounded() {
         else
             idle=$((idle + 1))
         fi
-        if [ -n "$show" ]; then
-            lines=$(wc -l <"$log" 2>/dev/null | tr -d ' ')
-            if [ -n "$lines" ] && [ "$lines" -gt "$shown" ]; then
-                sed -n "$((shown + 1)),${lines}p" "$log"; shown=$lines
-            fi
-        fi
         if [ "$idle" -ge "$stall" ] || [ "$elapsed" -ge "$max" ]; then
             kill "$pid" 2>/dev/null || true
-            stopped=1
             break
         fi
     done
-    wait "$pid" 2>/dev/null || rc=$?
-    [ -n "$show" ] && sed -n "$((shown + 1)),\$p" "$log"
+    wait "$pid" 2>/dev/null || true
     rm -f "$log"
-    [ -z "$stopped" ] || { [ -n "$show" ] && echo "[WARN] docker pull $img printed nothing for ${stall}s; stopped."; return 1; }
-    return "$rc"
+    return 0
+}
+
+# _image_has_grype <image>: whether grype is in that image. Read from its
+# com.sktelecom.sbom.deep-cve-tools label (images from 1.13.3 on), otherwise
+# by looking for grype in a throwaway container, one short container start.
+# An image that is not here counts as without grype under SBOM_PULL=never.
+_image_has_grype() {
+    local label=""
+    if ! label="$("${DOCKER_ENV[@]}" docker image inspect -f '{{index .Config.Labels "com.sktelecom.sbom.deep-cve-tools"}}' "$1" 2>/dev/null)"; then
+        [ "$SBOM_PULL" = never ] && return 1
+        label=""
+    fi
+    case "$label" in true) return 0 ;; false) return 1 ;; esac
+    "${DOCKER_ENV[@]}" docker run --rm --entrypoint sh "$1" -c 'command -v grype' >/dev/null 2>&1
 }
 
 # _optin_image_ready <image>: true when an opt-in image (deep-cve,
 # deep-license) is here or could be pulled now; the caller goes on without it
 # otherwise. SBOM_PULL=never only looks; SBOM_PULL=always pulls it here, once
-# (ensure_image_fresh then leaves it, see _optin_was_pulled). A first pull
-# shows docker's progress and is stopped when it prints nothing for
-# _SBOM_OPTIN_PULL_STALL_SECS seconds (120: docker prints a line per layer, and
-# a large layer takes a while), as on a host with no route to the registry.
+# (ensure_image_fresh then leaves it, see _optin_was_pulled), and uses the
+# local copy when that pull fails. A first pull runs as an ordinary
+# `docker pull`, with docker's own progress on the terminal and no time limit,
+# since a large layer can download for minutes without a new line.
 _OPTIN_PULLED=" "
 _optin_image_ready() {
     if [ "$SBOM_PULL" != "always" ] && docker image inspect "$1" >/dev/null 2>&1; then
@@ -803,12 +800,37 @@ _optin_image_ready() {
     fi
     [ "$SBOM_PULL" = "never" ] && return 1
     echo "[INFO] Pulling $1..."
-    _pull_bounded "$1" show "${_SBOM_OPTIN_PULL_STALL_SECS:-120}" || return 1
+    if ! _pull_optin "$1"; then
+        [ "$SBOM_PULL" = "always" ] && docker image inspect "$1" >/dev/null 2>&1 || return 1
+        echo "[WARN] Could not pull $1 (SBOM_PULL=always); using the copy already here."
+    fi
     _OPTIN_PULLED="$_OPTIN_PULLED$1 "
 }
 _optin_was_pulled() {
     case "$_OPTIN_PULLED" in *" $1 "*) return 0 ;; esac
     return 1
+}
+
+# _pull_optin <image>: `docker pull`, its output shown as docker writes it.
+# _SBOM_OPTIN_PULL_MAX_SECS, an internal test knob with no default, stops it
+# after that many seconds in all.
+_pull_optin() {
+    local img="$1" max="${_SBOM_OPTIN_PULL_MAX_SECS:-}" pid elapsed=0 rc=0
+    case "$max" in ''|*[!0-9]*) docker pull "$img"; return $? ;; esac
+    docker pull "$img" &
+    pid=$!
+    while kill -0 "$pid" 2>/dev/null; do
+        if [ "$elapsed" -ge "$max" ]; then
+            kill "$pid" 2>/dev/null || true
+            wait "$pid" 2>/dev/null || true
+            echo "[WARN] docker pull $img did not finish within ${max}s (_SBOM_OPTIN_PULL_MAX_SECS); stopped."
+            return 1
+        fi
+        sleep 1
+        elapsed=$((elapsed + 1))
+    done
+    wait "$pid" || rc=$?
+    return "$rc"
 }
 
 # missing (default): docker run's implicit pull covers an absent image
@@ -2668,17 +2690,18 @@ if [ "$MODE" = "SOURCE" ]; then
             PP_HAS_GRYPE=1
         elif [ -z "${SBOM_DEEP_CVE_IMAGE:-}" ] && [ -n "${SBOM_SCANNER_IMAGE:-}" ] \
              && { [ "$_SI_WHY" = path ] || [ "$_SI_WHY" = version ] || [ "$_SI_WHY" = name ]; }; then
-            # The stage stays on that image. entrypoint.sh looks for grype
-            # there first, so a build of one's own with SBOM_DEEP_CVE=true
-            # still runs the match and records its real outcome; the reason
-            # below is recorded only when the image has no grype.
-            if [ "$_SI_NAME" != bomlens-deep-cve ]; then
+            # The stage stays on that image. Whether it has grype (a build of
+            # one's own with SBOM_DEEP_CVE=true) is looked up now, before
+            # --deep-license below may move the stage to another image.
+            if _image_has_grype "$POSTPROCESS_IMAGE"; then
+                PP_HAS_GRYPE=1
+            else
                 case "$_SI_WHY" in
                     path)    _dc_why="is a local build" ;;
                     version) _dc_why="is a version before 1.13.2" ;;
                     *)       _dc_why="is not a BomLens image name" ;;
                 esac
-                echo "[WARN] --deep-cve: SBOM_SCANNER_IMAGE ($SBOM_SCANNER_IMAGE) $_dc_why, so no deep-cve image of the same build is known; post-processing stays on it, and the grype CPE match runs only if it has grype (built with SBOM_DEEP_CVE=true). Set SBOM_DEEP_CVE_IMAGE to choose one."
+                echo "[WARN] --deep-cve: SBOM_SCANNER_IMAGE ($SBOM_SCANNER_IMAGE) $_dc_why and has no grype, and no deep-cve image of the same build is known, so the grype CPE match does not run. Set SBOM_DEEP_CVE_IMAGE to choose one."
                 DEEP_CVE_FALLBACK_FROM="SBOM_SCANNER_IMAGE ($SBOM_SCANNER_IMAGE) $_dc_why and SBOM_DEEP_CVE_IMAGE is not set, so no deep-cve image of the same build was used"
             fi
         else
@@ -2712,18 +2735,43 @@ if [ "$MODE" = "SOURCE" ]; then
         _optin_was_pulled "$DL_PRE_IMAGE" || ensure_image_fresh "$DL_PRE_IMAGE"
         echo "[INFO] --deep-license with --deep-cve: running the licence scan in $DL_PRE_IMAGE, then post-processing in $PP_IMAGE."
         _dl_out="${OUTPUT_FILE%_bom.json}_scancode.json"
+        # A licence scan an earlier, interrupted run left writing to the same
+        # file is stopped first (its container carries this label), so it
+        # cannot replace the file after it is removed below. Each run's
+        # container has its own name, which cleanup() stops on Ctrl+C.
+        _dl_key="$(printf '%s' "$OUTPUT_HOST_DIR/$_dl_out" | cksum | cut -d' ' -f1)"
+        _dl_old="$("${DOCKER_ENV[@]}" docker ps -q --filter "label=bomlens.scan=cli" --filter "label=bomlens.deep-license-out=$_dl_key" 2>/dev/null || true)"
+        if [ -n "$_dl_old" ]; then
+            echo "$_dl_old" | xargs "${DOCKER_ENV[@]}" docker stop -t 5 >/dev/null 2>&1 || true
+        fi
         rm -f "$OUTPUT_HOST_DIR/$_dl_out"
+        # Folders left out of the licence scan: the run's output folder, as
+        # the post-process step leaves it out, and its own name when it sits
+        # inside the scanned tree under another name (--timestamp).
+        _dl_exclude="${SRC_TREE_EXCLUDE:-} ${OUTPUT_FILE%_bom.json}"
+        case "$OUTPUT_HOST_DIR" in
+            "$SCAN_INPUT_DIR"/*) [ "${OUTPUT_HOST_DIR##*/}" = "${OUTPUT_FILE%_bom.json}" ] || _dl_exclude="$_dl_exclude ${OUTPUT_HOST_DIR##*/}" ;;
+        esac
         _dl_started="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
         _dl_rc=0
-        # Read-only source: the licence scan only reads it. Its own output
-        # folder, inside the tree by default, is left out as the
-        # post-process step leaves it out.
-        eval "$DOCKER_MSYS"docker run --rm \
+        RUNNING_CONTAINER_NAME="bomlens-deep-license-$$-$RANDOM"
+        # Read-only source: the licence scan only reads it. --init: a signal
+        # reaches deep-license.sh, which stops scancode and exits. In the
+        # background with an explicit wait, as stage 1, so a Ctrl+C reaches
+        # cleanup() at once. HOST_UID/HOST_GID: the result belongs to the
+        # calling user, as the post-process step's files do.
+        eval "$DOCKER_MSYS"docker run --rm --init \
+            --name "\"$RUNNING_CONTAINER_NAME\"" \
+            --label bomlens.scan=cli --label "bomlens.deep-license-out=$_dl_key" \
             -v "\"$(hostpath "$SCAN_INPUT_DIR")\"":/src:ro -v "\"$(hostpath "$OUTPUT_HOST_DIR")\"":/host-output \
             -w /host-output \
-            -e DEEP_LICENSE_EXCLUDE="\"${SRC_TREE_EXCLUDE:-} ${OUTPUT_FILE%_bom.json}\"" -e DEEP_LICENSE_MAX_FILES -e DEEP_LICENSE_TIMEOUT -e BOMLENS_DEEP_LICENSE_ALL \
-            --entrypoint bash "\"$DL_PRE_IMAGE\"" /usr/local/lib/sbom/deep-license.sh /src "\"/host-output/$_dl_out\"" || _dl_rc=$?
-        PP_ENV="$PP_ENV -e BOMLENS_DEEP_LICENSE_RC=$_dl_rc -e BOMLENS_DEEP_LICENSE_STARTED=$_dl_started"
+            -e DEEP_LICENSE_EXCLUDE="\"$_dl_exclude\"" -e DEEP_LICENSE_MAX_FILES -e DEEP_LICENSE_TIMEOUT -e BOMLENS_DEEP_LICENSE_ALL \
+            -e HOST_UID="$(id -u)" -e HOST_GID="$(id -g)" \
+            --entrypoint bash "\"$DL_PRE_IMAGE\"" /usr/local/lib/sbom/deep-license.sh /src "\"/host-output/$_dl_out\"" &
+        _dl_pid=$!
+        wait "$_dl_pid" || _dl_rc=$?
+        RUNNING_CONTAINER_NAME=""
+        PP_ENV="$PP_ENV -e BOMLENS_DEEP_LICENSE_RC=$_dl_rc -e BOMLENS_DEEP_LICENSE_STARTED=$_dl_started -e BOMLENS_DEEP_LICENSE_ENDED=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
     fi
     # The fallback runs inside this image, which takes the hand-off only from
     # the engine contract on (an image older than this CLI ignores it and

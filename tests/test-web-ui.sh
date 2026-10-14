@@ -397,6 +397,47 @@ _dl_rc = server.run_deep_license_first(_dl_src, _dl_out, "My App", "1.0", _dl_en
 assert _dl_rc == 0 and _dl_env["BOMLENS_DEEP_LICENSE_RC"] == "0", (_dl_rc, _dl_env)
 assert _os.path.isfile(_os.path.join(_dl_out, "My_App_1.0_scancode.json"))
 assert re.fullmatch(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z", _dl_env["BOMLENS_DEEP_LICENSE_STARTED"])
+assert re.fullmatch(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z", _dl_env["BOMLENS_DEEP_LICENSE_ENDED"])
+captured.clear()
+server.run_sibling_scan(
+    "ghcr.io/sktelecom/bomlens-deep-cve:1.5.0", "SOURCE", run_out,
+    lambda ln: None, source_root=src_root,
+    extra_env={"DEEP_CVE": "true", "DEEP_LICENSE": "true", "BOMLENS_DEEP_LICENSE_RC": "0",
+               "BOMLENS_DEEP_LICENSE_STARTED": "2026-01-02T03:04:05Z",
+               "BOMLENS_DEEP_LICENSE_ENDED": "2026-01-02T03:09:05Z"},
+)
+assert "BOMLENS_DEEP_LICENSE_ENDED=2026-01-02T03:09:05Z" in captured["args"], captured["args"]
+# Cancel during the licence scan: scancode prints nothing, so the cancel is
+# polled, not read per line. The whole process group is ended (the stub's own
+# child included) within the grace period, and no exit code is handed on.
+import time as _time, signal as _signal
+_slow = _os.path.join(_dl_bin, "scancode-slow")
+_kid = _os.path.join(_dl_bin, "kid.pid")
+open(_slow, "w").write('#!/bin/bash\ntrap "" TERM\nsleep 60 &\necho $! > "%s"\nwait\n' % _kid)
+_os.chmod(_slow, 0o755)
+_saved_grace = server.CANCEL_GRACE_SECONDS
+server.CANCEL_GRACE_SECONDS = 2
+_c_env = {"PATH": _os.environ.get("PATH", ""), "BOMLENS_SCANCODE": _slow}
+_t0 = _time.monotonic()
+_beats = []
+_c_rc = server.run_deep_license_first(_dl_src, _dl_out, "My App", "1.0", _c_env, lambda ln: None,
+                                      cancel=lambda: _time.monotonic() - _t0 > 1.5,
+                                      heartbeat=lambda: _beats.append(1))
+_elapsed = _time.monotonic() - _t0
+server.CANCEL_GRACE_SECONDS = _saved_grace
+assert _c_rc is None and "BOMLENS_DEEP_LICENSE_RC" not in _c_env, (_c_rc, _c_env)
+assert _elapsed < 10, _elapsed
+_kpid = int(open(_kid).read().strip())
+_gone = False
+for _i in range(20):
+    try:
+        _os.kill(_kpid, 0)
+    except ProcessLookupError:
+        _gone = True
+        break
+    _time.sleep(0.1)
+assert _gone, "the licence scan's child process is still running"
+assert not _os.path.exists(_os.path.join(_dl_out, "My_App_1.0_scancode.json"))
 
 # Vendored-OSS identification (SCANOSS) can ride the same SOURCE sibling: the
 # flag is forwarded verbatim, and a credential goes by NAME ONLY, never as its

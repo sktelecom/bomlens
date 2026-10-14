@@ -537,6 +537,7 @@ LABEL com.sktelecom.sbom.firmware-tools="${SBOM_FIRMWARE}" \
       com.sktelecom.sbom.aibom-tools="${SBOM_AIBOM}" \
       com.sktelecom.sbom.pdf-tools="${SBOM_PDF}" \
       com.sktelecom.sbom.deep-license-tools="${SBOM_DEEP_LICENSE}" \
+      com.sktelecom.sbom.deep-cve-tools="${SBOM_DEEP_CVE}" \
       com.sktelecom.sbom.gpl-source-offer="https://github.com/sktelecom/bomlens/blob/main/THIRD_PARTY_LICENSES.md"
 
 COPY entrypoint.sh /usr/local/bin/run-scan
