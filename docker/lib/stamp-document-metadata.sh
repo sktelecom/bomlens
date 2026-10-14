@@ -156,10 +156,16 @@ fi
 # writes a fixed 1.6, an SBOM given to POSTPROCESS or kept as a merge root), so
 # a 1.4, 1.5 or 1.6 document is raised to 1.7 here when 1.7 was asked for,
 # $schema included. Those versions only gained fields up to 1.7 (the older
-# metadata.tools array is still accepted), so the content is valid as it
-# stands. 1.3 and older are left as they are: they predate the shapes this
-# pipeline writes into metadata. Never lowered: an AI SBOM is 1.7 whatever was
-# asked for.
+# metadata.tools array is still accepted), with one exception: from 1.6 on a
+# property must have a name, so a 1.4 or 1.5 property without one is removed
+# as the document is raised. 1.3 and older are left as they are: they predate
+# the shapes this pipeline writes into metadata. Never lowered: an AI SBOM is
+# 1.7 whatever was asked for.
+#
+# A document left below 1.5 (a 1.4 SBOM given to POSTPROCESS at the default
+# 1.6) keeps its version, as everything here does unless 1.7 is asked for, and
+# gets only what its version defines: no metadata.lifecycles (a 1.5 field) and
+# the BomLens tool entry in the older metadata.tools array.
 TMP="$(mktemp)"
 if jq --arg lifecycle "$LIFECYCLE" \
       --arg spec "$CDX_SPEC_VERSION" \
@@ -181,26 +187,32 @@ if jq --arg lifecycle "$LIFECYCLE" \
       else . end;
     def has_bomlens:
       ((.metadata.tools // {}) | tostring | contains("\"BomLens\""));
-    def add_bomlens($t):
+    def add_bomlens($t; $pre15):
       if has_bomlens then .
       # The older flat array (CycloneDX 1.4 and before) takes a tool, which has
       # vendor where a component has publisher, and no type.
-      elif (.metadata.tools | type) == "array" then .metadata.tools += [{vendor: $t.publisher, name: $t.name, version: $t.version}]
+      elif (.metadata.tools | type) == "array" or ($pre15 and .metadata.tools == null) then .metadata.tools = ((.metadata.tools // []) + [{vendor: $t.publisher, name: $t.name, version: $t.version}])
       elif (.metadata.tools | type) == "object" then .metadata.tools.components = (((.metadata.tools.components // []) + [$t]))
       else .metadata.tools = {components: [$t]} end;
 
       fill_tool_versions
     | (if $spec == "1.7" and ((.specVersion // "") | IN("1.4", "1.5", "1.6"))
-       then .specVersion = "1.7"
+       then (if (.specVersion | IN("1.4", "1.5"))
+             then walk(if type == "object" and (.properties | type) == "array"
+                       then .properties |= map(select(type != "object" or has("name")))
+                       else . end)
+             else . end)
+            | .specVersion = "1.7"
             | (if has("$schema") then ."$schema" = "http://cyclonedx.org/schema/bom-1.7.schema.json" else . end)
        else . end)
+    | ((.specVersion // "") | IN("1.0", "1.1", "1.2", "1.3", "1.4")) as $pre15
     # The tool the minimum elements ask about is the one the SBOM author ran, and
     # that is this one: the scanners below produced the raw inventory, but the
     # document being delivered is the one this pipeline normalized, enriched and
     # named. Their entries stay — the question is which tools were involved, not
     # which single tool gets the credit.
-    | add_bomlens({type: "application", publisher: "SK Telecom", name: "BomLens", version: $toolver})
-    | (if $lifecycle != "" then .metadata.lifecycles = [{phase: $lifecycle}] else . end)
+    | add_bomlens({type: "application", publisher: "SK Telecom", name: "BomLens", version: $toolver}; $pre15)
+    | (if $lifecycle != "" and ($pre15 | not) then .metadata.lifecycles = [{phase: $lifecycle}] else . end)
     | (if ($authors | length) > 0
        then .metadata.authors = $authors
        else (.metadata) |= del(.authors) end)
