@@ -1072,14 +1072,6 @@ rm -f "${OUTPUT_HOST_DIR}/${OUTPUT_FILE%_bom.json}_conda.cdx.json"
 # to clearing those via a throwaway container so nothing lingers.
 cleanup() {
     local d
-    for d in "${CLEANUP_DIRS[@]}"; do
-        [ -n "$d" ] || continue
-        rm -rf -- "$d" 2>/dev/null
-        if [ -e "$d" ] && command -v docker >/dev/null 2>&1; then
-            "${DOCKER_ENV[@]}" docker run --rm -v "$(hostpath "$(dirname "$d")")":/cleanup alpine:latest \
-                rm -rf -- "/cleanup/$(basename "$d")" >/dev/null 2>&1 || true
-        fi
-    done
     # RUNNING_CONTAINER_NAME is set only while stage 1 (SOURCE mode) is
     # waiting on its cdxgen container, so a Ctrl+C or `kill` reaching this
     # script here still stops that container instead of leaving it to run
@@ -1094,10 +1086,20 @@ cleanup() {
         "${DOCKER_ENV[@]}" docker rm -f "$RUNNING_CONTAINER_NAME" >/dev/null 2>&1 || true
         RUNNING_CONTAINER_NAME=""
     fi
+    for d in "${CLEANUP_DIRS[@]}"; do
+        [ -n "$d" ] || continue
+        rm -rf -- "$d" 2>/dev/null || true
+        if [ -e "$d" ] && command -v docker >/dev/null 2>&1; then
+            "${DOCKER_ENV[@]}" docker run --rm -v "$(hostpath "$(dirname "$d")")":/cleanup alpine:latest \
+                rm -rf -- "/cleanup/$(basename "$d")" >/dev/null 2>&1 || true
+        fi
+    done
 }
 # Ctrl+C or kill ends the run here, after cleanup, rather than going on to the
-# next step; exit runs the EXIT trap, and cleanup a second time does nothing
-# more (the temp dirs are gone and the container name is cleared).
+# next step. The container is stopped before its mounted temp dirs are
+# removed, and nothing in cleanup may fail the trap under set -e. exit runs
+# the EXIT trap, and cleanup a second time does nothing more (the temp dirs
+# are gone and the container name is cleared).
 trap cleanup EXIT
 trap 'cleanup; exit 130' INT
 trap 'cleanup; exit 143' TERM
