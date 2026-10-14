@@ -2414,9 +2414,13 @@ echo "[2/2] Uploading to Dependency Track..."
 if [ -z "$API_KEY" ] || [ -z "$API_URL" ]; then
     echo "[ERROR] API_KEY and API_URL are required for upload."; exit 1
 fi
-if ! curl -s --max-time 5 "$API_URL/api/version" > /dev/null 2>&1; then
+DT_VERSION_JSON=""
+if ! DT_VERSION_JSON="$(curl -s --max-time 5 "$API_URL/api/version" 2>/dev/null)"; then
     echo "[WARN] Cannot reach Dependency Track at $API_URL."
 fi
+# The server's version, when /api/version gives one in the x.y.z form.
+DT_VERSION="$(printf '%s' "$DT_VERSION_JSON" | jq -r '.version // empty' 2>/dev/null \
+    | grep -E '^[0-9]+\.[0-9]+\.[0-9]+' | head -n 1 || true)"
 dt_upload() {
     CURL_RC=0
     RESPONSE=$(curl -s -w "\n%{http_code}" --connect-timeout 10 -X POST "$API_URL/api/v1/bom" \
@@ -2432,18 +2436,50 @@ dt_upload() {
 }
 dt_upload "$OUTPUT_FILE"
 # Dependency-Track reads CycloneDX 1.7 from 4.14.4 and 5.1.0 on; an older
-# server refuses a 1.7 BOM (--spec-version 1.7) as invalid. The same retry as
-# scan-security.sh gives Trivy: once more with a copy labelled 1.6, and the
-# delivered SBOM keeps its version.
-if [ "$HTTP_CODE" = "400" ] && [ "$(jq -r '.specVersion // ""' "$OUTPUT_FILE" 2>/dev/null)" = "1.7" ]; then
-    DT_COPY="$(mktemp)"
-    if jq '.specVersion = "1.6"
-           | (if has("$schema") then ."$schema" = "http://cyclonedx.org/schema/bom-1.6.schema.json" else . end)' \
-           "$OUTPUT_FILE" > "$DT_COPY" 2>/dev/null; then
-        echo "[WARN] Dependency-Track refused the CycloneDX 1.7 SBOM (HTTP 400); it reads 1.7 from 4.14.4 and 5.1.0 on. Re-sending a copy labelled 1.6 (delivered SBOM unchanged)."
-        dt_upload "$DT_COPY"
+# server refuses a 1.7 BOM (a scan that asked for 1.7, and AI model and dataset SBOMs)
+# as invalid. When /api/version names such a server, or names no version at
+# all, a 400 is answered once more with a 1.6 copy (cdx-copy-as-1.6.sh, which
+# also rewrites what 1.6 does not allow), and the delivered SBOM keeps its
+# version. A server that reads 1.7 gets no second try: its 400 is about
+# something else.
+dt_reads_17() {
+    # 0: reads 1.7; 1: does not; 2: the version is not known.
+    [ -n "$DT_VERSION" ] || return 2
+    local major minor patch
+    major="${DT_VERSION%%.*}"
+    minor="${DT_VERSION#*.}"; minor="${minor%%.*}"
+    patch="${DT_VERSION#*.*.}"; patch="${patch%%[!0-9]*}"
+    [ -n "$patch" ] || patch=0
+    if [ "$major" -lt 4 ]; then return 1; fi
+    if [ "$major" -eq 4 ]; then
+        if [ "$minor" -lt 14 ] || { [ "$minor" -eq 14 ] && [ "$patch" -lt 4 ]; }; then return 1; fi
+        return 0
     fi
-    rm -f "$DT_COPY"
+    if [ "$major" -eq 5 ] && [ "$minor" -eq 0 ]; then return 1; fi
+    return 0
+}
+if [ "$HTTP_CODE" = "400" ] && [ "$(jq -r '.specVersion // ""' "$OUTPUT_FILE" 2>/dev/null)" = "1.7" ]; then
+    DT_READS_17=0
+    dt_reads_17 || DT_READS_17=$?
+    if [ "$DT_READS_17" = 0 ]; then
+        echo "[WARN] Dependency-Track $DT_VERSION reads CycloneDX 1.7, so the refusal (HTTP 400) is not about the version; the SBOM is not sent again."
+    else
+        DT_COPY="$(mktemp)"
+        if bash "$LIBDIR/cdx-copy-as-1.6.sh" "$OUTPUT_FILE" "$DT_COPY" 2>/dev/null; then
+            if [ "$DT_READS_17" = 1 ]; then
+                echo "[WARN] Dependency-Track $DT_VERSION refused the CycloneDX 1.7 SBOM (HTTP 400); it reads 1.7 from 4.14.4 and 5.1.0 on. Sending a CycloneDX 1.6 copy instead (delivered SBOM unchanged)."
+            else
+                echo "[WARN] Dependency-Track refused the CycloneDX 1.7 SBOM (HTTP 400) and its version is not known; servers before 4.14.4 and 5.1.0 do not read 1.7. Sending a CycloneDX 1.6 copy once (delivered SBOM unchanged)."
+            fi
+            DT_FIRST_BODY="$BODY"
+            dt_upload "$DT_COPY"
+            if ! { [[ "$HTTP_CODE" =~ ^[0-9]+$ ]] && [ "$HTTP_CODE" -ge 200 ] && [ "$HTTP_CODE" -lt 300 ]; }; then
+                echo "[ERROR] The CycloneDX 1.6 copy was refused too (HTTP $HTTP_CODE)."
+                echo "Response to the 1.7 SBOM: $DT_FIRST_BODY"
+            fi
+        fi
+        rm -f "$DT_COPY"
+    fi
 fi
 # A response that is not a status line at all (proxy banner, truncated body)
 # would make the numeric comparison below abort the script instead of reporting.
