@@ -217,7 +217,8 @@ done
 # The step before this one (reachability.sh) wrote govulncheck's judgements as a
 # CycloneDX VEX. Each finding it covers, matched on the advisory id (the CVE or
 # one of its references) and the component (purl, else module path and
-# version), carries the judgement as "bomlens:reachability" in _security.json,
+# version; the path keeps its case, as Go module paths are case-sensitive),
+# carries the judgement as "bomlens:reachability" in _security.json,
 # and the document has a Reachability summary. A finding judged not_affected
 # (code_not_present or code_not_reachable) is listed on its own below and left
 # out of the totals, as the kernel's advisories are: it is shown, not dropped. A
@@ -227,7 +228,7 @@ REACH_DOC="${REACHABILITY_DOC:-}"
 if [ -n "$REACH_DOC" ] && [ -f "$REACH_DOC" ] && jq -e '.vulnerabilities | type == "array"' "$REACH_DOC" >/dev/null 2>&1; then
     tmp_r="$(mktemp)"
     if jq --slurpfile vex "$REACH_DOC" --arg doc "$(basename "$REACH_DOC")" '
-        def np: (. // "") | tostring | sub("[?#].*$"; "") | ascii_downcase;
+        def np: (. // "") | tostring | sub("[?#].*$"; "") | sub("^pkg:golang/"; "pkg:golang/"; "i");
         def nv: (. // "") | sub("^(go|v)(?=[0-9])"; "");
         def modkey: np | sub("^pkg:golang/"; "") | (split("@") | (.[0:-1] | join("@")) + "@" + (.[-1] | nv));
         ($vex[0]) as $v
@@ -238,13 +239,18 @@ if [ -n "$REACH_DOC" ] && [ -f "$REACH_DOC" ] && jq -e '.vulnerabilities | type 
              | $ids[] as $id
              | ({key: (($p | np) + "|" + $id), value: $x},
                 {key: (($p | modkey) + "|" + $id), value: $x}) ]
+           # One key can carry more than one statement (two Go advisories with
+           # the same CVE): a reached one wins over one that is not.
+           | group_by(.key)
+           | map({key: .[0].key,
+                  value: ((map(.value) | map(select(.analysis.state == "exploitable"))) + map(.value) | .[0])})
            | from_entries) as $map
         | ($v.metadata.properties // [] | map(select(.name == "bomlens:reachability:mode")) | .[0].value // "") as $mode
         | .Results = [ (.Results // [])[] | .Vulnerabilities = [ (.Vulnerabilities // [])[]
             | ((.PkgIdentifier // {}).PURL // "") as $tp
             | (.VulnerabilityID // "") as $id
             | ($map[($tp | np) + "|" + $id]
-               // $map[((.PkgName // "") | ascii_downcase) + "@" + (.InstalledVersion | nv) + "|" + $id]) as $x
+               // $map[(.PkgName // "") + "@" + (.InstalledVersion | nv) + "|" + $id]) as $x
             | if $x then . + {"bomlens:reachability": ({state: $x.analysis.state}
                   + (if $x.analysis.justification then {justification: $x.analysis.justification} else {} end)
                   + {detail: ($x.analysis.detail // ""),

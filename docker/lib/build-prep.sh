@@ -4421,27 +4421,121 @@ fi
 # --reachability (Go): govulncheck reads the source with the Go toolchain this
 # image carries, so it runs here, after the module graph is complete, and not
 # in the post-processing image, which has no toolchain. The caller mounts the
-# govulncheck binary of the post-processing image at BOMLENS_GOVULNCHECK. Its
-# JSON stream, standard error and exit status go beside the SBOM; stage 2
-# (assess-reachability.py) reads and removes them. Nothing here changes the
-# SBOM, and a failure (no network for the Go vulnerability database, a tree
-# that does not build) is stage 2's to report.
-if [ "${BOMLENS_REACHABILITY:-false}" = "true" ] && [ -f go.mod ] && command -v go >/dev/null 2>&1; then
-    _gv_out="${OUT%_bom.json}_govulncheck_stage1"
-    rm -f "$_gv_out.json" "$_gv_out.err" "$_gv_out.rc"
-    if [ -n "${BOMLENS_GOVULNCHECK:-}" ] && [ -x "$BOMLENS_GOVULNCHECK" ]; then
-        log "reachability: govulncheck (source, call graph)"
-        run_supervised_timeout "$PREP_TIMEOUT_DEFAULT" \
-            sh -c '"$0" -format json ./... > "$1.json" 2> "$1.err"' "$BOMLENS_GOVULNCHECK" "$_gv_out"
-        echo "$?" > "$_gv_out.rc"
-    else
+# govulncheck binary of the post-processing image at BOMLENS_GOVULNCHECK and
+# gives a nonce (BOMLENS_REACHABILITY_NONCE) that stage 2 checks, so files an
+# earlier run left are never read as this run's. Nothing here changes the SBOM,
+# and a failure (no network for the Go vulnerability database, a tree that
+# does not build) is stage 2's to report.
+#
+# govulncheck reads one module per run and only the files the current GOOS
+# and GOARCH build, so it runs for every go.mod in the tree (up to
+# _rch_max_modules; vendor/, testdata/, node_modules/ and folders starting
+# with . or _, which `go build ./...` skips too, are not searched) and for
+# GOOS linux, darwin and windows, GOARCH amd64. Stage 2 keeps, per advisory,
+# the deepest level any run found. A module listed in the go.work governing
+# it runs in workspace mode, as `go build` there would; any other module runs
+# alone (GOWORK=off). A module with a vendor/ folder is judged on the tree as
+# it was before the go mod tidy above, after the guard puts it back: tidy can
+# add requirements and raise the go line, and the vendored copy then no longer
+# matches go.mod. With the guard off, it is read from the module cache instead
+# (-mod=mod). Each run's stream, standard error and exit status go beside the
+# SBOM, the run list last (stage 2 reads nothing without it).
+_rch_out=""; _rch_runs=""; _rch_deferred=""; _rch_n=0
+_rch_max_modules=20
+if [ "${BOMLENS_REACHABILITY:-false}" = "true" ] && command -v go >/dev/null 2>&1; then
+    _rch_out="${OUT%_bom.json}_govulncheck_stage1"
+    rm -f "$_rch_out.json" "$_rch_out.err" "$_rch_out.rc"
+    _rch_mods=$(find . \( -name vendor -o -name testdata -o -name node_modules -o -name '.?*' -o -name '_*' \) \
+        -prune -o -type f -name go.mod -print 2>/dev/null | sed 's|/go\.mod$||' | LC_ALL=C sort)
+    _rch_count=$(printf '%s\n' "$_rch_mods" | grep -c . || true)
+    if [ "${_rch_count:-0}" -eq 0 ]; then
+        _rch_out=""
+    elif [ -z "${BOMLENS_GOVULNCHECK:-}" ] || [ ! -x "$BOMLENS_GOVULNCHECK" ]; then
         log "reachability: no govulncheck binary was handed to this image; call analysis skipped"
+        _rch_out=""
+    elif [ "$_rch_count" -gt "$_rch_max_modules" ]; then
+        log "reachability: $_rch_count Go modules, over the $_rch_max_modules that are judged; call analysis skipped"
+        printf 'nonce %s\ntoo_large %s %s\n' "${BOMLENS_REACHABILITY_NONCE:-}" "$_rch_count" "$_rch_max_modules" > "$_rch_out.rc"
+        _rch_out=""
+    else
+        _rch_runs=$(mktemp)
+        : > "$_rch_out.json"; : > "$_rch_out.err"
     fi
+fi
+
+# rch_workspace_member <module dir>: true when the go.work that governs the
+# module (go env GOWORK, from its folder) lists it in a use directive.
+rch_workspace_member() {
+    _rch_gw=$(cd "$1" && GOTOOLCHAIN="${HOST_GOTOOLCHAIN:-auto}" go env GOWORK 2>/dev/null) || return 1
+    [ -n "$_rch_gw" ] && [ "$_rch_gw" != off ] && [ -f "$_rch_gw" ] || return 1
+    _rch_mod=$(cd "$1" && pwd -P) || return 1
+    _rch_gwdir=$(dirname "$_rch_gw")
+    (cd "$_rch_gwdir" && GOTOOLCHAIN="${HOST_GOTOOLCHAIN:-auto}" go work edit -json "$_rch_gw" 2>/dev/null) \
+        | sed -n 's/^[[:space:]]*"DiskPath": "\(.*\)",*$/\1/p' | {
+        while IFS= read -r _rch_use; do
+            case "$_rch_use" in /*) ;; *) _rch_use="$_rch_gwdir/$_rch_use" ;; esac
+            [ "$(cd "$_rch_use" 2>/dev/null && pwd -P)" = "$_rch_mod" ] && exit 0
+        done
+        exit 1
+    }
+}
+
+# rch_run_module <module dir> <GOFLAGS or "">: govulncheck once per GOOS.
+rch_run_module() {
+    _rch_dir="$1"; _rch_flags="$2"; _rch_work=off; _rch_how=module
+    if rch_workspace_member "$_rch_dir"; then _rch_work=workspace; _rch_how=workspace; fi
+    [ -z "$_rch_flags" ] || _rch_how="$_rch_how,$_rch_flags"
+    for _rch_goos in linux darwin windows; do
+        _rch_n=$((_rch_n + 1))
+        printf '{"bomlens_run": %s}\n' "$_rch_n" >> "$_rch_out.json"
+        printf '== bomlens run %s ==\n' "$_rch_n" >> "$_rch_out.err"
+        log "reachability: govulncheck (source, call graph) $_rch_dir GOOS=$_rch_goos"
+        run_supervised_timeout "$PREP_TIMEOUT_DEFAULT" sh -c '
+            cd "$1" || exit 1
+            if [ "$3" = workspace ]; then unset GOWORK; else export GOWORK=off; fi
+            [ -z "$4" ] || export GOFLAGS="$4"
+            GOOS="$2" GOARCH=amd64 GOTOOLCHAIN="$6" "$0" -format json ./... >> "$5.json" 2>> "$5.err"' \
+            "$BOMLENS_GOVULNCHECK" "$_rch_dir" "$_rch_goos" "$_rch_work" \
+            "$_rch_flags" "$_rch_out" "${HOST_GOTOOLCHAIN:-auto}"
+        printf 'run %s %s %s %s %s\n' "$_rch_n" "$?" "$_rch_goos" "$_rch_how" "$_rch_dir" >> "$_rch_runs"
+    done
+}
+
+if [ -n "$_rch_runs" ]; then
+    # Read the list from a here-document, not a pipe: the runs must count into
+    # _rch_n in this shell.
+    while IFS= read -r _rch_d; do
+        [ -n "$_rch_d" ] || continue
+        if [ -f "$_rch_d/vendor/modules.txt" ]; then
+            _rch_deferred="$_rch_deferred$_rch_d
+"
+        else
+            rch_run_module "$_rch_d" ""
+        fi
+    done <<EOF
+$_rch_mods
+EOF
 fi
 
 # Put the scanned tree back before the ownership fix below, so anything we
 # restored is chown'd too (the trap only covers an abnormal exit).
+_rch_restored=""; [ -z "$GUARD_DIR" ] || _rch_restored=1
 guard_restore
+
+# --reachability: the modules with a vendor/ folder, on the tree as it was
+# (see above), then the run list that tells stage 2 the output is complete.
+if [ -n "$_rch_runs" ]; then
+    while IFS= read -r _rch_d; do
+        [ -n "$_rch_d" ] || continue
+        if [ -n "$_rch_restored" ]; then rch_run_module "$_rch_d" ""; else rch_run_module "$_rch_d" "-mod=mod"; fi
+    done <<EOF
+$_rch_deferred
+EOF
+    { printf 'nonce %s
+goarch amd64
+' "${BOMLENS_REACHABILITY_NONCE:-}"; cat "$_rch_runs"; } > "$_rch_out.rc"
+    rm -f "$_rch_runs"
+fi
 
 # Hand the build tree back to the host user. This image runs as root (-u 0:0),
 # so the build steps above (npm install, cargo/go fetch, the bom write) leave

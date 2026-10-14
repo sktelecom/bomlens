@@ -189,7 +189,8 @@ TRUSCA_REF="${TRUSCA_REF:-}"; TRUSCA_RELEASE="${TRUSCA_RELEASE:-}"
 GENERATE_ONLY="false"; TARGET=""; PROJECT_NAME=""; PROJECT_VERSION=""; NESTED_ROOTFS_HINT=""
 GENERATE_NOTICE="false"; GENERATE_SECURITY="false"; GENERATE_SPDX="false"; DEEP_LICENSE="false"
 # Go reachability (--reachability): opt-in, it reads the Go vulnerability database online.
-REACHABILITY="false"
+# REACHABILITY_NONCE: set when stage 1 is handed govulncheck (see there).
+REACHABILITY="false"; REACHABILITY_NONCE=""
 # Tracks an EXPLICIT --security/--all, as opposed to the risk-report default
 # turning security on: only an explicit request is worth answering when a mode
 # cannot produce the report.
@@ -1108,8 +1109,9 @@ cleanup() {
                 rm -rf -- "/cleanup/$(basename "$d")" >/dev/null 2>&1 || true
         fi
     done
-    # The govulncheck copy --reachability hands stage 1 (removed after it, too).
-    [ -z "${REACH_BIN:-}" ] || rm -f "$REACH_BIN" 2>/dev/null || true
+    # The folder of the govulncheck copy --reachability hands stage 1
+    # (removed right after it, too).
+    [ -z "${REACH_TOOLS_DIR:-}" ] || rm -rf -- "$REACH_TOOLS_DIR" 2>/dev/null || true
 }
 # Ctrl+C or kill ends the run here, after cleanup, rather than going on to the
 # next step. The container is stopped before its mounted temp dirs are
@@ -1120,7 +1122,7 @@ trap cleanup EXIT
 trap 'cleanup; echo "[INFO] Scan cancelled (Ctrl+C); the scan container was stopped." >&2; exit 130' INT
 trap 'cleanup; echo "[INFO] Scan stopped (TERM); the scan container was stopped." >&2; exit 143' TERM
 RUNNING_CONTAINER_NAME=""
-REACH_BIN=""
+REACH_TOOLS_DIR=""
 
 # Host-persistent guard state: when a scan is interrupted hard
 # enough that build-prep.sh's own trap never runs (SIGKILL, OOM, a host
@@ -1247,13 +1249,13 @@ pp_env() {
     # secret never lands on the `docker run` argv where a local `ps` could read
     # it. Their values ride the exported shell env (see the export before each
     # `docker run`), matching the web-server path. Non-secret fields keep =value.
-    printf ' -e GENERATE_NOTICE=%s -e GENERATE_SECURITY=%s -e GENERATE_SPDX=%s -e SECURITY_ENRICH=%s -e GENERATE_REPORT=%s -e DEEP_LICENSE=%s -e IDENTIFY_VENDORED=%s -e SCANOSS_API_URL=%q -e SCANOSS_API_KEY -e SIGN_SBOM=%s -e BYTE_STABLE=%s -e REPORT_LANG=%s -e UPLOAD_ENABLED=%s -e PROJECT_NAME=%q -e PROJECT_VERSION=%q -e HOST_OUTPUT_DIR=/host-output -e HOST_UID=%s -e HOST_GID=%s -e API_KEY -e API_URL=%q -e UPLOAD_TARGET=%q -e TRUSCA_PROJECT_ID=%q -e TRUSCA_REF=%q -e TRUSCA_RELEASE=%q -e ENRICH_CDXGEN=%s -e ENRICH_EOL=%s -e ENRICH_MALICIOUS=%s -e STALENESS_ENRICH=%s -e DEEP_CVE=%s -e SECURITY_NVD_VERIFY=%s -e ENRICH_HF_SECURITY=%s -e VERIFY_MODEL_WEIGHTS=%s -e AIBOM_VERIFY_MAX_FILES=%q -e AIBOM_VERIFY_MAX_BYTES=%q -e AIBOM_DATASET_DEPTH=%q -e AIBOM_DATASET_MAX_LOOKUPS=%q -e GENERATE_SPDX3=%s -e AI_USAGE_CONTEXT=%q -e PROJECT_LICENSE=%q -e SBOM_AUTHOR=%q -e SRC_TREE_EXCLUDE=%q -e SOURCE_TREE_MAX=%q -e SOURCE_SNAPSHOT_MAX_TOTAL=%q -e SOURCE_SNAPSHOT_MAX_FILE=%q -e SOURCE_SNAPSHOT_MAX_FILES=%q -e FW_VERSTR_MAX_FILES=%q -e FW_VERSTR_MAX_BYTES=%q -e FW_ELF_MAX_FILES=%q -e FW_KERNEL_MAX_FILES=%q -e FW_KERNEL_MAX_BYTES=%q -e FW_KERNEL_MAX_VERSIONS=%q -e FW_EXTRA_ROOTS=%q -e FW_MAX_EXTRA_ROOTS=%q -e FW_CONTAINER_MEMBERSHIP=%q -e PURL_MIN_PCT=%q -e LICENSE_MIN_PCT=%q -e HASH_MIN_PCT=%q -e FIELD_MIN_PCT=%q -e CONFORMANCE_PROFILE=%s -e PURL_RESOLVE=%s -e PURL_RESOLVE_IGNORE -e PURL_RESOLVE_BUDGET -e LICENSE_REGISTRY=%s -e REACHABILITY=%s -e LICENSE_REGISTRY_VERIFY -e LICENSE_REGISTRY_BUDGET -e LICENSE_REGISTRY_API -e DEEP_LICENSE_MAX_FILES -e DEEP_LICENSE_TIMEOUT -e BOMLENS_DEEP_LICENSE_ALL' \
+    printf ' -e GENERATE_NOTICE=%s -e GENERATE_SECURITY=%s -e GENERATE_SPDX=%s -e SECURITY_ENRICH=%s -e GENERATE_REPORT=%s -e DEEP_LICENSE=%s -e IDENTIFY_VENDORED=%s -e SCANOSS_API_URL=%q -e SCANOSS_API_KEY -e SIGN_SBOM=%s -e BYTE_STABLE=%s -e REPORT_LANG=%s -e UPLOAD_ENABLED=%s -e PROJECT_NAME=%q -e PROJECT_VERSION=%q -e HOST_OUTPUT_DIR=/host-output -e HOST_UID=%s -e HOST_GID=%s -e API_KEY -e API_URL=%q -e UPLOAD_TARGET=%q -e TRUSCA_PROJECT_ID=%q -e TRUSCA_REF=%q -e TRUSCA_RELEASE=%q -e ENRICH_CDXGEN=%s -e ENRICH_EOL=%s -e ENRICH_MALICIOUS=%s -e STALENESS_ENRICH=%s -e DEEP_CVE=%s -e SECURITY_NVD_VERIFY=%s -e ENRICH_HF_SECURITY=%s -e VERIFY_MODEL_WEIGHTS=%s -e AIBOM_VERIFY_MAX_FILES=%q -e AIBOM_VERIFY_MAX_BYTES=%q -e AIBOM_DATASET_DEPTH=%q -e AIBOM_DATASET_MAX_LOOKUPS=%q -e GENERATE_SPDX3=%s -e AI_USAGE_CONTEXT=%q -e PROJECT_LICENSE=%q -e SBOM_AUTHOR=%q -e SRC_TREE_EXCLUDE=%q -e SOURCE_TREE_MAX=%q -e SOURCE_SNAPSHOT_MAX_TOTAL=%q -e SOURCE_SNAPSHOT_MAX_FILE=%q -e SOURCE_SNAPSHOT_MAX_FILES=%q -e FW_VERSTR_MAX_FILES=%q -e FW_VERSTR_MAX_BYTES=%q -e FW_ELF_MAX_FILES=%q -e FW_KERNEL_MAX_FILES=%q -e FW_KERNEL_MAX_BYTES=%q -e FW_KERNEL_MAX_VERSIONS=%q -e FW_EXTRA_ROOTS=%q -e FW_MAX_EXTRA_ROOTS=%q -e FW_CONTAINER_MEMBERSHIP=%q -e PURL_MIN_PCT=%q -e LICENSE_MIN_PCT=%q -e HASH_MIN_PCT=%q -e FIELD_MIN_PCT=%q -e CONFORMANCE_PROFILE=%s -e PURL_RESOLVE=%s -e PURL_RESOLVE_IGNORE -e PURL_RESOLVE_BUDGET -e LICENSE_REGISTRY=%s -e REACHABILITY=%s -e REACHABILITY_NONCE=%s -e LICENSE_REGISTRY_VERIFY -e LICENSE_REGISTRY_BUDGET -e LICENSE_REGISTRY_API -e DEEP_LICENSE_MAX_FILES -e DEEP_LICENSE_TIMEOUT -e BOMLENS_DEEP_LICENSE_ALL' \
         "$GENERATE_NOTICE" "$GENERATE_SECURITY" "$GENERATE_SPDX" "$SECURITY_ENRICH" "$GENERATE_REPORT" "$DEEP_LICENSE" "$IDENTIFY_VENDORED" "$SCANOSS_API_URL" "$SIGN_SBOM" "$BYTE_STABLE" "$REPORT_LANG" "$UPLOAD_VAR" "$PROJECT_NAME" "$PROJECT_VERSION" "$(id -u)" "$(id -g)" "$SERVER_URL" "$UPLOAD_TARGET" "$TRUSCA_PROJECT_ID" "$TRUSCA_REF" "$TRUSCA_RELEASE" "${ENRICH_CDXGEN:-true}" "${ENRICH_EOL:-true}" "${ENRICH_MALICIOUS:-true}" "${STALENESS_ENRICH:-false}" "$DEEP_CVE" "${SECURITY_NVD_VERIFY:-false}" "${ENRICH_HF_SECURITY:-true}" "$VERIFY_WEIGHTS" "${AIBOM_VERIFY_MAX_FILES:-}" "${AIBOM_VERIFY_MAX_BYTES:-}" "${AIBOM_DATASET_DEPTH:-}" "${AIBOM_DATASET_MAX_LOOKUPS:-}" "$GENERATE_SPDX3" "${USAGE_CONTEXT:-${AI_USAGE_CONTEXT:-}}" "${PROJECT_LICENSE:-}" "${SBOM_AUTHOR:-}" "${SRC_TREE_EXCLUDE:-}" \
         "${SOURCE_TREE_MAX:-}" "${SOURCE_SNAPSHOT_MAX_TOTAL:-}" "${SOURCE_SNAPSHOT_MAX_FILE:-}" "${SOURCE_SNAPSHOT_MAX_FILES:-}" \
         "${FW_VERSTR_MAX_FILES:-}" "${FW_VERSTR_MAX_BYTES:-}" "${FW_ELF_MAX_FILES:-}" \
         "${FW_KERNEL_MAX_FILES:-}" "${FW_KERNEL_MAX_BYTES:-}" "${FW_KERNEL_MAX_VERSIONS:-}" \
         "${FW_EXTRA_ROOTS:-}" "${FW_MAX_EXTRA_ROOTS:-}" "${FW_CONTAINER_MEMBERSHIP:-}" \
-        "${PURL_MIN_PCT:-}" "${LICENSE_MIN_PCT:-}" "${HASH_MIN_PCT:-}" "${FIELD_MIN_PCT:-}" "$CONFORMANCE_PROFILE" "${PURL_RESOLVE:-false}" "${LICENSE_REGISTRY:-false}" "$REACHABILITY"
+        "${PURL_MIN_PCT:-}" "${LICENSE_MIN_PCT:-}" "${HASH_MIN_PCT:-}" "${FIELD_MIN_PCT:-}" "$CONFORMANCE_PROFILE" "${PURL_RESOLVE:-false}" "${LICENSE_REGISTRY:-false}" "$REACHABILITY" "$REACHABILITY_NONCE"
     printf ' -e CYCLONEDX_SPEC_VERSION=%s' "$CDX_SPEC_VERSION"
     # Proxy, Trivy database and EPSS/KEV settings, by name.
     printf ' %s' "$(stage2_network_env_args)"
@@ -2590,10 +2592,15 @@ if [ "$MODE" = "SOURCE" ]; then
     PREP_ENV_ARGS=$(build_prep_env_args)
     # --reachability on Go: govulncheck needs the Go toolchain of the stage 1
     # image, and stage 1 images do not carry govulncheck, so the binary is
-    # copied out of the post-processing image into the run folder (which stage
-    # 1 mounts as /out) and removed when stage 1 is done. Stage 2 reports what
-    # came of it; an earlier run's leftovers are removed first.
-    REACH_BIN=""
+    # copied out of the post-processing image into a new folder of its own
+    # and mounted read-only at /bomlens-tools, apart from the run folder. The
+    # folder sits under the state folder, which the Docker engine can read on
+    # every host ($TMPDIR is /var/folders on macOS, which Colima does not
+    # share), and is removed when stage 1 is done. Stage 1 writes the nonce it
+    # is given beside its output and stage 2 reads only output that carries
+    # it, so an earlier run's leftovers are never this run's; they are
+    # removed first as well.
+    REACH_TOOLS_DIR=""; REACH_ARGS=""
     rm -f "$OUTPUT_HOST_DIR/${SAFE_PROJECT}_${SAFE_VERSION}_govulncheck_stage1".json \
           "$OUTPUT_HOST_DIR/${SAFE_PROJECT}_${SAFE_VERSION}_govulncheck_stage1".err \
           "$OUTPUT_HOST_DIR/${SAFE_PROJECT}_${SAFE_VERSION}_govulncheck_stage1".rc
@@ -2601,13 +2608,24 @@ if [ "$MODE" = "SOURCE" ]; then
         if ! docker image inspect "$POSTPROCESS_IMAGE" >/dev/null 2>&1 && [ "$SBOM_PULL" != "never" ]; then
             docker pull -q "$POSTPROCESS_IMAGE" >/dev/null 2>&1 || true
         fi
-        _rch_cid="$("${DOCKER_ENV[@]}" docker create --entrypoint true "$POSTPROCESS_IMAGE" 2>/dev/null)" || _rch_cid=""
+        _rch_base="$(dirname "$GUARD_STATE_DIR")/tools"
+        # A copy left by a scan that was killed outright (no trap ran).
+        find "$_rch_base" -maxdepth 1 -name 'govulncheck.*' -mmin +1440 -exec rm -rf {} + 2>/dev/null || true
+        mkdir -p "$_rch_base" 2>/dev/null && REACH_TOOLS_DIR="$(mktemp -d "$_rch_base/govulncheck.XXXXXX" 2>/dev/null)" || REACH_TOOLS_DIR=""
+        # Readable by the stage 1 container's user whatever the engine's file
+        # sharing maps it to; it holds nothing but the public binary.
+        [ -z "$REACH_TOOLS_DIR" ] || chmod 755 "$REACH_TOOLS_DIR" 2>/dev/null || true
+        _rch_cid=""
+        [ -z "$REACH_TOOLS_DIR" ] || _rch_cid="$("${DOCKER_ENV[@]}" docker create --entrypoint true "$POSTPROCESS_IMAGE" 2>/dev/null)" || _rch_cid=""
         if [ -n "$_rch_cid" ] \
-           && "${DOCKER_ENV[@]}" docker cp "$_rch_cid:/usr/local/bin/govulncheck" "$(hostpath "$OUTPUT_HOST_DIR")/.bomlens-govulncheck" >/dev/null 2>&1; then
-            REACH_BIN="$OUTPUT_HOST_DIR/.bomlens-govulncheck"
-            PREP_ENV_ARGS="$PREP_ENV_ARGS -e BOMLENS_REACHABILITY=true -e BOMLENS_GOVULNCHECK=/out/.bomlens-govulncheck"
+           && "${DOCKER_ENV[@]}" docker cp "$_rch_cid:/usr/local/bin/govulncheck" "$(hostpath "$REACH_TOOLS_DIR")/govulncheck" >/dev/null 2>&1; then
+            REACHABILITY_NONCE="$(od -An -N8 -tx1 /dev/urandom 2>/dev/null | tr -d ' \n')"
+            [ -n "$REACHABILITY_NONCE" ] || REACHABILITY_NONCE="$$${RANDOM}${RANDOM}$(date +%s)"
+            REACH_ARGS="-v \"$(hostpath "$REACH_TOOLS_DIR")\":/bomlens-tools:ro -e BOMLENS_REACHABILITY=true -e BOMLENS_GOVULNCHECK=/bomlens-tools/govulncheck -e BOMLENS_REACHABILITY_NONCE=$REACHABILITY_NONCE"
         else
-            echo "[WARN] --reachability: $POSTPROCESS_IMAGE has no govulncheck (an older image?); the Go call analysis is skipped. Refresh it (docker pull) and run again."
+            echo "[WARN] --reachability: could not take govulncheck from $POSTPROCESS_IMAGE (an older image without it?); the Go call analysis is skipped. Refresh it (docker pull) and run again."
+            [ -z "$REACH_TOOLS_DIR" ] || rm -rf -- "$REACH_TOOLS_DIR"
+            REACH_TOOLS_DIR=""
         fi
         [ -z "$_rch_cid" ] || "${DOCKER_ENV[@]}" docker rm -f "$_rch_cid" >/dev/null 2>&1 || true
     fi
@@ -2668,6 +2686,7 @@ if [ "$MODE" = "SOURCE" ]; then
         -e HOST_UID="$(id -u)" -e HOST_GID="$(id -g)" \
         -e HOST_GOTOOLCHAIN="\"$HOST_GOTOOLCHAIN\"" -e GOPROXY -e GOSUMDB \
         $PREP_ENV_ARGS \
+        $REACH_ARGS \
         --entrypoint sh "\"$CDX_IMG\"" \
         /tmp/build-prep.sh /app "\"/out/$OUTPUT_FILE\"" "$CDX_SPEC_VERSION" > "$STAGE1_LOG" 2>&1 &
     STAGE1_PID=$!
@@ -2678,7 +2697,8 @@ if [ "$MODE" = "SOURCE" ]; then
     # runs. The real exit code comes from `docker wait` next regardless.
     wait "$STAGE1_PID" || true
     RUNNING_CONTAINER_NAME=""
-    [ -z "$REACH_BIN" ] || rm -f "$REACH_BIN"
+    [ -z "$REACH_TOOLS_DIR" ] || rm -rf -- "$REACH_TOOLS_DIR"
+    REACH_TOOLS_DIR=""
     STAGE1_RC=$("${DOCKER_ENV[@]}" docker wait "$STAGE1_CONTAINER" 2>/dev/null || echo 1)
     # When stage 1 left no SBOM, stage 2 takes its place with the manifest-only
     # syft scan: the same fallback a caller running the execution plan gets

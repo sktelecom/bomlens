@@ -283,6 +283,17 @@ stop_sibling() {
     docker stop -t "$BOMLENS_CANCEL_GRACE" "$SIBLING_CID" >/dev/null 2>&1 || true
 }
 
+# REACH_TOOLS_DIR: the folder holding the govulncheck copy handed to the
+# sibling (--reachability), while it runs. REACHABILITY_NONCE: the nonce that
+# sibling was given, read by the reachability step (reachability.sh).
+REACH_TOOLS_DIR=""
+REACHABILITY_NONCE="${REACHABILITY_NONCE:-}"
+remove_reach_tools() {
+    [ -n "$REACH_TOOLS_DIR" ] || return 0
+    rm -rf -- "$REACH_TOOLS_DIR" 2>/dev/null
+    REACH_TOOLS_DIR=""
+}
+
 # Host-persistent guard state: mirrors scripts/scan-sbom.sh's
 # setup_guard_state for the web UI's SOURCE scans. Whoever launched this
 # container (scan-sbom.sh --ui, the desktop app) mounts a host directory at
@@ -480,16 +491,31 @@ generate_sbom_cdxgen() {
     # 128KiB single-argument limit).
     local prep_file; prep_file=$(write_prep_file "$prep")
     # --reachability on Go: the sibling has the Go toolchain this image lacks,
-    # so govulncheck runs there (build-prep.sh). The binary is copied into the
-    # output folder the sibling shares, and removed once it has finished.
-    local reach_env=() reach_bin=""
+    # so govulncheck runs there (build-prep.sh). The binary is copied into a
+    # new folder of its own under the guard-state mount, which the sibling
+    # shares through --volumes-from and which is not the run folder, and the
+    # folder is removed once the sibling has finished or the scan is
+    # cancelled. Stage 1 writes the nonce beside its output; the reachability
+    # step below reads only output that carries it.
+    local reach_env=()
+    REACH_TOOLS_DIR=""; REACHABILITY_NONCE=""
     if [ "${REACHABILITY:-false}" = "true" ] && [ "$lang" = "go" ] && [ "$bom_path" = "$outdir/$out" ] \
        && command -v govulncheck >/dev/null 2>&1; then
-        reach_bin="$outdir/.bomlens-govulncheck-$$"
-        if cp "$(command -v govulncheck)" "$reach_bin" 2>/dev/null && chmod 755 "$reach_bin"; then
-            reach_env=(-e BOMLENS_REACHABILITY=true -e "BOMLENS_GOVULNCHECK=$reach_bin")
+        if [ -d "$GUARD_STATE_DIR" ] && mkdir -p "$GUARD_STATE_DIR/tools" 2>/dev/null; then
+            # A copy left by a scan that was killed outright (no trap ran).
+            find "$GUARD_STATE_DIR/tools" -maxdepth 1 -name 'govulncheck.*' -mmin +1440 -exec rm -rf {} + 2>/dev/null || true
+            REACH_TOOLS_DIR=$(mktemp -d "$GUARD_STATE_DIR/tools/govulncheck.XXXXXX" 2>/dev/null) || REACH_TOOLS_DIR=""
+        fi
+        if [ -n "$REACH_TOOLS_DIR" ] && chmod 755 "$REACH_TOOLS_DIR" \
+           && cp "$(command -v govulncheck)" "$REACH_TOOLS_DIR/govulncheck" 2>/dev/null \
+           && chmod 755 "$REACH_TOOLS_DIR/govulncheck"; then
+            REACHABILITY_NONCE=$(od -An -N8 -tx1 /dev/urandom 2>/dev/null | tr -d ' \n')
+            [ -n "$REACHABILITY_NONCE" ] || REACHABILITY_NONCE="$$${RANDOM}${RANDOM}$(date +%s)"
+            reach_env=(-e BOMLENS_REACHABILITY=true -e "BOMLENS_GOVULNCHECK=$REACH_TOOLS_DIR/govulncheck"
+                       -e "BOMLENS_REACHABILITY_NONCE=$REACHABILITY_NONCE")
         else
-            rm -f "$reach_bin"; reach_bin=""
+            echo "[WARN] --reachability: no folder outside the run folder to hand govulncheck to the cdxgen container (the launcher mounts none at $GUARD_STATE_DIR); the Go call analysis is skipped."
+            remove_reach_tools
         fi
     fi
     ( if [ -n "$prep_file" ]; then
@@ -535,14 +561,14 @@ generate_sbom_cdxgen() {
         [ -n "$cid" ] || { sleep 0.1; _n=$((_n + 1)); }
     done
     SIBLING_CID="$cid"
-    trap 'stop_sibling; exit 130' INT
-    trap 'stop_sibling; exit 143' TERM
+    trap 'stop_sibling; remove_reach_tools; exit 130' INT
+    trap 'stop_sibling; remove_reach_tools; exit 143' TERM
     wait "$pipe_pid" || true
     trap 'exit 130' INT
     trap 'exit 143' TERM
     rc=$(cat "$rcf" 2>/dev/null || echo 1)
     rm -f "$rcf"
-    [ -z "$reach_bin" ] || rm -f "$reach_bin"
+    remove_reach_tools
     SIBLING_CID=""
     if [ "$rc" -ne 0 ]; then
         if [ -n "$cid" ] && [ "$(docker inspect -f '{{.State.OOMKilled}}' "$cid" 2>/dev/null)" = "true" ]; then
@@ -2119,7 +2145,7 @@ if [ -n "$_rch_mode" ]; then
     else
         _rch_started="$(er_now)"; er_event step.start reachability
         _rch_rc=0
-        _rch_out="$(bash "$LIBDIR/reachability.sh" "$OUTPUT_FILE" "$OUT_PREFIX" "$_rch_mode" "${TARGET_FILE:-}")" || _rch_rc=$?
+        _rch_out="$(REACHABILITY_NONCE="$REACHABILITY_NONCE" bash "$LIBDIR/reachability.sh" "$OUTPUT_FILE" "$OUT_PREFIX" "$_rch_mode" "${TARGET_FILE:-}")" || _rch_rc=$?
         _rch_detail="$(jq -r '.detail // empty' <<<"$_rch_out" 2>/dev/null)" || _rch_detail=""
         case "$_rch_rc" in
             0) REACHABILITY_DOC="${OUT_PREFIX}_reachability.cdx.json"
@@ -2133,6 +2159,8 @@ if [ -n "$_rch_mode" ]; then
                 er_record reachability skipped not_installed "$_rch_detail" "$_rch_started" ;;
             11) echo "[reachability] nothing to judge: ${_rch_detail}."
                 er_record reachability skipped no_input "$_rch_detail" "$_rch_started" ;;
+            12) echo "[WARN] --reachability skipped: ${_rch_detail}." >&2
+                er_record reachability skipped too_large "$_rch_detail" "$_rch_started" ;;
             *) echo "[WARN] post-process step 'reachability' failed: ${_rch_detail:-see the log above}." >&2
                mark_pipeline_warning "$OUTPUT_FILE" reachability
                er_record reachability failed failed "$_rch_detail" "$_rch_started" ;;

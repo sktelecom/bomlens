@@ -125,6 +125,13 @@ case "${1:-}" in
       *label=bomlens.deep-license-out=*) [ -z "${DOCKER_STUB_RUNNING_DL_CONTAINERS:-}" ] || printf '%s\n' $DOCKER_STUB_RUNNING_DL_CONTAINERS ;;
     esac
     exit 0 ;;
+  create)
+    # `docker create --entrypoint true <image>`: a container to copy a file
+    # out of (--reachability takes govulncheck from the scanner image).
+    echo "stub-container"; exit 0 ;;
+  cp)
+    # `docker cp <container>:<path> <dest>`: leave a file where it would land.
+    [ -n "${3:-}" ] && : > "$3"; exit 0 ;;
   inspect)
     # -f '{{.State.OOMKilled}}' (stage 1's fallback classification): the stub
     # container never OOMs, so this is always "false", matching real docker's
@@ -1154,6 +1161,18 @@ scan_in "$d" --project RB --version 1 --target app.out --generate-only --reachab
 { in_log "REACHABILITY=true" && in_log "GENERATE_SECURITY=true"; } \
   && pass "--reachability on an executable reaches the container and turns the security report on" \
   || { fail "--reachability on an executable"; show; }
+# A Go source scan hands stage 1 govulncheck in a folder of its own, mounted
+# read-only apart from the run folder, with a nonce stage 2 is given too; the
+# folder is gone when the scan ends.
+d="$(new_proj reach-src)"; printf 'module x\n\ngo 1.21\n' > "$d/go.mod"
+_rs_state="$WORK/reach-state"; mkdir -p "$_rs_state"
+XDG_STATE_HOME="$_rs_state" scan_in "$d" --project RS --version 1 --generate-only --reachability
+_rs_nonce="$(sed -n 's/.*BOMLENS_REACHABILITY_NONCE=\([0-9a-zA-Z]*\).*/\1/p' "$LOG" | head -1)"
+{ in_log ":/bomlens-tools:ro" && in_log "BOMLENS_GOVULNCHECK=/bomlens-tools/govulncheck" \
+  && [ -n "$_rs_nonce" ] && in_log "REACHABILITY_NONCE=$_rs_nonce " && ! in_log "/out/.bomlens-govulncheck" \
+  && [ -z "$(ls -A "$_rs_state/bomlens/tools" 2>/dev/null)" ] && [ -z "$(find "$d" -name '*govulncheck*' -print)" ]; } \
+  && pass "--reachability on Go source mounts govulncheck from its own folder, passes one nonce to both stages, and removes the folder" \
+  || { fail "--reachability on Go source"; show; sed 's/^/        /' "$LOG" | grep -i reach; }
 d="$(new_proj reach-rootfs)"; mkdir -p "$d/rfs/etc" "$d/rfs/usr" "$d/rfs/bin"
 scan_in "$d" --project RR --version 1 --target rfs --generate-only --reachability
 { in_out "--reachability applies to a Go source tree or a Go executable" && in_log "REACHABILITY=false"; } \

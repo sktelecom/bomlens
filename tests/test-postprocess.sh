@@ -8277,10 +8277,11 @@ DETECT="$ROOT_DIR/docker/lib/source-detect.sh"
 # `-e VAR=value` at each of its own call sites -- adding them here would make
 # build_prep_env_args ALSO forward name-only from the launcher's own shell,
 # clobbering nothing today but wiring a second, wrong path for the same name.
-# BOMLENS_REACHABILITY and BOMLENS_GOVULNCHECK are the same kind: the launcher
-# sets both with a value only when it hands stage 1 a govulncheck binary.
+# BOMLENS_REACHABILITY, BOMLENS_GOVULNCHECK and BOMLENS_REACHABILITY_NONCE are the
+# same kind: the launcher sets them with a value only when it hands stage 1 a
+# govulncheck binary.
 _read=$(grep -oE 'BOMLENS_[A-Z_]+:-' "$PREP" | sed 's/:-$//' | sort -u \
-    | grep -vE '^BOMLENS_(GUARD_ID|GUARD_RESTORE_ONLY|REACHABILITY|GOVULNCHECK)$' | tr '\n' ' ')
+    | grep -vE '^BOMLENS_(GUARD_ID|GUARD_RESTORE_ONLY|REACHABILITY|REACHABILITY_NONCE|GOVULNCHECK)$' | tr '\n' ' ')
 _listed=$(bash -c '. "$1"; printf "%s\n" $BUILD_PREP_ENV_NAMES' _ "$DETECT" | sort -u | tr '\n' ' ')
 [ -n "$_read" ] && [ "$_read" = "$_listed" ] \
     && pass "BUILD_PREP_ENV_NAMES matches the BOMLENS_* switches build-prep.sh reads" \
@@ -11051,6 +11052,11 @@ rc=0; out="$(python3 "$LIB/assess-reachability.py" "$RCH/bom.json" "$RCH/empty.e
 [ "$rc" = 3 ] && [ "$(jq -r .status <<<"$out")" = unavailable ] && [ ! -f "$RCH/off.cdx.json" ] \
     && pass "an unreachable Go vulnerability database is 'unavailable' and writes nothing" \
     || fail "offline: rc=$rc out=$out"
+printf 'govulncheck: loading packages: \nmain.go:7:2: golang.org/x/text@v0.3.7: Get "https://proxy.golang.org/golang.org/x/text/@v/v0.3.7.zip": dial tcp: lookup proxy.golang.org: no such host\n' > "$RCH/proxy.err"
+rc=0; out="$(python3 "$LIB/assess-reachability.py" "$RCH/bom.json" "$RCH/empty.err" 1 "$RCH/proxy.err" source "$RCH/px.cdx.json")" || rc=$?
+[ "$rc" = 2 ] && jq -e '.status == "failed" and (.detail | contains("proxy.golang.org"))' <<<"$out" >/dev/null \
+    && pass "a module the Go module proxy could not serve is a failure, not an unreachable database" \
+    || fail "proxy failure: rc=$rc out=$out"
 printf 'govulncheck: unrecognized binary format\n' > "$RCH/bad.err"
 rc=0; out="$(python3 "$LIB/assess-reachability.py" "$RCH/bom.json" "$RCH/empty.err" 1 "$RCH/bad.err" binary "$RCH/bad.cdx.json")" || rc=$?
 [ "$rc" = 2 ] && [ "$(jq -r .detail <<<"$out")" = "govulncheck: unrecognized binary format" ] \
@@ -11064,10 +11070,85 @@ rc=0; bash "$LIB/reachability.sh" "$RCH/npm.json" "$RCH/npm" source >/dev/null |
 rc=0; out="$(bash "$LIB/reachability.sh" "$RCH/bom.json" "$RCH/nostage1" source)" || rc=$?
 [ "$rc" = 11 ] && jq -e '.detail | contains("stage 1 did not run govulncheck")' <<<"$out" >/dev/null \
     && pass "source mode without stage 1's govulncheck output: nothing to judge, said why" || fail "no stage1: rc=$rc $out"
-cp "$RCH_STREAM" "$RCH/st_govulncheck_stage1.json"; : > "$RCH/st_govulncheck_stage1.err"; echo 0 > "$RCH/st_govulncheck_stage1.rc"
-rc=0; bash "$LIB/reachability.sh" "$RCH/bom.json" "$RCH/st" source >/dev/null || rc=$?
+# Stage 1's hand-off: one marked part of the stream and of standard error per
+# run, and the run list (headed by the run's nonce) in .rc.
+rch_stage1() { # <prefix> <nonce> then "<rc> <goos> <module dir> <stream file or ->" per run
+    _p="$1"; _nonce="$2"; shift 2; _i=0
+    : > "$_p.json"; : > "$_p.err"; printf 'nonce %s\ngoarch amd64\n' "$_nonce" > "$_p.rc"
+    for _r in "$@"; do
+        set -- $_r; _i=$((_i + 1))
+        printf '{"bomlens_run": %s}\n' "$_i" >> "$_p.json"
+        printf '== bomlens run %s ==\n' "$_i" >> "$_p.err"
+        [ "$4" = - ] || cat "$4" >> "$_p.json"
+        [ "$1" = 0 ] || cat "$RCH/run$_i.err" >> "$_p.err" 2>/dev/null
+        printf 'run %s %s %s module %s\n' "$_i" "$1" "$2" "$3" >> "$_p.rc"
+    done
+}
+rch_stage1 "$RCH/st_govulncheck_stage1" n1 "0 linux . $RCH_STREAM"
+rc=0; REACHABILITY_NONCE=n1 bash "$LIB/reachability.sh" "$RCH/bom.json" "$RCH/st" source >/dev/null || rc=$?
 [ "$rc" = 0 ] && [ -f "$RCH/st_reachability.cdx.json" ] && [ ! -e "$RCH/st_govulncheck_stage1.json" ] && [ ! -e "$RCH/st_govulncheck_stage1.rc" ] \
     && pass "source mode reads stage 1's output, writes the VEX and removes the hand-off files" || fail "stage1 hand-off rc=$rc"
+# Files an earlier (or another) run left carry its nonce, not this run's.
+rch_stage1 "$RCH/old_govulncheck_stage1" n-earlier "0 linux . $RCH_STREAM"
+rc=0; out="$(REACHABILITY_NONCE=n-now bash "$LIB/reachability.sh" "$RCH/bom.json" "$RCH/old" source)" || rc=$?
+[ "$rc" = 11 ] && jq -e '.status == "no_input" and (.detail | contains("not from this run"))' <<<"$out" >/dev/null \
+    && [ ! -f "$RCH/old_reachability.cdx.json" ] && [ ! -e "$RCH/old_govulncheck_stage1.rc" ] \
+    && pass "stage 1 output with another run's nonce is not read (no_input) and is removed" || fail "nonce mismatch: rc=$rc $out"
+rch_stage1 "$RCH/old_govulncheck_stage1" n-earlier "0 linux . $RCH_STREAM"
+rc=0; REACHABILITY_NONCE='' bash "$LIB/reachability.sh" "$RCH/bom.json" "$RCH/old" source >/dev/null || rc=$?
+[ "$rc" = 11 ] && [ ! -f "$RCH/old_reachability.cdx.json" ] \
+    && pass "without a nonce for this run, stage 1 output is not read" || fail "empty nonce: rc=$rc"
+printf 'nonce n2\ntoo_large 21 20\n' > "$RCH/big_govulncheck_stage1.rc"
+rc=0; out="$(REACHABILITY_NONCE=n2 bash "$LIB/reachability.sh" "$RCH/bom.json" "$RCH/big" source)" || rc=$?
+[ "$rc" = 12 ] && jq -e '.status == "too_large" and (.detail | contains("21 Go modules"))' <<<"$out" >/dev/null && [ ! -f "$RCH/big_reachability.cdx.json" ] \
+    && pass "more Go modules than are judged: skipped (12, too_large), nothing written" || fail "too_large: rc=$rc $out"
+
+# Several runs (GOOS x module): the deepest level any run found is kept.
+jq -c 'select((.finding.trace[0].package // null) == null)' "$RCH_STREAM" > "$RCH/modonly.json"
+rch_stage1 "$RCH/os_govulncheck_stage1" n3 "0 linux . $RCH/uncalled.json" "0 darwin . $RCH/uncalled.json" "0 windows . $RCH_STREAM"
+REACHABILITY_NONCE=n3 bash "$LIB/reachability.sh" "$RCH/bom.json" "$RCH/os" source >/dev/null
+jq -e '(.vulnerabilities[] | select(.id == "CVE-2022-32149") | .analysis.state == "exploitable"
+        and (.analysis.detail | contains("(module .: GOOS=windows)")))
+       and ([.metadata.properties[] | {(.name): .value}] | add
+            | .["bomlens:reachability:goos"] == "linux,darwin,windows" and .["bomlens:reachability:goarch"] == "amd64"
+              and (.["bomlens:reachability:build-tags"] | contains("custom build tag")))' "$RCH/os_reachability.cdx.json" >/dev/null \
+    && pass "a function called only on one GOOS is exploitable, and the VEX names the GOOS and build tags covered" \
+    || fail "GOOS merge" "$(jq -c '[.vulnerabilities[] | [.id, .analysis]], .metadata.properties' "$RCH/os_reachability.cdx.json")"
+rch_stage1 "$RCH/os2_govulncheck_stage1" n4 "0 linux . $RCH/uncalled.json" "0 darwin . $RCH/modonly.json" "0 windows . $RCH/modonly.json"
+REACHABILITY_NONCE=n4 bash "$LIB/reachability.sh" "$RCH/bom.json" "$RCH/os2" source >/dev/null
+jq -e '.vulnerabilities[] | select(.id == "CVE-2022-32149") | .analysis.state == "not_affected"
+       and .analysis.justification == "code_not_reachable"
+       and (.analysis.detail | contains("GOOS linux, darwin and windows") and contains("custom build tag is not covered"))' \
+    "$RCH/os2_reachability.cdx.json" >/dev/null \
+    && pass "a package imported on one GOOS only is code_not_reachable, not code_not_present, and says what was covered" \
+    || fail "GOOS merge, package level" "$(jq -c '.vulnerabilities' "$RCH/os2_reachability.cdx.json")"
+rch_stage1 "$RCH/sub_govulncheck_stage1" n5 "0 linux . $RCH/modonly.json" "0 darwin . $RCH/modonly.json" "0 windows . $RCH/modonly.json" \
+    "0 linux ./tools/gen $RCH_STREAM" "0 darwin ./tools/gen $RCH/uncalled.json" "0 windows ./tools/gen $RCH/uncalled.json"
+REACHABILITY_NONCE=n5 bash "$LIB/reachability.sh" "$RCH/bom.json" "$RCH/sub" source >/dev/null
+jq -e '(.vulnerabilities[] | select(.id == "CVE-2022-32149") | .analysis.state == "exploitable"
+        and (.analysis.detail | contains("(module ./tools/gen: GOOS=linux)")))
+       and (.metadata.properties[] | select(.name == "bomlens:reachability:modules") | .value == ".,./tools/gen")' "$RCH/sub_reachability.cdx.json" >/dev/null \
+    && pass "a function called in a sub-module only is exploitable for the component" \
+    || fail "module merge" "$(jq -c '[.vulnerabilities[] | [.id, .analysis]]' "$RCH/sub_reachability.cdx.json")"
+printf 'govulncheck: loading packages: \nThere are errors with the provided package patterns:\n\nmain.go:7:2: golang.org/x/text@v0.3.7: Get "https://proxy.golang.org/golang.org/x/text/@v/v0.3.7.zip": dial tcp: lookup proxy.golang.org: no such host\n\nFor details on package patterns, see https://pkg.go.dev/cmd/go#hdr-Package_lists_and_patterns.\n' > "$RCH/run5.err"
+rch_stage1 "$RCH/f1_govulncheck_stage1" n6 "0 linux . $RCH_STREAM" "0 darwin . $RCH_STREAM" "0 windows . $RCH_STREAM" \
+    "0 linux ./tools/gen $RCH_STREAM" "1 darwin ./tools/gen -" "0 windows ./tools/gen $RCH_STREAM"
+rc=0; out="$(REACHABILITY_NONCE=n6 bash "$LIB/reachability.sh" "$RCH/bom.json" "$RCH/f1" source)" || rc=$?
+[ "$rc" = 2 ] && [ ! -f "$RCH/f1_reachability.cdx.json" ] \
+    && jq -e '.status == "failed" and (.detail | contains("Go module proxy") and contains("main.go:7:2") and contains("(module ./tools/gen, GOOS=darwin)"))' <<<"$out" >/dev/null \
+    && pass "one run of six failed (a module download): the whole judgement fails, said where and why" || fail "one failed run: rc=$rc $out"
+rm -f "$RCH/run5.err"
+for i in 1 2 3; do printf 'govulncheck: fetching vulnerabilities: Get "https://vuln.go.dev/index/modules.json.gz": dial tcp: lookup vuln.go.dev: no such host\n' > "$RCH/run$i.err"; done
+rch_stage1 "$RCH/f2_govulncheck_stage1" n7 "1 linux . -" "1 darwin . -" "1 windows . -"
+rc=0; out="$(REACHABILITY_NONCE=n7 bash "$LIB/reachability.sh" "$RCH/bom.json" "$RCH/f2" source)" || rc=$?
+[ "$rc" = 3 ] && [ "$(jq -r .status <<<"$out")" = unavailable ] \
+    && pass "the Go vulnerability database unreadable in every run: unavailable (3)" || fail "database runs: rc=$rc $out"
+printf 'govulncheck: loading packages: \nmain.go:7:2: reading golang.org/x/text/go.mod at revision v0.3.99: unknown revision v0.3.99\n' > "$RCH/run3.err"
+rch_stage1 "$RCH/f3_govulncheck_stage1" n8 "1 linux . -" "1 darwin . -" "1 windows . -"
+rc=0; out="$(REACHABILITY_NONCE=n8 bash "$LIB/reachability.sh" "$RCH/bom.json" "$RCH/f3" source)" || rc=$?
+[ "$rc" = 2 ] && jq -e '.status == "failed" and (.detail | contains("unknown revision"))' <<<"$out" >/dev/null \
+    && pass "a database error in some runs and a source error in another: failed, not unavailable" || fail "mixed failures: rc=$rc $out"
+rm -f "$RCH"/run*.err
 mkdir -p "$RCH/bin"
 cat > "$RCH/bin/govulncheck" <<SH
 #!/bin/sh
@@ -11123,6 +11204,133 @@ cp "$RCH/bom.json" "$RCH/sec_bom.json"
 bash "$LIB/generate-risk-report.sh" "$RCH/sec" proj >/dev/null 2>&1
 grep -q '^| 0 | 1 | 0 | 1 | 0 | 2 |$' "$RCH/sec_risk-report.md" && grep -q '1 finding(s) are not reachable' "$RCH/sec_risk-report.md" \
     && pass "risk report: the same totals, with the note" || fail "risk report" "$(grep -n 'Critical' -A3 "$RCH/sec_risk-report.md")"
+
+# Two statements for one finding (two Go advisories that share a CVE): the
+# reached one wins, whichever comes last in the VEX.
+for order in ex-last ex-first; do
+    jq --arg o "$order" '.vulnerabilities = ([.vulnerabilities[] | select(.id == "CVE-2022-32149")]
+        | (.[0] | .analysis = {state: "not_affected", justification: "code_not_reachable", detail: "x"} | .id = "CVE-2022-32149") as $na
+        | (.[0] | .references = [{id: "GO-2099-7777"}]) as $ex
+        | if $o == "ex-last" then [$na, $ex] else [$ex, $na] end)' "$RCH/called.cdx.json" > "$RCH/dup-$order.cdx.json"
+    PATH="$FAKEBIN:$PATH" SECURITY_ENRICH=false DEEP_CVE=false REACHABILITY_DOC="$RCH/dup-$order.cdx.json" \
+        bash "$LIB/scan-security.sh" "$RCH/bom.json" "$RCH/dup-$order" proj >/dev/null 2>&1
+done
+[ "$(jq -r '.Results[].Vulnerabilities[] | select(.VulnerabilityID == "CVE-2022-32149") | .["bomlens:reachability"].state' "$RCH/dup-ex-last_security.json")" = exploitable ] \
+    && [ "$(jq -r '.Results[].Vulnerabilities[] | select(.VulnerabilityID == "CVE-2022-32149") | .["bomlens:reachability"].state' "$RCH/dup-ex-first_security.json")" = exploitable ] \
+    && pass "one finding with a reached and an unreached statement is marked reached, in either order" \
+    || fail "duplicate statements" "$(jq -c '[.Results[].Vulnerabilities[] | [.VulnerabilityID, .["bomlens:reachability"].state]]' "$RCH/dup-ex-first_security.json")"
+
+# Go module paths are case-sensitive: github.com/Foo/bar and github.com/foo/bar
+# are two modules, and a judgement of one is not the other's.
+cat > "$RCH/case-bom.json" <<'JSON'
+{"bomFormat":"CycloneDX","specVersion":"1.6","components":[
+ {"type":"library","name":"bar","group":"github.com/Foo","version":"v1.0.0","purl":"pkg:golang/github.com/Foo/bar@v1.0.0","bom-ref":"pkg:golang/github.com/Foo/bar@v1.0.0"},
+ {"type":"library","name":"bar","group":"github.com/foo","version":"v1.0.0","purl":"pkg:golang/github.com/foo/bar@v1.0.0","bom-ref":"pkg:golang/github.com/foo/bar@v1.0.0"}]}
+JSON
+cat > "$RCH/case-stream.json" <<'JSON'
+{"osv":{"id":"GO-2099-0100","aliases":["CVE-2099-0100"],"affected":[{"package":{"name":"github.com/foo/bar","ecosystem":"Go"},"ecosystem_specific":{"imports":[{"path":"github.com/foo/bar/x","symbols":["F"]}]}}]}}
+{"finding":{"osv":"GO-2099-0100","trace":[{"module":"github.com/foo/bar","version":"v1.0.0"}]}}
+JSON
+python3 "$LIB/assess-reachability.py" "$RCH/case-bom.json" "$RCH/case-stream.json" 0 "$RCH/empty.err" source "$RCH/case.cdx.json" >/dev/null
+jq -e '[.vulnerabilities[].affects[].ref] == ["pkg:golang/github.com/foo/bar@v1.0.0"]' "$RCH/case.cdx.json" >/dev/null \
+    && pass "VEX: a statement goes to the module of the exact case only" || fail "case VEX" "$(jq -c '.vulnerabilities' "$RCH/case.cdx.json")"
+cat > "$FAKEBIN/trivy" <<'SH'
+#!/bin/sh
+out=""
+while [ $# -gt 0 ]; do
+    [ "$1" = "--output" ] && { out="$2"; shift; }
+    shift
+done
+cat > "$out" <<'J'
+{"SchemaVersion":2,"Results":[{"Target":"sbom","Class":"lang-pkgs","Vulnerabilities":[
+ {"VulnerabilityID":"CVE-2099-0100","PkgName":"github.com/Foo/bar","InstalledVersion":"v1.0.0","PkgIdentifier":{"PURL":"pkg:golang/github.com/Foo/bar@v1.0.0"},"Severity":"HIGH"},
+ {"VulnerabilityID":"CVE-2099-0100","PkgName":"github.com/foo/bar","InstalledVersion":"v1.0.0","PkgIdentifier":{"PURL":"pkg:golang/github.com/foo/bar@v1.0.0"},"Severity":"HIGH"},
+ {"VulnerabilityID":"CVE-2099-0100","PkgName":"github.com/Foo/bar","InstalledVersion":"v1.0.0","Severity":"HIGH"}]}]}
+J
+exit 0
+SH
+chmod +x "$FAKEBIN/trivy"
+PATH="$FAKEBIN:$PATH" SECURITY_ENRICH=false DEEP_CVE=false REACHABILITY_DOC="$RCH/case.cdx.json" \
+    bash "$LIB/scan-security.sh" "$RCH/case-bom.json" "$RCH/case" proj >/dev/null 2>&1
+jq -e '[.Results[].Vulnerabilities[] | ((.["bomlens:reachability"] // {}).state // null)] == [null, "not_affected", null]' \
+    "$RCH/case_security.json" >/dev/null \
+    && pass "_security.json: the judgement of github.com/foo/bar is not applied to github.com/Foo/bar (by purl or by name)" \
+    || fail "case in scan-security" "$(jq -c '[.Results[].Vulnerabilities[] | [.PkgName, .["bomlens:reachability"].state]]' "$RCH/case_security.json")"
+
+echo "== reachability: stage 1 runs govulncheck per Go module and per GOOS =="
+# build-prep.sh with stand-ins for go, cdxgen and govulncheck: which modules
+# it runs, with what environment, and on what go.mod; the run list it leaves.
+RS1="$WORK/rch-stage1"
+mkdir -p "$RS1/bin" "$RS1/src/sub" "$RS1/src/vendor/github.com/x/y" "$RS1/src/testdata/m" "$RS1/src/_tools" "$RS1/src/.hidden" "$RS1/out"
+cat > "$RS1/bin/go" <<'STUB'
+#!/bin/sh
+case "$1 $2" in
+    "mod tidy") printf 'require example.com/added v1.0.0\n' >> go.mod ;;
+    "env GOWORK") d=$PWD; while [ "$d" != / ]; do [ -f "$d/go.work" ] && { echo "$d/go.work"; exit 0; }; d=$(dirname "$d"); done; echo ;;
+    "work edit") printf '{\n\t"Use": [\n\t\t{\n\t\t\t"DiskPath": "./a"\n\t\t}\n\t]\n}\n' ;;
+    "version ") echo "go version go1.24.0 linux/arm64" ;;
+esac
+exit 0
+STUB
+cat > "$RS1/bin/cdxgen" <<'STUB'
+#!/bin/sh
+out=""; prev=""
+for a in "$@"; do [ "$prev" = "-o" ] && out="$a"; prev="$a"; done
+[ -n "$out" ] && echo '{"bomFormat":"CycloneDX","components":[]}' > "$out"
+exit 0
+STUB
+cat > "$RS1/bin/govulncheck" <<'STUB'
+#!/bin/sh
+printf '%s %s %s %s %s %s\n' "$(basename "$PWD")" "$GOOS" "$GOARCH" "${GOWORK-unset}" "${GOFLAGS:-none}" "$(cksum < go.mod | cut -d' ' -f1)" >> "$RCH_STAGE1_LOG"
+echo '{"config":{"scanner_name":"govulncheck"}}'
+STUB
+chmod +x "$RS1/bin/go" "$RS1/bin/cdxgen" "$RS1/bin/govulncheck"
+printf 'module example.com/root\n\ngo 1.24\n' > "$RS1/src/go.mod"
+printf '# github.com/x/y v1.0.0\n## explicit\n' > "$RS1/src/vendor/modules.txt"
+for d in sub vendor/github.com/x/y testdata/m _tools .hidden; do printf 'module example.com/%s\n\ngo 1.24\n' "$(basename "$d")" > "$RS1/src/$d/go.mod"; done
+ROOT_SUM=$(cksum < "$RS1/src/go.mod" | cut -d' ' -f1)
+: > "$RS1/log"
+RCH_STAGE1_LOG="$RS1/log" BOMLENS_REACHABILITY=true BOMLENS_GOVULNCHECK="$RS1/bin/govulncheck" BOMLENS_REACHABILITY_NONCE=nz1 \
+    PATH="$RS1/bin:$PATH" sh "$LIB/build-prep.sh" "$RS1/src" "$RS1/out/p_1_bom.json" >/dev/null 2>&1
+[ "$(cut -d' ' -f1,2 "$RS1/log" | tr '\n' ',')" = "sub linux,sub darwin,sub windows,src linux,src darwin,src windows," ] \
+    && pass "every go.mod outside vendor/, testdata/ and . or _ folders runs once per GOOS; the vendored one last" \
+    || fail "stage 1 runs" "$(cat "$RS1/log")"
+awk -v s="$ROOT_SUM" '$1 == "src" && ($3 != "amd64" || $4 != "off" || $5 != "none" || $6 != s) { bad = 1 } END { exit bad }' "$RS1/log" \
+    && grep -q '^sub linux amd64 off none ' "$RS1/log" \
+    && pass "GOARCH amd64, outside a workspace GOWORK=off; the vendored module sees go.mod as it was before go mod tidy" \
+    || fail "stage 1 environment" "$(cat "$RS1/log"; echo "root go.mod sum $ROOT_SUM")"
+[ "$(sed -n 1p "$RS1/out/p_1_govulncheck_stage1.rc")" = "nonce nz1" ] \
+    && [ "$(grep -c '^run ' "$RS1/out/p_1_govulncheck_stage1.rc")" = 6 ] \
+    && grep -q '^run 6 0 windows module \.$' "$RS1/out/p_1_govulncheck_stage1.rc" \
+    && [ "$(grep -c '^{"bomlens_run": ' "$RS1/out/p_1_govulncheck_stage1.json")" = 6 ] \
+    && pass "the run list carries the nonce and one line per run, the stream one mark per run" \
+    || fail "stage 1 run list" "$(cat "$RS1/out/p_1_govulncheck_stage1.rc")"
+cmp -s "$RS1/src/go.mod" /dev/stdin <<EOF2 && pass "go.mod is put back after the runs" || fail "go.mod not restored"
+module example.com/root
+
+go 1.24
+EOF2
+# A go.work lists ./a: a runs in workspace mode, b (not listed) alone.
+WS="$RS1/ws"; mkdir -p "$WS/src/a" "$WS/src/b" "$WS/out"
+printf 'go 1.24\n\nuse ./a\n' > "$WS/src/go.work"
+printf 'module example.com/a\n\ngo 1.24\n' > "$WS/src/a/go.mod"; printf 'module example.com/b\n\ngo 1.24\n' > "$WS/src/b/go.mod"
+: > "$RS1/log"
+RCH_STAGE1_LOG="$RS1/log" BOMLENS_REACHABILITY=true BOMLENS_GOVULNCHECK="$RS1/bin/govulncheck" BOMLENS_REACHABILITY_NONCE=nz2 \
+    PATH="$RS1/bin:$PATH" sh "$LIB/build-prep.sh" "$WS/src" "$WS/out/w_1_bom.json" >/dev/null 2>&1
+grep -q '^a linux amd64 unset ' "$RS1/log" && grep -q '^b linux amd64 off ' "$RS1/log" \
+    && grep -q '^run 1 0 linux workspace \./a$' "$WS/out/w_1_govulncheck_stage1.rc" \
+    && pass "a go.work member runs in workspace mode, a module it does not list runs alone" \
+    || fail "workspace" "$(cat "$RS1/log" "$WS/out/w_1_govulncheck_stage1.rc")"
+# Over 20 modules: nothing runs, and the run list says why.
+BIG="$RS1/big"; mkdir -p "$BIG/out"
+i=0; while [ "$i" -lt 21 ]; do mkdir -p "$BIG/src/m$i"; printf 'module example.com/m%s\n\ngo 1.24\n' "$i" > "$BIG/src/m$i/go.mod"; i=$((i + 1)); done
+: > "$RS1/log"
+RCH_STAGE1_LOG="$RS1/log" BOMLENS_REACHABILITY=true BOMLENS_GOVULNCHECK="$RS1/bin/govulncheck" BOMLENS_REACHABILITY_NONCE=nz3 \
+    PATH="$RS1/bin:$PATH" sh "$LIB/build-prep.sh" "$BIG/src" "$BIG/out/b_1_bom.json" >/dev/null 2>&1
+[ ! -s "$RS1/log" ] && [ "$(cat "$BIG/out/b_1_govulncheck_stage1.rc")" = "nonce nz3
+too_large 21 20" ] && [ ! -e "$BIG/out/b_1_govulncheck_stage1.json" ] \
+    && pass "21 Go modules: govulncheck does not run, and the run list records too_large" \
+    || fail "module limit" "$(cat "$RS1/log" "$BIG/out/b_1_govulncheck_stage1.rc" 2>&1)"
 
 echo ""
 echo "Results: ${PASS} passed, ${FAIL} failed"
