@@ -59,6 +59,18 @@ _BOMLENS_IMAGE_NAMES = (
     "bomlens-firmware", "bomlens-aibom", "bomlens-deep-cve", "bomlens-deep-license",
     "sbom-scanner-firmware", "sbom-scanner-aibom",
 )
+_VERSION_TAG = re.compile(r"v?([0-9]+)\.([0-9]+)\.([0-9]+)(-[0-9A-Za-z.-]+)?")
+
+
+def _version_tag_before_1132(tag):
+    """True when the tag is a version (1.2.3, v1.2.3, 1.2.3-rc1) lower than
+    1.13.2, compared number by number, a pre-release before its release; the
+    same as scan-sbom.sh's _version_tag_before_1132."""
+    m = _VERSION_TAG.fullmatch(tag)
+    if not m:
+        return False
+    key = tuple(int(g) for g in m.groups()[:3])
+    return key < (1, 13, 2) or (key == (1, 13, 2) and m.group(4) is not None)
 
 
 def optin_image_ref(suffix, scanner_image=None):
@@ -67,12 +79,13 @@ def optin_image_ref(suffix, scanner_image=None):
     optin_image_ref does, so a UI started with `docker run -e MODE=UI` and only
     SBOM_SCANNER_IMAGE resolves the same siblings as `scan-sbom.sh --ui`.
 
-    A BomLens image name gives the same path with the same tag
-    (.../bomlens:1.13.2 -> .../bomlens-firmware:1.13.2). A digest identifies
-    only the scanner image, so the tag written with it is used, and latest when
-    there is none. Any other name keeps the published default; for deep-license
-    that is the scanner image itself. The caller applies the image's own
-    SBOM_*_IMAGE override."""
+    A BomLens image name under a registry path gives the same path with the
+    same tag (.../bomlens:1.13.2 -> .../bomlens-firmware:1.13.2). A digest
+    identifies only the scanner image, so the tag written with it is used, and
+    latest when there is none. A name with no / (resolved on Docker Hub, so a
+    local build), any other name, or a version tag before 1.13.2 keeps the
+    earlier default: the published image, and for deep-license the scanner
+    image itself. The caller applies the image's own SBOM_*_IMAGE override."""
     ref = os.environ.get("SBOM_SCANNER_IMAGE", "") if scanner_image is None else scanner_image
     published = "ghcr.io/sktelecom/bomlens-%s:latest" % suffix
     if not ref:
@@ -81,8 +94,9 @@ def optin_image_ref(suffix, scanner_image=None):
     prefix, slash, last = name_ref.rpartition("/")
     prefix = prefix + slash
     name, colon, tag = last.partition(":")
-    if name in _BOMLENS_IMAGE_NAMES:
-        return "%sbomlens-%s:%s" % (prefix, suffix, tag if colon and tag else "latest")
+    tag = tag if colon and tag else "latest"
+    if prefix and name in _BOMLENS_IMAGE_NAMES and not _version_tag_before_1132(tag):
+        return "%sbomlens-%s:%s" % (prefix, suffix, tag)
     if suffix == "deep-license":
         return ref
     return published

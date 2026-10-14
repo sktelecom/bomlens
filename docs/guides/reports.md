@@ -214,7 +214,7 @@ The private key is mounted read-only into the container. Additional output: `MyA
 | Symptom | Cause / fix |
 |---------|-------------|
 | `trivy not installed ... skipping` | old image. Pull the latest image with `docker pull`. |
-| `--deep-license requested but scancode not in image` | run with the `bomlens-deep-license` image (the CLI does this for a source scan unless `SBOM_SCANNER_IMAGE` names an image that is not a BomLens image), or build one with `--build-arg SBOM_DEEP_LICENSE=true`. |
+| `--deep-license requested but scancode not in image` | run with the `bomlens-deep-license` image (the CLI does this for a source scan unless `SBOM_SCANNER_IMAGE` names an image that is not a BomLens image, a short local name with no registry path, or a version before 1.13.2), or build one with `--build-arg SBOM_DEEP_LICENSE=true`. |
 | `Docker is not running` in the UI | start the Docker engine (Rancher Desktop/Docker Desktop, etc.) and run it again. |
 | Many `NOASSERTION` in the notice | the dependencies have no license metadata. Supplement with `--deep-license` or check manually. |
 | Port conflict (`--ui`) | specify a different port with `UI_PORT`. |

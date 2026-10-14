@@ -25,11 +25,13 @@ import {
   detectWsl2Docker,
   dockerStatus,
   findFreePort,
+  imageEnvArgs,
   imageRef,
   optinImageRef,
   resetDockerBin,
   resolveDockerBin,
   resolveHostDir,
+  versionTagBefore1132,
   scanMountArgs,
 } from "../lib/container.mjs";
 
@@ -166,15 +168,39 @@ test("sibling images are pinned to the same version as the base image", () => {
 
 test("sibling images follow SBOM_SCANNER_IMAGE the way scan-sbom.sh does", () => {
   const v = { version: "1.13.3" };
+  const d = `sha256:${"0".repeat(64)}`;
   assert.equal(optinImageRef("firmware", { scannerImage: null, ...v }), "ghcr.io/sktelecom/bomlens-firmware:1.13.3");
+  assert.equal(optinImageRef("firmware", { scannerImage: "", ...v }), "ghcr.io/sktelecom/bomlens-firmware:1.13.3");
   assert.equal(optinImageRef("aibom", { scannerImage: "ghcr.io/sktelecom/bomlens:1.13.2", ...v }), "ghcr.io/sktelecom/bomlens-aibom:1.13.2");
-  assert.equal(optinImageRef("deep-cve", { scannerImage: "ghcr.io/sktelecom/sbom-scanner:1.12.0", ...v }), "ghcr.io/sktelecom/bomlens-deep-cve:1.12.0");
-  assert.equal(optinImageRef("firmware", { scannerImage: "registry.example:5000/mirror/bomlens:2.0", ...v }), "registry.example:5000/mirror/bomlens-firmware:2.0");
-  assert.equal(optinImageRef("firmware", { scannerImage: `ghcr.io/sktelecom/bomlens:1.13.2@sha256:${"0".repeat(64)}`, ...v }), "ghcr.io/sktelecom/bomlens-firmware:1.13.2");
-  assert.equal(optinImageRef("firmware", { scannerImage: `ghcr.io/sktelecom/bomlens@sha256:${"0".repeat(64)}`, ...v }), "ghcr.io/sktelecom/bomlens-firmware:latest");
+  assert.equal(optinImageRef("deep-cve", { scannerImage: "ghcr.io/sktelecom/sbom-scanner:1.13.5", ...v }), "ghcr.io/sktelecom/bomlens-deep-cve:1.13.5");
+  assert.equal(optinImageRef("firmware", { scannerImage: "registry.example:5000/mirror/bomlens:main", ...v }), "registry.example:5000/mirror/bomlens-firmware:main");
+  assert.equal(optinImageRef("firmware", { scannerImage: "ghcr.io/sktelecom/bomlens", ...v }), "ghcr.io/sktelecom/bomlens-firmware:latest");
+  assert.equal(optinImageRef("firmware", { scannerImage: `ghcr.io/sktelecom/bomlens:1.13.2@${d}`, ...v }), "ghcr.io/sktelecom/bomlens-firmware:1.13.2");
+  // digest만 있으면 앱 버전 태그(버전을 모르면 :latest).
+  assert.equal(optinImageRef("firmware", { scannerImage: `ghcr.io/sktelecom/bomlens@${d}`, ...v }), "ghcr.io/sktelecom/bomlens-firmware:1.13.3");
+  assert.equal(optinImageRef("firmware", { scannerImage: `ghcr.io/sktelecom/bomlens@${d}`, version: null }), "ghcr.io/sktelecom/bomlens-firmware:latest");
   assert.equal(optinImageRef("deep-cve", { scannerImage: "ghcr.io/sktelecom/bomlens-aibom:1.13.2", ...v }), "ghcr.io/sktelecom/bomlens-deep-cve:1.13.2");
-  // BomLens 이미지 이름이 아니면 원래 기본값(앱 버전 태그)을 쓴다.
+  // 원래 기본값(앱 버전 태그): BomLens 이미지 이름이 아닌 경우, /가 없는 짧은 로컬 이름,
+  // 1.13.2보다 낮은 버전 태그.
   assert.equal(optinImageRef("aibom", { scannerImage: "registry.example/team/scanner:2.0", ...v }), "ghcr.io/sktelecom/bomlens-aibom:1.13.3");
+  assert.equal(optinImageRef("aibom", { scannerImage: "bomlens:dev", ...v }), "ghcr.io/sktelecom/bomlens-aibom:1.13.3");
+  assert.equal(optinImageRef("firmware", { scannerImage: "sbom-scanner:local", ...v }), "ghcr.io/sktelecom/bomlens-firmware:1.13.3");
+  assert.equal(optinImageRef("firmware", { scannerImage: "ghcr.io/sktelecom/bomlens:1.13.1", ...v }), "ghcr.io/sktelecom/bomlens-firmware:1.13.3");
+  assert.equal(optinImageRef("deep-cve", { scannerImage: "ghcr.io/sktelecom/sbom-scanner:v1.12.0", ...v }), "ghcr.io/sktelecom/bomlens-deep-cve:1.13.3");
+});
+
+test("versionTagBefore1132 compares versions number by number", () => {
+  const before = ["1.13.1", "1.9.0", "1.13.2-rc1", "v1.13.1", "0.1.0", "1.12.99"];
+  const notBefore = ["1.13.2", "v1.13.2", "1.13.10", "2.0.0", "latest", "main", "sha-abc123", "1.13", "1.13.2-", "1.2.3.4"];
+  for (const t of before) assert.equal(versionTagBefore1132(t), true, t);
+  for (const t of notBefore) assert.equal(versionTagBefore1132(t), false, t);
+});
+
+test("imageEnvArgs leaves out an empty image reference", () => {
+  assert.deepEqual(
+    imageEnvArgs({ SBOM_FIRMWARE_IMAGE: "a/bomlens-firmware:1", SBOM_AIBOM_IMAGE: "", SBOM_DEEP_CVE_IMAGE: undefined }),
+    ["-e", "SBOM_FIRMWARE_IMAGE=a/bomlens-firmware:1"],
+  );
 });
 
 test("cleanupOrphans lists by label and stops each orphan", async () => {

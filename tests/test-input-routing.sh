@@ -624,7 +624,7 @@ echo "== opt-in images follow SBOM_SCANNER_IMAGE =="
 # The defect: with only SBOM_SCANNER_IMAGE set, --deep-license ran on the
 # scanner image itself, which has no scancode, and the other opt-in images
 # stayed on :latest whatever version the scanner image was pinned to.
-for fn in _scanner_image_parts optin_image_ref optin_image_note; do
+for fn in _version_tag_before_1132 _scanner_image_parts optin_image_ref optin_image_note; do
     body="$(extract_fn "$fn")"
     if [ -z "$body" ]; then
         echo "[ERROR] could not lift $fn out of scan-sbom.sh (was it renamed?)"; exit 1
@@ -647,11 +647,23 @@ ref_is ghcr.io/sktelecom/bomlens:1.13.2 deep-license ghcr.io/sktelecom/bomlens-d
 ref_is ghcr.io/sktelecom/bomlens:1.13.2 firmware ghcr.io/sktelecom/bomlens-firmware:1.13.2
 ref_is ghcr.io/sktelecom/bomlens:1.13.2 aibom ghcr.io/sktelecom/bomlens-aibom:1.13.2
 ref_is ghcr.io/sktelecom/bomlens:1.13.2 deep-cve ghcr.io/sktelecom/bomlens-deep-cve:1.13.2
-ref_is ghcr.io/sktelecom/sbom-scanner:1.12.0 deep-license ghcr.io/sktelecom/bomlens-deep-license:1.12.0
-ref_is ghcr.io/sktelecom/sbom-generator:1.12.0 firmware ghcr.io/sktelecom/bomlens-firmware:1.12.0
+ref_is ghcr.io/sktelecom/sbom-scanner:1.13.3 deep-license ghcr.io/sktelecom/bomlens-deep-license:1.13.3
+ref_is ghcr.io/sktelecom/sbom-generator:v1.13.10 firmware ghcr.io/sktelecom/bomlens-firmware:v1.13.10
 ref_is ghcr.io/sktelecom/bomlens deep-cve ghcr.io/sktelecom/bomlens-deep-cve:latest
+ref_is ghcr.io/sktelecom/bomlens:main aibom ghcr.io/sktelecom/bomlens-aibom:main
+ref_is ghcr.io/sktelecom/bomlens:2.0.0 aibom ghcr.io/sktelecom/bomlens-aibom:2.0.0
 ref_is registry.example:5000/mirror/sktelecom/bomlens:1.13.2 deep-license registry.example:5000/mirror/sktelecom/bomlens-deep-license:1.13.2
-ref_is bomlens:dev aibom bomlens-aibom:dev
+# A name with no / is resolved on Docker Hub, so it is a local build, not a
+# BomLens image: the earlier defaults stay (docker/README.md's sbom-scanner:local).
+ref_is bomlens:dev aibom ghcr.io/sktelecom/bomlens-aibom:latest
+ref_is sbom-scanner:local firmware ghcr.io/sktelecom/bomlens-firmware:latest
+ref_is sbom-scanner:local deep-license sbom-scanner:local
+# A version before 1.13.2 keeps the earlier defaults too; its scanner image had scancode.
+ref_is ghcr.io/sktelecom/bomlens:1.13.1 deep-license ghcr.io/sktelecom/bomlens:1.13.1
+ref_is ghcr.io/sktelecom/bomlens:1.13.1 firmware ghcr.io/sktelecom/bomlens-firmware:latest
+ref_is ghcr.io/sktelecom/sbom-scanner:1.9.0 deep-cve ghcr.io/sktelecom/bomlens-deep-cve:latest
+ref_is ghcr.io/sktelecom/bomlens:1.13.2-rc1 deep-license ghcr.io/sktelecom/bomlens:1.13.2-rc1
+ref_is ghcr.io/sktelecom/bomlens:v1.13.2 deep-license ghcr.io/sktelecom/bomlens-deep-license:v1.13.2
 ref_is "ghcr.io/sktelecom/bomlens:1.13.2@sha256:$(printf '%064d' 0)" deep-license ghcr.io/sktelecom/bomlens-deep-license:1.13.2
 ref_is "ghcr.io/sktelecom/bomlens@sha256:$(printf '%064d' 0)" deep-license ghcr.io/sktelecom/bomlens-deep-license:latest
 # An opt-in image run as the scanner image (the web UI started on it) counts too.
@@ -664,7 +676,7 @@ ref_is registry.example/team/scanner:2.0 deep-license registry.example/team/scan
 note_is() {
     local img="$1" suffix="$2" want="$3" got
     shift 3
-    got="$(env "$@" SBOM_SCANNER_IMAGE="$img" bash -c "$(declare -f _scanner_image_parts optin_image_ref optin_image_note); optin_image_note $suffix")"
+    got="$(env "$@" SBOM_SCANNER_IMAGE="$img" bash -c "$(declare -f _version_tag_before_1132 _scanner_image_parts optin_image_ref optin_image_note); optin_image_note $suffix")"
     if [ -z "$want" ]; then
         [ -z "$got" ] && pass "no note: ${img:-(unset)} -> $suffix${1:+ with $1}" \
             || fail "unexpected note: ${img:-(unset)} -> $suffix" "$got"
@@ -679,6 +691,17 @@ note_is "ghcr.io/sktelecom/bomlens:1.13.2@sha256:$(printf '%064d' 0)" firmware "
 note_is "ghcr.io/sktelecom/bomlens@sha256:$(printf '%064d' 0)" deep-cve "pinned by digest with no tag.*SBOM_DEEP_CVE_IMAGE"
 note_is registry.example/team/scanner:2.0 aibom "not a BomLens image name.*bomlens-aibom:latest.*SBOM_AIBOM_IMAGE"
 note_is registry.example/team/scanner:2.0 aibom "" SBOM_AIBOM_IMAGE=registry.example/team/aibom:2.0
+note_is sbom-scanner:local firmware "has no registry path.*bomlens-firmware:latest.*SBOM_FIRMWARE_IMAGE"
+note_is ghcr.io/sktelecom/bomlens:1.13.1 deep-license "version before 1.13.2.*bomlens:1.13.1.*SBOM_DEEP_LICENSE_IMAGE"
+
+# _version_tag_before_1132: semver compared number by number, a pre-release
+# before its release, any other tag not a version.
+for t in 1.13.1 1.9.0 1.13.2-rc1 v1.13.1 0.1.0 1.12.99; do
+    _version_tag_before_1132 "$t" && pass "version before 1.13.2: $t" || fail "not read as before 1.13.2: $t"
+done
+for t in 1.13.2 v1.13.2 1.13.10 2.0.0 latest main sha-abc123 1.13 1.13.2- 1.2.3.4; do
+    _version_tag_before_1132 "$t" && fail "read as before 1.13.2: $t" || pass "not before 1.13.2: $t"
+done
 
 # The four image variables must take their defaults from the tested function,
 # each behind its own override.
