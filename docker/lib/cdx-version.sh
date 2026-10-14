@@ -8,11 +8,11 @@
 # 1.6 by default. CYCLONEDX_SPEC_VERSION=1.7 (the CLI's --spec-version 1.7)
 # asks for 1.7 instead, and only these two values are accepted. syft's own -o
 # selector, cdxgen's --spec-version, every script here that writes its own
-# document header, and stamp-document-metadata.sh (which raises a 1.6 document
-# assembled from a producer that writes a fixed 1.6 to the requested 1.7) all
-# read the value from here. A 1.7 document goes to Trivy as it is; when a Trivy
-# build cannot decode it, scan-security.sh retries with a 1.6 copy and the
-# delivered SBOM keeps its version.
+# document header, and stamp-document-metadata.sh (which raises a 1.4, 1.5 or
+# 1.6 document to the requested 1.7) all read the value from here. A 1.7
+# document goes to Trivy as it is; when a Trivy build cannot decode it,
+# scan-security.sh retries with a 1.6 copy and the delivered SBOM keeps its
+# version.
 #
 # AI/dataset SBOMs (identify-model-file.py, scan-figshare.py,
 # scan-hf-dataset.py, declare-ai-model.py) are 1.7 whatever this says, for the

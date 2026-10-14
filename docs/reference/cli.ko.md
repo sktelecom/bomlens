@@ -46,7 +46,7 @@ BomLens의 전체 옵션과 분석 모드, CI/CD 통합 방법, 트러블슈팅�
 | `--notice` | 위험분석보고서 기본값에 딸려 켜짐 | 오픈소스 고지문(NOTICE, txt+html) 생성. 플래그 자체의 기본값은 꺼짐이며, 기본으로 켜진 위험분석보고서가 이를 켠다. 그래서 끄려면 `--notice`를 빼는 게 아니라 `--no-report`를 써야 한다 |
 | `--security` | 위험분석보고서 기본값에 딸려 켜짐 | Trivy 보안 보고서(json+md+html) 생성. CVSS, EPSS, CISA KEV 우선순위 신호 포함. `--notice`와 같은 구조로, `--no-report`가 꺼야 꺼지고 플래그만 빼서는 꺼지지 않는다 |
 | `--spdx` | false | 최종 CycloneDX 결과를 변환한 SPDX 2.3 JSON(`_bom.spdx.json`)을 함께 생성 |
-| `--spec-version <1.6\|1.7>` | `1.6` | SBOM의 CycloneDX 버전. `1.7`을 주면 cdxgen과 syft가 1.7로 쓰고, 1.6으로 만들어진 SBOM은 내보내기 전에 1.7로 표기를 바꾼다(1.7은 필드를 더하기만 하므로 내용은 그대로 유효하다). NOTICE, 보안 리포트, 적합성 검사, 웹 UI는 두 버전을 모두 읽는다. AI 모델과 데이터셋 SBOM은 이 값과 관계없이 1.7이다. 다른 값을 주면 스캔이 멈춘다 |
+| `--spec-version <1.6\|1.7>` | `1.6` | SBOM의 CycloneDX 버전. `1.7`을 주면 cdxgen과 syft가 1.7로 쓰고, 1.4, 1.5, 1.6으로 만들어진 SBOM은 내보내기 전에 `$schema`까지 1.7로 표기를 바꾼다(이 버전들은 1.7까지 필드가 더해지기만 했으므로 내용은 그대로 유효하다). 1.3 이하인 SBOM은 버전을 그대로 둔다. NOTICE, 보안 리포트, 적합성 검사, 웹 UI는 두 버전을 모두 읽는다. AI 모델과 데이터셋 SBOM은 이 값과 관계없이 1.7이다. 다른 값을 주면 스캔이 멈춘다 |
 | `--all` | — | `--notice --security --spdx` |
 | `--no-report` | false | 오픈소스위험분석보고서(risk-report) 생략 (아래 참고) |
 | `--lang <en\|ko>` | `en` | 사람이 읽는 적합성·AI 준수 개요 보고서(`.md`/`.html`)의 언어. SBOM과 JSON 보고서는 언어와 무관하게 영어로 유지 |
