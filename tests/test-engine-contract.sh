@@ -1894,6 +1894,64 @@ UB2="$(new_run upstream-binary-off empty)"
     && pass "ENRICH_UPSTREAM_PURL=false leaves the purls alone and records the step as disabled" \
     || fail "upstream-purl off: $(jq -c '[.steps[] | select(.id == "upstream-purl")]' "$UB2/bomlens-result.json" 2>&1)"
 
+echo "== a step that failed during generation degrades generate =="
+# A firmware syft pass or a resolver in build-prep.sh that failed is recorded
+# only in the SBOM (bomlens:pipeline-step-failed); the run must not read
+# succeeded. The normal run at the top of this file stays succeeded.
+add_props() { jq --argjson p "$2" '.metadata.properties = ((.metadata.properties // []) + $p)' "$1" > "$1.x" && mv "$1.x" "$1"; }
+gen_line() { jq -r '.run.status + " " + ([.steps[] | select(.id=="generate")][0] | "\(.status) \(.reason) \(.detail)")' "$1/bomlens-result.json" 2>/dev/null; }
+D="$(new_run gen-step-failed)"
+add_props "$D/demo_1.0_bom.json" '[{"name":"bomlens:pipeline-step-failed","value":"firmware-packages"},{"name":"bomlens:pipeline-step-failed","value":"cargo-lockfile"},{"name":"bomlens:pipeline-step-failed","value":"firmware-packages"}]'
+run_engine "$D" "$ROOT_DIR/docker/lib" BOMLENS_UNAME_M=aarch64
+[ "$(gen_line "$D")" = "succeeded_degraded degraded failed steps that failed: cargo-lockfile, firmware-packages" ] \
+    && pass "generate is degraded (failed) with the failed steps named, and the run succeeded_degraded" \
+    || fail "got: $(gen_line "$D")" "$(tail -5 "$D.log")"
+err="$(schema_errors "$D/bomlens-result.json")"
+[ -z "$err" ] && pass "that manifest validates against the schema" || fail "schema errors" "$err"
+v="$(vocab_violations "$D/bomlens-result.json")"
+[ -z "$v" ] && pass "its reason is in the contract document" || fail "undocumented:" "$v"
+# The same, inside an amd64 image emulated on an arm64 host: the detail says so.
+printf 'processor\t: 0\nCPU implementer\t: 0x61\nCPU architecture: 8\n' > "$WORK/cpuinfo-arm"
+D="$(new_run gen-step-failed-emulated)"
+add_props "$D/demo_1.0_bom.json" '[{"name":"bomlens:pipeline-step-failed","value":"firmware-packages"}]'
+run_engine "$D" "$ROOT_DIR/docker/lib" BOMLENS_UNAME_M=x86_64 BOMLENS_CPUINFO_FILE="$WORK/cpuinfo-arm"
+case "$(gen_line "$D")" in
+    "succeeded_degraded degraded failed steps that failed: firmware-packages; this amd64 image ran under emulation on an arm64 host"*) pass "under amd64 emulation the detail says so" ;;
+    *) fail "emulated: $(gen_line "$D")" ;;
+esac
+# A post-process step that failed is its own step, not a generation failure.
+D="$(new_run gen-postprocess-failed)"
+add_props "$D/demo_1.0_bom.json" '[{"name":"bomlens:pipeline-step-failed","value":"normalize"}]'
+run_engine "$D" "$ROOT_DIR/docker/lib"
+[ "$(jq -r '[.steps[] | select(.id=="generate")][0].status' "$D/bomlens-result.json")" = "ok" ] \
+    && pass "a failed label that is a step of its own (normalize) leaves generate ok" \
+    || fail "generate: $(gen_line "$D")"
+# The generator's own fallback, recorded only in the SBOM, is the same.
+D="$(new_run gen-tool-degraded)"
+add_props "$D/demo_1.0_bom.json" '[{"name":"bomlens:sbom-tool-degraded","value":"cdxgen-crash"}]'
+run_engine "$D" "$ROOT_DIR/docker/lib"
+[ "$(gen_line "$D")" = "succeeded_degraded degraded fallback cdxgen-crash" ] \
+    && pass "bomlens:sbom-tool-degraded: generate degraded (fallback), run succeeded_degraded" \
+    || fail "sbom-tool-degraded: $(gen_line "$D")"
+# A supplier's SBOM carries its own run's record, not this run's.
+D="$(new_run gen-step-failed-analyze)"
+add_props "$D/demo_1.0_bom.json" '[{"name":"bomlens:pipeline-step-failed","value":"firmware-packages"}]'
+mv "$D/demo_1.0_bom.json" "$D/supplier.json"
+run_engine "$D" "$ROOT_DIR/docker/lib" MODE=ANALYZE ANALYZE_SBOM="$D/supplier.json"
+[ "$(jq -r '[.steps[] | select(.id=="generate")][0].status' "$D/bomlens-result.json")" = "ok" ] \
+    && pass "ANALYZE: a failed label in the supplier's SBOM leaves generate ok" \
+    || fail "ANALYZE: $(gen_line "$D")" "$(tail -5 "$D.log")"
+# Against a copy without the rule, the failed-step run reads succeeded.
+MUT4="$WORK/lib-mutant-genfailed"
+cp -R "$ROOT_DIR/docker/lib" "$MUT4"
+sed -i.bak 's/and (\$genfailed | length) > 0 then/and false then/' "$MUT4/engine-result.sh"
+D="$(new_run gen-step-failed-mutant)"
+add_props "$D/demo_1.0_bom.json" '[{"name":"bomlens:pipeline-step-failed","value":"firmware-packages"}]'
+run_engine "$D" "$MUT4"
+[ "$(jq -r .run.status "$D/bomlens-result.json" 2>/dev/null)" = "succeeded" ] \
+    && pass "negative control: without the rule the same run reads succeeded" \
+    || fail "the mutant run is $(jq -r .run.status "$D/bomlens-result.json" 2>/dev/null); the check does not isolate the rule"
+
 echo "== every step label in entrypoint.sh is documented =="
 missing=""
 for id in $(grep -v '^[[:space:]]*#' "$ENTRY" | grep -oE '(run_optional_step|er_record|er_phase) [a-z][a-z0-9-]+' | awk '{print $2}' | sort -u); do
