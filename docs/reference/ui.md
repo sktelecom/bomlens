@@ -60,6 +60,8 @@ An **Outbound license** field takes the SPDX id your project ships under, such a
 
 An **SBOM author** field records the organisation or person running the scan on the SBOM's own metadata, not the tool and not whoever wrote the software (the UI equivalent of `--sbom-author`). Leave it empty and the SBOM carries no author. Available for AI-model scans too, since they get a document-metadata stamp the same as any other generated SBOM; hidden for an analyzed supplier SBOM, which the UI did not author.
 
+A **CycloneDX version** choice sets the version the SBOM is written in: 1.6 (the default) or 1.7, the UI equivalent of `--spec-version`. AI model and dataset SBOMs are 1.7 whichever is chosen. Like the SBOM author, it is hidden for an analyzed supplier SBOM, which keeps the version its supplier wrote, and a re-scan keeps the version the earlier scan used.
+
 Below the outputs, an optional **Upload** step can send the finished SBOM to a server. Turn it on to pick the destination — Dependency-Track or TRUSCA — and enter the server URL and an access token; TRUSCA also asks for the target project id. The URL and token are used for that one run and are never saved. It is the UI equivalent of the CLI upload options; see [Upload to Dependency-Track / TRUSCA](../guides/upload.md).
 
 ### Yocto build directory
