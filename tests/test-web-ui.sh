@@ -5784,7 +5784,8 @@ assert d['components'][0]['group'] == 'org.apache.logging.log4j', d
 assert d['specVersion'] == '1.6', d['specVersion']
 " && pass "run-folder export matches a Maven group:artifact finding and stays self-contained" || fail "run-folder export is wrong" "$run_resp"
 # A 1.7 SBOM (--spec-version 1.7) gets a 1.7 VEX: the document copies its
-# root and components, which may carry fields 1.6 does not have.
+# root component whole, which may carry fields 1.6 does not have (the other
+# components keep only type, bom-ref, group, name, version and purl).
 jq '.specVersion = "1.7"' "$OUT/vexrun_1.0/vexrun_1.0_bom.json" > "$WORK/vexrun17.json" \
     && mv "$WORK/vexrun17.json" "$OUT/vexrun_1.0/vexrun_1.0_bom.json"
 curl -fsS "$BASE/vex-export?id=vexrun_1.0" >/dev/null

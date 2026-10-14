@@ -27,7 +27,7 @@ and nothing is invented to fill a field the supplier never chose.
 Each verdict is attached to the component of the scanned SBOM it was recorded
 against, matched by normalized purl, else by name and version (a Maven
 `group:artifact` name is matched too). The referenced components are copied into
-the document's own `components[]` (bom-ref, type, name, version, purl only) and
+the document's own `components[]` (type, bom-ref, group, name, version, purl only) and
 `affects[].ref` is the plain bom-ref of that copy, so every reference resolves
 inside this document whether or not the SBOM carries a serialNumber (a
 byte-stable scan drops it). The root component stays in `metadata.component`.
@@ -39,9 +39,10 @@ Standard output is one JSON line, {"exported": N, "skipped": M}, counted in
 judgements, so the caller can tell the user when some did not make it in.
 
 The document is CycloneDX 1.7 when the scanned SBOM is (a scan run with
---spec-version 1.7, or an AI SBOM), and 1.6 otherwise: it carries a copy of
-the SBOM's root component and of its components, which a 1.7 SBOM may write
-with fields 1.6 does not have.
+--spec-version 1.7, or an AI SBOM), and 1.6 otherwise: it carries a full copy
+of the SBOM's root component, which a 1.7 SBOM may write with fields 1.6 does
+not have. The other components are copied with only type, bom-ref, group,
+name, version and purl.
 
 The SBOM and the sidecar are never modified. Exit status is 0 whenever the
 document was written, including when it holds no vulnerabilities.
