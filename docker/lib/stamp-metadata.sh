@@ -56,6 +56,10 @@ if jq --arg n "$NAME" --arg v "$VERSION" --arg lic "${PROJECT_LICENSE:-}" \
     '.metadata.component.name = $n
      | .metadata.component.version = $v
      | (.metadata.component) |= del(.purl)
+     # CycloneDX requires a component type. cdxgen writes no metadata.component
+     # at all for a tree with no dependencies, so the root built above would
+     # otherwise carry only a name and version and fail schema validation.
+     | (if ((.metadata.component.type // "") == "") then .metadata.component.type = "application" else . end)
      | (if $lic != "" and (((.metadata.component.licenses // []) | length) == 0)
         then .metadata.component.licenses = [{license: {id: $lic}}]
         else . end)' \

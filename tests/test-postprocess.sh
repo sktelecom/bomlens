@@ -170,6 +170,15 @@ purl=$(jq -r '.metadata.component.purl // "ABSENT"' "$WORK/m.json")
 [ "$nm" = "MyProj" ] && pass "metadata.component.name = input project" || fail "name='$nm', expected MyProj"
 [ "$ver" = "2.0.0" ] && pass "metadata.component.version = input version" || fail "version='$ver', expected 2.0.0"
 [ "$purl" = "ABSENT" ] && pass "stale purl dropped" || fail "purl still present: $purl"
+printf '%s\n' '{"bomFormat":"CycloneDX","specVersion":"1.6","metadata":{},"components":[]}' > "$WORK/m-notype.json"
+bash "$LIB/stamp-metadata.sh" "$WORK/m-notype.json" "MyProj" "2.0.0" >/dev/null 2>&1
+[ "$(jq -r '.metadata.component.type // "ABSENT"' "$WORK/m-notype.json")" = "application" ] \
+    && pass "a root built from nothing gets the type the schema requires" \
+    || fail "root type: $(jq -c '.metadata.component' "$WORK/m-notype.json")"
+printf '%s\n' '{"bomFormat":"CycloneDX","specVersion":"1.6","metadata":{"component":{"type":"firmware","name":"x"}},"components":[]}' > "$WORK/m-type.json"
+bash "$LIB/stamp-metadata.sh" "$WORK/m-type.json" "MyProj" "2.0.0" >/dev/null 2>&1
+[ "$(jq -r '.metadata.component.type' "$WORK/m-type.json")" = "firmware" ] \
+    && pass "a root that has a type keeps it" || fail "root type replaced: $(jq -c '.metadata.component' "$WORK/m-type.json")"
 if ! grep -Eq 'host-output|\.uploads|extracted' "$WORK/m.json"; then
     pass "no internal temp path leaks into the SBOM"
 else
