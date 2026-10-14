@@ -83,7 +83,7 @@
               "type": "object",
               "required": ["role", "target", "mode"],
               "properties": {
-                "role": { "enum": ["source", "output", "plan-file", "guard-state", "cache-maven", "maven-settings", "maven-settings-security", "cache-gradle", "gradle-properties", "gradle-init", "trivy-db"] },
+                "role": { "enum": ["source", "output", "plan-file", "guard-state", "cache-maven", "maven-settings", "maven-settings-security", "cache-gradle", "gradle-properties", "gradle-init-script", "gradle-init-script-kts", "gradle-init", "trivy-db"] },
                 "source": { "type": "string" },
                 "target": { "type": "string" },
                 "mode": { "enum": ["ro", "rw"] },

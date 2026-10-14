@@ -21,7 +21,9 @@
 #     CVE, and the advisory number is kept in VendorIDs, the field Trivy itself
 #     uses for a CVE's advisory numbers. A CVE already reported for the same
 #     package takes the advisory number into its own VendorIDs instead of being
-#     repeated.
+#     repeated. A CVE made this way takes the advisory's severity and fixed
+#     version (the highest severity, and every fixed version, when several
+#     advisories name it) and is marked bomlens:fromAdvisory.
 #   - It names none: it moves to the top-level Advisories list, with the Target
 #     it came from. It is not counted in the vulnerability totals, the severity
 #     counts or the --fail-on gate, and the reports list it apart.
@@ -77,9 +79,25 @@ def sa_put($v; $ids):
       .vulns[$at] |= (.VendorIDs = (((.VendorIDs // []) + ($ids | map(select(. != $v.VulnerabilityID)))) | sa_uniq))
     else .vulns += [$v] end;
 
-def sa_as_cve($o; $cve):
-  ($o | sa_vendor_ids($o.VulnerabilityID)) as $ids
-  | sa_put($o | .VulnerabilityID = $cve | .VendorIDs = $ids; $ids);
+def sa_sev_rank: {"CRITICAL": 4, "HIGH": 3, "MEDIUM": 2, "LOW": 1}[. // "" | ascii_upcase] // 0;
+
+# One CVE for one package, from every advisory ($g: [{cve, o}]) that names it.
+# The result does not depend on the advisories' order: the fields come from
+# the one with the lowest id, Severity is the highest any of them gives,
+# FixedVersion lists their fixed versions sorted, and VendorIDs holds every
+# advisory number, sorted. It is marked bomlens:fromAdvisory. When Trivy
+# already reports the CVE for the package, that finding is kept and only
+# takes the advisory numbers into its VendorIDs.
+def sa_put_group($g):
+  ($g[0].cve) as $cve
+  | ($g | map(.o) | sort_by(.VulnerabilityID // "")) as $os
+  | ([$os[] | sa_vendor_ids(.VulnerabilityID)] | add | unique) as $ids
+  | ([$os[] | .Severity] | max_by(sa_sev_rank)) as $sev
+  | ([$os[] | .FixedVersion | strings | select(. != "")] | unique | join(", ")) as $fixed
+  | sa_put($os[0] | .VulnerabilityID = $cve | .VendorIDs = $ids
+           | (if $sev == null then del(.Severity) else .Severity = $sev end)
+           | (if $fixed == "" then del(.FixedVersion) else .FixedVersion = $fixed end)
+           | .["bomlens:fromAdvisory"] = true; $ids);
 
 # True for a finding this filter rewrites or moves.
 def sa_needs_work:
@@ -95,15 +113,17 @@ def sa_needs_work:
     | if ($all | any(sa_needs_work) | not) then .
       else
         ({vulns: ($all | map(select(sa_needs_work | not))), adv: []}
-         | reduce ($all[] | select(sa_needs_work)) as $o (.;
-             ($o.VulnerabilityID // "") as $id
-             | if ($id | sa_norm_id != $id) then
-                 sa_put($o | .VulnerabilityID |= sa_norm_id; $o.VendorIDs // [])
-               else
-                 ($o | sa_related_cves) as $cves
-                 | if ($cves | length) == 0 then .adv += [$o + {Target: ($r.Target // "")}]
-                   else reduce $cves[] as $cve (.; sa_as_cve($o; $cve)) end
-               end)) as $out
+         | reduce ($all[] | select(sa_needs_work)
+                   | select(.VulnerabilityID // "" | sa_norm_id != .)) as $o (.;
+             sa_put($o | .VulnerabilityID |= sa_norm_id; $o.VendorIDs // []))
+         | reduce ([$all[] | select(sa_needs_work)
+                   | select(.VulnerabilityID // "" | sa_norm_id == .)
+                   | . as $o | sa_related_cves[] | {cve: ., key: ($o | sa_pkg_key), o: $o}]
+                   | group_by([.cve, .key]))[] as $g (.; sa_put_group($g))
+         | .adv += [$all[] | select(sa_needs_work)
+                   | select(.VulnerabilityID // "" | sa_norm_id == .)
+                   | select((sa_related_cves | length) == 0)
+                   | . + {Target: ($r.Target // "")}]) as $out
         | .doc.Results[$i].Vulnerabilities = $out.vulns
         | .adv += $out.adv
       end)

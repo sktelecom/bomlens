@@ -360,6 +360,17 @@ mark_prep_failed() {
     esac
 }
 
+# Remove the Gradle settings files an earlier copy put into
+# GRADLE_SETTINGS_HOME (listed in its .bomlens-settings-copied).
+gradle_settings_remove() {
+    [ -n "${GRADLE_SETTINGS_HOME:-}" ] && [ -f "$GRADLE_SETTINGS_HOME/.bomlens-settings-copied" ] || return 0
+    while IFS= read -r _gr_f; do
+        case "$_gr_f" in ""|/*|*..*) continue ;; esac
+        rm -f "$GRADLE_SETTINGS_HOME/$_gr_f"
+    done < "$GRADLE_SETTINGS_HOME/.bomlens-settings-copied"
+    rm -f "$GRADLE_SETTINGS_HOME/.bomlens-settings-copied"
+}
+
 mark_prep_applied() {
     case " $PREP_APPLIED " in
         *" $1 "*) ;;
@@ -551,6 +562,24 @@ if [ -f pom.xml ] && ! opted_out "${BOMLENS_MAVEN_FULL_GRAPH:-}"; then
     MAVEN_SCOPE_FILTER=1
 fi
 
+# User settings mounted read-only outside the caches (the maven-settings,
+# maven-settings-security, gradle-properties, gradle-init-script(-kts) and
+# gradle-init roles), so no mount point is ever created inside a cache folder.
+# Maven is pointed at them through MAVEN_ARGS (read by Maven 3.9 and later,
+# which cdxgen's images carry; a wrapper's older Maven ignores it) and
+# settings.security; a settings.xml in the cache-maven folder applies when
+# none is mounted. Gradle's are copied into its user home further below.
+SETTINGS_ROOT="${PREP_SETTINGS_ROOT:-/bomlens-settings}"
+if [ -f "$SETTINGS_ROOT/m2/settings.xml" ]; then
+    MAVEN_ARGS="${MAVEN_ARGS:+$MAVEN_ARGS }-s $SETTINGS_ROOT/m2/settings.xml"
+    export MAVEN_ARGS
+    log "maven: using the mounted settings.xml"
+fi
+if [ -f "$SETTINGS_ROOT/m2/settings-security.xml" ]; then
+    MAVEN_OPTS="${MAVEN_OPTS:+$MAVEN_OPTS }-Dsettings.security=$SETTINGS_ROOT/m2/settings-security.xml"
+    export MAVEN_OPTS
+fi
+
 # Maven component hashes: cdxgen computes a component's hashes from its jar,
 # looked up only at $HOME/.m2/repository/<group>/<artifact>/<version>/, and
 # its dependency:tree run downloads poms, not jars. On a fresh repository every
@@ -561,7 +590,8 @@ fi
 # plugin is named by its full coordinates (no prefix lookup) and the run uses
 # --fail-never, so a module that fails (an unbuilt reactor sibling) does not
 # stop the others. Best-effort: a failure (no network) only costs the hashes,
-# so it is logged and not recorded as a failed resolution step. Skipped when
+# so it is logged; only a run that leaves no jar at all is recorded as a
+# failed step (maven-dependency-jars). Skipped when
 # the root also has a Gradle build, which cdxgen reads instead. The wrapper is
 # used only when its .mvn/wrapper files are there; otherwise mvn.
 MAVEN_DEPENDENCY_PLUGIN="org.apache.maven.plugins:maven-dependency-plugin:3.11.0"
@@ -586,6 +616,11 @@ if [ -f pom.xml ] && [ ! -f build.gradle ] && [ ! -f build.gradle.kts ]; then
         else
             log "maven: could not fetch every dependency jar; some components will have no hashes (non-fatal)"
             grep '^\[ERROR\]' "$_mvn_err" | head -5 | sed 's/^/[build-prep]   /'
+            # None fetched at all: recorded like a failed resolver step, so the
+            # result manifest shows it. Some fetched: the log is enough.
+            if [ -z "$(find "$MAVEN_REPO_LOCAL" -name '*.jar' 2>/dev/null | head -1)" ]; then
+                mark_prep_failed maven-dependency-jars
+            fi
         fi
         rm -f "$_mvn_err"
     fi
@@ -699,6 +734,41 @@ if { [ -f build.gradle ] || [ -f build.gradle.kts ]; } && command -v gradle >/de
         # java-gradle (or opted-out Android): resolve so cdxgen sees the full graph.
         log "gradle dependencies"
         prep_step gradle-dependencies "$PREP_TIMEOUT_GRADLE" "$GRADLEW" --no-daemon dependencies >/dev/null
+    fi
+fi
+
+# The user's Gradle settings (mounted under $SETTINGS_ROOT/gradle) go into the
+# Gradle user home this scan uses, which is the cache-gradle mount or, when
+# that cannot be written, $GRADLE_USER_HOME above. Only a file the home does
+# not already have is copied, and the copies are listed in a marker file and
+# removed at the end (or at the start of the next run, after a kill). Only
+# for a Gradle build at the root, the one cdxgen runs Gradle for.
+GRADLE_SETTINGS_HOME=""
+if [ -d "$SETTINGS_ROOT/gradle" ] && { [ -f build.gradle ] || [ -f build.gradle.kts ] \
+        || [ -f settings.gradle ] || [ -f settings.gradle.kts ]; }; then
+    GRADLE_SETTINGS_HOME="${GRADLE_USER_HOME:-}"
+    if [ -z "$GRADLE_SETTINGS_HOME" ]; then
+        _gs_acct="$( (getent passwd "$(id -u)" 2>/dev/null || true) | cut -d: -f6)"
+        GRADLE_SETTINGS_HOME="${_gs_acct:-/root}/.gradle"
+    fi
+    gradle_settings_remove
+    if mkdir -p "$GRADLE_SETTINGS_HOME" 2>/dev/null; then
+        for _gs_p in "$SETTINGS_ROOT/gradle/gradle.properties" "$SETTINGS_ROOT/gradle/init.gradle" \
+                "$SETTINGS_ROOT/gradle/init.gradle.kts" "$SETTINGS_ROOT/gradle/init.d/"*; do
+            [ -f "$_gs_p" ] || continue
+            _gs_f="${_gs_p#"$SETTINGS_ROOT/gradle/"}"
+            if [ -e "$GRADLE_SETTINGS_HOME/$_gs_f" ]; then
+                log "gradle: $GRADLE_SETTINGS_HOME/$_gs_f already exists; the mounted one is not used"
+            elif mkdir -p "$(dirname "$GRADLE_SETTINGS_HOME/$_gs_f")" 2>/dev/null \
+                && cp "$SETTINGS_ROOT/gradle/$_gs_f" "$GRADLE_SETTINGS_HOME/$_gs_f" 2>/dev/null; then
+                printf '%s\n' "$_gs_f" >> "$GRADLE_SETTINGS_HOME/.bomlens-settings-copied"
+                log "gradle: using the mounted $_gs_f"
+            else
+                log "gradle: could not copy the mounted $_gs_f into $GRADLE_SETTINGS_HOME; it is not used"
+            fi
+        done
+    else
+        log "gradle: $GRADLE_SETTINGS_HOME cannot be written; the mounted Gradle settings are not used"
     fi
 fi
 
@@ -4465,7 +4535,18 @@ guard_restore
 # root-owned files in the mounted source dir. On Linux the host user then cannot
 # clean its own project folder or the git/zip ingestion temp dir. HOST_UID/GID
 # arrive via `docker run -e`; best-effort, never fail the prep on this.
+gradle_settings_remove
 if [ -n "${HOST_UID:-}" ] && [ -n "${HOST_GID:-}" ]; then
     chown -R "${HOST_UID}:${HOST_GID}" "$SRC" 2>/dev/null || true
+    # The Maven and Gradle caches are host folders too (cache-maven,
+    # cache-gradle): hand back what this run wrote there. Only a mounted one,
+    # and only the files not already the host user's.
+    _co_acct="$( (getent passwd "$(id -u)" 2>/dev/null || true) | cut -d: -f6)"
+    for _co_d in "$HOME/.m2" "${_co_acct:-/root}/.gradle"; do
+        [ -d "$_co_d" ] && [ -r /proc/self/mountinfo ] || continue
+        awk -v p="$_co_d" '$5 == p { f = 1 } END { exit !f }' /proc/self/mountinfo 2>/dev/null || continue
+        find "$_co_d" \( ! -user "$HOST_UID" -o ! -group "$HOST_GID" \) \
+            -exec chown -h "${HOST_UID}:${HOST_GID}" {} + 2>/dev/null || true
+    done
 fi
 exit "${rc:-0}"

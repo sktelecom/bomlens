@@ -4268,6 +4268,20 @@ jq -e 'has("DLA-4792-1") or has("SUSE-SU-2024:0002-1") or has("NSWG-ECO-516") | 
 jq -f "$LIB/security-advisory-ids.jq" "$adv_json" | cmp -s - "$adv_json" \
     && pass "the advisory filter is idempotent" \
     || fail "a second pass of security-advisory-ids.jq changed the report"
+# Two advisories naming the same new CVE for one package: the result does not
+# depend on their order, takes the highest severity and both fixed versions,
+# and is marked as coming from an advisory.
+_sa_a='{"VulnerabilityID":"DSA-2-1","VendorIDs":["CVE-2026-91000"],"PkgName":"p","PkgIdentifier":{"PURL":"pkg:deb/debian/p@1"},"InstalledVersion":"1","FixedVersion":"1.1","Severity":"LOW","Title":"p - two"}'
+_sa_b='{"VulnerabilityID":"DSA-1-1","VendorIDs":["CVE-2026-91000"],"PkgName":"p","PkgIdentifier":{"PURL":"pkg:deb/debian/p@1"},"InstalledVersion":"1","FixedVersion":"1.2","Severity":"HIGH","Title":"p - one"}'
+_sa_ab=$(printf '{"Results":[{"Target":"t","Vulnerabilities":[%s,%s]}]}' "$_sa_a" "$_sa_b" | jq -cS -f "$LIB/security-advisory-ids.jq")
+_sa_ba=$(printf '{"Results":[{"Target":"t","Vulnerabilities":[%s,%s]}]}' "$_sa_b" "$_sa_a" | jq -cS -f "$LIB/security-advisory-ids.jq")
+[ -n "$_sa_ab" ] && [ "$_sa_ab" = "$_sa_ba" ] \
+    && pass "advisories naming the same CVE give the same finding in either order" \
+    || fail "the finding depends on the advisories' order" "[$_sa_ab] vs [$_sa_ba]"
+[ "$(printf '%s' "$_sa_ab" | jq -c '.Results[0].Vulnerabilities | map([.VulnerabilityID, .Severity, .FixedVersion, .VendorIDs, .["bomlens:fromAdvisory"], .Title])')" \
+    = '[["CVE-2026-91000","HIGH","1.1, 1.2",["DSA-1-1","DSA-2-1"],true,"p - one"]]' ] \
+    && pass "the CVE takes the highest severity, every fixed version and every advisory number, marked bomlens:fromAdvisory" \
+    || fail "merged CVE: $(printf '%s' "$_sa_ab" | jq -c '.Results[0].Vulnerabilities')"
 # Trivy's result alone, without a sidecar: _security_trivy.json is still kept
 # when the rewrite changed something.
 PATH="$FAKEBIN:$PATH" SECURITY_ENRICH=false DEEP_CVE=false \
@@ -5303,7 +5317,7 @@ else
     # as --fail-never leaves it.
     printf '#!/bin/sh\necho "${0##*/} $*" >> "$MH_CALLS"\n[ "$MH_FAIL" = error ] && echo "[ERROR] Failed to execute goal on project b"\n[ "$MH_FAIL" != exit ]\n' > "$_mh_bin/mvn"
     chmod +x "$_mh_bin/mvn"
-    _mh_prelude='log() { echo "[build-prep] $*"; }; run_supervised_timeout() { shift; "$@"; }; PREP_TIMEOUT_DEFAULT=5'
+    _mh_prelude='log() { echo "[build-prep] $*"; }; mark_prep_failed() { echo "MARK-FAILED $1"; }; run_supervised_timeout() { shift; "$@"; }; PREP_TIMEOUT_DEFAULT=5'
     _mh_run() {  # <dir> <maven-opts> [fail]
         rm -f "$WORK/mh-calls"
         ( cd "$1" && PATH="$_mh_bin:$PATH" HOME="$WORK/mh-home" MH_CALLS="$WORK/mh-calls" MH_FAIL="${3:-}" \
@@ -5348,6 +5362,14 @@ else
             fail "a failed jar fetch ($_mh_f) ended the block with an error"
         fi
     done
+    printf '%s' "$(_mh_run "$WORK/mh-proj" "" error)" | grep -q "MARK-FAILED maven-dependency-jars" \
+        && pass "a jar fetch that leaves no jar at all is recorded as the failed step maven-dependency-jars" \
+        || fail "a jar fetch with no jar was not recorded as failed"
+    mkdir -p "$WORK/mh-home/.m2/repository/g/a/1"; : > "$WORK/mh-home/.m2/repository/g/a/1/a-1.jar"
+    printf '%s' "$(_mh_run "$WORK/mh-proj" "" error)" | grep -q "MARK-FAILED" \
+        && fail "a partly failed jar fetch was recorded as a failed step" \
+        || pass "a partly failed jar fetch is only logged"
+    rm -rf "$WORK/mh-home/.m2/repository/g"
 fi
 # Every caller pins the repository to the standard layout under HOME=/tmp/sbomhome,
 # the one place cdxgen looks for the jars, and mounts the Maven cache there.
@@ -5361,10 +5383,57 @@ done
 [ -z "$_mh_bad" ] \
     && pass "scan-sbom.sh, entrypoint.sh and make-plan.sh use /tmp/sbomhome/.m2/repository and user.home /tmp/sbomhome" \
     || fail "MAVEN_OPTS is not the /tmp/sbomhome one in:$_mh_bad"
-grep -q 'role: "cache-maven", target: "/tmp/sbomhome/.m2/repository"' "$ROOT_DIR/docker/lib/make-plan.sh" \
-    && grep -q 'role: "maven-settings", target: "/tmp/sbomhome/.m2/settings.xml", mode: "ro"' "$ROOT_DIR/docker/lib/make-plan.sh" \
-    && pass "the plan mounts the Maven cache at /tmp/sbomhome/.m2/repository and settings.xml read-only" \
-    || fail "the plan's Maven mounts do not match /tmp/sbomhome/.m2"
+grep -q 'role: "cache-maven", target: "/tmp/sbomhome/.m2"' "$ROOT_DIR/docker/lib/make-plan.sh" \
+    && grep -q 'role: "maven-settings", target: "/bomlens-settings/m2/settings.xml", mode: "ro"' "$ROOT_DIR/docker/lib/make-plan.sh" \
+    && pass "the plan mounts the .m2-shaped Maven cache at /tmp/sbomhome/.m2 and settings.xml read-only outside it" \
+    || fail "the plan's Maven mounts do not match"
+
+echo "== stage1-settings: mounted Maven and Gradle settings are used without writing into the caches =="
+PREP="$ROOT_DIR/docker/lib/build-prep.sh"
+_ss_block=$(sed -n '/^# User settings mounted read-only outside the caches/,/^# Maven component hashes/p' "$PREP" | sed '$d')
+_gs_fn=$(sed -n '/^gradle_settings_remove() {/,/^}$/p' "$PREP")
+_gs_block=$(sed -n "/^# The user's Gradle settings (mounted under/,/^fi\$/p" "$PREP")
+if [ -z "$_ss_block" ] || [ -z "$_gs_fn" ] || [ -z "$_gs_block" ]; then
+    fail "could not extract the settings blocks from build-prep.sh"
+else
+    _ss_root="$WORK/ss-root"; mkdir -p "$_ss_root/m2" "$_ss_root/gradle/init.d"
+    : > "$_ss_root/m2/settings.xml"; : > "$_ss_root/m2/settings-security.xml"
+    echo mounted > "$_ss_root/gradle/gradle.properties"; echo mounted > "$_ss_root/gradle/init.gradle"
+    echo mounted > "$_ss_root/gradle/init.d/a.gradle"
+    _ss_out=$(PREP_SETTINGS_ROOT="$_ss_root" MAVEN_OPTS="-Dmaven.repo.local=/x" MAVEN_ARGS="" \
+        bash -c 'log() { :; }; '"$_ss_block"'; echo "ARGS=$MAVEN_ARGS"; echo "OPTS=$MAVEN_OPTS"')
+    printf '%s\n' "$_ss_out" | grep -qx "ARGS=-s $_ss_root/m2/settings.xml" \
+        && printf '%s\n' "$_ss_out" | grep -qx "OPTS=-Dmaven.repo.local=/x -Dsettings.security=$_ss_root/m2/settings-security.xml" \
+        && pass "Maven reads the mounted settings.xml (MAVEN_ARGS -s) and settings-security.xml" \
+        || fail "Maven settings: [$_ss_out]"
+    _ss_gh="$WORK/ss-gradle-home"; mkdir -p "$_ss_gh"; echo own > "$_ss_gh/init.gradle"
+    _ss_proj="$WORK/ss-proj"; mkdir -p "$_ss_proj"; : > "$_ss_proj/build.gradle"
+    _ss_run() { ( cd "${2:-$_ss_proj}" && PREP_SETTINGS_ROOT="$_ss_root" SETTINGS_ROOT="$_ss_root" GRADLE_USER_HOME="$_ss_gh" \
+        bash -c 'log() { echo "[build-prep] $*"; }; '"$_gs_fn"'; '"$_gs_block"'; '"$1" ); }
+    mkdir -p "$WORK/ss-nogradle"
+    _ss_run ':' "$WORK/ss-nogradle" >/dev/null
+    [ ! -e "$_ss_gh/gradle.properties" ] && [ ! -e "$_ss_gh/init.d" ] \
+        && pass "with no Gradle build at the root, nothing is copied into the Gradle home" \
+        || fail "Gradle settings were copied for a project with no Gradle build"
+    _ss_run ':' >/dev/null
+    { [ "$(cat "$_ss_gh/gradle.properties" 2>/dev/null)" = mounted ] && [ "$(cat "$_ss_gh/init.d/a.gradle" 2>/dev/null)" = mounted ] \
+        && [ "$(cat "$_ss_gh/init.gradle")" = own ]; } \
+        && pass "the mounted Gradle settings are copied into the Gradle home this scan uses, an existing file kept" \
+        || fail "Gradle settings copy: $(ls -R "$_ss_gh" | tr '\n' ' ')"
+    _ss_run 'gradle_settings_remove' >/dev/null
+    { [ ! -e "$_ss_gh/gradle.properties" ] && [ ! -e "$_ss_gh/init.d/a.gradle" ] && [ "$(cat "$_ss_gh/init.gradle")" = own ] \
+        && [ ! -e "$_ss_gh/.bomlens-settings-copied" ]; } \
+        && pass "the copies are removed at the end and the home's own file stays" \
+        || fail "Gradle settings removal: $(ls -aR "$_ss_gh" | tr '\n' ' ')"
+    _ss_run ':' >/dev/null; rm -f "$_ss_root/gradle/gradle.properties"
+    _ss_run ':' >/dev/null
+    [ ! -e "$_ss_gh/gradle.properties" ] \
+        && pass "a copy a killed run left is removed when the next run starts" \
+        || fail "a stale gradle.properties copy survived the next run"
+fi
+grep -q 'find "$_co_d" \\( ! -user "$HOST_UID"' "$PREP" \
+    && pass "build-prep hands the mounted cache folders back to HOST_UID" \
+    || fail "build-prep does not chown the cache mounts"
 
 echo "== android-scope: release-config selection picks the right variant (flavored projects) =="
 # Guards docker/lib/build-prep.sh's Android config selection. The SCA benchmark
