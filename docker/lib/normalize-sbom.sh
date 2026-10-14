@@ -413,10 +413,15 @@ OS_PURL_FORM="$(cat "$SCRIPT_DIR/os-purl-form.jq")"'
 # same answer in other fields: publisher (a Maven POM's <organization>, an npm
 # package's publisher), authors[] (PyPI, RubyGems, Composer author metadata) or
 # the legacy author string. Taken in that order, the first one present becomes
-# supplier.name. Every "<...>" and "(...)" in it is dropped (the email and URL
-# of an npm-style "Name <email> (url)"), so "Alice <a@x.org>, Bob <b@y.org>"
-# reads "Alice, Bob", and a value that is only an email address or only a URL
-# is not used. Several author names are joined. bomlens:supplierSource names
+# supplier.name. Every "<...>" is dropped, and so is a "(...)" or "[...]" that
+# holds only an email address or a URL (the email and URL of an npm-style
+# "Name <email> (url)"); other brackets, as in "Example (Holdings), Inc.", stay.
+# An unclosed "(" followed by an email or URL is dropped to the end. An email
+# address or a URL (http://, https://, ftp://, www.) anywhere else is dropped
+# too, so "Alice <a@x.org>, Bob <b@y.org>" reads "Alice, Bob", "Jane Doe
+# jane@example.org" reads "Jane Doe", and a value that is only an email address
+# or only a URL is not used. Spaces around "," and ";" are tidied, and the
+# separator is kept. Several author names are joined. bomlens:supplierSource names
 # the field it came from. A component that already has a supplier is never
 # touched, and one with none of these fields stays without a supplier: a name
 # is never derived from a purl namespace, a download URL or a guess. Nested
@@ -432,12 +437,23 @@ OS_PURL_FORM="$(cat "$SCRIPT_DIR/os-purl-form.jq")"'
 SUPPLIER_FIX='(
   def supplier_clean:
     if type == "string" then
-      gsub("<[^>]*>"; "") | gsub("<[^>]*$"; "") | gsub("\\([^)]*\\)"; "")
-      | [ split(",")[] | gsub("\\s+"; " ") | sub("^ "; "") | sub(" $"; "")
-          | select(. != "")
-          | select((test("@") and (test(" ") | not)) | not)
-          | select(test("^(https?|ftp)://|^www\\."; "i") | not) ]
-      | join(", ")
+      "[^\\s,;<>()\\[\\]]" as $t
+      | "(?:\($t)+@\($t)+\\.\($t)+|\\b(?:https?|ftp)://\($t)*|\\bwww\\.\($t)+)" as $addr
+      | gsub("<[^>]*>"; "") | gsub("<[^>]*$"; "")
+      | gsub("\\(\\s*" + $addr + "\\s*\\)"; ""; "i")
+      | gsub("\\[\\s*" + $addr + "\\s*\\]"; ""; "i")
+      | gsub("\\(\\s*" + $addr + "[^)]*$"; ""; "i")
+      | gsub($addr; ""; "i")
+      | gsub("\\(\\s*\\)|\\[\\s*\\]"; "")
+      | gsub("\\s+"; " ")
+      | [ scan("[^,;]*[,;]?") | select(. != "")
+          | {t: (sub("[,;]$"; "") | sub("^ +"; "") | sub(" +$"; "")),
+             s: (if test("[,;]$") then .[-1:] else "" end)}
+          | select(.t != "") ]
+      | . as $p
+      | [ range(0; $p | length) as $i
+          | $p[$i].t + (if $i < ($p | length) - 1 then $p[$i].s + " " else "" end) ]
+      | join("")
     else "" end;
   def supplier_fill:
     if type == "array" then map(
