@@ -75,3 +75,20 @@ run_optional_step() {
     [ -n "$_started" ] && er_record "$label" failed failed "" "$_started"
     return 0
 }
+
+# Print "arm64" and return 0 when this container is an amd64 image run under
+# user-mode emulation on an arm64 host (uname says x86_64, but the kernel's
+# /proc/cpuinfo describes ARM cores); return 1 otherwise. Go programs such as
+# syft can crash at random there, in the garbage collector. BOMLENS_UNAME_M and
+# BOMLENS_CPUINFO_FILE stand in for uname and /proc/cpuinfo in tests.
+emulated_host_arch() {
+    local m cpuinfo="${BOMLENS_CPUINFO_FILE:-/proc/cpuinfo}"
+    m="${BOMLENS_UNAME_M:-$(uname -m 2>/dev/null)}"
+    case "$m" in x86_64|amd64|i?86) ;; *) return 1 ;; esac
+    [ -r "$cpuinfo" ] || return 1
+    if grep -q '^CPU implementer' "$cpuinfo" 2>/dev/null; then
+        echo arm64
+        return 0
+    fi
+    return 1
+}
