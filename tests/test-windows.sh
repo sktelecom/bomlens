@@ -1154,6 +1154,24 @@ optin_scan ghcr.io/sktelecom/bomlens:1.13.2 "$d" --ui --output-dir "$d"
   || { fail "--ui opt-in image references" "rc=$RC"; show; }
 
 # --------------------------------------------------------
+section "--spec-version picks the CycloneDX version the container writes"
+# --------------------------------------------------------
+d="$(new_proj specversion)"; printf 'ELFish\n' > "$d/app.out"
+scan_in "$d" --project SV --version 1 --target app.out --generate-only --spec-version 1.7
+in_log "-e CYCLONEDX_SPEC_VERSION=1.7" \
+  && pass "--spec-version 1.7 reaches the container as CYCLONEDX_SPEC_VERSION" \
+  || { fail "--spec-version 1.7 not forwarded"; show; }
+scan_in "$d" --project SV --version 1 --target app.out --generate-only
+in_log "-e CYCLONEDX_SPEC_VERSION=1.6" \
+  && pass "without --spec-version the container is asked for 1.6" \
+  || { fail "default spec version not forwarded"; show; }
+scan_in "$d" --project SV --version 1 --target app.out --generate-only --spec-version 1.5
+{ [ "$RC" -ne 0 ] && in_out "--spec-version '1.5' is not supported. Use 1.6 (the default) or 1.7." \
+    && ! in_log "docker run"; } \
+  && pass "an unsupported --spec-version stops before any container runs" \
+  || { fail "--spec-version 1.5 accepted (rc=$RC)"; show; }
+
+# --------------------------------------------------------
 section "--sbom-author reaches the container verbatim (legal-entity names, shell metacharacters)"
 # --------------------------------------------------------
 # The web UI's server.py path checked ("SK Telecom Co., Ltd.", parens/ampersand)

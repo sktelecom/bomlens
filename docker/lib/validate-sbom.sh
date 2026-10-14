@@ -76,9 +76,9 @@ MISSING_CAP=50                            # cap missing-item lists in the report
 #
 # CycloneDX 1.7 is accepted for every kind of SBOM. It was released in October
 # 2025 and generators have been emitting it since, so a submission at 1.7 is a
-# current document, not an unsupported one. What this pipeline WRITES is still
-# 1.6 (docker/lib/cdx-version.sh) because the bundled Trivy cannot decode 1.7:
-# reading a version and emitting it are separate decisions. The AI list stays a
+# current document, not an unsupported one. What this pipeline WRITES is 1.6
+# unless CYCLONEDX_SPEC_VERSION=1.7 (docker/lib/cdx-version.sh): reading a
+# version and emitting it are separate decisions. The AI list stays a
 # variable of its own so that narrowing CYCLONEDX_SPEC_VERSIONS by env never
 # rejects the AIBOM toolchain's own output, which is always 1.7.
 CYCLONEDX_SPEC_VERSIONS="${CYCLONEDX_SPEC_VERSIONS:-1.3 1.4 1.5 1.6 1.7}"

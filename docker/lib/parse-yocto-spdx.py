@@ -56,7 +56,11 @@ import sys
 import tarfile
 import tempfile
 
+# The version cdx-version.sh writes: 1.6, or 1.7 when CYCLONEDX_SPEC_VERSION
+# asks for it (nothing here can source that file, so the rule is restated).
 CDX_SPEC_VERSION = "1.6"
+if os.environ.get("CYCLONEDX_SPEC_VERSION") == "1.7":
+    CDX_SPEC_VERSION = "1.7"
 
 # SPDX 3.0 VEX relationship types we understand. Anything else leaves the
 # vulnerability unresolved, which is the safe direction (it stays visible).

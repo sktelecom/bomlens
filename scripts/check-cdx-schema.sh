@@ -4,7 +4,9 @@
 # Licensed under the Apache License, Version 2.0.
 #
 # check-cdx-schema.sh — validate CycloneDX JSON documents against the official
-# 1.7 schema with the CycloneDX CLI (pinned version, checksum-verified).
+# schema of the version each one declares, 1.6 or 1.7, with the CycloneDX CLI
+# (pinned version, checksum-verified). A document that declares another version
+# is checked against 1.7.
 #
 # Usage: check-cdx-schema.sh <sbom.json> [<sbom.json> ...]
 #
@@ -104,8 +106,13 @@ for f in "$@"; do
         status=1
         continue
     fi
-    if out="$("$CLI" validate --input-file "$f" --input-format json --input-version v1_7 --fail-on-errors 2>&1)"; then
-        echo "[cdx-schema] ok: $f"
+    spec="$(jq -r '.specVersion // ""' "$f" 2>/dev/null || true)"
+    case "$spec" in
+        1.6) input_version=v1_6; label=1.6 ;;
+        *)   input_version=v1_7; label=1.7 ;;
+    esac
+    if out="$("$CLI" validate --input-file "$f" --input-format json --input-version "$input_version" --fail-on-errors 2>&1)"; then
+        echo "[cdx-schema] ok: $f ($label)"
     else
         echo "[cdx-schema] FAIL: $f"
         printf '%s\n' "$out" | sed 's/^/    /' | head -40

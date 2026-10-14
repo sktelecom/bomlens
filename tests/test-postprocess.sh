@@ -254,6 +254,17 @@ da=$(jq -rc '"\(.metadata.lifecycles[0].phase)|\(.metadata.authors[0].name)"' "$
 BOMLENS_VERSION=9.9.9 bash "$LIB/stamp-document-metadata.sh" "$WORK/doc-auth.json" FIRMWARE >/dev/null 2>&1
 dcount=$(jq '[.metadata.tools.components[] | select(.name=="BomLens")] | length' "$WORK/doc-auth.json")
 [ "$dcount" = "1" ] && pass "restamping does not duplicate the tool entry" || fail "BomLens listed ${dcount}x after two runs"
+# CYCLONEDX_SPEC_VERSION=1.7 (--spec-version 1.7) raises a 1.6 document, and a
+# 1.7 document (an AI SBOM) is never lowered when 1.6 is asked for.
+printf '%s' "$DOC" | jq '.specVersion = "1.6" | ."$schema" = "http://cyclonedx.org/schema/bom-1.6.schema.json"' > "$WORK/doc-spec.json"
+CYCLONEDX_SPEC_VERSION=1.7 bash "$LIB/stamp-document-metadata.sh" "$WORK/doc-spec.json" SOURCE >/dev/null 2>&1
+[ "$(jq -r '"\(.specVersion) \(."$schema")"' "$WORK/doc-spec.json")" = "1.7 http://cyclonedx.org/schema/bom-1.7.schema.json" ] \
+    && pass "a 1.6 document is raised to 1.7 when 1.7 is asked for" \
+    || fail "raise: $(jq -c '[.specVersion, ."$schema"]' "$WORK/doc-spec.json")"
+printf '%s' "$DOC" | jq '.specVersion = "1.7"' > "$WORK/doc-spec-ai.json"
+env -u CYCLONEDX_SPEC_VERSION bash "$LIB/stamp-document-metadata.sh" "$WORK/doc-spec-ai.json" AIBOM >/dev/null 2>&1
+[ "$(jq -r '.specVersion' "$WORK/doc-spec-ai.json")" = "1.7" ] \
+    && pass "a 1.7 document stays 1.7 under the 1.6 default" || fail "lowered: $(jq -r '.specVersion' "$WORK/doc-spec-ai.json")"
 # A tool entry with no version says nothing about which build ran; the minimum
 # elements ask for it to be stated as unknown instead of omitted. Same for BomLens
 # itself in a local build with no version baked in.

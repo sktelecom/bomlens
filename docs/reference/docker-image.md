@@ -181,6 +181,7 @@ MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL='*' docker run --rm \
 | `BOMLENS_INCLUDE_DEV_DEPENDENCIES` | - | - | Source scans: set `1` to keep the development-only components that are dropped by default (the ones cdxgen marks, and the gems a root `Gemfile` declares only in its `development` and `test` groups). The dropped components are recorded in `bomlens:excluded-components` |
 | `BOMLENS_NO_COPYRIGHT` | - | - | Source scans: set `1` to skip filling npm, Python, Go and Rust component `copyright` from the installed packages' license files |
 | `BOMLENS_NO_CARGO_LICENSE` | - | - | Source scans: set `1` to skip filling Rust component licenses from `cargo metadata` (`FETCH_LICENSE=false` on the command line skips it too) |
+| `CYCLONEDX_SPEC_VERSION` | — | `1.6` | CycloneDX version of the generated SBOM, `1.6` or `1.7` (the CLI's `--spec-version`). AI model and dataset SBOMs are always 1.7. Any other value stops the run |
 | `CYCLONEDX_SPEC_VERSIONS` | — | `1.3 1.4 1.5 1.6 1.7` | Accepted CycloneDX spec versions for the conformance check (space-separated); overrides the default range |
 | `AI_CYCLONEDX_SPEC_VERSIONS` | — | `1.3 1.4 1.5 1.6 1.7` | Accepted CycloneDX versions for AI SBOMs (ML-BOM); always includes 1.7, the version the AIBOM toolchain emits |
 | `SPDX_SPEC_VERSIONS` | — | `SPDX-2.2 SPDX-2.3` | Accepted SPDX spec versions for the conformance check |

@@ -82,7 +82,7 @@ if [ -n "$MERGE_ROOT_FROM" ] && [ -s "$MERGE_ROOT_FROM" ] && jq empty "$MERGE_RO
     else
         PRESERVE_SPEC=""
         echo "null" > "$ROOT_META_FILE"
-        echo "[merge] WARN: MERGE_ROOT_FROM has no specVersion/metadata.component; using fresh 1.6 root." >&2
+        echo "[merge] WARN: MERGE_ROOT_FROM has no specVersion/metadata.component; using fresh $CDX_SPEC_VERSION root." >&2
     fi
 fi
 
@@ -151,8 +151,8 @@ NEDGES=$(jq '[.[].dependsOn[]?] | length' "$WORK/deps.json")
 # --slurpfile reads the merged components/dependencies AND the preserved root from
 # files (ARG_MAX safe — see the comment at the collection loop). When a base root
 # is preserved, keep its specVersion and metadata.component (incl. any modelCard,
-# renamed to the caller's NAME/VERSION above); otherwise emit a fresh CycloneDX
-# 1.6 root. The preserved root's own component is not re-added as a plain
+# renamed to the caller's NAME/VERSION above); otherwise emit a fresh root at
+# $CDX_SPEC_VERSION. The preserved root's own component is not re-added as a plain
 # component — it stays the metadata.component — so the merged component set is
 # deduped as usual.
 jq -n \

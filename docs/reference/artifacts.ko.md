@@ -4,7 +4,7 @@ description: BomLens가 생성하는 산출물 파일 목록과 생성 조건, �
 
 # 산출물 레퍼런스
 
-생성된 SBOM은 CycloneDX 1.6 JSON 형식입니다. 최종 CycloneDX SBOM을 변환한 SPDX 2.3 JSON 파일은 CLI 스캔에서 `--spdx`로 만들거나, UI에서는 스캔이 끝난 뒤 결과 화면에서 내보냅니다. 두 경로 모두 같은 변환을 거치므로 결과 파일은 동일합니다. 이때도 정본은 CycloneDX이며, CycloneDX에만 있는 데이터(취약점, `bomlens:*` 속성, [선언한 AI 서비스](#선언한-ai-서비스)가 더하는 `services[]`)는 SPDX 파일로 옮겨지지 않습니다. AI 모델과 데이터셋 스캔은 AI와 Dataset 프로파일을 쓴 SPDX 3.0.1 문서(`_bom.spdx3.json`, 아래 표)도 만듭니다.
+생성된 SBOM은 CycloneDX 1.6 JSON 형식이고, `--spec-version 1.7`을 주면 1.7입니다. AI 모델과 데이터셋 SBOM은 항상 1.7입니다. 최종 CycloneDX SBOM을 변환한 SPDX 2.3 JSON 파일은 CLI 스캔에서 `--spdx`로 만들거나, UI에서는 스캔이 끝난 뒤 결과 화면에서 내보냅니다. 두 경로 모두 같은 변환을 거치므로 결과 파일은 동일합니다. 이때도 정본은 CycloneDX이며, CycloneDX에만 있는 데이터(취약점, `bomlens:*` 속성, [선언한 AI 서비스](#선언한-ai-서비스)가 더하는 `services[]`)는 SPDX 파일로 옮겨지지 않습니다. AI 모델과 데이터셋 스캔은 AI와 Dataset 프로파일을 쓴 SPDX 3.0.1 문서(`_bom.spdx3.json`, 아래 표)도 만듭니다.
 
 파일명은 `{Project}_{Version}_bom.json`입니다(예: `MyApp_1.0.0_bom.json`).
 
@@ -12,7 +12,7 @@ description: BomLens가 생성하는 산출물 파일 목록과 생성 조건, �
 
 | 파일 | 생성 조건 | 설명 |
 |------|----------|------|
-| `{Project}_{Version}_bom.json` | 항상 | SBOM (CycloneDX 1.6) |
+| `{Project}_{Version}_bom.json` | 항상 | SBOM (CycloneDX 1.6, `--spec-version 1.7`이면 1.7) |
 | `{Project}_{Version}_bom.spdx.json` | `--spdx` / `--all`, 또는 UI의 SPDX 2.3으로 내보내기 | SBOM (SPDX 2.3, CycloneDX 결과를 변환) |
 | `{Project}_{Version}_bom.spdx3.json` | AI 모델과 데이터셋 스캔(`--model`, `--model-file`, 데이터셋), `--no-spdx3`를 주지 않은 경우 | AI SBOM을 AI와 Dataset 프로파일을 쓴 SPDX 3.0.1 문서(JSON-LD)로 담은 파일. 값은 CycloneDX 결과, 그 결과에 대한 고정 규칙, 모델 공개자의 선언(`--ai-declare`)에서만 가져오며 추정하지 않는다. SPDX에 "알 수 없음" 값이 없는 필수 필드(모델과 데이터의 공급 주체와 제작 주체, 출시일과 생성일, 내려받기 주소, 문서 작성자)는 선언하기 전까지 비어 있고, 그동안 문서에 초안이라고 표시한다. 기반 모델은 id와 라이선스로만 식별한다. 배포 가중치 범위는 CycloneDX 속성 확장의 `bomlens:weights:scope`(`full`, `adapter`, `quantized`, `merged`)로 담는다. `--analyze` 입력으로는 쓸 수 없다 |
 | `{Project}_{Version}_spdx3-check.json` / `.md` | SPDX 3.0.1 문서와 함께 | 요소마다 각 필드가 스캔에서 왔는지, 선언에서 왔는지, 비어 있는지와, 채워지지 않은 필수 필드, 모델 공개자가 판단해야 할 항목(개인정보, 안전 위험, 자율성)을 정리한 검사 결과. `service.state`는 선언한 서비스와 모델 값이 CycloneDX SBOM에 들어 있는지를 알린다. `none`(선언도 없고 SBOM에도 없음), `applied`(SBOM이 선언과 같음), `pendingScan`(둘이 다르며 다시 스캔하면 반영됨) 중 하나다. 법적 자문이 아닌 안내 |
@@ -94,7 +94,7 @@ G7 시스템 속성 요소는 선언한 서비스를 읽고, 이렇게 충족된
 
 ```
 bomFormat          "CycloneDX"
-specVersion        "1.6"
+specVersion        "1.6" (--spec-version 1.7이면 "1.7")
 metadata
   ├── timestamp    생성 시각 (ISO 8601)
   └── component    프로젝트 정보 (name, version, type)
