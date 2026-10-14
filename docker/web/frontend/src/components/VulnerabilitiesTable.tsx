@@ -39,10 +39,12 @@ import { vulnsFromQuery, vulnsToQuery } from "@/lib/section-query";
 import { severityTone } from "@/lib/severity";
 import { useToast } from "@/lib/toast";
 import { uncheckedSummary } from "@/lib/unchecked";
+import { advisorySummary, vulnAliases } from "@/lib/advisories";
 import { compareVulns, groupByUpgrade, type SortDir, type VulnSortKey } from "@/lib/vulns";
 import { cn } from "@/lib/utils";
 import { IS_STATIC_DEMO } from "@/lib/demo";
 
+import { AdvisoriesWithoutCve } from "./AdvisoriesWithoutCve";
 import { SeverityBar } from "./SeverityBar";
 import { UncheckedComponents } from "./UncheckedComponents";
 
@@ -608,6 +610,19 @@ export function VulnerabilitiesTable({
         <div className="space-y-3">
           <UncheckedComponents security={security} />
           <p className="text-xs text-muted-foreground">{t("result.noVulnsInChecked")}</p>
+          <AdvisoriesWithoutCve security={security} />
+        </div>
+      );
+    }
+    // Advisories with no CVE are not findings, so the empty state stands; the
+    // list follows it rather than being dropped.
+    if (advisorySummary(security)) {
+      return (
+        <div className="space-y-3">
+          <EmptyState icon={ShieldCheck} hint={t("result.noVulnsHint")}>
+            {t("result.noVulns")}
+          </EmptyState>
+          <AdvisoriesWithoutCve security={security} />
         </div>
       );
     }
@@ -634,7 +649,7 @@ export function VulnerabilitiesTable({
   const q = query.trim().toLowerCase();
   const visible = sorted.filter((v) => {
     if (severityFilter && v.severity !== severityFilter) return false;
-    if (q && !`${v.id} ${v.pkg} ${v.title}`.toLowerCase().includes(q)) return false;
+    if (q && !`${v.id} ${vulnAliases(v).join(" ")} ${v.pkg} ${v.title}`.toLowerCase().includes(q)) return false;
     return true;
   });
 
@@ -901,6 +916,12 @@ export function VulnerabilitiesTable({
                   )}
                   <td className="px-3 py-2">
                     <span className="font-mono">{v.id}</span>
+                    {vulnAliases(v).length > 0 ? (
+                      <div className="mt-0.5 text-muted-foreground">
+                        {t("result.vulnAliases")}{" "}
+                        <span className="font-mono">{vulnAliases(v).join(", ")}</span>
+                      </div>
+                    ) : null}
                     {v.title ? (
                       <div className="mt-0.5 max-w-md text-muted-foreground">
                         {v.title}
@@ -951,6 +972,7 @@ export function VulnerabilitiesTable({
         </tbody>
       </table>
       </div>
+      <AdvisoriesWithoutCve security={security} />
     </div>
   );
 }
