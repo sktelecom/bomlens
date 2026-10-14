@@ -152,10 +152,14 @@ if [ -n "$ARTIFACT" ] && [ -f "$ARTIFACT" ]; then
 fi
 
 # The CycloneDX version asked for (cdx-version.sh). The generators write it
-# themselves, but a few producers write a fixed 1.6 (the Yocto parsers, the
-# Modelica identifier), so a 1.6 document is raised to 1.7 here when 1.7 was
-# asked for. 1.7 only adds to 1.6, so the content is valid as it stands. Never
-# lowered: an AI SBOM is 1.7 whatever was asked for.
+# themselves, but some documents arrive at an older version (a producer that
+# writes a fixed 1.6, an SBOM given to POSTPROCESS or kept as a merge root), so
+# a 1.4, 1.5 or 1.6 document is raised to 1.7 here when 1.7 was asked for,
+# $schema included. Those versions only gained fields up to 1.7 (the older
+# metadata.tools array is still accepted), so the content is valid as it
+# stands. 1.3 and older are left as they are: they predate the shapes this
+# pipeline writes into metadata. Never lowered: an AI SBOM is 1.7 whatever was
+# asked for.
 TMP="$(mktemp)"
 if jq --arg lifecycle "$LIFECYCLE" \
       --arg spec "$CDX_SPEC_VERSION" \
@@ -179,12 +183,14 @@ if jq --arg lifecycle "$LIFECYCLE" \
       ((.metadata.tools // {}) | tostring | contains("\"BomLens\""));
     def add_bomlens($t):
       if has_bomlens then .
-      elif (.metadata.tools | type) == "array" then .metadata.tools += [$t]
+      # The older flat array (CycloneDX 1.4 and before) takes a tool, which has
+      # vendor where a component has publisher, and no type.
+      elif (.metadata.tools | type) == "array" then .metadata.tools += [{vendor: $t.publisher, name: $t.name, version: $t.version}]
       elif (.metadata.tools | type) == "object" then .metadata.tools.components = (((.metadata.tools.components // []) + [$t]))
       else .metadata.tools = {components: [$t]} end;
 
       fill_tool_versions
-    | (if $spec == "1.7" and ((.specVersion // "") == "1.6")
+    | (if $spec == "1.7" and ((.specVersion // "") | IN("1.4", "1.5", "1.6"))
        then .specVersion = "1.7"
             | (if has("$schema") then ."$schema" = "http://cyclonedx.org/schema/bom-1.7.schema.json" else . end)
        else . end)

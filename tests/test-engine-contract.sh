@@ -2066,6 +2066,18 @@ S16="$WORK/spec-1.6"; S17="$WORK/spec-1.7"
     && [ "$(jq -r '.checks[] | select(.id == "spec-version") | "\(.status) \(.detail)"' "$S17/demo_1.0_conformance.json" 2>/dev/null)" = "pass CycloneDX 1.7" ] \
     && pass "NOTICE, the security report and the conformance check read the 1.7 SBOM" \
     || fail "1.7 consumers: $(jq -c '[.run.status] + [.steps[] | select(.status != "ok" and .status != "disabled")]' "$S17/bomlens-result.json" 2>&1)" "$(tail -5 "$S17.log")"
+# A 1.5 document (the fixture as it is) and a 1.4 one with the older flat
+# tools array are raised to 1.7 as well.
+S15="$(new_run spec-from-1.5)"
+cp "$FIX/good-cyclonedx.json" "$S15/demo_1.0_bom.json"
+run_engine "$S15" "$ROOT_DIR/docker/lib" CYCLONEDX_SPEC_VERSION=1.7
+S14="$(new_run spec-from-1.4)"
+jq '.specVersion = "1.4" | .metadata.tools = [{vendor: "Example", name: "generator", version: "1.0"}]' \
+    "$FIX/good-cyclonedx.json" > "$S14/demo_1.0_bom.json"
+run_engine "$S14" "$ROOT_DIR/docker/lib" CYCLONEDX_SPEC_VERSION=1.7
+[ "$(jq -r .specVersion "$S15/demo_1.0_bom.json") $(jq -r .specVersion "$S14/demo_1.0_bom.json")" = "1.7 1.7" ] \
+    && pass "1.5 and 1.4 SBOMs leave as 1.7 when 1.7 is asked for" \
+    || fail "raised: $(jq -r .specVersion "$S15/demo_1.0_bom.json" "$S14/demo_1.0_bom.json" | tr '\n' ' ')" "$(tail -5 "$S14.log")"
 SBAD="$(new_run spec-bad)"
 run_engine "$SBAD" "$ROOT_DIR/docker/lib" CYCLONEDX_SPEC_VERSION=2.0
 grep -q 'CYCLONEDX_SPEC_VERSION=2.0 is not a CycloneDX version this pipeline writes' "$SBAD.log" \
@@ -2079,6 +2091,11 @@ if [ "${BOMLENS_CDX_SCHEMA:-}" = "1" ] || command -v cyclonedx >/dev/null 2>&1 |
         pass "the 1.7 and 1.6 SBOMs validate against their CycloneDX schemas"
     else
         fail "an SBOM fails its CycloneDX schema" "$cdxout"
+    fi
+    if cdxout=$(bash "$ROOT_DIR/scripts/check-cdx-schema.sh" "$S15/demo_1.0_bom.json" "$S14/demo_1.0_bom.json" 2>&1); then
+        pass "1.5 and 1.4 SBOMs raised to 1.7 validate against the 1.7 schema"
+    else
+        fail "a raised SBOM fails the 1.7 schema" "$cdxout"
     fi
 else
     echo "  SKIP: CycloneDX CLI not available (set BOMLENS_CDX_SCHEMA=1 to download the pinned one)"

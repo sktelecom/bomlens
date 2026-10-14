@@ -265,6 +265,20 @@ printf '%s' "$DOC" | jq '.specVersion = "1.7"' > "$WORK/doc-spec-ai.json"
 env -u CYCLONEDX_SPEC_VERSION bash "$LIB/stamp-document-metadata.sh" "$WORK/doc-spec-ai.json" AIBOM >/dev/null 2>&1
 [ "$(jq -r '.specVersion' "$WORK/doc-spec-ai.json")" = "1.7" ] \
     && pass "a 1.7 document stays 1.7 under the 1.6 default" || fail "lowered: $(jq -r '.specVersion' "$WORK/doc-spec-ai.json")"
+# 1.4 and 1.5 are raised too (a 1.4 flat tools array gets a tool entry, not a
+# component), and 1.3 is left as it is.
+for v in 1.3 1.4 1.5; do
+    printf '%s' "$DOC" | jq --arg v "$v" '.specVersion = $v | ."$schema" = "http://cyclonedx.org/schema/bom-\($v).schema.json"
+        | if $v == "1.4" then .metadata.tools = [{vendor: "x", name: "t", version: "1"}] else . end' > "$WORK/doc-spec-$v.json"
+    CYCLONEDX_SPEC_VERSION=1.7 bash "$LIB/stamp-document-metadata.sh" "$WORK/doc-spec-$v.json" SOURCE >/dev/null 2>&1
+done
+[ "$(jq -r '.specVersion' "$WORK/doc-spec-1.4.json") $(jq -r '.specVersion' "$WORK/doc-spec-1.5.json") $(jq -r '"\(.specVersion) \(."$schema")"' "$WORK/doc-spec-1.3.json")" \
+    = "1.7 1.7 1.3 http://cyclonedx.org/schema/bom-1.3.schema.json" ] \
+    && pass "1.4 and 1.5 documents are raised to 1.7, a 1.3 document is left as it is" \
+    || fail "raise old: $(jq -r .specVersion "$WORK/doc-spec-1.4.json" "$WORK/doc-spec-1.5.json" "$WORK/doc-spec-1.3.json" | tr '\n' ' ')"
+[ "$(jq -c '[.metadata.tools[] | select(.name == "BomLens") | keys]' "$WORK/doc-spec-1.4.json")" = '[["name","vendor","version"]]' ] \
+    && pass "a flat tools array gets BomLens as a tool (vendor, name, version)" \
+    || fail "flat tools: $(jq -c '.metadata.tools' "$WORK/doc-spec-1.4.json")"
 # A tool entry with no version says nothing about which build ran; the minimum
 # elements ask for it to be stated as unknown instead of omitted. Same for BomLens
 # itself in a local build with no version baked in.

@@ -183,7 +183,7 @@ docker run --rm -v "$PWD/src:/src:ro" -v "$PWD/out:/host-output" \
 
 `MODE=PLAN`에 `CDXGEN_IMAGE_PREFIX`를 주면 1단계 이미지 이름을 레지스트리 미러 경로로 씁니다(예: `ghcr.io/cdxgen/` 대신 `registry.example/mirror/cdxgen/`). 다이제스트는 공개 이미지의 것을 그대로 쓰므로, 미러에는 다이제스트까지 같은 이미지가 있어야 합니다. pull-through 캐시이거나 모든 플랫폼을 복사한 미러(`skopeo copy --all`, `crane copy`)여야 합니다. `docker pull`, `docker tag`, `docker push`로 채운 미러는 한 플랫폼만 다른 다이제스트로 담으므로, 계획의 `image@image_digest`를 받으려 하면 "manifest unknown"으로 실패합니다.
 
-CycloneDX 1.7 SBOM을 계획하려면 `MODE=PLAN`에 `CYCLONEDX_SPEC_VERSION`(`1.6`이 기본값, 또는 `1.7`. CLI의 `--spec-version`)을 줍니다. 계획은 이 값을 1단계에는 `build-prep.sh`의 마지막 인자로, 2단계에는 `env`의 `CYCLONEDX_SPEC_VERSION`으로 넘깁니다. 그래서 2단계의 대체 스캔(syft)도 같은 버전으로 쓰고, 2단계는 1.6으로 쓰인 SBOM을 1.7로 올립니다. 이 값은 입력 지문(`CDX_SPEC_VERSION`)에도 들어갑니다. 다른 값을 주면 `MODE=PLAN`이 0이 아닌 코드로 멈춥니다.
+CycloneDX 1.7 SBOM을 계획하려면 `MODE=PLAN`에 `CYCLONEDX_SPEC_VERSION`(`1.6`이 기본값, 또는 `1.7`. CLI의 `--spec-version`)을 줍니다. 계획은 이 값을 1단계에는 `build-prep.sh`의 마지막 인자로, 2단계에는 `env`의 `CYCLONEDX_SPEC_VERSION`으로 넘깁니다. 그래서 2단계의 대체 스캔(syft)도 같은 버전으로 쓰고, 2단계는 1.4, 1.5, 1.6으로 쓰인 SBOM을 1.7로 올립니다(1.3 이하는 버전을 그대로 둡니다). 이 값은 입력 지문(`CDX_SPEC_VERSION`)에도 들어갑니다. 다른 값을 주면 `MODE=PLAN`이 0이 아닌 코드로 멈춥니다.
 
 `MODE=PLAN`은 계획을 썼으면 `ok`든 `unsupported`든 0으로 끝납니다. `unsupported` 계획은 결과 매니페스트에 `plan` 단계를 `skipped`로 기록하므로 실행은 `succeeded_degraded`입니다. 빈 소스(대개 컨테이너에 닿지 않은 마운트)는 0이 아닌 종료 코드로 거부합니다. 계획을 쓰기 전에 출력 폴더에서 이전 계획과 이전 실행의 1단계 산출물을 지웁니다. 2단계는 새 SBOM과 남은 SBOM을 구분할 수 없기 때문입니다. 1단계 이미지는 이 BomLens 릴리스가 시험한 cdxgen 태그로 고정되어 있어, `CDXGEN_TAG`를 바꾸면 언어 이미지는 `unsupported`(`no-pinned-digest`)가 됩니다.
 
