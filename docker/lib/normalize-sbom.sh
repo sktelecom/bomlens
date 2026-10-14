@@ -12,6 +12,9 @@
 set -e
 
 SBOM="$1"
+# The container's scan mode (the MODE environment variable entrypoint.sh runs
+# under), read before $MODE below is reused for this script's own flag.
+SCAN_MODE="${MODE:-}"
 MODE="${2:-}"
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -404,6 +407,43 @@ OS_PURL_FORM="$(cat "$SCRIPT_DIR/os-purl-form.jq")"'
        else false end) as $src
       | .purl |= os_purl_form($src))'
 
+# Fill component.supplier from what the generator already read out of the
+# package's own metadata, and from nothing else. CycloneDX's supplier is the
+# organisation or person that supplied the component; cdxgen and syft put the
+# same answer in other fields: publisher (a Maven POM's <organization>, an npm
+# package's publisher, a distro package's Maintainer), authors[] (PyPI, RubyGems,
+# Composer author metadata) or the legacy author string. Taken in that order, the
+# first one present becomes supplier.name, with a trailing " <email>" dropped and
+# several author names joined. bomlens:supplierSource names the field it came
+# from. A component that already has a supplier is never touched, and one with
+# none of these fields stays without a supplier: a name is never derived from a
+# purl namespace, a download URL or a guess.
+#
+# Not applied to a supplier's own SBOM (ANALYZE): it is a document under review,
+# and its supplier fields are left as the supplier wrote them.
+SUPPLIER_FIX='(.components) |= (if type=="array" then map(
+  def clean: if type == "string" then (sub("\\s*<[^>]*>\\s*$"; "") | gsub("^\\s+|\\s+$"; "")) else "" end;
+  if (.supplier // {}) != {} then .
+  else
+    ((.publisher // "") | clean) as $pub
+    | ([ (.authors // [])[]? | (.name? // "") | clean | select(. != "") ]
+        | reduce .[] as $a ([]; if any(.[]; ascii_downcase == ($a | ascii_downcase)) then . else . + [$a] end)) as $auth
+    | ((.author // "") | clean) as $legacy
+    | (if $pub != "" then [$pub, "publisher"]
+       elif ($auth | length) > 0 then [($auth | join(", ")), "authors"]
+       elif $legacy != "" then [$legacy, "author"]
+       else null end) as $pick
+    | if $pick == null then .
+      else .supplier = {name: $pick[0]}
+        | .properties = (((.properties // []) | map(select(.name != "bomlens:supplierSource")))
+            + [{name: "bomlens:supplierSource", value: $pick[1]}])
+      end
+  end
+) else . end)'
+if [ "$SCAN_MODE" = "ANALYZE" ]; then
+    SUPPLIER_FIX='.'
+fi
+
 # Always: normalize component license aliases to SPDX ids. cdxgen records some
 # licenses as non-SPDX free text ("Expat license", "Apache License 2.0"); the v1.3
 # web UI surfaces (license filter, distribution card, dependency tree) read these
@@ -528,6 +568,7 @@ if [ "$MODE" = "--stable" ]; then
         | ${LICENSE_REVIEW_FIX}
         | ${LICENSE_CLASS_FIX}
         | ${LICENSE_CONFLICT_FIX}
+        | ${SUPPLIER_FIX}
         | ${FILENAME_FILTER}
         | ${SORT_FILTER}
         | walk(if type==\"object\" and has(\"timestamp\") then .timestamp = \"1970-01-01T00:00:00Z\" else . end)
@@ -540,7 +581,7 @@ if [ "$MODE" = "--stable" ]; then
         | del(.serialNumber)
     " "$SBOM" > "$TMP"
 else
-    jq -S --argjson vmap "$VMAP_JSON" --argjson compat "$COMPAT_JSON" "${LICENSE_FLAGS_DEF} ${NORMALIZE_DEF} ${NULL_FIX} | ${UNKNOWN_VERSION_FIX} | ${VERSION_EVR_CONTAMINATION_FIX} | ${DROP_EMPTY_FILES} | ${BINARY_FILE_DEDUP} | ${NAME_VERSION_DEDUP} | ${PYRANGE_DEDUP} | ${SWIFT_DUP_FIX} | ${PURL_FIX} | ${VENDORED_CPE_FIX} | ${OS_SRC_FIX} | ${OS_PURL_FORM} | ${LICENSE_FIX} | ${LICENSE_REVIEW_FIX} | ${LICENSE_CLASS_FIX} | ${LICENSE_CONFLICT_FIX} | ${FILENAME_FILTER} | ${SORT_FILTER}" "$SBOM" > "$TMP"
+    jq -S --argjson vmap "$VMAP_JSON" --argjson compat "$COMPAT_JSON" "${LICENSE_FLAGS_DEF} ${NORMALIZE_DEF} ${NULL_FIX} | ${UNKNOWN_VERSION_FIX} | ${VERSION_EVR_CONTAMINATION_FIX} | ${DROP_EMPTY_FILES} | ${BINARY_FILE_DEDUP} | ${NAME_VERSION_DEDUP} | ${PYRANGE_DEDUP} | ${SWIFT_DUP_FIX} | ${PURL_FIX} | ${VENDORED_CPE_FIX} | ${OS_SRC_FIX} | ${OS_PURL_FORM} | ${LICENSE_FIX} | ${LICENSE_REVIEW_FIX} | ${LICENSE_CLASS_FIX} | ${LICENSE_CONFLICT_FIX} | ${SUPPLIER_FIX} | ${FILENAME_FILTER} | ${SORT_FILTER}" "$SBOM" > "$TMP"
 fi
 
 mv "$TMP" "$SBOM"
