@@ -132,7 +132,7 @@ docker build --build-arg ANDROID_API=<API> -t bomlens-android-sdk<API> docker/an
 
 > 주의: `poetry.lock`이 없는 Poetry 프로젝트는 `[tool.poetry.dependencies]`의 정확한 고정 버전(`requests = "2.31.0"`)으로 스캔합니다. `^2.0` 같은 범위와 경로·git 항목은 빠집니다. 고정 버전은 프로젝트에 연결되고 그 하위 의존성까지 나옵니다. 빠진 항목이 있거나 네트워크가 없어 하위 의존성을 풀지 못하면 SBOM은 의존 그래프를 불완전(incomplete)으로 표시합니다. 버전을 `==`로 고정하거나 `poetry.lock` 같은 잠금 파일을 커밋하세요. 그렇지 않으면 SBOM에는 실제로 쓰는 버전이 아니라 스캔 시점에 받을 수 있는 버전이 담깁니다. 번들 예제는 버전을 고정해 두었고 모든 컴포넌트에 라이선스가 있습니다.
 
-> 주의: uv(`uv.lock`)나 Poetry 프로젝트에서 cdxgen이 `main`이 아닌 의존성 그룹(예: `dev`, `test`)에만 넣은 컴포넌트는 운영 의존성 경로에서 닿지 않으면 빠지고, 그 컴포넌트만 필요로 하는 의존성도 함께 빠집니다. 운영 의존성도 쓰는 패키지는 남습니다. 프로젝트 안의 어느 `pyproject.toml`이든 `[project]`의 `dependencies`나 `optional-dependencies`, 또는 `[tool.poetry.dependencies]`에 적은 패키지도 의존성 그룹에 함께 있더라도 남습니다. BomLens는 이 파일을 자체의 간단한 읽기 방식으로 읽습니다. 스캔 루트에 `pyproject.toml`이 없거나, 읽지 못하는 형식(예: `dynamic = ["dependencies"]`)을 쓴 파일이 있으면 Python 패키지를 하나도 빼지 않고 빌드 로그에 그렇게 남깁니다. `vendor`와 소스 스캔이 기본으로 제외하는 폴더(위 참고) 밖에 `requirements*.txt`, `setup.py`, `setup.cfg`, `Pipfile`이 있어도 같습니다. 이 파일들이 읽기 방식이 보지 못하는 운영 의존성을 선언할 수 있기 때문입니다. 이 검색은 폴더 8단계 깊이까지 내려가며 `vendor`, `node_modules`, `.git`, 가상 환경(`.venv`, `venv`)은 건너뜁니다.
+> 주의: uv(`uv.lock`)나 Poetry 프로젝트에서 cdxgen이 `main`이 아닌 의존성 그룹(예: `dev`, `test`)에만 넣은 컴포넌트는 운영 의존성 경로에서 닿지 않으면 빠지고, 그 컴포넌트만 필요로 하는 의존성도 함께 빠집니다. 운영 의존성도 쓰는 패키지는 남습니다. 프로젝트 안의 어느 `pyproject.toml`이든 `[project]`의 `dependencies`나 `optional-dependencies`, 또는 `[tool.poetry.dependencies]`에 적은 패키지도 의존성 그룹에 함께 있더라도 남습니다. BomLens는 이 파일을 자체의 간단한 읽기 방식으로 읽습니다. 스캔 루트에 `pyproject.toml`이 없거나, 읽지 못하는 형식(예: `dynamic = ["dependencies"]`)을 쓴 파일이 있으면 Python 패키지를 하나도 빼지 않고 빌드 로그에 그렇게 남깁니다. `vendor`와 소스 스캔이 기본으로 제외하는 폴더(위 참고) 밖에 `requirements*.txt`, `setup.py`, `setup.cfg`, `Pipfile`이 있어도 같습니다. 이 파일들이 읽기 방식이 보지 못하는 운영 의존성을 선언할 수 있기 때문입니다. 이 검색은 폴더 8단계 깊이까지 내려가며 `vendor`, `node_modules`, `.git`, 가상 환경(`.venv`, `venv`)은 건너뜁니다. 이들과 기본 제외 폴더 밖에 더 깊은 폴더가 있어도 Python 패키지를 하나도 빼지 않습니다.
 
 ---
 
@@ -158,7 +158,7 @@ docker build --build-arg ANDROID_API=<API> -t bomlens-android-sdk<API> docker/an
 
 > 주의: `Gemfile.lock`이 커밋되어 있지 않으면 BomLens가 스캔 전에 `bundle lock`을 실행합니다. SBOM이 배포 구성과 일치하도록 잠금 파일을 커밋하세요.
 
-> 주의: cdxgen은 Bundler 그룹을 표시하지 않으므로 BomLens가 스캔 루트의 `Gemfile`을 직접 읽습니다. `development`와 `test` 그룹에만 선언된 gem(`group ... do` 블록 안이나 `group:`, `groups:` 옵션으로 선언)은 빠지고, 그런 gem만 필요로 하는 의존성도 함께 빠집니다. 운영 gem도 필요로 하면 남습니다. `Gemfile`은 보수적으로 읽습니다. 조건문, `gemspec`, `eval_gemfile`, 여러 줄에 걸친 선언처럼 읽지 못하는 줄이 있거나, `Gemfile.lock`에 `Gemfile`에 없는 gem이 있으면 gem을 하나도 빼지 않고 로그에 `Gemfile groups not read`를 남깁니다. 스캔 루트 아래에 다른 `Gemfile`이나 `Gemfile.lock`이 있거나 프로젝트 어디든 `.gemspec` 파일이 있어도 같습니다. 같은 gem을 운영용으로 선언했을 수 있기 때문입니다. 이 검색은 폴더 8단계 깊이까지 내려가며 `vendor`(설치된 gem이 있는 `vendor/bundle` 포함), `node_modules`, `.git`, `.venv`, `venv`는 건너뜁니다.
+> 주의: cdxgen은 Bundler 그룹을 표시하지 않으므로 BomLens가 스캔 루트의 `Gemfile`을 직접 읽습니다. `development`와 `test` 그룹에만 선언된 gem(`group ... do` 블록 안이나 `group:`, `groups:` 옵션으로 선언)은 빠지고, 그런 gem만 필요로 하는 의존성도 함께 빠집니다. 운영 gem도 필요로 하면 남습니다. `Gemfile`은 보수적으로 읽습니다. 조건문, `gemspec`, `eval_gemfile`, 여러 줄에 걸친 선언처럼 읽지 못하는 줄이 있거나, `Gemfile.lock`에 `Gemfile`에 없는 gem이 있으면 gem을 하나도 빼지 않고 로그에 `Gemfile groups not read`를 남깁니다. 스캔 루트 아래에 다른 `Gemfile`이나 `Gemfile.lock`이 있거나 프로젝트 어디든 `.gemspec` 파일이 있어도 같습니다. 같은 gem을 운영용으로 선언했을 수 있기 때문입니다. 이 검색은 폴더 8단계 깊이까지 내려가며 `vendor`(설치된 gem이 있는 `vendor/bundle` 포함), `node_modules`, `.git`, `.venv`, `venv`는 건너뜁니다. 이들 밖에 더 깊은 폴더가 있어도 gem을 하나도 빼지 않습니다.
 
 ---
 

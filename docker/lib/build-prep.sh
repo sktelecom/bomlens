@@ -1954,8 +1954,8 @@ const give_up = why => {
   process.exit(0);
 };
 const top = path.dirname(gemfile);
-// 8 folders deep; installed gems, packages and virtual environments are not
-// manifests of this project.
+// 8 folders deep (a deeper folder means nothing is reported); installed gems,
+// packages and virtual environments are not manifests of this project.
 const OTHERS_SKIP = new Set(['vendor', 'node_modules', '.git', '.venv', 'venv']);
 const others = (dir, depth) => {
   let ents;
@@ -1963,7 +1963,8 @@ const others = (dir, depth) => {
   for (const e of ents) {
     const p = path.join(dir, e.name);
     if (e.isDirectory()) {
-      if (depth >= 8 || OTHERS_SKIP.has(e.name)) continue;
+      if (OTHERS_SKIP.has(e.name)) continue;
+      if (depth >= 8) give_up(path.relative(top, p) + ' is deeper than 8 folders and was not searched');
       const hit = others(p, depth + 1);
       if (hit) return hit;
     } else if (/\.gemspec$/.test(e.name) || (depth > 0 && (e.name === 'Gemfile' || e.name === 'Gemfile.lock'))) {
@@ -2067,7 +2068,8 @@ const every = (c, n, isDev) => { const v = prop(c, n); return v.length > 0 && v.
 // under the root ([project] dependencies and optional-dependencies,
 // [tool.poetry.dependencies]) are read with a small reader, not a TOML parser:
 // when the root has no pyproject.toml or a file is one it cannot follow, no
-// Python marker is used. The walk goes 8 folders deep and skips vendor,
+// Python marker is used. The walk goes 8 folders deep (a deeper folder outside
+// the non-shipped ones means no Python marker is used) and skips vendor,
 // node_modules, .git and virtual environments.
 const pep503 = s => s.toLowerCase().replace(/[-_.]+/g, '-');
 // A requirements file, setup.py, setup.cfg or Pipfile outside the non-shipped
@@ -2079,17 +2081,22 @@ const readPyProd = () => {
   if (!fs.existsSync('pyproject.toml')) { say('python: no pyproject.toml at the scan root; no Python package dropped as development-only'); return null; }
   const files = [];
   let other = null;
+  let deep = null;
   const walk = (dir, depth, shipped) => {
     let ents;
     try { ents = fs.readdirSync(dir, { withFileTypes: true }); } catch (e) { return; }
     for (const e of ents) {
       if (e.isDirectory()) {
-        if (depth < 8 && !SKIP.has(e.name)) walk(path.join(dir, e.name), depth + 1, shipped && !nonShipped.has(e.name.toLowerCase()));
+        if (SKIP.has(e.name)) continue;
+        const sub = shipped && !nonShipped.has(e.name.toLowerCase());
+        if (depth < 8) walk(path.join(dir, e.name), depth + 1, sub);
+        else if (sub && !deep) deep = path.join(dir, e.name);
       } else if (e.isFile() && e.name === 'pyproject.toml') files.push(path.join(dir, e.name));
       else if (e.isFile() && shipped && !other && OTHER_PY.test(e.name)) other = path.join(dir, e.name);
     }
   };
   walk('.', 0, true);
+  if (deep) { say('python: ' + deep.replace(/^\.\//, '') + ' is deeper than 8 folders and was not searched; no Python package dropped as development-only'); return null; }
   if (other) { say('python: ' + other.replace(/^\.\//, '') + ' may declare production dependencies; no Python package dropped as development-only'); return null; }
   if (files.length > 1000) { say('python: too many pyproject.toml files; no Python package dropped as development-only'); return null; }
   const names = new Set();
