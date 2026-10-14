@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Firmware, root filesystem and binary scans now give a component identified with no package PURL (none, `pkg:generic` or `pkg:opkg`) the upstream source repository PURL when it is in `docker/lib/upstream-purl-map.json`, for example `pkg:generic/openssl@1.0.2h` becomes `pkg:github/openssl/openssl@OpenSSL_1_0_2h`; the replaced one is kept in `bomlens:originalPurl`. A tool that joins these scans with an earlier BomLens SBOM by PURL sees these components as new once. Set `ENRICH_UPSTREAM_PURL=false` to keep the earlier PURLs. The engine contract counts this as a minor change: the version rules now name package PURLs.
 - A step that failed while the SBOM was generated, and was until now recorded only in the SBOM's `bomlens:pipeline-step-failed` (a resolver step in build-prep such as `go-mod-tidy`, `cargo-lockfile` or `npm-production-set`, or a firmware syft pass), now makes `run.status` in `bomlens-result.json` read `succeeded_degraded` instead of `succeeded` (engine contract 1.3.0). This is common in offline scans, where the resolver steps cannot reach their registries; a caller that treats `succeeded_degraded` as a failure will see more of them.
+- In a `MODE=PLAN` plan, the stage 1 `env` now sets `MAVEN_OPTS` to `-Dmaven.repo.local=/tmp/sbomhome/.m2/repository` (it was `-Dmaven.repo.local=/tmp/sbomhome/.m2`). An engine that runs the plan as written needs no change. One that set the stage 1 environment itself with the earlier value should take the new one: with the earlier value stage 1 does not fetch the Maven dependency jars, only logs that it skipped them, and the Maven components come out without hashes.
 
 ### Added
 
@@ -51,6 +52,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A source scan of a tree with no dependencies wrote a root component without a type, which fails CycloneDX schema validation. It is now `application`.
 - An SBOM whose `metadata.tools` is the older flat array (CycloneDX 1.4 and before) got BomLens added to it with component fields (`type`, `publisher`), which fails schema validation. It is now added as a tool, with `vendor`, `name` and `version`.
 - A CycloneDX 1.4 SBOM post-processed at the default version stayed 1.4 but got `metadata.lifecycles` and, without a tools list, a `metadata.tools` object, both of which 1.4 does not define. It now keeps its version and gets neither the lifecycle nor the object form: BomLens goes into the flat tools array.
+- Maven components in a source scan now carry hashes (MD5, SHA-1, SHA-256, SHA-512): the dependency jars are fetched into the local repository cdxgen reads before it runs.
+- The security report no longer lists distribution or ecosystem advisory numbers (such as DLA-4792-1 or NSWG-ECO-516) as vulnerabilities. One that names a CVE is reported under that CVE, with the number kept in VendorIDs; one that names none is listed in its own section, in Advisories in _security.json and in the web UI, outside the counts and the --fail-on gate.
 
 ## [v1.13.2] - 2026-10-12
 
