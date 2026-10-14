@@ -18,8 +18,15 @@ then the path of its run list instead of one exit status: one line
 `run <n> <rc> <goos> <how> <module dir>` per run, beside `nonce` and `goarch`
 lines. Each run's part of the stream starts with a `{"bomlens_run": <n>}`
 line, and its part of standard error with a `== bomlens run <n> ==` line.
-Every run must succeed: one that failed leaves nothing written (a run that
-did not finish is not read as one that found nothing).
+Every run must succeed, except one that failed only because the module's code
+does not build for its GOOS (no package matched, build constraints exclude a
+package, or type errors alone): that GOOS is recorded as not covered for the
+module, which is judged from the GOOS that built. A module that builds for
+none of the three (no package matched on each) is not judged and the result
+is "degraded" (exit 4, the VEX is still written); type errors on all three
+read as a tree that does not build and fail the step. Any other failure
+leaves nothing written (a run that did not finish is not read as one that
+found nothing).
 
 govulncheck reports each advisory at the deepest level it could confirm:
 
@@ -116,6 +123,29 @@ def reason_line(text):
             if re.search(r"\.go:\d+:\d+: |^go: |^err: ", ln):
                 return ln[:400]
     return last_line(text)
+
+
+GOOS_NONE_RE = re.compile(r"no packages matched the provided patterns|build constraints exclude all Go files")
+NOT_GOOS_RE = re.compile(
+    r"fetching vulnerabilities|dial tcp|no such host|network is unreachable|i/o timeout|connection refused"
+    r"|proxy\.golang\.org|could not import|cannot find (module|package)|no required module|missing go\.sum"
+    r"|go\.mod|go: |unknown revision|invalid version", re.IGNORECASE)
+TYPE_ERROR_RE = re.compile(r"\.go:\d+:\d+: ")
+
+
+def goos_only(rc, stderr):
+    """Why a run failed when the reason is the GOOS, else None: "none" when
+    nothing builds there (no package matched, or build constraints exclude a
+    package), "types" when the code does not type-check there (a field or
+    function another system has), with nothing about fetching, importing or
+    the module. build-prep.sh (rch_goos_only) uses the same rule."""
+    if rc == "124":
+        return None
+    if GOOS_NONE_RE.search(stderr):
+        return "none"
+    if LOADING_RE.search(stderr) and not NOT_GOOS_RE.search(stderr) and TYPE_ERROR_RE.search(stderr):
+        return "types"
+    return None
 
 
 def classify(rc, stderr):
@@ -286,6 +316,12 @@ def best_findings(messages, where, best, osvs, config):
                 best[key][2].append(where)
 
 
+def uncovered_note(scope):
+    """"; not covered, as the code does not build there: module ./x: GOOS=darwin"."""
+    parts = ["module %s: GOOS=%s" % (m, ", ".join(g)) for m, g in sorted((scope.get("uncovered") or {}).items())]
+    return "; not covered, as the code does not build there: " + "; ".join(parts) if parts else ""
+
+
 def where_note(wheres, multi):
     """The runs that confirmed the level, when there was more than one run:
     " (module .: GOOS=linux, windows)"."""
@@ -329,7 +365,7 @@ def build(bom, runs, mode, stable, scope=None):
         if level == "symbol":
             detail += where_note(wheres, multi)
         elif scope is not None:
-            detail += "; " + SCOPE_NOTE
+            detail += "; " + SCOPE_NOTE + uncovered_note(scope)
         analysis["detail"] = detail
         counts[analysis["state"]] += 1
         vulns.append({
@@ -366,6 +402,12 @@ def build(bom, runs, mode, stable, scope=None):
              "value": "default; code built only under a custom build tag is not covered"},
             {"name": "bomlens:reachability:modules", "value": ",".join(scope["modules"])},
         ])
+        if scope.get("uncovered"):
+            metadata["properties"].append({"name": "bomlens:reachability:goos-not-covered", "value": "; ".join(
+                "%s:%s" % (m, ",".join(g)) for m, g in sorted(scope["uncovered"].items()))})
+        if scope.get("not_judged"):
+            metadata["properties"].append({"name": "bomlens:reachability:modules-not-judged",
+                                           "value": ",".join(scope["not_judged"])})
     if isinstance(meta_in.get("component"), dict):
         metadata["component"] = meta_in["component"]
     doc = {"bomFormat": "CycloneDX", "specVersion": CDX_SPEC_VERSION}
@@ -424,12 +466,36 @@ def main(argv):
             if not listed:
                 return emit("failed", 2, detail="stage 1 recorded no govulncheck run")
             errs = split_marked(read_err(err_path), ERR_MARK)
+            # A run that failed because the code does not build for its GOOS
+            # leaves that GOOS uncovered; any other failure fails the step.
             # The database first: when it could not be read, every run says so.
-            failures = []
+            failures, skipped_goos, ok_runs, failed_modules = [], {}, set(), set()
             for n, rc_n, goos, _how, module in listed:
-                if rc_n != "0":
-                    status, code, detail = classify(rc_n, errs.get(n, "")[-4000:])
-                    failures.append((code, status, "%s (module %s, GOOS=%s)" % (detail, module, goos)))
+                if rc_n == "0":
+                    ok_runs.add(n)
+                    continue
+                err_n = errs.get(n, "")[-4000:]
+                why = goos_only(rc_n, err_n)
+                if why:
+                    skipped_goos.setdefault(module, []).append((goos, why, reason_line(err_n)))
+                    continue
+                status, code, detail = classify(rc_n, err_n)
+                failed_modules.add(module)
+                failures.append((code, status, "%s (module %s, GOOS=%s)" % (detail, module, goos)))
+            modules = sorted({m for _n, _rc, _g, _h, m in listed})
+            not_judged = []
+            for module in modules:
+                if module in failed_modules or any(n in ok_runs for n, _rc, _g, _h, m in listed if m == module):
+                    continue
+                whys = skipped_goos.get(module, [])
+                if all(w == "none" for _g, w, _r in whys):
+                    not_judged.append(module)
+                else:
+                    # Type errors on every GOOS read as a tree that does not
+                    # build, not as code for another system.
+                    reason = whys[0][2]
+                    failures.append((2, "failed", "the code does not build for any of GOOS linux, darwin and "
+                                     "windows: %s (module %s)" % (reason, module)))
             if failures:
                 hard = [f for f in failures if f[0] == 2]
                 code, status, detail = (hard or failures)[0]
@@ -439,13 +505,16 @@ def main(argv):
             parts = split_marked(read_stream(stream_path), RUN_MARK)
             runs = []
             for n, _rc, goos, _how, module in listed:
+                if n not in ok_runs:
+                    continue
                 if n not in parts:
                     return emit("failed", 2, detail="govulncheck's output for module %s (GOOS=%s) is missing"
                                 % (module, goos))
                 runs.append((parse_text(parts[n]), (goos, module)))
-            modules = sorted({m for _n, _rc, _g, _h, m in listed})
             goos_seen = [g for g in GOOS_LIST if any(r[2] == g for r in listed)]
-            scope = {"goos": goos_seen, "goarch": goarch, "modules": modules}
+            uncovered = {m: [g for g, _w, _r in v] for m, v in skipped_goos.items() if m not in not_judged}
+            scope = {"goos": goos_seen, "goarch": goarch, "modules": [m for m in modules if m not in not_judged],
+                     "uncovered": uncovered, "not_judged": not_judged}
         with open(bom_path, encoding="utf-8") as fh:
             bom = json.load(fh)
     except (OSError, ValueError) as err:
@@ -459,6 +528,9 @@ def main(argv):
         json.dump(doc, fh, indent=2, ensure_ascii=False)
         fh.write("\n")
     os.replace(tmp, out_path)
+    if scope and scope["not_judged"]:
+        return emit("degraded", 4, detail="not judged, as the code builds for none of GOOS linux, darwin and "
+                    "windows: module %s" % ", ".join(scope["not_judged"]), **counts)
     return emit("ok", 0, **counts)
 
 

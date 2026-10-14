@@ -11149,6 +11149,43 @@ rc=0; out="$(REACHABILITY_NONCE=n8 bash "$LIB/reachability.sh" "$RCH/bom.json" "
 [ "$rc" = 2 ] && jq -e '.status == "failed" and (.detail | contains("unknown revision"))' <<<"$out" >/dev/null \
     && pass "a database error in some runs and a source error in another: failed, not unavailable" || fail "mixed failures: rc=$rc $out"
 rm -f "$RCH"/run*.err
+# A GOOS the code does not build for (every file constrained to linux, or a
+# field only linux has) is left uncovered, not a failure: the module is judged
+# from the GOOS that built, and the VEX says which were not covered.
+NOPKG='govulncheck: no packages matched the provided patterns'
+TYPES='govulncheck: loading packages: \nThere are errors with the provided package patterns:\n\n/exp/pds/main.go:14:39: unknown field Pdeathsig in struct literal of type syscall.SysProcAttr\n\nFor details on package patterns, see https://pkg.go.dev/cmd/go#hdr-Package_lists_and_patterns.\n'
+printf '%s\n' "$NOPKG" > "$RCH/run2.err"; printf "$TYPES" > "$RCH/run3.err"
+rch_stage1 "$RCH/g1_govulncheck_stage1" n9 "0 linux . $RCH_STREAM" "2 darwin . -" "1 windows . -"
+rc=0; out="$(REACHABILITY_NONCE=n9 bash "$LIB/reachability.sh" "$RCH/bom.json" "$RCH/g1" source)" || rc=$?
+[ "$rc" = 0 ] && jq -e '(.vulnerabilities[] | select(.id == "CVE-2022-32149") | .analysis.state == "exploitable")
+       and (.vulnerabilities[] | select(.id == "CVE-2026-56852") | .analysis.detail | contains("not covered, as the code does not build there: module .: GOOS=darwin, windows"))
+       and (.metadata.properties[] | select(.name == "bomlens:reachability:goos-not-covered") | .value == ".:darwin,windows")' \
+       "$RCH/g1_reachability.cdx.json" >/dev/null \
+    && pass "a linux-only module (no package on darwin, a linux-only field on windows) is judged from linux, the other GOOS named as not covered" \
+    || fail "GOOS not covered: rc=$rc $out" "$(jq -c '.metadata.properties, [.vulnerabilities[].analysis.detail]' "$RCH/g1_reachability.cdx.json" 2>&1)"
+rm -f "$RCH"/run*.err
+for i in 4 5 6; do printf '%s\n' "$NOPKG" > "$RCH/run$i.err"; done
+rch_stage1 "$RCH/g2_govulncheck_stage1" n10 "0 linux . $RCH/modonly.json" "0 darwin . $RCH/modonly.json" "0 windows . $RCH/modonly.json" \
+    "2 linux ./mobile -" "2 darwin ./mobile -" "2 windows ./mobile -"
+rc=0; out="$(REACHABILITY_NONCE=n10 bash "$LIB/reachability.sh" "$RCH/bom.json" "$RCH/g2" source)" || rc=$?
+[ "$rc" = 4 ] && jq -e '.status == "degraded" and (.detail | contains("module ./mobile"))' <<<"$out" >/dev/null \
+    && jq -e '(.metadata.properties[] | select(.name == "bomlens:reachability:modules-not-judged") | .value == "./mobile")
+       and (.metadata.properties[] | select(.name == "bomlens:reachability:modules") | .value == ".")' "$RCH/g2_reachability.cdx.json" >/dev/null \
+    && pass "a module that builds for none of the three GOOS is not judged: degraded (4), the VEX names it" \
+    || fail "module not judged: rc=$rc $out"
+rm -f "$RCH"/run*.err
+for i in 1 2 3; do printf "$TYPES" > "$RCH/run$i.err"; done
+rch_stage1 "$RCH/g3_govulncheck_stage1" n11 "1 linux . -" "1 darwin . -" "1 windows . -"
+rc=0; out="$(REACHABILITY_NONCE=n11 bash "$LIB/reachability.sh" "$RCH/bom.json" "$RCH/g3" source)" || rc=$?
+[ "$rc" = 2 ] && jq -e '.status == "failed" and (.detail | contains("does not build for any of GOOS"))' <<<"$out" >/dev/null && [ ! -f "$RCH/g3_reachability.cdx.json" ] \
+    && pass "type errors on every GOOS read as a tree that does not build: failed" || fail "type errors everywhere: rc=$rc $out"
+rm -f "$RCH"/run*.err
+printf 'govulncheck: loading packages: \nmain.go:7:2: could not import golang.org/x/text/language (invalid package name: "")\n' > "$RCH/run2.err"
+rch_stage1 "$RCH/g4_govulncheck_stage1" n12 "0 linux . $RCH_STREAM" "1 darwin . -" "0 windows . $RCH_STREAM"
+rc=0; out="$(REACHABILITY_NONCE=n12 bash "$LIB/reachability.sh" "$RCH/bom.json" "$RCH/g4" source)" || rc=$?
+[ "$rc" = 2 ] && [ ! -f "$RCH/g4_reachability.cdx.json" ] \
+    && pass "a package that could not be imported on one GOOS is a failure, not an uncovered GOOS" || fail "import failure: rc=$rc $out"
+rm -f "$RCH"/run*.err
 mkdir -p "$RCH/bin"
 cat > "$RCH/bin/govulncheck" <<SH
 #!/bin/sh
@@ -11261,7 +11298,7 @@ echo "== reachability: stage 1 runs govulncheck per Go module and per GOOS =="
 # build-prep.sh with stand-ins for go, cdxgen and govulncheck: which modules
 # it runs, with what environment, and on what go.mod; the run list it leaves.
 RS1="$WORK/rch-stage1"
-mkdir -p "$RS1/bin" "$RS1/src/sub" "$RS1/src/vendor/github.com/x/y" "$RS1/src/testdata/m" "$RS1/src/_tools" "$RS1/src/.hidden" "$RS1/out"
+mkdir -p "$RS1/bin" "$RS1/src/sub" "$RS1/src/vendor/github.com/x/y" "$RS1/src/testdata/m" "$RS1/src/_tools" "$RS1/src/.hidden" "$RS1/src/examples/demo" "$RS1/src/node_modules/m" "$RS1/out"
 cat > "$RS1/bin/go" <<'STUB'
 #!/bin/sh
 case "$1 $2" in
@@ -11281,28 +11318,35 @@ exit 0
 STUB
 cat > "$RS1/bin/govulncheck" <<'STUB'
 #!/bin/sh
-printf '%s %s %s %s %s %s\n' "$(basename "$PWD")" "$GOOS" "$GOARCH" "${GOWORK-unset}" "${GOFLAGS:-none}" "$(cksum < go.mod | cut -d' ' -f1)" >> "$RCH_STAGE1_LOG"
+printf '%s %s %s %s %s %s\n' "$(basename "$PWD")" "$GOOS" "$GOARCH" "${GOWORK-unset}" "$(printf '%s' "${GOFLAGS:-none}" | tr ' ' '+')" "$(cksum < go.mod | cut -d' ' -f1)" >> "$RCH_STAGE1_LOG"
+# RCH_STUB_FAIL="<folder>:<GOOS>:<none|types|net|slow>": fail that run as govulncheck does.
+case " ${RCH_STUB_FAIL:-} " in
+    *" $(basename "$PWD"):$GOOS:none "*) echo "govulncheck: no packages matched the provided patterns" >&2; exit 2 ;;
+    *" $(basename "$PWD"):$GOOS:types "*) printf 'govulncheck: loading packages: \nThere are errors with the provided package patterns:\n\n/src/main.go:14:39: unknown field Pdeathsig in struct literal of type syscall.SysProcAttr\n' >&2; exit 1 ;;
+    *" $(basename "$PWD"):$GOOS:net "*) printf 'govulncheck: loading packages: \nmain.go:7:2: golang.org/x/text@v0.3.7: Get "https://proxy.golang.org/x": dial tcp: lookup proxy.golang.org: no such host\n' >&2; exit 1 ;;
+    *" $(basename "$PWD"):$GOOS:slow "*) sleep 5 ;;
+esac
 echo '{"config":{"scanner_name":"govulncheck"}}'
 STUB
 chmod +x "$RS1/bin/go" "$RS1/bin/cdxgen" "$RS1/bin/govulncheck"
 printf 'module example.com/root\n\ngo 1.24\n' > "$RS1/src/go.mod"
 printf '# github.com/x/y v1.0.0\n## explicit\n' > "$RS1/src/vendor/modules.txt"
-for d in sub vendor/github.com/x/y testdata/m _tools .hidden; do printf 'module example.com/%s\n\ngo 1.24\n' "$(basename "$d")" > "$RS1/src/$d/go.mod"; done
+for d in sub vendor/github.com/x/y testdata/m _tools .hidden examples/demo node_modules/m; do printf 'module example.com/%s\n\ngo 1.24\n' "$(basename "$d")" > "$RS1/src/$d/go.mod"; done
 ROOT_SUM=$(cksum < "$RS1/src/go.mod" | cut -d' ' -f1)
 : > "$RS1/log"
 RCH_STAGE1_LOG="$RS1/log" BOMLENS_REACHABILITY=true BOMLENS_GOVULNCHECK="$RS1/bin/govulncheck" BOMLENS_REACHABILITY_NONCE=nz1 \
     PATH="$RS1/bin:$PATH" sh "$LIB/build-prep.sh" "$RS1/src" "$RS1/out/p_1_bom.json" >/dev/null 2>&1
-[ "$(cut -d' ' -f1,2 "$RS1/log" | tr '\n' ',')" = "sub linux,sub darwin,sub windows,src linux,src darwin,src windows," ] \
-    && pass "every go.mod outside vendor/, testdata/ and . or _ folders runs once per GOOS; the vendored one last" \
+[ "$(cut -d' ' -f1,2 "$RS1/log" | tr '\n' ',')" = "_tools linux,_tools darwin,_tools windows,sub linux,sub darwin,sub windows,src linux,src darwin,src windows," ] \
+    && pass "every go.mod the SBOM reads (an _ folder too, not vendor/, node_modules/, . folders or non-shipped ones) runs once per GOOS; the vendored one last" \
     || fail "stage 1 runs" "$(cat "$RS1/log")"
 awk -v s="$ROOT_SUM" '$1 == "src" && ($3 != "amd64" || $4 != "off" || $5 != "none" || $6 != s) { bad = 1 } END { exit bad }' "$RS1/log" \
     && grep -q '^sub linux amd64 off none ' "$RS1/log" \
     && pass "GOARCH amd64, outside a workspace GOWORK=off; the vendored module sees go.mod as it was before go mod tidy" \
     || fail "stage 1 environment" "$(cat "$RS1/log"; echo "root go.mod sum $ROOT_SUM")"
 [ "$(sed -n 1p "$RS1/out/p_1_govulncheck_stage1.rc")" = "nonce nz1" ] \
-    && [ "$(grep -c '^run ' "$RS1/out/p_1_govulncheck_stage1.rc")" = 6 ] \
-    && grep -q '^run 6 0 windows module \.$' "$RS1/out/p_1_govulncheck_stage1.rc" \
-    && [ "$(grep -c '^{"bomlens_run": ' "$RS1/out/p_1_govulncheck_stage1.json")" = 6 ] \
+    && [ "$(grep -c '^run ' "$RS1/out/p_1_govulncheck_stage1.rc")" = 9 ] \
+    && grep -q '^run 9 0 windows module \.$' "$RS1/out/p_1_govulncheck_stage1.rc" \
+    && [ "$(grep -c '^{"bomlens_run": ' "$RS1/out/p_1_govulncheck_stage1.json")" = 9 ] \
     && pass "the run list carries the nonce and one line per run, the stream one mark per run" \
     || fail "stage 1 run list" "$(cat "$RS1/out/p_1_govulncheck_stage1.rc")"
 cmp -s "$RS1/src/go.mod" /dev/stdin <<EOF2 && pass "go.mod is put back after the runs" || fail "go.mod not restored"
@@ -11310,6 +11354,46 @@ module example.com/root
 
 go 1.24
 EOF2
+# BOMLENS_INCLUDE_NON_SHIPPED keeps the non-shipped folders in the SBOM, and in the search.
+: > "$RS1/log"
+RCH_STAGE1_LOG="$RS1/log" BOMLENS_REACHABILITY=true BOMLENS_GOVULNCHECK="$RS1/bin/govulncheck" BOMLENS_REACHABILITY_NONCE=nz1 \
+    BOMLENS_INCLUDE_NON_SHIPPED=1 PATH="$RS1/bin:$PATH" sh "$LIB/build-prep.sh" "$RS1/src" "$RS1/out/p_1_bom.json" >/dev/null 2>&1
+[ "$(cut -d' ' -f1 "$RS1/log" | uniq | tr '\n' ',')" = "_tools,demo,sub,m,src," ] \
+    && pass "with BOMLENS_INCLUDE_NON_SHIPPED the examples/ and testdata/ modules are judged too" \
+    || fail "stage 1 runs with non-shipped" "$(cut -d' ' -f1,2 "$RS1/log")"
+# A run that fails for the GOOS goes on; another failure stops the runs left.
+: > "$RS1/log"
+RCH_STUB_FAIL="sub:darwin:none sub:windows:types" RCH_STAGE1_LOG="$RS1/log" BOMLENS_REACHABILITY=true \
+    BOMLENS_GOVULNCHECK="$RS1/bin/govulncheck" BOMLENS_REACHABILITY_NONCE=nz4 \
+    PATH="$RS1/bin:$PATH" sh "$LIB/build-prep.sh" "$RS1/src" "$RS1/out/p_1_bom.json" >/dev/null 2>&1
+[ "$(grep -c '^run ' "$RS1/out/p_1_govulncheck_stage1.rc")" = 9 ] && grep -q '^run 5 2 darwin module \./sub$' "$RS1/out/p_1_govulncheck_stage1.rc" \
+    && grep -q '^run 6 1 windows module \./sub$' "$RS1/out/p_1_govulncheck_stage1.rc" \
+    && pass "runs that fail because the code does not build for the GOOS do not stop the others" \
+    || fail "GOOS-only failures in stage 1" "$(cat "$RS1/out/p_1_govulncheck_stage1.rc")"
+: > "$RS1/log"
+RCH_STUB_FAIL="_tools:darwin:net" RCH_STAGE1_LOG="$RS1/log" BOMLENS_REACHABILITY=true \
+    BOMLENS_GOVULNCHECK="$RS1/bin/govulncheck" BOMLENS_REACHABILITY_NONCE=nz5 \
+    PATH="$RS1/bin:$PATH" sh "$LIB/build-prep.sh" "$RS1/src" "$RS1/out/p_1_bom.json" >/dev/null 2>&1
+[ "$(grep -c '^run ' "$RS1/out/p_1_govulncheck_stage1.rc")" = 2 ] && [ "$(wc -l < "$RS1/log" | tr -d ' ')" = 2 ] \
+    && pass "a module download failure stops the runs left (the step fails anyway)" \
+    || fail "stop after a failure" "$(cat "$RS1/out/p_1_govulncheck_stage1.rc")"
+: > "$RS1/log"
+RCH_STUB_FAIL="_tools:linux:slow" RCH_STAGE1_LOG="$RS1/log" BOMLENS_REACHABILITY=true BOMLENS_PREP_TIMEOUT=2 \
+    BOMLENS_GOVULNCHECK="$RS1/bin/govulncheck" BOMLENS_REACHABILITY_NONCE=nz6 \
+    PATH="$RS1/bin:$PATH" sh "$LIB/build-prep.sh" "$RS1/src" "$RS1/out/p_1_bom.json" >/dev/null 2>&1
+[ "$(cat "$RS1/out/p_1_govulncheck_stage1.rc" | grep '^run ')" = "run 1 124 linux module ./_tools" ] \
+    && pass "the time budget covers all the runs: the first one timing out ends them" \
+    || fail "time budget" "$(cat "$RS1/out/p_1_govulncheck_stage1.rc")"
+# Guard off: the vendored module is read off the module cache, -mod=mod added
+# to the caller's GOFLAGS; in workspace mode go refuses -mod=mod, so not there.
+: > "$RS1/log"
+GOFLAGS=-tags=netgo RCH_STAGE1_LOG="$RS1/log" BOMLENS_REACHABILITY=true BOMLENS_KEEP_BUILD_OUTPUT=1 \
+    BOMLENS_GOVULNCHECK="$RS1/bin/govulncheck" BOMLENS_REACHABILITY_NONCE=nz7 \
+    PATH="$RS1/bin:$PATH" sh "$LIB/build-prep.sh" "$RS1/src" "$RS1/out/p_1_bom.json" >/dev/null 2>&1
+grep -q '^src linux amd64 off -tags=netgo+-mod=mod ' "$RS1/log" && grep -q '^sub linux amd64 off -tags=netgo ' "$RS1/log" \
+    && pass "guard off: the vendored module adds -mod=mod after the caller's GOFLAGS" \
+    || fail "GOFLAGS with the guard off" "$(cat "$RS1/log")"
+printf 'module example.com/root\n\ngo 1.24\n' > "$RS1/src/go.mod"
 # A go.work lists ./a: a runs in workspace mode, b (not listed) alone.
 WS="$RS1/ws"; mkdir -p "$WS/src/a" "$WS/src/b" "$WS/out"
 printf 'go 1.24\n\nuse ./a\n' > "$WS/src/go.work"
@@ -11321,6 +11405,12 @@ grep -q '^a linux amd64 unset ' "$RS1/log" && grep -q '^b linux amd64 off ' "$RS
     && grep -q '^run 1 0 linux workspace \./a$' "$WS/out/w_1_govulncheck_stage1.rc" \
     && pass "a go.work member runs in workspace mode, a module it does not list runs alone" \
     || fail "workspace" "$(cat "$RS1/log" "$WS/out/w_1_govulncheck_stage1.rc")"
+mkdir -p "$WS/src/a/vendor"; printf '# x\n' > "$WS/src/a/vendor/modules.txt"; : > "$RS1/log"
+RCH_STAGE1_LOG="$RS1/log" BOMLENS_REACHABILITY=true BOMLENS_KEEP_BUILD_OUTPUT=1 BOMLENS_GOVULNCHECK="$RS1/bin/govulncheck" \
+    BOMLENS_REACHABILITY_NONCE=nz8 PATH="$RS1/bin:$PATH" sh "$LIB/build-prep.sh" "$WS/src" "$WS/out/w_1_bom.json" >/dev/null 2>&1
+grep -q '^a linux amd64 unset none ' "$RS1/log" \
+    && pass "a vendored workspace member gets no -mod=mod, which go refuses in workspace mode" \
+    || fail "workspace vendored module" "$(cat "$RS1/log")"
 # Over 20 modules: nothing runs, and the run list says why.
 BIG="$RS1/big"; mkdir -p "$BIG/out"
 i=0; while [ "$i" -lt 21 ]; do mkdir -p "$BIG/src/m$i"; printf 'module example.com/m%s\n\ngo 1.24\n' "$i" > "$BIG/src/m$i/go.mod"; i=$((i + 1)); done

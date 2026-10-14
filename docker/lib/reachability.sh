@@ -21,7 +21,8 @@
 #
 # The SBOM and the security report are not changed here; scan-security.sh reads
 # the VEX to mark its findings. Standard output is one JSON line from
-# assess-reachability.py. Exit status: 0 written, 2 failed, 3 the database
+# assess-reachability.py. Exit status: 0 written, 4 written but a Go module
+# builds for none of the GOOS judged (not judged), 2 failed, 3 the database
 # could not be reached, 10 govulncheck is not in this image, 11 nothing to judge
 # (no Go component, or stage 1 did not run govulncheck for this run), 12 more
 # Go modules than stage 1 judges.

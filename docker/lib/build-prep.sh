@@ -4428,25 +4428,39 @@ fi
 # does not build) is stage 2's to report.
 #
 # govulncheck reads one module per run and only the files the current GOOS
-# and GOARCH build, so it runs for every go.mod in the tree (up to
-# _rch_max_modules; vendor/, testdata/, node_modules/ and folders starting
-# with . or _, which `go build ./...` skips too, are not searched) and for
-# GOOS linux, darwin and windows, GOARCH amd64. Stage 2 keeps, per advisory,
-# the deepest level any run found. A module listed in the go.work governing
-# it runs in workspace mode, as `go build` there would; any other module runs
-# alone (GOWORK=off). A module with a vendor/ folder is judged on the tree as
-# it was before the go mod tidy above, after the guard puts it back: tidy can
-# add requirements and raise the go line, and the vendored copy then no longer
-# matches go.mod. With the guard off, it is read from the module cache instead
-# (-mod=mod). Each run's stream, standard error and exit status go beside the
-# SBOM, the run list last (stage 2 reads nothing without it).
-_rch_out=""; _rch_runs=""; _rch_deferred=""; _rch_n=0
+# and GOARCH build, so it runs for every go.mod that cdxgen reads into the SBOM
+# (up to _rch_max_modules) and for GOOS linux, darwin and windows, GOARCH
+# amd64. The modules are searched as cdxgen's own search does: not under
+# vendor/, node_modules/ or a folder whose name starts with a dot (.git
+# included; cdxgen 13.3.0 reads none of them, measured), nor under the
+# non-shipped folders and paths it is told to leave out (NON_SHIPPED_DIRS,
+# NON_SHIPPED_PATHS, unless BOMLENS_INCLUDE_NON_SHIPPED). Stage 2 keeps, per
+# advisory, the deepest level any run found. A module listed in the go.work
+# governing it runs in workspace mode, as `go build` there would; any other
+# module runs alone (GOWORK=off). A module with a vendor/ folder is judged on
+# the tree as it was before the go mod tidy above, after the guard puts it
+# back: tidy can add requirements and raise the go line, and the vendored copy
+# then no longer matches go.mod. With the guard off, a module outside a
+# workspace is read from the module cache instead (-mod=mod, added to the
+# caller's GOFLAGS; go refuses it in workspace mode). A run that fails for any
+# reason but the GOOS (code that does not build there) stops the runs left,
+# since stage 2 then fails the step anyway, and so does the time budget
+# (PREP_TIMEOUT_DEFAULT for all the runs together). Each run's stream,
+# standard error and exit status go beside the SBOM, the run list last
+# (stage 2 reads nothing without it).
+_rch_out=""; _rch_runs=""; _rch_deferred=""; _rch_n=0; _rch_stop=""; _rch_start=""
 _rch_max_modules=20
 if [ "${BOMLENS_REACHABILITY:-false}" = "true" ] && command -v go >/dev/null 2>&1; then
     _rch_out="${OUT%_bom.json}_govulncheck_stage1"
     rm -f "$_rch_out.json" "$_rch_out.err" "$_rch_out.rc"
-    _rch_mods=$(find . \( -name vendor -o -name testdata -o -name node_modules -o -name '.?*' -o -name '_*' \) \
-        -prune -o -type f -name go.mod -print 2>/dev/null | sed 's|/go\.mod$||' | LC_ALL=C sort)
+    set -- -name vendor -o -name node_modules -o -name '.?*'
+    if [ -n "$EXCLUDE_NON_SHIPPED" ]; then
+        for _rch_x in $NON_SHIPPED_DIRS; do set -- "$@" -o -name "$_rch_x"; done
+        for _rch_x in $NON_SHIPPED_PATHS; do set -- "$@" -o -path "*/$_rch_x"; done
+    fi
+    _rch_mods=$(find . -mindepth 1 -type d \( "$@" \) -prune -o -type f -name go.mod -print 2>/dev/null \
+        | sed 's|/go\.mod$||' | LC_ALL=C sort)
+    set --
     _rch_count=$(printf '%s\n' "$_rch_mods" | grep -c . || true)
     if [ "${_rch_count:-0}" -eq 0 ]; then
         _rch_out=""
@@ -4459,6 +4473,8 @@ if [ "${BOMLENS_REACHABILITY:-false}" = "true" ] && command -v go >/dev/null 2>&
         _rch_out=""
     else
         _rch_runs=$(mktemp)
+        _rch_err1=$(mktemp)
+        _rch_start=$(date +%s)
         : > "$_rch_out.json"; : > "$_rch_out.err"
     fi
 fi
@@ -4480,24 +4496,52 @@ rch_workspace_member() {
     }
 }
 
-# rch_run_module <module dir> <GOFLAGS or "">: govulncheck once per GOOS.
+# rch_goos_only <stderr file>: true when a failed run failed only because the
+# code does not build for that GOOS: no package matched (every file is
+# constrained to other systems), build constraints exclude a package, or the
+# package loading errors are all type errors in the code, with nothing about
+# fetching, importing or the module itself. The same rule as stage 2's
+# (assess-reachability.py); anything else stops the runs.
+rch_goos_only() {
+    grep -qE 'no packages matched the provided patterns|build constraints exclude all Go files' "$1" && return 0
+    grep -q 'loading packages' "$1" || return 1
+    grep -qiE 'fetching vulnerabilities|dial tcp|no such host|network is unreachable|i/o timeout|connection refused|proxy\.golang\.org|could not import|cannot find (module|package)|no required module|missing go\.sum|go\.mod|go: |unknown revision|invalid version' "$1" && return 1
+    grep -qE '\.go:[0-9]+:[0-9]+: ' "$1"
+}
+
+# rch_run_module <module dir> <"vendor" when read off the module cache, or "">:
+# govulncheck once per GOOS, until a run fails for another reason than the
+# GOOS or the time budget is spent.
 rch_run_module() {
-    _rch_dir="$1"; _rch_flags="$2"; _rch_work=off; _rch_how=module
+    _rch_dir="$1"; _rch_flags=""; _rch_work=off; _rch_how=module
     if rch_workspace_member "$_rch_dir"; then _rch_work=workspace; _rch_how=workspace; fi
-    [ -z "$_rch_flags" ] || _rch_how="$_rch_how,$_rch_flags"
+    if [ "$2" = vendor ] && [ "$_rch_work" = off ]; then _rch_flags="-mod=mod"; _rch_how="module,-mod=mod"; fi
     for _rch_goos in linux darwin windows; do
+        [ -z "$_rch_stop" ] || return 0
+        _rch_left=$((PREP_TIMEOUT_DEFAULT - ($(date +%s) - _rch_start)))
         _rch_n=$((_rch_n + 1))
         printf '{"bomlens_run": %s}\n' "$_rch_n" >> "$_rch_out.json"
         printf '== bomlens run %s ==\n' "$_rch_n" >> "$_rch_out.err"
+        if [ "$_rch_left" -le 0 ]; then
+            log "reachability: the time budget (${PREP_TIMEOUT_DEFAULT}s) is spent; the runs left are skipped"
+            printf 'run %s 124 %s %s %s\n' "$_rch_n" "$_rch_goos" "$_rch_how" "$_rch_dir" >> "$_rch_runs"
+            _rch_stop=1; return 0
+        fi
         log "reachability: govulncheck (source, call graph) $_rch_dir GOOS=$_rch_goos"
-        run_supervised_timeout "$PREP_TIMEOUT_DEFAULT" sh -c '
+        run_supervised_timeout "$_rch_left" sh -c '
             cd "$1" || exit 1
             if [ "$3" = workspace ]; then unset GOWORK; else export GOWORK=off; fi
-            [ -z "$4" ] || export GOFLAGS="$4"
-            GOOS="$2" GOARCH=amd64 GOTOOLCHAIN="$6" "$0" -format json ./... >> "$5.json" 2>> "$5.err"' \
+            [ -z "$4" ] || export GOFLAGS="${GOFLAGS:+$GOFLAGS }$4"
+            GOOS="$2" GOARCH=amd64 GOTOOLCHAIN="$6" "$0" -format json ./... >> "$5.json" 2> "$7"' \
             "$BOMLENS_GOVULNCHECK" "$_rch_dir" "$_rch_goos" "$_rch_work" \
-            "$_rch_flags" "$_rch_out" "${HOST_GOTOOLCHAIN:-auto}"
-        printf 'run %s %s %s %s %s\n' "$_rch_n" "$?" "$_rch_goos" "$_rch_how" "$_rch_dir" >> "$_rch_runs"
+            "$_rch_flags" "$_rch_out" "${HOST_GOTOOLCHAIN:-auto}" "$_rch_err1"
+        _rch_rc=$?
+        cat "$_rch_err1" >> "$_rch_out.err"
+        printf 'run %s %s %s %s %s\n' "$_rch_n" "$_rch_rc" "$_rch_goos" "$_rch_how" "$_rch_dir" >> "$_rch_runs"
+        if [ "$_rch_rc" -ne 0 ] && ! rch_goos_only "$_rch_err1"; then
+            log "reachability: govulncheck failed for $_rch_dir (GOOS=$_rch_goos); the runs left are skipped"
+            _rch_stop=1
+        fi
     done
 }
 
@@ -4527,14 +4571,12 @@ guard_restore
 if [ -n "$_rch_runs" ]; then
     while IFS= read -r _rch_d; do
         [ -n "$_rch_d" ] || continue
-        if [ -n "$_rch_restored" ]; then rch_run_module "$_rch_d" ""; else rch_run_module "$_rch_d" "-mod=mod"; fi
+        if [ -n "$_rch_restored" ]; then rch_run_module "$_rch_d" ""; else rch_run_module "$_rch_d" vendor; fi
     done <<EOF
 $_rch_deferred
 EOF
-    { printf 'nonce %s
-goarch amd64
-' "${BOMLENS_REACHABILITY_NONCE:-}"; cat "$_rch_runs"; } > "$_rch_out.rc"
-    rm -f "$_rch_runs"
+    { printf 'nonce %s\ngoarch amd64\n' "${BOMLENS_REACHABILITY_NONCE:-}"; cat "$_rch_runs"; } > "$_rch_out.rc"
+    rm -f "$_rch_runs" "$_rch_err1"
 fi
 
 # Hand the build tree back to the host user. This image runs as root (-u 0:0),

@@ -2153,6 +2153,11 @@ if [ -n "$_rch_mode" ]; then
                echo "[reachability] $(jq -r '"\(.exploitable) reached, \(.not_affected) not reached"' <<<"$_rch_out" 2>/dev/null) (govulncheck, $_rch_mode): $REACHABILITY_DOC"
                er_record reachability ok "" "" "$_rch_started" "" \
                    "$(jq -c '{exploitable, not_affected, components}' <<<"$_rch_out" 2>/dev/null)" ;;
+            4) REACHABILITY_DOC="${OUT_PREFIX}_reachability.cdx.json"
+               ARTIFACTS+=("$REACHABILITY_DOC")
+               echo "[WARN] --reachability: ${_rch_detail}; its components get no judgement from it." >&2
+               er_record reachability degraded unavailable "$_rch_detail" "$_rch_started" "" \
+                   "$(jq -c '{exploitable, not_affected, components}' <<<"$_rch_out" 2>/dev/null)" ;;
             3) echo "[WARN] --reachability skipped: ${_rch_detail}. Allow access to vuln.go.dev and run again." >&2
                er_record reachability skipped unavailable "$_rch_detail" "$_rch_started" ;;
             10) echo "[WARN] --reachability skipped: govulncheck is not in this image. Refresh it (docker pull) and run again." >&2
