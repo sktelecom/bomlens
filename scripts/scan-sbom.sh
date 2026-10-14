@@ -2655,7 +2655,7 @@ if [ "$MODE" = "SOURCE" ]; then
     # When an image is not here and cannot be pulled (not published yet, an
     # offline host, SBOM_PULL=never), the scan still runs without it and the
     # manifest records the step as skipped (fallback). So it does when the
-    # scanner image is a local build or a version before 1.13.2 and no
+    # scanner image is a local build, a version before 1.13.2 or another name, and no
     # SBOM_DEEP_CVE_IMAGE is set: no deep-cve image of that build is known, and
     # :latest would mix two releases in one run.
     PP_IMAGE="$POSTPROCESS_IMAGE"
@@ -2667,10 +2667,18 @@ if [ "$MODE" = "SOURCE" ]; then
         if [ "$DEEP_CVE_IMAGE" = "$POSTPROCESS_IMAGE" ]; then
             PP_HAS_GRYPE=1
         elif [ -z "${SBOM_DEEP_CVE_IMAGE:-}" ] && [ -n "${SBOM_SCANNER_IMAGE:-}" ] \
-             && { [ "$_SI_WHY" = path ] || [ "$_SI_WHY" = version ]; }; then
+             && { [ "$_SI_WHY" = path ] || [ "$_SI_WHY" = version ] || [ "$_SI_WHY" = name ]; }; then
+            # The stage stays on that image. entrypoint.sh looks for grype
+            # there first, so a build of one's own with SBOM_DEEP_CVE=true
+            # still runs the match and records its real outcome; the reason
+            # below is recorded only when the image has no grype.
             if [ "$_SI_NAME" != bomlens-deep-cve ]; then
-                if [ "$_SI_WHY" = path ]; then _dc_why="is a local build"; else _dc_why="is a version before 1.13.2"; fi
-                echo "[WARN] --deep-cve: SBOM_SCANNER_IMAGE ($SBOM_SCANNER_IMAGE) $_dc_why, so no deep-cve image of the same build is known; post-processing stays on it without the grype CPE match. Set SBOM_DEEP_CVE_IMAGE to choose one."
+                case "$_SI_WHY" in
+                    path)    _dc_why="is a local build" ;;
+                    version) _dc_why="is a version before 1.13.2" ;;
+                    *)       _dc_why="is not a BomLens image name" ;;
+                esac
+                echo "[WARN] --deep-cve: SBOM_SCANNER_IMAGE ($SBOM_SCANNER_IMAGE) $_dc_why, so no deep-cve image of the same build is known; post-processing stays on it, and the grype CPE match runs only if it has grype (built with SBOM_DEEP_CVE=true). Set SBOM_DEEP_CVE_IMAGE to choose one."
                 DEEP_CVE_FALLBACK_FROM="SBOM_SCANNER_IMAGE ($SBOM_SCANNER_IMAGE) $_dc_why and SBOM_DEEP_CVE_IMAGE is not set, so no deep-cve image of the same build was used"
             fi
         else

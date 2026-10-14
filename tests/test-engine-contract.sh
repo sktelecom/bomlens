@@ -417,6 +417,13 @@ D="$(new_run dc-reason)"; PATH="$NOGRYPE_PATH" run_engine "$D" "$ROOT_DIR/docker
     && pass "the CLI's reason for staying off the deep-cve image is the step's detail" \
     || fail "deep-cve is $(jq -c '[.steps[] | select(.id=="deep-cve")][0]' "$D/bomlens-result.json")"
 
+# The CLI kept the stage on an image of the user's own that has grype (built
+# with SBOM_DEEP_CVE=true): the match runs and its real outcome is recorded.
+D="$(new_run dc-own-grype)"; PATH="$WORK/grype-bin:$PATH" run_engine "$D" "$ROOT_DIR/docker/lib" DEEP_CVE=true \
+    BOMLENS_DEEP_CVE_FALLBACK="SBOM_SCANNER_IMAGE (registry.example/team/scanner:2.0) is not a BomLens image name and SBOM_DEEP_CVE_IMAGE is not set, so no deep-cve image of the same build was used"
+{ [ "$(dc_step "$D")" = "ok null" ] && [ -f "$D/demo_1.0_security_grype.json" ]; } \
+    && pass "a kept image that has grype runs the match: ok, not skipped" || fail "deep-cve is $(dc_step "$D")"
+
 # A firmware scan: the firmware image's own pipeline, stubbed here, with
 # DEEP_CVE=true as an older CLI passed it. The step is disabled and the run
 # is not degraded by it.
