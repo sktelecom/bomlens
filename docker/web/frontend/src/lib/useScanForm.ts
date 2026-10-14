@@ -15,6 +15,7 @@ import {
   stashGitCred,
   uploadFile,
   type Capabilities,
+  type CdxSpecVersion,
   type ConformanceProfile,
   type ScanConfig,
   type ScanParams,
@@ -156,6 +157,11 @@ export function useScanForm({
   const [sbomAuthor, setSbomAuthor] = useState(
     () => initialConfig?.sbomAuthor ?? "",
   );
+  // CycloneDX version of the SBOM (--spec-version). A re-scan keeps the
+  // version the earlier scan wrote; anything unrecognized falls back to 1.6.
+  const [specVersion, setSpecVersion] = useState<CdxSpecVersion>(() =>
+    initialConfig?.specVersion === "1.7" ? "1.7" : "1.6",
+  );
   // Optional upload of the generated SBOM to Dependency-Track or TRUSCA. The
   // server URL and token are never persisted (not in the re-scan sidecar), so a
   // re-scan always starts with upload off and the fields blank.
@@ -253,6 +259,9 @@ export function useScanForm({
   // converts a document someone else authored, and stamping our own name on it
   // would misattribute it (entrypoint.sh's own reason for excluding ANALYZE).
   const showSbomAuthor = !isAnalyze;
+  // Same rule as the SBOM author: ANALYZE delivers the supplier's document at
+  // the version they wrote it in.
+  const showSpecVersion = !isAnalyze;
   // The SKT submission profile tightens the same conformance report every
   // other SBOM/document scan already gets, so it applies wherever that report
   // does; an AI model is graded against the separate G7 profile instead.
@@ -270,7 +279,8 @@ export function useScanForm({
   const securityForced = isAnalyze || deepCveOn;
   const showScanOptions =
     showDeepLicense || showVendored || showByteStable ||
-    showOutboundLicense || showSbomAuthor || showDeepCve || showConformanceProfile;
+    showOutboundLicense || showSbomAuthor || showSpecVersion || showDeepCve ||
+    showConformanceProfile;
   // Any scan produces an SBOM, so upload is offered for every source.
   // A declaration opens questions before any scan; a credential stashed now
   // would sit on the server if they were cancelled, so it is not offered here.
@@ -483,6 +493,8 @@ export function useScanForm({
       license: showOutboundLicense ? outboundLicense.trim() : "",
       // SBOM author: hidden (and so never sent) for ANALYZE (see showSbomAuthor).
       sbomAuthor: showSbomAuthor ? sbomAuthor.trim() : "",
+      // CycloneDX version: not sent for ANALYZE (see showSpecVersion).
+      specVersion: showSpecVersion ? specVersion : undefined,
       // AI-model only: grade the assessment against the chosen usage.
       usage: isAiModel && usage ? usage : undefined,
       // Deep CVE matching: opt-in wherever offered (see showDeepCve); ignored
@@ -528,6 +540,7 @@ export function useScanForm({
     conformanceProfile, setConformanceProfile,
     outboundLicense, setOutboundLicense,
     sbomAuthor, setSbomAuthor,
+    specVersion, setSpecVersion,
     scanossToken, setScanossToken,
     uploadEnabled, setUploadEnabled,
     uploadTarget, setUploadTarget,
@@ -538,6 +551,7 @@ export function useScanForm({
     busy, uploadKind, textInput, isText, isAnalyze, isAiModel, showVendored,
     showDeepLicense, showDeepCve, showByteStable, showOutboundLicense,
     showSbomAuthor,
+    showSpecVersion,
     showConformanceProfile,
     showScanOptions, showUpload,
     options, submit,
