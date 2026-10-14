@@ -486,8 +486,13 @@ if run_scan_with_logs "test-java-maven" "TestJavaMaven" "1.0.0"; then
             print_error "Java Maven project (deployable transitive dropped — spring-web missing after scope filter)"
             show_failure_log "test-java-maven"
             FAILED=$((FAILED + 1))
+        elif ! jq -e '[.components[]? | select((.purl // "") | startswith("pkg:maven/"))
+                | select([.hashes[]? | select(.alg == "SHA-256")] | length == 0)] | length == 0' "$FOUND" >/dev/null 2>&1; then
+            print_error "Java Maven project (a Maven component has no SHA-256 hash: dependency jars not fetched)"
+            show_failure_log "test-java-maven"
+            FAILED=$((FAILED + 1))
         else
-            print_success "Java Maven project ($COMP_COUNT components, test/provided filtered, runtime closure kept)"
+            print_success "Java Maven project ($COMP_COUNT components, test/provided filtered, runtime closure kept, hashes present)"
             PASSED=$((PASSED + 1))
         fi
     else

@@ -360,6 +360,134 @@ mark_prep_failed() {
     esac
 }
 
+# The user's Gradle settings (mounted under $SETTINGS_ROOT/gradle) go into
+# the Gradle user home this scan uses: the cache-gradle mount or, when that
+# cannot be written, $GRADLE_USER_HOME. A file the home already has is left
+# as it is and the mounted one is not used (cache-gradle may be a user's own
+# ~/.gradle), unless it is a copy another scan made of the same content: then
+# this scan shares it. Each scan lists the files it uses, with their checksums
+# and its start time, in its own .bomlens-settings-copied.<run id>. At the end,
+# on any exit, it removes its list and each listed file that still holds what
+# was copied and no other scan's list names. Several scans can share one
+# Gradle home at once, so these decisions are taken under a lock (a folder,
+# .bomlens-settings.lock, taken over when older than two minutes). A list
+# whose scan was killed cannot be told from one still running, so only a list
+# older than a day is cleaned up as if its scan had ended.
+GRADLE_SETTINGS_HOME=""
+GRADLE_SETTINGS_RUN_ID=""
+GRADLE_SETTINGS_STALE_SECS=86400
+GRADLE_SETTINGS_LOCK_SECS=120
+
+gradle_settings_lock() {
+    _gl_dir="$GRADLE_SETTINGS_HOME/.bomlens-settings.lock"
+    _gl_tries=0
+    while ! mkdir "$_gl_dir" 2>/dev/null; do
+        _gl_tries=$((_gl_tries + 1))
+        if [ -n "$(find "$_gl_dir" -maxdepth 0 -mmin +$((GRADLE_SETTINGS_LOCK_SECS / 60)) 2>/dev/null)" ] \
+            || [ "$_gl_tries" -ge "$GRADLE_SETTINGS_LOCK_SECS" ]; then
+            log "gradle: taking over a settings lock left in $GRADLE_SETTINGS_HOME"
+            rmdir "$_gl_dir" 2>/dev/null
+            mkdir "$_gl_dir" 2>/dev/null && return 0
+        fi
+        sleep 1
+    done
+}
+
+gradle_settings_unlock() {
+    rmdir "$GRADLE_SETTINGS_HOME/.bomlens-settings.lock" 2>/dev/null || true
+}
+
+# Whether a list other than $1 names the file $2.
+gradle_settings_shared() {
+    for _gh_m in "$GRADLE_SETTINGS_HOME"/.bomlens-settings-copied.*; do
+        [ -f "$_gh_m" ] && [ "$_gh_m" != "$1" ] || continue
+        awk -v p="$2" 'NR > 1 && $2 == p { f = 1 } END { exit !f }' "$_gh_m" && return 0
+    done
+    return 1
+}
+
+# Drop the list $1 and remove each file it names that still holds what was
+# copied and that no other list names. Called under the lock.
+gradle_settings_release() {
+    [ -f "$1" ] || return 0
+    awk 'NR > 1 { print $1 " " $2 }' "$1" | while IFS=' ' read -r _gr_sum _gr_f; do
+        case "$_gr_f" in ""|/*|*..*) continue ;; esac
+        [ -f "$GRADLE_SETTINGS_HOME/$_gr_f" ] || continue
+        gradle_settings_shared "$1" "$_gr_f" && continue
+        if [ "$(cksum < "$GRADLE_SETTINGS_HOME/$_gr_f" | tr ' ' '-')" = "$_gr_sum" ]; then
+            rm -f "$GRADLE_SETTINGS_HOME/$_gr_f"
+        else
+            log "gradle: $GRADLE_SETTINGS_HOME/$_gr_f changed since it was copied; left in place"
+        fi
+    done
+    rm -f "$1"
+}
+
+gradle_settings_copy() {
+    [ -z "$GRADLE_SETTINGS_HOME" ] || return 0
+    GRADLE_SETTINGS_HOME="${GRADLE_USER_HOME:-}"
+    if [ -z "$GRADLE_SETTINGS_HOME" ]; then
+        _gs_acct="$( (getent passwd "$(id -u)" 2>/dev/null || true) | cut -d: -f6)"
+        GRADLE_SETTINGS_HOME="${_gs_acct:-/root}/.gradle"
+    fi
+    # Nothing mounted and no list to look at: nothing to do.
+    if [ ! -d "${SETTINGS_ROOT:-}/gradle" ]; then
+        set -- "$GRADLE_SETTINGS_HOME"/.bomlens-settings-copied.*
+        [ -f "$1" ] || return 0
+    fi
+    if ! mkdir -p "$GRADLE_SETTINGS_HOME" 2>/dev/null; then
+        log "gradle: $GRADLE_SETTINGS_HOME cannot be written; the mounted Gradle settings are not used"
+        return 0
+    fi
+    GRADLE_SETTINGS_RUN_ID="$(hostname 2>/dev/null || echo h).$$.$(date +%s).$(od -An -N4 -tu4 /dev/urandom 2>/dev/null | tr -d ' ')"
+    _gs_list="$GRADLE_SETTINGS_HOME/.bomlens-settings-copied.$GRADLE_SETTINGS_RUN_ID"
+    _gs_now=$(date +%s)
+    gradle_settings_lock
+    # Lists a day old: their scans are taken to have ended.
+    for _gs_m in "$GRADLE_SETTINGS_HOME"/.bomlens-settings-copied.*; do
+        [ -f "$_gs_m" ] || continue
+        _gs_t=$(awk 'NR == 1 && $1 == "time" { print $2 }' "$_gs_m")
+        case "$_gs_t" in ""|*[!0-9]*) _gs_t=0 ;; esac
+        [ $((_gs_now - _gs_t)) -gt "$GRADLE_SETTINGS_STALE_SECS" ] && gradle_settings_release "$_gs_m"
+    done
+    if [ -d "${SETTINGS_ROOT:-}/gradle" ]; then
+        printf 'time %s\n' "$_gs_now" > "$_gs_list"
+        for _gs_p in "$SETTINGS_ROOT/gradle/gradle.properties" "$SETTINGS_ROOT/gradle/init.gradle" \
+                "$SETTINGS_ROOT/gradle/init.gradle.kts" "$SETTINGS_ROOT/gradle/init.d/"*; do
+            [ -f "$_gs_p" ] || continue
+            _gs_f="${_gs_p#"$SETTINGS_ROOT/gradle/"}"
+            _gs_sum=$(cksum < "$_gs_p" | tr ' ' '-')
+            if [ -e "$GRADLE_SETTINGS_HOME/$_gs_f" ]; then
+                if gradle_settings_shared "$_gs_list" "$_gs_f" \
+                    && [ "$(cksum < "$GRADLE_SETTINGS_HOME/$_gs_f" | tr ' ' '-')" = "$_gs_sum" ]; then
+                    printf '%s %s\n' "$_gs_sum" "$_gs_f" >> "$_gs_list"
+                    log "gradle: using the mounted $_gs_f (copied by a scan running alongside)"
+                else
+                    log "gradle: $GRADLE_SETTINGS_HOME/$_gs_f already exists; the mounted one is not used"
+                fi
+            elif mkdir -p "$(dirname "$GRADLE_SETTINGS_HOME/$_gs_f")" 2>/dev/null \
+                && cp "$_gs_p" "$GRADLE_SETTINGS_HOME/$_gs_f" 2>/dev/null; then
+                printf '%s %s\n' "$_gs_sum" "$_gs_f" >> "$_gs_list"
+                log "gradle: using the mounted $_gs_f"
+            else
+                log "gradle: could not copy the mounted $_gs_f into $GRADLE_SETTINGS_HOME; it is not used"
+            fi
+        done
+    fi
+    gradle_settings_unlock
+}
+
+# This scan's part of the clean-up: its own list only. Safe to call more
+# than once.
+gradle_settings_remove() {
+    [ -n "${GRADLE_SETTINGS_RUN_ID:-}" ] || return 0
+    _gs_list="$GRADLE_SETTINGS_HOME/.bomlens-settings-copied.$GRADLE_SETTINGS_RUN_ID"
+    [ -f "$_gs_list" ] || return 0
+    gradle_settings_lock
+    gradle_settings_release "$_gs_list"
+    gradle_settings_unlock
+}
+
 mark_prep_applied() {
     case " $PREP_APPLIED " in
         *" $1 "*) ;;
@@ -384,9 +512,10 @@ fi
 
 guard_snapshot
 # _pg_dir: the Poetry dependency-graph run's scratch folder, while it exists.
-trap 'stop_supervised; guard_restore; [ -z "${_pg_dir:-}" ] || rm -rf "$_pg_dir"' EXIT
-trap 'stop_supervised; guard_restore; [ -z "${_pg_dir:-}" ] || rm -rf "$_pg_dir"; exit 130' INT
-trap 'stop_supervised; guard_restore; [ -z "${_pg_dir:-}" ] || rm -rf "$_pg_dir"; exit 143' TERM
+# gradle_settings_remove: the user's Gradle settings copied for this scan.
+trap 'stop_supervised; guard_restore; gradle_settings_remove; [ -z "${_pg_dir:-}" ] || rm -rf "$_pg_dir"' EXIT
+trap 'stop_supervised; guard_restore; gradle_settings_remove; [ -z "${_pg_dir:-}" ] || rm -rf "$_pg_dir"; exit 130' INT
+trap 'stop_supervised; guard_restore; gradle_settings_remove; [ -z "${_pg_dir:-}" ] || rm -rf "$_pg_dir"; exit 143' TERM
 
 # Non-shipped trees: manifests under test, fixture, example, benchmark and demo
 # folders, the GitHub Actions workflows and the Gradle wrapper jar are left out
@@ -529,28 +658,116 @@ if [ -f composer.json ] && [ ! -f composer.lock ] && command -v composer >/dev/n
     rm -f "${_cj_orig:-}" "${_cj_new:-}"
 fi
 
-# Maven — no pre-resolve step. cdxgen invokes maven itself (dependency:tree /
-# the cyclonedx plugin) to build the full transitive graph, so a separate
-# `mvn dependency:resolve` here is redundant. It also failed noisily: the run is
-# pinned to -Dmaven.repo.local=/tmp/sbomhome/.m2 (an empty repo), so maven could
-# not resolve the dependency-plugin prefix and printed a NoPluginFoundForPrefix
-# error to stdout on every Java scan. Dropping it removes that noise with no
-# effect on the SBOM — cdxgen alone already resolves transitive deps (verified:
-# the same scan yields 91 components with this step gone).
+# Maven dependency graph: cdxgen invokes maven itself (dependency:tree / the
+# cyclonedx plugin) to build the full transitive graph, so no resolve step is
+# needed for the graph. An earlier `mvn dependency:resolve` here was dropped for
+# that reason; called by its prefix it also printed a NoPluginFoundForPrefix
+# error on every Java scan. The jar fetch below calls the plugin by its full
+# coordinates, so prefix resolution does not come into it.
 #
 # Maven scope over-scan: cdxgen keeps EVERY resolved node, so a deployed app's
 # SBOM also carries its test/provided toolchain (junit, lombok, ...) as if it
 # shipped them. This is the Maven analogue of the Android/npm over-scan. cdxgen
 # already tags each node with its resolved scope (compile/runtime -> "required",
 # test -> "optional", provided/system -> "excluded"), so we post-filter the BOM
-# to the deployable set using those tags near the end of this script — no second
-# maven run needed (that would hit the empty-repo NoPluginFoundForPrefix above).
+# to the deployable set using those tags near the end of this script, so the
+# filter itself needs no maven run.
 # Caveat: cdxgen maps both test scope and <optional>true</optional> to "optional",
 # so a rare optional=true runtime dep is dropped too; BOMLENS_MAVEN_FULL_GRAPH=1
 # opts out (keep the full graph, unchanged behavior).
 MAVEN_SCOPE_FILTER=""
 if [ -f pom.xml ] && ! opted_out "${BOMLENS_MAVEN_FULL_GRAPH:-}"; then
     MAVEN_SCOPE_FILTER=1
+fi
+
+# User settings mounted read-only outside the caches (the maven-settings,
+# maven-settings-security, gradle-properties, gradle-init-script(-kts) and
+# gradle-init roles), so no mount point is ever created inside a cache folder.
+# Maven gets the settings file three ways, since none reaches every Maven:
+# on the command line of the jar fetch below (MAVEN_SETTINGS_ARGS), in
+# MVN_ARGS for cdxgen (it adds them to every Maven it runs, a project's mvnw
+# included), and in MAVEN_ARGS for any other mvn of Maven 3.9 or later (an
+# older Maven ignores it). Maven takes a repeated -s as one. settings.security
+# goes in MAVEN_OPTS, which every Maven reads. A settings.xml in the
+# cache-maven folder applies when none is mounted. Gradle's are copied into
+# its user home, before the first Gradle run below.
+SETTINGS_ROOT="${PREP_SETTINGS_ROOT:-/bomlens-settings}"
+MAVEN_SETTINGS_ARGS=""
+if [ -f "$SETTINGS_ROOT/m2/settings.xml" ]; then
+    MAVEN_SETTINGS_ARGS="-s $SETTINGS_ROOT/m2/settings.xml"
+    MAVEN_ARGS="${MAVEN_ARGS:+$MAVEN_ARGS }$MAVEN_SETTINGS_ARGS"
+    MVN_ARGS="${MVN_ARGS:+$MVN_ARGS }$MAVEN_SETTINGS_ARGS"
+    export MAVEN_ARGS MVN_ARGS
+    log "maven: using the mounted settings.xml"
+fi
+if [ -f "$SETTINGS_ROOT/m2/settings-security.xml" ]; then
+    MAVEN_SETTINGS_ARGS="${MAVEN_SETTINGS_ARGS:+$MAVEN_SETTINGS_ARGS }-Dsettings.security=$SETTINGS_ROOT/m2/settings-security.xml"
+    MAVEN_OPTS="${MAVEN_OPTS:+$MAVEN_OPTS }-Dsettings.security=$SETTINGS_ROOT/m2/settings-security.xml"
+    export MAVEN_OPTS
+fi
+
+# Maven component hashes: cdxgen computes a component's hashes from its jar,
+# looked up only at $HOME/.m2/repository/<group>/<artifact>/<version>/, and
+# its dependency:tree run downloads poms, not jars. On a fresh repository every
+# Maven component therefore came out without hashes. Fetch the jars into the
+# same local repository first. dependency:resolve has Maven resolve the test
+# classpath before the goal runs, so it fetches the jars of every scope; the
+# scope filter above still drops the test-only components from the SBOM. The
+# plugin is named by its full coordinates (no prefix lookup) and the run uses
+# --fail-never, so a module that fails (an unbuilt reactor sibling) does not
+# stop the others. Best-effort: a failure (no network) only costs the hashes,
+# so it is logged. The jars this run resolved are listed (-DoutputFile); when
+# the run reports an error and none of them is in the local repository (the
+# cache may hold others from earlier scans), it is recorded as a failed step
+# (maven-dependency-jars), otherwise only the count is logged. Skipped when
+# the root also has a Gradle build, which cdxgen reads instead. The wrapper is
+# used only when its .mvn/wrapper files are there; otherwise mvn.
+MAVEN_DEPENDENCY_PLUGIN="org.apache.maven.plugins:maven-dependency-plugin:3.11.0"
+MAVEN_REPO_LOCAL="$HOME/.m2/repository"
+case " ${MAVEN_OPTS:-} " in
+    *" -Dmaven.repo.local="*)
+        MAVEN_REPO_LOCAL=$(printf '%s\n' " $MAVEN_OPTS " | sed 's/.* -Dmaven\.repo\.local=\([^ ]*\) .*/\1/') ;;
+esac
+if [ -f pom.xml ] && [ ! -f build.gradle ] && [ ! -f build.gradle.kts ]; then
+    _mvn_cmd=""
+    if [ -x ./mvnw ] && [ -d .mvn/wrapper ]; then _mvn_cmd=./mvnw
+    elif command -v mvn >/dev/null 2>&1; then _mvn_cmd=mvn
+    fi
+    if [ "$MAVEN_REPO_LOCAL" != "$HOME/.m2/repository" ]; then
+        log "maven: local repository $MAVEN_REPO_LOCAL is not $HOME/.m2/repository; cdxgen will not find jars for hashes"
+    elif [ -n "$_mvn_cmd" ]; then
+        _mvn_err=$(mktemp); _mvn_list=$(mktemp)
+        _mvn_rc=0
+        # shellcheck disable=SC2086 # MAVEN_SETTINGS_ARGS is a list of options
+        run_supervised_timeout "$PREP_TIMEOUT_DEFAULT" "$_mvn_cmd" -q -B --fail-never $MAVEN_SETTINGS_ARGS \
+            "$MAVEN_DEPENDENCY_PLUGIN:resolve" -DoutputFile="$_mvn_list" -DappendOutput=true \
+            >"$_mvn_err" 2>&1 || _mvn_rc=$?
+        # Each resolved jar, as its path in the local repository:
+        # group:artifact:jar[:classifier]:version:scope.
+        _mvn_counts=$(awk -v repo="$MAVEN_REPO_LOCAL" '
+            /^[[:space:]]+[^[:space:]:]+:[^[:space:]:]+:/ {
+                n = split($1, c, ":")
+                if (c[3] != "jar" || (n != 5 && n != 6)) next
+                v = (n == 6) ? c[5] : c[4]; cl = (n == 6) ? "-" c[4] : ""
+                g = c[1]; gsub(/\./, "/", g)
+                print repo "/" g "/" c[2] "/" v "/" c[2] "-" v cl ".jar"
+            }' "$_mvn_list" 2>/dev/null | sort -u | {
+                _t=0; _h=0
+                while IFS= read -r _j; do _t=$((_t + 1)); [ -f "$_j" ] && _h=$((_h + 1)); done
+                echo "$_t $_h"
+            })
+        _mvn_total=${_mvn_counts% *}; _mvn_have=${_mvn_counts#* }
+        if [ "$_mvn_rc" -eq 0 ] && ! grep -q '^\[ERROR\]' "$_mvn_err"; then
+            log "maven: fetched dependency jars for component hashes ($_mvn_have of $_mvn_total in the local repository)"
+        else
+            log "maven: could not fetch every dependency jar; $_mvn_have of $_mvn_total resolved jars are in the local repository, so some components will have no hashes (non-fatal)"
+            grep '^\[ERROR\]' "$_mvn_err" | head -5 | sed 's/^/[build-prep]   /'
+            # None of this run's jars there: recorded like a failed resolver
+            # step, so the result manifest shows it. Some there: the log is enough.
+            [ "${_mvn_have:-0}" -gt 0 ] || mark_prep_failed maven-dependency-jars
+        fi
+        rm -f "$_mvn_err" "$_mvn_list"
+    fi
 fi
 
 # PHP/Composer scope over-scan: the same mechanism as the Maven filter above.
@@ -577,7 +794,7 @@ if { [ -f build.gradle ] || [ -f build.gradle.kts ]; } && command -v gradle >/de
     # from the password file (/root), not HOME. With a read-only root it
     # cannot unpack its native library there and every Gradle build fails at
     # once (cdxgen too, with an empty SBOM). Then it uses $HOME/.gradle. A
-    # writable ~/.gradle (the CLI mounts the host's Gradle cache there) is
+    # writable ~/.gradle (the CLI mounts BomLens's Gradle cache there) is
     # kept.
     if [ -z "${GRADLE_USER_HOME:-}" ]; then
         _acct_home="$( (getent passwd "$(id -u)" 2>/dev/null || true) | cut -d: -f6)"
@@ -587,6 +804,8 @@ if { [ -f build.gradle ] || [ -f build.gradle.kts ]; } && command -v gradle >/de
             log "gradle: $_acct_home/.gradle cannot be written; using $GRADLE_USER_HOME"
         fi
     fi
+    # The user's Gradle settings, before the first Gradle run.
+    gradle_settings_copy
 
     # Android scope fix: cdxgen resolves EVERY Gradle configuration, so an AGP
     # project drags its build/test toolchain (androidTestUtil, Unified Test
@@ -664,6 +883,11 @@ if { [ -f build.gradle ] || [ -f build.gradle.kts ]; } && command -v gradle >/de
     fi
 fi
 
+# A root Gradle build that did not reach the Gradle step above (no gradle
+# command; cdxgen may still run ./gradlew) gets the settings copied here.
+if { [ -f build.gradle ] || [ -f build.gradle.kts ] || [ -f settings.gradle ] || [ -f settings.gradle.kts ]; }; then
+    gradle_settings_copy
+fi
 # Python — install the requirements so transitive deps are visible
 # (requirements.txt without a lockfile) and so the license-evidence pass near the
 # end of this script has real dist-info metadata to read.
@@ -3493,7 +3717,7 @@ if (filled) {
   process.stderr.write('[build-prep] maven: inherited a parent POM license for ' + filled + ' component(s)\n');
 }
 MLIC_JS
-    node "$_mlic" "$OUT" "/tmp/sbomhome/.m2" || log "maven: parent-POM license inheritance skipped (non-fatal)"
+    node "$_mlic" "$OUT" "$MAVEN_REPO_LOCAL" || log "maven: parent-POM license inheritance skipped (non-fatal)"
     rm -f "$_mlic"
 fi
 
@@ -4600,7 +4824,18 @@ fi
 # root-owned files in the mounted source dir. On Linux the host user then cannot
 # clean its own project folder or the git/zip ingestion temp dir. HOST_UID/GID
 # arrive via `docker run -e`; best-effort, never fail the prep on this.
+gradle_settings_remove
 if [ -n "${HOST_UID:-}" ] && [ -n "${HOST_GID:-}" ]; then
     chown -R "${HOST_UID}:${HOST_GID}" "$SRC" 2>/dev/null || true
+    # The Maven and Gradle caches are host folders too (cache-maven,
+    # cache-gradle): hand back what this run wrote there. Only a mounted one,
+    # and only the files not already the host user's.
+    _co_acct="$( (getent passwd "$(id -u)" 2>/dev/null || true) | cut -d: -f6)"
+    for _co_d in "$HOME/.m2" "${_co_acct:-/root}/.gradle"; do
+        [ -d "$_co_d" ] && [ -r /proc/self/mountinfo ] || continue
+        awk -v p="$_co_d" '$5 == p { f = 1 } END { exit !f }' /proc/self/mountinfo 2>/dev/null || continue
+        find "$_co_d" \( ! -user "$HOST_UID" -o ! -group "$HOST_GID" \) \
+            -exec chown -h "${HOST_UID}:${HOST_GID}" {} + 2>/dev/null || true
+    done
 fi
 exit "${rc:-0}"

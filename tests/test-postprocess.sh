@@ -4195,6 +4195,102 @@ PATH="$FAKEBIN:$PATH" SECURITY_ENRICH=false \
 [ "$(jq '[.Results[].Vulnerabilities[]?] | length' "$WORK/secok_security.json")" = "1" ] \
     && pass "findings intact on a successful run" || fail "findings lost on a successful run"
 
+echo "== sec-advisory-ids: distribution advisory numbers become CVE ids or a separate advisory list =="
+# Trivy files some findings under a distribution advisory number (DLA-...,
+# SUSE-SU-...). One that names a CVE is reported under that CVE with the number
+# kept in VendorIDs; one that names none moves to the top-level Advisories
+# list, out of the findings and the counts. Every other id (GHSA, MAL, a
+# NSWG-ECO entry naming no CVE) stays a finding.
+cat > "$FAKEBIN/trivy" <<SH
+#!/bin/sh
+out=""
+while [ \$# -gt 0 ]; do
+    [ "\$1" = "--output" ] && { out="\$2"; shift; }
+    shift
+done
+cp "$FIX/trivy-advisory-ids.json" "\$out"
+exit 0
+SH
+chmod +x "$FAKEBIN/trivy"
+# A sidecar engine (the CPE index match) that reports a CVE the DSA advisory names, for the same
+# package, plus one of its own. Rewriting before the merge lets the merge drop
+# the overlap.
+cat > "$WORK/secadv_security_cvebintool.json" <<'JSON'
+{"Results":[{"Target":"cve-bin-tool","Class":"lang-pkgs","Vulnerabilities":[
+ {"VulnerabilityID":"CVE-2026-90001","PkgName":"libexample1","PkgIdentifier":{"PURL":"pkg:deb/debian/libexample1@1.0-1?arch=amd64&distro=debian-12.12"},"InstalledVersion":"1.0-1","Severity":"HIGH"},
+ {"VulnerabilityID":"CVE-2026-90003","PkgName":"libexample1","PkgIdentifier":{"PURL":"pkg:deb/debian/libexample1@1.0-1?arch=amd64&distro=debian-12.12"},"InstalledVersion":"1.0-1","Severity":"LOW"}]}]}
+JSON
+PATH="$FAKEBIN:$PATH" SECURITY_ENRICH=false DEEP_CVE=false \
+    bash "$LIB/scan-security.sh" "$WORK/secfail-bom.json" "$WORK/secadv" proj >/dev/null 2>&1 \
+    || fail "scan-security.sh failed on a report with advisory numbers"
+rm -f "$WORK/secadv_security_cvebintool.json"
+adv_json="$WORK/secadv_security.json"
+adv_ids=$(jq -r '[.Results[].Vulnerabilities[]?.VulnerabilityID] | sort | join(",")' "$adv_json")
+[ "$adv_ids" = "CVE-2020-8203,CVE-2023-42883,CVE-2023-42890,CVE-2026-90001,CVE-2026-90002,CVE-2026-90003,GHSA-aaaa-bbbb-cccc,GHSA-xxxx-yyyy-zzzz,MAL-2026-1,NSWG-ECO-1,NSWG-ECO-2,TEMP-0000001-ABCDEF" ] \
+    && pass "findings: advisories renamed to their CVE, other ids kept, no CVE repeated" \
+    || fail "findings ids: '$adv_ids'"
+[ "$(jq -r '[.Results[].Vulnerabilities[] | select(.VulnerabilityID == "CVE-2026-90001")] | length' "$adv_json")" = "1" ] \
+    && pass "a CVE a sidecar engine also reports for the same package is listed once" \
+    || fail "CVE-2026-90001 is listed $(jq -r '[.Results[].Vulnerabilities[] | select(.VulnerabilityID == "CVE-2026-90001")] | length' "$adv_json") times"
+[ "$(jq -r '[.Results[].Vulnerabilities[] | select(.VulnerabilityID == "CVE-2020-8203") | .VendorIDs[]?] | join(",")' "$adv_json")" = "NSWG-ECO-516" ] \
+    && pass "a NSWG-ECO entry naming a CVE is kept in that CVE's VendorIDs" \
+    || fail "CVE-2020-8203 does not carry NSWG-ECO-516 in VendorIDs"
+[ "$(jq -r '[.Results[].Vulnerabilities[] | select(.VulnerabilityID == "CVE-2026-90001" or .VulnerabilityID == "CVE-2023-42890") | .VendorIDs | join(",")] | join(";")' "$adv_json")" = "DSA-9999-1;SUSE-SU-2024:0002-1" ] \
+    && pass "an advisory naming two CVEs yields one finding per CVE (VendorIDs, SUSE CVE page)" \
+    || fail "VendorIDs: $(jq -c '[.Results[].Vulnerabilities[] | select(.VulnerabilityID == "CVE-2026-90001" or .VulnerabilityID == "CVE-2023-42890") | .VendorIDs]' "$adv_json")"
+[ "$(jq -r '[.Results[].Vulnerabilities[] | select(.VulnerabilityID == "GHSA-aaaa-bbbb-cccc") | .PkgName] | join(",")' "$adv_json")" = "examplepkg" ] \
+    && pass "a lower-case ghsa- id is kept as a finding, written in upper case" \
+    || fail "ghsa-aaaa-bbbb-cccc was not kept as GHSA-aaaa-bbbb-cccc"
+[ "$(jq -r '[.Results[].Vulnerabilities[]?.VulnerabilityID | select(test("CVE-2019-"))] | length' "$adv_json")" = "0" ] \
+    && pass "a CVE mentioned in a link that is not its record page is not taken" \
+    || fail "a CVE was taken from an unrelated link: $(jq -c '[.Results[].Vulnerabilities[]?.VulnerabilityID | select(test("CVE-2019-"))]' "$adv_json")"
+[ "$(jq -r '[.Advisories[]? | .VulnerabilityID + "@" + .Target] | join(",")' "$adv_json")" = "DLA-4792-1@sample_1.0_bom.json (debian 12.12),DLA-4800-1@sample_1.0_bom.json (debian 12.12)" ] \
+    && pass "distribution advisories with no CVE are listed apart, with their Target" \
+    || fail "Advisories: $(jq -c '[.Advisories[]? | .VulnerabilityID]' "$adv_json")"
+grep -q '| 1 | 6 | 2 | 3 | 0 | 12 |' "$WORK/secadv_security.md" \
+    && pass "the summary counts leave the advisories out" \
+    || fail "summary row: $(grep -A2 '| Critical' "$WORK/secadv_security.md" | tail -1)"
+grep -q '## Advisories with no CVE' "$WORK/secadv_security.md" && grep -q 'DLA-4792-1' "$WORK/secadv_security.md" \
+    && pass "markdown report lists the advisories in their own section" \
+    || fail "markdown report has no advisory section"
+grep -q 'Advisories with no CVE</h2>' "$WORK/secadv_security.html" && grep -q 'DLA-4800-1' "$WORK/secadv_security.html" \
+    && pass "html report lists the advisories in their own section" \
+    || fail "html report has no advisory section"
+jq -e 'has("DLA-4792-1") or has("SUSE-SU-2024:0002-1") or has("NSWG-ECO-516") | not' "$WORK/secadv_security_epss.json" >/dev/null \
+    && pass "the EPSS/KEV sidecar is keyed by vulnerability ids only" \
+    || fail "the EPSS/KEV sidecar carries an advisory number"
+[ "$(jq -r '[.Results[].Vulnerabilities[]?.VulnerabilityID] | (index("DLA-4792-1") != null) and (index("CVE-2026-90003") == null)' "$WORK/secadv_security_trivy.json" 2>/dev/null)" = "true" ] \
+    && pass "Trivy's own result, before the rewrite and the merge, is kept apart in _security_trivy.json" \
+    || fail "_security_trivy.json is missing, rewritten or merged"
+[ ! -f "$WORK/secok_security_trivy.json" ] \
+    && pass "a report with nothing to rewrite gets no _security_trivy.json" \
+    || fail "_security_trivy.json written for a report with no advisory numbers"
+jq -f "$LIB/security-advisory-ids.jq" "$adv_json" | cmp -s - "$adv_json" \
+    && pass "the advisory filter is idempotent" \
+    || fail "a second pass of security-advisory-ids.jq changed the report"
+# Two advisories naming the same new CVE for one package: the result does not
+# depend on their order, takes the highest severity and both fixed versions,
+# and is marked as coming from an advisory.
+_sa_a='{"VulnerabilityID":"DSA-2-1","VendorIDs":["CVE-2026-91000"],"PkgName":"p","PkgIdentifier":{"PURL":"pkg:deb/debian/p@1"},"InstalledVersion":"1","FixedVersion":"1.1","Severity":"LOW","Title":"p - two"}'
+_sa_b='{"VulnerabilityID":"DSA-1-1","VendorIDs":["CVE-2026-91000"],"PkgName":"p","PkgIdentifier":{"PURL":"pkg:deb/debian/p@1"},"InstalledVersion":"1","FixedVersion":"1.2","Severity":"HIGH","Title":"p - one"}'
+_sa_ab=$(printf '{"Results":[{"Target":"t","Vulnerabilities":[%s,%s]}]}' "$_sa_a" "$_sa_b" | jq -cS -f "$LIB/security-advisory-ids.jq")
+_sa_ba=$(printf '{"Results":[{"Target":"t","Vulnerabilities":[%s,%s]}]}' "$_sa_b" "$_sa_a" | jq -cS -f "$LIB/security-advisory-ids.jq")
+[ -n "$_sa_ab" ] && [ "$_sa_ab" = "$_sa_ba" ] \
+    && pass "advisories naming the same CVE give the same finding in either order" \
+    || fail "the finding depends on the advisories' order" "[$_sa_ab] vs [$_sa_ba]"
+[ "$(printf '%s' "$_sa_ab" | jq -c '.Results[0].Vulnerabilities | map([.VulnerabilityID, .Severity, .FixedVersion, .VendorIDs, .["bomlens:fromAdvisory"], .Title])')" \
+    = '[["CVE-2026-91000","HIGH","1.1, 1.2",["DSA-1-1","DSA-2-1"],true,"p - one"]]' ] \
+    && pass "the CVE takes the highest severity, every fixed version and every advisory number, marked bomlens:fromAdvisory" \
+    || fail "merged CVE: $(printf '%s' "$_sa_ab" | jq -c '.Results[0].Vulnerabilities')"
+# Trivy's result alone, without a sidecar: _security_trivy.json is still kept
+# when the rewrite changed something.
+PATH="$FAKEBIN:$PATH" SECURITY_ENRICH=false DEEP_CVE=false \
+    bash "$LIB/scan-security.sh" "$WORK/secfail-bom.json" "$WORK/secadv2" proj >/dev/null 2>&1 \
+    || fail "scan-security.sh failed on a report with advisory numbers (no sidecar)"
+[ -f "$WORK/secadv2_security_trivy.json" ] \
+    && pass "with no sidecar, a rewritten report still keeps Trivy's own result apart" \
+    || fail "no _security_trivy.json after a rewrite with no sidecar"
+
 echo "== cpe-index: components with no package purl are matched against the CPE index =="
 # Trivy never reads component.cpe, so a binary syft's classifier named
 # (pkg:generic), an OS component such as busybox, or a library a signature
@@ -5205,6 +5301,213 @@ else
         && pass "no composer.json: filter never turns on" \
         || fail "filter turned on with no composer.json present" "got [$_t_nocomposer]"
 fi
+
+echo "== maven-hashes: build-prep fetches dependency jars where cdxgen reads them for hashes =="
+# cdxgen computes a Maven component's hashes only from its jar under
+# $HOME/.m2/repository, and its dependency:tree run downloads poms, not jars.
+# Extract the real block from build-prep.sh (no logic duplication) and drive it
+# with a stand-in mvn (and mvnw) that records its arguments.
+PREP="$ROOT_DIR/docker/lib/build-prep.sh"
+_mh_block=$(sed -n '/^# Maven component hashes/,/^fi$/p' "$PREP")
+if [ -z "$_mh_block" ]; then
+    fail "could not extract the Maven component-hashes block from build-prep.sh"
+else
+    _mh_bin="$WORK/mh-bin"; mkdir -p "$_mh_bin"
+    # MH_FAIL=exit: a non-zero exit; MH_FAIL=error: exit 0 with an [ERROR] line,
+    # as --fail-never leaves it. MH_LIST: what it writes to -DoutputFile (the
+    # resolved list); the path is recorded as LIST.
+    cat > "$_mh_bin/mvn" <<'STUB'
+#!/bin/sh
+args=""
+for a in "$@"; do
+    case "$a" in
+        -DoutputFile=*) [ -z "$MH_LIST" ] || printf '%s\n' "$MH_LIST" >> "${a#-DoutputFile=}"; a="-DoutputFile=LIST" ;;
+    esac
+    args="$args $a"
+done
+echo "${0##*/}$args" >> "$MH_CALLS"
+[ "$MH_FAIL" = error ] && echo "[ERROR] Failed to execute goal on project b"
+[ "$MH_FAIL" != exit ]
+STUB
+    chmod +x "$_mh_bin/mvn"
+    _mh_prelude='log() { echo "[build-prep] $*"; }; mark_prep_failed() { echo "MARK-FAILED $1"; }; run_supervised_timeout() { shift; "$@"; }; PREP_TIMEOUT_DEFAULT=5'
+    _mh_run() {  # <dir> <maven-opts> [fail]
+        rm -f "$WORK/mh-calls"
+        ( cd "$1" && PATH="$_mh_bin:$PATH" HOME="$WORK/mh-home" MH_CALLS="$WORK/mh-calls" MH_FAIL="${3:-}" \
+            MH_LIST="${MH_LIST:-}" MAVEN_SETTINGS_ARGS="${MH_SETTINGS:-}" \
+            MAVEN_OPTS="$2" bash -c "$_mh_prelude; $_mh_block" )
+    }
+    _mh_goal="-q -B --fail-never org.apache.maven.plugins:maven-dependency-plugin:3.11.0:resolve -DoutputFile=LIST -DappendOutput=true"
+    mkdir -p "$WORK/mh-proj" "$WORK/mh-none" "$WORK/mh-gradle" "$WORK/mh-wrap/.mvn/wrapper" "$WORK/mh-bare"
+    touch "$WORK/mh-proj/pom.xml" "$WORK/mh-gradle/pom.xml" "$WORK/mh-gradle/build.gradle.kts" \
+        "$WORK/mh-wrap/pom.xml" "$WORK/mh-bare/pom.xml"
+    cp "$_mh_bin/mvn" "$WORK/mh-wrap/mvnw"; cp "$_mh_bin/mvn" "$WORK/mh-bare/mvnw"
+    _mh_run "$WORK/mh-proj" "-Duser.home=$WORK/mh-home -Dmaven.repo.local=$WORK/mh-home/.m2/repository" >/dev/null
+    [ "$(cat "$WORK/mh-calls" 2>/dev/null)" = "mvn $_mh_goal" ] \
+        && pass "the jars are fetched with the plugin's full coordinates and --fail-never" \
+        || fail "mvn was called with [$(cat "$WORK/mh-calls" 2>/dev/null)]"
+    _mh_run "$WORK/mh-proj" "" >/dev/null
+    [ "$(cat "$WORK/mh-calls" 2>/dev/null)" = "mvn $_mh_goal" ] \
+        && pass "the default repository is filled too" \
+        || fail "default repository: mvn was called with [$(cat "$WORK/mh-calls" 2>/dev/null)]"
+    _mh_out=$(_mh_run "$WORK/mh-proj" "-Dmaven.repo.local=/elsewhere/.m2")
+    { [ ! -f "$WORK/mh-calls" ] && printf '%s' "$_mh_out" | grep -q "cdxgen will not find jars"; } \
+        && pass "a repository cdxgen does not read is reported, not filled" \
+        || fail "repository outside \$HOME/.m2/repository: [$_mh_out]"
+    _mh_run "$WORK/mh-none" "" >/dev/null
+    [ ! -f "$WORK/mh-calls" ] && pass "no pom.xml: mvn is not run" || fail "mvn ran with no pom.xml"
+    _mh_run "$WORK/mh-gradle" "" >/dev/null
+    [ ! -f "$WORK/mh-calls" ] && pass "a root Gradle build next to pom.xml: the jar fetch is skipped" \
+        || fail "mvn ran next to build.gradle.kts: [$(cat "$WORK/mh-calls" 2>/dev/null)]"
+    _mh_run "$WORK/mh-wrap" "" >/dev/null
+    [ "$(cat "$WORK/mh-calls" 2>/dev/null)" = "mvnw $_mh_goal" ] \
+        && pass "mvnw with its .mvn/wrapper files is used" \
+        || fail "with .mvn/wrapper: [$(cat "$WORK/mh-calls" 2>/dev/null)]"
+    _mh_run "$WORK/mh-bare" "" >/dev/null
+    [ "$(cat "$WORK/mh-calls" 2>/dev/null)" = "mvn $_mh_goal" ] \
+        && pass "mvnw without .mvn/wrapper falls back to mvn" \
+        || fail "mvnw without .mvn/wrapper: [$(cat "$WORK/mh-calls" 2>/dev/null)]"
+    for _mh_f in exit error; do
+        if _mh_out=$(_mh_run "$WORK/mh-proj" "" "$_mh_f"); then
+            printf '%s' "$_mh_out" | grep -q "some components will have no hashes (non-fatal)" \
+                && pass "a failed jar fetch ($_mh_f) is logged and non-fatal" \
+                || fail "a failed jar fetch ($_mh_f) was not logged: [$_mh_out]"
+        else
+            fail "a failed jar fetch ($_mh_f) ended the block with an error"
+        fi
+    done
+    MH_SETTINGS="-s /s/settings.xml -Dsettings.security=/s/settings-security.xml" _mh_run "$WORK/mh-wrap" "" >/dev/null
+    [ "$(cat "$WORK/mh-calls" 2>/dev/null)" = "mvnw -q -B --fail-never -s /s/settings.xml -Dsettings.security=/s/settings-security.xml ${_mh_goal#-q -B --fail-never }" ] \
+        && pass "the mounted settings go on the jar fetch's own command line (a wrapper's older Maven ignores MAVEN_ARGS)" \
+        || fail "settings on the command line: [$(cat "$WORK/mh-calls" 2>/dev/null)]"
+    # The cache already holds a jar from an earlier scan: only this run's
+    # resolved list decides whether the fetch failed as a whole.
+    mkdir -p "$WORK/mh-home/.m2/repository/g/a/1"; : > "$WORK/mh-home/.m2/repository/g/a/1/a-1.jar"
+    _mh_two='The following files have been resolved:
+   org.x:y:jar:1.0:compile -- module y
+   org.x:z:jar:tests:2.0:test
+   org.x:p:pom:1.0:import'
+    _mh_out=$(MH_LIST="$_mh_two" _mh_run "$WORK/mh-proj" "" error)
+    printf '%s' "$_mh_out" | grep -q "MARK-FAILED maven-dependency-jars" \
+        && printf '%s' "$_mh_out" | grep -q "0 of 2 resolved jars" \
+        && pass "no jar of this run's list in the repository (others cached): recorded as the failed step maven-dependency-jars" \
+        || fail "a fetch with none of its jars was not recorded as failed: [$_mh_out]"
+    mkdir -p "$WORK/mh-home/.m2/repository/org/x/z/2.0"; : > "$WORK/mh-home/.m2/repository/org/x/z/2.0/z-2.0-tests.jar"
+    _mh_out=$(MH_LIST="$_mh_two" _mh_run "$WORK/mh-proj" "" error)
+    { ! printf '%s' "$_mh_out" | grep -q "MARK-FAILED" && printf '%s' "$_mh_out" | grep -q "1 of 2 resolved jars"; } \
+        && pass "a partly failed jar fetch is only logged, with the count" \
+        || fail "a partly failed jar fetch: [$_mh_out]"
+    rm -rf "$WORK/mh-home/.m2/repository/g" "$WORK/mh-home/.m2/repository/org"
+fi
+# Every caller pins the repository to the standard layout under HOME=/tmp/sbomhome,
+# the one place cdxgen looks for the jars, and mounts the Maven cache there.
+_mh_bad=""
+for _f in scripts/scan-sbom.sh docker/entrypoint.sh docker/lib/make-plan.sh; do
+    grep -o 'maven\.repo\.local=[^ "\\]*' "$ROOT_DIR/$_f" | grep -vx 'maven\.repo\.local=/tmp/sbomhome/\.m2/repository' >/dev/null \
+        && _mh_bad="$_mh_bad $_f"
+    grep -q 'maven\.repo\.local=' "$ROOT_DIR/$_f" || _mh_bad="$_mh_bad $_f(none)"
+    grep 'maven\.repo\.local=' "$ROOT_DIR/$_f" | grep -vq -- '-Duser\.home=/tmp/sbomhome ' && _mh_bad="$_mh_bad $_f(user.home)"
+done
+[ -z "$_mh_bad" ] \
+    && pass "scan-sbom.sh, entrypoint.sh and make-plan.sh use /tmp/sbomhome/.m2/repository and user.home /tmp/sbomhome" \
+    || fail "MAVEN_OPTS is not the /tmp/sbomhome one in:$_mh_bad"
+grep -q 'role: "cache-maven", target: "/tmp/sbomhome/.m2"' "$ROOT_DIR/docker/lib/make-plan.sh" \
+    && grep -q 'role: "maven-settings", target: "/bomlens-settings/m2/settings.xml", mode: "ro"' "$ROOT_DIR/docker/lib/make-plan.sh" \
+    && pass "the plan mounts the .m2-shaped Maven cache at /tmp/sbomhome/.m2 and settings.xml read-only outside it" \
+    || fail "the plan's Maven mounts do not match"
+
+echo "== stage1-settings: mounted Maven and Gradle settings are used without writing into the caches =="
+PREP="$ROOT_DIR/docker/lib/build-prep.sh"
+_ss_block=$(sed -n '/^# User settings mounted read-only outside the caches/,/^# Maven component hashes/p' "$PREP" | sed '$d')
+_gs_fn=$(sed -n '/^GRADLE_SETTINGS_HOME=""$/,/^mark_prep_applied() {/p' "$PREP" | sed '$d')
+if [ -z "$_ss_block" ] || [ -z "$_gs_fn" ]; then
+    fail "could not extract the settings blocks from build-prep.sh"
+else
+    _ss_root="$WORK/ss-root"; mkdir -p "$_ss_root/m2" "$_ss_root/gradle/init.d"
+    : > "$_ss_root/m2/settings.xml"; : > "$_ss_root/m2/settings-security.xml"
+    echo mounted > "$_ss_root/gradle/gradle.properties"; echo mounted > "$_ss_root/gradle/init.gradle"
+    echo mounted > "$_ss_root/gradle/init.d/a.gradle"
+    _ss_out=$(PREP_SETTINGS_ROOT="$_ss_root" MAVEN_OPTS="-Dmaven.repo.local=/x" MAVEN_ARGS="" MVN_ARGS="" \
+        bash -c 'log() { :; }; '"$_ss_block"'; echo "ARGS=$MAVEN_ARGS"; echo "MVN=$MVN_ARGS"; echo "OPTS=$MAVEN_OPTS"; echo "CMD=$MAVEN_SETTINGS_ARGS"')
+    { printf '%s\n' "$_ss_out" | grep -qx "ARGS=-s $_ss_root/m2/settings.xml" \
+        && printf '%s\n' "$_ss_out" | grep -qx "MVN=-s $_ss_root/m2/settings.xml" \
+        && printf '%s\n' "$_ss_out" | grep -qx "OPTS=-Dmaven.repo.local=/x -Dsettings.security=$_ss_root/m2/settings-security.xml" \
+        && printf '%s\n' "$_ss_out" | grep -qx "CMD=-s $_ss_root/m2/settings.xml -Dsettings.security=$_ss_root/m2/settings-security.xml"; } \
+        && pass "Maven gets the mounted settings on the jar fetch's command line, in MVN_ARGS for cdxgen and in MAVEN_ARGS" \
+        || fail "Maven settings: [$_ss_out]"
+    _ss_gh="$WORK/ss-gradle-home"; mkdir -p "$_ss_gh"; echo own > "$_ss_gh/init.gradle"
+    # One scan's copy (prints its run id) and its clean-up (<run id>).
+    _ss_copy() { SETTINGS_ROOT="${1:-$_ss_root}" GRADLE_USER_HOME="$_ss_gh" \
+        bash -c 'log() { :; }; '"$_gs_fn"'; gradle_settings_copy; echo "$GRADLE_SETTINGS_RUN_ID"'; }
+    _ss_done() { GRADLE_SETTINGS_HOME="$_ss_gh" GRADLE_SETTINGS_RUN_ID="$1" \
+        bash -c 'log() { echo "[build-prep] $*"; }; '"$_gs_fn"'; GRADLE_SETTINGS_HOME="$0"; GRADLE_SETTINGS_RUN_ID="$1"; gradle_settings_remove; gradle_settings_remove' "$_ss_gh" "$1"; }
+    _ss_lists() { find "$_ss_gh" -maxdepth 1 -name '.bomlens-settings-copied.*' | wc -l | tr -d ' '; }
+    _ss_a=$(_ss_copy)
+    { [ "$(cat "$_ss_gh/gradle.properties" 2>/dev/null)" = mounted ] && [ "$(cat "$_ss_gh/init.d/a.gradle" 2>/dev/null)" = mounted ] \
+        && [ "$(cat "$_ss_gh/init.gradle")" = own ] && [ "$(_ss_lists)" = 1 ]; } \
+        && pass "the mounted Gradle settings are copied into the Gradle home under this scan's own list, a file it already has kept" \
+        || fail "Gradle settings copy: $(ls -aR "$_ss_gh" | tr '\n' ' ')"
+    # A second scan starts while the first runs, and ends first.
+    _ss_b=$(_ss_copy)
+    { [ -n "$_ss_b" ] && [ "$_ss_b" != "$_ss_a" ] && [ "$(_ss_lists)" = 2 ] \
+        && grep -q ' gradle.properties$' "$_ss_gh/.bomlens-settings-copied.$_ss_b"; } \
+        && pass "a scan starting alongside shares the copies, under its own list" \
+        || fail "second scan: a=[$_ss_a] b=[$_ss_b] $(ls -a "$_ss_gh" | tr '\n' ' ')"
+    _ss_done "$_ss_b" >/dev/null
+    { [ "$(cat "$_ss_gh/gradle.properties" 2>/dev/null)" = mounted ] && [ -f "$_ss_gh/init.d/a.gradle" ] && [ "$(_ss_lists)" = 1 ]; } \
+        && pass "the scan that ends first leaves the copies the other still uses" \
+        || fail "the first scan to end removed copies still in use: $(ls -aR "$_ss_gh" | tr '\n' ' ')"
+    _ss_done "$_ss_a" >/dev/null
+    { [ ! -e "$_ss_gh/gradle.properties" ] && [ ! -e "$_ss_gh/init.d/a.gradle" ] && [ "$(cat "$_ss_gh/init.gradle")" = own ] \
+        && [ "$(_ss_lists)" = 0 ] && [ ! -d "$_ss_gh/.bomlens-settings.lock" ]; } \
+        && pass "when both have ended the copies are gone (removing twice is harmless), the home's own file stays" \
+        || fail "Gradle settings removal: $(ls -aR "$_ss_gh" | tr '\n' ' ')"
+    _ss_a=$(_ss_copy); echo "user edit" >> "$_ss_gh/gradle.properties"
+    _ss_done "$_ss_a" >/dev/null
+    { grep -q "user edit" "$_ss_gh/gradle.properties" 2>/dev/null && [ ! -e "$_ss_gh/init.d/a.gradle" ]; } \
+        && pass "a copied file changed since is left in place, an unchanged one removed" \
+        || fail "a changed copy was removed, or an unchanged one kept: $(ls -aR "$_ss_gh" | tr '\n' ' ')"
+    _ss_a=$(_ss_copy)
+    { grep -q "user edit" "$_ss_gh/gradle.properties" && ! grep -q ' gradle.properties$' "$_ss_gh/.bomlens-settings-copied.$_ss_a"; } \
+        && pass "a file in the home that no list names is the user's: not shared, not replaced" \
+        || fail "the user's gradle.properties was taken over"
+    _ss_done "$_ss_a" >/dev/null; rm -f "$_ss_gh/gradle.properties"
+    # A killed scan's list: kept while it may still be running, cleaned up a
+    # day later, even with nothing mounted.
+    _ss_a=$(_ss_copy)
+    _ss_b=$(_ss_copy "$WORK/ss-none")
+    [ -f "$_ss_gh/gradle.properties" ] && [ "$(_ss_lists)" = 1 ] \
+        && pass "a recent list whose scan may still run is left alone" \
+        || fail "a recent list was cleaned up"
+    sed -i.bak '1s/.*/time 1/' "$_ss_gh/.bomlens-settings-copied.$_ss_a" && rm -f "$_ss_gh/.bomlens-settings-copied.$_ss_a.bak"
+    mkdir "$_ss_gh/.bomlens-settings.lock"; touch -t 202001010000 "$_ss_gh/.bomlens-settings.lock"
+    _ss_b=$(_ss_copy "$WORK/ss-none")
+    { [ ! -e "$_ss_gh/gradle.properties" ] && [ "$(_ss_lists)" = 0 ] && [ ! -d "$_ss_gh/.bomlens-settings.lock" ]; } \
+        && pass "a list over a day old is cleaned up by the next scan, past a lock left behind" \
+        || fail "stale list or lock: $(ls -aR "$_ss_gh" | tr '\n' ' ')"
+    # The whole script: the settings are in place before build-prep's own
+    # first Gradle run, and gone afterwards.
+    _sg="$WORK/ss-full"; mkdir -p "$_sg/bin" "$_sg/src" "$_sg/out" "$_sg/gh"
+    : > "$_sg/src/build.gradle"
+    cat > "$_sg/bin/cdxgen" <<'STUB'
+#!/bin/sh
+out=""; prev=""
+for a in "$@"; do [ "$prev" = "-o" ] && out="$a"; prev="$a"; done
+printf '{"bomFormat":"CycloneDX","specVersion":"1.6","version":1,"metadata":{},"components":[]}\n' > "$out"
+STUB
+    chmod +x "$_sg/bin/cdxgen"
+    printf '#!/bin/sh\n[ -f "$GRADLE_USER_HOME/gradle.properties" ] && echo seen >> "%s/gradle-calls" || echo missing >> "%s/gradle-calls"\n' "$_sg" "$_sg" > "$_sg/bin/gradle"
+    chmod +x "$_sg/bin/gradle"
+    env -u ANDROID_HOME PATH="$_sg/bin:$PATH" PREP_SETTINGS_ROOT="$_ss_root" GRADLE_USER_HOME="$_sg/gh" \
+        sh "$PREP" "$_sg/src" "$_sg/out/bom.json" > "$_sg/log" 2>&1
+    { [ "$(head -1 "$_sg/gradle-calls" 2>/dev/null)" = seen ] && [ ! -e "$_sg/gh/gradle.properties" ] \
+        && [ ! -e "$_sg/gh/.bomlens-settings-copied" ]; } \
+        && pass "build-prep's first Gradle run sees the mounted gradle.properties, removed when the scan ends" \
+        || fail "Gradle settings around build-prep's own Gradle run" "calls=[$(cat "$_sg/gradle-calls" 2>/dev/null)] $(grep gradle "$_sg/log" | head -5)"
+fi
+grep -q 'find "$_co_d" \\( ! -user "$HOST_UID"' "$PREP" \
+    && pass "build-prep hands the mounted cache folders back to HOST_UID" \
+    || fail "build-prep does not chown the cache mounts"
 
 echo "== android-scope: release-config selection picks the right variant (flavored projects) =="
 # Guards docker/lib/build-prep.sh's Android config selection. The SCA benchmark

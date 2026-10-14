@@ -1,0 +1,197 @@
+{
+  "SchemaVersion": 2,
+  "Results": [
+    {
+      "Target": "sample_1.0_bom.json (debian 12.12)",
+      "Class": "os-pkgs",
+      "Type": "debian",
+      "Vulnerabilities": [
+        {
+          "VulnerabilityID": "DLA-4792-1",
+          "VendorIDs": [
+            "DLA-4792-1"
+          ],
+          "PkgName": "tzdata",
+          "PkgIdentifier": {
+            "PURL": "pkg:deb/debian/tzdata@2025b-0%2Bdeb12u2?arch=all&distro=debian-12.12"
+          },
+          "InstalledVersion": "2025b-0+deb12u2",
+          "FixedVersion": "2026c-0+deb12u1",
+          "Status": "fixed",
+          "DataSource": {
+            "ID": "debian",
+            "Name": "Debian Security Tracker"
+          },
+          "Title": "tzdata - new timezone database",
+          "Severity": "UNKNOWN"
+        },
+        {
+          "VulnerabilityID": "DSA-9999-1",
+          "VendorIDs": [
+            "DSA-9999-1",
+            "CVE-2026-90001",
+            "CVE-2026-90002"
+          ],
+          "PkgName": "libexample1",
+          "PkgIdentifier": {
+            "PURL": "pkg:deb/debian/libexample1@1.0-1?arch=amd64&distro=debian-12.12"
+          },
+          "InstalledVersion": "1.0-1",
+          "FixedVersion": "1.0-2",
+          "Title": "libexample1 - security update",
+          "Severity": "HIGH"
+        },
+        {
+          "VulnerabilityID": "CVE-2026-90002",
+          "PkgName": "libexample1",
+          "PkgIdentifier": {
+            "PURL": "pkg:deb/debian/libexample1@1.0-1?arch=amd64&distro=debian-12.12"
+          },
+          "InstalledVersion": "1.0-1",
+          "FixedVersion": "1.0-2",
+          "Severity": "HIGH"
+        },
+        {
+          "VulnerabilityID": "TEMP-0000001-ABCDEF",
+          "PkgName": "libexample1",
+          "PkgIdentifier": {
+            "PURL": "pkg:deb/debian/libexample1@1.0-1?arch=amd64&distro=debian-12.12"
+          },
+          "InstalledVersion": "1.0-1",
+          "Severity": "LOW"
+        },
+        {
+          "VulnerabilityID": "DLA-4800-1",
+          "VendorIDs": [
+            "DLA-4800-1"
+          ],
+          "PkgName": "libother1",
+          "PkgIdentifier": {
+            "PURL": "pkg:deb/debian/libother1@2.0-1?arch=amd64&distro=debian-12.12"
+          },
+          "InstalledVersion": "2.0-1",
+          "FixedVersion": "2.0-1+deb12u1",
+          "Title": "libother1 - security update",
+          "Severity": "UNKNOWN",
+          "References": [
+            "https://lists.debian.org/debian-lts-announce/2026/10/msg00001.html",
+            "https://github.com/example/libother/commit/abc123?fixes=CVE-2019-99999"
+          ]
+        }
+      ]
+    },
+    {
+      "Target": "Node.js",
+      "Class": "lang-pkgs",
+      "Type": "node-pkg",
+      "Vulnerabilities": [
+        {
+          "VulnerabilityID": "CVE-2020-8203",
+          "PkgName": "lodash",
+          "PkgIdentifier": {
+            "PURL": "pkg:npm/lodash@4.17.15"
+          },
+          "InstalledVersion": "4.17.15",
+          "FixedVersion": "4.17.19",
+          "Severity": "HIGH"
+        },
+        {
+          "VulnerabilityID": "NSWG-ECO-516",
+          "PkgName": "lodash",
+          "PkgIdentifier": {
+            "PURL": "pkg:npm/lodash@4.17.15"
+          },
+          "InstalledVersion": "4.17.15",
+          "FixedVersion": ">=4.17.19",
+          "PrimaryURL": "https://www.npmjs.com/advisories/1523",
+          "Title": "Allocation of Resources Without Limits or Throttling",
+          "Severity": "HIGH",
+          "References": [
+            "https://github.com/lodash/lodash/pull/4759",
+            "https://nvd.nist.gov/vuln/detail/CVE-2020-8203"
+          ]
+        },
+        {
+          "VulnerabilityID": "NSWG-ECO-1",
+          "PkgName": "examplepkg",
+          "PkgIdentifier": {
+            "PURL": "pkg:npm/examplepkg@1.0.0"
+          },
+          "InstalledVersion": "1.0.0",
+          "Title": "Example advisory with no CVE",
+          "Severity": "HIGH",
+          "References": [
+            "https://github.com/nodejs/security-wg"
+          ]
+        },
+        {
+          "VulnerabilityID": "GHSA-xxxx-yyyy-zzzz",
+          "PkgName": "examplepkg",
+          "PkgIdentifier": {
+            "PURL": "pkg:npm/examplepkg@1.0.0"
+          },
+          "InstalledVersion": "1.0.0",
+          "Severity": "MEDIUM"
+        },
+        {
+          "VulnerabilityID": "ghsa-aaaa-bbbb-cccc",
+          "PkgName": "examplepkg",
+          "PkgIdentifier": {
+            "PURL": "pkg:npm/examplepkg@1.0.0"
+          },
+          "InstalledVersion": "1.0.0",
+          "Severity": "LOW"
+        },
+        {
+          "VulnerabilityID": "MAL-2026-1",
+          "PkgName": "badpkg",
+          "PkgIdentifier": {
+            "PURL": "pkg:npm/badpkg@0.0.1"
+          },
+          "InstalledVersion": "0.0.1",
+          "Title": "Malicious code in badpkg",
+          "Severity": "CRITICAL"
+        },
+        {
+          "VulnerabilityID": "NSWG-ECO-2",
+          "PkgName": "examplepkg",
+          "PkgIdentifier": {
+            "PURL": "pkg:npm/examplepkg@1.0.0"
+          },
+          "InstalledVersion": "1.0.0",
+          "Title": "Example entry citing an earlier CVE",
+          "Severity": "MEDIUM",
+          "PrimaryURL": "https://github.com/example/examplepkg/issues/7#CVE-2019-11111",
+          "References": [
+            "https://nvd.nist.gov/vuln/detail/CVE-2019-22222/../CVE-2019-33333",
+            "https://www.openwall.com/lists/oss-security/2019/01/01/1?cve=CVE-2019-44444"
+          ]
+        }
+      ]
+    },
+    {
+      "Target": "sample_1.0_bom.json (suse linux enterprise server 15.5)",
+      "Class": "os-pkgs",
+      "Type": "sles",
+      "Vulnerabilities": [
+        {
+          "VulnerabilityID": "SUSE-SU-2024:0002-1",
+          "PkgName": "webkit2gtk3",
+          "PkgIdentifier": {
+            "PURL": "pkg:rpm/suse/webkit2gtk3@2.42.3-150000.3.160.1?distro=sles-15.5"
+          },
+          "InstalledVersion": "2.42.3-150000.3.160.1",
+          "FixedVersion": "2.42.4-150000.3.163.2",
+          "Title": "Security update for webkit2gtk3",
+          "Severity": "HIGH",
+          "References": [
+            "https://bugzilla.suse.com/1218033",
+            "https://www.suse.com/security/cve/CVE-2023-42883/",
+            "https://www.suse.com/security/cve/CVE-2023-42890/",
+            "https://www.suse.com/support/update/announcement/2024/suse-su-20240002-1/"
+          ]
+        }
+      ]
+    }
+  ]
+}
