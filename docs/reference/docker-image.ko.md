@@ -178,6 +178,7 @@ MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL='*' docker run --rm \
 | `BOMLENS_PREP_TIMEOUT` | - | `900`(Gradle/Android 단계는 `1800`) | 의존성 해석 단계(Cargo, Go, Bundler, pip, npm, pnpm, PHP Composer, Swift, Gradle/Android) 하나가 실행될 수 있는 최대 시간(초). 넘으면 그 단계를 멈추고 스캔은 그 단계 없이 계속됨. 값을 주면 모든 단계의 두 기본값을 함께 덮어씀. 실패하거나 시간을 넘긴 단계는 자신의 출력과 함께 로그에 남고 SBOM에 `bomlens:pipeline-step-failed`로 기록되며, 스캔 자체는 끝까지 완료됨 |
 | `BOMLENS_CANCEL_GRACE` | — | `30` | 스캔을 취소했을 때(CLI Ctrl+C 또는 웹 UI의 취소 버튼) 깔끔하게 멈출 수 있도록 주는 유예 시간(초). 이 시간이 지나도 안 멈추면 강제로 정지시킴. CLI와 `--ui`에 적용되고, 데스크톱 앱은 항상 기본값을 쓴다 |
 | `BOMLENS_INCLUDE_NON_SHIPPED` | - | - | 소스 스캔: `1`로 설정하면 기본으로 제외하는 테스트, 예제, 벤치마크, 데모 폴더의 매니페스트, `.github/workflows`의 GitHub Actions 워크플로, `gradle/wrapper`의 Gradle 래퍼를 포함 |
+| `BOMLENS_INCLUDE_DEV_DEPENDENCIES` | - | - | 소스 스캔: `1`로 설정하면 기본으로 빼는 개발 전용 컴포넌트(cdxgen이 개발 전용으로 표시한 컴포넌트와 루트 `Gemfile`의 `development`, `test` 그룹에만 선언된 gem)를 그대로 둠. 뺀 컴포넌트는 `bomlens:excluded-components`에 기록됨 |
 | `BOMLENS_NO_COPYRIGHT` | - | - | 소스 스캔: `1`로 설정하면 설치된 패키지의 라이선스 파일에서 npm, Python, Go, Rust 컴포넌트의 `copyright`를 채우는 단계를 건너뜀 |
 | `BOMLENS_NO_CARGO_LICENSE` | - | - | 소스 스캔: `1`로 설정하면 `cargo metadata`로 Rust 컴포넌트의 라이선스를 채우는 단계를 건너뜀(명령줄의 `FETCH_LICENSE=false`도 건너뜀) |
 | `CYCLONEDX_SPEC_VERSIONS` | — | `1.3 1.4 1.5 1.6 1.7` | 적합성 검사가 허용하는 CycloneDX spec 버전(공백 구분). 기본 범위를 덮어씀 |

@@ -39,7 +39,7 @@ jq '.components | length' NodeExample_1.0.0/NodeExample_1.0.0_bom.json
 
 소스 스캔은 기본으로 테스트, 테스트 데이터, 예제, 벤치마크, 데모 폴더(`test`, `tests`, `spec`, `fixtures`, `testdata`, `__tests__`, `e2e`, `example`, `examples`, `sample`, `samples`, `bench`, `benches`, `benchmark`, `benchmarks`, `demo`, `demos`, `playground`) 아래의 매니페스트, `.github/workflows`의 GitHub Actions 워크플로, `gradle/wrapper`의 Gradle 래퍼(`gradle-wrapper.jar`)를 제외합니다. 모두 제품과 함께 배포되지 않기 때문입니다. SBOM에는 적용한 패턴이 `bomlens:excluded-paths` 속성에, 제외한 파일이 `bomlens:excluded-manifests` 속성에 기록됩니다. 포함하려면 `BOMLENS_INCLUDE_NON_SHIPPED=1`을 설정하세요([Docker 이미지 환경 변수](docker-image.ko.md#환경-변수)).
 
-소스 스캔은 cdxgen이 개발 전용으로 표시한 컴포넌트도 뺍니다. 대상은 npm, pnpm, yarn, bun의 개발 패키지, uv와 Poetry에서 `main`이 아닌 의존성 그룹, Cargo의 dev-dependencies, sbt, Crystal, Gleam의 개발 의존성입니다. Ruby는 BomLens가 `Gemfile`의 그룹을 직접 읽습니다([Ruby](#ruby) 참고). 표시된 컴포넌트는 운영 의존성 경로에서 닿지 않을 때만 빠지고, 빠진 컴포넌트만 필요로 하는 의존성도 함께 빠집니다. 운영 코드도 쓰는 패키지는 남습니다. 생태계별로 달라지는 점은 아래 언어별 절에 적었습니다.
+소스 스캔은 cdxgen이 개발 전용으로 표시한 컴포넌트도 뺍니다. 대상은 npm, pnpm, yarn, bun의 개발 패키지, uv와 Poetry에서 `main`이 아닌 의존성 그룹, Cargo의 dev-dependencies, sbt, Crystal, Gleam의 개발 의존성입니다. Ruby는 BomLens가 `Gemfile`의 그룹을 직접 읽습니다([Ruby](#ruby) 참고). cdxgen이 한 컴포넌트에 같은 표시를 여러 번 붙였으면 모든 값이 개발용일 때만 개발 전용으로 봅니다. 표시된 컴포넌트와 표시된 컴포넌트만 필요로 하는 의존성은 의존성 그래프의 다른 어떤 컴포넌트도 닿지 않을 때만 빠집니다. 표시가 없는 컴포넌트는 루트에서 닿지 않더라도 자신이 의존하는 컴포넌트를 남기고, 워크스페이스 멤버도 자신의 의존성을 남깁니다(cdxgen이 멤버마다 따로 표시하는 npm 개발 패키지는 예외). 뺀 컴포넌트는 SBOM의 `bomlens:excluded-components` 속성에 기록됩니다. 그대로 두려면 `BOMLENS_INCLUDE_DEV_DEPENDENCIES=1`을 설정하세요([Docker 이미지 환경 변수](docker-image.ko.md#환경-변수)). 생태계별로 달라지는 점은 아래 언어별 절에 적었습니다.
 
 npm, Python(pip), Go, Rust(Cargo) 패키지는 소스 스캔이 설치된 패키지에 들어 있는 라이선스 파일(`LICENSE`, `LICENCE`, `COPYING`, `NOTICE`, `COPYRIGHT`)에서 저작권 문구를 읽어 컴포넌트의 `copyright`를 채웁니다. 고지문에 저작권 표기 줄이 나오게 하려는 것입니다. `Copyright` 바로 뒤에 `(c)`, 저작권 기호, 연도, `by` 중 하나가 오거나 `(c)`나 저작권 기호 뒤에 연도가 오면서 권리자 이름이 있는 줄만 사용합니다. `Copyright Acme, Inc.`처럼 연도가 없는 표기는 가져오지 않습니다. 읽는 곳은 패키지 자신의 폴더뿐이고(pip은 `.dist-info` 폴더, Go는 `go list`가 알려 주는 폴더로 모듈 캐시, `replace`한 모듈은 대체본 폴더, 또는 `vendor/`이며, Rust는 `cargo metadata`가 알려 주는 폴더로 cargo registry, git 체크아웃, 경로 의존성입니다), 파일은 최대 6개, 파일마다 앞 64KiB와 400줄까지, 컴포넌트당 문구는 최대 5개이며 `; `로 이어 붙입니다. 채우지 않은 서식(`<year>`, `[fullname]`)이나 라이선스 문서 자체의 문구(예: GNU 라이선스에 든 Free Software Foundation의 줄)는 제외하고, 패키지 밖을 가리키는 링크 파일도 읽지 않습니다. 이미 저작권 값이 있는 컴포넌트는 바꾸지 않고, 그런 줄이 없는 패키지는 비워 둡니다. 채운 값에는 `bomlens:copyrightSource` 속성이 붙습니다. `BOMLENS_NO_COPYRIGHT=1`로 끌 수 있습니다. Java(Maven)는 지원하지 않습니다. Maven은 소스 폴더가 아니라 jar 파일을 내려받으므로 의존성의 라이선스 파일이 디스크에 없습니다. `replace`한 Go 모듈에는 실제로 빌드되는 코드의 문구가 들어가므로 컴포넌트가 가리키는 버전과 다를 수 있습니다. 스캔 대상 자신의 Go 모듈과 Rust 워크스페이스 크레이트는 채우지 않습니다. Rust 단계는 이미 디스크에 있는 크레이트 소스만 읽고 네트워크로 내려받지 않으므로, `FETCH_LICENSE=false`나 `--byte-stable`에서는 내려받지 않은 크레이트가 비어 있습니다. 폴더가 디스크에 없는 Go와 Rust 컴포넌트(예: 내려받기 실패)도 비어 있습니다. 한 생태계의 폴더를 하나도 조회하지 못하면 SBOM의 `bomlens:copyrightUnread` 메타데이터 속성(`golang`, `cargo`)에 기록하므로, 저작권이 없는 것과 단계가 실행되지 않은 것을 구분할 수 있습니다.
 
@@ -118,7 +118,7 @@ docker build --build-arg ANDROID_API=<API> -t bomlens-android-sdk<API> docker/an
 
 > 주의: npm 워크스페이스 멤버가 `package-lock.json`에 등록돼 있으면, 그 멤버의 디렉터리가 제외 대상 트리 아래에 있어도 위의 파일 단위 제외로는 빠지지 않습니다. cdxgen이 `package-lock.json`을 직접 읽기 때문입니다. 이런 멤버 자신의 컴포넌트는 빠지고, 그 멤버만 필요로 하는 의존성도 함께 빠집니다. 다만 유지되는 멤버가 그 의존성을 필요로 하면 남습니다. `BOMLENS_INCLUDE_NON_SHIPPED=1`(위 파일 단위 제외와 같은 스위치)로 이렇게 빠지는 것을 모두 그대로 둘 수 있습니다. 제외한 멤버와 그 때문에 빠진 컴포넌트는 SBOM에 각각 `bomlens:excluded-members`, `bomlens:excluded-components`로 기록됩니다. yarn 워크스페이스 멤버는 아직 같은 방식으로 잡히지 않습니다.
 
-> 주의: production 필터와 별도로, cdxgen이 개발 패키지(npm, pnpm, yarn, bun)로 표시한 컴포넌트는 운영 의존성 경로에서 닿지 않으면 빠지고, 그 컴포넌트만 필요로 하는 의존성도 함께 빠집니다. production 필터가 읽지 않는 pnpm 워크스페이스도 여기에 해당합니다. 운영 의존성도 쓰는 패키지는 남습니다. `BOMLENS_NODE_FULL_GRAPH=1`이면 이 컴포넌트들도 그대로 둡니다.
+> 주의: production 필터와 별도로, cdxgen이 개발 패키지(npm, pnpm, yarn, bun)로 표시한 컴포넌트는 운영 의존성 경로에서 닿지 않으면 빠지고, 그 컴포넌트만 필요로 하는 의존성도 함께 빠집니다. production 필터가 읽지 않는 pnpm 워크스페이스도 여기에 해당합니다. 운영 의존성도 쓰는 패키지는 남습니다. `BOMLENS_NODE_FULL_GRAPH=1`이나 `BOMLENS_INCLUDE_DEV_DEPENDENCIES=1`이면 이 컴포넌트들도 그대로 둡니다.
 
 ---
 
@@ -132,7 +132,7 @@ docker build --build-arg ANDROID_API=<API> -t bomlens-android-sdk<API> docker/an
 
 > 주의: `poetry.lock`이 없는 Poetry 프로젝트는 `[tool.poetry.dependencies]`의 정확한 고정 버전(`requests = "2.31.0"`)으로 스캔합니다. `^2.0` 같은 범위와 경로·git 항목은 빠집니다. 고정 버전은 프로젝트에 연결되고 그 하위 의존성까지 나옵니다. 빠진 항목이 있거나 네트워크가 없어 하위 의존성을 풀지 못하면 SBOM은 의존 그래프를 불완전(incomplete)으로 표시합니다. 버전을 `==`로 고정하거나 `poetry.lock` 같은 잠금 파일을 커밋하세요. 그렇지 않으면 SBOM에는 실제로 쓰는 버전이 아니라 스캔 시점에 받을 수 있는 버전이 담깁니다. 번들 예제는 버전을 고정해 두었고 모든 컴포넌트에 라이선스가 있습니다.
 
-> 주의: uv(`uv.lock`)나 Poetry 프로젝트에서 cdxgen이 `main`이 아닌 의존성 그룹(예: `dev`, `test`)에 넣은 컴포넌트는 운영 의존성 경로에서 닿지 않으면 빠지고, 그 컴포넌트만 필요로 하는 의존성도 함께 빠집니다. 운영 의존성도 쓰는 패키지는 남습니다.
+> 주의: uv(`uv.lock`)나 Poetry 프로젝트에서 cdxgen이 `main`이 아닌 의존성 그룹(예: `dev`, `test`)에만 넣은 컴포넌트는 운영 의존성 경로에서 닿지 않으면 빠지고, 그 컴포넌트만 필요로 하는 의존성도 함께 빠집니다. 운영 의존성도 쓰는 패키지는 남습니다. 프로젝트 안의 어느 `pyproject.toml`이든 `[project]`의 `dependencies`나 `optional-dependencies`, 또는 `[tool.poetry.dependencies]`에 적은 패키지도 의존성 그룹에 함께 있더라도 남습니다. BomLens는 이 파일을 자체의 간단한 읽기 방식으로 읽습니다. 스캔 루트에 `pyproject.toml`이 없거나, 읽지 못하는 형식(예: `dynamic = ["dependencies"]`)을 쓴 파일이 있으면 Python 패키지를 하나도 빼지 않고 빌드 로그에 그렇게 남깁니다.
 
 ---
 
@@ -158,7 +158,7 @@ docker build --build-arg ANDROID_API=<API> -t bomlens-android-sdk<API> docker/an
 
 > 주의: `Gemfile.lock`이 커밋되어 있지 않으면 BomLens가 스캔 전에 `bundle lock`을 실행합니다. SBOM이 배포 구성과 일치하도록 잠금 파일을 커밋하세요.
 
-> 주의: cdxgen은 Bundler 그룹을 표시하지 않으므로 BomLens가 스캔 루트의 `Gemfile`을 직접 읽습니다. `development`와 `test` 그룹에만 선언된 gem(`group ... do` 블록 안이나 `group:`, `groups:` 옵션으로 선언)은 빠지고, 그런 gem만 필요로 하는 의존성도 함께 빠집니다. 운영 gem도 필요로 하면 남습니다. `Gemfile`은 보수적으로 읽습니다. 조건문, `gemspec`, `eval_gemfile`, 여러 줄에 걸친 선언처럼 읽지 못하는 줄이 있거나, `Gemfile.lock`에 `Gemfile`에 없는 gem이 있으면 gem을 하나도 빼지 않고 로그에 `Gemfile groups not read`를 남깁니다.
+> 주의: cdxgen은 Bundler 그룹을 표시하지 않으므로 BomLens가 스캔 루트의 `Gemfile`을 직접 읽습니다. `development`와 `test` 그룹에만 선언된 gem(`group ... do` 블록 안이나 `group:`, `groups:` 옵션으로 선언)은 빠지고, 그런 gem만 필요로 하는 의존성도 함께 빠집니다. 운영 gem도 필요로 하면 남습니다. `Gemfile`은 보수적으로 읽습니다. 조건문, `gemspec`, `eval_gemfile`, 여러 줄에 걸친 선언처럼 읽지 못하는 줄이 있거나, `Gemfile.lock`에 `Gemfile`에 없는 gem이 있으면 gem을 하나도 빼지 않고 로그에 `Gemfile groups not read`를 남깁니다. 스캔 루트 아래에 다른 `Gemfile`이나 `Gemfile.lock`이 있거나 프로젝트 어디든 `.gemspec` 파일이 있어도 같습니다. 같은 gem을 운영용으로 선언했을 수 있기 때문입니다.
 
 ---
 
@@ -186,7 +186,7 @@ docker build --build-arg ANDROID_API=<API> -t bomlens-android-sdk<API> docker/an
 
 > 주의: Cargo 워크스페이스 멤버가 `Cargo.lock`에 등록돼 있으면, 그 멤버의 디렉터리가 제외 대상 트리 아래에 있어도 위의 파일 단위 제외로는 빠지지 않습니다. cdxgen이 `Cargo.lock`을 직접 읽기 때문입니다. 이런 멤버 자신의 컴포넌트는 빠지고, 그 멤버만 필요로 하는 의존성도 함께 빠집니다. 다만 유지되는 멤버가 그 의존성을 어떤 식으로든 필요로 하면 남습니다. `BOMLENS_INCLUDE_NON_SHIPPED=1`(위 파일 단위 제외와 같은 스위치)로 이렇게 빠지는 것을 모두 그대로 둘 수 있습니다. 제외한 멤버와 그 때문에 빠진 컴포넌트는 SBOM에 각각 `bomlens:excluded-members`, `bomlens:excluded-components`로 기록됩니다.
 
-> 주의: cdxgen이 dev-dependencies(`[dev-dependencies]`)로 표시한 크레이트는 운영 의존성 경로에서 닿지 않으면 빠지고, 그 크레이트만 필요로 하는 의존성도 함께 빠집니다. 운영 의존성도 쓰는 크레이트는 남습니다.
+> 주의: cdxgen이 dev-dependencies(`[dev-dependencies]`)로만 표시한 크레이트는 운영 의존성 경로에서 닿지 않으면 빠지고, 그 크레이트만 필요로 하는 의존성도 함께 빠집니다. 운영 의존성도 쓰는 크레이트와 `[dependencies]`, `[dev-dependencies]`에 함께 적은 크레이트는 남습니다. `Cargo.lock`이 커밋돼 있지 않아도 BomLens가 먼저 해석해 만들므로 cdxgen은 이 표시를 붙입니다.
 
 ---
 
