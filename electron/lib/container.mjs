@@ -72,8 +72,37 @@ export class ContainerError extends Error {
 // base image. Passed into the container as env so both sides agree on the refs, and
 // pinned to the app's own version for the same reason DEFAULT_IMAGE is: a sibling left
 // on `:latest` drifts away from the base image the app just launched.
-export const FIRMWARE_IMAGE = process.env.SBOM_FIRMWARE_IMAGE ?? imageRef("bomlens-firmware");
-export const AIBOM_IMAGE = process.env.SBOM_AIBOM_IMAGE ?? imageRef("bomlens-aibom");
+//
+// SBOM_SCANNER_IMAGE로 베이스 이미지를 바꾸면 형제도 그것을 따른다. scan-sbom.sh의
+// optin_image_ref와 같은 규칙이다. 이름이 BomLens 이미지(bomlens, 옛 별칭 sbom-generator,
+// sbom-scanner, opt-in 이미지 자신)이면 같은 경로와 같은 태그의 bomlens-<suffix>를 쓴다. digest는 베이스 이미지
+// 자신만 가리키므로 함께 적힌 태그를 쓰고, 태그가 없으면 :latest를 쓴다. 다른 이름이면
+// 원래 기본값(앱 버전 태그)을 쓴다. 각 이미지의 SBOM_*_IMAGE가 있으면 그것이 우선한다.
+const BOMLENS_IMAGE_NAMES = [
+  "bomlens", "sbom-generator", "sbom-scanner",
+  "bomlens-firmware", "bomlens-aibom", "bomlens-deep-cve", "bomlens-deep-license",
+  "sbom-scanner-firmware", "sbom-scanner-aibom",
+];
+
+export function optinImageRef(suffix, { scannerImage = process.env.SBOM_SCANNER_IMAGE, version = APP_VERSION } = {}) {
+  if (scannerImage) {
+    const ref = scannerImage.split("@")[0];
+    const slash = ref.lastIndexOf("/");
+    const prefix = slash >= 0 ? ref.slice(0, slash + 1) : "";
+    const last = ref.slice(slash + 1);
+    const colon = last.indexOf(":");
+    const name = colon >= 0 ? last.slice(0, colon) : last;
+    const tag = colon >= 0 && colon < last.length - 1 ? last.slice(colon + 1) : "latest";
+    if (BOMLENS_IMAGE_NAMES.includes(name)) {
+      return `${prefix}bomlens-${suffix}:${tag}`;
+    }
+  }
+  return imageRef(`bomlens-${suffix}`, { version });
+}
+
+export const FIRMWARE_IMAGE = process.env.SBOM_FIRMWARE_IMAGE ?? optinImageRef("firmware");
+export const AIBOM_IMAGE = process.env.SBOM_AIBOM_IMAGE ?? optinImageRef("aibom");
+export const DEEP_CVE_IMAGE = process.env.SBOM_DEEP_CVE_IMAGE ?? optinImageRef("deep-cve");
 
 // 결과 저장 폴더. 두 엔진(Rancher/Docker Desktop) 모두 기본 공유하는 홈 디렉터리 아래.
 // SBOM_OUTPUT_DIR로 베이스를 바꿀 수 있다(실행별 하위 폴더는 server.py가 그 아래에 만든다).
@@ -429,6 +458,7 @@ export class UiContainer {
     guardStateDir = defaultGuardStateDir(),
     firmwareImage = FIRMWARE_IMAGE,
     aibomImage = AIBOM_IMAGE,
+    deepCveImage = DEEP_CVE_IMAGE,
     scanMounts = [],
   } = {}) {
     this.image = image;
@@ -437,6 +467,7 @@ export class UiContainer {
     this.guardStateDir = guardStateDir;
     this.firmwareImage = firmwareImage;
     this.aibomImage = aibomImage;
+    this.deepCveImage = deepCveImage;
     this.scanMounts = scanMounts;
     this.id = null;
   }
@@ -480,6 +511,8 @@ export class UiContainer {
       `SBOM_FIRMWARE_IMAGE=${this.firmwareImage}`,
       "-e",
       `SBOM_AIBOM_IMAGE=${this.aibomImage}`,
+      "-e",
+      `SBOM_DEEP_CVE_IMAGE=${this.deepCveImage}`,
       // A registry mirror for the source scans' cdxgen images, by name only:
       // docker takes the value from this process's environment, if set.
       "-e",

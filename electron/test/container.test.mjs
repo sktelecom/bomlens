@@ -13,6 +13,7 @@ import {
   AIBOM_IMAGE,
   APP_VERSION,
   cleanupOrphans,
+  DEEP_CVE_IMAGE,
   DEFAULT_IMAGE,
   DESKTOP_LABEL,
   FIRMWARE_IMAGE,
@@ -25,6 +26,7 @@ import {
   dockerStatus,
   findFreePort,
   imageRef,
+  optinImageRef,
   resetDockerBin,
   resolveDockerBin,
   resolveHostDir,
@@ -149,12 +151,30 @@ test("imageRef falls back to :latest when the version is unknown", () => {
 
 test("sibling images are pinned to the same version as the base image", () => {
   // 형제가 :latest에 남아 있으면 방금 띄운 베이스 이미지와 어긋난다.
+  // SBOM_SCANNER_IMAGE가 있으면 형제는 그것을 따르므로(아래 테스트) 여기서는 보지 않는다.
+  if (process.env.SBOM_SCANNER_IMAGE) return;
   if (!process.env.SBOM_FIRMWARE_IMAGE) {
     assert.equal(FIRMWARE_IMAGE, `ghcr.io/sktelecom/bomlens-firmware:${APP_VERSION}`);
   }
   if (!process.env.SBOM_AIBOM_IMAGE) {
     assert.equal(AIBOM_IMAGE, `ghcr.io/sktelecom/bomlens-aibom:${APP_VERSION}`);
   }
+  if (!process.env.SBOM_DEEP_CVE_IMAGE) {
+    assert.equal(DEEP_CVE_IMAGE, `ghcr.io/sktelecom/bomlens-deep-cve:${APP_VERSION}`);
+  }
+});
+
+test("sibling images follow SBOM_SCANNER_IMAGE the way scan-sbom.sh does", () => {
+  const v = { version: "1.13.3" };
+  assert.equal(optinImageRef("firmware", { scannerImage: null, ...v }), "ghcr.io/sktelecom/bomlens-firmware:1.13.3");
+  assert.equal(optinImageRef("aibom", { scannerImage: "ghcr.io/sktelecom/bomlens:1.13.2", ...v }), "ghcr.io/sktelecom/bomlens-aibom:1.13.2");
+  assert.equal(optinImageRef("deep-cve", { scannerImage: "ghcr.io/sktelecom/sbom-scanner:1.12.0", ...v }), "ghcr.io/sktelecom/bomlens-deep-cve:1.12.0");
+  assert.equal(optinImageRef("firmware", { scannerImage: "registry.example:5000/mirror/bomlens:2.0", ...v }), "registry.example:5000/mirror/bomlens-firmware:2.0");
+  assert.equal(optinImageRef("firmware", { scannerImage: `ghcr.io/sktelecom/bomlens:1.13.2@sha256:${"0".repeat(64)}`, ...v }), "ghcr.io/sktelecom/bomlens-firmware:1.13.2");
+  assert.equal(optinImageRef("firmware", { scannerImage: `ghcr.io/sktelecom/bomlens@sha256:${"0".repeat(64)}`, ...v }), "ghcr.io/sktelecom/bomlens-firmware:latest");
+  assert.equal(optinImageRef("deep-cve", { scannerImage: "ghcr.io/sktelecom/bomlens-aibom:1.13.2", ...v }), "ghcr.io/sktelecom/bomlens-deep-cve:1.13.2");
+  // BomLens 이미지 이름이 아니면 원래 기본값(앱 버전 태그)을 쓴다.
+  assert.equal(optinImageRef("aibom", { scannerImage: "registry.example/team/scanner:2.0", ...v }), "ghcr.io/sktelecom/bomlens-aibom:1.13.3");
 });
 
 test("cleanupOrphans lists by label and stops each orphan", async () => {

@@ -65,12 +65,79 @@ case "$(uname -s 2>/dev/null)" in
 esac
 
 POSTPROCESS_IMAGE="${SBOM_SCANNER_IMAGE:-ghcr.io/sktelecom/bomlens:latest}"           # legacy aliases: sbom-generator, sbom-scanner
-FIRMWARE_IMAGE="${SBOM_FIRMWARE_IMAGE:-ghcr.io/sktelecom/bomlens-firmware:latest}"     # opt-in (unblob/cve-bin-tool); legacy alias: sbom-scanner-firmware
-AIBOM_IMAGE="${SBOM_AIBOM_IMAGE:-ghcr.io/sktelecom/bomlens-aibom:latest}"               # opt-in (OWASP AIBOM Generator; HuggingFace network)
-DEEP_CVE_IMAGE="${SBOM_DEEP_CVE_IMAGE:-ghcr.io/sktelecom/bomlens-deep-cve:latest}"      # opt-in (grype + bundled NVD DB for maven CPE matching)
-# opt-in (scancode, for --deep-license). A caller who already points
-# SBOM_SCANNER_IMAGE at their own build keeps using it, as before this image existed.
-DEEP_LICENSE_IMAGE="${SBOM_DEEP_LICENSE_IMAGE:-${SBOM_SCANNER_IMAGE:-ghcr.io/sktelecom/bomlens-deep-license:latest}}"
+
+# The opt-in images follow the scanner image. When SBOM_SCANNER_IMAGE names a
+# BomLens image (bomlens, the legacy sbom-generator / sbom-scanner, or one of
+# the opt-in images themselves, from any registry or mirror path), an opt-in
+# image comes from the same path with the same tag: ghcr.io/sktelecom/bomlens:1.13.2 gives
+# ghcr.io/sktelecom/bomlens-deep-license:1.13.2. A digest identifies only the
+# scanner image itself, so the tag written with it is used, and :latest when
+# there is none. Any other name keeps the published default (the deep-license
+# image: the scanner image itself, a build of one's own). Each image's own
+# SBOM_*_IMAGE still wins.
+#
+# _scanner_image_parts: split SBOM_SCANNER_IMAGE into _SI_PREFIX (the path up
+# to and including the last /), _SI_NAME, _SI_TAG (latest when absent) and
+# _SI_TAGGED / _SI_DIGEST / _SI_BOMLENS (true or false; _SI_BOMLENS: the name
+# is one of the BomLens images).
+_scanner_image_parts() {
+    local ref="${SBOM_SCANNER_IMAGE:-}" last
+    _SI_DIGEST=false
+    case "$ref" in *@*) _SI_DIGEST=true; ref="${ref%%@*}" ;; esac
+    _SI_PREFIX=""; last="$ref"
+    case "$ref" in */*) _SI_PREFIX="${ref%/*}/"; last="${ref##*/}" ;; esac
+    _SI_NAME="${last%%:*}"; _SI_TAG="latest"; _SI_TAGGED=false
+    case "$last" in *:?*) _SI_TAG="${last#*:}"; _SI_TAGGED=true ;; esac
+    case "$_SI_NAME" in
+        bomlens|sbom-generator|sbom-scanner|bomlens-firmware|bomlens-aibom|bomlens-deep-cve|bomlens-deep-license|sbom-scanner-firmware|sbom-scanner-aibom)
+            _SI_BOMLENS=true ;;
+        *)  _SI_BOMLENS=false ;;
+    esac
+}
+
+# $1: opt-in image suffix (firmware, aibom, deep-cve, deep-license). Prints the
+# default reference for it; the caller applies the image's own override.
+optin_image_ref() {
+    local suffix="$1"
+    if [ -z "${SBOM_SCANNER_IMAGE:-}" ]; then
+        printf '%s' "ghcr.io/sktelecom/bomlens-${suffix}:latest"
+        return 0
+    fi
+    _scanner_image_parts
+    if [ "$_SI_BOMLENS" = "true" ]; then
+        printf '%s' "${_SI_PREFIX}bomlens-${suffix}:${_SI_TAG}"
+    elif [ "$suffix" = "deep-license" ]; then
+        printf '%s' "$SBOM_SCANNER_IMAGE"
+    else
+        printf '%s' "ghcr.io/sktelecom/bomlens-${suffix}:latest"
+    fi
+}
+
+# $1: opt-in image suffix. Prints one line when that image could not follow
+# SBOM_SCANNER_IMAGE by tag (a digest with no tag, or a name that is not a
+# BomLens image); nothing otherwise, or when the image's own variable is set.
+optin_image_note() {
+    local suffix="$1" var
+    case "$suffix" in
+        firmware)     var=SBOM_FIRMWARE_IMAGE ;;
+        aibom)        var=SBOM_AIBOM_IMAGE ;;
+        deep-cve)     var=SBOM_DEEP_CVE_IMAGE ;;
+        deep-license) var=SBOM_DEEP_LICENSE_IMAGE ;;
+        *)            return 0 ;;
+    esac
+    [ -z "${!var:-}" ] && [ -n "${SBOM_SCANNER_IMAGE:-}" ] || return 0
+    _scanner_image_parts
+    if [ "$_SI_BOMLENS" = "false" ]; then
+        echo "[INFO] SBOM_SCANNER_IMAGE ($SBOM_SCANNER_IMAGE) is not a BomLens image name, so the $suffix image stays $(optin_image_ref "$suffix"); set $var to choose another."
+    elif [ "$_SI_DIGEST" = "true" ] && [ "$_SI_TAGGED" = "false" ]; then
+        echo "[INFO] SBOM_SCANNER_IMAGE is pinned by digest with no tag, so the $suffix image is $(optin_image_ref "$suffix"); set $var to pin it too."
+    fi
+}
+
+FIRMWARE_IMAGE="${SBOM_FIRMWARE_IMAGE:-$(optin_image_ref firmware)}"           # opt-in (unblob/cve-bin-tool); legacy alias: sbom-scanner-firmware
+AIBOM_IMAGE="${SBOM_AIBOM_IMAGE:-$(optin_image_ref aibom)}"                    # opt-in (OWASP AIBOM Generator; HuggingFace network)
+DEEP_CVE_IMAGE="${SBOM_DEEP_CVE_IMAGE:-$(optin_image_ref deep-cve)}"           # opt-in (grype + bundled NVD DB for maven CPE matching)
+DEEP_LICENSE_IMAGE="${SBOM_DEEP_LICENSE_IMAGE:-$(optin_image_ref deep-license)}"  # opt-in (scancode, for --deep-license)
 # Language detection + cdxgen image selection are shared with the web UI source
 # path (docker/entrypoint.sh) so both resolve transitive deps identically.
 # shellcheck source=docker/lib/source-detect.sh
@@ -543,6 +610,9 @@ Environment:
   SBOM_DEEP_CVE_IMAGE    Override the deep-cve (grype) image
   SBOM_DEEP_LICENSE_IMAGE
                          Override the deep-license (scancode) image
+                         Unset, these four follow SBOM_SCANNER_IMAGE: the same
+                         registry path and tag (.../bomlens:1.13.2 gives
+                         .../bomlens-firmware:1.13.2)
   SECURITY_NVD_VERIFY    With --deep-cve: true drops loose-version false positives
                          via live NVD lookups (needs NVD_API_KEY, network/minutes)
   NVD_API_KEY            NVD API key for SECURITY_NVD_VERIFY (passed by name only)
@@ -747,11 +817,15 @@ if [ "$UI_MODE" = "true" ]; then
     # mount to the cdxgen sibling itself via --volumes-from.
     UI_GUARD_FLAGS=()
     mkdir -p "$GUARD_STATE_DIR" 2>/dev/null && UI_GUARD_FLAGS=(-v "$(hostpath "$GUARD_STATE_DIR")":/bomlens-state)
+    # The images the web UI launches as sibling containers, resolved here the
+    # same way as for a CLI scan, so they follow SBOM_SCANNER_IMAGE there too.
+    UI_IMAGE_FLAGS=(-e SBOM_SCANNER_IMAGE="$POSTPROCESS_IMAGE" -e SBOM_FIRMWARE_IMAGE="$FIRMWARE_IMAGE"
+                    -e SBOM_AIBOM_IMAGE="$AIBOM_IMAGE" -e SBOM_DEEP_CVE_IMAGE="$DEEP_CVE_IMAGE")
     ensure_image_fresh "$POSTPROCESS_IMAGE"
     exec "${DOCKER_ENV[@]}" docker run --rm "${TTY_FLAGS[@]}" -p "${UI_BIND_ADDRESS}:${UI_PORT}:8080" \
         -v "$(hostpath "$UI_BASE")":/src -v "$(hostpath "$UI_BASE")":/host-output \
         "${MOUNT_FLAGS[@]}" "${HF_FLAGS[@]}" "${GO_ENV_FLAGS[@]}" "${PREP_ENV_FLAGS[@]}" "${CANCEL_ENV_FLAGS[@]}" "${TRIVY_CACHE_FLAGS[@]}" "${CDXGEN_ENV_FLAGS[@]}" \
-        "${UI_GUARD_FLAGS[@]}" \
+        "${UI_GUARD_FLAGS[@]}" "${UI_IMAGE_FLAGS[@]}" \
         -v /var/run/docker.sock:/var/run/docker.sock \
         -e MODE=UI -e UI_PORT=8080 -e SBOM_UI_HOST_DIR="$(hostpath "$UI_BASE")" \
         -e SBOM_UI_SCAN_ROOTS="$SCAN_ROOTS" -e EXTERNAL_LOOKUP="$EXTERNAL_LOOKUP" \
@@ -2490,6 +2564,9 @@ if [ "$MODE" = "SOURCE" ]; then
     # offline host, SBOM_PULL=never), the scan still runs on the base image and
     # records the licence step as not installed, as it did before this image.
     PP_IMAGE="$POSTPROCESS_IMAGE"
+    if [ "$DEEP_LICENSE" = "true" ]; then
+        optin_image_note deep-license
+    fi
     if [ "$DEEP_LICENSE" = "true" ] && [ "$DEEP_LICENSE_IMAGE" != "$POSTPROCESS_IMAGE" ]; then
         PP_IMAGE="$DEEP_LICENSE_IMAGE"
         if ! docker image inspect "$PP_IMAGE" >/dev/null 2>&1 \
@@ -2585,7 +2662,7 @@ else
                 done ;;
         BINARY) FD="$(cd "$(dirname "$TARGET")" && pwd)"; FN="$(basename "$TARGET")"; VOL="-v \"$(hostpath "$FD")\":/target -v \"$(hostpath "$OUTPUT_HOST_DIR")\":/host-output"; ENVV="-e TARGET_FILE=\"/target/$FN\"" ;;
         ROOTFS) TD="$(cd "$TARGET" && pwd)"; VOL="-v \"$(hostpath "$TD")\":/target -v \"$(hostpath "$OUTPUT_HOST_DIR")\":/host-output"; ENVV="-e TARGET_DIR=/target" ;;
-        FIRMWARE) FD="$(cd "$(dirname "$TARGET")" && pwd)"; FN="$(basename "$TARGET")"; VOL="-v \"$(hostpath "$FD")\":/target -v \"$(hostpath "$OUTPUT_HOST_DIR")\":/host-output"; ENVV="-e TARGET_FILE=\"/target/$FN\""; RUN_IMAGE="$FIRMWARE_IMAGE" ;;
+        FIRMWARE) FD="$(cd "$(dirname "$TARGET")" && pwd)"; FN="$(basename "$TARGET")"; VOL="-v \"$(hostpath "$FD")\":/target -v \"$(hostpath "$OUTPUT_HOST_DIR")\":/host-output"; ENVV="-e TARGET_FILE=\"/target/$FN\""; RUN_IMAGE="$FIRMWARE_IMAGE"; optin_image_note firmware ;;
         MODELFILE)
             # Read-only: the model file is only ever read, and a weight file the
             # user handed us must come back untouched.
@@ -2597,7 +2674,7 @@ else
                 # value would expose the token in `ps`. docker reads it from our
                 # own environment instead. AIBOM only — no other mode needs it.
                 [ -n "$HF_TOKEN" ] && ENVV="$ENVV -e HF_TOKEN"
-                RUN_IMAGE="$AIBOM_IMAGE" ;;
+                RUN_IMAGE="$AIBOM_IMAGE"; optin_image_note aibom ;;
         # Base image: reading a Figshare item or a HuggingFace dataset is one
         # stdlib Python script against a public API, so this needs neither the
         # generator image nor an account. A HuggingFace token, when set, is
@@ -2644,7 +2721,7 @@ else
     # AIBOM HF_TOKEN.
     if [ "$DEEP_CVE" = "true" ]; then
         if [ "$RUN_IMAGE" = "$POSTPROCESS_IMAGE" ]; then
-            RUN_IMAGE="$DEEP_CVE_IMAGE"
+            RUN_IMAGE="$DEEP_CVE_IMAGE"; optin_image_note deep-cve
             [ -n "$NVD_API_KEY" ] && ENVV="$ENVV -e NVD_API_KEY"
         else
             echo "[WARN] --deep-cve does not apply to the $MODE image; running without grype." >&2

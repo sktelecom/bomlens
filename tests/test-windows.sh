@@ -1090,6 +1090,56 @@ scan_in "$d" --project PT --version 1 --target app.out --generate-only \
   || { fail "pass-through flags reach the container"; show; }
 
 # --------------------------------------------------------
+section "Opt-in images follow SBOM_SCANNER_IMAGE"
+# --------------------------------------------------------
+# Each run sets the opt-in variables empty (the same as unset to scan-sbom.sh),
+# so a runner's own SBOM_*_IMAGE does not change what is checked.
+optin_scan() {
+  SBOM_FIRMWARE_IMAGE="${OPT_FW:-}" SBOM_AIBOM_IMAGE="" SBOM_DEEP_CVE_IMAGE="" \
+    SBOM_DEEP_LICENSE_IMAGE="${OPT_DL:-}" SBOM_SCANNER_IMAGE="$1" scan_in "${@:2}"
+}
+d="$(new_proj optin_dl)"; printf '{"name":"x","version":"1.0.0"}\n' > "$d/package.json"
+optin_scan ghcr.io/sktelecom/bomlens:1.13.2 "$d" --project OD --version 1 --target . --generate-only --deep-license
+in_log "ghcr.io/sktelecom/bomlens-deep-license:1.13.2" \
+  && pass "--deep-license runs on bomlens-deep-license with the scanner image's tag" \
+  || { fail "--deep-license does not follow SBOM_SCANNER_IMAGE's tag" "rc=$RC"; show; }
+optin_scan "" "$d" --project OD --version 1 --target . --generate-only --deep-license
+in_log "ghcr.io/sktelecom/bomlens-deep-license:latest" \
+  && pass "--deep-license with no SBOM_SCANNER_IMAGE keeps bomlens-deep-license:latest" \
+  || { fail "--deep-license default image changed" "rc=$RC"; show; }
+OPT_DL=registry.example/team/dl:9 optin_scan ghcr.io/sktelecom/bomlens:1.13.2 "$d" --project OD --version 1 --target . --generate-only --deep-license
+{ in_log "registry.example/team/dl:9" && ! in_log "bomlens-deep-license"; } \
+  && pass "SBOM_DEEP_LICENSE_IMAGE still wins over the derived image" \
+  || { fail "SBOM_DEEP_LICENSE_IMAGE override lost" "rc=$RC"; show; }
+optin_scan registry.example/team/scanner:2.0 "$d" --project OD --version 1 --target . --generate-only --deep-license
+{ ! in_log "bomlens-deep-license" && in_out "is not a BomLens image name" && in_out "SBOM_DEEP_LICENSE_IMAGE"; } \
+  && pass "another image name keeps the scanner image for --deep-license and says so in one line" \
+  || { fail "a non-BomLens SBOM_SCANNER_IMAGE with --deep-license" "rc=$RC"; show; }
+
+d="$(new_proj optin_fw)"; printf 'FW\n' > "$d/router.bin"
+optin_scan ghcr.io/sktelecom/sbom-scanner:1.12.0 "$d" --project OF --version 1 --target router.bin --generate-only
+{ in_out "Mode: FIRMWARE" && in_log "ghcr.io/sktelecom/bomlens-firmware:1.12.0"; } \
+  && pass "the firmware image follows a legacy-alias scanner image's path and tag" \
+  || { fail "firmware image does not follow SBOM_SCANNER_IMAGE" "rc=$RC"; show; }
+optin_scan "ghcr.io/sktelecom/bomlens@sha256:$(printf '%064d' 0)" "$d" --project OF --version 1 --target router.bin --generate-only
+{ in_log "ghcr.io/sktelecom/bomlens-firmware:latest" && in_out "pinned by digest with no tag" && in_out "SBOM_FIRMWARE_IMAGE"; } \
+  && pass "a digest-only scanner image gives the firmware image :latest, with a note" \
+  || { fail "digest-only SBOM_SCANNER_IMAGE and the firmware image" "rc=$RC"; show; }
+
+d="$(new_proj optin_cve)"; printf 'ELFish\n' > "$d/app.out"
+optin_scan registry.example:5000/mirror/bomlens:1.13.2 "$d" --project OC --version 1 --target app.out --generate-only --deep-cve
+in_log "registry.example:5000/mirror/bomlens-deep-cve:1.13.2" \
+  && pass "--deep-cve follows a mirrored scanner image's path and tag" \
+  || { fail "--deep-cve image does not follow SBOM_SCANNER_IMAGE" "rc=$RC"; show; }
+
+d="$(new_proj optin_ui)"
+optin_scan ghcr.io/sktelecom/bomlens:1.13.2 "$d" --ui --output-dir "$d"
+{ in_log "SBOM_SCANNER_IMAGE=ghcr.io/sktelecom/bomlens:1.13.2" && in_log "SBOM_FIRMWARE_IMAGE=ghcr.io/sktelecom/bomlens-firmware:1.13.2" \
+    && in_log "SBOM_AIBOM_IMAGE=ghcr.io/sktelecom/bomlens-aibom:1.13.2" && in_log "SBOM_DEEP_CVE_IMAGE=ghcr.io/sktelecom/bomlens-deep-cve:1.13.2"; } \
+  && pass "--ui hands the web UI container the opt-in images resolved the same way" \
+  || { fail "--ui opt-in image references" "rc=$RC"; show; }
+
+# --------------------------------------------------------
 section "--sbom-author reaches the container verbatim (legal-entity names, shell metacharacters)"
 # --------------------------------------------------------
 # The web UI's server.py path checked ("SK Telecom Co., Ltd.", parens/ampersand)
