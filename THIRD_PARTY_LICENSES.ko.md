@@ -22,6 +22,7 @@ BomLens(Apache-2.0)는 자체 코드를 셸 스크립트로 두고, SBOM 생성�
 | Trivy | 보안 취약점 스캔 | Apache-2.0 | https://github.com/aquasecurity/trivy |
 | trivy-db | 취약점 DB | Apache-2.0 | https://github.com/aquasecurity/trivy-db |
 | cosign | SBOM 서명 | Apache-2.0 | https://github.com/sigstore/cosign |
+| govulncheck | Go 보안 권고의 도달성 판정(`--reachability`). `golang.org/x/vuln`으로 빌드한 정적 실행 파일 하나이며 Go 표준 라이브러리가 함께 컴파일되어 있다. Go 취약점 데이터베이스(vuln.go.dev, CC-BY-4.0)는 온라인으로 읽고 이미지에 넣지 않는다 | BSD-3-Clause | https://go.googlesource.com/vuln |
 | scancode-toolkit | 정밀 라이선스 검출. 이 이미지에는 없고 opt-in 이미지 `bomlens-deep-license`에만 들어갑니다. 아래 참조 | Apache-2.0 AND CC-BY-4.0 | https://github.com/aboutcode-org/scancode-toolkit |
 | scanoss (scanoss.py) | vendored 오픈소스 식별(기본 포함, 끄려면 `SBOM_SCANOSS=false`) | MIT (동봉 데이터셋 `osadl-copyleft.json`은 CC-BY-4.0) | https://github.com/scanoss/scanoss.py |
 | owasp-aibom-generator | AI 모델 SBOM 생성(opt-in `SBOM_AIBOM`, 별도 이미지 `bomlens-aibom`; HuggingFace API 호출) | Apache-2.0 | https://github.com/GenAI-Security-Project/aibom-generator |

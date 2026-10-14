@@ -709,6 +709,7 @@
     "sourceFileTree": "소스 파일 트리 캡처",
     "sourceSnapshot": "소스 스냅샷 캡처",
     "generateNotice": "오픈소스 고지문 생성",
+    "reachability": "Go 도달성 분석",
     "scanSecurity": "취약점 스캔",
     "generateRiskReport": "위험 보고서 생성",
     "firmwarePackages": "펌웨어 패키지 추출",

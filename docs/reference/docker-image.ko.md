@@ -150,6 +150,7 @@ MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL='*' docker run --rm \
 | `DEEP_LICENSE_MAX_FILES` | — | `20000` | `DEEP_LICENSE`: 프로젝트 자체 파일이 이보다 많은 트리는 검사하지 않음 |
 | `DEEP_LICENSE_TIMEOUT` | — | `600` | `DEEP_LICENSE`: scancode를 멈출 때까지의 초 |
 | `BOMLENS_DEEP_LICENSE_ALL` | — | — | `DEEP_LICENSE`: `1`이면 의존성, 빌드, 도구 폴더까지 검사 (기본은 제외) |
+| `REACHABILITY` | — | `false` | 각 Go 보안 권고의 코드에 도달하는지 govulncheck로 판정 (CLI `--reachability`). `BINARY` 모드는 실행 파일을 읽고, `SOURCE`와 `POSTPROCESS`는 1단계가 남긴 govulncheck 출력을 읽는다(CLI가 이미지의 govulncheck를 1단계에 넘긴다) |
 | `GENERATE_REPORT` | — | `false` | 오픈소스위험분석보고서 생성 (CLI 기본값과 달리 직접 실행은 꺼짐) |
 | `ENRICH_MAVEN_CPE` | — | `true` | maven 컴포넌트에 groupId로 유도한 NVD 매칭용 `cpe:2.3`을 부여해 CPE 기반 엔진이 NVD 전용 CVE를 찾게 함. 매핑 불가한 group은 CPE를 붙이지 않음 (AI SBOM은 건너뜀) |
 | `ENRICH_GITHUB_CPE` | — | `true` | 소수의 손검증된 `pkg:github/` 컴포넌트(패키지 매니저 생태계가 없는 대형 C/C++ 프로젝트에 흔한, 소스 저장소 좌표로만 식별되는 컴포넌트)에 NVD 매칭용 `cpe:2.3`을 부여해 CPE 기반 엔진이 NVD 전용 CVE를 찾게 함. 큐레이션 목록에 없으면 CPE를 붙이지 않음 (AI SBOM은 건너뜀) |

@@ -709,6 +709,7 @@
     "sourceFileTree": "source file tree capture",
     "sourceSnapshot": "source snapshot capture",
     "generateNotice": "third-party notice generation",
+    "reachability": "Go reachability analysis",
     "scanSecurity": "vulnerability scanning",
     "generateRiskReport": "risk report generation",
     "firmwarePackages": "firmware package extraction",

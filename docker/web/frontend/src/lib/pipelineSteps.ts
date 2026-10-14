@@ -34,6 +34,7 @@ const STEP_LABEL_KEY: Record<string, string> = {
   "source-file-tree": "pipelineSteps.sourceFileTree",
   "source-snapshot": "pipelineSteps.sourceSnapshot",
   "generate-notice": "pipelineSteps.generateNotice",
+  "reachability": "pipelineSteps.reachability",
   "scan-security": "pipelineSteps.scanSecurity",
   "generate-risk-report": "pipelineSteps.generateRiskReport",
   "firmware-packages": "pipelineSteps.firmwarePackages",

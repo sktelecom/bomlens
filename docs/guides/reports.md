@@ -141,6 +141,21 @@ SECURITY_NVD_VERIFY=true NVD_API_KEY="your-key" \
 
 ---
 
+## Go reachability (`--reachability`)
+
+A vulnerability in a Go module matters only when the program uses the affected code. `--reachability` asks govulncheck, the Go project's own checker, which advisories the scanned Go program actually reaches. For a source tree it follows the call graph from the program's entry points; for a Go executable (`--target ./app`) it looks for the affected functions in the executable's symbols.
+
+```bash
+./scripts/scan-sbom.sh --project "MyApp" --version "1.0.0" --reachability --generate-only
+./scripts/scan-sbom.sh --project "MyApp" --version "1.0.0" --target ./app --reachability --generate-only
+```
+
+- Each Go advisory against a component of the SBOM gets a judgement in `_reachability.cdx.json`, a CycloneDX VEX document. When the affected code is not reached, `analysis.state` is `not_affected` with `justification` `code_not_reachable`, and `analysis.detail` says why: the affected package is not in the build, or it is there but no affected function is called (source) or linked (executable). When it is reached, the state is `exploitable` and the detail gives the call path or the symbol.
+- The security report shows the not-reachable findings in a section of their own, with the reason, and leaves them out of its totals. Nothing is hidden: the findings are still in `_security.json`, each marked with `bomlens:reachability`. A reached finding is marked with a double dagger in the findings table. The risk report and `--fail-on vulnerability=` count the same way as the security report.
+- `--reachability` implies `--security`. It applies to Go source and Go executables; other scans print a warning and run without it. A source scan runs govulncheck inside the Go image of stage 1, which has the Go toolchain; the post-processing image carries only the govulncheck executable.
+- govulncheck reads the Go vulnerability database (vuln.go.dev) over the network. When it cannot, the step is recorded as skipped (`unavailable`) in `bomlens-result.json` and the security report is as without the option.
+- Only the code govulncheck can see is judged. A function called through reflection or from a plugin is not on the call graph, and an executable's symbols show what is linked, not what runs. Treat `not_affected` as the tool's judgement and keep an advisory open where the code is loaded in ways the call graph does not show.
+
 ## Deep license detection (`--deep-license`)
 
 The basic notice covers the licenses of dependencies (third-party). `--deep-license` uses scancode-toolkit to also detect license headers in the project's own source code (first-party).
