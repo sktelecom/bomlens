@@ -83,7 +83,11 @@ case "${1:-}" in
     [ -z "${DOCKER_STUB_PULL_SLEEP:-}" ] || sleep "$DOCKER_STUB_PULL_SLEEP"
     echo "${2:-}: Pull complete"
     exit 0 ;;
-  version|stop|rm) exit 0 ;;
+  stop)
+    # Marks the stop for a run that DOCKER_STUB_HANG keeps waiting (below).
+    [ -z "${DOCKER_STUB_HANG:-}" ] || : > "$log.stopped"
+    exit 0 ;;
+  version|rm) exit 0 ;;
   image)
     # DOCKER_STUB_ABSENT_IMAGE names one image that is not present but can be
     # pulled (a first use).
@@ -133,6 +137,16 @@ case "${1:-}" in
     # instead of 0; unset/empty means the ordinary successful-run case below.
     echo "${DOCKER_STUB_RUN_RC:-0}"; exit 0 ;;
   run)
+    # DOCKER_STUB_HANG: a run whose arguments contain this text keeps running
+    # (up to 20s) until a `docker stop` or a signal ends it, as a long scan.
+    if [ -n "${DOCKER_STUB_HANG:-}" ]; then
+      case "$*" in
+        *"$DOCKER_STUB_HANG"*)
+          : > "$log.running"
+          for _i in $(seq 1 100); do [ -f "$log.stopped" ] && exit 143; sleep 0.2; done
+          exit 0 ;;
+      esac
+    fi
     # `docker run --rm --entrypoint sh <image> -c 'command -v grype'`: grype
     # is only in the images DOCKER_STUB_GRYPE_IMAGES names.
     case "$*" in
@@ -1313,6 +1327,36 @@ DOCKER_STUB_MISSING_PULL=ghcr.io/sktelecom/bomlens-deep-cve:latest SBOM_PULL=alw
     && [ "$(grep -c -F -- 'docker pull ghcr.io/sktelecom/bomlens-deep-cve:latest' "$LOG")" = 1 ]; } \
   && pass "SBOM_PULL=always offline uses a deep-cve image already here" \
   || { fail "SBOM_PULL=always offline with a local deep-cve image" "rc=$RC $(pp_line)"; show; }
+# Ctrl+C ends the run with 130 after stopping the stage's container, in
+# stage 1, in the licence scan run first and in stage 2, and no later step
+# runs. The run is started with job control so it gets SIGINT as a terminal's
+# foreground group does (a background job of a script ignores it).
+ctrl_c_scan() {
+  local hang="$1"; shift
+  N=$((N+1)); LOG="$WORK/docker.$N.log"; : > "$LOG"; OUT="$WORK/out.$N"
+  rm -f "$LOG.running" "$LOG.stopped"
+  set -m
+  ( cd "$d" && SBOM_DEEP_LICENSE_IMAGE="" SBOM_DEEP_CVE_IMAGE="" SBOM_SCANNER_IMAGE="" \
+      DOCKER_STUB_HANG="$hang" DOCKER_STUB_LOG="$LOG" exec bash "$SCAN" "$@" ) > "$OUT" 2>&1 &
+  local pid=$!
+  set +m
+  for _i in $(seq 1 100); do [ -f "$LOG.running" ] && break; sleep 0.1; done
+  kill -INT -- "-$pid" 2>/dev/null
+  wait "$pid"; RC=$?
+}
+ctrl_c_scan build-prep.sh --project CC --version 1 --target . --generate-only
+{ [ "$RC" = 130 ] && grep -qE '^docker stop -t [0-9]+ bomlens-scan-' "$LOG" && ! in_log "MODE=POSTPROCESS" \
+    && [ "$(grep -c '^docker stop ' "$LOG")" = 1 ]; } \
+  && pass "Ctrl+C in stage 1 stops its container and ends the run with 130, without stage 2" \
+  || { fail "Ctrl+C in stage 1" "rc=$RC"; show; }
+ctrl_c_scan deep-license.sh --project CC --version 1 --target . --generate-only --deep-cve --deep-license
+{ [ "$RC" = 130 ] && grep -qE '^docker stop -t [0-9]+ bomlens-deep-license-' "$LOG" && ! in_log "MODE=POSTPROCESS"; } \
+  && pass "Ctrl+C in the licence scan run first stops its container and ends the run with 130, without stage 2" \
+  || { fail "Ctrl+C in the licence scan" "rc=$RC"; show; }
+ctrl_c_scan MODE=POSTPROCESS --project CC --version 1 --target . --generate-only
+{ [ "$RC" = 130 ] && ! in_out "[ERROR]" && ! in_out "[WARN] cdxgen"; } \
+  && pass "Ctrl+C in stage 2 ends the run with 130" \
+  || { fail "Ctrl+C in stage 2" "rc=$RC"; show; }
 # A firmware scan has no use for grype: no swap and DEEP_CVE=false.
 d="$(new_proj optin_fw_cve)"; printf 'FW\n' > "$d/router.bin"
 optin_scan "" "$d" --project FC --version 1 --target router.bin --generate-only --deep-cve
