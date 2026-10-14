@@ -415,20 +415,45 @@ fi
 # file, not /dev/null, so a failure leaves its cause in the scan log. A failure
 # writes an empty component list, so the scan goes on with the binary passes,
 # and queues $3 in SYFT_FAILED for the SBOM signal written with the SBOM below.
+# A failed pass is tried once more. When the container is the amd64 image under
+# emulation on an arm64 host, syft crashes in its garbage collector or hangs
+# there (measured with syft 1.52 on the busybox rootfs: every plain run crashed,
+# every run with GOGC=off completed), so it runs with the collector off and a
+# time limit; a pass that still fails says how to run the native image instead.
 SYFT_FAILED=""
 catalog_packages() {
-    local dir="$1" out="$2" label="$3" err
+    local dir="$1" out="$2" label="$3" err attempt emulated=""
+    local -a run=(env)
+    if declare -F emulated_host_arch >/dev/null; then
+        emulated="$(emulated_host_arch 2>/dev/null)" || emulated=""
+    fi
+    if [ -n "$emulated" ]; then
+        run=(env GOGC=off)
+        command -v timeout >/dev/null 2>&1 && run=(timeout -k 10 1800 env GOGC=off)
+        echo "[firmware] this amd64 image runs under emulation on an $emulated host; syft runs with GOGC=off and a 30-minute limit." >&2
+    fi
     err=$(mktemp)
-    if syft "dir:$dir" -o "cyclonedx-json@$CDX_SPEC_VERSION" > "$out" 2>"$err"; then
-        rm -f "$err"
-        return 0
-    fi
-    if [ -s "$err" ]; then
-        echo "[firmware] syft said (last 20 lines):" >&2
-        tail -20 "$err" | sed 's/^/[firmware]   /' >&2
-    fi
+    for attempt in 1 2; do
+        if "${run[@]}" syft "dir:$dir" -o "cyclonedx-json@$CDX_SPEC_VERSION" > "$out" 2>"$err"; then
+            rm -f "$err"
+            [ "$attempt" = 1 ] || echo "[firmware] syft: the second try succeeded." >&2
+            return 0
+        fi
+        if [ -s "$err" ]; then
+            echo "[firmware] syft said (last 20 lines):" >&2
+            tail -20 "$err" | sed 's/^/[firmware]   /' >&2
+        fi
+        if [ "$attempt" = 1 ]; then
+            echo "[firmware] syft failed; trying once more." >&2
+        fi
+    done
     rm -f "$err"
     echo '{"components":[]}' > "$out"
+    if [ -n "$emulated" ]; then
+        echo "[firmware] WARN: this container is the amd64 image running under emulation on an $emulated host, where syft can crash or hang." >&2
+        echo "[firmware]       Run the native image instead: docker pull --platform linux/$emulated ghcr.io/sktelecom/bomlens-firmware:latest" >&2
+        echo "[firmware]       (and do not set DOCKER_DEFAULT_PLATFORM=linux/amd64 or --platform linux/amd64 for the scan)." >&2
+    fi
     case " $SYFT_FAILED " in
         *" $label "*) ;;
         *) SYFT_FAILED="${SYFT_FAILED:+$SYFT_FAILED }$label" ;;

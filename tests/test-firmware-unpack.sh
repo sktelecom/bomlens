@@ -2258,6 +2258,66 @@ STUB
     else
         fail "a successful pass was mishandled" "rc=$rc SYFT_FAILED=[$SYFT_FAILED] out=$(cat "$out")"
     fi
+
+    # A pass that fails once is tried once more. The stub crashes on its first
+    # call (counted in a file), or, with SYFT_STUB_NEED_GOGC_OFF=1, whenever the
+    # garbage collector is on, the way syft does under amd64 emulation, where
+    # the scan turns the collector off.
+    cat > "$stub/syft" <<'STUB'
+#!/bin/sh
+n=$(( $(cat "$SYFT_STUB_COUNT" 2>/dev/null || echo 0) + 1 )); echo "$n" > "$SYFT_STUB_COUNT"
+if [ "${SYFT_STUB_NEED_GOGC_OFF:-0}" = 1 ]; then
+    [ "${GOGC:-}" = off ] || { echo "fatal error: found bad pointer in Go heap" >&2; exit 2; }
+elif [ "$n" = 1 ]; then
+    echo "fatal error: fault" >&2; exit 2
+fi
+echo '{"components":[{"name":"busybox"}]}'
+STUB
+    chmod +x "$stub/syft"
+    export SYFT_STUB_COUNT="$stub/count"
+    # shellcheck source=docker/lib/pipeline-step.sh
+    . "$ROOT_DIR/docker/lib/pipeline-step.sh"
+    printf 'processor\t: 0\nCPU implementer\t: 0x61\n' > "$stub/cpuinfo-arm"
+    printf 'processor\t: 0\nvendor_id\t: GenuineIntel\nflags\t\t: fpu sse2\n' > "$stub/cpuinfo-x86"
+
+    SYFT_FAILED=""; rm -f "$SYFT_STUB_COUNT"
+    PATH="$stub:$PATH" BOMLENS_UNAME_M=x86_64 BOMLENS_CPUINFO_FILE="$stub/cpuinfo-x86" \
+        catalog_packages /d "$out" firmware-packages 2>"$errlog"; rc=$?
+    if [ "$rc" -eq 0 ] && [ -z "$SYFT_FAILED" ] && [ "$(cat "$SYFT_STUB_COUNT")" = 2 ] \
+       && jq -e '.components[0].name == "busybox"' "$out" >/dev/null 2>&1 \
+       && ! grep -q "emulation" "$errlog"; then
+        pass "a pass that fails once succeeds on the second try, with no emulation notice on a native host"
+    else
+        fail "the retry was mishandled" "rc=$rc calls=$(cat "$SYFT_STUB_COUNT") SYFT_FAILED=[$SYFT_FAILED] log=$(cat "$errlog")"
+    fi
+
+    SYFT_FAILED=""; rm -f "$SYFT_STUB_COUNT"
+    PATH="$stub:$PATH" SYFT_STUB_NEED_GOGC_OFF=1 BOMLENS_UNAME_M=x86_64 BOMLENS_CPUINFO_FILE="$stub/cpuinfo-arm" \
+        catalog_packages /e "$out" firmware-packages 2>"$errlog"; rc=$?
+    if [ "$rc" -eq 0 ] && [ -z "$SYFT_FAILED" ] && [ "$(cat "$SYFT_STUB_COUNT")" = 1 ] \
+       && grep -q "under emulation on an arm64 host; syft runs with GOGC=off" "$errlog"; then
+        pass "under amd64 emulation syft runs with GOGC=off from the first try"
+    else
+        fail "the emulated retry was mishandled" "rc=$rc SYFT_FAILED=[$SYFT_FAILED] log=$(cat "$errlog")"
+    fi
+
+    # A syft that fails on every call.
+    printf '#!/bin/sh\necho "fatal error: fault" >&2\nexit 2\n' > "$stub/syft"
+    SYFT_FAILED=""; rm -f "$SYFT_STUB_COUNT"
+    PATH="$stub:$PATH" BOMLENS_UNAME_M=x86_64 BOMLENS_CPUINFO_FILE="$stub/cpuinfo-arm" \
+        catalog_packages /g "$out" firmware-packages 2>"$errlog"; rc=$?
+    if [ "$rc" -ne 0 ] && [ "$SYFT_FAILED" = "firmware-packages" ] \
+       && grep -q "docker pull --platform linux/arm64 ghcr.io/sktelecom/bomlens-firmware:latest" "$errlog"; then
+        pass "a pass that fails twice under emulation is queued and says to run the native image"
+    else
+        fail "the emulated double failure was mishandled" "rc=$rc SYFT_FAILED=[$SYFT_FAILED] log=$(cat "$errlog")"
+    fi
+    SYFT_FAILED=""
+    PATH="$stub:$PATH" BOMLENS_UNAME_M=aarch64 catalog_packages /h "$out" firmware-packages 2>"$errlog"
+    grep -q "emulation" "$errlog" \
+        && fail "a native arm64 host was taken for emulation" "$(cat "$errlog")" \
+        || pass "a native host gets no emulation notice"
+    unset SYFT_STUB_COUNT
     rm -rf "$stub" "$out" "$errlog"
 fi
 
