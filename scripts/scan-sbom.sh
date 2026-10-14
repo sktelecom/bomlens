@@ -2615,7 +2615,7 @@ if [ "$MODE" = "SOURCE" ]; then
         $CACHE_MOUNTS \
         $GUARD_STATE_ARGS \
         -e HOME=/tmp/sbomhome \
-        -e MAVEN_OPTS=-Dmaven.repo.local=/tmp/sbomhome/.m2 \
+        -e MAVEN_OPTS=-Dmaven.repo.local=/tmp/sbomhome/.m2/repository \
         -e FETCH_LICENSE="$FETCH_LICENSE" \
         -e PROJECT_NAME="\"$PROJECT_NAME\"" \
         -e PROJECT_VERSION="\"$PROJECT_VERSION\"" \

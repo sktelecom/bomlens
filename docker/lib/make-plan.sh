@@ -136,7 +136,7 @@ jq -n \
           on_kill: "If stage 1 is killed before it finishes, it cannot put the source back. With the guard-state mount and BOMLENS_GUARD_ID, run the same image and arguments again with BOMLENS_GUARD_RESTORE_ONLY=1 to restore it",
           env: ({
             HOME: "/tmp/sbomhome",
-            MAVEN_OPTS: "-Dmaven.repo.local=/tmp/sbomhome/.m2",
+            MAVEN_OPTS: "-Dmaven.repo.local=/tmp/sbomhome/.m2/repository",
             FETCH_LICENSE: $fetch,
             PROJECT_NAME: $pname,
             PROJECT_VERSION: $pver

@@ -5206,6 +5206,60 @@ else
         || fail "filter turned on with no composer.json present" "got [$_t_nocomposer]"
 fi
 
+echo "== maven-hashes: build-prep fetches dependency jars where cdxgen reads them for hashes =="
+# cdxgen computes a Maven component's hashes only from its jar under
+# $HOME/.m2/repository, and its dependency:tree run downloads poms, not jars.
+# Extract the real block from build-prep.sh (no logic duplication) and drive it
+# with a stand-in mvn that records its arguments.
+PREP="$ROOT_DIR/docker/lib/build-prep.sh"
+_mh_block=$(sed -n '/^# Maven component hashes/,/^fi$/p' "$PREP")
+if [ -z "$_mh_block" ]; then
+    fail "could not extract the Maven component-hashes block from build-prep.sh"
+else
+    _mh_bin="$WORK/mh-bin"; mkdir -p "$_mh_bin"
+    printf '#!/bin/sh\necho "$*" >> "$MH_CALLS"\n[ -z "$MH_FAIL" ]\n' > "$_mh_bin/mvn"
+    chmod +x "$_mh_bin/mvn"
+    _mh_prelude='log() { echo "[build-prep] $*"; }; run_supervised_timeout() { shift; "$@"; }; PREP_TIMEOUT_DEFAULT=5'
+    _mh_run() {  # <dir> <scope-filter> <maven-opts> [fail]
+        rm -f "$WORK/mh-calls"
+        ( cd "$1" && PATH="$_mh_bin:$PATH" HOME="$WORK/mh-home" MH_CALLS="$WORK/mh-calls" MH_FAIL="${4:-}" \
+            MAVEN_SCOPE_FILTER="$2" MAVEN_OPTS="$3" bash -c "$_mh_prelude; $_mh_block" )
+    }
+    mkdir -p "$WORK/mh-proj" "$WORK/mh-none" && touch "$WORK/mh-proj/pom.xml"
+    _mh_run "$WORK/mh-proj" 1 "-Dmaven.repo.local=$WORK/mh-home/.m2/repository" >/dev/null
+    [ "$(cat "$WORK/mh-calls" 2>/dev/null)" = "-q -B dependency:resolve -DincludeScope=runtime" ] \
+        && pass "scope filter on: the runtime jars are fetched" \
+        || fail "scope filter on: mvn was called with [$(cat "$WORK/mh-calls" 2>/dev/null)]"
+    _mh_run "$WORK/mh-proj" "" "" >/dev/null
+    [ "$(cat "$WORK/mh-calls" 2>/dev/null)" = "-q -B dependency:resolve -DincludeScope=test" ] \
+        && pass "full graph: the jars of every scope are fetched (default repository)" \
+        || fail "full graph: mvn was called with [$(cat "$WORK/mh-calls" 2>/dev/null)]"
+    _mh_out=$(_mh_run "$WORK/mh-proj" 1 "-Dmaven.repo.local=/elsewhere/.m2")
+    { [ ! -f "$WORK/mh-calls" ] && printf '%s' "$_mh_out" | grep -q "cdxgen will not find jars"; } \
+        && pass "a repository cdxgen does not read is reported, not filled" \
+        || fail "repository outside \$HOME/.m2/repository: [$_mh_out]"
+    _mh_run "$WORK/mh-none" 1 "" >/dev/null
+    [ ! -f "$WORK/mh-calls" ] && pass "no pom.xml: mvn is not run" || fail "mvn ran with no pom.xml"
+    if _mh_out=$(_mh_run "$WORK/mh-proj" 1 "" fail); then
+        printf '%s' "$_mh_out" | grep -q "some components will have no hashes (non-fatal)" \
+            && pass "a failed jar fetch is logged and non-fatal" \
+            || fail "a failed jar fetch was not logged: [$_mh_out]"
+    else
+        fail "a failed jar fetch ended the block with an error"
+    fi
+fi
+# Every caller pins the repository to the standard layout under HOME=/tmp/sbomhome,
+# the one place cdxgen looks for the jars.
+_mh_bad=""
+for _f in scripts/scan-sbom.sh docker/entrypoint.sh docker/lib/make-plan.sh; do
+    grep -o 'maven\.repo\.local=[^ "\\]*' "$ROOT_DIR/$_f" | grep -vx 'maven\.repo\.local=/tmp/sbomhome/\.m2/repository' >/dev/null \
+        && _mh_bad="$_mh_bad $_f"
+    grep -q 'maven\.repo\.local=' "$ROOT_DIR/$_f" || _mh_bad="$_mh_bad $_f(none)"
+done
+[ -z "$_mh_bad" ] \
+    && pass "scan-sbom.sh, entrypoint.sh and make-plan.sh use /tmp/sbomhome/.m2/repository" \
+    || fail "maven.repo.local is not /tmp/sbomhome/.m2/repository in:$_mh_bad"
+
 echo "== android-scope: release-config selection picks the right variant (flavored projects) =="
 # Guards docker/lib/build-prep.sh's Android config selection. The SCA benchmark
 # team found the old `{ grep -x releaseRuntimeClasspath || cat; }` idiom dropped

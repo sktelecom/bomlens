@@ -532,7 +532,7 @@ fi
 # Maven — no pre-resolve step. cdxgen invokes maven itself (dependency:tree /
 # the cyclonedx plugin) to build the full transitive graph, so a separate
 # `mvn dependency:resolve` here is redundant. It also failed noisily: the run is
-# pinned to -Dmaven.repo.local=/tmp/sbomhome/.m2 (an empty repo), so maven could
+# pinned to an empty -Dmaven.repo.local, so maven could
 # not resolve the dependency-plugin prefix and printed a NoPluginFoundForPrefix
 # error to stdout on every Java scan. Dropping it removes that noise with no
 # effect on the SBOM — cdxgen alone already resolves transitive deps (verified:
@@ -551,6 +551,40 @@ fi
 MAVEN_SCOPE_FILTER=""
 if [ -f pom.xml ] && ! opted_out "${BOMLENS_MAVEN_FULL_GRAPH:-}"; then
     MAVEN_SCOPE_FILTER=1
+fi
+
+# Maven component hashes: cdxgen computes a component's hashes from its jar,
+# looked up only at $HOME/.m2/repository/<group>/<artifact>/<version>/, and
+# its dependency:tree run downloads poms, not jars. On a fresh repository every
+# Maven component therefore came out without hashes. Fetch the jars of the
+# graph the SBOM keeps (runtime scope when the scope filter above applies,
+# every scope otherwise) into the same local repository first. Best-effort: a
+# failure (an unbuilt reactor sibling, no network) only costs the hashes, so it
+# is logged and not recorded as a failed resolution step.
+MAVEN_REPO_LOCAL="$HOME/.m2/repository"
+case " ${MAVEN_OPTS:-} " in
+    *" -Dmaven.repo.local="*)
+        MAVEN_REPO_LOCAL=$(printf '%s\n' " $MAVEN_OPTS " | sed 's/.* -Dmaven\.repo\.local=\([^ ]*\) .*/\1/') ;;
+esac
+if [ -f pom.xml ]; then
+    _mvn_cmd=""
+    if [ -x ./mvnw ]; then _mvn_cmd=./mvnw
+    elif command -v mvn >/dev/null 2>&1; then _mvn_cmd=mvn
+    fi
+    if [ "$MAVEN_REPO_LOCAL" != "$HOME/.m2/repository" ]; then
+        log "maven: local repository $MAVEN_REPO_LOCAL is not $HOME/.m2/repository; cdxgen will not find jars for hashes"
+    elif [ -n "$_mvn_cmd" ]; then
+        _mvn_scope="-DincludeScope=test"
+        [ -n "$MAVEN_SCOPE_FILTER" ] && _mvn_scope="-DincludeScope=runtime"
+        _mvn_err=$(mktemp)
+        if run_supervised_timeout "$PREP_TIMEOUT_DEFAULT" "$_mvn_cmd" -q -B dependency:resolve "$_mvn_scope" >"$_mvn_err" 2>&1; then
+            log "maven: fetched dependency jars for component hashes"
+        else
+            log "maven: could not fetch every dependency jar; some components will have no hashes (non-fatal)"
+            tail -5 "$_mvn_err" | sed 's/^/[build-prep]   /'
+        fi
+        rm -f "$_mvn_err"
+    fi
 fi
 
 # PHP/Composer scope over-scan: the same mechanism as the Maven filter above.
@@ -3493,7 +3527,7 @@ if (filled) {
   process.stderr.write('[build-prep] maven: inherited a parent POM license for ' + filled + ' component(s)\n');
 }
 MLIC_JS
-    node "$_mlic" "$OUT" "/tmp/sbomhome/.m2" || log "maven: parent-POM license inheritance skipped (non-fatal)"
+    node "$_mlic" "$OUT" "$MAVEN_REPO_LOCAL" || log "maven: parent-POM license inheritance skipped (non-fatal)"
     rm -f "$_mlic"
 fi
 
