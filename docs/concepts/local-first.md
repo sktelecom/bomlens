@@ -14,7 +14,7 @@ BomLens runs on air-gapped and offline networks. The few features that need an e
 
 ## Standard, portable outputs
 
-The outputs use standard formats — the SBOM is CycloneDX 1.6. They are not tied to any single vendor, so you can verify and reuse them anywhere. When you need a byte-for-byte identical SBOM for the same input, use `--byte-stable`.
+The outputs use standard formats: the SBOM is CycloneDX 1.6 by default, or 1.7 with `--spec-version 1.7`. They are not tied to any single vendor, so you can verify and reuse them anywhere. When you need a byte-for-byte identical SBOM for the same input, use `--byte-stable`.
 
 ## One scanner behind every entry point
 

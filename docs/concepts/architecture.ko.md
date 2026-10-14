@@ -14,8 +14,8 @@ BomLens의 전체 시스템 구조와, 스캔 파이프라인에서 각 도구�
 
 BomLens는 두 종류의 Docker 이미지가 협력하는 2단계 파이프라인입니다.
 
-- **Stage 1 — 생성**: 소스 코드는 cdxgen 언어별 공식 이미지가, 컨테이너 이미지·바이너리·디렉터리는 syft가 SBOM(CycloneDX 1.6)을 만듭니다.
-- **Stage 2 — 후처리**: 경량 `bomlens` 이미지가 SBOM을 받아 정규화, (정밀 라이선스), 고지문, 보안 보고서, 서명, 업로드를 차례로 수행합니다.
+- **Stage 1, 생성**: 소스 코드는 cdxgen 언어별 공식 이미지가, 컨테이너 이미지·바이너리·디렉터리는 syft가 SBOM을 만듭니다. 기본은 CycloneDX 1.6이고, `--spec-version 1.7`을 주면 1.7입니다.
+- **Stage 2, 후처리**: 경량 `bomlens` 이미지가 SBOM을 받아 정규화, (정밀 라이선스), 고지문, 보안 보고서, 서명, 업로드를 차례로 수행합니다.
 
 ![BomLens 2단계 파이프라인: 언어별 cdxgen 이미지 또는 syft가 bom.json을 만들고 bomlens 이미지가 후처리한다](../images/diagrams/architecture-overview.ko.png)
 
@@ -44,7 +44,7 @@ BomLens는 두 종류의 Docker 이미지가 협력하는 2단계 파이프라�
 
 | 도구 | 버전 | 단계 | 역할 | 활성 조건 |
 |------|------|------|------|-----------|
-| **cdxgen** | 언어 이미지 동봉 | Stage 1 | 소스 코드 SBOM 생성 (`--spec-version 1.6`) | `MODE=SOURCE` |
+| **cdxgen** | 언어 이미지 동봉 | Stage 1 | 소스 코드 SBOM 생성 (`--spec-version 1.6`, 스캔이 1.7을 요청하면 `1.7`) | `MODE=SOURCE` |
 | **build-prep.sh** | — | Stage 1 | cdxgen 직전 의존성 보강(cargo·go·bundle·mvn·pip) | `MODE=SOURCE` |
 | **syft** | `v1.51.0` | Stage 1 | 이미지·바이너리·RootFS 스캔 | `MODE=IMAGE/BINARY/ROOTFS` |
 | **jq** (`normalize-sbom.sh`) | — | Stage 2 | SBOM 정규화·정렬 | 항상 |
@@ -121,7 +121,7 @@ sequenceDiagram
 
 이미지 안에서의 두 단계:
 
-1. **`build-prep.sh`** (`docker/lib/build-prep.sh`) — cdxgen **직전** 의존성 보강. cdxgen이 자동 해석하지 못하는 생태계(특히 Rust·Go)의 lockfile을 만들어 전이 의존성까지 노출시킵니다. POSIX `sh`, 실패해도 스캔을 중단시키지 않습니다.
+1. **`build-prep.sh`** (`docker/lib/build-prep.sh`): cdxgen **직전** 의존성 보강. cdxgen이 자동 해석하지 못하는 생태계(특히 Rust·Go)의 lockfile을 만들어 전이 의존성까지 노출시킵니다. POSIX `sh`, 실패해도 스캔을 중단시키지 않습니다.
 
    | 생태계 | 동작 | 비고 |
    |--------|------|------|
@@ -131,7 +131,7 @@ sequenceDiagram
    | Maven | `mvn dependency:resolve` | 경량 안전망 |
    | Python | `pip install -r requirements.txt` | lockfile 없는 경우 전이 의존성 노출 |
 
-2. **cdxgen 실행** — `build-prep.sh`가 이미지별로 다른 cdxgen 바이너리 경로를 자동 탐지해 `cdxgen -r --spec-version 1.6 -o bom.json` 을 실행합니다(`build-prep.sh:60-73`). 생성된 SBOM은 이어서 Stage 2(`MODE=POSTPROCESS`) 후처리 이미지로 넘어갑니다.
+2. **cdxgen 실행**: `build-prep.sh`가 이미지별로 다른 cdxgen 바이너리 경로를 자동 탐지해 `cdxgen -r --spec-version 1.6 -o bom.json`을 실행합니다(`--spec-version 1.7`을 주면 `1.7`). 생성된 SBOM은 이어서 Stage 2(`MODE=POSTPROCESS`) 후처리 이미지로 넘어갑니다.
 
 ### 이미지 / 바이너리 / 디렉터리 — syft
 
@@ -245,7 +245,7 @@ CLI 플래그가 어떤 환경변수로 변환되어 어느 단계를 켜는지 
 
 | 파일 | 생성 조건 |
 |------|-----------|
-| `{Project}_{Version}_bom.json` | 항상 (CycloneDX 1.6; AI 모델은 1.7 ML-BOM) |
+| `{Project}_{Version}_bom.json` | 항상 (CycloneDX 1.6, `--spec-version 1.7`이면 1.7. AI 모델은 1.7 ML-BOM) |
 | `{Project}_{Version}_NOTICE.txt` / `.html` / `.pdf` | `--notice` / `--all` / 위험분석보고서 기본 생성 시 (PDF는 `SBOM_PDF` 빌드에서만) |
 | `{Project}_{Version}_security.json` / `.md` / `.html` | `--security` / `--all` / 위험분석보고서 기본 생성 시 |
 | `{Project}_{Version}_risk-report.md` / `.html` | 기본 (전 모드) — `--no-report`로 생략 |
@@ -271,12 +271,12 @@ CLI 플래그가 어떤 환경변수로 변환되어 어느 단계를 켜는지 
 
 ## 설계 원칙
 
-- **격리성** — 모든 분석은 Docker 컨테이너에서 수행, 호스트 환경 무오염.
-- **책임 분리** — 생성(Stage 1)과 후처리(Stage 2)를 분리해 후처리 이미지를 경량화.
-- **재현성** — 도구 버전을 `ARG`로 고정, `--byte-stable`로 바이트 동일 출력.
-- **표준 준수** — CycloneDX 1.6 스펙 준수.
-- **견고성** — 후처리 단계는 실패해도 전체 스캔을 중단시키지 않음.
-- **단일 인터페이스** — 모든 언어·모드를 `scan-sbom.sh` 하나로 호출.
+- **격리성**: 모든 분석은 Docker 컨테이너에서 수행, 호스트 환경 무오염.
+- **책임 분리**: 생성(Stage 1)과 후처리(Stage 2)를 분리해 후처리 이미지를 경량화.
+- **재현성**: 도구 버전을 `ARG`로 고정, `--byte-stable`로 바이트 동일 출력.
+- **표준 준수**: CycloneDX 스펙 준수. 기본은 1.6, `--spec-version 1.7`이면 1.7.
+- **견고성**: 후처리 단계는 실패해도 전체 스캔을 중단시키지 않음.
+- **단일 인터페이스**: 모든 언어·모드를 `scan-sbom.sh` 하나로 호출.
 
 ---
 

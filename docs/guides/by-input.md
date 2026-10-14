@@ -13,7 +13,7 @@ An open-source compliance manager receives deliverables from many teams in diffe
 | Deliverable | File | Meaning |
 |-------------|------|---------|
 | Open-source notice | `{Project}_{Version}_NOTICE.{txt,html}` | the notice that satisfies license obligations |
-| SBOM | `{Project}_{Version}_bom.json` | CycloneDX 1.6 component inventory |
+| SBOM | `{Project}_{Version}_bom.json` | CycloneDX 1.6 component inventory (1.7 with `--spec-version 1.7`) |
 | Open-source risk report | `{Project}_{Version}_risk-report.{md,html}` | aggregated license + vulnerability risk (with deadlines) |
 | Conformance report | `{Project}_{Version}_conformance.{json,md,html}` | whether the SBOM meets the submission quality criteria, and what is missing |
 
@@ -233,7 +233,7 @@ Deliverables are the same as Scenario 7's, minus what the model card would have 
 ## Reading the four deliverables
 
 - **Notice (NOTICE)**: components grouped by license. Use it to satisfy the obligation to include or disclose notices when distributing.
-- **SBOM**: CycloneDX 1.6. The artifact you upload to a vulnerability-management system.
+- **SBOM**: CycloneDX 1.6 by default, or 1.7 with `--spec-version 1.7`. The artifact you upload to a vulnerability-management system.
 - **Open-source risk report**: aggregates vulnerabilities by severity with recommended deadlines (Critical 7 days, High 30 days). Includes a license summary and the format conformance result.
 - **Conformance report**: the per-item check of whether the SBOM meets the submission quality criteria (required fields, PURL coverage, transitive dependencies, and more). The file is produced by default alongside the other three; the web UI shows it as a screen only on the `--analyze` path (see above). See [Reading the conformance report](supplier-sbom.md#reading-the-conformance-report) in the supplier SBOM guide.
 

@@ -13,7 +13,7 @@ description: GitHub URL, ZIP, 로컬 소스, 기존 SBOM, Yocto 빌드 디렉터
 | 산출물 | 파일 | 의미 |
 |--------|------|------|
 | 오픈소스 고지문 | `{Project}_{Version}_NOTICE.{txt,html}` | 라이선스 의무 이행을 위한 고지문 |
-| SBOM | `{Project}_{Version}_bom.json` | CycloneDX 1.6 구성요소 명세 |
+| SBOM | `{Project}_{Version}_bom.json` | CycloneDX 1.6 구성요소 명세(`--spec-version 1.7`이면 1.7) |
 | 오픈소스위험분석보고서 | `{Project}_{Version}_risk-report.{md,html}` | 라이선스+취약점 위험 집계(대응 기한 포함) |
 | 적합성 보고서 | `{Project}_{Version}_conformance.{json,md,html}` | 제출 품질 기준 충족 여부와 누락 항목 |
 
@@ -233,7 +233,7 @@ $SBOM --project internal-llm --version 1.0.0 \
 ## 산출물 4종 해석
 
 - **고지문(NOTICE)**: 라이선스별로 구성요소를 묶어 표기합니다. 배포할 때 동봉하거나 고지하는 의무를 이행하는 데 씁니다.
-- **SBOM**: CycloneDX 1.6. 취약점 관리 시스템에 올릴 때 기준이 되는 산출물입니다.
+- **SBOM**: 기본은 CycloneDX 1.6이고, `--spec-version 1.7`을 주면 1.7입니다. 취약점 관리 시스템에 올릴 때 기준이 되는 산출물입니다.
 - **오픈소스위험분석보고서**: 취약점을 심각도별로 집계하고 권고 대응 기한(Critical 7일, High 30일)을 명시합니다. 라이선스 요약과 포맷 적합성 결과도 담습니다.
 - **적합성 보고서**: SBOM이 제출 품질 기준(필수 항목, PURL 보유율, 전이 의존성 등)을 충족하는지 항목별로 점검한 결과입니다. 파일은 다른 세 산출물과 함께 기본 생성되지만, 화면은 `--analyze` 경로에서만 나타납니다(위 설명 참고). 자세한 읽는 법은 공급사 SBOM 검증 가이드의 [적합성 보고서 읽기](supplier-sbom.ko.md#적합성-보고서-읽기)를 참고하세요.
 
