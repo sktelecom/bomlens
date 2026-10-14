@@ -192,6 +192,8 @@ Set `CYCLONEDX_SPEC_VERSION` (`1.6`, the default, or `1.7`; the CLI's `--spec-ve
 
 `MODE=PLAN` exits 0 when it wrote a plan, `ok` or `unsupported`; an `unsupported` plan records the `plan` step as `skipped` in the result manifest, so the run reads `succeeded_degraded`. It refuses an empty source (usually a mount that did not reach the container) with a non-zero exit. Before writing, it removes an earlier plan and an earlier run's stage 1 outputs from the output folder, since stage 2 cannot tell a fresh SBOM from a leftover one. Stage 1 images are pinned for the cdxgen tag this BomLens release was tested with; overriding `CDXGEN_TAG` makes the language images `unsupported` (`no-pinned-digest`).
 
+A plan's stage 1 does not run govulncheck, so Go source reachability is not judged on this path: with `REACHABILITY=true`, stage 2 records the `reachability` step as `skipped` (`no_input`).
+
 Run stage 2 whatever stage 1's exit code, and pass that code as `BOMLENS_STAGE1_EXIT`, `true` in `BOMLENS_STAGE1_OOM` when the stage 1 container was killed for memory, and the stage 1 log saved in the output folder as `BOMLENS_STAGE1_LOG` (a file name). When stage 1 failed or left no SBOM, stage 2 scans the source with syft instead (direct dependencies only), records the reason in `bomlens:sbom-tool-degraded` (`oom`, `disk-space`, `network`, `cdxgen-crash`, `cdxgen-unavailable`), and the result manifest records `generate` as `degraded` (`fallback`), the same as the CLI. For an `unsupported` plan, where no stage 1 ran, pass `BOMLENS_STAGE1_EXIT=127` (or `BOMLENS_STAGE1_REASON=cdxgen-unavailable`) with no SBOM: the reason is then `cdxgen-unavailable`.
 
 ## Input fingerprint
