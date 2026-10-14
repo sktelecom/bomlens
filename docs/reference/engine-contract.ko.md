@@ -102,6 +102,7 @@ BomLens 이미지를 스캔 엔진으로 쓰는 프로그램은 모든 스캔이
 | `source-snapshot` | 파일 보기 화면용으로 스캔한 파일 내용 보관 |
 | `generate-notice` | 오픈소스 고지문 작성 |
 | `match-cpe` | `--security`를 켠 펌웨어, 루트 파일 시스템, 바이너리 스캔에서 패키지 PURL이 없는 컴포넌트의 CPE를 이미지에 들어 있는 NVD CPE 인덱스와 대조. `counts`에 `offered`, `components`, `cves`를 담고, 인덱스가 없는 이미지에서는 `skipped`(`not_installed`), `--security`가 꺼져 있거나 `CVE_BIN_TOOL_MODE=components-only`이면 `disabled` |
+| `reachability` | Go 소스나 Go 실행 파일 스캔에서 각 Go 보안 권고의 코드에 도달하는지 govulncheck로 판정(`--reachability`, `REACHABILITY=true`). `counts`는 `exploitable`, `not_affected`, `components`. Go 취약점 데이터베이스를 읽지 못하면 `skipped`(`unavailable`), SBOM에 Go 컴포넌트가 없거나 1단계가 이 실행의 govulncheck 출력을 남기지 않았으면 `skipped`(`no_input`), 소스 트리의 Go 모듈이 20개를 넘으면 `skipped`(`too_large`), Go 모듈이 GOOS linux, darwin, windows 어디에서도 빌드되지 않아 판정하지 못하면 `degraded`(`unavailable`), govulncheck가 없는 이미지면 `skipped`(`not_installed`), 옵션이 없으면 `disabled` |
 | `scan-security` | Trivy로 취약점 매칭 |
 | `deep-cve` | `--security`를 켰을 때 CPE가 있는 컴포넌트와 `bomlens:cpeAlternates`의 추가 CPE를 grype로 NVD와 대조(`--deep-cve`, deep-cve 이미지). grype가 없는 이미지에서 요청하면 `skipped`(`not_installed`), CLI가 deep-cve 이미지 없이 실행했으면 `skipped`(`fallback`, 이미지를 내려받지 못했거나 스캐너 이미지가 로컬 빌드, 1.13.2보다 낮은 버전, BomLens 이름이 아닌 이미지여서이며 `detail`에 이유를 적음. 그대로 둔 이미지에 grype가 있으면(`SBOM_DEEP_CVE=true`로 빌드) 대조를 실행하고 실제 결과를 기록), 요청하지 않았거나 `--security`가 꺼져 있거나 펌웨어 또는 AI 모델 스캔이면 `disabled` |
 | `generate-risk-report` | 위험 보고서 작성 |
@@ -123,6 +124,7 @@ BomLens 이미지를 스캔 엔진으로 쓰는 프로그램은 모든 스캔이
 | `vulnerabilities.other` | 다른 엔진의 결과(`_security_grype.json`, `_security_cvebintool.json`, `_security_yocto.json`) |
 | `license-scan.scancode` | `_scancode.json` |
 | `vendored.cyclonedx` | `_vendored.cdx.json` |
+| `vex.reachability` | `_reachability.cdx.json`(`--reachability`) |
 | `conformance` | `_conformance.json` |
 | `input-description` | `_input.json` |
 | `events` | `bomlens-events.jsonl`(`BOMLENS_EVENTS=file`) |
@@ -189,6 +191,8 @@ docker run --rm -v "$PWD/src:/src:ro" -v "$PWD/out:/host-output" \
 CycloneDX 1.7 SBOM을 계획하려면 `MODE=PLAN`에 `CYCLONEDX_SPEC_VERSION`(`1.6`이 기본값, 또는 `1.7`. CLI의 `--spec-version`)을 줍니다. 계획은 이 값을 1단계에는 `build-prep.sh`의 마지막 인자로, 2단계에는 `env`의 `CYCLONEDX_SPEC_VERSION`으로 넘깁니다. 그래서 2단계의 대체 스캔(syft)도 같은 버전으로 쓰고, 2단계는 1.4, 1.5, 1.6으로 쓰인 SBOM을 1.7로 올립니다(1.3 이하는 버전을 그대로 둡니다). 이 값은 입력 지문(`CDX_SPEC_VERSION`)에도 들어갑니다. 다른 값을 주면 `MODE=PLAN`이 0이 아닌 코드로 멈춥니다.
 
 `MODE=PLAN`은 계획을 썼으면 `ok`든 `unsupported`든 0으로 끝납니다. `unsupported` 계획은 결과 매니페스트에 `plan` 단계를 `skipped`로 기록하므로 실행은 `succeeded_degraded`입니다. 빈 소스(대개 컨테이너에 닿지 않은 마운트)는 0이 아닌 종료 코드로 거부합니다. 계획을 쓰기 전에 출력 폴더에서 이전 계획과 이전 실행의 1단계 산출물을 지웁니다. 2단계는 새 SBOM과 남은 SBOM을 구분할 수 없기 때문입니다. 1단계 이미지는 이 BomLens 릴리스가 시험한 cdxgen 태그로 고정되어 있어, `CDXGEN_TAG`를 바꾸면 언어 이미지는 `unsupported`(`no-pinned-digest`)가 됩니다.
+
+계획의 1단계는 govulncheck를 실행하지 않으므로 이 경로에서는 Go 소스 도달성을 판정하지 않습니다. `REACHABILITY=true`를 주면 2단계는 `reachability` 단계를 `skipped`(`no_input`)로 기록합니다.
 
 2단계는 1단계 종료 코드와 관계없이 실행하고, 그 코드를 `BOMLENS_STAGE1_EXIT`로, 1단계 컨테이너가 메모리 부족으로 종료됐으면 `BOMLENS_STAGE1_OOM`에 `true`를, 출력 폴더에 저장한 1단계 로그의 파일 이름을 `BOMLENS_STAGE1_LOG`로 넘깁니다. 1단계가 실패했거나 SBOM을 남기지 않았으면 2단계가 syft로 소스를 대신 스캔하고(직접 의존성만), 사유를 `bomlens:sbom-tool-degraded`(`oom`, `disk-space`, `network`, `cdxgen-crash`, `cdxgen-unavailable`)에 적으며, 결과 매니페스트는 `generate`를 `degraded`(`fallback`)로 기록합니다. CLI와 같은 동작입니다. 1단계를 실행하지 않는 `unsupported` 계획에서는 SBOM 없이 `BOMLENS_STAGE1_EXIT=127`(또는 `BOMLENS_STAGE1_REASON=cdxgen-unavailable`)을 넘기면 사유가 `cdxgen-unavailable`이 됩니다.
 

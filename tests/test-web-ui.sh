@@ -57,8 +57,8 @@ done
 
 echo "== capabilities + results contract =="
 caps=$(curl -fsS "$BASE/capabilities" 2>/dev/null)
-if echo "$caps" | python3 -c "import sys,json;d=json.load(sys.stdin);assert all(k in d for k in('firmware','docker','scanoss','aibom','firmwareSibling','aibomSibling','deepCve','deepCveSibling','version'))" 2>/dev/null; then
-    pass "/capabilities reports firmware, docker, scanoss, aibom, deepCve (+ sibling) flags and the image version"
+if echo "$caps" | python3 -c "import sys,json;d=json.load(sys.stdin);assert all(k in d for k in('firmware','docker','scanoss','aibom','firmwareSibling','aibomSibling','deepCve','deepCveSibling','reachability','version'))" 2>/dev/null; then
+    pass "/capabilities reports firmware, docker, scanoss, aibom, deepCve (+ sibling), reachability flags and the image version"
 else
     fail "/capabilities missing expected keys" "$caps"
 fi
@@ -721,6 +721,24 @@ rc = server.run_sibling_scan(
 )
 assert rc == 0, rc
 assert "STALENESS_ENRICH=false" in captured["args"], captured["args"]
+
+# REACHABILITY: the scan form's Go reachability toggle, opt-in like
+# DEEP_LICENSE -- on must be explicit, unset forwards the explicit "false".
+captured.clear()
+rc = server.run_sibling_scan(
+    "ghcr.io/sktelecom/bomlens-deep-cve:1.5.0", "SOURCE", run_out,
+    lambda ln: None, source_root=src_root,
+    extra_env={"REACHABILITY": "true"},
+)
+assert rc == 0, rc
+assert "REACHABILITY=true" in captured["args"], captured["args"]
+captured.clear()
+rc = server.run_sibling_scan(
+    "ghcr.io/sktelecom/bomlens-deep-cve:1.5.0", "SOURCE", run_out,
+    lambda ln: None, source_root=src_root,
+)
+assert rc == 0, rc
+assert "REACHABILITY=false" in captured["args"], captured["args"]
 
 # SECURITY_NVD_VERIFY + NVD_API_KEY: opt-in, meaningful only alongside
 # DEEP_CVE (gated the same way scan-security.sh gates scan-nvd-cpe.py). The
@@ -2107,6 +2125,61 @@ else
 fi
 rm -f "$OUT"/unchk*_1.0_*
 
+echo "== Go reachability: findings judged not reachable are listed apart and not counted =="
+# scan-security.sh marks each finding govulncheck judged with
+# "bomlens:reachability" and adds a Reachability summary. not_affected ones
+# leave the severity figures (as in the generated report) and are listed in
+# notReachable; a reached one stays in the table with its judgement.
+cat > "$OUT/rch_1.0_security.json" <<'JSON'
+{"Results":[{"Vulnerabilities":[
+  {"VulnerabilityID":"CVE-2022-32149","Severity":"HIGH","PkgName":"golang.org/x/text","InstalledVersion":"v0.3.7",
+   "PkgIdentifier":{"PURL":"pkg:golang/golang.org/x/text@v0.3.7"},
+   "bomlens:reachability":{"state":"exploitable","detail":"govulncheck (source, call graph): an affected function is called: main.main -> language.ParseAcceptLanguage","level":"symbol","engine":"govulncheck","mode":"source"}},
+  {"VulnerabilityID":"CVE-2026-56852","Severity":"CRITICAL","PkgName":"golang.org/x/text","InstalledVersion":"v0.3.7",
+   "PkgIdentifier":{"PURL":"pkg:golang/golang.org/x/text@v0.3.7"},
+   "bomlens:reachability":{"state":"not_affected","justification":"code_not_present","detail":"govulncheck (source): the module is required, but no affected package (golang.org/x/text/unicode/norm) is in the build","level":"module","engine":"govulncheck","mode":"source"}},
+  {"VulnerabilityID":"CVE-2026-1","Severity":"LOW","PkgName":"golang.org/x/text","InstalledVersion":"v0.3.7",
+   "PkgIdentifier":{"PURL":"pkg:golang/golang.org/x/text@v0.3.7"},
+   "bomlens:reachability":{"state":"not_affected","justification":"code_not_reachable","detail":"govulncheck (source, call graph): package golang.org/x/text/language is imported, but no call path reaches an affected symbol (Parse)"}},
+  {"VulnerabilityID":"CVE-2020-1111","Severity":"LOW","PkgName":"libfoo","InstalledVersion":"1.0","bomlens:reachability":"junk"}
+]}],"Reachability":{"Engine":"govulncheck","Mode":"source","Document":"rch_1.0_reachability.cdx.json","NotAffected":2,"Exploitable":1}}
+JSON
+if SBOM_OUTPUT_DIR="$OUT" python3 - "$ROOT_DIR" <<'PY'
+import sys, os, json, pathlib
+sys.path.insert(0, os.path.join(sys.argv[1], "docker", "web"))
+import server
+sm = server.security_summary("rch_1.0")
+assert sm["TOTAL"] == 2 and sm["HIGH"] == 1 and sm["LOW"] == 1 and sm["CRITICAL"] == 0, sm
+assert sm["notReachableCount"] == 2, sm
+assert [v["id"] for v in sm["vulnerabilities"]] == ["CVE-2022-32149", "CVE-2020-1111"], sm["vulnerabilities"]
+reached = sm["vulnerabilities"][0]["reachability"]
+assert reached["state"] == "exploitable" and "justification" not in reached and "ParseAcceptLanguage" in reached["detail"], reached
+assert "reachability" not in sm["vulnerabilities"][1], sm["vulnerabilities"][1]   # malformed -> none
+nr = {v["id"]: v["reachability"] for v in sm["notReachable"]}
+assert nr["CVE-2026-56852"]["justification"] == "code_not_present", nr
+assert nr["CVE-2026-1"]["justification"] == "code_not_reachable", nr
+assert all(r["state"] == "not_affected" for r in nr.values()), nr
+assert sm["reachability"] == {"engine": "govulncheck", "mode": "source",
+                              "document": "rch_1.0_reachability.cdx.json"}, sm["reachability"]
+# The component's risk follows the same rule: only the reached findings count.
+by_purl, _ = server._component_risk_index("rch_1.0")
+assert by_purl["pkg:golang/golang.org/x/text@v0.3.7"] == {"sev": "HIGH", "count": 1}, by_purl
+# Without --reachability nothing changes shape.
+out = pathlib.Path(os.environ["SBOM_OUTPUT_DIR"])
+(out / "rch0_1.0_security.json").write_text(json.dumps({"Results": [{"Vulnerabilities": [
+    {"VulnerabilityID": "CVE-X", "Severity": "LOW", "PkgName": "zlib", "InstalledVersion": "1.2"}]}]}))
+sm0 = server.security_summary("rch0_1.0")
+assert not ({"notReachableCount", "notReachable", "reachability"} & set(sm0)), sm0
+assert "reachability" not in sm0["vulnerabilities"][0], sm0
+assert "rch_1.0_reachability.cdx.json".endswith(server.ARTIFACT_SUFFIXES)
+assert "reachability" in server._DIAG_OPTION_KEYS
+PY
+then
+    pass "not-reachable findings: out of the figures and the component risk, listed with their judgement; _reachability.cdx.json listed"
+else
+    fail "reachability in the security summary is wrong (see assertion above)"
+fi
+rm -f "$OUT"/rch_1.0_* "$OUT"/rch0_1.0_*
 echo "== advisories with no CVE and CVE aliases (security_summary) =="
 # scan-security.sh moves a finding filed under a distribution advisory number with no CVE
 # to the top-level Advisories list, and keeps an advisory number reported for a
@@ -3712,6 +3785,8 @@ echo "[stub] scanning ${PROJECT_NAME} ${PROJECT_VERSION} (mode=$mode)"
   echo "YOCTO_BUILD_DIR=${YOCTO_BUILD_DIR:-}"
   echo "DATASET_REF=${DATASET_REF:-}"
   echo "AI_DECLARATION_FILE=${AI_DECLARATION_FILE:-}"
+  echo "REACHABILITY=${REACHABILITY:-}"
+  echo "GENERATE_SECURITY=${GENERATE_SECURITY:-}"
   # Counted here, while the scan is running: an extracted upload tree is removed
   # once the scan finishes, so a later check would always find it empty.
   echo "TARGET_DIR_FILES=$([ -n "${TARGET_DIR:-}" ] && find "$TARGET_DIR" -type f 2>/dev/null | wc -l | tr -d ' ' || echo 0)"; } > "${STUB_ENV_FILE:-/dev/null}"
@@ -3884,6 +3959,27 @@ assert 'includeOsv' not in (done[0]['data'].get('scanConfig') or {}), done[0]['d
 else
     fail "retired includeOsv / cvedb marker handling is wrong" "$events"
 fi
+
+# Go reachability: the scan form's opt-in toggle becomes REACHABILITY=true,
+# turns the security report on (as --reachability does) and is recorded for a
+# re-scan. Without it, REACHABILITY is an explicit false.
+rm -f "$WORK/stub-env"
+events=$(sse_events "project=rch&version=1.0&source=current-dir&security=false&reachability=true")
+if grep -qx 'REACHABILITY=true' "$WORK/stub-env" && grep -qx 'GENERATE_SECURITY=true' "$WORK/stub-env" \
+   && echo "$events" | python3 -c "
+import sys, json
+d = [e for e in json.load(sys.stdin) if e['event'] == 'done'][0]['data']
+assert d['scanConfig']['reachability'] is True, d['scanConfig']
+"; then
+    pass "reachability=true reaches the scanner as REACHABILITY=true with the security report on, and is recorded"
+else
+    fail "reachability toggle not forwarded" "$(cat "$WORK/stub-env" 2>/dev/null)"
+fi
+rm -f "$WORK/stub-env"
+sse_events "project=rch0&version=1.0&source=current-dir&security=false" >/dev/null
+grep -qx 'REACHABILITY=false' "$WORK/stub-env" && grep -qx 'GENERATE_SECURITY=false' "$WORK/stub-env" \
+    && pass "without the toggle REACHABILITY=false and the security choice is kept" \
+    || fail "reachability default" "$(cat "$WORK/stub-env" 2>/dev/null)"
 
 echo deepcve-progress > "$STUB_MODE_FILE"
 events=$(sse_events "project=deepprog&version=1.0&source=current-dir")

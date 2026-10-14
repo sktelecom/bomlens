@@ -177,6 +177,7 @@ KNOWN_ARTIFACT_SUFFIXES=(
     _modelica.cdx.json _cocoapods.cdx.json _conda.cdx.json
     _security_cvebintool.json _security_grype.json _security_yocto.json
     _security_trivy.json _component-versions.template.csv
+    _reachability.cdx.json
 )
 # Only a caller that knows about this cleanup runs it at all. An old
 # scan-sbom.sh or server.py (built before this existed) sends neither signal
@@ -280,6 +281,17 @@ SIBLING_CID=""
 stop_sibling() {
     [ -n "$SIBLING_CID" ] || return 0
     docker stop -t "$BOMLENS_CANCEL_GRACE" "$SIBLING_CID" >/dev/null 2>&1 || true
+}
+
+# REACH_TOOLS_DIR: the folder holding the govulncheck copy handed to the
+# sibling (--reachability), while it runs. REACHABILITY_NONCE: the nonce that
+# sibling was given, read by the reachability step (reachability.sh).
+REACH_TOOLS_DIR=""
+REACHABILITY_NONCE="${REACHABILITY_NONCE:-}"
+remove_reach_tools() {
+    [ -n "$REACH_TOOLS_DIR" ] || return 0
+    rm -rf -- "$REACH_TOOLS_DIR" 2>/dev/null
+    REACH_TOOLS_DIR=""
 }
 
 # Host-persistent guard state: mirrors scripts/scan-sbom.sh's
@@ -478,6 +490,34 @@ generate_sbom_cdxgen() {
     # otherwise (works as long as build-prep.sh stays under the kernel's
     # 128KiB single-argument limit).
     local prep_file; prep_file=$(write_prep_file "$prep")
+    # --reachability on Go: the sibling has the Go toolchain this image lacks,
+    # so govulncheck runs there (build-prep.sh). The binary is copied into a
+    # new folder of its own under the guard-state mount, which the sibling
+    # shares through --volumes-from and which is not the run folder, and the
+    # folder is removed once the sibling has finished or the scan is
+    # cancelled. Stage 1 writes the nonce beside its output; the reachability
+    # step below reads only output that carries it.
+    local reach_env=()
+    REACH_TOOLS_DIR=""; REACHABILITY_NONCE=""
+    if [ "${REACHABILITY:-false}" = "true" ] && [ "$lang" = "go" ] && [ "$bom_path" = "$outdir/$out" ] \
+       && command -v govulncheck >/dev/null 2>&1; then
+        if [ -d "$GUARD_STATE_DIR" ] && mkdir -p "$GUARD_STATE_DIR/tools" 2>/dev/null; then
+            # A copy left by a scan that was killed outright (no trap ran).
+            find "$GUARD_STATE_DIR/tools" -maxdepth 1 -name 'govulncheck.*' -mmin +1440 -exec rm -rf {} + 2>/dev/null || true
+            REACH_TOOLS_DIR=$(mktemp -d "$GUARD_STATE_DIR/tools/govulncheck.XXXXXX" 2>/dev/null) || REACH_TOOLS_DIR=""
+        fi
+        if [ -n "$REACH_TOOLS_DIR" ] && chmod 755 "$REACH_TOOLS_DIR" \
+           && cp "$(command -v govulncheck)" "$REACH_TOOLS_DIR/govulncheck" 2>/dev/null \
+           && chmod 755 "$REACH_TOOLS_DIR/govulncheck"; then
+            REACHABILITY_NONCE=$(od -An -N8 -tx1 /dev/urandom 2>/dev/null | tr -d ' \n')
+            [ -n "$REACHABILITY_NONCE" ] || REACHABILITY_NONCE="$$${RANDOM}${RANDOM}$(date +%s)"
+            reach_env=(-e BOMLENS_REACHABILITY=true -e "BOMLENS_GOVULNCHECK=$REACH_TOOLS_DIR/govulncheck"
+                       -e "BOMLENS_REACHABILITY_NONCE=$REACHABILITY_NONCE")
+        else
+            echo "[WARN] --reachability: no folder outside the run folder to hand govulncheck to the cdxgen container (the launcher mounts none at $GUARD_STATE_DIR); the Go call analysis is skipped."
+            remove_reach_tools
+        fi
+    fi
     ( if [ -n "$prep_file" ]; then
         docker run -u 0:0 \
             --name "$sibling_name" \
@@ -491,6 +531,7 @@ generate_sbom_cdxgen() {
             -e HOST_GOTOOLCHAIN="${GOTOOLCHAIN:-}" -e GOPROXY -e GOSUMDB \
             "${prep_env[@]}" \
             "${guard_env[@]}" \
+            "${reach_env[@]}" \
             --entrypoint sh "$img" \
             "$prep_file" "$src" "$bom_path" "$CDX_SPEC_VERSION"
       else
@@ -506,6 +547,7 @@ generate_sbom_cdxgen() {
             -e HOST_GOTOOLCHAIN="${GOTOOLCHAIN:-}" -e GOPROXY -e GOSUMDB \
             "${prep_env[@]}" \
             "${guard_env[@]}" \
+            "${reach_env[@]}" \
             --entrypoint sh "$img" \
             -c "$prep" _ "$src" "$bom_path" "$CDX_SPEC_VERSION"
       fi; echo $? > "$rcf" ) 2>&1 | tee "$logf" &
@@ -519,13 +561,14 @@ generate_sbom_cdxgen() {
         [ -n "$cid" ] || { sleep 0.1; _n=$((_n + 1)); }
     done
     SIBLING_CID="$cid"
-    trap 'stop_sibling; exit 130' INT
-    trap 'stop_sibling; exit 143' TERM
+    trap 'stop_sibling; remove_reach_tools; exit 130' INT
+    trap 'stop_sibling; remove_reach_tools; exit 143' TERM
     wait "$pipe_pid" || true
     trap 'exit 130' INT
     trap 'exit 143' TERM
     rc=$(cat "$rcf" 2>/dev/null || echo 1)
     rm -f "$rcf"
+    remove_reach_tools
     SIBLING_CID=""
     if [ "$rc" -ne 0 ]; then
         if [ -n "$cid" ] && [ "$(docker inspect -f '{{.State.OOMKilled}}' "$cid" 2>/dev/null)" = "true" ]; then
@@ -834,8 +877,12 @@ case "$SCAN_MODE" in
     BINARY)
         if [ -z "$TARGET_FILE" ] || [ ! -f "$TARGET_FILE" ]; then echo "[ERROR] TARGET_FILE not found: $TARGET_FILE"; exit 1; fi
         echo "[1/2] syft: binary $TARGET_FILE"
-        if ! syft "file:$TARGET_FILE" -o "cyclonedx-json@$CDX_SPEC_VERSION" > "$OUTPUT_FILE" 2>&1; then
+        # syft's own messages (an update check that cannot reach the network,
+        # for one) go to a log, not into the SBOM it writes on standard output.
+        BINARY_SYFT_LOG=$(mktemp)
+        if ! syft "file:$TARGET_FILE" -o "cyclonedx-json@$CDX_SPEC_VERSION" > "$OUTPUT_FILE" 2>"$BINARY_SYFT_LOG"; then
             echo "[WARN] syft binary scan failed; emitting minimal SBOM."
+            [ -s "$BINARY_SYFT_LOG" ] && tail -5 "$BINARY_SYFT_LOG" >&2
             FILE_INFO=$(file "$TARGET_FILE")
             cat > "$OUTPUT_FILE" <<EOF
 {
@@ -847,6 +894,7 @@ case "$SCAN_MODE" in
 }
 EOF
         fi
+        rm -f "$BINARY_SYFT_LOG"
         ;;
 
     ROOTFS)
@@ -2077,6 +2125,55 @@ case "$SCAN_MODE" in FIRMWARE|ROOTFS|BINARY)
     fi ;;
 esac
 export BOMLENS_CPE_INDEX_MATCHED
+# Go reachability (--reachability, opt-in): govulncheck judges whether the code
+# each Go advisory lives in is reached, from the source's call graph (run in
+# stage 1, which has the Go toolchain) or from a Go executable's symbols. The
+# judgements go into a CycloneDX VEX (_reachability.cdx.json); scan-security.sh
+# then marks the matching findings and counts the unreachable ones apart. Off,
+# this does nothing but record the step as disabled. The Go vulnerability
+# database is read over the network; without it the step is skipped.
+REACHABILITY_DOC=""
+_rch_mode=""
+case "$SCAN_MODE" in
+    SOURCE|POSTPROCESS) _rch_mode=source ;;
+    BINARY) _rch_mode=binary ;;
+esac
+if [ -n "$_rch_mode" ]; then
+    if [ "${REACHABILITY:-false}" != "true" ]; then
+        rm -f "${OUT_PREFIX}_govulncheck_stage1.json" "${OUT_PREFIX}_govulncheck_stage1.err" "${OUT_PREFIX}_govulncheck_stage1.rc"
+        er_record reachability disabled
+    else
+        _rch_started="$(er_now)"; er_event step.start reachability
+        _rch_rc=0
+        _rch_out="$(REACHABILITY_NONCE="$REACHABILITY_NONCE" bash "$LIBDIR/reachability.sh" "$OUTPUT_FILE" "$OUT_PREFIX" "$_rch_mode" "${TARGET_FILE:-}")" || _rch_rc=$?
+        _rch_detail="$(jq -r '.detail // empty' <<<"$_rch_out" 2>/dev/null)" || _rch_detail=""
+        case "$_rch_rc" in
+            0) REACHABILITY_DOC="${OUT_PREFIX}_reachability.cdx.json"
+               ARTIFACTS+=("$REACHABILITY_DOC")
+               echo "[reachability] $(jq -r '"\(.exploitable) reached, \(.not_affected) not reached"' <<<"$_rch_out" 2>/dev/null) (govulncheck, $_rch_mode): $REACHABILITY_DOC"
+               er_record reachability ok "" "" "$_rch_started" "" \
+                   "$(jq -c '{exploitable, not_affected, components}' <<<"$_rch_out" 2>/dev/null)" ;;
+            4) REACHABILITY_DOC="${OUT_PREFIX}_reachability.cdx.json"
+               ARTIFACTS+=("$REACHABILITY_DOC")
+               echo "[WARN] --reachability: ${_rch_detail}; its components get no judgement from it." >&2
+               er_record reachability degraded unavailable "$_rch_detail" "$_rch_started" "" \
+                   "$(jq -c '{exploitable, not_affected, components}' <<<"$_rch_out" 2>/dev/null)" ;;
+            3) echo "[WARN] --reachability skipped: ${_rch_detail}. Allow access to vuln.go.dev and run again." >&2
+               er_record reachability skipped unavailable "$_rch_detail" "$_rch_started" ;;
+            10) echo "[WARN] --reachability skipped: govulncheck is not in this image. Refresh it (docker pull) and run again." >&2
+                er_record reachability skipped not_installed "$_rch_detail" "$_rch_started" ;;
+            11) echo "[reachability] nothing to judge: ${_rch_detail}."
+                er_record reachability skipped no_input "$_rch_detail" "$_rch_started" ;;
+            12) echo "[WARN] --reachability skipped: ${_rch_detail}." >&2
+                er_record reachability skipped too_large "$_rch_detail" "$_rch_started" ;;
+            *) echo "[WARN] post-process step 'reachability' failed: ${_rch_detail:-see the log above}." >&2
+               mark_pipeline_warning "$OUTPUT_FILE" reachability
+               er_record reachability failed failed "$_rch_detail" "$_rch_started" ;;
+        esac
+        sync_artifacts
+    fi
+fi
+export REACHABILITY_DOC
 if [ "${GENERATE_SECURITY:-false}" = "true" ] && [ "$_trivy_db_ready" = true ]; then
     run_optional_step scan-security bash "$LIBDIR/scan-security.sh" "$OUTPUT_FILE" "$OUT_PREFIX" "$PROJECT_NAME"
     _trivy_db_max="${BOMLENS_TRIVY_DB_MAX_AGE_DAYS:-7}"

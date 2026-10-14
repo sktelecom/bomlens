@@ -145,6 +145,23 @@ SECURITY_NVD_VERIFY=true NVD_API_KEY="your-key" \
 
 ---
 
+## Go 도달성 (`--reachability`)
+
+Go 모듈의 취약점은 프로그램이 영향받는 코드를 실제로 쓸 때만 문제가 됩니다. `--reachability`는 Go 프로젝트가 직접 만든 점검 도구인 govulncheck에게, 스캔한 Go 프로그램이 어느 보안 권고의 코드에 실제로 도달하는지 묻습니다. 소스 트리는 프로그램의 진입점부터 호출 그래프를 따라가고, Go 실행 파일(`--target ./app`)은 실행 파일의 심볼에서 영향받는 함수를 찾습니다.
+
+```bash
+./scripts/scan-sbom.sh --project "MyApp" --version "1.0.0" --reachability --generate-only
+./scripts/scan-sbom.sh --project "MyApp" --version "1.0.0" --target ./app --reachability --generate-only
+```
+
+- SBOM의 컴포넌트에 해당하는 Go 보안 권고마다 CycloneDX VEX 문서인 `_reachability.cdx.json`에 판정이 남습니다. 영향받는 코드에 도달하지 않으면 `analysis.state`는 `not_affected`이고, `analysis.detail`에 이유를 적습니다. 영향받는 패키지가 빌드에 없으면 `justification`은 `code_not_present`, 패키지는 있지만 영향받는 함수를 호출하지 않거나(소스) 링크하지 않았으면(실행 파일) `code_not_reachable`입니다. 도달하면 상태는 `exploitable`이고 detail에 호출 경로나 심볼을 적습니다.
+- 보안 보고서는 도달하지 않는 발견 항목을 이유와 함께 별도 절에 싣고 집계에서 뺍니다. 숨기지는 않습니다. 발견 항목은 `_security.json`에 그대로 있고 각각 `bomlens:reachability` 표시가 붙습니다. 도달하는 발견 항목은 발견 표에 이중 단검 기호로 표시합니다. 위험 보고서와 `--fail-on vulnerability=`도 보안 보고서와 같은 방식으로 셉니다.
+- `--reachability`는 `--security`를 자동으로 켭니다. Go 소스와 Go 실행 파일에 적용되고, 다른 스캔은 경고를 출력한 뒤 이 옵션 없이 진행합니다. 소스 스캔은 Go 툴체인이 있는 1단계의 Go 이미지 안에서 govulncheck를 실행합니다. 후처리 이미지에는 govulncheck 실행 파일만 들어 있습니다.
+- 소스 스캔은 SBOM이 읽는 Go 모듈을 `go.mod`마다 모두 판정합니다(최대 20개). 모듈은 SBOM과 같은 기준으로 찾습니다. `vendor/`, `node_modules/`, 이름이 `.`으로 시작하는 폴더와 소스 스캔이 빼는 배포하지 않는 폴더는 찾지 않습니다(`BOMLENS_INCLUDE_NON_SHIPPED=1`이면 둘 다 넣습니다). 모듈마다 GOOS linux, darwin, windows 세 가지로, GOARCH는 amd64로 읽고, 어느 모듈이나 어느 GOOS에서든 도달하면 `exploitable`입니다. `go.work`에 들어 있는 모듈은 작업 공간 모드로 읽습니다. `vendor/` 폴더가 있는 모듈은 스캔의 `go mod tidy` 전 상태 그대로 그 폴더에서 읽습니다. `BOMLENS_KEEP_BUILD_OUTPUT=1`이면 트리를 되돌리지 않으므로, 작업 공간 밖의 모듈은 대신 모듈 캐시에서 읽습니다(`-mod=mod`). 모듈이 20개를 넘으면 이 단계를 건너뜁니다(`too_large`).
+- 모듈의 코드가 빌드되지 않는 GOOS(모든 파일이 다른 시스템용으로 제한되었거나, 다른 시스템에만 있는 필드나 함수를 쓰는 경우)는 그 모듈에서 빼고, `not_affected` detail과 `bomlens:reachability:goos-not-covered`에 적습니다. 그 모듈은 빌드된 GOOS로 판정합니다. 세 GOOS 모두에서 빌드되지 않는 모듈은 판정하지 않고(`bomlens:reachability:modules-not-judged`), 이 단계를 `degraded`로 기록합니다. 이때 그 모듈의 `go.mod`가 require하는 모듈에는 다른 모듈의 판정으로 `not_affected`를 내지 않으며(`bomlens:reachability:not-affected-withheld`), 그 `go.mod`를 읽지 못하면 `not_affected`를 하나도 내지 않습니다. 그 밖의 govulncheck 실패(내려받을 수 없는 모듈, 모든 GOOS에서 나는 타입 오류, 시간 제한 초과)는 이 단계를 실패로 만들고, 남은 실행은 건너뛰며 아무것도 기록하지 않습니다.
+- govulncheck는 Go 취약점 데이터베이스(vuln.go.dev)를 네트워크로 읽습니다. 닿지 않으면 `bomlens-result.json`에 이 단계를 건너뜀(`unavailable`)으로 기록하고, 보안 보고서는 이 옵션이 없을 때와 같습니다.
+- govulncheck가 볼 수 있는 코드만 판정합니다. 리플렉션이나 플러그인으로 부르는 함수는 호출 그래프에 나타나지 않고, 실행 파일의 심볼은 무엇이 링크됐는지를 보여 줄 뿐 무엇이 실행되는지는 보여 주지 않습니다. 소스 스캔은 GOOS linux, darwin, windows(GOARCH amd64)가 기본 빌드 태그로 빌드하는 파일을 읽습니다. 사용자 정의 빌드 태그나 다른 GOOS, 다른 GOARCH에서만 빌드되는 코드는 보지 않고, `_test.go` 파일에서만 호출되는 코드도 보지 않습니다(govulncheck는 기본으로 시험 코드를 빼고 읽습니다). VEX는 이 범위를 `not_affected` 판정마다 detail에 적고, `metadata.properties`(`bomlens:reachability:goos`, `goarch`, `build-tags`, `modules`)에도 남깁니다. `not_affected`는 도구의 판정으로 읽고, 호출 그래프가 보여 주지 않는 방식으로 코드를 불러오는 곳이나 빌드에 자체 태그를 쓰는 곳이라면 해당 권고를 열어 두세요.
+
 ## 정밀 라이선스 탐지 (`--deep-license`)
 
 기본 고지문은 의존성(3rd-party)의 라이선스를 다룹니다. `--deep-license`는 scancode-toolkit으로 프로젝트 자체 소스코드(1st-party)의 라이선스 헤더까지 탐지합니다.

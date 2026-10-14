@@ -235,6 +235,60 @@ for engine in cvebintool grype yocto; do
     fi
 done
 
+# --- Go reachability (--reachability) ------------------------------------------
+#
+# The step before this one (reachability.sh) wrote govulncheck's judgements as a
+# CycloneDX VEX. Each finding it covers, matched on the advisory id (the CVE or
+# one of its references) and the component (purl, else module path and
+# version; the path keeps its case, as Go module paths are case-sensitive),
+# carries the judgement as "bomlens:reachability" in _security.json,
+# and the document has a Reachability summary. A finding judged not_affected
+# (code_not_present or code_not_reachable) is listed on its own below and left
+# out of the totals, as the kernel's advisories are: it is shown, not dropped. A
+# finding with no judgement (not a Go advisory, or one govulncheck does not
+# know) is unchanged.
+REACH_DOC="${REACHABILITY_DOC:-}"
+if [ -n "$REACH_DOC" ] && [ -f "$REACH_DOC" ] && jq -e '.vulnerabilities | type == "array"' "$REACH_DOC" >/dev/null 2>&1; then
+    tmp_r="$(mktemp)"
+    if jq --slurpfile vex "$REACH_DOC" --arg doc "$(basename "$REACH_DOC")" '
+        def np: (. // "") | tostring | sub("[?#].*$"; "") | sub("^pkg:golang/"; "pkg:golang/"; "i");
+        def nv: (. // "") | sub("^(go|v)(?=[0-9])"; "");
+        def modkey: np | sub("^pkg:golang/"; "") | (split("@") | (.[0:-1] | join("@")) + "@" + (.[-1] | nv));
+        ($vex[0]) as $v
+        | ([ $v.components[]? | {key: (.["bom-ref"] // .purl // ""), value: (.purl // "")} ] | from_entries) as $purls
+        | ([ $v.vulnerabilities[]? as $x
+             | ([$x.id] + [$x.references[]?.id]) as $ids
+             | $x.affects[]? | ($purls[.ref] // "") as $p | select($p != "")
+             | $ids[] as $id
+             | ({key: (($p | np) + "|" + $id), value: $x},
+                {key: (($p | modkey) + "|" + $id), value: $x}) ]
+           # One key can carry more than one statement (two Go advisories with
+           # the same CVE): a reached one wins over one that is not.
+           | group_by(.key)
+           | map({key: .[0].key,
+                  value: ((map(.value) | map(select(.analysis.state == "exploitable"))) + map(.value) | .[0])})
+           | from_entries) as $map
+        | ($v.metadata.properties // [] | map(select(.name == "bomlens:reachability:mode")) | .[0].value // "") as $mode
+        | .Results = [ (.Results // [])[] | .Vulnerabilities = [ (.Vulnerabilities // [])[]
+            | ((.PkgIdentifier // {}).PURL // "") as $tp
+            | (.VulnerabilityID // "") as $id
+            | ($map[($tp | np) + "|" + $id]
+               // $map[(.PkgName // "") + "@" + (.InstalledVersion | nv) + "|" + $id]) as $x
+            | if $x then . + {"bomlens:reachability": ({state: $x.analysis.state}
+                  + (if $x.analysis.justification then {justification: $x.analysis.justification} else {} end)
+                  + {detail: ($x.analysis.detail // ""),
+                     level: ([$x.properties[]? | select(.name == "bomlens:reachability:level") | .value][0] // null),
+                     engine: "govulncheck", mode: $mode})}
+              else . end ] ]
+        | .Reachability = {Engine: "govulncheck", Mode: $mode, Document: $doc}
+      ' "$JSON" > "$tmp_r" 2>/dev/null; then
+        mv "$tmp_r" "$JSON"
+    else
+        rm -f "$tmp_r"
+        echo "[security] WARN: could not apply the reachability judgements; the report lists every finding as reported." >&2
+    fi
+fi
+
 ADVISORIES=$(jq -c '[ (.Advisories // [])[] | {
       id: .VulnerabilityID,
       pkg: (.PkgName // ""),
@@ -263,7 +317,10 @@ FINDINGS=$(jq -r '
       # deep-cve: a grype CPE match whose NVD version range was not verified
       # (SECURITY_NVD_VERIFY off / NVD unreachable). Surfaced so the reader sees
       # which findings may be loose-version false positives.
-      unverified: (.["bomlens:cpeVersionUnverified"] // false)
+      unverified: (.["bomlens:cpeVersionUnverified"] // false),
+      # --reachability: govulncheck judgement (null when there is none).
+      reach: ((.["bomlens:reachability"] // {}).state // null),
+      reach_detail: ((.["bomlens:reachability"] // {}).detail // "")
     } ]
   # Dedup by (purl-or-name, CVE): when the deep-CVE grype pass and Trivy both
   # report the same finding they must count once. purl is the stable key across
@@ -328,6 +385,23 @@ FINDINGS=$(echo "$FINDINGS" | jq --argjson epss "$EPSS_MAP" --argjson kev "$KEV_
 echo "$FINDINGS" | jq 'map({key: .id, value: {epss: .epss, kev: .kev}}) | from_entries' \
     > "${OUT_PREFIX}_security_epss.json" 2>/dev/null || echo "{}" > "${OUT_PREFIX}_security_epss.json"
 
+# Findings govulncheck judged not reachable: listed apart, out of the totals
+# (see the reachability block above). Split after the EPSS lookup so the
+# sidecar covers them too.
+UNREACHED_FINDINGS=$(echo "$FINDINGS" | jq '[ .[] | select(.reach == "not_affected") ]')
+FINDINGS=$(echo "$FINDINGS" | jq '[ .[] | select(.reach != "not_affected") ]')
+UNREACHED_N=$(echo "$UNREACHED_FINDINGS" | jq 'length')
+REACHED_N=$(echo "$FINDINGS" | jq '[ .[] | select(.reach == "exploitable") ] | length')
+if jq -e 'has("Reachability")' "$JSON" >/dev/null 2>&1; then
+    tmp_rs="$(mktemp)"
+    if jq --argjson na "$UNREACHED_N" --argjson ex "$REACHED_N" \
+        '.Reachability += {NotAffected: $na, Exploitable: $ex}' "$JSON" > "$tmp_rs" 2>/dev/null; then
+        mv "$tmp_rs" "$JSON"
+    else
+        rm -f "$tmp_rs"
+    fi
+fi
+
 # Failure marker written above (survives the sidecar merge, which keeps every
 # non-Results key). Non-empty => the Trivy findings are missing, not zero.
 SCAN_ERR=$(jq -r '.ScanError.Message // empty' "$JSON" 2>/dev/null)
@@ -361,7 +435,7 @@ if [ -z "$SCAN_ERR" ] && [ -f "$SCRIPT_DIR/vuln-coverage.jq" ]; then
     # Through a file: an old kernel's advisories make this list larger than one
     # command-line argument may be.
     _found="$(mktemp)"
-    { echo "$FINDINGS"; echo "$KERNEL_FINDINGS"; echo "$ADVISORIES"; } | jq -cs \
+    { echo "$FINDINGS"; echo "$KERNEL_FINDINGS"; echo "$UNREACHED_FINDINGS"; echo "$ADVISORIES"; } | jq -cs \
         '[add[] | (.purl // ""), (((.pkg // "") + "|" + (.version // "")) | ascii_downcase)]
          | map(select(. != "" and . != "|")) | unique' > "$_found" 2>/dev/null || echo '[]' > "$_found"
     UNCHECKED=$(jq -c --argjson cm "$_cpe_matched" --argjson yc "$_yocto_checked" --slurpfile foundf "$_found" \
@@ -418,6 +492,14 @@ KEV_COUNT=$(echo "$FINDINGS" | jq '[.[] | select(.kev)] | length')
         echo "  database was asked about them, so the counts above do not cover them."
         echo ""
     fi
+    if [ "${UNREACHED_N:-0}" -gt 0 ]; then
+        echo "- Not reachable: **${UNREACHED_N}** finding(s), listed separately below and not"
+        echo "  included in the counts above. govulncheck found that the affected Go package is"
+        echo "  not in the build (\`code_not_present\`), or that no affected function in it is"
+        echo "  called (source) or in the executable (binary) (\`code_not_reachable\`); each is"
+        echo "  recorded as \`not_affected\` in \`$(basename "${REACH_DOC:-reachability.cdx.json}")\`."
+        echo ""
+    fi
     if [ "${ADVISORY_N:-0}" -gt 0 ]; then
         echo "- Advisories with no CVE: **${ADVISORY_N}**, listed separately below and not"
         echo "  included in the counts above. Each is a distribution advisory number for"
@@ -441,18 +523,38 @@ KEV_COUNT=$(echo "$FINDINGS" | jq '[.[] | select(.kev)] | length')
             " | \(if .kev then "⚠️ KEV" else "" end)" +
             " | \(.cvss // "")" +
             " | \(if .epss then ((.epss*1000|floor)/1000|tostring) else "" end)" +
-            " | \(.id)\(if .unverified then " †" else "" end) | \(.pkg) | \(.version) | \(.fixed) |"'
+            " | \(.id)\(if .unverified then " †" else "" end)\(if .reach == "exploitable" then " ‡" else "" end) | \(.pkg) | \(.version) | \(.fixed) |"'
         # Footnote only when at least one finding is version-unverified.
         if echo "$FINDINGS" | jq -e 'any(.[]; .unverified)' >/dev/null 2>&1; then
             echo ""
             echo "† CPE-matched against NVD but the version range was not verified (deep-cve; set \`SECURITY_NVD_VERIFY=true\` with network + \`NVD_API_KEY\` to drop loose-version false positives)."
         fi
+        if [ "${REACHED_N:-0}" -gt 0 ]; then
+            echo ""
+            echo "‡ Reached: govulncheck found a call path to the affected Go code (source) or the affected symbol in the executable (binary)."
+        fi
     elif [ -n "$SCAN_ERR" ]; then
         echo "_Scan failed — no results were produced._"
     elif [ "${UNCHECKED_N:-0}" -gt 0 ]; then
         echo "_No vulnerability was found in the components that were checked. ${UNCHECKED_N} component(s) could not be checked; they are listed below._"
+    elif [ "${UNREACHED_N:-0}" -gt 0 ]; then
+        echo "_No reachable vulnerability was found. ${UNREACHED_N} finding(s) are not reachable; they are listed below._"
     else
         echo "_No known vulnerabilities found._"
+    fi
+    if [ "${UNREACHED_N:-0}" -gt 0 ]; then
+        echo ""
+        echo "## Not reachable"
+        echo ""
+        echo "govulncheck judged that the code these advisories name is not reached. They are"
+        echo "recorded as \`not_affected\` with \`code_not_present\` or \`code_not_reachable\` in"
+        echo "\`$(basename "${REACH_DOC:-reachability.cdx.json}")\`, and are not in the counts above."
+        echo ""
+        echo "| Severity | CVSS | CVE | Package | Installed | Fixed | Why |"
+        echo "|----------|-----:|-----|---------|-----------|-------|-----|"
+        echo "$UNREACHED_FINDINGS" | jq -r 'def cell: tostring | gsub("[|\n]"; " ");
+            sort_by({CRITICAL:0,HIGH:1,MEDIUM:2,LOW:3,UNKNOWN:4}[.severity] // 5)[] |
+            "| \(.severity) | \(.cvss // "") | \(.id) | \(.pkg) | \(.version) | \(.fixed) | \(.reach_detail | cell) |"'
     fi
     if [ "${UNCHECKED_N:-0}" -gt 0 ]; then
         echo ""
@@ -603,6 +705,9 @@ HTMLHEAD
     if [ "${UNCHECKED_N:-0}" -gt 0 ]; then
         echo "<div class=\"note\"><b>${UNCHECKED_N} component(s) could not be checked</b> and are listed below. No vulnerability database was asked about them, so the counts above do not cover them.</div>"
     fi
+    if [ "${UNREACHED_N:-0}" -gt 0 ]; then
+        echo "<div class=\"note\"><b>${UNREACHED_N} finding(s) are not reachable</b> and are listed at the end of this report, not in the counts above. govulncheck found that the affected Go package is not in the build (<code>code_not_present</code>), or that no affected function in it is called (source) or in the executable (binary) (<code>code_not_reachable</code>); each is recorded as <code>not_affected</code> in <code>$(esc "$(basename "${REACH_DOC:-reachability.cdx.json}")")</code>.</div>"
+    fi
     if [ "${ADVISORY_N:-0}" -gt 0 ]; then
         echo "<div class=\"note\"><b>${ADVISORY_N} advisories with no CVE</b> are listed below and are not included in the counts above. Each is a distribution advisory number for which the vulnerability database names no CVE.</div>"
     fi
@@ -617,17 +722,22 @@ HTMLHEAD
             "<td>" + (if .kev then "<span class=\"kevbadge\">KEV</span>" else "" end) + "</td>" +
             "<td class=\"num\">" + ((.cvss // "" )|tostring|@html) + "</td>" +
             "<td class=\"num\">" + (if .epss then ((.epss*1000|floor)/1000|tostring) else "" end) + "</td>" +
-            "<td>" + (.id|@html) + (if .unverified then " <span title=\"CPE-matched; NVD version range not verified\">&dagger;</span>" else "" end) + "</td><td>" + (.pkg|@html) + "</td>" +
+            "<td>" + (.id|@html) + (if .unverified then " <span title=\"CPE-matched; NVD version range not verified\">&dagger;</span>" else "" end) + (if .reach == "exploitable" then " <span title=\"" + (.reach_detail|@html) + "\">&Dagger;</span>" else "" end) + "</td><td>" + (.pkg|@html) + "</td>" +
             "<td>" + (.version|@html) + "</td><td>" + (.fixed|@html) + "</td>" +
             "<td>" + (.title|@html) + "</td></tr>"'
         echo "</table></div>"
         if echo "$FINDINGS" | jq -e 'any(.[]; .unverified)' >/dev/null 2>&1; then
             echo "<p class=\"meta\">&dagger; CPE-matched against NVD but the version range was not verified (deep-cve; set <code>SECURITY_NVD_VERIFY=true</code> with network + <code>NVD_API_KEY</code> to drop loose-version false positives).</p>"
         fi
+        if [ "${REACHED_N:-0}" -gt 0 ]; then
+            echo "<p class=\"meta\">&Dagger; Reached: govulncheck found a call path to the affected Go code (source) or the affected symbol in the executable (binary).</p>"
+        fi
     elif [ -n "$SCAN_ERR" ]; then
         echo "<p>Scan failed &mdash; no results were produced.</p>"
     elif [ "${UNCHECKED_N:-0}" -gt 0 ]; then
         echo "<p>No vulnerability was found in the components that were checked. ${UNCHECKED_N} component(s) could not be checked; they are listed below.</p>"
+    elif [ "${UNREACHED_N:-0}" -gt 0 ]; then
+        echo "<p>No reachable vulnerability was found. ${UNREACHED_N} finding(s) are not reachable; they are listed below.</p>"
     else
         echo "<p>No known vulnerabilities found.</p>"
     fi
@@ -643,6 +753,19 @@ HTMLHEAD
         if [ "$UNCHECKED_N" -gt "$UNCHECKED_MAX" ]; then
             echo "<p class=\"meta\">&hellip; and $((UNCHECKED_N - UNCHECKED_MAX)) more, listed in <code>UncheckedComponents</code> in <code>$(esc "$(basename "$JSON")")</code>.</p>"
         fi
+    fi
+    if [ "${UNREACHED_N:-0}" -gt 0 ]; then
+        echo "<h2>Not reachable</h2>"
+        echo "<p class=\"meta\">govulncheck judged that the code these advisories name is not reached. They are recorded as <code>not_affected</code> with <code>code_not_present</code> or <code>code_not_reachable</code> in <code>$(esc "$(basename "${REACH_DOC:-reachability.cdx.json}")")</code>, and are not in the counts above.</p>"
+        echo "<div class=\"table-wrap\"><table><tr><th>Severity</th><th>CVSS</th><th>CVE</th><th>Package</th><th>Installed</th><th>Fixed</th><th>Why</th></tr>"
+        echo "$UNREACHED_FINDINGS" | jq -r 'sort_by(
+            {CRITICAL:0,HIGH:1,MEDIUM:2,LOW:3,UNKNOWN:4}[.severity] // 5)[] |
+            "<tr><td class=\"sev-\(.severity)\">" + (.severity|@html) + "</td>" +
+            "<td class=\"num\">" + ((.cvss // "")|tostring|@html) + "</td>" +
+            "<td>" + (.id|@html) + "</td><td>" + (.pkg|@html) + "</td>" +
+            "<td>" + (.version|@html) + "</td><td>" + (.fixed|@html) + "</td>" +
+            "<td>" + (.reach_detail|@html) + "</td></tr>"'
+        echo "</table></div>"
     fi
     if [ "${ADVISORY_N:-0}" -gt 0 ]; then
         echo "<h2>Advisories with no CVE</h2>"
@@ -673,5 +796,5 @@ HTMLHEAD
 if [ -n "$SCAN_ERR" ]; then
     echo "[security] generated: $JSON, $MD, $HTML (SCAN FAILED — results incomplete: ${SCAN_ERR})"
 else
-    echo "[security] generated: $JSON, $MD, $HTML (total=${TOTAL}, critical=${C}, high=${H}, kev=${KEV_COUNT}, unchecked=${UNCHECKED_N:-0}, advisories=${ADVISORY_N:-0})"
+    echo "[security] generated: $JSON, $MD, $HTML (total=${TOTAL}, critical=${C}, high=${H}, kev=${KEV_COUNT}, unchecked=${UNCHECKED_N:-0}, advisories=${ADVISORY_N:-0}${REACH_DOC:+, not-reachable=${UNREACHED_N:-0}})"
 fi

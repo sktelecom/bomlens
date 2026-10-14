@@ -102,6 +102,7 @@ Each step also has `stage` (1 for the SBOM a language image generated before thi
 | `source-snapshot` | keep the scanned files' content for the file viewer |
 | `generate-notice` | write the open source notice |
 | `match-cpe` | a firmware, root filesystem or binary scan with `--security`: match the CPEs of components that have no package PURL against the NVD CPE index bundled in the image; `counts` gives `offered`, `components` and `cves`, `skipped` (`not_installed`) in an image without the index, `disabled` without `--security` or with `CVE_BIN_TOOL_MODE=components-only` |
+| `reachability` | a Go source or Go executable scan: judge with govulncheck whether the code each Go advisory names is reached (`--reachability`, `REACHABILITY=true`); `counts` gives `exploitable`, `not_affected` and `components`; `skipped` (`unavailable`) when the Go vulnerability database could not be read, (`no_input`) when the SBOM has no Go component or stage 1 left no govulncheck output for this run, (`too_large`) when the source tree has more than 20 Go modules, `degraded` (`unavailable`) when a Go module builds for none of GOOS linux, darwin and windows and is not judged, (`not_installed`) in an image without govulncheck; `disabled` without the option |
 | `scan-security` | match vulnerabilities with Trivy |
 | `deep-cve` | with `--security`: match the components that carry a CPE, and the extra CPEs in `bomlens:cpeAlternates`, against NVD with grype (`--deep-cve`, the deep-cve image); `skipped` (`not_installed`) when asked for in an image without grype, `skipped` (`fallback`) when the CLI ran it without the deep-cve image, because that image could not be pulled or the scanner image is a local build, a version before 1.13.2 or not a BomLens image name (`detail` says which; a kept image that has grype, built with `SBOM_DEEP_CVE=true`, runs the match and records its real outcome), `disabled` when not asked for, without `--security`, and in a firmware or AI model scan |
 | `generate-risk-report` | write the risk report |
@@ -123,6 +124,7 @@ Each step also has `stage` (1 for the SBOM a language image generated before thi
 | `vulnerabilities.other` | another engine's result (`_security_grype.json`, `_security_cvebintool.json`, `_security_yocto.json`) |
 | `license-scan.scancode` | `_scancode.json` |
 | `vendored.cyclonedx` | `_vendored.cdx.json` |
+| `vex.reachability` | `_reachability.cdx.json` (`--reachability`) |
 | `conformance` | `_conformance.json` |
 | `input-description` | `_input.json` |
 | `events` | `bomlens-events.jsonl` (`BOMLENS_EVENTS=file`) |
@@ -189,6 +191,8 @@ Set `CDXGEN_IMAGE_PREFIX` for `MODE=PLAN` to name the stage 1 image from a regis
 Set `CYCLONEDX_SPEC_VERSION` (`1.6`, the default, or `1.7`; the CLI's `--spec-version`) for `MODE=PLAN` to plan a CycloneDX 1.7 SBOM. The plan gives it to stage 1 as the last argument of `build-prep.sh` and to stage 2 as `CYCLONEDX_SPEC_VERSION` in its `env`, so the stage 2 fallback (syft) writes the same version and stage 2 raises an SBOM written at 1.4, 1.5 or 1.6 to 1.7 (1.3 and older keep their version). It is part of the input fingerprint (`CDX_SPEC_VERSION`). Any other value stops `MODE=PLAN` with a non-zero exit.
 
 `MODE=PLAN` exits 0 when it wrote a plan, `ok` or `unsupported`; an `unsupported` plan records the `plan` step as `skipped` in the result manifest, so the run reads `succeeded_degraded`. It refuses an empty source (usually a mount that did not reach the container) with a non-zero exit. Before writing, it removes an earlier plan and an earlier run's stage 1 outputs from the output folder, since stage 2 cannot tell a fresh SBOM from a leftover one. Stage 1 images are pinned for the cdxgen tag this BomLens release was tested with; overriding `CDXGEN_TAG` makes the language images `unsupported` (`no-pinned-digest`).
+
+A plan's stage 1 does not run govulncheck, so Go source reachability is not judged on this path: with `REACHABILITY=true`, stage 2 records the `reachability` step as `skipped` (`no_input`).
 
 Run stage 2 whatever stage 1's exit code, and pass that code as `BOMLENS_STAGE1_EXIT`, `true` in `BOMLENS_STAGE1_OOM` when the stage 1 container was killed for memory, and the stage 1 log saved in the output folder as `BOMLENS_STAGE1_LOG` (a file name). When stage 1 failed or left no SBOM, stage 2 scans the source with syft instead (direct dependencies only), records the reason in `bomlens:sbom-tool-degraded` (`oom`, `disk-space`, `network`, `cdxgen-crash`, `cdxgen-unavailable`), and the result manifest records `generate` as `degraded` (`fallback`), the same as the CLI. For an `unsupported` plan, where no stage 1 ran, pass `BOMLENS_STAGE1_EXIT=127` (or `BOMLENS_STAGE1_REASON=cdxgen-unavailable`) with no SBOM: the reason is then `cdxgen-unavailable`.
 

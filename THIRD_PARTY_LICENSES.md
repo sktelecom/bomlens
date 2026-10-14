@@ -22,6 +22,7 @@ BomLens (Apache-2.0) keeps its own code in shell scripts and bundles several ope
 | Trivy | Vulnerability scanning | Apache-2.0 | https://github.com/aquasecurity/trivy |
 | trivy-db | Vulnerability database | Apache-2.0 | https://github.com/aquasecurity/trivy-db |
 | cosign | SBOM signing | Apache-2.0 | https://github.com/sigstore/cosign |
+| govulncheck | Go reachability of Go advisories (`--reachability`); one static executable built from `golang.org/x/vuln`, with the Go standard library compiled in. It reads the Go vulnerability database (vuln.go.dev, CC-BY-4.0) online, nothing is bundled | BSD-3-Clause | https://go.googlesource.com/vuln |
 | scancode-toolkit | Detailed license detection. Not in this image; it ships only in the opt-in `bomlens-deep-license` image, see below | Apache-2.0 AND CC-BY-4.0 | https://github.com/aboutcode-org/scancode-toolkit |
 | scanoss (scanoss.py) | Vendored open-source identification (bundled by default; disable with `SBOM_SCANOSS=false`) | MIT (the bundled `osadl-copyleft.json` dataset is CC-BY-4.0) | https://github.com/scanoss/scanoss.py |
 | owasp-aibom-generator | AI model SBOM generation (opt-in `SBOM_AIBOM`, separate image `bomlens-aibom`; calls the HuggingFace API) | Apache-2.0 | https://github.com/GenAI-Security-Project/aibom-generator |

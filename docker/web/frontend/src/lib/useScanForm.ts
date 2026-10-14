@@ -25,6 +25,7 @@ import {
   type UsageContext,
 } from "@/lib/api";
 import i18n from "@/lib/i18n";
+import { reachabilityOffered } from "@/lib/reachability";
 import { DEFAULT_VERSION, parseSbomIdentity, suggestIdentity } from "@/lib/scanDefaults";
 
 export const UPLOAD_KIND: Partial<Record<SourceType, UploadKind>> = {
@@ -180,6 +181,11 @@ export function useScanForm({
   const [deepCve, setDeepCve] = useState(
     () => initialConfig?.deepCve ?? false,
   );
+  // Go reachability (govulncheck): opt-in, it reads the Go vulnerability
+  // database online. Offered for a source tree or an uploaded executable.
+  const [reachability, setReachability] = useState(
+    () => initialConfig?.reachability ?? false,
+  );
   const [scanossToken, setScanossToken] = useState("");
   const [errors, setErrors] = useState<FieldErrors>({});
   const [uploadError, setUploadError] = useState<UploadErrorInfo | null>(null);
@@ -276,11 +282,20 @@ export function useScanForm({
   // report it extends, and the server's --deep-cve flag itself implies
   // GENERATE_SECURITY=true — so turning deep CVE on forces security on too.
   const deepCveOn = showDeepCve && deepCve;
-  const securityForced = isAnalyze || deepCveOn;
+  // Go reachability reads a Go source tree (SOURCE: the current folder, a git
+  // URL, an archive, a picked folder scanned deep) or a Go executable (BINARY:
+  // an uploaded package). A wheel or an installer upload does not end up as
+  // BINARY, but the scanner then records the step as unused, nothing more.
+  // Gated on govulncheck being in this image.
+  const showReachability = reachabilityOffered(source, effectiveSource, capabilities.reachability);
+  // The judgements mark rows of the security report, so like deep CVE it turns
+  // that report on.
+  const reachabilityOn = showReachability && reachability;
+  const securityForced = isAnalyze || deepCveOn || reachabilityOn;
   const showScanOptions =
     showDeepLicense || showVendored || showByteStable ||
     showOutboundLicense || showSbomAuthor || showSpecVersion || showDeepCve ||
-    showConformanceProfile;
+    showConformanceProfile || showReachability;
   // Any scan produces an SBOM, so upload is offered for every source.
   // A declaration opens questions before any scan; a credential stashed now
   // would sit on the server if they were cancelled, so it is not offered here.
@@ -500,6 +515,7 @@ export function useScanForm({
       // Deep CVE matching: opt-in wherever offered (see showDeepCve); ignored
       // (sent false) when hidden.
       deepCve: showDeepCve ? deepCve : false,
+      reachability: reachabilityOn,
       uploadTarget: showUpload && uploadEnabled ? uploadTarget : "",
       uploadUrl: showUpload && uploadEnabled ? uploadUrl.trim() : "",
       uploadCred,
@@ -536,6 +552,7 @@ export function useScanForm({
     deepLicense, setDeepLicense,
     identifyVendored, setIdentifyVendored,
     deepCve, setDeepCve,
+    reachability, setReachability,
     byteStable, setByteStable,
     conformanceProfile, setConformanceProfile,
     outboundLicense, setOutboundLicense,
@@ -549,7 +566,7 @@ export function useScanForm({
     truscaProjectId, setTruscaProjectId,
     errors, uploadError, uploading, uploadPercent,
     busy, uploadKind, textInput, isText, isAnalyze, isAiModel, showVendored,
-    showDeepLicense, showDeepCve, showByteStable, showOutboundLicense,
+    showDeepLicense, showDeepCve, showReachability, showByteStable, showOutboundLicense,
     showSbomAuthor,
     showSpecVersion,
     showConformanceProfile,

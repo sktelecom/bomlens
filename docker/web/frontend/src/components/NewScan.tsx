@@ -149,6 +149,7 @@ export function NewScan({
     state.identifyVendored,
     state.deepLicense,
     state.deepCve,
+    state.reachability,
     state.byteStable,
   ].filter(Boolean).length;
 
