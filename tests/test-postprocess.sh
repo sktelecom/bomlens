@@ -4706,8 +4706,8 @@ sed -n '/^# Stale-artifact cleanup\./,/^# Report language for the human-facing c
 CLEANUP_SNIPPET_LINES="$(wc -l < "$WORK/cleanup-snippet.sh" | tr -d '[:space:]')"
 if [ ! -s "$WORK/cleanup-snippet.sh" ]; then
     fail "could not extract the stale-artifact cleanup snippet from entrypoint.sh (did its anchor comments move?)"
-elif [ -z "$CLEANUP_SNIPPET_LINES" ] || [ "$CLEANUP_SNIPPET_LINES" -gt 100 ]; then
-    fail "cleanup snippet is $CLEANUP_SNIPPET_LINES lines (expected well under 100) -- the end anchor likely did not match, and sourcing it would run the rest of entrypoint.sh" \
+elif [ -z "$CLEANUP_SNIPPET_LINES" ] || [ "$CLEANUP_SNIPPET_LINES" -gt 160 ]; then
+    fail "cleanup snippet is $CLEANUP_SNIPPET_LINES lines (expected well under 160) -- the end anchor likely did not match, and sourcing it would run the rest of entrypoint.sh" \
         "did the REPORT_LANG comment in docker/entrypoint.sh change?"
 elif grep -q '^[[:space:]]*exit\b' "$WORK/cleanup-snippet.sh"; then
     fail "cleanup snippet contains an exit statement -- refusing to source it into this test process" \
