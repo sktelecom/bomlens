@@ -240,8 +240,9 @@ else
                 if [ "$v" = "$SPEC" ]; then
                     continue
                 elif [ "$v" = "$MLSPEC" ]; then
-                    # The ML-BOM version is only correct in AI-model context.
-                    if ! printf '%s' "$line" | grep -qiE 'ml-?bom|model|aibom|\bAI\b'; then
+                    # The ML-BOM version is only correct in AI-model context,
+                    # or where the line names the option that asks for it.
+                    if ! printf '%s' "$line" | grep -qiE 'ml-?bom|model|aibom|\bAI\b|spec-version|SPEC_VERSION'; then
                         echo "  DRIFT[spec]: $f:$ln uses CycloneDX $v outside an AI/ML-BOM context (SBOM specVersion is $SPEC)"
                         FAIL=$((FAIL + 1))
                     fi
