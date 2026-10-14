@@ -529,22 +529,20 @@ if [ -f composer.json ] && [ ! -f composer.lock ] && command -v composer >/dev/n
     rm -f "${_cj_orig:-}" "${_cj_new:-}"
 fi
 
-# Maven — no pre-resolve step. cdxgen invokes maven itself (dependency:tree /
-# the cyclonedx plugin) to build the full transitive graph, so a separate
-# `mvn dependency:resolve` here is redundant. It also failed noisily: the run is
-# pinned to an empty -Dmaven.repo.local, so maven could
-# not resolve the dependency-plugin prefix and printed a NoPluginFoundForPrefix
-# error to stdout on every Java scan. Dropping it removes that noise with no
-# effect on the SBOM — cdxgen alone already resolves transitive deps (verified:
-# the same scan yields 91 components with this step gone).
+# Maven dependency graph: cdxgen invokes maven itself (dependency:tree / the
+# cyclonedx plugin) to build the full transitive graph, so no resolve step is
+# needed for the graph. An earlier `mvn dependency:resolve` here was dropped for
+# that reason; called by its prefix it also printed a NoPluginFoundForPrefix
+# error on every Java scan. The jar fetch below calls the plugin by its full
+# coordinates, so prefix resolution does not come into it.
 #
 # Maven scope over-scan: cdxgen keeps EVERY resolved node, so a deployed app's
 # SBOM also carries its test/provided toolchain (junit, lombok, ...) as if it
 # shipped them. This is the Maven analogue of the Android/npm over-scan. cdxgen
 # already tags each node with its resolved scope (compile/runtime -> "required",
 # test -> "optional", provided/system -> "excluded"), so we post-filter the BOM
-# to the deployable set using those tags near the end of this script — no second
-# maven run needed (that would hit the empty-repo NoPluginFoundForPrefix above).
+# to the deployable set using those tags near the end of this script, so the
+# filter itself needs no maven run.
 # Caveat: cdxgen maps both test scope and <optional>true</optional> to "optional",
 # so a rare optional=true runtime dep is dropped too; BOMLENS_MAVEN_FULL_GRAPH=1
 # opts out (keep the full graph, unchanged behavior).
@@ -556,32 +554,38 @@ fi
 # Maven component hashes: cdxgen computes a component's hashes from its jar,
 # looked up only at $HOME/.m2/repository/<group>/<artifact>/<version>/, and
 # its dependency:tree run downloads poms, not jars. On a fresh repository every
-# Maven component therefore came out without hashes. Fetch the jars of the
-# graph the SBOM keeps (runtime scope when the scope filter above applies,
-# every scope otherwise) into the same local repository first. Best-effort: a
-# failure (an unbuilt reactor sibling, no network) only costs the hashes, so it
-# is logged and not recorded as a failed resolution step.
+# Maven component therefore came out without hashes. Fetch the jars into the
+# same local repository first. dependency:resolve has Maven resolve the test
+# classpath before the goal runs, so it fetches the jars of every scope; the
+# scope filter above still drops the test-only components from the SBOM. The
+# plugin is named by its full coordinates (no prefix lookup) and the run uses
+# --fail-never, so a module that fails (an unbuilt reactor sibling) does not
+# stop the others. Best-effort: a failure (no network) only costs the hashes,
+# so it is logged and not recorded as a failed resolution step. Skipped when
+# the root also has a Gradle build, which cdxgen reads instead. The wrapper is
+# used only when its .mvn/wrapper files are there; otherwise mvn.
+MAVEN_DEPENDENCY_PLUGIN="org.apache.maven.plugins:maven-dependency-plugin:3.11.0"
 MAVEN_REPO_LOCAL="$HOME/.m2/repository"
 case " ${MAVEN_OPTS:-} " in
     *" -Dmaven.repo.local="*)
         MAVEN_REPO_LOCAL=$(printf '%s\n' " $MAVEN_OPTS " | sed 's/.* -Dmaven\.repo\.local=\([^ ]*\) .*/\1/') ;;
 esac
-if [ -f pom.xml ]; then
+if [ -f pom.xml ] && [ ! -f build.gradle ] && [ ! -f build.gradle.kts ]; then
     _mvn_cmd=""
-    if [ -x ./mvnw ]; then _mvn_cmd=./mvnw
+    if [ -x ./mvnw ] && [ -d .mvn/wrapper ]; then _mvn_cmd=./mvnw
     elif command -v mvn >/dev/null 2>&1; then _mvn_cmd=mvn
     fi
     if [ "$MAVEN_REPO_LOCAL" != "$HOME/.m2/repository" ]; then
         log "maven: local repository $MAVEN_REPO_LOCAL is not $HOME/.m2/repository; cdxgen will not find jars for hashes"
     elif [ -n "$_mvn_cmd" ]; then
-        _mvn_scope="-DincludeScope=test"
-        [ -n "$MAVEN_SCOPE_FILTER" ] && _mvn_scope="-DincludeScope=runtime"
         _mvn_err=$(mktemp)
-        if run_supervised_timeout "$PREP_TIMEOUT_DEFAULT" "$_mvn_cmd" -q -B dependency:resolve "$_mvn_scope" >"$_mvn_err" 2>&1; then
+        if run_supervised_timeout "$PREP_TIMEOUT_DEFAULT" "$_mvn_cmd" -q -B --fail-never \
+                "$MAVEN_DEPENDENCY_PLUGIN:resolve" >"$_mvn_err" 2>&1 \
+            && ! grep -q '^\[ERROR\]' "$_mvn_err"; then
             log "maven: fetched dependency jars for component hashes"
         else
             log "maven: could not fetch every dependency jar; some components will have no hashes (non-fatal)"
-            tail -5 "$_mvn_err" | sed 's/^/[build-prep]   /'
+            grep '^\[ERROR\]' "$_mvn_err" | head -5 | sed 's/^/[build-prep]   /'
         fi
         rm -f "$_mvn_err"
     fi

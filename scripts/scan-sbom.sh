@@ -2550,7 +2550,10 @@ if [ "$MODE" = "SOURCE" ]; then
     echo "[1/2] Generating SBOM (cdxgen)..."
     CACHE_MOUNTS=""
     [ -d "$HOME/.gradle" ] && CACHE_MOUNTS="$CACHE_MOUNTS -v \"$(hostpath "$HOME/.gradle")\":/root/.gradle"
-    [ -d "$HOME/.m2" ] && CACHE_MOUNTS="$CACHE_MOUNTS -v \"$(hostpath "$HOME/.m2")\":/root/.m2"
+    # The Maven cache goes where MAVEN_OPTS below points Maven (user.home for
+    # settings.xml, maven.repo.local for the repository) and where cdxgen looks
+    # for jars ($HOME/.m2/repository).
+    [ -d "$HOME/.m2" ] && CACHE_MOUNTS="$CACHE_MOUNTS -v \"$(hostpath "$HOME/.m2")\":/tmp/sbomhome/.m2"
     # HOME=/tmp/sbomhome: writable for both root and non-root (cyclonedx) images,
     # so maven/cargo/etc. caches resolve regardless of the base image's user.
     # -u 0:0: the all-in-one fallback image runs as a non-root user and could not
@@ -2615,7 +2618,7 @@ if [ "$MODE" = "SOURCE" ]; then
         $CACHE_MOUNTS \
         $GUARD_STATE_ARGS \
         -e HOME=/tmp/sbomhome \
-        -e MAVEN_OPTS=-Dmaven.repo.local=/tmp/sbomhome/.m2/repository \
+        -e "\"MAVEN_OPTS=-Duser.home=/tmp/sbomhome -Dmaven.repo.local=/tmp/sbomhome/.m2/repository\"" \
         -e FETCH_LICENSE="$FETCH_LICENSE" \
         -e PROJECT_NAME="\"$PROJECT_NAME\"" \
         -e PROJECT_VERSION="\"$PROJECT_VERSION\"" \
