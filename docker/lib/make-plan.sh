@@ -170,6 +170,7 @@ jq -n \
             HOST_OUTPUT_DIR: "/host-output",
             PROJECT_NAME: $pname,
             PROJECT_VERSION: $pver,
+            CYCLONEDX_SPEC_VERSION: $spec,
             UPLOAD_ENABLED: "false"
           },
           env_passthrough: (["HOST_UID", "HOST_GID", "SRC_TREE_EXCLUDE"] + ($prep2 | split(" ") | map(select(. != "")))
