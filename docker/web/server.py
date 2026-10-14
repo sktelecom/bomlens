@@ -3592,7 +3592,10 @@ def run_deep_license_first(source_root, out_dir, project, version, env, on_log, 
     scancode on it) and SIGKILL once CANCEL_GRACE_SECONDS have passed.
     Returns the exit code, or None when cancelled."""
     prefix = "%s_%s" % (safe_name(project), safe_name(version))
-    out = os.path.join(out_dir, prefix + "_scancode.json")
+    out = os.path.realpath(os.path.join(out_dir, prefix + "_scancode.json"))
+    if not out.startswith(os.path.realpath(out_dir) + os.sep):
+        on_log("[ERROR] The licence scan output path leaves the run folder; not running it.")
+        return 1
     try:
         os.remove(out)
     except OSError:

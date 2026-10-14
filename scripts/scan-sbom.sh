@@ -1101,8 +1101,8 @@ cleanup() {
 # the EXIT trap, and cleanup a second time does nothing more (the temp dirs
 # are gone and the container name is cleared).
 trap cleanup EXIT
-trap 'cleanup; exit 130' INT
-trap 'cleanup; exit 143' TERM
+trap 'cleanup; echo "[INFO] Scan cancelled (Ctrl+C); the scan container was stopped." >&2; exit 130' INT
+trap 'cleanup; echo "[INFO] Scan stopped (TERM); the scan container was stopped." >&2; exit 143' TERM
 RUNNING_CONTAINER_NAME=""
 
 # Host-persistent guard state: when a scan is interrupted hard
