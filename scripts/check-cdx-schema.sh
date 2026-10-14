@@ -4,7 +4,7 @@
 # Licensed under the Apache License, Version 2.0.
 #
 # check-cdx-schema.sh — validate CycloneDX JSON documents against the official
-# schema of the version each one declares, 1.6 or 1.7, with the CycloneDX CLI
+# schema of the version each one declares, 1.4 to 1.7, with the CycloneDX CLI
 # (pinned version, checksum-verified). A document that declares another version
 # is checked against 1.7.
 #
@@ -108,6 +108,8 @@ for f in "$@"; do
     fi
     spec="$(jq -r '.specVersion // ""' "$f" 2>/dev/null || true)"
     case "$spec" in
+        1.4) input_version=v1_4; label=1.4 ;;
+        1.5) input_version=v1_5; label=1.5 ;;
         1.6) input_version=v1_6; label=1.6 ;;
         *)   input_version=v1_7; label=1.7 ;;
     esac
