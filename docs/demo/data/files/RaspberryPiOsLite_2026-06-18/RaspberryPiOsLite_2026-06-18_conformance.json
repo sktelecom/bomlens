@@ -2,7 +2,7 @@
   "project": "RaspberryPiOsLite",
   "format": "CycloneDX",
   "result": "fail",
-  "generatedAt": "2026-10-12T08:31:56Z",
+  "generatedAt": "2026-10-14T18:15:39Z",
   "profile": "default",
   "untraceableComponents": 1904,
   "checks": [
@@ -30,7 +30,7 @@
       "label": "Timestamp (metadata.timestamp)",
       "required": true,
       "status": "pass",
-      "detail": "2026-10-12T08:22:02Z",
+      "detail": "2026-10-14T18:07:17Z",
       "missing": [],
       "regulations": [
         {
@@ -42,7 +42,7 @@
         }
       ],
       "label_ko": "타임스탬프 (metadata.timestamp)",
-      "detail_ko": "2026-10-12T08:22:02Z"
+      "detail_ko": "2026-10-14T18:07:17Z"
     },
     {
       "id": "tools",
@@ -161,7 +161,7 @@
       "source": "auto",
       "naKind": "",
       "status": "pass",
-      "detail": "98% (2829/2860); 9 identified by CPE instead",
+      "detail": "99% (2835/2860); 8 identified by CPE instead",
       "missing": [
         "cli-32",
         "cli-64",
@@ -181,13 +181,7 @@
         "libnl",
         "libpcap",
         "libusb",
-        "linux_kernel",
         "ncurses",
-        "net-tools",
-        "net-tools",
-        "net-tools",
-        "net-tools",
-        "net-tools",
         "nghttp2",
         "pcre2",
         "readline",
@@ -205,7 +199,7 @@
         }
       ],
       "label_ko": "PURL 포함률 (90% 이상)",
-      "detail_ko": "98% (2829/2860); 9 identified by CPE instead"
+      "detail_ko": "99% (2835/2860); 8 identified by CPE instead"
     },
     {
       "id": "file-identifier",
@@ -214,11 +208,11 @@
       "source": "auto",
       "naKind": "",
       "status": "pass",
-      "detail": "100% (57270/57270)",
+      "detail": "100% (57262/57262)",
       "missing": [],
       "regulations": [],
       "label_ko": "파일 구성요소 식별자 포함률 (해시, 80% 이상, 권장)",
-      "detail_ko": "100% (57270/57270)"
+      "detail_ko": "100% (57262/57262)"
     },
     {
       "id": "no-generic",
@@ -362,7 +356,7 @@
       "source": "auto",
       "naKind": "",
       "status": "warn",
-      "detail": "4% (2772/60131)",
+      "detail": "4% (2772/60123)",
       "missing": [],
       "regulations": [
         {
@@ -374,7 +368,7 @@
         }
       ],
       "label_ko": "라이선스 포함률 (80% 이상, 권장)",
-      "detail_ko": "4% (2772/60131)"
+      "detail_ko": "4% (2772/60123)"
     },
     {
       "id": "hash",
@@ -383,7 +377,7 @@
       "source": "auto",
       "naKind": "",
       "status": "pass",
-      "detail": "95% (57270/60131)",
+      "detail": "95% (57270/60123)",
       "missing": [],
       "regulations": [
         {
@@ -395,7 +389,7 @@
         }
       ],
       "label_ko": "해시 포함률 (50% 이상, 권장)",
-      "detail_ko": "95% (57270/60131)"
+      "detail_ko": "95% (57270/60123)"
     },
     {
       "id": "hash-algorithm",
@@ -404,7 +398,7 @@
       "source": "auto",
       "naKind": "",
       "status": "warn",
-      "detail": "0% (0/60131)",
+      "detail": "0% (0/60123)",
       "missing": [],
       "regulations": [
         {
@@ -416,7 +410,7 @@
         }
       ],
       "label_ko": "SHA-512 체크섬 포함률 (80% 이상, 권장)",
-      "detail_ko": "0% (0/60131)"
+      "detail_ko": "0% (0/60123)"
     },
     {
       "id": "component-creator",
@@ -425,7 +419,7 @@
       "source": "auto",
       "naKind": "",
       "status": "warn",
-      "detail": "22% (632/2860)",
+      "detail": "24% (700/2860)",
       "missing": [],
       "regulations": [
         {
@@ -437,7 +431,7 @@
         }
       ],
       "label_ko": "구성요소 작성자 포함률 (80% 이상, 권장)",
-      "detail_ko": "22% (632/2860)"
+      "detail_ko": "24% (700/2860)"
     },
     {
       "id": "component-filename",
@@ -732,7 +726,7 @@
       "label_ko": "구성요소 이름",
       "required": false,
       "status": "pass",
-      "detail": "60132/60132 component(s)",
+      "detail": "60124/60124 component(s)",
       "missing": [],
       "evidence": [],
       "cluster": "cisa-component",
@@ -747,7 +741,7 @@
           "short_ko": "CISA 2026"
         }
       ],
-      "detail_ko": "구성요소 60132/60132"
+      "detail_ko": "구성요소 60124/60124"
     },
     {
       "id": "cisa-component-version",
@@ -755,7 +749,7 @@
       "label_ko": "구성요소 버전",
       "required": false,
       "status": "warn",
-      "detail": "2862/60132 component(s)",
+      "detail": "2862/60124 component(s)",
       "missing": [
         "EGG-INFO/PKG-INFO",
         "EGG-INFO/top_level.txt",
@@ -821,7 +815,7 @@
           "short_ko": "CISA 2026"
         }
       ],
-      "detail_ko": "구성요소 2862/60132"
+      "detail_ko": "구성요소 2862/60124"
     },
     {
       "id": "cisa-component-producer",
@@ -829,7 +823,7 @@
       "label_ko": "구성요소 생산자",
       "required": false,
       "status": "warn",
-      "detail": "632/60132 component(s)",
+      "detail": "700/60124 component(s)",
       "missing": [
         "2026-06-18-raspios-trixie-arm64-lite.img.xz",
         "EGG-INFO/PKG-INFO",
@@ -899,7 +893,7 @@
           "short_ko": "CISA 2026"
         }
       ],
-      "detail_ko": "구성요소 632/60132"
+      "detail_ko": "구성요소 700/60124"
     },
     {
       "id": "cisa-component-identifiers",
@@ -907,7 +901,7 @@
       "label_ko": "구성요소 식별자",
       "required": false,
       "status": "warn",
-      "detail": "60109/60132 component(s)",
+      "detail": "60106/60124 component(s)",
       "missing": [
         "debian",
         "dhcpcd",
@@ -921,11 +915,6 @@
         "libpcap",
         "libusb",
         "ncurses",
-        "net-tools",
-        "net-tools",
-        "net-tools",
-        "net-tools",
-        "net-tools",
         "nghttp2",
         "pcre2",
         "readline",
@@ -934,7 +923,6 @@
         "zlib"
       ],
       "evidence": [
-        "cpe:/a:linux:linux_kernel:6.18.34",
         "cpe:2.3:a:cli-32:cli-32:*:*:*:*:*:*:*:*",
         "cpe:2.3:a:cli-64:cli-64:*:*:*:*:*:*:*:*",
         "cpe:2.3:a:cli-arm64:cli-arm64:*:*:*:*:*:*:*:*",
@@ -983,7 +971,8 @@
         "pkg:deb/debian/cron-daemon-common@3.0pl1-197?arch=all&distro=debian-13.5",
         "pkg:deb/debian/cron@3.0pl1-197?arch=arm64&distro=debian-13.5",
         "pkg:deb/debian/curl@8.14.1-2%2Bdeb13u3?arch=arm64&distro=debian-13.5",
-        "pkg:deb/debian/dash@0.5.12-12?arch=arm64&distro=debian-13.5"
+        "pkg:deb/debian/dash@0.5.12-12?arch=arm64&distro=debian-13.5",
+        "pkg:deb/debian/dbus-bin@1.16.2-2?arch=arm64&distro=debian-13.5"
       ],
       "cluster": "cisa-component",
       "source": "auto",
@@ -997,7 +986,7 @@
           "short_ko": "CISA 2026"
         }
       ],
-      "detail_ko": "구성요소 60109/60132"
+      "detail_ko": "구성요소 60106/60124"
     },
     {
       "id": "cisa-component-license",
@@ -1005,7 +994,7 @@
       "label_ko": "구성요소 라이선스",
       "required": false,
       "status": "warn",
-      "detail": "2772/60132 component(s)",
+      "detail": "2772/60124 component(s)",
       "missing": [
         "2026-06-18-raspios-trixie-arm64-lite.img.xz",
         "EGG-INFO/PKG-INFO",
@@ -1071,7 +1060,7 @@
           "short_ko": "CISA 2026"
         }
       ],
-      "detail_ko": "구성요소 2772/60132"
+      "detail_ko": "구성요소 2772/60124"
     },
     {
       "id": "cisa-component-hash-value",
@@ -1079,12 +1068,8 @@
       "label_ko": "구성요소 해시 값",
       "required": false,
       "status": "warn",
-      "detail": "57271/60132 component(s)",
+      "detail": "57271/60124 component(s)",
       "missing": [
-        "cli-32",
-        "cli-64",
-        "cli-arm64",
-        "cli",
         "debian",
         "dhcpcd",
         "dnsmasq",
@@ -1092,10 +1077,6 @@
         "glib",
         "glibc",
         "gnutls",
-        "gui-32",
-        "gui-64",
-        "gui-arm64",
-        "gui",
         "json-c",
         "libnl",
         "libpcap",
@@ -1130,7 +1111,15 @@
         "bluez",
         "bsdextrautils",
         "bsdutils",
-        "build-essential"
+        "build-essential",
+        "busybox",
+        "bzip2",
+        "ca-certificates",
+        "cifs-utils",
+        "cloud-guest-utils",
+        "cloud-init",
+        "console-setup-linux",
+        "console-setup"
       ],
       "evidence": [],
       "cluster": "cisa-component",
@@ -1149,7 +1138,7 @@
           "short_ko": "CISA 2026"
         }
       ],
-      "detail_ko": "구성요소 57271/60132"
+      "detail_ko": "구성요소 57271/60124"
     },
     {
       "id": "cisa-component-hash-algorithm",
@@ -1157,7 +1146,7 @@
       "label_ko": "구성요소 해시 알고리즘",
       "required": false,
       "status": "pass",
-      "detail": "60132/60132 component(s)",
+      "detail": "60124/60124 component(s)",
       "missing": [],
       "evidence": [],
       "cluster": "cisa-component",
@@ -1172,7 +1161,7 @@
           "short_ko": "CISA 2026"
         }
       ],
-      "detail_ko": "구성요소 60132/60132"
+      "detail_ko": "구성요소 60124/60124"
     },
     {
       "id": "cisa-component-dependency-relationship",
@@ -1410,7 +1399,7 @@
             "label": "Timestamp (metadata.timestamp)",
             "status": "pass",
             "source": null,
-            "detail": "2026-10-12T08:22:02Z",
+            "detail": "2026-10-14T18:07:17Z",
             "refs": [
               "Section 5.2.1"
             ]
@@ -1450,7 +1439,7 @@
             "label": "PURL coverage (>= 90%)",
             "status": "pass",
             "source": "auto",
-            "detail": "98% (2829/2860); 9 identified by CPE instead",
+            "detail": "99% (2835/2860); 8 identified by CPE instead",
             "refs": [
               "Section 5.2.4"
             ]
@@ -1470,7 +1459,7 @@
             "label": "License coverage (>= 80%, recommended)",
             "status": "warn",
             "source": "auto",
-            "detail": "4% (2772/60131)",
+            "detail": "4% (2772/60123)",
             "refs": [
               "Section 5.2.2"
             ]
@@ -1480,7 +1469,7 @@
             "label": "Hash coverage (>= 50%, recommended)",
             "status": "pass",
             "source": "auto",
-            "detail": "95% (57270/60131)",
+            "detail": "95% (57270/60123)",
             "refs": [
               "Section 5.2.2"
             ]
@@ -1490,7 +1479,7 @@
             "label": "SHA-512 checksum coverage (>= 80%, recommended)",
             "status": "warn",
             "source": "auto",
-            "detail": "0% (0/60131)",
+            "detail": "0% (0/60123)",
             "refs": [
               "Section 5.2.2"
             ]
@@ -1500,7 +1489,7 @@
             "label": "Component creator coverage (>= 80%, recommended)",
             "status": "warn",
             "source": "auto",
-            "detail": "22% (632/2860)",
+            "detail": "24% (700/2860)",
             "refs": [
               "Section 5.2.2"
             ]
@@ -1642,7 +1631,7 @@
             "label": "Component name",
             "status": "pass",
             "source": "auto",
-            "detail": "60132/60132 component(s)",
+            "detail": "60124/60124 component(s)",
             "refs": [
               "Component Name"
             ]
@@ -1652,7 +1641,7 @@
             "label": "Component version",
             "status": "warn",
             "source": "auto",
-            "detail": "2862/60132 component(s)",
+            "detail": "2862/60124 component(s)",
             "refs": [
               "Component Version"
             ]
@@ -1662,7 +1651,7 @@
             "label": "Component producer",
             "status": "warn",
             "source": "auto",
-            "detail": "632/60132 component(s)",
+            "detail": "700/60124 component(s)",
             "refs": [
               "Component Producer"
             ]
@@ -1672,7 +1661,7 @@
             "label": "Component identifiers",
             "status": "warn",
             "source": "auto",
-            "detail": "60109/60132 component(s)",
+            "detail": "60106/60124 component(s)",
             "refs": [
               "Component Identifiers"
             ]
@@ -1682,7 +1671,7 @@
             "label": "Component license",
             "status": "warn",
             "source": "auto",
-            "detail": "2772/60132 component(s)",
+            "detail": "2772/60124 component(s)",
             "refs": [
               "Component License"
             ]
@@ -1692,7 +1681,7 @@
             "label": "Component hash value",
             "status": "warn",
             "source": "auto",
-            "detail": "57271/60132 component(s)",
+            "detail": "57271/60124 component(s)",
             "refs": [
               "Component Hash Value"
             ]
@@ -1702,7 +1691,7 @@
             "label": "Component hash algorithm",
             "status": "pass",
             "source": "auto",
-            "detail": "60132/60132 component(s)",
+            "detail": "60124/60124 component(s)",
             "refs": [
               "Component Hash Algorithm"
             ]
