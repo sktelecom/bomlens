@@ -205,8 +205,11 @@ if [ -n "${BOMLENS_RUN_INPUT:-}" ] || [ "${BOMLENS_ARTIFACT_CLEANUP:-}" = "1" ];
     # else is ignored rather than trusted, since a malformed value here should
     # degrade to "skip nothing", not to a path escape.
     _run_input=""
+    # A licence scan the caller ran first and that finished (0, or 6 with
+    # errors on some files) wrote this run's _scancode.json; any other code
+    # leaves the file to be removed with the rest.
     _dl_handed_rc=""
-    printf '%s' "${BOMLENS_DEEP_LICENSE_RC:-}" | grep -qE '^[0-9]{1,3}$' && _dl_handed_rc=1
+    case "${BOMLENS_DEEP_LICENSE_RC:-}" in 0|6) _dl_handed_rc=1 ;; esac
     if [ -n "${BOMLENS_RUN_INPUT:-}" ] && printf '%s' "$BOMLENS_RUN_INPUT" | grep -qE '^[A-Za-z0-9][A-Za-z0-9._-]*$'; then
         _run_input="$BOMLENS_RUN_INPUT"
     fi
@@ -221,8 +224,9 @@ if [ -n "${BOMLENS_RUN_INPUT:-}" ] || [ "${BOMLENS_ARTIFACT_CLEANUP:-}" = "1" ];
             # one before stage 1 for the same reason as the SBOM itself.
             [ -n "$_run_input" ] && [ "$_suf" = "_conda.cdx.json" ] && continue
             # The licence scan ran before this container, in the deep-license
-            # image (see the deep-license step below): its result is this
-            # run's, written by the caller after its own cleanup.
+            # image (see the deep-license step below), and finished: its
+            # result is this run's, written by the caller after its own
+            # cleanup.
             [ -n "$_dl_handed_rc" ] && [ "$_suf" = "_scancode.json" ] && continue
             [ "${CV_INPUT_IS_TEMPLATE:-false}" = true ] && [ "$_suf" = "_component-versions.template.csv" ] && continue
             if [ -f "$_f" ]; then
@@ -1841,15 +1845,18 @@ DEEP_SRC="${SOURCE_ROOT:-/src}"
 # deep-license image and wrote ${OUT_PREFIX}_scancode.json, because this stage
 # runs on the deep-cve image (grype, no scancode); the value is its exit code,
 # recorded here as if it had run in this container.
+# BOMLENS_DEEP_LICENSE_STARTED and _ENDED, when given, are when it ran.
 _dl_handed=""
-printf '%s' "${BOMLENS_DEEP_LICENSE_RC:-}" | grep -qE '^[0-9]{1,3}$' && _dl_handed=1
+[[ "${BOMLENS_DEEP_LICENSE_RC:-}" =~ ^[0-9]{1,3}$ ]] && _dl_handed=1
 if [ "$SOURCE_SCAN" = "true" ] && [ "${DEEP_LICENSE:-false}" = "true" ] && { [ -d "$DEEP_SRC" ] || [ -n "$_dl_handed" ]; }; then
     _dl_started="$(er_now)"
+    _dl_ended=""
     _dl_rc=0
     if [ -n "$_dl_handed" ]; then
         _dl_rc="$BOMLENS_DEEP_LICENSE_RC"
-        printf '%s' "${BOMLENS_DEEP_LICENSE_STARTED:-}" | grep -qE '^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$' \
-            && _dl_started="$BOMLENS_DEEP_LICENSE_STARTED"
+        _dl_ts='^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$'
+        [[ "${BOMLENS_DEEP_LICENSE_STARTED:-}" =~ $_dl_ts ]] && _dl_started="$BOMLENS_DEEP_LICENSE_STARTED"
+        [[ "${BOMLENS_DEEP_LICENSE_ENDED:-}" =~ $_dl_ts ]] && _dl_ended="$BOMLENS_DEEP_LICENSE_ENDED"
         echo "[INFO] scancode deep license detection ran before this stage, in the deep-license image (exit code $_dl_rc)."
         case "$_dl_rc" in 0|6) [ -f "${OUT_PREFIX}_scancode.json" ] || _dl_rc=1 ;; esac
     else
@@ -1862,10 +1869,10 @@ if [ "$SOURCE_SCAN" = "true" ] && [ "${DEEP_LICENSE:-false}" = "true" ] && { [ -
     case "$_dl_rc" in
         0)
             ARTIFACTS+=("${OUT_PREFIX}_scancode.json")
-            er_record deep-license ok "" "" "$_dl_started" ;;
+            er_record deep-license ok "" "" "$_dl_started" "$_dl_ended" ;;
         6)
             ARTIFACTS+=("${OUT_PREFIX}_scancode.json")
-            er_record deep-license degraded failed "scancode reported errors on some files" "$_dl_started" ;;
+            er_record deep-license degraded failed "scancode reported errors on some files" "$_dl_started" "$_dl_ended" ;;
         3)
             # Say why scancode is missing: the CLI ran this step here because
             # the scancode image could not be pulled, the image the caller
@@ -1874,24 +1881,24 @@ if [ "$SOURCE_SCAN" = "true" ] && [ "${DEEP_LICENSE:-false}" = "true" ] && { [ -
             # first leaves without it.
             if [ -n "${BOMLENS_DEEP_LICENSE_FALLBACK:-}" ]; then
                 echo "[WARN] --deep-license: the scancode image ${BOMLENS_DEEP_LICENSE_FALLBACK} was not available, so the licence scan did not run."
-                er_record deep-license skipped fallback "the scancode image was not available: ${BOMLENS_DEEP_LICENSE_FALLBACK}" "$_dl_started"
+                er_record deep-license skipped fallback "the scancode image was not available: ${BOMLENS_DEEP_LICENSE_FALLBACK}" "$_dl_started" "$_dl_ended"
             elif [ -n "$_dl_handed" ]; then
                 echo "[WARN] --deep-license: scancode was not in the image the licence scan ran on, so it did not run."
-                er_record deep-license skipped not_installed "scancode was not in the image the licence scan ran on" "$_dl_started"
+                er_record deep-license skipped not_installed "scancode was not in the image the licence scan ran on" "$_dl_started" "$_dl_ended"
             elif command -v grype >/dev/null 2>&1; then
                 echo "[WARN] --deep-license: this stage runs on the deep-cve image, which has grype but not scancode, so the licence scan did not run. Run it in the bomlens-deep-license image before this stage and pass its exit code as BOMLENS_DEEP_LICENSE_RC (the CLI does this with --deep-cve)."
-                er_record deep-license skipped not_installed "scancode is not in this image: the deep-cve image has grype only" "$_dl_started"
+                er_record deep-license skipped not_installed "scancode is not in this image: the deep-cve image has grype only" "$_dl_started" "$_dl_ended"
             else
                 echo "[WARN] --deep-license requested but scancode not in image (use the bomlens-deep-license image, or rebuild with --build-arg SBOM_DEEP_LICENSE=true)."
-                er_record deep-license skipped not_installed "scancode is not in this image" "$_dl_started"
+                er_record deep-license skipped not_installed "scancode is not in this image" "$_dl_started" "$_dl_ended"
             fi ;;
         4)
-            er_record deep-license skipped too_large "more than ${DEEP_LICENSE_MAX_FILES:-20000} source files" "$_dl_started" ;;
+            er_record deep-license skipped too_large "more than ${DEEP_LICENSE_MAX_FILES:-20000} source files" "$_dl_started" "$_dl_ended" ;;
         5)
-            er_record deep-license failed timeout "stopped after ${DEEP_LICENSE_TIMEOUT:-600}s" "$_dl_started" ;;
+            er_record deep-license failed timeout "stopped after ${DEEP_LICENSE_TIMEOUT:-600}s" "$_dl_started" "$_dl_ended" ;;
         *)
             echo "[WARN] scancode run failed."
-            er_record deep-license failed failed "" "$_dl_started" ;;
+            er_record deep-license failed failed "" "$_dl_started" "$_dl_ended" ;;
     esac
 elif [ "$SOURCE_SCAN" = "true" ] && [ "${DEEP_LICENSE:-false}" = "true" ]; then
     er_record deep-license skipped no_input "no source tree at $DEEP_SRC"

@@ -32,6 +32,10 @@
 #   0 done   1 scancode failed   3 scancode not installed
 #   4 over the file limit   5 timed out
 #   6 done, but scancode reported errors on some files (the result is kept)
+# On any other exit, a stop by signal included, an existing <output-json> is
+# removed, so an earlier run's result is never read as this one's.
+# HOST_UID/HOST_GID, when set, own the result (a caller that runs this script
+# alone, as root, before the post-process step).
 
 set -u
 
@@ -42,6 +46,26 @@ MAX_FILES="${DEEP_LICENSE_MAX_FILES:-20000}"
 TIMEOUT_S="${DEEP_LICENSE_TIMEOUT:-600}"
 case "$MAX_FILES" in ''|*[!0-9]*) MAX_FILES=20000 ;; esac
 case "$TIMEOUT_S" in ''|*[!0-9]*) TIMEOUT_S=600 ;; esac
+
+tmp=""
+scan_pid=""
+_dl_exit() {
+    local rc=$?
+    [ -z "$tmp" ] || rm -f "$tmp"
+    case "$rc" in 0|6) ;; *) rm -f "$OUT" ;; esac
+}
+trap _dl_exit EXIT
+# A stop signal (docker stop, a web UI cancel) stops scancode, then exits.
+# timeout runs scancode in a process group of its own, so the signal goes to
+# that group; without timeout, to scancode itself.
+_dl_stop() {
+    if [ -n "$scan_pid" ]; then
+        kill -TERM -- "-$scan_pid" 2>/dev/null || kill -TERM "$scan_pid" 2>/dev/null
+    fi
+    exit "$1"
+}
+trap '_dl_stop 130' INT
+trap '_dl_stop 143' TERM
 
 # Folders that are not the project's own source.
 EXCLUDED_DIRS="node_modules vendor bower_components .venv venv virtualenv site-packages
@@ -95,12 +119,16 @@ if [ -z "$keep_all" ]; then
 fi
 
 tmp="$(mktemp "${TMPDIR:-/tmp}/bomlens-scancode.XXXXXX")" || exit 1
-trap 'rm -f "$tmp"' EXIT
 runner=()
 # -k: a scancode that ignores the stop signal is killed 30 seconds later.
 command -v timeout >/dev/null 2>&1 && runner=(timeout -k 30 "$TIMEOUT_S")
-"${runner[@]}" "$SCANCODE" --license --strip-root --json-pp "$tmp" "${ignore[@]}" "$SRC" >/dev/null 2>&1
+# In the background with an explicit wait, so a stop signal is acted on at
+# once rather than when scancode ends.
+"${runner[@]}" "$SCANCODE" --license --strip-root --json-pp "$tmp" "${ignore[@]}" "$SRC" >/dev/null 2>&1 &
+scan_pid=$!
+wait "$scan_pid"
 rc=$?
+scan_pid=""
 if [ "$rc" -eq 124 ] || [ "$rc" -eq 137 ]; then
     echo "[deep-license] scancode did not finish within ${TIMEOUT_S}s; stopped (raise DEEP_LICENSE_TIMEOUT to allow longer)." >&2
     exit 5
@@ -113,6 +141,10 @@ if [ ! -s "$tmp" ] || ! grep -q '"files"' "$tmp" || { [ "$rc" -ne 0 ] && [ "$rc"
 fi
 chmod 644 "$tmp" 2>/dev/null
 mv "$tmp" "$OUT" || exit 1
+tmp=""
+if [[ "${HOST_UID:-}" =~ ^[0-9]+$ ]] && [[ "${HOST_GID:-}" =~ ^[0-9]+$ ]]; then
+    chown "${HOST_UID}:${HOST_GID}" "$OUT" 2>/dev/null || true
+fi
 if [ "$rc" -eq 1 ]; then
     echo "[deep-license] scancode reported errors on some files; the result for the others is kept." >&2
     exit 6

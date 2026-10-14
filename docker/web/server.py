@@ -31,6 +31,7 @@ import os
 import re
 import secrets
 import shutil
+import signal
 import subprocess
 import sys
 import tempfile
@@ -3549,12 +3550,47 @@ def _path_under(path, base):
     return rp == rb or rp.startswith(rb + os.sep)
 
 
-def run_deep_license_first(source_root, out_dir, project, version, env, on_log, cancel=None):
+def _signal_session(sid, sig):
+    """Send `sig` to every process in session `sid` (a child started with
+    start_new_session=True): its process group, and any group made inside it."""
+    try:
+        os.killpg(sid, sig)
+    except OSError:
+        pass
+    pids = []
+    try:
+        pids = [int(p) for p in os.listdir("/proc") if p.isdigit()]
+    except OSError:
+        try:
+            pids = [int(p) for p in subprocess.run(["ps", "-A", "-o", "pid="], capture_output=True,
+                                                   text=True, timeout=5).stdout.split()]
+        except (OSError, ValueError, subprocess.SubprocessError):
+            pids = []
+    for pid in pids:
+        if pid == sid:
+            continue
+        try:
+            if os.getsid(pid) == sid:
+                os.kill(pid, sig)
+        except OSError:
+            pass
+
+
+def run_deep_license_first(source_root, out_dir, project, version, env, on_log, cancel=None,
+                           heartbeat=None):
     """Run deep-license.sh (scancode) in THIS container before a sibling that
     has no scancode (the deep-cve image) post-processes the same source tree.
-    Writes <prefix>_scancode.json into out_dir and sets BOMLENS_DEEP_LICENSE_RC
-    and BOMLENS_DEEP_LICENSE_STARTED in env, which run_sibling_scan forwards so
-    the sibling's entrypoint.sh records the step from them."""
+    Writes <prefix>_scancode.json into out_dir and sets BOMLENS_DEEP_LICENSE_RC,
+    BOMLENS_DEEP_LICENSE_STARTED and BOMLENS_DEEP_LICENSE_ENDED in env, which
+    run_sibling_scan forwards so the sibling's entrypoint.sh records the step
+    from them.
+
+    scancode prints nothing while it runs, so `cancel()` is polled every
+    second rather than per output line, and `heartbeat()` (an SSE comment, so
+    a closed stream is noticed) is called every few seconds. On cancel every
+    process of the script's session is sent SIGTERM (deep-license.sh stops
+    scancode on it) and SIGKILL once CANCEL_GRACE_SECONDS have passed.
+    Returns the exit code, or None when cancelled."""
     prefix = "%s_%s" % (safe_name(project), safe_name(version))
     out = os.path.join(out_dir, prefix + "_scancode.json")
     try:
@@ -3563,23 +3599,75 @@ def run_deep_license_first(source_root, out_dir, project, version, env, on_log, 
         pass
     run_env = dict(env)
     run_env["DEEP_LICENSE_EXCLUDE"] = ("%s %s" % (env.get("SRC_TREE_EXCLUDE", ""), prefix)).strip()
-    started = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    stamp = lambda: datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    started = stamp()
     on_log("[INFO] --deep-license with --deep-cve: running the licence scan here, then post-processing in the deep-cve image.")
     rc = 1
+    cancelled = False
     try:
         proc = subprocess.Popen(["bash", os.path.join(LIB_DIR, "deep-license.sh"), source_root, out],
                                 env=run_env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                                text=True, bufsize=1)
-        for raw in proc.stdout:
-            on_log(raw.rstrip("\n"))
-            if cancel and cancel():
-                proc.terminate()
-                break
-        rc = proc.wait()
+                                text=True, bufsize=1, start_new_session=True)
     except OSError as exc:
         on_log("[WARN] the licence scan could not be started: %s" % exc)
+        proc = None
+    if proc is not None:
+        lines = []
+        lock = threading.Lock()
+
+        def _read():
+            for raw in proc.stdout:
+                with lock:
+                    lines.append(raw.rstrip("\n"))
+        reader = threading.Thread(target=_read, daemon=True)
+        reader.start()
+
+        def _flush():
+            with lock:
+                pending = lines[:]
+                del lines[:]
+            for ln in pending:
+                on_log(ln)
+
+        def _signal(sig):
+            # The script's session: its own process group, and the group
+            # `timeout` makes for scancode inside it.
+            _signal_session(proc.pid, sig)
+
+        last_beat = time.monotonic()
+        while True:
+            try:
+                proc.wait(timeout=1)
+                break
+            except subprocess.TimeoutExpired:
+                pass
+            _flush()
+            if heartbeat and time.monotonic() - last_beat >= 5:
+                heartbeat()
+                last_beat = time.monotonic()
+            if cancel and cancel():
+                cancelled = True
+                _signal(signal.SIGTERM)
+                try:
+                    proc.wait(timeout=CANCEL_GRACE_SECONDS)
+                except subprocess.TimeoutExpired:
+                    _signal(signal.SIGKILL)
+                    try:
+                        proc.wait(timeout=5)
+                    except subprocess.TimeoutExpired:
+                        pass
+                # Anything still in the group (a scancode worker) goes too.
+                _signal(signal.SIGKILL)
+                break
+        reader.join(timeout=5)
+        _flush()
+        rc = proc.returncode if proc.returncode is not None else 1
+    if cancelled:
+        on_log("[INFO] the licence scan was stopped (scan cancelled).")
+        return None
     env["BOMLENS_DEEP_LICENSE_RC"] = str(rc if 0 <= rc <= 255 else 1)
     env["BOMLENS_DEEP_LICENSE_STARTED"] = started
+    env["BOMLENS_DEEP_LICENSE_ENDED"] = stamp()
     return rc
 
 
@@ -3791,7 +3879,7 @@ def run_sibling_scan(image, mode, out_dir, on_log, *, upload_file=None, model_id
         if env.get(_k):
             args += ["-e", _k]
     # The licence scan this server ran first (run_deep_license_first): its
-    # exit code and start time, re-formatted so only digits and the timestamp
+    # exit code, start and end time, re-formatted so only digits and the timestamp
     # shape reach the argv.
     _dlrc = re.fullmatch(r"[0-9]{1,3}", env.get("BOMLENS_DEEP_LICENSE_RC", ""))
     if mode == "SOURCE" and _dlrc:
@@ -3800,6 +3888,10 @@ def run_sibling_scan(image, mode, out_dir, on_log, *, upload_file=None, model_id
                             env.get("BOMLENS_DEEP_LICENSE_STARTED", ""))
         if _dls:
             args += ["-e", "BOMLENS_DEEP_LICENSE_STARTED=%s" % _dls.group(0)]
+        _dle = re.fullmatch(r"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z",
+                            env.get("BOMLENS_DEEP_LICENSE_ENDED", ""))
+        if _dle:
+            args += ["-e", "BOMLENS_DEEP_LICENSE_ENDED=%s" % _dle.group(0)]
     # Where the cdxgen images come from (a registry mirror) and the network
     # settings: proxy, Trivy's database, EPSS/KEV endpoints. By name, when set.
     for _k in ("CDXGEN_IMAGE_PREFIX", "CDXGEN_TAG", "CDXGEN_ALLINONE", "BOMLENS_OS_LICENSES",
@@ -6061,6 +6153,15 @@ class Handler(BaseHTTPRequestHandler):
             except (BrokenPipeError, ConnectionResetError):
                 disconnected[0] = True
 
+        def sse_ping():
+            # An SSE comment line: EventSource ignores it, and a write to a
+            # closed stream marks the scan as cancelled.
+            try:
+                self.wfile.write(b": keepalive\n\n")
+                self.wfile.flush()
+            except (BrokenPipeError, ConnectionResetError):
+                disconnected[0] = True
+
         def record_outcome(ok_, error_text=None, warnings=None):
             """Save how this run ended into the run folder's sidecar, for the
             diagnostics summary (GET /diagnostics). Written from a COPY of
@@ -6737,8 +6838,12 @@ class Handler(BaseHTTPRequestHandler):
                 # the licence scan runs here first (this image has scancode)
                 # and the sibling records it from the exit code, as the CLI does.
                 run_deep_license_first(sibling["source_root"], run_out, project, version,
-                                       env, note_log, cancel=lambda: disconnected[0])
-            if sibling is not None:
+                                       env, note_log, cancel=lambda: disconnected[0],
+                                       heartbeat=sse_ping)
+            if sibling is not None and disconnected[0]:
+                # Cancelled during the licence scan: the sibling is not started.
+                ok = False
+            elif sibling is not None:
                 # Firmware / AI on the permissive-only base image: run the
                 # dedicated image as a sibling container (host socket). It does
                 # the full pipeline and writes artifacts into our run_out folder
