@@ -8458,7 +8458,10 @@ EOF_DEV
   {"ref":"pkg:pypi/python-dateutil@2.8.2","dependsOn":["pkg:pypi/six@1.16.0"]},
   {"ref":"pkg:pypi/iniconfig@2.0.0","dependsOn":[]}]}
 EOF_DEV
-    node "$WORK/devf.js" "$WORK/devf-py.json" 0 2>/dev/null
+    # The Python markers are used only with a pyproject.toml it can read.
+    mkdir -p "$WORK/devf-pyroot"
+    printf '[project]\nname = "root"\ndependencies = ["python-dateutil==2.8.2"]\n' > "$WORK/devf-pyroot/pyproject.toml"
+    (cd "$WORK/devf-pyroot" && node "$WORK/devf.js" "$WORK/devf-py.json" 0 2>/dev/null)
     if jq -e '([.components[].purl] == ["pkg:pypi/python-dateutil@2.8.2","pkg:pypi/six@1.16.0"])
               and ([.dependencies[] | select(.ref=="pkg:pypi/root@1.0.0") | .dependsOn][0] == ["pkg:pypi/python-dateutil@2.8.2"])' \
            "$WORK/devf-py.json" >/dev/null 2>&1; then
@@ -8472,6 +8475,146 @@ EOF_DEV
     [ "$(jq '.components | length' "$WORK/devf-noroot.json")" = "5" ] \
         && pass "dev filter leaves the SBOM alone when the root is not in the graph" \
         || fail "dev filter dropped components without a root in the graph"
+    # A package in a dependency group that [project] dependencies also lists
+    # is production, and so is what it needs: requests and urllib3 stay.
+    cat > "$WORK/devf-pyprod.json" <<'EOF_DEV'
+{"bomFormat":"CycloneDX","metadata":{"component":{"bom-ref":"pkg:pypi/root@1.0.0"}},
+ "components":[
+  {"bom-ref":"pkg:pypi/requests@2.32.3","purl":"pkg:pypi/requests@2.32.3","scope":"optional",
+   "properties":[{"name":"cdx:pyproject:group","value":"test"}]},
+  {"bom-ref":"pkg:pypi/urllib3@2.2.3","purl":"pkg:pypi/urllib3@2.2.3"},
+  {"bom-ref":"pkg:pypi/pytest@8.3.3","purl":"pkg:pypi/pytest@8.3.3","scope":"optional",
+   "properties":[{"name":"cdx:pyproject:group","value":"test"}]},
+  {"bom-ref":"pkg:pypi/pluggy@1.5.0","purl":"pkg:pypi/pluggy@1.5.0"}],
+ "dependencies":[
+  {"ref":"pkg:pypi/root@1.0.0","dependsOn":["pkg:pypi/pytest@8.3.3","pkg:pypi/requests@2.32.3"]},
+  {"ref":"pkg:pypi/requests@2.32.3","dependsOn":["pkg:pypi/urllib3@2.2.3"]},
+  {"ref":"pkg:pypi/pytest@8.3.3","dependsOn":["pkg:pypi/pluggy@1.5.0"]}]}
+EOF_DEV
+    mkdir -p "$WORK/devf-pyprod"
+    cat > "$WORK/devf-pyprod/pyproject.toml" <<'EOF_TOML'
+[project]
+name = "root"
+version = "1.0.0"
+dependencies = [
+  "Requests>=2.31",  # HTTP client
+]
+
+[dependency-groups]
+test = ["requests", "pytest"]
+EOF_TOML
+    cp "$WORK/devf-pyprod.json" "$WORK/devf-pyprod-none.json"
+    (cd "$WORK/devf-pyprod" && node "$WORK/devf.js" "$WORK/devf-pyprod.json" 0 2>/dev/null)
+    if jq -e '([.components[].purl] == ["pkg:pypi/requests@2.32.3","pkg:pypi/urllib3@2.2.3"])
+              and ([.metadata.properties[] | select(.name=="bomlens:excluded-components") | .value][0]
+                   == "pkg:pypi/pytest@8.3.3, pkg:pypi/pluggy@1.5.0")' "$WORK/devf-pyprod.json" >/dev/null 2>&1; then
+        pass "a dependency-group package [project] dependencies also lists stays, with what it needs; the drop is recorded"
+    else
+        fail "dev filter dropped a production Python package or did not record the drop" "$(jq -c '[.components[].purl], .metadata.properties' "$WORK/devf-pyprod.json" 2>&1)"
+    fi
+    # [tool.poetry.dependencies] counts the same, and with no pyproject.toml at
+    # the root, or one the reader cannot follow, no Python package is dropped.
+    mkdir -p "$WORK/devf-poetry" "$WORK/devf-nopy" "$WORK/devf-badpy"
+    printf '[tool.poetry]\nname = "root"\n\n[tool.poetry.dependencies]\npython = "^3.9"\nrequests = { version = "^2.31", extras = ["socks"] }\n' \
+        > "$WORK/devf-poetry/pyproject.toml"
+    printf '[project]\nname = "root"\ndynamic = ["dependencies"]\n' > "$WORK/devf-badpy/pyproject.toml"
+    _pyk=""
+    for _d in devf-poetry devf-nopy devf-badpy; do
+        cp "$WORK/devf-pyprod-none.json" "$WORK/$_d.json"
+        (cd "$WORK/$_d" && node "$WORK/devf.js" "$WORK/$_d.json" 0 2>/dev/null)
+        _pyk="$_pyk $(jq -r '[.components[].purl | sub("^pkg:pypi/"; "") | sub("@.*"; "")] | join(",")' "$WORK/$_d.json")"
+    done
+    [ "$_pyk" = " requests,urllib3 requests,urllib3,pytest,pluggy requests,urllib3,pytest,pluggy" ] \
+        && pass "Poetry main dependencies count as production; an unread or missing pyproject.toml drops no Python package" \
+        || fail "Python production list or its fallback unexpected" "got [$_pyk]"
+    # A crate that is both a dependency and a dev-dependency (cdxgen without a
+    # Cargo.lock writes both scopes) stays; a dev-only crate goes.
+    cat > "$WORK/devf-cargo.json" <<'EOF_DEV'
+{"bomFormat":"CycloneDX","metadata":{"component":{"bom-ref":"pkg:cargo/app@0.1.0"}},
+ "components":[
+  {"bom-ref":"pkg:cargo/itoa@1.0.11","purl":"pkg:cargo/itoa@1.0.11",
+   "properties":[{"name":"cdx:cargo:scope","value":"dev"},{"name":"cdx:cargo:scope","value":"runtime"}]},
+  {"bom-ref":"pkg:cargo/ryu@1.0.18","purl":"pkg:cargo/ryu@1.0.18","scope":"excluded",
+   "properties":[{"name":"cdx:cargo:scope","value":"dev"}]}],
+ "dependencies":[
+  {"ref":"pkg:cargo/app@0.1.0","dependsOn":["pkg:cargo/itoa@1.0.11","pkg:cargo/ryu@1.0.18"]}]}
+EOF_DEV
+    node "$WORK/devf.js" "$WORK/devf-cargo.json" 1 2>/dev/null
+    [ "$(jq -c '[.components[].purl]' "$WORK/devf-cargo.json")" = '["pkg:cargo/itoa@1.0.11"]' ] \
+        && pass "a crate in both [dependencies] and [dev-dependencies] stays, a dev-only crate goes" \
+        || fail "dev filter (cargo normal+dev) output unexpected" "$(jq -c '[.components[].purl]' "$WORK/devf-cargo.json" 2>&1)"
+    # A workspace member's own dependency stays even when the root lists the
+    # same package in a dev group or as a dev-dependency (those markers are
+    # not per member).
+    cat > "$WORK/devf-member.json" <<'EOF_DEV'
+{"bomFormat":"CycloneDX","metadata":{"component":{"bom-ref":"pkg:pypi/root@1.0.0"}},
+ "components":[
+  {"bom-ref":"pkg:pypi/member@1.0.0","purl":"pkg:pypi/member@1.0.0","type":"application",
+   "properties":[{"name":"internal:is_workspace","value":"true"}]},
+  {"bom-ref":"pkg:pypi/pytest@8.3.3","purl":"pkg:pypi/pytest@8.3.3",
+   "properties":[{"name":"cdx:pyproject:group","value":"dev"}]},
+  {"bom-ref":"pkg:pypi/pluggy@1.5.0","purl":"pkg:pypi/pluggy@1.5.0"},
+  {"bom-ref":"pkg:cargo/member-crate@0.1.0","purl":"pkg:cargo/member-crate@0.1.0","type":"application"},
+  {"bom-ref":"pkg:cargo/criterion@0.5.1","purl":"pkg:cargo/criterion@0.5.1",
+   "properties":[{"name":"cdx:cargo:scope","value":"dev"}]}],
+ "dependencies":[
+  {"ref":"pkg:pypi/root@1.0.0","dependsOn":["pkg:pypi/member@1.0.0","pkg:pypi/pytest@8.3.3","pkg:cargo/member-crate@0.1.0"]},
+  {"ref":"pkg:pypi/member@1.0.0","dependsOn":["pkg:pypi/pytest@8.3.3"]},
+  {"ref":"pkg:pypi/pytest@8.3.3","dependsOn":["pkg:pypi/pluggy@1.5.0"]},
+  {"ref":"pkg:cargo/member-crate@0.1.0","dependsOn":["pkg:cargo/criterion@0.5.1"]}]}
+EOF_DEV
+    mkdir -p "$WORK/devf-member"
+    printf '[project]\nname = "root"\n[dependency-groups]\ndev = ["pytest"]\n' > "$WORK/devf-member/pyproject.toml"
+    (cd "$WORK/devf-member" && node "$WORK/devf.js" "$WORK/devf-member.json" 1 2>/dev/null)
+    [ "$(jq '.components | length' "$WORK/devf-member.json")" = "5" ] \
+        && pass "a workspace member's dependency stays though the root marks it development-only" \
+        || fail "dev filter dropped a workspace member's dependency" "$(jq -c '[.components[].purl]' "$WORK/devf-member.json" 2>&1)"
+    # A production subtree the root does not reach (the graph is not one tree)
+    # keeps what it shares with a dropped dev-only crate.
+    cat > "$WORK/devf-island.json" <<'EOF_DEV'
+{"bomFormat":"CycloneDX","metadata":{"component":{"bom-ref":"pkg:cargo/app@0.1.0"}},
+ "components":[
+  {"bom-ref":"pkg:cargo/criterion@0.5.1","purl":"pkg:cargo/criterion@0.5.1",
+   "properties":[{"name":"cdx:cargo:scope","value":"dev"}]},
+  {"bom-ref":"pkg:cargo/plotters@0.3.7","purl":"pkg:cargo/plotters@0.3.7"},
+  {"bom-ref":"pkg:cargo/serde_json@1.0.128","purl":"pkg:cargo/serde_json@1.0.128"},
+  {"bom-ref":"pkg:cargo/serde@1.0.210","purl":"pkg:cargo/serde@1.0.210"}],
+ "dependencies":[
+  {"ref":"pkg:cargo/app@0.1.0","dependsOn":["pkg:cargo/criterion@0.5.1"]},
+  {"ref":"pkg:cargo/criterion@0.5.1","dependsOn":["pkg:cargo/plotters@0.3.7","pkg:cargo/serde@1.0.210"]},
+  {"ref":"pkg:cargo/serde_json@1.0.128","dependsOn":["pkg:cargo/serde@1.0.210"]}]}
+EOF_DEV
+    node "$WORK/devf.js" "$WORK/devf-island.json" 1 2>/dev/null
+    [ "$(jq -c '[.components[].purl]' "$WORK/devf-island.json")" = '["pkg:cargo/serde_json@1.0.128","pkg:cargo/serde@1.0.210"]' ] \
+        && pass "a production subtree the root does not reach keeps its shared dependency" \
+        || fail "dev filter dropped a dependency an unreached production subtree shares" "$(jq -c '[.components[].purl]' "$WORK/devf-island.json" 2>&1)"
+    # The whole block in build-prep.sh: BOMLENS_INCLUDE_DEV_DEPENDENCIES=1
+    # turns it off, and by default it records what it dropped next to what an
+    # earlier filter recorded.
+    _opt_fn=$(sed -n '/^opted_out() /p' "$PREP")
+    _log_fn=$(sed -n '/^log() /p' "$PREP")
+    _dvblock=$(sed -n '/^# Development-marker filter/,/^fi$/p' "$PREP")
+    mkdir -p "$WORK/devf-block"
+    cat > "$WORK/devf-block/in.json" <<'EOF_DEV'
+{"bomFormat":"CycloneDX","metadata":{"component":{"bom-ref":"pkg:cargo/app@0.1.0"},
+  "properties":[{"name":"bomlens:excluded-components","value":"pkg:cargo/fixture@0.1.0"}]},
+ "components":[
+  {"bom-ref":"pkg:cargo/ryu@1.0.18","purl":"pkg:cargo/ryu@1.0.18","properties":[{"name":"cdx:cargo:scope","value":"dev"}]}],
+ "dependencies":[{"ref":"pkg:cargo/app@0.1.0","dependsOn":["pkg:cargo/ryu@1.0.18"]}]}
+EOF_DEV
+    cp "$WORK/devf-block/in.json" "$WORK/devf-block/on.json"
+    cp "$WORK/devf-block/in.json" "$WORK/devf-block/off.json"
+    (cd "$WORK/devf-block" && rc=0 OUT=on.json bash -c "$_opt_fn; $_log_fn; $_dvblock" >/dev/null 2>&1)
+    (cd "$WORK/devf-block" && rc=0 OUT=off.json BOMLENS_INCLUDE_DEV_DEPENDENCIES=1 bash -c "$_opt_fn; $_log_fn; $_dvblock" >/dev/null 2>&1)
+    if [ -n "$_dvblock" ] && jq -e '(.components == [])
+              and ([.metadata.properties[] | select(.name=="bomlens:excluded-components") | .value][0]
+                   == "pkg:cargo/fixture@0.1.0, pkg:cargo/ryu@1.0.18")' "$WORK/devf-block/on.json" >/dev/null 2>&1 \
+       && [ "$(jq '.components | length' "$WORK/devf-block/off.json")" = "1" ]; then
+        pass "BOMLENS_INCLUDE_DEV_DEPENDENCIES=1 keeps development dependencies; by default the drop joins bomlens:excluded-components"
+    else
+        fail "dev filter block: opt-out or excluded-components record unexpected" \
+            "on=$(jq -c '[.components[].purl], .metadata.properties' "$WORK/devf-block/on.json" 2>&1) off=$(jq -c '.components | length' "$WORK/devf-block/off.json" 2>&1)"
+    fi
 else
     echo "  SKIP: node not installed; development-marker filter not exercised"
 fi
@@ -8518,6 +8661,20 @@ EOF_GEM
     done
     [ -z "$_amb" ] && pass "Gemfile reader reports nothing for a Gemfile it cannot read for certain" \
         || fail "Gemfile reader reported gems from an ambiguous Gemfile" "$_amb"
+    # Another Bundler manifest in the tree (a Gemfile.lock below the root, a
+    # gemspec) may declare the same gems for production: nothing is reported.
+    mkdir -p "$WORK/gemsub/engine" "$WORK/gemspec"
+    printf 'source "https://rubygems.org"\ngem "rack"\ngroup :test do\n  gem "rspec"\nend\n' > "$WORK/gemsub/Gemfile"
+    cp "$WORK/gemsub/Gemfile" "$WORK/gemspec/Gemfile"
+    printf 'GEM\n  specs:\n    rspec (3.13.0)\n\nDEPENDENCIES\n  rspec\n' > "$WORK/gemsub/engine/Gemfile.lock"
+    printf 'Gem::Specification.new { |s| s.add_dependency "rspec" }\n' > "$WORK/gemspec/tool.gemspec"
+    _gs1=$(node "$WORK/gemdev.js" "$WORK/gemsub/Gemfile" "$WORK/gemsub/Gemfile.lock" 2>/dev/null)
+    _gs2=$(node "$WORK/gemdev.js" "$WORK/gemspec/Gemfile" "$WORK/gemspec/Gemfile.lock" 2>/dev/null)
+    rm "$WORK/gemsub/engine/Gemfile.lock"
+    _gs3=$(node "$WORK/gemdev.js" "$WORK/gemsub/Gemfile" "$WORK/gemsub/Gemfile.lock" 2>/dev/null)
+    [ -z "$_gs1" ] && [ -z "$_gs2" ] && [ "$_gs3" = "rspec" ] \
+        && pass "Gemfile reader reports nothing when another Gemfile.lock or a gemspec is in the tree" \
+        || fail "Gemfile reader ignored another Bundler manifest" "lock=[$_gs1] gemspec=[$_gs2] alone=[$_gs3]"
     # The filter with that list: rspec and what only it reaches go, a gem a
     # production gem also uses stays.
     cat > "$WORK/devf-gem.json" <<'EOF_DEV'
