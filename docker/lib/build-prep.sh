@@ -1824,7 +1824,8 @@ function mergeCapped(existing, additions, limit) {
   const merged = shown.concat(additions);
   const total = priorTotal + additions.length;
   let val = merged.slice(0, limit).join(', ');
-  if (total > limit) val += ' (+' + (total - Math.min(limit, merged.length)) + ' more)';
+  const hidden = total - Math.min(limit, merged.length);
+  if (hidden > 0) val += ' (+' + hidden + ' more)';
   return val;
 }
 const LIMIT = 50;
@@ -1913,12 +1914,18 @@ fi
 # development and test groups are read here (GEMDEV_JS) and count as marked.
 # A marker that repeats counts only when every value is a development one. A
 # Python package named in the production dependencies of a pyproject.toml is
-# not marked, and when those files cannot be read no Python marker is used.
+# not marked, and when those files cannot be read, or a requirements file,
+# setup.py, setup.cfg or Pipfile sits outside the non-shipped folders, no
+# Python marker is used.
 # A marked component, and what only marked components reach, is dropped only
 # when nothing else reaches it: the walk starts from the root and from every
 # component outside that set, and skips only the edges from the root into a
 # marked component (npm markers: from a workspace member too, since cdxgen
-# computes them per member). The dropped components are recorded in
+# 13.3.0 computes them over the whole workspace, so a package any member's
+# production dependencies reach is not marked). An edge from a member into a
+# component with any other marker is followed, so what a Cargo or uv workspace
+# member lists, its dev-dependencies and dependency groups included, stays.
+# The dropped components are recorded in
 # bomlens:excluded-components. Guard: the root must be in the dependency graph,
 # otherwise nothing is dropped. BOMLENS_INCLUDE_DEV_DEPENDENCIES=1 turns the
 # whole filter off; BOMLENS_NODE_FULL_GRAPH=1 keeps the npm-marked components.
@@ -1947,13 +1954,16 @@ const give_up = why => {
   process.exit(0);
 };
 const top = path.dirname(gemfile);
+// 8 folders deep; installed gems, packages and virtual environments are not
+// manifests of this project.
+const OTHERS_SKIP = new Set(['vendor', 'node_modules', '.git', '.venv', 'venv']);
 const others = (dir, depth) => {
   let ents;
   try { ents = fs.readdirSync(dir, { withFileTypes: true }); } catch (e) { return null; }
   for (const e of ents) {
     const p = path.join(dir, e.name);
     if (e.isDirectory()) {
-      if (e.name === 'node_modules' || e.name === '.git') continue;
+      if (depth >= 8 || OTHERS_SKIP.has(e.name)) continue;
       const hit = others(p, depth + 1);
       if (hit) return hit;
     } else if (/\.gemspec$/.test(e.name) || (depth > 0 && (e.name === 'Gemfile' || e.name === 'Gemfile.lock'))) {
@@ -2031,7 +2041,8 @@ GEMDEV_JS
     cat > "$_dvflt" <<'DEVFILTER_JS'
 const fs = require('fs');
 const path = require('path');
-const [bomPath, npmMarkers, gemListPath] = process.argv.slice(2);
+const [bomPath, npmMarkers, gemListPath, nonShippedDirs] = process.argv.slice(2);
+const nonShipped = new Set((nonShippedDirs || '').toLowerCase().split(/\s+/).filter(Boolean));
 const say = s => process.stderr.write('[build-prep] dev-marker: ' + s + '\n');
 let bom;
 try { bom = JSON.parse(fs.readFileSync(bomPath, 'utf8')); } catch (e) { process.exit(0); }
@@ -2056,21 +2067,30 @@ const every = (c, n, isDev) => { const v = prop(c, n); return v.length > 0 && v.
 // under the root ([project] dependencies and optional-dependencies,
 // [tool.poetry.dependencies]) are read with a small reader, not a TOML parser:
 // when the root has no pyproject.toml or a file is one it cannot follow, no
-// Python marker is used.
+// Python marker is used. The walk goes 8 folders deep and skips vendor,
+// node_modules, .git and virtual environments.
 const pep503 = s => s.toLowerCase().replace(/[-_.]+/g, '-');
+// A requirements file, setup.py, setup.cfg or Pipfile outside the non-shipped
+// folders may declare production dependencies this reader does not see, so
+// one of them also means no Python marker is used.
+const OTHER_PY = /^(requirements[^/]*\.txt|setup\.py|setup\.cfg|Pipfile)$/;
 const readPyProd = () => {
-  const SKIP = new Set(['node_modules', '.git', '.venv', 'venv', '.tox', '.nox', '__pypackages__', 'site-packages']);
+  const SKIP = new Set(['node_modules', '.git', '.venv', 'venv', 'vendor', '.tox', '.nox', '__pypackages__', 'site-packages']);
   if (!fs.existsSync('pyproject.toml')) { say('python: no pyproject.toml at the scan root; no Python package dropped as development-only'); return null; }
   const files = [];
-  const walk = dir => {
+  let other = null;
+  const walk = (dir, depth, shipped) => {
     let ents;
     try { ents = fs.readdirSync(dir, { withFileTypes: true }); } catch (e) { return; }
     for (const e of ents) {
-      if (e.isDirectory() && !SKIP.has(e.name)) walk(path.join(dir, e.name));
-      else if (e.isFile() && e.name === 'pyproject.toml') files.push(path.join(dir, e.name));
+      if (e.isDirectory()) {
+        if (depth < 8 && !SKIP.has(e.name)) walk(path.join(dir, e.name), depth + 1, shipped && !nonShipped.has(e.name.toLowerCase()));
+      } else if (e.isFile() && e.name === 'pyproject.toml') files.push(path.join(dir, e.name));
+      else if (e.isFile() && shipped && !other && OTHER_PY.test(e.name)) other = path.join(dir, e.name);
     }
   };
-  walk('.');
+  walk('.', 0, true);
+  if (other) { say('python: ' + other.replace(/^\.\//, '') + ' may declare production dependencies; no Python package dropped as development-only'); return null; }
   if (files.length > 1000) { say('python: too many pyproject.toml files; no Python package dropped as development-only'); return null; }
   const names = new Set();
   for (const f of files) {
@@ -2267,7 +2287,8 @@ function mergeCapped(existing, additions, limit) {
   const merged = shown.concat(additions);
   const total = priorTotal + additions.length;
   let val = merged.slice(0, limit).join(', ');
-  if (total > limit) val += ' (+' + (total - Math.min(limit, merged.length)) + ' more)';
+  const hidden = total - Math.min(limit, merged.length);
+  if (hidden > 0) val += ' (+' + hidden + ' more)';
   return val;
 }
 bom.metadata = bom.metadata || {};
@@ -2278,7 +2299,9 @@ bom.metadata.properties = existingProps.filter(p => p.name !== 'bomlens:excluded
 fs.writeFileSync(bomPath, JSON.stringify(bom, null, 2));
 say('dropped ' + drop.size + ' development-only component(s), kept ' + bom.components.length + ' of ' + before);
 DEVFILTER_JS
-    node "$_dvflt" "$OUT" "${_dvnpm:-0}" "$_dvgems" || log "dev-marker: filter skipped (non-fatal)"
+    _dvns=""
+    [ -n "${EXCLUDE_NON_SHIPPED:-}" ] && _dvns="${NON_SHIPPED_DIRS:-}"
+    node "$_dvflt" "$OUT" "${_dvnpm:-0}" "$_dvgems" "$_dvns" || log "dev-marker: filter skipped (non-fatal)"
     rm -f "$_dvflt" "$_dvgems"
 fi
 
@@ -2645,7 +2668,8 @@ const allComponents = priorShown.concat(droppedPurls);
 const totalComponents = allComponents.length + (priorM[2] ? parseInt(priorM[2], 10) : 0);
 if (allComponents.length) {
   let compVal = allComponents.slice(0, LIMIT).join(', ');
-  if (totalComponents > LIMIT) compVal += ` (+${totalComponents - Math.min(LIMIT, allComponents.length)} more)`;
+  const hiddenComponents = totalComponents - Math.min(LIMIT, allComponents.length);
+  if (hiddenComponents > 0) compVal += ` (+${hiddenComponents} more)`;
   props.push({ name: 'bomlens:excluded-components', value: compVal });
 }
 bom.metadata.properties = props;
@@ -2942,7 +2966,8 @@ function mergeCapped(existing, additions, limit) {
   const merged = shown.concat(additions);
   const total = priorTotal + additions.length;
   let val = merged.slice(0, limit).join(', ');
-  if (total > limit) val += ' (+' + (total - Math.min(limit, merged.length)) + ' more)';
+  const hidden = total - Math.min(limit, merged.length);
+  if (hidden > 0) val += ' (+' + hidden + ' more)';
   return val;
 }
 const LIMIT = 50;
@@ -3199,7 +3224,8 @@ function mergeCapped(existing, additions, limit) {
   const merged = shown.concat(additions);
   const total = priorTotal + additions.length;
   let val = merged.slice(0, limit).join(', ');
-  if (total > limit) val += ' (+' + (total - Math.min(limit, merged.length)) + ' more)';
+  const hidden = total - Math.min(limit, merged.length);
+  if (hidden > 0) val += ' (+' + hidden + ' more)';
   return val;
 }
 const LIMIT = 50;
