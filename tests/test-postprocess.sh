@@ -8544,7 +8544,7 @@ EOF_TOML
   {"ref":"pkg:pypi/idna@3.10","dependsOn":[]}]}
 EOF_DEV
     _pyr=""
-    for _d in req setuppy setupcfg pipfile nested tests vendor; do
+    for _d in req setuppy setupcfg pipfile nested deep tests vendor deeptests; do
         mkdir -p "$WORK/devf-pyreq-$_d"
         printf '[project]\nname = "root"\nversion = "1.0.0"\ndependencies = []\n\n[dependency-groups]\ndev = ["requests>=2"]\n' \
             > "$WORK/devf-pyreq-$_d/pyproject.toml"
@@ -8560,14 +8560,21 @@ EOF_DEV
                    printf 'requests\n' > "$WORK/devf-pyreq-$_d/tests/e2e/requirements.txt" ;;
             vendor) mkdir -p "$WORK/devf-pyreq-$_d/vendor/lib"
                     printf 'requests\n' > "$WORK/devf-pyreq-$_d/vendor/lib/requirements.txt" ;;
+            # A requirements file 9 folders deep, past the search: the rule is
+            # off. The same depth under tests/ is not searched and not counted.
+            deep) mkdir -p "$WORK/devf-pyreq-$_d/a/b/c/d/e/f/g/h/i"
+                  printf 'requests\n' > "$WORK/devf-pyreq-$_d/a/b/c/d/e/f/g/h/i/requirements.txt" ;;
+            deeptests) mkdir -p "$WORK/devf-pyreq-$_d/tests/b/c/d/e/f/g/h/i"
+                       printf 'requests\n' > "$WORK/devf-pyreq-$_d/tests/b/c/d/e/f/g/h/i/requirements.txt" ;;
         esac
         cp "$WORK/devf-pyreq.json" "$WORK/devf-pyreq-$_d.json"
         (cd "$WORK/devf-pyreq-$_d" && node "$WORK/devf.js" "$WORK/devf-pyreq-$_d.json" 0 "" "tests examples" 2>"$WORK/devf-pyreq-$_d.log")
         _pyr="$_pyr $(jq -r '[.components[].purl | sub("^pkg:pypi/"; "") | sub("@.*"; "")] | join(",")' "$WORK/devf-pyreq-$_d.json")"
     done
-    if [ "$_pyr" = " requests,idna requests,idna requests,idna requests,idna requests,idna  " ] \
-       && grep -q 'requirements.txt' "$WORK/devf-pyreq-req.log"; then
-        pass "a requirements file, setup.py, setup.cfg or Pipfile outside the non-shipped folders turns the Python markers off, with the reason logged"
+    if [ "$_pyr" = " requests,idna requests,idna requests,idna requests,idna requests,idna requests,idna   " ] \
+       && grep -q 'requirements.txt' "$WORK/devf-pyreq-req.log" \
+       && grep -q 'deeper than 8 folders' "$WORK/devf-pyreq-deep.log"; then
+        pass "a requirements file, setup.py, setup.cfg or Pipfile outside the non-shipped folders, or a folder past the search depth, turns the Python markers off, with the reason logged"
     else
         fail "dev filter dropped a Python package production may declare outside pyproject.toml" \
             "got [$_pyr] log=[$(cat "$WORK/devf-pyreq-req.log" 2>/dev/null)]"
@@ -8745,9 +8752,12 @@ EOF_GEM
     printf 'Gem::Specification.new\n' > "$WORK/gemsub/vendor/bundle/ruby/3.3.0/gems/rspec-3.13.0/rspec.gemspec"
     printf 'gem "rspec"\n' > "$WORK/gemsub/node_modules/x/Gemfile"
     _gs3=$(node "$WORK/gemdev.js" "$WORK/gemsub/Gemfile" "$WORK/gemsub/Gemfile.lock" 2>/dev/null)
-    [ -z "$_gs1" ] && [ -z "$_gs2" ] && [ "$_gs3" = "rspec" ] \
-        && pass "Gemfile reader reports nothing when another Gemfile.lock or a gemspec is in the tree; vendor/bundle and node_modules do not count" \
-        || fail "Gemfile reader ignored another Bundler manifest" "lock=[$_gs1] gemspec=[$_gs2] alone=[$_gs3]"
+    # A folder 9 deep was not searched, so nothing is reported.
+    mkdir -p "$WORK/gemsub/a/b/c/d/e/f/g/h/i"
+    _gs4=$(node "$WORK/gemdev.js" "$WORK/gemsub/Gemfile" "$WORK/gemsub/Gemfile.lock" 2>/dev/null)
+    [ -z "$_gs1" ] && [ -z "$_gs2" ] && [ "$_gs3" = "rspec" ] && [ -z "$_gs4" ] \
+        && pass "Gemfile reader reports nothing when another Gemfile.lock or a gemspec is in the tree; vendor/bundle and node_modules do not count, a folder past the search depth does" \
+        || fail "Gemfile reader ignored another Bundler manifest" "lock=[$_gs1] gemspec=[$_gs2] alone=[$_gs3] deep=[$_gs4]"
     # The filter with that list: rspec and what only it reaches go, a gem a
     # production gem also uses stays.
     cat > "$WORK/devf-gem.json" <<'EOF_DEV'
