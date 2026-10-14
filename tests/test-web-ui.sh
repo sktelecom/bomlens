@@ -4043,6 +4043,67 @@ else
     fail "credential mask unit checks failed (see assertion above)"
 fi
 
+echo "== opt-in image defaults follow SBOM_SCANNER_IMAGE (docker run -e MODE=UI) =="
+# A UI started directly with only SBOM_SCANNER_IMAGE resolves the same sibling
+# images as scan-sbom.sh --ui (optin_image_ref there); each SBOM_*_IMAGE wins.
+if SBOM_OUTPUT_DIR="$OUT" python3 - "$ROOT_DIR" <<'PY'
+import os, subprocess, sys
+web = os.path.join(sys.argv[1], "docker", "web")
+sys.path.insert(0, web)
+for k in ("SBOM_SCANNER_IMAGE", "SBOM_FIRMWARE_IMAGE", "SBOM_AIBOM_IMAGE", "SBOM_DEEP_CVE_IMAGE"):
+    os.environ.pop(k, None)
+import server
+r = server.optin_image_ref
+D = "sha256:" + "ab" * 32
+cases = [
+    ("", "firmware", "ghcr.io/sktelecom/bomlens-firmware:latest"),
+    ("", "deep-license", "ghcr.io/sktelecom/bomlens-deep-license:latest"),
+    ("ghcr.io/sktelecom/bomlens:1.13.2", "firmware", "ghcr.io/sktelecom/bomlens-firmware:1.13.2"),
+    ("ghcr.io/sktelecom/bomlens:1.13.2", "deep-license", "ghcr.io/sktelecom/bomlens-deep-license:1.13.2"),
+    ("mirror.example:5000/team/bomlens:1.13.2", "aibom", "mirror.example:5000/team/bomlens-aibom:1.13.2"),
+    ("mirror.example:5000/team/bomlens", "deep-cve", "mirror.example:5000/team/bomlens-deep-cve:latest"),
+    ("ghcr.io/sktelecom/sbom-generator:1.0", "firmware", "ghcr.io/sktelecom/bomlens-firmware:1.0"),
+    ("ghcr.io/sktelecom/sbom-scanner:1.0", "aibom", "ghcr.io/sktelecom/bomlens-aibom:1.0"),
+    ("ghcr.io/sktelecom/bomlens-deep-license:1.13.2", "deep-cve", "ghcr.io/sktelecom/bomlens-deep-cve:1.13.2"),
+    ("bomlens:dev", "firmware", "bomlens-firmware:dev"),
+    ("ghcr.io/sktelecom/bomlens:1.13.2@" + D, "firmware", "ghcr.io/sktelecom/bomlens-firmware:1.13.2"),
+    ("ghcr.io/sktelecom/bomlens@" + D, "firmware", "ghcr.io/sktelecom/bomlens-firmware:latest"),
+    ("registry.local/my-scanner:2", "firmware", "ghcr.io/sktelecom/bomlens-firmware:latest"),
+    ("registry.local/my-scanner:2", "deep-cve", "ghcr.io/sktelecom/bomlens-deep-cve:latest"),
+    ("registry.local/my-scanner:2", "deep-license", "registry.local/my-scanner:2"),
+]
+for scanner, suffix, want in cases:
+    got = r(suffix, scanner)
+    assert got == want, (scanner, suffix, got, want)
+
+# Module-level defaults, as a fresh server process reads them from its env.
+def images(env):
+    e = {k: v for k, v in os.environ.items() if not k.endswith("_IMAGE")}
+    e.update(env)
+    out = subprocess.run([sys.executable, "-c",
+        "import server; print(server.FIRMWARE_IMAGE); print(server.AIBOM_IMAGE); print(server.DEEP_CVE_IMAGE)"],
+        cwd=web, env=e, capture_output=True, text=True, check=True).stdout.split()
+    return out
+assert images({}) == ["ghcr.io/sktelecom/bomlens-firmware:latest",
+                      "ghcr.io/sktelecom/bomlens-aibom:latest",
+                      "ghcr.io/sktelecom/bomlens-deep-cve:latest"], images({})
+got = images({"SBOM_SCANNER_IMAGE": "mirror.example/bl/bomlens:1.13.2"})
+assert got == ["mirror.example/bl/bomlens-firmware:1.13.2",
+               "mirror.example/bl/bomlens-aibom:1.13.2",
+               "mirror.example/bl/bomlens-deep-cve:1.13.2"], got
+got = images({"SBOM_SCANNER_IMAGE": "mirror.example/bl/bomlens:1.13.2",
+              "SBOM_FIRMWARE_IMAGE": "other.example/fw:9", "SBOM_AIBOM_IMAGE": ""})
+assert got == ["other.example/fw:9",
+               "mirror.example/bl/bomlens-aibom:1.13.2",
+               "mirror.example/bl/bomlens-deep-cve:1.13.2"], got
+print("ok")
+PY
+then
+    pass "opt-in images take the scanner image's path and tag, fall back for other names and digests, and each SBOM_*_IMAGE wins"
+else
+    fail "opt-in image defaults do not follow SBOM_SCANNER_IMAGE (see assertion above)"
+fi
+
 echo "== diagnostics: custom registry hidden, sources allowlisted, lines capped =="
 if SBOM_OUTPUT_DIR="$OUT" SBOM_SCANNER_IMAGE="registry.corp.internal:5000/team/bomlens:1.2.3@sha256:$(printf 'ab%.0s' $(seq 32))" \
     python3 - "$ROOT_DIR" <<'PY'
@@ -4052,7 +4113,8 @@ import server
 t = server.build_diagnostics(None)
 assert "corp.internal" not in t and "team/bomlens" not in t, t
 assert "scanner image: <custom image>:1.2.3@sha256:" in t, t
-assert "firmware image: ghcr.io/sktelecom/bomlens-firmware:latest" in t, t
+# The firmware image follows the custom scanner image, so it is hidden the same way.
+assert "firmware image: <custom image>:1.2.3" in t, t
 assert server._diag_image("ghcr.io/sktelecom/bomlens:latest", "ghcr.io/sktelecom/bomlens:latest") == "ghcr.io/sktelecom/bomlens:latest"
 assert server._diag_image("host:5000/x/y", "z") == "<custom image>"
 

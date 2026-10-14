@@ -52,15 +52,45 @@ OUTPUT_DIR = os.environ.get("SBOM_OUTPUT_DIR", "/host-output")
 SRC_DIR = "/src"
 UPLOAD_DIR = os.path.join(OUTPUT_DIR, ".uploads")  # uploaded files + extracted/cloned trees
 PORT = int(os.environ.get("UI_PORT", "8080"))
-FIRMWARE_IMAGE = os.environ.get(
-    "SBOM_FIRMWARE_IMAGE", "ghcr.io/sktelecom/bomlens-firmware:latest"
+# The BomLens image names: the scanner image, its legacy aliases and the opt-in
+# images themselves. Same list as scan-sbom.sh's _scanner_image_parts.
+_BOMLENS_IMAGE_NAMES = (
+    "bomlens", "sbom-generator", "sbom-scanner",
+    "bomlens-firmware", "bomlens-aibom", "bomlens-deep-cve", "bomlens-deep-license",
+    "sbom-scanner-firmware", "sbom-scanner-aibom",
 )
-DEEP_CVE_IMAGE = os.environ.get(
-    "SBOM_DEEP_CVE_IMAGE", "ghcr.io/sktelecom/bomlens-deep-cve:latest"
-)
-AIBOM_IMAGE = os.environ.get(
-    "SBOM_AIBOM_IMAGE", "ghcr.io/sktelecom/bomlens-aibom:latest"
-)
+
+
+def optin_image_ref(suffix, scanner_image=None):
+    """The default reference for an opt-in image (firmware, aibom, deep-cve,
+    deep-license), following SBOM_SCANNER_IMAGE the way scan-sbom.sh's
+    optin_image_ref does, so a UI started with `docker run -e MODE=UI` and only
+    SBOM_SCANNER_IMAGE resolves the same siblings as `scan-sbom.sh --ui`.
+
+    A BomLens image name gives the same path with the same tag
+    (.../bomlens:1.13.2 -> .../bomlens-firmware:1.13.2). A digest identifies
+    only the scanner image, so the tag written with it is used, and latest when
+    there is none. Any other name keeps the published default; for deep-license
+    that is the scanner image itself. The caller applies the image's own
+    SBOM_*_IMAGE override."""
+    ref = os.environ.get("SBOM_SCANNER_IMAGE", "") if scanner_image is None else scanner_image
+    published = "ghcr.io/sktelecom/bomlens-%s:latest" % suffix
+    if not ref:
+        return published
+    name_ref = ref.partition("@")[0]
+    prefix, slash, last = name_ref.rpartition("/")
+    prefix = prefix + slash
+    name, colon, tag = last.partition(":")
+    if name in _BOMLENS_IMAGE_NAMES:
+        return "%sbomlens-%s:%s" % (prefix, suffix, tag if colon and tag else "latest")
+    if suffix == "deep-license":
+        return ref
+    return published
+
+
+FIRMWARE_IMAGE = os.environ.get("SBOM_FIRMWARE_IMAGE") or optin_image_ref("firmware")
+DEEP_CVE_IMAGE = os.environ.get("SBOM_DEEP_CVE_IMAGE") or optin_image_ref("deep-cve")
+AIBOM_IMAGE = os.environ.get("SBOM_AIBOM_IMAGE") or optin_image_ref("aibom")
 # In-process scan runner. Inside the image this is always the baked-in
 # /usr/local/bin/run-scan; the No-Docker contract tests (tests/test-web-ui.sh)
 # substitute a stub scanner here so the /scan-stream SSE protocol is testable
