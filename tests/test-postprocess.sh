@@ -8053,6 +8053,12 @@ python3 "$LIB/identify-conda.py" "$CONDADIR/normal" "$CONDADIR/normal/out.json" 
 [ "$(conda_get "$CONDADIR/normal" requests purl)" = "pkg:pypi/requests@2.31.0" ] \
     && pass "conda: pip: sub-list becomes pkg:pypi/ purls" \
     || fail "conda: requests purl" "$(conda_get "$CONDADIR/normal" requests purl)"
+[ "$(jq -r .specVersion "$CONDADIR/normal/out.json")" = "1.6" ] \
+    && CYCLONEDX_SPEC_VERSION=1.7 python3 "$LIB/identify-conda.py" "$CONDADIR/normal" "$CONDADIR/normal/out17.json" "1.0" >/dev/null 2>&1 \
+    && [ "$(jq -r .specVersion "$CONDADIR/normal/out17.json")" = "1.7" ] \
+    && grep -q 'CYCLONEDX_SPEC_VERSION="$SPEC" python3 /tmp/identify-conda.py' "$LIB/build-prep.sh" \
+    && pass "conda: the sidecar is 1.6 by default and 1.7 when build-prep.sh is asked for 1.7" \
+    || fail "conda: spec version $(jq -r .specVersion "$CONDADIR/normal/out.json" "$CONDADIR/normal/out17.json" 2>&1 | tr '\n' ' ')"
 
 # Non-standard indentation: pip: sub-items at 3 spaces (standard is 4).
 printf 'name: x\ndependencies:\n  - python=3.11\n  - pip:\n   - requests==2.31.0\n' \

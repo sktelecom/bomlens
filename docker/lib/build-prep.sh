@@ -937,7 +937,8 @@ CONDA_ENV_FILE=""
 [ -z "$CONDA_ENV_FILE" ] && [ -f "environment.yaml" ] && CONDA_ENV_FILE="environment.yaml"
 if [ -n "$CONDA_ENV_FILE" ] && command -v python3 >/dev/null 2>&1; then
     CONDA_SBOM="${OUT%_bom.json}_conda.cdx.json"
-    if python3 /tmp/identify-conda.py "$SRC" "$CONDA_SBOM" "${PROJECT_VERSION:-unknown}"; then
+    # Written at the version cdxgen is asked for below.
+    if CYCLONEDX_SPEC_VERSION="$SPEC" python3 /tmp/identify-conda.py "$SRC" "$CONDA_SBOM" "${PROJECT_VERSION:-unknown}"; then
         CONDA_N=$(node -e '
             try { const d = require(process.argv[1]); process.stdout.write(String((d.components||[]).length)); }
             catch (e) { process.stdout.write("0"); }
