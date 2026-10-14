@@ -41,7 +41,7 @@ def license_flag($s):
 # Known permissive SPDX ids (uppercased). An allowlist, not a heuristic — keep
 # in sync with the PERMISSIVE set in licenses.ts (single line: the drift guard
 # extracts the quoted ids from this def).
-def permissive_ids: ["MIT","MIT-0","ISC","0BSD","BSD-2-CLAUSE","BSD-3-CLAUSE","BSD-3-CLAUSE-LBNL","APACHE-2.0","APACHE-1.1","ZLIB","UNLICENSE","BSL-1.0","PSF-2.0","PYTHON-2.0","CC0-1.0","WTFPL","NCSA","X11"];
+def permissive_ids: ["MIT","MIT-0","ISC","0BSD","BSD-2-CLAUSE","BSD-3-CLAUSE","BSD-3-CLAUSE-LBNL","APACHE-2.0","APACHE-1.1","ZLIB","UNLICENSE","BSL-1.0","PSF-2.0","PYTHON-2.0","CC0-1.0","WTFPL","NCSA","X11","MIT-X11"];
 
 # Classify ONE license id/name/expression. Order matters: AGPL and LGPL are
 # matched before the bare GPL test so they don't fall to strong-copyleft, and a
@@ -244,12 +244,23 @@ def expr_verdict($s; $outbound; $compat):
       | min_by(verdict_rank[.verdict])
     end;
 
-# Verdict for a whole CycloneDX component. Several `licenses[]` entries mean the
-# consumer may choose one (CycloneDX treats them as alternatives), so the best
-# verdict across entries wins — the same rule as OR inside an expression.
+# Verdict for a whole CycloneDX component. CycloneDX does not say how several
+# `licenses[]` entries combine, so the meaning comes from where they were read:
+#   - a Debian package (pkg:deb/): the entries are the licenses of its copyright
+#     file (os-licenses.sh), which name the licenses of different files, so all
+#     of them apply and the worst verdict wins, the same rule as AND. An entry
+#     that cannot be parsed counts as "unknown" rather than being left out, so
+#     the rest cannot clear the package on their own.
+#   - anything else: the entries are alternatives (a Maven POM listing several
+#     licenses offers a choice), so the best verdict wins, the same rule as OR.
 def component_license_conflict($outbound; $compat):
   [ (.licenses // [])[] | (.license.id // .license.name // .expression // "") | select(. != "") ] as $strings
+  | ((.purl // "") | ascii_downcase | startswith("pkg:deb/")) as $all_apply
   | if ($strings | length) == 0 then {verdict: "unknown", why: "The component declares no license."}
+    elif $all_apply then
+      [ $strings[] | (expr_verdict(.; $outbound; $compat)
+          // {verdict: "unknown", why: ("The license \"" + . + "\" could not be parsed as an SPDX expression.")}) ]
+      | max_by(verdict_rank[.verdict])
     else
       ([ $strings[] | expr_verdict(.; $outbound; $compat) | select(. != null) ]) as $vs
       | if ($vs | length) == 0

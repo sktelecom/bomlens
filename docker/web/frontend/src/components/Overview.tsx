@@ -1060,7 +1060,17 @@ function JumpCards({
         ]
       : []),
     ...(result.security
-      ? [{ id: "vulnerabilities" as SectionId, icon: ShieldAlert, value: result.security.TOTAL }]
+      ? [
+          {
+            id: "vulnerabilities" as SectionId,
+            icon: ShieldAlert,
+            value: result.security.TOTAL,
+            // A 0 here covers only the components a check reached.
+            sub: result.security.uncheckedCount
+              ? t("result.uncheckedTile", { count: result.security.uncheckedCount })
+              : undefined,
+          },
+        ]
       : []),
     // The rail keeps this section whenever the scan produced a dependency view,
     // so hiding the tile made the two disagree about whether the section exists.

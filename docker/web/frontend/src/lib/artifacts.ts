@@ -25,6 +25,7 @@ import {
   ScrollText,
   ShieldAlert,
   ShieldCheck,
+  Tags,
   type LucideIcon,
 } from "lucide-react";
 
@@ -137,6 +138,16 @@ const GROUPS: GroupSpec[] = [
     match: (n) => n.includes("_security") && !n.includes("_security_epss"),
   },
   {
+    // Components a firmware, rootfs or binary scan found without a version, as
+    // a name,version CSV with the versions empty: filled in and passed back
+    // with --component-versions.
+    key: "componentVersions",
+    Icon: Tags,
+    primary: false,
+    rank: 5.5,
+    match: (n) => n.endsWith("_component-versions.template.csv"),
+  },
+  {
     key: "license",
     Icon: FileText,
     primary: false,
@@ -162,7 +173,7 @@ const GROUPS: GroupSpec[] = [
 ];
 
 // Preferred chip order within a card: rich/human formats first.
-const FORMAT_RANK: Record<string, number> = { spdx3: -1, html: 0, md: 1, txt: 2, json: 3, spdx: 4, cdx: 5, template: 6 };
+const FORMAT_RANK: Record<string, number> = { spdx3: -1, html: 0, md: 1, txt: 2, csv: 2.5, json: 3, spdx: 4, cdx: 5, template: 6 };
 
 function extOf(name: string): string {
   // The SPDX export is also .json; a distinct pseudo-extension keeps its chip
@@ -182,7 +193,7 @@ function toFormat(f: ResultFile): ArtifactFormat {
     ext,
     name: f.name,
     size: f.size,
-    viewable: ext !== "sig" && ["html", "json", "txt", "md", "spdx", "cdx", "spdx3", "template"].includes(ext),
+    viewable: ext !== "sig" && ["html", "json", "txt", "csv", "md", "spdx", "cdx", "spdx3", "template"].includes(ext),
   };
 }
 

@@ -1816,23 +1816,24 @@ echo "== the bundled CPE index is still offered what was identified from a layer
 # path and out of this one, which cost four CVEs on a switch OS — `snmp` and
 # `pkgconf` were reported by the index alone. Components are offered to both;
 # whatever both find is deduplicated on (component, CVE) further downstream.
-cpe_in_filter="$(awk '
-    /^    jq -n --slurpfile c "\$WORK\/merged.json" / { inside = 1; sub(/^[^\x27]*\x27/, ""); }
-    inside { print }
-    inside && /cpe-in.json/ { exit }
-' "$SCRIPT" | sed "s|\x27 > \"\$WORK/cpe-in.json\"||")"
-if [ -z "$cpe_in_filter" ]; then
-    fail "could not lift the CPE index input filter out of scan-firmware.sh" "was it renamed?"
+# The selection lives in vuln-coverage.jq, shared by match-cpe-index.sh and the
+# security report's list of components no check reached.
+COVERAGE_JQ="$ROOT_DIR/docker/lib/vuln-coverage.jq"
+if [ ! -f "$COVERAGE_JQ" ]; then
+    fail "vuln-coverage.jq is missing" "the CPE index input filter lives there"
 else
-    offered="$(jq -n --slurpfile c /dev/stdin "$cpe_in_filter" <<'EOF' | jq -r '[.components[].name] | sort | join(",")'
+    offered="$(jq -r "$(cat "$COVERAGE_JQ")"' [.[] | select(vc_cpe_index_candidate) | .name] | sort | join(",")' <<'EOF'
 [{"name":"no-purl","version":"1.0","cpe":"cpe:2.3:a:x:no-purl:1.0:*:*:*:*:*:*:*"},
  {"name":"generic","version":"1.0","purl":"pkg:generic/generic@1.0"},
+ {"name":"upstream","version":"1.0","purl":"pkg:github/acme/upstream@v1.0"},
+ {"name":"site","version":"1.0","purl":"pkg:sourceforge/site@1.0"},
+ {"name":"openwrt","version":"1.0-1","purl":"pkg:opkg/openwrt@1.0-1"},
  {"name":"real-purl","version":"1.0","purl":"pkg:deb/debian/real-purl@1.0?arch=amd64&distro=debian-13"},
  {"name":"from-layer","version":"1.0","purl":"pkg:deb/debian/from-layer@1.0?distro=debian-13",
   "properties":[{"name":"bomlens:purlSource","value":"container-store-distro"}]}]
 EOF
 )"
-    if [ "$offered" = "from-layer,generic,no-purl" ]; then
+    if [ "$offered" = "from-layer,generic,no-purl,openwrt,site,upstream" ]; then
         pass "a purl written from a layer keeps the component on the CPE index path"
     else
         fail "the CPE index input no longer holds what it needs" "offered: ${offered:-nothing}"
@@ -2164,6 +2165,26 @@ assert m.in_range("UNKNOWN", None, None, None, None, None) is False
 # Real release forms stay usable: letter suffixes and Debian epochs included.
 for v in ("1.0.2h", "2:9.1.1230-2", "1.7.1", "4.9.2-1", "0.11.0"):
     assert m.usable_version(v), v
+
+# The comparator used where cve-bin-tool is not installed (the base image, for
+# rootfs and binary scans) reads letter releases as later and pre-release
+# words as earlier, so an OpenSSL or OpenSSH range bounds the same way there.
+f = m._fallback_cmp
+assert f("1.0.2h", "1.0.2") > 0 and f("1.0.2h", "1.0.2i") < 0 and f("1.0.2h", "1.0.3") < 0
+assert f("1.0.2a", "1.0.2") > 0
+assert f("6.2p2", "6.2") > 0 and f("6.2p2", "7.0") < 0
+assert f("2.0.0rc1", "2.0.0") < 0 and f("2.0.0beta2", "2.0.0beta10") < 0
+assert f("1.00", "1.0") == 0 and f("1.10", "1.9") > 0 and f("2.6.19", "2.6.19.1") < 0
+# Trailing zero components are equal to their absence, in either order, while
+# a pre-release or a further non-zero component after them still orders.
+assert f("1.0", "1.0.0") == 0 and f("1.0.0", "1.0") == 0
+assert f("5.4.0", "5.4") == 0 and f("5.4", "5.4.0.0") == 0
+assert f("5.4.0rc1", "5.4") < 0 and f("5.4", "5.4.0rc1") > 0
+assert f("5.4.0.1", "5.4") > 0 and f("1.0.0a", "1.0") > 0
+assert f("1.0.2", "1.0.2.0h") < 0
+assert m.in_range("1.0", "1.0.0", None, None, None, None) is True
+assert m.in_range("5.4", None, "5.4.0", 1, "5.5", 0) is True
+assert m.in_range("5.4.0", None, None, None, "5.4", 0) is False
 CPEPY
     then
         pass "a prefixed version compares as its number, and a bounded range still bounds"
@@ -2174,12 +2195,12 @@ else
     echo "  SKIP: python3 not available"
 fi
 
-# The matching runs over the merged component set, so a component named by any
-# pass is offered to it.
-if awk '/^# ④.6 CPE -> CVE matching/,/^fi$/' "$SCRIPT" | grep -q 'merged.json'; then
-    pass "CPE matching reads the merged component set"
+# The matching runs over the final SBOM, after every CPE enrichment step, so a
+# component named by any pass, with a CPE from any step, is offered to it.
+if grep -q 'match-cpe-index.sh" "$OUTPUT_FILE"' "$ROOT_DIR/docker/entrypoint.sh"; then
+    pass "CPE matching reads the final, enriched SBOM"
 else
-    fail "CPE matching does not read the merged set"
+    fail "CPE matching does not read the final SBOM"
 fi
 
 echo "== a failed syft pass leaves its cause in the log and a signal for the SBOM =="

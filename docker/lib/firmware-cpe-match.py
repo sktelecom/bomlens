@@ -9,8 +9,8 @@
 # Usage: firmware-cpe-match.py <component_sbom.cdx.json> <cpe_match.sqlite>
 #   prints, to stdout, a JSON array of flat rows:
 #     [ { "cve_number", "product", "version", "severity", "score", "cvss_version" } ]
-#   which is the exact shape scan-firmware.sh step ⑤ reshapes into the Trivy-style
-#   sidecar, so nothing downstream changes.
+#   which match-cpe-index.sh reshapes into the Trivy-style sidecar that
+#   scan-security.sh merges.
 #
 # cve-bin-tool identifies firmware binaries and writes a CycloneDX SBOM whose
 # components carry a CPE (2.2 URI form, e.g. cpe:/a:haxx:curl:8.14.1). We parse
@@ -25,7 +25,8 @@ import sys
 # Prefer cve-bin-tool's own version comparator so our matching agrees with how
 # cve-bin-tool reads NVD ranges (it handles openssl letter releases like
 # 1.1.1 < 1.1.1a < 1.1.1k and pre-release suffixes, which naive parsing gets
-# wrong). Falls back to a self-contained comparator if the import ever changes.
+# wrong). Falls back to a self-contained comparator when cve-bin-tool is not
+# installed, as in the base image.
 try:
     from cve_bin_tool.version_compare import Version as _CBTVersion
 except Exception:  # pragma: no cover - only when run outside the firmware image
@@ -50,22 +51,53 @@ def parse_cpe(cpe):
 
 _part_re = re.compile(r"(\d+|[a-zA-Z]+)")
 
+# Words that mark a release before the version they follow (2.0.0rc1 < 2.0.0).
+_PRE_RELEASE = {"pre", "rc", "alpha", "beta", "dev"}
 
-def _key(v):
-    """Split a version into a comparable list of (is_num, value) tokens.
 
-    Handles dotted-numeric with alpha suffixes (1.30.1, 8.14.1, 1.1.1k, 2.0.0rc1)
-    without depending on PEP 440. Numeric tokens sort below alpha of the same
-    position so 1.1.1 < 1.1.1k.
-    """
-    toks = []
-    for chunk in re.split(r"[.\-_+~]", str(v)):
+def _tokens(v):
+    """Split a version into numeric and alphabetic tokens: 1.0.2h -> [1, 0, 2, 'h']."""
+    out = []
+    for chunk in re.split(r"[^0-9A-Za-z]+", str(v)):
         for tok in _part_re.findall(chunk):
-            if tok.isdigit():
-                toks.append((1, int(tok), ""))
-            else:
-                toks.append((0, 0, tok.lower()))
-    return toks
+            out.append(int(tok) if tok.isdigit() else tok.lower())
+    return out
+
+
+def _fallback_cmp(a, b):
+    """Compare two versions without cve-bin-tool (the base image has none).
+
+    Same reading as the firmware image's comparator for the release forms NVD
+    records: a letter after the last number is a later release (OpenSSL's
+    1.0.2 < 1.0.2h < 1.0.2i, OpenSSH's 6.2 < 6.2p2), and a pre-release word
+    is an earlier one (2.0.0rc1 < 2.0.0). At one position a number is later
+    than a letter, so 1.0.2h < 1.0.3. Trailing zero components do not count,
+    so 1.0 == 1.0.0 and 5.4.0 == 5.4, while 5.4.0rc1 < 5.4 < 5.4.0.1.
+    """
+    ta, tb = _tokens(a), _tokens(b)
+    for x, y in zip(ta, tb):
+        if x == y:
+            continue
+        xn, yn = isinstance(x, int), isinstance(y, int)
+        if xn and yn:
+            return (x > y) - (x < y)
+        if xn != yn:
+            return 1 if xn else -1
+        xp, yp = x in _PRE_RELEASE, y in _PRE_RELEASE
+        if xp != yp:
+            return -1 if xp else 1
+        return (x > y) - (x < y)
+    longer, sign = (ta, 1) if len(ta) > len(tb) else (tb, -1)
+    rest = longer[min(len(ta), len(tb)):]
+    # Zero components the shorter version leaves out are equal to it.
+    while rest and rest[0] == 0 and isinstance(rest[0], int):
+        rest = rest[1:]
+    if not rest:
+        return 0
+    nxt = rest[0]
+    if isinstance(nxt, str) and nxt in _PRE_RELEASE:
+        return -sign
+    return sign
 
 
 # Release prefixes that are not part of the number. The Go toolchain writes
@@ -90,11 +122,7 @@ def vcmp(a, b):
             return (va > vb) - (va < vb)
         except Exception:
             pass
-    ka, kb = _key(a), _key(b)
-    n = max(len(ka), len(kb))
-    ka += [(1, 0, "")] * (n - len(ka))
-    kb += [(1, 0, "")] * (n - len(kb))
-    return (ka > kb) - (ka < kb)
+    return _fallback_cmp(a, b)
 
 
 # Whether a string can be compared as a version at all. A version has to contain

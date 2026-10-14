@@ -1,0 +1,41 @@
+{
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.6",
+  "version": 1,
+  "metadata": {
+    "timestamp": "2026-10-01T00:00:00Z",
+    "tools": { "components": [ { "type": "application", "name": "syft", "version": "1.0.0" } ] },
+    "component": { "type": "firmware", "name": "device.img", "version": "1.0" }
+  },
+  "components": [
+    { "type": "operating-system", "bom-ref": "os:busybox@1.31.1", "name": "busybox", "version": "1.31.1",
+      "cpe": "cpe:2.3:a:busybox:busybox:1.31.1:*:*:*:*:*:*:*" },
+    { "type": "application", "name": "openssl", "version": "1.0.2u", "purl": "pkg:generic/openssl@1.0.2u",
+      "cpe": "cpe:2.3:a:openssl:openssl:1.0.2u:*:*:*:*:*:*:*" },
+    { "type": "library", "bom-ref": "k", "name": "kernel", "version": "5.10.0-1-7c4e9d2a1b3f5e6d8c0a9b8e7f6d5c4b",
+      "purl": "pkg:opkg/kernel@5.10.0-1-7c4e9d2a1b3f5e6d8c0a9b8e7f6d5c4b" },
+    { "type": "library", "bom-ref": "d", "name": "dropbear_ssh", "version": "2020.81",
+      "cpe": "cpe:2.3:a:dropbear_ssh_project:dropbear_ssh:2020.81:*:*:*:*:*:*:*" },
+    { "type": "library", "bom-ref": "l", "name": "linux_kernel", "version": "4.14.180",
+      "cpe": "cpe:/a:linux:linux_kernel:4.14.180",
+      "properties": [ { "name": "bomlens:identifiedBy", "value": "kernel-signature" } ] },
+    { "type": "library", "bom-ref": "z", "name": "zlib", "version": "1.0.5", "purl": "pkg:npm/zlib@1.0.5" },
+    { "type": "library", "bom-ref": "o3", "name": "openssl", "version": "3.0.13" },
+    { "type": "library", "bom-ref": "g", "name": "gcc", "version": "9.3.0", "cpe": "cpe:/a:gnu:gcc:9.3.0" },
+    { "type": "library", "bom-ref": "m", "name": "busybox", "version": "1.35.0",
+      "cpe": "cpe:2.3:a:openssl:openssl:1.35.0:*:*:*:*:*:*:*" },
+    { "type": "library", "bom-ref": "n", "name": "ncurses",
+      "properties": [ { "name": "bomlens:evidenceGrade", "value": "presence-only" },
+                      { "name": "bomlens:identifiedBy", "value": "elf-presence" } ] },
+    { "type": "library", "bom-ref": "x", "name": "libxml2",
+      "properties": [ { "name": "bomlens:evidenceGrade", "value": "presence-only" } ] },
+    { "type": "library", "bom-ref": "km", "name": "3c59x", "version": "UNKNOWN", "purl": "pkg:generic/3c59x" },
+    { "type": "library", "bom-ref": "sp", "name": "Vendor Utility",
+      "properties": [ { "name": "bomlens:evidenceGrade", "value": "presence-only" } ] },
+    { "type": "library", "bom-ref": "c", "name": "curl", "version": "7.88.1", "purl": "pkg:generic/curl@7.88.1" },
+    { "type": "file", "bom-ref": "f", "name": "bin/openssl", "version": "1.0.2u" }
+  ],
+  "dependencies": [
+    { "ref": "pkg:generic/curl@7.88.1", "dependsOn": [] }
+  ]
+}

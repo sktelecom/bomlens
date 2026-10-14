@@ -32,7 +32,9 @@ extract_fn() {
     ' "$SCRIPT"
 }
 
-for fn in _is_rootfs_dir find_rootfs_dir nested_rootfs_hint has_package_db is_container_archive is_archive; do
+for fn in _is_rootfs_dir find_rootfs_dir nested_rootfs_hint has_package_db is_container_archive is_archive \
+          is_firmware has_source_manifest release_folder_candidates release_folder_firmware_file \
+          release_folder_app_entry release_folder_vetoed release_folder_large_files; do
     body="$(extract_fn "$fn")"
     if [ -z "$body" ]; then
         echo "[ERROR] could not lift $fn out of scan-sbom.sh (was it renamed?)"; exit 1
@@ -113,6 +115,135 @@ if nested_rootfs_hint "$WORK/nodeps" >/dev/null; then
     fail "nested_rootfs_hint invented a candidate where none exists"
 else
     pass "an ordinary source tree with nothing nested gets no hint"
+fi
+
+echo "== release folders: only a folder with no source of its own is rerouted =="
+
+# release_folder_candidates looks at direct children only, skips symlinks, and
+# names each candidate by kind.
+mkdir -p "$WORK/rel/images/rootfs"/{etc,bin,usr} "$WORK/rel/images/install"
+printf 'blob\n' > "$WORK/rel/images/dev.ubi"
+ln -s / "$WORK/rel/images/hostroot" 2>/dev/null || true
+cands="$(release_folder_candidates "$WORK/rel/images")"
+if [ "$(printf '%s\n' "$cands" | grep -c .)" = 2 ] \
+   && printf '%s\n' "$cands" | grep -qx "rootfs	$WORK/rel/images/rootfs" \
+   && printf '%s\n' "$cands" | grep -qx "firmware	$WORK/rel/images/dev.ubi"; then
+    pass "a rootfs folder and a firmware file are both named, a symlink to / is not"
+else
+    fail "release_folder_candidates" "got: $cands"
+fi
+if has_source_manifest "$WORK/rel/images"; then
+    fail "a folder of build artifacts was taken for a source tree"
+else
+    pass "a folder of build artifacts has no source manifest"
+fi
+missed=""
+for m in package.json pom.xml go.mod Cargo.toml requirements.txt CMakeLists.txt Makefile meson.build App.csproj; do
+    mkdir -p "$WORK/srcm-$m"; : > "$WORK/srcm-$m/$m"
+    has_source_manifest "$WORK/srcm-$m" || missed="$missed $m"
+done
+if [ -z "$missed" ]; then
+    pass "a top-level manifest or build file marks a folder as source"
+else
+    fail "these at the top level were not read as source:$missed"
+fi
+mkdir -p "$WORK/gitrepo/.git"
+has_source_manifest "$WORK/gitrepo" && pass "a git checkout counts as source" \
+    || fail "a git checkout was not read as source"
+
+# A .bix image is a firmware container `file` reports only as "data".
+printf 'opaque\n' > "$WORK/dev-1.0.bix"
+is_firmware "$WORK/dev-1.0.bix" && pass ".bix is recognized as a firmware image" \
+    || fail ".bix was not recognized as a firmware image"
+
+# The folder from a lab delivery: rootfs/, install/, a kernel and a .bix image.
+# The kernel is not a candidate, so the two left are listed.
+mkdir -p "$WORK/lab/rootfs"/{etc,bin,usr,lib} "$WORK/lab/install"
+printf 'kernel\n' > "$WORK/lab/vmlinuz"; printf 'opaque\n' > "$WORK/lab/dev-1.0.bix"
+cands="$(release_folder_candidates "$WORK/lab")"
+if [ "$(printf '%s\n' "$cands" | grep -c .)" = 2 ] \
+   && printf '%s\n' "$cands" | grep -qx "rootfs	$WORK/lab/rootfs" \
+   && printf '%s\n' "$cands" | grep -qx "firmware	$WORK/lab/dev-1.0.bix"; then
+    pass "rootfs/, install/, a kernel and a .bix make two candidates"
+else
+    fail "lab release folder candidates" "got: $cands"
+fi
+
+# .bin and .img count by their content only, not by name.
+mkdir -p "$WORK/byname"; printf 'blob\n' > "$WORK/byname/dev.bin"; printf 'blob\n' > "$WORK/byname/disk.img"
+[ -z "$(release_folder_candidates "$WORK/byname")" ] \
+    && pass ".bin and .img with no firmware signature are not candidates" \
+    || fail ".bin/.img were taken by name alone" "got: $(release_folder_candidates "$WORK/byname")"
+if command -v file >/dev/null 2>&1; then
+    mkdir -p "$WORK/bymagic"
+    { printf 'hsqs'; head -c 200 /dev/zero; } > "$WORK/bymagic/rootfs.img"
+    { printf 'PK\003\004'; head -c 200 /dev/zero; } > "$WORK/bymagic/weights.bin"
+    cands="$(release_folder_candidates "$WORK/bymagic")"
+    [ "$cands" = "firmware	$WORK/bymagic/rootfs.img" ] \
+        && pass "an .img with a squashfs signature is a candidate, a zip named .bin is not" \
+        || fail "signature check on .img/.bin" "got: $cands"
+fi
+
+# Folders that are not releases, even with a .bin or a firmware-like file in them.
+mkdir -p "$WORK/electron/resources/app" "$WORK/electron/locales"
+for f in app.exe ffmpeg.dll libGLESv2.dll snapshot_blob.bin v8_context_snapshot.bin resources.pak icudtl.dat; do
+    printf 'x\n' > "$WORK/electron/$f"
+done
+: > "$WORK/electron/resources/app.asar"
+[ -z "$(release_folder_candidates "$WORK/electron")" ] && pass "an Electron app folder has no candidates" \
+    || fail "an Electron app folder was taken for a release folder" "got: $(release_folder_candidates "$WORK/electron")"
+mkdir -p "$WORK/electron-linux"; printf 'x\n' > "$WORK/electron-linux/libffmpeg.so"
+printf 'x\n' > "$WORK/electron-linux/snapshot_blob.bin"; printf 'x\n' > "$WORK/electron-linux/update.fw"
+[ -z "$(release_folder_candidates "$WORK/electron-linux")" ] && pass "a folder with a top-level .so has no candidates" \
+    || fail "a folder with a top-level .so was taken for a release folder"
+mkdir -p "$WORK/hfsnap"
+printf '{}\n' > "$WORK/hfsnap/config.json"; printf '{}\n' > "$WORK/hfsnap/tokenizer.json"
+{ printf 'PK\003\004'; head -c 200 /dev/zero; } > "$WORK/hfsnap/pytorch_model.bin"
+printf 'x\n' > "$WORK/hfsnap/model.rom"
+[ -z "$(release_folder_candidates "$WORK/hfsnap")" ] && pass "a model snapshot folder has no candidates" \
+    || fail "a model snapshot folder was taken for a release folder" "got: $(release_folder_candidates "$WORK/hfsnap")"
+mkdir -p "$WORK/staging/usr/lib" "$WORK/staging/bin" "$WORK/staging/lib"
+printf 'x\n' > "$WORK/staging/usr/lib/libfoo.so.1"; printf 'x\n' > "$WORK/staging/bin/app"
+printf 'x\n' > "$WORK/staging/app.bin"; printf 'x\n' > "$WORK/staging/boot.img"
+[ -z "$(release_folder_candidates "$WORK/staging")" ] && pass "a build output staging folder has no candidates" \
+    || fail "a staging folder was taken for a release folder" "got: $(release_folder_candidates "$WORK/staging")"
+mkdir -p "$WORK/many"; printf 'x\n' > "$WORK/many/dev.trx"
+for i in $(seq 1 21); do printf 'x\n' > "$WORK/many/file$i.txt"; done
+[ -z "$(release_folder_candidates "$WORK/many")" ] && pass "a folder with more than 20 top-level files has no candidates" \
+    || fail "a folder with many files was taken for a release folder"
+
+# Large files beside a rootfs with no package database are offered as firmware
+# commands: over 1 MiB only, no symlinks, at most five then a count.
+mkdir -p "$WORK/big"
+for i in 1 2 3 4 5 6 7; do head -c 1048577 /dev/zero > "$WORK/big/blob$i.pak"; done
+head -c 1048576 /dev/zero > "$WORK/big/exactly-1mib.pak"; printf 'x' > "$WORK/big/small.txt"
+ln -s "$WORK/big/blob1.pak" "$WORK/big/link.pak" 2>/dev/null || true
+head -c 1048577 /dev/zero > "$WORK/big/weights.safetensors"
+large="$(release_folder_large_files "$WORK/big")"
+if [ "$(printf '%s\n' "$large" | grep -c -- '--firmware')" = 5 ] \
+   && printf '%s\n' "$large" | grep -qF -- "--target \"$WORK/big/blob1.pak\" --firmware" \
+   && printf '%s\n' "$large" | grep -qF "(and 2 more)" \
+   && ! printf '%s\n' "$large" | grep -qE 'small|exactly|link|safetensors'; then
+    pass "files over 1 MiB are listed as firmware commands, five at most, model files left out"
+else
+    fail "release_folder_large_files" "got: $large"
+fi
+[ -z "$(release_folder_large_files "$WORK/nodeps")" ] && pass "a folder with no large file lists nothing" \
+    || fail "release_folder_large_files listed something for a folder without large files"
+
+# This repository's own example projects and test fixtures must keep scanning
+# as source: none of them is a folder without source that holds a rootfs or a
+# firmware image directly.
+hits=""
+while IFS= read -r d; do
+    _is_rootfs_dir "$d" && continue
+    has_source_manifest "$d" && continue
+    [ -n "$(release_folder_candidates "$d")" ] && hits="$hits ${d#"$ROOT_DIR"/}"
+done < <(find "$ROOT_DIR/examples" "$ROOT_DIR/tests/fixtures" -type d -not -path '*/node_modules/*')
+if [ -z "$hits" ]; then
+    pass "examples/ and tests/fixtures/ stay source (no release folder among them)"
+else
+    fail "folders in this repository would be rerouted away from a source scan" "$hits"
 fi
 
 echo "== the package database decides which scanner can say anything =="

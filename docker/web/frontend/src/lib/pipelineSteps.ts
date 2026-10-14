@@ -52,6 +52,9 @@ const STEP_LABEL_KEY: Record<string, string> = {
   "composer-install": "pipelineSteps.composerInstall",
   "pnpm-workspace-tree": "pipelineSteps.pnpmWorkspaceTree",
   "enrich-distro-supplier": "pipelineSteps.enrichDistroSupplier",
+  "component-versions": "pipelineSteps.componentVersions",
+  "upstream-purl": "pipelineSteps.upstreamPurl",
+  "match-cpe": "pipelineSteps.matchCpe",
 };
 
 /** The i18n key for a pipeline step id, or undefined for one with no label

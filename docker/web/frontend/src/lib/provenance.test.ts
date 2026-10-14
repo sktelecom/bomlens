@@ -17,8 +17,7 @@ function config(over: Partial<ScanConfig>): ScanConfig {
     security: true,
     deepLicense: false,
     identifyVendored: false,
-    includeOsv: false,
-    byteStable: false,
+      byteStable: false,
     deepCve: false,
     ...over,
   };

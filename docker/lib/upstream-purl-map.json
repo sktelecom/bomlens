@@ -1,0 +1,81 @@
+{
+  "_comment": "Component name or CPE -> purl of the project's upstream source repository, for components identified in firmware, root filesystem and binary scans (upstream-purl.py). Those components arrive with no purl, a pkg:generic one, or a package-manager type no vulnerability or license database resolves (opkg, openwrt), so a tool that looks components up by purl cannot identify them. upstream-purl.py sets pkg:<type>/<namespace>/<name>@<tag> from this table, where <tag> is the release tag the upstream repository uses for that version. CLOSED list on purpose: each entry reproduces a release tag of the upstream repository for the versions it names, and a name not listed here keeps the identifier it has (a wrong repository or tag points at a different version, which is worse than none). Entries starting with '_' are ignored.",
+
+  "_comment_fields": "names: lower-cased component names that mean this project. cpe: vendor:product pairs (NVD CPE dictionary) that mean it, matched when the name is not listed. purl: everything before '@'. version: the regular expression the normalized version must match in full; a version of any other shape is left alone rather than guessed at. tag: how the release tag is spelled, with {v} the version, {v_} the version with '.' replaced by '_', and {1}, {2}, ... the groups of the version expression. normalize: suffixes removed before matching; 'release' is a trailing package rebuild count (-1, -r2; at most three digits, so a date such as -20230520 is kept), 'build-hash' a trailing build hash of 20 or more hex digits (kernel packages carry one), 'zero-sublevel' a third part of 0 removed (5.4.0 becomes 5.4) for a project that tags a base release with two parts. verified: the versions whose release tag the entry was checked to reproduce.",
+
+  "replaceablePurlTypes": ["generic", "opkg", "openwrt"],
+
+  "entries": [
+    { "id": "busybox", "names": ["busybox"], "cpe": ["busybox:busybox"],
+      "purl": "pkg:github/mirror/busybox", "version": "^[0-9]+(\\.[0-9]+)+$", "tag": "{v_}",
+      "normalize": ["release"], "verified": ["1.00", "1.18.3", "1.22.1", "1.36.1"] },
+
+    { "id": "curl", "names": ["curl", "libcurl"], "cpe": ["haxx:curl", "haxx:libcurl"],
+      "purl": "pkg:github/curl/curl", "version": "^[0-9]+\\.[0-9]+\\.[0-9]+$", "tag": "curl-{v_}",
+      "normalize": ["release"], "verified": ["8.3.0"] },
+
+    { "id": "openssl-1", "names": ["openssl", "libopenssl", "openssl-util"], "cpe": ["openssl:openssl"],
+      "purl": "pkg:github/openssl/openssl", "version": "^1\\.[0-9]+\\.[0-9]+[a-z]?$", "tag": "OpenSSL_{v_}",
+      "normalize": ["release"], "verified": ["1.0.2h", "1.1.1w"] },
+
+    { "id": "openssh", "names": ["openssh", "openssh-server", "openssh-client"], "cpe": ["openbsd:openssh"],
+      "purl": "pkg:github/openssh/openssh-portable", "version": "^([0-9]+)\\.([0-9]+)p([0-9]+)$", "tag": "V_{1}_{2}_P{3}",
+      "normalize": ["release"], "verified": ["6.2p2"] },
+
+    { "id": "linux", "names": ["linux", "linux_kernel", "linux-kernel", "kernel"], "cpe": ["linux:linux_kernel"],
+      "purl": "pkg:github/gregkh/linux", "version": "^[0-9]+\\.[0-9]+(\\.[0-9]+)?$", "tag": "v{v}",
+      "normalize": ["build-hash", "release", "zero-sublevel"], "verified": ["3.10.18", "5.15.167"] },
+
+    { "id": "zlib", "names": ["zlib", "libz"], "cpe": ["zlib:zlib", "gnu:zlib"],
+      "purl": "pkg:github/madler/zlib", "version": "^[0-9]+\\.[0-9]+(\\.[0-9]+)*$", "tag": "v{v}",
+      "normalize": ["release"], "verified": ["1.1.4", "1.2.3", "1.2.13"] },
+
+    { "id": "u-boot", "names": ["u-boot", "uboot", "das-u-boot"], "cpe": ["denx:u-boot"],
+      "purl": "pkg:github/u-boot/u-boot", "version": "^[0-9]{4}\\.[0-9]{2}$", "tag": "v{v}",
+      "normalize": ["release"], "verified": ["2011.12", "2023.04"] },
+
+    { "id": "net-snmp", "names": ["net-snmp", "netsnmp", "libnetsnmp"], "cpe": ["net-snmp:net-snmp"],
+      "purl": "pkg:github/net-snmp/net-snmp", "version": "^[0-9]+\\.[0-9]+(\\.[0-9]+)*$", "tag": "v{v}",
+      "normalize": ["release"], "verified": ["5.7.1"] },
+
+    { "id": "ncurses", "names": ["ncurses", "libncurses", "libncursesw"], "cpe": ["gnu:ncurses"],
+      "purl": "pkg:github/mirror/ncurses", "version": "^[0-9]+\\.[0-9]+$", "tag": "v{v}",
+      "normalize": ["release"], "verified": ["5.7"] },
+
+    { "id": "net-tools", "names": ["net-tools"], "cpe": [],
+      "purl": "pkg:github/ecki/net-tools", "version": "^[0-9]+\\.[0-9]+$", "tag": "v{v}",
+      "normalize": ["release"], "verified": ["1.60"] },
+
+    { "id": "libxml2", "names": ["libxml2"], "cpe": ["xmlsoft:libxml2"],
+      "purl": "pkg:github/gnome/libxml2", "version": "^[0-9]+\\.[0-9]+\\.[0-9]+$", "tag": "v{v}",
+      "normalize": ["release"], "verified": ["2.11.4"] },
+
+    { "id": "sqlite", "names": ["sqlite", "sqlite3", "libsqlite3"], "cpe": ["sqlite:sqlite"],
+      "purl": "pkg:github/sqlite/sqlite", "version": "^3\\.[0-9]+\\.[0-9]+(\\.[0-9]+)?$", "tag": "version-{v}",
+      "normalize": ["release"], "verified": ["3.36.0"] },
+
+    { "id": "glibc", "names": ["glibc"], "cpe": ["gnu:glibc"],
+      "purl": "pkg:github/bminor/glibc", "version": "^2\\.[0-9]+(\\.[0-9]+)?$", "tag": "glibc-{v}",
+      "normalize": ["release", "zero-sublevel"], "verified": ["2.9"] },
+
+    { "id": "dropbear", "names": ["dropbear", "dropbearmulti"], "cpe": ["dropbear_ssh_project:dropbear_ssh"],
+      "purl": "pkg:github/mkj/dropbear", "version": "^[0-9]{4}\\.[0-9]+$", "tag": "DROPBEAR_{v}",
+      "normalize": ["release"], "verified": ["2022.82"] },
+
+    { "id": "mbedtls", "names": ["mbedtls", "libmbedtls"], "cpe": ["arm:mbed_tls"],
+      "purl": "pkg:github/mbed-tls/mbedtls", "version": "^(2\\.28|3\\.[0-9]+)\\.[0-9]+$", "tag": "v{v}",
+      "normalize": ["release"], "verified": ["2.28.9"] },
+
+    { "id": "python", "names": ["python", "python2", "python3", "cpython"], "cpe": ["python:python"],
+      "purl": "pkg:github/python/cpython", "version": "^[23]\\.[0-9]+\\.[0-9]+$", "tag": "v{v}",
+      "normalize": ["release"], "verified": ["2.7.11"] },
+
+    { "id": "boa", "names": ["boa"], "cpe": ["boa:boa"],
+      "purl": "pkg:sourceforge/boa", "version": "^[0-9]+\\.[0-9]+\\.[0-9]+$", "tag": "{v}",
+      "normalize": ["release"], "verified": ["0.94.13"] },
+
+    { "id": "readline", "names": ["readline", "libreadline"], "cpe": ["gnu:readline"],
+      "purl": "pkg:gnu/readline", "version": "^[0-9]+\\.[0-9]+$", "tag": "{v}",
+      "normalize": ["release"], "verified": ["5.2"] }
+  ]
+}

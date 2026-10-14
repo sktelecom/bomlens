@@ -48,7 +48,11 @@ export function SeverityBar({ security, selected = "", onSelect }: Props) {
         )}
       </div>
       {total === 0 ? (
-        <p className="text-sm text-muted-foreground">{t("result.noVulns")}</p>
+        <p className="text-sm text-muted-foreground">
+          {security.uncheckedCount
+            ? t("result.noVulnsSomeUnchecked", { count: security.uncheckedCount })
+            : t("result.noVulns")}
+        </p>
       ) : (
         <>
           <div

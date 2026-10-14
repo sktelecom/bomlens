@@ -54,7 +54,8 @@ Feature-specific tools are turned on with `--build-arg`. Most of them are off by
 
 | Build arg | Default | What turning it on adds |
 |-----------|--------|------------------|
-| `SBOM_FIRMWARE` | `false` | Firmware analysis tools (unblob, cve-bin-tool, ubi_reader) and a CPE-to-CVE index bundle. The `bomlens-firmware` image is built with this option. The NVD data is distilled into a local index at build time by cloning `fkie-cad/nvd-json-data-feeds`, so no NVD API key or secret is needed |
+| `SBOM_FIRMWARE` | `false` | Firmware analysis tools (unblob, cve-bin-tool, ubi_reader). The `bomlens-firmware` image is built with this option |
+| `SBOM_CPE_INDEX` | `true` | The NVD CPE-to-CVE index (`cpe_match.sqlite`, about 146 MB) that firmware, rootfs and binary scans match components with no package PURL against. The NVD data is distilled into a local index at build time by cloning `fkie-cad/nvd-json-data-feeds`, so no NVD API key or secret is needed. `false` leaves it out; a firmware build always includes it |
 | `SBOM_AIBOM` | `false` | AI model SBOM generation tools (OWASP aibom-generator + cdxgen) |
 | `SBOM_DEEP_LICENSE` | `false` | Deep license scanning based on scancode-toolkit |
 | `SBOM_SCANOSS` | `true` | Vendored OSS identification client (scanoss.py). Running it is gated again at runtime by `--identify-vendored` |
@@ -174,8 +175,8 @@ Tool versions are pinned as `ARG`s in the `Dockerfile`, and Renovate tracks the 
 
 | Tool | ARG | Pinned version |
 |------|-----|----------|
-| syft | `SYFT_VERSION` | v1.52.0 |
-| Trivy | `TRIVY_VERSION` | v0.74.0 |
+| syft | `SYFT_VERSION` | v1.54.1 |
+| Trivy | `TRIVY_VERSION` | v0.75.0 |
 | cosign | `COSIGN_VERSION` | See the [Docker image reference](../docs/reference/docker-image.md) |
 | docker CLI | `DOCKER_CLI_VERSION` | See the [Docker image reference](../docs/reference/docker-image.md) |
 | scanoss.py | `SCANOSS_VERSION` | 1.54.2 |
@@ -190,7 +191,7 @@ The base build is about 1GB (981MB measured locally). For a per-layer breakdown,
 docker history sbom-scanner:local
 ```
 
-The firmware image (`SBOM_FIRMWARE=true`) is larger by the size of the bundled CVE database (about 0.5-1.5GB).
+The CPE index (`SBOM_CPE_INDEX=true`, the default) adds about 146 MB to an image. The firmware image (`SBOM_FIRMWARE=true`) adds its analysis tools on top of that.
 
 ### Supported architectures
 

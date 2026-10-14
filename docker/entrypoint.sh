@@ -122,6 +122,26 @@ if [ "$SCAN_MODE" = "PLAN" ]; then
     esac
 fi
 
+# --component-versions: read the supplier's file before anything in the output
+# folder is removed. The template a scan writes is the file a supplier fills in
+# and passes back, so the input can be that very file. It is then neither
+# removed by the sweep below nor rewritten by this run: it holds the versions
+# the next scan needs as well.
+CV_INPUT_IS_TEMPLATE=false
+if [ -n "${COMPONENT_VERSIONS_FILE:-}" ] && [ -f "$COMPONENT_VERSIONS_FILE" ]; then
+    _cv_copy="$(mktemp)"
+    if cp "$COMPONENT_VERSIONS_FILE" "$_cv_copy" 2>/dev/null; then
+        if [ -n "$HOST_OUTPUT_DIR" ] && command -v cmp >/dev/null 2>&1 \
+           && cmp -s "$_cv_copy" "$HOST_OUTPUT_DIR/${OUT_PREFIX}_component-versions.template.csv"; then
+            CV_INPUT_IS_TEMPLATE=true
+        fi
+        COMPONENT_VERSIONS_FILE="$_cv_copy"
+    else
+        rm -f "$_cv_copy"
+    fi
+    unset _cv_copy
+fi
+
 # Stale-artifact cleanup. A re-scan of the same project/version reuses this
 # folder (mkdir -p, never recreated: scan-sbom.sh and server.py's
 # claim_run_id both do this) and sync_artifacts below only ever copies, never
@@ -156,7 +176,7 @@ KNOWN_ARTIFACT_SUFFIXES=(
     _bom.spdx3.json _bom.spdx3.json.sig _spdx3-check.json _spdx3-check.md _ai-declaration.template.json
     _modelica.cdx.json _cocoapods.cdx.json _conda.cdx.json
     _security_cvebintool.json _security_grype.json _security_yocto.json
-    _security_trivy.json
+    _security_trivy.json _component-versions.template.csv
 )
 # Only a caller that knows about this cleanup runs it at all. An old
 # scan-sbom.sh or server.py (built before this existed) sends neither signal
@@ -198,6 +218,7 @@ if [ -n "${BOMLENS_RUN_INPUT:-}" ] || [ "${BOMLENS_ARTIFACT_CLEANUP:-}" = "1" ];
             # does); it is this run's input too, and scan-sbom.sh clears an old
             # one before stage 1 for the same reason as the SBOM itself.
             [ -n "$_run_input" ] && [ "$_suf" = "_conda.cdx.json" ] && continue
+            [ "${CV_INPUT_IS_TEMPLATE:-false}" = true ] && [ "$_suf" = "_component-versions.template.csv" ] && continue
             if [ -f "$_f" ]; then
                 rm -f "$_f"
                 _cleaned+=("$(basename "$_f")")
@@ -719,6 +740,10 @@ case "$SCAN_MODE" in
 
     IMAGE)
         if [ -z "$TARGET_IMAGE" ]; then echo "[ERROR] TARGET_IMAGE required for IMAGE mode."; exit 1; fi
+        # syft, Trivy and docker would read a name starting with - as an option.
+        case "$TARGET_IMAGE" in
+            -*) echo "[ERROR] TARGET_IMAGE '$TARGET_IMAGE' starts with '-': an image name cannot, and the scan tools would read it as an option. Give the image reference itself, for example alpine:3.20."; exit 1 ;;
+        esac
         # With the Docker socket mounted syft reads the image from the daemon;
         # without it, straight from the registry (no daemon needed, as in a
         # Kubernetes job), or from an archive named with its scheme
@@ -730,7 +755,40 @@ case "$SCAN_MODE" in
             echo "[1/2] syft: image $TARGET_IMAGE (no Docker socket: read from the registry or the archive)"
         fi
         IMAGE_SYFT_LOG=$(mktemp)
-        if ! syft "$TARGET_IMAGE" -o "cyclonedx-json@$CDX_SPEC_VERSION" > "$OUTPUT_FILE" 2>"$IMAGE_SYFT_LOG"; then
+        # syft's source record (its syft-json `source`, through a template so
+        # the file catalogue is not written twice) gives the digest it read.
+        # It is an extra: when it cannot be written, the scan goes on with the
+        # digest unresolved.
+        IMAGE_SOURCE_TMPL="$(mktemp 2>/dev/null)" || IMAGE_SOURCE_TMPL=""
+        IMAGE_SOURCE_JSON="$(mktemp 2>/dev/null)" || IMAGE_SOURCE_JSON=""
+        _img_extra=()
+        if [ -n "$IMAGE_SOURCE_TMPL" ] && [ -n "$IMAGE_SOURCE_JSON" ] \
+            && printf '%s' '{{ toJson .source }}' > "$IMAGE_SOURCE_TMPL" 2>/dev/null; then
+            _img_extra=(-o "template=$IMAGE_SOURCE_JSON" -t "$IMAGE_SOURCE_TMPL")
+        else
+            echo "[WARN] no temporary file for syft's source record, so the image digest is not resolved: later reads use the reference as given." >&2
+            rm -f ${IMAGE_SOURCE_TMPL:+"$IMAGE_SOURCE_TMPL"} ${IMAGE_SOURCE_JSON:+"$IMAGE_SOURCE_JSON"}
+            IMAGE_SOURCE_TMPL=""; IMAGE_SOURCE_JSON=""
+        fi
+        _img_rc=0
+        syft "$TARGET_IMAGE" -o "cyclonedx-json@$CDX_SPEC_VERSION" "${_img_extra[@]}" \
+            > "$OUTPUT_FILE" 2>"$IMAGE_SYFT_LOG" || _img_rc=$?
+        if [ "$_img_rc" -ne 0 ] && [ "${#_img_extra[@]}" -gt 0 ]; then
+            # syft writes the SBOM before the template: a complete SBOM means
+            # only the source record failed. Otherwise read once more without it.
+            if jq -e '.bomFormat == "CycloneDX" and (.components | type) == "array"' "$OUTPUT_FILE" >/dev/null 2>&1; then
+                _img_rc=0
+            else
+                _img_rc=0
+                syft "$TARGET_IMAGE" -o "cyclonedx-json@$CDX_SPEC_VERSION" \
+                    > "$OUTPUT_FILE" 2>"$IMAGE_SYFT_LOG" || _img_rc=$?
+            fi
+            if [ "$_img_rc" -eq 0 ]; then
+                echo "[WARN] syft could not write its source record, so the image digest is not resolved: later reads use the reference as given." >&2
+                rm -f "$IMAGE_SOURCE_JSON"; IMAGE_SOURCE_JSON=""
+            fi
+        fi
+        if [ "$_img_rc" -ne 0 ]; then
             case "$TARGET_IMAGE" in
                 docker-archive:*|oci-archive:*|oci-dir:*)
                     echo "[ERROR] syft could not read the image archive $TARGET_IMAGE: check that the path is mounted into the container and holds an image in that format." ;;
@@ -738,10 +796,30 @@ case "$SCAN_MODE" in
                     echo "[ERROR] syft could not read the image $TARGET_IMAGE: it does not exist, or the registry needs credentials (SYFT_REGISTRY_AUTH_USERNAME and SYFT_REGISTRY_AUTH_PASSWORD, or a docker config file in DOCKER_CONFIG). With the CLI, pulling it first (docker pull) also works." ;;
             esac
             [ -s "$IMAGE_SYFT_LOG" ] && tail -5 "$IMAGE_SYFT_LOG" >&2
-            rm -f "$IMAGE_SYFT_LOG"
+            rm -f "$IMAGE_SYFT_LOG" ${IMAGE_SOURCE_TMPL:+"$IMAGE_SOURCE_TMPL"} ${IMAGE_SOURCE_JSON:+"$IMAGE_SOURCE_JSON"}
             exit 1
         fi
         rm -f "$IMAGE_SYFT_LOG"
+        # Pin the later reads of this image (Trivy's license scan, the file
+        # view) to the digest syft read, so a tag that moves meanwhile cannot
+        # give them another image. An archive is read as it is. With no digest
+        # the reference is read as given, and the manifest records it as null.
+        _img_socket=false; [ -S /var/run/docker.sock ] && _img_socket=true
+        ER_INPUT_IMAGE="$(bash "$LIBDIR/image-digest.sh" "$IMAGE_SOURCE_JSON" "$TARGET_IMAGE" "$_img_socket" 2>/dev/null)" || ER_INPUT_IMAGE=""
+        rm -f ${IMAGE_SOURCE_TMPL:+"$IMAGE_SOURCE_TMPL"} ${IMAGE_SOURCE_JSON:+"$IMAGE_SOURCE_JSON"}
+        IMAGE_READ_TARGET="$TARGET_IMAGE"
+        _img_json="${ER_INPUT_IMAGE:-"{}"}"
+        _img_pinned="$(jq -r '.pinned_reference // empty' <<<"$_img_json" 2>/dev/null)" || _img_pinned=""
+        case "$(jq -r '.source // empty' <<<"$_img_json" 2>/dev/null)" in
+            registry|daemon|unknown)
+                if [ -n "$_img_pinned" ]; then
+                    IMAGE_READ_TARGET="$_img_pinned"
+                    echo "[1/2] image digest: $(jq -r '.digest + (if .platform then " (" + .platform + ")" else "" end)' <<<"$ER_INPUT_IMAGE"); later reads use $IMAGE_READ_TARGET"
+                elif [ -n "$IMAGE_SOURCE_JSON" ]; then
+                    echo "[WARN] could not resolve the digest of $TARGET_IMAGE (no repository digest for this name, as for an image built locally, or a name that is not a plain image name): later reads use the reference as given." >&2
+                fi ;;
+        esac
+        export ER_INPUT_IMAGE
         ;;
 
     BINARY)
@@ -791,10 +869,10 @@ EOF
         echo "[1/2] firmware: unpack + identify $TARGET_FILE"
         # scan-firmware.sh is best-effort (always emits a valid SBOM); the empty-file
         # guard below still catches a hard failure.
-        # OUT_PREFIX lets scan-firmware.sh drop a Trivy-shaped cve-bin-tool CVE
-        # sidecar (${OUT_PREFIX}_security_cvebintool.json) that scan-security.sh
-        # merges into the security report — firmware binaries carry no purl/CPE,
-        # so Trivy alone matches nothing; cve-bin-tool matches by version signature.
+        # OUT_PREFIX names the file tree and snapshot it writes. Firmware
+        # binaries carry a CPE but no package purl, so Trivy alone matches
+        # nothing; their CVEs come from match-cpe-index.sh, run below once every
+        # CPE enrichment step has run.
         bash "$LIBDIR/scan-firmware.sh" "$TARGET_FILE" "$OUTPUT_FILE" "$PROJECT_VERSION" "$OUT_PREFIX"
         ;;
 
@@ -914,6 +992,22 @@ EOF
         # SBOM was already generated by a cdxgen language image (scan-sbom.sh,
         # or a caller that ran stage 1 from the execution plan).
         echo "[1/2] Post-processing existing SBOM: $OUTPUT_FILE"
+        # The input fingerprint of stage 1, for the result manifest's generate
+        # step (input-fingerprint.sh): computed again from the source with
+        # this image's code, and compared with the plan's when this run
+        # follows one. Read before the fallback below; it never stops the run.
+        # shellcheck source=docker/lib/input-fingerprint.sh
+        . "$LIBDIR/input-fingerprint.sh"
+        ER_INPUT_FINGERPRINT="$(input_fingerprint_for_run "${HOST_OUTPUT_DIR:-.}/bomlens-plan.json" "$OUTPUT_FILE" \
+            "${SOURCE_ROOT:-/src}" "${HOST_OUTPUT_DIR:-.}" 2>/dev/null)" || ER_INPUT_FINGERPRINT=""
+        # A stage 1 that exited 0 can still have come out short: a step that
+        # failed inside build-prep.sh, or the generator's own fallback, is only
+        # recorded in the SBOM. Read before stage 2 adds its own records.
+        ER_STAGE1_DEGRADED=false
+        if [ -s "$OUTPUT_FILE" ] && jq -e 'any(.metadata.properties[]?; .name == "bomlens:pipeline-step-failed" or .name == "bomlens:sbom-tool-degraded")' \
+               "$OUTPUT_FILE" >/dev/null 2>&1; then
+            ER_STAGE1_DEGRADED=true
+        fi
         # A caller that ran stage 1 from the execution plan passes its exit
         # code. When stage 1 failed or left no SBOM, the manifest-only syft
         # scan takes its place, the same fallback the CLI runs, and the SBOM
@@ -1088,7 +1182,7 @@ er_phase_end
 # read the target, the hashes are dropped and the step is degraded.
 case "$SCAN_MODE" in
     IMAGE|ROOTFS)
-        _osl_target="${TARGET_IMAGE:-}"; [ "$SCAN_MODE" = ROOTFS ] && _osl_target="$TARGET_DIR"
+        _osl_target="${IMAGE_READ_TARGET:-${TARGET_IMAGE:-}}"; [ "$SCAN_MODE" = ROOTFS ] && _osl_target="$TARGET_DIR"
         _osl_started="$(er_now)"; _osl_rc=0
         if [ "${BOMLENS_OS_LICENSES:-true}" = "false" ]; then
             bash "$LIBDIR/os-licenses.sh" "$OUTPUT_FILE" "$SCAN_MODE" "$_osl_target" >/dev/null || true
@@ -1431,6 +1525,55 @@ case "$SCAN_MODE" in
         ;;
 esac
 
+# Versions the scan could not read. A firmware, root filesystem or binary scan
+# can prove a component is there without finding its version. A supplier's
+# two-column file (--component-versions, CSV name,version) fills those in,
+# keeps a version read from the delivered files when the file disagrees, and
+# adds the names the scan did not find as supplier-declared components. Every
+# such scan also writes the components still missing a version as a template
+# in the same format. Before normalize, so what is added is normalized too;
+# the placeholder versions normalize removes (UNKNOWN) count as missing here.
+# A refused file (exit 3) fails the step, and the run exits 1 at the end, after
+# every file is written, with the reason: the versions the user supplied were
+# not applied.
+CV_REFUSED=""
+case "$SCAN_MODE" in
+    FIRMWARE|ROOTFS|BINARY)
+        _cv_args=("$OUTPUT_FILE" "$OUT_PREFIX")
+        [ "$CV_INPUT_IS_TEMPLATE" = true ] && _cv_args=(--no-template "${_cv_args[@]}")
+        if [ -n "${COMPONENT_VERSIONS_FILE:-}" ]; then
+            if [ -f "$COMPONENT_VERSIONS_FILE" ]; then
+                _cv_args+=("$COMPONENT_VERSIONS_FILE")
+            else
+                echo "[WARN] --component-versions skipped: the file is not visible inside the container ($COMPONENT_VERSIONS_FILE). If it is a symbolic link, pass the real file." >&2
+            fi
+        fi
+        if [ -f "$LIBDIR/component-versions.py" ]; then
+            _cv_started="$(er_now)"
+            er_event step.start component-versions
+            _cv_err="$(mktemp)"
+            _cv_rc=0
+            python3 "$LIBDIR/component-versions.py" "${_cv_args[@]}" 2> "$_cv_err" || _cv_rc=$?
+            cat "$_cv_err" >&2
+            if [ "$_cv_rc" -eq 0 ]; then
+                er_record component-versions ok "" "" "$_cv_started"
+            else
+                if [ "$_cv_rc" -eq 3 ]; then
+                    CV_REFUSED="$(sed -n 's/^\[component-versions\] ERROR: the --component-versions file was refused: //p' "$_cv_err" | head -n 1)"
+                    [ -n "$CV_REFUSED" ] || CV_REFUSED="the file was refused"
+                else
+                    echo "[WARN] post-process step 'component-versions' failed; continuing with a valid SBOM, but this step's output may be missing or incomplete." >&2
+                fi
+                mark_pipeline_warning "$OUTPUT_FILE" component-versions
+                er_record component-versions failed failed "${CV_REFUSED:+the --component-versions file was refused: $CV_REFUSED}" "$_cv_started"
+            fi
+            rm -f "$_cv_err"
+        fi
+        [ "$CV_INPUT_IS_TEMPLATE" != true ] && [ -f "${OUT_PREFIX}_component-versions.template.csv" ] \
+            && ARTIFACTS+=("${OUT_PREFIX}_component-versions.template.csv")
+        ;;
+esac
+
 if [ "${BYTE_STABLE:-false}" = "true" ]; then
     run_optional_step normalize bash "$LIBDIR/normalize-sbom.sh" "$OUTPUT_FILE" --stable
 else
@@ -1487,13 +1630,33 @@ mark_compositions_aggregate "$OUTPUT_FILE"
 # SPDX licenses. The CPE keeps the SBOM identifier correct for consumers that read
 # it; note that `trivy sbom` matches by PURL and OS-context, NOT by component.cpe
 # (issue #458), so distro CVE matching comes from the OS component synthesized just
-# below and, for firmware, from the cve-bin-tool sidecar. Skipped for AI SBOMs and
+# below and, for firmware/rootfs/binary, from match-cpe-index.sh before the security
+# scan. Skipped for AI SBOMs and
 # disabled with ENRICH_CPE=false. Generic across modes; best-effort (|| true).
 if [ "${ENRICH_CPE:-true}" != "false" ] && [ "$AI_MODEL_SCAN" != "true" ]; then
     run_optional_step enrich-cpe bash "$LIBDIR/enrich-cpe.sh" "$OUTPUT_FILE"
 elif [ "$AI_MODEL_SCAN" != "true" ]; then
     er_record enrich-cpe disabled
 fi
+
+# Upstream repository purl: a component a firmware, root filesystem or binary
+# scan identified has no purl, a pkg:generic one, or an opkg one, none of which
+# a tool that looks components up by purl can resolve. upstream-purl.py sets
+# the purl of the project's source repository at the release tag
+# (pkg:github/<owner>/<repo>@<tag>, pkg:sourceforge, pkg:gnu) from a closed,
+# checked table (upstream-purl-map.json); a name not in it is left alone. The
+# version, CPE and evidence stay, so the CVE matching that ran on them keeps
+# its result. After enrich-cpe, so a CPE it added can identify the project too.
+# Disable with ENRICH_UPSTREAM_PURL=false.
+case "$SCAN_MODE" in
+    FIRMWARE|ROOTFS|BINARY)
+        if [ "${ENRICH_UPSTREAM_PURL:-true}" != "false" ]; then
+            run_optional_step upstream-purl python3 "$LIBDIR/upstream-purl.py" "$OUTPUT_FILE"
+        else
+            er_record upstream-purl disabled
+        fi
+        ;;
+esac
 
 # OS-context enrichment: a supplier SBOM can list every rpm/deb/apk package yet
 # omit the operating-system component Trivy needs to pick a distro advisory DB.
@@ -1724,7 +1887,7 @@ case "$SCAN_MODE" in
         # shape scan-firmware.sh already uses for its extraction. Best-effort:
         # an ELF binary or a missing docker socket prints nothing and the file
         # views are simply absent.
-        UNPACK_TARGET="$TARGET_IMAGE"
+        UNPACK_TARGET="${IMAGE_READ_TARGET:-$TARGET_IMAGE}"
         [ "$SCAN_MODE" = "BINARY" ] && UNPACK_TARGET="$TARGET_FILE"
         # stdout is the directory (empty when it could not unpack); stderr is the
         # reason, and belongs in the scan log where the user reads it.
@@ -1847,6 +2010,33 @@ if [ "${GENERATE_SECURITY:-false}" = "true" ] && [ -d "$TRIVY_DB_MOUNT" ]; then
         er_record scan-security failed failed "no Trivy database in the trivy-db mount ($TRIVY_DB_MOUNT/db/trivy.db)"
     fi
 fi
+# CPE index match (FIRMWARE, ROOTFS, BINARY): components with no package purl
+# but a CPE (a binary syft's classifier named, a library a signature checker
+# found, a CPE enrich-cpe.sh added from cpe-name-map.json) are matched against
+# the bundled NVD index, since Trivy never reads component.cpe. Runs here, after
+# every CPE enrichment step, and writes the sidecar scan-security.sh merges.
+# scan-security.sh is told whether it ran, so it can name the components no
+# check reached.
+BOMLENS_CPE_INDEX_MATCHED=false
+case "$SCAN_MODE" in FIRMWARE|ROOTFS|BINARY)
+    if [ "${GENERATE_SECURITY:-false}" != "true" ]; then
+        er_record match-cpe disabled
+    else
+        _mc_started="$(er_now)"; er_event step.start match-cpe
+        _mc_rc=0
+        _mc_counts="$(bash "$LIBDIR/match-cpe-index.sh" "$OUTPUT_FILE" "$OUT_PREFIX")" || _mc_rc=$?
+        case "$_mc_rc" in
+            0) BOMLENS_CPE_INDEX_MATCHED=true
+               er_record match-cpe ok "" "" "$_mc_started" "" "$_mc_counts" ;;
+            3) er_record match-cpe skipped not_installed "no CPE index in this image" "$_mc_started" ;;
+            4) er_record match-cpe disabled "" "CVE_BIN_TOOL_MODE=components-only" "$_mc_started" ;;
+            *) echo "[WARN] post-process step 'match-cpe' failed; CVEs of components with no package purl are not reported." >&2
+               mark_pipeline_warning "$OUTPUT_FILE" match-cpe
+               er_record match-cpe failed failed "" "$_mc_started" ;;
+        esac
+    fi ;;
+esac
+export BOMLENS_CPE_INDEX_MATCHED
 if [ "${GENERATE_SECURITY:-false}" = "true" ] && [ "$_trivy_db_ready" = true ]; then
     run_optional_step scan-security bash "$LIBDIR/scan-security.sh" "$OUTPUT_FILE" "$OUT_PREFIX" "$PROJECT_NAME"
     _trivy_db_max="${BOMLENS_TRIVY_DB_MAX_AGE_DAYS:-7}"
@@ -2150,6 +2340,15 @@ fi
 # and the AI profile.
 # ========================================================
 sync_artifacts
+
+# A refused --component-versions file: everything above is written, without
+# the versions it held. Said last so it is the line the user reads, and a
+# non-zero exit, since the user asked for those versions and did not get them.
+if [ -n "$CV_REFUSED" ]; then
+    echo "[ERROR] --component-versions: the file was refused, so none of its versions were applied: ${CV_REFUSED}" >&2
+    echo "[ERROR]   The SBOM and the other files were written without them. Fix the file (CSV, two columns: name,version) and run the scan again." >&2
+    exit 1
+fi
 
 # ========================================================
 # Upload handling (optional — Dependency-Track or TRUSCA)

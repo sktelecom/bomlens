@@ -40,7 +40,7 @@ BomLens(Apache-2.0)는 자체 코드를 셸 스크립트로 두고, SBOM 생성�
 
 두 데이터 모두 원본을 그대로 복제하지 않습니다. 검사가 실제로 읽는 부분만 남깁니다. 제품별 지원 종료 날짜, 또는 PURL과 그에 대응하는 권고문 식별자입니다. 스냅샷 날짜는 동봉 파일과 검사가 표시한 각 컴포넌트에 함께 기록됩니다(`bomlens:eol:source`, `bomlens:malicious:source`). 두 프로젝트 모두 BomLens를 보증하거나 인증하지 않으며, 동봉 데이터는 있는 그대로 제공됩니다.
 
-펌웨어 이미지의 CPE 대응 인덱스는 이 둘이 아니라 NVD에서 온 것으로, 출처 표시와 고지는 해당 이미지 안에 `CVE-DATA-NOTICE.txt`로 함께 들어갑니다.
+CPE 대응 인덱스(`/opt/cve-bin-tool-home/cpe_match.sqlite`, 기본 이미지와 그 이미지에서 만든 이미지에 들어 있음)는 이 둘이 아니라 NVD에서 온 것으로, 출처 표시와 고지는 그 옆에 `CVE-DATA-NOTICE.txt`로 함께 들어갑니다.
 
 ### 웹 UI npm 패키지
 
@@ -154,7 +154,7 @@ Windows 배포물이 담겨 오는 컨테이너 형식용 7z, 그다음 binwalk�
 
 | 도구 | 핀 버전 (ARG) | 용도 | 라이선스 (SPDX) | Copyleft | Source |
 |------|------|------|------------------|----------|--------|
-| grype | v0.119.0 (`GRYPE_VERSION`) | CPE 기반 NVD CVE 매칭 | Apache-2.0 | permissive | https://github.com/anchore/grype |
+| grype | v0.120.1 (`GRYPE_VERSION`) | CPE 기반 NVD CVE 매칭 | Apache-2.0 | permissive | https://github.com/anchore/grype |
 
 > 데이터: 빌드 시 이미지에 굽는 grype 취약점 DB는 Anchore가 공개 취약점 출처를 모아 만든 것입니다 — NVD(public domain), GitHub Security Advisories(CC-BY-4.0), 배포판 보안 DB(각 배포판 조건). DB는 `GRYPE_DB_AUTO_UPDATE=false`로 고정되어 스캔 중 네트워크를 쓰지 않습니다.
 

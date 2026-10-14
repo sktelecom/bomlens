@@ -112,6 +112,10 @@ Scans the generated SBOM with Trivy and reports known vulnerabilities (CVEs). (N
 
 The report does not fail the scan even when vulnerabilities exist (report-only). If you need a gate, post-process `_security.json`.
 
+Trivy matches a component by its package PURL. In a firmware, root filesystem or binary scan, a component that has no package PURL (none, `pkg:generic`, or one that points at a source repository such as `pkg:github`) but has a CPE is also matched against the NVD CPE index bundled in the image, and its CVEs are merged into the same report. This covers binaries identified by their version string, such as OpenSSL or BusyBox in an embedded root filesystem with no package database. The index works offline.
+
+A component that no check could reach is not counted as clean. When a component has no version, or has no package PURL and no CPE that was matched, the report says how many there are and lists them under "Components that could not be checked", in place of "No known vulnerabilities found". `_security.json` keeps the same list as `UncheckedComponents` (`Count`, and `Components` with `Name`, `Version`, `PURL` and `Reason`: `no-version` or `no-identifier`), and the risk report repeats it in its vulnerability section.
+
 For severity, CVSS, EPSS, and KEV priority signals and follow-up interpretation, see [What the reports mean](../concepts/reports-explained.md).
 
 ---

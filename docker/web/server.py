@@ -141,7 +141,7 @@ UPLOAD_EXTS = {
               ".onnx", ".npz", ".npy"),
     "declaration": (".json",),
     "firmware": (".bin", ".img", ".squashfs", ".sqsh", ".ubi", ".ubifs",
-                 ".trx", ".chk", ".fw", ".rom", ".dlf",
+                 ".trx", ".chk", ".fw", ".rom", ".dlf", ".bix",
                  # Compressed firmware images (unblob unpacks these), e.g. the
                  # OpenWRT *.img.gz releases. .zip belongs here because that is
                  # how most vendors ship a firmware download — D-Link, NETGEAR,
@@ -223,6 +223,10 @@ ARTIFACT_SUFFIXES = (
     # across re-scans, like _vex.json) and the empty declaration to start from.
     "_bom.spdx3.json", "_bom.spdx3.json.sig", "_spdx3-check.json", "_spdx3-check.md",
     "_ai-declaration.json", "_ai-declaration.template.json",
+    # Components a firmware, rootfs or binary scan found without a version, in
+    # the --component-versions CSV format with the versions left empty: the user
+    # fills it and passes it back, so list/download it.
+    "_component-versions.template.csv",
 )
 
 # Recent-scans sidebar shows the newest N; older scans stay on disk but are not
@@ -1121,6 +1125,7 @@ MAX_SCAN_WARNINGS = 12
 MAX_VULN_ROWS = 2000
 MAX_VULN_REFS = 12  # reference links per CVE in the detail view
 MAX_VULN_DESC = 600  # description chars per CVE (keeps the SSE payload bounded)
+MAX_UNCHECKED_ROWS = 500  # components listed whose vulnerabilities were not checked
 MAX_CONFORMANCE_MISSING = 50  # missing items per conformance check
 MAX_CHECK_REGULATIONS = 12  # regulation refs mapped to one conformance check
 MAX_GUIDANCE_SNIPPET = 2000  # chars of the CycloneDX fill-in fragment per check
@@ -1353,7 +1358,52 @@ def security_summary(run_id):
     vex_count = len(_load_vex_verdicts(run_id))
     if vex_count:
         sev["vexCount"] = vex_count
+    # Components no vulnerability check could reach (scan-security.sh's
+    # UncheckedComponents: no version, or neither a purl nor a CPE a check
+    # used). Zero findings says nothing about them, so the UI must not call
+    # such a result clean. Both keys are omitted when there are none.
+    unchecked = _unchecked_components(data.get("UncheckedComponents"))
+    if unchecked:
+        sev["uncheckedCount"], sev["uncheckedComponents"] = unchecked
     return sev
+
+
+def _unchecked_components(block):
+    """Normalize _security.json's UncheckedComponents {Count, Components[{Name,
+    Version, PURL, Reason}]} to (count, rows[{name, version, purl?, reason}]),
+    rows capped at MAX_UNCHECKED_ROWS. None when absent, malformed or empty.
+    The count is the larger of the declared Count and the rows present, so a
+    truncated list never lowers it."""
+    if not isinstance(block, dict):
+        return None
+    comps = block.get("Components")
+    comps = comps if isinstance(comps, list) else []
+    rows = []
+    for c in comps:
+        if len(rows) >= MAX_UNCHECKED_ROWS:
+            break
+        if not isinstance(c, dict):
+            continue
+        name = c.get("Name")
+        if not isinstance(name, str) or not name:
+            continue
+        version = c.get("Version")
+        reason = c.get("Reason")
+        row = {
+            "name": name,
+            "version": version if isinstance(version, str) else "",
+            "reason": reason if isinstance(reason, str) and reason else "unknown",
+        }
+        purl = c.get("PURL")
+        if isinstance(purl, str) and purl:
+            row["purl"] = purl
+        rows.append(row)
+    declared = block.get("Count")
+    count = declared if isinstance(declared, int) and not isinstance(declared, bool) else 0
+    count = max(count, len([c for c in comps if isinstance(c, dict) and c.get("Name")]))
+    if count <= 0:
+        return None
+    return count, rows
 
 
 def _norm_purl(purl):
@@ -2815,7 +2865,7 @@ def scan_detail(run_id):
 # user to read the text before pasting it.
 # --------------------------------------------------------------------------
 _DIAG_OPTION_KEYS = (
-    "notice", "security", "deepLicense", "identifyVendored", "includeOsv",
+    "notice", "security", "deepLicense", "identifyVendored",
     "byteStable", "deepCve",
 )
 # Input kinds the server itself dispatches on. Anything else in a recorded scan
@@ -3320,15 +3370,10 @@ _REF_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:/@-]*")          # image ref
 _MODEL_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*(/[A-Za-z0-9][A-Za-z0-9._-]*)?")
 _CONTAINER_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,120}")  # docker --name
 
-# scan-firmware.sh emits `[firmware-cvedb-progress] NN%` on stdout while the
-# (large, one-time) firmware CVE database downloads. The server turns each such
-# marker into an SSE `progress` event instead of a plain log line.
-_CVEDB_PROGRESS_RE = re.compile(r"^\[firmware-cvedb-progress\]\s+(\d+)%\s*$")
-
 # scan-nvd-cpe.py (the deep-cve image's grype CPE-matching sidecar) emits
 # `[deep-cve-progress] NN%` on stdout while it verifies grype's CPE matches
-# against NVD (NVD_VERIFY=true only). Same treatment as the firmware CVE-DB
-# marker above: turned into an SSE `progress` event instead of a plain log line.
+# against NVD (NVD_VERIFY=true only). Turned into an SSE `progress` event
+# instead of a plain log line.
 _DEEPCVE_PROGRESS_RE = re.compile(r"^\[deep-cve-progress\]\s+(\d+)%\s*$")
 
 # Some pipeline tools (cdxgen's own notices, among others) color their stdout.
@@ -3338,21 +3383,13 @@ _DEEPCVE_PROGRESS_RE = re.compile(r"^\[deep-cve-progress\]\s+(\d+)%\s*$")
 _ANSI_RE = re.compile(r"\x1b\[[0-9;]*[a-zA-Z]")
 
 
-def _emit_or_log(line, on_log, on_progress=None, on_deepcve_progress=None):
+def _emit_or_log(line, on_log, on_deepcve_progress=None):
     """Route a captured child-process line to the right SSE channel.
 
-    If the line is a firmware CVE-DB progress marker and a progress handler is
-    given, emit the clamped (0..100) percent via on_progress. If it is a
-    deep-cve progress marker and on_deepcve_progress is given, emit it there
-    instead — a separate channel, since the two markers mean different things
-    and the caller needs to label each with its own SSE `phase`. Any other line
-    passes through to on_log unchanged (preserving the existing log
-    behaviour), with any ANSI color codes stripped first."""
+    If the line is a deep-cve progress marker and on_deepcve_progress is given,
+    emit the clamped (0..100) percent there. Any other line passes through to
+    on_log unchanged, with any ANSI color codes stripped first."""
     line = _ANSI_RE.sub("", line)
-    m = _CVEDB_PROGRESS_RE.match(line) if on_progress is not None else None
-    if m is not None:
-        on_progress(max(0, min(100, int(m.group(1)))))
-        return
     m = _DEEPCVE_PROGRESS_RE.match(line) if on_deepcve_progress is not None else None
     if m is not None:
         on_deepcve_progress(max(0, min(100, int(m.group(1)))))
@@ -3704,16 +3741,6 @@ def run_sibling_scan(image, mode, out_dir, on_log, *, upload_file=None, model_id
         _pct_val = _pct_env(_pct_name)
         if _pct_val is not None:
             args += ["-e", "%s=%d" % (_pct_name, _pct_val)]
-    # Opt-in OSV advisories for firmware: forward only the two fixed control
-    # values the UI may have set on the firmware path. We re-derive each from a
-    # closed allowlist (never the env string itself) so no user-influenced text
-    # can reach the docker-run argv. Absent/any-other value -> not forwarded,
-    # so scan-firmware.sh keeps its offline-bundle default.
-    if mode == "FIRMWARE":
-        if env.get("CVE_BIN_TOOL_DISABLE_SOURCES") == "GAD":
-            args += ["-e", "CVE_BIN_TOOL_DISABLE_SOURCES=GAD"]
-        if env.get("CVE_BIN_TOOL_MODE") == "online":
-            args += ["-e", "CVE_BIN_TOOL_MODE=online"]
     # Optional AI usage scenario for the model risk assessment: forwarded only on
     # the AIBOM path, and only as one of the fixed _USAGE_CONTEXTS literals (the
     # env string is compared, the allowlist literal is interpolated), so no
@@ -3841,7 +3868,7 @@ def run_sibling_scan(image, mode, out_dir, on_log, *, upload_file=None, model_id
     # Pass the assembled env (os.environ + extra_env) to the docker-run process so
     # a NAME-ONLY `-e API_KEY` / `-e HF_TOKEN` resolves the value from here instead
     # of the argv — keeping the upload token and HF token out of `ps`.
-    return _stream_cmd(args, on_log, on_progress=on_progress, cancel=cancel,
+    return _stream_cmd(args, on_log, cancel=cancel,
                        container=safe_name, env=env,
                        on_deepcve_progress=on_deepcve_progress)
 
@@ -4299,7 +4326,7 @@ def _sibling_image_version(image):
     return ""
 
 
-def _stream_cmd(args, on_log, on_progress=None, cancel=None, container=None, env=None,
+def _stream_cmd(args, on_log, cancel=None, container=None, env=None,
                 on_deepcve_progress=None):
     """Run a command, streaming combined stdout/stderr line-by-line to on_log.
     Returns the exit code, or -1 if the binary could not be launched.
@@ -4325,7 +4352,7 @@ def _stream_cmd(args, on_log, on_progress=None, cancel=None, container=None, env
     for raw in proc.stdout:
         for piece in raw.rstrip("\n").split("\r"):
             if piece:
-                _emit_or_log(piece, on_log, on_progress, on_deepcve_progress)
+                _emit_or_log(piece, on_log, on_deepcve_progress)
         if cancel and cancel():
             if container:
                 try:
@@ -5896,7 +5923,6 @@ class Handler(BaseHTTPRequestHandler):
                 "security": g("security", "true") == "true",
                 "deepLicense": g("deep_license") == "true",
                 "identifyVendored": g("identify_vendored") == "true",
-                "includeOsv": g("includeOsv") == "true",
                 "byteStable": g("byte_stable") == "true",
                 "deepCve": g("deep_cve") == "true",
                 "sbomAuthor": sbom_author,
@@ -6414,15 +6440,9 @@ class Handler(BaseHTTPRequestHandler):
                 mode = "FIRMWARE"
                 env["MODE"] = "FIRMWARE"
                 env["TARGET_FILE"] = up
-                # Opt-in: also pull OSV advisories from osv.dev for this scan.
-                # Default (off) keeps scan-firmware.sh's offline bundle matching
-                # (CVE_BIN_TOOL_DISABLE_SOURCES=GAD,OSV, auto/offline). When the
-                # user enables it we re-enable only OSV (leave GAD disabled) and
-                # force the online updater. The wire field is a plain boolean,
-                # and only these two fixed literals are injected (no user text).
-                if g("includeOsv") == "true":
-                    env["CVE_BIN_TOOL_DISABLE_SOURCES"] = "GAD"
-                    env["CVE_BIN_TOOL_MODE"] = "online"
+                # An older frontend may still send includeOsv; it is accepted
+                # and ignored (the firmware CVE check no longer has an online
+                # source to turn on).
                 if firmware_capable():
                     # Tools are in THIS image (UI launched from the firmware image):
                     # run in-process exactly as before.
@@ -6565,12 +6585,11 @@ class Handler(BaseHTTPRequestHandler):
 
             sse("log", json.dumps("▶ Starting %s scan: %s %s" % (mode.lower(), project, version)))
             ok = False
-            # Two distinct progress markers may appear in the child's output (see
-            # _emit_or_log): scan-firmware.sh's CVE-DB download and scan-nvd-cpe.py's
-            # deep-cve NVD verification. Each gets its own SSE `phase` regardless of
-            # which mode is running (a stub/alternate scanner may emit either marker
-            # from any mode), so both callbacks are always wired, not chosen by mode.
-            on_cvedb_progress = lambda p: sse("progress", json.dumps({"phase": "cvedb", "percent": p}))
+            # scan-nvd-cpe.py's deep-cve NVD verification marker (see
+            # _emit_or_log) becomes a `deepcve` progress event in any mode. A
+            # sibling image pull reports `pull` progress, the same shape as the
+            # pre-pull endpoint.
+            on_pull_progress = lambda snap: sse("progress", json.dumps(snap))
             on_deepcve_progress = lambda p: sse("progress", json.dumps({"phase": "deepcve", "percent": p}))
             # Warnings the scan emitted, kept for the result screen. The log
             # itself is streamed and never stored, so a scan re-opened later had
@@ -6611,7 +6630,7 @@ class Handler(BaseHTTPRequestHandler):
                     target_image=sibling.get("target_image"),
                     target_dir=sibling.get("target_dir"),
                     extra_env=env,
-                    on_progress=on_cvedb_progress,
+                    on_progress=on_pull_progress,
                     on_deepcve_progress=on_deepcve_progress,
                     # Cancel: if the client closes the stream, stop this sibling.
                     cancel=lambda: disconnected[0],
@@ -6635,7 +6654,6 @@ class Handler(BaseHTTPRequestHandler):
                                 _emit_or_log(
                                     piece,
                                     note_log,
-                                    on_cvedb_progress,
                                     on_deepcve_progress,
                                 )
                         # Client cancelled (the SSE write broke): stop the scan

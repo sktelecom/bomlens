@@ -101,7 +101,7 @@ const DONE = {
   sbom: { components: LIB.length, componentList, directCount: 5, transitiveCount: 9 },
   scanConfig: {
     source: "current-dir", target: "", project: "demo-app", version: "1.4.0",
-    notice: true, security: true, deepLicense: false, identifyVendored: false, includeOsv: false,
+    notice: true, security: true, deepLicense: false, identifyVendored: false,
   },
 };
 

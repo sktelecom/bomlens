@@ -148,7 +148,6 @@ export function NewScan({
   const scanOptionsOn = [
     state.identifyVendored,
     state.deepLicense,
-    state.includeOsv,
     state.deepCve,
     state.byteStable,
   ].filter(Boolean).length;

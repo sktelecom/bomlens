@@ -24,7 +24,6 @@ const CONFIG = {
   security: false,
   deepLicense: true,
   identifyVendored: false,
-  includeOsv: false,
 };
 
 // A finished scan carrying the config it ran with (re-scannable).

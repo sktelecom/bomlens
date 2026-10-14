@@ -39,7 +39,7 @@ export const ACCEPT: Record<UploadKind, string> = {
   package: ".jar,.war,.ear,.deb,.rpm,.whl,.exe,.msi,.dmg",
   sbom: ".json,.xml,.spdx,.cdx.json,.spdx.json,.spdx.tar.zst",
   firmware:
-    ".bin,.img,.squashfs,.sqsh,.ubi,.ubifs,.trx,.chk,.fw,.rom,.dlf," +
+    ".bin,.img,.squashfs,.sqsh,.ubi,.ubifs,.trx,.chk,.fw,.rom,.dlf,.bix," +
     ".gz,.tgz,.tar,.xz,.bz2,.lzma,.zst,.img.gz,.tar.gz",
   model: ".gguf,.safetensors,.pt,.pth,.ckpt,.pkl,.pickle,.onnx,.npz,.npy",
   declaration: ".json",
@@ -169,10 +169,6 @@ export function useScanForm({
   // AI-model only: the intended usage the assessment grades against.
   // "" = unspecified (the default) — the scan request then omits it.
   const [usage, setUsage] = useState<UsageContext | "">("");
-  // Firmware only: opt in to OSV.dev advisories (downloaded on this run).
-  const [includeOsv, setIncludeOsv] = useState(
-    () => initialConfig?.includeOsv ?? false,
-  );
   // SBOM-upload only: opt in to deep CVE matching (NVD-only advisories for older
   // Maven libraries). Runs grype in this image or via the deep-cve sibling.
   const [deepCve, setDeepCve] = useState(
@@ -231,10 +227,7 @@ export function useScanForm({
   // of both AI inputs: the model named on HuggingFace and the model file read
   // from its own header.
   const isAiModel = source === "ai-model" || source === "model-upload" || source === "ai-declare";
-  // OSV.dev advisories are only fetched for firmware scans (cve-bin-tool), and
-  // the osv.dev DB is not in the image, so it downloads on this run when on.
   const isFirmware = source === "firmware-upload";
-  const showIncludeOsv = isFirmware;
   // Vendored-OSS identification only applies to a scanned source tree.
   const isSourceScan =
     source === "current-dir" || source === "git-url" || source === "zip-upload";
@@ -276,7 +269,7 @@ export function useScanForm({
   const deepCveOn = showDeepCve && deepCve;
   const securityForced = isAnalyze || deepCveOn;
   const showScanOptions =
-    showDeepLicense || showVendored || showIncludeOsv || showByteStable ||
+    showDeepLicense || showVendored || showByteStable ||
     showOutboundLicense || showSbomAuthor || showDeepCve || showConformanceProfile;
   // Any scan produces an SBOM, so upload is offered for every source.
   // A declaration opens questions before any scan; a credential stashed now
@@ -484,8 +477,6 @@ export function useScanForm({
       security: isAiModel ? false : securityForced ? true : security,
       deepLicense: showDeepLicense ? deepLicense : false,
       identifyVendored: showVendored ? identifyVendored : false,
-      // OSV.dev advisories: firmware-only opt-in; ignored for any other source.
-      includeOsv: showIncludeOsv ? includeOsv : false,
       byteStable: showByteStable ? byteStable : false,
       conformanceProfile: showConformanceProfile ? conformanceProfile : undefined,
       // Outbound license: only where we generate the SBOM (see showOutboundLicense).
@@ -532,7 +523,6 @@ export function useScanForm({
     file, setFile,
     deepLicense, setDeepLicense,
     identifyVendored, setIdentifyVendored,
-    includeOsv, setIncludeOsv,
     deepCve, setDeepCve,
     byteStable, setByteStable,
     conformanceProfile, setConformanceProfile,
@@ -546,7 +536,7 @@ export function useScanForm({
     truscaProjectId, setTruscaProjectId,
     errors, uploadError, uploading, uploadPercent,
     busy, uploadKind, textInput, isText, isAnalyze, isAiModel, showVendored,
-    showDeepLicense, showIncludeOsv, showDeepCve, showByteStable, showOutboundLicense,
+    showDeepLicense, showDeepCve, showByteStable, showOutboundLicense,
     showSbomAuthor,
     showConformanceProfile,
     showScanOptions, showUpload,

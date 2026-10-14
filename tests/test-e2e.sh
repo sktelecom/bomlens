@@ -675,9 +675,9 @@ fi
 # The cve.db download progress filter (_cvedb_progress_filter) is gone: the
 # CPE index ships in the image, so nothing is downloaded at scan time and
 # scan-firmware.sh must no longer emit the progress marker. Guard against it
-# coming back without its consumer contract.
+# coming back, since nothing reads it any more.
 if [ -f "$LIB/scan-firmware.sh" ] && grep -q "firmware-cvedb-progress" "$LIB/scan-firmware.sh"; then
-    fail "scan-firmware.sh emits firmware-cvedb-progress again — restore the filter test and the server.py consumer contract"
+    fail "scan-firmware.sh emits firmware-cvedb-progress again; nothing reads it, so remove it"
 else
     pass "scan-firmware.sh no longer emits cve.db download progress (bundled CPE index)"
 fi
@@ -1089,7 +1089,7 @@ else
         # (no local layer cache) the pull itself can take longer than a
         # resolve step would, and the wait below is measuring build-prep.sh's
         # own responsiveness, not network/registry variance.
-        docker pull -q "ghcr.io/cdxgen/cdxgen-debian-swift:${CDXGEN_TAG:-13.2.0}" >/dev/null 2>&1
+        docker pull -q "ghcr.io/cdxgen/cdxgen-debian-swift:${CDXGEN_TAG:-13.3.0}" >/dev/null 2>&1
         w="$(mktemp -d "$WORK_ROOT/interrupt.XXXXXX")"
         out="$(mktemp -d "$WORK_ROOT/interrupt-out.XXXXXX")"
         cp -R "$swiftsrc/." "$w/"

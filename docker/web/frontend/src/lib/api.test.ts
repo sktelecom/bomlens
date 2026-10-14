@@ -506,7 +506,6 @@ const PARAMS: ScanParams = {
   security: true,
   deepLicense: false,
   identifyVendored: false,
-  includeOsv: false,
   byteStable: false,
   deepCve: false,
 };
@@ -527,7 +526,7 @@ describe("startScan", () => {
     expect(qs.get("security")).toBe("true");
     expect(qs.get("deep_license")).toBe("false");
     expect(qs.get("identify_vendored")).toBe("false");
-    expect(qs.get("includeOsv")).toBe("false");
+    expect(qs.has("includeOsv")).toBe(false);
     expect(qs.get("byte_stable")).toBe("false");
     expect(qs.get("deep_cve")).toBe("false");
   });
@@ -545,13 +544,13 @@ describe("startScan", () => {
     const h = handlers();
     startScan(PARAMS, h);
     const es = FakeEventSource.last!;
-    es.emit("progress", JSON.stringify({ phase: "cve-db", percent: 42 }));
+    es.emit("progress", JSON.stringify({ phase: "deepcve", percent: 42 }));
     es.emit("progress", "garbage");
     es.emit("progress", JSON.stringify({ phase: "x" })); // neither percent nor layers
-    expect(h.progress).toEqual([{ phase: "cve-db", percent: 42 }]);
+    expect(h.progress).toEqual([{ phase: "deepcve", percent: 42 }]);
   });
 
-  // The progress channel carries two shapes: a percent (firmware CVE DB) and
+  // The progress channel carries two shapes: a percent (deep CVE NVD check) and
   // layer counts (an image pull, which has no percent to report because a
   // non-TTY `docker pull` prints none). Widening it for the second must not
   // drop the first — the filter used to require a numeric percent, so a careless
@@ -561,11 +560,11 @@ describe("startScan", () => {
     startScan(PARAMS, h);
     const es = FakeEventSource.last!;
     es.emit("progress", JSON.stringify({ phase: "pull", complete: 2, total: 5 }));
-    es.emit("progress", JSON.stringify({ phase: "cve-db", percent: 7 }));
+    es.emit("progress", JSON.stringify({ phase: "deepcve", percent: 7 }));
     es.emit("progress", JSON.stringify({ phase: "pull" })); // no counts either
     expect(h.progress).toEqual([
       { phase: "pull", complete: 2, total: 5 },
-      { phase: "cve-db", percent: 7 },
+      { phase: "deepcve", percent: 7 },
     ]);
   });
 

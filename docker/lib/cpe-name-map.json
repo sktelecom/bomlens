@@ -85,5 +85,13 @@
   "ntp":            { "cpe_vendor": "ntp",                     "cpe_product": "ntp",            "spdx_license": "NTP" },
   "bash":           { "cpe_vendor": "gnu",                     "cpe_product": "bash",           "spdx_license": "GPL-3.0-or-later" },
   "sudo":           { "cpe_vendor": "sudo_project",            "cpe_product": "sudo" },
-  "util-linux":     { "cpe_vendor": "kernel",                  "cpe_product": "util-linux" }
+  "util-linux":     { "cpe_vendor": "kernel",                  "cpe_product": "util-linux" },
+  "net-snmp":       { "cpe_vendor": "net-snmp",                "cpe_product": "net-snmp" },
+  "libnetsnmp":     { "cpe_vendor": "net-snmp",                "cpe_product": "net-snmp" },
+  "ncurses":        { "cpe_vendor": "invisible-island",        "cpe_product": "ncurses" },
+  "libncurses":     { "cpe_vendor": "invisible-island",        "cpe_product": "ncurses" },
+  "readline":       { "cpe_vendor": "gnu",                     "cpe_product": "readline" },
+  "libreadline":    { "cpe_vendor": "gnu",                     "cpe_product": "readline" },
+  "dhcpcd":         { "cpe_vendor": "dhcpcd_project",          "cpe_product": "dhcpcd" },
+  "quagga":         { "cpe_vendor": "quagga",                  "cpe_product": "quagga" }
 }

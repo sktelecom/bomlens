@@ -103,6 +103,7 @@ const PERMISSIVE = new Set([
   "WTFPL",
   "NCSA",
   "X11",
+  "MIT-X11",
 ]);
 
 /**
@@ -416,15 +417,36 @@ export function expressionVerdict(
   );
 }
 
-/** Verdict for a whole component. Several license entries are alternatives
- *  (the consumer may pick one), so the best verdict across them wins. */
+/** Verdict for a whole component. CycloneDX does not say how several
+ *  `licenses[]` entries combine, so the meaning comes from where they were read:
+ *  - a Debian package (`pkg:deb/`): the entries are the licenses of its
+ *    copyright file (os-licenses.sh), which name the licenses of different
+ *    files, so all of them apply and the worst verdict wins, the same rule as
+ *    AND. An entry that cannot be parsed counts as "unknown" rather than being
+ *    left out, so the rest cannot clear the package on their own.
+ *  - anything else: the entries are alternatives (a Maven POM listing several
+ *    licenses offers a choice), so the best verdict wins, the same rule as OR.
+ *  Mirrors `component_license_conflict` in docker/lib/license-flags.jq. */
 export function componentConflict(
   licenses: string[],
   outbound: string,
   rules: CompatRules,
+  purl?: string,
 ): ConflictResult {
   if (licenses.length === 0)
     return { verdict: "unknown", why: "The component declares no license." };
+  if (purl?.toLowerCase().startsWith("pkg:deb/"))
+    return licenses
+      .map(
+        (l): ConflictResult =>
+          expressionVerdict(l, outbound, rules) ?? {
+            verdict: "unknown",
+            why: `The license "${l}" could not be parsed as an SPDX expression.`,
+          },
+      )
+      .reduce((worst, v) =>
+        CONFLICT_RANK[v.verdict] > CONFLICT_RANK[worst.verdict] ? v : worst,
+      );
   const verdicts = licenses
     .map((l) => expressionVerdict(l, outbound, rules))
     .filter((v): v is ConflictResult => v !== null);

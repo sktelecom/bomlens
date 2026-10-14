@@ -38421,7 +38421,7 @@
         }
       ],
       "publisher": "Natanael Copa <ncopa@alpinelinux.org>",
-      "purl": "pkg:apk/alpine/alpine-baselayout-data@3.4.0-r0?arch=x86_64&distro=alpine-3.17.7&upstream=alpine-baselayout",
+      "purl": "pkg:apk/alpine/alpine-baselayout-data@3.4.0-r0?arch=x86_64&distro=3.17.7",
       "type": "library",
       "version": "3.4.0-r0",
       "supplier": {
@@ -38533,7 +38533,7 @@
         }
       ],
       "publisher": "Natanael Copa <ncopa@alpinelinux.org>",
-      "purl": "pkg:apk/alpine/alpine-baselayout@3.4.0-r0?arch=x86_64&distro=alpine-3.17.7",
+      "purl": "pkg:apk/alpine/alpine-baselayout@3.4.0-r0?arch=x86_64&distro=3.17.7",
       "type": "library",
       "version": "3.4.0-r0",
       "supplier": {
@@ -38637,7 +38637,7 @@
         }
       ],
       "publisher": "Natanael Copa <ncopa@alpinelinux.org>",
-      "purl": "pkg:apk/alpine/alpine-keys@2.4-r1?arch=x86_64&distro=alpine-3.17.7",
+      "purl": "pkg:apk/alpine/alpine-keys@2.4-r1?arch=x86_64&distro=3.17.7",
       "type": "library",
       "version": "2.4-r1",
       "supplier": {
@@ -38759,7 +38759,7 @@
         }
       ],
       "publisher": "Oleg Titov <oleg.titov@gmail.com>",
-      "purl": "pkg:apk/alpine/aom-libs@3.5.0-r0?arch=x86_64&distro=alpine-3.17.7&upstream=aom",
+      "purl": "pkg:apk/alpine/aom-libs@3.5.0-r0?arch=x86_64&distro=3.17.7",
       "type": "library",
       "version": "3.5.0-r0",
       "supplier": {
@@ -38895,7 +38895,7 @@
         }
       ],
       "publisher": "Natanael Copa <ncopa@alpinelinux.org>",
-      "purl": "pkg:apk/alpine/apk-tools@2.12.10-r1?arch=x86_64&distro=alpine-3.17.7",
+      "purl": "pkg:apk/alpine/apk-tools@2.12.10-r1?arch=x86_64&distro=3.17.7",
       "type": "library",
       "version": "2.12.10-r1",
       "supplier": {
@@ -39023,7 +39023,7 @@
         }
       ],
       "publisher": "prspkt <prspkt@protonmail.com>",
-      "purl": "pkg:apk/alpine/brotli-libs@1.0.9-r9?arch=x86_64&distro=alpine-3.17.7&upstream=brotli",
+      "purl": "pkg:apk/alpine/brotli-libs@1.0.9-r9?arch=x86_64&distro=3.17.7",
       "type": "library",
       "version": "1.0.9-r9",
       "supplier": {
@@ -39139,7 +39139,7 @@
         }
       ],
       "publisher": "Sören Tempel <soeren+alpine@soeren-tempel.net>",
-      "purl": "pkg:apk/alpine/busybox-binsh@1.35.0-r29?arch=x86_64&distro=alpine-3.17.7&upstream=busybox",
+      "purl": "pkg:apk/alpine/busybox-binsh@1.35.0-r29?arch=x86_64&distro=3.17.7",
       "type": "library",
       "version": "1.35.0-r29",
       "supplier": {
@@ -39231,7 +39231,7 @@
         }
       ],
       "publisher": "Sören Tempel <soeren+alpine@soeren-tempel.net>",
-      "purl": "pkg:apk/alpine/busybox@1.35.0-r29?arch=x86_64&distro=alpine-3.17.7",
+      "purl": "pkg:apk/alpine/busybox@1.35.0-r29?arch=x86_64&distro=3.17.7",
       "type": "library",
       "version": "1.35.0-r29",
       "supplier": {
@@ -39361,7 +39361,7 @@
         }
       ],
       "publisher": "Natanael Copa <ncopa@alpinelinux.org>",
-      "purl": "pkg:apk/alpine/ca-certificates-bundle@20230506-r0?arch=x86_64&distro=alpine-3.17.7&upstream=ca-certificates",
+      "purl": "pkg:apk/alpine/ca-certificates-bundle@20230506-r0?arch=x86_64&distro=3.17.7",
       "type": "library",
       "version": "20230506-r0",
       "supplier": {
@@ -39491,7 +39491,7 @@
         }
       ],
       "publisher": "Natanael Copa <ncopa@alpinelinux.org>",
-      "purl": "pkg:apk/alpine/ca-certificates@20230506-r0?arch=x86_64&distro=alpine-3.17.7",
+      "purl": "pkg:apk/alpine/ca-certificates@20230506-r0?arch=x86_64&distro=3.17.7",
       "type": "library",
       "version": "20230506-r0",
       "supplier": {
@@ -39599,7 +39599,7 @@
         }
       ],
       "publisher": "Natanael Copa <ncopa@alpinelinux.org>",
-      "purl": "pkg:apk/alpine/curl@8.5.0-r0?arch=x86_64&distro=alpine-3.17.7",
+      "purl": "pkg:apk/alpine/curl@8.5.0-r0?arch=x86_64&distro=3.17.7",
       "type": "library",
       "version": "8.5.0-r0",
       "supplier": {
@@ -39739,7 +39739,7 @@
         }
       ],
       "publisher": "Natanael Copa <ncopa@alpinelinux.org>",
-      "purl": "pkg:apk/alpine/fontconfig@2.14.1-r0?arch=x86_64&distro=alpine-3.17.7",
+      "purl": "pkg:apk/alpine/fontconfig@2.14.1-r0?arch=x86_64&distro=3.17.7",
       "type": "library",
       "version": "2.14.1-r0",
       "supplier": {
@@ -39852,7 +39852,7 @@
         }
       ],
       "publisher": "Carlo Landmeter <clandmeter@alpinelinux.org>",
-      "purl": "pkg:apk/alpine/freetype@2.12.1-r0?arch=x86_64&distro=alpine-3.17.7",
+      "purl": "pkg:apk/alpine/freetype@2.12.1-r0?arch=x86_64&distro=3.17.7",
       "type": "library",
       "version": "2.12.1-r0",
       "supplier": {
@@ -39952,7 +39952,7 @@
         }
       ],
       "publisher": "Leonardo Arena <rnalrd@alpinelinux.org>",
-      "purl": "pkg:apk/alpine/geoip@1.6.12-r3?arch=x86_64&distro=alpine-3.17.7",
+      "purl": "pkg:apk/alpine/geoip@1.6.12-r3?arch=x86_64&distro=3.17.7",
       "type": "library",
       "version": "1.6.12-r3",
       "supplier": {
@@ -40056,7 +40056,7 @@
         }
       ],
       "publisher": "Bart Ribbers <bribbers@disroot.org>",
-      "purl": "pkg:apk/alpine/libavif@0.11.1-r0?arch=x86_64&distro=alpine-3.17.7",
+      "purl": "pkg:apk/alpine/libavif@0.11.1-r0?arch=x86_64&distro=3.17.7",
       "type": "library",
       "version": "0.11.1-r0",
       "supplier": {
@@ -40156,7 +40156,7 @@
         }
       ],
       "publisher": "Drew DeVault <sir@cmpwn.com>",
-      "purl": "pkg:apk/alpine/libbsd@0.11.7-r0?arch=x86_64&distro=alpine-3.17.7",
+      "purl": "pkg:apk/alpine/libbsd@0.11.7-r0?arch=x86_64&distro=3.17.7",
       "type": "library",
       "version": "0.11.7-r0",
       "supplier": {
@@ -40260,7 +40260,7 @@
         }
       ],
       "publisher": "Natanael Copa <ncopa@alpinelinux.org>",
-      "purl": "pkg:apk/alpine/libbz2@1.0.8-r4?arch=x86_64&distro=alpine-3.17.7&upstream=bzip2",
+      "purl": "pkg:apk/alpine/libbz2@1.0.8-r4?arch=x86_64&distro=3.17.7",
       "type": "library",
       "version": "1.0.8-r4",
       "supplier": {
@@ -40366,7 +40366,7 @@
         }
       ],
       "publisher": "Natanael Copa <ncopa@alpinelinux.org>",
-      "purl": "pkg:apk/alpine/libc-utils@0.7.2-r3?arch=x86_64&distro=alpine-3.17.7&upstream=libc-dev",
+      "purl": "pkg:apk/alpine/libc-utils@0.7.2-r3?arch=x86_64&distro=3.17.7",
       "type": "library",
       "version": "0.7.2-r3",
       "supplier": {
@@ -40470,7 +40470,7 @@
         }
       ],
       "publisher": "Ariadne Conill <ariadne@dereferenced.org>",
-      "purl": "pkg:apk/alpine/libcrypto3@3.0.12-r4?arch=x86_64&distro=alpine-3.17.7&upstream=openssl",
+      "purl": "pkg:apk/alpine/libcrypto3@3.0.12-r4?arch=x86_64&distro=3.17.7",
       "type": "library",
       "version": "3.0.12-r4",
       "supplier": {
@@ -40586,7 +40586,7 @@
         }
       ],
       "publisher": "Natanael Copa <ncopa@alpinelinux.org>",
-      "purl": "pkg:apk/alpine/libcurl@8.5.0-r0?arch=x86_64&distro=alpine-3.17.7&upstream=curl",
+      "purl": "pkg:apk/alpine/libcurl@8.5.0-r0?arch=x86_64&distro=3.17.7",
       "type": "library",
       "version": "8.5.0-r0",
       "supplier": {
@@ -40678,7 +40678,7 @@
         }
       ],
       "publisher": "Bart Ribbers <bribbers@disroot.org>",
-      "purl": "pkg:apk/alpine/libdav1d@1.0.0-r2?arch=x86_64&distro=alpine-3.17.7&upstream=dav1d",
+      "purl": "pkg:apk/alpine/libdav1d@1.0.0-r2?arch=x86_64&distro=3.17.7",
       "type": "library",
       "version": "1.0.0-r2",
       "supplier": {
@@ -40774,7 +40774,7 @@
         }
       ],
       "publisher": "Drew DeVault <sir@cmpwn.com>",
-      "purl": "pkg:apk/alpine/libedit@20221030.3.1-r0?arch=x86_64&distro=alpine-3.17.7",
+      "purl": "pkg:apk/alpine/libedit@20221030.3.1-r0?arch=x86_64&distro=3.17.7",
       "type": "library",
       "version": "20221030.3.1-r0",
       "supplier": {
@@ -40866,7 +40866,7 @@
         }
       ],
       "publisher": "Carlo Landmeter <clandmeter@alpinelinux.org>",
-      "purl": "pkg:apk/alpine/libexpat@2.6.2-r0?arch=x86_64&distro=alpine-3.17.7&upstream=expat",
+      "purl": "pkg:apk/alpine/libexpat@2.6.2-r0?arch=x86_64&distro=3.17.7",
       "type": "library",
       "version": "2.6.2-r0",
       "supplier": {
@@ -40962,7 +40962,7 @@
         }
       ],
       "publisher": "Natanael Copa <ncopa@alpinelinux.org>",
-      "purl": "pkg:apk/alpine/libgcrypt@1.10.1-r0?arch=x86_64&distro=alpine-3.17.7",
+      "purl": "pkg:apk/alpine/libgcrypt@1.10.1-r0?arch=x86_64&distro=3.17.7",
       "type": "library",
       "version": "1.10.1-r0",
       "supplier": {
@@ -41086,7 +41086,7 @@
         }
       ],
       "publisher": "Carlo Landmeter <clandmeter@alpinelinux.org>",
-      "purl": "pkg:apk/alpine/libgd@2.3.3-r3?arch=x86_64&distro=alpine-3.17.7&upstream=gd",
+      "purl": "pkg:apk/alpine/libgd@2.3.3-r3?arch=x86_64&distro=3.17.7",
       "type": "library",
       "version": "2.3.3-r3",
       "supplier": {
@@ -41207,7 +41207,7 @@
         }
       ],
       "publisher": "Natanael Copa <ncopa@alpinelinux.org>",
-      "purl": "pkg:apk/alpine/libgpg-error@1.46-r1?arch=x86_64&distro=alpine-3.17.7",
+      "purl": "pkg:apk/alpine/libgpg-error@1.46-r1?arch=x86_64&distro=3.17.7",
       "type": "library",
       "version": "1.46-r1",
       "supplier": {
@@ -41299,7 +41299,7 @@
         }
       ],
       "publisher": "Natanael Copa <ncopa@alpinelinux.org>",
-      "purl": "pkg:apk/alpine/libice@1.0.10-r1?arch=x86_64&distro=alpine-3.17.7",
+      "purl": "pkg:apk/alpine/libice@1.0.10-r1?arch=x86_64&distro=3.17.7",
       "type": "library",
       "version": "1.0.10-r1",
       "supplier": {
@@ -41395,7 +41395,7 @@
         }
       ],
       "publisher": "Carlo Landmeter <clandmeter@alpinelinux.org>",
-      "purl": "pkg:apk/alpine/libintl@0.21.1-r1?arch=x86_64&distro=alpine-3.17.7&upstream=gettext",
+      "purl": "pkg:apk/alpine/libintl@0.21.1-r1?arch=x86_64&distro=3.17.7",
       "type": "library",
       "version": "0.21.1-r1",
       "supplier": {
@@ -41509,7 +41509,7 @@
         }
       ],
       "publisher": "Natanael Copa <ncopa@alpinelinux.org>",
-      "purl": "pkg:apk/alpine/libjpeg-turbo@2.1.4-r0?arch=x86_64&distro=alpine-3.17.7",
+      "purl": "pkg:apk/alpine/libjpeg-turbo@2.1.4-r0?arch=x86_64&distro=3.17.7",
       "type": "library",
       "version": "2.1.4-r0",
       "supplier": {
@@ -41606,7 +41606,7 @@
         }
       ],
       "publisher": "omni <omni+alpine@hack.org>",
-      "purl": "pkg:apk/alpine/libmd@1.0.4-r0?arch=x86_64&distro=alpine-3.17.7",
+      "purl": "pkg:apk/alpine/libmd@1.0.4-r0?arch=x86_64&distro=3.17.7",
       "type": "library",
       "version": "1.0.4-r0",
       "supplier": {
@@ -41702,7 +41702,7 @@
         }
       ],
       "publisher": "Natanael Copa <ncopa@alpinelinux.org>",
-      "purl": "pkg:apk/alpine/libpng@1.6.39-r0?arch=x86_64&distro=alpine-3.17.7",
+      "purl": "pkg:apk/alpine/libpng@1.6.39-r0?arch=x86_64&distro=3.17.7",
       "type": "library",
       "version": "1.6.39-r0",
       "supplier": {
@@ -41802,7 +41802,7 @@
         }
       ],
       "publisher": "Natanael Copa <ncopa@alpinelinux.org>",
-      "purl": "pkg:apk/alpine/libsm@1.2.3-r1?arch=x86_64&distro=alpine-3.17.7",
+      "purl": "pkg:apk/alpine/libsm@1.2.3-r1?arch=x86_64&distro=3.17.7",
       "type": "library",
       "version": "1.2.3-r1",
       "supplier": {
@@ -41910,7 +41910,7 @@
         }
       ],
       "publisher": "Ariadne Conill <ariadne@dereferenced.org>",
-      "purl": "pkg:apk/alpine/libssl3@3.0.12-r4?arch=x86_64&distro=alpine-3.17.7&upstream=openssl",
+      "purl": "pkg:apk/alpine/libssl3@3.0.12-r4?arch=x86_64&distro=3.17.7",
       "type": "library",
       "version": "3.0.12-r4",
       "supplier": {
@@ -42002,7 +42002,7 @@
         }
       ],
       "publisher": "Natanael Copa <ncopa@alpinelinux.org>",
-      "purl": "pkg:apk/alpine/libuuid@2.38.1-r1?arch=x86_64&distro=alpine-3.17.7&upstream=util-linux",
+      "purl": "pkg:apk/alpine/libuuid@2.38.1-r1?arch=x86_64&distro=3.17.7",
       "type": "library",
       "version": "2.38.1-r1",
       "supplier": {
@@ -42106,7 +42106,7 @@
         }
       ],
       "publisher": "Natanael Copa <ncopa@alpinelinux.org>",
-      "purl": "pkg:apk/alpine/libwebp@1.2.4-r3?arch=x86_64&distro=alpine-3.17.7",
+      "purl": "pkg:apk/alpine/libwebp@1.2.4-r3?arch=x86_64&distro=3.17.7",
       "type": "library",
       "version": "1.2.4-r3",
       "supplier": {
@@ -42218,7 +42218,7 @@
         }
       ],
       "publisher": "Natanael Copa <ncopa@alpinelinux.org>",
-      "purl": "pkg:apk/alpine/libx11@1.8.7-r0?arch=x86_64&distro=alpine-3.17.7",
+      "purl": "pkg:apk/alpine/libx11@1.8.7-r0?arch=x86_64&distro=3.17.7",
       "type": "library",
       "version": "1.8.7-r0",
       "supplier": {
@@ -42310,7 +42310,7 @@
         }
       ],
       "publisher": "Natanael Copa <ncopa@alpinelinux.org>",
-      "purl": "pkg:apk/alpine/libxau@1.0.10-r0?arch=x86_64&distro=alpine-3.17.7",
+      "purl": "pkg:apk/alpine/libxau@1.0.10-r0?arch=x86_64&distro=3.17.7",
       "type": "library",
       "version": "1.0.10-r0",
       "supplier": {
@@ -42502,7 +42502,7 @@
         }
       ],
       "publisher": "Natanael Copa <ncopa@alpinelinux.org>",
-      "purl": "pkg:apk/alpine/libxcb@1.15-r0?arch=x86_64&distro=alpine-3.17.7",
+      "purl": "pkg:apk/alpine/libxcb@1.15-r0?arch=x86_64&distro=3.17.7",
       "type": "library",
       "version": "1.15-r0",
       "supplier": {
@@ -42598,7 +42598,7 @@
         }
       ],
       "publisher": "Natanael Copa <ncopa@alpinelinux.org>",
-      "purl": "pkg:apk/alpine/libxdmcp@1.1.4-r0?arch=x86_64&distro=alpine-3.17.7",
+      "purl": "pkg:apk/alpine/libxdmcp@1.1.4-r0?arch=x86_64&distro=3.17.7",
       "type": "library",
       "version": "1.1.4-r0",
       "supplier": {
@@ -42694,7 +42694,7 @@
         }
       ],
       "publisher": "Natanael Copa <ncopa@alpinelinux.org>",
-      "purl": "pkg:apk/alpine/libxext@1.3.5-r0?arch=x86_64&distro=alpine-3.17.7",
+      "purl": "pkg:apk/alpine/libxext@1.3.5-r0?arch=x86_64&distro=3.17.7",
       "type": "library",
       "version": "1.3.5-r0",
       "supplier": {
@@ -42806,7 +42806,7 @@
         }
       ],
       "publisher": "Carlo Landmeter <clandmeter@alpinelinux.org>",
-      "purl": "pkg:apk/alpine/libxml2@2.10.4-r0?arch=x86_64&distro=alpine-3.17.7",
+      "purl": "pkg:apk/alpine/libxml2@2.10.4-r0?arch=x86_64&distro=3.17.7",
       "type": "library",
       "version": "2.10.4-r0",
       "supplier": {
@@ -42926,7 +42926,7 @@
         }
       ],
       "publisher": "Natanael Copa <ncopa@alpinelinux.org>",
-      "purl": "pkg:apk/alpine/libxpm@3.5.15-r0?arch=x86_64&distro=alpine-3.17.7",
+      "purl": "pkg:apk/alpine/libxpm@3.5.15-r0?arch=x86_64&distro=3.17.7",
       "type": "library",
       "version": "3.5.15-r0",
       "supplier": {
@@ -43034,7 +43034,7 @@
         }
       ],
       "publisher": "Natanael Copa <ncopa@alpinelinux.org>",
-      "purl": "pkg:apk/alpine/libxslt@1.1.37-r1?arch=x86_64&distro=alpine-3.17.7",
+      "purl": "pkg:apk/alpine/libxslt@1.1.37-r1?arch=x86_64&distro=3.17.7",
       "type": "library",
       "version": "1.1.37-r1",
       "supplier": {
@@ -43138,7 +43138,7 @@
         }
       ],
       "publisher": "Natanael Copa <ncopa@alpinelinux.org>",
-      "purl": "pkg:apk/alpine/libxt@1.2.1-r0?arch=x86_64&distro=alpine-3.17.7",
+      "purl": "pkg:apk/alpine/libxt@1.2.1-r0?arch=x86_64&distro=3.17.7",
       "type": "library",
       "version": "1.2.1-r0",
       "supplier": {
@@ -43276,7 +43276,7 @@
         }
       ],
       "publisher": "Timo Teräs <timo.teras@iki.fi>",
-      "purl": "pkg:apk/alpine/musl-utils@1.2.3-r5?arch=x86_64&distro=alpine-3.17.7&upstream=musl",
+      "purl": "pkg:apk/alpine/musl-utils@1.2.3-r5?arch=x86_64&distro=3.17.7",
       "type": "library",
       "version": "1.2.3-r5",
       "supplier": {
@@ -43372,7 +43372,7 @@
         }
       ],
       "publisher": "Timo Teräs <timo.teras@iki.fi>",
-      "purl": "pkg:apk/alpine/musl@1.2.3-r5?arch=x86_64&distro=alpine-3.17.7",
+      "purl": "pkg:apk/alpine/musl@1.2.3-r5?arch=x86_64&distro=3.17.7",
       "type": "library",
       "version": "1.2.3-r5",
       "supplier": {
@@ -43504,7 +43504,7 @@
         }
       ],
       "publisher": "Natanael Copa <ncopa@alpinelinux.org>",
-      "purl": "pkg:apk/alpine/ncurses-libs@6.3_p20221119-r1?arch=x86_64&distro=alpine-3.17.7&upstream=ncurses",
+      "purl": "pkg:apk/alpine/ncurses-libs@6.3_p20221119-r1?arch=x86_64&distro=3.17.7",
       "type": "library",
       "version": "6.3_p20221119-r1",
       "supplier": {
@@ -43624,7 +43624,7 @@
         }
       ],
       "publisher": "Natanael Copa <ncopa@alpinelinux.org>",
-      "purl": "pkg:apk/alpine/ncurses-terminfo-base@6.3_p20221119-r1?arch=x86_64&distro=alpine-3.17.7&upstream=ncurses",
+      "purl": "pkg:apk/alpine/ncurses-terminfo-base@6.3_p20221119-r1?arch=x86_64&distro=3.17.7",
       "type": "library",
       "version": "6.3_p20221119-r1",
       "supplier": {
@@ -43808,7 +43808,7 @@
         }
       ],
       "publisher": "Francesco Colista <fcolista@alpinelinux.org>",
-      "purl": "pkg:apk/alpine/nghttp2-libs@1.51.0-r2?arch=x86_64&distro=alpine-3.17.7&upstream=nghttp2",
+      "purl": "pkg:apk/alpine/nghttp2-libs@1.51.0-r2?arch=x86_64&distro=3.17.7",
       "type": "library",
       "version": "1.51.0-r2",
       "supplier": {
@@ -43958,7 +43958,7 @@
         }
       ],
       "publisher": "NGINX Packaging <nginx-packaging@f5.com>",
-      "purl": "pkg:apk/alpine/nginx-module-geoip@1.24.0-r1?arch=x86_64&distro=alpine-3.17.7",
+      "purl": "pkg:apk/alpine/nginx-module-geoip@1.24.0-r1?arch=x86_64&distro=3.17.7",
       "type": "library",
       "version": "1.24.0-r1",
       "supplier": {
@@ -44124,7 +44124,7 @@
         }
       ],
       "publisher": "NGINX Packaging <nginx-packaging@f5.com>",
-      "purl": "pkg:apk/alpine/nginx-module-image-filter@1.24.0-r1?arch=x86_64&distro=alpine-3.17.7",
+      "purl": "pkg:apk/alpine/nginx-module-image-filter@1.24.0-r1?arch=x86_64&distro=3.17.7",
       "type": "library",
       "version": "1.24.0-r1",
       "supplier": {
@@ -44294,7 +44294,7 @@
         }
       ],
       "publisher": "NGINX Packaging <nginx-packaging@f5.com>",
-      "purl": "pkg:apk/alpine/nginx-module-njs@1.24.0.0.7.12-r1?arch=x86_64&distro=alpine-3.17.7",
+      "purl": "pkg:apk/alpine/nginx-module-njs@1.24.0.0.7.12-r1?arch=x86_64&distro=3.17.7",
       "type": "library",
       "version": "1.24.0.0.7.12-r1",
       "supplier": {
@@ -44452,7 +44452,7 @@
         }
       ],
       "publisher": "NGINX Packaging <nginx-packaging@f5.com>",
-      "purl": "pkg:apk/alpine/nginx-module-xslt@1.24.0-r1?arch=x86_64&distro=alpine-3.17.7",
+      "purl": "pkg:apk/alpine/nginx-module-xslt@1.24.0-r1?arch=x86_64&distro=3.17.7",
       "type": "library",
       "version": "1.24.0-r1",
       "supplier": {
@@ -44578,7 +44578,7 @@
         }
       ],
       "publisher": "NGINX Packaging <nginx-packaging@f5.com>",
-      "purl": "pkg:apk/alpine/nginx@1.24.0-r1?arch=x86_64&distro=alpine-3.17.7",
+      "purl": "pkg:apk/alpine/nginx@1.24.0-r1?arch=x86_64&distro=3.17.7",
       "type": "library",
       "version": "1.24.0-r1",
       "supplier": {
@@ -44686,7 +44686,7 @@
         }
       ],
       "publisher": "Jakub Jirutka <jakub@jirutka.cz>",
-      "purl": "pkg:apk/alpine/pcre2@10.42-r0?arch=x86_64&distro=alpine-3.17.7",
+      "purl": "pkg:apk/alpine/pcre2@10.42-r0?arch=x86_64&distro=3.17.7",
       "type": "library",
       "version": "10.42-r0",
       "supplier": {
@@ -44778,7 +44778,7 @@
         }
       ],
       "publisher": "Natanael Copa <ncopa@alpinelinux.org>",
-      "purl": "pkg:apk/alpine/scanelf@1.3.5-r1?arch=x86_64&distro=alpine-3.17.7&upstream=pax-utils",
+      "purl": "pkg:apk/alpine/scanelf@1.3.5-r1?arch=x86_64&distro=3.17.7",
       "type": "library",
       "version": "1.3.5-r1",
       "supplier": {
@@ -44898,7 +44898,7 @@
         }
       ],
       "publisher": "Sören Tempel <soeren+alpine@soeren-tempel.net>",
-      "purl": "pkg:apk/alpine/ssl_client@1.35.0-r29?arch=x86_64&distro=alpine-3.17.7&upstream=busybox",
+      "purl": "pkg:apk/alpine/ssl_client@1.35.0-r29?arch=x86_64&distro=3.17.7",
       "type": "library",
       "version": "1.35.0-r29",
       "supplier": {
@@ -45022,7 +45022,7 @@
         }
       ],
       "publisher": "Michael Mason <ms13sp@gmail.com>",
-      "purl": "pkg:apk/alpine/tiff@4.4.0-r4?arch=x86_64&distro=alpine-3.17.7",
+      "purl": "pkg:apk/alpine/tiff@4.4.0-r4?arch=x86_64&distro=3.17.7",
       "type": "library",
       "version": "4.4.0-r4",
       "supplier": {
@@ -45106,7 +45106,7 @@
         }
       ],
       "publisher": "Natanael Copa <ncopa@alpinelinux.org>",
-      "purl": "pkg:apk/alpine/tzdata@2024a-r0?arch=x86_64&distro=alpine-3.17.7",
+      "purl": "pkg:apk/alpine/tzdata@2024a-r0?arch=x86_64&distro=3.17.7",
       "type": "library",
       "version": "2024a-r0",
       "supplier": {
@@ -45233,7 +45233,7 @@
         }
       ],
       "publisher": "Natanael Copa <ncopa@alpinelinux.org>",
-      "purl": "pkg:apk/alpine/xz-libs@5.2.9-r0?arch=x86_64&distro=alpine-3.17.7&upstream=xz",
+      "purl": "pkg:apk/alpine/xz-libs@5.2.9-r0?arch=x86_64&distro=3.17.7",
       "type": "library",
       "version": "5.2.9-r0",
       "supplier": {
@@ -45325,7 +45325,7 @@
         }
       ],
       "publisher": "Natanael Copa <ncopa@alpinelinux.org>",
-      "purl": "pkg:apk/alpine/zlib@1.2.13-r0?arch=x86_64&distro=alpine-3.17.7",
+      "purl": "pkg:apk/alpine/zlib@1.2.13-r0?arch=x86_64&distro=3.17.7",
       "type": "library",
       "version": "1.2.13-r0",
       "supplier": {
@@ -45442,7 +45442,7 @@
         }
       ],
       "publisher": "psykose <alice@ayaya.dev>",
-      "purl": "pkg:apk/alpine/zstd-libs@1.5.5-r0?arch=x86_64&distro=alpine-3.17.7&upstream=zstd",
+      "purl": "pkg:apk/alpine/zstd-libs@1.5.5-r0?arch=x86_64&distro=3.17.7",
       "type": "library",
       "version": "1.5.5-r0",
       "supplier": {
@@ -45896,7 +45896,7 @@
         "value": "unknown-to-author"
       }
     ],
-    "timestamp": "2026-10-10T15:04:34Z",
+    "timestamp": "2026-10-12T08:21:11Z",
     "tools": {
       "components": [
         {
@@ -45909,12 +45909,12 @@
           "name": "BomLens",
           "publisher": "SK Telecom",
           "type": "application",
-          "version": "1.13.1"
+          "version": "1.13.2"
         }
       ]
     }
   },
-  "serialNumber": "urn:uuid:08e32a1d-9299-47e0-acc5-7bd5de3cffb2",
+  "serialNumber": "urn:uuid:024545e5-ce9f-4708-a43e-93169a70babd",
   "specVersion": "1.6",
   "version": 1,
   "compositions": [

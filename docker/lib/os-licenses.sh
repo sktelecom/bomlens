@@ -16,6 +16,14 @@
 # scan reads operating system packages only and needs no vulnerability or
 # Java database.
 #
+# A package's licenses stay separate entries in `licenses`, one per license
+# Trivy reports, never joined into one expression. Several licenses in a
+# copyright file usually belong to different files, so for the package they
+# all apply; license-flags.jq reads a deb package's entries that way. Trivy
+# cannot keep a choice the copyright file states ("GPL-2+ or Artistic"): it
+# splits "or" and "and" alike and merges every License: line into one list,
+# so a stated choice is recorded as licenses that all apply, the safe side.
+#
 # Each deb package Trivy reports with licenses takes Trivy's, matched by name.
 # A package Trivy does not report keeps syft's, less any hash. Prints
 # "<replaced> <hashes dropped>" on stdout. Exits 1 when Trivy could not read

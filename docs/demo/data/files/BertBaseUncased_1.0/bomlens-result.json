@@ -1,0 +1,227 @@
+{
+  "contract": {
+    "name": "bomlens-engine",
+    "version": "1.2.0"
+  },
+  "engine": {
+    "version": "1.13.2",
+    "image": null,
+    "image_digest": null
+  },
+  "input": {
+    "kind": "ai-model",
+    "mode": "AIBOM",
+    "target": null
+  },
+  "run": {
+    "status": "succeeded",
+    "reason": null,
+    "started_at": "2026-10-12T08:21:31Z",
+    "ended_at": "2026-10-12T08:21:37Z",
+    "exit_code": 0
+  },
+  "steps": [
+    {
+      "id": "enrich-aibom",
+      "status": "ok",
+      "reason": null,
+      "detail": null,
+      "started_at": "2026-10-12T08:21:34Z",
+      "ended_at": "2026-10-12T08:21:36Z",
+      "stage": 2
+    },
+    {
+      "id": "generate",
+      "status": "ok",
+      "reason": null,
+      "detail": null,
+      "started_at": "2026-10-12T08:21:31Z",
+      "ended_at": "2026-10-12T08:21:36Z",
+      "counts": {
+        "components": 2
+      },
+      "stage": 2
+    },
+    {
+      "id": "docmeta",
+      "status": "ok",
+      "reason": null,
+      "detail": null,
+      "started_at": "2026-10-12T08:21:36Z",
+      "ended_at": "2026-10-12T08:21:36Z",
+      "stage": 2
+    },
+    {
+      "id": "normalize",
+      "status": "ok",
+      "reason": null,
+      "detail": null,
+      "started_at": "2026-10-12T08:21:36Z",
+      "ended_at": "2026-10-12T08:21:36Z",
+      "stage": 2
+    },
+    {
+      "id": "enrich-malicious",
+      "status": "ok",
+      "reason": null,
+      "detail": null,
+      "started_at": "2026-10-12T08:21:36Z",
+      "ended_at": "2026-10-12T08:21:36Z",
+      "stage": 2
+    },
+    {
+      "id": "assess-ai-risk",
+      "status": "ok",
+      "reason": null,
+      "detail": null,
+      "started_at": "2026-10-12T08:21:36Z",
+      "ended_at": "2026-10-12T08:21:36Z",
+      "stage": 2
+    },
+    {
+      "id": "conformance",
+      "status": "ok",
+      "reason": null,
+      "detail": null,
+      "started_at": "2026-10-12T08:21:36Z",
+      "ended_at": "2026-10-12T08:21:37Z",
+      "stage": 2
+    },
+    {
+      "id": "generate-notice",
+      "status": "ok",
+      "reason": null,
+      "detail": null,
+      "started_at": "2026-10-12T08:21:37Z",
+      "ended_at": "2026-10-12T08:21:37Z",
+      "stage": 2
+    },
+    {
+      "id": "scan-security",
+      "status": "disabled",
+      "reason": null,
+      "detail": null,
+      "started_at": "2026-10-12T08:21:37Z",
+      "ended_at": "2026-10-12T08:21:37Z",
+      "stage": 2
+    },
+    {
+      "id": "generate-risk-report",
+      "status": "ok",
+      "reason": null,
+      "detail": null,
+      "started_at": "2026-10-12T08:21:37Z",
+      "ended_at": "2026-10-12T08:21:37Z",
+      "stage": 2
+    },
+    {
+      "id": "sign",
+      "status": "disabled",
+      "reason": null,
+      "detail": null,
+      "started_at": "2026-10-12T08:21:37Z",
+      "ended_at": "2026-10-12T08:21:37Z",
+      "stage": 2
+    }
+  ],
+  "tools": {
+    "owasp-aibom-generator": "1.0.2",
+    "syft": "1.52.0"
+  },
+  "engines": [],
+  "data_sources": {
+    "trivy_db": null
+  },
+  "outputs": [
+    {
+      "role": "sbom.cyclonedx",
+      "path": "BertBaseUncased_1.0_bom.json",
+      "sha256": "c22169983e82ac3b840d8361e578ad4bfef71b94a62f0c142da89c83710162b7",
+      "bytes": 28194
+    },
+    {
+      "role": "other",
+      "path": "BertBaseUncased_1.0_NOTICE.txt",
+      "sha256": "3df9660134f9bf08168dfd71d0f046b5865a506287bc03527c15d5f8fc41e5eb",
+      "bytes": 682
+    },
+    {
+      "role": "other",
+      "path": "BertBaseUncased_1.0_NOTICE.html",
+      "sha256": "53634cef34e802c9c2cce51c59dfcb619937d4f59761e702507f4e29faa696f8",
+      "bytes": 4518
+    },
+    {
+      "role": "conformance",
+      "path": "BertBaseUncased_1.0_conformance.json",
+      "sha256": "8d47c8edcea125b82ecef542efb0cbf7d4bb7103acd17c201f345855ba8a0b52",
+      "bytes": 99700
+    },
+    {
+      "role": "other",
+      "path": "BertBaseUncased_1.0_conformance.md",
+      "sha256": "28f998f0648d74c3780870d9a28ada2dbff858beaaeabea947352680c332ab3b",
+      "bytes": 19079
+    },
+    {
+      "role": "other",
+      "path": "BertBaseUncased_1.0_conformance.html",
+      "sha256": "2b3345a93cf604f409c6030dddf24ed0ab109095e17a20fd78d8e2ecbb9a84ce",
+      "bytes": 37381
+    },
+    {
+      "role": "other",
+      "path": "BertBaseUncased_1.0_conformance.result",
+      "sha256": "d74ff0ee8da3b9806b18c877dbf29bbde50b5bd8e4dad7a3a725000feb82e8f1",
+      "bytes": 4
+    },
+    {
+      "role": "other",
+      "path": "BertBaseUncased_1.0_risk-report.md",
+      "sha256": "bf1bae5140ab6a361447dfa6b7dca64788182d1acdf011641b2dc506f5171ada",
+      "bytes": 1885
+    },
+    {
+      "role": "other",
+      "path": "BertBaseUncased_1.0_risk-report.html",
+      "sha256": "27d2783e6394760de47f74a46e0bc5d71c9411490d113c07349ee002bdec52fa",
+      "bytes": 7126
+    },
+    {
+      "role": "sbom.spdx3",
+      "path": "BertBaseUncased_1.0_bom.spdx3.json",
+      "sha256": "05ba7034def21ede39acc110fcf2ed8146f01e898884795fd9637f048af13ad7",
+      "bytes": 18878
+    },
+    {
+      "role": "other",
+      "path": "BertBaseUncased_1.0_spdx3-check.json",
+      "sha256": "83213e2ced01f477325488bbe360845b0dab8c09182f7d6e0bafa9f64d111b55",
+      "bytes": 13097
+    },
+    {
+      "role": "other",
+      "path": "BertBaseUncased_1.0_spdx3-check.md",
+      "sha256": "5763e4e4a84e3066604015fa1af95949e995ef8906f6a2215abf84d8f9bea1a5",
+      "bytes": 1149
+    },
+    {
+      "role": "other",
+      "path": "BertBaseUncased_1.0_ai-declaration.template.json",
+      "sha256": "a7cdb49186d1d44e9f958740be05923326b207f19aa0da743fb086a37d713436",
+      "bytes": 2001
+    },
+    {
+      "role": "other",
+      "path": "BertBaseUncased_1.0_ai-profile.json",
+      "sha256": "69b4c5276b99f28a865951b736030f93ae7a692f6d197bdb5e2e03c7b6330e2b",
+      "bytes": 28947
+    },
+    {
+      "role": "other",
+      "path": "BertBaseUncased_1.0_ai-profile.md",
+      "sha256": "e66c6cb11ccb9937764028707a7e40d534d94507badbc614c148fb8c1f1ae7d5",
+      "bytes": 3998
+    }
+  ]
+}

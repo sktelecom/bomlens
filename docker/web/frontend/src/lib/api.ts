@@ -306,7 +306,23 @@ export type SecuritySummary = Record<Severity, number> & {
    *  for subsystems the image never compiled in, so mixing them in would make a
    *  device with two real criticals read like one with two thousand. */
   kernelCount?: number;
+  /** Components no vulnerability check could reach (no version, or no purl or
+   *  CPE a check used). Present only when there are some; may exceed the rows
+   *  in `uncheckedComponents`, which the server caps at 500. */
+  uncheckedCount?: number;
+  uncheckedComponents?: UncheckedComponent[];
 };
+
+/** Why a component's vulnerabilities were not checked. */
+export type UncheckedReason = "no-version" | "no-identifier" | "unknown";
+
+export interface UncheckedComponent {
+  name: string;
+  /** "" when the component has no version. */
+  version: string;
+  reason: UncheckedReason;
+  purl?: string;
+}
 
 /** One conformance check (base format requirement or a G7 AI minimum element). */
 export interface ConformanceCheck {
@@ -573,7 +589,6 @@ export interface ScanConfig {
   spdx?: boolean;
   deepLicense: boolean;
   identifyVendored: boolean;
-  includeOsv: boolean;
   byteStable: boolean;
   /** Conformance check strictness this scan actually ran with ("default" or
    *  "skt-submission"). Absent on scans that predate the profile. */
@@ -729,11 +744,6 @@ export interface ScanParams {
   security: boolean;
   deepLicense: boolean;
   identifyVendored: boolean;
-  /** Firmware only: pull OSV.dev advisories for this run. The osv.dev database
-   *  is not baked into the image, so enabling this downloads it on this run
-   *  (the determinate progress bar surfaces the download). Read server-side as
-   *  the exact `includeOsv` flag. */
-  includeOsv: boolean;
   byteStable: boolean;
   /** Conformance check strictness. Read server-side as the exact
    *  `conformance_profile` parameter; omitted (sent empty) lets the server pick
@@ -771,10 +781,10 @@ export interface ScanParams {
   truscaProjectId?: string; // required when uploadTarget === "trusca"
 }
 
-/** A determinate progress update (e.g. CVE database download). */
+/** A determinate progress update (e.g. the deep CVE NVD check). */
 export interface ScanProgress {
   phase: string;
-  /** Percent, for a phase that can report one (the firmware CVE DB download). */
+  /** Percent, for a phase that can report one (the deep CVE NVD check). */
   percent?: number;
   /** Layer counts, for an image pull. A non-TTY `docker pull` prints no byte
    *  totals and no percentage, so layers are the only honest unit and a percent
@@ -791,7 +801,7 @@ export interface ScanHandlers {
    *  "show detail"). Absent for the connection-dropped case (neither arg) and
    *  for any server failure the server could not classify. */
   onError: (message?: string, key?: string | null) => void;
-  /** Optional determinate progress (e.g. firmware CVE DB download). */
+  /** Optional determinate progress (e.g. the deep CVE NVD check). */
   onProgress?: (p: ScanProgress) => void;
 }
 
@@ -1542,7 +1552,6 @@ export function startScan(params: ScanParams, handlers: ScanHandlers): EventSour
     security: String(params.security),
     deep_license: String(params.deepLicense),
     identify_vendored: String(params.identifyVendored),
-    includeOsv: String(params.includeOsv),
     byte_stable: String(params.byteStable),
     conformance_profile: params.conformanceProfile ?? "",
     license: params.license ?? "",
@@ -1569,12 +1578,12 @@ export function startScan(params: ScanParams, handlers: ScanHandlers): EventSour
   });
 
   es.addEventListener("progress", (e) => {
-    // Determinate progress (e.g. firmware CVE DB download). Best-effort: ignore
+    // Determinate progress (e.g. the deep CVE NVD check). Best-effort: ignore
     // anything we can't parse into a numeric percent.
     const data = (e as MessageEvent).data;
     try {
       const p = JSON.parse(data) as ScanProgress;
-      // Two shapes reach this channel: a percent (firmware CVE DB) and layer
+      // Two shapes reach this channel: a percent (deep CVE NVD check) and layer
       // counts (an image pull). Accept either, and still drop anything with
       // neither so a malformed event cannot render as 0%.
       if (typeof p.percent === "number" || typeof p.total === "number") {

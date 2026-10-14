@@ -41,7 +41,7 @@ Two datasets are fetched once at image-build time and shipped inside the base im
 
 Neither dataset is reproduced whole. Each is reduced to what the check actually reads — a product's end-of-life dates, or a PURL keyed to its advisory id — and the snapshot date travels with it, both in the bundled file and on every component the check flags (`bomlens:eol:source`, `bomlens:malicious:source`). Neither project endorses or certifies BomLens, and the bundled data is provided as is.
 
-The CPE applicability index in the firmware image comes from NVD rather than either of these, and its attribution and notices ship beside it inside that image as `CVE-DATA-NOTICE.txt`.
+The CPE applicability index (`/opt/cve-bin-tool-home/cpe_match.sqlite`, in the base image and the images built from it) comes from NVD rather than either of these, and its attribution and notices ship beside it as `CVE-DATA-NOTICE.txt`.
 
 ### Web UI npm packages
 
@@ -160,7 +160,7 @@ The version below matches the build ARG default in `docker/Dockerfile` (pinned; 
 
 | Tool | Pinned version (ARG) | Purpose | License (SPDX) | Copyleft | Source |
 |------|----------------------|---------|----------------|----------|--------|
-| grype | v0.119.0 (`GRYPE_VERSION`) | CPE-based NVD CVE matching | Apache-2.0 | permissive | https://github.com/anchore/grype |
+| grype | v0.120.1 (`GRYPE_VERSION`) | CPE-based NVD CVE matching | Apache-2.0 | permissive | https://github.com/anchore/grype |
 
 Data: the grype vulnerability database baked into the image at build time is assembled by Anchore from public vulnerability sources — NVD (public domain), GitHub Security Advisories (CC-BY-4.0), and distribution security databases (each under its own terms). The database is pinned with `GRYPE_DB_AUTO_UPDATE=false`, so no network access happens during a scan.
 

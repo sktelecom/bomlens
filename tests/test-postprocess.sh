@@ -987,6 +987,74 @@ LCJSON
         || fail "licenseConflict stamping broke --byte-stable determinism"
 fi
 
+echo "== os-licenses: a Debian package's several licenses all apply, never a choice =="
+# Trivy lists each license of a copyright file as its own entry. They must stay
+# separate entries (no OR expression), and the class and the conflict verdict
+# must read them as all applying: a GPL-2.0-only among them is strong copyleft
+# and incompatible with a permissive product. A Maven package's several
+# entries stay a choice, and an apk expression is kept as syft wrote it.
+OSLT="$WORK/osl-multi"; mkdir -p "$OSLT/bin"
+cat > "$OSLT/trivy.cdx.json" <<'JSON'
+{"bomFormat":"CycloneDX","specVersion":"1.7","components":[
+ {"name":"libxxhash0","purl":"pkg:deb/debian/libxxhash0@0.8.1-1?arch=amd64","licenses":[{"license":{"id":"BSD-2-Clause"}},{"license":{"id":"GPL-2.0-only"}}]},
+ {"name":"base-passwd","purl":"pkg:deb/debian/base-passwd@3.6.1?arch=amd64","licenses":[{"license":{"id":"GPL-2.0-only"}},{"license":{"name":"public-domain"}}]},
+ {"name":"ncurses-base","purl":"pkg:deb/debian/ncurses-base@6.4-4?arch=all","licenses":[{"license":{"name":"MIT-X11"}},{"license":{"id":"X11"}},{"license":{"id":"BSD-3-Clause"}}]}]}
+JSON
+cat > "$OSLT/bin/trivy" <<'STUB'
+#!/bin/bash
+out=""; prev=""; for a in "$@"; do [ "$prev" = "--output" ] && out="$a"; prev="$a"; done
+cp "$OSLT_FIXTURE" "$out"
+STUB
+chmod +x "$OSLT/bin/trivy"
+cat > "$OSLT/bom.json" <<'JSON'
+{"bomFormat":"CycloneDX","specVersion":"1.6","version":1,
+ "metadata":{"component":{"type":"container","name":"img","version":"1","licenses":[{"license":{"id":"Apache-2.0"}}]}},
+ "components":[
+ {"type":"library","name":"libxxhash0","version":"0.8.1-1","purl":"pkg:deb/debian/libxxhash0@0.8.1-1?arch=amd64","licenses":[{"license":{"name":"sha256:0b1c"}}]},
+ {"type":"library","name":"base-passwd","version":"3.6.1","purl":"pkg:deb/debian/base-passwd@3.6.1?arch=amd64"},
+ {"type":"library","name":"ncurses-base","version":"6.4-4","purl":"pkg:deb/debian/ncurses-base@6.4-4?arch=all"},
+ {"type":"library","name":"musl","version":"1.2.5","purl":"pkg:apk/alpine/musl@1.2.5","licenses":[{"expression":"MPL-2.0 OR MIT"}]},
+ {"type":"library","name":"choice","version":"1","purl":"pkg:maven/x/choice@1","licenses":[{"license":{"id":"MIT"}},{"license":{"id":"GPL-2.0-only"}}]},
+ {"type":"library","name":"updeb","version":"1","purl":"PKG:DEB/debian/updeb@1","licenses":[{"license":{"id":"MIT"}},{"license":{"id":"GPL-2.0-only"}}]}]}
+JSON
+osl_counts="$(env PATH="$OSLT/bin:$PATH" OSLT_FIXTURE="$OSLT/trivy.cdx.json" bash "$LIB/os-licenses.sh" "$OSLT/bom.json" IMAGE debian:12 2>/dev/null)"
+osl_lic() { jq -c --arg n "$1" '[.components[] | select(.name == $n) | .licenses[]? | (.license.id // .license.name // ("expression:" + .expression))]' "$OSLT/bom.json"; }
+[ "$osl_counts" = "3 0" ] && [ "$(osl_lic libxxhash0)" = '["BSD-2-Clause","GPL-2.0-only"]' ] \
+    && [ "$(osl_lic ncurses-base)" = '["MIT-X11","X11","BSD-3-Clause"]' ] \
+    && pass "os-licenses: each license Trivy lists for a deb package is its own entry" \
+    || fail "os-licenses: counts '$osl_counts', libxxhash0 $(osl_lic libxxhash0), ncurses-base $(osl_lic ncurses-base)"
+bash "$LIB/normalize-sbom.sh" "$OSLT/bom.json" >/dev/null 2>&1
+osl_or="$(jq '[.components[] | select((.purl // "") | startswith("pkg:deb/")) | .licenses[]?
+    | select(has("expression") or ((.license.id // .license.name // "") | test("\\s(OR|AND)\\s"; "i")))] | length' "$OSLT/bom.json")"
+osl_prop() { jq -r --arg n "$1" --arg p "$2" '[.components[] | select(.name == $n) | .properties[]? | select(.name == $p) | .value] | first // "none"' "$OSLT/bom.json"; }
+[ "$osl_or" = 0 ] && [ "$(osl_lic libxxhash0)" = '["BSD-2-Clause","GPL-2.0-only"]' ] \
+    && pass "after normalize no deb package carries an OR or AND expression, the entries stay separate" \
+    || fail "deb licenses were joined into an expression ($osl_or entries): libxxhash0 $(osl_lic libxxhash0)"
+[ "$(osl_prop libxxhash0 bomlens:licenseClass)" = strong-copyleft ] && [ "$(osl_prop base-passwd bomlens:licenseClass)" = strong-copyleft ] \
+    && pass "a deb package with GPL-2.0-only among its licenses is strong copyleft" \
+    || fail "strong-copyleft flag: libxxhash0 $(osl_prop libxxhash0 bomlens:licenseClass), base-passwd $(osl_prop base-passwd bomlens:licenseClass)"
+[ "$(osl_prop libxxhash0 bomlens:licenseConflict)" = incompatible ] && [ "$(osl_prop base-passwd bomlens:licenseConflict)" = incompatible ] \
+    && pass "the conflict verdict reads a deb package's licenses as all applying (GPL-2.0-only and BSD-2-Clause is incompatible with Apache-2.0)" \
+    || fail "deb conflict verdict: libxxhash0 $(osl_prop libxxhash0 bomlens:licenseConflict), base-passwd $(osl_prop base-passwd bomlens:licenseConflict)"
+[ "$(osl_prop ncurses-base bomlens:licenseConflict)" = compatible ] \
+    && pass "a deb package whose licenses are all permissive (MIT-X11, X11, BSD-3-Clause) is compatible" \
+    || fail "ncurses-base verdict: $(osl_prop ncurses-base bomlens:licenseConflict)"
+[ "$(osl_prop ncurses-base bomlens:licenseClass)" = permissive ] \
+    && pass "Debian's MIT-X11 is classed as permissive" \
+    || fail "ncurses-base class: $(osl_prop ncurses-base bomlens:licenseClass)"
+[ "$(osl_prop updeb bomlens:licenseConflict)" = incompatible ] \
+    && pass "a deb purl written in upper case is still read as all applying" \
+    || fail "PKG:DEB verdict: $(osl_prop updeb bomlens:licenseConflict)"
+[ "$(osl_prop choice bomlens:licenseConflict)" = compatible ] && [ "$(osl_lic musl)" = '["expression:MPL-2.0 OR MIT"]' ] \
+    && pass "a Maven package's several licenses stay a choice and an apk expression is kept" \
+    || fail "non-deb: choice $(osl_prop choice bomlens:licenseConflict), musl $(osl_lic musl)"
+bash "$LIB/generate-notice.sh" "$OSLT/bom.json" "$OSLT/n" img >/dev/null 2>&1
+osl_under() { awk -v h="License: $1" -v c="  - $2@" '$0 == h {on = 1; next} /^License: / {on = 0} on && index($0, c) == 1 {found = 1} END {exit !found}' "$OSLT/n_NOTICE.txt"; }
+osl_under BSD-2-Clause libxxhash0 && osl_under GPL-2.0-only libxxhash0 \
+    && ! grep -qE '^License: .*(GPL-2\.0-only OR|OR GPL-2\.0-only)' "$OSLT/n_NOTICE.txt" \
+    && pass "the NOTICE lists a deb package under each of its licenses" \
+    || fail "NOTICE grouping of libxxhash0" "$(grep -n -E '^License: |libxxhash0' "$OSLT/n_NOTICE.txt" 2>/dev/null | head -10)"
+
 echo "== license-conflict drift guard: the jq parser and licenses.ts share one grammar =="
 # Same contract as the license-class guard above: the SPDX operator patterns and
 # the exception test are hand-mirrored, so extract both sides and diff them.
@@ -4093,6 +4161,276 @@ PATH="$FAKEBIN:$PATH" SECURITY_ENRICH=false \
 [ "$(jq '[.Results[].Vulnerabilities[]?] | length' "$WORK/secok_security.json")" = "1" ] \
     && pass "findings intact on a successful run" || fail "findings lost on a successful run"
 
+echo "== cpe-index: components with no package purl are matched against the CPE index =="
+# Trivy never reads component.cpe, so a binary syft's classifier named
+# (pkg:generic), an OS component such as busybox, or a library a signature
+# checker found reaches its CVEs only through match-cpe-index.sh. A tiny index
+# with the same schema build-cpe-index.py writes stands in for the bundled one.
+CPEDIR="$WORK/cpe-index"
+mkdir -p "$CPEDIR"
+CPEIDX="$CPEDIR/cpe_match.sqlite"
+if ! command -v python3 >/dev/null 2>&1; then
+    echo "  SKIP: python3 not available"
+else
+python3 - "$CPEIDX" <<'PY'
+import sqlite3, sys
+c = sqlite3.connect(sys.argv[1])
+c.execute("""CREATE TABLE cpe_match (vendor TEXT NOT NULL, product TEXT NOT NULL,
+  exact_version TEXT, version_start TEXT, vs_incl INTEGER, version_end TEXT,
+  ve_incl INTEGER, cve_id TEXT NOT NULL, severity TEXT, cvss_version TEXT, cvss_score REAL)""")
+rows = [
+  ("openbsd", "openssh", None, None, None, "7.0", 0, "CVE-2099-0001", "CRITICAL", "3", 9.8),
+  ("busybox", "busybox", "1.00", None, None, None, None, "CVE-2099-0002", "HIGH", "3", 7.5),
+  ("openssl", "openssl", None, "1.0.2", 1, "1.0.2i", 0, "CVE-2099-0003", "HIGH", "3", 7.5),
+  ("python", "flask", None, None, None, "9.0", 0, "CVE-2099-0004", "LOW", "3", 2.0),
+]
+c.executemany("INSERT INTO cpe_match VALUES (?,?,?,?,?,?,?,?,?,?,?)", rows)
+c.commit()
+PY
+    # firmware order: the openssh and busybox CPEs come only from cpe-name-map.json.
+    cat > "$WORK/fwo.json" <<'JSON'
+{"bomFormat":"CycloneDX","specVersion":"1.6","metadata":{"component":{"type":"firmware","name":"fw.bin","version":"1"}},
+ "components":[
+  {"type":"library","name":"openssh","version":"6.2p2","bom-ref":"4-openssh"},
+  {"type":"operating-system","name":"busybox","version":"1.00","bom-ref":"os:busybox@1.00"}]}
+JSON
+    FW_CPE_INDEX="$CPEIDX" bash "$LIB/match-cpe-index.sh" "$WORK/fwo.json" "$WORK/fwo-before" >/dev/null 2>&1
+    [ ! -f "$WORK/fwo-before_security_cvebintool.json" ] \
+        && pass "with no CPE yet, nothing is matched" \
+        || fail "a component with no CPE was matched"
+    bash "$LIB/enrich-cpe.sh" "$WORK/fwo.json" >/dev/null 2>&1
+    fwo_counts="$(FW_CPE_INDEX="$CPEIDX" bash "$LIB/match-cpe-index.sh" "$WORK/fwo.json" "$WORK/fwo" 2>/dev/null)"
+    fwo_ids="$(jq -r '[.Results[].Vulnerabilities[] | "\(.PkgName)@\(.InstalledVersion)=\(.VulnerabilityID)"] | sort | join(" ")' \
+        "$WORK/fwo_security_cvebintool.json" 2>/dev/null)"
+    [ "$fwo_ids" = "busybox@1.00=CVE-2099-0002 openssh@6.2p2=CVE-2099-0001" ] \
+        && pass "CPEs added from cpe-name-map.json are matched (openssh, busybox)" \
+        || fail "after enrichment the match found: '${fwo_ids:-nothing}'"
+    [ "$(printf '%s' "$fwo_counts" | jq -c .)" = '{"offered":2,"components":2,"cves":2}' ] \
+        && pass "the step reports offered/components/cves counts" \
+        || fail "counts are '$fwo_counts'"
+
+    # The pipeline runs the match after every CPE enrichment step, and the
+    # firmware script no longer matches (or writes the sidecar) on its own.
+    _ep="$ROOT_DIR/docker/entrypoint.sh"
+    _l_cpe="$(grep -n 'run_optional_step enrich-cpe ' "$_ep" | head -1 | cut -d: -f1)"
+    _l_icpe="$(grep -n 'run_optional_step enrich-interpreter-cpe ' "$_ep" | head -1 | cut -d: -f1)"
+    _l_match="$(grep -n 'bash "$LIBDIR/match-cpe-index.sh"' "$_ep" | head -1 | cut -d: -f1)"
+    _l_sec="$(grep -n 'run_optional_step scan-security ' "$_ep" | head -1 | cut -d: -f1)"
+    if [ -n "$_l_cpe" ] && [ -n "$_l_icpe" ] && [ -n "$_l_match" ] && [ -n "$_l_sec" ] \
+       && [ "$_l_cpe" -lt "$_l_match" ] && [ "$_l_icpe" -lt "$_l_match" ] && [ "$_l_match" -lt "$_l_sec" ]; then
+        pass "entrypoint.sh matches the CPE index after CPE enrichment and before the security scan"
+    else
+        fail "step order in entrypoint.sh" "enrich-cpe=$_l_cpe enrich-interpreter-cpe=$_l_icpe match=$_l_match scan-security=$_l_sec"
+    fi
+    if grep -q 'firmware-cpe-match.py\|_security_cvebintool' "$ROOT_DIR/docker/lib/scan-firmware.sh"; then
+        fail "scan-firmware.sh still matches CVEs itself" "the same CVE would be reported from two passes"
+    else
+        pass "scan-firmware.sh leaves CVE matching to the pipeline step (no second pass)"
+    fi
+    grep -q 'FIRMWARE|ROOTFS|BINARY)' "$_ep" \
+        && pass "the step runs for firmware, rootfs and binary scans" \
+        || fail "the CPE index step is not scoped to FIRMWARE|ROOTFS|BINARY"
+
+    # rootfs / binary: syft's pkg:generic binary and a purl-less OS component are
+    # offered; an ecosystem purl stays with Trivy even when it carries a CPE.
+    cat > "$WORK/rfs.json" <<'JSON'
+{"bomFormat":"CycloneDX","specVersion":"1.6","metadata":{"component":{"type":"application","name":"rootfs","version":"1"}},
+ "components":[
+  {"type":"application","name":"openssl","version":"1.0.2h","purl":"pkg:generic/openssl@1.0.2h","cpe":"cpe:2.3:a:openssl:openssl:1.0.2h:*:*:*:*:*:*:*"},
+  {"type":"application","name":"openssl","version":"1.0.2h","purl":"pkg:generic/openssl@1.0.2h?package-id=2","cpe":"cpe:2.3:a:openssl:openssl:1.0.2h:*:*:*:*:*:*:*"},
+  {"type":"operating-system","name":"busybox","version":"1.00","cpe":"cpe:2.3:a:busybox:busybox:1.00:*:*:*:*:*:*:*"},
+  {"type":"library","name":"flask","version":"2.0","purl":"pkg:pypi/flask@2.0","cpe":"cpe:2.3:a:python:flask:2.0:*:*:*:*:*:*:*"},
+  {"type":"library","name":"libmystery","purl":"pkg:generic/libmystery"}]}
+JSON
+    FW_CPE_INDEX="$CPEIDX" bash "$LIB/match-cpe-index.sh" "$WORK/rfs.json" "$WORK/rfs" >/dev/null 2>&1
+    rfs_ids="$(jq -r '[.Results[].Vulnerabilities[] | "\(.PkgName)=\(.VulnerabilityID)"] | join(" ")' \
+        "$WORK/rfs_security_cvebintool.json" 2>/dev/null)"
+    [ "$rfs_ids" = "busybox=CVE-2099-0002 openssl=CVE-2099-0003" ] \
+        && pass "a pkg:generic binary and a purl-less OS component are matched; each CVE once" \
+        || fail "rootfs match found: '${rfs_ids:-nothing}'" "expected busybox and openssl once each, not flask"
+
+    # Exit status the pipeline records: 3 = no index (skipped), 4 = turned off.
+    _rc=0; FW_CPE_INDEX="$CPEDIR/absent.sqlite" bash "$LIB/match-cpe-index.sh" "$WORK/rfs.json" "$WORK/rfs-none" >/dev/null 2>&1 || _rc=$?
+    [ "$_rc" = 3 ] && [ ! -f "$WORK/rfs-none_security_cvebintool.json" ] \
+        && pass "an image without the index exits 3 (recorded as skipped) and writes nothing" \
+        || fail "missing index: exit $_rc"
+    _rc=0; CVE_BIN_TOOL_MODE=components-only FW_CPE_INDEX="$CPEIDX" bash "$LIB/match-cpe-index.sh" "$WORK/rfs.json" "$WORK/rfs-off" >/dev/null 2>&1 || _rc=$?
+    [ "$_rc" = 4 ] && pass "CVE_BIN_TOOL_MODE=components-only exits 4 (recorded as disabled)" \
+        || fail "components-only: exit $_rc"
+    # jq exits 3 on a compile error; only a missing index may exit 3, so a
+    # broken filter is a failure the pipeline reports, not a skipped step.
+    mkdir -p "$CPEDIR/brokenlib"
+    cp "$LIB/match-cpe-index.sh" "$LIB/firmware-cpe-match.py" "$CPEDIR/brokenlib/"
+    printf 'def vc_cpe_index_candidate: (;\n' > "$CPEDIR/brokenlib/vuln-coverage.jq"
+    _rc=0; FW_CPE_INDEX="$CPEIDX" bash "$CPEDIR/brokenlib/match-cpe-index.sh" "$WORK/rfs.json" "$WORK/rfs-broken" >/dev/null 2>&1 || _rc=$?
+    [ "$_rc" = 1 ] && pass "a filter that does not compile exits 1 (recorded as failed), not 3" \
+        || fail "broken vuln-coverage.jq: exit $_rc, expected 1"
+    rm -f "$CPEDIR/brokenlib/vuln-coverage.jq"
+    _rc=0; FW_CPE_INDEX="$CPEIDX" bash "$CPEDIR/brokenlib/match-cpe-index.sh" "$WORK/rfs.json" "$WORK/rfs-broken" >/dev/null 2>&1 || _rc=$?
+    [ "$_rc" = 1 ] && pass "a missing vuln-coverage.jq exits 1, not 3" \
+        || fail "missing vuln-coverage.jq: exit $_rc, expected 1"
+
+    echo "== cpe-index: the merged report counts a CVE once and names what was not checked =="
+    cat > "$FAKEBIN/trivy" <<'SH'
+#!/bin/sh
+out=""
+while [ $# -gt 0 ]; do
+    [ "$1" = "--output" ] && { out="$2"; shift; }
+    shift
+done
+echo '{"SchemaVersion":2,"Results":[]}' > "$out"
+exit 0
+SH
+    chmod +x "$FAKEBIN/trivy"
+    # Before the step existed (no index match): no finding, and the report must
+    # not read as a clean result.
+    PATH="$FAKEBIN:$PATH" SECURITY_ENRICH=false DEEP_CVE=false \
+        bash "$LIB/scan-security.sh" "$WORK/rfs.json" "$WORK/unm" proj >/dev/null 2>&1
+    if grep -q "No known vulnerabilities found" "$WORK/unm_security.md" "$WORK/unm_security.html"; then
+        fail "the report says 'No known vulnerabilities found' with unchecked components"
+    else
+        pass "with unchecked components the report does not claim a clean result"
+    fi
+    unm_list="$(jq -r '[.UncheckedComponents.Components[] | "\(.Name):\(.Reason)"] | join(" ")' "$WORK/unm_security.json" 2>/dev/null)"
+    [ "$unm_list" = "busybox:no-identifier libmystery:no-version openssl:no-identifier" ] \
+        && [ "$(jq '.UncheckedComponents.Count' "$WORK/unm_security.json")" = 3 ] \
+        && pass "_security.json lists the unchecked components with a reason (flask is Trivy's)" \
+        || fail "UncheckedComponents is '${unm_list:-absent}'"
+    grep -q "3 component(s) could not be checked" "$WORK/unm_security.md" \
+        && grep -q "| busybox | 1.00 |" "$WORK/unm_security.md" \
+        && grep -q "3 component(s) could not be checked" "$WORK/unm_security.html" \
+        && pass "the markdown and HTML reports say how many and list them" \
+        || fail "the report does not name the unchecked components"
+
+    # With the match done, only what it could not reach is left, and the CVE
+    # Trivy and the index would both report is counted once.
+    cat > "$FAKEBIN/trivy" <<'SH'
+#!/bin/sh
+out=""
+while [ $# -gt 0 ]; do
+    [ "$1" = "--output" ] && { out="$2"; shift; }
+    shift
+done
+echo '{"SchemaVersion":2,"Results":[{"Target":"sbom","Class":"lang-pkgs","Vulnerabilities":[{"VulnerabilityID":"CVE-2099-0002","PkgName":"busybox","InstalledVersion":"1.00","Severity":"HIGH"}]}]}' > "$out"
+exit 0
+SH
+    chmod +x "$FAKEBIN/trivy"
+    cp "$WORK/rfs_security_cvebintool.json" "$WORK/mat_security_cvebintool.json"
+    BOMLENS_CPE_INDEX_MATCHED=true PATH="$FAKEBIN:$PATH" SECURITY_ENRICH=false DEEP_CVE=false \
+        bash "$LIB/scan-security.sh" "$WORK/rfs.json" "$WORK/mat" proj >/dev/null 2>&1
+    mat_ids="$(jq -r '[.Results[].Vulnerabilities[]?.VulnerabilityID] | sort | join(" ")' "$WORK/mat_security.json")"
+    [ "$mat_ids" = "CVE-2099-0002 CVE-2099-0003" ] \
+        && pass "a CVE both engines report is kept once in _security.json" \
+        || fail "merged CVEs are '$mat_ids'"
+    [ "$(grep -c 'CVE-2099-0002' "$WORK/mat_security.md")" = 1 ] \
+        && pass "the report lists it once" || fail "CVE-2099-0002 appears $(grep -c 'CVE-2099-0002' "$WORK/mat_security.md") times"
+    mat_list="$(jq -r '[.UncheckedComponents.Components[] | .Name] | join(" ")' "$WORK/mat_security.json")"
+    [ "$mat_list" = "libmystery" ] \
+        && pass "after the index match only the component with no version is unchecked" \
+        || fail "UncheckedComponents after the match: '$mat_list'"
+
+    # A component with no version field but a version in its CPE is matched
+    # with the CPE's version, so it is not listed as having no version.
+    cat > "$FAKEBIN/trivy" <<'SH'
+#!/bin/sh
+out=""
+while [ $# -gt 0 ]; do
+    [ "$1" = "--output" ] && { out="$2"; shift; }
+    shift
+done
+echo '{"SchemaVersion":2,"Results":[]}' > "$out"
+exit 0
+SH
+    cat > "$WORK/cpev.json" <<'JSON'
+{"bomFormat":"CycloneDX","specVersion":"1.6","components":[
+  {"type":"application","name":"busybox","purl":"pkg:generic/busybox","cpe":"cpe:2.3:a:busybox:busybox:1.00:*:*:*:*:*:*:*"},
+  {"type":"application","name":"dropbear","purl":"pkg:generic/dropbear","cpe":"cpe:/a:dropbear_ssh_project:dropbear_ssh:2019.78"},
+  {"type":"application","name":"thing","purl":"pkg:generic/thing","cpe":"cpe:2.3:a:thing:thing:*:*:*:*:*:*:*:*"}]}
+JSON
+    FW_CPE_INDEX="$CPEIDX" bash "$LIB/match-cpe-index.sh" "$WORK/cpev.json" "$WORK/cpev" >/dev/null 2>&1
+    [ "$(jq -r '[.Results[].Vulnerabilities[] | "\(.PkgName)@\(.InstalledVersion)"] | join(" ")' "$WORK/cpev_security_cvebintool.json" 2>/dev/null)" = "busybox@1.00" ] \
+        && pass "the matcher compares a CPE's version when the component has none" \
+        || fail "CPE-version match found: $(jq -c '.' "$WORK/cpev_security_cvebintool.json" 2>/dev/null)"
+    BOMLENS_CPE_INDEX_MATCHED=true PATH="$FAKEBIN:$PATH" SECURITY_ENRICH=false DEEP_CVE=false \
+        bash "$LIB/scan-security.sh" "$WORK/cpev.json" "$WORK/cpev" proj >/dev/null 2>&1
+    cpev_list="$(jq -r '[.UncheckedComponents.Components[] | "\(.Name):\(.Reason)"] | join(" ")' "$WORK/cpev_security.json" 2>/dev/null)"
+    [ "$cpev_list" = "thing:no-version" ] \
+        && pass "a CPE's version counts as the version; only the one with none ('*') is unchecked" \
+        || fail "UncheckedComponents with CPE versions: '${cpev_list:-absent}'"
+    rm -f "$WORK/cpev_security_cvebintool.json"
+    PATH="$FAKEBIN:$PATH" SECURITY_ENRICH=false DEEP_CVE=false \
+        bash "$LIB/scan-security.sh" "$WORK/cpev.json" "$WORK/cpev-nomatch" proj >/dev/null 2>&1
+    cpev_list="$(jq -r '[.UncheckedComponents.Components[] | "\(.Name):\(.Reason)"] | join(" ")' "$WORK/cpev-nomatch_security.json" 2>/dev/null)"
+    [ "$cpev_list" = "busybox:no-identifier dropbear:no-identifier thing:no-version" ] \
+        && pass "without the index match the same components are unchecked for want of an identifier" \
+        || fail "UncheckedComponents with no match: '${cpev_list:-absent}'"
+
+    # A clean scan of fully identified components keeps the plain wording.
+    cat > "$WORK/clean.json" <<'JSON'
+{"bomFormat":"CycloneDX","specVersion":"1.6","components":[
+  {"type":"library","name":"flask","version":"2.0","purl":"pkg:pypi/flask@2.0"},
+  {"type":"operating-system","name":"debian","version":"12"}]}
+JSON
+    cat > "$FAKEBIN/trivy" <<'SH'
+#!/bin/sh
+out=""
+while [ $# -gt 0 ]; do
+    [ "$1" = "--output" ] && { out="$2"; shift; }
+    shift
+done
+echo '{"SchemaVersion":2,"Results":[]}' > "$out"
+exit 0
+SH
+    PATH="$FAKEBIN:$PATH" SECURITY_ENRICH=false DEEP_CVE=false \
+        bash "$LIB/scan-security.sh" "$WORK/clean.json" "$WORK/clean" proj >/dev/null 2>&1
+    grep -q "No known vulnerabilities found" "$WORK/clean_security.md" \
+        && [ "$(jq '.UncheckedComponents.Count' "$WORK/clean_security.json")" = 0 ] \
+        && pass "with every component checked the clean wording stays (a distro OS component is context, not a gap)" \
+        || fail "a fully checked SBOM lost the clean wording"
+
+    # An old kernel carries thousands of advisories; the list of what was
+    # found must not go through one command-line argument (128 KiB on Linux).
+    cat > "$FAKEBIN/trivy" <<'SH'
+#!/bin/sh
+out=""
+while [ $# -gt 0 ]; do
+    [ "$1" = "--output" ] && { out="$2"; shift; }
+    shift
+done
+python3 -c '
+import json, sys
+v = [{"VulnerabilityID": "CVE-2098-%05d" % i, "PkgName": "linux_kernel", "InstalledVersion": "2.6.19",
+      "Severity": "MEDIUM", "Title": "x" * 40} for i in range(6000)]
+json.dump({"SchemaVersion": 2, "Results": [{"Target": "sbom", "Vulnerabilities": v}]}, open(sys.argv[1], "w"))
+' "$out"
+exit 0
+SH
+    chmod +x "$FAKEBIN/trivy"
+    PATH="$FAKEBIN:$PATH" SECURITY_ENRICH=false DEEP_CVE=false \
+        bash "$LIB/scan-security.sh" "$WORK/rfs.json" "$WORK/big" proj >/dev/null 2>&1
+    [ "$(jq '.UncheckedComponents.Count' "$WORK/big_security.json" 2>/dev/null)" = 3 ] \
+        && pass "the unchecked list is still written beside 6,000 kernel advisories" \
+        || fail "with many findings UncheckedComponents is $(jq -c '.UncheckedComponents.Count' "$WORK/big_security.json" 2>/dev/null)"
+
+    # The risk report summary says the same, in both languages.
+    mkdir -p "$WORK/unmrisk"
+    cp "$WORK/unm_security.json" "$WORK/unmrisk/proj_1.0_security.json"
+    ( cd "$WORK/unmrisk" && bash "$LIB/generate-risk-report.sh" proj_1.0 proj ROOTFS >/dev/null 2>&1 )
+    if grep -q "3 component(s) could not be checked" "$WORK/unmrisk/proj_1.0_risk-report.md" \
+       && grep -q '`openssl` 1.0.2h' "$WORK/unmrisk/proj_1.0_risk-report.md" \
+       && grep -q "could not be checked" "$WORK/unmrisk/proj_1.0_risk-report.html" \
+       && ! grep -q "No known vulnerabilities" "$WORK/unmrisk/proj_1.0_risk-report.md"; then
+        pass "the risk report names the unchecked components instead of 'no known vulnerabilities'"
+    else
+        fail "the risk report does not name the unchecked components" "$(sed -n '/Vulnerability/,/License/p' "$WORK/unmrisk/proj_1.0_risk-report.md" | head -20)"
+    fi
+    ( cd "$WORK/unmrisk" && REPORT_LANG=ko bash "$LIB/generate-risk-report.sh" proj_1.0 proj ROOTFS >/dev/null 2>&1 )
+    grep -q "취약점을 확인하지 못한 컴포넌트 3개" "$WORK/unmrisk/proj_1.0_risk-report.md" \
+        && grep -q "취약점을 확인하지 못한 컴포넌트 3개" "$WORK/unmrisk/proj_1.0_risk-report.html" \
+        && pass "the Korean risk report says the same" \
+        || fail "the Korean risk report does not name the unchecked components"
+fi
+
 echo "== sec-firmware-type: a root type Trivy cannot decode is retried, not failed =="
 # Regression for the SCA-benchmark report: a firmware scan's root component
 # (metadata.component.type = "firmware", CycloneDX 1.4+) made the bundled Trivy 0.70
@@ -5123,6 +5461,33 @@ ynames=$(jq -r '[.components[].name] | sort | join(",")' "$WORK/yocto.cdx.json" 
 [ "$(jq -r '.metadata.timestamp' "$WORK/yocto.cdx.json")" = "2026-01-01T00:00:00Z" ] \
     && pass "document creation time is carried into metadata.timestamp" \
     || fail "timestamp='$(jq -r '.metadata.timestamp' "$WORK/yocto.cdx.json")'"
+
+# An --analyze of a Yocto SBOM runs no CPE index match, but the build's own
+# cve-check judged every recipe, so none is listed as unchecked. The same SBOM
+# without the build's judgements lists the recipe that has no CVE (libz1).
+cat > "$FAKEBIN/trivy" <<'SH'
+#!/bin/sh
+out=""
+while [ $# -gt 0 ]; do
+    [ "$1" = "--output" ] && { out="$2"; shift; }
+    shift
+done
+echo '{"SchemaVersion":2,"Results":[]}' > "$out"
+exit 0
+SH
+chmod +x "$FAKEBIN/trivy"
+BOMLENS_CPE_INDEX_MATCHED=false PATH="$FAKEBIN:$PATH" SECURITY_ENRICH=false DEEP_CVE=false \
+    bash "$LIB/scan-security.sh" "$WORK/yocto.cdx.json" "$WORK/yocto" proj >/dev/null 2>&1
+[ "$(jq '.UncheckedComponents.Count' "$WORK/yocto_security.json" 2>/dev/null)" = 0 ] \
+    && grep -q "CVE-2022-28391" "$WORK/yocto_security.md" \
+    && pass "a Yocto build's recipes are not listed as unchecked: its cve-check judged them" \
+    || fail "Yocto UncheckedComponents: $(jq -c '.UncheckedComponents' "$WORK/yocto_security.json" 2>/dev/null)"
+cp "$WORK/yocto.cdx.json" "$WORK/yocto-novex.cdx.json"
+BOMLENS_CPE_INDEX_MATCHED=false PATH="$FAKEBIN:$PATH" SECURITY_ENRICH=false DEEP_CVE=false \
+    bash "$LIB/scan-security.sh" "$WORK/yocto-novex.cdx.json" "$WORK/yocto-novex" proj >/dev/null 2>&1
+[ "$(jq -r '[.UncheckedComponents.Components[] | "\(.Name):\(.Reason)"] | join(" ")' "$WORK/yocto-novex_security.json" 2>/dev/null)" = "busybox:no-identifier libz1:no-identifier" ] \
+    && pass "with no cve-check judgements the same recipes are listed" \
+    || fail "Yocto with no judgements: $(jq -c '.UncheckedComponents' "$WORK/yocto-novex_security.json" 2>/dev/null)"
 
 # rc=3 means "not mine" and must stay non-fatal: the generic converter handles
 # every other supplier SBOM.
@@ -9786,6 +10151,223 @@ JSON
 bash "$LIB/validate-sbom.sh" "$SUMDIR/ai.json" "$SUMDIR/ai" P >/dev/null 2>&1
 [ ! -f "$SUMDIR/ai_summary.result" ] && [ -f "$SUMDIR/ai_conformance.json" ] \
     && pass "an AI SBOM writes no closing-summary sidecar" || fail "an AI SBOM wrote a summary sidecar"
+
+echo "== upstream purl: firmware components get their source repository purl from a closed table =="
+# Each pair below is a version and the release tag its upstream repository
+# uses; the tag spelling differs per project, and a wrong one names another
+# version.
+UPP="$LIB/upstream-purl.py"
+while IFS='|' read -r up_name up_ver up_want; do
+    [ -n "$up_name" ] || continue
+    up_got=$(python3 "$UPP" --resolve "$up_name" "$up_ver")
+    [ "$up_got" = "$up_want" ] && pass "$up_name $up_ver -> $up_want" \
+        || fail "$up_name $up_ver resolved to '$up_got'" "expected $up_want"
+done <<'PAIRS'
+busybox|1.00|pkg:github/mirror/busybox@1_00
+busybox|1.22.1|pkg:github/mirror/busybox@1_22_1
+busybox|1.36.1-1|pkg:github/mirror/busybox@1_36_1
+curl|8.3.0|pkg:github/curl/curl@curl-8_3_0
+OpenSSL|1.0.2h|pkg:github/openssl/openssl@OpenSSL_1_0_2h
+openssl|1.1.1w|pkg:github/openssl/openssl@OpenSSL_1_1_1w
+OpenSSH|6.2p2|pkg:github/openssh/openssh-portable@V_6_2_P2
+linux|3.10.18|pkg:github/gregkh/linux@v3.10.18
+linux|5.15.167|pkg:github/gregkh/linux@v5.15.167
+linux|5.4.0|pkg:github/gregkh/linux@v5.4
+linux|5.4|pkg:github/gregkh/linux@v5.4
+linux|4.0.0|pkg:github/gregkh/linux@v4.0
+linux|5.10.0-1-7c4e9d2a1b3f5e6d8c0a9b8e7f6d5c4b|pkg:github/gregkh/linux@v5.10
+linux|5.10.10|pkg:github/gregkh/linux@v5.10.10
+zlib|1.2.3|pkg:github/madler/zlib@v1.2.3
+u-boot|2023.04|pkg:github/u-boot/u-boot@v2023.04
+net-snmp|5.7.1|pkg:github/net-snmp/net-snmp@v5.7.1
+ncurses|5.7|pkg:github/mirror/ncurses@v5.7
+net-tools|1.60|pkg:github/ecki/net-tools@v1.60
+libxml2|2.11.4|pkg:github/gnome/libxml2@v2.11.4
+sqlite|3.36.0|pkg:github/sqlite/sqlite@version-3.36.0
+glibc|2.9|pkg:github/bminor/glibc@glibc-2.9
+glibc|2.36.0|pkg:github/bminor/glibc@glibc-2.36
+glibc|2.31.1|pkg:github/bminor/glibc@glibc-2.31.1
+zlib|1.2.0|pkg:github/madler/zlib@v1.2.0
+dropbear|2022.82|pkg:github/mkj/dropbear@DROPBEAR_2022.82
+mbedtls|2.28.9|pkg:github/mbed-tls/mbedtls@v2.28.9
+python|2.7.11|pkg:github/python/cpython@v2.7.11
+boa|0.94.13|pkg:sourceforge/boa@0.94.13
+readline|5.2|pkg:gnu/readline@5.2
+PAIRS
+# Not in the table, or a version form it does not cover: no purl, never a guess.
+for up_case in "musl 1.2.4" "dnsmasq 2.90" "hostapd 2.10" "openssl 3.0.13" "ncurses 6.4-20230520" "openssh 9.8" "hydra 0.1.8"; do
+    up_got=$(python3 "$UPP" --resolve ${up_case})
+    [ -z "$up_got" ] && pass "no purl for $up_case" || fail "$up_case resolved to '$up_got'" "expected nothing"
+done
+
+cp "$FIX/firmware-upstream-purl.json" "$WORK/upp.json"
+python3 "$UPP" "$WORK/upp.json" >/dev/null 2>&1
+upp_purl() { jq -r --arg r "$1" '.components[] | select((.["bom-ref"] // .name) == $r) | .purl // "-"' "$WORK/upp.json"; }
+upp_prop() { jq -r --arg r "$1" --arg p "$2" '[.components[] | select((.["bom-ref"] // .name) == $r) | .properties[]? | select(.name == $p) | .value][0] // "-"' "$WORK/upp.json"; }
+[ "$(upp_purl os:busybox@1.31.1)" = "pkg:github/mirror/busybox@1_31_1" ] && [ "$(upp_prop os:busybox@1.31.1 bomlens:purlSource)" = "upstream-map" ] \
+    && pass "a versioned component with no purl gets the upstream purl, marked upstream-map" \
+    || fail "busybox: $(upp_purl os:busybox@1.31.1) / $(upp_prop os:busybox@1.31.1 bomlens:purlSource)"
+o_row=$(jq -c '[.components[] | select(.name == "openssl" and .version == "1.0.2u")][0] | [.purl, .cpe, ([.properties[]? | select(.name == "bomlens:originalPurl") | .value][0])]' "$WORK/upp.json")
+[ "$o_row" = '["pkg:github/openssl/openssl@OpenSSL_1_0_2u","cpe:2.3:a:openssl:openssl:1.0.2u:*:*:*:*:*:*:*","pkg:generic/openssl@1.0.2u"]' ] \
+    && pass "pkg:generic is replaced; the CPE stays and the old purl is kept in bomlens:originalPurl" \
+    || fail "openssl 1.0.2u row: $o_row"
+[ "$(upp_purl k)" = "pkg:github/gregkh/linux@v5.10" ] \
+    && pass "an opkg kernel package loses its rebuild count and build hash, and a base release gets the vX.Y tag" \
+    || fail "kernel opkg: $(upp_purl k)"
+[ "$(upp_purl d)" = "pkg:github/mkj/dropbear@DROPBEAR_2020.81" ] && [ "$(upp_purl l)" = "pkg:github/gregkh/linux@v4.14.180" ] \
+    && pass "a name the table does not list is matched by its CPE vendor and product (cpe:2.3 and cpe:/ forms)" \
+    || fail "CPE match: dropbear=$(upp_purl d) linux=$(upp_purl l)"
+[ "$(upp_purl z)" = "pkg:npm/zlib@1.0.5" ] && [ "$(upp_purl o3)" = "-" ] && [ "$(upp_purl g)" = "-" ] \
+    && [ "$(upp_purl m)" = "-" ] && [ "$(upp_purl n)" = "-" ] && [ "$(upp_purl f)" = "-" ] \
+    && [ "$(upp_purl km)" = "pkg:generic/3c59x" ] \
+    && pass "an ecosystem purl, an uncovered version, an unlisted name, a name and CPE that disagree, a versionless, an UNKNOWN and a file component are left alone" \
+    || fail "left alone: z=$(upp_purl z) o3=$(upp_purl o3) g=$(upp_purl g) m=$(upp_purl m) n=$(upp_purl n) f=$(upp_purl f) km=$(upp_purl km)"
+[ "$(jq -r '.components[] | select(.name == "curl") | ["bom-ref", .purl] | join(" ")' "$WORK/upp.json" 2>/dev/null)" != "" ] \
+    && [ "$(jq -r '.components[] | select(.name == "curl") | .["bom-ref"]' "$WORK/upp.json")" = "c" ] \
+    && pass "a component keeps its bom-ref when its purl changes" || fail "curl bom-ref changed"
+jq 'del(.components[] | select(.name == "curl") | .["bom-ref"])' "$FIX/firmware-upstream-purl.json" > "$WORK/upp-ref.json"
+python3 "$UPP" "$WORK/upp-ref.json" >/dev/null 2>&1
+[ "$(jq -r '.components[] | select(.name == "curl") | .["bom-ref"]' "$WORK/upp-ref.json")" = "pkg:generic/curl@7.88.1" ] \
+    && pass "a dependency edge that named a component by its old purl still resolves" \
+    || fail "curl without bom-ref: $(jq -c '.components[] | select(.name == "curl")' "$WORK/upp-ref.json")"
+cp "$WORK/upp.json" "$WORK/upp2.json"
+python3 "$UPP" "$WORK/upp2.json" >/dev/null 2>&1
+diff -q "$WORK/upp.json" "$WORK/upp2.json" >/dev/null && pass "upstream-purl.py is idempotent" || fail "a second run changed the SBOM"
+# The table is the only source of identities: no entry for a project this
+# change was not asked to cover.
+up_ids=$(jq -r '[.entries[].id] | join(" ")' "$LIB/upstream-purl-map.json")
+[ "$up_ids" = "busybox curl openssl-1 openssh linux zlib u-boot net-snmp ncurses net-tools libxml2 sqlite glibc dropbear mbedtls python boa readline" ] \
+    && pass "the mapping table holds exactly the checked projects" || fail "mapping table entries: $up_ids"
+
+echo "== component versions: a supplier file fills what the scan could not read =="
+CVP="$LIB/component-versions.py"
+cp "$FIX/firmware-upstream-purl.json" "$WORK/cv.json"
+printf '# versions from the release notes\nname,version\nncurses,5.7\nbusybox,1.18.3\nglibc,2.9\nreadline,\nVendor Utility,\n3c59x,5.10.0\n' > "$WORK/cv.csv"
+python3 "$CVP" "$WORK/cv.json" "$WORK/cvp" "$WORK/cv.csv" > "$WORK/cv.out" 2> "$WORK/cv.err"; cv_rc=$?
+[ "$cv_rc" = 0 ] && pass "a valid file is accepted" || fail "component-versions.py exited $cv_rc" "$(cat "$WORK/cv.err")"
+cv_n=$(jq -c '.components[] | select(.name == "ncurses") | [.version, ([.properties[] | select(.name == "bomlens:evidenceGrade")] | length), ([.properties[] | select(.name == "bomlens:versionSource") | .value][0]), ([.properties[] | select(.name == "bomlens:identifiedBy") | .value][0])]' "$WORK/cv.json")
+[ "$cv_n" = '["5.7",0,"supplier-declared","elf-presence"]' ] \
+    && pass "a presence-only component takes the version, marked supplier-declared, and keeps its evidence" \
+    || fail "ncurses after the file: $cv_n"
+[ "$(jq -r '.components[] | select(.["bom-ref"] == "os:busybox@1.31.1") | .version' "$WORK/cv.json")" = "1.31.1" ] \
+    && grep -q "busybox: the scan read 1.31.1; the file says 1.18.3" "$WORK/cv.err" \
+    && pass "a version read from the delivered files is kept, and the disagreement is reported" \
+    || fail "busybox conflict" "$(cat "$WORK/cv.err")"
+[ "$(jq -c '[.components[] | select(.name == "glibc") | [.version, .properties[0].value, .["bom-ref"]]]' "$WORK/cv.json")" = '[["2.9","supplier-declared","supplier-declared:glibc@2.9"]]' ] \
+    && pass "a name the scan did not find is added as a supplier-declared component" \
+    || fail "glibc: $(jq -c '[.components[] | select(.name == "glibc")]' "$WORK/cv.json")"
+[ "$(jq '[.components[] | select(.name == "readline")] | length' "$WORK/cv.json")" = 0 ] \
+    && pass "a row with an empty version is skipped" || fail "readline was added from an empty row"
+# An empty row is skipped before its name is checked, so a name the format
+# cannot hold does not refuse the file.
+[ "$(jq '[.components[] | select(.name == "Vendor Utility" and .version == null)] | length' "$WORK/cv.json")" = 1 ] \
+    && pass "an empty row with a name the format cannot hold is skipped, not refused" \
+    || fail "Vendor Utility row: rc=$cv_rc" "$(cat "$WORK/cv.err")"
+# UNKNOWN is what normalize removes: here it is a missing version, so the file
+# fills it, and normalize then keeps the value.
+cv_km=$(jq -c '.components[] | select(.name == "3c59x") | [.version, ([.properties[]? | select(.name == "bomlens:versionSource") | .value][0])]' "$WORK/cv.json")
+[ "$cv_km" = '["5.10.0","supplier-declared"]' ] && ! grep -q "3c59x: the scan read" "$WORK/cv.err" \
+    && pass "a placeholder UNKNOWN version is filled from the file, not kept" \
+    || fail "3c59x after the file: $cv_km" "$(cat "$WORK/cv.err")"
+cp "$WORK/cv.json" "$WORK/cv-norm.json"
+bash "$LIB/normalize-sbom.sh" "$WORK/cv-norm.json" >/dev/null 2>&1
+[ "$(jq -r '.components[] | select(.name == "3c59x") | .version' "$WORK/cv-norm.json")" = "5.10.0" ] \
+    && pass "normalize keeps a version filled in place of UNKNOWN" \
+    || fail "3c59x after normalize: $(jq -c '.components[] | select(.name == "3c59x")' "$WORK/cv-norm.json")"
+[ "$(grep -v '^#' "$WORK/cvp_component-versions.template.csv" | tr '\n' ' ')" = "name,version libxml2, " ] \
+    && grep -q "1 component(s) still have no version: libxml2" "$WORK/cv.out" \
+    && grep -q "1 component(s) with no version have a name the --component-versions file cannot hold, so they are not in the template: 'Vendor Utility'" "$WORK/cv.out" \
+    && pass "the components still missing a version are listed and written as a template; a name the format cannot hold is listed apart" \
+    || fail "template: $(cat "$WORK/cvp_component-versions.template.csv" 2>&1)" "$(cat "$WORK/cv.out")"
+python3 "$UPP" "$WORK/cv.json" >/dev/null 2>&1
+[ "$(jq -r '.components[] | select(.name == "ncurses") | .purl' "$WORK/cv.json")" = "pkg:github/mirror/ncurses@v5.7" ] \
+    && [ "$(jq -r '.components[] | select(.name == "glibc") | .purl' "$WORK/cv.json")" = "pkg:github/bminor/glibc@glibc-2.9" ] \
+    && pass "a supplied version then gets its upstream purl" || fail "purl after supplied versions"
+# The template round-trips: fill it and the template goes away.
+printf 'name,version\nlibxml2,2.9.14\n' > "$WORK/cv2.csv"
+python3 "$CVP" "$WORK/cv.json" "$WORK/cvp" "$WORK/cv2.csv" >/dev/null 2>&1
+[ ! -f "$WORK/cvp_component-versions.template.csv" ] && pass "no template is left when every component has a version" \
+    || fail "a template is left with nothing missing"
+# Without a file the scan still lists what is missing.
+cp "$FIX/firmware-upstream-purl.json" "$WORK/cv3.json"
+python3 "$CVP" "$WORK/cv3.json" "$WORK/cv3" >/dev/null 2>&1
+[ "$(grep -v '^#' "$WORK/cv3_component-versions.template.csv" | tr '\n' ' ')" = "name,version 3c59x, libxml2, ncurses, " ] \
+    && diff -q "$FIX/firmware-upstream-purl.json" "$WORK/cv3.json" >/dev/null \
+    && pass "without a file the SBOM is unchanged and the template lists the versionless and UNKNOWN components" \
+    || fail "no-file template: $(cat "$WORK/cv3_component-versions.template.csv" 2>&1)"
+# The template round-trips as written: one row filled, the rest left empty.
+sed 's/^ncurses,$/ncurses,6.1/' "$WORK/cv3_component-versions.template.csv" > "$WORK/cv3-filled.csv"
+python3 "$CVP" "$WORK/cv3.json" "$WORK/cv3" "$WORK/cv3-filled.csv" >/dev/null 2>&1; cv3_rc=$?
+[ "$cv3_rc" = 0 ] && [ "$(jq -r '.components[] | select(.name == "ncurses") | .version' "$WORK/cv3.json")" = "6.1" ] \
+    && pass "a template filled in part is accepted" || fail "partly filled template: rc=$cv3_rc"
+# External input: refused as a whole, SBOM untouched, exit 3.
+cv_refuse() {  # <label> <expected message part> ; file content on stdin
+    cat > "$WORK/bad.csv"
+    cp "$FIX/firmware-upstream-purl.json" "$WORK/cvb.json"
+    python3 "$CVP" "$WORK/cvb.json" "$WORK/cvb" "$WORK/bad.csv" >/dev/null 2> "$WORK/cvb.err"; local rc=$?
+    if [ "$rc" = 3 ] && grep -q -- "$2" "$WORK/cvb.err" && diff -q "$FIX/firmware-upstream-purl.json" "$WORK/cvb.json" >/dev/null; then
+        pass "refused: $1"
+    else
+        fail "not refused as expected: $1 (rc=$rc)" "$(cat "$WORK/cvb.err")"
+    fi
+}
+printf 'name,version\n../../etc/passwd,1.0\n' | cv_refuse "a path in the name" "is not a component name"
+printf 'name,version\nVendor Utility,1.0\n' | cv_refuse "a space in a name given a version" "is not a component name"
+printf 'ncurses,5.7,extra\n' | cv_refuse "a row with three fields" "expected two fields"
+printf 'ncurses,5.7\nncurses,6.0\n' | cv_refuse "one name with two versions" "given two versions"
+printf 'ncurses,$(id)\n' | cv_refuse "a shell expression as the version" "is not a version"
+printf 'ncurses,5.7\000\n' | cv_refuse "a NUL byte" "NUL byte"
+printf 'ncurses,5.\3777\n' | cv_refuse "bytes that are not UTF-8" "not UTF-8"
+head -c 300000 /dev/zero | tr '\0' 'a' | cv_refuse "a file over the size limit" "the limit is"
+
+echo "== conformance: skt-submission names what to fix and which file to submit =="
+# The pipeline's order: normalize (which removes UNKNOWN) before upstream-purl.
+cp "$FIX/firmware-upstream-purl.json" "$WORK/sk.json"
+bash "$LIB/normalize-sbom.sh" "$WORK/sk.json" >/dev/null 2>&1
+python3 "$UPP" "$WORK/sk.json" >/dev/null 2>&1
+jq '.components += [{"type":"library","name":"readline","version":"5.2","purl":"pkg:gnu/readline@5.2"},
+                     {"type":"library","name":"boa","version":"0.94.13","purl":"pkg:sourceforge/boa@0.94.13"}]' \
+    "$WORK/sk.json" > "$WORK/sk2.json"
+CONFORMANCE_PROFILE=skt-submission bash "$LIB/validate-sbom.sh" "$WORK/sk2.json" "$WORK/sk_1.0" "sk" >/dev/null 2>&1
+sk_v=$(jq -c '.checks[] | select(.id == "versions-needed") | [.required, .status, .detail, .missing]' "$WORK/sk_1.0_conformance.json")
+[ "$sk_v" = '[true,"fail","4 without a version",["Vendor Utility","libxml2","ncurses","3c59x"]]' ] \
+    && pass "version needed: a required row listing the components without a version" || fail "versions-needed row: $sk_v"
+sk_u=$(jq -c '.checks[] | select(.id == "upstream-purl") | [.required, .status, .missing]' "$WORK/sk_1.0_conformance.json")
+[ "$sk_u" = '[true,"fail",["busybox@1.35.0","gcc@9.3.0","openssl@3.0.13"]]' ] \
+    && pass "no upstream purl: a required row listing the versioned components still without one" || fail "upstream-purl row: $sk_u"
+jq -e '.checks[] | select(.id == "versions-needed") | .reviewGuide.how | contains("sk_1.0_component-versions.template.csv") and contains("--component-versions")' \
+    "$WORK/sk_1.0_conformance.json" >/dev/null && pass "the version row points at the template and the option" \
+    || fail "versions-needed guidance does not name the template"
+[ "$(jq -r '.checks[] | select(.id == "purl-type") | .status' "$WORK/sk_1.0_conformance.json")" = pass ] \
+    && pass "skt-submission accepts pkg:gnu and pkg:sourceforge" || fail "purl-type under skt-submission: $(jq -c '.checks[] | select(.id == "purl-type")' "$WORK/sk_1.0_conformance.json")"
+[ "$(jq -r '.submitFile' "$WORK/sk_1.0_conformance.json")" = "sk_1.0_bom.json" ] \
+    && grep -qx -- '- Submit `sk_1.0_bom.json` only. The other files in the output folder are for your own review.' "$WORK/sk_1.0_conformance.md" \
+    && grep -q 'submit-file">Submit <code>sk_1.0_bom.json</code> only' "$WORK/sk_1.0_conformance.html" \
+    && pass "the summary says the one file to submit (JSON, Markdown, HTML)" || fail "submit file line missing"
+[ "$(jq -r '.checks[] | select(.id == "versions-needed") | "\(.label_ko)|\(.detail_ko)"' "$WORK/sk_1.0_conformance.json")" = "모든 구성요소의 버전 (버전 보충 필요)|버전 없음 4개" ] \
+    && pass "the two rows carry Korean wording" || fail "ko: $(jq -c '.checks[] | select(.id == "versions-needed") | [.label_ko, .detail_ko]' "$WORK/sk_1.0_conformance.json")"
+REPORT_LANG=ko CONFORMANCE_PROFILE=skt-submission bash "$LIB/validate-sbom.sh" "$WORK/sk2.json" "$WORK/skk" "sk" >/dev/null 2>&1
+grep -q '제출할 파일은 `skk_bom.json` 하나입니다' "$WORK/skk_conformance.md" && pass "the Korean report says the file to submit" \
+    || fail "ko submit line" "$(head -8 "$WORK/skk_conformance.md")"
+MODE=ANALYZE CONFORMANCE_PROFILE=skt-submission bash "$LIB/validate-sbom.sh" "$WORK/sk2.json" "$WORK/ska" "sk" >/dev/null 2>&1
+jq -e 'has("submitFile") | not' "$WORK/ska_conformance.json" >/dev/null && ! grep -q '^- Submit' "$WORK/ska_conformance.md" \
+    && pass "a submitted SBOM under review gets no submit line" || fail "ANALYZE carries a submit line"
+# Under --analyze no template is written and --component-versions is not
+# offered: the rows stay, worded as what to ask the supplier for.
+jq -e '[.checks[] | select(.id == "versions-needed" or .id == "upstream-purl")] as $r
+       | ($r | length) == 2 and all($r[]; .status == "fail" and (.reviewGuide.how | contains("Ask the supplier"))
+                                     and (.reviewGuide.how | contains("template.csv") | not)
+                                     and (.reviewGuide.how_ko | contains("공급사에"))
+                                     and (.reviewGuide.how | contains("upstream purl table") | not))' \
+    "$WORK/ska_conformance.json" >/dev/null && grep -q 'Ask the supplier for the version shipped' "$WORK/ska_conformance.md" \
+    && ! grep -q 'ska_component-versions.template.csv' "$WORK/ska_conformance.md" \
+    && pass "under --analyze the two rows ask the supplier, with no template file" \
+    || fail "ANALYZE submission rows: $(jq -c '[.checks[] | select(.id == "versions-needed" or .id == "upstream-purl") | .reviewGuide]' "$WORK/ska_conformance.json")"
+bash "$LIB/validate-sbom.sh" "$WORK/sk2.json" "$WORK/skd" "sk" >/dev/null 2>&1
+jq -e '([.checks[] | select(.id == "versions-needed" or .id == "upstream-purl")] | length == 0)
+       and (.checks[] | select(.id == "purl-type") | .status == "warn") and (has("submitFile") | not)' "$WORK/skd_conformance.json" >/dev/null \
+    && pass "the default profile is unchanged: no extra rows, pkg:gnu still an undefined type" \
+    || fail "default profile changed: $(jq -c '[.checks[] | select(.id == "purl-type" or .id == "versions-needed")]' "$WORK/skd_conformance.json")"
 
 echo ""
 echo "Results: ${PASS} passed, ${FAIL} failed"

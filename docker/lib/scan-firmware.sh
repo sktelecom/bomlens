@@ -7,18 +7,15 @@
 #
 # Usage: scan-firmware.sh <firmware_file> <output_sbom.json> <version> [out_prefix]
 #   produces <output_sbom.json> (CycloneDX, components from package DB + binaries)
-#   and, when out_prefix is given and cve-bin-tool can match CVEs online:
-#            <out_prefix>_security_cvebintool.json
-#              (Trivy-shaped CVE rows that scan-security.sh merges into _security.json)
+#   and, when out_prefix is given, <out_prefix>_files.json / _source.json.
+#   The CPE -> CVE match runs later, from entrypoint.sh (match-cpe-index.sh).
 #
 # Pipeline:
 #   ① unpack   : unblob (preferred) -> unsquashfs / 7z / binwalk (fallback)
 #   ② packages : syft dir:<rootfs>            -> package-manager components
-#   ③ binaries : cve-bin-tool                 -> stripped static binaries (Phase 2)
-#                + ONLINE CVE matching (NVD/vuln DB) on those binaries (Plan 2):
-#                cve-bin-tool matches CVEs by version signature, not by purl/CPE,
-#                so it finds CVEs on firmware binaries that have neither (the
-#                common-pipeline Trivy needs purl/CPE and otherwise reports 0).
+#   ③ binaries : cve-bin-tool                 -> stripped static binaries (Phase 2),
+#                identified by signature and given a CPE. Trivy never reads a
+#                CPE, so their CVEs come from match-cpe-index.sh.
 #   ④ merge    : jq, dedupe by purl (fallback name@version)
 #
 # Tools live ONLY in the opt-in `bomlens-firmware` image. Everything here is
@@ -533,26 +530,19 @@ if [ "${FW_EXTRA_ROOTS:-true}" != "false" ]; then
 fi
 
 BIN_SBOM="$WORK/bin.cdx.json"
-CVE_JSON="$WORK/cve-bin-tool.json"
 echo '{"components":[]}' > "$BIN_SBOM"
-echo '[]' > "$CVE_JSON"
 
 # Plan 2 — CVE matching. cve-bin-tool is used ONLY to IDENTIFY binaries (its
 # signature checkers), emitting a CycloneDX SBOM whose components carry a CPE. It
-# does NOT match CVEs here: CPE->CVE matching is done by firmware-cpe-match.py
+# does NOT match CVEs: match-cpe-index.sh does that later, from entrypoint.sh,
 # against the bundled NVD CPE index (cpe_match.sqlite, distilled at image-build
-# time by build-cpe-index.py from the NVD data feeds). This removes the ~1.5 GB
-# cve.db and the throttled NVD api2 fetch while keeping offline/air-gap matching.
-# CVE_BIN_TOOL_MODE: auto (default; identify + match) | components-only (identify,
-# no CVE matching).
-CVE_BIN_TOOL_MODE="${CVE_BIN_TOOL_MODE:-auto}"
+# time by build-cpe-index.py from the NVD data feeds). CVE_BIN_TOOL_MODE=
+# components-only turns that match off; identification runs either way.
 # cve-bin-tool 3.x hard-codes its DB cache to $HOME/.cache/cve-bin-tool/cve.db and
 # refuses to run on an empty cache (EmptyCache). The image bundles a tiny STUB DB
 # there purely to satisfy that check; identification never reads CVE data from it.
 CVE_BIN_TOOL_HOME="${CVE_BIN_TOOL_HOME:-/opt/cve-bin-tool-home}"
 BUNDLED_DB="$CVE_BIN_TOOL_HOME/.cache/cve-bin-tool/cve.db"
-# Distilled CPE->CVE applicability index (built by docker/build-cpe-index.py).
-FW_CPE_INDEX="${FW_CPE_INDEX:-$CVE_BIN_TOOL_HOME/cpe_match.sqlite}"
 # GAD/OSV are cve-bin-tool data sources; disabling them keeps identification from
 # reaching out. Override with CVE_BIN_TOOL_DISABLE_SOURCES.
 CVE_BIN_TOOL_DISABLE_SOURCES="${CVE_BIN_TOOL_DISABLE_SOURCES:-GAD,OSV}"
@@ -583,13 +573,6 @@ if command -v cve-bin-tool >/dev/null 2>&1; then
     if [ ! -s "$BIN_SBOM" ] || ! jq empty "$BIN_SBOM" >/dev/null 2>&1; then
         echo "[firmware] WARN: cve-bin-tool produced no usable SBOM; continuing without binary components." >&2
         echo '{"components":[]}' > "$BIN_SBOM"
-    fi
-
-    # CPE -> CVE matching runs over the merged component set, in step ④.6 below.
-    if [ "$CVE_BIN_TOOL_MODE" = "components-only" ]; then
-        echo "[firmware] CVE_BIN_TOOL_MODE=components-only: skipping CVE matching."
-    elif [ ! -f "$FW_CPE_INDEX" ]; then
-        echo "[firmware] WARN: no CPE index at $FW_CPE_INDEX; emitting component-only (no CVEs)." >&2
     fi
 else
     echo "[firmware] cve-bin-tool not installed; skipping binary identification (Phase 2)."
@@ -870,42 +853,10 @@ jq -n --slurpfile a "$WORK/pkg-comps.json" --slurpfile b "$WORK/bin-comps.json" 
 ' > "$WORK/merged.json"
 
 # --------------------------------------------------------
-# ④.6 CPE -> CVE matching against the bundled NVD index.
-#
-# Every pass that names a component can attach a CPE — the signature checkers do,
-# and enrich-cpe.sh fills more from its curated table — and a CPE is all this index
-# needs, so the whole merged set is offered to it.
-#
-# The rows land in $CVE_JSON, which step ⑤ reshapes into the sidecar that
-# scan-security.sh merges; the downstream contract is unchanged. A component with
-# no usable version is skipped by the matcher itself.
-if [ "$CVE_BIN_TOOL_MODE" != "components-only" ] && [ -f "$FW_CPE_INDEX" ] \
-   && command -v python3 >/dev/null 2>&1; then
-    # Components the purl path cannot serve: those with no purl, and those with a
-    # `pkg:generic` one, which names no ecosystem. Those are what this index is for.
-    #
-    # A component with a real purl is left to the purl path, which keys on the
-    # ecosystem. A CPE for a language package is derived from its name, and two
-    # projects that share a name do not share a version line.
-    #
-    # A purl synthesized from a container layer's os-release is the exception, and
-    # stays offered here. It was written to reach the distribution advisories,
-    # which is a different question from what this index answers, and the two
-    # disagree: measured on one switch OS, giving `snmp` and `pkgconf` a purl and
-    # taking them out of this pass cost four CVEs that nothing else reported.
-    # Whatever both find is deduplicated on (component, CVE) where the results
-    # meet, so offering a component to both costs nothing.
-    jq -n --slurpfile c "$WORK/merged.json" '{components: [
-        $c[0][] | select(((.purl // "") == "")
-                         or ((.purl // "") | startswith("pkg:generic"))
-                         or (any(.properties[]?; .name == "bomlens:purlSource")))
-    ]}' > "$WORK/cpe-in.json"
-    python3 "$(dirname "$0")/firmware-cpe-match.py" "$WORK/cpe-in.json" "$FW_CPE_INDEX" \
-        > "$CVE_JSON" 2>/dev/null || echo '[]' > "$CVE_JSON"
-fi
-if [ ! -s "$CVE_JSON" ] || ! jq empty "$CVE_JSON" >/dev/null 2>&1; then
-    echo '[]' > "$CVE_JSON"
-fi
+# ④.6 CPE -> CVE matching is not done here. entrypoint.sh runs
+# match-cpe-index.sh over the final SBOM after enrich-cpe.sh and the other CPE
+# enrichment steps, so a CPE added from cpe-name-map.json is matched as well as
+# one a signature checker attached.
 
 NPKG=$(jq 'length' "$WORK/pkg-comps.json")
 NBIN=$(jq 'length' "$WORK/bin-comps.json")
@@ -1054,45 +1005,5 @@ if [ "${NTOTAL:-0}" -eq 0 ]; then
     else
         echo "[firmware]       ${NFILES} file(s) were unpacked, but they carry no package database" >&2
         echo "[firmware]       and no binary matched a known version signature." >&2
-    fi
-fi
-
-# --------------------------------------------------------
-# ⑤ Plan 2 — emit cve-bin-tool CVEs as a Trivy-shaped sidecar.
-# cve-bin-tool's JSON is a flat list of rows: { product, version, cve_number,
-# severity, score, cvss_version, cvss_vector, source, ... }. We reshape it into
-# the exact contract the web layer (server.py security_summary) and our report
-# renderer read: { "Results": [ { "Target", "Vulnerabilities": [ {
-# VulnerabilityID, PkgName, InstalledVersion, Severity, CVSS, PrimaryURL } ] } ] }.
-# scan-security.sh merges this sidecar into _security.json AFTER Trivy runs, so
-# the contract is never broken and both engines' findings appear in one report.
-# Written only when out_prefix is provided and there is at least one CVE row.
-# --------------------------------------------------------
-if [ -n "$OUT_PREFIX" ]; then
-    NCVE=$(jq 'if type=="array" then length else 0 end' "$CVE_JSON" 2>/dev/null || echo 0)
-    if [ "${NCVE:-0}" -gt 0 ]; then
-        SIDE="${OUT_PREFIX}_security_cvebintool.json"
-        # NVD severity is upper-case already; default UNKNOWN. score -> CVSS V3.
-        # PrimaryURL points at NVD for the CVE id. Dedupe identical (cve,pkg,ver).
-        jq '
-          [ .[]? | select((.cve_number // "") | test("^CVE-")) | {
-              VulnerabilityID: .cve_number,
-              PkgName: (.product // ""),
-              InstalledVersion: (.version // ""),
-              Severity: ((.severity // "UNKNOWN") | ascii_upcase),
-              PrimaryURL: ("https://nvd.nist.gov/vuln/detail/" + .cve_number),
-              CVSS: ( (.score // null) as $s
-                      | if ($s != null and ($s|tostring|test("^[0-9.]+$")) and (($s|tonumber) > 0))
-                        then { "cve-bin-tool": { ("V" + ((.cvss_version // "3")|tostring) + "Score"): ($s|tonumber) } }
-                        else {} end ),
-              source: "cve-bin-tool"
-            } ]
-          | unique_by([.VulnerabilityID, .PkgName, .InstalledVersion])
-          | { Results: [ { Target: "firmware (cve-bin-tool)", Class: "firmware", Vulnerabilities: . } ] }
-        ' "$CVE_JSON" > "$SIDE" 2>/dev/null || echo '{"Results":[]}' > "$SIDE"
-        NSIDE=$(jq '[.Results[].Vulnerabilities[]?] | length' "$SIDE" 2>/dev/null || echo 0)
-        echo "[firmware] cve-bin-tool found ${NSIDE} CVE(s) -> $SIDE (merged into the security report)."
-    else
-        echo "[firmware] cve-bin-tool reported no CVEs (or CVE matching was skipped)."
     fi
 fi

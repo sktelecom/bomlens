@@ -1,0 +1,19 @@
+{
+  "id": "365a051f12e05767b598e643676f14a450fb678a75ccf2beb0052c95d5c73b83",
+  "name": "busybox",
+  "version": "sha256:365a051f12e05767b598e643676f14a450fb678a75ccf2beb0052c95d5c73b83",
+  "type": "image",
+  "metadata": {
+    "userInput": "busybox:latest",
+    "imageID": "sha256:d2482869a6b838d3b4c9cad0c8085c06277909482771eb525d298fc3a7d07927",
+    "manifestDigest": "sha256:365a051f12e05767b598e643676f14a450fb678a75ccf2beb0052c95d5c73b83",
+    "mediaType": "application/vnd.oci.image.manifest.v1+json",
+    "tags": [],
+    "imageSize": 4170758,
+    "repoDigests": [
+      "index.docker.io/library/busybox@sha256:fd7dc98638c8e305f4dc34e979f1c0fdfdcaeb0fbf8fcff77ae834b6da3d7e6e"
+    ],
+    "architecture": "arm64",
+    "os": "linux"
+  }
+}

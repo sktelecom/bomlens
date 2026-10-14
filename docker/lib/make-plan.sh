@@ -31,6 +31,8 @@ LIBDIR="$(cd "$(dirname "$0")" && pwd)"
 . "$LIBDIR/source-detect.sh"
 # shellcheck source=docker/lib/cdx-version.sh
 . "$LIBDIR/cdx-version.sh"
+# shellcheck source=docker/lib/input-fingerprint.sh
+. "$LIBDIR/input-fingerprint.sh"
 
 # The plan follows the same engine contract as the result manifest: one
 # version, kept in engine-result.sh (ENGINE_CONTRACT_VERSION).
@@ -72,17 +74,22 @@ case "$lang" in
         ;;
     *)
         image="$(img_for_lang "$lang")"
-        # Digests are recorded by the published name; a mirror serves the
-        # same image under its own prefix.
-        _canon="${image%:*}"; _canon="ghcr.io/cdxgen/${_canon#"$CDXGEN_IMAGE_PREFIX"}"
-        digest="$(jq -r --arg i "$_canon" --arg t "${image##*:}" \
-            'if .tag == $t then (.digests[$i] // "") else "" end' "$LIBDIR/cdxgen-images.json" 2>/dev/null || true)"
+        digest="$(cdxgen_pinned_digest "$image" "$LIBDIR")"
         if [ -z "$digest" ]; then
             status="unsupported"; reason="no-pinned-digest"
             detail="no digest recorded for $image in cdxgen-images.json"
         fi
         ;;
 esac
+
+# What stage 1 reads (input-fingerprint.sh): a caller that kept the SBOM of an
+# earlier stage 1 with the same sha256 may use it again instead of running
+# stage 1. The build-prep options are read from this environment, so the
+# caller gives PLAN the same ones it gives the stages; stage 2 gets them too
+# (env_passthrough), to compute the same value for the result manifest.
+fingerprint="$(input_fingerprint_plan "$SRC" "$lang" "$digest" "$([ "$status" = "ok" ] && echo false || echo true)" \
+    "$fetch" "$gotoolchain" "$CDX_SPEC_VERSION" "$OUTDIR/bomlens-plan")" || fingerprint=""
+[ -n "$fingerprint" ] || fingerprint="$INPUT_FINGERPRINT_UNAVAILABLE"
 
 jq -n \
     --arg cv "$PLAN_CONTRACT_VERSION" --arg ev "${BOMLENS_VERSION:-}" \
@@ -93,7 +100,9 @@ jq -n \
     --arg outfile "$OUTFILE" --arg spec "$CDX_SPEC_VERSION" \
     --arg fetch "$fetch" --arg gotc "$gotoolchain" \
     --arg pname "${PROJECT_NAME:-}" --arg pver "${PROJECT_VERSION:-}" \
-    --arg prepenv "$BUILD_PREP_ENV_NAMES $PROXY_ENV_NAMES" --arg netenv "$STAGE2_NETWORK_ENV_NAMES" '
+    --arg prepenv "$BUILD_PREP_ENV_NAMES $PROXY_ENV_NAMES" --arg netenv "$STAGE2_NETWORK_ENV_NAMES" \
+    --arg prep2 "$BUILD_PREP_ENV_NAMES" \
+    --argjson fp "$fingerprint" '
     def nn: if . == "" then null else . end;
     {
       contract: {name: "bomlens-engine-plan", version: $cv},
@@ -103,6 +112,7 @@ jq -n \
       reason: ($reason | nn),
       detail: ($detail | nn),
       output_file: $outfile,
+      input_fingerprint: $fp,
       stages: (if $status != "ok" then [] else [
         {
           id: "generate",
@@ -122,6 +132,7 @@ jq -n \
             {role: "cache-maven", target: "/root/.m2", mode: "rw", optional: true},
             {role: "cache-gradle", target: "/root/.gradle", mode: "rw", optional: true}
           ],
+          input_fingerprint: $fp,
           on_kill: "If stage 1 is killed before it finishes, it cannot put the source back. With the guard-state mount and BOMLENS_GUARD_ID, run the same image and arguments again with BOMLENS_GUARD_RESTORE_ONLY=1 to restore it",
           env: ({
             HOME: "/tmp/sbomhome",
@@ -161,11 +172,13 @@ jq -n \
             PROJECT_VERSION: $pver,
             UPLOAD_ENABLED: "false"
           },
-          env_passthrough: (["HOST_UID", "HOST_GID", "BOMLENS_INCLUDE_NON_SHIPPED", "SRC_TREE_EXCLUDE"] + ($netenv | split(" ") | map(select(. != "")))),
+          env_passthrough: (["HOST_UID", "HOST_GID", "SRC_TREE_EXCLUDE"] + ($prep2 | split(" ") | map(select(. != "")))
+                            + ($netenv | split(" ") | map(select(. != "")))),
           env_from_stage1: {
             BOMLENS_STAGE1_EXIT: "the stage 1 exit code",
             BOMLENS_STAGE1_OOM: "true when the stage 1 container was killed for memory",
-            BOMLENS_STAGE1_LOG: "bomlens-stage1.log (stage 1 output, saved in the output folder)"
+            BOMLENS_STAGE1_LOG: "bomlens-stage1.log (stage 1 output, saved in the output folder)",
+            BOMLENS_STAGE1_REUSED: "1 when stage 1 did not run and the SBOM, exit code and log of an earlier stage 1 with the same input_fingerprint.sha256 were used"
           },
           network: {required: false, purpose: "the Trivy database download when no trivy-db mount holds one, and options that look things up online (--license-registry, --resolve-purl, EPSS/KEV, staleness)"}
         }

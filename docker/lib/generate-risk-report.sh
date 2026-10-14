@@ -68,6 +68,18 @@ if [ -f "$SEC" ] && jq empty "$SEC" >/dev/null 2>&1; then
     ' "$SEC" 2>/dev/null || echo '[]')
 fi
 sev_count() { echo "$FINDINGS" | jq "[.[] | select(.severity==\"$1\")] | length"; }
+
+# Components no vulnerability check could reach (scan-security.sh writes them to
+# _security.json as UncheckedComponents): no version, or no package purl and no
+# CPE that was matched. A clean table must not read as covering them.
+UNCHECKED_N=0; UNCHECKED_TOP='[]'; UNCHECKED_LIST_MAX=20
+if [ -f "$SEC" ] && jq empty "$SEC" >/dev/null 2>&1; then
+    UNCHECKED_N=$(jq '.UncheckedComponents.Count // 0 | if type == "number" then . else 0 end' "$SEC" 2>/dev/null || echo 0)
+    UNCHECKED_TOP=$(jq -c --argjson max "$UNCHECKED_LIST_MAX" \
+        '[(.UncheckedComponents.Components // [])[0:$max][]
+          | {name: (.Name // "" | tostring), version: (.Version // "" | tostring), reason: (.Reason // "" | tostring)}]' \
+        "$SEC" 2>/dev/null || echo '[]')
+fi
 C=$(sev_count CRITICAL); H=$(sev_count HIGH); M=$(sev_count MEDIUM); L=$(sev_count LOW); U=$(sev_count UNKNOWN)
 TOTAL=$(echo "$FINDINGS" | jq 'length')
 
@@ -288,6 +300,12 @@ if [ "$REPORT_LANG" = "ko" ]; then
     P_VULN_NONE_MD=$(kstr risk.vuln_none_md); P_VULN_NONE_HTML=$(kstr risk.vuln_none_html)
     P_PRESENCE_MD=$(tfmt risk.presence_only_md "$PRESENCE_ONLY" "$PRESENCE_ONLY")
     P_PRESENCE_HTML=$(tfmt risk.presence_only_html "$PRESENCE_ONLY" "$PRESENCE_ONLY")
+    P_UNCHECKED_MD=$(tfmt risk.unchecked_md "$UNCHECKED_N")
+    P_UNCHECKED_HTML=$(tfmt risk.unchecked_html "$UNCHECKED_N")
+    P_UNCHECKED_MORE=$(tfmt risk.unchecked_more "$((UNCHECKED_N - UNCHECKED_LIST_MAX))")
+    P_REASON_NO_VERSION=$(kstr risk.unchecked_no_version)
+    P_REASON_NO_ID=$(kstr risk.unchecked_no_identifier)
+    P_VULN_NONE_CHECKED_MD=$(kstr risk.vuln_none_checked_md); P_VULN_NONE_CHECKED_HTML=$(kstr risk.vuln_none_checked_html)
     P_FW_SCOPE_H=$(kstr risk.fw_scope_h)
     P_FW_LABEL=$(kstr risk.fw_scope_label)
     P_FW_UNKNOWN=$(tfmt risk.fw_scope_unknown "$FW_UNKNOWN_PCT" "$FW_UNKNOWN_BYTES")
@@ -354,6 +372,13 @@ else
     P_VULN_NONE_HTML="No known vulnerabilities, or no security artifact was produced."
     P_PRESENCE_MD="> ${PRESENCE_ONLY} component(s) were proved present but no version could be recovered. With no version there is nothing to ask a vulnerability database about, so the counts above do not cover them. The licence obligations still apply."
     P_PRESENCE_HTML="<b>${PRESENCE_ONLY} component(s)</b> were proved present but no version could be recovered. With no version there is nothing to ask a vulnerability database about, so the counts above do not cover them. The licence obligations still apply."
+    P_UNCHECKED_MD="> ${UNCHECKED_N} component(s) could not be checked: they have no version, or no package purl and no CPE that was matched, so no vulnerability database was asked about them. The counts above do not cover them."
+    P_UNCHECKED_HTML="<b>${UNCHECKED_N} component(s) could not be checked</b>: they have no version, or no package purl and no CPE that was matched, so no vulnerability database was asked about them. The counts above do not cover them."
+    P_UNCHECKED_MORE="… and $((UNCHECKED_N - UNCHECKED_LIST_MAX)) more (the security report lists them all)"
+    P_REASON_NO_VERSION="no version"
+    P_REASON_NO_ID="no package purl or matched CPE"
+    P_VULN_NONE_CHECKED_MD="_No vulnerability was found in the components that were checked. The components that could not be checked are listed above._"
+    P_VULN_NONE_CHECKED_HTML="No vulnerability was found in the components that were checked. The components that could not be checked are listed above."
     P_FW_SCOPE_H="Firmware analysis scope"
     P_FW_LABEL="Analysis scope:"
     P_FW_UNKNOWN="${FW_UNKNOWN_PCT}% of the image (${FW_UNKNOWN_BYTES} bytes) was not recognized as a known format."
@@ -445,7 +470,18 @@ P_VULN_NOTE_HTML="<div class=\"note\">${P_DL_LEAD}<b>${P_DL_BOLD_CRIT}</b>, <b>$
     echo "|---:|---:|---:|---:|---:|---:|"
     echo "| ${C} | ${H} | ${M} | ${L} | ${U} | ${TOTAL} |"
     echo ""
-    if [ "${PRESENCE_ONLY:-0}" -gt 0 ]; then
+    if [ "${UNCHECKED_N:-0}" -gt 0 ]; then
+        # The list names the presence-only components too (no version), so
+        # their separate note is not repeated.
+        echo "${P_UNCHECKED_MD}"
+        echo ""
+        # shellcheck disable=SC2016
+        echo "$UNCHECKED_TOP" | jq -r --arg nv "$P_REASON_NO_VERSION" --arg ni "$P_REASON_NO_ID" '.[] |
+            "- `" + (.name | gsub("`"; "")) + "`" + (if .version != "" then " " + .version else "" end)
+            + " (" + (if .reason == "no-version" then $nv elif .reason == "no-identifier" then $ni else .reason end) + ")"'
+        if [ "$UNCHECKED_N" -gt "$UNCHECKED_LIST_MAX" ]; then echo "- ${P_UNCHECKED_MORE}"; fi
+        echo ""
+    elif [ "${PRESENCE_ONLY:-0}" -gt 0 ]; then
         echo "${P_PRESENCE_MD}"
         echo ""
     fi
@@ -465,6 +501,8 @@ P_VULN_NOTE_HTML="<div class=\"note\">${P_DL_LEAD}<b>${P_DL_BOLD_CRIT}</b>, <b>$
             "| \(.severity) | \(.id) | \(.pkg) | \(.version) | \(.fixed) | \(
               if .severity=="CRITICAL" then $cd elif .severity=="HIGH" then $hd else $pol end
             ) |"'
+    elif [ "${UNCHECKED_N:-0}" -gt 0 ]; then
+        echo "${P_VULN_NONE_CHECKED_MD}"
     else
         echo "${P_VULN_NONE_MD}"
     fi
@@ -657,7 +695,15 @@ ${P_VULN_NOTE_HTML}
 </div>
 HTMLSEC
 
-    if [ "${PRESENCE_ONLY:-0}" -gt 0 ]; then
+    if [ "${UNCHECKED_N:-0}" -gt 0 ]; then
+        echo "<div class=\"note\">${P_UNCHECKED_HTML}<ul>"
+        # shellcheck disable=SC2016
+        echo "$UNCHECKED_TOP" | jq -r --arg nv "$P_REASON_NO_VERSION" --arg ni "$P_REASON_NO_ID" '.[] |
+            "<li><code>" + (.name | @html) + "</code>" + (if .version != "" then " " + (.version | @html) else "" end)
+            + " (" + ((if .reason == "no-version" then $nv elif .reason == "no-identifier" then $ni else .reason end) | @html) + ")</li>"'
+        if [ "$UNCHECKED_N" -gt "$UNCHECKED_LIST_MAX" ]; then echo "<li>$(esc "$P_UNCHECKED_MORE")</li>"; fi
+        echo "</ul></div>"
+    elif [ "${PRESENCE_ONLY:-0}" -gt 0 ]; then
         echo "<div class=\"note\">${P_PRESENCE_HTML}</div>"
     fi
     if [ "$FW_SCOPE" = "true" ]; then
@@ -676,6 +722,8 @@ HTMLSEC
             "<td>" + (.version|@html) + "</td><td>" + (.fixed|@html) + "</td>" +
             "<td>" + ((if .severity=="CRITICAL" then $cd elif .severity=="HIGH" then $hd else $pol end)|@html) + "</td></tr>"'
         echo "</table></div>"
+    elif [ "${UNCHECKED_N:-0}" -gt 0 ]; then
+        echo "<p>${P_VULN_NONE_CHECKED_HTML}</p>"
     else
         echo "<p>${P_VULN_NONE_HTML}</p>"
     fi

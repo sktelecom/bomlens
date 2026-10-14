@@ -420,9 +420,9 @@ rc = server.run_sibling_scan(
 )
 assert rc == -1 and "args" not in captured, (rc, captured)
 
-# Opt-in OSV (includeOsv): the firmware path sets the two control env vars and
-# they are forwarded to the sibling as exactly two fixed -e literals. AIBOM and
-# the default (off) firmware path must NOT carry them.
+# The retired firmware OSV option: the cve-bin-tool control vars are never
+# forwarded to a sibling, on the firmware path or any other, even if present
+# in extra_env.
 captured.clear()
 rc = server.run_sibling_scan(
     "ghcr.io/sktelecom/bomlens-firmware:1.5.0", "FIRMWARE", run_out,
@@ -430,19 +430,8 @@ rc = server.run_sibling_scan(
     extra_env={"CVE_BIN_TOOL_DISABLE_SOURCES": "GAD", "CVE_BIN_TOOL_MODE": "online"},
 )
 assert rc == 0, rc
-assert "CVE_BIN_TOOL_DISABLE_SOURCES=GAD" in captured["args"], captured["args"]
-assert "CVE_BIN_TOOL_MODE=online" in captured["args"], captured["args"]
-
-# Default firmware (no opt-in) forwards neither var -> offline-bundle default.
-captured.clear()
-rc = server.run_sibling_scan(
-    "ghcr.io/sktelecom/bomlens-firmware:1.5.0", "FIRMWARE", run_out,
-    lambda ln: None, upload_file=up_file,
-)
-assert rc == 0, rc
 assert not any(a.startswith("CVE_BIN_TOOL_") for a in captured["args"]), captured["args"]
 
-# AIBOM never carries the OSV control vars even if present in extra_env.
 captured.clear()
 rc = server.run_sibling_scan(
     "ghcr.io/sktelecom/bomlens-aibom:1.5.0", "AIBOM", run_out,
@@ -743,29 +732,17 @@ rc = server.run_sibling_scan(
 )
 assert rc == -1 and "args" not in captured, (rc, captured)
 
-# Firmware CVE-DB progress markers become a `progress` channel call (clamped
-# 0..100); everything else stays a plain log line. A missing progress handler
-# falls back to log so older callers keep working.
-logs = []; progs = []
-server._emit_or_log("[firmware-cvedb-progress] 42%", logs.append, progs.append)
-server._emit_or_log("[firmware-cvedb-progress] 250%", logs.append, progs.append)
-server._emit_or_log("regular build line", logs.append, progs.append)
-server._emit_or_log("[firmware-cvedb-progress] 10%", logs.append, None)
-assert progs == [42, 100], progs
-assert logs == ["regular build line", "[firmware-cvedb-progress] 10%"], logs
-
-# Deep-cve NVD-verification progress markers get their own channel
-# (on_deepcve_progress), separate from the firmware CVE-DB one above — a
-# missing on_deepcve_progress falls back to log the same way.
-logs = []; progs = []; deep_progs = []
-server._emit_or_log("[deep-cve-progress] 7%", logs.append, progs.append, deep_progs.append)
-server._emit_or_log("[deep-cve-progress] 150%", logs.append, progs.append, deep_progs.append)
-server._emit_or_log("[firmware-cvedb-progress] 5%", logs.append, progs.append, deep_progs.append)
-server._emit_or_log("regular build line", logs.append, progs.append, deep_progs.append)
-server._emit_or_log("[deep-cve-progress] 20%", logs.append, progs.append, None)
+# Deep-cve NVD-verification progress markers become an on_deepcve_progress
+# call (clamped 0..100); a missing handler falls back to log. The retired
+# firmware CVE-DB marker is no longer parsed and stays a plain log line.
+logs = []; deep_progs = []
+server._emit_or_log("[deep-cve-progress] 7%", logs.append, deep_progs.append)
+server._emit_or_log("[deep-cve-progress] 150%", logs.append, deep_progs.append)
+server._emit_or_log("[firmware-cvedb-progress] 5%", logs.append, deep_progs.append)
+server._emit_or_log("regular build line", logs.append, deep_progs.append)
+server._emit_or_log("[deep-cve-progress] 20%", logs.append, None)
 assert deep_progs == [7, 100], deep_progs
-assert progs == [5], progs
-assert logs == ["regular build line", "[deep-cve-progress] 20%"], logs
+assert logs == ["[firmware-cvedb-progress] 5%", "regular build line", "[deep-cve-progress] 20%"], logs
 PY
 then
     pass "sibling dispatch allowlists image/mode/model-id and sanitizes env (no flag/shell injection)"
@@ -1977,6 +1954,76 @@ else
 fi
 rm -f "$OUT"/serr_1.0_* "$OUT"/sok_1.0_*
 
+echo "== uncheckedComponents exposure (security_summary) =="
+# scan-security.sh records components no vulnerability check could reach as
+# UncheckedComponents. A report with zero findings but unchecked components
+# must carry them so the UI never calls it clean; both keys are omitted when
+# the block is absent, empty or malformed.
+cat > "$OUT/unchk_1.0_security.json" <<'JSON'
+{"Results":[],"UncheckedComponents":{"Count":3,"Components":[
+ {"Name":"busybox","Version":"","PURL":"","Reason":"no-version"},
+ {"Name":"libvendor","Version":"2.1","PURL":"pkg:generic/libvendor@2.1","Reason":"no-identifier"},
+ {"Name":"","Version":"1","Reason":"no-version"},
+ "junk"]}}
+JSON
+cat > "$OUT/unchk0_1.0_security.json" <<'JSON'
+{"Results":[],"UncheckedComponents":{"Count":0,"Components":[]}}
+JSON
+cat > "$OUT/unchkbad_1.0_security.json" <<'JSON'
+{"Results":[],"UncheckedComponents":"oops"}
+JSON
+cat > "$OUT/unchknone_1.0_security.json" <<'JSON'
+{"Results":[]}
+JSON
+cat > "$OUT/unchkcap_1.0_security.json" <<'JSON'
+{"Results":[],"UncheckedComponents":{"Count":1,"Components":[]}}
+JSON
+if SBOM_OUTPUT_DIR="$OUT" python3 - "$ROOT_DIR" <<'PY'
+import sys, os, json
+sys.path.insert(0, os.path.join(sys.argv[1], "docker", "web"))
+import server
+# A long list is capped at MAX_UNCHECKED_ROWS but the count is kept.
+n = server.MAX_UNCHECKED_ROWS + 5
+big = {"Results": [], "UncheckedComponents": {"Count": n, "Components": [
+    {"Name": "c%d" % i, "Version": "", "PURL": "", "Reason": "no-version"} for i in range(n)]}}
+with open(os.path.join(os.environ["SBOM_OUTPUT_DIR"], "unchkbig_1.0_security.json"), "w") as f:
+    json.dump(big, f)
+s = server.security_summary("unchk_1.0")
+assert s["TOTAL"] == 0, s
+assert s["uncheckedCount"] == 3, s
+rows = s["uncheckedComponents"]
+assert rows == [
+    {"name": "busybox", "version": "", "reason": "no-version"},
+    {"name": "libvendor", "version": "2.1", "reason": "no-identifier", "purl": "pkg:generic/libvendor@2.1"},
+], rows
+for rid in ("unchk0_1.0", "unchkbad_1.0", "unchknone_1.0"):
+    o = server.security_summary(rid)
+    assert "uncheckedCount" not in o and "uncheckedComponents" not in o, (rid, o)
+c = server.security_summary("unchkcap_1.0")
+assert c["uncheckedCount"] == 1 and c["uncheckedComponents"] == [], c
+b = server.security_summary("unchkbig_1.0")
+assert b["uncheckedCount"] == n and len(b["uncheckedComponents"]) == server.MAX_UNCHECKED_ROWS, b["uncheckedCount"]
+PY
+then
+    pass "uncheckedCount/uncheckedComponents surfaced, normalized and capped; absent when none"
+else
+    fail "uncheckedComponents exposure is wrong"
+fi
+rm -f "$OUT"/unchk*_1.0_*
+
+echo "== component-versions template CSV is a listed artifact =="
+if SBOM_OUTPUT_DIR="$OUT" python3 - "$ROOT_DIR" <<'PY'
+import sys, os
+sys.path.insert(0, os.path.join(sys.argv[1], "docker", "web"))
+import server
+assert "fw_1.0_component-versions.template.csv".endswith(server.ARTIFACT_SUFFIXES)
+PY
+then
+    pass "_component-versions.template.csv is in ARTIFACT_SUFFIXES"
+else
+    fail "_component-versions.template.csv missing from ARTIFACT_SUFFIXES"
+fi
+
 echo "== purl attached to vulnerability rows (security_summary) =="
 # Two different components (different ecosystems) can share a name and
 # installed version by coincidence. Without the purl on each row, a consumer
@@ -2990,7 +3037,6 @@ cfg = {
     "spdx": True,
     "deepLicense": False,
     "identifyVendored": True,
-    "includeOsv": False,
     "byteStable": True,
 }
 server.write_scanmeta(run_out, cfg)
@@ -3006,7 +3052,7 @@ got = server.scanmeta("cfg_2.0")
 assert got == cfg, got
 expected_keys = {"source", "target", "sourceLabel", "project", "version",
                  "notice", "security", "spdx", "deepLicense", "identifyVendored",
-                 "includeOsv", "byteStable"}
+                 "byteStable"}
 assert set(got) == expected_keys, set(got)
 # No secret material is ever stored.
 assert not any(k in got for k in ("token", "cred", "scanoss_cred", "gitToken",
@@ -3668,19 +3714,22 @@ fi
 [ -f "$OUT2/demo_1.0/.scanmeta.json" ] && pass "scan writes the .scanmeta.json sidecar into the run folder" || fail "missing .scanmeta.json sidecar"
 
 echo progress > "$STUB_MODE_FILE"
-events=$(sse_events "project=prog&version=1.0&source=current-dir")
+# An older frontend may still send includeOsv=true: accepted and ignored. The
+# retired firmware CVE-DB marker is no longer turned into a progress event.
+events=$(sse_events "project=prog&version=1.0&source=current-dir&includeOsv=true")
 if echo "$events" | python3 -c "
 import sys, json
 evs = json.load(sys.stdin)
-progs = [e for e in evs if e['event'] == 'progress']
-assert len(progs) == 1, 'expected one progress event, got %d' % len(progs)
-assert progs[0]['data'] == {'phase': 'cvedb', 'percent': 42}, progs[0]['data']
-assert not any('firmware-cvedb-progress' in str(e['data']) for e in evs if e['event'] == 'log'), \
-    'progress marker leaked into log events'
+assert not [e for e in evs if e['event'] == 'progress'], 'unexpected progress event'
+assert any('firmware-cvedb-progress' in str(e['data']) for e in evs if e['event'] == 'log'), \
+    'the old marker should pass through as a plain log line'
+done = [e for e in evs if e['event'] == 'done']
+assert len(done) == 1 and done[0]['data']['ok'] is True, done
+assert 'includeOsv' not in (done[0]['data'].get('scanConfig') or {}), done[0]['data'].get('scanConfig')
 "; then
-    pass "cvedb progress marker becomes a progress event (not duplicated as log)"
+    pass "includeOsv is accepted and ignored; the old cvedb marker is a plain log line"
 else
-    fail "progress event contract violated" "$events"
+    fail "retired includeOsv / cvedb marker handling is wrong" "$events"
 fi
 
 echo deepcve-progress > "$STUB_MODE_FILE"

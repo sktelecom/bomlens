@@ -87,6 +87,7 @@ const FILE_SUFFIXES = [
   // infix is part of the filename rather than part of the project.
   ".rootfs",
   ".bin",
+  ".bix",
   ".bz2",
   ".chk",
   ".dlf",

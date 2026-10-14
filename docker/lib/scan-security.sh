@@ -167,7 +167,8 @@ if command -v grype >/dev/null 2>&1 && [ "${DEEP_CVE:-true}" != "false" ]; then
 fi
 
 # Merge Trivy-shaped CVE sidecars from other engines, if present:
-#   _security_cvebintool.json — firmware binaries (cve-bin-tool, no purl/CPE)
+#   _security_cvebintool.json: components with no package purl, matched by CPE
+#                                against the bundled NVD index (match-cpe-index.sh)
 #   _security_grype.json       — deep-cve maven NVD-CPE findings (grype)
 # Each already carries the .Results[].Vulnerabilities[] contract, so we append its
 # Results to Trivy's; the FINDINGS dedup above collapses any (purl, cve) overlap so
@@ -296,6 +297,58 @@ echo "$FINDINGS" | jq 'map({key: .id, value: {epss: .epss, kev: .kev}}) | from_e
 # non-Results key). Non-empty => the Trivy findings are missing, not zero.
 SCAN_ERR=$(jq -r '.ScanError.Message // empty' "$JSON" 2>/dev/null)
 
+# --- Components no check could reach -------------------------------------------
+#
+# Trivy reads a package purl; the CPE index (match-cpe-index.sh, run before this
+# for firmware, rootfs and binary scans, BOMLENS_CPE_INDEX_MATCHED=true) reads a
+# CPE. A component with neither that a check used, or with no version at all,
+# was never asked about, so an empty table says nothing about it. They are
+# named in the report and kept in _security.json as UncheckedComponents for the
+# web layer and the risk report. A component that has a finding was checked by
+# definition (a grype CPE match, for one), matched on purl or on name and
+# version. A Yocto build's recipes were checked by the build's own cve-check
+# when _yocto_vex.json holds its judgements (an --analyze of a Yocto SBOM or
+# build directory), so they are not listed. The classifier is vuln-coverage.jq,
+# shared with match-cpe-index.sh. Not computed when the scan itself failed: the
+# failure note already says nothing was checked.
+UNCHECKED='[]'
+if [ -z "$SCAN_ERR" ] && [ -f "$SCRIPT_DIR/vuln-coverage.jq" ]; then
+    _cpe_matched=false
+    if [ "${BOMLENS_CPE_INDEX_MATCHED:-false}" = "true" ]; then
+        _cpe_matched=true
+    fi
+    _yocto_checked=false
+    if [ -f "${OUT_PREFIX}_yocto_vex.json" ] \
+       && jq -e '([(.judgements // {})[]? | numbers] | add // 0) + (.unresolved // 0) > 0' \
+            "${OUT_PREFIX}_yocto_vex.json" >/dev/null 2>&1; then
+        _yocto_checked=true
+    fi
+    # Through a file: an old kernel's advisories make this list larger than one
+    # command-line argument may be.
+    _found="$(mktemp)"
+    { echo "$FINDINGS"; echo "$KERNEL_FINDINGS"; } | jq -cs \
+        '[add[] | (.purl // ""), (((.pkg // "") + "|" + (.version // "")) | ascii_downcase)]
+         | map(select(. != "" and . != "|")) | unique' > "$_found" 2>/dev/null || echo '[]' > "$_found"
+    UNCHECKED=$(jq -c --argjson cm "$_cpe_matched" --argjson yc "$_yocto_checked" --slurpfile foundf "$_found" \
+        "$(cat "$SCRIPT_DIR/vuln-coverage.jq")"' ($foundf[0] // []) as $found
+        | [ (.components // [])[] | recurse(.components[]?)
+          | select(vc_in_scope)
+          | (.purl // "") as $p | (((.name // "") + "|" + vc_version) | ascii_downcase) as $n
+          | select((($p != "" and ($p | IN($found[]))) or ($n | IN($found[]))) | not)
+          | . as $c | (vc_unchecked_reason($cm; $yc)) as $r
+          | {Name: $c.name, Version: ($c.version // ""), PURL: ($c.purl // ""), Reason: $r} ]
+        | unique_by([.Name, .Version, .Reason])' "$SBOM" 2>/dev/null || echo '[]')
+    rm -f "$_found"
+    [ -n "$UNCHECKED" ] || UNCHECKED='[]'
+    tmp_u="$(mktemp)"
+    if echo "$UNCHECKED" | jq --slurpfile j "$JSON" \
+        '. as $u | $j[0] + {UncheckedComponents: {Count: ($u | length), Components: $u}}' \
+        > "$tmp_u" 2>/dev/null; then mv "$tmp_u" "$JSON"; else rm -f "$tmp_u"; fi
+fi
+UNCHECKED_N=$(echo "$UNCHECKED" | jq 'length')
+# The report lists at most this many; the rest are in _security.json.
+UNCHECKED_MAX=200
+
 count() { echo "$FINDINGS" | jq "[.[] | select(.severity==\"$1\")] | length"; }
 C=$(count CRITICAL); H=$(count HIGH); M=$(count MEDIUM); L=$(count LOW); U=$(count UNKNOWN)
 TOTAL=$(echo "$FINDINGS" | jq 'length')
@@ -325,6 +378,11 @@ KEV_COUNT=$(echo "$FINDINGS" | jq '[.[] | select(.kev)] | length')
         echo "- Priority order: KEV first, then severity, then EPSS (exploit probability)."
         echo ""
     fi
+    if [ "${UNCHECKED_N:-0}" -gt 0 ]; then
+        echo "- Could not be checked: **${UNCHECKED_N}** component(s), listed below. No vulnerability"
+        echo "  database was asked about them, so the counts above do not cover them."
+        echo ""
+    fi
     if [ "${KERNEL_TOTAL:-0}" -gt 0 ]; then
         echo "- Kernel advisories: **${KERNEL_TOTAL}**, listed separately below and not"
         echo "  included in the counts above. Most advisories against a kernel are for"
@@ -350,8 +408,28 @@ KEV_COUNT=$(echo "$FINDINGS" | jq '[.[] | select(.kev)] | length')
         fi
     elif [ -n "$SCAN_ERR" ]; then
         echo "_Scan failed — no results were produced._"
+    elif [ "${UNCHECKED_N:-0}" -gt 0 ]; then
+        echo "_No vulnerability was found in the components that were checked. ${UNCHECKED_N} component(s) could not be checked; they are listed below._"
     else
         echo "_No known vulnerabilities found._"
+    fi
+    if [ "${UNCHECKED_N:-0}" -gt 0 ]; then
+        echo ""
+        echo "## Components that could not be checked"
+        echo ""
+        echo "${UNCHECKED_N} component(s) could not be checked against a vulnerability database:"
+        echo "they have no version, or no package purl and no CPE that was matched. A clean"
+        echo "result does not cover them."
+        echo ""
+        echo "| Component | Version | PURL | Reason |"
+        echo "|-----------|---------|------|--------|"
+        echo "$UNCHECKED" | jq -r --argjson max "$UNCHECKED_MAX" 'def cell: tostring | gsub("[|\n]"; " ");
+            .[0:$max][] |
+            "| \(.Name | cell) | \(.Version | cell) | \(.PURL | cell) | \({"no-version": "no version", "no-identifier": "no package purl or matched CPE"}[.Reason] // .Reason) |"'
+        if [ "$UNCHECKED_N" -gt "$UNCHECKED_MAX" ]; then
+            echo ""
+            echo "… and $((UNCHECKED_N - UNCHECKED_MAX)) more, listed in \`UncheckedComponents\` in \`$(basename "$JSON")\`."
+        fi
     fi
     if [ "${KERNEL_TOTAL:-0}" -gt 0 ]; then
         echo ""
@@ -469,6 +547,9 @@ HTMLHEAD
         ERR_HTML=$(printf '%s' "$SCAN_ERR" | jq -Rr '@html')
         echo "<div class=\"note\"><b>Scan failed.</b> The vulnerability scan did not complete, so this report does not reflect the target's actual exposure.<br><code>${ERR_HTML}</code></div>"
     fi
+    if [ "${UNCHECKED_N:-0}" -gt 0 ]; then
+        echo "<div class=\"note\"><b>${UNCHECKED_N} component(s) could not be checked</b> and are listed below. No vulnerability database was asked about them, so the counts above do not cover them.</div>"
+    fi
     if [ "${KERNEL_TOTAL:-0}" -gt 0 ]; then
         echo "<div class=\"note\"><b>${KERNEL_TOTAL} kernel advisories</b> are listed at the end of this report and are not included in the counts above. Most advisories against a kernel are for subsystems a given device never compiled in, and the SBOM cannot tell which, so counting them here would bury the findings this report exists to show.</div>"
     fi
@@ -489,8 +570,23 @@ HTMLHEAD
         fi
     elif [ -n "$SCAN_ERR" ]; then
         echo "<p>Scan failed &mdash; no results were produced.</p>"
+    elif [ "${UNCHECKED_N:-0}" -gt 0 ]; then
+        echo "<p>No vulnerability was found in the components that were checked. ${UNCHECKED_N} component(s) could not be checked; they are listed below.</p>"
     else
         echo "<p>No known vulnerabilities found.</p>"
+    fi
+    if [ "${UNCHECKED_N:-0}" -gt 0 ]; then
+        echo "<h2>Components that could not be checked</h2>"
+        echo "<p class=\"meta\">They have no version, or no package purl and no CPE that was matched, so no vulnerability database was asked about them. A clean result does not cover them.</p>"
+        echo "<div class=\"table-wrap\"><table><tr><th>Component</th><th>Version</th><th>PURL</th><th>Reason</th></tr>"
+        echo "$UNCHECKED" | jq -r --argjson max "$UNCHECKED_MAX" '.[0:$max][] |
+            "<tr><td>" + (.Name|@html) + "</td><td>" + (.Version|@html) + "</td>" +
+            "<td>" + (.PURL|@html) + "</td>" +
+            "<td>" + ({"no-version": "no version", "no-identifier": "no package purl or matched CPE"}[.Reason] // .Reason | @html) + "</td></tr>"'
+        echo "</table></div>"
+        if [ "$UNCHECKED_N" -gt "$UNCHECKED_MAX" ]; then
+            echo "<p class=\"meta\">&hellip; and $((UNCHECKED_N - UNCHECKED_MAX)) more, listed in <code>UncheckedComponents</code> in <code>$(esc "$(basename "$JSON")")</code>.</p>"
+        fi
     fi
     if [ "${KERNEL_TOTAL:-0}" -gt 0 ]; then
         echo "<h2>Kernel advisories</h2>"
@@ -510,5 +606,5 @@ HTMLHEAD
 if [ -n "$SCAN_ERR" ]; then
     echo "[security] generated: $JSON, $MD, $HTML (SCAN FAILED — results incomplete: ${SCAN_ERR})"
 else
-    echo "[security] generated: $JSON, $MD, $HTML (total=${TOTAL}, critical=${C}, high=${H}, kev=${KEV_COUNT})"
+    echo "[security] generated: $JSON, $MD, $HTML (total=${TOTAL}, critical=${C}, high=${H}, kev=${KEV_COUNT}, unchecked=${UNCHECKED_N:-0})"
 fi

@@ -28,7 +28,6 @@ import {
   type RecentScan,
   type ScanConfig,
   type ScanParams,
-  type ScanProgress,
   type Severity,
 } from "@/lib/api";
 import { IS_STATIC_DEMO } from "@/lib/demo";
@@ -116,7 +115,6 @@ export function NextApp() {
   // a git clone that failed because the repo is missing or private): an i18n
   // key for a friendlier headline, with scanError kept as the raw detail.
   const [scanErrorKey, setScanErrorKey] = useState<string | null>(null);
-  const [progress, setProgress] = useState<ScanProgress | null>(null);
   const [result, setResult] = useState<DoneEvent | null>(null);
   const [projectInfo, setProjectInfo] = useState<{
     name: string;
@@ -409,7 +407,6 @@ export function NextApp() {
     setLogs([]);
     setScanError(null);
     setScanErrorKey(null);
-    setProgress(null);
     setResult(null);
     setActiveSection("overview");
     setProjectInfo({
@@ -418,7 +415,6 @@ export function NextApp() {
     });
     streamRef.current = startScan(params, {
       onLog: (line) => setLogs((prev) => [...prev, line]),
-      onProgress: (p) => setProgress(p),
       onDone: (done) => {
         streamRef.current = null;
         setResult(done);
@@ -608,7 +604,6 @@ export function NextApp() {
           <ScanRunning
             logs={logs}
             status={status === "error" ? "error" : "running"}
-            progress={status === "running" ? progress : null}
             projectLabel={
               projectInfo &&
               (projectInfo.version

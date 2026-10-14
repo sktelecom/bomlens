@@ -1,0 +1,21 @@
+{
+  "id": "ccb4ddc5b79d28c8e6971faa4e95c4564666122e461a530e1fbcdd7cd4b2538b",
+  "metadata": {
+    "architecture": "arm64",
+    "imageID": "sha256:d2482869a6b838d3b4c9cad0c8085c06277909482771eb525d298fc3a7d07927",
+    "imageSize": 4170758,
+    "manifestDigest": "sha256:ccb4ddc5b79d28c8e6971faa4e95c4564666122e461a530e1fbcdd7cd4b2538b",
+    "mediaType": "application/vnd.docker.distribution.manifest.v2+json",
+    "os": "linux",
+    "repoDigests": [
+      "busybox@sha256:fd7dc98638c8e305f4dc34e979f1c0fdfdcaeb0fbf8fcff77ae834b6da3d7e6e"
+    ],
+    "tags": [
+      "busybox:latest"
+    ],
+    "userInput": "busybox:latest"
+  },
+  "name": "busybox",
+  "type": "image",
+  "version": "sha256:ccb4ddc5b79d28c8e6971faa4e95c4564666122e461a530e1fbcdd7cd4b2538b"
+}

@@ -159,6 +159,11 @@ case "${1:-}" in
       if [ -n "${DOCKER_STUB_SUMMARY_RESULT:-}" ]; then
         printf '%b' "$DOCKER_STUB_SUMMARY_RESULT" > "$dest/${spn}_${spv}_summary.result"
       fi
+      # DOCKER_STUB_VERSIONS_TEMPLATE models the component-versions template a
+      # firmware, root filesystem or binary scan writes, verbatim. Unset means none.
+      if [ -n "${DOCKER_STUB_VERSIONS_TEMPLATE:-}" ]; then
+        printf '%b' "$DOCKER_STUB_VERSIONS_TEMPLATE" > "$dest/${spn}_${spv}_component-versions.template.csv"
+      fi
     fi
     # MODE=DIFF carries no PROJECT_NAME/VERSION at all — it names its own
     # output file (DIFF_OUT_NAME) instead, so it needs its own stub write.
@@ -207,7 +212,7 @@ for flag in --project --version --target --git --branch --firmware --analyze \
             --byte-stable --sign --output-dir --timestamp --ui \
             --license --sbom-author --model --model-file --usage --merge --merge-root \
             --diff --trusca --upload-target --deep-cve --identify-vendored --verify-weights --spdx --lang \
-            --conformance-profile --fail-on-conformance --fail-on --vex --ai-declare --no-spdx3; do
+            --conformance-profile --fail-on-conformance --fail-on --vex --ai-declare --no-spdx3 --as-source --component-versions; do
   if printf '%s' "$HELP" | grep -q -- "$flag"; then pass "help documents $flag"
   else fail "help documents $flag"; fi
 done
@@ -663,6 +668,103 @@ d="$(new_proj analyze)"; printf '{"bomFormat":"CycloneDX"}' > "$d/supplier.json"
 scan_in "$d" --project Sup --version 1 --analyze supplier.json --generate-only
 in_out "Mode: ANALYZE" && pass "--analyze <sbom> → ANALYZE mode" || { fail "--analyze → ANALYZE" "rc=$RC"; show; }
 
+# A release folder: built artifacts side by side and no source of its own.
+# One root filesystem or firmware image in it is scanned as that, with a notice;
+# several stop the scan with the commands to choose from; --as-source keeps the
+# plain source scan; a source project holding a rootfs-shaped fixture stays source.
+mk_rootfs() { mkdir -p "$1/etc" "$1/bin" "$1/usr/bin" "$1/lib"; printf 'x' > "$1/usr/bin/f"; }
+d="$(new_proj relfs)"; mk_rootfs "$d/images/rootfs"; mkdir -p "$d/images/install" "$d/images/kernel"
+printf 'x' > "$d/images/install/app"; printf 'opaque\n' > "$d/images/dev-1.0.pak"
+scan_in "$d" --project Rel --version 1 --target images --generate-only
+{ in_out "Mode: ROOTFS" && in_out "images/rootfs" && in_out "add --as-source" \
+  && in_log "images/rootfs:/target"; } \
+  && pass "release folder with one rootfs → ROOTFS of that rootfs, with a notice" \
+  || { fail "release folder with one rootfs did not switch to it" "rc=$RC"; show; }
+
+d="$(new_proj relfw)"; mkdir -p "$d/images/docs"; printf 'blob\n' > "$d/images/device-1.0.trx"
+printf 'readme\n' > "$d/images/README.txt"
+scan_in "$d" --project Rel --version 1 --target images/ --generate-only
+{ in_out "Mode: FIRMWARE" && in_out "images/device-1.0.trx" && in_log "TARGET_FILE=/target/device-1.0.trx"; } \
+  && pass "release folder with one firmware image → FIRMWARE of that file" \
+  || { fail "release folder with one firmware image did not switch to it" "rc=$RC"; show; }
+
+d="$(new_proj reltwo)"; mk_rootfs "$d/images/rootfs"; printf 'blob\n' > "$d/images/device.ubi"
+scan_in "$d" --project Rel --version 1 --target images --generate-only
+{ [ "$RC" -ne 0 ] && in_out '--target "images/rootfs"' && in_out '--target "images/device.ubi" --firmware' \
+  && ! in_out "Mode:" && ! grep -q '^docker run' "$LOG"; } \
+  && pass "release folder with two candidates stops before scanning and lists both" \
+  || { fail "two candidates were not refused with a list" "rc=$RC"; show; }
+
+# The rootfs it switched to has no package database, so the large file beside
+# it (not a recognized firmware type) is offered as a --firmware command.
+d="$(new_proj relbig)"; mk_rootfs "$d/images/rootfs"; mkdir -p "$d/images/install"
+head -c 2097152 /dev/zero > "$d/images/vendor-image.pak"; printf 'notes\n' > "$d/images/notes.txt"
+scan_in "$d" --project Rel --version 1 --target images --generate-only
+{ in_out "Mode: ROOTFS" && in_out "no package database" \
+  && in_out '--target "images/vendor-image.pak" --firmware' && ! in_out 'notes.txt'; } \
+  && pass "a rootfs with no package database names the large file beside it as a --firmware command" \
+  || { fail "the large file beside a package-less rootfs was not offered" "rc=$RC"; show; }
+
+# A .bix image is recognized, so a folder holding it next to a rootfs, an
+# install tree and a kernel has two candidates (the kernel is not one).
+d="$(new_proj relbix)"; mk_rootfs "$d/images/rootfs"; printf 'opaque\n' > "$d/images/dev-1.0.bix"
+mkdir -p "$d/images/install"; printf 'kernel\n' > "$d/images/vmlinuz"
+scan_in "$d" --project Rel --version 1 --target images --generate-only
+{ [ "$RC" -ne 0 ] && in_out '--target "images/rootfs"' && in_out '--target "images/dev-1.0.bix" --firmware' \
+  && ! in_out 'vmlinuz'; } \
+  && pass "rootfs/, install/, a kernel and a .bix stop with the two candidates listed" \
+  || { fail "a .bix image next to a rootfs was not listed" "rc=$RC"; show; }
+d="$(new_proj bix)"; printf 'opaque\n' > "$d/dev-1.0.bix"
+scan_in "$d" --project Bix --version 1 --target dev-1.0.bix --generate-only
+in_out "Mode: FIRMWARE" && pass "--target *.bix → FIRMWARE mode (extension)" || { fail "--target .bix → FIRMWARE" "rc=$RC"; show; }
+
+# Folders that hold a .bin but are an application, a model or a build output
+# stay a SOURCE scan: no switch and no stop.
+d="$(new_proj relapp)"; mkdir -p "$d/app/resources/app" "$d/app/locales"
+for f in App.exe ffmpeg.dll libEGL.dll snapshot_blob.bin v8_context_snapshot.bin resources.pak; do printf 'x\n' > "$d/app/$f"; done
+: > "$d/app/resources/app.asar"
+scan_in "$d" --project App --version 1 --target app --generate-only
+{ in_out "Mode: SOURCE" && ! in_out "is not a source tree" && [ "$RC" -eq 0 ]; } \
+  && pass "an Electron app folder stays SOURCE" \
+  || { fail "an Electron app folder was rerouted or stopped" "rc=$RC"; show; }
+d="$(new_proj relmodel)"; mkdir -p "$d/snap"
+printf '{}\n' > "$d/snap/config.json"; printf '{}\n' > "$d/snap/tokenizer.json"
+{ printf 'PK\003\004'; head -c 200 /dev/zero; } > "$d/snap/pytorch_model.bin"
+scan_in "$d" --project Model --version 1 --target snap --generate-only
+{ in_out "Mode: SOURCE" && ! in_out "Mode: FIRMWARE" && ! in_out "is not a source tree"; } \
+  && pass "a model snapshot folder stays SOURCE, pytorch_model.bin is not taken as firmware" \
+  || { fail "a model snapshot folder was rerouted" "rc=$RC"; show; }
+d="$(new_proj relstage)"; mkdir -p "$d/staging/usr/lib" "$d/staging/bin"
+printf 'x\n' > "$d/staging/usr/lib/libfoo.so.1"; printf 'x\n' > "$d/staging/bin/app"
+printf 'x\n' > "$d/staging/app.bin"; printf 'x\n' > "$d/staging/libbar.so"
+scan_in "$d" --project Stage --version 1 --target staging --generate-only
+{ in_out "Mode: SOURCE" && ! in_out "is not a source tree"; } \
+  && pass "a build output staging folder stays SOURCE" \
+  || { fail "a build output staging folder was rerouted" "rc=$RC"; show; }
+
+d="$(new_proj relsrc)"; printf '{"name":"app","version":"1.0.0"}\n' > "$d/package.json"
+mk_rootfs "$d/rootfs"; printf 'blob\n' > "$d/sample.bin"
+mkdir -p "$d/wrap"; cp "$d/package.json" "$d/wrap/"; mk_rootfs "$d/wrap/rootfs"
+scan_in "$d" --project Src --version 1 --target wrap --generate-only
+{ in_out "Mode: SOURCE" && ! in_out "is not a source tree"; } \
+  && pass "a source project holding a rootfs fixture stays SOURCE" \
+  || { fail "a source project with a rootfs fixture was rerouted" "rc=$RC"; show; }
+
+d="$(new_proj relopt)"; mk_rootfs "$d/images/rootfs"; printf 'blob\n' > "$d/images/device.bin"
+scan_in "$d" --project Rel --version 1 --target images --as-source --generate-only
+{ in_out "Mode: SOURCE" && ! in_out "is not a source tree" && [ "$RC" -eq 0 ]; } \
+  && pass "--as-source keeps a release folder a SOURCE scan" \
+  || { fail "--as-source did not keep SOURCE" "rc=$RC"; show; }
+
+d="$(new_proj relopt2)"; mk_rootfs "$d/rootfs"
+scan_in "$d" --project Rel --version 1 --target rootfs --as-source --generate-only
+in_out "Mode: SOURCE" && pass "--as-source scans a rootfs directory itself as SOURCE" \
+  || { fail "--as-source on a rootfs directory" "rc=$RC"; show; }
+d="$(new_proj relopt3)"; printf 'blob\n' > "$d/dev.bin"
+scan_in "$d" --project Rel --version 1 --target dev.bin --as-source --generate-only
+{ [ "$RC" -ne 0 ] && in_out "--as-source applies to a directory --target only"; } \
+  && pass "--as-source on a file target is refused" || { fail "--as-source on a file was not refused" "rc=$RC"; show; }
+
 # --------------------------------------------------------
 section "Mutual-exclusivity & input guards"
 # --------------------------------------------------------
@@ -696,6 +798,9 @@ guard "--vex is refused with --ui"      "--vex is not offered with --ui" --ui --
 guard "--ai-declare file must exist"    "--ai-declare file not found" --project p --version 1 --model o/r --ai-declare no-such.json
 guard "--ai-declare is refused with --diff" "--ai-declare cannot be combined with --diff" --project p --version 1 --diff a.json b.json --ai-declare d.json
 guard "--ai-declare is refused with --ui" "--ai-declare is not offered with --ui" --ui --ai-declare d.json
+guard "--component-versions file must exist" "--component-versions file not found" --project p --version 1 --target z --component-versions no-such.csv
+guard "--component-versions is refused with --diff" "--component-versions cannot be combined with --diff" --project p --version 1 --diff a.json b.json --component-versions v.csv
+guard "--component-versions is refused with --ui" "--component-versions is not offered with --ui" --ui --component-versions v.csv
 guard "--merge needs >=2 files"         "needs at least 2" --project p --version 1 --merge one.json
 guard "--merge-root without --merge"    "only applies with --merge" --project p --version 1 --merge-root x.json
 guard "--merge-root not in --merge list" "must be one of the --merge input files" \
@@ -1029,6 +1134,38 @@ in_log "/dir with space/supplier vex.json:/vex-in/vex.json:ro>" \
 in_log "<GENERATE_SECURITY=true>" \
   && pass "--vex turns the security report on" \
   || { fail "--vex did not enable the security report"; show; cat "$LOG"; }
+
+# --component-versions: the supplier's version file is mounted read-only under
+# /component-versions-in and named by its container path, for a binary scan.
+d="$(new_proj cv-mount)"; printf 'ELFish\n' > "$d/app.out"; mkdir -p "$d/dir with space"
+printf 'name,version\nncurses,5.7\n' > "$d/dir with space/versions list.csv"
+DOCKER_STUB_ARGV_DUMP=1 \
+  scan_in "$d" --project CV1 --version 1 --target app.out --generate-only \
+  --component-versions "dir with space/versions list.csv"
+in_log "<COMPONENT_VERSIONS_FILE=/component-versions-in/versions.csv>" \
+  && in_log "/dir with space/versions list.csv:/component-versions-in/versions.csv:ro>" \
+  && pass "--component-versions mounts the file alone, read-only, and names its container path" \
+  || { fail "--component-versions was not mounted as a single read-only file"; show; cat "$LOG"; }
+# The closing count is the template rows still without a version: the
+# template can be the filled-in file this run read, left as the supplier wrote it.
+d="$(new_proj cv-count)"; printf 'ELFish\n' > "$d/app.out"
+DOCKER_STUB_VERSIONS_TEMPLATE='# note\nname,version\nncurses,5.7\nnet-snmp,\nzlib,1.2.3\r\nbusybox,\r\n' \
+  scan_in "$d" --project CV3 --version 1 --target app.out --generate-only
+[ "$RC" -eq 0 ] && in_out "[WARN] 2 component(s) have no version" \
+  && pass "the closing count takes only the template rows with an empty version" \
+  || { fail "versionless count: rc=$RC"; show; }
+DOCKER_STUB_VERSIONS_TEMPLATE='name,version\nncurses,5.7\nnet-snmp,5.7.1\n' \
+  scan_in "$d" --project CV3 --version 1 --target app.out --generate-only
+[ "$RC" -eq 0 ] && ! in_out "have no version" \
+  && pass "a template with every row filled prints no versionless count" \
+  || { fail "a filled template still printed a count: rc=$RC"; show; }
+# A source scan has nothing for it to fill, and is refused before any container runs.
+d="$(new_proj cv-source)"; printf '{"name":"x","version":"1.0.0"}\n' > "$d/package.json"
+printf 'name,version\nx,1\n' > "$d/v.csv"
+scan_in "$d" --project CV2 --version 1 --generate-only --component-versions v.csv
+[ "$RC" -ne 0 ] && grep -q "applies to firmware, root filesystem and binary scans only" "$OUT" \
+  && pass "--component-versions is refused for a source scan" \
+  || { fail "--component-versions on a source scan: rc=$RC"; show; }
 
 # The SOURCE path runs a second (post-process) container: it must get the mount too.
 d="$(new_proj vex-source)"; printf '{"name":"x","version":"1.0.0"}\n' > "$d/package.json"

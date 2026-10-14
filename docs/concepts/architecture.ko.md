@@ -51,7 +51,7 @@ BomLens는 두 종류의 Docker 이미지가 협력하는 2단계 파이프라�
 | **ScanCode Toolkit** | `32.5.0` | Stage 2 | 1st-party 소스 정밀 라이선스 탐지 | `--deep-license` (opt-in 빌드) |
 | **SCANOSS** | `1.54.2` | Stage 2 | 패키지 매니저 없는 C/C++ 소스의 vendored 오픈소스 식별 | `--identify-vendored` |
 | **jq** (`generate-notice.sh`) | — | Stage 2 | 오픈소스 고지문(NOTICE) 생성 | `--notice` / `--all` |
-| **Trivy** | `v0.74.0` | Stage 2 | 취약점(CVE) 보안 보고서 | `--security` / `--all` |
+| **Trivy** | `v0.75.0` | Stage 2 | 취약점(CVE) 보안 보고서 | `--security` / `--all` |
 | **Cosign** | `v3.1.3` | Stage 2 | SBOM detached 서명 | `--sign` |
 | **curl** | — | Stage 2 | Dependency-Track 업로드 | 기본(=`--generate-only` 아님) |
 

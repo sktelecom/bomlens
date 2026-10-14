@@ -384,8 +384,6 @@ export function ScanOptions({ state }: { state: ScanFormState }) {
     setDeepLicense,
     identifyVendored,
     setIdentifyVendored,
-    includeOsv,
-    setIncludeOsv,
     deepCve,
     setDeepCve,
     byteStable,
@@ -401,7 +399,6 @@ export function ScanOptions({ state }: { state: ScanFormState }) {
     setScanossToken,
     showVendored,
     showDeepLicense,
-    showIncludeOsv,
     showDeepCve,
     showByteStable,
     showOutboundLicense,
@@ -448,14 +445,6 @@ export function ScanOptions({ state }: { state: ScanFormState }) {
           labelKey="deepLicense"
           checked={deepLicense}
           onChange={setDeepLicense}
-          disabled={busy}
-        />
-      )}
-      {showIncludeOsv && (
-        <ToggleRow
-          labelKey="includeOsv"
-          checked={includeOsv}
-          onChange={setIncludeOsv}
           disabled={busy}
         />
       )}

@@ -51,7 +51,7 @@ The tools invoked by the pipeline and their **version pinning** status (supply c
 | **ScanCode Toolkit** | `32.5.0` | Stage 2 | Precise license detection on first-party source | `--deep-license` (opt-in build) |
 | **SCANOSS** | `1.54.2` | Stage 2 | Identify vendored open source in C/C++ source with no package manager | `--identify-vendored` |
 | **jq** (`generate-notice.sh`) | — | Stage 2 | Generates the open source notice (NOTICE) | `--notice` / `--all` |
-| **Trivy** | `v0.74.0` | Stage 2 | Vulnerability (CVE) security report | `--security` / `--all` |
+| **Trivy** | `v0.75.0` | Stage 2 | Vulnerability (CVE) security report | `--security` / `--all` |
 | **Cosign** | `v3.1.3` | Stage 2 | Detached SBOM signature | `--sign` |
 | **curl** | — | Stage 2 | Upload to Dependency-Track | Default (unless `--generate-only`) |
 

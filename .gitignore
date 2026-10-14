@@ -45,6 +45,7 @@ bom.json
 *_spdx3-check.md
 *_ai-declaration.json
 *_ai-declaration.template.json
+*_component-versions.template.csv
 *_security_cvebintool.json
 *_security_grype.json
 *_security_trivy.json

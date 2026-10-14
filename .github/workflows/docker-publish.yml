@@ -102,10 +102,54 @@ concurrency:
 
 jobs:
   # ---------------------------------------------------------------
+  # (0) NVD CPE index, built once for every image below
+  # ---------------------------------------------------------------
+  # The index (docker/Dockerfile, cpe-index stage) is the same data for every
+  # image and both platforms, so it is built here once, on the build platform,
+  # with its release gate, and stored under its own cache scope. Each image job
+  # reads that scope and pins the same feed commit, so its cpe-index stage is a
+  # cache hit instead of a fresh clone and distill per image and per platform.
+  build-cpe-index:
+    name: Build NVD CPE index
+    runs-on: ${{ fromJSON(vars.CI_LINUX_RUNNER || '["self-hosted","linux","bomlens-wsl"]') }}
+    timeout-minutes: 45
+    permissions:
+      contents: read
+    outputs:
+      feed_ref: ${{ steps.feed.outputs.ref }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+      # One feed commit for the whole run: the feed updates every few hours, and
+      # images of one release must carry the same index.
+      - name: Resolve the NVD feed commit
+        id: feed
+        run: |
+          set -euo pipefail
+          repo=$(grep -oP 'ARG NVD_FEED_REPO="\K[^"]+' docker/Dockerfile)
+          ref=$(git ls-remote "$repo" HEAD | cut -f1)
+          [ -n "$ref" ] || { echo "::error::could not resolve HEAD of $repo"; exit 1; }
+          echo "NVD feed $repo at $ref"
+          echo "ref=$ref" >> "$GITHUB_OUTPUT"
+      - name: Build the CPE index stage
+        uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25 # v5
+        with:
+          context: ./docker
+          target: cpe-index
+          outputs: type=cacheonly
+          build-args: |
+            NVD_FEED_REF=${{ steps.feed.outputs.ref }}
+          cache-from: type=gha,scope=cpe-index
+          cache-to: type=gha,mode=max,scope=cpe-index
+
+  # ---------------------------------------------------------------
   # (1) Post-process image: syft + Trivy + cosign + notice + UI
   # ---------------------------------------------------------------
   build-postprocess:
     name: Build post-process image
+    needs: build-cpe-index
     runs-on: ${{ fromJSON(vars.CI_LINUX_RUNNER || '["self-hosted","linux","bomlens-wsl"]') }}
     # No timeout existed here before (360-minute platform default). Measured
     # on a real successful run: "Build and push" alone took 24 minutes, on
@@ -200,8 +244,11 @@ jobs:
           build-args: |
             SBOM_SCANOSS=true
             BOMLENS_VERSION=${{ steps.version.outputs.value }}
+            NVD_FEED_REF=${{ needs.build-cpe-index.outputs.feed_ref }}
           tags: bomlens:publish-gate
-          cache-from: type=gha
+          cache-from: |
+            type=gha
+            type=gha,scope=cpe-index
           cache-to: type=gha,mode=max
 
       # Scope, and why it is this narrow:
@@ -244,13 +291,16 @@ jobs:
           build-args: |
             SBOM_SCANOSS=true
             BOMLENS_VERSION=${{ steps.version.outputs.value }}
+            NVD_FEED_REF=${{ needs.build-cpe-index.outputs.feed_ref }}
           tags: ${{ steps.meta.outputs.tags }}
           # Override metadata-action's own image.version annotation (which
           # would otherwise say "latest") with the same resolved identifier.
           labels: |
             ${{ steps.meta.outputs.labels }}
             org.opencontainers.image.version=${{ steps.version.outputs.value }}
-          cache-from: type=gha
+          cache-from: |
+            type=gha
+            type=gha,scope=cpe-index
           cache-to: type=gha,mode=max
 
       # --- Supply-chain: dogfood our own signing and SBOM on the published image ---
@@ -351,6 +401,7 @@ jobs:
   # ---------------------------------------------------------------
   build-firmware:
     name: Build firmware image
+    needs: build-cpe-index
     # The firmware CVE data comes from a plain git clone of the NVD data feeds
     # plus a local distill (docker/build-cpe-index.py), with no NVD api2 rate
     # limit and no API key, so this doesn't need a cloud IP. (It previously
@@ -423,11 +474,14 @@ jobs:
           build-args: |
             SBOM_FIRMWARE=true
             BOMLENS_VERSION=${{ steps.version.outputs.value }}
+            NVD_FEED_REF=${{ needs.build-cpe-index.outputs.feed_ref }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: |
             ${{ steps.meta.outputs.labels }}
             org.opencontainers.image.version=${{ steps.version.outputs.value }}
-          cache-from: type=gha,scope=firmware
+          cache-from: |
+            type=gha,scope=firmware
+            type=gha,scope=cpe-index
           cache-to: type=gha,mode=max,scope=firmware
       # The build above only proves the arm64 layers build (buildx's own
       # bundled QEMU runs the RUN steps during the build). Running the built
@@ -451,6 +505,8 @@ jobs:
             --platform linux/arm64 --load \
             --build-arg SBOM_FIRMWARE=true \
             --build-arg BOMLENS_VERSION=${{ steps.version.outputs.value }} \
+            --build-arg NVD_FEED_REF=${{ needs.build-cpe-index.outputs.feed_ref }} \
+            --cache-from type=gha,scope=cpe-index \
             --cache-from type=gha,scope=firmware \
             -t bomlens-firmware-arm64-smoke \
             ./docker
@@ -569,6 +625,7 @@ jobs:
   # ---------------------------------------------------------------
   build-aibom:
     name: Build AIBOM image
+    needs: build-cpe-index
     runs-on: ${{ fromJSON(vars.CI_LINUX_RUNNER || '["self-hosted","linux","bomlens-wsl"]') }}
     # This job had no timeout at all before (the 360-minute platform default).
     # Measured on a real successful run: the "Build and push" step alone took
@@ -640,11 +697,14 @@ jobs:
           build-args: |
             SBOM_AIBOM=true
             BOMLENS_VERSION=${{ steps.version.outputs.value }}
+            NVD_FEED_REF=${{ needs.build-cpe-index.outputs.feed_ref }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: |
             ${{ steps.meta.outputs.labels }}
             org.opencontainers.image.version=${{ steps.version.outputs.value }}
-          cache-from: type=gha,scope=aibom
+          cache-from: |
+            type=gha,scope=aibom
+            type=gha,scope=cpe-index
           cache-to: type=gha,mode=max,scope=aibom
       - name: Install cosign
         if: steps.flags.outputs.push == 'true'
@@ -716,6 +776,7 @@ jobs:
   #     lean; the DB is ~1.8 GB.
   build-deep-cve:
     name: Build deep-cve image
+    needs: build-cpe-index
     runs-on: ${{ fromJSON(vars.CI_LINUX_RUNNER || '["self-hosted","linux","bomlens-wsl"]') }}
     # `grype db update` downloads a ~1.8 GB DB at build time, once per
     # platform. Measured multi-arch build time: ~23 min. Plus ~2 min for the
@@ -780,11 +841,14 @@ jobs:
           build-args: |
             SBOM_DEEP_CVE=true
             BOMLENS_VERSION=${{ steps.version.outputs.value }}
+            NVD_FEED_REF=${{ needs.build-cpe-index.outputs.feed_ref }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: |
             ${{ steps.meta.outputs.labels }}
             org.opencontainers.image.version=${{ steps.version.outputs.value }}
-          cache-from: type=gha,scope=deep-cve
+          cache-from: |
+            type=gha,scope=deep-cve
+            type=gha,scope=cpe-index
           cache-to: type=gha,mode=max,scope=deep-cve
       # See the firmware job's own comment above: buildx's bundled QEMU built
       # the arm64 layers; running the loaded image afterward needs
@@ -804,6 +868,8 @@ jobs:
             --platform linux/arm64 --load \
             --build-arg SBOM_DEEP_CVE=true \
             --build-arg BOMLENS_VERSION=${{ steps.version.outputs.value }} \
+            --build-arg NVD_FEED_REF=${{ needs.build-cpe-index.outputs.feed_ref }} \
+            --cache-from type=gha,scope=cpe-index \
             --cache-from type=gha,scope=deep-cve \
             -t bomlens-deep-cve-arm64-smoke \
             ./docker
@@ -885,6 +951,7 @@ jobs:
 
   build-deep-license:
     name: Build deep-license image
+    needs: build-cpe-index
     runs-on: ${{ fromJSON(vars.CI_LINUX_RUNNER || '["self-hosted","linux","bomlens-wsl"]') }}
     # scancode installs per platform, and the arm64 half runs under
     # emulation, so a cache-cold multi-arch build is slow. The smoke test
@@ -952,8 +1019,11 @@ jobs:
           build-args: |
             SBOM_DEEP_LICENSE=true
             BOMLENS_VERSION=${{ steps.version.outputs.value }}
+            NVD_FEED_REF=${{ needs.build-cpe-index.outputs.feed_ref }}
           tags: bomlens-deep-license-smoke
-          cache-from: type=gha,scope=deep-license
+          cache-from: |
+            type=gha,scope=deep-license
+            type=gha,scope=cpe-index
       - name: Build base image for the smoke test (amd64, load)
         uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25 # v5
         with:
@@ -963,8 +1033,11 @@ jobs:
           push: false
           build-args: |
             BOMLENS_VERSION=${{ steps.version.outputs.value }}
+            NVD_FEED_REF=${{ needs.build-cpe-index.outputs.feed_ref }}
           tags: bomlens-base-smoke
-          cache-from: type=gha
+          cache-from: |
+            type=gha
+            type=gha,scope=cpe-index
       - name: Smoke test (result manifest, LGPL sources, licence inventory)
         run: bash tests/test-deep-license-image.sh bomlens-deep-license-smoke bomlens-base-smoke
       - name: Remove the smoke-test images
@@ -982,11 +1055,14 @@ jobs:
           build-args: |
             SBOM_DEEP_LICENSE=true
             BOMLENS_VERSION=${{ steps.version.outputs.value }}
+            NVD_FEED_REF=${{ needs.build-cpe-index.outputs.feed_ref }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: |
             ${{ steps.meta.outputs.labels }}
             org.opencontainers.image.version=${{ steps.version.outputs.value }}
-          cache-from: type=gha,scope=deep-license
+          cache-from: |
+            type=gha,scope=deep-license
+            type=gha,scope=cpe-index
           cache-to: type=gha,mode=max,scope=deep-license
       - name: Install cosign
         if: steps.flags.outputs.push == 'true'

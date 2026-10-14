@@ -14,9 +14,10 @@
 # `component.cpe`. A CPE attached here is therefore not a Trivy input on its own
 # and does not by itself produce findings; measurements confirmed a CPE-only
 # component (e.g. openssl@1.0.1f) yields 0 Trivy findings (issue #458). Distro CVE
-# matching comes from the synthesized OS component; firmware binaries with no
-# usable PURL are covered by the cve-bin-tool sidecar (scan-security.sh). The CPE
-# is retained here for correctness and for downstream consumers that read it.
+# matching comes from the synthesized OS component. For a firmware, rootfs or
+# binary scan, match-cpe-index.sh runs after this step and matches the CPE of a
+# component with no package purl against the bundled NVD index, so a CPE added
+# here does produce findings there. The CPE also stays for consumers that read it.
 #
 # Why: firmware / image / rootfs SBOMs carry no license for famous OSS, and their
 # CPEs (where present) carry distro-suffixed versions. Fixed here for WHITELISTED

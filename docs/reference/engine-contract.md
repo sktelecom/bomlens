@@ -6,19 +6,19 @@ description: The result manifest (bomlens-result.json) every scan writes, for a 
 
 A program that runs the BomLens image as its scan engine reads `bomlens-result.json`, written to the output folder by every scan. It says how the run ended, which steps ran, were turned off, could not run or failed, and which file in the folder plays which role, so the program does not parse the log or guess file names.
 
-The format is checked against [`schemas/engine-result-1.json`](https://github.com/sktelecom/bomlens/blob/main/schemas/engine-result-1.json) by `tests/test-engine-contract.sh` in CI. This page describes contract version `1.2.0`.
+The format is checked against [`schemas/engine-result-1.json`](https://github.com/sktelecom/bomlens/blob/main/schemas/engine-result-1.json) by `tests/test-engine-contract.sh` in CI. This page describes contract version `1.3.0`.
 
 ## The file
 
 `bomlens-result.json` has a fixed name, so give each scan its own output folder. A manifest left in the folder by an earlier run is removed when the run starts, before anything else is checked, and the new one is written when the run ends, also when it stops early on an error. A folder with no manifest after the run means the engine was killed before it could write one.
 
-The scan's exit code is unchanged by the contract. A run that produced its SBOM exits 0 even when a step failed along the way; the manifest is where that failure is reported.
+The scan's exit code is unchanged by the contract. A run that produced its SBOM exits 0 even when a step failed along the way; the manifest is where that failure is reported. The one exception is a `--component-versions` file that is refused: every file is still written, and the run exits 1, since the versions it was given were not applied.
 
 | Field | Meaning |
 |---|---|
 | `contract` | `name` is `bomlens-engine`, `version` the contract version (semantic versioning, separate from the BomLens version) |
 | `engine` | `version` is the BomLens version built into the image. `image` and `image_digest` repeat `BOMLENS_IMAGE_REF` and `BOMLENS_IMAGE_DIGEST` when the caller passes them; the image cannot see its own reference |
-| `input` | `kind` (`source`, `image`, `sbom`, `binary`, `rootfs`, `firmware`, `ai-model`, `dataset`), the `MODE` it ran in, and `target` (the image reference for an image scan; paths are not recorded) |
+| `input` | `kind` (`source`, `image`, `sbom`, `binary`, `rootfs`, `firmware`, `ai-model`, `dataset`), the `MODE` it ran in, `target` (the image reference for an image scan; paths are not recorded), and for an image scan `image` (below) |
 | `run` | `status`, `reason`, `started_at`, `ended_at` (UTC), `exit_code` |
 | `steps[]` | one entry per step, in the order they were recorded; a step is recorded when it ends (below) |
 | `tools` | tool name and version: the generator recorded in the SBOM, syft, and Trivy when the vulnerability scan ran |
@@ -65,7 +65,7 @@ Every step that applies to the scan's mode is recorded, also when it did not run
 
 No step reports `budget_exhausted` yet; it is reserved for a work limit a later release records.
 
-Each step also has `stage` (1 for the SBOM a language image generated before this container started, 2 otherwise), `started_at`, `ended_at`, an optional `detail` of up to 500 characters, and for some steps `counts` (`generate` records `components`, and `unresolved` when it left out packages the generator saw but could not name, which `detail` then says).
+Each step also has `stage` (1 for the SBOM a language image generated before this container started, 2 otherwise), `started_at`, `ended_at`, an optional `detail` of up to 500 characters, and for some steps `counts` (`generate` records `components`, and `unresolved` when it left out packages the generator saw but could not name, which `detail` then says). In `POSTPROCESS` mode `generate` also has `input_fingerprint`, `reused`, `reuse_unsafe` and, after an execution plan, `plan_mismatch` (see [Input fingerprint](#input-fingerprint)).
 
 <!-- steps:begin -->
 | Step | What it does |
@@ -79,8 +79,10 @@ Each step also has `stage` (1 for the SBOM a language image generated before thi
 | `stamp-metadata` | set the root component to the project name and version; the run stops if this fails |
 | `docmeta` | record the document's author, tool and lifecycle phase |
 | `license-registry` | ask the package registry for missing licences and check a single strong-copyleft or non-commercial one (`--license-registry`); `counts` gives `candidates`, `filled`, `superseded`, `confirmed`, `no_answer`, `not_found`, `non_standard`, `lookup_failed`, `budget_reached` |
+| `component-versions` | a firmware, root filesystem or binary scan: fill the versions given with `--component-versions` and write the components still missing one to `_component-versions.template.csv`; `failed` when the file is refused, with the reason in `detail`, and the run then exits 1 |
 | `normalize` | normalize licences, PURLs and duplicates |
 | `enrich-cpe` | add CPE identifiers |
+| `upstream-purl` | a firmware, root filesystem or binary scan: set the upstream source repository purl from the mapping table; `disabled` with `ENRICH_UPSTREAM_PURL=false` |
 | `enrich-os-context` | record the operating system packages' distribution |
 | `enrich-distro-supplier` | record the distribution as the OS packages' supplier |
 | `enrich-maven-cpe` | add CPEs for Maven components |
@@ -99,6 +101,7 @@ Each step also has `stage` (1 for the SBOM a language image generated before thi
 | `source-file-tree` | record the scanned tree's file list |
 | `source-snapshot` | keep the scanned files' content for the file viewer |
 | `generate-notice` | write the open source notice |
+| `match-cpe` | a firmware, root filesystem or binary scan with `--security`: match the CPEs of components that have no package PURL against the NVD CPE index bundled in the image; `counts` gives `offered`, `components` and `cves`, `skipped` (`not_installed`) in an image without the index, `disabled` without `--security` or with `CVE_BIN_TOOL_MODE=components-only` |
 | `scan-security` | match vulnerabilities with Trivy |
 | `generate-risk-report` | write the risk report |
 | `model-security` | check an AI model file for unsafe content |
@@ -134,6 +137,29 @@ Operating system packages in `bom.json` carry PURLs in the form Trivy and the pu
 - Qualifiers are sorted by name.
 
 A change to this form is a major version change (see below).
+
+## Image scans
+
+In `IMAGE` mode syft reads the image first, and Trivy reads it again for the licenses of Debian packages (`os-licenses`), as does the file view. Those later reads take the image by the digest syft read, `<repository>@sha256:...`, so a tag that moves between the two reads cannot give them a different image. `input.image` records it:
+
+```json
+"image": {
+  "reference": "alpine:3.20",
+  "source": "registry",
+  "digest": "sha256:45e09956dc667c5eff3583c9d94830261fb1ca0be10a0a7db36266edf5de9e1d",
+  "platform": "linux/arm64/v8",
+  "index_digest": "sha256:d9e853e87e55526f6b2917df91a2115c36dd7c696a35be12163d44e6e2a4b6bc"
+}
+```
+
+| Field | Meaning |
+|---|---|
+| `reference` | the image reference as given (`TARGET_IMAGE`) |
+| `source` | where syft read it: `registry` (the `registry:` scheme, or a plain name with no Docker socket), `daemon` (`docker:` and `podman:`), `archive` (`docker-archive:`, `oci-archive:`, `oci-dir:`), `other` (`containerd:`), or `null` when the run stopped before syft read the image. With the socket, syft reads a plain name from the daemon and falls back to the registry when the daemon cannot give it the image, and its record does not name which it used. It is then told from the record: a Docker Hub repository digest written in full (`index.docker.io/...`) means `registry`, a listed tag means `daemon`, and anything else is `unknown` |
+| `digest` | for `registry`, the manifest digest of the image read, one platform; for `daemon` and `unknown`, the repository digest recorded for that repository, which for a multi-platform image is the digest of its index and names the same content in the daemon and in the registry. `null` for an archive, which is read as it is, and when no digest could be resolved: a repository with no repository digest (an image built locally and never pushed), a name that is not a plain image name, or a syft source record that could not be written. The later reads then use the reference as given, and the log says so |
+| `platform` | `os/architecture[/variant]` of the image read, or `null`. The variant is syft's `architectureVariant`, or else the `variant` in the image config (Docker writes `v8` for arm64 images) |
+| `index_digest` | `registry` only, present when the reference named an image index (manifest list) whose digest differs from `digest` |
+
 ## Execution plan
 
 A source scan runs in two containers: stage 1 resolves the dependencies in a cdxgen language image, stage 2 is this image in `POSTPROCESS` mode. A program that runs the containers itself (a Kubernetes Job, a hardened Docker runner) asks BomLens what to run with `MODE=PLAN`: mount the source read-only at `/src` and an output folder at `/host-output`, and the image writes `bomlens-plan.json` there and copies the files stage 1 mounts into `bomlens-plan/`. Nothing is scanned. The format is [`schemas/engine-plan-1.json`](https://github.com/sktelecom/bomlens/blob/main/schemas/engine-plan-1.json).
@@ -150,6 +176,7 @@ docker run --rm -v "$PWD/src:/src:ro" -v "$PWD/out:/host-output" \
 | `status` | `ok`, or `unsupported` with `reason` and `detail` (`android-sdk-image`: the Android SDK image is built by you and not published) and no stages |
 | `input.detected_ecosystem` | the language detection result that chose the stage 1 image |
 | `output_file` | the SBOM file name stage 1 writes and stage 2 reads |
+| `input_fingerprint` | what stage 1 reads, as sha256 values (see [Input fingerprint](#input-fingerprint)); the same value as in the `generate` stage, and here also when there are no stages |
 | `stages[]` | `generate` (stage 1) and `postprocess` (stage 2), in order |
 
 Each stage gives `image` and `image_digest` (stage 1 is always pinned by digest; stage 2 repeats `BOMLENS_IMAGE_REF` and `BOMLENS_IMAGE_DIGEST`), `user`, `entrypoint`, `args`, `workdir`, `env` (names and values to set), `env_passthrough` (names to pass from your own environment when set), `network` (whether it needs to reach the package registries) and `mounts`. A mount has a `role` (`source`, `output`, `plan-file` with a `source` path inside the output folder, the optional `guard-state`, an optional cache, or the optional `trivy-db`), a `target` and a `mode`. Mount a Trivy cache folder that holds a database (`db/trivy.db`) as `trivy-db`, read-only: with `GENERATE_SECURITY=true` (stage 2's report options are yours to set, as in the image reference), stage 2 then reads that database as it is, with no download, no update and no write, so it runs with no network and a read-only root. A `trivy-db` mount with no database fails `scan-security` with that reason; a database older than `BOMLENS_TRIVY_DB_MAX_AGE_DAYS` days (7, counted from `UpdatedAt` in `db/metadata.json`, when the database was built) records it as `degraded` (`unavailable`). Pass a value that fits how often you refresh the database. The source is writable in stage 1 only: the resolvers write lock files there, and stage 1 puts the tree back as it was when it finishes. A stage 1 that is killed (out of memory, a timeout) cannot; mount a folder of your own as `guard-state` and set `BOMLENS_GUARD_ID` to a unique id per scan, and after a kill run the same stage 1 again with `BOMLENS_GUARD_RESTORE_ONLY=1` to restore the source. Pass `HOST_UID` and `HOST_GID` to both stages so the files they write belong to your user rather than root. Stage 2 also runs as any user (`user` is `null`, so you choose) with a read-only root filesystem, given a writable `$TMPDIR` (default `/tmp`, a tmpfs) and an output folder that user can write; a home it cannot write is replaced with a folder in `$TMPDIR`, unless something is mounted under it. Without a `trivy-db` mount Trivy downloads its database there, several hundred MB, which a memory-backed tmpfs counts as memory: mount `trivy-db`. Stage 1 runs as root: the resolvers install packages and write into the source. It also runs with a read-only root filesystem given a writable `/tmp`, where `HOME` points (Gradle's files go there when the account's `~/.gradle` cannot be written).
@@ -159,6 +186,67 @@ Set `CDXGEN_IMAGE_PREFIX` for `MODE=PLAN` to name the stage 1 image from a regis
 `MODE=PLAN` exits 0 when it wrote a plan, `ok` or `unsupported`; an `unsupported` plan records the `plan` step as `skipped` in the result manifest, so the run reads `succeeded_degraded`. It refuses an empty source (usually a mount that did not reach the container) with a non-zero exit. Before writing, it removes an earlier plan and an earlier run's stage 1 outputs from the output folder, since stage 2 cannot tell a fresh SBOM from a leftover one. Stage 1 images are pinned for the cdxgen tag this BomLens release was tested with; overriding `CDXGEN_TAG` makes the language images `unsupported` (`no-pinned-digest`).
 
 Run stage 2 whatever stage 1's exit code, and pass that code as `BOMLENS_STAGE1_EXIT`, `true` in `BOMLENS_STAGE1_OOM` when the stage 1 container was killed for memory, and the stage 1 log saved in the output folder as `BOMLENS_STAGE1_LOG` (a file name). When stage 1 failed or left no SBOM, stage 2 scans the source with syft instead (direct dependencies only), records the reason in `bomlens:sbom-tool-degraded` (`oom`, `disk-space`, `network`, `cdxgen-crash`, `cdxgen-unavailable`), and the result manifest records `generate` as `degraded` (`fallback`), the same as the CLI. For an `unsupported` plan, where no stage 1 ran, pass `BOMLENS_STAGE1_EXIT=127` (or `BOMLENS_STAGE1_REASON=cdxgen-unavailable`) with no SBOM: the reason is then `cdxgen-unavailable`.
+
+## Input fingerprint
+
+The plan's `generate` stage has `input_fingerprint`: a sha256 over the whole source tree and what stage 1 runs with. When it is the same as the `sha256` of an earlier scan whose stage 1 exited 0, you may skip stage 1 and give stage 2 that scan's stage 1 outputs instead: the SBOM (`output_file`, and `_conda.cdx.json` when there was one) in the output folder, its exit code as `BOMLENS_STAGE1_EXIT` and its log as `BOMLENS_STAGE1_LOG`, with `BOMLENS_STAGE1_REUSED=1`. Reuse only a stage 1 that exited 0; a failed one is run again. Stage 2 always runs: the licence scan of the source files, the registry lookups, the version age and the vulnerabilities depend on the files and on the day, not only on stage 1, so `--deep-license` can stay on.
+
+The fingerprint errs on the side of not reusable: when a check cannot tell whether stage 1 would give the same result, `reusable` is `false`.
+
+```json
+{"algorithm": "bomlens-input-1", "sha256": "9e61...", "reusable": true, "reasons": [],
+ "components": [{"kind": "file", "name": ".", "sha256": "a729...", "count": 1840}, ...]}
+```
+
+| Field | Meaning |
+|---|---|
+| `algorithm` | `bomlens-input-1`. Compare it along with `sha256`: two values from different algorithms never match |
+| `sha256` | the fingerprint, or `null` when `reusable` is `false` |
+| `reusable` | whether stage 1's result for this input can be reused at all |
+| `reasons` | why not, when `reusable` is `false` (below); one entry per reason |
+| `components` | each input, as `kind` (`file`, `engine`, `image`, `setting`), `name` and `sha256`. A value is only ever given as its sha256 |
+
+The components, sorted by kind and name:
+
+- `file`: the source tree as one component, named `.`. Stage 1 runs cdxgen over the whole tree with no type filter, and cdxgen reads many kinds of file (its own `.cdxgenrc`, archives, installed package metadata, build files of many tools), so every file counts except any folder or file named `.git` (a worktree's `.git` file names an absolute path). Nothing else is skipped: `node_modules`, `vendor`, virtual environments, hidden folders and the non-shipped folders are hashed too. Its `sha256` is taken over one line per file, `<path><TAB><mode><TAB><sha256 of the content>`, with paths relative to the source and sorted byte by byte (`LC_ALL=C`). `<mode>` is `755` when the file can be executed and `644` otherwise (build-prep runs `./gradlew` only when it can), with an `l` in front for a link, so a link and a copy differ. `count` is the number of files. A change to any file, a README or a source file as much as a lock file, changes the value; a change to `.git` does not. A link is followed to a regular file inside the source. A path that cannot be hashed (an unreadable file or folder, a link that is broken or leads outside the source, a folder link, a FIFO, socket or device, a name with a tab or line break) is also listed as its own `file` component with `sha256` `null`, and the tree's `sha256` is then `null`. A tree with an installed pnpm `node_modules` (made of folder links) or a virtual environment (whose links lead outside the source) is therefore not reusable. The walk stops after `BOMLENS_FINGERPRINT_MAX_FILES` entries, files and folders counted together (200000), or after `BOMLENS_FINGERPRINT_TIMEOUT` seconds (300); the component then has `truncated: true` and `sha256` `null`. The whole computation, the checks below included, is stopped 30 seconds after that limit, and the fingerprint is then the not-reusable value with `unhashable-input` and no components. The checks read at most 4 MiB of a file; a manifest, lock file or Go source over that cannot be judged and makes the value `unhashable-input` (it is still hashed in full). In the result manifest of a CLI source scan, the run's own output folder is left out of the walk when it is inside the source (the default), since it holds this run's results, but the value is then not reusable (`unhashable-input`, with the folder listed with `sha256` `null`): stage 1 ran before the folder was cleaned and may have read an earlier run's files there. Put the output folder outside the source (`--output-dir`) to get a reusable value on the CLI path.
+- `engine`: the files stage 1 runs from BomLens, as the sha256 of their content: `build-prep.sh` and `identify-conda.py`, and the file that sets stage 1's arguments and environment, `make-plan.sh` in a plan. In the result manifest of a CLI source scan that file is `scan-sbom.sh` instead, and `build-prep.sh` and `identify-conda.py` are the CLI's own copies it mounted, so a CLI value is comparable only with other CLI values.
+- `image`: `stage1`, the stage 1 image's digest, and `bomlens`, `BOMLENS_IMAGE_DIGEST` (`null` when it is not passed; the files it would cover are already `engine` components). A CLI scan records the digest the stage 1 image was pulled at; a locally built image has none.
+- `setting`: `detected_ecosystem`, `PROJECT_NAME`, `PROJECT_VERSION`, `FETCH_LICENSE`, `HOST_GOTOOLCHAIN`, `CDX_SPEC_VERSION` (stage 1's `--spec-version`), and the build-prep options `BOMLENS_KEEP_BUILD_OUTPUT`, `BOMLENS_MAVEN_FULL_GRAPH`, `BOMLENS_ANDROID_FULL_GRAPH`, `BOMLENS_NODE_FULL_GRAPH`, `BOMLENS_PHP_FULL_GRAPH`, `BOMLENS_INCLUDE_NON_SHIPPED`, `BOMLENS_NO_COPYRIGHT`, `BOMLENS_NO_CARGO_LICENSE` and `BOMLENS_PREP_TIMEOUT`, as the sha256 of the value (of an empty value when unset). `FETCH_LICENSE` and `HOST_GOTOOLCHAIN` are the values in the stage 1 `env`. `MODE=PLAN` reads the build-prep options from its own environment, so give it the same values you give the stages; the plan's stage 2 `env_passthrough` lists them too.
+
+Not components: absolute paths, the time, the scan id, the proxy settings (`HTTP_PROXY`, `HTTPS_PROXY`, `NO_PROXY` and the lower-case forms), `GOPROXY`, `GOSUMDB`, `TRIVY_*`, `CDXGEN_IMAGE_PREFIX` (a mirror serves the same digest), `HOST_UID`/`HOST_GID`, and `SRC_TREE_EXCLUDE`, which only stage 2 reads. Stage 1's fixed arguments and environment are covered through the `engine` file that defines them.
+
+Two things stay the caller's responsibility:
+
+- What you mount into stage 1 besides the source is not covered: the `cache-maven` and `cache-gradle` mounts, and what they hold, such as a Maven `settings.xml` or a Gradle `init.d` script or `gradle.properties`. Change those and the same fingerprint can stand for a different result.
+- With `FETCH_LICENSE=true` cdxgen looks the licences up online. The fingerprint has the setting but still counts the result as reusable, on the assumption that the licence metadata of a published version rarely changes.
+
+The checks below ask whether an identical tree would still give a different stage 1 result, because a resolver asks the registry again. Go, Maven and Gradle are resolved from the root over the whole tree, so they are judged everywhere (Go leaves out what the go tool does: `testdata`, `vendor` and names starting with `.` or `_`). For the other languages the folders a source scan skips (`node_modules`, `vendor`, `.venv`, `site-packages`, and the non-shipped folders unless `BOMLENS_INCLUDE_NON_SHIPPED=1`) are not judged, though they are hashed.
+
+Decide on reuse from the result manifest, not only from the plan: store a stage 1 for reuse only when the `input_fingerprint` in its result manifest is `reusable`. Stage 2 adds `stage1-degraded` there when stage 1 came out short although it exited 0.
+
+<!-- fingerprint-reasons:begin -->
+| `reasons` | Meaning |
+|---|---|
+| `no-lockfile` | a manifest that declares a dependency has no lock file in its own folder: Node.js `package-lock.json`, `npm-shrinkwrap.json`, `yarn.lock`, `pnpm-lock.yaml`, `bun.lock` or `bun.lockb`; Python `poetry.lock`, `uv.lock` or `Pipfile.lock`; Rust `Cargo.lock`; Go `go.sum` (every `go.mod` with a `require` needs its own); Ruby `Gemfile.lock`; PHP `composer.lock`; Swift `Package.resolved` or `Podfile.lock`. A lock in a folder above covers only a declared workspace member: npm, yarn, pnpm or bun `workspaces` (or `pnpm-workspace.yaml`), and Cargo `[workspace] members`. Gradle: every build script (and every project `settings.gradle` includes, when the root declares dependencies in `subprojects {}` or `allprojects {}`) needs its own `gradle.lockfile` with at least one `group:artifact:version=` entry (one with only `empty=` lines locks nothing), and the file counts only when locking is on (`lockAllConfigurations()` or `activateDependencyLocking()`, comments aside): in the project's own build file, or for a subproject inside the root's `subprojects {}` or `allprojects {}` block. Locking at the top of the root build file locks the root project only. .NET: a project needs its own `packages.lock.json` or `obj/project.assets.json`, or a `paket.lock` above it, and a tree with .NET projects and none of these anywhere is `no-lockfile`. A `requirements*.txt` (or a `.txt` under `requirements/`) counts as locked only in pip's hash-checking mode: every requirement `name==version` with `--hash`, and no include (`-r`, `-c`), editable, URL, path or `${VARIABLE}` requirement. No other lock covers it, since stage 1 installs it with pip from the registry |
+| `unpinned-versions` | Maven, in addition to `registry-resolution` (below): an element of the tree's own poms holds, as written, a version range, a `-SNAPSHOT`, `LATEST` or `RELEASE`. Properties are not expanded, so a version set through a property is not judged here; the tree is not reusable either way. .NET: a floating or range version (`*`, `[1.0,2.0)`, an MSBuild `$(property)`) in a project, `.props` or `.targets` file. Versions in the poms of the dependencies themselves are not visible and are not checked |
+| `registry-resolution` | stage 1 resolves again from the registry although the tree has not changed. Maven: any `pom.xml`, since no lock covers the transitive graph and a range in a dependency's own pom cannot be seen. Node.js: a root `package.json` with no `package-lock.json` (a yarn, pnpm or bun project, or one with only `npm-shrinkwrap.json`) that is not a workspace root, unless `BOMLENS_NODE_FULL_GRAPH=1`, because the production filter has npm resolve it; and an npm lock that does not match its `package.json` (the dependency specs in the lock's entry for it, or with lockfile version 1 every dependency name, differ). Ruby: a `Gemfile.lock` whose `DEPENDENCIES` lacks a gem the `Gemfile` names. Swift: a `Package.resolved` that does not pin every remote package `Package.swift` names. Go: a `.go` file imports a module the `go.mod` does not require, so `go mod tidy` adds its newest version. An import counts as covered when a required module path is a prefix of it (a `/vN` major version after the prefix does not count); an import that a required path covers by prefix but that lives in a separate, unrequired module is not detected |
+| `unsupported-ecosystem` | the language is not one stage 1 resolves reproducibly: `unknown`, a Conan or vcpkg manifest anywhere, a Modelica library (`package.mo`), or a Swift project with only an Xcode project |
+| `plan-unsupported` | the plan's `status` is `unsupported` |
+| `stage1-degraded` | in the result manifest only: the stage 1 SBOM records a failed step (`bomlens:pipeline-step-failed`) or a fallback (`bomlens:sbom-tool-degraded`), or `generate` is `degraded` or `failed` |
+| `unhashable-input` | an input could not be hashed: a file or folder that cannot be read, a link that is broken or leads outside the source, a folder link (cdxgen may follow it), a FIFO, socket or device, a path with a tab or line break, a walk stopped at its file count or time limit, a CLI output folder inside the source (or a flat output into it), or a file a requirements file includes that is missing or outside the source |
+| `unknown-stage1-image` | the result manifest does not know the stage 1 image's digest: the CLI's stage 1 image has no RepoDigest (a locally built one), or a stage 2 run with no plan was not told |
+<!-- fingerprint-reasons:end -->
+
+When the plan is `unsupported` there are no stages, and the fingerprint is only in the plan's top-level `input_fingerprint`, with `plan-unsupported`.
+
+In a `POSTPROCESS` run the result manifest's `generate` step has the fingerprint stage 2 computes again from the source with its own code; a file in the output folder is never taken as it is.
+
+- After an execution plan (`bomlens-plan.json` in the output folder, written for the same `output_file`), stage 2 takes stage 1's image digest, settings and `--spec-version` from the plan, or the digest from `BOMLENS_STAGE1_DIGEST` when you pass it, and hashes the `engine` files from the `bomlens-plan/` copies. The value then equals the plan's, and `plan_mismatch` is `false`. When it differs (the source changed after the plan, or the plan is a leftover from another scan), the step has the computed value and `plan_mismatch: true`. Stage 2 writes into the output folder, so keep it outside the source; one inside it changes the tree.
+- After a CLI source scan, stage 2 uses what the CLI passes on: the stage 1 image's RepoDigest, the sha256 of the files it ran, and the output folder to leave out (`BOMLENS_FINGERPRINT_EXCLUDE`, a path relative to the source).
+
+`reused` is `true` when you passed `BOMLENS_STAGE1_REUSED=1`. `reuse_unsafe` is `true` when you did so although the fingerprint is not `reusable`, is missing, or does not match the plan's: the SBOM may not be the one stage 1 would give now.
+
+`algorithm` changes when the kinds or the list of components change, or when the same input would give a different `sha256`. A new reason does not change it. A fingerprint for image input is not part of this version.
 
 ## Restricted networks
 
@@ -199,8 +287,8 @@ Set `BOMLENS_EVENTS=file` to have the run write one JSON object per line to `bom
 
 The contract version changes on its own schedule, not with each BomLens release.
 
-- Major: a field, step id, output role or status value is removed, renamed, or changes meaning, or a change makes the same input produce a different PURL or licence id, or reports a failure as success.
-- Minor: a new optional field, step id, reason, output role or status detail. A reader ignores values it does not know.
+- Major: a field, step id, output role or status value is removed, renamed, or changes meaning, or a change makes the same input produce a different package PURL (one with a package ecosystem type, such as `pkg:npm` or `pkg:deb`) or licence id, or reports a failure as success.
+- Minor: a new optional field, step id, reason, output role or status detail, or a PURL added or replaced on a component that had no package PURL (none, `pkg:generic`, `pkg:opkg`), as firmware, root filesystem and binary scans do. A reader ignores values it does not know.
 - Patch: no change a reader can see in the fields above.
 
 Properties named `bomlens:*` in the SBOM, and the human-readable reports, are not part of the contract and can change in any release.

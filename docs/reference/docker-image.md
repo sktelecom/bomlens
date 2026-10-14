@@ -29,15 +29,17 @@ It is a lightweight image (based on python 3.12 slim) without language toolchain
 
 | Tool | Version | Role |
 |------|------|------|
-| syft | v1.52.0 | Scans images, binaries, and directories |
-| Trivy | v0.74.0 | Vulnerability report |
+| syft | v1.54.1 | Scans images, binaries, and directories |
+| Trivy | v0.75.0 | Vulnerability report |
 | cosign | v3.1.3 | SBOM signing |
 | jq | — | SBOM normalization and notice generation |
 | ScanCode Toolkit | 32.5.0 | Precise license detection (included only in opt-in builds) |
-| docker CLI | 29.8.1 | Starts a sibling cdxgen container when the web UI runs a source scan |
-| cdxgen | 13.2.0 | Model pedigree enrichment (`bomlens-aibom` image only) |
+| docker CLI | 29.9.0 | Starts a sibling cdxgen container when the web UI runs a source scan |
+| cdxgen | 13.3.0 | Model pedigree enrichment (`bomlens-aibom` image only) |
 
 Tool versions are pinned with `ARG` in `docker/Dockerfile`.
+
+Every image also carries the NVD CPE index (`cpe_match.sqlite`, about 146 MB), built from the NVD data when the image is built. Firmware, root filesystem and binary scans with `--security` match the CPEs of components that have no package PURL against it, with no network (see [How CVEs are matched](../guides/firmware.md#how-cves-are-matched)). Building it clones the NVD data feeds from GitHub. When you build an image yourself where GitHub is not reachable, the build stops at that step and names `--build-arg SBOM_CPE_INDEX=false`, which leaves the index out; a firmware build does not accept it, so the firmware image always has the index.
 
 ## Running directly
 
@@ -149,6 +151,7 @@ MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL='*' docker run --rm \
 | `GENERATE_REPORT` | — | `false` | Generate the open-source risk analysis report (off in direct runs, unlike the CLI default) |
 | `ENRICH_MAVEN_CPE` | — | `true` | Attach an NVD-matchable `cpe:2.3` to maven components (derived from the groupId) so a CPE-aware engine can reach their NVD-only CVEs; unmapped groups get no CPE (skipped for AI SBOMs) |
 | `ENRICH_GITHUB_CPE` | — | `true` | Attach an NVD-matchable `cpe:2.3` to a small, hand-verified set of `pkg:github/` components (source-repository-only coordinates, typical for large C/C++ projects with no package-manager ecosystem) so a CPE-aware engine can reach their NVD-only CVEs; anything not in the curated list gets no CPE (skipped for AI SBOMs) |
+| `ENRICH_UPSTREAM_PURL` | — | `true` | For a firmware, root filesystem or binary scan, set the purl of the upstream source repository (`pkg:github/<owner>/<repo>@<tag>`, `pkg:sourceforge`, `pkg:gnu`) on components that have no purl, a `pkg:generic` one or a `pkg:opkg` one, from the closed table in `docker/lib/upstream-purl-map.json`. A component not in the table keeps its identifier |
 | `ENRICH_INTERPRETER_CPE` | — | `true` | Attach an NVD-matchable `cpe:2.3` to a small, hand-verified set of interpreter components (e.g. Python packaged as a conda or NuGet artifact) so a CPE-aware engine can reach their NVD-only CVEs; anything not in the curated list gets no CPE (skipped for AI SBOMs) |
 | `SECURITY_NVD_VERIFY` | — | `false` | With `--deep-cve`: verify each grype `nvd:cpe` finding against the live NVD version range and drop out-of-range false positives (needs `NVD_API_KEY` + network; adds minutes). Off by default — findings are kept and flagged version-unverified |
 | `NVD_API_KEY` | For `SECURITY_NVD_VERIFY` | — | NVD API key used by the deep-cve version filter; passed to the container by name only (never inlined) |

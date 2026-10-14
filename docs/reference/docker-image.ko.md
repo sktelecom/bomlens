@@ -29,15 +29,17 @@ docker pull ghcr.io/sktelecom/bomlens:latest
 
 | 도구 | 버전 | 역할 |
 |------|------|------|
-| syft | v1.52.0 | 이미지, 바이너리, 디렉터리 스캔 |
-| Trivy | v0.74.0 | 취약점 보고서 |
+| syft | v1.54.1 | 이미지, 바이너리, 디렉터리 스캔 |
+| Trivy | v0.75.0 | 취약점 보고서 |
 | cosign | v3.1.3 | SBOM 서명 |
 | jq | — | SBOM 정규화와 고지문 생성 |
 | ScanCode Toolkit | 32.5.0 | 정밀 라이선스 탐지 (opt-in 빌드에만 포함) |
-| docker CLI | 29.8.1 | 웹 UI가 소스 스캔에서 cdxgen 컨테이너를 sibling으로 띄울 때 사용 |
-| cdxgen | 13.2.0 | 모델 계보 정보 보강(`bomlens-aibom` 이미지 전용) |
+| docker CLI | 29.9.0 | 웹 UI가 소스 스캔에서 cdxgen 컨테이너를 sibling으로 띄울 때 사용 |
+| cdxgen | 13.3.0 | 모델 계보 정보 보강(`bomlens-aibom` 이미지 전용) |
 
 도구 버전은 `docker/Dockerfile`의 `ARG`로 고정됩니다.
+
+모든 이미지에는 NVD CPE 인덱스(`cpe_match.sqlite`, 약 146 MB)도 들어 있으며, 이미지를 빌드할 때 NVD 데이터로 만듭니다. 펌웨어, 루트 파일시스템, 바이너리 스캔에서 `--security`를 켜면 패키지 PURL이 없는 컴포넌트의 CPE를 네트워크 없이 이 인덱스와 대조합니다([CVE 대조 방식](../guides/firmware.ko.md#cve-대조-방식) 참고). 인덱스를 만들 때 GitHub에서 NVD 데이터 피드를 복제합니다. GitHub에 접속할 수 없는 환경에서 이미지를 직접 빌드하면 빌드가 이 단계에서 멈추고 `--build-arg SBOM_CPE_INDEX=false`를 안내하며, 이 옵션으로 인덱스를 뺄 수 있습니다. 펌웨어 빌드는 이 옵션을 받지 않으므로 펌웨어 이미지에는 항상 인덱스가 들어갑니다.
 
 ## 직접 실행
 
@@ -149,6 +151,7 @@ MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL='*' docker run --rm \
 | `GENERATE_REPORT` | — | `false` | 오픈소스위험분석보고서 생성 (CLI 기본값과 달리 직접 실행은 꺼짐) |
 | `ENRICH_MAVEN_CPE` | — | `true` | maven 컴포넌트에 groupId로 유도한 NVD 매칭용 `cpe:2.3`을 부여해 CPE 기반 엔진이 NVD 전용 CVE를 찾게 함. 매핑 불가한 group은 CPE를 붙이지 않음 (AI SBOM은 건너뜀) |
 | `ENRICH_GITHUB_CPE` | — | `true` | 소수의 손검증된 `pkg:github/` 컴포넌트(패키지 매니저 생태계가 없는 대형 C/C++ 프로젝트에 흔한, 소스 저장소 좌표로만 식별되는 컴포넌트)에 NVD 매칭용 `cpe:2.3`을 부여해 CPE 기반 엔진이 NVD 전용 CVE를 찾게 함. 큐레이션 목록에 없으면 CPE를 붙이지 않음 (AI SBOM은 건너뜀) |
+| `ENRICH_UPSTREAM_PURL` | — | `true` | 펌웨어, 루트 파일시스템, 바이너리 스캔에서 purl이 없거나 `pkg:generic`, `pkg:opkg` purl인 컴포넌트에 upstream 소스 저장소 purl(`pkg:github/<owner>/<repo>@<tag>`, `pkg:sourceforge`, `pkg:gnu`)을 붙임. `docker/lib/upstream-purl-map.json`의 변환표에 있는 프로젝트만 바꾸고, 나머지는 원래 식별자를 둠 |
 | `ENRICH_INTERPRETER_CPE` | — | `true` | 소수의 손검증된 인터프리터 컴포넌트(예: conda나 NuGet 패키지로 배포된 Python)에 NVD 매칭용 `cpe:2.3`을 부여해 CPE 기반 엔진이 NVD 전용 CVE를 찾게 함. 큐레이션 목록에 없으면 CPE를 붙이지 않음 (AI SBOM은 건너뜀) |
 | `SECURITY_NVD_VERIFY` | — | `false` | `--deep-cve` 사용 시: grype `nvd:cpe` 결과를 실시간 NVD 버전 범위로 검증해 범위 밖 오탐을 제거 (`NVD_API_KEY`·네트워크 필요, 수 분 추가). 기본 off — 결과는 유지하되 버전 미검증으로 표시 |
 | `NVD_API_KEY` | `SECURITY_NVD_VERIFY`에 필요 | — | deep-cve 버전 필터가 쓰는 NVD API 키. 컨테이너에 이름으로만 전달(값은 인라인하지 않음) |

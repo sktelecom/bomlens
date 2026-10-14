@@ -112,6 +112,10 @@ Components (1):
 
 보고서는 취약점이 있어도 스캔을 실패시키지 않습니다(report-only). 게이트가 필요하면 `_security.json`을 후처리하세요.
 
+Trivy는 컴포넌트를 패키지 PURL로 대조합니다. 펌웨어, 루트 파일 시스템, 바이너리 스캔에서는 패키지 PURL이 없고(PURL이 없거나 `pkg:generic`이거나 `pkg:github`처럼 소스 저장소를 가리키는 경우) CPE가 있는 컴포넌트를 이미지에 들어 있는 NVD CPE 인덱스와도 대조하고, 찾은 CVE를 같은 보고서에 합칩니다. 패키지 데이터베이스가 없는 임베디드 루트 파일 시스템에서 버전 문자열로 식별한 OpenSSL이나 BusyBox 같은 바이너리가 여기에 해당합니다. 인덱스는 오프라인에서 동작합니다.
+
+어떤 검사도 닿지 못한 컴포넌트는 취약점이 없는 것으로 세지 않습니다. 버전이 없거나, 패키지 PURL도 대조한 CPE도 없는 컴포넌트가 있으면 보고서는 "No known vulnerabilities found" 대신 그 개수를 알리고 "Components that could not be checked" 아래에 목록을 보여 줍니다. `_security.json`에도 같은 목록이 `UncheckedComponents`(`Count`, 그리고 `Name`, `Version`, `PURL`, `Reason`을 담은 `Components`. `Reason`은 `no-version` 또는 `no-identifier`)로 남고, 위험 보고서의 취약점 절에도 같은 내용이 나옵니다.
+
 심각도, CVSS, EPSS, KEV 우선순위 신호와 후속 조치 해석은 [보고서 읽는 법](../concepts/reports-explained.ko.md)을 참고하세요.
 
 ---

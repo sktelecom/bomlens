@@ -15,7 +15,6 @@ import { useTranslation } from "react-i18next";
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Disclosure } from "@/components/ui/disclosure";
-import type { ScanProgress } from "@/lib/api";
 import { SCAN_STAGES, stageStatuses } from "@/lib/scanProgress";
 import { cn } from "@/lib/utils";
 
@@ -37,7 +36,6 @@ type Status = "running" | "done" | "error";
 export function ScanRunning({
   logs,
   status,
-  progress,
   projectLabel,
   errorMessage,
   errorKey,
@@ -49,7 +47,6 @@ export function ScanRunning({
 }: {
   logs: string[];
   status: Status;
-  progress?: ScanProgress | null;
   projectLabel?: string;
   /** Failure message to surface prominently (falls back to a generic line). */
   errorMessage?: string | null;
@@ -181,7 +178,7 @@ export function ScanRunning({
         </Card>
       )}
 
-      <ProgressLog logs={logs} status={status} progress={progress} />
+      <ProgressLog logs={logs} status={status} />
 
       {/* No run id here: the stream ended before a finished scan existed, so the
           summary is the environment section only. */}

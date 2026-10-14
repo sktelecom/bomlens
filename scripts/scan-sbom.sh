@@ -116,8 +116,9 @@ fail_on_bad_coverage() {
     echo "[ERROR] --fail-on: '$1' needs a whole percentage from 0 to 100 without leading zeros, for example license-coverage=80 (there is no default)."
     exit 1
 }
-FORCE_FIRMWARE="false"; ANALYZE_SBOM=""; MODEL=""; MODEL_FILE=""; VEX_FILE=""
+FORCE_FIRMWARE="false"; FORCE_SOURCE="false"; RELEASE_FOLDER_DIR=""; ANALYZE_SBOM=""; MODEL=""; MODEL_FILE=""; VEX_FILE=""
 AI_DECLARE_FILE=""; GENERATE_SPDX3="true"
+COMPONENT_VERSIONS_FILE=""
 # Set when --target turned out to be a Yocto build directory: the folder the
 # user pointed at, while ANALYZE_SBOM holds the image SBOM found inside it.
 YOCTO_BUILD_DIR=""
@@ -181,6 +182,7 @@ while [[ "$#" -gt 0 ]]; do
         # report, so asking for a VEX asks for that report too (as --deep-cve does).
         --vex) VEX_FILE="$2"; GENERATE_SECURITY="true"; shift ;;
         --ai-declare) AI_DECLARE_FILE="$2"; shift ;;
+        --component-versions) COMPONENT_VERSIONS_FILE="$2"; shift ;;
         --no-spdx3) GENERATE_SPDX3="false" ;;
         --usage) USAGE_CONTEXT="$2"; shift ;;
         --merge)
@@ -243,6 +245,7 @@ while [[ "$#" -gt 0 ]]; do
         --resolve-purl) PURL_RESOLVE="true" ;;
         --license-registry) LICENSE_REGISTRY="true" ;;
         --firmware) FORCE_FIRMWARE="true" ;;
+        --as-source) FORCE_SOURCE="true" ;;
         --output-dir|-o) OUTPUT_BASE="$2"; shift ;;
         --timestamp) TIMESTAMP="true" ;;
         --ui) UI_MODE="true" ;;
@@ -295,6 +298,17 @@ Options:
                          yet: its base models (model.baseModels) and datasets
                          (datasets[].ref) are read from the hub by id, and the
                          rest comes from the declaration (base image).
+  --component-versions <file>
+                         For a firmware, root filesystem or binary scan: a CSV
+                         file with two columns, name,version, giving the version
+                         of components the scan found but could not read a
+                         version for. A version the scan read from the delivered
+                         files is kept (a warning names both), and a name the
+                         scan did not find is added as a supplier-declared
+                         component. Every such scan writes the components still
+                         missing a version to
+                         <Project>_<Version>_component-versions.template.csv,
+                         in this format, to fill in and pass back.
   --no-spdx3             For an AI model or dataset scan: do not write the
                          SPDX 3.0.1 AI document (<Project>_<Version>_bom.spdx3.json)
                          and its check
@@ -313,6 +327,9 @@ Options:
                          A Yocto build directory is recognized as such: its
                          image SBOM under tmp/deploy/images/ is analyzed
                          instead of the build tree being walked.
+                         A folder with no manifest of its own that directly
+                         holds one root filesystem or firmware image (a
+                         release folder) is scanned as that; see --as-source.
   --git <url>            Clone a git/GitHub URL (shallow) and scan as source.
                          Private repos: set GIT_TOKEN env. Mutually exclusive
                          with --target/--analyze/--firmware.
@@ -322,6 +339,13 @@ Options:
                          on an archive too: the firmware unpacker reads it
                          directly, nested formats and all, instead of the
                          archive being extracted and scanned as source.
+  --as-source            Scan a directory --target as a source tree, as it is.
+                         Without it, a folder that is not a source tree (no
+                         manifest or build file at its top level) and directly
+                         holds one root filesystem or one firmware image is
+                         scanned as that instead; holding several stops the
+                         scan with a list to choose from. Also skips the Yocto
+                         build directory and root filesystem recognition.
   --analyze <sbom>       Validate + analyze a supplier SBOM (alias: --sbom).
                          CycloneDX or SPDX; mutually exclusive with --target.
   --model <ref>          Generate an AI SBOM (CycloneDX 1.7 ML-BOM) for a
@@ -652,6 +676,7 @@ SBOM_PULL="${SBOM_PULL:-missing}"
 if [ "$UI_MODE" = "true" ]; then
     [ -z "$VEX_FILE" ] || { echo "[ERROR] --vex is not offered with --ui (import a VEX from the Vulnerabilities screen instead)."; exit 1; }
     [ -z "$AI_DECLARE_FILE" ] || { echo "[ERROR] --ai-declare is not offered with --ui (fill the declaration on the Models & datasets screen instead)."; exit 1; }
+    [ -z "$COMPONENT_VERSIONS_FILE" ] || { echo "[ERROR] --component-versions is not offered with --ui (it applies to one firmware, root filesystem or binary scan)."; exit 1; }
     [ "${#FAIL_ON[@]}" -eq 0 ] || { echo "[ERROR] --fail-on is not offered with --ui (it exits on one scan's result; the UI runs many)."; exit 1; }
     [ "$FAIL_ON_CONFORMANCE" = "true" ] && { echo "[ERROR] --fail-on-conformance is not offered with --ui (it exits on one scan's result; the UI runs many)."; exit 1; }
     docker_check
@@ -744,6 +769,7 @@ if [ -n "$DIFF_OLD" ]; then
     [ "${#FAIL_ON[@]}" -eq 0 ] || { echo "[ERROR] --fail-on cannot be combined with --diff (a diff judges no scan)."; exit 1; }
     [ -z "$VEX_FILE" ] || { echo "[ERROR] --vex cannot be combined with --diff (a diff writes no SBOM to attach statements to)."; exit 1; }
     [ -z "$AI_DECLARE_FILE" ] || { echo "[ERROR] --ai-declare cannot be combined with --diff (a diff writes no AI document to declare into)."; exit 1; }
+    [ -z "$COMPONENT_VERSIONS_FILE" ] || { echo "[ERROR] --component-versions cannot be combined with --diff (a diff writes no SBOM to add versions to)."; exit 1; }
     docker_check
     [ -f "$DIFF_OLD" ] || { echo "[ERROR] --diff: old SBOM not found: $DIFF_OLD"; exit 1; }
     [ -f "$DIFF_NEW" ] || { echo "[ERROR] --diff: new SBOM not found: $DIFF_NEW"; exit 1; }
@@ -1078,6 +1104,15 @@ declare_run() {
     printf ' -v %q:/declare-in/declaration.json:ro -e AI_DECLARATION_FILE=/declare-in/declaration.json' "$(hostpath "$d/$f")"
 }
 
+# --component-versions: mounted the same way as --vex, one file, read-only, at
+# a fixed container path. component-versions.py validates its content.
+component_versions_run() {
+    [ -n "$COMPONENT_VERSIONS_FILE" ] || return 0
+    local d f
+    d="$(cd "$(dirname "$COMPONENT_VERSIONS_FILE")" && pwd)"; f="$(basename "$COMPONENT_VERSIONS_FILE")"
+    printf ' -v %q:/component-versions-in/versions.csv:ro -e COMPONENT_VERSIONS_FILE=/component-versions-in/versions.csv' "$(hostpath "$d/$f")"
+}
+
 # --fail-on: the conditions travel to the container as one comma-separated value.
 # Each is from a closed list (checked when the option is read), so none holds a
 # space or a shell-special character.
@@ -1108,11 +1143,14 @@ is_model_file() {
     return 1
 }
 
+# .bix is a vendor firmware image container (in the one examined, a 64-byte
+# header, then a gzip kernel with its initramfs). `file` calls it "data", so only the extension
+# says what it is; unblob unpacks it through the gzip inside.
 is_firmware() {
     local f="$1" lower magic
     lower=$(printf '%s' "$f" | tr '[:upper:]' '[:lower:]')
     case "$lower" in
-        *.bin|*.img|*.squashfs|*.sqsh|*.ubi|*.ubifs|*.trx|*.chk|*.fw|*.rom|*.dlf) return 0 ;;
+        *.bin|*.img|*.squashfs|*.sqsh|*.ubi|*.ubifs|*.trx|*.chk|*.fw|*.rom|*.dlf|*.bix) return 0 ;;
     esac
     if command -v file >/dev/null 2>&1; then
         magic=$(file -b "$f" 2>/dev/null)
@@ -1422,6 +1460,206 @@ nested_rootfs_hint() {
     printf '%s' "${found#"$d"/}"
 }
 
+# ---------------------------------------------------------------------------
+# Release folders
+#
+# A folder handed over with a product release often holds the built artifacts
+# side by side, not source: an extracted root filesystem, a firmware image, a
+# kernel, an install tree. Scanned as source it yields an almost empty SBOM,
+# because there is no manifest to read. When such a folder directly holds
+# exactly one root filesystem or firmware image, that is what gets scanned.
+#
+# The rule is kept narrow on purpose (see nested_rootfs_hint for why routing a
+# source tree away from cdxgen is the worse mistake):
+#   - only a folder with no manifest, lockfile or build file of its own at the
+#     top level, and no .git, is considered at all, so a source repository
+#     that keeps a rootfs-shaped test fixture or a .bin blob stays source;
+#   - a folder with signs of an application or a model at its top level
+#     (executables, shared libraries, .asar, node_modules, model weights or
+#     tokenizer files) or with more than 20 top-level files is not considered
+#     either, so an unpacked desktop app, a model snapshot or a build output
+#     staging folder stays source;
+#   - only its direct children are candidates, and symlinks are skipped, so a
+#     link to / or to a folder elsewhere is never followed into a scan;
+#   - a candidate is a root filesystem folder, or a file with a firmware or
+#     filesystem signature or an extension used for little but firmware;
+#     .bin and .img by name alone do not count;
+#   - several candidates stop the scan instead of picking one.
+# --as-source turns all of it off.
+
+# Does this folder carry anything a source scan reads, at its top level only?
+# Broader than detect_lang on purpose: a C/C++ tree with only a Makefile or
+# CMakeLists.txt has no package manifest, yet is still source.
+has_source_manifest() {
+    local d="$1" f
+    [ -e "$d/.git" ] && return 0
+    for f in package.json package-lock.json yarn.lock pnpm-lock.yaml bun.lock \
+             pom.xml build.gradle build.gradle.kts settings.gradle settings.gradle.kts \
+             go.mod go.sum Cargo.toml Cargo.lock Gemfile Gemfile.lock \
+             requirements.txt pyproject.toml setup.py setup.cfg Pipfile poetry.lock uv.lock \
+             composer.json composer.lock Package.swift Podfile Cartfile \
+             conanfile.txt conanfile.py vcpkg.json packages.config \
+             CMakeLists.txt Makefile GNUmakefile makefile Makefile.am configure configure.ac \
+             meson.build MODULE.bazel WORKSPACE BUILD.bazel build.sbt mix.exs pubspec.yaml \
+             deno.json package.mo; do
+        [ -f "$d/$f" ] && return 0
+    done
+    for f in "$d"/*.csproj "$d"/*.fsproj "$d"/*.vbproj "$d"/*.sln "$d"/*.slnx \
+             "$d"/*.xcodeproj "$d"/*.xcworkspace "$d"/*.gemspec "$d"/*.cabal; do
+        [ -e "$f" ] && return 0
+    done
+    return 1
+}
+
+# Print one "<kind><TAB><path>" line per direct child of $1 that would be
+# scanned on its own: kind is "rootfs" (a root filesystem directory) or
+# "firmware" (a file release_folder_firmware_file accepts). Hidden entries and
+# symlinks are skipped. Prints nothing for a folder that looks like an
+# application, a model or anything else with many files (release_folder_vetoed),
+# so such a folder stays a source scan.
+release_folder_candidates() {
+    local d="${1%/}" e
+    release_folder_vetoed "$d" && return 0
+    for e in "$d"/*; do
+        [ -L "$e" ] && continue
+        if [ -d "$e" ]; then
+            _is_rootfs_dir "$e" && printf 'rootfs\t%s\n' "$e"
+        elif [ -f "$e" ]; then
+            release_folder_firmware_file "$e" && printf 'firmware\t%s\n' "$e"
+        fi
+    done
+    return 0
+}
+
+# Is this file, found in a release folder, a firmware or filesystem image? Stricter
+# than is_firmware, which takes .bin and .img by name when the user points at the
+# file: in a folder, a .bin is as often a V8 snapshot or model weights. Here an
+# extension counts only when it is used for little else, and .bin/.img (or any
+# other name) only with a firmware or filesystem signature from `file`. A kernel
+# uImage is not counted: it sits beside the image it boots, and is not the thing
+# to scan on its own.
+release_folder_firmware_file() {
+    local f="$1" lower magic
+    lower=$(printf '%s' "$f" | tr '[:upper:]' '[:lower:]')
+    case "$lower" in
+        *.bix|*.trx|*.chk|*.dlf|*.ubi|*.ubifs|*.squashfs|*.sqsh|*.rom|*.fw|*.jffs2|*.cramfs) return 0 ;;
+    esac
+    command -v file >/dev/null 2>&1 || return 1
+    magic=$(file -b "$f" 2>/dev/null)
+    case "$magic" in
+        *Squashfs*|*"UBI image"*|*UBIfs*|*JFFS2*|*cramfs*|*"filesystem data"*) return 0 ;;
+    esac
+    return 1
+}
+
+# Does this top-level entry belong to an application or a model rather than to
+# a firmware release? Name checks only. Used to keep such folders out of the
+# release-folder switch, and such files out of the large-file hint.
+release_folder_app_entry() {
+    local e="$1" name lower
+    name="${e##*/}"
+    lower=$(printf '%s' "$name" | tr '[:upper:]' '[:lower:]')
+    if [ -d "$e" ]; then
+        case "$lower" in
+            node_modules|*.app|contents|site-packages) return 0 ;;
+            resources) [ -e "$e/app.asar" ] || [ -d "$e/app" ] ;;
+            *) return 1 ;;
+        esac
+        return
+    fi
+    case "$lower" in
+        *.exe|*.dll|*.so|*.so.*|*.dylib|*.asar|*.jar|*.war|*.apk|*.ipa|*.msi|*.node) return 0 ;;
+        *.gguf|*.safetensors|*.onnx|*.tflite|*.mlmodel|*.h5|*.keras|*.pt|*.pth|*.ckpt|*.pkl|*.pickle|*.npz|*.npy) return 0 ;;
+        config.json|tokenizer.json|tokenizer_config.json|tokenizer.model|special_tokens_map.json \
+            |generation_config.json|preprocessor_config.json|vocab.json|vocab.txt|merges.txt|*.index.json) return 0 ;;
+    esac
+    return 1
+}
+
+# Is this folder something other than a release folder? True when any top-level
+# entry is an application or model file (release_folder_app_entry), or when it
+# has more than 20 top-level files: a release folder holds a handful of
+# artifacts, an unpacked application or a build output holds many.
+release_folder_vetoed() {
+    local d="${1%/}" e files=0
+    for e in "$d"/*; do
+        [ -e "$e" ] || [ -L "$e" ] || continue
+        release_folder_app_entry "$e" && return 0
+        [ -f "$e" ] && files=$((files + 1))
+    done
+    [ "$files" -gt 20 ]
+}
+
+# Decide what a directory --target that is not a source tree is scanned as.
+# One candidate: point TARGET at it and say so. Several: list them and stop.
+# None: leave TARGET alone (it is scanned as source, as before).
+resolve_release_folder() {
+    local dir="${TARGET%/}" cands n kind path label as
+    has_source_manifest "$dir" && return 0
+    cands="$(release_folder_candidates "$dir")"
+    [ -n "$cands" ] || return 0
+    n="$(printf '%s\n' "$cands" | grep -c .)"
+    # The chosen path is interpolated into the eval'ed docker run below. The
+    # folder part is what the user typed, as with any --target; the entry name
+    # comes from the folder's contents, so refuse the few characters that
+    # would be more than a name there.
+    while IFS="$(printf '\t')" read -r kind path; do
+        case "${path##*/}" in
+            *'$'*|*'`'*|*'"'*|*'\'*)
+                echo "[ERROR] $dir holds an entry whose name contains a character that"
+                echo "        cannot be passed through safely: $path"
+                echo "        Rename it, or add --as-source to scan $dir itself as source."
+                exit 1 ;;
+        esac
+    done <<< "$cands"
+    if [ "$n" -gt 1 ]; then
+        echo "[ERROR] $dir is not a source tree, and it holds more than one thing to scan:"
+        while IFS="$(printf '\t')" read -r kind path; do
+            if [ "$kind" = "rootfs" ]; then
+                echo "          root filesystem  --target \"$path\""
+            else
+                echo "          firmware image   --target \"$path\" --firmware"
+            fi
+        done <<< "$cands"
+        echo "        Run again with one of the --target options above, or add --as-source"
+        echo "        to scan $dir itself as source."
+        exit 1
+    fi
+    IFS="$(printf '\t')" read -r kind path <<< "$cands"
+    if [ "$kind" = "rootfs" ]; then label="root filesystem"; as="ROOTFS"; else label="firmware image"; as="FIRMWARE"; fi
+    echo "[INFO] $dir is not a source tree (no manifest or build file at its top level),"
+    echo "[INFO]   and it holds one $label: $path"
+    echo "[INFO]   Scanning $path as $as instead. Other files in $dir are not scanned."
+    echo "[INFO]   To scan $dir itself as source, add --as-source."
+    TARGET="$path"
+    RELEASE_FOLDER_DIR="$dir"
+}
+
+# Regular files directly in a release folder that are larger than 1 MiB. Called
+# when the scan switched to a root filesystem with no package database: a
+# firmware image the extension and magic checks did not recognize is then the
+# better thing to scan, so the warning names these as commands to try. Files
+# release_folder_app_entry marks as application or model files are left out.
+# At most five, then a count of the rest.
+release_folder_large_files() {
+    local d="$1" e size shown=0 more=0
+    for e in "$d"/*; do
+        [ -L "$e" ] && continue
+        [ -f "$e" ] || continue
+        release_folder_app_entry "$e" && continue
+        size="$(wc -c < "$e" 2>/dev/null | tr -d ' ')"
+        [ "${size:-0}" -gt 1048576 ] || continue
+        if [ "$shown" -lt 5 ]; then
+            echo "         --target \"$e\" --firmware"
+            shown=$((shown + 1))
+        else
+            more=$((more + 1))
+        fi
+    done
+    [ "$more" -eq 0 ] || echo "         (and $more more)"
+    return 0
+}
+
 # Does the root filesystem record its own packages? syft reads apk/dpkg/rpm and
 # reports the installed set exactly; without one of these there is nothing for it
 # to read, and only binary signature identification (the firmware image) will
@@ -1569,6 +1807,17 @@ if [ -n "$VEX_FILE" ] && [ ! -f "$VEX_FILE" ]; then
     echo "[ERROR] --vex file not found: $VEX_FILE"
     echo "[ERROR] Pass the path of a CycloneDX VEX document (JSON), e.g. --vex supplier-vex.json."; exit 1
 fi
+if [ -n "$COMPONENT_VERSIONS_FILE" ]; then
+    if [ ! -f "$COMPONENT_VERSIONS_FILE" ]; then
+        echo "[ERROR] --component-versions file not found: $COMPONENT_VERSIONS_FILE"
+        echo "[ERROR] Pass a CSV file with two columns, name,version. A firmware, root filesystem or binary scan writes one to start from: <Project>_<Version>_component-versions.template.csv."; exit 1
+    fi
+    # The container checks every row; refusing an oversized file here saves
+    # starting the scan for it.
+    if [ "$(wc -c < "$COMPONENT_VERSIONS_FILE" | tr -d ' ')" -gt 262144 ]; then
+        echo "[ERROR] --component-versions: the file is larger than 256 KiB. It lists one component per line (name,version)."; exit 1
+    fi
+fi
 
 if [ -n "$GIT_URL" ]; then
     [ -z "$TARGET" ]      || { echo "[ERROR] --git is mutually exclusive with --target."; exit 1; }
@@ -1703,6 +1952,16 @@ elif [ -n "$MODEL_FILE" ]; then
         *) echo "[ERROR] --usage must be one of: internal, product, redistribute, outputs-only."; exit 1 ;;
     esac
 elif [ -n "$TARGET" ]; then
+    [ "$FORCE_SOURCE" != "true" ] || [ "$FORCE_FIRMWARE" != "true" ] \
+        || { echo "[ERROR] --as-source cannot be combined with --firmware."; exit 1; }
+    # A release folder (built artifacts, no source) that holds one root
+    # filesystem or firmware image is scanned as that; see resolve_release_folder.
+    # A folder that is a rootfs or a Yocto build directory itself is left to
+    # the branches below, which already know what to do with it.
+    if [ -d "$TARGET" ] && [ "$FORCE_SOURCE" != "true" ] && [ "$FORCE_FIRMWARE" != "true" ] \
+       && ! _is_rootfs_dir "$TARGET" && ! is_yocto_build_dir "$TARGET"; then
+        resolve_release_folder
+    fi
     if [ -f "$TARGET" ]; then
         if [ "$FORCE_FIRMWARE" = "true" ] || is_firmware "$TARGET"; then
             MODE="FIRMWARE"
@@ -1734,7 +1993,7 @@ elif [ -n "$TARGET" ]; then
         else
             MODE="BINARY"
         fi
-    elif [ -d "$TARGET" ] && [ "$FORCE_FIRMWARE" != "true" ] && is_yocto_build_dir "$TARGET"; then
+    elif [ -d "$TARGET" ] && [ "$FORCE_FIRMWARE" != "true" ] && [ "$FORCE_SOURCE" != "true" ] && is_yocto_build_dir "$TARGET"; then
         # A Yocto build already knows what it put in the image; read that rather
         # than walking the build tree. Joins the ANALYZE path below with the
         # SBOM the build wrote — no separate mode, so validation, conformance
@@ -1842,7 +2101,7 @@ elif [ -n "$TARGET" ]; then
         GENERATE_NOTICE="true"; GENERATE_SECURITY="true"
         fi
     elif [ -d "$TARGET" ]; then
-        if _is_rootfs_dir "$TARGET"; then
+        if [ "$FORCE_SOURCE" != "true" ] && _is_rootfs_dir "$TARGET"; then
             # Looks like a real root filesystem (etc/ plus two of bin/sbin/usr/lib/var):
             # syft reads its package database directly, same as an archive that
             # unpacked to one (see INGEST_ROOTFS above).
@@ -1851,6 +2110,13 @@ elif [ -n "$TARGET" ]; then
                 echo "       so there is no installed-package list to read. Re-run with"
                 echo "       --firmware to identify the binaries by signature instead"
                 echo "       (opt-in image: docker build --build-arg SBOM_FIRMWARE=true)."
+                if [ -n "$RELEASE_FOLDER_DIR" ]; then
+                    large="$(release_folder_large_files "$RELEASE_FOLDER_DIR")"
+                    if [ -n "$large" ]; then
+                        echo "       Files beside it in $RELEASE_FOLDER_DIR that may be a firmware image:"
+                        printf '%s\n' "$large"
+                    fi
+                fi
             fi
             MODE="ROOTFS"
         else
@@ -1870,13 +2136,22 @@ elif [ -n "$TARGET" ]; then
             # just because the folder exists.
             NESTED_ROOTFS_HINT="$(nested_rootfs_hint "$SCAN_INPUT_DIR" || true)"
         fi
-    else MODE="IMAGE"; fi
+    else
+        # An image name: syft, Trivy and docker would read one starting with - as an option.
+        case "$TARGET" in
+            -*) echo "[ERROR] --target '$TARGET' starts with '-': no file or folder has that name, and an image name cannot start with '-'. Give the image reference itself, for example --target alpine:3.20."; exit 1 ;;
+        esac
+        MODE="IMAGE"
+    fi
 elif [ "$FORCE_FIRMWARE" = "true" ]; then
     echo "[ERROR] --firmware requires '--target <firmware-file>'."; exit 1
 fi
 
 if [ -n "${USAGE_CONTEXT:-}" ] && [ "$MODE" != "AIBOM" ] && [ "$MODE" != "MODELFILE" ] && [ "$MODE" != "DATASET" ] && [ "$MODE" != "AIDECLARE" ]; then
     echo "[ERROR] --usage applies to AI model and dataset scans only (use it with --model or --model-file)."; exit 1
+fi
+if [ -n "$COMPONENT_VERSIONS_FILE" ] && [ "$MODE" != "FIRMWARE" ] && [ "$MODE" != "ROOTFS" ] && [ "$MODE" != "BINARY" ]; then
+    echo "[ERROR] --component-versions applies to firmware, root filesystem and binary scans only (this target is scanned as $MODE)."; exit 1
 fi
 
 if { [ -n "$AI_DECLARE_FILE" ] || [ "$GENERATE_SPDX3" = "false" ]; } \
@@ -1905,6 +2180,11 @@ fi
 
 if [ "$FORCE_FIRMWARE" = "true" ] && [ "$MODE" != "FIRMWARE" ]; then
     echo "[ERROR] --firmware expects a file target, but '$TARGET' is not a regular file."; exit 1
+fi
+
+if [ "$FORCE_SOURCE" = "true" ] && { [ -z "$TARGET" ] || [ ! -d "$TARGET" ] || [ "$MODE" != "SOURCE" ]; }; then
+    echo "[ERROR] --as-source applies to a directory --target only."
+    echo "        Pass the folder to scan as source: --target <folder> --as-source"; exit 1
 fi
 
 # Unified 오픈소스위험분석보고서 (risk-report) is on by default in every mode.
@@ -2229,13 +2509,45 @@ if [ "$MODE" = "SOURCE" ]; then
         echo "        Use the image of the same BomLens version as this CLI (docker pull $PP_IMAGE, or set SBOM_SCANNER_IMAGE to it). Full cdxgen log: $STAGE1_LOG"
         exit 1
     fi
+    # What stage 1 ran with, for the input fingerprint stage 2 records in the
+    # result manifest (docker/lib/input-fingerprint.sh): the digest the stage 1
+    # image was pulled at (its RepoDigest under the name it ran by; none for a
+    # locally built image), the sha256 of the two files this CLI mounted into
+    # it and of this script, which sets stage 1's arguments, and the settings
+    # build-prep.sh read, the build-prep options by name as for stage 1.
+    _fp_sha256() {
+        if command -v sha256sum >/dev/null 2>&1; then sha256sum < "$1" | cut -d' ' -f1
+        else shasum -a 256 < "$1" | cut -d' ' -f1; fi
+    }
+    STAGE1_DIGEST=""
+    while IFS= read -r _rd; do
+        case "$_rd" in "${CDX_IMG%:*}@sha256:"*) STAGE1_DIGEST="${_rd#*@}" ;; esac
+    done <<EOF
+$("${DOCKER_ENV[@]}" docker image inspect -f '{{range .RepoDigests}}{{println .}}{{end}}' "$CDX_IMG" 2>/dev/null)
+EOF
+    case "$STAGE1_DIGEST" in sha256:*[!0-9a-f]*|sha256:) STAGE1_DIGEST="" ;; esac
+    STAGE1_FINGERPRINT_ENV=" -e BOMLENS_STAGE1_DIGEST=$STAGE1_DIGEST -e BOMLENS_STAGE1_PREP_SHA256=$(_fp_sha256 "$BUILD_PREP" 2>/dev/null)"
+    STAGE1_FINGERPRINT_ENV="$STAGE1_FINGERPRINT_ENV -e BOMLENS_STAGE1_CONDA_SHA256=$(_fp_sha256 "$IDENTIFY_CONDA" 2>/dev/null) -e BOMLENS_STAGE1_CLI_SHA256=$(_fp_sha256 "${BASH_SOURCE[0]}" 2>/dev/null)"
+    STAGE1_FINGERPRINT_ENV="$STAGE1_FINGERPRINT_ENV -e BOMLENS_STAGE1_SPEC_VERSION=$CDX_SPEC_VERSION -e FETCH_LICENSE=\"$FETCH_LICENSE\" -e HOST_GOTOOLCHAIN=\"$HOST_GOTOOLCHAIN\""
+    for _n in $BUILD_PREP_ENV_NAMES; do
+        [ "$_n" = BOMLENS_INCLUDE_NON_SHIPPED ] || STAGE1_FINGERPRINT_ENV="$STAGE1_FINGERPRINT_ENV -e $_n"
+    done
+    # This run's output folder, when it is inside the scanned tree (the
+    # default), is left out of the tree the fingerprint hashes: it holds this
+    # run's own results. Stage 1 ran with an earlier run's files there, so
+    # the value is then not reusable. A flat output (SBOM_OUTPUT_FLAT=1) into
+    # the scanned folder itself is passed as ".".
+    case "$OUTPUT_HOST_DIR" in
+        "$SCAN_INPUT_DIR") STAGE1_FINGERPRINT_ENV="$STAGE1_FINGERPRINT_ENV -e BOMLENS_FINGERPRINT_EXCLUDE=." ;;
+        "$SCAN_INPUT_DIR"/*) STAGE1_FINGERPRINT_ENV="$STAGE1_FINGERPRINT_ENV -e BOMLENS_FINGERPRINT_EXCLUDE=\"${OUTPUT_HOST_DIR#"$SCAN_INPUT_DIR"/}\"" ;;
+    esac
     export_scan_secrets
     # shellcheck disable=SC2046
     eval "$DOCKER_MSYS"docker run --rm \
         -v "\"$(hostpath "$SCAN_INPUT_DIR")\"":/src -v "\"$(hostpath "$OUTPUT_HOST_DIR")\"":/host-output \
         -w /host-output \
         --add-host=host.docker.internal:host-gateway \
-        -e MODE=POSTPROCESS -e BOMLENS_RUN_INPUT="$OUTPUT_FILE" -e NESTED_ROOTFS_HINT="\"$NESTED_ROOTFS_HINT\"" -e BOMLENS_DEEP_LICENSE_FALLBACK="\"${DEEP_LICENSE_FALLBACK_FROM:-}\"" -e BOMLENS_INCLUDE_NON_SHIPPED${STAGE1_FALLBACK_ENV} $(pp_env)$(cosign_run)$(vex_run)$(declare_run)$(gate_run) \
+        -e MODE=POSTPROCESS -e BOMLENS_RUN_INPUT="$OUTPUT_FILE" -e NESTED_ROOTFS_HINT="\"$NESTED_ROOTFS_HINT\"" -e BOMLENS_DEEP_LICENSE_FALLBACK="\"${DEEP_LICENSE_FALLBACK_FROM:-}\"" -e BOMLENS_INCLUDE_NON_SHIPPED${STAGE1_FALLBACK_ENV}${STAGE1_FINGERPRINT_ENV} $(pp_env)$(cosign_run)$(vex_run)$(declare_run)$(gate_run) \
         "\"$PP_IMAGE\"" || {
         _pp_rc=$?
         if [ -n "$STAGE1_FAILED" ] && [ ! -s "$OUTPUT_HOST_DIR/$OUTPUT_FILE" ]; then
@@ -2349,7 +2661,7 @@ else
     # shellcheck disable=SC2046
     eval "$DOCKER_MSYS"docker run --rm $VOL \
         --add-host=host.docker.internal:host-gateway \
-        -e MODE="$MODE" -e BOMLENS_ARTIFACT_CLEANUP=1 $ENVV $(pp_env)$(cosign_run)$(vex_run)$(declare_run)$(gate_run) \
+        -e MODE="$MODE" -e BOMLENS_ARTIFACT_CLEANUP=1 $ENVV $(pp_env)$(cosign_run)$(vex_run)$(declare_run)$(component_versions_run)$(gate_run) \
         "\"$RUN_IMAGE\""
 fi
 
@@ -2496,6 +2808,19 @@ if [ -f "$SUMMARY_RESULT_FILE" ]; then
             fi
             ;;
     esac
+fi
+# Components a firmware, root filesystem or binary scan found without a version.
+# Counted from the template the scan wrote: the rows after the header whose
+# version is still empty. The template can also be the file this run read
+# (filled in by the supplier and left as written), so a filled row is not one.
+VERSIONS_TEMPLATE="${SAFE_PROJECT}_${SAFE_VERSION}_component-versions.template.csv"
+if [ -f "$OUTPUT_HOST_DIR/$VERSIONS_TEMPLATE" ]; then
+    n_versionless=$(tr -d '\r' < "$OUTPUT_HOST_DIR/$VERSIONS_TEMPLATE" | grep -v '^[[:space:]]*#' \
+        | grep -v '^name,version$' | grep -c '^[^,].*,[[:space:]]*$' || true)
+    if [ "${n_versionless:-0}" -gt 0 ]; then
+        echo "[WARN] ${n_versionless} component(s) have no version, so nothing can be matched against them."
+        echo "  Write each version in ${VERSIONS_TEMPLATE} and run again with --component-versions \"$OUTPUT_HOST_DIR/$VERSIONS_TEMPLATE\""
+    fi
 fi
 echo "=========================================="
 

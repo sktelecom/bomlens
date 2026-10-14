@@ -13,7 +13,6 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import type { ScanProgress } from "@/lib/api";
 import { copyToClipboard } from "@/lib/diagnostics";
 import { stageProgress } from "@/lib/scanProgress";
 import { Disclosure } from "@/components/ui/disclosure";
@@ -31,19 +30,12 @@ interface Props {
    * focus — the live run (ScanRunning) keeps it expanded.
    */
   collapsible?: boolean;
-  /**
-   * Determinate progress from the backend (e.g. firmware CVE DB download). When
-   * present while running, the bar shows the real percentage; otherwise the bar
-   * falls back to the log-volume approximation used for ordinary scans.
-   */
-  progress?: ScanProgress | null;
 }
 
 export function ProgressLog({
   logs,
   status,
   collapsible = false,
-  progress,
 }: Props) {
   const { t } = useTranslation();
   const { toast } = useToast();
@@ -57,21 +49,9 @@ export function ProgressLog({
     if (box) box.scrollTop = box.scrollHeight;
   }, [logs]);
 
-  // Determinate phases (e.g. the firmware CVE DB download) report a real
-  // percent — use it. Otherwise there is no real percentage from the backend, so
-  // approximate from log volume while running, then snap to 100% on completion.
-  //
-  // The percent is checked, not assumed: the same progress channel also carries
-  // an image pull, which reports layer counts and no percent at all (a non-TTY
-  // `docker pull` prints none), so a phase check alone would read undefined here.
-  const percent = progress?.percent;
-  const determinate =
-    status === "running" && progress?.phase === "cvedb" && typeof percent === "number";
-  const value = determinate
-    ? Math.min(100, Math.max(0, percent))
-    : status === "running"
-      ? stageProgress(logs)
-      : 100;
+  // There is no real percentage from the backend, so approximate from log
+  // volume while running, then snap to 100% on completion.
+  const value = status === "running" ? stageProgress(logs) : 100;
 
   // Copies the lines exactly as they are shown in the box, so what lands on the
   // clipboard is what the user just read.
@@ -88,12 +68,6 @@ export function ProgressLog({
 
   const body = (
     <>
-      {determinate && (
-        <p className="flex items-center justify-between text-xs font-medium text-foreground/70">
-          <span>{t("progress.cvedbDownloading")}</span>
-          <span>{Math.round(value)}%</span>
-        </p>
-      )}
       <Progress
         value={value}
         aria-label={t("progress.title")}

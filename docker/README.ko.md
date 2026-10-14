@@ -54,7 +54,8 @@ docker run --rm --entrypoint trivy sbom-scanner:local --version
 
 | 빌드 인자 | 기본값 | 켜면 포함되는 것 |
 |-----------|--------|------------------|
-| `SBOM_FIRMWARE` | `false` | 펌웨어 분석 도구(unblob, cve-bin-tool, ubi_reader)와 CPE→CVE 인덱스 번들. `bomlens-firmware` 이미지가 이 옵션으로 빌드됩니다. NVD 데이터는 빌드 시 `fkie-cad/nvd-json-data-feeds`를 clone해 로컬에서 인덱스로 증류하므로 NVD API 키나 시크릿이 필요 없습니다 |
+| `SBOM_FIRMWARE` | `false` | 펌웨어 분석 도구(unblob, cve-bin-tool, ubi_reader). `bomlens-firmware` 이미지가 이 옵션으로 빌드됩니다 |
+| `SBOM_CPE_INDEX` | `true` | 펌웨어, rootfs, 바이너리 스캔이 패키지 PURL이 없는 컴포넌트를 대조하는 NVD CPE→CVE 인덱스(`cpe_match.sqlite`, 약 146MB). NVD 데이터는 빌드 시 `fkie-cad/nvd-json-data-feeds`를 clone해 로컬에서 인덱스로 증류하므로 NVD API 키나 시크릿이 필요 없습니다. `false`면 넣지 않으며, 펌웨어 빌드에는 항상 들어갑니다 |
 | `SBOM_AIBOM` | `false` | AI 모델 SBOM 생성 도구(OWASP aibom-generator + cdxgen) |
 | `SBOM_DEEP_LICENSE` | `false` | scancode-toolkit 기반 딥 라이선스 스캔 |
 | `SBOM_SCANOSS` | `true` | vendored OSS 식별 클라이언트(scanoss.py). 실행은 런타임 `--identify-vendored`로 다시 gate됩니다 |
@@ -174,8 +175,8 @@ docker buildx imagetools inspect ghcr.io/sktelecom/bomlens:latest
 
 | 도구 | ARG | 고정 버전 |
 |------|-----|----------|
-| syft | `SYFT_VERSION` | v1.51.0 |
-| Trivy | `TRIVY_VERSION` | v0.74.0 |
+| syft | `SYFT_VERSION` | v1.54.1 |
+| Trivy | `TRIVY_VERSION` | v0.75.0 |
 | cosign | `COSIGN_VERSION` | [Docker image reference](../docs/reference/docker-image.ko.md) 참고 |
 | docker CLI | `DOCKER_CLI_VERSION` | [Docker image reference](../docs/reference/docker-image.ko.md) 참고 |
 | scanoss.py | `SCANOSS_VERSION` | 1.54.2 |
@@ -190,7 +191,7 @@ docker buildx imagetools inspect ghcr.io/sktelecom/bomlens:latest
 docker history sbom-scanner:local
 ```
 
-펌웨어 이미지(`SBOM_FIRMWARE=true`)는 번들된 CVE DB(약 0.5~1.5GB)만큼 커집니다.
+CPE 인덱스(`SBOM_CPE_INDEX=true`, 기본값)는 이미지 크기를 약 146MB 늘립니다. 펌웨어 이미지(`SBOM_FIRMWARE=true`)는 여기에 분석 도구만큼 더 커집니다.
 
 ### 지원 아키텍처
 

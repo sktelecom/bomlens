@@ -3,6 +3,33 @@
   "$id": "https://github.com/sktelecom/bomlens/blob/main/schemas/engine-result-1.json",
   "title": "BomLens engine result manifest (contract 1.x)",
   "description": "bomlens-result.json, written to the output folder by every scan. See docs/reference/engine-contract.md.",
+  "$defs": {
+    "input_fingerprint": {
+      "type": "object",
+      "description": "What stage 1 reads, as sha256 values only. See the input fingerprint section of docs/reference/engine-contract.md.",
+      "required": ["algorithm", "sha256", "reusable", "reasons", "components"],
+      "properties": {
+        "algorithm": { "type": "string", "pattern": "^bomlens-input-[0-9]+$" },
+        "sha256": { "type": ["string", "null"], "pattern": "^[0-9a-f]{64}$" },
+        "reusable": { "type": "boolean" },
+        "reasons": { "type": "array", "items": { "enum": ["no-lockfile", "unpinned-versions", "unsupported-ecosystem", "plan-unsupported", "unhashable-input", "unknown-stage1-image", "registry-resolution", "stage1-degraded"] } },
+        "components": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["kind", "name", "sha256"],
+            "properties": {
+              "kind": { "enum": ["file", "setting", "image", "engine"] },
+              "name": { "type": "string" },
+              "sha256": { "type": ["string", "null"], "pattern": "^[0-9a-f]{64}$" },
+              "count": { "type": "integer", "minimum": 0 },
+              "truncated": { "type": "boolean" }
+            }
+          }
+        }
+      }
+    }
+  },
   "type": "object",
   "required": ["contract", "engine", "input", "run", "steps", "outputs"],
   "properties": {
@@ -29,7 +56,19 @@
       "properties": {
         "kind": { "enum": ["source", "image", "sbom", "binary", "rootfs", "firmware", "ai-model", "dataset", "unknown"] },
         "mode": { "type": "string" },
-        "target": { "type": ["string", "null"] }
+        "target": { "type": ["string", "null"] },
+        "image": {
+          "description": "IMAGE mode: the image read, and the digest the later reads of it were pinned to.",
+          "type": "object",
+          "required": ["reference", "digest", "platform"],
+          "properties": {
+            "reference": { "type": ["string", "null"] },
+            "source": { "enum": ["registry", "daemon", "unknown", "archive", "other", null] },
+            "digest": { "type": ["string", "null"], "pattern": "^sha256:[0-9a-f]{64}$" },
+            "index_digest": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+            "platform": { "type": ["string", "null"], "pattern": "^[a-z0-9][a-z0-9._-]*/[a-z0-9][a-z0-9._-]*(/[a-z0-9][a-z0-9._-]*)?$" }
+          }
+        }
       }
     },
     "run": {
@@ -56,7 +95,11 @@
           "detail": { "type": ["string", "null"], "maxLength": 500 },
           "started_at": { "type": "string", "format": "date-time" },
           "ended_at": { "type": "string", "format": "date-time" },
-          "counts": { "type": "object", "additionalProperties": { "type": "integer" } }
+          "counts": { "type": "object", "additionalProperties": { "type": "integer" } },
+          "reused": { "type": "boolean" },
+          "reuse_unsafe": { "type": "boolean" },
+          "plan_mismatch": { "type": "boolean" },
+          "input_fingerprint": { "$ref": "#/$defs/input_fingerprint" }
         }
       }
     },

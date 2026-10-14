@@ -1,0 +1,312 @@
+{
+  "contract": {
+    "name": "bomlens-engine",
+    "version": "1.2.0"
+  },
+  "engine": {
+    "version": "1.13.2",
+    "image": null,
+    "image_digest": null
+  },
+  "input": {
+    "kind": "sbom",
+    "mode": "ANALYZE",
+    "target": null
+  },
+  "run": {
+    "status": "succeeded",
+    "reason": null,
+    "started_at": "2026-10-12T08:19:01Z",
+    "ended_at": "2026-10-12T08:19:10Z",
+    "exit_code": 0
+  },
+  "steps": [
+    {
+      "id": "conformance",
+      "status": "ok",
+      "reason": null,
+      "detail": null,
+      "started_at": "2026-10-12T08:19:01Z",
+      "ended_at": "2026-10-12T08:19:01Z",
+      "stage": 2
+    },
+    {
+      "id": "describe-input",
+      "status": "ok",
+      "reason": null,
+      "detail": null,
+      "started_at": "2026-10-12T08:19:01Z",
+      "ended_at": "2026-10-12T08:19:01Z",
+      "stage": 2
+    },
+    {
+      "id": "generate",
+      "status": "ok",
+      "reason": null,
+      "detail": null,
+      "started_at": "2026-10-12T08:19:01Z",
+      "ended_at": "2026-10-12T08:19:01Z",
+      "counts": {
+        "components": 39
+      },
+      "stage": 2
+    },
+    {
+      "id": "normalize",
+      "status": "ok",
+      "reason": null,
+      "detail": null,
+      "started_at": "2026-10-12T08:19:01Z",
+      "ended_at": "2026-10-12T08:19:01Z",
+      "stage": 2
+    },
+    {
+      "id": "license-registry",
+      "status": "disabled",
+      "reason": null,
+      "detail": null,
+      "started_at": "2026-10-12T08:19:01Z",
+      "ended_at": "2026-10-12T08:19:01Z",
+      "stage": 2
+    },
+    {
+      "id": "enrich-cpe",
+      "status": "ok",
+      "reason": null,
+      "detail": null,
+      "started_at": "2026-10-12T08:19:01Z",
+      "ended_at": "2026-10-12T08:19:01Z",
+      "stage": 2
+    },
+    {
+      "id": "enrich-os-context",
+      "status": "ok",
+      "reason": null,
+      "detail": null,
+      "started_at": "2026-10-12T08:19:01Z",
+      "ended_at": "2026-10-12T08:19:02Z",
+      "stage": 2
+    },
+    {
+      "id": "enrich-distro-supplier",
+      "status": "ok",
+      "reason": null,
+      "detail": null,
+      "started_at": "2026-10-12T08:19:02Z",
+      "ended_at": "2026-10-12T08:19:02Z",
+      "stage": 2
+    },
+    {
+      "id": "enrich-maven-cpe",
+      "status": "ok",
+      "reason": null,
+      "detail": null,
+      "started_at": "2026-10-12T08:19:02Z",
+      "ended_at": "2026-10-12T08:19:02Z",
+      "stage": 2
+    },
+    {
+      "id": "enrich-github-cpe",
+      "status": "ok",
+      "reason": null,
+      "detail": null,
+      "started_at": "2026-10-12T08:19:02Z",
+      "ended_at": "2026-10-12T08:19:02Z",
+      "stage": 2
+    },
+    {
+      "id": "enrich-interpreter-cpe",
+      "status": "ok",
+      "reason": null,
+      "detail": null,
+      "started_at": "2026-10-12T08:19:02Z",
+      "ended_at": "2026-10-12T08:19:02Z",
+      "stage": 2
+    },
+    {
+      "id": "enrich-eol",
+      "status": "ok",
+      "reason": null,
+      "detail": null,
+      "started_at": "2026-10-12T08:19:02Z",
+      "ended_at": "2026-10-12T08:19:02Z",
+      "stage": 2
+    },
+    {
+      "id": "enrich-malicious",
+      "status": "ok",
+      "reason": null,
+      "detail": null,
+      "started_at": "2026-10-12T08:19:02Z",
+      "ended_at": "2026-10-12T08:19:02Z",
+      "stage": 2
+    },
+    {
+      "id": "enrich-staleness",
+      "status": "disabled",
+      "reason": null,
+      "detail": null,
+      "started_at": "2026-10-12T08:19:02Z",
+      "ended_at": "2026-10-12T08:19:02Z",
+      "stage": 2
+    },
+    {
+      "id": "assess-ai-risk",
+      "status": "ok",
+      "reason": null,
+      "detail": null,
+      "started_at": "2026-10-12T08:19:02Z",
+      "ended_at": "2026-10-12T08:19:02Z",
+      "stage": 2
+    },
+    {
+      "id": "generate-notice",
+      "status": "ok",
+      "reason": null,
+      "detail": null,
+      "started_at": "2026-10-12T08:19:02Z",
+      "ended_at": "2026-10-12T08:19:02Z",
+      "stage": 2
+    },
+    {
+      "id": "scan-security",
+      "status": "ok",
+      "reason": null,
+      "detail": null,
+      "started_at": "2026-10-12T08:19:02Z",
+      "ended_at": "2026-10-12T08:19:09Z",
+      "stage": 2
+    },
+    {
+      "id": "generate-risk-report",
+      "status": "ok",
+      "reason": null,
+      "detail": null,
+      "started_at": "2026-10-12T08:19:09Z",
+      "ended_at": "2026-10-12T08:19:10Z",
+      "stage": 2
+    },
+    {
+      "id": "sign",
+      "status": "disabled",
+      "reason": null,
+      "detail": null,
+      "started_at": "2026-10-12T08:19:10Z",
+      "ended_at": "2026-10-12T08:19:10Z",
+      "stage": 2
+    }
+  ],
+  "tools": {
+    "cdxgen": "12.8.3",
+    "syft": "1.52.0",
+    "trivy": "0.74.0"
+  },
+  "engines": [
+    "trivy"
+  ],
+  "data_sources": {
+    "trivy_db": {
+      "schema_version": 2,
+      "updated_at": "2026-10-12T07:12:51.98420317Z",
+      "downloaded_at": "2026-10-12T08:19:09.194914515Z"
+    }
+  },
+  "outputs": [
+    {
+      "role": "sbom.cyclonedx",
+      "path": "FlaskDataService_3.2.0_bom.json",
+      "sha256": "c5b5173fb5290001f4da3cc6b58e536c7947d8136a8f80d20005dc2cb8083c5f",
+      "bytes": 415022
+    },
+    {
+      "role": "input-description",
+      "path": "FlaskDataService_3.2.0_input.json",
+      "sha256": "105f33ecc1c9e64ef96095cb07d81d499a3d0f74fc65fca6ef0ec0f5af04acd0",
+      "bytes": 468
+    },
+    {
+      "role": "other",
+      "path": "FlaskDataService_3.2.0_NOTICE.txt",
+      "sha256": "736073308cb313a3d1d4c8c2a95b0d85ead6ab3edfc7063e8ba2e4c89868a9b9",
+      "bytes": 34174
+    },
+    {
+      "role": "other",
+      "path": "FlaskDataService_3.2.0_NOTICE.html",
+      "sha256": "e16ac6665461887b27452bac9efe55a7dde075a3e31b183d7f9100e92acdaf54",
+      "bytes": 42852
+    },
+    {
+      "role": "vulnerabilities.all",
+      "path": "FlaskDataService_3.2.0_security.json",
+      "sha256": "b1fbcde8e0bc997e116a8e8bad78ed05d8e93d074ce7d16bc7ac81bffa5d18b6",
+      "bytes": 105493
+    },
+    {
+      "role": "other",
+      "path": "FlaskDataService_3.2.0_security.md",
+      "sha256": "77c5e8d046161ba864fd3c1818c84eeab25d1f7a41b8909aacde749f2435f058",
+      "bytes": 2071
+    },
+    {
+      "role": "other",
+      "path": "FlaskDataService_3.2.0_security.html",
+      "sha256": "3a8dfa962397bc566ab05fe094fbafc529d8ab6cf7c7405c80e5324531cac5e1",
+      "bytes": 11083
+    },
+    {
+      "role": "conformance",
+      "path": "FlaskDataService_3.2.0_conformance.json",
+      "sha256": "064ebf1a62ee184becd0745ef47e944a54083a4db32bfc1424b7d87db382bc96",
+      "bytes": 47635
+    },
+    {
+      "role": "other",
+      "path": "FlaskDataService_3.2.0_conformance.md",
+      "sha256": "4d50ffc0b30c750c987292493d7f25e96cd1088e2988fcebdbe62e4fcf501a5c",
+      "bytes": 10394
+    },
+    {
+      "role": "other",
+      "path": "FlaskDataService_3.2.0_conformance.html",
+      "sha256": "157b9ea970603492d06b8fdf91505ea9790dfc9a47b58801e35f26484f85f6c2",
+      "bytes": 21434
+    },
+    {
+      "role": "other",
+      "path": "FlaskDataService_3.2.0_conformance.result",
+      "sha256": "d74ff0ee8da3b9806b18c877dbf29bbde50b5bd8e4dad7a3a725000feb82e8f1",
+      "bytes": 4
+    },
+    {
+      "role": "other",
+      "path": "FlaskDataService_3.2.0_summary.result",
+      "sha256": "1a758b861e416d32fd41f040be88e1bdc1f40b8ecfbf909b16f838971dcf894e",
+      "bytes": 61
+    },
+    {
+      "role": "other",
+      "path": "FlaskDataService_3.2.0_risk-report.md",
+      "sha256": "46028ed754a4ffea584ca951983596a2cb08e176896f02bce0c782fa5f72a4e2",
+      "bytes": 2926
+    },
+    {
+      "role": "other",
+      "path": "FlaskDataService_3.2.0_risk-report.html",
+      "sha256": "0fe803e2c3294889a190ffc45b0c081e68da25a6ace36e0633a38b74cd12e3fd",
+      "bytes": 9247
+    },
+    {
+      "role": "other",
+      "path": "FlaskDataService_3.2.0_security_epss.json",
+      "sha256": "c3822d6aa1827262a06bceaf0f1d7a84140432e61eb388bb900f9b2c643d63f4",
+      "bytes": 1522
+    },
+    {
+      "role": "vulnerabilities.trivy",
+      "path": "FlaskDataService_3.2.0_security.json",
+      "sha256": "b1fbcde8e0bc997e116a8e8bad78ed05d8e93d074ce7d16bc7ac81bffa5d18b6",
+      "bytes": 105493
+    }
+  ]
+}

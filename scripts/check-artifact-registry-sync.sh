@@ -94,6 +94,7 @@ _spdx3-check.json       :: yes :: yes :: _spdx3-check
 _spdx3-check.md         :: yes :: yes :: _spdx3-check
 _ai-declaration.json    :: yes :: yes :: _ai-declaration\.json
 _ai-declaration.template.json :: yes :: yes :: _ai-declaration\.template\.json
+_component-versions.template.csv :: yes :: yes :: _component-versions\.template\.csv
 "
 
 # _vex.json and _vex_imported.json are deliberately absent from entrypoint.sh's

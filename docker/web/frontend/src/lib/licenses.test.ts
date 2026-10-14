@@ -267,6 +267,30 @@ describe("componentConflict", () => {
   it("is unknown when the component declares no license", () => {
     expect(v([])).toBe("unknown");
   });
+
+  const DEB = "pkg:deb/debian/libxxhash0@0.8.1-1?arch=amd64";
+  const deb = (licenses: string[], outbound = "Apache-2.0") =>
+    componentConflict(licenses, outbound, RULES, DEB).verdict;
+
+  it("reads a Debian package's license entries as all applying", () => {
+    expect(deb(["BSD-2-Clause", "GPL-2.0-only"])).toBe("incompatible");
+    expect(v(["BSD-2-Clause", "GPL-2.0-only"])).toBe("compatible");
+  });
+
+  it("never clears a Debian package past an entry it cannot parse", () => {
+    expect(deb(["MIT", "(MIT)"])).toBe("unknown");
+    expect(deb(["(MIT)", "GPL-2.0-only"])).toBe("incompatible");
+  });
+
+  it("classes Debian's MIT-X11 license as permissive", () => {
+    expect(deb(["MIT-X11", "X11", "BSD-3-Clause"])).toBe("compatible");
+    // purl types are case-insensitive, and a single OR expression on a deb
+    // package is a real choice stated in one entry.
+    expect(
+      componentConflict(["MIT", "GPL-2.0-only"], "Apache-2.0", RULES, "PKG:DEB/debian/x@1").verdict,
+    ).toBe("incompatible");
+    expect(deb(["GPL-2.0-only OR MIT"])).toBe("compatible");
+  });
 });
 
 describe("conflictGroups", () => {

@@ -38,11 +38,13 @@ import { buildQuery, parseQuery, type RouteQuery, scanHash } from "@/lib/route";
 import { vulnsFromQuery, vulnsToQuery } from "@/lib/section-query";
 import { severityTone } from "@/lib/severity";
 import { useToast } from "@/lib/toast";
+import { uncheckedSummary } from "@/lib/unchecked";
 import { compareVulns, groupByUpgrade, type SortDir, type VulnSortKey } from "@/lib/vulns";
 import { cn } from "@/lib/utils";
 import { IS_STATIC_DEMO } from "@/lib/demo";
 
 import { SeverityBar } from "./SeverityBar";
+import { UncheckedComponents } from "./UncheckedComponents";
 
 // Vendor/advisory disposition badge, shown beside the severity badge. `fixed`
 // reads as resolved (success); the still-open dispositions read as a caution
@@ -599,6 +601,16 @@ export function VulnerabilitiesTable({
         </ErrorState>
       );
     }
+    // Zero findings over a partial inventory is not a clean result: say how
+    // many components no check reached instead of "No vulnerabilities found".
+    if (uncheckedSummary(security)) {
+      return (
+        <div className="space-y-3">
+          <UncheckedComponents security={security} />
+          <p className="text-xs text-muted-foreground">{t("result.noVulnsInChecked")}</p>
+        </div>
+      );
+    }
     return (
       <EmptyState
         icon={ShieldCheck}
@@ -650,6 +662,7 @@ export function VulnerabilitiesTable({
           {t("result.kernelAdvisories", { count: security.kernelCount })}
         </p>
       ) : null}
+      <UncheckedComponents security={security} />
       {upgradeGroups.length > 0 && (
         <div className="space-y-1.5 rounded-md border bg-muted/30 px-3 py-2">
           <div className="text-xs font-medium text-foreground">

@@ -169,7 +169,12 @@ for run in "${RUNS[@]}"; do
     # Dot-files are internal (.scanmeta.json records how the scan was launched);
     # the server keeps them out of /results, so they must stay out of the copied
     # folder and its zip too, or the demo would publish more than the app does.
+    # Each engine's own security result is left out for the same reason: the
+    # app shows the merged _security.json, and a firmware run's Trivy result
+    # alone is about as large (60 MB) as the merged one.
     find "$SRC/$run" -maxdepth 1 -type f ! -name '*.md' ! -name '.*' \
+        ! -name '*_security_trivy.json' ! -name '*_security_grype.json' \
+        ! -name '*_security_cvebintool.json' \
         -exec cp {} "$DEST/files/$run/" \;
 
     # The file-content snapshot is dropped unless the scan read the operator's

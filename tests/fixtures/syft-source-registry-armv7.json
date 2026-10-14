@@ -1,0 +1,21 @@
+{
+  "id": "bd05c4d38cbeb5cfb34883906276560353a6b0282fb5c4b9dd3bd40f5143d7c3",
+  "name": "alpine",
+  "version": "3.20",
+  "type": "image",
+  "metadata": {
+    "userInput": "alpine:3.20",
+    "imageID": "sha256:02ad79cff41d24f746add377cfbea19db0f7881725939b1240c96d7b571889b8",
+    "manifestDigest": "sha256:bd05c4d38cbeb5cfb34883906276560353a6b0282fb5c4b9dd3bd40f5143d7c3",
+    "mediaType": "application/vnd.oci.image.manifest.v1+json",
+    "tags": [],
+    "imageSize": 5102846,
+    "config": "eyJhcmNoaXRlY3R1cmUiOiJhcm0iLCJjb25maWciOnsiRW52IjpbIlBBVEg9L3Vzci9sb2NhbC9zYmluOi91c3IvbG9jYWwvYmluOi91c3Ivc2JpbjovdXNyL2Jpbjovc2JpbjovYmluIl0sIkNtZCI6WyIvYmluL3NoIl0sIldvcmtpbmdEaXIiOiIvIn0sImNyZWF0ZWQiOiIyMDI2LTA0LTE2VDIzOjU0OjI1LjE2Mjg5NjI1MloiLCJoaXN0b3J5IjpbeyJjcmVhdGVkIjoiMjAyNi0wNC0xNlQyMzo1NDoyNS4xNjI4OTYyNTJaIiwiY3JlYXRlZF9ieSI6IkFERCBhbHBpbmUtbWluaXJvb3Rmcy0zLjIwLjEwLWFybXY3LnRhci5neiAvICMgYnVpbGRraXQiLCJjb21tZW50IjoiYnVpbGRraXQuZG9ja2VyZmlsZS52MCJ9LHsiY3JlYXRlZCI6IjIwMjYtMDQtMTZUMjM6NTQ6MjUuMTYyODk2MjUyWiIsImNyZWF0ZWRfYnkiOiJDTUQgW1wiL2Jpbi9zaFwiXSIsImNvbW1lbnQiOiJidWlsZGtpdC5kb2NrZXJmaWxlLnYwIiwiZW1wdHlfbGF5ZXIiOnRydWV9XSwib3MiOiJsaW51eCIsInJvb3RmcyI6eyJ0eXBlIjoibGF5ZXJzIiwiZGlmZl9pZHMiOlsic2hhMjU2OjM0ZjczZWQzZjgwMGE4NDU0NzUxMDhhMjU1MjRkNWFmNzhlMWUwMzc0NGY5ZWQ4MjAxYzU1MmQwNzllMzc2ZjEiXX0sInZhcmlhbnQiOiJ2NyJ9",
+    "repoDigests": [
+      "index.docker.io/library/alpine@sha256:d9e853e87e55526f6b2917df91a2115c36dd7c696a35be12163d44e6e2a4b6bc"
+    ],
+    "architecture": "arm",
+    "architectureVariant": "v7",
+    "os": "linux"
+  }
+}

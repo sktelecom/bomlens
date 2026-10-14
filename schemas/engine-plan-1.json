@@ -3,6 +3,33 @@
   "$id": "https://github.com/sktelecom/bomlens/blob/main/schemas/engine-plan-1.json",
   "title": "BomLens execution plan (contract 1.x)",
   "description": "bomlens-plan.json, written by MODE=PLAN for a source scan. See docs/reference/engine-contract.md.",
+  "$defs": {
+    "input_fingerprint": {
+      "type": "object",
+      "description": "What stage 1 reads, as sha256 values only. See the input fingerprint section of docs/reference/engine-contract.md.",
+      "required": ["algorithm", "sha256", "reusable", "reasons", "components"],
+      "properties": {
+        "algorithm": { "type": "string", "pattern": "^bomlens-input-[0-9]+$" },
+        "sha256": { "type": ["string", "null"], "pattern": "^[0-9a-f]{64}$" },
+        "reusable": { "type": "boolean" },
+        "reasons": { "type": "array", "items": { "enum": ["no-lockfile", "unpinned-versions", "unsupported-ecosystem", "plan-unsupported", "unhashable-input", "unknown-stage1-image", "registry-resolution", "stage1-degraded"] } },
+        "components": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["kind", "name", "sha256"],
+            "properties": {
+              "kind": { "enum": ["file", "setting", "image", "engine"] },
+              "name": { "type": "string" },
+              "sha256": { "type": ["string", "null"], "pattern": "^[0-9a-f]{64}$" },
+              "count": { "type": "integer", "minimum": 0 },
+              "truncated": { "type": "boolean" }
+            }
+          }
+        }
+      }
+    }
+  },
   "type": "object",
   "required": ["contract", "engine", "input", "status", "reason", "detail", "output_file", "stages"],
   "properties": {
@@ -35,6 +62,7 @@
     "reason": { "enum": ["android-sdk-image", "no-pinned-digest", null] },
     "detail": { "type": ["string", "null"] },
     "output_file": { "type": "string", "pattern": "^[^/]+_bom\\.json$" },
+    "input_fingerprint": { "$ref": "#/$defs/input_fingerprint" },
     "stages": {
       "type": "array",
       "items": {
@@ -68,6 +96,7 @@
           "env_from_stage1": { "type": "object", "additionalProperties": { "type": "string" } },
           "env_from_caller": { "type": "object", "additionalProperties": { "type": "string" } },
           "on_kill": { "type": "string" },
+          "input_fingerprint": { "$ref": "#/$defs/input_fingerprint" },
           "network": {
             "type": "object",
             "required": ["required"],

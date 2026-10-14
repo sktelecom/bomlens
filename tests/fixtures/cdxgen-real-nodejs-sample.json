@@ -1,19 +1,19 @@
 {
   "bomFormat": "CycloneDX",
   "specVersion": "1.6",
-  "serialNumber": "urn:uuid:34ea25c4-c76f-4e1a-90f0-cf6b0f525e1c",
+  "serialNumber": "urn:uuid:618bbf33-6b55-40b3-adaf-9ecd42ba4fe9",
   "version": 1,
   "metadata": {
-    "timestamp": "2026-10-10T03:30:41Z",
+    "timestamp": "2026-10-13T06:46:41Z",
     "tools": {
       "components": [
         {
           "group": "@cdxgen",
           "name": "cdxgen",
-          "version": "13.2.0",
-          "purl": "pkg:npm/%40cdxgen/cdxgen@13.2.0",
+          "version": "13.3.0",
+          "purl": "pkg:npm/%40cdxgen/cdxgen@13.3.0",
           "type": "application",
-          "bom-ref": "pkg:npm/@cdxgen/cdxgen@13.2.0",
+          "bom-ref": "pkg:npm/@cdxgen/cdxgen@13.3.0",
           "publisher": "OWASP Foundation",
           "authors": [
             {
@@ -197,7 +197,7 @@
       "group": "",
       "name": "accepts",
       "version": "1.3.8",
-      "scope": "optional",
+      "scope": "required",
       "hashes": [
         {
           "alg": "SHA-512",
@@ -278,7 +278,7 @@
       "group": "",
       "name": "mime-types",
       "version": "2.1.35",
-      "scope": "optional",
+      "scope": "required",
       "hashes": [
         {
           "alg": "SHA-512",
@@ -358,12 +358,12 @@
     {
       "group": "",
       "name": "mime-db",
-      "version": "1.52.0",
-      "scope": "optional",
+      "version": "1.54.0",
+      "scope": "required",
       "hashes": [
         {
           "alg": "SHA-512",
-          "content": "b0f538b95edd625bed589c70c311c3d0fba285536213b4f201b439496c43081f66518bce82ba103b061040e28f27c0886c4fb51135653a82b5502da7537818be"
+          "content": "694e4426e20dd960de982700a76bc505fa7f9b810085626750d492c348b1b3bfe45db77a3e0eb8126c0990d745841f1a5add6c1f60935eb2f1a3f880195de83d"
         }
       ],
       "licenses": [
@@ -396,15 +396,15 @@
           }
         }
       ],
-      "purl": "pkg:npm/mime-db@1.52.0",
+      "purl": "pkg:npm/mime-db@1.54.0",
       "externalReferences": [
         {
           "type": "distribution",
-          "url": "https://registry.npmjs.org/mime-db/-/mime-db-1.52.0.tgz"
+          "url": "https://registry.npmjs.org/mime-db/-/mime-db-1.54.0.tgz"
         }
       ],
       "type": "library",
-      "bom-ref": "pkg:npm/mime-db@1.52.0",
+      "bom-ref": "pkg:npm/mime-db@1.54.0",
       "properties": [
         {
           "name": "cdx:license:category",
@@ -412,7 +412,7 @@
         },
         {
           "name": "internal:ResolvedUrl",
-          "value": "https://registry.npmjs.org/mime-db/-/mime-db-1.52.0.tgz"
+          "value": "https://registry.npmjs.org/mime-db/-/mime-db-1.54.0.tgz"
         },
         {
           "name": "internal:SrcFile",
@@ -439,12 +439,12 @@
     {
       "group": "",
       "name": "negotiator",
-      "version": "0.6.3",
-      "scope": "optional",
+      "version": "0.6.4",
+      "scope": "required",
       "hashes": [
         {
           "alg": "SHA-512",
-          "content": "f8452ca863cbb0cfa3ff37428598ec9d7e758385eb1c53885f07e70953c695093f9398226a470ab2ec4239b051bba0d29bda29c3f3bab2559b25d82140ce1b06"
+          "content": "9b2453dc38963c7aa1a393eb25a211c9a32fda48187f499456004d39832e087e4a8b5c8489069ffd926e43ada7be9738e302f95836d35fbc86262d4d79ebf0f3"
         }
       ],
       "licenses": [
@@ -477,15 +477,15 @@
           }
         }
       ],
-      "purl": "pkg:npm/negotiator@0.6.3",
+      "purl": "pkg:npm/negotiator@0.6.4",
       "externalReferences": [
         {
           "type": "distribution",
-          "url": "https://registry.npmjs.org/negotiator/-/negotiator-0.6.3.tgz"
+          "url": "https://registry.npmjs.org/negotiator/-/negotiator-0.6.4.tgz"
         }
       ],
       "type": "library",
-      "bom-ref": "pkg:npm/negotiator@0.6.3",
+      "bom-ref": "pkg:npm/negotiator@0.6.4",
       "properties": [
         {
           "name": "cdx:license:category",
@@ -493,7 +493,7 @@
         },
         {
           "name": "internal:ResolvedUrl",
-          "value": "https://registry.npmjs.org/negotiator/-/negotiator-0.6.3.tgz"
+          "value": "https://registry.npmjs.org/negotiator/-/negotiator-0.6.4.tgz"
         },
         {
           "name": "internal:SrcFile",
@@ -521,7 +521,7 @@
       "group": "",
       "name": "array-flatten",
       "version": "1.1.1",
-      "scope": "optional",
+      "scope": "required",
       "hashes": [
         {
           "alg": "SHA-512",
@@ -602,7 +602,7 @@
       "group": "",
       "name": "body-parser",
       "version": "1.20.8",
-      "scope": "optional",
+      "scope": "required",
       "hashes": [
         {
           "alg": "SHA-512",
@@ -686,7 +686,7 @@
       "group": "",
       "name": "bytes",
       "version": "3.1.2",
-      "scope": "optional",
+      "scope": "required",
       "hashes": [
         {
           "alg": "SHA-512",
@@ -767,7 +767,7 @@
       "group": "",
       "name": "content-type",
       "version": "1.0.5",
-      "scope": "optional",
+      "scope": "required",
       "hashes": [
         {
           "alg": "SHA-512",
@@ -847,12 +847,12 @@
     {
       "group": "",
       "name": "debug",
-      "version": "2.6.9",
-      "scope": "optional",
+      "version": "4.4.3",
+      "scope": "required",
       "hashes": [
         {
           "alg": "SHA-512",
-          "content": "6c2ec496b7496899cf6c03fed44a2d62fa99b1bdde725e708ba05f8ba0494d470da30a7a72fb298348d7ce74532838e6fc4ec076014155e00f54c35c286b0730"
+          "content": "446c305a7c10be455f6af295b76d8518bc3ec5849dcc04709b4aeee83853540dee994e6165cdbc57790ee2cb6062bcab4e52e9baf808f468a28e5b408cd6dca8"
         }
       ],
       "licenses": [
@@ -885,15 +885,15 @@
           }
         }
       ],
-      "purl": "pkg:npm/debug@2.6.9",
+      "purl": "pkg:npm/debug@4.4.3",
       "externalReferences": [
         {
           "type": "distribution",
-          "url": "https://registry.npmjs.org/debug/-/debug-2.6.9.tgz"
+          "url": "https://registry.npmjs.org/debug/-/debug-4.4.3.tgz"
         }
       ],
       "type": "library",
-      "bom-ref": "pkg:npm/debug@2.6.9",
+      "bom-ref": "pkg:npm/debug@4.4.3",
       "properties": [
         {
           "name": "cdx:license:category",
@@ -901,7 +901,7 @@
         },
         {
           "name": "internal:ResolvedUrl",
-          "value": "https://registry.npmjs.org/debug/-/debug-2.6.9.tgz"
+          "value": "https://registry.npmjs.org/debug/-/debug-4.4.3.tgz"
         },
         {
           "name": "internal:SrcFile",
@@ -928,12 +928,12 @@
     {
       "group": "",
       "name": "ms",
-      "version": "2.0.0",
-      "scope": "optional",
+      "version": "2.1.3",
+      "scope": "required",
       "hashes": [
         {
           "alg": "SHA-512",
-          "content": "4e9a7ad0fe885090d3b8eabfe59f1c76c93326e8dfc2a7ce4e4af02308fb211212a679099d3e92c89e0f08f9c63281630bd75d85a979295218b40b7dee2c74e4"
+          "content": "e85973b9b4cb646dc9d9afcd542025784863ceae68c601f268253dc985ef70bb2fa1568726afece715c8ebf5d73fab73ed1f7100eb479d23bfb57b45dd645394"
         }
       ],
       "licenses": [
@@ -966,15 +966,15 @@
           }
         }
       ],
-      "purl": "pkg:npm/ms@2.0.0",
+      "purl": "pkg:npm/ms@2.1.3",
       "externalReferences": [
         {
           "type": "distribution",
-          "url": "https://registry.npmjs.org/ms/-/ms-2.0.0.tgz"
+          "url": "https://registry.npmjs.org/ms/-/ms-2.1.3.tgz"
         }
       ],
       "type": "library",
-      "bom-ref": "pkg:npm/ms@2.0.0",
+      "bom-ref": "pkg:npm/ms@2.1.3",
       "properties": [
         {
           "name": "cdx:license:category",
@@ -982,7 +982,7 @@
         },
         {
           "name": "internal:ResolvedUrl",
-          "value": "https://registry.npmjs.org/ms/-/ms-2.0.0.tgz"
+          "value": "https://registry.npmjs.org/ms/-/ms-2.1.3.tgz"
         },
         {
           "name": "internal:SrcFile",
@@ -1010,7 +1010,7 @@
       "group": "",
       "name": "depd",
       "version": "2.0.0",
-      "scope": "optional",
+      "scope": "required",
       "hashes": [
         {
           "alg": "SHA-512",
@@ -1091,7 +1091,7 @@
       "group": "",
       "name": "destroy",
       "version": "1.2.0",
-      "scope": "optional",
+      "scope": "required",
       "hashes": [
         {
           "alg": "SHA-512",
@@ -1172,7 +1172,7 @@
       "group": "",
       "name": "http-errors",
       "version": "2.0.1",
-      "scope": "optional",
+      "scope": "required",
       "hashes": [
         {
           "alg": "SHA-512",
@@ -1253,7 +1253,7 @@
       "group": "",
       "name": "inherits",
       "version": "2.0.4",
-      "scope": "optional",
+      "scope": "required",
       "hashes": [
         {
           "alg": "SHA-512",
@@ -1334,7 +1334,7 @@
       "group": "",
       "name": "setprototypeof",
       "version": "1.2.0",
-      "scope": "optional",
+      "scope": "required",
       "hashes": [
         {
           "alg": "SHA-512",
@@ -1415,7 +1415,7 @@
       "group": "",
       "name": "statuses",
       "version": "2.0.2",
-      "scope": "optional",
+      "scope": "required",
       "hashes": [
         {
           "alg": "SHA-512",
@@ -1496,7 +1496,7 @@
       "group": "",
       "name": "toidentifier",
       "version": "1.0.1",
-      "scope": "optional",
+      "scope": "required",
       "hashes": [
         {
           "alg": "SHA-512",
@@ -1577,7 +1577,7 @@
       "group": "",
       "name": "iconv-lite",
       "version": "0.4.24",
-      "scope": "optional",
+      "scope": "required",
       "hashes": [
         {
           "alg": "SHA-512",
@@ -1658,7 +1658,7 @@
       "group": "",
       "name": "safer-buffer",
       "version": "2.1.2",
-      "scope": "optional",
+      "scope": "required",
       "hashes": [
         {
           "alg": "SHA-512",
@@ -1739,7 +1739,7 @@
       "group": "",
       "name": "on-finished",
       "version": "2.4.1",
-      "scope": "optional",
+      "scope": "required",
       "hashes": [
         {
           "alg": "SHA-512",
@@ -1820,7 +1820,7 @@
       "group": "",
       "name": "ee-first",
       "version": "1.1.1",
-      "scope": "optional",
+      "scope": "required",
       "hashes": [
         {
           "alg": "SHA-512",
@@ -1901,7 +1901,7 @@
       "group": "",
       "name": "qs",
       "version": "6.16.0",
-      "scope": "optional",
+      "scope": "required",
       "hashes": [
         {
           "alg": "SHA-512",
@@ -1982,7 +1982,7 @@
       "group": "",
       "name": "es-define-property",
       "version": "1.0.1",
-      "scope": "optional",
+      "scope": "required",
       "hashes": [
         {
           "alg": "SHA-512",
@@ -2063,7 +2063,7 @@
       "group": "",
       "name": "side-channel",
       "version": "1.1.1",
-      "scope": "optional",
+      "scope": "required",
       "hashes": [
         {
           "alg": "SHA-512",
@@ -2144,7 +2144,7 @@
       "group": "",
       "name": "es-errors",
       "version": "1.3.0",
-      "scope": "optional",
+      "scope": "required",
       "hashes": [
         {
           "alg": "SHA-512",
@@ -2225,7 +2225,7 @@
       "group": "",
       "name": "object-inspect",
       "version": "1.13.4",
-      "scope": "optional",
+      "scope": "required",
       "hashes": [
         {
           "alg": "SHA-512",
@@ -2306,7 +2306,7 @@
       "group": "",
       "name": "side-channel-list",
       "version": "1.0.1",
-      "scope": "optional",
+      "scope": "required",
       "hashes": [
         {
           "alg": "SHA-512",
@@ -2387,7 +2387,7 @@
       "group": "",
       "name": "side-channel-map",
       "version": "1.0.1",
-      "scope": "optional",
+      "scope": "required",
       "hashes": [
         {
           "alg": "SHA-512",
@@ -2468,7 +2468,7 @@
       "group": "",
       "name": "call-bound",
       "version": "1.0.4",
-      "scope": "optional",
+      "scope": "required",
       "hashes": [
         {
           "alg": "SHA-512",
@@ -2549,7 +2549,7 @@
       "group": "",
       "name": "call-bind-apply-helpers",
       "version": "1.0.2",
-      "scope": "optional",
+      "scope": "required",
       "hashes": [
         {
           "alg": "SHA-512",
@@ -2630,7 +2630,7 @@
       "group": "",
       "name": "function-bind",
       "version": "1.1.2",
-      "scope": "optional",
+      "scope": "required",
       "hashes": [
         {
           "alg": "SHA-512",
@@ -2711,7 +2711,7 @@
       "group": "",
       "name": "get-intrinsic",
       "version": "1.3.0",
-      "scope": "optional",
+      "scope": "required",
       "hashes": [
         {
           "alg": "SHA-512",
@@ -2792,7 +2792,7 @@
       "group": "",
       "name": "es-object-atoms",
       "version": "1.1.2",
-      "scope": "optional",
+      "scope": "required",
       "hashes": [
         {
           "alg": "SHA-512",
@@ -2873,7 +2873,7 @@
       "group": "",
       "name": "get-proto",
       "version": "1.0.1",
-      "scope": "optional",
+      "scope": "required",
       "hashes": [
         {
           "alg": "SHA-512",
@@ -2954,7 +2954,7 @@
       "group": "",
       "name": "dunder-proto",
       "version": "1.0.1",
-      "scope": "optional",
+      "scope": "required",
       "hashes": [
         {
           "alg": "SHA-512",
@@ -3035,7 +3035,7 @@
       "group": "",
       "name": "gopd",
       "version": "1.2.0",
-      "scope": "optional",
+      "scope": "required",
       "hashes": [
         {
           "alg": "SHA-512",
@@ -3116,7 +3116,7 @@
       "group": "",
       "name": "has-symbols",
       "version": "1.1.0",
-      "scope": "optional",
+      "scope": "required",
       "hashes": [
         {
           "alg": "SHA-512",
@@ -3197,7 +3197,7 @@
       "group": "",
       "name": "hasown",
       "version": "2.0.4",
-      "scope": "optional",
+      "scope": "required",
       "hashes": [
         {
           "alg": "SHA-512",
@@ -3278,7 +3278,7 @@
       "group": "",
       "name": "math-intrinsics",
       "version": "1.1.0",
-      "scope": "optional",
+      "scope": "required",
       "hashes": [
         {
           "alg": "SHA-512",
@@ -3359,7 +3359,7 @@
       "group": "",
       "name": "side-channel-weakmap",
       "version": "1.0.2",
-      "scope": "optional",
+      "scope": "required",
       "hashes": [
         {
           "alg": "SHA-512",
@@ -3440,7 +3440,7 @@
       "group": "",
       "name": "raw-body",
       "version": "2.5.3",
-      "scope": "optional",
+      "scope": "required",
       "hashes": [
         {
           "alg": "SHA-512",
@@ -3521,7 +3521,7 @@
       "group": "",
       "name": "unpipe",
       "version": "1.0.0",
-      "scope": "optional",
+      "scope": "required",
       "hashes": [
         {
           "alg": "SHA-512",
@@ -3602,7 +3602,7 @@
       "group": "",
       "name": "type-is",
       "version": "1.6.18",
-      "scope": "optional",
+      "scope": "required",
       "hashes": [
         {
           "alg": "SHA-512",
@@ -3683,7 +3683,7 @@
       "group": "",
       "name": "media-typer",
       "version": "0.3.0",
-      "scope": "optional",
+      "scope": "required",
       "hashes": [
         {
           "alg": "SHA-512",
@@ -3764,7 +3764,7 @@
       "group": "",
       "name": "content-disposition",
       "version": "0.5.4",
-      "scope": "optional",
+      "scope": "required",
       "hashes": [
         {
           "alg": "SHA-512",
@@ -3844,12 +3844,12 @@
     {
       "group": "",
       "name": "safe-buffer",
-      "version": "5.2.1",
-      "scope": "optional",
+      "version": "5.1.2",
+      "scope": "required",
       "hashes": [
         {
           "alg": "SHA-512",
-          "content": "ae9dd2a34eca71d9a629b1af81a37141226bedb1954959394bd12ad45fa9a5b468ef4f9879a0f1930e4377c34f37e183e9b8e7626d95b8fb825e6a6e62f9825d"
+          "content": "19dd94641243917958ec66c9c5fb04f3f9ef2a45045351b7f1cd6c88de903fa6bd3d3f4c98707c1a7a6c71298c252a05f0b388aedf2e77fc0fb688f2b381bafa"
         }
       ],
       "licenses": [
@@ -3882,15 +3882,15 @@
           }
         }
       ],
-      "purl": "pkg:npm/safe-buffer@5.2.1",
+      "purl": "pkg:npm/safe-buffer@5.1.2",
       "externalReferences": [
         {
           "type": "distribution",
-          "url": "https://registry.npmjs.org/safe-buffer/-/safe-buffer-5.2.1.tgz"
+          "url": "https://registry.npmjs.org/safe-buffer/-/safe-buffer-5.1.2.tgz"
         }
       ],
       "type": "library",
-      "bom-ref": "pkg:npm/safe-buffer@5.2.1",
+      "bom-ref": "pkg:npm/safe-buffer@5.1.2",
       "properties": [
         {
           "name": "cdx:license:category",
@@ -3898,7 +3898,7 @@
         },
         {
           "name": "internal:ResolvedUrl",
-          "value": "https://registry.npmjs.org/safe-buffer/-/safe-buffer-5.2.1.tgz"
+          "value": "https://registry.npmjs.org/safe-buffer/-/safe-buffer-5.1.2.tgz"
         },
         {
           "name": "internal:SrcFile",
@@ -3926,7 +3926,7 @@
       "group": "",
       "name": "cookie",
       "version": "0.7.2",
-      "scope": "optional",
+      "scope": "required",
       "hashes": [
         {
           "alg": "SHA-512",
@@ -4007,7 +4007,7 @@
       "group": "",
       "name": "cookie-signature",
       "version": "1.0.7",
-      "scope": "optional",
+      "scope": "required",
       "hashes": [
         {
           "alg": "SHA-512",
@@ -4088,7 +4088,7 @@
       "group": "",
       "name": "encodeurl",
       "version": "2.0.0",
-      "scope": "optional",
+      "scope": "required",
       "hashes": [
         {
           "alg": "SHA-512",
@@ -4169,7 +4169,7 @@
       "group": "",
       "name": "escape-html",
       "version": "1.0.3",
-      "scope": "optional",
+      "scope": "required",
       "hashes": [
         {
           "alg": "SHA-512",
@@ -4250,7 +4250,7 @@
       "group": "",
       "name": "etag",
       "version": "1.8.1",
-      "scope": "optional",
+      "scope": "required",
       "hashes": [
         {
           "alg": "SHA-512",
@@ -4331,7 +4331,7 @@
       "group": "",
       "name": "finalhandler",
       "version": "1.3.2",
-      "scope": "optional",
+      "scope": "required",
       "hashes": [
         {
           "alg": "SHA-512",
@@ -4412,7 +4412,7 @@
       "group": "",
       "name": "parseurl",
       "version": "1.3.3",
-      "scope": "optional",
+      "scope": "required",
       "hashes": [
         {
           "alg": "SHA-512",
@@ -4493,7 +4493,7 @@
       "group": "",
       "name": "fresh",
       "version": "0.5.2",
-      "scope": "optional",
+      "scope": "required",
       "hashes": [
         {
           "alg": "SHA-512",
@@ -4574,7 +4574,7 @@
       "group": "",
       "name": "merge-descriptors",
       "version": "1.0.3",
-      "scope": "optional",
+      "scope": "required",
       "hashes": [
         {
           "alg": "SHA-512",
@@ -4655,7 +4655,7 @@
       "group": "",
       "name": "methods",
       "version": "1.1.2",
-      "scope": "optional",
+      "scope": "required",
       "hashes": [
         {
           "alg": "SHA-512",
@@ -4736,7 +4736,7 @@
       "group": "",
       "name": "path-to-regexp",
       "version": "0.1.13",
-      "scope": "optional",
+      "scope": "required",
       "hashes": [
         {
           "alg": "SHA-512",
@@ -4817,7 +4817,7 @@
       "group": "",
       "name": "proxy-addr",
       "version": "2.0.8",
-      "scope": "optional",
+      "scope": "required",
       "hashes": [
         {
           "alg": "SHA-512",
@@ -4898,7 +4898,7 @@
       "group": "",
       "name": "forwarded",
       "version": "0.2.0",
-      "scope": "optional",
+      "scope": "required",
       "hashes": [
         {
           "alg": "SHA-512",
@@ -4979,7 +4979,7 @@
       "group": "",
       "name": "ipaddr.js",
       "version": "1.9.1",
-      "scope": "optional",
+      "scope": "required",
       "hashes": [
         {
           "alg": "SHA-512",
@@ -5060,7 +5060,7 @@
       "group": "",
       "name": "range-parser",
       "version": "1.2.1",
-      "scope": "optional",
+      "scope": "required",
       "hashes": [
         {
           "alg": "SHA-512",
@@ -5144,7 +5144,7 @@
       "group": "",
       "name": "send",
       "version": "0.19.2",
-      "scope": "optional",
+      "scope": "required",
       "hashes": [
         {
           "alg": "SHA-512",
@@ -5225,7 +5225,7 @@
       "group": "",
       "name": "mime",
       "version": "1.6.0",
-      "scope": "optional",
+      "scope": "required",
       "hashes": [
         {
           "alg": "SHA-512",
@@ -5316,90 +5316,9 @@
     },
     {
       "group": "",
-      "name": "ms",
-      "version": "2.1.3",
-      "scope": "optional",
-      "hashes": [
-        {
-          "alg": "SHA-512",
-          "content": "e85973b9b4cb646dc9d9afcd542025784863ceae68c601f268253dc985ef70bb2fa1568726afece715c8ebf5d73fab73ed1f7100eb479d23bfb57b45dd645394"
-        }
-      ],
-      "licenses": [
-        {
-          "license": {
-            "id": "MIT",
-            "url": "https://opensource.org/licenses/MIT",
-            "properties": [
-              {
-                "name": "cdx:license:category",
-                "value": "Permissive"
-              },
-              {
-                "name": "cdx:license:foss",
-                "value": "true"
-              },
-              {
-                "name": "cdx:license:osiApproved",
-                "value": "true"
-              },
-              {
-                "name": "cdx:license:fsfLibre",
-                "value": "true"
-              },
-              {
-                "name": "cdx:license:deprecated",
-                "value": "false"
-              }
-            ]
-          }
-        }
-      ],
-      "purl": "pkg:npm/ms@2.1.3",
-      "externalReferences": [
-        {
-          "type": "distribution",
-          "url": "https://registry.npmjs.org/ms/-/ms-2.1.3.tgz"
-        }
-      ],
-      "type": "library",
-      "bom-ref": "pkg:npm/ms@2.1.3",
-      "properties": [
-        {
-          "name": "cdx:license:category",
-          "value": "Permissive"
-        },
-        {
-          "name": "internal:ResolvedUrl",
-          "value": "https://registry.npmjs.org/ms/-/ms-2.1.3.tgz"
-        },
-        {
-          "name": "internal:SrcFile",
-          "value": "package-lock.json"
-        }
-      ],
-      "evidence": {
-        "identity": [
-          {
-            "field": "purl",
-            "confidence": 1,
-            "methods": [
-              {
-                "technique": "manifest-analysis",
-                "confidence": 1,
-                "value": "package-lock.json"
-              }
-            ],
-            "concludedValue": "package-lock.json"
-          }
-        ]
-      }
-    },
-    {
-      "group": "",
       "name": "serve-static",
       "version": "1.16.3",
-      "scope": "optional",
+      "scope": "required",
       "hashes": [
         {
           "alg": "SHA-512",
@@ -5480,7 +5399,7 @@
       "group": "",
       "name": "utils-merge",
       "version": "1.0.1",
-      "scope": "optional",
+      "scope": "required",
       "hashes": [
         {
           "alg": "SHA-512",
@@ -5561,7 +5480,7 @@
       "group": "",
       "name": "vary",
       "version": "1.1.2",
-      "scope": "optional",
+      "scope": "required",
       "hashes": [
         {
           "alg": "SHA-512",
@@ -5733,7 +5652,7 @@
       "group": "",
       "name": "object-assign",
       "version": "4.1.1",
-      "scope": "optional",
+      "scope": "required",
       "hashes": [
         {
           "alg": "SHA-512",
@@ -5996,7 +5915,7 @@
       "group": "",
       "name": "basic-auth",
       "version": "2.0.1",
-      "scope": "optional",
+      "scope": "required",
       "hashes": [
         {
           "alg": "SHA-512",
@@ -6075,90 +5994,9 @@
     },
     {
       "group": "",
-      "name": "safe-buffer",
-      "version": "5.1.2",
-      "scope": "optional",
-      "hashes": [
-        {
-          "alg": "SHA-512",
-          "content": "19dd94641243917958ec66c9c5fb04f3f9ef2a45045351b7f1cd6c88de903fa6bd3d3f4c98707c1a7a6c71298c252a05f0b388aedf2e77fc0fb688f2b381bafa"
-        }
-      ],
-      "licenses": [
-        {
-          "license": {
-            "id": "MIT",
-            "url": "https://opensource.org/licenses/MIT",
-            "properties": [
-              {
-                "name": "cdx:license:category",
-                "value": "Permissive"
-              },
-              {
-                "name": "cdx:license:foss",
-                "value": "true"
-              },
-              {
-                "name": "cdx:license:osiApproved",
-                "value": "true"
-              },
-              {
-                "name": "cdx:license:fsfLibre",
-                "value": "true"
-              },
-              {
-                "name": "cdx:license:deprecated",
-                "value": "false"
-              }
-            ]
-          }
-        }
-      ],
-      "purl": "pkg:npm/safe-buffer@5.1.2",
-      "externalReferences": [
-        {
-          "type": "distribution",
-          "url": "https://registry.npmjs.org/safe-buffer/-/safe-buffer-5.1.2.tgz"
-        }
-      ],
-      "type": "library",
-      "bom-ref": "pkg:npm/safe-buffer@5.1.2",
-      "properties": [
-        {
-          "name": "cdx:license:category",
-          "value": "Permissive"
-        },
-        {
-          "name": "internal:ResolvedUrl",
-          "value": "https://registry.npmjs.org/safe-buffer/-/safe-buffer-5.1.2.tgz"
-        },
-        {
-          "name": "internal:SrcFile",
-          "value": "package-lock.json"
-        }
-      ],
-      "evidence": {
-        "identity": [
-          {
-            "field": "purl",
-            "confidence": 1,
-            "methods": [
-              {
-                "technique": "manifest-analysis",
-                "confidence": 1,
-                "value": "package-lock.json"
-              }
-            ],
-            "concludedValue": "package-lock.json"
-          }
-        ]
-      }
-    },
-    {
-      "group": "",
       "name": "on-headers",
       "version": "1.1.0",
-      "scope": "optional",
+      "scope": "required",
       "hashes": [
         {
           "alg": "SHA-512",
@@ -6330,7 +6168,6 @@
       "group": "",
       "name": "axios",
       "version": "1.20.0",
-      "scope": "optional",
       "hashes": [
         {
           "alg": "SHA-512",
@@ -6411,7 +6248,6 @@
       "group": "",
       "name": "follow-redirects",
       "version": "1.16.1",
-      "scope": "optional",
       "hashes": [
         {
           "alg": "SHA-512",
@@ -6492,7 +6328,6 @@
       "group": "",
       "name": "form-data",
       "version": "4.0.6",
-      "scope": "optional",
       "hashes": [
         {
           "alg": "SHA-512",
@@ -6573,7 +6408,6 @@
       "group": "",
       "name": "asynckit",
       "version": "0.4.0",
-      "scope": "optional",
       "hashes": [
         {
           "alg": "SHA-512",
@@ -6654,7 +6488,6 @@
       "group": "",
       "name": "combined-stream",
       "version": "1.0.8",
-      "scope": "optional",
       "hashes": [
         {
           "alg": "SHA-512",
@@ -6735,7 +6568,6 @@
       "group": "",
       "name": "delayed-stream",
       "version": "1.0.0",
-      "scope": "optional",
       "hashes": [
         {
           "alg": "SHA-512",
@@ -6816,7 +6648,6 @@
       "group": "",
       "name": "es-set-tostringtag",
       "version": "2.1.0",
-      "scope": "optional",
       "hashes": [
         {
           "alg": "SHA-512",
@@ -6897,7 +6728,6 @@
       "group": "",
       "name": "has-tostringtag",
       "version": "1.0.2",
-      "scope": "optional",
       "hashes": [
         {
           "alg": "SHA-512",
@@ -6978,7 +6808,6 @@
       "group": "",
       "name": "https-proxy-agent",
       "version": "5.0.1",
-      "scope": "optional",
       "hashes": [
         {
           "alg": "SHA-512",
@@ -7059,7 +6888,6 @@
       "group": "",
       "name": "agent-base",
       "version": "6.0.2",
-      "scope": "optional",
       "hashes": [
         {
           "alg": "SHA-512",
@@ -7138,90 +6966,8 @@
     },
     {
       "group": "",
-      "name": "debug",
-      "version": "4.4.3",
-      "scope": "optional",
-      "hashes": [
-        {
-          "alg": "SHA-512",
-          "content": "446c305a7c10be455f6af295b76d8518bc3ec5849dcc04709b4aeee83853540dee994e6165cdbc57790ee2cb6062bcab4e52e9baf808f468a28e5b408cd6dca8"
-        }
-      ],
-      "licenses": [
-        {
-          "license": {
-            "id": "MIT",
-            "url": "https://opensource.org/licenses/MIT",
-            "properties": [
-              {
-                "name": "cdx:license:category",
-                "value": "Permissive"
-              },
-              {
-                "name": "cdx:license:foss",
-                "value": "true"
-              },
-              {
-                "name": "cdx:license:osiApproved",
-                "value": "true"
-              },
-              {
-                "name": "cdx:license:fsfLibre",
-                "value": "true"
-              },
-              {
-                "name": "cdx:license:deprecated",
-                "value": "false"
-              }
-            ]
-          }
-        }
-      ],
-      "purl": "pkg:npm/debug@4.4.3",
-      "externalReferences": [
-        {
-          "type": "distribution",
-          "url": "https://registry.npmjs.org/debug/-/debug-4.4.3.tgz"
-        }
-      ],
-      "type": "library",
-      "bom-ref": "pkg:npm/debug@4.4.3",
-      "properties": [
-        {
-          "name": "cdx:license:category",
-          "value": "Permissive"
-        },
-        {
-          "name": "internal:ResolvedUrl",
-          "value": "https://registry.npmjs.org/debug/-/debug-4.4.3.tgz"
-        },
-        {
-          "name": "internal:SrcFile",
-          "value": "package-lock.json"
-        }
-      ],
-      "evidence": {
-        "identity": [
-          {
-            "field": "purl",
-            "confidence": 1,
-            "methods": [
-              {
-                "technique": "manifest-analysis",
-                "confidence": 1,
-                "value": "package-lock.json"
-              }
-            ],
-            "concludedValue": "package-lock.json"
-          }
-        ]
-      }
-    },
-    {
-      "group": "",
       "name": "proxy-from-env",
       "version": "2.1.0",
-      "scope": "optional",
       "hashes": [
         {
           "alg": "SHA-512",
@@ -7484,7 +7230,6 @@
       "group": "",
       "name": "winston",
       "version": "3.19.0",
-      "scope": "optional",
       "hashes": [
         {
           "alg": "SHA-512",
@@ -7564,12 +7309,11 @@
     {
       "group": "@colors",
       "name": "colors",
-      "version": "1.6.1",
-      "scope": "optional",
+      "version": "1.6.0",
       "hashes": [
         {
           "alg": "SHA-512",
-          "content": "7539942735d2b9ac812be859c9d11a5ddda6871eb5a96430930681058e8bc84395c7f2fd69053969cf1e14d12c77d9eb0f5fb36fdcef0c2a612d27bc83517843"
+          "content": "22bf803a26eaceb22c2fa6a3b77473dcbb2407b3a23151ea96d666b296d6fd326e4d5bb238c8ab56a0248df63a2484a22c783236a89c002f00c871c6ccd77f74"
         }
       ],
       "licenses": [
@@ -7602,15 +7346,15 @@
           }
         }
       ],
-      "purl": "pkg:npm/%40colors/colors@1.6.1",
+      "purl": "pkg:npm/%40colors/colors@1.6.0",
       "externalReferences": [
         {
           "type": "distribution",
-          "url": "https://registry.npmjs.org/@colors/colors/-/colors-1.6.1.tgz"
+          "url": "https://registry.npmjs.org/@colors/colors/-/colors-1.6.0.tgz"
         }
       ],
       "type": "library",
-      "bom-ref": "pkg:npm/@colors/colors@1.6.1",
+      "bom-ref": "pkg:npm/@colors/colors@1.6.0",
       "properties": [
         {
           "name": "cdx:license:category",
@@ -7618,7 +7362,7 @@
         },
         {
           "name": "internal:ResolvedUrl",
-          "value": "https://registry.npmjs.org/@colors/colors/-/colors-1.6.1.tgz"
+          "value": "https://registry.npmjs.org/@colors/colors/-/colors-1.6.0.tgz"
         },
         {
           "name": "internal:SrcFile",
@@ -7646,7 +7390,6 @@
       "group": "@dabh",
       "name": "diagnostics",
       "version": "2.0.9",
-      "scope": "optional",
       "hashes": [
         {
           "alg": "SHA-512",
@@ -7727,7 +7470,6 @@
       "group": "@so-ric",
       "name": "colorspace",
       "version": "1.1.6",
-      "scope": "optional",
       "hashes": [
         {
           "alg": "SHA-512",
@@ -7808,7 +7550,6 @@
       "group": "",
       "name": "color",
       "version": "5.0.3",
-      "scope": "optional",
       "hashes": [
         {
           "alg": "SHA-512",
@@ -7889,7 +7630,6 @@
       "group": "",
       "name": "color-convert",
       "version": "3.1.3",
-      "scope": "optional",
       "hashes": [
         {
           "alg": "SHA-512",
@@ -7970,7 +7710,6 @@
       "group": "",
       "name": "color-name",
       "version": "2.1.1",
-      "scope": "optional",
       "hashes": [
         {
           "alg": "SHA-512",
@@ -8051,7 +7790,6 @@
       "group": "",
       "name": "color-string",
       "version": "2.1.4",
-      "scope": "optional",
       "hashes": [
         {
           "alg": "SHA-512",
@@ -8132,7 +7870,6 @@
       "group": "",
       "name": "text-hex",
       "version": "1.0.0",
-      "scope": "optional",
       "hashes": [
         {
           "alg": "SHA-512",
@@ -8213,7 +7950,6 @@
       "group": "",
       "name": "enabled",
       "version": "2.0.0",
-      "scope": "optional",
       "hashes": [
         {
           "alg": "SHA-512",
@@ -8294,7 +8030,6 @@
       "group": "",
       "name": "kuler",
       "version": "2.0.0",
-      "scope": "optional",
       "hashes": [
         {
           "alg": "SHA-512",
@@ -8375,7 +8110,6 @@
       "group": "",
       "name": "async",
       "version": "3.2.6",
-      "scope": "optional",
       "hashes": [
         {
           "alg": "SHA-512",
@@ -8456,7 +8190,6 @@
       "group": "",
       "name": "is-stream",
       "version": "2.0.1",
-      "scope": "optional",
       "hashes": [
         {
           "alg": "SHA-512",
@@ -8537,7 +8270,6 @@
       "group": "",
       "name": "logform",
       "version": "2.7.0",
-      "scope": "optional",
       "hashes": [
         {
           "alg": "SHA-512",
@@ -8591,87 +8323,6 @@
         {
           "name": "internal:ResolvedUrl",
           "value": "https://registry.npmjs.org/logform/-/logform-2.7.0.tgz"
-        },
-        {
-          "name": "internal:SrcFile",
-          "value": "package-lock.json"
-        }
-      ],
-      "evidence": {
-        "identity": [
-          {
-            "field": "purl",
-            "confidence": 1,
-            "methods": [
-              {
-                "technique": "manifest-analysis",
-                "confidence": 1,
-                "value": "package-lock.json"
-              }
-            ],
-            "concludedValue": "package-lock.json"
-          }
-        ]
-      }
-    },
-    {
-      "group": "@colors",
-      "name": "colors",
-      "version": "1.6.0",
-      "scope": "optional",
-      "hashes": [
-        {
-          "alg": "SHA-512",
-          "content": "22bf803a26eaceb22c2fa6a3b77473dcbb2407b3a23151ea96d666b296d6fd326e4d5bb238c8ab56a0248df63a2484a22c783236a89c002f00c871c6ccd77f74"
-        }
-      ],
-      "licenses": [
-        {
-          "license": {
-            "id": "MIT",
-            "url": "https://opensource.org/licenses/MIT",
-            "properties": [
-              {
-                "name": "cdx:license:category",
-                "value": "Permissive"
-              },
-              {
-                "name": "cdx:license:foss",
-                "value": "true"
-              },
-              {
-                "name": "cdx:license:osiApproved",
-                "value": "true"
-              },
-              {
-                "name": "cdx:license:fsfLibre",
-                "value": "true"
-              },
-              {
-                "name": "cdx:license:deprecated",
-                "value": "false"
-              }
-            ]
-          }
-        }
-      ],
-      "purl": "pkg:npm/%40colors/colors@1.6.0",
-      "externalReferences": [
-        {
-          "type": "distribution",
-          "url": "https://registry.npmjs.org/@colors/colors/-/colors-1.6.0.tgz"
-        }
-      ],
-      "type": "library",
-      "bom-ref": "pkg:npm/@colors/colors@1.6.0",
-      "properties": [
-        {
-          "name": "cdx:license:category",
-          "value": "Permissive"
-        },
-        {
-          "name": "internal:ResolvedUrl",
-          "value": "https://registry.npmjs.org/@colors/colors/-/colors-1.6.0.tgz"
         },
         {
           "name": "internal:SrcFile",
@@ -8784,7 +8435,6 @@
       "group": "",
       "name": "fecha",
       "version": "4.2.3",
-      "scope": "optional",
       "hashes": [
         {
           "alg": "SHA-512",
@@ -8865,7 +8515,6 @@
       "group": "",
       "name": "safe-stable-stringify",
       "version": "2.5.0",
-      "scope": "optional",
       "hashes": [
         {
           "alg": "SHA-512",
@@ -8946,7 +8595,6 @@
       "group": "",
       "name": "triple-beam",
       "version": "1.4.1",
-      "scope": "optional",
       "hashes": [
         {
           "alg": "SHA-512",
@@ -9027,7 +8675,6 @@
       "group": "",
       "name": "one-time",
       "version": "1.0.0",
-      "scope": "optional",
       "hashes": [
         {
           "alg": "SHA-512",
@@ -9108,7 +8755,6 @@
       "group": "",
       "name": "fn.name",
       "version": "1.1.0",
-      "scope": "optional",
       "hashes": [
         {
           "alg": "SHA-512",
@@ -9189,7 +8835,6 @@
       "group": "",
       "name": "readable-stream",
       "version": "3.6.2",
-      "scope": "optional",
       "hashes": [
         {
           "alg": "SHA-512",
@@ -9270,7 +8915,6 @@
       "group": "",
       "name": "string_decoder",
       "version": "1.3.0",
-      "scope": "optional",
       "hashes": [
         {
           "alg": "SHA-512",
@@ -9351,7 +8995,6 @@
       "group": "",
       "name": "util-deprecate",
       "version": "1.0.2",
-      "scope": "optional",
       "hashes": [
         {
           "alg": "SHA-512",
@@ -9432,7 +9075,6 @@
       "group": "",
       "name": "stack-trace",
       "version": "0.0.10",
-      "scope": "optional",
       "hashes": [
         {
           "alg": "SHA-512",
@@ -9513,7 +9155,6 @@
       "group": "",
       "name": "winston-transport",
       "version": "4.9.0",
-      "scope": "optional",
       "hashes": [
         {
           "alg": "SHA-512",
@@ -9685,7 +9326,7 @@
       "group": "",
       "name": "compressible",
       "version": "2.0.18",
-      "scope": "optional",
+      "scope": "required",
       "hashes": [
         {
           "alg": "SHA-512",
@@ -9761,191 +9402,29 @@
           }
         ]
       }
-    },
-    {
-      "group": "",
-      "name": "mime-db",
-      "version": "1.54.0",
-      "scope": "optional",
-      "hashes": [
-        {
-          "alg": "SHA-512",
-          "content": "694e4426e20dd960de982700a76bc505fa7f9b810085626750d492c348b1b3bfe45db77a3e0eb8126c0990d745841f1a5add6c1f60935eb2f1a3f880195de83d"
-        }
-      ],
-      "licenses": [
-        {
-          "license": {
-            "id": "MIT",
-            "url": "https://opensource.org/licenses/MIT",
-            "properties": [
-              {
-                "name": "cdx:license:category",
-                "value": "Permissive"
-              },
-              {
-                "name": "cdx:license:foss",
-                "value": "true"
-              },
-              {
-                "name": "cdx:license:osiApproved",
-                "value": "true"
-              },
-              {
-                "name": "cdx:license:fsfLibre",
-                "value": "true"
-              },
-              {
-                "name": "cdx:license:deprecated",
-                "value": "false"
-              }
-            ]
-          }
-        }
-      ],
-      "purl": "pkg:npm/mime-db@1.54.0",
-      "externalReferences": [
-        {
-          "type": "distribution",
-          "url": "https://registry.npmjs.org/mime-db/-/mime-db-1.54.0.tgz"
-        }
-      ],
-      "type": "library",
-      "bom-ref": "pkg:npm/mime-db@1.54.0",
-      "properties": [
-        {
-          "name": "cdx:license:category",
-          "value": "Permissive"
-        },
-        {
-          "name": "internal:ResolvedUrl",
-          "value": "https://registry.npmjs.org/mime-db/-/mime-db-1.54.0.tgz"
-        },
-        {
-          "name": "internal:SrcFile",
-          "value": "package-lock.json"
-        }
-      ],
-      "evidence": {
-        "identity": [
-          {
-            "field": "purl",
-            "confidence": 1,
-            "methods": [
-              {
-                "technique": "manifest-analysis",
-                "confidence": 1,
-                "value": "package-lock.json"
-              }
-            ],
-            "concludedValue": "package-lock.json"
-          }
-        ]
-      }
-    },
-    {
-      "group": "",
-      "name": "negotiator",
-      "version": "0.6.4",
-      "scope": "optional",
-      "hashes": [
-        {
-          "alg": "SHA-512",
-          "content": "9b2453dc38963c7aa1a393eb25a211c9a32fda48187f499456004d39832e087e4a8b5c8489069ffd926e43ada7be9738e302f95836d35fbc86262d4d79ebf0f3"
-        }
-      ],
-      "licenses": [
-        {
-          "license": {
-            "id": "MIT",
-            "url": "https://opensource.org/licenses/MIT",
-            "properties": [
-              {
-                "name": "cdx:license:category",
-                "value": "Permissive"
-              },
-              {
-                "name": "cdx:license:foss",
-                "value": "true"
-              },
-              {
-                "name": "cdx:license:osiApproved",
-                "value": "true"
-              },
-              {
-                "name": "cdx:license:fsfLibre",
-                "value": "true"
-              },
-              {
-                "name": "cdx:license:deprecated",
-                "value": "false"
-              }
-            ]
-          }
-        }
-      ],
-      "purl": "pkg:npm/negotiator@0.6.4",
-      "externalReferences": [
-        {
-          "type": "distribution",
-          "url": "https://registry.npmjs.org/negotiator/-/negotiator-0.6.4.tgz"
-        }
-      ],
-      "type": "library",
-      "bom-ref": "pkg:npm/negotiator@0.6.4",
-      "properties": [
-        {
-          "name": "cdx:license:category",
-          "value": "Permissive"
-        },
-        {
-          "name": "internal:ResolvedUrl",
-          "value": "https://registry.npmjs.org/negotiator/-/negotiator-0.6.4.tgz"
-        },
-        {
-          "name": "internal:SrcFile",
-          "value": "package-lock.json"
-        }
-      ],
-      "evidence": {
-        "identity": [
-          {
-            "field": "purl",
-            "confidence": 1,
-            "methods": [
-              {
-                "technique": "manifest-analysis",
-                "confidence": 1,
-                "value": "package-lock.json"
-              }
-            ],
-            "concludedValue": "package-lock.json"
-          }
-        ]
-      }
     }
   ],
   "services": [],
   "dependencies": [
     {
-      "ref": "pkg:npm/mime-db@1.52.0",
+      "ref": "pkg:npm/mime-db@1.54.0",
       "dependsOn": []
     },
     {
       "ref": "pkg:npm/mime-types@2.1.35",
       "dependsOn": [
-        "pkg:npm/mime-db@1.52.0"
+        "pkg:npm/mime-db@1.54.0"
       ]
     },
     {
-      "ref": "pkg:npm/negotiator@0.6.3",
+      "ref": "pkg:npm/negotiator@0.6.4",
       "dependsOn": []
     },
     {
       "ref": "pkg:npm/accepts@1.3.8",
       "dependsOn": [
         "pkg:npm/mime-types@2.1.35",
-        "pkg:npm/negotiator@0.6.3"
+        "pkg:npm/negotiator@0.6.4"
       ]
     },
     {
@@ -9961,13 +9440,13 @@
       "dependsOn": []
     },
     {
-      "ref": "pkg:npm/ms@2.0.0",
+      "ref": "pkg:npm/ms@2.1.3",
       "dependsOn": []
     },
     {
-      "ref": "pkg:npm/debug@2.6.9",
+      "ref": "pkg:npm/debug@4.4.3",
       "dependsOn": [
-        "pkg:npm/ms@2.0.0"
+        "pkg:npm/ms@2.1.3"
       ]
     },
     {
@@ -10180,7 +9659,7 @@
       "dependsOn": [
         "pkg:npm/bytes@3.1.2",
         "pkg:npm/content-type@1.0.5",
-        "pkg:npm/debug@2.6.9",
+        "pkg:npm/debug@4.4.3",
         "pkg:npm/depd@2.0.0",
         "pkg:npm/destroy@1.2.0",
         "pkg:npm/http-errors@2.0.1",
@@ -10193,13 +9672,13 @@
       ]
     },
     {
-      "ref": "pkg:npm/safe-buffer@5.2.1",
+      "ref": "pkg:npm/safe-buffer@5.1.2",
       "dependsOn": []
     },
     {
       "ref": "pkg:npm/content-disposition@0.5.4",
       "dependsOn": [
-        "pkg:npm/safe-buffer@5.2.1"
+        "pkg:npm/safe-buffer@5.1.2"
       ]
     },
     {
@@ -10229,7 +9708,7 @@
     {
       "ref": "pkg:npm/finalhandler@1.3.2",
       "dependsOn": [
-        "pkg:npm/debug@2.6.9",
+        "pkg:npm/debug@4.4.3",
         "pkg:npm/encodeurl@2.0.0",
         "pkg:npm/escape-html@1.0.3",
         "pkg:npm/on-finished@2.4.1",
@@ -10278,13 +9757,9 @@
       "dependsOn": []
     },
     {
-      "ref": "pkg:npm/ms@2.1.3",
-      "dependsOn": []
-    },
-    {
       "ref": "pkg:npm/send@0.19.2",
       "dependsOn": [
-        "pkg:npm/debug@2.6.9",
+        "pkg:npm/debug@4.4.3",
         "pkg:npm/depd@2.0.0",
         "pkg:npm/destroy@1.2.0",
         "pkg:npm/encodeurl@2.0.0",
@@ -10326,7 +9801,7 @@
         "pkg:npm/content-type@1.0.5",
         "pkg:npm/cookie-signature@1.0.7",
         "pkg:npm/cookie@0.7.2",
-        "pkg:npm/debug@2.6.9",
+        "pkg:npm/debug@4.4.3",
         "pkg:npm/depd@2.0.0",
         "pkg:npm/encodeurl@2.0.0",
         "pkg:npm/escape-html@1.0.3",
@@ -10342,7 +9817,7 @@
         "pkg:npm/proxy-addr@2.0.8",
         "pkg:npm/qs@6.16.0",
         "pkg:npm/range-parser@1.2.1",
-        "pkg:npm/safe-buffer@5.2.1",
+        "pkg:npm/safe-buffer@5.1.2",
         "pkg:npm/send@0.19.2",
         "pkg:npm/serve-static@1.16.3",
         "pkg:npm/setprototypeof@1.2.0",
@@ -10368,10 +9843,6 @@
       "dependsOn": []
     },
     {
-      "ref": "pkg:npm/safe-buffer@5.1.2",
-      "dependsOn": []
-    },
-    {
       "ref": "pkg:npm/basic-auth@2.0.1",
       "dependsOn": [
         "pkg:npm/safe-buffer@5.1.2"
@@ -10385,7 +9856,7 @@
       "ref": "pkg:npm/morgan@1.12.1",
       "dependsOn": [
         "pkg:npm/basic-auth@2.0.1",
-        "pkg:npm/debug@2.6.9",
+        "pkg:npm/debug@4.4.3",
         "pkg:npm/depd@2.0.0",
         "pkg:npm/on-finished@2.4.1",
         "pkg:npm/on-headers@1.1.0"
@@ -10439,12 +9910,6 @@
       ]
     },
     {
-      "ref": "pkg:npm/debug@4.4.3",
-      "dependsOn": [
-        "pkg:npm/ms@2.1.3"
-      ]
-    },
-    {
       "ref": "pkg:npm/agent-base@6.0.2",
       "dependsOn": [
         "pkg:npm/debug@4.4.3"
@@ -10479,7 +9944,7 @@
       "dependsOn": []
     },
     {
-      "ref": "pkg:npm/@colors/colors@1.6.1",
+      "ref": "pkg:npm/@colors/colors@1.6.0",
       "dependsOn": []
     },
     {
@@ -10541,10 +10006,6 @@
       "dependsOn": []
     },
     {
-      "ref": "pkg:npm/@colors/colors@1.6.0",
-      "dependsOn": []
-    },
-    {
       "ref": "pkg:npm/@types/triple-beam@1.3.5",
       "dependsOn": []
     },
@@ -10584,7 +10045,7 @@
     {
       "ref": "pkg:npm/string_decoder@1.3.0",
       "dependsOn": [
-        "pkg:npm/safe-buffer@5.2.1"
+        "pkg:npm/safe-buffer@5.1.2"
       ]
     },
     {
@@ -10614,7 +10075,7 @@
     {
       "ref": "pkg:npm/winston@3.19.0",
       "dependsOn": [
-        "pkg:npm/@colors/colors@1.6.1",
+        "pkg:npm/@colors/colors@1.6.0",
         "pkg:npm/@dabh/diagnostics@2.0.9",
         "pkg:npm/async@3.2.6",
         "pkg:npm/is-stream@2.0.1",
@@ -10628,29 +10089,21 @@
       ]
     },
     {
-      "ref": "pkg:npm/mime-db@1.54.0",
-      "dependsOn": []
-    },
-    {
       "ref": "pkg:npm/compressible@2.0.18",
       "dependsOn": [
         "pkg:npm/mime-db@1.54.0"
       ]
     },
     {
-      "ref": "pkg:npm/negotiator@0.6.4",
-      "dependsOn": []
-    },
-    {
       "ref": "pkg:npm/compression@1.8.2",
       "dependsOn": [
         "pkg:npm/bytes@3.1.2",
         "pkg:npm/compressible@2.0.18",
-        "pkg:npm/debug@2.6.9",
+        "pkg:npm/debug@4.4.3",
         "pkg:npm/destroy@1.2.0",
         "pkg:npm/negotiator@0.6.4",
         "pkg:npm/on-headers@1.1.0",
-        "pkg:npm/safe-buffer@5.2.1",
+        "pkg:npm/safe-buffer@5.1.2",
         "pkg:npm/vary@1.1.2"
       ]
     },
@@ -10680,10 +10133,10 @@
         "component": {
           "group": "@cdxgen",
           "name": "cdxgen",
-          "version": "13.2.0",
-          "purl": "pkg:npm/%40cdxgen/cdxgen@13.2.0",
+          "version": "13.3.0",
+          "purl": "pkg:npm/%40cdxgen/cdxgen@13.3.0",
           "type": "application",
-          "bom-ref": "pkg:npm/@cdxgen/cdxgen@13.2.0",
+          "bom-ref": "pkg:npm/@cdxgen/cdxgen@13.3.0",
           "publisher": "OWASP Foundation",
           "authors": [
             {
@@ -10692,8 +10145,8 @@
           ]
         }
       },
-      "timestamp": "2026-10-10T03:30:41Z",
-      "text": "This Software Bill-of-Materials (SBOM) document was created on Saturday, October 10, 2026 with cdxgen. The data was captured during the build lifecycle phase. The document describes an application named 'sbom-example-nodejs' with version '1.0.0'. The package type in this SBOM is npm with 4 purl namespaces described under components. The components were identified from the source files: package-lock.json."
+      "timestamp": "2026-10-13T06:46:41Z",
+      "text": "This Software Bill-of-Materials (SBOM) document was created on Tuesday, October 13, 2026 with cdxgen. The data was captured during the build lifecycle phase. The document describes an application named 'sbom-example-nodejs' with version '1.0.0'. The package type in this SBOM is npm with 4 purl namespaces described under components. The components were identified from the source files: package-lock.json."
     }
   ]
 }

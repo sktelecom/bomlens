@@ -78,6 +78,14 @@ describe("groupArtifacts", () => {
     expect(groups[2].formats.every((f) => f.viewable)).toBe(true);
   });
 
+  it("gives the component-versions template a viewable CSV card", () => {
+    const groups = groupArtifacts([file(`${PREFIX}_bom.json`), file(`${PREFIX}_component-versions.template.csv`)]);
+    expect(groups.map((g) => g.key)).toEqual(["sbom", "componentVersions"]);
+    const cv = groups[1];
+    expect(cv.titleKey).toBe("result.kind.componentVersions.title");
+    expect(cv.formats.map((f) => [f.ext, f.viewable])).toEqual([["csv", true]]);
+  });
+
   it("never puts the SPDX 3.0.1 signature on the SBOM card", () => {
     const groups = groupArtifacts([file(`${PREFIX}_bom.json`), file(`${PREFIX}_bom.spdx3.json`), file(`${PREFIX}_bom.spdx3.json.sig`)]);
     expect(groups.find((g) => g.key === "sbom")?.signature).toBeUndefined();

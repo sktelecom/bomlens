@@ -91,8 +91,6 @@
     "identifyVendoredHint": "소스 트리에 직접 복사해 넣은 서드파티 오픈소스(주로 C/C++)를 SCANOSS로 찾아냅니다. 소스가 아니라 파일 지문만 OSSKB 서비스로 전송합니다.",
     "scanossTokenPlaceholder": "SCANOSS 토큰 (선택)",
     "scanossTokenHint": "무료 OSSKB는 호출 한도가 있어 가끔 쓰기엔 충분하지만 자주 돌리면 빈 결과가 나올 수 있습니다. 자주 사용한다면 scanoss.com에서 토큰을 발급해 넣으세요. 토큰은 1회용으로만 쓰이고 저장하거나 로그에 남기지 않습니다.",
-    "includeOsv": "더 많은 취약점 권고",
-    "includeOsvHint": "펌웨어 취약점 매칭에 OSV.dev 권고를 추가합니다. OSV 데이터베이스는 이미지에 포함돼 있지 않아, 이 실행에서 osv.dev로부터 내려받습니다(진행률은 아래에 표시됩니다).",
     "deepCve": "심층 CVE 매칭 (NVD CPE)",
     "deepCveHint": "다른 매칭 경로가 놓치는 취약점까지 NVD 전용 취약점 정보로 대조합니다. 시간이 더 걸리고, 보안 보고서를 함께 켭니다.",
     "byteStable": "재현 가능한 출력",
@@ -123,8 +121,7 @@
   },
   "progress": {
     "title": "실행 로그",
-    "waiting": "스캔을 시작하면 실시간 로그가 여기에 표시됩니다.",
-    "cvedbDownloading": "CVE 데이터베이스 다운로드 중"
+    "waiting": "스캔을 시작하면 실시간 로그가 여기에 표시됩니다."
   },
   "result": {
     "title": "결과",
@@ -246,6 +243,10 @@
       "aiDeclaration": {
         "title": "AI 문서 선언 파일",
         "desc": "직접 입력한 값만 담은 파일입니다. 스캔이 채운 값은 들어가지 않습니다. 모델과 데이터셋 화면의 \"빈 항목 채우기\"로 화면에서 고칠 수 있고, 파일을 고쳐서 여기에 다시 올리거나 CLI의 --ai-declare로 넘길 수도 있습니다."
+      },
+      "componentVersions": {
+        "title": "컴포넌트 버전 템플릿",
+        "desc": "버전 없이 발견된 컴포넌트를 버전 칸을 비운 name,version CSV로 담은 파일입니다. 버전을 채워 --component-versions로 다시 넘기면 됩니다."
       }
     },
     "download": "다운로드",
@@ -402,7 +403,25 @@
     "declarationNotJson": "JSON 파일이 아닙니다.",
     "declarationRefused": "선언이 거부되었습니다: {{reason}}",
     "checkFormat": "검사 결과 {{format}}",
-    "spdx3Rebuild": "저장한 선언을 반영해 다시 만들기"
+    "spdx3Rebuild": "저장한 선언을 반영해 다시 만들기",
+    "uncheckedTitle_one": "컴포넌트 {{count}}개는 취약점을 확인하지 못했습니다",
+    "uncheckedTitle_other": "컴포넌트 {{count}}개는 취약점을 확인하지 못했습니다",
+    "uncheckedHint": "취약점 결과에는 이 컴포넌트들이 포함되지 않습니다.",
+    "uncheckedList": "컴포넌트 목록 보기",
+    "uncheckedName": "이름",
+    "uncheckedVersion": "버전",
+    "uncheckedReasonCol": "사유",
+    "uncheckedReason": {
+      "noVersion": "버전 없음",
+      "noIdentifier": "식별자 없음",
+      "unknown": "알 수 없음"
+    },
+    "uncheckedTruncated": "전체 {{count}}개 중 처음 {{shown}}개를 표시합니다.",
+    "uncheckedTile_one": "{{count}}개 미확인",
+    "uncheckedTile_other": "{{count}}개 미확인",
+    "noVulnsInChecked": "확인한 컴포넌트에서는 취약점이 발견되지 않았습니다.",
+    "noVulnsSomeUnchecked_one": "확인한 컴포넌트에는 취약점이 없지만, {{count}}개는 확인하지 못했습니다",
+    "noVulnsSomeUnchecked_other": "확인한 컴포넌트에는 취약점이 없지만, {{count}}개는 확인하지 못했습니다"
   },
   "deps": {
     "loading": "의존성을 불러오는 중…",
@@ -705,7 +724,10 @@
     "pnpmWorkspaceTree": "pnpm 워크스페이스 의존성 트리 해석",
     "enrichDistroSupplier": "OS 패키지 공급자 정보 보강",
     "declaredSources": "AI 선언에 적은 데이터셋 원천 조회",
-    "declaredService": "AI 선언에 적은 서비스 기록"
+    "declaredService": "AI 선언에 적은 서비스 기록",
+    "componentVersions": "제공된 컴포넌트 버전 채우기",
+    "upstreamPurl": "상위 소스 저장소 purl 추가",
+    "matchCpe": "NVD CPE 색인 대조"
   },
   "pipelineNote": {
     "titleScan": "일부 데이터가 없을 수 있습니다",

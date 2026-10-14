@@ -24,7 +24,6 @@ const CONFIG = {
   security: false,
   deepLicense: false,
   identifyVendored: false,
-  includeOsv: false,
 };
 
 const BOM = { name: "demo_2.1_bom.json", size: 100 };

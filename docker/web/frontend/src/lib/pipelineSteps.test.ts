@@ -32,6 +32,9 @@ describe("pipelineStepLabelKey", () => {
       "composer-install",
       "pnpm-workspace-tree",
       "enrich-distro-supplier",
+      "component-versions",
+      "upstream-purl",
+      "match-cpe",
     ]) {
       expect(pipelineStepLabelKey(step)).toBeDefined();
     }
