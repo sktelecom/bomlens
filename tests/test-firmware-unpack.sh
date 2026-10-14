@@ -2209,16 +2209,16 @@ echo "== a failed syft pass leaves its cause in the log and a signal for the SBO
 # SBOM carried no trace of the missing packages. Lift the helper both syft
 # passes now go through and drive it with a stub syft.
 body="$(awk '
-    /^catalog_packages\(\) \{/ { inside = 1 }
+    /^(syft_memory_limit|firmware_image_tag|catalog_packages)\(\) \{/ { inside = 1 }
     inside { print }
-    inside && $0 == "}" { exit }
+    inside && $0 == "}" { inside = 0 }
 ' "$SCRIPT")"
 if [ -z "$body" ]; then
     fail "could not lift catalog_packages out of scan-firmware.sh" "was it renamed?"
 else
     eval "$body"
     export CDX_SPEC_VERSION=1.6
-    SYFT_FAILED=""
+    SYFT_FAILED=""; SYFT_SINGLE_TRY=""
     stub="$(mktemp -d)"
     cat > "$stub/syft" <<'STUB'
 #!/bin/sh
@@ -2277,7 +2277,7 @@ STUB
     export SYFT_STUB_COUNT="$stub/count"
     # shellcheck source=docker/lib/pipeline-step.sh
     . "$ROOT_DIR/docker/lib/pipeline-step.sh"
-    printf 'processor\t: 0\nCPU implementer\t: 0x61\n' > "$stub/cpuinfo-arm"
+    printf 'processor\t: 0\nCPU implementer\t: 0x61\nCPU architecture: 8\n' > "$stub/cpuinfo-arm"
     printf 'processor\t: 0\nvendor_id\t: GenuineIntel\nflags\t\t: fpu sse2\n' > "$stub/cpuinfo-x86"
 
     SYFT_FAILED=""; rm -f "$SYFT_STUB_COUNT"
@@ -2317,6 +2317,117 @@ STUB
     grep -q "emulation" "$errlog" \
         && fail "a native arm64 host was taken for emulation" "$(cat "$errlog")" \
         || pass "a native host gets no emulation notice"
+
+    # A pass that ran out of time (124) or was killed (137) is not tried again.
+    # The stub exits with SYFT_STUB_RC and writes the GOGC and GOMEMLIMIT it ran
+    # with to SYFT_STUB_ENV.
+    cat > "$stub/syft" <<'STUB'
+#!/bin/sh
+n=$(( $(cat "$SYFT_STUB_COUNT" 2>/dev/null || echo 0) + 1 )); echo "$n" > "$SYFT_STUB_COUNT"
+echo "${GOGC:-} ${GOMEMLIMIT:-}" > "$SYFT_STUB_ENV"
+if [ "${SYFT_STUB_RC:-0}" != 0 ]; then echo "stub: exit $SYFT_STUB_RC" >&2; exit "$SYFT_STUB_RC"; fi
+echo '{"components":[{"name":"busybox"}]}'
+STUB
+    chmod +x "$stub/syft"
+    export SYFT_STUB_ENV="$stub/env"
+    # Memory as the scan reads it: a cgroup v2 limit of 1 GiB on an 8 GB machine.
+    mkdir -p "$stub/cg2" "$stub/cg-max" "$stub/cg1/memory"
+    echo 1073741824 > "$stub/cg2/memory.max"
+    echo max > "$stub/cg-max/memory.max"
+    echo 9223372036854771712 > "$stub/cg1/memory/memory.limit_in_bytes"
+    printf 'MemTotal:        8000000 kB\nMemFree:         100 kB\n' > "$stub/meminfo"
+    for rc_case in 124 137; do
+        SYFT_FAILED=""; SYFT_SINGLE_TRY=""; rm -f "$SYFT_STUB_COUNT"
+        PATH="$stub:$PATH" SYFT_STUB_RC=$rc_case BOMLENS_UNAME_M=x86_64 BOMLENS_CPUINFO_FILE="$stub/cpuinfo-x86" \
+            catalog_packages /t "$out" firmware-packages 2>"$errlog"; rc=$?
+        if [ "$rc" -ne 0 ] && [ "$(cat "$SYFT_STUB_COUNT")" = 1 ] && [ "$SYFT_FAILED" = firmware-packages ] \
+           && grep -q "not trying again" "$errlog" && ! grep -q "trying once more" "$errlog"; then
+            pass "a pass that ends with exit $rc_case is not tried again, and is queued"
+        else
+            fail "exit $rc_case was retried or mishandled" "rc=$rc calls=$(cat "$SYFT_STUB_COUNT") SYFT_FAILED=[$SYFT_FAILED] log=$(cat "$errlog")"
+        fi
+    done
+    SYFT_FAILED=""; SYFT_SINGLE_TRY=""; rm -f "$SYFT_STUB_COUNT"
+    PATH="$stub:$PATH" SYFT_STUB_RC=2 BOMLENS_UNAME_M=x86_64 BOMLENS_CPUINFO_FILE="$stub/cpuinfo-x86" \
+        catalog_packages /t "$out" firmware-packages 2>/dev/null
+    [ "$(cat "$SYFT_STUB_COUNT")" = 2 ] \
+        && pass "an ordinary crash (exit 2) is still tried twice" \
+        || fail "exit 2 was tried $(cat "$SYFT_STUB_COUNT") times"
+
+    # Under emulation the collector is off with a memory limit of 75% of the
+    # container's, and once a pass has failed for good the next one (an extra
+    # root) runs once.
+    SYFT_FAILED=""; SYFT_SINGLE_TRY=""; rm -f "$SYFT_STUB_COUNT"
+    PATH="$stub:$PATH" SYFT_STUB_RC=2 BOMLENS_CGROUP_ROOT="$stub/cg2" BOMLENS_MEMINFO_FILE="$stub/meminfo" BOMLENS_UNAME_M=x86_64 BOMLENS_CPUINFO_FILE="$stub/cpuinfo-arm" \
+        catalog_packages /r "$out" firmware-packages 2>"$errlog"
+    if [ "$(cat "$SYFT_STUB_COUNT")" = 2 ] && [ "$(cat "$SYFT_STUB_ENV")" = "off 786432KiB" ] && [ "$SYFT_SINGLE_TRY" = 1 ]; then
+        pass "under emulation syft gets GOGC=off with GOMEMLIMIT at 75% of the cgroup limit, and a pass failing twice ends the retries"
+    else
+        fail "emulated settings" "calls=$(cat "$SYFT_STUB_COUNT") env=[$(cat "$SYFT_STUB_ENV")] single=[$SYFT_SINGLE_TRY] log=$(cat "$errlog")"
+    fi
+    rm -f "$SYFT_STUB_COUNT"
+    PATH="$stub:$PATH" SYFT_STUB_RC=2 BOMLENS_CGROUP_ROOT="$stub/cg2" BOMLENS_MEMINFO_FILE="$stub/meminfo" BOMLENS_UNAME_M=x86_64 BOMLENS_CPUINFO_FILE="$stub/cpuinfo-arm" \
+        catalog_packages /x "$out" firmware-extra-roots 2>/dev/null
+    [ "$(cat "$SYFT_STUB_COUNT")" = 1 ] && [ "$SYFT_FAILED" = "firmware-packages firmware-extra-roots" ] \
+        && pass "after that, an extra root runs once and is queued" \
+        || fail "the extra root after a failed pass" "calls=$(cat "$SYFT_STUB_COUNT") SYFT_FAILED=[$SYFT_FAILED]"
+    SYFT_SINGLE_TRY=""
+    # The limit read: cgroup v2 "max" and a v1 "no limit" fall back to MemTotal,
+    # nothing readable gives no limit.
+    [ "$(BOMLENS_CGROUP_ROOT="$stub/cg-max" BOMLENS_MEMINFO_FILE="$stub/meminfo" syft_memory_limit)" = 6000000KiB ] \
+        && [ "$(BOMLENS_CGROUP_ROOT="$stub/cg1" BOMLENS_MEMINFO_FILE="$stub/meminfo" syft_memory_limit)" = 6000000KiB ] \
+        && [ -z "$(BOMLENS_CGROUP_ROOT="$stub/none" BOMLENS_MEMINFO_FILE="$stub/none" syft_memory_limit)" ] \
+        && pass "memory.max of max, or a v1 limit near 2^63, uses 75% of MemTotal; nothing readable sets no limit" \
+        || fail "syft_memory_limit" "max=$(BOMLENS_CGROUP_ROOT="$stub/cg-max" BOMLENS_MEMINFO_FILE="$stub/meminfo" syft_memory_limit) v1=$(BOMLENS_CGROUP_ROOT="$stub/cg1" BOMLENS_MEMINFO_FILE="$stub/meminfo" syft_memory_limit)"
+
+    # With timeout installed the emulated pass runs under it; without it the
+    # pass still runs, with no time limit, and the log says so. A stand-in
+    # timeout records its arguments; the second PATH has no timeout at all.
+    printf '#!/bin/sh\necho "$@" > "%s/timeout-args"\nshift 3\nexec "$@"\n' "$stub" > "$stub/timeout"
+    chmod +x "$stub/timeout"
+    SYFT_FAILED=""; rm -f "$SYFT_STUB_COUNT" "$stub/timeout-args"
+    PATH="$stub:$PATH" BOMLENS_CGROUP_ROOT="$stub/cg2" BOMLENS_MEMINFO_FILE="$stub/meminfo" BOMLENS_UNAME_M=x86_64 BOMLENS_CPUINFO_FILE="$stub/cpuinfo-arm" \
+        catalog_packages /k "$out" firmware-packages 2>"$errlog"; rc=$?
+    [ "$rc" -eq 0 ] && grep -q '^-k 10 1800 env GOGC=off GOMEMLIMIT=786432KiB syft dir:/k' "$stub/timeout-args" 2>/dev/null \
+        && grep -q "and a 30-minute limit" "$errlog" \
+        && pass "with timeout installed the emulated pass runs under a 30-minute limit" \
+        || fail "the timeout path" "rc=$rc args=$(cat "$stub/timeout-args" 2>&1) log=$(cat "$errlog")"
+    nt="$stub/no-timeout"; mkdir -p "$nt"
+    for t in sh env mktemp rm tail sed cat head awk tr grep uname; do
+        p="$(command -v "$t")" && ln -sf "$p" "$nt/$t"
+    done
+    cp "$stub/syft" "$nt/syft"
+    SYFT_FAILED=""; rm -f "$SYFT_STUB_COUNT"
+    PATH="$nt" BOMLENS_CGROUP_ROOT="$stub/cg2" BOMLENS_MEMINFO_FILE="$stub/meminfo" BOMLENS_UNAME_M=x86_64 BOMLENS_CPUINFO_FILE="$stub/cpuinfo-arm" \
+        catalog_packages /n "$out" firmware-packages 2>"$errlog"; rc=$?
+    [ "$rc" -eq 0 ] && [ "$(cat "$SYFT_STUB_ENV")" = "off 786432KiB" ] \
+        && grep -q "no time limit: timeout is not installed" "$errlog" \
+        && pass "without timeout the emulated pass still runs with GOGC=off, and the log says there is no time limit" \
+        || fail "the no-timeout path" "rc=$rc env=[$(cat "$SYFT_STUB_ENV")] log=$(cat "$errlog")"
+
+    # armv7 cores are "arm", for which there is no linux/arm64 image to point to.
+    printf 'processor\t: 0\nmodel name\t: ARMv7 Processor rev 4 (v7l)\nCPU implementer\t: 0x41\nCPU architecture: 7\n' > "$stub/cpuinfo-armv7"
+    [ "$(BOMLENS_UNAME_M=x86_64 BOMLENS_CPUINFO_FILE="$stub/cpuinfo-armv7" emulated_host_arch)" = arm ] \
+        && [ "$(BOMLENS_UNAME_M=x86_64 BOMLENS_CPUINFO_FILE="$stub/cpuinfo-arm" emulated_host_arch)" = arm64 ] \
+        && ! BOMLENS_UNAME_M=x86_64 BOMLENS_CPUINFO_FILE="$stub/cpuinfo-x86" emulated_host_arch >/dev/null \
+        && pass "CPU architecture 8 is arm64, 7 is arm, an x86 cpuinfo is no emulation" \
+        || fail "emulated_host_arch" "armv7=$(BOMLENS_UNAME_M=x86_64 BOMLENS_CPUINFO_FILE="$stub/cpuinfo-armv7" emulated_host_arch)"
+    SYFT_FAILED=""; SYFT_SINGLE_TRY=""; rm -f "$SYFT_STUB_COUNT"
+    PATH="$stub:$PATH" SYFT_STUB_RC=2 BOMLENS_CGROUP_ROOT="$stub/cg2" BOMLENS_MEMINFO_FILE="$stub/meminfo" BOMLENS_UNAME_M=x86_64 BOMLENS_CPUINFO_FILE="$stub/cpuinfo-armv7" \
+        catalog_packages /v "$out" firmware-packages 2>"$errlog"
+    grep -q "under emulation on an arm host" "$errlog" && ! grep -q "linux/arm64" "$errlog" \
+        && pass "a pass failing under emulation on armv7 says so without pointing to linux/arm64" \
+        || fail "armv7 notice" "$(cat "$errlog")"
+    # The image named in the notice carries this image's release version.
+    SYFT_FAILED=""; SYFT_SINGLE_TRY=""
+    PATH="$stub:$PATH" SYFT_STUB_RC=2 BOMLENS_VERSION=1.13.3 BOMLENS_CGROUP_ROOT="$stub/cg2" BOMLENS_MEMINFO_FILE="$stub/meminfo" BOMLENS_UNAME_M=x86_64 BOMLENS_CPUINFO_FILE="$stub/cpuinfo-arm" \
+        catalog_packages /w "$out" firmware-packages 2>"$errlog"
+    grep -q "Use the linux/arm64 image instead (for example docker pull --platform linux/arm64 ghcr.io/sktelecom/bomlens-firmware:1.13.3)" "$errlog" \
+        && [ "$(BOMLENS_VERSION=latest-0a1b2c3 firmware_image_tag)" = latest ] && [ "$(BOMLENS_VERSION='' firmware_image_tag)" = latest ] \
+        && pass "the notice names the image of this release (1.13.3), and latest for a main build or an unknown version" \
+        || fail "the image tag in the notice" "log=$(cat "$errlog") main=$(BOMLENS_VERSION=latest-0a1b2c3 firmware_image_tag)"
+    SYFT_FAILED=""; SYFT_SINGLE_TRY=""
+    unset SYFT_STUB_ENV
     unset SYFT_STUB_COUNT
     rm -rf "$stub" "$out" "$errlog"
 fi

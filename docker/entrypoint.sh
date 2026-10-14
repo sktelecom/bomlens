@@ -1002,9 +1002,13 @@ EOF
             "${SOURCE_ROOT:-/src}" "${HOST_OUTPUT_DIR:-.}" 2>/dev/null)" || ER_INPUT_FINGERPRINT=""
         # A stage 1 that exited 0 can still have come out short: a step that
         # failed inside build-prep.sh, or the generator's own fallback, is only
-        # recorded in the SBOM. Read before stage 2 adds its own records.
+        # recorded in the SBOM. Read before stage 2 adds its own records. The
+        # label of a post-process step is left out: a reused SBOM carries the
+        # post-process record of the run that left it, not of stage 1.
         ER_STAGE1_DEGRADED=false
-        if [ -s "$OUTPUT_FILE" ] && jq -e 'any(.metadata.properties[]?; .name == "bomlens:pipeline-step-failed" or .name == "bomlens:sbom-tool-degraded")' \
+        if [ -s "$OUTPUT_FILE" ] && jq -e --arg pp "$ER_POSTPROCESS_STEPS" "$ER_JQ_POSTPROCESS"'
+               any(.metadata.properties[]?; (.name == "bomlens:pipeline-step-failed" and ((.value | strings | er_postprocess) | not))
+                   or .name == "bomlens:sbom-tool-degraded")' \
                "$OUTPUT_FILE" >/dev/null 2>&1; then
             ER_STAGE1_DEGRADED=true
         fi
