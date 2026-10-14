@@ -2075,26 +2075,45 @@ S16="$WORK/spec-1.6"; S17="$WORK/spec-1.7"
     && pass "NOTICE, the security report and the conformance check read the 1.7 SBOM" \
     || fail "1.7 consumers: $(jq -c '[.run.status] + [.steps[] | select(.status != "ok" and .status != "disabled")]' "$S17/bomlens-result.json" 2>&1)" "$(tail -5 "$S17.log")"
 # A 1.5 document (the fixture as it is) and a 1.4 one with the older flat
-# tools array are raised to 1.7 as well.
+# tools array are raised to 1.7 as well. A property without a name (allowed
+# before 1.6) is removed as the document is raised.
 S15="$(new_run spec-from-1.5)"
 cp "$FIX/good-cyclonedx.json" "$S15/demo_1.0_bom.json"
 run_engine "$S15" "$ROOT_DIR/docker/lib" CYCLONEDX_SPEC_VERSION=1.7
 S14="$(new_run spec-from-1.4)"
-jq '.specVersion = "1.4" | .metadata.tools = [{vendor: "Example", name: "generator", version: "1.0"}]' \
+jq '.specVersion = "1.4" | .metadata.tools = [{vendor: "Example", name: "generator", version: "1.0"}]
+    | .components[0].properties = [{"value":"no name"},{"name":"example:kept","value":"y"}]' \
     "$FIX/good-cyclonedx.json" > "$S14/demo_1.0_bom.json"
 run_engine "$S14" "$ROOT_DIR/docker/lib" CYCLONEDX_SPEC_VERSION=1.7
 [ "$(jq -r .specVersion "$S15/demo_1.0_bom.json") $(jq -r .specVersion "$S14/demo_1.0_bom.json")" = "1.7 1.7" ] \
     && pass "1.5 and 1.4 SBOMs leave as 1.7 when 1.7 is asked for" \
     || fail "raised: $(jq -r .specVersion "$S15/demo_1.0_bom.json" "$S14/demo_1.0_bom.json" | tr '\n' ' ')" "$(tail -5 "$S14.log")"
+[ "$(jq -c '[.. | objects | select(has("properties")) | .properties[]? | select(has("name") | not)] | length' "$S14/demo_1.0_bom.json")" = 0 ] \
+    && jq -e 'any(.components[].properties[]?; .name == "example:kept")' "$S14/demo_1.0_bom.json" >/dev/null \
+    && pass "raising 1.4 to 1.7 removes a property without a name and keeps the named ones" \
+    || fail "nameless property: $(jq -c '[.components[].properties]' "$S14/demo_1.0_bom.json" 2>&1)"
+# At the default 1.6 a 1.4 document keeps its version and gets only what 1.4
+# defines: no metadata.lifecycles (1.5), and BomLens in the flat tools array.
+S14D="$(new_run spec-1.4-default)"
+jq '.specVersion = "1.4" | ."$schema" = "http://cyclonedx.org/schema/bom-1.4.schema.json" | del(.metadata.tools, .metadata.lifecycles)
+    | .components[0].properties = [{"value":"no name"}]' \
+    "$FIX/good-cyclonedx.json" > "$S14D/demo_1.0_bom.json"
+run_engine "$S14D" "$ROOT_DIR/docker/lib"
+[ "$(jq -c '[.specVersion, (.metadata | has("lifecycles")), (.metadata.tools | type), ([.metadata.tools[]? | .name] | index("BomLens") != null)]' "$S14D/demo_1.0_bom.json" 2>/dev/null)" = '["1.4",false,"array",true]' ] \
+    && pass "a 1.4 SBOM at the default stays 1.4, without lifecycles and with BomLens in the tools array" \
+    || fail "1.4 default: $(jq -c '[.specVersion, .metadata.lifecycles, .metadata.tools]' "$S14D/demo_1.0_bom.json" 2>&1)" "$(tail -5 "$S14D.log")"
 SBAD="$(new_run spec-bad)"
 run_engine "$SBAD" "$ROOT_DIR/docker/lib" CYCLONEDX_SPEC_VERSION=2.0
 grep -q 'CYCLONEDX_SPEC_VERSION=2.0 is not a CycloneDX version this pipeline writes' "$SBAD.log" \
     && [ "$(jq -r '.specVersion' "$SBAD/demo_1.0_bom.json")" = "1.5" ] \
     && pass "an unsupported CYCLONEDX_SPEC_VERSION stops the run with the accepted values" \
     || fail "bad spec: $(tail -3 "$SBAD.log")"
-# Upload: a Dependency-Track that predates 1.7 answers 400; the BOM is sent
-# again labelled 1.6, and the delivered SBOM stays 1.7. The stub server accepts
-# only 1.6 and records the specVersion of each BOM it was sent.
+# Upload: a Dependency-Track that predates 1.7 (4.14.4, 5.1.0) answers 400; the
+# BOM is sent again as a 1.6 copy, and the delivered SBOM stays 1.7. A server
+# that reads 1.7 gets no second try, and one whose version is not known gets
+# the same second try as an old one. The stub server answers /api/version with
+# DT_STUB_VERSION (or a page that is not JSON when it is "none"), accepts only
+# 1.6 unless DT_STUB_ACCEPT=none, and keeps a copy of each BOM it was sent.
 mkdir -p "$WORK/dtbin"
 cat > "$WORK/dtbin/curl" <<'EOF'
 #!/bin/bash
@@ -2103,26 +2122,69 @@ for a in "$@"; do
     case "$a" in http*) url="$a" ;; bom=@*) bom="${a#bom=@}" ;; esac
 done
 case "$url" in
-    */api/version) echo '{"version":"4.13.0"}' ;;
+    */api/version)
+        if [ "${DT_STUB_VERSION:-4.13.0}" = none ]; then echo '<html>login</html>'
+        else echo "{\"version\":\"${DT_STUB_VERSION:-4.13.0}\"}"; fi ;;
     */api/v1/bom)
         v="$(jq -r .specVersion "$bom")"; echo "$v" >> "$DT_STUB_LOG"
-        if [ "$v" = "1.6" ]; then printf '{"token":"t-1"}\n200'; else printf 'The uploaded BOM is invalid\n400'; fi ;;
+        cp "$bom" "$DT_STUB_LOG.$v.json"
+        if [ "$v" = "1.6" ] && [ "${DT_STUB_ACCEPT:-1.6}" = 1.6 ]; then printf '{"token":"t-1"}\n200'
+        else printf 'refused a %s BOM\n400' "$v"; fi ;;
 esac
 EOF
 chmod +x "$WORK/dtbin/curl"
-for sv in 1.7 1.6; do
-    D="$(new_run "spec-upload-$sv")"
-    jq '.specVersion = "1.6"' "$FIX/good-cyclonedx.json" > "$D/demo_1.0_bom.json"
-    run_engine "$D" "$ROOT_DIR/docker/lib" PATH="$WORK/dtbin:$WORK/bin:$PATH" DT_STUB_LOG="$D.dt" \
-        UPLOAD_ENABLED=true API_URL=http://dt.example API_KEY=k GENERATE_SECURITY=false CYCLONEDX_SPEC_VERSION="$sv"
-done
+# A 1.7 BOM whose root license list mixes a license and an expression, which
+# 1.6 does not allow, and an external reference with a field only 1.7 has.
+jq '.specVersion = "1.6"
+    | .metadata.component.licenses = [{"license":{"id":"MIT"}},{"expression":"Apache-2.0 OR GPL-2.0-only"}]
+    | .components[0].externalReferences = [{"type":"website","url":"https://example.org","properties":[{"name":"k","value":"v"}]}]' \
+    "$FIX/good-cyclonedx.json" > "$WORK/upload-mixed.json"
+dt_run() {  # dt_run <name> <spec-version> [VAR=value ...]
+    local name="$1" sv="$2" d; shift 2
+    d="$(new_run "spec-upload-$name")"
+    cp "$WORK/upload-mixed.json" "$d/demo_1.0_bom.json"
+    run_engine "$d" "$ROOT_DIR/docker/lib" PATH="$WORK/dtbin:$WORK/bin:$PATH" DT_STUB_LOG="$d.dt" \
+        UPLOAD_ENABLED=true API_URL=http://dt.example API_KEY=k GENERATE_SECURITY=false CYCLONEDX_SPEC_VERSION="$sv" "$@"
+}
+dt_run 1.7 1.7 DT_STUB_VERSION=4.13.0
+dt_run 1.6 1.6
+dt_run 5.0 1.7 DT_STUB_VERSION=5.0.2
+dt_run new 1.7 DT_STUB_VERSION=4.14.4
+dt_run unknown 1.7 DT_STUB_VERSION=none
+dt_run unknown-refused 1.7 DT_STUB_VERSION=none DT_STUB_ACCEPT=none
 U17="$WORK/spec-upload-1.7"; U16="$WORK/spec-upload-1.6"
 [ "$(tr '\n' ' ' < "$U17.dt")" = "1.7 1.6 " ] && grep -q 'Upload complete' "$U17.log" \
-    && grep -q 'Re-sending a copy labelled 1.6' "$U17.log" && [ "$(jq -r .specVersion "$U17/demo_1.0_bom.json")" = "1.7" ] \
-    && pass "a 1.7 BOM refused by Dependency-Track is sent again labelled 1.6, and the delivered SBOM stays 1.7" \
+    && grep -q 'Dependency-Track 4.13.0 refused the CycloneDX 1.7 SBOM (HTTP 400).*Sending a CycloneDX 1.6 copy instead' "$U17.log" \
+    && [ "$(jq -r .specVersion "$U17/demo_1.0_bom.json")" = "1.7" ] \
+    && pass "a 1.7 BOM refused by Dependency-Track 4.13.0 is sent again as a 1.6 copy, and the delivered SBOM stays 1.7" \
     || fail "1.7 upload: sent $(tr '\n' ' ' < "$U17.dt" 2>&1)" "$(tail -5 "$U17.log")"
+[ "$(jq -c '.metadata.component.licenses' "$U17.dt.1.6.json" 2>/dev/null)" = '[{"expression":"(Apache-2.0 OR GPL-2.0-only) AND MIT"}]' ] \
+    && [ "$(jq -c '.components[0].externalReferences' "$U17.dt.1.6.json" 2>/dev/null)" = '[{"type":"website","url":"https://example.org"}]' ] \
+    && [ "$(jq -r '."$schema" // "none"' "$U17.dt.1.6.json")" != "http://cyclonedx.org/schema/bom-1.7.schema.json" ] \
+    && pass "the 1.6 copy joins a mixed license list into one expression and drops a 1.7-only field" \
+    || fail "1.6 copy: $(jq -c '[.metadata.component.licenses, .components[0].externalReferences]' "$U17.dt.1.6.json" 2>&1)"
 [ "$(tr '\n' ' ' < "$U16.dt")" = "1.6 " ] && grep -q 'Upload complete' "$U16.log" \
     && pass "a 1.6 BOM is uploaded once" || fail "1.6 upload: sent $(tr '\n' ' ' < "$U16.dt" 2>&1)" "$(tail -5 "$U16.log")"
+[ "$(tr '\n' ' ' < "$WORK/spec-upload-5.0.dt")" = "1.7 1.6 " ] && grep -q 'Upload complete' "$WORK/spec-upload-5.0.log" \
+    && pass "Dependency-Track 5.0.2 also gets the 1.6 copy" \
+    || fail "5.0 upload: sent $(tr '\n' ' ' < "$WORK/spec-upload-5.0.dt" 2>&1)" "$(tail -5 "$WORK/spec-upload-5.0.log")"
+UN="$WORK/spec-upload-new"
+[ "$(tr '\n' ' ' < "$UN.dt")" = "1.7 " ] && ! grep -q 'Upload complete' "$UN.log" \
+    && grep -q 'Dependency-Track 4.14.4 reads CycloneDX 1.7, so the refusal (HTTP 400) is not about the version' "$UN.log" \
+    && grep -q 'refused a 1.7 BOM' "$UN.log" \
+    && pass "a server that reads 1.7 (4.14.4) is not sent a 1.6 copy, and its refusal is shown" \
+    || fail "4.14.4 upload: sent $(tr '\n' ' ' < "$UN.dt" 2>&1)" "$(tail -5 "$UN.log")"
+UU="$WORK/spec-upload-unknown"
+[ "$(tr '\n' ' ' < "$UU.dt")" = "1.7 1.6 " ] && grep -q 'Upload complete' "$UU.log" \
+    && grep -q 'its version is not known' "$UU.log" \
+    && pass "when /api/version gives no version, a 400 still gets one 1.6 copy" \
+    || fail "unknown-version upload: sent $(tr '\n' ' ' < "$UU.dt" 2>&1)" "$(tail -5 "$UU.log")"
+UR="$WORK/spec-upload-unknown-refused"
+[ "$(tr '\n' ' ' < "$UR.dt")" = "1.7 1.6 " ] && ! grep -q 'Upload complete' "$UR.log" \
+    && grep -q 'Response to the 1.7 SBOM: refused a 1.7 BOM' "$UR.log" \
+    && grep -q 'Response: refused a 1.6 BOM' "$UR.log" \
+    && pass "when the 1.6 copy is refused too, both responses are shown" \
+    || fail "both refused: sent $(tr '\n' ' ' < "$UR.dt" 2>&1)" "$(tail -6 "$UR.log")"
 # The pinned CycloneDX CLI (scripts/check-cdx-schema.sh); BOMLENS_CDX_SCHEMA=1
 # downloads it when it is not installed.
 if [ "${BOMLENS_CDX_SCHEMA:-}" = "1" ] || command -v cyclonedx >/dev/null 2>&1 || [ -n "${CYCLONEDX_CLI:-}" ]; then
@@ -2135,6 +2197,16 @@ if [ "${BOMLENS_CDX_SCHEMA:-}" = "1" ] || command -v cyclonedx >/dev/null 2>&1 |
         pass "1.5 and 1.4 SBOMs raised to 1.7 validate against the 1.7 schema"
     else
         fail "a raised SBOM fails the 1.7 schema" "$cdxout"
+    fi
+    if cdxout=$(bash "$ROOT_DIR/scripts/check-cdx-schema.sh" "$S14D/demo_1.0_bom.json" 2>&1); then
+        pass "a 1.4 SBOM kept at 1.4 validates against the 1.4 schema"
+    else
+        fail "a 1.4 SBOM kept at 1.4 fails the 1.4 schema" "$cdxout"
+    fi
+    if cdxout=$(bash "$ROOT_DIR/scripts/check-cdx-schema.sh" "$U17.dt.1.6.json" 2>&1); then
+        pass "the 1.6 copy sent to Dependency-Track validates against the 1.6 schema"
+    else
+        fail "the 1.6 copy fails the 1.6 schema" "$cdxout"
     fi
 else
     echo "  SKIP: CycloneDX CLI not available (set BOMLENS_CDX_SCHEMA=1 to download the pinned one)"
