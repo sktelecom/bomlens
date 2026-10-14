@@ -4195,6 +4195,61 @@ PATH="$FAKEBIN:$PATH" SECURITY_ENRICH=false \
 [ "$(jq '[.Results[].Vulnerabilities[]?] | length' "$WORK/secok_security.json")" = "1" ] \
     && pass "findings intact on a successful run" || fail "findings lost on a successful run"
 
+echo "== sec-advisory-ids: advisory numbers become CVE ids or a separate advisory list =="
+# Trivy reports some findings under an advisory number (DLA-..., NSWG-ECO-...)
+# instead of a vulnerability id. One that names a CVE is reported under that
+# CVE with the number kept in VendorIDs; one that names none moves to the
+# top-level Advisories list, out of the findings and the counts.
+cat > "$FAKEBIN/trivy" <<SH
+#!/bin/sh
+out=""
+while [ \$# -gt 0 ]; do
+    [ "\$1" = "--output" ] && { out="\$2"; shift; }
+    shift
+done
+cp "$FIX/trivy-advisory-ids.json" "\$out"
+exit 0
+SH
+chmod +x "$FAKEBIN/trivy"
+PATH="$FAKEBIN:$PATH" SECURITY_ENRICH=false \
+    bash "$LIB/scan-security.sh" "$WORK/secfail-bom.json" "$WORK/secadv" proj >/dev/null 2>&1 \
+    || fail "scan-security.sh failed on a report with advisory numbers"
+adv_json="$WORK/secadv_security.json"
+adv_ids=$(jq -r '[.Results[].Vulnerabilities[]?.VulnerabilityID] | sort | join(",")' "$adv_json")
+[ "$adv_ids" = "CVE-2020-8203,CVE-2026-90001,CVE-2026-90002,GHSA-xxxx-yyyy-zzzz,TEMP-0000001-ABCDEF" ] \
+    && pass "findings carry vulnerability ids only, a CVE already reported is not repeated" \
+    || fail "findings ids: '$adv_ids'"
+[ "$(jq -r '[.Results[].Vulnerabilities[] | select(.VulnerabilityID == "CVE-2020-8203") | .VendorIDs[]?] | join(",")' "$adv_json")" = "NSWG-ECO-516" ] \
+    && pass "the advisory number is kept in the CVE's VendorIDs" \
+    || fail "CVE-2020-8203 does not carry NSWG-ECO-516 in VendorIDs"
+[ "$(jq -r '[.Results[].Vulnerabilities[] | select(.VulnerabilityID == "CVE-2026-90001") | .VendorIDs[]?] | join(",")' "$adv_json")" = "DSA-9999-1" ] \
+    && pass "an advisory naming two CVEs yields one finding per CVE" \
+    || fail "CVE-2026-90001 VendorIDs: $(jq -c '[.Results[].Vulnerabilities[] | select(.VulnerabilityID == "CVE-2026-90001") | .VendorIDs]' "$adv_json")"
+[ "$(jq -r '[.Advisories[]? | .VulnerabilityID + "@" + .Target] | join(",")' "$adv_json")" = "DLA-4792-1@sample_1.0_bom.json (debian 12.12),NSWG-ECO-1@Node.js" ] \
+    && pass "advisories with no CVE are listed apart, with their Target" \
+    || fail "Advisories: $(jq -c '[.Advisories[]? | .VulnerabilityID]' "$adv_json")"
+grep -q '| 0 | 3 | 1 | 1 | 0 | 5 |' "$WORK/secadv_security.md" \
+    && pass "the summary counts leave the advisories out" \
+    || fail "summary row: $(grep -A2 '| Critical' "$WORK/secadv_security.md" | tail -1)"
+grep -q '## Advisories with no CVE' "$WORK/secadv_security.md" && grep -q 'DLA-4792-1' "$WORK/secadv_security.md" \
+    && pass "markdown report lists the advisories in their own section" \
+    || fail "markdown report has no advisory section"
+grep -q 'Advisories with no CVE</h2>' "$WORK/secadv_security.html" && grep -q 'NSWG-ECO-1' "$WORK/secadv_security.html" \
+    && pass "html report lists the advisories in their own section" \
+    || fail "html report has no advisory section"
+jq -e 'has("DLA-4792-1") or has("NSWG-ECO-516") | not' "$WORK/secadv_security_epss.json" >/dev/null \
+    && pass "the EPSS/KEV sidecar is keyed by vulnerability ids only" \
+    || fail "the EPSS/KEV sidecar carries an advisory number"
+[ "$(jq -r '[.Results[].Vulnerabilities[]?.VulnerabilityID] | index("DLA-4792-1") != null' "$WORK/secadv_security_trivy.json" 2>/dev/null)" = "true" ] \
+    && pass "Trivy's own result is kept apart in _security_trivy.json" \
+    || fail "_security_trivy.json is missing or already rewritten"
+[ ! -f "$WORK/secok_security_trivy.json" ] \
+    && pass "a report with nothing to rewrite gets no _security_trivy.json" \
+    || fail "_security_trivy.json written for a report with no advisory numbers"
+jq -f "$LIB/security-advisory-ids.jq" "$adv_json" | cmp -s - "$adv_json" \
+    && pass "the advisory filter is idempotent" \
+    || fail "a second pass of security-advisory-ids.jq changed the report"
+
 echo "== cpe-index: components with no package purl are matched against the CPE index =="
 # Trivy never reads component.cpe, so a binary syft's classifier named
 # (pkg:generic), an OS component such as busybox, or a library a signature

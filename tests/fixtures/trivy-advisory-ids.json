@@ -1,0 +1,91 @@
+{
+  "SchemaVersion": 2,
+  "Results": [
+    {
+      "Target": "sample_1.0_bom.json (debian 12.12)",
+      "Class": "os-pkgs",
+      "Type": "debian",
+      "Vulnerabilities": [
+        {
+          "VulnerabilityID": "DLA-4792-1",
+          "VendorIDs": ["DLA-4792-1"],
+          "PkgName": "tzdata",
+          "PkgIdentifier": {"PURL": "pkg:deb/debian/tzdata@2025b-0%2Bdeb12u2?arch=all&distro=debian-12.12"},
+          "InstalledVersion": "2025b-0+deb12u2",
+          "FixedVersion": "2026c-0+deb12u1",
+          "Status": "fixed",
+          "DataSource": {"ID": "debian", "Name": "Debian Security Tracker"},
+          "Title": "tzdata - new timezone database",
+          "Severity": "UNKNOWN"
+        },
+        {
+          "VulnerabilityID": "DSA-9999-1",
+          "VendorIDs": ["DSA-9999-1", "CVE-2026-90001", "CVE-2026-90002"],
+          "PkgName": "libexample1",
+          "PkgIdentifier": {"PURL": "pkg:deb/debian/libexample1@1.0-1?arch=amd64&distro=debian-12.12"},
+          "InstalledVersion": "1.0-1",
+          "FixedVersion": "1.0-2",
+          "Title": "libexample1 - security update",
+          "Severity": "HIGH"
+        },
+        {
+          "VulnerabilityID": "CVE-2026-90002",
+          "PkgName": "libexample1",
+          "PkgIdentifier": {"PURL": "pkg:deb/debian/libexample1@1.0-1?arch=amd64&distro=debian-12.12"},
+          "InstalledVersion": "1.0-1",
+          "FixedVersion": "1.0-2",
+          "Severity": "HIGH"
+        },
+        {
+          "VulnerabilityID": "TEMP-0000001-ABCDEF",
+          "PkgName": "libexample1",
+          "PkgIdentifier": {"PURL": "pkg:deb/debian/libexample1@1.0-1?arch=amd64&distro=debian-12.12"},
+          "InstalledVersion": "1.0-1",
+          "Severity": "LOW"
+        }
+      ]
+    },
+    {
+      "Target": "Node.js",
+      "Class": "lang-pkgs",
+      "Type": "node-pkg",
+      "Vulnerabilities": [
+        {
+          "VulnerabilityID": "CVE-2020-8203",
+          "PkgName": "lodash",
+          "PkgIdentifier": {"PURL": "pkg:npm/lodash@4.17.15"},
+          "InstalledVersion": "4.17.15",
+          "FixedVersion": "4.17.19",
+          "Severity": "HIGH"
+        },
+        {
+          "VulnerabilityID": "NSWG-ECO-516",
+          "PkgName": "lodash",
+          "PkgIdentifier": {"PURL": "pkg:npm/lodash@4.17.15"},
+          "InstalledVersion": "4.17.15",
+          "FixedVersion": ">=4.17.19",
+          "PrimaryURL": "https://www.npmjs.com/advisories/1523",
+          "Title": "Allocation of Resources Without Limits or Throttling",
+          "Severity": "HIGH",
+          "References": ["https://github.com/lodash/lodash/pull/4759", "https://nvd.nist.gov/vuln/detail/CVE-2020-8203"]
+        },
+        {
+          "VulnerabilityID": "NSWG-ECO-1",
+          "PkgName": "examplepkg",
+          "PkgIdentifier": {"PURL": "pkg:npm/examplepkg@1.0.0"},
+          "InstalledVersion": "1.0.0",
+          "Title": "Example advisory with no CVE",
+          "Severity": "HIGH",
+          "References": ["https://github.com/nodejs/security-wg"]
+        },
+        {
+          "VulnerabilityID": "GHSA-xxxx-yyyy-zzzz",
+          "PkgName": "examplepkg",
+          "PkgIdentifier": {"PURL": "pkg:npm/examplepkg@1.0.0"},
+          "InstalledVersion": "1.0.0",
+          "Severity": "MEDIUM"
+        }
+      ]
+    }
+  ]
+}
