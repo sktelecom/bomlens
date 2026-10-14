@@ -1911,13 +1911,20 @@ fi
 # not read those for pnpm workspaces, uv.lock or Poetry. cdxgen marks no Bundler
 # group, so for a Gemfile at the scan root the gems declared only in its
 # development and test groups are read here (GEMDEV_JS) and count as marked.
-# A marked component is dropped only when no production path reaches it: a
-# walk from the app root that does not step from the root or a workspace
-# member into a marked component. A component only such a dropped one reaches
-# goes too. A component a production package also depends on stays.
-# Guard: the root must be in the dependency graph, otherwise nothing is
-# dropped. BOMLENS_NODE_FULL_GRAPH=1 keeps the npm-marked components.
-if [ "${rc:-1}" -eq 0 ] && [ -f "$OUT" ] && command -v node >/dev/null 2>&1; then
+# A marker that repeats counts only when every value is a development one. A
+# Python package named in the production dependencies of a pyproject.toml is
+# not marked, and when those files cannot be read no Python marker is used.
+# A marked component, and what only marked components reach, is dropped only
+# when nothing else reaches it: the walk starts from the root and from every
+# component outside that set, and skips only the edges from the root into a
+# marked component (npm markers: from a workspace member too, since cdxgen
+# computes them per member). The dropped components are recorded in
+# bomlens:excluded-components. Guard: the root must be in the dependency graph,
+# otherwise nothing is dropped. BOMLENS_INCLUDE_DEV_DEPENDENCIES=1 turns the
+# whole filter off; BOMLENS_NODE_FULL_GRAPH=1 keeps the npm-marked components.
+if opted_out "${BOMLENS_INCLUDE_DEV_DEPENDENCIES:-}"; then
+    log "dev-marker: development dependencies kept (BOMLENS_INCLUDE_DEV_DEPENDENCIES)"
+elif [ "${rc:-1}" -eq 0 ] && [ -f "$OUT" ] && command -v node >/dev/null 2>&1; then
     _dvnpm=1
     opted_out "${BOMLENS_NODE_FULL_GRAPH:-}" && _dvnpm=""
     _dvgems=$(mktemp)
@@ -1928,14 +1935,35 @@ if [ "${rc:-1}" -eq 0 ] && [ -f "$OUT" ] && command -v node >/dev/null 2>&1; the
 // A conservative line reader, not Ruby: anything it does not recognise (a
 // condition, gemspec, eval_gemfile, a declaration over several lines, a group
 // option it cannot read) means nothing is reported. With a Gemfile.lock, every
-// name in its DEPENDENCIES must be one the reader saw.
+// name in its DEPENDENCIES must be one the reader saw. The Gemfile must be the
+// one Bundler manifest in the tree: another Gemfile or Gemfile.lock below it,
+// or a gemspec anywhere, may declare the same gems for production.
 const fs = require('fs');
+const path = require('path');
 const [gemfile, lockfile] = process.argv.slice(2);
 const DEV = new Set(['development', 'test']);
 const give_up = why => {
   process.stderr.write('[build-prep] ruby: Gemfile groups not read (' + why + '); no gem dropped as development-only\n');
   process.exit(0);
 };
+const top = path.dirname(gemfile);
+const others = (dir, depth) => {
+  let ents;
+  try { ents = fs.readdirSync(dir, { withFileTypes: true }); } catch (e) { return null; }
+  for (const e of ents) {
+    const p = path.join(dir, e.name);
+    if (e.isDirectory()) {
+      if (e.name === 'node_modules' || e.name === '.git') continue;
+      const hit = others(p, depth + 1);
+      if (hit) return hit;
+    } else if (/\.gemspec$/.test(e.name) || (depth > 0 && (e.name === 'Gemfile' || e.name === 'Gemfile.lock'))) {
+      return path.relative(top, p);
+    }
+  }
+  return null;
+};
+const other = others(top, 0);
+if (other) give_up(other + ' found');
 let src;
 try { src = fs.readFileSync(gemfile, 'utf8'); } catch (e) { process.exit(0); }
 const one = /^\s*(?::([A-Za-z_]\w*)|"([^"\\#]*)"|'([^'\\]*)')\s*$/;
@@ -2002,7 +2030,9 @@ GEMDEV_JS
     _dvflt=$(mktemp).js
     cat > "$_dvflt" <<'DEVFILTER_JS'
 const fs = require('fs');
+const path = require('path');
 const [bomPath, npmMarkers, gemListPath] = process.argv.slice(2);
+const say = s => process.stderr.write('[build-prep] dev-marker: ' + s + '\n');
 let bom;
 try { bom = JSON.parse(fs.readFileSync(bomPath, 'utf8')); } catch (e) { process.exit(0); }
 if (!Array.isArray(bom.components) || !Array.isArray(bom.dependencies)) process.exit(0);
@@ -2012,20 +2042,173 @@ const edges = new Map(bom.dependencies.map(d => [d.ref, Array.isArray(d.dependsO
 if (!rootRef || !edges.has(rootRef)) process.exit(0);
 let devGems = new Set();
 try { devGems = new Set(fs.readFileSync(gemListPath, 'utf8').split('\n').filter(Boolean)); } catch (e) { /* no Gemfile */ }
-const gemName = c => ((/^pkg:gem\/([^@?#]+)/.exec(c.purl || '') || [])[1] || '').toLowerCase();
+const purlName = (c, type) => {
+  const m = new RegExp('^pkg:' + type + '/([^@?#]+)').exec(c.purl || '');
+  try { return m ? decodeURIComponent(m[1]).toLowerCase() : ''; } catch (e) { return ''; }
+};
 const prop = (c, n) => (c.properties || []).filter(p => p.name === n).map(p => String(p.value));
-const isDev = c =>
-  (npmMarkers === '1' && prop(c, 'cdx:npm:package:development').includes('true'))
-  || prop(c, 'cdx:pyproject:group').some(g => g !== 'main')
-  || prop(c, 'cdx:cargo:scope').includes('dev')
-  || prop(c, 'cdx:sbt:package:development').includes('true')
-  || prop(c, 'cdx:crystal:scope').includes('development')
-  || prop(c, 'cdx:gleam:scope').includes('development')
-  || (devGems.size > 0 && devGems.has(decodeURIComponent(gemName(c))));
+// A marker can repeat with different values (a crate that is both a dependency
+// and a dev-dependency); it counts only when every value is a development one.
+const every = (c, n, isDev) => { const v = prop(c, n); return v.length > 0 && v.every(isDev); };
+
+// cdx:pyproject:group says a package is listed in a dependency group, not that
+// it is used only there. The production dependencies of every pyproject.toml
+// under the root ([project] dependencies and optional-dependencies,
+// [tool.poetry.dependencies]) are read with a small reader, not a TOML parser:
+// when the root has no pyproject.toml or a file is one it cannot follow, no
+// Python marker is used.
+const pep503 = s => s.toLowerCase().replace(/[-_.]+/g, '-');
+const readPyProd = () => {
+  const SKIP = new Set(['node_modules', '.git', '.venv', 'venv', '.tox', '.nox', '__pypackages__', 'site-packages']);
+  if (!fs.existsSync('pyproject.toml')) { say('python: no pyproject.toml at the scan root; no Python package dropped as development-only'); return null; }
+  const files = [];
+  const walk = dir => {
+    let ents;
+    try { ents = fs.readdirSync(dir, { withFileTypes: true }); } catch (e) { return; }
+    for (const e of ents) {
+      if (e.isDirectory() && !SKIP.has(e.name)) walk(path.join(dir, e.name));
+      else if (e.isFile() && e.name === 'pyproject.toml') files.push(path.join(dir, e.name));
+    }
+  };
+  walk('.');
+  if (files.length > 1000) { say('python: too many pyproject.toml files; no Python package dropped as development-only'); return null; }
+  const names = new Set();
+  for (const f of files) {
+    let text;
+    try { text = fs.readFileSync(f, 'utf8'); } catch (e) { return null; }
+    const got = pyprojectNames(text);
+    if (!got) { say('python: ' + f.replace(/^\.\//, '') + ' not read; no Python package dropped as development-only'); return null; }
+    for (const n of got) names.add(n);
+  }
+  return names;
+};
+// Key path: dotted segments, bare or quoted.
+const keyPath = s => {
+  const out = [];
+  let rest = s.trim();
+  while (rest.length) {
+    const m = /^(?:"([^"\\]*)"|'([^']*)'|([A-Za-z0-9_-]+))\s*(?:\.\s*|$)/.exec(rest);
+    if (!m) return null;
+    out.push(m[1] !== undefined ? m[1] : m[2] !== undefined ? m[2] : m[3]);
+    rest = rest.slice(m[0].length);
+  }
+  return out.length ? out : null;
+};
+// Reads one value from text[i...]: returns its source and where it ends, or
+// null for a value the reader does not follow. Strings, arrays and inline
+// tables may span lines; comments outside strings are dropped.
+const readValue = (text, i) => {
+  let out = '';
+  let depth = 0;
+  while (i < text.length) {
+    const ch = text[i];
+    if (text.startsWith('"""', i) || text.startsWith("'''", i)) {
+      const q = text.substr(i, 3);
+      const end = text.indexOf(q, i + 3);
+      if (end < 0) return null;
+      out += '""';
+      i = end + 3;
+      while (text[i] === q[0]) i++;
+      continue;
+    }
+    if (ch === '"' || ch === "'") {
+      let j = i + 1;
+      while (j < text.length && text[j] !== ch && text[j] !== '\n') j += (ch === '"' && text[j] === '\\') ? 2 : 1;
+      if (text[j] !== ch) return null;
+      out += text.slice(i, j + 1);
+      i = j + 1;
+      continue;
+    }
+    if (ch === '#') { while (i < text.length && text[i] !== '\n') i++; continue; }
+    if (ch === '[' || ch === '{') depth++;
+    if (ch === ']' || ch === '}') { depth--; if (depth < 0) return null; }
+    if (ch === '\n' && depth === 0) break;
+    out += ch;
+    i++;
+  }
+  if (depth !== 0) return null;
+  return { src: out.trim(), end: i };
+};
+const stringArray = src => {
+  if (!/^\[[\s\S]*\]$/.test(src)) return null;
+  let rest = src.slice(1, -1);
+  const out = [];
+  for (;;) {
+    rest = rest.replace(/^\s+/, '');
+    if (!rest.length) return out;
+    const m = /^(?:"((?:[^"\\\n]|\\.)*)"|'([^'\n]*)')\s*(,|$)/.exec(rest);
+    if (!m) return null;
+    out.push(m[1] !== undefined ? m[1] : m[2]);
+    rest = rest.slice(m[0].length);
+  }
+};
+const pyprojectNames = text => {
+  const names = new Set();
+  let table = [];
+  let i = 0;
+  const addReq = s => {
+    const m = /^\s*([A-Za-z0-9](?:[A-Za-z0-9._-]*[A-Za-z0-9])?)\s*(?:[\[(;<>=!~@ ]|$)/.exec(s);
+    if (!m) return false;
+    names.add(pep503(m[1]));
+    return true;
+  };
+  while (i < text.length) {
+    const nl = text.indexOf('\n', i);
+    const raw = text.slice(i, nl < 0 ? text.length : nl);
+    const line = raw.trim();
+    if (!line || line.startsWith('#')) { i = nl < 0 ? text.length : nl + 1; continue; }
+    let m;
+    if ((m = /^\[\[([^\]]*)\]\]\s*(?:#.*)?$/.exec(line))) {
+      table = keyPath(m[1]); if (!table) return null; table = ['[]'].concat(table);
+      i = nl < 0 ? text.length : nl + 1; continue;
+    }
+    if ((m = /^\[([^\]]*)\]\s*(?:#.*)?$/.exec(line))) {
+      table = keyPath(m[1]); if (!table) return null;
+      i = nl < 0 ? text.length : nl + 1; continue;
+    }
+    const eq = /^((?:"[^"\\]*"|'[^']*'|[A-Za-z0-9_.\s-])+?)\s*=\s*/.exec(raw.replace(/^\s+/, ''));
+    if (!eq) return null;
+    const key = keyPath(eq[1]);
+    if (!key) return null;
+    const v = readValue(text, i + (raw.length - raw.replace(/^\s+/, '').length) + eq[0].length);
+    if (!v) return null;
+    const full = table.concat(key).join('\u0000');
+    const at = p => full === p.join('\u0000');
+    const under = p => full.startsWith(p.join('\u0000') + '\u0000') && full.split('\u0000').length === p.length + 1;
+    if (at(['project', 'dependencies']) || under(['project', 'optional-dependencies'])) {
+      const arr = stringArray(v.src);
+      if (!arr) return null;
+      for (const s of arr) if (!addReq(s)) return null;
+    } else if (at(['project', 'dynamic'])) {
+      const arr = stringArray(v.src);
+      if (!arr || arr.includes('dependencies') || arr.includes('optional-dependencies')) return null;
+    } else if (full.startsWith(['tool', 'poetry', 'dependencies', ''].join('\u0000'))) {
+      const k = full.split('\u0000')[3];
+      if (k.toLowerCase() !== 'python') names.add(pep503(k));
+    } else if (at(['project']) || at(['tool']) || at(['tool', 'poetry']) || at(['tool', 'poetry', 'dependencies'])
+        || at(['project', 'optional-dependencies'])) {
+      return null; // a whole table written inline
+    }
+    i = v.end < text.length ? v.end + 1 : text.length;
+  }
+  return names;
+};
+const pyMarked = bom.components.some(c => prop(c, 'cdx:pyproject:group').length);
+const pyProd = pyMarked ? readPyProd() : null;
+
+const npmDev = c => npmMarkers === '1' && every(c, 'cdx:npm:package:development', v => v === 'true');
+const otherDev = c =>
+  (pyProd !== null && every(c, 'cdx:pyproject:group', g => g !== 'main') && !pyProd.has(pep503(purlName(c, 'pypi'))))
+  || every(c, 'cdx:cargo:scope', v => v === 'dev')
+  || every(c, 'cdx:sbt:package:development', v => v === 'true')
+  || every(c, 'cdx:crystal:scope', v => v === 'development')
+  || every(c, 'cdx:gleam:scope', v => v === 'development')
+  || (devGems.size > 0 && devGems.has(purlName(c, 'gem')));
 const refOf = c => c['bom-ref'] || c.purl;
 const byRef = new Map(bom.components.map(c => [refOf(c), c]));
-const devRefs = new Set(bom.components.filter(isDev).map(refOf));
-if (devRefs.size === 0) process.exit(0);
+const npmMarked = new Set(bom.components.filter(npmDev).map(refOf));
+const marked = new Set(bom.components.filter(c => npmDev(c) || otherDev(c)).map(refOf));
+if (marked.size === 0) process.exit(0);
 // The root, a workspace member cdxgen lists only in the graph, and a member it
 // lists as an application component declare dependencies; anything else is a
 // package depending on another.
@@ -2035,37 +2218,65 @@ const isProject = r => {
   return !c || c.type === 'application'
     || (c.properties || []).some(p => p.name === 'internal:is_workspace' && p.value === 'true');
 };
-const reached = new Set([rootRef]);
-const queue = [rootRef];
+// The development side: the marked components and what they reach. An npm
+// package is judged by its own marker only (cdxgen sets it from what the
+// production dependencies reach), and so is a crate with a non-dev scope.
+const devSide = new Set(marked);
+const pending = [...marked];
+while (pending.length) {
+  for (const m of edges.get(pending.shift()) || []) {
+    const c = byRef.get(m);
+    if (devSide.has(m) || !c || isProject(m) || /^pkg:npm\//.test(c.purl || '')
+      || prop(c, 'cdx:cargo:scope').some(v => v !== 'dev')) continue;
+    devSide.add(m);
+    pending.push(m);
+  }
+}
+// What reaches it from outside that side keeps it.
+const skip = (n, m) => marked.has(m) && (n === rootRef || (npmMarked.has(m) && isProject(n)));
+const seeds = [rootRef];
+for (const r of new Set([...edges.keys(), ...byRef.keys()])) if (r !== rootRef && !devSide.has(r)) seeds.push(r);
+const reached = new Set(seeds);
+const queue = [...seeds];
 while (queue.length) {
   const n = queue.shift();
   for (const m of edges.get(n) || []) {
-    if (reached.has(m)) continue;
-    if (devRefs.has(m) && isProject(n)) continue;
+    if (reached.has(m) || skip(n, m)) continue;
     reached.add(m);
     queue.push(m);
   }
 }
-const drop = new Set([...devRefs].filter(r => !reached.has(r)));
-// What only a dropped component reaches is development-only too.
-const walk = [...drop];
-while (walk.length) {
-  for (const m of edges.get(walk.shift()) || []) {
-    if (drop.has(m) || reached.has(m) || !byRef.has(m) || isProject(m)) continue;
-    drop.add(m);
-    walk.push(m);
-  }
-}
+const drop = new Set([...devSide].filter(r => !reached.has(r) && byRef.has(r)));
 if (drop.size === 0) process.exit(0);
 const before = bom.components.length;
+const droppedPurls = bom.components.filter(c => drop.has(refOf(c))).map(c => c.purl || refOf(c));
 bom.components = bom.components.filter(c => !drop.has(refOf(c)));
 bom.dependencies = bom.dependencies
   .filter(d => !drop.has(d.ref))
   .map(d => Array.isArray(d.dependsOn)
     ? Object.assign({}, d, { dependsOn: d.dependsOn.filter(r => !drop.has(r)) })
     : d);
+function mergeCapped(existing, additions, limit) {
+  let shown = [];
+  let priorTotal = 0;
+  if (existing) {
+    const m = /^(.*?)(?: \(\+(\d+) more\))?$/.exec(existing);
+    shown = m[1] ? m[1].split(', ').filter(Boolean) : [];
+    priorTotal = shown.length + (m[2] ? parseInt(m[2], 10) : 0);
+  }
+  const merged = shown.concat(additions);
+  const total = priorTotal + additions.length;
+  let val = merged.slice(0, limit).join(', ');
+  if (total > limit) val += ' (+' + (total - Math.min(limit, merged.length)) + ' more)';
+  return val;
+}
+bom.metadata = bom.metadata || {};
+const existingProps = bom.metadata.properties || [];
+const priorComponents = (existingProps.find(p => p.name === 'bomlens:excluded-components') || {}).value || null;
+bom.metadata.properties = existingProps.filter(p => p.name !== 'bomlens:excluded-components')
+  .concat([{ name: 'bomlens:excluded-components', value: mergeCapped(priorComponents, droppedPurls, 50) }]);
 fs.writeFileSync(bomPath, JSON.stringify(bom, null, 2));
-process.stderr.write('[build-prep] dev-marker: dropped ' + drop.size + ' development-only component(s), kept ' + bom.components.length + ' of ' + before + '\n');
+say('dropped ' + drop.size + ' development-only component(s), kept ' + bom.components.length + ' of ' + before);
 DEVFILTER_JS
     node "$_dvflt" "$OUT" "${_dvnpm:-0}" "$_dvgems" || log "dev-marker: filter skipped (non-fatal)"
     rm -f "$_dvflt" "$_dvgems"
@@ -2417,6 +2628,7 @@ bom.dependencies = bom.dependencies
 // 4. record what was excluded, same shape as bomlens:excluded-paths/-manifests
 const LIMIT = 50;
 bom.metadata = bom.metadata || {};
+const priorComponents = ((bom.metadata.properties || []).find(p => p.name === 'bomlens:excluded-components') || {}).value || '';
 const props = (bom.metadata.properties || []).filter(p => p.name !== 'bomlens:excluded-modules' && p.name !== 'bomlens:excluded-components');
 // Every skip=true module actually present in this scan's reactor, not just the
 // ones used to seed the BFS above (a nested excluded module, e.g. one two
@@ -2426,9 +2638,14 @@ const excludedList = [...excludedGAs].filter(g => moduleRefByGA.has(g)).sort();
 let modVal = excludedList.slice(0, LIMIT).join(', ');
 if (excludedList.length > LIMIT) modVal += ` (+${excludedList.length - LIMIT} more)`;
 props.push({ name: 'bomlens:excluded-modules', value: modVal });
-if (droppedPurls.length) {
-  let compVal = droppedPurls.slice(0, LIMIT).join(', ');
-  if (droppedPurls.length > LIMIT) compVal += ` (+${droppedPurls.length - LIMIT} more)`;
+// Keep what an earlier filter (the development-marker filter) recorded.
+const priorM = /^(.*?)(?: \(\+(\d+) more\))?$/.exec(priorComponents);
+const priorShown = priorM[1] ? priorM[1].split(', ').filter(Boolean) : [];
+const allComponents = priorShown.concat(droppedPurls);
+const totalComponents = allComponents.length + (priorM[2] ? parseInt(priorM[2], 10) : 0);
+if (allComponents.length) {
+  let compVal = allComponents.slice(0, LIMIT).join(', ');
+  if (totalComponents > LIMIT) compVal += ` (+${totalComponents - Math.min(LIMIT, allComponents.length)} more)`;
   props.push({ name: 'bomlens:excluded-components', value: compVal });
 }
 bom.metadata.properties = props;
