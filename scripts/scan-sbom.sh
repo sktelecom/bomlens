@@ -1092,9 +1092,15 @@ cleanup() {
         # exits, before it is gone): remove it here so a cancelled run does
         # not leave it behind. A no-op if stage 1 already removed it itself.
         "${DOCKER_ENV[@]}" docker rm -f "$RUNNING_CONTAINER_NAME" >/dev/null 2>&1 || true
+        RUNNING_CONTAINER_NAME=""
     fi
 }
-trap cleanup EXIT INT TERM
+# Ctrl+C or kill ends the run here, after cleanup, rather than going on to the
+# next step; exit runs the EXIT trap, and cleanup a second time does nothing
+# more (the temp dirs are gone and the container name is cleared).
+trap cleanup EXIT
+trap 'cleanup; exit 130' INT
+trap 'cleanup; exit 143' TERM
 RUNNING_CONTAINER_NAME=""
 
 # Host-persistent guard state: when a scan is interrupted hard
