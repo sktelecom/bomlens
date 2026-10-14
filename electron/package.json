@@ -17,6 +17,6 @@
   "devDependencies": {
     "@playwright/test": "1.63.0",
     "electron": "42.11.12",
-    "electron-builder": "26.16.1"
+    "electron-builder": "26.17.0"
   }
 }
