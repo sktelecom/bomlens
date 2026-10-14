@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v1.13.4] - 2026-10-15
+
 ### Fixed
 
 - Normalizing a firmware or root filesystem SBOM with tens of thousands of components could take hours: the step that folds the `file` entry syft writes for an identified binary into that binary compared every file entry with every component. It now looks up only the binaries filed under the same file name, with the same result (a 60,000-component SBOM went from several minutes to about a second in this step).
