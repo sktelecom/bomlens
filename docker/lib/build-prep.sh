@@ -389,16 +389,21 @@ trap 'stop_supervised; guard_restore; [ -z "${_pg_dir:-}" ] || rm -rf "$_pg_dir"
 trap 'stop_supervised; guard_restore; [ -z "${_pg_dir:-}" ] || rm -rf "$_pg_dir"; exit 143' TERM
 
 # Non-shipped trees: manifests under test, fixture, example, benchmark and demo
-# folders, and the GitHub Actions workflows, are left out of the SBOM because
-# none of it ships with the product. The two lists below are copies of the ones
-# in source-detect.sh (this file runs alone in the cdxgen container);
-# tests/test-postprocess.sh checks they stay equal.
+# folders, the GitHub Actions workflows and the Gradle wrapper jar are left out
+# of the SBOM because none of it ships with the product. The lists below are
+# copies of the ones in source-detect.sh (this file runs alone in the cdxgen
+# container); tests/test-postprocess.sh checks they stay equal.
+# NON_SHIPPED_PATHS are folder paths left out at any depth;
+# NON_SHIPPED_PATH_FILE_RE names the files under them that are recorded in
+# bomlens:excluded-manifests.
 # BOMLENS_INCLUDE_NON_SHIPPED=1 (or true) keeps everything. Defined here,
 # ahead of every ecosystem block below, because the lock-evidence check each
 # one may run (mark_prep_applied / _lock_evidence_found) needs it too, not
 # just the cdxgen --exclude flags built from it further down.
 NON_SHIPPED_DIRS="test tests spec fixtures testdata __tests__ e2e example examples sample samples bench benches benchmark benchmarks demo demos playground"
 NON_SHIPPED_MANIFEST_RE='(^|/)(package\.json|package-lock\.json|npm-shrinkwrap\.json|yarn\.lock|pnpm-lock\.yaml|bun\.lockb?|requirements[^/]*\.txt|pyproject\.toml|poetry\.lock|uv\.lock|Pipfile|Pipfile\.lock|setup\.py|setup\.cfg|environment\.ya?ml|pom\.xml|build\.gradle(\.kts)?|settings\.gradle(\.kts)?|gradle\.lockfile|go\.mod|go\.sum|Cargo\.toml|Cargo\.lock|Gemfile|Gemfile\.lock|[^/]+\.gemspec|composer\.json|composer\.lock|[^/]+\.(cs|fs|vb)proj|packages\.config|packages\.lock\.json|Directory\.Packages\.props|Package\.swift|Package\.resolved|Podfile|Podfile\.lock|conanfile\.txt|conanfile\.py|vcpkg\.json|METADATA|PKG-INFO)$'
+NON_SHIPPED_PATHS=".github/workflows gradle/wrapper"
+NON_SHIPPED_PATH_FILE_RE='(^|/)(\.github/workflows/[^/]+\.ya?ml|gradle/wrapper/[^/]+\.jar)$'
 EXCLUDE_NON_SHIPPED=1
 if opted_out "${BOMLENS_INCLUDE_NON_SHIPPED:-}"; then
     EXCLUDE_NON_SHIPPED=""
@@ -946,14 +951,14 @@ if [ -n "$CONDA_ENV_FILE" ] && command -v python3 >/dev/null 2>&1; then
     fi
 fi
 # Non-shipped trees: leave out manifests under test, fixture, example,
-# benchmark and demo folders, and the GitHub Actions workflows -- none of it
-# ships with the product. NON_SHIPPED_DIRS/EXCLUDE_NON_SHIPPED are defined
+# benchmark and demo folders, the GitHub Actions workflows and the Gradle
+# wrapper -- none of it ships with the product. NON_SHIPPED_DIRS/EXCLUDE_NON_SHIPPED are defined
 # near the top of this file (ahead of every ecosystem block, including the
 # lock-evidence checks that also read them); this is just where they get
 # turned into cdxgen's own --exclude flags.
 if [ -n "$EXCLUDE_NON_SHIPPED" ]; then
     for _d in $NON_SHIPPED_DIRS; do set -- "$@" --exclude "**/$_d/**"; done
-    set -- "$@" --exclude "**/.github/workflows/**"
+    for _d in $NON_SHIPPED_PATHS; do set -- "$@" --exclude "**/$_d/**"; done
 fi
 set -- "$@" "$SRC"
 
@@ -1896,6 +1901,56 @@ if [ -n "${MAVEN_SCOPE_FILTER:-}" ]; then
 fi
 if [ -n "${PHP_SCOPE_FILTER:-}" ]; then
     run_scope_filter "pkg:composer/" "php"
+fi
+
+# Non-shipped path filter: the --exclude globs keep cdxgen from reading the
+# NON_SHIPPED_PATHS folders, and this drops a component that still names only
+# such a location, in internal:SrcFile or its identity evidence (cdxgen 13
+# reports gradle/wrapper/gradle-wrapper.jar as a file component that way). A
+# component with any other location stays.
+if [ "${rc:-1}" -eq 0 ] && [ -n "$EXCLUDE_NON_SHIPPED" ] && [ -f "$OUT" ] && command -v node >/dev/null 2>&1; then
+    _nspflt=$(mktemp).js
+    cat > "$_nspflt" <<'NSPATH_JS'
+const fs = require('fs');
+const [bomPath, paths] = process.argv.slice(2);
+let bom;
+try { bom = JSON.parse(fs.readFileSync(bomPath, 'utf8')); } catch (e) { process.exit(0); }
+if (!Array.isArray(bom.components)) process.exit(0);
+const esc = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const list = paths.split(/\s+/).filter(Boolean);
+if (!list.length) process.exit(0);
+const re = new RegExp('(^|/)(' + list.map(esc).join('|') + ')/', 'i');
+const locations = c => {
+  const out = (c.properties || [])
+    .filter(p => p.name === 'internal:SrcFile' || p.name === 'SrcFile')
+    .map(p => String(p.value));
+  const ev = c.evidence && c.evidence.identity;
+  for (const id of Array.isArray(ev) ? ev : (ev ? [ev] : [])) {
+    if (id.concludedValue) out.push(String(id.concludedValue));
+    for (const m of id.methods || []) if (m.value) out.push(String(m.value));
+  }
+  return out;
+};
+const dropped = [];
+bom.components = bom.components.filter(c => {
+  const locs = locations(c);
+  if (locs.length && locs.every(l => re.test(l))) { dropped.push(c['bom-ref'] || c.purl); return false; }
+  return true;
+});
+if (!dropped.length) process.exit(0);
+const drop = new Set(dropped);
+if (Array.isArray(bom.dependencies)) {
+  bom.dependencies = bom.dependencies
+    .filter(d => !drop.has(d.ref))
+    .map(d => Array.isArray(d.dependsOn)
+      ? Object.assign({}, d, { dependsOn: d.dependsOn.filter(r => !drop.has(r)) })
+      : d);
+}
+fs.writeFileSync(bomPath, JSON.stringify(bom, null, 2));
+process.stderr.write('[build-prep] non-shipped: dropped ' + dropped.length + ' component(s) found only under ' + list.join(', ') + '\n');
+NSPATH_JS
+    node "$_nspflt" "$OUT" "$NON_SHIPPED_PATHS" || log "non-shipped: path filter skipped (non-fatal)"
+    rm -f "$_nspflt"
 fi
 
 # Maven non-deployed-module filter: the scope filter above keeps a component the
@@ -3910,13 +3965,14 @@ if [ "${rc:-1}" -eq 0 ] && [ -n "$EXCLUDE_NON_SHIPPED" ] && [ -f "$OUT" ] && com
     _globs=""
     _re=""
     for _d in $NON_SHIPPED_DIRS; do _globs="$_globs, **/$_d/**"; _re="$_re|$_d"; done
-    _globs="${_globs#, }, **/.github/workflows/**"
+    for _d in $NON_SHIPPED_PATHS; do _globs="$_globs, **/$_d/**"; done
+    _globs="${_globs#, }"
     _re="(^|/)(${_re#|})/"
     _excl=$(mktemp)
     find . \( -name node_modules -o -name .git \) -prune -o -type f -print 2>/dev/null \
         | sed 's#^\./##' \
-        | { grep -Ei "^\.github/workflows/[^/]+\.ya?ml$|$_re" || true; } \
-        | { grep -Ei "^\.github/workflows/|$NON_SHIPPED_MANIFEST_RE" || true; } \
+        | { grep -Ei "$NON_SHIPPED_PATH_FILE_RE|$_re" || true; } \
+        | { grep -Ei "$NON_SHIPPED_PATH_FILE_RE|$NON_SHIPPED_MANIFEST_RE" || true; } \
         | LC_ALL=C sort > "$_excl"
     _js=$(mktemp).js
     cat > "$_js" <<'EXCL_JS'

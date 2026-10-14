@@ -8289,13 +8289,34 @@ _bp=$(grep -m1 '^NON_SHIPPED_MANIFEST_RE=' "$PREP"); _sd=$(grep -m1 '^NON_SHIPPE
 [ -n "$_bp" ] && [ "$_bp" = "$_sd" ] \
     && pass "NON_SHIPPED_MANIFEST_RE is the same in build-prep.sh and source-detect.sh" \
     || fail "NON_SHIPPED_MANIFEST_RE differs"
+for _v in NON_SHIPPED_PATHS NON_SHIPPED_PATH_FILE_RE; do
+    _bp=$(grep -m1 "^$_v=" "$PREP"); _sd=$(grep -m1 "^$_v=" "$DETECT")
+    [ -n "$_bp" ] && [ "$_bp" = "$_sd" ] \
+        && pass "$_v is the same in build-prep.sh and source-detect.sh" \
+        || fail "$_v differs" "build-prep [$_bp] source-detect [$_sd]"
+done
+# The Gradle wrapper jar (cdxgen lists it as a file component) is left out and
+# recorded, at the root and in a sub-project; a jar elsewhere is not.
+mkdir -p "$WORK/nswrap/gradle/wrapper" "$WORK/nswrap/app/gradle/wrapper" "$WORK/nswrap/libs"
+: > "$WORK/nswrap/gradle/wrapper/gradle-wrapper.jar"
+: > "$WORK/nswrap/gradle/wrapper/gradle-wrapper.properties"
+: > "$WORK/nswrap/app/gradle/wrapper/gradle-wrapper.jar"
+: > "$WORK/nswrap/libs/vendor.jar"
+_list=$(bash -c '. "$1"; non_shipped_manifests "$2"' _ "$DETECT" "$WORK/nswrap" | tr '\n' ' ')
+[ "$_list" = "app/gradle/wrapper/gradle-wrapper.jar gradle/wrapper/gradle-wrapper.jar " ] \
+    && pass "non_shipped_manifests records the Gradle wrapper jars only" \
+    || fail "non_shipped_manifests Gradle wrapper list unexpected" "got [$_list]"
+case "$(bash -c '. "$1"; non_shipped_globs' _ "$DETECT")" in
+    *"**/.github/workflows/**, **/gradle/wrapper/**") pass "non_shipped_globs ends with the workflow and Gradle wrapper paths" ;;
+    *) fail "non_shipped_globs is missing the Gradle wrapper path" ;;
+esac
 _list=$(bash -c '. "$1"; non_shipped_manifests "$2"' _ "$DETECT" "$NSM" | tr '\n' ' ')
 [ "$_list" = ".github/workflows/ci.yml examples/demo/requirements.txt tests/fixtures/requirements.txt " ] \
     && pass "non_shipped_manifests lists the fixture's workflow, example and test manifests only" \
     || fail "non_shipped_manifests output unexpected" "got [$_list]"
 _sargs=$(bash -c '. "$1"; non_shipped_syft_args' _ "$DETECT")
 case "$_sargs" in
-    *"--exclude ./**/[tT][eE][sS][tT][sS]/**"*"--exclude ./**/.github/workflows/**") pass "non_shipped_syft_args builds syft --exclude flags" ;;
+    *"--exclude ./**/[tT][eE][sS][tT][sS]/**"*"--exclude ./**/.github/workflows/** --exclude ./**/gradle/wrapper/**") pass "non_shipped_syft_args builds syft --exclude flags" ;;
     *) fail "non_shipped_syft_args output unexpected" "got [$_sargs]" ;;
 esac
 _off=$(BOMLENS_INCLUDE_NON_SHIPPED=true bash -c '. "$1"; non_shipped_syft_args' _ "$DETECT")
@@ -8345,6 +8366,39 @@ if command -v node >/dev/null 2>&1; then
     fi
 else
     echo "  SKIP: node not installed; build-prep.sh recorder not exercised"
+fi
+
+echo "== non-shipped path filter: a component found only under gradle/wrapper is dropped =="
+if command -v node >/dev/null 2>&1; then
+    sed -n "/<<'NSPATH_JS'/,/^NSPATH_JS\$/p" "$PREP" | sed '1d;$d' > "$WORK/nspath.js"
+    cat > "$WORK/nspath.json" <<'EOF_NSP'
+{"bomFormat":"CycloneDX","metadata":{"component":{"bom-ref":"app"}},
+ "components":[
+  {"bom-ref":"pkg:generic/gradle-wrapper.jar","purl":"pkg:generic/gradle-wrapper.jar","type":"file",
+   "properties":[{"name":"internal:SrcFile","value":"gradle/wrapper/gradle-wrapper.jar"}],
+   "evidence":{"identity":[{"field":"purl","concludedValue":"gradle/wrapper/gradle-wrapper.jar","methods":[{"technique":"filename","value":"gradle/wrapper/gradle-wrapper.jar"}]}]}},
+  {"bom-ref":"pkg:generic/sub-wrapper.jar","purl":"pkg:generic/sub-wrapper.jar","type":"file",
+   "properties":[{"name":"internal:SrcFile","value":"app/gradle/wrapper/gradle-wrapper.jar!/inner.jar"}]},
+  {"bom-ref":"pkg:generic/vendor.jar","purl":"pkg:generic/vendor.jar","type":"file",
+   "properties":[{"name":"internal:SrcFile","value":"libs/vendor.jar"}]},
+  {"bom-ref":"pkg:maven/a/b@1","purl":"pkg:maven/a/b@1",
+   "properties":[{"name":"internal:SrcFile","value":"build.gradle"}]},
+  {"bom-ref":"pkg:maven/c/d@1","purl":"pkg:maven/c/d@1",
+   "properties":[{"name":"internal:SrcFile","value":"gradle/wrapper/x.jar"}],
+   "evidence":{"identity":{"field":"purl","methods":[{"technique":"manifest-analysis","value":"gradle.lockfile"}]}}},
+  {"bom-ref":"pkg:maven/e/f@1","purl":"pkg:maven/e/f@1"}],
+ "dependencies":[{"ref":"app","dependsOn":["pkg:maven/a/b@1","pkg:generic/gradle-wrapper.jar"]},
+                 {"ref":"pkg:generic/gradle-wrapper.jar","dependsOn":[]}]}
+EOF_NSP
+    node "$WORK/nspath.js" "$WORK/nspath.json" ".github/workflows gradle/wrapper" 2>/dev/null
+    if jq -e '([.components[].purl] == ["pkg:generic/vendor.jar","pkg:maven/a/b@1","pkg:maven/c/d@1","pkg:maven/e/f@1"])
+              and (.dependencies == [{"ref":"app","dependsOn":["pkg:maven/a/b@1"]}])' "$WORK/nspath.json" >/dev/null 2>&1; then
+        pass "path filter drops the wrapper jars only and prunes the graph"
+    else
+        fail "path filter output unexpected" "$(jq -c '[.components[].purl], .dependencies' "$WORK/nspath.json" 2>&1)"
+    fi
+else
+    echo "  SKIP: node not installed; non-shipped path filter not exercised"
 fi
 
 echo "== maven non-deployed-module filter: skip resolution and dependency-graph reachability =="

@@ -106,12 +106,17 @@ trivy_cache_args() {
 
 # Folders whose manifests a source scan leaves out by default: test suites and
 # their fixtures, examples, benchmarks and demo playgrounds. The GitHub Actions
-# workflows under .github/workflows are left out too. None of it ships with the
-# product. build-prep.sh runs alone in the cdxgen container and keeps its own
-# copy of both lists; tests/test-postprocess.sh checks the copies stay equal.
+# workflows under .github/workflows and the Gradle wrapper under gradle/wrapper
+# (NON_SHIPPED_PATHS, at any depth) are left out too. None of it ships with the
+# product. NON_SHIPPED_PATH_FILE_RE names the files under those paths that are
+# recorded as left out. build-prep.sh runs alone in the cdxgen container and
+# keeps its own copy of the lists; tests/test-postprocess.sh checks the copies
+# stay equal.
 # BOMLENS_INCLUDE_NON_SHIPPED=1 (or true) keeps everything.
 NON_SHIPPED_DIRS="test tests spec fixtures testdata __tests__ e2e example examples sample samples bench benches benchmark benchmarks demo demos playground"
 NON_SHIPPED_MANIFEST_RE='(^|/)(package\.json|package-lock\.json|npm-shrinkwrap\.json|yarn\.lock|pnpm-lock\.yaml|bun\.lockb?|requirements[^/]*\.txt|pyproject\.toml|poetry\.lock|uv\.lock|Pipfile|Pipfile\.lock|setup\.py|setup\.cfg|environment\.ya?ml|pom\.xml|build\.gradle(\.kts)?|settings\.gradle(\.kts)?|gradle\.lockfile|go\.mod|go\.sum|Cargo\.toml|Cargo\.lock|Gemfile|Gemfile\.lock|[^/]+\.gemspec|composer\.json|composer\.lock|[^/]+\.(cs|fs|vb)proj|packages\.config|packages\.lock\.json|Directory\.Packages\.props|Package\.swift|Package\.resolved|Podfile|Podfile\.lock|conanfile\.txt|conanfile\.py|vcpkg\.json|METADATA|PKG-INFO)$'
+NON_SHIPPED_PATHS=".github/workflows gradle/wrapper"
+NON_SHIPPED_PATH_FILE_RE='(^|/)(\.github/workflows/[^/]+\.ya?ml|gradle/wrapper/[^/]+\.jar)$'
 
 # True unless BOMLENS_INCLUDE_NON_SHIPPED asks to keep the non-shipped trees.
 non_shipped_enabled() {
@@ -231,8 +236,8 @@ stage1_fail_reason() {
 # The glob patterns applied, relative to the scan root, joined with ", ".
 non_shipped_globs() {
     local d out=""
-    for d in $NON_SHIPPED_DIRS; do out="$out, **/$d/**"; done
-    printf '%s' "${out#, }, **/.github/workflows/**"
+    for d in $NON_SHIPPED_DIRS $NON_SHIPPED_PATHS; do out="$out, **/$d/**"; done
+    printf '%s' "${out#, }"
 }
 
 # Prints $1 with every letter as a two-case character class ([tT]), so a glob
@@ -253,7 +258,8 @@ non_shipped_syft_args() {
     non_shipped_enabled || return 0
     local d out=""
     for d in $NON_SHIPPED_DIRS; do out="$out --exclude ./**/$(non_shipped_any_case "$d")/**"; done
-    printf '%s' "${out# } --exclude ./**/.github/workflows/**"
+    for d in $NON_SHIPPED_PATHS; do out="$out --exclude ./**/$d/**"; done
+    printf '%s' "${out# }"
 }
 
 # Manifest files under the non-shipped folders, and workflow files, relative to
@@ -264,8 +270,8 @@ non_shipped_manifests() {
     re="(^|/)(${re#|})/"
     (cd "$root" 2>/dev/null && find . \( -name node_modules -o -name .git \) -prune -o -type f -print 2>/dev/null) \
         | sed 's#^\./##' \
-        | { grep -Ei "^\.github/workflows/[^/]+\.ya?ml$|$re" || true; } \
-        | { grep -Ei "^\.github/workflows/|$NON_SHIPPED_MANIFEST_RE" || true; } \
+        | { grep -Ei "$NON_SHIPPED_PATH_FILE_RE|$re" || true; } \
+        | { grep -Ei "$NON_SHIPPED_PATH_FILE_RE|$NON_SHIPPED_MANIFEST_RE" || true; } \
         | LC_ALL=C sort
 }
 
