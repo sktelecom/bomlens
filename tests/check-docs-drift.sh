@@ -192,7 +192,8 @@ fi
 SPEC=""
 if [ -f docker/lib/cdx-version.sh ]; then
     # shellcheck disable=SC1091
-    SPEC="$(. docker/lib/cdx-version.sh && echo "$CDX_SPEC_VERSION")"
+    # The default, not whatever --spec-version this shell happens to carry.
+    SPEC="$(unset CYCLONEDX_SPEC_VERSION; . docker/lib/cdx-version.sh && echo "$CDX_SPEC_VERSION")"
 fi
 MLSPEC="$(grep -oE '_[0-9]_[0-9]\.json' docker/lib/scan-aibom.sh | head -1 | grep -oE '[0-9]_[0-9]' | tr '_' '.')"
 PY_MLSPEC_MODEL="$(grep -oE '^CDX_SPEC_VERSION = "[0-9.]+"' docker/lib/identify-model-file.py | head -1 | grep -oE '[0-9]+\.[0-9]+')"
