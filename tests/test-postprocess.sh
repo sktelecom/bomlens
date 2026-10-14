@@ -5314,16 +5314,30 @@ if [ -z "$_mh_block" ]; then
 else
     _mh_bin="$WORK/mh-bin"; mkdir -p "$_mh_bin"
     # MH_FAIL=exit: a non-zero exit; MH_FAIL=error: exit 0 with an [ERROR] line,
-    # as --fail-never leaves it.
-    printf '#!/bin/sh\necho "${0##*/} $*" >> "$MH_CALLS"\n[ "$MH_FAIL" = error ] && echo "[ERROR] Failed to execute goal on project b"\n[ "$MH_FAIL" != exit ]\n' > "$_mh_bin/mvn"
+    # as --fail-never leaves it. MH_LIST: what it writes to -DoutputFile (the
+    # resolved list); the path is recorded as LIST.
+    cat > "$_mh_bin/mvn" <<'STUB'
+#!/bin/sh
+args=""
+for a in "$@"; do
+    case "$a" in
+        -DoutputFile=*) [ -z "$MH_LIST" ] || printf '%s\n' "$MH_LIST" >> "${a#-DoutputFile=}"; a="-DoutputFile=LIST" ;;
+    esac
+    args="$args $a"
+done
+echo "${0##*/}$args" >> "$MH_CALLS"
+[ "$MH_FAIL" = error ] && echo "[ERROR] Failed to execute goal on project b"
+[ "$MH_FAIL" != exit ]
+STUB
     chmod +x "$_mh_bin/mvn"
     _mh_prelude='log() { echo "[build-prep] $*"; }; mark_prep_failed() { echo "MARK-FAILED $1"; }; run_supervised_timeout() { shift; "$@"; }; PREP_TIMEOUT_DEFAULT=5'
     _mh_run() {  # <dir> <maven-opts> [fail]
         rm -f "$WORK/mh-calls"
         ( cd "$1" && PATH="$_mh_bin:$PATH" HOME="$WORK/mh-home" MH_CALLS="$WORK/mh-calls" MH_FAIL="${3:-}" \
+            MH_LIST="${MH_LIST:-}" MAVEN_SETTINGS_ARGS="${MH_SETTINGS:-}" \
             MAVEN_OPTS="$2" bash -c "$_mh_prelude; $_mh_block" )
     }
-    _mh_goal="-q -B --fail-never org.apache.maven.plugins:maven-dependency-plugin:3.11.0:resolve"
+    _mh_goal="-q -B --fail-never org.apache.maven.plugins:maven-dependency-plugin:3.11.0:resolve -DoutputFile=LIST -DappendOutput=true"
     mkdir -p "$WORK/mh-proj" "$WORK/mh-none" "$WORK/mh-gradle" "$WORK/mh-wrap/.mvn/wrapper" "$WORK/mh-bare"
     touch "$WORK/mh-proj/pom.xml" "$WORK/mh-gradle/pom.xml" "$WORK/mh-gradle/build.gradle.kts" \
         "$WORK/mh-wrap/pom.xml" "$WORK/mh-bare/pom.xml"
@@ -5362,14 +5376,28 @@ else
             fail "a failed jar fetch ($_mh_f) ended the block with an error"
         fi
     done
-    printf '%s' "$(_mh_run "$WORK/mh-proj" "" error)" | grep -q "MARK-FAILED maven-dependency-jars" \
-        && pass "a jar fetch that leaves no jar at all is recorded as the failed step maven-dependency-jars" \
-        || fail "a jar fetch with no jar was not recorded as failed"
+    MH_SETTINGS="-s /s/settings.xml -Dsettings.security=/s/settings-security.xml" _mh_run "$WORK/mh-wrap" "" >/dev/null
+    [ "$(cat "$WORK/mh-calls" 2>/dev/null)" = "mvnw -q -B --fail-never -s /s/settings.xml -Dsettings.security=/s/settings-security.xml ${_mh_goal#-q -B --fail-never }" ] \
+        && pass "the mounted settings go on the jar fetch's own command line (a wrapper's older Maven ignores MAVEN_ARGS)" \
+        || fail "settings on the command line: [$(cat "$WORK/mh-calls" 2>/dev/null)]"
+    # The cache already holds a jar from an earlier scan: only this run's
+    # resolved list decides whether the fetch failed as a whole.
     mkdir -p "$WORK/mh-home/.m2/repository/g/a/1"; : > "$WORK/mh-home/.m2/repository/g/a/1/a-1.jar"
-    printf '%s' "$(_mh_run "$WORK/mh-proj" "" error)" | grep -q "MARK-FAILED" \
-        && fail "a partly failed jar fetch was recorded as a failed step" \
-        || pass "a partly failed jar fetch is only logged"
-    rm -rf "$WORK/mh-home/.m2/repository/g"
+    _mh_two='The following files have been resolved:
+   org.x:y:jar:1.0:compile -- module y
+   org.x:z:jar:tests:2.0:test
+   org.x:p:pom:1.0:import'
+    _mh_out=$(MH_LIST="$_mh_two" _mh_run "$WORK/mh-proj" "" error)
+    printf '%s' "$_mh_out" | grep -q "MARK-FAILED maven-dependency-jars" \
+        && printf '%s' "$_mh_out" | grep -q "0 of 2 resolved jars" \
+        && pass "no jar of this run's list in the repository (others cached): recorded as the failed step maven-dependency-jars" \
+        || fail "a fetch with none of its jars was not recorded as failed: [$_mh_out]"
+    mkdir -p "$WORK/mh-home/.m2/repository/org/x/z/2.0"; : > "$WORK/mh-home/.m2/repository/org/x/z/2.0/z-2.0-tests.jar"
+    _mh_out=$(MH_LIST="$_mh_two" _mh_run "$WORK/mh-proj" "" error)
+    { ! printf '%s' "$_mh_out" | grep -q "MARK-FAILED" && printf '%s' "$_mh_out" | grep -q "1 of 2 resolved jars"; } \
+        && pass "a partly failed jar fetch is only logged, with the count" \
+        || fail "a partly failed jar fetch: [$_mh_out]"
+    rm -rf "$WORK/mh-home/.m2/repository/g" "$WORK/mh-home/.m2/repository/org"
 fi
 # Every caller pins the repository to the standard layout under HOME=/tmp/sbomhome,
 # the one place cdxgen looks for the jars, and mounts the Maven cache there.
@@ -5391,45 +5419,65 @@ grep -q 'role: "cache-maven", target: "/tmp/sbomhome/.m2"' "$ROOT_DIR/docker/lib
 echo "== stage1-settings: mounted Maven and Gradle settings are used without writing into the caches =="
 PREP="$ROOT_DIR/docker/lib/build-prep.sh"
 _ss_block=$(sed -n '/^# User settings mounted read-only outside the caches/,/^# Maven component hashes/p' "$PREP" | sed '$d')
-_gs_fn=$(sed -n '/^gradle_settings_remove() {/,/^}$/p' "$PREP")
-_gs_block=$(sed -n "/^# The user's Gradle settings (mounted under/,/^fi\$/p" "$PREP")
-if [ -z "$_ss_block" ] || [ -z "$_gs_fn" ] || [ -z "$_gs_block" ]; then
+_gs_fn=$(sed -n '/^GRADLE_SETTINGS_HOME=""$/,/^}$/p' "$PREP"; sed -n '/^gradle_settings_remove() {/,/^}$/p' "$PREP")
+if [ -z "$_ss_block" ] || [ -z "$_gs_fn" ]; then
     fail "could not extract the settings blocks from build-prep.sh"
 else
     _ss_root="$WORK/ss-root"; mkdir -p "$_ss_root/m2" "$_ss_root/gradle/init.d"
     : > "$_ss_root/m2/settings.xml"; : > "$_ss_root/m2/settings-security.xml"
     echo mounted > "$_ss_root/gradle/gradle.properties"; echo mounted > "$_ss_root/gradle/init.gradle"
     echo mounted > "$_ss_root/gradle/init.d/a.gradle"
-    _ss_out=$(PREP_SETTINGS_ROOT="$_ss_root" MAVEN_OPTS="-Dmaven.repo.local=/x" MAVEN_ARGS="" \
-        bash -c 'log() { :; }; '"$_ss_block"'; echo "ARGS=$MAVEN_ARGS"; echo "OPTS=$MAVEN_OPTS"')
-    printf '%s\n' "$_ss_out" | grep -qx "ARGS=-s $_ss_root/m2/settings.xml" \
+    _ss_out=$(PREP_SETTINGS_ROOT="$_ss_root" MAVEN_OPTS="-Dmaven.repo.local=/x" MAVEN_ARGS="" MVN_ARGS="" \
+        bash -c 'log() { :; }; '"$_ss_block"'; echo "ARGS=$MAVEN_ARGS"; echo "MVN=$MVN_ARGS"; echo "OPTS=$MAVEN_OPTS"; echo "CMD=$MAVEN_SETTINGS_ARGS"')
+    { printf '%s\n' "$_ss_out" | grep -qx "ARGS=-s $_ss_root/m2/settings.xml" \
+        && printf '%s\n' "$_ss_out" | grep -qx "MVN=-s $_ss_root/m2/settings.xml" \
         && printf '%s\n' "$_ss_out" | grep -qx "OPTS=-Dmaven.repo.local=/x -Dsettings.security=$_ss_root/m2/settings-security.xml" \
-        && pass "Maven reads the mounted settings.xml (MAVEN_ARGS -s) and settings-security.xml" \
+        && printf '%s\n' "$_ss_out" | grep -qx "CMD=-s $_ss_root/m2/settings.xml -Dsettings.security=$_ss_root/m2/settings-security.xml"; } \
+        && pass "Maven gets the mounted settings on the jar fetch's command line, in MVN_ARGS for cdxgen and in MAVEN_ARGS" \
         || fail "Maven settings: [$_ss_out]"
     _ss_gh="$WORK/ss-gradle-home"; mkdir -p "$_ss_gh"; echo own > "$_ss_gh/init.gradle"
-    _ss_proj="$WORK/ss-proj"; mkdir -p "$_ss_proj"; : > "$_ss_proj/build.gradle"
-    _ss_run() { ( cd "${2:-$_ss_proj}" && PREP_SETTINGS_ROOT="$_ss_root" SETTINGS_ROOT="$_ss_root" GRADLE_USER_HOME="$_ss_gh" \
-        bash -c 'log() { echo "[build-prep] $*"; }; '"$_gs_fn"'; '"$_gs_block"'; '"$1" ); }
-    mkdir -p "$WORK/ss-nogradle"
-    _ss_run ':' "$WORK/ss-nogradle" >/dev/null
-    [ ! -e "$_ss_gh/gradle.properties" ] && [ ! -e "$_ss_gh/init.d" ] \
-        && pass "with no Gradle build at the root, nothing is copied into the Gradle home" \
-        || fail "Gradle settings were copied for a project with no Gradle build"
-    _ss_run ':' >/dev/null
+    _ss_run() { SETTINGS_ROOT="$_ss_root" GRADLE_USER_HOME="$_ss_gh" \
+        bash -c 'log() { echo "[build-prep] $*"; }; '"$_gs_fn"'; '"$1"; }
+    _ss_run 'gradle_settings_copy' >/dev/null
     { [ "$(cat "$_ss_gh/gradle.properties" 2>/dev/null)" = mounted ] && [ "$(cat "$_ss_gh/init.d/a.gradle" 2>/dev/null)" = mounted ] \
         && [ "$(cat "$_ss_gh/init.gradle")" = own ]; } \
-        && pass "the mounted Gradle settings are copied into the Gradle home this scan uses, an existing file kept" \
+        && pass "the mounted Gradle settings are copied into the Gradle home, a file it already has kept" \
         || fail "Gradle settings copy: $(ls -R "$_ss_gh" | tr '\n' ' ')"
-    _ss_run 'gradle_settings_remove' >/dev/null
+    _ss_run 'GRADLE_SETTINGS_HOME="$GRADLE_USER_HOME"; gradle_settings_remove; gradle_settings_remove' >/dev/null
     { [ ! -e "$_ss_gh/gradle.properties" ] && [ ! -e "$_ss_gh/init.d/a.gradle" ] && [ "$(cat "$_ss_gh/init.gradle")" = own ] \
         && [ ! -e "$_ss_gh/.bomlens-settings-copied" ]; } \
-        && pass "the copies are removed at the end and the home's own file stays" \
+        && pass "the copies are removed (twice is harmless) and the home's own file stays" \
         || fail "Gradle settings removal: $(ls -aR "$_ss_gh" | tr '\n' ' ')"
-    _ss_run ':' >/dev/null; rm -f "$_ss_root/gradle/gradle.properties"
-    _ss_run ':' >/dev/null
-    [ ! -e "$_ss_gh/gradle.properties" ] \
-        && pass "a copy a killed run left is removed when the next run starts" \
-        || fail "a stale gradle.properties copy survived the next run"
+    _ss_run 'gradle_settings_copy' >/dev/null; echo "user edit" >> "$_ss_gh/gradle.properties"
+    _ss_run 'GRADLE_SETTINGS_HOME="$GRADLE_USER_HOME"; gradle_settings_remove' >/dev/null
+    { grep -q "user edit" "$_ss_gh/gradle.properties" 2>/dev/null && [ ! -e "$_ss_gh/init.d/a.gradle" ]; } \
+        && pass "a copied file changed since is left in place, an unchanged one removed" \
+        || fail "a changed copy was removed, or an unchanged one kept: $(ls -aR "$_ss_gh" | tr '\n' ' ')"
+    rm -f "$_ss_gh/gradle.properties"
+    _ss_run 'gradle_settings_copy' >/dev/null; mv "$_ss_root/gradle" "$_ss_root/gradle.off"
+    _ss_run 'gradle_settings_copy' >/dev/null; mv "$_ss_root/gradle.off" "$_ss_root/gradle"
+    [ ! -e "$_ss_gh/gradle.properties" ] && [ ! -e "$_ss_gh/.bomlens-settings-copied" ] \
+        && pass "copies a killed run left are removed when the next run starts, even with nothing mounted" \
+        || fail "a stale copy survived the next run"
+    # The whole script: the settings are in place before build-prep's own
+    # first Gradle run, and gone afterwards.
+    _sg="$WORK/ss-full"; mkdir -p "$_sg/bin" "$_sg/src" "$_sg/out" "$_sg/gh"
+    : > "$_sg/src/build.gradle"
+    cat > "$_sg/bin/cdxgen" <<'STUB'
+#!/bin/sh
+out=""; prev=""
+for a in "$@"; do [ "$prev" = "-o" ] && out="$a"; prev="$a"; done
+printf '{"bomFormat":"CycloneDX","specVersion":"1.6","version":1,"metadata":{},"components":[]}\n' > "$out"
+STUB
+    chmod +x "$_sg/bin/cdxgen"
+    printf '#!/bin/sh\n[ -f "$GRADLE_USER_HOME/gradle.properties" ] && echo seen >> "%s/gradle-calls" || echo missing >> "%s/gradle-calls"\n' "$_sg" "$_sg" > "$_sg/bin/gradle"
+    chmod +x "$_sg/bin/gradle"
+    env -u ANDROID_HOME PATH="$_sg/bin:$PATH" PREP_SETTINGS_ROOT="$_ss_root" GRADLE_USER_HOME="$_sg/gh" \
+        sh "$PREP" "$_sg/src" "$_sg/out/bom.json" > "$_sg/log" 2>&1
+    { [ "$(head -1 "$_sg/gradle-calls" 2>/dev/null)" = seen ] && [ ! -e "$_sg/gh/gradle.properties" ] \
+        && [ ! -e "$_sg/gh/.bomlens-settings-copied" ]; } \
+        && pass "build-prep's first Gradle run sees the mounted gradle.properties, removed when the scan ends" \
+        || fail "Gradle settings around build-prep's own Gradle run" "calls=[$(cat "$_sg/gradle-calls" 2>/dev/null)] $(grep gradle "$_sg/log" | head -5)"
 fi
 grep -q 'find "$_co_d" \\( ! -user "$HOST_UID"' "$PREP" \
     && pass "build-prep hands the mounted cache folders back to HOST_UID" \
