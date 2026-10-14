@@ -73,10 +73,10 @@ Environment variables adjust the behavior.
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `SBOM_SCANNER_IMAGE` | `ghcr.io/sktelecom/bomlens:latest` | Override the scanner image |
-| `SBOM_FIRMWARE_IMAGE` | `ghcr.io/sktelecom/bomlens-firmware:latest` | Image used for firmware analysis |
-| `SBOM_AIBOM_IMAGE` | `ghcr.io/sktelecom/bomlens-aibom:latest` | Image used for AI model (ML-BOM) generation |
-| `SBOM_DEEP_CVE_IMAGE` | `ghcr.io/sktelecom/bomlens-deep-cve:latest` | Image used for `--deep-cve` (grype CPE matching), and by the same toggle in the web UI |
-| `SBOM_DEEP_LICENSE_IMAGE` | `SBOM_SCANNER_IMAGE` when set, else `ghcr.io/sktelecom/bomlens-deep-license:latest` | Image a source scan's post-process step runs on with `--deep-license` (scancode) |
+| `SBOM_FIRMWARE_IMAGE` | Follows `SBOM_SCANNER_IMAGE` (same registry path and tag: `.../bomlens:1.13.2` gives `.../bomlens-firmware:1.13.2`), else `ghcr.io/sktelecom/bomlens-firmware:latest` | Image used for firmware analysis |
+| `SBOM_AIBOM_IMAGE` | Follows `SBOM_SCANNER_IMAGE` (same registry path and tag: `.../bomlens:1.13.2` gives `.../bomlens-aibom:1.13.2`), else `ghcr.io/sktelecom/bomlens-aibom:latest` | Image used for AI model (ML-BOM) generation |
+| `SBOM_DEEP_CVE_IMAGE` | Follows `SBOM_SCANNER_IMAGE` (same registry path and tag: `.../bomlens:1.13.2` gives `.../bomlens-deep-cve:1.13.2`), else `ghcr.io/sktelecom/bomlens-deep-cve:latest` | Image used for `--deep-cve` (grype CPE matching), and by the same toggle in the web UI |
+| `SBOM_DEEP_LICENSE_IMAGE` | Follows `SBOM_SCANNER_IMAGE` the same way; when `SBOM_SCANNER_IMAGE` is not a BomLens image name, that image itself; when neither is set, `ghcr.io/sktelecom/bomlens-deep-license:latest` | Image a source scan's post-process step runs on with `--deep-license` (scancode) |
 | `SBOM_OUTPUT_FLAT` | — | Set to `1` to write artifacts flat in the output base, with no per-run subfolder (the pre-isolation layout, for CI that expects the old paths) |
 | `SBOM_OUTPUT_DIR` | `~/sbom-output` | Output base for the desktop app and web UI (the CLI uses `--output-dir` instead). Each scan still lands in a `{Project}_{Version}/` subfolder under it |
 | `SBOM_UI_MOUNT_DIR` | — | For the Windows launcher `sbom-ui.bat`, which takes no CLI arguments: one extra folder to expose to the web UI as a read-only Directory path target (the double-click counterpart of `--ui --mount`). Use a path without `& ^ | < >` — the launcher rejects those rather than passing a mangled mount to Docker |
@@ -120,6 +120,8 @@ Environment variables adjust the behavior.
 | `TRUSCA_RELEASE` | `--version` value | Ingest release label |
 | `EXTERNAL_LOOKUP` | `true` | With `--ui`: enable the web UI's CVE/package lookup, which queries OSV.dev on demand. Set `false` for air-gapped runs |
 | `SBOM_UPLOAD_TTL_HOURS` | `24` | With `--ui`: how long an uploaded file is kept if no scan is ever started with it (a picked-then-abandoned upload). Clamped to at least 1 |
+
+When `SBOM_SCANNER_IMAGE` is pinned by digest only, the opt-in images use `:latest`; to pin them as well, set each `SBOM_*_IMAGE`.
 
 Source-scan resolver options such as `BOMLENS_MAVEN_FULL_GRAPH` are listed under [Docker image environment variables](docker-image.md#environment-variables). Set them in the shell that runs `scan-sbom.sh` and they reach dependency resolution the same way.
 
