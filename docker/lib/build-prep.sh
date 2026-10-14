@@ -1903,6 +1903,79 @@ if [ -n "${PHP_SCOPE_FILTER:-}" ]; then
     run_scope_filter "pkg:composer/" "php"
 fi
 
+# Development-marker filter: cdxgen marks a development-only component with a
+# property of its own ecosystem (npm, pnpm, yarn and bun:
+# cdx:npm:package:development=true; uv and Poetry dependency groups:
+# cdx:pyproject:group=<group>; Cargo dev-dependencies: cdx:cargo:scope=dev;
+# sbt, Crystal and Gleam: their development markers), and the filters above do
+# not read those for pnpm workspaces, uv.lock or Poetry. A marked component is
+# dropped only when no production path reaches it: a walk from the app root
+# that does not step from the root or a workspace member into a marked
+# component. A marked component a production package also depends on stays.
+# Guard: the root must be in the dependency graph, otherwise nothing is
+# dropped. BOMLENS_NODE_FULL_GRAPH=1 keeps the npm-marked components.
+if [ "${rc:-1}" -eq 0 ] && [ -f "$OUT" ] && command -v node >/dev/null 2>&1; then
+    _dvnpm=1
+    opted_out "${BOMLENS_NODE_FULL_GRAPH:-}" && _dvnpm=""
+    _dvflt=$(mktemp).js
+    cat > "$_dvflt" <<'DEVFILTER_JS'
+const fs = require('fs');
+const [bomPath, npmMarkers] = process.argv.slice(2);
+let bom;
+try { bom = JSON.parse(fs.readFileSync(bomPath, 'utf8')); } catch (e) { process.exit(0); }
+if (!Array.isArray(bom.components) || !Array.isArray(bom.dependencies)) process.exit(0);
+const mc = bom.metadata && bom.metadata.component;
+const rootRef = mc && (mc['bom-ref'] || mc.purl);
+const edges = new Map(bom.dependencies.map(d => [d.ref, Array.isArray(d.dependsOn) ? d.dependsOn : []]));
+if (!rootRef || !edges.has(rootRef)) process.exit(0);
+const prop = (c, n) => (c.properties || []).filter(p => p.name === n).map(p => String(p.value));
+const isDev = c =>
+  (npmMarkers === '1' && prop(c, 'cdx:npm:package:development').includes('true'))
+  || prop(c, 'cdx:pyproject:group').some(g => g !== 'main')
+  || prop(c, 'cdx:cargo:scope').includes('dev')
+  || prop(c, 'cdx:sbt:package:development').includes('true')
+  || prop(c, 'cdx:crystal:scope').includes('development')
+  || prop(c, 'cdx:gleam:scope').includes('development');
+const refOf = c => c['bom-ref'] || c.purl;
+const byRef = new Map(bom.components.map(c => [refOf(c), c]));
+const devRefs = new Set(bom.components.filter(isDev).map(refOf));
+if (devRefs.size === 0) process.exit(0);
+// The root, a workspace member cdxgen lists only in the graph, and a member it
+// lists as an application component declare dependencies; anything else is a
+// package depending on another.
+const isProject = r => {
+  if (r === rootRef) return true;
+  const c = byRef.get(r);
+  return !c || c.type === 'application'
+    || (c.properties || []).some(p => p.name === 'internal:is_workspace' && p.value === 'true');
+};
+const reached = new Set([rootRef]);
+const queue = [rootRef];
+while (queue.length) {
+  const n = queue.shift();
+  for (const m of edges.get(n) || []) {
+    if (reached.has(m)) continue;
+    if (devRefs.has(m) && isProject(n)) continue;
+    reached.add(m);
+    queue.push(m);
+  }
+}
+const drop = new Set([...devRefs].filter(r => !reached.has(r)));
+if (drop.size === 0) process.exit(0);
+const before = bom.components.length;
+bom.components = bom.components.filter(c => !drop.has(refOf(c)));
+bom.dependencies = bom.dependencies
+  .filter(d => !drop.has(d.ref))
+  .map(d => Array.isArray(d.dependsOn)
+    ? Object.assign({}, d, { dependsOn: d.dependsOn.filter(r => !drop.has(r)) })
+    : d);
+fs.writeFileSync(bomPath, JSON.stringify(bom, null, 2));
+process.stderr.write('[build-prep] dev-marker: dropped ' + drop.size + ' development-only component(s), kept ' + bom.components.length + ' of ' + before + '\n');
+DEVFILTER_JS
+    node "$_dvflt" "$OUT" "${_dvnpm:-0}" || log "dev-marker: filter skipped (non-fatal)"
+    rm -f "$_dvflt"
+fi
+
 # Non-shipped path filter: the --exclude globs keep cdxgen from reading the
 # NON_SHIPPED_PATHS folders, and this drops a component that still names only
 # such a location, in internal:SrcFile or its identity evidence (cdxgen 13

@@ -8401,6 +8401,81 @@ else
     echo "  SKIP: node not installed; non-shipped path filter not exercised"
 fi
 
+echo "== development-marker filter: dev-only components no production path reaches are dropped =="
+if command -v node >/dev/null 2>&1; then
+    sed -n "/<<'DEVFILTER_JS'/,/^DEVFILTER_JS\$/p" "$PREP" | sed '1d;$d' > "$WORK/devf.js"
+    # pnpm workspace: the root's own devDependency, a member's devDependency,
+    # a dev-marked package a production package also uses, and an npm
+    # optional dependency with no development marker.
+    cat > "$WORK/devf-pnpm.json" <<'EOF_DEV'
+{"bomFormat":"CycloneDX","metadata":{"component":{"bom-ref":"pkg:npm/root@1.0.0"}},
+ "components":[
+  {"bom-ref":"pkg:npm/debug@4.3.4","purl":"pkg:npm/debug@4.3.4"},
+  {"bom-ref":"pkg:npm/ms@2.1.2","purl":"pkg:npm/ms@2.1.2","scope":"optional"},
+  {"bom-ref":"pkg:npm/is-number@7.0.0","purl":"pkg:npm/is-number@7.0.0","scope":"optional",
+   "properties":[{"name":"cdx:npm:package:development","value":"true"}]},
+  {"bom-ref":"pkg:npm/eslint@9.0.0","purl":"pkg:npm/eslint@9.0.0","scope":"optional",
+   "properties":[{"name":"cdx:npm:package:development","value":"true"}]},
+  {"bom-ref":"pkg:npm/shared@1.0.0","purl":"pkg:npm/shared@1.0.0","scope":"optional",
+   "properties":[{"name":"cdx:npm:package:development","value":"true"}]}],
+ "dependencies":[
+  {"ref":"pkg:npm/root@1.0.0","dependsOn":["pkg:npm/@w/app@1.0.0","pkg:npm/is-number@7.0.0"]},
+  {"ref":"pkg:npm/@w/app@1.0.0","dependsOn":["pkg:npm/debug@4.3.4","pkg:npm/eslint@9.0.0"]},
+  {"ref":"pkg:npm/debug@4.3.4","dependsOn":["pkg:npm/ms@2.1.2","pkg:npm/shared@1.0.0"]},
+  {"ref":"pkg:npm/eslint@9.0.0","dependsOn":["pkg:npm/shared@1.0.0"]},
+  {"ref":"pkg:npm/is-number@7.0.0","dependsOn":[]},
+  {"ref":"pkg:npm/ms@2.1.2","dependsOn":[]},
+  {"ref":"pkg:npm/shared@1.0.0","dependsOn":[]}]}
+EOF_DEV
+    cp "$WORK/devf-pnpm.json" "$WORK/devf-pnpm-full.json"
+    node "$WORK/devf.js" "$WORK/devf-pnpm.json" 1 2>/dev/null
+    if jq -e '([.components[].purl] == ["pkg:npm/debug@4.3.4","pkg:npm/ms@2.1.2","pkg:npm/shared@1.0.0"])
+              and ([.dependencies[] | select(.ref=="pkg:npm/root@1.0.0") | .dependsOn][0] == ["pkg:npm/@w/app@1.0.0"])
+              and ([.dependencies[] | select(.ref=="pkg:npm/@w/app@1.0.0") | .dependsOn][0] == ["pkg:npm/debug@4.3.4"])
+              and ([.dependencies[].ref] | index("pkg:npm/eslint@9.0.0") == null)' "$WORK/devf-pnpm.json" >/dev/null 2>&1; then
+        pass "dev filter drops root and member devDependencies, keeps a package production also uses"
+    else
+        fail "dev filter (pnpm) output unexpected" "$(jq -c '[.components[].purl], .dependencies' "$WORK/devf-pnpm.json" 2>&1)"
+    fi
+    node "$WORK/devf.js" "$WORK/devf-pnpm-full.json" 0 2>/dev/null
+    [ "$(jq '.components | length' "$WORK/devf-pnpm-full.json")" = "5" ] \
+        && pass "BOMLENS_NODE_FULL_GRAPH keeps the npm-marked components" \
+        || fail "npm-marked components dropped with the npm markers off"
+    # uv dependency group, a Poetry group package the main dependencies also
+    # list, and a Cargo dev-dependency.
+    cat > "$WORK/devf-py.json" <<'EOF_DEV'
+{"bomFormat":"CycloneDX","metadata":{"component":{"bom-ref":"pkg:pypi/root@1.0.0"}},
+ "components":[
+  {"bom-ref":"pkg:pypi/python-dateutil@2.8.2","purl":"pkg:pypi/python-dateutil@2.8.2"},
+  {"bom-ref":"pkg:pypi/six@1.16.0","purl":"pkg:pypi/six@1.16.0","scope":"optional",
+   "properties":[{"name":"cdx:pyproject:group","value":"test"}]},
+  {"bom-ref":"pkg:pypi/iniconfig@2.0.0","purl":"pkg:pypi/iniconfig@2.0.0","scope":"optional",
+   "properties":[{"name":"cdx:pyproject:group","value":"dev"}]},
+  {"bom-ref":"pkg:cargo/criterion@0.5.1","purl":"pkg:cargo/criterion@0.5.1","scope":"excluded",
+   "properties":[{"name":"cdx:cargo:scope","value":"dev"}]}],
+ "dependencies":[
+  {"ref":"pkg:pypi/root@1.0.0","dependsOn":["pkg:pypi/python-dateutil@2.8.2","pkg:cargo/criterion@0.5.1"]},
+  {"ref":"pkg:pypi/python-dateutil@2.8.2","dependsOn":["pkg:pypi/six@1.16.0"]},
+  {"ref":"pkg:pypi/iniconfig@2.0.0","dependsOn":[]}]}
+EOF_DEV
+    node "$WORK/devf.js" "$WORK/devf-py.json" 0 2>/dev/null
+    if jq -e '([.components[].purl] == ["pkg:pypi/python-dateutil@2.8.2","pkg:pypi/six@1.16.0"])
+              and ([.dependencies[] | select(.ref=="pkg:pypi/root@1.0.0") | .dependsOn][0] == ["pkg:pypi/python-dateutil@2.8.2"])' \
+           "$WORK/devf-py.json" >/dev/null 2>&1; then
+        pass "dev filter drops uv/Poetry group and Cargo dev-only packages, keeps a shared one"
+    else
+        fail "dev filter (python/cargo) output unexpected" "$(jq -c '[.components[].purl], .dependencies' "$WORK/devf-py.json" 2>&1)"
+    fi
+    # No root in the dependency graph: nothing is dropped.
+    jq 'del(.dependencies[0])' "$WORK/devf-pnpm-full.json" > "$WORK/devf-noroot.json"
+    node "$WORK/devf.js" "$WORK/devf-noroot.json" 1 2>/dev/null
+    [ "$(jq '.components | length' "$WORK/devf-noroot.json")" = "5" ] \
+        && pass "dev filter leaves the SBOM alone when the root is not in the graph" \
+        || fail "dev filter dropped components without a root in the graph"
+else
+    echo "  SKIP: node not installed; development-marker filter not exercised"
+fi
+
 echo "== maven non-deployed-module filter: skip resolution and dependency-graph reachability =="
 PREP="$ROOT_DIR/docker/lib/build-prep.sh"
 if command -v node >/dev/null 2>&1; then
