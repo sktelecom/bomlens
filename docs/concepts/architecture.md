@@ -14,8 +14,8 @@ For the per-input tool flow — source code (with the ScanCode and SCANOSS optio
 
 BomLens is a 2-stage pipeline in which two kinds of Docker images work together.
 
-- **Stage 1 — Generation**: for source code, the official per-language cdxgen images generate the SBOM (CycloneDX 1.6); for container images, binaries, and directories, syft does.
-- **Stage 2 — Post-processing**: the lightweight `bomlens` image takes the SBOM and runs normalization, optional deep license detection, notice generation, the security report, signing, and upload in order.
+- **Stage 1, generation**: for source code, the official per-language cdxgen images generate the SBOM (CycloneDX 1.6 by default, or 1.7 with `--spec-version 1.7`); for container images, binaries, and directories, syft does.
+- **Stage 2, post-processing**: the lightweight `bomlens` image takes the SBOM and runs normalization, optional deep license detection, notice generation, the security report, signing, and upload in order.
 
 ![BomLens two-stage pipeline: per-language cdxgen images or syft build bom.json, and the bomlens image post-processes it](../images/diagrams/architecture-overview.png)
 
@@ -44,7 +44,7 @@ The tools invoked by the pipeline and their **version pinning** status (supply c
 
 | Tool | Version | Stage | Role | Enabled when |
 |------|------|------|------|-----------|
-| **cdxgen** | bundled in the language image | Stage 1 | Generates the SBOM from source code (`--spec-version 1.6`) | `MODE=SOURCE` |
+| **cdxgen** | bundled in the language image | Stage 1 | Generates the SBOM from source code (`--spec-version 1.6`, or `1.7` when the scan asks for it) | `MODE=SOURCE` |
 | **build-prep.sh** | — | Stage 1 | Dependency preparation right before cdxgen (cargo, go, bundle, mvn, pip) | `MODE=SOURCE` |
 | **syft** | `v1.51.0` | Stage 1 | Scans images, binaries, and root filesystems | `MODE=IMAGE/BINARY/ROOTFS` |
 | **jq** (`normalize-sbom.sh`) | — | Stage 2 | Normalizes and sorts the SBOM | Always |
@@ -121,7 +121,7 @@ The per-language cdxgen image mapping is as follows (`scan-sbom.sh:158-177`; the
 
 Two steps run inside the image:
 
-1. **`build-prep.sh`** (`docker/lib/build-prep.sh`) — dependency preparation **right before** cdxgen. It creates lockfiles for ecosystems cdxgen cannot resolve on its own (notably Rust and Go), exposing transitive dependencies. POSIX `sh`, best-effort (it never fails the scan).
+1. **`build-prep.sh`** (`docker/lib/build-prep.sh`): dependency preparation **right before** cdxgen. It creates lockfiles for ecosystems cdxgen cannot resolve on its own (notably Rust and Go), exposing transitive dependencies. POSIX `sh`, best-effort (it never fails the scan).
 
    | Ecosystem | Action | Notes |
    |--------|------|------|
@@ -131,7 +131,7 @@ Two steps run inside the image:
    | Maven | `mvn dependency:resolve` | Lightweight safety net |
    | Python | `pip install -r requirements.txt` | Exposes transitive dependencies when no lockfile exists |
 
-2. **Run cdxgen** — `build-prep.sh` auto-detects the cdxgen binary path, which differs per image, and runs `cdxgen -r --spec-version 1.6 -o bom.json` (`build-prep.sh:60-73`). The generated SBOM is then handed to the Stage 2 (`MODE=POSTPROCESS`) post-processing image.
+2. **Run cdxgen**: `build-prep.sh` auto-detects the cdxgen binary path, which differs per image, and runs `cdxgen -r --spec-version 1.6 -o bom.json` (`1.7` instead with `--spec-version 1.7`). The generated SBOM is then handed to the Stage 2 (`MODE=POSTPROCESS`) post-processing image.
 
 ### Image / binary / directory — syft
 
@@ -245,7 +245,7 @@ For how to use each feature, see the [notice and security report guide](../guide
 
 | File | Generated when |
 |------|-----------|
-| `{Project}_{Version}_bom.json` | Always (CycloneDX 1.6; a 1.7 ML-BOM for AI models) |
+| `{Project}_{Version}_bom.json` | Always (CycloneDX 1.6, or 1.7 with `--spec-version 1.7`; a 1.7 ML-BOM for AI models) |
 | `{Project}_{Version}_NOTICE.txt` / `.html` / `.pdf` | `--notice` / `--all` / default risk report generation (PDF only in an `SBOM_PDF` build) |
 | `{Project}_{Version}_security.json` / `.md` / `.html` | `--security` / `--all` / default risk report generation |
 | `{Project}_{Version}_risk-report.md` / `.html` | Default (all modes) — skip with `--no-report` |
@@ -271,12 +271,12 @@ Add a helper script under `docker/lib/`, call it from the shared pipeline sectio
 
 ## Design principles
 
-- **Isolation** — all analysis runs in Docker containers; the host environment stays untouched.
-- **Separation of concerns** — generation (Stage 1) and post-processing (Stage 2) are split, keeping the post-processing image small.
-- **Reproducibility** — tool versions are pinned via `ARG`; `--byte-stable` produces byte-identical output.
-- **Standards compliance** — conforms to the CycloneDX 1.6 specification.
-- **Robustness** — post-processing steps are best-effort and do not abort the whole scan.
-- **Single interface** — every language and mode is invoked through the one `scan-sbom.sh`.
+- **Isolation**: all analysis runs in Docker containers; the host environment stays untouched.
+- **Separation of concerns**: generation (Stage 1) and post-processing (Stage 2) are split, keeping the post-processing image small.
+- **Reproducibility**: tool versions are pinned via `ARG`; `--byte-stable` produces byte-identical output.
+- **Standards compliance**: conforms to the CycloneDX specification, 1.6 by default and 1.7 with `--spec-version 1.7`.
+- **Robustness**: post-processing steps are best-effort and do not abort the whole scan.
+- **Single interface**: every language and mode is invoked through the one `scan-sbom.sh`.
 
 ---
 

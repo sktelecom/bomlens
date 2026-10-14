@@ -18,7 +18,7 @@ SBOM(Software Bill of Materials)은 소프트웨어 안에 든 구성요소의 �
 
 ## 결과물에서 만나는 용어
 
-**CycloneDX**는 BomLens가 SBOM을 기록하는 표준 파일 형식입니다. [OWASP CycloneDX](https://cyclonedx.org/) 프로젝트가 정의한 JSON 문서(버전 1.6, AI 모델 SBOM은 1.6에 없는 머신러닝 모델 필드를 담은 1.7)입니다. 표준 형식이라서 생성한 파일을 다른 도구가 그대로 읽을 수 있습니다. 취약점 추적기, 정책 검사기, 고객사의 자체 도구 모두 해당합니다.
+**CycloneDX**는 BomLens가 SBOM을 기록하는 표준 파일 형식입니다. [OWASP CycloneDX](https://cyclonedx.org/) 프로젝트가 정의한 JSON 문서입니다. 기본은 버전 1.6이고 `--spec-version 1.7`을 주면 1.7로 기록합니다. AI 모델 SBOM은 1.6에 없는 머신러닝 모델 필드를 담기 위해 항상 1.7입니다. 표준 형식이라서 생성한 파일을 다른 도구가 그대로 읽을 수 있습니다. 취약점 추적기, 정책 검사기, 고객사의 자체 도구 모두 해당합니다.
 
 **PURL**(Package URL)은 SBOM 안에서 각 구성요소가 달고 있는 식별자입니다. 예를 들어 `pkg:npm/express@4.18.2`처럼 생태계(npm, Maven, PyPI 등), 패키지, 정확한 버전을 한 문자열로 담아, SBOM을 읽는 모든 도구가 같은 구성요소를 가리키게 합니다.
 

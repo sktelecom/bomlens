@@ -18,7 +18,7 @@ Two everyday jobs depend on knowing exactly what is inside your software.
 
 ## Terms you will meet in the results
 
-**CycloneDX** is the standard file format BomLens writes its SBOMs in — a JSON document defined by the [OWASP CycloneDX](https://cyclonedx.org/) project (version 1.6; an AI model SBOM is written in 1.7, which carries the machine-learning-model fields 1.6 does not have). Because the format is standard, the file you generate can be read by other tools: vulnerability trackers, policy checkers, or a customer's own tooling.
+**CycloneDX** is the standard file format BomLens writes its SBOMs in: a JSON document defined by the [OWASP CycloneDX](https://cyclonedx.org/) project. BomLens writes version 1.6 by default and 1.7 with `--spec-version 1.7`; an AI model SBOM is always 1.7, which carries the machine-learning-model fields 1.6 does not have. Because the format is standard, the file you generate can be read by other tools: vulnerability trackers, policy checkers, or a customer's own tooling.
 
 **PURL** (Package URL) is the identifier each component carries inside the SBOM, such as `pkg:npm/express@4.18.2`. It names the ecosystem (npm, Maven, PyPI, and so on), the package, and the exact version in one string, so every tool that reads the SBOM agrees on which component is meant.
 
