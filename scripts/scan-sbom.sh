@@ -745,10 +745,18 @@ ensure_image_fresh() {
 #
 # $1: image ref
 _refresh_image_quietly() {
-    local img="$1" stall max log pid elapsed idle last size
-    stall="${_SBOM_PULL_STALL_SECS:-12}"
+    _pull_bounded "$1" "" "${_SBOM_PULL_STALL_SECS:-12}" || true
+    return 0
+}
+
+# _pull_bounded <image> [show] [stall seconds]: docker pull, stopped once it
+# has printed nothing for the stall seconds or run _SBOM_PULL_MAX_SECS. With
+# "show", docker's lines are printed as they come. Returns the pull's exit
+# code, 1 when it was stopped.
+_pull_bounded() {
+    local img="$1" show="${2:-}" stall="${3:-12}" max log pid elapsed idle last size shown=0 lines rc=0 stopped=""
     max="${_SBOM_PULL_MAX_SECS:-2700}"
-    log="$(mktemp)" || return 0
+    log="$(mktemp)" || return 1
     docker pull "$img" >"$log" 2>&1 &
     pid=$!
     elapsed=0; idle=0; last=0
@@ -762,14 +770,45 @@ _refresh_image_quietly() {
         else
             idle=$((idle + 1))
         fi
+        if [ -n "$show" ]; then
+            lines=$(wc -l <"$log" 2>/dev/null | tr -d ' ')
+            if [ -n "$lines" ] && [ "$lines" -gt "$shown" ]; then
+                sed -n "$((shown + 1)),${lines}p" "$log"; shown=$lines
+            fi
+        fi
         if [ "$idle" -ge "$stall" ] || [ "$elapsed" -ge "$max" ]; then
             kill "$pid" 2>/dev/null || true
+            stopped=1
             break
         fi
     done
-    wait "$pid" 2>/dev/null || true
+    wait "$pid" 2>/dev/null || rc=$?
+    [ -n "$show" ] && sed -n "$((shown + 1)),\$p" "$log"
     rm -f "$log"
-    return 0
+    [ -z "$stopped" ] || { [ -n "$show" ] && echo "[WARN] docker pull $img printed nothing for ${stall}s; stopped."; return 1; }
+    return "$rc"
+}
+
+# _optin_image_ready <image>: true when an opt-in image (deep-cve,
+# deep-license) is here or could be pulled now; the caller goes on without it
+# otherwise. SBOM_PULL=never only looks; SBOM_PULL=always pulls it here, once
+# (ensure_image_fresh then leaves it, see _optin_was_pulled). A first pull
+# shows docker's progress and is stopped when it prints nothing for
+# _SBOM_OPTIN_PULL_STALL_SECS seconds (120: docker prints a line per layer, and
+# a large layer takes a while), as on a host with no route to the registry.
+_OPTIN_PULLED=" "
+_optin_image_ready() {
+    if [ "$SBOM_PULL" != "always" ] && docker image inspect "$1" >/dev/null 2>&1; then
+        return 0
+    fi
+    [ "$SBOM_PULL" = "never" ] && return 1
+    echo "[INFO] Pulling $1..."
+    _pull_bounded "$1" show "${_SBOM_OPTIN_PULL_STALL_SECS:-120}" || return 1
+    _OPTIN_PULLED="$_OPTIN_PULLED$1 "
+}
+_optin_was_pulled() {
+    case "$_OPTIN_PULLED" in *" $1 "*) return 0 ;; esac
+    return 1
 }
 
 # missing (default): docker run's implicit pull covers an absent image
@@ -2608,44 +2647,76 @@ if [ "$MODE" = "SOURCE" ]; then
     # is only in the deep-license image (the base image stays small).
     # --deep-cve: the security step runs grype, which is only in the deep-cve
     # image. Neither image has the other's tool, so with both options the
-    # deep-cve image is used and the licence scan is reported as not run, as
-    # the web UI does.
-    # When the image is not here and cannot be pulled (not published yet, an
-    # offline host, SBOM_PULL=never), the scan still runs on the base image (or
-    # the deep-license image, with both options) and records the step as
-    # skipped (fallback).
+    # licence scan runs first, alone, in the deep-license image (its result,
+    # _scancode.json, is read by nothing else in the pipeline), and the
+    # post-process step runs on the deep-cve image and records it from the exit
+    # code it is handed (BOMLENS_DEEP_LICENSE_RC). One manifest, one pipeline
+    # run; the extra cost is one container start.
+    # When an image is not here and cannot be pulled (not published yet, an
+    # offline host, SBOM_PULL=never), the scan still runs without it and the
+    # manifest records the step as skipped (fallback). So it does when the
+    # scanner image is a local build or a version before 1.13.2 and no
+    # SBOM_DEEP_CVE_IMAGE is set: no deep-cve image of that build is known, and
+    # :latest would mix two releases in one run.
     PP_IMAGE="$POSTPROCESS_IMAGE"
     PP_ENV=""
-    _optin_image_ready() {
-        docker image inspect "$1" >/dev/null 2>&1 \
-            || { [ "$SBOM_PULL" != "never" ] && docker pull "$1" >/dev/null 2>&1; }
-    }
+    PP_HAS_GRYPE=""
+    DL_PRE_IMAGE=""
     if [ "$DEEP_CVE" = "true" ]; then
-        optin_image_note deep-cve
-        if [ "$DEEP_CVE_IMAGE" != "$POSTPROCESS_IMAGE" ]; then
+        _scanner_image_parts
+        if [ "$DEEP_CVE_IMAGE" = "$POSTPROCESS_IMAGE" ]; then
+            PP_HAS_GRYPE=1
+        elif [ -z "${SBOM_DEEP_CVE_IMAGE:-}" ] && [ -n "${SBOM_SCANNER_IMAGE:-}" ] \
+             && { [ "$_SI_WHY" = path ] || [ "$_SI_WHY" = version ]; }; then
+            if [ "$_SI_NAME" != bomlens-deep-cve ]; then
+                if [ "$_SI_WHY" = path ]; then _dc_why="is a local build"; else _dc_why="is a version before 1.13.2"; fi
+                echo "[WARN] --deep-cve: SBOM_SCANNER_IMAGE ($SBOM_SCANNER_IMAGE) $_dc_why, so no deep-cve image of the same build is known; post-processing stays on it without the grype CPE match. Set SBOM_DEEP_CVE_IMAGE to choose one."
+                DEEP_CVE_FALLBACK_FROM="SBOM_SCANNER_IMAGE ($SBOM_SCANNER_IMAGE) $_dc_why and SBOM_DEEP_CVE_IMAGE is not set, so no deep-cve image of the same build was used"
+            fi
+        else
+            optin_image_note deep-cve
             if _optin_image_ready "$DEEP_CVE_IMAGE"; then
-                PP_IMAGE="$DEEP_CVE_IMAGE"
-                [ -n "$NVD_API_KEY" ] && PP_ENV=" -e NVD_API_KEY"
-                [ "$DEEP_LICENSE" = "true" ] \
-                    && echo "[WARN] --deep-license and --deep-cve: no image has both scancode and grype; running on $DEEP_CVE_IMAGE without the licence scan."
+                PP_IMAGE="$DEEP_CVE_IMAGE"; PP_HAS_GRYPE=1
             else
                 echo "[WARN] --deep-cve: the grype image $DEEP_CVE_IMAGE is not available; continuing without the grype CPE match."
-                DEEP_CVE_FALLBACK_FROM="$DEEP_CVE_IMAGE"
+                DEEP_CVE_FALLBACK_FROM="the grype image was not available: $DEEP_CVE_IMAGE"
             fi
         fi
+        # By name only, whichever image the stage runs on: SECURITY_NVD_VERIFY
+        # reads it there.
+        [ -n "${NVD_API_KEY:-}" ] && PP_ENV=" -e NVD_API_KEY"
     fi
     if [ "$DEEP_LICENSE" = "true" ]; then
         optin_image_note deep-license
-    fi
-    if [ "$DEEP_LICENSE" = "true" ] && [ "$PP_IMAGE" = "$POSTPROCESS_IMAGE" ] && [ "$DEEP_LICENSE_IMAGE" != "$POSTPROCESS_IMAGE" ]; then
-        PP_IMAGE="$DEEP_LICENSE_IMAGE"
-        if ! _optin_image_ready "$PP_IMAGE"; then
-            echo "[WARN] --deep-license: the scancode image $PP_IMAGE is not available; continuing on $POSTPROCESS_IMAGE without the licence scan."
-            DEEP_LICENSE_FALLBACK_FROM="$PP_IMAGE"
-            PP_IMAGE="$POSTPROCESS_IMAGE"
+        if [ "$DEEP_LICENSE_IMAGE" = "$PP_IMAGE" ]; then
+            :
+        elif ! _optin_image_ready "$DEEP_LICENSE_IMAGE"; then
+            echo "[WARN] --deep-license: the scancode image $DEEP_LICENSE_IMAGE is not available; continuing on $PP_IMAGE without the licence scan."
+            DEEP_LICENSE_FALLBACK_FROM="$DEEP_LICENSE_IMAGE"
+        elif [ -n "$PP_HAS_GRYPE" ]; then
+            DL_PRE_IMAGE="$DEEP_LICENSE_IMAGE"
+        else
+            PP_IMAGE="$DEEP_LICENSE_IMAGE"
         fi
     fi
-    ensure_image_fresh "$PP_IMAGE"
+    _optin_was_pulled "$PP_IMAGE" || ensure_image_fresh "$PP_IMAGE"
+    if [ -n "$DL_PRE_IMAGE" ]; then
+        _optin_was_pulled "$DL_PRE_IMAGE" || ensure_image_fresh "$DL_PRE_IMAGE"
+        echo "[INFO] --deep-license with --deep-cve: running the licence scan in $DL_PRE_IMAGE, then post-processing in $PP_IMAGE."
+        _dl_out="${OUTPUT_FILE%_bom.json}_scancode.json"
+        rm -f "$OUTPUT_HOST_DIR/$_dl_out"
+        _dl_started="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+        _dl_rc=0
+        # Read-only source: the licence scan only reads it. Its own output
+        # folder, inside the tree by default, is left out as the
+        # post-process step leaves it out.
+        eval "$DOCKER_MSYS"docker run --rm \
+            -v "\"$(hostpath "$SCAN_INPUT_DIR")\"":/src:ro -v "\"$(hostpath "$OUTPUT_HOST_DIR")\"":/host-output \
+            -w /host-output \
+            -e DEEP_LICENSE_EXCLUDE="\"${SRC_TREE_EXCLUDE:-} ${OUTPUT_FILE%_bom.json}\"" -e DEEP_LICENSE_MAX_FILES -e DEEP_LICENSE_TIMEOUT -e BOMLENS_DEEP_LICENSE_ALL \
+            --entrypoint bash "\"$DL_PRE_IMAGE\"" /usr/local/lib/sbom/deep-license.sh /src "\"/host-output/$_dl_out\"" || _dl_rc=$?
+        PP_ENV="$PP_ENV -e BOMLENS_DEEP_LICENSE_RC=$_dl_rc -e BOMLENS_DEEP_LICENSE_STARTED=$_dl_started"
+    fi
     # The fallback runs inside this image, which takes the hand-off only from
     # the engine contract on (an image older than this CLI ignores it and
     # stops with "SBOM not found"). Checked only when it is needed.
@@ -2784,17 +2855,22 @@ else
             ENVV="-e MERGE_FILES=\"${MF_CONTAINER# }\"$ROOT_ENV" ;;
     esac
     # --deep-cve: swap the base image for the grype-bundled one so the security
-    # step can run grype's CPE matcher. Base-image modes only (FIRMWARE/AIBOM carry
-    # their own tools and image). When SECURITY_NVD_VERIFY is on, pass NVD_API_KEY
-    # by name only (value read from our env, so it never appears in `ps`), like the
-    # AIBOM HF_TOKEN.
+    # step can run grype's CPE matcher. Not for a firmware or AI model scan
+    # (FIRMWARE/AIBOM carry their own tools and image, and none of them has
+    # package purls for grype): those run without it and are not handed
+    # DEEP_CVE=true, as the web UI does, so the result manifest records the
+    # step as disabled rather than the run as degraded. When SECURITY_NVD_VERIFY
+    # is on, pass NVD_API_KEY by name only (value read from our env, so it never
+    # appears in `ps`), like the AIBOM HF_TOKEN.
     if [ "$DEEP_CVE" = "true" ]; then
-        if [ "$RUN_IMAGE" = "$POSTPROCESS_IMAGE" ]; then
-            RUN_IMAGE="$DEEP_CVE_IMAGE"; optin_image_note deep-cve
-            [ -n "$NVD_API_KEY" ] && ENVV="$ENVV -e NVD_API_KEY"
-        else
-            echo "[WARN] --deep-cve does not apply to the $MODE image; running without grype." >&2
-        fi
+        case "$MODE" in
+            FIRMWARE|AIBOM|MODELFILE|DATASET|AIDECLARE)
+                echo "[WARN] --deep-cve does not apply to a $MODE scan; running without grype." >&2
+                DEEP_CVE="false" ;;
+            *)
+                RUN_IMAGE="$DEEP_CVE_IMAGE"; optin_image_note deep-cve
+                [ -n "${NVD_API_KEY:-}" ] && ENVV="$ENVV -e NVD_API_KEY" ;;
+        esac
     fi
     ensure_image_fresh "$RUN_IMAGE"
     # VOL/ENVV/pp_env/cosign_run intentionally expand to multiple tokens (-v, -e

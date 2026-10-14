@@ -205,6 +205,8 @@ if [ -n "${BOMLENS_RUN_INPUT:-}" ] || [ "${BOMLENS_ARTIFACT_CLEANUP:-}" = "1" ];
     # else is ignored rather than trusted, since a malformed value here should
     # degrade to "skip nothing", not to a path escape.
     _run_input=""
+    _dl_handed_rc=""
+    printf '%s' "${BOMLENS_DEEP_LICENSE_RC:-}" | grep -qE '^[0-9]{1,3}$' && _dl_handed_rc=1
     if [ -n "${BOMLENS_RUN_INPUT:-}" ] && printf '%s' "$BOMLENS_RUN_INPUT" | grep -qE '^[A-Za-z0-9][A-Za-z0-9._-]*$'; then
         _run_input="$BOMLENS_RUN_INPUT"
     fi
@@ -218,6 +220,10 @@ if [ -n "${BOMLENS_RUN_INPUT:-}" ] || [ "${BOMLENS_ARTIFACT_CLEANUP:-}" = "1" ];
             # does); it is this run's input too, and scan-sbom.sh clears an old
             # one before stage 1 for the same reason as the SBOM itself.
             [ -n "$_run_input" ] && [ "$_suf" = "_conda.cdx.json" ] && continue
+            # The licence scan ran before this container, in the deep-license
+            # image (see the deep-license step below): its result is this
+            # run's, written by the caller after its own cleanup.
+            [ -n "$_dl_handed_rc" ] && [ "$_suf" = "_scancode.json" ] && continue
             [ "${CV_INPUT_IS_TEMPLATE:-false}" = true ] && [ "$_suf" = "_component-versions.template.csv" ] && continue
             if [ -f "$_f" ]; then
                 rm -f "$_f"
@@ -229,7 +235,7 @@ if [ -n "${BOMLENS_RUN_INPUT:-}" ] || [ "${BOMLENS_ARTIFACT_CLEANUP:-}" = "1" ];
         fi
         unset _cleaned _suf _f
     fi
-    unset _run_input
+    unset _run_input _dl_handed_rc
 fi
 
 # Report language for the human-facing conformance + AI-profile reports. Only
@@ -1831,14 +1837,28 @@ fi
 
 # Deep license detection (scancode, opt-in). Only meaningful for source trees.
 DEEP_SRC="${SOURCE_ROOT:-/src}"
-if [ "$SOURCE_SCAN" = "true" ] && [ "${DEEP_LICENSE:-false}" = "true" ] && [ -d "$DEEP_SRC" ]; then
-    echo "[INFO] Running scancode deep license detection..."
+# BOMLENS_DEEP_LICENSE_RC: the caller already ran deep-license.sh in the
+# deep-license image and wrote ${OUT_PREFIX}_scancode.json, because this stage
+# runs on the deep-cve image (grype, no scancode); the value is its exit code,
+# recorded here as if it had run in this container.
+_dl_handed=""
+printf '%s' "${BOMLENS_DEEP_LICENSE_RC:-}" | grep -qE '^[0-9]{1,3}$' && _dl_handed=1
+if [ "$SOURCE_SCAN" = "true" ] && [ "${DEEP_LICENSE:-false}" = "true" ] && { [ -d "$DEEP_SRC" ] || [ -n "$_dl_handed" ]; }; then
     _dl_started="$(er_now)"
     _dl_rc=0
-    # This run's own output folder, when it sits inside the scanned tree (a
-    # CLI scan of the current folder), is not the project's source.
-    DEEP_LICENSE_EXCLUDE="${SRC_TREE_EXCLUDE:-} $OUT_PREFIX" \
-        bash "$LIBDIR/deep-license.sh" "$DEEP_SRC" "${OUT_PREFIX}_scancode.json" || _dl_rc=$?
+    if [ -n "$_dl_handed" ]; then
+        _dl_rc="$BOMLENS_DEEP_LICENSE_RC"
+        printf '%s' "${BOMLENS_DEEP_LICENSE_STARTED:-}" | grep -qE '^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$' \
+            && _dl_started="$BOMLENS_DEEP_LICENSE_STARTED"
+        echo "[INFO] scancode deep license detection ran before this stage, in the deep-license image (exit code $_dl_rc)."
+        case "$_dl_rc" in 0|6) [ -f "${OUT_PREFIX}_scancode.json" ] || _dl_rc=1 ;; esac
+    else
+        echo "[INFO] Running scancode deep license detection..."
+        # This run's own output folder, when it sits inside the scanned tree (a
+        # CLI scan of the current folder), is not the project's source.
+        DEEP_LICENSE_EXCLUDE="${SRC_TREE_EXCLUDE:-} $OUT_PREFIX" \
+            bash "$LIBDIR/deep-license.sh" "$DEEP_SRC" "${OUT_PREFIX}_scancode.json" || _dl_rc=$?
+    fi
     case "$_dl_rc" in
         0)
             ARTIFACTS+=("${OUT_PREFIX}_scancode.json")
@@ -1847,12 +1867,22 @@ if [ "$SOURCE_SCAN" = "true" ] && [ "${DEEP_LICENSE:-false}" = "true" ] && [ -d 
             ARTIFACTS+=("${OUT_PREFIX}_scancode.json")
             er_record deep-license degraded failed "scancode reported errors on some files" "$_dl_started" ;;
         3)
-            echo "[WARN] --deep-license requested but scancode not in image (use the bomlens-deep-license image, or rebuild with --build-arg SBOM_DEEP_LICENSE=true)."
-            # The CLI ran this step here because the scancode image could not
-            # be pulled; say so, rather than that this image lacks a tool.
+            # Say why scancode is missing: the CLI ran this step here because
+            # the scancode image could not be pulled, the image the caller
+            # handed the scan to had none, or this is the deep-cve image (grype,
+            # no scancode), which a caller that does not run the licence scan
+            # first leaves without it.
             if [ -n "${BOMLENS_DEEP_LICENSE_FALLBACK:-}" ]; then
+                echo "[WARN] --deep-license: the scancode image ${BOMLENS_DEEP_LICENSE_FALLBACK} was not available, so the licence scan did not run."
                 er_record deep-license skipped fallback "the scancode image was not available: ${BOMLENS_DEEP_LICENSE_FALLBACK}" "$_dl_started"
+            elif [ -n "$_dl_handed" ]; then
+                echo "[WARN] --deep-license: scancode was not in the image the licence scan ran on, so it did not run."
+                er_record deep-license skipped not_installed "scancode was not in the image the licence scan ran on" "$_dl_started"
+            elif command -v grype >/dev/null 2>&1; then
+                echo "[WARN] --deep-license: this stage runs on the deep-cve image, which has grype but not scancode, so the licence scan did not run. Run it in the bomlens-deep-license image before this stage and pass its exit code as BOMLENS_DEEP_LICENSE_RC (the CLI does this with --deep-cve)."
+                er_record deep-license skipped not_installed "scancode is not in this image: the deep-cve image has grype only" "$_dl_started"
             else
+                echo "[WARN] --deep-license requested but scancode not in image (use the bomlens-deep-license image, or rebuild with --build-arg SBOM_DEEP_LICENSE=true)."
                 er_record deep-license skipped not_installed "scancode is not in this image" "$_dl_started"
             fi ;;
         4)
@@ -2058,24 +2088,37 @@ fi
 # Deep CVE matching (--deep-cve): scan-security.sh runs grype's CPE matcher
 # when grype is in this image (the deep-cve image) and DEEP_CVE is not false.
 # Asked for with no grype here, it is skipped: fallback when the CLI ran this
-# step here because the deep-cve image could not be pulled.
-if [ "${GENERATE_SECURITY:-false}" = "true" ]; then
-    if [ "${DEEP_CVE:-}" = "false" ] || { [ "${DEEP_CVE:-}" != "true" ] && ! command -v grype >/dev/null 2>&1; }; then
-        er_record deep-cve disabled
-    elif ! command -v grype >/dev/null 2>&1; then
-        if [ -n "${BOMLENS_DEEP_CVE_FALLBACK:-}" ]; then
-            er_record deep-cve skipped fallback "the grype image was not available: ${BOMLENS_DEEP_CVE_FALLBACK}"
+# stage without the deep-cve image (see BOMLENS_DEEP_CVE_FALLBACK below).
+# A firmware or AI model scan has no package purls for grype to match: the
+# step is disabled there whatever was asked, as it is without --security.
+case "$SCAN_MODE" in
+    FIRMWARE|AIBOM|MODELFILE|DATASET|AIDECLARE)
+        if [ "${DEEP_CVE:-}" = "true" ]; then
+            er_record deep-cve disabled "" "grype CPE matching does not apply to a $SCAN_MODE scan"
         else
-            er_record deep-cve skipped not_installed "grype is not in this image"
-        fi
-    elif [ "$_trivy_db_ready" != true ]; then
-        er_record deep-cve skipped no_input "the security scan did not run"
-    elif [ -f "${OUT_PREFIX}_security_grype.json" ]; then
-        er_record deep-cve ok
-    else
-        er_record deep-cve failed failed "grype did not write its result"
-    fi
-fi
+            er_record deep-cve disabled
+        fi ;;
+    *) if [ "${GENERATE_SECURITY:-false}" != "true" ]; then
+           er_record deep-cve disabled
+       elif [ "${DEEP_CVE:-}" = "false" ] || { [ "${DEEP_CVE:-}" != "true" ] && ! command -v grype >/dev/null 2>&1; }; then
+           er_record deep-cve disabled
+       elif ! command -v grype >/dev/null 2>&1; then
+           # BOMLENS_DEEP_CVE_FALLBACK: why the CLI ran this stage without
+           # the deep-cve image (it could not be pulled, or no deep-cve image
+           # of the scanner image's own build is known).
+           if [ -n "${BOMLENS_DEEP_CVE_FALLBACK:-}" ]; then
+               er_record deep-cve skipped fallback "${BOMLENS_DEEP_CVE_FALLBACK}"
+           else
+               er_record deep-cve skipped not_installed "grype is not in this image"
+           fi
+       elif [ "$_trivy_db_ready" != true ]; then
+           er_record deep-cve skipped no_input "the security scan did not run"
+       elif [ -f "${OUT_PREFIX}_security_grype.json" ]; then
+           er_record deep-cve ok
+       else
+           er_record deep-cve failed failed "grype did not write its result"
+       fi ;;
+esac
 
 # A supplier's CycloneDX VEX (--vex): keep the statements that apply to this
 # SBOM in ${OUT_PREFIX}_vex_imported.json. The SBOM and the security report are
