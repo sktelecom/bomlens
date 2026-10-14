@@ -363,6 +363,41 @@ rc = server.run_sibling_scan(
 assert rc == 0, rc
 assert not any(x.startswith("SOURCE_ROOT_HOST=") for x in captured["args"]), captured["args"]
 
+# Deep license with deep CVE: the licence scan this server ran first is
+# handed to the deep-cve sibling as its exit code and start time, re-formatted;
+# a malformed value is not forwarded.
+captured.clear()
+rc = server.run_sibling_scan(
+    "ghcr.io/sktelecom/bomlens-deep-cve:1.5.0", "SOURCE", run_out,
+    lambda ln: None, source_root=src_root,
+    extra_env={"DEEP_CVE": "true", "DEEP_LICENSE": "true", "BOMLENS_DEEP_LICENSE_RC": "6",
+               "BOMLENS_DEEP_LICENSE_STARTED": "2026-01-02T03:04:05Z"},
+)
+assert rc == 0, rc
+assert "BOMLENS_DEEP_LICENSE_RC=6" in captured["args"], captured["args"]
+assert "BOMLENS_DEEP_LICENSE_STARTED=2026-01-02T03:04:05Z" in captured["args"], captured["args"]
+captured.clear()
+server.run_sibling_scan(
+    "ghcr.io/sktelecom/bomlens-deep-cve:1.5.0", "SOURCE", run_out,
+    lambda ln: None, source_root=src_root,
+    extra_env={"DEEP_CVE": "true", "BOMLENS_DEEP_LICENSE_RC": "0; rm -rf /",
+               "BOMLENS_DEEP_LICENSE_STARTED": "now"},
+)
+assert not any(x.startswith("BOMLENS_DEEP_LICENSE_") for x in captured["args"]), captured["args"]
+# run_deep_license_first runs deep-license.sh here (scancode stubbed) and
+# leaves the exit code and start time in env for the sibling.
+import tempfile as _tf, os as _os, re
+_dl_src = _tf.mkdtemp(); _dl_out = _tf.mkdtemp(); _dl_bin = _tf.mkdtemp()
+open(_os.path.join(_dl_src, "LICENSE"), "w").write("MIT License\n")
+_stub = _os.path.join(_dl_bin, "scancode")
+open(_stub, "w").write('#!/bin/bash\nout=""\nwhile [ $# -gt 0 ]; do case "$1" in --json-pp) out="$2"; shift 2 ;; *) shift ;; esac; done\necho \'{"files":[]}\' > "$out"\n')
+_os.chmod(_stub, 0o755)
+_dl_env = {"PATH": _os.environ.get("PATH", ""), "BOMLENS_SCANCODE": _stub}
+_dl_rc = server.run_deep_license_first(_dl_src, _dl_out, "My App", "1.0", _dl_env, lambda ln: None)
+assert _dl_rc == 0 and _dl_env["BOMLENS_DEEP_LICENSE_RC"] == "0", (_dl_rc, _dl_env)
+assert _os.path.isfile(_os.path.join(_dl_out, "My_App_1.0_scancode.json"))
+assert re.fullmatch(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z", _dl_env["BOMLENS_DEEP_LICENSE_STARTED"])
+
 # Vendored-OSS identification (SCANOSS) can ride the same SOURCE sibling: the
 # flag is forwarded verbatim, and a credential goes by NAME ONLY, never as its
 # value, mirroring API_KEY/HF_TOKEN.

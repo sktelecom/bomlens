@@ -173,7 +173,7 @@ jq -n \
             CYCLONEDX_SPEC_VERSION: $spec,
             UPLOAD_ENABLED: "false"
           },
-          env_passthrough: (["HOST_UID", "HOST_GID", "SRC_TREE_EXCLUDE"] + ($prep2 | split(" ") | map(select(. != "")))
+          env_passthrough: (["HOST_UID", "HOST_GID", "SRC_TREE_EXCLUDE", "NVD_API_KEY"] + ($prep2 | split(" ") | map(select(. != "")))
                             + ($netenv | split(" ") | map(select(. != "")))),
           env_from_stage1: {
             BOMLENS_STAGE1_EXIT: "the stage 1 exit code",

@@ -391,7 +391,7 @@ D="$(new_run dc-missing)"; PATH="$NOGRYPE_PATH" run_engine "$D" "$ROOT_DIR/docke
     && pass "asked for in an image without grype: skipped, not_installed, and the run is succeeded_degraded" \
     || fail "deep-cve is $(dc_step "$D"), run.status $(jq -r .run.status "$D/bomlens-result.json")"
 
-D="$(new_run dc-fallback)"; PATH="$NOGRYPE_PATH" run_engine "$D" "$ROOT_DIR/docker/lib" DEEP_CVE=true BOMLENS_DEEP_CVE_FALLBACK=ghcr.io/example/bomlens-deep-cve:latest
+D="$(new_run dc-fallback)"; PATH="$NOGRYPE_PATH" run_engine "$D" "$ROOT_DIR/docker/lib" DEEP_CVE=true BOMLENS_DEEP_CVE_FALLBACK="the grype image was not available: ghcr.io/example/bomlens-deep-cve:latest"
 [ "$(dc_step "$D") $(jq -r .run.status "$D/bomlens-result.json")" = "skipped fallback succeeded_degraded" ] \
     && pass "the CLI fell back from the deep-cve image: skipped, fallback, and the run is succeeded_degraded" \
     || fail "deep-cve is $(dc_step "$D"), run.status $(jq -r .run.status "$D/bomlens-result.json")"
@@ -402,6 +402,60 @@ D="$(new_run dc-ok)"; PATH="$WORK/grype-bin:$PATH" run_engine "$D" "$ROOT_DIR/do
 
 D="$(new_run dc-failed)"; PATH="$WORK/grype-bin:$PATH" run_engine "$D" "$ROOT_DIR/docker/lib" DEEP_CVE=true GRYPE_STUB_RC=1
 [ "$(dc_step "$D")" = "failed failed" ] && pass "grype failed: failed" || fail "deep-cve is $(dc_step "$D")"
+
+D="$(new_run dc-false)"; PATH="$WORK/grype-bin:$PATH" run_engine "$D" "$ROOT_DIR/docker/lib" DEEP_CVE=false
+{ [ "$(dc_step "$D")" = "disabled null" ] && [ ! -f "$D/demo_1.0_security_grype.json" ]; } \
+    && pass "DEEP_CVE=false in an image with grype: disabled, and grype does not run" || fail "deep-cve is $(dc_step "$D")"
+
+D="$(new_run dc-nosec)"; PATH="$WORK/grype-bin:$PATH" run_engine "$D" "$ROOT_DIR/docker/lib" DEEP_CVE=true GENERATE_SECURITY=false
+[ "$(dc_step "$D")" = "disabled null" ] && pass "without --security the step is disabled, as scan-security is" || fail "deep-cve is $(dc_step "$D")"
+
+D="$(new_run dc-reason)"; PATH="$NOGRYPE_PATH" run_engine "$D" "$ROOT_DIR/docker/lib" DEEP_CVE=true \
+    BOMLENS_DEEP_CVE_FALLBACK="SBOM_SCANNER_IMAGE (bomlens:dev) is a local build and SBOM_DEEP_CVE_IMAGE is not set, so no deep-cve image of the same build was used"
+[ "$(jq -r '[.steps[] | select(.id=="deep-cve")][0] | "\(.status) \(.reason) \(.detail)"' "$D/bomlens-result.json")" \
+    = "skipped fallback SBOM_SCANNER_IMAGE (bomlens:dev) is a local build and SBOM_DEEP_CVE_IMAGE is not set, so no deep-cve image of the same build was used" ] \
+    && pass "the CLI's reason for staying off the deep-cve image is the step's detail" \
+    || fail "deep-cve is $(jq -c '[.steps[] | select(.id=="deep-cve")][0]' "$D/bomlens-result.json")"
+
+# A firmware scan: the firmware image's own pipeline, stubbed here, with
+# DEEP_CVE=true as an older CLI passed it. The step is disabled and the run
+# is not degraded by it.
+FWLIB="$WORK/lib-fw"; rm -rf "$FWLIB"; cp -R "$ROOT_DIR/docker/lib" "$FWLIB"
+printf '#!/bin/bash\ncp "%s" "$2"\n' "$FIX/good-cyclonedx.json" > "$FWLIB/scan-firmware.sh"
+printf 'FW\n' > "$WORK/fw.bin"
+D="$(new_run dc-firmware empty)"; PATH="$WORK/grype-bin:$PATH" run_engine "$D" "$FWLIB" MODE=FIRMWARE TARGET_FILE="$WORK/fw.bin" DEEP_CVE=true
+[ "$(jq -r '[.steps[] | select(.id=="deep-cve")][0] | "\(.status) \(.detail)"' "$D/bomlens-result.json" 2>/dev/null)" = "disabled grype CPE matching does not apply to a FIRMWARE scan" ] \
+    && pass "a firmware scan handed DEEP_CVE=true records deep-cve as disabled" \
+    || fail "firmware deep-cve is $(jq -c '[.steps[] | select(.id=="deep-cve")][0]' "$D/bomlens-result.json" 2>&1)" "$(tail -3 "$D.log")"
+
+echo "== deep-license run before stage 2 (BOMLENS_DEEP_LICENSE_RC) =="
+# The CLI runs deep-license.sh in the deep-license image, then stage 2 on the
+# deep-cve image: stage 2 keeps the file (also through the stale-artifact
+# sweep) and records the step from the exit code.
+D="$(new_run dl-handed)"; echo '{"files":[{"path":"LICENSE","type":"file"}]}' > "$D/demo_1.0_scancode.json"
+PATH="$WORK/grype-bin:$PATH" run_engine "$D" "$ROOT_DIR/docker/lib" SOURCE_ROOT="$SRCT" DEEP_CVE=true DEEP_LICENSE=true \
+    BOMLENS_SCANCODE=/nonexistent/scancode BOMLENS_DEEP_LICENSE_RC=0 BOMLENS_DEEP_LICENSE_STARTED=2026-01-02T03:04:05Z
+{ [ "$(dl_step "$D")" = "ok null" ] && [ "$(dc_step "$D")" = "ok null" ] && [ -f "$D/demo_1.0_scancode.json" ] \
+    && [ "$(jq -r '[.steps[] | select(.id=="deep-license")][0].started_at' "$D/bomlens-result.json")" = 2026-01-02T03:04:05Z ] \
+    && jq -e '[.outputs[]? | select(.role=="license-scan.scancode")] | length == 1' "$D/bomlens-result.json" >/dev/null \
+    && [ "$(jq -r .run.status "$D/bomlens-result.json")" = succeeded ]; } \
+    && pass "a handed-on licence scan: deep-license and deep-cve both ok, _scancode.json kept and listed, the run succeeded" \
+    || fail "handed deep-license: $(dl_step "$D") / $(dc_step "$D"), $(jq -r .run.status "$D/bomlens-result.json")" "$(jq -c '[.outputs[]?.role]' "$D/bomlens-result.json")"
+D="$(new_run dl-handed-none)"
+PATH="$WORK/grype-bin:$PATH" run_engine "$D" "$ROOT_DIR/docker/lib" SOURCE_ROOT="$SRCT" DEEP_CVE=true DEEP_LICENSE=true BOMLENS_DEEP_LICENSE_RC=0
+[ "$(dl_step "$D")" = "failed failed" ] && pass "exit code 0 handed on with no _scancode.json: failed" || fail "deep-license is $(dl_step "$D")"
+D="$(new_run dl-handed-3)"
+PATH="$WORK/grype-bin:$PATH" run_engine "$D" "$ROOT_DIR/docker/lib" SOURCE_ROOT="$SRCT" DEEP_CVE=true DEEP_LICENSE=true BOMLENS_DEEP_LICENSE_RC=3
+{ [ "$(dl_step "$D")" = "skipped not_installed" ] && grep -qF "scancode was not in the image the licence scan ran on" "$D.log"; } \
+    && pass "exit code 3 handed on: not_installed, said of the image the licence scan ran on" || fail "deep-license is $(dl_step "$D")"
+# Stage 2 on the deep-cve image with no licence scan handed on: the message
+# and the manifest name the deep-cve image, not a missing deep-license image.
+D="$(new_run dl-on-dc)"
+PATH="$WORK/grype-bin:$PATH" run_engine "$D" "$ROOT_DIR/docker/lib" SOURCE_ROOT="$SRCT" DEEP_CVE=true DEEP_LICENSE=true BOMLENS_SCANCODE=/nonexistent/scancode
+{ [ "$(dl_step "$D")" = "skipped not_installed" ] && grep -qF "runs on the deep-cve image, which has grype but not scancode" "$D.log" \
+    && jq -e '[.steps[] | select(.id=="deep-license")][0].detail | test("deep-cve image")' "$D/bomlens-result.json" >/dev/null; } \
+    && pass "deep-license asked for on the deep-cve image says so" \
+    || fail "deep-license on the deep-cve image: $(jq -c '[.steps[] | select(.id=="deep-license")][0]' "$D/bomlens-result.json")" "$(grep -F 'deep-license' "$D.log" | head -2)"
 
 echo "== license-registry: fill, replace, confirm, no answer, lookup failed (fixtures, no network) =="
 LRF="$WORK/lr-fixtures"

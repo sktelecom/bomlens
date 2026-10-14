@@ -3549,6 +3549,40 @@ def _path_under(path, base):
     return rp == rb or rp.startswith(rb + os.sep)
 
 
+def run_deep_license_first(source_root, out_dir, project, version, env, on_log, cancel=None):
+    """Run deep-license.sh (scancode) in THIS container before a sibling that
+    has no scancode (the deep-cve image) post-processes the same source tree.
+    Writes <prefix>_scancode.json into out_dir and sets BOMLENS_DEEP_LICENSE_RC
+    and BOMLENS_DEEP_LICENSE_STARTED in env, which run_sibling_scan forwards so
+    the sibling's entrypoint.sh records the step from them."""
+    prefix = "%s_%s" % (safe_name(project), safe_name(version))
+    out = os.path.join(out_dir, prefix + "_scancode.json")
+    try:
+        os.remove(out)
+    except OSError:
+        pass
+    run_env = dict(env)
+    run_env["DEEP_LICENSE_EXCLUDE"] = ("%s %s" % (env.get("SRC_TREE_EXCLUDE", ""), prefix)).strip()
+    started = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    on_log("[INFO] --deep-license with --deep-cve: running the licence scan here, then post-processing in the deep-cve image.")
+    rc = 1
+    try:
+        proc = subprocess.Popen(["bash", os.path.join(LIB_DIR, "deep-license.sh"), source_root, out],
+                                env=run_env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                                text=True, bufsize=1)
+        for raw in proc.stdout:
+            on_log(raw.rstrip("\n"))
+            if cancel and cancel():
+                proc.terminate()
+                break
+        rc = proc.wait()
+    except OSError as exc:
+        on_log("[WARN] the licence scan could not be started: %s" % exc)
+    env["BOMLENS_DEEP_LICENSE_RC"] = str(rc if 0 <= rc <= 255 else 1)
+    env["BOMLENS_DEEP_LICENSE_STARTED"] = started
+    return rc
+
+
 def run_sibling_scan(image, mode, out_dir, on_log, *, upload_file=None, model_id=None,
                      source_root=None, target_image=None, target_dir=None,
                      extra_env=None, on_progress=None, on_deepcve_progress=None,
@@ -3756,6 +3790,16 @@ def run_sibling_scan(image, mode, out_dir, on_log, *, upload_file=None, model_id
     for _k in ("DEEP_LICENSE_MAX_FILES", "DEEP_LICENSE_TIMEOUT", "BOMLENS_DEEP_LICENSE_ALL"):
         if env.get(_k):
             args += ["-e", _k]
+    # The licence scan this server ran first (run_deep_license_first): its
+    # exit code and start time, re-formatted so only digits and the timestamp
+    # shape reach the argv.
+    _dlrc = re.fullmatch(r"[0-9]{1,3}", env.get("BOMLENS_DEEP_LICENSE_RC", ""))
+    if mode == "SOURCE" and _dlrc:
+        args += ["-e", "BOMLENS_DEEP_LICENSE_RC=%d" % int(_dlrc.group(0))]
+        _dls = re.fullmatch(r"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z",
+                            env.get("BOMLENS_DEEP_LICENSE_STARTED", ""))
+        if _dls:
+            args += ["-e", "BOMLENS_DEEP_LICENSE_STARTED=%s" % _dls.group(0)]
     # Where the cdxgen images come from (a registry mirror) and the network
     # settings: proxy, Trivy's database, EPSS/KEV endpoints. By name, when set.
     for _k in ("CDXGEN_IMAGE_PREFIX", "CDXGEN_TAG", "CDXGEN_ALLINONE", "BOMLENS_OS_LICENSES",
@@ -6686,6 +6730,14 @@ class Handler(BaseHTTPRequestHandler):
                 # Credential-shaped text is masked before it reaches the browser
                 # (and so the copy-log button); digests and checksums are kept.
                 sse("log", json.dumps(_mask_credentials(ln) if isinstance(ln, str) else ln))
+            if (sibling is not None and env.get("MODE") == "SOURCE" and sibling.get("source_root")
+                    and env.get("DEEP_LICENSE") == "true" and deep_license_capable()):
+                # Deep license with deep CVE on a source tree: the sibling runs
+                # on the deep-cve image, which has grype but not scancode, so
+                # the licence scan runs here first (this image has scancode)
+                # and the sibling records it from the exit code, as the CLI does.
+                run_deep_license_first(sibling["source_root"], run_out, project, version,
+                                       env, note_log, cancel=lambda: disconnected[0])
             if sibling is not None:
                 # Firmware / AI on the permissive-only base image: run the
                 # dedicated image as a sibling container (host socket). It does

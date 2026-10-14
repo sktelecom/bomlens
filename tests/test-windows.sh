@@ -75,12 +75,16 @@ case "${1:-}" in
     # DOCKER_STUB_MISSING_IMAGE names one image that is neither present nor
     # pullable (not published, an offline host).
     [ -n "${DOCKER_STUB_MISSING_IMAGE:-}" ] && [ "${2:-}" = "$DOCKER_STUB_MISSING_IMAGE" ] && exit 1
+    echo "${2:-}: Pull complete"
     exit 0 ;;
   version|stop|rm) exit 0 ;;
   image)
-    if [ -n "${DOCKER_STUB_MISSING_IMAGE:-}" ]; then
-      for a in "$@"; do [ "$a" = "$DOCKER_STUB_MISSING_IMAGE" ] && exit 1; done
-    fi
+    # DOCKER_STUB_ABSENT_IMAGE names one image that is not present but can be
+    # pulled (a first use).
+    for a in "$@"; do
+      [ -n "${DOCKER_STUB_MISSING_IMAGE:-}" ] && [ "$a" = "$DOCKER_STUB_MISSING_IMAGE" ] && exit 1
+      [ -n "${DOCKER_STUB_ABSENT_IMAGE:-}" ] && [ "$a" = "$DOCKER_STUB_ABSENT_IMAGE" ] && exit 1
+    done
     # `docker image inspect -f '{{index .Config.Labels "com.sktelecom.sbom.engine-contract"}}'`:
     # the stub models an image as new as this CLI. DOCKER_STUB_OLD_IMAGE=1
     # models one from before the engine contract (no label).
@@ -1109,7 +1113,7 @@ section "Opt-in images follow SBOM_SCANNER_IMAGE"
 # Each run sets the opt-in variables empty (the same as unset to scan-sbom.sh),
 # so a runner's own SBOM_*_IMAGE does not change what is checked.
 optin_scan() {
-  SBOM_FIRMWARE_IMAGE="${OPT_FW:-}" SBOM_AIBOM_IMAGE="" SBOM_DEEP_CVE_IMAGE="" \
+  SBOM_FIRMWARE_IMAGE="${OPT_FW:-}" SBOM_AIBOM_IMAGE="" SBOM_DEEP_CVE_IMAGE="${OPT_DC:-}" \
     SBOM_DEEP_LICENSE_IMAGE="${OPT_DL:-}" SBOM_SCANNER_IMAGE="$1" scan_in "${@:2}"
 }
 d="$(new_proj optin_dl)"; printf '{"name":"x","version":"1.0.0"}\n' > "$d/package.json"
@@ -1166,20 +1170,75 @@ NVD_API_KEY=k optin_scan "" "$d" --project SC --version 1 --target . --generate-
 DOCKER_STUB_MISSING_IMAGE=ghcr.io/sktelecom/bomlens-deep-cve:latest SBOM_PULL=never \
   optin_scan "" "$d" --project SC --version 1 --target . --generate-only --deep-cve
 { [ "$RC" = 0 ] && pp_line | grep -qE ' ghcr.io/sktelecom/bomlens:latest$' \
-    && pp_line | grep -qF 'BOMLENS_DEEP_CVE_FALLBACK=ghcr.io/sktelecom/bomlens-deep-cve:latest ' \
-    && in_out "the grype image ghcr.io/sktelecom/bomlens-deep-cve:latest is not available"; } \
+    && pp_line | grep -qF 'BOMLENS_DEEP_CVE_FALLBACK=the grype image was not available: ghcr.io/sktelecom/bomlens-deep-cve:latest ' \
+    && in_out "the grype image ghcr.io/sktelecom/bomlens-deep-cve:latest is not available" && ! in_log "docker pull"; } \
   && pass "with the deep-cve image unavailable, a source scan goes on with the base image and says so" \
   || { fail "source scan --deep-cve fallback" "rc=$RC $(pp_line)"; show; }
+# Both options: the licence scan runs first, alone, in the deep-license image,
+# and the post-processing stage on the deep-cve image takes its exit code.
+dl_line() { grep -F -- "--entrypoint bash" "$LOG" | grep -F -- "deep-license.sh"; }
 optin_scan "" "$d" --project SC --version 1 --target . --generate-only --deep-cve --deep-license
-{ pp_line | grep -qE ' ghcr.io/sktelecom/bomlens-deep-cve:latest$' && in_out "no image has both scancode and grype"; } \
-  && pass "--deep-cve with --deep-license runs on the deep-cve image and says the licence scan does not run" \
-  || { fail "source scan --deep-cve --deep-license image" "rc=$RC $(pp_line)"; show; }
+{ pp_line | grep -qE ' ghcr.io/sktelecom/bomlens-deep-cve:latest$' && pp_line | grep -qF -- '-e BOMLENS_DEEP_LICENSE_RC=0 ' \
+    && pp_line | grep -qF -- '-e DEEP_LICENSE=true' \
+    && dl_line | grep -qF -- 'ghcr.io/sktelecom/bomlens-deep-license:latest /usr/local/lib/sbom/deep-license.sh /src /host-output/SC_1_scancode.json' \
+    && dl_line | grep -qF -- ':/src:ro' \
+    && [ "$(grep -n -F -- 'deep-license.sh' "$LOG" | head -1 | cut -d: -f1)" -lt "$(grep -n -F -- 'MODE=POSTPROCESS' "$LOG" | head -1 | cut -d: -f1)" ]; } \
+  && pass "--deep-cve with --deep-license runs the licence scan in the deep-license image first, then post-processes on the deep-cve image" \
+  || { fail "source scan --deep-cve --deep-license" "rc=$RC $(dl_line) / $(pp_line)"; show; }
 DOCKER_STUB_MISSING_IMAGE=ghcr.io/sktelecom/bomlens-deep-cve:latest SBOM_PULL=never \
   optin_scan "" "$d" --project SC --version 1 --target . --generate-only --deep-cve --deep-license
-{ pp_line | grep -qE ' ghcr.io/sktelecom/bomlens-deep-license:latest$' \
-    && pp_line | grep -qF 'BOMLENS_DEEP_CVE_FALLBACK=ghcr.io/sktelecom/bomlens-deep-cve:latest '; } \
-  && pass "with the deep-cve image unavailable, --deep-license still gets the deep-license image" \
+{ pp_line | grep -qE ' ghcr.io/sktelecom/bomlens-deep-license:latest$' && [ -z "$(dl_line)" ] \
+    && pp_line | grep -qF 'BOMLENS_DEEP_CVE_FALLBACK=the grype image was not available: ghcr.io/sktelecom/bomlens-deep-cve:latest '; } \
+  && pass "with the deep-cve image unavailable, --deep-license still gets the deep-license image, in one container" \
   || { fail "source scan --deep-cve fallback with --deep-license" "rc=$RC $(pp_line)"; show; }
+DOCKER_STUB_MISSING_IMAGE=ghcr.io/sktelecom/bomlens-deep-license:latest SBOM_PULL=never \
+  optin_scan "" "$d" --project SC --version 1 --target . --generate-only --deep-cve --deep-license
+{ pp_line | grep -qE ' ghcr.io/sktelecom/bomlens-deep-cve:latest$' && [ -z "$(dl_line)" ] \
+    && pp_line | grep -qF 'BOMLENS_DEEP_LICENSE_FALLBACK=ghcr.io/sktelecom/bomlens-deep-license:latest '; } \
+  && pass "with the deep-license image unavailable, the deep-cve stage runs and records the licence scan as fallback" \
+  || { fail "source scan --deep-license fallback with --deep-cve" "rc=$RC $(pp_line)"; show; }
+# The scanner image is the deep-cve image itself: no swap, NVD_API_KEY still
+# passed, and --deep-license must not move the stage off grype.
+NVD_API_KEY=k optin_scan ghcr.io/sktelecom/bomlens-deep-cve:1.13.3 "$d" --project SC --version 1 --target . --generate-only --deep-cve --deep-license
+{ pp_line | grep -qE ' ghcr.io/sktelecom/bomlens-deep-cve:1.13.3$' && pp_line | grep -qF -- '-e NVD_API_KEY ' \
+    && dl_line | grep -qF -- 'ghcr.io/sktelecom/bomlens-deep-license:1.13.3 '; } \
+  && pass "a scanner image that is the deep-cve image keeps grype with --deep-license, and gets NVD_API_KEY" \
+  || { fail "SBOM_SCANNER_IMAGE = deep-cve image" "rc=$RC $(dl_line) / $(pp_line)"; show; }
+# A local build or a version before 1.13.2: no deep-cve image of that build is
+# known, so the stage stays on it and the step is recorded as fallback.
+optin_scan bomlens:dev "$d" --project SC --version 1 --target . --generate-only --deep-cve
+{ [ "$RC" = 0 ] && pp_line | grep -qE ' bomlens:dev$' && ! in_log "bomlens-deep-cve" \
+    && pp_line | grep -qF 'BOMLENS_DEEP_CVE_FALLBACK=SBOM_SCANNER_IMAGE (bomlens:dev) is a local build' \
+    && [ "$(grep -c -- '--deep-cve' "$OUT")" = 1 ] && in_out "Set SBOM_DEEP_CVE_IMAGE"; } \
+  && pass "a short local scanner name keeps post-processing on it, says so in one line, and hands the reason on" \
+  || { fail "local SBOM_SCANNER_IMAGE with --deep-cve" "rc=$RC $(pp_line)"; show; }
+optin_scan ghcr.io/sktelecom/bomlens:1.13.1 "$d" --project SC --version 1 --target . --generate-only --deep-cve
+{ pp_line | grep -qE ' ghcr.io/sktelecom/bomlens:1.13.1$' && ! in_log "bomlens-deep-cve" \
+    && pp_line | grep -qF 'is a version before 1.13.2 and SBOM_DEEP_CVE_IMAGE is not set'; } \
+  && pass "a scanner image before 1.13.2 keeps post-processing on it with the reason handed on" \
+  || { fail "pinned old SBOM_SCANNER_IMAGE with --deep-cve" "rc=$RC $(pp_line)"; show; }
+OPT_DC=registry.example/team/dc:7 optin_scan bomlens:dev "$d" --project SC --version 1 --target . --generate-only --deep-cve
+{ pp_line | grep -qE ' registry.example/team/dc:7$' && pp_line | grep -qF 'BOMLENS_DEEP_CVE_FALLBACK= '; } \
+  && pass "SBOM_DEEP_CVE_IMAGE set with a local scanner image is used as it is" \
+  || { fail "SBOM_DEEP_CVE_IMAGE with a local scanner image" "rc=$RC $(pp_line)"; show; }
+# A first pull shows docker's lines; SBOM_PULL=always pulls the image once.
+DOCKER_STUB_ABSENT_IMAGE=ghcr.io/sktelecom/bomlens-deep-cve:latest \
+  optin_scan "" "$d" --project SC --version 1 --target . --generate-only --deep-cve
+{ pp_line | grep -qE ' ghcr.io/sktelecom/bomlens-deep-cve:latest$' && in_out "[INFO] Pulling ghcr.io/sktelecom/bomlens-deep-cve:latest" \
+    && in_out "ghcr.io/sktelecom/bomlens-deep-cve:latest: Pull complete"; } \
+  && pass "a first pull of the deep-cve image shows docker's progress" \
+  || { fail "deep-cve first pull progress" "rc=$RC"; show; }
+SBOM_PULL=always optin_scan "" "$d" --project SC --version 1 --target . --generate-only --deep-cve
+[ "$(grep -c -F -- 'docker pull ghcr.io/sktelecom/bomlens-deep-cve:latest' "$LOG")" = 1 ] \
+  && pass "SBOM_PULL=always pulls the deep-cve image once" \
+  || { fail "SBOM_PULL=always and the deep-cve image" "$(grep -F 'docker pull' "$LOG" | tr '\n' ' ')"; show; }
+# A firmware scan has no use for grype: no swap and DEEP_CVE=false.
+d="$(new_proj optin_fw_cve)"; printf 'FW\n' > "$d/router.bin"
+optin_scan "" "$d" --project FC --version 1 --target router.bin --generate-only --deep-cve
+{ in_out "Mode: FIRMWARE" && in_log "-e DEEP_CVE=false" && ! in_log "-e DEEP_CVE=true" && ! in_log "bomlens-deep-cve" \
+    && in_out "does not apply to a FIRMWARE scan"; } \
+  && pass "a firmware scan with --deep-cve stays on the firmware image and is handed DEEP_CVE=false" \
+  || { fail "firmware scan with --deep-cve" "rc=$RC"; show; }
 
 d="$(new_proj optin_ui)"
 optin_scan ghcr.io/sktelecom/bomlens:1.13.2 "$d" --ui --output-dir "$d"
