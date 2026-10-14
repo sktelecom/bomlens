@@ -335,7 +335,11 @@ jobs:
       # this checkout's docker/lib, with Trivy stubbed (success, injected
       # failure, early exit), validated against schemas/engine-result-1.json;
       # the execution plan (MODE=PLAN) and the stage 2 fallback.
+      # BOMLENS_CDX_SCHEMA=1 runs the CycloneDX 1.6 and 1.7 schema check of the
+      # --spec-version SBOMs here, with the same pinned CLI as the AI SBOM tests.
       - name: Engine contract tests
+        env:
+          BOMLENS_CDX_SCHEMA: "1"
         run: bash tests/test-engine-contract.sh
 
       # No Docker: checks that an archive is routed by what it holds, not by its
