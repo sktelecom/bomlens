@@ -177,6 +177,12 @@ case "${1:-}" in
 esac
 STUB
 chmod +x "$BIN/docker"
+# --ui opens the UI in a browser after a short delay; stub the openers so a
+# test run never opens a real browser tab on a page no server is behind.
+for opener in open xdg-open; do
+  printf '#!/bin/sh\nexit 0\n' > "$BIN/$opener"
+  chmod +x "$BIN/$opener"
+done
 export PATH="$BIN:$PATH"
 
 # Run scan-sbom.sh in $dir with a fresh docker log. Sets globals OUT, LOG, RC.
