@@ -56,7 +56,7 @@ BomLens 이미지를 스캔 엔진으로 쓰는 프로그램은 모든 스캔이
 | `timeout` | 시간 제한을 넘김 |
 | `not_installed` | 필요한 도구가 이 이미지에 없음 |
 | `too_large` | 입력이 단계의 크기 제한을 넘음 |
-| `fallback` | 더 단순한 방법으로 대신함(매니페스트만 읽는 대체 경로로 SBOM을 만들어 직접 의존성만 있음, 또는 `poetry.lock`이 없는 Poetry 프로젝트를 일부만 풀었음: 범위·테이블 의존성이 빠졌거나 고정 버전의 하위 의존성을 풀지 못함), 또는 필요한 이미지 없이 진행함(scancode 이미지를 내려받지 못한 `--deep-license`) |
+| `fallback` | 더 단순한 방법으로 대신함(매니페스트만 읽는 대체 경로로 SBOM을 만들어 직접 의존성만 있음, 또는 `poetry.lock`이 없는 Poetry 프로젝트를 일부만 풀었음: 범위·테이블 의존성이 빠졌거나 고정 버전의 하위 의존성을 풀지 못함), 또는 필요한 이미지 없이 진행함(scancode 이미지를 내려받지 못한 `--deep-license`, grype 이미지를 내려받지 못한 `--deep-cve`) |
 | `unavailable` | 단계가 읽는 데이터를 쓸 수 없었음 |
 | `budget_exhausted` | 작업량 제한에서 멈춤 |
 | `no_input` | 단계가 읽을 것이 없었음(소스 트리 없음, 서명 키 없음) |
@@ -103,6 +103,7 @@ BomLens 이미지를 스캔 엔진으로 쓰는 프로그램은 모든 스캔이
 | `generate-notice` | 오픈소스 고지문 작성 |
 | `match-cpe` | `--security`를 켠 펌웨어, 루트 파일 시스템, 바이너리 스캔에서 패키지 PURL이 없는 컴포넌트의 CPE를 이미지에 들어 있는 NVD CPE 인덱스와 대조. `counts`에 `offered`, `components`, `cves`를 담고, 인덱스가 없는 이미지에서는 `skipped`(`not_installed`), `--security`가 꺼져 있거나 `CVE_BIN_TOOL_MODE=components-only`이면 `disabled` |
 | `scan-security` | Trivy로 취약점 매칭 |
+| `deep-cve` | `--security`를 켰을 때 grype로 Maven 컴포넌트를 CPE 기준으로 NVD와 대조(`--deep-cve`, deep-cve 이미지). grype가 없는 이미지에서 요청하면 `skipped`(`not_installed`), deep-cve 이미지를 내려받지 못해 CLI가 그 이미지 없이 실행했으면 `skipped`(`fallback`), 요청하지 않았으면 `disabled` |
 | `generate-risk-report` | 위험 보고서 작성 |
 | `model-security` | AI 모델 파일의 위험한 내용 검사 |
 | `verify-weights` | 공개된 모델 가중치가 해시와 맞는지 확인 |
@@ -180,6 +181,8 @@ docker run --rm -v "$PWD/src:/src:ro" -v "$PWD/out:/host-output" \
 | `stages[]` | 순서대로 `generate`(1단계)와 `postprocess`(2단계) |
 
 각 단계에는 `image`와 `image_digest`(1단계는 항상 다이제스트로 고정, 2단계는 `BOMLENS_IMAGE_REF`와 `BOMLENS_IMAGE_DIGEST`를 그대로 적음), `user`, `entrypoint`, `args`, `workdir`, `env`(설정할 이름과 값), `env_passthrough`(값이 있으면 호출자의 환경에서 그대로 넘길 이름), `network`(패키지 레지스트리 접속이 필요한지), `mounts`가 있습니다. 마운트에는 `role`(`source`, `output`, 출력 폴더 안 경로를 `source`로 가진 `plan-file`, 선택 항목인 `guard-state`와 캐시, 선택 항목인 `trivy-db`), `target`, `mode`가 있습니다. 데이터베이스(`db/trivy.db`)가 든 Trivy 캐시 폴더를 `trivy-db`로 읽기 전용 마운트하고 `GENERATE_SECURITY=true`를 주면(2단계 보고서 옵션은 이미지 참조 문서대로 호출자가 정함), 2단계는 그 데이터베이스를 내려받거나 갱신하거나 쓰지 않고 그대로 읽습니다. 그래서 네트워크 없이, 읽기 전용 루트로 실행됩니다. `trivy-db` 마운트에 데이터베이스가 없으면 `scan-security`가 그 사유로 실패하고, 데이터베이스가 `BOMLENS_TRIVY_DB_MAX_AGE_DAYS`일(7일)보다 오래됐으면 `degraded`(`unavailable`)로 기록합니다. 나이는 `db/metadata.json`의 `UpdatedAt`(데이터베이스를 만든 시각)부터 셉니다. 데이터베이스를 갱신하는 주기에 맞는 값을 넘기세요. 소스는 1단계에서만 쓰기 가능합니다. 해석기가 그 안에 lock 파일을 쓰고, 1단계가 끝날 때 트리를 원래대로 되돌립니다. 1단계가 강제 종료되면(메모리 부족, 시간 초과) 되돌리지 못합니다. 호출자의 폴더 하나를 `guard-state`로 마운트하고 스캔마다 고유한 `BOMLENS_GUARD_ID`를 넘겨 두면, 강제 종료 뒤 같은 1단계를 `BOMLENS_GUARD_RESTORE_ONLY=1`로 다시 실행해 소스를 되돌릴 수 있습니다. 두 단계 모두에 `HOST_UID`와 `HOST_GID`를 넘기면 단계가 쓴 파일이 root가 아니라 호출자 사용자 소유가 됩니다. 2단계는 임의 사용자(`user`가 `null`이므로 호출자가 정함)와 읽기 전용 루트 파일시스템으로도 실행됩니다. 이때 쓰기 가능한 `$TMPDIR`(기본 `/tmp`, tmpfs)와 그 사용자가 쓸 수 있는 출력 폴더가 필요하며, 쓸 수 없는 홈 폴더는 그 아래에 마운트된 것이 없으면 `$TMPDIR` 안의 폴더로 바꿔 씁니다. `trivy-db` 마운트가 없으면 Trivy가 그곳에 수백 MB의 데이터베이스를 내려받는데, 메모리 기반 tmpfs에서는 이것이 메모리로 잡히므로 `trivy-db`를 마운트하세요. 1단계는 root로 실행합니다. 해석기가 패키지를 설치하고 소스에 파일을 쓰기 때문입니다. 쓰기 가능한 `/tmp`(`HOME`이 가리키는 곳)가 있으면 읽기 전용 루트 파일시스템으로도 실행됩니다(계정의 `~/.gradle`에 쓸 수 없으면 Gradle 파일은 그곳에 둡니다).
+
+2단계 이미지는 2단계에 어떤 옵션을 주든 `BOMLENS_IMAGE_REF`에 적은 이미지입니다. `DEEP_CVE=true`에는 grype가, `DEEP_LICENSE=true`에는 scancode가 필요하고 각각 `bomlens-deep-cve`와 `bomlens-deep-license` 이미지에만 들어 있으므로, 2단계를 그 이미지로 실행하고 `BOMLENS_IMAGE_REF`에도 그 이미지를 적습니다. 두 도구를 모두 가진 이미지는 없습니다. 도구가 없는 이미지로 실행하면 결과 매니페스트가 그 단계(`deep-cve` 또는 `deep-license`)를 `skipped`(`not_installed`)로, 실행을 `succeeded_degraded`로 기록합니다.
 
 `MODE=PLAN`에 `CDXGEN_IMAGE_PREFIX`를 주면 1단계 이미지 이름을 레지스트리 미러 경로로 씁니다(예: `ghcr.io/cdxgen/` 대신 `registry.example/mirror/cdxgen/`). 다이제스트는 공개 이미지의 것을 그대로 쓰므로, 미러에는 다이제스트까지 같은 이미지가 있어야 합니다. pull-through 캐시이거나 모든 플랫폼을 복사한 미러(`skopeo copy --all`, `crane copy`)여야 합니다. `docker pull`, `docker tag`, `docker push`로 채운 미러는 한 플랫폼만 다른 다이제스트로 담으므로, 계획의 `image@image_digest`를 받으려 하면 "manifest unknown"으로 실패합니다.
 

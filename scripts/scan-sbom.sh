@@ -2606,17 +2606,40 @@ if [ "$MODE" = "SOURCE" ]; then
     # word splitting SC2046 flags here is required, not a bug.
     # --deep-license: the post-process step runs scancode over /src, and scancode
     # is only in the deep-license image (the base image stays small).
-    # When that image is not here and cannot be pulled (not published yet, an
-    # offline host, SBOM_PULL=never), the scan still runs on the base image and
-    # records the licence step as not installed, as it did before this image.
+    # --deep-cve: the security step runs grype, which is only in the deep-cve
+    # image. Neither image has the other's tool, so with both options the
+    # deep-cve image is used and the licence scan is reported as not run, as
+    # the web UI does.
+    # When the image is not here and cannot be pulled (not published yet, an
+    # offline host, SBOM_PULL=never), the scan still runs on the base image (or
+    # the deep-license image, with both options) and records the step as
+    # skipped (fallback).
     PP_IMAGE="$POSTPROCESS_IMAGE"
+    PP_ENV=""
+    _optin_image_ready() {
+        docker image inspect "$1" >/dev/null 2>&1 \
+            || { [ "$SBOM_PULL" != "never" ] && docker pull "$1" >/dev/null 2>&1; }
+    }
+    if [ "$DEEP_CVE" = "true" ]; then
+        optin_image_note deep-cve
+        if [ "$DEEP_CVE_IMAGE" != "$POSTPROCESS_IMAGE" ]; then
+            if _optin_image_ready "$DEEP_CVE_IMAGE"; then
+                PP_IMAGE="$DEEP_CVE_IMAGE"
+                [ -n "$NVD_API_KEY" ] && PP_ENV=" -e NVD_API_KEY"
+                [ "$DEEP_LICENSE" = "true" ] \
+                    && echo "[WARN] --deep-license and --deep-cve: no image has both scancode and grype; running on $DEEP_CVE_IMAGE without the licence scan."
+            else
+                echo "[WARN] --deep-cve: the grype image $DEEP_CVE_IMAGE is not available; continuing without the grype CPE match."
+                DEEP_CVE_FALLBACK_FROM="$DEEP_CVE_IMAGE"
+            fi
+        fi
+    fi
     if [ "$DEEP_LICENSE" = "true" ]; then
         optin_image_note deep-license
     fi
-    if [ "$DEEP_LICENSE" = "true" ] && [ "$DEEP_LICENSE_IMAGE" != "$POSTPROCESS_IMAGE" ]; then
+    if [ "$DEEP_LICENSE" = "true" ] && [ "$PP_IMAGE" = "$POSTPROCESS_IMAGE" ] && [ "$DEEP_LICENSE_IMAGE" != "$POSTPROCESS_IMAGE" ]; then
         PP_IMAGE="$DEEP_LICENSE_IMAGE"
-        if ! docker image inspect "$PP_IMAGE" >/dev/null 2>&1 \
-           && { [ "$SBOM_PULL" = "never" ] || ! docker pull "$PP_IMAGE" >/dev/null 2>&1; }; then
+        if ! _optin_image_ready "$PP_IMAGE"; then
             echo "[WARN] --deep-license: the scancode image $PP_IMAGE is not available; continuing on $POSTPROCESS_IMAGE without the licence scan."
             DEEP_LICENSE_FALLBACK_FROM="$PP_IMAGE"
             PP_IMAGE="$POSTPROCESS_IMAGE"
@@ -2670,7 +2693,7 @@ EOF
         -v "\"$(hostpath "$SCAN_INPUT_DIR")\"":/src -v "\"$(hostpath "$OUTPUT_HOST_DIR")\"":/host-output \
         -w /host-output \
         --add-host=host.docker.internal:host-gateway \
-        -e MODE=POSTPROCESS -e BOMLENS_RUN_INPUT="$OUTPUT_FILE" -e NESTED_ROOTFS_HINT="\"$NESTED_ROOTFS_HINT\"" -e BOMLENS_DEEP_LICENSE_FALLBACK="\"${DEEP_LICENSE_FALLBACK_FROM:-}\"" -e BOMLENS_INCLUDE_NON_SHIPPED${STAGE1_FALLBACK_ENV}${STAGE1_FINGERPRINT_ENV} $(pp_env)$(cosign_run)$(vex_run)$(declare_run)$(gate_run) \
+        -e MODE=POSTPROCESS -e BOMLENS_RUN_INPUT="$OUTPUT_FILE" -e NESTED_ROOTFS_HINT="\"$NESTED_ROOTFS_HINT\"" -e BOMLENS_DEEP_LICENSE_FALLBACK="\"${DEEP_LICENSE_FALLBACK_FROM:-}\"" -e BOMLENS_DEEP_CVE_FALLBACK="\"${DEEP_CVE_FALLBACK_FROM:-}\"" -e BOMLENS_INCLUDE_NON_SHIPPED${STAGE1_FALLBACK_ENV}${STAGE1_FINGERPRINT_ENV}${PP_ENV} $(pp_env)$(cosign_run)$(vex_run)$(declare_run)$(gate_run) \
         "\"$PP_IMAGE\"" || {
         _pp_rc=$?
         if [ -n "$STAGE1_FAILED" ] && [ ! -s "$OUTPUT_HOST_DIR/$OUTPUT_FILE" ]; then

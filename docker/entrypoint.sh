@@ -2055,6 +2055,27 @@ if [ "${GENERATE_SECURITY:-false}" = "true" ] && [ "$_trivy_db_ready" = true ]; 
     [ -f "${OUT_PREFIX}_security.html" ] && ARTIFACTS+=("${OUT_PREFIX}_security.html")
     sync_artifacts
 fi
+# Deep CVE matching (--deep-cve): scan-security.sh runs grype's CPE matcher
+# when grype is in this image (the deep-cve image) and DEEP_CVE is not false.
+# Asked for with no grype here, it is skipped: fallback when the CLI ran this
+# step here because the deep-cve image could not be pulled.
+if [ "${GENERATE_SECURITY:-false}" = "true" ]; then
+    if [ "${DEEP_CVE:-}" = "false" ] || { [ "${DEEP_CVE:-}" != "true" ] && ! command -v grype >/dev/null 2>&1; }; then
+        er_record deep-cve disabled
+    elif ! command -v grype >/dev/null 2>&1; then
+        if [ -n "${BOMLENS_DEEP_CVE_FALLBACK:-}" ]; then
+            er_record deep-cve skipped fallback "the grype image was not available: ${BOMLENS_DEEP_CVE_FALLBACK}"
+        else
+            er_record deep-cve skipped not_installed "grype is not in this image"
+        fi
+    elif [ "$_trivy_db_ready" != true ]; then
+        er_record deep-cve skipped no_input "the security scan did not run"
+    elif [ -f "${OUT_PREFIX}_security_grype.json" ]; then
+        er_record deep-cve ok
+    else
+        er_record deep-cve failed failed "grype did not write its result"
+    fi
+fi
 
 # A supplier's CycloneDX VEX (--vex): keep the statements that apply to this
 # SBOM in ${OUT_PREFIX}_vex_imported.json. The SBOM and the security report are

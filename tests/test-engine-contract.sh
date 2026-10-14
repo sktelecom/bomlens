@@ -357,6 +357,52 @@ else
     echo "  SKIP: no timeout command on this host"
 fi
 
+echo "== deep-cve: disabled, not installed, fallback, ok, failed =="
+# A grype stub with no matches; GRYPE_STUB_RC=1 makes it fail as a broken
+# database does. It is put on PATH only where a run should have grype.
+mkdir -p "$WORK/grype-bin"
+cat > "$WORK/grype-bin/grype" <<'EOF2'
+#!/bin/bash
+[ "${1:-}" = "db" ] && exit 1
+[ "${GRYPE_STUB_RC:-0}" = 0 ] || exit "$GRYPE_STUB_RC"
+echo '{"matches":[]}'
+EOF2
+chmod +x "$WORK/grype-bin/grype"
+# PATH with any grype of this host left out, so "not installed" is tested as
+# such on a host that has grype.
+NOGRYPE_PATH=""
+_old_ifs="$IFS"; IFS=:
+for _d in $PATH; do
+    if [ -x "$_d/grype" ]; then
+        _nd="$WORK/nogrype$(printf '%s' "$_d" | tr '/' '_')"; mkdir -p "$_nd"
+        for _f in "$_d"/*; do [ "${_f##*/}" = grype ] || ln -sf "$_f" "$_nd/"; done
+        _d="$_nd"
+    fi
+    NOGRYPE_PATH="$NOGRYPE_PATH:$_d"
+done
+IFS="$_old_ifs"; NOGRYPE_PATH="${NOGRYPE_PATH#:}"
+dc_step() { jq -r '[.steps[] | select(.id=="deep-cve")][0] | "\(.status) \(.reason)"' "$1/bomlens-result.json" 2>/dev/null; }
+
+D="$(new_run dc-off)"; PATH="$NOGRYPE_PATH" run_engine "$D" "$ROOT_DIR/docker/lib"
+[ "$(dc_step "$D")" = "disabled null" ] && pass "without --deep-cve the step is disabled" || fail "deep-cve is $(dc_step "$D")"
+
+D="$(new_run dc-missing)"; PATH="$NOGRYPE_PATH" run_engine "$D" "$ROOT_DIR/docker/lib" DEEP_CVE=true
+[ "$(dc_step "$D") $(jq -r .run.status "$D/bomlens-result.json")" = "skipped not_installed succeeded_degraded" ] \
+    && pass "asked for in an image without grype: skipped, not_installed, and the run is succeeded_degraded" \
+    || fail "deep-cve is $(dc_step "$D"), run.status $(jq -r .run.status "$D/bomlens-result.json")"
+
+D="$(new_run dc-fallback)"; PATH="$NOGRYPE_PATH" run_engine "$D" "$ROOT_DIR/docker/lib" DEEP_CVE=true BOMLENS_DEEP_CVE_FALLBACK=ghcr.io/example/bomlens-deep-cve:latest
+[ "$(dc_step "$D") $(jq -r .run.status "$D/bomlens-result.json")" = "skipped fallback succeeded_degraded" ] \
+    && pass "the CLI fell back from the deep-cve image: skipped, fallback, and the run is succeeded_degraded" \
+    || fail "deep-cve is $(dc_step "$D"), run.status $(jq -r .run.status "$D/bomlens-result.json")"
+
+D="$(new_run dc-ok)"; PATH="$WORK/grype-bin:$PATH" run_engine "$D" "$ROOT_DIR/docker/lib" DEEP_CVE=true
+[ "$(dc_step "$D")" = "ok null" ] && [ -f "$D/demo_1.0_security_grype.json" ] \
+    && pass "grype ran and wrote its result: ok" || fail "deep-cve is $(dc_step "$D")" "$(grep -i 'nvd-cpe\|grype' "$D.log" | head -3)"
+
+D="$(new_run dc-failed)"; PATH="$WORK/grype-bin:$PATH" run_engine "$D" "$ROOT_DIR/docker/lib" DEEP_CVE=true GRYPE_STUB_RC=1
+[ "$(dc_step "$D")" = "failed failed" ] && pass "grype failed: failed" || fail "deep-cve is $(dc_step "$D")"
+
 echo "== license-registry: fill, replace, confirm, no answer, lookup failed (fixtures, no network) =="
 LRF="$WORK/lr-fixtures"
 mkdir -p "$LRF"
