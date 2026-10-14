@@ -411,38 +411,62 @@ OS_PURL_FORM="$(cat "$SCRIPT_DIR/os-purl-form.jq")"'
 # package's own metadata, and from nothing else. CycloneDX's supplier is the
 # organisation or person that supplied the component; cdxgen and syft put the
 # same answer in other fields: publisher (a Maven POM's <organization>, an npm
-# package's publisher, a distro package's Maintainer), authors[] (PyPI, RubyGems,
-# Composer author metadata) or the legacy author string. Taken in that order, the
-# first one present becomes supplier.name, with a trailing " <email>" dropped and
-# several author names joined. bomlens:supplierSource names the field it came
-# from. A component that already has a supplier is never touched, and one with
-# none of these fields stays without a supplier: a name is never derived from a
-# purl namespace, a download URL or a guess.
+# package's publisher), authors[] (PyPI, RubyGems, Composer author metadata) or
+# the legacy author string. Taken in that order, the first one present becomes
+# supplier.name. Every "<...>" and "(...)" in it is dropped (the email and URL
+# of an npm-style "Name <email> (url)"), so "Alice <a@x.org>, Bob <b@y.org>"
+# reads "Alice, Bob", and a value that is only an email address or only a URL
+# is not used. Several author names are joined. bomlens:supplierSource names
+# the field it came from. A component that already has a supplier is never
+# touched, and one with none of these fields stays without a supplier: a name
+# is never derived from a purl namespace, a download URL or a guess. Nested
+# components[].components get the same rule.
 #
-# Not applied to a supplier's own SBOM (ANALYZE): it is a document under review,
-# and its supplier fields are left as the supplier wrote them.
-SUPPLIER_FIX='(.components) |= (if type=="array" then map(
-  def clean: if type == "string" then (sub("\\s*<[^>]*>\\s*$"; "") | gsub("^\\s+|\\s+$"; "")) else "" end;
-  if (.supplier // {}) != {} then .
-  else
-    ((.publisher // "") | clean) as $pub
-    | ([ (.authors // [])[]? | (.name? // "") | clean | select(. != "") ]
-        | reduce .[] as $a ([]; if any(.[]; ascii_downcase == ($a | ascii_downcase)) then . else . + [$a] end)) as $auth
-    | ((.author // "") | clean) as $legacy
-    | (if $pub != "" then [$pub, "publisher"]
-       elif ($auth | length) > 0 then [($auth | join(", ")), "authors"]
-       elif $legacy != "" then [$legacy, "author"]
-       else null end) as $pick
-    | if $pick == null then .
-      else .supplier = {name: $pick[0]}
-        | .properties = (((.properties // []) | map(select(.name != "bomlens:supplierSource")))
-            + [{name: "bomlens:supplierSource", value: $pick[1]}])
-      end
-  end
-) else . end)'
-if [ "$SCAN_MODE" = "ANALYZE" ]; then
-    SUPPLIER_FIX='.'
-fi
+# Not applied to distribution and firmware packages (pkg:deb, pkg:rpm, pkg:apk,
+# pkg:alpm, pkg:opkg, pkg:generic) or an operating-system component: syft puts
+# the package's Maintainer in publisher, which is usually one person's name
+# rather than who supplied the package, and the distribution is not guessed in
+# its place. Not applied to a supplier's own SBOM (ANALYZE), a document under
+# review whose supplier fields are left as the supplier wrote them, or to a
+# merge of SBOMs (MERGE), whose inputs were each normalized when they were made.
+SUPPLIER_FIX='(
+  def supplier_clean:
+    if type == "string" then
+      gsub("<[^>]*>"; "") | gsub("<[^>]*$"; "") | gsub("\\([^)]*\\)"; "")
+      | [ split(",")[] | gsub("\\s+"; " ") | sub("^ "; "") | sub(" $"; "")
+          | select(. != "")
+          | select((test("@") and (test(" ") | not)) | not)
+          | select(test("^(https?|ftp)://|^www\\."; "i") | not) ]
+      | join(", ")
+    else "" end;
+  def supplier_fill:
+    if type == "array" then map(
+      (if (.supplier // {}) != {}
+          or ((.purl // "") | type == "string" and test("^pkg:(deb|rpm|apk|alpm|opkg|generic)/"))
+          or (.type == "operating-system")
+       then .
+       else
+         ((.publisher // "") | supplier_clean) as $pub
+         | ([ (.authors // [])[]? | (.name? // "") | supplier_clean | select(. != "") ]
+             | reduce .[] as $a ([]; if any(.[]; ascii_downcase == ($a | ascii_downcase)) then . else . + [$a] end)) as $auth
+         | ((.author // "") | supplier_clean) as $legacy
+         | (if $pub != "" then [$pub, "publisher"]
+            elif ($auth | length) > 0 then [($auth | join(", ")), "authors"]
+            elif $legacy != "" then [$legacy, "author"]
+            else null end) as $pick
+         | if $pick == null then .
+           else .supplier = {name: $pick[0]}
+             | .properties = (((.properties // []) | map(select(.name != "bomlens:supplierSource")))
+                 + [{name: "bomlens:supplierSource", value: $pick[1]}])
+           end
+       end)
+      | (if (.components | type) == "array" then .components |= supplier_fill else . end)
+    ) else . end;
+  .components |= supplier_fill
+)'
+case "$SCAN_MODE" in
+    ANALYZE|MERGE) SUPPLIER_FIX='.' ;;
+esac
 
 # Always: normalize component license aliases to SPDX ids. cdxgen records some
 # licenses as non-SPDX free text ("Expat license", "Apache License 2.0"); the v1.3

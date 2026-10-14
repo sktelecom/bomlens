@@ -110,7 +110,7 @@ compositions[]     의존성 그래프 완전성 (아래 참고)
 
 언어별 PURL 형식은 [지원 생태계](ecosystems.ko.md)를 참고하세요.
 
-컴포넌트의 `supplier.name`은 패키지 메타데이터에 이미 적힌 값으로만 채웁니다. 생성 도구가 읽은 `publisher`(Maven POM의 `<organization>`, npm 게시자, 배포판 패키지의 관리자), `authors`(PyPI, RubyGems, Composer), 예전 형식의 `author` 필드 순서로 처음 있는 값을 씁니다. 끝에 붙은 이메일 주소는 빼고, 작성자가 여럿이면 쉼표로 잇습니다. 어느 필드에서 왔는지는 `bomlens:supplierSource` 속성(`publisher`, `authors`, `author`)에 남습니다. 세 필드가 모두 없는 컴포넌트에는 공급자를 넣지 않고, 이미 공급자가 있는 컴포넌트는 그대로 둡니다. `--analyze`로 받은 공급사 SBOM은 작성된 그대로 둡니다.
+컴포넌트의 `supplier.name`은 패키지 메타데이터에 이미 적힌 값으로만 채웁니다. 생성 도구가 읽은 `publisher`(Maven POM의 `<organization>`, npm 게시자), `authors`(PyPI, RubyGems, Composer), 예전 형식의 `author` 필드 순서로 처음 있는 값을 씁니다. 값 안의 꺾쇠괄호와 괄호 부분은 지웁니다. 그래서 npm 형식 `Name <email> (url)`의 이메일 주소와 URL이 빠지고, `Alice <a@x.org>, Bob <b@y.org>`는 `Alice, Bob`이 됩니다. 이메일 주소나 URL만 있는 값은 쓰지 않으며, 작성자가 여럿이면 쉼표로 잇습니다. 어느 필드에서 왔는지는 `bomlens:supplierSource` 속성(`publisher`, `authors`, `author`)에 남습니다. 세 필드가 모두 없는 컴포넌트에는 공급자를 넣지 않고, 이미 공급자가 있는 컴포넌트는 그대로 둡니다. 하위 컴포넌트(`components[].components`)에도 같은 규칙을 적용합니다. 배포판과 펌웨어 패키지(`pkg:deb`, `pkg:rpm`, `pkg:apk`, `pkg:alpm`, `pkg:opkg`, `pkg:generic`)와 `operating-system` 컴포넌트에는 공급자를 넣지 않습니다. 생성 도구가 이 패키지에서 읽는 게시자는 패키지 관리자이고 대개 개인 한 명이며, 배포판 이름을 추정해 대신 넣지도 않습니다. `--analyze`로 받은 공급사 SBOM과 `--merge` 결과는 작성된 그대로 둡니다.
 
 ## 의존성 그래프 완전성
 

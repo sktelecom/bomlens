@@ -10861,8 +10861,8 @@ jq -e '([.components[] | select(.name == "etc/openssl.cnf" or .name == "/usr/lib
     || fail "file entries kept: $(jq -c '[.components[] | {name, hashes}]' "$WORK/bf.json")"
 
 echo "== normalize-sbom.sh fills component.supplier only from the package's own metadata =="
-# The generator already read a publisher (a Maven POM <organization>, a distro
-# Maintainer), authors[] (PyPI, RubyGems, Composer) or the legacy author string.
+# The generator already read a publisher (a Maven POM <organization>, an npm
+# publisher), authors[] (PyPI, RubyGems, Composer) or the legacy author string.
 # That value becomes supplier.name, marked bomlens:supplierSource; a component
 # with none of those keeps no supplier, and an existing supplier is never replaced.
 cat > "$WORK/sup.json" <<'JSON'
@@ -10905,6 +10905,54 @@ crt() { jq -r '[.checks[] | select(.id == "component-creator") | .detail][0] // 
     && [ "$(crt "$WORK/sup-after_conformance.json")" = "83% (5/6)" ] \
     && pass "component-creator coverage gains only the legacy-author component" \
     || fail "creator coverage: $(crt "$WORK/sup-before_conformance.json") -> $(crt "$WORK/sup-after_conformance.json")"
+# Every <...> and (...) is dropped, a value that is only an email or a URL is not
+# used, and distribution or firmware packages (whose publisher is the package's
+# Maintainer) and operating-system components get no supplier. Nested
+# components follow the same rule, and a merge (MODE=MERGE) is left alone.
+cat > "$WORK/sup2.json" <<'JSON'
+{"bomFormat":"CycloneDX","specVersion":"1.6","metadata":{"timestamp":"2026-01-01T00:00:00Z","component":{"name":"app","version":"1"}},
+ "components":[
+  {"type":"library","name":"npm-person","version":"1","purl":"pkg:npm/npm-person@1","author":"Barney Rubble <b@rubble.com> (http://barnyrubble.tumblr.com/)"},
+  {"type":"library","name":"two-authors","version":"1","purl":"pkg:npm/two-authors@1","author":"Alice <a@x.org>, Bob <b@y.org>"},
+  {"type":"library","name":"email-only","version":"1","purl":"pkg:npm/email-only@1","author":"someone@example.org"},
+  {"type":"library","name":"url-only","version":"1","purl":"pkg:npm/url-only@1","publisher":"https://example.org/team","authors":[{"name":"Dee Author"}]},
+  {"type":"library","name":"deb-pkg","version":"1","purl":"pkg:deb/debian/deb-pkg@1","publisher":"Jo Maintainer <jo@debian.org>"},
+  {"type":"library","name":"rpm-pkg","version":"1","purl":"pkg:rpm/redhat/rpm-pkg@1","publisher":"Red Hat, Inc."},
+  {"type":"library","name":"apk-pkg","version":"1","purl":"pkg:apk/alpine/apk-pkg@1","publisher":"Natanael Copa <ncopa@alpinelinux.org>"},
+  {"type":"library","name":"alpm-pkg","version":"1","purl":"pkg:alpm/arch/alpm-pkg@1","publisher":"Packager"},
+  {"type":"library","name":"opkg-pkg","version":"1","purl":"pkg:opkg/openwrt/opkg-pkg@1","publisher":"Maint <m@openwrt.org>"},
+  {"type":"library","name":"generic-pkg","version":"1","purl":"pkg:generic/generic-pkg@1","publisher":"Someone"},
+  {"type":"operating-system","name":"debian","version":"12","publisher":"Debian"},
+  {"type":"library","name":"outer","version":"1","purl":"pkg:maven/x/outer@1","publisher":"Outer Org",
+   "components":[{"type":"library","name":"inner","version":"1","purl":"pkg:maven/x/inner@1","authors":[{"name":"Inner Person <i@x.org>"}]},
+                 {"type":"library","name":"inner-deb","version":"1","purl":"pkg:deb/debian/inner-deb@1","publisher":"Deb Person"}]}
+ ]}
+JSON
+cp "$WORK/sup2.json" "$WORK/sup2-merge.json"
+bash "$LIB/normalize-sbom.sh" "$WORK/sup2.json" >/dev/null 2>&1
+supn() { jq -r --arg n "$1" '[.. | objects | select(.name? == $n and has("type"))][0] | .supplier.name // "NONE"' "$2"; }
+[ "$(supn npm-person "$WORK/sup2.json")" = "Barney Rubble" ] \
+    && pass "an npm-style \"Name <email> (url)\" author gives just the name" || fail "npm person: $(supn npm-person "$WORK/sup2.json")"
+[ "$(supn two-authors "$WORK/sup2.json")" = "Alice, Bob" ] \
+    && pass "every <email> in a several-author string is dropped" || fail "two authors: $(supn two-authors "$WORK/sup2.json")"
+[ "$(supn email-only "$WORK/sup2.json")" = "NONE" ] \
+    && pass "a value that is only an email address is not used" || fail "email only: $(supn email-only "$WORK/sup2.json")"
+[ "$(supn url-only "$WORK/sup2.json")" = "Dee Author" ] \
+    && pass "a publisher that is only a URL is skipped for the next field" || fail "url only: $(supn url-only "$WORK/sup2.json")"
+distro=""
+for n in deb-pkg rpm-pkg apk-pkg alpm-pkg opkg-pkg generic-pkg debian inner-deb; do
+    [ "$(supn "$n" "$WORK/sup2.json")" = "NONE" ] || distro="$distro $n=$(supn "$n" "$WORK/sup2.json")"
+done
+[ -z "$distro" ] \
+    && pass "distribution and firmware packages and the operating system get no supplier from their maintainer" \
+    || fail "distro supplier set:$distro"
+[ "$(supn outer "$WORK/sup2.json")|$(supn inner "$WORK/sup2.json")" = "Outer Org|Inner Person" ] \
+    && pass "nested components get a supplier by the same rule" \
+    || fail "nested: $(supn outer "$WORK/sup2.json")|$(supn inner "$WORK/sup2.json")"
+MODE=MERGE bash "$LIB/normalize-sbom.sh" "$WORK/sup2-merge.json" >/dev/null 2>&1
+[ "$(jq '[.. | objects | select(has("supplier"))] | length' "$WORK/sup2-merge.json")" = "0" ] \
+    && pass "a merge of SBOMs (MERGE) is not given suppliers" \
+    || fail "MERGE: $(jq -c '[.. | objects | select(has("supplier")) | .name]' "$WORK/sup2-merge.json")"
 
 echo ""
 echo "Results: ${PASS} passed, ${FAIL} failed"
