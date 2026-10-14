@@ -8476,6 +8476,76 @@ else
     echo "  SKIP: node not installed; development-marker filter not exercised"
 fi
 
+echo "== Gemfile development/test groups: gems declared only there are dropped =="
+if command -v node >/dev/null 2>&1; then
+    sed -n "/<<'GEMDEV_JS'/,/^GEMDEV_JS\$/p" "$PREP" | sed '1d;$d' > "$WORK/gemdev.js"
+    mkdir -p "$WORK/gemdev"
+    cat > "$WORK/gemdev/Gemfile" <<'EOF_GEM'
+source "https://rubygems.org"
+git_source(:github) { |repo| "https://github.com/#{repo}.git" }
+ruby "3.3.0"
+
+gem "rails", "~> 7.1" # web
+gem 'puma', group: :production
+gem "pry", groups: [:development, :test]
+gem "rubocop", :group => :development, require: false
+
+group :development, :test do
+  gem "rspec"
+  platforms :mri do
+    gem "byebug"
+  end
+end
+group :test do
+  gem "rails"
+  gem "capybara"
+end
+EOF_GEM
+    _gd=$(node "$WORK/gemdev.js" "$WORK/gemdev/Gemfile" "$WORK/gemdev/Gemfile.lock" 2>/dev/null | tr '\n' ' ')
+    [ "$_gd" = "byebug capybara pry rspec rubocop " ] \
+        && pass "Gemfile reader lists the gems only the development and test groups declare" \
+        || fail "Gemfile reader output unexpected" "got [$_gd]"
+    printf 'GEM\n  remote: https://rubygems.org/\n  specs:\n    rails (7.1.0)\n\nDEPENDENCIES\n  capybara\n  rails (~> 7.1)\n  from-gemspec!\n' > "$WORK/gemdev/Gemfile.lock"
+    _gd=$(node "$WORK/gemdev.js" "$WORK/gemdev/Gemfile" "$WORK/gemdev/Gemfile.lock" 2>/dev/null)
+    [ -z "$_gd" ] && pass "Gemfile reader gives up when Gemfile.lock names a gem the Gemfile does not" \
+        || fail "Gemfile reader trusted a Gemfile that does not match its lock" "got [$_gd]"
+    _amb=""
+    for _g in 'gem "a"\nif ENV["X"]\n  gem "b"\nend' 'group :test do\n  gem "a",\n    "1.0"\nend' \
+              'gemspec\ngroup :test do\n  gem "a"\nend' 'group :test, optional: true do\n  gem "a"\nend' \
+              'gem "a", group: ENV["G"]' 'group :test do\n  gem "a"'; do
+        printf "$_g\n" > "$WORK/gemdev/Gemfile.amb"
+        [ -z "$(node "$WORK/gemdev.js" "$WORK/gemdev/Gemfile.amb" "" 2>/dev/null)" ] || _amb="$_amb [$_g]"
+    done
+    [ -z "$_amb" ] && pass "Gemfile reader reports nothing for a Gemfile it cannot read for certain" \
+        || fail "Gemfile reader reported gems from an ambiguous Gemfile" "$_amb"
+    # The filter with that list: rspec and what only it reaches go, a gem a
+    # production gem also uses stays.
+    cat > "$WORK/devf-gem.json" <<'EOF_DEV'
+{"bomFormat":"CycloneDX","metadata":{"component":{"bom-ref":"pkg:gem/app@latest"}},
+ "components":[
+  {"bom-ref":"pkg:gem/rack@3.0.8","purl":"pkg:gem/rack@3.0.8"},
+  {"bom-ref":"pkg:gem/rspec@3.13.0","purl":"pkg:gem/rspec@3.13.0"},
+  {"bom-ref":"pkg:gem/rspec-core@3.13.0","purl":"pkg:gem/rspec-core@3.13.0"},
+  {"bom-ref":"pkg:gem/rake@13.1.0","purl":"pkg:gem/rake@13.1.0"}],
+ "dependencies":[
+  {"ref":"pkg:gem/app@latest","dependsOn":["pkg:gem/rack@3.0.8","pkg:gem/rspec@3.13.0"]},
+  {"ref":"pkg:gem/rack@3.0.8","dependsOn":["pkg:gem/rake@13.1.0"]},
+  {"ref":"pkg:gem/rspec@3.13.0","dependsOn":["pkg:gem/rspec-core@3.13.0","pkg:gem/rake@13.1.0"]},
+  {"ref":"pkg:gem/rspec-core@3.13.0","dependsOn":[]}]}
+EOF_DEV
+    printf 'rspec\n' > "$WORK/devf-gem.txt"
+    node "$WORK/devf.js" "$WORK/devf-gem.json" 1 "$WORK/devf-gem.txt" 2>/dev/null
+    if jq -e '([.components[].purl] == ["pkg:gem/rack@3.0.8","pkg:gem/rake@13.1.0"])
+              and ([.dependencies[] | select(.ref=="pkg:gem/app@latest") | .dependsOn][0] == ["pkg:gem/rack@3.0.8"])' \
+           "$WORK/devf-gem.json" >/dev/null 2>&1; then
+        pass "dev filter drops a test-only gem and its own dependencies, keeps one production also uses"
+    else
+        fail "dev filter (gem) output unexpected" "$(jq -c '[.components[].purl], .dependencies' "$WORK/devf-gem.json" 2>&1)"
+    fi
+else
+    echo "  SKIP: node not installed; Gemfile group reader not exercised"
+fi
+
 echo "== maven non-deployed-module filter: skip resolution and dependency-graph reachability =="
 PREP="$ROOT_DIR/docker/lib/build-prep.sh"
 if command -v node >/dev/null 2>&1; then

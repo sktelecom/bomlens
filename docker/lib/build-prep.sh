@@ -1908,19 +1908,101 @@ fi
 # cdx:npm:package:development=true; uv and Poetry dependency groups:
 # cdx:pyproject:group=<group>; Cargo dev-dependencies: cdx:cargo:scope=dev;
 # sbt, Crystal and Gleam: their development markers), and the filters above do
-# not read those for pnpm workspaces, uv.lock or Poetry. A marked component is
-# dropped only when no production path reaches it: a walk from the app root
-# that does not step from the root or a workspace member into a marked
-# component. A marked component a production package also depends on stays.
+# not read those for pnpm workspaces, uv.lock or Poetry. cdxgen marks no Bundler
+# group, so for a Gemfile at the scan root the gems declared only in its
+# development and test groups are read here (GEMDEV_JS) and count as marked.
+# A marked component is dropped only when no production path reaches it: a
+# walk from the app root that does not step from the root or a workspace
+# member into a marked component. A component only such a dropped one reaches
+# goes too. A component a production package also depends on stays.
 # Guard: the root must be in the dependency graph, otherwise nothing is
 # dropped. BOMLENS_NODE_FULL_GRAPH=1 keeps the npm-marked components.
 if [ "${rc:-1}" -eq 0 ] && [ -f "$OUT" ] && command -v node >/dev/null 2>&1; then
     _dvnpm=1
     opted_out "${BOMLENS_NODE_FULL_GRAPH:-}" && _dvnpm=""
+    _dvgems=$(mktemp)
+    if [ -f Gemfile ]; then
+        _gdjs=$(mktemp).js
+        cat > "$_gdjs" <<'GEMDEV_JS'
+// Reads the gems a Gemfile declares only in its development and test groups.
+// A conservative line reader, not Ruby: anything it does not recognise (a
+// condition, gemspec, eval_gemfile, a declaration over several lines, a group
+// option it cannot read) means nothing is reported. With a Gemfile.lock, every
+// name in its DEPENDENCIES must be one the reader saw.
+const fs = require('fs');
+const [gemfile, lockfile] = process.argv.slice(2);
+const DEV = new Set(['development', 'test']);
+const give_up = why => {
+  process.stderr.write('[build-prep] ruby: Gemfile groups not read (' + why + '); no gem dropped as development-only\n');
+  process.exit(0);
+};
+let src;
+try { src = fs.readFileSync(gemfile, 'utf8'); } catch (e) { process.exit(0); }
+const one = /^\s*(?::([A-Za-z_]\w*)|"([^"\\#]*)"|'([^'\\]*)')\s*$/;
+const list = s => {
+  s = s.trim();
+  if (s.startsWith('[')) { if (!s.endsWith(']')) return null; s = s.slice(1, -1); }
+  const out = [];
+  for (const part of s.split(',')) { const m = one.exec(part); if (!m) return null; out.push(m[1] || m[2] || m[3]); }
+  return out.length ? out : null;
+};
+const stack = [];
+const gems = new Map();
+const lines = src.split(/\r?\n/);
+for (let i = 0; i < lines.length; i++) {
+  const line = lines[i].replace(/^\s*#.*$/, '').replace(/\s+#.*$/, '').trim();
+  const at = 'line ' + (i + 1);
+  if (!line) continue;
+  let m;
+  if (line === 'end') { if (!stack.length) give_up(at); stack.pop(); continue; }
+  if ((m = /^group\s*\(?\s*(.+?)\s*\)?\s+do(\s*\|[^|]*\|)?$/.exec(line))) {
+    const g = list(m[1]); if (!g) give_up(at); stack.push(g); continue;
+  }
+  if (/^(platforms?|source|git|github|path)\b[^{}]*\sdo(\s*\|[^|]*\|)?$/.test(line)) { stack.push([]); continue; }
+  if (/^(source|ruby|git_source|plugin)\b/.test(line)) {
+    if ((line.match(/\{/g) || []).length !== (line.match(/\}/g) || []).length || /\sdo\b/.test(line)) give_up(at);
+    continue;
+  }
+  if ((m = /^gem\s*\(?\s*(["'])([A-Za-z0-9_.-]+)\1(.*)$/.exec(line))) {
+    const rest = m[3];
+    if (/[,\\]\s*$/.test(rest) || /\sdo\b|\{/.test(rest)) give_up(at);
+    let own = [];
+    if (/group/.test(rest)) {
+      const o = /(?:\bgroups?:|:groups?\s*=>)\s*(\[[^\]]*\]|:\w+|"[^"]*"|'[^']*')/.exec(rest);
+      if (!o) give_up(at);
+      own = list(o[1]); if (!own) give_up(at);
+    }
+    const groups = new Set([].concat(...stack, own));
+    if (!groups.size) groups.add('default');
+    const name = m[2].toLowerCase();
+    const seen = gems.get(name) || new Set();
+    for (const g of groups) seen.add(String(g));
+    gems.set(name, seen);
+    continue;
+  }
+  give_up(at);
+}
+if (stack.length) give_up('unclosed block');
+if (lockfile && fs.existsSync(lockfile)) {
+  let inDeps = false;
+  for (const l of fs.readFileSync(lockfile, 'utf8').split(/\r?\n/)) {
+    if (/^\S/.test(l)) { inDeps = l.trim() === 'DEPENDENCIES'; continue; }
+    if (!inDeps) continue;
+    const d = /^ {2}([^\s!(]+)/.exec(l);
+    if (d && !gems.has(d[1].toLowerCase())) give_up('Gemfile.lock lists ' + d[1]);
+  }
+}
+const dev = [...gems].filter(([, g]) => [...g].every(x => DEV.has(x))).map(([n]) => n).sort();
+if (dev.length) process.stdout.write(dev.join('\n') + '\n');
+GEMDEV_JS
+        node "$_gdjs" Gemfile Gemfile.lock > "$_dvgems" || : > "$_dvgems"
+        rm -f "$_gdjs"
+        [ -s "$_dvgems" ] && log "ruby: development/test-only gems in Gemfile: $(tr '\n' ' ' < "$_dvgems")"
+    fi
     _dvflt=$(mktemp).js
     cat > "$_dvflt" <<'DEVFILTER_JS'
 const fs = require('fs');
-const [bomPath, npmMarkers] = process.argv.slice(2);
+const [bomPath, npmMarkers, gemListPath] = process.argv.slice(2);
 let bom;
 try { bom = JSON.parse(fs.readFileSync(bomPath, 'utf8')); } catch (e) { process.exit(0); }
 if (!Array.isArray(bom.components) || !Array.isArray(bom.dependencies)) process.exit(0);
@@ -1928,6 +2010,9 @@ const mc = bom.metadata && bom.metadata.component;
 const rootRef = mc && (mc['bom-ref'] || mc.purl);
 const edges = new Map(bom.dependencies.map(d => [d.ref, Array.isArray(d.dependsOn) ? d.dependsOn : []]));
 if (!rootRef || !edges.has(rootRef)) process.exit(0);
+let devGems = new Set();
+try { devGems = new Set(fs.readFileSync(gemListPath, 'utf8').split('\n').filter(Boolean)); } catch (e) { /* no Gemfile */ }
+const gemName = c => ((/^pkg:gem\/([^@?#]+)/.exec(c.purl || '') || [])[1] || '').toLowerCase();
 const prop = (c, n) => (c.properties || []).filter(p => p.name === n).map(p => String(p.value));
 const isDev = c =>
   (npmMarkers === '1' && prop(c, 'cdx:npm:package:development').includes('true'))
@@ -1935,7 +2020,8 @@ const isDev = c =>
   || prop(c, 'cdx:cargo:scope').includes('dev')
   || prop(c, 'cdx:sbt:package:development').includes('true')
   || prop(c, 'cdx:crystal:scope').includes('development')
-  || prop(c, 'cdx:gleam:scope').includes('development');
+  || prop(c, 'cdx:gleam:scope').includes('development')
+  || (devGems.size > 0 && devGems.has(decodeURIComponent(gemName(c))));
 const refOf = c => c['bom-ref'] || c.purl;
 const byRef = new Map(bom.components.map(c => [refOf(c), c]));
 const devRefs = new Set(bom.components.filter(isDev).map(refOf));
@@ -1961,6 +2047,15 @@ while (queue.length) {
   }
 }
 const drop = new Set([...devRefs].filter(r => !reached.has(r)));
+// What only a dropped component reaches is development-only too.
+const walk = [...drop];
+while (walk.length) {
+  for (const m of edges.get(walk.shift()) || []) {
+    if (drop.has(m) || reached.has(m) || !byRef.has(m) || isProject(m)) continue;
+    drop.add(m);
+    walk.push(m);
+  }
+}
 if (drop.size === 0) process.exit(0);
 const before = bom.components.length;
 bom.components = bom.components.filter(c => !drop.has(refOf(c)));
@@ -1972,8 +2067,8 @@ bom.dependencies = bom.dependencies
 fs.writeFileSync(bomPath, JSON.stringify(bom, null, 2));
 process.stderr.write('[build-prep] dev-marker: dropped ' + drop.size + ' development-only component(s), kept ' + bom.components.length + ' of ' + before + '\n');
 DEVFILTER_JS
-    node "$_dvflt" "$OUT" "${_dvnpm:-0}" || log "dev-marker: filter skipped (non-fatal)"
-    rm -f "$_dvflt"
+    node "$_dvflt" "$OUT" "${_dvnpm:-0}" "$_dvgems" || log "dev-marker: filter skipped (non-fatal)"
+    rm -f "$_dvflt" "$_dvgems"
 fi
 
 # Non-shipped path filter: the --exclude globs keep cdxgen from reading the
