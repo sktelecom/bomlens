@@ -25,6 +25,10 @@ SBOM="$1"
 MODE="$2"
 ARTIFACT="${3:-}"
 
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+# shellcheck source=docker/lib/cdx-version.sh
+. "$SCRIPT_DIR/cdx-version.sh"
+
 if [ -z "$SBOM" ] || [ ! -f "$SBOM" ]; then
     echo "[docmeta] SBOM file not found: $SBOM" >&2
     exit 1
@@ -147,8 +151,14 @@ if [ -n "$ARTIFACT" ] && [ -f "$ARTIFACT" ]; then
     fi
 fi
 
+# The CycloneDX version asked for (cdx-version.sh). The generators write it
+# themselves, but a few producers write a fixed 1.6 (the Yocto parsers, the
+# Modelica identifier), so a 1.6 document is raised to 1.7 here when 1.7 was
+# asked for. 1.7 only adds to 1.6, so the content is valid as it stands. Never
+# lowered: an AI SBOM is 1.7 whatever was asked for.
 TMP="$(mktemp)"
 if jq --arg lifecycle "$LIFECYCLE" \
+      --arg spec "$CDX_SPEC_VERSION" \
       --argjson authors "$AUTHORS_JSON" \
       --arg authorsource "$AUTHOR_SOURCE" \
       --arg toolver "$TOOL_VERSION" \
@@ -174,6 +184,10 @@ if jq --arg lifecycle "$LIFECYCLE" \
       else .metadata.tools = {components: [$t]} end;
 
       fill_tool_versions
+    | (if $spec == "1.7" and ((.specVersion // "") == "1.6")
+       then .specVersion = "1.7"
+            | (if has("$schema") then ."$schema" = "http://cyclonedx.org/schema/bom-1.7.schema.json" else . end)
+       else . end)
     # The tool the minimum elements ask about is the one the SBOM author ran, and
     # that is this one: the scanners below produced the raw inventory, but the
     # document being delivered is the one this pipeline normalized, enriched and

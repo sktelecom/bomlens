@@ -4,7 +4,7 @@ description: The output files BomLens produces — file list, when each is gener
 
 # Artifacts reference
 
-The generated SBOM is CycloneDX 1.6 JSON. An SPDX 2.3 JSON copy, converted from the final CycloneDX BOM, is produced by `--spdx` during a CLI scan or on demand from the results screen in the UI. AI model and dataset scans also write an SPDX 3.0.1 document with the AI and Dataset profiles (`_bom.spdx3.json`, below). Both paths run the same conversion and give the same file. CycloneDX remains the primary format, and CycloneDX-only data (vulnerabilities, `bomlens:*` properties, and the `services[]` a [declared AI service](#the-declared-ai-service) adds) is not carried over.
+The generated SBOM is CycloneDX 1.6 JSON, or 1.7 with `--spec-version 1.7`; AI model and dataset SBOMs are always 1.7. An SPDX 2.3 JSON copy, converted from the final CycloneDX BOM, is produced by `--spdx` during a CLI scan or on demand from the results screen in the UI. AI model and dataset scans also write an SPDX 3.0.1 document with the AI and Dataset profiles (`_bom.spdx3.json`, below). Both paths run the same conversion and give the same file. CycloneDX remains the primary format, and CycloneDX-only data (vulnerabilities, `bomlens:*` properties, and the `services[]` a [declared AI service](#the-declared-ai-service) adds) is not carried over.
 
 The filename is `{Project}_{Version}_bom.json` (e.g. `MyApp_1.0.0_bom.json`).
 
@@ -12,7 +12,7 @@ The filename is `{Project}_{Version}_bom.json` (e.g. `MyApp_1.0.0_bom.json`).
 
 | File | When generated | Description |
 |------|----------------|-------------|
-| `{Project}_{Version}_bom.json` | always | SBOM (CycloneDX 1.6) |
+| `{Project}_{Version}_bom.json` | always | SBOM (CycloneDX 1.6, or 1.7 with `--spec-version 1.7`) |
 | `{Project}_{Version}_bom.spdx.json` | `--spdx` / `--all`, or Export as SPDX 2.3 in the UI | SBOM (SPDX 2.3, converted from the CycloneDX output) |
 | `{Project}_{Version}_bom.spdx3.json` | AI model and dataset scans (`--model`, `--model-file`, a dataset), unless `--no-spdx3` | the AI SBOM as an SPDX 3.0.1 document with the AI and Dataset profiles (JSON-LD). Fields come from the CycloneDX output, from fixed rules over it, or from the publisher's declaration (`--ai-declare`); nothing is estimated. Required fields SPDX gives no "unknown" value (who supplied and who made the model and data, release and build dates, the download address, the document's author) stay empty until declared, and the document says it is a draft until then. Base models are identified by id and licence only. The weights scope is carried as `bomlens:weights:scope` (`full`, `adapter`, `quantized`, `merged`) in a CycloneDX properties extension. Not an input for `--analyze` |
 | `{Project}_{Version}_spdx3-check.json` / `.md` | with the SPDX 3.0.1 document | which field of each element came from the scan, from the declaration, or from nothing, which required fields are open, and what needs a decision by the publisher (personal data, safety risk, autonomy). `service.state` says whether the CycloneDX SBOM carries the declared service and model values: `none` (nothing declared, nothing in the SBOM), `applied` (the SBOM matches the declaration) or `pendingScan` (they differ; a new scan writes them). Guidance, not legal advice |
@@ -94,7 +94,7 @@ The G7 system-level elements read the declared service, and an element met by it
 
 ```
 bomFormat          "CycloneDX"
-specVersion        "1.6"
+specVersion        "1.6" ("1.7" with --spec-version 1.7)
 metadata
   ├── timestamp    generation time (ISO 8601)
   └── component    project info (name, version, type)

@@ -2021,6 +2021,50 @@ pp_used="$(grep -v '^[[:space:]]*#' "$ENTRY" | grep -oE '(run_optional_step|er_r
     && pass "ER_POSTPROCESS_STEPS lists every step entrypoint.sh records after generation, and no other" \
     || fail "ER_POSTPROCESS_STEPS differs from entrypoint.sh" "$(diff <(printf '%s\n' "$pp_listed") <(printf '%s\n' "$pp_used"))"
 
+echo "== --spec-version 1.7: the delivered SBOM is CycloneDX 1.7 =="
+# CYCLONEDX_SPEC_VERSION is what scan-sbom.sh --spec-version sets. A 1.6 stage-1
+# document leaves as 1.7, and NOTICE, the security report and the conformance
+# check all read it; without the variable the same input stays 1.6.
+for sv in 1.6 1.7; do
+    D="$(new_run "spec-$sv")"
+    jq '.specVersion = "1.6" | ."$schema" = "http://cyclonedx.org/schema/bom-1.6.schema.json"' \
+        "$FIX/good-cyclonedx.json" > "$D/demo_1.0_bom.json"
+    if [ "$sv" = 1.7 ]; then
+        run_engine "$D" "$ROOT_DIR/docker/lib" GENERATE_NOTICE=true GENERATE_REPORT=true CYCLONEDX_SPEC_VERSION=1.7
+    else
+        run_engine "$D" "$ROOT_DIR/docker/lib" GENERATE_NOTICE=true GENERATE_REPORT=true
+    fi
+done
+S16="$WORK/spec-1.6"; S17="$WORK/spec-1.7"
+[ "$(jq -r '"\(.specVersion) \(."$schema")"' "$S17/demo_1.0_bom.json")" = "1.7 http://cyclonedx.org/schema/bom-1.7.schema.json" ] \
+    && pass "CYCLONEDX_SPEC_VERSION=1.7 writes specVersion 1.7 and the 1.7 schema" \
+    || fail "1.7 run: $(jq -c '[.specVersion, ."$schema"]' "$S17/demo_1.0_bom.json" 2>&1)" "$(tail -5 "$S17.log")"
+[ "$(jq -r '.specVersion' "$S16/demo_1.0_bom.json")" = "1.6" ] \
+    && pass "without it the SBOM stays 1.6" || fail "default run: $(jq -r '.specVersion' "$S16/demo_1.0_bom.json" 2>&1)"
+[ "$(jq -r '.run.status' "$S17/bomlens-result.json" 2>/dev/null)" = succeeded ] \
+    && grep -q 'lodash' "$S17/demo_1.0_NOTICE.txt" \
+    && [ "$(jq '[.Results[]?.Vulnerabilities[]?] | length' "$S17/demo_1.0_security.json" 2>/dev/null)" = 1 ] \
+    && [ "$(jq -r '.checks[] | select(.id == "spec-version") | "\(.status) \(.detail)"' "$S17/demo_1.0_conformance.json" 2>/dev/null)" = "pass CycloneDX 1.7" ] \
+    && pass "NOTICE, the security report and the conformance check read the 1.7 SBOM" \
+    || fail "1.7 consumers: $(jq -c '[.run.status] + [.steps[] | select(.status != "ok" and .status != "disabled")]' "$S17/bomlens-result.json" 2>&1)" "$(tail -5 "$S17.log")"
+SBAD="$(new_run spec-bad)"
+run_engine "$SBAD" "$ROOT_DIR/docker/lib" CYCLONEDX_SPEC_VERSION=2.0
+grep -q 'CYCLONEDX_SPEC_VERSION=2.0 is not a CycloneDX version this pipeline writes' "$SBAD.log" \
+    && [ "$(jq -r '.specVersion' "$SBAD/demo_1.0_bom.json")" = "1.5" ] \
+    && pass "an unsupported CYCLONEDX_SPEC_VERSION stops the run with the accepted values" \
+    || fail "bad spec: $(tail -3 "$SBAD.log")"
+# The pinned CycloneDX CLI (scripts/check-cdx-schema.sh); BOMLENS_CDX_SCHEMA=1
+# downloads it when it is not installed.
+if [ "${BOMLENS_CDX_SCHEMA:-}" = "1" ] || command -v cyclonedx >/dev/null 2>&1 || [ -n "${CYCLONEDX_CLI:-}" ]; then
+    if cdxout=$(bash "$ROOT_DIR/scripts/check-cdx-schema.sh" "$S17/demo_1.0_bom.json" "$S16/demo_1.0_bom.json" 2>&1); then
+        pass "the 1.7 and 1.6 SBOMs validate against their CycloneDX schemas"
+    else
+        fail "an SBOM fails its CycloneDX schema" "$cdxout"
+    fi
+else
+    echo "  SKIP: CycloneDX CLI not available (set BOMLENS_CDX_SCHEMA=1 to download the pinned one)"
+fi
+
 echo "== every step label in entrypoint.sh is documented =="
 missing=""
 for id in $(grep -v '^[[:space:]]*#' "$ENTRY" | grep -oE '(run_optional_step|er_record|er_phase) [a-z][a-z0-9-]+' | awk '{print $2}' | sort -u); do

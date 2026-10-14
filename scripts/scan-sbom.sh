@@ -314,6 +314,7 @@ while [[ "$#" -gt 0 ]]; do
         --notice) GENERATE_NOTICE="true" ;;
         --security) GENERATE_SECURITY="true"; SECURITY_REQUESTED="true" ;;
         --spdx) GENERATE_SPDX="true" ;;
+        --spec-version) CYCLONEDX_SPEC_VERSION="${2:-}"; shift ;;
         --all) GENERATE_NOTICE="true"; GENERATE_SECURITY="true"; GENERATE_SPDX="true"
                SECURITY_REQUESTED="true" ;;
         --deep-license) DEEP_LICENSE="true" ;;
@@ -506,6 +507,9 @@ Options:
   --security             Trivy security report (json+md+html)
   --spdx                 Also export the SBOM as SPDX 2.3 JSON (converted from
                          the CycloneDX output; CycloneDX stays the primary format)
+  --spec-version <1.6|1.7>
+                         CycloneDX version of the SBOM (default 1.6). AI model
+                         and dataset SBOMs are always 1.7
   --all                  --notice --security --spdx
   --no-report            Skip the open-source risk report (risk-report). By default
                          the risk report (+notice+security) is generated in
@@ -629,6 +633,7 @@ Environment:
                          private or gated repo (e.g. reviewing a model before
                          you publish it). HUGGING_FACE_HUB_TOKEN also accepted
   COSIGN_KEY             Signing key for --sign
+  CYCLONEDX_SPEC_VERSION Same as --spec-version: 1.6 (default) or 1.7
   SBOM_OUTPUT_FLAT       Set to 1 to write artifacts flat in the output base
                          (no per-run subfolder), matching the pre-isolation layout
   SBOM_PULL              missing (default): refresh an already-present image in
@@ -921,6 +926,10 @@ fi
 # Validate
 # ========================================================
 [ -n "$PROJECT_NAME" ] && [ -n "$PROJECT_VERSION" ] || { echo "[ERROR] --project and --version are required ($0 --help)."; exit 1; }
+case "${CYCLONEDX_SPEC_VERSION:-1.6}" in
+    1.6|1.7) CDX_SPEC_VERSION="${CYCLONEDX_SPEC_VERSION:-1.6}" ;;
+    *) echo "[ERROR] --spec-version '${CYCLONEDX_SPEC_VERSION}' is not supported. Use 1.6 (the default) or 1.7."; exit 1 ;;
+esac
 if [ "$UPLOAD_TARGET" = "trusca" ] && [ "$GENERATE_ONLY" != "true" ] && [ -z "$TRUSCA_PROJECT_ID" ]; then
     echo "[ERROR] TRUSCA upload requires a project id: --trusca <id> or TRUSCA_PROJECT_ID env."; exit 1
 fi
@@ -1159,6 +1168,7 @@ pp_env() {
         "${FW_KERNEL_MAX_FILES:-}" "${FW_KERNEL_MAX_BYTES:-}" "${FW_KERNEL_MAX_VERSIONS:-}" \
         "${FW_EXTRA_ROOTS:-}" "${FW_MAX_EXTRA_ROOTS:-}" "${FW_CONTAINER_MEMBERSHIP:-}" \
         "${PURL_MIN_PCT:-}" "${LICENSE_MIN_PCT:-}" "${HASH_MIN_PCT:-}" "${FIELD_MIN_PCT:-}" "$CONFORMANCE_PROFILE" "${PURL_RESOLVE:-false}" "${LICENSE_REGISTRY:-false}"
+    printf ' -e CYCLONEDX_SPEC_VERSION=%s' "$CDX_SPEC_VERSION"
     # Proxy, Trivy database and EPSS/KEV settings, by name.
     printf ' %s' "$(stage2_network_env_args)"
     # Debian package licenses from Trivy (image/rootfs scans), on unless set false.

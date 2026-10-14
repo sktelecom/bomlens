@@ -181,6 +181,7 @@ MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL='*' docker run --rm \
 | `BOMLENS_INCLUDE_DEV_DEPENDENCIES` | - | - | 소스 스캔: `1`로 설정하면 기본으로 빼는 개발 전용 컴포넌트(cdxgen이 개발 전용으로 표시한 컴포넌트와 루트 `Gemfile`의 `development`, `test` 그룹에만 선언된 gem)를 그대로 둠. 뺀 컴포넌트는 `bomlens:excluded-components`에 기록됨 |
 | `BOMLENS_NO_COPYRIGHT` | - | - | 소스 스캔: `1`로 설정하면 설치된 패키지의 라이선스 파일에서 npm, Python, Go, Rust 컴포넌트의 `copyright`를 채우는 단계를 건너뜀 |
 | `BOMLENS_NO_CARGO_LICENSE` | - | - | 소스 스캔: `1`로 설정하면 `cargo metadata`로 Rust 컴포넌트의 라이선스를 채우는 단계를 건너뜀(명령줄의 `FETCH_LICENSE=false`도 건너뜀) |
+| `CYCLONEDX_SPEC_VERSION` | — | `1.6` | 생성하는 SBOM의 CycloneDX 버전. `1.6` 또는 `1.7`(CLI의 `--spec-version`). AI 모델과 데이터셋 SBOM은 항상 1.7. 다른 값이면 실행을 멈춤 |
 | `CYCLONEDX_SPEC_VERSIONS` | — | `1.3 1.4 1.5 1.6 1.7` | 적합성 검사가 허용하는 CycloneDX spec 버전(공백 구분). 기본 범위를 덮어씀 |
 | `AI_CYCLONEDX_SPEC_VERSIONS` | — | `1.3 1.4 1.5 1.6 1.7` | AI SBOM(ML-BOM)이 허용하는 CycloneDX 버전. AIBOM 도구가 내보내는 1.7을 항상 포함 |
 | `SPDX_SPEC_VERSIONS` | — | `SPDX-2.2 SPDX-2.3` | 적합성 검사가 허용하는 SPDX spec 버전 |

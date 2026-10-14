@@ -38,7 +38,7 @@ BomLens의 전체 옵션과 분석 모드, CI/CD 통합 방법, 트러블슈팅�
 | `--component-versions <file>` | — | 펌웨어, 루트 파일시스템, 바이너리 스캔에서, 스캔이 찾았지만 버전을 읽지 못한 컴포넌트의 버전을 적은 CSV 파일(`name,version` 두 열). 스캔이 배포 파일에서 읽은 버전은 유지하고 두 값을 경고로 보여 준다. 스캔이 찾지 못한 이름은 `bomlens:identifiedBy = supplier-declared` 컴포넌트로 추가한다. 이런 스캔은 아직 버전이 없는 컴포넌트를 같은 형식의 `{Project}_{Version}_component-versions.template.csv`로 쓴다. 256 KiB를 넘거나 형식이 틀린 행이 있는 파일은 거부한다. 이때도 스캔은 그 버전 없이 파일을 모두 쓰고, 이유를 보여 준 뒤 1로 끝난다. 버전을 비워 둔 행은 건너뛴다. [펌웨어 가이드](../guides/firmware.ko.md#스캔이-읽지-못한-버전-채우기) 참고 |
 | `--usage <scenario>` | — | AI 모델 위험 판정을 사용 형태에 맞춘다(`--model`과 `--model-file`): `internal`, `product`, `redistribute`, `outputs-only`. 그 사용 형태에 적용되는 라이선스 조건만으로 판정하고, 보고서에 어떤 형태 기준인지 명시한다. 지정하지 않으면 전체 조건 기준으로 판정한다 |
 | `--merge <a.json> <b.json> …` | — | CycloneDX SBOM 두 개 이상을 하나로 병합하고 purl 기준으로 중복을 제거한 뒤, 최상위 컴포넌트를 `--project`/`--version`으로 기재. 선택 기능으로, 외부 시스템이 제품당 단일 BOM을 요구할 때 씁니다. 그 외에는 층별로 따로 둡니다([서버 SBOM 작성 가이드](../guides/server-delivery.ko.md) 참고). `--target`/`--analyze`/`--git`와 배타 |
-| `--merge-root <file>` | — | `--merge`와 함께: 새 1.6 루트를 만드는 대신 이 입력 파일의 `specVersion`과 최상위 컴포넌트를 유지합니다(예: ML-BOM의 CycloneDX 1.7 루트와 모델 카드). `--merge` 입력 중 하나여야 하며, 유지된 루트의 이름과 버전은 `--project`/`--version`으로 바뀝니다 |
+| `--merge-root <file>` | — | `--merge`와 함께: `--spec-version` 버전의 새 루트를 만드는 대신 이 입력 파일의 `specVersion`과 최상위 컴포넌트를 유지합니다(예: ML-BOM의 CycloneDX 1.7 루트와 모델 카드). `--merge` 입력 중 하나여야 하며, 유지된 루트의 이름과 버전은 `--project`/`--version`으로 바뀝니다 |
 | `--diff <old.json> <new.json>` | — | 이미 생성한 AI 모델 SBOM 두 개(`--model` 또는 `--model-file` 결과물)를 비교해 변동을 찾는다. `bomlens:assessment:*` 판정이 이전보다 나빠졌는지, 선언된 라이선스가 바뀌었는지, 그리고 같은 모델 이름·purl·HuggingFace ID인데 가중치 파일의 SHA-256 해시가 달라졌는지를 본다. 마지막 항목이 가장 중요한 신호로, 이름은 그대로인데 그 뒤의 실제 파일이 조용히 바뀌었다는 뜻이다. `--project`/`--version`도 스캔 대상도 필요 없으며, 새 쪽 파일 이름을 따서 `<new>_model-diff.json`을 만든다(위치는 현재 디렉터리, `--output-dir` 지정 시 그 아래) |
 | `--generate-only` | false | 업로드 없이 로컬에만 저장 |
 | `--upload-target <대상>` | `dependency-track` | 업로드 대상: `dependency-track`(DT 호환) 또는 `trusca`(네이티브 ingest) |
@@ -46,6 +46,7 @@ BomLens의 전체 옵션과 분석 모드, CI/CD 통합 방법, 트러블슈팅�
 | `--notice` | 위험분석보고서 기본값에 딸려 켜짐 | 오픈소스 고지문(NOTICE, txt+html) 생성. 플래그 자체의 기본값은 꺼짐이며, 기본으로 켜진 위험분석보고서가 이를 켠다. 그래서 끄려면 `--notice`를 빼는 게 아니라 `--no-report`를 써야 한다 |
 | `--security` | 위험분석보고서 기본값에 딸려 켜짐 | Trivy 보안 보고서(json+md+html) 생성. CVSS, EPSS, CISA KEV 우선순위 신호 포함. `--notice`와 같은 구조로, `--no-report`가 꺼야 꺼지고 플래그만 빼서는 꺼지지 않는다 |
 | `--spdx` | false | 최종 CycloneDX 결과를 변환한 SPDX 2.3 JSON(`_bom.spdx.json`)을 함께 생성 |
+| `--spec-version <1.6\|1.7>` | `1.6` | SBOM의 CycloneDX 버전. `1.7`을 주면 cdxgen과 syft가 1.7로 쓰고, 1.6으로 만들어진 SBOM은 내보내기 전에 1.7로 표기를 바꾼다(1.7은 필드를 더하기만 하므로 내용은 그대로 유효하다). NOTICE, 보안 리포트, 적합성 검사, 웹 UI는 두 버전을 모두 읽는다. AI 모델과 데이터셋 SBOM은 이 값과 관계없이 1.7이다. 다른 값을 주면 스캔이 멈춘다 |
 | `--all` | — | `--notice --security --spdx` |
 | `--no-report` | false | 오픈소스위험분석보고서(risk-report) 생략 (아래 참고) |
 | `--lang <en\|ko>` | `en` | 사람이 읽는 적합성·AI 준수 개요 보고서(`.md`/`.html`)의 언어. SBOM과 JSON 보고서는 언어와 무관하게 영어로 유지 |
@@ -97,6 +98,7 @@ BomLens의 전체 옵션과 분석 모드, CI/CD 통합 방법, 트러블슈팅�
 | `AIBOM_DATASET_DEPTH` | `3` | `--model`에서 데이터셋 카드가 적은 원천(`source_datasets`)을 몇 단계 아래까지 읽어 함께 판정할지. `0`이면 예전처럼 모델 카드가 적은 데이터셋만 읽는다 |
 | `AIBOM_DATASET_MAX_LOOKUPS` | `40` | `--model`에서 스캔 한 번에 읽는 데이터셋의 최대 개수(원천 포함). 상한을 넘은 데이터셋은 이름만 기록하고 읽지 않았다고 표시한다 |
 | `COSIGN_KEY` | — | `--sign`에 쓰는 서명 키 경로 |
+| `CYCLONEDX_SPEC_VERSION` | `1.6` | `--spec-version`과 같다. CLI 없이 `docker run`으로 스캐너 이미지를 실행할 때도 이 값을 읽는다 |
 | `FETCH_LICENSE` | `true` | 소스 스캔 시 의존성 라이선스를 자동 조회. `false`면 조회를 생략해 속도를 높임 |
 | `GOTOOLCHAIN` | `auto` | Go 소스 스캔에서 모듈을 해석할 Go 툴체인. 기본값에서는 `go.mod`가 스캐너 이미지보다 새 Go를 요구하면 그 버전을 내려받는다. `local`이면 이미지에 든 Go만 쓰고, 이런 프로젝트는 의존성 해석이 실패한다 |
 | `GOPROXY` | `https://proxy.golang.org,direct` | Go 소스 스캔에서 모듈과 툴체인을 내려받을 프록시. `proxy.golang.org`에 접근할 수 없는 사내망에서 지정한다. `GOSUMDB`도 같은 방식으로 전달된다 |

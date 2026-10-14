@@ -25,6 +25,7 @@ Best-effort like identify-cocoapods.sh: no .mo files, or none carrying a
 uses() block, degrades to an empty CycloneDX envelope rather than aborting.
 """
 import json
+import os
 import re
 import sys
 from datetime import datetime, timezone
@@ -33,9 +34,11 @@ from pathlib import Path
 SELFDIR = Path(__file__).resolve().parent
 LIBRARY_MAP_PATH = SELFDIR / "modelica-library-map.json"
 
-# Matches every other producer in docker/lib/ (see cdx-version.sh for the
-# bash side; nothing here can source that file, so it's restated).
+# The version cdx-version.sh writes: 1.6, or 1.7 when CYCLONEDX_SPEC_VERSION
+# asks for it (nothing here can source that file, so the rule is restated).
 CDX_SPEC_VERSION = "1.6"
+if os.environ.get("CYCLONEDX_SPEC_VERSION") == "1.7":
+    CDX_SPEC_VERSION = "1.7"
 
 # One level of nesting only: each entry inside uses(...) is `Name(version =
 # "X.Y.Z")` with no further parentheses of its own, so a single non-greedy

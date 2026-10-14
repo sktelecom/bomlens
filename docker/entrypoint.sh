@@ -669,11 +669,10 @@ echo "=========================================="
 # ========================================================
 # Every syft invocation below pins its CycloneDX output to @$CDX_SPEC_VERSION.
 # syft >= 1.28 defaults to emitting CycloneDX 1.7, but the rest of this
-# pipeline standardizes on the version cdx-version.sh names (cdxgen is run
-# with --spec-version "$CDX_SPEC_VERSION"; convert-to-cdx.sh writes it; the
-# docs promise it) and the bundled Trivy 0.70 cannot decode 1.7 ("invalid
-# specification version"), which would silently empty the security report.
-# The selector keeps syft output aligned with cdxgen and readable by Trivy.
+# pipeline standardizes on the version cdx-version.sh names (1.6, or 1.7 when
+# CYCLONEDX_SPEC_VERSION asks for it): cdxgen is run with --spec-version
+# "$CDX_SPEC_VERSION", convert-to-cdx.sh writes it, and the docs promise it.
+# The selector keeps syft output aligned with cdxgen.
 case "$SCAN_MODE" in
     SOURCE)
         # Local web UI source scan (current dir / extracted ZIP / cloned git repo).

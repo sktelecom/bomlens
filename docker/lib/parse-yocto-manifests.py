@@ -45,7 +45,11 @@ import os
 import re
 import sys
 
+# The version cdx-version.sh writes: 1.6, or 1.7 when CYCLONEDX_SPEC_VERSION
+# asks for it (nothing here can source that file, so the rule is restated).
 CDX_SPEC_VERSION = "1.6"
+if os.environ.get("CYCLONEDX_SPEC_VERSION") == "1.7":
+    CDX_SPEC_VERSION = "1.7"
 
 # Files that are not the image package manifest, though they end in .manifest.
 _NOT_IMAGE_MANIFEST = ("image_license.manifest",)
