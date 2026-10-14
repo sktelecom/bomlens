@@ -116,6 +116,9 @@ Trivy matches a component by its package PURL. In a firmware, root filesystem or
 
 A component that no check could reach is not counted as clean. When a component has no version, or has no package PURL and no CPE that was matched, the report says how many there are and lists them under "Components that could not be checked", in place of "No known vulnerabilities found". `_security.json` keeps the same list as `UncheckedComponents` (`Count`, and `Components` with `Name`, `Version`, `PURL` and `Reason`: `no-version` or `no-identifier`), and the risk report repeats it in its vulnerability section.
 
+A finding that Trivy files under a distribution or ecosystem advisory number instead of a vulnerability id (a Debian advisory such as `DLA-4792-1`, a Node.js security working group entry such as `NSWG-ECO-516`; vulnerability ids are `CVE`, `GHSA`, `GO`, `PYSEC`, `RUSTSEC` and Debian's `TEMP` placeholder) is not listed as a vulnerability. When Trivy names a CVE for it, the finding is reported under that CVE and the advisory number is kept in the CVE's `VendorIDs`; the web UI shows it next to the CVE id. When Trivy names no CVE, the finding moves to the top-level `Advisories` list in `_security.json`, with Trivy's own fields (`VulnerabilityID`, `PkgName`, `PkgIdentifier`, `InstalledVersion`, `FixedVersion`, `Severity`, `Title`) and the `Target` it came from. These advisories are not counted in the totals or the severity counts, get no EPSS or KEV lookup, and do not trip `--fail-on`. The security report lists them under "Advisories with no CVE", and the web UI shows them in the security section as a list of their own below the findings. When either change is made, Trivy's unchanged result is kept in `_security_trivy.json`.
+
+
 For severity, CVSS, EPSS, and KEV priority signals and follow-up interpretation, see [What the reports mean](../concepts/reports-explained.md).
 
 ---

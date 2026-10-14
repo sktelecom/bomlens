@@ -118,8 +118,8 @@ Each step also has `stage` (1 for the SBOM a language image generated before thi
 | `sbom.cyclonedx` | `_bom.json` |
 | `sbom.spdx` | `_bom.spdx.json` |
 | `sbom.spdx3` | `_bom.spdx3.json` |
-| `vulnerabilities.trivy` | Trivy's own result. This is `_security.json` when no other engine added results, and `_security_trivy.json` (Trivy's result kept apart before the merge) when one did |
-| `vulnerabilities.all` | `_security.json`, Trivy's result with the other engines' results merged in |
+| `vulnerabilities.trivy` | Trivy's own result. This is `_security.json` when nothing changed it, and `_security_trivy.json` (Trivy's result kept apart) when another engine added results or a finding filed under an advisory number was moved (see [the security report](../guides/reports.md)) |
+| `vulnerabilities.all` | `_security.json`, Trivy's result with the other engines' results merged in, and findings filed under an advisory number reported under their CVE or in the top-level `Advisories` list |
 | `vulnerabilities.other` | another engine's result (`_security_grype.json`, `_security_cvebintool.json`, `_security_yocto.json`) |
 | `license-scan.scancode` | `_scancode.json` |
 | `vendored.cyclonedx` | `_vendored.cdx.json` |

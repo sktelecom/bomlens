@@ -116,6 +116,9 @@ Trivy는 컴포넌트를 패키지 PURL로 대조합니다. 펌웨어, 루트 �
 
 어떤 검사도 닿지 못한 컴포넌트는 취약점이 없는 것으로 세지 않습니다. 버전이 없거나, 패키지 PURL도 대조한 CPE도 없는 컴포넌트가 있으면 보고서는 "No known vulnerabilities found" 대신 그 개수를 알리고 "Components that could not be checked" 아래에 목록을 보여 줍니다. `_security.json`에도 같은 목록이 `UncheckedComponents`(`Count`, 그리고 `Name`, `Version`, `PURL`, `Reason`을 담은 `Components`. `Reason`은 `no-version` 또는 `no-identifier`)로 남고, 위험 보고서의 취약점 절에도 같은 내용이 나옵니다.
 
+Trivy가 취약점 번호가 아니라 배포판이나 생태계의 권고 번호로 보고한 항목(`DLA-4792-1` 같은 Debian 권고, `NSWG-ECO-516` 같은 Node.js 보안 워킹 그룹 항목)은 취약점으로 싣지 않습니다. 취약점 번호로 보는 것은 `CVE`, `GHSA`, `GO`, `PYSEC`, `RUSTSEC`와 Debian의 임시 번호 `TEMP`입니다. Trivy가 관련 CVE를 밝힌 항목은 그 CVE로 보고하고, 권고 번호는 그 CVE의 `VendorIDs`에 남깁니다. 웹 UI는 이 번호를 CVE 번호 옆에 보여 줍니다. Trivy가 CVE를 밝히지 않은 항목은 `_security.json` 최상위의 `Advisories` 목록으로 옮깁니다. 각 항목에는 Trivy가 준 필드(`VulnerabilityID`, `PkgName`, `PkgIdentifier`, `InstalledVersion`, `FixedVersion`, `Severity`, `Title`)와 그 항목이 나온 `Target`이 들어 있습니다. 이 권고는 전체 개수와 심각도별 개수에 넣지 않고, EPSS와 KEV도 조회하지 않으며, `--fail-on` 판정에도 쓰지 않습니다. 보안 보고서는 이 권고를 "Advisories with no CVE" 아래에 따로 싣고, 웹 UI는 보안 화면의 취약점 목록 아래에 별도 목록으로 보여 줍니다. 둘 중 어느 쪽이든 고쳐 쓴 경우에는 Trivy의 원래 결과를 `_security_trivy.json`에 남깁니다.
+
+
 심각도, CVSS, EPSS, KEV 우선순위 신호와 후속 조치 해석은 [보고서 읽는 법](../concepts/reports-explained.ko.md)을 참고하세요.
 
 ---

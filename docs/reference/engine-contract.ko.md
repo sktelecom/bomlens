@@ -118,8 +118,8 @@ BomLens 이미지를 스캔 엔진으로 쓰는 프로그램은 모든 스캔이
 | `sbom.cyclonedx` | `_bom.json` |
 | `sbom.spdx` | `_bom.spdx.json` |
 | `sbom.spdx3` | `_bom.spdx3.json` |
-| `vulnerabilities.trivy` | Trivy 자체 결과입니다. 다른 엔진이 결과를 더하지 않았으면 `_security.json`이고, 더했으면 병합 전에 따로 남긴 `_security_trivy.json`입니다 |
-| `vulnerabilities.all` | `_security.json`. Trivy 결과에 다른 엔진의 결과를 병합한 파일 |
+| `vulnerabilities.trivy` | Trivy 자체 결과입니다. 아무것도 고치지 않았으면 `_security.json`이고, 다른 엔진이 결과를 더했거나 권고 번호로 보고된 항목을 옮겼으면 따로 남긴 `_security_trivy.json`입니다([보안 보고서](../guides/reports.ko.md) 참고) |
+| `vulnerabilities.all` | `_security.json`. Trivy 결과에 다른 엔진의 결과를 병합하고, 권고 번호로 보고된 항목을 관련 CVE로 바꾸거나 최상위 `Advisories` 목록으로 옮긴 파일 |
 | `vulnerabilities.other` | 다른 엔진의 결과(`_security_grype.json`, `_security_cvebintool.json`, `_security_yocto.json`) |
 | `license-scan.scancode` | `_scancode.json` |
 | `vendored.cyclonedx` | `_vendored.cdx.json` |
