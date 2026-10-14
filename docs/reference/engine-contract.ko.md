@@ -103,7 +103,7 @@ BomLens 이미지를 스캔 엔진으로 쓰는 프로그램은 모든 스캔이
 | `generate-notice` | 오픈소스 고지문 작성 |
 | `match-cpe` | `--security`를 켠 펌웨어, 루트 파일 시스템, 바이너리 스캔에서 패키지 PURL이 없는 컴포넌트의 CPE를 이미지에 들어 있는 NVD CPE 인덱스와 대조. `counts`에 `offered`, `components`, `cves`를 담고, 인덱스가 없는 이미지에서는 `skipped`(`not_installed`), `--security`가 꺼져 있거나 `CVE_BIN_TOOL_MODE=components-only`이면 `disabled` |
 | `scan-security` | Trivy로 취약점 매칭 |
-| `deep-cve` | `--security`를 켰을 때 CPE가 있는 컴포넌트와 `bomlens:cpeAlternates`의 추가 CPE를 grype로 NVD와 대조(`--deep-cve`, deep-cve 이미지). grype가 없는 이미지에서 요청하면 `skipped`(`not_installed`), CLI가 deep-cve 이미지 없이 실행했으면 `skipped`(`fallback`, 이미지를 내려받지 못했거나 스캐너 이미지가 로컬 빌드 또는 1.13.2보다 낮은 버전이어서이며 `detail`에 이유를 적음), 요청하지 않았거나 `--security`가 꺼져 있거나 펌웨어 또는 AI 모델 스캔이면 `disabled` |
+| `deep-cve` | `--security`를 켰을 때 CPE가 있는 컴포넌트와 `bomlens:cpeAlternates`의 추가 CPE를 grype로 NVD와 대조(`--deep-cve`, deep-cve 이미지). grype가 없는 이미지에서 요청하면 `skipped`(`not_installed`), CLI가 deep-cve 이미지 없이 실행했으면 `skipped`(`fallback`, 이미지를 내려받지 못했거나 스캐너 이미지가 로컬 빌드, 1.13.2보다 낮은 버전, BomLens 이름이 아닌 이미지여서이며 `detail`에 이유를 적음. 그대로 둔 이미지에 grype가 있으면(`SBOM_DEEP_CVE=true`로 빌드) 대조를 실행하고 실제 결과를 기록), 요청하지 않았거나 `--security`가 꺼져 있거나 펌웨어 또는 AI 모델 스캔이면 `disabled` |
 | `generate-risk-report` | 위험 보고서 작성 |
 | `model-security` | AI 모델 파일의 위험한 내용 검사 |
 | `verify-weights` | 공개된 모델 가중치가 해시와 맞는지 확인 |

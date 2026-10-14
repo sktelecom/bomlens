@@ -1217,6 +1217,12 @@ optin_scan ghcr.io/sktelecom/bomlens:1.13.1 "$d" --project SC --version 1 --targ
     && pp_line | grep -qF 'is a version before 1.13.2 and SBOM_DEEP_CVE_IMAGE is not set'; } \
   && pass "a scanner image before 1.13.2 keeps post-processing on it with the reason handed on" \
   || { fail "pinned old SBOM_SCANNER_IMAGE with --deep-cve" "rc=$RC $(pp_line)"; show; }
+optin_scan registry.example/team/scanner:2.0 "$d" --project SC --version 1 --target . --generate-only --deep-cve
+{ pp_line | grep -qE ' registry.example/team/scanner:2.0$' && ! in_log "bomlens-deep-cve" \
+    && pp_line | grep -qF 'is not a BomLens image name and SBOM_DEEP_CVE_IMAGE is not set' \
+    && [ "$(grep -c -- '--deep-cve' "$OUT")" = 1 ] && in_out "runs only if it has grype"; } \
+  && pass "another scanner image name keeps post-processing on it, says so in one line, and hands the reason on" \
+  || { fail "non-BomLens SBOM_SCANNER_IMAGE with --deep-cve" "rc=$RC $(pp_line)"; show; }
 OPT_DC=registry.example/team/dc:7 optin_scan bomlens:dev "$d" --project SC --version 1 --target . --generate-only --deep-cve
 { pp_line | grep -qE ' registry.example/team/dc:7$' && pp_line | grep -qF 'BOMLENS_DEEP_CVE_FALLBACK= '; } \
   && pass "SBOM_DEEP_CVE_IMAGE set with a local scanner image is used as it is" \
