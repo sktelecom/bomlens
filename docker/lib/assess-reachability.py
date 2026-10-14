@@ -19,8 +19,11 @@ govulncheck reports each advisory at the deepest level it could confirm:
     symbol    an affected function is called (source) or present (binary)
 
 An advisory confirmed only at module or package level is written with
-`analysis.state = not_affected` and `justification = code_not_reachable`, and
-`detail` says which of the two it was. One confirmed at symbol level is
+`analysis.state = not_affected`. At module level no affected package is in the
+build (source) or linked (binary), so the justification is `code_not_present`;
+at package level the package is there but no affected function is called or
+linked, so it is `code_not_reachable`. `detail` says which. One confirmed at
+symbol level is
 `exploitable`: CycloneDX defines it as "may be directly or indirectly
 exploitable", which is what a call path (or the symbol in the binary) shows;
 `in_triage` is a person's open question, not a tool's answer. `detail` gives
@@ -50,6 +53,9 @@ CDX_SPEC_VERSION = "1.6"
 MAX_STREAM_BYTES = 256 * 1024 * 1024
 GO_VULN_URL = "https://pkg.go.dev/vuln/"
 LEVELS = {"module": 1, "package": 2, "symbol": 3}
+# not_affected: the affected package is absent (module level), or present with
+# no affected function called or linked (package level).
+JUSTIFICATIONS = {"module": "code_not_present", "package": "code_not_reachable"}
 
 # govulncheck reports a database it could not reach as "fetching
 # vulnerabilities: <the Go http error>". The second list covers a client
@@ -234,7 +240,7 @@ def build(bom, messages, mode, stable):
         primary, others = vuln_ids(osv)
         analysis = {"state": "exploitable" if level == "symbol" else "not_affected"}
         if level != "symbol":
-            analysis["justification"] = "code_not_reachable"
+            analysis["justification"] = JUSTIFICATIONS[level]
         analysis["detail"] = detail_for(mode, level, trace, pkgs, syms)
         counts[analysis["state"]] += 1
         vulns.append({

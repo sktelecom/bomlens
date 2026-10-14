@@ -150,7 +150,7 @@ Go 모듈의 취약점은 프로그램이 영향받는 코드를 실제로 쓸 �
 ./scripts/scan-sbom.sh --project "MyApp" --version "1.0.0" --target ./app --reachability --generate-only
 ```
 
-- SBOM의 컴포넌트에 해당하는 Go 보안 권고마다 CycloneDX VEX 문서인 `_reachability.cdx.json`에 판정이 남습니다. 영향받는 코드에 도달하지 않으면 `analysis.state`는 `not_affected`, `justification`은 `code_not_reachable`이고, `analysis.detail`에 이유를 적습니다. 영향받는 패키지가 빌드에 없거나, 패키지는 있지만 영향받는 함수를 호출하지 않거나(소스) 링크하지 않은(실행 파일) 경우입니다. 도달하면 상태는 `exploitable`이고 detail에 호출 경로나 심볼을 적습니다.
+- SBOM의 컴포넌트에 해당하는 Go 보안 권고마다 CycloneDX VEX 문서인 `_reachability.cdx.json`에 판정이 남습니다. 영향받는 코드에 도달하지 않으면 `analysis.state`는 `not_affected`이고, `analysis.detail`에 이유를 적습니다. 영향받는 패키지가 빌드에 없으면 `justification`은 `code_not_present`, 패키지는 있지만 영향받는 함수를 호출하지 않거나(소스) 링크하지 않았으면(실행 파일) `code_not_reachable`입니다. 도달하면 상태는 `exploitable`이고 detail에 호출 경로나 심볼을 적습니다.
 - 보안 보고서는 도달하지 않는 발견 항목을 이유와 함께 별도 절에 싣고 집계에서 뺍니다. 숨기지는 않습니다. 발견 항목은 `_security.json`에 그대로 있고 각각 `bomlens:reachability` 표시가 붙습니다. 도달하는 발견 항목은 발견 표에 이중 단검 기호로 표시합니다. 위험 보고서와 `--fail-on vulnerability=`도 보안 보고서와 같은 방식으로 셉니다.
 - `--reachability`는 `--security`를 자동으로 켭니다. Go 소스와 Go 실행 파일에 적용되고, 다른 스캔은 경고를 출력한 뒤 이 옵션 없이 진행합니다. 소스 스캔은 Go 툴체인이 있는 1단계의 Go 이미지 안에서 govulncheck를 실행합니다. 후처리 이미지에는 govulncheck 실행 파일만 들어 있습니다.
 - govulncheck는 Go 취약점 데이터베이스(vuln.go.dev)를 네트워크로 읽습니다. 닿지 않으면 `bomlens-result.json`에 이 단계를 건너뜀(`unavailable`)으로 기록하고, 보안 보고서는 이 옵션이 없을 때와 같습니다.

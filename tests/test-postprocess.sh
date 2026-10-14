@@ -11028,17 +11028,19 @@ jq -e '.bomFormat == "CycloneDX" and .specVersion == "1.6"
             and (.analysis | has("justification") | not) and (.analysis.detail | contains("ParseAcceptLanguage"))
             and any(.references[]; .id == "GO-2022-1059"))
        and (.vulnerabilities[] | select(.id == "CVE-2026-56852") | .analysis.state == "not_affected"
-            and .analysis.justification == "code_not_reachable" and (.analysis.detail | contains("unicode/norm")))
+            and .analysis.justification == "code_not_present" and (.analysis.detail | contains("unicode/norm")))
        and ([.vulnerabilities[].affects[].ref] - [.components[]["bom-ref"]] | length == 0)
        and ([.vulnerabilities[].id] | index("CVE-2099-0001") | not)' "$RCH/called.cdx.json" >/dev/null \
-    && pass "VEX: exploitable with the call path, not_affected + code_not_reachable with the reason, refs resolve" \
+    && pass "VEX: exploitable with the call path, a package not in the build is not_affected + code_not_present, refs resolve" \
     || fail "VEX content" "$(jq -c '[.vulnerabilities[] | [.id, .analysis]]' "$RCH/called.cdx.json")"
 # The same program without the call: the symbol finding is gone, the package one stays.
 jq -c 'select((.finding.trace[0].function // null) == null)' "$RCH_STREAM" > "$RCH/uncalled.json"
 python3 "$LIB/assess-reachability.py" "$RCH/bom.json" "$RCH/uncalled.json" 0 "$RCH/empty.err" source "$RCH/uncalled.cdx.json" >/dev/null
-jq -e '.vulnerabilities[] | select(.id == "CVE-2022-32149") | .analysis.state == "not_affected"
-       and (.analysis.detail | contains("is imported, but no call path reaches"))' "$RCH/uncalled.cdx.json" >/dev/null \
-    && pass "an imported package whose affected function is not called is not_affected" \
+jq -e '(.vulnerabilities[] | select(.id == "CVE-2022-32149") | .analysis.state == "not_affected"
+        and .analysis.justification == "code_not_reachable"
+        and (.analysis.detail | contains("is imported, but no call path reaches")))
+       and (.vulnerabilities[] | select(.id == "CVE-2026-56852") | .analysis.justification == "code_not_present")' "$RCH/uncalled.cdx.json" >/dev/null \
+    && pass "an imported package whose affected function is not called is not_affected + code_not_reachable" \
     || fail "uncalled: $(jq -c '.vulnerabilities' "$RCH/uncalled.cdx.json")"
 BYTE_STABLE=true python3 "$LIB/assess-reachability.py" "$RCH/bom.json" "$RCH_STREAM" 0 "$RCH/empty.err" source "$RCH/s1.cdx.json" >/dev/null
 BYTE_STABLE=true python3 "$LIB/assess-reachability.py" "$RCH/bom.json" "$RCH_STREAM" 0 "$RCH/empty.err" source "$RCH/s2.cdx.json" >/dev/null

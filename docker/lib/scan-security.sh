@@ -219,9 +219,10 @@ done
 # one of its references) and the component (purl, else module path and
 # version), carries the judgement as "bomlens:reachability" in _security.json,
 # and the document has a Reachability summary. A finding judged not_affected
-# (code_not_reachable) is listed on its own below and left out of the totals,
-# as the kernel's advisories are: it is shown, not dropped. A finding with no
-# judgement (not a Go advisory, or one govulncheck does not know) is unchanged.
+# (code_not_present or code_not_reachable) is listed on its own below and left
+# out of the totals, as the kernel's advisories are: it is shown, not dropped. A
+# finding with no judgement (not a Go advisory, or one govulncheck does not
+# know) is unchanged.
 REACH_DOC="${REACHABILITY_DOC:-}"
 if [ -n "$REACH_DOC" ] && [ -f "$REACH_DOC" ] && jq -e '.vulnerabilities | type == "array"' "$REACH_DOC" >/dev/null 2>&1; then
     tmp_r="$(mktemp)"
@@ -452,9 +453,10 @@ KEV_COUNT=$(echo "$FINDINGS" | jq '[.[] | select(.kev)] | length')
     fi
     if [ "${UNREACHED_N:-0}" -gt 0 ]; then
         echo "- Not reachable: **${UNREACHED_N}** finding(s), listed separately below and not"
-        echo "  included in the counts above. govulncheck found that the affected Go code is"
-        echo "  not called (source) or not in the executable (binary); each is recorded as"
-        echo "  \`not_affected\` (\`code_not_reachable\`) in \`$(basename "${REACH_DOC:-reachability.cdx.json}")\`."
+        echo "  included in the counts above. govulncheck found that the affected Go package is"
+        echo "  not in the build (\`code_not_present\`), or that no affected function in it is"
+        echo "  called (source) or in the executable (binary) (\`code_not_reachable\`); each is"
+        echo "  recorded as \`not_affected\` in \`$(basename "${REACH_DOC:-reachability.cdx.json}")\`."
         echo ""
     fi
     if [ "${KERNEL_TOTAL:-0}" -gt 0 ]; then
@@ -498,7 +500,7 @@ KEV_COUNT=$(echo "$FINDINGS" | jq '[.[] | select(.kev)] | length')
         echo "## Not reachable"
         echo ""
         echo "govulncheck judged that the code these advisories name is not reached. They are"
-        echo "recorded as \`not_affected\` with \`code_not_reachable\` in"
+        echo "recorded as \`not_affected\` with \`code_not_present\` or \`code_not_reachable\` in"
         echo "\`$(basename "${REACH_DOC:-reachability.cdx.json}")\`, and are not in the counts above."
         echo ""
         echo "| Severity | CVSS | CVE | Package | Installed | Fixed | Why |"
@@ -645,7 +647,7 @@ HTMLHEAD
         echo "<div class=\"note\"><b>${UNCHECKED_N} component(s) could not be checked</b> and are listed below. No vulnerability database was asked about them, so the counts above do not cover them.</div>"
     fi
     if [ "${UNREACHED_N:-0}" -gt 0 ]; then
-        echo "<div class=\"note\"><b>${UNREACHED_N} finding(s) are not reachable</b> and are listed at the end of this report, not in the counts above. govulncheck found that the affected Go code is not called (source) or not in the executable (binary); each is recorded as <code>not_affected</code> (<code>code_not_reachable</code>) in <code>$(esc "$(basename "${REACH_DOC:-reachability.cdx.json}")")</code>.</div>"
+        echo "<div class=\"note\"><b>${UNREACHED_N} finding(s) are not reachable</b> and are listed at the end of this report, not in the counts above. govulncheck found that the affected Go package is not in the build (<code>code_not_present</code>), or that no affected function in it is called (source) or in the executable (binary) (<code>code_not_reachable</code>); each is recorded as <code>not_affected</code> in <code>$(esc "$(basename "${REACH_DOC:-reachability.cdx.json}")")</code>.</div>"
     fi
     if [ "${KERNEL_TOTAL:-0}" -gt 0 ]; then
         echo "<div class=\"note\"><b>${KERNEL_TOTAL} kernel advisories</b> are listed at the end of this report and are not included in the counts above. Most advisories against a kernel are for subsystems a given device never compiled in, and the SBOM cannot tell which, so counting them here would bury the findings this report exists to show.</div>"
@@ -692,7 +694,7 @@ HTMLHEAD
     fi
     if [ "${UNREACHED_N:-0}" -gt 0 ]; then
         echo "<h2>Not reachable</h2>"
-        echo "<p class=\"meta\">govulncheck judged that the code these advisories name is not reached. They are recorded as <code>not_affected</code> with <code>code_not_reachable</code> in <code>$(esc "$(basename "${REACH_DOC:-reachability.cdx.json}")")</code>, and are not in the counts above.</p>"
+        echo "<p class=\"meta\">govulncheck judged that the code these advisories name is not reached. They are recorded as <code>not_affected</code> with <code>code_not_present</code> or <code>code_not_reachable</code> in <code>$(esc "$(basename "${REACH_DOC:-reachability.cdx.json}")")</code>, and are not in the counts above.</p>"
         echo "<div class=\"table-wrap\"><table><tr><th>Severity</th><th>CVSS</th><th>CVE</th><th>Package</th><th>Installed</th><th>Fixed</th><th>Why</th></tr>"
         echo "$UNREACHED_FINDINGS" | jq -r 'sort_by(
             {CRITICAL:0,HIGH:1,MEDIUM:2,LOW:3,UNKNOWN:4}[.severity] // 5)[] |

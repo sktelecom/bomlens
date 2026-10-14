@@ -529,7 +529,8 @@ Options:
                          whether the code each Go advisory names is reached (the
                          source's call graph, or the executable's symbols).
                          Unreached advisories are written as not_affected
-                         (code_not_reachable) in <Project>_<Version>_reachability.cdx.json
+                         (code_not_present or code_not_reachable) in
+                         <Project>_<Version>_reachability.cdx.json
                          (CycloneDX VEX) and listed apart in the security report,
                          out of its totals. Implies --security. Reads the Go
                          vulnerability database (vuln.go.dev) online; offline,
