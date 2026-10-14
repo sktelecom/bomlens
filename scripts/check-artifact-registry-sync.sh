@@ -95,6 +95,10 @@ _spdx3-check.md         :: yes :: yes :: _spdx3-check
 _ai-declaration.json    :: yes :: yes :: _ai-declaration\.json
 _ai-declaration.template.json :: yes :: yes :: _ai-declaration\.template\.json
 _component-versions.template.csv :: yes :: yes :: _component-versions\.template\.csv
+_reachability.cdx.json  :: no  :: yes :: _reachability\.cdx\.json
+_govulncheck_stage1.json :: no :: yes :: skip
+_govulncheck_stage1.err :: no  :: yes :: skip
+_govulncheck_stage1.rc  :: no  :: yes :: skip
 "
 
 # _vex.json and _vex_imported.json are deliberately absent from entrypoint.sh's
@@ -109,10 +113,17 @@ _component-versions.template.csv :: yes :: yes :: _component-versions\.template\
 # fresh each run, which is exactly why the cleanup sweeps it first.
 # _ai-declaration.json is the same kind of file: what the model's publisher
 # declared (with --ai-declare or in the web UI), applied again on a re-scan.
+# The _govulncheck_stage1.* files are stage 1's hand-off to stage 2 for
+# --reachability (build-prep.sh writes them, reachability.sh reads and removes
+# them): swept at the start of stage 2, they would be gone before they are
+# read. scan-sbom.sh removes an earlier run's copies before stage 1 instead.
 CLEANUP_EXEMPT="
 _vex.json
 _vex_imported.json
 _ai-declaration.json
+_govulncheck_stage1.json
+_govulncheck_stage1.err
+_govulncheck_stage1.rc
 "
 
 [ -f "$SERVER" ] || { echo "ERROR: $SERVER not found"; exit 2; }

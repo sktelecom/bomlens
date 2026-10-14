@@ -1141,6 +1141,17 @@ scan_in "$d" --project PT --version 1 --target app.out --generate-only \
   && pass "--license/--sbom-author/--identify-vendored/--trusca/--deep-cve reach the container" \
   || { fail "pass-through flags reach the container"; show; }
 
+d="$(new_proj reach-bin)"; printf 'ELFish\n' > "$d/app.out"
+scan_in "$d" --project RB --version 1 --target app.out --generate-only --reachability
+{ in_log "REACHABILITY=true" && in_log "GENERATE_SECURITY=true"; } \
+  && pass "--reachability on an executable reaches the container and turns the security report on" \
+  || { fail "--reachability on an executable"; show; }
+d="$(new_proj reach-rootfs)"; mkdir -p "$d/rfs/etc" "$d/rfs/usr" "$d/rfs/bin"
+scan_in "$d" --project RR --version 1 --target rfs --generate-only --reachability
+{ in_out "--reachability applies to a Go source tree or a Go executable" && in_log "REACHABILITY=false"; } \
+  && pass "--reachability on a root filesystem is refused with a warning and not passed on" \
+  || { fail "--reachability on a root filesystem"; show; }
+
 # --------------------------------------------------------
 section "Opt-in images follow SBOM_SCANNER_IMAGE"
 # --------------------------------------------------------

@@ -49,6 +49,11 @@ bom.json
 *_security_cvebintool.json
 *_security_grype.json
 *_security_trivy.json
+*_reachability.cdx.json
+*_govulncheck_stage1.json
+*_govulncheck_stage1.err
+*_govulncheck_stage1.rc
+.bomlens-govulncheck*
 bomlens-result.json
 bomlens-events.jsonl
 *.wfp

@@ -54,10 +54,15 @@ fi
 # --------------------------------------------------------
 # Vulnerability aggregation (Trivy JSON)
 # --------------------------------------------------------
-FINDINGS='[]'
+FINDINGS='[]'; UNREACHED_N=0
 if [ -f "$SEC" ] && jq empty "$SEC" >/dev/null 2>&1; then
+    # A finding govulncheck judged not reachable (--reachability) is counted
+    # apart, as the security report does.
+    UNREACHED_N=$(jq '[ .Results[]?.Vulnerabilities[]?
+        | select(((.["bomlens:reachability"] // {}).state // "") == "not_affected") ] | length' "$SEC" 2>/dev/null || echo 0)
     FINDINGS=$(jq -c '
-      [ .Results[]?.Vulnerabilities[]? | {
+      [ .Results[]?.Vulnerabilities[]?
+        | select(((.["bomlens:reachability"] // {}).state // "") != "not_affected") | {
           id: .VulnerabilityID,
           pkg: .PkgName,
           version: .InstalledVersion,
@@ -301,6 +306,8 @@ if [ "$REPORT_LANG" = "ko" ]; then
     P_PRESENCE_MD=$(tfmt risk.presence_only_md "$PRESENCE_ONLY" "$PRESENCE_ONLY")
     P_PRESENCE_HTML=$(tfmt risk.presence_only_html "$PRESENCE_ONLY" "$PRESENCE_ONLY")
     P_UNCHECKED_MD=$(tfmt risk.unchecked_md "$UNCHECKED_N")
+    P_UNREACHED_MD=$(tfmt risk.unreached_md "$UNREACHED_N")
+    P_UNREACHED_HTML=$(tfmt risk.unreached_html "$UNREACHED_N")
     P_UNCHECKED_HTML=$(tfmt risk.unchecked_html "$UNCHECKED_N")
     P_UNCHECKED_MORE=$(tfmt risk.unchecked_more "$((UNCHECKED_N - UNCHECKED_LIST_MAX))")
     P_REASON_NO_VERSION=$(kstr risk.unchecked_no_version)
@@ -372,6 +379,8 @@ else
     P_VULN_NONE_HTML="No known vulnerabilities, or no security artifact was produced."
     P_PRESENCE_MD="> ${PRESENCE_ONLY} component(s) were proved present but no version could be recovered. With no version there is nothing to ask a vulnerability database about, so the counts above do not cover them. The licence obligations still apply."
     P_PRESENCE_HTML="<b>${PRESENCE_ONLY} component(s)</b> were proved present but no version could be recovered. With no version there is nothing to ask a vulnerability database about, so the counts above do not cover them. The licence obligations still apply."
+    P_UNREACHED_MD="> ${UNREACHED_N} finding(s) are not reachable: govulncheck found that the affected Go code is not called or not in the executable (--reachability). They are not in the counts above; the security report lists them."
+    P_UNREACHED_HTML="<b>${UNREACHED_N} finding(s) are not reachable</b>: govulncheck found that the affected Go code is not called or not in the executable (--reachability). They are not in the counts above; the security report lists them."
     P_UNCHECKED_MD="> ${UNCHECKED_N} component(s) could not be checked: they have no version, or no package purl and no CPE that was matched, so no vulnerability database was asked about them. The counts above do not cover them."
     P_UNCHECKED_HTML="<b>${UNCHECKED_N} component(s) could not be checked</b>: they have no version, or no package purl and no CPE that was matched, so no vulnerability database was asked about them. The counts above do not cover them."
     P_UNCHECKED_MORE="… and $((UNCHECKED_N - UNCHECKED_LIST_MAX)) more (the security report lists them all)"
@@ -470,6 +479,10 @@ P_VULN_NOTE_HTML="<div class=\"note\">${P_DL_LEAD}<b>${P_DL_BOLD_CRIT}</b>, <b>$
     echo "|---:|---:|---:|---:|---:|---:|"
     echo "| ${C} | ${H} | ${M} | ${L} | ${U} | ${TOTAL} |"
     echo ""
+    if [ "${UNREACHED_N:-0}" -gt 0 ]; then
+        echo "${P_UNREACHED_MD}"
+        echo ""
+    fi
     if [ "${UNCHECKED_N:-0}" -gt 0 ]; then
         # The list names the presence-only components too (no version), so
         # their separate note is not repeated.
@@ -695,6 +708,9 @@ ${P_VULN_NOTE_HTML}
 </div>
 HTMLSEC
 
+    if [ "${UNREACHED_N:-0}" -gt 0 ]; then
+        echo "<div class=\"note\">${P_UNREACHED_HTML}</div>"
+    fi
     if [ "${UNCHECKED_N:-0}" -gt 0 ]; then
         echo "<div class=\"note\">${P_UNCHECKED_HTML}<ul>"
         # shellcheck disable=SC2016

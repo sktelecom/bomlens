@@ -188,6 +188,8 @@ TRUSCA_REF="${TRUSCA_REF:-}"; TRUSCA_RELEASE="${TRUSCA_RELEASE:-}"
 
 GENERATE_ONLY="false"; TARGET=""; PROJECT_NAME=""; PROJECT_VERSION=""; NESTED_ROOTFS_HINT=""
 GENERATE_NOTICE="false"; GENERATE_SECURITY="false"; GENERATE_SPDX="false"; DEEP_LICENSE="false"
+# Go reachability (--reachability): opt-in, it reads the Go vulnerability database online.
+REACHABILITY="false"
 # Tracks an EXPLICIT --security/--all, as opposed to the risk-report default
 # turning security on: only an explicit request is worth answering when a mode
 # cannot produce the report.
@@ -319,6 +321,8 @@ while [[ "$#" -gt 0 ]]; do
                SECURITY_REQUESTED="true" ;;
         --deep-license) DEEP_LICENSE="true" ;;
         --deep-cve) DEEP_CVE="true"; GENERATE_SECURITY="true"; SECURITY_REQUESTED="true" ;;
+        # The judgements mark rows of the security report, so it asks for that report too.
+        --reachability) REACHABILITY="true"; GENERATE_SECURITY="true"; SECURITY_REQUESTED="true" ;;
         --identify-vendored) IDENTIFY_VENDORED="true" ;;
         --verify-weights) VERIFY_WEIGHTS="true" ;;
         --sign) SIGN_SBOM="true" ;;
@@ -521,6 +525,15 @@ Options:
                          SECURITY_NVD_VERIFY=true (needs NVD_API_KEY, network) to
                          drop loose-version false positives; otherwise nvd:cpe
                          findings are flagged version-unverified.
+  --reachability         Go source or a Go executable: judge with govulncheck
+                         whether the code each Go advisory names is reached (the
+                         source's call graph, or the executable's symbols).
+                         Unreached advisories are written as not_affected
+                         (code_not_reachable) in <Project>_<Version>_reachability.cdx.json
+                         (CycloneDX VEX) and listed apart in the security report,
+                         out of its totals. Implies --security. Reads the Go
+                         vulnerability database (vuln.go.dev) online; offline,
+                         the step is skipped.
   --identify-vendored    Identify open source copied (vendored) into C/C++ source
                          that has no package manager. Matches file fingerprints
                          against the OSSKB service (opt-in image; sends hashes,
@@ -847,6 +860,7 @@ SBOM_PULL="${SBOM_PULL:-missing}"
 # ========================================================
 if [ "$UI_MODE" = "true" ]; then
     [ -z "$VEX_FILE" ] || { echo "[ERROR] --vex is not offered with --ui (import a VEX from the Vulnerabilities screen instead)."; exit 1; }
+    [ "$REACHABILITY" = "true" ] && { echo "[ERROR] --reachability is not offered with --ui yet; run it as a CLI scan of the Go source or executable."; exit 1; }
     [ -z "$AI_DECLARE_FILE" ] || { echo "[ERROR] --ai-declare is not offered with --ui (fill the declaration on the Models & datasets screen instead)."; exit 1; }
     [ -z "$COMPONENT_VERSIONS_FILE" ] || { echo "[ERROR] --component-versions is not offered with --ui (it applies to one firmware, root filesystem or binary scan)."; exit 1; }
     [ "${#FAIL_ON[@]}" -eq 0 ] || { echo "[ERROR] --fail-on is not offered with --ui (it exits on one scan's result; the UI runs many)."; exit 1; }
@@ -1094,6 +1108,8 @@ cleanup() {
                 rm -rf -- "/cleanup/$(basename "$d")" >/dev/null 2>&1 || true
         fi
     done
+    # The govulncheck copy --reachability hands stage 1 (removed after it, too).
+    [ -z "${REACH_BIN:-}" ] || rm -f "$REACH_BIN" 2>/dev/null || true
 }
 # Ctrl+C or kill ends the run here, after cleanup, rather than going on to the
 # next step. The container is stopped before its mounted temp dirs are
@@ -1104,6 +1120,7 @@ trap cleanup EXIT
 trap 'cleanup; echo "[INFO] Scan cancelled (Ctrl+C); the scan container was stopped." >&2; exit 130' INT
 trap 'cleanup; echo "[INFO] Scan stopped (TERM); the scan container was stopped." >&2; exit 143' TERM
 RUNNING_CONTAINER_NAME=""
+REACH_BIN=""
 
 # Host-persistent guard state: when a scan is interrupted hard
 # enough that build-prep.sh's own trap never runs (SIGKILL, OOM, a host
@@ -1230,13 +1247,13 @@ pp_env() {
     # secret never lands on the `docker run` argv where a local `ps` could read
     # it. Their values ride the exported shell env (see the export before each
     # `docker run`), matching the web-server path. Non-secret fields keep =value.
-    printf ' -e GENERATE_NOTICE=%s -e GENERATE_SECURITY=%s -e GENERATE_SPDX=%s -e SECURITY_ENRICH=%s -e GENERATE_REPORT=%s -e DEEP_LICENSE=%s -e IDENTIFY_VENDORED=%s -e SCANOSS_API_URL=%q -e SCANOSS_API_KEY -e SIGN_SBOM=%s -e BYTE_STABLE=%s -e REPORT_LANG=%s -e UPLOAD_ENABLED=%s -e PROJECT_NAME=%q -e PROJECT_VERSION=%q -e HOST_OUTPUT_DIR=/host-output -e HOST_UID=%s -e HOST_GID=%s -e API_KEY -e API_URL=%q -e UPLOAD_TARGET=%q -e TRUSCA_PROJECT_ID=%q -e TRUSCA_REF=%q -e TRUSCA_RELEASE=%q -e ENRICH_CDXGEN=%s -e ENRICH_EOL=%s -e ENRICH_MALICIOUS=%s -e STALENESS_ENRICH=%s -e DEEP_CVE=%s -e SECURITY_NVD_VERIFY=%s -e ENRICH_HF_SECURITY=%s -e VERIFY_MODEL_WEIGHTS=%s -e AIBOM_VERIFY_MAX_FILES=%q -e AIBOM_VERIFY_MAX_BYTES=%q -e AIBOM_DATASET_DEPTH=%q -e AIBOM_DATASET_MAX_LOOKUPS=%q -e GENERATE_SPDX3=%s -e AI_USAGE_CONTEXT=%q -e PROJECT_LICENSE=%q -e SBOM_AUTHOR=%q -e SRC_TREE_EXCLUDE=%q -e SOURCE_TREE_MAX=%q -e SOURCE_SNAPSHOT_MAX_TOTAL=%q -e SOURCE_SNAPSHOT_MAX_FILE=%q -e SOURCE_SNAPSHOT_MAX_FILES=%q -e FW_VERSTR_MAX_FILES=%q -e FW_VERSTR_MAX_BYTES=%q -e FW_ELF_MAX_FILES=%q -e FW_KERNEL_MAX_FILES=%q -e FW_KERNEL_MAX_BYTES=%q -e FW_KERNEL_MAX_VERSIONS=%q -e FW_EXTRA_ROOTS=%q -e FW_MAX_EXTRA_ROOTS=%q -e FW_CONTAINER_MEMBERSHIP=%q -e PURL_MIN_PCT=%q -e LICENSE_MIN_PCT=%q -e HASH_MIN_PCT=%q -e FIELD_MIN_PCT=%q -e CONFORMANCE_PROFILE=%s -e PURL_RESOLVE=%s -e PURL_RESOLVE_IGNORE -e PURL_RESOLVE_BUDGET -e LICENSE_REGISTRY=%s -e LICENSE_REGISTRY_VERIFY -e LICENSE_REGISTRY_BUDGET -e LICENSE_REGISTRY_API -e DEEP_LICENSE_MAX_FILES -e DEEP_LICENSE_TIMEOUT -e BOMLENS_DEEP_LICENSE_ALL' \
+    printf ' -e GENERATE_NOTICE=%s -e GENERATE_SECURITY=%s -e GENERATE_SPDX=%s -e SECURITY_ENRICH=%s -e GENERATE_REPORT=%s -e DEEP_LICENSE=%s -e IDENTIFY_VENDORED=%s -e SCANOSS_API_URL=%q -e SCANOSS_API_KEY -e SIGN_SBOM=%s -e BYTE_STABLE=%s -e REPORT_LANG=%s -e UPLOAD_ENABLED=%s -e PROJECT_NAME=%q -e PROJECT_VERSION=%q -e HOST_OUTPUT_DIR=/host-output -e HOST_UID=%s -e HOST_GID=%s -e API_KEY -e API_URL=%q -e UPLOAD_TARGET=%q -e TRUSCA_PROJECT_ID=%q -e TRUSCA_REF=%q -e TRUSCA_RELEASE=%q -e ENRICH_CDXGEN=%s -e ENRICH_EOL=%s -e ENRICH_MALICIOUS=%s -e STALENESS_ENRICH=%s -e DEEP_CVE=%s -e SECURITY_NVD_VERIFY=%s -e ENRICH_HF_SECURITY=%s -e VERIFY_MODEL_WEIGHTS=%s -e AIBOM_VERIFY_MAX_FILES=%q -e AIBOM_VERIFY_MAX_BYTES=%q -e AIBOM_DATASET_DEPTH=%q -e AIBOM_DATASET_MAX_LOOKUPS=%q -e GENERATE_SPDX3=%s -e AI_USAGE_CONTEXT=%q -e PROJECT_LICENSE=%q -e SBOM_AUTHOR=%q -e SRC_TREE_EXCLUDE=%q -e SOURCE_TREE_MAX=%q -e SOURCE_SNAPSHOT_MAX_TOTAL=%q -e SOURCE_SNAPSHOT_MAX_FILE=%q -e SOURCE_SNAPSHOT_MAX_FILES=%q -e FW_VERSTR_MAX_FILES=%q -e FW_VERSTR_MAX_BYTES=%q -e FW_ELF_MAX_FILES=%q -e FW_KERNEL_MAX_FILES=%q -e FW_KERNEL_MAX_BYTES=%q -e FW_KERNEL_MAX_VERSIONS=%q -e FW_EXTRA_ROOTS=%q -e FW_MAX_EXTRA_ROOTS=%q -e FW_CONTAINER_MEMBERSHIP=%q -e PURL_MIN_PCT=%q -e LICENSE_MIN_PCT=%q -e HASH_MIN_PCT=%q -e FIELD_MIN_PCT=%q -e CONFORMANCE_PROFILE=%s -e PURL_RESOLVE=%s -e PURL_RESOLVE_IGNORE -e PURL_RESOLVE_BUDGET -e LICENSE_REGISTRY=%s -e REACHABILITY=%s -e LICENSE_REGISTRY_VERIFY -e LICENSE_REGISTRY_BUDGET -e LICENSE_REGISTRY_API -e DEEP_LICENSE_MAX_FILES -e DEEP_LICENSE_TIMEOUT -e BOMLENS_DEEP_LICENSE_ALL' \
         "$GENERATE_NOTICE" "$GENERATE_SECURITY" "$GENERATE_SPDX" "$SECURITY_ENRICH" "$GENERATE_REPORT" "$DEEP_LICENSE" "$IDENTIFY_VENDORED" "$SCANOSS_API_URL" "$SIGN_SBOM" "$BYTE_STABLE" "$REPORT_LANG" "$UPLOAD_VAR" "$PROJECT_NAME" "$PROJECT_VERSION" "$(id -u)" "$(id -g)" "$SERVER_URL" "$UPLOAD_TARGET" "$TRUSCA_PROJECT_ID" "$TRUSCA_REF" "$TRUSCA_RELEASE" "${ENRICH_CDXGEN:-true}" "${ENRICH_EOL:-true}" "${ENRICH_MALICIOUS:-true}" "${STALENESS_ENRICH:-false}" "$DEEP_CVE" "${SECURITY_NVD_VERIFY:-false}" "${ENRICH_HF_SECURITY:-true}" "$VERIFY_WEIGHTS" "${AIBOM_VERIFY_MAX_FILES:-}" "${AIBOM_VERIFY_MAX_BYTES:-}" "${AIBOM_DATASET_DEPTH:-}" "${AIBOM_DATASET_MAX_LOOKUPS:-}" "$GENERATE_SPDX3" "${USAGE_CONTEXT:-${AI_USAGE_CONTEXT:-}}" "${PROJECT_LICENSE:-}" "${SBOM_AUTHOR:-}" "${SRC_TREE_EXCLUDE:-}" \
         "${SOURCE_TREE_MAX:-}" "${SOURCE_SNAPSHOT_MAX_TOTAL:-}" "${SOURCE_SNAPSHOT_MAX_FILE:-}" "${SOURCE_SNAPSHOT_MAX_FILES:-}" \
         "${FW_VERSTR_MAX_FILES:-}" "${FW_VERSTR_MAX_BYTES:-}" "${FW_ELF_MAX_FILES:-}" \
         "${FW_KERNEL_MAX_FILES:-}" "${FW_KERNEL_MAX_BYTES:-}" "${FW_KERNEL_MAX_VERSIONS:-}" \
         "${FW_EXTRA_ROOTS:-}" "${FW_MAX_EXTRA_ROOTS:-}" "${FW_CONTAINER_MEMBERSHIP:-}" \
-        "${PURL_MIN_PCT:-}" "${LICENSE_MIN_PCT:-}" "${HASH_MIN_PCT:-}" "${FIELD_MIN_PCT:-}" "$CONFORMANCE_PROFILE" "${PURL_RESOLVE:-false}" "${LICENSE_REGISTRY:-false}"
+        "${PURL_MIN_PCT:-}" "${LICENSE_MIN_PCT:-}" "${HASH_MIN_PCT:-}" "${FIELD_MIN_PCT:-}" "$CONFORMANCE_PROFILE" "${PURL_RESOLVE:-false}" "${LICENSE_REGISTRY:-false}" "$REACHABILITY"
     printf ' -e CYCLONEDX_SPEC_VERSION=%s' "$CDX_SPEC_VERSION"
     # Proxy, Trivy database and EPSS/KEV settings, by name.
     printf ' %s' "$(stage2_network_env_args)"
@@ -2362,6 +2379,12 @@ fi
 # nothing to catch there; saying so beats letting the flag look like it took
 # effect. A warning rather than an error, so a shared command line that carries
 # the flag still runs.
+# --reachability reads Go source (SOURCE) or one Go executable (BINARY).
+if [ "$REACHABILITY" = "true" ] && [ "$MODE" != "SOURCE" ] && [ "$MODE" != "BINARY" ]; then
+    echo "[WARN] --reachability applies to a Go source tree or a Go executable; ignoring it for this $MODE scan."
+    REACHABILITY="false"
+fi
+
 if [ "$PURL_RESOLVE" = "true" ] && [ "$MODE" != "ANALYZE" ]; then
     echo "[WARN] --resolve-purl applies to --analyze only; ignoring it for this scan."
     PURL_RESOLVE="false"
@@ -2565,6 +2588,29 @@ if [ "$MODE" = "SOURCE" ]; then
     esac
     # Names only (see build_prep_env_args), so this is safe inside the eval.
     PREP_ENV_ARGS=$(build_prep_env_args)
+    # --reachability on Go: govulncheck needs the Go toolchain of the stage 1
+    # image, and stage 1 images do not carry govulncheck, so the binary is
+    # copied out of the post-processing image into the run folder (which stage
+    # 1 mounts as /out) and removed when stage 1 is done. Stage 2 reports what
+    # came of it; an earlier run's leftovers are removed first.
+    REACH_BIN=""
+    rm -f "$OUTPUT_HOST_DIR/${SAFE_PROJECT}_${SAFE_VERSION}_govulncheck_stage1".json \
+          "$OUTPUT_HOST_DIR/${SAFE_PROJECT}_${SAFE_VERSION}_govulncheck_stage1".err \
+          "$OUTPUT_HOST_DIR/${SAFE_PROJECT}_${SAFE_VERSION}_govulncheck_stage1".rc
+    if [ "$REACHABILITY" = "true" ] && [ "$LANG_DET" = "go" ]; then
+        if ! docker image inspect "$POSTPROCESS_IMAGE" >/dev/null 2>&1 && [ "$SBOM_PULL" != "never" ]; then
+            docker pull -q "$POSTPROCESS_IMAGE" >/dev/null 2>&1 || true
+        fi
+        _rch_cid="$("${DOCKER_ENV[@]}" docker create --entrypoint true "$POSTPROCESS_IMAGE" 2>/dev/null)" || _rch_cid=""
+        if [ -n "$_rch_cid" ] \
+           && "${DOCKER_ENV[@]}" docker cp "$_rch_cid:/usr/local/bin/govulncheck" "$(hostpath "$OUTPUT_HOST_DIR")/.bomlens-govulncheck" >/dev/null 2>&1; then
+            REACH_BIN="$OUTPUT_HOST_DIR/.bomlens-govulncheck"
+            PREP_ENV_ARGS="$PREP_ENV_ARGS -e BOMLENS_REACHABILITY=true -e BOMLENS_GOVULNCHECK=/out/.bomlens-govulncheck"
+        else
+            echo "[WARN] --reachability: $POSTPROCESS_IMAGE has no govulncheck (an older image?); the Go call analysis is skipped. Refresh it (docker pull) and run again."
+        fi
+        [ -z "$_rch_cid" ] || "${DOCKER_ENV[@]}" docker rm -f "$_rch_cid" >/dev/null 2>&1 || true
+    fi
     # Run in the background and wait explicitly, instead of foreground, so a
     # Ctrl+C or `kill` is handled the moment it arrives: a shell only acts on a
     # trap once it regains control, and while blocked on a foreground command
@@ -2632,6 +2678,7 @@ if [ "$MODE" = "SOURCE" ]; then
     # runs. The real exit code comes from `docker wait` next regardless.
     wait "$STAGE1_PID" || true
     RUNNING_CONTAINER_NAME=""
+    [ -z "$REACH_BIN" ] || rm -f "$REACH_BIN"
     STAGE1_RC=$("${DOCKER_ENV[@]}" docker wait "$STAGE1_CONTAINER" 2>/dev/null || echo 1)
     # When stage 1 left no SBOM, stage 2 takes its place with the manifest-only
     # syft scan: the same fallback a caller running the execution plan gets
@@ -2997,6 +3044,11 @@ if [ "$GENERATE_ONLY" = "true" ]; then
     fi
     if [ -n "$VEX_FILE" ]; then
         summary_line "Supplier VEX:" "${P}_vex_imported.json" || note_missing "supplier VEX import"
+    fi
+    # A source tree that is not Go has nothing to judge (the log says so);
+    # only a Go source or an executable is expected to produce the VEX.
+    if [ "$REACHABILITY" = "true" ] && { [ "$MODE" = "BINARY" ] || [ "${LANG_DET:-}" = "go" ]; }; then
+        summary_line "Reachability:" "${P}_reachability.cdx.json" || note_missing "reachability VEX"
     fi
     if [ "$GENERATE_SPDX" = "true" ]; then
         summary_line "SPDX:" "${P}_bom.spdx.json" || note_missing "SPDX export"

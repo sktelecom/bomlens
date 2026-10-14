@@ -8277,8 +8277,10 @@ DETECT="$ROOT_DIR/docker/lib/source-detect.sh"
 # `-e VAR=value` at each of its own call sites -- adding them here would make
 # build_prep_env_args ALSO forward name-only from the launcher's own shell,
 # clobbering nothing today but wiring a second, wrong path for the same name.
+# BOMLENS_REACHABILITY and BOMLENS_GOVULNCHECK are the same kind: the launcher
+# sets both with a value only when it hands stage 1 a govulncheck binary.
 _read=$(grep -oE 'BOMLENS_[A-Z_]+:-' "$PREP" | sed 's/:-$//' | sort -u \
-    | grep -vE '^BOMLENS_GUARD_(ID|RESTORE_ONLY)$' | tr '\n' ' ')
+    | grep -vE '^BOMLENS_(GUARD_ID|GUARD_RESTORE_ONLY|REACHABILITY|GOVULNCHECK)$' | tr '\n' ' ')
 _listed=$(bash -c '. "$1"; printf "%s\n" $BUILD_PREP_ENV_NAMES' _ "$DETECT" | sort -u | tr '\n' ' ')
 [ -n "$_read" ] && [ "$_read" = "$_listed" ] \
     && pass "BUILD_PREP_ENV_NAMES matches the BOMLENS_* switches build-prep.sh reads" \
@@ -11003,6 +11005,122 @@ CASES
 [ -z "$sup_bad" ] \
     && pass "emails and URLs are dropped wherever they are, other brackets stay, and separators are tidied" \
     || fail "supplier cleaning:$sup_bad"
+echo "== reachability: govulncheck judgements become a CycloneDX VEX and mark the security report =="
+# --reachability. assess-reachability.py reads govulncheck's JSON stream (a
+# trimmed real run over a program that calls language.ParseAcceptLanguage of
+# golang.org/x/text v0.3.7, plus a stdlib advisory read from another Go
+# toolchain than the SBOM names) and writes analysis.state per advisory.
+RCH="$WORK/reach"
+mkdir -p "$RCH"
+RCH_STREAM="$ROOT_DIR/tests/fixtures/govulncheck-source-called.json"
+cat > "$RCH/bom.json" <<'JSON'
+{"bomFormat":"CycloneDX","specVersion":"1.6","metadata":{"timestamp":"2026-01-01T00:00:00Z","component":{"type":"application","name":"app","version":"1.0","bom-ref":"app"}},
+ "components":[{"type":"library","name":"text","group":"golang.org/x","version":"v0.3.7","purl":"pkg:golang/golang.org/x/text@v0.3.7","bom-ref":"pkg:golang/golang.org/x/text@v0.3.7"},
+               {"type":"library","name":"stdlib","version":"1.25.5","purl":"pkg:golang/stdlib@1.25.5","bom-ref":"pkg:golang/stdlib@1.25.5"}]}
+JSON
+: > "$RCH/empty.err"
+out="$(python3 "$LIB/assess-reachability.py" "$RCH/bom.json" "$RCH_STREAM" 0 "$RCH/empty.err" source "$RCH/called.cdx.json")"; rc=$?
+[ "$rc" = 0 ] && [ "$(jq -c '[.exploitable, .not_affected, .components]' <<<"$out")" = "[1,1,1]" ] \
+    && pass "a called advisory and a module-only one are judged; the stdlib of another toolchain is left out" \
+    || fail "assess-reachability: rc=$rc out=$out"
+jq -e '.bomFormat == "CycloneDX" and .specVersion == "1.6"
+       and (.vulnerabilities[] | select(.id == "CVE-2022-32149") | .analysis.state == "exploitable"
+            and (.analysis | has("justification") | not) and (.analysis.detail | contains("ParseAcceptLanguage"))
+            and any(.references[]; .id == "GO-2022-1059"))
+       and (.vulnerabilities[] | select(.id == "CVE-2026-56852") | .analysis.state == "not_affected"
+            and .analysis.justification == "code_not_reachable" and (.analysis.detail | contains("unicode/norm")))
+       and ([.vulnerabilities[].affects[].ref] - [.components[]["bom-ref"]] | length == 0)
+       and ([.vulnerabilities[].id] | index("CVE-2099-0001") | not)' "$RCH/called.cdx.json" >/dev/null \
+    && pass "VEX: exploitable with the call path, not_affected + code_not_reachable with the reason, refs resolve" \
+    || fail "VEX content" "$(jq -c '[.vulnerabilities[] | [.id, .analysis]]' "$RCH/called.cdx.json")"
+# The same program without the call: the symbol finding is gone, the package one stays.
+jq -c 'select((.finding.trace[0].function // null) == null)' "$RCH_STREAM" > "$RCH/uncalled.json"
+python3 "$LIB/assess-reachability.py" "$RCH/bom.json" "$RCH/uncalled.json" 0 "$RCH/empty.err" source "$RCH/uncalled.cdx.json" >/dev/null
+jq -e '.vulnerabilities[] | select(.id == "CVE-2022-32149") | .analysis.state == "not_affected"
+       and (.analysis.detail | contains("is imported, but no call path reaches"))' "$RCH/uncalled.cdx.json" >/dev/null \
+    && pass "an imported package whose affected function is not called is not_affected" \
+    || fail "uncalled: $(jq -c '.vulnerabilities' "$RCH/uncalled.cdx.json")"
+BYTE_STABLE=true python3 "$LIB/assess-reachability.py" "$RCH/bom.json" "$RCH_STREAM" 0 "$RCH/empty.err" source "$RCH/s1.cdx.json" >/dev/null
+BYTE_STABLE=true python3 "$LIB/assess-reachability.py" "$RCH/bom.json" "$RCH_STREAM" 0 "$RCH/empty.err" source "$RCH/s2.cdx.json" >/dev/null
+cmp -s "$RCH/s1.cdx.json" "$RCH/s2.cdx.json" && ! jq -e 'has("serialNumber")' "$RCH/s1.cdx.json" >/dev/null \
+    && pass "--byte-stable: two runs write the same bytes" || fail "byte-stable VEX differs"
+printf 'govulncheck: fetching vulnerabilities: Get "https://vuln.go.dev/index/modules.json.gz": dial tcp: lookup vuln.go.dev: no such host\n' > "$RCH/net.err"
+rc=0; out="$(python3 "$LIB/assess-reachability.py" "$RCH/bom.json" "$RCH/empty.err" 1 "$RCH/net.err" binary "$RCH/off.cdx.json")" || rc=$?
+[ "$rc" = 3 ] && [ "$(jq -r .status <<<"$out")" = unavailable ] && [ ! -f "$RCH/off.cdx.json" ] \
+    && pass "an unreachable Go vulnerability database is 'unavailable' and writes nothing" \
+    || fail "offline: rc=$rc out=$out"
+printf 'govulncheck: unrecognized binary format\n' > "$RCH/bad.err"
+rc=0; out="$(python3 "$LIB/assess-reachability.py" "$RCH/bom.json" "$RCH/empty.err" 1 "$RCH/bad.err" binary "$RCH/bad.cdx.json")" || rc=$?
+[ "$rc" = 2 ] && [ "$(jq -r .detail <<<"$out")" = "govulncheck: unrecognized binary format" ] \
+    && pass "another govulncheck error is a failure with its message" || fail "failure: rc=$rc out=$out"
+
+# reachability.sh: what it does without a Go component, without stage 1's
+# output, and in binary mode with govulncheck (a stub standing in for it).
+echo '{"bomFormat":"CycloneDX","specVersion":"1.6","components":[{"type":"library","name":"x","version":"1","purl":"pkg:npm/x@1"}]}' > "$RCH/npm.json"
+rc=0; bash "$LIB/reachability.sh" "$RCH/npm.json" "$RCH/npm" source >/dev/null || rc=$?
+[ "$rc" = 11 ] && pass "no Go component: nothing to judge (11)" || fail "npm-only SBOM rc=$rc"
+rc=0; out="$(bash "$LIB/reachability.sh" "$RCH/bom.json" "$RCH/nostage1" source)" || rc=$?
+[ "$rc" = 11 ] && jq -e '.detail | contains("stage 1 did not run govulncheck")' <<<"$out" >/dev/null \
+    && pass "source mode without stage 1's govulncheck output: nothing to judge, said why" || fail "no stage1: rc=$rc $out"
+cp "$RCH_STREAM" "$RCH/st_govulncheck_stage1.json"; : > "$RCH/st_govulncheck_stage1.err"; echo 0 > "$RCH/st_govulncheck_stage1.rc"
+rc=0; bash "$LIB/reachability.sh" "$RCH/bom.json" "$RCH/st" source >/dev/null || rc=$?
+[ "$rc" = 0 ] && [ -f "$RCH/st_reachability.cdx.json" ] && [ ! -e "$RCH/st_govulncheck_stage1.json" ] && [ ! -e "$RCH/st_govulncheck_stage1.rc" ] \
+    && pass "source mode reads stage 1's output, writes the VEX and removes the hand-off files" || fail "stage1 hand-off rc=$rc"
+mkdir -p "$RCH/bin"
+cat > "$RCH/bin/govulncheck" <<SH
+#!/bin/sh
+[ "\$1" = "-mode=binary" ] || exit 9
+cat "$RCH_STREAM"
+SH
+chmod +x "$RCH/bin/govulncheck"
+echo app > "$RCH/app"
+rc=0; out="$(PATH="$RCH/bin:$PATH" bash "$LIB/reachability.sh" "$RCH/bom.json" "$RCH/bn" binary "$RCH/app")" || rc=$?
+[ "$rc" = 0 ] && jq -e '.metadata.properties[] | select(.name == "bomlens:reachability:mode") | .value == "binary"' "$RCH/bn_reachability.cdx.json" >/dev/null \
+    && pass "binary mode runs govulncheck -mode=binary on the executable" || fail "binary mode rc=$rc out=$out"
+
+# scan-security.sh with the VEX: the not-reachable finding is marked, listed on
+# its own and kept out of the totals; the reached one carries its mark too.
+cat > "$FAKEBIN/trivy" <<'SH'
+#!/bin/sh
+out=""
+while [ $# -gt 0 ]; do
+    [ "$1" = "--output" ] && { out="$2"; shift; }
+    shift
+done
+cat > "$out" <<'J'
+{"SchemaVersion":2,"Results":[{"Target":"sbom","Class":"lang-pkgs","Vulnerabilities":[
+ {"VulnerabilityID":"CVE-2022-32149","PkgName":"golang.org/x/text","InstalledVersion":"v0.3.7","PkgIdentifier":{"PURL":"pkg:golang/golang.org/x/text@v0.3.7"},"Severity":"HIGH"},
+ {"VulnerabilityID":"CVE-2026-56852","PkgName":"golang.org/x/text","InstalledVersion":"v0.3.7","PkgIdentifier":{"PURL":"pkg:golang/golang.org/x/text@v0.3.7"},"Severity":"HIGH"},
+ {"VulnerabilityID":"CVE-2020-1111","PkgName":"libfoo","InstalledVersion":"1.0","Severity":"LOW"}]}]}
+J
+exit 0
+SH
+chmod +x "$FAKEBIN/trivy"
+PATH="$FAKEBIN:$PATH" SECURITY_ENRICH=false DEEP_CVE=false REACHABILITY_DOC="$RCH/called.cdx.json" \
+    bash "$LIB/scan-security.sh" "$RCH/bom.json" "$RCH/sec" proj >/dev/null 2>&1 || fail "scan-security.sh failed with a reachability VEX"
+jq -e '[.Results[].Vulnerabilities[] | [.VulnerabilityID, ((.["bomlens:reachability"] // {}).state // null)]]
+       == [["CVE-2022-32149","exploitable"],["CVE-2026-56852","not_affected"],["CVE-2020-1111",null]]
+       and .Reachability.NotAffected == 1 and .Reachability.Exploitable == 1 and .Reachability.Mode == "source"' \
+    "$RCH/sec_security.json" >/dev/null \
+    && pass "_security.json: each judged finding carries bomlens:reachability, with a Reachability summary" \
+    || fail "_security.json annotations" "$(jq -c '[.Results[].Vulnerabilities[] | [.VulnerabilityID, .["bomlens:reachability"]]], .Reachability' "$RCH/sec_security.json")"
+grep -q '^| 0 | 1 | 0 | 1 | 0 | 2 |$' "$RCH/sec_security.md" && grep -q '^## Not reachable' "$RCH/sec_security.md" \
+    && grep -q 'CVE-2026-56852 | golang.org/x/text' "$RCH/sec_security.md" && grep -q 'CVE-2022-32149 ‡' "$RCH/sec_security.md" \
+    && pass "markdown: the not-reachable finding is listed apart and out of the totals; the reached one is marked" \
+    || fail "markdown report" "$(sed -n '1,40p' "$RCH/sec_security.md")"
+grep -q '<h2>Not reachable</h2>' "$RCH/sec_security.html" && grep -q '1 finding(s) are not reachable' "$RCH/sec_security.html" \
+    && pass "html: the not-reachable section and its note" || fail "html report has no not-reachable section"
+PATH="$FAKEBIN:$PATH" SECURITY_ENRICH=false DEEP_CVE=false bash "$LIB/scan-security.sh" "$RCH/bom.json" "$RCH/secoff" proj >/dev/null 2>&1
+jq -e 'has("Reachability") | not' "$RCH/secoff_security.json" >/dev/null && ! grep -q 'Not reachable' "$RCH/secoff_security.md" \
+    && grep -q '^| 0 | 2 | 0 | 1 | 0 | 3 |$' "$RCH/secoff_security.md" \
+    && pass "without --reachability the report is as before" || fail "default report changed"
+bash "$LIB/evaluate-gate.sh" "$RCH/bom.json" "$RCH/sec" vulnerability=high >/dev/null 2>&1
+grep -q '^met	vulnerability=high	1 finding(s) at HIGH or worse (1 finding(s) judged not reachable are not counted)$' "$RCH/sec_gate.result" \
+    && pass "--fail-on vulnerability=high counts the reached finding only, and says so" || fail "gate: $(cat "$RCH/sec_gate.result")"
+cp "$RCH/bom.json" "$RCH/sec_bom.json"
+bash "$LIB/generate-risk-report.sh" "$RCH/sec" proj >/dev/null 2>&1
+grep -q '^| 0 | 1 | 0 | 1 | 0 | 2 |$' "$RCH/sec_risk-report.md" && grep -q '1 finding(s) are not reachable' "$RCH/sec_risk-report.md" \
+    && pass "risk report: the same totals, with the note" || fail "risk report" "$(grep -n 'Critical' -A3 "$RCH/sec_risk-report.md")"
 
 echo ""
 echo "Results: ${PASS} passed, ${FAIL} failed"

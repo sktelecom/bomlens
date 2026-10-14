@@ -4418,6 +4418,27 @@ EXCL_JS
     rm -f "$_js" "$_excl"
 fi
 
+# --reachability (Go): govulncheck reads the source with the Go toolchain this
+# image carries, so it runs here, after the module graph is complete, and not
+# in the post-processing image, which has no toolchain. The caller mounts the
+# govulncheck binary of the post-processing image at BOMLENS_GOVULNCHECK. Its
+# JSON stream, standard error and exit status go beside the SBOM; stage 2
+# (assess-reachability.py) reads and removes them. Nothing here changes the
+# SBOM, and a failure (no network for the Go vulnerability database, a tree
+# that does not build) is stage 2's to report.
+if [ "${BOMLENS_REACHABILITY:-false}" = "true" ] && [ -f go.mod ] && command -v go >/dev/null 2>&1; then
+    _gv_out="${OUT%_bom.json}_govulncheck_stage1"
+    rm -f "$_gv_out.json" "$_gv_out.err" "$_gv_out.rc"
+    if [ -n "${BOMLENS_GOVULNCHECK:-}" ] && [ -x "$BOMLENS_GOVULNCHECK" ]; then
+        log "reachability: govulncheck (source, call graph)"
+        run_supervised_timeout "$PREP_TIMEOUT_DEFAULT" \
+            sh -c '"$0" -format json ./... > "$1.json" 2> "$1.err"' "$BOMLENS_GOVULNCHECK" "$_gv_out"
+        echo "$?" > "$_gv_out.rc"
+    else
+        log "reachability: no govulncheck binary was handed to this image; call analysis skipped"
+    fi
+fi
+
 # Put the scanned tree back before the ownership fix below, so anything we
 # restored is chown'd too (the trap only covers an abnormal exit).
 guard_restore

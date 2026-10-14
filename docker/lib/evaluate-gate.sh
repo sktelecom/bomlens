@@ -114,7 +114,7 @@ step_problem() { # <step label> <status property name or ""> -> prints why, if a
 KERNEL_NAMES='["linux_kernel","linux-kernel","kernel","linux"]'
 
 judge_vulnerability() { # <cond> <severity>
-    local cond="$1" sev set count kernel err
+    local cond="$1" sev set count kernel err unreached
     sev="$(printf '%s' "$2" | tr '[:lower:]' '[:upper:]')"
     case "$sev" in
         CRITICAL) set='["CRITICAL"]' ;;
@@ -132,9 +132,14 @@ judge_vulnerability() { # <cond> <severity>
     # The same view of the findings as the report and the web screen: one per
     # (purl or name, id), the kernel's advisories counted apart from the rest.
     local unique='[ .Results[]?.Vulnerabilities[]?
-        | { sev: (.Severity // ""), pkg: (.PkgName // ""), purl: ((.PkgIdentifier // {}).PURL // ""), id: (.VulnerabilityID // "") } ]
+        | { sev: (.Severity // ""), pkg: (.PkgName // ""), purl: ((.PkgIdentifier // {}).PURL // ""), id: (.VulnerabilityID // ""),
+            unreached: (((.["bomlens:reachability"] // {}).state // "") == "not_affected") } ]
         | unique_by([ (if .purl != "" then .purl else .pkg end), .id ])
         | map(select(.sev as $s | $set | index($s)))'
+    # A finding govulncheck judged not reachable (--reachability) is listed apart
+    # in the report, out of its totals, and is not counted here either.
+    unreached="$(jq --argjson set "$set" "$unique"' | map(select(.unreached)) | length' "$SECURITY" 2>/dev/null)"
+    unique="$unique | map(select(.unreached | not))"
     count="$(jq --argjson set "$set" --argjson kn "$KERNEL_NAMES" "$unique"' | map(select((.pkg | ascii_downcase) as $n | ($kn | index($n)) | not)) | length' "$SECURITY" 2>/dev/null)"
     kernel="$(jq --argjson set "$set" --argjson kn "$KERNEL_NAMES" "$unique"' | map(select((.pkg | ascii_downcase) as $n | ($kn | index($n)) != null)) | length' "$SECURITY" 2>/dev/null)"
     is_number "$count" || { emit unjudged "$cond" "the security report could not be read"; return; }
@@ -142,6 +147,10 @@ judge_vulnerability() { # <cond> <severity>
     err="$(jq -r '.ScanError.Message // empty' "$SECURITY" 2>/dev/null)"
     local note=""
     [ "$kernel" -gt 0 ] && note=" ($kernel kernel advisory(ies) are reported separately and not counted)"
+    is_number "$unreached" || unreached=0
+    if [ "$unreached" -gt 0 ]; then
+        note="$note ($unreached finding(s) judged not reachable are not counted)"
+    fi
     if [ "$count" -gt 0 ]; then
         emit met "$cond" "$count finding(s) at $sev or worse${note}"
     elif [ -n "$err" ]; then

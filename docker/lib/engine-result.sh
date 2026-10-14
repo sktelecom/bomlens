@@ -132,6 +132,7 @@ _er_role() {
         *_security_grype.json|*_security_cvebintool.json|*_security_yocto.json) echo "vulnerabilities.other" ;;
         *_scancode.json) echo "license-scan.scancode" ;;
         *_vendored.cdx.json) echo "vendored.cyclonedx" ;;
+        *_reachability.cdx.json) echo "vex.reachability" ;;
         *_conformance.json) echo "conformance" ;;
         *_input.json) echo "input-description" ;;
         bomlens-plan.json) echo "plan" ;;

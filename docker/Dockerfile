@@ -103,6 +103,30 @@ RUN mkdir -p /out
 # hadolint ignore=DL3006
 FROM cpe-index-${SBOM_CPE_INDEX} AS cpe-index
 
+# ---- govulncheck stage: Go reachability (--reachability) ----
+# govulncheck has no release binaries, so it is built here from the pinned module
+# version and copied into the runtime stage as one static executable; no Go
+# toolchain goes into the image. Built on the BUILD platform and cross-compiled
+# for the target (no emulation). The module's h1 hash is checked against the pin
+# below before the build (go also checks it against the Go checksum database),
+# so a changed release cannot slip in under the same version. Go 1.27 builds it:
+# govulncheck type-checks the scanned source with the Go it was built with, so
+# it reads modules up to that Go version. BSD-3-Clause (THIRD_PARTY_LICENSES.md).
+FROM --platform=$BUILDPLATFORM golang:1.27.2-alpine@sha256:f92b6ef800e499660581efdabdf25d9d817a9d124eaf900924f0504e7e27e12d AS govulncheck
+ARG TARGETARCH
+# renovate: datasource=go depName=golang.org/x/vuln
+ARG GOVULNCHECK_VERSION=v1.8.0
+ARG GOVULNCHECK_MODULE_SUM=h1:clG4qBU6zH5VKjti8n5j8BBuYzoSha392xXMkXS351U=
+ENV GOTOOLCHAIN=local CGO_ENABLED=0 GOFLAGS=-trimpath
+RUN set -e; \
+    got="$(go mod download -json "golang.org/x/vuln@${GOVULNCHECK_VERSION}" | sed -n 's/^[[:space:]]*"Sum": "\(.*\)",*$/\1/p')"; \
+    if [ "$got" != "$GOVULNCHECK_MODULE_SUM" ]; then \
+      echo "[build] ERROR: golang.org/x/vuln@${GOVULNCHECK_VERSION} hash is '$got', expected '$GOVULNCHECK_MODULE_SUM'."; exit 1; \
+    fi; \
+    GOOS=linux GOARCH="${TARGETARCH}" GOBIN= go install -ldflags="-s -w" "golang.org/x/vuln/cmd/govulncheck@${GOVULNCHECK_VERSION}"; \
+    out="/go/bin/govulncheck"; [ -x "$out" ] || out="/go/bin/linux_${TARGETARCH}/govulncheck"; \
+    install -D -m 0755 "$out" /out/govulncheck
+
 # ---- Stage 2: post-process runtime ----
 # python 3.12: the base only needs stdlib (web server.py), but the opt-in scancode/
 # firmware tools (pinned) do not yet support newer Python, so we stay on 3.12.
@@ -460,6 +484,8 @@ ENV CVE_BIN_TOOL_HOME=/opt/cve-bin-tool-home
 # Attribution + required notices for the bundled NVD-derived data. Shipped with it.
 COPY CVE-DATA-NOTICE.txt /opt/cve-bin-tool-home/CVE-DATA-NOTICE.txt
 COPY --from=cpe-index /out/ /opt/cve-bin-tool-home/
+# govulncheck (--reachability), built in the govulncheck stage above.
+COPY --from=govulncheck /out/govulncheck /usr/local/bin/govulncheck
 RUN set -e; \
     if [ "$SBOM_FIRMWARE" = "true" ]; then \
       if [ ! -s "$CVE_BIN_TOOL_HOME/cpe_match.sqlite" ]; then \
