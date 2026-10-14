@@ -11027,6 +11027,26 @@ python3 "$UPP" "$WORK/upp-ref.json" >/dev/null 2>&1
 cp "$WORK/upp.json" "$WORK/upp2.json"
 python3 "$UPP" "$WORK/upp2.json" >/dev/null 2>&1
 diff -q "$WORK/upp.json" "$WORK/upp2.json" >/dev/null && pass "upstream-purl.py is idempotent" || fail "a second run changed the SBOM"
+# syft reports a firmware's busybox twice: as the distribution (operating-system)
+# and as the classified binary (application). The purl goes to the binary only.
+upp_os() {
+    printf '{"bomFormat":"CycloneDX","specVersion":"1.6","components":[%s]}' "$2" > "$WORK/upp-$1.json"
+    python3 "$UPP" "$WORK/upp-$1.json" >/dev/null 2>&1
+    jq -r '[.components[] | "\(.type)=\(.purl // "-")"] | join(" ")' "$WORK/upp-$1.json"
+}
+UPP_OS='{"type":"operating-system","name":"busybox","version":"1.35.0","bom-ref":"os:busybox@1.35.0"}'
+upp_got=$(upp_os both "$UPP_OS,{\"type\":\"application\",\"name\":\"busybox\",\"version\":\"1.35.0\",\"purl\":\"pkg:generic/busybox@1.35.0\"}")
+[ "$upp_got" = "operating-system=- application=pkg:github/mirror/busybox@1_35_0" ] \
+    && pass "an operating-system component and the binary of the same name and version: only the binary gets the upstream purl" \
+    || fail "busybox os + binary: $upp_got"
+upp_got=$(upp_os osonly "$UPP_OS")
+[ "$upp_got" = "operating-system=pkg:github/mirror/busybox@1_35_0" ] \
+    && pass "an operating-system component with no matching package keeps getting the upstream purl" \
+    || fail "busybox os only: $upp_got"
+upp_got=$(upp_os otherver "$UPP_OS,{\"type\":\"library\",\"name\":\"busybox\",\"version\":\"1.36.1\"}")
+[ "$upp_got" = "operating-system=pkg:github/mirror/busybox@1_35_0 library=pkg:github/mirror/busybox@1_36_1" ] \
+    && pass "the same name at a different version: each component gets its own upstream purl" \
+    || fail "busybox os + other version: $upp_got"
 # The table is the only source of identities: no entry for a project this
 # change was not asked to cover.
 up_ids=$(jq -r '[.entries[].id] | join(" ")' "$LIB/upstream-purl-map.json")

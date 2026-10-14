@@ -30,6 +30,9 @@
 #     the form its repository tags);
 #   - its name is in the entry's names, or its CPE vendor:product is in the
 #     entry's cpe list, and the two do not point at different entries.
+#   - for an operating-system component, no package or binary component in
+#     the SBOM carries the same purl (busybox is reported as both; the purl
+#     goes to the binary only).
 # Anything else is left exactly as it is. A name the table does not hold is
 # never turned into a repository by pattern: a wrong owner or tag identifies a
 # different project or a different version, which is worse than no purl.
@@ -158,21 +161,36 @@ def apply(doc, table):
         if isinstance(d, dict):
             refs.add(d.get("ref"))
             refs.update(d.get("dependsOn") or [])
-    changed = unmapped = 0
+    plans = []
     for c in comps:
         if not isinstance(c, dict) or c.get("type", "library") not in PACKAGE_TYPES:
             continue
         old = c.get("purl") or ""
         if old and purl_type(old) not in replaceable:
+            plans.append((c, old, None))
             continue
         version = c.get("version")
         if not isinstance(version, str) or not version.strip():
             continue
-        new = resolve(by_name, by_cpe, c.get("name"), version, c.get("cpe"))
+        plans.append((c, old, resolve(by_name, by_cpe, c.get("name"), version, c.get("cpe")) or ""))
+    # The purl each package or binary component carries once this step is done.
+    # syft reports a firmware's busybox both as its distribution
+    # (operating-system, os:busybox@<v>) and as the binary it classified
+    # (application); both resolve to the same repository purl, and one purl on
+    # two components reads as the project listed twice. The package keeps it;
+    # the operating-system component stays, without it.
+    package_purls = {(new if new else old) for c, old, new in plans
+                     if c.get("type", "library") != "operating-system"}
+    changed = unmapped = 0
+    for c, old, new in plans:
+        if new is None:
+            continue
         if not new:
             unmapped += 1
             continue
         if new == old:
+            continue
+        if c.get("type") == "operating-system" and new in package_purls:
             continue
         props = [p for p in (c.get("properties") or [])
                  if not (isinstance(p, dict)

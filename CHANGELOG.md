@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Normalizing a firmware or root filesystem SBOM with tens of thousands of components could take hours: the step that folds the `file` entry syft writes for an identified binary into that binary compared every file entry with every component. It now looks up only the binaries filed under the same file name, with the same result (a 60,000-component SBOM went from several minutes to about a second in this step).
+- A firmware, root filesystem or binary scan that reports a project both as the operating-system component and as a package or binary of the same name and version, as syft does for BusyBox (`os:busybox@1.35.0` and the classified `busybox` binary), gave both the same upstream repository PURL, so the SBOM listed that PURL twice. The PURL now goes to the package or binary only; the operating-system component stays, without it. An operating-system component with no such package still gets the PURL.
 
 ## [v1.13.3] - 2026-10-14
 
