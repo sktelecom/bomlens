@@ -71,8 +71,16 @@ case "${1:-}" in
     # value cannot be read would.
     [ -z "${DOCKER_STUB_MEMTOTAL:-}" ] || echo "$DOCKER_STUB_MEMTOTAL"
     exit 0 ;;
-  version|pull|stop|rm) exit 0 ;;
+  pull)
+    # DOCKER_STUB_MISSING_IMAGE names one image that is neither present nor
+    # pullable (not published, an offline host).
+    [ -n "${DOCKER_STUB_MISSING_IMAGE:-}" ] && [ "${2:-}" = "$DOCKER_STUB_MISSING_IMAGE" ] && exit 1
+    exit 0 ;;
+  version|stop|rm) exit 0 ;;
   image)
+    if [ -n "${DOCKER_STUB_MISSING_IMAGE:-}" ]; then
+      for a in "$@"; do [ "$a" = "$DOCKER_STUB_MISSING_IMAGE" ] && exit 1; done
+    fi
     # `docker image inspect -f '{{index .Config.Labels "com.sktelecom.sbom.engine-contract"}}'`:
     # the stub models an image as new as this CLI. DOCKER_STUB_OLD_IMAGE=1
     # models one from before the engine contract (no label).
@@ -1145,6 +1153,33 @@ optin_scan registry.example:5000/mirror/bomlens:1.13.2 "$d" --project OC --versi
 in_log "registry.example:5000/mirror/bomlens-deep-cve:1.13.2" \
   && pass "--deep-cve follows a mirrored scanner image's path and tag" \
   || { fail "--deep-cve image does not follow SBOM_SCANNER_IMAGE" "rc=$RC"; show; }
+
+# A source scan runs --deep-cve's grype in its post-processing stage, so that
+# stage must run on the deep-cve image (the base image has no grype).
+pp_line() { grep -F -- "MODE=POSTPROCESS" "$LOG" | grep -F -- "docker run"; }
+d="$(new_proj optin_src_cve)"; printf '{"name":"x","version":"1.0.0"}\n' > "$d/package.json"
+NVD_API_KEY=k optin_scan "" "$d" --project SC --version 1 --target . --generate-only --deep-cve
+{ pp_line | grep -qE ' ghcr.io/sktelecom/bomlens-deep-cve:latest$' && pp_line | grep -qF -- '-e DEEP_CVE=true' \
+    && pp_line | grep -qF -- '-e NVD_API_KEY ' && pp_line | grep -qF 'BOMLENS_DEEP_CVE_FALLBACK= '; } \
+  && pass "a source scan with --deep-cve post-processes on the deep-cve image, with NVD_API_KEY by name" \
+  || { fail "source scan --deep-cve post-process image" "rc=$RC $(pp_line)"; show; }
+DOCKER_STUB_MISSING_IMAGE=ghcr.io/sktelecom/bomlens-deep-cve:latest SBOM_PULL=never \
+  optin_scan "" "$d" --project SC --version 1 --target . --generate-only --deep-cve
+{ [ "$RC" = 0 ] && pp_line | grep -qE ' ghcr.io/sktelecom/bomlens:latest$' \
+    && pp_line | grep -qF 'BOMLENS_DEEP_CVE_FALLBACK=ghcr.io/sktelecom/bomlens-deep-cve:latest ' \
+    && in_out "the grype image ghcr.io/sktelecom/bomlens-deep-cve:latest is not available"; } \
+  && pass "with the deep-cve image unavailable, a source scan goes on with the base image and says so" \
+  || { fail "source scan --deep-cve fallback" "rc=$RC $(pp_line)"; show; }
+optin_scan "" "$d" --project SC --version 1 --target . --generate-only --deep-cve --deep-license
+{ pp_line | grep -qE ' ghcr.io/sktelecom/bomlens-deep-cve:latest$' && in_out "no image has both scancode and grype"; } \
+  && pass "--deep-cve with --deep-license runs on the deep-cve image and says the licence scan does not run" \
+  || { fail "source scan --deep-cve --deep-license image" "rc=$RC $(pp_line)"; show; }
+DOCKER_STUB_MISSING_IMAGE=ghcr.io/sktelecom/bomlens-deep-cve:latest SBOM_PULL=never \
+  optin_scan "" "$d" --project SC --version 1 --target . --generate-only --deep-cve --deep-license
+{ pp_line | grep -qE ' ghcr.io/sktelecom/bomlens-deep-license:latest$' \
+    && pp_line | grep -qF 'BOMLENS_DEEP_CVE_FALLBACK=ghcr.io/sktelecom/bomlens-deep-cve:latest '; } \
+  && pass "with the deep-cve image unavailable, --deep-license still gets the deep-license image" \
+  || { fail "source scan --deep-cve fallback with --deep-license" "rc=$RC $(pp_line)"; show; }
 
 d="$(new_proj optin_ui)"
 optin_scan ghcr.io/sktelecom/bomlens:1.13.2 "$d" --ui --output-dir "$d"
