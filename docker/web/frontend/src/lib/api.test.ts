@@ -529,6 +529,14 @@ describe("startScan", () => {
     expect(qs.has("includeOsv")).toBe(false);
     expect(qs.get("byte_stable")).toBe("false");
     expect(qs.get("deep_cve")).toBe("false");
+    // Go reachability is opt-in: an absent flag is sent as false.
+    expect(qs.get("reachability")).toBe("false");
+  });
+
+  it("sends the Go reachability toggle as the reachability flag", () => {
+    startScan({ ...PARAMS, reachability: true }, handlers());
+    const qs = new URLSearchParams(FakeEventSource.last!.url.split("?")[1]);
+    expect(qs.get("reachability")).toBe("true");
   });
 
   it("sends the CycloneDX version as spec_version, empty when not chosen", () => {

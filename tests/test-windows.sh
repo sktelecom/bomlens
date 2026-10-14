@@ -264,7 +264,7 @@ for flag in --project --version --target --git --branch --firmware --analyze \
             --byte-stable --sign --output-dir --timestamp --ui \
             --license --sbom-author --model --model-file --usage --merge --merge-root \
             --diff --trusca --upload-target --deep-cve --identify-vendored --verify-weights --spdx --lang \
-            --conformance-profile --fail-on-conformance --fail-on --vex --ai-declare --no-spdx3 --as-source --component-versions; do
+            --conformance-profile --fail-on-conformance --fail-on --vex --ai-declare --no-spdx3 --as-source --component-versions --reachability; do
   if printf '%s' "$HELP" | grep -q -- "$flag"; then pass "help documents $flag"
   else fail "help documents $flag"; fi
 done
@@ -391,6 +391,14 @@ BOMLENS_CANCEL_GRACE=45 scan_in "$d" --ui --output-dir "$d"
 in_log "-e BOMLENS_CANCEL_GRACE" \
   && pass "BOMLENS_CANCEL_GRACE passed to the web UI container" \
   || { fail "BOMLENS_CANCEL_GRACE passed to the web UI container" "rc=$RC"; show; }
+
+# --reachability is a per-scan option of the UI (its new-scan form), so with
+# --ui it is accepted and left to that form, like --deep-license.
+d="$(new_proj ui_reach)"
+scan_in "$d" --ui --reachability --output-dir "$d"
+{ [ "$RC" -eq 0 ] && in_log "MODE=UI" && ! in_out "--reachability"; } \
+  && pass "--ui --reachability starts the web UI" \
+  || { fail "--ui --reachability starts the web UI" "rc=$RC"; show; }
 
 d="$(new_proj ui_mirror)"
 CDXGEN_IMAGE_PREFIX=registry.example/mirror/cdxgen/ scan_in "$d" --ui --output-dir "$d"

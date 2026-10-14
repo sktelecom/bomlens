@@ -861,7 +861,6 @@ SBOM_PULL="${SBOM_PULL:-missing}"
 # ========================================================
 if [ "$UI_MODE" = "true" ]; then
     [ -z "$VEX_FILE" ] || { echo "[ERROR] --vex is not offered with --ui (import a VEX from the Vulnerabilities screen instead)."; exit 1; }
-    [ "$REACHABILITY" = "true" ] && { echo "[ERROR] --reachability is not offered with --ui yet; run it as a CLI scan of the Go source or executable."; exit 1; }
     [ -z "$AI_DECLARE_FILE" ] || { echo "[ERROR] --ai-declare is not offered with --ui (fill the declaration on the Models & datasets screen instead)."; exit 1; }
     [ -z "$COMPONENT_VERSIONS_FILE" ] || { echo "[ERROR] --component-versions is not offered with --ui (it applies to one firmware, root filesystem or binary scan)."; exit 1; }
     [ "${#FAIL_ON[@]}" -eq 0 ] || { echo "[ERROR] --fail-on is not offered with --ui (it exits on one scan's result; the UI runs many)."; exit 1; }

@@ -1065,10 +1065,13 @@ function JumpCards({
             id: "vulnerabilities" as SectionId,
             icon: ShieldAlert,
             value: result.security.TOTAL,
-            // A 0 here covers only the components a check reached.
+            // A 0 here covers only the components a check reached. Findings
+            // judged not reachable are out of TOTAL, as in the security report.
             sub: result.security.uncheckedCount
               ? t("result.uncheckedTile", { count: result.security.uncheckedCount })
-              : undefined,
+              : result.security.notReachableCount
+                ? t("result.notReachableTile", { count: result.security.notReachableCount })
+                : undefined,
           },
         ]
       : []),

@@ -51,7 +51,9 @@ export function SeverityBar({ security, selected = "", onSelect }: Props) {
         <p className="text-sm text-muted-foreground">
           {security.uncheckedCount
             ? t("result.noVulnsSomeUnchecked", { count: security.uncheckedCount })
-            : t("result.noVulns")}
+            : security.notReachableCount
+              ? t("result.noVulnsSomeNotReachable", { count: security.notReachableCount })
+              : t("result.noVulns")}
         </p>
       ) : (
         <>

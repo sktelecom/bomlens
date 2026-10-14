@@ -388,6 +388,8 @@ export function ScanOptions({ state }: { state: ScanFormState }) {
     setIdentifyVendored,
     deepCve,
     setDeepCve,
+    reachability,
+    setReachability,
     byteStable,
     setByteStable,
     conformanceProfile,
@@ -404,6 +406,7 @@ export function ScanOptions({ state }: { state: ScanFormState }) {
     showVendored,
     showDeepLicense,
     showDeepCve,
+    showReachability,
     showByteStable,
     showOutboundLicense,
     showSbomAuthor,
@@ -467,6 +470,14 @@ export function ScanOptions({ state }: { state: ScanFormState }) {
             <SiblingImagePanel imageKey="deep-cve" />
           )}
         </div>
+      )}
+      {showReachability && (
+        <ToggleRow
+          labelKey="reachability"
+          checked={reachability}
+          onChange={setReachability}
+          disabled={busy}
+        />
       )}
       {showByteStable && (
         <ToggleRow

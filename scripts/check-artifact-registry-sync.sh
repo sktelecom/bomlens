@@ -95,7 +95,7 @@ _spdx3-check.md         :: yes :: yes :: _spdx3-check
 _ai-declaration.json    :: yes :: yes :: _ai-declaration\.json
 _ai-declaration.template.json :: yes :: yes :: _ai-declaration\.template\.json
 _component-versions.template.csv :: yes :: yes :: _component-versions\.template\.csv
-_reachability.cdx.json  :: no  :: yes :: _reachability\.cdx\.json
+_reachability.cdx.json  :: yes :: yes :: _reachability\.cdx\.json
 _govulncheck_stage1.json :: no :: yes :: skip
 _govulncheck_stage1.err :: no  :: yes :: skip
 _govulncheck_stage1.rc  :: no  :: yes :: skip

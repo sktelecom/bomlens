@@ -38,11 +38,13 @@ import { buildQuery, parseQuery, type RouteQuery, scanHash } from "@/lib/route";
 import { vulnsFromQuery, vulnsToQuery } from "@/lib/section-query";
 import { severityTone } from "@/lib/severity";
 import { useToast } from "@/lib/toast";
+import { notReachableSummary } from "@/lib/reachability";
 import { uncheckedSummary } from "@/lib/unchecked";
 import { compareVulns, groupByUpgrade, type SortDir, type VulnSortKey } from "@/lib/vulns";
 import { cn } from "@/lib/utils";
 import { IS_STATIC_DEMO } from "@/lib/demo";
 
+import { NotReachableFindings } from "./NotReachableFindings";
 import { SeverityBar } from "./SeverityBar";
 import { UncheckedComponents } from "./UncheckedComponents";
 
@@ -603,11 +605,16 @@ export function VulnerabilitiesTable({
     }
     // Zero findings over a partial inventory is not a clean result: say how
     // many components no check reached instead of "No vulnerabilities found".
-    if (uncheckedSummary(security)) {
+    // Findings judged not reachable are not counted either, but they are shown.
+    const unchecked = uncheckedSummary(security);
+    if (unchecked || notReachableSummary(security)) {
       return (
         <div className="space-y-3">
           <UncheckedComponents security={security} />
-          <p className="text-xs text-muted-foreground">{t("result.noVulnsInChecked")}</p>
+          <NotReachableFindings security={security} />
+          <p className="text-xs text-muted-foreground">
+            {t(unchecked ? "result.noVulnsInChecked" : "result.noReachableVulns")}
+          </p>
         </div>
       );
     }
@@ -663,6 +670,7 @@ export function VulnerabilitiesTable({
         </p>
       ) : null}
       <UncheckedComponents security={security} />
+      <NotReachableFindings security={security} />
       {upgradeGroups.length > 0 && (
         <div className="space-y-1.5 rounded-md border bg-muted/30 px-3 py-2">
           <div className="text-xs font-medium text-foreground">
@@ -867,6 +875,11 @@ export function VulnerabilitiesTable({
                       {received && (
                         <Badge tone={VEX_TONE[received.state]} title={t("result.vexReceivedHint")}>
                           {t("result.vexReceivedBadge", { state: t(VEX_LABEL_KEY[received.state]) })}
+                        </Badge>
+                      )}
+                      {v.reachability?.state === "exploitable" && (
+                        <Badge tone="medium" title={v.reachability.detail || t("result.reachedHint")}>
+                          {t("result.reachedBadge")}
                         </Badge>
                       )}
                       {v.kev && (

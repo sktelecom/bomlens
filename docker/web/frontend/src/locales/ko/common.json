@@ -93,6 +93,8 @@
     "scanossTokenHint": "무료 OSSKB는 호출 한도가 있어 가끔 쓰기엔 충분하지만 자주 돌리면 빈 결과가 나올 수 있습니다. 자주 사용한다면 scanoss.com에서 토큰을 발급해 넣으세요. 토큰은 1회용으로만 쓰이고 저장하거나 로그에 남기지 않습니다.",
     "deepCve": "심층 CVE 매칭 (NVD CPE)",
     "deepCveHint": "다른 매칭 경로가 놓치는 취약점까지 NVD 전용 취약점 정보로 대조합니다. 시간이 더 걸리고, 보안 보고서를 함께 켭니다.",
+    "reachability": "Go 도달성 분석",
+    "reachabilityHint": "Go 소스나 Go 실행 파일에서 각 Go 보안 권고가 가리키는 코드에 도달하는지 govulncheck로 판정합니다. 도달하지 않는 발견 항목은 따로 보여 주고 집계에서 뺍니다. Go 취약점 데이터베이스를 온라인으로 읽으며, 보안 보고서를 함께 켭니다.",
     "byteStable": "재현 가능한 출력",
     "byteStableHint": "같은 입력을 다시 스캔하면 바이트 단위로 동일한 SBOM을 만들어, 출력을 비교하고 체크섬으로 검증할 수 있습니다. 실행마다 결과가 달라질 수 있는 네트워크 라이선스 조회는 건너뜁니다.",
     "conformanceProfile": "적합성 검사 기준",
@@ -425,7 +427,26 @@
     "uncheckedTile_other": "{{count}}개 미확인",
     "noVulnsInChecked": "확인한 컴포넌트에서는 취약점이 발견되지 않았습니다.",
     "noVulnsSomeUnchecked_one": "확인한 컴포넌트에는 취약점이 없지만, {{count}}개는 확인하지 못했습니다",
-    "noVulnsSomeUnchecked_other": "확인한 컴포넌트에는 취약점이 없지만, {{count}}개는 확인하지 못했습니다"
+    "noVulnsSomeUnchecked_other": "확인한 컴포넌트에는 취약점이 없지만, {{count}}개는 확인하지 못했습니다",
+    "noVulnsSomeNotReachable_one": "도달하는 취약점이 없습니다. 발견 항목 {{count}}건은 도달하지 않는다고 판정했습니다",
+    "noVulnsSomeNotReachable_other": "도달하는 취약점이 없습니다. 발견 항목 {{count}}건은 도달하지 않는다고 판정했습니다",
+    "noReachableVulns": "도달하는 취약점은 발견되지 않았습니다.",
+    "notReachableTitle_one": "발견 항목 {{count}}건은 호출되지 않아 위 집계에 넣지 않았습니다",
+    "notReachableTitle_other": "발견 항목 {{count}}건은 호출되지 않아 위 집계에 넣지 않았습니다",
+    "notReachableHint": "govulncheck가 영향받는 Go 패키지가 빌드에 없거나, 패키지 안의 영향받는 함수가 호출되지 않았거나(소스) 링크되지 않았다고(실행 파일) 판정했습니다. 보안 보고서와 같이 각각 도달성 VEX에 not_affected로 기록합니다.",
+    "notReachableList": "발견 항목 목록 보기",
+    "notReachableWhy": "근거",
+    "notReachableBadge": "호출되지 않음",
+    "notReachableTruncated": "{{count}}건 중 처음 {{shown}}건을 표시합니다.",
+    "notReachableTile_one": "호출되지 않음 {{count}}건",
+    "notReachableTile_other": "호출되지 않음 {{count}}건",
+    "reachedBadge": "호출됨",
+    "reachedHint": "govulncheck가 영향받는 Go 코드로 가는 호출 경로(소스)나 실행 파일 안의 영향받는 심볼(바이너리)을 찾았습니다.",
+    "reachabilityJustification": {
+      "codeNotPresent": "영향받는 패키지가 빌드에 없음",
+      "codeNotReachable": "영향받는 함수에 도달하지 않음",
+      "other": "도달하지 않음"
+    }
   },
   "deps": {
     "loading": "의존성을 불러오는 중…",

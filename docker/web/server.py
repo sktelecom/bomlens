@@ -272,6 +272,9 @@ ARTIFACT_SUFFIXES = (
     # the --component-versions CSV format with the versions left empty: the user
     # fills it and passes it back, so list/download it.
     "_component-versions.template.csv",
+    # govulncheck's judgement of each Go advisory (--reachability), a CycloneDX
+    # VEX document. security_summary reads its result through _security.json.
+    "_reachability.cdx.json",
 )
 
 # Recent-scans sidebar shows the newest N; older scans stay on disk but are not
@@ -1008,6 +1011,12 @@ def scanoss_capable():
     return shutil.which("scanoss-py") is not None
 
 
+def reachability_capable():
+    """Go reachability (--reachability) needs govulncheck in this image: a binary
+    scan runs it here, and a source scan hands this copy to the stage 1 image."""
+    return shutil.which("govulncheck") is not None
+
+
 def deep_license_capable():
     """Deep license detection (scancode) is only built in with SBOM_DEEP_LICENSE.
     Unlike firmware/aibom/deep-cve there is no sibling image for it — a source
@@ -1288,6 +1297,10 @@ def security_summary(run_id):
     sev = {"CRITICAL": 0, "HIGH": 0, "MEDIUM": 0, "LOW": 0, "UNKNOWN": 0}
     vulns = []
     kernel = 0
+    # Findings govulncheck judged not reachable (--reachability): listed apart
+    # and kept out of the severity figures, as the generated report does.
+    unreached_rows = []
+    unreached = 0
     for r in (data.get("Results") or []):
         for v in (r.get("Vulnerabilities") or []):
             s = (v.get("Severity") or "UNKNOWN").upper()
@@ -1304,8 +1317,14 @@ def security_summary(run_id):
             if (v.get("PkgName") or "").lower() in _KERNEL_PKG_NAMES:
                 kernel += 1
                 continue
-            sev[s] += 1
-            if len(vulns) < MAX_VULN_ROWS:
+            reach = _reachability_of(v)
+            not_reached = bool(reach) and reach["state"] == "not_affected"
+            if not_reached:
+                unreached += 1
+            else:
+                sev[s] += 1
+            rows = unreached_rows if not_reached else vulns
+            if len(rows) < MAX_VULN_ROWS:
                 score, vector = _cvss_best(v)
                 desc = (v.get("Description") or "")[:MAX_VULN_DESC]
                 cid = v.get("VulnerabilityID") or ""
@@ -1385,7 +1404,9 @@ def security_summary(run_id):
                     }
                     if recv_source:
                         row["vexReceived"]["source"] = recv_source
-                vulns.append(row)
+                if reach:
+                    row["reachability"] = reach
+                rows.append(row)
     sev["TOTAL"] = sum(sev.values())
     sev["vulnerabilities"] = vulns
     # Reported, but on its own line: a number the reader should see without it
@@ -1410,7 +1431,40 @@ def security_summary(run_id):
     unchecked = _unchecked_components(data.get("UncheckedComponents"))
     if unchecked:
         sev["uncheckedCount"], sev["uncheckedComponents"] = unchecked
+    # --reachability: which engine and mode judged the findings (the report's
+    # Reachability summary), and the findings judged not reachable. Each key is
+    # omitted when the scan did not run it or judged nothing unreachable.
+    rsum = data.get("Reachability")
+    if isinstance(rsum, dict):
+        meta = {k: str(rsum[src])[:200] for k, src in
+                (("engine", "Engine"), ("mode", "Mode"), ("document", "Document"))
+                if isinstance(rsum.get(src), str) and rsum.get(src)}
+        if meta:
+            sev["reachability"] = meta
+    if unreached:
+        sev["notReachableCount"] = unreached
+        sev["notReachable"] = unreached_rows
     return sev
+
+
+MAX_REACH_DETAIL = 600  # chars of govulncheck's reason (a call path can be long)
+
+
+def _reachability_of(v):
+    """A finding's govulncheck judgement (scan-security.sh's
+    "bomlens:reachability") as {state, justification?, detail?}, or None when
+    it has none or it is malformed. Only the two states the step writes."""
+    r = v.get("bomlens:reachability")
+    if not isinstance(r, dict) or r.get("state") not in ("exploitable", "not_affected"):
+        return None
+    out = {"state": r["state"]}
+    just = r.get("justification")
+    if isinstance(just, str) and re.fullmatch(r"[a-z_]{1,40}", just):
+        out["justification"] = just
+    detail = r.get("detail")
+    if isinstance(detail, str) and detail:
+        out["detail"] = detail[:MAX_REACH_DETAIL]
+    return out
 
 
 def _unchecked_components(block):
@@ -1485,6 +1539,11 @@ def _component_risk_index(run_id):
 
     for r in (data.get("Results") or []):
         for v in (r.get("Vulnerabilities") or []):
+            # Not reachable (--reachability): not_affected, so not a risk of
+            # the component, the same as in the report's totals.
+            reach = _reachability_of(v)
+            if reach and reach["state"] == "not_affected":
+                continue
             sev = (v.get("Severity") or "UNKNOWN").upper()
             if sev not in _SEV_RANK:
                 sev = "UNKNOWN"
@@ -2911,7 +2970,7 @@ def scan_detail(run_id):
 # --------------------------------------------------------------------------
 _DIAG_OPTION_KEYS = (
     "notice", "security", "deepLicense", "identifyVendored",
-    "byteStable", "deepCve",
+    "byteStable", "deepCve", "reachability",
 )
 # Input kinds the server itself dispatches on. Anything else in a recorded scan
 # (the value comes from the request) is shown as "other".
@@ -3869,6 +3928,8 @@ def run_sibling_scan(image, mode, out_dir, on_log, *, upload_file=None, model_id
         # reason, and read the same way. entrypoint.sh runs it on the ANALYZE
         # path only, so passing it for every mode costs nothing.
         "-e", "PURL_RESOLVE=%s" % ("true" if env.get("PURL_RESOLVE") == "true" else "false"),
+        # Go reachability: the scan form's opt-in toggle, read the same way.
+        "-e", "REACHABILITY=%s" % ("true" if env.get("REACHABILITY") == "true" else "false"),
     ]
     # Free-form companions to PURL_RESOLVE: a namespace list and a time budget.
     # Passed by name so the value never reaches the argv, like API_KEY above,
@@ -4873,6 +4934,8 @@ class Handler(BaseHTTPRequestHandler):
                 # No sibling fallback (see deep_license_capable): false hides the
                 # toggle outright rather than promising a pull that never comes.
                 "deepLicense": deep_license_capable(),
+                # Go reachability (govulncheck) for a source or binary scan.
+                "reachability": reachability_capable(),
                 "docker": docker_capable(),
                 "aibom": aibom_usable(),
                 # Deep CVE matching (maven NVD-CPE via grype) offered on uploaded
@@ -6130,6 +6193,7 @@ class Handler(BaseHTTPRequestHandler):
                 "identifyVendored": g("identify_vendored") == "true",
                 "byteStable": g("byte_stable") == "true",
                 "deepCve": g("deep_cve") == "true",
+                "reachability": g("reachability") == "true",
                 "sbomAuthor": sbom_author,
                 "specVersion": spec_version,
             }
@@ -6237,7 +6301,14 @@ class Handler(BaseHTTPRequestHandler):
             # child (this branch) or a firmware/AI sibling container.
             "BOMLENS_CANCEL_GRACE": str(CANCEL_GRACE_SECONDS),
             "GENERATE_NOTICE": "true" if g("notice", "true") == "true" else "false",
-            "GENERATE_SECURITY": "true" if g("security", "true") == "true" else "false",
+            # Go reachability marks rows of the security report, so it turns
+            # that report on, as the CLI's --reachability does.
+            "GENERATE_SECURITY": "true" if (g("security", "true") == "true"
+                                            or g("reachability") == "true") else "false",
+            # Go reachability (govulncheck), opt-in: it reads the Go
+            # vulnerability database online. entrypoint.sh runs it for SOURCE
+            # and BINARY only, so another input simply records it as unused.
+            "REACHABILITY": "true" if g("reachability") == "true" else "false",
             # No GENERATE_SPDX: the UI exports SPDX on demand from the results
             # screen (GET /spdx-export) instead of deciding before the scan.
             "GENERATE_REPORT": "true",  # 오픈소스위험분석보고서: default-on (mirrors CLI)

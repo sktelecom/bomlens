@@ -246,10 +246,24 @@ export interface VulnItem {
    *  (POST /vex-import). Its own field, never merged into `vexState`: the user's
    *  own judgement and a received statement are shown side by side. */
   vexReceived?: VexReceived;
+  /** govulncheck's judgement of this finding (--reachability). Absent when the
+   *  scan did not judge it. A `not_affected` finding is listed in the summary's
+   *  `notReachable`, never among the counted `vulnerabilities`. */
+  reachability?: Reachability;
   /** Optional note recorded alongside vexState. */
   vexDetail?: string;
   /** ISO 8601 timestamp of when vexState was last saved. */
   vexUpdatedAt?: string;
+}
+
+/** govulncheck's judgement of one Go advisory (CycloneDX VEX analysis):
+ *  `not_affected` with `code_not_present` (the affected package is not in the
+ *  build) or `code_not_reachable` (it is, but no affected function is called or
+ *  linked), or `exploitable` with the call path or symbol in `detail`. */
+export interface Reachability {
+  state: "exploitable" | "not_affected";
+  justification?: string;
+  detail?: string;
 }
 
 /** A supplier's own judgement of one CVE against one component, in the same
@@ -311,6 +325,13 @@ export type SecuritySummary = Record<Severity, number> & {
    *  in `uncheckedComponents`, which the server caps at 500. */
   uncheckedCount?: number;
   uncheckedComponents?: UncheckedComponent[];
+  /** Findings govulncheck judged not reachable (--reachability), counted apart
+   *  from the severity figures and TOTAL, as the security report does. Present
+   *  only when there are some; may exceed the rows in `notReachable`. */
+  notReachableCount?: number;
+  notReachable?: VulnItem[];
+  /** Which engine and mode judged reachability, present when the step ran. */
+  reachability?: { engine?: string; mode?: string; document?: string };
 };
 
 /** Why a component's vulnerabilities were not checked. */
@@ -607,6 +628,9 @@ export interface ScanConfig {
    *  produces or reads a package SBOM (not firmware or an AI model — see
    *  showDeepCve). Forces security on when set. */
   deepCve: boolean;
+  /** Go reachability (govulncheck) was asked for. Absent on scans that
+   *  predate the option. */
+  reachability?: boolean;
 }
 
 export interface DoneEvent {
@@ -789,6 +813,11 @@ export interface ScanParams {
    *  (not firmware or an AI model). Read server-side as the exact `deep_cve`
    *  flag; ignored (sent false) where the toggle is hidden. */
   deepCve: boolean;
+  /** Judge with govulncheck whether each Go advisory's code is reached (a Go
+   *  source tree or a Go executable). Read server-side as the exact
+   *  `reachability` flag, which also turns the security report on; omitted
+   *  (sent false) where the toggle is hidden. */
+  reachability?: boolean;
   /** Optional upload of the generated SBOM. "" leaves the scan generate-only. */
   uploadTarget?: "" | "dependency-track" | "trusca";
   uploadUrl?: string; // upload server base URL (API_URL)
@@ -920,6 +949,9 @@ export interface Capabilities {
   /** Deep CVE is satisfied by a sibling container, so the first run pulls the
    *  (large) deep-cve image — show the one-time notice. */
   deepCveSibling?: boolean;
+  /** govulncheck is in this image, so a source or binary scan can judge Go
+   *  reachability. False hides the toggle. */
+  reachability?: boolean;
   /** The running image's version, as stamped at build time. Empty on a local
    *  build; the UI then omits the version rather than showing a blank or a
    *  guess. */
@@ -1575,6 +1607,7 @@ export function startScan(params: ScanParams, handlers: ScanHandlers): EventSour
     lang: params.lang ?? "",
     usage: params.usage ?? "",
     deep_cve: String(params.deepCve),
+    reachability: String(params.reachability ?? false),
     upload_target: params.uploadTarget ?? "",
     upload_url: params.uploadUrl ?? "",
     upload_cred: params.uploadCred ?? "",
