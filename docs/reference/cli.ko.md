@@ -71,10 +71,10 @@ BomLens의 전체 옵션과 분석 모드, CI/CD 통합 방법, 트러블슈팅�
 | 환경변수 | 기본값 | 설명 |
 |----------|--------|------|
 | `SBOM_SCANNER_IMAGE` | `ghcr.io/sktelecom/bomlens:latest` | 스캐너 이미지를 다른 태그로 재정의 |
-| `SBOM_FIRMWARE_IMAGE` | `ghcr.io/sktelecom/bomlens-firmware:latest` | 펌웨어 분석용 이미지 지정 |
-| `SBOM_AIBOM_IMAGE` | `ghcr.io/sktelecom/bomlens-aibom:latest` | AI 모델(ML-BOM) 생성용 이미지 지정 |
-| `SBOM_DEEP_CVE_IMAGE` | `ghcr.io/sktelecom/bomlens-deep-cve:latest` | `--deep-cve`(grype CPE 매칭)용 이미지 지정. 웹 UI의 같은 토글도 이 이미지를 쓴다 |
-| `SBOM_DEEP_LICENSE_IMAGE` | `SBOM_SCANNER_IMAGE`가 있으면 그 값, 없으면 `ghcr.io/sktelecom/bomlens-deep-license:latest` | `--deep-license`(scancode)일 때 소스 스캔의 후처리 단계를 실행할 이미지 |
+| `SBOM_FIRMWARE_IMAGE` | `SBOM_SCANNER_IMAGE`를 따른다(같은 레지스트리 경로와 태그. `.../bomlens:1.13.2`이면 `.../bomlens-firmware:1.13.2`). 그 밖에는 `ghcr.io/sktelecom/bomlens-firmware:latest` | 펌웨어 분석용 이미지 지정 |
+| `SBOM_AIBOM_IMAGE` | `SBOM_SCANNER_IMAGE`를 따른다(같은 레지스트리 경로와 태그. `.../bomlens:1.13.2`이면 `.../bomlens-aibom:1.13.2`). 그 밖에는 `ghcr.io/sktelecom/bomlens-aibom:latest` | AI 모델(ML-BOM) 생성용 이미지 지정 |
+| `SBOM_DEEP_CVE_IMAGE` | `SBOM_SCANNER_IMAGE`를 따른다(같은 레지스트리 경로와 태그. `.../bomlens:1.13.2`이면 `.../bomlens-deep-cve:1.13.2`). 그 밖에는 `ghcr.io/sktelecom/bomlens-deep-cve:latest` | `--deep-cve`(grype CPE 매칭)용 이미지 지정. 웹 UI의 같은 토글도 이 이미지를 쓴다 |
+| `SBOM_DEEP_LICENSE_IMAGE` | 같은 규칙으로 `SBOM_SCANNER_IMAGE`를 따른다. `SBOM_SCANNER_IMAGE`가 BomLens 이미지 이름이 아니면 그 이미지 자체, 둘 다 없으면 `ghcr.io/sktelecom/bomlens-deep-license:latest` | `--deep-license`(scancode)일 때 소스 스캔의 후처리 단계를 실행할 이미지 |
 | `SBOM_OUTPUT_FLAT` | — | `1`로 두면 실행별 하위 폴더 없이 산출물을 베이스에 평면으로 저장(격리 이전 배치, 옛 경로를 기대하는 CI용) |
 | `SBOM_OUTPUT_DIR` | `~/sbom-output` | 데스크톱 앱과 웹 UI의 산출물 베이스(CLI는 대신 `--output-dir` 사용). 스캔마다 그 아래 `{Project}_{Version}/` 하위 폴더에 저장 |
 | `SBOM_UI_MOUNT_DIR` | — | CLI 인자를 받지 않는 Windows 실행 파일 `sbom-ui.bat`용: 웹 UI의 디렉터리 경로 입력에 읽기 전용 대상으로 추가할 폴더 하나(`--ui --mount`의 더블클릭 대응). `& ^ | < >` 가 없는 경로를 쓸 것 — 런처는 이런 문자가 있으면 잘못된 마운트를 Docker에 넘기는 대신 거부한다 |
@@ -118,6 +118,8 @@ BomLens의 전체 옵션과 분석 모드, CI/CD 통합 방법, 트러블슈팅�
 | `TRUSCA_RELEASE` | `--version` 값 | ingest release 라벨 |
 | `EXTERNAL_LOOKUP` | `true` | `--ui`와 함께: 웹 UI의 CVE·패키지 조회 기능을 켠다. 필요할 때 osv.dev로 조회한다. 폐쇄망에서는 `false`로 끈다 |
 | `SBOM_UPLOAD_TTL_HOURS` | `24` | `--ui`와 함께: 스캔을 시작하지 않은 업로드 파일(선택만 하고 방치된 업로드)을 보관하는 시간. 최소 1로 제한된다 |
+
+`SBOM_SCANNER_IMAGE`를 digest로만 지정하면 opt-in 이미지는 `:latest`를 씁니다. opt-in 이미지도 고정하려면 각 `SBOM_*_IMAGE`를 지정하세요.
 
 `BOMLENS_MAVEN_FULL_GRAPH` 같은 소스 스캔 의존성 해석 옵션은 [Docker 이미지 환경 변수](docker-image.ko.md#환경-변수)에 정리돼 있습니다. `scan-sbom.sh`를 실행하는 셸에서 설정하면 같은 방식으로 의존성 해석에 적용됩니다.
 

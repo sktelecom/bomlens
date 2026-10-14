@@ -214,7 +214,7 @@ docker run --rm -v "$PWD":/w -w /w --entrypoint cosign \
 | 증상 | 원인 / 해결 |
 |------|------------|
 | `trivy not installed ... skipping` | 구버전 이미지. `docker pull`로 최신 이미지를 받으세요. |
-| `--deep-license requested but scancode not in image` | `bomlens-deep-license` 이미지로 실행하세요(`SBOM_SCANNER_IMAGE`로 다른 이미지를 지정하지 않았다면 소스 스캔은 CLI가 자동으로 고릅니다). 직접 빌드하려면 `--build-arg SBOM_DEEP_LICENSE=true`를 쓰세요. |
+| `--deep-license requested but scancode not in image` | `bomlens-deep-license` 이미지로 실행하세요(`SBOM_SCANNER_IMAGE`에 BomLens 이미지가 아닌 이름을 지정하지 않았다면 소스 스캔은 CLI가 자동으로 고릅니다). 직접 빌드하려면 `--build-arg SBOM_DEEP_LICENSE=true`를 쓰세요. |
 | UI에서 `Docker is not running` | Docker 엔진(Rancher Desktop/Docker Desktop 등)을 시작한 뒤 다시 실행하세요. |
 | 고지문에 `NOASSERTION`이 많음 | 의존성에 라이선스 메타데이터가 없는 경우입니다. `--deep-license`로 보완하거나 수동 확인하세요. |
 | 포트 충돌(`--ui`) | `UI_PORT`로 다른 포트를 지정하세요. |
