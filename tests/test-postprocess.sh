@@ -10840,6 +10840,52 @@ jq -e '([.components[] | select(.name == "etc/openssl.cnf" or .name == "/usr/lib
     && pass "a file that is not a binary package's location, or belongs to a non-binary package, is kept" \
     || fail "file entries kept: $(jq -c '[.components[] | {name, hashes}]' "$WORK/bf.json")"
 
+echo "== normalize-sbom.sh fills component.supplier only from the package's own metadata =="
+# The generator already read a publisher (a Maven POM <organization>, a distro
+# Maintainer), authors[] (PyPI, RubyGems, Composer) or the legacy author string.
+# That value becomes supplier.name, marked bomlens:supplierSource; a component
+# with none of those keeps no supplier, and an existing supplier is never replaced.
+cat > "$WORK/sup.json" <<'JSON'
+{"bomFormat":"CycloneDX","specVersion":"1.6","metadata":{"timestamp":"2026-01-01T00:00:00Z","component":{"name":"app","version":"1"}},
+ "components":[
+  {"type":"library","name":"jackson-annotations","version":"2.18.2","purl":"pkg:maven/com.fasterxml.jackson.core/jackson-annotations@2.18.2","publisher":"FasterXML"},
+  {"type":"library","name":"certifi","version":"1","purl":"pkg:pypi/certifi@1","authors":[{"name":"Kenneth Reitz <me@kennethreitz.com>"}]},
+  {"type":"library","name":"rake","version":"13.1.0","purl":"pkg:gem/rake@13.1.0","authors":[{"name":"Hiroshi SHIBATA"},{"name":" Eric Hodel"},{"name":"eric hodel"}]},
+  {"type":"library","name":"legacy","version":"1","purl":"pkg:npm/legacy@1","author":"Jane Doe <jane@example.org>"},
+  {"type":"library","name":"musl","version":"1","purl":"pkg:apk/alpine/musl@1","publisher":"Natanael Copa <ncopa@alpinelinux.org>","supplier":{"name":"Alpine"}},
+  {"type":"library","name":"lodash","version":"4.17.21","purl":"pkg:npm/lodash@4.17.21"}
+ ]}
+JSON
+cp "$WORK/sup.json" "$WORK/sup-analyze.json"
+bash "$LIB/validate-sbom.sh" "$WORK/sup.json" "$WORK/sup-before" "sup" >/dev/null 2>&1
+bash "$LIB/normalize-sbom.sh" "$WORK/sup.json" >/dev/null 2>&1
+bash "$LIB/normalize-sbom.sh" "$WORK/sup.json" >/dev/null 2>&1
+sup_of() { jq -r --arg n "$1" '[.components[]|select(.name==$n)][0] | "\(.supplier.name // "NONE")|\([(.properties // [])[]|select(.name=="bomlens:supplierSource")|.value]|join(","))"' "$2"; }
+[ "$(sup_of jackson-annotations "$WORK/sup.json")" = "FasterXML|publisher" ] \
+    && pass "a Maven publisher becomes the supplier" || fail "maven: $(sup_of jackson-annotations "$WORK/sup.json")"
+[ "$(sup_of certifi "$WORK/sup.json")" = "Kenneth Reitz|authors" ] \
+    && pass "an author's trailing email is dropped from the supplier name" || fail "pypi: $(sup_of certifi "$WORK/sup.json")"
+[ "$(sup_of rake "$WORK/sup.json")" = "Hiroshi SHIBATA, Eric Hodel|authors" ] \
+    && pass "several authors are trimmed, de-duplicated and joined in their order" || fail "gem: $(sup_of rake "$WORK/sup.json")"
+[ "$(sup_of legacy "$WORK/sup.json")" = "Jane Doe|author" ] \
+    && pass "the legacy author string is used when nothing else is present" || fail "legacy: $(sup_of legacy "$WORK/sup.json")"
+[ "$(sup_of musl "$WORK/sup.json")" = "Alpine|" ] \
+    && pass "an existing supplier is kept and not marked" || fail "existing: $(sup_of musl "$WORK/sup.json")"
+[ "$(sup_of lodash "$WORK/sup.json")" = "NONE|" ] \
+    && pass "a component with no publisher or author stays without a supplier" || fail "none: $(sup_of lodash "$WORK/sup.json")"
+MODE=ANALYZE bash "$LIB/normalize-sbom.sh" "$WORK/sup-analyze.json" >/dev/null 2>&1
+[ "$(jq '[.components[] | select(.supplier != null)] | length' "$WORK/sup-analyze.json")" = "1" ] \
+    && pass "a supplier's own SBOM (ANALYZE) is not given suppliers" \
+    || fail "ANALYZE: $(jq -c '[.components[] | .supplier]' "$WORK/sup-analyze.json")"
+bash "$LIB/validate-sbom.sh" "$WORK/sup.json" "$WORK/sup-after" "sup" >/dev/null 2>&1
+crt() { jq -r '[.checks[] | select(.id == "component-creator") | .detail][0] // "NONE"' "$1"; }
+# The check already counted publisher and authors[], so only the component that
+# carried nothing but the legacy author string moves into the covered count.
+[ "$(crt "$WORK/sup-before_conformance.json")" = "66% (4/6)" ] \
+    && [ "$(crt "$WORK/sup-after_conformance.json")" = "83% (5/6)" ] \
+    && pass "component-creator coverage gains only the legacy-author component" \
+    || fail "creator coverage: $(crt "$WORK/sup-before_conformance.json") -> $(crt "$WORK/sup-after_conformance.json")"
+
 echo ""
 echo "Results: ${PASS} passed, ${FAIL} failed"
 [ "$FAIL" -eq 0 ]
