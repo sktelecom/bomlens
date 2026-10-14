@@ -57,26 +57,37 @@ DROP_EMPTY_FILES='(.components) |= (if type=="array" then map(select((.type != "
 BINARY_FILE_DEDUP='(if (.components | type) == "array" then
     def _same($a; $b): ($a | ltrimstr("/")) as $x | ($b | ltrimstr("/")) as $y
         | $x != "" and $y != "" and ($x == $y or ($x | endswith("/" + $y)) or ($y | endswith("/" + $x)));
+    def _base: split("/") | last;
     def _isbin: any((.properties // [])[]; .name == "syft:package:type" and .value == "binary");
     def _locs: [ (.properties // [])[] | select((.name // "") | test("^syft:location:[0-9]+:path$")) | .value ]
         + [ (.evidence.occurrences // [])[] | .location // empty ];
     def _isfile: .type == "file" and ((.purl // "") == "") and ((.version // "") == "") and ((.name // "") != "");
-    def _owns($f): _isbin and (_locs as $l | any($l[]; _same(.; $f.name)));
+    # Paths that end the same way share their last segment, so the binary
+    # packages are indexed by the last segment of each location once, and a
+    # file entry is compared only with the few binaries filed under its own
+    # name. Comparing every file with every component made a 60,000-component
+    # root filesystem take hours.
     .components as $all
-    | [ $all[] | select(_isfile) | . as $f | select(any($all[]; _owns($f))) ] as $dups
+    | [ range(0; $all | length) | select($all[.] | _isbin) ] as $binIdx
+    | (reduce $binIdx[] as $i ({}; reduce ($all[$i] | _locs[]) as $p (.;
+          ($p | _base) as $k | .[$k] = ((.[$k] // []) + [$i])))) as $byBase
+    | [ range(0; $all | length) as $i | $all[$i] | select(_isfile) | .name as $n
+        | [ ($byBase[$n | _base] // [])[] | . as $b | select(any($all[$b] | _locs[]; _same(.; $n))) ] | unique
+        | select(length > 0) | {i: $i, owners: .} ] as $dups
     | if ($dups | length) == 0 then . else
-        [ $dups[] | .["bom-ref"] // empty ] as $refs
-        | .components = [ $all[] | . as $c
-            | if any($dups[]; . == $c) then empty
+        (reduce $dups[] as $d ({}; .[$d.i | tostring] = true)) as $dropIdx
+        | (reduce $dups[] as $d ({}; reduce $d.owners[] as $b (.; .[$b | tostring] = ((.[$b | tostring] // []) + [$d.i])))) as $mineOf
+        | (reduce $dups[] as $d ({}; ($all[$d.i]["bom-ref"] // null) as $r | if $r then .[$r] = true else . end)) as $refs
+        | .components = [ range(0; $all | length) as $i | $all[$i]
+            | if $dropIdx[$i | tostring] then empty
               elif _isbin and ((.hashes // []) | length) == 0 then
-                  [ $dups[] | . as $f | select($c | _owns($f)) ] as $mine
-                  | if ($mine | length) == 1 and (($mine[0].hashes // []) | length) > 0
-                    then .hashes = $mine[0].hashes else . end
+                  ($mineOf[$i | tostring] // []) as $mine
+                  | if ($mine | length) == 1 and (($all[$mine[0]].hashes // []) | length) > 0
+                    then .hashes = $all[$mine[0]].hashes else . end
               else . end ]
         | if (.dependencies | type) == "array" then
-            .dependencies |= [ .[] | (.ref // "") as $r
-                | select(any($refs[]; . == $r) | not)
-                | if (.dependsOn | type) == "array" then .dependsOn |= map(select(. as $d | any($refs[]; . == $d) | not)) else . end ]
+            .dependencies |= [ .[] | select($refs[.ref // ""] | not)
+                | if (.dependsOn | type) == "array" then .dependsOn |= map(select($refs[.] | not)) else . end ]
           else . end
       end
   else . end)'
