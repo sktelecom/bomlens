@@ -425,7 +425,7 @@
     "uncheckedTile_other": "{{count}}개 미확인",
     "advisoriesTitle_one": "CVE가 없는 권고 {{count}}건",
     "advisoriesTitle_other": "CVE가 없는 권고 {{count}}건",
-    "advisoriesHint": "취약점 데이터베이스가 배포판이나 생태계의 권고 번호로 보고했고 관련 CVE를 밝히지 않은 항목입니다. 취약점 집계와 --fail-on 판정에는 넣지 않았습니다.",
+    "advisoriesHint": "취약점 데이터베이스가 배포판의 권고 번호로 보고했고 관련 CVE를 밝히지 않은 항목입니다. 취약점 집계와 --fail-on 판정에는 넣지 않았습니다.",
     "advisoriesList": "권고 목록 보기",
     "advisoryId": "권고 번호",
     "advisoryTarget": "발견 위치",

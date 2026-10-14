@@ -425,7 +425,7 @@
     "uncheckedTile_other": "{{count}} not checked",
     "advisoriesTitle_one": "{{count}} advisory with no CVE",
     "advisoriesTitle_other": "{{count}} advisories with no CVE",
-    "advisoriesHint": "The vulnerability database reported these under a distribution or ecosystem advisory number and names no CVE for them. They are not counted in the vulnerability findings or in the --fail-on gate.",
+    "advisoriesHint": "The vulnerability database reported these under a distribution advisory number and names no CVE for them. They are not counted in the vulnerability findings or in the --fail-on gate.",
     "advisoriesList": "Show the advisories",
     "advisoryId": "Advisory",
     "advisoryTarget": "Found in",

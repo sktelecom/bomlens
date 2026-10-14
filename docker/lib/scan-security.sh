@@ -155,6 +155,29 @@ if ! jq -e 'has("Results")' "$JSON" >/dev/null 2>&1; then
     if jq '. + {Results: []}' "$JSON" > "$tmp_r" 2>/dev/null; then mv "$tmp_r" "$JSON"; else echo '{"Results":[]}' > "$JSON"; rm -f "$tmp_r"; fi
 fi
 
+# Distribution advisory numbers (DLA-..., SUSE-SU-...) are not vulnerability
+# ids: report them under the CVE the advisory names, or, when it names none,
+# move them to the top-level Advisories list, out of the counts. Done on
+# Trivy's result before the other engines' results are merged in, so the merge
+# below drops a CVE another engine reports for the same package. Rewrites
+# _security.json in place so the web layer, the risk report and the gate read
+# the same list. When that changes anything, Trivy's own result is kept apart
+# first, the same way the sidecar merge keeps it.
+if [ -f "$SCRIPT_DIR/security-advisory-ids.jq" ]; then
+    tmp_a="$(mktemp)"
+    if jq -f "$SCRIPT_DIR/security-advisory-ids.jq" "$JSON" > "$tmp_a" 2>/dev/null; then
+        if jq -n -e --slurpfile a "$JSON" --slurpfile b "$tmp_a" '$a[0] == $b[0]' >/dev/null 2>&1; then
+            rm -f "$tmp_a"
+        else
+            [ -f "$TRIVY_ONLY" ] || cp "$JSON" "$TRIVY_ONLY"
+            mv "$tmp_a" "$JSON"
+        fi
+    else
+        rm -f "$tmp_a"
+        echo "[security] WARN: could not separate distribution advisory numbers from CVE ids; reporting them as findings." >&2
+    fi
+fi
+
 # Deep-CVE (opt-in image): run grype's CPE matcher for the NVD-only maven CVEs
 # Trivy misses (older Apache libs whose CVEs live in NVD keyed by CPE, absent from
 # the GitHub Security Advisory data Trivy uses for maven). scan-nvd-cpe.py drops a
@@ -212,26 +235,6 @@ for engine in cvebintool grype yocto; do
     fi
 done
 
-# Advisory numbers (DLA-..., NSWG-ECO-...) are not vulnerability ids: report
-# them under the CVE Trivy names for them, or, when it names none, move them to
-# the top-level Advisories list, out of the counts. Rewrites _security.json in
-# place so the web layer, the risk report and the gate read the same list.
-# When that changes anything, Trivy's own result is kept apart first, the same
-# way the sidecar merge above keeps it.
-if [ -f "$SCRIPT_DIR/security-advisory-ids.jq" ]; then
-    tmp_a="$(mktemp)"
-    if jq -f "$SCRIPT_DIR/security-advisory-ids.jq" "$JSON" > "$tmp_a" 2>/dev/null; then
-        if jq -n -e --slurpfile a "$JSON" --slurpfile b "$tmp_a" '$a[0] == $b[0]' >/dev/null 2>&1; then
-            rm -f "$tmp_a"
-        else
-            [ -f "$TRIVY_ONLY" ] || cp "$JSON" "$TRIVY_ONLY"
-            mv "$tmp_a" "$JSON"
-        fi
-    else
-        rm -f "$tmp_a"
-        echo "[security] WARN: could not separate advisory numbers from CVE ids; reporting them as findings." >&2
-    fi
-fi
 ADVISORIES=$(jq -c '[ (.Advisories // [])[] | {
       id: .VulnerabilityID,
       pkg: (.PkgName // ""),
@@ -417,8 +420,8 @@ KEV_COUNT=$(echo "$FINDINGS" | jq '[.[] | select(.kev)] | length')
     fi
     if [ "${ADVISORY_N:-0}" -gt 0 ]; then
         echo "- Advisories with no CVE: **${ADVISORY_N}**, listed separately below and not"
-        echo "  included in the counts above. Each is a distribution or ecosystem advisory"
-        echo "  number for which the vulnerability database names no CVE."
+        echo "  included in the counts above. Each is a distribution advisory number for"
+        echo "  which the vulnerability database names no CVE."
         echo ""
     fi
     if [ "${KERNEL_TOTAL:-0}" -gt 0 ]; then
@@ -601,7 +604,7 @@ HTMLHEAD
         echo "<div class=\"note\"><b>${UNCHECKED_N} component(s) could not be checked</b> and are listed below. No vulnerability database was asked about them, so the counts above do not cover them.</div>"
     fi
     if [ "${ADVISORY_N:-0}" -gt 0 ]; then
-        echo "<div class=\"note\"><b>${ADVISORY_N} advisories with no CVE</b> are listed below and are not included in the counts above. Each is a distribution or ecosystem advisory number for which the vulnerability database names no CVE.</div>"
+        echo "<div class=\"note\"><b>${ADVISORY_N} advisories with no CVE</b> are listed below and are not included in the counts above. Each is a distribution advisory number for which the vulnerability database names no CVE.</div>"
     fi
     if [ "${KERNEL_TOTAL:-0}" -gt 0 ]; then
         echo "<div class=\"note\"><b>${KERNEL_TOTAL} kernel advisories</b> are listed at the end of this report and are not included in the counts above. Most advisories against a kernel are for subsystems a given device never compiled in, and the SBOM cannot tell which, so counting them here would bury the findings this report exists to show.</div>"

@@ -41,7 +41,7 @@ describe("advisorySummary", () => {
       ...base,
       advisories: [
         { id: "", pkg: "x", installed: "", severity: "LOW", title: "", target: "" },
-        { id: "NSWG-ECO-1", pkg: "p", installed: "1.0.0", severity: "weird" as never, title: "", target: "Node.js" },
+        { id: "ELSA-2024-12698", pkg: "p", installed: "1.0.0", severity: "weird" as never, title: "", target: "oracle 8.10" },
       ],
     })!;
     expect(a.count).toBe(1);

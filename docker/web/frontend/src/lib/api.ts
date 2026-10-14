@@ -314,7 +314,7 @@ export type SecuritySummary = Record<Severity, number> & {
    *  in `uncheckedComponents`, which the server caps at 500. */
   uncheckedCount?: number;
   uncheckedComponents?: UncheckedComponent[];
-  /** Advisory numbers (DLA-..., NSWG-ECO-...) for which the vulnerability
+  /** Distribution advisory numbers (DLA-..., SUSE-SU-...) for which the vulnerability
    *  database names no CVE (_security.json's top-level Advisories). Listed apart
    *  and not counted in the severity figures or TOTAL. Present only when there
    *  are some; may exceed the rows in `advisories`, which the server caps at 500. */

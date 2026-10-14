@@ -2108,7 +2108,7 @@ fi
 rm -f "$OUT"/unchk*_1.0_*
 
 echo "== advisories with no CVE and CVE aliases (security_summary) =="
-# scan-security.sh moves a finding filed under an advisory number with no CVE
+# scan-security.sh moves a finding filed under a distribution advisory number with no CVE
 # to the top-level Advisories list, and keeps an advisory number reported for a
 # CVE in that CVE's VendorIDs. The summary lists the first apart from the
 # counts and shows the second next to the CVE id.
@@ -2117,7 +2117,7 @@ cat > "$OUT/adv_1.0_security.json" <<'JSON'
  {"VulnerabilityID":"CVE-2020-8203","VendorIDs":["NSWG-ECO-516","CVE-2020-8203","NSWG-ECO-516"],"PkgName":"lodash","InstalledVersion":"4.17.15","Severity":"HIGH"}]}],
  "Advisories":[
  {"VulnerabilityID":"DLA-4792-1","PkgName":"tzdata","PkgIdentifier":{"PURL":"pkg:deb/debian/tzdata@2025b-0%2Bdeb12u2?arch=all"},"InstalledVersion":"2025b-0+deb12u2","FixedVersion":"2026c-0+deb12u1","Title":"tzdata - new timezone database","Severity":"UNKNOWN","Target":"sample (debian 12.12)"},
- {"VulnerabilityID":"NSWG-ECO-1","PkgName":"examplepkg","InstalledVersion":"1.0.0","Description":"no title","Severity":"weird","Target":"Node.js"},
+ {"VulnerabilityID":"ELSA-2024-12698","PkgName":"ovirt-engine","InstalledVersion":"4.5.5-1.20.el8","Description":"no title","Severity":"weird","Target":"sample (oracle 8.10)"},
  {"VulnerabilityID":""}, "junk"]}
 JSON
 cat > "$OUT/advnone_1.0_security.json" <<'JSON'
@@ -2143,8 +2143,8 @@ assert s["advisories"] == [
     {"id": "DLA-4792-1", "pkg": "tzdata", "installed": "2025b-0+deb12u2", "severity": "UNKNOWN",
      "title": "tzdata - new timezone database", "target": "sample (debian 12.12)",
      "fixed": "2026c-0+deb12u1", "purl": "pkg:deb/debian/tzdata@2025b-0%2bdeb12u2"},
-    {"id": "NSWG-ECO-1", "pkg": "examplepkg", "installed": "1.0.0", "severity": "UNKNOWN",
-     "title": "no title", "target": "Node.js"},
+    {"id": "ELSA-2024-12698", "pkg": "ovirt-engine", "installed": "4.5.5-1.20.el8", "severity": "UNKNOWN",
+     "title": "no title", "target": "sample (oracle 8.10)"},
 ], s["advisories"]
 assert s["vulnerabilities"][0]["aliases"] == ["NSWG-ECO-516"], s["vulnerabilities"][0]
 for rid in ("advnone_1.0", "advbad_1.0"):

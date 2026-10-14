@@ -4195,11 +4195,12 @@ PATH="$FAKEBIN:$PATH" SECURITY_ENRICH=false \
 [ "$(jq '[.Results[].Vulnerabilities[]?] | length' "$WORK/secok_security.json")" = "1" ] \
     && pass "findings intact on a successful run" || fail "findings lost on a successful run"
 
-echo "== sec-advisory-ids: advisory numbers become CVE ids or a separate advisory list =="
-# Trivy reports some findings under an advisory number (DLA-..., NSWG-ECO-...)
-# instead of a vulnerability id. One that names a CVE is reported under that
-# CVE with the number kept in VendorIDs; one that names none moves to the
-# top-level Advisories list, out of the findings and the counts.
+echo "== sec-advisory-ids: distribution advisory numbers become CVE ids or a separate advisory list =="
+# Trivy files some findings under a distribution advisory number (DLA-...,
+# SUSE-SU-...). One that names a CVE is reported under that CVE with the number
+# kept in VendorIDs; one that names none moves to the top-level Advisories
+# list, out of the findings and the counts. Every other id (GHSA, MAL, a
+# NSWG-ECO entry naming no CVE) stays a finding.
 cat > "$FAKEBIN/trivy" <<SH
 #!/bin/sh
 out=""
@@ -4211,44 +4212,70 @@ cp "$FIX/trivy-advisory-ids.json" "\$out"
 exit 0
 SH
 chmod +x "$FAKEBIN/trivy"
-PATH="$FAKEBIN:$PATH" SECURITY_ENRICH=false \
+# A sidecar engine (the CPE index match) that reports a CVE the DSA advisory names, for the same
+# package, plus one of its own. Rewriting before the merge lets the merge drop
+# the overlap.
+cat > "$WORK/secadv_security_cvebintool.json" <<'JSON'
+{"Results":[{"Target":"cve-bin-tool","Class":"lang-pkgs","Vulnerabilities":[
+ {"VulnerabilityID":"CVE-2026-90001","PkgName":"libexample1","PkgIdentifier":{"PURL":"pkg:deb/debian/libexample1@1.0-1?arch=amd64&distro=debian-12.12"},"InstalledVersion":"1.0-1","Severity":"HIGH"},
+ {"VulnerabilityID":"CVE-2026-90003","PkgName":"libexample1","PkgIdentifier":{"PURL":"pkg:deb/debian/libexample1@1.0-1?arch=amd64&distro=debian-12.12"},"InstalledVersion":"1.0-1","Severity":"LOW"}]}]}
+JSON
+PATH="$FAKEBIN:$PATH" SECURITY_ENRICH=false DEEP_CVE=false \
     bash "$LIB/scan-security.sh" "$WORK/secfail-bom.json" "$WORK/secadv" proj >/dev/null 2>&1 \
     || fail "scan-security.sh failed on a report with advisory numbers"
+rm -f "$WORK/secadv_security_cvebintool.json"
 adv_json="$WORK/secadv_security.json"
 adv_ids=$(jq -r '[.Results[].Vulnerabilities[]?.VulnerabilityID] | sort | join(",")' "$adv_json")
-[ "$adv_ids" = "CVE-2020-8203,CVE-2026-90001,CVE-2026-90002,GHSA-xxxx-yyyy-zzzz,TEMP-0000001-ABCDEF" ] \
-    && pass "findings carry vulnerability ids only, a CVE already reported is not repeated" \
+[ "$adv_ids" = "CVE-2020-8203,CVE-2023-42883,CVE-2023-42890,CVE-2026-90001,CVE-2026-90002,CVE-2026-90003,GHSA-aaaa-bbbb-cccc,GHSA-xxxx-yyyy-zzzz,MAL-2026-1,NSWG-ECO-1,NSWG-ECO-2,TEMP-0000001-ABCDEF" ] \
+    && pass "findings: advisories renamed to their CVE, other ids kept, no CVE repeated" \
     || fail "findings ids: '$adv_ids'"
+[ "$(jq -r '[.Results[].Vulnerabilities[] | select(.VulnerabilityID == "CVE-2026-90001")] | length' "$adv_json")" = "1" ] \
+    && pass "a CVE a sidecar engine also reports for the same package is listed once" \
+    || fail "CVE-2026-90001 is listed $(jq -r '[.Results[].Vulnerabilities[] | select(.VulnerabilityID == "CVE-2026-90001")] | length' "$adv_json") times"
 [ "$(jq -r '[.Results[].Vulnerabilities[] | select(.VulnerabilityID == "CVE-2020-8203") | .VendorIDs[]?] | join(",")' "$adv_json")" = "NSWG-ECO-516" ] \
-    && pass "the advisory number is kept in the CVE's VendorIDs" \
+    && pass "a NSWG-ECO entry naming a CVE is kept in that CVE's VendorIDs" \
     || fail "CVE-2020-8203 does not carry NSWG-ECO-516 in VendorIDs"
-[ "$(jq -r '[.Results[].Vulnerabilities[] | select(.VulnerabilityID == "CVE-2026-90001") | .VendorIDs[]?] | join(",")' "$adv_json")" = "DSA-9999-1" ] \
-    && pass "an advisory naming two CVEs yields one finding per CVE" \
-    || fail "CVE-2026-90001 VendorIDs: $(jq -c '[.Results[].Vulnerabilities[] | select(.VulnerabilityID == "CVE-2026-90001") | .VendorIDs]' "$adv_json")"
-[ "$(jq -r '[.Advisories[]? | .VulnerabilityID + "@" + .Target] | join(",")' "$adv_json")" = "DLA-4792-1@sample_1.0_bom.json (debian 12.12),NSWG-ECO-1@Node.js" ] \
-    && pass "advisories with no CVE are listed apart, with their Target" \
+[ "$(jq -r '[.Results[].Vulnerabilities[] | select(.VulnerabilityID == "CVE-2026-90001" or .VulnerabilityID == "CVE-2023-42890") | .VendorIDs | join(",")] | join(";")' "$adv_json")" = "DSA-9999-1;SUSE-SU-2024:0002-1" ] \
+    && pass "an advisory naming two CVEs yields one finding per CVE (VendorIDs, SUSE CVE page)" \
+    || fail "VendorIDs: $(jq -c '[.Results[].Vulnerabilities[] | select(.VulnerabilityID == "CVE-2026-90001" or .VulnerabilityID == "CVE-2023-42890") | .VendorIDs]' "$adv_json")"
+[ "$(jq -r '[.Results[].Vulnerabilities[] | select(.VulnerabilityID == "GHSA-aaaa-bbbb-cccc") | .PkgName] | join(",")' "$adv_json")" = "examplepkg" ] \
+    && pass "a lower-case ghsa- id is kept as a finding, written in upper case" \
+    || fail "ghsa-aaaa-bbbb-cccc was not kept as GHSA-aaaa-bbbb-cccc"
+[ "$(jq -r '[.Results[].Vulnerabilities[]?.VulnerabilityID | select(test("CVE-2019-"))] | length' "$adv_json")" = "0" ] \
+    && pass "a CVE mentioned in a link that is not its record page is not taken" \
+    || fail "a CVE was taken from an unrelated link: $(jq -c '[.Results[].Vulnerabilities[]?.VulnerabilityID | select(test("CVE-2019-"))]' "$adv_json")"
+[ "$(jq -r '[.Advisories[]? | .VulnerabilityID + "@" + .Target] | join(",")' "$adv_json")" = "DLA-4792-1@sample_1.0_bom.json (debian 12.12),DLA-4800-1@sample_1.0_bom.json (debian 12.12)" ] \
+    && pass "distribution advisories with no CVE are listed apart, with their Target" \
     || fail "Advisories: $(jq -c '[.Advisories[]? | .VulnerabilityID]' "$adv_json")"
-grep -q '| 0 | 3 | 1 | 1 | 0 | 5 |' "$WORK/secadv_security.md" \
+grep -q '| 1 | 6 | 2 | 3 | 0 | 12 |' "$WORK/secadv_security.md" \
     && pass "the summary counts leave the advisories out" \
     || fail "summary row: $(grep -A2 '| Critical' "$WORK/secadv_security.md" | tail -1)"
 grep -q '## Advisories with no CVE' "$WORK/secadv_security.md" && grep -q 'DLA-4792-1' "$WORK/secadv_security.md" \
     && pass "markdown report lists the advisories in their own section" \
     || fail "markdown report has no advisory section"
-grep -q 'Advisories with no CVE</h2>' "$WORK/secadv_security.html" && grep -q 'NSWG-ECO-1' "$WORK/secadv_security.html" \
+grep -q 'Advisories with no CVE</h2>' "$WORK/secadv_security.html" && grep -q 'DLA-4800-1' "$WORK/secadv_security.html" \
     && pass "html report lists the advisories in their own section" \
     || fail "html report has no advisory section"
-jq -e 'has("DLA-4792-1") or has("NSWG-ECO-516") | not' "$WORK/secadv_security_epss.json" >/dev/null \
+jq -e 'has("DLA-4792-1") or has("SUSE-SU-2024:0002-1") or has("NSWG-ECO-516") | not' "$WORK/secadv_security_epss.json" >/dev/null \
     && pass "the EPSS/KEV sidecar is keyed by vulnerability ids only" \
     || fail "the EPSS/KEV sidecar carries an advisory number"
-[ "$(jq -r '[.Results[].Vulnerabilities[]?.VulnerabilityID] | index("DLA-4792-1") != null' "$WORK/secadv_security_trivy.json" 2>/dev/null)" = "true" ] \
-    && pass "Trivy's own result is kept apart in _security_trivy.json" \
-    || fail "_security_trivy.json is missing or already rewritten"
+[ "$(jq -r '[.Results[].Vulnerabilities[]?.VulnerabilityID] | (index("DLA-4792-1") != null) and (index("CVE-2026-90003") == null)' "$WORK/secadv_security_trivy.json" 2>/dev/null)" = "true" ] \
+    && pass "Trivy's own result, before the rewrite and the merge, is kept apart in _security_trivy.json" \
+    || fail "_security_trivy.json is missing, rewritten or merged"
 [ ! -f "$WORK/secok_security_trivy.json" ] \
     && pass "a report with nothing to rewrite gets no _security_trivy.json" \
     || fail "_security_trivy.json written for a report with no advisory numbers"
 jq -f "$LIB/security-advisory-ids.jq" "$adv_json" | cmp -s - "$adv_json" \
     && pass "the advisory filter is idempotent" \
     || fail "a second pass of security-advisory-ids.jq changed the report"
+# Trivy's result alone, without a sidecar: _security_trivy.json is still kept
+# when the rewrite changed something.
+PATH="$FAKEBIN:$PATH" SECURITY_ENRICH=false DEEP_CVE=false \
+    bash "$LIB/scan-security.sh" "$WORK/secfail-bom.json" "$WORK/secadv2" proj >/dev/null 2>&1 \
+    || fail "scan-security.sh failed on a report with advisory numbers (no sidecar)"
+[ -f "$WORK/secadv2_security_trivy.json" ] \
+    && pass "with no sidecar, a rewritten report still keeps Trivy's own result apart" \
+    || fail "no _security_trivy.json after a rewrite with no sidecar"
 
 echo "== cpe-index: components with no package purl are matched against the CPE index =="
 # Trivy never reads component.cpe, so a binary syft's classifier named

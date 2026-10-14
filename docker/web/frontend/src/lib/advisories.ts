@@ -4,7 +4,7 @@
 /**
  * Advisories with no CVE (the security summary's `advisoryCount` /
  * `advisories`): findings the vulnerability database filed under a
- * distribution or ecosystem advisory number (DLA-..., NSWG-ECO-...) and for
+ * distribution advisory number (DLA-..., SUSE-SU-...) and for
  * which it names no CVE. They are listed apart from the findings and are not
  * part of the severity counts.
  */

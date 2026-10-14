@@ -12,7 +12,7 @@ import { severityTone } from "@/lib/severity";
 import { cn } from "@/lib/utils";
 
 /**
- * Advisory numbers (DLA-..., NSWG-ECO-...) for which the vulnerability database
+ * Distribution advisory numbers (DLA-..., SUSE-SU-...) for which the vulnerability database
  * names no CVE. Listed on their own, below the findings: they are not counted in
  * the severity figures, and one advisory can cover several issues, so mixing them
  * into the CVE list would misstate both. Renders nothing when there are none.
