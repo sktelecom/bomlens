@@ -4065,7 +4065,18 @@ cases = [
     ("ghcr.io/sktelecom/sbom-generator:1.0", "firmware", "ghcr.io/sktelecom/bomlens-firmware:1.0"),
     ("ghcr.io/sktelecom/sbom-scanner:1.0", "aibom", "ghcr.io/sktelecom/bomlens-aibom:1.0"),
     ("ghcr.io/sktelecom/bomlens-deep-license:1.13.2", "deep-cve", "ghcr.io/sktelecom/bomlens-deep-cve:1.13.2"),
-    ("bomlens:dev", "firmware", "bomlens-firmware:dev"),
+    # A name with no / is resolved on Docker Hub (a local build): earlier defaults.
+    ("bomlens:dev", "firmware", "ghcr.io/sktelecom/bomlens-firmware:latest"),
+    ("sbom-scanner:local", "aibom", "ghcr.io/sktelecom/bomlens-aibom:latest"),
+    ("sbom-scanner:local", "deep-license", "sbom-scanner:local"),
+    # A version before 1.13.2 keeps the earlier defaults too.
+    ("ghcr.io/sktelecom/bomlens:1.13.1", "firmware", "ghcr.io/sktelecom/bomlens-firmware:latest"),
+    ("ghcr.io/sktelecom/bomlens:1.13.1", "deep-license", "ghcr.io/sktelecom/bomlens:1.13.1"),
+    ("ghcr.io/sktelecom/bomlens:1.13.2-rc1", "deep-license", "ghcr.io/sktelecom/bomlens:1.13.2-rc1"),
+    ("ghcr.io/sktelecom/sbom-scanner:1.9.0", "deep-cve", "ghcr.io/sktelecom/bomlens-deep-cve:latest"),
+    ("ghcr.io/sktelecom/bomlens:v1.13.2", "aibom", "ghcr.io/sktelecom/bomlens-aibom:v1.13.2"),
+    ("ghcr.io/sktelecom/bomlens:1.13.10", "deep-license", "ghcr.io/sktelecom/bomlens-deep-license:1.13.10"),
+    ("ghcr.io/sktelecom/bomlens:main", "deep-cve", "ghcr.io/sktelecom/bomlens-deep-cve:main"),
     ("ghcr.io/sktelecom/bomlens:1.13.2@" + D, "firmware", "ghcr.io/sktelecom/bomlens-firmware:1.13.2"),
     ("ghcr.io/sktelecom/bomlens@" + D, "firmware", "ghcr.io/sktelecom/bomlens-firmware:latest"),
     ("registry.local/my-scanner:2", "firmware", "ghcr.io/sktelecom/bomlens-firmware:latest"),
@@ -4075,6 +4086,10 @@ cases = [
 for scanner, suffix, want in cases:
     got = r(suffix, scanner)
     assert got == want, (scanner, suffix, got, want)
+for t in ("1.13.1", "1.9.0", "1.13.2-rc1", "v1.13.1", "0.1.0", "1.12.99"):
+    assert server._version_tag_before_1132(t), t
+for t in ("1.13.2", "v1.13.2", "1.13.10", "2.0.0", "latest", "main", "sha-abc123", "1.13", "1.13.2-", "1.2.3.4"):
+    assert not server._version_tag_before_1132(t), t
 
 # Module-level defaults, as a fresh server process reads them from its env.
 def images(env):
@@ -4099,7 +4114,7 @@ assert got == ["other.example/fw:9",
 print("ok")
 PY
 then
-    pass "opt-in images take the scanner image's path and tag, fall back for other names and digests, and each SBOM_*_IMAGE wins"
+    pass "opt-in images take the scanner image's path and tag, keep the earlier defaults for short names, other names and versions before 1.13.2, and each SBOM_*_IMAGE wins"
 else
     fail "opt-in image defaults do not follow SBOM_SCANNER_IMAGE (see assertion above)"
 fi
@@ -4113,8 +4128,8 @@ import server
 t = server.build_diagnostics(None)
 assert "corp.internal" not in t and "team/bomlens" not in t, t
 assert "scanner image: <custom image>:1.2.3@sha256:" in t, t
-# The firmware image follows the custom scanner image, so it is hidden the same way.
-assert "firmware image: <custom image>:1.2.3" in t, t
+# 1.2.3 is before 1.13.2, so the firmware image keeps the published default.
+assert "firmware image: ghcr.io/sktelecom/bomlens-firmware:latest" in t, t
 assert server._diag_image("ghcr.io/sktelecom/bomlens:latest", "ghcr.io/sktelecom/bomlens:latest") == "ghcr.io/sktelecom/bomlens:latest"
 assert server._diag_image("host:5000/x/y", "z") == "<custom image>"
 

@@ -1111,16 +1111,24 @@ OPT_DL=registry.example/team/dl:9 optin_scan ghcr.io/sktelecom/bomlens:1.13.2 "$
 { in_log "registry.example/team/dl:9" && ! in_log "bomlens-deep-license"; } \
   && pass "SBOM_DEEP_LICENSE_IMAGE still wins over the derived image" \
   || { fail "SBOM_DEEP_LICENSE_IMAGE override lost" "rc=$RC"; show; }
+optin_scan sbom-scanner:local "$d" --project OD --version 1 --target . --generate-only --deep-license
+{ ! in_log "bomlens-deep-license" && in_out "has no registry path"; } \
+  && pass "a short local name (docker/README.md's sbom-scanner:local) keeps the scanner image for --deep-license" \
+  || { fail "a short local SBOM_SCANNER_IMAGE with --deep-license" "rc=$RC"; show; }
 optin_scan registry.example/team/scanner:2.0 "$d" --project OD --version 1 --target . --generate-only --deep-license
 { ! in_log "bomlens-deep-license" && in_out "is not a BomLens image name" && in_out "SBOM_DEEP_LICENSE_IMAGE"; } \
   && pass "another image name keeps the scanner image for --deep-license and says so in one line" \
   || { fail "a non-BomLens SBOM_SCANNER_IMAGE with --deep-license" "rc=$RC"; show; }
 
 d="$(new_proj optin_fw)"; printf 'FW\n' > "$d/router.bin"
-optin_scan ghcr.io/sktelecom/sbom-scanner:1.12.0 "$d" --project OF --version 1 --target router.bin --generate-only
-{ in_out "Mode: FIRMWARE" && in_log "ghcr.io/sktelecom/bomlens-firmware:1.12.0"; } \
+optin_scan ghcr.io/sktelecom/sbom-scanner:1.13.3 "$d" --project OF --version 1 --target router.bin --generate-only
+{ in_out "Mode: FIRMWARE" && in_log "ghcr.io/sktelecom/bomlens-firmware:1.13.3"; } \
   && pass "the firmware image follows a legacy-alias scanner image's path and tag" \
   || { fail "firmware image does not follow SBOM_SCANNER_IMAGE" "rc=$RC"; show; }
+optin_scan ghcr.io/sktelecom/bomlens:1.13.1 "$d" --project OF --version 1 --target router.bin --generate-only
+{ in_log "ghcr.io/sktelecom/bomlens-firmware:latest" && in_out "version before 1.13.2"; } \
+  && pass "a scanner image tagged before 1.13.2 keeps the firmware image's earlier default, with a note" \
+  || { fail "a scanner image before 1.13.2 and the firmware image" "rc=$RC"; show; }
 optin_scan "ghcr.io/sktelecom/bomlens@sha256:$(printf '%064d' 0)" "$d" --project OF --version 1 --target router.bin --generate-only
 { in_log "ghcr.io/sktelecom/bomlens-firmware:latest" && in_out "pinned by digest with no tag" && in_out "SBOM_FIRMWARE_IMAGE"; } \
   && pass "a digest-only scanner image gives the firmware image :latest, with a note" \

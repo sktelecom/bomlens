@@ -42,7 +42,7 @@ export function imageRef(name, { version = APP_VERSION } = {}) {
   return `ghcr.io/sktelecom/${name}:${version ?? "latest"}`;
 }
 
-export const DEFAULT_IMAGE = process.env.SBOM_SCANNER_IMAGE ?? imageRef("bomlens");
+export const DEFAULT_IMAGE = process.env.SBOM_SCANNER_IMAGE || imageRef("bomlens");
 
 // 데스크톱 앱이 띄운 UI 컨테이너 식별 라벨. 앱이 강제 종료되면 --rm 컨테이너도 살아남는데,
 // 다음 기동 때 이 라벨로 고아를 찾아 정리한다(cleanupOrphans).
@@ -74,35 +74,54 @@ export class ContainerError extends Error {
 // on `:latest` drifts away from the base image the app just launched.
 //
 // SBOM_SCANNER_IMAGE로 베이스 이미지를 바꾸면 형제도 그것을 따른다. scan-sbom.sh의
-// optin_image_ref와 같은 규칙이다. 이름이 BomLens 이미지(bomlens, 옛 별칭 sbom-generator,
-// sbom-scanner, opt-in 이미지 자신)이면 같은 경로와 같은 태그의 bomlens-<suffix>를 쓴다. digest는 베이스 이미지
-// 자신만 가리키므로 함께 적힌 태그를 쓰고, 태그가 없으면 :latest를 쓴다. 다른 이름이면
-// 원래 기본값(앱 버전 태그)을 쓴다. 각 이미지의 SBOM_*_IMAGE가 있으면 그것이 우선한다.
+// optin_image_ref와 같은 규칙이다. 레지스트리 경로(/)가 있는 BomLens 이미지 이름(bomlens,
+// 옛 별칭 sbom-generator, sbom-scanner, opt-in 이미지 자신)이면 같은 경로와 같은 태그의
+// bomlens-<suffix>를 쓴다. digest만 있으면 베이스 이미지 자신만 가리키므로 앱 버전 태그를
+// 쓰고, 태그도 digest도 없으면 :latest를 쓴다. 다음 경우에는 원래 기본값(앱 버전 태그)을
+// 쓴다: /가 없는 짧은 이름(Docker Hub로 해석되므로 로컬 빌드로 본다), 다른 이름, 1.13.2보다
+// 낮은 버전 태그. 각 이미지의 SBOM_*_IMAGE가 비어 있지 않으면 그것이 우선한다.
 const BOMLENS_IMAGE_NAMES = [
   "bomlens", "sbom-generator", "sbom-scanner",
   "bomlens-firmware", "bomlens-aibom", "bomlens-deep-cve", "bomlens-deep-license",
   "sbom-scanner-firmware", "sbom-scanner-aibom",
 ];
+const VERSION_TAG = /^v?([0-9]+)\.([0-9]+)\.([0-9]+)(-[0-9A-Za-z.-]+)?$/;
+
+// 태그가 1.13.2보다 낮은 버전(1.2.3, v1.2.3, 1.2.3-rc1)인지. 숫자 단위로 비교하고,
+// 사전 배포판은 같은 번호의 정식판보다 낮다. scan-sbom.sh의 _version_tag_before_1132와 같다.
+export function versionTagBefore1132(tag) {
+  const m = VERSION_TAG.exec(tag);
+  if (!m) return false;
+  const key = [m[1], m[2], m[3]].map(BigInt);
+  const floor = [1n, 13n, 2n];
+  for (let i = 0; i < 3; i++) {
+    if (key[i] !== floor[i]) return key[i] < floor[i];
+  }
+  return m[4] !== undefined;
+}
 
 export function optinImageRef(suffix, { scannerImage = process.env.SBOM_SCANNER_IMAGE, version = APP_VERSION } = {}) {
   if (scannerImage) {
-    const ref = scannerImage.split("@")[0];
+    const at = scannerImage.indexOf("@");
+    const ref = at >= 0 ? scannerImage.slice(0, at) : scannerImage;
     const slash = ref.lastIndexOf("/");
     const prefix = slash >= 0 ? ref.slice(0, slash + 1) : "";
     const last = ref.slice(slash + 1);
     const colon = last.indexOf(":");
     const name = colon >= 0 ? last.slice(0, colon) : last;
-    const tag = colon >= 0 && colon < last.length - 1 ? last.slice(colon + 1) : "latest";
-    if (BOMLENS_IMAGE_NAMES.includes(name)) {
+    let tag = colon >= 0 && colon < last.length - 1 ? last.slice(colon + 1) : "latest";
+    if (prefix && BOMLENS_IMAGE_NAMES.includes(name) && !versionTagBefore1132(tag)) {
+      if (at >= 0 && colon < 0) tag = version ?? "latest";
       return `${prefix}bomlens-${suffix}:${tag}`;
     }
   }
   return imageRef(`bomlens-${suffix}`, { version });
 }
 
-export const FIRMWARE_IMAGE = process.env.SBOM_FIRMWARE_IMAGE ?? optinImageRef("firmware");
-export const AIBOM_IMAGE = process.env.SBOM_AIBOM_IMAGE ?? optinImageRef("aibom");
-export const DEEP_CVE_IMAGE = process.env.SBOM_DEEP_CVE_IMAGE ?? optinImageRef("deep-cve");
+// 빈 문자열은 지정하지 않은 것으로 본다(scan-sbom.sh의 ${VAR:-...}와 같다).
+export const FIRMWARE_IMAGE = process.env.SBOM_FIRMWARE_IMAGE || optinImageRef("firmware");
+export const AIBOM_IMAGE = process.env.SBOM_AIBOM_IMAGE || optinImageRef("aibom");
+export const DEEP_CVE_IMAGE = process.env.SBOM_DEEP_CVE_IMAGE || optinImageRef("deep-cve");
 
 // 결과 저장 폴더. 두 엔진(Rancher/Docker Desktop) 모두 기본 공유하는 홈 디렉터리 아래.
 // SBOM_OUTPUT_DIR로 베이스를 바꿀 수 있다(실행별 하위 폴더는 server.py가 그 아래에 만든다).
@@ -141,6 +160,16 @@ export function resolveHostDir(dir, { mkdir = fs.mkdirSync, realpath = fs.realpa
   } catch {
     return dir;
   }
+}
+
+// 형제 이미지 참조를 docker run -e 인자로 변환한다(순수). 값이 비어 있으면 그 변수는
+// 넘기지 않는다(그러면 server.py가 자기 기본값을 쓴다).
+export function imageEnvArgs(images = {}) {
+  const args = [];
+  for (const [key, value] of Object.entries(images)) {
+    if (value) args.push("-e", `${key}=${value}`);
+  }
+  return args;
 }
 
 // 추가 스캔 대상 폴더(--ui --mount의 데스크톱판)를 docker run 인자로 변환한다(순수 —
@@ -507,12 +536,11 @@ export class UiContainer {
       `SBOM_UI_HOST_DIR=${hostDir}`,
       // Sibling-image refs for firmware / AI-model scans (server.py launches
       // these via the host socket when the input type needs them).
-      "-e",
-      `SBOM_FIRMWARE_IMAGE=${this.firmwareImage}`,
-      "-e",
-      `SBOM_AIBOM_IMAGE=${this.aibomImage}`,
-      "-e",
-      `SBOM_DEEP_CVE_IMAGE=${this.deepCveImage}`,
+      ...imageEnvArgs({
+        SBOM_FIRMWARE_IMAGE: this.firmwareImage,
+        SBOM_AIBOM_IMAGE: this.aibomImage,
+        SBOM_DEEP_CVE_IMAGE: this.deepCveImage,
+      }),
       // A registry mirror for the source scans' cdxgen images, by name only:
       // docker takes the value from this process's environment, if set.
       "-e",

@@ -68,18 +68,41 @@ POSTPROCESS_IMAGE="${SBOM_SCANNER_IMAGE:-ghcr.io/sktelecom/bomlens:latest}"     
 
 # The opt-in images follow the scanner image. When SBOM_SCANNER_IMAGE names a
 # BomLens image (bomlens, the legacy sbom-generator / sbom-scanner, or one of
-# the opt-in images themselves, from any registry or mirror path), an opt-in
+# the opt-in images themselves) under a registry or mirror path, an opt-in
 # image comes from the same path with the same tag: ghcr.io/sktelecom/bomlens:1.13.2 gives
 # ghcr.io/sktelecom/bomlens-deep-license:1.13.2. A digest identifies only the
 # scanner image itself, so the tag written with it is used, and :latest when
-# there is none. Any other name keeps the published default (the deep-license
-# image: the scanner image itself, a build of one's own). Each image's own
-# SBOM_*_IMAGE still wins.
+# there is none. Otherwise the earlier defaults stay: the published
+# ghcr.io/sktelecom/bomlens-<suffix>:latest, and for deep-license the scanner
+# image itself (a build of one's own, perhaps with SBOM_DEEP_LICENSE=true).
+# That covers a name with no / (Docker resolves sbom-scanner:local or
+# bomlens:dev on Docker Hub, so it is a local build, not a BomLens image),
+# another name, and a version tag before 1.13.2 (those scanner images had
+# scancode, and their siblings were not published under the same tag). Each
+# image's own SBOM_*_IMAGE still wins. docker/web/server.py and
+# electron/lib/container.mjs apply the same rule.
 #
+# _version_tag_before_1132 <tag>: true when the tag is a version (1.2.3,
+# v1.2.3, 1.2.3-rc1) lower than 1.13.2, compared number by number; a
+# pre-release sorts before its release. latest, main, sha-... are not versions.
+_version_tag_before_1132() {
+    local t="${1#v}" core pre="" maj min pat
+    case "$t" in *-*) core="${t%%-*}"; pre="${t#*-}" ;; *) core="$t" ;; esac
+    case "$core" in *[!0-9.]*|.*|*.|*..*|*.*.*.*) return 1 ;; *.*.*) ;; *) return 1 ;; esac
+    maj="${core%%.*}"; min="${core#*.}"; pat="${min#*.}"; min="${min%%.*}"
+    case "$t" in *-*) case "$pre" in ""|*[!0-9A-Za-z.-]*) return 1 ;; esac ;; esac
+    maj=$((10#$maj)); min=$((10#$min)); pat=$((10#$pat))
+    [ "$maj" -ne 1 ] && { [ "$maj" -lt 1 ]; return; }
+    [ "$min" -ne 13 ] && { [ "$min" -lt 13 ]; return; }
+    [ "$pat" -ne 2 ] && { [ "$pat" -lt 2 ]; return; }
+    case "$t" in *-*) return 0 ;; esac
+    return 1
+}
+
 # _scanner_image_parts: split SBOM_SCANNER_IMAGE into _SI_PREFIX (the path up
-# to and including the last /), _SI_NAME, _SI_TAG (latest when absent) and
-# _SI_TAGGED / _SI_DIGEST / _SI_BOMLENS (true or false; _SI_BOMLENS: the name
-# is one of the BomLens images).
+# to and including the last /), _SI_NAME, _SI_TAG (latest when absent),
+# _SI_TAGGED / _SI_DIGEST (true or false), and _SI_FOLLOW (true when the
+# opt-in images follow it) with _SI_WHY (path, name or version) when not.
 _scanner_image_parts() {
     local ref="${SBOM_SCANNER_IMAGE:-}" last
     _SI_DIGEST=false
@@ -88,10 +111,16 @@ _scanner_image_parts() {
     case "$ref" in */*) _SI_PREFIX="${ref%/*}/"; last="${ref##*/}" ;; esac
     _SI_NAME="${last%%:*}"; _SI_TAG="latest"; _SI_TAGGED=false
     case "$last" in *:?*) _SI_TAG="${last#*:}"; _SI_TAGGED=true ;; esac
+    _SI_FOLLOW=false; _SI_WHY=name
     case "$_SI_NAME" in
         bomlens|sbom-generator|sbom-scanner|bomlens-firmware|bomlens-aibom|bomlens-deep-cve|bomlens-deep-license|sbom-scanner-firmware|sbom-scanner-aibom)
-            _SI_BOMLENS=true ;;
-        *)  _SI_BOMLENS=false ;;
+            if [ -z "$_SI_PREFIX" ]; then
+                _SI_WHY=path
+            elif _version_tag_before_1132 "$_SI_TAG"; then
+                _SI_WHY=version
+            else
+                _SI_FOLLOW=true; _SI_WHY=""
+            fi ;;
     esac
 }
 
@@ -104,7 +133,7 @@ optin_image_ref() {
         return 0
     fi
     _scanner_image_parts
-    if [ "$_SI_BOMLENS" = "true" ]; then
+    if [ "$_SI_FOLLOW" = "true" ]; then
         printf '%s' "${_SI_PREFIX}bomlens-${suffix}:${_SI_TAG}"
     elif [ "$suffix" = "deep-license" ]; then
         printf '%s' "$SBOM_SCANNER_IMAGE"
@@ -114,8 +143,9 @@ optin_image_ref() {
 }
 
 # $1: opt-in image suffix. Prints one line when that image could not follow
-# SBOM_SCANNER_IMAGE by tag (a digest with no tag, or a name that is not a
-# BomLens image); nothing otherwise, or when the image's own variable is set.
+# SBOM_SCANNER_IMAGE by tag (a digest with no tag, a name with no registry
+# path, a name that is not a BomLens image, or a version before 1.13.2);
+# nothing otherwise, or when the image's own variable is set.
 optin_image_note() {
     local suffix="$1" var
     case "$suffix" in
@@ -127,11 +157,15 @@ optin_image_note() {
     esac
     [ -z "${!var:-}" ] && [ -n "${SBOM_SCANNER_IMAGE:-}" ] || return 0
     _scanner_image_parts
-    if [ "$_SI_BOMLENS" = "false" ]; then
-        echo "[INFO] SBOM_SCANNER_IMAGE ($SBOM_SCANNER_IMAGE) is not a BomLens image name, so the $suffix image stays $(optin_image_ref "$suffix"); set $var to choose another."
-    elif [ "$_SI_DIGEST" = "true" ] && [ "$_SI_TAGGED" = "false" ]; then
-        echo "[INFO] SBOM_SCANNER_IMAGE is pinned by digest with no tag, so the $suffix image is $(optin_image_ref "$suffix"); set $var to pin it too."
-    fi
+    case "$_SI_WHY" in
+        name)    echo "[INFO] SBOM_SCANNER_IMAGE ($SBOM_SCANNER_IMAGE) is not a BomLens image name, so the $suffix image stays $(optin_image_ref "$suffix"); set $var to choose another." ;;
+        path)    echo "[INFO] SBOM_SCANNER_IMAGE ($SBOM_SCANNER_IMAGE) has no registry path, so it is treated as a local build and the $suffix image stays $(optin_image_ref "$suffix"); set $var to choose another." ;;
+        version) echo "[INFO] SBOM_SCANNER_IMAGE ($SBOM_SCANNER_IMAGE) is a version before 1.13.2, so the $suffix image stays $(optin_image_ref "$suffix"); set $var to choose another." ;;
+        *)
+            if [ "$_SI_DIGEST" = "true" ] && [ "$_SI_TAGGED" = "false" ]; then
+                echo "[INFO] SBOM_SCANNER_IMAGE is pinned by digest with no tag, so the $suffix image is $(optin_image_ref "$suffix"); set $var to pin it too."
+            fi ;;
+    esac
 }
 
 FIRMWARE_IMAGE="${SBOM_FIRMWARE_IMAGE:-$(optin_image_ref firmware)}"           # opt-in (unblob/cve-bin-tool); legacy alias: sbom-scanner-firmware
@@ -612,7 +646,9 @@ Environment:
                          Override the deep-license (scancode) image
                          Unset, these four follow SBOM_SCANNER_IMAGE: the same
                          registry path and tag (.../bomlens:1.13.2 gives
-                         .../bomlens-firmware:1.13.2)
+                         .../bomlens-firmware:1.13.2), when it is a BomLens
+                         image with a registry path and a tag of 1.13.2 or
+                         later or not a version
   SECURITY_NVD_VERIFY    With --deep-cve: true drops loose-version false positives
                          via live NVD lookups (needs NVD_API_KEY, network/minutes)
   NVD_API_KEY            NVD API key for SECURITY_NVD_VERIFY (passed by name only)
