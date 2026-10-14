@@ -8,7 +8,7 @@ Usage: export-vex.py <bom.json> <vex-verdicts.json> <output.json>
 
 <vex-verdicts.json> is the `<prefix>_vex.json` sidecar the web UI writes
 (POST /vex-verdict): {"verdicts": [{cve, state, detail, purl, pkg, installed,
-...}]}. The output is a standalone CycloneDX 1.6 document whose
+...}]}. The output is a standalone CycloneDX document whose
 `vulnerabilities[]` carry each judgement in the standard `analysis` object, so
 another tool can read it without knowing anything about BomLens.
 
@@ -38,6 +38,11 @@ version come from the binary, not from an SBOM component.
 Standard output is one JSON line, {"exported": N, "skipped": M}, counted in
 judgements, so the caller can tell the user when some did not make it in.
 
+The document is CycloneDX 1.7 when the scanned SBOM is (a scan run with
+--spec-version 1.7, or an AI SBOM), and 1.6 otherwise: it carries a copy of
+the SBOM's root component and of its components, which a 1.7 SBOM may write
+with fields 1.6 does not have.
+
 The SBOM and the sidecar are never modified. Exit status is 0 whenever the
 document was written, including when it holds no vulnerabilities.
 """
@@ -47,6 +52,12 @@ import uuid
 from datetime import datetime, timezone
 
 CDX_SPEC_VERSION = "1.6"
+
+
+def spec_version_for(bom):
+    """The version the VEX document is written in: the SBOM's own when it is
+    1.7, the pipeline default otherwise (see the module docstring)."""
+    return "1.7" if bom.get("specVersion") == "1.7" else CDX_SPEC_VERSION
 
 STATE_MAP = {
     "affected": "exploitable",
@@ -183,7 +194,7 @@ def build(bom, verdicts):
         metadata["component"] = root
     doc = {
         "bomFormat": "CycloneDX",
-        "specVersion": CDX_SPEC_VERSION,
+        "specVersion": spec_version_for(bom),
         "serialNumber": "urn:uuid:%s" % uuid.uuid4(),
         "version": 1,
         "metadata": metadata,

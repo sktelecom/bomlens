@@ -5781,7 +5781,16 @@ assert any(x['name'] == 'vexrun_1.0_vex.cdx.json' for x in r['results']), r['res
 d = json.load(open('$OUT/vexrun_1.0/vexrun_1.0_vex.cdx.json'))
 assert d['vulnerabilities'][0]['affects'] == [{'ref': 'm1'}], d
 assert d['components'][0]['group'] == 'org.apache.logging.log4j', d
+assert d['specVersion'] == '1.6', d['specVersion']
 " && pass "run-folder export matches a Maven group:artifact finding and stays self-contained" || fail "run-folder export is wrong" "$run_resp"
+# A 1.7 SBOM (--spec-version 1.7) gets a 1.7 VEX: the document copies its
+# root and components, which may carry fields 1.6 does not have.
+jq '.specVersion = "1.7"' "$OUT/vexrun_1.0/vexrun_1.0_bom.json" > "$WORK/vexrun17.json" \
+    && mv "$WORK/vexrun17.json" "$OUT/vexrun_1.0/vexrun_1.0_bom.json"
+curl -fsS "$BASE/vex-export?id=vexrun_1.0" >/dev/null
+[ "$(jq -r .specVersion "$OUT/vexrun_1.0/vexrun_1.0_vex.cdx.json" 2>/dev/null)" = "1.7" ] \
+    && pass "the VEX of a 1.7 SBOM is CycloneDX 1.7" \
+    || fail "VEX of a 1.7 SBOM is $(jq -r .specVersion "$OUT/vexrun_1.0/vexrun_1.0_vex.cdx.json" 2>&1)"
 rm -rf "$OUT/vexonly_1.0" "$OUT/vexrun_1.0"
 
 cross_export=$(curl -s -o /dev/null -w '%{http_code}' -H "Origin: http://evil.example" "$BASE/vex-export?id=vex_1.0")

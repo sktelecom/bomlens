@@ -51,12 +51,18 @@ is left running exactly as before, since an inaccurate python-derived SBOM is
 still better than an empty one.
 """
 import json
+import os
 import re
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
+# The version cdx-version.sh writes: 1.6, or 1.7 when CYCLONEDX_SPEC_VERSION
+# asks for it (nothing here can source that file, so the rule is restated).
+# build-prep.sh sets it from its own spec-version argument.
 CDX_SPEC_VERSION = "1.6"
+if os.environ.get("CYCLONEDX_SPEC_VERSION") == "1.7":
+    CDX_SPEC_VERSION = "1.7"
 
 # Generous but bounded: a real environment.yml is a few dozen lines. Anything
 # far larger than that is not a project manifest this shape applies to, and
