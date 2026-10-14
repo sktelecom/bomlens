@@ -664,11 +664,19 @@ elif command -v syft >/dev/null 2>&1; then
     [ "$(jq -r '[.steps[] | select(.id=="generate")][0] | "\(.status) \(.reason) \(.stage)"' "$D/bomlens-result.json")" = "degraded fallback 1" ] \
         && pass "generate is recorded as degraded (fallback)" \
         || fail "generate is $(jq -c '[.steps[] | select(.id=="generate")]' "$D/bomlens-result.json")"
-    D="$(new_run fallback-spec17 empty)"
-    run_engine "$D" "$ROOT_DIR/docker/lib" SOURCE_ROOT="$FB" BOMLENS_STAGE1_EXIT=1 CYCLONEDX_SPEC_VERSION=1.7
-    [ "$(jq -r '"\(.specVersion) \([.components[] | select(.type=="library") | .name] | join(","))"' "$D/demo_1.0_bom.json" 2>/dev/null)" = "1.7 requests" ] \
-        && pass "the stage 2 fallback writes the CycloneDX version it is asked for (1.7)" \
-        || fail "fallback 1.7: $(jq -c '[.specVersion, [.components[]?.name]]' "$D/demo_1.0_bom.json" 2>&1)" "$(tail -5 "$D.log")"
+    # The image's syft (and CI's, pinned to it) writes 1.7; an older local syft
+    # does not, and the case is skipped there.
+    if syft "dir:$FB" -o cyclonedx-json@1.7 >/dev/null 2>&1; then
+        D="$(new_run fallback-spec17 empty)"
+        run_engine "$D" "$ROOT_DIR/docker/lib" SOURCE_ROOT="$FB" BOMLENS_STAGE1_EXIT=1 CYCLONEDX_SPEC_VERSION=1.7
+        [ "$(jq -r '"\(.specVersion) \([.components[] | select(.type=="library") | .name] | join(","))"' "$D/demo_1.0_bom.json" 2>/dev/null)" = "1.7 requests" ] \
+            && pass "the stage 2 fallback writes the CycloneDX version it is asked for (1.7)" \
+            || fail "fallback 1.7: $(jq -c '[.specVersion, [.components[]?.name]]' "$D/demo_1.0_bom.json" 2>&1)" "$(tail -5 "$D.log")"
+    elif [ -n "${CI:-}" ]; then
+        fail "this runner's syft cannot write CycloneDX 1.7, so the 1.7 fallback is not tested"
+    else
+        echo "  SKIP: the local syft ($(syft version 2>/dev/null | awk '/^Version/{print $2}')) cannot write CycloneDX 1.7"
+    fi
     D="$(new_run fallback-oom empty)"
     run_engine "$D" "$ROOT_DIR/docker/lib" SOURCE_ROOT="$FB" BOMLENS_STAGE1_EXIT=137 BOMLENS_STAGE1_OOM=true
     [ "$(jq -r '[.metadata.properties[]? | select(.name=="bomlens:sbom-tool-degraded") | .value] | first' "$D/demo_1.0_bom.json" 2>/dev/null)" = "oom" ] \
@@ -2084,6 +2092,37 @@ grep -q 'CYCLONEDX_SPEC_VERSION=2.0 is not a CycloneDX version this pipeline wri
     && [ "$(jq -r '.specVersion' "$SBAD/demo_1.0_bom.json")" = "1.5" ] \
     && pass "an unsupported CYCLONEDX_SPEC_VERSION stops the run with the accepted values" \
     || fail "bad spec: $(tail -3 "$SBAD.log")"
+# Upload: a Dependency-Track that predates 1.7 answers 400; the BOM is sent
+# again labelled 1.6, and the delivered SBOM stays 1.7. The stub server accepts
+# only 1.6 and records the specVersion of each BOM it was sent.
+mkdir -p "$WORK/dtbin"
+cat > "$WORK/dtbin/curl" <<'EOF'
+#!/bin/bash
+url=""; bom=""
+for a in "$@"; do
+    case "$a" in http*) url="$a" ;; bom=@*) bom="${a#bom=@}" ;; esac
+done
+case "$url" in
+    */api/version) echo '{"version":"4.13.0"}' ;;
+    */api/v1/bom)
+        v="$(jq -r .specVersion "$bom")"; echo "$v" >> "$DT_STUB_LOG"
+        if [ "$v" = "1.6" ]; then printf '{"token":"t-1"}\n200'; else printf 'The uploaded BOM is invalid\n400'; fi ;;
+esac
+EOF
+chmod +x "$WORK/dtbin/curl"
+for sv in 1.7 1.6; do
+    D="$(new_run "spec-upload-$sv")"
+    jq '.specVersion = "1.6"' "$FIX/good-cyclonedx.json" > "$D/demo_1.0_bom.json"
+    run_engine "$D" "$ROOT_DIR/docker/lib" PATH="$WORK/dtbin:$WORK/bin:$PATH" DT_STUB_LOG="$D.dt" \
+        UPLOAD_ENABLED=true API_URL=http://dt.example API_KEY=k GENERATE_SECURITY=false CYCLONEDX_SPEC_VERSION="$sv"
+done
+U17="$WORK/spec-upload-1.7"; U16="$WORK/spec-upload-1.6"
+[ "$(tr '\n' ' ' < "$U17.dt")" = "1.7 1.6 " ] && grep -q 'Upload complete' "$U17.log" \
+    && grep -q 'Re-sending a copy labelled 1.6' "$U17.log" && [ "$(jq -r .specVersion "$U17/demo_1.0_bom.json")" = "1.7" ] \
+    && pass "a 1.7 BOM refused by Dependency-Track is sent again labelled 1.6, and the delivered SBOM stays 1.7" \
+    || fail "1.7 upload: sent $(tr '\n' ' ' < "$U17.dt" 2>&1)" "$(tail -5 "$U17.log")"
+[ "$(tr '\n' ' ' < "$U16.dt")" = "1.6 " ] && grep -q 'Upload complete' "$U16.log" \
+    && pass "a 1.6 BOM is uploaded once" || fail "1.6 upload: sent $(tr '\n' ' ' < "$U16.dt" 2>&1)" "$(tail -5 "$U16.log")"
 # The pinned CycloneDX CLI (scripts/check-cdx-schema.sh); BOMLENS_CDX_SCHEMA=1
 # downloads it when it is not installed.
 if [ "${BOMLENS_CDX_SCHEMA:-}" = "1" ] || command -v cyclonedx >/dev/null 2>&1 || [ -n "${CYCLONEDX_CLI:-}" ]; then

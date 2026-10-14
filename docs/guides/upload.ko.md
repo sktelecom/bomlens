@@ -42,6 +42,7 @@ CLI 없이도 업로드할 수 있습니다. 새 스캔 화면에서 **업로드
 | `TRUSCA ingest failed (HTTP <code>)` | TRUSCA가 요청을 거부했습니다. 오류와 함께 찍히는 응답 본문에 이유가 있습니다(잘못된 토큰, 존재하지 않는 프로젝트 id, 형식이 잘못된 SBOM 등). |
 | `Upload failed (HTTP <code>)` (Dependency-Track) | 마찬가지로 찍히는 응답 본문에 서버가 밝힌 이유가 있습니다. 401이면 대개 `API_KEY`가 잘못됐거나 만료된 것입니다. |
 | `Cannot reach Dependency Track at <url>` (경고일 뿐, 실패 아님) | 사전 확인이 실패해도 업로드는 그대로 시도합니다. 일부 서버는 버전 조회 엔드포인트는 막아 두고 BOM 업로드는 받기 때문입니다. 뒤이은 업로드마저 실패하면 그때는 실제 연결 문제입니다. |
+| `Dependency-Track refused the CycloneDX 1.7 SBOM (HTTP 400)` (경고) | Dependency-Track은 4.14.4와 5.1.0부터 CycloneDX 1.7을 읽으며, 그보다 오래된 서버는 `--spec-version 1.7`로 만든 SBOM을 거부합니다. 이때 같은 SBOM에 1.6 표기를 붙여 한 번 더 보내고, 저장된 SBOM은 1.7로 유지합니다. 그래도 거부되면 SBOM에 1.6에 없는 필드가 있다는 뜻이므로, 서버를 올리거나 기본값인 `--spec-version 1.6`으로 다시 스캔하세요. |
 
 TRUSCA는 `HTTP 202`가 접수를 큐에 넣었다는 뜻일 뿐입니다. 완료까지 추적하는 건 BomLens가 아니라 TRUSCA UI(`GET /v1/scans/{id}`)에서 합니다.
 

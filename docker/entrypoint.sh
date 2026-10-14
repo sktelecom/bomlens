@@ -2417,17 +2417,34 @@ fi
 if ! curl -s --max-time 5 "$API_URL/api/version" > /dev/null 2>&1; then
     echo "[WARN] Cannot reach Dependency Track at $API_URL."
 fi
-CURL_RC=0
-RESPONSE=$(curl -s -w "\n%{http_code}" --connect-timeout 10 -X POST "$API_URL/api/v1/bom" \
-    -H "Content-Type: multipart/form-data" \
-    -H "X-Api-Key: $API_KEY" \
-    -F "autoCreate=true" \
-    -F "projectName=$PROJECT_NAME" \
-    -F "projectVersion=$PROJECT_VERSION" \
-    -F "bom=@$OUTPUT_FILE") || CURL_RC=$?
-report_unreachable_upload "$CURL_RC" "$API_URL"
-HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
-BODY=$(echo "$RESPONSE" | sed '$d')
+dt_upload() {
+    CURL_RC=0
+    RESPONSE=$(curl -s -w "\n%{http_code}" --connect-timeout 10 -X POST "$API_URL/api/v1/bom" \
+        -H "Content-Type: multipart/form-data" \
+        -H "X-Api-Key: $API_KEY" \
+        -F "autoCreate=true" \
+        -F "projectName=$PROJECT_NAME" \
+        -F "projectVersion=$PROJECT_VERSION" \
+        -F "bom=@$1") || CURL_RC=$?
+    report_unreachable_upload "$CURL_RC" "$API_URL"
+    HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
+    BODY=$(echo "$RESPONSE" | sed '$d')
+}
+dt_upload "$OUTPUT_FILE"
+# Dependency-Track reads CycloneDX 1.7 from 4.14.4 and 5.1.0 on; an older
+# server refuses a 1.7 BOM (--spec-version 1.7) as invalid. The same retry as
+# scan-security.sh gives Trivy: once more with a copy labelled 1.6, and the
+# delivered SBOM keeps its version.
+if [ "$HTTP_CODE" = "400" ] && [ "$(jq -r '.specVersion // ""' "$OUTPUT_FILE" 2>/dev/null)" = "1.7" ]; then
+    DT_COPY="$(mktemp)"
+    if jq '.specVersion = "1.6"
+           | (if has("$schema") then ."$schema" = "http://cyclonedx.org/schema/bom-1.6.schema.json" else . end)' \
+           "$OUTPUT_FILE" > "$DT_COPY" 2>/dev/null; then
+        echo "[WARN] Dependency-Track refused the CycloneDX 1.7 SBOM (HTTP 400); it reads 1.7 from 4.14.4 and 5.1.0 on. Re-sending a copy labelled 1.6 (delivered SBOM unchanged)."
+        dt_upload "$DT_COPY"
+    fi
+    rm -f "$DT_COPY"
+fi
 # A response that is not a status line at all (proxy banner, truncated body)
 # would make the numeric comparison below abort the script instead of reporting.
 if ! [[ "$HTTP_CODE" =~ ^[0-9]+$ ]]; then

@@ -42,6 +42,7 @@ You can upload without the CLI. On the New scan form, turn on the **Upload** ste
 | `TRUSCA ingest failed (HTTP <code>)` | TRUSCA rejected the request. The response body printed alongside the error names the reason — a bad token, an unknown project id, or a malformed SBOM. |
 | `Upload failed (HTTP <code>)` (Dependency-Track) | Same idea — the printed response body has the server's reason. A 401 usually means a wrong or expired `API_KEY`. |
 | `Cannot reach Dependency Track at <url>` (a warning, not a failure) | A pre-flight check failed but the upload is attempted anyway, since some deployments block the version endpoint but still accept the BOM upload. If the upload itself then fails too, it is a real connectivity problem. |
+| `Dependency-Track refused the CycloneDX 1.7 SBOM (HTTP 400)` (a warning) | Dependency-Track reads CycloneDX 1.7 from 4.14.4 and 5.1.0 on, and an older server refuses an SBOM made with `--spec-version 1.7`. The same SBOM is sent once more labelled 1.6; the saved SBOM stays 1.7. If that is refused too, the SBOM uses fields 1.6 does not have: upgrade the server, or scan with the default `--spec-version 1.6`. |
 
 For TRUSCA, `HTTP 202` only means the ingest was queued; tracking it to completion happens in the TRUSCA UI (`GET /v1/scans/{id}`), not in BomLens.
 
