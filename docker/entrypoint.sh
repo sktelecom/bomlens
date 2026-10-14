@@ -834,8 +834,12 @@ case "$SCAN_MODE" in
     BINARY)
         if [ -z "$TARGET_FILE" ] || [ ! -f "$TARGET_FILE" ]; then echo "[ERROR] TARGET_FILE not found: $TARGET_FILE"; exit 1; fi
         echo "[1/2] syft: binary $TARGET_FILE"
-        if ! syft "file:$TARGET_FILE" -o "cyclonedx-json@$CDX_SPEC_VERSION" > "$OUTPUT_FILE" 2>&1; then
+        # syft's own messages (an update check that cannot reach the network,
+        # for one) go to a log, not into the SBOM it writes on standard output.
+        BINARY_SYFT_LOG=$(mktemp)
+        if ! syft "file:$TARGET_FILE" -o "cyclonedx-json@$CDX_SPEC_VERSION" > "$OUTPUT_FILE" 2>"$BINARY_SYFT_LOG"; then
             echo "[WARN] syft binary scan failed; emitting minimal SBOM."
+            [ -s "$BINARY_SYFT_LOG" ] && tail -5 "$BINARY_SYFT_LOG" >&2
             FILE_INFO=$(file "$TARGET_FILE")
             cat > "$OUTPUT_FILE" <<EOF
 {
@@ -847,6 +851,7 @@ case "$SCAN_MODE" in
 }
 EOF
         fi
+        rm -f "$BINARY_SYFT_LOG"
         ;;
 
     ROOTFS)
