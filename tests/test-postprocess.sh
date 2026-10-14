@@ -10369,6 +10369,29 @@ jq -e '([.checks[] | select(.id == "versions-needed" or .id == "upstream-purl")]
     && pass "the default profile is unchanged: no extra rows, pkg:gnu still an undefined type" \
     || fail "default profile changed: $(jq -c '[.checks[] | select(.id == "purl-type" or .id == "versions-needed")]' "$WORK/skd_conformance.json")"
 
+echo "== normalize: the file entry syft writes for a binary it identified is folded into the binary =="
+cat > "$WORK/bf.json" <<'JSON'
+{"bomFormat":"CycloneDX","specVersion":"1.6","components":[
+ {"bom-ref":"pkg:generic/openssl@1.0.2h?package-id=1","type":"application","name":"openssl","version":"1.0.2h","purl":"pkg:generic/openssl@1.0.2h",
+  "properties":[{"name":"syft:package:type","value":"binary"},{"name":"syft:location:0:path","value":"/sqfs.img_extract/bin/openssl"}]},
+ {"bom-ref":"f1","type":"file","name":"bin/openssl","hashes":[{"alg":"SHA-256","content":"160e"}]},
+ {"bom-ref":"f2","type":"file","name":"etc/openssl.cnf","hashes":[{"alg":"SHA-256","content":"aaaa"}]},
+ {"bom-ref":"pkg:pypi/six@1.0","type":"library","name":"six","version":"1.0","purl":"pkg:pypi/six@1.0",
+  "properties":[{"name":"syft:package:type","value":"python"},{"name":"syft:location:0:path","value":"/usr/lib/six/METADATA"}]},
+ {"bom-ref":"f3","type":"file","name":"/usr/lib/six/METADATA","hashes":[{"alg":"SHA-256","content":"bbbb"}]}],
+ "dependencies":[{"ref":"f1","dependsOn":[]},{"ref":"pkg:generic/openssl@1.0.2h?package-id=1","dependsOn":["f1"]}]}
+JSON
+bash "$LIB/normalize-sbom.sh" "$WORK/bf.json" >/dev/null 2>&1
+jq -e '([.components[] | select(.name == "bin/openssl")] | length == 0)
+       and (.components[] | select(.name == "openssl") | .hashes == [{"alg":"SHA-256","content":"160e"}])
+       and ([.dependencies[] | .ref, .dependsOn[]] | index("f1") == null)' "$WORK/bf.json" >/dev/null \
+    && pass "the binary's own file entry is dropped, its hashes move to the binary, and its dependency refs go" \
+    || fail "binary file entry: $(jq -c '[.components[] | {name, hashes}], .dependencies' "$WORK/bf.json")"
+jq -e '([.components[] | select(.name == "etc/openssl.cnf" or .name == "/usr/lib/six/METADATA")] | length == 2)
+       and (.components[] | select(.name == "six") | has("hashes") | not)' "$WORK/bf.json" >/dev/null \
+    && pass "a file that is not a binary package's location, or belongs to a non-binary package, is kept" \
+    || fail "file entries kept: $(jq -c '[.components[] | {name, hashes}]' "$WORK/bf.json")"
+
 echo ""
 echo "Results: ${PASS} passed, ${FAIL} failed"
 [ "$FAIL" -eq 0 ]

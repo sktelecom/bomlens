@@ -44,6 +44,40 @@ NULL_FIX='(.components) |= (if type=="array" then . else [] end)'
 # always have a name or purl) and named file components are untouched.
 DROP_EMPTY_FILES='(.components) |= (if type=="array" then map(select((.type != "file") or ((.name // "") != "") or ((.purl // "") != ""))) else . end)'
 
+# Always: drop the file entry syft writes for a binary it identified. A binary
+# found by its signature (syft:package:type=binary) comes with a second component
+# of type "file" for the same path, with no purl and no version, so the binary is
+# listed twice and the copy can never be matched. Drop a nameless-identity file
+# component whose path ends where one of a binary package's location paths ends
+# (the two paths are written from different roots), and move its hashes to the
+# package when that package has none and this is its only such file.
+BINARY_FILE_DEDUP='(if (.components | type) == "array" then
+    def _same($a; $b): ($a | ltrimstr("/")) as $x | ($b | ltrimstr("/")) as $y
+        | $x != "" and $y != "" and ($x == $y or ($x | endswith("/" + $y)) or ($y | endswith("/" + $x)));
+    def _isbin: any((.properties // [])[]; .name == "syft:package:type" and .value == "binary");
+    def _locs: [ (.properties // [])[] | select((.name // "") | test("^syft:location:[0-9]+:path$")) | .value ]
+        + [ (.evidence.occurrences // [])[] | .location // empty ];
+    def _isfile: .type == "file" and ((.purl // "") == "") and ((.version // "") == "") and ((.name // "") != "");
+    def _owns($f): _isbin and (_locs as $l | any($l[]; _same(.; $f.name)));
+    .components as $all
+    | [ $all[] | select(_isfile) | . as $f | select(any($all[]; _owns($f))) ] as $dups
+    | if ($dups | length) == 0 then . else
+        [ $dups[] | .["bom-ref"] // empty ] as $refs
+        | .components = [ $all[] | . as $c
+            | if any($dups[]; . == $c) then empty
+              elif _isbin and ((.hashes // []) | length) == 0 then
+                  [ $dups[] | . as $f | select($c | _owns($f)) ] as $mine
+                  | if ($mine | length) == 1 and (($mine[0].hashes // []) | length) > 0
+                    then .hashes = $mine[0].hashes else . end
+              else . end ]
+        | if (.dependencies | type) == "array" then
+            .dependencies |= [ .[] | (.ref // "") as $r
+                | select(any($refs[]; . == $r) | not)
+                | if (.dependsOn | type) == "array" then .dependsOn |= map(select(. as $d | any($refs[]; . == $d) | not)) else . end ]
+          else . end
+      end
+  else . end)'
+
 # Always: strip a redundant " : <version>" suffix a supplier SBOM sometimes bakes
 # into the component name itself (observed in supplier-provided SPDX input,
 # e.g. PackageName "uuid : 3.4.0" with PackageVersionInfo "3.4.0" — the same
@@ -482,6 +516,7 @@ if [ "$MODE" = "--stable" ]; then
         ${NULL_FIX}
         | ${VERSION_EVR_CONTAMINATION_FIX}
         | ${DROP_EMPTY_FILES}
+        | ${BINARY_FILE_DEDUP}
         | ${NAME_VERSION_DEDUP}
         | ${PYRANGE_DEDUP}
         | ${SWIFT_DUP_FIX}
@@ -505,7 +540,7 @@ if [ "$MODE" = "--stable" ]; then
         | del(.serialNumber)
     " "$SBOM" > "$TMP"
 else
-    jq -S --argjson vmap "$VMAP_JSON" --argjson compat "$COMPAT_JSON" "${LICENSE_FLAGS_DEF} ${NORMALIZE_DEF} ${NULL_FIX} | ${UNKNOWN_VERSION_FIX} | ${VERSION_EVR_CONTAMINATION_FIX} | ${DROP_EMPTY_FILES} | ${NAME_VERSION_DEDUP} | ${PYRANGE_DEDUP} | ${SWIFT_DUP_FIX} | ${PURL_FIX} | ${VENDORED_CPE_FIX} | ${OS_SRC_FIX} | ${OS_PURL_FORM} | ${LICENSE_FIX} | ${LICENSE_REVIEW_FIX} | ${LICENSE_CLASS_FIX} | ${LICENSE_CONFLICT_FIX} | ${FILENAME_FILTER} | ${SORT_FILTER}" "$SBOM" > "$TMP"
+    jq -S --argjson vmap "$VMAP_JSON" --argjson compat "$COMPAT_JSON" "${LICENSE_FLAGS_DEF} ${NORMALIZE_DEF} ${NULL_FIX} | ${UNKNOWN_VERSION_FIX} | ${VERSION_EVR_CONTAMINATION_FIX} | ${DROP_EMPTY_FILES} | ${BINARY_FILE_DEDUP} | ${NAME_VERSION_DEDUP} | ${PYRANGE_DEDUP} | ${SWIFT_DUP_FIX} | ${PURL_FIX} | ${VENDORED_CPE_FIX} | ${OS_SRC_FIX} | ${OS_PURL_FORM} | ${LICENSE_FIX} | ${LICENSE_REVIEW_FIX} | ${LICENSE_CLASS_FIX} | ${LICENSE_CONFLICT_FIX} | ${FILENAME_FILTER} | ${SORT_FILTER}" "$SBOM" > "$TMP"
 fi
 
 mv "$TMP" "$SBOM"
