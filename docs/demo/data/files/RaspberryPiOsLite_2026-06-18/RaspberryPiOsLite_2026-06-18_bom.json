@@ -172,6 +172,16 @@
     {
       "bom-ref": "d49e059ef7cf61cc",
       "cpe": "cpe:2.3:a:cli-32:cli-32:*:*:*:*:*:*:*:*",
+      "hashes": [
+        {
+          "alg": "SHA-1",
+          "content": "015535f3274f28cf0b01a3e858de4ecf9fb4ef34"
+        },
+        {
+          "alg": "SHA-256",
+          "content": "32acc1bc543116cbe2cff10cb867772df2f254ff2634c870aef0b46c4b696fdb"
+        }
+      ],
       "name": "cli-32",
       "properties": [
         {
@@ -284,6 +294,16 @@
     {
       "bom-ref": "7f442c8794f773a8",
       "cpe": "cpe:2.3:a:cli-64:cli-64:*:*:*:*:*:*:*:*",
+      "hashes": [
+        {
+          "alg": "SHA-1",
+          "content": "32f4a73f1f15e2cc04da20dffd60e5aa40d32466"
+        },
+        {
+          "alg": "SHA-256",
+          "content": "bbb3de5707629e6a60a0c238cd477b28f07f0066982fda953fa6fcec39073a4a"
+        }
+      ],
       "name": "cli-64",
       "properties": [
         {
@@ -396,6 +416,16 @@
     {
       "bom-ref": "cc9a32f16e054b56",
       "cpe": "cpe:2.3:a:cli-arm64:cli-arm64:*:*:*:*:*:*:*:*",
+      "hashes": [
+        {
+          "alg": "SHA-1",
+          "content": "463cf7b9a2334eb33d5e89e33a164e74dce6d0e9"
+        },
+        {
+          "alg": "SHA-256",
+          "content": "b9a7d08da880dfac8bcf548eba4b06fb59b6f09b17d33148a0f6618328926c61"
+        }
+      ],
       "name": "cli-arm64",
       "properties": [
         {
@@ -508,6 +538,16 @@
     {
       "bom-ref": "41d52c847730d228",
       "cpe": "cpe:2.3:a:cli:cli:*:*:*:*:*:*:*:*",
+      "hashes": [
+        {
+          "alg": "SHA-1",
+          "content": "015535f3274f28cf0b01a3e858de4ecf9fb4ef34"
+        },
+        {
+          "alg": "SHA-256",
+          "content": "32acc1bc543116cbe2cff10cb867772df2f254ff2634c870aef0b46c4b696fdb"
+        }
+      ],
       "name": "cli",
       "properties": [
         {
@@ -12901,6 +12941,16 @@
     {
       "bom-ref": "5ffe3c415862845d",
       "cpe": "cpe:2.3:a:gui-32:gui-32:*:*:*:*:*:*:*:*",
+      "hashes": [
+        {
+          "alg": "SHA-1",
+          "content": "418b4d0ee1459ae958185c5620fd326107b60dad"
+        },
+        {
+          "alg": "SHA-256",
+          "content": "85dae1e95d77845f2cb59bcac3d4afe74bbe4c91a9bcc5bf4a71cd43104dbe7c"
+        }
+      ],
       "name": "gui-32",
       "properties": [
         {
@@ -13013,6 +13063,16 @@
     {
       "bom-ref": "a1d7f93debde866f",
       "cpe": "cpe:2.3:a:gui-64:gui-64:*:*:*:*:*:*:*:*",
+      "hashes": [
+        {
+          "alg": "SHA-1",
+          "content": "b9a4181165b5864760055cdf7dc2d360fbf885c0"
+        },
+        {
+          "alg": "SHA-256",
+          "content": "3471b6140eadc6412277dbbefe3fef8c345a0f1a59776086b80a3618c3a83e3b"
+        }
+      ],
       "name": "gui-64",
       "properties": [
         {
@@ -13125,6 +13185,16 @@
     {
       "bom-ref": "d339628c27a368bb",
       "cpe": "cpe:2.3:a:gui-arm64:gui-arm64:*:*:*:*:*:*:*:*",
+      "hashes": [
+        {
+          "alg": "SHA-1",
+          "content": "aa7e72efcaf8b2dfc2f04b6ff17ed42d7233e397"
+        },
+        {
+          "alg": "SHA-256",
+          "content": "e694f4743405c8b5926ff457db6fe7f1a12dec7c16a9c3864784d3f4e07ae097"
+        }
+      ],
       "name": "gui-arm64",
       "properties": [
         {
@@ -13237,6 +13307,16 @@
     {
       "bom-ref": "c39a4847b19888ce",
       "cpe": "cpe:2.3:a:gui:gui:*:*:*:*:*:*:*:*",
+      "hashes": [
+        {
+          "alg": "SHA-1",
+          "content": "418b4d0ee1459ae958185c5620fd326107b60dad"
+        },
+        {
+          "alg": "SHA-256",
+          "content": "85dae1e95d77845f2cb59bcac3d4afe74bbe4c91a9bcc5bf4a71cd43104dbe7c"
+        }
+      ],
       "name": "gui",
       "properties": [
         {
@@ -13457,10 +13537,15 @@
         {
           "name": "bomlens:licenseClass",
           "value": "uncategorized"
+        },
+        {
+          "name": "bomlens:purlSource",
+          "value": "upstream-map"
         }
       ],
       "type": "library",
-      "version": "6.18.34"
+      "version": "6.18.34",
+      "purl": "pkg:github/gregkh/linux@v6.18.34"
     },
     {
       "bom-ref": "8ec6ea95a367b643",
@@ -13567,10 +13652,15 @@
         {
           "name": "bomlens:licenseClass",
           "value": "uncategorized"
+        },
+        {
+          "name": "bomlens:purlSource",
+          "value": "upstream-map"
         }
       ],
       "type": "library",
-      "version": "1.33"
+      "version": "1.33",
+      "purl": "pkg:github/ecki/net-tools@v1.33"
     },
     {
       "bom-ref": "version-string:net-tools@1.51",
@@ -13598,10 +13688,15 @@
         {
           "name": "bomlens:licenseClass",
           "value": "uncategorized"
+        },
+        {
+          "name": "bomlens:purlSource",
+          "value": "upstream-map"
         }
       ],
       "type": "library",
-      "version": "1.51"
+      "version": "1.51",
+      "purl": "pkg:github/ecki/net-tools@v1.51"
     },
     {
       "bom-ref": "version-string:net-tools@1.54",
@@ -13629,10 +13724,15 @@
         {
           "name": "bomlens:licenseClass",
           "value": "uncategorized"
+        },
+        {
+          "name": "bomlens:purlSource",
+          "value": "upstream-map"
         }
       ],
       "type": "library",
-      "version": "1.54"
+      "version": "1.54",
+      "purl": "pkg:github/ecki/net-tools@v1.54"
     },
     {
       "bom-ref": "version-string:net-tools@1.58",
@@ -13660,10 +13760,15 @@
         {
           "name": "bomlens:licenseClass",
           "value": "uncategorized"
+        },
+        {
+          "name": "bomlens:purlSource",
+          "value": "upstream-map"
         }
       ],
       "type": "library",
-      "version": "1.58"
+      "version": "1.58",
+      "purl": "pkg:github/ecki/net-tools@v1.58"
     },
     {
       "bom-ref": "version-string:net-tools@2.10",
@@ -13691,10 +13796,15 @@
         {
           "name": "bomlens:licenseClass",
           "value": "uncategorized"
+        },
+        {
+          "name": "bomlens:purlSource",
+          "value": "upstream-map"
         }
       ],
       "type": "library",
-      "version": "2.10"
+      "version": "2.10",
+      "purl": "pkg:github/ecki/net-tools@v2.10"
     },
     {
       "bom-ref": "elf-presence:nghttp2",
@@ -313178,9 +313288,16 @@
         {
           "name": "bomlens:licenseClass",
           "value": "strong-copyleft"
+        },
+        {
+          "name": "bomlens:supplierSource",
+          "value": "author"
         }
       ],
       "purl": "pkg:pypi/apt-listchanges@4.8",
+      "supplier": {
+        "name": "Jonathan Kamens"
+      },
       "type": "library",
       "version": "4.8"
     },
@@ -313305,9 +313422,16 @@
         {
           "name": "bomlens:licenseClass",
           "value": "uncategorized"
+        },
+        {
+          "name": "bomlens:supplierSource",
+          "value": "author"
         }
       ],
       "purl": "pkg:pypi/arrow@1.3.0",
+      "supplier": {
+        "name": "Chris Smith"
+      },
       "type": "library",
       "version": "1.3.0"
     },
@@ -313439,9 +313563,16 @@
         {
           "name": "bomlens:licenseClass",
           "value": "permissive"
+        },
+        {
+          "name": "bomlens:supplierSource",
+          "value": "author"
         }
       ],
       "purl": "pkg:pypi/attrs@25.3.0",
+      "supplier": {
+        "name": "Hynek Schlawack"
+      },
       "type": "library",
       "version": "25.3.0"
     },
@@ -313569,9 +313700,16 @@
         {
           "name": "bomlens:licenseClass",
           "value": "weak-copyleft"
+        },
+        {
+          "name": "bomlens:supplierSource",
+          "value": "author"
         }
       ],
       "purl": "pkg:pypi/autocommand@2.2.2",
+      "supplier": {
+        "name": "Nathan West"
+      },
       "type": "library",
       "version": "2.2.2"
     },
@@ -313707,9 +313845,16 @@
         {
           "name": "bomlens:licenseClass",
           "value": "permissive"
+        },
+        {
+          "name": "bomlens:supplierSource",
+          "value": "author"
         }
       ],
       "purl": "pkg:pypi/babel@2.17.0",
+      "supplier": {
+        "name": "Armin Ronacher"
+      },
       "type": "library",
       "version": "2.17.0"
     },
@@ -313945,9 +314090,16 @@
         {
           "name": "bomlens:licenseClass",
           "value": "permissive"
+        },
+        {
+          "name": "bomlens:supplierSource",
+          "value": "author"
         }
       ],
       "purl": "pkg:pypi/backports-tarfile@1.2.0",
+      "supplier": {
+        "name": "\"Jason R. Coombs\""
+      },
       "type": "library",
       "version": "1.2.0"
     },
@@ -314083,9 +314235,16 @@
         {
           "name": "bomlens:licenseClass",
           "value": "permissive"
+        },
+        {
+          "name": "bomlens:supplierSource",
+          "value": "author"
         }
       ],
       "purl": "pkg:pypi/bcrypt@4.2.0",
+      "supplier": {
+        "name": "The Python Cryptographic Authority developers"
+      },
       "type": "library",
       "version": "4.2.0"
     },
@@ -314198,9 +314357,16 @@
         {
           "name": "bomlens:licenseClass",
           "value": "uncategorized"
+        },
+        {
+          "name": "bomlens:supplierSource",
+          "value": "author"
         }
       ],
       "purl": "pkg:pypi/blinker@1.9.0",
+      "supplier": {
+        "name": "Jason Kirtland"
+      },
       "type": "library",
       "version": "1.9.0"
     },
@@ -314244,9 +314410,16 @@
         {
           "name": "bomlens:licenseClass",
           "value": "weak-copyleft"
+        },
+        {
+          "name": "bomlens:supplierSource",
+          "value": "author"
         }
       ],
       "purl": "pkg:pypi/certifi@2025.1.31",
+      "supplier": {
+        "name": "Kenneth Reitz"
+      },
       "type": "library",
       "version": "2025.1.31"
     },
@@ -314406,9 +314579,16 @@
         {
           "name": "bomlens:licenseClass",
           "value": "weak-copyleft"
+        },
+        {
+          "name": "bomlens:supplierSource",
+          "value": "author"
         }
       ],
       "purl": "pkg:pypi/chardet@5.2.0",
+      "supplier": {
+        "name": "Mark Pilgrim"
+      },
       "type": "library",
       "version": "5.2.0"
     },
@@ -314640,9 +314820,16 @@
         {
           "name": "bomlens:licenseClass",
           "value": "permissive"
+        },
+        {
+          "name": "bomlens:supplierSource",
+          "value": "author"
         }
       ],
       "purl": "pkg:pypi/charset-normalizer@3.4.2",
+      "supplier": {
+        "name": "\"Ahmed R. TAHRI\""
+      },
       "type": "library",
       "version": "3.4.2"
     },
@@ -314874,9 +315061,16 @@
         {
           "name": "bomlens:licenseClass",
           "value": "strong-copyleft"
+        },
+        {
+          "name": "bomlens:supplierSource",
+          "value": "author"
         }
       ],
       "purl": "pkg:pypi/cloud-init@25.2",
+      "supplier": {
+        "name": "Scott Moser"
+      },
       "type": "library",
       "version": "25.2"
     },
@@ -315036,9 +315230,16 @@
         {
           "name": "bomlens:licenseClass",
           "value": "permissive"
+        },
+        {
+          "name": "bomlens:supplierSource",
+          "value": "author"
         }
       ],
       "purl": "pkg:pypi/colorzero@2.0",
+      "supplier": {
+        "name": "Dave Jones"
+      },
       "type": "library",
       "version": "2.0"
     },
@@ -315198,9 +315399,16 @@
         {
           "name": "bomlens:licenseClass",
           "value": "permissive"
+        },
+        {
+          "name": "bomlens:supplierSource",
+          "value": "author"
         }
       ],
       "purl": "pkg:pypi/configobj@5.0.9",
+      "supplier": {
+        "name": "Rob Dennis, Eli Courtwright (Michael Foord & Nicola Larosa original maintainers)"
+      },
       "type": "library",
       "version": "5.0.9"
     },
@@ -315242,9 +315450,16 @@
         {
           "name": "bomlens:licenseClass",
           "value": "uncategorized"
+        },
+        {
+          "name": "bomlens:supplierSource",
+          "value": "author"
         }
       ],
       "purl": "pkg:pypi/cryptography@43.0.0",
+      "supplier": {
+        "name": "The cryptography developers >"
+      },
       "type": "library",
       "version": "43.0.0"
     },
@@ -315404,9 +315619,16 @@
         {
           "name": "bomlens:licenseClass",
           "value": "permissive"
+        },
+        {
+          "name": "bomlens:supplierSource",
+          "value": "author"
         }
       ],
       "purl": "pkg:pypi/distro@1.9.0",
+      "supplier": {
+        "name": "Nir Cohen"
+      },
       "type": "library",
       "version": "1.9.0"
     },
@@ -315530,9 +315752,16 @@
         {
           "name": "bomlens:licenseClass",
           "value": "weak-copyleft"
+        },
+        {
+          "name": "bomlens:supplierSource",
+          "value": "author"
         }
       ],
       "purl": "pkg:pypi/fqdn@1.5.1",
+      "supplier": {
+        "name": "ypcrts"
+      },
       "type": "library",
       "version": "1.5.1"
     },
@@ -315692,9 +315921,16 @@
         {
           "name": "bomlens:licenseClass",
           "value": "weak-copyleft"
+        },
+        {
+          "name": "bomlens:supplierSource",
+          "value": "author"
         }
       ],
       "purl": "pkg:pypi/gpiod@2.2.0",
+      "supplier": {
+        "name": "Bartosz Golaszewski"
+      },
       "type": "library",
       "version": "2.2.0"
     },
@@ -315854,9 +316090,16 @@
         {
           "name": "bomlens:licenseClass",
           "value": "permissive"
+        },
+        {
+          "name": "bomlens:supplierSource",
+          "value": "author"
         }
       ],
       "purl": "pkg:pypi/gpiozero@2.0.1",
+      "supplier": {
+        "name": "Ben Nuttall"
+      },
       "type": "library",
       "version": "2.0.1"
     },
@@ -315889,9 +316132,16 @@
         {
           "name": "bomlens:licenseClass",
           "value": "uncategorized"
+        },
+        {
+          "name": "bomlens:supplierSource",
+          "value": "author"
         }
       ],
       "purl": "pkg:pypi/idna@3.10",
+      "supplier": {
+        "name": "Kim Davies"
+      },
       "type": "library",
       "version": "3.10"
     },
@@ -316127,9 +316377,16 @@
         {
           "name": "bomlens:licenseClass",
           "value": "permissive"
+        },
+        {
+          "name": "bomlens:supplierSource",
+          "value": "author"
         }
       ],
       "purl": "pkg:pypi/importlib-metadata@8.0.0",
+      "supplier": {
+        "name": "\"Jason R. Coombs\""
+      },
       "type": "library",
       "version": "8.0.0"
     },
@@ -316269,9 +316526,16 @@
         {
           "name": "bomlens:licenseClass",
           "value": "permissive"
+        },
+        {
+          "name": "bomlens:supplierSource",
+          "value": "author"
         }
       ],
       "purl": "pkg:pypi/inflect@7.3.1",
+      "supplier": {
+        "name": "Paul Dyson"
+      },
       "type": "library",
       "version": "7.3.1"
     },
@@ -316388,9 +316652,16 @@
         {
           "name": "bomlens:licenseClass",
           "value": "uncategorized"
+        },
+        {
+          "name": "bomlens:supplierSource",
+          "value": "author"
         }
       ],
       "purl": "pkg:pypi/isoduration@20.11.0",
+      "supplier": {
+        "name": "Víctor Muñoz"
+      },
       "type": "library",
       "version": "20.11.0"
     },
@@ -316626,9 +316897,16 @@
         {
           "name": "bomlens:licenseClass",
           "value": "permissive"
+        },
+        {
+          "name": "bomlens:supplierSource",
+          "value": "author"
         }
       ],
       "purl": "pkg:pypi/jaraco-collections@5.1.0",
+      "supplier": {
+        "name": "\"Jason R. Coombs\""
+      },
       "type": "library",
       "version": "5.1.0"
     },
@@ -316880,9 +317158,16 @@
         {
           "name": "bomlens:licenseClass",
           "value": "permissive"
+        },
+        {
+          "name": "bomlens:supplierSource",
+          "value": "author"
         }
       ],
       "purl": "pkg:pypi/jaraco-context@5.3.0",
+      "supplier": {
+        "name": "Jason R. Coombs"
+      },
       "type": "library",
       "version": "5.3.0"
     },
@@ -317118,9 +317403,16 @@
         {
           "name": "bomlens:licenseClass",
           "value": "permissive"
+        },
+        {
+          "name": "bomlens:supplierSource",
+          "value": "author"
         }
       ],
       "purl": "pkg:pypi/jaraco-functools@4.0.1",
+      "supplier": {
+        "name": "\"Jason R. Coombs\""
+      },
       "type": "library",
       "version": "4.0.1"
     },
@@ -317356,9 +317648,16 @@
         {
           "name": "bomlens:licenseClass",
           "value": "permissive"
+        },
+        {
+          "name": "bomlens:supplierSource",
+          "value": "author"
         }
       ],
       "purl": "pkg:pypi/jaraco-text@3.12.1",
+      "supplier": {
+        "name": "\"Jason R. Coombs\""
+      },
       "type": "library",
       "version": "3.12.1"
     },
@@ -317560,9 +317859,16 @@
         {
           "name": "bomlens:licenseClass",
           "value": "uncategorized"
+        },
+        {
+          "name": "bomlens:supplierSource",
+          "value": "author"
         }
       ],
       "purl": "pkg:pypi/jsonpatch@1.32",
+      "supplier": {
+        "name": "Stefan Kögl"
+      },
       "type": "library",
       "version": "1.32"
     },
@@ -317686,9 +317992,16 @@
         {
           "name": "bomlens:licenseClass",
           "value": "uncategorized"
+        },
+        {
+          "name": "bomlens:supplierSource",
+          "value": "author"
         }
       ],
       "purl": "pkg:pypi/jsonpointer@2.4",
+      "supplier": {
+        "name": "Stefan Kögl"
+      },
       "type": "library",
       "version": "2.4"
     },
@@ -317964,9 +318277,16 @@
         {
           "name": "bomlens:licenseClass",
           "value": "permissive"
+        },
+        {
+          "name": "bomlens:supplierSource",
+          "value": "author"
         }
       ],
       "purl": "pkg:pypi/jsonschema-specifications@2023.12.1",
+      "supplier": {
+        "name": "Julian Berman"
+      },
       "type": "library",
       "version": "2023.12.1"
     },
@@ -318122,9 +318442,16 @@
         {
           "name": "bomlens:licenseClass",
           "value": "permissive"
+        },
+        {
+          "name": "bomlens:supplierSource",
+          "value": "author"
         }
       ],
       "purl": "pkg:pypi/jsonschema@4.19.2",
+      "supplier": {
+        "name": "Julian Berman"
+      },
       "type": "library",
       "version": "4.19.2"
     },
@@ -318248,9 +318575,16 @@
         {
           "name": "bomlens:licenseClass",
           "value": "uncategorized"
+        },
+        {
+          "name": "bomlens:supplierSource",
+          "value": "author"
         }
       ],
       "purl": "pkg:pypi/lgpio@0.2.2.0",
+      "supplier": {
+        "name": "joan"
+      },
       "type": "library",
       "version": "0.2.2.0"
     },
@@ -318530,9 +318864,16 @@
         {
           "name": "bomlens:licenseClass",
           "value": "permissive"
+        },
+        {
+          "name": "bomlens:supplierSource",
+          "value": "author"
         }
       ],
       "purl": "pkg:pypi/linkify-it-py@2.0.3",
+      "supplier": {
+        "name": "tsutsu3"
+      },
       "type": "library",
       "version": "2.0.3"
     },
@@ -318817,9 +319158,16 @@
         {
           "name": "bomlens:licenseClass",
           "value": "uncategorized"
+        },
+        {
+          "name": "bomlens:supplierSource",
+          "value": "author"
         }
       ],
       "purl": "pkg:pypi/markdown-it-py@3.0.0",
+      "supplier": {
+        "name": "Chris Sewell"
+      },
       "type": "library",
       "version": "3.0.0"
     },
@@ -319037,9 +319385,16 @@
         {
           "name": "bomlens:licenseClass",
           "value": "uncategorized"
+        },
+        {
+          "name": "bomlens:supplierSource",
+          "value": "author"
         }
       ],
       "purl": "pkg:pypi/mdurl@0.1.2",
+      "supplier": {
+        "name": "Taneli Hukkinen"
+      },
       "type": "library",
       "version": "0.1.2"
     },
@@ -319271,9 +319626,16 @@
         {
           "name": "bomlens:licenseClass",
           "value": "permissive"
+        },
+        {
+          "name": "bomlens:supplierSource",
+          "value": "author"
         }
       ],
       "purl": "pkg:pypi/more-itertools@10.3.0",
+      "supplier": {
+        "name": "Erik Rose"
+      },
       "type": "library",
       "version": "10.3.0"
     },
@@ -319569,9 +319931,16 @@
         {
           "name": "bomlens:licenseClass",
           "value": "uncategorized"
+        },
+        {
+          "name": "bomlens:supplierSource",
+          "value": "author"
         }
       ],
       "purl": "pkg:pypi/my-test-package@1.0",
+      "supplier": {
+        "name": "UNKNOWN"
+      },
       "type": "library",
       "version": "1.0"
     },
@@ -319731,9 +320100,16 @@
         {
           "name": "bomlens:licenseClass",
           "value": "uncategorized"
+        },
+        {
+          "name": "bomlens:supplierSource",
+          "value": "author"
         }
       ],
       "purl": "pkg:pypi/oauthlib@3.2.2",
+      "supplier": {
+        "name": "The OAuthlib Community"
+      },
       "type": "library",
       "version": "3.2.2"
     },
@@ -319879,9 +320255,16 @@
         {
           "name": "bomlens:licenseClass",
           "value": "uncategorized"
+        },
+        {
+          "name": "bomlens:supplierSource",
+          "value": "author"
         }
       ],
       "purl": "pkg:pypi/packaging@24.2",
+      "supplier": {
+        "name": "Donald Stufft"
+      },
       "type": "library",
       "version": "24.2"
     },
@@ -320033,9 +320416,16 @@
         {
           "name": "bomlens:licenseClass",
           "value": "permissive"
+        },
+        {
+          "name": "bomlens:supplierSource",
+          "value": "author"
         }
       ],
       "purl": "pkg:pypi/pip@25.1.1",
+      "supplier": {
+        "name": "The pip developers"
+      },
       "type": "library",
       "version": "25.1.1"
     },
@@ -320168,9 +320558,16 @@
         {
           "name": "bomlens:licenseClass",
           "value": "uncategorized"
+        },
+        {
+          "name": "bomlens:supplierSource",
+          "value": "author"
         }
       ],
       "purl": "pkg:pypi/pycryptodomex@3.20.0",
+      "supplier": {
+        "name": "Helder Eijs"
+      },
       "type": "library",
       "version": "3.20.0"
     },
@@ -320302,9 +320699,16 @@
         {
           "name": "bomlens:licenseClass",
           "value": "permissive"
+        },
+        {
+          "name": "bomlens:supplierSource",
+          "value": "author"
         }
       ],
       "purl": "pkg:pypi/pygments@2.18.0",
+      "supplier": {
+        "name": "Georg Brandl"
+      },
       "type": "library",
       "version": "2.18.0"
     },
@@ -320440,9 +320844,16 @@
         {
           "name": "bomlens:licenseClass",
           "value": "permissive"
+        },
+        {
+          "name": "bomlens:supplierSource",
+          "value": "author"
         }
       ],
       "purl": "pkg:pypi/pyjwt@2.10.1",
+      "supplier": {
+        "name": "Jose Padilla"
+      },
       "type": "library",
       "version": "2.10.1"
     },
@@ -320554,9 +320965,16 @@
         {
           "name": "bomlens:licenseClass",
           "value": "strong-copyleft"
+        },
+        {
+          "name": "bomlens:supplierSource",
+          "value": "author"
         }
       ],
       "purl": "pkg:pypi/python-apt@3.0.0",
+      "supplier": {
+        "name": "APT Development Team"
+      },
       "type": "library",
       "version": "3.0.0"
     },
@@ -320668,9 +321086,16 @@
         {
           "name": "bomlens:licenseClass",
           "value": "uncategorized"
+        },
+        {
+          "name": "bomlens:supplierSource",
+          "value": "author"
         }
       ],
       "purl": "pkg:pypi/python-dateutil@2.9.0",
+      "supplier": {
+        "name": "Gustavo Niemeyer"
+      },
       "type": "library",
       "version": "2.9.0"
     },
@@ -320830,9 +321255,16 @@
         {
           "name": "bomlens:licenseClass",
           "value": "permissive"
+        },
+        {
+          "name": "bomlens:supplierSource",
+          "value": "author"
         }
       ],
       "purl": "pkg:pypi/pyyaml@6.0.2",
+      "supplier": {
+        "name": "Kirill Simonov"
+      },
       "type": "library",
       "version": "6.0.2"
     },
@@ -320964,9 +321396,16 @@
         {
           "name": "bomlens:licenseClass",
           "value": "permissive"
+        },
+        {
+          "name": "bomlens:supplierSource",
+          "value": "author"
         }
       ],
       "purl": "pkg:pypi/referencing@0.36.2",
+      "supplier": {
+        "name": "Julian Berman"
+      },
       "type": "library",
       "version": "0.36.2"
     },
@@ -321010,9 +321449,16 @@
         {
           "name": "bomlens:licenseClass",
           "value": "permissive"
+        },
+        {
+          "name": "bomlens:supplierSource",
+          "value": "author"
         }
       ],
       "purl": "pkg:pypi/requests@2.32.3",
+      "supplier": {
+        "name": "Kenneth Reitz"
+      },
       "type": "library",
       "version": "2.32.3"
     },
@@ -321276,9 +321722,16 @@
         {
           "name": "bomlens:licenseClass",
           "value": "permissive"
+        },
+        {
+          "name": "bomlens:supplierSource",
+          "value": "author"
         }
       ],
       "purl": "pkg:pypi/rfc3339-validator@0.1.4",
+      "supplier": {
+        "name": "Nicolas Aimetti"
+      },
       "type": "library",
       "version": "0.1.4"
     },
@@ -321542,9 +321995,16 @@
         {
           "name": "bomlens:licenseClass",
           "value": "permissive"
+        },
+        {
+          "name": "bomlens:supplierSource",
+          "value": "author"
         }
       ],
       "purl": "pkg:pypi/rfc3986-validator@0.1.1",
+      "supplier": {
+        "name": "Nicolas Aimetti"
+      },
       "type": "library",
       "version": "0.1.1"
     },
@@ -321716,9 +322176,16 @@
         {
           "name": "bomlens:licenseClass",
           "value": "strong-copyleft"
+        },
+        {
+          "name": "bomlens:supplierSource",
+          "value": "author"
         }
       ],
       "purl": "pkg:pypi/rfc3987@1.3.8",
+      "supplier": {
+        "name": "Daniel Gerber"
+      },
       "type": "library",
       "version": "1.3.8"
     },
@@ -321874,9 +322341,16 @@
         {
           "name": "bomlens:licenseClass",
           "value": "permissive"
+        },
+        {
+          "name": "bomlens:supplierSource",
+          "value": "author"
         }
       ],
       "purl": "pkg:pypi/rich@13.9.4",
+      "supplier": {
+        "name": "Will McGugan"
+      },
       "type": "library",
       "version": "13.9.4"
     },
@@ -322097,9 +322571,16 @@
         {
           "name": "bomlens:licenseClass",
           "value": "uncategorized"
+        },
+        {
+          "name": "bomlens:supplierSource",
+          "value": "author"
         }
       ],
       "purl": "pkg:pypi/rpds-py@0.21.0",
+      "supplier": {
+        "name": "Julian Berman"
+      },
       "type": "library",
       "version": "0.21.0"
     },
@@ -322388,9 +322869,16 @@
         {
           "name": "bomlens:licenseClass",
           "value": "uncategorized"
+        },
+        {
+          "name": "bomlens:supplierSource",
+          "value": "author"
         }
       ],
       "purl": "pkg:pypi/rpi-keyboard-config@1.0",
+      "supplier": {
+        "name": "Mathew Blowers"
+      },
       "type": "library",
       "version": "1.0"
     },
@@ -322654,9 +323142,16 @@
         {
           "name": "bomlens:licenseClass",
           "value": "permissive"
+        },
+        {
+          "name": "bomlens:supplierSource",
+          "value": "author"
         }
       ],
       "purl": "pkg:pypi/rpi-lgpio@0.6",
+      "supplier": {
+        "name": "Dave Jones"
+      },
       "type": "library",
       "version": "0.6"
     },
@@ -322697,9 +323192,16 @@
         {
           "name": "bomlens:licenseClass",
           "value": "uncategorized"
+        },
+        {
+          "name": "bomlens:supplierSource",
+          "value": "author"
         }
       ],
       "purl": "pkg:pypi/setuptools@78.1.1",
+      "supplier": {
+        "name": "Python Packaging Authority"
+      },
       "type": "library",
       "version": "78.1.1"
     },
@@ -322871,9 +323373,16 @@
         {
           "name": "bomlens:licenseClass",
           "value": "permissive"
+        },
+        {
+          "name": "bomlens:supplierSource",
+          "value": "author"
         }
       ],
       "purl": "pkg:pypi/smbus2@0.4.3",
+      "supplier": {
+        "name": "Karl-Petter Lindegaard"
+      },
       "type": "library",
       "version": "0.4.3"
     },
@@ -323033,9 +323542,16 @@
         {
           "name": "bomlens:licenseClass",
           "value": "permissive"
+        },
+        {
+          "name": "bomlens:supplierSource",
+          "value": "author"
         }
       ],
       "purl": "pkg:pypi/spidev@3.6",
+      "supplier": {
+        "name": "Volker Thoms"
+      },
       "type": "library",
       "version": "3.6"
     },
@@ -323379,9 +323895,16 @@
         {
           "name": "bomlens:licenseClass",
           "value": "strong-copyleft"
+        },
+        {
+          "name": "bomlens:supplierSource",
+          "value": "author"
         }
       ],
       "purl": "pkg:pypi/ssh-import-id@5.10",
+      "supplier": {
+        "name": "Dustin Kirkland, Casey Marshall"
+      },
       "type": "library",
       "version": "5.10"
     },
@@ -323517,9 +324040,16 @@
         {
           "name": "bomlens:licenseClass",
           "value": "permissive"
+        },
+        {
+          "name": "bomlens:supplierSource",
+          "value": "author"
         }
       ],
       "purl": "pkg:pypi/tomli@2.0.1",
+      "supplier": {
+        "name": "Taneli Hukkinen"
+      },
       "type": "library",
       "version": "2.0.1"
     },
@@ -323611,9 +324141,16 @@
         {
           "name": "bomlens:licenseClass",
           "value": "permissive"
+        },
+        {
+          "name": "bomlens:supplierSource",
+          "value": "author"
         }
       ],
       "purl": "pkg:pypi/typeguard@4.3.0",
+      "supplier": {
+        "name": "Alex Grönholm"
+      },
       "type": "library",
       "version": "4.3.0"
     },
@@ -355661,9 +356198,16 @@
         {
           "name": "bomlens:licenseClass",
           "value": "uncategorized"
+        },
+        {
+          "name": "bomlens:supplierSource",
+          "value": "author"
         }
       ],
       "purl": "pkg:pypi/typing-extensions@4.12.2",
+      "supplier": {
+        "name": "\"Guido van Rossum, Jukka Lehtosalo, Łukasz Langa, Michael Lee\""
+      },
       "type": "library",
       "version": "4.12.2"
     },
@@ -355943,9 +356487,16 @@
         {
           "name": "bomlens:licenseClass",
           "value": "permissive"
+        },
+        {
+          "name": "bomlens:supplierSource",
+          "value": "author"
         }
       ],
       "purl": "pkg:pypi/uc-micro-py@1.0.3",
+      "supplier": {
+        "name": "tsutsu3"
+      },
       "type": "library",
       "version": "1.0.3"
     },
@@ -356105,9 +356656,16 @@
         {
           "name": "bomlens:licenseClass",
           "value": "uncategorized"
+        },
+        {
+          "name": "bomlens:supplierSource",
+          "value": "author"
         }
       ],
       "purl": "pkg:pypi/uritemplate@4.1.1",
+      "supplier": {
+        "name": "Ian Stapleton Cordasco"
+      },
       "type": "library",
       "version": "4.1.1"
     },
@@ -356140,9 +356698,16 @@
         {
           "name": "bomlens:licenseClass",
           "value": "uncategorized"
+        },
+        {
+          "name": "bomlens:supplierSource",
+          "value": "author"
         }
       ],
       "purl": "pkg:pypi/urllib3@2.3.0",
+      "supplier": {
+        "name": "Andrey Petrov"
+      },
       "type": "library",
       "version": "2.3.0"
     },
@@ -356278,9 +356843,16 @@
         {
           "name": "bomlens:licenseClass",
           "value": "permissive"
+        },
+        {
+          "name": "bomlens:supplierSource",
+          "value": "author"
         }
       ],
       "purl": "pkg:pypi/webcolors@1.13",
+      "supplier": {
+        "name": "James Bennett"
+      },
       "type": "library",
       "version": "1.13"
     },
@@ -356416,9 +356988,16 @@
         {
           "name": "bomlens:licenseClass",
           "value": "permissive"
+        },
+        {
+          "name": "bomlens:supplierSource",
+          "value": "author"
         }
       ],
       "purl": "pkg:pypi/wheel@0.45.1",
+      "supplier": {
+        "name": "Daniel Holth"
+      },
       "type": "library",
       "version": "0.45.1"
     },
@@ -356558,9 +357137,16 @@
         {
           "name": "bomlens:licenseClass",
           "value": "permissive"
+        },
+        {
+          "name": "bomlens:supplierSource",
+          "value": "author"
         }
       ],
       "purl": "pkg:pypi/zipp@3.19.2",
+      "supplier": {
+        "name": "\"Jason R. Coombs\""
+      },
       "type": "library",
       "version": "3.19.2"
     },
@@ -357584,174 +358170,6 @@
         }
       ],
       "name": "setuptools/_vendor/zipp-3.19.2.dist-info/top_level.txt",
-      "properties": [
-        {
-          "name": "bomlens:licenseClass",
-          "value": "uncategorized"
-        }
-      ],
-      "type": "file"
-    },
-    {
-      "bom-ref": "51d8c571eff3f5cb",
-      "hashes": [
-        {
-          "alg": "SHA-1",
-          "content": "015535f3274f28cf0b01a3e858de4ecf9fb4ef34"
-        },
-        {
-          "alg": "SHA-256",
-          "content": "32acc1bc543116cbe2cff10cb867772df2f254ff2634c870aef0b46c4b696fdb"
-        }
-      ],
-      "name": "setuptools/cli-32.exe",
-      "properties": [
-        {
-          "name": "bomlens:licenseClass",
-          "value": "uncategorized"
-        }
-      ],
-      "type": "file"
-    },
-    {
-      "bom-ref": "789a2190ff4b8959",
-      "hashes": [
-        {
-          "alg": "SHA-1",
-          "content": "32f4a73f1f15e2cc04da20dffd60e5aa40d32466"
-        },
-        {
-          "alg": "SHA-256",
-          "content": "bbb3de5707629e6a60a0c238cd477b28f07f0066982fda953fa6fcec39073a4a"
-        }
-      ],
-      "name": "setuptools/cli-64.exe",
-      "properties": [
-        {
-          "name": "bomlens:licenseClass",
-          "value": "uncategorized"
-        }
-      ],
-      "type": "file"
-    },
-    {
-      "bom-ref": "d355f813bc6623d4",
-      "hashes": [
-        {
-          "alg": "SHA-1",
-          "content": "463cf7b9a2334eb33d5e89e33a164e74dce6d0e9"
-        },
-        {
-          "alg": "SHA-256",
-          "content": "b9a7d08da880dfac8bcf548eba4b06fb59b6f09b17d33148a0f6618328926c61"
-        }
-      ],
-      "name": "setuptools/cli-arm64.exe",
-      "properties": [
-        {
-          "name": "bomlens:licenseClass",
-          "value": "uncategorized"
-        }
-      ],
-      "type": "file"
-    },
-    {
-      "bom-ref": "0efee7f75b3e309a",
-      "hashes": [
-        {
-          "alg": "SHA-1",
-          "content": "015535f3274f28cf0b01a3e858de4ecf9fb4ef34"
-        },
-        {
-          "alg": "SHA-256",
-          "content": "32acc1bc543116cbe2cff10cb867772df2f254ff2634c870aef0b46c4b696fdb"
-        }
-      ],
-      "name": "setuptools/cli.exe",
-      "properties": [
-        {
-          "name": "bomlens:licenseClass",
-          "value": "uncategorized"
-        }
-      ],
-      "type": "file"
-    },
-    {
-      "bom-ref": "c1cd4ef75297bb63",
-      "hashes": [
-        {
-          "alg": "SHA-1",
-          "content": "418b4d0ee1459ae958185c5620fd326107b60dad"
-        },
-        {
-          "alg": "SHA-256",
-          "content": "85dae1e95d77845f2cb59bcac3d4afe74bbe4c91a9bcc5bf4a71cd43104dbe7c"
-        }
-      ],
-      "name": "setuptools/gui-32.exe",
-      "properties": [
-        {
-          "name": "bomlens:licenseClass",
-          "value": "uncategorized"
-        }
-      ],
-      "type": "file"
-    },
-    {
-      "bom-ref": "dfe02d2dc16ffa97",
-      "hashes": [
-        {
-          "alg": "SHA-1",
-          "content": "b9a4181165b5864760055cdf7dc2d360fbf885c0"
-        },
-        {
-          "alg": "SHA-256",
-          "content": "3471b6140eadc6412277dbbefe3fef8c345a0f1a59776086b80a3618c3a83e3b"
-        }
-      ],
-      "name": "setuptools/gui-64.exe",
-      "properties": [
-        {
-          "name": "bomlens:licenseClass",
-          "value": "uncategorized"
-        }
-      ],
-      "type": "file"
-    },
-    {
-      "bom-ref": "d1444d78b5e89159",
-      "hashes": [
-        {
-          "alg": "SHA-1",
-          "content": "aa7e72efcaf8b2dfc2f04b6ff17ed42d7233e397"
-        },
-        {
-          "alg": "SHA-256",
-          "content": "e694f4743405c8b5926ff457db6fe7f1a12dec7c16a9c3864784d3f4e07ae097"
-        }
-      ],
-      "name": "setuptools/gui-arm64.exe",
-      "properties": [
-        {
-          "name": "bomlens:licenseClass",
-          "value": "uncategorized"
-        }
-      ],
-      "type": "file"
-    },
-    {
-      "bom-ref": "db3644ab040de195",
-      "hashes": [
-        {
-          "alg": "SHA-1",
-          "content": "418b4d0ee1459ae958185c5620fd326107b60dad"
-        },
-        {
-          "alg": "SHA-256",
-          "content": "85dae1e95d77845f2cb59bcac3d4afe74bbe4c91a9bcc5bf4a71cd43104dbe7c"
-        }
-      ],
-      "name": "setuptools/gui.exe",
       "properties": [
         {
           "name": "bomlens:licenseClass",
@@ -1552174,7 +1552592,7 @@
         "value": "unknown-to-author"
       }
     ],
-    "timestamp": "2026-10-12T08:22:02Z",
+    "timestamp": "2026-10-14T18:07:17Z",
     "tools": {
       "components": [
         {
@@ -1552185,7 +1552603,7 @@
         {
           "name": "syft",
           "type": "application",
-          "version": "v1.52.0"
+          "version": "v1.54.1"
         },
         {
           "name": "cve-bin-tool",
@@ -1552196,7 +1552614,7 @@
           "name": "BomLens",
           "publisher": "SK Telecom",
           "type": "application",
-          "version": "1.13.2"
+          "version": "1.13.4"
         }
       ]
     }

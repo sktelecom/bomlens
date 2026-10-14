@@ -45896,25 +45896,25 @@
         "value": "unknown-to-author"
       }
     ],
-    "timestamp": "2026-10-12T08:21:11Z",
+    "timestamp": "2026-10-14T18:06:27Z",
     "tools": {
       "components": [
         {
           "author": "anchore",
           "name": "syft",
           "type": "application",
-          "version": "1.52.0"
+          "version": "1.54.1"
         },
         {
           "name": "BomLens",
           "publisher": "SK Telecom",
           "type": "application",
-          "version": "1.13.2"
+          "version": "1.13.4"
         }
       ]
     }
   },
-  "serialNumber": "urn:uuid:024545e5-ce9f-4708-a43e-93169a70babd",
+  "serialNumber": "urn:uuid:06d16f8d-a43d-47f7-b2fb-7b21a52bb918",
   "specVersion": "1.6",
   "version": 1,
   "compositions": [

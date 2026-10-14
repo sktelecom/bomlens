@@ -2,7 +2,7 @@
   "project": "SpringBootDemo",
   "format": "CycloneDX",
   "result": "pass",
-  "generatedAt": "2026-10-12T08:20:47Z",
+  "generatedAt": "2026-10-14T18:06:09Z",
   "profile": "default",
   "untraceableComponents": 0,
   "checks": [
@@ -30,7 +30,7 @@
       "label": "Timestamp (metadata.timestamp)",
       "required": true,
       "status": "pass",
-      "detail": "2026-10-12T08:20:44Z",
+      "detail": "2026-10-14T18:06:06Z",
       "missing": [],
       "regulations": [
         {
@@ -42,7 +42,7 @@
         }
       ],
       "label_ko": "타임스탬프 (metadata.timestamp)",
-      "detail_ko": "2026-10-12T08:20:44Z"
+      "detail_ko": "2026-10-14T18:06:06Z"
     },
     {
       "id": "tools",
@@ -245,8 +245,8 @@
       "required": false,
       "source": "auto",
       "naKind": "",
-      "status": "warn",
-      "detail": "0% (0/64)",
+      "status": "pass",
+      "detail": "100% (64/64)",
       "missing": [],
       "regulations": [
         {
@@ -258,7 +258,7 @@
         }
       ],
       "label_ko": "해시 포함률 (50% 이상, 권장)",
-      "detail_ko": "0% (0/64)"
+      "detail_ko": "100% (64/64)"
     },
     {
       "id": "hash-algorithm",
@@ -266,8 +266,8 @@
       "required": false,
       "source": "auto",
       "naKind": "",
-      "status": "warn",
-      "detail": "0% (0/64)",
+      "status": "pass",
+      "detail": "100% (64/64)",
       "missing": [],
       "regulations": [
         {
@@ -279,7 +279,7 @@
         }
       ],
       "label_ko": "SHA-512 체크섬 포함률 (80% 이상, 권장)",
-      "detail_ko": "0% (0/64)"
+      "detail_ko": "100% (64/64)"
     },
     {
       "id": "component-creator",
@@ -288,7 +288,7 @@
       "source": "auto",
       "naKind": "",
       "status": "warn",
-      "detail": "60% (39/64)",
+      "detail": "50% (32/64)",
       "missing": [],
       "regulations": [
         {
@@ -300,7 +300,7 @@
         }
       ],
       "label_ko": "구성요소 작성자 포함률 (80% 이상, 권장)",
-      "detail_ko": "60% (39/64)"
+      "detail_ko": "50% (32/64)"
     },
     {
       "id": "component-filename",
@@ -329,8 +329,8 @@
       "required": false,
       "source": "auto",
       "naKind": "",
-      "status": "pass",
-      "detail": "81% (52/64)",
+      "status": "warn",
+      "detail": "73% (47/64)",
       "missing": [],
       "regulations": [
         {
@@ -342,7 +342,7 @@
         }
       ],
       "label_ko": "소스 또는 배포 URI 포함률 (80% 이상, 권장)",
-      "detail_ko": "81% (52/64)"
+      "detail_ko": "73% (47/64)"
     },
     {
       "id": "file-properties",
@@ -641,9 +641,10 @@
       "label_ko": "구성요소 생산자",
       "required": false,
       "status": "warn",
-      "detail": "39/65 component(s)",
+      "detail": "32/65 component(s)",
       "missing": [
         "SpringBootDemo",
+        "jackson-annotations",
         "jackson-core",
         "jackson-databind",
         "jackson-datatype-jdk8",
@@ -654,8 +655,13 @@
         "micrometer-commons",
         "micrometer-observation",
         "jandex",
+        "jakarta.activation-api",
+        "jakarta.annotation-api",
+        "jakarta.inject-api",
+        "jakarta.persistence-api",
         "jakarta.xml.bind-api",
         "byte-buddy",
+        "antlr4-runtime",
         "commons-lang3",
         "log4j-api",
         "log4j-to-slf4j",
@@ -667,6 +673,7 @@
         "jaxb-core",
         "jaxb-runtime",
         "txw2",
+        "jboss-logging",
         "spring-data-jpa",
         "snakeyaml"
       ],
@@ -687,7 +694,7 @@
           "short_ko": "CISA 2026"
         }
       ],
-      "detail_ko": "구성요소 39/65"
+      "detail_ko": "구성요소 32/65"
     },
     {
       "id": "cisa-component-identifiers",
@@ -794,58 +801,9 @@
       "label_ko": "구성요소 해시 값",
       "required": false,
       "status": "warn",
-      "detail": "0/65 component(s)",
+      "detail": "64/65 component(s)",
       "missing": [
-        "SpringBootDemo",
-        "logback-classic",
-        "logback-core",
-        "jackson-annotations",
-        "jackson-core",
-        "jackson-databind",
-        "jackson-datatype-jdk8",
-        "jackson-datatype-jsr310",
-        "jackson-module-parameter-names",
-        "classmate",
-        "h2",
-        "istack-commons-runtime",
-        "HikariCP",
-        "micrometer-commons",
-        "micrometer-observation",
-        "jandex",
-        "jakarta.activation-api",
-        "jakarta.annotation-api",
-        "jakarta.inject-api",
-        "jakarta.persistence-api",
-        "jakarta.transaction-api",
-        "jakarta.xml.bind-api",
-        "byte-buddy",
-        "antlr4-runtime",
-        "commons-lang3",
-        "log4j-api",
-        "log4j-to-slf4j",
-        "tomcat-embed-core",
-        "tomcat-embed-el",
-        "tomcat-embed-websocket",
-        "aspectjweaver",
-        "angus-activation",
-        "jaxb-core",
-        "jaxb-runtime",
-        "txw2",
-        "hibernate-commons-annotations",
-        "hibernate-core",
-        "jboss-logging",
-        "jul-to-slf4j",
-        "slf4j-api",
-        "spring-boot-autoconfigure",
-        "spring-boot-starter-aop",
-        "spring-boot-starter-data-jpa",
-        "spring-boot-starter-jdbc",
-        "spring-boot-starter-json",
-        "spring-boot-starter-logging",
-        "spring-boot-starter-tomcat",
-        "spring-boot-starter-web",
-        "spring-boot-starter",
-        "spring-boot"
+        "SpringBootDemo"
       ],
       "evidence": [],
       "cluster": "cisa-component",
@@ -864,7 +822,7 @@
           "short_ko": "CISA 2026"
         }
       ],
-      "detail_ko": "구성요소 0/65"
+      "detail_ko": "구성요소 64/65"
     },
     {
       "id": "cisa-component-hash-algorithm",
@@ -1105,8 +1063,8 @@
         "title": "BSI TR-03183-2 — SBOM data fields (EU CRA)",
         "source": "Regulation (EU) 2024/2847 Annex I Part II(1); BSI TR-03183-2 v2.1.0 (2025-08-20)",
         "total": 14,
-        "present": 10,
-        "gap": 3,
+        "present": 11,
+        "gap": 2,
         "review": 1,
         "failed": 0,
         "elements": [
@@ -1125,7 +1083,7 @@
             "label": "Timestamp (metadata.timestamp)",
             "status": "pass",
             "source": null,
-            "detail": "2026-10-12T08:20:44Z",
+            "detail": "2026-10-14T18:06:06Z",
             "refs": [
               "Section 5.2.1"
             ]
@@ -1193,9 +1151,9 @@
           {
             "id": "hash",
             "label": "Hash coverage (>= 50%, recommended)",
-            "status": "warn",
+            "status": "pass",
             "source": "auto",
-            "detail": "0% (0/64)",
+            "detail": "100% (64/64)",
             "refs": [
               "Section 5.2.2"
             ]
@@ -1203,9 +1161,9 @@
           {
             "id": "hash-algorithm",
             "label": "SHA-512 checksum coverage (>= 80%, recommended)",
-            "status": "warn",
+            "status": "pass",
             "source": "auto",
-            "detail": "0% (0/64)",
+            "detail": "100% (64/64)",
             "refs": [
               "Section 5.2.2"
             ]
@@ -1215,7 +1173,7 @@
             "label": "Component creator coverage (>= 80%, recommended)",
             "status": "warn",
             "source": "auto",
-            "detail": "60% (39/64)",
+            "detail": "50% (32/64)",
             "refs": [
               "Section 5.2.2"
             ]
@@ -1233,9 +1191,9 @@
           {
             "id": "artifact-uri",
             "label": "Source or distribution URI coverage (>= 80%, recommended)",
-            "status": "pass",
+            "status": "warn",
             "source": "auto",
-            "detail": "81% (52/64)",
+            "detail": "73% (47/64)",
             "refs": [
               "Section 5.2.4"
             ]
@@ -1377,7 +1335,7 @@
             "label": "Component producer",
             "status": "warn",
             "source": "auto",
-            "detail": "39/65 component(s)",
+            "detail": "32/65 component(s)",
             "refs": [
               "Component Producer"
             ]
@@ -1407,7 +1365,7 @@
             "label": "Component hash value",
             "status": "warn",
             "source": "auto",
-            "detail": "0/65 component(s)",
+            "detail": "64/65 component(s)",
             "refs": [
               "Component Hash Value"
             ]

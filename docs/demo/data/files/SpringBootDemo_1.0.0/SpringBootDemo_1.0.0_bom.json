@@ -8,21 +8,21 @@
               "name": "OWASP Foundation"
             }
           ],
-          "bom-ref": "pkg:npm/@cdxgen/cdxgen@13.2.0",
+          "bom-ref": "pkg:npm/@cdxgen/cdxgen@13.3.0",
           "group": "@cdxgen",
           "name": "cdxgen",
           "publisher": "OWASP Foundation",
-          "purl": "pkg:npm/%40cdxgen/cdxgen@13.2.0",
+          "purl": "pkg:npm/%40cdxgen/cdxgen@13.3.0",
           "type": "application",
-          "version": "13.2.0"
+          "version": "13.3.0"
         }
       },
       "bom-ref": "metadata-annotations",
       "subjects": [
         "pkg:maven/com.example/sbom-example-app@1.0.0?type=jar"
       ],
-      "text": "This Software Bill-of-Materials (SBOM) document was created on Monday, October 12, 2026 with cdxgen. The data was captured during the build lifecycle phase. The document describes an application named 'sbom-example-app' with version '1.0.0'. The package type in this SBOM is maven with 48 purl namespaces described under components. The components were identified from the source files: pom.xml.",
-      "timestamp": "2026-10-12T08:20:44Z"
+      "text": "This Software Bill-of-Materials (SBOM) document was created on Wednesday, October 14, 2026 with cdxgen. The data was captured during the build lifecycle phase. The document describes an application named 'sbom-example-app' with version '1.0.0'. The package type in this SBOM is maven with 48 purl namespaces described under components. The components were identified from the source files: pom.xml.",
+      "timestamp": "2026-10-14T18:06:06Z"
     }
   ],
   "bomFormat": "CycloneDX",
@@ -53,6 +53,24 @@
         }
       ],
       "group": "ch.qos.logback",
+      "hashes": [
+        {
+          "alg": "MD5",
+          "content": "a6a09da5f4d40cf80bedcf7a6a0d35b2"
+        },
+        {
+          "alg": "SHA-1",
+          "content": "54450c0c783e896a1a6d88c043bd2f1daba1c382"
+        },
+        {
+          "alg": "SHA-256",
+          "content": "05850fca185dfa652969ed1e3864e365c0d724737a0f4ec68574baad1d855a0e"
+        },
+        {
+          "alg": "SHA-512",
+          "content": "8d368d3a1472075aa99e14b3505f5c66035fdc54c2801846ee168fe035e0e4cfad32283ccbcce8a3b1ad8aeb84f8698d2a012733f81565c4c903c1d79b202a72"
+        }
+      ],
       "licenses": [
         {
           "license": {
@@ -134,6 +152,10 @@
           "value": "File- or library-level reciprocity: changes to the dependency stay under its license, and static linking adds obligations. Distributing your own code under the permissive license is still fine."
         },
         {
+          "name": "bomlens:supplierSource",
+          "value": "publisher"
+        },
+        {
           "name": "bsi:component:filename",
           "value": "logback-classic-1.4.11.jar"
         },
@@ -145,6 +167,9 @@
       "publisher": "QOS.ch",
       "purl": "pkg:maven/ch.qos.logback/logback-classic@1.4.11?type=jar",
       "scope": "required",
+      "supplier": {
+        "name": "QOS.ch"
+      },
       "type": "library",
       "version": "1.4.11",
       "cpe": "cpe:2.3:a:qos:logback:1.4.11:*:*:*:*:*:*:*"
@@ -175,6 +200,24 @@
         }
       ],
       "group": "ch.qos.logback",
+      "hashes": [
+        {
+          "alg": "MD5",
+          "content": "d71bee74f4ae2864c7b68fc8212b8a66"
+        },
+        {
+          "alg": "SHA-1",
+          "content": "2f9f280219a9922a74200eaf7138c4c17fb87c0f"
+        },
+        {
+          "alg": "SHA-256",
+          "content": "37ee7367bd24ca87ef77430119a1cb814a76b240afab5c17f802ea383f58aca1"
+        },
+        {
+          "alg": "SHA-512",
+          "content": "d429a0052093f2fc65ca93cc26f07f1e7ef2999051d8b187b286d2257f631171217bc1521ad56226bec8c525e99a2cd030a1eb6185d8a6648f9896951a8cac97"
+        }
+      ],
       "licenses": [
         {
           "license": {
@@ -256,6 +299,10 @@
           "value": "File- or library-level reciprocity: changes to the dependency stay under its license, and static linking adds obligations. Distributing your own code under the permissive license is still fine."
         },
         {
+          "name": "bomlens:supplierSource",
+          "value": "publisher"
+        },
+        {
           "name": "bsi:component:filename",
           "value": "logback-core-1.4.11.jar"
         },
@@ -267,6 +314,9 @@
       "publisher": "QOS.ch",
       "purl": "pkg:maven/ch.qos.logback/logback-core@1.4.11?type=jar",
       "scope": "required",
+      "supplier": {
+        "name": "QOS.ch"
+      },
       "type": "library",
       "version": "1.4.11",
       "cpe": "cpe:2.3:a:qos:logback:1.4.11:*:*:*:*:*:*:*"
@@ -297,6 +347,24 @@
         }
       ],
       "group": "com.fasterxml.jackson.core",
+      "hashes": [
+        {
+          "alg": "MD5",
+          "content": "9caec6e7cdd5cc18e18f99359b9e8d95"
+        },
+        {
+          "alg": "SHA-1",
+          "content": "dc30995f7428c0a405eba9b8c619b20d2b3b9905"
+        },
+        {
+          "alg": "SHA-256",
+          "content": "c4b90ea0c0074da17efdc3aa23973525f25d6f34725692169748f529547334a6"
+        },
+        {
+          "alg": "SHA-512",
+          "content": "2c7d70c88b7e8dd710863f8c920d3e2fe56f8ecc01c757011bd9bbd195228028402566fbf4feaa083192453348a86a70732bf5d3f6eebb75ab4e5b3a525f6148"
+        }
+      ],
       "licenses": [
         {
           "license": {
@@ -358,7 +426,6 @@
           "value": "maven-groupid"
         }
       ],
-      "publisher": "FasterXML",
       "purl": "pkg:maven/com.fasterxml.jackson.core/jackson-annotations@2.16.0?type=jar",
       "scope": "required",
       "type": "library",
@@ -391,6 +458,24 @@
         }
       ],
       "group": "com.fasterxml.jackson.core",
+      "hashes": [
+        {
+          "alg": "MD5",
+          "content": "e2510fa60b7d363566a9016a8c40710f"
+        },
+        {
+          "alg": "SHA-1",
+          "content": "899e5cf01be55fbf094ad72b2edb0c5df99111ee"
+        },
+        {
+          "alg": "SHA-256",
+          "content": "66e2cde4cc7e565d5fce2a2998b64e991777bf9fad4d220735c525fd8d01c31a"
+        },
+        {
+          "alg": "SHA-512",
+          "content": "89b134b2808c34562f751ff39b938e8c1b67030c4cfb8fd0418d76aed1d6b8f256915a5e88d9935f472322b414a7002e59d92160854cbd01774b28eed61c5315"
+        }
+      ],
       "licenses": [
         {
           "license": {
@@ -484,6 +569,24 @@
         }
       ],
       "group": "com.fasterxml.jackson.core",
+      "hashes": [
+        {
+          "alg": "MD5",
+          "content": "f9ae3e3bd773be8b474cb1b98dcf7ee6"
+        },
+        {
+          "alg": "SHA-1",
+          "content": "3a6b7f8ff7b30d518bbd65678e9c30cd881f19a7"
+        },
+        {
+          "alg": "SHA-256",
+          "content": "8aaf1753823be70b798290e5826ab5bfe015d35b3a36a5d3c2ec9f57d4b0138b"
+        },
+        {
+          "alg": "SHA-512",
+          "content": "2f0a4211c1723bd88299380093a935840290694838a4c5ae0989bad46a615e02017b707ba7f3b825d0f0163f42a392efd0a1629024594992b5a4edee415c207a"
+        }
+      ],
       "licenses": [
         {
           "license": {
@@ -577,6 +680,24 @@
         }
       ],
       "group": "com.fasterxml.jackson.datatype",
+      "hashes": [
+        {
+          "alg": "MD5",
+          "content": "3b6579ff944e128c4eccb34e76ff67e0"
+        },
+        {
+          "alg": "SHA-1",
+          "content": "80158cb020c7bd4e4ba94d8d752a65729dc943b2"
+        },
+        {
+          "alg": "SHA-256",
+          "content": "29995d3677f72dde74bf32bbf268b96beb952492b742d93f4c70af6c44b2156e"
+        },
+        {
+          "alg": "SHA-512",
+          "content": "1b13d4f0a955af18a2c68ca45deca79c38d7f9f065d7053bddf2a3dc2fafe729b3355676f7442012451e363aa0da0cd8a0b7a44ded7057cf513df98a475cbbf6"
+        }
+      ],
       "licenses": [
         {
           "license": {
@@ -670,6 +791,24 @@
         }
       ],
       "group": "com.fasterxml.jackson.datatype",
+      "hashes": [
+        {
+          "alg": "MD5",
+          "content": "acd8ae6da000eb831a69b4acdc182b7f"
+        },
+        {
+          "alg": "SHA-1",
+          "content": "4a20a0e104931bfa72f24ef358c2eb63f1ef2aaf"
+        },
+        {
+          "alg": "SHA-256",
+          "content": "bea1d78009ebc4e5d54918a3f7aec5da9fbd09f662c191a217ffcf37e8527c5e"
+        },
+        {
+          "alg": "SHA-512",
+          "content": "1c5bde6c91a2a89f3c1f231f4e17c435063d9012babbfcba509a3b25363b1fd99f0dcd4234f1e00559e43d3dc8e6c71834282c72f2ebf15484ae900754c5d757"
+        }
+      ],
       "licenses": [
         {
           "license": {
@@ -763,6 +902,24 @@
         }
       ],
       "group": "com.fasterxml.jackson.module",
+      "hashes": [
+        {
+          "alg": "MD5",
+          "content": "495868f770056602bfe13ea781656f03"
+        },
+        {
+          "alg": "SHA-1",
+          "content": "8d251b90c5358677e7d8161e0c2488e6f84f49da"
+        },
+        {
+          "alg": "SHA-256",
+          "content": "baf1a3156a23cb407e05374161a07ed8560f78a7ae249955de04a9a2fa2d0f2b"
+        },
+        {
+          "alg": "SHA-512",
+          "content": "497b08f55f601b7ff6294e0b8307e015e60ad45c7949bd80ed3f5ee19daa93fad7f0b5a93abb8082ec46480667ab8539337633213d0fd5992e4a10c710f0a7aa"
+        }
+      ],
       "licenses": [
         {
           "license": {
@@ -856,6 +1013,24 @@
         }
       ],
       "group": "com.fasterxml",
+      "hashes": [
+        {
+          "alg": "MD5",
+          "content": "e91fcd30ba329fd1b0b6dc5321fd067c"
+        },
+        {
+          "alg": "SHA-1",
+          "content": "3fe0bed568c62df5e89f4f174c101eab25345b6c"
+        },
+        {
+          "alg": "SHA-256",
+          "content": "aab4de3006808c09d25dd4ff4a3611cfb63c95463cfd99e73d2e1680d229a33b"
+        },
+        {
+          "alg": "SHA-512",
+          "content": "7fc4764eb65227f5ba614698a5cf2f9430133f42ec6e2ae53b4c724ee53f258541a0109fe0659e0b9e45729b46c95c00227e696b8d1addcd772c85f877658c9a"
+        }
+      ],
       "licenses": [
         {
           "license": {
@@ -909,6 +1084,10 @@
           "value": "Both are permissive; keep the notices."
         },
         {
+          "name": "bomlens:supplierSource",
+          "value": "publisher"
+        },
+        {
           "name": "bsi:component:filename",
           "value": "classmate-1.5.1.jar"
         },
@@ -920,6 +1099,9 @@
       "publisher": "fasterxml.com",
       "purl": "pkg:maven/com.fasterxml/classmate@1.5.1?type=jar",
       "scope": "required",
+      "supplier": {
+        "name": "fasterxml.com"
+      },
       "type": "library",
       "version": "1.5.1",
       "cpe": "cpe:2.3:a:fasterxml:fasterxml:1.5.1:*:*:*:*:*:*:*"
@@ -950,6 +1132,24 @@
         }
       ],
       "group": "com.h2database",
+      "hashes": [
+        {
+          "alg": "MD5",
+          "content": "769d5a85d19ccc2b06620f8c81d6d8f8"
+        },
+        {
+          "alg": "SHA-1",
+          "content": "7bdade27d8cd197d9b5ce9dc251f41d2edc5f7ad"
+        },
+        {
+          "alg": "SHA-256",
+          "content": "b9d8f19358ada82a4f6eb5b174c6cfe320a375b5a9cb5a4fe456d623e6e55497"
+        },
+        {
+          "alg": "SHA-512",
+          "content": "f2fd97ef57232b3436a0c7aab04cd3a8212851fecd82404a12a4f5fd76059c8841e366dec7a1ab8f9e2a8ccb49ce741a1581094343eb9487c697077cfaad3724"
+        }
+      ],
       "licenses": [
         {
           "license": {
@@ -1050,7 +1250,6 @@
     },
     {
       "bom-ref": "pkg:maven/com.sun.istack/istack-commons-runtime@4.1.1?type=jar",
-      "description": "istack common utility code",
       "evidence": {
         "identity": [
           {
@@ -1067,17 +1266,52 @@
           }
         ]
       },
-      "externalReferences": [
+      "group": "com.sun.istack",
+      "hashes": [
         {
-          "type": "vcs",
-          "url": "https://github.com/eclipse-ee4j/jaxb-istack-commons"
+          "alg": "MD5",
+          "content": "8a0b5fe40f96b22dbf7a2d971bf21964"
+        },
+        {
+          "alg": "SHA-1",
+          "content": "9b3769c76235bc283b060da4fae2318c6d53f07e"
+        },
+        {
+          "alg": "SHA-256",
+          "content": "7e8148c5bf5d5ae6f8c4534c1873f82e80bf7f9164fd09ee573df0013918dcd3"
+        },
+        {
+          "alg": "SHA-512",
+          "content": "85856dda847ef111f25e359b6957c583fbfd84d99b98e8cb7012e9aff8f4627e3152e9192002a55a1bc3729ec313086f5486110c9527a9c3d7bbd809cf197182"
         }
       ],
-      "group": "com.sun.istack",
       "licenses": [
         {
           "license": {
-            "id": "BSD-3-Clause"
+            "id": "BSD-3-Clause",
+            "properties": [
+              {
+                "name": "cdx:license:category",
+                "value": "Permissive"
+              },
+              {
+                "name": "cdx:license:foss",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:osiApproved",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:fsfLibre",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:deprecated",
+                "value": "false"
+              }
+            ],
+            "url": "https://opensource.org/licenses/BSD-3-Clause"
           }
         }
       ],
@@ -1085,7 +1319,7 @@
       "properties": [
         {
           "name": "cdx:license:category",
-          "value": "Unstated License"
+          "value": "Permissive"
         },
         {
           "name": "internal:SrcFile",
@@ -1138,6 +1372,24 @@
         ]
       },
       "group": "com.zaxxer",
+      "hashes": [
+        {
+          "alg": "MD5",
+          "content": "3bc96d2ce8285470da11ec41bff6129f"
+        },
+        {
+          "alg": "SHA-1",
+          "content": "a74c7f0a37046846e88d54f7cb6ea6d565c65f9c"
+        },
+        {
+          "alg": "SHA-256",
+          "content": "26d492397e6775b4296737a8919bf04047afe5827fdd2c08b4557595436b3a2b"
+        },
+        {
+          "alg": "SHA-512",
+          "content": "0a932d8c1083d3ba8eb6e004aa1783cc3f6df7424666f1d61ca6606715afbbb3da20bc0b61efd91bb3162f8092100ddad5e90fe019f818c89cc69a8d8d0bd5d5"
+        }
+      ],
       "licenses": [
         {
           "license": {
@@ -1191,6 +1443,10 @@
           "value": "Both are permissive; keep the notices."
         },
         {
+          "name": "bomlens:supplierSource",
+          "value": "publisher"
+        },
+        {
           "name": "bsi:component:filename",
           "value": "HikariCP-5.0.1.jar"
         },
@@ -1202,6 +1458,9 @@
       "publisher": "Zaxxer.com",
       "purl": "pkg:maven/com.zaxxer/HikariCP@5.0.1?type=jar",
       "scope": "required",
+      "supplier": {
+        "name": "Zaxxer.com"
+      },
       "tags": [
         "jdbc"
       ],
@@ -1229,6 +1488,24 @@
         ]
       },
       "group": "io.micrometer",
+      "hashes": [
+        {
+          "alg": "MD5",
+          "content": "e026ce63291d32fc790bd6972b512a70"
+        },
+        {
+          "alg": "SHA-1",
+          "content": "02436654d439bd4ff6aad6419519357be8ba4f0d"
+        },
+        {
+          "alg": "SHA-256",
+          "content": "f4b8ecae3c8ef40fd9b9da82582aada1cf764b8bb93f4a2a2126575e3f67de47"
+        },
+        {
+          "alg": "SHA-512",
+          "content": "166b7e85e92acefcdd2418e825b812c828596299e136b1e3ad8b70e781a38634bdb7bb295921464e22a5182d7e4bd80f786ab6972db9918f00b38c5333af2815"
+        }
+      ],
       "licenses": [
         {
           "license": {
@@ -1316,6 +1593,24 @@
         ]
       },
       "group": "io.micrometer",
+      "hashes": [
+        {
+          "alg": "MD5",
+          "content": "88589043f39ce9cb826530c49a21db1d"
+        },
+        {
+          "alg": "SHA-1",
+          "content": "4f4981faa7968441d0092107df9b750e057374af"
+        },
+        {
+          "alg": "SHA-256",
+          "content": "3f160a849da81d2520bbdfe1d6976d1f72568256479576a16bf95babb6520085"
+        },
+        {
+          "alg": "SHA-512",
+          "content": "2500bd844146269892c548f8a8477e83170df4bb3a385a7dab358804e5a8a40b26d8da78f079d9f86c6d1eb4a38c2e51ae00f5b6d2e4bb5e9fbc0210a9c7fa27"
+        }
+      ],
       "licenses": [
         {
           "license": {
@@ -1408,6 +1703,24 @@
         }
       ],
       "group": "io.smallrye",
+      "hashes": [
+        {
+          "alg": "MD5",
+          "content": "757ae579a3a52c03c3c60fbe393c086f"
+        },
+        {
+          "alg": "SHA-1",
+          "content": "a6c1c89925c7df06242b03dddb353116ceb9584c"
+        },
+        {
+          "alg": "SHA-256",
+          "content": "dee12fa1787d5523ed1a02d6c63b19e7aef6ac560f7c6d70595db01aa37e041e"
+        },
+        {
+          "alg": "SHA-512",
+          "content": "fa47891bf01ea727007f29f0265d28b536957171ea1e9af9a28b3715bbf9bf938562c3ea038c761d4ba0fd652db5772dd7c6cefd05299e25bf412a32e816d4f6"
+        }
+      ],
       "licenses": [
         {
           "license": {
@@ -1504,6 +1817,24 @@
         }
       ],
       "group": "jakarta.activation",
+      "hashes": [
+        {
+          "alg": "MD5",
+          "content": "1af11450fafc7ee26c633d940286bc16"
+        },
+        {
+          "alg": "SHA-1",
+          "content": "640c0d5aff45dbff1e1a1bc09673ff3a02b1ba12"
+        },
+        {
+          "alg": "SHA-256",
+          "content": "f53f578dd0eb4170c195a4e215c59a38abfb4123dcb95dd902fef92876499fbb"
+        },
+        {
+          "alg": "SHA-512",
+          "content": "383283f469aba01a274591e29f1aa398fefa273bca180162d9d11c87509ffb55cb2dde51783bd6cae6f2c4347e0ac7358cf11f4c85787d5d2857354b9e29d877"
+        }
+      ],
       "licenses": [
         {
           "license": {
@@ -1542,7 +1873,6 @@
           "value": "maven-groupid"
         }
       ],
-      "publisher": "Eclipse Foundation",
       "purl": "pkg:maven/jakarta.activation/jakarta.activation-api@2.1.2?type=jar",
       "scope": "required",
       "type": "library",
@@ -1575,6 +1905,24 @@
         }
       ],
       "group": "jakarta.annotation",
+      "hashes": [
+        {
+          "alg": "MD5",
+          "content": "5dac2f68e8288d0add4dc92cb161711d"
+        },
+        {
+          "alg": "SHA-1",
+          "content": "48b9bda22b091b1f48b13af03fe36db3be6e1ae3"
+        },
+        {
+          "alg": "SHA-256",
+          "content": "5f65fdaf424eee2b55e1d882ba9bb376be93fb09b37b808be6e22e8851c909fe"
+        },
+        {
+          "alg": "SHA-512",
+          "content": "eabe8b855b735663684052ec4cc357cc737936fa57cebf144eb09f70b3b6c600db7fa6f1c93a4f36c5994b1b37dad2dfcec87a41448872e69552accfd7f52af6"
+        }
+      ],
       "licenses": [
         {
           "expression": "GPL-2.0-or-later OR Classpath-exception-2.0"
@@ -1607,7 +1955,6 @@
           "value": "maven-groupid"
         }
       ],
-      "publisher": "Eclipse Foundation",
       "purl": "pkg:maven/jakarta.annotation/jakarta.annotation-api@2.1.1?type=jar",
       "scope": "required",
       "type": "library",
@@ -1640,6 +1987,24 @@
         }
       ],
       "group": "jakarta.inject",
+      "hashes": [
+        {
+          "alg": "MD5",
+          "content": "72003bf6efcc8455d414bbd7da86c11c"
+        },
+        {
+          "alg": "SHA-1",
+          "content": "4c28afe1991a941d7702fe1362c365f0a8641d1e"
+        },
+        {
+          "alg": "SHA-256",
+          "content": "f7dc98062fccf14126abb751b64fab12c312566e8cbdc8483598bffcea93af7c"
+        },
+        {
+          "alg": "SHA-512",
+          "content": "f186b2ada470abba1cc3b4f8c4373d940fb7c71a051b2c26f7c204ad4dfb69235fbf3f9c33da36d744cb90f52d921c51d76c0ff263bacb35eafb66cab83dc47d"
+        }
+      ],
       "licenses": [
         {
           "license": {
@@ -1701,7 +2066,6 @@
           "value": "maven-groupid"
         }
       ],
-      "publisher": "Eclipse Foundation",
       "purl": "pkg:maven/jakarta.inject/jakarta.inject-api@2.0.1?type=jar",
       "scope": "required",
       "type": "library",
@@ -1710,7 +2074,6 @@
     },
     {
       "bom-ref": "pkg:maven/jakarta.persistence/jakarta.persistence-api@3.1.0?type=jar",
-      "description": "Eclipse Enterprise for Java (EE4J) is an open source initiative to create standard APIs,\nimplementations of those APIs, and technology compatibility kits for Java runtimes\nthat enable development, deployment, and management of server-side and cloud-native applications.",
       "evidence": {
         "identity": [
           {
@@ -1734,6 +2097,24 @@
         }
       ],
       "group": "jakarta.persistence",
+      "hashes": [
+        {
+          "alg": "MD5",
+          "content": "35a1b7dfb38cf44ff795be607b0e6b5b"
+        },
+        {
+          "alg": "SHA-1",
+          "content": "66901fa1c373c6aff65c13791cc11da72060a8d6"
+        },
+        {
+          "alg": "SHA-256",
+          "content": "475389446d35c6f46c565728b756dc508c284644ea2690644e0d8e7e339d42fd"
+        },
+        {
+          "alg": "SHA-512",
+          "content": "5ff83c6ade13eff5ca9daf7cf13bbba46a2c8aec3cc6ae4eea884026a081698d0425d18804147a075459c02480d25c88528a942bee3f6778a1e903a6a1fc8263"
+        }
+      ],
       "licenses": [
         {
           "license": {
@@ -1800,7 +2181,6 @@
           "value": "maven-groupid"
         }
       ],
-      "publisher": "Eclipse Foundation",
       "purl": "pkg:maven/jakarta.persistence/jakarta.persistence-api@3.1.0?type=jar",
       "scope": "required",
       "type": "library",
@@ -1833,6 +2213,24 @@
         }
       ],
       "group": "jakarta.transaction",
+      "hashes": [
+        {
+          "alg": "MD5",
+          "content": "5315974a3935e342b40849478e1c9966"
+        },
+        {
+          "alg": "SHA-1",
+          "content": "51a520e3fae406abb84e2e1148e6746ce3f80a1a"
+        },
+        {
+          "alg": "SHA-256",
+          "content": "50c0a7c760c13ae6c042acf182b28f0047413db95b4636fb8879bcffab5ba875"
+        },
+        {
+          "alg": "SHA-512",
+          "content": "13c1a21af3c8030794155a62b4cdc70ba1d951fbfc0aead9e89f3f529e7bb4473a070bd4a6c593ce1c0cfb781332bd62d21cf0b34e3751f99b0de463f566ec61"
+        }
+      ],
       "licenses": [
         {
           "expression": "GPL-2.0-or-later OR Classpath-exception-2.0"
@@ -1857,6 +2255,10 @@
           "value": "The dependency's license was not recognised."
         },
         {
+          "name": "bomlens:supplierSource",
+          "value": "publisher"
+        },
+        {
           "name": "bsi:component:filename",
           "value": "jakarta.transaction-api-2.0.1.jar"
         },
@@ -1868,13 +2270,15 @@
       "publisher": "EE4J Community",
       "purl": "pkg:maven/jakarta.transaction/jakarta.transaction-api@2.0.1?type=jar",
       "scope": "required",
+      "supplier": {
+        "name": "EE4J Community"
+      },
       "type": "library",
       "version": "2.0.1",
       "cpe": "cpe:2.3:a:transaction:transaction:2.0.1:*:*:*:*:*:*:*"
     },
     {
       "bom-ref": "pkg:maven/jakarta.xml.bind/jakarta.xml.bind-api@4.0.1?type=jar",
-      "description": "Jakarta XML Binding API",
       "evidence": {
         "identity": [
           {
@@ -1891,17 +2295,52 @@
           }
         ]
       },
-      "externalReferences": [
+      "group": "jakarta.xml.bind",
+      "hashes": [
         {
-          "type": "vcs",
-          "url": "https://github.com/eclipse-ee4j/jaxb-api.git"
+          "alg": "MD5",
+          "content": "e62084f1afb23eccde6645bf3a9eb06f"
+        },
+        {
+          "alg": "SHA-1",
+          "content": "ca2330866cbc624c7e5ce982e121db1125d23e15"
+        },
+        {
+          "alg": "SHA-256",
+          "content": "287f3b6d0600082e0b60265d7de32be403ee7d7269369c9718d9424305b89d95"
+        },
+        {
+          "alg": "SHA-512",
+          "content": "dcc70e8301a7f274bbb6d6b3fe84ad8c9e5beda318699c05aeac0c42b9e1e210fc6953911be2cb1a2ef49ac5159c331608365b1b83a14a8e86f89f630830dd28"
         }
       ],
-      "group": "jakarta.xml.bind",
       "licenses": [
         {
           "license": {
-            "id": "BSD-3-Clause"
+            "id": "BSD-3-Clause",
+            "properties": [
+              {
+                "name": "cdx:license:category",
+                "value": "Permissive"
+              },
+              {
+                "name": "cdx:license:foss",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:osiApproved",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:fsfLibre",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:deprecated",
+                "value": "false"
+              }
+            ],
+            "url": "https://opensource.org/licenses/BSD-3-Clause"
           }
         }
       ],
@@ -1909,7 +2348,7 @@
       "properties": [
         {
           "name": "cdx:license:category",
-          "value": "Unstated License"
+          "value": "Permissive"
         },
         {
           "name": "internal:SrcFile",
@@ -1938,9 +2377,6 @@
       ],
       "purl": "pkg:maven/jakarta.xml.bind/jakarta.xml.bind-api@4.0.1?type=jar",
       "scope": "required",
-      "tags": [
-        "xml"
-      ],
       "type": "library",
       "version": "4.0.1",
       "cpe": "cpe:2.3:a:xml:bind:4.0.1:*:*:*:*:*:*:*"
@@ -1965,6 +2401,24 @@
         ]
       },
       "group": "net.bytebuddy",
+      "hashes": [
+        {
+          "alg": "MD5",
+          "content": "123cba40942f929194bb8755f2a99011"
+        },
+        {
+          "alg": "SHA-1",
+          "content": "34efde5f0bb93afc94aaf9d400521899c4806873"
+        },
+        {
+          "alg": "SHA-256",
+          "content": "7cc119aa0bf8105938f2c14b36c5cb99aa7eefd21757d02deecfa497c7890a00"
+        },
+        {
+          "alg": "SHA-512",
+          "content": "07b865c71e7af9262751eeff4f9ecb0d97526f6b231607d03dba25d599875c6b18115f6581a1aa210663046e30ef031345ea0ac80dd1f22eff46bcad462a066a"
+        }
+      ],
       "licenses": [
         {
           "license": {
@@ -2051,17 +2505,29 @@
           }
         ]
       },
-      "externalReferences": [
+      "group": "org.antlr",
+      "hashes": [
         {
-          "type": "vcs",
-          "url": "https://github.com/antlr/antlr4/tree/master"
+          "alg": "MD5",
+          "content": "b694fc738bf1a7e8f7eea2638ef2cc7f"
+        },
+        {
+          "alg": "SHA-1",
+          "content": "10839f875928f59c622d675091d51a43ea0dc5f7"
+        },
+        {
+          "alg": "SHA-256",
+          "content": "da66be0c98acfb29bc708300d05f1a3269c40f9984a4cb9251cf2ba1898d1334"
+        },
+        {
+          "alg": "SHA-512",
+          "content": "901c199e15db7e8d92ff62d2255e44e11d29ce350ad20e32e320bdd29d08bf372a0c1bd912558461a06157d36ad4cddc5f89cb890bc511f8365099042b35bd4d"
         }
       ],
-      "group": "org.antlr",
       "licenses": [
         {
           "license": {
-            "id": "BSD-2-Clause",
+            "id": "BSD-3-Clause",
             "properties": [
               {
                 "name": "cdx:license:category",
@@ -2084,7 +2550,7 @@
                 "value": "false"
               }
             ],
-            "url": "https://opensource.org/licenses/BSD-2-Clause"
+            "url": "https://opensource.org/licenses/BSD-3-Clause"
           }
         }
       ],
@@ -2119,7 +2585,6 @@
           "value": "maven-groupid"
         }
       ],
-      "publisher": "ANTLR",
       "purl": "pkg:maven/org.antlr/antlr4-runtime@4.10.1?type=jar",
       "scope": "required",
       "type": "library",
@@ -2152,6 +2617,24 @@
         }
       ],
       "group": "org.apache.commons",
+      "hashes": [
+        {
+          "alg": "MD5",
+          "content": "4e5c3f5e6b0b965ef241d7d72ac8971f"
+        },
+        {
+          "alg": "SHA-1",
+          "content": "1ed471194b02f2c6cb734a0cd6f6f107c673afae"
+        },
+        {
+          "alg": "SHA-256",
+          "content": "7b96bf3ee68949abb5bc465559ac270e0551596fa34523fddf890ec418dde13c"
+        },
+        {
+          "alg": "SHA-512",
+          "content": "0338b50767166e5746ada6d6aa2e071e7221d699323bfb629f7f204b294c1dc4cad140610a129ed751798443b43e74e0818989c7df7d33c5915aa29742be9ba8"
+        }
+      ],
       "licenses": [
         {
           "license": {
@@ -2242,6 +2725,24 @@
         ]
       },
       "group": "org.apache.logging.log4j",
+      "hashes": [
+        {
+          "alg": "MD5",
+          "content": "b5e9bf76dd128b37666ecd9a252b50ec"
+        },
+        {
+          "alg": "SHA-1",
+          "content": "74c65e87b9ce1694a01524e192d7be989ba70486"
+        },
+        {
+          "alg": "SHA-256",
+          "content": "1db48e180881bef1deb502022006a025a248d8f6a26186789b0c7ce487c602d6"
+        },
+        {
+          "alg": "SHA-512",
+          "content": "4cbf72fbea7009ec2fc363aae2ccfe11ea2023967d65be39335eedd1d8917b7402eeb2219efd5a1f11d03833dd1f57eecab428616b03124ef2266c6cca06ac56"
+        }
+      ],
       "licenses": [
         {
           "license": {
@@ -2332,6 +2833,24 @@
         ]
       },
       "group": "org.apache.logging.log4j",
+      "hashes": [
+        {
+          "alg": "MD5",
+          "content": "00b957af4a40bea6a7bf61400b6ccf63"
+        },
+        {
+          "alg": "SHA-1",
+          "content": "d77b2ba81711ed596cd797cc2b5b5bd7409d841c"
+        },
+        {
+          "alg": "SHA-256",
+          "content": "de143c565ba78b0f2c0be58f132c7aec75e6e1a10845ebda5a4f17c2a35d9990"
+        },
+        {
+          "alg": "SHA-512",
+          "content": "8a7a682dc5ae6a123c8de6002f1470ad2682795c65b47b06397d9ad9a31729e588c406013bfa989f9c2a51750c353cd7a147bc036f2d66b0f8f0b3f13798a637"
+        }
+      ],
       "licenses": [
         {
           "license": {
@@ -2424,6 +2943,24 @@
         ]
       },
       "group": "org.apache.tomcat.embed",
+      "hashes": [
+        {
+          "alg": "MD5",
+          "content": "2e10aec04f55e395d5a59c85e0e6601c"
+        },
+        {
+          "alg": "SHA-1",
+          "content": "176162fb3998856a90436826034ffe5d25beaeb9"
+        },
+        {
+          "alg": "SHA-256",
+          "content": "0e10a073e143b338ddb3d57dfabb62169f61b3f3127733df8111a635b3fb799f"
+        },
+        {
+          "alg": "SHA-512",
+          "content": "0df643b7659f50e2ffaae9da23b462122ed1aae4ae532df4498da40fdaf7b195ade71560460fec458d37c3271a5c0f9050b44476d5fafad1eeddad7abb33aa54"
+        }
+      ],
       "licenses": [
         {
           "license": {
@@ -2515,6 +3052,24 @@
         ]
       },
       "group": "org.apache.tomcat.embed",
+      "hashes": [
+        {
+          "alg": "MD5",
+          "content": "a000c19fe9f062ab262ebb1d35b46d75"
+        },
+        {
+          "alg": "SHA-1",
+          "content": "f057e54bfffe99df7f0d04cd4e688e55bf8a0da5"
+        },
+        {
+          "alg": "SHA-256",
+          "content": "4b00097753037c7e4fb8217d6bb951db022a6c9a45af11d7bb087ed17f8d21d2"
+        },
+        {
+          "alg": "SHA-512",
+          "content": "727ebf956f1861831dc8bdf2c06327766ccd8be24d4adc893e81d2c4d895b2a6b462a4bdc82c76b0de3ce42f93fe168545a7ff47fe691ec1b60c4085e5bfbaa5"
+        }
+      ],
       "licenses": [
         {
           "license": {
@@ -2606,6 +3161,24 @@
         ]
       },
       "group": "org.apache.tomcat.embed",
+      "hashes": [
+        {
+          "alg": "MD5",
+          "content": "eacc36544fa58153938bb5ce8cf53dfb"
+        },
+        {
+          "alg": "SHA-1",
+          "content": "05c372739ee9409b47c474d8d47d276a7cd9bc2b"
+        },
+        {
+          "alg": "SHA-256",
+          "content": "2ca8e769b76284b3c52fd8c7c15bb12cf2a1d4b9cc3309db525cdfec84dc9b3b"
+        },
+        {
+          "alg": "SHA-512",
+          "content": "41e8fbdc95c1e0a24c88502674abd2aca6acf9f406342b83f66fb89436fda9f413225a97162e30035106e2608af33fbe83bd04ed254d6237e0d846ca3fa7e309"
+        }
+      ],
       "licenses": [
         {
           "license": {
@@ -2703,6 +3276,24 @@
         }
       ],
       "group": "org.aspectj",
+      "hashes": [
+        {
+          "alg": "MD5",
+          "content": "25ff63c95878ac361028f45748b2b540"
+        },
+        {
+          "alg": "SHA-1",
+          "content": "33b0e41476658229933eec7134678cf336e66dd4"
+        },
+        {
+          "alg": "SHA-256",
+          "content": "ca4d10891b851c62bff65c6cf9a7ef870f51584253399060d300041083afbb99"
+        },
+        {
+          "alg": "SHA-512",
+          "content": "25f9315176f8861856443803f183de4e3184de1e745b29194a67d236014bb0a3873b62df8d2658fdb17a89bd7925353e7649d49ce8591040a22071787f43dd83"
+        }
+      ],
       "licenses": [
         {
           "license": {
@@ -2789,17 +3380,52 @@
           }
         ]
       },
-      "externalReferences": [
+      "group": "org.eclipse.angus",
+      "hashes": [
         {
-          "type": "vcs",
-          "url": "https://github.com/eclipse-ee4j/angus-activation"
+          "alg": "MD5",
+          "content": "834539f269d476663784d8571048f3c4"
+        },
+        {
+          "alg": "SHA-1",
+          "content": "72369f4e2314d38de2dcbb277141ef0226f73151"
+        },
+        {
+          "alg": "SHA-256",
+          "content": "3a12d321a0f35aa9458ff9b6ee93a3de76b78e3f18b077c81721473d83079147"
+        },
+        {
+          "alg": "SHA-512",
+          "content": "fa7193342e1b0824fdc73a8e0c70444a11f03ec149de0af59dfe89517c0f5ab9d9019378d468c846063de94815b748ea0508acad28a592a81262d30187da87c4"
         }
       ],
-      "group": "org.eclipse.angus",
       "licenses": [
         {
           "license": {
-            "id": "BSD-3-Clause"
+            "id": "BSD-3-Clause",
+            "properties": [
+              {
+                "name": "cdx:license:category",
+                "value": "Permissive"
+              },
+              {
+                "name": "cdx:license:foss",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:osiApproved",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:fsfLibre",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:deprecated",
+                "value": "false"
+              }
+            ],
+            "url": "https://opensource.org/licenses/BSD-3-Clause"
           }
         }
       ],
@@ -2807,7 +3433,7 @@
       "properties": [
         {
           "name": "cdx:license:category",
-          "value": "Unstated License"
+          "value": "Permissive"
         },
         {
           "name": "internal:SrcFile",
@@ -2859,17 +3485,52 @@
           }
         ]
       },
-      "externalReferences": [
+      "group": "org.glassfish.jaxb",
+      "hashes": [
         {
-          "type": "vcs",
-          "url": "https://github.com/eclipse-ee4j/jaxb-ri.git"
+          "alg": "MD5",
+          "content": "f47f53ebb68dd97dea880a6eeb49814e"
+        },
+        {
+          "alg": "SHA-1",
+          "content": "08c29249f6c10f4ee08967783831580b0f5c5360"
+        },
+        {
+          "alg": "SHA-256",
+          "content": "d7ff2954ad78480bbab9391cccff3a22f42a82b6e09aeca1c7d502411c470ccd"
+        },
+        {
+          "alg": "SHA-512",
+          "content": "cbce70fe2c5911fc82aea7a801b097831e267e45a6ec29fc30cfd3e328139d844c8887574a22d68717d9b09f2c284d4987c2f9ba61c200c7d93e0d48ddc136c9"
         }
       ],
-      "group": "org.glassfish.jaxb",
       "licenses": [
         {
           "license": {
-            "id": "BSD-3-Clause"
+            "id": "BSD-3-Clause",
+            "properties": [
+              {
+                "name": "cdx:license:category",
+                "value": "Permissive"
+              },
+              {
+                "name": "cdx:license:foss",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:osiApproved",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:fsfLibre",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:deprecated",
+                "value": "false"
+              }
+            ],
+            "url": "https://opensource.org/licenses/BSD-3-Clause"
           }
         }
       ],
@@ -2877,7 +3538,7 @@
       "properties": [
         {
           "name": "cdx:license:category",
-          "value": "Unstated License"
+          "value": "Permissive"
         },
         {
           "name": "internal:SrcFile",
@@ -2930,6 +3591,24 @@
         ]
       },
       "group": "org.glassfish.jaxb",
+      "hashes": [
+        {
+          "alg": "MD5",
+          "content": "b7fa25f7058a49fe29ad39619efb4022"
+        },
+        {
+          "alg": "SHA-1",
+          "content": "e4e4e0c5b0d42054d00dc4023901572a60d368c7"
+        },
+        {
+          "alg": "SHA-256",
+          "content": "1bc271e61b71ca4bd89eb053f3d2c91d478211b02a8982cb520f216fe0e9a939"
+        },
+        {
+          "alg": "SHA-512",
+          "content": "eef3e7925d978ea7fdcd1947829e56a523af217e9c17cea73b2f77b5ed81e8b7744de6be9c2a1c613e9182cb7b64e28a808ec731237318fe7d8f1fc84a2153f0"
+        }
+      ],
       "licenses": [
         {
           "license": {
@@ -3017,6 +3696,24 @@
         ]
       },
       "group": "org.glassfish.jaxb",
+      "hashes": [
+        {
+          "alg": "MD5",
+          "content": "d6f9cea932f006bad4ac3fd48dc8c799"
+        },
+        {
+          "alg": "SHA-1",
+          "content": "24e167be69c29ebb7ee0a3b1f9b546f1dfd111fc"
+        },
+        {
+          "alg": "SHA-256",
+          "content": "ea71912e4f0a42530f77c9840ae90019c46402dedfdf007cff03797429a0cf0c"
+        },
+        {
+          "alg": "SHA-512",
+          "content": "f7a302ee1c3395414bb647552eb617a1829fe865c5955df1c0bf794c4af71b5858d40db142b4522b2bea5e87f867c3a245640b537d60b70b625ac035e8f8a1d7"
+        }
+      ],
       "licenses": [
         {
           "license": {
@@ -3113,6 +3810,24 @@
         }
       ],
       "group": "org.hibernate.common",
+      "hashes": [
+        {
+          "alg": "MD5",
+          "content": "c155df7d9f04d15f3f6bbe79f4907074"
+        },
+        {
+          "alg": "SHA-1",
+          "content": "77a5f94b56d49508e0ee334751db5b78e5ccd50c"
+        },
+        {
+          "alg": "SHA-256",
+          "content": "cd974e0a8481fafdbaf9b4a0f08bb5a6c969b0365482763eedf77e6fd7f493b7"
+        },
+        {
+          "alg": "SHA-512",
+          "content": "f670bfed87c66897660da90a3d94e4d21de8fb726757858d18d331999c3d223badc24af6437046f01e8c90f2b2427001500b9679f29c3465c402ae082a97712c"
+        }
+      ],
       "licenses": [
         {
           "license": {
@@ -3139,6 +3854,10 @@
           "value": "File- or library-level reciprocity: changes to the dependency stay under its license, and static linking adds obligations. Distributing your own code under the permissive license is still fine."
         },
         {
+          "name": "bomlens:supplierSource",
+          "value": "publisher"
+        },
+        {
           "name": "bsi:component:filename",
           "value": "hibernate-commons-annotations-6.0.6.Final.jar"
         },
@@ -3150,6 +3869,9 @@
       "publisher": "Hibernate.org",
       "purl": "pkg:maven/org.hibernate.common/hibernate-commons-annotations@6.0.6.Final?type=jar",
       "scope": "required",
+      "supplier": {
+        "name": "Hibernate.org"
+      },
       "tags": [
         "framework"
       ],
@@ -3183,6 +3905,24 @@
         }
       ],
       "group": "org.hibernate.orm",
+      "hashes": [
+        {
+          "alg": "MD5",
+          "content": "22a20d23b603b98de680a86aa3b4dc59"
+        },
+        {
+          "alg": "SHA-1",
+          "content": "1101d7e09e4853a110fd27a6f35c906f5709ac4f"
+        },
+        {
+          "alg": "SHA-256",
+          "content": "8a884cf689453a1ec821e79e205b93e62deeea06e440856e8349eb162540b193"
+        },
+        {
+          "alg": "SHA-512",
+          "content": "b8115386636a4f9957f46bbc194e475a0ee1f53b3cb06049cf8351deb025142912e031eaecf1230fb638e6f71bec72f6cf1bcaffc8748af560f30eb3fb7e3a0f"
+        }
+      ],
       "licenses": [
         {
           "license": {
@@ -3209,6 +3949,10 @@
           "value": "File- or library-level reciprocity: changes to the dependency stay under its license, and static linking adds obligations. Distributing your own code under the permissive license is still fine."
         },
         {
+          "name": "bomlens:supplierSource",
+          "value": "publisher"
+        },
+        {
           "name": "bsi:component:filename",
           "value": "hibernate-core-6.3.1.Final.jar"
         },
@@ -3220,6 +3964,9 @@
       "publisher": "Hibernate.org",
       "purl": "pkg:maven/org.hibernate.orm/hibernate-core@6.3.1.Final?type=jar",
       "scope": "required",
+      "supplier": {
+        "name": "Hibernate.org"
+      },
       "tags": [
         "framework",
         "orm"
@@ -3254,6 +4001,24 @@
         }
       ],
       "group": "org.jboss.logging",
+      "hashes": [
+        {
+          "alg": "MD5",
+          "content": "bdb57db05e9905e02dbbf1cbedf26469"
+        },
+        {
+          "alg": "SHA-1",
+          "content": "c19307cc11f28f5e2679347e633a3294d865334d"
+        },
+        {
+          "alg": "SHA-256",
+          "content": "7bb135b081952f6d32d83374619ae5201b05ca3bf862a28dd111016ce19b2c07"
+        },
+        {
+          "alg": "SHA-512",
+          "content": "c47792f5f0f219f000ce5d4cb48b3b26c97aadc056a9a9ad8062b6ef38dc9ec34db2c557f247b230c69378ecbccac8c6699a9c73a6377880e3bc8c36f39351a0"
+        }
+      ],
       "licenses": [
         {
           "license": {
@@ -3315,7 +4080,6 @@
           "value": "maven-groupid"
         }
       ],
-      "publisher": "JBoss by Red Hat",
       "purl": "pkg:maven/org.jboss.logging/jboss-logging@3.5.0.Final?type=jar",
       "scope": "required",
       "tags": [
@@ -3346,6 +4110,24 @@
         ]
       },
       "group": "org.slf4j",
+      "hashes": [
+        {
+          "alg": "MD5",
+          "content": "24f86e89ee3f71ea91f644150c507740"
+        },
+        {
+          "alg": "SHA-1",
+          "content": "09ef7c70b248185845f013f49a33ff9ca65b7975"
+        },
+        {
+          "alg": "SHA-256",
+          "content": "69b4e5f8d3bd3f6f54367d19f2c1ee95dd5877802f12d868282e218dd76b00bf"
+        },
+        {
+          "alg": "SHA-512",
+          "content": "c1cdfbc0c867917d65ab58e039b01c5b119368aef82abcb406d91646da208a4bfad91831a5a425eacfa8253ccd5713a9d4325d45665288483929cce7a6a56eb7"
+        }
+      ],
       "licenses": [
         {
           "license": {
@@ -3376,6 +4158,10 @@
           "value": "Both are permissive; keep the notices."
         },
         {
+          "name": "bomlens:supplierSource",
+          "value": "publisher"
+        },
+        {
           "name": "bsi:component:filename",
           "value": "jul-to-slf4j-2.0.9.jar"
         },
@@ -3387,6 +4173,9 @@
       "publisher": "QOS.ch",
       "purl": "pkg:maven/org.slf4j/jul-to-slf4j@2.0.9?type=jar",
       "scope": "required",
+      "supplier": {
+        "name": "QOS.ch"
+      },
       "tags": [
         "framework",
         "slf4j"
@@ -3421,6 +4210,24 @@
         }
       ],
       "group": "org.slf4j",
+      "hashes": [
+        {
+          "alg": "MD5",
+          "content": "6da5b2a01bf56fd39d5da3ff1b90febd"
+        },
+        {
+          "alg": "SHA-1",
+          "content": "436c02bca56b56a2db7f818c2a4e019efa32df6e"
+        },
+        {
+          "alg": "SHA-256",
+          "content": "f920e120b32ffddb2fdf5af96eed3cd5320199693f47a36b0c2afde3913d7071"
+        },
+        {
+          "alg": "SHA-512",
+          "content": "1fe70fcd304dd08f4f5f4db7f49b69d0240019a31245133c1709a94e7ef39fb15921830536c18ae591a5f3c18fe4e6eb63c30792970658b0693eefa5241fb7c5"
+        }
+      ],
       "licenses": [
         {
           "license": {
@@ -3474,6 +4281,10 @@
           "value": "Both are permissive; keep the notices."
         },
         {
+          "name": "bomlens:supplierSource",
+          "value": "publisher"
+        },
+        {
           "name": "bsi:component:filename",
           "value": "slf4j-api-2.0.2.jar"
         },
@@ -3485,6 +4296,9 @@
       "publisher": "QOS.ch",
       "purl": "pkg:maven/org.slf4j/slf4j-api@2.0.2?type=jar",
       "scope": "required",
+      "supplier": {
+        "name": "QOS.ch"
+      },
       "tags": [
         "framework",
         "slf4j"
@@ -3519,6 +4333,24 @@
         }
       ],
       "group": "org.springframework.boot",
+      "hashes": [
+        {
+          "alg": "MD5",
+          "content": "fb98bdaeb804577b862607c52df427fe"
+        },
+        {
+          "alg": "SHA-1",
+          "content": "29b231378146bd6606e75389297f3a7d55476b87"
+        },
+        {
+          "alg": "SHA-256",
+          "content": "c317b3c218da4fa2f1715e06a5c22432f508cfd64dff0d83946c39092e6848a6"
+        },
+        {
+          "alg": "SHA-512",
+          "content": "2b475aec11f0c7e924f66c5d52f94bc0ac962580b8ad02e6e6c9eca468d42c7d7951aa31575efd1b3362ab6b18d6f5ecb10c34de847461f381ec64e9c601f98b"
+        }
+      ],
       "licenses": [
         {
           "license": {
@@ -3572,6 +4404,10 @@
           "value": "Both are permissive; keep the notices."
         },
         {
+          "name": "bomlens:supplierSource",
+          "value": "publisher"
+        },
+        {
           "name": "bsi:component:filename",
           "value": "spring-boot-autoconfigure-3.2.0.jar"
         },
@@ -3597,7 +4433,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-10-12"
+          "value": "endoflife.date@2026-10-14"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -3611,6 +4447,9 @@
       "publisher": "VMware, Inc.",
       "purl": "pkg:maven/org.springframework.boot/spring-boot-autoconfigure@3.2.0?type=jar",
       "scope": "required",
+      "supplier": {
+        "name": "VMware, Inc."
+      },
       "tags": [
         "framework"
       ],
@@ -3644,6 +4483,24 @@
         }
       ],
       "group": "org.springframework.boot",
+      "hashes": [
+        {
+          "alg": "MD5",
+          "content": "bdaa5c0dcdef43299c3f70aec6221c1f"
+        },
+        {
+          "alg": "SHA-1",
+          "content": "1c4e5498a0ae4c179d0c192e9b674ac656f3e0b9"
+        },
+        {
+          "alg": "SHA-256",
+          "content": "12aa9092650027964ceb2eddb75aa3a61033c148bed8e4b53430bbf036f9d524"
+        },
+        {
+          "alg": "SHA-512",
+          "content": "12c63709eeea46ed6184ed431eb2555fc3fe36ff0b099b2e3180c8285ee76e371b55286118e4c28dedddb9a62004783c0da275ee1573078b288bac96d5161b85"
+        }
+      ],
       "licenses": [
         {
           "license": {
@@ -3697,6 +4554,10 @@
           "value": "Both are permissive; keep the notices."
         },
         {
+          "name": "bomlens:supplierSource",
+          "value": "publisher"
+        },
+        {
           "name": "bsi:component:filename",
           "value": "spring-boot-starter-aop-3.2.0.jar"
         },
@@ -3722,7 +4583,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-10-12"
+          "value": "endoflife.date@2026-10-14"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -3736,6 +4597,9 @@
       "publisher": "VMware, Inc.",
       "purl": "pkg:maven/org.springframework.boot/spring-boot-starter-aop@3.2.0?type=jar",
       "scope": "required",
+      "supplier": {
+        "name": "VMware, Inc."
+      },
       "tags": [
         "aop",
         "framework"
@@ -3770,6 +4634,24 @@
         }
       ],
       "group": "org.springframework.boot",
+      "hashes": [
+        {
+          "alg": "MD5",
+          "content": "f8741dbe45cbab5c0fd872a5b06c5561"
+        },
+        {
+          "alg": "SHA-1",
+          "content": "06a8ad077a37f8a0cef6949dcfd91a9b2115cade"
+        },
+        {
+          "alg": "SHA-256",
+          "content": "810498f8ba357c822fe785e4fe233791bca2cf7a84388fe289a8fe2514e16b45"
+        },
+        {
+          "alg": "SHA-512",
+          "content": "882aee63c5d81c358c38828486f8fbe6fceec580671cf5853fa1261c724a7b158dd8b579bc800bd1e0b1b3176347bc7e4956900609aea4dcf661f19d01d45cfd"
+        }
+      ],
       "licenses": [
         {
           "license": {
@@ -3823,6 +4705,10 @@
           "value": "Both are permissive; keep the notices."
         },
         {
+          "name": "bomlens:supplierSource",
+          "value": "publisher"
+        },
+        {
           "name": "bsi:component:filename",
           "value": "spring-boot-starter-data-jpa-3.2.0.jar"
         },
@@ -3848,7 +4734,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-10-12"
+          "value": "endoflife.date@2026-10-14"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -3862,6 +4748,9 @@
       "publisher": "VMware, Inc.",
       "purl": "pkg:maven/org.springframework.boot/spring-boot-starter-data-jpa@3.2.0?type=jar",
       "scope": "required",
+      "supplier": {
+        "name": "VMware, Inc."
+      },
       "tags": [
         "framework"
       ],
@@ -3895,6 +4784,24 @@
         }
       ],
       "group": "org.springframework.boot",
+      "hashes": [
+        {
+          "alg": "MD5",
+          "content": "5a94370bda4a93ef59c3f0a8eb3d06d7"
+        },
+        {
+          "alg": "SHA-1",
+          "content": "1ab4ef09c814142be2fafc6d40c9bc242921ca12"
+        },
+        {
+          "alg": "SHA-256",
+          "content": "2d24739446ddb932e44844b371f20739ed8dfac03651a061a7022bb5bafb87a3"
+        },
+        {
+          "alg": "SHA-512",
+          "content": "8dc9c99fb5b46d562c3b0916bb93d22c50e5e7ed4830b787a2d43c18c2d6728dff8dc96f8ca770a1eeca7c621f201aa0c06ba0ab98c7f1083de8fceda6bd2a8b"
+        }
+      ],
       "licenses": [
         {
           "license": {
@@ -3948,6 +4855,10 @@
           "value": "Both are permissive; keep the notices."
         },
         {
+          "name": "bomlens:supplierSource",
+          "value": "publisher"
+        },
+        {
           "name": "bsi:component:filename",
           "value": "spring-boot-starter-jdbc-3.2.0.jar"
         },
@@ -3973,7 +4884,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-10-12"
+          "value": "endoflife.date@2026-10-14"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -3987,6 +4898,9 @@
       "publisher": "VMware, Inc.",
       "purl": "pkg:maven/org.springframework.boot/spring-boot-starter-jdbc@3.2.0?type=jar",
       "scope": "required",
+      "supplier": {
+        "name": "VMware, Inc."
+      },
       "tags": [
         "framework",
         "jdbc"
@@ -4021,6 +4935,24 @@
         }
       ],
       "group": "org.springframework.boot",
+      "hashes": [
+        {
+          "alg": "MD5",
+          "content": "b3092c321a18108d56afd0de721c8d0f"
+        },
+        {
+          "alg": "SHA-1",
+          "content": "e831483c03433b987cc9c72f8ea67757f9865191"
+        },
+        {
+          "alg": "SHA-256",
+          "content": "fa8fd66d636a7b7a9aa1f4487ace4bb2261f620d50ac2410bef30f305cc8c958"
+        },
+        {
+          "alg": "SHA-512",
+          "content": "43f56d734074a84d937f6380fdad99b099c80aa9db4dac218662388ec88e5e3ff996ecd0848148ce5f06cb88a53c9429675e468407d563cd11f783f4cf70705b"
+        }
+      ],
       "licenses": [
         {
           "license": {
@@ -4074,6 +5006,10 @@
           "value": "Both are permissive; keep the notices."
         },
         {
+          "name": "bomlens:supplierSource",
+          "value": "publisher"
+        },
+        {
           "name": "bsi:component:filename",
           "value": "spring-boot-starter-json-3.2.0.jar"
         },
@@ -4099,7 +5035,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-10-12"
+          "value": "endoflife.date@2026-10-14"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -4113,6 +5049,9 @@
       "publisher": "VMware, Inc.",
       "purl": "pkg:maven/org.springframework.boot/spring-boot-starter-json@3.2.0?type=jar",
       "scope": "required",
+      "supplier": {
+        "name": "VMware, Inc."
+      },
       "tags": [
         "framework"
       ],
@@ -4146,6 +5085,24 @@
         }
       ],
       "group": "org.springframework.boot",
+      "hashes": [
+        {
+          "alg": "MD5",
+          "content": "844361bc2a20b20d34e29b7e2b61d10b"
+        },
+        {
+          "alg": "SHA-1",
+          "content": "54998ab18f16e8d3a6e46c3d326f2de41c0b1ce0"
+        },
+        {
+          "alg": "SHA-256",
+          "content": "3bce47ba84854cd6d37d91eadedae2d40a43c5c5069cc19ab9ca11d7ecc2e65d"
+        },
+        {
+          "alg": "SHA-512",
+          "content": "7c8bc8338a9a631969ae1906a9f298f820e71ef338af44f34c70334d78b8e323d73b0d0ad4b5c3956b096e627a0e8967bf46381f873ad18f3ea9eb342c89eaee"
+        }
+      ],
       "licenses": [
         {
           "license": {
@@ -4199,6 +5156,10 @@
           "value": "Both are permissive; keep the notices."
         },
         {
+          "name": "bomlens:supplierSource",
+          "value": "publisher"
+        },
+        {
           "name": "bsi:component:filename",
           "value": "spring-boot-starter-logging-3.2.0.jar"
         },
@@ -4224,7 +5185,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-10-12"
+          "value": "endoflife.date@2026-10-14"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -4238,6 +5199,9 @@
       "publisher": "VMware, Inc.",
       "purl": "pkg:maven/org.springframework.boot/spring-boot-starter-logging@3.2.0?type=jar",
       "scope": "required",
+      "supplier": {
+        "name": "VMware, Inc."
+      },
       "tags": [
         "framework",
         "logging"
@@ -4272,6 +5236,24 @@
         }
       ],
       "group": "org.springframework.boot",
+      "hashes": [
+        {
+          "alg": "MD5",
+          "content": "9ac7b196c001605951cf826fab241d2b"
+        },
+        {
+          "alg": "SHA-1",
+          "content": "fc758099e394fe5646d9e36883fab38da4b26e22"
+        },
+        {
+          "alg": "SHA-256",
+          "content": "ff9ad38027481119a715f9e4344039de189c6f99259b6699df89e5413657b222"
+        },
+        {
+          "alg": "SHA-512",
+          "content": "3390f5c34c610c54e75c9bd40448ad63005d11e8910028d0f00a227454ee350c828ba5a3d73da02c91ce9f38821c984479f08a2790155c5d6cbc44c2c21fc531"
+        }
+      ],
       "licenses": [
         {
           "license": {
@@ -4325,6 +5307,10 @@
           "value": "Both are permissive; keep the notices."
         },
         {
+          "name": "bomlens:supplierSource",
+          "value": "publisher"
+        },
+        {
           "name": "bsi:component:filename",
           "value": "spring-boot-starter-tomcat-3.2.0.jar"
         },
@@ -4350,7 +5336,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-10-12"
+          "value": "endoflife.date@2026-10-14"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -4364,6 +5350,9 @@
       "publisher": "VMware, Inc.",
       "purl": "pkg:maven/org.springframework.boot/spring-boot-starter-tomcat@3.2.0?type=jar",
       "scope": "required",
+      "supplier": {
+        "name": "VMware, Inc."
+      },
       "tags": [
         "framework",
         "tomcat"
@@ -4398,6 +5387,24 @@
         }
       ],
       "group": "org.springframework.boot",
+      "hashes": [
+        {
+          "alg": "MD5",
+          "content": "f9649d2837eb7d1a7c5f4fc0e0818e75"
+        },
+        {
+          "alg": "SHA-1",
+          "content": "e609f839e7c2ff9c90bc75d7c05dbcbb19315319"
+        },
+        {
+          "alg": "SHA-256",
+          "content": "a822294f646f14bdae888bd50081ed8f2f164c1e2338c50631df3955dedeaf3c"
+        },
+        {
+          "alg": "SHA-512",
+          "content": "1e0361daf6c5ec9a861d7c1d504c12becd253128de4dbd6dafa34779f9166fd590be3900ba3e77950ec35da8f89918ab1bab5acf55654db7db7893637b2065fd"
+        }
+      ],
       "licenses": [
         {
           "license": {
@@ -4451,6 +5458,10 @@
           "value": "Both are permissive; keep the notices."
         },
         {
+          "name": "bomlens:supplierSource",
+          "value": "publisher"
+        },
+        {
           "name": "bsi:component:filename",
           "value": "spring-boot-starter-web-3.2.0.jar"
         },
@@ -4476,7 +5487,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-10-12"
+          "value": "endoflife.date@2026-10-14"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -4490,6 +5501,9 @@
       "publisher": "VMware, Inc.",
       "purl": "pkg:maven/org.springframework.boot/spring-boot-starter-web@3.2.0?type=jar",
       "scope": "required",
+      "supplier": {
+        "name": "VMware, Inc."
+      },
       "tags": [
         "framework",
         "mvc",
@@ -4525,6 +5539,24 @@
         }
       ],
       "group": "org.springframework.boot",
+      "hashes": [
+        {
+          "alg": "MD5",
+          "content": "c0d12e09eccfa385ae0d3aeaf901b9bf"
+        },
+        {
+          "alg": "SHA-1",
+          "content": "4d0cc70617a9febbbc6ad81562e930d93f7b2665"
+        },
+        {
+          "alg": "SHA-256",
+          "content": "18b46cf89609455b34ecd13d95ac8d0cccf88d4d7935249ae4a6f79c6deb43e6"
+        },
+        {
+          "alg": "SHA-512",
+          "content": "09e90a69b0879c8003c1a63ec459898b893dada9635ee3b07dc38cc132bb7852d7c687acf7733dfbfda11a949766c24f51e14f325ad20531121af648156d3caa"
+        }
+      ],
       "licenses": [
         {
           "license": {
@@ -4578,6 +5610,10 @@
           "value": "Both are permissive; keep the notices."
         },
         {
+          "name": "bomlens:supplierSource",
+          "value": "publisher"
+        },
+        {
           "name": "bsi:component:filename",
           "value": "spring-boot-starter-3.2.0.jar"
         },
@@ -4603,7 +5639,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-10-12"
+          "value": "endoflife.date@2026-10-14"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -4617,6 +5653,9 @@
       "publisher": "VMware, Inc.",
       "purl": "pkg:maven/org.springframework.boot/spring-boot-starter@3.2.0?type=jar",
       "scope": "required",
+      "supplier": {
+        "name": "VMware, Inc."
+      },
       "tags": [
         "framework",
         "logging"
@@ -4651,6 +5690,24 @@
         }
       ],
       "group": "org.springframework.boot",
+      "hashes": [
+        {
+          "alg": "MD5",
+          "content": "52aa622adb4a8d631b30ad5a5ad711b9"
+        },
+        {
+          "alg": "SHA-1",
+          "content": "4088ad23df91481bc7415cbfa068c423ccb7e54e"
+        },
+        {
+          "alg": "SHA-256",
+          "content": "768ce558b6a998d203666d9647ed60a5ec8a6e0cd4598a6a7f6bdf226ff5e5d6"
+        },
+        {
+          "alg": "SHA-512",
+          "content": "034597be72b69fd83cbb47fce7ac92b4bb8215571e573adc43f1ab9752ec14a2dcd3166055e80e4fab3f8f6c9eb894bf4e6a18f484b961c7a3b300852d1219dc"
+        }
+      ],
       "licenses": [
         {
           "license": {
@@ -4704,6 +5761,10 @@
           "value": "Both are permissive; keep the notices."
         },
         {
+          "name": "bomlens:supplierSource",
+          "value": "publisher"
+        },
+        {
           "name": "bsi:component:filename",
           "value": "spring-boot-3.2.0.jar"
         },
@@ -4729,7 +5790,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-10-12"
+          "value": "endoflife.date@2026-10-14"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -4743,6 +5804,9 @@
       "publisher": "VMware, Inc.",
       "purl": "pkg:maven/org.springframework.boot/spring-boot@3.2.0?type=jar",
       "scope": "required",
+      "supplier": {
+        "name": "VMware, Inc."
+      },
       "tags": [
         "framework"
       ],
@@ -4776,6 +5840,24 @@
         }
       ],
       "group": "org.springframework.data",
+      "hashes": [
+        {
+          "alg": "MD5",
+          "content": "27ef11ec65c4bc3dc850a9dd851312f4"
+        },
+        {
+          "alg": "SHA-1",
+          "content": "1c98c48b9fde0624337e19f3577fce20d19b78ea"
+        },
+        {
+          "alg": "SHA-256",
+          "content": "53705bfd09657c71c1a56334dfde8aa574166ccbcf429c7e94cd3db06a6bda53"
+        },
+        {
+          "alg": "SHA-512",
+          "content": "d3f3852e7422d77893cc639ea988de4c7b633bb0d85933b61d0b0af8c31ec2828f0b62d967114f48e76c3e89675960bab71ee8ff8497c04bb65f6c84237dbd32"
+        }
+      ],
       "licenses": [
         {
           "license": {
@@ -4829,6 +5911,10 @@
           "value": "Both are permissive; keep the notices."
         },
         {
+          "name": "bomlens:supplierSource",
+          "value": "publisher"
+        },
+        {
           "name": "bsi:component:filename",
           "value": "spring-data-commons-3.2.0.jar"
         },
@@ -4844,6 +5930,9 @@
       "publisher": "Pivotal Software, Inc.",
       "purl": "pkg:maven/org.springframework.data/spring-data-commons@3.2.0?type=jar",
       "scope": "required",
+      "supplier": {
+        "name": "Pivotal Software, Inc."
+      },
       "tags": [
         "framework"
       ],
@@ -4877,6 +5966,24 @@
         }
       ],
       "group": "org.springframework.data",
+      "hashes": [
+        {
+          "alg": "MD5",
+          "content": "c98e61747a14b967fa83480544464071"
+        },
+        {
+          "alg": "SHA-1",
+          "content": "59e49a0eca3d02c3dc593e7a881c19b932641894"
+        },
+        {
+          "alg": "SHA-256",
+          "content": "907a3f51fa380342e7b7cad76273861965c22724b361cf03892e3f8e58ef0c30"
+        },
+        {
+          "alg": "SHA-512",
+          "content": "9e181b940c2e07969a16bd2125195ea29d20b28a7f7e314e061fa61f43cee64f0df46e6dca165d74625bbe8acad0abb0905e26db815b001dcf5505b706a9d7fb"
+        }
+      ],
       "licenses": [
         {
           "license": {
@@ -4977,6 +6084,24 @@
         }
       ],
       "group": "org.springframework",
+      "hashes": [
+        {
+          "alg": "MD5",
+          "content": "30335595e2929a5fa664c2d25ae937dd"
+        },
+        {
+          "alg": "SHA-1",
+          "content": "66cb0e08770d4523ae3976b0b791cde767466c61"
+        },
+        {
+          "alg": "SHA-256",
+          "content": "a3d5a8e7f7f1dc231c25d1d80669b67c3a306294bc9e36cdd002453e76a481b1"
+        },
+        {
+          "alg": "SHA-512",
+          "content": "f8a04fb310855b178686223c47c3e36a4339159cf771564e1b26c869e69fd3ffb808051f8f46c59c9ccd8be2435af04ee268fcbd70c1e4402d2e061ab0960e92"
+        }
+      ],
       "licenses": [
         {
           "license": {
@@ -5030,6 +6155,10 @@
           "value": "Both are permissive; keep the notices."
         },
         {
+          "name": "bomlens:supplierSource",
+          "value": "publisher"
+        },
+        {
           "name": "bsi:component:filename",
           "value": "spring-aop-6.1.1.jar"
         },
@@ -5059,7 +6188,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-10-12"
+          "value": "endoflife.date@2026-10-14"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -5073,6 +6202,9 @@
       "publisher": "Spring IO",
       "purl": "pkg:maven/org.springframework/spring-aop@6.1.1?type=jar",
       "scope": "required",
+      "supplier": {
+        "name": "Spring IO"
+      },
       "tags": [
         "framework"
       ],
@@ -5106,6 +6238,24 @@
         }
       ],
       "group": "org.springframework",
+      "hashes": [
+        {
+          "alg": "MD5",
+          "content": "f01cddf77784ee7df0e9abbbd69989a7"
+        },
+        {
+          "alg": "SHA-1",
+          "content": "bfcb6682e205b4ef6ae7986ac7ea35eae29f31f4"
+        },
+        {
+          "alg": "SHA-256",
+          "content": "95420b1f058aa3121ad0da1e1d58686d46230facae66a25566f2f127e829d06a"
+        },
+        {
+          "alg": "SHA-512",
+          "content": "d1d49eb65381ad594badd9625ec5e0a9fd4cf46812ba0ecea9dcd4f1f0398d3b690fb822ff3f94282c3b412cbe57d96de48620ec5a0fcb6300ec82e819d510af"
+        }
+      ],
       "licenses": [
         {
           "license": {
@@ -5159,6 +6309,10 @@
           "value": "Both are permissive; keep the notices."
         },
         {
+          "name": "bomlens:supplierSource",
+          "value": "publisher"
+        },
+        {
           "name": "bsi:component:filename",
           "value": "spring-aspects-6.1.1.jar"
         },
@@ -5188,7 +6342,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-10-12"
+          "value": "endoflife.date@2026-10-14"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -5202,6 +6356,9 @@
       "publisher": "Spring IO",
       "purl": "pkg:maven/org.springframework/spring-aspects@6.1.1?type=jar",
       "scope": "required",
+      "supplier": {
+        "name": "Spring IO"
+      },
       "tags": [
         "framework"
       ],
@@ -5235,6 +6392,24 @@
         }
       ],
       "group": "org.springframework",
+      "hashes": [
+        {
+          "alg": "MD5",
+          "content": "46f0a8e7e249c67bd00ea4501fe3d4a2"
+        },
+        {
+          "alg": "SHA-1",
+          "content": "6af88af13193acf2197bc0a42f0ec4e5c481bfe9"
+        },
+        {
+          "alg": "SHA-256",
+          "content": "2bca4b8cdeeb81121db76cc423e4d952e251f708e9abc319c8e3f38511c43b86"
+        },
+        {
+          "alg": "SHA-512",
+          "content": "fa513ade6ca87c1227bf481dc0ea985337cfc637fa09e5acb3b8a4ac46963a8701552ae632d3a5cd086b561b6ca9315eaee1eb669d41adecaa7176aacfd03bba"
+        }
+      ],
       "licenses": [
         {
           "license": {
@@ -5288,6 +6463,10 @@
           "value": "Both are permissive; keep the notices."
         },
         {
+          "name": "bomlens:supplierSource",
+          "value": "publisher"
+        },
+        {
           "name": "bsi:component:filename",
           "value": "spring-beans-6.1.1.jar"
         },
@@ -5317,7 +6496,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-10-12"
+          "value": "endoflife.date@2026-10-14"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -5331,6 +6510,9 @@
       "publisher": "Spring IO",
       "purl": "pkg:maven/org.springframework/spring-beans@6.1.1?type=jar",
       "scope": "required",
+      "supplier": {
+        "name": "Spring IO"
+      },
       "tags": [
         "framework"
       ],
@@ -5364,6 +6546,24 @@
         }
       ],
       "group": "org.springframework",
+      "hashes": [
+        {
+          "alg": "MD5",
+          "content": "4ca9075daea9de15f42ba7de14420e47"
+        },
+        {
+          "alg": "SHA-1",
+          "content": "0610d7dd3f62d22d42b993a201e3110649b68e17"
+        },
+        {
+          "alg": "SHA-256",
+          "content": "b46807c32546320560078dddd95f3b2e6a42b7a643830b323f45b0573bdbfaad"
+        },
+        {
+          "alg": "SHA-512",
+          "content": "e3566093ba67bf8e714ab0f1cace09554749cec6a732e73ed6e51792bc80724d97444dd6e6e2e0c8164b8ac6a00f8e16e5b6ce250b3c95fa4531b0e27d602ca2"
+        }
+      ],
       "licenses": [
         {
           "license": {
@@ -5417,6 +6617,10 @@
           "value": "Both are permissive; keep the notices."
         },
         {
+          "name": "bomlens:supplierSource",
+          "value": "publisher"
+        },
+        {
           "name": "bsi:component:filename",
           "value": "spring-context-6.1.1.jar"
         },
@@ -5446,7 +6650,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-10-12"
+          "value": "endoflife.date@2026-10-14"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -5460,6 +6664,9 @@
       "publisher": "Spring IO",
       "purl": "pkg:maven/org.springframework/spring-context@6.1.1?type=jar",
       "scope": "required",
+      "supplier": {
+        "name": "Spring IO"
+      },
       "tags": [
         "framework"
       ],
@@ -5493,6 +6700,24 @@
         }
       ],
       "group": "org.springframework",
+      "hashes": [
+        {
+          "alg": "MD5",
+          "content": "7a787700b8de9fc9034ffdc070517f51"
+        },
+        {
+          "alg": "SHA-1",
+          "content": "22d73bef97aff8a74a992716fe1aafc8f8a8a68d"
+        },
+        {
+          "alg": "SHA-256",
+          "content": "a2ef6992edc54d3380ba95c56d86d1baf64afb0eda9296518be21a483318d93f"
+        },
+        {
+          "alg": "SHA-512",
+          "content": "5eddaed20579e18bcf17f4879542e35f7d2227879b2a76e2f38f324ff15020192aaee3531103e6f744e12d60e70ffed00c6f04cd9074831fc3d9b142882e85fe"
+        }
+      ],
       "licenses": [
         {
           "license": {
@@ -5546,6 +6771,10 @@
           "value": "Both are permissive; keep the notices."
         },
         {
+          "name": "bomlens:supplierSource",
+          "value": "publisher"
+        },
+        {
           "name": "bsi:component:filename",
           "value": "spring-core-6.1.1.jar"
         },
@@ -5575,7 +6804,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-10-12"
+          "value": "endoflife.date@2026-10-14"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -5589,6 +6818,9 @@
       "publisher": "Spring IO",
       "purl": "pkg:maven/org.springframework/spring-core@6.1.1?type=jar",
       "scope": "required",
+      "supplier": {
+        "name": "Spring IO"
+      },
       "tags": [
         "framework"
       ],
@@ -5622,6 +6854,24 @@
         }
       ],
       "group": "org.springframework",
+      "hashes": [
+        {
+          "alg": "MD5",
+          "content": "3234369c83a51c371210abf399d57a48"
+        },
+        {
+          "alg": "SHA-1",
+          "content": "807700a64cb055ed85af189d1fa0702bc0d2efba"
+        },
+        {
+          "alg": "SHA-256",
+          "content": "a787dc92f1f9959069f5be206d5adbd6c1efb2444d458d279f02eda6b0e6b26f"
+        },
+        {
+          "alg": "SHA-512",
+          "content": "690f90b08c1d22a85982abea38439126e6b42cebcb7933290ffad77a427fd24a89ea83e3d95338fc9ada5837c2645882e66c7d2397e272248e95ae82f5f0fc71"
+        }
+      ],
       "licenses": [
         {
           "license": {
@@ -5675,6 +6925,10 @@
           "value": "Both are permissive; keep the notices."
         },
         {
+          "name": "bomlens:supplierSource",
+          "value": "publisher"
+        },
+        {
           "name": "bsi:component:filename",
           "value": "spring-expression-6.1.1.jar"
         },
@@ -5704,7 +6958,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-10-12"
+          "value": "endoflife.date@2026-10-14"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -5718,6 +6972,9 @@
       "publisher": "Spring IO",
       "purl": "pkg:maven/org.springframework/spring-expression@6.1.1?type=jar",
       "scope": "required",
+      "supplier": {
+        "name": "Spring IO"
+      },
       "tags": [
         "framework"
       ],
@@ -5751,6 +7008,24 @@
         }
       ],
       "group": "org.springframework",
+      "hashes": [
+        {
+          "alg": "MD5",
+          "content": "ecba6e6236c07a3ad918bbab0e5f90d5"
+        },
+        {
+          "alg": "SHA-1",
+          "content": "69ebbf7bad707d34e81d00213c756bc6fcc31dd7"
+        },
+        {
+          "alg": "SHA-256",
+          "content": "df17daa5812222a83795065dcc920a494dad423171265f8fa392628961c92317"
+        },
+        {
+          "alg": "SHA-512",
+          "content": "b5b6710eb31d897297f763933f938f1df32c6e3781c648d9c278c3483ea8c515948440ce0e7670e3d5dab8bbf21cc96587e8c357546fa4121a6a3c56a71c4223"
+        }
+      ],
       "licenses": [
         {
           "license": {
@@ -5804,6 +7079,10 @@
           "value": "Both are permissive; keep the notices."
         },
         {
+          "name": "bomlens:supplierSource",
+          "value": "publisher"
+        },
+        {
           "name": "bsi:component:filename",
           "value": "spring-jcl-6.1.1.jar"
         },
@@ -5833,7 +7112,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-10-12"
+          "value": "endoflife.date@2026-10-14"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -5847,6 +7126,9 @@
       "publisher": "Spring IO",
       "purl": "pkg:maven/org.springframework/spring-jcl@6.1.1?type=jar",
       "scope": "required",
+      "supplier": {
+        "name": "Spring IO"
+      },
       "tags": [
         "framework",
         "logging"
@@ -5881,6 +7163,24 @@
         }
       ],
       "group": "org.springframework",
+      "hashes": [
+        {
+          "alg": "MD5",
+          "content": "95e1886132ced2a8ea1382aacd1bd5f9"
+        },
+        {
+          "alg": "SHA-1",
+          "content": "92f1f65c3d8ccee4a86cd8f85a446d99f2915833"
+        },
+        {
+          "alg": "SHA-256",
+          "content": "0a4aa6dba9c48b9b534dd675ec99e09572f42d181289757be5342bfbc9db01f5"
+        },
+        {
+          "alg": "SHA-512",
+          "content": "84b8f4c4ecb0de2adbe3f4c5efd73e600a117af8c5e7bfd91e490bbfe5356f1d915136200b57809dcb377537036d27cc256472acf82534f583bbe07eedb8c3b1"
+        }
+      ],
       "licenses": [
         {
           "license": {
@@ -5934,6 +7234,10 @@
           "value": "Both are permissive; keep the notices."
         },
         {
+          "name": "bomlens:supplierSource",
+          "value": "publisher"
+        },
+        {
           "name": "bsi:component:filename",
           "value": "spring-jdbc-6.1.1.jar"
         },
@@ -5963,7 +7267,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-10-12"
+          "value": "endoflife.date@2026-10-14"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -5977,6 +7281,9 @@
       "publisher": "Spring IO",
       "purl": "pkg:maven/org.springframework/spring-jdbc@6.1.1?type=jar",
       "scope": "required",
+      "supplier": {
+        "name": "Spring IO"
+      },
       "tags": [
         "framework"
       ],
@@ -6010,6 +7317,24 @@
         }
       ],
       "group": "org.springframework",
+      "hashes": [
+        {
+          "alg": "MD5",
+          "content": "5e8517bfaea898b84389d8de6cc00f2c"
+        },
+        {
+          "alg": "SHA-1",
+          "content": "6985738997594d1ee317e04dee06819cbc20bc59"
+        },
+        {
+          "alg": "SHA-256",
+          "content": "34969d56a78ca42d67831738a3f7e185c7a9fc7c7a2ed7c1a9ede6d53cf2d32e"
+        },
+        {
+          "alg": "SHA-512",
+          "content": "094c0fae0eee5e28559b4bfe013633f560641820bf21fd5c0245f6b1af2f13906de17aece8e5a71fe36bb49771b1f5eaaa5b30f5fcf702c2f862b83c96ef7d0a"
+        }
+      ],
       "licenses": [
         {
           "license": {
@@ -6063,6 +7388,10 @@
           "value": "Both are permissive; keep the notices."
         },
         {
+          "name": "bomlens:supplierSource",
+          "value": "publisher"
+        },
+        {
           "name": "bsi:component:filename",
           "value": "spring-orm-6.1.0.jar"
         },
@@ -6092,7 +7421,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-10-12"
+          "value": "endoflife.date@2026-10-14"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -6106,6 +7435,9 @@
       "publisher": "Spring IO",
       "purl": "pkg:maven/org.springframework/spring-orm@6.1.0?type=jar",
       "scope": "required",
+      "supplier": {
+        "name": "Spring IO"
+      },
       "tags": [
         "framework"
       ],
@@ -6139,6 +7471,24 @@
         }
       ],
       "group": "org.springframework",
+      "hashes": [
+        {
+          "alg": "MD5",
+          "content": "1ec97467484fd259eac287f66d823969"
+        },
+        {
+          "alg": "SHA-1",
+          "content": "7238e93c2c1a1b2156e6dc145d2612ea8a2914ee"
+        },
+        {
+          "alg": "SHA-256",
+          "content": "20e2393de02fe349cd279e6717324f702119acc48830137936bb3957bce43b63"
+        },
+        {
+          "alg": "SHA-512",
+          "content": "33c780693a1ad96fa9494037e7dc07d8d755bb7266ba3822123e19e1b9fa65ee17638f064813eac914e18884e3119e2f61dbe1446a9d0f2ee023447d28c50309"
+        }
+      ],
       "licenses": [
         {
           "license": {
@@ -6192,6 +7542,10 @@
           "value": "Both are permissive; keep the notices."
         },
         {
+          "name": "bomlens:supplierSource",
+          "value": "publisher"
+        },
+        {
           "name": "bsi:component:filename",
           "value": "spring-tx-6.1.0.jar"
         },
@@ -6221,7 +7575,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-10-12"
+          "value": "endoflife.date@2026-10-14"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -6235,6 +7589,9 @@
       "publisher": "Spring IO",
       "purl": "pkg:maven/org.springframework/spring-tx@6.1.0?type=jar",
       "scope": "required",
+      "supplier": {
+        "name": "Spring IO"
+      },
       "tags": [
         "framework"
       ],
@@ -6268,6 +7625,24 @@
         }
       ],
       "group": "org.springframework",
+      "hashes": [
+        {
+          "alg": "MD5",
+          "content": "431b4950bad0860cd6165f617e130e9e"
+        },
+        {
+          "alg": "SHA-1",
+          "content": "4eeb5f2edb9f04d00357edcc56b59d3874b3b453"
+        },
+        {
+          "alg": "SHA-256",
+          "content": "9aead203936fc3508217ca833b58c2ce65d8b8162133dfea5f3e03cbf8be3d26"
+        },
+        {
+          "alg": "SHA-512",
+          "content": "3265527bb5e2f12cd22e578a1bf428762484d91377b667431355834dabc7f4dc5ba75772a46a86b8ba0ecc4e2d973d372f79db6f6e6559b1bd31add4e5030993"
+        }
+      ],
       "licenses": [
         {
           "license": {
@@ -6321,6 +7696,10 @@
           "value": "Both are permissive; keep the notices."
         },
         {
+          "name": "bomlens:supplierSource",
+          "value": "publisher"
+        },
+        {
           "name": "bsi:component:filename",
           "value": "spring-web-6.1.1.jar"
         },
@@ -6350,7 +7729,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-10-12"
+          "value": "endoflife.date@2026-10-14"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -6364,6 +7743,9 @@
       "publisher": "Spring IO",
       "purl": "pkg:maven/org.springframework/spring-web@6.1.1?type=jar",
       "scope": "required",
+      "supplier": {
+        "name": "Spring IO"
+      },
       "tags": [
         "framework"
       ],
@@ -6397,6 +7779,24 @@
         }
       ],
       "group": "org.springframework",
+      "hashes": [
+        {
+          "alg": "MD5",
+          "content": "072af77e31540979e44865e57e4ff3cf"
+        },
+        {
+          "alg": "SHA-1",
+          "content": "76c4408b67828aa9656f5955dc2c1c4c0e1b6da3"
+        },
+        {
+          "alg": "SHA-256",
+          "content": "2474c7b3ee933268afaa06220e07166bac3cc8a9303845df9aec8526a29850c8"
+        },
+        {
+          "alg": "SHA-512",
+          "content": "286f4aba97fc16303f45447cde58c8dc4505547981254d8a5d5ff9b09b464e0be10b74c85c410f76b802ac62bd9c44ef194cb327652fd57897e5f30a6d5e64cf"
+        }
+      ],
       "licenses": [
         {
           "license": {
@@ -6450,6 +7850,10 @@
           "value": "Both are permissive; keep the notices."
         },
         {
+          "name": "bomlens:supplierSource",
+          "value": "publisher"
+        },
+        {
           "name": "bsi:component:filename",
           "value": "spring-webmvc-6.1.1.jar"
         },
@@ -6479,7 +7883,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-10-12"
+          "value": "endoflife.date@2026-10-14"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -6493,6 +7897,9 @@
       "publisher": "Spring IO",
       "purl": "pkg:maven/org.springframework/spring-webmvc@6.1.1?type=jar",
       "scope": "required",
+      "supplier": {
+        "name": "Spring IO"
+      },
       "tags": [
         "framework",
         "web"
@@ -6527,6 +7934,24 @@
         }
       ],
       "group": "org.yaml",
+      "hashes": [
+        {
+          "alg": "MD5",
+          "content": "d78aacf5f2de5b52f1a327470efd1ad7"
+        },
+        {
+          "alg": "SHA-1",
+          "content": "3af797a25458550a16bf89acc8e4ab2b7f2bfce0"
+        },
+        {
+          "alg": "SHA-256",
+          "content": "1467931448a0817696ae2805b7b8b20bfb082652bf9c4efaed528930dc49389b"
+        },
+        {
+          "alg": "SHA-512",
+          "content": "11547e75cc80bee26f532e2598bc6e4ffa802941496dc0d8ce017f1b15e01ebbb80e91ed17d1047916e32bf2fc58da532bc71a1dfe93afccc277a296d86634ba"
+        }
+      ],
       "licenses": [
         {
           "license": {
@@ -6955,7 +8380,7 @@
       "properties": [
         {
           "name": "internal:SrcFile",
-          "value": "/app/pom.xml"
+          "value": "pom.xml"
         }
       ],
       "type": "application",
@@ -6981,14 +8406,14 @@
       },
       {
         "name": "bomlens:excluded-paths",
-        "value": "**/test/**, **/tests/**, **/spec/**, **/fixtures/**, **/testdata/**, **/__tests__/**, **/e2e/**, **/example/**, **/examples/**, **/sample/**, **/samples/**, **/bench/**, **/benches/**, **/benchmark/**, **/benchmarks/**, **/demo/**, **/demos/**, **/playground/**, **/.github/workflows/**"
+        "value": "**/test/**, **/tests/**, **/spec/**, **/fixtures/**, **/testdata/**, **/__tests__/**, **/e2e/**, **/example/**, **/examples/**, **/sample/**, **/samples/**, **/bench/**, **/benches/**, **/benchmark/**, **/benchmarks/**, **/demo/**, **/demos/**, **/playground/**, **/.github/workflows/**, **/gradle/wrapper/**"
       },
       {
         "name": "bomlens:undeclared-fields",
         "value": "unknown-to-author"
       }
     ],
-    "timestamp": "2026-10-12T08:20:44Z",
+    "timestamp": "2026-10-14T18:06:06Z",
     "tools": {
       "components": [
         {
@@ -6997,24 +8422,24 @@
               "name": "OWASP Foundation"
             }
           ],
-          "bom-ref": "pkg:npm/@cdxgen/cdxgen@13.2.0",
+          "bom-ref": "pkg:npm/@cdxgen/cdxgen@13.3.0",
           "group": "@cdxgen",
           "name": "cdxgen",
           "publisher": "OWASP Foundation",
-          "purl": "pkg:npm/%40cdxgen/cdxgen@13.2.0",
+          "purl": "pkg:npm/%40cdxgen/cdxgen@13.3.0",
           "type": "application",
-          "version": "13.2.0"
+          "version": "13.3.0"
         },
         {
           "name": "BomLens",
           "publisher": "SK Telecom",
           "type": "application",
-          "version": "1.13.2"
+          "version": "1.13.4"
         }
       ]
     }
   },
-  "serialNumber": "urn:uuid:7cf62778-b1df-40e6-bbee-43e4f7bca1d3",
+  "serialNumber": "urn:uuid:54c970eb-23d6-48ae-97b5-2bd786744f06",
   "services": [],
   "specVersion": "1.6",
   "version": 1,
