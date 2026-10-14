@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: Apache-2.0
 # Licensed under the Apache License, Version 2.0.
 #
-# cdx-version.sh — the CycloneDX specVersion this pipeline emits.
+# cdx-version.sh: the CycloneDX specVersion this pipeline emits.
 #
 # 1.6 by default. CYCLONEDX_SPEC_VERSION=1.7 (the CLI's --spec-version 1.7)
 # asks for 1.7 instead, and only these two values are accepted. syft's own -o
