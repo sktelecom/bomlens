@@ -615,7 +615,7 @@ if { [ -f build.gradle ] || [ -f build.gradle.kts ]; } && command -v gradle >/de
     # from the password file (/root), not HOME. With a read-only root it
     # cannot unpack its native library there and every Gradle build fails at
     # once (cdxgen too, with an empty SBOM). Then it uses $HOME/.gradle. A
-    # writable ~/.gradle (the CLI mounts the host's Gradle cache there) is
+    # writable ~/.gradle (the CLI mounts BomLens's Gradle cache there) is
     # kept.
     if [ -z "${GRADLE_USER_HOME:-}" ]; then
         _acct_home="$( (getent passwd "$(id -u)" 2>/dev/null || true) | cut -d: -f6)"

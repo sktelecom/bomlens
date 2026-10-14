@@ -5361,10 +5361,10 @@ done
 [ -z "$_mh_bad" ] \
     && pass "scan-sbom.sh, entrypoint.sh and make-plan.sh use /tmp/sbomhome/.m2/repository and user.home /tmp/sbomhome" \
     || fail "MAVEN_OPTS is not the /tmp/sbomhome one in:$_mh_bad"
-grep -q '"$HOME/.m2")\\":/tmp/sbomhome/.m2"' "$ROOT_DIR/scripts/scan-sbom.sh" \
-    && grep -q 'role: "cache-maven", target: "/tmp/sbomhome/.m2"' "$ROOT_DIR/docker/lib/make-plan.sh" \
-    && pass "the Maven cache is mounted at /tmp/sbomhome/.m2 (CLI and plan)" \
-    || fail "the Maven cache mount does not target /tmp/sbomhome/.m2"
+grep -q 'role: "cache-maven", target: "/tmp/sbomhome/.m2/repository"' "$ROOT_DIR/docker/lib/make-plan.sh" \
+    && grep -q 'role: "maven-settings", target: "/tmp/sbomhome/.m2/settings.xml", mode: "ro"' "$ROOT_DIR/docker/lib/make-plan.sh" \
+    && pass "the plan mounts the Maven cache at /tmp/sbomhome/.m2/repository and settings.xml read-only" \
+    || fail "the plan's Maven mounts do not match /tmp/sbomhome/.m2"
 
 echo "== android-scope: release-config selection picks the right variant (flavored projects) =="
 # Guards docker/lib/build-prep.sh's Android config selection. The SCA benchmark

@@ -58,10 +58,12 @@ case "$(uname -s 2>/dev/null)" in
         # A POSIX path this shell can mkdir/read directly; hostpath() (above)
         # still does the cygpath -m conversion when this needs to reach a
         # docker -v flag, same as every other mount in this script.
-        GUARD_STATE_DIR="$(cygpath -u "${LOCALAPPDATA:-$HOME/AppData/Local}" 2>/dev/null)/bomlens/guard" ;;
+        GUARD_STATE_DIR="$(cygpath -u "${LOCALAPPDATA:-$HOME/AppData/Local}" 2>/dev/null)/bomlens/guard"
+        BOMLENS_CACHE_DIR="$(cygpath -u "${LOCALAPPDATA:-$HOME/AppData/Local}" 2>/dev/null)/bomlens/cache" ;;
     *)
         hostpath() { printf '%s' "$1"; }
-        GUARD_STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/bomlens/guard" ;;
+        GUARD_STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/bomlens/guard"
+        BOMLENS_CACHE_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/bomlens" ;;
 esac
 
 POSTPROCESS_IMAGE="${SBOM_SCANNER_IMAGE:-ghcr.io/sktelecom/bomlens:latest}"           # legacy aliases: sbom-generator, sbom-scanner
@@ -2548,12 +2550,25 @@ if [ "$MODE" = "SOURCE" ]; then
         fi
     fi
     echo "[1/2] Generating SBOM (cdxgen)..."
+    # Stage 1 runs as root, so the Maven and Gradle caches it writes are
+    # BomLens's own folders, not ~/.m2 or ~/.gradle: root-owned files there
+    # would break the user's own builds on Linux. The user's settings files
+    # (mirrors, proxies, init scripts) are mounted read-only on top. The Maven
+    # repository goes where MAVEN_OPTS below points Maven and where cdxgen
+    # looks for jars ($HOME/.m2/repository); user.home=/tmp/sbomhome makes
+    # Maven read the settings from /tmp/sbomhome/.m2.
     CACHE_MOUNTS=""
-    [ -d "$HOME/.gradle" ] && CACHE_MOUNTS="$CACHE_MOUNTS -v \"$(hostpath "$HOME/.gradle")\":/root/.gradle"
-    # The Maven cache goes where MAVEN_OPTS below points Maven (user.home for
-    # settings.xml, maven.repo.local for the repository) and where cdxgen looks
-    # for jars ($HOME/.m2/repository).
-    [ -d "$HOME/.m2" ] && CACHE_MOUNTS="$CACHE_MOUNTS -v \"$(hostpath "$HOME/.m2")\":/tmp/sbomhome/.m2"
+    if mkdir -p "$BOMLENS_CACHE_DIR/m2" 2>/dev/null; then
+        CACHE_MOUNTS="$CACHE_MOUNTS -v \"$(hostpath "$BOMLENS_CACHE_DIR/m2")\":/tmp/sbomhome/.m2/repository"
+    fi
+    for _mf in settings.xml settings-security.xml; do
+        [ -f "$HOME/.m2/$_mf" ] && CACHE_MOUNTS="$CACHE_MOUNTS -v \"$(hostpath "$HOME/.m2/$_mf")\":/tmp/sbomhome/.m2/$_mf:ro"
+    done
+    if mkdir -p "$BOMLENS_CACHE_DIR/gradle" 2>/dev/null; then
+        CACHE_MOUNTS="$CACHE_MOUNTS -v \"$(hostpath "$BOMLENS_CACHE_DIR/gradle")\":/root/.gradle"
+        [ -f "$HOME/.gradle/gradle.properties" ] && CACHE_MOUNTS="$CACHE_MOUNTS -v \"$(hostpath "$HOME/.gradle/gradle.properties")\":/root/.gradle/gradle.properties:ro"
+        [ -d "$HOME/.gradle/init.d" ] && CACHE_MOUNTS="$CACHE_MOUNTS -v \"$(hostpath "$HOME/.gradle/init.d")\":/root/.gradle/init.d:ro"
+    fi
     # HOME=/tmp/sbomhome: writable for both root and non-root (cyclonedx) images,
     # so maven/cargo/etc. caches resolve regardless of the base image's user.
     # -u 0:0: the all-in-one fallback image runs as a non-root user and could not

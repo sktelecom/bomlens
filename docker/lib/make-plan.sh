@@ -129,8 +129,12 @@ jq -n \
             {role: "plan-file", source: "bomlens-plan/build-prep.sh", target: "/tmp/build-prep.sh", mode: "ro"},
             {role: "plan-file", source: "bomlens-plan/identify-conda.py", target: "/tmp/identify-conda.py", mode: "ro"},
             {role: "guard-state", target: "/bomlens-state", mode: "rw", optional: true},
-            {role: "cache-maven", target: "/tmp/sbomhome/.m2", mode: "rw", optional: true},
-            {role: "cache-gradle", target: "/root/.gradle", mode: "rw", optional: true}
+            {role: "cache-maven", target: "/tmp/sbomhome/.m2/repository", mode: "rw", optional: true},
+            {role: "maven-settings", target: "/tmp/sbomhome/.m2/settings.xml", mode: "ro", optional: true},
+            {role: "maven-settings-security", target: "/tmp/sbomhome/.m2/settings-security.xml", mode: "ro", optional: true},
+            {role: "cache-gradle", target: "/root/.gradle", mode: "rw", optional: true},
+            {role: "gradle-properties", target: "/root/.gradle/gradle.properties", mode: "ro", optional: true},
+            {role: "gradle-init", target: "/root/.gradle/init.d", mode: "ro", optional: true}
           ],
           input_fingerprint: $fp,
           on_kill: "If stage 1 is killed before it finishes, it cannot put the source back. With the guard-state mount and BOMLENS_GUARD_ID, run the same image and arguments again with BOMLENS_GUARD_RESTORE_ONLY=1 to restore it",
