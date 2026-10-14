@@ -1660,6 +1660,48 @@ err="$(bash "$SCAN" --ui --fail-on-conformance 2>&1)"; rc=$?
   || fail "--fail-on-conformance + --ui rejection" "rc=$rc: $err"
 
 # --------------------------------------------------------
+section "Stage 1 Maven and Gradle caches"
+# --------------------------------------------------------
+# Stage 1 runs as root, so it gets BomLens's own cache folders, never the
+# user's ~/.m2 or ~/.gradle; the user's settings files go in read-only, at
+# paths outside the cache folders.
+cache_home="$WORK/cachehome"; fake_home="$WORK/fakehome"
+mkdir -p "$fake_home/.m2/repository" "$fake_home/.gradle/init.d"
+: > "$fake_home/.m2/settings.xml"; : > "$fake_home/.m2/settings-security.xml"
+: > "$fake_home/.gradle/gradle.properties"; : > "$fake_home/.gradle/init.gradle"; : > "$fake_home/.gradle/init.gradle.kts"
+host_form() { if is_windows_bash; then cygpath -m -- "$1" 2>/dev/null || printf '%s' "$1"; else printf '%s' "$1"; fi; }
+_prev_xch="${XDG_CACHE_HOME-__unset__}"; _prev_lad="${LOCALAPPDATA-__unset__}"
+if is_windows_bash; then
+    LOCALAPPDATA="$(cygpath -w "$cache_home" 2>/dev/null || printf '%s' "$cache_home")"; export LOCALAPPDATA
+    cache_dir="$cache_home/bomlens/cache"
+else
+    XDG_CACHE_HOME="$cache_home"; export XDG_CACHE_HOME
+    cache_dir="$cache_home/bomlens"
+fi
+d="$(new_proj cachemounts)"; printf '<project><modelVersion>4.0.0</modelVersion></project>' > "$d/pom.xml"
+HOME="$fake_home" scan_in "$d" --project Pcache --version 1.0.0 --generate-only
+{ in_log "$(host_form "$cache_dir/m2"):/tmp/sbomhome/.m2 " && [ -d "$cache_dir/m2/repository" ]; } \
+  && pass "the Maven cache is BomLens's .m2-shaped cache folder" \
+  || { fail "the Maven cache is BomLens's .m2-shaped cache folder" "rc=$RC; $(grep -o -- '-v [^ ]*m2[^ ]*' "$LOG" | head -3 | tr '\n' ' ')"; show; }
+in_log "$(host_form "$cache_dir/gradle"):/root/.gradle " \
+  && pass "the Gradle home is BomLens's cache folder" \
+  || { fail "the Gradle home is BomLens's cache folder" "rc=$RC"; show; }
+ok=1
+for m in ".m2/settings.xml:/bomlens-settings/m2/settings.xml:ro" ".m2/settings-security.xml:/bomlens-settings/m2/settings-security.xml:ro" \
+         ".gradle/gradle.properties:/bomlens-settings/gradle/gradle.properties:ro" ".gradle/init.gradle:/bomlens-settings/gradle/init.gradle:ro" \
+         ".gradle/init.gradle.kts:/bomlens-settings/gradle/init.gradle.kts:ro" ".gradle/init.d:/bomlens-settings/gradle/init.d:ro"; do
+    in_log "$(host_form "$fake_home")/$m" || ok=0
+done
+[ "$ok" = 1 ] && pass "the user's Maven and Gradle settings files are mounted read-only" \
+  || { fail "the user's Maven and Gradle settings files are mounted read-only" "rc=$RC"; show; }
+! in_log "$(host_form "$fake_home/.m2"):" && ! in_log "$(host_form "$fake_home/.gradle"):" \
+  && ! grep -qE ':/(tmp/sbomhome/\.m2|root/\.gradle)/[^ ]' "$LOG" \
+  && pass "neither ~/.m2 nor ~/.gradle is mounted whole, and nothing is mounted inside a cache folder" \
+  || { fail "neither ~/.m2 nor ~/.gradle is mounted whole, and nothing is mounted inside a cache folder" "rc=$RC"; show; }
+[ "$_prev_xch" = "__unset__" ] && unset XDG_CACHE_HOME || export XDG_CACHE_HOME="$_prev_xch"
+[ "$_prev_lad" = "__unset__" ] && unset LOCALAPPDATA || export LOCALAPPDATA="$_prev_lad"
+
+# --------------------------------------------------------
 section "Windows path & filesystem adversarial matrix"
 # --------------------------------------------------------
 # Windows path/filename grammar differs from Linux in ways "works in CI"

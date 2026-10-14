@@ -730,6 +730,15 @@ P="$(plan_run node-badtc "$PSRC" GOTOOLCHAIN='local;rm -rf /')"
 [ "$(jq -r '[.stages[0].mounts[] | select(.role=="guard-state") | .target] | first' "$P/bomlens-plan.json") $(jq -r '.stages[0].env_from_caller | has("BOMLENS_GUARD_ID")' "$P/bomlens-plan.json")" = "/bomlens-state true" ] \
     && pass "stage 1 offers the guard-state mount and BOMLENS_GUARD_ID, so a killed stage 1 can be undone" \
     || fail "guard state: $(jq -c '[.stages[0].mounts, .stages[0].env_from_caller]' "$P/bomlens-plan.json")"
+jq -e '[.stages[0].mounts[] | select(.role | test("maven|gradle")) | "\(.role) \(.target) \(.mode)"]
+    == ["cache-maven /tmp/sbomhome/.m2 rw", "maven-settings /bomlens-settings/m2/settings.xml ro",
+        "maven-settings-security /bomlens-settings/m2/settings-security.xml ro", "cache-gradle /root/.gradle rw",
+        "gradle-properties /bomlens-settings/gradle/gradle.properties ro",
+        "gradle-init-script /bomlens-settings/gradle/init.gradle ro",
+        "gradle-init-script-kts /bomlens-settings/gradle/init.gradle.kts ro",
+        "gradle-init /bomlens-settings/gradle/init.d ro"]' "$P/bomlens-plan.json" >/dev/null \
+    && pass "stage 1 takes the Maven and Gradle caches read-write and the settings files read-only, outside them" \
+    || fail "cache mounts: $(jq -c '[.stages[0].mounts[] | select(.role | test("maven|gradle"))]' "$P/bomlens-plan.json")"
 jq -e '(.stages[0].env_passthrough | index("HOST_UID")) and (.stages[1].env_passthrough | index("HOST_UID")) and (.stages[1].env_passthrough | index("BOMLENS_INCLUDE_NON_SHIPPED"))' "$P/bomlens-plan.json" >/dev/null \
     && pass "HOST_UID/HOST_GID pass to both stages, BOMLENS_INCLUDE_NON_SHIPPED to stage 2 (its fallback reads it)" \
     || fail "passthrough: $(jq -c '[.stages[].env_passthrough]' "$P/bomlens-plan.json")"

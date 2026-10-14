@@ -1171,6 +1171,8 @@ MAX_VULN_ROWS = 2000
 MAX_VULN_REFS = 12  # reference links per CVE in the detail view
 MAX_VULN_DESC = 600  # description chars per CVE (keeps the SSE payload bounded)
 MAX_UNCHECKED_ROWS = 500  # components listed whose vulnerabilities were not checked
+MAX_ADVISORY_ROWS = 500  # advisories with no CVE listed apart from the findings
+MAX_VULN_ALIASES = 12  # advisory numbers shown next to one CVE
 MAX_CONFORMANCE_MISSING = 50  # missing items per conformance check
 MAX_CHECK_REGULATIONS = 12  # regulation refs mapped to one conformance check
 MAX_GUIDANCE_SNIPPET = 2000  # chars of the CycloneDX fill-in fragment per check
@@ -1323,6 +1325,11 @@ def security_summary(run_id):
                     "url": v.get("PrimaryURL") or "",
                     "refs": (v.get("References") or [])[:MAX_VULN_REFS],
                 }
+                # Advisory numbers filed for this CVE (VendorIDs: DLA-..., DSA-...,
+                # NSWG-ECO-...), shown next to the id. Omitted when there are none.
+                aliases = _vuln_aliases(v.get("VendorIDs"), cid)
+                if aliases:
+                    row["aliases"] = aliases
                 # Same normalized join key as _component_risk_index. PkgName +
                 # InstalledVersion alone collide across different components that
                 # happen to share both (a vendored copy in one ecosystem, an
@@ -1410,7 +1417,78 @@ def security_summary(run_id):
     unchecked = _unchecked_components(data.get("UncheckedComponents"))
     if unchecked:
         sev["uncheckedCount"], sev["uncheckedComponents"] = unchecked
+    # Advisory numbers for which the vulnerability database names no CVE
+    # (scan-security.sh moves them to the top-level Advisories list). Listed on
+    # their own, outside the severity counts and TOTAL above. Both keys are
+    # omitted when there are none.
+    advisories = _advisories(data.get("Advisories"))
+    if advisories:
+        sev["advisoryCount"], sev["advisories"] = advisories
     return sev
+
+
+def _vuln_aliases(vendor_ids, cid):
+    """VendorIDs of one finding other than its own id, first occurrence first,
+    capped at MAX_VULN_ALIASES."""
+    out = []
+    if not isinstance(vendor_ids, list):
+        return out
+    for x in vendor_ids:
+        if isinstance(x, str) and x and x != cid and x not in out:
+            out.append(x)
+            if len(out) >= MAX_VULN_ALIASES:
+                break
+    return out
+
+
+def _str_field(d, key):
+    """d[key] when it is a string, else ""."""
+    val = d.get(key)
+    return val if isinstance(val, str) else ""
+
+
+def _advisories(block):
+    """Normalize _security.json's top-level Advisories (Trivy findings kept as
+    they were, plus the Target they came from) to (count, rows[{id, pkg,
+    installed, severity, title, target, fixed?, purl?}]), rows capped at
+    MAX_ADVISORY_ROWS. None when absent, malformed or empty. The count covers
+    every well-formed entry, so a capped list never lowers it."""
+    if not isinstance(block, list):
+        return None
+    count = 0
+    rows = []
+    for a in block:
+        if not isinstance(a, dict):
+            continue
+        aid = a.get("VulnerabilityID")
+        if not isinstance(aid, str) or not aid:
+            continue
+        count += 1
+        if len(rows) >= MAX_ADVISORY_ROWS:
+            continue
+        s = (a.get("Severity") or "UNKNOWN")
+        s = s.upper() if isinstance(s, str) else "UNKNOWN"
+        if s not in ("CRITICAL", "HIGH", "MEDIUM", "LOW", "UNKNOWN"):
+            s = "UNKNOWN"
+        row = {
+            "id": aid,
+            "pkg": _str_field(a, "PkgName"),
+            "installed": _str_field(a, "InstalledVersion"),
+            "severity": s,
+            "title": (_str_field(a, "Title") or _str_field(a, "Description"))[:MAX_VULN_DESC],
+            "target": _str_field(a, "Target"),
+        }
+        fixed = _str_field(a, "FixedVersion")
+        if fixed:
+            row["fixed"] = fixed
+        ident = a.get("PkgIdentifier")
+        purl = ident.get("PURL") if isinstance(ident, dict) else None
+        if isinstance(purl, str) and purl:
+            row["purl"] = _norm_purl(purl)
+        rows.append(row)
+    if count <= 0:
+        return None
+    return count, rows
 
 
 def _unchecked_components(block):

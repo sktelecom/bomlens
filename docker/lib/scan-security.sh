@@ -155,6 +155,29 @@ if ! jq -e 'has("Results")' "$JSON" >/dev/null 2>&1; then
     if jq '. + {Results: []}' "$JSON" > "$tmp_r" 2>/dev/null; then mv "$tmp_r" "$JSON"; else echo '{"Results":[]}' > "$JSON"; rm -f "$tmp_r"; fi
 fi
 
+# Distribution advisory numbers (DLA-..., SUSE-SU-...) are not vulnerability
+# ids: report them under the CVE the advisory names, or, when it names none,
+# move them to the top-level Advisories list, out of the counts. Done on
+# Trivy's result before the other engines' results are merged in, so the merge
+# below drops a CVE another engine reports for the same package. Rewrites
+# _security.json in place so the web layer, the risk report and the gate read
+# the same list. When that changes anything, Trivy's own result is kept apart
+# first, the same way the sidecar merge keeps it.
+if [ -f "$SCRIPT_DIR/security-advisory-ids.jq" ]; then
+    tmp_a="$(mktemp)"
+    if jq -f "$SCRIPT_DIR/security-advisory-ids.jq" "$JSON" > "$tmp_a" 2>/dev/null; then
+        if jq -n -e --slurpfile a "$JSON" --slurpfile b "$tmp_a" '$a[0] == $b[0]' >/dev/null 2>&1; then
+            rm -f "$tmp_a"
+        else
+            [ -f "$TRIVY_ONLY" ] || cp "$JSON" "$TRIVY_ONLY"
+            mv "$tmp_a" "$JSON"
+        fi
+    else
+        rm -f "$tmp_a"
+        echo "[security] WARN: could not separate distribution advisory numbers from CVE ids; reporting them as findings." >&2
+    fi
+fi
+
 # Deep-CVE (opt-in image): run grype's CPE matcher for the NVD-only maven CVEs
 # Trivy misses (older Apache libs whose CVEs live in NVD keyed by CPE, absent from
 # the GitHub Security Advisory data Trivy uses for maven). scan-nvd-cpe.py drops a
@@ -211,6 +234,18 @@ for engine in cvebintool grype yocto; do
         echo "[security] WARN: failed to merge ${engine} sidecar; reporting prior results only." >&2
     fi
 done
+
+ADVISORIES=$(jq -c '[ (.Advisories // [])[] | {
+      id: .VulnerabilityID,
+      pkg: (.PkgName // ""),
+      purl: ((.PkgIdentifier // {}).PURL // ""),
+      version: (.InstalledVersion // ""),
+      severity: (.Severity // "UNKNOWN"),
+      fixed: (.FixedVersion // ""),
+      title: (.Title // .Description // "" | .[0:120])
+    } ]' "$JSON" 2>/dev/null || echo '[]')
+[ -n "$ADVISORIES" ] || ADVISORIES='[]'
+ADVISORY_N=$(echo "$ADVISORIES" | jq 'length')
 
 # Flatten findings: id, pkg, version, severity, fixed, cvss, title.
 # cvss = highest V3 (fallback V2) score across Trivy's CVSS sources.
@@ -326,7 +361,7 @@ if [ -z "$SCAN_ERR" ] && [ -f "$SCRIPT_DIR/vuln-coverage.jq" ]; then
     # Through a file: an old kernel's advisories make this list larger than one
     # command-line argument may be.
     _found="$(mktemp)"
-    { echo "$FINDINGS"; echo "$KERNEL_FINDINGS"; } | jq -cs \
+    { echo "$FINDINGS"; echo "$KERNEL_FINDINGS"; echo "$ADVISORIES"; } | jq -cs \
         '[add[] | (.purl // ""), (((.pkg // "") + "|" + (.version // "")) | ascii_downcase)]
          | map(select(. != "" and . != "|")) | unique' > "$_found" 2>/dev/null || echo '[]' > "$_found"
     UNCHECKED=$(jq -c --argjson cm "$_cpe_matched" --argjson yc "$_yocto_checked" --slurpfile foundf "$_found" \
@@ -383,6 +418,12 @@ KEV_COUNT=$(echo "$FINDINGS" | jq '[.[] | select(.kev)] | length')
         echo "  database was asked about them, so the counts above do not cover them."
         echo ""
     fi
+    if [ "${ADVISORY_N:-0}" -gt 0 ]; then
+        echo "- Advisories with no CVE: **${ADVISORY_N}**, listed separately below and not"
+        echo "  included in the counts above. Each is a distribution advisory number for"
+        echo "  which the vulnerability database names no CVE."
+        echo ""
+    fi
     if [ "${KERNEL_TOTAL:-0}" -gt 0 ]; then
         echo "- Kernel advisories: **${KERNEL_TOTAL}**, listed separately below and not"
         echo "  included in the counts above. Most advisories against a kernel are for"
@@ -430,6 +471,18 @@ KEV_COUNT=$(echo "$FINDINGS" | jq '[.[] | select(.kev)] | length')
             echo ""
             echo "… and $((UNCHECKED_N - UNCHECKED_MAX)) more, listed in \`UncheckedComponents\` in \`$(basename "$JSON")\`."
         fi
+    fi
+    if [ "${ADVISORY_N:-0}" -gt 0 ]; then
+        echo ""
+        echo "## Advisories with no CVE"
+        echo ""
+        echo "The vulnerability database reported these under an advisory number and names"
+        echo "no CVE for them, so they are kept out of the findings and the counts above."
+        echo ""
+        echo "| Severity | Advisory | Package | Installed | Fixed | Title |"
+        echo "|----------|----------|---------|-----------|-------|-------|"
+        echo "$ADVISORIES" | jq -r 'def cell: tostring | gsub("[|\n]"; " ");
+            .[] | "| \(.severity | cell) | \(.id | cell) | \(.pkg | cell) | \(.version | cell) | \(.fixed | cell) | \(.title | cell) |"'
     fi
     if [ "${KERNEL_TOTAL:-0}" -gt 0 ]; then
         echo ""
@@ -550,6 +603,9 @@ HTMLHEAD
     if [ "${UNCHECKED_N:-0}" -gt 0 ]; then
         echo "<div class=\"note\"><b>${UNCHECKED_N} component(s) could not be checked</b> and are listed below. No vulnerability database was asked about them, so the counts above do not cover them.</div>"
     fi
+    if [ "${ADVISORY_N:-0}" -gt 0 ]; then
+        echo "<div class=\"note\"><b>${ADVISORY_N} advisories with no CVE</b> are listed below and are not included in the counts above. Each is a distribution advisory number for which the vulnerability database names no CVE.</div>"
+    fi
     if [ "${KERNEL_TOTAL:-0}" -gt 0 ]; then
         echo "<div class=\"note\"><b>${KERNEL_TOTAL} kernel advisories</b> are listed at the end of this report and are not included in the counts above. Most advisories against a kernel are for subsystems a given device never compiled in, and the SBOM cannot tell which, so counting them here would bury the findings this report exists to show.</div>"
     fi
@@ -588,6 +644,17 @@ HTMLHEAD
             echo "<p class=\"meta\">&hellip; and $((UNCHECKED_N - UNCHECKED_MAX)) more, listed in <code>UncheckedComponents</code> in <code>$(esc "$(basename "$JSON")")</code>.</p>"
         fi
     fi
+    if [ "${ADVISORY_N:-0}" -gt 0 ]; then
+        echo "<h2>Advisories with no CVE</h2>"
+        echo "<p class=\"meta\">The vulnerability database reported these under an advisory number and names no CVE for them, so they are kept out of the findings and the counts above.</p>"
+        echo "<div class=\"table-wrap\"><table><tr><th>Severity</th><th>Advisory</th><th>Package</th><th>Installed</th><th>Fixed</th><th>Title</th></tr>"
+        echo "$ADVISORIES" | jq -r '.[] |
+            "<tr><td class=\"sev-\(.severity|@html)\">" + (.severity|@html) + "</td>" +
+            "<td>" + (.id|@html) + "</td><td>" + (.pkg|@html) + "</td>" +
+            "<td>" + (.version|@html) + "</td><td>" + (.fixed|@html) + "</td>" +
+            "<td>" + (.title|@html) + "</td></tr>"'
+        echo "</table></div>"
+    fi
     if [ "${KERNEL_TOTAL:-0}" -gt 0 ]; then
         echo "<h2>Kernel advisories</h2>"
         echo "<p class=\"meta\">Advisories filed against the kernel this image carries. Read them against the kernel configuration, not as a list to work through: a kernel accumulates thousands and most concern subsystems a given device never built.</p>"
@@ -606,5 +673,5 @@ HTMLHEAD
 if [ -n "$SCAN_ERR" ]; then
     echo "[security] generated: $JSON, $MD, $HTML (SCAN FAILED — results incomplete: ${SCAN_ERR})"
 else
-    echo "[security] generated: $JSON, $MD, $HTML (total=${TOTAL}, critical=${C}, high=${H}, kev=${KEV_COUNT}, unchecked=${UNCHECKED_N:-0})"
+    echo "[security] generated: $JSON, $MD, $HTML (total=${TOTAL}, critical=${C}, high=${H}, kev=${KEV_COUNT}, unchecked=${UNCHECKED_N:-0}, advisories=${ADVISORY_N:-0})"
 fi

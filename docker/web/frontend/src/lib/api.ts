@@ -207,6 +207,9 @@ export type Severity = (typeof SEVERITY_ORDER)[number];
 
 export interface VulnItem {
   id: string;
+  /** Advisory numbers filed for this CVE (Trivy's VendorIDs: DLA-..., DSA-...,
+   *  NSWG-ECO-...), other than `id`. Absent when there are none. */
+  aliases?: string[];
   severity: Severity;
   pkg: string;
   installed: string;
@@ -311,7 +314,27 @@ export type SecuritySummary = Record<Severity, number> & {
    *  in `uncheckedComponents`, which the server caps at 500. */
   uncheckedCount?: number;
   uncheckedComponents?: UncheckedComponent[];
+  /** Distribution advisory numbers (DLA-..., SUSE-SU-...) for which the vulnerability
+   *  database names no CVE (_security.json's top-level Advisories). Listed apart
+   *  and not counted in the severity figures or TOTAL. Present only when there
+   *  are some; may exceed the rows in `advisories`, which the server caps at 500. */
+  advisoryCount?: number;
+  advisories?: AdvisoryItem[];
 };
+
+/** One advisory with no CVE, as the security summary lists it. */
+export interface AdvisoryItem {
+  id: string;
+  pkg: string;
+  /** "" when the finding carries no installed version. */
+  installed: string;
+  severity: Severity;
+  title: string;
+  /** The Trivy result (OS packages, a language ecosystem) the advisory came from. */
+  target: string;
+  fixed?: string;
+  purl?: string;
+}
 
 /** Why a component's vulnerabilities were not checked. */
 export type UncheckedReason = "no-version" | "no-identifier" | "unknown";

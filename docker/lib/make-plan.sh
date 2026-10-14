@@ -129,14 +129,20 @@ jq -n \
             {role: "plan-file", source: "bomlens-plan/build-prep.sh", target: "/tmp/build-prep.sh", mode: "ro"},
             {role: "plan-file", source: "bomlens-plan/identify-conda.py", target: "/tmp/identify-conda.py", mode: "ro"},
             {role: "guard-state", target: "/bomlens-state", mode: "rw", optional: true},
-            {role: "cache-maven", target: "/root/.m2", mode: "rw", optional: true},
-            {role: "cache-gradle", target: "/root/.gradle", mode: "rw", optional: true}
+            {role: "cache-maven", target: "/tmp/sbomhome/.m2", mode: "rw", optional: true},
+            {role: "maven-settings", target: "/bomlens-settings/m2/settings.xml", mode: "ro", optional: true},
+            {role: "maven-settings-security", target: "/bomlens-settings/m2/settings-security.xml", mode: "ro", optional: true},
+            {role: "cache-gradle", target: "/root/.gradle", mode: "rw", optional: true},
+            {role: "gradle-properties", target: "/bomlens-settings/gradle/gradle.properties", mode: "ro", optional: true},
+            {role: "gradle-init-script", target: "/bomlens-settings/gradle/init.gradle", mode: "ro", optional: true},
+            {role: "gradle-init-script-kts", target: "/bomlens-settings/gradle/init.gradle.kts", mode: "ro", optional: true},
+            {role: "gradle-init", target: "/bomlens-settings/gradle/init.d", mode: "ro", optional: true}
           ],
           input_fingerprint: $fp,
           on_kill: "If stage 1 is killed before it finishes, it cannot put the source back. With the guard-state mount and BOMLENS_GUARD_ID, run the same image and arguments again with BOMLENS_GUARD_RESTORE_ONLY=1 to restore it",
           env: ({
             HOME: "/tmp/sbomhome",
-            MAVEN_OPTS: "-Dmaven.repo.local=/tmp/sbomhome/.m2",
+            MAVEN_OPTS: "-Duser.home=/tmp/sbomhome -Dmaven.repo.local=/tmp/sbomhome/.m2/repository",
             FETCH_LICENSE: $fetch,
             PROJECT_NAME: $pname,
             PROJECT_VERSION: $pver

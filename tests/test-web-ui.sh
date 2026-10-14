@@ -2107,6 +2107,62 @@ else
 fi
 rm -f "$OUT"/unchk*_1.0_*
 
+echo "== advisories with no CVE and CVE aliases (security_summary) =="
+# scan-security.sh moves a finding filed under a distribution advisory number with no CVE
+# to the top-level Advisories list, and keeps an advisory number reported for a
+# CVE in that CVE's VendorIDs. The summary lists the first apart from the
+# counts and shows the second next to the CVE id.
+cat > "$OUT/adv_1.0_security.json" <<'JSON'
+{"Results":[{"Target":"Node.js","Vulnerabilities":[
+ {"VulnerabilityID":"CVE-2020-8203","VendorIDs":["NSWG-ECO-516","CVE-2020-8203","NSWG-ECO-516"],"PkgName":"lodash","InstalledVersion":"4.17.15","Severity":"HIGH"}]}],
+ "Advisories":[
+ {"VulnerabilityID":"DLA-4792-1","PkgName":"tzdata","PkgIdentifier":{"PURL":"pkg:deb/debian/tzdata@2025b-0%2Bdeb12u2?arch=all"},"InstalledVersion":"2025b-0+deb12u2","FixedVersion":"2026c-0+deb12u1","Title":"tzdata - new timezone database","Severity":"UNKNOWN","Target":"sample (debian 12.12)"},
+ {"VulnerabilityID":"ELSA-2024-12698","PkgName":"ovirt-engine","InstalledVersion":"4.5.5-1.20.el8","Description":"no title","Severity":"weird","Target":"sample (oracle 8.10)"},
+ {"VulnerabilityID":""}, "junk"]}
+JSON
+cat > "$OUT/advnone_1.0_security.json" <<'JSON'
+{"Results":[{"Target":"x","Vulnerabilities":[{"VulnerabilityID":"CVE-2021-1","PkgName":"a","Severity":"LOW"}]}]}
+JSON
+cat > "$OUT/advbad_1.0_security.json" <<'JSON'
+{"Results":[],"Advisories":{"oops":1}}
+JSON
+if SBOM_OUTPUT_DIR="$OUT" python3 - "$ROOT_DIR" <<'PY'
+import sys, os, json
+sys.path.insert(0, os.path.join(sys.argv[1], "docker", "web"))
+import server
+# A long list is capped at MAX_ADVISORY_ROWS but the count is kept.
+n = server.MAX_ADVISORY_ROWS + 3
+big = {"Results": [], "Advisories": [
+    {"VulnerabilityID": "DLA-%d-1" % i, "PkgName": "p", "Severity": "LOW"} for i in range(n)]}
+with open(os.path.join(os.environ["SBOM_OUTPUT_DIR"], "advbig_1.0_security.json"), "w") as f:
+    json.dump(big, f)
+s = server.security_summary("adv_1.0")
+assert s["TOTAL"] == 1 and s["HIGH"] == 1 and s["UNKNOWN"] == 0, s
+assert s["advisoryCount"] == 2, s
+assert s["advisories"] == [
+    {"id": "DLA-4792-1", "pkg": "tzdata", "installed": "2025b-0+deb12u2", "severity": "UNKNOWN",
+     "title": "tzdata - new timezone database", "target": "sample (debian 12.12)",
+     "fixed": "2026c-0+deb12u1", "purl": "pkg:deb/debian/tzdata@2025b-0%2bdeb12u2"},
+    {"id": "ELSA-2024-12698", "pkg": "ovirt-engine", "installed": "4.5.5-1.20.el8", "severity": "UNKNOWN",
+     "title": "no title", "target": "sample (oracle 8.10)"},
+], s["advisories"]
+assert s["vulnerabilities"][0]["aliases"] == ["NSWG-ECO-516"], s["vulnerabilities"][0]
+for rid in ("advnone_1.0", "advbad_1.0"):
+    o = server.security_summary(rid)
+    assert "advisoryCount" not in o and "advisories" not in o, (rid, o)
+none = server.security_summary("advnone_1.0")
+assert "aliases" not in none["vulnerabilities"][0], none
+b = server.security_summary("advbig_1.0")
+assert b["advisoryCount"] == n and len(b["advisories"]) == server.MAX_ADVISORY_ROWS, b["advisoryCount"]
+assert b["TOTAL"] == 0, b
+PY
+then
+    pass "advisoryCount/advisories listed apart from the counts and capped; CVE aliases from VendorIDs"
+else
+    fail "advisories exposure is wrong"
+fi
+rm -f "$OUT"/adv*_1.0_*
+
 echo "== component-versions template CSV is a listed artifact =="
 if SBOM_OUTPUT_DIR="$OUT" python3 - "$ROOT_DIR" <<'PY'
 import sys, os

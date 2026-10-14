@@ -87,6 +87,17 @@ for proj in "${PROJECTS[@]}"; do
                     "got $ncomp, README promises $lo-$hi — update the README claim (and its marker)"
             fi
         fi
+        # Maven components carry hashes: stage 1 fetches the dependency jars
+        # into the repository cdxgen reads them from.
+        if [ "$proj" = "java-maven" ]; then
+            nohash=$(jq '[.components[]? | select((.purl // "") | startswith("pkg:maven/"))
+                | select([.hashes[]? | select(.alg == "SHA-256")] | length == 0)] | length' "$bom" 2>/dev/null || echo -1)
+            if [ "$nohash" = "0" ]; then
+                pass "$proj: every Maven component has a SHA-256 hash"
+            else
+                fail "$proj: every Maven component has a SHA-256 hash" "$nohash Maven component(s) without one"
+            fi
+        fi
     else
         fail "$proj: valid CycloneDX SBOM" "rc=$rc; $(grep -iE 'error|fail' "$w/_scan.log" | tail -2 | tr '\n' ' ')"
     fi
