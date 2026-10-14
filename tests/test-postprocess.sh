@@ -10925,7 +10925,7 @@ crt() { jq -r '[.checks[] | select(.id == "component-creator") | .detail][0] // 
     && [ "$(crt "$WORK/sup-after_conformance.json")" = "83% (5/6)" ] \
     && pass "component-creator coverage gains only the legacy-author component" \
     || fail "creator coverage: $(crt "$WORK/sup-before_conformance.json") -> $(crt "$WORK/sup-after_conformance.json")"
-# Every <...> and (...) is dropped, a value that is only an email or a URL is not
+# Every <...> and an email or URL (...) is dropped, a value that is only an email or a URL is not
 # used, and distribution or firmware packages (whose publisher is the package's
 # Maintainer) and operating-system components get no supplier. Nested
 # components follow the same rule, and a merge (MODE=MERGE) is left alone.
@@ -10973,6 +10973,36 @@ MODE=MERGE bash "$LIB/normalize-sbom.sh" "$WORK/sup2-merge.json" >/dev/null 2>&1
 [ "$(jq '[.. | objects | select(has("supplier"))] | length' "$WORK/sup2-merge.json")" = "0" ] \
     && pass "a merge of SBOMs (MERGE) is not given suppliers" \
     || fail "MERGE: $(jq -c '[.. | objects | select(has("supplier")) | .name]' "$WORK/sup2-merge.json")"
+# An email address or a URL anywhere in the value is dropped, a bracket only
+# when it holds one, and the spaces around "," and ";" are tidied.
+sup_case() { jq -n --arg v "$1" '{"bomFormat":"CycloneDX","specVersion":"1.6","metadata":{"component":{"name":"app","version":"1"}},
+  "components":[{"type":"library","name":"c","version":"1","purl":"pkg:npm/c@1","publisher":$v}]}' > "$WORK/sup3.json"
+    bash "$LIB/normalize-sbom.sh" "$WORK/sup3.json" >/dev/null 2>&1
+    jq -r '.components[0].supplier.name // "NONE"' "$WORK/sup3.json"; }
+sup_bad=""
+TAB="$(printf '\t')"
+while IFS='|' read -r in want; do
+    in="$(printf '%s' "$in" | sed "s/<TAB>/$TAB/")"
+    got="$(sup_case "$in")"
+    [ "$got" = "$want" ] || sup_bad="$sup_bad [$in] -> [$got] (want [$want]);"
+done <<'CASES'
+Jane Doe jane@example.org|Jane Doe
+Acme [acme@x.org]|Acme
+Foo<TAB>bar@x.org|Foo
+Team https://x.org/team|Team
+Name <email@x.org> http://x.org|Name
+Jane Doe (https://x.org|Jane Doe
+Example (Holdings), Inc.|Example (Holdings), Inc.
+Google LLC|Google LLC
+Red Hat, Inc.|Red Hat, Inc.
+Bob <b@x.org>; Carol <c@y.org>|Bob; Carol
+Bob ; Carol|Bob; Carol
+Acme [www.acme.example]|Acme
+ftp://x.org/pub|NONE
+CASES
+[ -z "$sup_bad" ] \
+    && pass "emails and URLs are dropped wherever they are, other brackets stay, and separators are tidied" \
+    || fail "supplier cleaning:$sup_bad"
 
 echo ""
 echo "Results: ${PASS} passed, ${FAIL} failed"
