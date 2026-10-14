@@ -11173,6 +11173,30 @@ rc=0; out="$(REACHABILITY_NONCE=n10 bash "$LIB/reachability.sh" "$RCH/bom.json" 
        and (.metadata.properties[] | select(.name == "bomlens:reachability:modules") | .value == ".")' "$RCH/g2_reachability.cdx.json" >/dev/null \
     && pass "a module that builds for none of the three GOOS is not judged: degraded (4), the VEX names it" \
     || fail "module not judged: rc=$rc $out"
+# What the module not judged requires keeps no not_affected from the others'
+# runs: golang.org/x/text is required by ./mobile, so its unreached advisories
+# get no statement; a go.mod stage 1 could not read withholds every one.
+rch_g2b() { # <prefix> <nonce> <gomod rc> <go mod edit -json text>
+    rch_stage1 "$1" "$2" "0 linux . $RCH/modonly.json" "0 darwin . $RCH/modonly.json" "0 windows . $RCH/modonly.json" \
+        "2 linux ./mobile -" "2 darwin ./mobile -" "2 windows ./mobile -"
+    printf '{"bomlens_gomod": 7}\n%s\n' "$4" >> "$1.json"; printf 'gomod 7 %s ./mobile\n' "$3" >> "$1.rc"
+}
+rch_g2b "$RCH/h1_govulncheck_stage1" n13 0 '{"Module":{"Path":"example.com/mobile"},"Require":[{"Path":"golang.org/x/text","Version":"v0.3.7","Indirect":true}]}'
+rc=0; REACHABILITY_NONCE=n13 bash "$LIB/reachability.sh" "$RCH/bom.json" "$RCH/h1" source >/dev/null || rc=$?
+[ "$rc" = 4 ] && jq -e '([.vulnerabilities[] | select(.analysis.state == "not_affected")] | length == 0)
+       and (.metadata.properties[] | select(.name == "bomlens:reachability:not-affected-withheld") | .value == "golang.org/x/text")' \
+       "$RCH/h1_reachability.cdx.json" >/dev/null \
+    && pass "a component the module not judged requires gets no not_affected from another module's runs" \
+    || fail "withheld not_affected: rc=$rc" "$(jq -c '[.vulnerabilities[] | [.id, .analysis.state]], .metadata.properties' "$RCH/h1_reachability.cdx.json")"
+rch_g2b "$RCH/h2_govulncheck_stage1" n14 0 '{"Module":{"Path":"example.com/mobile"},"Require":[{"Path":"golang.org/x/sync","Version":"v0.7.0"}]}'
+REACHABILITY_NONCE=n14 bash "$LIB/reachability.sh" "$RCH/bom.json" "$RCH/h2" source >/dev/null || true
+[ "$(jq '[.vulnerabilities[] | select(.analysis.state == "not_affected")] | length' "$RCH/h2_reachability.cdx.json")" = 2 ] \
+    && pass "a component the module not judged does not require keeps its not_affected" || fail "unrelated component withheld"
+rch_g2b "$RCH/h3_govulncheck_stage1" n15 1 ''
+REACHABILITY_NONCE=n15 bash "$LIB/reachability.sh" "$RCH/bom.json" "$RCH/h3" source >/dev/null || true
+jq -e '([.vulnerabilities[] | select(.analysis.state == "not_affected")] | length == 0)
+       and (.metadata.properties[] | select(.name == "bomlens:reachability:not-affected-withheld") | .value == "all")' "$RCH/h3_reachability.cdx.json" >/dev/null \
+    && pass "a go.mod stage 1 could not read withholds every not_affected" || fail "unreadable go.mod"
 rm -f "$RCH"/run*.err
 for i in 1 2 3; do printf "$TYPES" > "$RCH/run$i.err"; done
 rch_stage1 "$RCH/g3_govulncheck_stage1" n11 "1 linux . -" "1 darwin . -" "1 windows . -"
@@ -11306,6 +11330,7 @@ case "$1 $2" in
     "env GOWORK") d=$PWD; while [ "$d" != / ]; do [ -f "$d/go.work" ] && { echo "$d/go.work"; exit 0; }; d=$(dirname "$d"); done; echo ;;
     "work edit") printf '{\n\t"Use": [\n\t\t{\n\t\t\t"DiskPath": "./a"\n\t\t}\n\t]\n}\n' ;;
     "version ") echo "go version go1.24.0 linux/arm64" ;;
+    "mod edit") printf '{\n\t"Module": {"Path": "example.com/%s"},\n\t"Require": [{"Path": "golang.org/x/text", "Version": "v0.3.7"}]\n}\n' "$(basename "$PWD")" ;;
 esac
 exit 0
 STUB
@@ -11366,6 +11391,15 @@ RCH_STAGE1_LOG="$RS1/log" BOMLENS_REACHABILITY=true BOMLENS_GOVULNCHECK="$RS1/bi
 RCH_STUB_FAIL="sub:darwin:none sub:windows:types" RCH_STAGE1_LOG="$RS1/log" BOMLENS_REACHABILITY=true \
     BOMLENS_GOVULNCHECK="$RS1/bin/govulncheck" BOMLENS_REACHABILITY_NONCE=nz4 \
     PATH="$RS1/bin:$PATH" sh "$LIB/build-prep.sh" "$RS1/src" "$RS1/out/p_1_bom.json" >/dev/null 2>&1
+# A module that builds for none of the GOOS: stage 1 records its go.mod.
+RCH_STUB_FAIL="sub:linux:none sub:darwin:none sub:windows:none" RCH_STAGE1_LOG="$RS1/log" BOMLENS_REACHABILITY=true \
+    BOMLENS_GOVULNCHECK="$RS1/bin/govulncheck" BOMLENS_REACHABILITY_NONCE=nz9 \
+    PATH="$RS1/bin:$PATH" sh "$LIB/build-prep.sh" "$RS1/src" "$RS1/out/q_1_bom.json" >/dev/null 2>&1
+grep -q '^gomod 7 0 \./sub$' "$RS1/out/q_1_govulncheck_stage1.rc" && grep -q '^{"bomlens_gomod": 7}$' "$RS1/out/q_1_govulncheck_stage1.json" \
+    && grep -q '"Path": "golang.org/x/text"' "$RS1/out/q_1_govulncheck_stage1.json" \
+    && pass "stage 1 records the go.mod of a module that builds for none of the GOOS" \
+    || fail "stage 1 gomod record" "$(cat "$RS1/out/q_1_govulncheck_stage1.rc")"
+printf 'module example.com/root\n\ngo 1.24\n' > "$RS1/src/go.mod"
 [ "$(grep -c '^run ' "$RS1/out/p_1_govulncheck_stage1.rc")" = 9 ] && grep -q '^run 5 2 darwin module \./sub$' "$RS1/out/p_1_govulncheck_stage1.rc" \
     && grep -q '^run 6 1 windows module \./sub$' "$RS1/out/p_1_govulncheck_stage1.rc" \
     && pass "runs that fail because the code does not build for the GOOS do not stop the others" \

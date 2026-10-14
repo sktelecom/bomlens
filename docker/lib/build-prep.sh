@@ -4513,7 +4513,7 @@ rch_goos_only() {
 # govulncheck once per GOOS, until a run fails for another reason than the
 # GOOS or the time budget is spent.
 rch_run_module() {
-    _rch_dir="$1"; _rch_flags=""; _rch_work=off; _rch_how=module
+    _rch_dir="$1"; _rch_flags=""; _rch_work=off; _rch_how=module; _rch_built=""
     if rch_workspace_member "$_rch_dir"; then _rch_work=workspace; _rch_how=workspace; fi
     if [ "$2" = vendor ] && [ "$_rch_work" = off ]; then _rch_flags="-mod=mod"; _rch_how="module,-mod=mod"; fi
     for _rch_goos in linux darwin windows; do
@@ -4538,11 +4538,27 @@ rch_run_module() {
         _rch_rc=$?
         cat "$_rch_err1" >> "$_rch_out.err"
         printf 'run %s %s %s %s %s\n' "$_rch_n" "$_rch_rc" "$_rch_goos" "$_rch_how" "$_rch_dir" >> "$_rch_runs"
-        if [ "$_rch_rc" -ne 0 ] && ! rch_goos_only "$_rch_err1"; then
+        if [ "$_rch_rc" -eq 0 ]; then
+            _rch_built=1
+        elif ! rch_goos_only "$_rch_err1"; then
             log "reachability: govulncheck failed for $_rch_dir (GOOS=$_rch_goos); the runs left are skipped"
             _rch_stop=1
         fi
     done
+    # Built for none of the three: stage 2 does not judge the module, and keeps
+    # every module its go.mod requires from a not_affected another module's
+    # runs would give, so it needs that list (go mod edit -json, offline). A
+    # go.mod that cannot be read is recorded as such (-), and stage 2 then
+    # writes no not_affected at all.
+    if [ -z "$_rch_built" ] && [ -z "$_rch_stop" ]; then
+        _rch_n=$((_rch_n + 1))
+        printf '{"bomlens_gomod": %s}\n' "$_rch_n" >> "$_rch_out.json"
+        if (cd "$_rch_dir" && GOTOOLCHAIN="${HOST_GOTOOLCHAIN:-auto}" go mod edit -json) >> "$_rch_out.json" 2>/dev/null; then
+            printf 'gomod %s 0 %s\n' "$_rch_n" "$_rch_dir" >> "$_rch_runs"
+        else
+            printf 'gomod %s 1 %s\n' "$_rch_n" "$_rch_dir" >> "$_rch_runs"
+        fi
+    fi
 }
 
 if [ -n "$_rch_runs" ]; then

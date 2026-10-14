@@ -23,7 +23,9 @@ does not build for its GOOS (no package matched, build constraints exclude a
 package, or type errors alone): that GOOS is recorded as not covered for the
 module, which is judged from the GOOS that built. A module that builds for
 none of the three (no package matched on each) is not judged and the result
-is "degraded" (exit 4, the VEX is still written); type errors on all three
+is "degraded" (exit 4, the VEX is still written), and every module its
+go.mod requires gets no not_affected (it might call what the others do not;
+none at all when that go.mod could not be read); type errors on all three
 read as a tree that does not build and fail the step. Any other failure
 leaves nothing written (a run that did not finish is not read as one that
 found nothing).
@@ -92,7 +94,7 @@ LOADING_RE = re.compile(r"loading packages", re.IGNORECASE)
 GOOS_LIST = ("linux", "darwin", "windows")
 SCOPE_NOTE = ("checked for GOOS linux, darwin and windows (GOARCH amd64) with the default build tags; "
               "code built only under a custom build tag is not covered")
-RUN_MARK = re.compile(r'^\{"bomlens_run": (\d+)\}$', re.MULTILINE)
+RUN_MARK = re.compile(r'^\{"bomlens_(?:run|gomod)": (\d+)\}$', re.MULTILINE)
 ERR_MARK = re.compile(r"^== bomlens run (\d+) ==$", re.MULTILINE)
 
 
@@ -354,6 +356,8 @@ def build(bom, runs, mode, stable, scope=None):
         osv = osvs.get(osv_id)
         if comp is None or osv is None:
             continue
+        if level != "symbol" and scope is not None and (scope.get("hold_all") or module in scope.get("held", ())):
+            continue
         ref = comp.get("bom-ref") or comp.get("purl")
         used.setdefault(ref, embedded(comp))
         pkgs, syms = affected_symbols(osv, module)
@@ -408,6 +412,9 @@ def build(bom, runs, mode, stable, scope=None):
         if scope.get("not_judged"):
             metadata["properties"].append({"name": "bomlens:reachability:modules-not-judged",
                                            "value": ",".join(scope["not_judged"])})
+        if scope.get("hold_all") or scope.get("held"):
+            metadata["properties"].append({"name": "bomlens:reachability:not-affected-withheld",
+                                           "value": "all" if scope.get("hold_all") else ",".join(sorted(scope["held"]))})
     if isinstance(meta_in.get("component"), dict):
         metadata["component"] = meta_in["component"]
     doc = {"bomFormat": "CycloneDX", "specVersion": CDX_SPEC_VERSION}
@@ -427,8 +434,11 @@ def split_marked(text, mark):
     return parts
 
 
-def read_run_list(path):
-    """Stage 1's run list: [(n, rc, goos, how, module dir)] and its goarch."""
+def read_run_list(path, gomods=None):
+    """Stage 1's run list: [(n, rc, goos, how, module dir)] and its goarch.
+    gomods, when given, collects the `gomod <n> <rc> <module dir>` lines:
+    {module dir: (n, rc)}, the go.mod stage 1 read for a module that built
+    for none of the GOOS."""
     runs, goarch = [], "amd64"
     with open(path, encoding="utf-8", errors="replace") as fh:
         for line in fh:
@@ -437,7 +447,32 @@ def read_run_list(path):
                 goarch = fields[1]
             elif fields[0] == "run" and len(fields) == 6 and fields[1].isdigit():
                 runs.append((int(fields[1]), fields[2], fields[3], fields[4], fields[5]))
+            elif fields[0] == "gomod" and gomods is not None:
+                g = line.rstrip("\n").split(" ", 3)
+                if len(g) == 4 and g[1].isdigit():
+                    gomods[g[3]] = (int(g[1]), g[2])
     return runs, goarch
+
+
+def required_modules(text):
+    """The module paths a `go mod edit -json` document requires (direct and
+    indirect), and the paths its replace directives name; None when it
+    cannot be read."""
+    try:
+        doc = json.loads(text)
+    except ValueError:
+        return None
+    if not isinstance(doc, dict):
+        return None
+    paths = set()
+    for req in doc.get("Require") or []:
+        if isinstance(req, dict) and isinstance(req.get("Path"), str):
+            paths.add(req["Path"])
+    for rep in doc.get("Replace") or []:
+        for side in ("Old", "New"):
+            if isinstance(rep, dict) and isinstance(rep.get(side), dict) and isinstance(rep[side].get("Path"), str):
+                paths.add(rep[side]["Path"])
+    return paths
 
 
 def read_err(path):
@@ -462,7 +497,8 @@ def main(argv):
                 return emit(status, code, detail=detail)
             runs = [(parse_stream(stream_path), None)]
         else:
-            listed, goarch = read_run_list(rc)
+            gomods = {}
+            listed, goarch = read_run_list(rc, gomods)
             if not listed:
                 return emit("failed", 2, detail="stage 1 recorded no govulncheck run")
             errs = split_marked(read_err(err_path), ERR_MARK)
@@ -511,10 +547,21 @@ def main(argv):
                     return emit("failed", 2, detail="govulncheck's output for module %s (GOOS=%s) is missing"
                                 % (module, goos))
                 runs.append((parse_text(parts[n]), (goos, module)))
+            # A module not judged may call what another module does not: every
+            # module its go.mod requires keeps no not_affected; a go.mod that
+            # could not be read keeps none at all.
+            held, hold_all = set(), False
+            for module in not_judged:
+                n_rc = gomods.get(module)
+                paths = required_modules(parts.get(n_rc[0], "")) if n_rc and n_rc[1] == "0" else None
+                if paths is None:
+                    hold_all = True
+                else:
+                    held |= paths
             goos_seen = [g for g in GOOS_LIST if any(r[2] == g for r in listed)]
             uncovered = {m: [g for g, _w, _r in v] for m, v in skipped_goos.items() if m not in not_judged}
             scope = {"goos": goos_seen, "goarch": goarch, "modules": [m for m in modules if m not in not_judged],
-                     "uncovered": uncovered, "not_judged": not_judged}
+                     "uncovered": uncovered, "not_judged": not_judged, "held": held, "hold_all": hold_all}
         with open(bom_path, encoding="utf-8") as fh:
             bom = json.load(fh)
     except (OSError, ValueError) as err:
