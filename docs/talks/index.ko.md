@@ -34,6 +34,16 @@ BomLens를 발표한 자리와 외부에 소개된 기사를 모읍니다. 행�
 
 ## 외부 소개
 
+### 서울경제 (한국)
+
+- **매체:** [서울경제](https://www.sedaily.com/)
+- **일자:** 2026년 10월 14일
+- **언어:** 한국어
+- **제목:** 통신업계, 협력사 '보안 구멍'까지 막는다
+- **내용:** 통신사들의 선제적 보안 대응을 다룬 기사. SK텔레콤이 개발해 GitHub로 배포하는 BomLens를, 소프트웨어 공급사가 제품에 포함된 오픈소스를 확인하고 취약점을 점검하는 데 쓰는 도구로 소개
+
+[기사 보기](https://www.sedaily.com/article/20101683){ .md-button .md-button--primary target=_blank }
+
 ### Open Culture Foundation (대만)
 
 - **매체:** [Open Culture Foundation](https://ocf.tw/)

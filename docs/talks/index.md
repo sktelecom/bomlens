@@ -35,6 +35,16 @@ Where BomLens has been presented or covered, with slides and links for each. If 
 
 ## Press
 
+### Seoul Economic Daily (Korea)
+
+- **Publisher:** [Seoul Economic Daily](https://www.sedaily.com/)
+- **Date:** 14 October 2026
+- **Language:** Korean
+- **Headline:** 통신업계, 협력사 '보안 구멍'까지 막는다 (Telecom carriers move to close security gaps at their partners, too)
+- **About:** A feature on the preemptive security measures of Korean telecom carriers. It introduces BomLens, which SK Telecom developed and distributes on GitHub, as a tool that helps software suppliers identify the open source in their products and check it for vulnerabilities.
+
+[Read the article](https://www.sedaily.com/article/20101683){ .md-button .md-button--primary target=_blank }
+
 ### Open Culture Foundation (Taiwan)
 
 - **Publisher:** [Open Culture Foundation](https://ocf.tw/)
