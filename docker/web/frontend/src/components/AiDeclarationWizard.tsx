@@ -977,6 +977,7 @@ export function AiDeclarationWizard({
   mode = "fill",
   authorFromScan: authorGiven,
   declaredScan = false,
+  startNote,
 }: {
   title: string;
   index: FieldIndex;
@@ -997,6 +998,9 @@ export function AiDeclarationWizard({
   /** The scan names the document's author itself (--sbom-author), so the
    *  question is not asked. Read from the check when not given. */
   authorFromScan?: boolean;
+  /** When set, the final action is disabled and this note is shown under it
+   *  (the read-only demo, which cannot start a scan). */
+  startNote?: ReactNode;
   /** Filling a model that was itself described from a declaration (its
    *  licence takes effect at its next scan). */
   declaredScan?: boolean;
@@ -1802,7 +1806,7 @@ export function AiDeclarationWizard({
                 </Button>
               )}
               {step === "preview" ? (
-                <Button onClick={save} disabled={saving || blockers.length > 0}>
+                <Button onClick={save} disabled={saving || blockers.length > 0 || Boolean(startNote)}>
                   {saving && <Loader2 className="h-4 w-4 animate-spin" />}
                   {create ? t("aiDecl.startScan") : t("aiDecl.save")}
                 </Button>
@@ -1813,6 +1817,11 @@ export function AiDeclarationWizard({
               )}
             </div>
           </div>
+          {startNote && step === "preview" && (
+            <p className="text-right text-xs text-muted-foreground" data-testid="declare-demo-note">
+              {startNote}
+            </p>
+          )}
         </div>
 
         <aside className="space-y-3">
