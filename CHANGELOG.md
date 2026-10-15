@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Upgrade note
+
+- An SBOM read from a Yocto build's records (a Yocto build directory, its SPDX or its manifests) now gets the upstream repository PURL step that firmware, root filesystem and binary scans already had: components that had no PURL get `pkg:github/...` or `pkg:gnu/...` with `bomlens:purlSource=upstream-map`. Set `ENRICH_UPSTREAM_PURL=false` to keep the earlier PURLs. A build that published SPDX 2.2 also gets, with `--security`, the CPE index match, so the security report lists the CVEs matched from Yocto's CPEs where it listed none. SPDX 2.2 does not record which CVEs a recipe patched, so these can include CVEs the recipe already patched; an SPDX 3.0 build and the manifest reader keep Yocto's own verdicts and are not matched again.
+
+### Added
+
+- The upstream PURL step matches a component by the name of what it was built from as well as its own: the Yocto recipe (`bomlens:yocto:recipe`, now also written by the SPDX 2.2 reader), the OpenWrt source package (the last part of `syft:metadata:source`, so `libmbedtls12` is read as Mbed TLS and `ip-full` as iproute2), and the product of a CPE whose vendor is `*`. OpenWrt's toolchain packages (`libc`) and kernel module packages (`kmod-*`) are left alone.
+- The upstream PURL table covers OpenSSL 3.x, jansson, json-c (0.13.1 to 0.19), libbpf, iproute2, musl and util-linux.
+- A component the table does not cover at all gets a PURL from its source address (`bomlens:sourceUrl`, written by the Yocto SPDX 2.2 reader) when the address states the release of the component's version: a GitHub release asset or tag archive, or a GNU release.
+- The CPE index match reads a 2.3 CPE whose part is `*` as an application, and looks one whose vendor is `*` up by product alone, across every vendor, as Yocto's own cve-check does. New images index the product column for that lookup.
+
+### Fixed
+
+- The risk report of an AI model or dataset scan left the model or dataset itself out of the license count and the license classification, so a model with no dependent dataset read as 0 licenses. Its own license is now counted; source and image scans still leave their own project out.
+
 ## [v1.13.4] - 2026-10-15
 
 ### Fixed

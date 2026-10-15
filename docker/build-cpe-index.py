@@ -161,6 +161,8 @@ def main():
         conn.executemany("INSERT INTO cpe_match VALUES (?,?,?,?,?,?,?,?,?,?,?)", batch)
 
     conn.execute("CREATE INDEX ix_vp ON cpe_match (vendor, product)")
+    # A CPE with no vendor (Yocto's CVE_PRODUCT) is looked up by product alone.
+    conn.execute("CREATE INDEX ix_p ON cpe_match (product)")
     conn.commit()
     conn.close()
 

@@ -4334,6 +4334,8 @@ rows = [
   ("busybox", "busybox", "1.00", None, None, None, None, "CVE-2099-0002", "HIGH", "3", 7.5),
   ("openssl", "openssl", None, "1.0.2", 1, "1.0.2i", 0, "CVE-2099-0003", "HIGH", "3", 7.5),
   ("python", "flask", None, None, None, "9.0", 0, "CVE-2099-0004", "LOW", "3", 2.0),
+  ("vendor_a", "shared", None, None, None, "9.0", 0, "CVE-2099-0005", "LOW", "3", 2.0),
+  ("vendor_b", "shared", None, None, None, "9.0", 0, "CVE-2099-0006", "LOW", "3", 2.0),
 ]
 c.executemany("INSERT INTO cpe_match VALUES (?,?,?,?,?,?,?,?,?,?,?)", rows)
 c.commit()
@@ -4359,6 +4361,25 @@ JSON
     [ "$(printf '%s' "$fwo_counts" | jq -c .)" = '{"offered":2,"components":2,"cves":2}' ] \
         && pass "the step reports offered/components/cves counts" \
         || fail "counts are '$fwo_counts'"
+    # Yocto writes its CVE_PRODUCT as a CPE whose part, and often vendor, is
+    # '*'. The part is read as an application; a '*' vendor is looked up by the
+    # product alone, as Yocto's own cve-check does.
+    cat > "$WORK/yoc.json" <<'JSON'
+{"bomFormat":"CycloneDX","specVersion":"1.6","components":[
+  {"type":"library","name":"busybox-hwclock","version":"1.00","cpe":"cpe:2.3:*:*:busybox:1.00:*:*:*:*:*:*:*"},
+  {"type":"library","name":"openssh","version":"6.2p2","cpe":"cpe:2.3:*:openbsd:openssh:6.2p2:*:*:*:*:*:*:*"},
+  {"type":"library","name":"libother","version":"1.0","cpe":"cpe:2.3:*:*:*:1.0:*:*:*:*:*:*:*"},
+  {"type":"library","name":"shared","version":"1.0","cpe":"cpe:2.3:*:*:shared:1.0:*:*:*:*:*:*:*"}]}
+JSON
+    FW_CPE_INDEX="$CPEIDX" bash "$LIB/match-cpe-index.sh" "$WORK/yoc.json" "$WORK/yoc" >/dev/null 2>&1
+    yoc_ids="$(jq -r '[.Results[].Vulnerabilities[] | "\(.PkgName)@\(.InstalledVersion)=\(.VulnerabilityID)"] | sort | join(" ")' \
+        "$WORK/yoc_security_cvebintool.json" 2>/dev/null)"
+    [ "$yoc_ids" = "busybox@1.00=CVE-2099-0002 openssh@6.2p2=CVE-2099-0001 shared@1.0=CVE-2099-0005 shared@1.0=CVE-2099-0006" ] \
+        && pass "Yocto CPEs with '*' as the part or the vendor are matched, a '*' vendor across every vendor of the product; one with no product is not" \
+        || fail "Yocto-shaped CPEs matched: '${yoc_ids:-nothing}'"
+    jq -e "$(cat "$LIB/vuln-coverage.jq") (.components[0] | vc_app_cpe and (vc_cpe_version == \"1.00\")) and (.components[2] | vc_app_cpe | not)" "$WORK/yoc.json" >/dev/null \
+        && pass "the coverage check counts a '*' part CPE as one the index can be asked about, and one with no product as not" \
+        || fail "vuln-coverage does not read a '*' part CPE"
 
     # The pipeline runs the match after every CPE enrichment step, and the
     # firmware script no longer matches (or writes the sidecar) on its own.
@@ -4378,9 +4399,11 @@ JSON
     else
         pass "scan-firmware.sh leaves CVE matching to the pipeline step (no second pass)"
     fi
-    grep -q 'FIRMWARE|ROOTFS|BINARY)' "$_ep" \
-        && pass "the step runs for firmware, rootfs and binary scans" \
-        || fail "the CPE index step is not scoped to FIRMWARE|ROOTFS|BINARY"
+    grep -q 'case "$_cpe_mode" in FIRMWARE|ROOTFS|BINARY|YOCTO)' "$_ep" \
+        && grep -q 'case "$_upstream_mode" in' "$_ep" \
+        && grep -q '\[ "\$YOCTO_ARCHIVE" = "true" \] && YOCTO_CPE_MATCH=true' "$_ep" \
+        && pass "the CPE step runs for firmware, rootfs and binary scans and a Yocto SPDX 2.2 archive only; the upstream purl step for any Yocto records" \
+        || fail "the CPE index or upstream purl step is not scoped as expected"
 
     # rootfs / binary: syft's pkg:generic binary and a purl-less OS component are
     # offered; an ecosystem purl stays with Trivy even when it carries a CPE.
@@ -5902,6 +5925,9 @@ for pn, pv, lic, cpe in [
                       "externalRefs": [{"referenceCategory": "SECURITY",
                                         "referenceType": "http://spdx.org/rdf/references/cpe23Type",
                                         "referenceLocator": cpe}]}]
+    if pn == "busybox":
+        d["packages"].append({"SPDXID": "SPDXRef-busybox-source-1", "name": "busybox-source-1",
+                              "downloadLocation": "https://busybox.net/downloads/busybox-1.36.1.tar.bz2"})
     recipes["recipe-" + pn] = d
 
 packages = {}
@@ -6003,6 +6029,10 @@ PYGEN
     [ "$arch_names" = "busybox,busybox-syslog,libz1" ] \
         && pass "the archive-only read finds the same installed set" \
         || fail "archive-only components='$arch_names'"
+    arch_src=$(jq -c '[.components[] | [.name, ([.properties[] | select(.name == "bomlens:yocto:recipe") | .value][0]), ([.properties[] | select(.name == "bomlens:sourceUrl") | .value][0])]]' "$WORK/y22arch.cdx.json" 2>/dev/null)
+    [ "$arch_src" = '[["busybox",null,"https://busybox.net/downloads/busybox-1.36.1.tar.bz2"],["busybox-syslog","busybox","https://busybox.net/downloads/busybox-1.36.1.tar.bz2"],["libz1","zlib",null]]' ] \
+        && pass "each package records the recipe it was built from and the recipe's first source" \
+        || fail "recipe and source per package: $arch_src"
     [ "$(jq -r '.metadata.component.name' "$WORK/y22arch.cdx.json")" = "core-image-minimal" ] \
         && pass "the image inside the archive names the root component" \
         || fail "archive-only root component wrong"
@@ -11008,9 +11038,19 @@ mbedtls|2.28.9|pkg:github/mbed-tls/mbedtls@v2.28.9
 python|2.7.11|pkg:github/python/cpython@v2.7.11
 boa|0.94.13|pkg:sourceforge/boa@0.94.13
 readline|5.2|pkg:gnu/readline@5.2
+openssl|3.0.13|pkg:github/openssl/openssl@openssl-3.0.13
+libssl3|3.5.7|pkg:github/openssl/openssl@openssl-3.5.7
+OpenSSH|9.6p1|pkg:github/openssh/openssh-portable@V_9_6_P1
+jansson|2.14-3|pkg:github/akheron/jansson@v2.14
+json-c|0.16|pkg:github/json-c/json-c@json-c-0.16-20220414
+libjson-c|0.18-1|pkg:github/json-c/json-c@json-c-0.18-20240915
+libbpf|1.2.2-1|pkg:github/libbpf/libbpf@v1.2.2
+iproute2|6.3.0-1|pkg:github/shemminger/iproute2@v6.3.0
+musl|1.2.4|pkg:github/kraj/musl@v1.2.4
+util-linux|2.39.3|pkg:github/util-linux/util-linux@v2.39.3
 PAIRS
 # Not in the table, or a version form it does not cover: no purl, never a guess.
-for up_case in "musl 1.2.4" "dnsmasq 2.90" "hostapd 2.10" "openssl 3.0.13" "ncurses 6.4-20230520" "openssh 9.8" "hydra 0.1.8"; do
+for up_case in "dnsmasq 2.90" "hostapd 2.10" "openssl 0.9.8zh" "openssl 3.2.0-alpha1" "openssl 3.0" "ncurses 6.4-20230520" "openssh 9.8" "hydra 0.1.8" "json-c 0.12.2" "nftables 1.0.8"; do
     up_got=$(python3 "$UPP" --resolve ${up_case})
     [ -z "$up_got" ] && pass "no purl for $up_case" || fail "$up_case resolved to '$up_got'" "expected nothing"
 done
@@ -11068,10 +11108,51 @@ upp_got=$(upp_os otherver "$UPP_OS,{\"type\":\"library\",\"name\":\"busybox\",\"
 [ "$upp_got" = "operating-system=pkg:github/mirror/busybox@1_35_0 library=pkg:github/mirror/busybox@1_36_1" ] \
     && pass "the same name at a different version: each component gets its own upstream purl" \
     || fail "busybox os + other version: $upp_got"
+# The name of what a component was built from: a Yocto recipe, an OpenWrt
+# source package (the last part of syft:metadata:source), or the product of a
+# CPE whose vendor is '*'. A toolchain package is not read as anything.
+upp_one() {  # <label> <component json>
+    printf '{"bomFormat":"CycloneDX","specVersion":"1.6","components":[%s]}' "$2" > "$WORK/upp1-$1.json"
+    python3 "$UPP" "$WORK/upp1-$1.json" >/dev/null 2>&1
+    jq -r '.components[0].purl // "-"' "$WORK/upp1-$1.json"
+}
+[ "$(upp_one recipe '{"type":"library","name":"openssl-bin","version":"3.5.7","properties":[{"name":"bomlens:yocto:recipe","value":"openssl"}]}')" = "pkg:github/openssl/openssl@openssl-3.5.7" ] \
+    && pass "a Yocto package is matched by the recipe it was built from" || fail "Yocto recipe name"
+[ "$(upp_one opkg '{"type":"library","name":"libmbedtls12","version":"2.28.9-1","properties":[{"name":"syft:metadata:source","value":"feeds/base/libs/mbedtls"}]}')" = "pkg:github/mbed-tls/mbedtls@v2.28.9" ] \
+    && pass "an opkg package is matched by its source package" || fail "opkg source package"
+[ "$(upp_one tc '{"type":"library","name":"libc","version":"1.2.4-4","properties":[{"name":"syft:metadata:source","value":"feeds/base/libs/toolchain"}]}')" = "-" ] \
+    && pass "a toolchain package gets no purl" || fail "toolchain libc got a purl"
+[ "$(upp_one kmod '{"type":"library","name":"kmod-nf-conntrack","version":"5.15.137-1","purl":"pkg:opkg/kmod-nf-conntrack@5.15.137-1","properties":[{"name":"syft:metadata:source","value":"package/kernel/linux"}]}')" = "pkg:opkg/kmod-nf-conntrack@5.15.137-1" ] \
+    && pass "a kernel module package is not given the kernel's purl once more" || fail "kmod got the kernel purl"
+[ "$(upp_one cpestar '{"type":"library","name":"libz1","version":"1.3.1","cpe":"cpe:2.3:*:*:zlib:1.3.1:*:*:*:*:*:*:*"}')" = "pkg:github/madler/zlib@v1.3.1" ] \
+    && [ "$(upp_one cpepart '{"type":"library","name":"zz","version":"1.3.1","cpe":"cpe:2.3:*:zlib:zlib:1.3.1:*:*:*:*:*:*:*"}')" = "pkg:github/madler/zlib@v1.3.1" ] \
+    && pass "a CPE with '*' as its part or vendor still names the project" || fail "CPE with '*'"
+[ "$(upp_one clash '{"type":"library","name":"zlib","version":"1.3.1","properties":[{"name":"bomlens:yocto:recipe","value":"busybox"}]}')" = "-" ] \
+    && pass "a name and a recipe that mean two different projects give no purl" || fail "name and recipe disagree"
+# A source address that states the release: a GitHub release asset or tag
+# archive, or a GNU release whose version agrees. A plain tarball or a git
+# commit is not a release.
+upp_url() { upp_one "url$1" "{\"type\":\"library\",\"name\":\"$2\",\"version\":\"$3\",\"properties\":[{\"name\":\"bomlens:sourceUrl\",\"value\":\"$4\"}]}"; }
+[ "$(upp_url 1 xz 5.4.7 https://github.com/tukaani-project/xz/releases/download/v5.4.7/xz-5.4.7.tar.gz)" = "pkg:github/tukaani-project/xz@v5.4.7" ] \
+    && [ "$(upp_url 2 libffi 3.4.6 https://github.com/libffi/libffi/releases//download/v3.4.6/libffi-3.4.6.tar.gz)" = "pkg:github/libffi/libffi@v3.4.6" ] \
+    && [ "$(upp_url 3 foo 1.2 https://github.com/Owner/Foo/archive/refs/tags/v1.2.tar.gz)" = "pkg:github/owner/foo@v1.2" ] \
+    && pass "a GitHub release address gives that repository at that tag" || fail "GitHub release address"
+[ "$(upp_url 4 bash 5.2.21 https://ftpmirror.gnu.org/gnu/bash/bash-5.2.21.tar.gz)" = "pkg:gnu/bash@5.2.21" ] \
+    && [ "$(upp_url 5 bash 5.2.15 https://ftpmirror.gnu.org/gnu/bash/bash-5.2.21.tar.gz)" = "-" ] \
+    && pass "a GNU release address gives pkg:gnu, only when its version is the component's" || fail "GNU release address"
+[ "$(upp_url 8 foo 2.0 https://github.com/o/foo/releases/download/v1.0/foo-1.0.tar.gz)" = "-" ] \
+    && [ "$(upp_url 9 foo 1.0 https://github.com/o/foo/releases/download/nightly/foo.tar.gz)" = "-" ] \
+    && pass "a GitHub release that is not the component's version gives no purl" || fail "GitHub tag and version disagree"
+[ "$(upp_one urlclash '{"type":"library","name":"zlib","version":"1.0","properties":[{"name":"bomlens:yocto:recipe","value":"busybox"},{"name":"bomlens:sourceUrl","value":"https://github.com/x/y/releases/download/v1.0/y-1.0.tar.gz"}]}')" = "-" ] \
+    && [ "$(upp_one urlver '{"type":"library","name":"openssl","version":"3.2.0-alpha1","properties":[{"name":"bomlens:sourceUrl","value":"https://github.com/openssl/openssl/releases/download/openssl-3.2.0-alpha1/openssl-3.2.0-alpha1.tar.gz"}]}')" = "-" ] \
+    && pass "a project the table knows is never given a purl from its address" || fail "address used for a project in the table"
+[ "$(upp_url 6 file 5.45 git+https://github.com/file/file.git@4cbd5c8f0851201d203755b76cb66ba991ffd8be)" = "-" ] \
+    && [ "$(upp_url 7 bzip2 1.0.8 https://sourceware.org/pub/bzip2/bzip2-1.0.8.tar.gz)" = "-" ] \
+    && pass "a git commit or a plain tarball address gives no purl" || fail "commit or tarball address"
 # The table is the only source of identities: no entry for a project this
 # change was not asked to cover.
 up_ids=$(jq -r '[.entries[].id] | join(" ")' "$LIB/upstream-purl-map.json")
-[ "$up_ids" = "busybox curl openssl-1 openssh linux zlib u-boot net-snmp ncurses net-tools libxml2 sqlite glibc dropbear mbedtls python boa readline" ] \
+[ "$up_ids" = "busybox curl openssl-1 openssl-3 openssh linux zlib u-boot net-snmp ncurses net-tools libxml2 sqlite glibc dropbear mbedtls jansson json-c libbpf iproute2 musl util-linux python boa readline" ] \
     && pass "the mapping table holds exactly the checked projects" || fail "mapping table entries: $up_ids"
 
 echo "== component versions: a supplier file fills what the scan could not read =="
@@ -11168,7 +11249,7 @@ sk_v=$(jq -c '.checks[] | select(.id == "versions-needed") | [.required, .status
 [ "$sk_v" = '[true,"fail","4 without a version",["Vendor Utility","libxml2","ncurses","3c59x"]]' ] \
     && pass "version needed: a required row listing the components without a version" || fail "versions-needed row: $sk_v"
 sk_u=$(jq -c '.checks[] | select(.id == "upstream-purl") | [.required, .status, .missing]' "$WORK/sk_1.0_conformance.json")
-[ "$sk_u" = '[true,"fail",["busybox@1.35.0","gcc@9.3.0","openssl@3.0.13"]]' ] \
+[ "$sk_u" = '[true,"fail",["busybox@1.35.0","gcc@9.3.0","openssl@0.9.8zh"]]' ] \
     && pass "no upstream purl: a required row listing the versioned components still without one" || fail "upstream-purl row: $sk_u"
 jq -e '.checks[] | select(.id == "versions-needed") | .reviewGuide.how | contains("sk_1.0_component-versions.template.csv") and contains("--component-versions")' \
     "$WORK/sk_1.0_conformance.json" >/dev/null && pass "the version row points at the template and the option" \

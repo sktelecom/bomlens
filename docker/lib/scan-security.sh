@@ -409,7 +409,8 @@ SCAN_ERR=$(jq -r '.ScanError.Message // empty' "$JSON" 2>/dev/null)
 # --- Components no check could reach -------------------------------------------
 #
 # Trivy reads a package purl; the CPE index (match-cpe-index.sh, run before this
-# for firmware, rootfs and binary scans, BOMLENS_CPE_INDEX_MATCHED=true) reads a
+# for firmware, rootfs and binary scans and a Yocto SPDX 2.2 archive,
+# BOMLENS_CPE_INDEX_MATCHED=true) reads a
 # CPE. A component with neither that a check used, or with no version at all,
 # was never asked about, so an empty table says nothing about it. They are
 # named in the report and kept in _security.json as UncheckedComponents for the

@@ -16,9 +16,9 @@
 # component.cpe. A component with no purl, a `pkg:generic` one, an opkg one or
 # one that points at a source repository (a binary syft's classifier named, a library
 # the firmware signature checkers found, an OS component such as busybox) is
-# reached by nothing else. Run by entrypoint.sh for FIRMWARE, ROOTFS and BINARY
-# after every CPE enrichment step, so a CPE added from cpe-name-map.json is
-# matched too.
+# reached by nothing else. Run by entrypoint.sh for FIRMWARE, ROOTFS and BINARY,
+# and for a Yocto SPDX 2.2 archive, after every CPE enrichment step, so a CPE
+# added from cpe-name-map.json is matched too.
 #
 # The rows go into the sidecar scan-security.sh merges into _security.json,
 # keyed on (package, CVE), so a CVE Trivy also reports is counted once. The

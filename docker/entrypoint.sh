@@ -726,6 +726,17 @@ echo "=========================================="
 # CYCLONEDX_SPEC_VERSION asks for it): cdxgen is run with --spec-version
 # "$CDX_SPEC_VERSION", convert-to-cdx.sh writes it, and the docs promise it.
 # The selector keeps syft output aligned with cdxgen.
+# Whether the SBOM was read from a Yocto build's own records (ANALYZE: the
+# SPDX reader or the manifest reader). Those components have the same need as a
+# firmware scan's: no package purl a vulnerability or license database
+# resolves, so the upstream purl step below runs for them too.
+# YOCTO_CPE_MATCH: the CPE index step as well, for an SPDX 2.2 archive only. Its
+# CPEs (Yocto's CVE_PRODUCT) are all it gives for vulnerabilities. An SPDX 3.0
+# document records which CVEs each recipe patched or is not affected by, and
+# the manifest reader takes cve-check's own verdicts; matching their CPEs again
+# would report as open what Yocto already judged.
+YOCTO_SBOM=false
+YOCTO_CPE_MATCH=false
 case "$SCAN_MODE" in
     SOURCE)
         # Local web UI source scan (current dir / extracted ZIP / cloned git repo).
@@ -1123,6 +1134,7 @@ EOF
                 echo "[ERROR] this build directory holds no image package manifest to read."
                 exit 1
             fi
+            YOCTO_SBOM=true
             # No conformance report: conformance measures a document someone sent
             # us against the submission criteria, and there is no document here.
         else
@@ -1185,6 +1197,10 @@ EOF
             echo "[ERROR] could not read the Yocto SPDX archive: $(basename "$ANALYZE_SBOM")"
             echo "        See the [yocto-spdx] message above for what stopped it."
             exit 1
+        fi
+        if [ "$YOCTO_RC" = 0 ]; then
+            YOCTO_SBOM=true
+            [ "$YOCTO_ARCHIVE" = "true" ] && YOCTO_CPE_MATCH=true
         fi
         if [ "$YOCTO_RC" != 0 ]; then
             [ "$YOCTO_RC" = 3 ] || echo "[analyze] WARN: Yocto SPDX parser failed (rc=$YOCTO_RC); using the generic converter." >&2
@@ -1708,9 +1724,12 @@ fi
 # checked table (upstream-purl-map.json); a name not in it is left alone. The
 # version, CPE and evidence stay, so the CVE matching that ran on them keeps
 # its result. After enrich-cpe, so a CPE it added can identify the project too.
-# Disable with ENRICH_UPSTREAM_PURL=false.
-case "$SCAN_MODE" in
-    FIRMWARE|ROOTFS|BINARY)
+# A Yocto build's records (YOCTO_SBOM) get the same step. Disable with
+# ENRICH_UPSTREAM_PURL=false.
+_upstream_mode="$SCAN_MODE"
+[ "$YOCTO_SBOM" = true ] && _upstream_mode=YOCTO
+case "$_upstream_mode" in
+    FIRMWARE|ROOTFS|BINARY|YOCTO)
         if [ "${ENRICH_UPSTREAM_PURL:-true}" != "false" ]; then
             run_optional_step upstream-purl python3 "$LIBDIR/upstream-purl.py" "$OUTPUT_FILE"
         else
@@ -2098,7 +2117,8 @@ if [ "${GENERATE_SECURITY:-false}" = "true" ] && [ -d "$TRIVY_DB_MOUNT" ]; then
         er_record scan-security failed failed "no Trivy database in the trivy-db mount ($TRIVY_DB_MOUNT/db/trivy.db)"
     fi
 fi
-# CPE index match (FIRMWARE, ROOTFS, BINARY): components with no package purl
+# CPE index match (FIRMWARE, ROOTFS, BINARY, and a Yocto SPDX 2.2 archive):
+# components with no package purl
 # but a CPE (a binary syft's classifier named, a library a signature checker
 # found, a CPE enrich-cpe.sh added from cpe-name-map.json) are matched against
 # the bundled NVD index, since Trivy never reads component.cpe. Runs here, after
@@ -2106,7 +2126,9 @@ fi
 # scan-security.sh is told whether it ran, so it can name the components no
 # check reached.
 BOMLENS_CPE_INDEX_MATCHED=false
-case "$SCAN_MODE" in FIRMWARE|ROOTFS|BINARY)
+_cpe_mode="$SCAN_MODE"
+[ "$YOCTO_CPE_MATCH" = true ] && _cpe_mode=YOCTO
+case "$_cpe_mode" in FIRMWARE|ROOTFS|BINARY|YOCTO)
     if [ "${GENERATE_SECURITY:-false}" != "true" ]; then
         er_record match-cpe disabled
     else

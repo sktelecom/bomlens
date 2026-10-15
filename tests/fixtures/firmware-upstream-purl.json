@@ -20,7 +20,7 @@
       "cpe": "cpe:/a:linux:linux_kernel:4.14.180",
       "properties": [ { "name": "bomlens:identifiedBy", "value": "kernel-signature" } ] },
     { "type": "library", "bom-ref": "z", "name": "zlib", "version": "1.0.5", "purl": "pkg:npm/zlib@1.0.5" },
-    { "type": "library", "bom-ref": "o3", "name": "openssl", "version": "3.0.13" },
+    { "type": "library", "bom-ref": "o3", "name": "openssl", "version": "0.9.8zh" },
     { "type": "library", "bom-ref": "g", "name": "gcc", "version": "9.3.0", "cpe": "cpe:/a:gnu:gcc:9.3.0" },
     { "type": "library", "bom-ref": "m", "name": "busybox", "version": "1.35.0",
       "cpe": "cpe:2.3:a:openssl:openssl:1.35.0:*:*:*:*:*:*:*" },

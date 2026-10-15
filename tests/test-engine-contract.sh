@@ -2043,7 +2043,7 @@ printf 'name,version\nncurses,5.7\n' > "$WORK/upstream-versions.csv"
     && jq -e 'any(.outputs[]; .path == "demo_1.0_component-versions.template.csv")' "$UB/bomlens-result.json" >/dev/null \
     && pass "the template of what is still missing is written and listed in the outputs" \
     || fail "template: $(cat "$UB/demo_1.0_component-versions.template.csv" 2>&1)"
-[ "$(jq -c '[.checks[] | select(.id == "versions-needed" or .id == "upstream-purl") | .missing] + [.submitFile]' "$UB/demo_1.0_conformance.json" 2>/dev/null)" = '[["Vendor Utility","libxml2","3c59x"],["gcc@9.3.0","openssl@3.0.13"],"demo_1.0_bom.json"]' ] \
+[ "$(jq -c '[.checks[] | select(.id == "versions-needed" or .id == "upstream-purl") | .missing] + [.submitFile]' "$UB/demo_1.0_conformance.json" 2>/dev/null)" = '[["Vendor Utility","libxml2","3c59x"],["gcc@9.3.0","openssl@0.9.8zh"],"demo_1.0_bom.json"]' ] \
     && pass "the submission profile names what is missing and the file to submit" \
     || fail "conformance: $(jq -c '[.checks[] | select(.id == "versions-needed" or .id == "upstream-purl")] + [.submitFile]' "$UB/demo_1.0_conformance.json" 2>&1)"
 # The template filled in place and passed back is the supplier's record: the
