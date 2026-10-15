@@ -606,7 +606,7 @@ scan_in "$d" --project Pmixed --version 1.0.0 --generate-only
 # isolated in the per-run <proj>_<ver>/ subfolder (not flat in the source tree).
 d="$(new_proj complete)"; printf '{"name":"a"}' > "$d/package.json"
 scan_in "$d" --project Done --version 2.0.0 --generate-only
-{ [ "$RC" -eq 0 ] && in_out "Analysis Complete" \
+{ [ "$RC" -eq 0 ] && { in_out "Analysis Complete" || in_out "Analysis finished"; } \
     && [ -f "$d/Done_2.0.0/Done_2.0.0_bom.json" ] && [ ! -f "$d/Done_2.0.0_bom.json" ]; } \
   && pass "source scan completes and writes <proj>_<ver>/<proj>_<ver>_bom.json" \
   || { fail "source scan completes and writes SBOM" "rc=$RC"; show; }
@@ -640,7 +640,7 @@ unset DOCKER_STUB_NOWRITE
 # artifact is missing and must be reported as such instead of announced.
 d="$(new_proj summary)"; printf '{"name":"a"}' > "$d/package.json"
 scan_in "$d" --project Sum --version 4.0.0 --all --generate-only
-{ [ "$RC" -eq 0 ] && in_out "Analysis Complete" \
+{ [ "$RC" -eq 0 ] && in_out "Analysis finished with errors" && ! in_out "Analysis Complete" \
     && ! in_out "_bom.spdx.json" \
     && in_out "requested but not produced" \
     && in_out "SPDX export" && in_out "notice" && in_out "security report"; } \
@@ -671,7 +671,7 @@ d="$(new_proj sumempty)"; printf '{"name":"a"}' > "$d/package.json"
 export DOCKER_STUB_SUMMARY_RESULT='components\t0\nlicensed\t0\nlicensePercent\t-\npurlPercent\t-\n'
 scan_in "$d" --project Empty0 --version 5.1.0 --generate-only
 unset DOCKER_STUB_SUMMARY_RESULT
-{ [ "$RC" -eq 0 ] && in_out "Analysis Complete" && in_out "0 identified" && in_out "[WARN] No software was identified"; } \
+{ [ "$RC" -eq 0 ] && { in_out "Analysis Complete" || in_out "Analysis finished"; } && in_out "0 identified" && in_out "[WARN] No software was identified"; } \
   && pass "a scan with no components says so after 'Analysis Complete!'" \
   || { fail "an empty result ended without a warning" "rc=$RC"; show; }
 
@@ -696,7 +696,7 @@ unset DOCKER_STUB_SUMMARY_RESULT
 
 d="$(new_proj sumnone)"; printf '{"name":"a"}' > "$d/package.json"
 scan_in "$d" --project NoFacts --version 5.3.0 --generate-only
-{ [ "$RC" -eq 0 ] && in_out "Analysis Complete" && ! in_out "Components:" && ! in_out "identified"; } \
+{ [ "$RC" -eq 0 ] && { in_out "Analysis Complete" || in_out "Analysis finished"; } && ! in_out "Components:" && ! in_out "identified"; } \
   && pass "no summary sidecar, no invented counts" \
   || { fail "counts were printed without a sidecar" "rc=$RC"; show; }
 
@@ -1057,7 +1057,7 @@ d="$(new_proj merge)"
 printf '%s' "$CDX" > "$d/a.json"
 printf '%s' "$CDX" > "$d/b.json"
 scan_in "$d" --project Merged --version 1.0.0 --merge a.json b.json --generate-only
-{ in_out "Mode: MERGE" && [ "$RC" -eq 0 ] && in_out "Analysis Complete"; } \
+{ in_out "Mode: MERGE" && [ "$RC" -eq 0 ] && { in_out "Analysis Complete" || in_out "Analysis finished"; }; } \
   && pass "--merge a.json b.json -> MERGE mode completes" || { fail "--merge -> MERGE mode"; show; }
 
 d="$(new_proj merge_root)"
@@ -1762,7 +1762,7 @@ sane_outcome() {
   # sane_outcome <label> [-- expect-in-out ...]
   local label="$1"; shift
   if [ "$RC" -eq 0 ]; then
-    if in_out "Analysis Complete"; then
+    if in_out "Analysis Complete" || in_out "Analysis finished"; then
       local ok=1
       for want in "$@"; do in_out "$want" || ok=0; done
       [ "$ok" = 1 ] && pass "$label" || { fail "$label" "rc=0 but missing expected output"; show; }

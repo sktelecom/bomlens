@@ -135,7 +135,14 @@ call :say M_SEP
 
 REM Open the browser shortly after the server comes up. The port was verified
 REM free above, so the bind below is very likely to succeed.
-start "" cmd /c "timeout /t 4 >nul & start http://localhost:%UI_PORT%"
+REM Wait until the server answers (the first start can take about a minute),
+REM for up to 120 s. Without curl.exe, fall back to a fixed 4 s wait.
+where curl.exe >nul 2>&1
+if errorlevel 1 (
+    start "" cmd /c "timeout /t 4 >nul & start http://localhost:%UI_PORT%"
+) else (
+    start "" cmd /c "for /l %%i in (1,1,120) do @(curl.exe -fs -o nul --max-time 2 http://localhost:%UI_PORT% && (start http://localhost:%UI_PORT% & exit) || timeout /t 1 >nul)"
+)
 
 docker run --rm -it ^
     -p %UI_BIND_ADDRESS%:%UI_PORT%:8080 ^

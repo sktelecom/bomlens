@@ -198,7 +198,7 @@ Windows에서는 명령 프롬프트에서 설정한 환경변수가 더블클�
 
 ## 스캔이 끝날 때 출력하는 내용
 
-`--generate-only`를 쓰면 CLI가 `Analysis Complete!` 뒤에 만든 파일 목록을 보여 줍니다. 소프트웨어를 측정한 스캔(AI 모델과 데이터셋 스캔은 제외)이면 이어서 결과에 무엇이 들었는지 알려 줍니다.
+`--generate-only`를 쓰면 CLI가 `Analysis Complete!` 뒤에 만든 파일 목록을 보여 줍니다. 요청한 파일이 만들어지지 않았으면 제목이 `Analysis finished with errors`로 바뀌고 빠진 파일을 알리는 경고가 나옵니다. 종료 코드는 0 그대로이므로, 판정하지 못한 스캔에서 파이프라인을 멈추려면 `--fail-on`을 쓰십시오. 소프트웨어를 측정한 스캔(AI 모델과 데이터셋 스캔은 제외)이면 이어서 결과에 무엇이 들었는지 알려 줍니다.
 
 ```
   Components:  176 identified (purl on 100%, license declared on 96% (169 of 176))
