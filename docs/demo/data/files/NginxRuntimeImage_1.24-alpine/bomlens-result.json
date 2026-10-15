@@ -4,7 +4,7 @@
     "version": "1.3.0"
   },
   "engine": {
-    "version": "1.13.4",
+    "version": "latest-21874a5",
     "image": null,
     "image_digest": null
   },
@@ -22,8 +22,8 @@
   "run": {
     "status": "succeeded",
     "reason": null,
-    "started_at": "2026-10-14T18:06:24Z",
-    "ended_at": "2026-10-14T18:06:38Z",
+    "started_at": "2026-10-15T17:37:32Z",
+    "ended_at": "2026-10-15T17:37:50Z",
     "exit_code": 0
   },
   "steps": [
@@ -32,8 +32,8 @@
       "status": "ok",
       "reason": null,
       "detail": null,
-      "started_at": "2026-10-14T18:06:24Z",
-      "ended_at": "2026-10-14T18:06:27Z",
+      "started_at": "2026-10-15T17:37:32Z",
+      "ended_at": "2026-10-15T17:37:35Z",
       "counts": {
         "components": 1885
       },
@@ -44,8 +44,8 @@
       "status": "ok",
       "reason": null,
       "detail": null,
-      "started_at": "2026-10-14T18:06:27Z",
-      "ended_at": "2026-10-14T18:06:27Z",
+      "started_at": "2026-10-15T17:37:35Z",
+      "ended_at": "2026-10-15T17:37:35Z",
       "counts": {
         "replaced": 0,
         "hashes_dropped": 0
@@ -57,8 +57,8 @@
       "status": "ok",
       "reason": null,
       "detail": null,
-      "started_at": "2026-10-14T18:06:27Z",
-      "ended_at": "2026-10-14T18:06:27Z",
+      "started_at": "2026-10-15T17:37:35Z",
+      "ended_at": "2026-10-15T17:37:35Z",
       "stage": 2
     },
     {
@@ -66,8 +66,8 @@
       "status": "ok",
       "reason": null,
       "detail": null,
-      "started_at": "2026-10-14T18:06:27Z",
-      "ended_at": "2026-10-14T18:06:29Z",
+      "started_at": "2026-10-15T17:37:35Z",
+      "ended_at": "2026-10-15T17:37:39Z",
       "stage": 2
     },
     {
@@ -75,8 +75,8 @@
       "status": "disabled",
       "reason": null,
       "detail": null,
-      "started_at": "2026-10-14T18:06:29Z",
-      "ended_at": "2026-10-14T18:06:29Z",
+      "started_at": "2026-10-15T17:37:39Z",
+      "ended_at": "2026-10-15T17:37:39Z",
       "stage": 2
     },
     {
@@ -84,8 +84,8 @@
       "status": "ok",
       "reason": null,
       "detail": null,
-      "started_at": "2026-10-14T18:06:29Z",
-      "ended_at": "2026-10-14T18:06:30Z",
+      "started_at": "2026-10-15T17:37:39Z",
+      "ended_at": "2026-10-15T17:37:40Z",
       "stage": 2
     },
     {
@@ -93,8 +93,8 @@
       "status": "ok",
       "reason": null,
       "detail": null,
-      "started_at": "2026-10-14T18:06:30Z",
-      "ended_at": "2026-10-14T18:06:30Z",
+      "started_at": "2026-10-15T17:37:40Z",
+      "ended_at": "2026-10-15T17:37:40Z",
       "stage": 2
     },
     {
@@ -102,8 +102,8 @@
       "status": "ok",
       "reason": null,
       "detail": null,
-      "started_at": "2026-10-14T18:06:30Z",
-      "ended_at": "2026-10-14T18:06:30Z",
+      "started_at": "2026-10-15T17:37:40Z",
+      "ended_at": "2026-10-15T17:37:40Z",
       "stage": 2
     },
     {
@@ -111,8 +111,8 @@
       "status": "ok",
       "reason": null,
       "detail": null,
-      "started_at": "2026-10-14T18:06:30Z",
-      "ended_at": "2026-10-14T18:06:30Z",
+      "started_at": "2026-10-15T17:37:40Z",
+      "ended_at": "2026-10-15T17:37:40Z",
       "stage": 2
     },
     {
@@ -120,8 +120,8 @@
       "status": "ok",
       "reason": null,
       "detail": null,
-      "started_at": "2026-10-14T18:06:30Z",
-      "ended_at": "2026-10-14T18:06:30Z",
+      "started_at": "2026-10-15T17:37:40Z",
+      "ended_at": "2026-10-15T17:37:40Z",
       "stage": 2
     },
     {
@@ -129,8 +129,8 @@
       "status": "ok",
       "reason": null,
       "detail": null,
-      "started_at": "2026-10-14T18:06:30Z",
-      "ended_at": "2026-10-14T18:06:30Z",
+      "started_at": "2026-10-15T17:37:40Z",
+      "ended_at": "2026-10-15T17:37:40Z",
       "stage": 2
     },
     {
@@ -138,8 +138,8 @@
       "status": "ok",
       "reason": null,
       "detail": null,
-      "started_at": "2026-10-14T18:06:30Z",
-      "ended_at": "2026-10-14T18:06:30Z",
+      "started_at": "2026-10-15T17:37:40Z",
+      "ended_at": "2026-10-15T17:37:40Z",
       "stage": 2
     },
     {
@@ -147,8 +147,8 @@
       "status": "ok",
       "reason": null,
       "detail": null,
-      "started_at": "2026-10-14T18:06:30Z",
-      "ended_at": "2026-10-14T18:06:30Z",
+      "started_at": "2026-10-15T17:37:40Z",
+      "ended_at": "2026-10-15T17:37:40Z",
       "stage": 2
     },
     {
@@ -156,8 +156,8 @@
       "status": "disabled",
       "reason": null,
       "detail": null,
-      "started_at": "2026-10-14T18:06:30Z",
-      "ended_at": "2026-10-14T18:06:30Z",
+      "started_at": "2026-10-15T17:37:41Z",
+      "ended_at": "2026-10-15T17:37:41Z",
       "stage": 2
     },
     {
@@ -165,8 +165,8 @@
       "status": "ok",
       "reason": null,
       "detail": null,
-      "started_at": "2026-10-14T18:06:30Z",
-      "ended_at": "2026-10-14T18:06:31Z",
+      "started_at": "2026-10-15T17:37:41Z",
+      "ended_at": "2026-10-15T17:37:41Z",
       "stage": 2
     },
     {
@@ -174,8 +174,8 @@
       "status": "ok",
       "reason": null,
       "detail": null,
-      "started_at": "2026-10-14T18:06:31Z",
-      "ended_at": "2026-10-14T18:06:31Z",
+      "started_at": "2026-10-15T17:37:42Z",
+      "ended_at": "2026-10-15T17:37:42Z",
       "stage": 2
     },
     {
@@ -183,8 +183,8 @@
       "status": "ok",
       "reason": null,
       "detail": null,
-      "started_at": "2026-10-14T18:06:31Z",
-      "ended_at": "2026-10-14T18:06:32Z",
+      "started_at": "2026-10-15T17:37:42Z",
+      "ended_at": "2026-10-15T17:37:42Z",
       "stage": 2
     },
     {
@@ -192,8 +192,8 @@
       "status": "ok",
       "reason": null,
       "detail": null,
-      "started_at": "2026-10-14T18:06:32Z",
-      "ended_at": "2026-10-14T18:06:32Z",
+      "started_at": "2026-10-15T17:37:42Z",
+      "ended_at": "2026-10-15T17:37:43Z",
       "stage": 2
     },
     {
@@ -201,8 +201,8 @@
       "status": "ok",
       "reason": null,
       "detail": null,
-      "started_at": "2026-10-14T18:06:32Z",
-      "ended_at": "2026-10-14T18:06:37Z",
+      "started_at": "2026-10-15T17:37:43Z",
+      "ended_at": "2026-10-15T17:37:49Z",
       "stage": 2
     },
     {
@@ -210,8 +210,8 @@
       "status": "disabled",
       "reason": null,
       "detail": null,
-      "started_at": "2026-10-14T18:06:37Z",
-      "ended_at": "2026-10-14T18:06:37Z",
+      "started_at": "2026-10-15T17:37:49Z",
+      "ended_at": "2026-10-15T17:37:49Z",
       "stage": 2
     },
     {
@@ -219,8 +219,8 @@
       "status": "ok",
       "reason": null,
       "detail": null,
-      "started_at": "2026-10-14T18:06:37Z",
-      "ended_at": "2026-10-14T18:06:37Z",
+      "started_at": "2026-10-15T17:37:49Z",
+      "ended_at": "2026-10-15T17:37:49Z",
       "stage": 2
     },
     {
@@ -228,8 +228,8 @@
       "status": "disabled",
       "reason": null,
       "detail": null,
-      "started_at": "2026-10-14T18:06:37Z",
-      "ended_at": "2026-10-14T18:06:37Z",
+      "started_at": "2026-10-15T17:37:49Z",
+      "ended_at": "2026-10-15T17:37:49Z",
       "stage": 2
     }
   ],
@@ -243,16 +243,16 @@
   "data_sources": {
     "trivy_db": {
       "schema_version": 2,
-      "updated_at": "2026-10-14T13:10:32.349175575Z",
-      "downloaded_at": "2026-10-14T18:06:36.379126041Z"
+      "updated_at": "2026-10-15T13:13:18.204005334Z",
+      "downloaded_at": "2026-10-15T17:37:48.437403709Z"
     }
   },
   "outputs": [
     {
       "role": "sbom.cyclonedx",
       "path": "NginxRuntimeImage_1.24-alpine_bom.json",
-      "sha256": "4b19ef6213efa032d7a8ccfc93de7c95433b517bb2de22ab667e3777ee0e5ace",
-      "bytes": 1194521
+      "sha256": "a4f5160da62409b18a7f5110040a6e52ccbb54fc529e10e809b4322cd9d4546f",
+      "bytes": 1194529
     },
     {
       "role": "other",
@@ -263,55 +263,55 @@
     {
       "role": "other",
       "path": "NginxRuntimeImage_1.24-alpine_source.json",
-      "sha256": "f7aa667f476c050b49fb3d0b9159f14559114bda37607b2c12d77bbe22c81358",
+      "sha256": "70e2b690601a828b627bc7b71cb4081e7515e6ef77332ca34c172f5b0e7ee554",
       "bytes": 2122959
     },
     {
       "role": "other",
       "path": "NginxRuntimeImage_1.24-alpine_NOTICE.txt",
-      "sha256": "7648e848fc67fc39aff1f71cc766a46579a3ca4c6c1bbd8afe045d4564012016",
+      "sha256": "c5d6f1f3b8afb9cd9d73001ed995a12e7f0d06e7c505a42d1010a080c2c71c99",
       "bytes": 66412
     },
     {
       "role": "other",
       "path": "NginxRuntimeImage_1.24-alpine_NOTICE.html",
-      "sha256": "dcbc537c1d60878ad33d7ba4a3f3284f479cf8728b5af530f05cf8dc172d990b",
+      "sha256": "adc632c85cc492608fd012c4e18647704dbe722e66d6ae05e1fc81a2069f53c9",
       "bytes": 79875
     },
     {
       "role": "vulnerabilities.all",
       "path": "NginxRuntimeImage_1.24-alpine_security.json",
-      "sha256": "e2698b4fcb5018c1cc6fd5b5c207a6aefe4e6c6cd09bd1911d24e768a3cede09",
-      "bytes": 381868
+      "sha256": "9cd07605c756e2b9cbd6585f21e44d73cf6304d717b7e7786498761f5cb6e7c6",
+      "bytes": 384038
     },
     {
       "role": "other",
       "path": "NginxRuntimeImage_1.24-alpine_security.md",
-      "sha256": "7966b355b65c030c6d42d4ed8184a11a570863c0874d81e56db7edae701d3017",
-      "bytes": 5623
+      "sha256": "001d6752d7bc4d10646c1550a52f333c8219b6d59f7538d14fa67a51d3f41bf1",
+      "bytes": 5624
     },
     {
       "role": "other",
       "path": "NginxRuntimeImage_1.24-alpine_security.html",
-      "sha256": "92a0d59178e6c4fb17a8219b796873d79f801e064997360b83600152e170f8da",
-      "bytes": 21187
+      "sha256": "3ff002a1d05527e60793165c469fc6be94ea6b57aca57a9e71cd421bac81742b",
+      "bytes": 21188
     },
     {
       "role": "conformance",
       "path": "NginxRuntimeImage_1.24-alpine_conformance.json",
-      "sha256": "04ed878c8c36e8843195aaa1618551477eba460bfd2b5b7c39f0c9163d2f8f51",
+      "sha256": "53b42384edc19a8634d413f2fe85dbd12d18c811cedd8a8b8c76fc75f896fbef",
       "bytes": 56377
     },
     {
       "role": "other",
       "path": "NginxRuntimeImage_1.24-alpine_conformance.md",
-      "sha256": "7e9a6802da33b1d6343e3f4abd68c77e9d73a801be6273bc722d02c4e25ec9e5",
+      "sha256": "5678f3b274dfab223fb7474770965f5ebdc5944b97ffd23b0001d64f303a4a46",
       "bytes": 17145
     },
     {
       "role": "other",
       "path": "NginxRuntimeImage_1.24-alpine_conformance.html",
-      "sha256": "faf01151b3e3f029771383f7b41b895f546c2c97e1a8c7d0ac7a10169306358a",
+      "sha256": "271419f382b512504f7dd744416369e440dc4cb1b8fd43b03f30783829912d46",
       "bytes": 29570
     },
     {
@@ -329,26 +329,26 @@
     {
       "role": "other",
       "path": "NginxRuntimeImage_1.24-alpine_risk-report.md",
-      "sha256": "4af9c5fdbbefaf2d4c36bae72741ea00449ef55a47704a9e37611594cb7beede",
+      "sha256": "27c3e853363bee8853a00d102e0e94d36efa47e49cc4932b8acc72ae912e0750",
       "bytes": 6907
     },
     {
       "role": "other",
       "path": "NginxRuntimeImage_1.24-alpine_risk-report.html",
-      "sha256": "a1d5e75f697a7f2012a83da9605dd363f1a5b862d05a2ac77ba52c4ec755c322",
+      "sha256": "f91e9cf09c491c49c3770d10d45051604b878dd47dd2a58acb66f281cb2aecfd",
       "bytes": 15861
     },
     {
       "role": "other",
       "path": "NginxRuntimeImage_1.24-alpine_security_epss.json",
-      "sha256": "744c5854533dca8ced43e10c9306cf0b2c99cff8019383837cbdde8c848478f8",
+      "sha256": "645278c59cc18517ef7fd4a489e3512a5e77a9510d0593e655e02c6701435bb9",
       "bytes": 2265
     },
     {
       "role": "vulnerabilities.trivy",
       "path": "NginxRuntimeImage_1.24-alpine_security.json",
-      "sha256": "e2698b4fcb5018c1cc6fd5b5c207a6aefe4e6c6cd09bd1911d24e768a3cede09",
-      "bytes": 381868
+      "sha256": "9cd07605c756e2b9cbd6585f21e44d73cf6304d717b7e7786498761f5cb6e7c6",
+      "bytes": 384038
     }
   ]
 }
