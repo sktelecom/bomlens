@@ -1183,6 +1183,8 @@ MAX_UNCHECKED_ROWS = 500  # components listed whose vulnerabilities were not che
 MAX_ADVISORY_ROWS = 500  # advisories with no CVE listed apart from the findings
 MAX_VULN_ALIASES = 12  # advisory numbers shown next to one CVE
 MAX_CONFORMANCE_MISSING = 50  # missing items per conformance check
+# Reasons a supplier may give instead of a component version (validate-sbom.sh).
+EXPLAINED_REASONS = ("own-code", "not-open-source", "version-unknown")
 MAX_CHECK_REGULATIONS = 12  # regulation refs mapped to one conformance check
 MAX_GUIDANCE_SNIPPET = 2000  # chars of the CycloneDX fill-in fragment per check
 MAX_CROSSWALK_FRAMEWORKS = 20  # frameworks in the regulatory crosswalk view
@@ -2585,6 +2587,18 @@ def conformance_summary(run_id):
         ][:MAX_CHECK_REGULATIONS]
         if regs:
             row["regulations"] = regs
+        # Components the supplier gave a reason for instead of a version (the
+        # versions-needed row of the skt-submission profile). The row can pass
+        # while this list is non-empty, and the reviewer still needs to see it.
+        # Only the three reasons validate-sbom.sh writes are accepted; omitted
+        # when empty, like regulations.
+        explained = [
+            {"name": str(e.get("name") or ""), "reason": e.get("reason")}
+            for e in _as_list(c.get("explained"))
+            if isinstance(e, dict) and e.get("reason") in EXPLAINED_REASONS
+        ][:MAX_CONFORMANCE_MISSING]
+        if explained:
+            row["explained"] = explained
         # Fill-in guidance for this element (validate-sbom.sh joins
         # docker/lib/g7-guidance.json by element id): the CycloneDX fragment that
         # would satisfy it, plus a reference link. Runs produced before the
@@ -2646,6 +2660,12 @@ def conformance_summary(run_id):
     xwalk = _crosswalk_view(data.get("regulatoryCrosswalk"))
     if xwalk is not None:
         out["regulatoryCrosswalk"] = xwalk
+    # The scan mode the submission profile judged this SBOM as, when it relaxed
+    # some general rows for a firmware, root filesystem or binary scan. The
+    # reviewer needs the basis next to the verdict; only the three modes pass.
+    judged = data.get("submissionJudgedAs")
+    if judged in ("FIRMWARE", "ROOTFS", "BINARY"):
+        out["submissionJudgedAs"] = judged
     return out
 
 

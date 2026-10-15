@@ -409,13 +409,16 @@ Options:
                          rest comes from the declaration (base image).
   --component-versions <file>
                          For a firmware, root filesystem or binary scan: a CSV
-                         file with two columns, name,version, giving the version
-                         of components the scan found but could not read a
+                         file, name,version[,reason], giving the version of
+                         components the scan found but could not read a
                          version for. A version the scan read from the delivered
                          files is kept (a warning names both), and a name the
                          scan did not find is added as a supplier-declared
-                         component. Every such scan writes the components still
-                         missing a version to
+                         component. With no version to give, leave it empty and
+                         write a reason: own-code, not-open-source or
+                         version-unknown (recorded as bomlens:versionReason).
+                         Every such scan writes the components still missing a
+                         version to
                          <Project>_<Version>_component-versions.template.csv,
                          in this format, to fill in and pass back.
   --no-spdx3             For an AI model or dataset scan: do not write the
@@ -2020,12 +2023,12 @@ fi
 if [ -n "$COMPONENT_VERSIONS_FILE" ]; then
     if [ ! -f "$COMPONENT_VERSIONS_FILE" ]; then
         echo "[ERROR] --component-versions file not found: $COMPONENT_VERSIONS_FILE"
-        echo "[ERROR] Pass a CSV file with two columns, name,version. A firmware, root filesystem or binary scan writes one to start from: <Project>_<Version>_component-versions.template.csv."; exit 1
+        echo "[ERROR] Pass a CSV file with the columns name,version[,reason]. A firmware, root filesystem or binary scan writes one to start from: <Project>_<Version>_component-versions.template.csv."; exit 1
     fi
     # The container checks every row; refusing an oversized file here saves
     # starting the scan for it.
     if [ "$(wc -c < "$COMPONENT_VERSIONS_FILE" | tr -d ' ')" -gt 262144 ]; then
-        echo "[ERROR] --component-versions: the file is larger than 256 KiB. It lists one component per line (name,version)."; exit 1
+        echo "[ERROR] --component-versions: the file is larger than 256 KiB. It lists one component per line (name,version[,reason])."; exit 1
     fi
 fi
 

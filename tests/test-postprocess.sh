@@ -11088,7 +11088,7 @@ bash "$LIB/normalize-sbom.sh" "$WORK/cv-norm.json" >/dev/null 2>&1
 [ "$(jq -r '.components[] | select(.name == "3c59x") | .version' "$WORK/cv-norm.json")" = "5.10.0" ] \
     && pass "normalize keeps a version filled in place of UNKNOWN" \
     || fail "3c59x after normalize: $(jq -c '.components[] | select(.name == "3c59x")' "$WORK/cv-norm.json")"
-[ "$(grep -v '^#' "$WORK/cvp_component-versions.template.csv" | tr '\n' ' ')" = "name,version libxml2, " ] \
+[ "$(grep -v '^#' "$WORK/cvp_component-versions.template.csv" | tr '\n' ' ')" = "name,version,reason libxml2,, " ] \
     && grep -q "1 component(s) still have no version: libxml2" "$WORK/cv.out" \
     && grep -q "1 component(s) with no version have a name the --component-versions file cannot hold, so they are not in the template: 'Vendor Utility'" "$WORK/cv.out" \
     && pass "the components still missing a version are listed and written as a template; a name the format cannot hold is listed apart" \
@@ -11105,12 +11105,12 @@ python3 "$CVP" "$WORK/cv.json" "$WORK/cvp" "$WORK/cv2.csv" >/dev/null 2>&1
 # Without a file the scan still lists what is missing.
 cp "$FIX/firmware-upstream-purl.json" "$WORK/cv3.json"
 python3 "$CVP" "$WORK/cv3.json" "$WORK/cv3" >/dev/null 2>&1
-[ "$(grep -v '^#' "$WORK/cv3_component-versions.template.csv" | tr '\n' ' ')" = "name,version 3c59x, libxml2, ncurses, " ] \
+[ "$(grep -v '^#' "$WORK/cv3_component-versions.template.csv" | tr '\n' ' ')" = "name,version,reason 3c59x,, libxml2,, ncurses,, " ] \
     && diff -q "$FIX/firmware-upstream-purl.json" "$WORK/cv3.json" >/dev/null \
     && pass "without a file the SBOM is unchanged and the template lists the versionless and UNKNOWN components" \
     || fail "no-file template: $(cat "$WORK/cv3_component-versions.template.csv" 2>&1)"
 # The template round-trips as written: one row filled, the rest left empty.
-sed 's/^ncurses,$/ncurses,6.1/' "$WORK/cv3_component-versions.template.csv" > "$WORK/cv3-filled.csv"
+sed 's/^ncurses,,$/ncurses,6.1,/' "$WORK/cv3_component-versions.template.csv" > "$WORK/cv3-filled.csv"
 python3 "$CVP" "$WORK/cv3.json" "$WORK/cv3" "$WORK/cv3-filled.csv" >/dev/null 2>&1; cv3_rc=$?
 [ "$cv3_rc" = 0 ] && [ "$(jq -r '.components[] | select(.name == "ncurses") | .version' "$WORK/cv3.json")" = "6.1" ] \
     && pass "a template filled in part is accepted" || fail "partly filled template: rc=$cv3_rc"
@@ -11127,12 +11127,62 @@ cv_refuse() {  # <label> <expected message part> ; file content on stdin
 }
 printf 'name,version\n../../etc/passwd,1.0\n' | cv_refuse "a path in the name" "is not a component name"
 printf 'name,version\nVendor Utility,1.0\n' | cv_refuse "a space in a name given a version" "is not a component name"
-printf 'ncurses,5.7,extra\n' | cv_refuse "a row with three fields" "expected two fields"
+printf 'ncurses,5.7,,extra\n' | cv_refuse "a row with four fields" "expected two or three fields"
+printf 'name,version,reason\nncurses,,unknown\n' | cv_refuse "a reason that is not one of the three" "is not a reason"
+printf 'ncurses,,own-code\nncurses,,version-unknown\n' | cv_refuse "one name with two reasons" "given two reasons"
+printf 'name,version,reason\nVendor Utility,,own-code\n' | cv_refuse "a space in a name given a reason" "is not a component name"
+cp "$FIX/firmware-upstream-purl.json" "$WORK/cvc.json"
+printf 'libxml2,,Own-Code\nncurses,,own-code\nncurses,6.1,not-open-source\n' > "$WORK/cvc.csv"
+python3 "$CVP" "$WORK/cvc.json" "$WORK/cvc" "$WORK/cvc.csv" >/dev/null 2> "$WORK/cvc.err"; cvc_rc=$?
+[ "$cvc_rc" = 0 ] \
+    && [ "$(jq -r '.components[] | select(.name == "libxml2") | [.properties[]? | select(.name == "bomlens:versionReason") | .value][0]' "$WORK/cvc.json")" = own-code ] \
+    && [ "$(grep -c 'ncurses: the file gives a version, so the reason' "$WORK/cvc.err")" = 2 ] \
+    && pass "a reason is read whatever its case, and every reason a version overrides is reported" \
+    || fail "reason case / ignored reasons: rc=$cvc_rc" "$(cat "$WORK/cvc.err")"
 printf 'ncurses,5.7\nncurses,6.0\n' | cv_refuse "one name with two versions" "given two versions"
 printf 'ncurses,$(id)\n' | cv_refuse "a shell expression as the version" "is not a version"
 printf 'ncurses,5.7\000\n' | cv_refuse "a NUL byte" "NUL byte"
 printf 'ncurses,5.\3777\n' | cv_refuse "bytes that are not UTF-8" "not UTF-8"
 head -c 300000 /dev/zero | tr '\0' 'a' | cv_refuse "a file over the size limit" "the limit is"
+
+echo "== component versions: a reason stands in for a version the supplier cannot give =="
+cp "$FIX/firmware-upstream-purl.json" "$WORK/cvr.json"
+printf 'name,version,reason\nlibxml2,,own-code\n3c59x,5.10.0,version-unknown\nbusybox,,not-open-source\nghostlib,,own-code\n' > "$WORK/cvr.csv"
+python3 "$CVP" "$WORK/cvr.json" "$WORK/cvr" "$WORK/cvr.csv" > "$WORK/cvr.out" 2> "$WORK/cvr.err"; cvr_rc=$?
+[ "$cvr_rc" = 0 ] && pass "a three-column file is accepted" || fail "component-versions.py exited $cvr_rc" "$(cat "$WORK/cvr.err")"
+[ "$(jq -c '[.components[] | select(.name == "libxml2") | (.version // null), ([.properties[]? | select(.name == "bomlens:versionReason") | .value][0])]' "$WORK/cvr.json")" = '[null,"own-code"]' ] \
+    && pass "a reason is recorded as bomlens:versionReason and the component keeps no version" \
+    || fail "libxml2: $(jq -c '.components[] | select(.name == "libxml2")' "$WORK/cvr.json")"
+[ "$(jq -c '[.components[] | select(.name == "3c59x") | .version, ([.properties[]? | select(.name == "bomlens:versionReason")] | length)]' "$WORK/cvr.json")" = '["5.10.0",0]' ] \
+    && grep -q "3c59x: the file gives a version, so the reason version-unknown is ignored" "$WORK/cvr.err" \
+    && pass "a row with a version and a reason applies the version and warns about the reason" \
+    || fail "3c59x: $(jq -c '.components[] | select(.name == "3c59x")' "$WORK/cvr.json")" "$(cat "$WORK/cvr.err")"
+! jq -e 'any(.components[]; .name == "busybox" and ((.properties // []) | any(.name == "bomlens:versionReason")))' "$WORK/cvr.json" >/dev/null \
+    && grep -q "busybox: the reason not-open-source is ignored, because the scan read version" "$WORK/cvr.err" \
+    && pass "a reason for a component the scan read a version for is ignored, with a warning" \
+    || fail "busybox reason" "$(cat "$WORK/cvr.err")"
+[ "$(jq '[.components[] | select(.name == "ghostlib")] | length' "$WORK/cvr.json")" = 0 ] \
+    && grep -q "ghostlib: the reason own-code is ignored, because the scan did not find it" "$WORK/cvr.err" \
+    && pass "a reason for a name the scan did not find adds nothing, with a warning" \
+    || fail "ghostlib" "$(cat "$WORK/cvr.err")"
+[ "$(grep -v '^#' "$WORK/cvr_component-versions.template.csv" | tr '\n' ' ')" = "name,version,reason ncurses,, " ] \
+    && grep -q '^#   own-code ' "$WORK/cvr_component-versions.template.csv" \
+    && grep -q '^#   not-open-source ' "$WORK/cvr_component-versions.template.csv" \
+    && grep -q '^#   version-unknown ' "$WORK/cvr_component-versions.template.csv" \
+    && grep -q "recorded the reason 1 component(s) have no version (bomlens:versionReason): libxml2 (own-code)" "$WORK/cvr.out" \
+    && pass "the template explains the three reasons and leaves out the explained components" \
+    || fail "template with reasons: $(cat "$WORK/cvr_component-versions.template.csv" 2>&1)" "$(cat "$WORK/cvr.out")"
+cp "$WORK/cvr.json" "$WORK/cvr-norm.json"
+bash "$LIB/normalize-sbom.sh" "$WORK/cvr-norm.json" >/dev/null 2>&1
+[ "$(jq -r '.components[] | select(.name == "libxml2") | [.properties[]? | select(.name == "bomlens:versionReason") | .value][0]' "$WORK/cvr-norm.json")" = "own-code" ] \
+    && pass "normalize keeps the recorded reason" || fail "reason after normalize: $(jq -c '.components[] | select(.name == "libxml2")' "$WORK/cvr-norm.json")"
+# A two-column file gives the same SBOM as before the reason column existed.
+cp "$FIX/firmware-upstream-purl.json" "$WORK/cv2c.json"
+printf 'name,version\nlibxml2,2.9.14\n' > "$WORK/cv2c.csv"
+python3 "$CVP" "$WORK/cv2c.json" "$WORK/cv2c" "$WORK/cv2c.csv" >/dev/null 2>&1
+! grep -q 'bomlens:versionReason' "$WORK/cv2c.json" \
+    && [ "$(jq -r '.components[] | select(.name == "libxml2") | .version' "$WORK/cv2c.json")" = "2.9.14" ] \
+    && pass "a two-column file is read as before" || fail "two-column file"
 
 echo "== conformance: skt-submission names what to fix and which file to submit =="
 # The pipeline's order: normalize (which removes UNKNOWN) before upstream-purl.
@@ -11147,8 +11197,9 @@ sk_v=$(jq -c '.checks[] | select(.id == "versions-needed") | [.required, .status
 [ "$sk_v" = '[true,"fail","4 without a version",["Vendor Utility","libxml2","ncurses","3c59x"]]' ] \
     && pass "version needed: a required row listing the components without a version" || fail "versions-needed row: $sk_v"
 sk_u=$(jq -c '.checks[] | select(.id == "upstream-purl") | [.required, .status, .missing]' "$WORK/sk_1.0_conformance.json")
-[ "$sk_u" = '[true,"fail",["busybox@1.35.0","gcc@9.3.0","openssl@3.0.13"]]' ] \
-    && pass "no upstream purl: a required row listing the versioned components still without one" || fail "upstream-purl row: $sk_u"
+[ "$sk_u" = '[false,"warn",["busybox@1.35.0","gcc@9.3.0","openssl@3.0.13"]]' ] \
+    && jq -e '.checks[] | select(.id == "upstream-purl") | (.reviewGuide.how | contains("does not block the submission")) and (.reviewGuide.how_ko | contains("SK텔레콤"))' "$WORK/sk_1.0_conformance.json" >/dev/null \
+    && pass "no upstream purl: an advisory row listing the versioned components still without one, for SK Telecom to check" || fail "upstream-purl row: $sk_u"
 jq -e '.checks[] | select(.id == "versions-needed") | .reviewGuide.how | contains("sk_1.0_component-versions.template.csv") and contains("--component-versions")' \
     "$WORK/sk_1.0_conformance.json" >/dev/null && pass "the version row points at the template and the option" \
     || fail "versions-needed guidance does not name the template"
@@ -11169,7 +11220,7 @@ jq -e 'has("submitFile") | not' "$WORK/ska_conformance.json" >/dev/null && ! gre
 # Under --analyze no template is written and --component-versions is not
 # offered: the rows stay, worded as what to ask the supplier for.
 jq -e '[.checks[] | select(.id == "versions-needed" or .id == "upstream-purl")] as $r
-       | ($r | length) == 2 and all($r[]; .status == "fail" and (.reviewGuide.how | contains("Ask the supplier"))
+       | ($r | length) == 2 and ([$r[].status] == ["fail", "warn"]) and all($r[]; (.reviewGuide.how | contains("Ask the supplier"))
                                      and (.reviewGuide.how | contains("template.csv") | not)
                                      and (.reviewGuide.how_ko | contains("공급사에"))
                                      and (.reviewGuide.how | contains("upstream purl table") | not))' \
@@ -11182,6 +11233,96 @@ jq -e '([.checks[] | select(.id == "versions-needed" or .id == "upstream-purl")]
        and (.checks[] | select(.id == "purl-type") | .status == "warn") and (has("submitFile") | not)' "$WORK/skd_conformance.json" >/dev/null \
     && pass "the default profile is unchanged: no extra rows, pkg:gnu still an undefined type" \
     || fail "default profile changed: $(jq -c '[.checks[] | select(.id == "purl-type" or .id == "versions-needed")]' "$WORK/skd_conformance.json")"
+
+echo "== conformance: skt-submission lists what the supplier explained and defers the generic rows =="
+# What a firmware scan writes once the supplier has given every version it can
+# and a reason for the rest: no dependency graph, some versioned components
+# without an upstream purl.
+cat > "$WORK/skr.json" <<'JSON'
+{"bomFormat":"CycloneDX","specVersion":"1.6","metadata":{"timestamp":"2026-10-15T00:00:00Z","tools":{"components":[{"type":"application","name":"bomlens"}]},
+ "component":{"type":"firmware","name":"fw","version":"1.0"}},
+ "compositions":[{"aggregate":"unknown"}],
+ "components":[
+  {"type":"library","name":"busybox","version":"1.35.0","purl":"pkg:github/mirror/busybox@1_35_0"},
+  {"type":"library","name":"dhcpcd","version":"1.3.22"},
+  {"type":"library","name":"msntp","version":"1.6","purl":"pkg:generic/msntp@1.6"},
+  {"type":"library","name":"libvendor","properties":[{"name":"bomlens:versionReason","value":"own-code"}]},
+  {"type":"library","name":"quagga","properties":[{"name":"bomlens:versionReason","value":"version-unknown"}]}]}
+JSON
+CONFORMANCE_PROFILE=skt-submission MODE=FIRMWARE bash "$LIB/validate-sbom.sh" "$WORK/skr.json" "$WORK/skr" "skr" >/dev/null 2>&1
+skr_v=$(jq -c '.checks[] | select(.id == "versions-needed") | [.status, .detail, .detail_ko, .missing, .explained]' "$WORK/skr_conformance.json")
+[ "$skr_v" = '["pass","0 without a version, 2 explained by the supplier","버전 없음 0개, 공급사 소명 2개",[],[{"name":"libvendor","reason":"own-code"},{"name":"quagga","reason":"version-unknown"}]]' ] \
+    && pass "version needed: explained components pass the row and are listed with their reason" || fail "versions-needed with reasons: $skr_v"
+skr_d=$(jq -c '[.checks[] | select(.id == "name-version" or .id == "purl" or .id == "no-generic" or .id == "transitive") | "\(.id)=\(.required)/\(.status)"]' "$WORK/skr_conformance.json")
+[ "$skr_d" = '["name-version=true/warn","purl=true/warn","no-generic=true/warn","transitive=true/warn"]' ] \
+    && jq -e '.checks[] | select(.id == "transitive") | .detail | contains("not a dependency graph")' "$WORK/skr_conformance.json" >/dev/null \
+    && jq -e '.checks[] | select(.id == "name-version") | .detail_ko | contains("공급사 소명 2개")' "$WORK/skr_conformance.json" >/dev/null \
+    && pass "the generic rows defer to the submission rows and say why" || fail "deferred rows: $skr_d"
+[ "$(jq -r '.result' "$WORK/skr_conformance.json")" = pass ] \
+    && pass "a firmware SBOM with every version given or explained passes the submission profile" \
+    || fail "result: $(jq -c '[.checks[] | select(.required and .status == "fail") | .id]' "$WORK/skr_conformance.json")"
+grep -q '^## Explained by the supplier' "$WORK/skr_conformance.md" && grep -qx -- '- libvendor: own-code' "$WORK/skr_conformance.md" \
+    && grep -q '<li>quagga: version-unknown</li>' "$WORK/skr_conformance.html" \
+    && pass "the Markdown and HTML reports list the explanations" || fail "explained section missing"
+# One component with neither a version nor a reason: the row and the result fail.
+jq '.components += [{"type":"library","name":"telnetd"}]' "$WORK/skr.json" > "$WORK/skr2.json"
+CONFORMANCE_PROFILE=skt-submission MODE=FIRMWARE bash "$LIB/validate-sbom.sh" "$WORK/skr2.json" "$WORK/skr2" "skr" >/dev/null 2>&1
+[ "$(jq -c '[.result, (.checks[] | select(.id == "versions-needed" or .id == "name-version" or .id == "purl") | "\(.id)=\(.status)")]' "$WORK/skr2_conformance.json")" = '["fail","name-version=fail","purl=fail","versions-needed=fail"]' ] \
+    && pass "a component with no version and no reason still fails" \
+    || fail "unexplained: $(jq -c '[.result, (.checks[] | select(.id == "versions-needed" or .id == "name-version" or .id == "purl") | [.id, .status])]' "$WORK/skr2_conformance.json")"
+# Nothing is relaxed for a firmware SBOM that names no package (a file
+# inventory only), nor while a component has neither a version nor a reason,
+# even one that carries a purl.
+cat > "$WORK/skf.json" <<'JSON'
+{"bomFormat":"CycloneDX","specVersion":"1.6","metadata":{"timestamp":"2026-10-15T00:00:00Z","tools":{"components":[{"type":"application","name":"bomlens"}]},
+ "component":{"type":"firmware","name":"fw","version":"1.0"}},
+ "components":[{"type":"file","name":"bin/a","hashes":[{"alg":"SHA-256","content":"aa"}]},
+               {"type":"file","name":"bin/b","hashes":[{"alg":"SHA-256","content":"bb"}]}]}
+JSON
+CONFORMANCE_PROFILE=skt-submission MODE=FIRMWARE bash "$LIB/validate-sbom.sh" "$WORK/skf.json" "$WORK/skf" "skf" >/dev/null 2>&1
+[ "$(jq -c '[.result, (has("submissionJudgedAs")), (.checks[] | select(.id == "name-version" or .id == "purl" or .id == "transitive") | .status)]' "$WORK/skf_conformance.json")" = '["fail",false,"fail","fail","fail"]' ] \
+    && pass "a firmware SBOM listing only files is not relaxed" \
+    || fail "file-only firmware SBOM: $(jq -c '[.result, (.checks[] | select(.id == "name-version" or .id == "purl" or .id == "transitive") | [.id, .status])]' "$WORK/skf_conformance.json")"
+jq '.components += [{"type":"library","name":"libfoo","purl":"pkg:generic/libfoo"}]' "$WORK/skr.json" > "$WORK/skp.json"
+CONFORMANCE_PROFILE=skt-submission MODE=FIRMWARE bash "$LIB/validate-sbom.sh" "$WORK/skp.json" "$WORK/skp" "skr" >/dev/null 2>&1
+[ "$(jq -c '[.result, (.checks[] | select(.id == "versions-needed" or .id == "purl" or .id == "no-generic" or .id == "transitive") | "\(.id)=\(.status)")]' "$WORK/skp_conformance.json")" = '["fail","purl=fail","no-generic=fail","transitive=fail","versions-needed=fail"]' ] \
+    && pass "an unexplained versionless component with a purl keeps every general row as measured" \
+    || fail "unexplained with purl: $(jq -c '[.result, (.checks[] | select(.id == "versions-needed" or .id == "purl" or .id == "no-generic" or .id == "transitive") | [.id, .status])]' "$WORK/skp_conformance.json")"
+# Under --analyze the SBOM's own properties drive the same list. With no
+# bomlens:scanMode (another tool, or a BomLens SBOM older than the marker) the
+# generic rows stay as measured.
+MODE=ANALYZE CONFORMANCE_PROFILE=skt-submission bash "$LIB/validate-sbom.sh" "$WORK/skr.json" "$WORK/skra" "skr" >/dev/null 2>&1
+[ "$(jq -c '[.result, (.checks[] | select(.id == "versions-needed") | [.status, (.explained | length)]), (.checks[] | select(.id == "name-version" or .id == "purl" or .id == "transitive") | .status)]' "$WORK/skra_conformance.json")" = '["fail",["pass",2],"fail","fail","fail"]' ] \
+    && pass "under --analyze an SBOM with no scan mode keeps the generic rows as measured, and still lists the reasons" \
+    || fail "analyze with reasons: $(jq -c '[.result, (.checks[] | select(.id == "versions-needed" or .id == "name-version" or .id == "purl" or .id == "transitive") | [.id, .status])]' "$WORK/skra_conformance.json")"
+# An SBOM that states a BomLens firmware scan wrote it is judged as one under
+# --analyze, and the report says so.
+jq '.metadata.properties = [{"name":"bomlens:scanMode","value":"FIRMWARE"}]' "$WORK/skr.json" > "$WORK/skrm.json"
+MODE=ANALYZE CONFORMANCE_PROFILE=skt-submission bash "$LIB/validate-sbom.sh" "$WORK/skrm.json" "$WORK/skrm" "skr" >/dev/null 2>&1
+[ "$(jq -c '[.result, .submissionJudgedAs, (.checks[] | select(.id == "name-version" or .id == "purl" or .id == "transitive") | .status)]' "$WORK/skrm_conformance.json")" = '["pass","FIRMWARE","warn","warn","warn"]' ] \
+    && grep -q 'Judged as a BomLens firmware, root filesystem or binary scan SBOM (bomlens:scanMode=FIRMWARE)' "$WORK/skrm_conformance.md" \
+    && grep -q 'submit-judged' "$WORK/skrm_conformance.html" \
+    && pass "under --analyze an SBOM marked bomlens:scanMode=FIRMWARE is judged as a firmware scan, and the summary says so" \
+    || fail "analyze with scanMode: $(jq -c '[.result, .submissionJudgedAs]' "$WORK/skrm_conformance.json")"
+REPORT_LANG=ko MODE=ANALYZE CONFORMANCE_PROFILE=skt-submission bash "$LIB/validate-sbom.sh" "$WORK/skrm.json" "$WORK/skrmk" "skr" >/dev/null 2>&1
+grep -q 'BomLens 펌웨어, 루트 파일시스템, 바이너리 스캔 SBOM(bomlens:scanMode=FIRMWARE)으로 판정해' "$WORK/skrmk_conformance.md" \
+    && pass "the Korean report gives the same reason" || fail "ko judged-as line"
+jq '.metadata.properties = [{"name":"bomlens:scanMode","value":"SOURCE"}]' "$WORK/skr.json" > "$WORK/skrs.json"
+MODE=ANALYZE CONFORMANCE_PROFILE=skt-submission bash "$LIB/validate-sbom.sh" "$WORK/skrs.json" "$WORK/skrs" "skr" >/dev/null 2>&1
+jq -e '.result == "fail" and (has("submissionJudgedAs") | not)' "$WORK/skrs_conformance.json" >/dev/null \
+    && pass "any other scan mode is judged as measured" || fail "scanMode SOURCE relaxed"
+[ "$(jq -r '.submissionJudgedAs' "$WORK/skr_conformance.json")" = FIRMWARE ] \
+    && grep -q 'bomlens:scanMode=FIRMWARE' "$WORK/skr_conformance.md" \
+    && pass "a firmware scan's own report names the basis too" || fail "scan-time judged-as line"
+# A source scan under the same profile: no relaxation either.
+MODE=SOURCE CONFORMANCE_PROFILE=skt-submission bash "$LIB/validate-sbom.sh" "$WORK/skr.json" "$WORK/skr3" "skr" >/dev/null 2>&1
+[ "$(jq -c '[.checks[] | select(.id == "purl" or .id == "transitive") | .status]' "$WORK/skr3_conformance.json")" = '["fail","fail"]' ] \
+    && pass "a source scan keeps the purl and transitive rows as measured" || fail "source scan rows: $(jq -c '[.checks[] | select(.id == "purl" or .id == "transitive") | [.id, .status]]' "$WORK/skr3_conformance.json")"
+# The default profile ignores the reasons.
+bash "$LIB/validate-sbom.sh" "$WORK/skr.json" "$WORK/skrd" "skr" >/dev/null 2>&1
+[ "$(jq -c '[.checks[] | select(.id == "name-version" or .id == "transitive") | .status]' "$WORK/skrd_conformance.json")" = '["fail","fail"]' ] \
+    && ! grep -q 'Explained by the supplier' "$WORK/skrd_conformance.md" \
+    && pass "the default profile is unchanged by recorded reasons" || fail "default profile with reasons"
 
 echo "== normalize: the file entry syft writes for a binary it identified is folded into the binary =="
 cat > "$WORK/bf.json" <<'JSON'

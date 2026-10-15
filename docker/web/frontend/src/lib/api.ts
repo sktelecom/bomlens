@@ -420,6 +420,19 @@ export interface ConformanceCheck {
   /** The Korean detail line ("측정할 패키지 없음"), from the same join. Empty when
    *  the detail is a bare value (a timestamp, a purl) that needs no translation. */
   detailKo?: string;
+  /** Components the supplier gave a reason for instead of a version (the
+   *  versions-needed row of the skt-submission profile). The row can pass while
+   *  this list is non-empty, so it is shown either way. Absent when empty. */
+  explained?: ExplainedComponent[];
+}
+
+/** Why the supplier left a component without a version. */
+export type ExplainedReason = "own-code" | "not-open-source" | "version-unknown";
+
+/** One component the supplier explained instead of versioning. */
+export interface ExplainedComponent {
+  name: string;
+  reason: ExplainedReason;
 }
 
 /** What a person has to establish for one element. */
@@ -503,6 +516,11 @@ export interface ConformanceSummary {
   pipelineStepsFailed?: string[];
   /** How many more failed steps exist past the cap in pipelineStepsFailed. */
   pipelineStepsFailedMore?: number;
+  /** The scan mode the skt-submission profile judged this SBOM as when it
+   *  turned some general rows into warnings (a firmware, root filesystem or
+   *  binary scan, or an SBOM marked bomlens:scanMode under --analyze). Absent
+   *  when nothing was relaxed. */
+  submissionJudgedAs?: "FIRMWARE" | "ROOTFS" | "BINARY";
   /** Components other than operating-system and file entries: what the scan
    *  identified as software. Absent on a report from before this field existed. */
   softwareComponentCount?: number;

@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Upgrade note
+
+- Under `--conformance-profile skt-submission`, the "No upstream purl" row (`upstream-purl`) is no longer required: it still lists the versioned components without an upstream purl, as a warning, and no longer makes the result `fail`. For a firmware, root filesystem or binary scan, the name+version, PURL coverage, `pkg:generic` and transitive-dependency rows also warn instead of failing on what the "Version needed" and "No upstream purl" rows cover; none of them is relaxed while any component has neither a version nor a reason, or for an SBOM that lists no package. These scans now record `bomlens:scanMode` (`FIRMWARE`, `ROOTFS` or `BINARY`) in `metadata.properties`, and `--analyze` relaxes the same rows only for an SBOM that carries it, saying so in the report summary (`submissionJudgedAs` in the conformance JSON). Source scans, other SBOMs under `--analyze`, including firmware SBOMs from earlier BomLens versions, and the default profile are judged as before. A caller that reads the overall result of a firmware submission sees `pass` where it saw `fail`.
+
+### Added
+
+- `--component-versions` takes an optional third column, `reason`: `own-code`, `not-open-source` or `version-unknown`, for a component the supplier has no version to give. The component stays in the SBOM without a version and carries `bomlens:versionReason`. Under `skt-submission` the "Version needed" row fails only on components with neither a version nor a reason and lists the explained ones with their reason (`explained` in the conformance JSON, "Explained by the supplier" in the reports and the web UI), also under `--analyze`. Two-column files are read as before. Any other reason value refuses the file with the line number; a row with both a version and a reason applies the version and warns. The template `<Project>_<Version>_component-versions.template.csv` now has the header `name,version,reason` and explains the three values.
+
 ## [v1.13.4] - 2026-10-15
 
 ### Fixed
