@@ -148,6 +148,18 @@ jobs:
             --target "fw/${FW_FILE}" \
             --firmware --generate-only -o "$PWD/out"
 
+      # 스캔 목록의 제목은 SBOM 루트 컴포넌트 이름(metadata.component.name)에서 오는데,
+      # 펌웨어 스캔은 그 자리에 이미지 파일 이름을 그대로 쓴다. 폴더 이름(run id)과 다른
+      # 파일은 건드리지 않고, 목록에 보이는 제목만 읽기 쉽게 바꾼다.
+      - name: Give the firmware a readable title in the scan list
+        run: |
+          set -euo pipefail
+          bom="out/${FW_ID}_${FW_VER}/${FW_ID}_${FW_VER}_bom.json"
+          test -f "$bom" || { echo "::error::firmware SBOM not found: $bom"; exit 1; }
+          jq '.metadata.component.name = "Raspberry Pi OS Lite (arm64)"' "$bom" > "$bom.tmp"
+          mv "$bom.tmp" "$bom"
+          jq -e '.metadata.component.name == "Raspberry Pi OS Lite (arm64)"' "$bom" >/dev/null
+
       # 캡처는 실제 server.py 를 띄워 그 응답을 저장한다. 데모가 읽는 모양이
       # 서버의 모양과 어긋날 수 없도록, 손으로 쓰지 않고 서버에게 물어서 받는다.
       - name: Capture the demo data
