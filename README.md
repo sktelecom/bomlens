@@ -48,14 +48,14 @@ Download the installer and double-click it: [BomLens-Setup.exe](https://github.c
 ### Web UI
 
 ```bash
-git clone https://github.com/sktelecom/bomlens.git && cd bomlens
+git clone --depth 1 https://github.com/sktelecom/bomlens.git && cd bomlens   # --depth 1: about 50 MB instead of the full history
 ./scripts/scan-sbom.sh --ui     # opens http://localhost:8080; results save to the current folder
 #   Windows: double-click scripts\sbom-ui.bat
 ```
 
 > **PowerShell**: don't paste the block above as-is — `.sh` has no default handler there, so it fails silently with no error and no output. Double-click `scripts\sbom-ui.bat` instead.
 
-Enter a project name and version, pick a scan target (current folder, GitHub URL, ZIP, SBOM, firmware upload, or Docker image), click Run scan, then view or download the results; live logs stream as it runs. To scan a folder outside the launch directory, add `--mount <dir>` (repeatable, or `--mount /` for the whole host); the desktop app has an Add folder button for the same.
+The page can take up to a minute to load the first time while the image is checked, so reload the tab if it shows a connection error. Enter a project name and version, pick a scan target (current folder, GitHub URL, ZIP, SBOM, firmware upload, or Docker image), click Run scan, then view or download the results; live logs stream as it runs. To scan a folder outside the launch directory, add `--mount <dir>` (repeatable, or `--mount /` for the whole host); the desktop app has an Add folder button for the same.
 
 ### CLI (advanced)
 
