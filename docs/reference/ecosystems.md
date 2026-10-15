@@ -6,6 +6,8 @@ description: Try BomLens hands-on with per-language example projects (Java, Pyth
 
 A hands-on guide using the per-language example projects under `examples/`. Run each example to see the SBOM output right away.
 
+How BomLens runs each ecosystem's build tool, and how it narrows the result to what ships, is explained in [How dependencies are resolved](../concepts/dependency-resolution.md).
+
 ## Example directory structure
 
 ```
