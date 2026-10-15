@@ -13,6 +13,7 @@ import {
   licenseRiskSummary,
 } from "@/lib/licenses";
 import { cn } from "@/lib/utils";
+import { useFormatNumber } from "@/lib/format";
 
 const TONE: Record<
   LicenseRiskTier,
@@ -120,6 +121,7 @@ export function LicenseRiskBar({
   onSelect,
 }: Props) {
   const { t } = useTranslation();
+  const fmt = useFormatNumber();
   const summary = useMemo(() => licenseRiskSummary(components), [components]);
   const total = summary.TOTAL;
   const interactive = Boolean(onSelect);
@@ -149,7 +151,7 @@ export function LicenseRiskBar({
             selected && selected !== tier && "opacity-30",
           );
           const segStyle = { width: `${(summary[tier] / total) * 100}%` };
-          const segTitle = `${t(LABEL[tier])}: ${summary[tier]}`;
+          const segTitle = `${t(LABEL[tier])}: ${fmt(summary[tier])}`;
           if (!interactive) {
             return <div key={tier} className={segClass} style={segStyle} title={segTitle} />;
           }
@@ -158,7 +160,7 @@ export function LicenseRiskBar({
               key={tier}
               type="button"
               aria-pressed={selected === tier}
-              aria-label={`${t(LABEL[tier])} ${summary[tier]}`}
+              aria-label={`${t(LABEL[tier])} ${fmt(summary[tier])}`}
               onClick={() => onSelect?.(tier)}
               className={cn(
                 segClass,
@@ -176,7 +178,7 @@ export function LicenseRiskBar({
           if (summary[tier] === 0) return null;
           const badge = (
             <Badge tone={TONE[tier]}>
-              {t(LABEL[tier])} {summary[tier]}
+              {t(LABEL[tier])} {fmt(summary[tier])}
             </Badge>
           );
           if (!interactive) return <span key={tier}>{badge}</span>;

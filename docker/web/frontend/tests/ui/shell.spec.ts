@@ -2314,11 +2314,11 @@ test("Vulnerabilities table shows the disposition status and NVD severity, when 
   await stubVexAndRun(page);
   await page.getByRole("link", { name: /^Vulnerabilities/ }).first().click();
 
-  // Status badges, scoped to their own row — "Fixed" also names the Fixed
-  // column header, so an unscoped lookup would be ambiguous.
+  // Status badges, scoped to their own row, so a label that repeats elsewhere
+  // on the page cannot make the lookup ambiguous.
   const row1 = page.locator("tr", { has: page.getByText("CVE-2024-1111") });
   const row2 = page.locator("tr", { has: page.getByText("CVE-2024-2222") });
-  await expect(row1.getByText("Fixed", { exact: true })).toBeVisible();
+  await expect(row1.getByText("Fix available", { exact: true })).toBeVisible();
   await expect(row2.getByText("Will not fix", { exact: true })).toBeVisible();
 
   // NVD severity is its own sortable column, separate from the adopted severity.
@@ -2387,9 +2387,9 @@ test("a supplier can record their own judgement, separate from the vendor status
   });
   expect(savedBody).not.toHaveProperty("purl");
 
-  // The new badge sits beside the pre-existing vendor Status badge ("Fixed")
+  // The new badge sits beside the pre-existing vendor Status badge ("Fix available")
   // rather than replacing it -- the two are different axes.
-  await expect(row1.getByText("Fixed", { exact: true })).toBeVisible();
+  await expect(row1.getByText("Fix available", { exact: true })).toBeVisible();
   await expect(row1.getByText("Judgement: Affected")).toBeVisible();
 
   // Once a judgement exists the table offers to export it as a VEX document.

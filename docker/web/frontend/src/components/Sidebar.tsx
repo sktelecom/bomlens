@@ -12,6 +12,7 @@ import {
 } from "@/lib/nav";
 import { scanHash } from "@/lib/route";
 import { cn } from "@/lib/utils";
+import { useFormatNumber } from "@/lib/format";
 
 interface SidebarProps {
   scan?: ScanContext;
@@ -74,6 +75,7 @@ export function Sidebar({
   onNewScan,
 }: SidebarProps) {
   const { t } = useTranslation();
+  const fmt = useFormatNumber();
   const groups = visibleGroups(scan);
 
   return (
@@ -187,7 +189,7 @@ export function Sidebar({
                             : undefined
                         }
                       >
-                        {count}
+                        {typeof count === "number" ? fmt(count) : count}
                       </span>
                     )}
                   </a>

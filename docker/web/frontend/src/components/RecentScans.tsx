@@ -44,6 +44,7 @@ import {
 import { scanHash } from "@/lib/route";
 import { NARROW_QUERY, useMediaQuery } from "@/lib/useMediaQuery";
 import { cn } from "@/lib/utils";
+import { useFormatNumber } from "@/lib/format";
 
 interface Props {
   scans: RecentScan[];
@@ -78,6 +79,7 @@ function SummaryCard({
   onClick?: () => void;
   active?: boolean;
 }) {
+  const fmt = useFormatNumber();
   const body = (
     <CardContent className="flex flex-col gap-1.5 p-3 md:p-5">
       <span className="text-xs text-muted-foreground">{label}</span>
@@ -87,7 +89,7 @@ function SummaryCard({
           accent && "text-brand-accent",
         )}
       >
-        {value}
+        {fmt(value)}
       </span>
     </CardContent>
   );
@@ -328,6 +330,7 @@ function SortHeader({
  */
 export function RecentScans({ scans, newHref, onDelete }: Props) {
   const { t, i18n } = useTranslation();
+  const fmt = useFormatNumber();
   const summary = summarizeRecent(scans);
   const narrow = useMediaQuery(NARROW_QUERY);
   const now = Date.now();
@@ -506,14 +509,14 @@ export function RecentScans({ scans, newHref, onDelete }: Props) {
                           once has nothing to compare against and shows nothing,
                           rather than a "0" that would read as "unchanged". */}
                       <td className="px-4 py-3 text-right tabular-nums">
-                        {s.components}
+                        {fmt(s.components)}
                         {cmp && cmp.componentsDelta !== 0 && (
                           <span
                             className="ml-1.5 text-xs text-muted-foreground"
                             title={t("recent.vsPrevious")}
                           >
                             {cmp.componentsDelta > 0 ? "+" : ""}
-                            {cmp.componentsDelta}
+                            {fmt(cmp.componentsDelta)}
                           </span>
                         )}
                       </td>

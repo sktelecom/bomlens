@@ -108,6 +108,7 @@ export function conformanceCount(result: DoneEvent): string | undefined {
  */
 export function sectionCounts(
   result: DoneEvent,
+  fmt: (n: number) => string = String,
 ): Partial<Record<SectionId, number | string>> {
   const componentList = result.sbom?.componentList ?? [];
   // Dependency graph as a direct/transitive split. Omit when there's no graph
@@ -127,8 +128,8 @@ export function sectionCounts(
       direct + transitive === 0
         ? undefined
         : transitive === 0
-          ? `${direct}`
-          : `${direct}/${transitive}`,
+          ? fmt(direct)
+          : `${fmt(direct)}/${fmt(transitive)}`,
     // No security report means the scan never asked, which is not the same as
     // asking and finding nothing. Writing 0 claimed the second. The section
     // itself says so ("no report was generated"); the badge must not contradict
