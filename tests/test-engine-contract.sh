@@ -724,6 +724,21 @@ P="$(plan_run node-opts "$PSRC" BYTE_STABLE=true GOTOOLCHAIN=local HOST_UID=501 
 [ "$(jq -r '.stages[0].env | "\(.FETCH_LICENSE) \(.HOST_GOTOOLCHAIN)"' "$P/bomlens-plan.json")" = "false local" ] \
     && pass "BYTE_STABLE turns stage 1's license lookup off; GOTOOLCHAIN reaches it as HOST_GOTOOLCHAIN" \
     || fail "stage 1 env: $(jq -c '.stages[0].env' "$P/bomlens-plan.json")"
+[ "$(jq -r '.stages[0].env | "\(.GOPATH) \(.GOMODCACHE) \(.GOCACHE)"' "$P/bomlens-plan.json")" = "/tmp/sbomhome/go /tmp/sbomhome/go/pkg/mod /tmp/sbomhome/go-build" ] \
+    && pass "stage 1 env keeps the Go module and build caches under /tmp/sbomhome (a read-only root filesystem has no /go/pkg)" \
+    || fail "stage 1 Go cache env: $(jq -c '.stages[0].env' "$P/bomlens-plan.json")"
+if command -v go >/dev/null 2>&1; then
+    # No Docker needed: the plan's env alone decides where go puts its caches.
+    # HOME and the default GOPATH are made unusable, as in a read-only root.
+    go_plan_env=()
+    while IFS= read -r _l; do go_plan_env+=("$_l"); done < <(jq -r '.stages[0].env | to_entries[] | select(.key | test("^GO(PATH|MODCACHE|CACHE)$")) | "\(.key)=\(.value)"' "$P/bomlens-plan.json")
+    go_env_out="$(env -i PATH="$PATH" HOME=/nonexistent GOTOOLCHAIN=local "${go_plan_env[@]}" go env GOMODCACHE GOPATH GOCACHE 2>&1 | tr '\n' ' ')"
+    [ "$go_env_out" = "/tmp/sbomhome/go/pkg/mod /tmp/sbomhome/go /tmp/sbomhome/go-build " ] \
+        && pass "go resolves GOMODCACHE, GOPATH and GOCACHE from the stage 1 env alone, not under /go or HOME" \
+        || fail "go env under the plan's stage 1 env: $go_env_out"
+else
+    echo "  SKIP: go is not installed here, so go env under the plan's stage 1 env was not checked"
+fi
 P="$(plan_run node-badtc "$PSRC" GOTOOLCHAIN='local;rm -rf /')"
 [ "$(jq -r '.stages[0].env.HOST_GOTOOLCHAIN // "absent"' "$P/bomlens-plan.json")" = "absent" ] \
     && pass "a GOTOOLCHAIN that is not a toolchain name is not passed on" || fail "HOST_GOTOOLCHAIN: $(jq -r '.stages[0].env.HOST_GOTOOLCHAIN' "$P/bomlens-plan.json")"
