@@ -1,6 +1,7 @@
 // Copyright 2026 SK Telecom Co., Ltd.
 // SPDX-License-Identifier: Apache-2.0
 
+// @no-unit-test: a thin wrapper over window.matchMedia, which the DOM-less vitest here cannot provide; the narrow layout is checked in a browser.
 import { useSyncExternalStore } from "react";
 
 /**
