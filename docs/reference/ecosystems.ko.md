@@ -6,6 +6,8 @@ description: Java, Python, Node.js 등 언어별 예제 프로젝트로 BomLens�
 
 `examples/` 디렉터리의 언어별 예제 프로젝트로 직접 실습해 보는 가이드입니다. 각 예제를 실행하면 SBOM 출력 결과를 바로 확인할 수 있습니다.
 
+BomLens가 생태계마다 빌드 도구를 어떻게 실행하고 결과를 배포되는 구성으로 어떻게 좁히는지는 [의존성을 해석하는 방식](../concepts/dependency-resolution.ko.md)에 설명돼 있습니다.
+
 ## 예제 디렉터리 구조
 
 ```
