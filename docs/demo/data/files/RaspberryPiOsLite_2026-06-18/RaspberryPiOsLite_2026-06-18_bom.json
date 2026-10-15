@@ -1552577,7 +1552577,7 @@
           "content": "acff736ca7945e3b305f07cda4abdb870910e12634991da69783611756e381b3"
         }
       ],
-      "name": "2026-06-18-raspios-trixie-arm64-lite.img.xz",
+      "name": "Raspberry Pi OS Lite (arm64)",
       "type": "firmware",
       "version": "2026-06-18"
     },
@@ -1552590,9 +1552590,13 @@
       {
         "name": "bomlens:undeclared-fields",
         "value": "unknown-to-author"
+      },
+      {
+        "name": "bomlens:scanMode",
+        "value": "FIRMWARE"
       }
     ],
-    "timestamp": "2026-10-14T18:07:17Z",
+    "timestamp": "2026-10-15T17:38:26Z",
     "tools": {
       "components": [
         {
@@ -1552614,7 +1552618,7 @@
           "name": "BomLens",
           "publisher": "SK Telecom",
           "type": "application",
-          "version": "1.13.4"
+          "version": "1.13.5"
         }
       ]
     }

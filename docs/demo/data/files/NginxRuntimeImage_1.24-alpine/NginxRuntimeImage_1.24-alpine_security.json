@@ -3,8 +3,8 @@
   "Trivy": {
     "Version": "0.75.0"
   },
-  "ReportID": "01a13b98-41a1-755f-b1bb-53cf848e31bf",
-  "CreatedAt": "2026-10-14T18:06:36.449354116Z",
+  "ReportID": "01a140a4-3fb6-7ccd-9d4d-a57e02be273c",
+  "CreatedAt": "2026-10-15T17:37:48.470839842Z",
   "ArtifactName": "NginxRuntimeImage_1.24-alpine_bom.json",
   "ArtifactType": "cyclonedx",
   "Metadata": {
@@ -1909,6 +1909,9 @@
             "https://access.redhat.com/security/cve/CVE-2024-2398",
             "https://bugzilla.redhat.com/2270498",
             "https://bugzilla.redhat.com/show_bug.cgi?id=2270498",
+            "https://cert-portal.siemens.com/productcert/html/ssa-331112.html",
+            "https://cert-portal.siemens.com/productcert/html/ssa-398330.html",
+            "https://cert-portal.siemens.com/productcert/html/ssa-417159.html",
             "https://creativecommons.org/licenses/by/4.0/",
             "https://curl.se/docs/CVE-2024-2398.html",
             "https://curl.se/docs/CVE-2024-2398.json",
@@ -1935,7 +1938,7 @@
             "https://www.cve.org/CVERecord?id=CVE-2024-2398"
           ],
           "PublishedDate": "2024-03-27T08:15:41.283Z",
-          "LastModifiedDate": "2026-06-17T07:24:27.17Z"
+          "LastModifiedDate": "2026-10-15T01:17:43.52Z"
         },
         {
           "VulnerabilityID": "CVE-2024-2466",
@@ -1984,6 +1987,9 @@
             "http://seclists.org/fulldisclosure/2024/Jul/20",
             "http://www.openwall.com/lists/oss-security/2024/03/27/4",
             "https://access.redhat.com/security/cve/CVE-2024-2466",
+            "https://cert-portal.siemens.com/productcert/html/ssa-331112.html",
+            "https://cert-portal.siemens.com/productcert/html/ssa-398330.html",
+            "https://cert-portal.siemens.com/productcert/html/ssa-417159.html",
             "https://curl.se/docs/CVE-2024-2466.html",
             "https://curl.se/docs/CVE-2024-2466.json",
             "https://github.com/advisories/GHSA-9xr6-qf7m-2jv5",
@@ -1998,7 +2004,7 @@
             "https://www.vicarius.io/vsociety/posts/tls-certificate-check-bypass-curl-with-mbedtls-cve-2024-2466-2468"
           ],
           "PublishedDate": "2024-03-27T08:15:41.343Z",
-          "LastModifiedDate": "2026-06-17T07:24:35.55Z"
+          "LastModifiedDate": "2026-10-15T01:17:43.823Z"
         },
         {
           "VulnerabilityID": "CVE-2024-6874",
@@ -2110,6 +2116,9 @@
             "http://seclists.org/fulldisclosure/2024/Jul/20",
             "http://www.openwall.com/lists/oss-security/2024/03/27/1",
             "https://access.redhat.com/security/cve/CVE-2024-2004",
+            "https://cert-portal.siemens.com/productcert/html/ssa-331112.html",
+            "https://cert-portal.siemens.com/productcert/html/ssa-398330.html",
+            "https://cert-portal.siemens.com/productcert/html/ssa-417159.html",
             "https://curl.se/docs/CVE-2024-2004.html",
             "https://curl.se/docs/CVE-2024-2004.json",
             "https://github.com/advisories/GHSA-97xx-95pm-5qv6",
@@ -2129,7 +2138,7 @@
             "https://www.cve.org/CVERecord?id=CVE-2024-2004"
           ],
           "PublishedDate": "2024-03-27T08:15:41.173Z",
-          "LastModifiedDate": "2026-06-17T07:23:32.39Z"
+          "LastModifiedDate": "2026-10-15T01:17:42.867Z"
         },
         {
           "VulnerabilityID": "CVE-2024-2379",
@@ -2177,6 +2186,9 @@
             "http://seclists.org/fulldisclosure/2024/Jul/20",
             "http://www.openwall.com/lists/oss-security/2024/03/27/2",
             "https://access.redhat.com/security/cve/CVE-2024-2379",
+            "https://cert-portal.siemens.com/productcert/html/ssa-331112.html",
+            "https://cert-portal.siemens.com/productcert/html/ssa-398330.html",
+            "https://cert-portal.siemens.com/productcert/html/ssa-417159.html",
             "https://curl.se/docs/CVE-2024-2379.html",
             "https://curl.se/docs/CVE-2024-2379.json",
             "https://github.com/advisories/GHSA-wr4c-gwg7-p734",
@@ -2190,7 +2202,7 @@
             "https://www.cve.org/CVERecord?id=CVE-2024-2379"
           ],
           "PublishedDate": "2024-03-27T08:15:41.23Z",
-          "LastModifiedDate": "2026-06-17T07:24:25.16Z"
+          "LastModifiedDate": "2026-10-15T01:17:43.293Z"
         },
         {
           "VulnerabilityID": "CVE-2024-6119",
@@ -2413,7 +2425,7 @@
             "https://www.cve.org/CVERecord?id=CVE-2025-15467"
           ],
           "PublishedDate": "2026-01-27T16:16:14.257Z",
-          "LastModifiedDate": "2026-09-07T13:17:27.74Z"
+          "LastModifiedDate": "2026-10-15T02:17:23.44Z"
         },
         {
           "VulnerabilityID": "CVE-2025-69421",
@@ -2686,7 +2698,7 @@
             "https://www.cve.org/CVERecord?id=CVE-2025-9230"
           ],
           "PublishedDate": "2025-09-30T14:15:41.05Z",
-          "LastModifiedDate": "2026-07-14T13:18:07.327Z"
+          "LastModifiedDate": "2026-10-15T02:18:27.243Z"
         },
         {
           "VulnerabilityID": "CVE-2024-13176",
@@ -3021,7 +3033,7 @@
             "https://www.openssl.org/news/vulnerabilities.html"
           ],
           "PublishedDate": "2024-04-08T14:15:07.66Z",
-          "LastModifiedDate": "2026-06-17T07:24:40.83Z"
+          "LastModifiedDate": "2026-10-15T01:17:44.053Z"
         },
         {
           "VulnerabilityID": "CVE-2024-4603",
@@ -3330,7 +3342,7 @@
             "https://www.oracle.com/security-alerts/cpuoct2024.html#AppendixMSQL"
           ],
           "PublishedDate": "2024-06-27T11:15:24.447Z",
-          "LastModifiedDate": "2026-06-17T08:16:08.843Z"
+          "LastModifiedDate": "2026-10-15T01:19:17.867Z"
         },
         {
           "VulnerabilityID": "CVE-2024-9143",
@@ -3403,7 +3415,7 @@
             "https://www.cve.org/CVERecord?id=CVE-2024-9143"
           ],
           "PublishedDate": "2024-10-16T17:15:18.13Z",
-          "LastModifiedDate": "2026-06-17T08:24:02.61Z"
+          "LastModifiedDate": "2026-10-15T01:19:26.257Z"
         },
         {
           "VulnerabilityID": "CVE-2025-68160",
@@ -4195,6 +4207,9 @@
             "https://access.redhat.com/security/cve/CVE-2024-2398",
             "https://bugzilla.redhat.com/2270498",
             "https://bugzilla.redhat.com/show_bug.cgi?id=2270498",
+            "https://cert-portal.siemens.com/productcert/html/ssa-331112.html",
+            "https://cert-portal.siemens.com/productcert/html/ssa-398330.html",
+            "https://cert-portal.siemens.com/productcert/html/ssa-417159.html",
             "https://creativecommons.org/licenses/by/4.0/",
             "https://curl.se/docs/CVE-2024-2398.html",
             "https://curl.se/docs/CVE-2024-2398.json",
@@ -4221,7 +4236,7 @@
             "https://www.cve.org/CVERecord?id=CVE-2024-2398"
           ],
           "PublishedDate": "2024-03-27T08:15:41.283Z",
-          "LastModifiedDate": "2026-06-17T07:24:27.17Z"
+          "LastModifiedDate": "2026-10-15T01:17:43.52Z"
         },
         {
           "VulnerabilityID": "CVE-2024-2466",
@@ -4270,6 +4285,9 @@
             "http://seclists.org/fulldisclosure/2024/Jul/20",
             "http://www.openwall.com/lists/oss-security/2024/03/27/4",
             "https://access.redhat.com/security/cve/CVE-2024-2466",
+            "https://cert-portal.siemens.com/productcert/html/ssa-331112.html",
+            "https://cert-portal.siemens.com/productcert/html/ssa-398330.html",
+            "https://cert-portal.siemens.com/productcert/html/ssa-417159.html",
             "https://curl.se/docs/CVE-2024-2466.html",
             "https://curl.se/docs/CVE-2024-2466.json",
             "https://github.com/advisories/GHSA-9xr6-qf7m-2jv5",
@@ -4284,7 +4302,7 @@
             "https://www.vicarius.io/vsociety/posts/tls-certificate-check-bypass-curl-with-mbedtls-cve-2024-2466-2468"
           ],
           "PublishedDate": "2024-03-27T08:15:41.343Z",
-          "LastModifiedDate": "2026-06-17T07:24:35.55Z"
+          "LastModifiedDate": "2026-10-15T01:17:43.823Z"
         },
         {
           "VulnerabilityID": "CVE-2024-6874",
@@ -4396,6 +4414,9 @@
             "http://seclists.org/fulldisclosure/2024/Jul/20",
             "http://www.openwall.com/lists/oss-security/2024/03/27/1",
             "https://access.redhat.com/security/cve/CVE-2024-2004",
+            "https://cert-portal.siemens.com/productcert/html/ssa-331112.html",
+            "https://cert-portal.siemens.com/productcert/html/ssa-398330.html",
+            "https://cert-portal.siemens.com/productcert/html/ssa-417159.html",
             "https://curl.se/docs/CVE-2024-2004.html",
             "https://curl.se/docs/CVE-2024-2004.json",
             "https://github.com/advisories/GHSA-97xx-95pm-5qv6",
@@ -4415,7 +4436,7 @@
             "https://www.cve.org/CVERecord?id=CVE-2024-2004"
           ],
           "PublishedDate": "2024-03-27T08:15:41.173Z",
-          "LastModifiedDate": "2026-06-17T07:23:32.39Z"
+          "LastModifiedDate": "2026-10-15T01:17:42.867Z"
         },
         {
           "VulnerabilityID": "CVE-2024-2379",
@@ -4463,6 +4484,9 @@
             "http://seclists.org/fulldisclosure/2024/Jul/20",
             "http://www.openwall.com/lists/oss-security/2024/03/27/2",
             "https://access.redhat.com/security/cve/CVE-2024-2379",
+            "https://cert-portal.siemens.com/productcert/html/ssa-331112.html",
+            "https://cert-portal.siemens.com/productcert/html/ssa-398330.html",
+            "https://cert-portal.siemens.com/productcert/html/ssa-417159.html",
             "https://curl.se/docs/CVE-2024-2379.html",
             "https://curl.se/docs/CVE-2024-2379.json",
             "https://github.com/advisories/GHSA-wr4c-gwg7-p734",
@@ -4476,7 +4500,7 @@
             "https://www.cve.org/CVERecord?id=CVE-2024-2379"
           ],
           "PublishedDate": "2024-03-27T08:15:41.23Z",
-          "LastModifiedDate": "2026-06-17T07:24:25.16Z"
+          "LastModifiedDate": "2026-10-15T01:17:43.293Z"
         },
         {
           "VulnerabilityID": "CVE-2024-45491",
@@ -4809,6 +4833,9 @@
             "https://access.redhat.com/security/cve/CVE-2024-50602",
             "https://bugzilla.redhat.com/2321987",
             "https://bugzilla.redhat.com/show_bug.cgi?id=2321987",
+            "https://cert-portal.siemens.com/productcert/html/ssa-202008.html",
+            "https://cert-portal.siemens.com/productcert/html/ssa-355557.html",
+            "https://cert-portal.siemens.com/productcert/html/ssa-398330.html",
             "https://creativecommons.org/licenses/by/4.0/",
             "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2024-50602",
             "https://docs.python.org/release/3.10.16/whatsnew/changelog.html",
@@ -4830,7 +4857,7 @@
             "https://www.cve.org/CVERecord?id=CVE-2024-50602"
           ],
           "PublishedDate": "2024-10-27T05:15:04.09Z",
-          "LastModifiedDate": "2026-06-17T08:04:47.443Z"
+          "LastModifiedDate": "2026-10-15T01:19:12.483Z"
         },
         {
           "VulnerabilityID": "CVE-2024-6119",
@@ -5053,7 +5080,7 @@
             "https://www.cve.org/CVERecord?id=CVE-2025-15467"
           ],
           "PublishedDate": "2026-01-27T16:16:14.257Z",
-          "LastModifiedDate": "2026-09-07T13:17:27.74Z"
+          "LastModifiedDate": "2026-10-15T02:17:23.44Z"
         },
         {
           "VulnerabilityID": "CVE-2025-69421",
@@ -5326,7 +5353,7 @@
             "https://www.cve.org/CVERecord?id=CVE-2025-9230"
           ],
           "PublishedDate": "2025-09-30T14:15:41.05Z",
-          "LastModifiedDate": "2026-07-14T13:18:07.327Z"
+          "LastModifiedDate": "2026-10-15T02:18:27.243Z"
         },
         {
           "VulnerabilityID": "CVE-2024-13176",
@@ -5661,7 +5688,7 @@
             "https://www.openssl.org/news/vulnerabilities.html"
           ],
           "PublishedDate": "2024-04-08T14:15:07.66Z",
-          "LastModifiedDate": "2026-06-17T07:24:40.83Z"
+          "LastModifiedDate": "2026-10-15T01:17:44.053Z"
         },
         {
           "VulnerabilityID": "CVE-2024-4603",
@@ -5970,7 +5997,7 @@
             "https://www.oracle.com/security-alerts/cpuoct2024.html#AppendixMSQL"
           ],
           "PublishedDate": "2024-06-27T11:15:24.447Z",
-          "LastModifiedDate": "2026-06-17T08:16:08.843Z"
+          "LastModifiedDate": "2026-10-15T01:19:17.867Z"
         },
         {
           "VulnerabilityID": "CVE-2024-9143",
@@ -6043,7 +6070,7 @@
             "https://www.cve.org/CVERecord?id=CVE-2024-9143"
           ],
           "PublishedDate": "2024-10-16T17:15:18.13Z",
-          "LastModifiedDate": "2026-06-17T08:24:02.61Z"
+          "LastModifiedDate": "2026-10-15T01:19:26.257Z"
         },
         {
           "VulnerabilityID": "CVE-2025-68160",
