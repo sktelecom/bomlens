@@ -23,6 +23,7 @@ import {
   CISA_CLUSTER_ORDER,
   crosswalkTotals,
   dedupeMissing,
+  explainedEntries,
   groupByCluster,
   groupG7ByCluster,
   isNotApplicable,
@@ -221,6 +222,9 @@ function CheckRow({ check }: { check: ConformanceCheck }) {
   const detail = (isKo && check.detailKo) || check.detail;
   const missing = dedupeMissing(check.missing ?? []);
   const overflow = missingOverflow(check);
+  // Components the supplier explained instead of versioning. Shown on a passing
+  // row too: the count passed, but each reason is still the reviewer's call.
+  const explained = explainedEntries(check);
   // Supplied by the report itself (validate-sbom.sh joins docker/lib/g7-guidance.json),
   // so the CLI artifacts and this panel show the same fragment. Runs from before
   // the guidance registry carry none.
@@ -270,6 +274,22 @@ function CheckRow({ check }: { check: ConformanceCheck }) {
             {overflow > 0 ? (
               <span className="tabular-nums">{t("g7.missingMore", { count: overflow })}</span>
             ) : null}
+          </div>
+        ) : null}
+        {explained.length > 0 ? (
+          <div className="mt-1 flex flex-wrap items-center gap-1 text-xs text-muted-foreground">
+            <span className="font-medium">{t("g7.explained")}</span>
+            {explained.map(({ name, reason }, i) => (
+              <code
+                key={`${name}-${i}`}
+                className="rounded bg-muted px-1.5 py-0.5 font-mono text-[11px] text-foreground"
+              >
+                {name}{" "}
+                <span className="font-sans text-muted-foreground">
+                  ({t(`g7.explainedReason.${reason}`)})
+                </span>
+              </code>
+            ))}
           </div>
         ) : null}
         {evidence.length > 0 ? (
@@ -564,6 +584,11 @@ export function ConformancePanel({
         isSuppliedDocument={isSuppliedDocument}
         testId="conformance-pipeline-steps-failed"
       />
+      {conformance.submissionJudgedAs ? (
+        <p className="text-xs text-muted-foreground" data-testid="conformance-judged-as">
+          {t("conf.submissionJudgedAs", { mode: conformance.submissionJudgedAs })}
+        </p>
+      ) : null}
       <div className="space-y-1.5">
         <div className="flex flex-wrap items-center gap-2 text-sm">
           {conformance.format ? (

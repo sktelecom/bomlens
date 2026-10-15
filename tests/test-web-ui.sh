@@ -2686,6 +2686,62 @@ else
     echo "  SKIP: jq not available for conformance generation"
 fi
 
+echo "== conformance_summary passes through the supplier's version explanations =="
+# The versions-needed row of the skt-submission profile lists the components the
+# supplier explained instead of versioning. The row can pass with a non-empty
+# list, and the reviewer still needs to see it, so the list rides on the row.
+# Only the three known reasons survive, non-dict entries drop, the list is capped,
+# and the key is absent when nothing is explained.
+if SBOM_OUTPUT_DIR="$OUT" python3 - "$ROOT_DIR" "$OUT/explweb_1.0_conformance.json" <<'PY'
+import sys, os, json
+sys.path.insert(0, os.path.join(sys.argv[1], "docker", "web"))
+import server
+path = sys.argv[2]
+explained = [
+    {"name": "libradius", "reason": "own-code"},
+    {"name": "vendor-blob", "reason": "not-open-source"},
+    {"name": "quagga", "reason": "version-unknown"},
+    {"name": "bogus", "reason": "made-up"},
+    "not-a-dict",
+    {"name": "noreason"},
+]
+json.dump({"result": "pass", "checks": [
+    {"id": "versions-needed", "required": True, "status": "pass",
+     "detail": "0 without a version, 3 explained by the supplier",
+     "detail_ko": "버전 없음 0개, 공급사 소명 3개", "missing": [],
+     "explained": explained},
+    {"id": "name-version", "required": True, "status": "pass", "detail": "", "missing": []},
+]}, open(path, "w"))
+c = server.conformance_summary("explweb_1.0")
+rows = {x["id"]: x for x in c["checks"]}
+assert rows["versions-needed"]["explained"] == [
+    {"name": "libradius", "reason": "own-code"},
+    {"name": "vendor-blob", "reason": "not-open-source"},
+    {"name": "quagga", "reason": "version-unknown"},
+], rows["versions-needed"].get("explained")
+assert "explained" not in rows["name-version"], "an empty list must be omitted"
+many = [{"name": f"c{i}", "reason": "own-code"} for i in range(server.MAX_CONFORMANCE_MISSING + 10)]
+json.dump({"result": "pass", "checks": [
+    {"id": "versions-needed", "status": "pass", "explained": many},
+    {"id": "other", "status": "pass", "explained": "not-a-list"},
+]}, open(path, "w"))
+c = server.conformance_summary("explweb_1.0")
+rows = {x["id"]: x for x in c["checks"]}
+assert len(rows["versions-needed"]["explained"]) == server.MAX_CONFORMANCE_MISSING
+assert "explained" not in rows["other"], "a non-list value must be dropped"
+assert "submissionJudgedAs" not in c, "absent when nothing was relaxed"
+for value, kept in (("FIRMWARE", True), ("ROOTFS", True), ("SOURCE", False), ("<b>", False)):
+    json.dump({"result": "pass", "checks": [], "submissionJudgedAs": value}, open(path, "w"))
+    c = server.conformance_summary("explweb_1.0")
+    assert (c.get("submissionJudgedAs") == value) == kept, (value, c.get("submissionJudgedAs"))
+PY
+then
+    pass "conformance_summary passes through explained, filtered and capped"
+else
+    fail "conformance_summary explained pass-through wrong"
+fi
+rm -f "$OUT"/explweb_1.0_*
+
 echo "== ai profile summary (ai_profile_summary) =="
 # generate-ai-profile.sh re-aggregates the conformance + SBOM artifacts into a
 # governance card. ai_profile_summary must return the light rollup for an AI SBOM

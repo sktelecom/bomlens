@@ -1603,10 +1603,11 @@ case "$SCAN_MODE" in
 esac
 
 # Versions the scan could not read. A firmware, root filesystem or binary scan
-# can prove a component is there without finding its version. A supplier's
-# two-column file (--component-versions, CSV name,version) fills those in,
-# keeps a version read from the delivered files when the file disagrees, and
-# adds the names the scan did not find as supplier-declared components. Every
+# can prove a component is there without finding its version. The supplier's
+# file (--component-versions, CSV name,version[,reason]) fills those in, keeps
+# a version read from the delivered files when the file disagrees, adds the
+# names the scan did not find as supplier-declared components, and records the
+# reason a supplier gives for a component it has no version for. Every
 # such scan also writes the components still missing a version as a template
 # in the same format. Before normalize, so what is added is normalized too;
 # the placeholder versions normalize removes (UNKNOWN) count as missing here.
@@ -1616,6 +1617,15 @@ esac
 CV_REFUSED=""
 case "$SCAN_MODE" in
     FIRMWARE|ROOTFS|BINARY)
+        # Which kind of scan wrote this SBOM, stated rather than left to be
+        # guessed from the tools listed: a reviewer's --analyze run reads it
+        # (validate-sbom.sh, submission profile).
+        if jq --arg m "$SCAN_MODE" '.metadata.properties = ([(.metadata.properties // [])[] | select(.name? != "bomlens:scanMode")]
+                                    + [{name: "bomlens:scanMode", value: $m}])' "$OUTPUT_FILE" > "$OUTPUT_FILE.mode.tmp" 2>/dev/null; then
+            mv "$OUTPUT_FILE.mode.tmp" "$OUTPUT_FILE"
+        else
+            rm -f "$OUTPUT_FILE.mode.tmp"
+        fi
         _cv_args=("$OUTPUT_FILE" "$OUT_PREFIX")
         [ "$CV_INPUT_IS_TEMPLATE" = true ] && _cv_args=(--no-template "${_cv_args[@]}")
         if [ -n "${COMPONENT_VERSIONS_FILE:-}" ]; then
@@ -2539,7 +2549,7 @@ sync_artifacts
 # non-zero exit, since the user asked for those versions and did not get them.
 if [ -n "$CV_REFUSED" ]; then
     echo "[ERROR] --component-versions: the file was refused, so none of its versions were applied: ${CV_REFUSED}" >&2
-    echo "[ERROR]   The SBOM and the other files were written without them. Fix the file (CSV, two columns: name,version) and run the scan again." >&2
+    echo "[ERROR]   The SBOM and the other files were written without them. Fix the file (CSV: name,version[,reason]) and run the scan again." >&2
     exit 1
 fi
 

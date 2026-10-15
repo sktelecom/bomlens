@@ -100,7 +100,19 @@ A component tagged `presence-only` has no version, so neither a CVE lookup nor a
   --component-versions device-fw_1.0.0_component-versions.template.csv --generate-only
 ```
 
-The file is CSV with two columns, `name,version`; lines starting with `#` and rows left empty are skipped. The template can be filled in where it is: when the file passed is that template, the scan leaves it as you wrote it and only lists what is still missing. A filled version is marked `bomlens:versionSource = supplier-declared` and gets the upstream purl above. When the scan read a version from the delivered files, that version is kept and a warning shows both, because a source tree can hold several releases of one project and the binary shows which one shipped. A name the scan did not find is added as a component marked `bomlens:identifiedBy = supplier-declared`. A file over 256 KiB, a row that is not two fields, a name or version with characters outside letters, digits and `. _ + ~ -`, or one name given two versions is refused with the line number: the SBOM and the other files are written without the file's versions, and the scan exits 1. A component whose version reads `UNKNOWN` (a kernel module with no version in its metadata) counts as having none, so it is in the template. A component whose name holds other characters, such as a space, is listed on the console instead of in the template.
+The file is CSV with the columns `name,version,reason`; the third column is optional, so a two-column `name,version` file is read as before. Lines starting with `#` and rows with neither a version nor a reason are skipped. The template can be filled in where it is: when the file passed is that template, the scan leaves it as you wrote it and only lists what is still missing. A filled version is marked `bomlens:versionSource = supplier-declared` and gets the upstream purl above. When the scan read a version from the delivered files, that version is kept and a warning shows both, because a source tree can hold several releases of one project and the binary shows which one shipped. A name the scan did not find is added as a component marked `bomlens:identifiedBy = supplier-declared`. A file over 256 KiB, a row that is not two or three fields, a name or version with characters outside letters, digits and `. _ + ~ -`, or one name given two versions is refused with the line number: the SBOM and the other files are written without the file's versions, and the scan exits 1. A component whose version reads `UNKNOWN` (a kernel module with no version in its metadata) counts as having none, so it is in the template. A component whose name holds other characters, such as a space, is listed on the console instead of in the template.
+
+When a component has no version to give, leave the version empty and write a reason instead. The reason is one of `own-code` (the manufacturer's own code), `not-open-source` (only the name matches an open source project) or `version-unknown` (open source, but the shipped version cannot be confirmed); case is ignored, and any other value, or one name given two different reasons, refuses the file with the line number. The component stays in the SBOM without a version and carries `bomlens:versionReason` with the reason. A row with both a version and a reason applies the version and ignores the reason with a warning, and a reason given for a component the scan read a version for, or for a name the scan did not find, is ignored with a warning. A `version-unknown` component is still listed in the security report under the components that could not be checked.
+
+```text
+name,version,reason
+busybox,1.36.1,
+libvendor,,own-code
+telnetd,,not-open-source
+libfoo,,version-unknown
+```
+
+The template has the header `name,version,reason` and comment lines that explain the three reasons, and it leaves out components that already carry a reason.
 
 ## How CVEs are matched
 

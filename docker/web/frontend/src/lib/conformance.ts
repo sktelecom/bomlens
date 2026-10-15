@@ -9,7 +9,13 @@
  * Pure and unit tested — every count comes from the check statuses and sources,
  * none is invented.
  */
-import type { AiProfile, ConformanceCheck, ConformanceSummary } from "./api";
+import type {
+  AiProfile,
+  ConformanceCheck,
+  ConformanceSummary,
+  ExplainedComponent,
+  ExplainedReason,
+} from "./api";
 
 export function isG7(check: ConformanceCheck): boolean {
   return check.id.startsWith("g7-");
@@ -108,6 +114,27 @@ export function missingOverflow(check: ConformanceCheck): number {
   if (!m) return 0;
   const total = Number(m[2]) - Number(m[1]);
   return Math.max(0, total - (check.missing?.length ?? 0));
+}
+
+const EXPLAINED_REASONS: readonly ExplainedReason[] = [
+  "own-code",
+  "not-open-source",
+  "version-unknown",
+];
+
+/** The components the supplier explained instead of versioning, in report
+ *  order. Shown whether or not the row passed: a passing versions-needed row
+ *  still asks the reviewer to judge each reason. Entries with an unknown reason
+ *  or no name are dropped, so the panel only ever renders a translatable reason. */
+export function explainedEntries(check: ConformanceCheck): ExplainedComponent[] {
+  const list = Array.isArray(check.explained) ? check.explained : [];
+  return list.filter(
+    (e): e is ExplainedComponent =>
+      !!e &&
+      typeof e.name === "string" &&
+      e.name !== "" &&
+      EXPLAINED_REASONS.includes(e.reason),
+  );
 }
 
 export interface G7Group {

@@ -11,6 +11,7 @@ import {
   crosswalkTotals,
   dedupeMissing,
   elementCoverage,
+  explainedEntries,
   g7Tally,
   groupG7ByCluster,
   kindTally,
@@ -461,5 +462,52 @@ describe("resultQuality", () => {
     const q = resultQuality({ ...base, emptyResult: true,
       licenseCoverage: { declared: 0, total: 2, pct: 0 } }, true);
     expect(q).toEqual({ empty: false, noLicenses: false, license: null });
+  });
+});
+
+describe("explainedEntries", () => {
+  const row = (explained: unknown): ConformanceCheck =>
+    ({
+      id: "versions-needed",
+      label: "Versions needed",
+      required: true,
+      status: "pass",
+      detail: "0 without a version, 3 explained by the supplier",
+      explained,
+    }) as ConformanceCheck;
+
+  it("lists the explained components of a passing row in report order", () => {
+    expect(
+      explainedEntries(
+        row([
+          { name: "libradius", reason: "own-code" },
+          { name: "vendor-blob", reason: "not-open-source" },
+          { name: "quagga", reason: "version-unknown" },
+        ]),
+      ),
+    ).toEqual([
+      { name: "libradius", reason: "own-code" },
+      { name: "vendor-blob", reason: "not-open-source" },
+      { name: "quagga", reason: "version-unknown" },
+    ]);
+  });
+
+  it("drops unknown reasons, nameless entries and non-objects", () => {
+    expect(
+      explainedEntries(
+        row([
+          { name: "bogus", reason: "made-up" },
+          { name: "", reason: "own-code" },
+          null,
+          "x",
+          { name: "ok", reason: "own-code" },
+        ]),
+      ),
+    ).toEqual([{ name: "ok", reason: "own-code" }]);
+  });
+
+  it("is empty when the row carries no list", () => {
+    expect(explainedEntries(row(undefined))).toEqual([]);
+    expect(explainedEntries(row("not-a-list"))).toEqual([]);
   });
 });

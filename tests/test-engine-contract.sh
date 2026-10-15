@@ -2027,7 +2027,7 @@ EOF
 chmod +x "$WORK/bin-syft/syft"
 UB="$(new_run upstream-binary empty)"
 printf 'x' > "$WORK/upstream-fw.bin"
-printf 'name,version\nncurses,5.7\n' > "$WORK/upstream-versions.csv"
+printf 'name,version,reason\nncurses,5.7,\nlibxml2,,version-unknown\n' > "$WORK/upstream-versions.csv"
 ( cd "$UB" && env PATH="$WORK/bin-syft:$WORK/bin:$PATH" MODE=BINARY TARGET_FILE="$WORK/upstream-fw.bin" \
     PROJECT_NAME=demo PROJECT_VERSION=1.0 HOST_OUTPUT_DIR="$UB" BOMLENS_LIBDIR="$ROOT_DIR/docker/lib" \
     BOMLENS_ARTIFACT_CLEANUP=1 UPLOAD_ENABLED=false GENERATE_SECURITY=false SECURITY_ENRICH=false \
@@ -2039,13 +2039,20 @@ printf 'name,version\nncurses,5.7\n' > "$WORK/upstream-versions.csv"
 [ "$(jq -r '.components[] | select(.name == "ncurses") | "\(.version) \(.purl)"' "$UB/demo_1.0_bom.json" 2>/dev/null)" = "5.7 pkg:github/mirror/ncurses@v5.7" ] \
     && pass "a version from the file reaches the SBOM with its upstream purl" \
     || fail "ncurses: $(jq -c '.components[] | select(.name == "ncurses")' "$UB/demo_1.0_bom.json" 2>&1)"
-[ "$(grep -v '^#' "$UB/demo_1.0_component-versions.template.csv" 2>/dev/null | tr '\n' ' ')" = "name,version 3c59x, libxml2, " ] \
+[ "$(grep -v '^#' "$UB/demo_1.0_component-versions.template.csv" 2>/dev/null | tr '\n' ' ')" = "name,version,reason 3c59x,, " ] \
     && jq -e 'any(.outputs[]; .path == "demo_1.0_component-versions.template.csv")' "$UB/bomlens-result.json" >/dev/null \
     && pass "the template of what is still missing is written and listed in the outputs" \
     || fail "template: $(cat "$UB/demo_1.0_component-versions.template.csv" 2>&1)"
-[ "$(jq -c '[.checks[] | select(.id == "versions-needed" or .id == "upstream-purl") | .missing] + [.submitFile]' "$UB/demo_1.0_conformance.json" 2>/dev/null)" = '[["Vendor Utility","libxml2","3c59x"],["gcc@9.3.0","openssl@0.9.8zh"],"demo_1.0_bom.json"]' ] \
+[ "$(jq -c '[.checks[] | select(.id == "versions-needed" or .id == "upstream-purl") | .missing] + [.submitFile]' "$UB/demo_1.0_conformance.json" 2>/dev/null)" = '[["Vendor Utility","3c59x"],["gcc@9.3.0","openssl@0.9.8zh"],"demo_1.0_bom.json"]' ] \
     && pass "the submission profile names what is missing and the file to submit" \
     || fail "conformance: $(jq -c '[.checks[] | select(.id == "versions-needed" or .id == "upstream-purl")] + [.submitFile]' "$UB/demo_1.0_conformance.json" 2>&1)"
+# A reason the supplier gave survives the rest of the pipeline (normalize,
+# upstream purl) and the submission profile lists it as explained.
+[ "$(jq -c '[.components[] | select(.name == "libxml2") | (.version // null), ([.properties[]? | select(.name == "bomlens:versionReason") | .value][0])]' "$UB/demo_1.0_bom.json" 2>/dev/null)" = '[null,"version-unknown"]' ] \
+    && [ "$(jq -c '.checks[] | select(.id == "versions-needed") | .explained' "$UB/demo_1.0_conformance.json" 2>/dev/null)" = '[{"name":"libxml2","reason":"version-unknown"}]' ] \
+    && [ "$(jq -r '.metadata.properties[]? | select(.name == "bomlens:scanMode") | .value' "$UB/demo_1.0_bom.json" 2>/dev/null)" = BINARY ] \
+    && pass "a reason from the file reaches the SBOM and the version-needed row; the SBOM states its scan mode" \
+    || fail "reason: $(jq -c '.components[] | select(.name == "libxml2")' "$UB/demo_1.0_bom.json" 2>&1)"
 # The template filled in place and passed back is the supplier's record: the
 # run reads it, and neither sweeps nor rewrites it.
 printf '# filled\nname,version\n3c59x,\nlibxml2,2.9.14\n' > "$UB/demo_1.0_component-versions.template.csv"
