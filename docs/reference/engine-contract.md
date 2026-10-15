@@ -79,7 +79,7 @@ Each step also has `stage` (1 for the SBOM a language image generated before thi
 | `stamp-metadata` | set the root component to the project name and version; the run stops if this fails |
 | `docmeta` | record the document's author, tool and lifecycle phase |
 | `license-registry` | ask the package registry for missing licences and check a single strong-copyleft or non-commercial one (`--license-registry`); `counts` gives `candidates`, `filled`, `superseded`, `confirmed`, `no_answer`, `not_found`, `non_standard`, `lookup_failed`, `budget_reached` |
-| `component-versions` | a firmware, root filesystem or binary scan: fill the versions given with `--component-versions` and write the components still missing one to `_component-versions.template.csv`; `failed` when the file is refused, with the reason in `detail`, and the run then exits 1 |
+| `component-versions` | a firmware, root filesystem or binary scan: fill the versions given with `--component-versions`, record the reasons given as `bomlens:versionReason`, and write the components still missing a version and a reason to `_component-versions.template.csv`; `failed` when the file is refused, with the reason in `detail`, and the run then exits 1 |
 | `normalize` | normalize licences, PURLs and duplicates |
 | `enrich-cpe` | add CPE identifiers |
 | `upstream-purl` | a firmware, root filesystem or binary scan: set the upstream source repository purl from the mapping table; `disabled` with `ENRICH_UPSTREAM_PURL=false` |

@@ -1030,8 +1030,28 @@ fi
 # Under --analyze the document is a supplier's SBOM under review: no template is
 # written and --component-versions is not offered, and the upstream purl table
 # is not applied. The rows stay, worded as what to ask the supplier for.
+#
+# A supplier with no version to give says why, in the reason column of the
+# --component-versions file; component-versions.py records it as
+# bomlens:versionReason. Those components are listed on the version-needed row
+# as explained (explained[]: name and reason) instead of failing it. The
+# upstream-purl row lists what the table does not cover but does not block the
+# submission: the supplier cannot fix it, and SK Telecom checks those
+# separately.
+#
+# The generic rows count the same components again. For a firmware, root
+# filesystem or binary scan this pipeline ran, they defer to the two rows here
+# instead of failing on what these rows excuse: name+version on the explained
+# components, PURL coverage and no pkg:generic on the explained and the
+# no-upstream-purl components, and the transitive row, since such a scan
+# records the packages found in delivered files, not a dependency graph. Each
+# such row is shown as a warning that says why. A component with neither a
+# version nor a reason still fails them. A source scan, and any SBOM under
+# --analyze, keeps the generic rows as measured: a missing purl or dependency
+# graph is something its supplier can fix.
 # --------------------------------------------------------
 SUBMIT_FILE="$(basename "$OUT_PREFIX")_bom.json"
+SUBMIT_EXCUSE=""
 # Which file goes to the reviewer. A scan writes a dozen files, and all of them
 # have been sent. Said in the summary for a scan this pipeline produced; under
 # --analyze the document under test is already the submission.
@@ -1042,43 +1062,76 @@ fi
 if [ "$CONFORMANCE_PROFILE" = "skt-submission" ] && [ "$FORMAT" = "CycloneDX" ]; then
     _submit_analyze=false
     [ "${MODE:-}" = "ANALYZE" ] && _submit_analyze=true
+    _submit_fwmode=false
+    case "${MODE:-}" in FIRMWARE|ROOTFS|BINARY) _submit_fwmode=true ;; esac
     if SUBMIT_ROWS=$(jq -c --argjson cap "$MISSING_CAP" --argjson analyze "$_submit_analyze" \
+            --arg fwmode "$_submit_fwmode" --arg scanmode "${MODE:-}" \
             --arg tmpl "$(basename "$OUT_PREFIX")_component-versions.template.csv" '
         [ .components[]? | select(.type != "data" and .type != "file" and .type != "operating-system") ] as $pkg
-        | [ $pkg[] | select(((.version // "") | tostring) == "") | (.name // "(unnamed)") ] as $nover
+        | ["own-code", "not-open-source", "version-unknown"] as $reasons
+        | def reason: [ (.properties // [])[]? | select(.name? == "bomlens:versionReason") | .value ]
+                      | map(select(. as $v | $reasons | index($v))) | first;
+        [ $pkg[] | select(((.version // "") | tostring) == "") ] as $versionless
+        | [ $versionless[] | select(reason == null) | (.name // "(unnamed)") ] as $nover
+        | [ $versionless[] | select(reason != null) | {name: (.name // "(unnamed)"), reason: reason} ] as $explained
         | [ $pkg[] | select(((.version // "") | tostring) != "")
                    | select(((.purl // "") == "") or ((.purl // "") | test("^pkg:(generic|opkg|openwrt)/"; "i")))
                    | ((.name // "(unnamed)") + "@" + (.version | tostring)) ] as $noup
-        | [ {id: "versions-needed", label: "Version for every component (version needed)",
+        # What the generic rows would still fail on once the explained and the
+        # no-upstream-purl components are excused (see the note above).
+        | ([ $pkg[] | select((.name == null) or (.version == null)) | select(reason == null) ] | length) as $nv_block
+        | ([ $pkg[] | select(.purl == null)
+                    | select(((.version // "") | tostring) == "" and reason == null) ] | length) as $purl_block
+        | ([ .components[]? | select((.purl // "") | startswith("pkg:generic"))
+                            | select(((.type // "library") as $t | ["data", "file", "operating-system"] | index($t)) != null
+                                     or (((.version // "") | tostring) == "" and reason == null)) ] | length) as $generic_block
+        # Under --analyze, only an SBOM that says a BomLens firmware, root
+        # filesystem or binary scan wrote it (bomlens:scanMode, written since
+        # that scan began recording it) is judged as one; any other SBOM, an
+        # older one included, is judged as measured.
+        | ([ (.metadata.properties // [])[]? | select(.name? == "bomlens:scanMode") | .value
+             | select(. == "FIRMWARE" or . == "ROOTFS" or . == "BINARY") ] | first) as $declared_mode
+        | (if $fwmode == "true" then $scanmode elif $analyze then ($declared_mode // "") else "" end) as $fw_as
+        # Nothing is deferred for an SBOM with no package at all (a file
+        # inventory only: the generic rows fail it for naming nothing), nor
+        # while any component has neither a version nor a reason.
+        | ($fw_as != "" and ($pkg | length) > 0 and ($nover | length) == 0) as $fw
+        | {excuse: {nv_block: $nv_block, purl_block: $purl_block, generic_block: $generic_block,
+                    explained: ($explained | length), fw: $fw, mode: $fw_as},
+           rows:
+          [ {id: "versions-needed", label: "Version for every component (version needed)",
              label_ko: "모든 구성요소의 버전 (버전 보충 필요)",
              required: true, source: (if ($pkg | length) == 0 then "na" else "auto" end),
              naKind: (if ($pkg | length) == 0 then "not-applicable" else "" end),
              status: (if ($nover | length) == 0 then "pass" else "fail" end),
-             detail: "\($nover | length) without a version", missing: ($nover[0:$cap]),
+             detail: ("\($nover | length) without a version"
+                      + (if ($explained | length) > 0 then ", \($explained | length) explained by the supplier" else "" end)),
+             missing: ($nover[0:$cap]), explained: ($explained[0:$cap]),
              reviewGuide: (if $analyze then {
-               how: "This SBOM lists these components without a version, so they cannot be checked for vulnerabilities. Ask the supplier for the version shipped in the product, in a corrected SBOM: a BomLens firmware, root filesystem or binary scan writes the components it could not read a version for to a template the supplier fills in and passes back with --component-versions.",
-               how_ko: "이 SBOM에는 버전이 없는 구성요소가 있어 취약점을 확인할 수 없습니다. 제품에 들어간 버전을 넣은 SBOM을 공급사에 다시 요청합니다. BomLens 펌웨어, 루트 파일시스템, 바이너리 스캔은 버전을 읽지 못한 구성요소를 템플릿 파일로 쓰고, 공급사는 버전을 채운 템플릿을 --component-versions 옵션으로 넘겨 다시 스캔합니다.",
+               how: "This SBOM lists these components without a version, so they cannot be checked for vulnerabilities. Ask the supplier for the version shipped in the product, in a corrected SBOM: a BomLens firmware, root filesystem or binary scan writes the components it could not read a version for to a template the supplier fills in and passes back with --component-versions. A component the supplier has no version for carries a reason instead (bomlens:versionReason) and is listed as explained.",
+               how_ko: "이 SBOM에는 버전이 없는 구성요소가 있어 취약점을 확인할 수 없습니다. 제품에 들어간 버전을 넣은 SBOM을 공급사에 다시 요청합니다. BomLens 펌웨어, 루트 파일시스템, 바이너리 스캔은 버전을 읽지 못한 구성요소를 템플릿 파일로 쓰고, 공급사는 버전을 채운 템플릿을 --component-versions 옵션으로 넘겨 다시 스캔합니다. 공급사가 버전을 알 수 없는 구성요소에는 버전 대신 사유(bomlens:versionReason)가 적히고, 공급사 소명 목록에 따로 표시됩니다.",
                docUrl: "https://sktelecom.github.io/bomlens/guides/supplier-sbom/"}
              else {
-               how: ("The scan found these components but could not read their version. Write the version shipped in the product after each name in " + $tmpl + " (CSV: name,version), then scan again with --component-versions " + $tmpl + ". A version the scan read from the delivered files is kept."),
-               how_ko: ("스캔이 찾았지만 버전을 읽지 못한 구성요소입니다. " + $tmpl + " 파일(CSV, name,version)의 각 이름 뒤에 제품에 들어간 버전을 적고 --component-versions " + $tmpl + " 옵션으로 다시 스캔합니다. 스캔이 배포 파일에서 읽은 버전은 그대로 유지됩니다."),
+               how: ("The scan found these components but could not read their version. Write the version shipped in the product after each name in " + $tmpl + " (CSV: name,version,reason), then scan again with --component-versions " + $tmpl + ". When there is no version to give, leave it empty and write the reason instead: own-code, not-open-source or version-unknown. A version the scan read from the delivered files is kept."),
+               how_ko: ("스캔이 찾았지만 버전을 읽지 못한 구성요소입니다. " + $tmpl + " 파일(CSV, name,version,reason)의 각 이름 뒤에 제품에 들어간 버전을 적고 --component-versions " + $tmpl + " 옵션으로 다시 스캔합니다. 적을 버전이 없으면 버전을 비우고 사유를 적습니다. 사유는 own-code(자체 개발 코드), not-open-source(오픈소스 아님), version-unknown(버전 확인 불가) 중 하나입니다. 스캔이 배포 파일에서 읽은 버전은 그대로 유지됩니다."),
                docUrl: "https://sktelecom.github.io/bomlens/guides/firmware/"} end)},
-            {id: "upstream-purl", label: "Upstream purl for every versioned component (no upstream purl)",
-             label_ko: "버전이 있는 모든 구성요소의 upstream purl (upstream purl 없음)",
-             required: true, source: (if ($pkg | length) == 0 then "na" else "auto" end),
+            {id: "upstream-purl", label: "Upstream purl for every versioned component (no upstream purl, reviewed by SK Telecom)",
+             label_ko: "버전이 있는 모든 구성요소의 upstream purl (upstream purl 없음, SK텔레콤 확인)",
+             required: false, source: (if ($pkg | length) == 0 then "na" else "auto" end),
              naKind: (if ($pkg | length) == 0 then "not-applicable" else "" end),
-             status: (if ($noup | length) == 0 then "pass" else "fail" end),
+             status: (if ($noup | length) == 0 then "pass" else "warn" end),
              detail: "\($noup | length) without an upstream purl", missing: ($noup[0:$cap]),
              reviewGuide: (if $analyze then {
                how: "These components have a version but no purl that names their source repository (none, pkg:generic, pkg:opkg or pkg:openwrt), so they cannot be looked up by purl. Ask the supplier for an SBOM that gives each one the purl of its source repository at the release tag, for example by rescanning with a current BomLens firmware, root filesystem or binary scan.",
                how_ko: "버전은 있지만 소스 저장소를 가리키는 purl이 없어(purl 없음, pkg:generic, pkg:opkg, pkg:openwrt) purl로 조회할 수 없는 구성요소입니다. 각 구성요소에 릴리스 태그 기준 소스 저장소 purl을 넣은 SBOM을 공급사에 요청합니다. 최신 BomLens로 펌웨어, 루트 파일시스템, 바이너리를 다시 스캔하는 방법이 있습니다.",
                docUrl: "https://sktelecom.github.io/bomlens/guides/supplier-sbom/"}
              else {
-               how: "These components have a version but no purl that names their source repository, because the upstream purl table does not cover the project or that version form. Editing the SBOM by hand is not the fix: report the component name and version so the table can be extended.",
-               how_ko: "버전은 있지만 소스 저장소를 가리키는 purl이 없는 구성요소입니다. upstream purl 변환표에 해당 프로젝트나 그 버전 형식이 없기 때문입니다. SBOM을 직접 고치지 말고 구성요소 이름과 버전을 알려 주면 변환표에 추가합니다.",
-               docUrl: "https://sktelecom.github.io/bomlens/guides/firmware/"} end)} ]
+               how: "These components have a version but no purl that names their source repository, because the upstream purl table does not cover the project or that version form. This is not for the supplier to fix and does not block the submission: submit the SBOM as it is, and SK Telecom checks these components separately. Do not edit the SBOM by hand.",
+               how_ko: "버전은 있지만 소스 저장소를 가리키는 purl이 없는 구성요소입니다. upstream purl 변환표에 해당 프로젝트나 그 버전 형식이 없기 때문입니다. 공급사가 고칠 항목이 아니며 제출을 막지 않습니다. SBOM을 직접 고치지 말고 그대로 제출하면 SK텔레콤이 이 구성요소를 따로 확인합니다.",
+               docUrl: "https://sktelecom.github.io/bomlens/guides/firmware/"} end)} ] }
         ' "$SBOM" 2>/dev/null); then
-        CHECKS=$(printf '%s\n%s' "$CHECKS" "$SUBMIT_ROWS" | jq -cs 'add')
+        SUBMIT_EXCUSE=$(printf '%s' "$SUBMIT_ROWS" | jq -c '.excuse')
+        CHECKS=$(printf '%s\n%s' "$CHECKS" "$(printf '%s' "$SUBMIT_ROWS" | jq -c '.rows')" | jq -cs 'add')
     else
         echo "[validate] WARN: could not measure the submission next steps; those two rows are omitted." >&2
     fi
@@ -1172,6 +1225,7 @@ if [ -f "$KO_CATALOG" ] && [ -f "$KO_REG" ]; then
           elif ($d|test("^[0-9]+ malformed$")) then ($C["conformance.detail.malformed"]|gsub("%n%";($d|capture("(?<n>[0-9]+)").n)))
           elif $d=="no identifiers of a type that requires a namespace" then $C["conformance.detail.no_ns_purls"]
           elif ($d|test("^[0-9]+ without namespace$")) then ($C["conformance.detail.no_namespace"]|gsub("%n%";($d|capture("(?<n>[0-9]+)").n)))
+          elif ($d|test("^[0-9]+ without a version, [0-9]+ explained by the supplier$")) then ($d|capture("^(?<a>[0-9]+) without a version, (?<b>[0-9]+)")) as $m | ($C["conformance.detail.without_version_explained"]|gsub("%a%";$m.a)|gsub("%b%";$m.b))
           elif ($d|test("^[0-9]+ without a version$")) then ($C["conformance.detail.without_version"]|gsub("%n%";($d|capture("(?<n>[0-9]+)").n)))
           elif ($d|test("^[0-9]+ without an upstream purl$")) then ($C["conformance.detail.without_upstream_purl"]|gsub("%n%";($d|capture("(?<n>[0-9]+)").n)))
           elif ($d|test("^[0-9]+ undefined type\\(s\\)$")) then ($C["conformance.detail.undefined_type"]|gsub("%n%";($d|capture("(?<n>[0-9]+)").n)))
@@ -1194,6 +1248,38 @@ if [ -f "$KO_CATALOG" ] && [ -f "$KO_REG" ]; then
         CHECKS="$KO_JOINED"
     else
         echo "[validate] WARN: Korean labels unavailable; the report stays English." >&2
+    fi
+fi
+
+# Submission profile: the generic rows defer to the version-needed and
+# upstream-purl rows (see "Submission profile" above). Runs after the Korean
+# join so the reason can be appended to both detail lines. SUBMIT_RELAXED_MODE
+# names the scan mode the SBOM was judged as when any row was deferred, for the
+# summary line that tells the reviewer why.
+SUBMIT_RELAXED_MODE=""
+if [ -n "$SUBMIT_EXCUSE" ]; then
+    _checks_before="$CHECKS"
+    if DEFERRED=$(printf '%s' "$CHECKS" | jq -c --argjson x "$SUBMIT_EXCUSE" '
+        def defer($en; $ko): .status = "warn" | .detail = ((.detail // "") + "; " + $en)
+                             | .detail_ko = ((.detail_ko // .detail // "") + "; " + $ko);
+        map(if .status != "fail" or (.required | not) or ($x.fw | not) then .
+            elif .id == "name-version" and $x.nv_block == 0 then
+              defer("\($x.explained) explained by the supplier, see the version-needed row";
+                    "공급사 소명 \($x.explained)개, 버전 보충 필요 항목 참고")
+            elif .id == "purl" and $x.purl_block == 0 then
+              defer("the rest are listed on the version-needed and upstream-purl rows";
+                    "나머지는 버전 보충 필요, upstream purl 없음 항목에 표시")
+            elif .id == "no-generic" and $x.generic_block == 0 then
+              defer("listed on the version-needed and upstream-purl rows";
+                    "버전 보충 필요, upstream purl 없음 항목에 표시")
+            elif .id == "transitive" and $x.fw then
+              defer("a firmware, root filesystem or binary SBOM records the packages found, not a dependency graph";
+                    "펌웨어, 루트 파일시스템, 바이너리 SBOM은 의존 관계 그래프 없이 찾은 패키지를 기록함")
+            else . end)' 2>/dev/null); then
+        CHECKS="$DEFERRED"
+        [ "$CHECKS" != "$_checks_before" ] && SUBMIT_RELAXED_MODE=$(printf '%s' "$SUBMIT_EXCUSE" | jq -r '.mode // ""')
+    else
+        echo "[validate] WARN: could not apply the submission profile to the generic rows; they stay as measured." >&2
     fi
 fi
 
@@ -1341,12 +1427,13 @@ jq -n \
    --arg ts "$GEN_AT" --argjson checks "$CHECKS" --argjson xwalk "$XW_SUMMARY" \
    --argjson untraceable "$N_UNTRACEABLE" --arg profile "$CONFORMANCE_PROFILE" \
    --argjson pipelineStepsFailed "$PIPELINE_STEPS_FAILED" --argjson pipelineStepsFailedMore "$PIPELINE_STEPS_FAILED_MORE" \
-   --argjson signal "$SIGNAL" --arg submitFile "$SUBMIT_NOTE_FILE" '
+   --argjson signal "$SIGNAL" --arg submitFile "$SUBMIT_NOTE_FILE" --arg relaxedAs "$SUBMIT_RELAXED_MODE" '
 { project: $project, format: $format, result: $result, generatedAt: $ts,
   profile: $profile, untraceableComponents: $untraceable, checks: $checks,
   pipelineStepsFailed: $pipelineStepsFailed, pipelineStepsFailedMore: $pipelineStepsFailedMore }
 + $signal
 + (if $submitFile != "" then { submitFile: $submitFile } else {} end)
++ (if $relaxedAs != "" then { submissionJudgedAs: $relaxedAs } else {} end)
 + (if ($xwalk.frameworks | length) > 0 then { regulatoryCrosswalk: $xwalk } else {} end)
 ' > "$JSON"
 
@@ -1481,6 +1568,7 @@ if [ "$REPORT_LANG" = "ko" ]; then
     C_TH_FLAG=$(kstr aiprofile.th_flag); C_LIC_NONE=$(kstr aiprofile.lic_none_html)
     C_H2_G7CHK=$(kstr conformance.h2_g7checks); C_G7CHK_INTRO=$(kstr conformance.g7checks_intro)
     C_H2_MISSING=$(kstr conformance.h2_missing); C_H2_FILL=$(kstr conformance.h2_fill)
+    C_H2_EXPLAINED=$(kstr conformance.h2_explained)
     C_H2_REVIEW=$(kstr conformance.h2_review); C_REVIEW_INTRO=$(kstr conformance.review_intro)
     C_FILL_INTRO=$(kstr conformance.fill_intro); C_H2_XWALK=$(kstr conformance.h2_crosswalk)
     C_YES=$(kstr common.yes); C_NO=$(kstr common.no)
@@ -1513,6 +1601,7 @@ else
     C_H2_G7CHK="G7 minimum elements"
     C_G7CHK_INTRO="Advisory elements from the G7 \"Software Bill of Materials for AI — Minimum Elements\". Being advisory they never move the result, and elements with no automated source are marked for review."
     C_H2_MISSING="Missing / non-conformant items"; C_H2_FILL="How to fill the gaps"
+    C_H2_EXPLAINED="Explained by the supplier (no version, with a reason)"
     C_H2_REVIEW="What needs a person"; C_REVIEW_INTRO="Items no scan can settle, and what to establish for each."
     C_FILL_INTRO="Each element below is advisory and does not affect the result. The fragment shows the shape that would satisfy it."
     C_H2_XWALK="Regulatory crosswalk"
@@ -1575,6 +1664,19 @@ if [ -n "$SUBMIT_NOTE_FILE" ]; then
         C_SUBMIT_MD="- Submit \`${SUBMIT_NOTE_FILE}\` only. The other files in the output folder are for your own review."
         C_SUBMIT_HTML="<p class=\"meta submit-file\">Submit <code>${_sf_html}</code> only. The other files in the output folder are for your own review.</p>"
     fi
+fi
+# Why some general rows read as warnings (see SUBMIT_RELAXED_MODE). The mode is
+# one of three fixed words, so it needs no escaping.
+if [ -n "$SUBMIT_RELAXED_MODE" ]; then
+    if [ "$REPORT_LANG" = "ko" ]; then
+        _rx=$(tfmt conformance.submit_judged_as "bomlens:scanMode=${SUBMIT_RELAXED_MODE}")
+    else
+        _rx="Judged as a BomLens firmware, root filesystem or binary scan SBOM (bomlens:scanMode=${SUBMIT_RELAXED_MODE}), so some general rows are shown as warnings."
+    fi
+    C_SUBMIT_MD="${C_SUBMIT_MD:+$C_SUBMIT_MD
+}- ${_rx}"
+    C_SUBMIT_HTML="${C_SUBMIT_HTML:+$C_SUBMIT_HTML
+}<p class=\"meta submit-judged\">${_rx}</p>"
 fi
 
 # --------------------------------------------------------
@@ -1646,6 +1748,16 @@ fi
         echo ""
         echo "$RCHECKS" | jq -r '.[] | select(.status!="pass" and (.missing|length>0)) |
             "### \(.label)\n" + (.missing | map("- " + (. | tostring)) | join("\n")) + "\n"'
+    fi
+    # The components the supplier gave a reason for instead of a version
+    # (submission profile, version-needed row). Listed whether the row passed or
+    # not: the reviewer decides whether to accept each explanation.
+    if echo "$RCHECKS" | jq -e 'any(.[]; (.explained // []) | length > 0)' >/dev/null; then
+        echo "## ${C_H2_EXPLAINED}"
+        echo ""
+        echo "$RCHECKS" | jq -r '.[] | select((.explained // []) | length > 0) |
+            .explained[] | "- " + (.name | tostring) + ": " + (.reason | tostring)'
+        echo ""
     fi
     # How to fill the gaps (AI SBOMs only): the CycloneDX fragment that would
     # satisfy each advisory element still missing. Scoped to real gaps — passing
@@ -1892,6 +2004,11 @@ HTMLHEAD
         echo "<h2>${C_H2_MISSING}</h2>"
         echo "$RCHECKS" | jq -r '.[] | select(.status!="pass" and (.missing|length>0)) |
             "<h3>" + (.label|@html) + "</h3><ul class=\"mono\">" + (.missing | map("<li>" + (.|tostring|@html) + "</li>") | join("")) + "</ul>"'
+    fi
+    if echo "$RCHECKS" | jq -e 'any(.[]; (.explained // []) | length > 0)' >/dev/null; then
+        echo "<h2>${C_H2_EXPLAINED}</h2>"
+        echo "$RCHECKS" | jq -r '"<ul class=\"mono\">" + ([.[] | select((.explained // []) | length > 0) | .explained[]
+            | "<li>" + (.name|tostring|@html) + ": " + (.reason|tostring|@html) + "</li>"] | join("")) + "</ul>"'
     fi
     # The fill-in fragments used to live here as their own section; they now ride
     # in the evidence column of the row they belong to (see above). The Markdown
