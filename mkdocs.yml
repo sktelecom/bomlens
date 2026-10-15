@@ -24,7 +24,7 @@ theme:
   logo: images/logo.svg
   favicon: images/logo-mark.svg
   font:
-    text: Roboto
+    text: Inter
     code: Roboto Mono
   palette:
     - media: "(prefers-color-scheme: light)"
@@ -52,6 +52,9 @@ theme:
     - search.highlight
     - content.code.copy
     - content.tabs.link
+
+hooks:
+  - hooks/sitemap_alias.py
 
 extra_css:
   - stylesheets/extra.css
@@ -97,6 +100,7 @@ plugins:
           build: true
           nav_translations:
             Home: 홈
+            Live demo: 데모 둘러보기
             Get started: 빠른 시작
             What is an SBOM: SBOM이란
             First scan: 시작하기

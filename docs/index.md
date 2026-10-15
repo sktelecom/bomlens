@@ -1,27 +1,39 @@
 ---
-description: BomLens is a local-first SBOM generator and open-source risk assessor. From source code, containers, binaries, firmware, or an SBOM you received, it produces a CycloneDX SBOM, an open-source notice, and a security and license risk report — CLI or web UI, no SaaS.
+description: BomLens is a local-first SBOM generator and open-source risk assessor. From source code, containers, binaries, firmware, or an SBOM you received, it produces a CycloneDX SBOM, an open-source notice, and a security and license risk report, from the CLI or a web UI, with no SaaS.
 hide:
   - toc
 ---
 
+<div class="home-hero" markdown>
+
 # Generate SBOMs and assess open-source risk, all locally
 
-A local-first SBOM generator and open-source risk assessor for a single project — no SaaS, no account. From source code, a container image, a binary, firmware, an SBOM you received, or a HuggingFace AI model, it produces an [SBOM](concepts/what-is-sbom.md) (CycloneDX 1.6), an open-source notice, and a security risk report in one run. For an AI model it builds a CycloneDX ML-BOM and checks it against the [G7 minimum elements for AI](guides/ai-model.md), whose clusters overlap with the EU AI Act's Annex IV.
+From source, containers, binaries, firmware, or an SBOM you received.
+One run gives you an SBOM, an open-source notice, and a risk report.
+No SaaS and no account.
 
-[Get started](start/first-scan.md){ .md-button .md-button--primary }
-[Try the demo](https://sktelecom.github.io/bomlens/demo/){ .md-button }
-[Download for Windows (.exe)](https://github.com/sktelecom/bomlens/releases/latest/download/BomLens-Setup.exe){ .md-button }
+[Try the live demo](https://sktelecom.github.io/bomlens/demo/){ .md-button .md-button--primary }
+[Get started](start/first-scan.md){ .md-button }
 
-[![Latest release](https://img.shields.io/github/v/release/sktelecom/bomlens)](https://github.com/sktelecom/bomlens/releases/latest)
-The Windows installer needs a Docker engine already running; see the [no-CLI quick start](start/no-cli.md) below.
+<p class="home-hero__aside" markdown>[Download for Windows (.exe)](https://github.com/sktelecom/bomlens/releases/latest/download/BomLens-Setup.exe). It needs a Docker engine that is already running.</p>
+
+</div>
+
+![BomLens web UI Overview screen for a finished scan: component, vulnerability, dependency and artifact counts, a needs-attention banner, and the severity and license classification distributions](images/web-ui-demo.png){ .home-shot }
+
+## What it does
+
+A local-first SBOM generator and open-source risk assessor for a single project. From source code, a container image, a binary, firmware, an SBOM you received, or a HuggingFace AI model, it produces an [SBOM](concepts/what-is-sbom.md) (CycloneDX 1.6), an open-source notice, and a security risk report in one run. For an AI model it builds a CycloneDX ML-BOM and checks it against the [G7 minimum elements for AI](guides/ai-model.md), whose clusters overlap with the EU AI Act's Annex IV.
 
 Want to see what a result looks like before installing anything? The [live demo](https://sktelecom.github.io/bomlens/demo/) is the real web UI holding one finished scan of each kind: a Spring Boot project from source, a container image, a device firmware image, an AI model as a CycloneDX ML-BOM, and a supplier SBOM checked against the format requirements. Nothing to install, and nothing is uploaded: it is a frozen copy of results produced by ordinary local runs.
 
 Prefer no command line? Download the installer and double-click it. A Docker engine is required; the free [Rancher Desktop](https://rancherdesktop.io/) works well on Windows. A step-by-step walkthrough is in the [no-CLI quick start](start/no-cli.md).
 
-![BomLens web UI Overview screen for a finished scan: component/vulnerability/dependency/artifact counts, a needs-attention banner, and the severity and license classification distributions](images/web-ui-demo.png){ .home-shot }
+[![Latest release](https://img.shields.io/github/v/release/sktelecom/bomlens)](https://github.com/sktelecom/bomlens/releases/latest)
 
-## Where to go next
+## Where to start
+
+### If you want to try it
 
 <div class="grid cards" markdown>
 
@@ -33,7 +45,7 @@ Prefer no command line? Download the installer and double-click it. A Docker eng
 
 -   :material-cursor-default-click: __No-CLI quick start__
 
-    Make an SBOM and a notice with the desktop app — no command line.
+    Make an SBOM and a notice with the desktop app, no command line.
 
     [:octicons-arrow-right-24: Quick start](start/no-cli.md)
 
@@ -49,11 +61,23 @@ Prefer no command line? Download the installer and double-click it. A Docker eng
 
     [:octicons-arrow-right-24: Supplier SBOM](guides/supplier-sbom.md)
 
--   :material-robot-outline: __AI model SBOM__
+</div>
 
-    An ML-BOM for a HuggingFace model, checked against the G7 minimum elements and mapped to the EU AI Act.
+### If you run it in CI or need the reference
 
-    [:octicons-arrow-right-24: AI model SBOM](guides/ai-model.md)
+<div class="grid cards" markdown>
+
+-   :material-cog: __CLI reference__
+
+    Every option and analysis mode.
+
+    [:octicons-arrow-right-24: CLI reference](reference/cli.md)
+
+-   :material-source-branch: __CI/CD__
+
+    Run scans in a pipeline and gate on the result.
+
+    [:octicons-arrow-right-24: CI/CD](guides/ci-cd.md)
 
 -   :material-shield-check: __Notice & security report__
 
@@ -61,10 +85,10 @@ Prefer no command line? Download the installer and double-click it. A Docker eng
 
     [:octicons-arrow-right-24: Reports](guides/reports.md)
 
--   :material-cog: __CLI reference__
+-   :material-robot-outline: __AI model SBOM__
 
-    Every option, analysis modes, CI/CD.
+    An ML-BOM for a HuggingFace model, checked against the G7 minimum elements and mapped to the EU AI Act.
 
-    [:octicons-arrow-right-24: CLI reference](reference/cli.md)
+    [:octicons-arrow-right-24: AI model SBOM](guides/ai-model.md)
 
 </div>

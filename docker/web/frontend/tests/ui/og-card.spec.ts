@@ -23,3 +23,12 @@ test("@capture og card", async ({ page }) => {
   await page.evaluate(() => document.fonts.ready);
   await page.screenshot({ path: `${IMAGES}/og-card.png` });
 });
+
+// The Korean card (docs/images/og-card-ko.png) is written at CSS size, a plain
+// 1200x630, because that is the size the sharing platforms ask for.
+test("@capture og card ko", async ({ page }) => {
+  const source = path.resolve(process.cwd(), `${IMAGES}/src/og-card-ko.html`);
+  await page.goto(pathToFileURL(source).href);
+  await page.evaluate(() => document.fonts.ready);
+  await page.screenshot({ path: `${IMAGES}/og-card-ko.png`, scale: "css" });
+});
