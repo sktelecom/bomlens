@@ -171,10 +171,25 @@ fi
 # --------------------------------------------------------
 BOM="${OUT_PREFIX}_bom.json"
 LIB_DIR="$(cd "$(dirname "$0")" && pwd)"
+# The components whose licenses this report counts. For a source or image scan
+# the root component is the scanned project itself, whose own license is not a
+# third-party obligation, so it is left out (as the NOTICE file leaves it out).
+# For an AI model or dataset scan the root is the model or dataset under
+# review, and its license is the one that matters most: a model with no
+# dependent datasets has no other component at all, and read as 0 licenses.
+# shellcheck disable=SC2016
+LIC_SUBJECTS='((if ((.metadata.component.type // "") | IN("machine-learning-model", "data"))
+                then [.metadata.component] else [] end) + [ .components[]? ])'
 LIC_CLASS='null'
+if [ -f "$BOM" ] && jq empty "$BOM" >/dev/null 2>&1 \
+   && jq -e '(.metadata.component.type // "") | IN("machine-learning-model", "data")' "$BOM" >/dev/null 2>&1; then
+    LIC_COUNT=$(jq -r "$LIC_SUBJECTS"'
+      | [ .[] | (.licenses // [])[] | (.license.id // .license.name // .expression // empty) ]
+      | unique | length' "$BOM" 2>/dev/null || echo "$LIC_COUNT")
+fi
 if [ -f "$BOM" ] && [ -f "$LIB_DIR/license-flags.jq" ] && jq empty "$BOM" >/dev/null 2>&1; then
-    LIC_CLASS=$(jq -c "$(cat "$LIB_DIR/license-flags.jq")"'
-      [ .components[]? | { class: component_license_class,
+    LIC_CLASS=$(jq -c "$(cat "$LIB_DIR/license-flags.jq")$LIC_SUBJECTS"'
+      | [ .[] | { class: component_license_class,
                            label: ((.name // "?") + "@" + (.version // "?")) } ] as $rows
       | { nc: ([$rows[] | select(.class=="network-copyleft") | .label]),
           sc: ([$rows[] | select(.class=="strong-copyleft")  | .label]),

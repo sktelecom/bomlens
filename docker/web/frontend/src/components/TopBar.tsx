@@ -109,7 +109,7 @@ export function TopBar({
     />
   );
   return (
-    <header className="sticky top-0 z-20 flex h-14 shrink-0 items-center gap-4 border-b bg-card/80 px-4 backdrop-blur supports-[backdrop-filter]:bg-card/60">
+    <header className="sticky top-0 z-20 flex h-14 shrink-0 items-center gap-2 border-b bg-card/80 px-3 backdrop-blur sm:gap-4 sm:px-4 supports-[backdrop-filter]:bg-card/60">
       {showHomeLink ? (
         <a
           href={homeHref}
@@ -133,8 +133,9 @@ export function TopBar({
       )}
       {project && (
         <>
-          <span className="h-5 w-px shrink-0 bg-border" aria-hidden />
-          <div className="flex min-w-0 items-baseline gap-2">
+          <span className="hidden h-5 w-px shrink-0 bg-border sm:block" aria-hidden />
+          {/* The scan name needs room the icon buttons cannot spare on a phone. */}
+          <div className="hidden min-w-0 items-baseline gap-2 sm:flex">
             <span
               className="truncate text-sm font-medium text-foreground"
               title={project.name}
@@ -149,7 +150,7 @@ export function TopBar({
           </div>
         </>
       )}
-      <div className="ml-auto flex shrink-0 items-center gap-2">
+      <div className="ml-auto flex shrink-0 items-center gap-1 sm:gap-2">
         {search}
         {/* Re-scan parks the finished scan's config in the form and reruns it,
             which the demo cannot do. New scan stays: the form itself is worth

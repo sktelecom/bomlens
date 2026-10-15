@@ -1,7 +1,7 @@
 {
-  "_comment": "Component name or CPE -> purl of the project's upstream source repository, for components identified in firmware, root filesystem and binary scans (upstream-purl.py). Those components arrive with no purl, a pkg:generic one, or a package-manager type no vulnerability or license database resolves (opkg, openwrt), so a tool that looks components up by purl cannot identify them. upstream-purl.py sets pkg:<type>/<namespace>/<name>@<tag> from this table, where <tag> is the release tag the upstream repository uses for that version. CLOSED list on purpose: each entry reproduces a release tag of the upstream repository for the versions it names, and a name not listed here keeps the identifier it has (a wrong repository or tag points at a different version, which is worse than none). Entries starting with '_' are ignored.",
+  "_comment": "Component name or CPE -> purl of the project's upstream source repository, for components identified in firmware, root filesystem and binary scans and read from a Yocto build's records (upstream-purl.py). Those components arrive with no purl, a pkg:generic one, or a package-manager type no vulnerability or license database resolves (opkg, openwrt), so a tool that looks components up by purl cannot identify them. upstream-purl.py sets pkg:<type>/<namespace>/<name>@<tag> from this table, where <tag> is the release tag the upstream repository uses for that version. CLOSED list on purpose: each entry reproduces a release tag of the upstream repository for the versions it names, and a name not listed here keeps the identifier it has (a wrong repository or tag points at a different version, which is worse than none). Entries starting with '_' are ignored.",
 
-  "_comment_fields": "names: lower-cased component names that mean this project. cpe: vendor:product pairs (NVD CPE dictionary) that mean it, matched when the name is not listed. purl: everything before '@'. version: the regular expression the normalized version must match in full; a version of any other shape is left alone rather than guessed at. tag: how the release tag is spelled, with {v} the version, {v_} the version with '.' replaced by '_', and {1}, {2}, ... the groups of the version expression. normalize: suffixes removed before matching; 'release' is a trailing package rebuild count (-1, -r2; at most three digits, so a date such as -20230520 is kept), 'build-hash' a trailing build hash of 20 or more hex digits (kernel packages carry one), 'zero-sublevel' a third part of 0 removed (5.4.0 becomes 5.4) for a project that tags a base release with two parts. verified: the versions whose release tag the entry was checked to reproduce.",
+  "_comment_fields": "names: lower-cased component names that mean this project. cpe: vendor:product pairs (NVD CPE dictionary) that mean it, matched when the name is not listed. purl: everything before '@'. version: the regular expression the normalized version must match in full; a version of any other shape is left alone rather than guessed at. tag: how the release tag is spelled, with {v} the version, {v_} the version with '.' replaced by '_', and {1}, {2}, ... the groups of the version expression. tags: instead of tag, for a project whose tag carries something the version does not (a release date): the normalized version -> its tag, for the checked versions only; any other version is left alone. normalize: suffixes removed before matching; 'release' is a trailing package rebuild count (-1, -r2; at most three digits, so a date such as -20230520 is kept), 'build-hash' a trailing build hash of 20 or more hex digits (kernel packages carry one), 'zero-sublevel' a third part of 0 removed (5.4.0 becomes 5.4) for a project that tags a base release with two parts. verified: the versions whose release tag the entry was checked to reproduce.",
 
   "replaceablePurlTypes": ["generic", "opkg", "openwrt"],
 
@@ -17,6 +17,10 @@
     { "id": "openssl-1", "names": ["openssl", "libopenssl", "openssl-util"], "cpe": ["openssl:openssl"],
       "purl": "pkg:github/openssl/openssl", "version": "^1\\.[0-9]+\\.[0-9]+[a-z]?$", "tag": "OpenSSL_{v_}",
       "normalize": ["release"], "verified": ["1.0.2h", "1.1.1w"] },
+
+    { "id": "openssl-3", "names": ["openssl", "libopenssl", "openssl-util", "openssl-bin", "libssl3", "libcrypto3"], "cpe": ["openssl:openssl"],
+      "purl": "pkg:github/openssl/openssl", "version": "^3\\.[0-9]+\\.[0-9]+$", "tag": "openssl-{v}",
+      "normalize": ["release"], "verified": ["3.0.13", "3.5.7"] },
 
     { "id": "openssh", "names": ["openssh", "openssh-server", "openssh-client"], "cpe": ["openbsd:openssh"],
       "purl": "pkg:github/openssh/openssh-portable", "version": "^([0-9]+)\\.([0-9]+)p([0-9]+)$", "tag": "V_{1}_{2}_P{3}",
@@ -65,6 +69,33 @@
     { "id": "mbedtls", "names": ["mbedtls", "libmbedtls"], "cpe": ["arm:mbed_tls"],
       "purl": "pkg:github/mbed-tls/mbedtls", "version": "^(2\\.28|3\\.[0-9]+)\\.[0-9]+$", "tag": "v{v}",
       "normalize": ["release"], "verified": ["2.28.9"] },
+
+    { "id": "jansson", "names": ["jansson", "libjansson"], "cpe": ["jansson_project:jansson"],
+      "purl": "pkg:github/akheron/jansson", "version": "^[0-9]+\\.[0-9]+(\\.[0-9]+)?$", "tag": "v{v}",
+      "normalize": ["release"], "verified": ["2.13.1", "2.14"] },
+
+    { "id": "json-c", "names": ["json-c", "libjson-c"], "cpe": ["json-c:json-c"],
+      "purl": "pkg:github/json-c/json-c", "version": "^0\\.[0-9]+(\\.[0-9]+)?$",
+      "tags": { "0.13.1": "json-c-0.13.1-20180305", "0.14": "json-c-0.14-20200419", "0.15": "json-c-0.15-20200726",
+                "0.16": "json-c-0.16-20220414", "0.17": "json-c-0.17-20230812", "0.18": "json-c-0.18-20240915",
+                "0.19": "json-c-0.19-20260627" },
+      "normalize": ["release"], "verified": ["0.13.1", "0.14", "0.15", "0.16", "0.17", "0.18", "0.19"] },
+
+    { "id": "libbpf", "names": ["libbpf"], "cpe": ["libbpf_project:libbpf"],
+      "purl": "pkg:github/libbpf/libbpf", "version": "^[0-9]+\\.[0-9]+\\.[0-9]+$", "tag": "v{v}",
+      "normalize": ["release"], "verified": ["1.2.2", "1.4.0"] },
+
+    { "id": "iproute2", "names": ["iproute2", "iproute"], "cpe": ["iproute2_project:iproute2"],
+      "purl": "pkg:github/shemminger/iproute2", "version": "^[0-9]+\\.[0-9]+\\.[0-9]+$", "tag": "v{v}",
+      "normalize": ["release"], "verified": ["6.3.0", "6.7.0"] },
+
+    { "id": "musl", "names": ["musl"], "cpe": ["musl-libc:musl"],
+      "purl": "pkg:github/kraj/musl", "version": "^1\\.[0-9]+\\.[0-9]+$", "tag": "v{v}",
+      "normalize": ["release"], "verified": ["1.2.4"] },
+
+    { "id": "util-linux", "names": ["util-linux"], "cpe": ["kernel:util-linux"],
+      "purl": "pkg:github/util-linux/util-linux", "version": "^2\\.[0-9]+(\\.[0-9]+)?$", "tag": "v{v}",
+      "normalize": ["release"], "verified": ["2.39.3"] },
 
     { "id": "python", "names": ["python", "python2", "python3", "cpython"], "cpe": ["python:python"],
       "purl": "pkg:github/python/cpython", "version": "^[23]\\.[0-9]+\\.[0-9]+$", "tag": "v{v}",

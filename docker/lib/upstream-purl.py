@@ -4,7 +4,8 @@
 # Licensed under the Apache License, Version 2.0.
 #
 # upstream-purl.py - give a component identified in a firmware, root filesystem
-# or binary scan the purl of its upstream source repository.
+# or binary scan, or read from a Yocto build's records, the purl of its upstream
+# source repository.
 #
 # Usage: upstream-purl.py <sbom.json>                 (CycloneDX JSON, edited in place)
 #        upstream-purl.py --resolve <name> <version>  (print the purl, or nothing)
@@ -28,11 +29,24 @@
 #     allows (a package rebuild count, a kernel build hash), matches the entry's
 #     version expression in full (a kernel or glibc X.Y.0 is read as X.Y,
 #     the form its repository tags);
-#   - its name is in the entry's names, or its CPE vendor:product is in the
-#     entry's cpe list, and the two do not point at different entries.
+#   - one of its names is in the entry's names, or its CPE vendor:product is in
+#     the entry's cpe list, and the two do not point at different projects. Its
+#     names are the component name and, when the scan recorded one, the name of
+#     the source it was built from: the Yocto recipe (bomlens:yocto:recipe), the
+#     OpenWrt source package (the last part of syft:metadata:source, so
+#     libmbedtls12 is read as mbedtls), and the product of a CPE whose vendor is
+#     '*' (Yocto writes its CVE_PRODUCT that way);
 #   - for an operating-system component, no package or binary component in
 #     the SBOM carries the same purl (busybox is reported as both; the purl
 #     goes to the binary only).
+# A component the table does not cover gets a purl from its source download
+# address (bomlens:sourceUrl, written by the Yocto reader) only when that address
+# states the repository and the release outright: a GitHub release asset or tag
+# archive (github.com/<owner>/<repo>/releases/download/<tag>/,
+# .../archive/refs/tags/<tag>.tar.gz) gives pkg:github/<owner>/<repo>@<tag>, and
+# a GNU release (ftp.gnu.org or ftpmirror.gnu.org /gnu/<name>/<name>-<version>.tar.*)
+# gives pkg:gnu/<name>@<version>. A plain tarball elsewhere, or a git commit, is
+# not read as a release.
 # Anything else is left exactly as it is. A name the table does not hold is
 # never turned into a repository by pattern: a wrong owner or tag identifies a
 # different project or a different version, which is worse than no purl.
@@ -67,8 +81,15 @@ _BUILD_HASH = re.compile(r"-[0-9a-f]{20,}$")
 # A base release written with a zero third part (5.4.0) where the repository
 # tags it with two (v5.4): the kernel and glibc never tag an X.Y.0.
 _ZERO_SUBLEVEL = re.compile(r"^([0-9]+\.[0-9]+)\.0$")
-_CPE23 = re.compile(r"^cpe:2\.3:[aho]:([^:]+):([^:]+):")
+_CPE23 = re.compile(r"^cpe:2\.3:[aho*]:([^:]+):([^:]+):")
 _CPE22 = re.compile(r"^cpe:/[aho]:([^:]+):([^:]+)")
+# Source addresses that state the release (see the header).
+_GH_RELEASE = re.compile(
+    r"^https?://github\.com/([A-Za-z0-9_.-]+)/([A-Za-z0-9_.-]+?)(?:\.git)?/"
+    r"(?:releases/+download/([^/]+)/[^/]+|archive/refs/tags/([^/]+?)\.(?:tar\.gz|tar\.bz2|tar\.xz|zip))$")
+_GNU_RELEASE = re.compile(
+    r"^https?://(?:ftp|ftpmirror)\.gnu\.org/gnu/([a-z0-9][a-z0-9+_-]*)/"
+    r"([a-z0-9][a-z0-9+_-]*)-([0-9][0-9A-Za-z.]*)\.tar\.(?:gz|bz2|xz|lz|zst)$")
 
 
 def load_table(path=MAP_FILE):
@@ -79,12 +100,14 @@ def load_table(path=MAP_FILE):
         if not isinstance(e, dict) or str(e.get("id", "")).startswith("_"):
             continue
         entries.append(dict(e, _re=re.compile(e["version"])))
+    # A name or CPE can mean more than one entry when a project's tag spelling
+    # changed between release series (OpenSSL 1.x and 3.x); the version picks.
     by_name, by_cpe = {}, {}
     for e in entries:
         for n in e.get("names", []):
-            by_name[n.lower()] = e
+            by_name.setdefault(n.lower(), []).append(e)
         for c in e.get("cpe", []):
-            by_cpe[c.lower()] = e
+            by_cpe.setdefault(c.lower(), []).append(e)
     types = {t.lower() for t in doc.get("replaceablePurlTypes", [])}
     return by_name, by_cpe, types
 
@@ -117,6 +140,9 @@ def build_tag(entry, version):
     m = entry["_re"].fullmatch(v)
     if not m:
         return None
+    if "tags" in entry:
+        tag = entry["tags"].get(v)
+        return tag if tag and _TAG_SAFE.match(tag) else None
     tag = entry["tag"].replace("{v_}", v.replace(".", "_")).replace("{v}", v)
     for i, g in enumerate(m.groups(), start=1):
         tag = tag.replace("{%d}" % i, g or "")
@@ -125,25 +151,101 @@ def build_tag(entry, version):
     return tag
 
 
-def pick_entry(by_name, by_cpe, name, cpe):
-    by_n = by_name.get((name or "").strip().lower())
+def _project(e):
+    return e["purl"]
+
+
+def pick_entries(by_name, by_cpe, names, cpe):
+    """The entries the component's names or CPE point at, or [] when they point
+    at different projects."""
+    by_n = []
+    for n in names:
+        for e in by_name.get((n or "").strip().lower(), []):
+            if e not in by_n:
+                by_n.append(e)
     vp = cpe_vendor_product(cpe)
-    by_c = by_cpe.get(vp) if vp else None
-    if by_n is not None and by_c is not None and by_n is not by_c:
-        return None  # the name and the CPE name two different projects
+    by_c = by_cpe.get(vp, []) if vp and not vp.startswith("*:") else []
+    projects_n = {_project(e) for e in by_n}
+    projects_c = {_project(e) for e in by_c}
+    if len(projects_n) > 1:
+        return []  # the component's own names mean two different projects
+    if projects_n and projects_c and projects_n != projects_c:
+        return []  # the name and the CPE name two different projects
     return by_n or by_c
 
 
-def resolve(by_name, by_cpe, name, version, cpe=None):
+def known(by_name, by_cpe, names, cpe):
+    """True when any of the names or the CPE is in the table, whether or not the
+    entries agree: such a component is the table's to decide, never an address's."""
+    if any(by_name.get((n or "").strip().lower()) for n in names):
+        return True
+    vp = cpe_vendor_product(cpe)
+    return bool(vp and not vp.startswith("*:") and by_cpe.get(vp))
+
+
+def resolve(by_name, by_cpe, name, version, cpe=None, extra_names=()):
     if not version:
         return None
-    entry = pick_entry(by_name, by_cpe, name, cpe)
-    if entry is None:
+    names = [name] + [n for n in extra_names if n]
+    for entry in pick_entries(by_name, by_cpe, names, cpe):
+        tag = build_tag(entry, version)
+        if tag is not None:
+            return entry["purl"] + "@" + tag
+    return None
+
+
+def source_names(c):
+    """The names of what the component was built from, as the scan recorded them."""
+    out = []
+    for p in c.get("properties") or []:
+        if not isinstance(p, dict) or not isinstance(p.get("value"), str):
+            continue
+        if p.get("name") == "bomlens:yocto:recipe":
+            out.append(p["value"])
+        elif p.get("name") == "syft:metadata:source":
+            last = p["value"].rstrip("/").rsplit("/", 1)[-1]
+            # The toolchain path builds libc and libgcc, which it does not name;
+            # the kernel path builds every kmod-* package, which are the kernel
+            # already listed once, not a project each.
+            if last and last not in ("toolchain", "linux"):
+                out.append(last)
+    vp = cpe_vendor_product(c.get("cpe"))
+    if vp and vp.startswith("*:"):
+        out.append(vp[2:])
+    return out
+
+
+def _tag_names_version(tag, version):
+    """True when a release tag spells this version: v1.2, V_1_2, name-1.2 or 1.2."""
+    core = re.sub(r"^(?:[A-Za-z][A-Za-z0-9+.]*?[-_])?[vV]_?", "", tag)
+    core = re.sub(r"^[A-Za-z][A-Za-z0-9+.]*?-(?=[0-9])", "", core)
+    return core.replace("_", ".") == version
+
+
+def from_source_url(c, version):
+    """pkg:github or pkg:gnu from a source address that states the release.
+
+    Only for a component the table does not cover at all (resolve() decides
+    that), and only when the release the address names is the component's
+    version: an address can point at a helper fetched beside the project, or at
+    a release other than the one packaged."""
+    url = next((p.get("value") for p in c.get("properties") or []
+                if isinstance(p, dict) and p.get("name") == "bomlens:sourceUrl"), None)
+    if not isinstance(url, str):
         return None
-    tag = build_tag(entry, version)
-    if tag is None:
+    v = normalize_version({"normalize": ["release"]}, version or "")
+    if not v:
         return None
-    return entry["purl"] + "@" + tag
+    m = _GH_RELEASE.match(url.strip())
+    if m:
+        tag = m.group(3) or m.group(4)
+        if tag and _TAG_SAFE.match(tag) and _tag_names_version(tag, v):
+            return f"pkg:github/{m.group(1).lower()}/{m.group(2).lower()}@{tag}"
+        return None
+    m = _GNU_RELEASE.match(url.strip())
+    if m and m.group(1) == m.group(2) and _TAG_SAFE.match(m.group(3)) and m.group(3) == v:
+        return f"pkg:gnu/{m.group(1)}@{m.group(3)}"
+    return None
 
 
 def purl_type(purl):
@@ -172,7 +274,11 @@ def apply(doc, table):
         version = c.get("version")
         if not isinstance(version, str) or not version.strip():
             continue
-        plans.append((c, old, resolve(by_name, by_cpe, c.get("name"), version, c.get("cpe")) or ""))
+        extra = source_names(c)
+        new = resolve(by_name, by_cpe, c.get("name"), version, c.get("cpe"), extra)
+        if not new and not known(by_name, by_cpe, [c.get("name")] + extra, c.get("cpe")):
+            new = from_source_url(c, version)
+        plans.append((c, old, new or ""))
     # The purl each package or binary component carries once this step is done.
     # syft reports a firmware's busybox both as its distribution
     # (operating-system, os:busybox@<v>) and as the binary it classified

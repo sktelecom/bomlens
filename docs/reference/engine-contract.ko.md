@@ -82,7 +82,7 @@ BomLens 이미지를 스캔 엔진으로 쓰는 프로그램은 모든 스캔이
 | `component-versions` | 펌웨어, 루트 파일시스템, 바이너리 스캔에서 `--component-versions`로 받은 버전을 채우고 사유는 `bomlens:versionReason`으로 기록하며, 버전도 사유도 없는 컴포넌트를 `_component-versions.template.csv`로 씀. 파일을 거부하면 `failed`이고 이유를 `detail`에 적으며, 실행은 1로 끝남 |
 | `normalize` | 라이선스, PURL, 중복 정규화 |
 | `enrich-cpe` | CPE 식별자 추가 |
-| `upstream-purl` | 펌웨어, 루트 파일시스템, 바이너리 스캔에서 변환표로 upstream 소스 저장소 purl을 붙임. `ENRICH_UPSTREAM_PURL=false`이면 `disabled` |
+| `upstream-purl` | 펌웨어, 루트 파일시스템, 바이너리 스캔이나 Yocto 빌드의 기록에서 변환표로 upstream 소스 저장소 purl을 붙임. `ENRICH_UPSTREAM_PURL=false`이면 `disabled` |
 | `enrich-os-context` | 운영체제 패키지의 배포판 기록 |
 | `enrich-distro-supplier` | 배포판을 운영체제 패키지의 공급자로 기록 |
 | `enrich-maven-cpe` | Maven 컴포넌트의 CPE 추가 |
@@ -101,7 +101,7 @@ BomLens 이미지를 스캔 엔진으로 쓰는 프로그램은 모든 스캔이
 | `source-file-tree` | 스캔한 트리의 파일 목록 기록 |
 | `source-snapshot` | 파일 보기 화면용으로 스캔한 파일 내용 보관 |
 | `generate-notice` | 오픈소스 고지문 작성 |
-| `match-cpe` | `--security`를 켠 펌웨어, 루트 파일 시스템, 바이너리 스캔에서 패키지 PURL이 없는 컴포넌트의 CPE를 이미지에 들어 있는 NVD CPE 인덱스와 대조. `counts`에 `offered`, `components`, `cves`를 담고, 인덱스가 없는 이미지에서는 `skipped`(`not_installed`), `--security`가 꺼져 있거나 `CVE_BIN_TOOL_MODE=components-only`이면 `disabled` |
+| `match-cpe` | `--security`를 켠 펌웨어, 루트 파일 시스템, 바이너리 스캔이나 Yocto SPDX 2.2 아카이브에서 패키지 PURL이 없는 컴포넌트의 CPE를 이미지에 들어 있는 NVD CPE 인덱스와 대조. `counts`에 `offered`, `components`, `cves`를 담고, 인덱스가 없는 이미지에서는 `skipped`(`not_installed`), `--security`가 꺼져 있거나 `CVE_BIN_TOOL_MODE=components-only`이면 `disabled` |
 | `reachability` | Go 소스나 Go 실행 파일 스캔에서 각 Go 보안 권고의 코드에 도달하는지 govulncheck로 판정(`--reachability`, `REACHABILITY=true`). `counts`는 `exploitable`, `not_affected`, `components`. Go 취약점 데이터베이스를 읽지 못하면 `skipped`(`unavailable`), SBOM에 Go 컴포넌트가 없거나 1단계가 이 실행의 govulncheck 출력을 남기지 않았으면 `skipped`(`no_input`), 소스 트리의 Go 모듈이 20개를 넘으면 `skipped`(`too_large`), Go 모듈이 GOOS linux, darwin, windows 어디에서도 빌드되지 않아 판정하지 못하면 `degraded`(`unavailable`), govulncheck가 없는 이미지면 `skipped`(`not_installed`), 옵션이 없으면 `disabled` |
 | `scan-security` | Trivy로 취약점 매칭 |
 | `deep-cve` | `--security`를 켰을 때 CPE가 있는 컴포넌트와 `bomlens:cpeAlternates`의 추가 CPE를 grype로 NVD와 대조(`--deep-cve`, deep-cve 이미지). grype가 없는 이미지에서 요청하면 `skipped`(`not_installed`), CLI가 deep-cve 이미지 없이 실행했으면 `skipped`(`fallback`, 이미지를 내려받지 못했거나 스캐너 이미지가 로컬 빌드, 1.13.2보다 낮은 버전, BomLens 이름이 아닌 이미지여서이며 `detail`에 이유를 적음. 그대로 둔 이미지에 grype가 있으면(`SBOM_DEEP_CVE=true`로 빌드) 대조를 실행하고 실제 결과를 기록), 요청하지 않았거나 `--security`가 꺼져 있거나 펌웨어 또는 AI 모델 스캔이면 `disabled` |

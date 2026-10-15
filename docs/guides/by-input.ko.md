@@ -141,6 +141,7 @@ $SBOM --project team5-image --version 1.0.0 \
 - `conf/local.conf`에 `INHERIT += "create-spdx-3.0"`과 `INHERIT += "vex"`를 넣고 빌드하면 가장 많은 정보를 얻습니다. 넣지 않아도 BomLens는 빌드가 기본으로 남긴 것을 읽습니다. SPDX 버전별 호환 표와 SPDX가 전혀 없는 빌드의 처리 방식은 [Yocto 이미지](supplier-sbom.ko.md#yocto-이미지)를 참고하세요.
 - 분석 대상은 `tmp/deploy/images/<machine>/` 아래의 이미지 SBOM입니다. 빌드 트리 자체는 훑지 않습니다. 이미지에 들어가지 않는 sysroot와 빌드용 도구가 결과에 섞이기 때문입니다.
 - 구성요소는 이미지에 설치된 패키지이고, 취약점에는 빌드가 내린 판정(레시피가 패치함, 해당 없음, 아직 남음)이 함께 담깁니다. 남은 것만 발견 항목으로 셉니다.
+- [펌웨어 가이드](firmware.ko.md#upstream-저장소-purl)에 나온 프로젝트의 컴포넌트에는 upstream 저장소 purl이 붙습니다. SPDX 2.2만 쓴 빌드는 빌드 판정이 없어서 `--security`를 켜면 대신 CPE를 이미지에 들어 있는 NVD CPE 인덱스와 대조합니다. SPDX 2.2는 레시피가 어떤 CVE를 패치했는지 기록하지 않으므로, 이렇게 찾은 CVE에는 레시피가 이미 패치한 것이 섞일 수 있습니다. SPDX 3.0은 이를 기록합니다.
 - 머신이나 이미지를 여럿 빌드했다면 가장 최근 SBOM을 분석하고 후보 전체를 로그에 남깁니다. 다른 것을 고르려면 `--analyze <파일>`로 지정합니다.
 - 웹 UI에서는 **디렉터리 / rootfs** 입력으로 그 폴더를 고르면 됩니다(`--ui --mount ~/poky/build`로 마운트하거나 데스크톱 앱의 폴더 추가 사용). 같은 감지가 동작합니다.
 - 자세한 동작과 한계는 [공급사 SBOM 가이드의 Yocto 이미지 절](supplier-sbom.ko.md#yocto-이미지)을 참고하세요.
