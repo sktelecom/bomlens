@@ -700,7 +700,7 @@ Architecture: source SBOM generation uses cdxgen's per-language images
 (on-demand); this tool orchestrates + post-processes.
 EOF
             exit 0 ;;
-        *) echo "[ERROR] Unknown option: $1"; exit 1 ;;
+        *) echo "[ERROR] Unknown option: $1 (see ./scripts/scan-sbom.sh --help for the options)"; exit 1 ;;
     esac
     shift
 done
@@ -709,8 +709,8 @@ done
 # Docker checks
 # ========================================================
 docker_check() {
-    command -v docker &>/dev/null || { echo "[ERROR] Docker not installed."; echo "  https://www.docker.com/products/docker-desktop/"; exit 1; }
-    docker info >/dev/null 2>&1 || { echo "[ERROR] Docker daemon not running. Start Docker Desktop and retry."; exit 1; }
+    command -v docker &>/dev/null || { echo "[ERROR] Docker is not installed, or not on PATH. BomLens needs a Docker engine (Docker Desktop, Rancher Desktop, Colima, or docker-ce)."; echo "  Install steps: https://sktelecom.github.io/bomlens/start/first-scan/#requirements"; exit 1; }
+    docker info >/dev/null 2>&1 || { echo "[ERROR] Cannot reach the Docker engine. Start Docker Desktop or Rancher Desktop (or run 'colima start'), wait until it is ready, then retry. To check: docker info"; exit 1; }
 }
 
 # `docker run` only auto-pulls an image that is entirely ABSENT locally; once a
@@ -2353,6 +2353,10 @@ elif [ -n "$TARGET" ]; then
         # An image name: syft, Trivy and docker would read one starting with - as an option.
         case "$TARGET" in
             -*) echo "[ERROR] --target '$TARGET' starts with '-': no file or folder has that name, and an image name cannot start with '-'. Give the image reference itself, for example --target alpine:3.20."; exit 1 ;;
+        esac
+        case "$TARGET" in
+            .*|/*|~*|*.zip|*.tar|*.tar.gz|*.tgz|*.bin)
+                echo "[WARN] --target '$TARGET' is not a file or folder under $(pwd), so it is treated as a Docker image name. If you meant a path, check the spelling and the folder you ran this from." ;;
         esac
         MODE="IMAGE"
     fi
