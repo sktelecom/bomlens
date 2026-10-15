@@ -16,6 +16,8 @@ Every external tool below is open source; the table in [Open-source tools used](
 
 A source folder, a GitHub URL, or a ZIP archive. Language detection picks the matching official [cdxgen](https://github.com/CycloneDX/cdxgen) language image, which prepares dependencies (`build-prep.sh`) and generates the SBOM. BomLens falls back to [syft](https://github.com/anchore/syft) over the directory, which captures direct dependencies from lock files, when it cannot run a sibling container (for example the web UI's source scan) or when cdxgen itself fails partway through (an internal exception, or its own document validation rejecting the result). Either way the SBOM carries `bomlens:sbom-tool-degraded` with the reason. For Node/npm, a fallback that covers none of the project's own declared dependencies is discarded and the scan fails with guidance, rather than reporting a misleadingly complete-looking result. When the source declares dependencies (a manifest or lock file lists some) and the scan still finds no component, the SBOM carries `bomlens:sbom-empty-with-manifests` naming those files, and the result manifest records the `generate` step as degraded (`no_components`).
 
+What the build tools do before cdxgen reads the project, and which images they come from, is in [How dependencies are resolved](dependency-resolution.md).
+
 Two options apply to source scans only, and both are off by default.
 
 - **Identify vendored OSS** (`--identify-vendored`, [SCANOSS](https://github.com/scanoss/scanoss.py)) — for C/C++ and other code copied in without a package manager. The SCANOSS client fingerprints files and queries the hosted OSSKB service, then BomLens reconciles the matches against what the package-manager scan already found and merges the rest into the SBOM.
