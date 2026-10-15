@@ -21,7 +21,7 @@ import {
   type UploadKind,
   type UsageContext,
 } from "@/lib/api";
-import { demoInstallUrl, IS_STATIC_DEMO } from "@/lib/demo";
+import { demoInstallUrl, demoRunAction, IS_STATIC_DEMO } from "@/lib/demo";
 import { canManageScanFolders, desktopBridge } from "@/lib/desktop";
 import { USAGE_LABEL_KEY } from "@/lib/models";
 import { ACCEPT, type ScanFormState } from "@/lib/useScanForm";
@@ -492,6 +492,7 @@ export function ScanOptions({ state }: { state: ScanFormState }) {
           <Label htmlFor="conformance-profile">{t("options.conformanceProfile")}</Label>
           <Select
             id="conformance-profile"
+            className="w-full min-w-0"
             value={conformanceProfile}
             onChange={(e) =>
               setConformanceProfile(e.target.value as ConformanceProfile)
@@ -561,6 +562,7 @@ export function ScanOptions({ state }: { state: ScanFormState }) {
           <Label htmlFor="spec-version">{t("options.specVersion")}</Label>
           <Select
             id="spec-version"
+            className="w-full min-w-0"
             value={specVersion}
             onChange={(e) => setSpecVersion(e.target.value as CdxSpecVersion)}
             disabled={busy}
@@ -615,6 +617,7 @@ export function UploadOptions({ state }: { state: ScanFormState }) {
             <Label htmlFor="uploadTarget">{t("upload.target")}</Label>
             <Select
               id="uploadTarget"
+              className="w-full min-w-0"
               value={uploadTarget}
               onChange={(e) =>
                 setUploadTarget(e.target.value as "dependency-track" | "trusca")
@@ -717,11 +720,19 @@ export function RunButton({ state, running }: { state: ScanFormState; running: b
   // a missing button reads as a broken page, a disabled one with a reason reads
   // as a boundary — and the reason is where the install link belongs.
   if (IS_STATIC_DEMO) {
+    // The model questionnaire runs in the browser, so it stays reachable; only
+    // its last step (starting a scan) is refused there.
+    const questions = demoRunAction(state.source) === "questions";
     return (
       <div className="space-y-2">
-        <Button className="w-full" data-testid="run-scan" disabled>
+        <Button
+          className="w-full"
+          data-testid="run-scan"
+          disabled={!questions}
+          onClick={questions ? submit : undefined}
+        >
           <Play className="h-4 w-4" />
-          {t("form.run")}
+          {questions ? t("newscan.startQuestions") : t("form.run")}
         </Button>
         <p className="text-center text-xs text-muted-foreground">
           {t("form.demoRunDisabled")}{" "}

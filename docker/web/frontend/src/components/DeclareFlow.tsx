@@ -4,6 +4,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
+import { demoInstallUrl, IS_STATIC_DEMO } from "@/lib/demo";
+
 import { ErrorState, LoadingState } from "@/components/ui/state";
 import {
   checkAiDeclaration,
@@ -43,7 +45,7 @@ export function DeclareFlow({
   onCancel: () => void;
   onStart: (params: ScanParams) => void;
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [index, setIndex] = useState<FieldIndex | null>(null);
   const [loaded, setLoaded] = useState<{ saved: unknown } | null>(null);
   const [failed, setFailed] = useState(false);
@@ -119,6 +121,23 @@ export function DeclareFlow({
       authorFromScan={authorFromScan}
       onCancel={onCancel}
       onSave={start}
+      // The questions run in the browser; only starting the scan needs a
+      // server, so the demo stops there with a pointer to installing it.
+      startNote={
+        IS_STATIC_DEMO ? (
+          <>
+            {t("form.demoRunDisabled")}{" "}
+            <a
+              href={demoInstallUrl(i18n.language)}
+              target="_blank"
+              rel="noreferrer"
+              className="font-medium text-brand underline underline-offset-2 hover:no-underline"
+            >
+              {t("form.demoRunDisabledCta")}
+            </a>
+          </>
+        ) : undefined
+      }
     />
   );
 }

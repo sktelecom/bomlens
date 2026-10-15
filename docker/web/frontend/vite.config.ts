@@ -15,6 +15,17 @@ import { thirdPartyNotices } from "./scripts/vite-third-party-notices.mjs";
 // BASE_PATH exists for the published read-only demo, which is served from a
 // sub-path (`/bomlens/demo/`) rather than a host root. server.py serves the app
 // at `/`, so a normal build leaves this at the default.
+// The SPDX 3.0.1 field mapping that drives the model questionnaire. A normal
+// build fetches it from server.py (/spdx3-map), which serves the one source of
+// truth, docker/lib/spdx3-ai-map.json. The demo has no server and its data
+// folder is overwritten by every capture, so a demo build (VITE_DEMO_DATA_BASE
+// set) bundles that same file; any other build resolves the alias to a null
+// stub, so the Docker image build (whose context holds only web/frontend/) and
+// the shipped bundle are unaffected.
+const spdx3MapFile = process.env.VITE_DEMO_DATA_BASE
+  ? path.resolve(__dirname, "../../lib/spdx3-ai-map.json")
+  : path.resolve(__dirname, "./src/lib/spdx3-map-stub.json");
+
 export default defineConfig({
   base: process.env.BASE_PATH || "/",
   // The notice plugin emits dist/third-party-licenses.txt from the bundled
@@ -22,7 +33,10 @@ export default defineConfig({
   // actually inside it.
   plugins: [react(), thirdPartyNotices()],
   resolve: {
-    alias: { "@": path.resolve(__dirname, "./src") },
+    alias: [
+      { find: /^@spdx3-map$/, replacement: spdx3MapFile },
+      { find: "@", replacement: path.resolve(__dirname, "./src") },
+    ],
   },
   // Unit tests (Vitest): data/display logic only — pure modules, no DOM.
   // Playwright owns interaction/visual/a11y coverage.

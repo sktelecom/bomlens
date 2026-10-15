@@ -65,3 +65,13 @@ export function docsUrl(language: string | undefined): string {
 export function demoUrl(): string {
   return `${DOCS_BASE}/demo/`;
 }
+
+/**
+ * What the primary action of the New scan form does in the demo. Running a
+ * scan is refused everywhere, but the model questionnaire ("ai-declare") runs
+ * in the browser and only needs a server for its last step, so it stays
+ * reachable: its button opens the questions.
+ */
+export function demoRunAction(source: string): "questions" | "disabled" {
+  return source === "ai-declare" ? "questions" : "disabled";
+}

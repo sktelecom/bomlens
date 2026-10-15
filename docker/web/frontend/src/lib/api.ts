@@ -21,6 +21,8 @@
  * project/version. Omitting `id` falls back to the legacy flat layout.
  */
 
+import spdx3Map from "@spdx3-map";
+
 import { DEMO_DATA_BASE, IS_STATIC_DEMO } from "./demo";
 
 /**
@@ -1345,7 +1347,10 @@ export async function checkAiDeclaration(
 /** The field mapping the declaration screens draw their questions from
  *  (`docker/lib/spdx3-ai-map.json`). Null when the server has none. */
 export async function fetchSpdx3Map(): Promise<unknown | null> {
-  if (IS_STATIC_DEMO) return null;
+  // The demo has no server, and its data folder is overwritten by each
+  // capture, so the mapping ships inside the demo bundle (see the
+  // `@spdx3-map` alias in vite.config.ts).
+  if (IS_STATIC_DEMO) return spdx3Map;
   try {
     const res = await fetch("/spdx3-map");
     if (!res.ok) return null;
