@@ -171,6 +171,12 @@ ARG CHARDET_VERSION=6.0.0.post1
 ARG INTBITSET_VERSION=4.1.2
 ARG INTBITSET_SDIST_SHA256=f82fafe0bcb4fe7a010d942099b5a84d721d37c897538ed632f788962c1411f8
 ARG EXTRACTCODE_7Z_VERSION=16.5.210531
+# pluggy 1.7.0 makes scancode 32.5.0 fail at start-up ("did not find any
+# 'pre_scan' hooks"), which stops the deep-license image build at its probe scan.
+# Stay on the version the image was last built and verified with, and revisit it
+# when scancode-toolkit moves. No renovate comment on purpose: a bump to 1.7.0
+# alone would break the build again.
+ARG PLUGGY_VERSION=1.6.0
 ARG SBOM_DEEP_LICENSE=false
 # Vendored-OSS identification (on by default; disable with --build-arg SBOM_SCANOSS=false).
 # scanoss.py is MIT, so unlike the firmware GPL tools it can live in the base image.
@@ -349,7 +355,7 @@ RUN if [ "$SBOM_DEEP_LICENSE" = "true" ]; then \
       && sevenzip_pin="" \
       && if [ "$(uname -m)" = "x86_64" ]; then sevenzip_pin="extractcode-7z==${EXTRACTCODE_7Z_VERSION}"; fi \
       && pip3 install --no-cache-dir "scancode-toolkit==${SCANCODE_VERSION}" \
-           "chardet==${CHARDET_VERSION}" "intbitset==${INTBITSET_VERSION}" ${sevenzip_pin} \
+           "chardet==${CHARDET_VERSION}" "intbitset==${INTBITSET_VERSION}" "pluggy==${PLUGGY_VERSION}" ${sevenzip_pin} \
       && ln -sf "$(find /usr/lib -name 'libarchive.so.13' | head -1)" /usr/local/lib/libarchive.so \
       && ln -sf "$(find /usr/lib -name 'libmagic.so.1' | head -1)" /usr/local/lib/libmagic.so \
       && mkdir -p /tmp/sc-probe \
