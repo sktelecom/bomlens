@@ -20,6 +20,7 @@ import {
 
 import { buildQuery, parseQuery, type RouteQuery } from "@/lib/route";
 import { licensesFromQuery, licensesToQuery } from "@/lib/section-query";
+import { useFormatNumber } from "@/lib/format";
 
 import { LicenseRiskBar } from "./LicenseRiskBar";
 import { LicenseSummary } from "./LicenseSummary";
@@ -75,6 +76,7 @@ export function Licenses({
   onPickLicense?: (license: string) => void;
 }) {
   const { t } = useTranslation();
+  const fmt = useFormatNumber();
   // Clicking a classification tier filters the rest of the tab to that tier.
   const [tier, setTier] = useState<LicenseRiskTier | "">(() => licensesFromQuery(query).tier);
 
@@ -138,7 +140,7 @@ export function Licenses({
                   <div className="flex items-center gap-2 text-sm">
                     <Badge tone={CONFLICT_TONE[g.verdict]}>{t(CONFLICT_LABEL[g.verdict])}</Badge>
                     <span className="tabular-nums text-muted-foreground">
-                      {g.components.length}
+                      {fmt(g.components.length)}
                     </span>
                   </div>
                   <ul className="divide-y rounded-md border bg-card">
@@ -183,7 +185,7 @@ export function Licenses({
                   <div className="flex items-center gap-2 text-sm">
                     <Badge tone="medium">{t(FLAG_LABEL[g.flag])}</Badge>
                     <span className="tabular-nums text-muted-foreground">
-                      {g.components.length}
+                      {fmt(g.components.length)}
                     </span>
                   </div>
                   <ul className="divide-y rounded-md border bg-card">

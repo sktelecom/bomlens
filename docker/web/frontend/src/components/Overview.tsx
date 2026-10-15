@@ -52,6 +52,7 @@ import { conformanceCount, inputSbomFileName, isAiScan, sbomFileName } from "@/l
 import { scanHash } from "@/lib/route";
 import { diffComponents, diffVulnerabilities, type ComponentDiff, type VulnDiff } from "@/lib/scanDiff";
 import { cn, formatBytes } from "@/lib/utils";
+import { useFormatNumber } from "@/lib/format";
 
 import { LicenseRiskBar } from "./LicenseRiskBar";
 import { PipelineStepsFailedNote } from "./PipelineStepsFailedNote";
@@ -187,6 +188,7 @@ function TopRisk({
   scanId: string | null;
 }) {
   const { t } = useTranslation();
+  const fmt = useFormatNumber();
   const rows = topRiskComponents(result);
   const affected = riskyComponentCount(result);
   if (rows.length === 0) return null;
@@ -235,7 +237,7 @@ function TopRisk({
                 {c.maxSeverity && (
                   <Badge tone={SEV_TONE[c.maxSeverity]} className="shrink-0">
                     {t(`severity.${c.maxSeverity}`)}
-                    {c.vulnCount ? ` · ${c.vulnCount}` : ""}
+                    {c.vulnCount ? ` · ${fmt(c.vulnCount)}` : ""}
                   </Badge>
                 )}
                 <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
@@ -1014,6 +1016,7 @@ function JumpCards({
   scanId: string | null;
 }) {
   const { t } = useTranslation();
+  const fmt = useFormatNumber();
   // Models AND datasets: the tile carries the section's name, and counting only
   // the models left it reading "1" next to a rail badge of 4 for the same
   // screen. Kept in step with sectionCounts.
@@ -1138,7 +1141,7 @@ function JumpCards({
               valueClass,
             )}
           >
-            {value ?? "—"}
+            {typeof value === "number" ? fmt(value) : (value ?? "—")}
           </div>
           <div className="truncate text-xs text-muted-foreground">{text}</div>
           {sub && (

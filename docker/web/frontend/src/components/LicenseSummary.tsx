@@ -7,6 +7,7 @@ import { useTranslation } from "react-i18next";
 import { BarList, type BarDatum } from "@/components/ui/barlist";
 import type { ComponentItem } from "@/lib/api";
 import { licenseGroups, licenseRiskTier } from "@/lib/licenses";
+import { useFormatNumber } from "@/lib/format";
 
 import { TIER_FILL, TIER_FLAGGED, TierBadge } from "./LicenseRiskBar";
 
@@ -37,6 +38,7 @@ export function LicenseSummary({
   onPickLicense?: (license: string) => void;
 }) {
   const { t } = useTranslation();
+  const fmt = useFormatNumber();
   const { groups, unlicensed } = useMemo(
     () => licenseGroups(components),
     [components],
@@ -77,7 +79,7 @@ export function LicenseSummary({
         <span className="text-sm font-medium">
           {t("result.licenseSummaryTitle")}{" "}
           {groups.length > 0 && (
-            <span className="tabular-nums text-muted-foreground">{groups.length}</span>
+            <span className="tabular-nums text-muted-foreground">{fmt(groups.length)}</span>
           )}
         </span>
         {onPickLicense && (

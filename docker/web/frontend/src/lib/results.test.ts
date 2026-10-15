@@ -168,6 +168,14 @@ describe("sectionCounts", () => {
     expect(counts.licenses).toBe(2); // MIT, Apache-2.0
   });
 
+  it("formats the dependency split with the supplied number formatter", () => {
+    const counts = sectionCounts(
+      makeResult({ sbom: { components: 3, directCount: 1200, transitiveCount: 34567 } }),
+      (n) => n.toLocaleString("en-US"),
+    );
+    expect(counts.dependencies).toBe("1,200/34,567");
+  });
+
   it("drops the split when nothing is transitive", () => {
     // An AI scan's root model is not a dependency of itself, so every AI scan
     // has a transitive count of zero; "3/0" printed a zero carrying no

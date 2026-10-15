@@ -4,6 +4,7 @@
 import type { ReactNode } from "react";
 
 import { cn } from "@/lib/utils";
+import { useFormatNumber } from "@/lib/format";
 
 export interface BarDatum {
   key: string;
@@ -56,6 +57,7 @@ export function BarList({
   onActivate,
   activateHint,
 }: Props) {
+  const fmt = useFormatNumber();
   const top = max ?? Math.max(1, ...items.map((i) => i.value));
   const interactive = Boolean(onSelect);
   // Shared button chrome for both interactive modes.
@@ -86,7 +88,7 @@ export function BarList({
               <span className="truncate">{it.label}</span>
             </span>
             <span className="relative z-10 ml-auto pr-2.5 text-xs tabular-nums text-foreground">
-              {it.value}
+              {fmt(it.value)}
             </span>
           </div>
         );

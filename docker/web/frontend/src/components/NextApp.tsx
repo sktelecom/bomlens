@@ -45,6 +45,7 @@ import {
   scanHash,
   type RouteQuery,
 } from "@/lib/route";
+import { formatNumber } from "@/lib/format";
 import { deriveScanContext, sectionCounts } from "@/lib/results";
 import { useToast } from "@/lib/toast";
 
@@ -104,7 +105,7 @@ function toRecentLink(s: RecentScan): RecentScanLink {
  * open-in-new-tab; a `hashchange` listener drives the in-app transition.
  */
 export function NextApp() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { toast } = useToast();
   const [status, setStatus] = useState<Status>("idle");
   const [logs, setLogs] = useState<string[]>([]);
@@ -377,8 +378,8 @@ export function NextApp() {
   const scan = useMemo(() => deriveScanContext(result), [result]);
   const recentLinks = useMemo(() => recent.map(toRecentLink), [recent]);
   const counts = useMemo(
-    () => (result ? sectionCounts(result) : undefined),
-    [result],
+    () => (result ? sectionCounts(result, (n) => formatNumber(n, i18n.language)) : undefined),
+    [result, i18n.language],
   );
 
   // Keep the active section valid for the current result (e.g. a new scan

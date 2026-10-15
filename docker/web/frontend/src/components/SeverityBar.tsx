@@ -6,6 +6,7 @@ import { useTranslation } from "react-i18next";
 import { Badge } from "@/components/ui/badge";
 import { SEVERITY_ORDER, type SecuritySummary, type Severity } from "@/lib/api";
 import { cn } from "@/lib/utils";
+import { useFormatNumber } from "@/lib/format";
 
 const TONE: Record<Severity, "critical" | "high" | "medium" | "low" | "info"> = {
   CRITICAL: "critical",
@@ -36,6 +37,7 @@ interface Props {
 
 export function SeverityBar({ security, selected = "", onSelect }: Props) {
   const { t } = useTranslation();
+  const fmt = useFormatNumber();
   const total = security.TOTAL;
   const interactive = Boolean(onSelect);
 
@@ -71,7 +73,7 @@ export function SeverityBar({ security, selected = "", onSelect }: Props) {
                 selected && selected !== s && "opacity-30",
               );
               const segStyle = { width: `${(security[s] / total) * 100}%` };
-              const segTitle = `${t(`severity.${s}`)}: ${security[s]}`;
+              const segTitle = `${t(`severity.${s}`)}: ${fmt(security[s])}`;
               if (!interactive) {
                 return <div key={s} className={segClass} style={segStyle} title={segTitle} />;
               }
@@ -80,7 +82,7 @@ export function SeverityBar({ security, selected = "", onSelect }: Props) {
                   key={s}
                   type="button"
                   aria-pressed={selected === s}
-                  aria-label={`${t(`severity.${s}`)} ${security[s]}`}
+                  aria-label={`${t(`severity.${s}`)} ${fmt(security[s])}`}
                   onClick={() => onSelect?.(s)}
                   className={cn(
                     segClass,
@@ -97,7 +99,7 @@ export function SeverityBar({ security, selected = "", onSelect }: Props) {
             {SEVERITY_ORDER.map((s) => {
               const badge = (
                 <Badge tone={TONE[s]}>
-                  {t(`severity.${s}`)} {security[s]}
+                  {t(`severity.${s}`)} {fmt(security[s])}
                 </Badge>
               );
               if (!interactive) return <span key={s}>{badge}</span>;

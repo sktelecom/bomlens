@@ -216,3 +216,13 @@ test("the dependency tree carries tree semantics and moves under the arrow keys"
     .analyze();
   expect(axe.violations).toEqual([]);
 });
+
+for (const lang of ["en", "ko"] as const) {
+  test(`<html lang> follows the UI language from the first render (${lang})`, async ({ page }) => {
+    // A screen reader picks its voice from this attribute (WCAG 3.1.1); the
+    // static default in index.html must never outlive the first render.
+    await seedThemeLang(page, "light", lang);
+    await openDependencies(page);
+    await expect(page.locator("html")).toHaveAttribute("lang", lang);
+  });
+}

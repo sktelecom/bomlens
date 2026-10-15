@@ -7,7 +7,8 @@ import { useTranslation } from "react-i18next";
 import { Disclosure } from "@/components/ui/disclosure";
 import type { SecuritySummary } from "@/lib/api";
 import { uncheckedReasonKey, uncheckedSummary } from "@/lib/unchecked";
-import { cn } from "@/lib/utils";
+import { useFormatNumber } from "@/lib/format";
+import { CoverageNotice } from "@/components/ui/coverage-notice";
 
 /**
  * Components the vulnerability check could not reach, with why and which.
@@ -23,20 +24,19 @@ export function UncheckedComponents({
   className?: string;
 }) {
   const { t } = useTranslation();
+  const fmt = useFormatNumber();
   const u = uncheckedSummary(security);
   if (!u) return null;
   return (
-    <div
-      data-testid="unchecked-components"
-      className={cn("space-y-2 rounded-md border border-brand/30 bg-brand/5 px-3 py-2 text-left text-xs", className)}
+    <CoverageNotice
+      testId="unchecked-components"
+      icon={ShieldQuestion}
+      title={t("result.uncheckedTitle", { count: u.count })}
+      className={className}
     >
-      <p className="flex items-start gap-2 text-sm font-medium text-foreground">
-        <ShieldQuestion className="mt-0.5 h-4 w-4 shrink-0 text-brand" aria-hidden />
-        {t("result.uncheckedTitle", { count: u.count })}
-      </p>
       <p className="text-muted-foreground">
         {t("result.uncheckedHint")}{" "}
-        {u.byReason.map((b) => `${t(uncheckedReasonKey(b.reason))} ${b.count}`).join(", ")}
+        {u.byReason.map((b) => `${t(uncheckedReasonKey(b.reason))} ${fmt(b.count)}`).join(", ")}
       </p>
       {u.rows.length > 0 && (
         <Disclosure
@@ -77,6 +77,6 @@ export function UncheckedComponents({
           )}
         </Disclosure>
       )}
-    </div>
+    </CoverageNotice>
   );
 }

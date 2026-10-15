@@ -47,16 +47,19 @@ import { IS_STATIC_DEMO } from "@/lib/demo";
 
 import { NotReachableFindings } from "./NotReachableFindings";
 import { AdvisoriesWithoutCve } from "./AdvisoriesWithoutCve";
+import { CoverageNotice } from "@/components/ui/coverage-notice";
 import { SeverityBar } from "./SeverityBar";
 import { UncheckedComponents } from "./UncheckedComponents";
 
 // Vendor/advisory disposition badge, shown beside the severity badge. `fixed`
-// reads as resolved (success); the still-open dispositions read as a caution
+// only says a fixed version is published, not that the installed one is fixed,
+// so it stays informational; green is kept for VEX states that declare a
+// resolution (VEX_TONE below). The still-open dispositions read as a caution
 // (medium); dispositions that are informational rather than actionable stay
 // neutral (info) — same three-tier logic as the severity/EOL/outdated badges
 // elsewhere in this table.
 const STATUS_TONE: Record<string, "success" | "medium" | "info"> = {
-  fixed: "success",
+  fixed: "info",
   affected: "medium",
   will_not_fix: "medium",
   end_of_life: "medium",
@@ -680,9 +683,9 @@ export function VulnerabilitiesTable({
         // old kernel carries thousands, nearly all for subsystems the image
         // never compiled in, and the SBOM cannot tell which — so counting them
         // here would bury the findings this screen exists to show.
-        <p className="rounded-md border border-brand/30 bg-brand/5 px-3 py-2 text-xs text-muted-foreground">
+        <CoverageNotice testId="kernel-advisories-notice">
           {t("result.kernelAdvisories", { count: security.kernelCount })}
-        </p>
+        </CoverageNotice>
       ) : null}
       <UncheckedComponents security={security} />
       <NotReachableFindings security={security} />

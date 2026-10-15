@@ -31,6 +31,7 @@ import {
 import { buildQuery, parseQuery, type RouteQuery } from "@/lib/route";
 import { componentsFromQuery, componentsToQuery } from "@/lib/section-query";
 import { cn } from "@/lib/utils";
+import { useFormatNumber } from "@/lib/format";
 
 interface Props {
   items: ComponentItem[];
@@ -147,6 +148,7 @@ function FilterChip({
  *  decision-first Scope and Risk columns (shown when the scan carries that data). */
 export function ComponentsTable({ items, total, truncated, scanId, query, onQueryChange, onPickVulns, onPickDependency }: Props) {
   const { t } = useTranslation();
+  const fmt = useFormatNumber();
   const [filters, setFilters] = useState<ComponentFilters>(
     () => componentsFromQuery(query).filters,
   );
@@ -628,7 +630,7 @@ export function ComponentsTable({ items, total, truncated, scanId, query, onQuer
                     {c.maxSeverity ? (
                       <Badge tone={SEV_TONE[c.maxSeverity]}>
                         {t(`severity.${c.maxSeverity}`)}
-                        {c.vulnCount ? ` · ${c.vulnCount}` : ""}
+                        {c.vulnCount ? ` · ${fmt(c.vulnCount)}` : ""}
                       </Badge>
                     ) : (
                       <span className="text-muted-foreground">—</span>
@@ -731,7 +733,7 @@ export function ComponentsTable({ items, total, truncated, scanId, query, onQuer
                           <dd className="flex flex-wrap items-baseline gap-2">
                             <span>
                               {c.maxSeverity ? `${t(`severity.${c.maxSeverity}`)} · ` : ""}
-                              {c.vulnCount}
+                              {fmt(c.vulnCount)}
                             </span>
                             {/* Into the CVEs behind this row. It sits in the
                                 expanded detail rather than on the risk badge

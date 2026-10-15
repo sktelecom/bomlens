@@ -42,7 +42,7 @@
     "gitTokenHint": "비공개 저장소일 때만 입력. 토큰은 클론에 1회용으로만 쓰이고 저장·로그에 남지 않습니다.",
     "zipUpload": "ZIP 업로드",
     "sbomUpload": "SBOM 업로드",
-    "sbomAnalyzeHint": "위험분석을 위해 고지문·보안 보고서가 자동 활성화됩니다.",
+    "sbomAnalyzeHint": "위험 분석을 위해 고지문·보안 보고서가 자동 활성화됩니다.",
     "firmwareUpload": "펌웨어 업로드",
     "firmwareHint": "추출 후 syft·cve-bin-tool로 컴포넌트를 식별합니다(.bin/.img/.squashfs 등).",
     "firmwareUnavailable": "펌웨어 분석은 Docker가 실행 중이어야 사용할 수 있습니다(펌웨어 이미지를 sibling 컨테이너로 실행합니다).",
@@ -98,7 +98,7 @@
     "byteStable": "재현 가능한 출력",
     "byteStableHint": "같은 입력을 다시 스캔하면 바이트 단위로 동일한 SBOM을 만들어, 출력을 비교하고 체크섬으로 검증할 수 있습니다. 실행마다 결과가 달라질 수 있는 네트워크 라이선스 조회는 건너뜁니다.",
     "conformanceProfile": "적합성 검사 기준",
-    "conformanceProfileHint": "적합성 보고서를 어떤 기준으로 판정할지 선택합니다.",
+    "conformanceProfileHint": "적합성 검사를 어떤 기준으로 판정할지 선택합니다.",
     "conformanceProfileAnalyzeHint": "제출 전 점검용 문서 검사라 여기서는 SKT 제출 기준이 기본값입니다.",
     "conformanceProfileDefault": "기본 (PURL 포함률 90%, pkg:generic 권고)",
     "conformanceProfileSktSubmission": "SKT 제출 기준 (PURL 포함률 100%, pkg:generic 필수)",
@@ -140,14 +140,14 @@
     "kindSbom": "SBOM",
     "succeeded": "스캔 완료",
     "failed": "스캔 실패",
-    "rescan": "재스캔",
+    "rescan": "다시 스캔",
     "rescanHint": "같은 대상을 이 설정을 채운 채로 다시 스캔합니다",
     "components": "컴포넌트",
     "vulnerabilities": "취약점",
     "noSecurity": "보안 보고서를 생성하지 않았습니다",
     "noSecurityHint": "이 스캔에는 취약점 보고서가 없습니다. 대조를 하지 않은 것이므로, 비어 있다는 것이 취약점이 없다는 뜻은 아닙니다.",
-    "vendoredHintTitle": "컴포넌트가 거의 없습니다 — C/C++ 임베디드 소스인가요?",
-    "vendoredHintBody": "패키지 매니저가 없는 C/C++ 소스에는 오픈소스를 그대로 복사(vendored)해 넣은 경우가 많아, 일반 스캔으로는 보이지 않습니다. 고급 스캔 옵션에서 \"복사해 넣은 오픈소스 탐지\"를 켜고 다시 실행하세요. 소스가 아니라 파일 지문만 전송됩니다.",
+    "vendoredHintTitle": "컴포넌트가 거의 없습니다. C/C++ 임베디드 소스인가요?",
+    "vendoredHintBody": "패키지 매니저가 없는 C/C++ 소스에는 오픈소스를 그대로 복사(vendored)해 넣은 경우가 많아, 일반 스캔으로는 보이지 않습니다. 고급 스캔 옵션에서 \"복사해 넣은 오픈소스 탐지\"를 켜고 다시 스캔하세요. 소스가 아니라 파일 지문만 전송됩니다.",
     "zeroComponentsTitle": "컴포넌트를 찾지 못했습니다",
     "zeroComponentsBody": "안전하다는 뜻이 아니라 경고입니다. 읽을 것이 없으면 결과가 0건이 됩니다. 폴더 최상위에 의존성 목록 파일(requirements.txt, package.json, pom.xml 등)이 없거나, 검사 경로가 다른 곳을 가리키는 경우입니다. 목록과 경로를 확인한 뒤 다시 검사해 주십시오.",
     "zeroComponentsBodyDegraded": "안전하다는 뜻이 아니라 경고입니다. 읽을 것이 없으면 결과가 0건이 됩니다. 폴더 최상위에 의존성 목록 파일(requirements.txt, package.json, pom.xml 등)이 없거나, 검사 경로가 다른 곳을 가리키는 경우입니다. 목록과 경로를 확인한 뒤 다시 검사해 주십시오. 전이 의존성 분석기(cdxgen)도 실행되지 못해 이번에는 직접 의존성조차 확인하지 못했습니다.",
@@ -165,7 +165,7 @@
     "firmwareScopeFormats": "해당 형식: {{formats}}.",
     "firmwareScopeMore_one": "목록에 싣지 않은 이름이 {{count}}개 더 있습니다.",
     "firmwareScopeMore_other": "목록에 싣지 않은 이름이 {{count}}개 더 있습니다.",
-    "sbomDegradedTitle": "직접 의존성만 — 전이 의존성 분석이 실행되지 않음",
+    "sbomDegradedTitle": "직접 의존성만 (전이 의존성 분석이 실행되지 않음)",
     "sbomDegradedBody": "전이 의존성 분석기(cdxgen)가 실행되지 못해, 이 SBOM에는 직접 의존성만 담겼습니다. Docker가 사용 가능한지 확인한 뒤 다시 스캔하면 전체 의존성 그래프를 얻습니다.",
     "sbomDegradedDisk": "전이 의존성 분석기(cdxgen)가 Docker 디스크 공간 부족으로 실행되지 못해, 이 SBOM에는 직접 의존성만 담겼습니다. 공간을 확보(예: \"docker system prune\")한 뒤 다시 스캔하면 전체 의존성 그래프를 얻습니다.",
     "sbomDegradedOom": "전이 의존성 분석기(cdxgen)가 메모리 부족으로 강제 종료돼, 이 SBOM에는 직접 의존성만 담겼습니다. Docker 엔진에 메모리를 더 할당(Docker Desktop은 설정의 Resources, macOS의 Colima는 \"colima start --memory N\")한 뒤 다시 스캔하면 전체 의존성 그래프를 얻습니다.",
@@ -175,7 +175,7 @@
     "sbomGraphEmptyTitle": "의존성 그래프가 비어 있습니다",
     "sbomGraphEmptyBody": "전이 의존성 분석기는 정상적으로 실행됐지만, 이후 처리 과정에서 의존성 관계가 사라진 것으로 보입니다. 다시 스캔해도 계속 비어 있다면 결함일 수 있으니 알려주세요.",
     "scanossUnavailableTitle": "SCANOSS 검색이 완료되지 않았습니다",
-    "scanossUnavailableBody": "호출 한도 초과, 네트워크 문제, 토큰 부재로 OSSKB 검색이 막혔습니다. 무료 OSSKB는 익명 호출 한도가 있어, '고급 스캔 옵션'에서 SCANOSS 토큰을 넣고 다시 실행하면 결과가 나올 수 있습니다.",
+    "scanossUnavailableBody": "호출 한도 초과, 네트워크 문제, 토큰 부재로 OSSKB 검색이 막혔습니다. 무료 OSSKB는 익명 호출 한도가 있어, '고급 스캔 옵션'에서 SCANOSS 토큰을 넣고 다시 스캔하면 결과가 나올 수 있습니다.",
     "scanossNoMatchTitle": "복사된 오픈소스를 찾지 못했습니다",
     "scanossNoMatchBody": "SCANOSS 검색은 정상 완료됐지만, 소스에 직접 복사된 서드파티 오픈소스를 찾지 못했습니다. 실제로 없거나 OSSKB에 등록되지 않은 코드일 수 있습니다.",
     "vendoredBadge": "vendored",
@@ -190,9 +190,9 @@
     "noVulnsAction": "검사한 구성요소 보기",
     "securityScanFailed": "보안 스캔이 실패해 결과가 생성되지 않았습니다. 여기 표시된 수치는 실제 취약점 노출을 반영하지 않습니다.",
     "securityScanPartial": "보안 스캐너가 오류를 보고했습니다. 아래 결과는 불완전할 수 있습니다.",
-    "artifacts": "생성된 결과물",
-    "artifactsEmpty": "생성된 결과물이 없습니다.",
-    "artifactCount": "결과물 {{count}}개 · {{size}}",
+    "artifacts": "생성된 산출물",
+    "artifactsEmpty": "생성된 산출물이 없습니다.",
+    "artifactCount": "산출물 {{count}}개 · {{size}}",
     "downloadAll": "전체 다운로드 (ZIP)",
     "copyLink": "링크 복사",
     "copied": "링크를 복사했습니다",
@@ -203,7 +203,7 @@
     "spdxExportFailed": "SPDX로 내보내지 못했습니다. CycloneDX SBOM은 그대로 사용할 수 있습니다.",
     "kind": {
       "riskReport": {
-        "title": "오픈소스 위험분석 보고서",
+        "title": "오픈소스 위험 보고서",
         "desc": "라이선스와 취약점을 아우른 공급망 위험 분석 종합본입니다."
       },
       "sbom": {
@@ -215,8 +215,8 @@
         "desc": "포함된 컴포넌트의 라이선스 고지와 저작권 표시입니다."
       },
       "conformance": {
-        "title": "적합성 보고서",
-        "desc": "이 스캔이 만든 SBOM의 형식 검증 결과입니다."
+        "title": "적합성 검사 보고서",
+        "desc": "이 스캔이 만든 SBOM의 적합성 검사 결과입니다."
       },
       "aiProfile": {
         "title": "AI 준수 프로필",
@@ -257,10 +257,10 @@
     },
     "download": "다운로드",
     "view": "보기",
-    "conformance": "적합성",
+    "conformance": "적합성 검사",
     "verdictPass": "적합",
     "verdictFail": "부적합",
-    "riskReport": "오픈소스 위험분석 보고서",
+    "riskReport": "오픈소스 위험 보고서",
     "tabSummary": "요약",
     "tabComponents": "컴포넌트",
     "tabVulns": "취약점",
@@ -306,13 +306,13 @@
     "kevBadge": "KEV",
     "kevHint": "실제 악용 중(CISA Known Exploited Vulnerabilities)",
     "colNvdSeverity": "NVD 등급",
-    "statusFixed": "수정됨",
+    "statusFixed": "수정 버전 있음",
     "statusAffected": "영향받음",
     "statusWillNotFix": "수정 계획 없음",
     "statusEndOfLife": "지원 종료",
     "statusFixDeferred": "수정 보류",
     "statusUnderInvestigation": "조사 중",
-    "statusFixedHint": "공급사 또는 보안 권고에서 이 CVE를 수정됨으로 보고했습니다.",
+    "statusFixedHint": "수정된 버전이 배포되어 있습니다. 해당 버전으로 올리기 전까지 설치된 버전은 여전히 영향을 받습니다.",
     "statusAffectedHint": "공급사 또는 보안 권고에서 설치된 버전이 영향받는다고 확인했습니다.",
     "statusWillNotFixHint": "공급사가 이 CVE를 수정하지 않기로 했습니다.",
     "statusEndOfLifeHint": "이 컴포넌트는 지원이 종료되어 수정 계획이 없습니다.",
@@ -360,7 +360,7 @@
     "eolTile": "지원 종료",
     "eolAtRisk": "취약점 동반 {{count}}건",
     "eolBadge": "지원 종료",
-    "eolBadgeHint": "상위 지원이 종료됨 — 보안 패치가 제공되지 않습니다",
+    "eolBadgeHint": "상위 지원이 종료됨. 보안 패치가 제공되지 않습니다",
     "eolSince": "{{date}} 종료",
     "filterEol": "지원 종료",
     "colEol": "지원 상태",
@@ -538,7 +538,7 @@
     "NONE": "None"
   },
   "viewer": {
-    "open": "결과물 보기",
+    "open": "산출물 보기",
     "close": "닫기"
   },
   "dialog": {
@@ -574,7 +574,7 @@
     "sourceTree": "소스 트리",
     "vulnerabilities": "취약점",
     "licenses": "라이선스",
-    "conformance": "SBOM 규제 검사",
+    "conformance": "적합성 검사",
     "models": "모델 · 데이터셋",
     "artifacts": "산출물",
     "inputSbom": "제출된 SBOM",
@@ -652,7 +652,7 @@
     "enabledCount": "{{n}}개 켜짐",
     "on": "켜짐",
     "catCode": "코드",
-    "catArtifact": "아티팩트",
+    "catArtifact": "빌드 산출물",
     "catSbom": "SBOM",
     "catAiModel": "AI 모델",
     "startQuestions": "질문 시작"
@@ -710,7 +710,7 @@
     "topRisk": "위험이 큰 컴포넌트",
     "topRiskOf": "취약점 있는 {{total}}개 중 {{shown}}개",
     "topRiskAll": "전체 컴포넌트",
-    "attnMalicious": "악성 패키지 {{count}}개 — 제거하고 자격 증명을 교체하세요",
+    "attnMalicious": "악성 패키지 {{count}}개: 제거하고 자격 증명을 교체하세요",
     "attnModelRisk": "라이선스나 보안 검토가 필요한 모델·데이터셋 {{count}}건",
     "attnConformanceGap": "채울 수 있는 적합성 항목 {{count}}건",
     "depNone": "기록된 관계 없음"
@@ -719,7 +719,7 @@
     "enrichAibom": "AI 모델 메타데이터 보강",
     "verifyWeights": "모델 가중치 검증",
     "modelSecurity": "모델 보안 검사",
-    "conformance": "적합성 검증",
+    "conformance": "적합성 검사",
     "resolvePurl": "제출된 식별자의 패키지 저장소 조회",
     "licenseRegistry": "패키지 레지스트리의 라이선스 조회",
     "describeInput": "입력 SBOM 설명 생성",
@@ -988,19 +988,19 @@
       },
       "g7-slp-data-flow": {
         "what": "시스템 내 데이터 흐름입니다.",
-        "fix": "시스템 데이터 흐름을 문서화하세요 — 자동 출처가 없어 사람 검토가 필요합니다."
+        "fix": "시스템 데이터 흐름을 문서화하세요. 자동 출처가 없어 사람 검토가 필요합니다."
       },
       "g7-slp-data-usage": {
         "what": "시스템의 데이터 사용 방식입니다.",
-        "fix": "시스템의 데이터 사용을 문서화하세요 — 자동 출처가 없어 사람 검토가 필요합니다."
+        "fix": "시스템의 데이터 사용을 문서화하세요. 자동 출처가 없어 사람 검토가 필요합니다."
       },
       "g7-slp-io": {
         "what": "시스템의 입력·출력 특성입니다.",
-        "fix": "시스템 입출력을 문서화하세요 — 자동 출처가 없어 사람 검토가 필요합니다."
+        "fix": "시스템 입출력을 문서화하세요. 자동 출처가 없어 사람 검토가 필요합니다."
       },
       "g7-slp-app-area": {
         "what": "시스템이 의도한 적용 분야입니다.",
-        "fix": "의도한 적용 분야를 문서화하세요 — 자동 출처가 없어 사람 검토가 필요합니다."
+        "fix": "의도한 적용 분야를 문서화하세요. 자동 출처가 없어 사람 검토가 필요합니다."
       },
       "g7-model-name": {
         "what": "모델의 이름입니다.",
@@ -1068,7 +1068,7 @@
       },
       "g7-ds-content": {
         "what": "데이터셋의 내용입니다.",
-        "fix": "데이터셋 내용을 문서화하세요 — 자동 출처가 없어 사람 검토가 필요합니다."
+        "fix": "데이터셋 내용을 문서화하세요. 자동 출처가 없어 사람 검토가 필요합니다."
       },
       "g7-ds-identifier": {
         "what": "데이터셋의 고정 식별자입니다.",
@@ -1076,7 +1076,7 @@
       },
       "g7-ds-hash": {
         "what": "데이터셋의 무결성 해시입니다.",
-        "fix": "데이터셋 파일 해시를 추가하세요 — 자동 출처가 없어 사람 검토가 필요합니다."
+        "fix": "데이터셋 파일 해시를 추가하세요. 자동 출처가 없어 사람 검토가 필요합니다."
       },
       "g7-ds-provenance": {
         "what": "데이터셋의 출처입니다.",
@@ -1084,15 +1084,15 @@
       },
       "g7-ds-statistics": {
         "what": "데이터셋의 통계적 특성입니다.",
-        "fix": "데이터셋 통계를 문서화하세요 — 자동 출처가 없어 사람 검토가 필요합니다."
+        "fix": "데이터셋 통계를 문서화하세요. 자동 출처가 없어 사람 검토가 필요합니다."
       },
       "g7-ds-sensitivity": {
         "what": "데이터셋의 민감 정보(개인정보 또는 저작권)입니다.",
-        "fix": "데이터셋 민감도를 문서화하세요 — 자동 출처가 없어 사람 검토가 필요합니다."
+        "fix": "데이터셋 민감도를 문서화하세요. 자동 출처가 없어 사람 검토가 필요합니다."
       },
       "g7-ds-dependency": {
         "what": "데이터셋의 의존 관계입니다.",
-        "fix": "데이터셋 의존 관계를 문서화하세요 — 자동 출처가 없어 사람 검토가 필요합니다."
+        "fix": "데이터셋 의존 관계를 문서화하세요. 자동 출처가 없어 사람 검토가 필요합니다."
       },
       "g7-ds-license": {
         "what": "데이터셋의 라이선스입니다.",
@@ -1108,15 +1108,15 @@
       },
       "g7-sec-controls": {
         "what": "시스템에 적용한 보안 통제입니다.",
-        "fix": "보안 통제를 문서화하세요 — 자동 출처가 없어 사람 검토가 필요합니다."
+        "fix": "보안 통제를 문서화하세요. 자동 출처가 없어 사람 검토가 필요합니다."
       },
       "g7-sec-compliance": {
         "what": "시스템이 충족하는 보안 규정 준수입니다.",
-        "fix": "보안 규정 준수를 문서화하세요 — 자동 출처가 없어 사람 검토가 필요합니다."
+        "fix": "보안 규정 준수를 문서화하세요. 자동 출처가 없어 사람 검토가 필요합니다."
       },
       "g7-sec-policy": {
         "what": "사이버 보안 정책 정보입니다.",
-        "fix": "사이버 보안 정책을 문서화하세요 — 자동 출처가 없어 사람 검토가 필요합니다."
+        "fix": "사이버 보안 정책을 문서화하세요. 자동 출처가 없어 사람 검토가 필요합니다."
       },
       "g7-sec-vulns": {
         "what": "시스템에 대해 참조된 알려진 취약점입니다.",
@@ -1124,7 +1124,7 @@
       },
       "g7-kpi-security": {
         "what": "시스템의 보안 지표입니다.",
-        "fix": "보안 지표를 문서화하세요 — 자동 출처가 없어 사람 검토가 필요합니다."
+        "fix": "보안 지표를 문서화하세요. 자동 출처가 없어 사람 검토가 필요합니다."
       },
       "g7-kpi-operational": {
         "what": "모델의 운영 성능 지표입니다.",
@@ -1247,7 +1247,7 @@
     "empty": "감지된 라이선스가 없습니다.",
     "emptyHint": "스캔이 구성요소를 찾지 못해 분류할 대상이 없습니다. 라이선스 화면은 같은 목록에서 라이선스를 읽습니다.",
     "reviewTitle": "라이선스 검토 필요",
-    "reviewHint": "AI 제한 조항 — 사람 검토가 필요합니다.",
+    "reviewHint": "AI 제한 조항이 있어 사람 검토가 필요합니다.",
     "flagBehavioral": "행위 기반 제한",
     "flagNonCommercial": "비상업",
     "tier": {
@@ -1258,6 +1258,15 @@
       "uncategorized": "Uncategorized",
       "permissive": "Permissive"
     },
+    "tierHint": {
+      "networkCopyleft": "사용자가 네트워크로 이용하기만 해도 적용됩니다. 서비스로 제공할 때도 소스를 공개해야 할 수 있습니다.",
+      "strongCopyleft": "이 소프트웨어를 자체 코드와 합쳐서 배포하면, 합친 소프트웨어 전체를 같은 라이선스로 공개해야 할 수 있습니다.",
+      "weakCopyleft": "라이브러리 자체를 고치면 고친 부분을 같은 라이선스로 공개해야 합니다. 라이브러리를 가져다 쓰기만 하는 자체 코드는 대개 해당하지 않습니다.",
+      "reviewNeeded": "비상업 이용이나 사용 목적 제한 같은 조건이 있는 라이선스입니다. 담당자가 직접 검토해야 합니다.",
+      "uncategorized": "스캔에서 어떤 분류인지 알아내지 못한 라이선스입니다. 라이선스 전문을 직접 확인하세요.",
+      "permissive": "지켜야 할 조건이 적습니다. 대부분 저작권과 라이선스 문구를 그대로 남기면 됩니다."
+    },
+    "tierHintNote": "일반적인 안내이며 법률 자문이 아닙니다.",
     "conflictTitle": "배포 라이선스({{license}})와의 충돌",
     "conflictHint": "배포하는 라이선스를 기준으로 각 의존성의 조건이 어떻게 맞물리는지 보여 줍니다. 검토가 필요한 조합을 드러내는 참고 자료이며 법적 판단을 내리지 않습니다.",
     "conflictIncompatible": "충족 불가",
@@ -1269,7 +1278,7 @@
   },
   "recent": {
     "title": "스캔 관리",
-    "subtitle": "이 머신의 로컬 출력 폴더에 저장된 스캔",
+    "subtitle": "이 컴퓨터의 로컬 출력 폴더에 저장된 스캔",
     "total": "전체 스캔",
     "atRisk": "위험 주의",
     "projects": "프로젝트",
@@ -1331,7 +1340,7 @@
     "download": "지금 받기",
     "downloadSize": "내려받을 용량 약 {{size}} GB",
     "pullingStart": "받기를 시작합니다…",
-    "pullingLayers": "받는 중 — 레이어 {{total}}개 중 {{complete}}개 완료",
+    "pullingLayers": "받는 중: 레이어 {{total}}개 중 {{complete}}개 완료",
     "failed": {
       "timeout": "받는 도중 진행이 멎어 중단했습니다. 네트워크를 확인한 뒤 다시 눌러 주세요.",
       "disk": "디스크 공간이 부족해 받지 못했습니다. 공간을 확보한 뒤 다시 눌러 주세요.",
