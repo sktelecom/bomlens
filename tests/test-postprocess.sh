@@ -1140,6 +1140,27 @@ if [ -f "$RMD" ] && [ -f "$RHTML" ]; then
 else
     fail "generate-risk-report.sh produced no md/html with a BOM present"
 fi
+# An AI model scan's root component is the model under review, not the scanner's
+# own project: its license is counted and classified. A model with no dependent
+# dataset has no other component and used to read as 0 licenses.
+mkdir -p "$WORK/risk-ai"
+printf '%s' '{"bomFormat":"CycloneDX","specVersion":"1.6","metadata":{"component":{"type":"machine-learning-model","name":"m","licenses":[{"license":{"id":"Apache-2.0"}}]}},"components":[]}' \
+    > "$WORK/risk-ai/m_1.0_bom.json"
+: > "$WORK/risk-ai/m_1.0_NOTICE.txt"
+( cd "$WORK/risk-ai" && bash "$LIB/generate-risk-report.sh" m_1.0 m AIBOM >/dev/null 2>&1 )
+grep -q '^- Distinct licenses identified: 1 ' "$WORK/risk-ai/m_1.0_risk-report.md" \
+    && grep -q '^| 0 | 0 | 0 | 1 | 0 |$' "$WORK/risk-ai/m_1.0_risk-report.md" \
+    && pass "an AI model scan counts and classifies the model's own license" \
+    || fail "AI model license count" "$(grep -E 'Distinct licenses|^\| [0-9]' "$WORK/risk-ai/m_1.0_risk-report.md")"
+# A source scan still leaves its own project out.
+printf '%s' '{"bomFormat":"CycloneDX","specVersion":"1.6","metadata":{"component":{"type":"application","name":"p","licenses":[{"license":{"id":"GPL-3.0-only"}}]}},"components":[{"type":"library","name":"a","version":"1","licenses":[{"license":{"id":"MIT"}}]}]}' \
+    > "$WORK/risk-ai/p_1.0_bom.json"
+printf 'License: MIT\n' > "$WORK/risk-ai/p_1.0_NOTICE.txt"
+( cd "$WORK/risk-ai" && bash "$LIB/generate-risk-report.sh" p_1.0 p >/dev/null 2>&1 )
+grep -q '^- Distinct licenses identified: 1 ' "$WORK/risk-ai/p_1.0_risk-report.md" \
+    && grep -q '^| 0 | 0 | 0 | 1 | 0 |$' "$WORK/risk-ai/p_1.0_risk-report.md" \
+    && pass "a source scan leaves its own project's license out" \
+    || fail "source scan license count" "$(grep -E 'Distinct licenses|^\| [0-9]' "$WORK/risk-ai/p_1.0_risk-report.md")"
 # The Korean report prints the same class names as the English one. Four of the
 # five were hardcoded English while "Uncategorized" went through a translation
 # key, so a Korean table read "... | Permissive | 미분류 |" and disagreed with
