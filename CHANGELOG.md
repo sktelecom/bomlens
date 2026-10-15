@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v1.13.5] - 2026-10-16
+
 ### Upgrade note
 
 - In a `MODE=PLAN` plan, stage 1's `env` also sets `GOPATH=/tmp/sbomhome/go`, `GOMODCACHE=/tmp/sbomhome/go/pkg/mod` and `GOCACHE=/tmp/sbomhome/go-build`, so `go mod tidy` runs when stage 1 has a read-only root filesystem and only `/tmp` writable (before, it failed on `mkdir /go/pkg`, `go-mod-tidy` was recorded as `failed` and the run read `succeeded_degraded`). A Go toolchain that `go.mod` asks for is downloaded into `GOMODCACHE`. The CLI and the UI's scan set the same variables for stage 1. The engine contract version is unchanged: it is an additive `env` entry, like `MAVEN_OPTS` and `cache-maven` in v1.13.3, and no field, step or role changes.
@@ -20,6 +22,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The upstream PURL table covers OpenSSL 3.x, jansson, json-c (0.13.1 to 0.19), libbpf, iproute2, musl and util-linux.
 - A component the table does not cover at all gets a PURL from its source address (`bomlens:sourceUrl`, written by the Yocto SPDX 2.2 reader) when the address states the release of the component's version: a GitHub release asset or tag archive, or a GNU release.
 - The CPE index match reads a 2.3 CPE whose part is `*` as an application, and looks one whose vendor is `*` up by product alone, across every vendor, as Yocto's own cve-check does. New images index the product column for that lookup.
+
+### Changed
+
+- The web UI says what a vulnerability's package status means: a status of "fixed" reads "Fix available" in a neutral tone, since a fixed version is published but the installed one is still affected until it is upgraded. Green stays for states that really mean resolved. Notices about what a scan did not cover (components that could not be checked, kernel advisories left out of the counts) use a neutral notice box instead of the red one.
+- Counts are grouped by thousands in the interface language (`60,123`), and `<html lang>` matches the interface language from the first render.
+- One set of terms across the interface, kept in `docker/web/frontend/src/locales/GLOSSARY.md` and enforced by `npm run i18n:check`: "Conformance check" (적합성 검사), "Artifacts" (산출물) for what a scan writes, "Build artifact" (빌드 산출물) for the New scan input category, "Re-scan" (다시 스캔). License classes keep their English names and carry a plain-words hint in the interface language.
+- The advanced option selects stay inside the settings card. In the read-only demo, the scan list opens with a start-here strip, long scan names are shortened in the middle, the list becomes stacked rows on narrow screens, and the model information questions open (only their last step, starting a scan, needs a server).
+- Documentation: the home page leads with the live demo and a short subtitle, the home screenshot is per language at the current release, Korean pages have their own share title, description and image, and the language switch now keeps the page you are on. The install guides use a shallow clone and say what the first run downloads and how long the web UI takes to answer. `scan-sbom.sh` says what to do next for a missing Docker, an unreachable engine and an unknown option, and warns when a `--target` that looks like a path is treated as an image name; `check-setup.sh` no longer reports a stopped engine as a missing Docker.
 
 ### Fixed
 
