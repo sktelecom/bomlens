@@ -20,7 +20,7 @@
 #   2. The published scanner image for this version is pullable.
 #   3. The documented first-scan command produces a valid SBOM on that exact
 #      published image (not a CI-built one).
-#   4. The three opt-in images (firmware/aibom/deep-cve) are pullable too
+#   4. The four opt-in images (firmware/aibom/deep-cve/deep-license) are pullable too
 #      (checked after step 3, not before -- see that step's own comment).
 #
 # It only verifies (no publish/side effects), so the release-gate job can run it
@@ -32,7 +32,7 @@
 #        VERIFY_TIMEOUT    seconds to wait for the installers and the main
 #                          image (default 2100)
 #        VERIFY_SECONDARY_TIMEOUT  seconds for the WHOLE step checking the
-#                          three opt-in images, shared rather than split three
+#                          four opt-in images, shared rather than split four
 #                          ways (default 5400 = 90 min): they do not take
 #                          equal time to build (measured on a real run:
 #                          firmware ~11min, deep-cve ~9min, aibom ~86min, all
@@ -193,8 +193,10 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-# 4) The three opt-in images (firmware/aibom/deep-cve) pullable at this
-#    version. docker-publish.yml's build-firmware/build-aibom/build-deep-cve
+# 4) The four opt-in images (firmware/aibom/deep-cve/deep-license) pullable at this
+#    version. docker-publish.yml's build-firmware/build-aibom/build-deep-cve/
+#    build-deep-license (the last one was missing from this check until v1.13.5,
+#    when its build failed and the gate would still have published the release)
 #    jobs run unconditionally alongside the main image on a real release, so
 #    a broken push for one of them is exactly as release-blocking as the main
 #    image being missing -- just harder to notice, since nothing else in this
@@ -221,9 +223,9 @@ fi
 #    reachable, and checking it again here would only spend more of the
 #    shared deadline on a second pull of bytes already confirmed present.
 # ---------------------------------------------------------------------------
-echo "4) Opt-in images (firmware/aibom/deep-cve) pullable"
+echo "4) Opt-in images (firmware/aibom/deep-cve/deep-license) pullable"
 secondary_deadline=$(( $(date +%s) + SECONDARY_TIMEOUT ))
-for suffix in firmware aibom deep-cve; do
+for suffix in firmware aibom deep-cve deep-license; do
     img="ghcr.io/${OWNER}/bomlens-${suffix}:${IMAGE_VERSION}"
     check_secondary_image "$img" "$secondary_deadline" || fail=1
 done
@@ -261,4 +263,4 @@ if [ "$fail" -ne 0 ]; then
     echo "❌ release $TAG is NOT ready (a recommended entry point is broken)"
     exit 1
 fi
-echo "✅ release $TAG verified: installers attached, all four images published, documented command works, SBOMs attached"
+echo "✅ release $TAG verified: installers attached, all five images published, documented command works, SBOMs attached"
