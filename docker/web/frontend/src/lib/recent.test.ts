@@ -7,6 +7,8 @@ import type { RecentScan } from "./api";
 import {
   filterRecent,
   formatRelativeTime,
+  middleEllipsis,
+  pickStartScans,
   presentTypes,
   scanComparison,
   scanType,
@@ -258,5 +260,63 @@ describe("formatRelativeTime", () => {
     const nowSec = nowMs / 1000;
     expect(formatRelativeTime(nowSec - 7200, nowMs, "en")).toBe("2 hours ago");
     expect(formatRelativeTime(nowSec - 86_400, nowMs, "en")).toBe("yesterday");
+  });
+});
+
+describe("pickStartScans", () => {
+  const base = {
+    version: "1",
+    components: 1,
+    maxSeverity: null,
+    isAiScan: false,
+    inputSource: null,
+  } as const;
+  const mk = (id: string, componentType: string | null, generatedAt: number, extra = {}) =>
+    ({ ...base, id, project: id, componentType, generatedAt, ...extra }) as RecentScan;
+
+  it("picks the newest of source, container and AI, in that order", () => {
+    const scans = [
+      mk("old-src", "application", 1),
+      mk("fw", "firmware", 9),
+      mk("model", "machine-learning-model", 5, { isAiScan: true }),
+      mk("img", "container", 4),
+      mk("new-src", "application", 3),
+    ];
+    expect(pickStartScans(scans).map((s) => s.id)).toEqual(["new-src", "img", "model"]);
+  });
+
+  it("skips a missing type and returns nothing for an unrelated list", () => {
+    expect(pickStartScans([mk("img", "container", 4)]).map((s) => s.id)).toEqual(["img"]);
+    expect(pickStartScans([mk("fw", "firmware", 1)])).toEqual([]);
+    expect(pickStartScans([])).toEqual([]);
+  });
+
+  it("does not count an uploaded supplier SBOM as a source project", () => {
+    const up = mk("up", "application", 7, { inputSource: "sbom-upload" });
+    expect(pickStartScans([up])).toEqual([]);
+  });
+});
+
+describe("middleEllipsis", () => {
+  it("leaves a short name alone", () => {
+    expect(middleEllipsis("nginx", 20)).toBe("nginx");
+    expect(middleEllipsis("a".repeat(20), 20)).toBe("a".repeat(20));
+  });
+
+  it("keeps the start and the end and fits the limit", () => {
+    const out = middleEllipsis("2026-06-18-raspios-trixie-arm64-lite.img.xz", 24);
+    expect(Array.from(out)).toHaveLength(24);
+    expect(out.startsWith("2026-06-18-r")).toBe(true);
+    expect(out.endsWith("lite.img.xz")).toBe(true);
+    expect(out).toContain("…");
+  });
+
+  it("counts characters, not UTF-16 units", () => {
+    const out = middleEllipsis("가".repeat(30), 10);
+    expect(Array.from(out)).toHaveLength(10);
+  });
+
+  it("ignores a limit too small to be useful", () => {
+    expect(middleEllipsis("abcdef", 2)).toBe("abcdef");
   });
 });

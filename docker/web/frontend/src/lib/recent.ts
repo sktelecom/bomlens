@@ -256,3 +256,39 @@ export function formatRelativeTime(
     return rtf.format(Math.round(diffSec / (86_400 * 30)), "month");
   return rtf.format(Math.round(diffSec / (86_400 * 365)), "year");
 }
+
+/** Types the demo's "start here" strip offers, in the order it lists them. */
+const START_TYPES: ScanType[] = ["source", "container", "ai"];
+
+/**
+ * Up to three scans to recommend to a first-time visitor of the demo: the
+ * newest source project, container image and AI model in the list. Chosen by
+ * type from the loaded list, never by id, so a recapture that renames or
+ * reorders the data cannot break it. A type with no scan is simply skipped.
+ */
+export function pickStartScans(scans: RecentScan[]): RecentScan[] {
+  const picked: RecentScan[] = [];
+  for (const ty of START_TYPES) {
+    const newest = scans
+      .filter((s) => scanType(s) === ty)
+      .sort((a, b) => b.generatedAt - a.generatedAt)[0];
+    if (newest) picked.push(newest);
+  }
+  return picked;
+}
+
+/**
+ * Shorten a long name to at most `max` characters by replacing the middle with
+ * an ellipsis, so both the start (what it is) and the end (often a file
+ * extension or architecture) stay readable. A name that already fits is
+ * returned unchanged. The caller keeps the full name for tooltips and
+ * assistive technology.
+ */
+export function middleEllipsis(name: string, max: number): string {
+  const chars = Array.from(name);
+  if (chars.length <= max || max < 3) return name;
+  const keep = max - 1;
+  const tail = Math.floor(keep / 2);
+  const head = keep - tail;
+  return chars.slice(0, head).join("") + "…" + chars.slice(chars.length - tail).join("");
+}

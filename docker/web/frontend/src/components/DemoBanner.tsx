@@ -29,12 +29,16 @@ export function DemoBanner() {
       <span className="font-medium text-foreground">
         {t("shell.demoBannerTitle")}
       </span>
-      <span className="min-w-0 flex-1">{t("shell.demoBannerBody")}</span>
+      {/* The explanation is the long part; on a phone it would fill the first
+          screen, so only the title and the install link remain there. */}
+      <span className="hidden min-w-0 flex-1 md:block">
+        {t("shell.demoBannerBody")}
+      </span>
       <a
         href={demoInstallUrl(i18n.language)}
         target="_blank"
         rel="noreferrer"
-        className="shrink-0 font-medium text-brand underline underline-offset-2 hover:no-underline"
+        className="ml-auto shrink-0 font-medium text-brand underline underline-offset-2 hover:no-underline"
       >
         {t("shell.demoBannerCta")}
       </a>

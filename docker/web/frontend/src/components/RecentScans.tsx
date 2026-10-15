@@ -23,11 +23,13 @@ import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { IS_STATIC_DEMO } from "@/lib/demo";
 import { Card, CardContent } from "@/components/ui/card";
+import { DemoStartHere } from "@/components/DemoStartHere";
 import { Input } from "@/components/ui/input";
 import type { RecentScan, Severity } from "@/lib/api";
 import {
   filterRecent,
   formatRelativeTime,
+  middleEllipsis,
   presentTypes,
   scanComparison,
   type RecentSortDir,
@@ -40,6 +42,7 @@ import {
   summarizeRecent,
 } from "@/lib/recent";
 import { scanHash } from "@/lib/route";
+import { NARROW_QUERY, useMediaQuery } from "@/lib/useMediaQuery";
 import { cn } from "@/lib/utils";
 
 interface Props {
@@ -76,7 +79,7 @@ function SummaryCard({
   active?: boolean;
 }) {
   const body = (
-    <CardContent className="flex flex-col gap-1.5 p-5">
+    <CardContent className="flex flex-col gap-1.5 p-3 md:p-5">
       <span className="text-xs text-muted-foreground">{label}</span>
       <span
         className={cn(
@@ -155,6 +158,128 @@ function FilterChip({
   );
 }
 
+/** Longest name shown in full before the middle is replaced with an ellipsis. */
+const NAME_MAX = 40;
+
+/**
+ * A scan's name and version as one link label. A long name (a firmware image's
+ * file name, say) is shortened in the middle so the start and the end both stay
+ * readable and the version is never pushed out; the full text stays in the
+ * tooltip and is what assistive technology reads.
+ */
+function ScanLabel({ scan }: { scan: RecentScan }) {
+  const shown = middleEllipsis(scan.project, NAME_MAX);
+  const full = scan.version ? `${scan.project} @${scan.version}` : scan.project;
+  return (
+    <span title={shown === scan.project ? undefined : full}>
+      <span aria-hidden={shown === scan.project ? undefined : true} className="font-medium text-foreground">
+        {shown}
+      </span>
+      {shown !== scan.project && <span className="sr-only">{scan.project}</span>}
+      {scan.version && (
+        <span className="text-muted-foreground">
+          {" @"}
+          {scan.version}
+        </span>
+      )}
+    </span>
+  );
+}
+
+/** The type chip, shared by the table and the stacked rows. */
+function TypeBadge({ scan }: { scan: RecentScan }) {
+  const { t } = useTranslation();
+  return scanType(scan) === "ai" ? (
+    <Badge className="border-transparent bg-brand/10 text-brand-strong">
+      {t(scanTypeLabelKey(scan))}
+    </Badge>
+  ) : (
+    <Badge variant="muted">{t(scanTypeLabelKey(scan))}</Badge>
+  );
+}
+
+/**
+ * The narrow-screen form of the scan list: one stacked row per scan instead of
+ * a five-column table that would run off the edge. Name and version on top,
+ * the type and severity chips under it, then component count and date as
+ * secondary text. Sorting is the default (newest first) on this layout.
+ */
+function ScanRows({
+  scans,
+  all,
+  now,
+  onDelete,
+}: {
+  scans: RecentScan[];
+  all: RecentScan[];
+  now: number;
+  onDelete: (id: string) => void;
+}) {
+  const { t, i18n } = useTranslation();
+  if (scans.length === 0) {
+    return (
+      <p className="px-4 py-8 text-center text-sm text-muted-foreground">
+        {t("recent.noMatch")}
+      </p>
+    );
+  }
+  return (
+    <ul>
+      {scans.map((s) => {
+        const cmp = scanComparison(all, s.id);
+        return (
+          <li
+            key={s.id}
+            className="flex items-start gap-2 border-b px-4 py-3 last:border-0"
+          >
+            <div className="min-w-0 flex-1 space-y-1.5">
+              <a
+                href={scanHash(s.id)}
+                className="block break-words rounded text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              >
+                <ScanLabel scan={s} />
+              </a>
+              <div className="flex flex-wrap items-center gap-1.5">
+                <TypeBadge scan={s} />
+                {s.maxSeverity ? (
+                  <Badge tone={SEV_TONE[s.maxSeverity]}>
+                    {t(`severity.${s.maxSeverity}`)}
+                  </Badge>
+                ) : null}
+                {cmp && cmp.severityDir !== "same" && (
+                  <TrendArrow
+                    up={cmp.severityDir === "up"}
+                    label={t(
+                      cmp.severityDir === "up" ? "recent.sevUp" : "recent.sevDown",
+                    )}
+                  />
+                )}
+              </div>
+              <p className="text-xs tabular-nums text-muted-foreground">
+                {t("recent.rowMeta", {
+                  count: s.components,
+                  date: formatRelativeTime(s.generatedAt, now, i18n.language),
+                })}
+              </p>
+            </div>
+            {!IS_STATIC_DEMO && (
+              <button
+                type="button"
+                onClick={() => onDelete(s.id)}
+                aria-label={t("recent.delete")}
+                title={t("recent.delete")}
+                className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors duration-fast ease-out-soft hover:bg-destructive/10 hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              >
+                <Trash2 className="h-4 w-4" aria-hidden />
+              </button>
+            )}
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
 interface RecentSort {
   key: RecentSortKey;
   dir: RecentSortDir;
@@ -204,6 +329,7 @@ function SortHeader({
 export function RecentScans({ scans, newHref, onDelete }: Props) {
   const { t, i18n } = useTranslation();
   const summary = summarizeRecent(scans);
+  const narrow = useMediaQuery(NARROW_QUERY);
   const now = Date.now();
   const [sort, setSort] = useState<RecentSort>({ key: "generated", dir: "desc" });
   const [query, setQuery] = useState("");
@@ -268,7 +394,8 @@ export function RecentScans({ scans, newHref, onDelete }: Props) {
         </Card>
       ) : (
         <>
-          <div className="grid grid-cols-3 gap-4">
+          {IS_STATIC_DEMO && <DemoStartHere scans={scans} />}
+          <div className="grid grid-cols-3 gap-2 md:gap-4">
             <SummaryCard label={t("recent.total")} value={summary.total} />
             <SummaryCard
               label={t("recent.atRisk")}
@@ -318,6 +445,9 @@ export function RecentScans({ scans, newHref, onDelete }: Props) {
 
           <Card>
             <CardContent className="p-0">
+              {narrow ? (
+                <ScanRows scans={sorted} all={scans} now={now} onDelete={onDelete} />
+              ) : (
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b text-xs text-muted-foreground">
@@ -362,25 +492,11 @@ export function RecentScans({ scans, newHref, onDelete }: Props) {
                           href={scanHash(s.id)}
                           className="rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                         >
-                          <span className="font-medium text-foreground">
-                            {s.project}
-                          </span>
-                          {s.version && (
-                            <span className="text-muted-foreground">
-                              {" @"}
-                              {s.version}
-                            </span>
-                          )}
+                          <ScanLabel scan={s} />
                         </a>
                       </td>
                       <td className="px-4 py-3">
-                        {scanType(s) === "ai" ? (
-                          <Badge className="border-transparent bg-brand/10 text-brand-strong">
-                            {t(scanTypeLabelKey(s))}
-                          </Badge>
-                        ) : (
-                          <Badge variant="muted">{t(scanTypeLabelKey(s))}</Badge>
-                        )}
+                        <TypeBadge scan={s} />
                       </td>
                       <td className="px-4 py-3 text-muted-foreground">
                         {formatRelativeTime(s.generatedAt, now, i18n.language)}
@@ -443,6 +559,7 @@ export function RecentScans({ scans, newHref, onDelete }: Props) {
                   )}
                 </tbody>
               </table>
+              )}
             </CardContent>
           </Card>
 
