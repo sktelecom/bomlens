@@ -50,6 +50,25 @@ const LABEL: Record<LicenseRiskTier, string> = {
 /** i18n key per tier, for anywhere that names a tier outside this bar. */
 export const TIER_LABEL = LABEL;
 
+const HINT: Record<LicenseRiskTier, string> = {
+  "network-copyleft": "licenses.tierHint.networkCopyleft",
+  "strong-copyleft": "licenses.tierHint.strongCopyleft",
+  "weak-copyleft": "licenses.tierHint.weakCopyleft",
+  "review-needed": "licenses.tierHint.reviewNeeded",
+  uncategorized: "licenses.tierHint.uncategorized",
+  permissive: "licenses.tierHint.permissive",
+};
+
+/**
+ * Plain-words meaning of a tier plus the shared "guidance, not legal advice"
+ * note, in the current UI language. The class names themselves stay English in
+ * both languages, so this text is what makes them readable.
+ */
+export function useTierHint(): (tier: LicenseRiskTier) => string {
+  const { t } = useTranslation();
+  return (tier) => `${t(HINT[tier])} ${t("licenses.tierHintNote")}`;
+}
+
 /**
  * Fill for a flagged row in the distribution list.
  *
@@ -90,9 +109,10 @@ export const TIER_FLAGGED: ReadonlySet<LicenseRiskTier> = new Set([
  */
 export function TierBadge({ tier }: { tier: LicenseRiskTier }) {
   const { t } = useTranslation();
+  const tierHint = useTierHint();
   const label = t(TIER_LABEL[tier]);
   return (
-    <span title={label} className="flex shrink-0 items-center">
+    <span title={`${label}. ${tierHint(tier)}`} className="flex shrink-0 items-center">
       <Scale className="h-3.5 w-3.5 text-muted-foreground" role="img" aria-label={label} />
     </span>
   );
@@ -122,6 +142,7 @@ export function LicenseRiskBar({
 }: Props) {
   const { t } = useTranslation();
   const fmt = useFormatNumber();
+  const tierHint = useTierHint();
   const summary = useMemo(() => licenseRiskSummary(components), [components]);
   const total = summary.TOTAL;
   const interactive = Boolean(onSelect);
@@ -151,7 +172,7 @@ export function LicenseRiskBar({
             selected && selected !== tier && "opacity-30",
           );
           const segStyle = { width: `${(summary[tier] / total) * 100}%` };
-          const segTitle = `${t(LABEL[tier])}: ${fmt(summary[tier])}`;
+          const segTitle = `${t(LABEL[tier])}: ${fmt(summary[tier])}. ${tierHint(tier)}`;
           if (!interactive) {
             return <div key={tier} className={segClass} style={segStyle} title={segTitle} />;
           }
@@ -177,7 +198,7 @@ export function LicenseRiskBar({
         {LICENSE_TIER_ORDER.map((tier) => {
           if (summary[tier] === 0) return null;
           const badge = (
-            <Badge tone={TONE[tier]}>
+            <Badge tone={TONE[tier]} title={tierHint(tier)}>
               {t(LABEL[tier])} {fmt(summary[tier])}
             </Badge>
           );

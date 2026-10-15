@@ -841,7 +841,7 @@ test("scan results render in the rail sections, adapted to scan type", async ({ 
   await expect(page.getByRole("link", { name: /^Source tree/ })).toBeVisible();
   await expect(page.getByRole("link", { name: /^Artifacts/ })).toBeVisible();
   await expect(page.getByRole("navigation").getByRole("link", { name: /Models & datasets/ })).toHaveCount(0);
-  await expect(page.getByRole("navigation").getByRole("link", { name: /validation/i })).toHaveCount(0);
+  await expect(page.getByRole("navigation").getByRole("link", { name: /Conformance check/ })).toHaveCount(0);
 
   // Overview leads; switching to Components shows the table content.
   await page.getByRole("link", { name: /^Components/ }).first().click();
@@ -1741,9 +1741,9 @@ test("AI scan exposes G7 conformance with present/advisory split", async ({ page
   // The badge counts the mandatory checks — the ones that decide the verdict —
   // so it means the same thing on every scan. It used to show G7 coverage here
   // and all-check passes elsewhere, two answers to two different questions.
-  await expect(page.getByRole("navigation").getByRole("link", { name: /validation/i })).toContainText("1/1");
+  await expect(page.getByRole("navigation").getByRole("link", { name: /Conformance check/ })).toContainText("1/1");
   await expect(page.locator("main").getByText("1/1").first()).toBeVisible();
-  await page.getByRole("navigation").getByRole("link", { name: /validation/i }).click();
+  await page.getByRole("navigation").getByRole("link", { name: /Conformance check/ }).click();
 
   // Coverage of the baseline itself: 6 of the 8 auto-covered elements are
   // present. It counts every G7 check, so a filter must not change it.
@@ -1930,7 +1930,7 @@ test("conformance without a crosswalk omits the crosswalk sub-block", async ({ p
   await page.fill("#project", "model");
   await page.fill("#version", "1.0");
   await page.getByTestId("run-scan").click();
-  await page.getByRole("navigation").getByRole("link", { name: /validation/i }).click();
+  await page.getByRole("navigation").getByRole("link", { name: /Conformance check/ }).click();
 
   // The G7 section still renders (proves we reached the conformance panel)…
   await expect(page.getByText("6/8 present")).toBeVisible();
