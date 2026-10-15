@@ -525,6 +525,7 @@ generate_sbom_cdxgen() {
             --volumes-from "$self" \
             -e HOME=/tmp/sbomhome \
             -e "MAVEN_OPTS=-Duser.home=/tmp/sbomhome -Dmaven.repo.local=/tmp/sbomhome/.m2/repository" \
+            -e GOPATH=/tmp/sbomhome/go -e GOMODCACHE=/tmp/sbomhome/go/pkg/mod -e GOCACHE=/tmp/sbomhome/go-build \
             -e FETCH_LICENSE="$FETCH_LICENSE" \
             -e PROJECT_NAME="$PROJECT_NAME" \
             -e PROJECT_VERSION="$PROJECT_VERSION" \
@@ -541,6 +542,7 @@ generate_sbom_cdxgen() {
             --volumes-from "$self" \
             -e HOME=/tmp/sbomhome \
             -e "MAVEN_OPTS=-Duser.home=/tmp/sbomhome -Dmaven.repo.local=/tmp/sbomhome/.m2/repository" \
+            -e GOPATH=/tmp/sbomhome/go -e GOMODCACHE=/tmp/sbomhome/go/pkg/mod -e GOCACHE=/tmp/sbomhome/go-build \
             -e FETCH_LICENSE="$FETCH_LICENSE" \
             -e PROJECT_NAME="$PROJECT_NAME" \
             -e PROJECT_VERSION="$PROJECT_VERSION" \
