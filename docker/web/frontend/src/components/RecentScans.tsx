@@ -5,6 +5,7 @@ import {
   ArrowDown,
   ArrowUp,
   ArrowUpDown,
+  ExternalLink,
   FileJson,
   FolderOpen,
   Plus,
@@ -22,7 +23,7 @@ import { useTranslation } from "react-i18next";
 import { Badge } from "@/components/ui/badge";
 import { FOCUS_RING, SELECTED_SOLID } from "@/components/ui/selectable";
 import { buttonVariants } from "@/components/ui/button";
-import { IS_STATIC_DEMO } from "@/lib/demo";
+import { demoUrl, IS_STATIC_DEMO } from "@/lib/demo";
 import { Card, CardContent } from "@/components/ui/card";
 import { DemoStartHere } from "@/components/DemoStartHere";
 import { Input } from "@/components/ui/input";
@@ -334,6 +335,20 @@ export function RecentScans({ scans, newHref, onDelete }: Props) {
               <Plus className="h-4 w-4" aria-hidden />
               {t("shell.newScan")}
             </a>
+            {/* A second way in for someone who wants to see a result before
+                scanning anything of their own. */}
+            {!IS_STATIC_DEMO && (
+              <a
+                href={demoUrl()}
+                target="_blank"
+                rel="noreferrer noopener"
+                data-testid="empty-demo-link"
+                className="inline-flex items-center gap-1.5 text-body-sm font-medium text-foreground underline underline-offset-2 hover:no-underline"
+              >
+                {t("recent.emptyDemo")}
+                <ExternalLink className="h-3.5 w-3.5" aria-hidden />
+              </a>
+            )}
             <ul className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1.5 text-label text-muted-foreground">
               {[
                 { icon: FileJson, label: t("recent.emptyOutSbom") },

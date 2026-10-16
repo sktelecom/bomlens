@@ -605,12 +605,24 @@
     "inputSbom": "제출된 SBOM",
     "help": "도움말",
     "helpDocs": "문서",
+    "helpStart": "처음 사용하기",
+    "helpShortcuts": "키보드 단축키",
+    "helpWhatsNew": "이 버전에서 바뀐 것",
     "helpDemo": "온라인 데모",
     "helpVersion": "버전 {{version}}",
     "helpVersionUnknown": "이 빌드에는 버전이 기록되지 않았습니다",
     "conformanceSplitTitle": "측정한 필수 검사 중 통과한 개수",
     "lookupTitle": "외부 취약점 조회",
     "helpReport": "문제 신고"
+  },
+  "shortcuts": {
+    "title": "키보드 단축키",
+    "search": "열려 있는 스캔 검색",
+    "searchMove": "검색 결과 사이 이동",
+    "searchOpen": "선택한 결과 열기",
+    "close": "메뉴나 대화상자 닫기",
+    "list": "이 목록 보기",
+    "done": "닫기"
   },
   "shell": {
     "newScan": "새 스캔",
@@ -1348,6 +1360,7 @@
     "typeContainer": "컨테이너",
     "typeRootfs": "RootFS",
     "emptyTitle": "첫 SBOM을 만들어 보세요",
+    "emptyDemo": "결과 예시 먼저 보기",
     "emptyBody": "폴더나 Git 저장소, Docker 이미지, SBOM, AI 모델을 스캔하면 BomLens가 SBOM과 고지문, 보안 보고서를 한 번에 로컬에서 만듭니다.",
     "emptyOutSbom": "SBOM (CycloneDX)",
     "emptyOutNotice": "오픈소스 고지문",

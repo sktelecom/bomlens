@@ -605,12 +605,24 @@
     "inputSbom": "Submitted SBOM",
     "help": "Help",
     "helpDocs": "Documentation",
+    "helpStart": "Getting started",
+    "helpShortcuts": "Keyboard shortcuts",
+    "helpWhatsNew": "What's new in this version",
     "helpDemo": "Live demo",
     "helpVersion": "Version {{version}}",
     "helpVersionUnknown": "Version not stamped in this build",
     "conformanceSplitTitle": "Mandatory checks passed, out of the mandatory checks measured",
     "lookupTitle": "External vulnerability lookup",
     "helpReport": "Report a problem"
+  },
+  "shortcuts": {
+    "title": "Keyboard shortcuts",
+    "search": "Search the open scan",
+    "searchMove": "Move through search results",
+    "searchOpen": "Open the highlighted result",
+    "close": "Close a menu or dialog",
+    "list": "Show this list",
+    "done": "Done"
   },
   "shell": {
     "newScan": "New scan",
@@ -1348,6 +1360,7 @@
     "typeContainer": "Container",
     "typeRootfs": "RootFS",
     "emptyTitle": "Generate your first SBOM",
+    "emptyDemo": "See an example result first",
     "emptyBody": "Scan a folder, Git repo, Docker image, SBOM or AI model. BomLens builds the bill of materials, license notice and security report locally, in one run.",
     "emptyOutSbom": "SBOM (CycloneDX)",
     "emptyOutNotice": "Open-source notice",

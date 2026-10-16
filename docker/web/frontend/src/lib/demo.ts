@@ -61,6 +61,13 @@ export function docsUrl(language: string | undefined): string {
   return `${DOCS_BASE}/${korean ? "ko/" : ""}`;
 }
 
+/** What changed in a version: its release page, or the list when the build
+ *  carries no version stamp. */
+export function releaseNotesUrl(version: string | undefined): string {
+  const base = "https://github.com/sktelecom/bomlens/releases";
+  return version ? `${base}/tag/v${version.replace(/^v/, "")}` : base;
+}
+
 /** The public demo, for showing someone the tool without installing it. */
 export function demoUrl(): string {
   return `${DOCS_BASE}/demo/`;
