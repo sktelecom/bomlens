@@ -1,0 +1,12 @@
+{"bomFormat":"CycloneDX","specVersion":"1.6","version":1,
+ "metadata":{"timestamp":"2026-01-01T00:00:00Z","tools":{"components":[{"type":"application","name":"cdxgen","version":"12.0.0"}]},
+  "component":{"type":"application","name":"contrast-sample","version":"1.0.0","bom-ref":"root"}},
+ "components":[
+  {"type":"library","bom-ref":"a","name":"express","version":"4.17.1","purl":"pkg:npm/express@4.17.1","licenses":[{"license":{"id":"MIT"}}]},
+  {"type":"library","bom-ref":"b","name":"lodash","version":"4.17.15","purl":"pkg:npm/lodash@4.17.15","licenses":[{"license":{"id":"MIT"}}]},
+  {"type":"library","bom-ref":"c","name":"readline-lib","version":"8.1","purl":"pkg:generic/readline-lib@8.1","licenses":[{"license":{"id":"GPL-3.0-only"}}]},
+  {"type":"library","bom-ref":"d","name":"libfoo","version":"2.0","purl":"pkg:npm/libfoo@2.0","licenses":[{"license":{"id":"LGPL-2.1-only"}}]},
+  {"type":"library","bom-ref":"e","name":"netlib","version":"1.2","purl":"pkg:npm/netlib@1.2","licenses":[{"license":{"id":"AGPL-3.0-only"}}]},
+  {"type":"library","bom-ref":"f","name":"weights-lib","version":"1.0","purl":"pkg:npm/weights-lib@1.0","licenses":[{"license":{"id":"CC-BY-NC-4.0"}}]},
+  {"type":"library","bom-ref":"g","name":"mystery","version":"0.1","purl":"pkg:npm/mystery@0.1"}],
+ "dependencies":[{"ref":"root","dependsOn":["a","b","c","d","e","f","g"]},{"ref":"a","dependsOn":["b"]}]}
