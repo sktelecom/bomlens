@@ -34,11 +34,6 @@ const MAIN = {
     network: "프로젝트를 처음 스캔할 때 언어별 이미지(0.6~1.7GB)를 한 번 더 내려받습니다...",
     // 화면에는 "다시 시도" 버튼이 있다. 문구가 "앱을 다시 실행"이라고 하면 서로 어긋난다.
     pullFailed: "이미지 다운로드에 실패했습니다. 아래 안내를 확인한 뒤 다시 시도를 눌러 주세요.",
-    // non-TTY docker pull에는 바이트/퍼센트가 없어 레이어 개수로만 셀 수 있다(pullprogress.mjs).
-    pullProgress: (complete, total, secs) =>
-      total === 0
-        ? `레지스트리에 접속하는 중... (${secs}초 경과)`
-        : `이미지 레이어 내려받는 중: ${total}개 중 ${complete}개 완료 (${secs}초 경과)`,
     // 이미지가 이미 있어도 조용히 최신 여부를 확인하다가 실제로 새 버전을 받기 시작했을 때만 뜬다.
     updateFound: "새 버전의 스캐너 이미지를 내려받는 중입니다...",
     cleanedOrphans: (n) => `이전 실행에서 남은 컨테이너 ${n}개를 정리했습니다.`,
@@ -71,10 +66,6 @@ const MAIN = {
     image: (img) => `Image: ${img}`,
     network: "The first scan of a project also fetches a language image (0.6-1.7 GB)...",
     pullFailed: "Image download failed. Check the guidance below, then press Try again.",
-    pullProgress: (complete, total, secs) =>
-      total === 0
-        ? `Contacting the registry... (${secs}s elapsed)`
-        : `Downloading image layers: ${complete}/${total} done (${secs}s elapsed)`,
     updateFound: "Downloading a newer scanner image...",
     cleanedOrphans: (n) =>
       n === 1

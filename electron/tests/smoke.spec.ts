@@ -14,8 +14,8 @@ import { fileURLToPath } from "node:url";
 const appRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
 const SUBTITLE: Record<"en" | "ko", string> = {
-  en: "Getting ready. On the first run, downloading the scanner image can take a few minutes.",
-  ko: "준비 중입니다. 처음 실행이면 스캐너 이미지를 내려받느라 수 분 걸릴 수 있어요.",
+  en: "The first run downloads the scanner image once.",
+  ko: "처음 실행에서는 스캐너 이미지를 한 번 내려받습니다.",
 };
 
 // Seeds the docker-missing screen (SBOM_SMOKE_SCREEN) and checks the rebranded
@@ -64,6 +64,14 @@ test("failed-pull renders proxy guidance, retry, and the log button in English",
     // Nothing Korean may reach an English-locale attendee.
     await expect(help).not.toHaveText(/[가-힣]/);
     await expect(win.locator("#log")).not.toHaveText(/[가-힣]/);
+    // The failure panel sits inside the failed step, so the cause and the next action read
+    // as part of that step, and the detailed log opens by itself.
+    await expect(win.locator('li[data-step="image"] #failure')).toBeVisible();
+    await expect(win.locator('li[data-step="image"]')).toHaveAttribute("data-state", "failed");
+    await expect(win.locator('li[data-step="docker"]')).toHaveAttribute("data-state", "done");
+    await expect(win.locator("#copy-log")).toBeVisible();
+    await expect(win.locator("#docker-help")).toHaveAttribute("href", /^docker-missing\.html\?/);
+    await expect(win.locator("#log-details")).toHaveJSProperty("open", true);
   } finally {
     await app.close();
   }
@@ -147,9 +155,9 @@ test("status screen displays the app version", async () => {
 });
 
 // Light/dark contract: the status screen's CSS must follow prefers-color-scheme
-// with exactly the colors main.mjs paints the window background with (#f5f5f7
-// light / #0a0a0c dark) — if either side drifts, the app flashes the wrong
-// color on first paint. The scheme is emulated at the page level: overriding
+// with exactly the colors main.mjs paints the window background with (#fafafa
+// light / #0e0e10 dark, the computed shared --background token) — if either side
+// drifts, the app flashes the wrong color on first paint. The scheme is emulated at the page level: overriding
 // nativeTheme.themeSource in the main process does not reach a file:// page's
 // media query in this Electron version, and the app itself never overrides it.
 test("status screen styles both color schemes with the first-paint colors", async () => {
@@ -162,11 +170,11 @@ test("status screen styles both color schemes with the first-paint colors", asyn
     await win.emulateMedia({ colorScheme: "light" });
     await expect
       .poll(() => win.evaluate(() => getComputedStyle(document.body).backgroundColor))
-      .toBe("rgb(245, 245, 247)");
+      .toBe("rgb(250, 250, 250)");
     await win.emulateMedia({ colorScheme: "dark" });
     await expect
       .poll(() => win.evaluate(() => getComputedStyle(document.body).backgroundColor))
-      .toBe("rgb(10, 10, 12)");
+      .toBe("rgb(14, 14, 16)");
   } finally {
     await app.close();
   }
@@ -193,4 +201,92 @@ test("startup log file is written and flushed on quit", async () => {
   // After quit the stream is closed, so the smoke-mode ready line is flushed.
   expect(fs.existsSync(logPath)).toBe(true);
   expect(fs.readFileSync(logPath, "utf8")).toContain("Ready. Opening the UI.");
+});
+
+// The start screen is a three-step list. SBOM_SMOKE_SCREEN=pulling seeds the image step
+// mid-download with fixed numbers (3 of 7 layers, 94 s), so the layer count, the elapsed time
+// and the first-run note are asserted without a real multi-minute pull. The state must be
+// readable without colour: every step carries a text state, and the current one is
+// aria-current.
+const PULLING: Record<"en" | "ko", { layers: string; elapsed: string; note: RegExp; image: string }> = {
+  en: {
+    layers: "3 of 7 layers done",
+    elapsed: "Elapsed 1:34",
+    note: /Only on the first run/,
+    image: "Download scanner image",
+  },
+  ko: {
+    layers: "레이어 7개 중 3개 완료",
+    elapsed: "경과 시간 1:34",
+    note: /처음 한 번만 받습니다/,
+    image: "스캐너 이미지 내려받기",
+  },
+};
+for (const lang of ["en", "ko"] as const) {
+  test(`start screen shows step list and pull progress (${lang})`, async () => {
+    const app = await electron.launch({
+      args: [appRoot],
+      env: { ...process.env, SBOM_SMOKE: "1", SBOM_SMOKE_SCREEN: "pulling", SBOM_LANG: lang },
+    });
+    try {
+      const win = await app.firstWindow();
+      const want = PULLING[lang];
+      const steps = win.locator("#steps > li");
+      await expect(steps).toHaveCount(3);
+      const image = win.locator('li[data-step="image"]');
+      await expect(image).toHaveAttribute("data-state", "current");
+      await expect(image).toHaveAttribute("aria-current", "step");
+      await expect(image).toContainText(want.image);
+      await expect(image).toContainText(want.layers);
+      await expect(image).toContainText(want.elapsed);
+      await expect(image).toContainText(want.note);
+      const bar = image.getByRole("progressbar");
+      await expect(bar).toHaveAttribute("aria-valuenow", "3");
+      await expect(bar).toHaveAttribute("aria-valuemax", "7");
+      await expect(win.locator('li[data-step="docker"]')).toHaveAttribute("data-state", "done");
+      await expect(win.locator('li[data-step="ui"]')).toHaveAttribute("data-state", "pending");
+      // Each state has a text label next to the marker.
+      await expect(win.locator('li[data-step="docker"] .state-text')).toHaveText(lang === "en" ? "Done" : "완료");
+      await expect(win.locator('li[data-step="ui"] .state-text')).toHaveText(lang === "en" ? "Waiting" : "대기 중");
+      // The log is collapsed by default and holds the lines main sent.
+      await expect(win.locator("#log-details")).toHaveJSProperty("open", false);
+      await expect(win.locator("#failure")).toBeHidden();
+    } finally {
+      await app.close();
+    }
+  });
+}
+
+// The tokens must really reach the window. A packaged build gets the CSS through the
+// electron-builder file set; a development run reads it from docker/shared. Either way the
+// script sets the "tokens" class on <html>, which is what switches the screen off the
+// fallback palette. If neither link resolved, the screen would silently use the fallback.
+test("start screen loads the shared design tokens", async () => {
+  const app = await electron.launch({
+    args: [appRoot],
+    env: { ...process.env, SBOM_SMOKE: "1", SBOM_LANG: "en" },
+  });
+  try {
+    const win = await app.firstWindow();
+    await expect(win.locator("html")).toHaveClass(/tokens/);
+    const ring = await win.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue("--ring").trim());
+    expect(ring).not.toBe("");
+  } finally {
+    await app.close();
+  }
+});
+
+// The Docker guide shares the tokens and the language toggle with the start screen.
+test("docker-missing screen loads the shared design tokens", async () => {
+  const app = await electron.launch({
+    args: [appRoot],
+    env: { ...process.env, SBOM_SMOKE: "1", SBOM_SMOKE_SCREEN: "docker-missing", SBOM_LANG: "en" },
+  });
+  try {
+    const win = await app.firstWindow();
+    await expect(win.locator("html")).toHaveClass(/tokens/);
+    await expect(win.locator("#check-again")).toHaveText("Check again");
+  } finally {
+    await app.close();
+  }
 });

@@ -23,7 +23,7 @@ import {
   UiContainer,
 } from "./lib/container.mjs";
 import { BOOT, canRetry, isBusy } from "./lib/boot.mjs";
-import { classifyPullFailure, createPullProgress } from "./lib/pullprogress.mjs";
+import { classifyPullFailure, createPullProgress, pullPayload } from "./lib/pullprogress.mjs";
 import { addScanMounts, parseScanMounts, removeScanMount } from "./lib/scanmounts.mjs";
 import { createHealthMonitor } from "./lib/health.mjs";
 import { buildMenuTemplate, ISSUE_FORM_URL } from "./lib/helpmenu.mjs";
@@ -56,10 +56,17 @@ function status(line) {
   startupLogger?.line(line);
 }
 
-// pull 진행 요약: 로그 창(status)과 달리 한 줄을 제자리에서 갱신한다. 로그는 흐르지만
-// 요약은 "지금 어디쯤인지"를 고정된 자리에서 보여줘야 멈춘 것처럼 보이지 않는다.
-function statusProgress(line) {
-  send("status-progress", line);
+// pull progress: unlike the log (status), this is a structured payload the start screen
+// renders in place ({complete, total, secs, update}, see pullPayload). The log scrolls, but
+// the progress bar and elapsed time must stay put or the screen looks frozen.
+function statusProgress(payload) {
+  send("status-progress", payload);
+}
+
+// Query string shared by every load of the start screen. `platform` lets the screen link to
+// the Docker guide with the right OS section (a window cannot read process.platform).
+function statusQuery() {
+  return { lang, platform: process.platform, v: app.getVersion() };
 }
 
 // 예외를 사용자 언어 문구로. container.mjs는 번역 가능한 code를 실어 던지므로(ContainerError)
@@ -148,7 +155,7 @@ async function restartForScanMounts() {
   await current?.stop();
   if (!mainWindow || mainWindow.isDestroyed() || shutdownPromise) return;
   await mainWindow.loadFile(path.join(here, "assets", "status.html"), {
-    query: { lang, v: app.getVersion() },
+    query: statusQuery(),
   });
   setBootState(BOOT.IDLE);
   startup().catch((err) => status(t.startFailed(describeErr(err))));
@@ -191,9 +198,10 @@ async function createWindow() {
   const { bounds, maximized } = restoreWindowState();
   mainWindow = new BrowserWindow({
     ...bounds,
-    // 첫 페인트 배경을 OS 테마에 맞춰 흰/검 플래시를 막는다. 시작 화면의 CSS
-    // (prefers-color-scheme)와 같은 색이어야 한다.
-    backgroundColor: nativeTheme.shouldUseDarkColors ? "#0a0a0c" : "#f5f5f7",
+    // First-paint background in the OS theme so there is no white/black flash. These are the
+    // computed values of the shared tokens' --background (hsl(0 0% 98%) light, hsl(240 6% 6%)
+    // dark), which is what the start screen paints once its CSS loads.
+    backgroundColor: nativeTheme.shouldUseDarkColors ? "#0e0e10" : "#fafafa",
     title: "BomLens",
     // Windows/Linux에서 메뉴바를 숨긴다(Alt로 꺼낼 수 있고 Edit 단축키는 유지된다).
     // Menu.setApplicationMenu(null)은 단축키까지 없애므로 쓰지 않는다.
@@ -208,7 +216,7 @@ async function createWindow() {
   if (maximized) mainWindow.maximize();
   mainWindow.on("close", saveWindowState);
   await mainWindow.loadFile(path.join(here, "assets", "status.html"), {
-    query: { lang, v: app.getVersion() },
+    query: statusQuery(),
   });
 }
 
@@ -222,11 +230,7 @@ async function refreshImageInBackground() {
   let tally = { total: 0, complete: 0 };
   let downloading = false;
   const heartbeat = setInterval(() => {
-    if (downloading) {
-      statusProgress(
-        t.pullProgress(tally.complete, tally.total, Math.round((Date.now() - startedAt) / 1000)),
-      );
-    }
+    if (downloading) statusProgress(pullPayload(tally, startedAt, Date.now(), true));
   }, 1000);
 
   let pull;
@@ -292,10 +296,7 @@ async function startup() {
     const progress = createPullProgress();
     const startedAt = Date.now();
     let tally = { total: 0, complete: 0 };
-    const render = () =>
-      statusProgress(
-        t.pullProgress(tally.complete, tally.total, Math.round((Date.now() - startedAt) / 1000)),
-      );
+    const render = () => statusProgress(pullPayload(tally, startedAt, Date.now()));
     const heartbeat = setInterval(render, 1000);
     render();
 
@@ -370,7 +371,7 @@ async function handleContainerDown() {
   await current?.stop();
   if (!mainWindow || mainWindow.isDestroyed() || shutdownPromise) return;
   await mainWindow.loadFile(path.join(here, "assets", "status.html"), {
-    query: { lang, v: app.getVersion() },
+    query: statusQuery(),
   });
   setBootState(BOOT.FAILED_DIED);
   status(t.containerDied);
@@ -441,7 +442,10 @@ function registerApp() {
     if (!canRetry(bootState)) return { ok: false };
     if (shutdownPromise) return { ok: false };
 
-    if (bootState === BOOT.FAILED_DOCKER) {
+    // The Docker guide is also reachable from a later failed step (the start screen links to
+    // it), so a recheck from that page takes the same path as a failed Docker check.
+    const fromDockerGuide = event.senderFrame.url.includes("docker-missing.html");
+    if (bootState === BOOT.FAILED_DOCKER || fromDockerGuide) {
       // Docker 안내 화면에서의 재확인: 여전히 불가면 화면 전환 없이 사유만 돌려준다.
       // 캐시된 docker 경로를 버리고 다시 찾는다 — 앱을 켜 둔 채 Docker를 설치한 경우
       // (데모에서 흔하다) 재확인만으로 복구되어야 한다.
@@ -452,8 +456,12 @@ function registerApp() {
         return { ok: false, reason };
       }
       // Docker가 살아났다: 상태 화면으로 돌아가 부팅을 재개한다(응답은 즉시 반환).
+      healthMonitor?.stop();
+      healthMonitor = null;
+      await container?.stop();
+      container = null;
       await mainWindow.loadFile(path.join(here, "assets", "status.html"), {
-        query: { lang, v: app.getVersion() },
+        query: statusQuery(),
       });
       startup().catch((err) => status(t.startFailed(describeErr(err))));
       return { ok: true };
@@ -549,6 +557,16 @@ function registerApp() {
         await mainWindow.loadFile(path.join(here, "assets", "docker-missing.html"), {
           query: { reason: "not-installed", lang, platform: process.platform, v: app.getVersion() },
         });
+        return;
+      }
+      // Seed: SBOM_SMOKE_SCREEN=pulling shows the image step mid-download with fixed numbers,
+      // so the docs capture and the screen tests are deterministic (a real pull is not).
+      if (process.env.SBOM_SMOKE_SCREEN === "pulling") {
+        setBootState(BOOT.PULLING);
+        status(t.dockerChecking);
+        status(t.firstPull);
+        status(t.image(DEFAULT_IMAGE));
+        statusProgress({ complete: 3, total: 7, secs: 94, update: false });
         return;
       }
       // 화면 시드: SBOM_SMOKE_SCREEN=failed-pull:<사유>로 pull 실패 화면을 직접 띄운다.
