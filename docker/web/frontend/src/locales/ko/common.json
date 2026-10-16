@@ -587,11 +587,11 @@
     "recentDelete": "이 스캔 삭제",
     "sectionsHint": "스캔을 실행하면 결과 섹션이 여기에 표시됩니다.",
     "group": {
-      "inventory": "인벤토리",
+      "inventory": "구성 정보",
       "ai": "AI",
       "outputs": "산출물",
       "security": "보안",
-      "compliance": "컴플라이언스"
+      "compliance": "규정 준수"
     },
     "overview": "개요",
     "components": "컴포넌트",
