@@ -3,13 +3,24 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Download, Maximize2, Search, Workflow, ZoomIn, ZoomOut } from "lucide-react";
+import {
+  Download,
+  Keyboard,
+  Maximize2,
+  MousePointer2,
+  MoveRight,
+  Search,
+  Workflow,
+  ZoomIn,
+  ZoomOut,
+} from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { EmptyState, ErrorState } from "@/components/ui/state";
 import { SEVERITY_ORDER, type Severity } from "@/lib/api";
+import { cssLengthToPx } from "@/lib/graphView";
 import type { GraphEdge, GraphNode } from "@/lib/sbomGraph";
 
 const VULN_TONE: Record<Severity, "critical" | "high" | "medium" | "low" | "info"> = {
@@ -71,7 +82,13 @@ function themeColors() {
     const channels = css.getPropertyValue(name).trim().replace(/\s+/g, ", ");
     return `rgb(${channels})`;
   };
+  // Label size follows the --font-size-label token (12px), never a literal.
+  const labelPx = cssLengthToPx(
+    css.getPropertyValue("--font-size-label"),
+    parseFloat(css.fontSize) || 16,
+  );
   return {
+    labelPx: labelPx ?? 12,
     node: hsl("--muted-foreground"),
     text: hsl("--foreground"),
     edge: hsl("--border"),
@@ -87,6 +104,31 @@ function themeColors() {
       UNKNOWN: rgb("--risk-info"),
     } as Record<Severity, string>,
   };
+}
+
+/** One legend entry: a mark and a short label in a pill. `quiet` entries are
+ *  how-to hints rather than node kinds, so they drop the border. */
+function LegendChip({
+  label,
+  quiet,
+  children,
+}: {
+  label: string;
+  quiet?: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <li
+      className={
+        quiet
+          ? "inline-flex items-center gap-1.5 px-1.5 py-0.5 text-label text-muted-foreground"
+          : "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-label text-foreground"
+      }
+    >
+      {children}
+      {label}
+    </li>
+  );
 }
 
 export function DependencyGraph({
@@ -143,6 +185,8 @@ export function DependencyGraph({
         if (destroyed || !containerRef.current) return;
 
         const c = themeColors();
+        // Published so a test can pin the label size the canvas was given.
+        containerRef.current.dataset.labelPx = String(c.labelPx);
         // dagre layout options aren't in cytoscape's base LayoutOptions type.
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const config: any = {
@@ -166,13 +210,15 @@ export function DependencyGraph({
               selector: "node",
               style: {
                 label: "data(label)",
-                "font-size": "10px",
+                "font-size": `${c.labelPx}px`,
                 "background-color": c.node,
                 color: c.text,
                 "text-valign": "center",
                 "text-halign": "right",
                 "text-margin-x": 6,
-                "min-zoomed-font-size": 7,
+                // Below 8 rendered px a label is noise, so it is left out until the
+                // reader zooms in; the node itself stays.
+                "min-zoomed-font-size": 8,
                 // A translucent card-coloured plate behind each label keeps it
                 // legible where labels and edges overlap on a dense graph.
                 "text-background-color": c.bg,
@@ -252,31 +298,27 @@ export function DependencyGraph({
               },
             },
           ],
-          layout: { name: "dagre", rankDir: "LR", nodeSep: 36, rankSep: 160, fit: true, padding: 24 },
+          // nodeSep is the gap between stacked nodes. The graph is as tall as its
+          // widest rank, and a tall graph fits to a tiny zoom, so keep the stack
+          // tight: with 12px labels, about 22px per node is enough to read.
+          layout: { name: "dagre", rankDir: "LR", nodeSep: 10, rankSep: 160, fit: true, padding: 24 },
           // Cap zoom so small graphs (a few nodes) don't blow up to fill the
-          // canvas — that's what made labels huge and overlap.
-          minZoom: 0.2,
+          // canvas — that's what made labels huge and overlap. The floor is low
+          // so a fit is never clamped to a view that crops the graph.
+          minZoom: 0.02,
           maxZoom: 1.4,
           wheelSensitivity: 0.2,
         };
         cy = cytoscape(config);
         cyRef.current = cy;
-        // First view: a big graph fits to unreadable dots, so when fit zoomed
-        // far out, snap to zoom 1 (labels legible) and anchor the top-left —
-        // the user pans/scrolls from there. Small graphs keep their fit.
-        // dagre runs synchronously inside cytoscape(config), so layoutstop
-        // has already fired before any listener can attach — snap now, and
-        // keep the listener for any later async re-layout.
-        const snapLegible = () => {
-          if (cy.zoom() < 0.9) {
-            cy.zoom(1);
-            const bb = cy.elements().boundingBox();
-            cy.pan({ x: 24 - bb.x1, y: 24 - bb.y1 });
-          }
-        };
-        snapLegible();
-        cy.one("layoutstop", snapLegible);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        // First view: the layout's own fit, which shows the whole graph inside
+        // the pane. A big graph used to be snapped to zoom 1 and anchored at the
+        // top-left right after this, which cut nodes off, so there is
+        // deliberately no "legible zoom" override here: labels stay hidden until
+        // the reader zooms, and a graph large enough to need that opens as the
+        // tree. The layout runs synchronously inside cytoscape(config); publish
+        // the level it landed on.
+        setZoomLevel(cy.zoom());
         // Every zoom lands here — the buttons, the wheel, the initial fit — so
         // the published level is the graph's own, not a guess at what it became.
         cy.on("zoom", () => setZoomLevel(cy.zoom()));
@@ -397,33 +439,36 @@ export function DependencyGraph({
           className="h-8 pl-8"
         />
       </div>
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-label text-muted-foreground">
-        <span className="inline-flex items-center gap-1.5">
-          <span
-            className="h-2.5 w-2.5 shrink-0 rounded-full border-2 border-foreground bg-card"
-            aria-hidden
-          />
-          {t("deps.legendRoot")}
-        </span>
-        <span className="inline-flex items-center gap-1.5">
+      <ul
+        aria-label={t("deps.legend")}
+        data-testid="deps-legend"
+        className="flex flex-wrap items-center gap-1.5"
+      >
+        <LegendChip label={t("deps.legendRoot")}>
+          <span className="h-2.5 w-2.5 shrink-0 rounded-full border-2 border-foreground bg-card" aria-hidden />
+        </LegendChip>
+        <LegendChip label={t("deps.direct")}>
           <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-foreground" aria-hidden />
-          {t("deps.direct")}
-        </span>
-        <span className="inline-flex items-center gap-1.5">
+        </LegendChip>
+        <LegendChip label={t("deps.legendTransitive")}>
           <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-muted-foreground" aria-hidden />
-          {t("deps.legendTransitive")}
-        </span>
-        <span className="inline-flex items-center gap-1.5">
+        </LegendChip>
+        <LegendChip label={t("deps.legendVuln")}>
           <span
             className="h-2.5 w-2.5 shrink-0 rounded-full border-2 border-risk-high bg-muted-foreground"
             aria-hidden
           />
-          {t("deps.legendVuln")}
-        </span>
-        <span className="text-muted-foreground">
-          {t("deps.arrowHint")} {t("deps.interactHint")} {t("deps.keyboardHint")}
-        </span>
-      </div>
+        </LegendChip>
+        <LegendChip label={t("deps.legendArrow")} quiet>
+          <MoveRight className="h-3.5 w-3.5 shrink-0" aria-hidden />
+        </LegendChip>
+        <LegendChip label={t("deps.legendHover")} quiet>
+          <MousePointer2 className="h-3.5 w-3.5 shrink-0" aria-hidden />
+        </LegendChip>
+        <LegendChip label={t("deps.legendKeyboard")} quiet>
+          <Keyboard className="h-3.5 w-3.5 shrink-0" aria-hidden />
+        </LegendChip>
+      </ul>
       <div className="flex flex-wrap items-center gap-1.5">
         <Button type="button" variant="outline" size="sm" onClick={() => zoomBy(1.25)}>
           <ZoomIn className="mr-1.5 h-3.5 w-3.5" aria-hidden />
@@ -450,7 +495,7 @@ export function DependencyGraph({
         // could otherwise only assert that a button exists. Publishing the level
         // makes "the button actually zoomed" observable.
         data-zoom={zoomLevel.toFixed(2)}
-        className="h-[28rem] w-full rounded-md border bg-card"
+        className="h-[32rem] w-full rounded-md border bg-card"
       />
       {selected && (
         <div className="space-y-2 rounded-md border bg-muted/30 p-3 text-label">

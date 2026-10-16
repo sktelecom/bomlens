@@ -3,45 +3,36 @@
 
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import {
-  ArrowDown,
-  ArrowUp,
-  ArrowUpDown,
-  ChevronRight,
-  Download,
-  ExternalLink,
-  ShieldCheck,
-  Upload,
-} from "lucide-react";
-import { Badge } from "@/components/ui/badge";
+import { Download, ShieldCheck, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Select } from "@/components/ui/select";
+import { useDensity } from "@/components/ui/density-toggle";
 import { EmptyState, ErrorState } from "@/components/ui/state";
 import {
-  ApiError,
   exportVex,
   fileUrl,
   importVex,
-  saveVexVerdict,
-  VEX_STATES,
   type ResultFile,
-  type VexReceived,
   type SecuritySummary,
   type Severity,
-  type VexState,
-  type VulnItem,
 } from "@/lib/api";
-import { receivedFor, receivedIndex, type ReceivedIndex } from "@/lib/vexReceived";
+import { receivedIndex, type ReceivedIndex } from "@/lib/vexReceived";
 import { csvFilename, downloadCsv, toCsv, vulnCsvRows } from "@/lib/csv";
 import { buildQuery, parseQuery, type RouteQuery, scanHash } from "@/lib/route";
 import { vulnsFromQuery, vulnsToQuery } from "@/lib/section-query";
-import { severityTone } from "@/lib/severity";
 import { useToast } from "@/lib/toast";
 import { notReachableSummary } from "@/lib/reachability";
 import { uncheckedSummary } from "@/lib/unchecked";
 import { advisorySummary, vulnAliases } from "@/lib/advisories";
-import { compareVulns, groupByUpgrade, type SortDir, type VulnSortKey } from "@/lib/vulns";
+import { densityClass } from "@/lib/tableDensity";
+import { compareVulns, type VulnSortKey } from "@/lib/vulns";
+import { groupByPackage, upgradeBundles } from "@/lib/vulnGroups";
+import {
+  applyVulnView,
+  viewCounts,
+  vulnViewFromQuery,
+  vulnViewToQuery,
+} from "@/lib/vulnView";
 import { cn } from "@/lib/utils";
 import { IS_STATIC_DEMO } from "@/lib/demo";
 
@@ -50,57 +41,12 @@ import { AdvisoriesWithoutCve } from "./AdvisoriesWithoutCve";
 import { CoverageNotice } from "@/components/ui/coverage-notice";
 import { SeverityBar } from "./SeverityBar";
 import { UncheckedComponents } from "./UncheckedComponents";
-
-// Vendor/advisory disposition badge, shown beside the severity badge. `fixed`
-// only says a fixed version is published, not that the installed one is fixed,
-// so it stays informational; green is kept for VEX states that declare a
-// resolution (VEX_TONE below). The still-open dispositions read as a caution
-// (medium); dispositions that are informational rather than actionable stay
-// neutral (info) — same three-tier logic as the severity/EOL/outdated badges
-// elsewhere in this table.
-const STATUS_TONE: Record<string, "success" | "medium" | "info"> = {
-  fixed: "info",
-  affected: "medium",
-  will_not_fix: "medium",
-  end_of_life: "medium",
-  fix_deferred: "info",
-  under_investigation: "info",
-};
-
-const STATUS_LABEL_KEY: Record<string, string> = {
-  fixed: "result.statusFixed",
-  affected: "result.statusAffected",
-  will_not_fix: "result.statusWillNotFix",
-  end_of_life: "result.statusEndOfLife",
-  fix_deferred: "result.statusFixDeferred",
-  under_investigation: "result.statusUnderInvestigation",
-};
-
-const STATUS_HINT_KEY: Record<string, string> = {
-  fixed: "result.statusFixedHint",
-  affected: "result.statusAffectedHint",
-  will_not_fix: "result.statusWillNotFixHint",
-  end_of_life: "result.statusEndOfLifeHint",
-  fix_deferred: "result.statusFixDeferredHint",
-  under_investigation: "result.statusUnderInvestigationHint",
-};
-
-// The supplier's own judgement (POST /vex-verdict), badged separately from
-// STATUS_TONE above (the vendor/advisory's own disposition) with its own
-// "Judgement: …" wording so the two are never mistaken for one axis.
-const VEX_TONE: Record<VexState, "success" | "medium" | "info"> = {
-  fixed: "success",
-  not_affected: "success",
-  affected: "medium",
-  under_investigation: "info",
-};
-
-const VEX_LABEL_KEY: Record<VexState, string> = {
-  affected: "result.vexStateAffected",
-  not_affected: "result.vexStateNotAffected",
-  fixed: "result.vexStateFixed",
-  under_investigation: "result.vexStateUnderInvestigation",
-};
+import { PackageGroupRow } from "./vulns/PackageGroupRow";
+import { SortableTh, type Sort } from "./vulns/SortableTh";
+import { UpgradeBundles } from "./vulns/UpgradeBundles";
+import { vexKey, type VexFields } from "./vulns/VulnDetail";
+import { BASE_COLUMNS, VulnRow } from "./vulns/VulnRow";
+import { VulnViewBar } from "./vulns/VulnViewBar";
 
 interface Props {
   security: SecuritySummary;
@@ -124,322 +70,12 @@ interface Props {
   onResultsChange?: (files: ResultFile[]) => void;
 }
 
-type Sort = { key: VulnSortKey; dir: SortDir };
-
-/** Sortable column header for the Severity / CVSS columns. */
-function SortableTh({
-  label,
-  sortKey,
-  sort,
-  onSort,
-  className,
-}: {
-  label: string;
-  sortKey: VulnSortKey;
-  sort: Sort;
-  onSort: (key: VulnSortKey) => void;
-  className?: string;
-}) {
-  const active = sort.key === sortKey;
-  const Icon = !active ? ArrowUpDown : sort.dir === "asc" ? ArrowUp : ArrowDown;
-  return (
-    // Same reason as the components table: a Korean header splits between any
-    // two characters, so a narrow column stacked it vertically.
-    <th
-      className={cn("whitespace-nowrap px-3 py-2 font-medium", className)}
-      aria-sort={active ? (sort.dir === "asc" ? "ascending" : "descending") : "none"}
-    >
-      <button
-        type="button"
-        onClick={() => onSort(sortKey)}
-        className="inline-flex items-center gap-1 hover:text-foreground"
-      >
-        {label}
-        <Icon
-          className={cn("h-3 w-3", active ? "text-foreground" : "text-muted-foreground/60")}
-          aria-hidden
-        />
-      </button>
-    </th>
-  );
-}
-
-/** Primary advisory URL first, then references, de-duplicated. */
-function vulnLinks(v: VulnItem): string[] {
-  const seen = new Set<string>();
-  const out: string[] = [];
-  for (const u of [v.url, ...(v.refs ?? [])]) {
-    if (u && !seen.has(u)) {
-      seen.add(u);
-      out.push(u);
-    }
-  }
-  return out;
-}
-
-/** Human-readable publish date; falls back to the raw string if it doesn't parse. */
-function formatPublishedDate(iso: string, locale: string): string {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return iso;
-  return d.toLocaleDateString(locale, { dateStyle: "medium" });
-}
-
-/** Expanded detail for one CVE: CVSS, description, reference links, and the
- *  supplier's own judgement (VexJudgement below). */
-function VulnDetail({
-  vuln,
-  links,
-  onPickComponent,
-  onPickDependency,
-  scanId,
-  vex,
-  received,
-  onVexSaved,
-}: {
-  vuln: VulnItem;
-  links: string[];
-  onPickComponent?: (name: string) => void;
-  onPickDependency?: (name: string, version?: string) => void;
-  scanId?: string | null;
-  vex: VexFields;
-  received?: VexReceived;
-  onVexSaved: (saved: VexFields) => void;
-}) {
-  const { t, i18n } = useTranslation();
-  const noOriginalDetail =
-    vuln.cvss == null && !vuln.description && links.length === 0 && !vuln.publishedDate;
-  if (noOriginalDetail && !scanId && !vex.state && !received) {
-    return <p className="text-muted-foreground">{t("result.vulnNoDetail")}</p>;
-  }
-  return (
-    <div className="space-y-3">
-      {noOriginalDetail && <p className="text-muted-foreground">{t("result.vulnNoDetail")}</p>}
-      {vuln.cvss != null && (
-        <div className="flex flex-wrap items-baseline gap-2">
-          <span className="font-medium">{t("result.vulnCvss")}</span>
-          <span className="tabular-nums">{vuln.cvss}</span>
-          {vuln.cvssVector ? (
-            <span className="font-mono text-label text-muted-foreground">
-              {vuln.cvssVector}
-            </span>
-          ) : null}
-        </div>
-      )}
-      {vuln.publishedDate && (
-        <div className="flex flex-wrap items-baseline gap-2">
-          <span className="font-medium">{t("result.vulnPublished")}</span>
-          <span className="tabular-nums text-muted-foreground">
-            {formatPublishedDate(vuln.publishedDate, i18n.language)}
-          </span>
-        </div>
-      )}
-      {vuln.description ? (
-        <div className="space-y-1">
-          <div className="font-medium">{t("result.vulnDescription")}</div>
-          <p className="max-w-3xl leading-relaxed text-muted-foreground">
-            {vuln.description}
-          </p>
-        </div>
-      ) : null}
-      {links.length > 0 ? (
-        <div className="space-y-1">
-          <div className="font-medium">{t("result.vulnReferences")}</div>
-          <ul className="space-y-0.5">
-            {links.map((href) => (
-              <li key={href}>
-                <a
-                  href={href}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-flex items-center gap-1 break-all text-primary underline-offset-2 hover:underline"
-                >
-                  <ExternalLink className="h-3 w-3 shrink-0" aria-hidden />
-                  {href}
-                </a>
-              </li>
-            ))}
-          </ul>
-        </div>
-      ) : null}
-      {/* Back to the package this CVE is against, in the component inventory.
-          It lives in the expanded detail because the row itself is the toggle
-          control, and a control nested in a control is not announced reliably. */}
-      {onPickComponent && vuln.pkg ? (
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            onPickComponent(vuln.pkg);
-          }}
-          className="rounded text-primary underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-        >
-          {t("result.viewInComponents", { name: vuln.pkg })}
-        </button>
-      ) : null}
-      {onPickDependency && vuln.pkg ? (
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            onPickDependency(vuln.pkg, vuln.installed);
-          }}
-          className="ml-3 rounded text-primary underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-        >
-          {t("result.viewInDependencies", { name: vuln.pkg })}
-        </button>
-      ) : null}
-      {received && (
-        <div className="space-y-1 border-t pt-3">
-          <div className="font-medium">{t("result.vexReceivedTitle")}</div>
-          <p className="text-body-sm text-muted-foreground">
-            {received.source
-              ? t("result.vexReceivedFrom", { product: received.source })
-              : t("result.vexReceivedHint")}
-          </p>
-          <Badge tone={VEX_TONE[received.state]}>{t(VEX_LABEL_KEY[received.state])}</Badge>
-          {received.justification && (
-            <p className="text-muted-foreground">
-              {t("result.vexReceivedJustification", { value: received.justification })}
-            </p>
-          )}
-          {received.detail && <p className="text-muted-foreground">{received.detail}</p>}
-        </div>
-      )}
-      <VexJudgement scanId={scanId} vuln={vuln} vex={vex} onSaved={onVexSaved} />
-    </div>
-  );
-}
-
-/** Judgement input for one CVE against one component: state select, an
- *  optional note, and Save. Read-only (state only, no editing) in the static
- *  demo build, which has no server to save to. */
-function VexJudgement({
-  scanId,
-  vuln,
-  vex,
-  onSaved,
-}: {
-  scanId?: string | null;
-  vuln: VulnItem;
-  vex: VexFields;
-  onSaved: (saved: VexFields) => void;
-}) {
-  const { t, i18n } = useTranslation();
-  const { toast } = useToast();
-  const [pendingState, setPendingState] = useState<VexState | "">(vex.state ?? "");
-  const [pendingDetail, setPendingDetail] = useState(vex.detail ?? "");
-  const [saving, setSaving] = useState(false);
-
-  // The same component instance is reused across rows as the open panel
-  // switches (React diffs by the surrounding Fragment's key, not this one's
-  // props), so the form has to resync when the row underneath it changes.
-  useEffect(() => {
-    setPendingState(vex.state ?? "");
-    setPendingDetail(vex.detail ?? "");
-  }, [vuln.id, vuln.purl, vuln.pkg, vex.state, vex.detail]);
-
-  if (IS_STATIC_DEMO) {
-    if (!vex.state) return null;
-    return (
-      <div className="space-y-1 border-t pt-3">
-        <div className="font-medium">{t("result.vexSectionTitle")}</div>
-        <Badge tone={VEX_TONE[vex.state]}>{t(VEX_LABEL_KEY[vex.state])}</Badge>
-        {vex.detail && <p className="text-muted-foreground">{vex.detail}</p>}
-      </div>
-    );
-  }
-  if (!scanId) return null;
-
-  const save = async () => {
-    if (!pendingState) return;
-    setSaving(true);
-    try {
-      const verdict = await saveVexVerdict(scanId, {
-        cve: vuln.id,
-        state: pendingState,
-        detail: pendingDetail || undefined,
-        purl: vuln.purl,
-        pkg: vuln.purl ? undefined : vuln.pkg,
-        installed: vuln.purl ? undefined : vuln.installed,
-      });
-      onSaved({ state: verdict.state, detail: verdict.detail, updatedAt: verdict.updatedAt });
-      toast(t("result.vexSaved"));
-    } catch (e) {
-      toast(e instanceof ApiError ? e.message : t("result.vexSaveFailed"));
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  return (
-    <div className="space-y-2 border-t pt-3">
-      <div className="font-medium">{t("result.vexSectionTitle")}</div>
-      <p className="text-body-sm text-muted-foreground">{t("result.vexSectionHint")}</p>
-      <div className="flex flex-wrap items-center gap-2">
-        <Select
-          aria-label={t("result.vexStateLabel")}
-          value={pendingState}
-          onChange={(e) => setPendingState(e.target.value as VexState | "")}
-          onClick={(e) => e.stopPropagation()}
-        >
-          <option value="">{t("result.vexStatePlaceholder")}</option>
-          {VEX_STATES.map((s) => (
-            <option key={s} value={s}>
-              {t(VEX_LABEL_KEY[s])}
-            </option>
-          ))}
-        </Select>
-        <Button
-          type="button"
-          size="sm"
-          variant="secondary"
-          disabled={!pendingState || saving}
-          onClick={(e) => {
-            e.stopPropagation();
-            void save();
-          }}
-        >
-          {saving ? t("result.vexSaving") : t("result.vexSaveButton")}
-        </Button>
-      </div>
-      <textarea
-        value={pendingDetail}
-        onChange={(e) => setPendingDetail(e.target.value)}
-        onClick={(e) => e.stopPropagation()}
-        placeholder={t("result.vexDetailPlaceholder")}
-        aria-label={t("result.vexDetailLabel")}
-        rows={2}
-        maxLength={2000}
-        className="w-full max-w-lg rounded-lg border border-input bg-background px-2 py-1.5 text-body-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-      />
-      {vex.updatedAt && (
-        <p className="text-body-sm text-muted-foreground">
-          {t("result.vexUpdatedAt", { date: formatPublishedDate(vex.updatedAt, i18n.language) })}
-        </p>
-      )}
-    </div>
-  );
-}
-
-/** A row's own saved fields, or a not-yet-persisted local edit overriding
- *  them (set right after a successful save, before the next full reload). */
-interface VexFields {
-  state?: VexState;
-  detail?: string;
-  updatedAt?: string;
-}
-
-/** Same identity a saved verdict is keyed by: purl when the row has one,
- *  otherwise pkg+installed (matching the server's own purl-then-fallback
- *  join in security_summary/_vex_verdict_index). */
-function vexKey(v: VulnItem): string {
-  return `${v.purl || `${v.pkg}@${v.installed}`}::${v.id}`;
-}
-
 /**
  * Vulnerabilities sorted by severity. Each row expands in place to show the
  * CVSS score, description and reference links already present in the Trivy
- * report — no extra fetch, no side panel.
+ * report, with no extra fetch and no side panel. A preset view and a
+ * per-package layout change how the same rows read and live in the URL like the
+ * filters; the row density lives in browser-local storage.
  */
 export function VulnerabilitiesTable({
   security,
@@ -474,6 +110,13 @@ export function VulnerabilitiesTable({
   const [query, setQuery] = useState(initial.term);
   // Default: most severe first, highest CVSS within a severity band.
   const [sort, setSort] = useState<Sort>(initial.sort);
+  const initialView = vulnViewFromQuery(urlState);
+  const [view, setView] = useState(initialView.view);
+  const [layout, setLayout] = useState(initialView.layout);
+  const [density, setDensity] = useDensity();
+  // Packages whose open/closed state differs from the default (closed, except
+  // when only one package is on screen).
+  const [toggledGroups, setToggledGroups] = useState<ReadonlySet<string>>(new Set());
 
   // The URL is the source; see ComponentsTable for why this compares strings.
   const urlQuery = buildQuery(urlState);
@@ -481,19 +124,26 @@ export function VulnerabilitiesTable({
   useEffect(() => {
     if (appliedRef.current === urlQuery) return;
     appliedRef.current = urlQuery;
-    const next = vulnsFromQuery(parseQuery(urlQuery));
+    const parsed = parseQuery(urlQuery);
+    const next = vulnsFromQuery(parsed);
+    const nextView = vulnViewFromQuery(parsed);
     setQuery(next.term);
     setSeverityFilter(next.severity);
     setSort(next.sort);
+    setView(nextView.view);
+    setLayout(nextView.layout);
   }, [urlQuery]);
 
   useEffect(() => {
-    const next = buildQuery(vulnsToQuery(query, severityFilter, sort));
+    const next = buildQuery({
+      ...vulnsToQuery(query, severityFilter, sort),
+      ...vulnViewToQuery(view, layout),
+    });
     if (next === appliedRef.current) return;
     appliedRef.current = next;
     onQueryChange?.(parseQuery(next));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [query, severityFilter, sort]);
+  }, [query, severityFilter, sort, view, layout]);
 
   // EPSS column appears only when the report was enriched (online run).
   // Exports what the table is showing: this filter, this sort, this order.
@@ -588,10 +238,12 @@ export function VulnerabilitiesTable({
     () => [...items].sort((a, b) => compareVulns(a, b, sort.key, sort.dir)),
     [items, sort],
   );
-  // Which CVEs a single upgrade would resolve together, worst-severity-first.
-  // Answers "what should I fix first" before the reader has to notice the
-  // pattern by comparing Fixed-column values across separate rows.
-  const upgradeGroups = useMemo(() => groupByUpgrade(items), [items]);
+  // Which single upgrade per package resolves the most CVEs, worst severity
+  // first. Answers "what should I fix first" before the reader has to notice
+  // the pattern by comparing Fixed-column values across separate rows. Built
+  // from every row, not the filtered ones: the bundle is a fact about the scan.
+  const bundles = useMemo(() => upgradeBundles(groupByPackage(items)), [items]);
+  const counts = useMemo(() => viewCounts(items), [items]);
   const onSort = (key: VulnSortKey) =>
     setSort((s) =>
       s.key === key ? { key, dir: s.dir === "asc" ? "desc" : "asc" } : { key, dir: "desc" },
@@ -657,11 +309,40 @@ export function VulnerabilitiesTable({
   }
 
   const q = query.trim().toLowerCase();
-  const visible = sorted.filter((v) => {
+  const visible = applyVulnView(sorted, view).filter((v) => {
     if (severityFilter && v.severity !== severityFilter) return false;
     if (q && !`${v.id} ${vulnAliases(v).join(" ")} ${v.pkg} ${v.title}`.toLowerCase().includes(q)) return false;
     return true;
   });
+  const optionalColumns = (anyEpss ? 1 : 0) + (anyNvdSeverity ? 1 : 0);
+  const groups = layout === "package" ? groupByPackage(visible) : [];
+  const visibleIndex = new Map(visible.map((v, i) => [v, i] as const));
+  const rowKeyOf = (v: (typeof visible)[number]) =>
+    `${v.id}-${v.purl || v.pkg}-${visibleIndex.get(v)}`;
+
+  const renderRow = (v: (typeof visible)[number]) => {
+    // The visible index alone already makes this unique for React; purl
+    // (falling back to pkg name) is used instead of pkg so the key identifies
+    // the same component as the grouping/join keys elsewhere.
+    const key = rowKeyOf(v);
+    const isOpen = openKey === key;
+    return (
+      <VulnRow
+        key={key}
+        vuln={v}
+        isOpen={isOpen}
+        onToggle={() => setOpenKey(isOpen ? null : key)}
+        anyEpss={anyEpss}
+        anyNvdSeverity={anyNvdSeverity}
+        scanId={scanId}
+        override={vexOverrides[vexKey(v)]}
+        imported={imported}
+        onPickComponent={onPickComponent}
+        onPickDependency={onPickDependency}
+        onVexSaved={(saved) => setVexOverrides((prev) => ({ ...prev, [vexKey(v)]: saved }))}
+      />
+    );
+  };
 
   return (
     <div className="space-y-4">
@@ -689,35 +370,16 @@ export function VulnerabilitiesTable({
       ) : null}
       <UncheckedComponents security={security} />
       <NotReachableFindings security={security} />
-      {upgradeGroups.length > 0 && (
-        <div className="space-y-1.5 rounded-md border bg-muted/30 px-3 py-2">
-          <div className="text-label font-medium text-foreground">
-            {t("result.upgradeBundlesTitle")}
-          </div>
-          <ul className="space-y-1">
-            {upgradeGroups.slice(0, 5).map((g) => (
-              <li key={`${g.pkg}::${g.installed}::${g.fixed}`}>
-                <button
-                  type="button"
-                  onClick={() => setQuery(g.pkg)}
-                  className="rounded text-label text-primary underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                >
-                  {t("result.upgradeBundleLine", {
-                    pkg: g.pkg,
-                    fixed: g.fixed,
-                    count: g.vulnIds.length,
-                  })}
-                </button>
-              </li>
-            ))}
-          </ul>
-          {upgradeGroups.length > 5 && (
-            <p className="text-body-sm text-muted-foreground">
-              {t("result.upgradeBundlesMore", { count: upgradeGroups.length - 5 })}
-            </p>
-          )}
-        </div>
-      )}
+      <UpgradeBundles bundles={bundles} onPick={setQuery} />
+      <VulnViewBar
+        view={view}
+        counts={counts}
+        onView={setView}
+        layout={layout}
+        onLayout={setLayout}
+        density={density}
+        onDensity={setDensity}
+      />
       <div className="flex flex-wrap items-center gap-2">
         <Input
           value={query}
@@ -726,7 +388,7 @@ export function VulnerabilitiesTable({
           className="h-9 max-w-xs"
           aria-label={t("result.vulnSearchPlaceholder")}
         />
-        {(q || severityFilter) && (
+        {(q || severityFilter || view !== "all") && (
           <span className="text-label tabular-nums text-muted-foreground">
             {t("result.vulnShown", { shown: visible.length, total: items.length })}
           </span>
@@ -787,7 +449,7 @@ export function VulnerabilitiesTable({
         </div>
       </div>
       <div className="max-h-[44rem] resize-y overflow-auto rounded-md border">
-        <table className="w-full text-left text-label">
+        <table className={cn("w-full text-left text-label", densityClass(density))}>
         <thead className="sticky top-0 z-10 bg-muted/95 backdrop-blur">
           <tr className="border-b">
             <SortableTh label={t("result.colSeverity")} sortKey="severity" sort={sort} onSort={onSort} />
@@ -810,181 +472,29 @@ export function VulnerabilitiesTable({
           </tr>
         </thead>
         <tbody>
-          {visible.map((v, i) => {
-            // `i` alone already makes this unique for React; purl (falling back
-            // to pkg name) is used instead of pkg so the key identifies the same
-            // component as the grouping/join keys elsewhere in this file.
-            const key = `${v.id}-${v.purl || v.pkg}-${i}`;
-            const isOpen = openKey === key;
-            const links = vulnLinks(v);
-            const vex: VexFields = vexOverrides[vexKey(v)] ?? {
-              state: v.vexState,
-              detail: v.vexDetail,
-              updatedAt: v.vexUpdatedAt,
-            };
-            const received = imported ? receivedFor(imported, v) : v.vexReceived;
-            const hasDetail =
-              v.cvss != null ||
-              !!v.description ||
-              links.length > 0 ||
-              !!v.publishedDate ||
-              // The judgement panel is reachable even for a CVE with no other
-              // detail: a component's own scan is the one place to set it.
-              Boolean(scanId) ||
-              Boolean(vex.state) ||
-              Boolean(received);
-            const toggle = () => setOpenKey(isOpen ? null : key);
-            return (
-              <Fragment key={key}>
-                <tr
-                  className={cn(
-                    "border-b align-top last:border-0 hover:bg-accent/50",
-                    hasDetail && "cursor-pointer",
-                  )}
-                  {...(hasDetail
-                    ? {
-                        role: "button",
-                        tabIndex: 0,
-                        "aria-expanded": isOpen,
-                        "aria-label": t("result.vulnRowToggle"),
-                        onClick: toggle,
-                        onKeyDown: (e: React.KeyboardEvent) => {
-                          if (e.key === "Enter" || e.key === " ") {
-                            e.preventDefault();
-                            toggle();
-                          }
-                        },
+          {layout === "package"
+            ? groups.map((g) => {
+                // One package on screen is shown open; toggling flips it.
+                const open = (groups.length === 1) !== toggledGroups.has(g.key);
+                return (
+                  <Fragment key={g.key}>
+                    <PackageGroupRow
+                      group={g}
+                      isOpen={open}
+                      colSpan={BASE_COLUMNS + optionalColumns}
+                      onToggle={() =>
+                        setToggledGroups((prev) => {
+                          const next = new Set(prev);
+                          if (!next.delete(g.key)) next.add(g.key);
+                          return next;
+                        })
                       }
-                    : {})}
-                >
-                  <td className="px-3 py-2">
-                    <div className="flex items-center gap-1.5">
-                      {hasDetail ? (
-                        <ChevronRight
-                          className={cn(
-                            "h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform",
-                            isOpen && "rotate-90",
-                          )}
-                          aria-hidden
-                        />
-                      ) : (
-                        <span className="w-3.5 shrink-0" />
-                      )}
-                      <Badge tone={severityTone(v.severity)} mark>
-                        {t(`severity.${v.severity}`)}
-                      </Badge>
-                      {v.status && (
-                        <Badge
-                          tone={STATUS_TONE[v.status] ?? "info"}
-                          title={
-                            STATUS_HINT_KEY[v.status]
-                              ? t(STATUS_HINT_KEY[v.status])
-                              : undefined
-                          }
-                        >
-                          {STATUS_LABEL_KEY[v.status] ? t(STATUS_LABEL_KEY[v.status]) : v.status}
-                        </Badge>
-                      )}
-                      {vex.state && (
-                        <Badge tone={VEX_TONE[vex.state]} title={t("result.vexSectionHint")}>
-                          {t("result.vexBadge", { state: t(VEX_LABEL_KEY[vex.state]) })}
-                        </Badge>
-                      )}
-                      {received && (
-                        <Badge tone={VEX_TONE[received.state]} title={t("result.vexReceivedHint")}>
-                          {t("result.vexReceivedBadge", { state: t(VEX_LABEL_KEY[received.state]) })}
-                        </Badge>
-                      )}
-                      {v.reachability?.state === "exploitable" && (
-                        <Badge tone="medium" title={v.reachability.detail || t("result.reachedHint")}>
-                          {t("result.reachedBadge")}
-                        </Badge>
-                      )}
-                      {v.kev && (
-                        <Badge tone="critical" title={t("result.kevHint")}>
-                          {t("result.kevBadge")}
-                        </Badge>
-                      )}
-                    </div>
-                  </td>
-                  <td className="px-3 py-2 font-mono tabular-nums">
-                    {v.cvss != null ? (
-                      v.cvss
-                    ) : (
-                      <span className="text-muted-foreground">—</span>
-                    )}
-                  </td>
-                  {anyEpss && (
-                    <td className="px-3 py-2 font-mono tabular-nums text-muted-foreground">
-                      {typeof v.epss === "number" ? `${(v.epss * 100).toFixed(1)}%` : "—"}
-                    </td>
-                  )}
-                  {anyNvdSeverity && (
-                    <td className="px-3 py-2">
-                      {v.nvdSeverity ? (
-                        <Badge tone={severityTone(v.nvdSeverity)} mark>
-                          {t(`severity.${v.nvdSeverity}`)}
-                        </Badge>
-                      ) : (
-                        <span className="text-muted-foreground">—</span>
-                      )}
-                    </td>
-                  )}
-                  <td className="px-3 py-2">
-                    <span className="font-mono">{v.id}</span>
-                    {vulnAliases(v).length > 0 ? (
-                      <div className="mt-0.5 text-muted-foreground">
-                        {t("result.vulnAliases")}{" "}
-                        <span className="font-mono">{vulnAliases(v).join(", ")}</span>
-                      </div>
-                    ) : null}
-                    {v.title ? (
-                      <div className="mt-0.5 max-w-md text-muted-foreground">
-                        {v.title}
-                      </div>
-                    ) : null}
-                  </td>
-                  <td className="px-3 py-2 font-mono">{v.pkg}</td>
-                  <td className="px-3 py-2 font-mono tabular-nums text-muted-foreground">
-                    {v.installed || "—"}
-                  </td>
-                  {/* Fixed version carries the success foreground, which is set
-                      to the darker green on light surfaces: the lighter one
-                      measures 3.77 there, under the 4.5 minimum. */}
-                  <td className="px-3 py-2 font-mono tabular-nums">
-                    {v.fixed ? (
-                      <span className="text-success">
-                        {v.fixed}
-                      </span>
-                    ) : (
-                      <span className="text-muted-foreground">—</span>
-                    )}
-                  </td>
-                </tr>
-                {isOpen && (
-                  <tr className="border-b last:border-0">
-                    <td
-                      colSpan={6 + (anyEpss ? 1 : 0) + (anyNvdSeverity ? 1 : 0)}
-                      className="bg-muted/30 px-3 py-3"
-                    >
-                      <VulnDetail
-                        vuln={v}
-                        links={links}
-                        onPickComponent={onPickComponent}
-                        onPickDependency={onPickDependency}
-                        scanId={scanId}
-                        vex={vex}
-                        received={received}
-                        onVexSaved={(saved) =>
-                          setVexOverrides((prev) => ({ ...prev, [vexKey(v)]: saved }))
-                        }
-                      />
-                    </td>
-                  </tr>
-                )}
-              </Fragment>
-            );
-          })}
+                    />
+                    {open && g.vulns.map(renderRow)}
+                  </Fragment>
+                );
+              })
+            : visible.map(renderRow)}
         </tbody>
       </table>
       </div>

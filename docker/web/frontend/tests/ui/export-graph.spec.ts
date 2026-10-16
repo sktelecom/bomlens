@@ -123,6 +123,9 @@ test("the graph zooms and fits from its buttons", async ({ page }) => {
   await open(page, "dependencies");
   const graph = page.locator("[data-zoom]");
   await graph.waitFor({ timeout: 15000 });
+  // The element is there before cytoscape has loaded; the buttons do nothing
+  // until the canvas exists, and it publishes its label size once it does.
+  await expect(graph).toHaveAttribute("data-label-px", /\d/, { timeout: 15000 });
   const zoomOf = async () => Number(await graph.getAttribute("data-zoom"));
 
   // Fit first, so the comparisons start from a known level rather than from

@@ -353,7 +353,8 @@ for (const theme of ["light", "dark"] as Theme[]) {
 
     const ring = await tokenColour(page, "hsl(var(--ring))");
     const primary = await tokenColour(page, "hsl(var(--primary))");
-    const chips = page.locator("main button[aria-pressed]");
+    // The density switch beside them is pressable too, but it is not a filter chip.
+    const chips = page.locator('main :not([data-testid="density-toggle"]) > button[aria-pressed]');
     await expect(chips).toHaveCount(2);
     const first = chips.nth(0);
     const second = chips.nth(1);
