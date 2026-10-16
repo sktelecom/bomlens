@@ -14,8 +14,9 @@
  * `hsl(${getComputedStyle(...).getPropertyValue('--brand')})` — the first
  * character after `(` is `$`, not a digit, so the literal-call rule skips it.
  *
- * Also enforced: brand tokens stay out of the dependency graph and out of
- * badges, only the `-fg` shade of a role is a text colour.
+ * Also enforced: brand tokens appear only in the primary button variants (an
+ * allow list), only the `-fg` shade of a role is a text colour, and font sizes
+ * come from the role scale (no text-[Npx]).
  *
  * Scope: src/**\/*.{ts,tsx}. The token source itself (src/index.css) is not a
  * component and is never scanned. The rules live in token-lint-rules.mjs.
@@ -36,7 +37,8 @@ function walk(dir) {
   for (const entry of readdirSync(dir)) {
     const p = join(dir, entry);
     if (statSync(p).isDirectory()) out.push(...walk(p));
-    else if (/\.(ts|tsx)$/.test(entry)) out.push(p);
+    // The rule test feeds the rules deliberate violations, so it is not scanned.
+    else if (/\.(ts|tsx)$/.test(entry) && entry !== "tokenLintRules.test.ts") out.push(p);
   }
   return out;
 }

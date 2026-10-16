@@ -241,13 +241,13 @@ export function DependencyTree({
   };
 
   if (tree.length === 0) {
-    return <p className="text-sm text-muted-foreground">{t("deps.empty")}</p>;
+    return <p className="text-body-sm text-muted-foreground">{t("deps.empty")}</p>;
   }
 
   return (
     <div className="space-y-2">
       {!hasDependencies && (
-        <p className="text-xs text-muted-foreground">{t("deps.flatFallback")}</p>
+        <p className="text-body-sm text-muted-foreground">{t("deps.flatFallback")}</p>
       )}
       <div className="relative">
         <Search
@@ -259,12 +259,12 @@ export function DependencyTree({
           value={query}
           onChange={(e) => onSearchChange(e.target.value)}
           placeholder={t("deps.search")}
-          className="h-8 pl-8 text-xs"
+          className="h-8 pl-8 text-label"
           aria-label={t("deps.search")}
         />
       </div>
       {noMatch && (
-        <p className="text-xs text-muted-foreground">{t("deps.searchNoMatch")}</p>
+        <p className="text-body-sm text-muted-foreground">{t("deps.searchNoMatch")}</p>
       )}
       <div className="max-h-[44rem] resize-y overflow-auto rounded-md border p-1">
         <ul role="tree" aria-label={t("deps.treeLabel")}>
@@ -318,7 +318,7 @@ export function DependencyTree({
                   )}
 
                   <Package className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden />
-                  <span className="font-mono text-xs">
+                  <span className="font-mono text-label">
                     {node.name}
                     {node.version ? (
                       <span className="text-muted-foreground"> {node.version}</span>

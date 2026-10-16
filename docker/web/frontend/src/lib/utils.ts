@@ -2,7 +2,15 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { clsx, type ClassValue } from "clsx";
-import { twMerge } from "tailwind-merge";
+import { extendTailwindMerge } from "tailwind-merge";
+
+/** The role font sizes (tailwind.config.ts). Without this, tailwind-merge reads
+ *  `text-body-sm` as a text colour and drops it when a real colour follows. */
+export const FONT_SIZE_ROLES = ["display", "title", "heading", "body", "body-sm", "label", "caption", "mono"];
+
+const twMerge = extendTailwindMerge({
+  extend: { classGroups: { "font-size": [{ text: FONT_SIZE_ROLES }] } },
+});
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));

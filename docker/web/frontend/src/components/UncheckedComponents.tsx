@@ -40,10 +40,10 @@ export function UncheckedComponents({
       </p>
       {u.rows.length > 0 && (
         <Disclosure
-          summary={<span className="text-xs font-medium text-foreground">{t("result.uncheckedList")}</span>}
+          summary={<span className="text-label font-medium text-foreground">{t("result.uncheckedList")}</span>}
         >
           <div className="mt-2 max-h-80 overflow-auto rounded-md border bg-card">
-            <table className="w-full text-left text-xs">
+            <table className="w-full text-left text-label">
               <thead className="border-b bg-muted/40 text-muted-foreground">
                 <tr>
                   <th scope="col" className="px-3 py-2 font-medium">

@@ -31,12 +31,12 @@ export function CoverageNotice({
       data-testid={testId}
       data-coverage-notice=""
       className={cn(
-        "space-y-2 rounded-md border bg-muted/30 px-3 py-2 text-left text-xs text-muted-foreground",
+        "space-y-2 rounded-md border bg-muted/30 px-3 py-2 text-left text-label text-muted-foreground",
         className,
       )}
     >
       {title ? (
-        <p className="flex items-start gap-2 text-sm font-medium text-foreground">
+        <p className="flex items-start gap-2 text-body-sm font-medium text-foreground">
           <Icon className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
           {title}
         </p>

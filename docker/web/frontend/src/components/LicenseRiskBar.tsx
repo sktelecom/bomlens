@@ -155,9 +155,9 @@ export function LicenseRiskBar({
   return (
     <div className="space-y-3">
       <div className="flex items-baseline justify-between gap-3">
-        <span className="text-sm font-medium">{t("result.licenseClassTitle")}</span>
+        <span className="text-body-sm font-medium">{t("result.licenseClassTitle")}</span>
         {interactive && (
-          <span className="text-xs text-muted-foreground">
+          <span className="text-label text-muted-foreground">
             {t("result.licenseClassFilterHint")}
           </span>
         )}

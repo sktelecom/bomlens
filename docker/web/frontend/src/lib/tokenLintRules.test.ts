@@ -12,7 +12,8 @@ import { describe, expect, it } from "vitest";
 import { BRAND_TOKEN, lintLine } from "../../scripts/token-lint-rules.mjs";
 
 const lint = lintLine as (line: string, file?: string) => string[];
-const BRAND_RULE = "brand token in the graph or a badge (use a role, a category or a neutral)";
+const BRAND_RULE = "brand token outside the allow list (primary button, logo, focus ring only)";
+const SIZE_RULE = "arbitrary font size (use a role size: text-caption, text-label, text-body-sm ...)";
 const SHADE_RULE = "role or category shade other than -fg used as text colour";
 
 describe("brand token rule", () => {
@@ -36,36 +37,71 @@ describe("brand token rule", () => {
     }
   });
 
-  it("rejects brand in the dependency graph, the badge, the bars and the marker files", () => {
+  it("rejects brand in any file that is not on the allow list", () => {
     const line = '<span className="h-2.5 w-2.5 rounded-full bg-brand" />';
     for (const file of [
       "src/components/DependencyGraph.tsx",
-      "src/components/DependencyTree.tsx",
       "src/components/ui/badge.tsx",
-      "src/components/ui/marker.tsx",
-      "src/components/LicenseRiskBar.tsx",
-      "src/components/SeverityBar.tsx",
-      "src/components/ui/barlist.tsx",
+      "src/components/ui/switch.tsx",
+      "src/components/FileDropzone.tsx",
+      "src/components/DemoBanner.tsx",
+      "src/components/TopBar.tsx",
+      "src/components/ui/button.tsx.bak",
     ]) {
       expect(lint(line, file), file).toContain(BRAND_RULE);
     }
     expect(lint('direct: hsl("--brand"),', "src/components/DependencyGraph.tsx")).toContain(BRAND_RULE);
+    expect(lint('<a className="text-brand-strong underline">', "src/components/Overview.tsx")).toContain(BRAND_RULE);
+    expect(lint('<Check className="text-brand" />', "src\\components\\ui\\switch.tsx")).toContain(BRAND_RULE);
   });
 
-  it("rejects brand on any line that draws a Badge, in any file", () => {
+  it("rejects brand on a Badge line in any file", () => {
     const badge = '<Badge className="border-transparent bg-brand/10 text-brand-strong">'; // token-lint-ignore
     expect(lint(badge, "src/components/RecentScans.tsx")).toContain(BRAND_RULE);
-    const variants = 'badgeVariants({ tone }) + " bg-brand"'; // token-lint-ignore
-    expect(lint(variants, "src/components/X.tsx")).toContain(BRAND_RULE);
   });
 
-  it("still allows brand on a primary action and elsewhere", () => {
-    expect(lint('"bg-brand text-brand-foreground shadow-sm hover:bg-brand/90"', "src/components/ui/button.tsx")).toEqual([]);
-    expect(lint('<ScanLine className="text-brand" />', "src/components/TopBar.tsx")).toEqual([]);
+  it("allows brand in the primary button variants only", () => {
+    const line = '"bg-brand text-brand-foreground shadow-sm hover:bg-brand/90"';
+    expect(lint(line, "src/components/ui/button.tsx")).toEqual([]);
+    expect(lint(line, "src\\components\\ui\\button.tsx")).toEqual([]);
+    expect(lint(line, "src/components/ui/badge.tsx")).toContain(BRAND_RULE);
+  });
+
+  it("does not flag the focus ring colour", () => {
+    expect(lint('"focus-visible:ring-2 focus-visible:ring-ring"', "src/components/X.tsx")).toEqual([]);
   });
 
   it("honours the ignore marker", () => {
     expect(lint('bg-brand // token-lint-ignore', "src/components/DependencyGraph.tsx")).toEqual([]);
+  });
+});
+
+describe("arbitrary font size rule", () => {
+  it("rejects a size typed at the call site", () => {
+    for (const bad of ["text-[10px]", "text-[0.6875rem]", "md:text-[11px]", "text-[ 12px ]", "text-[1.5em]"]) {
+      expect(lint(`className="${bad}"`), bad).toContain(SIZE_RULE);
+    }
+  });
+
+  it("allows the role scale, colours and other bracket values", () => {
+    for (const ok of ["text-caption", "text-body-sm", "text-[color:var(--x)]", "w-[10px]", "text-left"]) {
+      expect(lint(`className="${ok}"`), ok).toEqual([]);
+    }
+  });
+});
+
+describe("legacy font size rule", () => {
+  const LEGACY = "legacy Tailwind font size (renamed: xs=label, sm=body-sm, base=body, lg=heading, xl=title, 3xl=display)";
+  it("rejects a removed Tailwind size name, with or without a variant", () => {
+    for (const bad of ["text-xs", "text-sm", "text-base", "text-lg", "text-xl", "text-2xl", "md:text-3xl"]) {
+      expect(lint(`className="${bad}"`), bad).toContain(LEGACY);
+    }
+  });
+
+  it("allows the role names that merely start like one", () => {
+    for (const ok of ["text-body-sm", "text-label", "text-display", "text-smoke", "text-xs-not-a-size"]) {
+      expect(lint(`className="${ok}"`), ok).not.toContain(LEGACY);
+    }
   });
 });
 
@@ -110,10 +146,16 @@ describe("the CLI", () => {
     }
   };
 
-  it("fails a graph file that uses brand and names the rule", () => {
-    const r = run({ "components/DependencyGraph.tsx": 'const a = "bg-brand";\n' });
+  it("fails a component that uses brand and names the rule", () => {
+    const r = run({ "components/Switch2.tsx": 'const a = "bg-brand";\n' });
     expect(r.status).toBe(1);
-    expect(r.stderr).toContain("brand token in the graph or a badge");
+    expect(r.stderr).toContain("brand token outside the allow list");
+  });
+
+  it("fails an arbitrary font size and names the rule", () => {
+    const r = run({ "components/X.tsx": 'const a = "text-[10px]";\n' });
+    expect(r.status).toBe(1);
+    expect(r.stderr).toContain("arbitrary font size");
   });
 
   it("passes the same line in a button file", () => {

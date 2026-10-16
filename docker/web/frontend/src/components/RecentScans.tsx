@@ -83,10 +83,10 @@ function SummaryCard({
   const fmt = useFormatNumber();
   const body = (
     <CardContent className="flex flex-col gap-1.5 p-3 md:p-5">
-      <span className="text-xs text-muted-foreground">{label}</span>
+      <span className="text-label text-muted-foreground">{label}</span>
       <span
         className={cn(
-          "text-3xl font-semibold tabular-nums",
+          "text-display font-semibold tabular-nums",
           accent && "text-role-severe-fg",
         )}
       >
@@ -148,7 +148,7 @@ function FilterChip({
       aria-pressed={active}
       onClick={onClick}
       className={cn(
-        "inline-flex h-9 items-center rounded-full border px-3.5 text-sm",
+        "inline-flex h-9 items-center rounded-full border px-3.5 text-body-sm",
         "transition-[color,border-color,background-color,box-shadow] duration-fast ease-out-soft",
         FOCUS_RING,
         active
@@ -221,7 +221,7 @@ function ScanRows({
   const { t, i18n } = useTranslation();
   if (scans.length === 0) {
     return (
-      <p className="px-4 py-8 text-center text-sm text-muted-foreground">
+      <p className="px-4 py-8 text-center text-body-sm text-muted-foreground">
         {t("recent.noMatch")}
       </p>
     );
@@ -238,7 +238,7 @@ function ScanRows({
             <div className="min-w-0 flex-1 space-y-1.5">
               <a
                 href={scanHash(s.id)}
-                className="block break-words rounded text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                className="block break-words rounded text-body-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
               >
                 <ScanLabel scan={s} />
               </a>
@@ -258,7 +258,7 @@ function ScanRows({
                   />
                 )}
               </div>
-              <p className="text-xs tabular-nums text-muted-foreground">
+              <p className="text-label tabular-nums text-muted-foreground">
                 {t("recent.rowMeta", {
                   count: s.components,
                   date: formatRelativeTime(s.generatedAt, now, i18n.language),
@@ -354,10 +354,10 @@ export function RecentScans({ scans, newHref, onDelete }: Props) {
   return (
     <div className="space-y-6">
       <div className="space-y-1.5">
-        <h1 className="text-3xl font-semibold tracking-tight text-foreground">
+        <h1 className="text-display font-semibold tracking-tight text-foreground">
           {t("recent.title")}
         </h1>
-        <p className="text-sm text-muted-foreground">
+        <p className="text-body-sm text-muted-foreground">
           {t(IS_STATIC_DEMO ? "recent.demoSubtitle" : "recent.subtitle")}
         </p>
       </div>
@@ -371,10 +371,10 @@ export function RecentScans({ scans, newHref, onDelete }: Props) {
               <ScanLine className="h-6 w-6" aria-hidden />
             </div>
             <div className="space-y-1.5">
-              <h2 className="text-xl font-semibold tracking-tight text-foreground">
+              <h2 className="text-title font-semibold tracking-tight text-foreground">
                 {t("recent.emptyTitle")}
               </h2>
-              <p className="mx-auto max-w-md text-sm text-muted-foreground">
+              <p className="mx-auto max-w-md text-body-sm text-muted-foreground">
                 {t("recent.emptyBody")}
               </p>
             </div>
@@ -382,7 +382,7 @@ export function RecentScans({ scans, newHref, onDelete }: Props) {
               <Plus className="h-4 w-4" aria-hidden />
               {t("shell.newScan")}
             </a>
-            <ul className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1.5 text-xs text-muted-foreground">
+            <ul className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1.5 text-label text-muted-foreground">
               {[
                 { icon: FileJson, label: t("recent.emptyOutSbom") },
                 { icon: ScrollText, label: t("recent.emptyOutNotice") },
@@ -441,7 +441,7 @@ export function RecentScans({ scans, newHref, onDelete }: Props) {
                 </FilterChip>
               ))}
             {filtering && (
-              <span className="text-xs tabular-nums text-muted-foreground">
+              <span className="text-label tabular-nums text-muted-foreground">
                 {t("recent.shown", { shown: sorted.length, total: scans.length })}
               </span>
             )}
@@ -452,9 +452,9 @@ export function RecentScans({ scans, newHref, onDelete }: Props) {
               {narrow ? (
                 <ScanRows scans={sorted} all={scans} now={now} onDelete={onDelete} />
               ) : (
-              <table className="w-full text-sm">
+              <table className="w-full text-body-sm">
                 <thead>
-                  <tr className="border-b text-xs text-muted-foreground">
+                  <tr className="border-b text-label text-muted-foreground">
                     <SortHeader label={t("recent.colScan")} sortKey="scan" sort={sort} onSort={onSort} />
                     <th className={TH}>{t("recent.colType")}</th>
                     <SortHeader label={t("recent.colGenerated")} sortKey="generated" sort={sort} onSort={onSort} />
@@ -478,7 +478,7 @@ export function RecentScans({ scans, newHref, onDelete }: Props) {
                     <tr>
                       <td
                         colSpan={6}
-                        className="px-4 py-8 text-center text-sm text-muted-foreground"
+                        className="px-4 py-8 text-center text-body-sm text-muted-foreground"
                       >
                         {t("recent.noMatch")}
                       </td>
@@ -513,7 +513,7 @@ export function RecentScans({ scans, newHref, onDelete }: Props) {
                         {fmt(s.components)}
                         {cmp && cmp.componentsDelta !== 0 && (
                           <span
-                            className="ml-1.5 text-xs text-muted-foreground"
+                            className="ml-1.5 text-label text-muted-foreground"
                             title={t("recent.vsPrevious")}
                           >
                             {cmp.componentsDelta > 0 ? "+" : ""}
@@ -570,7 +570,7 @@ export function RecentScans({ scans, newHref, onDelete }: Props) {
           {/* Where the list comes from — true of a local run, false of the
               demo, whose list is a fixed capture and not a folder on disk. */}
           {!IS_STATIC_DEMO && (
-            <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <p className="flex items-center gap-1.5 text-body-sm text-muted-foreground">
               <FolderOpen className="h-3.5 w-3.5" aria-hidden />
               <code className="rounded bg-muted px-1.5 py-0.5 font-mono">
                 ~/sbom-output

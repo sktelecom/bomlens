@@ -129,15 +129,15 @@ export function Licenses({
       {outboundLicense && conflicts.length > 0 && (
         <Card className="border-warning-border/60 bg-warning-surface/60 dark:border-warning-border/20 dark:bg-warning-surface/20">
           <CardContent className="space-y-3 p-4">
-            <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
+            <div className="flex items-center gap-2 text-body-sm font-semibold text-foreground">
               <Scale className="h-4 w-4 text-risk-medium" aria-hidden />
               {t("licenses.conflictTitle", { license: outboundLicense })}
             </div>
-            <p className="text-xs text-muted-foreground">{t("licenses.conflictHint")}</p>
+            <p className="text-body-sm text-muted-foreground">{t("licenses.conflictHint")}</p>
             <div className="space-y-3">
               {conflicts.map((g) => (
                 <div key={g.verdict} className="space-y-1.5">
-                  <div className="flex items-center gap-2 text-sm">
+                  <div className="flex items-center gap-2 text-body-sm">
                     <Badge tone={CONFLICT_TONE[g.verdict]}>{t(CONFLICT_LABEL[g.verdict])}</Badge>
                     <span className="tabular-nums text-muted-foreground">
                       {fmt(g.components.length)}
@@ -145,7 +145,7 @@ export function Licenses({
                   </div>
                   <ul className="divide-y rounded-md border bg-card">
                     {g.components.map((c, i) => (
-                      <li key={c.purl || `${c.name}-${i}`} className="space-y-1 px-3 py-2 text-sm">
+                      <li key={c.purl || `${c.name}-${i}`} className="space-y-1 px-3 py-2 text-body-sm">
                         <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                           <span className="font-mono">
                             {c.group ? `${c.group} / ` : ""}
@@ -154,12 +154,12 @@ export function Licenses({
                               <span className="text-muted-foreground"> {c.version}</span>
                             ) : null}
                           </span>
-                          <span className="text-xs text-muted-foreground">
+                          <span className="text-label text-muted-foreground">
                             {c.licenses.join(", ")}
                           </span>
                         </div>
                         {c.licenseConflictWhy ? (
-                          <p className="text-xs text-muted-foreground">{c.licenseConflictWhy}</p>
+                          <p className="text-body-sm text-muted-foreground">{c.licenseConflictWhy}</p>
                         ) : null}
                       </li>
                     ))}
@@ -174,15 +174,15 @@ export function Licenses({
       {review.length > 0 && (
         <Card className="border-warning-border/60 bg-warning-surface/60 dark:border-warning-border/20 dark:bg-warning-surface/20">
           <CardContent className="space-y-3 p-4">
-            <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
+            <div className="flex items-center gap-2 text-body-sm font-semibold text-foreground">
               <TriangleAlert className="h-4 w-4 text-risk-medium" aria-hidden />
               {t("licenses.reviewTitle")}
             </div>
-            <p className="text-xs text-muted-foreground">{t("licenses.reviewHint")}</p>
+            <p className="text-body-sm text-muted-foreground">{t("licenses.reviewHint")}</p>
             <div className="space-y-3">
               {review.map((g) => (
                 <div key={g.flag} className="space-y-1.5">
-                  <div className="flex items-center gap-2 text-sm">
+                  <div className="flex items-center gap-2 text-body-sm">
                     <Badge tone="medium">{t(FLAG_LABEL[g.flag])}</Badge>
                     <span className="tabular-nums text-muted-foreground">
                       {fmt(g.components.length)}
@@ -192,7 +192,7 @@ export function Licenses({
                     {g.components.map((c, i) => (
                       <li
                         key={c.purl || `${c.name}-${i}`}
-                        className="flex flex-wrap items-center gap-x-2 gap-y-1 px-3 py-2 text-sm"
+                        className="flex flex-wrap items-center gap-x-2 gap-y-1 px-3 py-2 text-body-sm"
                       >
                         <span className="font-mono">
                           {c.group ? `${c.group} / ` : ""}
@@ -219,10 +219,10 @@ export function Licenses({
       {!outboundLicense && (
         <Card>
           <CardContent className="space-y-1 p-4">
-            <div className="text-sm font-semibold text-foreground">
+            <div className="text-body-sm font-semibold text-foreground">
               {t("licenses.conflictOffTitle")}
             </div>
-            <p className="text-xs text-muted-foreground">{t("licenses.conflictOffHint")}</p>
+            <p className="text-body-sm text-muted-foreground">{t("licenses.conflictOffHint")}</p>
           </CardContent>
         </Card>
       )}

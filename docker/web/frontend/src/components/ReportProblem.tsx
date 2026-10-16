@@ -93,7 +93,7 @@ export function ReportProblem({
         size="md"
         defaultOpen={defaultOpen}
         onToggle={(open) => open && setOpened(true)}
-        summaryClassName="p-6 text-base font-semibold tracking-tight"
+        summaryClassName="p-6 text-body font-semibold tracking-tight"
         summary={
           <span className="flex items-center gap-2">
             <LifeBuoy className="h-4 w-4 text-muted-foreground" aria-hidden />
@@ -102,16 +102,16 @@ export function ReportProblem({
         }
       >
         <div className="space-y-3 px-6 pb-6">
-          <p className="text-sm text-foreground/70">{t("report.intro")}</p>
+          <p className="text-body-sm text-foreground/70">{t("report.intro")}</p>
           {/* Present from the start so a screen reader announces the change. */}
           <div className="sr-only" aria-live="polite">
             {state === "ready" ? t("report.ready") : ""}
           </div>
           {state === "loading" && (
-            <p className="text-sm text-foreground/70">{t("report.loading")}</p>
+            <p className="text-body-sm text-foreground/70">{t("report.loading")}</p>
           )}
           {state === "failed" && (
-            <p className="text-sm text-foreground/70">{t("report.loadFailed")}</p>
+            <p className="text-body-sm text-foreground/70">{t("report.loadFailed")}</p>
           )}
           {state === "ready" && text !== null && (
             <textarea
@@ -120,11 +120,11 @@ export function ReportProblem({
               rows={Math.min(18, text.split("\n").length + 1)}
               aria-label={t("report.label")}
               data-testid="report-text"
-              className="w-full resize-y rounded-md border bg-muted/40 p-3 font-mono text-xs leading-relaxed text-foreground/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              className="w-full resize-y rounded-md border bg-muted/40 p-3 font-mono text-label leading-relaxed text-foreground/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
             />
           )}
           {copyBlocked && (
-            <p role="status" className="text-sm text-foreground/70">
+            <p role="status" className="text-body-sm text-foreground/70">
               {t("report.copyFailed")}
             </p>
           )}

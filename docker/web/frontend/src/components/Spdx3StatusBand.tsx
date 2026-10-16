@@ -77,8 +77,8 @@ export function Spdx3StatusBand({
       <Card data-testid="spdx3-band">
         <CardContent className="flex flex-wrap items-center justify-between gap-3 p-4">
           <div className="min-w-0">
-            <div className="text-sm font-semibold">{t("spdx3.band.title")}</div>
-            <p className="mt-0.5 text-xs text-muted-foreground">
+            <div className="text-body-sm font-semibold">{t("spdx3.band.title")}</div>
+            <p className="mt-0.5 text-body-sm text-muted-foreground">
               {available ? t("spdx3.band.none") : t("spdx3.band.unavailable")}
             </p>
           </div>
@@ -111,7 +111,7 @@ export function Spdx3StatusBand({
       <CardContent className="space-y-3 p-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-2">
-            <span className="text-sm font-semibold">{t("spdx3.band.title")}</span>
+            <span className="text-body-sm font-semibold">{t("spdx3.band.title")}</span>
             {summary.draft ? (
               <Badge tone="warning">{t("spdx3.draft")}</Badge>
             ) : (
@@ -136,7 +136,7 @@ export function Spdx3StatusBand({
             ) : null,
           )}
         </div>
-        <ul className="flex flex-wrap gap-x-4 gap-y-1 text-xs">
+        <ul className="flex flex-wrap gap-x-4 gap-y-1 text-label">
           {segments.map((s) => (
             <li key={s.key} className="flex items-center gap-1.5" data-segment={s.key}>
               <span className={cn("h-2 w-2 rounded-full", SEGMENT_COLOR[s.key])} aria-hidden />
@@ -145,12 +145,12 @@ export function Spdx3StatusBand({
             </li>
           ))}
         </ul>
-        <p className="text-xs text-muted-foreground">
+        <p className="text-body-sm text-muted-foreground">
           {summary.draft ? t("spdx3.band.draftNote", { count: missing }) : t("spdx3.band.completeNote")}
           {summary.draft && !publisher && <> {t("spdx3.band.consumerNote")}</>}
         </p>
         {where.length > 0 && (
-          <p className="text-xs text-foreground" data-testid="spdx3-missing-where">
+          <p className="text-body-sm text-foreground" data-testid="spdx3-missing-where">
             {t("spdx3.band.missingAt", {
               list: where
                 .map((e) =>
@@ -172,7 +172,7 @@ export function Spdx3StatusBand({
           <div
             role="status"
             data-testid="spdx3-service-pending"
-            className="flex flex-wrap items-center justify-between gap-2 rounded-md border bg-muted/40 p-3 text-xs text-foreground"
+            className="flex flex-wrap items-center justify-between gap-2 rounded-md border bg-muted/40 p-3 text-label text-foreground"
           >
             <span className="flex items-start gap-1.5">
               <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden />
@@ -189,7 +189,7 @@ export function Spdx3StatusBand({
         {refused && (
           <div
             role="status"
-            className="space-y-1 rounded-md border border-warning/40 bg-warning-surface p-3 text-xs text-warning dark:bg-warning-surface/15"
+            className="space-y-1 rounded-md border border-warning/40 bg-warning-surface p-3 text-label text-warning dark:bg-warning-surface/15"
           >
             <div className="flex items-center gap-1.5 font-medium">
               <TriangleAlert className="h-3.5 w-3.5" aria-hidden />
@@ -272,7 +272,7 @@ export function Spdx3FieldTable({
   return (
     <div className="space-y-1">
       <div className="overflow-x-auto rounded-md border">
-        <table className="w-full text-left text-xs">
+        <table className="w-full text-left text-label">
           <thead className="border-b bg-muted/40 text-muted-foreground">
             <tr>
               <th scope="col" className="px-3 py-2 font-medium">{t("spdx3.table.field")}</th>
@@ -304,7 +304,7 @@ export function Spdx3FieldTable({
           </tbody>
         </table>
       </div>
-      {hidden > 0 && <p className="text-xs text-muted-foreground">{t("spdx3.table.optionalHidden", { count: hidden })}</p>}
+      {hidden > 0 && <p className="text-body-sm text-muted-foreground">{t("spdx3.table.optionalHidden", { count: hidden })}</p>}
     </div>
   );
 }
@@ -389,7 +389,7 @@ export function Spdx3Fields({ check, defaultOpen = false }: { check: Spdx3Check;
   return (
     <Disclosure
       defaultOpen={defaultOpen}
-      summary={<span className="text-sm font-medium">{t("spdx3.table.toggle")}</span>}
+      summary={<span className="text-body-sm font-medium">{t("spdx3.table.toggle")}</span>}
       className="rounded-lg border bg-card p-3"
     >
       <div className="mt-3 space-y-3" data-testid="spdx3-fields">
@@ -397,8 +397,8 @@ export function Spdx3Fields({ check, defaultOpen = false }: { check: Spdx3Check;
           <Card>
             <CardContent className="space-y-2 p-4">
               <div className="flex flex-wrap items-baseline justify-between gap-2">
-                <span className="text-sm font-semibold">{model.label}</span>
-                <span className="text-xs text-muted-foreground">{t("spdx3.table.caption")}</span>
+                <span className="text-body-sm font-semibold">{model.label}</span>
+                <span className="text-label text-muted-foreground">{t("spdx3.table.caption")}</span>
               </div>
               <Spdx3FieldTable element={model} extraRows={extra} trailingRows={roleRows} />
             </CardContent>
@@ -408,16 +408,16 @@ export function Spdx3Fields({ check, defaultOpen = false }: { check: Spdx3Check;
           <Card data-testid="spdx3-service-fields">
             <CardContent className="space-y-2 p-4">
               <div className="flex flex-wrap items-baseline justify-between gap-2">
-                <span className="flex items-center gap-2 text-sm font-semibold">
+                <span className="flex items-center gap-2 text-body-sm font-semibold">
                   {service.label}
                   <Badge tone="info">{t("spdx3.table.publisherDeclared")}</Badge>
                 </span>
-                <span className="text-xs text-muted-foreground">{t("spdx3.table.serviceCaption")}</span>
+                <span className="text-label text-muted-foreground">{t("spdx3.table.serviceCaption")}</span>
               </div>
               <Spdx3FieldTable element={service} />
               {externals.map((e) => (
                 <div key={e.declarationKey ?? e.label} className="space-y-1 pt-2" data-testid="spdx3-external-model">
-                  <div className="text-xs font-semibold">
+                  <div className="text-label font-semibold">
                     {t("spdx3.table.externalModel", { name: e.label })}
                   </div>
                   <Spdx3FieldTable element={e} />
@@ -429,7 +429,7 @@ export function Spdx3Fields({ check, defaultOpen = false }: { check: Spdx3Check;
         {!model && doc && datasets[0] && (
           <Card>
             <CardContent className="space-y-2 p-4">
-              <span className="text-sm font-semibold">{datasets[0].label}</span>
+              <span className="text-body-sm font-semibold">{datasets[0].label}</span>
               <Spdx3FieldTable element={datasets[0]} extraRows={extra} />
             </CardContent>
           </Card>
@@ -440,7 +440,7 @@ export function Spdx3Fields({ check, defaultOpen = false }: { check: Spdx3Check;
           <Disclosure
             defaultOpen={foldedMissing > 0}
             summary={
-              <span className="text-sm font-medium" data-testid="spdx3-dataset-fields">
+              <span className="text-body-sm font-medium" data-testid="spdx3-dataset-fields">
                 {t("spdx3.table.datasetFields", { count: folded.length })}
                 {foldedMissing > 0 && (
                   <span className="ml-2 font-normal text-risk-critical-fg">
@@ -453,14 +453,14 @@ export function Spdx3Fields({ check, defaultOpen = false }: { check: Spdx3Check;
             <div className="mt-2 space-y-3">
               {folded.map((d) => (
                 <div key={d.declarationKey ?? d.label} className="space-y-1">
-                  <div className="text-xs font-semibold">{d.label}</div>
+                  <div className="text-label font-semibold">{d.label}</div>
                   <Spdx3FieldTable element={d} />
                 </div>
               ))}
             </div>
           </Disclosure>
         )}
-        <p className="text-xs text-muted-foreground">{t("spdx3.table.notLegalAdvice")}</p>
+        <p className="text-body-sm text-muted-foreground">{t("spdx3.table.notLegalAdvice")}</p>
       </div>
     </Disclosure>
   );

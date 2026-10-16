@@ -48,19 +48,19 @@ export function PipelineStepsFailedNote({
       className="rounded-md border border-warning-border/60 bg-warning-surface px-4 py-3 text-warning dark:border-warning-border/20 dark:bg-warning-surface/30"
       data-testid={testId}
     >
-      <div className="text-sm font-medium">{title}</div>
-      <ul className="mt-1 list-disc space-y-0.5 pl-4 text-xs">
+      <div className="text-body-sm font-medium">{title}</div>
+      <ul className="mt-1 list-disc space-y-0.5 pl-4 text-label">
         {steps.map((step) => {
           const key = pipelineStepLabelKey(step);
           return <li key={step}>{key ? t(key) : <span className="font-mono">{step}</span>}</li>;
         })}
       </ul>
       {more > 0 && (
-        <p className="mt-1 text-xs">{t("pipelineNote.more", { count: more })}</p>
+        <p className="mt-1 text-body-sm">{t("pipelineNote.more", { count: more })}</p>
       )}
-      <p className="mt-1 text-xs">{hint}</p>
+      <p className="mt-1 text-body-sm">{hint}</p>
       {context === "conformance" && isSuppliedDocument && (
-        <p className="mt-1 text-xs">{t("pipelineNote.supplierHint")}</p>
+        <p className="mt-1 text-body-sm">{t("pipelineNote.supplierHint")}</p>
       )}
     </div>
   );

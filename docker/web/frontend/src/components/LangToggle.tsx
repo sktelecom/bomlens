@@ -30,7 +30,7 @@ export function LangToggle() {
             onClick={() => void i18n.changeLanguage(code)}
             aria-pressed={active}
             className={cn(
-              "rounded-sm px-2 py-1 text-xs font-medium transition-colors duration-fast ease-out-soft",
+              "rounded-sm px-2 py-1 text-label font-medium transition-colors duration-fast ease-out-soft",
               FOCUS_RING,
               active
                 ? "bg-primary text-primary-foreground"

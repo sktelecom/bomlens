@@ -79,6 +79,46 @@
 
     --radius: 0.375rem;
 
+    /* Type scale: eight roles, each a size and a line height. Components name the
+     * role (text-body-sm), never a pixel value; token-lint rejects text-[Npx]
+     * and the old Tailwind names (text-xs ...). Sizes are rem so the user's
+     * browser font setting still scales them. Line heights are unitless-safe
+     * rem pairs; Pretendard (Korean) is set at the same height as Inter, and
+     * 20px leading on 14px text (1.43) keeps Hangul rows from touching.
+     *   display   page title (h1)                       30px / 36px
+     *   title     section title, large stat             20px / 28px
+     *   heading   card title, metric value              18px / 28px
+     *   body      reading text, dialog title            16px / 24px
+     *   body-sm   descriptions, hints, table cells      14px / 20px
+     *   label     badges, chips, table headers, meta    12px / 16px
+     *   caption   keycap, rail group title, tiny meta   11px / 16px
+     *   mono      code, identifiers, hashes             12px / 16px
+     * The --font-size-* values are exported to bomlens-tokens.css; the line
+     * heights stay here (they are not colours or sizes the other surfaces read). */
+    --font-size-display: 1.875rem;
+    --font-size-title: 1.25rem;
+    --font-size-heading: 1.125rem;
+    --font-size-body: 1rem;
+    --font-size-body-sm: 0.875rem;
+    --font-size-label: 0.75rem;
+    --font-size-caption: 0.6875rem;
+    --font-size-mono: 0.75rem;
+    --line-height-display: 2.25rem;
+    --line-height-title: 1.75rem;
+    --line-height-heading: 1.75rem;
+    --line-height-body: 1.5rem;
+    --line-height-body-sm: 1.25rem;
+    --line-height-label: 1rem;
+    --line-height-caption: 1rem;
+    --line-height-mono: 1rem;
+
+    /* Spacing: Tailwind's 4px scale is kept as is. The steps a layout uses are
+     * 4, 8, 12, 16, 24, 32 and 48px (p-1, p-2, p-3, p-4, p-6, p-8, p-12): 4 and 8
+     * inside a control, 12 between a label and its field, 16 inside a card, 24
+     * between cards, 32 and 48 around a page section. Half steps (0.5, 1.5, 2.5)
+     * are for icon and badge padding only. Table rows are 32px (dense) or 40px
+     * (regular). Nothing enforces this: it is a convention, not a lint rule. */
+
     --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.04);
     --shadow-md: 0 2px 8px -2px rgb(0 0 0 / 0.08), 0 1px 2px 0 rgb(0 0 0 / 0.04);
     --shadow-lg: 0 10px 28px -8px rgb(0 0 0 / 0.12), 0 3px 8px -3px rgb(0 0 0 / 0.06);
@@ -140,34 +180,44 @@
     --role-neutral-border: 191 191 195;
 
     /* Category palette for classifications that are not severities (the licence
-     * tiers). Teal, violet, purple, plum and a warm grey, kept clear of the
-     * alarm hues above (red, orange, yellow) and of the info blue, so a licence
-     * row never reads as a finding. Same four shades and the same contrast
-     * rules as the roles. */
+     * tiers). Six tiers, six hues spread around the wheel and kept muted:
+     *   permissive teal 175, weak-copyleft indigo 230, strong-copyleft violet
+     *   280, network-copyleft magenta 328, review-needed brown 28, and the
+     *   neutral grey of role-neutral for uncategorized.
+     * The three copyleft tiers used to sit 25 to 30 degrees apart (265, 290,
+     * 320) and read as one purple; they are now 48 to 50 degrees apart. They
+     * stay off the alarm hues (red, orange, yellow) and the info blue, so a
+     * licence row never reads as a finding, and the tier is also carried by a
+     * marker shape and its name, so colour is never the only signal. Same four
+     * shades and the same contrast rules as the roles. Ratios (WCAG relative
+     * luminance): the four recoloured tiers have fg at least 8.4:1 on their
+     * muted surface, 10.4:1 on the card and 9.9:1 on the page in both themes;
+     * teal (unchanged) is 6.0, 7.0 and 6.7 light, all above the 4.5:1 floor.
+     * Emphasis fills are at least 4.4:1 on the card in light and 5.4:1 in dark. */
     --cat-permissive-fg: 12 100 91; /* 6.0:1 on muted, 7.0:1 on card, 6.7:1 on page */
     --cat-permissive-muted: 227 240 239; /* emphasis at 12% over the card */
     --cat-permissive-emphasis: 24 134 123; /* 4.4:1 on card (fills, bars) */
     --cat-permissive-border: 151 201 196;
 
-    --cat-weak-fg: 82 41 153; /* 8.3:1 on muted, 9.8:1 on card, 9.4:1 on page */
-    --cat-weak-muted: 238 233 248; /* emphasis at 12% over the card */
-    --cat-weak-emphasis: 116 71 194; /* 6.1:1 on card (fills, bars) */
-    --cat-weak-border: 192 172 228;
+    --cat-weak-fg: 31 45 111; /* 10.6:1 on muted, 12.6:1 on card, 12.1:1 on page */
+    --cat-weak-muted: 232 235 247; /* emphasis at 12% over the card */
+    --cat-weak-emphasis: 66 87 189; /* 6.3:1 on card (fills, bars) */
+    --cat-weak-border: 170 179 225;
 
-    --cat-strong-fg: 113 42 137; /* 7.3:1 on muted, 8.8:1 on card, 8.4:1 on page */
-    --cat-strong-muted: 241 232 244; /* emphasis at 12% over the card */
-    --cat-strong-emphasis: 141 63 166; /* 6.2:1 on card (fills, bars) */
-    --cat-strong-border: 204 169 215;
+    --cat-strong-fg: 82 40 103; /* 9.6:1 on muted, 11.3:1 on card, 10.8:1 on page */
+    --cat-strong-muted: 241 234 244; /* emphasis at 12% over the card */
+    --cat-strong-emphasis: 137 78 166; /* 5.7:1 on card (fills, bars) */
+    --cat-strong-border: 202 175 215;
 
-    --cat-network-fg: 134 45 101; /* 6.8:1 on muted, 8.1:1 on card, 7.8:1 on page */
-    --cat-network-muted: 244 232 240; /* emphasis at 12% over the card */
-    --cat-network-emphasis: 163 67 128; /* 5.7:1 on card (fills, bars) */
-    --cat-network-border: 214 170 198;
+    --cat-network-fg: 107 36 74; /* 9.0:1 on muted, 10.6:1 on card, 10.2:1 on page */
+    --cat-network-muted: 244 233 239; /* emphasis at 12% over the card */
+    --cat-network-emphasis: 167 68 121; /* 5.6:1 on card (fills, bars) */
+    --cat-network-border: 215 171 195;
 
-    --cat-review-fg: 84 71 59; /* 7.8:1 on muted, 9.0:1 on card, 8.6:1 on page */
-    --cat-review-muted: 240 238 237; /* emphasis at 12% over the card */
-    --cat-review-emphasis: 126 115 103; /* 4.6:1 on card (fills, bars) */
-    --cat-review-border: 197 192 187;
+    --cat-review-fg: 80 60 43; /* 8.9:1 on muted, 10.4:1 on card, 9.9:1 on page */
+    --cat-review-muted: 240 237 234; /* emphasis at 12% over the card */
+    --cat-review-emphasis: 131 106 84; /* 5.1:1 on card (fills, bars) */
+    --cat-review-border: 199 188 178;
 
     /* Legacy names, kept as aliases of the roles so existing call sites keep
      * working. New code should name the role directly. The alias lives in :root
@@ -289,25 +339,25 @@
     --cat-permissive-emphasis: 40 189 174; /* 7.6:1 on card */
     --cat-permissive-border: 31 98 93;
 
-    --cat-weak-fg: 203 186 232; /* 7.9:1 on muted, 9.9:1 on card, 11.0:1 on page */
-    --cat-weak-muted: 45 41 56; /* emphasis at 16% over the card */
-    --cat-weak-emphasis: 158 129 207; /* 5.5:1 on card */
-    --cat-weak-border: 84 71 108;
+    --cat-weak-fg: 194 201 240; /* 8.4:1 on muted, 10.6:1 on card, 11.9:1 on page */
+    --cat-weak-muted: 43 45 59; /* emphasis at 16% over the card */
+    --cat-weak-emphasis: 124 139 218; /* 5.4:1 on card */
+    --cat-weak-border: 71 77 114;
 
-    --cat-strong-fg: 215 181 227; /* 7.9:1 on muted, 9.8:1 on card, 10.9:1 on page */
-    --cat-strong-muted: 48 39 54; /* emphasis at 16% over the card */
-    --cat-strong-emphasis: 177 119 197; /* 5.3:1 on card */
-    --cat-strong-border: 93 67 104;
+    --cat-strong-fg: 223 198 235; /* 8.6:1 on muted, 11.0:1 on card, 12.3:1 on page */
+    --cat-strong-muted: 52 44 58; /* emphasis at 16% over the card */
+    --cat-strong-emphasis: 183 134 208; /* 6.0:1 on card */
+    --cat-strong-border: 97 75 110;
 
-    --cat-network-fg: 225 183 210; /* 8.0:1 on muted, 10.0:1 on card, 11.2:1 on page */
-    --cat-network-muted: 51 40 50; /* emphasis at 16% over the card */
-    --cat-network-emphasis: 194 122 168; /* 5.6:1 on card */
-    --cat-network-border: 101 68 90;
+    --cat-network-fg: 237 196 218; /* 8.6:1 on muted, 11.1:1 on card, 12.4:1 on page */
+    --cat-network-muted: 57 43 52; /* emphasis at 16% over the card */
+    --cat-network-emphasis: 213 129 174; /* 6.2:1 on card */
+    --cat-network-border: 111 73 94;
 
-    --cat-review-fg: 209 204 199; /* 8.6:1 on muted, 11.1:1 on card, 12.4:1 on page */
-    --cat-review-muted: 46 45 47; /* emphasis at 16% over the card */
-    --cat-review-emphasis: 163 158 153; /* 6.7:1 on card */
-    --cat-review-border: 87 84 84;
+    --cat-review-fg: 230 216 204; /* 9.1:1 on muted, 12.3:1 on card, 13.8:1 on page */
+    --cat-review-muted: 54 50 48; /* emphasis at 16% over the card */
+    --cat-review-emphasis: 196 169 146; /* 7.7:1 on card */
+    --cat-review-border: 103 91 82;
 
     /* Syntax colours lift for the dark card (#18181b); ratios against it. */
     --code-keyword: 255 123 114; /* 7.03:1 */

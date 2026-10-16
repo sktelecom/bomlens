@@ -112,10 +112,10 @@ export function SourceTreePanel({
   return (
     <div className="space-y-2">
       {!hasLicenses && (
-        <p className="text-xs text-muted-foreground">{t("sourceTree.noLicenseHint")}</p>
+        <p className="text-body-sm text-muted-foreground">{t("sourceTree.noLicenseHint")}</p>
       )}
       {totals && (
-        <p className="text-xs text-muted-foreground">
+        <p className="text-body-sm text-muted-foreground">
           {t("sourceViewer.summary", { count: totals.files })}
           {totals.links > 0 && ` ${t("sourceViewer.linksSummary", { count: totals.links })}`}
           {omitted > 0 && ` ${t("sourceViewer.summaryOmitted", { count: omitted })}`}

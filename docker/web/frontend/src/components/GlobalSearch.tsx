@@ -188,7 +188,7 @@ export function GlobalSearch({
         className="h-8 w-56 pl-8 pr-14"
       />
       <kbd
-        className="pointer-events-none absolute right-2 top-1/2 hidden -translate-y-1/2 select-none rounded border bg-muted px-1.5 py-0.5 font-sans text-[10px] font-medium text-muted-foreground lg:block"
+        className="pointer-events-none absolute right-2 top-1/2 hidden -translate-y-1/2 select-none rounded border bg-muted px-1.5 py-0.5 font-sans text-caption font-medium text-muted-foreground lg:block"
         aria-hidden
       >
         {isAppleKeyboard() ? "⌘K" : "Ctrl K"}
@@ -206,14 +206,14 @@ export function GlobalSearch({
           }}
         >
           {!hasResults && !showLookup ? (
-            <p className="px-3 py-3 text-sm text-muted-foreground">{t("search.none")}</p>
+            <p className="px-3 py-3 text-body-sm text-muted-foreground">{t("search.none")}</p>
           ) : (
-            <div className="max-h-80 overflow-auto py-1 text-sm">
+            <div className="max-h-80 overflow-auto py-1 text-body-sm">
               {components.length > 0 && (
                 <div role="group" aria-labelledby={componentsHeadingId}>
                   <div
                     id={componentsHeadingId}
-                    className="px-3 pb-1 pt-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground"
+                    className="px-3 pb-1 pt-2 text-label font-semibold uppercase tracking-wider text-muted-foreground"
                   >
                     {t("search.components")}
                   </div>
@@ -229,7 +229,7 @@ export function GlobalSearch({
                       <Boxes className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden />
                       <span className="truncate">{c.name}</span>
                       {c.version && (
-                        <span className="shrink-0 text-xs text-muted-foreground">{c.version}</span>
+                        <span className="shrink-0 text-label text-muted-foreground">{c.version}</span>
                       )}
                     </div>
                   ))}
@@ -239,7 +239,7 @@ export function GlobalSearch({
                 <div role="group" aria-labelledby={vulnsHeadingId}>
                   <div
                     id={vulnsHeadingId}
-                    className="px-3 pb-1 pt-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground"
+                    className="px-3 pb-1 pt-2 text-label font-semibold uppercase tracking-wider text-muted-foreground"
                   >
                     {t("search.vulnerabilities")}
                   </div>
@@ -256,8 +256,8 @@ export function GlobalSearch({
                         className="h-3.5 w-3.5 shrink-0 text-muted-foreground"
                         aria-hidden
                       />
-                      <span className="truncate font-mono text-xs">{v.id}</span>
-                      <span className="shrink-0 text-xs text-muted-foreground">{v.pkg}</span>
+                      <span className="truncate font-mono text-label">{v.id}</span>
+                      <span className="shrink-0 text-label text-muted-foreground">{v.pkg}</span>
                     </div>
                   ))}
                 </div>
@@ -266,7 +266,7 @@ export function GlobalSearch({
                 <div role="group" aria-labelledby={lookupHeadingId}>
                   <div
                     id={lookupHeadingId}
-                    className="px-3 pb-1 pt-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground"
+                    className="px-3 pb-1 pt-2 text-label font-semibold uppercase tracking-wider text-muted-foreground"
                   >
                     {t("search.lookupGroup")}
                   </div>

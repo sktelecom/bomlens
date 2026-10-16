@@ -80,7 +80,7 @@ const SOURCE_GROUPS: Array<{ key: string; sources: SourceType[] }> = [
 ];
 
 const SECTION_LABEL =
-  "text-xs font-semibold uppercase tracking-wider text-muted-foreground";
+  "text-label font-semibold uppercase tracking-wider text-muted-foreground";
 
 /** Collapsed-by-default panel section, on the shared disclosure.
  *  Keeps the settings panel within one viewport: only identity, outputs and
@@ -105,7 +105,7 @@ function PanelDisclosure({
         <>
           <span className={SECTION_LABEL}>{label}</span>
           {badge && (
-            <span className="ml-auto rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-foreground">
+            <span className="ml-auto rounded-full bg-muted px-2 py-0.5 text-label font-medium text-foreground">
               {badge}
             </span>
           )}
@@ -157,10 +157,10 @@ export function NewScan({
   return (
     <div className="space-y-6">
       <div className="space-y-1.5">
-        <h1 className="text-3xl font-semibold tracking-tight text-foreground">
+        <h1 className="text-display font-semibold tracking-tight text-foreground">
           {t("newscan.title")}
         </h1>
-        <p className="text-sm text-muted-foreground">{t("newscan.subtitle")}</p>
+        <p className="text-body-sm text-muted-foreground">{t("newscan.subtitle")}</p>
       </div>
 
       <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
@@ -203,7 +203,7 @@ export function NewScan({
                             if (!locked) state.changeSource(s);
                           }}
                           className={cn(
-                            "flex items-center gap-2 rounded-lg border px-3 py-2.5 text-left text-sm",
+                            "flex items-center gap-2 rounded-lg border px-3 py-2.5 text-left text-body-sm",
                             "transition-[color,border-color,background-color,box-shadow] duration-fast ease-out-soft",
                             FOCUS_RING,
                             "disabled:pointer-events-none disabled:opacity-50",
@@ -237,7 +237,7 @@ export function NewScan({
                     })}
                   </div>
                   {lockReason && (
-                    <p className="text-xs text-muted-foreground">{lockReason}</p>
+                    <p className="text-body-sm text-muted-foreground">{lockReason}</p>
                   )}
                 </div>
               );
@@ -278,7 +278,7 @@ export function NewScan({
                 />
                 {/* A declared model has no hub name: the project becomes its name. */}
                 {state.source === "ai-declare" && (
-                  <p id="project-hint" className="text-xs text-muted-foreground">
+                  <p id="project-hint" className="text-body-sm text-muted-foreground">
                     {t("form.projectHintDeclare")}
                   </p>
                 )}

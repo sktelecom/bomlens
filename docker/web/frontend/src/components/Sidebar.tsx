@@ -46,7 +46,7 @@ interface SidebarProps {
 // each of the two gaps, 2px at each side padding. Re-check this budget before
 // lengthening any label — nav.ts carries a note on the one that hit it.
 const RAIL_ROW =
-  "group relative flex w-full items-center gap-2 rounded-md px-1 py-2 text-sm " +
+  "group relative flex w-full items-center gap-2 rounded-md px-1 py-2 text-body-sm " +
   "transition-colors duration-fast ease-out-soft " +
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-sidebar";
 
@@ -132,7 +132,7 @@ export function Sidebar({
       {groups.map((group) => (
         <div key={group.id} className="mb-2">
           {!collapsed && (
-            <p className="px-2 pb-1 pt-2 text-[0.6875rem] font-semibold uppercase tracking-wider text-muted-foreground">
+            <p className="px-2 pb-1 pt-2 text-caption font-semibold uppercase tracking-wider text-muted-foreground">
               {t(group.labelKey)}
             </p>
           )}
@@ -168,7 +168,7 @@ export function Sidebar({
                     {!collapsed && count !== undefined && (
                       <span
                         className={cn(
-                          "ml-auto shrink-0 tabular-nums text-xs",
+                          "ml-auto shrink-0 tabular-nums text-label",
                           // Keep the count at foreground contrast on the active row,
                           // like the label.
                           active ? "text-foreground" : "text-muted-foreground",

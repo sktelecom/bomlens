@@ -18,12 +18,13 @@ export function DemoBanner() {
   const { t, i18n } = useTranslation("common");
   return (
     <div
-      role="note"
+      role="region"
+      aria-label={t("shell.demoBannerTitle")}
       data-testid="demo-banner"
-      className="flex flex-wrap items-baseline gap-x-2 gap-y-1 border-b border-brand/25 bg-brand/5 px-4 py-2 text-xs text-muted-foreground"
+      className="flex flex-wrap items-baseline gap-x-2 gap-y-1 border-b bg-muted/50 px-4 py-2 text-label text-muted-foreground"
     >
       <FlaskConical
-        className="h-3.5 w-3.5 shrink-0 self-center text-brand"
+        className="h-3.5 w-3.5 shrink-0 self-center text-muted-foreground"
         aria-hidden
       />
       <span className="font-medium text-foreground">
@@ -38,7 +39,7 @@ export function DemoBanner() {
         href={demoInstallUrl(i18n.language)}
         target="_blank"
         rel="noreferrer"
-        className="ml-auto shrink-0 font-medium text-brand underline underline-offset-2 hover:no-underline"
+        className="ml-auto shrink-0 font-medium text-foreground underline underline-offset-2 hover:no-underline"
       >
         {t("shell.demoBannerCta")}
       </a>
