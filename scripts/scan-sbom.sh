@@ -522,7 +522,7 @@ Options:
                          and dataset SBOMs are always 1.7
   --all                  --notice --security --spdx
   --no-report            Skip the open-source risk report (risk-report). By default
-                         the risk report (+notice+security) is generated in
+                         the open-source risk report (+notice+security) is generated in
                          every mode; --no-report opts out.
   --deep-license         scancode deep license (opt-in image)
   --deep-cve             Also match maven components against NVD by CPE via grype
@@ -556,8 +556,8 @@ Options:
                          default 5 files / 2 GiB each), so this is opt-in, unlike
                          the metadata-only file-security lookup.
   --byte-stable          Deterministic SBOM output
-  --fail-on-conformance  Exit 2 if this scan's own conformance report says
-                         "fail" (exit 3 if no conformance report was produced
+  --fail-on-conformance  Exit 2 if this scan's own conformance check report says
+                         "fail" (exit 3 if no conformance check report was produced
                          for this scan). Not offered with --ui. See "Exit
                          codes" in the CLI reference.
   --fail-on <condition>  Exit 4 when this scan meets the condition (exit 5 when it
@@ -595,7 +595,7 @@ Options:
                          default; uses the network.
   --resolve-purl         --analyze only: ask each package repository whether the
                          identifiers in the submitted SBOM name packages that
-                         exist, and add the answer to the conformance report as
+                         exist, and add the answer to the conformance check report as
                          an advisory row. Off by default; it is the only part of
                          the check that uses the network. An identifier that
                          resolves to nothing is reported, never failed: a
@@ -3153,11 +3153,11 @@ if [ "$GENERATE_ONLY" = "true" ]; then
     if { [ "$MODE" = "ANALYZE" ] && ! { [ -n "${YOCTO_BUILD_DIR:-}" ] && [ -z "$ANALYZE_SBOM" ]; }; } \
         || [ "$MODE" = "AIBOM" ] || [ "$MODE" = "DATASET" ] || [ "$MODE" = "AIDECLARE" ]; then
         summary_line "Conformance:" "${P}_conformance.json" "${P}_conformance.md" "${P}_conformance.html" \
-            || note_missing "conformance report"
+            || note_missing "conformance check report"
     fi
     if [ "$GENERATE_REPORT" = "true" ]; then
         summary_line "Risk report:" "${P}_risk-report.md" "${P}_risk-report.html" \
-            || note_missing "risk report"
+            || note_missing "open-source risk report"
     fi
     if [ -n "$missing" ]; then
         echo ""
@@ -3286,7 +3286,7 @@ fi
 # failed, 3 means this run produced no conformance report to judge at all.
 if [ "$FAIL_ON_CONFORMANCE" = "true" ]; then
     if [ ! -f "$CONFORMANCE_RESULT_FILE" ]; then
-        echo "[ERROR] --fail-on-conformance: this scan produced no conformance report to judge."
+        echo "[ERROR] --fail-on-conformance: this scan produced no conformance check report to judge."
         exit 3
     fi
     if [ "$(cat "$CONFORMANCE_RESULT_FILE")" = "fail" ]; then

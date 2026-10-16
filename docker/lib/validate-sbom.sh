@@ -31,6 +31,13 @@
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+# Shared look of the HTML reports (design tokens, print rules, time format).
+if [ ! -f "$SCRIPT_DIR/report-common.sh" ]; then
+    echo "[validate] report-common.sh not found next to $0; the image is incomplete. Fix: rebuild the scanner image." >&2
+    exit 1
+fi
+# shellcheck source=report-common.sh
+. "$SCRIPT_DIR/report-common.sh"
 # shellcheck source=docker/lib/cdx-version.sh
 . "$SCRIPT_DIR/cdx-version.sh"
 
@@ -1122,7 +1129,7 @@ if [ "$CONFORMANCE_PROFILE" = "skt-submission" ] && [ "$FORMAT" = "CycloneDX" ];
              status: (if ($noup | length) == 0 then "pass" else "warn" end),
              detail: "\($noup | length) without an upstream purl", missing: ($noup[0:$cap]),
              reviewGuide: (if $analyze then {
-               how: "These components have a version but no purl that names their source repository (none, pkg:generic, pkg:opkg or pkg:openwrt), so they cannot be looked up by purl. Ask the supplier for an SBOM that gives each one the purl of its source repository at the release tag, for example by rescanning with a current BomLens firmware, root filesystem or binary scan.",
+               how: "These components have a version but no purl that names their source repository (none, pkg:generic, pkg:opkg or pkg:openwrt), so they cannot be looked up by purl. Ask the supplier for an SBOM that gives each one the purl of its source repository at the release tag, for example by scanning again with a current BomLens firmware, root filesystem or binary scan.",
                how_ko: "버전은 있지만 소스 저장소를 가리키는 purl이 없어(purl 없음, pkg:generic, pkg:opkg, pkg:openwrt) purl로 조회할 수 없는 구성요소입니다. 각 구성요소에 릴리스 태그 기준 소스 저장소 purl을 넣은 SBOM을 공급사에 요청합니다. 최신 BomLens로 펌웨어, 루트 파일시스템, 바이너리를 다시 스캔하는 방법이 있습니다.",
                docUrl: "https://sktelecom.github.io/bomlens/guides/supplier-sbom/"}
              else {
@@ -1576,13 +1583,13 @@ if [ "$REPORT_LANG" = "ko" ]; then
     C_TH_FRAMEWORK=$(kstr aiprofile.th_framework)
     C_HTML_TITLE=$(tfmt conformance.html_title "$PROJECT_ESC")
     C_KIND=$(kstr conformance.kind); C_H1=$(kstr conformance.h1)
-    C_META="$(kstr conformance.meta_project): ${PROJECT_HTML} &middot; $(kstr conformance.meta_generated): ${GEN_AT} &middot; $(kstr conformance.meta_format): ${FORMAT} &middot; $(kstr conformance.meta_profile): ${CONFORMANCE_PROFILE}"
+    C_META="$(kstr conformance.meta_project): ${PROJECT_HTML} &middot; $(kstr conformance.meta_generated): $(report_time_html "$GEN_AT") &middot; $(kstr conformance.meta_format): ${FORMAT} &middot; $(kstr conformance.meta_profile): ${CONFORMANCE_PROFILE}"
     C_PILL_RESULT="$(kstr conformance.pill_result) ${RESULT_UP}"
     C_PILL_FAIL=$(kstr conformance.pill_failures); C_PILL_WARN=$(kstr conformance.pill_warnings)
     C_PILL_REVIEW=$(kstr conformance.pill_review); C_PILL_UNTRACE=$(kstr conformance.pill_untraceable)
     C_PILL_NA=$(kstr conformance.pill_na)
 else
-    C_MD_TITLE="SBOM Conformance — ${PROJECT}"
+    C_MD_TITLE="SBOM conformance check — ${PROJECT}"
     C_MD_GEN="- Generated: ${GEN_AT}"
     C_MD_FMT="- Format: ${FORMAT}"
     C_MD_RESULT="- Result: **${RESULT_UP}** (mandatory failures: ${N_FAIL}, warnings: ${N_WARN}, needs review: ${N_REVIEW}, not applicable: ${N_NA})"
@@ -1608,9 +1615,9 @@ else
     C_YES="yes"; C_NO="no"
     C_REF="Reference:"
     C_TH_FRAMEWORK="Framework"
-    C_HTML_TITLE="SBOM Conformance — ${PROJECT_ESC}"
-    C_KIND="Conformance"; C_H1="SBOM Conformance Report"
-    C_META="Project: ${PROJECT_HTML} &middot; Generated: ${GEN_AT} &middot; Format: ${FORMAT} &middot; Profile: ${CONFORMANCE_PROFILE}"
+    C_HTML_TITLE="SBOM conformance check — ${PROJECT_ESC}"
+    C_KIND="Conformance check"; C_H1="Conformance check report"
+    C_META="Project: ${PROJECT_HTML} &middot; Generated: $(report_time_html "$GEN_AT") &middot; Format: ${FORMAT} &middot; Profile: ${CONFORMANCE_PROFILE}"
     C_PILL_RESULT="Result: ${RESULT_UP}"
     C_PILL_FAIL="Mandatory failures:"; C_PILL_WARN="Warnings:"; C_PILL_REVIEW="Needs review:"
     C_PILL_NA="Not applicable:"
@@ -1806,75 +1813,10 @@ fi
 <meta charset="utf-8">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline';">
 <title>${C_HTML_TITLE}</title>
-<style>
- :root{
-  --bg:#fafafa;--surface:#ffffff;--text:#18181b;--muted:#6c6c75;--border:#e5e5ea;
-  --brand:#EA002C;--brand-2:#F47725;--th-bg:#f4f4f5;--row-hover:#fafafa;--review:#2563eb;
-  --radius:.375rem;--radius-card:.5rem;
-  --shadow:0 1px 2px rgb(0 0 0/.04),0 2px 8px -2px rgb(0 0 0/.08);
-  --font:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;
-  --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
- }
- @media (prefers-color-scheme:dark){:root{
-  --bg:#0a0a0c;--surface:#18181b;--text:#fafafa;--muted:#a1a1aa;--border:#27272a;
-  --th-bg:#1f1f23;--row-hover:#202024;--review:#60a5fa;
-  --shadow:0 1px 2px rgb(0 0 0/.3),0 2px 8px -2px rgb(0 0 0/.5);
- }}
- *{box-sizing:border-box;}
- body{font-family:var(--font);background:var(--bg);color:var(--text);
-  max-width:1040px;margin:0 auto;padding:2.5rem 1.5rem 4rem;line-height:1.55;
-  -webkit-font-smoothing:antialiased;}
- a{color:var(--brand);}
- .report-header{display:flex;align-items:flex-end;justify-content:space-between;
-  gap:1rem;flex-wrap:wrap;padding-bottom:.85rem;border-bottom:1px solid var(--border);
-  margin-bottom:1.5rem;}
- .wordmark{display:flex;align-items:center;gap:.5rem;font-size:1.15rem;font-weight:800;
-  letter-spacing:-.02em;color:var(--brand);}
- .wordmark .tag{font-size:.62rem;font-weight:700;letter-spacing:.1em;color:var(--muted);
-  border:1px solid var(--border);border-radius:999px;padding:.15rem .5rem;background:var(--surface);}
- .report-kind{font-size:.78rem;font-weight:600;color:var(--muted);
-  text-transform:uppercase;letter-spacing:.07em;}
- h1{font-size:1.55rem;font-weight:700;letter-spacing:-.01em;margin:.2rem 0 .35rem;}
- h2{font-size:1.15rem;font-weight:600;letter-spacing:-.01em;margin:2.1rem 0 .8rem;}
- h3{font-size:.95rem;font-weight:600;margin:1.3rem 0 .4rem;}
- .meta{color:var(--muted);font-size:.875rem;margin:.15rem 0 0;}
- .cards{display:flex;gap:.5rem;flex-wrap:wrap;margin:1.1rem 0 1.3rem;}
- .pill{display:inline-flex;align-items:center;gap:.4rem;padding:.3rem .7rem;
-  border-radius:999px;font-size:.8rem;font-weight:600;line-height:1.1;}
- .pill .count{font-variant-numeric:tabular-nums;}
- .pill-pass{background:rgba(22,163,74,.12);color:#16a34a;}
- .pill-fail{background:rgba(220,38,38,.12);color:#dc2626;}
- .pill-warn{background:rgba(202,138,4,.14);color:#ca8a04;}
- .pill-info{background:rgba(113,113,122,.14);color:#71717a;}
- .table-wrap{border:1px solid var(--border);border-radius:var(--radius-card);
-  overflow-x:auto;box-shadow:var(--shadow);background:var(--surface);margin:1rem 0 1.5rem;}
- table{border-collapse:collapse;width:100%;font-size:.85rem;}
- th{background:var(--th-bg);text-align:left;font-size:.7rem;font-weight:600;
-  text-transform:uppercase;letter-spacing:.05em;color:var(--muted);
-  padding:.6rem .8rem;border-bottom:1px solid var(--border);white-space:nowrap;}
- td{padding:.6rem .8rem;border-bottom:1px solid var(--border);vertical-align:top;}
- tr:last-child td{border-bottom:none;}
- tr:hover td{background:var(--row-hover);}
- .s-pass{color:#16a34a;font-weight:700;}
- .s-fail{color:#dc2626;font-weight:700;}
- .s-warn{color:#ca8a04;font-weight:700;}
- .s-review{color:var(--review);font-weight:700;}
- .s-na{color:var(--muted);font-weight:700;}
- td.num{color:var(--muted);font-variant-numeric:tabular-nums;text-align:right;white-space:nowrap;}
- th.num{text-align:right;}
- td.req{white-space:nowrap;}
- details.fix{margin:.4rem 0 0;}
- details.fix summary{cursor:pointer;color:var(--brand);font-size:.8rem;font-weight:600;}
- details.fix pre{margin:.4rem 0 .2rem;}
- details.fix .meta{font-size:.8rem;}
- .mono{list-style:none;padding-left:0;}
- .mono li{font-family:var(--mono);font-size:.82rem;margin:.3rem 0;}
- pre{background:var(--th-bg);border:1px solid var(--border);border-radius:var(--radius);
-     padding:.6rem .75rem;overflow-x:auto;margin:.5rem 0;}
- pre code{font-family:var(--mono);font-size:.8rem;white-space:pre;}
- ol,ul{margin:.5rem 0 0;padding-left:1.3rem;}
- li{margin:.3rem 0;}
-</style></head><body>
+HTMLHEAD
+    report_style
+    cat <<HTMLHEAD2
+</head><body>
 <header class="report-header">
  <div class="wordmark">BomLens<span class="tag">SBOM</span></div>
  <div class="report-kind">${C_KIND}</div>
@@ -1891,7 +1833,7 @@ $( [ "${N_UNTRACEABLE:-0}" -gt 0 ] && echo " <span class=\"pill\">${C_PILL_UNTRA
 </div>
 $( [ -n "$C_PIPELINE_STEPS_HTML" ] && printf '%s\n' "$C_PIPELINE_STEPS_HTML" )
 $( [ -n "$C_SUBMIT_HTML" ] && printf '%s\n' "$C_SUBMIT_HTML" )
-HTMLHEAD
+HTMLHEAD2
     # Two tables, not one. The submission requirements decide the verdict; the G7
     # elements are advisory and never do. Mixed into a single 60-row table the
     # reader cannot tell which is which, or why a given row is there. The G7 table
@@ -1949,7 +1891,7 @@ HTMLHEAD
     # need a human decision. Everything below is the per-check detail behind it.
     if [ "$G7_CLUSTERS" != "[]" ]; then
         echo "<h2>${C_H2_CLUSTERS}</h2>"
-        echo "<div class=\"table-wrap\"><table><tr><th>${C_TH_CLUSTER}</th><th>${C_TH_PRESENT}</th><th>${C_TH_GAP}</th><th>${C_TH_REVIEWCNT}</th><th>${C_TH_TOTAL}</th></tr>"
+        echo "<div class=\"table-wrap\"><table><thead><tr><th>${C_TH_CLUSTER}</th><th>${C_TH_PRESENT}</th><th>${C_TH_GAP}</th><th>${C_TH_REVIEWCNT}</th><th>${C_TH_TOTAL}</th></tr></thead><tbody>"
         echo "$G7_CLUSTERS" | jq -r --arg lang "$REPORT_LANG" '.[] |
             "<tr><td>" + ((if $lang=="ko" then .name_ko else .name end)|@html) + "</td>"
             + "<td>" + (.present|tostring) + "</td><td>" + (.gap|tostring) + "</td>"
@@ -1958,14 +1900,14 @@ HTMLHEAD
             "<tr><td><b>" + ($total|@html) + "</b></td><td><b>" + (map(.present)|add|tostring)
             + "</b></td><td><b>" + (map(.gap)|add|tostring) + "</b></td><td><b>"
             + (map(.review)|add|tostring) + "</b></td><td><b>" + (map(.total)|add|tostring) + "</b></td></tr>"'
-        echo "</table></div>"
+        echo "</tbody></table></div>"
         echo "<h2>${C_H2_LIC}</h2>"
         if [ "$(echo "$LIC_REVIEW" | jq 'length')" -gt 0 ]; then
-            echo "<div class=\"table-wrap\"><table><tr><th>${C_TH_COMP}</th><th>${C_TH_VER}</th><th>${C_TH_LIC}</th><th>${C_TH_FLAG}</th></tr>"
+            echo "<div class=\"table-wrap\"><table><thead><tr><th>${C_TH_COMP}</th><th>${C_TH_VER}</th><th>${C_TH_LIC}</th><th>${C_TH_FLAG}</th></tr></thead><tbody>"
             echo "$LIC_REVIEW" | jq -r '.[] |
                 "<tr><td>" + (.name|@html) + "</td><td>" + (.version|@html) + "</td>"
                 + "<td>" + (.license|@html) + "</td><td>" + (.flag|@html) + "</td></tr>"'
-            echo "</table></div>"
+            echo "</tbody></table></div>"
         else
             echo "<p class=\"meta\">${C_LIC_NONE}</p>"
         fi
@@ -1978,27 +1920,27 @@ HTMLHEAD
     # same labels, statuses and details as the table one screen up.
     if [ "$(echo "$RXW" | jq -r '.frameworks | length')" -gt 0 ]; then
         echo "<h2>${C_H2_XWALK}</h2>"
-        echo "<div class=\"table-wrap\"><table><tr><th>${C_TH_FRAMEWORK}</th><th>${C_TH_PRESENT}</th><th>${C_TH_GAP}</th><th>${C_TH_FAILED}</th><th>${C_TH_REVIEWCNT}</th><th>${C_TH_TOTAL}</th></tr>"
+        echo "<div class=\"table-wrap\"><table><thead><tr><th>${C_TH_FRAMEWORK}</th><th>${C_TH_PRESENT}</th><th>${C_TH_GAP}</th><th>${C_TH_FAILED}</th><th>${C_TH_REVIEWCNT}</th><th>${C_TH_TOTAL}</th></tr></thead><tbody>"
         echo "$RXW" | jq -r '.frameworks[] |
             "<tr><td>" + (.title|@html)
             + "<br><span class=\"meta\">" + (.source|@html) + "</span></td>"
             + "<td>" + (.present|tostring) + "</td><td>" + (.gap|tostring) + "</td>"
             + "<td>" + ((.failed // 0)|tostring) + "</td>"
             + "<td>" + (.review|tostring) + "</td><td>" + (.total|tostring) + "</td></tr>"'
-        echo "</table></div>"
+        echo "</tbody></table></div>"
         echo "<p class=\"meta\">$(echo "$RXW" | jq -r '.disclaimer' | sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g')</p>"
     fi
     echo "<h2>${C_H2_SUBMIT}</h2>"
     echo "<p class=\"meta\">${C_SUBMIT_INTRO}</p>"
-    echo "<div class=\"table-wrap\"><table><tr><th class=\"num\">#</th><th>${C_TH_STATUS}</th><th>${C_TH_REQMT}</th><th>${C_TH_REQD}</th><th>${C_TH_DETAIL}</th><th>${C_TH_EVID}</th></tr>"
+    echo "<div class=\"table-wrap\"><table><thead><tr><th class=\"num\">#</th><th>${C_TH_STATUS}</th><th>${C_TH_REQMT}</th><th>${C_TH_REQD}</th><th>${C_TH_DETAIL}</th><th>${C_TH_EVID}</th></tr></thead><tbody>"
     html_rows submission
-    echo "</table></div>"
+    echo "</tbody></table></div>"
     if echo "$RCHECKS" | jq -e 'any(.[]; .id|startswith("g7-"))' >/dev/null; then
         echo "<h2>${C_H2_G7CHK}</h2>"
         echo "<p class=\"meta\">${C_G7CHK_INTRO}</p>"
-        echo "<div class=\"table-wrap\"><table><tr><th class=\"num\">#</th><th>${C_TH_STATUS}</th><th>${C_TH_REQMT}</th><th>${C_TH_DETAIL}</th><th>${C_TH_EVID}</th></tr>"
+        echo "<div class=\"table-wrap\"><table><thead><tr><th class=\"num\">#</th><th>${C_TH_STATUS}</th><th>${C_TH_REQMT}</th><th>${C_TH_DETAIL}</th><th>${C_TH_EVID}</th></tr></thead><tbody>"
         html_rows g7
-        echo "</table></div>"
+        echo "</tbody></table></div>"
     fi
     if echo "$RCHECKS" | jq -e 'any(.[]; .status!="pass" and (.missing|length>0))' >/dev/null; then
         echo "<h2>${C_H2_MISSING}</h2>"

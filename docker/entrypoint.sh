@@ -2501,7 +2501,7 @@ if [ "${SIGN_SBOM:-false}" = "true" ]; then
         # either. Skipped when this mode never produced a conformance report.
         if [ -f "${OUT_PREFIX}_conformance.json" ]; then
             SIGN_FAILED="$SIGN_FAILED" bash "$LIBDIR/validate-sbom.sh" "$OUTPUT_FILE" "$OUT_PREFIX" "$PROJECT_NAME" \
-                || echo "[WARN] could not refresh the conformance report's signature status after signing." >&2
+                || echo "[WARN] could not refresh the conformance check report's signature status after signing." >&2
         fi
         # A requested signature that was not produced is a failure on a
         # supply-chain tool. Do not exit 0 leaving the user to believe their
