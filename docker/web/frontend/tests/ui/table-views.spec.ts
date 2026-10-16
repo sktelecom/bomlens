@@ -232,12 +232,12 @@ test.describe("row density", () => {
     await expect(page.getByRole("cell", { name: "urllib3", exact: true })).toBeVisible();
     const toggle = page.getByTestId("density-toggle");
     await expect(toggle.getByRole("button", { name: "Comfortable" })).toHaveAttribute("aria-pressed", "true");
-    expect(await firstRowHeight(page, /urllib3/)).toBeGreaterThanOrEqual(40);
+    expect(await firstRowHeight(page, /urllib3/)).toBeGreaterThanOrEqual(39.5); // sub-pixel layout can give 39.99998
     expect(await firstRowHeight(page, /urllib3/)).toBeLessThan(42);
 
     await toggle.getByRole("button", { name: "Compact" }).click();
     await expect(toggle.getByRole("button", { name: "Compact" })).toHaveAttribute("aria-pressed", "true");
-    expect(await firstRowHeight(page, /urllib3/)).toBeGreaterThanOrEqual(32);
+    expect(await firstRowHeight(page, /urllib3/)).toBeGreaterThanOrEqual(31.5);
     expect(await firstRowHeight(page, /urllib3/)).toBeLessThan(34);
 
     await page.reload();
