@@ -51,7 +51,7 @@ test("the CycloneDX version defaults to 1.6 and is sent on the scan request", as
   await stub(page);
   await page.goto("/#/new");
   await fillIdentity(page);
-  await page.getByText("Advanced scan options").click();
+  await page.getByText("Output format").click();
   await expect(page.getByLabel("CycloneDX version")).toHaveValue("1.6");
   expect(await specVersionSent(page)).toBe("1.6");
 });
@@ -60,7 +60,7 @@ test("choosing CycloneDX 1.7 sends spec_version=1.7", async ({ page }) => {
   await stub(page);
   await page.goto("/#/new");
   await fillIdentity(page);
-  await page.getByText("Advanced scan options").click();
+  await page.getByText("Output format").click();
   await page.getByLabel("CycloneDX version").selectOption("1.7");
   expect(await specVersionSent(page)).toBe("1.7");
 });
@@ -69,7 +69,7 @@ test("the CycloneDX version is hidden and not sent for an SBOM upload (ANALYZE)"
   await stub(page);
   await page.goto("/#/new");
   await fillIdentity(page);
-  await page.getByText("Advanced scan options").click();
+  await page.getByText("Output format").click();
   await page.getByLabel("CycloneDX version").selectOption("1.7");
   await page.getByRole("button", { name: /SBOM upload/i }).click();
   await page.locator("#file").setInputFiles({

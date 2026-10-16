@@ -293,9 +293,9 @@ export function useScanForm({
   const reachabilityOn = showReachability && reachability;
   const securityForced = isAnalyze || deepCveOn || reachabilityOn;
   const showScanOptions =
-    showDeepLicense || showVendored || showByteStable ||
-    showOutboundLicense || showSbomAuthor || showSpecVersion || showDeepCve ||
-    showConformanceProfile || showReachability;
+    showDeepLicense || showVendored || showByteStable || showDeepCve || showReachability;
+  const showFormatOptions =
+    showOutboundLicense || showSbomAuthor || showSpecVersion || showConformanceProfile;
   // Any scan produces an SBOM, so upload is offered for every source.
   // A declaration opens questions before any scan; a credential stashed now
   // would sit on the server if they were cancelled, so it is not offered here.
@@ -570,7 +570,7 @@ export function useScanForm({
     showSbomAuthor,
     showSpecVersion,
     showConformanceProfile,
-    showScanOptions, showUpload,
+    showScanOptions, showFormatOptions, showUpload,
     options, submit,
     capabilities,
   };

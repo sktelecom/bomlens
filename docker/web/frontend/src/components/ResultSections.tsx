@@ -45,6 +45,7 @@ export function ResultSection({
   onResultsChange,
   onResultPatch,
   onRescan,
+  onRescanWithLicense,
 }: {
   section: SectionId;
   result: DoneEvent;
@@ -83,6 +84,8 @@ export function ResultSection({
   onResultPatch?: (patch: Partial<DoneEvent>) => void;
   /** Open the scan again with its settings (the top bar's re-scan). */
   onRescan?: () => void;
+  /** Re-scan from the Licenses section with the outbound-license field in focus. */
+  onRescanWithLicense?: () => void;
 }) {
   const { t } = useTranslation();
 
@@ -156,6 +159,7 @@ export function ResultSection({
           onPickLicense={
             onPick ? (license) => onPick("components", { license }) : undefined
           }
+          onRescanWithLicense={onRescanWithLicense}
         />
       );
 

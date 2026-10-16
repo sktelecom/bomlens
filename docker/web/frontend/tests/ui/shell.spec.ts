@@ -2004,7 +2004,9 @@ test("Licenses section says so when no outbound license was declared", async ({ 
   await page.getByRole("link", { name: /^Licenses/ }).first().click();
 
   await expect(page.getByText("Outbound-license conflicts were not checked")).toBeVisible();
-  await expect(page.getByText(/--license/)).toBeVisible();
+  // The command-line form is folded away; the form route is the visible one.
+  await expect(page.getByText(/Set the license in the New scan form/)).toBeVisible();
+  await expect(page.getByText(/--license/)).toBeHidden();
   await expect(page.getByText(/Conflicts with your outbound license/)).toHaveCount(0);
 });
 

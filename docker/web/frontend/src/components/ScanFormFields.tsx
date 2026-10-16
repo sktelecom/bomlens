@@ -1,7 +1,7 @@
 // Copyright 2026 SK Telecom Co., Ltd.
 // SPDX-License-Identifier: Apache-2.0
 
-import { Loader2, Play, Upload } from "lucide-react";
+import { Loader2, Play, Send, Upload } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -327,23 +327,43 @@ function HfAuthNotice({ state }: { state: ScanFormState }) {
   );
 }
 
+/** Marks an option that sends data off this machine. The same mark sits on
+ *  every such option so a reader can scan the panel for it. */
+export function ExternalMark() {
+  const { t } = useTranslation();
+  return (
+    <span
+      data-testid="external-mark"
+      className="inline-flex items-center gap-1 rounded-full border px-1.5 py-px text-label font-medium text-muted-foreground"
+    >
+      <Send className="h-3 w-3" aria-hidden />
+      {t("newscan.externalMark")}
+    </span>
+  );
+}
+
 /** One label + hint + switch row, shared by the output and scan-option groups. */
 function ToggleRow({
   labelKey,
   checked,
   onChange,
   disabled,
+  external,
 }: {
   labelKey: string;
   checked: boolean;
   onChange: (v: boolean) => void;
   disabled?: boolean;
+  external?: boolean;
 }) {
   const { t } = useTranslation();
   return (
     <label className="flex cursor-pointer items-start justify-between gap-4">
       <span className="space-y-0.5">
-        <span className="block text-body-sm font-medium">{t(`options.${labelKey}`)}</span>
+        <span className="flex flex-wrap items-center gap-x-2 gap-y-1 text-body-sm font-medium">
+          {t(`options.${labelKey}`)}
+          {external && <ExternalMark />}
+        </span>
         <span className="block text-label text-muted-foreground">{t(`options.${labelKey}Hint`)}</span>
       </span>
       <Switch
@@ -378,7 +398,7 @@ export function GenerationOptions({ state }: { state: ScanFormState }) {
   );
 }
 
-/** Scan method: how the source is analyzed (deep license / vendored identification). */
+/** Result quality: how the source is analyzed (deep license / vendored identification / CVE matching). */
 export function ScanOptions({ state }: { state: ScanFormState }) {
   const { t } = useTranslation();
   const {
@@ -392,15 +412,6 @@ export function ScanOptions({ state }: { state: ScanFormState }) {
     setReachability,
     byteStable,
     setByteStable,
-    conformanceProfile,
-    setConformanceProfile,
-    isAnalyze,
-    outboundLicense,
-    setOutboundLicense,
-    sbomAuthor,
-    setSbomAuthor,
-    specVersion,
-    setSpecVersion,
     scanossToken,
     setScanossToken,
     showVendored,
@@ -408,10 +419,6 @@ export function ScanOptions({ state }: { state: ScanFormState }) {
     showDeepCve,
     showReachability,
     showByteStable,
-    showOutboundLicense,
-    showSbomAuthor,
-    showSpecVersion,
-    showConformanceProfile,
     capabilities,
     busy,
   } = state;
@@ -429,6 +436,7 @@ export function ScanOptions({ state }: { state: ScanFormState }) {
             checked={identifyVendored}
             onChange={setIdentifyVendored}
             disabled={busy}
+            external
           />
           {identifyVendored && (
             <div className="space-y-1">
@@ -487,6 +495,31 @@ export function ScanOptions({ state }: { state: ScanFormState }) {
           disabled={busy}
         />
       )}
+    </div>
+  );
+}
+
+/** Output format: which thresholds, license and author the SBOM and its checks carry. */
+export function FormatOptions({ state }: { state: ScanFormState }) {
+  const { t } = useTranslation();
+  const {
+    conformanceProfile,
+    setConformanceProfile,
+    isAnalyze,
+    outboundLicense,
+    setOutboundLicense,
+    sbomAuthor,
+    setSbomAuthor,
+    specVersion,
+    setSpecVersion,
+    showOutboundLicense,
+    showSbomAuthor,
+    showSpecVersion,
+    showConformanceProfile,
+    busy,
+  } = state;
+  return (
+    <div className="space-y-3">
       {showConformanceProfile && (
         <div className="space-y-1.5">
           <Label htmlFor="conformance-profile">{t("options.conformanceProfile")}</Label>
@@ -610,6 +643,7 @@ export function UploadOptions({ state }: { state: ScanFormState }) {
         checked={uploadEnabled}
         onChange={setUploadEnabled}
         disabled={busy}
+        external
       />
       {uploadEnabled && (
         <div className="space-y-3">
