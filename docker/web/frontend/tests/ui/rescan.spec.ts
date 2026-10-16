@@ -130,3 +130,14 @@ test("a plain New scan after a re-scan starts blank (config consumed once)", asy
   await expect(page.locator("#project")).toHaveValue("");
   await expect(page.getByRole("button", { name: "Current folder" })).toHaveAttribute("aria-pressed", "true");
 });
+
+test("the Licenses notice opens the scan form on the outbound-license field", async ({ page }) => {
+  await openScan(page, DONE_WITH_CONFIG);
+  await page.goto("/?ui=next#/scan/demo_2.1/licenses");
+  await page.getByTestId("rescan-with-license").click();
+  const field = page.locator("#outbound-license");
+  await expect(field).toBeVisible();
+  await expect(field).toBeFocused();
+  // The rest of the config is still seeded.
+  await expect(page.locator("#project")).toHaveValue("demo");
+});

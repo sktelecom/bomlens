@@ -6,6 +6,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Disclosure } from "@/components/ui/disclosure";
 import { Card, CardContent } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/state";
 import type { ComponentItem } from "@/lib/api";
@@ -61,6 +63,7 @@ export function Licenses({
   onQueryChange,
   outboundLicense,
   onPickLicense,
+  onRescanWithLicense,
 }: {
   components: ComponentItem[];
   /** Tier filter as carried in the URL — a shared link, a reload, or a tier
@@ -74,6 +77,9 @@ export function Licenses({
   outboundLicense?: string;
   /** Open the Components section filtered to one license id. */
   onPickLicense?: (license: string) => void;
+  /** Open the New scan form on the outbound-license field, so the check can be
+   *  turned on without the command line. Absent where a re-scan is not possible. */
+  onRescanWithLicense?: () => void;
 }) {
   const { t } = useTranslation();
   const fmt = useFormatNumber();
@@ -223,6 +229,29 @@ export function Licenses({
               {t("licenses.conflictOffTitle")}
             </div>
             <p className="text-body-sm text-muted-foreground">{t("licenses.conflictOffHint")}</p>
+            {onRescanWithLicense && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="mt-2"
+                data-testid="rescan-with-license"
+                onClick={onRescanWithLicense}
+              >
+                {t("licenses.conflictOffAction")}
+              </Button>
+            )}
+            <Disclosure
+              className="pt-2"
+              summary={
+                <span className="text-label text-muted-foreground">
+                  {t("licenses.conflictOffCli")}
+                </span>
+              }
+            >
+              <p className="mt-1 text-label text-muted-foreground">
+                {t("licenses.conflictOffCliBody")}
+              </p>
+            </Disclosure>
           </CardContent>
         </Card>
       )}

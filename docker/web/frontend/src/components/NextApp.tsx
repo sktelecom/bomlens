@@ -144,6 +144,8 @@ export function NextApp() {
   // New scan form can seed itself from it. The form reads it once on mount and
   // clears it, so a subsequent plain New scan starts blank.
   const [pendingRescan, setPendingRescan] = useState<ScanConfig | null>(null);
+  // Field the New scan form should focus when it opens from a re-scan prompt.
+  const [pendingFocus, setPendingFocus] = useState<"license" | null>(null);
   // A model described from its declaration: the form's settings wait here while
   // the questions are answered. `saved` is the declaration of a scan being
   // re-run, read when Re-scan was pressed.
@@ -444,8 +446,9 @@ export function NextApp() {
   // "Re-scan": park the finished scan's config and open the New scan form so the
   // user can adjust toggles and run it again (not an immediate re-run). The form
   // consumes the parked config once and clears it.
-  const handleRescan = (config: ScanConfig) => {
+  const handleRescan = (config: ScanConfig, focus?: "license") => {
     setPendingRescan(config);
+    setPendingFocus(focus ?? null);
     savedDeclarationRef.current = undefined;
     // A declared model re-runs from its own declaration: read it now, while the
     // scan it belongs to is the one on screen.
@@ -599,7 +602,11 @@ export function NextApp() {
               capabilities={capabilities}
               onRun={run}
               initialConfig={pendingRescan}
-              onConfigConsumed={() => setPendingRescan(null)}
+              focusField={pendingFocus}
+              onConfigConsumed={() => {
+                setPendingRescan(null);
+                setPendingFocus(null);
+              }}
             />
           )}
         </div>
@@ -667,6 +674,11 @@ export function NextApp() {
             // only from a new scan; the SPDX 3.0.1 band offers the re-scan.
             onRescan={
               result.scanConfig && !IS_STATIC_DEMO ? () => handleRescan(result.scanConfig!) : undefined
+            }
+            onRescanWithLicense={
+              result.scanConfig && !IS_STATIC_DEMO
+                ? () => handleRescan(result.scanConfig!, "license")
+                : undefined
             }
           />
 

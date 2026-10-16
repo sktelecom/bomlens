@@ -68,8 +68,8 @@ test("deep CVE toggle is offered for an SBOM upload when the capability is prese
   await stub(page, { firmware: false, scanoss: false, docker: true, deepCve: true });
   await page.goto("/#/new");
   await selectSbomUpload(page);
-  // Advanced scan options is a collapsed disclosure; expand to reveal the toggle.
-  await page.getByText("Advanced scan options").click();
+  // Result quality is a collapsed disclosure; expand to reveal the toggle.
+  await page.getByText("Result quality").click();
   await expect(page.getByText("Deep CVE matching (NVD CPE)")).toBeVisible();
 });
 
@@ -87,7 +87,7 @@ test("deep CVE toggle is offered for a source scan (current folder) when the cap
   await page.goto("/#/new");
   // Default source is the current folder; open its advanced options.
   await page.locator("#project").waitFor();
-  await page.getByText("Advanced scan options").click();
+  await page.getByText("Result quality").click();
   await expect(page.getByText("Deep CVE matching (NVD CPE)")).toBeVisible();
 });
 
@@ -99,15 +99,16 @@ test("deep CVE toggle stays hidden for firmware upload and an AI model even when
   await page.getByTestId("source-firmware-upload").click();
   // Firmware still has other advanced options (OSV, reproducible output, …),
   // so the disclosure itself renders — just not the deep-CVE row.
-  await page.getByText("Advanced scan options").click();
+  await page.getByText("Result quality").click();
   await expect(page.getByText("Deep CVE matching (NVD CPE)")).toHaveCount(0);
 
   await page.getByTestId("source-ai-model").click();
   // An AI model has no deep-CVE toggle (no package purls to extend), but the
-  // disclosure itself still renders for the SBOM author field: docmeta stamps
-  // an AI model's SBOM same as any other generated one, only ANALYZE is
-  // excluded (see useScanForm.ts's showSbomAuthor).
+  // quality group is folded away; the SBOM author field sits in Output format:
+  // docmeta stamps an AI model's SBOM same as any other generated one, only
+  // ANALYZE is excluded (see useScanForm.ts's showSbomAuthor).
   await expect(page.getByText("Deep CVE matching (NVD CPE)")).toHaveCount(0);
+  await page.getByText("Output format").click();
   await expect(page.getByLabel("SBOM author (optional)")).toBeVisible();
 });
 
@@ -115,7 +116,7 @@ test("running with deep CVE on sends deep_cve=true on the scan request", async (
   await stub(page, { firmware: false, scanoss: false, docker: true, deepCve: true });
   await page.goto("/#/new");
   await selectSbomUpload(page);
-  await page.getByText("Advanced scan options").click();
+  await page.getByText("Result quality").click();
   await page.getByRole("switch", { name: "Deep CVE matching (NVD CPE)" }).click();
 
   const scanReq = page.waitForRequest((req) => req.url().includes("/scan-stream"));
@@ -140,7 +141,7 @@ test("running a source scan with deep CVE on sends deep_cve=true", async ({ page
   await page.goto("/#/new");
   await page.fill("#project", "demo");
   await page.fill("#version", "1.0");
-  await page.getByText("Advanced scan options").click();
+  await page.getByText("Result quality").click();
   await page.getByRole("switch", { name: "Deep CVE matching (NVD CPE)" }).click();
 
   const scanReq = page.waitForRequest((req) => req.url().includes("/scan-stream"));
@@ -174,7 +175,7 @@ test("turning deep CVE on also forces the security report on", async ({ page }) 
   await securitySwitch.click();
   await expect(securitySwitch).toHaveAttribute("aria-checked", "false");
 
-  await page.getByText("Advanced scan options").click();
+  await page.getByText("Result quality").click();
   await page.getByRole("switch", { name: "Deep CVE matching (NVD CPE)" }).click();
 
   // Forced on: reflected back as checked, and disabled like any other

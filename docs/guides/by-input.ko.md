@@ -105,7 +105,7 @@ $SBOM --project team3-dev --version 1.0.0 --all --deep-license --generate-only
 ```
 
 - 패키지 매니저가 있으면(Conan `conanfile.txt` / vcpkg `vcpkg.json`) 의존성이 해석되어 SBOM에 반영됩니다.
-- 순수 CMake/Make 소스는 매니저 메타데이터가 없어 SBOM이 희소할 수 있습니다. 이때는 `--deep-license`로 1st-party 소스의 라이선스 헤더를 보강하는데(후처리 단계는 ScanCode가 들어 있는 `ghcr.io/sktelecom/bomlens-deep-license` 이미지에서 실행되며 이 이미지는 자동으로 받습니다. 받을 수 없으면 라이선스 스캔 없이 기본 이미지로 진행하고, 경고를 출력하며 결과 매니페스트에 이 단계를 `skipped`(`fallback`)로 기록합니다), 빌드 산출물(설치된 라이브러리가 있는 staging/rootfs)은 별도로 `$SBOM --target <build-dir> --all --generate-only`(syft)로 분석합니다. OS rootfs와 애플리케이션, 정적 링크 의존성을 층별로 나눠 만드는 서버 SBOM 전체 흐름은 [서버 SBOM 작성 가이드](server-delivery.ko.md)를 참고하세요. 웹 UI에서는 `--deep-license`가 고급 스캔 옵션의 **라이선스 스캔 (ScanCode)** 토글에 대응합니다. 선언된 의존성이 아니라 내 소스 파일(`/src`)을 스캔하며 느리므로, 파일 단위 라이선스 탐지가 필요할 때만 켜세요.
+- 순수 CMake/Make 소스는 매니저 메타데이터가 없어 SBOM이 희소할 수 있습니다. 이때는 `--deep-license`로 1st-party 소스의 라이선스 헤더를 보강하는데(후처리 단계는 ScanCode가 들어 있는 `ghcr.io/sktelecom/bomlens-deep-license` 이미지에서 실행되며 이 이미지는 자동으로 받습니다. 받을 수 없으면 라이선스 스캔 없이 기본 이미지로 진행하고, 경고를 출력하며 결과 매니페스트에 이 단계를 `skipped`(`fallback`)로 기록합니다), 빌드 산출물(설치된 라이브러리가 있는 staging/rootfs)은 별도로 `$SBOM --target <build-dir> --all --generate-only`(syft)로 분석합니다. OS rootfs와 애플리케이션, 정적 링크 의존성을 층별로 나눠 만드는 서버 SBOM 전체 흐름은 [서버 SBOM 작성 가이드](server-delivery.ko.md)를 참고하세요. 웹 UI에서는 `--deep-license`가 결과 품질 묶음의 **라이선스 스캔 (ScanCode)** 토글에 대응합니다. 선언된 의존성이 아니라 내 소스 파일(`/src`)을 스캔하며 느리므로, 파일 단위 라이선스 탐지가 필요할 때만 켜세요.
 - 패키지 매니저 없이(순수 Make/CMake) 오픈소스를 소스 트리에 통째로 복사(vendored)해 쓰는 경우 — 임베디드와 펌웨어 소스에서 흔합니다 — `--identify-vendored`를 강력히 권장합니다. 이 옵션이 없으면 SBOM이 희소해 내장 라이브러리를 놓치고, 켜면 이들을 CPE가 붙은 이름 있는 구성요소로 탐지해 오픈소스 위험 보고서가 CVE를 연결할 수 있습니다. [내장 오픈소스 식별](identify-vendored.ko.md)을 참고하세요. BomLens는 이 상황을 감지하면 자동으로 이 옵션을 안내하기도 합니다.
 - 패키지 매니저가 없어도 오픈소스 위험 보고서는 생성되며, 탐지된 구성요소의 라이선스와 취약점을 집계합니다.
 
@@ -265,7 +265,7 @@ UI 상단에서 스캔 대상을 고르고 각 형태에 맞게 입력합니다.
 
 이 표는 이 가이드가 다루는 시나리오 기준입니다. 전체 12개 스캔 대상은 [웹 UI 레퍼런스](../reference/ui.ko.md#새-스캔)를 참고하세요.
 
-소스 코드 스캔(현재 폴더, GitHub URL, ZIP 업로드)에서는 **고급 스캔 옵션** 섹션이 어떤 파일을 만들지가 아니라 소스를 어떻게 분석할지를 바꾸는 토글(라이선스 스캔/ScanCode, 파일 단위 식별/SCANOSS)을 제공하며, 둘 다 기본은 꺼져 있습니다. 각 토글이 하는 일과 스캔 대상별 제공 여부는 [웹 UI 레퍼런스](../reference/ui.ko.md#새-스캔)의 고급 스캔 옵션 설명을 참고하세요.
+소스 코드 스캔(현재 폴더, GitHub URL, ZIP 업로드)에서는 **결과 품질** 묶음이 어떤 파일을 만들지가 아니라 소스를 어떻게 분석할지를 바꾸는 토글(라이선스 스캔/ScanCode, 파일 단위 식별/SCANOSS)을 제공하며, 둘 다 기본은 꺼져 있습니다. 각 토글이 하는 일과 스캔 대상별 제공 여부는 [웹 UI 레퍼런스](../reference/ui.ko.md#새-스캔)의 결과 품질 설명을 참고하세요.
 
 실행하면 진행 로그가 실시간으로 표시되고, 완료 후에는 고지문과 SBOM, 오픈소스 위험 보고서를 화면에서 보거나 내려받을 수 있습니다. 적합성 검사 보고서 파일도 내려받을 수 있지만, 판정 화면은 업로드한 SBOM을 분석한 경우(`--analyze`)에만 나타납니다.
 

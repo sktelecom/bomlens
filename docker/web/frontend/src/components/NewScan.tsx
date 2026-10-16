@@ -31,6 +31,7 @@ import { cn } from "@/lib/utils";
 import {
   FieldError,
   FormMessages,
+  FormatOptions,
   GenerationOptions,
   RequiredMark,
   RunButton,
@@ -49,6 +50,9 @@ interface Props {
   /** Called once after `initialConfig` is read so the parent can clear the
    *  pending config — a later plain New scan then starts blank. */
   onConfigConsumed?: () => void;
+  /** Field to open and focus on arrival, for a prompt that sends the reader
+   *  here to fill one in (the Licenses section's outbound-license notice). */
+  focusField?: "license" | null;
 }
 
 const SOURCE_META: Record<SourceType, { labelKey: string; icon: LucideIcon }> = {
@@ -129,6 +133,7 @@ export function NewScan({
   onRun,
   initialConfig,
   onConfigConsumed,
+  focusField,
 }: Props) {
   const { t } = useTranslation();
   const state = useScanForm({ running, capabilities, onRun, initialConfig });
@@ -144,8 +149,8 @@ export function NewScan({
     }
   }, [initialConfig, onConfigConsumed]);
 
-  // How many advanced toggles are on (seeded by a re-scan config). Drives the
-  // disclosure's initial open state and its collapsed badge.
+  // How many toggles are on in each folded group (seeded by a re-scan config).
+  // Drives the disclosure's initial open state and its collapsed badge.
   const scanOptionsOn = [
     state.identifyVendored,
     state.deepLicense,
@@ -153,6 +158,18 @@ export function NewScan({
     state.reachability,
     state.byteStable,
   ].filter(Boolean).length;
+  const formatOptionsOn = [
+    state.outboundLicense.trim() !== "",
+    state.sbomAuthor.trim() !== "",
+    state.specVersion !== "1.6",
+    state.conformanceProfile !== "default",
+  ].filter(Boolean).length;
+
+  // Arriving from a prompt that asks for one field: the field's group is already
+  // open (see `defaultOpen` below), so only the focus is left to move.
+  useEffect(() => {
+    if (focusField === "license") document.getElementById("outbound-license")?.focus();
+  }, [focusField]);
 
   return (
     <div className="space-y-6">
@@ -251,9 +268,11 @@ export function NewScan({
           </Card>
         </div>
 
-        {/* Right: sticky settings panel — identity, outputs, generate. */}
-        <Card className="animate-fade-in lg:sticky lg:top-6">
-          <CardContent className="space-y-5 p-5">
+        {/* Right: sticky settings panel — identity, outputs, then the folded
+            groups scroll inside it while the run action stays pinned below, so
+            opening every group never pushes the button off screen. */}
+        <Card className="flex animate-fade-in flex-col lg:sticky lg:top-6 lg:max-h-[calc(100vh-3rem)]">
+          <CardContent className="min-h-0 flex-1 space-y-5 overflow-y-auto p-5">
             <div className="space-y-3">
               <p className={SECTION_LABEL}>{t("newscan.settings")}</p>
               <div className="space-y-2">
@@ -308,7 +327,7 @@ export function NewScan({
               <GenerationOptions state={state} />
             </div>
 
-            {/* Advanced scan options are how the scan analyzes the source, a
+            {/* The result-quality group is how the scan analyzes the source, a
                 different altitude from the output artifacts above — their own
                 sections, folded by default so the panel fits one viewport.
                 A section seeded with non-default values (re-scan) opens
@@ -327,6 +346,20 @@ export function NewScan({
               </PanelDisclosure>
             )}
 
+            {state.showFormatOptions && (
+              <PanelDisclosure
+                label={t("newscan.formatOptions")}
+                badge={
+                  formatOptionsOn > 0
+                    ? t("newscan.enabledCount", { n: formatOptionsOn })
+                    : undefined
+                }
+                defaultOpen={formatOptionsOn > 0 || focusField === "license"}
+              >
+                <FormatOptions state={state} />
+              </PanelDisclosure>
+            )}
+
             {state.showUpload && (
               <PanelDisclosure
                 label={t("newscan.upload")}
@@ -336,12 +369,12 @@ export function NewScan({
                 <UploadOptions state={state} />
               </PanelDisclosure>
             )}
-
-            <div className="space-y-3 border-t pt-4">
-              <FormMessages state={state} />
-              <RunButton state={state} running={running} />
-            </div>
           </CardContent>
+
+          <div className="space-y-3 border-t bg-card p-5">
+            <FormMessages state={state} />
+            <RunButton state={state} running={running} />
+          </div>
         </Card>
       </div>
     </div>

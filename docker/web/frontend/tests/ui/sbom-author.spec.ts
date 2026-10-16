@@ -53,7 +53,7 @@ test("SBOM author field is offered for a source scan", async ({ page }) => {
   await stub(page);
   await page.goto("/#/new");
   await page.locator("#project").waitFor();
-  await page.getByText("Advanced scan options").click();
+  await page.getByText("Output format").click();
   await expect(page.getByLabel("SBOM author (optional)")).toBeVisible();
 });
 
@@ -63,7 +63,7 @@ test("SBOM author field is hidden for an SBOM upload (ANALYZE)", async ({ page }
   await selectSbomUpload(page);
   // Other advanced options remain (deep CVE, byte-stable, …), so the
   // disclosure itself still renders, just not this field.
-  await page.getByText("Advanced scan options").click();
+  await page.getByText("Output format").click();
   await expect(page.getByLabel("SBOM author (optional)")).toHaveCount(0);
 });
 
@@ -72,7 +72,7 @@ test("running with an SBOM author sends it on the scan request", async ({ page }
   await page.goto("/#/new");
   await page.fill("#project", "demo");
   await page.fill("#version", "1.0");
-  await page.getByText("Advanced scan options").click();
+  await page.getByText("Output format").click();
   await page.getByLabel("SBOM author (optional)").fill("SK Telecom Co., Ltd.");
 
   const scanReq = page.waitForRequest((req) => req.url().includes("/scan-stream"));
@@ -98,7 +98,7 @@ test("an SBOM author typed before switching to SBOM upload is not sent (field hi
   await page.goto("/#/new");
   await page.fill("#project", "demo");
   await page.fill("#version", "1.0");
-  await page.getByText("Advanced scan options").click();
+  await page.getByText("Output format").click();
   await page.getByLabel("SBOM author (optional)").fill("Should not reach ANALYZE");
 
   await selectSbomUpload(page);
