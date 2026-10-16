@@ -24,6 +24,8 @@ on:
     paths:
       - docs/**
       - overrides/**
+      - hooks/**
+      - docker/shared/bomlens-tokens.css
       - mkdocs.yml
       - .github/workflows/docs.yml
       - docker/web/frontend/**
@@ -33,6 +35,8 @@ on:
     paths:
       - docs/**
       - overrides/**
+      - hooks/**
+      - docker/shared/bomlens-tokens.css
       - mkdocs.yml
       - .github/workflows/docs.yml
       - docker/web/frontend/**
