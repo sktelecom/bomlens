@@ -155,7 +155,7 @@ codesign --force --deep -s - /Applications/BomLens.app
 ![스캔 결과 개요 — 컴포넌트, 취약점, 라이선스 요약](../images/web-ui-scan.png)
 
 스캔이 끝나면 결과 화면에서 고지문을 포맷별 칩(`HTML`, `TXT`)으로 내려받습니다. 함께 만들어진
-SBOM(`..._bom.json`)과 위험분석 보고서(`..._risk-report.html`)도 같은 화면에서 받을 수 있고,
+SBOM(`..._bom.json`)과 오픈소스 위험 보고서(`..._risk-report.html`)도 같은 화면에서 받을 수 있고,
 전체를 ZIP 하나로 한 번에 받을 수도 있습니다. 내려받은 파일은 결과 폴더에도 저장됩니다.
 각 파일이 무엇이고 언제 생기는지는 [산출물 레퍼런스](../reference/artifacts.ko.md)를 참고하세요.
 

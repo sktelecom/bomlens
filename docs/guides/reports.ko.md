@@ -65,11 +65,11 @@ MyApp_1.0.0_NOTICE.html         # 고지문 (HTML)
 MyApp_1.0.0_security.json       # 보안보고서 (Trivy 원본)
 MyApp_1.0.0_security.md         # 보안보고서 (요약)
 MyApp_1.0.0_security.html       # 보안보고서 (시각화)
-MyApp_1.0.0_risk-report.md      # 오픈소스위험분석보고서 (요약)
-MyApp_1.0.0_risk-report.html    # 오픈소스위험분석보고서 (시각화)
+MyApp_1.0.0_risk-report.md      # 오픈소스 위험 보고서 (요약)
+MyApp_1.0.0_risk-report.html    # 오픈소스 위험 보고서 (시각화)
 ```
 
-> 오픈소스위험분석보고서(`_risk-report`)는 모든 분석 모드에서 기본 생성됩니다(라이선스+취약점 집계, 대응 기한 포함). 생략하려면 `--no-report`를 쓰세요. 7가지 입력 형태별 처리는 [시나리오별 가이드](by-input.ko.md)를 참고하세요.
+> 오픈소스 위험 보고서(`_risk-report`)는 모든 분석 모드에서 기본 생성됩니다(라이선스+취약점 집계, 대응 기한 포함). 생략하려면 `--no-report`를 쓰세요. 7가지 입력 형태별 처리는 [시나리오별 가이드](by-input.ko.md)를 참고하세요.
 
 산출물 종류 전체 목록은 [산출물 레퍼런스](../reference/artifacts.ko.md)를, 웹 UI로 만들려면 [웹 UI](../reference/ui.ko.md)를 참고하세요.
 
@@ -176,7 +176,7 @@ scancode는 무겁고 느려서(대형 저장소는 수 분에서 수십 분) �
 > SBOM_SCANNER_IMAGE=ghcr.io/sktelecom/bomlens-deep-license:latest ./scripts/scan-sbom.sh --ui
 > ```
 
-프로젝트 자체 파일만 검사합니다. 의존성 폴더(`node_modules`, `vendor`, 가상 환경), 빌드 결과물, 도구 폴더는 라이선스를 패키지 관리자에서 얻으므로 제외합니다. 검사 대상 파일이 20,000개를 넘는 트리는 검사하지 않고, scancode는 600초가 지나면 멈춥니다. 한도는 `DEEP_LICENSE_MAX_FILES`와 `DEEP_LICENSE_TIMEOUT`으로 바꿀 수 있습니다([Docker 이미지 환경 변수](../reference/docker-image.ko.md#환경-변수)). 어느 경우든 로그와 실행 [결과 매니페스트](../reference/engine-contract.ko.md)에 남습니다.
+프로젝트 자체 파일만 검사합니다. 의존성 폴더(`node_modules`, `vendor`, 가상 환경), 빌드 산출물, 도구 폴더는 라이선스를 패키지 관리자에서 얻으므로 제외합니다. 검사 대상 파일이 20,000개를 넘는 트리는 검사하지 않고, scancode는 600초가 지나면 멈춥니다. 한도는 `DEEP_LICENSE_MAX_FILES`와 `DEEP_LICENSE_TIMEOUT`으로 바꿀 수 있습니다([Docker 이미지 환경 변수](../reference/docker-image.ko.md#환경-변수)). 어느 경우든 로그와 실행 [결과 매니페스트](../reference/engine-contract.ko.md)에 남습니다.
 
 추가 산출물: `MyApp_1.0.0_scancode.json`
 
@@ -190,7 +190,7 @@ scancode는 무겁고 느려서(대형 저장소는 수 분에서 수십 분) �
 ./scripts/scan-sbom.sh --project "MyApp" --version "1.0.0" --license Apache-2.0 --all --generate-only
 ```
 
-선언한 값은 SBOM 루트 컴포넌트에 기록되고, 위험분석보고서에 충돌 절이 생깁니다. SBOM에 이미 있는 루트 라이선스(공급사가 선언한 값)는 덮어쓰지 않습니다. 판정을 읽는 방법은 [보고서 읽는 법](../concepts/reports-explained.ko.md#배포-라이선스-충돌)을 참고하세요.
+선언한 값은 SBOM 루트 컴포넌트에 기록되고, 오픈소스 위험 보고서에 충돌 절이 생깁니다. SBOM에 이미 있는 루트 라이선스(공급사가 선언한 값)는 덮어쓰지 않습니다. 판정을 읽는 방법은 [보고서 읽는 법](../concepts/reports-explained.ko.md#배포-라이선스-충돌)을 참고하세요.
 
 ---
 

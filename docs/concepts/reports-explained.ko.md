@@ -1,5 +1,5 @@
 ---
-description: BomLens가 만드는 오픈소스 고지문과 보안 보고서, 오픈소스위험분석보고서를 읽고 해석하는 방법을 다룹니다.
+description: BomLens가 만드는 오픈소스 고지문과 보안 보고서, 오픈소스 위험 보고서를 읽고 해석하는 방법을 다룹니다.
 ---
 
 # 보고서 읽는 법
@@ -80,9 +80,9 @@ BomLens는 각 컴포넌트의 릴리스 주기가 상위(upstream) 지원 종�
 - Critical 발견 시 빌드를 실패시키는 게이트 예시는 [CI/CD 연동](../guides/ci-cd.ko.md)을 참고하세요.
 - 오탐(실제 영향 없음) 판단, 예외 승인, 이력 관리 같은 취약점 분류 업무는 BomLens의 범위를 넘습니다. 취약점 관리 시스템(Dependency-Track, TRUSCA 등)에 SBOM을 업로드해 처리하세요.
 
-## 오픈소스위험분석보고서
+## 오픈소스 위험 보고서
 
-오픈소스위험분석보고서는 취약점을 심각도별로 집계하고 권고 대응 기한(Critical 7일, High 30일)을 명시합니다. 라이선스 요약도 담고 있으며, 공급사 SBOM을 분석한 경우에는 포맷 적합성 결과가 더해집니다.
+오픈소스 위험 보고서는 취약점을 심각도별로 집계하고 권고 대응 기한(Critical 7일, High 30일)을 명시합니다. 라이선스 요약도 담고 있으며, 공급사 SBOM을 분석한 경우에는 적합성 검사 결과가 더해집니다.
 
 라이선스 요약에는 카피레프트 강도에 따른 컴포넌트 분류도 함께 담기며, 웹 UI가 보여 주는 분류와 같은 기준을 사용합니다. SBOM의 각 컴포넌트에는 `bomlens:licenseClass` 속성이 `network-copyleft`(AGPL), `strong-copyleft`(GPL), `weak-copyleft`(LGPL, MPL, EPL, 데이터셋·AI 모델의 경우 CC-BY-SA), `permissive`(MIT, Apache-2.0, BSD, 일반 CC-BY), `uncategorized` 중 하나로 기록되고, 보고서에는 분류별 개수와 카피레프트 노출을 만드는 컴포넌트 목록이 더해집니다. 인식되지 않은 라이선스는 permissive로 간주하지 않고 `uncategorized`로 남겨 사람이 확인하도록 합니다.
 

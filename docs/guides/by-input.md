@@ -15,9 +15,9 @@ An open-source compliance manager receives deliverables from many teams in diffe
 | Open-source notice | `{Project}_{Version}_NOTICE.{txt,html}` | the notice that satisfies license obligations |
 | SBOM | `{Project}_{Version}_bom.json` | CycloneDX 1.6 component inventory (1.7 with `--spec-version 1.7`) |
 | Open-source risk report | `{Project}_{Version}_risk-report.{md,html}` | aggregated license + vulnerability risk (with deadlines) |
-| Conformance report | `{Project}_{Version}_conformance.{json,md,html}` | whether the SBOM meets the submission quality criteria, and what is missing |
+| Conformance check report | `{Project}_{Version}_conformance.{json,md,html}` | whether the SBOM meets the submission quality criteria, and what is missing |
 
-The conformance report's file is always produced, but the web UI only shows it as a dedicated pass/fail screen when the input being checked is a supplied SBOM (the `--analyze` path); a self-generated SBOM grading itself is not a meaningful pass/fail signal for most of its checks. For a self-generated scan, open the file directly, or feed the output back in with `--analyze` to see it on screen. See [Reading the conformance report](supplier-sbom.md#reading-the-conformance-report).
+The conformance check report's file is always produced, but the web UI only shows it as a dedicated pass/fail screen when the input being checked is a supplied SBOM (the `--analyze` path); a self-generated SBOM grading itself is not a meaningful pass/fail signal for most of its checks. For a self-generated scan, open the file directly, or feed the output back in with `--analyze` to see it on screen. See [Reading the conformance check report](supplier-sbom.md#reading-the-conformance-check-report).
 
 For any input form, adding `--all --generate-only` produces all four at once (they are on by default and are only turned off with `--no-report`).
 
@@ -43,7 +43,7 @@ SBOM=/path/to/bomlens/scripts/scan-sbom.sh
 
 | Input form | Mode | Core command (summary) | Deliverables |
 |------------|------|------------------------|--------------|
-| GitHub URL | SOURCE | `$SBOM --git <url> --all --generate-only` | notice, SBOM, risk report, conformance report |
+| GitHub URL | SOURCE | `$SBOM --git <url> --all --generate-only` | notice, SBOM, risk report, conformance check report |
 | Source ZIP | SOURCE | `$SBOM --target app.zip --all --generate-only` | same |
 | Local directory (C/C++) | SOURCE | `cd dir && $SBOM --all --generate-only` | same |
 | Existing SBOM JSON | ANALYZE | `$SBOM --analyze sbom.json --generate-only` | same, but the SBOM is the converted input rather than freshly generated |
@@ -93,7 +93,7 @@ $SBOM --project team2-app --version 1.0.0 \
 - Supported: `.zip`, `.tar.gz`, `.tgz`, `.tar.bz2`, `.tar.xz`, `.tar`
 - It is extracted to a temp directory after a zip-slip (path-escape) check; a single top-level folder is entered automatically.
 
-**Deliverables**: notice, SBOM, risk report, conformance report (four)
+**Deliverables**: notice, SBOM, risk report, conformance check report (four)
 
 ## Scenario 3 — Local C/C++ source directory
 
@@ -109,7 +109,7 @@ $SBOM --project team3-dev --version 1.0.0 --all --deep-license --generate-only
 - When the source has no package manager (plain Make/CMake) and bundles open source copied straight into the tree — common for embedded and firmware sources — `--identify-vendored` is strongly recommended. Without it the SBOM stays sparse and misses the bundled libraries; with it they are detected as named components with CPEs, so the risk report can match CVEs. See [Identify bundled open source](identify-vendored.md). BomLens also nudges you toward this option automatically when it detects this situation.
 - Even without a package manager, the risk report is still generated, aggregating licenses and vulnerabilities of detected components.
 
-**Deliverables**: notice, SBOM, risk report, conformance report (four)
+**Deliverables**: notice, SBOM, risk report, conformance check report (four)
 
 ## Scenario 4 — Existing SBOM JSON
 
@@ -124,9 +124,9 @@ $SBOM --project team4-proj --version 2.0.0 \
 
 - CycloneDX (JSON or XML) and SPDX (JSON/Tag-Value) are accepted and converted to CycloneDX internally. SPDX RDF/XML is not supported yet.
 - `--analyze` turns on notice and security automatically, so you do not need `--all`.
-- A format conformance report (`_conformance.{json,md,html}`) is also produced, and the first section of the risk report includes the conformance result (whether required fields are present). For what counts as a `fail` vs. a `warn`, see [Reading the conformance report](supplier-sbom.md#reading-the-conformance-report) in the supplier SBOM guide.
+- A conformance check report (`_conformance.{json,md,html}`) is also produced, and the first section of the risk report includes the conformance result (whether required fields are present). For what counts as a `fail` vs. a `warn`, see [Reading the conformance check report](supplier-sbom.md#reading-the-conformance-check-report) in the supplier SBOM guide.
 
-**Deliverables**: notice, SBOM (converted), risk report, conformance report
+**Deliverables**: notice, SBOM (converted), risk report, conformance check report
 
 ## Scenario 5 — Yocto build directory
 
@@ -146,7 +146,7 @@ $SBOM --project team5-image --version 1.0.0 \
 - In the web UI, pick the folder with the **Directory / rootfs** input (mount it with `--ui --mount ~/poky/build`, or use Add folder in the desktop app) — the same detection runs there.
 - For the full behavior and its limits, see the [Yocto section of the supplier SBOM guide](supplier-sbom.md#yocto-images).
 
-**Deliverables**: notice, SBOM, risk report, conformance report
+**Deliverables**: notice, SBOM, risk report, conformance check report
 
 ## Scenario 6 — Firmware binary
 
@@ -162,7 +162,7 @@ $SBOM --project team6-fw --version 1.0.0 \
 - Recognized extensions (`.bin/.img/.squashfs/.ubi/...`) are auto-detected even without `--firmware`, but being explicit is recommended.
 - For behavior and limits, see the [firmware analysis guide](../guides/firmware.md).
 
-**Deliverables**: notice, SBOM, risk report, conformance report (four)
+**Deliverables**: notice, SBOM, risk report, conformance check report (four)
 
 ## Scenario 7 — AI model (HuggingFace)
 
@@ -236,7 +236,7 @@ Deliverables are the same as Scenario 7's, minus what the model card would have 
 - **Notice (NOTICE)**: components grouped by license. Use it to satisfy the obligation to include or disclose notices when distributing.
 - **SBOM**: CycloneDX 1.6 by default, or 1.7 with `--spec-version 1.7`. The artifact you upload to a vulnerability-management system.
 - **Open-source risk report**: aggregates vulnerabilities by severity with recommended deadlines (Critical 7 days, High 30 days). Includes a license summary and the format conformance result.
-- **Conformance report**: the per-item check of whether the SBOM meets the submission quality criteria (required fields, PURL coverage, transitive dependencies, and more). The file is produced by default alongside the other three; the web UI shows it as a screen only on the `--analyze` path (see above). See [Reading the conformance report](supplier-sbom.md#reading-the-conformance-report) in the supplier SBOM guide.
+- **Conformance check report**: the per-item check of whether the SBOM meets the submission quality criteria (required fields, PURL coverage, transitive dependencies, and more). The file is produced by default alongside the other three; the web UI shows it as a screen only on the `--analyze` path (see above). See [Reading the conformance check report](supplier-sbom.md#reading-the-conformance-check-report) in the supplier SBOM guide.
 
 ## All at once in the web UI
 
@@ -267,7 +267,7 @@ This table lists what the input scenarios in this guide cover; the full set (12 
 
 For source-code scans (current folder, GitHub URL, ZIP upload), an **Advanced scan options** section offers toggles (License scan / ScanCode, File-level identification / SCANOSS) that change how the source is analyzed rather than which files are produced, both off by default. See [Advanced scan options](../reference/ui.md#new-scan) in the Web UI reference for what each one does and per-target availability.
 
-As it runs, logs stream live; when done you can view or download the notice, SBOM, and risk report. The conformance report file is downloadable too; its pass/fail screen only appears when the input was an uploaded SBOM (`--analyze`) rather than a fresh scan.
+As it runs, logs stream live; when done you can view or download the notice, SBOM, and risk report. The conformance check report file is downloadable too; its pass/fail screen only appears when the input was an uploaded SBOM (`--analyze`) rather than a fresh scan.
 
 > The firmware upload tab appears automatically whenever the Docker engine is running. See the
 > [firmware guide](firmware.md) for how it works and how to point it at a different image tag.

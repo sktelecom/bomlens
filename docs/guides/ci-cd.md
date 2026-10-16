@@ -6,7 +6,7 @@ description: Integrate the scanner into CI so the SBOM refreshes on every build 
 
 An SBOM is a point-in-time snapshot of dependencies, so it must be regenerated whenever dependencies change to stay in sync with the code. In CI it refreshes on every build and release, attaches to release artifacts, and becomes the basis for a vulnerability policy gate.
 
-> **Important**: a scan reports vulnerabilities and exits successfully unless you ask it to gate. `--fail-on` makes the scan itself exit non-zero when a condition you name is met (exit 4), or cannot be judged from what the scan produced (exit 5): a finding at a severity or worse, a known malicious package, a license conflict, a scan that found no software (`empty-result`), or license coverage below a percentage you set (`license-coverage=<0-100>`). `--fail-on-conformance` does the same for the conformance report (exit 2). See [Exit codes](../reference/cli.md#exit-codes). No separate step that inspects the report files is needed.
+> **Important**: a scan reports vulnerabilities and exits successfully unless you ask it to gate. `--fail-on` makes the scan itself exit non-zero when a condition you name is met (exit 4), or cannot be judged from what the scan produced (exit 5): a finding at a severity or worse, a known malicious package, a license conflict, a scan that found no software (`empty-result`), or license coverage below a percentage you set (`license-coverage=<0-100>`). `--fail-on-conformance` does the same for the conformance check report (exit 2). See [Exit codes](../reference/cli.md#exit-codes). No separate step that inspects the report files is needed.
 
 To reduce load, split depth by trigger: on PRs generate the SBOM quickly (`--generate-only --no-report`); on `main` and releases generate everything (`--all --generate-only`) and apply the gate.
 
@@ -58,7 +58,7 @@ jobs:
             --all --generate-only --fail-on-conformance \
             --fail-on vulnerability=critical --fail-on malicious-package
 
-      # The scan above already failed this step if the conformance report says
+      # The scan above already failed this step if the conformance check report says
       # "fail" (exit 2), if a Critical finding or a malicious package was found
       # (exit 4), or if either could not be judged (exit 5). Add
       # `--license <SPDX id> --fail-on license-conflict` to gate on license
@@ -95,7 +95,7 @@ generate-sbom:
         --version "$CI_COMMIT_SHA"
         --all --generate-only --fail-on-conformance
         --fail-on vulnerability=critical --fail-on malicious-package
-    # The scan already fails this job: exit 2 if the conformance report says
+    # The scan already fails this job: exit 2 if the conformance check report says
     # "fail", 4 if a Critical finding or a malicious package was found, 5 if
     # either could not be judged. Outputs land in a {project}_{version}/
     # subfolder (see the CLI reference), hence the */ globs below.

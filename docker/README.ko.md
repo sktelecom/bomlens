@@ -168,7 +168,7 @@ docker buildx imagetools inspect ghcr.io/sktelecom/bomlens:latest
 
 2-스테이지 빌드입니다. 언어 toolchain은 넣지 않습니다. 소스 코드의 SBOM 생성은 `scan-sbom.sh`가 cdxgen 언어별 공식 이미지를 그때그때 받아 위임하고, 이 이미지는 후처리와 스캔을 담당합니다.
 
-- 스테이지 1 (`node:26-alpine`): 웹 UI(React SPA)를 빌드합니다. node는 이 스테이지에만 있고 결과물 `dist/`만 런타임으로 복사됩니다.
+- 스테이지 1 (`node:26-alpine`): 웹 UI(React SPA)를 빌드합니다. node는 이 스테이지에만 있고 빌드 산출물 `dist/`만 런타임으로 복사됩니다.
 - 스테이지 2 (`python:3.12-slim`): 실행 이미지입니다. syft(이미지/바이너리/RootFS 스캔), Trivy(보안 보고서), cosign(서명), docker CLI(웹 UI 소스 스캔이 cdxgen 형제 컨테이너를 띄울 때 사용), 그리고 entrypoint와 후처리 스크립트가 들어갑니다.
 
 도구 버전은 `Dockerfile`의 `ARG`로 고정되며 Renovate가 업스트림 릴리스를 추적해 갱신 PR을 엽니다.

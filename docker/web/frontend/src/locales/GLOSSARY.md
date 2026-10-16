@@ -47,5 +47,7 @@ Permissive, Weak copyleft, Strong copyleft, Network copyleft, Uncategorized, Rev
 | 인벤토리, 컴플라이언스 | 레일 묶음 이름 | 음차어이나 레일 폭과 시각 기준선에 걸려 이 변경에서는 유지, 후속 후보 |
 | 적합 / 부적합 | 판정 표시 | 정본 유지 (검사 결과 값) |
 | 형식 적합성 / Format conformance | G7 화면 소제목 | 정본 유지 (검사 항목의 한 갈래) |
+| 포맷 검증 / Format validation | 적합성 검사의 옛 이름(셸 보고서 제목) | 적합성 검사로 정리 |
+| Supplier SBOM risk report | 공급사 검토용 보고서 제목 | 오픈소스 위험 보고서와 부제로 정리 |
 
-보고서를 만드는 셸 스크립트의 제목은 UI 문구와 따로 관리되며 이 용어집과 다른 곳이 남아 있다(`docker/lib/generate-risk-report.sh`, `docker/lib/validate-sbom.sh`, `docker/lib/i18n/report-strings.ko.json`). 맞추는 작업은 별도 변경으로 한다.
+보고서를 만드는 셸 스크립트(`docker/lib/generate-risk-report.sh`, `docker/lib/validate-sbom.sh`)와 `docker/lib/i18n/report-strings.ko.json`의 제목도 이 용어집을 따른다. 새 보고서 문구를 추가할 때는 같은 이름을 쓴다.
