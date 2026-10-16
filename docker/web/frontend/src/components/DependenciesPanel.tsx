@@ -10,6 +10,7 @@ import { SELECTED_SOLID } from "@/components/ui/selectable";
 import { ErrorState, LoadingState } from "@/components/ui/state";
 import type { ComponentItem } from "@/lib/api";
 import { severityFor, vulnSeverityIndex } from "@/lib/dependencies";
+import { defaultDependencyView, type DependencyView } from "@/lib/graphView";
 import { dependenciesFromQuery } from "@/lib/section-query";
 import { loadSbom, parseSbomGraph, type SbomGraph } from "@/lib/sbomGraph";
 import type { RouteQuery } from "@/lib/route";
@@ -17,8 +18,6 @@ import { cn } from "@/lib/utils";
 
 import { DependencyGraph } from "./DependencyGraph";
 import { DependencyTree } from "./DependencyTree";
-
-type View = "graph" | "tree";
 
 /**
  * Fetches the raw `_bom.json` (lazily, when its tab opens), parses the
@@ -45,13 +44,15 @@ export function DependenciesPanel({
   const [graph, setGraph] = useState<SbomGraph | null>(null);
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
   const focus = dependenciesFromQuery(query);
-  // A jump always means "show me the tree", even if Graph was left open from
-  // a previous visit: the graph has no equivalent jump-and-expand.
-  const [view, setView] = useState<View>(focus ? "tree" : "graph");
+  // The reader's own pick, once made. Until then the view follows the size of
+  // the graph (see defaultDependencyView), which is only known after the SBOM
+  // has loaded. A jump always means "show me the tree", even if Graph was left
+  // open from a previous visit: the graph has no equivalent jump-and-expand.
+  const [picked, setPicked] = useState<DependencyView | null>(focus ? "tree" : null);
   const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
-    if (focus) setView("tree");
+    if (focus) setPicked("tree");
     // Only react to the focus target itself changing, not every re-render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [focus?.name, focus?.version]);
@@ -89,6 +90,11 @@ export function DependenciesPanel({
     );
   }
 
+  const view: DependencyView = picked ?? defaultDependencyView(graph.nodes.length, false);
+  // The tree opened because the graph would be a tangle, not because anyone
+  // asked for it: say so, so the missing graph is not mistaken for a fault.
+  const autoTree = picked === null && view === "tree" && graph.edges.length > 0;
+
   return (
     <div className="space-y-3">
       <div className="inline-flex rounded-md border p-0.5">
@@ -99,7 +105,7 @@ export function DependenciesPanel({
           data-testid="deps-view-graph"
           aria-pressed={view === "graph"}
           className={cn(view === "graph" && SELECTED_SOLID)}
-          onClick={() => setView("graph")}
+          onClick={() => setPicked("graph")}
         >
           <GitFork className="h-4 w-4" />
           {t("deps.viewGraph")}
@@ -111,12 +117,18 @@ export function DependenciesPanel({
           data-testid="deps-view-tree"
           aria-pressed={view === "tree"}
           className={cn(view === "tree" && SELECTED_SOLID)}
-          onClick={() => setView("tree")}
+          onClick={() => setPicked("tree")}
         >
           <ListTree className="h-4 w-4" />
           {t("deps.viewTree")}
         </Button>
       </div>
+
+      {autoTree && (
+        <p className="text-body-sm text-muted-foreground" data-testid="deps-auto-tree-note">
+          {t("deps.autoTreeNote", { count: graph.nodes.length })}
+        </p>
+      )}
 
       {view === "graph" ? (
         <DependencyGraph nodes={graph.nodes} edges={graph.edges} />

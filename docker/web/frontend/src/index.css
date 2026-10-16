@@ -404,6 +404,23 @@
   }
 }
 
+/* Row density of the result tables (see lib/tableDensity.ts). A data row is
+   at least 32px (compact) or 40px (comfortable) tall; a row whose content
+   wraps, such as a CVE title, grows past that. Cells that span columns (the
+   expanded detail, a package header, a recycled-chunk spacer) keep their own
+   padding. */
+.table-density-compact td:not([colspan]) {
+  height: 2rem;
+  padding-top: 0.25rem;
+  padding-bottom: 0.25rem;
+}
+
+.table-density-comfortable td:not([colspan]) {
+  height: 2.5rem;
+  padding-top: 0.5rem;
+  padding-bottom: 0.5rem;
+}
+
 /* Syntax highlighting for the source viewer.
  *
  * Only the classes highlight.js actually emits for the grammars bundled here,
