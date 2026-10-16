@@ -177,7 +177,7 @@ try {
         -BatArgs '--project WinApp --version 0.0.1 --generate-only' -Cwd $proj
     $bom = Join-Path $proj 'WinApp_0.0.1\WinApp_0.0.1_bom.json'
     if ($r.TimedOut) { Failed 'scan-sbom.bat 스캔이 시간 안에 끝나지 않았습니다.' }
-    elseif ($r.ExitCode -eq 0 -and $r.Output -match 'Analysis Complete' -and (Test-Path $bom)) {
+    elseif ($r.ExitCode -eq 0 -and $r.Output -match 'Analysis (Complete|finished)' -and (Test-Path $bom)) {
         Pass "cmd → bash → docker 전 구간 완주, SBOM 이 호스트에 생성됨: $bom"
     } else {
         Failed "scan-sbom.bat 스캔 실패 (exit=$($r.ExitCode), bom=$(Test-Path $bom)):`n$($r.Output)"

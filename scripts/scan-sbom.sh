@@ -905,8 +905,28 @@ if [ "$UI_MODE" = "true" ]; then
     echo "=========================================="
     echo "  BomLens Web UI — http://localhost:${UI_PORT}  (Ctrl+C to stop)"
     echo "=========================================="
-    ( sleep 2; (command -v open >/dev/null 2>&1 && open "http://localhost:${UI_PORT}") \
-        || (command -v xdg-open >/dev/null 2>&1 && xdg-open "http://localhost:${UI_PORT}") ) >/dev/null 2>&1 &
+    # Open the browser once the server answers (the first start can take about a
+    # minute while the image is extracted). Without curl or wget, fall back to a
+    # fixed short wait. After 120 s with no answer the browser is left alone.
+    (
+        UI_URL="http://localhost:${UI_PORT}"
+        ui_ready() {
+            if command -v curl >/dev/null 2>&1; then curl -fs -o /dev/null --max-time 2 "$UI_URL"
+            elif command -v wget >/dev/null 2>&1; then wget -q -O /dev/null -T 2 "$UI_URL"
+            else sleep 2; return 0; fi
+        }
+        n=0
+        until ui_ready; do
+            n=$((n+1))
+            if [ "$n" -ge 120 ]; then
+                echo "  The web UI is still starting. Open $UI_URL in your browser when it is ready."
+                exit 0
+            fi
+            sleep 1
+        done
+        (command -v open >/dev/null 2>&1 && open "$UI_URL") \
+            || (command -v xdg-open >/dev/null 2>&1 && xdg-open "$UI_URL")
+    ) 2>/dev/null &
     # -it only when attached to a terminal: docker refuses -t without one
     # (CI, pipes), and Ctrl+C passthrough is moot there anyway.
     TTY_FLAGS=()
@@ -3078,8 +3098,11 @@ summary_line() {  # <label> <file> [more files…] — prints iff the first exis
 missing=""
 note_missing() { missing="${missing:+$missing }$1"; }
 
-echo "=========================================="
-echo "  Analysis Complete!"
+# The heading depends on whether anything requested is missing, which is only
+# known after the lines below are decided, so they are buffered first. A group
+# (not a subshell) keeps note_missing's variable.
+SUMMARY_BUF="$(mktemp)"
+{
 if [ "$GENERATE_ONLY" = "true" ]; then
     P="${SAFE_PROJECT}_${SAFE_VERSION}"
     echo "  Output dir: ${OUTPUT_HOST_DIR}"
@@ -3145,6 +3168,15 @@ if [ "$GENERATE_ONLY" = "true" ]; then
         echo "  Otherwise the step degraded — check the log above for its warning."
     fi
 fi
+} > "$SUMMARY_BUF"
+echo "=========================================="
+if [ -n "$missing" ]; then
+    echo "  Analysis finished with errors"
+else
+    echo "  Analysis Complete!"
+fi
+cat "$SUMMARY_BUF"
+rm -f "$SUMMARY_BUF"
 # What the result holds, in every mode: the numbers come from the scan's own
 # measurement (validate-sbom.sh), not from a count made here. Absent (an older
 # image, an AI SBOM) it prints nothing.

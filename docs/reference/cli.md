@@ -201,7 +201,7 @@ To restore the previous flat layout, where every file is written directly in the
 
 ## What the scan prints at the end
 
-With `--generate-only`, the CLI lists the files it produced after `Analysis Complete!`. For every scan that measured software (not an AI model or dataset scan) it then states what the result holds:
+With `--generate-only`, the CLI lists the files it produced after `Analysis Complete!`. If a requested file was not produced, the heading reads `Analysis finished with errors` instead and a warning names the missing files; the exit code stays 0, so use `--fail-on` to stop a pipeline on a scan that could not be judged. For every scan that measured software (not an AI model or dataset scan) it then states what the result holds:
 
 ```
   Components:  176 identified (purl on 100%, license declared on 96% (169 of 176))
