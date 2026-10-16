@@ -4,8 +4,9 @@
 import AxeBuilder from "@axe-core/playwright";
 import { test, expect, type Page } from "@playwright/test";
 
+import { AI_DONE, AI_SBOM, DONE as SOURCE_DONE, SBOM as SOURCE_SBOM } from "./fixtures";
 import { waitForSettled } from "./settle";
-import { seedThemeLang } from "./visual";
+import { COMBOS, seedThemeLang } from "./visual";
 
 // Findings an adversarial pass turned up that the existing checks did not cover.
 // The accessibility scan ran on one result screen in light mode only, so a badge
@@ -226,3 +227,123 @@ for (const lang of ["en", "ko"] as const) {
     await expect(page.locator("html")).toHaveAttribute("lang", lang);
   });
 }
+
+// ---------------------------------------------------------------------------
+// Every rail section x theme x language. The checks above cover a handful of
+// sections in one theme; a regression in any other section, in dark mode or in
+// Korean, would pass CI unnoticed. Each section is rendered from the shared
+// stub data so it draws real content, then scanned with the same WCAG tags.
+
+/** A source scan that has a dependency graph, a source tree and a conformance report. */
+const FULL_DONE = {
+  ...SOURCE_DONE,
+  conformance: {
+    result: "pass",
+    format: "CycloneDX",
+    checks: [
+      { id: "timestamp", label: "Timestamp present", required: true, status: "pass", detail: "1 found" },
+      { id: "license", label: "License coverage (recommended)", required: false, status: "warn", detail: "33%" },
+    ],
+  },
+  results: [
+    ...SOURCE_DONE.results,
+    { name: "demo_1.0_risk-report.html", size: 7100 },
+    { name: "demo_1.0_NOTICE.txt", size: 1200 },
+  ],
+};
+
+const SCANCODE = {
+  files: [
+    { path: "src", type: "directory" },
+    { path: "src/main.c", type: "file", detected_license_expression_spdx: "Apache-2.0" },
+    { path: "LICENSE", type: "file" },
+  ],
+};
+
+type Kind = "source" | "ai";
+
+const SECTIONS: Array<{ kind: Kind; section: string }> = [
+  { kind: "source", section: "overview" },
+  { kind: "source", section: "components" },
+  { kind: "source", section: "dependencies" },
+  { kind: "source", section: "sourceTree" },
+  { kind: "source", section: "vulnerabilities" },
+  { kind: "source", section: "licenses" },
+  { kind: "source", section: "conformance" },
+  { kind: "source", section: "artifacts" },
+  { kind: "ai", section: "overview" },
+  { kind: "ai", section: "models" },
+  { kind: "ai", section: "conformance" },
+];
+
+/**
+ * Combinations known to violate today, keyed `kind/section/theme/lang`, value =
+ * the reason. They run under test.fail so CI documents the current state and
+ * flips red the moment one is fixed (remove the entry then). Never widen this
+ * list to silence a new regression.
+ */
+const KNOWN_VIOLATIONS: Record<string, string> = {
+  "source/conformance/light/en": "color-contrast: success badge (text-success on bg-success-surface) in the light theme",
+  "source/conformance/light/ko": "color-contrast: success badge (text-success on bg-success-surface) in the light theme",
+  "ai/conformance/light/en": "color-contrast: info badge (text-risk-info-fg) inside dimmed (opacity-60) check cards, light theme",
+  "ai/conformance/light/ko": "color-contrast: info badge (text-risk-info-fg) inside dimmed (opacity-60) check cards, light theme",
+};
+
+async function openSection(page: Page, kind: Kind, section: string) {
+  const done = kind === "ai" ? AI_DONE : FULL_DONE;
+  const sbom = kind === "ai" ? AI_SBOM : SOURCE_SBOM;
+  await page.route("**/capabilities", (r) =>
+    r.fulfill({ contentType: "application/json", body: JSON.stringify({ firmware: false, scanoss: false, docker: true, spdxExport: false }) }),
+  );
+  await page.route("**/results", (r) => r.fulfill({ contentType: "application/json", body: "[]" }));
+  await page.route("**/scans", (r) => r.fulfill({ contentType: "application/json", body: "[]" }));
+  await page.route(`**/scan?id=${done.id}`, (r) =>
+    r.fulfill({ contentType: "application/json", body: JSON.stringify(done) }),
+  );
+  await page.route("**/file**", (r) =>
+    r.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify(r.request().url().includes("scancode") ? SCANCODE : sbom),
+    }),
+  );
+  await page.goto(`/?ui=next#/scan/${done.id}/${section}`);
+  await page.getByRole("navigation").first().waitFor();
+  await page.locator("main h1").first().waitFor();
+  await waitForSettled(page.locator("main"));
+}
+
+for (const { kind, section } of SECTIONS) {
+  for (const { theme, lang } of COMBOS) {
+    const key = `${kind}/${section}/${theme}/${lang}`;
+    test(`axe: ${key}`, async ({ page }) => {
+      if (KNOWN_VIOLATIONS[key]) test.fail(true, KNOWN_VIOLATIONS[key]);
+      await seedThemeLang(page, theme, lang);
+      await openSection(page, kind, section);
+      // Guard against scanning an empty or fallback screen: the rail link for
+      // this section must be the active one.
+      // Overview has no section suffix in its route, so match it by exclusion.
+      const active = page.locator('nav a[aria-current="page"]');
+      await expect(active).toHaveCount(1);
+      if (section !== "overview") await expect(active).toHaveAttribute("href", new RegExp(`/${section}$`));
+      const axe = await new AxeBuilder({ page })
+        .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
+        .analyze();
+      expect(
+        axe.violations.map((v) => `${v.id}: ${v.nodes.length} (${v.nodes[0]?.target.join(" ")})`),
+      ).toEqual([]);
+    });
+  }
+}
+
+test("a skip link lets keyboard users bypass the rail", async ({ page }) => {
+  // WCAG 2.4.1: the first Tab stop should jump past the repeated navigation to
+  // the main content. There is no such link yet, so this is expected to fail.
+  test.fail(true, "no skip-to-content link exists in the shell yet");
+  await seedThemeLang(page, "light", "en");
+  await openSection(page, "source", "overview");
+  await page.keyboard.press("Tab");
+  const first = page.locator(":focus");
+  await expect(first).toHaveAttribute("href", /^#/);
+  const target = await first.getAttribute("href");
+  await expect(page.locator(target ?? "#main")).toHaveCount(1);
+});
