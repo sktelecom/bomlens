@@ -4,7 +4,7 @@
     "version": "1.3.0"
   },
   "engine": {
-    "version": "latest-4052adc",
+    "version": "1.13.6",
     "image": null,
     "image_digest": null
   },
@@ -16,8 +16,8 @@
   "run": {
     "status": "succeeded",
     "reason": null,
-    "started_at": "2026-10-16T14:31:26Z",
-    "ended_at": "2026-10-16T14:46:05Z",
+    "started_at": "2026-10-16T16:54:01Z",
+    "ended_at": "2026-10-16T17:03:22Z",
     "exit_code": 0
   },
   "steps": [
@@ -26,8 +26,8 @@
       "status": "ok",
       "reason": null,
       "detail": null,
-      "started_at": "2026-10-16T14:31:26Z",
-      "ended_at": "2026-10-16T14:42:09Z",
+      "started_at": "2026-10-16T16:54:01Z",
+      "ended_at": "2026-10-16T17:00:54Z",
       "counts": {
         "components": 60131
       },
@@ -38,8 +38,8 @@
       "status": "ok",
       "reason": null,
       "detail": null,
-      "started_at": "2026-10-16T14:42:10Z",
-      "ended_at": "2026-10-16T14:42:13Z",
+      "started_at": "2026-10-16T17:00:54Z",
+      "ended_at": "2026-10-16T17:00:56Z",
       "stage": 2
     },
     {
@@ -47,8 +47,8 @@
       "status": "ok",
       "reason": null,
       "detail": null,
-      "started_at": "2026-10-16T14:42:14Z",
-      "ended_at": "2026-10-16T14:42:14Z",
+      "started_at": "2026-10-16T17:00:57Z",
+      "ended_at": "2026-10-16T17:00:57Z",
       "stage": 2
     },
     {
@@ -56,8 +56,8 @@
       "status": "ok",
       "reason": null,
       "detail": null,
-      "started_at": "2026-10-16T14:42:14Z",
-      "ended_at": "2026-10-16T14:44:09Z",
+      "started_at": "2026-10-16T17:00:57Z",
+      "ended_at": "2026-10-16T17:02:05Z",
       "stage": 2
     },
     {
@@ -65,8 +65,8 @@
       "status": "disabled",
       "reason": null,
       "detail": null,
-      "started_at": "2026-10-16T14:44:09Z",
-      "ended_at": "2026-10-16T14:44:09Z",
+      "started_at": "2026-10-16T17:02:05Z",
+      "ended_at": "2026-10-16T17:02:05Z",
       "stage": 2
     },
     {
@@ -74,8 +74,8 @@
       "status": "ok",
       "reason": null,
       "detail": null,
-      "started_at": "2026-10-16T14:44:12Z",
-      "ended_at": "2026-10-16T14:44:22Z",
+      "started_at": "2026-10-16T17:02:07Z",
+      "ended_at": "2026-10-16T17:02:13Z",
       "stage": 2
     },
     {
@@ -83,8 +83,8 @@
       "status": "ok",
       "reason": null,
       "detail": null,
-      "started_at": "2026-10-16T14:44:22Z",
-      "ended_at": "2026-10-16T14:44:23Z",
+      "started_at": "2026-10-16T17:02:13Z",
+      "ended_at": "2026-10-16T17:02:14Z",
       "stage": 2
     },
     {
@@ -92,8 +92,8 @@
       "status": "ok",
       "reason": null,
       "detail": null,
-      "started_at": "2026-10-16T14:44:23Z",
-      "ended_at": "2026-10-16T14:44:24Z",
+      "started_at": "2026-10-16T17:02:14Z",
+      "ended_at": "2026-10-16T17:02:14Z",
       "stage": 2
     },
     {
@@ -101,8 +101,8 @@
       "status": "ok",
       "reason": null,
       "detail": null,
-      "started_at": "2026-10-16T14:44:24Z",
-      "ended_at": "2026-10-16T14:44:25Z",
+      "started_at": "2026-10-16T17:02:14Z",
+      "ended_at": "2026-10-16T17:02:15Z",
       "stage": 2
     },
     {
@@ -110,8 +110,8 @@
       "status": "ok",
       "reason": null,
       "detail": null,
-      "started_at": "2026-10-16T14:44:25Z",
-      "ended_at": "2026-10-16T14:44:26Z",
+      "started_at": "2026-10-16T17:02:15Z",
+      "ended_at": "2026-10-16T17:02:15Z",
       "stage": 2
     },
     {
@@ -119,8 +119,8 @@
       "status": "ok",
       "reason": null,
       "detail": null,
-      "started_at": "2026-10-16T14:44:26Z",
-      "ended_at": "2026-10-16T14:44:26Z",
+      "started_at": "2026-10-16T17:02:15Z",
+      "ended_at": "2026-10-16T17:02:16Z",
       "stage": 2
     },
     {
@@ -128,8 +128,8 @@
       "status": "ok",
       "reason": null,
       "detail": null,
-      "started_at": "2026-10-16T14:44:26Z",
-      "ended_at": "2026-10-16T14:44:27Z",
+      "started_at": "2026-10-16T17:02:16Z",
+      "ended_at": "2026-10-16T17:02:16Z",
       "stage": 2
     },
     {
@@ -137,8 +137,8 @@
       "status": "ok",
       "reason": null,
       "detail": null,
-      "started_at": "2026-10-16T14:44:27Z",
-      "ended_at": "2026-10-16T14:44:32Z",
+      "started_at": "2026-10-16T17:02:16Z",
+      "ended_at": "2026-10-16T17:02:19Z",
       "stage": 2
     },
     {
@@ -146,8 +146,8 @@
       "status": "ok",
       "reason": null,
       "detail": null,
-      "started_at": "2026-10-16T14:44:32Z",
-      "ended_at": "2026-10-16T14:44:36Z",
+      "started_at": "2026-10-16T17:02:19Z",
+      "ended_at": "2026-10-16T17:02:22Z",
       "stage": 2
     },
     {
@@ -155,8 +155,8 @@
       "status": "disabled",
       "reason": null,
       "detail": null,
-      "started_at": "2026-10-16T14:44:36Z",
-      "ended_at": "2026-10-16T14:44:36Z",
+      "started_at": "2026-10-16T17:02:22Z",
+      "ended_at": "2026-10-16T17:02:22Z",
       "stage": 2
     },
     {
@@ -164,8 +164,8 @@
       "status": "ok",
       "reason": null,
       "detail": null,
-      "started_at": "2026-10-16T14:44:36Z",
-      "ended_at": "2026-10-16T14:44:53Z",
+      "started_at": "2026-10-16T17:02:22Z",
+      "ended_at": "2026-10-16T17:02:33Z",
       "stage": 2
     },
     {
@@ -173,8 +173,8 @@
       "status": "ok",
       "reason": null,
       "detail": null,
-      "started_at": "2026-10-16T14:44:53Z",
-      "ended_at": "2026-10-16T14:44:57Z",
+      "started_at": "2026-10-16T17:02:33Z",
+      "ended_at": "2026-10-16T17:02:35Z",
       "stage": 2
     },
     {
@@ -182,8 +182,8 @@
       "status": "ok",
       "reason": null,
       "detail": null,
-      "started_at": "2026-10-16T14:44:57Z",
-      "ended_at": "2026-10-16T14:45:04Z",
+      "started_at": "2026-10-16T17:02:36Z",
+      "ended_at": "2026-10-16T17:02:41Z",
       "counts": {
         "offered": 59198,
         "components": 1,
@@ -196,8 +196,8 @@
       "status": "ok",
       "reason": null,
       "detail": null,
-      "started_at": "2026-10-16T14:45:04Z",
-      "ended_at": "2026-10-16T14:45:42Z",
+      "started_at": "2026-10-16T17:02:41Z",
+      "ended_at": "2026-10-16T17:03:06Z",
       "stage": 2
     },
     {
@@ -205,8 +205,8 @@
       "status": "disabled",
       "reason": null,
       "detail": null,
-      "started_at": "2026-10-16T14:45:42Z",
-      "ended_at": "2026-10-16T14:45:42Z",
+      "started_at": "2026-10-16T17:03:06Z",
+      "ended_at": "2026-10-16T17:03:06Z",
       "stage": 2
     },
     {
@@ -214,8 +214,8 @@
       "status": "ok",
       "reason": null,
       "detail": null,
-      "started_at": "2026-10-16T14:45:42Z",
-      "ended_at": "2026-10-16T14:46:00Z",
+      "started_at": "2026-10-16T17:03:06Z",
+      "ended_at": "2026-10-16T17:03:18Z",
       "stage": 2
     },
     {
@@ -223,8 +223,8 @@
       "status": "disabled",
       "reason": null,
       "detail": null,
-      "started_at": "2026-10-16T14:46:00Z",
-      "ended_at": "2026-10-16T14:46:00Z",
+      "started_at": "2026-10-16T17:03:18Z",
+      "ended_at": "2026-10-16T17:03:18Z",
       "stage": 2
     }
   ],
@@ -242,20 +242,20 @@
     "trivy_db": {
       "schema_version": 2,
       "updated_at": "2026-10-16T01:13:54.947090392Z",
-      "downloaded_at": "2026-10-16T14:45:10.516253131Z"
+      "downloaded_at": "2026-10-16T17:02:45.394623382Z"
     }
   },
   "outputs": [
     {
       "role": "sbom.cyclonedx",
       "path": "RaspberryPiOsLite_2026-06-18_bom.json",
-      "sha256": "d006b05e958e5e7851678b52cd6e620139d0d2749674a202de51838e9206ceed",
-      "bytes": 41871161
+      "sha256": "86fa4290dfa47a8ac343e56d7617683314bb6b52f7d2c6416c5d8eb1ea45a13e",
+      "bytes": 41871153
     },
     {
       "role": "other",
       "path": "RaspberryPiOsLite_2026-06-18_component-versions.template.csv",
-      "sha256": "77535ae42da854efbd20c89a80550e942a40daf37f3e89d9a31f85fea3ea03ea",
+      "sha256": "ed093dda8c3e02b8a30b10fd3ef9972111a50f39fd59f3ba85719e31ef60aeaf",
       "bytes": 23918
     },
     {
@@ -267,61 +267,61 @@
     {
       "role": "other",
       "path": "RaspberryPiOsLite_2026-06-18_source.json",
-      "sha256": "c4d94c937968fa10aaa5477b1280a2c596d40840842cba03ca49a90345d7beb6",
+      "sha256": "449ff72ba0e419e57ce399d56d861e5eb5a8d4c780efdb7cb74a50b14a583cfc",
       "bytes": 8766241
     },
     {
       "role": "other",
       "path": "RaspberryPiOsLite_2026-06-18_NOTICE.txt",
-      "sha256": "a4357a259e1ed57f4c8bf3280758b8de062ad37f8789a45f3fae7f2c13453afe",
+      "sha256": "23c0b36828810ea3860d8d3d9306a45b5efffeafa5e26a29625cf306549a7cbe",
       "bytes": 710081
     },
     {
       "role": "other",
       "path": "RaspberryPiOsLite_2026-06-18_NOTICE.html",
-      "sha256": "89ade0b42537d3216bfcaf2cab7f1a45760b3333ed389c147d8535c37586b761",
+      "sha256": "dc76e981038ab1bb10e6d923a3d4bf9a6573ca0267c646f35e50735d8c97071c",
       "bytes": 875454
     },
     {
       "role": "vulnerabilities.all",
       "path": "RaspberryPiOsLite_2026-06-18_security.json",
-      "sha256": "c74342cbfcdfde18249a13624ecf053ac22661fc9ceffb07b6b27992dffdea0e",
+      "sha256": "addcfec2c7e082c28189aead9db375b83de72f9901f0516b5ceaad8d4be77ca8",
       "bytes": 65574806
     },
     {
       "role": "vulnerabilities.trivy",
       "path": "RaspberryPiOsLite_2026-06-18_security_trivy.json",
-      "sha256": "a81928dee7185bfba0b22000d0306f5a67237681627d4182cf400dad4c8017d1",
+      "sha256": "c4d8dff6c86042208c20f8254817220ab1948926dee350b66cc4f7b608ae7ba1",
       "bytes": 65626828
     },
     {
       "role": "other",
       "path": "RaspberryPiOsLite_2026-06-18_security.md",
-      "sha256": "389a2936779f442cc171380333ff7dbf1318e76d9664e80a2751d7bf69347d92",
+      "sha256": "55f9feb9863ae9b9752cce9f8a9e9b77e01c972d04270a2e3a40bf5faaae9a73",
       "bytes": 1602297
     },
     {
       "role": "other",
       "path": "RaspberryPiOsLite_2026-06-18_security.html",
-      "sha256": "7508fce0b4dba048c791b01a982537b0ec24440b3bdc8e8d50e966b61cc38caf",
+      "sha256": "f9a747ee74143648a72a5020545fa93c69ee402133a9969d86c17f127a1c6a19",
       "bytes": 5041096
     },
     {
       "role": "conformance",
       "path": "RaspberryPiOsLite_2026-06-18_conformance.json",
-      "sha256": "d6ee6eaa31cc0bc5baa5086481f99c4d64c663cb1677b02fe9e56f5b4ff32601",
+      "sha256": "c6f5a91fae38521bca1856cf1431ef5973a09ce259214f2de07adcbc3281929d",
       "bytes": 60823
     },
     {
       "role": "other",
       "path": "RaspberryPiOsLite_2026-06-18_conformance.md",
-      "sha256": "b21745d6cc257495badcd42c4ad8eb15c427d8c839d3eab3e23b9a4f8eea297a",
+      "sha256": "0f017544aa9ad43c8b2dea23330aaa58f6a068a16f8b6edc262de4340b45d712",
       "bytes": 20153
     },
     {
       "role": "other",
       "path": "RaspberryPiOsLite_2026-06-18_conformance.html",
-      "sha256": "c3b69773d1b67503f5d26412f71d4f9d956c514440bbc1046d88b47a81b985fc",
+      "sha256": "b67ba1620293f337b1099bb1c6a31ec7b846243e277cf35886c021f4a6076f31",
       "bytes": 44409
     },
     {
@@ -339,13 +339,13 @@
     {
       "role": "other",
       "path": "RaspberryPiOsLite_2026-06-18_risk-report.md",
-      "sha256": "ce38cb93c880e1c964b6744259992080ebf33a9e8482e1287603385318b4e84a",
+      "sha256": "4ef3d0e78a263e26e49bda02170154dd3ac8e845eb9858f1d6415d05e4a053a9",
       "bytes": 1635213
     },
     {
       "role": "other",
       "path": "RaspberryPiOsLite_2026-06-18_risk-report.html",
-      "sha256": "97b5f329a3cf271bfa9667f24f80e0c286c1e9f046dc4e2a5a4ce7e1b2f274f8",
+      "sha256": "0fae7d3266819d644f062491e5ab1c267946512acb2b1f91d6e5ed913b44b4a4",
       "bytes": 3008352
     },
     {
