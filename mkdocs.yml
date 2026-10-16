@@ -1,6 +1,8 @@
 # 사용자 문서 사이트 설정. 정본 마크다운은 docs/에 있고, 이 설정으로 GitHub Pages에
 # 렌더링한다(검색, 사이드바, 한국어/영어). 룩은 Gemini API 문서(Google DevSite) 인상을
-# MkDocs Material과 docs/stylesheets/extra.css로 재현하되, 강조색만 SK 브랜드 색을 쓴다.
+# MkDocs Material과 docs/stylesheets/extra.css로 재현한다. 색과 글꼴 크기는 앱과 공유하는
+# 토큰(docker/shared/bomlens-tokens.css, hooks/shared_tokens.py가 빌드 때 포함)을 쓰고,
+# SK 브랜드 색은 주 버튼, 로고, 초점 표시에만 쓴다.
 # internal/은 사이트 빌드에서 제외한다(exclude_docs 참고).
 site_name: BomLens
 site_description: BomLens is a local-first SBOM generator and open-source risk assessor. Produce a CycloneDX SBOM, an open-source notice, and a security and license risk report from source code, containers, binaries, firmware, or an SBOM you received — from the CLI or a browser UI, with no SaaS.
@@ -25,7 +27,7 @@ theme:
   favicon: images/logo-mark.svg
   font:
     text: Inter
-    code: Roboto Mono
+    code: JetBrains Mono
   palette:
     - media: "(prefers-color-scheme: light)"
       scheme: default
@@ -55,8 +57,10 @@ theme:
 
 hooks:
   - hooks/sitemap_alias.py
+  - hooks/shared_tokens.py
 
 extra_css:
+  - stylesheets/bomlens-tokens.css
   - stylesheets/extra.css
 
 extra_javascript:
