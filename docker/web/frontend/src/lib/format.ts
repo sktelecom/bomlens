@@ -33,3 +33,29 @@ export function useFormatNumber(): (value: number) => string {
   const language = i18n.language;
   return (value: number) => formatNumber(value, language);
 }
+
+const dateTimeFormatters = new Map<string, Intl.DateTimeFormat>();
+
+/**
+ * A moment as date and time to the minute in the UI language, 24-hour clock
+ * (ko "2026. 10. 15. 18:04", en "Oct 15, 2026, 18:04"), in the viewer's time
+ * zone. Takes Unix seconds, the unit the scan list carries. Non-finite input
+ * returns an empty string so a missing time never renders as "Invalid Date".
+ */
+export function formatDateTime(unixSec: number, language?: string): string {
+  if (!Number.isFinite(unixSec)) return "";
+  const tag = numberLocale(language);
+  let df = dateTimeFormatters.get(tag);
+  if (!df) {
+    df = new Intl.DateTimeFormat(tag, {
+      year: "numeric",
+      month: tag === "ko-KR" ? "numeric" : "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      hourCycle: "h23",
+    });
+    dateTimeFormatters.set(tag, df);
+  }
+  return df.format(new Date(unixSec * 1000));
+}

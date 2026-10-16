@@ -454,7 +454,10 @@
       "codeNotPresent": "The affected package is not in the build",
       "codeNotReachable": "No affected function is reached",
       "other": "Not reachable"
-    }
+    },
+    "partial": "Some steps failed",
+    "metaScanType": "Scan type",
+    "metaGenerated": "Scan time"
   },
   "deps": {
     "loading": "Loading dependencies…",
@@ -592,7 +595,8 @@
     "demoGetTool": "Get BomLens",
     "demoBannerTitle": "Read-only demo",
     "demoBannerBody": "These are real results from a real scan, frozen so you can look around. Scanning, uploading and deleting are turned off here. Run BomLens on your own code to produce your own.",
-    "demoBannerCta": "How to run it"
+    "demoBannerCta": "How to run it",
+    "skipToMain": "Skip to main content"
   },
   "search": {
     "placeholder": "Search components, CVEs…",
@@ -713,7 +717,19 @@
     "attnMalicious": "{{count}} known-malicious package(s): remove and rotate credentials",
     "attnModelRisk": "{{count}} model or dataset needs a licence or security review",
     "attnConformanceGap": "{{count}} conformance element(s) can be filled in",
-    "depNone": "no relationships recorded"
+    "depNone": "no relationships recorded",
+    "firstChecks": {
+      "title": "Items to check first",
+      "note": "A reference order for looking through this scan. It is not a ranking of importance or a verdict.",
+      "knownExploited": "Known exploited vulnerabilities (CISA KEV)",
+      "fixableSevere": "Critical or High with a fixed version",
+      "requiredItems": "Required conformance items to fill in",
+      "sourceVulns": "Source: this scan's vulnerability results",
+      "sourceVulnsPartial": "Source: vulnerability results, counted among the {{listed}} of {{total}} findings listed",
+      "sourceConformance": "Source: this scan's conformance check",
+      "asOf": "as of scan time {{time}}"
+    },
+    "summaryLabel": "Scan summary"
   },
   "pipelineSteps": {
     "enrichAibom": "AI model metadata enrichment",

@@ -20,7 +20,7 @@ import { type ReactNode, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { Badge } from "@/components/ui/badge";
-import { FOCUS_RING, SELECTED_SOLID, SELECTED_TILE } from "@/components/ui/selectable";
+import { FOCUS_RING, SELECTED_SOLID } from "@/components/ui/selectable";
 import { buttonVariants } from "@/components/ui/button";
 import { IS_STATIC_DEMO } from "@/lib/demo";
 import { Card, CardContent } from "@/components/ui/card";
@@ -65,54 +65,6 @@ const SEV_TONE: Record<
   LOW: "low",
   UNKNOWN: "info",
 };
-
-function SummaryCard({
-  label,
-  value,
-  accent,
-  onClick,
-  active,
-}: {
-  label: string;
-  value: number;
-  accent?: boolean;
-  /** When set, the card becomes a toggle that filters the list. */
-  onClick?: () => void;
-  active?: boolean;
-}) {
-  const fmt = useFormatNumber();
-  const body = (
-    <CardContent className="flex flex-col gap-1.5 p-3 md:p-5">
-      <span className="text-label text-muted-foreground">{label}</span>
-      <span
-        className={cn(
-          "text-display font-semibold tabular-nums",
-          accent && "text-role-severe-fg",
-        )}
-      >
-        {fmt(value)}
-      </span>
-    </CardContent>
-  );
-  if (!onClick) return <Card>{body}</Card>;
-  return (
-    <Card
-      className={cn(
-        "transition-colors duration-fast ease-out-soft",
-        active ? SELECTED_TILE : "hover:bg-muted/40",
-      )}
-    >
-      <button
-        type="button"
-        onClick={onClick}
-        aria-pressed={active}
-        className="w-full rounded-lg text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-      >
-        {body}
-      </button>
-    </Card>
-  );
-}
 
 const TH = "whitespace-nowrap px-4 py-3 text-left font-medium";
 
@@ -399,20 +351,6 @@ export function RecentScans({ scans, newHref, onDelete }: Props) {
       ) : (
         <>
           {IS_STATIC_DEMO && <DemoStartHere scans={scans} />}
-          <div className="grid grid-cols-3 gap-2 md:gap-4">
-            <SummaryCard label={t("recent.total")} value={summary.total} />
-            <SummaryCard
-              label={t("recent.atRisk")}
-              value={summary.atRisk}
-              accent={summary.atRisk > 0}
-              active={atRisk}
-              onClick={
-                summary.atRisk > 0 ? () => setAtRisk((v) => !v) : undefined
-              }
-            />
-            <SummaryCard label={t("recent.projects")} value={summary.projects} />
-          </div>
-
           <div className="flex flex-wrap items-center gap-2">
             <div className="relative">
               <Search
@@ -428,8 +366,15 @@ export function RecentScans({ scans, newHref, onDelete }: Props) {
                 className="h-9 w-56 pl-8"
               />
             </div>
-            {/* Type chips only when there's more than one type to choose between.
-                Risk filtering lives on the "At risk" summary card above. */}
+            {/* The at-risk filter is a chip like the type chips, with its count on
+                it. It stays while active so it can be turned off. */}
+            {(summary.atRisk > 0 || atRisk) && (
+              <FilterChip active={atRisk} onClick={() => setAtRisk((v) => !v)}>
+                {t("recent.atRisk")}
+                <span className="ml-1.5 tabular-nums">{fmt(summary.atRisk)}</span>
+              </FilterChip>
+            )}
+            {/* Type chips only when there's more than one type to choose between. */}
             {types.length > 1 &&
               types.map((ty) => (
                 <FilterChip
@@ -445,6 +390,15 @@ export function RecentScans({ scans, newHref, onDelete }: Props) {
                 {t("recent.shown", { shown: sorted.length, total: scans.length })}
               </span>
             )}
+            {/* Totals: plain text, not controls. */}
+            <span className="ml-auto flex gap-4 text-label tabular-nums text-muted-foreground">
+              <span>
+                {t("recent.total")} {fmt(summary.total)}
+              </span>
+              <span>
+                {t("recent.projects")} {fmt(summary.projects)}
+              </span>
+            </span>
           </div>
 
           <Card>

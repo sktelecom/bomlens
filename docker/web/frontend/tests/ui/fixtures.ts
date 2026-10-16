@@ -180,3 +180,47 @@ export const AI_SBOM = {
     },
   ],
 };
+
+// A firmware scan with the shape that makes the severity bar hard to hit: tens
+// of thousands of Medium findings dwarf the Critical and Unknown ones, so those
+// bar segments render a few pixels wide (WCAG 2.2 target size, 2.5.8). Also
+// carries a known-exploited row, fixable Critical/High rows and a failed
+// mandatory conformance check, which feed the Overview's "first checks" block.
+export const FIRMWARE_DONE = {
+  ok: true,
+  mode: "FIRMWARE",
+  id: "router_2.1",
+  results: [
+    { name: "router_2.1_bom.json", size: 4096 },
+    { name: "router_2.1_security.json", size: 2048 },
+  ],
+  security: {
+    CRITICAL: 2, HIGH: 40, MEDIUM: 6000, LOW: 900, UNKNOWN: 3, TOTAL: 6945,
+    vulnerabilities: [
+      { id: "CVE-2024-1001", severity: "CRITICAL", pkg: "busybox", installed: "1.30.0", fixed: "1.36.1", title: "command injection", cvss: 9.8, epss: 0.91, kev: true },
+      { id: "CVE-2024-1002", severity: "CRITICAL", pkg: "openssl", installed: "1.0.2", fixed: "", title: "memory corruption", cvss: 9.1, epss: 0.02 },
+      { id: "CVE-2024-1003", severity: "HIGH", pkg: "dnsmasq", installed: "2.80", fixed: "2.90", title: "cache poisoning", cvss: 7.5, epss: 0.1 },
+      { id: "CVE-2024-1004", severity: "MEDIUM", pkg: "zlib", installed: "1.2.8", fixed: "1.2.12", title: "oob write", cvss: 5.5 },
+      { id: "CVE-2024-1005", severity: "UNKNOWN", pkg: "libfoo", installed: "0.1", fixed: "", title: "unscored" },
+    ],
+  },
+  conformance: {
+    result: "fail",
+    format: "CycloneDX",
+    checks: [
+      { id: "timestamp", label: "Timestamp present", required: true, status: "pass", detail: "1 found" },
+      { id: "supplier", label: "Supplier name", required: true, status: "fail", detail: "0 of 3 components" },
+      { id: "license", label: "License coverage (recommended)", required: false, status: "warn", detail: "33%" },
+    ],
+  },
+  sbom: {
+    components: 3,
+    componentType: "firmware",
+    componentList: [
+      { name: "busybox", version: "1.30.0", group: "", purl: "pkg:generic/busybox@1.30.0", type: "library", licenses: ["GPL-2.0-only"], scope: "direct", maxSeverity: "CRITICAL", vulnCount: 1 },
+      { name: "openssl", version: "1.0.2", group: "", purl: "pkg:generic/openssl@1.0.2", type: "library", licenses: ["Apache-2.0"], scope: "direct", maxSeverity: "CRITICAL", vulnCount: 1 },
+      { name: "dnsmasq", version: "2.80", group: "", purl: "pkg:generic/dnsmasq@2.80", type: "library", licenses: ["GPL-2.0-only"], scope: "transitive", maxSeverity: "HIGH", vulnCount: 1 },
+    ],
+    firmwareScope: { unknownPercent: 12, unknownBytes: 3145728, failedSteps: 0, encryptedRegions: 0, failedFormats: [], missingExtractors: [], namesMore: 0 },
+  },
+};

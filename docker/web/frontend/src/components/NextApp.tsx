@@ -1,7 +1,6 @@
 // Copyright 2026 SK Telecom Co., Ltd.
 // SPDX-License-Identifier: Apache-2.0
 
-import { TriangleAlert } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -12,6 +11,7 @@ import { GlobalSearch } from "./GlobalSearch";
 import { NewScan } from "./NewScan";
 import { ProgressLog } from "./ProgressLog";
 import { RecentScans } from "./RecentScans";
+import { ResultHeader } from "./ResultHeader";
 import { ResultSection } from "./ResultSections";
 import { ReportProblem } from "./ReportProblem";
 import { ScanRunning } from "./ScanRunning";
@@ -523,6 +523,9 @@ export function NextApp() {
   );
 
   const isHome = status === "idle";
+  // When the open scan was made, from the scan list (the result payload itself
+  // carries no timestamp). Absent until the list has the scan.
+  const generatedAt = recent.find((s) => s.id === loadedIdRef.current)?.generatedAt;
   // Every entry point into the Lookup screen (this hash, the top-bar icon,
   // the GlobalSearch row) is gated the same way: the server won't make
   // outbound requests when externalLookup is off, and the static demo has no
@@ -628,44 +631,28 @@ export function NextApp() {
         </div>
       ) : (
         <div className="mx-auto max-w-6xl space-y-6 px-6 py-8">
-          <div>
-            <div className="flex items-center gap-3">
-              <h1
-                ref={headingRef}
-                tabIndex={-1}
-                className="text-display font-semibold tracking-tight text-foreground focus:outline-none"
-              >
-                {t(`nav.${activeSection}`)}
-              </h1>
-              <span
-                role="status"
-                className={
-                  result.ok
-                    ? "rounded-full bg-success-solid/10 px-2 py-0.5 text-label font-medium text-success"
-                    : "inline-flex items-center gap-1 rounded-full bg-destructive/10 px-2 py-0.5 text-label font-medium text-risk-critical-fg"
-                }
-              >
-                {/* text-risk-critical-fg (not text-destructive): --destructive
-                    is the same value in both themes, so text-destructive on
-                    this badge's own tinted background fails WCAG AA in light
-                    mode (axe: 3.95:1, needs 4.5:1) -- risk-critical-fg is
-                    already the AA-passing dark/light cut of the same red the
-                    destructive token aligns with (see index.css). The icon
-                    means the failure reads without relying on color alone. */}
-                {!result.ok && <TriangleAlert className="h-3 w-3" aria-hidden />}
-                {result.ok ? t("result.succeeded") : t("result.failed")}
-              </span>
-            </div>
-            <p className="mt-1.5 text-body-sm text-muted-foreground">
-              {t(scanKindKey(scan.isAiScan, result))}
-            </p>
-          </div>
+          <ResultHeader
+            name={projectInfo?.name}
+            version={projectInfo?.version}
+            kind={t(scanKindKey(scan.isAiScan, result))}
+            generatedAt={generatedAt}
+            status={
+              !result.ok
+                ? "failed"
+                : (result.sbom?.pipelineStepsFailed?.length ?? 0) > 0
+                  ? "partial"
+                  : "ok"
+            }
+            title={t(`nav.${activeSection}`)}
+            headingRef={headingRef}
+          />
 
           <ResultSection
             section={activeSection}
             result={result}
             scanId={loadedIdRef.current}
             recent={recent}
+            generatedAt={generatedAt}
             query={sectionQuery}
             onQueryChange={handleQueryChange}
             onPick={handleFilterPick}

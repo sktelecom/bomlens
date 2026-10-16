@@ -54,6 +54,7 @@ import { diffComponents, diffVulnerabilities, type ComponentDiff, type VulnDiff 
 import { cn, formatBytes } from "@/lib/utils";
 import { useFormatNumber } from "@/lib/format";
 
+import { FirstChecks } from "./FirstChecks";
 import { LicenseRiskBar } from "./LicenseRiskBar";
 import { PipelineStepsFailedNote } from "./PipelineStepsFailedNote";
 import { ResultsList } from "./ResultsList";
@@ -67,18 +68,15 @@ const TONE_ICON: Record<AttentionItem["tone"], string> = {
   high: "text-risk-high", // token-lint-ignore
   info: "text-risk-info", // token-lint-ignore
 };
-/** Left accent + faint tint on the "Needs attention" card, keyed to the worst
- *  tone among its items (the list is already sorted most-urgent-first, see
- *  needsAttention()), so the one card asking for action reads as more urgent
- *  than the purely informational cards around it (severity/license
- *  distribution), without borrowing the full-bleed treatment a failed scan
- *  itself gets (that would misreport a successful scan as having failed).
- *  `info` (e.g. vendored-source review only) stays neutral: nothing failed or
- *  crossed a severity threshold, so it does not need to visually compete. */
-const ATTN_ACCENT: Record<AttentionItem["tone"], string> = {
-  critical: "border-l-4 border-l-risk-critical bg-risk-critical/5",
-  high: "border-l-4 border-l-risk-high bg-risk-high/5",
-  info: "",
+/** The "Needs attention" card is the same neutral card for every scan kind;
+ *  only the thin left bar carries the role colour, keyed to the worst tone among
+ *  its items (the list is already sorted most-urgent-first, see
+ *  needsAttention()). No tinted fill: a coloured surface would read as a failed
+ *  scan, and the bar plus the item icons already say which role it is. */
+const ATTN_BAR: Record<AttentionItem["tone"], string> = {
+  critical: "border-l-[3px] border-l-risk-critical",
+  high: "border-l-[3px] border-l-risk-high",
+  info: "border-l-[3px] border-l-risk-info",
 };
 const ATTN_ICON: Record<AttentionItem["id"], LucideIcon> = {
   malicious: Biohazard,
@@ -262,6 +260,7 @@ export function Overview({
   result,
   scanId,
   recent = [],
+  generatedAt,
   onPick,
 }: {
   result: DoneEvent;
@@ -269,6 +268,9 @@ export function Overview({
   scanId: string | null;
   /** Local Recent-scans list, for the "vs previous scan" comparison line. */
   recent?: RecentScan[];
+  /** Unix seconds when this scan was made; the "check first" block names it as
+   *  the point the counts are taken at. */
+  generatedAt?: number;
   /**
    * Route into a section with a filter pre-applied — clicking a severity band
    * opens Vulnerabilities filtered to it; clicking a license class opens
@@ -882,8 +884,10 @@ export function Overview({
         scanId={scanId}
       />
 
+      <FirstChecks result={result} scanId={scanId} generatedAt={generatedAt} />
+
       {attention.length > 0 && (
-        <Card className={ATTN_ACCENT[attention[0].tone]}>
+        <Card className={ATTN_BAR[attention[0].tone]} data-testid="needs-attention">
           <CardContent className="p-4">
             <div className="mb-2 text-body-sm font-semibold text-foreground">
               {t("overview.needsAttention")}
@@ -1109,45 +1113,53 @@ function JumpCards({
     { id: "artifacts", icon: Package, value: result.results.length },
   ];
 
-  // auto-fit: the card set is conditional (2–6 cards), so a fixed 4-column
-  // grid left a lopsided empty tail. Let however many render fill the row.
+  // One compact strip instead of a row of tall cards. The set is conditional
+  // (2 to 7 entries), so the entries wrap onto a second line instead of
+  // shrinking: each keeps its own width and nothing breaks mid-entry.
   return (
-    <div className="grid grid-cols-2 gap-3 md:[grid-template-columns:repeat(auto-fit,minmax(11rem,1fr))]">
-      {jumps.map(({ id, key, icon: Icon, value, sub, label, valueClass }) => {
-        const text = label ?? t(`nav.${id}`);
-        return (
-        <a
-          key={key ?? id}
-          href={scanId ? scanHash(scanId, id) : undefined}
-          aria-label={t("overview.jumpHint", { section: text })}
-          className={cn(
-            "group rounded-lg border bg-card p-4 text-left",
-            "transition-[border-color,background-color,box-shadow] duration-fast ease-out-soft",
-            "hover:border-foreground/30 hover:bg-muted/50 hover:shadow-md",
-            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
-          )}
-        >
-          <div className="flex items-center justify-between">
-            <Icon className="h-4 w-4 text-muted-foreground" aria-hidden />
-            <ChevronRight className="h-4 w-4 text-muted-foreground transition-transform duration-fast ease-out-soft group-hover:translate-x-0.5" aria-hidden />
-          </div>
-          <div
-            className={cn(
-              "mt-3 text-title font-semibold tabular-nums text-foreground",
-              valueClass,
-            )}
-          >
-            {typeof value === "number" ? fmt(value) : (value ?? "—")}
-          </div>
-          <div className="truncate text-label text-muted-foreground">{text}</div>
-          {sub && (
-            <div className="mt-0.5 truncate text-caption text-muted-foreground">
-              {sub}
-            </div>
-          )}
-        </a>
-        );
-      })}
+    <div>
+      <ul aria-label={t("overview.summaryLabel")} className="flex flex-wrap gap-2">
+        {jumps.map(({ id, key, icon: Icon, value, sub, label, valueClass }) => {
+          const text = label ?? t(`nav.${id}`);
+          return (
+            <li key={key ?? id}>
+              <a
+                href={scanId ? scanHash(scanId, id) : undefined}
+                aria-label={t("overview.jumpHint", { section: text })}
+                className={cn(
+                  "group flex items-center gap-2 rounded-lg border bg-card px-3 py-2",
+                  "transition-[border-color,background-color] duration-fast ease-out-soft",
+                  "hover:border-foreground/30 hover:bg-muted/50",
+                  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+                )}
+              >
+                <Icon className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
+                <span
+                  className={cn(
+                    "text-body-sm font-semibold tabular-nums text-foreground",
+                    valueClass,
+                  )}
+                >
+                  {typeof value === "number" ? fmt(value) : (value ?? "—")}
+                </span>
+                <span className="text-body-sm text-muted-foreground">{text}</span>
+                {sub && (
+                  <span
+                    className="max-w-[14rem] truncate text-label text-muted-foreground"
+                    title={sub}
+                  >
+                    {sub}
+                  </span>
+                )}
+                <ChevronRight
+                  className="h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-fast ease-out-soft group-hover:translate-x-0.5"
+                  aria-hidden
+                />
+              </a>
+            </li>
+          );
+        })}
+      </ul>
     </div>
   );
 }

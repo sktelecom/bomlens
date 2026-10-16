@@ -38,6 +38,7 @@ export function ResultSection({
   result,
   scanId,
   recent,
+  generatedAt,
   query,
   onQueryChange,
   onPick,
@@ -51,6 +52,8 @@ export function ResultSection({
   scanId: string | null;
   /** Local Recent-scans list, for the Overview "vs previous scan" line. */
   recent?: RecentScan[];
+  /** Unix seconds when the scan was made, for the Overview's source and time lines. */
+  generatedAt?: number;
   /** This section's filter and sort state, as carried in the URL hash. Arrives
    *  from a shared link, a reload, or a pick routed in from another section. */
   query?: RouteQuery;
@@ -88,7 +91,13 @@ export function ResultSection({
       return (
         <div className="space-y-6">
           {isAiScan(result) && <AiSummaryCard result={result} scanId={scanId} />}
-          <Overview result={result} scanId={scanId} recent={recent} onPick={onPick} />
+          <Overview
+            result={result}
+            scanId={scanId}
+            recent={recent}
+            generatedAt={generatedAt}
+            onPick={onPick}
+          />
         </div>
       );
 
