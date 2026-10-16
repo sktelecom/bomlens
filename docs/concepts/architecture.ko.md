@@ -143,7 +143,7 @@ sequenceDiagram
 | ③ | 고지문 | `generate-notice.sh` (jq) | `--notice` / `--all` | `_NOTICE.txt`, `_NOTICE.html` |
 | ④ | 보안 보고서 | `scan-security.sh` (Trivy) | `--security` / `--all` | `_security.{json,md,html}` |
 | ⑤ | 서명 | `cosign sign-blob` | `--sign` + `COSIGN_KEY` | `bom.json.sig` |
-| ⑥ | 위험분석보고서 | `generate-risk-report.sh` | 기본 (`--no-report`로 생략) | `_risk-report.{md,html}` (+ ANALYZE면 `_conformance.*`) |
+| ⑥ | 오픈소스 위험 보고서 | `generate-risk-report.sh` | 기본 (`--no-report`로 생략) | `_risk-report.{md,html}` (+ ANALYZE면 `_conformance.*`) |
 | ⑦ | 호스트 복사 | `cp` | 항상 | `HOST_OUTPUT_DIR`로 복사 |
 | ⑧ | 업로드 | `curl` | 기본 (`--generate-only`이면 생략) | Dependency-Track 서버 또는 TRUSCA 네이티브 ingest로 업로드 (`UPLOAD_TARGET`로 선택) |
 
@@ -194,8 +194,8 @@ CLI 플래그가 어떤 환경변수로 변환되어 어느 단계를 켜는지 
 
 | 플래그 | 환경변수 | 켜지는 단계 |
 |--------|----------|-------------|
-| (기본) | `GENERATE_REPORT=true` (+ notice·security) | normalize + 위험분석보고서 + 업로드 |
-| `--no-report` | `GENERATE_REPORT=false` | 위험분석보고서·고지문·보안 강제 활성화 안 함 |
+| (기본) | `GENERATE_REPORT=true` (+ notice·security) | normalize + 오픈소스 위험 보고서 + 업로드 |
+| `--no-report` | `GENERATE_REPORT=false` | 오픈소스 위험 보고서·고지문·보안 강제 활성화 안 함 |
 | `--notice` | `GENERATE_NOTICE=true` | ③ 고지문 |
 | `--security` | `GENERATE_SECURITY=true` | ④ 보안 보고서 |
 | `--all` | 위 둘 다 | ③ + ④ |
@@ -212,7 +212,7 @@ CLI 플래그가 어떤 환경변수로 변환되어 어느 단계를 켜는지 
 | `--generate-only` | `UPLOAD_ENABLED=false` | ⑦ 업로드 생략 |
 | `--ui` | `MODE=UI` | 웹 UI |
 
-> 위험분석보고서(`_risk-report.{md,html}`)는 모든 모드에서 기본 생성됩니다(라이선스+취약점 집계). 이를 위해 고지문·보안 스캔이 자동으로 함께 켜지며, `--no-report`로 끌 수 있습니다.
+> 오픈소스 위험 보고서(`_risk-report.{md,html}`)는 모든 모드에서 기본 생성됩니다(라이선스+취약점 집계). 이를 위해 고지문·보안 스캔이 자동으로 함께 켜지며, `--no-report`로 끌 수 있습니다.
 
 각 기능의 사용법은 [고지문·보안 보고서 가이드](../guides/reports.ko.md)를 참조하세요.
 
@@ -223,8 +223,8 @@ CLI 플래그가 어떤 환경변수로 변환되어 어느 단계를 켜는지 
 | 파일 | 생성 조건 |
 |------|-----------|
 | `{Project}_{Version}_bom.json` | 항상 (CycloneDX 1.6, `--spec-version 1.7`이면 1.7. AI 모델은 1.7 ML-BOM) |
-| `{Project}_{Version}_NOTICE.txt` / `.html` / `.pdf` | `--notice` / `--all` / 위험분석보고서 기본 생성 시 (PDF는 `SBOM_PDF` 빌드에서만) |
-| `{Project}_{Version}_security.json` / `.md` / `.html` | `--security` / `--all` / 위험분석보고서 기본 생성 시 |
+| `{Project}_{Version}_NOTICE.txt` / `.html` / `.pdf` | `--notice` / `--all` / 오픈소스 위험 보고서 기본 생성 시 (PDF는 `SBOM_PDF` 빌드에서만) |
+| `{Project}_{Version}_security.json` / `.md` / `.html` | `--security` / `--all` / 오픈소스 위험 보고서 기본 생성 시 |
 | `{Project}_{Version}_risk-report.md` / `.html` | 기본 (전 모드), `--no-report`로 생략 |
 | `{Project}_{Version}_conformance.json` / `.md` / `.html` | `--analyze` (공급사 SBOM 검증) |
 | `{Project}_{Version}_scancode.json` | `--deep-license` |

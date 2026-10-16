@@ -14,10 +14,13 @@ export const FORBIDDEN_TERMS = [
   { lng: "ko", pattern: /결과물/, prefer: "산출물 (스캔이 만든 파일)" },
   { lng: "ko", pattern: /재스캔/, prefer: "다시 스캔" },
   { lng: "ko", pattern: /위험분석/, prefer: "오픈소스 위험 보고서 (문서 이름) 또는 위험 분석 (띄어 씀)" },
+  { lng: "ko", pattern: /포맷 검증/, prefer: "적합성 검사" },
   { lng: "ko", pattern: /아티팩트/, prefer: "산출물 또는 빌드 산출물" },
   { lng: "en", pattern: /SBOM Validation/i, prefer: "Conformance check" },
   { lng: "en", pattern: /conformance validation/i, prefer: "conformance check" },
   { lng: "en", pattern: /conformance report/i, prefer: "Conformance check report" },
+  { lng: "en", pattern: /Supplier SBOM risk report/i, prefer: "Open-source risk report (subtitle: Supplier SBOM under review)" },
+  { lng: "en", pattern: /format validation/i, prefer: "Conformance check" },
 ];
 
 /** Flatten a nested message object to [dottedKey, string] pairs. */

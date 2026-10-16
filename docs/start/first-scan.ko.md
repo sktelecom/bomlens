@@ -37,9 +37,9 @@ git clone --depth 1 https://github.com/sktelecom/bomlens.git && cd bomlens
 1. 프로젝트 이름과 버전을 입력합니다.
 2. 스캔 대상을 고릅니다. 현재 폴더, GitHub URL, ZIP 업로드, SBOM 업로드, 펌웨어 업로드, Docker 이미지 중에서 선택합니다.
 3. 스캔 실행을 누르면 진행 로그가 실시간으로 표시됩니다.
-4. 완료되면 SBOM, 고지문, 위험분석 보고서, 보안 보고서를 열거나 내려받습니다.
+4. 완료되면 SBOM, 고지문, 오픈소스 위험 보고서, 보안 보고서를 열거나 내려받습니다.
 
-![결과 화면 — 종류별 결과물 카드와 전체 ZIP 다운로드](../images/app-results-ko.png)
+![결과 화면 — 종류별 산출물 카드와 전체 ZIP 다운로드](../images/app-results-ko.png)
 
 > 펌웨어 업로드 타일은 Docker 엔진이 켜져 있으면 자동으로 나타납니다. 자세한 동작은 [펌웨어 분석 가이드](../guides/firmware.ko.md)를 참고하세요.
 
@@ -62,7 +62,7 @@ UI 화면 구성과 스캔 대상별 상세는 [웹 UI 레퍼런스](../referenc
 
 ZIP 소스(`--target app.zip`), 기존 SBOM(`--analyze sbom.json`), 펌웨어(`--target dev.bin --firmware`), Docker 이미지(`--target nginx:latest`) 등 입력 형태별 처리는 [시나리오별 가이드](../guides/by-input.ko.md)에 정리되어 있습니다.
 
-> `--generate-only`는 산출물을 업로드 없이 로컬에만 저장합니다(취약점 스캔은 그대로 수행). `--all`은 고지문, SBOM, 위험분석 보고서를 한 번에 만듭니다. 전체 옵션은 [CLI 레퍼런스](../reference/cli.ko.md#옵션-레퍼런스)에, 업로드는 `--trusca <project_id>`(또는 `UPLOAD_TARGET`)로 하며 절차는 [업로드 가이드](../guides/upload.ko.md)에 있습니다.
+> `--generate-only`는 산출물을 업로드 없이 로컬에만 저장합니다(취약점 스캔은 그대로 수행). `--all`은 고지문, SBOM, 오픈소스 위험 보고서를 한 번에 만듭니다. 전체 옵션은 [CLI 레퍼런스](../reference/cli.ko.md#옵션-레퍼런스)에, 업로드는 `--trusca <project_id>`(또는 `UPLOAD_TARGET`)로 하며 절차는 [업로드 가이드](../guides/upload.ko.md)에 있습니다.
 
 ## 결과 파일 이해하기
 
@@ -73,7 +73,7 @@ ZIP 소스(`--target app.zip`), 기존 SBOM(`--analyze sbom.json`), 펌웨어(`-
 | `{Project}_{Version}_bom.json` | SBOM (CycloneDX 1.6) |
 | `{Project}_{Version}_NOTICE.{txt,html}` | 라이선스별로 묶은 오픈소스 고지문 |
 | `{Project}_{Version}_security.{json,md,html}` | Trivy 취약점 보고서 |
-| `{Project}_{Version}_risk-report.{md,html}` | 오픈소스 위험분석 보고서(기본 생성) |
+| `{Project}_{Version}_risk-report.{md,html}` | 오픈소스 위험 보고서(기본 생성) |
 
 SBOM은 [CycloneDX 1.6](https://cyclonedx.org/) 형식의 JSON입니다.
 
@@ -192,7 +192,7 @@ docker pull ghcr.io/sktelecom/bomlens:latest
 | 목표 | 문서 |
 |------|------|
 | 입력 형태(GitHub, ZIP, SBOM, 펌웨어 등)별 처리 | [시나리오별 가이드](../guides/by-input.ko.md) |
-| 고지문, 보안 보고서, 위험분석보고서, 웹 UI | [고지문·보안 보고서 가이드](../guides/reports.ko.md) |
+| 고지문, 보안 보고서, 오픈소스 위험 보고서, 웹 UI | [고지문·보안 보고서 가이드](../guides/reports.ko.md) |
 | 전체 옵션과 CI/CD 연동 방법 | [CLI 레퍼런스](../reference/cli.ko.md) |
 | 언어별 예제 프로젝트 실습 | [지원 생태계](../reference/ecosystems.ko.md) |
 | 내부 구조 이해 | [아키텍처](../concepts/architecture.ko.md) |

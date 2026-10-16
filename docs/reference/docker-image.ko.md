@@ -152,7 +152,7 @@ MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL='*' docker run --rm \
 | `DEEP_LICENSE_TIMEOUT` | — | `600` | `DEEP_LICENSE`: scancode를 멈출 때까지의 초 |
 | `BOMLENS_DEEP_LICENSE_ALL` | — | — | `DEEP_LICENSE`: `1`이면 의존성, 빌드, 도구 폴더까지 검사 (기본은 제외) |
 | `REACHABILITY` | — | `false` | 각 Go 보안 권고의 코드에 도달하는지 govulncheck로 판정 (CLI `--reachability`). `BINARY` 모드는 실행 파일을 읽고, `SOURCE`와 `POSTPROCESS`는 1단계가 남긴 govulncheck 출력을 읽는다(CLI가 이미지의 govulncheck를 1단계에 넘긴다) |
-| `GENERATE_REPORT` | — | `false` | 오픈소스위험분석보고서 생성 (CLI 기본값과 달리 직접 실행은 꺼짐) |
+| `GENERATE_REPORT` | — | `false` | 오픈소스 위험 보고서 생성 (CLI 기본값과 달리 직접 실행은 꺼짐) |
 | `ENRICH_MAVEN_CPE` | — | `true` | maven 컴포넌트에 groupId로 유도한 NVD 매칭용 `cpe:2.3`을 부여해 CPE 기반 엔진이 NVD 전용 CVE를 찾게 함. 매핑 불가한 group은 CPE를 붙이지 않음 (AI SBOM은 건너뜀) |
 | `ENRICH_GITHUB_CPE` | — | `true` | 소수의 손검증된 `pkg:github/` 컴포넌트(패키지 매니저 생태계가 없는 대형 C/C++ 프로젝트에 흔한, 소스 저장소 좌표로만 식별되는 컴포넌트)에 NVD 매칭용 `cpe:2.3`을 부여해 CPE 기반 엔진이 NVD 전용 CVE를 찾게 함. 큐레이션 목록에 없으면 CPE를 붙이지 않음 (AI SBOM은 건너뜀) |
 | `ENRICH_UPSTREAM_PURL` | — | `true` | 펌웨어, 루트 파일시스템, 바이너리 스캔과 Yocto 빌드의 기록에서 읽은 SBOM에서 purl이 없거나 `pkg:generic`, `pkg:opkg` purl인 컴포넌트에 upstream 소스 저장소 purl(`pkg:github/<owner>/<repo>@<tag>`, `pkg:sourceforge`, `pkg:gnu`)을 붙임. `docker/lib/upstream-purl-map.json`의 변환표에 있는 프로젝트와, 소스 내려받기 주소가 GitHub이나 GNU 릴리스를 밝히는 컴포넌트만 바꾸고, 나머지는 원래 식별자를 둠 |
@@ -197,7 +197,7 @@ MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL='*' docker run --rm \
 | `LICENSE_REGISTRY_VERIFY` | — | GPL, AGPL, SSPL-1.0, BUSL-1.1, CC-BY-NC 식별자 | 하나뿐일 때 레지스트리와 대조할 SPDX 식별자(공백 또는 쉼표 구분) |
 | `LICENSE_REGISTRY_BUDGET` | — | `240` | 조회 전체에 허용하는 시간(초). 시간 안에 조회하지 못한 컴포넌트는 그대로 두고 단계를 degraded로 기록한다 |
 | `LICENSE_REGISTRY_API` | — | `https://api.deps.dev/v3` | deps.dev v3 버전 조회에 같은 형식으로 답하는 서버의 기본 URL. 레지스트리에 자체 미러나 프록시로만 닿는 네트워크용. 응답이 없으면 컴포넌트는 그대로 두고 단계를 degraded(`unavailable`)로 기록한다 |
-| `PURL_RESOLVE` | — | `false` | `--analyze` 전용(스크립트의 `--resolve-purl`). 각 식별자를 패키지 저장소(deps.dev)에 조회해 적합성 보고서에 권고 항목으로 덧붙인다. 네트워크를 사용 |
+| `PURL_RESOLVE` | — | `false` | `--analyze` 전용(스크립트의 `--resolve-purl`). 각 식별자를 패키지 저장소(deps.dev)에 조회해 적합성 검사 보고서에 권고 항목으로 덧붙인다. 네트워크를 사용 |
 | `PURL_RESOLVE_IGNORE` | — | — | 조회에서 제외할 네임스페이스 접두사(공백 또는 쉼표 구분). 사내 저장소에만 올리는 네임스페이스에 쓴다. 잘못된 식별자와 구분할 수 없기 때문이다 |
 | `PURL_RESOLVE_BUDGET` | — | `240` | 조회 전체에 허용하는 시간(초). 시간 안에 조회하지 못한 식별자는 없음이 아니라 확인 불가로 보고한다 |
 
