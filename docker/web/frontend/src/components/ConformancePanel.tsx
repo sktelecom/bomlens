@@ -267,7 +267,7 @@ function CheckRow({ check }: { check: ConformanceCheck }) {
             {missing.map(({ name, count }: { name: string; count: number }) => (
               <code
                 key={name}
-                className="rounded bg-muted px-1.5 py-0.5 font-mono text-mono text-foreground"
+                className="break-all rounded bg-muted px-1.5 py-0.5 font-mono text-mono text-foreground"
               >
                 {count > 1 ? `${name} ×${count}` : name}
               </code>
@@ -283,7 +283,7 @@ function CheckRow({ check }: { check: ConformanceCheck }) {
             {explained.map(({ name, reason }, i) => (
               <code
                 key={`${name}-${i}`}
-                className="rounded bg-muted px-1.5 py-0.5 font-mono text-mono text-foreground"
+                className="break-all rounded bg-muted px-1.5 py-0.5 font-mono text-mono text-foreground"
               >
                 {name}{" "}
                 <span className="font-sans text-muted-foreground">
@@ -306,7 +306,7 @@ function CheckRow({ check }: { check: ConformanceCheck }) {
               {evidence.map((e, i) => (
                 <code
                   key={`${e}-${i}`}
-                  className="rounded bg-muted px-1.5 py-0.5 font-mono text-mono text-foreground"
+                  className="break-all rounded bg-muted px-1.5 py-0.5 font-mono text-mono text-foreground"
                 >
                   {e}
                 </code>

@@ -8,6 +8,7 @@ import {
   filterRecent,
   formatRelativeTime,
   middleEllipsis,
+  pickComparedScan,
   pickStartScans,
   presentTypes,
   scanComparison,
@@ -318,5 +319,25 @@ describe("middleEllipsis", () => {
 
   it("ignores a limit too small to be useful", () => {
     expect(middleEllipsis("abcdef", 2)).toBe("abcdef");
+  });
+});
+
+describe("pickComparedScan", () => {
+  it("returns the newest scan of a project that was scanned twice", () => {
+    const scans = [
+      scan({ id: "a_1", project: "a", version: "1", generatedAt: 1 }),
+      scan({ id: "b_1", project: "b", version: "1", generatedAt: 2 }),
+      scan({ id: "a_2", project: "a", version: "2", generatedAt: 3 }),
+    ];
+    expect(pickComparedScan(scans)?.id).toBe("a_2");
+  });
+
+  it("returns null when every project was scanned once", () => {
+    expect(
+      pickComparedScan([
+        scan({ id: "a_1", project: "a", generatedAt: 1 }),
+        scan({ id: "b_1", project: "b", generatedAt: 2 }),
+      ]),
+    ).toBeNull();
   });
 });

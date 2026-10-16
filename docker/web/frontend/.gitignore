@@ -10,3 +10,4 @@
 # Before/after audit captures (npm run capture:audit) and their demo build
 /audit-out/
 /dist-audit/
+/dist-demo-mode/

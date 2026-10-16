@@ -6,7 +6,7 @@ import { useTranslation } from "react-i18next";
 
 import { Card, CardContent } from "@/components/ui/card";
 import type { RecentScan } from "@/lib/api";
-import { pickStartScans, scanTypeLabelKey } from "@/lib/recent";
+import { pickComparedScan, pickStartScans, scanTypeLabelKey } from "@/lib/recent";
 import { scanHash } from "@/lib/route";
 
 /**
@@ -19,6 +19,7 @@ import { scanHash } from "@/lib/route";
 export function DemoStartHere({ scans }: { scans: RecentScan[] }) {
   const { t } = useTranslation();
   const picks = pickStartScans(scans);
+  const compared = pickComparedScan(scans);
   if (picks.length === 0) return null;
   return (
     <Card data-testid="demo-start-here">
@@ -45,6 +46,17 @@ export function DemoStartHere({ scans }: { scans: RecentScan[] }) {
             </li>
           ))}
         </ul>
+        {compared && (
+          <p className="text-body-sm text-muted-foreground md:max-w-xs">
+            <a
+              href={scanHash(compared.id)}
+              className="rounded font-medium text-foreground underline underline-offset-2 hover:no-underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              data-testid="demo-compare-link"
+            >
+              {t("recent.demoCompare", { project: compared.project, version: compared.version })}
+            </a>
+          </p>
+        )}
       </CardContent>
     </Card>
   );

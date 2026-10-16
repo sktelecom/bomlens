@@ -1,11 +1,13 @@
 // Copyright 2026 SK Telecom Co., Ltd.
 // SPDX-License-Identifier: Apache-2.0
 
-import { type ChildProcess, execFileSync, spawn } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync } from "node:fs";
-import { extname, join, relative, resolve } from "node:path";
+import type { ChildProcess } from "node:child_process";
+import { existsSync, mkdirSync } from "node:fs";
+import { join, relative, resolve } from "node:path";
 
 import { expect, test, type Page } from "@playwright/test";
+
+import { serveDemoData, startDemoBundle } from "./demo-bundle";
 
 // Before/after audit capture set, run on demand: `npm run capture:audit`.
 //
@@ -27,8 +29,6 @@ test.skip(process.env.AUDIT !== "1", "opt-in via AUDIT=1 (npm run capture:audit)
 
 const FRONTEND = process.cwd(); // Playwright runs from docker/web/frontend
 const REPO = resolve(FRONTEND, "..", "..", "..");
-const DEMO_DATA = join(REPO, "docs", "demo", "data");
-const DATA_BASE = "/demo-data";
 const PORT = Number(process.env.AUDIT_PORT ?? 4174);
 const ORIGIN = `http://localhost:${PORT}`;
 const OUT = resolve(process.env.AUDIT_OUT ?? join(FRONTEND, "audit-out"));
@@ -140,31 +140,6 @@ const SCENES: Scene[] = [
   }),
 ];
 
-const MIME: Record<string, string> = {
-  ".json": "application/json",
-  ".html": "text/html",
-  ".txt": "text/plain",
-  ".zip": "application/zip",
-};
-
-// Answer the demo bundle's data requests from docs/demo/data, confined to that
-// folder so a crafted path cannot read anything else.
-async function serveDemoData(page: Page) {
-  await page.route(`**${DATA_BASE}/**`, async (route) => {
-    const rel = decodeURIComponent(new URL(route.request().url()).pathname.slice(DATA_BASE.length));
-    const file = resolve(DEMO_DATA, "." + rel);
-    const inside = relative(DEMO_DATA, file);
-    if (inside.startsWith("..")) return route.fulfill({ status: 404, body: "not found" });
-    let body: Buffer;
-    try {
-      body = readFileSync(file);
-    } catch {
-      return route.fulfill({ status: 404, body: "not found" });
-    }
-    return route.fulfill({ contentType: MIME[extname(file)] ?? "application/octet-stream", body });
-  });
-}
-
 let preview: ChildProcess | undefined;
 
 test.describe.configure({ mode: "serial" }); // one worker, one demo build
@@ -172,26 +147,7 @@ test.describe.configure({ mode: "serial" }); // one worker, one demo build
 test.beforeAll(async () => {
   test.setTimeout(240_000);
   mkdirSync(OUT, { recursive: true });
-  execFileSync("npx", ["vite", "build", "--outDir", "dist-audit", "--emptyOutDir"], {
-    cwd: FRONTEND,
-    stdio: "ignore",
-    env: { ...process.env, VITE_DEMO_DATA_BASE: DATA_BASE },
-  });
-  preview = spawn(
-    "npx",
-    ["vite", "preview", "--outDir", "dist-audit", "--port", String(PORT), "--strictPort"],
-    { cwd: FRONTEND, stdio: "ignore" },
-  );
-  // Wait until the preview server answers.
-  for (let i = 0; i < 60; i++) {
-    try {
-      if ((await fetch(ORIGIN)).ok) return;
-    } catch {
-      /* not up yet */
-    }
-    await new Promise((r) => setTimeout(r, 500));
-  }
-  throw new Error("audit preview server did not start");
+  preview = await startDemoBundle("dist-audit", PORT);
 });
 
 test.afterAll(() => {
