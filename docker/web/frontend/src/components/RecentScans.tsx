@@ -20,6 +20,7 @@ import { type ReactNode, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { Badge } from "@/components/ui/badge";
+import { FOCUS_RING, SELECTED_SOLID, SELECTED_TILE } from "@/components/ui/selectable";
 import { buttonVariants } from "@/components/ui/button";
 import { IS_STATIC_DEMO } from "@/lib/demo";
 import { Card, CardContent } from "@/components/ui/card";
@@ -86,7 +87,7 @@ function SummaryCard({
       <span
         className={cn(
           "text-3xl font-semibold tabular-nums",
-          accent && "text-brand-accent",
+          accent && "text-role-severe-fg",
         )}
       >
         {fmt(value)}
@@ -98,7 +99,7 @@ function SummaryCard({
     <Card
       className={cn(
         "transition-colors duration-fast ease-out-soft",
-        active ? "border-brand bg-brand/5" : "hover:bg-muted/40",
+        active ? SELECTED_TILE : "hover:bg-muted/40",
       )}
     >
       <button
@@ -149,9 +150,9 @@ function FilterChip({
       className={cn(
         "inline-flex h-9 items-center rounded-full border px-3.5 text-sm",
         "transition-[color,border-color,background-color,box-shadow] duration-fast ease-out-soft",
-        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+        FOCUS_RING,
         active
-          ? "ring-2 ring-foreground ring-offset-1 font-medium text-foreground"
+          ? SELECTED_SOLID
           : "border-input text-muted-foreground hover:bg-muted hover:text-foreground",
       )}
     >
@@ -192,7 +193,7 @@ function ScanLabel({ scan }: { scan: RecentScan }) {
 function TypeBadge({ scan }: { scan: RecentScan }) {
   const { t } = useTranslation();
   return scanType(scan) === "ai" ? (
-    <Badge className="border-transparent bg-brand/10 text-brand-strong">
+    <Badge variant="outline" className="font-semibold">
       {t(scanTypeLabelKey(scan))}
     </Badge>
   ) : (
@@ -244,7 +245,7 @@ function ScanRows({
               <div className="flex flex-wrap items-center gap-1.5">
                 <TypeBadge scan={s} />
                 {s.maxSeverity ? (
-                  <Badge tone={SEV_TONE[s.maxSeverity]}>
+                  <Badge tone={SEV_TONE[s.maxSeverity]} mark>
                     {t(`severity.${s.maxSeverity}`)}
                   </Badge>
                 ) : null}
@@ -366,7 +367,7 @@ export function RecentScans({ scans, newHref, onDelete }: Props) {
         // so orient them — what BomLens does, how to start, and what it produces.
         <Card>
           <CardContent className="flex flex-col items-center gap-5 px-6 py-12 text-center">
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-brand/10 text-brand">
+            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-muted text-foreground">
               <ScanLine className="h-6 w-6" aria-hidden />
             </div>
             <div className="space-y-1.5">
@@ -523,7 +524,7 @@ export function RecentScans({ scans, newHref, onDelete }: Props) {
                       <td className="px-4 py-3">
                         <span className="inline-flex items-center gap-1.5">
                           {s.maxSeverity ? (
-                            <Badge tone={SEV_TONE[s.maxSeverity]}>
+                            <Badge tone={SEV_TONE[s.maxSeverity]} mark>
                               {t(`severity.${s.maxSeverity}`)}
                             </Badge>
                           ) : (

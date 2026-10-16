@@ -9,7 +9,7 @@ import type { ComponentItem } from "@/lib/api";
 import { licenseGroups, licenseRiskTier } from "@/lib/licenses";
 import { useFormatNumber } from "@/lib/format";
 
-import { TIER_FILL, TIER_FLAGGED, TierBadge } from "./LicenseRiskBar";
+import { TIER_FILL, TierBadge } from "./LicenseRiskBar";
 
 /** Rows shown before the "+N more" line, when the caller asks for a short list. */
 const TOP = 8;
@@ -61,7 +61,7 @@ export function LicenseSummary({
       label: g.name,
       value: g.count,
       fill: TIER_FILL[tier],
-      badge: TIER_FLAGGED.has(tier) ? <TierBadge tier={tier} /> : undefined,
+      badge: <TierBadge tier={tier} />,
     };
   });
   if (unlicensed > 0) {

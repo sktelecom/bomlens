@@ -69,7 +69,7 @@ export function AdvisoriesWithoutCve({
                 {a.rows.map((r, i) => (
                   <tr key={`${r.id}-${r.purl || r.pkg}-${i}`} className="border-b last:border-0">
                     <td className="px-3 py-1.5">
-                      <Badge tone={severityTone(r.severity)}>{t(`severity.${r.severity}`)}</Badge>
+                      <Badge tone={severityTone(r.severity)} mark>{t(`severity.${r.severity}`)}</Badge>
                     </td>
                     <td className="px-3 py-1.5">
                       <span className="font-mono text-foreground">{r.id}</span>

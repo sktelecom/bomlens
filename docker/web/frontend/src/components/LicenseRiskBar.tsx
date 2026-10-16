@@ -1,11 +1,12 @@
 // Copyright 2026 SK Telecom Co., Ltd.
 // SPDX-License-Identifier: Apache-2.0
 
-import { Scale } from "lucide-react";
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 
 import { Badge } from "@/components/ui/badge";
+import { Marker, TIER_SHAPE } from "@/components/ui/marker";
+import { SELECTED_OUTLINE, UNSELECTED_OUTLINE } from "@/components/ui/selectable";
 import type { ComponentItem } from "@/lib/api";
 import {
   LICENSE_TIER_ORDER,
@@ -15,27 +16,29 @@ import {
 import { cn } from "@/lib/utils";
 import { useFormatNumber } from "@/lib/format";
 
+/** Licence tiers use the category palette, never the severity roles: an
+ *  obligation is not a vulnerability, and two bars side by side on the Overview
+ *  must not read on one scale. Review-needed and uncategorized are not findings. */
 const TONE: Record<
   LicenseRiskTier,
-  "critical" | "high" | "medium" | "low" | "info"
+  "catNetwork" | "catStrong" | "catWeak" | "catReview" | "catPermissive" | "info"
 > = {
-  "network-copyleft": "critical",
-  "strong-copyleft": "high",
-  "weak-copyleft": "medium",
-  "review-needed": "medium",
+  "network-copyleft": "catNetwork",
+  "strong-copyleft": "catStrong",
+  "weak-copyleft": "catWeak",
+  "review-needed": "catReview",
   uncategorized: "info",
-  permissive: "low",
+  permissive: "catPermissive",
 };
 
-// Bar segment fill. review-needed carries the warning hue so it reads apart
-// from weak's gold when both are present (the review card is the same hue).
+// Bar segment fill, one category colour per tier.
 const BAR: Record<LicenseRiskTier, string> = {
-  "network-copyleft": "bg-risk-critical",
-  "strong-copyleft": "bg-risk-high",
-  "weak-copyleft": "bg-risk-medium",
-  "review-needed": "bg-warning-solid",
-  uncategorized: "bg-risk-info",
-  permissive: "bg-risk-low",
+  "network-copyleft": "bg-cat-network-emphasis",
+  "strong-copyleft": "bg-cat-strong-emphasis",
+  "weak-copyleft": "bg-cat-weak-emphasis",
+  "review-needed": "bg-cat-review-emphasis",
+  uncategorized: "bg-role-neutral-emphasis",
+  permissive: "bg-cat-permissive-emphasis",
 };
 
 const LABEL: Record<LicenseRiskTier, string> = {
@@ -70,50 +73,50 @@ export function useTierHint(): (tier: LicenseRiskTier) => string {
 }
 
 /**
- * Fill for a flagged row in the distribution list.
- *
- * The brand accent, matching the left rail's active-section tint, rather than
- * the risk hues the bar above uses. Those hues belong to vulnerability
- * severity; carrying them into a licence list makes an obligation look like a
- * CVE, and the amber/orange end of that scale dominated a row-wide fill.
- *
- * One accent for every flagged tier: the tint says "this row has obligations",
- * and the badge beside the label says which kind. The distinction lives in the
- * text, not in four shades a reader would have to learn.
- *
- * Permissive and uncategorized stay neutral — neither is a finding, and tinting
- * every row would leave nothing standing out.
+ * Fill for a row in the distribution list: the tier's category colour at a low
+ * alpha, so the row says which tier it is without the loud fill of the bar.
+ * Permissive and uncategorized stay neutral: neither is a finding, and tinting
+ * every row would leave nothing standing out. The tier is also named by the
+ * marker shape and its tooltip, so the tint is never the only signal.
  */
 export const TIER_FILL: Record<LicenseRiskTier, string> = {
-  "network-copyleft": "bg-brand/15",
-  "strong-copyleft": "bg-brand/15",
-  "weak-copyleft": "bg-brand/15",
-  "review-needed": "bg-brand/15",
+  "network-copyleft": "bg-cat-network-emphasis/20",
+  "strong-copyleft": "bg-cat-strong-emphasis/20",
+  "weak-copyleft": "bg-cat-weak-emphasis/20",
+  "review-needed": "bg-cat-review-emphasis/20",
   uncategorized: "bg-muted-foreground/20",
   permissive: "bg-muted-foreground/20",
 };
 
-/** Tiers that carry an obligation worth a second look, so they get a badge. */
-export const TIER_FLAGGED: ReadonlySet<LicenseRiskTier> = new Set([
-  "network-copyleft",
-  "strong-copyleft",
-  "weak-copyleft",
-  "review-needed",
-]);
+/** Label colour per tier, the fg shade of its category (AA on card and page). */
+const TIER_TEXT: Record<LicenseRiskTier, string> = {
+  "network-copyleft": "text-cat-network-fg",
+  "strong-copyleft": "text-cat-strong-fg",
+  "weak-copyleft": "text-cat-weak-fg",
+  "review-needed": "text-cat-review-fg",
+  uncategorized: "text-role-neutral-fg",
+  permissive: "text-cat-permissive-fg",
+};
 
 /**
- * The marker beside a flagged license in the distribution list. It exists so the
- * tint is not the only thing saying "this one has obligations" — colour alone
- * fails anyone who cannot separate these hues, and a translucent fill is easy to
- * miss regardless. Names its tier, so hovering or reading it aloud is specific.
+ * The marker beside a license in the distribution list: a shape of its own per
+ * tier, in the tier's category colour. It exists so the tint is not the only
+ * thing saying which class a row belongs to; hue alone fails anyone who cannot
+ * separate it, and a translucent fill is easy to miss regardless. Names its
+ * tier, so hovering or reading it aloud is specific.
  */
 export function TierBadge({ tier }: { tier: LicenseRiskTier }) {
   const { t } = useTranslation();
   const tierHint = useTierHint();
   const label = t(TIER_LABEL[tier]);
   return (
-    <span title={`${label}. ${tierHint(tier)}`} className="flex shrink-0 items-center">
-      <Scale className="h-3.5 w-3.5 text-muted-foreground" role="img" aria-label={label} />
+    <span
+      title={`${label}. ${tierHint(tier)}`}
+      role="img"
+      aria-label={label}
+      className="flex shrink-0 items-center"
+    >
+      <Marker shape={TIER_SHAPE[tier]} className={TIER_TEXT[tier]} />
     </span>
   );
 }
@@ -198,7 +201,7 @@ export function LicenseRiskBar({
         {LICENSE_TIER_ORDER.map((tier) => {
           if (summary[tier] === 0) return null;
           const badge = (
-            <Badge tone={TONE[tier]} title={tierHint(tier)}>
+            <Badge tone={TONE[tier]} mark={TIER_SHAPE[tier]} title={tierHint(tier)}>
               {t(LABEL[tier])} {fmt(summary[tier])}
             </Badge>
           );
@@ -217,8 +220,7 @@ export function LicenseRiskBar({
                 // Rest-state border so this reads as pressable next to identical-
                 // looking but inert badges elsewhere (see SeverityBar's own for
                 // why this is a real `border`, not a low-contrast `ring`).
-                isSel ? "ring-2 ring-foreground ring-offset-1" : "border-border",
-                Boolean(selected) && !isSel && "opacity-60",
+                isSel ? SELECTED_OUTLINE : UNSELECTED_OUTLINE,
               )}
             >
               {badge}

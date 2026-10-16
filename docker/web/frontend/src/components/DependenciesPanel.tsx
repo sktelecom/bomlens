@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { Button } from "@/components/ui/button";
+import { SELECTED_SOLID } from "@/components/ui/selectable";
 import { ErrorState, LoadingState } from "@/components/ui/state";
 import type { ComponentItem } from "@/lib/api";
 import { severityFor, vulnSeverityIndex } from "@/lib/dependencies";
@@ -97,7 +98,7 @@ export function DependenciesPanel({
           variant="ghost"
           data-testid="deps-view-graph"
           aria-pressed={view === "graph"}
-          className={cn(view === "graph" && "ring-2 ring-foreground ring-offset-1")}
+          className={cn(view === "graph" && SELECTED_SOLID)}
           onClick={() => setView("graph")}
         >
           <GitFork className="h-4 w-4" />
@@ -109,7 +110,7 @@ export function DependenciesPanel({
           variant="ghost"
           data-testid="deps-view-tree"
           aria-pressed={view === "tree"}
-          className={cn(view === "tree" && "ring-2 ring-foreground ring-offset-1")}
+          className={cn(view === "tree" && SELECTED_SOLID)}
           onClick={() => setView("tree")}
         >
           <ListTree className="h-4 w-4" />

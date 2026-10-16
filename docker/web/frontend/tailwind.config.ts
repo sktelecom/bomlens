@@ -10,6 +10,11 @@ import animate from "tailwindcss-animate";
  * custom properties; this file maps them to utility classes. Dark mode IS
  * populated here (BomLens ships a dark theme — see index.css `.dark`).
  */
+/** The four shades every role and category carries; see index.css. */
+const SHADES = ["fg", "muted", "emphasis", "border"] as const;
+const shadeSet = (prefix: string) =>
+  Object.fromEntries(SHADES.map((s) => [s, `rgb(var(--${prefix}-${s}) / <alpha-value>)`]));
+
 const config: Config = {
   content: ["./index.html", "./src/**/*.{ts,tsx}"],
   darkMode: ["class"],
@@ -85,6 +90,25 @@ const config: Config = {
           "medium-fg": "rgb(var(--risk-medium-fg) / <alpha-value>)",
           "low-fg": "rgb(var(--risk-low-fg) / <alpha-value>)",
           "info-fg": "rgb(var(--risk-info-fg) / <alpha-value>)",
+        },
+        // Colour roles: `text-role-danger-fg`, `bg-role-info-muted`,
+        // `border-role-attention-border`, `bg-role-severe-emphasis`. The legacy
+        // risk/success/warning names below are aliases of these (index.css).
+        role: {
+          danger: shadeSet("role-danger"),
+          severe: shadeSet("role-severe"),
+          attention: shadeSet("role-attention"),
+          info: shadeSet("role-info"),
+          success: shadeSet("role-success"),
+          neutral: shadeSet("role-neutral"),
+        },
+        // Category palette for non-severity classifications (licence tiers).
+        cat: {
+          permissive: shadeSet("cat-permissive"),
+          weak: shadeSet("cat-weak"),
+          strong: shadeSet("cat-strong"),
+          network: shadeSet("cat-network"),
+          review: shadeSet("cat-review"),
         },
         // Success and warning states — same channel form as `risk` above, and
         // for the same reason: components tint these with alpha modifiers.

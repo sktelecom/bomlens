@@ -28,12 +28,23 @@ const VULN_TONE: Record<Severity, "critical" | "high" | "medium" | "low" | "info
  * Interactions: click a node to see its details, type to highlight matching
  * packages (others dim). Canvas colors are read from the CSS design tokens at
  * mount so the graph follows light/dark (the canvas can't use Tailwind
- * classes); the direct-dependency accent keeps the SK red brand mark.
+ * classes). The direct-dependency accent is the foreground colour: the brand
+ * red is not a data colour, and a red dot reads as "problem" next to the
+ * severity rings (token-lint rejects brand tokens in this file).
  *
  * Large graphs are slow to lay out and unreadable, so above NODE_CAP we skip
  * the canvas and point the user at the tree view instead.
  */
 const NODE_CAP = 1500;
+
+/** Cytoscape shape per severity, mirroring `SEVERITY_SHAPE` in ui/marker.tsx.
+ *  UNKNOWN keeps the default circle: its ring is the neutral grey. */
+const NODE_SHAPE: Partial<Record<Severity, string>> = {
+  CRITICAL: "diamond",
+  HIGH: "triangle",
+  MEDIUM: "ellipse",
+  LOW: "rectangle",
+};
 
 let dagreRegistered = false;
 
@@ -64,8 +75,8 @@ function themeColors() {
     edge: hsl("--border"),
     // Card surface — used as a translucent plate behind node labels.
     bg: hsl("--card"),
-    // Direct-dependency accent — SK red brand token (legend mark).
-    direct: hsl("--brand"),
+    // Direct-dependency accent: the foreground colour (legend mark).
+    direct: hsl("--foreground"),
     risk: {
       CRITICAL: rgb("--risk-critical"),
       HIGH: rgb("--risk-high"),
@@ -187,10 +198,16 @@ export function DependencyGraph({
               selector: 'node[direct = "1"]',
               style: { "background-color": c.direct, width: 14, height: 14 },
             },
-            // Vulnerable nodes get a severity-coloured ring.
+            // Vulnerable nodes get a severity-coloured ring and, for the four
+            // graded severities, the same shape as the severity badge (diamond,
+            // triangle, circle, square), so the grade does not rest on hue.
             ...SEVERITY_ORDER.map((sev) => ({
               selector: `node[vuln = "${sev}"]`,
-              style: { "border-width": 3, "border-color": c.risk[sev] },
+              style: {
+                "border-width": 3,
+                "border-color": c.risk[sev],
+                ...(NODE_SHAPE[sev] ? { shape: NODE_SHAPE[sev] } : {}),
+              },
             })),
             {
               selector: "node.match",
@@ -201,7 +218,7 @@ export function DependencyGraph({
               style: { "border-width": 2, "border-color": c.text },
             },
             { selector: ".dim", style: { opacity: 0.2 } },
-            // Hover trace: the focused node gets a brand ring while the edges of
+            // Hover trace: the focused node gets a foreground ring while the edges of
             // its neighbourhood thicken and recolour to the foreground, so the
             // package's links read clearly against the dimmed rest.
             {
@@ -377,13 +394,13 @@ export function DependencyGraph({
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-muted-foreground">
         <span className="inline-flex items-center gap-1.5">
           <span
-            className="h-2.5 w-2.5 shrink-0 rounded-full border-2 border-brand bg-card"
+            className="h-2.5 w-2.5 shrink-0 rounded-full border-2 border-foreground bg-card"
             aria-hidden
           />
           {t("deps.legendRoot")}
         </span>
         <span className="inline-flex items-center gap-1.5">
-          <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-brand" aria-hidden />
+          <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-foreground" aria-hidden />
           {t("deps.direct")}
         </span>
         <span className="inline-flex items-center gap-1.5">
@@ -434,7 +451,7 @@ export function DependencyGraph({
           <div className="flex items-center gap-2">
             <span className="font-mono font-medium">{selected.label}</span>
             {selected.vuln && (
-              <Badge tone={VULN_TONE[selected.vuln]} title={t("deps.hasVuln")}>
+              <Badge tone={VULN_TONE[selected.vuln]} mark title={t("deps.hasVuln")}>
                 {t(`severity.${selected.vuln}`)}
               </Badge>
             )}
