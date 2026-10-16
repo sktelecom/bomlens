@@ -454,7 +454,10 @@
       "codeNotPresent": "영향받는 패키지가 빌드에 없음",
       "codeNotReachable": "영향받는 함수에 도달하지 않음",
       "other": "도달하지 않음"
-    }
+    },
+    "partial": "일부 단계 실패",
+    "metaScanType": "스캔 유형",
+    "metaGenerated": "스캔 시각"
   },
   "deps": {
     "loading": "의존성을 불러오는 중…",
@@ -592,7 +595,8 @@
     "demoGetTool": "BomLens 받기",
     "demoBannerTitle": "읽기 전용 데모",
     "demoBannerBody": "실제로 스캔한 결과를 그대로 담아 둘러볼 수 있게 한 화면입니다. 여기서는 스캔과 업로드, 삭제가 꺼져 있습니다. 직접 만든 결과를 보려면 각자 환경에서 BomLens를 실행하면 됩니다.",
-    "demoBannerCta": "실행 방법 보기"
+    "demoBannerCta": "실행 방법 보기",
+    "skipToMain": "본문으로 건너뛰기"
   },
   "search": {
     "placeholder": "컴포넌트, CVE 검색…",
@@ -713,7 +717,19 @@
     "attnMalicious": "악성 패키지 {{count}}개: 제거하고 자격 증명을 교체하세요",
     "attnModelRisk": "라이선스나 보안 검토가 필요한 모델·데이터셋 {{count}}건",
     "attnConformanceGap": "채울 수 있는 적합성 항목 {{count}}건",
-    "depNone": "기록된 관계 없음"
+    "depNone": "기록된 관계 없음",
+    "firstChecks": {
+      "title": "먼저 확인할 항목",
+      "note": "이 스캔을 살펴볼 때 참고할 순서입니다. 중요도 순위나 판정이 아닙니다.",
+      "knownExploited": "알려진 악용 취약점 (CISA KEV)",
+      "fixableSevere": "수정 버전이 있는 Critical, High 취약점",
+      "requiredItems": "채워야 할 적합성 검사 필수 항목",
+      "sourceVulns": "출처: 이 스캔의 취약점 결과",
+      "sourceVulnsPartial": "출처: 취약점 결과, 전체 {{total}}건 중 목록에 있는 {{listed}}건에서 집계",
+      "sourceConformance": "출처: 이 스캔의 적합성 검사",
+      "asOf": "스캔 시각 {{time}} 기준"
+    },
+    "summaryLabel": "스캔 요약"
   },
   "pipelineSteps": {
     "enrichAibom": "AI 모델 메타데이터 보강",

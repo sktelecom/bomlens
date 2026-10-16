@@ -4,7 +4,7 @@
 import AxeBuilder from "@axe-core/playwright";
 import { test, expect, type Page } from "@playwright/test";
 
-import { AI_DONE, AI_SBOM, DONE as SOURCE_DONE, SBOM as SOURCE_SBOM } from "./fixtures";
+import { AI_DONE, AI_SBOM, DONE as SOURCE_DONE, FIRMWARE_DONE, SBOM as SOURCE_SBOM } from "./fixtures";
 import { waitForSettled } from "./settle";
 import { COMBOS, seedThemeLang } from "./visual";
 
@@ -260,7 +260,7 @@ const SCANCODE = {
   ],
 };
 
-type Kind = "source" | "ai";
+type Kind = "source" | "ai" | "firmware";
 
 const SECTIONS: Array<{ kind: Kind; section: string }> = [
   { kind: "source", section: "overview" },
@@ -274,6 +274,10 @@ const SECTIONS: Array<{ kind: Kind; section: string }> = [
   { kind: "ai", section: "overview" },
   { kind: "ai", section: "models" },
   { kind: "ai", section: "conformance" },
+  // A firmware scan whose severity bar has a few-pixel Critical and Unknown
+  // segment (the target-size finding, F22).
+  { kind: "firmware", section: "overview" },
+  { kind: "firmware", section: "vulnerabilities" },
 ];
 
 /**
@@ -287,7 +291,7 @@ const SECTIONS: Array<{ kind: Kind; section: string }> = [
 const KNOWN_VIOLATIONS: Record<string, string> = {};
 
 async function openSection(page: Page, kind: Kind, section: string) {
-  const done = kind === "ai" ? AI_DONE : FULL_DONE;
+  const done = kind === "ai" ? AI_DONE : kind === "firmware" ? FIRMWARE_DONE : FULL_DONE;
   const sbom = kind === "ai" ? AI_SBOM : SOURCE_SBOM;
   await page.route("**/capabilities", (r) =>
     r.fulfill({ contentType: "application/json", body: JSON.stringify({ firmware: false, scanoss: false, docker: true, spdxExport: false }) }),
@@ -322,8 +326,10 @@ for (const { kind, section } of SECTIONS) {
       const active = page.locator('nav a[aria-current="page"]');
       await expect(active).toHaveCount(1);
       if (section !== "overview") await expect(active).toHaveAttribute("href", new RegExp(`/${section}$`));
+      // wcag22aa carries target-size (2.5.8), the rule the narrow severity-bar
+      // segments break; the matrix above stops at 2.1 and could not see it.
       const axe = await new AxeBuilder({ page })
-        .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
+        .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"])
         .analyze();
       expect(
         axe.violations.map((v) => `${v.id}: ${v.nodes.length} (${v.nodes[0]?.target.join(" ")})`),
@@ -350,14 +356,22 @@ for (const { kind, section } of SECTIONS) {
 }
 
 test("a skip link lets keyboard users bypass the rail", async ({ page }) => {
-  // WCAG 2.4.1: the first Tab stop should jump past the repeated navigation to
-  // the main content. There is no such link yet, so this is expected to fail.
-  test.fail(true, "no skip-to-content link exists in the shell yet");
+  // WCAG 2.4.1: the first Tab stop jumps past the repeated navigation to the
+  // main content. It is hidden until focused, and following it must not rewrite
+  // the URL hash (the hash is the router).
   await seedThemeLang(page, "light", "en");
   await openSection(page, "source", "overview");
+  const hashBefore = await page.evaluate(() => window.location.hash);
+  await page.mouse.move(0, 0);
   await page.keyboard.press("Tab");
   const first = page.locator(":focus");
   await expect(first).toHaveAttribute("href", /^#/);
+  await expect(first).toHaveText("Skip to main content");
+  await expect(first).toBeVisible();
   const target = await first.getAttribute("href");
-  await expect(page.locator(target ?? "#main")).toHaveCount(1);
+  await expect(page.locator(target ?? "#main-content")).toHaveCount(1);
+
+  await page.keyboard.press("Enter");
+  await expect(page.locator("main")).toBeFocused();
+  expect(await page.evaluate(() => window.location.hash)).toBe(hashBefore);
 });

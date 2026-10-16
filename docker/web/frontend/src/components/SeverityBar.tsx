@@ -28,7 +28,7 @@ const BAR: Record<Severity, string> = {
 interface Props {
   security: SecuritySummary;
   /**
-   * When set, the bar segments and legend badges become filter controls: the
+   * When set, the legend badges become filter controls: the
    * caller owns `selected` and `onSelect` toggles it (re-selecting clears).
    * Omit for a static read-out (e.g. the Overview).
    */
@@ -60,38 +60,27 @@ export function SeverityBar({ security, selected = "", onSelect }: Props) {
         </p>
       ) : (
         <>
+          {/* The bar only displays the split. Its smallest segments can be a few
+              pixels wide, below the 24px target size (WCAG 2.5.8), so picking a
+              band is left to the chips underneath, which are always full size. */}
           <div
             className="flex h-2.5 w-full origin-left animate-grow-x overflow-hidden rounded-full bg-muted"
-            role={interactive ? "group" : "img"}
+            role="img"
             aria-label={t("result.severityTitle")}
           >
             {SEVERITY_ORDER.map((s) => {
               if (security[s] === 0) return null;
-              const segClass = cn(
-                BAR[s],
-                "h-full transition-[opacity,filter] duration-fast ease-out-soft",
-                // Dim the non-selected bands while a filter is active.
-                selected && selected !== s && "opacity-30",
-              );
-              const segStyle = { width: `${(security[s] / total) * 100}%` };
-              const segTitle = `${t(`severity.${s}`)}: ${fmt(security[s])}`;
-              if (!interactive) {
-                return <div key={s} className={segClass} style={segStyle} title={segTitle} />;
-              }
               return (
-                <button
+                <div
                   key={s}
-                  type="button"
-                  aria-pressed={selected === s}
-                  aria-label={`${t(`severity.${s}`)} ${fmt(security[s])}`}
-                  onClick={() => onSelect?.(s)}
                   className={cn(
-                    segClass,
-                    "cursor-pointer hover:brightness-110",
-                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                    BAR[s],
+                    "h-full transition-[opacity,filter] duration-fast ease-out-soft",
+                    // Dim the non-selected bands while a filter is active.
+                    selected && selected !== s && "opacity-30",
                   )}
-                  style={segStyle}
-                  title={segTitle}
+                  style={{ width: `${(security[s] / total) * 100}%` }}
+                  title={`${t(`severity.${s}`)}: ${fmt(security[s])}`}
                 />
               );
             })}

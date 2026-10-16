@@ -641,8 +641,8 @@ for (const [label, sbomOver, expected] of SUBTITLES) {
     await page.getByTestId("run-scan").click();
     await page.locator("main h1").waitFor();
 
-    const subtitle = page.locator("main h1").locator("xpath=../following-sibling::p[1]");
-    await expect(subtitle).toHaveText(expected);
+    // The scan type sits on the one-line meta row above the section title.
+    await expect(page.getByTestId("result-kind")).toHaveText(expected);
   });
 }
 
@@ -1910,7 +1910,7 @@ async function stubMaliciousAndRun(page: Page) {
 test("Overview leads with malicious packages, above critical vulnerabilities", async ({ page }) => {
   await stubMaliciousAndRun(page);
 
-  const attention = page.locator("main ul li a");
+  const attention = page.getByTestId("needs-attention").locator("li a");
   // Ordering is the assertion: a package already running in the build outranks
   // a vulnerability waiting to be patched.
   await expect(attention.first()).toContainText(/known-malicious/i);

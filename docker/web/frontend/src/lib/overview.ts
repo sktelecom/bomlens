@@ -159,3 +159,87 @@ function riskyComponents(result: DoneEvent): ComponentItem[] {
 export function riskyComponentCount(result: DoneEvent): number {
   return riskyComponents(result).length;
 }
+
+/**
+ * One thing worth looking at first, with where its number came from. A reference
+ * order for reading the scan, not a verdict: nothing here judges the scan or ranks
+ * importance, and every figure is a count BomLens already derives.
+ */
+export interface FirstCheck {
+  id: "knownExploited" | "fixableSevere" | "requiredItems";
+  count: number;
+  /** Section to open. */
+  target: SectionId;
+  /** Filter to open it with, when the section can apply one. */
+  query?: Record<string, string>;
+  /** Which of the scan's results the count was taken from. */
+  source: "vulnerabilities" | "conformance";
+  /** Vulnerability counts only: the rows counted and the scan's total. The
+   *  server lists a bounded number of rows, so the two can differ; the screen
+   *  says so instead of presenting a partial count as the whole. */
+  rowsListed?: number;
+  rowsTotal?: number;
+}
+
+/**
+ * Up to `limit` items to look at first, in a fixed reference order: findings
+ * known to be exploited, then Critical or High findings that already have a
+ * fixed version, then the required conformance items still open. Returns an
+ * empty list when none applies, and the caller leaves the block out.
+ *
+ * Counts come from the vulnerability rows the scan carries and from the
+ * conformance checks. Nothing is recomputed from anywhere else.
+ */
+export function firstChecks(result: DoneEvent, limit = 3): FirstCheck[] {
+  const items: FirstCheck[] = [];
+  const sec = result.security;
+  const rows = sec?.vulnerabilities ?? [];
+  const partial = (): Pick<FirstCheck, "rowsListed" | "rowsTotal"> =>
+    sec && rows.length < sec.TOTAL ? { rowsListed: rows.length, rowsTotal: sec.TOTAL } : {};
+
+  const kev = rows.filter((v) => v.kev).length;
+  if (kev > 0) {
+    items.push({
+      id: "knownExploited",
+      count: kev,
+      target: "vulnerabilities",
+      source: "vulnerabilities",
+      ...partial(),
+    });
+  }
+
+  const fixable = rows.filter(
+    (v) => (v.severity === "CRITICAL" || v.severity === "HIGH") && Boolean(v.fixed),
+  );
+  if (fixable.length > 0) {
+    // Open the table on the worst severity present, so the first row seen is
+    // the first of the counted rows.
+    const worst = fixable.some((v) => v.severity === "CRITICAL") ? "CRITICAL" : "HIGH";
+    items.push({
+      id: "fixableSevere",
+      count: fixable.length,
+      target: "vulnerabilities",
+      query: { severity: worst },
+      source: "vulnerabilities",
+      ...partial(),
+    });
+  }
+
+  // Same gate as needsAttention: the Conformance section is not shown for a
+  // self-generated AI SBOM, so pointing at it would be a dead end.
+  const conf = result.conformance;
+  const conformanceVisible = Boolean(inputSbomFileName(result)) || !isAiScan(result);
+  if (conformanceVisible && conf && conf.result === "fail") {
+    const open = baseTally(splitChecks(conf.checks ?? []).base).failed;
+    if (open > 0) {
+      items.push({
+        id: "requiredItems",
+        count: open,
+        target: "conformance",
+        source: "conformance",
+      });
+    }
+  }
+
+  return items.slice(0, Math.max(0, limit));
+}
