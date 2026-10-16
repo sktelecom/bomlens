@@ -1349,6 +1349,7 @@
     "emptyOutSecurity": "Security report",
     "source": "Delete a file and it leaves this list too.",
     "demoSubtitle": "Five finished scans: a project's source, a container image, a device firmware image, an AI model, and an SBOM received from a supplier",
+    "demoCompare": "See what changed between two versions of {{project}}",
     "demoStart": "These are real, finished scans. Open one to see its SBOM, vulnerabilities and licenses. Three to begin with:",
     "rowMeta_one": "{{count}} component, {{date}}",
     "rowMeta_other": "{{count}} components, {{date}}"

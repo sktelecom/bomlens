@@ -225,7 +225,10 @@ function TopRisk({
                   {c.group ? `${c.group} / ` : ""}
                   {c.name}
                 </span>
-                <span className="shrink-0 font-mono text-label text-muted-foreground">
+                <span
+                  className="min-w-0 max-w-[9rem] truncate font-mono text-label text-muted-foreground"
+                  title={c.version}
+                >
                   {c.version}
                 </span>
                 {c.maxSeverity && (
@@ -1122,12 +1125,12 @@ function JumpCards({
         {jumps.map(({ id, key, icon: Icon, value, sub, label, valueClass }) => {
           const text = label ?? t(`nav.${id}`);
           return (
-            <li key={key ?? id}>
+            <li key={key ?? id} className="min-w-0 max-w-full">
               <a
                 href={scanId ? scanHash(scanId, id) : undefined}
                 aria-label={t("overview.jumpHint", { section: text })}
                 className={cn(
-                  "group flex items-center gap-2 rounded-lg border bg-card px-3 py-2",
+                  "group flex max-w-full items-center gap-2 rounded-lg border bg-card px-3 py-2",
                   "transition-[border-color,background-color] duration-fast ease-out-soft",
                   "hover:border-foreground/30 hover:bg-muted/50",
                   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
@@ -1145,7 +1148,7 @@ function JumpCards({
                 <span className="text-body-sm text-muted-foreground">{text}</span>
                 {sub && (
                   <span
-                    className="max-w-[14rem] truncate text-label text-muted-foreground"
+                    className="min-w-0 max-w-[14rem] truncate text-label text-muted-foreground"
                     title={sub}
                   >
                     {sub}

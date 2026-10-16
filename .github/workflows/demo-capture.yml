@@ -6,12 +6,12 @@ name: Demo capture
 # 다시 빌드되지만, 데이터는 캡처해서 커밋한 파일이라 저절로 따라오지 않는다.
 # 그래서 릴리스가 나가면 방문자는 새 화면 위에 옛 결과를 보게 된다.
 #
-# 다섯 건을 여기서 다시 스캔하고 캡처해 PR로 올린다. 손으로 돌리던 일을 옮겨온
+# 여섯 건(자바 예제는 두 버전)을 여기서 다시 스캔하고 캡처해 PR로 올린다. 손으로 돌리던 일을 옮겨온
 # 것이라 입력은 전부 이름 하나로 지정된다. 자바는 저장소 안의 예제, 컨테이너는
 # 이미지 태그, AI 모델은 HuggingFace 식별자, 공급사 SBOM은 저장소에 둔 입력
 # 파일, 펌웨어는 공개 URL이다. 사람이 판단할 지점은 PR 하나로 모인다.
 #
-# 캡처 스크립트는 대상 폴더를 통째로 다시 쓴다. 그래서 다섯 건을 한 번에 돌린다
+# 캡처 스크립트는 대상 폴더를 통째로 다시 쓴다. 그래서 여섯 건을 한 번에 돌린다
 # — 일부만 돌리면 나머지가 데모에서 사라진다.
 #
 # 러너는 amd64라 펌웨어 이미지도 여기서는 그대로 돈다(Apple Silicon 장비에서
@@ -24,6 +24,15 @@ on:
         description: "스캐너 이미지 태그 (예: 1.10.4)"
         required: false
         default: "latest"
+      build_from_source:
+        description: "이미지 대신 이 브랜치의 소스로 스캐너를 빌드해 쓴다 (릴리스 전 변경분을 데모에 반영할 때)"
+        type: boolean
+        required: false
+        default: false
+      tool_version:
+        description: "build_from_source일 때 이미지에 찍는 버전 (SBOM 도구 버전 칸에 들어간다)"
+        required: false
+        default: "1.13.6-dev"
       firmware_url:
         description: "펌웨어 이미지 URL (<url>.sha256 또는 같은 폴더의 sha256sums 필요)"
         required: false
@@ -44,6 +53,9 @@ env:
   FLASK_VER: "3.2.0"
   SPRING_ID: SpringBootDemo
   SPRING_VER: "1.0.0"
+  # 같은 프로젝트의 두 번째 버전. 개요의 변화 비교 카드와 다시 스캔 흐름을 보이려는 것이라
+  # 프로젝트 이름은 같고 버전만 다르다. 입력은 예제 pom.xml을 올려 쓴 사본이다.
+  SPRING_VER_NEXT: "1.1.0"
   NGINX_ID: NginxRuntimeImage
   NGINX_VER: "1.24-alpine"
   MODEL_ID: BertBaseUncased
@@ -70,7 +82,14 @@ jobs:
         run: |
           set -euo pipefail
           tag="${{ inputs.image_tag }}"
-          docker pull "ghcr.io/sktelecom/sbom-scanner:${tag}"
+          if [ "${{ inputs.build_from_source }}" = "true" ]; then
+            # 릴리스 전 소스로 스캔한다. 도구 버전은 이미지에 구워 넣는 값이라 직접 준다.
+            tag="${{ inputs.tool_version }}"
+            docker build --build-arg "BOMLENS_VERSION=${tag}" \
+              -f docker/Dockerfile -t "ghcr.io/sktelecom/sbom-scanner:${tag}" docker
+          else
+            docker pull "ghcr.io/sktelecom/sbom-scanner:${tag}"
+          fi
           docker pull "ghcr.io/sktelecom/bomlens-aibom:${tag}"     || docker pull ghcr.io/sktelecom/bomlens-aibom:latest
           docker pull "ghcr.io/sktelecom/bomlens-firmware:${tag}"  || docker pull ghcr.io/sktelecom/bomlens-firmware:latest
           {
@@ -100,6 +119,14 @@ jobs:
           cd examples/java-maven
           "$GITHUB_WORKSPACE/scripts/scan-sbom.sh" \
             --project "$SPRING_ID" --version "$SPRING_VER" \
+            --generate-only -o "$GITHUB_WORKSPACE/out"
+
+      - name: Scan the next version of the Java project from source
+        run: |
+          set -euo pipefail
+          cd docs/demo/inputs/spring-boot-demo-1.1.0
+          "$GITHUB_WORKSPACE/scripts/scan-sbom.sh" \
+            --project "$SPRING_ID" --version "$SPRING_VER_NEXT" \
             --generate-only -o "$GITHUB_WORKSPACE/out"
 
       # 3) 컨테이너 이미지.
@@ -170,7 +197,9 @@ jobs:
           # The capabilities response comes from server.py run here rather than
           # from the image, so the version it reports has to be passed in. A
           # capture against `latest` leaves it empty, which the UI states.
-          DEMO_VERSION="$(printf '%s' "${{ inputs.image_tag }}" | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' || true)" \
+          shown="${{ inputs.image_tag }}"
+          [ "${{ inputs.build_from_source }}" = "true" ] && shown="${{ inputs.tool_version }}"
+          DEMO_VERSION="$(printf '%s' "$shown" | grep -E '^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$' || true)" \
             ./scripts/capture-demo-data.sh "$PWD/out"
 
       - name: Summarize what changed
@@ -227,7 +256,7 @@ jobs:
           cat > /tmp/demo-pr-body.md <<BODY
           Captured by [demo-capture](${run_url}) against \`${IMAGE}\`.
 
-          All five published scans were re-run and recaptured together: the
+          All six published scans were re-run and recaptured together: the
           capture script rewrites the whole folder, so a partial run would drop
           the rest from the demo.
 

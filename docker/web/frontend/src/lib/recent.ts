@@ -278,6 +278,17 @@ export function pickStartScans(scans: RecentScan[]): RecentScan[] {
 }
 
 /**
+ * The newest scan of a project that has been scanned more than once, with the
+ * scan it is compared against. The demo uses it to point at the comparison
+ * card, which only appears once a project has two scans. Null when no project
+ * has.
+ */
+export function pickComparedScan(scans: RecentScan[]): RecentScan | null {
+  const newestFirst = [...scans].sort((a, b) => b.generatedAt - a.generatedAt);
+  return newestFirst.find((s) => scanComparison(scans, s.id)) ?? null;
+}
+
+/**
  * Shorten a long name to at most `max` characters by replacing the middle with
  * an ellipsis, so both the start (what it is) and the end (often a file
  * extension or architecture) stay readable. A name that already fits is
