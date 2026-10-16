@@ -42,7 +42,7 @@ export default defineConfig({
   // Playwright owns interaction/visual/a11y coverage.
   test: {
     environment: "node",
-    include: ["src/**/*.test.ts"],
+    include: ["src/**/*.test.ts", "scripts/**/*.test.ts"],
     // Coverage is scoped to src/lib — the pure data/display modules Vitest
     // actually exercises. Components live behind the DOM and are covered by
     // Playwright, so including them here would just depress the number.

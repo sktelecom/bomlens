@@ -503,7 +503,7 @@ jobs:
           }
 
           emit web      '^(docker/web/|docker/Dockerfile|docker/entrypoint\.sh|scripts/scan-sbom\.sh|tests/test-web-e2e\.sh|\.github/workflows/heavy-e2e\.yml)'
-          emit frontend '^(docker/web/frontend/|docker/entrypoint\.sh$|docker/lib/(build-prep|scan-firmware)\.sh$)'
+          emit frontend '^(docker/web/frontend/|docker/shared/|docker/entrypoint\.sh$|docker/lib/(build-prep|scan-firmware)\.sh$)'
           emit docs     '(\.md$|^docs/|^mkdocs\.yml$|^\.github/markdown-link-check-config\.json$)'
           emit examples '^examples/'
           emit desktop  '^(electron/|docker/web/server\.py$)'
@@ -800,6 +800,8 @@ jobs:
         run: npm run typecheck
       - name: Token lint (no hardcoded colours)
         run: npm run token:lint
+      - name: Shared tokens CSS in sync with src/index.css
+        run: npm run tokens:check
       - name: i18n coverage (en ≡ ko)
         run: npm run i18n:check
       - name: Lib test gate (every src/lib module has a unit test)

@@ -20,6 +20,8 @@
     "capture:audit": "AUDIT=1 playwright test --grep @audit",
     "demo:record": "playwright test --grep @demo",
     "token:lint": "node scripts/token-lint.mjs",
+    "tokens:build": "node scripts/build-tokens.mjs",
+    "tokens:check": "node scripts/build-tokens.mjs --check",
     "i18n:check": "node scripts/i18n-coverage.mjs",
     "notices:check": "node scripts/check-third-party-notices.mjs"
   },
