@@ -2,12 +2,12 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // Run the axe color-contrast rule over generated HTML reports and print one
-// count per report. It reuses @axe-core/playwright and playwright, which are
+// count per report and colour scheme. It reuses @axe-core/playwright and playwright, which are
 // already devDependencies of docker/web/frontend, so nothing new is installed.
 //
 // Usage: node axe-report-contrast.mjs <frontend-dir> <report.html>...
 //   <frontend-dir>  docker/web/frontend after `npm ci` (modules resolve from it)
-// Output: one line per file, "<count>\t<file>", then a JSON summary on the
+// Output: one line per file and scheme, "<count>\t<scheme>\t<file>", then a JSON summary on the
 // last line prefixed with "SUMMARY ". Exit 0 always; the caller applies limits.
 import { createRequire } from 'node:module';
 import path from 'node:path';
@@ -34,20 +34,26 @@ const browser = await chromium.launch();
 const summary = {};
 try {
   for (const file of files) {
-    const context = await browser.newContext();
-    const page = await context.newPage();
-    await page.goto(pathToFileURL(path.resolve(file)).href);
-    const res = await new AxeBuilder({ page }).withRules(['color-contrast']).analyze();
-    const nodes = res.violations.reduce((n, v) => n + v.nodes.length, 0);
-    summary[path.basename(file)] = nodes;
-    console.log(`${nodes}\t${file}`);
-    for (const v of res.violations) {
-      for (const n of v.nodes.slice(0, 3)) {
-        const d = (n.any[0] && n.any[0].message) || '';
-        console.log(`  e.g. ${n.target.join(' ')}: ${d}`);
+    let total = 0;
+    // The reports follow prefers-color-scheme, so both schemes are measured; the
+    // count of a report is the sum, and a line is printed per scheme.
+    for (const colorScheme of ['light', 'dark']) {
+      const context = await browser.newContext({ colorScheme });
+      const page = await context.newPage();
+      await page.goto(pathToFileURL(path.resolve(file)).href);
+      const res = await new AxeBuilder({ page }).withRules(['color-contrast']).analyze();
+      const nodes = res.violations.reduce((n, v) => n + v.nodes.length, 0);
+      total += nodes;
+      console.log(`${nodes}\t${colorScheme}\t${file}`);
+      for (const v of res.violations) {
+        for (const n of v.nodes.slice(0, 3)) {
+          const d = (n.any[0] && n.any[0].message) || '';
+          console.log(`  e.g. ${n.target.join(' ')}: ${d}`);
+        }
       }
+      await context.close();
     }
-    await context.close();
+    summary[path.basename(file)] = total;
   }
 } finally {
   await browser.close();

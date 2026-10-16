@@ -574,6 +574,14 @@ LABEL com.sktelecom.sbom.firmware-tools="${SBOM_FIRMWARE}" \
 
 COPY entrypoint.sh /usr/local/bin/run-scan
 COPY lib/ /usr/local/lib/sbom/
+# Design tokens (generated from the web UI's index.css) that the HTML report
+# generators inline into every report. Kept beside the scripts, where
+# report-common.sh looks first; the build fails if it is missing or empty so an
+# image never ships reports without the shared palette.
+COPY shared/bomlens-tokens.css /usr/local/lib/sbom/bomlens-tokens.css
+RUN test -s /usr/local/lib/sbom/bomlens-tokens.css \
+    && grep -q -- '--role-danger-fg:' /usr/local/lib/sbom/bomlens-tokens.css \
+    || { echo "bomlens-tokens.css is missing or incomplete: run 'npm run tokens:build' in docker/web/frontend" >&2; exit 1; }
 COPY web/server.py /usr/local/lib/sbom-web/server.py
 COPY --from=web /web/dist /usr/local/lib/sbom-web/dist
 RUN chmod +x /usr/local/bin/run-scan /usr/local/lib/sbom/*.sh

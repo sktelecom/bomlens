@@ -12043,6 +12043,135 @@ too_large 21 20" ] && [ ! -e "$BIG/out/b_1_govulncheck_stage1.json" ] \
     && pass "21 Go modules: govulncheck does not run, and the run list records too_large" \
     || fail "module limit" "$(cat "$RS1/log" "$BIG/out/b_1_govulncheck_stage1.rc" 2>&1)"
 
+echo "== reports: shared design tokens, print rules, time format and the missing-tokens fallback =="
+# The four HTML reports inline docker/shared/bomlens-tokens.css (report-common.sh).
+# A report that lost the tokens must be loud about it, never quietly unstyled.
+RC="$FIX/report-contrast"
+RT="$WORK/rt"; mkdir -p "$RT/bin"
+cat > "$RT/bin/trivy" <<'STUB'
+#!/bin/bash
+out=""; prev=""
+for a in "$@"; do [ "$prev" = "--output" ] && out="$a"; prev="$a"; done
+cp "$RC_TRIVY_FIXTURE" "$out"
+STUB
+chmod +x "$RT/bin/trivy"
+RTP="$RT/t_1.0"
+( export RC_TRIVY_FIXTURE="$RC/trivy.json" PATH="$RT/bin:$PATH" SECURITY_ENRICH=false DEEP_CVE=false
+  bash "$LIB/validate-sbom.sh" "$RC/sbom.json" "$RTP" t >/dev/null 2>&1
+  bash "$LIB/scan-security.sh" "$RC/sbom.json" "$RTP" t >/dev/null 2>&1
+  bash "$LIB/generate-notice.sh" "$RC/sbom.json" "$RTP" t >/dev/null 2>&1
+  cp "$RC/risk-bom.json" "${RTP}_bom.json"
+  bash "$LIB/generate-risk-report.sh" "$RTP" t ANALYZE >/dev/null 2>&1 )
+for kind in risk-report security NOTICE conformance; do
+    H="${RTP}_$kind.html"
+    if [ ! -s "$H" ]; then fail "$kind report was not generated for the token checks"; continue; fi
+    if grep -q -- '--background:' "$H" && grep -q -- '--role-danger-fg:' "$H" && grep -q -- '--font-size-body:' "$H"; then
+        pass "$kind report carries the design tokens (--background, --role-danger-fg, --font-size-body)"
+    else
+        fail "$kind report lacks the design tokens"
+    fi
+    grep -q 'bomlens-report: built-in fallback' "$H" \
+        && fail "$kind report used the fallback palette although the tokens file exists" \
+        || pass "$kind report uses the real tokens file, not the fallback"
+    if grep -q '@media print' "$H" && grep -q 'thead{display:table-header-group' "$H" \
+       && grep -q 'a\[href^="http"\]::after' "$H" && grep -q 'break-inside:avoid' "$H"; then
+        pass "$kind report has the print rules (repeating table header, no row splits, external link addresses)"
+    else
+        fail "$kind report lacks the print rules"
+    fi
+    grep -qE '<time datetime="[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z">[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2} UTC</time>' "$H" \
+        && pass "$kind report shows a readable generation time with its zone, ISO value kept in datetime" \
+        || fail "$kind report time is not <time datetime=ISO>YYYY-MM-DD HH:MM UTC</time>"
+done
+for kind in risk-report security conformance; do
+    grep -q '<thead><tr>' "${RTP}_$kind.html" && grep -q '</tbody></table>' "${RTP}_$kind.html" \
+        && pass "$kind report tables have a real <thead> (so the header can repeat in print)" \
+        || fail "$kind report tables lack <thead>"
+done
+for kind in risk-report security; do
+    grep -q '<td class="id">CVE-' "${RTP}_$kind.html" && grep -q 'td.id{white-space:nowrap' "${RTP}_$kind.html" \
+        && pass "$kind report keeps a CVE id on one line" || fail "$kind report CVE column may wrap"
+done
+grep -q '<h1>Open-source risk report</h1>' "${RTP}_risk-report.html" \
+    && grep -q '<p class="subtitle">Supplier SBOM under review</p>' "${RTP}_risk-report.html" \
+    && pass "supplier risk report: GLOSSARY title with the supplier review as subtitle" \
+    || fail "supplier risk report title/subtitle"
+grep -q '^_Supplier SBOM under review_$' "${RTP}_risk-report.md" \
+    && pass "supplier risk report markdown carries the subtitle" || fail "supplier risk report markdown subtitle"
+grep -q '<h1>Conformance check report</h1>' "${RTP}_conformance.html" \
+    && pass "conformance report is titled Conformance check report" || fail "conformance report title"
+# No retired term in any generated English report (GLOSSARY.md).
+for f in "${RTP}_risk-report.html" "${RTP}_conformance.html" "${RTP}_security.html" "${RTP}_NOTICE.html"; do
+    if grep -qE 'risk analysis report|Supplier SBOM risk report|SBOM Conformance Report|format validation' "$f"; then
+        fail "$(basename "$f") still uses a term GLOSSARY.md retired"
+    else
+        pass "$(basename "$f") uses no retired term"
+    fi
+done
+( cd "$RT" && REPORT_LANG=ko bash "$LIB/generate-risk-report.sh" t_1.0 t ANALYZE >/dev/null 2>&1 )
+grep -q '<h1>오픈소스 위험 보고서</h1>' "${RTP}_risk-report.html" && grep -q '공급사 SBOM 검토' "${RTP}_risk-report.html" \
+    && pass "ko supplier risk report: 오픈소스 위험 보고서 with 공급사 SBOM 검토 as subtitle" \
+    || fail "ko supplier risk report title/subtitle"
+if grep -qE '위험 ?분석 ?보고서|적합성 보고서|결과물|포맷 검증' "${RTP}_risk-report.html" "${RTP}_risk-report.md" \
+   "$LIB/i18n/report-strings.ko.json"; then
+    fail "the ko report strings still use a term GLOSSARY.md retired"
+else
+    pass "the ko report strings use no retired term"
+fi
+
+# Missing tokens file: a warning, and the built-in palette inside the report.
+SOLO="$RT/solo"; mkdir -p "$SOLO"; cp "$LIB/report-common.sh" "$SOLO/"
+NOTOK="$( ( . "$SOLO/report-common.sh"; report_style ) 2>"$RT/solo.err" )"
+NOTOK_TOKENS="$( ( . "$SOLO/report-common.sh"; report_tokens_css ) 2>/dev/null )"
+if grep -q 'WARN: bomlens-tokens.css not found' "$RT/solo.err" \
+   && printf '%s' "$NOTOK" | grep -q 'bomlens-report: built-in fallback' \
+   && printf '%s' "$NOTOK" | grep -q -- '--role-danger-fg:' && printf '%s' "$NOTOK" | grep -q -- '--background:'; then
+    pass "no tokens file: a warning is printed and the report embeds the fallback palette"
+else
+    fail "no tokens file: no warning or no fallback" "$(cat "$RT/solo.err")"
+fi
+# An unusable tokens file (empty, or without the role colours) counts as missing.
+: > "$RT/empty.css"
+EMPTYTOK="$( ( export BOMLENS_TOKENS_CSS="$RT/empty.css"; . "$SOLO/report-common.sh"; report_style ) 2>/dev/null )"
+printf '%s' "$EMPTYTOK" | grep -q 'bomlens-report: built-in fallback' \
+    && pass "an empty tokens file falls back instead of producing an unstyled report" \
+    || fail "an empty tokens file produced a report without the fallback"
+# BOMLENS_TOKENS_CSS wins over the bundled copy, and .dark becomes a media rule.
+printf ':root{--role-danger-fg: 1 2 3;--background: 9 9 9%%;}\n.dark {\n  --background: 8 8 8%%;\n}\n' > "$RT/custom.css"
+CUSTOM="$( ( export BOMLENS_TOKENS_CSS="$RT/custom.css"; . "$SOLO/report-common.sh"; report_style ) 2>/dev/null )"
+if printf '%s' "$CUSTOM" | grep -q -- '--background: 9 9 9%' \
+   && printf '%s' "$CUSTOM" | grep -q 'prefers-color-scheme: dark'; then
+    pass "BOMLENS_TOKENS_CSS overrides the bundled tokens; the .dark block becomes a prefers-color-scheme rule"
+else
+    fail "BOMLENS_TOKENS_CSS override" "$CUSTOM"
+fi
+# The fallback must not drift from the real tokens: every declaration in it is
+# also in docker/shared/bomlens-tokens.css, with the same value, light and dark.
+norm_css() { awk 'BEGIN{d=0} /\.dark|prefers-color-scheme/{d=1}
+    { n=split($0,a,";"); for(i=1;i<=n;i++){ s=a[i];
+        if (match(s,/--[a-z0-9-]+: *[^;{}]+$/)) { v=substr(s,RSTART,RLENGTH); gsub(/: */,":",v); gsub(/[[:space:]]+$/,"",v); print (d?"D ":"L ") v } } }'; }
+DRIFT="$(comm -23 <(printf '%s\n' "$NOTOK_TOKENS" | norm_css | sort -u) <(norm_css < "$ROOT_DIR/docker/shared/bomlens-tokens.css" | sort -u))"
+FBN="$(printf '%s\n' "$NOTOK_TOKENS" | norm_css | wc -l | tr -d ' ')"
+if [ -z "$DRIFT" ] && [ "$FBN" -gt 100 ]; then
+    pass "the fallback palette ($FBN declarations) matches bomlens-tokens.css exactly"
+else
+    fail "the fallback palette drifted from bomlens-tokens.css" "$DRIFT"
+fi
+# Image bundle: the Dockerfile must install the tokens next to the scripts, the
+# build context must not exclude them, and the file must exist in the checkout.
+grep -q '^COPY shared/bomlens-tokens.css /usr/local/lib/sbom/bomlens-tokens.css$' "$ROOT_DIR/docker/Dockerfile" \
+    && pass "Dockerfile installs bomlens-tokens.css beside the report scripts" \
+    || fail "Dockerfile does not COPY shared/bomlens-tokens.css into /usr/local/lib/sbom/"
+grep -q 'test -s /usr/local/lib/sbom/bomlens-tokens.css' "$ROOT_DIR/docker/Dockerfile" \
+    && pass "Dockerfile fails the build when the installed tokens file is missing or empty" \
+    || fail "Dockerfile has no build-time check of the tokens file"
+if [ -s "$ROOT_DIR/docker/shared/bomlens-tokens.css" ] \
+   && ! grep -Eq '^(\*\*/)?(shared|docker/shared|bomlens-tokens)' "$ROOT_DIR/docker/.dockerignore"; then
+    pass "the tokens file exists and .dockerignore does not exclude it"
+else
+    fail "the tokens file is missing or excluded from the build context"
+fi
+
 echo ""
 echo "Results: ${PASS} passed, ${FAIL} failed"
 [ "$FAIL" -eq 0 ]

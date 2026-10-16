@@ -1911,14 +1911,14 @@ else
     fail "ko conformance JSON diverged from the English JSON"
 fi
 grep -q '<html lang="ko">' "$WORK/koconf_conformance.html" && pass "ko conformance HTML sets lang=ko" || fail "ko conformance HTML lang is not ko"
-grep -q 'SBOM 적합성 보고서' "$WORK/koconf_conformance.html" && pass "ko conformance HTML h1 is Korean" || fail "ko conformance HTML h1 not localized"
+grep -q '<h1>적합성 검사 보고서</h1>' "$WORK/koconf_conformance.html" && pass "ko conformance HTML h1 is Korean" || fail "ko conformance HTML h1 not localized"
 grep -q '모델 라이선스' "$WORK/koconf_conformance.md" && pass "ko conformance MD localizes a G7 element label" || fail "ko conformance MD label not localized"
 grep -q '사람 검토 필요' "$WORK/koconf_conformance.md" && pass "ko conformance MD localizes a review detail" || fail "ko conformance MD detail not localized"
 # Data/identifiers must survive verbatim in the ko report.
 grep -q 'Apache-2.0' "$WORK/koconf_conformance.md" && pass "ko conformance keeps the license id verbatim" || fail "ko conformance dropped the license id"
 grep -q '✅' "$WORK/koconf_conformance.md" && pass "ko conformance keeps the status emoji" || fail "ko conformance dropped the status emoji"
 # The English default must be untouched (same fixture, no REPORT_LANG).
-grep -q 'SBOM Conformance Report' "$WORK/conf_conformance.html" && pass "en (default) conformance stays English" || fail "en default conformance drifted"
+grep -q '<h1>Conformance check report</h1>' "$WORK/conf_conformance.html" && pass "en (default) conformance stays English" || fail "en default conformance drifted"
 
 echo "== ko AI compliance profile renders Korean while the JSON stays English =="
 cp "$WORK/conf_bom.json" "$WORK/koconf_bom.json" 2>/dev/null

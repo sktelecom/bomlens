@@ -1589,7 +1589,7 @@ unset DOCKER_STUB_CONFORMANCE_RESULT
 d="$(new_proj foc_none)"; printf 'ELFish\n' > "$d/app.out"
 scan_in "$d" --project FN --version 1 --target app.out --generate-only --fail-on-conformance
 rc_none=$RC
-{ [ "$rc_none" -eq 3 ] && in_out "no conformance report to judge"; } \
+{ [ "$rc_none" -eq 3 ] && in_out "no conformance check report to judge"; } \
   && pass "--fail-on-conformance: no report exits 3" \
   || { fail "--fail-on-conformance no-report case" "rc=$rc_none"; show; }
 
@@ -1623,8 +1623,8 @@ gate_case "--fail-on: license-coverage met exits 4 and shows the measured value"
   "met${TAB}license-coverage=80${TAB}license coverage is 0% (1/157), below 80%\n" --fail-on license-coverage=80
 gate_case "--fail-on: license-coverage ok exits 0" 0 "none is met" \
   "ok${TAB}license-coverage=80${TAB}license coverage is 100% (3/3), at or above 80%\n" --fail-on license-coverage=80
-gate_case "--fail-on: empty-result without a conformance report exits 5" 5 "no conformance report was produced" \
-  "unjudged${TAB}empty-result${TAB}no conformance report was produced for this scan\n" --fail-on empty-result
+gate_case "--fail-on: empty-result without a conformance report exits 5" 5 "no conformance check report was produced" \
+  "unjudged${TAB}empty-result${TAB}no conformance check report was produced for this scan\n" --fail-on empty-result
 guard "--fail-on empty-result is refused for an AI model input" "not available for AI model and dataset inputs" --project M --version 1 --model owner/repo --fail-on empty-result
 
 gate_case "--fail-on: a condition an older image does not know exits 5 and says to refresh the image" 5 "docker pull" \
@@ -1687,7 +1687,7 @@ scan_in "$d" --project FS --version 1 --target app.out --generate-only --fail-on
 unset DOCKER_STUB_CONFORMANCE_RESULT
 scan_in "$d" --project FS --version 1 --target app.out --generate-only --fail-on-conformance
 rc_stale=$RC
-{ [ "$rc_stale" -eq 3 ] && in_out "no conformance report to judge"; } \
+{ [ "$rc_stale" -eq 3 ] && in_out "no conformance check report to judge"; } \
   && pass "--fail-on-conformance: a stale pass file from an earlier run is not mistaken for this run's verdict" \
   || { fail "--fail-on-conformance stale-result case" "rc=$rc_stale"; show; }
 
