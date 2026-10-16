@@ -3,6 +3,7 @@
 
 import type { ReactNode } from "react";
 
+import { FOCUS_RING, SELECTED_TILE } from "@/components/ui/selectable";
 import { cn } from "@/lib/utils";
 import { useFormatNumber } from "@/lib/format";
 
@@ -64,7 +65,7 @@ export function BarList({
   const rowButton =
     "block w-full rounded-md border border-transparent text-left " +
     "transition-colors duration-fast ease-out-soft " +
-    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1";
+    FOCUS_RING;
 
   return (
     <ul role="list" aria-label={ariaLabel} className="space-y-1">
@@ -117,9 +118,7 @@ export function BarList({
               onClick={() => onSelect?.(it.key)}
               className={cn(
                 rowButton,
-                sel
-                  ? "ring-2 ring-foreground ring-offset-1"
-                  : "hover:border-border hover:shadow-sm",
+                sel ? SELECTED_TILE : "hover:border-border hover:shadow-sm",
               )}
             >
               {inner}

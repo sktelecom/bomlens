@@ -79,7 +79,7 @@ function AdvisoryCard({ advisory }: { advisory: AdvisoryRecord }) {
       <CardContent className="space-y-3 p-5">
         <div className="flex flex-wrap items-center gap-2">
           <span className="font-mono text-sm font-medium">{advisory.id}</span>
-          <Badge tone={severityTone(advisory.severity)}>
+          <Badge tone={severityTone(advisory.severity)} mark>
             {t(`severity.${advisory.severity}`)}
           </Badge>
           {advisory.withdrawn && (

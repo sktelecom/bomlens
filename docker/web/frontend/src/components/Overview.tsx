@@ -235,7 +235,7 @@ function TopRisk({
                   {c.version}
                 </span>
                 {c.maxSeverity && (
-                  <Badge tone={SEV_TONE[c.maxSeverity]} className="shrink-0">
+                  <Badge tone={SEV_TONE[c.maxSeverity]} mark className="shrink-0">
                     {t(`severity.${c.maxSeverity}`)}
                     {c.vulnCount ? ` · ${fmt(c.vulnCount)}` : ""}
                   </Badge>
@@ -1127,7 +1127,7 @@ function JumpCards({
           className={cn(
             "group rounded-lg border bg-card p-4 text-left",
             "transition-[border-color,background-color,box-shadow] duration-fast ease-out-soft",
-            "hover:border-brand/40 hover:bg-muted/50 hover:shadow-md",
+            "hover:border-foreground/30 hover:bg-muted/50 hover:shadow-md",
             "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
           )}
         >

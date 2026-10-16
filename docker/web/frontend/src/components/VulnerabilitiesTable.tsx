@@ -870,7 +870,7 @@ export function VulnerabilitiesTable({
                       ) : (
                         <span className="w-3.5 shrink-0" />
                       )}
-                      <Badge tone={severityTone(v.severity)}>
+                      <Badge tone={severityTone(v.severity)} mark>
                         {t(`severity.${v.severity}`)}
                       </Badge>
                       {v.status && (
@@ -922,7 +922,7 @@ export function VulnerabilitiesTable({
                   {anyNvdSeverity && (
                     <td className="px-3 py-2">
                       {v.nvdSeverity ? (
-                        <Badge tone={severityTone(v.nvdSeverity)}>
+                        <Badge tone={severityTone(v.nvdSeverity)} mark>
                           {t(`severity.${v.nvdSeverity}`)}
                         </Badge>
                       ) : (

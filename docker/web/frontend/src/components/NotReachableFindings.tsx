@@ -70,7 +70,7 @@ export function NotReachableFindings({
                   <tr key={`${v.id}-${v.purl || v.pkg}-${i}`} className="border-b align-top last:border-0">
                     <td className="px-3 py-1.5">
                       <div className="flex flex-wrap items-center gap-1.5">
-                        <Badge tone={severityTone(v.severity)}>{t(`severity.${v.severity}`)}</Badge>
+                        <Badge tone={severityTone(v.severity)} mark>{t(`severity.${v.severity}`)}</Badge>
                         <Badge tone="info">{t("result.notReachableBadge")}</Badge>
                       </div>
                     </td>

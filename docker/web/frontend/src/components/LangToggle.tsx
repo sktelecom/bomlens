@@ -4,6 +4,7 @@
 import { useTranslation } from "react-i18next";
 
 import { cn } from "@/lib/utils";
+import { FOCUS_RING } from "@/components/ui/selectable";
 
 const LANGS: Array<[string, string]> = [
   ["ko", "KO"],
@@ -30,6 +31,7 @@ export function LangToggle() {
             aria-pressed={active}
             className={cn(
               "rounded-sm px-2 py-1 text-xs font-medium transition-colors duration-fast ease-out-soft",
+              FOCUS_RING,
               active
                 ? "bg-primary text-primary-foreground"
                 : "text-muted-foreground hover:text-foreground",

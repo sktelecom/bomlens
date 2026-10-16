@@ -20,6 +20,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
 import { Card, CardContent } from "@/components/ui/card";
+import { FOCUS_RING, SELECTED_TILE } from "@/components/ui/selectable";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import type { Capabilities, ScanConfig, ScanParams, SourceType } from "@/lib/api";
@@ -104,7 +105,7 @@ function PanelDisclosure({
         <>
           <span className={SECTION_LABEL}>{label}</span>
           {badge && (
-            <span className="ml-auto rounded-full bg-brand/10 px-2 py-0.5 text-xs font-medium text-brand">
+            <span className="ml-auto rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-foreground">
               {badge}
             </span>
           )}
@@ -204,13 +205,13 @@ export function NewScan({
                           className={cn(
                             "flex items-center gap-2 rounded-lg border px-3 py-2.5 text-left text-sm",
                             "transition-[color,border-color,background-color,box-shadow] duration-fast ease-out-soft",
-                            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+                            FOCUS_RING,
                             "disabled:pointer-events-none disabled:opacity-50",
                             locked
                               ? "cursor-not-allowed border-dashed text-muted-foreground"
                               : active
-                                ? "ring-2 ring-foreground ring-offset-1 font-medium text-foreground"
-                                : "text-foreground hover:border-brand/40 hover:bg-muted/50 hover:shadow-md",
+                                ? SELECTED_TILE
+                                : "text-foreground hover:border-foreground/30 hover:bg-muted/50 hover:shadow-md",
                           )}
                         >
                           <Icon
@@ -219,7 +220,7 @@ export function NewScan({
                               locked
                                 ? "text-muted-foreground/60"
                                 : active
-                                  ? "text-brand"
+                                  ? "text-foreground"
                                   : "text-muted-foreground",
                             )}
                             aria-hidden

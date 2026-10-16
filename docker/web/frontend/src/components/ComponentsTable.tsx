@@ -6,6 +6,7 @@ import { useTranslation } from "react-i18next";
 import { ArrowDown, ArrowUp, ArrowUpDown, Download, Package, Search, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { FOCUS_RING, SELECTED_SOLID } from "@/components/ui/selectable";
 import { Button } from "@/components/ui/button";
 import { CheckMenu, type CheckMenuItem } from "@/components/ui/check-menu";
 import { Select } from "@/components/ui/select";
@@ -133,9 +134,9 @@ function FilterChip({
       onClick={onClick}
       className={cn(
         "rounded-md border px-2.5 py-1 text-xs font-medium transition-colors duration-fast ease-out-soft",
-        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1",
+        FOCUS_RING,
         active
-          ? "border-brand/40 bg-brand/10 text-foreground"
+          ? SELECTED_SOLID
           : "border-border text-muted-foreground hover:text-foreground",
       )}
     >
@@ -628,7 +629,7 @@ export function ComponentsTable({ items, total, truncated, scanId, query, onQuer
                 {showRisk && (
                   <td className="whitespace-nowrap px-3 py-2">
                     {c.maxSeverity ? (
-                      <Badge tone={SEV_TONE[c.maxSeverity]}>
+                      <Badge tone={SEV_TONE[c.maxSeverity]} mark>
                         {t(`severity.${c.maxSeverity}`)}
                         {c.vulnCount ? ` · ${fmt(c.vulnCount)}` : ""}
                       </Badge>

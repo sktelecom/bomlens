@@ -280,14 +280,11 @@ const SECTIONS: Array<{ kind: Kind; section: string }> = [
  * Combinations known to violate today, keyed `kind/section/theme/lang`, value =
  * the reason. They run under test.fail so CI documents the current state and
  * flips red the moment one is fixed (remove the entry then). Never widen this
- * list to silence a new regression.
+ * list to silence a new regression. It is empty now: the colour-role tokens
+ * (success and info labels on their muted surfaces) and the filter chips that no
+ * longer fade to opacity-60 cleared the four conformance contrast failures.
  */
-const KNOWN_VIOLATIONS: Record<string, string> = {
-  "source/conformance/light/en": "color-contrast: success badge (text-success on bg-success-surface) in the light theme",
-  "source/conformance/light/ko": "color-contrast: success badge (text-success on bg-success-surface) in the light theme",
-  "ai/conformance/light/en": "color-contrast: info badge (text-risk-info-fg) inside dimmed (opacity-60) check cards, light theme",
-  "ai/conformance/light/ko": "color-contrast: info badge (text-risk-info-fg) inside dimmed (opacity-60) check cards, light theme",
-};
+const KNOWN_VIOLATIONS: Record<string, string> = {};
 
 async function openSection(page: Page, kind: Kind, section: string) {
   const done = kind === "ai" ? AI_DONE : FULL_DONE;

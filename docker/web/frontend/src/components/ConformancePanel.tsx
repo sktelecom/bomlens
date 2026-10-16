@@ -8,6 +8,7 @@ import { useTranslation } from "react-i18next";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { SELECTED_OUTLINE, UNSELECTED_OUTLINE } from "@/components/ui/selectable";
 import { Input } from "@/components/ui/input";
 import { EmptyState } from "@/components/ui/state";
 import { PipelineStepsFailedNote } from "@/components/PipelineStepsFailedNote";
@@ -391,8 +392,7 @@ function KindChip({
         // Rest-state border so this reads as pressable next to identical-looking
         // but inert badges elsewhere (see SeverityBar's own for why this is a
         // real `border`, not a low-contrast `ring`).
-        isSel ? "ring-2 ring-foreground ring-offset-1" : "border-border",
-        Boolean(selected) && !isSel && "opacity-60",
+        isSel ? SELECTED_OUTLINE : UNSELECTED_OUTLINE,
       )}
     >
       <Badge tone={KIND_TONE[kind]} variant={kind === "na" ? "muted" : undefined}>

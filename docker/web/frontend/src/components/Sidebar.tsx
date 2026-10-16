@@ -60,7 +60,7 @@ const RAIL_ROW_IDLE =
  * appear only for AI/ANALYZE scans). The global block repeats what the TopBar
  * offers, spelled out in words: from a result screen the only labelled way back
  * to the scan list was the logo, which reads as decoration. Tokens only; the
- * brand accent marks the active section. Collapses to an icon rail on narrow
+ * neutral fill and a thin bar mark the active section. Collapses to an icon rail on narrow
  * widths or via the header toggle.
  */
 export function Sidebar({
@@ -151,15 +151,17 @@ export function Sidebar({
                     className={cn(
                       RAIL_ROW,
                       collapsed && "justify-center",
-                      // Label stays at foreground contrast (AA); the brand accent
-                      // lives in the icon + left indicator, not the text.
+                      // The active row is a neutral fill plus a thin bar on its
+                      // left edge. The brand red is not used here: it would read
+                      // as a warning on the one row that is simply "where you
+                      // are". The label stays at foreground contrast (AA).
                       active
-                        ? "bg-brand/10 font-semibold text-foreground"
+                        ? "bg-muted font-semibold text-foreground before:absolute before:inset-y-1.5 before:left-0 before:w-0.5 before:rounded-full before:bg-foreground"
                         : RAIL_ROW_IDLE,
                     )}
                   >
                     <Icon
-                      className={cn("h-4 w-4 shrink-0", active && "text-brand")}
+                      className={cn("h-4 w-4 shrink-0", active && "text-foreground")}
                       aria-hidden
                     />
                     {!collapsed && <span className="truncate">{label}</span>}
@@ -167,8 +169,8 @@ export function Sidebar({
                       <span
                         className={cn(
                           "ml-auto shrink-0 tabular-nums text-xs",
-                          // Muted fails AA on the active row's brand tint — keep
-                          // the count at foreground contrast there, like the label.
+                          // Keep the count at foreground contrast on the active row,
+                          // like the label.
                           active ? "text-foreground" : "text-muted-foreground",
                         )}
                         // Every badge sits in the same place in the same type,

@@ -4,6 +4,7 @@
 import { useTranslation } from "react-i18next";
 
 import { Badge } from "@/components/ui/badge";
+import { SELECTED_OUTLINE, UNSELECTED_OUTLINE } from "@/components/ui/selectable";
 import { SEVERITY_ORDER, type SecuritySummary, type Severity } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { useFormatNumber } from "@/lib/format";
@@ -98,7 +99,7 @@ export function SeverityBar({ security, selected = "", onSelect }: Props) {
           <div className="flex flex-wrap gap-1.5">
             {SEVERITY_ORDER.map((s) => {
               const badge = (
-                <Badge tone={TONE[s]}>
+                <Badge tone={TONE[s]} mark>
                   {t(`severity.${s}`)} {fmt(security[s])}
                 </Badge>
               );
@@ -127,10 +128,7 @@ export function SeverityBar({ security, selected = "", onSelect }: Props) {
                     // the pinned Playwright container (measured: byte-identical
                     // screenshots before/after adding it), while the same colour
                     // as an actual border always paints.
-                    isSel
-                      ? "ring-2 ring-foreground ring-offset-1"
-                      : "border-border",
-                    Boolean(selected) && !isSel && "opacity-60",
+                    isSel ? SELECTED_OUTLINE : UNSELECTED_OUTLINE,
                   )}
                 >
                   {badge}

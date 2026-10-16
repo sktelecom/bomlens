@@ -326,7 +326,7 @@ export function DependencyTree({
                   </span>
 
                   {node.vuln && (
-                    <Badge tone={VULN_TONE[node.vuln]} className="ml-1" title={t("deps.hasVuln")}>
+                    <Badge tone={VULN_TONE[node.vuln]} mark className="ml-1" title={t("deps.hasVuln")}>
                       {t(`severity.${node.vuln}`)}
                     </Badge>
                   )}
