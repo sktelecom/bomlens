@@ -12,7 +12,7 @@
  */
 
 /** Packages above which the tree is the opening view. */
-export const GRAPH_TREE_THRESHOLD = 150;
+export const GRAPH_TREE_THRESHOLD = 60;
 
 export type DependencyView = "graph" | "tree";
 

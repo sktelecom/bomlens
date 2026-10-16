@@ -69,6 +69,18 @@ export function effectiveFixed(v: Pick<VulnItem, "fixed" | "installed">): string
  * Group rows by installed package, in the order the packages first appear, so
  * a caller that sorts the rows first gets the groups in the same order.
  */
+/** Packages up to this many open all at once; past it only the first few do. */
+export const OPEN_ALL_UP_TO = 5;
+/** How many packages open first when there are more than OPEN_ALL_UP_TO. */
+export const OPEN_FIRST = 3;
+
+/** Whether the package at `index` (of `count`) starts open. The grouped list
+ *  is worst first, so the opening few are the ones to read; a long list stays
+ *  folded below them instead of running to hundreds of rows. */
+export function startsOpen(index: number, count: number): boolean {
+  return count <= OPEN_ALL_UP_TO || index < OPEN_FIRST;
+}
+
 export function groupByPackage(vulns: VulnItem[]): PackageGroup[] {
   const byKey = new Map<string, VulnItem[]>();
   for (const v of vulns) {

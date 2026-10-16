@@ -184,19 +184,19 @@ test.describe("per-package layout", () => {
 
     const rows = page.getByTestId("vuln-package-row");
     await expect(rows).toHaveCount(4);
-    // Closed to start with: the CVE rows are not in the table yet.
-    await expect(page.getByText("CVE-2024-4001")).toHaveCount(0);
+    // Four packages is a short list, so every package starts open.
+    await expect(page.getByText("CVE-2024-4001")).toBeVisible();
     const urllib3 = rows.filter({ hasText: "urllib3" });
     await expect(urllib3).toContainText("6 CVEs");
     await expect(urllib3).toContainText("Upgrade to 2.8.0 to resolve 5 (2.5.0 alone: 1, 2.6.0 alone: 3)");
     await expect(urllib3).toContainText("1 without a fix");
     await expect(rows.filter({ hasText: "zlib" })).toContainText("No fixed version yet");
 
-    await urllib3.click();
-    await expect(page.getByText("CVE-2024-4001")).toBeVisible();
     await expect(page.getByText("CVE-2024-4006")).toBeVisible();
     await urllib3.click();
     await expect(page.getByText("CVE-2024-4001")).toHaveCount(0);
+    await urllib3.click();
+    await expect(page.getByText("CVE-2024-4001")).toBeVisible();
   });
 
   test("a shared link carries layout and view together", async ({ page }) => {
@@ -299,14 +299,14 @@ test.describe("dependency graph default", () => {
     await expect(page.getByTestId("deps-auto-tree-note")).toHaveCount(0);
   });
 
-  test("the threshold counts graph nodes: 150 still opens the graph, 151 the tree", async ({ page }) => {
-    // The scanned root is a node too, so 149 components make 150 nodes.
-    await open(page, "dependencies", sbomWith(149));
+  test("the threshold counts graph nodes: 60 still opens the graph, 61 the tree", async ({ page }) => {
+    // The scanned root is a node too, so 59 components make 60 nodes.
+    await open(page, "dependencies", sbomWith(59));
     await graph(page).waitFor({ timeout: 15000 });
     await expect(page.getByTestId("deps-view-graph")).toHaveAttribute("aria-pressed", "true");
 
     await page.unrouteAll();
-    await open(page, "dependencies", sbomWith(150));
+    await open(page, "dependencies", sbomWith(60));
     await page.reload();
     await expect(page.getByTestId("deps-view-tree")).toHaveAttribute("aria-pressed", "true");
   });
@@ -327,7 +327,7 @@ test.describe("dependency graph default", () => {
   });
 
   test("the first view is the whole graph, not a zoomed-in corner, and zoom is not reset by other actions", async ({ page }) => {
-    await open(page, "dependencies", sbomWith(120));
+    await open(page, "dependencies", sbomWith(59));
     await graph(page).waitFor({ timeout: 15000 });
     // Starts at 1 until the canvas has loaded and fitted itself.
     await expect(graph(page)).toHaveAttribute("data-zoom", /^0\./);
@@ -358,7 +358,6 @@ for (const theme of ["light", "dark"] as const) {
     test(`view chips, bundle card and package groups pass axe — ${theme}/${lang}`, async ({ page }) => {
       await seedThemeLang(page, theme, lang);
       await open(page, "vulnerabilities?group=package&view=fixable");
-      await page.getByTestId("vuln-package-row").first().click();
       await expect(page.getByTestId("upgrade-bundles")).toBeVisible();
       await waitForSettled(page.locator("main"));
       const axe = await new AxeBuilder({ page })
