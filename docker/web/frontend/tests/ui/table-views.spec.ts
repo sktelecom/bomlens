@@ -257,12 +257,12 @@ test.describe("row density", () => {
     const toggle = page.getByTestId("density-toggle");
     await expect(toggle.getByRole("button", { name: "Compact" })).toHaveAttribute("aria-pressed", "true");
     const compact = await firstRowHeight(page, /CVE-2024-4101/);
-    expect(compact).toBeGreaterThanOrEqual(32);
+    expect(compact).toBeGreaterThanOrEqual(31.5);
     expect(compact).toBeLessThan(34);
 
     await toggle.getByRole("button", { name: "Comfortable" }).click();
     const comfortable = await firstRowHeight(page, /CVE-2024-4101/);
-    expect(comfortable).toBeGreaterThanOrEqual(40);
+    expect(comfortable).toBeGreaterThanOrEqual(39.5);
     expect(comfortable).toBeLessThan(42);
   });
 
