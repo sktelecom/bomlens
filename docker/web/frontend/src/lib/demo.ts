@@ -65,7 +65,8 @@ export function docsUrl(language: string | undefined): string {
  *  carries no version stamp. */
 export function releaseNotesUrl(version: string | undefined): string {
   const base = "https://github.com/sktelecom/bomlens/releases";
-  return version ? `${base}/tag/v${version.replace(/^v/, "")}` : base;
+  // A pre-release stamp (1.2.3-dev) has no release page of its own.
+  return version && !version.includes("-") ? `${base}/tag/v${version.replace(/^v/, "")}` : base;
 }
 
 /** The public demo, for showing someone the tool without installing it. */

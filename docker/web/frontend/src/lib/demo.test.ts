@@ -4,7 +4,7 @@
 import { describe, expect, it } from "vitest";
 
 import { parseMap } from "./aiDeclaration";
-import { demoInstallUrl, demoRunAction, IS_STATIC_DEMO } from "./demo";
+import { demoInstallUrl, demoRunAction, IS_STATIC_DEMO, releaseNotesUrl } from "./demo";
 import serverMap from "../../../../lib/spdx3-ai-map.json";
 
 describe("demoInstallUrl", () => {
@@ -38,6 +38,19 @@ describe("demoInstallUrl", () => {
     expect(demoInstallUrl(lang)).toBe(
       "https://sktelecom.github.io/bomlens/start/first-scan/",
     );
+  });
+});
+
+describe("releaseNotesUrl", () => {
+  const base = "https://github.com/sktelecom/bomlens/releases";
+  it("points at the release page of a stamped version", () => {
+    expect(releaseNotesUrl("1.13.5")).toBe(`${base}/tag/v1.13.5`);
+    expect(releaseNotesUrl("v1.13.5")).toBe(`${base}/tag/v1.13.5`);
+  });
+  it("falls back to the release list without a stamp or with a pre-release one", () => {
+    expect(releaseNotesUrl(undefined)).toBe(base);
+    expect(releaseNotesUrl("")).toBe(base);
+    expect(releaseNotesUrl("1.13.6-dev")).toBe(base);
   });
 });
 
