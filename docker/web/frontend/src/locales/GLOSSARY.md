@@ -44,7 +44,7 @@ Permissive, Weak copyleft, Strong copyleft, Network copyleft, Uncategorized, Rev
 | 다시 실행 / Re-run / run again (스캔을 가리킬 때) | 복사 소스 탐지, SCANOSS, 라이선스 충돌 안내 | 다시 스캔으로 정리 |
 | 아티팩트 / Artifact | 새 스캔 화면 분류 `newscan.catArtifact` | 빌드 산출물 / Build artifact로 정리 |
 | 이 머신 | 스캔 관리 화면 부제 | 이 컴퓨터로 정리 |
-| 인벤토리, 컴플라이언스 | 레일 묶음 이름 | 음차어이나 레일 폭과 시각 기준선에 걸려 이 변경에서는 유지, 후속 후보 |
+| 인벤토리, 컴플라이언스 | 레일 묶음 이름 | 구성 정보, 규정 준수로 정리 (이제 금지어) |
 | 적합 / 부적합 | 판정 표시 | 정본 유지 (검사 결과 값) |
 | 형식 적합성 / Format conformance | G7 화면 소제목 | 정본 유지 (검사 항목의 한 갈래) |
 | 포맷 검증 / Format validation | 적합성 검사의 옛 이름(셸 보고서 제목) | 적합성 검사로 정리 |

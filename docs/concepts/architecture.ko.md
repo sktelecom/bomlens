@@ -34,7 +34,7 @@ BomLens는 두 종류의 Docker 이미지가 협력하는 2단계 파이프라�
 
 > `build-prep.sh`가 cdxgen 전에 그 생태계의 빌드 도구를 실행합니다(Cargo, Bundler, Composer, Swift는 lock 파일이 커밋돼 있지 않을 때만). 그래야 cdxgen이 매니페스트의 직접 의존성만이 아니라 전체 의존성 그래프를 볼 수 있습니다. 생태계마다 실행하는 것은 [의존성을 해석하는 방식](dependency-resolution.ko.md)에 있습니다. cdxgen 단독 실행과 비교해 보려면 [`tests/compare-cdxgen-vs-docker.sh`](https://github.com/sktelecom/bomlens/blob/main/tests/compare-cdxgen-vs-docker.sh)를 참고하세요.
 
-## 도구 인벤토리
+## 도구 목록
 
 파이프라인에서 호출되는 도구입니다.
 

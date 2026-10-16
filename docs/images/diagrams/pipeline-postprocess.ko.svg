@@ -42,7 +42,7 @@
 <rect x="504" y="691.0" width="66" height="22" rx="11" fill="#f1f3f5" stroke="#e3e7ec"/>
 <text x="537" y="706.0" text-anchor="middle" font-family="SFMono-Regular,Menlo,Consolas,monospace" font-size="12.5" fill="#5c6773">--sign</text>
 <rect x="100" y="764" width="380" height="56" rx="8" fill="#ffffff" stroke="#d6dbe1" stroke-width="1" filter="url(#sh)"/>
-<text x="290.0" y="792.0" text-anchor="middle" font-family="'Apple SD Gothic Neo','Noto Sans CJK KR','Malgun Gothic',sans-serif" font-size="17" font-weight="600" fill="#1c2228">위험분석 보고서</text>
+<text x="290.0" y="792.0" text-anchor="middle" font-family="'Apple SD Gothic Neo','Noto Sans CJK KR','Malgun Gothic',sans-serif" font-size="17" font-weight="600" fill="#1c2228">오픈소스 위험 보고서</text>
 <rect x="504" y="781.0" width="178" height="22" rx="11" fill="#f1f3f5" stroke="#e3e7ec"/>
 <text x="593" y="796.0" text-anchor="middle" font-family="SFMono-Regular,Menlo,Consolas,monospace" font-size="12.5" fill="#5c6773">기본 · --no-report면 생략</text>
 <rect x="100" y="844" width="380" height="56" rx="8" fill="#ffffff" stroke="#d6dbe1" stroke-width="1" filter="url(#sh)"/>

@@ -16,6 +16,8 @@ export const FORBIDDEN_TERMS = [
   { lng: "ko", pattern: /위험분석/, prefer: "오픈소스 위험 보고서 (문서 이름) 또는 위험 분석 (띄어 씀)" },
   { lng: "ko", pattern: /포맷 검증/, prefer: "적합성 검사" },
   { lng: "ko", pattern: /아티팩트/, prefer: "산출물 또는 빌드 산출물" },
+  { lng: "ko", pattern: /인벤토리/, prefer: "구성 정보 (레일 묶음) 또는 목록" },
+  { lng: "ko", pattern: /컴플라이언스/, prefer: "규정 준수 또는 준수" },
   { lng: "en", pattern: /SBOM Validation/i, prefer: "Conformance check" },
   { lng: "en", pattern: /conformance validation/i, prefer: "conformance check" },
   { lng: "en", pattern: /conformance report/i, prefer: "Conformance check report" },

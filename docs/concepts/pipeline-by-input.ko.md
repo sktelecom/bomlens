@@ -102,7 +102,7 @@ HuggingFace 데이터셋도 같은 경로로 처리합니다. 앞에 아무것�
 | WeasyPrint | 고지문 PDF 렌더링(선택) | 공통(`SBOM_PDF` 빌드) | BSD-3-Clause | base(opt-in) | [Kozea/WeasyPrint](https://github.com/Kozea/WeasyPrint) |
 | jq | SBOM 정규화·고지문·보고서 조립 | 공통 | MIT | base | [jqlang/jq](https://github.com/jqlang/jq) |
 
-> 전체 라이선스 인벤토리와 펌웨어 이미지의 GPL 소스 제공은 [THIRD_PARTY_LICENSES.ko.md](https://github.com/sktelecom/bomlens/blob/main/THIRD_PARTY_LICENSES.ko.md)를 참고하세요.
+> 전체 라이선스 목록와 펌웨어 이미지의 GPL 소스 제공은 [THIRD_PARTY_LICENSES.ko.md](https://github.com/sktelecom/bomlens/blob/main/THIRD_PARTY_LICENSES.ko.md)를 참고하세요.
 
 ---
 
