@@ -7,10 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v1.13.6] - 2026-10-17
+
+### Upgrade note
+
+- The titles of the HTML reports and the Korean names of the rail groups changed to the interface's glossary terms. File names, JSON fields, the artifact list and the engine contract version are unchanged.
+
+### Added
+
+- The web UI's Help menu has Getting started, Keyboard shortcuts and What's new in this version; `?` outside a text field opens the shortcut list. An empty scan list links to an example result next to the New scan button.
+- The New scan form groups the options by purpose (Result quality, Output format, External transfer), marks each option that sends data off the machine (the SCANOSS lookup and the server upload) the same way, and keeps the scan button pinned below the scrolling settings. The Licenses section's "not checked" notice has a button that opens the form on the outbound-license field; the command-line form of the advice is folded below it.
+- The result screens have a compact header with a summary strip, an "Items to check first" card (a reference order, not a ranking), a skip link, per-package upgrade bundles in the vulnerability table (the single upgrade that resolves the most CVEs), shareable preset views, a row density switch, and a tree view that opens first for dependency graphs of more than 60 packages (it was 150). Package groups of a long list start open only for the first three; a short list (five or fewer) starts open.
+- The desktop app's start screen shows start-up as three steps with download progress and a next action when one fails.
+- The demo has a second version of one project, so its Overview shows the comparison with the earlier version, and its start strip links there. A demo-mode check keeps every screen free of sideways scrolling at 390px and the demo free of axe violations.
+
 ### Changed
 
 - A scan that ends without a requested artifact closes with the heading "Analysis finished with errors" (the exit code stays 0), and the web UI launchers open the browser only once the server answers.
 - When an npm project's SBOM has 0 components because the project declares only development dependencies, the warning says the lock file was read and names `BOMLENS_NODE_FULL_GRAPH=1` to list them.
+- One set of design tokens (`docker/shared/bomlens-tokens.css`, checked by `npm run tokens:check`) drives the web UI, the four HTML reports, the documentation site and the desktop start screen. Brand red is limited to the primary button, the logo and the focus ring; roles (severity, license class, status) have their own colours, each also carries a shape so colour is never the only signal, and selection and focus are separate states. The font sizes follow an eight-step scale.
+- The reports use the same terms as the interface: "Open-source risk report" and "Conformance check report". They print cleanly, show times in a readable form, and the build fails if the image lacks the token file. Zero colour-contrast findings in the four reports is enforced in CI.
+- The Korean rail groups are named 구성 정보 and 규정 준수 (they were 인벤토리 and 컴플라이언스), and the Korean pipeline diagrams and training slides use the glossary terms.
+- "Needs attention" no longer repeats a failed conformance check that "Items to check first" already lists.
+- The documentation site uses the app's fonts, links and buttons, and its build now runs axe over representative pages in both languages and both colour schemes.
+- The demo data is recaptured from this code; a source scan shows its path inside the repository instead of the capture machine's.
+- `@electron/asar` is a declared, pinned dev dependency of the desktop package.
+
+### Fixed
+
+- Hidden text no longer extends the web UI's scrolling content area, which let the page scroll into blank space.
 
 ## [v1.13.5] - 2026-10-16
 
