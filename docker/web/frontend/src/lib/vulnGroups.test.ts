@@ -4,7 +4,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { Severity, VulnItem } from "./api";
-import { bundleSteps, effectiveFixed, groupByPackage, upgradeBundles } from "./vulnGroups";
+import { bundleSteps, effectiveFixed, groupByPackage, startsOpen, upgradeBundles } from "./vulnGroups";
 
 function v(
   id: string,
@@ -135,5 +135,17 @@ describe("bundleSteps", () => {
       { fixed: "3", count: 2 },
       { fixed: "4", count: 3 },
     ]);
+  });
+});
+
+describe("startsOpen", () => {
+  it("opens every package of a short list", () => {
+    for (let i = 0; i < 5; i++) expect(startsOpen(i, 5)).toBe(true);
+    expect(startsOpen(0, 1)).toBe(true);
+  });
+
+  it("opens only the first three of a longer list", () => {
+    expect([0, 1, 2, 3, 4, 5].map((i) => startsOpen(i, 6))).toEqual([true, true, true, false, false, false]);
+    expect(startsOpen(500, 1200)).toBe(false);
   });
 });

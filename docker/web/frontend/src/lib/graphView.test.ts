@@ -7,10 +7,10 @@ import { cssLengthToPx, defaultDependencyView, GRAPH_TREE_THRESHOLD } from "./gr
 
 describe("defaultDependencyView", () => {
   it("opens the graph up to the threshold and the tree above it", () => {
-    expect(GRAPH_TREE_THRESHOLD).toBe(150);
+    expect(GRAPH_TREE_THRESHOLD).toBe(60);
     expect(defaultDependencyView(3, false)).toBe("graph");
-    expect(defaultDependencyView(150, false)).toBe("graph");
-    expect(defaultDependencyView(151, false)).toBe("tree");
+    expect(defaultDependencyView(60, false)).toBe("graph");
+    expect(defaultDependencyView(61, false)).toBe("tree");
     expect(defaultDependencyView(1200, false)).toBe("tree");
   });
 

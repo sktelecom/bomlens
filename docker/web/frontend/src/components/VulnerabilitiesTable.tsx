@@ -26,7 +26,7 @@ import { uncheckedSummary } from "@/lib/unchecked";
 import { advisorySummary, vulnAliases } from "@/lib/advisories";
 import { densityClass } from "@/lib/tableDensity";
 import { compareVulns, type VulnSortKey } from "@/lib/vulns";
-import { groupByPackage, upgradeBundles } from "@/lib/vulnGroups";
+import { groupByPackage, startsOpen, upgradeBundles } from "@/lib/vulnGroups";
 import {
   applyVulnView,
   viewCounts,
@@ -473,9 +473,9 @@ export function VulnerabilitiesTable({
         </thead>
         <tbody>
           {layout === "package"
-            ? groups.map((g) => {
+            ? groups.map((g, gi) => {
                 // One package on screen is shown open; toggling flips it.
-                const open = (groups.length === 1) !== toggledGroups.has(g.key);
+                const open = startsOpen(gi, groups.length) !== toggledGroups.has(g.key);
                 return (
                   <Fragment key={g.key}>
                     <PackageGroupRow

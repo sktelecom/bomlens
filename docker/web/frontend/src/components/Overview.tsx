@@ -285,7 +285,9 @@ export function Overview({
   ) => void;
 }) {
   const { t, i18n } = useTranslation();
-  const attention = needsAttention(result);
+  // A failed conformance is already the "required items" row of the first-checks
+  // card (same count, same target), so it is not listed a second time here.
+  const attention = needsAttention(result).filter((i) => i.id !== "conformance");
   const hasDeps = Boolean(sbomFileName(result));
   const ai = isAiScan(result);
   // Mirrors nav.ts's gate on the Conformance section itself: a jump card that
