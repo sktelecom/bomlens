@@ -4,9 +4,12 @@
 import {
   BookOpen,
   CircleQuestionMark,
+  Keyboard,
   Clock,
   ExternalLink,
   LifeBuoy,
+  Rocket,
+  Sparkles,
   MonitorPlay,
   Plus,
   RotateCw,
@@ -17,7 +20,7 @@ import { type ReactNode, useEffect, useId, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { Button, buttonVariants } from "@/components/ui/button";
-import { demoUrl, docsUrl } from "@/lib/demo";
+import { demoInstallUrl, demoUrl, docsUrl, releaseNotesUrl } from "@/lib/demo";
 import { ISSUE_FORM_URL } from "@/lib/diagnostics";
 import { IS_STATIC_DEMO } from "@/lib/demo";
 import { type RecentScanLink } from "@/lib/nav";
@@ -25,6 +28,7 @@ import { scanHash } from "@/lib/route";
 import { cn } from "@/lib/utils";
 
 import { LangToggle } from "./LangToggle";
+import { ShortcutsDialog } from "./ShortcutsDialog";
 import { ThemeToggle } from "./ThemeToggle";
 
 interface TopBarProps {
@@ -221,8 +225,25 @@ export function TopBar({
 function HelpMenu({ version }: { version?: string }) {
   const { t, i18n } = useTranslation();
   const [open, setOpen] = useState(false);
+  const [shortcuts, setShortcuts] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
   const panelId = useId();
+
+  // "?" lists the keys, the way most web tools do. Not while typing: a question
+  // mark in a field is text, and a modifier means some other shortcut.
+  useEffect(() => {
+    const onQuestion = (e: KeyboardEvent) => {
+      if (e.key !== "?" || e.metaKey || e.ctrlKey || e.altKey) return;
+      const el = e.target as HTMLElement | null;
+      if (el?.closest("input, textarea, select, [contenteditable='true']")) return;
+      e.preventDefault();
+      setOpen(false);
+      setShortcuts(true);
+    };
+    window.addEventListener("keydown", onQuestion);
+    return () => window.removeEventListener("keydown", onQuestion);
+  }, []);
 
   useEffect(() => {
     if (!open) return;
@@ -246,6 +267,7 @@ function HelpMenu({ version }: { version?: string }) {
   return (
     <div ref={wrapRef} className="relative shrink-0">
       <button
+        ref={triggerRef}
         type="button"
         onClick={() => setOpen((v) => !v)}
         aria-haspopup="true"
@@ -269,6 +291,18 @@ function HelpMenu({ version }: { version?: string }) {
           className="absolute right-0 top-full z-30 mt-1 w-64 max-w-[90vw] overflow-hidden rounded-md border bg-popover text-popover-foreground shadow-lg"
         >
           <a
+            href={demoInstallUrl(i18n.language)}
+            target="_blank"
+            rel="noreferrer noopener"
+            onClick={() => setOpen(false)}
+            className={item}
+            data-testid="help-start"
+          >
+            <Rocket className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
+            {t("nav.helpStart")}
+            <ExternalLink className="ml-auto h-3 w-3 shrink-0 text-muted-foreground" aria-hidden />
+          </a>
+          <a
             href={docsUrl(i18n.language)}
             target="_blank"
             rel="noreferrer noopener"
@@ -290,6 +324,33 @@ function HelpMenu({ version }: { version?: string }) {
             {t("nav.helpDemo")}
             <ExternalLink className="ml-auto h-3 w-3 shrink-0 text-muted-foreground" aria-hidden />
           </a>
+          <button
+            type="button"
+            onClick={() => {
+              setOpen(false);
+              setShortcuts(true);
+            }}
+            className={cn(item, "w-full text-left")}
+            data-testid="help-shortcuts"
+          >
+            <Keyboard className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
+            {t("nav.helpShortcuts")}
+            <kbd className="ml-auto rounded border bg-muted px-1.5 font-sans text-caption text-muted-foreground" aria-hidden>
+              ?
+            </kbd>
+          </button>
+          <a
+            href={releaseNotesUrl(version)}
+            target="_blank"
+            rel="noreferrer noopener"
+            onClick={() => setOpen(false)}
+            className={item}
+            data-testid="help-whats-new"
+          >
+            <Sparkles className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
+            {t("nav.helpWhatsNew")}
+            <ExternalLink className="ml-auto h-3 w-3 shrink-0 text-muted-foreground" aria-hidden />
+          </a>
           <a
             href={ISSUE_FORM_URL}
             target="_blank"
@@ -307,6 +368,15 @@ function HelpMenu({ version }: { version?: string }) {
           </p>
         </div>
       )}
+      <ShortcutsDialog
+        open={shortcuts}
+        onClose={() => {
+          setShortcuts(false);
+          // The menu item that opened the list is gone by now, so the dialog
+          // cannot hand focus back to it; the menu button stands in.
+          requestAnimationFrame(() => triggerRef.current?.focus());
+        }}
+      />
     </div>
   );
 }

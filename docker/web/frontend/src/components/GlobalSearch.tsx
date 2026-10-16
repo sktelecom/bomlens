@@ -8,14 +8,9 @@ import { useTranslation } from "react-i18next";
 import { Input } from "@/components/ui/input";
 import type { DoneEvent } from "@/lib/api";
 import { parseLookupInput } from "@/lib/lookup";
+import { isAppleKeyboard } from "@/lib/platform";
 import type { SectionId } from "@/lib/nav";
 import { searchScan } from "@/lib/search";
-
-/** Meta on Apple keyboards, Control elsewhere — only affects the hint glyph. */
-function isAppleKeyboard() {
-  if (typeof navigator === "undefined") return false;
-  return /Mac|iPhone|iPad|iPod/.test(navigator.platform || navigator.userAgent);
-}
 
 /**
  * Cross-section quick search in the top bar (shown only with a scan loaded).
