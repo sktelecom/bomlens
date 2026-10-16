@@ -23,6 +23,7 @@
     "tokens:build": "node scripts/build-tokens.mjs",
     "tokens:check": "node scripts/build-tokens.mjs --check",
     "i18n:check": "node scripts/i18n-coverage.mjs",
+    "site:axe": "node scripts/site-axe.mjs",
     "notices:check": "node scripts/check-third-party-notices.mjs"
   },
   "dependencies": {
