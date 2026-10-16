@@ -57,15 +57,27 @@ export const RULES = [
       ) && !/aria-hidden/.test(line),
   },
   // The brand red marks the primary action, the logo and keyboard focus. It is
-  // not a data colour: on a graph node or a badge it reads as "problem" next to
-  // the severity colours, and on the active menu fill it made "where you are"
-  // look like a warning. Scoped to the files and lines that draw data, so a
-  // primary button or a logo may still use it.
+  // not a data colour and not decoration: on a switch, a drop target, a callout
+  // or a link it reads as "problem" or "look here" next to the severity colours.
+  // So the rule is an allow list, not a deny list: a brand token is accepted
+  // only in BRAND_ALLOWED_FILES (the primary button variant). The logo is an
+  // image and the focus ring is the `ring` colour (`--ring`), neither of which
+  // is a brand utility class. Anything else uses a neutral, a role or a category.
   {
-    name: "brand token in the graph or a badge (use a role, a category or a neutral)",
-    test: (line, file = "") =>
-      BRAND_TOKEN.test(line) &&
-      (DATA_COLOUR_FILES.test(file.replace(/\\/g, "/")) || /<Badge\b|\bbadgeVariants\(/.test(line)),
+    name: "brand token outside the allow list (primary button, logo, focus ring only)",
+    test: (line, file = "") => BRAND_TOKEN.test(line) && !BRAND_ALLOWED_FILES.test(file.replace(/\\/g, "/")),
+  },
+  // Font sizes come from the role scale (text-display ... text-mono, defined in
+  // index.css and tailwind.config.ts), not from a value typed at the call site.
+  {
+    name: "arbitrary font size (use a role size: text-caption, text-label, text-body-sm ...)",
+    re: /\btext-\[\s*[\d.]+(?:px|rem|em|pt)\s*\]/,
+  },
+  // Tailwind's own size names were removed from the theme (tailwind.config.ts),
+  // so a leftover one would silently render at the inherited size.
+  {
+    name: "legacy Tailwind font size (renamed: xs=label, sm=body-sm, base=body, lg=heading, xl=title, 3xl=display)",
+    re: /(?<![\w-])text-(?:xs|sm|base|lg|xl|[2-9]xl)(?![\w-])/,
   },
 ];
 
@@ -73,9 +85,9 @@ export const RULES = [
 export const BRAND_TOKEN =
   /--brand\b|(?:^|[^\w-])(?:[\w-]+:)*(?:bg|text|border|ring|ring-offset|outline|decoration|divide|placeholder|caret|accent|fill|stroke|shadow|from|via|to)-brand(?:-(?:foreground|accent|strong))?(?:\/\d+)?(?![\w-])/;
 
-/** Files that draw data and so never use the brand colour at all. */
-export const DATA_COLOUR_FILES =
-  /(?:^|\/)(?:DependencyGraph\.tsx|DependencyTree\.tsx|ui\/badge\.tsx|ui\/marker\.tsx|LicenseRiskBar\.tsx|SeverityBar\.tsx|ui\/barlist\.tsx)$/;
+/** The only files that may use a brand utility: the Button variants (the primary
+ *  action). Add a file here only for a primary action, never for data or decoration. */
+export const BRAND_ALLOWED_FILES = /(?:^|\/)ui\/button\.tsx$/;
 
 /** Rules that report a line, as `[ruleName, ...]`. */
 export function lintLine(line, file = "") {

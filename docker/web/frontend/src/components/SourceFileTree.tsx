@@ -47,7 +47,7 @@ function FileRow({
       ) : (
         <File className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
       )}
-      <span className="truncate font-mono text-xs">{node.name}</span>
+      <span className="truncate font-mono text-label">{node.name}</span>
 
       {node.licenses.slice(0, 2).map((l) => (
         <Badge key={l} variant="muted">
@@ -131,7 +131,7 @@ export function SourceFileTree({
 
   if (nodes.length === 0) {
     return (
-      <p className="text-sm text-muted-foreground">{t("sourceTree.empty")}</p>
+      <p className="text-body-sm text-muted-foreground">{t("sourceTree.empty")}</p>
     );
   }
 

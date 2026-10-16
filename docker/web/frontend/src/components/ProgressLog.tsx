@@ -81,7 +81,7 @@ export function ProgressLog({
         role="log"
         aria-label={t("progress.title")}
         tabIndex={0}
-        className="h-72 min-h-40 max-h-[80vh] resize-y overflow-auto rounded-md border bg-muted/40 p-3 font-mono text-xs leading-relaxed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+        className="h-72 min-h-40 max-h-[80vh] resize-y overflow-auto rounded-md border bg-muted/40 p-3 font-mono text-label leading-relaxed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
       >
         {logs.length === 0 ? (
           // foreground/70 (not muted-foreground) clears AA on the muted log panel.
@@ -103,12 +103,12 @@ export function ProgressLog({
             <Copy className="h-4 w-4" aria-hidden />
             {t("report.copyLog")}
           </Button>
-          <p className="flex items-start gap-2 text-sm text-foreground/80">
+          <p className="flex items-start gap-2 text-body-sm text-foreground/80">
             <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0 text-risk-medium" aria-hidden />
             {t("report.logHint")}
           </p>
           {copyBlocked && (
-            <p role="status" className="text-sm text-foreground/70">
+            <p role="status" className="text-body-sm text-foreground/70">
               {t("report.logCopyFailed")}
             </p>
           )}
@@ -122,7 +122,7 @@ export function ProgressLog({
       <Card className="animate-fade-in">
         <Disclosure
           size="md"
-          summaryClassName="p-6 text-base font-semibold tracking-tight"
+          summaryClassName="p-6 text-body font-semibold tracking-tight"
           summary={t("progress.title")}
         >
           <div className="space-y-3 px-6 pb-6">{body}</div>
@@ -134,7 +134,7 @@ export function ProgressLog({
   return (
     <Card className="animate-fade-in">
       <CardHeader className="pb-3">
-        <CardTitle className="text-base">{t("progress.title")}</CardTitle>
+        <CardTitle className="text-body">{t("progress.title")}</CardTitle>
       </CardHeader>
       <CardContent className="space-y-3">{body}</CardContent>
     </Card>

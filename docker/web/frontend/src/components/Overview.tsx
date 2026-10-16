@@ -149,17 +149,13 @@ function capList<T>(items: T[]): { shown: T[]; more: number } {
 
 /** A comparison-card diff entry's name, linking into the section it names
  *  filtered to that name (the same free-text `q` filter TopRisk's rows use).
- *  text-brand-strong, not text-primary: --primary equals --foreground in both
- *  themes (plain body text colour), so a link using it is indistinguishable
- *  from surrounding text until hovered. text-brand-strong is the token built
- *  for brand-red-as-text on a card background (4.5:1+ in both themes); a
- *  handful of other screens still use text-primary for the same purpose and
- *  share this bug, tracked separately. Underlined at rest, not just on hover:
+ *  Foreground colour plus an underline, never the brand red (reserved for the
+ *  primary button, the logo and the focus ring). Underlined at rest, not just on hover:
  *  the "moved from X to Y" line sets this link next to plain muted-foreground
  *  text, and that colour pair is only 1.21:1 apart, far under the 3:1 axe
  *  requires to tell a link from prose by colour alone. */
 const DIFF_ITEM_LINK_CLASS =
-  "rounded text-brand-strong underline underline-offset-2 hover:no-underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
+  "rounded text-foreground underline underline-offset-2 hover:no-underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
 
 /** Severity tone for the risk badge, matching the components table. */
 const SEV_TONE: Record<Severity, "critical" | "high" | "medium" | "low" | "info"> = {
@@ -197,20 +193,20 @@ function TopRisk({
       <CardContent className="p-4">
         <div className="mb-3 flex items-baseline justify-between gap-4">
           <div className="flex flex-wrap items-baseline gap-x-2">
-            <span className="text-sm font-semibold text-foreground">
+            <span className="text-body-sm font-semibold text-foreground">
               {t("overview.topRisk")}
             </span>
             {/* On an OS image the worst six can all be variants of one kernel
                 package. True, but it reads as the whole story unless the size
                 of what sits behind it is stated. */}
-            <span className="text-xs text-muted-foreground">
+            <span className="text-label text-muted-foreground">
               {t("overview.topRiskOf", { shown: rows.length, total: affected })}
             </span>
           </div>
           {scanId && (
             <a
               href={scanHash(scanId, "components")}
-              className="rounded text-xs text-muted-foreground underline-offset-2 hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1"
+              className="rounded text-label text-muted-foreground underline-offset-2 hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1"
             >
               {t("overview.topRiskAll")}
             </a>
@@ -222,7 +218,7 @@ function TopRisk({
               <a
                 href={scanId ? scanHash(scanId, "vulnerabilities", { q: c.name }) : undefined}
                 className={cn(
-                  "flex items-center gap-3 rounded-md px-2 py-2 text-sm",
+                  "flex items-center gap-3 rounded-md px-2 py-2 text-body-sm",
                   "transition-colors duration-fast ease-out-soft hover:bg-muted",
                   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1",
                 )}
@@ -231,7 +227,7 @@ function TopRisk({
                   {c.group ? `${c.group} / ` : ""}
                   {c.name}
                 </span>
-                <span className="shrink-0 font-mono text-xs text-muted-foreground">
+                <span className="shrink-0 font-mono text-label text-muted-foreground">
                   {c.version}
                 </span>
                 {c.maxSeverity && (
@@ -352,11 +348,11 @@ export function Overview({
       {!result.ok && (
         <Card role="alert" className="border-destructive/40 bg-destructive/5">
           <CardContent className="space-y-1 p-4">
-            <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
+            <div className="flex items-center gap-2 text-body-sm font-semibold text-foreground">
               <TriangleAlert className="h-4 w-4 shrink-0 text-destructive" aria-hidden />
               {t("run.failedTitle")}
             </div>
-            <p className="whitespace-pre-wrap break-words text-sm text-muted-foreground">
+            <p className="whitespace-pre-wrap break-words text-body-sm text-muted-foreground">
               {result.errorMessage || t("run.failedBody")}
             </p>
           </CardContent>
@@ -367,7 +363,7 @@ export function Overview({
         // same "71 components" means something different for a folder on disk
         // than for an image someone pulled.
         <div
-          className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground"
+          className="flex flex-wrap items-center gap-x-2 gap-y-1 text-label text-muted-foreground"
           data-testid="provenance"
         >
           <ProvenanceIcon
@@ -393,7 +389,7 @@ export function Overview({
           <CardContent className="p-4">
             <div className="flex flex-wrap items-center gap-x-8 gap-y-3">
               <div>
-                <div className="text-xs text-muted-foreground">
+                <div className="text-label text-muted-foreground">
                   {t("overview.vsPrevious", {
                     label:
                       comparison.prev.version ||
@@ -404,7 +400,7 @@ export function Overview({
                       ),
                   })}
                 </div>
-                <div className="mt-1 text-sm font-medium text-foreground">
+                <div className="mt-1 text-body-sm font-medium text-foreground">
                   {comparison.componentsDelta === 0
                     ? t("overview.compSame")
                     : t("overview.compDelta", {
@@ -416,12 +412,12 @@ export function Overview({
                 </div>
               </div>
               <div>
-                <div className="text-xs text-muted-foreground">
+                <div className="text-label text-muted-foreground">
                   {t("overview.sevTrendLabel")}
                 </div>
                 <div
                   className={cn(
-                    "mt-1 flex items-center gap-1.5 text-sm font-medium",
+                    "mt-1 flex items-center gap-1.5 text-body-sm font-medium",
                     // The graphical/badge token (used at full saturation for
                     // icons and badge backgrounds) fails WCAG AA text contrast
                     // on this card's background in light mode (3.56:1, needs
@@ -462,11 +458,11 @@ export function Overview({
                 <Disclosure
                   summary={
                     <div className="min-w-0 flex-1 text-left">
-                      <div className="text-xs text-muted-foreground">
+                      <div className="text-label text-muted-foreground">
                         {t("overview.compChangeLabel")}
                       </div>
                       <div
-                        className="mt-1 text-sm font-medium text-foreground"
+                        className="mt-1 text-body-sm font-medium text-foreground"
                         data-testid="comp-change-summary"
                       >
                         {changesLoading || !changes
@@ -482,7 +478,7 @@ export function Overview({
                   summaryClassName="items-start"
                 >
                   {changes && (
-                    <div className="mt-2 space-y-3 pl-5 text-xs" data-testid="comp-change-details">
+                    <div className="mt-2 space-y-3 pl-5 text-label" data-testid="comp-change-details">
                       {(() => {
                         const added = capList(changes.components.added);
                         const removed = capList(changes.components.removed);
@@ -585,7 +581,7 @@ export function Overview({
                               <a
                                 href={scanHash(scanId, "components")}
                                 data-testid="comp-diff-all-link"
-                                className="inline-block rounded text-brand-strong underline underline-offset-2 hover:no-underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                className="inline-block rounded text-foreground underline underline-offset-2 hover:no-underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                               >
                                 {t("overview.topRiskAll")}
                               </a>
@@ -599,11 +595,11 @@ export function Overview({
                 <Disclosure
                   summary={
                     <div className="min-w-0 flex-1 text-left">
-                      <div className="text-xs text-muted-foreground">
+                      <div className="text-label text-muted-foreground">
                         {t("overview.vulnChangeLabel")}
                       </div>
                       <div
-                        className="mt-1 text-sm font-medium text-foreground"
+                        className="mt-1 text-body-sm font-medium text-foreground"
                         data-testid="vuln-change-summary"
                       >
                         {changesLoading || !changes
@@ -618,7 +614,7 @@ export function Overview({
                   summaryClassName="items-start"
                 >
                   {changes && (
-                    <div className="mt-2 space-y-3 pl-5 text-xs" data-testid="vuln-change-details">
+                    <div className="mt-2 space-y-3 pl-5 text-label" data-testid="vuln-change-details">
                       {(() => {
                         const news = capList(changes.vulns.new);
                         const resolved = capList(changes.vulns.resolved);
@@ -688,7 +684,7 @@ export function Overview({
                               <a
                                 href={scanHash(scanId, "vulnerabilities")}
                                 data-testid="vuln-diff-all-link"
-                                className="inline-block rounded text-brand-strong underline underline-offset-2 hover:no-underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                className="inline-block rounded text-foreground underline underline-offset-2 hover:no-underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                               >
                                 {t("overview.allVulnerabilities")}
                               </a>
@@ -703,7 +699,7 @@ export function Overview({
             )}
           </CardContent>
           {changes?.partial && (
-            <p className="border-t px-4 py-2 text-xs text-muted-foreground">
+            <p className="border-t px-4 py-2 text-label text-muted-foreground">
               {t("overview.diffPartial")}
             </p>
           )}
@@ -719,8 +715,8 @@ export function Overview({
           className="rounded-md border border-warning-border/60 bg-warning-surface px-4 py-3 text-warning dark:border-warning-border/20 dark:bg-warning-surface/30"
           data-testid="zero-components"
         >
-          <div className="text-sm font-medium">{t("result.zeroComponentsTitle")}</div>
-          <p className="mt-1 text-xs">
+          <div className="text-body-sm font-medium">{t("result.zeroComponentsTitle")}</div>
+          <p className="mt-1 text-body-sm">
             {t(
               result.sbom.sbomToolDegraded
                 ? "result.zeroComponentsBodyDegraded"
@@ -750,8 +746,8 @@ export function Overview({
           className="rounded-md border bg-muted/40 px-4 py-3 text-muted-foreground"
           data-testid="firmware-scope"
         >
-          <div className="text-sm font-medium text-foreground">{t("result.firmwareScopeTitle")}</div>
-          <ul className="mt-1 list-disc space-y-0.5 pl-4 text-xs">
+          <div className="text-body-sm font-medium text-foreground">{t("result.firmwareScopeTitle")}</div>
+          <ul className="mt-1 list-disc space-y-0.5 pl-4 text-label">
             {result.sbom.firmwareScope.unknownBytes > 0 && (
               <li>
                 {t("result.firmwareScopeUnknown", {
@@ -781,11 +777,11 @@ export function Overview({
             )}
           </ul>
           {result.sbom.firmwareScope.namesMore > 0 && (
-            <p className="mt-1 text-xs">
+            <p className="mt-1 text-body-sm">
               {t("result.firmwareScopeMore", { count: result.sbom.firmwareScope.namesMore })}
             </p>
           )}
-          <p className="mt-1 text-xs">{t("result.firmwareScopeBody")}</p>
+          <p className="mt-1 text-body-sm">{t("result.firmwareScopeBody")}</p>
         </div>
       )}
 
@@ -797,8 +793,8 @@ export function Overview({
           className="rounded-md border border-warning-border/60 bg-warning-surface px-4 py-3 text-warning dark:border-warning-border/20 dark:bg-warning-surface/30"
           data-testid="scan-warnings"
         >
-          <div className="text-sm font-medium">{t("result.scanWarningsTitle")}</div>
-          <ul className="mt-1 list-disc space-y-0.5 pl-4 text-xs">
+          <div className="text-body-sm font-medium">{t("result.scanWarningsTitle")}</div>
+          <ul className="mt-1 list-disc space-y-0.5 pl-4 text-label">
             {result.scanWarnings?.map((w) => (
               <li key={w} className="break-words font-mono">
                 {w.replace(/^\[WARN\]\s*/, "")}
@@ -817,17 +813,17 @@ export function Overview({
           className="rounded-md border bg-muted/40 px-4 py-3 text-muted-foreground"
           data-testid="version-pinning"
         >
-          <div className="text-sm font-medium text-foreground">
+          <div className="text-body-sm font-medium text-foreground">
             {t("result.unpinnedTitle")}
           </div>
-          <p className="mt-1 text-xs">{t("result.unpinnedBody")}</p>
+          <p className="mt-1 text-body-sm">{t("result.unpinnedBody")}</p>
         </div>
       )}
 
       {!ai && result.sbom?.suggestIdentifyVendored && (
         <div className="rounded-md border border-warning-border/60 bg-warning-surface px-4 py-3 text-warning dark:border-warning-border/20 dark:bg-warning-surface/30">
-          <div className="text-sm font-medium">{t("result.vendoredHintTitle")}</div>
-          <p className="mt-1 text-xs">{t("result.vendoredHintBody")}</p>
+          <div className="text-body-sm font-medium">{t("result.vendoredHintTitle")}</div>
+          <p className="mt-1 text-body-sm">{t("result.vendoredHintBody")}</p>
         </div>
       )}
 
@@ -839,8 +835,8 @@ export function Overview({
           repeat a claim that isn't true here. */}
       {result.sbom?.sbomToolDegraded && result.sbom.components > 0 && (
         <div className="rounded-md border border-warning-border/60 bg-warning-surface px-4 py-3 text-warning dark:border-warning-border/20 dark:bg-warning-surface/30">
-          <div className="text-sm font-medium">{t("result.sbomDegradedTitle")}</div>
-          <p className="mt-1 text-xs">{t(sbomDegradedBodyKey(result.sbom.sbomToolDegraded))}</p>
+          <div className="text-body-sm font-medium">{t("result.sbomDegradedTitle")}</div>
+          <p className="mt-1 text-body-sm">{t(sbomDegradedBodyKey(result.sbom.sbomToolDegraded))}</p>
         </div>
       )}
 
@@ -859,22 +855,22 @@ export function Overview({
           (c) => c.id === "transitive" && c.status === "fail",
         ) && (
           <div className="rounded-md border border-warning-border/60 bg-warning-surface px-4 py-3 text-warning dark:border-warning-border/20 dark:bg-warning-surface/30">
-            <div className="text-sm font-medium">{t("result.sbomGraphEmptyTitle")}</div>
-            <p className="mt-1 text-xs">{t("result.sbomGraphEmptyBody")}</p>
+            <div className="text-body-sm font-medium">{t("result.sbomGraphEmptyTitle")}</div>
+            <p className="mt-1 text-body-sm">{t("result.sbomGraphEmptyBody")}</p>
           </div>
         )}
 
       {result.scanoss?.status === "unavailable" && (
         <div className="rounded-md border border-warning-border/60 bg-warning-surface px-4 py-3 text-warning dark:border-warning-border/20 dark:bg-warning-surface/30">
-          <div className="text-sm font-medium">{t("result.scanossUnavailableTitle")}</div>
-          <p className="mt-1 text-xs">{t("result.scanossUnavailableBody")}</p>
+          <div className="text-body-sm font-medium">{t("result.scanossUnavailableTitle")}</div>
+          <p className="mt-1 text-body-sm">{t("result.scanossUnavailableBody")}</p>
         </div>
       )}
 
       {result.scanoss?.status === "no-match" && (
         <div className="rounded-md border bg-muted/40 px-4 py-3 text-muted-foreground">
-          <div className="text-sm font-medium text-foreground">{t("result.scanossNoMatchTitle")}</div>
-          <p className="mt-1 text-xs">{t("result.scanossNoMatchBody")}</p>
+          <div className="text-body-sm font-medium text-foreground">{t("result.scanossNoMatchTitle")}</div>
+          <p className="mt-1 text-body-sm">{t("result.scanossNoMatchBody")}</p>
         </div>
       )}
 
@@ -889,7 +885,7 @@ export function Overview({
       {attention.length > 0 && (
         <Card className={ATTN_ACCENT[attention[0].tone]}>
           <CardContent className="p-4">
-            <div className="mb-2 text-sm font-semibold text-foreground">
+            <div className="mb-2 text-body-sm font-semibold text-foreground">
               {t("overview.needsAttention")}
             </div>
             <ul className="flex flex-col gap-1">
@@ -909,7 +905,7 @@ export function Overview({
                     <a
                       href={scanId ? scanHash(scanId, item.target) : undefined}
                       className={cn(
-                        "flex w-full items-center gap-3 rounded-md px-2 py-2 text-left text-sm",
+                        "flex w-full items-center gap-3 rounded-md px-2 py-2 text-left text-body-sm",
                         "transition-colors duration-fast ease-out-soft hover:bg-muted",
                         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1",
                       )}
@@ -969,8 +965,8 @@ function YoctoVexNote({ vex }: { vex: YoctoVex }) {
       <CardContent className="flex items-start gap-3 p-4">
         <ShieldCheck className="mt-0.5 size-5 shrink-0 text-risk-info" aria-hidden />
         <div className="space-y-1">
-          <div className="text-sm font-medium">{t("overview.yoctoVex.title")}</div>
-          <p className="text-sm text-muted-foreground">
+          <div className="text-body-sm font-medium">{t("overview.yoctoVex.title")}</div>
+          <p className="text-body-sm text-muted-foreground">
             {vex.unresolved > 0
               ? t("overview.yoctoVex.withOpen", {
                   fixed: vex.fixed,
@@ -1137,15 +1133,15 @@ function JumpCards({
           </div>
           <div
             className={cn(
-              "mt-3 text-2xl font-semibold tabular-nums text-foreground",
+              "mt-3 text-title font-semibold tabular-nums text-foreground",
               valueClass,
             )}
           >
             {typeof value === "number" ? fmt(value) : (value ?? "—")}
           </div>
-          <div className="truncate text-xs text-muted-foreground">{text}</div>
+          <div className="truncate text-label text-muted-foreground">{text}</div>
           {sub && (
-            <div className="mt-0.5 truncate text-[0.6875rem] text-muted-foreground">
+            <div className="mt-0.5 truncate text-caption text-muted-foreground">
               {sub}
             </div>
           )}

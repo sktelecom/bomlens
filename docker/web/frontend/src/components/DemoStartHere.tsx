@@ -23,7 +23,7 @@ export function DemoStartHere({ scans }: { scans: RecentScan[] }) {
   return (
     <Card data-testid="demo-start-here">
       <CardContent className="flex flex-col gap-3 p-4 md:flex-row md:items-center md:gap-5">
-        <p className="text-sm text-foreground md:max-w-sm">
+        <p className="text-body-sm text-foreground md:max-w-sm">
           {t("recent.demoStart")}
         </p>
         <ul className="flex min-w-0 flex-1 flex-col gap-2 md:flex-row md:flex-wrap">
@@ -31,14 +31,14 @@ export function DemoStartHere({ scans }: { scans: RecentScan[] }) {
             <li key={s.id} className="min-w-0">
               <a
                 href={scanHash(s.id)}
-                className="group inline-flex max-w-full items-center gap-2 rounded-md border bg-background px-3 py-2 text-sm text-foreground transition-colors duration-fast ease-out-soft hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                className="group inline-flex max-w-full items-center gap-2 rounded-md border bg-background px-3 py-2 text-body-sm text-foreground transition-colors duration-fast ease-out-soft hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
               >
-                <span className="shrink-0 text-xs text-muted-foreground">
+                <span className="shrink-0 text-label text-muted-foreground">
                   {t(scanTypeLabelKey(s))}
                 </span>
                 <span className="min-w-0 truncate font-medium" title={s.project}>{s.project}</span>
                 <ArrowRight
-                  className="h-3.5 w-3.5 shrink-0 text-brand"
+                  className="h-3.5 w-3.5 shrink-0 text-muted-foreground"
                   aria-hidden
                 />
               </a>

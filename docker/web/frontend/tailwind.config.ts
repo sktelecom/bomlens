@@ -20,6 +20,19 @@ const config: Config = {
   darkMode: ["class"],
   theme: {
     container: { center: true, padding: "1rem", screens: { "2xl": "1400px" } },
+    // The type scale replaces Tailwind's default sizes on purpose: text-xs, text-sm
+    // and the rest no longer exist, so a component has to name a role. Values are
+    // the CSS variables in src/index.css, size and line height as a pair.
+    fontSize: {
+      display: ["var(--font-size-display)", { lineHeight: "var(--line-height-display)" }],
+      title: ["var(--font-size-title)", { lineHeight: "var(--line-height-title)" }],
+      heading: ["var(--font-size-heading)", { lineHeight: "var(--line-height-heading)" }],
+      body: ["var(--font-size-body)", { lineHeight: "var(--line-height-body)" }],
+      "body-sm": ["var(--font-size-body-sm)", { lineHeight: "var(--line-height-body-sm)" }],
+      label: ["var(--font-size-label)", { lineHeight: "var(--line-height-label)" }],
+      caption: ["var(--font-size-caption)", { lineHeight: "var(--line-height-caption)" }],
+      mono: ["var(--font-size-mono)", { lineHeight: "var(--line-height-mono)" }],
+    },
     extend: {
       colors: {
         border: "hsl(var(--border))",

@@ -78,7 +78,7 @@ function AdvisoryCard({ advisory }: { advisory: AdvisoryRecord }) {
     <Card>
       <CardContent className="space-y-3 p-5">
         <div className="flex flex-wrap items-center gap-2">
-          <span className="font-mono text-sm font-medium">{advisory.id}</span>
+          <span className="font-mono text-body-sm font-medium">{advisory.id}</span>
           <Badge tone={severityTone(advisory.severity)} mark>
             {t(`severity.${advisory.severity}`)}
           </Badge>
@@ -89,21 +89,21 @@ function AdvisoryCard({ advisory }: { advisory: AdvisoryRecord }) {
           )}
         </div>
         {advisory.title && (
-          <p className="text-sm font-medium text-foreground">{advisory.title}</p>
+          <p className="text-body-sm font-medium text-foreground">{advisory.title}</p>
         )}
         {advisory.cvss != null && (
-          <div className="flex flex-wrap items-baseline gap-2 text-sm">
+          <div className="flex flex-wrap items-baseline gap-2 text-body-sm">
             <span className="font-medium">{t("lookup.cvss")}</span>
             <span className="tabular-nums">{advisory.cvss}</span>
             {advisory.cvssVector && (
-              <span className="font-mono text-xs text-muted-foreground">
+              <span className="font-mono text-label text-muted-foreground">
                 {advisory.cvssVector}
               </span>
             )}
           </div>
         )}
         {(advisory.published || advisory.modified) && (
-          <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+          <div className="flex flex-wrap gap-x-4 gap-y-1 text-label text-muted-foreground">
             {advisory.published && (
               <span>
                 {t("lookup.published")}: {formatDate(advisory.published, i18n.language)}
@@ -117,13 +117,13 @@ function AdvisoryCard({ advisory }: { advisory: AdvisoryRecord }) {
           </div>
         )}
         {advisory.description && (
-          <p className="max-w-3xl text-sm leading-relaxed text-muted-foreground">
+          <p className="max-w-3xl text-body-sm leading-relaxed text-muted-foreground">
             {advisory.description}
           </p>
         )}
         {advisory.aliases.length > 0 && (
           <div className="space-y-1">
-            <div className="text-xs font-medium text-foreground">{t("lookup.aliases")}</div>
+            <div className="text-label font-medium text-foreground">{t("lookup.aliases")}</div>
             <div className="flex flex-wrap gap-1.5">
               {advisory.aliases.map((a) => (
                 <Badge key={a} variant="muted">
@@ -135,8 +135,8 @@ function AdvisoryCard({ advisory }: { advisory: AdvisoryRecord }) {
         )}
         {advisory.affected.length > 0 && (
           <div className="space-y-1">
-            <div className="text-xs font-medium text-foreground">{t("lookup.affected")}</div>
-            <ul className="space-y-1 text-xs text-muted-foreground">
+            <div className="text-label font-medium text-foreground">{t("lookup.affected")}</div>
+            <ul className="space-y-1 text-label text-muted-foreground">
               {advisory.affected.map((a, i) => (
                 <li key={`${a.ecosystem}-${a.name}-${i}`} className="font-mono">
                   {a.ecosystem ? `${a.ecosystem}: ` : ""}
@@ -152,7 +152,7 @@ function AdvisoryCard({ advisory }: { advisory: AdvisoryRecord }) {
         )}
         {advisory.refs.length > 0 && (
           <div className="space-y-1">
-            <div className="text-xs font-medium text-foreground">{t("lookup.references")}</div>
+            <div className="text-label font-medium text-foreground">{t("lookup.references")}</div>
             <ul className="space-y-0.5">
               {advisory.refs.map((href) => (
                 <li key={href}>
@@ -160,7 +160,7 @@ function AdvisoryCard({ advisory }: { advisory: AdvisoryRecord }) {
                     href={href}
                     target="_blank"
                     rel="noreferrer"
-                    className="inline-flex items-center gap-1 break-all text-xs text-primary underline-offset-2 hover:underline"
+                    className="inline-flex items-center gap-1 break-all text-label text-primary underline-offset-2 hover:underline"
                   >
                     <ExternalLink className="h-3 w-3 shrink-0" aria-hidden />
                     {href}
@@ -292,10 +292,10 @@ export function ExternalLookup({ initialQuery, onQueryChange }: Props) {
   return (
     <div className="space-y-6">
       <div className="space-y-1.5">
-        <h1 className="text-3xl font-semibold tracking-tight text-foreground">
+        <h1 className="text-display font-semibold tracking-tight text-foreground">
           {t("lookup.title")}
         </h1>
-        <p className="max-w-2xl text-sm text-muted-foreground">{t("lookup.subtitle")}</p>
+        <p className="max-w-2xl text-body-sm text-muted-foreground">{t("lookup.subtitle")}</p>
       </div>
 
       <Card>
@@ -348,7 +348,7 @@ export function ExternalLookup({ initialQuery, onQueryChange }: Props) {
             </Button>
           </form>
           {parsed.kind === "unsupportedPurl" && (
-            <p className="mt-2 text-xs text-muted-foreground">
+            <p className="mt-2 text-body-sm text-muted-foreground">
               {t("lookup.unsupportedPurl", { type: parsed.type })}
             </p>
           )}
@@ -387,8 +387,8 @@ export function ExternalLookup({ initialQuery, onQueryChange }: Props) {
         result.result.found ? (
           <div className="space-y-3">
             {result.result.truncated && (
-              <p className="flex items-center gap-1.5 rounded-md border border-brand/30 bg-brand/5 px-3 py-2 text-xs text-muted-foreground">
-                <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-brand" aria-hidden />
+              <p className="flex items-center gap-1.5 rounded-md border border-role-attention-border bg-role-attention-muted px-3 py-2 text-body-sm text-foreground">
+                <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-role-attention-fg" aria-hidden />
                 {t("lookup.truncated")}
               </p>
             )}

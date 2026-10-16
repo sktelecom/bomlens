@@ -219,7 +219,7 @@ function VulnDetail({
           <span className="font-medium">{t("result.vulnCvss")}</span>
           <span className="tabular-nums">{vuln.cvss}</span>
           {vuln.cvssVector ? (
-            <span className="font-mono text-xs text-muted-foreground">
+            <span className="font-mono text-label text-muted-foreground">
               {vuln.cvssVector}
             </span>
           ) : null}
@@ -291,7 +291,7 @@ function VulnDetail({
       {received && (
         <div className="space-y-1 border-t pt-3">
           <div className="font-medium">{t("result.vexReceivedTitle")}</div>
-          <p className="text-xs text-muted-foreground">
+          <p className="text-body-sm text-muted-foreground">
             {received.source
               ? t("result.vexReceivedFrom", { product: received.source })
               : t("result.vexReceivedHint")}
@@ -374,7 +374,7 @@ function VexJudgement({
   return (
     <div className="space-y-2 border-t pt-3">
       <div className="font-medium">{t("result.vexSectionTitle")}</div>
-      <p className="text-xs text-muted-foreground">{t("result.vexSectionHint")}</p>
+      <p className="text-body-sm text-muted-foreground">{t("result.vexSectionHint")}</p>
       <div className="flex flex-wrap items-center gap-2">
         <Select
           aria-label={t("result.vexStateLabel")}
@@ -410,10 +410,10 @@ function VexJudgement({
         aria-label={t("result.vexDetailLabel")}
         rows={2}
         maxLength={2000}
-        className="w-full max-w-lg rounded-lg border border-input bg-background px-2 py-1.5 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+        className="w-full max-w-lg rounded-lg border border-input bg-background px-2 py-1.5 text-body-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
       />
       {vex.updatedAt && (
-        <p className="text-xs text-muted-foreground">
+        <p className="text-body-sm text-muted-foreground">
           {t("result.vexUpdatedAt", { date: formatPublishedDate(vex.updatedAt, i18n.language) })}
         </p>
       )}
@@ -604,7 +604,7 @@ export function VulnerabilitiesTable({
       return (
         <ErrorState>
           <span>{t("result.securityScanFailed")}</span>
-          <span className="max-w-xl break-all font-mono text-xs">{security.scanError}</span>
+          <span className="max-w-xl break-all font-mono text-label">{security.scanError}</span>
         </ErrorState>
       );
     }
@@ -617,7 +617,7 @@ export function VulnerabilitiesTable({
         <div className="space-y-3">
           <UncheckedComponents security={security} />
           <NotReachableFindings security={security} />
-          <p className="text-xs text-muted-foreground">
+          <p className="text-body-sm text-muted-foreground">
             {t(unchecked ? "result.noVulnsInChecked" : "result.noReachableVulns")}
           </p>
           <AdvisoriesWithoutCve security={security} />
@@ -644,7 +644,7 @@ export function VulnerabilitiesTable({
           scanId ? (
             <a
               href={scanHash(scanId, "components")}
-              className="rounded text-xs text-primary underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1"
+              className="rounded text-label text-primary underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1"
             >
               {t("result.noVulnsAction")}
             </a>
@@ -668,7 +668,7 @@ export function VulnerabilitiesTable({
       {security.scanError && (
         // Findings exist (e.g. merged from a sidecar engine) but the primary
         // engine failed — the list below is incomplete, not the full picture.
-        <p className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+        <p className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-label text-destructive">
           {t("result.securityScanPartial")}{" "}
           <span className="break-all font-mono">{security.scanError}</span>
         </p>
@@ -691,7 +691,7 @@ export function VulnerabilitiesTable({
       <NotReachableFindings security={security} />
       {upgradeGroups.length > 0 && (
         <div className="space-y-1.5 rounded-md border bg-muted/30 px-3 py-2">
-          <div className="text-xs font-medium text-foreground">
+          <div className="text-label font-medium text-foreground">
             {t("result.upgradeBundlesTitle")}
           </div>
           <ul className="space-y-1">
@@ -700,7 +700,7 @@ export function VulnerabilitiesTable({
                 <button
                   type="button"
                   onClick={() => setQuery(g.pkg)}
-                  className="rounded text-xs text-primary underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  className="rounded text-label text-primary underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 >
                   {t("result.upgradeBundleLine", {
                     pkg: g.pkg,
@@ -712,7 +712,7 @@ export function VulnerabilitiesTable({
             ))}
           </ul>
           {upgradeGroups.length > 5 && (
-            <p className="text-xs text-muted-foreground">
+            <p className="text-body-sm text-muted-foreground">
               {t("result.upgradeBundlesMore", { count: upgradeGroups.length - 5 })}
             </p>
           )}
@@ -727,7 +727,7 @@ export function VulnerabilitiesTable({
           aria-label={t("result.vulnSearchPlaceholder")}
         />
         {(q || severityFilter) && (
-          <span className="text-xs tabular-nums text-muted-foreground">
+          <span className="text-label tabular-nums text-muted-foreground">
             {t("result.vulnShown", { shown: visible.length, total: items.length })}
           </span>
         )}
@@ -787,7 +787,7 @@ export function VulnerabilitiesTable({
         </div>
       </div>
       <div className="max-h-[44rem] resize-y overflow-auto rounded-md border">
-        <table className="w-full text-left text-xs">
+        <table className="w-full text-left text-label">
         <thead className="sticky top-0 z-10 bg-muted/95 backdrop-blur">
           <tr className="border-b">
             <SortableTh label={t("result.colSeverity")} sortKey="severity" sort={sort} onSort={onSort} />

@@ -38,7 +38,9 @@ const VULN_TONE: Record<Severity, "critical" | "high" | "medium" | "low" | "info
 const NODE_CAP = 1500;
 
 /** Cytoscape shape per severity, mirroring `SEVERITY_SHAPE` in ui/marker.tsx.
- *  UNKNOWN keeps the default circle: its ring is the neutral grey. */
+ *  UNKNOWN keeps the circle, but is drawn hollow with a dashed ring (see the
+ *  style list), the counterpart of the dash marker: "not graded" is not a grade,
+ *  and a plain grey ring was only a colour difference from a low-severity ring. */
 const NODE_SHAPE: Partial<Record<Severity, string>> = {
   CRITICAL: "diamond",
   HIGH: "triangle",
@@ -209,6 +211,10 @@ export function DependencyGraph({
                 ...(NODE_SHAPE[sev] ? { shape: NODE_SHAPE[sev] } : {}),
               },
             })),
+            {
+              selector: 'node[vuln = "UNKNOWN"]',
+              style: { "border-style": "dashed", "background-color": c.bg },
+            },
             {
               selector: "node.match",
               style: { "border-width": 2, "border-color": c.text },
@@ -391,7 +397,7 @@ export function DependencyGraph({
           className="h-8 pl-8"
         />
       </div>
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-muted-foreground">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-label text-muted-foreground">
         <span className="inline-flex items-center gap-1.5">
           <span
             className="h-2.5 w-2.5 shrink-0 rounded-full border-2 border-foreground bg-card"
@@ -447,7 +453,7 @@ export function DependencyGraph({
         className="h-[28rem] w-full rounded-md border bg-card"
       />
       {selected && (
-        <div className="space-y-2 rounded-md border bg-muted/30 p-3 text-xs">
+        <div className="space-y-2 rounded-md border bg-muted/30 p-3 text-label">
           <div className="flex items-center gap-2">
             <span className="font-mono font-medium">{selected.label}</span>
             {selected.vuln && (

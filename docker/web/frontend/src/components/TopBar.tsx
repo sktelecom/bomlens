@@ -124,7 +124,7 @@ export function TopBar({
       )}
       {version && (
         <span
-          className="hidden shrink-0 rounded-full border px-1.5 py-0.5 font-mono text-[10px] leading-none text-muted-foreground sm:inline-block"
+          className="hidden shrink-0 rounded-full border px-1.5 py-0.5 font-mono text-caption leading-none text-muted-foreground sm:inline-block"
           title={t("nav.helpVersion", { version })}
           data-testid="app-version-badge"
         >
@@ -137,13 +137,13 @@ export function TopBar({
           {/* The scan name needs room the icon buttons cannot spare on a phone. */}
           <div className="hidden min-w-0 items-baseline gap-2 sm:flex">
             <span
-              className="truncate text-sm font-medium text-foreground"
+              className="truncate text-body-sm font-medium text-foreground"
               title={project.name}
             >
               {project.name}
             </span>
             {project.version && (
-              <span className="shrink-0 text-sm text-muted-foreground">
+              <span className="shrink-0 text-body-sm text-muted-foreground">
                 {project.version}
               </span>
             )}
@@ -163,7 +163,7 @@ export function TopBar({
             className="gap-1.5"
             title={t("result.rescanHint")}
           >
-            <RotateCw className="h-4 w-4 text-brand" aria-hidden />
+            <RotateCw className="h-4 w-4" aria-hidden />
             <span>{t("result.rescan")}</span>
           </Button>
         )}
@@ -241,7 +241,7 @@ function HelpMenu({ version }: { version?: string }) {
   }, [open]);
 
   const item =
-    "flex items-center gap-2 px-3 py-2 text-sm hover:bg-muted focus-visible:bg-muted focus-visible:outline-none";
+    "flex items-center gap-2 px-3 py-2 text-body-sm hover:bg-muted focus-visible:bg-muted focus-visible:outline-none";
 
   return (
     <div ref={wrapRef} className="relative shrink-0">
@@ -302,7 +302,7 @@ function HelpMenu({ version }: { version?: string }) {
             {t("nav.helpReport")}
             <ExternalLink className="ml-auto h-3 w-3 shrink-0 text-muted-foreground" aria-hidden />
           </a>
-          <p className="border-t px-3 py-2 text-xs text-muted-foreground" data-testid="app-version">
+          <p className="border-t px-3 py-2 text-label text-muted-foreground" data-testid="app-version">
             {version ? t("nav.helpVersion", { version }) : t("nav.helpVersionUnknown")}
           </p>
         </div>
@@ -368,13 +368,13 @@ function RecentMenu({
           <a
             href={homeHref}
             onClick={() => setOpen(false)}
-            className="flex items-center gap-2 border-b px-3 py-2 text-sm font-medium hover:bg-muted focus-visible:bg-muted focus-visible:outline-none"
+            className="flex items-center gap-2 border-b px-3 py-2 text-body-sm font-medium hover:bg-muted focus-visible:bg-muted focus-visible:outline-none"
           >
             <Clock className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
             {t("nav.recentScans")}
           </a>
           {recent.length === 0 ? (
-            <p className="px-3 py-3 text-sm text-muted-foreground">
+            <p className="px-3 py-3 text-body-sm text-muted-foreground">
               {t("nav.recentEmpty")}
             </p>
           ) : (
@@ -385,7 +385,7 @@ function RecentMenu({
                     href={scanHash(scanItem.id)}
                     onClick={() => setOpen(false)}
                     className={cn(
-                      "flex w-full items-center gap-2 px-3 py-1.5 text-sm text-muted-foreground",
+                      "flex w-full items-center gap-2 px-3 py-1.5 text-body-sm text-muted-foreground",
                       "transition-colors duration-fast ease-out-soft hover:bg-muted hover:text-foreground",
                       "focus-visible:bg-muted focus-visible:text-foreground focus-visible:outline-none",
                       onDeleteRecent && "pr-8",

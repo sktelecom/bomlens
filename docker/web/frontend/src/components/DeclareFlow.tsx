@@ -131,7 +131,7 @@ export function DeclareFlow({
               href={demoInstallUrl(i18n.language)}
               target="_blank"
               rel="noreferrer"
-              className="font-medium text-brand underline underline-offset-2 hover:no-underline"
+              className="font-medium text-foreground underline underline-offset-2 hover:no-underline"
             >
               {t("form.demoRunDisabledCta")}
             </a>

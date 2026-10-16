@@ -133,7 +133,7 @@ function FilterChip({
       aria-pressed={active}
       onClick={onClick}
       className={cn(
-        "rounded-md border px-2.5 py-1 text-xs font-medium transition-colors duration-fast ease-out-soft",
+        "rounded-md border px-2.5 py-1 text-label font-medium transition-colors duration-fast ease-out-soft",
         FOCUS_RING,
         active
           ? SELECTED_SOLID
@@ -437,7 +437,7 @@ export function ComponentsTable({ items, total, truncated, scanId, query, onQuer
         </Button>
         {/* The count closes the toolbar rather than starting a line of its own,
             which is what made the controls read as four stacked rows. */}
-        <div className="ml-auto text-xs text-muted-foreground">
+        <div className="ml-auto text-label text-muted-foreground">
           {t("result.componentsCount", { shown: filtered.length, total })}
           {/* "list truncated" left the reader guessing how much they were
               looking at. items.length is what the server sent for this scan. */}
@@ -465,7 +465,7 @@ export function ComponentsTable({ items, total, truncated, scanId, query, onQuer
                 licenseUnclear: false,
               })
             }
-            className="rounded text-xs text-muted-foreground underline-offset-2 hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+            className="rounded text-label text-muted-foreground underline-offset-2 hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
           >
             {t("result.clearFilters")}
           </button>
@@ -473,7 +473,7 @@ export function ComponentsTable({ items, total, truncated, scanId, query, onQuer
       )}
 
       <div ref={scrollRef} className="max-h-[44rem] resize-y overflow-auto rounded-md border">
-        <table className="w-full text-left text-xs">
+        <table className="w-full text-left text-label">
           <thead className="sticky top-0 z-10 bg-muted/95 backdrop-blur">
             <tr className="border-b">
               {/* The name column is pinned: reading the columns on the right of a
@@ -598,7 +598,7 @@ export function ComponentsTable({ items, total, truncated, scanId, query, onQuer
                 <td className="whitespace-nowrap px-3 py-2 font-mono tabular-nums text-muted-foreground">
                   {c.version || (c.presenceOnly ? (
                     <span
-                      className="font-sans text-xs"
+                      className="font-sans text-label"
                       title={t("result.presenceOnlyHint")}
                     >
                       {t("result.presenceOnlyVersion")}
@@ -668,7 +668,7 @@ export function ComponentsTable({ items, total, truncated, scanId, query, onQuer
               {isOpen && (
                 <tr className="border-b last:border-0">
                   <td colSpan={colCount} className="bg-muted/30 px-3 py-3">
-                    <dl className="grid grid-cols-[max-content,1fr] gap-x-4 gap-y-1.5 text-xs">
+                    <dl className="grid grid-cols-[max-content,1fr] gap-x-4 gap-y-1.5 text-label">
                       {c.purl ? (
                         <>
                           <dt className="font-medium text-muted-foreground">purl</dt>

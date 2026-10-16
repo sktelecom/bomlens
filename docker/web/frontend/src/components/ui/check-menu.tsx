@@ -73,14 +73,14 @@ export function CheckMenu({
         aria-expanded={open}
         aria-controls={open ? panelId : undefined}
         className={cn(
-          "inline-flex h-9 items-center gap-1.5 rounded-full border border-input bg-background px-3.5 text-sm",
+          "inline-flex h-9 items-center gap-1.5 rounded-full border border-input bg-background px-3.5 text-body-sm",
           "shadow-sm transition-colors duration-fast ease-out-soft hover:bg-accent hover:text-accent-foreground",
           "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
         )}
       >
         {label}
         {checkedCount > 0 && (
-          <span className="rounded-full bg-muted px-1.5 text-xs tabular-nums text-muted-foreground">
+          <span className="rounded-full bg-muted px-1.5 text-label tabular-nums text-muted-foreground">
             {checkedCount}
           </span>
         )}
@@ -105,12 +105,12 @@ export function CheckMenu({
               <li key={item.id}>
                 <label
                   className={cn(
-                    "flex cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-sm",
+                    "flex cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-body-sm",
                     "hover:bg-accent hover:text-accent-foreground",
                     "focus-within:bg-accent focus-within:text-accent-foreground",
                   )}
                 >
-                  {/* A real checkbox, tinted with the brand accent rather than
+                  {/* A real checkbox, tinted with the foreground colour rather than
                       hidden behind a drawn one: it is then the thing a click
                       and a screen reader both land on, with no second element
                       in front of it. */}
@@ -118,7 +118,7 @@ export function CheckMenu({
                     type="checkbox"
                     checked={item.checked}
                     onChange={item.onToggle}
-                    className="h-4 w-4 shrink-0 accent-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    className="h-4 w-4 shrink-0 accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   />
                   {item.label}
                 </label>

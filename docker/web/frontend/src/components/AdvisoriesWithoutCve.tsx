@@ -30,19 +30,19 @@ export function AdvisoriesWithoutCve({
   return (
     <div
       data-testid="advisories-without-cve"
-      className={cn("space-y-2 rounded-md border bg-muted/30 px-3 py-2 text-left text-xs", className)}
+      className={cn("space-y-2 rounded-md border bg-muted/30 px-3 py-2 text-left text-label", className)}
     >
-      <p className="flex items-start gap-2 text-sm font-medium text-foreground">
+      <p className="flex items-start gap-2 text-body-sm font-medium text-foreground">
         <FileWarning className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
         {t("result.advisoriesTitle", { count: a.count })}
       </p>
       <p className="text-muted-foreground">{t("result.advisoriesHint")}</p>
       {a.rows.length > 0 && (
         <Disclosure
-          summary={<span className="text-xs font-medium text-foreground">{t("result.advisoriesList")}</span>}
+          summary={<span className="text-label font-medium text-foreground">{t("result.advisoriesList")}</span>}
         >
           <div className="mt-2 max-h-80 overflow-auto rounded-md border bg-card">
-            <table className="w-full text-left text-xs">
+            <table className="w-full text-left text-label">
               <thead className="border-b bg-muted/40 text-muted-foreground">
                 <tr>
                   <th scope="col" className="px-3 py-2 font-medium">

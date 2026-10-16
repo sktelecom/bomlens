@@ -45,13 +45,13 @@ export function SeverityBar({ security, selected = "", onSelect }: Props) {
   return (
     <div className="space-y-3">
       <div className="flex items-baseline justify-between gap-3">
-        <span className="text-sm font-medium">{t("result.severityTitle")}</span>
+        <span className="text-body-sm font-medium">{t("result.severityTitle")}</span>
         {interactive && total > 0 && (
-          <span className="text-xs text-muted-foreground">{t("result.severityFilterHint")}</span>
+          <span className="text-label text-muted-foreground">{t("result.severityFilterHint")}</span>
         )}
       </div>
       {total === 0 ? (
-        <p className="text-sm text-muted-foreground">
+        <p className="text-body-sm text-muted-foreground">
           {security.uncheckedCount
             ? t("result.noVulnsSomeUnchecked", { count: security.uncheckedCount })
             : security.notReachableCount

@@ -84,11 +84,11 @@ export function BarList({
               style={{ width: `${pct}%` }}
               aria-hidden
             />
-            <span className="relative z-10 flex min-w-0 items-center gap-1.5 pl-2.5 text-sm text-foreground">
+            <span className="relative z-10 flex min-w-0 items-center gap-1.5 pl-2.5 text-body-sm text-foreground">
               {it.badge}
               <span className="truncate">{it.label}</span>
             </span>
-            <span className="relative z-10 ml-auto pr-2.5 text-xs tabular-nums text-foreground">
+            <span className="relative z-10 ml-auto pr-2.5 text-label tabular-nums text-foreground">
               {fmt(it.value)}
             </span>
           </div>

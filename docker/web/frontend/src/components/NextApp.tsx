@@ -633,7 +633,7 @@ export function NextApp() {
               <h1
                 ref={headingRef}
                 tabIndex={-1}
-                className="text-3xl font-semibold tracking-tight text-foreground focus:outline-none"
+                className="text-display font-semibold tracking-tight text-foreground focus:outline-none"
               >
                 {t(`nav.${activeSection}`)}
               </h1>
@@ -641,8 +641,8 @@ export function NextApp() {
                 role="status"
                 className={
                   result.ok
-                    ? "rounded-full bg-success-solid/10 px-2 py-0.5 text-xs font-medium text-success"
-                    : "inline-flex items-center gap-1 rounded-full bg-destructive/10 px-2 py-0.5 text-xs font-medium text-risk-critical-fg"
+                    ? "rounded-full bg-success-solid/10 px-2 py-0.5 text-label font-medium text-success"
+                    : "inline-flex items-center gap-1 rounded-full bg-destructive/10 px-2 py-0.5 text-label font-medium text-risk-critical-fg"
                 }
               >
                 {/* text-risk-critical-fg (not text-destructive): --destructive
@@ -656,7 +656,7 @@ export function NextApp() {
                 {result.ok ? t("result.succeeded") : t("result.failed")}
               </span>
             </div>
-            <p className="mt-1.5 text-sm text-muted-foreground">
+            <p className="mt-1.5 text-body-sm text-muted-foreground">
               {t(scanKindKey(scan.isAiScan, result))}
             </p>
           </div>

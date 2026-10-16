@@ -76,14 +76,14 @@ export function LicenseSummary({
   return (
     <div className="space-y-3">
       <div className="flex items-baseline justify-between gap-3">
-        <span className="text-sm font-medium">
+        <span className="text-body-sm font-medium">
           {t("result.licenseSummaryTitle")}{" "}
           {groups.length > 0 && (
             <span className="tabular-nums text-muted-foreground">{fmt(groups.length)}</span>
           )}
         </span>
         {onPickLicense && (
-          <span className="text-xs text-muted-foreground">
+          <span className="text-label text-muted-foreground">
             {t("result.licenseRowHint")}
           </span>
         )}
@@ -96,7 +96,7 @@ export function LicenseSummary({
         activateHint={onPickLicense ? t("result.licenseRowHint") : undefined}
       />
       {more > 0 && (
-        <div className="text-xs text-muted-foreground">
+        <div className="text-label text-muted-foreground">
           {t("result.licenseMore", { count: more })}
         </div>
       )}

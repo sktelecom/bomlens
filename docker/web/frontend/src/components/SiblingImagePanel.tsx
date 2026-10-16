@@ -76,12 +76,12 @@ export function SiblingImagePanel({ imageKey }: { imageKey: PullImageKey }) {
   // Already downloaded: say so and offer nothing to press.
   if (status?.present) {
     return (
-      <div className="flex items-center gap-2 rounded-md border border-brand/30 bg-brand/5 px-3 py-2 text-xs text-muted-foreground">
-        <Check className="h-3.5 w-3.5 shrink-0 text-brand" aria-hidden />
+      <div className="flex items-center gap-2 rounded-md border border-role-success-border bg-role-success-muted px-3 py-2 text-label text-foreground">
+        <Check className="h-3.5 w-3.5 shrink-0 text-role-success-fg" aria-hidden />
         <span>{t("image.ready")}</span>
         {status.version && (
           <span
-            className="font-mono text-[10px] text-muted-foreground"
+            className="font-mono text-caption text-muted-foreground"
             title={t("nav.helpVersion", { version: status.version })}
             data-testid="sibling-image-version"
           >
@@ -100,7 +100,7 @@ export function SiblingImagePanel({ imageKey }: { imageKey: PullImageKey }) {
       : null;
 
   return (
-    <div className="space-y-2 rounded-md border border-brand/30 bg-brand/5 px-3 py-2 text-xs text-muted-foreground">
+    <div className="space-y-2 rounded-md border bg-muted/40 px-3 py-2 text-label text-muted-foreground">
       <p>{t("source.siblingPullNotice")}</p>
       {pulling ? (
         <p className="flex items-center gap-2" role="status" aria-live="polite">

@@ -61,7 +61,7 @@ export function FileViewer({ name, scanId, onClose }: Props) {
       className="h-[80vh] max-w-4xl"
     >
       <div className="flex items-center justify-between gap-3 border-b px-4 py-3">
-        <span className="truncate font-mono text-sm">{name}</span>
+        <span className="truncate font-mono text-body-sm">{name}</span>
         <div className="flex shrink-0 items-center gap-2">
           <Button variant="outline" size="sm" asChild>
             <a href={fileUrl(scanId, name)} download={name}>
@@ -87,7 +87,7 @@ export function FileViewer({ name, scanId, onClose }: Props) {
             className="h-full w-full bg-white"
           />
         ) : (
-          <pre className="whitespace-pre-wrap break-all p-4 font-mono text-xs">
+          <pre className="whitespace-pre-wrap break-all p-4 font-mono text-label">
             {body}
           </pre>
         )}

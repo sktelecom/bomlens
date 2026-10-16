@@ -5,6 +5,7 @@ import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
 
 import { AI_DONE, AI_SBOM, DONE, SBOM } from "./fixtures";
+import { waitForSettled } from "./settle";
 import {
   captureMain,
   COMBOS,
@@ -2026,7 +2027,10 @@ test("Dependencies tree marks vulnerable packages and direct deps", async ({ pag
   await expect(opensslRow.getByText("Critical", { exact: true })).toBeVisible();
   await expect(opensslRow.getByText("Direct", { exact: true })).toBeVisible();
 
-  // The tree view has no axe violations.
+  // The tree view has no axe violations. The view switch recolours both of its
+  // buttons through a transition; measure them once it has finished, not midway.
+  await waitForSettled(page.getByTestId("deps-view-graph"));
+  await waitForSettled(page.getByTestId("deps-view-tree"));
   const results = await new AxeBuilder({ page })
     .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
     .analyze();
