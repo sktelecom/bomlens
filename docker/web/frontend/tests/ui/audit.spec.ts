@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { type ChildProcess, execFileSync, spawn } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync, statSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync } from "node:fs";
 import { extname, join, relative, resolve } from "node:path";
 
 import { expect, test, type Page } from "@playwright/test";
@@ -154,13 +154,14 @@ async function serveDemoData(page: Page) {
     const rel = decodeURIComponent(new URL(route.request().url()).pathname.slice(DATA_BASE.length));
     const file = resolve(DEMO_DATA, "." + rel);
     const inside = relative(DEMO_DATA, file);
-    if (inside.startsWith("..") || !existsSync(file) || !statSync(file).isFile()) {
+    if (inside.startsWith("..")) return route.fulfill({ status: 404, body: "not found" });
+    let body: Buffer;
+    try {
+      body = readFileSync(file);
+    } catch {
       return route.fulfill({ status: 404, body: "not found" });
     }
-    return route.fulfill({
-      contentType: MIME[extname(file)] ?? "application/octet-stream",
-      body: readFileSync(file),
-    });
+    return route.fulfill({ contentType: MIME[extname(file)] ?? "application/octet-stream", body });
   });
 }
 
