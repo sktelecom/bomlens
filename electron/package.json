@@ -16,6 +16,7 @@
     "dist:mac": "electron-builder --mac dmg --universal"
   },
   "devDependencies": {
+    "@electron/asar": "3.4.1",
     "@playwright/test": "1.63.0",
     "electron": "42.11.12",
     "electron-builder": "26.16.1"
