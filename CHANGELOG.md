@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- A scan that ends without a requested artifact closes with the heading "Analysis finished with errors" (the exit code stays 0), and the web UI launchers open the browser only once the server answers.
+- When an npm project's SBOM has 0 components because the project declares only development dependencies, the warning says the lock file was read and names `BOMLENS_NODE_FULL_GRAPH=1` to list them.
+
 ## [v1.13.5] - 2026-10-16
 
 ### Upgrade note

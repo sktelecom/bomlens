@@ -5087,6 +5087,27 @@ else
         fail "a non-empty SBOM still printed the 0-components diagnostic" "$NRH_LOG4"
     fi
     unset NESTED_ROOTFS_HINT
+
+    # An npm project whose production set was resolved and came out empty:
+    # the warning also says only development dependencies are left out.
+    printf '{"components":[],"metadata":{"properties":[{"name":"bomlens:prep-step-applied","value":"npm-production-set"}]}}' > "$WORK/devonly.json"
+    # shellcheck disable=SC2034  # read by the sourced snippet
+    OUTPUT_FILE="$WORK/devonly.json"
+    NRH_LOG5="$(. "$WORK/nested-rootfs-warn.sh" 2>&1)"
+    if printf '%s' "$NRH_LOG5" | grep -q "no runtime dependencies" \
+        && printf '%s' "$NRH_LOG5" | grep -q "BOMLENS_NODE_FULL_GRAPH=1"; then
+        pass "an empty npm production set says only development dependencies were left out"
+    else
+        fail "the development-only note is missing" "$NRH_LOG5"
+    fi
+    # shellcheck disable=SC2034  # read by the sourced snippet
+    OUTPUT_FILE="$WORK/empty.json"
+    NRH_LOG6="$(. "$WORK/nested-rootfs-warn.sh" 2>&1)"
+    if printf '%s' "$NRH_LOG6" | grep -q "no runtime dependencies"; then
+        fail "the development-only note appeared without the npm production-set marker" "$NRH_LOG6"
+    else
+        pass "no production-set marker -> no development-only note"
+    fi
 fi
 unset OUTPUT_FILE
 

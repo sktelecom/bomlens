@@ -1296,6 +1296,12 @@ if command -v jq >/dev/null 2>&1; then
     COMP_COUNT=$(jq '[.components[]?] | length' "$OUTPUT_FILE" 2>/dev/null || echo 0)
     if [ "${COMP_COUNT:-0}" -eq 0 ]; then
         echo "[WARN] SBOM has 0 components — the scan may have found nothing (missing lockfile or empty source)."
+        # The npm production set was resolved, so the project declares no
+        # runtime dependencies; its development-only ones are left out.
+        if jq -e '(.metadata.properties // []) | any(.name == "bomlens:prep-step-applied" and .value == "npm-production-set")' "$OUTPUT_FILE" >/dev/null 2>&1; then
+            echo "       The lock file was read: this project has no runtime dependencies, and its development-only dependencies are left out."
+            echo "       Set BOMLENS_NODE_FULL_GRAPH=1 to list them as well."
+        fi
         # A directory --target that is not itself a root filesystem but
         # has one a level or two below it (a delivery folder wrapping the
         # actual rootfs) is a common way this ends up empty -- cdxgen has
