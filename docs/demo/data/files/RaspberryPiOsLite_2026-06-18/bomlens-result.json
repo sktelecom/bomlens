@@ -4,7 +4,7 @@
     "version": "1.3.0"
   },
   "engine": {
-    "version": "1.13.5",
+    "version": "latest-4052adc",
     "image": null,
     "image_digest": null
   },
@@ -16,8 +16,8 @@
   "run": {
     "status": "succeeded",
     "reason": null,
-    "started_at": "2026-10-15T17:38:26Z",
-    "ended_at": "2026-10-15T17:53:04Z",
+    "started_at": "2026-10-16T14:31:26Z",
+    "ended_at": "2026-10-16T14:46:05Z",
     "exit_code": 0
   },
   "steps": [
@@ -26,8 +26,8 @@
       "status": "ok",
       "reason": null,
       "detail": null,
-      "started_at": "2026-10-15T17:38:26Z",
-      "ended_at": "2026-10-15T17:49:10Z",
+      "started_at": "2026-10-16T14:31:26Z",
+      "ended_at": "2026-10-16T14:42:09Z",
       "counts": {
         "components": 60131
       },
@@ -38,8 +38,8 @@
       "status": "ok",
       "reason": null,
       "detail": null,
-      "started_at": "2026-10-15T17:49:10Z",
-      "ended_at": "2026-10-15T17:49:13Z",
+      "started_at": "2026-10-16T14:42:10Z",
+      "ended_at": "2026-10-16T14:42:13Z",
       "stage": 2
     },
     {
@@ -47,8 +47,8 @@
       "status": "ok",
       "reason": null,
       "detail": null,
-      "started_at": "2026-10-15T17:49:14Z",
-      "ended_at": "2026-10-15T17:49:14Z",
+      "started_at": "2026-10-16T14:42:14Z",
+      "ended_at": "2026-10-16T14:42:14Z",
       "stage": 2
     },
     {
@@ -56,8 +56,8 @@
       "status": "ok",
       "reason": null,
       "detail": null,
-      "started_at": "2026-10-15T17:49:14Z",
-      "ended_at": "2026-10-15T17:51:10Z",
+      "started_at": "2026-10-16T14:42:14Z",
+      "ended_at": "2026-10-16T14:44:09Z",
       "stage": 2
     },
     {
@@ -65,8 +65,8 @@
       "status": "disabled",
       "reason": null,
       "detail": null,
-      "started_at": "2026-10-15T17:51:10Z",
-      "ended_at": "2026-10-15T17:51:10Z",
+      "started_at": "2026-10-16T14:44:09Z",
+      "ended_at": "2026-10-16T14:44:09Z",
       "stage": 2
     },
     {
@@ -74,8 +74,8 @@
       "status": "ok",
       "reason": null,
       "detail": null,
-      "started_at": "2026-10-15T17:51:13Z",
-      "ended_at": "2026-10-15T17:51:22Z",
+      "started_at": "2026-10-16T14:44:12Z",
+      "ended_at": "2026-10-16T14:44:22Z",
       "stage": 2
     },
     {
@@ -83,8 +83,8 @@
       "status": "ok",
       "reason": null,
       "detail": null,
-      "started_at": "2026-10-15T17:51:22Z",
-      "ended_at": "2026-10-15T17:51:24Z",
+      "started_at": "2026-10-16T14:44:22Z",
+      "ended_at": "2026-10-16T14:44:23Z",
       "stage": 2
     },
     {
@@ -92,8 +92,8 @@
       "status": "ok",
       "reason": null,
       "detail": null,
-      "started_at": "2026-10-15T17:51:24Z",
-      "ended_at": "2026-10-15T17:51:24Z",
+      "started_at": "2026-10-16T14:44:23Z",
+      "ended_at": "2026-10-16T14:44:24Z",
       "stage": 2
     },
     {
@@ -101,8 +101,8 @@
       "status": "ok",
       "reason": null,
       "detail": null,
-      "started_at": "2026-10-15T17:51:24Z",
-      "ended_at": "2026-10-15T17:51:26Z",
+      "started_at": "2026-10-16T14:44:24Z",
+      "ended_at": "2026-10-16T14:44:25Z",
       "stage": 2
     },
     {
@@ -110,8 +110,8 @@
       "status": "ok",
       "reason": null,
       "detail": null,
-      "started_at": "2026-10-15T17:51:26Z",
-      "ended_at": "2026-10-15T17:51:26Z",
+      "started_at": "2026-10-16T14:44:25Z",
+      "ended_at": "2026-10-16T14:44:26Z",
       "stage": 2
     },
     {
@@ -119,8 +119,8 @@
       "status": "ok",
       "reason": null,
       "detail": null,
-      "started_at": "2026-10-15T17:51:26Z",
-      "ended_at": "2026-10-15T17:51:27Z",
+      "started_at": "2026-10-16T14:44:26Z",
+      "ended_at": "2026-10-16T14:44:26Z",
       "stage": 2
     },
     {
@@ -128,8 +128,8 @@
       "status": "ok",
       "reason": null,
       "detail": null,
-      "started_at": "2026-10-15T17:51:27Z",
-      "ended_at": "2026-10-15T17:51:27Z",
+      "started_at": "2026-10-16T14:44:26Z",
+      "ended_at": "2026-10-16T14:44:27Z",
       "stage": 2
     },
     {
@@ -137,8 +137,8 @@
       "status": "ok",
       "reason": null,
       "detail": null,
-      "started_at": "2026-10-15T17:51:27Z",
-      "ended_at": "2026-10-15T17:51:32Z",
+      "started_at": "2026-10-16T14:44:27Z",
+      "ended_at": "2026-10-16T14:44:32Z",
       "stage": 2
     },
     {
@@ -146,8 +146,8 @@
       "status": "ok",
       "reason": null,
       "detail": null,
-      "started_at": "2026-10-15T17:51:32Z",
-      "ended_at": "2026-10-15T17:51:36Z",
+      "started_at": "2026-10-16T14:44:32Z",
+      "ended_at": "2026-10-16T14:44:36Z",
       "stage": 2
     },
     {
@@ -155,8 +155,8 @@
       "status": "disabled",
       "reason": null,
       "detail": null,
-      "started_at": "2026-10-15T17:51:36Z",
-      "ended_at": "2026-10-15T17:51:36Z",
+      "started_at": "2026-10-16T14:44:36Z",
+      "ended_at": "2026-10-16T14:44:36Z",
       "stage": 2
     },
     {
@@ -164,8 +164,8 @@
       "status": "ok",
       "reason": null,
       "detail": null,
-      "started_at": "2026-10-15T17:51:37Z",
-      "ended_at": "2026-10-15T17:51:53Z",
+      "started_at": "2026-10-16T14:44:36Z",
+      "ended_at": "2026-10-16T14:44:53Z",
       "stage": 2
     },
     {
@@ -173,8 +173,8 @@
       "status": "ok",
       "reason": null,
       "detail": null,
-      "started_at": "2026-10-15T17:51:53Z",
-      "ended_at": "2026-10-15T17:51:57Z",
+      "started_at": "2026-10-16T14:44:53Z",
+      "ended_at": "2026-10-16T14:44:57Z",
       "stage": 2
     },
     {
@@ -182,8 +182,8 @@
       "status": "ok",
       "reason": null,
       "detail": null,
-      "started_at": "2026-10-15T17:51:57Z",
-      "ended_at": "2026-10-15T17:52:04Z",
+      "started_at": "2026-10-16T14:44:57Z",
+      "ended_at": "2026-10-16T14:45:04Z",
       "counts": {
         "offered": 59198,
         "components": 1,
@@ -196,8 +196,8 @@
       "status": "ok",
       "reason": null,
       "detail": null,
-      "started_at": "2026-10-15T17:52:04Z",
-      "ended_at": "2026-10-15T17:52:41Z",
+      "started_at": "2026-10-16T14:45:04Z",
+      "ended_at": "2026-10-16T14:45:42Z",
       "stage": 2
     },
     {
@@ -205,8 +205,8 @@
       "status": "disabled",
       "reason": null,
       "detail": null,
-      "started_at": "2026-10-15T17:52:41Z",
-      "ended_at": "2026-10-15T17:52:41Z",
+      "started_at": "2026-10-16T14:45:42Z",
+      "ended_at": "2026-10-16T14:45:42Z",
       "stage": 2
     },
     {
@@ -214,8 +214,8 @@
       "status": "ok",
       "reason": null,
       "detail": null,
-      "started_at": "2026-10-15T17:52:41Z",
-      "ended_at": "2026-10-15T17:52:59Z",
+      "started_at": "2026-10-16T14:45:42Z",
+      "ended_at": "2026-10-16T14:46:00Z",
       "stage": 2
     },
     {
@@ -223,8 +223,8 @@
       "status": "disabled",
       "reason": null,
       "detail": null,
-      "started_at": "2026-10-15T17:52:59Z",
-      "ended_at": "2026-10-15T17:52:59Z",
+      "started_at": "2026-10-16T14:46:00Z",
+      "ended_at": "2026-10-16T14:46:00Z",
       "stage": 2
     }
   ],
@@ -241,21 +241,21 @@
   "data_sources": {
     "trivy_db": {
       "schema_version": 2,
-      "updated_at": "2026-10-15T13:13:18.204005334Z",
-      "downloaded_at": "2026-10-15T17:52:10.221080716Z"
+      "updated_at": "2026-10-16T01:13:54.947090392Z",
+      "downloaded_at": "2026-10-16T14:45:10.516253131Z"
     }
   },
   "outputs": [
     {
       "role": "sbom.cyclonedx",
       "path": "RaspberryPiOsLite_2026-06-18_bom.json",
-      "sha256": "2c700073ad384f6a1fa9e898317f5c8d94a054248bdd687f978e0475e01ddaff",
-      "bytes": 41871153
+      "sha256": "d006b05e958e5e7851678b52cd6e620139d0d2749674a202de51838e9206ceed",
+      "bytes": 41871161
     },
     {
       "role": "other",
       "path": "RaspberryPiOsLite_2026-06-18_component-versions.template.csv",
-      "sha256": "fde1f698fe243e5ab6a73920847997d244dea5139719400c0efbdf40c7a43e9e",
+      "sha256": "77535ae42da854efbd20c89a80550e942a40daf37f3e89d9a31f85fea3ea03ea",
       "bytes": 23918
     },
     {
@@ -267,62 +267,62 @@
     {
       "role": "other",
       "path": "RaspberryPiOsLite_2026-06-18_source.json",
-      "sha256": "e17e157a1a751934eed0e044d044e9c752b599edd99bae85b39b3d5566ecb0c8",
+      "sha256": "c4d94c937968fa10aaa5477b1280a2c596d40840842cba03ca49a90345d7beb6",
       "bytes": 8766241
     },
     {
       "role": "other",
       "path": "RaspberryPiOsLite_2026-06-18_NOTICE.txt",
-      "sha256": "9f1279670d4035165413d199ddd1b828e1bf3cac71e3b584225f5a1279fbe6bc",
+      "sha256": "a4357a259e1ed57f4c8bf3280758b8de062ad37f8789a45f3fae7f2c13453afe",
       "bytes": 710081
     },
     {
       "role": "other",
       "path": "RaspberryPiOsLite_2026-06-18_NOTICE.html",
-      "sha256": "d8a920f1d4c1def7c3fe9776c9cd5d7af7810526780aaf647a6a6fead80da86a",
-      "bytes": 863797
+      "sha256": "89ade0b42537d3216bfcaf2cab7f1a45760b3333ed389c147d8535c37586b761",
+      "bytes": 875454
     },
     {
       "role": "vulnerabilities.all",
       "path": "RaspberryPiOsLite_2026-06-18_security.json",
-      "sha256": "2004c108e114d5adeece29584a692d779d2fb357482ea8f45a8fac75eff8876c",
-      "bytes": 64817868
+      "sha256": "c74342cbfcdfde18249a13624ecf053ac22661fc9ceffb07b6b27992dffdea0e",
+      "bytes": 65574806
     },
     {
       "role": "vulnerabilities.trivy",
       "path": "RaspberryPiOsLite_2026-06-18_security_trivy.json",
-      "sha256": "3e7aaf09839c70f53a7212604106ee8006c117fe33a6a08df14ff41fef5568fe",
-      "bytes": 64868835
+      "sha256": "a81928dee7185bfba0b22000d0306f5a67237681627d4182cf400dad4c8017d1",
+      "bytes": 65626828
     },
     {
       "role": "other",
       "path": "RaspberryPiOsLite_2026-06-18_security.md",
-      "sha256": "136c2bcdf1d930204d36b94a04dbdb5048542645716905267b491fccf7abeb5f",
-      "bytes": 1600040
+      "sha256": "389a2936779f442cc171380333ff7dbf1318e76d9664e80a2751d7bf69347d92",
+      "bytes": 1602297
     },
     {
       "role": "other",
       "path": "RaspberryPiOsLite_2026-06-18_security.html",
-      "sha256": "648a81bf7ea5568765df8c6f75859326fa893cbec938363d0a0ab1d0381351db",
-      "bytes": 4819258
+      "sha256": "7508fce0b4dba048c791b01a982537b0ec24440b3bdc8e8d50e966b61cc38caf",
+      "bytes": 5041096
     },
     {
       "role": "conformance",
       "path": "RaspberryPiOsLite_2026-06-18_conformance.json",
-      "sha256": "ec7c2c208619da21a854135abaf175c0977e07f3fb5f1fc9ffc7e2b6ac516a53",
+      "sha256": "d6ee6eaa31cc0bc5baa5086481f99c4d64c663cb1677b02fe9e56f5b4ff32601",
       "bytes": 60823
     },
     {
       "role": "other",
       "path": "RaspberryPiOsLite_2026-06-18_conformance.md",
-      "sha256": "1128ab9aa67a249e108898b472dea886ea635cb28250b96cfa79309ea340f0b0",
-      "bytes": 20147
+      "sha256": "b21745d6cc257495badcd42c4ad8eb15c427d8c839d3eab3e23b9a4f8eea297a",
+      "bytes": 20153
     },
     {
       "role": "other",
       "path": "RaspberryPiOsLite_2026-06-18_conformance.html",
-      "sha256": "3d22338f087790905e4f1bc2153dd136f743f880235d06e3902997d768e3a35d",
-      "bytes": 33326
+      "sha256": "c3b69773d1b67503f5d26412f71d4f9d956c514440bbc1046d88b47a81b985fc",
+      "bytes": 44409
     },
     {
       "role": "other",
@@ -339,20 +339,20 @@
     {
       "role": "other",
       "path": "RaspberryPiOsLite_2026-06-18_risk-report.md",
-      "sha256": "488c0034083ee3700258e4ef1e54fc2bcfbd1f2701f0269553f637ecb363f32d",
-      "bytes": 1633100
+      "sha256": "ce38cb93c880e1c964b6744259992080ebf33a9e8482e1287603385318b4e84a",
+      "bytes": 1635213
     },
     {
       "role": "other",
       "path": "RaspberryPiOsLite_2026-06-18_risk-report.html",
-      "sha256": "ad1115671cc15714e2dc93acdf6d1cc78167d9e47741d1b1dddc01413d957721",
-      "bytes": 2789872
+      "sha256": "97b5f329a3cf271bfa9667f24f80e0c286c1e9f046dc4e2a5a4ce7e1b2f274f8",
+      "bytes": 3008352
     },
     {
       "role": "other",
       "path": "RaspberryPiOsLite_2026-06-18_security_epss.json",
-      "sha256": "e6363d3f6e096b24b32f0791920d2a74fb8906ab313e0875d0205d6f18575768",
-      "bytes": 112881
+      "sha256": "f38e9e711287421ffb19601dcf30237abe63bf6abfef8b4339e52f7936e162d6",
+      "bytes": 113005
     },
     {
       "role": "vulnerabilities.other",
