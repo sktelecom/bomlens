@@ -132,7 +132,11 @@ export function AppShell({
         {/* tabIndex makes the scrollable region keyboard-accessible (axe
             scrollable-region-focusable / WCAG 2.1.1): a mouse-free user can
             focus it and scroll with the arrow keys. */}
-        <main tabIndex={0} className="min-w-0 flex-1 overflow-y-auto animate-fade-in">
+        {/* `relative` makes main the containing block of absolutely positioned
+            descendants (the sr-only text). Without it they sit outside main's
+            clipping and stretch the page to the depth of the content, so the
+            document scrolls on into blank space under the shell. */}
+        <main tabIndex={0} className="relative min-w-0 flex-1 overflow-y-auto animate-fade-in">
           {children}
         </main>
       </div>

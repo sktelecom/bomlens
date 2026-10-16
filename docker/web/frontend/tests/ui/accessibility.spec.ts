@@ -332,6 +332,23 @@ for (const { kind, section } of SECTIONS) {
   }
 }
 
+// The content area (`main`) is the only scroll container. Visually hidden text
+// (`sr-only`) is absolutely positioned, and without a positioned ancestor its
+// containing block is the page, so it escapes main's clipping and stretches the
+// document to the depth of main's content: the page then scrolls on into blank
+// space under the shell. A short viewport forces every section to overflow.
+for (const { kind, section } of SECTIONS) {
+  test(`the page itself never scrolls: ${kind}/${section}`, async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 360 });
+    await openSection(page, kind, section);
+    const metrics = await page.evaluate(() => {
+      const el = document.scrollingElement as HTMLElement;
+      return { scroll: el.scrollHeight, client: el.clientHeight };
+    });
+    expect(metrics.scroll, "document scroll height equals the viewport").toBe(metrics.client);
+  });
+}
+
 test("a skip link lets keyboard users bypass the rail", async ({ page }) => {
   // WCAG 2.4.1: the first Tab stop should jump past the repeated navigation to
   // the main content. There is no such link yet, so this is expected to fail.
