@@ -129,7 +129,11 @@ NON_SHIPPED_PATH_FILE_RE='(^|/)(\.github/workflows/[^/]+\.ya?ml|gradle/wrapper/[
 # the registry lookup fills them. The same read of a project with no lock file
 # finds a fraction of what a build does (pom.xml 4 of 13, requirements.txt 4 of 11,
 # no lock file 0), so "auto" only chooses it when a lock file of a kind listed
-# here covers the whole tree.
+# here covers the whole tree. Cargo.lock, poetry.lock, uv.lock and yarn.lock are not
+# listed on purpose: a static read of a Cargo project has the same packages as a
+# build but not the 73 of 98 copyright notices the build reads from the downloaded
+# crates, poetry.lock's dev group differs from what a build installs, and yarn.lock
+# and uv.lock list the project itself as a package.
 #
 # static_detection_check <dir> <lang>: returns 0 and sets STATIC_DETECTION_WHY to
 # the lock file when the tree is covered by one; returns 1 and sets it to the
@@ -160,18 +164,18 @@ static_detection_check() {
         STATIC_DETECTION_WHY="manifests under folders that are left out of the scan"; return 1
     fi
     # Another manifest further down is a second project the root lock file may not
-    # cover. A workspace root (pnpm-workspace.yaml, or "workspaces" in package.json)
-    # lists its members and its lock file covers them.
+    # cover, and in a workspace the members' own dependencies come into a static read
+    # that a build leaves out (a real monorepo read statically had 231 packages
+    # against 26 built). Both stay on the build.
     nested="$(cd "$d" 2>/dev/null && find . -mindepth 2 -maxdepth 5 \( -name .git -o -name node_modules -o -name vendor -o -name build -o -name target \) -prune -o -type f \
         \( -name package.json -o -name pom.xml -o -name 'build.gradle*' -o -name requirements.txt -o -name pyproject.toml -o -name go.mod -o -name Cargo.toml -o -name Gemfile -o -name composer.json \) -print -quit 2>/dev/null)"
     if [ -n "$nested" ]; then
-        if [ "$lang" = node ] && { [ -f "$d/pnpm-workspace.yaml" ] || grep -q '"workspaces"' "$d/package.json" 2>/dev/null; }; then
-            :
-        elif [ "$lang" = java ] && { [ -f "$d/settings.gradle" ] || [ -f "$d/settings.gradle.kts" ]; }; then
-            :
-        else
-            STATIC_DETECTION_WHY="another manifest below the root ($nested)"; return 1
-        fi
+        STATIC_DETECTION_WHY="another manifest below the root ($nested)"; return 1
+    fi
+    # A workspace root with no manifest of a member below it (or one that is itself a
+    # member list) is a monorepo too.
+    if [ "$lang" = node ] && { [ -f "$d/pnpm-workspace.yaml" ] || grep -q '"workspaces"' "$d/package.json" 2>/dev/null; }; then
+        STATIC_DETECTION_WHY="a workspace root"; return 1
     fi
     STATIC_DETECTION_WHY="$found"
     return 0
