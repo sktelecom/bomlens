@@ -1091,6 +1091,18 @@ EOF
                "$OUTPUT_FILE" >/dev/null 2>&1; then
             ER_STAGE1_DEGRADED=true
         fi
+        # Static detection (scan-sbom.sh --detection static, or auto when a lock
+        # file covers the tree): the CLI skipped stage 1 and this step reads the
+        # lock file itself. A failure ends the run, and the CLI then builds.
+        if [ "${BOMLENS_DETECTION:-}" = "static" ] && [ ! -s "$OUTPUT_FILE" ]; then
+            echo "[1/2] static: source dir ${SOURCE_ROOT:-/src} (lock file, no build)"
+            if ! generate_sbom_static "${SOURCE_ROOT:-/src}" "$OUTPUT_FILE"; then
+                echo "[ERROR] static detection failed (the lock file could not be read into an SBOM)."
+                exit 3
+            fi
+            mark_sbom_detection "$OUTPUT_FILE" static "${BOMLENS_DETECTION_WHY:-}"
+            mark_sbom_excluded "$OUTPUT_FILE" "${SOURCE_ROOT:-/src}"
+        fi
         # A caller that ran stage 1 from the execution plan passes its exit
         # code. When stage 1 failed or left no SBOM, the manifest-only syft
         # scan takes its place, the same fallback the CLI runs, and the SBOM

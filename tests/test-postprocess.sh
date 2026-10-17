@@ -12214,5 +12214,89 @@ out="$(SBOM_TRIVY_CACHE="$TC/cache" trivy_cache_args | wc -l | tr -d ' ')"
 rm -rf "$TC"
 
 echo ""
+echo "== static detection: which trees a lock file covers, and the SBOM read from it =="
+SD_OUT="$( {
+  . "$ROOT_DIR/docker/lib/source-detect.sh"
+  SD="$(mktemp -d)"
+  chk() { # <name> <expect: static|build> <why-fragment> -> runs detect + check in $SD/<name>
+    local l; l="$(detect_lang "$SD/$1")"
+    if static_detection_check "$SD/$1" "$l"; then got=static; else got=build; fi
+    if [ "$got" = "$2" ] && printf '%s' "$STATIC_DETECTION_WHY" | grep -qF -- "$3"; then
+      echo "PASS: $4 ($got: $STATIC_DETECTION_WHY)"
+    else
+      echo "FAIL: $4 (wanted $2 / '$3', got $got / '$STATIC_DETECTION_WHY')"
+    fi
+  }
+  mkdir -p "$SD/npm" "$SD/pnpm/packages/a" "$SD/pnpm/packages/b" "$SD/nolock" "$SD/maven" "$SD/gradle/gradle/wrapper" "$SD/nested/web" "$SD/leftout/test/app" "$SD/python" "$SD/ws"
+  echo '{"name":"a"}' > "$SD/npm/package.json"; echo '{}' > "$SD/npm/package-lock.json"
+  echo '{"name":"a"}' > "$SD/pnpm/package.json"; echo 'lock' > "$SD/pnpm/pnpm-lock.yaml"; echo 'packages: ["packages/*"]' > "$SD/pnpm/pnpm-workspace.yaml"
+  echo '{"name":"a1"}' > "$SD/pnpm/packages/a/package.json"; echo '{"name":"b1"}' > "$SD/pnpm/packages/b/package.json"
+  echo '{"name":"a","dependencies":{"x":"^1"}}' > "$SD/nolock/package.json"
+  echo '<project/>' > "$SD/maven/pom.xml"; echo 'x' > "$SD/maven/gradle.lockfile"
+  echo "plugins {}" > "$SD/gradle/build.gradle"; echo "x" > "$SD/gradle/gradle.lockfile"; echo jar > "$SD/gradle/gradle/wrapper/gradle-wrapper.jar"
+  echo '{"name":"a"}' > "$SD/nested/package.json"; echo '{}' > "$SD/nested/package-lock.json"; echo '{"name":"w"}' > "$SD/nested/web/package.json"
+  echo '{"name":"a"}' > "$SD/leftout/package.json"; echo '{}' > "$SD/leftout/package-lock.json"; echo '{"name":"t"}' > "$SD/leftout/test/app/package.json"
+  echo 'requests==2.0' > "$SD/python/requirements.txt"
+  echo '{"name":"a","workspaces":["p/*"]}' > "$SD/ws/package.json"; echo '{}' > "$SD/ws/package-lock.json"; mkdir -p "$SD/ws/p/x"; echo '{"name":"x"}' > "$SD/ws/p/x/package.json"
+  chk npm static package-lock.json "a Node project with a package-lock.json"
+  chk pnpm static pnpm-lock.yaml "a pnpm workspace covered by its root lock file"
+  chk ws static package-lock.json "an npm workspace covered by its root lock file"
+  chk gradle static gradle.lockfile "a Gradle project with gradle.lockfile (the wrapper jar is not a manifest)"
+  chk nolock build "no package-lock.json" "a Node project with no lock file"
+  chk maven build "Maven" "a Maven project, even beside a gradle.lockfile"
+  chk nested build "another manifest below the root" "a second project below the root"
+  chk leftout build "left out" "manifests under a test folder"
+  chk python build "no lock file kind is verified" "a Python project (no verified lock kind)"
+  rm -rf "$SD"
+} 2>&1 )"
+while IFS= read -r line; do
+  case "$line" in PASS:*) pass "${line#PASS: }" ;; FAIL:*) fail "${line#FAIL: }" ;; esac
+done <<< "$SD_OUT"
+
+GS="$(mktemp -d)"; mkdir -p "$GS/bin" "$GS/src"
+# A stand-in for `trivy fs`: writes a CycloneDX 1.7 document with a root, a lock
+# file entry (an application with no purl) and two packages.
+cat > "$GS/bin/trivy" <<'STUB'
+#!/bin/bash
+out=""; prev=""
+for a in "$@"; do [ "$prev" = "-o" ] && out="$a"; prev="$a"; done
+[ -n "${TRIVY_STUB_FAIL:-}" ] && exit 1
+cat > "$out" <<'JSON'
+{"bomFormat":"CycloneDX","specVersion":"1.7","metadata":{"component":{"type":"application","name":"/src"}},
+ "components":[{"type":"application","name":"package-lock.json"},
+             {"type":"library","name":"debug","version":"4.3.1","purl":"pkg:npm/debug@4.3.1"},
+             {"type":"library","name":"ms","version":"2.1.2","purl":"pkg:npm/ms@2.1.2"}]}
+JSON
+STUB
+chmod +x "$GS/bin/trivy"
+GS_OUT="$( {
+  . "$ROOT_DIR/docker/lib/source-detect.sh"
+  export PATH="$GS/bin:$PATH" LIBDIR="$ROOT_DIR/docker/lib"
+  CDX_SPEC_VERSION=1.6 generate_sbom_static "$GS/src" "$GS/out16.json" \
+    && [ "$(jq -r .specVersion "$GS/out16.json")" = "1.6" ] \
+    && [ "$(jq '[.components[]]|length' "$GS/out16.json")" = "2" ] \
+    && [ "$(jq -r '.metadata.component.name' "$GS/out16.json")" = "/src" ] \
+    && echo "PASS: the SBOM read from a lock file drops the lock file entry, keeps the root, and is written as 1.6 when 1.6 is asked" \
+    || echo "FAIL: generate_sbom_static to 1.6"
+  CDX_SPEC_VERSION=1.7 generate_sbom_static "$GS/src" "$GS/out17.json" \
+    && [ "$(jq -r .specVersion "$GS/out17.json")" = "1.7" ] \
+    && echo "PASS: a 1.7 document stays 1.7 when 1.7 is asked" \
+    || echo "FAIL: generate_sbom_static to 1.7"
+  TRIVY_STUB_FAIL=1 CDX_SPEC_VERSION=1.6 generate_sbom_static "$GS/src" "$GS/outf.json" \
+    && echo "FAIL: a failing trivy was reported as success" \
+    || { [ ! -e "$GS/outf.json" ] && echo "PASS: a failing trivy returns 1 and leaves no file, so the caller can build"; }
+  mark_sbom_detection "$GS/out16.json" static package-lock.json
+  [ "$(jq -r '[.metadata.properties[]|select(.name=="bomlens:detection")|.value]|first' "$GS/out16.json")" = "static" ] \
+    && [ "$(jq -r '[.metadata.properties[]|select(.name=="bomlens:detection-source")|.value]|first' "$GS/out16.json")" = "package-lock.json" ] \
+    && echo "PASS: the SBOM says it was read statically and from which lock file" \
+    || echo "FAIL: mark_sbom_detection"
+  true
+} 2>&1 )"
+while IFS= read -r line; do
+  case "$line" in PASS:*) pass "${line#PASS: }" ;; FAIL:*) fail "${line#FAIL: }" ;; esac
+done <<< "$GS_OUT"
+rm -rf "$GS"
+
+echo ""
 echo "Results: ${PASS} passed, ${FAIL} failed"
 [ "$FAIL" -eq 0 ]

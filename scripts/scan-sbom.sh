@@ -11,6 +11,9 @@
 
 set -e
 
+# The arguments as given, so a static detection that fails can run again as a build.
+ORIG_ARGS=("$@")
+
 # ========================================================
 # SBOM Scan Orchestrator (2-stage architecture)
 #
@@ -214,6 +217,10 @@ REACHABILITY="false"; REACHABILITY_NONCE=""
 # turning security on: only an explicit request is worth answering when a mode
 # cannot produce the report.
 SECURITY_REQUESTED="false"
+# How a source scan finds its dependencies: build (resolve them in a cdxgen
+# language image), static (read the lock file, no build) or auto (static when a
+# lock file of a verified kind covers the whole tree, a build otherwise).
+DETECTION="${DETECTION:-auto}"
 SIGN_SBOM="false"; BYTE_STABLE="false"; UI_MODE="false"; UI_PORT="${UI_PORT:-8080}"
 # The web UI is a local tool: it reaches the engine socket to run scans, so it
 # is published to the loopback interface only. Set UI_BIND_ADDRESS=0.0.0.0 to
@@ -230,6 +237,7 @@ CONFORMANCE_PROFILE="${CONFORMANCE_PROFILE:-default}"
 # it is the only part of the conformance check that uses the network.
 PURL_RESOLVE="${PURL_RESOLVE:-false}"
 # Registry licences (--license-registry). Off unless asked: it uses the network.
+_LICENSE_REGISTRY_USER="${LICENSE_REGISTRY-}"
 LICENSE_REGISTRY="${LICENSE_REGISTRY:-false}"
 # CI gate: exit non-zero when this scan's own conformance report says "fail".
 # Host-only logic (see the check near the end of this script); nothing is
@@ -347,6 +355,7 @@ while [[ "$#" -gt 0 ]]; do
         --verify-weights) VERIFY_WEIGHTS="true" ;;
         --sign) SIGN_SBOM="true" ;;
         --byte-stable) BYTE_STABLE="true" ;;
+        --detection) DETECTION="${2:-}"; shift ;;
         --fail-on-conformance) FAIL_ON_CONFORMANCE="true" ;;
         # Repeatable. The list of conditions is closed (checked below), so a typo
         # fails here instead of quietly gating on nothing.
@@ -573,6 +582,14 @@ Options:
                          default 5 files / 2 GiB each), so this is opt-in, unlike
                          the metadata-only file-security lookup.
   --byte-stable          Deterministic SBOM output
+  --detection <how>      How a source scan finds dependencies: build, static or
+                         auto (default). static reads the lock file and does not
+                         build (no cdxgen image, a few seconds shorter; a
+                         project without a complete lock file comes out short).
+                         auto chooses static only when a package-lock.json,
+                         npm-shrinkwrap.json, pnpm-lock.yaml, bun.lock or
+                         gradle.lockfile covers the whole tree, and builds
+                         otherwise. DETECTION=<how> in the environment does the same
   --fail-on-conformance  Exit 2 if this scan's own conformance check report says
                          "fail" (exit 3 if no conformance check report was produced
                          for this scan). Not offered with --ui. See "Exit
@@ -1272,6 +1289,10 @@ setup_guard_state() {
 # license fetched in one scan but not the next would make two otherwise-identical
 # scans differ. Pin the lookup off for byte-stable scans.
 FETCH_LICENSE="${FETCH_LICENSE:-true}"
+case "$DETECTION" in
+    build|static|auto) ;;
+    *) echo "[ERROR] --detection takes build, static or auto (got '$DETECTION')."; exit 1 ;;
+esac
 [ "$BYTE_STABLE" = "true" ] && FETCH_LICENSE="false"
 # EPSS + CISA KEV enrichment defaults on, but the host setting must reach the
 # post-process container so SECURITY_ENRICH=false works for air-gapped runs.
@@ -2603,6 +2624,22 @@ if [ "$MODE" = "SOURCE" ]; then
     # separate from the scanned tree, even for --git/zip ingestion.
     [ -n "$(ls -A "$SCAN_INPUT_DIR" 2>/dev/null)" ] || { echo "[ERROR] source directory is empty: $SCAN_INPUT_DIR"; exit 1; }
     LANG_DET=$(detect_lang "$SCAN_INPUT_DIR")
+    # Build or static? Static needs the registry lookup to fill the licenses a lock
+    # file does not carry, so "auto" leaves it to a build when that lookup is off
+    # (--byte-stable, FETCH_LICENSE=false) or the user turned it off.
+    DETECTION_USED="build"; DETECTION_WHY=""
+    if [ "$DETECTION" = static ]; then
+        DETECTION_USED="static"; DETECTION_WHY="requested"
+        if ! static_detection_check "$SCAN_INPUT_DIR" "$LANG_DET"; then
+            echo "[WARN] --detection static: $STATIC_DETECTION_WHY; the SBOM may be incomplete."
+        fi
+    elif [ "$DETECTION" = auto ] && [ "$BYTE_STABLE" != "true" ] && [ "$FETCH_LICENSE" = "true" ] \
+         && [ "$_LICENSE_REGISTRY_USER" != "false" ] && static_detection_check "$SCAN_INPUT_DIR" "$LANG_DET"; then
+        DETECTION_USED="static"; DETECTION_WHY="$STATIC_DETECTION_WHY"
+    fi
+    if [ "$DETECTION_USED" = static ] && [ "$FETCH_LICENSE" = "true" ] && [ "$_LICENSE_REGISTRY_USER" != "false" ] && [ "$BYTE_STABLE" != "true" ]; then
+        LICENSE_REGISTRY="true"
+    fi
     warn_low_engine_memory_for "$LANG_DET" "$SCAN_INPUT_DIR"
     if [ "$LANG_DET" = "android" ]; then
         API=$(android_api "$SCAN_INPUT_DIR")
@@ -2644,6 +2681,12 @@ if [ "$MODE" = "SOURCE" ]; then
             echo "[WARN]   If this is C/C++ embedded source, --identify-vendored finds open source copied in (opt-in image)."
         fi
     fi
+    HOST_GOTOOLCHAIN="${GOTOOLCHAIN:-}"
+    STAGE1_FALLBACK_ENV=""; STAGE1_FAILED=""; STAGE1_LOG=""
+    if [ "$DETECTION_USED" = static ]; then
+        echo "[INFO] Detection: static ($DETECTION_WHY); the dependency build is skipped."
+        STAGE1_FALLBACK_ENV=" -e BOMLENS_DETECTION=static -e BOMLENS_DETECTION_WHY=$DETECTION_WHY"
+    else
     echo "[1/2] Generating SBOM (cdxgen)..."
     # Stage 1 runs as root, so the Maven and Gradle caches it writes are
     # BomLens's own folders, not ~/.m2 or ~/.gradle: root-owned files there
@@ -2834,6 +2877,7 @@ if [ "$MODE" = "SOURCE" ]; then
         "${DOCKER_ENV[@]}" docker rm -f "$STAGE1_CONTAINER" >/dev/null 2>&1
         rm -f "$STAGE1_LOG"
     fi
+    fi
 
     echo "[2/2] Post-processing..."
     # Mount the scanned tree as /src (so deep-license/vendored see the real source)
@@ -3000,6 +3044,13 @@ EOF
         -e MODE=POSTPROCESS -e BOMLENS_RUN_INPUT="$OUTPUT_FILE" -e NESTED_ROOTFS_HINT="\"$NESTED_ROOTFS_HINT\"" -e BOMLENS_DEEP_LICENSE_FALLBACK="\"${DEEP_LICENSE_FALLBACK_FROM:-}\"" -e BOMLENS_DEEP_CVE_FALLBACK="\"${DEEP_CVE_FALLBACK_FROM:-}\"" -e BOMLENS_INCLUDE_NON_SHIPPED${STAGE1_FALLBACK_ENV}${STAGE1_FINGERPRINT_ENV}${PP_ENV} $(pp_env)$(cosign_run)$(vex_run)$(declare_run)$(gate_run) \
         "\"$PP_IMAGE\"" || {
         _pp_rc=$?
+        if [ "$DETECTION_USED" = static ] && [ ! -s "$OUTPUT_HOST_DIR/$OUTPUT_FILE" ]; then
+            if [ "$DETECTION" = auto ]; then
+                echo "[WARN] Static detection could not read the lock file; scanning again with a build."
+                exec "$0" "${ORIG_ARGS[@]}" --detection build
+            fi
+            echo "[ERROR] Static detection failed. Scan again with --detection build."
+        fi
         if [ -n "$STAGE1_FAILED" ] && [ ! -s "$OUTPUT_HOST_DIR/$OUTPUT_FILE" ]; then
             echo "[ERROR] SBOM generation failed (stage 1), and the manifest-only fallback also failed or was discarded (see the guidance above, if any). Full cdxgen log: $STAGE1_LOG"
         fi
