@@ -45,18 +45,23 @@ const VENDORED_LICENSES = path.join(process.cwd(), "licenses");
 
 function readLicenseText(dir, pkgName) {
   for (const name of LICENSE_FILENAMES) {
-    const p = path.join(dir, name);
-    if (fs.existsSync(p) && fs.statSync(p).isFile()) {
-      return { text: fs.readFileSync(p, "utf8").trim(), file: name };
+    // Read it directly rather than checking first: a file that changes between the
+    // check and the read is then just a failed read, and a directory fails the same way.
+    try {
+      return { text: fs.readFileSync(path.join(dir, name), "utf8").trim(), file: name };
+    } catch {
+      /* not there, or not a file: try the next name */
     }
   }
   if (pkgName) {
     const vendored = path.join(VENDORED_LICENSES, `${pkgName.replace(/\//g, "-")}.txt`);
-    if (fs.existsSync(vendored)) {
+    try {
       return {
         text: fs.readFileSync(vendored, "utf8").trim(),
         file: path.join("licenses", path.basename(vendored)),
       };
+    } catch {
+      /* no vendored text for this package */
     }
   }
   return { text: null, file: null };

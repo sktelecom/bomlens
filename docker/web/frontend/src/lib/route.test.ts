@@ -3,7 +3,7 @@
 
 import { describe, expect, it } from "vitest";
 
-import { buildHash, homeHash, lookupHash, newHash, parseHash, scanHash } from "./route";
+import { buildHash, homeHash, lookupHash, newHash, parseHash, parseQuery, scanHash } from "./route";
 
 describe("parseHash", () => {
   it("treats empty / bare slash as Recent (home)", () => {
@@ -104,5 +104,19 @@ describe("buildHash / scanHash / homeHash / newHash", () => {
       id: "my app_1.0",
       section: "vulnerabilities",
     });
+  });
+});
+
+describe("parseQuery with a key that names the prototype", () => {
+  it("keeps __proto__ as data and leaves Object.prototype alone", () => {
+    const q = parseQuery("__proto__=polluted&constructor=x&a=1");
+    expect(Object.getPrototypeOf(q)).toBe(Object.prototype);
+    expect(({} as Record<string, unknown>).polluted).toBeUndefined();
+    expect(Object.keys(q).sort()).toEqual(["__proto__", "a", "constructor"]);
+    expect(q.a).toBe("1");
+  });
+
+  it("still drops empty keys and values", () => {
+    expect(parseQuery("a=1&b=&=c")).toEqual({ a: "1" });
   });
 });

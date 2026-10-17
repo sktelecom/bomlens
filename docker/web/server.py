@@ -554,7 +554,10 @@ def _classify_git_failure(text):
 # _ScanErrorTracker (that drop is unconditional regardless of indentation;
 # these patterns are a second, explicit layer in case such a line were ever
 # folded into a block some other way).
-_URL_USERINFO_RE = re.compile(r"://[^/\s@]+:[^/\s@]+@")
+# The user part excludes ':' so the split point is the first colon. With ':' allowed
+# in both parts the pattern backtracked over every colon of a long input with no '@'
+# (16,000 colons took two seconds); the strings it matches are the same.
+_URL_USERINFO_RE = re.compile(r"://[^/\s@:]+:[^/\s@]+@")
 # A URL whose userinfo is a bare token (`https://<token>@host`). `git@` is the
 # ssh account name, not a credential, so it stays.
 _URL_TOKEN_USERINFO_RE = re.compile(r"://(?!git@)[^/\s@:]+@")

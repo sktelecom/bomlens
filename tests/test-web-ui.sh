@@ -2921,6 +2921,32 @@ else
 fi
 rm -f "$OUT"/deg_1.0_* "$OUT"/clean_1.0_*
 
+echo "== credential masking: a long input without a closing @ stays fast, the same strings are masked =="
+# The userinfo pattern backtracked over every colon of a long input (16,000 colons
+# took two seconds). It must stay linear, and it must still mask what it did before.
+if python3 - "$ROOT_DIR" <<'PY'
+import sys, os, time
+sys.path.insert(0, os.path.join(sys.argv[1], "docker", "web"))
+import server
+for text, want in [
+    ("clone https://user:pw@host/x", "clone https://***@host/x"),
+    ("clone https://us:er:pw@host/x", "clone https://***@host/x"),
+    ("clone https://tok@host/x", "clone https://***@host/x"),
+    ("clone git@github.com:o/r.git", "clone git@github.com:o/r.git"),
+]:
+    got = server._mask_credentials(text)
+    assert got == want, (text, got, want)
+for hostile in ("://" + "a:" * 40000, "://" + "a:" * 20000 + "b", "://" + ":" * 40000):
+    t = time.time()
+    server._mask_credentials(hostile)
+    assert time.time() - t < 1.0, "masking a hostile line took %.2fs" % (time.time() - t)
+PY
+then
+    pass "userinfo masking keeps its results and is linear on a line full of colons"
+else
+    fail "credential masking changed or is slow on a hostile line"
+fi
+
 echo "== detection property (sbom_summary) =="
 # A scan that read a lock file records bomlens:detection=static; the summary shows
 # it with the lock file's name. The property can come from a supplier's SBOM, so
