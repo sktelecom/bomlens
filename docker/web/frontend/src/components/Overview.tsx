@@ -387,6 +387,15 @@ export function Overview({
           </code>
         </div>
       )}
+      {result.sbom?.detection === "static" && (
+        // A scan that read a lock file says so: it skipped the build, which is why
+        // it finished quickly and what its dependency list rests on.
+        <div className="text-label text-muted-foreground" data-testid="detection">
+          {result.sbom.detectionSource
+            ? t("overview.detectionStaticFrom", { file: result.sbom.detectionSource })
+            : t("overview.detectionStatic")}
+        </div>
+      )}
       {/* How this run moved against the last one of the same project. It used to
           be a line of grey text under the title, which is where a reader's eye
           goes last; a scan that got worse deserves better than that. Absent

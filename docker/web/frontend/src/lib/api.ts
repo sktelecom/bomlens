@@ -136,6 +136,10 @@ export interface SbomSummary {
    *  failed on its own) | "cdxgen-unavailable" (cdxgen never ran at all).
    *  Drives a result banner. */
   sbomToolDegraded?: string | null;
+  /** "static" when the scan read a lock file instead of building (the lock
+   *  file's name in `detectionSource`); absent when it built. */
+  detection?: string | null;
+  detectionSource?: string | null;
   /** Best-effort post-process steps that failed during this scan (docker/lib/
    *  pipeline-step.sh's bomlens:pipeline-step-failed property), by step id: a
    *  valid SBOM was still produced, but that step's output may be missing or

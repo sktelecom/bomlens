@@ -2921,6 +2921,37 @@ else
 fi
 rm -f "$OUT"/deg_1.0_* "$OUT"/clean_1.0_*
 
+echo "== detection property (sbom_summary) =="
+# A scan that read a lock file records bomlens:detection=static; the summary shows
+# it with the lock file's name. The property can come from a supplier's SBOM, so
+# any other value is dropped and the source must look like a file name.
+cat > "$OUT/det_1.0_bom.json" <<'JSON'
+{"bomFormat":"CycloneDX","metadata":{"component":{"name":"det","version":"1.0"},"properties":[{"name":"bomlens:detection","value":"static"},{"name":"bomlens:detection-source","value":"package-lock.json"}]},"components":[{"name":"flask","version":"2.0","type":"library","purl":"pkg:pypi/flask@2.0"}]}
+JSON
+cat > "$OUT/detbad_1.0_bom.json" <<'JSON'
+{"bomFormat":"CycloneDX","metadata":{"component":{"name":"detbad","version":"1.0"},"properties":[{"name":"bomlens:detection","value":"<b>x</b>"},{"name":"bomlens:detection-source","value":"<img src=x>"}]},"components":[{"name":"flask","version":"2.0","type":"library","purl":"pkg:pypi/flask@2.0"}]}
+JSON
+cat > "$OUT/detsrc_1.0_bom.json" <<'JSON'
+{"bomFormat":"CycloneDX","metadata":{"component":{"name":"detsrc","version":"1.0"},"properties":[{"name":"bomlens:detection","value":"static"},{"name":"bomlens:detection-source","value":"<img src=x>"}]},"components":[{"name":"flask","version":"2.0","type":"library","purl":"pkg:pypi/flask@2.0"}]}
+JSON
+if SBOM_OUTPUT_DIR="$OUT" python3 - "$ROOT_DIR" <<'PY'
+import sys, os
+sys.path.insert(0, os.path.join(sys.argv[1], "docker", "web"))
+import server
+s = server.sbom_summary("det_1.0")
+assert s["detection"] == "static" and s["detectionSource"] == "package-lock.json"
+b = server.sbom_summary("detbad_1.0")
+assert b["detection"] is None and b["detectionSource"] is None
+c = server.sbom_summary("detsrc_1.0")
+assert c["detection"] == "static" and c["detectionSource"] is None
+PY
+then
+    pass "detection surfaced from metadata, only the value this scan writes, source cut to a file-name shape"
+else
+    fail "detection not surfaced correctly"
+fi
+rm -f "$OUT"/det_1.0_* "$OUT"/detbad_1.0_* "$OUT"/detsrc_1.0_*
+
 echo "== pipeline-step-failed property (sbom_summary) =="
 # mark_pipeline_warning (docker/lib/pipeline-step.sh) appends one
 # bomlens:pipeline-step-failed property per failed best-effort step, so the

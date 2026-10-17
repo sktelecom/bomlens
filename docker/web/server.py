@@ -2281,6 +2281,27 @@ def sbom_summary(run_id):
         ),
         None,
     )
+    # detection: "static" when the scan read a lock file instead of building
+    # (bomlens:detection, with the lock file's name in bomlens:detection-source).
+    # The property can come from a supplier's SBOM, so only the one value this
+    # scan writes is accepted and the source is cut to a file-name shape.
+    detection = next(
+        (p.get("value") for p in meta_props if p.get("name") == "bomlens:detection"),
+        None,
+    )
+    detection = "static" if detection == "static" else None
+    detection_source = None
+    if detection:
+        raw = next(
+            (
+                p.get("value")
+                for p in meta_props
+                if p.get("name") == "bomlens:detection-source"
+            ),
+            None,
+        )
+        if isinstance(raw, str) and re.fullmatch(r"[A-Za-z0-9._-]{1,64}", raw):
+            detection_source = raw
     # pipeline-step-failed: set by docker/lib/pipeline-step.sh's
     # mark_pipeline_warning for every best-effort post-process step that
     # failed (normalize, CPE/EOL/malicious enrichment, conformance, notice
@@ -2377,6 +2398,8 @@ def sbom_summary(run_id):
         "truncated": len(comps) > MAX_COMPONENT_ROWS,
         "suggestIdentifyVendored": suggest,
         "sbomToolDegraded": degraded,
+        "detection": detection,
+        "detectionSource": detection_source,
         "pipelineStepsFailed": pipeline_steps_failed,
         "pipelineStepsFailedMore": pipeline_steps_failed_more,
         "firmwareScope": _firmware_scope(_as_dict(data.get("metadata"))),
