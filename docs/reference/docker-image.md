@@ -105,7 +105,7 @@ MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL='*' docker run --rm \
   ghcr.io/sktelecom/bomlens:latest
 ```
 
-In direct runs, `SOURCE` mode has syft read the package manifests inside the container, so it may only capture direct dependencies. If you need transitive dependencies, use `scan-sbom.sh`, which routes to the per-language cdxgen images. Syft's manifest readers need a lockfile (`package-lock.json`, `npm-shrinkwrap.json`, `yarn.lock`, `pnpm-lock.yaml` for Node, and the equivalent for other ecosystems) to resolve any of a project's declared dependencies; without one, direct-run SOURCE mode has nothing to read and the scan fails with guidance rather than reporting an empty result as complete.
+In direct runs, `SOURCE` mode reads a lock file that covers the whole tree (a `package-lock.json`, `npm-shrinkwrap.json`, `pnpm-lock.yaml`, `bun.lock` or `gradle.lockfile`, with no other manifest below the root) as it is, with no build and no Docker socket, and fills the licenses it lacks from the package registry; the SBOM records this as `bomlens:detection`. That is the form to use where there is no Docker to start a sibling container in, such as a CI job that runs this image as its job image. For any other tree, syft reads the package manifests inside the container, so it may only capture direct dependencies; if you need transitive dependencies there, use `scan-sbom.sh`, which routes to the per-language cdxgen images. Syft's manifest readers need a lockfile (`package-lock.json`, `npm-shrinkwrap.json`, `yarn.lock`, `pnpm-lock.yaml` for Node, and the equivalent for other ecosystems) to resolve any of a project's declared dependencies; without one, direct-run SOURCE mode has nothing to read and the scan fails with guidance rather than reporting an empty result as complete.
 
 ### Notice and reports in one run
 
@@ -151,6 +151,7 @@ MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL='*' docker run --rm \
 | `DEEP_LICENSE_MAX_FILES` | — | `20000` | `DEEP_LICENSE`: a tree with more of the project's own files than this is not scanned |
 | `DEEP_LICENSE_TIMEOUT` | — | `600` | `DEEP_LICENSE`: seconds before scancode is stopped |
 | `BOMLENS_DEEP_LICENSE_ALL` | — | — | `DEEP_LICENSE`: set `1` to scan dependency, build and tool folders too (left out by default) |
+| `DETECTION` | — | `auto` | `SOURCE` mode only. `auto` reads a covering lock file statically and otherwise runs the build or syft path as before; `static` always reads statically; `build` never does (CLI `--detection`). Static detection fills missing licenses from the package registry, so `auto` builds under `BYTE_STABLE=true` or `FETCH_LICENSE=false` |
 | `REACHABILITY` | — | `false` | Judge with govulncheck whether each Go advisory's code is reached (CLI `--reachability`): on the executable in `BINARY` mode; in `SOURCE` and `POSTPROCESS`, from the govulncheck output stage 1 left (the CLI hands stage 1 the image's govulncheck) |
 | `GENERATE_REPORT` | — | `false` | Generate the open-source risk report (off in direct runs, unlike the CLI default) |
 | `ENRICH_MAVEN_CPE` | — | `true` | Attach an NVD-matchable `cpe:2.3` to maven components (derived from the groupId) so a CPE-aware engine can reach their NVD-only CVEs; unmapped groups get no CPE (skipped for AI SBOMs) |
