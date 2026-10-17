@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Upgrade note
+
+- The CLI and the web UI keep Trivy's vulnerability database in a host folder by default (`~/.cache/bomlens/trivy`, `%LOCALAPPDATA%\bomlens\cache\trivy` on Windows; about 1.5 GB) instead of downloading it inside the scan container on every scan. A scan with the security report is 15 to 25 seconds shorter after the first one. Set `SBOM_TRIVY_CACHE=` (empty) to download on every scan as before, or point it at another folder. The engine contract and the plan format are unchanged.
+
+### Changed
+
+- Scans that share the cache folder keep Trivy's per-scan layer cache in memory, so several scans can run at once. Before, a second scan opening the same cache file at the same time failed with "cache may be in use by another process" and its security report was incomplete.
+
 ### Fixed
 
 - When the dependency resolver failed and the manifest-only fallback found no component, the CLI no longer says the SBOM holds "direct dependencies only". It says the fallback found none, that the SBOM does not list the project's dependencies, and that a dependency file with fixed versions is what the fallback can read.

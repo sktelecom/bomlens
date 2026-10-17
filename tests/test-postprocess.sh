@@ -12195,5 +12195,24 @@ PATH="$SAVE_PATH"
 rm -rf "$SHC" "$NOJQ"
 
 echo ""
+echo "== Trivy cache folder (default on, shared between scans) =="
+grep -q '^SBOM_TRIVY_CACHE="${SBOM_TRIVY_CACHE-$BOMLENS_CACHE_DIR/trivy}"$' "$ROOT_DIR/scripts/scan-sbom.sh" \
+    && pass "scan-sbom.sh defaults SBOM_TRIVY_CACHE to a folder under the BomLens cache, and an empty value turns it off" \
+    || fail "scan-sbom.sh does not default SBOM_TRIVY_CACHE (unset must mean the default, empty must mean off)"
+grep -q 'TRIVY_CACHE_BACKEND=memory' "$ROOT_DIR/docker/entrypoint.sh" \
+    && pass "entrypoint.sh keeps Trivy's per-scan cache in memory when the shared cache folder is mounted" \
+    || fail "entrypoint.sh does not set TRIVY_CACHE_BACKEND=memory for the shared cache folder"
+eval "$(sed -n '/^trivy_cache_args() {/,/^}/p' "$ROOT_DIR/docker/lib/source-detect.sh")"
+TC="$(mktemp -d)"
+out="$(SBOM_TRIVY_CACHE="$TC/cache" trivy_cache_args | wc -l | tr -d ' ')"
+[ "$out" = "4" ] && [ -d "$TC/cache" ] \
+    && pass "a cache folder is created and mounted as -v <dir>:/trivy-cache -e TRIVY_CACHE_DIR" \
+    || fail "trivy_cache_args did not print the four mount words for a cache folder" "lines=$out"
+[ -z "$(SBOM_TRIVY_CACHE="" trivy_cache_args)" ] \
+    && pass "an empty SBOM_TRIVY_CACHE mounts nothing" \
+    || fail "an empty SBOM_TRIVY_CACHE still mounted a folder"
+rm -rf "$TC"
+
+echo ""
 echo "Results: ${PASS} passed, ${FAIL} failed"
 [ "$FAIL" -eq 0 ]

@@ -57,6 +57,15 @@ if ! { [ -n "${HOME:-}" ] && [ -d "$HOME" ] && [ -w "$HOME" ]; }; then
     fi
 fi
 
+# The cache folder a host shares between scans (SBOM_TRIVY_CACHE) is meant to
+# hold the vulnerability database. Trivy's per-scan layer cache goes to memory
+# there: a second scan opening the same cache file at the same time failed with
+# "cache may be in use by another process" and left its report incomplete. The
+# database is opened read-only, so scans run side by side.
+if [ "${TRIVY_CACHE_DIR:-}" = "/trivy-cache" ] && [ -z "${TRIVY_CACHE_BACKEND:-}" ]; then
+    export TRIVY_CACHE_BACKEND=memory
+fi
+
 # --- UI mode: hand off to the web server, no project metadata needed ---
 if [ "$SCAN_MODE" = "UI" ]; then
     echo "[INFO] Starting BomLens Web UI on port ${UI_PORT:-8080}..."
