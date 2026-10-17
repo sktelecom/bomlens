@@ -2646,6 +2646,17 @@ if [ "$MODE" = "SOURCE" ]; then
         done
         [ -d "$HOME/.gradle/init.d" ] && CACHE_MOUNTS="$CACHE_MOUNTS -v \"$(hostpath "$HOME/.gradle/init.d")\":/bomlens-settings/gradle/init.d:ro"
     fi
+    # Package downloads that every scan repeated because the container is thrown away
+    # afterwards: the Cargo registry, the Go module and build caches, pip's and npm's
+    # download caches. Each is a folder of its own under the BomLens cache, so a
+    # scan reads only what an earlier scan downloaded from the same registries.
+    for _cm in "cargo/registry:/usr/local/cargo/registry" "go/mod:/tmp/sbomhome/go/pkg/mod" \
+               "go/build:/tmp/sbomhome/go-build" "pip:/tmp/sbomhome/.cache/pip" "npm:/tmp/sbomhome/.npm"; do
+        _cm_host="${_cm%%:*}"
+        if mkdir -p "$BOMLENS_CACHE_DIR/$_cm_host" 2>/dev/null; then
+            CACHE_MOUNTS="$CACHE_MOUNTS -v \"$(hostpath "$BOMLENS_CACHE_DIR/$_cm_host")\":${_cm#*:}"
+        fi
+    done
     # HOME=/tmp/sbomhome: writable for both root and non-root (cyclonedx) images,
     # so maven/cargo/etc. caches resolve regardless of the base image's user.
     # -u 0:0: the all-in-one fallback image runs as a non-root user and could not

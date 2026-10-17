@@ -1724,6 +1724,14 @@ HOME="$fake_home" scan_in "$d" --project Pcache --version 1.0.0 --generate-only
 in_log "$(host_form "$cache_dir/gradle"):/root/.gradle " \
   && pass "the Gradle home is BomLens's cache folder" \
   || { fail "the Gradle home is BomLens's cache folder" "rc=$RC"; show; }
+cm_ok=1
+for m in "cargo/registry:/usr/local/cargo/registry" "go/mod:/tmp/sbomhome/go/pkg/mod" "go/build:/tmp/sbomhome/go-build" \
+         "pip:/tmp/sbomhome/.cache/pip" "npm:/tmp/sbomhome/.npm"; do
+    in_log "$(host_form "$cache_dir/${m%%:*}"):${m#*:} " && [ -d "$cache_dir/${m%%:*}" ] || cm_ok=0
+done
+[ "$cm_ok" = 1 ] \
+  && pass "the Cargo registry, Go module and build caches, and pip and npm download caches are BomLens's cache folders" \
+  || { fail "package download caches are not mounted from BomLens's cache folder" "rc=$RC"; show; }
 ok=1
 for m in ".m2/settings.xml:/bomlens-settings/m2/settings.xml:ro" ".m2/settings-security.xml:/bomlens-settings/m2/settings-security.xml:ro" \
          ".gradle/gradle.properties:/bomlens-settings/gradle/gradle.properties:ro" ".gradle/init.gradle:/bomlens-settings/gradle/init.gradle:ro" \
