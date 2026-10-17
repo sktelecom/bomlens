@@ -108,7 +108,7 @@ BomLens의 전체 옵션과 분석 모드, CI/CD 통합 방법, 트러블슈팅�
 | `SECURITY_ENRICH` | `true` | 보안 보고서에 EPSS와 CISA KEV 신호를 보강. 폐쇄망에서는 `false`로 외부 조회 생략 |
 | `HTTP_PROXY`, `HTTPS_PROXY`, `NO_PROXY` | — | 스캔 컨테이너에 이름으로 전달(소문자 이름도). 이 컴퓨터의 루프백 주소(`127.0.0.1`, `localhost`)에 있는 프록시는 넘기지 않는다. 컨테이너 안에서는 그 주소가 컨테이너 자신이기 때문이다. 이때는 Docker의 프록시 설정이 적용된다 |
 | `TRIVY_*` | — | Trivy 설정을 이름으로 그대로 전달. 예: 데이터베이스 미러 `TRIVY_DB_REPOSITORY`, 오프라인 `TRIVY_SKIP_DB_UPDATE=true`. `TRIVY_CACHE_DIR`은 호스트 경로라 전달하지 않으므로 `SBOM_TRIVY_CACHE`를 쓴다 |
-| `SBOM_TRIVY_CACHE` | — | Trivy 캐시로 쓸 호스트 폴더. 취약점 데이터베이스를 스캔마다 받지 않고 한 번만 받는다(웹 UI의 스캔도). 오프라인 호스트에서는 데이터베이스를 여기에 넣고 `TRIVY_SKIP_DB_UPDATE=true`로 둔다. Linux에서는 안의 파일이 root 소유가 된다 |
+| `SBOM_TRIVY_CACHE` | `~/.cache/bomlens/trivy`(Windows는 `%LOCALAPPDATA%\bomlens\cache\trivy`) | Trivy 캐시로 쓸 호스트 폴더. 취약점 데이터베이스(약 1.5GB)를 스캔마다 받지 않고 한 번만 받아 스캔당 15~25초를 줄인다(웹 UI의 스캔도). 빈 값으로 두면 예전처럼 스캔마다 받는다. 스캔을 동시에 돌려도 되며 데이터베이스만 공유한다. 오프라인 호스트에서는 데이터베이스를 여기에 넣고 `TRIVY_SKIP_DB_UPDATE=true`로 둔다. Linux에서는 안의 파일이 root 소유가 된다 |
 | `EPSS_API`, `KEV_URL` | 공개 엔드포인트 | EPSS와 CISA KEV 조회용 미러 |
 | `SECURITY_NVD_VERIFY` | `false` | `--deep-cve`와 함께: grype의 `nvd:cpe` 결과를 NVD 실시간 버전 범위와 대조해 범위 밖 오탐을 걸러낸다 (`NVD_API_KEY`와 네트워크 필요, 수 분 추가). 기본은 꺼짐 — 결과를 버리지 않고 버전 미검증으로 표시한다 |
 | `NVD_API_KEY` | — | `SECURITY_NVD_VERIFY`에 쓰는 NVD API 키. 컨테이너에 이름으로만 전달하며 명령줄에 노출하지 않는다 |

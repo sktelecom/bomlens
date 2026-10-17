@@ -66,6 +66,14 @@ case "$(uname -s 2>/dev/null)" in
         BOMLENS_CACHE_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/bomlens" ;;
 esac
 
+# Trivy keeps its vulnerability database inside the scan container, which is
+# thrown away after the scan, so without a cache folder every scan downloaded the
+# database again (about 100 MB and 15 to 25 seconds). The default is now a folder
+# under the BomLens cache; the database is about 1.5 GB there. SBOM_TRIVY_CACHE
+# names another folder, and SBOM_TRIVY_CACHE= (set and empty) goes back to a
+# download per scan.
+SBOM_TRIVY_CACHE="${SBOM_TRIVY_CACHE-$BOMLENS_CACHE_DIR/trivy}"
+
 POSTPROCESS_IMAGE="${SBOM_SCANNER_IMAGE:-ghcr.io/sktelecom/bomlens:latest}"           # legacy aliases: sbom-generator, sbom-scanner
 
 # The opt-in images follow the scanner image. When SBOM_SCANNER_IMAGE names a
@@ -624,7 +632,9 @@ Environment:
   SECURITY_ENRICH        Enrich the security report with EPSS + CISA KEV
                          signals (default: true; set false for air-gapped)
   SBOM_TRIVY_CACHE       Host folder kept as Trivy's cache (database downloaded
-                         once); HTTP(S)_PROXY, NO_PROXY, TRIVY_*, EPSS_API and
+                         once; default: the BomLens cache folder, 'trivy' under it,
+                         about 1.5 GB; set it empty to download on every scan);
+                         HTTP(S)_PROXY, NO_PROXY, TRIVY_*, EPSS_API and
                          KEV_URL are passed on to the containers by name
   ENRICH_EOL             Flag components past their end-of-life from a bundled
                          endoflife.date snapshot (default: true; runs OFFLINE,
