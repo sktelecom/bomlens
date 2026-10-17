@@ -33,6 +33,8 @@ Full docs — searchable, English and Korean — live at **[sktelecom.github.io/
 - [Input scenarios](docs/guides/by-input.md) — GitHub URL, ZIP, local source, an existing SBOM, firmware
 - [CLI reference](docs/reference/cli.md) — every option and environment variable
 - [CI/CD integration](docs/guides/ci-cd.md) — gate a pipeline on scan results
+- [Verify a release](docs/guides/verify-release.md) — check the signatures and read the SBOM that ships with the image
+- [What BomLens does not do](docs/concepts/limitations.md) — the limits we know about
 - Contributing to the tool itself — [CONTRIBUTING](CONTRIBUTING.md) and the [architecture](docs/concepts/architecture.md)
 
 ## Quick Start
