@@ -755,7 +755,9 @@ else
 fi
 # Tier regex patterns, in match order (order decides AGPL/LGPL vs bare GPL).
 ts_pat=$(sed -n '/^export function licenseRiskTier/,/^}/p' "$LTS" | grep -oE '/\\b[^/]+/i' | sed 's:^/::; s:/i$::')
-jq_pat=$(sed -n '/^def license_class/,/^def class_rank/p' "$LFJ" | grep -oE 'test\("[^"]+"' | sed 's/^test("//; s/"$//; s/\\\\/\\/g')
+# Only the strength patterns (they start with \b); the expression gate and the
+# WITH test sit in the same function but have no counterpart pattern in licenses.ts.
+jq_pat=$(sed -n '/^def license_class/,/^def generic_license_synonym_family/p' "$LFJ" | grep -oE 'test\("[^"]+"' | sed 's/^test("//; s/"$//; s/\\\\/\\/g' | grep -F '\b')
 if [ -z "$ts_pat" ] || [ -z "$jq_pat" ]; then
     fail "could not extract the tier patterns (licenses.ts / license-flags.jq changed shape?)"
 elif [ "$ts_pat" = "$jq_pat" ]; then
@@ -1088,6 +1090,33 @@ osl_under BSD-2-Clause libxxhash0 && osl_under GPL-2.0-only libxxhash0 \
     && ! grep -qE '^License: .*(GPL-2\.0-only OR|OR GPL-2\.0-only)' "$OSLT/n_NOTICE.txt" \
     && pass "the NOTICE lists a deb package under each of its licenses" \
     || fail "NOTICE grouping of libxxhash0" "$(grep -n -E '^License: |libxxhash0' "$OSLT/n_NOTICE.txt" 2>/dev/null | head -10)"
+
+echo "== SPDX expressions: class, nesting and conflict (the same cases licenses.test.ts checks) =="
+spdx_class() { jq -n -r --arg e "$1" 'include "license-flags"; {licenses:[{expression:$e}]} | component_license_class' -L "$LIB"; }
+spdx_dnf_of() { jq -n -c --arg e "$1" 'include "license-flags"; parse_license_expr($e)' -L "$LIB"; }
+spdx_verdict() { jq -n -r --arg e "$1" --argjson c "$(cat "$LIB/license-compat.json")" 'include "license-flags"; expr_verdict($e; "Apache-2.0"; $c).verdict' -L "$LIB"; }
+for pair in "MIT OR Apache-2.0|permissive" "Unlicense/MIT|permissive" "(MIT OR Apache-2.0) AND Unicode-3.0|permissive" \
+            "Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT|permissive" "GPL-3.0-only OR MIT|strong-copyleft" \
+            "Apache-2.0 AND (MIT OR GPL-2.0-only)|strong-copyleft" "MPL-2.0 OR MIT|weak-copyleft" "Foo-1.0 OR MIT|uncategorized" \
+            "(MIT|uncategorized" "BSD License|uncategorized" "GNU General Public License v2 or later (GPLv2+)|strong-copyleft"; do
+    e="${pair%|*}"; want="${pair##*|}"; got="$(spdx_class "$e")"
+    [ "$got" = "$want" ] && pass "class of '$e' is $want" || fail "class of '$e': wanted $want, got $got"
+done
+[ "$(spdx_dnf_of '(A OR B) AND C')" = '[["A","C"],["B","C"]]' ] \
+    && [ "$(spdx_dnf_of 'A AND (B OR (C AND D))')" = '[["A","B"],["A","C","D"]]' ] \
+    && [ "$(spdx_dnf_of '(MIT)')" = '[["MIT"]]' ] \
+    && pass "a parenthesised expression is distributed into OR alternatives of AND terms" \
+    || fail "spdx nesting: $(spdx_dnf_of '(A OR B) AND C') / $(spdx_dnf_of 'A AND (B OR (C AND D))')"
+bad_ok=1
+for bad in "(A OR B" "A OR B)" "(A OR)" "(OR A)" "(A AND)" "( )" "(A WITH)"; do
+    [ "$(spdx_dnf_of "$bad")" = '[]' ] || { bad_ok=0; echo "  not refused: $bad -> $(spdx_dnf_of "$bad")"; }
+done
+[ "$bad_ok" = 1 ] && pass "an expression that cannot be parsed gives no terms (the verdict stays unknown)" || fail "unparseable expressions were not refused"
+[ "$(spdx_verdict '(MIT OR GPL-2.0-only) AND BSD-3-Clause')" = compatible ] \
+    && [ "$(spdx_verdict 'GPL-3.0-only AND (MIT OR BSD-2-Clause)')" = incompatible ] \
+    && [ "$(spdx_verdict '(GPL-3.0-only AND MIT) OR Apache-2.0')" = compatible ] \
+    && pass "the conflict verdict combines a nested expression: AND is the worst, OR the best" \
+    || fail "nested verdicts: $(spdx_verdict '(MIT OR GPL-2.0-only) AND BSD-3-Clause') $(spdx_verdict 'GPL-3.0-only AND (MIT OR BSD-2-Clause)') $(spdx_verdict '(GPL-3.0-only AND MIT) OR Apache-2.0')"
 
 echo "== license-conflict drift guard: the jq parser and licenses.ts share one grammar =="
 # Same contract as the license-class guard above: the SPDX operator patterns and

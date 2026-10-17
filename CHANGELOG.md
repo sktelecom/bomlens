@@ -20,6 +20,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A license written as an SPDX expression was classed `uncategorized` even when every term was known: 77 of the 98 crates of a Rust project (`MIT OR Apache-2.0`) read as needing a license decision. The license class of an expression is now the strongest of its terms (a copyleft branch of an OR still shows, because the class is a warning; the conflict verdict still takes the best branch of an OR), `<permissive id> WITH <exception>` stays permissive, a single `/` between two ids reads as OR, and Unicode-3.0 and Unicode-DFS-2016 are permissive. A string that is not an expression, such as `GNU General Public License v2 or later`, is read whole as before.
+- The license conflict verdict reads a parenthesised expression (`(MIT OR Apache-2.0) AND Unicode-3.0`, `A AND (B OR C)`) with AND over OR, where it used to answer `unknown`. An expression it cannot parse (an unbalanced parenthesis, an operator in the wrong place) is still `unknown`.
 - When the dependency resolver failed and the manifest-only fallback found no component, the CLI no longer says the SBOM holds "direct dependencies only". It says the fallback found none, that the SBOM does not list the project's dependencies, and that a dependency file with fixed versions is what the fallback can read.
 
 ## [v1.13.6] - 2026-10-17
