@@ -1,0 +1,2644 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="The result manifest (bomlens-result.json) every scan writes, for a program that runs the BomLens image as its scan engine.">
+      
+      
+        <meta name="author" content="SK Telecom">
+      
+      
+        <link rel="canonical" href="https://sktelecom.github.io/bomlens/reference/engine-contract/">
+      
+      
+        <link rel="prev" href="../docker-image/">
+      
+      
+        <link rel="next" href="../ecosystems/">
+      
+      
+        
+          <link rel="alternate" href="./" hreflang="en">
+        
+          <link rel="alternate" href="../../ko/reference/engine-contract/" hreflang="ko">
+        
+      
+      
+      <link rel="icon" href="../../images/logo-mark.svg">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Engine contract - BomLens</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Inter:300,300i,400,400i,700,700i%7CJetBrains+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Inter";--md-code-font:"JetBrains Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../stylesheets/bomlens-tokens.css">
+    
+      <link rel="stylesheet" href="../../stylesheets/extra.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  
+  
+  
+    
+    
+    
+    
+  
+  
+    
+    
+  
+  
+  
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="BomLens">
+  <meta property="og:locale" content="en_US">
+  <meta property="og:title" content="Engine contract - BomLens">
+  <meta property="og:description" content="The result manifest (bomlens-result.json) every scan writes, for a program that runs the BomLens image as...">
+  <meta property="og:image" content="https://sktelecom.github.io/bomlens/images/og-card.png">
+  <meta property="og:url" content="https://sktelecom.github.io/bomlens/reference/engine-contract/">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Engine contract - BomLens">
+  <meta name="twitter:description" content="The result manifest (bomlens-result.json) every scan writes, for a program that runs the BomLens image as...">
+  <meta name="twitter:image" content="https://sktelecom.github.io/bomlens/images/og-card.png">
+
+  <!--
+    방문 분석(GoatCounter): 쿠키도 개인정보도 수집하지 않는다. config.extra.goatcounter에
+    사이트 코드가 있을 때만 켜진다(없으면 출력하지 않으므로 등록 전에는 비활성).
+  -->
+  
+
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="custom" data-md-color-accent="custom">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#engine-contract" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="BomLens" class="md-header__button md-logo" aria-label="BomLens" data-md-component="logo">
+      
+  <img src="../../images/logo.svg" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            BomLens
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Engine contract
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="custom" data-md-color-accent="custom"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m17.75 4.09-2.53 1.94.91 3.06-2.63-1.81-2.63 1.81.91-3.06-2.53-1.94L12.44 4l1.06-3 1.06 3zm3.5 6.91-1.64 1.25.59 1.98-1.7-1.17-1.7 1.17.59-1.98L15.75 11l2.06-.05L18.5 9l.69 1.95zm-2.28 4.95c.83-.08 1.72 1.1 1.19 1.85-.32.45-.66.87-1.08 1.27C15.17 23 8.84 23 4.94 19.07c-3.91-3.9-3.91-10.24 0-14.14.4-.4.82-.76 1.27-1.08.75-.53 1.93.36 1.85 1.19-.27 2.86.69 5.83 2.89 8.02a9.96 9.96 0 0 0 8.02 2.89m-1.64 2.02a12.08 12.08 0 0 1-7.8-3.47c-2.17-2.19-3.33-5-3.49-7.82-2.81 3.14-2.7 7.96.31 10.98 3.02 3.01 7.84 3.12 10.98.31"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="custom" data-md-color-accent="custom"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 7a5 5 0 0 1 5 5 5 5 0 0 1-5 5 5 5 0 0 1-5-5 5 5 0 0 1 5-5m0 2a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3m0-7 2.39 3.42C13.65 5.15 12.84 5 12 5s-1.65.15-2.39.42zM3.34 7l4.16-.35A7.2 7.2 0 0 0 5.94 8.5c-.44.74-.69 1.5-.83 2.29zm.02 10 1.76-3.77a7.131 7.131 0 0 0 2.38 4.14zM20.65 7l-1.77 3.79a7.02 7.02 0 0 0-2.38-4.15zm-.01 10-4.14.36c.59-.51 1.12-1.14 1.54-1.86.42-.73.69-1.5.83-2.29zM12 22l-2.41-3.44c.74.27 1.55.44 2.41.44.82 0 1.63-.17 2.37-.44z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+      <div class="md-header__option">
+  <div class="md-select">
+    
+    <button class="md-header__button md-icon" aria-label="Select language">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m12.87 15.07-2.54-2.51.03-.03A17.5 17.5 0 0 0 14.07 6H17V4h-7V2H8v2H1v2h11.17C11.5 7.92 10.44 9.75 9 11.35 8.07 10.32 7.3 9.19 6.69 8h-2c.73 1.63 1.73 3.17 2.98 4.56l-5.09 5.02L4 19l5-5 3.11 3.11zM18.5 10h-2L12 22h2l1.12-3h4.75L21 22h2zm-2.62 7 1.62-4.33L19.12 17z"/></svg>
+    </button>
+    <div class="md-select__inner">
+      <ul class="md-select__list">
+        
+          <li class="md-select__item">
+            <a href="./" hreflang="en" class="md-select__link">
+              English
+            </a>
+          </li>
+        
+          <li class="md-select__item">
+            <a href="../../ko/reference/engine-contract/" hreflang="ko" class="md-select__link">
+              한국어
+            </a>
+          </li>
+        
+      </ul>
+    </div>
+  </div>
+</div>
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/sktelecom/bomlens" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    sktelecom/bomlens
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="BomLens" class="md-nav__button md-logo" aria-label="BomLens" data-md-component="logo">
+      
+  <img src="../../images/logo.svg" alt="logo">
+
+    </a>
+    BomLens
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/sktelecom/bomlens" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    sktelecom/bomlens
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="https://sktelecom.github.io/bomlens/demo/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Live demo
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Get started
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Get started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../concepts/what-is-sbom/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    What is an SBOM
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../start/first-scan/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    First scan
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../start/no-cli/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    No-CLI quickstart
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ui/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Web UI & app
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Guides
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Guides
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/by-input/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    By input type
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/reports/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reports
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/supplier-sbom/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Supplier SBOM
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/firmware/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Firmware
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/ai-model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    AI model
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/identify-vendored/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Identify bundled OSS (C/C++)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/server-delivery/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Server SBOM
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/upload/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Upload
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/ci-cd/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CI/CD
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/verify-release/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Verify a release
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Outputs
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Outputs
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../artifacts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Artifacts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../concepts/reports-explained/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reading reports
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../concepts/dependency-resolution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How dependencies are resolved
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Advanced
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Advanced
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../cli/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../docker-image/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Docker image
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Engine contract
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Engine contract
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#the-file" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The file
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#run-status" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Run status
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#steps" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Steps
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#output-roles" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Output roles
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#package-identifiers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Package identifiers
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#image-scans" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Image scans
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#execution-plan" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Execution plan
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#input-fingerprint" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Input fingerprint
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#restricted-networks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Restricted networks
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#progress-events" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Progress events
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#versioning" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Versioning
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ecosystems/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Ecosystems
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    About
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    About
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../concepts/architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../concepts/pipeline-by-input/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pipeline by input
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../concepts/local-first/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Local-first
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../concepts/limitations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Limitations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../contribute/package-managers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Package managers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../contribute/testing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Testing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../talks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    News
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="https://github.com/sktelecom/bomlens/releases" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Release notes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#the-file" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The file
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#run-status" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Run status
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#steps" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Steps
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#output-roles" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Output roles
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#package-identifiers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Package identifiers
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#image-scans" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Image scans
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#execution-plan" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Execution plan
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#input-fingerprint" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Input fingerprint
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#restricted-networks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Restricted networks
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#progress-events" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Progress events
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#versioning" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Versioning
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+                
+
+
+
+  
+
+
+  <nav class="md-path" aria-label="Navigation" >
+    <ol class="md-path__list">
+      
+        
+  
+  
+    <li class="md-path__item">
+      <a href="../.." class="md-path__link">
+        
+  <span class="md-ellipsis">
+    Home
+  </span>
+
+      </a>
+    </li>
+  
+
+      
+      
+        
+  
+  
+    
+    
+      <li class="md-path__item">
+        <a href="../cli/" class="md-path__link">
+          
+  <span class="md-ellipsis">
+    Advanced
+  </span>
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ol>
+  </nav>
+
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="engine-contract">Engine contract<a class="headerlink" href="#engine-contract" title="Permanent link">&para;</a></h1>
+<p>A program that runs the BomLens image as its scan engine reads <code>bomlens-result.json</code>, written to the output folder by every scan. It says how the run ended, which steps ran, were turned off, could not run or failed, and which file in the folder plays which role, so the program does not parse the log or guess file names.</p>
+<p>The format is checked against <a href="https://github.com/sktelecom/bomlens/blob/main/schemas/engine-result-1.json"><code>schemas/engine-result-1.json</code></a> by <code>tests/test-engine-contract.sh</code> in CI. This page describes contract version <code>1.3.0</code>.</p>
+<h2 id="the-file">The file<a class="headerlink" href="#the-file" title="Permanent link">&para;</a></h2>
+<p><code>bomlens-result.json</code> has a fixed name, so give each scan its own output folder. A manifest left in the folder by an earlier run is removed when the run starts, before anything else is checked, and the new one is written when the run ends, also when it stops early on an error. A folder with no manifest after the run means the engine was killed before it could write one.</p>
+<p>The scan's exit code is unchanged by the contract. A run that produced its SBOM exits 0 even when a step failed along the way; the manifest is where that failure is reported. The one exception is a <code>--component-versions</code> file that is refused: every file is still written, and the run exits 1, since the versions it was given were not applied.</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>contract</code></td>
+<td><code>name</code> is <code>bomlens-engine</code>, <code>version</code> the contract version (semantic versioning, separate from the BomLens version)</td>
+</tr>
+<tr>
+<td><code>engine</code></td>
+<td><code>version</code> is the BomLens version built into the image. <code>image</code> and <code>image_digest</code> repeat <code>BOMLENS_IMAGE_REF</code> and <code>BOMLENS_IMAGE_DIGEST</code> when the caller passes them; the image cannot see its own reference</td>
+</tr>
+<tr>
+<td><code>input</code></td>
+<td><code>kind</code> (<code>source</code>, <code>image</code>, <code>sbom</code>, <code>binary</code>, <code>rootfs</code>, <code>firmware</code>, <code>ai-model</code>, <code>dataset</code>), the <code>MODE</code> it ran in, <code>target</code> (the image reference for an image scan; paths are not recorded), and for an image scan <code>image</code> (below)</td>
+</tr>
+<tr>
+<td><code>run</code></td>
+<td><code>status</code>, <code>reason</code>, <code>started_at</code>, <code>ended_at</code> (UTC), <code>exit_code</code></td>
+</tr>
+<tr>
+<td><code>steps[]</code></td>
+<td>one entry per step, in the order they were recorded; a step is recorded when it ends (below)</td>
+</tr>
+<tr>
+<td><code>tools</code></td>
+<td>tool name and version: the generator recorded in the SBOM, syft, and Trivy when the vulnerability scan ran</td>
+</tr>
+<tr>
+<td><code>engines</code></td>
+<td>the vulnerability engines whose results this run produced (<code>trivy</code>, <code>grype</code>, <code>cve-bin-tool</code>, <code>yocto</code>)</td>
+</tr>
+<tr>
+<td><code>data_sources.trivy_db</code></td>
+<td>the Trivy database's schema version, <code>updated_at</code> and <code>downloaded_at</code>, when the vulnerability scan ran</td>
+</tr>
+<tr>
+<td><code>outputs[]</code></td>
+<td><code>role</code>, <code>path</code> (relative to the output folder), <code>sha256</code> and <code>bytes</code> of each file the run wrote</td>
+</tr>
+</tbody>
+</table>
+<h2 id="run-status">Run status<a class="headerlink" href="#run-status" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th><code>run.status</code></th>
+<th>When</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>succeeded</code></td>
+<td>exit code 0, and every recorded step <code>ok</code>, <code>disabled</code>, or <code>skipped</code> because it had nothing to read (<code>no_input</code>)</td>
+</tr>
+<tr>
+<td><code>succeeded_degraded</code></td>
+<td>exit code 0, and at least one step <code>failed</code> or <code>degraded</code>, or <code>skipped</code> for any other reason (a step that was asked for and could not run: its tool not installed, its input over a limit, its image unavailable). The SBOM is valid; read <code>steps[]</code> to decide whether the failed step matters to you</td>
+</tr>
+<tr>
+<td><code>failed</code></td>
+<td>the run exited with a non-zero code (<code>reason</code> is <code>exit_code</code>)</td>
+</tr>
+<tr>
+<td><code>cancelled</code></td>
+<td>the run was stopped by a signal (exit code 130 or 143)</td>
+</tr>
+</tbody>
+</table>
+<p>A failed vulnerability scan never yields <code>succeeded</code>. Trivy writes an empty result with a <code>ScanError</code> when its database cannot be read; the manifest reports that as <code>scan-security</code> <code>failed</code>, with Trivy's message in <code>detail</code>, so "no vulnerabilities" and "the scan did not run" stay apart.</p>
+<h2 id="steps">Steps<a class="headerlink" href="#steps" title="Permanent link">&para;</a></h2>
+<p>Every step that applies to the scan's mode is recorded, also when it did not run. A step that does not apply to the mode at all (CPE enrichment of an AI model) is left out.</p>
+<table>
+<thead>
+<tr>
+<th><code>status</code></th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ok</code></td>
+<td>ran and completed</td>
+</tr>
+<tr>
+<td><code>degraded</code></td>
+<td>ran, but with less than it needed (for example, the offline end-of-life data was missing)</td>
+</tr>
+<tr>
+<td><code>failed</code></td>
+<td>ran and failed; the SBOM is still written. Most post-process steps also add their name to the SBOM's <code>bomlens:pipeline-step-failed</code> property; the manifest is the complete record</td>
+</tr>
+<tr>
+<td><code>skipped</code></td>
+<td>could not run: its tool is not in the image, or its input is missing</td>
+</tr>
+<tr>
+<td><code>disabled</code></td>
+<td>a setting turned it off</td>
+</tr>
+</tbody>
+</table>
+<!-- reasons:begin -->
+<table>
+<thead>
+<tr>
+<th><code>reason</code></th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>failed</code></td>
+<td>the step returned an error</td>
+</tr>
+<tr>
+<td><code>timeout</code></td>
+<td>the step ran out of time</td>
+</tr>
+<tr>
+<td><code>not_installed</code></td>
+<td>the tool it needs is not in this image</td>
+</tr>
+<tr>
+<td><code>too_large</code></td>
+<td>the input was over the step's size limit</td>
+</tr>
+<tr>
+<td><code>fallback</code></td>
+<td>a simpler method was used instead (the SBOM came from the manifest-only fallback, direct dependencies only, or a Poetry project with no <code>poetry.lock</code> was resolved only in part: ranged or table dependencies left out, or the pins' own dependencies not resolved), or the step ran without the image it needs (<code>--deep-license</code> when the scancode image could not be pulled, <code>--deep-cve</code> when the grype image could not be pulled)</td>
+</tr>
+<tr>
+<td><code>unavailable</code></td>
+<td>the data the step reads was not available</td>
+</tr>
+<tr>
+<td><code>budget_exhausted</code></td>
+<td>the step stopped at its work limit</td>
+</tr>
+<tr>
+<td><code>no_input</code></td>
+<td>there was nothing for the step to read (no source tree, no signing key)</td>
+</tr>
+<tr>
+<td><code>no_components</code></td>
+<td>the source declares dependencies (a manifest or lock file lists some) but the SBOM has no component; <code>detail</code> names the manifests and the resolver steps that failed, if any. Recorded on <code>generate</code></td>
+</tr>
+</tbody>
+</table>
+<!-- reasons:end -->
+
+<p>No step reports <code>budget_exhausted</code> yet; it is reserved for a work limit a later release records.</p>
+<p>Each step also has <code>stage</code> (1 for the SBOM a language image generated before this container started, 2 otherwise), <code>started_at</code>, <code>ended_at</code>, an optional <code>detail</code> of up to 500 characters, and for some steps <code>counts</code> (<code>generate</code> records <code>components</code>, and <code>unresolved</code> when it left out packages the generator saw but could not name, which <code>detail</code> then says). In <code>POSTPROCESS</code> mode <code>generate</code> also has <code>input_fingerprint</code>, <code>reused</code>, <code>reuse_unsafe</code> and, after an execution plan, <code>plan_mismatch</code> (see <a href="#input-fingerprint">Input fingerprint</a>).</p>
+<!-- steps:begin -->
+<table>
+<thead>
+<tr>
+<th>Step</th>
+<th>What it does</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>plan</code></td>
+<td>write the execution plan (<code>MODE=PLAN</code>, below)</td>
+</tr>
+<tr>
+<td><code>generate</code></td>
+<td>produce the SBOM (stage 1 for a source scan, where the language image ran first); <code>degraded</code> (<code>failed</code>) when a step inside generation failed (a syft pass of a firmware scan, a resolver step of a source scan) and recorded itself only in the SBOM's <code>bomlens:pipeline-step-failed</code>, with those steps named in <code>detail</code>; when a firmware syft pass is among them and the amd64 image ran under emulation on an ARM host, <code>detail</code> also says so, and on an arm64 host names the <code>linux/arm64</code> image to use instead. The label of a post-process step (a step of its own in this table) is never counted here, even from an SBOM an earlier run left</td>
+</tr>
+<tr>
+<td><code>os-licenses</code></td>
+<td>an image or root filesystem scan: the licenses of Debian packages from Trivy, which reads the license names, common-licenses references and license text in the copyright files syft leaves as a hash; <code>counts</code> gives <code>replaced</code> and <code>hashes_dropped</code>, <code>degraded</code> (<code>unavailable</code>) when Trivy could not read the target or gave no Debian package a license, <code>skipped</code> (<code>not_installed</code>) without Trivy, <code>disabled</code> with <code>BOMLENS_OS_LICENSES=false</code></td>
+</tr>
+<tr>
+<td><code>vendored</code></td>
+<td>identify open source copied into the sources (<code>--identify-vendored</code>)</td>
+</tr>
+<tr>
+<td><code>suggest-vendored</code></td>
+<td>suggest that identification when a C/C++ project scanned near-empty</td>
+</tr>
+<tr>
+<td><code>cocoapods</code></td>
+<td>add CocoaPods dependencies from <code>Podfile.lock</code></td>
+</tr>
+<tr>
+<td><code>stamp-metadata</code></td>
+<td>set the root component to the project name and version; the run stops if this fails</td>
+</tr>
+<tr>
+<td><code>docmeta</code></td>
+<td>record the document's author, tool and lifecycle phase</td>
+</tr>
+<tr>
+<td><code>license-registry</code></td>
+<td>ask the package registry for missing licences and check a single strong-copyleft or non-commercial one (<code>--license-registry</code>); <code>counts</code> gives <code>candidates</code>, <code>filled</code>, <code>superseded</code>, <code>confirmed</code>, <code>no_answer</code>, <code>not_found</code>, <code>non_standard</code>, <code>lookup_failed</code>, <code>budget_reached</code></td>
+</tr>
+<tr>
+<td><code>component-versions</code></td>
+<td>a firmware, root filesystem or binary scan: fill the versions given with <code>--component-versions</code>, record the reasons given as <code>bomlens:versionReason</code>, and write the components still missing a version and a reason to <code>_component-versions.template.csv</code>; <code>failed</code> when the file is refused, with the reason in <code>detail</code>, and the run then exits 1</td>
+</tr>
+<tr>
+<td><code>normalize</code></td>
+<td>normalize licences, PURLs and duplicates</td>
+</tr>
+<tr>
+<td><code>enrich-cpe</code></td>
+<td>add CPE identifiers</td>
+</tr>
+<tr>
+<td><code>upstream-purl</code></td>
+<td>a firmware, root filesystem or binary scan, or the records of a Yocto build: set the upstream source repository purl from the mapping table; <code>disabled</code> with <code>ENRICH_UPSTREAM_PURL=false</code></td>
+</tr>
+<tr>
+<td><code>enrich-os-context</code></td>
+<td>record the operating system packages' distribution</td>
+</tr>
+<tr>
+<td><code>enrich-distro-supplier</code></td>
+<td>record the distribution as the OS packages' supplier</td>
+</tr>
+<tr>
+<td><code>enrich-maven-cpe</code></td>
+<td>add CPEs for Maven components</td>
+</tr>
+<tr>
+<td><code>enrich-github-cpe</code></td>
+<td>add CPEs for components named by GitHub repository</td>
+</tr>
+<tr>
+<td><code>enrich-interpreter-cpe</code></td>
+<td>add CPEs for language runtimes</td>
+</tr>
+<tr>
+<td><code>enrich-eol</code></td>
+<td>mark end-of-life versions (offline data)</td>
+</tr>
+<tr>
+<td><code>enrich-malicious</code></td>
+<td>mark known malicious packages (offline data)</td>
+</tr>
+<tr>
+<td><code>enrich-staleness</code></td>
+<td>measure how far behind each version is (opt-in, online)</td>
+</tr>
+<tr>
+<td><code>declared-sources</code></td>
+<td>apply the dataset sources an AI declaration names</td>
+</tr>
+<tr>
+<td><code>declared-service</code></td>
+<td>apply the AI service an AI declaration describes</td>
+</tr>
+<tr>
+<td><code>assess-ai-risk</code></td>
+<td>assess the AI model's risk</td>
+</tr>
+<tr>
+<td><code>resolve-purl</code></td>
+<td>look each PURL up in its package repository (<code>--resolve-purl</code>)</td>
+</tr>
+<tr>
+<td><code>describe-input</code></td>
+<td>record the supplier SBOM's own format and tool (<code>--analyze</code>)</td>
+</tr>
+<tr>
+<td><code>conformance</code></td>
+<td>check the SBOM against the minimum elements</td>
+</tr>
+<tr>
+<td><code>deep-license</code></td>
+<td>detect licences in the source files with scancode (<code>--deep-license</code>)</td>
+</tr>
+<tr>
+<td><code>source-file-tree</code></td>
+<td>record the scanned tree's file list</td>
+</tr>
+<tr>
+<td><code>source-snapshot</code></td>
+<td>keep the scanned files' content for the file viewer</td>
+</tr>
+<tr>
+<td><code>generate-notice</code></td>
+<td>write the open source notice</td>
+</tr>
+<tr>
+<td><code>match-cpe</code></td>
+<td>a firmware, root filesystem or binary scan, or a Yocto SPDX 2.2 archive, with <code>--security</code>: match the CPEs of components that have no package PURL against the NVD CPE index bundled in the image; <code>counts</code> gives <code>offered</code>, <code>components</code> and <code>cves</code>, <code>skipped</code> (<code>not_installed</code>) in an image without the index, <code>disabled</code> without <code>--security</code> or with <code>CVE_BIN_TOOL_MODE=components-only</code></td>
+</tr>
+<tr>
+<td><code>reachability</code></td>
+<td>a Go source or Go executable scan: judge with govulncheck whether the code each Go advisory names is reached (<code>--reachability</code>, <code>REACHABILITY=true</code>); <code>counts</code> gives <code>exploitable</code>, <code>not_affected</code> and <code>components</code>; <code>skipped</code> (<code>unavailable</code>) when the Go vulnerability database could not be read, (<code>no_input</code>) when the SBOM has no Go component or stage 1 left no govulncheck output for this run, (<code>too_large</code>) when the source tree has more than 20 Go modules, <code>degraded</code> (<code>unavailable</code>) when a Go module builds for none of GOOS linux, darwin and windows and is not judged, (<code>not_installed</code>) in an image without govulncheck; <code>disabled</code> without the option</td>
+</tr>
+<tr>
+<td><code>scan-security</code></td>
+<td>match vulnerabilities with Trivy</td>
+</tr>
+<tr>
+<td><code>deep-cve</code></td>
+<td>with <code>--security</code>: match the components that carry a CPE, and the extra CPEs in <code>bomlens:cpeAlternates</code>, against NVD with grype (<code>--deep-cve</code>, the deep-cve image); <code>skipped</code> (<code>not_installed</code>) when asked for in an image without grype, <code>skipped</code> (<code>fallback</code>) when the CLI ran it without the deep-cve image, because that image could not be pulled or the scanner image is a local build, a version before 1.13.2 or not a BomLens image name (<code>detail</code> says which; a kept image that has grype, built with <code>SBOM_DEEP_CVE=true</code>, runs the match and records its real outcome), <code>disabled</code> when not asked for, without <code>--security</code>, and in a firmware or AI model scan</td>
+</tr>
+<tr>
+<td><code>generate-risk-report</code></td>
+<td>write the risk report</td>
+</tr>
+<tr>
+<td><code>model-security</code></td>
+<td>check an AI model file for unsafe content</td>
+</tr>
+<tr>
+<td><code>verify-weights</code></td>
+<td>check that a model's published weights match their hashes</td>
+</tr>
+<tr>
+<td><code>enrich-aibom</code></td>
+<td>add details read from the model's hub page</td>
+</tr>
+<tr>
+<td><code>sign</code></td>
+<td>sign the SBOM with cosign (<code>--sign</code>)</td>
+</tr>
+</tbody>
+</table>
+<!-- steps:end -->
+
+<h2 id="output-roles">Output roles<a class="headerlink" href="#output-roles" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th><code>role</code></th>
+<th>File</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>sbom.cyclonedx</code></td>
+<td><code>_bom.json</code></td>
+</tr>
+<tr>
+<td><code>sbom.spdx</code></td>
+<td><code>_bom.spdx.json</code></td>
+</tr>
+<tr>
+<td><code>sbom.spdx3</code></td>
+<td><code>_bom.spdx3.json</code></td>
+</tr>
+<tr>
+<td><code>vulnerabilities.trivy</code></td>
+<td>Trivy's own result. This is <code>_security.json</code> when nothing changed it, and <code>_security_trivy.json</code> (Trivy's result kept apart) when another engine added results or a finding was put under another id or moved to <code>Advisories</code> (see <a href="../../guides/reports/">the security report</a>)</td>
+</tr>
+<tr>
+<td><code>vulnerabilities.all</code></td>
+<td><code>_security.json</code>, Trivy's result with the other engines' results merged in, and findings filed under a distribution advisory number reported under their CVE or in the top-level <code>Advisories</code> list</td>
+</tr>
+<tr>
+<td><code>vulnerabilities.other</code></td>
+<td>another engine's result (<code>_security_grype.json</code>, <code>_security_cvebintool.json</code>, <code>_security_yocto.json</code>)</td>
+</tr>
+<tr>
+<td><code>license-scan.scancode</code></td>
+<td><code>_scancode.json</code></td>
+</tr>
+<tr>
+<td><code>vendored.cyclonedx</code></td>
+<td><code>_vendored.cdx.json</code></td>
+</tr>
+<tr>
+<td><code>vex.reachability</code></td>
+<td><code>_reachability.cdx.json</code> (<code>--reachability</code>)</td>
+</tr>
+<tr>
+<td><code>conformance</code></td>
+<td><code>_conformance.json</code></td>
+</tr>
+<tr>
+<td><code>input-description</code></td>
+<td><code>_input.json</code></td>
+</tr>
+<tr>
+<td><code>events</code></td>
+<td><code>bomlens-events.jsonl</code> (<code>BOMLENS_EVENTS=file</code>)</td>
+</tr>
+<tr>
+<td><code>other</code></td>
+<td>any other file the run wrote (reports, sidecars)</td>
+</tr>
+</tbody>
+</table>
+<h2 id="package-identifiers">Package identifiers<a class="headerlink" href="#package-identifiers" title="Permanent link">&para;</a></h2>
+<p>Operating system packages in <code>bom.json</code> carry PURLs in the form Trivy and the purl-spec use, so they join the same packages from a Trivy scan or a supplier SBOM:</p>
+<ul>
+<li>deb: the epoch is an <code>epoch</code> qualifier, not part of the version (<code>pkg:deb/debian/bsdutils@2.38.1-5?arch=amd64&amp;distro=debian-12&amp;epoch=1</code>).</li>
+<li>apk: <code>distro</code> is the release id (<code>distro=3.20.10</code>).</li>
+<li>deb, rpm, apk: no <code>upstream</code> qualifier; the source package is in the <code>aquasecurity:trivy:SrcName</code> property (with <code>SrcVersion</code>, <code>SrcRelease</code>, <code>SrcEpoch</code>), which is what Trivy matches distribution advisories on.</li>
+<li>Qualifiers are sorted by name.</li>
+</ul>
+<p>A change to this form is a major version change (see below).</p>
+<h2 id="image-scans">Image scans<a class="headerlink" href="#image-scans" title="Permanent link">&para;</a></h2>
+<p>In <code>IMAGE</code> mode syft reads the image first, and Trivy reads it again for the licenses of Debian packages (<code>os-licenses</code>), as does the file view. Those later reads take the image by the digest syft read, <code>&lt;repository&gt;@sha256:...</code>, so a tag that moves between the two reads cannot give them a different image. <code>input.image</code> records it:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nt">"image"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">  </span><span class="nt">"reference"</span><span class="p">:</span><span class="w"> </span><span class="s2">"alpine:3.20"</span><span class="p">,</span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">  </span><span class="nt">"source"</span><span class="p">:</span><span class="w"> </span><span class="s2">"registry"</span><span class="p">,</span>
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="w">  </span><span class="nt">"digest"</span><span class="p">:</span><span class="w"> </span><span class="s2">"sha256:45e09956dc667c5eff3583c9d94830261fb1ca0be10a0a7db36266edf5de9e1d"</span><span class="p">,</span>
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="w">  </span><span class="nt">"platform"</span><span class="p">:</span><span class="w"> </span><span class="s2">"linux/arm64/v8"</span><span class="p">,</span>
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="w">  </span><span class="nt">"index_digest"</span><span class="p">:</span><span class="w"> </span><span class="s2">"sha256:d9e853e87e55526f6b2917df91a2115c36dd7c696a35be12163d44e6e2a4b6bc"</span>
+<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="p">}</span>
+</code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>reference</code></td>
+<td>the image reference as given (<code>TARGET_IMAGE</code>)</td>
+</tr>
+<tr>
+<td><code>source</code></td>
+<td>where syft read it: <code>registry</code> (the <code>registry:</code> scheme, or a plain name with no Docker socket), <code>daemon</code> (<code>docker:</code> and <code>podman:</code>), <code>archive</code> (<code>docker-archive:</code>, <code>oci-archive:</code>, <code>oci-dir:</code>), <code>other</code> (<code>containerd:</code>), or <code>null</code> when the run stopped before syft read the image. With the socket, syft reads a plain name from the daemon and falls back to the registry when the daemon cannot give it the image, and its record does not name which it used. It is then told from the record: a Docker Hub repository digest written in full (<code>index.docker.io/...</code>) means <code>registry</code>, a listed tag means <code>daemon</code>, and anything else is <code>unknown</code></td>
+</tr>
+<tr>
+<td><code>digest</code></td>
+<td>for <code>registry</code>, the manifest digest of the image read, one platform; for <code>daemon</code> and <code>unknown</code>, the repository digest recorded for that repository, which for a multi-platform image is the digest of its index and names the same content in the daemon and in the registry. <code>null</code> for an archive, which is read as it is, and when no digest could be resolved: a repository with no repository digest (an image built locally and never pushed), a name that is not a plain image name, or a syft source record that could not be written. The later reads then use the reference as given, and the log says so</td>
+</tr>
+<tr>
+<td><code>platform</code></td>
+<td><code>os/architecture[/variant]</code> of the image read, or <code>null</code>. The variant is syft's <code>architectureVariant</code>, or else the <code>variant</code> in the image config (Docker writes <code>v8</code> for arm64 images)</td>
+</tr>
+<tr>
+<td><code>index_digest</code></td>
+<td><code>registry</code> only, present when the reference named an image index (manifest list) whose digest differs from <code>digest</code></td>
+</tr>
+</tbody>
+</table>
+<h2 id="execution-plan">Execution plan<a class="headerlink" href="#execution-plan" title="Permanent link">&para;</a></h2>
+<p>A source scan runs in two containers: stage 1 resolves the dependencies in a cdxgen language image, stage 2 is this image in <code>POSTPROCESS</code> mode. A program that runs the containers itself (a Kubernetes Job, a hardened Docker runner) asks BomLens what to run with <code>MODE=PLAN</code>: mount the source read-only at <code>/src</code> and an output folder at <code>/host-output</code>, and the image writes <code>bomlens-plan.json</code> there and copies the files stage 1 mounts into <code>bomlens-plan/</code>. Nothing is scanned. The format is <a href="https://github.com/sktelecom/bomlens/blob/main/schemas/engine-plan-1.json"><code>schemas/engine-plan-1.json</code></a>.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>docker<span class="w"> </span>run<span class="w"> </span>--rm<span class="w"> </span>-v<span class="w"> </span><span class="s2">"</span><span class="nv">$PWD</span><span class="s2">/src:/src:ro"</span><span class="w"> </span>-v<span class="w"> </span><span class="s2">"</span><span class="nv">$PWD</span><span class="s2">/out:/host-output"</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">  </span>-e<span class="w"> </span><span class="nv">MODE</span><span class="o">=</span>PLAN<span class="w"> </span>-e<span class="w"> </span><span class="nv">PROJECT_NAME</span><span class="o">=</span>app<span class="w"> </span>-e<span class="w"> </span><span class="nv">PROJECT_VERSION</span><span class="o">=</span><span class="m">1</span>.0<span class="w"> </span>-e<span class="w"> </span><span class="nv">HOST_OUTPUT_DIR</span><span class="o">=</span>/host-output<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="w">  </span>-e<span class="w"> </span><span class="nv">BOMLENS_IMAGE_REF</span><span class="o">=</span>ghcr.io/sktelecom/bomlens:&lt;version&gt;<span class="w"> </span>-e<span class="w"> </span><span class="nv">BOMLENS_IMAGE_DIGEST</span><span class="o">=</span>sha256:...<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="w">  </span>ghcr.io/sktelecom/bomlens:&lt;version&gt;
+</code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>status</code></td>
+<td><code>ok</code>, or <code>unsupported</code> with <code>reason</code> and <code>detail</code> (<code>android-sdk-image</code>: the Android SDK image is built by you and not published) and no stages</td>
+</tr>
+<tr>
+<td><code>input.detected_ecosystem</code></td>
+<td>the language detection result that chose the stage 1 image</td>
+</tr>
+<tr>
+<td><code>output_file</code></td>
+<td>the SBOM file name stage 1 writes and stage 2 reads</td>
+</tr>
+<tr>
+<td><code>input_fingerprint</code></td>
+<td>what stage 1 reads, as sha256 values (see <a href="#input-fingerprint">Input fingerprint</a>); the same value as in the <code>generate</code> stage, and here also when there are no stages</td>
+</tr>
+<tr>
+<td><code>stages[]</code></td>
+<td><code>generate</code> (stage 1) and <code>postprocess</code> (stage 2), in order</td>
+</tr>
+</tbody>
+</table>
+<p>Each stage gives <code>image</code> and <code>image_digest</code> (stage 1 is always pinned by digest; stage 2 repeats <code>BOMLENS_IMAGE_REF</code> and <code>BOMLENS_IMAGE_DIGEST</code>), <code>user</code>, <code>entrypoint</code>, <code>args</code>, <code>workdir</code>, <code>env</code> (names and values to set), <code>env_passthrough</code> (names to pass from your own environment when set), <code>network</code> (whether it needs to reach the package registries) and <code>mounts</code>. A mount has a <code>role</code> (<code>source</code>, <code>output</code>, <code>plan-file</code> with a <code>source</code> path inside the output folder, the optional <code>guard-state</code>, an optional cache (<code>cache-maven</code>, <code>cache-gradle</code>), an optional settings file (<code>maven-settings</code>, <code>maven-settings-security</code>, <code>gradle-properties</code>, <code>gradle-init-script</code>, <code>gradle-init-script-kts</code>, <code>gradle-init</code>), or the optional <code>trivy-db</code>), a <code>target</code> and a <code>mode</code>. Mount a Trivy cache folder that holds a database (<code>db/trivy.db</code>) as <code>trivy-db</code>, read-only: with <code>GENERATE_SECURITY=true</code> (stage 2's report options are yours to set, as in the image reference), stage 2 then reads that database as it is, with no download, no update and no write, so it runs with no network and a read-only root. A <code>trivy-db</code> mount with no database fails <code>scan-security</code> with that reason; a database older than <code>BOMLENS_TRIVY_DB_MAX_AGE_DAYS</code> days (7, counted from <code>UpdatedAt</code> in <code>db/metadata.json</code>, when the database was built) records it as <code>degraded</code> (<code>unavailable</code>). Pass a value that fits how often you refresh the database. The source is writable in stage 1 only: the resolvers write lock files there, and stage 1 puts the tree back as it was when it finishes. A stage 1 that is killed (out of memory, a timeout) cannot; mount a folder of your own as <code>guard-state</code> and set <code>BOMLENS_GUARD_ID</code> to a unique id per scan, and after a kill run the same stage 1 again with <code>BOMLENS_GUARD_RESTORE_ONLY=1</code> to restore the source. Pass <code>HOST_UID</code> and <code>HOST_GID</code> to both stages so the files they write belong to your user rather than root. Stage 2 also runs as any user (<code>user</code> is <code>null</code>, so you choose) with a read-only root filesystem, given a writable <code>$TMPDIR</code> (default <code>/tmp</code>, a tmpfs) and an output folder that user can write; a home it cannot write is replaced with a folder in <code>$TMPDIR</code>, unless something is mounted under it. Without a <code>trivy-db</code> mount Trivy downloads its database there, several hundred MB, which a memory-backed tmpfs counts as memory: mount <code>trivy-db</code>. Stage 1 runs as root: the resolvers install packages and write into the source. Stage 1's <code>env</code> also keeps the Go caches under <code>/tmp/sbomhome</code> (<code>GOPATH=/tmp/sbomhome/go</code>, <code>GOMODCACHE=/tmp/sbomhome/go/pkg/mod</code>, <code>GOCACHE=/tmp/sbomhome/go-build</code>), so <code>go mod tidy</code> runs with a read-only root filesystem and a writable <code>/tmp</code>, where the image's default <code>/go/pkg</code> cannot be created. A Go toolchain that <code>go.mod</code> asks for is downloaded into <code>GOMODCACHE</code>, which counts against a memory-backed <code>/tmp</code>. There is no Go cache mount role; mount a folder of your own at <code>/tmp/sbomhome/go</code> if you want the module cache kept between scans. <code>cache-maven</code> is a <code>.m2</code>-shaped folder (the Maven repository in <code>repository/</code>, and a <code>settings.xml</code> there is read when no <code>maven-settings</code> is mounted), and <code>cache-gradle</code> is a Gradle user home. Mount folders of the engine's own there, not a user's <code>~/.m2</code> or <code>~/.gradle</code>: root-owned files there would break that user's own builds, and with <code>HOST_UID</code> and <code>HOST_GID</code> stage 1 hands what it wrote in these two mounts back to that user. Mount the user's settings files read-only under their own roles, which sit outside the cache folders, so no mount point is created inside them: Maven reads <code>maven-settings</code> and <code>maven-settings-security</code> in place of the cache's own, and the Gradle ones are copied into the Gradle user home before the first Gradle run and removed afterwards (a file the home already has is not replaced, and a copy that changed during the scan is kept). Scans that share one <code>cache-gradle</code> at the same time share the copies, and the last of them to end removes them; a scan that was killed leaves its copies for a day. Use the Gradle settings roles together with <code>cache-gradle</code>. The CLI mounts <code>${XDG_CACHE_HOME:-~/.cache}/bomlens/m2</code> and <code>.../bomlens/gradle</code> (<code>%LOCALAPPDATA%\bomlens\cache</code> on Windows) as the caches, and <code>~/.m2/settings.xml</code>, <code>~/.m2/settings-security.xml</code>, <code>~/.gradle/gradle.properties</code>, <code>~/.gradle/init.gradle</code>, <code>~/.gradle/init.gradle.kts</code> and <code>~/.gradle/init.d</code> read-only when they exist. It also runs with a read-only root filesystem given a writable <code>/tmp</code>, where <code>HOME</code> points (Gradle's files go there when the account's <code>~/.gradle</code> cannot be written).</p>
+<p>Stage 2's image is the one you name in <code>BOMLENS_IMAGE_REF</code>, whatever options you give stage 2. <code>DEEP_CVE=true</code> needs grype and <code>DEEP_LICENSE=true</code> needs scancode, which only the <code>bomlens-deep-cve</code> and <code>bomlens-deep-license</code> images have, so run stage 2 on that image and name it in <code>BOMLENS_IMAGE_REF</code>. Neither image has both tools: to have both, first remove an earlier <code>&lt;prefix&gt;_scancode.json</code> from the output folder, then run <code>/usr/local/lib/sbom/deep-license.sh /src /host-output/&lt;prefix&gt;_scancode.json</code> in the deep-license image (entrypoint <code>bash</code>, the same mounts, <code>HOST_UID</code> and <code>HOST_GID</code> so the file is yours), then stage 2 on the deep-cve image with <code>DEEP_LICENSE=true</code> and that script's exit code as <code>BOMLENS_DEEP_LICENSE_RC</code>, and optionally when it started and ended as <code>BOMLENS_DEEP_LICENSE_STARTED</code> and <code>BOMLENS_DEEP_LICENSE_ENDED</code> (<code>YYYY-MM-DDTHH:MM:SSZ</code>). When the output folder is inside the source tree, set <code>DEEP_LICENSE_EXCLUDE</code> to its folder name (folder names separated by spaces, left out at any depth) so the licence scan does not read the results. The script removes its output file when it does not finish (any exit code other than 0 or 6), and stage 2 keeps the file only for 0 and 6, removing it otherwise, and records the <code>deep-license</code> step from the code. The CLI does this with both options. On an image without the tool, the result manifest records the step (<code>deep-cve</code> or <code>deep-license</code>) as <code>skipped</code> (<code>not_installed</code>) and the run as <code>succeeded_degraded</code>. <code>SECURITY_NVD_VERIFY=true</code> with <code>DEEP_CVE=true</code> reads <code>NVD_API_KEY</code> in stage 2, which the plan lists in <code>env_passthrough</code> by name only.</p>
+<p>Set <code>CDXGEN_IMAGE_PREFIX</code> for <code>MODE=PLAN</code> to name the stage 1 image from a registry mirror (for example <code>registry.example/mirror/cdxgen/</code>, in place of <code>ghcr.io/cdxgen/</code>); the digest stays the published one, so the mirror must hold the same image with the same digest: a pull-through cache, or a copy of every platform (<code>skopeo copy --all</code>, <code>crane copy</code>). A mirror filled with <code>docker pull</code>, <code>docker tag</code> and <code>docker push</code> holds one platform under another digest, and pulling the plan's <code>image@image_digest</code> from it fails with "manifest unknown".</p>
+<p>Set <code>CYCLONEDX_SPEC_VERSION</code> (<code>1.6</code>, the default, or <code>1.7</code>; the CLI's <code>--spec-version</code>) for <code>MODE=PLAN</code> to plan a CycloneDX 1.7 SBOM. The plan gives it to stage 1 as the last argument of <code>build-prep.sh</code> and to stage 2 as <code>CYCLONEDX_SPEC_VERSION</code> in its <code>env</code>, so the stage 2 fallback (syft) writes the same version and stage 2 raises an SBOM written at 1.4, 1.5 or 1.6 to 1.7 (1.3 and older keep their version). It is part of the input fingerprint (<code>CDX_SPEC_VERSION</code>). Any other value stops <code>MODE=PLAN</code> with a non-zero exit.</p>
+<p><code>MODE=PLAN</code> exits 0 when it wrote a plan, <code>ok</code> or <code>unsupported</code>; an <code>unsupported</code> plan records the <code>plan</code> step as <code>skipped</code> in the result manifest, so the run reads <code>succeeded_degraded</code>. It refuses an empty source (usually a mount that did not reach the container) with a non-zero exit. Before writing, it removes an earlier plan and an earlier run's stage 1 outputs from the output folder, since stage 2 cannot tell a fresh SBOM from a leftover one. Stage 1 images are pinned for the cdxgen tag this BomLens release was tested with; overriding <code>CDXGEN_TAG</code> makes the language images <code>unsupported</code> (<code>no-pinned-digest</code>).</p>
+<p>A plan's stage 1 does not run govulncheck, so Go source reachability is not judged on this path: with <code>REACHABILITY=true</code>, stage 2 records the <code>reachability</code> step as <code>skipped</code> (<code>no_input</code>).</p>
+<p>Run stage 2 whatever stage 1's exit code, and pass that code as <code>BOMLENS_STAGE1_EXIT</code>, <code>true</code> in <code>BOMLENS_STAGE1_OOM</code> when the stage 1 container was killed for memory, and the stage 1 log saved in the output folder as <code>BOMLENS_STAGE1_LOG</code> (a file name). When stage 1 failed or left no SBOM, stage 2 scans the source with syft instead (direct dependencies only), records the reason in <code>bomlens:sbom-tool-degraded</code> (<code>oom</code>, <code>disk-space</code>, <code>network</code>, <code>cdxgen-crash</code>, <code>cdxgen-unavailable</code>), and the result manifest records <code>generate</code> as <code>degraded</code> (<code>fallback</code>), the same as the CLI. For an <code>unsupported</code> plan, where no stage 1 ran, pass <code>BOMLENS_STAGE1_EXIT=127</code> (or <code>BOMLENS_STAGE1_REASON=cdxgen-unavailable</code>) with no SBOM: the reason is then <code>cdxgen-unavailable</code>.</p>
+<h2 id="input-fingerprint">Input fingerprint<a class="headerlink" href="#input-fingerprint" title="Permanent link">&para;</a></h2>
+<p>The plan's <code>generate</code> stage has <code>input_fingerprint</code>: a sha256 over the whole source tree and what stage 1 runs with. When it is the same as the <code>sha256</code> of an earlier scan whose stage 1 exited 0, you may skip stage 1 and give stage 2 that scan's stage 1 outputs instead: the SBOM (<code>output_file</code>, and <code>_conda.cdx.json</code> when there was one) in the output folder, its exit code as <code>BOMLENS_STAGE1_EXIT</code> and its log as <code>BOMLENS_STAGE1_LOG</code>, with <code>BOMLENS_STAGE1_REUSED=1</code>. Reuse only a stage 1 that exited 0; a failed one is run again. Stage 2 always runs: the licence scan of the source files, the registry lookups, the version age and the vulnerabilities depend on the files and on the day, not only on stage 1, so <code>--deep-license</code> can stay on.</p>
+<p>The fingerprint errs on the side of not reusable: when a check cannot tell whether stage 1 would give the same result, <code>reusable</code> is <code>false</code>.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="p">{</span><span class="nt">"algorithm"</span><span class="p">:</span><span class="w"> </span><span class="s2">"bomlens-input-1"</span><span class="p">,</span><span class="w"> </span><span class="nt">"sha256"</span><span class="p">:</span><span class="w"> </span><span class="s2">"9e61..."</span><span class="p">,</span><span class="w"> </span><span class="nt">"reusable"</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span><span class="w"> </span><span class="nt">"reasons"</span><span class="p">:</span><span class="w"> </span><span class="p">[],</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="w"> </span><span class="nt">"components"</span><span class="p">:</span><span class="w"> </span><span class="p">[{</span><span class="nt">"kind"</span><span class="p">:</span><span class="w"> </span><span class="s2">"file"</span><span class="p">,</span><span class="w"> </span><span class="nt">"name"</span><span class="p">:</span><span class="w"> </span><span class="s2">"."</span><span class="p">,</span><span class="w"> </span><span class="nt">"sha256"</span><span class="p">:</span><span class="w"> </span><span class="s2">"a729..."</span><span class="p">,</span><span class="w"> </span><span class="nt">"count"</span><span class="p">:</span><span class="w"> </span><span class="mi">1840</span><span class="p">},</span><span class="w"> </span><span class="err">...</span><span class="p">]}</span>
+</code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>algorithm</code></td>
+<td><code>bomlens-input-1</code>. Compare it along with <code>sha256</code>: two values from different algorithms never match</td>
+</tr>
+<tr>
+<td><code>sha256</code></td>
+<td>the fingerprint, or <code>null</code> when <code>reusable</code> is <code>false</code></td>
+</tr>
+<tr>
+<td><code>reusable</code></td>
+<td>whether stage 1's result for this input can be reused at all</td>
+</tr>
+<tr>
+<td><code>reasons</code></td>
+<td>why not, when <code>reusable</code> is <code>false</code> (below); one entry per reason</td>
+</tr>
+<tr>
+<td><code>components</code></td>
+<td>each input, as <code>kind</code> (<code>file</code>, <code>engine</code>, <code>image</code>, <code>setting</code>), <code>name</code> and <code>sha256</code>. A value is only ever given as its sha256</td>
+</tr>
+</tbody>
+</table>
+<p>The components, sorted by kind and name:</p>
+<ul>
+<li><code>file</code>: the source tree as one component, named <code>.</code>. Stage 1 runs cdxgen over the whole tree with no type filter, and cdxgen reads many kinds of file (its own <code>.cdxgenrc</code>, archives, installed package metadata, build files of many tools), so every file counts except any folder or file named <code>.git</code> (a worktree's <code>.git</code> file names an absolute path). Nothing else is skipped: <code>node_modules</code>, <code>vendor</code>, virtual environments, hidden folders and the non-shipped folders are hashed too. Its <code>sha256</code> is taken over one line per file, <code>&lt;path&gt;&lt;TAB&gt;&lt;mode&gt;&lt;TAB&gt;&lt;sha256 of the content&gt;</code>, with paths relative to the source and sorted byte by byte (<code>LC_ALL=C</code>). <code>&lt;mode&gt;</code> is <code>755</code> when the file can be executed and <code>644</code> otherwise (build-prep runs <code>./gradlew</code> only when it can), with an <code>l</code> in front for a link, so a link and a copy differ. <code>count</code> is the number of files. A change to any file, a README or a source file as much as a lock file, changes the value; a change to <code>.git</code> does not. A link is followed to a regular file inside the source. A path that cannot be hashed (an unreadable file or folder, a link that is broken or leads outside the source, a folder link, a FIFO, socket or device, a name with a tab or line break) is also listed as its own <code>file</code> component with <code>sha256</code> <code>null</code>, and the tree's <code>sha256</code> is then <code>null</code>. A tree with an installed pnpm <code>node_modules</code> (made of folder links) or a virtual environment (whose links lead outside the source) is therefore not reusable. The walk stops after <code>BOMLENS_FINGERPRINT_MAX_FILES</code> entries, files and folders counted together (200000), or after <code>BOMLENS_FINGERPRINT_TIMEOUT</code> seconds (300); the component then has <code>truncated: true</code> and <code>sha256</code> <code>null</code>. The whole computation, the checks below included, is stopped 30 seconds after that limit, and the fingerprint is then the not-reusable value with <code>unhashable-input</code> and no components. The checks read at most 4 MiB of a file; a manifest, lock file or Go source over that cannot be judged and makes the value <code>unhashable-input</code> (it is still hashed in full). In the result manifest of a CLI source scan, the run's own output folder is left out of the walk when it is inside the source (the default), since it holds this run's results, but the value is then not reusable (<code>unhashable-input</code>, with the folder listed with <code>sha256</code> <code>null</code>): stage 1 ran before the folder was cleaned and may have read an earlier run's files there. Put the output folder outside the source (<code>--output-dir</code>) to get a reusable value on the CLI path.</li>
+<li><code>engine</code>: the files stage 1 runs from BomLens, as the sha256 of their content: <code>build-prep.sh</code> and <code>identify-conda.py</code>, and the file that sets stage 1's arguments and environment, <code>make-plan.sh</code> in a plan. In the result manifest of a CLI source scan that file is <code>scan-sbom.sh</code> instead, and <code>build-prep.sh</code> and <code>identify-conda.py</code> are the CLI's own copies it mounted, so a CLI value is comparable only with other CLI values.</li>
+<li><code>image</code>: <code>stage1</code>, the stage 1 image's digest, and <code>bomlens</code>, <code>BOMLENS_IMAGE_DIGEST</code> (<code>null</code> when it is not passed; the files it would cover are already <code>engine</code> components). A CLI scan records the digest the stage 1 image was pulled at; a locally built image has none.</li>
+<li><code>setting</code>: <code>detected_ecosystem</code>, <code>PROJECT_NAME</code>, <code>PROJECT_VERSION</code>, <code>FETCH_LICENSE</code>, <code>HOST_GOTOOLCHAIN</code>, <code>CDX_SPEC_VERSION</code> (stage 1's <code>--spec-version</code>), and the build-prep options <code>BOMLENS_KEEP_BUILD_OUTPUT</code>, <code>BOMLENS_MAVEN_FULL_GRAPH</code>, <code>BOMLENS_ANDROID_FULL_GRAPH</code>, <code>BOMLENS_NODE_FULL_GRAPH</code>, <code>BOMLENS_PHP_FULL_GRAPH</code>, <code>BOMLENS_INCLUDE_NON_SHIPPED</code>, <code>BOMLENS_INCLUDE_DEV_DEPENDENCIES</code>, <code>BOMLENS_NO_COPYRIGHT</code>, <code>BOMLENS_NO_CARGO_LICENSE</code> and <code>BOMLENS_PREP_TIMEOUT</code>, as the sha256 of the value (of an empty value when unset). <code>FETCH_LICENSE</code> and <code>HOST_GOTOOLCHAIN</code> are the values in the stage 1 <code>env</code>. <code>MODE=PLAN</code> reads the build-prep options from its own environment, so give it the same values you give the stages; the plan's stage 2 <code>env_passthrough</code> lists them too.</li>
+</ul>
+<p>Not components: absolute paths, the time, the scan id, the proxy settings (<code>HTTP_PROXY</code>, <code>HTTPS_PROXY</code>, <code>NO_PROXY</code> and the lower-case forms), <code>GOPROXY</code>, <code>GOSUMDB</code>, <code>TRIVY_*</code>, <code>CDXGEN_IMAGE_PREFIX</code> (a mirror serves the same digest), <code>HOST_UID</code>/<code>HOST_GID</code>, and <code>SRC_TREE_EXCLUDE</code>, which only stage 2 reads. Stage 1's fixed arguments and environment are covered through the <code>engine</code> file that defines them.</p>
+<p>Two things stay the caller's responsibility:</p>
+<ul>
+<li>What you mount into stage 1 besides the source is not covered: the <code>cache-maven</code> and <code>cache-gradle</code> mounts, and what they hold, such as a Maven <code>settings.xml</code> or a Gradle <code>init.d</code> script or <code>gradle.properties</code>, and the settings file mounts (<code>maven-settings</code>, <code>maven-settings-security</code>, <code>gradle-properties</code>, <code>gradle-init-script</code>, <code>gradle-init-script-kts</code>, <code>gradle-init</code>). Change those and the same fingerprint can stand for a different result.</li>
+<li>With <code>FETCH_LICENSE=true</code> cdxgen looks the licences up online. The fingerprint has the setting but still counts the result as reusable, on the assumption that the licence metadata of a published version rarely changes.</li>
+</ul>
+<p>The checks below ask whether an identical tree would still give a different stage 1 result, because a resolver asks the registry again. Go, Maven and Gradle are resolved from the root over the whole tree, so they are judged everywhere (Go leaves out what the go tool does: <code>testdata</code>, <code>vendor</code> and names starting with <code>.</code> or <code>_</code>). For the other languages the folders a source scan skips (<code>node_modules</code>, <code>vendor</code>, <code>.venv</code>, <code>site-packages</code>, and the non-shipped folders unless <code>BOMLENS_INCLUDE_NON_SHIPPED=1</code>) are not judged, though they are hashed.</p>
+<p>Decide on reuse from the result manifest, not only from the plan: store a stage 1 for reuse only when the <code>input_fingerprint</code> in its result manifest is <code>reusable</code>. Stage 2 adds <code>stage1-degraded</code> there when stage 1 came out short although it exited 0.</p>
+<!-- fingerprint-reasons:begin -->
+<table>
+<thead>
+<tr>
+<th><code>reasons</code></th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>no-lockfile</code></td>
+<td>a manifest that declares a dependency has no lock file in its own folder: Node.js <code>package-lock.json</code>, <code>npm-shrinkwrap.json</code>, <code>yarn.lock</code>, <code>pnpm-lock.yaml</code>, <code>bun.lock</code> or <code>bun.lockb</code>; Python <code>poetry.lock</code>, <code>uv.lock</code> or <code>Pipfile.lock</code>; Rust <code>Cargo.lock</code>; Go <code>go.sum</code> (every <code>go.mod</code> with a <code>require</code> needs its own); Ruby <code>Gemfile.lock</code>; PHP <code>composer.lock</code>; Swift <code>Package.resolved</code> or <code>Podfile.lock</code>. A lock in a folder above covers only a declared workspace member: npm, yarn, pnpm or bun <code>workspaces</code> (or <code>pnpm-workspace.yaml</code>), and Cargo <code>[workspace] members</code>. Gradle: every build script (and every project <code>settings.gradle</code> includes, when the root declares dependencies in <code>subprojects {}</code> or <code>allprojects {}</code>) needs its own <code>gradle.lockfile</code> with at least one <code>group:artifact:version=</code> entry (one with only <code>empty=</code> lines locks nothing), and the file counts only when locking is on (<code>lockAllConfigurations()</code> or <code>activateDependencyLocking()</code>, comments aside): in the project's own build file, or for a subproject inside the root's <code>subprojects {}</code> or <code>allprojects {}</code> block. Locking at the top of the root build file locks the root project only. .NET: a project needs its own <code>packages.lock.json</code> or <code>obj/project.assets.json</code>, or a <code>paket.lock</code> above it, and a tree with .NET projects and none of these anywhere is <code>no-lockfile</code>. A <code>requirements*.txt</code> (or a <code>.txt</code> under <code>requirements/</code>) counts as locked only in pip's hash-checking mode: every requirement <code>name==version</code> with <code>--hash</code>, and no include (<code>-r</code>, <code>-c</code>), editable, URL, path or <code>${VARIABLE}</code> requirement. No other lock covers it, since stage 1 installs it with pip from the registry</td>
+</tr>
+<tr>
+<td><code>unpinned-versions</code></td>
+<td>Maven, in addition to <code>registry-resolution</code> (below): an element of the tree's own poms holds, as written, a version range, a <code>-SNAPSHOT</code>, <code>LATEST</code> or <code>RELEASE</code>. Properties are not expanded, so a version set through a property is not judged here; the tree is not reusable either way. .NET: a floating or range version (<code>*</code>, <code>[1.0,2.0)</code>, an MSBuild <code>$(property)</code>) in a project, <code>.props</code> or <code>.targets</code> file. Versions in the poms of the dependencies themselves are not visible and are not checked</td>
+</tr>
+<tr>
+<td><code>registry-resolution</code></td>
+<td>stage 1 resolves again from the registry although the tree has not changed. Maven: any <code>pom.xml</code>, since no lock covers the transitive graph and a range in a dependency's own pom cannot be seen. Node.js: a root <code>package.json</code> with no <code>package-lock.json</code> (a yarn, pnpm or bun project, or one with only <code>npm-shrinkwrap.json</code>) that is not a workspace root, unless <code>BOMLENS_NODE_FULL_GRAPH=1</code>, because the production filter has npm resolve it; and an npm lock that does not match its <code>package.json</code> (the dependency specs in the lock's entry for it, or with lockfile version 1 every dependency name, differ). Ruby: a <code>Gemfile.lock</code> whose <code>DEPENDENCIES</code> lacks a gem the <code>Gemfile</code> names. Swift: a <code>Package.resolved</code> that does not pin every remote package <code>Package.swift</code> names. Go: a <code>.go</code> file imports a module the <code>go.mod</code> does not require, so <code>go mod tidy</code> adds its newest version. An import counts as covered when a required module path is a prefix of it (a <code>/vN</code> major version after the prefix does not count); an import that a required path covers by prefix but that lives in a separate, unrequired module is not detected</td>
+</tr>
+<tr>
+<td><code>unsupported-ecosystem</code></td>
+<td>the language is not one stage 1 resolves reproducibly: <code>unknown</code>, a Conan or vcpkg manifest anywhere, a Modelica library (<code>package.mo</code>), or a Swift project with only an Xcode project</td>
+</tr>
+<tr>
+<td><code>plan-unsupported</code></td>
+<td>the plan's <code>status</code> is <code>unsupported</code></td>
+</tr>
+<tr>
+<td><code>stage1-degraded</code></td>
+<td>in the result manifest only: the stage 1 SBOM records a failed step (<code>bomlens:pipeline-step-failed</code>) or a fallback (<code>bomlens:sbom-tool-degraded</code>), or <code>generate</code> is <code>degraded</code> or <code>failed</code></td>
+</tr>
+<tr>
+<td><code>unhashable-input</code></td>
+<td>an input could not be hashed: a file or folder that cannot be read, a link that is broken or leads outside the source, a folder link (cdxgen may follow it), a FIFO, socket or device, a path with a tab or line break, a walk stopped at its file count or time limit, a CLI output folder inside the source (or a flat output into it), or a file a requirements file includes that is missing or outside the source</td>
+</tr>
+<tr>
+<td><code>unknown-stage1-image</code></td>
+<td>the result manifest does not know the stage 1 image's digest: the CLI's stage 1 image has no RepoDigest (a locally built one), or a stage 2 run with no plan was not told</td>
+</tr>
+</tbody>
+</table>
+<!-- fingerprint-reasons:end -->
+
+<p>When the plan is <code>unsupported</code> there are no stages, and the fingerprint is only in the plan's top-level <code>input_fingerprint</code>, with <code>plan-unsupported</code>.</p>
+<p>In a <code>POSTPROCESS</code> run the result manifest's <code>generate</code> step has the fingerprint stage 2 computes again from the source with its own code; a file in the output folder is never taken as it is.</p>
+<ul>
+<li>After an execution plan (<code>bomlens-plan.json</code> in the output folder, written for the same <code>output_file</code>), stage 2 takes stage 1's image digest, settings and <code>--spec-version</code> from the plan, or the digest from <code>BOMLENS_STAGE1_DIGEST</code> when you pass it, and hashes the <code>engine</code> files from the <code>bomlens-plan/</code> copies. The value then equals the plan's, and <code>plan_mismatch</code> is <code>false</code>. When it differs (the source changed after the plan, or the plan is a leftover from another scan), the step has the computed value and <code>plan_mismatch: true</code>. Stage 2 writes into the output folder, so keep it outside the source; one inside it changes the tree.</li>
+<li>After a CLI source scan, stage 2 uses what the CLI passes on: the stage 1 image's RepoDigest, the sha256 of the files it ran, and the output folder to leave out (<code>BOMLENS_FINGERPRINT_EXCLUDE</code>, a path relative to the source).</li>
+</ul>
+<p><code>reused</code> is <code>true</code> when you passed <code>BOMLENS_STAGE1_REUSED=1</code>. <code>reuse_unsafe</code> is <code>true</code> when you did so although the fingerprint is not <code>reusable</code>, is missing, or does not match the plan's: the SBOM may not be the one stage 1 would give now.</p>
+<p><code>algorithm</code> changes when the kinds or the list of components change, or when the same input would give a different <code>sha256</code>. A new reason does not change it. A fingerprint for image input is not part of this version.</p>
+<h2 id="restricted-networks">Restricted networks<a class="headerlink" href="#restricted-networks" title="Permanent link">&para;</a></h2>
+<p>What a scan reaches over the network, and the setting for each. The execution plan lists these names in <code>env_passthrough</code>, so a caller passes on the ones it has set.</p>
+<table>
+<thead>
+<tr>
+<th>What</th>
+<th>Stage</th>
+<th>Setting</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Proxy</td>
+<td>1, 2</td>
+<td><code>HTTP_PROXY</code>, <code>HTTPS_PROXY</code>, <code>NO_PROXY</code> (and the lower-case forms)</td>
+</tr>
+<tr>
+<td>Package registries (pip, npm, Maven and so on)</td>
+<td>1</td>
+<td>through the proxy; each package manager's own mirror settings work as usual</td>
+</tr>
+<tr>
+<td>Licences looked up by cdxgen</td>
+<td>1</td>
+<td><code>FETCH_LICENSE=false</code> turns it off</td>
+</tr>
+<tr>
+<td>Trivy vulnerability database</td>
+<td>2</td>
+<td>the <code>trivy-db</code> mount (no network at all); or <code>TRIVY_DB_REPOSITORY</code> and <code>TRIVY_JAVA_DB_REPOSITORY</code> for a mirror. Trivy reads any other <code>TRIVY_*</code> variable set in the container (the CLI passes on all it has)</td>
+</tr>
+<tr>
+<td>EPSS and CISA KEV</td>
+<td>2</td>
+<td>off in the plan (its stage 2 <code>env</code> sets <code>SECURITY_ENRICH=false</code>); the CLI and the image alone have them on. <code>EPSS_API</code> and <code>KEV_URL</code> point at a mirror</td>
+</tr>
+<tr>
+<td>deps.dev (licence registry, version age)</td>
+<td>2</td>
+<td>off unless asked for (<code>LICENSE_REGISTRY</code>, <code>STALENESS_ENRICH</code>); <code>LICENSE_REGISTRY_API</code> points at a mirror</td>
+</tr>
+<tr>
+<td>PURL repository check</td>
+<td>2</td>
+<td>off unless asked for (<code>PURL_RESOLVE</code>)</td>
+</tr>
+<tr>
+<td>SCANOSS (vendored code identification)</td>
+<td>2</td>
+<td>off unless asked for (<code>IDENTIFY_VENDORED</code>); <code>SCANOSS_API_URL</code> points at a self-hosted endpoint</td>
+</tr>
+<tr>
+<td>NVD (checking deep CVE matches)</td>
+<td>2</td>
+<td>off unless asked for (<code>SECURITY_NVD_VERIFY</code> with <code>DEEP_CVE</code>)</td>
+</tr>
+</tbody>
+</table>
+<p>End-of-life and malicious-package data are bundled in the image and need no network.</p>
+<h2 id="progress-events">Progress events<a class="headerlink" href="#progress-events" title="Permanent link">&para;</a></h2>
+<p>Set <code>BOMLENS_EVENTS=file</code> to have the run write one JSON object per line to <code>bomlens-events.jsonl</code> in the output folder as it goes, or <code>BOMLENS_EVENTS=stderr</code> to write them to stderr, where they share the stream with warnings and the bundled tools' own messages: read only the lines that start with <code>{"v":1</code>. Use them to show progress while the run is going; the result manifest is the final record, and where the two differ the manifest wins. Each line follows <a href="https://github.com/sktelecom/bomlens/blob/main/schemas/engine-event-1.json"><code>schemas/engine-event-1.json</code></a>:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="p">{</span><span class="nt">"v"</span><span class="p">:</span><span class="mi">1</span><span class="p">,</span><span class="nt">"seq"</span><span class="p">:</span><span class="mi">12</span><span class="p">,</span><span class="nt">"ts"</span><span class="p">:</span><span class="s2">"2026-10-11T03:04:05Z"</span><span class="p">,</span><span class="nt">"type"</span><span class="p">:</span><span class="s2">"step.end"</span><span class="p">,</span><span class="nt">"step"</span><span class="p">:</span><span class="s2">"normalize"</span><span class="p">,</span><span class="nt">"stage"</span><span class="p">:</span><span class="mi">2</span><span class="p">,</span><span class="nt">"status"</span><span class="p">:</span><span class="s2">"ok"</span><span class="p">,</span><span class="nt">"reason"</span><span class="p">:</span><span class="kc">null</span><span class="p">}</span>
+</code></pre></div>
+<table>
+<thead>
+<tr>
+<th><code>type</code></th>
+<th>When</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>run.start</code></td>
+<td>the run began</td>
+</tr>
+<tr>
+<td><code>step.start</code></td>
+<td>a step began (<code>step</code>, <code>stage</code>)</td>
+</tr>
+<tr>
+<td><code>step.end</code></td>
+<td>a step ended, with <code>status</code>, <code>reason</code> and <code>detail</code> as in the manifest. A step that was turned off or could not run has an end without a start</td>
+</tr>
+<tr>
+<td><code>run.end</code></td>
+<td>the run ended, with the manifest's <code>run.status</code>. A run that is stopped (<code>cancelled</code>) can leave a step with a start and no end</td>
+</tr>
+</tbody>
+</table>
+<p><code>seq</code> rises by one per event, so a reader can tell a lost or reordered line. The file is listed in the manifest's <code>outputs</code> with the role <code>events</code>, and the manifest appears only once the events are complete. An events file left by an earlier run in the folder is removed when a run starts.</p>
+<h2 id="versioning">Versioning<a class="headerlink" href="#versioning" title="Permanent link">&para;</a></h2>
+<p>The contract version changes on its own schedule, not with each BomLens release.</p>
+<ul>
+<li>Major: a field, step id, output role or status value is removed, renamed, or changes meaning, or a change makes the same input produce a different package PURL (one with a package ecosystem type, such as <code>pkg:npm</code> or <code>pkg:deb</code>) or licence id, or reports a failure as success.</li>
+<li>Minor: a new optional field, step id, reason, output role or status detail, or a PURL added or replaced on a component that had no package PURL (none, <code>pkg:generic</code>, <code>pkg:opkg</code>), as firmware, root filesystem and binary scans do. A reader ignores values it does not know.</li>
+<li>Patch: no change a reader can see in the fields above.</li>
+</ul>
+<p>Properties named <code>bomlens:*</code> in the SBOM, and the human-readable reports, are not part of the contract and can change in any release.</p>
+
+
+
+
+
+
+
+  
+  
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+  <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var labels=set.querySelector(".tabbed-labels");for(var tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script>
+
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      Copyright &copy; 2026 SK Telecom Co., Ltd. · <a href="https://github.com/sktelecom/bomlens/blob/main/LICENSE">Apache-2.0</a> · <a href="https://github.com/sktelecom/bomlens/blob/main/THIRD_PARTY_LICENSES.md">Third-party licenses</a>
+
+    </div>
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.sections", "navigation.expand", "navigation.path", "navigation.top", "navigation.tracking", "toc.follow", "search.suggest", "search.highlight", "content.code.copy", "content.tabs.link"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+        <script src="../../javascripts/extra.js"></script>
+      
+    
+  </body>
+</html>

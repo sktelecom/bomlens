@@ -1,0 +1,81 @@
+{
+  "schema": "bomlens-ai-declaration/1",
+  "document": {
+    "createdBy": []
+  },
+  "model": {
+    "releaseTime": "",
+    "builtTime": "",
+    "originatedBy": [],
+    "domain": [],
+    "informationAboutApplication": "",
+    "informationAboutTraining": "",
+    "hyperparameter": [],
+    "modelDataPreprocessing": [],
+    "modelExplainability": [],
+    "standardCompliance": [],
+    "useSensitivePersonalInformation": "",
+    "autonomyType": "",
+    "safetyRiskAssessment": "",
+    "weightsScope": "",
+    "inputModality": [],
+    "outputModality": [],
+    "trainingComputeFlops": "",
+    "trainingComputeBasis": "",
+    "adversarialTesting": "",
+    "baseModels": []
+  },
+  "datasets": [
+    {
+      "ref": "huggingface:bookcorpus",
+      "role": "",
+      "sources": [],
+      "originatedBy": null,
+      "builtTime": "",
+      "releaseTime": "",
+      "hasSensitivePersonalInformation": "",
+      "intendedUse": "",
+      "knownBias": [],
+      "confidentialityLevel": "",
+      "dataCollectionProcess": "",
+      "anonymizationMethodUsed": [],
+      "dataPreprocessing": [],
+      "datasetNoise": "",
+      "datasetUpdateMechanism": ""
+    },
+    {
+      "ref": "huggingface:wikipedia",
+      "role": "",
+      "sources": [],
+      "originatedBy": null,
+      "builtTime": "",
+      "releaseTime": "",
+      "hasSensitivePersonalInformation": "",
+      "intendedUse": "",
+      "knownBias": [],
+      "confidentialityLevel": "",
+      "dataCollectionProcess": "",
+      "anonymizationMethodUsed": [],
+      "dataPreprocessing": [],
+      "datasetNoise": "",
+      "datasetUpdateMechanism": ""
+    }
+  ],
+  "service": {
+    "name": "",
+    "packageVersion": "",
+    "downloadLocation": "",
+    "suppliedBy": null,
+    "releaseTime": "",
+    "informationAboutApplication": "",
+    "domain": [],
+    "autonomyType": "",
+    "inputModality": [],
+    "outputModality": [],
+    "dataFlows": [],
+    "standardCompliance": [],
+    "disclosureUrl": "",
+    "externalModels": []
+  },
+  "relationships": []
+}
