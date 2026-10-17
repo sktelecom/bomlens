@@ -18,6 +18,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The CLI keeps the package downloads a source scan repeated every time in folders under the BomLens cache (`cargo/registry`, `go/mod`, `go/build`, `pip`, `npm`, beside the Maven and Gradle ones that were already there), instead of in the throwaway scan container. On a small Rust project the dependency step took 30 s and now takes 13 s from the second scan; Go, Python and Node projects with few dependencies change little, larger ones save the downloads. The folders can be deleted at any time. The web UI's source scans and the engine contract are unchanged.
 - Scans that share the cache folder keep Trivy's per-scan layer cache in memory, so several scans can run at once. Before, a second scan opening the same cache file at the same time failed with "cache may be in use by another process" and its security report was incomplete.
 
+### Added
+
+- The web UI's Overview says "Read from the lock file (package-lock.json), no build" for a scan that read a lock file instead of building, so the speed and what the dependency list rests on are not a surprise. A scan that built says nothing.
+
 ### Fixed
 
 - A license written as an SPDX expression was classed `uncategorized` even when every term was known: 77 of the 98 crates of a Rust project (`MIT OR Apache-2.0`) read as needing a license decision. The license class of an expression is now the strongest of its terms (a copyleft branch of an OR still shows, because the class is a warning; the conflict verdict still takes the best branch of an OR), `<permissive id> WITH <exception>` stays permissive, a single `/` between two ids reads as OR, and Unicode-3.0 and Unicode-DFS-2016 are permissive. A string that is not an expression, such as `GNU General Public License v2 or later`, is read whole as before.

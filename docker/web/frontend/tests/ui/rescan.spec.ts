@@ -141,3 +141,18 @@ test("the Licenses notice opens the scan form on the outbound-license field", as
   // The rest of the config is still seeded.
   await expect(page.locator("#project")).toHaveValue("demo");
 });
+
+test("a scan that read a lock file says so", async ({ page }) => {
+  const done = {
+    ...DONE_WITH_CONFIG,
+    sbom: { ...DONE_WITH_CONFIG.sbom, detection: "static", detectionSource: "package-lock.json" },
+  };
+  await openScan(page, done);
+  await expect(page.getByTestId("detection")).toHaveText("Read from the lock file (package-lock.json), no build");
+});
+
+test("a scan that built says nothing about how it read the dependencies", async ({ page }) => {
+  await openScan(page, DONE_WITH_CONFIG);
+  await expect(page.getByRole("link", { name: /^Overview/ })).toBeVisible();
+  await expect(page.getByTestId("detection")).toHaveCount(0);
+});
