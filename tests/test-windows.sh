@@ -423,6 +423,18 @@ DOCKER_STUB_ARGV_DUMP=1 SBOM_TRIVY_CACHE="$WORK/ui trivy cache" HTTPS_PROXY=http
   && pass "--ui mounts SBOM_TRIVY_CACHE; a loopback proxy is left out, another proxy is passed" \
   || { fail "--ui trivy cache / proxy"; show; cat "$LOG"; }
 
+# The sibling cdxgen container the UI starts uses --volumes-from the UI container,
+# so the package caches the CLI mounts into stage 1 are mounted into the UI
+# container at the same places (Maven, Gradle, Cargo, Go, pip, npm).
+ui_ok=1
+for m in "m2:/tmp/sbomhome/.m2" "gradle:/root/.gradle" "cargo/registry:/usr/local/cargo/registry" "go/mod:/tmp/sbomhome/go/pkg/mod" \
+         "go/build:/tmp/sbomhome/go-build" "pip:/tmp/sbomhome/.cache/pip" "npm:/tmp/sbomhome/.npm"; do
+    grep -q -- "/bomlens/${m%%:*}:${m#*:}\|\\bomlens\\cache\\${m%%:*}:${m#*:}\|/bomlens/cache/${m%%:*}:${m#*:}" "$LOG" || ui_ok=0
+done
+[ "$ui_ok" = 1 ] \
+  && pass "--ui mounts the Maven, Gradle, Cargo, Go, pip and npm caches into the UI container for its source scans" \
+  || { fail "--ui package cache mounts" "rc=$RC"; grep -o -- '-v [^ ]*bomlens[^ ]*' "$LOG" | head -12; }
+
 # --------------------------------------------------------
 section "Startup sweep for a killed scan's leftover container"
 # --------------------------------------------------------
