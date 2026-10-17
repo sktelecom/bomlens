@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- The web UI's source scans use the same package caches as the CLI: `scan-sbom.sh --ui` mounts the Maven, Gradle, Cargo, Go, pip and npm cache folders into the UI container, which the cdxgen container of each source scan inherits. Before, a UI scan downloaded everything again (a small Rust project took 29 s the first time and takes 12 s after).
 - The CLI keeps the package downloads a source scan repeated every time in folders under the BomLens cache (`cargo/registry`, `go/mod`, `go/build`, `pip`, `npm`, beside the Maven and Gradle ones that were already there), instead of in the throwaway scan container. On a small Rust project the dependency step took 30 s and now takes 13 s from the second scan; Go, Python and Node projects with few dependencies change little, larger ones save the downloads. The folders can be deleted at any time. The web UI's source scans and the engine contract are unchanged.
 - Scans that share the cache folder keep Trivy's per-scan layer cache in memory, so several scans can run at once. Before, a second scan opening the same cache file at the same time failed with "cache may be in use by another process" and its security report was incomplete.
 

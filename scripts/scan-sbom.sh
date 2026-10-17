@@ -74,6 +74,15 @@ esac
 # download per scan.
 SBOM_TRIVY_CACHE="${SBOM_TRIVY_CACHE-$BOMLENS_CACHE_DIR/trivy}"
 
+# Package downloads a scan would otherwise repeat every time, because the
+# container that does the work is thrown away afterwards: "<folder under the
+# BomLens cache>:<where the build tools look for it inside the container>". The
+# Maven and Gradle ones are mounted separately (their settings files go beside
+# them); these are the Cargo registry, the Go module and build caches, and pip's
+# and npm's download caches.
+PKG_CACHE_PAIRS=("cargo/registry:/usr/local/cargo/registry" "go/mod:/tmp/sbomhome/go/pkg/mod"
+                 "go/build:/tmp/sbomhome/go-build" "pip:/tmp/sbomhome/.cache/pip" "npm:/tmp/sbomhome/.npm")
+
 POSTPROCESS_IMAGE="${SBOM_SCANNER_IMAGE:-ghcr.io/sktelecom/bomlens:latest}"           # legacy aliases: sbom-generator, sbom-scanner
 
 # The opt-in images follow the scanner image. When SBOM_SCANNER_IMAGE names a
@@ -946,6 +955,18 @@ if [ "$UI_MODE" = "true" ]; then
     # to keep a secret, so it comes from the environment that launched the tool.
     HF_FLAGS=()
     if [ -n "$HF_TOKEN" ]; then HF_FLAGS=(-e HF_TOKEN); fi
+    # The web UI starts each source scan's cdxgen container with --volumes-from this
+    # one, so the package caches the CLI mounts into stage 1 are mounted here, at the
+    # same places, for the UI's scans to find. The UI itself never reads them.
+    UI_CACHE_FLAGS=()
+    mkdir -p "$BOMLENS_CACHE_DIR/m2/repository" 2>/dev/null \
+        && UI_CACHE_FLAGS+=(-v "$(hostpath "$BOMLENS_CACHE_DIR/m2"):/tmp/sbomhome/.m2")
+    mkdir -p "$BOMLENS_CACHE_DIR/gradle" 2>/dev/null \
+        && UI_CACHE_FLAGS+=(-v "$(hostpath "$BOMLENS_CACHE_DIR/gradle"):/root/.gradle")
+    for _cm in "${PKG_CACHE_PAIRS[@]}"; do
+        mkdir -p "$BOMLENS_CACHE_DIR/${_cm%%:*}" 2>/dev/null \
+            && UI_CACHE_FLAGS+=(-v "$(hostpath "$BOMLENS_CACHE_DIR/${_cm%%:*}"):${_cm#*:}")
+    done
     # Go toolchain and module proxy settings for Go dependency resolution. A
     # name-only -e is skipped by docker when the variable is unset.
     GO_ENV_FLAGS=(-e GOTOOLCHAIN -e GOPROXY -e GOSUMDB)
@@ -976,7 +997,7 @@ if [ "$UI_MODE" = "true" ]; then
     ensure_image_fresh "$POSTPROCESS_IMAGE"
     exec "${DOCKER_ENV[@]}" docker run --rm "${TTY_FLAGS[@]}" -p "${UI_BIND_ADDRESS}:${UI_PORT}:8080" \
         -v "$(hostpath "$UI_BASE")":/src -v "$(hostpath "$UI_BASE")":/host-output \
-        "${MOUNT_FLAGS[@]}" "${HF_FLAGS[@]}" "${GO_ENV_FLAGS[@]}" "${PREP_ENV_FLAGS[@]}" "${CANCEL_ENV_FLAGS[@]}" "${TRIVY_CACHE_FLAGS[@]}" "${CDXGEN_ENV_FLAGS[@]}" \
+        "${MOUNT_FLAGS[@]}" "${HF_FLAGS[@]}" "${GO_ENV_FLAGS[@]}" "${PREP_ENV_FLAGS[@]}" "${CANCEL_ENV_FLAGS[@]}" "${TRIVY_CACHE_FLAGS[@]}" "${UI_CACHE_FLAGS[@]}" "${CDXGEN_ENV_FLAGS[@]}" \
         "${UI_GUARD_FLAGS[@]}" "${UI_IMAGE_FLAGS[@]}" \
         -v /var/run/docker.sock:/var/run/docker.sock \
         -e MODE=UI -e UI_PORT=8080 -e SBOM_UI_HOST_DIR="$(hostpath "$UI_BASE")" \
@@ -2650,8 +2671,7 @@ if [ "$MODE" = "SOURCE" ]; then
     # afterwards: the Cargo registry, the Go module and build caches, pip's and npm's
     # download caches. Each is a folder of its own under the BomLens cache, so a
     # scan reads only what an earlier scan downloaded from the same registries.
-    for _cm in "cargo/registry:/usr/local/cargo/registry" "go/mod:/tmp/sbomhome/go/pkg/mod" \
-               "go/build:/tmp/sbomhome/go-build" "pip:/tmp/sbomhome/.cache/pip" "npm:/tmp/sbomhome/.npm"; do
+    for _cm in "${PKG_CACHE_PAIRS[@]}"; do
         _cm_host="${_cm%%:*}"
         if mkdir -p "$BOMLENS_CACHE_DIR/$_cm_host" 2>/dev/null; then
             CACHE_MOUNTS="$CACHE_MOUNTS -v \"$(hostpath "$BOMLENS_CACHE_DIR/$_cm_host")\":${_cm#*:}"
