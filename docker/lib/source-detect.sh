@@ -135,9 +135,9 @@ NON_SHIPPED_PATH_FILE_RE='(^|/)(\.github/workflows/[^/]+\.ya?ml|gradle/wrapper/[
 # the lock file when the tree is covered by one; returns 1 and sets it to the
 # reason when it is not.
 STATIC_NODE_LOCKS="package-lock.json npm-shrinkwrap.json pnpm-lock.yaml bun.lock"
+# shellcheck disable=SC2034  # STATIC_DETECTION_WHY is read by the caller after the call
 static_detection_check() {
     local d="$1" lang="$2" l found="" nested
-    # shellcheck disable=SC2034  # read by scripts/scan-sbom.sh after the call
     STATIC_DETECTION_WHY=""
     case "$lang" in
         node)

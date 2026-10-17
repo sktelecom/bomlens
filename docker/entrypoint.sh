@@ -765,7 +765,38 @@ case "$SCAN_MODE" in
         # The syft fallback leaves out the same non-shipped trees as the cdxgen
         # path (see NON_SHIPPED_DIRS in source-detect.sh).
         read -ra SYFT_EXCLUDE <<< "$(non_shipped_syft_args)"
-        if [ -S /var/run/docker.sock ] && command -v docker >/dev/null 2>&1 && [ -n "$SOURCE_ROOT_HOST" ]; then
+        # Static detection first, as the CLI does (scan-sbom.sh --detection): a lock
+        # file that covers the whole tree is read as it is, with no language image
+        # and no docker socket. This is also what lets the image run as a CI job
+        # container, where there is no Docker to start a sibling in. DETECTION=build
+        # keeps the old order; the registry license lookup that fills the licenses
+        # a lock file lacks is switched on with it, so a reproducible (BYTE_STABLE)
+        # or no-license-fetch run builds instead.
+        _static_why=""
+        case "${DETECTION:-auto}" in
+            static) _static_why="requested" ;;
+            auto)
+                if [ "${BYTE_STABLE:-false}" != "true" ] && [ "${FETCH_LICENSE:-true}" != "false" ] \
+                   && static_detection_check "$SRC_ROOT" "$(detect_lang "$SRC_ROOT")"; then
+                    _static_why="$STATIC_DETECTION_WHY"
+                fi ;;
+        esac
+        _static_ok=false
+        if [ -n "$_static_why" ]; then
+            echo "[1/2] static: source dir $SRC_ROOT ($_static_why, no build)"
+            if generate_sbom_static "$SRC_ROOT" "$OUTPUT_FILE"; then
+                _static_ok=true
+                mark_sbom_detection "$OUTPUT_FILE" static "$_static_why"
+                mark_sbom_excluded "$OUTPUT_FILE" "$SRC_ROOT"
+                [ "${BYTE_STABLE:-false}" = "true" ] || [ "${FETCH_LICENSE:-true}" = "false" ] || LICENSE_REGISTRY=true
+            else
+                rm -f "$OUTPUT_FILE"
+                echo "[WARN] static detection could not read the lock file; continuing without it."
+            fi
+        fi
+        if [ "$_static_ok" = "true" ]; then
+            :
+        elif [ -S /var/run/docker.sock ] && command -v docker >/dev/null 2>&1 && [ -n "$SOURCE_ROOT_HOST" ]; then
             # Best-effort low-disk warning: cdxgen pulls/extracts a language image
             # via the host Docker, which fails if space is tight. We only see this
             # container's view of the disk (on Docker Desktop it shares the VM
