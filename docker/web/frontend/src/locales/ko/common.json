@@ -95,6 +95,8 @@
     "deepCveHint": "다른 매칭 경로가 놓치는 취약점까지 NVD 전용 취약점 정보로 대조합니다. 시간이 더 걸리고, 보안 보고서를 함께 켭니다.",
     "reachability": "Go 도달성 분석",
     "reachabilityHint": "Go 소스나 Go 실행 파일에서 각 Go 보안 권고가 가리키는 코드에 도달하는지 govulncheck로 판정합니다. 도달하지 않는 발견 항목은 따로 보여 주고 집계에서 뺍니다. Go 취약점 데이터베이스를 온라인으로 읽으며, 보안 보고서를 함께 켭니다.",
+    "readLockFile": "빌드 대신 lock 파일 읽기",
+    "readLockFileHint": "package-lock.json, pnpm-lock.yaml, bun.lock, gradle.lockfile 중 하나가 프로젝트 전체를 덮으면 그대로 읽습니다. 빌드 대신 몇 초 만에 끝나고 구성요소와 라이선스는 같습니다. 끄면 항상 빌드로 의존성을 해석합니다(그런 lock 파일이 덮지 않는 프로젝트는 어느 쪽이든 빌드합니다).",
     "byteStable": "재현 가능한 출력",
     "byteStableHint": "같은 입력을 다시 스캔하면 바이트 단위로 동일한 SBOM을 만들어, 출력을 비교하고 체크섬으로 검증할 수 있습니다. 실행마다 결과가 달라질 수 있는 네트워크 라이선스 조회는 건너뜁니다.",
     "conformanceProfile": "적합성 검사 기준",

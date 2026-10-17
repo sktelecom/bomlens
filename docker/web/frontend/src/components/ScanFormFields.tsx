@@ -412,6 +412,9 @@ export function ScanOptions({ state }: { state: ScanFormState }) {
     setReachability,
     byteStable,
     setByteStable,
+    readLockFile,
+    setReadLockFile,
+    showDetection,
     scanossToken,
     setScanossToken,
     showVendored,
@@ -484,6 +487,14 @@ export function ScanOptions({ state }: { state: ScanFormState }) {
           labelKey="reachability"
           checked={reachability}
           onChange={setReachability}
+          disabled={busy}
+        />
+      )}
+      {showDetection && (
+        <ToggleRow
+          labelKey="readLockFile"
+          checked={readLockFile}
+          onChange={setReadLockFile}
           disabled={busy}
         />
       )}

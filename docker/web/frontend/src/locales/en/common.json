@@ -95,6 +95,8 @@
     "deepCveHint": "Also checks against NVD-only advisories that other matching paths miss. Takes longer, and turns the security report on with it.",
     "reachability": "Go reachability analysis",
     "reachabilityHint": "For Go source or a Go executable, govulncheck checks whether the code each Go advisory names is reached. Findings that are not reached are listed apart and left out of the counts. Reads the Go vulnerability database online, and turns the security report on with it.",
+    "readLockFile": "Read a lock file instead of building",
+    "readLockFileHint": "When a package-lock.json, pnpm-lock.yaml, bun.lock or gradle.lockfile covers the whole project, BomLens reads it as it is: a few seconds instead of a build, with the same components and licenses. Turn it off to always resolve the dependencies by building (a project that is not covered by such a lock file is built either way).",
     "byteStable": "Reproducible output",
     "byteStableHint": "Produces a byte-for-byte identical SBOM when the same input is re-scanned, so outputs can be diffed and checksummed. Skips network license lookups, which can otherwise vary between runs.",
     "conformanceProfile": "Conformance profile",

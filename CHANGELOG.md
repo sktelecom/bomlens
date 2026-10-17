@@ -20,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- The New scan form has "Read a lock file instead of building" (on by default) for a source scan. Turning it off sends `detection=build`, the web UI's `--detection build`. The choice is kept with the scan, so a re-scan refills the toggle.
 - The web UI's Overview says "Read from the lock file (package-lock.json), no build" for a scan that read a lock file instead of building, so the speed and what the dependency list rests on are not a surprise. A scan that built says nothing.
 
 ### Fixed
