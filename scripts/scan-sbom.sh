@@ -1297,6 +1297,18 @@ pp_env() {
 # The docker CLI forwards a name-only `-e VAR` from its own environment, so the
 # secret values must be exported for pp_env/cosign_run to carry them. API_KEY is
 # the resolved DEFAULT_API_KEY; the others come straight from the host env.
+# True when the CycloneDX file lists at least one component. Uses jq when the
+# host has it; otherwise looks for a package URL, which every component the
+# fallback scan writes carries.
+sbom_has_components() {
+    [ -s "$1" ] || return 1
+    if command -v jq >/dev/null 2>&1; then
+        [ "$(jq '[.components[]?] | length' "$1" 2>/dev/null || echo 0)" -gt 0 ]
+    else
+        grep -q '"purl"' "$1" 2>/dev/null
+    fi
+}
+
 export_scan_secrets() { export API_KEY="$DEFAULT_API_KEY" SCANOSS_API_KEY COSIGN_PASSWORD; }
 
 # cosign key mount + env, only when --sign is set with a real key. The private
@@ -2953,7 +2965,13 @@ EOF
         exit "$_pp_rc"
     }
     if [ -n "$STAGE1_FAILED" ]; then
-        echo "[WARN] Manifest-only fallback used (direct dependencies only, no transitive resolution). Full cdxgen log: $STAGE1_LOG"
+        # The fallback reads manifests only. When it found no component, "direct
+        # dependencies only" would say the opposite of what the SBOM holds.
+        if sbom_has_components "$OUTPUT_HOST_DIR/$OUTPUT_FILE"; then
+            echo "[WARN] Manifest-only fallback used (direct dependencies only, no transitive resolution). Full cdxgen log: $STAGE1_LOG"
+        else
+            echo "[WARN] Manifest-only fallback used and it found no components: this SBOM does not list the project's dependencies. A dependency file with fixed versions (a lock file or pinned requirements) is what the fallback can read. Fix the cause in the cdxgen log and re-scan: $STAGE1_LOG"
+        fi
     fi
 else
     # image / binary / rootfs / firmware / aibom / analyze / merge: scanner image

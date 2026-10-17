@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- When the dependency resolver failed and the manifest-only fallback found no component, the CLI no longer says the SBOM holds "direct dependencies only". It says the fallback found none, that the SBOM does not list the project's dependencies, and that a dependency file with fixed versions is what the fallback can read.
+
 ## [v1.13.6] - 2026-10-17
 
 ### Upgrade note

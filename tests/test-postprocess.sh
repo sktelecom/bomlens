@@ -12173,5 +12173,27 @@ else
 fi
 
 echo ""
+echo "== sbom_has_components (decides the manifest-only fallback warning) =="
+eval "$(sed -n '/^sbom_has_components() {/,/^}/p' "$ROOT_DIR/scripts/scan-sbom.sh")"
+SHC="$(mktemp -d)"
+printf '{"bomFormat":"CycloneDX","components":[{"type":"library","name":"a","purl":"pkg:pypi/a@1"}]}\n' > "$SHC/full.json"
+printf '{"bomFormat":"CycloneDX","components":[]}\n' > "$SHC/empty.json"
+printf '{"bomFormat":"CycloneDX"}\n' > "$SHC/none.json"
+: > "$SHC/zero-bytes.json"
+sbom_has_components "$SHC/full.json" && pass "an SBOM with a component counts as non-empty" || fail "an SBOM with a component was read as empty"
+sbom_has_components "$SHC/empty.json" && fail "an empty components array was read as non-empty" || pass "an empty components array is empty"
+sbom_has_components "$SHC/none.json" && fail "an SBOM with no components key was read as non-empty" || pass "an SBOM with no components key is empty"
+sbom_has_components "$SHC/zero-bytes.json" && fail "an empty file was read as non-empty" || pass "an empty file is empty"
+sbom_has_components "$SHC/missing.json" && fail "a missing file was read as non-empty" || pass "a missing file is empty"
+# Without jq the check falls back to looking for a package URL.
+SAVE_PATH="$PATH"; NOJQ="$(mktemp -d)"
+for t in grep cat sed tr head tail wc awk; do ln -s "$(command -v $t)" "$NOJQ/$t" 2>/dev/null; done
+PATH="$NOJQ"
+sbom_has_components "$SHC/full.json" && pass "without jq, a package URL marks a non-empty SBOM" || fail "without jq, a component was read as empty"
+sbom_has_components "$SHC/empty.json" && fail "without jq, an empty SBOM was read as non-empty" || pass "without jq, an empty SBOM is empty"
+PATH="$SAVE_PATH"
+rm -rf "$SHC" "$NOJQ"
+
+echo ""
 echo "Results: ${PASS} passed, ${FAIL} failed"
 [ "$FAIL" -eq 0 ]
