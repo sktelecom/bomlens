@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v1.13.7] - 2026-10-17
+
 ### Upgrade note
 
 - A source scan reads a lock file instead of building when one covers the whole tree: `--detection auto` is the default (`--detection build` is the old behaviour, `DETECTION=build` in the environment does the same). Only a `package-lock.json`, `npm-shrinkwrap.json`, `pnpm-lock.yaml`, `bun.lock` or `gradle.lockfile` counts, with no manifest below the root (a workspace is built: its members' dependencies would come into a static read) and no manifest under a folder that is left out of the scan. On the benchmark's lock-file projects and on a real package-lock.json with 38 development dependencies the static SBOM has the same components and the same licenses as the built one, in 4 to 5 seconds instead of 11 to 21, and no cdxgen language image is pulled. The licenses a lock file does not carry come from the package registry, so `--byte-stable` and `FETCH_LICENSE=false` keep the build. The SBOM says which way it was made (`bomlens:detection`, `bomlens:detection-source`). If reading the lock file fails, `auto` builds. A project with no complete lock file is built as before. The image's own source scan (`MODE=SOURCE`, which the web UI and a CI job that runs the image directly use) reads a covering lock file the same way, with no Docker socket, so a runner without Docker can use it (`DETECTION=build|static|auto` in the environment; the CI guide has a GitLab job). In a direct run the `--fail-on` verdict is the `*_gate.result` file, not an exit code.
@@ -20,6 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Two documentation pages: [Verify a release](docs/guides/verify-release.md) (the cosign commands for the release checksum file, the container image and the SBOM attached to it as a signed attestation, run against a real release) and [What BomLens does not do](docs/concepts/limitations.md) (the limits we know about), in English and Korean, linked from the README and SECURITY.md. The CI guide has a GitLab job that runs the scanner image as the job image where there is no Docker.
 - The New scan form has "Read a lock file instead of building" (on by default) for a source scan. Turning it off sends `detection=build`, the web UI's `--detection build`. The choice is kept with the scan, so a re-scan refills the toggle.
 - The web UI's Overview says "Read from the lock file (package-lock.json), no build" for a scan that read a lock file instead of building, so the speed and what the dependency list rests on are not a surprise. A scan that built says nothing.
 
