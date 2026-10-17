@@ -6315,6 +6315,9 @@ class Handler(BaseHTTPRequestHandler):
                 "byteStable": g("byte_stable") == "true",
                 "deepCve": g("deep_cve") == "true",
                 "reachability": g("reachability") == "true",
+                # How a source scan finds its dependencies: "build" never reads a
+                # lock file statically, anything else is "auto" (the default).
+                "detection": "build" if g("detection") == "build" else "auto",
                 "sbomAuthor": sbom_author,
                 "specVersion": spec_version,
             }
@@ -6438,6 +6441,10 @@ class Handler(BaseHTTPRequestHandler):
             # the server's environment, pass through via env.copy() above.
             "IDENTIFY_VENDORED": "true" if g("identify_vendored") == "true" else "false",
             "BYTE_STABLE": "true" if g("byte_stable") == "true" else "false",
+            # Source scans read a lock file that covers the tree instead of building
+            # (entrypoint.sh, DETECTION). "build" is the form's way to turn that off;
+            # only these two literals are ever passed on.
+            "DETECTION": "build" if g("detection") == "build" else "auto",
             # Opt-in deep CVE matching (maven NVD-CPE via grype). Consumed by
             # scan-security.sh in the deep-cve image; a plain boolean from a fixed
             # literal, no user text. SECURITY_NVD_VERIFY stays off (network/NVD key).

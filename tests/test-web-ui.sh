@@ -3865,6 +3865,7 @@ echo "[stub] scanning ${PROJECT_NAME} ${PROJECT_VERSION} (mode=$mode)"
   echo "SBOM_AUTHOR=${SBOM_AUTHOR:-}"
   echo "CYCLONEDX_SPEC_VERSION=${CYCLONEDX_SPEC_VERSION:-}"
   echo "REPORT_LANG=${REPORT_LANG:-}"
+  echo "DETECTION=${DETECTION:-}"
   echo "MODE=${MODE:-}"
   echo "TARGET_FILE=${TARGET_FILE:-}"
   echo "TARGET_DIR=${TARGET_DIR:-}"
@@ -4913,6 +4914,27 @@ if [ "$(sed -n 's/^TARGET_DIR_FILES=//p' "$WORK/stub-env")" -gt 0 ] 2>/dev/null;
 else
     fail "wheel was not extracted" "$(cat "$WORK/stub-env")"
 fi
+
+echo "== detection: the form's choice reaches the scan env as one of two literals =="
+echo ok > "$STUB_MODE_FILE"
+rm -f "$WORK/stub-env"
+sse_events "project=det1&version=1.0&source=current-dir&detection=build" >/dev/null
+d1="$(sed -n 's/^DETECTION=//p' "$WORK/stub-env")"
+rm -f "$WORK/stub-env"
+sse_events "project=det2&version=1.0&source=current-dir" >/dev/null
+d2="$(sed -n 's/^DETECTION=//p' "$WORK/stub-env")"
+rm -f "$WORK/stub-env"
+sse_events "project=det3&version=1.0&source=current-dir&detection=static;rm" >/dev/null
+d3="$(sed -n 's/^DETECTION=//p' "$WORK/stub-env")"
+if [ "$d1" = build ] && [ "$d2" = auto ] && [ "$d3" = auto ]; then
+    pass "detection=build -> DETECTION=build; omitted or anything else -> auto"
+else
+    fail "detection did not map to the scan env" "build=$d1 omitted=$d2 other=$d3"
+fi
+det_cfg="$(python3 -c "import json,glob;print(json.load(open(glob.glob('$OUT2/det1_1.0/.scanmeta.json')[0])).get('detection',''))" 2>/dev/null)"
+[ "$det_cfg" = build ] \
+    && pass "the scan's recorded settings keep detection=build, so a re-scan refills the toggle" \
+    || fail "scanmeta detection: '$det_cfg'"
 
 echo "== license: the outbound license reaches the scan env, and only when given =="
 echo ok > "$STUB_MODE_FILE"

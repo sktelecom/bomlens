@@ -145,6 +145,11 @@ export function useScanForm({
   const [deepSource, setDeepSource] = useState(true);
   // Byte-stable (reproducible) output: identical SBOM when the same input is
   // re-scanned, so it can be diffed/checksummed.
+  // Read a lock file that covers the tree instead of building (on by default; off
+  // is the CLI's --detection build). Seeded from a re-scan's recorded choice.
+  const [readLockFile, setReadLockFile] = useState(
+    () => initialConfig?.detection !== "build",
+  );
   const [byteStable, setByteStable] = useState(
     () => initialConfig?.byteStable ?? false,
   );
@@ -255,6 +260,8 @@ export function useScanForm({
   // Reproducible output applies to any generated SBOM. It is a near no-op for a
   // supplier SBOM we only analyze, and for an AI model, so hide it there.
   const showByteStable = !isAnalyze && !isAiModel;
+  // Only a source tree has a lock file to read in place of a build.
+  const showDetection = isSourceScan;
   // A received SBOM carries its supplier's own root license and an AI model has
   // no outbound license of ours, so the field is offered only where we generate
   // the SBOM and therefore own what it ships under.
@@ -293,7 +300,8 @@ export function useScanForm({
   const reachabilityOn = showReachability && reachability;
   const securityForced = isAnalyze || deepCveOn || reachabilityOn;
   const showScanOptions =
-    showDeepLicense || showVendored || showByteStable || showDeepCve || showReachability;
+    showDeepLicense || showVendored || showByteStable || showDeepCve || showReachability ||
+    showDetection;
   const showFormatOptions =
     showOutboundLicense || showSbomAuthor || showSpecVersion || showConformanceProfile;
   // Any scan produces an SBOM, so upload is offered for every source.
@@ -503,6 +511,7 @@ export function useScanForm({
       deepLicense: showDeepLicense ? deepLicense : false,
       identifyVendored: showVendored ? identifyVendored : false,
       byteStable: showByteStable ? byteStable : false,
+      detection: showDetection && !readLockFile ? "build" : "auto",
       conformanceProfile: showConformanceProfile ? conformanceProfile : undefined,
       // Outbound license: only where we generate the SBOM (see showOutboundLicense).
       license: showOutboundLicense ? outboundLicense.trim() : "",
@@ -554,6 +563,7 @@ export function useScanForm({
     deepCve, setDeepCve,
     reachability, setReachability,
     byteStable, setByteStable,
+    readLockFile, setReadLockFile, showDetection,
     conformanceProfile, setConformanceProfile,
     outboundLicense, setOutboundLicense,
     sbomAuthor, setSbomAuthor,

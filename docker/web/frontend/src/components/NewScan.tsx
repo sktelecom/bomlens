@@ -157,6 +157,8 @@ export function NewScan({
     state.deepCve,
     state.reachability,
     state.byteStable,
+    // On by default, so it counts only when it was turned off.
+    state.showDetection && !state.readLockFile,
   ].filter(Boolean).length;
   const formatOptionsOn = [
     state.outboundLicense.trim() !== "",

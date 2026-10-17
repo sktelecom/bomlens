@@ -658,6 +658,9 @@ export interface ScanConfig {
   deepLicense: boolean;
   identifyVendored: boolean;
   byteStable: boolean;
+  /** "build" when the scan was told not to read a lock file statically; absent
+   *  or "auto" otherwise. */
+  detection?: string;
   /** Conformance check strictness this scan actually ran with ("default" or
    *  "skt-submission"). Absent on scans that predate the profile. */
   conformanceProfile?: string;
@@ -826,6 +829,9 @@ export interface ScanParams {
   deepLicense: boolean;
   identifyVendored: boolean;
   byteStable: boolean;
+  /** "build" turns off reading a covering lock file instead of building (server
+   *  DETECTION); "auto" or omitted leaves it on. Source scans only. */
+  detection?: "auto" | "build";
   /** Conformance check strictness. Read server-side as the exact
    *  `conformance_profile` parameter; omitted (sent empty) lets the server pick
    *  the per-mode default ("skt-submission" for ANALYZE, "default" otherwise). */
@@ -1650,6 +1656,7 @@ export function startScan(params: ScanParams, handlers: ScanHandlers): EventSour
     deep_license: String(params.deepLicense),
     identify_vendored: String(params.identifyVendored),
     byte_stable: String(params.byteStable),
+    detection: params.detection ?? "auto",
     conformance_profile: params.conformanceProfile ?? "",
     license: params.license ?? "",
     sbom_author: params.sbomAuthor ?? "",
