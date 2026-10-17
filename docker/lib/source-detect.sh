@@ -137,6 +137,7 @@ NON_SHIPPED_PATH_FILE_RE='(^|/)(\.github/workflows/[^/]+\.ya?ml|gradle/wrapper/[
 STATIC_NODE_LOCKS="package-lock.json npm-shrinkwrap.json pnpm-lock.yaml bun.lock"
 static_detection_check() {
     local d="$1" lang="$2" l found="" nested
+    # shellcheck disable=SC2034  # read by scripts/scan-sbom.sh after the call
     STATIC_DETECTION_WHY=""
     case "$lang" in
         node)
@@ -166,7 +167,7 @@ static_detection_check() {
     if [ -n "$nested" ]; then
         if [ "$lang" = node ] && { [ -f "$d/pnpm-workspace.yaml" ] || grep -q '"workspaces"' "$d/package.json" 2>/dev/null; }; then
             :
-        elif [ "$lang" = java ] && [ -f "$d/settings.gradle" -o -f "$d/settings.gradle.kts" ]; then
+        elif [ "$lang" = java ] && { [ -f "$d/settings.gradle" ] || [ -f "$d/settings.gradle.kts" ]; }; then
             :
         else
             STATIC_DETECTION_WHY="another manifest below the root ($nested)"; return 1
