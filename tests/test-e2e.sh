@@ -1075,6 +1075,28 @@ else
         skip "examples/nodejs not found"
     fi
 
+    # 3d': the same direct run on a tree whose lock file covers it. It is read as it
+    # is, with no docker socket and no build: the components come from the lock
+    # file, the SBOM says it was read statically, and the lock file entry itself
+    # is not one of the components.
+    w="$(mktemp -d "$WORK_ROOT/static.XXXXXX")"; mkdir -p "$w/src" "$w/out"
+    printf '{"name":"a","version":"1.0.0","dependencies":{"ms":"2.1.2"}}' > "$w/src/package.json"
+    printf '{"name":"a","version":"1.0.0","lockfileVersion":3,"requires":true,"packages":{"":{"name":"a","version":"1.0.0","dependencies":{"ms":"2.1.2"}},"node_modules/ms":{"version":"2.1.2","resolved":"https://registry.npmjs.org/ms/-/ms-2.1.2.tgz"}}}' > "$w/src/package-lock.json"
+    docker run --rm -v "$w/src":/src:ro -v "$w/out":/host-output -w /host-output \
+        -e MODE=SOURCE -e PROJECT_NAME=statictest -e PROJECT_VERSION=1.0 -e UPLOAD_ENABLED=false \
+        "$SCANNER_IMG" > "$w/_scan.log" 2>&1
+    rc=$?
+    sb="$w/out/statictest_1.0_bom.json"
+    if [ "$rc" -eq 0 ] && grep -q "static: source dir" "$w/_scan.log" && [ -f "$sb" ] \
+        && [ "$(jq -r '[.components[]|select(.purl=="pkg:npm/ms@2.1.2")]|length' "$sb")" = "1" ] \
+        && [ "$(jq -r '[.components[]|select((.purl // "")=="")]|length' "$sb")" = "0" ] \
+        && [ "$(jq -r '[.metadata.properties[]?|select(.name=="bomlens:detection")|.value]|first' "$sb")" = "static" ]; then
+        pass "no-docker static read: a lock file that covers the tree is read as it is, with no build"
+    else
+        fail "no-docker static read: a lock file that covers the tree is read as it is, with no build" "rc=$rc $(tail -8 "$w/_scan.log" 2>/dev/null | tr '\n' '|')"
+    fi
+    rm -rf "$w"
+
     # 3e: interrupt regression, driven through the real script path (not a
     # stub): interrupt a SOURCE scan while cdxgen is actually mid-resolve and
     # confirm neither the cdxgen container nor build artifacts in the source

@@ -118,6 +118,75 @@ NON_SHIPPED_MANIFEST_RE='(^|/)(package\.json|package-lock\.json|npm-shrinkwrap\.
 NON_SHIPPED_PATHS=".github/workflows gradle/wrapper"
 NON_SHIPPED_PATH_FILE_RE='(^|/)(\.github/workflows/[^/]+\.ya?ml|gradle/wrapper/[^/]+\.jar)$'
 
+# Static detection: read the lock file instead of building.
+#
+# A complete lock file already records every package at its resolved version, so
+# resolving the project again in a language image (a container start, an image
+# pull on the first run, the package manager's own work) adds nothing to the
+# component list. Measured on the benchmark's lock-file projects, the component
+# lists of a build and of `trivy fs` are the same for npm, pnpm and bun lock files
+# and for gradle.lockfile; the licenses are the part a static read leaves out, and
+# the registry lookup fills them. The same read of a project with no lock file
+# finds a fraction of what a build does (pom.xml 4 of 13, requirements.txt 4 of 11,
+# no lock file 0), so "auto" only chooses it when a lock file of a kind listed
+# here covers the whole tree.
+#
+# static_detection_check <dir> <lang>: returns 0 and sets STATIC_DETECTION_WHY to
+# the lock file when the tree is covered by one; returns 1 and sets it to the
+# reason when it is not.
+STATIC_NODE_LOCKS="package-lock.json npm-shrinkwrap.json pnpm-lock.yaml bun.lock"
+# shellcheck disable=SC2034  # STATIC_DETECTION_WHY is read by the caller after the call
+static_detection_check() {
+    local d="$1" lang="$2" l found="" nested
+    STATIC_DETECTION_WHY=""
+    case "$lang" in
+        node)
+            for l in $STATIC_NODE_LOCKS; do [ -f "$d/$l" ] && { found="$l"; break; }; done
+            [ -n "$found" ] || { STATIC_DETECTION_WHY="no package-lock.json, npm-shrinkwrap.json, pnpm-lock.yaml or bun.lock"; return 1; }
+            ;;
+        java)
+            [ -f "$d/pom.xml" ] && { STATIC_DETECTION_WHY="a Maven project resolves in a build"; return 1; }
+            [ -f "$d/gradle.lockfile" ] || { STATIC_DETECTION_WHY="no gradle.lockfile"; return 1; }
+            found="gradle.lockfile"
+            ;;
+        *) STATIC_DETECTION_WHY="no lock file kind is verified for this language"; return 1 ;;
+    esac
+    # Left-out folders (tests, examples) carry manifests the build leaves out of the
+    # SBOM and records; a static read would have to reproduce that, so they stay on
+    # the build.
+    # (The Gradle wrapper jar and the workflow files are listed there too, but they are
+    # not manifests and do not change what a lock file covers.)
+    if non_shipped_enabled && [ -n "$(non_shipped_manifests "$d" | { grep -Ev '(^|/)(gradle/wrapper/|\.github/workflows/)' || true; })" ]; then
+        STATIC_DETECTION_WHY="manifests under folders that are left out of the scan"; return 1
+    fi
+    # Another manifest further down is a second project the root lock file may not
+    # cover. A workspace root (pnpm-workspace.yaml, or "workspaces" in package.json)
+    # lists its members and its lock file covers them.
+    nested="$(cd "$d" 2>/dev/null && find . -mindepth 2 -maxdepth 5 \( -name .git -o -name node_modules -o -name vendor -o -name build -o -name target \) -prune -o -type f \
+        \( -name package.json -o -name pom.xml -o -name 'build.gradle*' -o -name requirements.txt -o -name pyproject.toml -o -name go.mod -o -name Cargo.toml -o -name Gemfile -o -name composer.json \) -print -quit 2>/dev/null)"
+    if [ -n "$nested" ]; then
+        if [ "$lang" = node ] && { [ -f "$d/pnpm-workspace.yaml" ] || grep -q '"workspaces"' "$d/package.json" 2>/dev/null; }; then
+            :
+        elif [ "$lang" = java ] && { [ -f "$d/settings.gradle" ] || [ -f "$d/settings.gradle.kts" ]; }; then
+            :
+        else
+            STATIC_DETECTION_WHY="another manifest below the root ($nested)"; return 1
+        fi
+    fi
+    STATIC_DETECTION_WHY="$found"
+    return 0
+}
+
+# trivy --skip-dirs flags for the folders a source scan leaves out, plus the
+# installed packages: the lock file is the authority in a static read.
+non_shipped_trivy_args() {
+    local d out="--skip-dirs **/node_modules"
+    if non_shipped_enabled; then
+        for d in $NON_SHIPPED_DIRS $NON_SHIPPED_PATHS; do out="$out --skip-dirs **/$d"; done
+    fi
+    printf '%s' "$out"
+}
+
 # True unless BOMLENS_INCLUDE_NON_SHIPPED asks to keep the non-shipped trees.
 non_shipped_enabled() {
     case "${BOMLENS_INCLUDE_NON_SHIPPED:-}" in 1|true) return 1 ;; esac
@@ -273,6 +342,56 @@ non_shipped_manifests() {
         | { grep -Ei "$NON_SHIPPED_PATH_FILE_RE|$re" || true; } \
         | { grep -Ei "$NON_SHIPPED_PATH_FILE_RE|$NON_SHIPPED_MANIFEST_RE" || true; } \
         | LC_ALL=C sort
+}
+
+# generate_sbom_static <root> <out>: the SBOM of a source tree read from its lock
+# file, with no build. `trivy fs` reads the lock files (the license scanner is
+# the one that needs no vulnerability database), the lock files themselves come
+# out of the list (Trivy lists each as a component without a purl), and a
+# Trivy's 1.7 document is lowered to 1.6 when the pipeline emits 1.6. Returns 1
+# when anything fails, so the caller can fall back to a build.
+generate_sbom_static() {
+    local root="$1" out="$2" tmp="$2.static.tmp" skip=() have
+    command -v trivy >/dev/null 2>&1 && command -v jq >/dev/null 2>&1 || return 1
+    read -ra skip <<< "$(non_shipped_trivy_args)"
+    if ! trivy fs --quiet --scanners license --format cyclonedx --offline-scan "${skip[@]}" -o "$tmp" "$root" 2>/dev/null \
+       || ! jq -e '.bomFormat == "CycloneDX"' "$tmp" >/dev/null 2>&1; then
+        rm -f "$tmp"; return 1
+    fi
+    if ! jq '.components = [(.components // [])[] | select(((.type == "application") and ((.purl // "") == "")) | not)]' "$tmp" > "$out" 2>/dev/null; then
+        rm -f "$tmp" "$out"; return 1
+    fi
+    rm -f "$tmp"
+    # Trivy writes 1.7. The pipeline's later step raises a 1.6 document to 1.7 when
+    # asked, and lowering 1.7 to 1.6 is what cdx-copy-as-1.6.sh does (syft's own
+    # convert would turn the root component into a component).
+    have="$(jq -r '.specVersion // ""' "$out" 2>/dev/null)"
+    if [ "$have" = "1.7" ] && [ "${CDX_SPEC_VERSION:-1.6}" = "1.6" ]; then
+        if bash "${LIBDIR:-$(dirname "${BASH_SOURCE[0]}")}/cdx-copy-as-1.6.sh" "$out" "$out.conv" 2>/dev/null && [ -s "$out.conv" ]; then
+            mv "$out.conv" "$out"
+        else
+            rm -f "$out" "$out.conv"; return 1
+        fi
+    fi
+    return 0
+}
+
+# mark_sbom_detection <file> <how> <why>: say on the SBOM which way it was made.
+mark_sbom_detection() {
+    local file="$1" how="$2" why="$3" tmp
+    [ -f "$file" ] || return 0
+    command -v jq >/dev/null 2>&1 || return 0
+    tmp="${file}.detection.tmp"
+    if jq --arg h "$how" --arg w "$why" '
+        .metadata = (.metadata // {})
+        | .metadata.properties = (((.metadata.properties // [])
+              | map(select(.name != "bomlens:detection" and .name != "bomlens:detection-source")))
+            + [{name: "bomlens:detection", value: $h}]
+            + (if $w != "" then [{name: "bomlens:detection-source", value: $w}] else [] end))' "$file" > "$tmp" 2>/dev/null; then
+        mv "$tmp" "$file"
+    else
+        rm -f "$tmp"
+    fi
 }
 
 # Record the patterns and the manifest files left out, in the two properties

@@ -105,6 +105,40 @@ generate-sbom:
       - "*/*_security.*"
 ```
 
+## 러너에 Docker가 없을 때
+
+`scan-sbom.sh`는 컨테이너를 띄우므로 Docker 엔진이 필요합니다. 엔진이 없는 러너(쿠버네티스 러너, `docker:dind`를 쓰지 않는 GitLab 작업)에서는 위 예시를 쓸 수 없습니다. 이때는 스캐너 이미지를 작업 이미지로 그대로 씁니다. lock 파일이 트리 전체를 덮으면(`package-lock.json`, `npm-shrinkwrap.json`, `pnpm-lock.yaml`, `bun.lock`, `gradle.lockfile` 중 하나이고 루트 아래 다른 매니페스트가 없을 때) 이미지 안의 소스 스캔은 Docker 소켓 없이 lock 파일을 그대로 읽고, 빠진 라이선스는 패키지 레지스트리에서 채웁니다. 그런 lock 파일이 없는 트리는 syft가 매니페스트를 읽어 직접 의존성만 나오므로(의존성을 선언했는데 lock 파일이 없는 Node 프로젝트는 안내와 함께 거부됩니다) lock 파일을 커밋하거나 Docker가 있는 러너를 쓰세요.
+
+```yaml
+generate-sbom:
+  stage: security
+  image:
+    name: ghcr.io/sktelecom/bomlens:latest
+    entrypoint: [""]
+  variables:
+    MODE: SOURCE
+    SOURCE_ROOT: $CI_PROJECT_DIR
+    PROJECT_NAME: $CI_PROJECT_NAME
+    PROJECT_VERSION: $CI_COMMIT_SHA
+    GENERATE_NOTICE: "true"
+    GENERATE_SECURITY: "true"
+    UPLOAD_ENABLED: "false"
+    HOST_OUTPUT_DIR: $CI_PROJECT_DIR/sbom-out
+    FAIL_ON: "vulnerability=critical,malicious-package"
+  script:
+    - mkdir -p sbom-out && cd sbom-out
+    - /usr/local/bin/run-scan
+    # 직접 실행에서 게이트 판정은 종료 코드가 아니라 파일로 남습니다. 조건에 걸렸거나
+    # ("met") 판정할 수 없으면("unjudged") 작업을 실패시킵니다.
+    - '! grep -qE "^(met|unjudged)" *_gate.result'
+  artifacts:
+    when: always
+    paths:
+      - sbom-out/
+```
+
+변수는 [직접 `docker run`](../reference/docker-image.ko.md)과 같습니다. 스캔은 `SOURCE_ROOT`에서 프로젝트를 읽고 실행한 폴더에 결과를 씁니다.
+
 ---
 
 > **관련 문서**: [CLI 레퍼런스](../reference/cli.ko.md) | [고지문·보안·위험 보고서 생성](reports.ko.md) | [보고서 읽는 법](../concepts/reports-explained.ko.md)

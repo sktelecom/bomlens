@@ -1715,6 +1715,52 @@ section "Stage 1 Maven and Gradle caches"
 # Stage 1 runs as root, so it gets BomLens's own cache folders, never the
 # user's ~/.m2 or ~/.gradle; the user's settings files go in read-only, at
 # paths outside the cache folders.
+# --------------------------------------------------------
+section "--detection: build, static or auto"
+# --------------------------------------------------------
+# auto reads a covering lock file instead of building: no stage 1, and the
+# post-process step is told to read the lock file.
+d="$(new_proj det_auto_node)"; printf '{"name":"a","dependencies":{"debug":"4.3.1"}}' > "$d/package.json"; printf '{"lockfileVersion":3}' > "$d/package-lock.json"
+scan_in "$d" --project Det --version 1 --generate-only
+{ in_out "Detection: static (package-lock.json)" && in_log "BOMLENS_DETECTION=static" && in_log "BOMLENS_DETECTION_WHY=package-lock.json" \
+    && ! in_log "build-prep.sh" && in_log "LICENSE_REGISTRY=true"; } \
+  && pass "auto with a package-lock.json skips the build, reads the lock file and turns the registry license lookup on" \
+  || { fail "--detection auto with a lock file" "rc=$RC"; show; cat "$LOG"; }
+d="$(new_proj det_build)"; printf '{"name":"a","dependencies":{"debug":"4.3.1"}}' > "$d/package.json"; printf '{"lockfileVersion":3}' > "$d/package-lock.json"
+scan_in "$d" --project Det --version 1 --generate-only --detection build
+{ in_log "build-prep.sh" && ! in_log "BOMLENS_DETECTION=static" && ! in_out "Detection: static"; } \
+  && pass "--detection build builds even with a lock file" \
+  || { fail "--detection build" "rc=$RC"; show; }
+d="$(new_proj det_nolock)"; printf '{"name":"a","dependencies":{"debug":"^4"}}' > "$d/package.json"
+scan_in "$d" --project Det --version 1 --generate-only
+{ in_log "build-prep.sh" && ! in_log "BOMLENS_DETECTION=static"; } \
+  && pass "auto builds a Node project that has no lock file" \
+  || { fail "auto without a lock file" "rc=$RC"; show; }
+d="$(new_proj det_bytestable)"; printf '{"name":"a","dependencies":{"debug":"4.3.1"}}' > "$d/package.json"; printf '{"lockfileVersion":3}' > "$d/package-lock.json"
+scan_in "$d" --project Det --version 1 --generate-only --byte-stable
+{ in_log "build-prep.sh" && ! in_log "BOMLENS_DETECTION=static"; } \
+  && pass "auto builds under --byte-stable, which allows no registry license lookup" \
+  || { fail "auto with --byte-stable" "rc=$RC"; show; }
+d="$(new_proj det_pom)"; printf '<project><modelVersion>4.0.0</modelVersion></project>' > "$d/pom.xml"
+scan_in "$d" --project Det --version 1 --generate-only
+{ in_log "build-prep.sh" && ! in_log "BOMLENS_DETECTION=static"; } \
+  && pass "auto builds a Maven project" \
+  || { fail "auto with a Maven project" "rc=$RC"; show; }
+d="$(new_proj det_static_nolock)"; printf '{"name":"a","dependencies":{"debug":"^4"}}' > "$d/package.json"
+scan_in "$d" --project Det --version 1 --generate-only --detection static
+{ in_out "--detection static: no package-lock.json" && in_log "BOMLENS_DETECTION=static" && ! in_log "build-prep.sh"; } \
+  && pass "--detection static on a project with no lock file warns that the SBOM may be incomplete and still reads statically" \
+  || { fail "--detection static without a lock file" "rc=$RC"; show; }
+scan_in "$d" --project Det --version 1 --generate-only --detection fast
+{ [ "$RC" -ne 0 ] && in_out "--detection takes build, static or auto"; } \
+  && pass "--detection with another word is refused" \
+  || { fail "--detection fast" "rc=$RC"; show; }
+d="$(new_proj det_env)"; printf '{"name":"a","dependencies":{"debug":"4.3.1"}}' > "$d/package.json"; printf '{"lockfileVersion":3}' > "$d/package-lock.json"
+( cd "$d" && DETECTION=build DOCKER_STUB_LOG="$LOG" bash "$SCAN" --project Det --version 1 --generate-only ) > "$OUT" 2>&1
+in_log "build-prep.sh" \
+  && pass "DETECTION=build in the environment does what --detection build does" \
+  || { fail "DETECTION=build" ; show; }
+
 cache_home="$WORK/cachehome"; fake_home="$WORK/fakehome"
 mkdir -p "$fake_home/.m2/repository" "$fake_home/.gradle/init.d"
 : > "$fake_home/.m2/settings.xml"; : > "$fake_home/.m2/settings-security.xml"
