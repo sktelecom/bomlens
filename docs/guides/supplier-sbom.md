@@ -11,7 +11,7 @@ How to validate that an SBOM (JSON) received from a supplier or another team mee
 
 Use it when a supplier or another team hands you an SBOM file instead of source, and you need to confirm the SBOM meets your quality criteria and then check its licenses and vulnerabilities. The input can be CycloneDX (JSON or XML) or SPDX (JSON, Tag-Value); it is converted to CycloneDX internally for analysis. SPDX RDF/XML is not supported yet.
 
-The criteria check whether an SBOM is good enough for dependency review. Requirements vary by organization; as one reference, see SK Telecom's [supply chain security guide](https://sktelecom.github.io/guide/supply-chain/for-suppliers/) and its [SBOM requirements](https://sktelecom.github.io/guide/supply-chain/for-suppliers/requirements/).
+BomLens was built for SK Telecom's supplier SBOM submission, and the table below follows its requirements. The criteria check whether an SBOM is good enough for dependency review. Requirements vary by organization; see SK Telecom's [supply chain security guide](https://sktelecom.github.io/guide/supply-chain/for-suppliers/) and its [SBOM requirements](https://sktelecom.github.io/guide/supply-chain/for-suppliers/requirements/).
 
 | Category | Criteria |
 |----------|----------|

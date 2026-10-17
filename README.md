@@ -18,6 +18,12 @@ Try it without installing anything: the [live demo](https://sktelecom.github.io/
   <img src="docs/images/web-ui-demo.png" alt="BomLens web UI Overview screen for a finished scan: component/vulnerability/dependency/artifact counts, a needs-attention banner, and the severity and license classification distributions" width="860" />
 </p>
 
+## Why it exists
+
+SK Telecom asks its suppliers to submit an SBOM, and BomLens was built so that a supplier can produce one that meets the [submission requirements](https://sktelecom.github.io/guide/supply-chain/for-suppliers/requirements/), understand what is in its software, and act on the vulnerabilities found. The `skt-submission` conformance profile checks an SBOM against those requirements (see the [supplier SBOM guide](docs/guides/supplier-sbom.md)). Anyone can use it, whether or not they supply SK Telecom.
+
+BomLens runs on one machine, which makes it easy to install and use but means it does not manage a whole organization's open source. For company-wide governance (project inventory, vulnerability triage, license policy gates) SK Telecom uses [TRUSCA](https://github.com/trustedoss/trusca), an open source SCA platform that uses BomLens as its scan engine. BomLens output is CycloneDX, so it can be uploaded to TRUSCA or to Dependency-Track (see the [upload guide](docs/guides/upload.md)).
+
 ## What it does
 
 One Docker image, two jobs. It **generates**: scan your source code, a container image, or a binary and get a CycloneDX SBOM, an open-source notice, and a security report. It also **assesses open-source risk** in what you receive — a supplier's finished SBOM (`--analyze`) or a firmware binary — reporting licenses and known vulnerabilities with Critical-7d / High-30d remediation deadlines. Every scan emits the risk report by default. Originally built by SK Telecom for supply-chain security, now open source.
