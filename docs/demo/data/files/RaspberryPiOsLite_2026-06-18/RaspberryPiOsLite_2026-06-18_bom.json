@@ -49682,7 +49682,7 @@
         },
         {
           "name": "bomlens:licenseClass",
-          "value": "uncategorized"
+          "value": "permissive"
         },
         {
           "name": "bomlens:cpeSource",
@@ -59516,7 +59516,7 @@
         },
         {
           "name": "bomlens:licenseClass",
-          "value": "uncategorized"
+          "value": "permissive"
         },
         {
           "name": "bomlens:cpeSource",
@@ -67845,7 +67845,7 @@
         },
         {
           "name": "bomlens:licenseClass",
-          "value": "uncategorized"
+          "value": "permissive"
         },
         {
           "name": "bomlens:cpeSource",
@@ -67952,7 +67952,7 @@
         },
         {
           "name": "bomlens:licenseClass",
-          "value": "uncategorized"
+          "value": "permissive"
         },
         {
           "name": "bomlens:cpeSource",
@@ -68059,7 +68059,7 @@
         },
         {
           "name": "bomlens:licenseClass",
-          "value": "uncategorized"
+          "value": "permissive"
         },
         {
           "name": "bomlens:cpeSource",
@@ -315449,7 +315449,7 @@
         },
         {
           "name": "bomlens:licenseClass",
-          "value": "uncategorized"
+          "value": "permissive"
         },
         {
           "name": "bomlens:supplierSource",
@@ -1552596,7 +1552596,7 @@
         "value": "FIRMWARE"
       }
     ],
-    "timestamp": "2026-10-16T16:54:01Z",
+    "timestamp": "2026-10-17T13:50:29Z",
     "tools": {
       "components": [
         {
@@ -1552618,7 +1552618,7 @@
           "name": "BomLens",
           "publisher": "SK Telecom",
           "type": "application",
-          "version": "1.13.6"
+          "version": "1.13.7"
         }
       ]
     }
