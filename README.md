@@ -12,6 +12,8 @@
 [![OpenSSF Best Practices](https://www.bestpractices.dev/projects/13059/badge)](https://www.bestpractices.dev/projects/13059)
 [![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/sktelecom/bomlens/badge)](https://securityscorecards.dev/viewer/?uri=github.com/sktelecom/bomlens)
 
+한국어 문서: [sktelecom.github.io/bomlens/ko](https://sktelecom.github.io/bomlens/ko/). 한국어로 질문하거나 이슈를 남겨도 됩니다.
+
 Try it without installing anything: the [live demo](https://sktelecom.github.io/bomlens/demo/) holds one finished scan of each kind — a Spring Boot project from source, a container image (1,393 components), a Raspberry Pi OS device image as firmware, an AI model as a CycloneDX ML-BOM checked against the G7 minimum elements, and a supplier SBOM checked against the format requirements. Read-only, nothing to install, nothing uploaded. To run your own scans, download the installer for [Windows](https://github.com/sktelecom/bomlens/releases/latest/download/BomLens-Setup.exe) or [macOS](https://github.com/sktelecom/bomlens/releases/latest/download/BomLens-Setup.dmg), or go straight to the [CLI](#cli-advanced).
 
 <p align="center">
