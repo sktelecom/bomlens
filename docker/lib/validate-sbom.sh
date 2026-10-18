@@ -333,9 +333,16 @@ cdx_checks() {
         status:(if (\$ts|length)>0 then \"pass\" else \"fail\" end), detail:\$ts, missing:[]},
        {id:\"tools\", label:\"Tool info (metadata.tools)\", required:true,
         status:(if \$tools>0 then \"pass\" else \"fail\" end), detail:\"\(\$tools) tool(s)\", missing:[]},
+       # A fixed value some generators write in place of the product name (a dot
+       # or the scanned directory) makes unrelated submissions collide.
+       # Under the submission profile it fails; elsewhere the row warns.
        {id:\"top-component\", label:\"Top-level component name+version\", required:true,
-        status:(if ((\$top.name//\"\")|length)>0 and ((\$top.version//\"\")|length)>0 then \"pass\" else \"fail\" end),
-        detail:((\$top.name//\"(none)\") + \"@\" + (\$top.version//\"\")), missing:[]},
+        status:(if ((\$top.name//\"\")|length)==0 or ((\$top.version//\"\")|length)==0 then \"fail\"
+                elif ((\$top.name) as \$n | [\".\",\"..\",\"/\",\"/scan\"] | index(\$n)) != null
+                then (if \$typeRequired then \"fail\" else \"warn\" end)
+                else \"pass\" end),
+        detail:((\$top.name//\"(none)\") + \"@\" + (\$top.version//\"\")
+                + (if (\$top.name // \"\") as \$n | [\".\",\"..\",\"/\",\"/scan\"] | index(\$n) then \" (a fixed value, not a product name: change metadata.component.name)\" else \"\" end)), missing:[]},
        # Nothing to measure is not a coverage failure, EXCEPT when the packages
        # went missing because this check stopped counting file components. A
        # binary scan that recovered only a file listing identified no package, and

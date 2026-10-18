@@ -2522,6 +2522,21 @@ else
     fail "validate-sbom.sh produced no conformance report for clean Tag-Value input"
 fi
 
+echo "== conformance: a fixed value as the top-level component name =="
+for nm in "/scan" "." "my-device"; do
+    jq --arg n "$nm" '.metadata.component.name = $n' "$FIX/good-cyclonedx.json" > "$WORK/topname.json"
+    for prof in default skt-submission; do
+        CONFORMANCE_PROFILE=$prof bash "$LIB/validate-sbom.sh" "$WORK/topname.json" "$WORK/topname-$prof" "supplier" >/dev/null 2>&1
+        st=$(jq -r '.checks[] | select(.id=="top-component") | .status' "$WORK/topname-${prof}_conformance.json")
+        case "$nm:$prof" in
+            "my-device:"*) want=pass ;;
+            *:default)     want=warn ;;
+            *)             want=fail ;;
+        esac
+        [ "$st" = "$want" ] && pass "top-level name '$nm' under $prof is $want" || fail "top-level name '$nm' under $prof is '$st', expected $want"
+    done
+done
+
 echo "== input-format: UTF-16 / BOM-encoded SBOMs are normalized, not rejected =="
 # A supplier SBOM saved as UTF-16 (common from Windows tooling) or with a UTF-8
 # BOM must be read, not dropped as "unknown format": jq/grep assume UTF-8, so
