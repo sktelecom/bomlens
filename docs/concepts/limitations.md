@@ -11,6 +11,7 @@ This page is the list of limits we know about. Read it before you rely on a resu
 - It needs a Docker engine (20.10 or later). The desktop app and the web UI manage the image for you; the CLI asks you to pull it. There is no hosted service.
 - The Windows installer is not code-signed yet, so Windows shows a SmartScreen warning on first run. Verify the file with [the release signature](../guides/verify-release.md).
 - The web UI is a single-user tool for your own machine. It has no accounts and no access control, so do not expose its port to a network.
+- The scanner image bundles third-party tools (Trivy, syft, grype, cosign and others). About 200 vulnerability findings on those bundled binaries are still open on the repository's code scanning page, because their upstream projects have not yet released a build with a fixed dependency. We update the tools when a fixed release exists and dismiss a finding only with the reason written on it.
 
 ## Finding dependencies
 
