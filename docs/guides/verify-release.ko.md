@@ -32,7 +32,7 @@ sha256sum -c SHA256SUMS.txt --ignore-missing
 
 ### Windows에서
 
-이 확인에는 `gh`, `sha256sum`, `jq`가 필요 없습니다. [cosign 릴리스 페이지](https://github.com/sigstore/cosign/releases/latest)에서 `cosign-windows-amd64.exe`를 작업할 폴더에 내려받은 뒤 PowerShell에서 아래를 실행하세요. 설치 파일과 체크섬 파일을 내려받고, 체크섬 파일의 서명을 확인한 다음, 설치 파일의 해시가 목록의 값과 같은지 비교합니다.
+이 확인에는 `gh`, `sha256sum`, `jq`가 필요 없습니다. [cosign 릴리스 페이지](https://github.com/sigstore/cosign/releases/latest)에서 `cosign-windows-amd64`를 작업할 폴더에 내려받아 이름을 `cosign.exe`로 바꾼 뒤 PowerShell에서 아래를 실행하세요. 설치 파일과 체크섬 파일을 내려받고, 체크섬 파일의 서명을 확인한 다음, 설치 파일의 해시가 목록의 값과 같은지 비교합니다.
 
 ```powershell
 $v = "v1.13.7"
@@ -41,7 +41,7 @@ foreach ($f in "SHA256SUMS.txt","SHA256SUMS.txt.sig","SHA256SUMS.txt.pem","BomLe
   Invoke-WebRequest "$base/$f" -OutFile $f
 }
 
-.\cosign-windows-amd64.exe verify-blob SHA256SUMS.txt `
+.\cosign.exe verify-blob SHA256SUMS.txt `
   --signature SHA256SUMS.txt.sig `
   --certificate SHA256SUMS.txt.pem `
   --certificate-identity-regexp '^https://github.com/sktelecom/bomlens/' `

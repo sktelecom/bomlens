@@ -32,7 +32,7 @@ sha256sum -c SHA256SUMS.txt --ignore-missing
 
 ### On Windows
 
-You need no `gh`, `sha256sum` or `jq` for this check. Download `cosign-windows-amd64.exe` from the [cosign releases page](https://github.com/sigstore/cosign/releases/latest) into the folder you work in, then run this in PowerShell. It downloads the installer and its checksum files, verifies the signature on the checksum file, and compares the installer's hash with the one listed.
+You need no `gh`, `sha256sum` or `jq` for this check. Download `cosign-windows-amd64` from the [cosign releases page](https://github.com/sigstore/cosign/releases/latest) into the folder you work in, rename it to `cosign.exe`, then run this in PowerShell. It downloads the installer and its checksum files, verifies the signature on the checksum file, and compares the installer's hash with the one listed.
 
 ```powershell
 $v = "v1.13.7"
@@ -41,7 +41,7 @@ foreach ($f in "SHA256SUMS.txt","SHA256SUMS.txt.sig","SHA256SUMS.txt.pem","BomLe
   Invoke-WebRequest "$base/$f" -OutFile $f
 }
 
-.\cosign-windows-amd64.exe verify-blob SHA256SUMS.txt `
+.\cosign.exe verify-blob SHA256SUMS.txt `
   --signature SHA256SUMS.txt.sig `
   --certificate SHA256SUMS.txt.pem `
   --certificate-identity-regexp '^https://github.com/sktelecom/bomlens/' `
