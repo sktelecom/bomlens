@@ -734,9 +734,11 @@ done
 mkdir -p "$WORK/ex/vendor/a" "$WORK/ex/vendor/keep" "$WORK/ex/src" "$WORK/ex/.hid/x" "$WORK/ex/out"
 echo 1 > "$WORK/ex/vendor/a/f"; echo 2 > "$WORK/ex/vendor/keep/g"; echo 3 > "$WORK/ex/src/m"
 echo 4 > "$WORK/ex/.hid/x/h"; echo 5 > "$WORK/ex/top"
+# shellcheck disable=SC2034  # read by the functions lifted above
 SCAN_EXCLUDE=""
 add_scan_exclude "./vendor/a/"
 add_scan_exclude ".hid"
+# shellcheck disable=SC2034
 SCAN_EXCLUDE_SKIP="$WORK/ex/out $WORK/ex/.scan-view"
 copy_without_excluded "$WORK/ex" "$WORK/ex/.scan-view" ""
 view="$WORK/ex/.scan-view"

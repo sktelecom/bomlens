@@ -6274,6 +6274,14 @@ class Handler(BaseHTTPRequestHandler):
             self._send(400, json.dumps({"error": "invalid git_ref"}))
             return
 
+        # Paths to leave out of a source scan (--exclude on the CLI), one per line.
+        scan_exclude, bad_exclude = parse_scan_exclude(g("exclude"))
+        if scan_exclude is None:
+            self._send(400, json.dumps({"error": "invalid exclude path: %s" % bad_exclude[:80]}))
+            return
+        if source not in ("current-dir", "git-url", "zip-upload", "scan-target-src"):
+            scan_exclude = []
+
         # Optional AI usage scenario (--usage on the CLI) scoping the model risk
         # assessment. Closed allowlist: an out-of-list value is refused before
         # the stream starts, and the literal REBOUND from _USAGE_CONTEXTS (never
@@ -6398,6 +6406,7 @@ class Handler(BaseHTTPRequestHandler):
                 "sbomAuthor": sbom_author,
                 "specVersion": spec_version,
                 "gitRef": git_ref,
+                "exclude": scan_exclude,
             }
             write_scanmeta(run_out, scan_config)
 
@@ -7050,6 +7059,27 @@ class Handler(BaseHTTPRequestHandler):
             else:
                 fail("unknown input type: %s" % source[:40]); return
 
+            # Leave the excluded paths out. A clone, an extracted archive and a
+            # picked-folder copy belong to this scan, so the paths are deleted from
+            # them. The launch folder is the user's own: it is copied without them.
+            if scan_exclude and env.get("MODE") == "SOURCE" and env.get("SOURCE_ROOT"):
+                if source == "current-dir":
+                    cleanup_dir = os.path.join(OUTPUT_DIR, ".srccopy-" + secrets.token_hex(8))
+                    sse("log", json.dumps("▶ Copying the folder without %d excluded path(s) ..." % len(scan_exclude)))
+                    try:
+                        copy_tree_without(env["SOURCE_ROOT"], cleanup_dir, scan_exclude)
+                    except (OSError, shutil.Error) as exc:
+                        fail("could not prepare the folder for --exclude: %s" % exc)
+                        return
+                    env["SOURCE_ROOT"] = cleanup_dir
+                    gone = [e for e in scan_exclude
+                            if not os.path.lexists(os.path.join(SRC_DIR, e))]
+                else:
+                    gone = prune_scan_tree(env["SOURCE_ROOT"], scan_exclude)
+                for e in gone:
+                    sse("log", json.dumps("▶ Exclude path not found, ignored: %s" % e))
+                sse("log", json.dumps("▶ Excluded %d path(s) from the scan" % (len(scan_exclude) - len(gone))))
+
             # For a source scan, hand the entrypoint the HOST path of the scanned
             # tree so it can run a cdxgen language image as a sibling container
             # (transitive resolution). Empty -> entrypoint falls back to syft.
@@ -7269,7 +7299,7 @@ class Handler(BaseHTTPRequestHandler):
             token_dir = upload_token_dir(token)
             if token_dir:
                 shutil.rmtree(token_dir, ignore_errors=True)
-            if cleanup_dir and source in ("git-url", "scan-target-src"):
+            if cleanup_dir and (source in ("git-url", "scan-target-src") or (source == "current-dir" and scan_exclude)):
                 shutil.rmtree(cleanup_dir, ignore_errors=True)
                 if source == "git-url":
                     with _scan_lock:

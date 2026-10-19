@@ -131,6 +131,8 @@ export function useScanForm({
   const [scanRoot, setScanRootRaw] = useState("");
   const [gitToken, setGitToken] = useState("");
   const [gitRef, setGitRef] = useState(() => initialConfig?.gitRef ?? "");
+  // One path per line; a re-scan fills it from the earlier scan.
+  const [exclude, setExclude] = useState(() => (initialConfig?.exclude ?? []).join("\n"));
   const [file, setFileRaw] = useState<File | null>(null);
   const [notice, setNotice] = useState(() => initialConfig?.notice ?? true);
   const [security, setSecurity] = useState(() => initialConfig?.security ?? true);
@@ -249,6 +251,8 @@ export function useScanForm({
   // Vendored-OSS identification only applies to a scanned source tree.
   const isSourceScan =
     source === "current-dir" || source === "git-url" || source === "zip-upload";
+  // Excluded paths need a source tree, like the vendored-code scan.
+  const showExclude = isSourceScan || effectiveSource === "scan-target-src";
   const showVendored = Boolean(capabilities.scanoss) && isSourceScan;
   // Deep license (ScanCode) needs a source tree too, so like SCANOSS it only
   // applies to source scans — not Docker images, SBOM uploads, firmware or AI
@@ -500,6 +504,9 @@ export function useScanForm({
       token,
       cred,
       gitRef: source === "git-url" ? gitRef.trim() : undefined,
+      exclude: showExclude
+        ? exclude.split("\n").map((line) => line.trim()).filter(Boolean)
+        : undefined,
       scanossCred,
       // Which language the pipeline's own generated prose (notice, conformance,
       // security, AI-profile reports, model/dataset risk reasons) renders in.
@@ -560,6 +567,7 @@ export function useScanForm({
     deepSource, setDeepSource, showDeepSource,
     gitToken, setGitToken,
     gitRef, setGitRef,
+    exclude, setExclude, showExclude,
     usage, setUsage,
     file, setFile,
     deepLicense, setDeepLicense,

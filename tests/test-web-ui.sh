@@ -4693,6 +4693,30 @@ else
     fail "commit git_ref contract violated" "$events"
 fi
 
+# A source scan can leave paths out (exclude, one per line). A path that could
+# leave the scanned folder is refused before the stream starts; a path that
+# exists is deleted from the clone and counted, one that does not is reported.
+EXREPO="$WORK/exclude-repo"
+git init -q "$EXREPO" && mkdir -p "$EXREPO/vendor/legacy" "$EXREPO/src" && echo x > "$EXREPO/vendor/legacy/f" && echo y > "$EXREPO/src/m" \
+    && git -C "$EXREPO" add -A && git -C "$EXREPO" -c user.email=t@t -c user.name=t commit -q -m one
+for bad in "..%2Fetc" "%2Fetc%2Fpasswd" "a%2F..%2Fb" "vendor%2F*"; do
+    code=$(curl -s -o /dev/null -w '%{http_code}' "$BASE2/scan-stream?project=ex&version=1.0&source=git-url&target=file://$EXREPO&exclude=$bad")
+    [ "$code" = "400" ] && pass "exclude $bad is refused before the stream starts" \
+        || fail "exclude $bad was not refused" "HTTP $code"
+done
+events=$(sse_events "project=ex&version=1.0&source=git-url&target=file://$EXREPO&exclude=vendor%2Flegacy%0Anope")
+if echo "$events" | python3 -c "
+import sys, json
+evs = json.load(sys.stdin)
+logs = [str(e['data']) for e in evs if e['event'] == 'log']
+assert any('Excluded 1 path(s)' in l for l in logs), logs
+assert any('not found, ignored: nope' in l for l in logs), logs
+"; then
+    pass "an exclude path is deleted from the clone; a missing one is reported"
+else
+    fail "exclude contract violated" "$events"
+fi
+
 echo "== zip-upload: hostile archives are rejected before extraction (zip-slip / tar traversal / tar symlink) =="
 # safe_extract_zip() and the zip-upload tar branch (server.py) are the only
 # things standing between an uploaded archive and the filesystem outside the

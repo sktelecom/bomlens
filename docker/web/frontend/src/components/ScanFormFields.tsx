@@ -7,6 +7,7 @@ import { useTranslation } from "react-i18next";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { FileDropzone } from "@/components/FileDropzone";
@@ -75,7 +76,7 @@ export function FieldError({ id, msgKey }: { id: string; msgKey?: string }) {
 /** Source-specific control: current-folder hint / free-text target / git token / upload. */
 export function SourceControls({ state }: { state: ScanFormState }) {
   const { t } = useTranslation();
-  const { source, target, setTarget, scanRoot, setScanRoot, scanRoots, deepSource, setDeepSource, showDeepSource, gitToken, setGitToken, gitRef, setGitRef, file, setFile, uploadPercent, uploadKind, textInput, isAnalyze, busy, capabilities, errors } = state;
+  const { source, target, setTarget, scanRoot, setScanRoot, scanRoots, deepSource, setDeepSource, showDeepSource, gitToken, setGitToken, gitRef, setGitRef, exclude, setExclude, showExclude, file, setFile, uploadPercent, uploadKind, textInput, isAnalyze, busy, capabilities, errors } = state;
 
   // Extra --mount scan targets make the rootfs-dir path a subpath inside the
   // chosen base — and optional when a mounted base is selected (empty = scan
@@ -217,6 +218,24 @@ export function SourceControls({ state }: { state: ScanFormState }) {
             autoComplete="off"
           />
           <p className="text-body-sm text-muted-foreground">{t("source.gitRefHint")}</p>
+        </div>
+      )}
+
+      {showExclude && (
+        <div className="space-y-2">
+          <Label htmlFor="exclude">{t("source.exclude")}</Label>
+          <Textarea
+            id="exclude"
+            value={exclude}
+            onChange={(e) => setExclude(e.target.value)}
+            placeholder={t("source.excludePlaceholder")}
+            disabled={busy}
+            rows={3}
+            spellCheck={false}
+            autoCapitalize="off"
+            aria-describedby="exclude-hint"
+          />
+          <p id="exclude-hint" className="text-body-sm text-muted-foreground">{t("source.excludeHint")}</p>
         </div>
       )}
 
