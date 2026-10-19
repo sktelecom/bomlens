@@ -141,8 +141,8 @@ done
 # Lines that scan a file are excluded. A guide now also names an installer as a
 # thing to scan (`--target installer.exe`), which is somebody else's file and has
 # no reason to carry our artifact name. Excluding by the scan flag keeps the check
-# on the download references it was written for. `bash.exe` is excluded too: it
-# is Git Bash's own binary (SBOM_BASH points at it), not something we publish.
+# on the download references it was written for. `bash.exe` and `cosign.exe` are excluded too: they are
+# other projects' binaries (Git Bash for SBOM_BASH, the cosign the verification guide uses), not something we publish.
 # shellcheck disable=SC2016  # the ${ext} in the grep pattern is a literal
 art="$(grep -oE 'artifactName:[[:space:]]*[A-Za-z0-9.${}-]+' electron/electron-builder.yml 2>/dev/null | head -1 | awk '{print $2}')"
 art_base="${art%%.\$\{ext\}}"
@@ -156,7 +156,7 @@ if [ -n "$art_base" ] && [ "$art_base" != "$art" ]; then
         fi
     done < <(grep -rhv -- '--target' "${DOCS[@]}" 2>/dev/null \
              | grep -oE '[A-Za-z0-9][A-Za-z0-9._*-]*\.(exe|dmg)' \
-             | grep -vxF 'bash.exe' | sort -u)
+             | grep -vxF -e 'bash.exe' -e 'cosign.exe' | sort -u)
 fi
 
 # --- Check 6: Windows output folder -----------------------------------------
