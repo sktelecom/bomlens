@@ -1169,6 +1169,21 @@ if [ -f "$RMD" ] && [ -f "$RHTML" ]; then
 else
     fail "generate-risk-report.sh produced no md/html with a BOM present"
 fi
+# A source that stated version ranges and shipped no lock file says so in the report,
+# in both languages; a pinned or unmarked one does not.
+for pin in unpinned pinned none; do
+    d="$WORK/risk-pin-$pin"; mkdir -p "$d"
+    if [ "$pin" = none ]; then cp "$WORK/lc.json" "$d/p_1.0_bom.json"
+    else jq --arg v "$pin" '.metadata.component.properties = ((.metadata.component.properties // []) + [{name:"bomlens:source:versionPinning", value:$v}])' "$WORK/lc.json" > "$d/p_1.0_bom.json"; fi
+    printf 'License: MIT\n' > "$d/p_1.0_NOTICE.txt"
+    ( cd "$d" && bash "$LIB/generate-risk-report.sh" p_1.0 p >/dev/null 2>&1 && mkdir ko && cd ko && cp ../p_1.0_bom.json ../p_1.0_NOTICE.txt . && REPORT_LANG=ko bash "$LIB/generate-risk-report.sh" p_1.0 p >/dev/null 2>&1 )
+    en_n=$(grep -c 'states version ranges and ships no lock file' "$d/p_1.0_risk-report.md" "$d/p_1.0_risk-report.html" | awk -F: '{s+=$2} END{print s}')
+    ko_n=$(grep -c '버전을 범위로 적었고 고정 파일이 없어서' "$d/ko/p_1.0_risk-report.md" "$d/ko/p_1.0_risk-report.html" | awk -F: '{s+=$2} END{print s}')
+    if [ "$pin" = unpinned ]; then want=2; else want=0; fi
+    [ "$en_n" = "$want" ] && [ "$ko_n" = "$want" ] \
+        && pass "risk report ($pin source): the version-ranges note appears $want time(s) in md+html, en and ko" \
+        || fail "risk report ($pin source): note count en=$en_n ko=$ko_n, expected $want"
+done
 # An AI model scan's root component is the model under review, not the scanner's
 # own project: its license is counted and classified. A model with no dependent
 # dataset has no other component and used to read as 0 licenses.

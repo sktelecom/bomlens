@@ -92,6 +92,15 @@ TOTAL=$(echo "$FINDINGS" | jq 'length')
 # They carry no version, purl or CPE, so no vulnerability database can be asked
 # about them. Printing the severity table without saying so lets "0 vulnerabilities"
 # read as covering the whole SBOM when part of it was never eligible to be checked.
+# The source stated version ranges and shipped no lock file (detect-version-pinning.sh),
+# so the SBOM lists what a fresh install resolves at scan time. The severity table is
+# then a statement about those versions, which may not be the ones that were run.
+UNPINNED=0
+if [ -f "${OUT_PREFIX}_bom.json" ] && jq -e '[.metadata.component.properties[]?
+        | select(.name == "bomlens:source:versionPinning" and .value == "unpinned")] | length > 0' \
+        "${OUT_PREFIX}_bom.json" >/dev/null 2>&1; then
+    UNPINNED=1
+fi
 PRESENCE_ONLY=0
 if [ -f "${OUT_PREFIX}_bom.json" ] && jq empty "${OUT_PREFIX}_bom.json" >/dev/null 2>&1; then
     PRESENCE_ONLY=$(jq '[.components[]? | select(any(.properties[]?;
@@ -325,6 +334,7 @@ if [ "$REPORT_LANG" = "ko" ]; then
     P_VULN_NONE_MD=$(kstr risk.vuln_none_md); P_VULN_NONE_HTML=$(kstr risk.vuln_none_html)
     P_PRESENCE_MD=$(tfmt risk.presence_only_md "$PRESENCE_ONLY" "$PRESENCE_ONLY")
     P_PRESENCE_HTML=$(tfmt risk.presence_only_html "$PRESENCE_ONLY" "$PRESENCE_ONLY")
+    P_UNPINNED_MD=$(kstr risk.unpinned_md); P_UNPINNED_HTML=$(kstr risk.unpinned_html)
     P_UNCHECKED_MD=$(tfmt risk.unchecked_md "$UNCHECKED_N")
     P_UNREACHED_MD=$(tfmt risk.unreached_md "$UNREACHED_N")
     P_UNREACHED_HTML=$(tfmt risk.unreached_html "$UNREACHED_N")
@@ -397,6 +407,8 @@ else
     P_VULN_NONE_HTML="No known vulnerabilities, or no security artifact was produced."
     P_PRESENCE_MD="> ${PRESENCE_ONLY} component(s) were proved present but no version could be recovered. With no version there is nothing to ask a vulnerability database about, so the counts above do not cover them. The licence obligations still apply."
     P_PRESENCE_HTML="<b>${PRESENCE_ONLY} component(s)</b> were proved present but no version could be recovered. With no version there is nothing to ask a vulnerability database about, so the counts above do not cover them. The licence obligations still apply."
+    P_UNPINNED_MD="> The source states version ranges and ships no lock file, so the versions in this SBOM are what a fresh install resolves at scan time, not necessarily the versions that were used. The counts above were measured against these versions. To judge a specific environment, scan a manifest that pins exact versions."
+    P_UNPINNED_HTML="The source states version ranges and ships no lock file, so the versions in this SBOM are what a fresh install resolves at scan time, not necessarily the versions that were used. The counts above were measured against these versions. To judge a specific environment, scan a manifest that pins exact versions."
     P_UNREACHED_MD="> ${UNREACHED_N} finding(s) are not reachable: govulncheck found that the affected Go code is not called or not in the executable (--reachability). They are not in the counts above; the security report lists them."
     P_UNREACHED_HTML="<b>${UNREACHED_N} finding(s) are not reachable</b>: govulncheck found that the affected Go code is not called or not in the executable (--reachability). They are not in the counts above; the security report lists them."
     P_UNCHECKED_MD="> ${UNCHECKED_N} component(s) could not be checked: they have no version, or no package purl and no CPE that was matched, so no vulnerability database was asked about them. The counts above do not cover them."
@@ -524,6 +536,10 @@ P_VULN_NOTE_HTML="<div class=\"note\">${P_DL_LEAD}<b>${P_DL_BOLD_CRIT}</b>, <b>$
         echo ""
     elif [ "${PRESENCE_ONLY:-0}" -gt 0 ]; then
         echo "${P_PRESENCE_MD}"
+        echo ""
+    fi
+    if [ "${UNPINNED:-0}" -eq 1 ]; then
+        echo "${P_UNPINNED_MD}"
         echo ""
     fi
     if [ "$FW_SCOPE" = "true" ]; then
@@ -686,6 +702,9 @@ HTMLSEC
         echo "</ul></div>"
     elif [ "${PRESENCE_ONLY:-0}" -gt 0 ]; then
         echo "<div class=\"note\">${P_PRESENCE_HTML}</div>"
+    fi
+    if [ "${UNPINNED:-0}" -eq 1 ]; then
+        echo "<div class=\"note\">${P_UNPINNED_HTML}</div>"
     fi
     if [ "$FW_SCOPE" = "true" ]; then
         echo "<div class=\"note\"><b>${P_FW_LABEL}</b> ${FW_SCOPE_TEXT}"

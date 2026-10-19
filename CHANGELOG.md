@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- The risk report (Markdown and HTML, English and Korean) now says when the scanned source stated version ranges and shipped no lock file: the versions in the SBOM are what a fresh install resolved on the scan day, and the vulnerability counts were measured against them. Before, only the web UI and the SBOM property `bomlens:source:versionPinning` said so.
 - The conformance check flags a top-level component name that is a fixed value instead of a product name (`.`, `..`, `/` or `/scan`): it fails under `--conformance-profile skt-submission` and warns under the default profile. The supplier SBOM guide now lists what the check does not cover.
 
 ## [v1.13.7] - 2026-10-17

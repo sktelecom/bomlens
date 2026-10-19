@@ -113,6 +113,8 @@ compositions[]     의존성 그래프 완전성 (아래 참고)
 
 컴포넌트의 `supplier.name`은 패키지 메타데이터에 이미 적힌 값으로만 채웁니다. 생성 도구가 읽은 `publisher`(Maven POM의 `<organization>`, npm 게시자), `authors`(PyPI, RubyGems, Composer), 예전 형식의 `author` 필드 순서로 처음 있는 값을 씁니다. 값 안의 꺾쇠괄호 부분은 지우고, 괄호나 대괄호는 안에 이메일 주소나 URL만 있을 때 지웁니다. 그래서 npm 형식 `Name <email> (url)`의 이메일 주소와 URL이 빠지고, `Example (Holdings), Inc.`처럼 다른 내용이 든 괄호는 그대로 남습니다. 괄호 밖에 있는 이메일 주소와 URL(`http://`, `https://`, `ftp://`, `www.`)도 지우며, 그 앞에 닫히지 않은 괄호가 있으면 함께 지웁니다. 그래서 `Alice <a@x.org>, Bob <b@y.org>`는 `Alice, Bob`, `Jane Doe jane@example.org`는 `Jane Doe`, `Bob <b@x.org>; Carol <c@y.org>`는 `Bob; Carol`이 됩니다. 이메일 주소나 URL만 있는 값은 쓰지 않으며, 작성자가 여럿이면 쉼표로 잇습니다. 어느 필드에서 왔는지는 `bomlens:supplierSource` 속성(`publisher`, `authors`, `author`)에 남습니다. 세 필드가 모두 없는 컴포넌트에는 공급자를 넣지 않고, 이미 공급자가 있는 컴포넌트는 그대로 둡니다. 하위 컴포넌트(`components[].components`)에도 같은 규칙을 적용합니다. 배포판과 펌웨어 패키지(`pkg:deb`, `pkg:rpm`, `pkg:apk`, `pkg:alpm`, `pkg:opkg`, `pkg:generic`)와 `operating-system` 컴포넌트에는 공급자를 넣지 않습니다. 생성 도구가 이 패키지에서 읽는 게시자는 패키지 관리자이고 대개 개인 한 명이며, 배포판 이름을 추정해 대신 넣지도 않습니다. `--analyze`로 받은 공급사 SBOM과 `--merge` 결과는 작성된 그대로 둡니다.
 
+소스 스캔은 프로젝트가 버전을 고정했는지도 `metadata.component.properties`에 기록합니다. `bomlens:source:versionPinning` 값이 `pinned`이면 lock 파일이 있거나 `requirements.txt`의 모든 줄에 정확한 버전이 있는 것이고, `unpinned`이면 `requirements.txt`, `package.json`, `pyproject.toml`, `setup.py`, `setup.cfg` 옆에 lock 파일이 없고 모든 버전이 고정되어 있지 않은 것입니다. `unpinned`일 때 SBOM의 버전은 스캔한 날 새로 설치하면 받게 될 버전이어서, 실제로 실행한 버전과 다를 수 있습니다. 웹 UI가 안내를 보이고, 위험 보고서는 취약점 집계 아래에 같은 내용을 적습니다. 스캔이 판단하지 못했으면 이 속성은 없습니다.
+
 ## 의존성 그래프 완전성
 
 생성된 SBOM은 의존성 그래프가 얼마나 완전한지 나타내는 `compositions[0].aggregate` 항목을 담습니다.
