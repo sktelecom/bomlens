@@ -890,14 +890,6 @@ export function Overview({
         </div>
       )}
 
-      <JumpCards
-        result={result}
-        hasDeps={hasDeps}
-        ai={ai}
-        hasConformance={hasConformance}
-        scanId={scanId}
-      />
-
       <FirstChecks result={result} scanId={scanId} generatedAt={generatedAt} />
 
       {attention.length > 0 && (
@@ -960,6 +952,17 @@ export function Overview({
       </div>
 
       <TopRisk result={result} scanId={scanId} />
+
+      {/* Section links come last: the rail already carries the same counts, so
+          the first screen leads with what to look at (first checks, needs
+          attention, the two risk axes) and keeps this strip as a way on. */}
+      <JumpCards
+        result={result}
+        hasDeps={hasDeps}
+        ai={ai}
+        hasConformance={hasConformance}
+        scanId={scanId}
+      />
     </div>
   );
 }
