@@ -180,7 +180,7 @@ export function GlobalSearch({
         onKeyDown={onKeyDown}
         placeholder={t("search.placeholder")}
         aria-label={t("search.placeholder")}
-        className="h-8 w-56 pl-8 pr-14"
+        className="h-8 w-56 pl-8 pr-3 lg:w-72 lg:pr-14"
       />
       <kbd
         className="pointer-events-none absolute right-2 top-1/2 hidden -translate-y-1/2 select-none rounded border bg-muted px-1.5 py-0.5 font-sans text-caption font-medium text-muted-foreground lg:block"
