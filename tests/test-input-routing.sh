@@ -723,5 +723,38 @@ for v in SCANNER FIRMWARE AIBOM DEEP_CVE; do
 done
 
 echo
+echo "== --exclude leaves the named paths out of the scanned copy =="
+
+for fn in add_scan_exclude copy_without_excluded; do
+    body="$(extract_fn "$fn")"
+    [ -n "$body" ] || { echo "[ERROR] could not lift $fn out of scan-sbom.sh"; exit 1; }
+    eval "$body"
+done
+
+mkdir -p "$WORK/ex/vendor/a" "$WORK/ex/vendor/keep" "$WORK/ex/src" "$WORK/ex/.hid/x" "$WORK/ex/out"
+echo 1 > "$WORK/ex/vendor/a/f"; echo 2 > "$WORK/ex/vendor/keep/g"; echo 3 > "$WORK/ex/src/m"
+echo 4 > "$WORK/ex/.hid/x/h"; echo 5 > "$WORK/ex/top"
+SCAN_EXCLUDE=""
+add_scan_exclude "./vendor/a/"
+add_scan_exclude ".hid"
+SCAN_EXCLUDE_SKIP="$WORK/ex/out $WORK/ex/.scan-view"
+copy_without_excluded "$WORK/ex" "$WORK/ex/.scan-view" ""
+view="$WORK/ex/.scan-view"
+[ ! -e "$view/vendor/a" ] && pass "an excluded nested directory is not copied" || fail "vendor/a was copied"
+[ ! -e "$view/.hid" ] && pass "an excluded dot directory is not copied" || fail ".hid was copied"
+[ -f "$view/vendor/keep/g" ] && [ -f "$view/src/m" ] && [ -f "$view/top" ] \
+    && pass "siblings of an excluded path are copied" || fail "a sibling of an excluded path is missing"
+[ ! -e "$view/out" ] && [ ! -e "$view/.scan-view" ] \
+    && pass "the output folder and the copy itself are never copied" || fail "output folder or the copy was copied into itself"
+
+for bad in "/abs" "../x" "a/../b" "." "a*" 'a\b'; do
+    if (add_scan_exclude "$bad") >/dev/null 2>&1; then
+        fail "--exclude accepted $bad"
+    else
+        pass "--exclude rejects $bad"
+    fi
+done
+
+echo
 echo "== summary: $PASS passed, $FAIL failed =="
 [ "$FAIL" -eq 0 ]
