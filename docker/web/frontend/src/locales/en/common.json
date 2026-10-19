@@ -389,6 +389,7 @@
     "vulnViews": "Preset views",
     "vulnViewAll": "All",
     "vulnViewFixable": "Fix available",
+    "vulnViewUnfixed": "No fix yet",
     "vulnViewExploited": "Known exploited",
     "vulnViewCriticalHigh": "Critical and High",
     "vulnLayout": "Layout",

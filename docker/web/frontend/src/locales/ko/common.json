@@ -389,6 +389,7 @@
     "vulnViews": "미리 정한 보기",
     "vulnViewAll": "전체",
     "vulnViewFixable": "수정 버전 있음",
+    "vulnViewUnfixed": "수정 버전 없음",
     "vulnViewExploited": "알려진 악용",
     "vulnViewCriticalHigh": "Critical과 High",
     "vulnLayout": "배치",
