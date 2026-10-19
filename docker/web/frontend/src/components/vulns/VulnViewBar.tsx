@@ -15,6 +15,7 @@ import { VULN_VIEWS, type VulnLayout, type VulnView } from "@/lib/vulnView";
 const VIEW_LABEL: Record<VulnView, string> = {
   all: "result.vulnViewAll",
   fixable: "result.vulnViewFixable",
+  unfixed: "result.vulnViewUnfixed",
   exploited: "result.vulnViewExploited",
   "critical-high": "result.vulnViewCriticalHigh",
 };

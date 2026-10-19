@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- The Vulnerabilities table has a "No fix yet" preset view next to "Fix available", so findings with no published fixed version can be listed on their own.
 - `CITATION.cff`, so GitHub offers a "Cite this repository" entry.
 - The release verification guide has a Windows section: the PowerShell commands that download the installer, verify the signature on its checksum file and compare the installer's hash.
 

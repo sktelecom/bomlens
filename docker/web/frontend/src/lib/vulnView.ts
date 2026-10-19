@@ -16,11 +16,11 @@
 import type { VulnItem } from "./api";
 import type { RouteQuery } from "./route";
 
-export type VulnView = "all" | "fixable" | "exploited" | "critical-high";
+export type VulnView = "all" | "fixable" | "unfixed" | "exploited" | "critical-high";
 export type VulnLayout = "list" | "package";
 
 /** In the order the chips show. */
-export const VULN_VIEWS: readonly VulnView[] = ["all", "fixable", "exploited", "critical-high"];
+export const VULN_VIEWS: readonly VulnView[] = ["all", "fixable", "unfixed", "exploited", "critical-high"];
 export const DEFAULT_VULN_VIEW: VulnView = "all";
 export const DEFAULT_VULN_LAYOUT: VulnLayout = "list";
 
@@ -29,6 +29,8 @@ const PRESETS: Record<VulnView, (v: VulnItem) => boolean> = {
   // A fixed version is published. The installed one is still affected until
   // the reader upgrades, which is why the label says "available".
   fixable: (v) => Boolean(v.fixed),
+  // No fixed version is published yet: the reader can only mitigate or wait.
+  unfixed: (v) => !v.fixed,
   exploited: (v) => Boolean(v.kev),
   "critical-high": (v) => v.severity === "CRITICAL" || v.severity === "HIGH",
 };
