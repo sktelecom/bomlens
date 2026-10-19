@@ -139,7 +139,7 @@ jobs:
       - name: Install hadolint
         env:
           # renovate: datasource=github-releases depName=hadolint/hadolint
-          HADOLINT_VERSION: v2.15.0
+          HADOLINT_VERSION: v2.15.1
         run: |
           curl -sSfL "https://github.com/hadolint/hadolint/releases/download/${HADOLINT_VERSION}/hadolint-Linux-x86_64" -o /tmp/hadolint
           sudo install -m 0755 /tmp/hadolint /usr/local/bin/hadolint
