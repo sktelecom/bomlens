@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - The Vulnerabilities table has a "No fix yet" preset view next to "Fix available", so findings with no published fixed version can be listed on their own.
+- A GitHub URL scan in the web UI takes an optional branch, tag or commit, as `--branch` does on the command line. A commit id falls back to a full clone and a checkout. A re-scan fills the field from the earlier scan.
 - `CITATION.cff`, so GitHub offers a "Cite this repository" entry.
 - The release verification guide has a Windows section: the PowerShell commands that download the installer, verify the signature on its checksum file and compare the installer's hash.
 
