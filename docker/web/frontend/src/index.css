@@ -161,7 +161,7 @@
 
     --role-attention-fg: 133 77 14; /* 6.1:1 on muted, 6.9:1 on card, 6.6:1 on page */
     --role-attention-muted: 249 241 225; /* emphasis at 12% over the card */
-    --role-attention-emphasis: 202 138 4; /* 2.9:1 on card (fills, bars) */
+    --role-attention-emphasis: 190 129 3; /* 3.3:1 on card, 3.2:1 on page, 3.0:1 on muted (fills, bars) */
     --role-attention-border: 231 202 142;
 
     --role-info-fg: 29 78 216; /* 5.7:1 on muted, 6.7:1 on card, 6.4:1 on page */
@@ -171,7 +171,7 @@
 
     --role-success-fg: 6 95 70; /* 6.9:1 on muted, 7.7:1 on card, 7.4:1 on page */
     --role-success-muted: 226 247 240; /* emphasis at 12% over the card */
-    --role-success-emphasis: 16 185 129; /* 2.5:1 on card (fills, bars) */
+    --role-success-emphasis: 10 155 110; /* 3.5:1 on card, 3.4:1 on page, 3.2:1 on muted (fills, bars) */
     --role-success-border: 147 224 198;
 
     --role-neutral-fg: 63 63 70; /* 9.0:1 on muted, 10.4:1 on card, 10.0:1 on page */

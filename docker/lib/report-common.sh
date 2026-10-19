@@ -74,9 +74,9 @@ report_tokens_css() {
   --role-danger-emphasis:220 38 38;--role-danger-border:239 157 157;--role-severe-fg:154 52 18;
   --role-severe-muted:252 235 226;--role-severe-emphasis:234 88 12;--role-severe-border:246 180 146;
   --role-attention-fg:133 77 14;--role-attention-muted:249 241 225;
-  --role-attention-emphasis:202 138 4;--role-attention-border:231 202 142;--role-info-fg:29 78 216;
+  --role-attention-emphasis:190 129 3;--role-attention-border:231 202 142;--role-info-fg:29 78 216;
   --role-info-muted:229 236 253;--role-info-emphasis:37 99 235;--role-info-border:157 185 246;
-  --role-success-fg:6 95 70;--role-success-muted:226 247 240;--role-success-emphasis:16 185 129;
+  --role-success-fg:6 95 70;--role-success-muted:226 247 240;--role-success-emphasis:10 155 110;
   --role-success-border:147 224 198;--role-neutral-fg:63 63 70;--role-neutral-muted:238 238 239;
   --role-neutral-emphasis:113 113 122;--role-neutral-border:191 191 195;
   --cat-permissive-fg:12 100 91;--cat-permissive-muted:227 240 239;

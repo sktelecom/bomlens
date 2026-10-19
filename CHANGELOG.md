@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- The medium-severity amber and the success green are darker in the light theme, so bars, dots and progress fills reach 3:1 against the page (they were 2.8:1 and 2.4:1). A new check, `npm run token:contrast`, fails when a text color falls under 4.5:1 or a fill color under 3:1 in either theme. The web UI reference has an Accessibility section that lists what is measured and what is not.
 - The risk report (Markdown and HTML, English and Korean) now says when the scanned source stated version ranges and shipped no lock file: the versions in the SBOM are what a fresh install resolved on the scan day, and the vulnerability counts were measured against them. Before, only the web UI and the SBOM property `bomlens:source:versionPinning` said so.
 - The README says which Docker engines the desktop app works with on Windows: Rancher Desktop or Docker Desktop, not WSL2 + docker-ce (CLI only).
 - The conformance check flags a top-level component name that is a fixed value instead of a product name (`.`, `..`, `/` or `/scan`): it fails under `--conformance-profile skt-submission` and warns under the default profile. The supplier SBOM guide now lists what the check does not cover.
