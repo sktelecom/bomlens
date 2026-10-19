@@ -1027,46 +1027,56 @@ def parse_scan_exclude(raw):
     return paths, None
 
 
-def _inside(root, path):
-    real_root = os.path.realpath(root)
-    real = os.path.realpath(path)
-    return real == real_root or real.startswith(real_root + os.sep)
+def find_scan_entry(root, rel):
+    """The path of `rel` inside `root`, or None when it is not there.
+
+    Each component is matched against a directory listing, so the returned path
+    comes from the filesystem and not from the request, and no link is followed
+    on the way (a link in the middle of the path counts as not found)."""
+    here = os.path.realpath(root)
+    parts = rel.split("/")
+    for n, part in enumerate(parts):
+        try:
+            with os.scandir(here) as it:
+                found = next((e for e in it if e.name == part), None)
+        except OSError:
+            return None
+        if found is None or (n < len(parts) - 1 and (found.is_symlink() or not found.is_dir())):
+            return None
+        here = found.path
+    return here
 
 
 def prune_scan_tree(root, paths):
     """Delete the excluded paths from a tree the scan owns (a clone, an extracted
-    archive or a working copy). Returns the paths that were not found.
-
-    The path is joined without following links: a link is removed as a link,
-    and a path whose parent resolves outside the tree is skipped."""
+    archive or a working copy). Returns the paths that were not found. A link is
+    removed as a link, never followed."""
     missing = []
     for rel in paths:
-        target = os.path.join(root, rel)
-        if not _inside(root, os.path.dirname(target)):
+        target = find_scan_entry(root, rel)
+        if target is None:
             missing.append(rel)
         elif os.path.islink(target) or os.path.isfile(target):
             os.remove(target)
-        elif os.path.isdir(target):
-            shutil.rmtree(target, ignore_errors=True)
         else:
-            missing.append(rel)
+            shutil.rmtree(target, ignore_errors=True)
     return missing
 
 
 def copy_tree_without(src, dest, paths):
     """Copy a tree the scan must not change (the launch folder) to dest without
-    the excluded paths. The skip set is built from the validated relative paths,
-    so no request input reaches the copy as a path of its own."""
+    the excluded paths and without the output folder. Returns the paths that
+    were not found."""
     real_src = os.path.realpath(src)
-    skip = {os.path.join(real_src, rel) for rel in paths}
-    out_real = os.path.realpath(OUTPUT_DIR)
+    found = {rel: find_scan_entry(real_src, rel) for rel in paths}
+    skip = {p for p in found.values() if p}
+    skip.add(os.path.realpath(OUTPUT_DIR))
 
     def _ignore(d, names):
-        return [n for n in names
-                if os.path.join(d, n) in skip or os.path.join(d, n) == out_real]
+        return [n for n in names if os.path.join(d, n) in skip]
     shutil.copytree(real_src, dest, ignore=_ignore, symlinks=True,
                     ignore_dangling_symlinks=True, dirs_exist_ok=True)
-    return dest
+    return [rel for rel, p in found.items() if not p]
 
 
 def firmware_capable():
@@ -7067,13 +7077,11 @@ class Handler(BaseHTTPRequestHandler):
                     cleanup_dir = os.path.join(OUTPUT_DIR, ".srccopy-" + secrets.token_hex(8))
                     sse("log", json.dumps("▶ Copying the folder without %d excluded path(s) ..." % len(scan_exclude)))
                     try:
-                        copy_tree_without(env["SOURCE_ROOT"], cleanup_dir, scan_exclude)
+                        gone = copy_tree_without(env["SOURCE_ROOT"], cleanup_dir, scan_exclude)
                     except (OSError, shutil.Error) as exc:
                         fail("could not prepare the folder for --exclude: %s" % exc)
                         return
                     env["SOURCE_ROOT"] = cleanup_dir
-                    gone = [e for e in scan_exclude
-                            if not os.path.lexists(os.path.join(SRC_DIR, e))]
                 else:
                     gone = prune_scan_tree(env["SOURCE_ROOT"], scan_exclude)
                 for e in gone:
