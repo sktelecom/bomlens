@@ -1004,6 +1004,71 @@ def copy_scan_target_tree(src, dest):
     return dest
 
 
+def parse_scan_exclude(raw):
+    """Turn the form's exclude field (one path per line) into a clean list.
+
+    Returns (paths, error). A path is relative to the scanned folder; an absolute
+    path, a '..' segment, a glob character or a control character is refused, so
+    a path can never point outside the tree. Same rules as the CLI's --exclude."""
+    paths = []
+    for line in (raw or "").splitlines():
+        p = line.strip()
+        while p.startswith("./") or (p.endswith("/") and len(p) > 1):
+            p = p[2:] if p.startswith("./") else p[:-1]
+        if not p:
+            continue
+        if (p == "." or p.startswith("/") or "\\" in p or any(c in p for c in "*?[")
+                or any(ord(c) < 32 for c in p) or ".." in p.split("/")):
+            return None, p
+        if p not in paths:
+            paths.append(p)
+    if len(paths) > 100:
+        return None, "more than 100 paths"
+    return paths, None
+
+
+def _inside(root, path):
+    real_root = os.path.realpath(root)
+    real = os.path.realpath(path)
+    return real == real_root or real.startswith(real_root + os.sep)
+
+
+def prune_scan_tree(root, paths):
+    """Delete the excluded paths from a tree the scan owns (a clone, an extracted
+    archive or a working copy). Returns the paths that were not found.
+
+    The path is joined without following links: a link is removed as a link,
+    and a path whose parent resolves outside the tree is skipped."""
+    missing = []
+    for rel in paths:
+        target = os.path.join(root, rel)
+        if not _inside(root, os.path.dirname(target)):
+            missing.append(rel)
+        elif os.path.islink(target) or os.path.isfile(target):
+            os.remove(target)
+        elif os.path.isdir(target):
+            shutil.rmtree(target, ignore_errors=True)
+        else:
+            missing.append(rel)
+    return missing
+
+
+def copy_tree_without(src, dest, paths):
+    """Copy a tree the scan must not change (the launch folder) to dest without
+    the excluded paths. The skip set is built from the validated relative paths,
+    so no request input reaches the copy as a path of its own."""
+    real_src = os.path.realpath(src)
+    skip = {os.path.join(real_src, rel) for rel in paths}
+    out_real = os.path.realpath(OUTPUT_DIR)
+
+    def _ignore(d, names):
+        return [n for n in names
+                if os.path.join(d, n) in skip or os.path.join(d, n) == out_real]
+    shutil.copytree(real_src, dest, ignore=_ignore, symlinks=True,
+                    ignore_dangling_symlinks=True, dirs_exist_ok=True)
+    return dest
+
+
 def firmware_capable():
     """The firmware tools (unblob) are only built into the firmware image."""
     return shutil.which("unblob") is not None
