@@ -47,7 +47,7 @@ Full docs — searchable, English and Korean — live at **[sktelecom.github.io/
 
 ## Quick Start
 
-Everything runs on a Docker engine (20.10+). The desktop app and web UI manage the image for you; only the CLI asks you to pull it. On Windows, free [Rancher Desktop](https://rancherdesktop.io/) or WSL2 + docker-ce works well; Docker Desktop also works, with licensing caveats for larger organizations.
+Everything runs on a Docker engine (20.10+). The desktop app and web UI manage the image for you; only the CLI asks you to pull it. On Windows, the desktop app needs [Rancher Desktop](https://rancherdesktop.io/) (free) or Docker Desktop (licensing caveats for larger organizations). WSL2 + docker-ce also works, but for the CLI only: the desktop app cannot see a Docker engine inside WSL2.
 
 ### Desktop app — no command line (recommended)
 
