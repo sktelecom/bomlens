@@ -252,6 +252,32 @@ Chromium의 제3자 구성요소에는 FFmpeg를 비롯한 LGPL-2.1+ 코드가 �
 
 BomLens 자신의 이용 조건도 설치본과 함께 나갑니다. `LICENSE`, `NOTICE`, 그리고 이 문서가 앱 리소스 폴더에 들어갑니다(`electron/electron-builder.yml`).
 
+## 웹 UI: 라이선스 의무 데이터
+
+웹 UI의 라이선스 화면은 주요 라이선스가 재배포자에게 요구하는 사항(고지 유지, 소스 공개, 동일 조건 배포)을 보여 줍니다. 이 목록은 choosealicense.com(`github/choosealicense.com`)이 MIT 라이선스로 공개한 라이선스 데이터의 `conditions` 필드에서 가져왔습니다. 문서 작성 보조이며 법률 자문이 아닙니다.
+
+```
+Copyright (c) GitHub, Inc. and contributors
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
+```
+
 ## 모든 이미지의 Debian 패키지
 
 BomLens의 모든 이미지는 Debian 기반인 `python:3.12-slim` 위에 빌드됩니다. 그래서 위에 적은 도구들 외에 Debian 시스템 패키지도 함께 들어 있고, 그 대부분이 카피레프트입니다. 기본 이미지의 패키지 128개 가운데 백 개 넘는 수가 GPL이나 LGPL 조건을 답니다. bash, coreutils, grep, sed, gzip, findutils, wget, tar가 GPL-3.0+이고 git과 mawk가 GPL-2.0, GNU C 라이브러리가 LGPL-2.1+입니다. GPL이 없는 리눅스 베이스 이미지는 없습니다. Alpine은 BusyBox가 GPL-2.0이고 glibc 계열 이미지는 모두 LGPL을 담습니다. 이 프로젝트의 선택이 아니라 컨테이너 이미지 일반의 성질입니다.
