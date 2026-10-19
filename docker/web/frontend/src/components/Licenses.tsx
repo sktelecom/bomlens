@@ -24,6 +24,7 @@ import { buildQuery, parseQuery, type RouteQuery } from "@/lib/route";
 import { licensesFromQuery, licensesToQuery } from "@/lib/section-query";
 import { useFormatNumber } from "@/lib/format";
 
+import { LicenseObligations } from "./LicenseObligations";
 import { LicenseRiskBar } from "./LicenseRiskBar";
 import { LicenseSummary } from "./LicenseSummary";
 
@@ -131,6 +132,8 @@ export function Licenses({
       <LicenseRiskBar components={components} selected={tier} onSelect={toggleTier} />
 
       <LicenseSummary components={filtered} onPickLicense={onPickLicense} />
+
+      <LicenseObligations components={filtered} />
 
       {outboundLicense && conflicts.length > 0 && (
         <Card className="border-warning-border/60 bg-warning-surface/60 dark:border-warning-border/20 dark:bg-warning-surface/20">

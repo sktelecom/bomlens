@@ -1333,7 +1333,25 @@
     "conflictOffHint": "This scan did not declare the license the project ships under, so dependencies could not be compared against it. Set the license in the New scan form and scan again to turn the check on.",
     "conflictOffAction": "Set the license and re-scan",
     "conflictOffCli": "Command line",
-    "conflictOffCliBody": "Pass --license <spdx-id> (or set PROJECT_LICENSE) when you run the scan."
+    "conflictOffCliBody": "Pass --license <spdx-id> (or set PROJECT_LICENSE) when you run the scan.",
+    "obligationsTitle": "What each license asks of you",
+    "obligationsHint": "Conditions on redistributing the component, from public license summaries. A documentation aid, not a legal determination. A license that is not listed shows \"Needs checking\".",
+    "obligationsUnknown": "Needs checking",
+    "obligationsNone": "No conditions",
+    "obligationsChooseOne": "Choose one:",
+    "obligationsAll": "All apply:",
+    "obligationsShowAll": "Show all {{count}} licenses",
+    "obligationsShowLess": "Show fewer",
+    "obligation": {
+      "includeCopyright": "Keep copyright and license notice",
+      "includeCopyrightSource": "Keep notice in source form",
+      "documentChanges": "State changes",
+      "discloseSource": "Disclose source",
+      "networkUseDisclose": "Source for network users",
+      "sameLicense": "Same license",
+      "sameLicenseFile": "Same license (per file)",
+      "sameLicenseLibrary": "Same license (library)"
+    }
   },
   "recent": {
     "title": "Scan management",

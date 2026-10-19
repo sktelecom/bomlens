@@ -1847,6 +1847,27 @@ test("Licenses section flags AI-restrictive licenses for review", async ({ page 
   expect(results.violations).toEqual([]);
 });
 
+test("Licenses section lists what each license asks of you and never guesses", async ({ page }) => {
+  await stubLicensesAndRun(page);
+  await page.getByRole("link", { name: /^Licenses/ }).first().click();
+
+  const card = page.getByTestId("license-obligations");
+  await expect(card.getByText("What each license asks of you")).toBeVisible();
+  const row = (id: string) => card.locator("li", { has: page.getByText(id, { exact: true }) }).first();
+  // GPL-3.0-only resolves through the -only form to the GPL-3.0 conditions.
+  await expect(row("GPL-3.0-only").getByText("Disclose source")).toBeVisible();
+  await expect(row("MIT").getByText("Keep copyright and license notice")).toBeVisible();
+  // Licenses outside the data set are marked, not filled in.
+  await expect(row("LLaMA-3.1").getByText("Needs checking")).toBeVisible();
+  await expect(row("CC-BY-NC-4.0").getByText("Needs checking")).toBeVisible();
+  await expect(card.getByText(/not a legal determination/)).toBeVisible();
+
+  const results = await new AxeBuilder({ page })
+    .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
+    .analyze();
+  expect(results.violations).toEqual([]);
+});
+
 test("a classification narrows the license distribution, and a license opens its components", async ({ page }) => {
   await stubLicensesAndRun(page);
   await page.getByRole("link", { name: /^Licenses/ }).first().click();
