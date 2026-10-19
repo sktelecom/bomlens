@@ -158,6 +158,17 @@ This is the one feature that reaches outside the machine on its own initiative r
 
 When a scan ends, whether it succeeded or failed, the Overview ends with a Report a problem panel. It is folded after a successful scan and open after a failed one. It shows a diagnostics summary in full: the app and scanner image versions, the container engine, the scan mode and options, the result of each stage, and the `[WARN]` lines the scan collected. The summary is built from a fixed list of fields, so source contents, the scanned path and the project name are not part of it. Text taken from the scan itself (warnings and error messages) is filtered: user names in home-directory paths and text that looks like a credential are masked. The filter is best effort, and a folder name or other detail can remain, so read the summary before you paste it. **Copy summary** puts exactly the text you see on the clipboard, and **Open the issue form** opens the bug report form in your browser. Nothing is sent until you paste the text into the issue yourself. The run log has its own Copy log button, which copies the log as shown with credential-shaped text already masked; check it for paths and names too. The Help menu (web UI and desktop app) also links to the issue form, and so does the desktop app's start screen.
 
+## Accessibility
+
+BomLens does not claim conformance with WCAG (Web Content Accessibility Guidelines). What it measures is listed here, along with what it does not.
+
+- Every CI run scans 13 result screens (source, AI and firmware scans) in the light and dark themes and in English and Korean, 52 combinations in all, with axe-core against the WCAG 2.2 level AA rule set. A violation fails the build. The scan includes color contrast and target size.
+- A separate check (`npm run token:contrast` in `docker/web/frontend`) reads the color tokens themselves. Every text color is at least 4.5:1 on the page, the card and its own tinted surface in both themes; the lowest is 4.7:1 (secondary text on the muted surface, light theme). Every fill color used for bars, dots and progress is at least 3:1 on those surfaces; the lowest is 3.0:1 (the medium-severity amber on the muted surface, light theme).
+- A classification is never carried by color alone: severity and license tiers also show their name in text, and a license tier also has its own marker shape. The segments of the stacked bars have no pattern of their own, so the legend under each bar is what names them.
+- The first Tab stop is a skip link to the main content. The dependency tree has tree semantics and moves with the arrow keys. The bar segments that filter a list are buttons with a pressed state. The page language follows the UI language.
+
+What is not covered: automated checks find only a part of the WCAG criteria, and no screen reader has been used to walk through the screens. The borders of text fields and cards are about 1.2:1 against their background, under the 3:1 that WCAG 1.4.11 asks for the boundary of an input; each field has a visible label. The report files (HTML) use the same color tokens but are not part of the axe scan.
+
 ## Notes
 
 > The firmware upload tile appears automatically whenever the Docker engine is running. See the
