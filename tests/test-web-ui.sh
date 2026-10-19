@@ -4648,6 +4648,51 @@ else
     fail "git clone failure contract violated" "$events"
 fi
 
+# A git URL scan can name a branch, tag or commit (git_ref). The ref reaches
+# git as the argument of --branch, so a value that could pass as an option or a
+# path escape is refused, and a ref the repository does not have fails the clone.
+GITREPO="$WORK/gitref-repo"
+git init -q "$GITREPO" && git -C "$GITREPO" -c user.email=t@t -c user.name=t commit -q --allow-empty -m one \
+    && git -C "$GITREPO" tag v1 && git -C "$GITREPO" -c user.email=t@t -c user.name=t commit -q --allow-empty -m two
+code=$(curl -s -o /dev/null -w '%{http_code}' "$BASE2/scan-stream?project=gr&version=1.0&source=git-url&target=file://$GITREPO&git_ref=--upload-pack%3Dx")
+[ "$code" = "400" ] && pass "a git_ref that starts with a dash is refused before the stream starts" \
+    || fail "git_ref starting with a dash was not refused" "HTTP $code"
+events=$(sse_events "project=gr&version=1.0&source=git-url&target=file://$GITREPO&git_ref=no-such-ref")
+if echo "$events" | python3 -c "
+import sys, json
+evs = json.load(sys.stdin)
+assert any(e['event'] == 'error' and 'git clone failed' in e['data']['detail'] for e in evs), evs
+"; then
+    pass "a git_ref the repository does not have fails the clone"
+else
+    fail "unknown git_ref did not fail the clone" "$events"
+fi
+events=$(sse_events "project=gr&version=1.0&source=git-url&target=file://$GITREPO&git_ref=v1")
+if echo "$events" | python3 -c "
+import sys, json
+evs = json.load(sys.stdin)
+logs = [e['data'] for e in evs if e['event'] == 'log']
+assert any('(ref: v1)' in str(l) for l in logs), logs
+assert not any(e['event'] == 'error' and 'git clone failed' in str(e['data']) for e in evs), evs
+"; then
+    pass "a tag as git_ref clones and is named in the log"
+else
+    fail "tag git_ref contract violated" "$events"
+fi
+
+events=$(sse_events "project=gr&version=1.0&source=git-url&target=file://$GITREPO&git_ref=$(git -C "$GITREPO" rev-parse v1)")
+if echo "$events" | python3 -c "
+import sys, json
+evs = json.load(sys.stdin)
+logs = [str(e['data']) for e in evs if e['event'] == 'log']
+assert any('retrying as a full clone' in l for l in logs), logs
+assert not any(e['event'] == 'error' and 'git clone failed' in str(e['data']) for e in evs), evs
+"; then
+    pass "a commit id as git_ref falls back to a full clone and checks it out"
+else
+    fail "commit git_ref contract violated" "$events"
+fi
+
 echo "== zip-upload: hostile archives are rejected before extraction (zip-slip / tar traversal / tar symlink) =="
 # safe_extract_zip() and the zip-upload tar branch (server.py) are the only
 # things standing between an uploaded archive and the filesystem outside the

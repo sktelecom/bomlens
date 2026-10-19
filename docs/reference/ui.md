@@ -39,7 +39,7 @@ The New scan screen is two panes. On the left, pick a source — grouped into Co
 |-------------|--------------|--------------|
 | Current folder | scans the source in the UI's run folder | SOURCE |
 | Directory path | a subfolder under the run folder (e.g. an OS rootfs), a folder mounted with `--ui --mount <dir>`, or — in the desktop app — a folder added with the Add folder button | ROOTFS, or ANALYZE when the folder is a [Yocto build directory](#yocto-build-directory) |
-| GitHub URL | enter the repository URL | SOURCE (clone) |
+| GitHub URL | enter the repository URL, and optionally a branch, tag or commit (the default branch when empty) | SOURCE (clone) |
 | ZIP upload | upload a `.zip`/tar file | SOURCE (extract) |
 | Package upload | upload a build artifact — `.jar`, `.war`, `.ear`, `.deb`, `.rpm`, `.whl` | BINARY (a wheel is unpacked and scanned as ROOTFS) |
 | SBOM upload | upload an existing SBOM (JSON, or the `.spdx.tar.zst` a Yocto SPDX 2.2 build deploys) | ANALYZE |

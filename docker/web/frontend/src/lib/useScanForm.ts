@@ -130,6 +130,7 @@ export function useScanForm({
   // instead — safe_scan_dir accepts it as-is, so no root matching is needed.
   const [scanRoot, setScanRootRaw] = useState("");
   const [gitToken, setGitToken] = useState("");
+  const [gitRef, setGitRef] = useState(() => initialConfig?.gitRef ?? "");
   const [file, setFileRaw] = useState<File | null>(null);
   const [notice, setNotice] = useState(() => initialConfig?.notice ?? true);
   const [security, setSecurity] = useState(() => initialConfig?.security ?? true);
@@ -400,6 +401,7 @@ export function useScanForm({
     setTargetRaw("");
     setScanRootRaw("");
     setGitToken("");
+    setGitRef("");
     setUsage("");
     setUploadError(null);
     setErrors({});
@@ -497,6 +499,7 @@ export function useScanForm({
       target: isText ? effectiveTarget : undefined,
       token,
       cred,
+      gitRef: source === "git-url" ? gitRef.trim() : undefined,
       scanossCred,
       // Which language the pipeline's own generated prose (notice, conformance,
       // security, AI-profile reports, model/dataset risk reasons) renders in.
@@ -556,6 +559,7 @@ export function useScanForm({
     scanRoot, setScanRoot, scanRoots,
     deepSource, setDeepSource, showDeepSource,
     gitToken, setGitToken,
+    gitRef, setGitRef,
     usage, setUsage,
     file, setFile,
     deepLicense, setDeepLicense,

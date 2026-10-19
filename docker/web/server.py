@@ -6200,6 +6200,15 @@ class Handler(BaseHTTPRequestHandler):
             return
         spec_version = _CDX_SPEC_VERSIONS[_CDX_SPEC_VERSIONS.index(spec_version)]
 
+        # Branch, tag or commit to scan for a git URL (--branch on the CLI).
+        # Passed to git as an argument after `--branch`, never through a shell, but
+        # a value that starts with '-' or carries '..' is refused all the same.
+        git_ref = g("git_ref").strip() if source == "git-url" else ""
+        if git_ref and (not re.match(r"^[A-Za-z0-9][A-Za-z0-9._/@+-]{0,199}$", git_ref)
+                        or ".." in git_ref):
+            self._send(400, json.dumps({"error": "invalid git_ref"}))
+            return
+
         # Optional AI usage scenario (--usage on the CLI) scoping the model risk
         # assessment. Closed allowlist: an out-of-list value is refused before
         # the stream starts, and the literal REBOUND from _USAGE_CONTEXTS (never
@@ -6323,6 +6332,7 @@ class Handler(BaseHTTPRequestHandler):
                 "detection": "build" if g("detection") == "build" else "auto",
                 "sbomAuthor": sbom_author,
                 "specVersion": spec_version,
+                "gitRef": git_ref,
             }
             write_scanmeta(run_out, scan_config)
 
@@ -6732,12 +6742,30 @@ class Handler(BaseHTTPRequestHandler):
                 with _scan_lock:
                     _active_upload_tokens.add(os.path.basename(cleanup_dir))
                 clone_dest = os.path.join(cleanup_dir, "repo")
-                sse("log", json.dumps("▶ Cloning %s ..." % target))
+                sse("log", json.dumps("▶ Cloning %s%s ..." % (target, " (ref: %s)" % git_ref if git_ref else "")))
+                git_env = {**os.environ, "GIT_TERMINAL_PROMPT": "0"}
+                clone_cmd = ["git", "clone", "--depth", "1", "--single-branch"]
+                if git_ref:
+                    clone_cmd += ["--branch", git_ref]
                 cp = subprocess.run(
-                    ["git", "clone", "--depth", "1", "--single-branch", "--", clone_url, clone_dest],
-                    env={**os.environ, "GIT_TERMINAL_PROMPT": "0"},
-                    stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
+                    clone_cmd + ["--", clone_url, clone_dest],
+                    env=git_env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
                 )
+                if cp.returncode != 0 and git_ref:
+                    # `clone --branch` resolves only a branch or a tag, so a commit
+                    # id fails here. Retry as a full clone and a local checkout,
+                    # the same fallback the CLI's --branch has.
+                    sse("log", json.dumps("▶ Shallow clone of %s failed; retrying as a full clone ..." % git_ref))
+                    shutil.rmtree(clone_dest, ignore_errors=True)
+                    cp = subprocess.run(
+                        ["git", "clone", "--", clone_url, clone_dest],
+                        env=git_env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
+                    )
+                    if cp.returncode == 0:
+                        cp = subprocess.run(
+                            ["git", "-C", clone_dest, "checkout", "--quiet", git_ref + "^{commit}", "--"],
+                            env=git_env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
+                        )
                 if cp.returncode != 0:
                     out = re.sub(r"x-access-token:[^@]*@", "x-access-token:***@", (cp.stdout or "").strip()[-500:])
                     fail("git clone failed: %s" % out, _classify_git_failure(out)); return

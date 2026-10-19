@@ -39,7 +39,7 @@ cd ~/sbom-output      # 출력 폴더(아무 곳이나 가능)
 |-----------|-----------|-------------|
 | 현재 폴더 | UI 실행 폴더의 소스를 스캔 | SOURCE |
 | 디렉터리 경로 | 실행 폴더 하위 폴더(예: OS rootfs), `--ui --mount <dir>`로 마운트한 폴더, 데스크톱 앱에서는 "폴더 추가" 버튼으로 고른 폴더 | ROOTFS, [Yocto 빌드 디렉터리](#yocto-빌드-디렉터리)면 ANALYZE |
-| GitHub URL | 저장소 URL 입력 | SOURCE (clone) |
+| GitHub URL | 저장소 URL 입력, 브랜치·태그·커밋은 선택(비우면 기본 브랜치) | SOURCE (clone) |
 | ZIP 업로드 | `.zip`/tar 파일 업로드 | SOURCE (extract) |
 | 패키지 업로드 | 빌드 산출물 업로드 — `.jar`, `.war`, `.ear`, `.deb`, `.rpm`, `.whl` | BINARY (whl은 압축을 풀어 ROOTFS로 스캔) |
 | SBOM 업로드 | 기존 SBOM(JSON, 또는 Yocto SPDX 2.2 빌드가 만드는 `.spdx.tar.zst`) 업로드 | ANALYZE |

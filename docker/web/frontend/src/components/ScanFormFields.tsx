@@ -75,7 +75,7 @@ export function FieldError({ id, msgKey }: { id: string; msgKey?: string }) {
 /** Source-specific control: current-folder hint / free-text target / git token / upload. */
 export function SourceControls({ state }: { state: ScanFormState }) {
   const { t } = useTranslation();
-  const { source, target, setTarget, scanRoot, setScanRoot, scanRoots, deepSource, setDeepSource, showDeepSource, gitToken, setGitToken, file, setFile, uploadPercent, uploadKind, textInput, isAnalyze, busy, capabilities, errors } = state;
+  const { source, target, setTarget, scanRoot, setScanRoot, scanRoots, deepSource, setDeepSource, showDeepSource, gitToken, setGitToken, gitRef, setGitRef, file, setFile, uploadPercent, uploadKind, textInput, isAnalyze, busy, capabilities, errors } = state;
 
   // Extra --mount scan targets make the rootfs-dir path a subpath inside the
   // chosen base — and optional when a mounted base is selected (empty = scan
@@ -202,6 +202,21 @@ export function SourceControls({ state }: { state: ScanFormState }) {
           <p className="text-body-sm text-muted-foreground">
             {targetOptional ? t("source.rootfsSubpathHint") : t(textInput.hint)}
           </p>
+        </div>
+      )}
+
+      {source === "git-url" && (
+        <div className="space-y-2">
+          <Label htmlFor="gitRef">{t("source.gitRef")}</Label>
+          <Input
+            id="gitRef"
+            value={gitRef}
+            onChange={(e) => setGitRef(e.target.value)}
+            placeholder={t("source.gitRefPlaceholder")}
+            disabled={busy}
+            autoComplete="off"
+          />
+          <p className="text-body-sm text-muted-foreground">{t("source.gitRefHint")}</p>
         </div>
       )}
 
