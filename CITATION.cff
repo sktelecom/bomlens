@@ -1,0 +1,15 @@
+cff-version: 1.2.0
+message: "If you use BomLens in research, please cite it as below."
+title: "BomLens"
+type: software
+abstract: "A local-first SBOM generator and open-source risk assessor that produces a CycloneDX SBOM, an open-source notice, and a security and license risk report."
+authors:
+  - name: "SK Telecom Co., Ltd."
+license: Apache-2.0
+repository-code: "https://github.com/sktelecom/bomlens"
+url: "https://sktelecom.github.io/bomlens/"
+keywords:
+  - SBOM
+  - CycloneDX
+  - software supply chain
+  - open source license compliance
