@@ -1077,7 +1077,7 @@ if [ "$CONFORMANCE_PROFILE" = "skt-submission" ] && [ "$FORMAT" = "CycloneDX" ];
     _submit_analyze=false
     [ "${MODE:-}" = "ANALYZE" ] && _submit_analyze=true
     _submit_fwmode=false
-    case "${MODE:-}" in FIRMWARE|ROOTFS|BINARY) _submit_fwmode=true ;; esac
+    case "${MODE:-}" in FIRMWARE|ROOTFS|BINARY|YOCTO) _submit_fwmode=true ;; esac
     if SUBMIT_ROWS=$(jq -c --argjson cap "$MISSING_CAP" --argjson analyze "$_submit_analyze" \
             --arg fwmode "$_submit_fwmode" --arg scanmode "${MODE:-}" \
             --arg tmpl "$(basename "$OUT_PREFIX")_component-versions.template.csv" '
@@ -1104,7 +1104,7 @@ if [ "$CONFORMANCE_PROFILE" = "skt-submission" ] && [ "$FORMAT" = "CycloneDX" ];
         # that scan began recording it) is judged as one; any other SBOM, an
         # older one included, is judged as measured.
         | ([ (.metadata.properties // [])[]? | select(.name? == "bomlens:scanMode") | .value
-             | select(. == "FIRMWARE" or . == "ROOTFS" or . == "BINARY") ] | first) as $declared_mode
+             | select(. == "FIRMWARE" or . == "ROOTFS" or . == "BINARY" or . == "YOCTO") ] | first) as $declared_mode
         | (if $fwmode == "true" then $scanmode elif $analyze then ($declared_mode // "") else "" end) as $fw_as
         # Nothing is deferred for an SBOM with no package at all (a file
         # inventory only: the generic rows fail it for naming nothing), nor
@@ -1124,6 +1124,10 @@ if [ "$CONFORMANCE_PROFILE" = "skt-submission" ] && [ "$FORMAT" = "CycloneDX" ];
              reviewGuide: (if $analyze then {
                how: "This SBOM lists these components without a version, so they cannot be checked for vulnerabilities. Ask the supplier for the version shipped in the product, in a corrected SBOM: a BomLens firmware, root filesystem or binary scan writes the components it could not read a version for to a template the supplier fills in and passes back with --component-versions. A component the supplier has no version for carries a reason instead (bomlens:versionReason) and is listed as explained.",
                how_ko: "이 SBOM에는 버전이 없는 구성요소가 있어 취약점을 확인할 수 없습니다. 제품에 들어간 버전을 넣은 SBOM을 공급사에 다시 요청합니다. BomLens 펌웨어, 루트 파일시스템, 바이너리 스캔은 버전을 읽지 못한 구성요소를 템플릿 파일로 쓰고, 공급사는 버전을 채운 템플릿을 --component-versions 옵션으로 넘겨 다시 스캔합니다. 공급사가 버전을 알 수 없는 구성요소에는 버전 대신 사유(bomlens:versionReason)가 적히고, 공급사 소명 목록에 따로 표시됩니다.",
+               docUrl: "https://sktelecom.github.io/bomlens/guides/supplier-sbom/"}
+             elif $scanmode == "YOCTO" then {
+               how: "The Yocto build records these packages without a version. Set the version in the recipe of each package (PV), build the image again, and scan the build directory again. A version template and --component-versions do not apply to a Yocto build, whose versions come from the build records.",
+               how_ko: "Yocto 빌드 기록에 버전 없이 남은 패키지입니다. 각 패키지 레시피의 버전(PV)을 지정해 이미지를 다시 빌드하고, 빌드 디렉터리를 다시 스캔합니다. Yocto 빌드는 버전을 빌드 기록에서 읽으므로 버전 양식과 --component-versions는 쓰지 않습니다.",
                docUrl: "https://sktelecom.github.io/bomlens/guides/supplier-sbom/"}
              else {
                how: ("The scan found these components but could not read their version. Write the version shipped in the product after each name in " + $tmpl + " (CSV: name,version,reason), then scan again with --component-versions " + $tmpl + ". When there is no version to give, leave it empty and write the reason instead: own-code, not-open-source or version-unknown. A version the scan read from the delivered files is kept."),
@@ -1287,8 +1291,8 @@ if [ -n "$SUBMIT_EXCUSE" ]; then
               defer("listed on the version-needed and upstream-purl rows";
                     "버전 보충 필요, upstream purl 없음 항목에 표시")
             elif .id == "transitive" and $x.fw then
-              defer("a firmware, root filesystem or binary SBOM records the packages found, not a dependency graph";
-                    "펌웨어, 루트 파일시스템, 바이너리 SBOM은 의존 관계 그래프 없이 찾은 패키지를 기록함")
+              defer("a firmware, root filesystem, binary or Yocto build SBOM records the packages found, not a dependency graph";
+                    "펌웨어, 루트 파일시스템, 바이너리, Yocto 빌드 SBOM은 의존 관계 그래프 없이 찾은 패키지를 기록함")
             else . end)' 2>/dev/null); then
         CHECKS="$DEFERRED"
         [ "$CHECKS" != "$_checks_before" ] && SUBMIT_RELAXED_MODE=$(printf '%s' "$SUBMIT_EXCUSE" | jq -r '.mode // ""')
@@ -1680,12 +1684,12 @@ if [ -n "$SUBMIT_NOTE_FILE" ]; then
     fi
 fi
 # Why some general rows read as warnings (see SUBMIT_RELAXED_MODE). The mode is
-# one of three fixed words, so it needs no escaping.
+# one of four fixed words, so it needs no escaping.
 if [ -n "$SUBMIT_RELAXED_MODE" ]; then
     if [ "$REPORT_LANG" = "ko" ]; then
         _rx=$(tfmt conformance.submit_judged_as "bomlens:scanMode=${SUBMIT_RELAXED_MODE}")
     else
-        _rx="Judged as a BomLens firmware, root filesystem or binary scan SBOM (bomlens:scanMode=${SUBMIT_RELAXED_MODE}), so some general rows are shown as warnings."
+        _rx="Judged as a BomLens firmware, root filesystem, binary or Yocto build scan SBOM (bomlens:scanMode=${SUBMIT_RELAXED_MODE}), so some general rows are shown as warnings."
     fi
     C_SUBMIT_MD="${C_SUBMIT_MD:+$C_SUBMIT_MD
 }- ${_rx}"

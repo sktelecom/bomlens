@@ -2019,6 +2019,27 @@ has_package_db() {
     return 1
 }
 
+# A root filesystem with no package database: syft has nothing to read there, so
+# the firmware image identifies the binaries by signature instead, the same as
+# for the firmware file the tree came from. Sets MODE to FIRMWARE when that image
+# is here; otherwise keeps ROOTFS and says how to get it. The firmware path takes
+# the folder as an unpacked tree (scan-firmware.sh copies it, nothing is written
+# back).
+route_rootfs_without_db() {
+    if docker image inspect "$FIRMWARE_IMAGE" >/dev/null 2>&1; then
+        echo "[INFO] This root filesystem has no package database (apk/dpkg/rpm);"
+        echo "       identifying its binaries by signature with the firmware image."
+        MODE="FIRMWARE"
+    else
+        echo "[WARN] This root filesystem has no package database (apk/dpkg/rpm),"
+        echo "       so there is no installed-package list to read. To identify the"
+        echo "       binaries by signature, get the firmware image and run the same"
+        echo "       command again:"
+        echo "         docker pull $FIRMWARE_IMAGE"
+        MODE="ROOTFS"
+    fi
+}
+
 # `docker save` writes a tar that syft reads as an image, package database and
 # all. Extracting it as a source archive throws that away and leaves compressed
 # layer blobs no language detector can read. Recognized by the image manifest
@@ -2216,14 +2237,9 @@ elif [ "$INGEST_SOURCE" = "true" ]; then
         # at the extracted tree so syft reads its package database; scanning it
         # as source would report nothing, since there is no manifest in it.
         echo "[INFO] Archive contains a root filesystem; scanning as ROOTFS."
-        if ! has_package_db "$SCAN_INPUT_DIR"; then
-            echo "[WARN] This root filesystem has no package database (apk/dpkg/rpm),"
-            echo "       so there is no installed-package list to read. Re-run with"
-            echo "       --firmware to identify the binaries by signature instead"
-            echo "       (opt-in image: docker build --build-arg SBOM_FIRMWARE=true)."
-        fi
         TARGET="$SCAN_INPUT_DIR"
         MODE="ROOTFS"
+        has_package_db "$SCAN_INPUT_DIR" || route_rootfs_without_db
     else
         # A git clone / extracted source archive is scanned as SOURCE (the temp
         # dir would otherwise be detected as ROOTFS below).
@@ -2344,8 +2360,8 @@ elif [ -n "$TARGET" ]; then
         # than walking the build tree. Joins the ANALYZE path below with the
         # SBOM the build wrote — no separate mode, so validation, conformance
         # and the reports all behave exactly as they do for an uploaded SBOM.
-        # --firmware is excluded above so that combination still gets its own
-        # "expects a file target" error instead of one about a missing SBOM.
+        # --firmware is excluded above; that combination is refused below,
+        # since a build directory is not an unpacked image.
         echo "[INFO] Yocto build directory: $TARGET"
         # Collect first, then choose, so the list the user sees and the choice
         # come from one set. A timestamped document and the IMAGE_LINK_NAME
@@ -2446,17 +2462,24 @@ elif [ -n "$TARGET" ]; then
         # Same as an uploaded SBOM: the risk report needs license + vulnerability data.
         GENERATE_NOTICE="true"; GENERATE_SECURITY="true"
         fi
+    elif [ -d "$TARGET" ] && [ "$FORCE_FIRMWARE" = "true" ]; then
+        # A folder with --firmware is a tree already unpacked (a root
+        # filesystem from the build, say): the firmware image identifies its
+        # binaries as it would after unpacking the image file. A Yocto build
+        # directory is not one: the build records what went into the image.
+        if is_yocto_build_dir "$TARGET"; then
+            echo "[ERROR] '$TARGET' is a Yocto build directory, not an unpacked image. Drop --firmware: the scan reads what the build recorded."; exit 1
+        fi
+        MODE="FIRMWARE"
     elif [ -d "$TARGET" ]; then
         if [ "$FORCE_SOURCE" != "true" ] && _is_rootfs_dir "$TARGET"; then
             # Looks like a real root filesystem (etc/ plus two of bin/sbin/usr/lib/var):
             # syft reads its package database directly, same as an archive that
             # unpacked to one (see INGEST_ROOTFS above).
+            MODE="ROOTFS"
             if ! has_package_db "$TARGET"; then
-                echo "[WARN] This root filesystem has no package database (apk/dpkg/rpm),"
-                echo "       so there is no installed-package list to read. Re-run with"
-                echo "       --firmware to identify the binaries by signature instead"
-                echo "       (opt-in image: docker build --build-arg SBOM_FIRMWARE=true)."
-                if [ -n "$RELEASE_FOLDER_DIR" ]; then
+                route_rootfs_without_db
+                if [ "$MODE" = "ROOTFS" ] && [ -n "$RELEASE_FOLDER_DIR" ]; then
                     large="$(release_folder_large_files "$RELEASE_FOLDER_DIR")"
                     if [ -n "$large" ]; then
                         echo "       Files beside it in $RELEASE_FOLDER_DIR that may be a firmware image:"
@@ -2464,7 +2487,6 @@ elif [ -n "$TARGET" ]; then
                     fi
                 fi
             fi
-            MODE="ROOTFS"
         else
             # An ordinary source tree pointed at directly, e.g. `--target
             # examples/nodejs`. MODE is already "SOURCE" by default (set above,
@@ -2494,7 +2516,7 @@ elif [ -n "$TARGET" ]; then
         MODE="IMAGE"
     fi
 elif [ "$FORCE_FIRMWARE" = "true" ]; then
-    echo "[ERROR] --firmware requires '--target <firmware-file>'."; exit 1
+    echo "[ERROR] --firmware requires '--target <firmware file or unpacked folder>'."; exit 1
 fi
 
 if [ -n "${USAGE_CONTEXT:-}" ] && [ "$MODE" != "AIBOM" ] && [ "$MODE" != "MODELFILE" ] && [ "$MODE" != "DATASET" ] && [ "$MODE" != "AIDECLARE" ]; then
@@ -2535,7 +2557,7 @@ if [ "$PURL_RESOLVE" = "true" ] && [ "$MODE" != "ANALYZE" ]; then
 fi
 
 if [ "$FORCE_FIRMWARE" = "true" ] && [ "$MODE" != "FIRMWARE" ]; then
-    echo "[ERROR] --firmware expects a file target, but '$TARGET' is not a regular file."; exit 1
+    echo "[ERROR] --firmware expects a firmware file or an unpacked folder, but '$TARGET' is neither."; exit 1
 fi
 
 if [ "$FORCE_SOURCE" = "true" ] && { [ -z "$TARGET" ] || [ ! -d "$TARGET" ] || [ "$MODE" != "SOURCE" ]; }; then
@@ -2605,7 +2627,12 @@ case "$MODE" in
         fi
         ;;
     IMAGE)    META_SOURCE="docker-image";    META_TARGET="$TARGET"; META_LABEL="" ;;
-    FIRMWARE) META_SOURCE="firmware-upload"; META_TARGET=""; META_LABEL="$(basename "$TARGET")" ;;
+    FIRMWARE) META_SOURCE="firmware-upload"; META_TARGET=""; META_LABEL="$(basename "$TARGET")"
+              # An unpacked folder is labelled as the root filesystem it is.
+              if [ -d "$TARGET" ]; then
+                  META_SOURCE="rootfs-dir"
+                  if [ -n "$INGEST_ARCHIVE" ]; then META_SOURCE="rootfs-archive"; META_LABEL="$(basename "$INGEST_ARCHIVE")"; else META_LABEL="$TARGET"; fi
+              fi ;;
     BINARY)   META_SOURCE="package-upload";  META_TARGET=""; META_LABEL="$(basename "$TARGET")" ;;
     ROOTFS)   META_SOURCE="rootfs-dir";      META_TARGET=""
               # An archive that turned out to hold a root filesystem is labelled
@@ -3169,7 +3196,17 @@ else
                 done ;;
         BINARY) FD="$(cd "$(dirname "$TARGET")" && pwd)"; FN="$(basename "$TARGET")"; VOL="-v \"$(hostpath "$FD")\":/target -v \"$(hostpath "$OUTPUT_HOST_DIR")\":/host-output"; ENVV="-e TARGET_FILE=\"/target/$FN\"" ;;
         ROOTFS) TD="$(cd "$TARGET" && pwd)"; VOL="-v \"$(hostpath "$TD")\":/target -v \"$(hostpath "$OUTPUT_HOST_DIR")\":/host-output"; ENVV="-e TARGET_DIR=/target" ;;
-        FIRMWARE) FD="$(cd "$(dirname "$TARGET")" && pwd)"; FN="$(basename "$TARGET")"; VOL="-v \"$(hostpath "$FD")\":/target -v \"$(hostpath "$OUTPUT_HOST_DIR")\":/host-output"; ENVV="-e TARGET_FILE=\"/target/$FN\""; RUN_IMAGE="$FIRMWARE_IMAGE"; optin_image_note firmware ;;
+        FIRMWARE)
+            if [ -d "$TARGET" ]; then
+                # An unpacked folder is mounted on its own and read-only, under
+                # its own name so the SBOM names it; nothing beside it is exposed.
+                TD="$(cd "$TARGET" && pwd)"; FN="$(basename "$TD")"; [ "$FN" != "/" ] || FN="rootfs"
+                VOL="-v \"$(hostpath "$TD")\":\"/target/$FN\":ro -v \"$(hostpath "$OUTPUT_HOST_DIR")\":/host-output"
+            else
+                FD="$(cd "$(dirname "$TARGET")" && pwd)"; FN="$(basename "$TARGET")"
+                VOL="-v \"$(hostpath "$FD")\":/target -v \"$(hostpath "$OUTPUT_HOST_DIR")\":/host-output"
+            fi
+            ENVV="-e TARGET_FILE=\"/target/$FN\""; RUN_IMAGE="$FIRMWARE_IMAGE"; optin_image_note firmware ;;
         MODELFILE)
             # Read-only: the model file is only ever read, and a weight file the
             # user handed us must come back untouched.
@@ -3202,6 +3239,9 @@ else
                 FD="$(cd "$(dirname "$ANALYZE_SBOM")" && pwd)"; FN="$(basename "$ANALYZE_SBOM")"
                 VOL="-v \"$(hostpath "$FD")\":/input:ro -v \"$(hostpath "$OUTPUT_HOST_DIR")\":/host-output"
                 ENVV="-e ANALYZE_SBOM=\"/input/$FN\""
+                # Found in a Yocto build: the SBOM this scan writes is the one
+                # checked for conformance, not the build's document.
+                [ -z "$YOCTO_BUILD_DIR" ] || ENVV="$ENVV -e YOCTO_FROM_BUILD=true"
             fi ;;
         MERGE)
             # Mount each input's directory read-only under its own index so files
@@ -3325,20 +3365,11 @@ if [ "$GENERATE_ONLY" = "true" ]; then
         fi
     fi
     # Conformance comes from both modes that can validate a BOM: ANALYZE (format
-    # checks on a supplier SBOM) and AIBOM (the G7 minimum-element checklist).
-    # It used to be announced for ANALYZE only, so an AI-model scan produced the
-    # G7 report and never mentioned it.
-    #
-    # One ANALYZE case never produces it, though, and must not be announced
-    # either: a Yocto build directory with no SPDX document, read from its own
-    # manifests instead (entrypoint.sh's ANALYZE case, same YOCTO_BUILD_DIR +
-    # empty ANALYZE_SBOM test). There is no submitted document to measure
-    # conformance against there, so it is not a missing artifact: announcing it
-    # anyway told a fully successful Yocto scan "requested but not produced:
-    # conformance report" and pointed at `docker pull`/a log warning that never
-    # existed.
-    if { [ "$MODE" = "ANALYZE" ] && ! { [ -n "${YOCTO_BUILD_DIR:-}" ] && [ -z "$ANALYZE_SBOM" ]; }; } \
-        || [ "$MODE" = "AIBOM" ] || [ "$MODE" = "DATASET" ] || [ "$MODE" = "AIDECLARE" ]; then
+    # checks on a supplier SBOM, or on the SBOM read from a Yocto build) and
+    # AIBOM (the G7 minimum-element checklist). It used to be announced for
+    # ANALYZE only, so an AI-model scan produced the G7 report and never
+    # mentioned it.
+    if [ "$MODE" = "ANALYZE" ] || [ "$MODE" = "AIBOM" ] || [ "$MODE" = "DATASET" ] || [ "$MODE" = "AIDECLARE" ]; then
         summary_line "Conformance:" "${P}_conformance.json" "${P}_conformance.md" "${P}_conformance.html" \
             || note_missing "conformance check report"
     fi

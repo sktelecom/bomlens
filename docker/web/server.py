@@ -2762,10 +2762,11 @@ def conformance_summary(run_id):
     if xwalk is not None:
         out["regulatoryCrosswalk"] = xwalk
     # The scan mode the submission profile judged this SBOM as, when it relaxed
-    # some general rows for a firmware, root filesystem or binary scan. The
-    # reviewer needs the basis next to the verdict; only the three modes pass.
+    # some general rows for a firmware, root filesystem, binary or Yocto build
+    # scan. The reviewer needs the basis next to the verdict; only those four
+    # modes pass.
     judged = data.get("submissionJudgedAs")
-    if judged in ("FIRMWARE", "ROOTFS", "BINARY"):
+    if judged in ("FIRMWARE", "ROOTFS", "BINARY", "YOCTO"):
         out["submissionJudgedAs"] = judged
     return out
 
@@ -4220,6 +4221,10 @@ def run_sibling_scan(image, mode, out_dir, on_log, *, upload_file=None, model_id
         # reads it as ANALYZE_SBOM.
         if mode == "ANALYZE":
             args += ["-e", "ANALYZE_SBOM=%s" % upload_file]
+            # A document found in a Yocto build directory: the sibling checks the
+            # SBOM it writes, not the build's document (entrypoint.sh).
+            if env.get("YOCTO_FROM_BUILD") == "true":
+                args += ["-e", "YOCTO_FROM_BUILD=true"]
         else:
             args += ["-e", "TARGET_FILE=%s" % upload_file]
     if source_root is not None:
@@ -6690,6 +6695,9 @@ class Handler(BaseHTTPRequestHandler):
                     mode = "ANALYZE"
                     env["MODE"] = "ANALYZE"
                     env["ANALYZE_SBOM"] = doc
+                    # The SBOM this scan writes is the one checked for
+                    # conformance, not the build's document (entrypoint.sh).
+                    env["YOCTO_FROM_BUILD"] = "true"
                     # ANALYZE needs license + vulnerability data for the risk report.
                     env["GENERATE_NOTICE"] = "true"
                     env["GENERATE_SECURITY"] = "true"

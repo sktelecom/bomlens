@@ -577,10 +577,10 @@ if [ "$have_docker" = 1 ]; then
         fail "a document beside an archive is still the one analyzed" "$y2b_log"
     fi
 
-    # --firmware with a directory keeps its own error: the Yocto branch must not
-    # answer for it with a message about a missing SBOM.
+    # --firmware with a build directory is refused: it is not an unpacked image,
+    # and the Yocto branch must not answer for it with a missing-SBOM message.
     fw_err="$(bash "$SCAN" --project p --version 1 --firmware --target "$yb/nosbom" --generate-only 2>&1 || true)"
-    if printf '%s' "$fw_err" | grep -q -- "--firmware expects a file target"; then
+    if printf '%s' "$fw_err" | grep -q -- "is a Yocto build directory, not an unpacked image"; then
         pass "--firmware with a build directory reports the firmware error"
     else
         fail "--firmware with a build directory reports the firmware error" "$fw_err"

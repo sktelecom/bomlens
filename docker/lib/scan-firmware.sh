@@ -5,7 +5,9 @@
 #
 # scan-firmware.sh — unpack a firmware image and build a CycloneDX SBOM.
 #
-# Usage: scan-firmware.sh <firmware_file> <output_sbom.json> <version> [out_prefix]
+# Usage: scan-firmware.sh <firmware_file|folder> <output_sbom.json> <version> [out_prefix]
+#   A folder is a tree already unpacked, such as a root filesystem from the
+#   build: it is copied in place of step ① and every later step runs unchanged.
 #   produces <output_sbom.json> (CycloneDX, components from package DB + binaries)
 #   and, when out_prefix is given, <out_prefix>_files.json / _source.json.
 #   The CPE -> CVE match runs later, from entrypoint.sh (match-cpe-index.sh).
@@ -34,8 +36,8 @@ OUTPUT="$2"
 VERSION="${3:-unknown}"
 OUT_PREFIX="${4:-}"
 
-if [ -z "$FW" ] || [ ! -f "$FW" ]; then
-    echo "[firmware] firmware file not found: $FW" >&2
+if [ -z "$FW" ] || { [ ! -f "$FW" ] && [ ! -d "$FW" ]; }; then
+    echo "[firmware] firmware file or folder not found: $FW" >&2
     exit 1
 fi
 if [ -z "$OUTPUT" ]; then
@@ -56,7 +58,11 @@ mkdir -p "$EXTRACT"
 
 GEN_AT=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 FILE_INFO="firmware image"
-command -v file >/dev/null 2>&1 && FILE_INFO=$(file -b "$FW" 2>/dev/null || echo "firmware image")
+if [ -d "$FW" ]; then
+    FILE_INFO="unpacked firmware folder"
+elif command -v file >/dev/null 2>&1; then
+    FILE_INFO=$(file -b "$FW" 2>/dev/null || echo "firmware image")
+fi
 
 # --------------------------------------------------------
 # ① Unpack — unblob preferred; format-specific extractors as fallback.
@@ -80,7 +86,40 @@ note_tried() { tried="${tried:+$tried, }$1"; }
 FW_UNPACK_TIMEOUT="${FW_UNPACK_TIMEOUT:-900}"
 _tmo() { if command -v timeout >/dev/null 2>&1; then timeout "$FW_UNPACK_TIMEOUT" "$@"; else "$@"; fi; }
 
-if command -v unblob >/dev/null 2>&1; then
+# A folder is copied rather than read in place: the carve pass below writes an
+# opened image beside the one it found, and the user's tree must stay as it was.
+#
+# Symbolic links are copied as links, and inside this container an absolute one
+# (/bin/sh -> /bin/busybox) would resolve to the scanner's own files. A tool that
+# follows it would then report this image's busybox as the firmware's. So each
+# link is pointed back into the copy: an absolute target is read from the tree
+# root, as it would be on the device, and a link that still leads outside the
+# tree is removed.
+contain_symlinks() {
+    local tree="$1" link target dest removed=0
+    while IFS= read -r -d '' link; do
+        target=$(readlink "$link") || continue
+        case "$target" in
+            /*) dest=$(realpath -m -s "$tree$target") ;;
+            *)  dest=$(realpath -m -s "$(dirname "$link")/$target") ;;
+        esac
+        case "$dest" in
+            "$tree"|"$tree"/*) [ "${target#/}" = "$target" ] || ln -sfn "$dest" "$link" ;;
+            *) rm -f "$link"; removed=$((removed + 1)) ;;
+        esac
+    done < <(find "$tree" -type l -print0 2>/dev/null)
+    [ "$removed" -eq 0 ] || echo "[firmware] removed ${removed} symbolic link(s) that point outside the folder."
+}
+if [ -d "$FW" ]; then
+    echo "[firmware] reading an unpacked folder; copying it for identification..."
+    note_tried copy
+    if ! cp -a "$FW/." "$EXTRACT/" 2>"$WORK/copy.err"; then
+        echo "[firmware] WARN: some files could not be copied, so they are not identified:" >&2
+        head -n 5 "$WORK/copy.err" | sed 's/^/[firmware]   /' >&2
+    fi
+    contain_symlinks "$(realpath -s "$EXTRACT")"
+    has_extracted && unpacked=1
+elif command -v unblob >/dev/null 2>&1; then
     echo "[firmware] unpacking with unblob..."
     note_tried unblob
     _tmo unblob --extract-dir "$EXTRACT" --report "$UNBLOB_REPORT" "$FW" >/dev/null 2>&1 || true
@@ -94,7 +133,7 @@ fi
 #
 # squashfs is the most common firmware filesystem; unsquashfs (squashfs-tools)
 # handles standard images even when unblob's sasquatch handler is absent.
-if [ "$unpacked" = 0 ] && command -v unsquashfs >/dev/null 2>&1 && printf '%s' "$FILE_INFO" | grep -qi squashfs; then
+if [ "$unpacked" = 0 ] && [ -f "$FW" ] && command -v unsquashfs >/dev/null 2>&1 && printf '%s' "$FILE_INFO" | grep -qi squashfs; then
     echo "[firmware] falling back to unsquashfs..."
     note_tried unsquashfs
     _tmo unsquashfs -no-xattrs -f -d "$EXTRACT/squashfs-root" "$FW" >/dev/null 2>&1 || true
@@ -107,13 +146,13 @@ fi
 # the image (unblob shells out to it), so this costs nothing. Last in the chain
 # because it will also happily carve fragments out of files it does not really
 # understand; anything the earlier, format-aware unpackers claim wins.
-if [ "$unpacked" = 0 ] && command -v 7z >/dev/null 2>&1; then
+if [ "$unpacked" = 0 ] && [ -f "$FW" ] && command -v 7z >/dev/null 2>&1; then
     echo "[firmware] falling back to 7z extraction..."
     note_tried 7z
     _tmo 7z x -y -bso0 -bsp0 -o"$EXTRACT/7z-out" -- "$FW" >/dev/null 2>&1 || true
     has_extracted && unpacked=1
 fi
-if [ "$unpacked" = 0 ] && command -v binwalk >/dev/null 2>&1; then
+if [ "$unpacked" = 0 ] && [ -f "$FW" ] && command -v binwalk >/dev/null 2>&1; then
     echo "[firmware] falling back to binwalk extraction..."
     note_tried binwalk
     _tmo binwalk --run-as=root --extract --directory "$EXTRACT" "$FW" >/dev/null 2>&1 \

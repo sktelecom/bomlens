@@ -773,14 +773,10 @@ fi
 
 # ========================================================
 # Test 9c: a Yocto build directory with no SPDX document (read from its own
-# manifests instead) must not claim a conformance report was "requested but
-# not produced": there is no submitted document to measure conformance
-# against, so entrypoint.sh's ANALYZE case deliberately skips it. Before the
-# fix, the scan summary expected conformance for every ANALYZE run
-# unconditionally and printed that warning on an otherwise fully successful
-# Yocto scan, pointing at an unrelated `docker pull` suggestion.
+# manifests instead) writes a conformance report for the SBOM read from the
+# build, judged as a Yocto build scan, and the summary does not call it missing.
 # ========================================================
-print_test "Test 9c/15: Yocto manifest fallback does not warn about missing conformance"
+print_test "Test 9c/15: Yocto manifest fallback writes a conformance report"
 
 mkdir -p yocto-nospdx/tmp/deploy/images/qemux86-64 yocto-nospdx/tmp/deploy/licenses/qemux86-64 yocto-nospdx/tmp/log/cve
 cat > yocto-nospdx/tmp/deploy/images/qemux86-64/core-image-minimal-qemux86-64.rootfs.manifest <<'EOF'
@@ -802,12 +798,14 @@ if run_scan_with_logs "test-yocto-nospdx" "YoctoNoSpdx" "1.0.0" "--target yocto-
     # rule ANALYZE mode follows for a submitted SBOM. Checked directly instead.
     if [ -n "$YN_BOM" ] \
        && jq -e '.bomFormat == "CycloneDX" and ((.components | type) == "array")' "$YN_BOM" >/dev/null 2>&1 \
+       && jq -e '[.metadata.properties[]? | select(.name == "bomlens:scanMode") | .value] == ["YOCTO"]' "$YN_BOM" >/dev/null 2>&1 \
+       && [ -f "$(dirname "$YN_BOM")/YoctoNoSpdx_1.0.0_conformance.json" ] \
        && grep -q "No SPDX in this build" "$LOG_DIR/test-yocto-nospdx.log" \
        && ! grep -q "requested but not produced" "$LOG_DIR/test-yocto-nospdx.log"; then
-        print_success "Yocto manifest fallback (no false conformance warning)"
+        print_success "Yocto manifest fallback (conformance report written, scan mode YOCTO)"
         PASSED=$((PASSED + 1))
     else
-        print_error "Yocto manifest fallback (manifest path not taken, or a conformance warning was printed)"
+        print_error "Yocto manifest fallback (manifest path not taken, no conformance report, or a warning was printed)"
         show_failure_log "test-yocto-nospdx"
         FAILED=$((FAILED + 1))
     fi

@@ -11482,12 +11482,12 @@ MODE=ANALYZE CONFORMANCE_PROFILE=skt-submission bash "$LIB/validate-sbom.sh" "$W
 jq '.metadata.properties = [{"name":"bomlens:scanMode","value":"FIRMWARE"}]' "$WORK/skr.json" > "$WORK/skrm.json"
 MODE=ANALYZE CONFORMANCE_PROFILE=skt-submission bash "$LIB/validate-sbom.sh" "$WORK/skrm.json" "$WORK/skrm" "skr" >/dev/null 2>&1
 [ "$(jq -c '[.result, .submissionJudgedAs, (.checks[] | select(.id == "name-version" or .id == "purl" or .id == "transitive") | .status)]' "$WORK/skrm_conformance.json")" = '["pass","FIRMWARE","warn","warn","warn"]' ] \
-    && grep -q 'Judged as a BomLens firmware, root filesystem or binary scan SBOM (bomlens:scanMode=FIRMWARE)' "$WORK/skrm_conformance.md" \
+    && grep -q 'Judged as a BomLens firmware, root filesystem, binary or Yocto build scan SBOM (bomlens:scanMode=FIRMWARE)' "$WORK/skrm_conformance.md" \
     && grep -q 'submit-judged' "$WORK/skrm_conformance.html" \
     && pass "under --analyze an SBOM marked bomlens:scanMode=FIRMWARE is judged as a firmware scan, and the summary says so" \
     || fail "analyze with scanMode: $(jq -c '[.result, .submissionJudgedAs]' "$WORK/skrm_conformance.json")"
 REPORT_LANG=ko MODE=ANALYZE CONFORMANCE_PROFILE=skt-submission bash "$LIB/validate-sbom.sh" "$WORK/skrm.json" "$WORK/skrmk" "skr" >/dev/null 2>&1
-grep -q 'BomLens 펌웨어, 루트 파일시스템, 바이너리 스캔 SBOM(bomlens:scanMode=FIRMWARE)으로 판정해' "$WORK/skrmk_conformance.md" \
+grep -q 'BomLens 펌웨어, 루트 파일시스템, 바이너리, Yocto 빌드 스캔 SBOM(bomlens:scanMode=FIRMWARE)으로 판정해' "$WORK/skrmk_conformance.md" \
     && pass "the Korean report gives the same reason" || fail "ko judged-as line"
 jq '.metadata.properties = [{"name":"bomlens:scanMode","value":"SOURCE"}]' "$WORK/skr.json" > "$WORK/skrs.json"
 MODE=ANALYZE CONFORMANCE_PROFILE=skt-submission bash "$LIB/validate-sbom.sh" "$WORK/skrs.json" "$WORK/skrs" "skr" >/dev/null 2>&1
@@ -11496,6 +11496,17 @@ jq -e '.result == "fail" and (has("submissionJudgedAs") | not)' "$WORK/skrs_conf
 [ "$(jq -r '.submissionJudgedAs' "$WORK/skr_conformance.json")" = FIRMWARE ] \
     && grep -q 'bomlens:scanMode=FIRMWARE' "$WORK/skr_conformance.md" \
     && pass "a firmware scan's own report names the basis too" || fail "scan-time judged-as line"
+# A Yocto build directory scan is judged the same way, both when the scan
+# checks its own SBOM (MODE=YOCTO) and when a reviewer reads that SBOM later.
+MODE=YOCTO CONFORMANCE_PROFILE=skt-submission bash "$LIB/validate-sbom.sh" "$WORK/skr.json" "$WORK/skry" "skr" >/dev/null 2>&1
+[ "$(jq -c '[.result, .submissionJudgedAs, .submitFile, (.checks[] | select(.id == "name-version" or .id == "purl" or .id == "transitive") | .status)]' "$WORK/skry_conformance.json")" = '["pass","YOCTO","skry_bom.json","warn","warn","warn"]' ] \
+    && pass "a Yocto build scan is judged as a firmware SBOM is, and names the file to submit" \
+    || fail "Yocto scan mode: $(jq -c '[.result, .submissionJudgedAs, .submitFile]' "$WORK/skry_conformance.json")"
+jq '.metadata.properties = [{"name":"bomlens:scanMode","value":"YOCTO"}]' "$WORK/skr.json" > "$WORK/skryo.json"
+MODE=ANALYZE CONFORMANCE_PROFILE=skt-submission bash "$LIB/validate-sbom.sh" "$WORK/skryo.json" "$WORK/skryo" "skr" >/dev/null 2>&1
+[ "$(jq -r '.submissionJudgedAs' "$WORK/skryo_conformance.json")" = YOCTO ] \
+    && pass "under --analyze an SBOM marked bomlens:scanMode=YOCTO is judged the same way" \
+    || fail "analyze with scanMode YOCTO: $(jq -c '[.result, .submissionJudgedAs]' "$WORK/skryo_conformance.json")"
 # A source scan under the same profile: no relaxation either.
 MODE=SOURCE CONFORMANCE_PROFILE=skt-submission bash "$LIB/validate-sbom.sh" "$WORK/skr.json" "$WORK/skr3" "skr" >/dev/null 2>&1
 [ "$(jq -c '[.checks[] | select(.id == "purl" or .id == "transitive") | .status]' "$WORK/skr3_conformance.json")" = '["fail","fail"]' ] \

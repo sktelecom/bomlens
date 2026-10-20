@@ -748,6 +748,12 @@ echo "=========================================="
 # would report as open what Yocto already judged.
 YOCTO_SBOM=false
 YOCTO_CPE_MATCH=false
+# The document came out of a Yocto build directory the user pointed at, not from
+# a supplier: the SBOM this scan writes is the one to submit, so it is the one
+# checked for conformance (below), not the build's own document. YOCTO_FROM_BUILD
+# is set by scan-sbom.sh and server.py when they found the document in the build.
+YOCTO_FROM_BUILD="${YOCTO_FROM_BUILD:-false}"
+[ -n "${YOCTO_BUILD_DIR:-}" ] && YOCTO_FROM_BUILD=true
 case "$SCAN_MODE" in
     SOURCE)
         # Local web UI source scan (current dir / extracted ZIP / cloned git repo).
@@ -975,7 +981,9 @@ EOF
         ;;
 
     FIRMWARE)
-        if [ -z "$TARGET_FILE" ] || [ ! -f "$TARGET_FILE" ]; then echo "[ERROR] TARGET_FILE not found: $TARGET_FILE"; exit 1; fi
+        # TARGET_FILE may name a folder: a tree already unpacked, such as a root
+        # filesystem with no package database (scan-firmware.sh copies it).
+        if [ -z "$TARGET_FILE" ] || { [ ! -f "$TARGET_FILE" ] && [ ! -d "$TARGET_FILE" ]; }; then echo "[ERROR] TARGET_FILE not found: $TARGET_FILE"; exit 1; fi
         echo "[1/2] firmware: unpack + identify $TARGET_FILE"
         # scan-firmware.sh is best-effort (always emits a valid SBOM); the empty-file
         # guard below still catches a hard failure.
@@ -1189,8 +1197,6 @@ EOF
                 exit 1
             fi
             YOCTO_SBOM=true
-            # No conformance report: conformance measures a document someone sent
-            # us against the submission criteria, and there is no document here.
         else
         # Supplier-submitted SBOM (CycloneDX or SPDX). Validate the ORIGINAL for
         # conformance, then convert to CycloneDX so the common pipeline is reused.
@@ -1200,9 +1206,8 @@ EOF
         # An SPDX 2.x archive is not a document: it is a bundle of them, and the
         # image document inside is an index listing one package. Measuring either
         # against the submission criteria would report an unparseable or almost
-        # empty SBOM for something we read 36 packages out of, so conformance is
-        # skipped here for the same reason the manifest path skips it — there is
-        # no submitted document to judge.
+        # empty SBOM for something we read 36 packages out of, so the archive is
+        # not judged; the SBOM read out of it is, below (YOCTO_FROM_BUILD).
         case "$ANALYZE_SBOM" in
             *.spdx.tar.zst) YOCTO_ARCHIVE=true ;;
             *)              YOCTO_ARCHIVE=false ;;
@@ -1218,9 +1223,11 @@ EOF
             run_optional_step resolve-purl python3 "$LIBDIR/resolve-purl.py" \
                 "$ANALYZE_SBOM" "$OUT_PREFIX"
         fi
+        if [ "$YOCTO_FROM_BUILD" != "true" ]; then
         echo "[1/2] Validating supplier SBOM (conformance, original input)..."
         # Conformance never aborts the pipeline (best-effort report).
         run_optional_step conformance bash "$LIBDIR/validate-sbom.sh" "$ANALYZE_SBOM" "$OUT_PREFIX" "$PROJECT_NAME"
+        fi
         # Describe the document the supplier actually sent, before conversion
         # rewrites it: the format and version it was written in, the tool that
         # produced it, when, and on whose authority. The result screens otherwise
@@ -1655,7 +1662,12 @@ esac
 # which is one file.
 case "$SCAN_MODE" in
     BINARY|FIRMWARE|MODELFILE)
-        run_optional_step docmeta bash "$LIBDIR/stamp-document-metadata.sh" "$OUTPUT_FILE" "$SCAN_MODE" "$TARGET_FILE"
+        # A firmware folder is not one file, so it has no hash to stamp.
+        if [ -f "$TARGET_FILE" ]; then
+            run_optional_step docmeta bash "$LIBDIR/stamp-document-metadata.sh" "$OUTPUT_FILE" "$SCAN_MODE" "$TARGET_FILE"
+        else
+            run_optional_step docmeta bash "$LIBDIR/stamp-document-metadata.sh" "$OUTPUT_FILE" "$SCAN_MODE"
+        fi
         ;;
     SOURCE|POSTPROCESS|ROOTFS|IMAGE|AIBOM|DATASET|AIDECLARE|MERGE)
         run_optional_step docmeta bash "$LIBDIR/stamp-document-metadata.sh" "$OUTPUT_FILE" "$SCAN_MODE"
@@ -1720,6 +1732,18 @@ case "$SCAN_MODE" in
             && ARTIFACTS+=("${OUT_PREFIX}_component-versions.template.csv")
         ;;
 esac
+# A Yocto build's SBOM says so too, for the same reviewer. It has every version
+# from the build records, so no template is written for it.
+CONFORMANCE_MODE="$SCAN_MODE"
+if [ "$YOCTO_SBOM" = true ] && [ "$YOCTO_FROM_BUILD" = true ]; then
+    CONFORMANCE_MODE=YOCTO
+    if jq '.metadata.properties = ([(.metadata.properties // [])[] | select(.name? != "bomlens:scanMode")]
+                                   + [{name: "bomlens:scanMode", value: "YOCTO"}])' "$OUTPUT_FILE" > "$OUTPUT_FILE.mode.tmp" 2>/dev/null; then
+        mv "$OUTPUT_FILE.mode.tmp" "$OUTPUT_FILE"
+    else
+        rm -f "$OUTPUT_FILE.mode.tmp"
+    fi
+fi
 
 if [ "${BYTE_STABLE:-false}" = "true" ]; then
     run_optional_step normalize bash "$LIBDIR/normalize-sbom.sh" "$OUTPUT_FILE" --stable
@@ -1969,6 +1993,11 @@ if [ "$AI_MODEL_SCAN" = "true" ]; then
     run_optional_step conformance bash "$LIBDIR/validate-sbom.sh" "$OUTPUT_FILE" "$OUT_PREFIX" "$PROJECT_NAME"
 elif [ "$CONFORMANCE_GEN_MODE" = "true" ]; then
     run_optional_step conformance bash "$LIBDIR/validate-sbom.sh" "$OUTPUT_FILE" "$OUT_PREFIX" "$PROJECT_NAME"
+elif [ "$YOCTO_FROM_BUILD" = "true" ] && [ ! -f "${OUT_PREFIX}_conformance.json" ]; then
+    # A Yocto build directory: the SBOM read from the build is what the supplier
+    # submits. Judged as a firmware SBOM is (MODE=YOCTO): it records the packages
+    # installed, not a dependency graph.
+    MODE="$CONFORMANCE_MODE" run_optional_step conformance bash "$LIBDIR/validate-sbom.sh" "$OUTPUT_FILE" "$OUT_PREFIX" "$PROJECT_NAME"
 fi
 # --no-report skips the block that collects the conformance sidecars below, but the
 # CLI's closing summary still needs its facts on the host.
@@ -2552,7 +2581,7 @@ if [ "${SIGN_SBOM:-false}" = "true" ]; then
         # $OUTPUT_FILE, this call is unwrapped so a failure here cannot do that
         # either. Skipped when this mode never produced a conformance report.
         if [ -f "${OUT_PREFIX}_conformance.json" ]; then
-            SIGN_FAILED="$SIGN_FAILED" bash "$LIBDIR/validate-sbom.sh" "$OUTPUT_FILE" "$OUT_PREFIX" "$PROJECT_NAME" \
+            MODE="$CONFORMANCE_MODE" SIGN_FAILED="$SIGN_FAILED" bash "$LIBDIR/validate-sbom.sh" "$OUTPUT_FILE" "$OUT_PREFIX" "$PROJECT_NAME" \
                 || echo "[WARN] could not refresh the conformance check report's signature status after signing." >&2
         fi
         # A requested signature that was not produced is a failure on a
