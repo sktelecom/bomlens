@@ -520,6 +520,12 @@ describe("startScan", () => {
     expect(qs.get("git_ref")).toBe("v1.2.0");
   });
 
+  it("sends the excluded paths one per line", () => {
+    startScan({ ...PARAMS, exclude: ["vendor/legacy", "test/fixtures"] }, handlers());
+    const qs = new URLSearchParams(FakeEventSource.last!.url.split("?")[1]);
+    expect(qs.get("exclude")).toBe("vendor/legacy\ntest/fixtures");
+  });
+
   it("builds the scan-stream query from params", () => {
     startScan(PARAMS, handlers());
     const url = FakeEventSource.last!.url;

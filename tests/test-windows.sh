@@ -266,7 +266,7 @@ section "CLI contract (no docker daemon touched)"
 # --------------------------------------------------------
 HELP="$(bash "$SCAN" --help 2>&1)"; hrc=$?
 [ "$hrc" -eq 0 ] && pass "--help exits 0" || fail "--help exits 0" "rc=$hrc"
-for flag in --project --version --target --git --branch --firmware --analyze \
+for flag in --project --version --target --git --branch --exclude --firmware --analyze \
             --generate-only --notice --security --all --no-report --deep-license \
             --byte-stable --sign --output-dir --timestamp --ui \
             --license --sbom-author --model --model-file --usage --merge --merge-root \

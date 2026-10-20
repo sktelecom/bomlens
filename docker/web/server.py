@@ -1004,6 +1004,81 @@ def copy_scan_target_tree(src, dest):
     return dest
 
 
+def parse_scan_exclude(raw):
+    """Turn the form's exclude field (one path per line) into a clean list.
+
+    Returns (paths, error). A path is relative to the scanned folder; an absolute
+    path, a '..' segment, a glob character or a control character is refused, so
+    a path can never point outside the tree. Same rules as the CLI's --exclude."""
+    paths = []
+    for line in (raw or "").splitlines():
+        p = line.strip()
+        while p.startswith("./") or (p.endswith("/") and len(p) > 1):
+            p = p[2:] if p.startswith("./") else p[:-1]
+        if not p:
+            continue
+        if (p == "." or p.startswith("/") or "\\" in p or any(c in p for c in "*?[")
+                or any(ord(c) < 32 for c in p) or ".." in p.split("/")):
+            return None, p
+        if p not in paths:
+            paths.append(p)
+    if len(paths) > 100:
+        return None, "more than 100 paths"
+    return paths, None
+
+
+def find_scan_entry(root, rel):
+    """The path of `rel` inside `root`, or None when it is not there.
+
+    Each component is matched against a directory listing, so the returned path
+    comes from the filesystem and not from the request, and no link is followed
+    on the way (a link in the middle of the path counts as not found)."""
+    here = os.path.realpath(root)
+    parts = rel.split("/")
+    for n, part in enumerate(parts):
+        try:
+            with os.scandir(here) as it:
+                found = next((e for e in it if e.name == part), None)
+        except OSError:
+            return None
+        if found is None or (n < len(parts) - 1 and (found.is_symlink() or not found.is_dir())):
+            return None
+        here = found.path
+    return here
+
+
+def prune_scan_tree(root, paths):
+    """Delete the excluded paths from a tree the scan owns (a clone, an extracted
+    archive or a working copy). Returns the paths that were not found. A link is
+    removed as a link, never followed."""
+    missing = []
+    for rel in paths:
+        target = find_scan_entry(root, rel)
+        if target is None:
+            missing.append(rel)
+        elif os.path.islink(target) or os.path.isfile(target):
+            os.remove(target)
+        else:
+            shutil.rmtree(target, ignore_errors=True)
+    return missing
+
+
+def copy_tree_without(src, dest, paths):
+    """Copy a tree the scan must not change (the launch folder) to dest without
+    the excluded paths and without the output folder. Returns the paths that
+    were not found."""
+    real_src = os.path.realpath(src)
+    found = {rel: find_scan_entry(real_src, rel) for rel in paths}
+    skip = {p for p in found.values() if p}
+    skip.add(os.path.realpath(OUTPUT_DIR))
+
+    def _ignore(d, names):
+        return [n for n in names if os.path.join(d, n) in skip]
+    shutil.copytree(real_src, dest, ignore=_ignore, symlinks=True,
+                    ignore_dangling_symlinks=True, dirs_exist_ok=True)
+    return [rel for rel, p in found.items() if not p]
+
+
 def firmware_capable():
     """The firmware tools (unblob) are only built into the firmware image."""
     return shutil.which("unblob") is not None
@@ -6209,6 +6284,14 @@ class Handler(BaseHTTPRequestHandler):
             self._send(400, json.dumps({"error": "invalid git_ref"}))
             return
 
+        # Paths to leave out of a source scan (--exclude on the CLI), one per line.
+        scan_exclude, bad_exclude = parse_scan_exclude(g("exclude"))
+        if scan_exclude is None:
+            self._send(400, json.dumps({"error": "invalid exclude path: %s" % bad_exclude[:80]}))
+            return
+        if source not in ("current-dir", "git-url", "zip-upload", "scan-target-src"):
+            scan_exclude = []
+
         # Optional AI usage scenario (--usage on the CLI) scoping the model risk
         # assessment. Closed allowlist: an out-of-list value is refused before
         # the stream starts, and the literal REBOUND from _USAGE_CONTEXTS (never
@@ -6333,6 +6416,7 @@ class Handler(BaseHTTPRequestHandler):
                 "sbomAuthor": sbom_author,
                 "specVersion": spec_version,
                 "gitRef": git_ref,
+                "exclude": scan_exclude,
             }
             write_scanmeta(run_out, scan_config)
 
@@ -6985,6 +7069,25 @@ class Handler(BaseHTTPRequestHandler):
             else:
                 fail("unknown input type: %s" % source[:40]); return
 
+            # Leave the excluded paths out. A clone, an extracted archive and a
+            # picked-folder copy belong to this scan, so the paths are deleted from
+            # them. The launch folder is the user's own: it is copied without them.
+            if scan_exclude and env.get("MODE") == "SOURCE" and env.get("SOURCE_ROOT"):
+                if source == "current-dir":
+                    cleanup_dir = os.path.join(OUTPUT_DIR, ".srccopy-" + secrets.token_hex(8))
+                    sse("log", json.dumps("▶ Copying the folder without %d excluded path(s) ..." % len(scan_exclude)))
+                    try:
+                        gone = copy_tree_without(env["SOURCE_ROOT"], cleanup_dir, scan_exclude)
+                    except (OSError, shutil.Error) as exc:
+                        fail("could not prepare the folder for --exclude: %s" % exc)
+                        return
+                    env["SOURCE_ROOT"] = cleanup_dir
+                else:
+                    gone = prune_scan_tree(env["SOURCE_ROOT"], scan_exclude)
+                for e in gone:
+                    sse("log", json.dumps("▶ Exclude path not found, ignored: %s" % e))
+                sse("log", json.dumps("▶ Excluded %d path(s) from the scan" % (len(scan_exclude) - len(gone))))
+
             # For a source scan, hand the entrypoint the HOST path of the scanned
             # tree so it can run a cdxgen language image as a sibling container
             # (transitive resolution). Empty -> entrypoint falls back to syft.
@@ -7204,7 +7307,7 @@ class Handler(BaseHTTPRequestHandler):
             token_dir = upload_token_dir(token)
             if token_dir:
                 shutil.rmtree(token_dir, ignore_errors=True)
-            if cleanup_dir and source in ("git-url", "scan-target-src"):
+            if cleanup_dir and (source in ("git-url", "scan-target-src") or (source == "current-dir" and scan_exclude)):
                 shutil.rmtree(cleanup_dir, ignore_errors=True)
                 if source == "git-url":
                     with _scan_lock:
