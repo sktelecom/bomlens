@@ -15,11 +15,21 @@
 #   lists them: the entrypoint passes it when the file given is that template,
 #   so the supplier's filled-in copy is not overwritten.
 #
-# The file (--component-versions on the CLI) is CSV with two columns, name and
-# version. A first row reading "name,version" is a header; blank lines and
-# lines starting with '#' are skipped; a row with an empty version is read as
-# "not known" and skipped before anything else in the row is checked, so the
+# The file (--component-versions on the CLI) is CSV with the columns name,
+# version and an optional third, reason. A first row reading "name,version" or
+# "name,version,reason" is a header; blank lines and lines starting with '#'
+# are skipped; a row with neither a version nor a reason is read as "not
+# known" and skipped before anything else in the row is checked, so the
 # template this script writes can be passed back with only some rows filled.
+# Two-column files are read as before.
+#
+# The reason says why a component has no version to give, one of REASONS:
+# own-code (the manufacturer's own code), not-open-source (only the name
+# matches an open source project) or version-unknown. It is recorded on the
+# component as bomlens:versionReason, so the reviewer sees the explanation in
+# the SBOM, and the submission conformance profile lists the component as
+# explained instead of failing on it. A row that gives a version and a reason
+# applies the version and ignores the reason, with a warning.
 #
 # A version normalize-sbom.sh removes counts as no version here: the
 # placeholder UNKNOWN (a kernel module with no version in its metadata), and an
@@ -39,13 +49,19 @@
 #     something different, a warning names both: a version read from the
 #     binary is what is installed, and a source tree can hold several;
 #   - a name the scan did not find is added as a library component marked
-#     bomlens:identifiedBy=supplier-declared.
+#     bomlens:identifiedBy=supplier-declared;
+#   - a reason (no version) is recorded on a component the scan found without
+#     a version. Given for a component that has a version, or for a name the
+#     scan did not find, it is ignored with a warning: there is nothing to
+#     explain, and a component the scan did not find cannot be added without
+#     a version.
 #
 # The file is external input. It is refused as a whole, with the line and the
 # reason, when it is larger than MAX_BYTES, holds more than MAX_ROWS rows, is not
-# UTF-8 text, has a row that is not exactly two fields, has a name or version
+# UTF-8 text, has a row that is not two or three fields, has a name or version
 # outside a conservative character set (no path separators, no '..', no spaces
-# or control characters), or gives one name two different versions. Exit code 3
+# or control characters), has a reason that is not one of REASONS, or gives one
+# name two different versions or two different reasons. Exit code 3
 # means the file was refused and the SBOM was not changed.
 import csv
 import io
@@ -61,6 +77,8 @@ VERSION_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._+~-]{0,63}$")
 PACKAGE_TYPES = {"library", "application", "framework", "firmware", "operating-system"}
 TEMPLATE_SUFFIX = "_component-versions.template.csv"
 DECLARED = "supplier-declared"
+REASON_PROP = "bomlens:versionReason"
+REASONS = ("own-code", "not-open-source", "version-unknown")
 # What normalize-sbom.sh removes from .version (UNKNOWN_VERSION_FIX and
 # VERSION_EVR_CONTAMINATION_FIX); keep the two in step.
 PLACEHOLDER_VERSIONS = {"unknown"}
@@ -77,7 +95,12 @@ def valid_name(name):
 
 
 def read_versions(path):
-    """{lower-cased name: (name as written, version)} from the file, or Refused."""
+    """{lower-cased name: (name as written, version, reason)} from the file, or Refused.
+
+    One of version and reason is empty: a row that gives both keeps the version
+    and drops the reason (main() warns about each one dropped, from the list
+    returned beside the dict). A reason is read case-insensitively.
+    """
     try:
         size = os.path.getsize(path)
     except OSError as exc:
@@ -93,6 +116,7 @@ def read_versions(path):
     except UnicodeDecodeError as exc:
         raise Refused(f"the file is not UTF-8 text (byte {exc.start})")
     out = {}
+    ignored = []
     rows = 0
     reader = csv.reader(io.StringIO(text, newline=""), strict=True)
     try:
@@ -105,29 +129,49 @@ def read_versions(path):
             rows += 1
             if rows > MAX_ROWS:
                 raise Refused(f"the file has more than {MAX_ROWS} rows")
-            if len(fields) != 2:
-                raise Refused(f"line {line}: expected two fields (name,version), found {len(fields)}")
+            if len(fields) not in (2, 3):
+                raise Refused(f"line {line}: expected two or three fields (name,version[,reason]),"
+                              f" found {len(fields)}")
             name, version = fields[0].strip(), fields[1].strip()
-            if rows == 1 and name.lower() == "name" and version.lower() == "version":
+            reason = fields[2].strip().lower() if len(fields) == 3 else ""
+            if rows == 1 and name.lower() == "name" and version.lower() == "version" \
+                    and reason.lower() in ("", "reason"):
                 continue
-            if any(ord(ch) < 32 or ord(ch) == 127 for ch in name + version):
+            if any(ord(ch) < 32 or ord(ch) == 127 for ch in name + version + reason):
                 raise Refused(f"line {line}: a control character is not allowed")
-            if version == "":
+            if version == "" and reason == "":
                 continue
+            if reason and reason not in REASONS:
+                raise Refused(f"line {line}: '{reason[:60]}' is not a reason"
+                              f" (one of {', '.join(REASONS)})")
             if not valid_name(name):
                 raise Refused(f"line {line}: '{name[:60]}' is not a component name "
                               "(letters, digits and . _ + - only, up to 128 characters)")
-            if not VERSION_RE.match(version) or ".." in version:
+            if version and (not VERSION_RE.match(version) or ".." in version):
                 raise Refused(f"line {line}: '{version[:60]}' is not a version "
                               "(letters, digits and . _ + ~ - only, up to 64 characters)")
             key = name.lower()
-            if key in out and out[key][1] != version:
-                raise Refused(f"line {line}: {name} is given two versions, "
-                              f"{out[key][1]} and {version}")
-            out[key] = (name, version)
+            if version and reason:
+                ignored.append((name, reason))
+                reason = ""
+            if key in out:
+                _, had_version, had_reason = out[key]
+                if had_version and version and had_version != version:
+                    raise Refused(f"line {line}: {name} is given two versions, "
+                                  f"{had_version} and {version}")
+                if had_reason and reason and had_reason != reason:
+                    raise Refused(f"line {line}: {name} is given two reasons, "
+                                  f"{had_reason} and {reason}")
+                # A version on one row and a reason on another: the version wins.
+                if had_version or version:
+                    if reason or had_reason:
+                        ignored.append((name, reason or had_reason))
+                    out[key] = (name, had_version or version, "")
+                    continue
+            out[key] = (name, version, reason)
     except csv.Error as exc:
         raise Refused(f"line {reader.line_num}: {exc}")
-    return out
+    return out, ignored
 
 
 def prop(c, name):
@@ -162,7 +206,7 @@ def apply(doc, versions):
     if not isinstance(comps, list):
         comps = doc["components"] = []
     seen = set()
-    filled, kept, added = [], [], []
+    filled, kept, added, explained, unexplainable = [], [], [], [], []
     for c in comps:
         if not is_package(c):
             continue
@@ -170,7 +214,17 @@ def apply(doc, versions):
         if key not in versions:
             continue
         seen.add(key)
-        _, version = versions[key]
+        _, version, reason = versions[key]
+        if not version:
+            if has_version(c):
+                unexplainable.append((c.get("name"), reason, f"the scan read version {c['version']}"))
+                continue
+            props = [p for p in (c.get("properties") or [])
+                     if not (isinstance(p, dict) and p.get("name") == REASON_PROP)]
+            props.append({"name": REASON_PROP, "value": reason})
+            c["properties"] = props
+            explained.append((c.get("name"), reason))
+            continue
         if has_version(c):
             if c["version"] != version:
                 kept.append((c.get("name"), c["version"], version))
@@ -181,6 +235,7 @@ def apply(doc, versions):
                  if not (isinstance(p, dict)
                          and ((p.get("name") == "bomlens:evidenceGrade" and p.get("value") == "presence-only")
                               or p.get("name") == "bomlens:versionSource"
+                              or p.get("name") == REASON_PROP
                               or (replaced and p.get("name") == "bomlens:versionContaminated")))]
         if replaced:
             # What normalize would have kept: the misattributed string, for audit.
@@ -192,7 +247,10 @@ def apply(doc, versions):
     for key in sorted(versions):
         if key in seen:
             continue
-        name, version = versions[key]
+        name, version, reason = versions[key]
+        if not version:
+            unexplainable.append((name, reason, "the scan did not find it"))
+            continue
         ref = f"{DECLARED}:{name}@{version}"
         if ref in refs:
             continue
@@ -205,13 +263,15 @@ def apply(doc, versions):
         })
         refs.add(ref)
         added.append((name, version))
-    return filled, kept, added
+    return filled, kept, added, explained, unexplainable
 
 
 def versionless(doc):
+    """Names of package components with no version and no recorded reason."""
     names = set()
     for c in doc.get("components") or []:
-        if is_package(c) and not has_version(c) and (c.get("name") or "").strip():
+        if is_package(c) and not has_version(c) and (c.get("name") or "").strip() \
+                and prop(c, REASON_PROP) not in REASONS:
             names.add(c["name"].strip())
     return sorted(names, key=str.lower)
 
@@ -221,10 +281,14 @@ def write_template(path, names):
         f.write("# Components this scan found but could not read a version for.\n")
         f.write("# Write the version shipped in the product after each name, then pass\n")
         f.write("# this file back with --component-versions. Rows left empty are skipped.\n")
+        f.write("# When there is no version to give, leave version empty and write a reason:\n")
+        f.write("#   own-code         the manufacturer's own code, not open source\n")
+        f.write("#   not-open-source  only the name matches an open source project\n")
+        f.write("#   version-unknown  open source, but the shipped version cannot be confirmed\n")
         w = csv.writer(f, lineterminator="\n")
-        w.writerow(["name", "version"])
+        w.writerow(["name", "version", "reason"])
         for n in names:
-            w.writerow([n, ""])
+            w.writerow([n, "", ""])
 
 
 def main(argv):
@@ -246,15 +310,19 @@ def main(argv):
     rc = 0
     if len(argv) == 4:
         try:
-            versions = read_versions(argv[3])
+            versions, ignored = read_versions(argv[3])
         except Refused as why:
             print(f"[component-versions] ERROR: the --component-versions file was refused: {why}.", file=sys.stderr)
-            print("[component-versions]   Fix it and run the scan again. The format is CSV, two columns:"
-                  " name,version (one component per line).", file=sys.stderr)
-            versions = None
+            print("[component-versions]   Fix it and run the scan again. The format is CSV:"
+                  " name,version[,reason] (one component per line; reason is one of "
+                  + ", ".join(REASONS) + ").", file=sys.stderr)
+            versions, ignored = None, []
             rc = 3
+        for name, reason in ignored:
+            print(f"[component-versions] WARN: {name}: the file gives a version, so the reason"
+                  f" {reason} is ignored.", file=sys.stderr)
         if versions:
-            filled, kept, added = apply(doc, versions)
+            filled, kept, added, explained, unexplainable = apply(doc, versions)
             tmp = sbom_path + ".versions.tmp"
             with open(tmp, "w", encoding="utf-8") as f:
                 json.dump(doc, f, ensure_ascii=False)
@@ -264,6 +332,14 @@ def main(argv):
             for name, read, declared in kept:
                 print(f"[component-versions] WARN: {name}: the scan read {read}; the file says {declared}."
                       f" Keeping {read}, the version found in the delivered files.", file=sys.stderr)
+            if explained:
+                shown = ", ".join(f"{n} ({r})" for n, r in explained[:30]) + (
+                    f" (and {len(explained) - 30} more)" if len(explained) > 30 else "")
+                print(f"[component-versions] recorded the reason {len(explained)} component(s) have no"
+                      f" version ({REASON_PROP}): {shown}")
+            for name, reason, why in unexplainable:
+                print(f"[component-versions] WARN: {name}: the reason {reason} is ignored, because"
+                      f" {why}.", file=sys.stderr)
     template = prefix + TEMPLATE_SUFFIX
     missing_all = versionless(doc)
     missing = [n for n in missing_all if valid_name(n)]

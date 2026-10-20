@@ -6,7 +6,8 @@ import * as path from "node:path";
 import { test, type Page } from "@playwright/test";
 
 /**
- * Hero screenshot for docs/images/web-ui-demo.png (run on demand, excluded
+ * Hero screenshots for docs/images/web-ui-demo.png (English UI) and
+ * docs/images/web-ui-demo-ko.png (Korean UI) (run on demand, excluded
  * from the normal `test:ui` run via the @demo tag). Runs the New scan form
  * over a stubbed backend, then captures the Overview screen — counts,
  * needs-attention, severity distribution, license classification and the
@@ -17,7 +18,7 @@ import { test, type Page } from "@playwright/test";
  * with an enlarged video.size left the recorded frame only partially painted
  * (the rest blank), and doubling the viewport itself instead changed the
  * page's own layout (more whitespace at the wider width). page.screenshot(),
- * used here, does honor deviceScaleFactor directly, so the original 900x563
+ * used here, does honor deviceScaleFactor directly, so a 1040x650
  * layout is captured at full 2x pixel density with no such tradeoff.
  *
  * Regenerate (same pinned container as the guide screenshots):
@@ -27,9 +28,9 @@ import { test, type Page } from "@playwright/test";
  */
 
 // Playwright runs from docker/web/frontend, so cwd-relative is stable.
-const OUT_PNG = path.join(process.cwd(), "..", "..", "..", "docs", "images", "web-ui-demo.png");
-const W = 900;
-const H = 563;
+const IMAGES = path.join(process.cwd(), "..", "..", "..", "docs", "images");
+const W = 1040;
+const H = 650;
 
 test.use({
   viewport: { width: W, height: H },
@@ -80,13 +81,13 @@ const componentList = LIB.map(([name, version, lic, scope]) => ({
 const DONE = {
   ok: true,
   mode: "SOURCE",
-  id: "demo-app_1.4.0",
+  id: "demo-app_1.0.0",
   results: [
-    { name: "demo-app_1.4.0_bom.json", size: 48211 },
-    { name: "demo-app_1.4.0_NOTICE.txt", size: 20480 },
-    { name: "demo-app_1.4.0_NOTICE.html", size: 34816 },
-    { name: "demo-app_1.4.0_security.html", size: 25600 },
-    { name: "demo-app_1.4.0_risk-report.html", size: 30720 },
+    { name: "demo-app_1.0.0_bom.json", size: 48211 },
+    { name: "demo-app_1.0.0_NOTICE.txt", size: 20480 },
+    { name: "demo-app_1.0.0_NOTICE.html", size: 34816 },
+    { name: "demo-app_1.0.0_security.html", size: 25600 },
+    { name: "demo-app_1.0.0_risk-report.html", size: 30720 },
   ],
   security: {
     CRITICAL: 1, HIGH: 1, MEDIUM: 1, LOW: 1, UNKNOWN: 0, TOTAL: 4,
@@ -100,14 +101,14 @@ const DONE = {
   conformance: null,
   sbom: { components: LIB.length, componentList, directCount: 5, transitiveCount: 9 },
   scanConfig: {
-    source: "current-dir", target: "", project: "demo-app", version: "1.4.0",
+    source: "current-dir", target: "", project: "demo-app", version: "1.0.0",
     notice: true, security: true, deepLicense: false, identifyVendored: false,
   },
 };
 
 const SBOM = {
   bomFormat: "CycloneDX",
-  metadata: { component: { "bom-ref": "root", name: "demo-app", version: "1.4.0" } },
+  metadata: { component: { "bom-ref": "root", name: "demo-app", version: "1.0.0" } },
   components: LIB.map(([name, version]) => ({
     "bom-ref": name, name, version, type: "library", purl: `pkg:generic/${name}@${version}`,
   })),
@@ -121,11 +122,11 @@ const SBOM = {
   ],
 };
 
-async function stub(page: Page) {
-  await page.addInitScript(() => {
+async function stub(page: Page, lang: "en" | "ko") {
+  await page.addInitScript((l) => {
     localStorage.setItem("sbom.theme", "light");
-    localStorage.setItem("sbom.lang", "en");
-  });
+    localStorage.setItem("sbom.lang", l);
+  }, lang);
   await page.route("**/capabilities", (r) =>
     r.fulfill({ contentType: "application/json", body: JSON.stringify({ firmware: false, scanoss: true, docker: true }) }),
   );
@@ -141,27 +142,31 @@ async function stub(page: Page) {
 
 const beat = (page: Page, ms: number) => page.waitForTimeout(ms);
 
-test("capture the Overview hero screenshot @demo", async ({ page }) => {
-  test.setTimeout(60_000);
-  await stub(page);
+for (const lang of ["en", "ko"] as const) {
+  test(`capture the Overview hero screenshot, ${lang} @demo`, async ({ page }) => {
+    test.setTimeout(60_000);
+    await stub(page, lang);
 
-  // New scan: type the project identity, then run.
-  await page.goto("/#/new");
-  await beat(page, 1200);
-  await page.locator("#project").pressSequentially("demo-app", { delay: 70 });
-  await page.locator("#version").pressSequentially("1.4.0", { delay: 70 });
-  await beat(page, 700);
-  await page.getByTestId("run-scan").click();
+    // New scan: type the project identity, then run.
+    await page.goto("/#/new");
+    await beat(page, 1200);
+    await page.locator("#project").pressSequentially("demo-app", { delay: 70 });
+    await page.locator("#version").pressSequentially("1.0.0", { delay: 70 });
+    await beat(page, 700);
+    await page.getByTestId("run-scan").click();
 
-  // Overview: counts, needs-attention, severity/license axes, highest-risk table.
-  await page.getByRole("link", { name: /^Overview/ }).waitFor();
-  await beat(page, 1200);
-  // The main content area scrolls independently of the document (window.scrollTo
-  // has no effect on it), and it starts already scrolled past the page heading
-  // and the count cards' numbers. Scroll the heading itself into view instead.
-  await page.getByRole("heading", { name: "Overview" }).scrollIntoViewIfNeeded();
-  await beat(page, 300);
+    // Overview: counts, needs-attention, severity/license axes, highest-risk table.
+    await page.locator("main h1").waitFor();
+    await beat(page, 1200);
+    // The main content area scrolls independently of the document (window.scrollTo
+    // has no effect on it), and it starts already scrolled past the page heading
+    // and the count cards' numbers. Scroll the heading itself into view instead.
+    await page.locator("main h1").scrollIntoViewIfNeeded();
+    await beat(page, 300);
 
-  fs.mkdirSync(path.dirname(OUT_PNG), { recursive: true });
-  await page.screenshot({ path: OUT_PNG });
-});
+    fs.mkdirSync(IMAGES, { recursive: true });
+    await page.screenshot({
+      path: path.join(IMAGES, lang === "en" ? "web-ui-demo.png" : "web-ui-demo-ko.png"),
+    });
+  });
+}

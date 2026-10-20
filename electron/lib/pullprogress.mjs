@@ -54,6 +54,15 @@ export function createPullProgress() {
   };
 }
 
+// Payload for the start screen's `status-progress` channel (see preload.mjs). `secs` is wall
+// time since the pull began, so the screen can show elapsed time even while docker prints
+// nothing (the extract phase is silent for minutes). `update` marks a background refresh of an
+// image that is already present, so the screen does not claim "first run only".
+export function pullPayload(tally, startedAtMs, nowMs, update = false) {
+  const secs = Math.max(0, Math.round((nowMs - startedAtMs) / 1000));
+  return { complete: tally.complete, total: tally.total, secs, update: update === true };
+}
+
 // pull 실패 원인 분류. 문구가 아니라 키를 돌려주고 번역은 i18n이 맡는다.
 // reason === "timeout"이면 출력 내용과 무관하게 정체로 끊긴 것이다.
 // 순서가 중요하다: 디스크·DNS처럼 특정적인 신호를 프록시/인증보다 먼저 본다

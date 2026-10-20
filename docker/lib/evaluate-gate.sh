@@ -222,10 +222,10 @@ judge_license_conflict() { # <cond>
 # two conditions below. Prints nothing and returns 1 when it cannot be used.
 conformance_readable() { # <cond> -> emits unjudged and returns 1 when unusable
     if [ ! -f "$CONFORMANCE" ]; then
-        emit unjudged "$1" "no conformance report was produced for this scan"; return 1
+        emit unjudged "$1" "no conformance check report was produced for this scan"; return 1
     fi
     if ! jq empty "$CONFORMANCE" >/dev/null 2>&1; then
-        emit unjudged "$1" "the conformance report could not be read"; return 1
+        emit unjudged "$1" "the conformance check report could not be read"; return 1
     fi
     return 0
 }

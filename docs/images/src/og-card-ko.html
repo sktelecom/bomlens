@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<title>BomLens social card (Korean)</title>
+<!--
+  Source for docs/images/og-card-ko.png, the Open Graph card the Korean pages
+  of the docs site use (overrides/main.html).
+
+  Render it with:  npm run capture:og   (in docker/web/frontend)
+  which screenshots this file at 1200x630 through tests/ui/og-card.spec.ts.
+  The font is Pretendard, the same face the web UI uses for Korean; it comes
+  from the frontend's node_modules, so run npm ci there first.
+
+  Keep the wording in step with the Korean home page.
+-->
+<style>
+  @font-face {
+    font-family: "Pretendard Variable";
+    font-weight: 45 920;
+    src: url("../../../docker/web/frontend/node_modules/pretendard/dist/web/variable/woff2/PretendardVariable.woff2") format("woff2-variations");
+  }
+  :root { --sk-red: #EA002C; --ink: #18181b; --muted: #6c6c75; }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    width: 1200px;
+    height: 630px;
+    background: #fafafa;
+    font-family: "Pretendard Variable", "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
+    -webkit-font-smoothing: antialiased;
+    padding: 84px 96px 64px;
+    display: flex;
+    flex-direction: column;
+  }
+  .brand { display: flex; align-items: center; gap: 22px; }
+  .mark { width: 72px; height: 72px; flex: none; }
+  .wordmark { font-size: 44px; font-weight: 700; letter-spacing: -0.5px; color: var(--ink); }
+  .rule { width: 72px; height: 6px; border-radius: 3px; background: var(--sk-red); margin-top: 96px; }
+  .headline {
+    margin-top: 32px;
+    font-size: 62px;
+    font-weight: 700;
+    line-height: 1.3;
+    letter-spacing: -1.2px;
+    color: var(--ink);
+  }
+  .footer { margin-top: auto; font-size: 26px; font-weight: 500; color: var(--muted); }
+</style>
+</head>
+<body>
+  <div class="brand">
+    <svg class="mark" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" role="img" aria-label="BomLens">
+      <rect width="48" height="48" rx="11" fill="#EA002C"/>
+      <g transform="translate(12 12)" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="10"/>
+        <line x1="14.31" y1="8" x2="20.05" y2="17.94"/>
+        <line x1="9.69" y1="8" x2="21.17" y2="8"/>
+        <line x1="7.38" y1="12" x2="13.12" y2="2.06"/>
+        <line x1="9.69" y1="16" x2="3.95" y2="6.06"/>
+        <line x1="14.31" y1="16" x2="2.83" y2="16"/>
+        <line x1="16.62" y1="12" x2="10.88" y2="21.94"/>
+      </g>
+    </svg>
+    <div class="wordmark">BomLens</div>
+  </div>
+  <div class="rule"></div>
+  <p class="headline">로컬에서 SBOM 생성과<br />오픈소스 위험 평가를 한 번에</p>
+  <p class="footer">github.com/sktelecom/bomlens</p>
+</body>
+</html>

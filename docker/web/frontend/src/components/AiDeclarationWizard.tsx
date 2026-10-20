@@ -95,12 +95,12 @@ const SERVICE_ANSWERS: ServiceAnswer[] = ["yes", "no", "later"];
 const CLASSIFICATION_KEYS = ["personal", "public", "internal"];
 
 const textAreaClass =
-  "flex min-h-[4.5rem] w-full rounded-lg border border-input bg-background px-3 py-2 text-sm ring-offset-background " +
+  "flex min-h-[4.5rem] w-full rounded-lg border border-input bg-background px-3 py-2 text-body-sm ring-offset-background " +
   "placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2";
 
 const chipClass = (on: boolean) =>
   cn(
-    "rounded-full border px-3 py-1 text-sm transition-colors duration-fast ease-out-soft",
+    "rounded-full border px-3 py-1 text-body-sm transition-colors duration-fast ease-out-soft",
     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
     on ? "border-foreground bg-foreground text-background" : "border-input hover:bg-muted",
   );
@@ -490,11 +490,11 @@ function Field({
     >
       <div className="flex items-center gap-2">
         {field.enum || isList ? (
-          <span id={labelId} className="text-sm font-medium">
+          <span id={labelId} className="text-body-sm font-medium">
             {label}
           </span>
         ) : (
-          <label id={labelId} htmlFor={id} className="text-sm font-medium">
+          <label id={labelId} htmlFor={id} className="text-body-sm font-medium">
             {label}
           </label>
         )}
@@ -502,17 +502,17 @@ function Field({
       </div>
       {input}
       {hint && (
-        <p id={hintId} className="text-xs text-muted-foreground">
+        <p id={hintId} className="text-body-sm text-muted-foreground">
           {hint}
         </p>
       )}
       {warning && <WarningNote>{warning}</WarningNote>}
       <div id={errId} aria-live="polite">
         {showProblem ? (
-          <p className="text-xs text-risk-critical-fg">{t(`aiDecl.problem.${problem}`)}</p>
+          <p className="text-label text-risk-critical-fg">{t(`aiDecl.problem.${problem}`)}</p>
         ) : showMissing ? (
           <p
-            className={cn("text-xs", loud ? "text-risk-critical-fg" : "text-muted-foreground")}
+            className={cn("text-label", loud ? "text-risk-critical-fg" : "text-muted-foreground")}
             data-missing={loud ? "shown" : "quiet"}
           >
             {t("aiDecl.requiredFailsValidation")}
@@ -538,7 +538,7 @@ function WarningNote({ children }: { children: ReactNode }) {
   return (
     <p
       role="note"
-      className="flex items-start gap-1.5 rounded-md border border-warning-border/60 bg-warning-surface px-3 py-2 text-xs text-warning dark:border-warning-border/20 dark:bg-warning-surface/30"
+      className="flex items-start gap-1.5 rounded-md border border-warning-border/60 bg-warning-surface px-3 py-2 text-label text-warning dark:border-warning-border/20 dark:bg-warning-surface/30"
     >
       <TriangleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
       <span>{children}</span>
@@ -597,16 +597,16 @@ function SourcesEditor({
         if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setTouched(true);
       }}
     >
-      <div id={`${id}-label`} className="text-sm font-medium">
+      <div id={`${id}-label`} className="text-body-sm font-medium">
         {t("aiDecl.sources.label")}
       </div>
-      <p className="text-xs text-muted-foreground">
+      <p className="text-body-sm text-muted-foreground">
         {onRecord.length ? t("aiDecl.sources.onRecord", { list: onRecord.join(", ") }) : t("aiDecl.sources.none")}
       </p>
       {sources.map((src, i) => (
         <div key={i} className="flex flex-wrap items-center gap-2" data-source-row={i}>
           {src.ref !== undefined ? (
-            <span className="font-mono text-sm">{src.ref.replace(/^huggingface:/, "")}</span>
+            <span className="font-mono text-body-sm">{src.ref.replace(/^huggingface:/, "")}</span>
           ) : (
             <>
               <Input
@@ -681,7 +681,7 @@ function SourcesEditor({
       <Suggestions id={`${id}-licenses`} values={COMMON_LICENSES} />
       <div id={errId} aria-live="polite">
         {[...new Set(shown)].map((p) => (
-          <p key={p} className="text-xs text-risk-critical-fg">
+          <p key={p} className="text-label text-risk-critical-fg">
             {t(`aiDecl.problem.${p}`)}
           </p>
         ))}
@@ -761,7 +761,7 @@ function AddById({
   };
   return (
     <div className="space-y-1.5">
-      <label htmlFor={id} className="text-sm font-medium">
+      <label htmlFor={id} className="text-body-sm font-medium">
         {label}
       </label>
       <div className="flex gap-2">
@@ -791,13 +791,13 @@ function AddById({
       </div>
       {suggestions && <Suggestions id={`${id}-list`} values={suggestions} />}
       {hint && (
-        <p id={`${id}-hint`} className="text-xs text-muted-foreground">
+        <p id={`${id}-hint`} className="text-body-sm text-muted-foreground">
           {hint}
         </p>
       )}
       <div id={`${id}-err`} aria-live="polite">
-        {bad && <p className="text-xs text-risk-critical-fg">{t(invalidKey)}</p>}
-        {bad && held && <p className="text-xs text-risk-critical-fg">{t("aiDecl.pendingBlocked")}</p>}
+        {bad && <p className="text-label text-risk-critical-fg">{t(invalidKey)}</p>}
+        {bad && held && <p className="text-label text-risk-critical-fg">{t("aiDecl.pendingBlocked")}</p>}
       </div>
     </div>
   );
@@ -831,14 +831,14 @@ function DataFlowsEditor({
   const suggestions = CLASSIFICATION_KEYS.map((k) => t(`aiDecl.dataFlow.suggest.${k}`));
   return (
     <div className="space-y-3" data-testid="data-flows">
-      <p className="text-xs text-muted-foreground">{t("aiDecl.dataFlow.intro")}</p>
+      <p className="text-body-sm text-muted-foreground">{t("aiDecl.dataFlow.intro")}</p>
       {flows.map((d, i) => {
         const where = `service.dataFlows[${i}]`;
         const label = t("aiDecl.dataFlow.n", { n: i + 1 });
         return (
           <div key={i} data-where={where} data-flow-row={i} className="space-y-4 rounded-md border p-3">
             <div className="flex items-center justify-between gap-2">
-              <span className="text-sm font-semibold">
+              <span className="text-body-sm font-semibold">
                 {label}
                 {d.classification.trim() && (
                   <span className="ml-2 font-normal text-muted-foreground">{d.classification.trim()}</span>
@@ -912,14 +912,14 @@ function ExternalModelsEditor({
     .filter((f): f is MapField => Boolean(f));
   return (
     <div className="space-y-3" data-testid="external-models">
-      <p className="text-xs text-muted-foreground">{t("aiDecl.externalModel.intro")}</p>
+      <p className="text-body-sm text-muted-foreground">{t("aiDecl.externalModel.intro")}</p>
       {models.map((m, i) => {
         const where = `service.externalModels[${i}]`;
         const label = m.name.trim() || t("aiDecl.externalModel.n", { n: i + 1 });
         return (
           <div key={i} data-where={where} data-external-model={i} className="space-y-4 rounded-md border p-3">
             <div className="flex items-center justify-between gap-2">
-              <span className="text-sm font-semibold">{label}</span>
+              <span className="text-body-sm font-semibold">{label}</span>
               <Button
                 variant="ghost"
                 size="sm"
@@ -977,6 +977,7 @@ export function AiDeclarationWizard({
   mode = "fill",
   authorFromScan: authorGiven,
   declaredScan = false,
+  startNote,
 }: {
   title: string;
   index: FieldIndex;
@@ -997,6 +998,9 @@ export function AiDeclarationWizard({
   /** The scan names the document's author itself (--sbom-author), so the
    *  question is not asked. Read from the check when not given. */
   authorFromScan?: boolean;
+  /** When set, the final action is disabled and this note is shown under it
+   *  (the read-only demo, which cannot start a scan). */
+  startNote?: ReactNode;
   /** Filling a model that was itself described from a declaration (its
    *  licence takes effect at its next scan). */
   declaredScan?: boolean;
@@ -1137,7 +1141,7 @@ export function AiDeclarationWizard({
           />
         )}
         {create && origin === "scratch" && (
-          <p className="text-sm text-muted-foreground" data-testid="origin-scratch">
+          <p className="text-body-sm text-muted-foreground" data-testid="origin-scratch">
             {t("aiDecl.origin.scratchNote")}
           </p>
         )}
@@ -1150,7 +1154,7 @@ export function AiDeclarationWizard({
                 button={t("aiDecl.base.add.button")}
                 toAction={(ref) => ({ type: "addBase", ref })}
               />
-              <p className="mt-1.5 text-xs text-muted-foreground">{t("aiDecl.base.add.hint")}</p>
+              <p className="mt-1.5 text-body-sm text-muted-foreground">{t("aiDecl.base.add.hint")}</p>
             </CardContent>
           </Card>
         )}
@@ -1160,7 +1164,7 @@ export function AiDeclarationWizard({
               <CardContent className="space-y-2 p-4">
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2">
-                    <span className="font-mono text-sm font-medium">{b.ref}</span>
+                    <span className="font-mono text-body-sm font-medium">{b.ref}</span>
                     {create ? (
                       <Badge tone="info">{t("spdx3.status.declared")}</Badge>
                     ) : (
@@ -1181,7 +1185,7 @@ export function AiDeclarationWizard({
                     </Button>
                   )}
                 </div>
-                <label className="block text-sm font-medium" htmlFor={`base-rev-${i}`}>
+                <label className="block text-body-sm font-medium" htmlFor={`base-rev-${i}`}>
                   {t("aiDecl.base.revision.label")}
                 </label>
                 <Input
@@ -1191,12 +1195,12 @@ export function AiDeclarationWizard({
                   placeholder={t("aiDecl.base.revision.example")}
                   onChange={(e) => set({ kind: "base", index: i }, "revision", e.target.value)}
                 />
-                <p id={`base-rev-${i}-hint`} className="text-xs text-muted-foreground">
+                <p id={`base-rev-${i}-hint`} className="text-body-sm text-muted-foreground">
                   {t("aiDecl.base.revision.hint")}
                 </p>
                 <div aria-live="polite">
                   {problemAt(`model.baseModels[${i}]`, "revision") && (
-                    <p className="text-xs text-risk-critical-fg">{t("aiDecl.problem.revision")}</p>
+                    <p className="text-label text-risk-critical-fg">{t("aiDecl.problem.revision")}</p>
                   )}
                 </div>
               </CardContent>
@@ -1245,7 +1249,7 @@ export function AiDeclarationWizard({
           {useFields.length > 0 && (
             <Disclosure
               defaultOpen={hasIssueIn("model", useFields)}
-              summary={<span className="text-sm font-medium">{t("aiDecl.group.use")}</span>}
+              summary={<span className="text-body-sm font-medium">{t("aiDecl.group.use")}</span>}
             >
               <div className="mt-3 space-y-5">{useFields.map(modelField)}</div>
             </Disclosure>
@@ -1253,10 +1257,10 @@ export function AiDeclarationWizard({
           {regFields.length > 0 && (
             <Disclosure
               defaultOpen={hasIssueIn("model", regFields)}
-              summary={<span className="text-sm font-medium">{t("aiDecl.group.regulatory")}</span>}
+              summary={<span className="text-body-sm font-medium">{t("aiDecl.group.regulatory")}</span>}
             >
               <div className="mt-3 space-y-5" data-testid="regulatory-fields">
-                <p className="text-xs text-muted-foreground">{t("aiDecl.group.regulatoryNote")}</p>
+                <p className="text-body-sm text-muted-foreground">{t("aiDecl.group.regulatoryNote")}</p>
                 {regFields.map(modelField)}
               </div>
             </Disclosure>
@@ -1295,10 +1299,10 @@ export function AiDeclarationWizard({
                 <div className="flex flex-wrap items-start justify-between gap-2">
                   <div className="min-w-0">
                     {local ? (
-                      <span className="text-sm font-semibold">{t("aiDecl.localTitle")}</span>
+                      <span className="text-body-sm font-semibold">{t("aiDecl.localTitle")}</span>
                     ) : (
                       <div className="flex items-center gap-2">
-                        <span className="font-mono text-sm font-semibold">{d.ref?.replace(/^huggingface:/, "")}</span>
+                        <span className="font-mono text-body-sm font-semibold">{d.ref?.replace(/^huggingface:/, "")}</span>
                         {create ? (
                           <Badge tone="info">{t("aiDecl.readAtScan")}</Badge>
                         ) : (
@@ -1307,7 +1311,7 @@ export function AiDeclarationWizard({
                       </div>
                     )}
                     {(supplier || download) && (
-                      <p className="mt-1 break-all text-xs text-muted-foreground">
+                      <p className="mt-1 break-all text-label text-muted-foreground">
                         {[supplier && t("aiDecl.autoSupplier", { value: supplier }), download].filter(Boolean).join(", ")}
                       </p>
                     )}
@@ -1332,7 +1336,7 @@ export function AiDeclarationWizard({
                 </div>
                 {"role" in d && (
                   <div className="space-y-1.5">
-                    <span id={`role-${i}`} className="text-sm font-medium">
+                    <span id={`role-${i}`} className="text-body-sm font-medium">
                       {t("aiDecl.role.label")}
                     </span>
                     <Choices
@@ -1343,14 +1347,14 @@ export function AiDeclarationWizard({
                       labelOf={(o) => t(`aiDecl.role.${o}`)}
                       onPick={(o) => set({ kind: "dataset", index: i }, "role", d.role === o ? "" : o)}
                     />
-                    <p id={`role-${i}-hint`} className="text-xs text-muted-foreground">
+                    <p id={`role-${i}-hint`} className="text-body-sm text-muted-foreground">
                       {t("aiDecl.role.hint")}
                     </p>
                   </div>
                 )}
                 {local && (
                   <div className="space-y-1.5">
-                    <label htmlFor={`local-name-${i}`} className="flex items-center gap-2 text-sm font-medium">
+                    <label htmlFor={`local-name-${i}`} className="flex items-center gap-2 text-body-sm font-medium">
                       {t("aiDecl.dataset.name.label")}
                       <Badge variant="muted">{t("g7.required")}</Badge>
                     </label>
@@ -1382,13 +1386,13 @@ export function AiDeclarationWizard({
                 {more.length > 0 && (
                   <Disclosure
                     defaultOpen={hasIssueIn(where, more)}
-                    summary={<span className="text-sm font-medium">{t("aiDecl.group.moreData")}</span>}
+                    summary={<span className="text-body-sm font-medium">{t("aiDecl.group.moreData")}</span>}
                   >
                     <div className="mt-3 space-y-5">{more.map(field)}</div>
                   </Disclosure>
                 )}
                 {problemAt(where, "local") && (
-                  <p className="text-xs text-risk-critical-fg">{t("aiDecl.problem.localIncomplete")}</p>
+                  <p className="text-label text-risk-critical-fg">{t("aiDecl.problem.localIncomplete")}</p>
                 )}
               </CardContent>
             </Card>
@@ -1417,7 +1421,7 @@ export function AiDeclarationWizard({
             <CardContent className="p-4">
               <Disclosure
                 defaultOpen={hasIssueIn("model", trainFields)}
-                summary={<span className="text-sm font-medium">{t("aiDecl.group.training")}</span>}
+                summary={<span className="text-body-sm font-medium">{t("aiDecl.group.training")}</span>}
               >
                 <div className="mt-3 space-y-5">{trainFields.map(modelField)}</div>
               </Disclosure>
@@ -1472,7 +1476,7 @@ export function AiDeclarationWizard({
               }
             />
             {answer && answer !== "yes" && (
-              <p className="text-sm text-muted-foreground" data-testid="service-answer-note">
+              <p className="text-body-sm text-muted-foreground" data-testid="service-answer-note">
                 {t(`aiDecl.serviceAnswer.${answer}Note`)}
               </p>
             )}
@@ -1490,7 +1494,7 @@ export function AiDeclarationWizard({
                     key={g.id}
                     defaultOpen={groupOpen(g.fields)}
                     summary={
-                      <span className="text-sm font-medium" data-service-group={g.id}>
+                      <span className="text-body-sm font-medium" data-service-group={g.id}>
                         {t(`aiDecl.serviceGroup.${g.id}`)}
                       </span>
                     }
@@ -1544,7 +1548,7 @@ export function AiDeclarationWizard({
         <CardContent className="space-y-5 p-4">
           {judgmentFields(index, decl).map(modelField)}
           {viaService && (
-            <p className="text-xs text-muted-foreground" data-testid="autonomy-in-service">
+            <p className="text-body-sm text-muted-foreground" data-testid="autonomy-in-service">
               {t("aiDecl.autonomyInService")}
             </p>
           )}
@@ -1558,7 +1562,7 @@ export function AiDeclarationWizard({
     body = (
       <div className="space-y-3">
         <Card>
-          <CardContent className="space-y-1 p-4 text-sm">
+          <CardContent className="space-y-1 p-4 text-body-sm">
             {all.length === 0 ? (
               <p className="flex items-center gap-2 text-success">
                 <Check className="h-4 w-4" />
@@ -1567,7 +1571,7 @@ export function AiDeclarationWizard({
             ) : (
               <>
                 <p>{t("aiDecl.preview.open", { count: all.length })}</p>
-                <p className="text-xs text-muted-foreground">
+                <p className="text-body-sm text-muted-foreground">
                   {blockers.length ? t("aiDecl.preview.blocked") : t("aiDecl.preview.draftOk")}
                 </p>
               </>
@@ -1575,7 +1579,7 @@ export function AiDeclarationWizard({
             {/* The model's own values that also go into the CycloneDX SBOM; a
                 declared service says so in its own group below. */}
             {!serviceDeclared(decl) && modelCdxValues(decl) && (
-              <p className="text-xs text-muted-foreground" data-testid="cdx-note">
+              <p className="text-body-sm text-muted-foreground" data-testid="cdx-note">
                 {t(create ? "aiDecl.preview.modelCreate" : "aiDecl.preview.modelFill")}
               </p>
             )}
@@ -1588,21 +1592,21 @@ export function AiDeclarationWizard({
             const mine = groups.filter((g) => g.step === s);
             return (
               <Card key={s} data-summary={s}>
-                <CardContent className="space-y-2 p-4 text-sm">
+                <CardContent className="space-y-2 p-4 text-body-sm">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <h3 className="font-semibold">{stepName(s)}</h3>
                     {open > 0 ? (
                       <button
                         type="button"
                         aria-label={`${stepName(s)}: ${t("aiDecl.preview.openInStep", { count: open })}`}
-                        className="inline-flex items-center gap-1 rounded text-xs font-medium text-brand-strong underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        className="inline-flex items-center gap-1 rounded text-label font-medium text-foreground underline underline-offset-2 hover:no-underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                         onClick={() => go(s, firstOpenIn(s, all))}
                       >
                         <TriangleAlert className="h-3.5 w-3.5" aria-hidden />
                         {t("aiDecl.preview.openInStep", { count: open })}
                       </button>
                     ) : (
-                      <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+                      <span className="inline-flex items-center gap-1 text-label text-muted-foreground">
                         <Check className="h-3.5 w-3.5" aria-hidden />
                         {t("aiDecl.preview.stepDone")}
                       </span>
@@ -1646,14 +1650,14 @@ export function AiDeclarationWizard({
                     const empty = g.rows.length === 0 && extra.length === 0 && after.length === 0;
                     return (
                       <div key={gi} className="space-y-1">
-                        {g.title && <div className="font-mono text-xs font-semibold">{g.title}</div>}
+                        {g.title && <div className="font-mono text-label font-semibold">{g.title}</div>}
                         {g.datasetIndex === undefined && s === "data" && (
-                          <div className="text-xs font-semibold">{t("aiDecl.group.training")}</div>
+                          <div className="text-label font-semibold">{t("aiDecl.group.training")}</div>
                         )}
                         {empty ? (
-                          <p className="text-xs text-muted-foreground">{t("aiDecl.preview.nothing")}</p>
+                          <p className="text-body-sm text-muted-foreground">{t("aiDecl.preview.nothing")}</p>
                         ) : (
-                          <dl className="grid grid-cols-[minmax(8rem,14rem)_minmax(0,1fr)] gap-x-3 gap-y-1 text-xs">
+                          <dl className="grid grid-cols-[minmax(8rem,14rem)_minmax(0,1fr)] gap-x-3 gap-y-1 text-label">
                             {extra.map((x) => (
                               <SummaryLine key={x.label} label={x.label} value={x.value} />
                             ))}
@@ -1673,28 +1677,28 @@ export function AiDeclarationWizard({
                     );
                   })}
                   {s === "service" && (
-                    <p className="text-xs text-muted-foreground" data-testid="service-summary-note">
+                    <p className="text-body-sm text-muted-foreground" data-testid="service-summary-note">
                       {serviceDeclared(decl)
                         ? t(create ? "aiDecl.preview.serviceCreate" : "aiDecl.preview.serviceFill")
                         : t(`aiDecl.preview.service.${decl.serviceAnswer ?? "none"}`)}
                     </p>
                   )}
                   {s !== "base" && s !== "service" && mine.length === 0 && (
-                    <p className="text-xs text-muted-foreground">{t("aiDecl.preview.nothing")}</p>
+                    <p className="text-body-sm text-muted-foreground">{t("aiDecl.preview.nothing")}</p>
                   )}
                 </CardContent>
               </Card>
             );
           })}
-        <Disclosure summary={<span className="text-sm font-medium">{t("aiDecl.preview.file")}</span>}>
-          <pre className="mt-2 max-h-80 overflow-auto rounded-md border bg-muted/40 p-3 text-xs">
+        <Disclosure summary={<span className="text-body-sm font-medium">{t("aiDecl.preview.file")}</span>}>
+          <pre className="mt-2 max-h-80 overflow-auto rounded-md border bg-muted/40 p-3 text-body-sm">
             {JSON.stringify(toFile(decl, create), null, 2)}
           </pre>
         </Disclosure>
         {failure && (
           <div
             role="alert"
-            className="space-y-1 rounded-md border border-risk-critical/40 bg-risk-critical/10 p-3 text-xs text-risk-critical-fg"
+            className="space-y-1 rounded-md border border-risk-critical/40 bg-risk-critical/10 p-3 text-label text-risk-critical-fg"
           >
             <div className="font-medium">
               {failure.status === 422
@@ -1720,7 +1724,7 @@ export function AiDeclarationWizard({
     <PendingIds.Provider value={pending}>
       <div className="grid gap-6 lg:grid-cols-[12rem_minmax(0,1fr)_16rem]" data-testid="ai-declaration">
         <nav aria-label={t("aiDecl.stepsLabel")} className="space-y-4">
-          <div className="truncate text-xs text-muted-foreground">{title}</div>
+          <div className="truncate text-label text-muted-foreground">{title}</div>
           <ol className="space-y-2">
             {steps.map((s, i) => {
               const visited = i < stepIndex || left.includes(s);
@@ -1738,14 +1742,14 @@ export function AiDeclarationWizard({
                     aria-describedby={open > 0 ? `${headingId}-open-${s}` : undefined}
                     data-step={s}
                     className={cn(
-                      "flex w-full items-center gap-2 rounded-md px-1 py-1 text-left text-sm",
+                      "flex w-full items-center gap-2 rounded-md px-1 py-1 text-left text-body-sm",
                       "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                       s === step ? "font-semibold" : "text-muted-foreground hover:text-foreground",
                     )}
                   >
                     <span
                       className={cn(
-                        "flex h-5 w-5 shrink-0 items-center justify-center rounded-full border text-[0.7rem]",
+                        "flex h-5 w-5 shrink-0 items-center justify-center rounded-full border text-caption",
                         done && "border-foreground bg-foreground text-background",
                         warn && "border-warning-border bg-warning-surface text-warning",
                       )}
@@ -1757,7 +1761,7 @@ export function AiDeclarationWizard({
                     {open > 0 && (
                       <span
                         id={`${headingId}-open-${s}`}
-                        className="shrink-0 text-xs font-normal text-muted-foreground"
+                        className="shrink-0 text-label font-normal text-muted-foreground"
                         data-open={open}
                       >
                         {t("aiDecl.preview.openInStep", { count: open })}
@@ -1769,7 +1773,7 @@ export function AiDeclarationWizard({
             })}
           </ol>
           <div className="space-y-1.5">
-            <div className="text-xs text-muted-foreground" aria-live="polite">
+            <div className="text-label text-muted-foreground" aria-live="polite">
               {t("aiDecl.remaining", { count: remaining })}
             </div>
             <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted" aria-hidden>
@@ -1783,10 +1787,10 @@ export function AiDeclarationWizard({
 
         <div className="min-w-0 space-y-4">
           <div>
-            <h2 ref={heading} id={headingId} tabIndex={-1} className="text-xl font-semibold focus:outline-none">
+            <h2 ref={heading} id={headingId} tabIndex={-1} className="text-title font-semibold focus:outline-none">
               {t(create && step === "base" ? "aiDecl.questionCreate.base" : `aiDecl.question.${step}`)}
             </h2>
-            <p id={`${headingId}-hint`} className="mt-1 text-sm text-muted-foreground">
+            <p id={`${headingId}-hint`} className="mt-1 text-body-sm text-muted-foreground">
               {t(create ? `aiDecl.questionHintCreate.${step}` : `aiDecl.questionHint.${step}`)}
             </p>
           </div>
@@ -1802,7 +1806,7 @@ export function AiDeclarationWizard({
                 </Button>
               )}
               {step === "preview" ? (
-                <Button onClick={save} disabled={saving || blockers.length > 0}>
+                <Button onClick={save} disabled={saving || blockers.length > 0 || Boolean(startNote)}>
                   {saving && <Loader2 className="h-4 w-4 animate-spin" />}
                   {create ? t("aiDecl.startScan") : t("aiDecl.save")}
                 </Button>
@@ -1813,26 +1817,31 @@ export function AiDeclarationWizard({
               )}
             </div>
           </div>
+          {startNote && step === "preview" && (
+            <p className="text-right text-label text-muted-foreground" data-testid="declare-demo-note">
+              {startNote}
+            </p>
+          )}
         </div>
 
         <aside className="space-y-3">
           {decl.model?.baseModels?.length ? (
             <Card>
-              <CardContent className="space-y-1.5 p-4 text-sm">
+              <CardContent className="space-y-1.5 p-4 text-body-sm">
                 <div className="font-semibold">{t("aiDecl.side.baseTitle")}</div>
                 {decl.model.baseModels.map((b) => (
-                  <div key={b.ref} className="font-mono text-xs">
+                  <div key={b.ref} className="font-mono text-label">
                     {b.ref}
                   </div>
                 ))}
-                <p className="text-xs text-muted-foreground">{t("aiDecl.side.baseNote")}</p>
+                <p className="text-body-sm text-muted-foreground">{t("aiDecl.side.baseNote")}</p>
               </CardContent>
             </Card>
           ) : null}
           <Card>
-            <CardContent className="space-y-1.5 p-4 text-sm">
+            <CardContent className="space-y-1.5 p-4 text-body-sm">
               <div className="font-semibold">{t("aiDecl.whyTitle")}</div>
-              <p className="text-xs text-muted-foreground">{t(`aiDecl.why.${why}`)}</p>
+              <p className="text-body-sm text-muted-foreground">{t(`aiDecl.why.${why}`)}</p>
             </CardContent>
           </Card>
         </aside>
@@ -1872,13 +1881,13 @@ function BaseSummary({ bases, scratch }: { bases: { ref: string; revision: strin
   const { t } = useTranslation();
   if (!bases.length) {
     return (
-      <p className="text-xs text-muted-foreground">
+      <p className="text-body-sm text-muted-foreground">
         {scratch ? t("aiDecl.origin.scratch") : t("aiDecl.preview.noBase")}
       </p>
     );
   }
   return (
-    <ul className="space-y-0.5 text-xs">
+    <ul className="space-y-0.5 text-label">
       {bases.map((b) => (
         <li key={b.ref}>
           <span className="font-mono">{b.ref}</span>

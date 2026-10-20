@@ -6,6 +6,8 @@ description: Try BomLens hands-on with per-language example projects (Java, Pyth
 
 A hands-on guide using the per-language example projects under `examples/`. Run each example to see the SBOM output right away.
 
+How BomLens runs each ecosystem's build tool, and how it narrows the result to what ships, is explained in [How dependencies are resolved](../concepts/dependency-resolution.md).
+
 ## Example directory structure
 
 ```
@@ -182,7 +184,7 @@ Detected file: `composer.lock`
 
 Detected file: `Cargo.lock`
 
-> Note: cdxgen reads only `Cargo.lock`, which carries no licenses, so BomLens fills them from `cargo metadata`, which reads each crate's own manifest (your own workspace crates included). The container needs a route to the crate registry (crates.io or your mirror) for this. Without one, the SBOM records a license for almost no Cargo packages and the notice file built from the scan is nearly empty. The scan then records the step `cargo-license-metadata` as failed on the SBOM, which the result screen and the conformance report show, and the log says `could not read crate licenses`. A crate that declares its license only as a file (`license-file`) stays without one. Alternatives such as `MIT OR Apache-2.0` are written in a fixed order, so the same pair is one entry in the notice however a crate spells it, and a value that is not an SPDX expression is kept as a plain license name. The bundled example lists 147 libraries and 146 of them carry a license. `BOMLENS_NO_CARGO_LICENSE=1` turns this off, and so does `FETCH_LICENSE=false` on the command line. `--deep-license` does not help here: it scans your own source files, not the dependencies, and writes a separate report.
+> Note: cdxgen reads only `Cargo.lock`, which carries no licenses, so BomLens fills them from `cargo metadata`, which reads each crate's own manifest (your own workspace crates included). The container needs a route to the crate registry (crates.io or your mirror) for this. Without one, the SBOM records a license for almost no Cargo packages and the notice file built from the scan is nearly empty. The scan then records the step `cargo-license-metadata` as failed on the SBOM, which the result screen and the conformance check report show, and the log says `could not read crate licenses`. A crate that declares its license only as a file (`license-file`) stays without one. Alternatives such as `MIT OR Apache-2.0` are written in a fixed order, so the same pair is one entry in the notice however a crate spells it, and a value that is not an SPDX expression is kept as a plain license name. The bundled example lists 147 libraries and 146 of them carry a license. `BOMLENS_NO_CARGO_LICENSE=1` turns this off, and so does `FETCH_LICENSE=false` on the command line. `--deep-license` does not help here: it scans your own source files, not the dependencies, and writes a separate report.
 
 > Note: a Cargo workspace member registered in `Cargo.lock` survives the file-level exclusion above even when its own directory sits under an excluded tree, because cdxgen reads `Cargo.lock` directly. Such a member's own component is left out too, along with a dependency only that member needs, unless a kept member reaches it as well (any way at all). `BOMLENS_INCLUDE_NON_SHIPPED=1` (the same switch as the file-level exclusion above) keeps everything this leaves out. The excluded members and the components dropped because of them are recorded on the SBOM as `bomlens:excluded-members` and `bomlens:excluded-components`.
 

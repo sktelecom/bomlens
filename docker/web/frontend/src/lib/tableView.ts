@@ -70,7 +70,7 @@ export function toggleHidden(hidden: string[], id: string): string[] {
 }
 
 /** Default store: the browser's localStorage when there is one. */
-function defaultStore(): ViewStore | null {
+export function defaultStore(): ViewStore | null {
   try {
     return typeof localStorage === "undefined" ? null : localStorage;
   } catch {

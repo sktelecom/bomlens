@@ -36,6 +36,7 @@ It is a lightweight image (based on python 3.12 slim) without language toolchain
 | cosign | v3.1.3 | SBOM signing |
 | jq | — | SBOM normalization and notice generation |
 | ScanCode Toolkit | 32.5.0 | Precise license detection (included only in opt-in builds) |
+| SCANOSS | 1.54.2 | Identifies open source copied into C/C++ source (`--identify-vendored`) |
 | docker CLI | 29.9.0 | Starts a sibling cdxgen container when the web UI runs a source scan |
 | cdxgen | 13.3.0 | Model pedigree enrichment (`bomlens-aibom` image only) |
 
@@ -104,7 +105,7 @@ MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL='*' docker run --rm \
   ghcr.io/sktelecom/bomlens:latest
 ```
 
-In direct runs, `SOURCE` mode has syft read the package manifests inside the container, so it may only capture direct dependencies. If you need transitive dependencies, use `scan-sbom.sh`, which routes to the per-language cdxgen images. Syft's manifest readers need a lockfile (`package-lock.json`, `npm-shrinkwrap.json`, `yarn.lock`, `pnpm-lock.yaml` for Node, and the equivalent for other ecosystems) to resolve any of a project's declared dependencies; without one, direct-run SOURCE mode has nothing to read and the scan fails with guidance rather than reporting an empty result as complete.
+In direct runs, `SOURCE` mode reads a lock file that covers the whole tree (a `package-lock.json`, `npm-shrinkwrap.json`, `pnpm-lock.yaml`, `bun.lock` or `gradle.lockfile`, with no other manifest below the root) as it is, with no build and no Docker socket, and fills the licenses it lacks from the package registry; the SBOM records this as `bomlens:detection`. That is the form to use where there is no Docker to start a sibling container in, such as a CI job that runs this image as its job image. For any other tree, syft reads the package manifests inside the container, so it may only capture direct dependencies; if you need transitive dependencies there, use `scan-sbom.sh`, which routes to the per-language cdxgen images. Syft's manifest readers need a lockfile (`package-lock.json`, `npm-shrinkwrap.json`, `yarn.lock`, `pnpm-lock.yaml` for Node, and the equivalent for other ecosystems) to resolve any of a project's declared dependencies; without one, direct-run SOURCE mode has nothing to read and the scan fails with guidance rather than reporting an empty result as complete.
 
 ### Notice and reports in one run
 
@@ -150,11 +151,12 @@ MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL='*' docker run --rm \
 | `DEEP_LICENSE_MAX_FILES` | — | `20000` | `DEEP_LICENSE`: a tree with more of the project's own files than this is not scanned |
 | `DEEP_LICENSE_TIMEOUT` | — | `600` | `DEEP_LICENSE`: seconds before scancode is stopped |
 | `BOMLENS_DEEP_LICENSE_ALL` | — | — | `DEEP_LICENSE`: set `1` to scan dependency, build and tool folders too (left out by default) |
+| `DETECTION` | — | `auto` | `SOURCE` mode only. `auto` reads a covering lock file statically and otherwise runs the build or syft path as before; `static` always reads statically; `build` never does (CLI `--detection`). Static detection fills missing licenses from the package registry, so `auto` builds under `BYTE_STABLE=true` or `FETCH_LICENSE=false` |
 | `REACHABILITY` | — | `false` | Judge with govulncheck whether each Go advisory's code is reached (CLI `--reachability`): on the executable in `BINARY` mode; in `SOURCE` and `POSTPROCESS`, from the govulncheck output stage 1 left (the CLI hands stage 1 the image's govulncheck) |
-| `GENERATE_REPORT` | — | `false` | Generate the open-source risk analysis report (off in direct runs, unlike the CLI default) |
+| `GENERATE_REPORT` | — | `false` | Generate the open-source risk report (off in direct runs, unlike the CLI default) |
 | `ENRICH_MAVEN_CPE` | — | `true` | Attach an NVD-matchable `cpe:2.3` to maven components (derived from the groupId) so a CPE-aware engine can reach their NVD-only CVEs; unmapped groups get no CPE (skipped for AI SBOMs) |
 | `ENRICH_GITHUB_CPE` | — | `true` | Attach an NVD-matchable `cpe:2.3` to a small, hand-verified set of `pkg:github/` components (source-repository-only coordinates, typical for large C/C++ projects with no package-manager ecosystem) so a CPE-aware engine can reach their NVD-only CVEs; anything not in the curated list gets no CPE (skipped for AI SBOMs) |
-| `ENRICH_UPSTREAM_PURL` | — | `true` | For a firmware, root filesystem or binary scan, set the purl of the upstream source repository (`pkg:github/<owner>/<repo>@<tag>`, `pkg:sourceforge`, `pkg:gnu`) on components that have no purl, a `pkg:generic` one or a `pkg:opkg` one, from the closed table in `docker/lib/upstream-purl-map.json`. A component not in the table keeps its identifier |
+| `ENRICH_UPSTREAM_PURL` | — | `true` | For a firmware, root filesystem or binary scan, or an SBOM read from a Yocto build's records, set the purl of the upstream source repository (`pkg:github/<owner>/<repo>@<tag>`, `pkg:sourceforge`, `pkg:gnu`) on components that have no purl, a `pkg:generic` one or a `pkg:opkg` one, from the closed table in `docker/lib/upstream-purl-map.json`, or from a source download address that states a GitHub or GNU release. Any other component keeps its identifier |
 | `ENRICH_INTERPRETER_CPE` | — | `true` | Attach an NVD-matchable `cpe:2.3` to a small, hand-verified set of interpreter components (e.g. Python packaged as a conda or NuGet artifact) so a CPE-aware engine can reach their NVD-only CVEs; anything not in the curated list gets no CPE (skipped for AI SBOMs) |
 | `SECURITY_NVD_VERIFY` | — | `false` | With `--deep-cve`: verify each grype `nvd:cpe` finding against the live NVD version range and drop out-of-range false positives (needs `NVD_API_KEY` + network; adds minutes). Off by default — findings are kept and flagged version-unverified |
 | `NVD_API_KEY` | For `SECURITY_NVD_VERIFY` | — | NVD API key used by the deep-cve version filter; passed to the container by name only (never inlined) |
@@ -196,7 +198,7 @@ MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL='*' docker run --rm \
 | `LICENSE_REGISTRY_VERIFY` | — | GPL, AGPL, SSPL-1.0, BUSL-1.1 and CC-BY-NC ids | SPDX ids whose single occurrence is checked against the registry, space- or comma-separated |
 | `LICENSE_REGISTRY_BUDGET` | — | `240` | Seconds the lookups may take in total. Components it does not reach are left as they were, and the step is recorded as degraded |
 | `LICENSE_REGISTRY_API` | — | `https://api.deps.dev/v3` | Base URL of a server that answers the deps.dev v3 version lookup, for a network that reaches the registries only through its own mirror or proxy. When nothing answers, the components stay as they were and the step is recorded as degraded (`unavailable`) |
-| `PURL_RESOLVE` | — | `false` | `--analyze` only (the script's `--resolve-purl`): look each identifier up in its package repository (deps.dev) and add the answer to the conformance report as an advisory row. Uses the network |
+| `PURL_RESOLVE` | — | `false` | `--analyze` only (the script's `--resolve-purl`): look each identifier up in its package repository (deps.dev) and add the answer to the conformance check report as an advisory row. Uses the network |
 | `PURL_RESOLVE_IGNORE` | — | — | Namespace prefixes to leave out of that lookup, space- or comma-separated. Use it for namespaces published only to an internal repository, which cannot be told apart from a wrong identifier |
 | `PURL_RESOLVE_BUDGET` | — | `240` | Seconds the lookup may take in total. Identifiers it does not reach are reported as unchecked, never as missing |
 

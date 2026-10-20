@@ -3,7 +3,9 @@
 
 import type { ReactNode } from "react";
 
+import { FOCUS_RING, SELECTED_TILE } from "@/components/ui/selectable";
 import { cn } from "@/lib/utils";
+import { useFormatNumber } from "@/lib/format";
 
 export interface BarDatum {
   key: string;
@@ -56,13 +58,14 @@ export function BarList({
   onActivate,
   activateHint,
 }: Props) {
+  const fmt = useFormatNumber();
   const top = max ?? Math.max(1, ...items.map((i) => i.value));
   const interactive = Boolean(onSelect);
   // Shared button chrome for both interactive modes.
   const rowButton =
     "block w-full rounded-md border border-transparent text-left " +
     "transition-colors duration-fast ease-out-soft " +
-    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1";
+    FOCUS_RING;
 
   return (
     <ul role="list" aria-label={ariaLabel} className="space-y-1">
@@ -81,12 +84,12 @@ export function BarList({
               style={{ width: `${pct}%` }}
               aria-hidden
             />
-            <span className="relative z-10 flex min-w-0 items-center gap-1.5 pl-2.5 text-sm text-foreground">
+            <span className="relative z-10 flex min-w-0 items-center gap-1.5 pl-2.5 text-body-sm text-foreground">
               {it.badge}
               <span className="truncate">{it.label}</span>
             </span>
-            <span className="relative z-10 ml-auto pr-2.5 text-xs tabular-nums text-foreground">
-              {it.value}
+            <span className="relative z-10 ml-auto pr-2.5 text-label tabular-nums text-foreground">
+              {fmt(it.value)}
             </span>
           </div>
         );
@@ -115,9 +118,7 @@ export function BarList({
               onClick={() => onSelect?.(it.key)}
               className={cn(
                 rowButton,
-                sel
-                  ? "ring-2 ring-foreground ring-offset-1"
-                  : "hover:border-border hover:shadow-sm",
+                sel ? SELECTED_TILE : "hover:border-border hover:shadow-sm",
               )}
             >
               {inner}

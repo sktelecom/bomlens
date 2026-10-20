@@ -266,7 +266,7 @@ section "CLI contract (no docker daemon touched)"
 # --------------------------------------------------------
 HELP="$(bash "$SCAN" --help 2>&1)"; hrc=$?
 [ "$hrc" -eq 0 ] && pass "--help exits 0" || fail "--help exits 0" "rc=$hrc"
-for flag in --project --version --target --git --branch --firmware --analyze \
+for flag in --project --version --target --git --branch --exclude --firmware --analyze \
             --generate-only --notice --security --all --no-report --deep-license \
             --byte-stable --sign --output-dir --timestamp --ui \
             --license --sbom-author --model --model-file --usage --merge --merge-root \
@@ -422,6 +422,18 @@ DOCKER_STUB_ARGV_DUMP=1 SBOM_TRIVY_CACHE="$WORK/ui trivy cache" HTTPS_PROXY=http
   && in_log "<HTTP_PROXY>" && ! in_log "<HTTPS_PROXY>"; } \
   && pass "--ui mounts SBOM_TRIVY_CACHE; a loopback proxy is left out, another proxy is passed" \
   || { fail "--ui trivy cache / proxy"; show; cat "$LOG"; }
+
+# The sibling cdxgen container the UI starts uses --volumes-from the UI container,
+# so the package caches the CLI mounts into stage 1 are mounted into the UI
+# container at the same places (Maven, Gradle, Cargo, Go, pip, npm).
+ui_ok=1
+for m in "m2:/tmp/sbomhome/.m2" "gradle:/root/.gradle" "cargo/registry:/usr/local/cargo/registry" "go/mod:/tmp/sbomhome/go/pkg/mod" \
+         "go/build:/tmp/sbomhome/go-build" "pip:/tmp/sbomhome/.cache/pip" "npm:/tmp/sbomhome/.npm"; do
+    grep -q -- "/bomlens/${m%%:*}:${m#*:}\|\\bomlens\\cache\\${m%%:*}:${m#*:}\|/bomlens/cache/${m%%:*}:${m#*:}" "$LOG" || ui_ok=0
+done
+[ "$ui_ok" = 1 ] \
+  && pass "--ui mounts the Maven, Gradle, Cargo, Go, pip and npm caches into the UI container for its source scans" \
+  || { fail "--ui package cache mounts" "rc=$RC"; grep -o -- '-v [^ ]*bomlens[^ ]*' "$LOG" | head -12; }
 
 # --------------------------------------------------------
 section "Startup sweep for a killed scan's leftover container"
@@ -606,7 +618,7 @@ scan_in "$d" --project Pmixed --version 1.0.0 --generate-only
 # isolated in the per-run <proj>_<ver>/ subfolder (not flat in the source tree).
 d="$(new_proj complete)"; printf '{"name":"a"}' > "$d/package.json"
 scan_in "$d" --project Done --version 2.0.0 --generate-only
-{ [ "$RC" -eq 0 ] && in_out "Analysis Complete" \
+{ [ "$RC" -eq 0 ] && { in_out "Analysis Complete" || in_out "Analysis finished"; } \
     && [ -f "$d/Done_2.0.0/Done_2.0.0_bom.json" ] && [ ! -f "$d/Done_2.0.0_bom.json" ]; } \
   && pass "source scan completes and writes <proj>_<ver>/<proj>_<ver>_bom.json" \
   || { fail "source scan completes and writes SBOM" "rc=$RC"; show; }
@@ -640,7 +652,7 @@ unset DOCKER_STUB_NOWRITE
 # artifact is missing and must be reported as such instead of announced.
 d="$(new_proj summary)"; printf '{"name":"a"}' > "$d/package.json"
 scan_in "$d" --project Sum --version 4.0.0 --all --generate-only
-{ [ "$RC" -eq 0 ] && in_out "Analysis Complete" \
+{ [ "$RC" -eq 0 ] && in_out "Analysis finished with errors" && ! in_out "Analysis Complete" \
     && ! in_out "_bom.spdx.json" \
     && in_out "requested but not produced" \
     && in_out "SPDX export" && in_out "notice" && in_out "security report"; } \
@@ -671,7 +683,7 @@ d="$(new_proj sumempty)"; printf '{"name":"a"}' > "$d/package.json"
 export DOCKER_STUB_SUMMARY_RESULT='components\t0\nlicensed\t0\nlicensePercent\t-\npurlPercent\t-\n'
 scan_in "$d" --project Empty0 --version 5.1.0 --generate-only
 unset DOCKER_STUB_SUMMARY_RESULT
-{ [ "$RC" -eq 0 ] && in_out "Analysis Complete" && in_out "0 identified" && in_out "[WARN] No software was identified"; } \
+{ [ "$RC" -eq 0 ] && { in_out "Analysis Complete" || in_out "Analysis finished"; } && in_out "0 identified" && in_out "[WARN] No software was identified"; } \
   && pass "a scan with no components says so after 'Analysis Complete!'" \
   || { fail "an empty result ended without a warning" "rc=$RC"; show; }
 
@@ -696,7 +708,7 @@ unset DOCKER_STUB_SUMMARY_RESULT
 
 d="$(new_proj sumnone)"; printf '{"name":"a"}' > "$d/package.json"
 scan_in "$d" --project NoFacts --version 5.3.0 --generate-only
-{ [ "$RC" -eq 0 ] && in_out "Analysis Complete" && ! in_out "Components:" && ! in_out "identified"; } \
+{ [ "$RC" -eq 0 ] && { in_out "Analysis Complete" || in_out "Analysis finished"; } && ! in_out "Components:" && ! in_out "identified"; } \
   && pass "no summary sidecar, no invented counts" \
   || { fail "counts were printed without a sidecar" "rc=$RC"; show; }
 
@@ -1057,7 +1069,7 @@ d="$(new_proj merge)"
 printf '%s' "$CDX" > "$d/a.json"
 printf '%s' "$CDX" > "$d/b.json"
 scan_in "$d" --project Merged --version 1.0.0 --merge a.json b.json --generate-only
-{ in_out "Mode: MERGE" && [ "$RC" -eq 0 ] && in_out "Analysis Complete"; } \
+{ in_out "Mode: MERGE" && [ "$RC" -eq 0 ] && { in_out "Analysis Complete" || in_out "Analysis finished"; }; } \
   && pass "--merge a.json b.json -> MERGE mode completes" || { fail "--merge -> MERGE mode"; show; }
 
 d="$(new_proj merge_root)"
@@ -1589,7 +1601,7 @@ unset DOCKER_STUB_CONFORMANCE_RESULT
 d="$(new_proj foc_none)"; printf 'ELFish\n' > "$d/app.out"
 scan_in "$d" --project FN --version 1 --target app.out --generate-only --fail-on-conformance
 rc_none=$RC
-{ [ "$rc_none" -eq 3 ] && in_out "no conformance report to judge"; } \
+{ [ "$rc_none" -eq 3 ] && in_out "no conformance check report to judge"; } \
   && pass "--fail-on-conformance: no report exits 3" \
   || { fail "--fail-on-conformance no-report case" "rc=$rc_none"; show; }
 
@@ -1623,8 +1635,8 @@ gate_case "--fail-on: license-coverage met exits 4 and shows the measured value"
   "met${TAB}license-coverage=80${TAB}license coverage is 0% (1/157), below 80%\n" --fail-on license-coverage=80
 gate_case "--fail-on: license-coverage ok exits 0" 0 "none is met" \
   "ok${TAB}license-coverage=80${TAB}license coverage is 100% (3/3), at or above 80%\n" --fail-on license-coverage=80
-gate_case "--fail-on: empty-result without a conformance report exits 5" 5 "no conformance report was produced" \
-  "unjudged${TAB}empty-result${TAB}no conformance report was produced for this scan\n" --fail-on empty-result
+gate_case "--fail-on: empty-result without a conformance report exits 5" 5 "no conformance check report was produced" \
+  "unjudged${TAB}empty-result${TAB}no conformance check report was produced for this scan\n" --fail-on empty-result
 guard "--fail-on empty-result is refused for an AI model input" "not available for AI model and dataset inputs" --project M --version 1 --model owner/repo --fail-on empty-result
 
 gate_case "--fail-on: a condition an older image does not know exits 5 and says to refresh the image" 5 "docker pull" \
@@ -1687,7 +1699,7 @@ scan_in "$d" --project FS --version 1 --target app.out --generate-only --fail-on
 unset DOCKER_STUB_CONFORMANCE_RESULT
 scan_in "$d" --project FS --version 1 --target app.out --generate-only --fail-on-conformance
 rc_stale=$RC
-{ [ "$rc_stale" -eq 3 ] && in_out "no conformance report to judge"; } \
+{ [ "$rc_stale" -eq 3 ] && in_out "no conformance check report to judge"; } \
   && pass "--fail-on-conformance: a stale pass file from an earlier run is not mistaken for this run's verdict" \
   || { fail "--fail-on-conformance stale-result case" "rc=$rc_stale"; show; }
 
@@ -1703,6 +1715,52 @@ section "Stage 1 Maven and Gradle caches"
 # Stage 1 runs as root, so it gets BomLens's own cache folders, never the
 # user's ~/.m2 or ~/.gradle; the user's settings files go in read-only, at
 # paths outside the cache folders.
+# --------------------------------------------------------
+section "--detection: build, static or auto"
+# --------------------------------------------------------
+# auto reads a covering lock file instead of building: no stage 1, and the
+# post-process step is told to read the lock file.
+d="$(new_proj det_auto_node)"; printf '{"name":"a","dependencies":{"debug":"4.3.1"}}' > "$d/package.json"; printf '{"lockfileVersion":3}' > "$d/package-lock.json"
+scan_in "$d" --project Det --version 1 --generate-only
+{ in_out "Detection: static (package-lock.json)" && in_log "BOMLENS_DETECTION=static" && in_log "BOMLENS_DETECTION_WHY=package-lock.json" \
+    && ! in_log "build-prep.sh" && in_log "LICENSE_REGISTRY=true"; } \
+  && pass "auto with a package-lock.json skips the build, reads the lock file and turns the registry license lookup on" \
+  || { fail "--detection auto with a lock file" "rc=$RC"; show; cat "$LOG"; }
+d="$(new_proj det_build)"; printf '{"name":"a","dependencies":{"debug":"4.3.1"}}' > "$d/package.json"; printf '{"lockfileVersion":3}' > "$d/package-lock.json"
+scan_in "$d" --project Det --version 1 --generate-only --detection build
+{ in_log "build-prep.sh" && ! in_log "BOMLENS_DETECTION=static" && ! in_out "Detection: static"; } \
+  && pass "--detection build builds even with a lock file" \
+  || { fail "--detection build" "rc=$RC"; show; }
+d="$(new_proj det_nolock)"; printf '{"name":"a","dependencies":{"debug":"^4"}}' > "$d/package.json"
+scan_in "$d" --project Det --version 1 --generate-only
+{ in_log "build-prep.sh" && ! in_log "BOMLENS_DETECTION=static"; } \
+  && pass "auto builds a Node project that has no lock file" \
+  || { fail "auto without a lock file" "rc=$RC"; show; }
+d="$(new_proj det_bytestable)"; printf '{"name":"a","dependencies":{"debug":"4.3.1"}}' > "$d/package.json"; printf '{"lockfileVersion":3}' > "$d/package-lock.json"
+scan_in "$d" --project Det --version 1 --generate-only --byte-stable
+{ in_log "build-prep.sh" && ! in_log "BOMLENS_DETECTION=static"; } \
+  && pass "auto builds under --byte-stable, which allows no registry license lookup" \
+  || { fail "auto with --byte-stable" "rc=$RC"; show; }
+d="$(new_proj det_pom)"; printf '<project><modelVersion>4.0.0</modelVersion></project>' > "$d/pom.xml"
+scan_in "$d" --project Det --version 1 --generate-only
+{ in_log "build-prep.sh" && ! in_log "BOMLENS_DETECTION=static"; } \
+  && pass "auto builds a Maven project" \
+  || { fail "auto with a Maven project" "rc=$RC"; show; }
+d="$(new_proj det_static_nolock)"; printf '{"name":"a","dependencies":{"debug":"^4"}}' > "$d/package.json"
+scan_in "$d" --project Det --version 1 --generate-only --detection static
+{ in_out "--detection static: no package-lock.json" && in_log "BOMLENS_DETECTION=static" && ! in_log "build-prep.sh"; } \
+  && pass "--detection static on a project with no lock file warns that the SBOM may be incomplete and still reads statically" \
+  || { fail "--detection static without a lock file" "rc=$RC"; show; }
+scan_in "$d" --project Det --version 1 --generate-only --detection fast
+{ [ "$RC" -ne 0 ] && in_out "--detection takes build, static or auto"; } \
+  && pass "--detection with another word is refused" \
+  || { fail "--detection fast" "rc=$RC"; show; }
+d="$(new_proj det_env)"; printf '{"name":"a","dependencies":{"debug":"4.3.1"}}' > "$d/package.json"; printf '{"lockfileVersion":3}' > "$d/package-lock.json"
+( cd "$d" && DETECTION=build DOCKER_STUB_LOG="$LOG" bash "$SCAN" --project Det --version 1 --generate-only ) > "$OUT" 2>&1
+in_log "build-prep.sh" \
+  && pass "DETECTION=build in the environment does what --detection build does" \
+  || { fail "DETECTION=build" ; show; }
+
 cache_home="$WORK/cachehome"; fake_home="$WORK/fakehome"
 mkdir -p "$fake_home/.m2/repository" "$fake_home/.gradle/init.d"
 : > "$fake_home/.m2/settings.xml"; : > "$fake_home/.m2/settings-security.xml"
@@ -1724,6 +1782,14 @@ HOME="$fake_home" scan_in "$d" --project Pcache --version 1.0.0 --generate-only
 in_log "$(host_form "$cache_dir/gradle"):/root/.gradle " \
   && pass "the Gradle home is BomLens's cache folder" \
   || { fail "the Gradle home is BomLens's cache folder" "rc=$RC"; show; }
+cm_ok=1
+for m in "cargo/registry:/usr/local/cargo/registry" "go/mod:/tmp/sbomhome/go/pkg/mod" "go/build:/tmp/sbomhome/go-build" \
+         "pip:/tmp/sbomhome/.cache/pip" "npm:/tmp/sbomhome/.npm"; do
+    in_log "$(host_form "$cache_dir/${m%%:*}"):${m#*:} " && [ -d "$cache_dir/${m%%:*}" ] || cm_ok=0
+done
+[ "$cm_ok" = 1 ] \
+  && pass "the Cargo registry, Go module and build caches, and pip and npm download caches are BomLens's cache folders" \
+  || { fail "package download caches are not mounted from BomLens's cache folder" "rc=$RC"; show; }
 ok=1
 for m in ".m2/settings.xml:/bomlens-settings/m2/settings.xml:ro" ".m2/settings-security.xml:/bomlens-settings/m2/settings-security.xml:ro" \
          ".gradle/gradle.properties:/bomlens-settings/gradle/gradle.properties:ro" ".gradle/init.gradle:/bomlens-settings/gradle/init.gradle:ro" \
@@ -1762,7 +1828,7 @@ sane_outcome() {
   # sane_outcome <label> [-- expect-in-out ...]
   local label="$1"; shift
   if [ "$RC" -eq 0 ]; then
-    if in_out "Analysis Complete"; then
+    if in_out "Analysis Complete" || in_out "Analysis finished"; then
       local ok=1
       for want in "$@"; do in_out "$want" || ok=0; done
       [ "$ok" = 1 ] && pass "$label" || { fail "$label" "rc=0 but missing expected output"; show; }

@@ -57,6 +57,15 @@ if ! { [ -n "${HOME:-}" ] && [ -d "$HOME" ] && [ -w "$HOME" ]; }; then
     fi
 fi
 
+# The cache folder a host shares between scans (SBOM_TRIVY_CACHE) is meant to
+# hold the vulnerability database. Trivy's per-scan layer cache goes to memory
+# there: a second scan opening the same cache file at the same time failed with
+# "cache may be in use by another process" and left its report incomplete. The
+# database is opened read-only, so scans run side by side.
+if [ "${TRIVY_CACHE_DIR:-}" = "/trivy-cache" ] && [ -z "${TRIVY_CACHE_BACKEND:-}" ]; then
+    export TRIVY_CACHE_BACKEND=memory
+fi
+
 # --- UI mode: hand off to the web server, no project metadata needed ---
 if [ "$SCAN_MODE" = "UI" ]; then
     echo "[INFO] Starting BomLens Web UI on port ${UI_PORT:-8080}..."
@@ -525,6 +534,7 @@ generate_sbom_cdxgen() {
             --volumes-from "$self" \
             -e HOME=/tmp/sbomhome \
             -e "MAVEN_OPTS=-Duser.home=/tmp/sbomhome -Dmaven.repo.local=/tmp/sbomhome/.m2/repository" \
+            -e GOPATH=/tmp/sbomhome/go -e GOMODCACHE=/tmp/sbomhome/go/pkg/mod -e GOCACHE=/tmp/sbomhome/go-build \
             -e FETCH_LICENSE="$FETCH_LICENSE" \
             -e PROJECT_NAME="$PROJECT_NAME" \
             -e PROJECT_VERSION="$PROJECT_VERSION" \
@@ -541,6 +551,7 @@ generate_sbom_cdxgen() {
             --volumes-from "$self" \
             -e HOME=/tmp/sbomhome \
             -e "MAVEN_OPTS=-Duser.home=/tmp/sbomhome -Dmaven.repo.local=/tmp/sbomhome/.m2/repository" \
+            -e GOPATH=/tmp/sbomhome/go -e GOMODCACHE=/tmp/sbomhome/go/pkg/mod -e GOCACHE=/tmp/sbomhome/go-build \
             -e FETCH_LICENSE="$FETCH_LICENSE" \
             -e PROJECT_NAME="$PROJECT_NAME" \
             -e PROJECT_VERSION="$PROJECT_VERSION" \
@@ -726,6 +737,17 @@ echo "=========================================="
 # CYCLONEDX_SPEC_VERSION asks for it): cdxgen is run with --spec-version
 # "$CDX_SPEC_VERSION", convert-to-cdx.sh writes it, and the docs promise it.
 # The selector keeps syft output aligned with cdxgen.
+# Whether the SBOM was read from a Yocto build's own records (ANALYZE: the
+# SPDX reader or the manifest reader). Those components have the same need as a
+# firmware scan's: no package purl a vulnerability or license database
+# resolves, so the upstream purl step below runs for them too.
+# YOCTO_CPE_MATCH: the CPE index step as well, for an SPDX 2.2 archive only. Its
+# CPEs (Yocto's CVE_PRODUCT) are all it gives for vulnerabilities. An SPDX 3.0
+# document records which CVEs each recipe patched or is not affected by, and
+# the manifest reader takes cve-check's own verdicts; matching their CPEs again
+# would report as open what Yocto already judged.
+YOCTO_SBOM=false
+YOCTO_CPE_MATCH=false
 case "$SCAN_MODE" in
     SOURCE)
         # Local web UI source scan (current dir / extracted ZIP / cloned git repo).
@@ -743,7 +765,38 @@ case "$SCAN_MODE" in
         # The syft fallback leaves out the same non-shipped trees as the cdxgen
         # path (see NON_SHIPPED_DIRS in source-detect.sh).
         read -ra SYFT_EXCLUDE <<< "$(non_shipped_syft_args)"
-        if [ -S /var/run/docker.sock ] && command -v docker >/dev/null 2>&1 && [ -n "$SOURCE_ROOT_HOST" ]; then
+        # Static detection first, as the CLI does (scan-sbom.sh --detection): a lock
+        # file that covers the whole tree is read as it is, with no language image
+        # and no docker socket. This is also what lets the image run as a CI job
+        # container, where there is no Docker to start a sibling in. DETECTION=build
+        # keeps the old order; the registry license lookup that fills the licenses
+        # a lock file lacks is switched on with it, so a reproducible (BYTE_STABLE)
+        # or no-license-fetch run builds instead.
+        _static_why=""
+        case "${DETECTION:-auto}" in
+            static) _static_why="requested" ;;
+            auto)
+                if [ "${BYTE_STABLE:-false}" != "true" ] && [ "${FETCH_LICENSE:-true}" != "false" ] \
+                   && static_detection_check "$SRC_ROOT" "$(detect_lang "$SRC_ROOT")"; then
+                    _static_why="$STATIC_DETECTION_WHY"
+                fi ;;
+        esac
+        _static_ok=false
+        if [ -n "$_static_why" ]; then
+            echo "[1/2] static: source dir $SRC_ROOT ($_static_why, no build)"
+            if generate_sbom_static "$SRC_ROOT" "$OUTPUT_FILE"; then
+                _static_ok=true
+                mark_sbom_detection "$OUTPUT_FILE" static "$_static_why"
+                mark_sbom_excluded "$OUTPUT_FILE" "$SRC_ROOT"
+                [ "${BYTE_STABLE:-false}" = "true" ] || [ "${FETCH_LICENSE:-true}" = "false" ] || LICENSE_REGISTRY=true
+            else
+                rm -f "$OUTPUT_FILE"
+                echo "[WARN] static detection could not read the lock file; continuing without it."
+            fi
+        fi
+        if [ "$_static_ok" = "true" ]; then
+            :
+        elif [ -S /var/run/docker.sock ] && command -v docker >/dev/null 2>&1 && [ -n "$SOURCE_ROOT_HOST" ]; then
             # Best-effort low-disk warning: cdxgen pulls/extracts a language image
             # via the host Docker, which fails if space is tight. We only see this
             # container's view of the disk (on Docker Desktop it shares the VM
@@ -1069,6 +1122,18 @@ EOF
                "$OUTPUT_FILE" >/dev/null 2>&1; then
             ER_STAGE1_DEGRADED=true
         fi
+        # Static detection (scan-sbom.sh --detection static, or auto when a lock
+        # file covers the tree): the CLI skipped stage 1 and this step reads the
+        # lock file itself. A failure ends the run, and the CLI then builds.
+        if [ "${BOMLENS_DETECTION:-}" = "static" ] && [ ! -s "$OUTPUT_FILE" ]; then
+            echo "[1/2] static: source dir ${SOURCE_ROOT:-/src} (lock file, no build)"
+            if ! generate_sbom_static "${SOURCE_ROOT:-/src}" "$OUTPUT_FILE"; then
+                echo "[ERROR] static detection failed (the lock file could not be read into an SBOM)."
+                exit 3
+            fi
+            mark_sbom_detection "$OUTPUT_FILE" static "${BOMLENS_DETECTION_WHY:-}"
+            mark_sbom_excluded "$OUTPUT_FILE" "${SOURCE_ROOT:-/src}"
+        fi
         # A caller that ran stage 1 from the execution plan passes its exit
         # code. When stage 1 failed or left no SBOM, the manifest-only syft
         # scan takes its place, the same fallback the CLI runs, and the SBOM
@@ -1123,6 +1188,7 @@ EOF
                 echo "[ERROR] this build directory holds no image package manifest to read."
                 exit 1
             fi
+            YOCTO_SBOM=true
             # No conformance report: conformance measures a document someone sent
             # us against the submission criteria, and there is no document here.
         else
@@ -1185,6 +1251,10 @@ EOF
             echo "[ERROR] could not read the Yocto SPDX archive: $(basename "$ANALYZE_SBOM")"
             echo "        See the [yocto-spdx] message above for what stopped it."
             exit 1
+        fi
+        if [ "$YOCTO_RC" = 0 ]; then
+            YOCTO_SBOM=true
+            [ "$YOCTO_ARCHIVE" = "true" ] && YOCTO_CPE_MATCH=true
         fi
         if [ "$YOCTO_RC" != 0 ]; then
             [ "$YOCTO_RC" = 3 ] || echo "[analyze] WARN: Yocto SPDX parser failed (rc=$YOCTO_RC); using the generic converter." >&2
@@ -1278,6 +1348,12 @@ if command -v jq >/dev/null 2>&1; then
     COMP_COUNT=$(jq '[.components[]?] | length' "$OUTPUT_FILE" 2>/dev/null || echo 0)
     if [ "${COMP_COUNT:-0}" -eq 0 ]; then
         echo "[WARN] SBOM has 0 components — the scan may have found nothing (missing lockfile or empty source)."
+        # The npm production set was resolved, so the project declares no
+        # runtime dependencies; its development-only ones are left out.
+        if jq -e '(.metadata.properties // []) | any(.name == "bomlens:prep-step-applied" and .value == "npm-production-set")' "$OUTPUT_FILE" >/dev/null 2>&1; then
+            echo "       The lock file was read: this project has no runtime dependencies, and its development-only dependencies are left out."
+            echo "       Set BOMLENS_NODE_FULL_GRAPH=1 to list them as well."
+        fi
         # A directory --target that is not itself a root filesystem but
         # has one a level or two below it (a delivery folder wrapping the
         # actual rootfs) is a common way this ends up empty -- cdxgen has
@@ -1587,10 +1663,11 @@ case "$SCAN_MODE" in
 esac
 
 # Versions the scan could not read. A firmware, root filesystem or binary scan
-# can prove a component is there without finding its version. A supplier's
-# two-column file (--component-versions, CSV name,version) fills those in,
-# keeps a version read from the delivered files when the file disagrees, and
-# adds the names the scan did not find as supplier-declared components. Every
+# can prove a component is there without finding its version. The supplier's
+# file (--component-versions, CSV name,version[,reason]) fills those in, keeps
+# a version read from the delivered files when the file disagrees, adds the
+# names the scan did not find as supplier-declared components, and records the
+# reason a supplier gives for a component it has no version for. Every
 # such scan also writes the components still missing a version as a template
 # in the same format. Before normalize, so what is added is normalized too;
 # the placeholder versions normalize removes (UNKNOWN) count as missing here.
@@ -1600,6 +1677,15 @@ esac
 CV_REFUSED=""
 case "$SCAN_MODE" in
     FIRMWARE|ROOTFS|BINARY)
+        # Which kind of scan wrote this SBOM, stated rather than left to be
+        # guessed from the tools listed: a reviewer's --analyze run reads it
+        # (validate-sbom.sh, submission profile).
+        if jq --arg m "$SCAN_MODE" '.metadata.properties = ([(.metadata.properties // [])[] | select(.name? != "bomlens:scanMode")]
+                                    + [{name: "bomlens:scanMode", value: $m}])' "$OUTPUT_FILE" > "$OUTPUT_FILE.mode.tmp" 2>/dev/null; then
+            mv "$OUTPUT_FILE.mode.tmp" "$OUTPUT_FILE"
+        else
+            rm -f "$OUTPUT_FILE.mode.tmp"
+        fi
         _cv_args=("$OUTPUT_FILE" "$OUT_PREFIX")
         [ "$CV_INPUT_IS_TEMPLATE" = true ] && _cv_args=(--no-template "${_cv_args[@]}")
         if [ -n "${COMPONENT_VERSIONS_FILE:-}" ]; then
@@ -1708,9 +1794,12 @@ fi
 # checked table (upstream-purl-map.json); a name not in it is left alone. The
 # version, CPE and evidence stay, so the CVE matching that ran on them keeps
 # its result. After enrich-cpe, so a CPE it added can identify the project too.
-# Disable with ENRICH_UPSTREAM_PURL=false.
-case "$SCAN_MODE" in
-    FIRMWARE|ROOTFS|BINARY)
+# A Yocto build's records (YOCTO_SBOM) get the same step. Disable with
+# ENRICH_UPSTREAM_PURL=false.
+_upstream_mode="$SCAN_MODE"
+[ "$YOCTO_SBOM" = true ] && _upstream_mode=YOCTO
+case "$_upstream_mode" in
+    FIRMWARE|ROOTFS|BINARY|YOCTO)
         if [ "${ENRICH_UPSTREAM_PURL:-true}" != "false" ]; then
             run_optional_step upstream-purl python3 "$LIBDIR/upstream-purl.py" "$OUTPUT_FILE"
         else
@@ -2098,7 +2187,8 @@ if [ "${GENERATE_SECURITY:-false}" = "true" ] && [ -d "$TRIVY_DB_MOUNT" ]; then
         er_record scan-security failed failed "no Trivy database in the trivy-db mount ($TRIVY_DB_MOUNT/db/trivy.db)"
     fi
 fi
-# CPE index match (FIRMWARE, ROOTFS, BINARY): components with no package purl
+# CPE index match (FIRMWARE, ROOTFS, BINARY, and a Yocto SPDX 2.2 archive):
+# components with no package purl
 # but a CPE (a binary syft's classifier named, a library a signature checker
 # found, a CPE enrich-cpe.sh added from cpe-name-map.json) are matched against
 # the bundled NVD index, since Trivy never reads component.cpe. Runs here, after
@@ -2106,7 +2196,9 @@ fi
 # scan-security.sh is told whether it ran, so it can name the components no
 # check reached.
 BOMLENS_CPE_INDEX_MATCHED=false
-case "$SCAN_MODE" in FIRMWARE|ROOTFS|BINARY)
+_cpe_mode="$SCAN_MODE"
+[ "$YOCTO_CPE_MATCH" = true ] && _cpe_mode=YOCTO
+case "$_cpe_mode" in FIRMWARE|ROOTFS|BINARY|YOCTO)
     if [ "${GENERATE_SECURITY:-false}" != "true" ]; then
         er_record match-cpe disabled
     else
@@ -2461,7 +2553,7 @@ if [ "${SIGN_SBOM:-false}" = "true" ]; then
         # either. Skipped when this mode never produced a conformance report.
         if [ -f "${OUT_PREFIX}_conformance.json" ]; then
             SIGN_FAILED="$SIGN_FAILED" bash "$LIBDIR/validate-sbom.sh" "$OUTPUT_FILE" "$OUT_PREFIX" "$PROJECT_NAME" \
-                || echo "[WARN] could not refresh the conformance report's signature status after signing." >&2
+                || echo "[WARN] could not refresh the conformance check report's signature status after signing." >&2
         fi
         # A requested signature that was not produced is a failure on a
         # supply-chain tool. Do not exit 0 leaving the user to believe their
@@ -2517,7 +2609,7 @@ sync_artifacts
 # non-zero exit, since the user asked for those versions and did not get them.
 if [ -n "$CV_REFUSED" ]; then
     echo "[ERROR] --component-versions: the file was refused, so none of its versions were applied: ${CV_REFUSED}" >&2
-    echo "[ERROR]   The SBOM and the other files were written without them. Fix the file (CSV, two columns: name,version) and run the scan again." >&2
+    echo "[ERROR]   The SBOM and the other files were written without them. Fix the file (CSV: name,version[,reason]) and run the scan again." >&2
     exit 1
 fi
 

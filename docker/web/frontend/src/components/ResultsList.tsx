@@ -292,7 +292,7 @@ function ArtifactCard({
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
-            <span className={primary ? "font-semibold" : "text-sm font-medium"}>
+            <span className={primary ? "font-semibold" : "text-body-sm font-medium"}>
               {t(artifact.titleKey)}
             </span>
             {signature && (
@@ -307,7 +307,7 @@ function ArtifactCard({
               </Badge>
             )}
           </div>
-          <p className="mt-0.5 text-xs text-muted-foreground">
+          <p className="mt-0.5 text-body-sm text-muted-foreground">
             {t(artifact.descKey)}
             {artifact.key === "spdx3" && spdx3?.draft && (
               <> {t("result.kind.spdx3.draftNote", { count: spdx3.counts.missingRequired ?? 0 })}</>
@@ -315,7 +315,7 @@ function ArtifactCard({
             {artifact.key === "spdx3" && uploadedSbom && <> {t("result.kind.spdx3.uploadNote")}</>}
             {behind && <> {t("result.kind.spdx3.behindNote")}</>}
           </p>
-          <span className="mt-1 block truncate font-mono text-xs text-muted-foreground">
+          <span className="mt-1 block truncate font-mono text-label text-muted-foreground">
             {baseName(formats)}
           </span>
         </div>
@@ -432,7 +432,7 @@ export function ResultsList({
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+        <div className="flex items-center gap-2 text-body-sm text-muted-foreground">
           <Package className="h-4 w-4" />
           {/* Count what is on screen. The header said "10 artifacts" over four
               cards, because it counted files while the cards group a report's
@@ -442,14 +442,13 @@ export function ResultsList({
             count: artifacts.length,
             size: formatBytes(totalBytes),
           })}
-          <span className="text-xs">
+          <span className="text-label">
             {t("result.artifactFiles", { count: results.length })}
           </span>
         </div>
         <Button
           asChild
           variant="outline"
-          className="text-brand-strong hover:text-brand-strong"
           onClick={() => toast(t("result.downloadStarted"))}
         >
           <a href={downloadAllUrl(scanId)} download>

@@ -80,11 +80,11 @@ export function ScanRunning({
   return (
     <div className="space-y-5">
       <div className="flex items-center gap-3">
-        <h1 className="text-xl font-semibold tracking-tight text-foreground">
+        <h1 className="text-title font-semibold tracking-tight text-foreground">
           {failed ? t("result.failed") : t("form.running")}
         </h1>
         {projectLabel && (
-          <span className="truncate text-sm text-muted-foreground">{projectLabel}</span>
+          <span className="truncate text-body-sm text-muted-foreground">{projectLabel}</span>
         )}
         {!failed && onCancel && (
           <button
@@ -101,29 +101,29 @@ export function ScanRunning({
       {failed ? (
         <Card role="alert" className="border-destructive/40 bg-destructive/5">
           <CardContent className="space-y-3 p-4">
-            <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
+            <div className="flex items-center gap-2 text-body-sm font-semibold text-foreground">
               <TriangleAlert className="h-4 w-4 shrink-0 text-destructive" aria-hidden />
               {t("run.failedTitle")}
             </div>
             {errorKey ? (
               <div className="space-y-2">
-                <p className="text-sm text-muted-foreground">{t(errorKey)}</p>
+                <p className="text-body-sm text-muted-foreground">{t(errorKey)}</p>
                 {errorMessage && (
                   <Disclosure
                     summary={
-                      <span className="text-xs text-muted-foreground">
+                      <span className="text-label text-muted-foreground">
                         {t("run.showDetail")}
                       </span>
                     }
                   >
-                    <p className="mt-1 whitespace-pre-wrap break-words font-mono text-xs text-muted-foreground">
+                    <p className="mt-1 whitespace-pre-wrap break-words font-mono text-label text-muted-foreground">
                       {errorMessage}
                     </p>
                   </Disclosure>
                 )}
               </div>
             ) : (
-              <p className="text-sm text-muted-foreground">
+              <p className="text-body-sm text-muted-foreground">
                 {errorMessage || t("run.failedBody")}
               </p>
             )}
@@ -157,12 +157,12 @@ export function ScanRunning({
                 const Icon =
                   st === "done" ? CircleCheck : st === "active" ? Loader2 : CircleDashed;
                 return (
-                  <li key={stage.id} className="flex items-center gap-2.5 text-sm">
+                  <li key={stage.id} className="flex items-center gap-2.5 text-body-sm">
                     <Icon
                       className={cn(
                         "h-4 w-4 shrink-0",
                         st === "done" && "text-risk-low", // token-lint-ignore: aria-hidden below
-                        st === "active" && "animate-spin text-brand",
+                        st === "active" && "animate-spin text-foreground",
                         st === "pending" && "text-muted-foreground/50",
                       )}
                       aria-hidden

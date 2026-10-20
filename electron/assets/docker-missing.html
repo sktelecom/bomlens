@@ -2,176 +2,226 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>BomLens</title>
+    <!-- Shared design tokens: see the note at the top of status.html. -->
+    <link rel="stylesheet" href="bomlens-tokens.css" />
+    <link rel="stylesheet" href="../../docker/shared/bomlens-tokens.css" />
     <style>
-      /* 색은 커스텀 프로퍼티로 모으고, OS가 라이트 모드면 아래 미디어 쿼리가 덮어쓴다. */
       :root {
         color-scheme: light dark;
-        --bg: #0a0a0c;
-        --fg: #e7e7ea;
-        --text: #c7c7cd;
-        --muted: #9a9aa2;
-        --dim: #6f6f77;
-        --link: #6ea8fe;
-        --code-bg: #1c1c21;
-        --border: #26262b;
-        --feedback: #f0a5b4;
+        /* Fallback palette, used only when the token CSS did not load. */
+        --s-bg: #f5f5f7;
+        --s-fg: #1c1c21;
+        --s-muted: #6b6b74;
+        --s-card: #ffffff;
+        --s-border: #d9d9de;
+        --s-code-bg: #ececf0;
+        --s-brand: #ea002c;
+        --s-brand-fg: #ffffff;
+        --s-ring: #ea002c;
+        --s-danger: #b91c1c;
+        --s-link: #1d4ed8;
+        --s-fs-title: 1.25rem;
+        --s-fs-body: 1rem;
+        --s-fs-sm: 0.875rem;
+        --s-fs-label: 0.75rem;
+        --s-fs-mono: 0.75rem;
       }
-      @media (prefers-color-scheme: light) {
-        :root {
-          --bg: #f5f5f7;
-          --fg: #1c1c21;
-          --text: #3c3c44;
-          --muted: #6b6b74;
-          --dim: #8a8a92;
-          --link: #1d4ed8;
-          --code-bg: #ececf0;
-          --border: #d9d9de;
-          --feedback: #b3103a;
-        }
+      :root.dark {
+        --s-bg: #0a0a0c;
+        --s-fg: #e7e7ea;
+        --s-muted: #9a9aa2;
+        --s-card: #131316;
+        --s-border: #26262b;
+        --s-code-bg: #1c1c21;
+        --s-ring: #ff5c7c;
+        --s-danger: #fca5a5;
+        --s-link: #93c5fd;
+      }
+      :root.tokens {
+        --s-bg: hsl(var(--background));
+        --s-fg: hsl(var(--foreground));
+        --s-muted: hsl(var(--muted-foreground));
+        --s-card: hsl(var(--card));
+        --s-border: hsl(var(--border));
+        --s-code-bg: hsl(var(--muted));
+        --s-brand: hsl(var(--brand));
+        --s-brand-fg: hsl(var(--brand-foreground));
+        --s-ring: hsl(var(--ring));
+        --s-danger: rgb(var(--role-danger-fg));
+        --s-link: rgb(var(--role-info-fg));
+        --s-fs-title: var(--font-size-title);
+        --s-fs-body: var(--font-size-body);
+        --s-fs-sm: var(--font-size-body-sm);
+        --s-fs-label: var(--font-size-label);
+        --s-fs-mono: var(--font-size-mono);
+      }
+      * {
+        box-sizing: border-box;
       }
       body {
         margin: 0;
-        font-family: -apple-system, "Segoe UI", "Malgun Gothic", system-ui, sans-serif;
-        background: var(--bg);
-        color: var(--fg);
         min-height: 100vh;
-        display: flex;
-        align-items: center;
-        justify-content: center;
+        font-family: -apple-system, "Segoe UI", "Malgun Gothic", system-ui, sans-serif;
+        font-size: var(--s-fs-body);
+        background: var(--s-bg);
+        color: var(--s-fg);
+      }
+      :focus-visible {
+        outline: 2px solid var(--s-ring);
+        outline-offset: 2px;
+      }
+      #lang-toggle {
+        position: fixed;
+        top: 16px;
+        right: 24px;
+        font-size: var(--s-fs-label);
+        color: var(--s-muted);
+        user-select: none;
+      }
+      #lang-toggle button {
+        padding: 4px 6px;
+        font: inherit;
+        font-weight: 600;
+        color: var(--s-muted);
+        background: none;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+      }
+      #lang-toggle button:disabled {
+        color: var(--s-fg);
+        cursor: default;
       }
       main {
-        max-width: 560px;
-        padding: 32px;
+        max-width: 640px;
+        margin: 0 auto;
+        padding: 40px 32px 72px;
+      }
+      .logo {
+        display: block;
+        height: 40px;
+        width: auto;
       }
       h1 {
-        font-size: 20px;
-        margin: 0 0 8px;
+        margin: 28px 0 8px;
+        font-size: var(--s-fs-title);
+        font-weight: 600;
       }
       p {
-        font-size: 14px;
+        font-size: var(--s-fs-sm);
         line-height: 1.7;
-        color: var(--text);
+        color: var(--s-fg);
       }
       ul {
-        font-size: 14px;
-        line-height: 1.8;
-        color: var(--text);
         padding-left: 18px;
+        font-size: var(--s-fs-sm);
+        line-height: 1.8;
+        color: var(--s-fg);
       }
       a {
-        color: var(--link);
+        color: var(--s-link);
       }
       code {
         font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
-        font-size: 12.5px;
-        background: var(--code-bg);
-        border: 1px solid var(--border);
+        font-size: var(--s-fs-mono);
+        background: var(--s-code-bg);
+        border: 1px solid var(--s-border);
         border-radius: 4px;
         padding: 1px 5px;
       }
       .hint {
         margin-top: 20px;
-        font-size: 13px;
-        color: var(--muted);
+        color: var(--s-muted);
       }
-      #check-again {
+      .actions {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 8px;
         margin-top: 12px;
-        padding: 8px 18px;
-        font-size: 13px;
+      }
+      .btn {
+        padding: 8px 16px;
+        font: inherit;
+        font-size: var(--s-fs-sm);
         font-weight: 600;
-        color: #ffffff;
-        background: #ea002c;
-        border: none;
+        color: var(--s-fg);
+        background: var(--s-card);
+        border: 1px solid var(--s-border);
         border-radius: 6px;
         cursor: pointer;
       }
-      #check-again:disabled {
+      /* Brand red is reserved for the one primary action, the logo and the focus ring. */
+      .btn.primary {
+        color: var(--s-brand-fg);
+        background: var(--s-brand);
+        border-color: transparent;
+      }
+      .btn:disabled {
         opacity: 0.5;
         cursor: default;
-      }
-      /* 보조 동작: 진단정보를 건네줄 통로이므로 항상 보이되 약하게. */
-      #open-logs {
-        margin-top: 12px;
-        margin-left: 8px;
-        padding: 8px 18px;
-        font-size: 13px;
-        font-weight: 600;
-        color: var(--fg);
-        background: none;
-        border: 1px solid var(--border);
-        border-radius: 6px;
-        cursor: pointer;
       }
       #feedback {
         min-height: 1.4em;
         margin: 10px 0 0;
-        font-size: 13px;
-        color: var(--feedback);
+        font-size: var(--s-fs-sm);
+        color: var(--s-danger);
         visibility: hidden;
       }
-      /* 보조 링크: 메뉴바가 숨겨진 OS에서도 신고 양식에 닿는 길. */
-      #report {
-        position: fixed;
-        left: 0;
-        bottom: 30px;
-        margin: 0;
-        padding: 0 32px;
-        font-size: 11.5px;
-        color: var(--dim);
+      footer {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px 16px;
+        margin-top: 28px;
+        font-size: var(--s-fs-label);
+        color: var(--s-muted);
       }
-      #report:hover {
-        color: var(--fg);
+      footer a {
+        color: var(--s-muted);
       }
-      #version {
-        position: fixed;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        margin: 0;
-        padding: 0 32px 14px;
-        font-size: 11.5px;
-        color: var(--dim);
-      }
-      #lang-toggle {
-        position: fixed;
-        top: 20px;
-        right: 24px;
-        font-size: 12px;
-        color: var(--dim);
-        user-select: none;
-      }
-      #lang-toggle button {
-        padding: 2px 4px;
-        font-size: 12px;
-        font-weight: 600;
-        color: var(--muted);
-        background: none;
-        border: none;
-        cursor: pointer;
-      }
-      #lang-toggle button:disabled {
-        color: var(--fg);
-        cursor: default;
+      footer a:hover {
+        color: var(--s-fg);
       }
     </style>
+    <script>
+      // Runs after the token links have loaded: detect the tokens, follow the OS theme.
+      (function () {
+        var root = document.documentElement;
+        if (getComputedStyle(root).getPropertyValue("--background").trim()) {
+          root.classList.add("tokens");
+        }
+        var mq = window.matchMedia("(prefers-color-scheme: dark)");
+        function apply() {
+          root.classList.toggle("dark", mq.matches);
+        }
+        apply();
+        if (mq.addEventListener) mq.addEventListener("change", apply);
+      })();
+    </script>
   </head>
   <body>
     <nav id="lang-toggle" aria-label="Language">
       <button type="button" data-lang="ko">KO</button>|<button type="button" data-lang="en">EN</button>
     </nav>
     <main>
+      <img class="logo" src="logo.svg" alt="BomLens: SBOM Generator" />
       <h1 id="title"></h1>
       <p id="lead"></p>
       <p id="intro"></p>
       <ul id="options"></ul>
       <p class="hint" id="hint"></p>
-      <button id="check-again" type="button"></button>
-      <button id="open-logs" type="button"></button>
+      <div class="actions">
+        <button id="check-again" class="btn primary" type="button"></button>
+        <button id="open-logs" class="btn" type="button"></button>
+      </div>
       <p id="feedback" role="status"></p>
+      <footer>
+        <span id="version"></span>
+        <a id="report" target="_blank" rel="noreferrer noopener" href="https://github.com/sktelecom/bomlens/issues/new?template=bug_report.yml"></a>
+      </footer>
     </main>
-    <a id="report" target="_blank" rel="noreferrer noopener" href="https://github.com/sktelecom/bomlens/issues/new?template=bug_report.yml"></a>
-    <footer id="version"></footer>
     <script>
       // 언어는 main.mjs가 ?lang= 쿼리로, OS는 ?platform=(process.platform 값)으로 넘긴다.
       const params = new URLSearchParams(location.search);
@@ -204,34 +254,34 @@
         ko: {
           title: "Docker가 필요합니다",
           titleNotRunning: "Docker 엔진을 켜 주세요",
-          titleWsl2Only: "이 앱은 WSL2의 Docker를 못 씁니다",
+          titleWsl2Only: "이 앱은 WSL2의 Docker를 사용할 수 없습니다",
           leadNotRunning:
-            "Docker는 설치되어 있지만 엔진이 실행 중이 아닙니다. Rancher Desktop 또는 Docker Desktop을 켜고 아이콘이 안정될 때까지 기다린 뒤 이 앱을 다시 실행하세요.",
+            "Docker는 설치되어 있지만 엔진이 실행 중이 아닙니다. Rancher Desktop 또는 Docker Desktop을 켜고 아이콘이 안정될 때까지 기다린 뒤 다시 확인을 눌러 주세요.",
           leadNotRunningLinux:
-            "Docker는 설치되어 있지만 엔진이 실행 중이 아닙니다. sudo systemctl start docker로 엔진을 켠 뒤 이 앱을 다시 실행하세요.",
+            "Docker는 설치되어 있지만 엔진이 실행 중이 아닙니다. sudo systemctl start docker로 엔진을 켠 뒤 다시 확인을 눌러 주세요.",
           leadNotInstalled: "Docker가 설치되어 있지 않거나 PATH에서 찾을 수 없습니다.",
           leadWsl2Only:
-            "WSL2 안에 Docker가 떠 있는 게 확인됐지만, 이 데스크톱 앱은 WSL2 쪽 Docker에 연결하는 방법을 아직 지원하지 않습니다. 대신 WSL2 터미널 안에서 CLI로 실행하세요.",
-          wsl2Cli: "wsl 실행 후, 저장소 폴더에서:",
+            "WSL2 안에서 Docker가 실행 중인 것은 확인했지만, 이 데스크톱 앱은 WSL2의 Docker에 연결하는 방법을 아직 지원하지 않습니다. 대신 WSL2 터미널에서 CLI로 실행해 주세요.",
+          wsl2Cli: "wsl을 실행한 뒤 저장소 폴더에서:",
           intro: {
             win32: "BomLens는 스캐너를 Docker 컨테이너로 실행합니다. Windows에서 쓸 수 있는 무료 옵션:",
             darwin: "BomLens는 스캐너를 Docker 컨테이너로 실행합니다. macOS에서 쓸 수 있는 옵션:",
             linux: "BomLens는 스캐너를 Docker 컨테이너로 실행합니다. Linux에서는 Docker Engine을 설치하면 됩니다:",
           },
           report: "문제 신고",
-          hint: "설치하고 엔진을 켠 뒤 이 앱을 다시 실행하세요.",
+          hint: "설치하고 엔진을 켠 뒤 다시 확인을 눌러 주세요.",
           checkAgain: "다시 확인",
           openLogs: "로그 폴더 열기",
-          stillMissing: "아직 Docker를 찾을 수 없어요. 엔진이 켜졌는지 확인해 주세요.",
+          stillMissing: "아직 Docker를 찾을 수 없습니다. 엔진이 켜져 있는지 확인해 주세요.",
         },
         en: {
           title: "Docker is required",
           titleNotRunning: "Please start the Docker engine",
           titleWsl2Only: "This app can't use Docker inside WSL2",
           leadNotRunning:
-            "Docker is installed but the engine isn't running. Start Rancher Desktop or Docker Desktop, wait until the icon settles, then relaunch this app.",
+            "Docker is installed but the engine isn't running. Start Rancher Desktop or Docker Desktop, wait until the icon settles, then press Check again.",
           leadNotRunningLinux:
-            "Docker is installed but the engine isn't running. Start it with sudo systemctl start docker, then relaunch this app.",
+            "Docker is installed but the engine isn't running. Start it with sudo systemctl start docker, then press Check again.",
           leadNotInstalled: "Docker isn't installed or can't be found on your PATH.",
           leadWsl2Only:
             "Docker is running inside WSL2, but this desktop app doesn't yet know how to reach it. Run BomLens from the CLI inside WSL2 instead.",
@@ -242,7 +292,7 @@
             linux: "BomLens runs the scanner as a Docker container. On Linux, install Docker Engine:",
           },
           report: "Report a problem",
-          hint: "Install it, start the engine, then relaunch this app.",
+          hint: "Install it, start the engine, then press Check again.",
           checkAgain: "Check again",
           openLogs: "Open log folder",
           stillMissing: "Still can't find Docker. Make sure the engine is running.",
@@ -256,7 +306,7 @@
             url: "https://rancherdesktop.io/",
             name: "Rancher Desktop",
             desc: {
-              ko: "GUI, 이 앱과 바로 동작(권장)",
+              ko: "GUI, 이 앱에서 바로 사용 가능(권장)",
               en: "GUI, works with this app out of the box (recommended)",
             },
           },
@@ -264,7 +314,7 @@
             url: "https://docs.docker.com/engine/install/",
             name: "WSL2 + docker-ce",
             desc: {
-              ko: "완전 무료, CLI 전용이라 이 데스크톱 앱에서는 안 됨",
+              ko: "완전 무료. CLI 전용이라 이 데스크톱 앱에서는 사용할 수 없음",
               en: "completely free, CLI only, does not work with this desktop app",
             },
           },
@@ -318,7 +368,7 @@
             name: "sudo usermod -aG docker $USER",
             code: true,
             desc: {
-              ko: "다시 로그인하면 sudo 없이 쓸 수 있어요",
+              ko: "다시 로그인하면 sudo 없이 사용할 수 있습니다",
               en: "log out and back in to use Docker without sudo",
             },
           },

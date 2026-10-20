@@ -147,11 +147,11 @@ export function ConfirmDialog({
       initialFocus={cancelRef}
       className="max-w-md gap-4 p-6"
     >
-      <h2 id={`${id}-title`} className="text-base font-semibold">
+      <h2 id={`${id}-title`} className="text-body font-semibold">
         {title}
       </h2>
       {description && (
-        <p id={`${id}-desc`} className="text-sm text-muted-foreground">
+        <p id={`${id}-desc`} className="text-body-sm text-muted-foreground">
           {description}
         </p>
       )}

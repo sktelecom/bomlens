@@ -4,8 +4,9 @@
 import AxeBuilder from "@axe-core/playwright";
 import { test, expect, type Page } from "@playwright/test";
 
+import { AI_DONE, AI_SBOM, DONE as SOURCE_DONE, FIRMWARE_DONE, SBOM as SOURCE_SBOM } from "./fixtures";
 import { waitForSettled } from "./settle";
-import { seedThemeLang } from "./visual";
+import { COMBOS, seedThemeLang } from "./visual";
 
 // Findings an adversarial pass turned up that the existing checks did not cover.
 // The accessibility scan ran on one result screen in light mode only, so a badge
@@ -215,4 +216,162 @@ test("the dependency tree carries tree semantics and moves under the arrow keys"
     .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
     .analyze();
   expect(axe.violations).toEqual([]);
+});
+
+for (const lang of ["en", "ko"] as const) {
+  test(`<html lang> follows the UI language from the first render (${lang})`, async ({ page }) => {
+    // A screen reader picks its voice from this attribute (WCAG 3.1.1); the
+    // static default in index.html must never outlive the first render.
+    await seedThemeLang(page, "light", lang);
+    await openDependencies(page);
+    await expect(page.locator("html")).toHaveAttribute("lang", lang);
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Every rail section x theme x language. The checks above cover a handful of
+// sections in one theme; a regression in any other section, in dark mode or in
+// Korean, would pass CI unnoticed. Each section is rendered from the shared
+// stub data so it draws real content, then scanned with the same WCAG tags.
+
+/** A source scan that has a dependency graph, a source tree and a conformance report. */
+const FULL_DONE = {
+  ...SOURCE_DONE,
+  conformance: {
+    result: "pass",
+    format: "CycloneDX",
+    checks: [
+      { id: "timestamp", label: "Timestamp present", required: true, status: "pass", detail: "1 found" },
+      { id: "license", label: "License coverage (recommended)", required: false, status: "warn", detail: "33%" },
+    ],
+  },
+  results: [
+    ...SOURCE_DONE.results,
+    { name: "demo_1.0_risk-report.html", size: 7100 },
+    { name: "demo_1.0_NOTICE.txt", size: 1200 },
+  ],
+};
+
+const SCANCODE = {
+  files: [
+    { path: "src", type: "directory" },
+    { path: "src/main.c", type: "file", detected_license_expression_spdx: "Apache-2.0" },
+    { path: "LICENSE", type: "file" },
+  ],
+};
+
+type Kind = "source" | "ai" | "firmware";
+
+const SECTIONS: Array<{ kind: Kind; section: string }> = [
+  { kind: "source", section: "overview" },
+  { kind: "source", section: "components" },
+  { kind: "source", section: "dependencies" },
+  { kind: "source", section: "sourceTree" },
+  { kind: "source", section: "vulnerabilities" },
+  { kind: "source", section: "licenses" },
+  { kind: "source", section: "conformance" },
+  { kind: "source", section: "artifacts" },
+  { kind: "ai", section: "overview" },
+  { kind: "ai", section: "models" },
+  { kind: "ai", section: "conformance" },
+  // A firmware scan whose severity bar has a few-pixel Critical and Unknown
+  // segment (the target-size finding, F22).
+  { kind: "firmware", section: "overview" },
+  { kind: "firmware", section: "vulnerabilities" },
+];
+
+/**
+ * Combinations known to violate today, keyed `kind/section/theme/lang`, value =
+ * the reason. They run under test.fail so CI documents the current state and
+ * flips red the moment one is fixed (remove the entry then). Never widen this
+ * list to silence a new regression. It is empty now: the colour-role tokens
+ * (success and info labels on their muted surfaces) and the filter chips that no
+ * longer fade to opacity-60 cleared the four conformance contrast failures.
+ */
+const KNOWN_VIOLATIONS: Record<string, string> = {};
+
+async function openSection(page: Page, kind: Kind, section: string) {
+  const done = kind === "ai" ? AI_DONE : kind === "firmware" ? FIRMWARE_DONE : FULL_DONE;
+  const sbom = kind === "ai" ? AI_SBOM : SOURCE_SBOM;
+  await page.route("**/capabilities", (r) =>
+    r.fulfill({ contentType: "application/json", body: JSON.stringify({ firmware: false, scanoss: false, docker: true, spdxExport: false }) }),
+  );
+  await page.route("**/results", (r) => r.fulfill({ contentType: "application/json", body: "[]" }));
+  await page.route("**/scans", (r) => r.fulfill({ contentType: "application/json", body: "[]" }));
+  await page.route(`**/scan?id=${done.id}`, (r) =>
+    r.fulfill({ contentType: "application/json", body: JSON.stringify(done) }),
+  );
+  await page.route("**/file**", (r) =>
+    r.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify(r.request().url().includes("scancode") ? SCANCODE : sbom),
+    }),
+  );
+  await page.goto(`/?ui=next#/scan/${done.id}/${section}`);
+  await page.getByRole("navigation").first().waitFor();
+  await page.locator("main h1").first().waitFor();
+  await waitForSettled(page.locator("main"));
+}
+
+for (const { kind, section } of SECTIONS) {
+  for (const { theme, lang } of COMBOS) {
+    const key = `${kind}/${section}/${theme}/${lang}`;
+    test(`axe: ${key}`, async ({ page }) => {
+      if (KNOWN_VIOLATIONS[key]) test.fail(true, KNOWN_VIOLATIONS[key]);
+      await seedThemeLang(page, theme, lang);
+      await openSection(page, kind, section);
+      // Guard against scanning an empty or fallback screen: the rail link for
+      // this section must be the active one.
+      // Overview has no section suffix in its route, so match it by exclusion.
+      const active = page.locator('nav a[aria-current="page"]');
+      await expect(active).toHaveCount(1);
+      if (section !== "overview") await expect(active).toHaveAttribute("href", new RegExp(`/${section}$`));
+      // wcag22aa carries target-size (2.5.8), the rule the narrow severity-bar
+      // segments break; the matrix above stops at 2.1 and could not see it.
+      const axe = await new AxeBuilder({ page })
+        .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"])
+        .analyze();
+      expect(
+        axe.violations.map((v) => `${v.id}: ${v.nodes.length} (${v.nodes[0]?.target.join(" ")})`),
+      ).toEqual([]);
+    });
+  }
+}
+
+// The content area (`main`) is the only scroll container. Visually hidden text
+// (`sr-only`) is absolutely positioned, and without a positioned ancestor its
+// containing block is the page, so it escapes main's clipping and stretches the
+// document to the depth of main's content: the page then scrolls on into blank
+// space under the shell. A short viewport forces every section to overflow.
+for (const { kind, section } of SECTIONS) {
+  test(`the page itself never scrolls: ${kind}/${section}`, async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 360 });
+    await openSection(page, kind, section);
+    const metrics = await page.evaluate(() => {
+      const el = document.scrollingElement as HTMLElement;
+      return { scroll: el.scrollHeight, client: el.clientHeight };
+    });
+    expect(metrics.scroll, "document scroll height equals the viewport").toBe(metrics.client);
+  });
+}
+
+test("a skip link lets keyboard users bypass the rail", async ({ page }) => {
+  // WCAG 2.4.1: the first Tab stop jumps past the repeated navigation to the
+  // main content. It is hidden until focused, and following it must not rewrite
+  // the URL hash (the hash is the router).
+  await seedThemeLang(page, "light", "en");
+  await openSection(page, "source", "overview");
+  const hashBefore = await page.evaluate(() => window.location.hash);
+  await page.mouse.move(0, 0);
+  await page.keyboard.press("Tab");
+  const first = page.locator(":focus");
+  await expect(first).toHaveAttribute("href", /^#/);
+  await expect(first).toHaveText("Skip to main content");
+  await expect(first).toBeVisible();
+  const target = await first.getAttribute("href");
+  await expect(page.locator(target ?? "#main-content")).toHaveCount(1);
+
+  await page.keyboard.press("Enter");
+  await expect(page.locator("main")).toBeFocused();
+  expect(await page.evaluate(() => window.location.hash)).toBe(hashBefore);
 });

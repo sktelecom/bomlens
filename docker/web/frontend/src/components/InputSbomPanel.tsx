@@ -75,15 +75,15 @@ export function InputSbomPanel({
 
   return (
     <div className="space-y-4">
-      <p className="text-sm text-muted-foreground">{t("inputSbom.intro")}</p>
+      <p className="text-body-sm text-muted-foreground">{t("inputSbom.intro")}</p>
 
       <div className="rounded-md border">
         <div className="flex flex-wrap items-center gap-3 border-b px-4 py-3">
-          <span className="truncate font-mono text-sm" title={input.originalName}>
+          <span className="truncate font-mono text-body-sm" title={input.originalName}>
             {input.originalName || t("inputSbom.unnamed")}
           </span>
           {input.originalBytes > 0 && (
-            <span className="text-xs text-muted-foreground">
+            <span className="text-label text-muted-foreground">
               {formatBytes(input.originalBytes)}
             </span>
           )}
@@ -98,14 +98,14 @@ export function InputSbomPanel({
               key={fact.labelKey}
               className="grid grid-cols-[minmax(0,12rem)_minmax(0,1fr)] gap-3 px-4 py-2"
             >
-              <dt className="text-xs text-muted-foreground">
+              <dt className="text-label text-muted-foreground">
                 {t(`inputSbom.field.${fact.labelKey}`)}
               </dt>
               <dd
                 className={
                   fact.mono
-                    ? "break-all font-mono text-xs"
-                    : "break-words text-sm"
+                    ? "break-all font-mono text-label"
+                    : "break-words text-body-sm"
                 }
               >
                 {fact.value}
@@ -115,7 +115,7 @@ export function InputSbomPanel({
         </dl>
       </div>
 
-      <p className="text-xs text-muted-foreground">
+      <p className="text-body-sm text-muted-foreground">
         {t("inputSbom.componentsHint")}
         {componentsHref && (
           <>

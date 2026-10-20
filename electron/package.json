@@ -1,6 +1,6 @@
 {
   "name": "sbom-generator-desktop",
-  "version": "1.13.4",
+  "version": "1.13.7",
   "private": true,
   "type": "module",
   "license": "Apache-2.0",
@@ -9,12 +9,14 @@
   "scripts": {
     "test": "node --test test/*.test.mjs",
     "test:smoke": "playwright test",
+    "check:package": "node scripts/check-package.mjs",
     "start": "electron .",
     "dist": "electron-builder",
     "dist:win": "electron-builder --win nsis",
     "dist:mac": "electron-builder --mac dmg --universal"
   },
   "devDependencies": {
+    "@electron/asar": "3.4.1",
     "@playwright/test": "1.63.0",
     "electron": "42.11.12",
     "electron-builder": "26.17.0"

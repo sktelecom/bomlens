@@ -16,6 +16,8 @@ BomLens는 여러 입력을 받습니다. 소스코드, 펌웨어, 받은 SBOM, 
 
 소스 폴더, GitHub URL, ZIP 아카이브입니다. 언어 감지로 알맞은 공식 [cdxgen](https://github.com/CycloneDX/cdxgen) 언어 이미지를 골라, 의존성을 준비(`build-prep.sh`)한 뒤 SBOM을 생성합니다. 형제 컨테이너를 실행할 수 없을 때(예: 웹 UI의 소스 스캔)나 cdxgen 자체가 처리 도중 실패했을 때(내부 예외, 또는 자체 문서 검증이 결과를 거부한 경우)는 디렉터리를 [syft](https://github.com/anchore/syft)로 스캔하는 방식으로 폴백하며, 이때는 락 파일에서 직접 의존성을 잡습니다. 어느 경우든 SBOM에는 사유와 함께 `bomlens:sbom-tool-degraded`가 남습니다. Node/npm에서는 폴백 결과가 프로젝트의 선언된 의존성을 하나도 포함하지 않으면 그 결과를 버리고 안내와 함께 스캔을 실패로 끝내며, 실제로는 아무것도 못 잡았는데 완전한 것처럼 보이는 결과를 보고하지 않습니다. 소스가 의존성을 선언했는데(매니페스트나 lock 파일에 의존성이 있음) 컴포넌트를 하나도 찾지 못하면, SBOM에 해당 파일을 적은 `bomlens:sbom-empty-with-manifests`가 남고 결과 매니페스트는 `generate` 단계를 degraded(`no_components`)로 기록합니다.
 
+cdxgen이 프로젝트를 읽기 전에 빌드 도구가 하는 일과 그 도구가 들어 있는 이미지는 [의존성을 해석하는 방식](dependency-resolution.ko.md)에 있습니다.
+
 소스 스캔에만 적용되는 옵션이 두 가지 있고, 둘 다 기본은 꺼짐입니다.
 
 - **내장 OSS 식별**(`--identify-vendored`, [SCANOSS](https://github.com/scanoss/scanoss.py)) — 패키지 매니저 없이 복사해 넣은 C/C++ 등의 코드를 위한 옵션입니다. SCANOSS 클라이언트가 파일 지문을 만들어 호스팅 OSSKB 서비스에 조회하고, 패키지 매니저 스캔이 이미 찾은 것과 대조해 중복을 제거한 뒤 나머지를 SBOM에 병합합니다.
@@ -41,13 +43,13 @@ BomLens는 여러 입력을 받습니다. 소스코드, 펌웨어, 받은 SBOM, 
 
 ## 받은 SBOM
 
-협력사 등 외부에서 받은 SBOM(CycloneDX 또는 SPDX)이며, 소스 코드가 필요 없습니다. BomLens는 먼저 품질 기준에 맞는지 검사해 적합성 보고서를 쓰고, 이후 파이프라인이 분석할 수 있도록 입력을 CycloneDX로 정규화합니다. SPDX는 `syft convert`로 변환하며, syft를 쓸 수 없으면 `jq` 폴백이 SPDX JSON을 처리합니다. 이 모드에서는 고지문, 보안, 위험 보고서가 항상 생성됩니다.
+협력사 등 외부에서 받은 SBOM(CycloneDX 또는 SPDX)이며, 소스 코드가 필요 없습니다. BomLens는 먼저 품질 기준에 맞는지 검사해 적합성 검사 보고서를 쓰고, 이후 파이프라인이 분석할 수 있도록 입력을 CycloneDX로 정규화합니다. SPDX는 `syft convert`로 변환하며, syft를 쓸 수 없으면 `jq` 폴백이 SPDX JSON을 처리합니다. 이 모드에서는 고지문, 보안, 위험 보고서가 항상 생성됩니다.
 
 ![수신 SBOM 흐름: 적합성을 검증하고 SPDX는 CycloneDX로 변환한 뒤 공통 후처리로 넘어간다](../images/diagrams/pipeline-analyze.ko.png)
 
 > 적합성 검사는 변환 전 원본을 기준으로 하므로, SPDX는 SPDX로 검사합니다. 자세한 내용은 [공급사 SBOM 가이드](../guides/supplier-sbom.ko.md)에 있습니다.
 
-Yocto 빌드 디렉터리도 이 경로로 들어옵니다. `--target`으로 빌드 디렉터리를 지정하면 그렇게 인식해서, 빌드가 `tmp/deploy/images/` 아래에 만든 이미지 SBOM이 같은 경로를 탑니다. 다만 일반 SPDX 변환이 아니라 전용 파서가 읽어, 이미지에 설치된 패키지 목록과 빌드가 기록한 취약점 판정을 살립니다.
+Yocto 빌드 디렉터리도 이 경로로 들어옵니다. `--target`으로 빌드 디렉터리를 지정하면 그렇게 인식해서, 빌드가 `tmp/deploy/images/` 아래에 만든 이미지 SBOM이 같은 경로를 탑니다. 다만 일반 SPDX 변환이 아니라 전용 파서가 읽어, 이미지에 설치된 패키지 목록과 빌드가 기록한 취약점 판정을 살립니다. 그 뒤 펌웨어 스캔과 같이 컴포넌트에 upstream 저장소 purl을 붙입니다. 빌드 판정이 없는 SPDX 2.2 아카이브만 `--security`를 켰을 때 CPE를 이미지에 들어 있는 NVD CPE 인덱스와 대조합니다.
 
 ---
 
@@ -100,7 +102,7 @@ HuggingFace 데이터셋도 같은 경로로 처리합니다. 앞에 아무것�
 | WeasyPrint | 고지문 PDF 렌더링(선택) | 공통(`SBOM_PDF` 빌드) | BSD-3-Clause | base(opt-in) | [Kozea/WeasyPrint](https://github.com/Kozea/WeasyPrint) |
 | jq | SBOM 정규화·고지문·보고서 조립 | 공통 | MIT | base | [jqlang/jq](https://github.com/jqlang/jq) |
 
-> 전체 라이선스 인벤토리와 펌웨어 이미지의 GPL 소스 제공은 [THIRD_PARTY_LICENSES.ko.md](https://github.com/sktelecom/bomlens/blob/main/THIRD_PARTY_LICENSES.ko.md)를 참고하세요.
+> 전체 라이선스 목록와 펌웨어 이미지의 GPL 소스 제공은 [THIRD_PARTY_LICENSES.ko.md](https://github.com/sktelecom/bomlens/blob/main/THIRD_PARTY_LICENSES.ko.md)를 참고하세요.
 
 ---
 

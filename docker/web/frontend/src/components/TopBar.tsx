@@ -4,9 +4,12 @@
 import {
   BookOpen,
   CircleQuestionMark,
+  Keyboard,
   Clock,
   ExternalLink,
   LifeBuoy,
+  Rocket,
+  Sparkles,
   MonitorPlay,
   Plus,
   RotateCw,
@@ -17,7 +20,7 @@ import { type ReactNode, useEffect, useId, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { Button, buttonVariants } from "@/components/ui/button";
-import { demoUrl, docsUrl } from "@/lib/demo";
+import { demoInstallUrl, demoUrl, docsUrl, releaseNotesUrl } from "@/lib/demo";
 import { ISSUE_FORM_URL } from "@/lib/diagnostics";
 import { IS_STATIC_DEMO } from "@/lib/demo";
 import { type RecentScanLink } from "@/lib/nav";
@@ -25,6 +28,7 @@ import { scanHash } from "@/lib/route";
 import { cn } from "@/lib/utils";
 
 import { LangToggle } from "./LangToggle";
+import { ShortcutsDialog } from "./ShortcutsDialog";
 import { ThemeToggle } from "./ThemeToggle";
 
 interface TopBarProps {
@@ -109,7 +113,7 @@ export function TopBar({
     />
   );
   return (
-    <header className="sticky top-0 z-20 flex h-14 shrink-0 items-center gap-4 border-b bg-card/80 px-4 backdrop-blur supports-[backdrop-filter]:bg-card/60">
+    <header className="sticky top-0 z-20 flex h-14 shrink-0 items-center gap-2 border-b bg-card/80 px-3 backdrop-blur sm:gap-4 sm:px-4 supports-[backdrop-filter]:bg-card/60">
       {showHomeLink ? (
         <a
           href={homeHref}
@@ -124,7 +128,7 @@ export function TopBar({
       )}
       {version && (
         <span
-          className="hidden shrink-0 rounded-full border px-1.5 py-0.5 font-mono text-[10px] leading-none text-muted-foreground sm:inline-block"
+          className="hidden shrink-0 rounded-full border px-1.5 py-0.5 font-mono text-caption leading-none text-muted-foreground sm:inline-block"
           title={t("nav.helpVersion", { version })}
           data-testid="app-version-badge"
         >
@@ -133,23 +137,24 @@ export function TopBar({
       )}
       {project && (
         <>
-          <span className="h-5 w-px shrink-0 bg-border" aria-hidden />
-          <div className="flex min-w-0 items-baseline gap-2">
+          <span className="hidden h-5 w-px shrink-0 bg-border sm:block" aria-hidden />
+          {/* The scan name needs room the icon buttons cannot spare on a phone. */}
+          <div className="hidden min-w-0 items-baseline gap-2 sm:flex">
             <span
-              className="truncate text-sm font-medium text-foreground"
+              className="truncate text-body-sm font-medium text-foreground"
               title={project.name}
             >
               {project.name}
             </span>
             {project.version && (
-              <span className="shrink-0 text-sm text-muted-foreground">
+              <span className="shrink-0 text-body-sm text-muted-foreground">
                 {project.version}
               </span>
             )}
           </div>
         </>
       )}
-      <div className="ml-auto flex shrink-0 items-center gap-2">
+      <div className="ml-auto flex shrink-0 items-center gap-1 sm:gap-2">
         {search}
         {/* Re-scan parks the finished scan's config in the form and reruns it,
             which the demo cannot do. New scan stays: the form itself is worth
@@ -162,7 +167,7 @@ export function TopBar({
             className="gap-1.5"
             title={t("result.rescanHint")}
           >
-            <RotateCw className="h-4 w-4 text-brand" aria-hidden />
+            <RotateCw className="h-4 w-4" aria-hidden />
             <span>{t("result.rescan")}</span>
           </Button>
         )}
@@ -220,8 +225,25 @@ export function TopBar({
 function HelpMenu({ version }: { version?: string }) {
   const { t, i18n } = useTranslation();
   const [open, setOpen] = useState(false);
+  const [shortcuts, setShortcuts] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
   const panelId = useId();
+
+  // "?" lists the keys, the way most web tools do. Not while typing: a question
+  // mark in a field is text, and a modifier means some other shortcut.
+  useEffect(() => {
+    const onQuestion = (e: KeyboardEvent) => {
+      if (e.key !== "?" || e.metaKey || e.ctrlKey || e.altKey) return;
+      const el = e.target as HTMLElement | null;
+      if (el?.closest("input, textarea, select, [contenteditable='true']")) return;
+      e.preventDefault();
+      setOpen(false);
+      setShortcuts(true);
+    };
+    window.addEventListener("keydown", onQuestion);
+    return () => window.removeEventListener("keydown", onQuestion);
+  }, []);
 
   useEffect(() => {
     if (!open) return;
@@ -240,11 +262,12 @@ function HelpMenu({ version }: { version?: string }) {
   }, [open]);
 
   const item =
-    "flex items-center gap-2 px-3 py-2 text-sm hover:bg-muted focus-visible:bg-muted focus-visible:outline-none";
+    "flex items-center gap-2 px-3 py-2 text-body-sm hover:bg-muted focus-visible:bg-muted focus-visible:outline-none";
 
   return (
     <div ref={wrapRef} className="relative shrink-0">
       <button
+        ref={triggerRef}
         type="button"
         onClick={() => setOpen((v) => !v)}
         aria-haspopup="true"
@@ -268,6 +291,18 @@ function HelpMenu({ version }: { version?: string }) {
           className="absolute right-0 top-full z-30 mt-1 w-64 max-w-[90vw] overflow-hidden rounded-md border bg-popover text-popover-foreground shadow-lg"
         >
           <a
+            href={demoInstallUrl(i18n.language)}
+            target="_blank"
+            rel="noreferrer noopener"
+            onClick={() => setOpen(false)}
+            className={item}
+            data-testid="help-start"
+          >
+            <Rocket className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
+            {t("nav.helpStart")}
+            <ExternalLink className="ml-auto h-3 w-3 shrink-0 text-muted-foreground" aria-hidden />
+          </a>
+          <a
             href={docsUrl(i18n.language)}
             target="_blank"
             rel="noreferrer noopener"
@@ -289,6 +324,33 @@ function HelpMenu({ version }: { version?: string }) {
             {t("nav.helpDemo")}
             <ExternalLink className="ml-auto h-3 w-3 shrink-0 text-muted-foreground" aria-hidden />
           </a>
+          <button
+            type="button"
+            onClick={() => {
+              setOpen(false);
+              setShortcuts(true);
+            }}
+            className={cn(item, "w-full text-left")}
+            data-testid="help-shortcuts"
+          >
+            <Keyboard className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
+            {t("nav.helpShortcuts")}
+            <kbd className="ml-auto rounded border bg-muted px-1.5 font-sans text-caption text-muted-foreground" aria-hidden>
+              ?
+            </kbd>
+          </button>
+          <a
+            href={releaseNotesUrl(version)}
+            target="_blank"
+            rel="noreferrer noopener"
+            onClick={() => setOpen(false)}
+            className={item}
+            data-testid="help-whats-new"
+          >
+            <Sparkles className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
+            {t("nav.helpWhatsNew")}
+            <ExternalLink className="ml-auto h-3 w-3 shrink-0 text-muted-foreground" aria-hidden />
+          </a>
           <a
             href={ISSUE_FORM_URL}
             target="_blank"
@@ -301,11 +363,20 @@ function HelpMenu({ version }: { version?: string }) {
             {t("nav.helpReport")}
             <ExternalLink className="ml-auto h-3 w-3 shrink-0 text-muted-foreground" aria-hidden />
           </a>
-          <p className="border-t px-3 py-2 text-xs text-muted-foreground" data-testid="app-version">
+          <p className="border-t px-3 py-2 text-label text-muted-foreground" data-testid="app-version">
             {version ? t("nav.helpVersion", { version }) : t("nav.helpVersionUnknown")}
           </p>
         </div>
       )}
+      <ShortcutsDialog
+        open={shortcuts}
+        onClose={() => {
+          setShortcuts(false);
+          // The menu item that opened the list is gone by now, so the dialog
+          // cannot hand focus back to it; the menu button stands in.
+          requestAnimationFrame(() => triggerRef.current?.focus());
+        }}
+      />
     </div>
   );
 }
@@ -367,13 +438,13 @@ function RecentMenu({
           <a
             href={homeHref}
             onClick={() => setOpen(false)}
-            className="flex items-center gap-2 border-b px-3 py-2 text-sm font-medium hover:bg-muted focus-visible:bg-muted focus-visible:outline-none"
+            className="flex items-center gap-2 border-b px-3 py-2 text-body-sm font-medium hover:bg-muted focus-visible:bg-muted focus-visible:outline-none"
           >
             <Clock className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
             {t("nav.recentScans")}
           </a>
           {recent.length === 0 ? (
-            <p className="px-3 py-3 text-sm text-muted-foreground">
+            <p className="px-3 py-3 text-body-sm text-muted-foreground">
               {t("nav.recentEmpty")}
             </p>
           ) : (
@@ -384,7 +455,7 @@ function RecentMenu({
                     href={scanHash(scanItem.id)}
                     onClick={() => setOpen(false)}
                     className={cn(
-                      "flex w-full items-center gap-2 px-3 py-1.5 text-sm text-muted-foreground",
+                      "flex w-full items-center gap-2 px-3 py-1.5 text-body-sm text-muted-foreground",
                       "transition-colors duration-fast ease-out-soft hover:bg-muted hover:text-foreground",
                       "focus-visible:bg-muted focus-visible:text-foreground focus-visible:outline-none",
                       onDeleteRecent && "pr-8",

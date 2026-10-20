@@ -1,12 +1,13 @@
 // Copyright 2026 SK Telecom Co., Ltd.
 // SPDX-License-Identifier: Apache-2.0
 
-import { Loader2, Play, Upload } from "lucide-react";
+import { Loader2, Play, Send, Upload } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { FileDropzone } from "@/components/FileDropzone";
@@ -21,7 +22,7 @@ import {
   type UploadKind,
   type UsageContext,
 } from "@/lib/api";
-import { demoInstallUrl, IS_STATIC_DEMO } from "@/lib/demo";
+import { demoInstallUrl, demoRunAction, IS_STATIC_DEMO } from "@/lib/demo";
 import { canManageScanFolders, desktopBridge } from "@/lib/desktop";
 import { USAGE_LABEL_KEY } from "@/lib/models";
 import { ACCEPT, type ScanFormState } from "@/lib/useScanForm";
@@ -66,7 +67,7 @@ export function FieldError({ id, msgKey }: { id: string; msgKey?: string }) {
   const { t } = useTranslation();
   if (!msgKey) return null;
   return (
-    <p id={id} className="text-xs text-destructive" role="alert">
+    <p id={id} className="text-label text-destructive" role="alert">
       {t(msgKey)}
     </p>
   );
@@ -75,7 +76,7 @@ export function FieldError({ id, msgKey }: { id: string; msgKey?: string }) {
 /** Source-specific control: current-folder hint / free-text target / git token / upload. */
 export function SourceControls({ state }: { state: ScanFormState }) {
   const { t } = useTranslation();
-  const { source, target, setTarget, scanRoot, setScanRoot, scanRoots, deepSource, setDeepSource, showDeepSource, gitToken, setGitToken, file, setFile, uploadPercent, uploadKind, textInput, isAnalyze, busy, capabilities, errors } = state;
+  const { source, target, setTarget, scanRoot, setScanRoot, scanRoots, deepSource, setDeepSource, showDeepSource, gitToken, setGitToken, gitRef, setGitRef, exclude, setExclude, showExclude, file, setFile, uploadPercent, uploadKind, textInput, isAnalyze, busy, capabilities, errors } = state;
 
   // Extra --mount scan targets make the rootfs-dir path a subpath inside the
   // chosen base — and optional when a mounted base is selected (empty = scan
@@ -108,7 +109,7 @@ export function SourceControls({ state }: { state: ScanFormState }) {
   return (
     <>
       {source === "current-dir" && (
-        <div className="rounded-md bg-muted/50 px-3 py-2 text-xs text-muted-foreground">
+        <div className="rounded-md bg-muted/50 px-3 py-2 text-label text-muted-foreground">
           {capabilities.hostDir && (
             <div className="mb-1">
               <span className="text-foreground">{t("source.currentDirPath")}: </span>
@@ -159,7 +160,7 @@ export function SourceControls({ state }: { state: ScanFormState }) {
           {desktopFolders && scanRoot !== "" && (
             <button
               type="button"
-              className="text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground disabled:opacity-50"
+              className="text-label text-muted-foreground underline underline-offset-2 hover:text-foreground disabled:opacity-50"
               disabled={busy || mountBusy}
               onClick={removeScanFolder}
             >
@@ -167,7 +168,7 @@ export function SourceControls({ state }: { state: ScanFormState }) {
             </button>
           )}
           {desktopFolders && (
-            <p className="text-xs text-muted-foreground">{t("source.scanFolderDesktopHint")}</p>
+            <p className="text-body-sm text-muted-foreground">{t("source.scanFolderDesktopHint")}</p>
           )}
           {showDeepSource && (
             <div className="rounded-md border border-border/60 bg-muted/30 px-3 py-2.5">
@@ -199,9 +200,49 @@ export function SourceControls({ state }: { state: ScanFormState }) {
             aria-describedby={errors.target ? "target-error" : undefined}
           />
           <FieldError id="target-error" msgKey={errors.target} />
-          <p className="text-xs text-muted-foreground">
+          <p className="text-body-sm text-muted-foreground">
             {targetOptional ? t("source.rootfsSubpathHint") : t(textInput.hint)}
           </p>
+        </div>
+      )}
+
+      {source === "git-url" && (
+        <div className="space-y-2">
+          <Label htmlFor="gitRef">{t("source.gitRef")}</Label>
+          <Input
+            id="gitRef"
+            value={gitRef}
+            onChange={(e) => setGitRef(e.target.value)}
+            placeholder={t("source.gitRefPlaceholder")}
+            disabled={busy}
+            autoComplete="off"
+            spellCheck={false}
+            autoCapitalize="off"
+            aria-invalid={errors.gitRef ? true : undefined}
+            aria-describedby={errors.gitRef ? "gitRef-error gitRef-hint" : "gitRef-hint"}
+          />
+          <FieldError id="gitRef-error" msgKey={errors.gitRef} />
+          <p id="gitRef-hint" className="text-body-sm text-muted-foreground">{t("source.gitRefHint")}</p>
+        </div>
+      )}
+
+      {showExclude && (
+        <div className="space-y-2">
+          <Label htmlFor="exclude">{t("source.exclude")}</Label>
+          <Textarea
+            id="exclude"
+            value={exclude}
+            onChange={(e) => setExclude(e.target.value)}
+            placeholder={t("source.excludePlaceholder")}
+            disabled={busy}
+            rows={3}
+            spellCheck={false}
+            autoCapitalize="off"
+            aria-invalid={errors.exclude ? true : undefined}
+            aria-describedby={errors.exclude ? "exclude-error exclude-hint" : "exclude-hint"}
+          />
+          <FieldError id="exclude-error" msgKey={errors.exclude} />
+          <p id="exclude-hint" className="text-body-sm text-muted-foreground">{t("source.excludeHint")}</p>
         </div>
       )}
 
@@ -217,7 +258,7 @@ export function SourceControls({ state }: { state: ScanFormState }) {
             placeholder={t("source.gitTokenPlaceholder")}
             disabled={busy}
           />
-          <p className="text-xs text-muted-foreground">{t("source.gitTokenHint")}</p>
+          <p className="text-body-sm text-muted-foreground">{t("source.gitTokenHint")}</p>
         </div>
       )}
 
@@ -239,22 +280,22 @@ export function SourceControls({ state }: { state: ScanFormState }) {
           />
           <FieldError id="file-error" msgKey={errors.file} />
           {isAnalyze && (
-            <p className="text-xs text-muted-foreground">{t("source.sbomAnalyzeHint")}</p>
+            <p className="text-body-sm text-muted-foreground">{t("source.sbomAnalyzeHint")}</p>
           )}
           {source === "firmware-upload" && (
-            <p className="text-xs text-muted-foreground">{t("source.firmwareHint")}</p>
+            <p className="text-body-sm text-muted-foreground">{t("source.firmwareHint")}</p>
           )}
           {source === "package-upload" && (
-            <p className="text-xs text-muted-foreground">{t("source.packageUploadHint")}</p>
+            <p className="text-body-sm text-muted-foreground">{t("source.packageUploadHint")}</p>
           )}
           {source === "model-upload" && (
-            <p className="text-xs text-muted-foreground">{t("source.modelUploadHint")}</p>
+            <p className="text-body-sm text-muted-foreground">{t("source.modelUploadHint")}</p>
           )}
         </div>
       )}
 
       {source === "ai-declare" && (
-        <p className="text-sm text-muted-foreground" data-testid="ai-declare-hint">
+        <p className="text-body-sm text-muted-foreground" data-testid="ai-declare-hint">
           {t("source.aiDeclareHint")}
         </p>
       )}
@@ -290,7 +331,7 @@ function UsageContextSelect({ state }: { state: ScanFormState }) {
           </option>
         ))}
       </Select>
-      <p className="text-xs text-muted-foreground">{t("source.usageContextHint")}</p>
+      <p className="text-body-sm text-muted-foreground">{t("source.usageContextHint")}</p>
     </div>
   );
 }
@@ -321,9 +362,24 @@ function HfAuthNotice({ state }: { state: ScanFormState }) {
   const { source, capabilities } = state;
   if (source !== "ai-model") return null;
   return (
-    <div className="rounded-md border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
+    <div className="rounded-md border border-border bg-muted/40 px-3 py-2 text-label text-muted-foreground">
       {t(capabilities.hfAuth ? "source.hfAuthOn" : "source.hfAuthOff")}
     </div>
+  );
+}
+
+/** Marks an option that sends data off this machine. The same mark sits on
+ *  every such option so a reader can scan the panel for it. */
+export function ExternalMark() {
+  const { t } = useTranslation();
+  return (
+    <span
+      data-testid="external-mark"
+      className="inline-flex items-center gap-1 rounded-full border px-1.5 py-px text-label font-medium text-muted-foreground"
+    >
+      <Send className="h-3 w-3" aria-hidden />
+      {t("newscan.externalMark")}
+    </span>
   );
 }
 
@@ -333,18 +389,23 @@ function ToggleRow({
   checked,
   onChange,
   disabled,
+  external,
 }: {
   labelKey: string;
   checked: boolean;
   onChange: (v: boolean) => void;
   disabled?: boolean;
+  external?: boolean;
 }) {
   const { t } = useTranslation();
   return (
     <label className="flex cursor-pointer items-start justify-between gap-4">
       <span className="space-y-0.5">
-        <span className="block text-sm font-medium">{t(`options.${labelKey}`)}</span>
-        <span className="block text-xs text-muted-foreground">{t(`options.${labelKey}Hint`)}</span>
+        <span className="flex flex-wrap items-center gap-x-2 gap-y-1 text-body-sm font-medium">
+          {t(`options.${labelKey}`)}
+          {external && <ExternalMark />}
+        </span>
+        <span className="block text-label text-muted-foreground">{t(`options.${labelKey}Hint`)}</span>
       </span>
       <Switch
         checked={checked}
@@ -372,13 +433,13 @@ export function GenerationOptions({ state }: { state: ScanFormState }) {
         />
       ))}
       {isAiModel && (
-        <p className="text-xs text-muted-foreground">{t("options.aiNoticeHint")}</p>
+        <p className="text-body-sm text-muted-foreground">{t("options.aiNoticeHint")}</p>
       )}
     </div>
   );
 }
 
-/** Scan method: how the source is analyzed (deep license / vendored identification). */
+/** Result quality: how the source is analyzed (deep license / vendored identification / CVE matching). */
 export function ScanOptions({ state }: { state: ScanFormState }) {
   const { t } = useTranslation();
   const {
@@ -392,15 +453,9 @@ export function ScanOptions({ state }: { state: ScanFormState }) {
     setReachability,
     byteStable,
     setByteStable,
-    conformanceProfile,
-    setConformanceProfile,
-    isAnalyze,
-    outboundLicense,
-    setOutboundLicense,
-    sbomAuthor,
-    setSbomAuthor,
-    specVersion,
-    setSpecVersion,
+    readLockFile,
+    setReadLockFile,
+    showDetection,
     scanossToken,
     setScanossToken,
     showVendored,
@@ -408,10 +463,6 @@ export function ScanOptions({ state }: { state: ScanFormState }) {
     showDeepCve,
     showReachability,
     showByteStable,
-    showOutboundLicense,
-    showSbomAuthor,
-    showSpecVersion,
-    showConformanceProfile,
     capabilities,
     busy,
   } = state;
@@ -420,7 +471,7 @@ export function ScanOptions({ state }: { state: ScanFormState }) {
       {/* Set the group's altitude once: these are advanced analyses for source
           without a package manager, so PM-built projects can leave them off. */}
       {(showVendored || showDeepLicense) && (
-        <p className="text-xs text-muted-foreground">{t("options.scanMethodHint")}</p>
+        <p className="text-body-sm text-muted-foreground">{t("options.scanMethodHint")}</p>
       )}
       {showVendored && (
         <div className="space-y-2">
@@ -429,6 +480,7 @@ export function ScanOptions({ state }: { state: ScanFormState }) {
             checked={identifyVendored}
             onChange={setIdentifyVendored}
             disabled={busy}
+            external
           />
           {identifyVendored && (
             <div className="space-y-1">
@@ -441,7 +493,7 @@ export function ScanOptions({ state }: { state: ScanFormState }) {
                 placeholder={t("options.scanossTokenPlaceholder")}
                 disabled={busy}
               />
-              <p className="text-xs text-muted-foreground">
+              <p className="text-body-sm text-muted-foreground">
                 {t("options.scanossTokenHint")}
               </p>
             </div>
@@ -479,6 +531,14 @@ export function ScanOptions({ state }: { state: ScanFormState }) {
           disabled={busy}
         />
       )}
+      {showDetection && (
+        <ToggleRow
+          labelKey="readLockFile"
+          checked={readLockFile}
+          onChange={setReadLockFile}
+          disabled={busy}
+        />
+      )}
       {showByteStable && (
         <ToggleRow
           labelKey="byteStable"
@@ -487,11 +547,37 @@ export function ScanOptions({ state }: { state: ScanFormState }) {
           disabled={busy}
         />
       )}
+    </div>
+  );
+}
+
+/** Output format: which thresholds, license and author the SBOM and its checks carry. */
+export function FormatOptions({ state }: { state: ScanFormState }) {
+  const { t } = useTranslation();
+  const {
+    conformanceProfile,
+    setConformanceProfile,
+    isAnalyze,
+    outboundLicense,
+    setOutboundLicense,
+    sbomAuthor,
+    setSbomAuthor,
+    specVersion,
+    setSpecVersion,
+    showOutboundLicense,
+    showSbomAuthor,
+    showSpecVersion,
+    showConformanceProfile,
+    busy,
+  } = state;
+  return (
+    <div className="space-y-3">
       {showConformanceProfile && (
         <div className="space-y-1.5">
           <Label htmlFor="conformance-profile">{t("options.conformanceProfile")}</Label>
           <Select
             id="conformance-profile"
+            className="w-full min-w-0"
             value={conformanceProfile}
             onChange={(e) =>
               setConformanceProfile(e.target.value as ConformanceProfile)
@@ -504,11 +590,11 @@ export function ScanOptions({ state }: { state: ScanFormState }) {
               </option>
             ))}
           </Select>
-          <p className="text-xs text-muted-foreground">
+          <p className="text-body-sm text-muted-foreground">
             {t("options.conformanceProfileHint")}
           </p>
           {isAnalyze && (
-            <p className="text-xs text-muted-foreground">
+            <p className="text-body-sm text-muted-foreground">
               {t("options.conformanceProfileAnalyzeHint")}
             </p>
           )}
@@ -516,10 +602,10 @@ export function ScanOptions({ state }: { state: ScanFormState }) {
       )}
       {showOutboundLicense && (
         <div className="space-y-1.5">
-          <label htmlFor="outbound-license" className="text-sm font-medium text-foreground">
+          <label htmlFor="outbound-license" className="text-body-sm font-medium text-foreground">
             {t("options.outboundLicense")}
           </label>
-          <input
+          <Input
             id="outbound-license"
             type="text"
             value={outboundLicense}
@@ -527,20 +613,19 @@ export function ScanOptions({ state }: { state: ScanFormState }) {
             disabled={busy}
             placeholder="Apache-2.0"
             spellCheck={false}
-            className="w-full rounded-md border bg-background px-3 py-2 text-sm disabled:opacity-60"
             aria-describedby="outbound-license-hint"
           />
-          <p id="outbound-license-hint" className="text-xs text-muted-foreground">
+          <p id="outbound-license-hint" className="text-body-sm text-muted-foreground">
             {t("options.outboundLicenseHint")}
           </p>
         </div>
       )}
       {showSbomAuthor && (
         <div className="space-y-1.5">
-          <label htmlFor="sbom-author" className="text-sm font-medium text-foreground">
+          <label htmlFor="sbom-author" className="text-body-sm font-medium text-foreground">
             {t("options.sbomAuthor")}
           </label>
-          <input
+          <Input
             id="sbom-author"
             type="text"
             value={sbomAuthor}
@@ -548,10 +633,9 @@ export function ScanOptions({ state }: { state: ScanFormState }) {
             disabled={busy}
             placeholder="SK Telecom Co., Ltd."
             spellCheck={false}
-            className="w-full rounded-md border bg-background px-3 py-2 text-sm disabled:opacity-60"
             aria-describedby="sbom-author-hint"
           />
-          <p id="sbom-author-hint" className="text-xs text-muted-foreground">
+          <p id="sbom-author-hint" className="text-body-sm text-muted-foreground">
             {t("options.sbomAuthorHint")}
           </p>
         </div>
@@ -561,6 +645,7 @@ export function ScanOptions({ state }: { state: ScanFormState }) {
           <Label htmlFor="spec-version">{t("options.specVersion")}</Label>
           <Select
             id="spec-version"
+            className="w-full min-w-0"
             value={specVersion}
             onChange={(e) => setSpecVersion(e.target.value as CdxSpecVersion)}
             disabled={busy}
@@ -572,7 +657,7 @@ export function ScanOptions({ state }: { state: ScanFormState }) {
               </option>
             ))}
           </Select>
-          <p id="spec-version-hint" className="text-xs text-muted-foreground">
+          <p id="spec-version-hint" className="text-body-sm text-muted-foreground">
             {t("options.specVersionHint")}
           </p>
         </div>
@@ -608,6 +693,7 @@ export function UploadOptions({ state }: { state: ScanFormState }) {
         checked={uploadEnabled}
         onChange={setUploadEnabled}
         disabled={busy}
+        external
       />
       {uploadEnabled && (
         <div className="space-y-3">
@@ -615,6 +701,7 @@ export function UploadOptions({ state }: { state: ScanFormState }) {
             <Label htmlFor="uploadTarget">{t("upload.target")}</Label>
             <Select
               id="uploadTarget"
+              className="w-full min-w-0"
               value={uploadTarget}
               onChange={(e) =>
                 setUploadTarget(e.target.value as "dependency-track" | "trusca")
@@ -652,7 +739,7 @@ export function UploadOptions({ state }: { state: ScanFormState }) {
               aria-describedby={errors.uploadToken ? "uploadToken-error" : undefined}
             />
             <FieldError id="uploadToken-error" msgKey={errors.uploadToken} />
-            <p className="text-xs text-muted-foreground">{t("upload.tokenHint")}</p>
+            <p className="text-body-sm text-muted-foreground">{t("upload.tokenHint")}</p>
           </div>
           {uploadTarget === "trusca" && (
             <div className="space-y-1">
@@ -689,7 +776,7 @@ export function FormMessages({ state }: { state: ScanFormState }) {
   return (
     <>
       {hasErrors && (
-        <p className="text-sm text-destructive" role="alert">
+        <p className="text-body-sm text-destructive" role="alert">
           {errors.file && !errors.project && !errors.version && !errors.target
             ? t("validation.file")
             : t("validation.required")}
@@ -697,9 +784,9 @@ export function FormMessages({ state }: { state: ScanFormState }) {
       )}
       {uploadError && (
         <div role="alert">
-          <p className="text-sm text-destructive">{t(uploadError.key)}</p>
+          <p className="text-body-sm text-destructive">{t(uploadError.key)}</p>
           {uploadError.detail && (
-            <p className="text-xs text-muted-foreground">{uploadError.detail}</p>
+            <p className="text-body-sm text-muted-foreground">{uploadError.detail}</p>
           )}
         </div>
       )}
@@ -717,19 +804,27 @@ export function RunButton({ state, running }: { state: ScanFormState; running: b
   // a missing button reads as a broken page, a disabled one with a reason reads
   // as a boundary — and the reason is where the install link belongs.
   if (IS_STATIC_DEMO) {
+    // The model questionnaire runs in the browser, so it stays reachable; only
+    // its last step (starting a scan) is refused there.
+    const questions = demoRunAction(state.source) === "questions";
     return (
       <div className="space-y-2">
-        <Button className="w-full" data-testid="run-scan" disabled>
+        <Button
+          className="w-full"
+          data-testid="run-scan"
+          disabled={!questions}
+          onClick={questions ? submit : undefined}
+        >
           <Play className="h-4 w-4" />
-          {t("form.run")}
+          {questions ? t("newscan.startQuestions") : t("form.run")}
         </Button>
-        <p className="text-center text-xs text-muted-foreground">
+        <p className="text-center text-label text-muted-foreground">
           {t("form.demoRunDisabled")}{" "}
           <a
             href={demoInstallUrl(i18n.language)}
             target="_blank"
             rel="noreferrer"
-            className="font-medium text-brand underline underline-offset-2 hover:no-underline"
+            className="font-medium text-foreground underline underline-offset-2 hover:no-underline"
           >
             {t("form.demoRunDisabledCta")}
           </a>

@@ -281,8 +281,10 @@ class Tree:
                     self.unhashable.append(rel)
                     continue
                 keep.append(d)
-            dirnames[:] = keep
-            for f in filenames:
+            # Sorted, so a walk that stops at the limit stops at the same file
+            # on every filesystem (readdir order is not stable across them).
+            dirnames[:] = sorted(keep)
+            for f in sorted(filenames):
                 if f == ".git":
                     continue        # a worktree's gitlink, which names an absolute path
                 rel = join(reld, f)

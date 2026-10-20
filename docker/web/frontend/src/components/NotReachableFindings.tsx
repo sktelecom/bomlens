@@ -30,19 +30,19 @@ export function NotReachableFindings({
   return (
     <div
       data-testid="not-reachable-findings"
-      className={cn("space-y-2 rounded-md border bg-muted/30 px-3 py-2 text-left text-xs", className)}
+      className={cn("space-y-2 rounded-md border bg-muted/30 px-3 py-2 text-left text-label", className)}
     >
-      <p className="flex items-start gap-2 text-sm font-medium text-foreground">
+      <p className="flex items-start gap-2 text-body-sm font-medium text-foreground">
         <ShieldMinus className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
         {t("result.notReachableTitle", { count: s.count })}
       </p>
       <p className="text-muted-foreground">{t("result.notReachableHint")}</p>
       {s.rows.length > 0 && (
         <Disclosure
-          summary={<span className="text-xs font-medium text-foreground">{t("result.notReachableList")}</span>}
+          summary={<span className="text-label font-medium text-foreground">{t("result.notReachableList")}</span>}
         >
           <div className="mt-2 max-h-80 overflow-auto rounded-md border bg-card">
-            <table className="w-full text-left text-xs">
+            <table className="w-full text-left text-label">
               <thead className="border-b bg-muted/40 text-muted-foreground">
                 <tr>
                   <th scope="col" className="whitespace-nowrap px-3 py-2 font-medium">
@@ -70,7 +70,7 @@ export function NotReachableFindings({
                   <tr key={`${v.id}-${v.purl || v.pkg}-${i}`} className="border-b align-top last:border-0">
                     <td className="px-3 py-1.5">
                       <div className="flex flex-wrap items-center gap-1.5">
-                        <Badge tone={severityTone(v.severity)}>{t(`severity.${v.severity}`)}</Badge>
+                        <Badge tone={severityTone(v.severity)} mark>{t(`severity.${v.severity}`)}</Badge>
                         <Badge tone="info">{t("result.notReachableBadge")}</Badge>
                       </div>
                     </td>

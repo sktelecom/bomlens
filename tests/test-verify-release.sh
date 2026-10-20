@@ -5,7 +5,7 @@
 #
 # test-verify-release.sh: No-Docker unit tests for
 # scripts/verify-release.sh's check_secondary_image(), the step-3 loop that
-# confirms the three opt-in images (firmware/aibom/deep-cve) are pullable at
+# confirms the four opt-in images (firmware/aibom/deep-cve/deep-license) are pullable at
 # a release's version tag.
 #
 # The rest of verify-release.sh needs a real `gh` CLI, a real network, and a

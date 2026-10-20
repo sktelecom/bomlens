@@ -16,6 +16,8 @@ Every external tool below is open source; the table in [Open-source tools used](
 
 A source folder, a GitHub URL, or a ZIP archive. Language detection picks the matching official [cdxgen](https://github.com/CycloneDX/cdxgen) language image, which prepares dependencies (`build-prep.sh`) and generates the SBOM. BomLens falls back to [syft](https://github.com/anchore/syft) over the directory, which captures direct dependencies from lock files, when it cannot run a sibling container (for example the web UI's source scan) or when cdxgen itself fails partway through (an internal exception, or its own document validation rejecting the result). Either way the SBOM carries `bomlens:sbom-tool-degraded` with the reason. For Node/npm, a fallback that covers none of the project's own declared dependencies is discarded and the scan fails with guidance, rather than reporting a misleadingly complete-looking result. When the source declares dependencies (a manifest or lock file lists some) and the scan still finds no component, the SBOM carries `bomlens:sbom-empty-with-manifests` naming those files, and the result manifest records the `generate` step as degraded (`no_components`).
 
+What the build tools do before cdxgen reads the project, and which images they come from, is in [How dependencies are resolved](dependency-resolution.md).
+
 Two options apply to source scans only, and both are off by default.
 
 - **Identify vendored OSS** (`--identify-vendored`, [SCANOSS](https://github.com/scanoss/scanoss.py)) — for C/C++ and other code copied in without a package manager. The SCANOSS client fingerprints files and queries the hosted OSSKB service, then BomLens reconciles the matches against what the package-manager scan already found and merges the rest into the SBOM.
@@ -41,13 +43,13 @@ Unpacking tries tools in order, using the first that succeeds: [unblob](https://
 
 ## Received SBOM
 
-An SBOM (CycloneDX or SPDX) received from a supplier or another team — no source code needed. BomLens first checks it against the quality criteria and writes a conformance report, then normalizes the input to CycloneDX so the rest of the pipeline can analyze it. SPDX is converted with `syft convert` (a `jq` fallback handles SPDX JSON if syft is unavailable). Notice, security, and the risk report are always produced in this mode.
+An SBOM (CycloneDX or SPDX) received from a supplier or another team — no source code needed. BomLens first checks it against the quality criteria and writes a conformance check report, then normalizes the input to CycloneDX so the rest of the pipeline can analyze it. SPDX is converted with `syft convert` (a `jq` fallback handles SPDX JSON if syft is unavailable). Notice, security, and the risk report are always produced in this mode.
 
 ![Received SBOM flow: validate for conformance, convert SPDX to CycloneDX, then shared post-processing](../images/diagrams/pipeline-analyze.png)
 
 > Validation is based on the original input before conversion, so SPDX is checked as SPDX. Details are in the [supplier SBOM guide](../guides/supplier-sbom.md).
 
-A Yocto build directory enters here too. Pointing `--target` at one is recognized, and the image SBOM the build published under `tmp/deploy/images/` takes this same path — read by a dedicated parser that keeps the installed package set and the vulnerability verdicts the build recorded, rather than by the generic SPDX conversion.
+A Yocto build directory enters here too. Pointing `--target` at one is recognized, and the image SBOM the build published under `tmp/deploy/images/` takes this same path, read by a dedicated parser that keeps the installed package set and the vulnerability verdicts the build recorded, rather than by the generic SPDX conversion. As in a firmware scan, its components then get the upstream repository purl. Only an SPDX 2.2 archive, which carries no build verdicts, has its CPEs matched against the NVD CPE index in the image with `--security`.
 
 ---
 
