@@ -796,13 +796,29 @@ if run_scan_with_logs "test-yocto-nospdx" "YoctoNoSpdx" "1.0.0" "--target yocto-
     # identity read from the build (e.g. "core-image-minimal-qemux86-64"), not
     # the --project value, the same supplier-identity-is-not-ours-to-overwrite
     # rule ANALYZE mode follows for a submitted SBOM. Checked directly instead.
+    # The conformance report comes from the scanner image. An image published
+    # before this change cannot write it, so against such an image only the
+    # manifest path is checked; the report and the scan mode are checked once
+    # the image has the feature.
+    YN_IMAGE="${SBOM_SCANNER_IMAGE:-ghcr.io/sktelecom/bomlens:latest}"
+    YN_FEATURE=false
+    if docker run --rm --entrypoint sh "$YN_IMAGE" -c 'grep -q YOCTO_FROM_BUILD /usr/local/bin/run-scan' >/dev/null 2>&1; then
+        YN_FEATURE=true
+    fi
+    YN_OK=false
     if [ -n "$YN_BOM" ] \
        && jq -e '.bomFormat == "CycloneDX" and ((.components | type) == "array")' "$YN_BOM" >/dev/null 2>&1 \
-       && jq -e '[.metadata.properties[]? | select(.name == "bomlens:scanMode") | .value] == ["YOCTO"]' "$YN_BOM" >/dev/null 2>&1 \
-       && [ -f "$(dirname "$YN_BOM")/YoctoNoSpdx_1.0.0_conformance.json" ] \
-       && grep -q "No SPDX in this build" "$LOG_DIR/test-yocto-nospdx.log" \
-       && ! grep -q "requested but not produced" "$LOG_DIR/test-yocto-nospdx.log"; then
-        print_success "Yocto manifest fallback (conformance report written, scan mode YOCTO)"
+       && grep -q "No SPDX in this build" "$LOG_DIR/test-yocto-nospdx.log"; then
+        YN_OK=true
+        if [ "$YN_FEATURE" = "true" ]; then
+            jq -e '[.metadata.properties[]? | select(.name == "bomlens:scanMode") | .value] == ["YOCTO"]' "$YN_BOM" >/dev/null 2>&1 \
+                && [ -f "$(dirname "$YN_BOM")/YoctoNoSpdx_1.0.0_conformance.json" ] \
+                && ! grep -q "requested but not produced" "$LOG_DIR/test-yocto-nospdx.log" \
+                || YN_OK=false
+        fi
+    fi
+    if [ "$YN_OK" = "true" ]; then
+        print_success "Yocto manifest fallback (manifest path taken; conformance report and scan mode checked: $YN_FEATURE)"
         PASSED=$((PASSED + 1))
     else
         print_error "Yocto manifest fallback (manifest path not taken, no conformance report, or a warning was printed)"
