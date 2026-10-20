@@ -13627,186 +13627,6 @@
       "type": "library"
     },
     {
-      "bom-ref": "version-string:net-tools@1.33",
-      "evidence": {
-        "occurrences": [
-          {
-            "location": "usr/share/doc/net-tools/TODO"
-          }
-        ]
-      },
-      "name": "net-tools",
-      "properties": [
-        {
-          "name": "bomlens:identifiedBy",
-          "value": "version-string"
-        },
-        {
-          "name": "bomlens:versionEvidence",
-          "value": "net-tools 1.33"
-        },
-        {
-          "name": "bomlens:cpeUnmapped",
-          "value": "true"
-        },
-        {
-          "name": "bomlens:licenseClass",
-          "value": "uncategorized"
-        },
-        {
-          "name": "bomlens:purlSource",
-          "value": "upstream-map"
-        }
-      ],
-      "type": "library",
-      "version": "1.33",
-      "purl": "pkg:github/ecki/net-tools@v1.33"
-    },
-    {
-      "bom-ref": "version-string:net-tools@1.51",
-      "evidence": {
-        "occurrences": [
-          {
-            "location": "usr/share/locale/de/LC_MESSAGES/net-tools.mo"
-          }
-        ]
-      },
-      "name": "net-tools",
-      "properties": [
-        {
-          "name": "bomlens:identifiedBy",
-          "value": "version-string"
-        },
-        {
-          "name": "bomlens:versionEvidence",
-          "value": "net-tools 1.51"
-        },
-        {
-          "name": "bomlens:cpeUnmapped",
-          "value": "true"
-        },
-        {
-          "name": "bomlens:licenseClass",
-          "value": "uncategorized"
-        },
-        {
-          "name": "bomlens:purlSource",
-          "value": "upstream-map"
-        }
-      ],
-      "type": "library",
-      "version": "1.51",
-      "purl": "pkg:github/ecki/net-tools@v1.51"
-    },
-    {
-      "bom-ref": "version-string:net-tools@1.54",
-      "evidence": {
-        "occurrences": [
-          {
-            "location": "usr/share/locale/pt_BR/LC_MESSAGES/net-tools.mo"
-          }
-        ]
-      },
-      "name": "net-tools",
-      "properties": [
-        {
-          "name": "bomlens:identifiedBy",
-          "value": "version-string"
-        },
-        {
-          "name": "bomlens:versionEvidence",
-          "value": "net-tools 1.54"
-        },
-        {
-          "name": "bomlens:cpeUnmapped",
-          "value": "true"
-        },
-        {
-          "name": "bomlens:licenseClass",
-          "value": "uncategorized"
-        },
-        {
-          "name": "bomlens:purlSource",
-          "value": "upstream-map"
-        }
-      ],
-      "type": "library",
-      "version": "1.54",
-      "purl": "pkg:github/ecki/net-tools@v1.54"
-    },
-    {
-      "bom-ref": "version-string:net-tools@1.58",
-      "evidence": {
-        "occurrences": [
-          {
-            "location": "usr/share/locale/et/LC_MESSAGES/net-tools.mo"
-          }
-        ]
-      },
-      "name": "net-tools",
-      "properties": [
-        {
-          "name": "bomlens:identifiedBy",
-          "value": "version-string"
-        },
-        {
-          "name": "bomlens:versionEvidence",
-          "value": "net-tools 1.58"
-        },
-        {
-          "name": "bomlens:cpeUnmapped",
-          "value": "true"
-        },
-        {
-          "name": "bomlens:licenseClass",
-          "value": "uncategorized"
-        },
-        {
-          "name": "bomlens:purlSource",
-          "value": "upstream-map"
-        }
-      ],
-      "type": "library",
-      "version": "1.58",
-      "purl": "pkg:github/ecki/net-tools@v1.58"
-    },
-    {
-      "bom-ref": "version-string:net-tools@2.10",
-      "evidence": {
-        "occurrences": [
-          {
-            "location": "usr/share/doc/net-tools/README"
-          }
-        ]
-      },
-      "name": "net-tools",
-      "properties": [
-        {
-          "name": "bomlens:identifiedBy",
-          "value": "version-string"
-        },
-        {
-          "name": "bomlens:versionEvidence",
-          "value": "net-tools 2.10"
-        },
-        {
-          "name": "bomlens:cpeUnmapped",
-          "value": "true"
-        },
-        {
-          "name": "bomlens:licenseClass",
-          "value": "uncategorized"
-        },
-        {
-          "name": "bomlens:purlSource",
-          "value": "upstream-map"
-        }
-      ],
-      "type": "library",
-      "version": "2.10",
-      "purl": "pkg:github/ecki/net-tools@v2.10"
-    },
-    {
       "bom-ref": "elf-presence:nghttp2",
       "evidence": {
         "occurrences": [
@@ -1552596,7 +1552416,7 @@
         "value": "FIRMWARE"
       }
     ],
-    "timestamp": "2026-10-17T13:50:29Z",
+    "timestamp": "2026-10-20T12:28:47Z",
     "tools": {
       "components": [
         {
@@ -1552618,7 +1552438,7 @@
           "name": "BomLens",
           "publisher": "SK Telecom",
           "type": "application",
-          "version": "1.13.7"
+          "version": "1.13.8"
         }
       ]
     }

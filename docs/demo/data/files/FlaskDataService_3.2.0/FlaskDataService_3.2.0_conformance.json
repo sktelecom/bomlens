@@ -2,7 +2,7 @@
   "project": "FlaskDataService",
   "format": "CycloneDX",
   "result": "pass",
-  "generatedAt": "2026-10-17T13:47:16Z",
+  "generatedAt": "2026-10-20T12:25:52Z",
   "profile": "default",
   "untraceableComponents": 0,
   "checks": [
