@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v1.13.9] - 2026-10-20
+
 ### Added
 
 - A root filesystem folder with no package database (apk, dpkg or rpm) is identified by binary signature with the firmware image when that image is present, and gives the same result and version template as the firmware file it came from. `--firmware` takes a folder holding an unpacked image as well as a file. The folder is copied for the scan and mounted read-only.
