@@ -25,23 +25,7 @@
       "type": "file"
     },
     {
-      "path": "src/main/java/com/example/Application.java",
-      "type": "file"
-    },
-    {
-      "path": "src/main/java/com/example/.gitkeep",
-      "type": "file"
-    },
-    {
-      "path": "src/main/java/com/.gitkeep",
-      "type": "file"
-    },
-    {
-      "path": "src/main/java/.gitkeep",
-      "type": "file"
-    },
-    {
-      "path": "src/main/.gitkeep",
+      "path": "README.md",
       "type": "file"
     },
     {
@@ -49,7 +33,23 @@
       "type": "file"
     },
     {
-      "path": "README.md",
+      "path": "src/main/.gitkeep",
+      "type": "file"
+    },
+    {
+      "path": "src/main/java/.gitkeep",
+      "type": "file"
+    },
+    {
+      "path": "src/main/java/com/.gitkeep",
+      "type": "file"
+    },
+    {
+      "path": "src/main/java/com/example/.gitkeep",
+      "type": "file"
+    },
+    {
+      "path": "src/main/java/com/example/Application.java",
       "type": "file"
     }
   ]
