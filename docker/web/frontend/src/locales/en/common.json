@@ -1342,6 +1342,8 @@
     "conflictOffCli": "Command line",
     "conflictOffCliBody": "Pass --license <spdx-id> (or set PROJECT_LICENSE) when you run the scan.",
     "obligationsTitle": "What each license asks of you",
+    "obligationsComponentCount_one": "{{count}} component",
+    "obligationsComponentCount_other": "{{count}} components",
     "obligationsHint": "Conditions on redistributing the component, from public license summaries. A documentation aid, not a legal determination. A license that is not listed shows \"Needs checking\".",
     "obligationsUnknown": "Needs checking",
     "obligationsNone": "No conditions",
@@ -1409,6 +1411,8 @@
     "target": "Enter the scan target.",
     "uploadUrl": "Enter the upload server URL.",
     "uploadToken": "Enter the upload API token.",
+    "gitRef": "Use a branch, tag or commit id: letters, digits and . _ / @ + - only, without \"..\".",
+    "exclude": "Use a relative path with no .. , no wildcard and no backslash, one per line.",
     "truscaProjectId": "Enter the TRUSCA project id."
   },
   "provenance": {
