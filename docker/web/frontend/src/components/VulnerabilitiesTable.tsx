@@ -448,7 +448,7 @@ export function VulnerabilitiesTable({
           </Button>
         </div>
       </div>
-      <div className="max-h-[44rem] resize-y overflow-auto rounded-md border">
+      <div className="max-h-[max(44rem,calc(100vh-21rem))] resize-y overflow-auto rounded-md border">
         <table className={cn("w-full text-left text-label", densityClass(density))}>
         <thead className="sticky top-0 z-10 bg-muted/95 backdrop-blur">
           <tr className="border-b">

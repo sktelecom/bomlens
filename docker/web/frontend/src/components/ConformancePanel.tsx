@@ -589,164 +589,172 @@ export function ConformancePanel({
           {t("conf.submissionJudgedAs", { mode: conformance.submissionJudgedAs })}
         </p>
       ) : null}
-      <div className="space-y-1.5">
-        <div className="flex flex-wrap items-center gap-2 text-body-sm">
-          {conformance.format ? (
-            <span className="font-medium text-foreground">{conformance.format}</span>
-          ) : null}
-          <Badge tone={!pass ? "critical" : warnPass ? "warning" : "success"}>
-            {!pass
-              ? t("result.verdictFail")
-              : warnPass
-                ? t("conf.qualityPassWarn")
-                : t("result.verdictPass")}
-          </Badge>
-          <div className="flex-1" />
-          {scanId
-            ? reports.map((r) => (
-                <Button key={r.name} variant="outline" size="sm" asChild>
-                  <a href={fileUrl(scanId, r.name)} download={r.name}>
-                    <Download className="h-3.5 w-3.5" />
-                    {t("conf.report", { ext: r.name.split(".").pop()?.toUpperCase() })}
-                  </a>
-                </Button>
-              ))
-            : null}
+      {/* From 2xl up the summary and the filters stay in a narrow column at
+          the right while the checks scroll beside them; below 2xl the order
+          is the one this panel always had (summary, filters, checks). */}
+      <div className="space-y-6 2xl:grid 2xl:grid-cols-[minmax(0,1fr)_22rem] 2xl:items-start 2xl:gap-x-8 2xl:space-y-0">
+        <div className="space-y-6 2xl:sticky 2xl:top-6 2xl:col-start-2 2xl:row-start-1">
+        <div className="space-y-1.5">
+          <div className="flex flex-wrap items-center gap-2 text-body-sm">
+            {conformance.format ? (
+              <span className="font-medium text-foreground">{conformance.format}</span>
+            ) : null}
+            <Badge tone={!pass ? "critical" : warnPass ? "warning" : "success"}>
+              {!pass
+                ? t("result.verdictFail")
+                : warnPass
+                  ? t("conf.qualityPassWarn")
+                  : t("result.verdictPass")}
+            </Badge>
+            <div className="flex-1" />
+            {scanId
+              ? reports.map((r) => (
+                  <Button key={r.name} variant="outline" size="sm" asChild>
+                    <a href={fileUrl(scanId, r.name)} download={r.name}>
+                      <Download className="h-3.5 w-3.5" />
+                      {t("conf.report", { ext: r.name.split(".").pop()?.toUpperCase() })}
+                    </a>
+                  </Button>
+                ))
+              : null}
+          </div>
+          {/* Says what "conformance" here measures — this SBOM's own fields
+              against format and regulatory requirements, not a judgment of the
+              scanned software or (for a self-generated SBOM) a verdict BomLens
+              passes on its own document — so the section title and its "SBOM
+              Validation" name are not read as a compliance verdict on the
+              scanned software. Reachable for every scan except a self-generated
+              AI SBOM, whose G7 rollup lives on Models & datasets instead (see
+              nav.ts) to avoid showing it twice. */}
+          <p className="max-w-3xl text-body-sm text-muted-foreground">{t("g7.panelIntro")}</p>
+          <p className="text-body-sm text-foreground">
+            <span className="font-medium">
+              {t("g7.verdictFailed", { count: verdict.mandatoryFailed })}
+            </span>
+          </p>
         </div>
-        {/* Says what "conformance" here measures — this SBOM's own fields
-            against format and regulatory requirements, not a judgment of the
-            scanned software or (for a self-generated SBOM) a verdict BomLens
-            passes on its own document — so the section title and its "SBOM
-            Validation" name are not read as a compliance verdict on the
-            scanned software. Reachable for every scan except a self-generated
-            AI SBOM, whose G7 rollup lives on Models & datasets instead (see
-            nav.ts) to avoid showing it twice. */}
-        <p className="max-w-3xl text-body-sm text-muted-foreground">{t("g7.panelIntro")}</p>
-        <p className="text-body-sm text-foreground">
-          <span className="font-medium">
-            {t("g7.verdictFailed", { count: verdict.mandatoryFailed })}
-          </span>
-        </p>
-      </div>
-      <ResultQualityNote quality={quality} isSuppliedDocument={isSuppliedDocument} />
+        <ResultQualityNote quality={quality} isSuppliedDocument={isSuppliedDocument} />
 
-      <div className="space-y-3">
-        <div className="flex flex-wrap items-center gap-1.5">
-          {(["actionable", "review", "na", "pass"] as const).map((k) => (
-            <KindChip
-              key={k}
-              kind={k}
-              count={tally[k]}
-              selected={kind}
-              onSelect={(picked) => setKind((cur) => (cur === picked ? null : picked))}
+        <div className="space-y-3">
+          <div className="flex flex-wrap items-center gap-1.5">
+            {(["actionable", "review", "na", "pass"] as const).map((k) => (
+              <KindChip
+                key={k}
+                kind={k}
+                count={tally[k]}
+                selected={kind}
+                onSelect={(picked) => setKind((cur) => (cur === picked ? null : picked))}
+              />
+            ))}
+            <div className="flex-1" />
+            <Input
+              type="search"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder={t("conf.searchPlaceholder")}
+              aria-label={t("conf.searchPlaceholder")}
+              className="h-8 w-full max-w-xs text-body-sm"
             />
-          ))}
-          <div className="flex-1" />
-          <Input
-            type="search"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder={t("conf.searchPlaceholder")}
-            aria-label={t("conf.searchPlaceholder")}
-            className="h-8 w-full max-w-xs text-body-sm"
-          />
+          </div>
+          <p className="text-body-sm text-muted-foreground">
+            {kind === null && !query
+              ? t("conf.showingAll", { count: checks.length })
+              : t("conf.showingFiltered", { count: shown.length, total: checks.length })}
+            {hiddenByChip > 0 && shown.length > 0
+              ? ` ${t("conf.hiddenByFilter", { count: hiddenByChip })}`
+              : null}
+          </p>
         </div>
-        <p className="text-body-sm text-muted-foreground">
-          {kind === null && !query
-            ? t("conf.showingAll", { count: checks.length })
-            : t("conf.showingFiltered", { count: shown.length, total: checks.length })}
-          {hiddenByChip > 0 && shown.length > 0
-            ? ` ${t("conf.hiddenByFilter", { count: hiddenByChip })}`
-            : null}
-        </p>
-      </div>
-
-      {shown.length === 0 ? (
-        <EmptyState
-          hint={
-            hiddenByChip > 0
-              ? t("conf.hiddenByFilter", { count: hiddenByChip })
-              : undefined
-          }
-        >
-          {t("conf.noMatch")}
-        </EmptyState>
-      ) : (
-        <div className="space-y-6" key={foldKey}>
-          <CheckGroup
-            title={t("g7.formatTitle")}
-            checks={base}
-            defaultOpen={openByDefault || base.some((c) => checkKind(c) === "actionable")}
-            trailing={
-              <span className="text-label font-normal text-muted-foreground">
-                {t("g7.baseMandatory", {
-                  passed: verdict.mandatoryPassed,
-                  total: verdict.mandatoryTotal,
-                })}
-              </span>
+        </div>
+        <div className="min-w-0 2xl:col-start-1 2xl:row-start-1">
+        {shown.length === 0 ? (
+          <EmptyState
+            hint={
+              hiddenByChip > 0
+                ? t("conf.hiddenByFilter", { count: hiddenByChip })
+                : undefined
             }
-          />
+          >
+            {t("conf.noMatch")}
+          </EmptyState>
+        ) : (
+          <div className="space-y-6" key={foldKey}>
+            <CheckGroup
+              title={t("g7.formatTitle")}
+              checks={base}
+              defaultOpen={openByDefault || base.some((c) => checkKind(c) === "actionable")}
+              trailing={
+                <span className="text-label font-normal text-muted-foreground">
+                  {t("g7.baseMandatory", {
+                    passed: verdict.mandatoryPassed,
+                    total: verdict.mandatoryTotal,
+                  })}
+                </span>
+              }
+            />
 
-          {conformance.regulatoryCrosswalk &&
-          conformance.regulatoryCrosswalk.frameworks.length > 0 &&
-          kind === null &&
-          !query ? (
-            <CrosswalkBlock crosswalk={conformance.regulatoryCrosswalk} />
-          ) : null}
+            {conformance.regulatoryCrosswalk &&
+            conformance.regulatoryCrosswalk.frameworks.length > 0 &&
+            kind === null &&
+            !query ? (
+              <CrosswalkBlock crosswalk={conformance.regulatoryCrosswalk} />
+            ) : null}
 
-          {cisa.length > 0 && (
-            <Card>
-              <CardContent className="space-y-4 p-4">
-                <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-                  <div className="text-body-sm font-semibold text-foreground">{t("cisa.subtitle")}</div>
-                  <div className="text-heading font-semibold tabular-nums text-foreground">
-                    {t("g7.present", { present: cisaT.present, total: cisaT.autoTotal })}
+            {cisa.length > 0 && (
+              <Card>
+                <CardContent className="space-y-4 p-4">
+                  <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                    <div className="text-body-sm font-semibold text-foreground">{t("cisa.subtitle")}</div>
+                    <div className="text-heading font-semibold tabular-nums text-foreground">
+                      {t("g7.present", { present: cisaT.present, total: cisaT.autoTotal })}
+                    </div>
+                    <p className="text-body-sm text-muted-foreground">{t("cisa.allAdvisory")}</p>
                   </div>
-                  <p className="text-body-sm text-muted-foreground">{t("cisa.allAdvisory")}</p>
-                </div>
-                <div className="space-y-3">
-                  {cisaGroups.map((group) => (
-                    <CheckGroup
-                      key={group.cluster}
-                      title={t(`cisa.cluster.${group.cluster}`, { defaultValue: group.cluster })}
-                      checks={group.checks}
-                      defaultOpen={
-                        openByDefault || group.checks.some((c) => checkKind(c) === "actionable")
-                      }
-                    />
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {g7.length > 0 && (
-            <Card>
-              <CardContent className="space-y-4 p-4">
-                <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-                  <div className="text-body-sm font-semibold text-foreground">{t("g7.subtitle")}</div>
-                  <div className="text-heading font-semibold tabular-nums text-foreground">
-                    {t("g7.present", { present: g7t.present, total: g7t.autoTotal })}
+                  <div className="space-y-3">
+                    {cisaGroups.map((group) => (
+                      <CheckGroup
+                        key={group.cluster}
+                        title={t(`cisa.cluster.${group.cluster}`, { defaultValue: group.cluster })}
+                        checks={group.checks}
+                        defaultOpen={
+                          openByDefault || group.checks.some((c) => checkKind(c) === "actionable")
+                        }
+                      />
+                    ))}
                   </div>
-                  <p className="text-body-sm text-muted-foreground">{t("g7.allAdvisory")}</p>
-                </div>
-                <div className="space-y-3">
-                  {g7groups.map((group) => (
-                    <CheckGroup
-                      key={group.cluster}
-                      title={t(`g7.cluster.${group.cluster}`, { defaultValue: group.cluster })}
-                      checks={group.checks}
-                      defaultOpen={
-                        openByDefault || group.checks.some((c) => checkKind(c) === "actionable")
-                      }
-                    />
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          )}
+                </CardContent>
+              </Card>
+            )}
+
+            {g7.length > 0 && (
+              <Card>
+                <CardContent className="space-y-4 p-4">
+                  <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                    <div className="text-body-sm font-semibold text-foreground">{t("g7.subtitle")}</div>
+                    <div className="text-heading font-semibold tabular-nums text-foreground">
+                      {t("g7.present", { present: g7t.present, total: g7t.autoTotal })}
+                    </div>
+                    <p className="text-body-sm text-muted-foreground">{t("g7.allAdvisory")}</p>
+                  </div>
+                  <div className="space-y-3">
+                    {g7groups.map((group) => (
+                      <CheckGroup
+                        key={group.cluster}
+                        title={t(`g7.cluster.${group.cluster}`, { defaultValue: group.cluster })}
+                        checks={group.checks}
+                        defaultOpen={
+                          openByDefault || group.checks.some((c) => checkKind(c) === "actionable")
+                        }
+                      />
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+        )}
         </div>
-      )}
+      </div>
     </div>
   );
 }

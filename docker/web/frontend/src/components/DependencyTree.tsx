@@ -266,7 +266,7 @@ export function DependencyTree({
       {noMatch && (
         <p className="text-body-sm text-muted-foreground">{t("deps.searchNoMatch")}</p>
       )}
-      <div className="max-h-[44rem] resize-y overflow-auto rounded-md border p-1">
+      <div className="max-h-[max(44rem,calc(100vh-21rem))] resize-y overflow-auto rounded-md border p-1">
         <ul role="tree" aria-label={t("deps.treeLabel")}>
           {rows.map((row, i) => {
             const { node } = row;

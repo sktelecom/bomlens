@@ -880,79 +880,99 @@ export function Overview({
         </div>
       )}
 
-      <FirstChecks result={result} scanId={scanId} generatedAt={generatedAt} />
-
-      {attention.length > 0 && (
-        <Card data-testid="needs-attention">
-          <CardContent className="p-4">
-            <div className="mb-2 text-body-sm font-semibold text-foreground">
-              {t("overview.needsAttention")}
+      {/* From 2xl up the first checks and the worst components sit in a main
+          column and the two risk axes and the section links in a narrow column
+          beside it, so a wide window is used instead of left empty. Below 2xl
+          the wrappers vanish (`contents`) and `order` keeps the single-column
+          sequence this page always had. */}
+      <div className="flex flex-col gap-6 2xl:grid 2xl:grid-cols-[minmax(0,1fr)_22rem] 2xl:items-start">
+        <div className="contents 2xl:flex 2xl:min-w-0 2xl:flex-col 2xl:gap-6">
+          <div className="order-1 empty:hidden 2xl:order-none">
+            <FirstChecks result={result} scanId={scanId} generatedAt={generatedAt} />
+          </div>
+          {attention.length > 0 && (
+            <div className="order-2 empty:hidden 2xl:order-none">
+              <Card data-testid="needs-attention">
+                <CardContent className="p-4">
+                  <div className="mb-2 text-body-sm font-semibold text-foreground">
+                    {t("overview.needsAttention")}
+                  </div>
+                  <ul className="flex flex-col gap-1">
+                    {attention.map((item) => {
+                      const Icon = ATTN_ICON[item.id];
+                      const ATTN_KEY: Record<AttentionItem["id"], string> = {
+                        malicious: "overview.attnMalicious",
+                        conformance: "overview.attnConformance",
+                        vulns: "overview.attnVulns",
+                        review: "overview.attnReview",
+                        modelRisk: "overview.attnModelRisk",
+                        conformanceGap: "overview.attnConformanceGap",
+                      };
+                      const label = t(ATTN_KEY[item.id], { count: item.count });
+                      return (
+                        <li key={item.id}>
+                          <a
+                            href={scanId ? scanHash(scanId, item.target) : undefined}
+                            className={cn(
+                              "flex w-full items-center gap-3 rounded-md px-2 py-2 text-left text-body-sm",
+                              "transition-colors duration-fast ease-out-soft hover:bg-muted",
+                              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1",
+                            )}
+                          >
+                            <Icon className={cn("h-4 w-4 shrink-0", TONE_ICON[item.tone])} aria-hidden />
+                            <span className="text-foreground">{label}</span>
+                            <ChevronRight className="ml-auto h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
+                          </a>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </CardContent>
+              </Card>
             </div>
-            <ul className="flex flex-col gap-1">
-              {attention.map((item) => {
-                const Icon = ATTN_ICON[item.id];
-                const ATTN_KEY: Record<AttentionItem["id"], string> = {
-                  malicious: "overview.attnMalicious",
-                  conformance: "overview.attnConformance",
-                  vulns: "overview.attnVulns",
-                  review: "overview.attnReview",
-                  modelRisk: "overview.attnModelRisk",
-                  conformanceGap: "overview.attnConformanceGap",
-                };
-                const label = t(ATTN_KEY[item.id], { count: item.count });
-                return (
-                  <li key={item.id}>
-                    <a
-                      href={scanId ? scanHash(scanId, item.target) : undefined}
-                      className={cn(
-                        "flex w-full items-center gap-3 rounded-md px-2 py-2 text-left text-body-sm",
-                        "transition-colors duration-fast ease-out-soft hover:bg-muted",
-                        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1",
-                      )}
-                    >
-                      <Icon className={cn("h-4 w-4 shrink-0", TONE_ICON[item.tone])} aria-hidden />
-                      <span className="text-foreground">{label}</span>
-                      <ChevronRight className="ml-auto h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
-                    </a>
-                  </li>
-                );
-              })}
-            </ul>
-          </CardContent>
-        </Card>
-      )}
-
-      {result.yoctoVex && <YoctoVexNote vex={result.yoctoVex} />}
-
-      {/* The two risk axes side by side; clicking a band routes into its
-          section with that filter applied. */}
-      <div className="grid grid-cols-1 gap-x-8 gap-y-6 lg:grid-cols-2">
-        {result.security && (
-          <SeverityBar
-            security={result.security}
-            onSelect={
-              onPick ? (s) => onPick("vulnerabilities", { severity: s }) : undefined
-            }
-          />
-        )}
-        <LicenseRiskBar
-          components={result.sbom?.componentList ?? []}
-          onSelect={onPick ? (tier) => onPick("licenses", { tier }) : undefined}
-        />
+          )}
+          {result.yoctoVex && (
+            <div className="order-3 empty:hidden 2xl:order-none">
+              <YoctoVexNote vex={result.yoctoVex} />
+            </div>
+          )}
+          <div className="order-5 empty:hidden 2xl:order-none">
+            <TopRisk result={result} scanId={scanId} />
+          </div>
+        </div>
+        <div className="contents 2xl:flex 2xl:min-w-0 2xl:flex-col 2xl:gap-6">
+          <div className="order-4 empty:hidden 2xl:order-none">
+            {/* The two risk axes side by side; clicking a band routes into its
+                section with that filter applied. */}
+            <div className="grid grid-cols-1 gap-x-8 gap-y-6 lg:grid-cols-2 2xl:grid-cols-1">
+              {result.security && (
+                <SeverityBar
+                  security={result.security}
+                  onSelect={
+                    onPick ? (s) => onPick("vulnerabilities", { severity: s }) : undefined
+                  }
+                />
+              )}
+              <LicenseRiskBar
+                components={result.sbom?.componentList ?? []}
+                onSelect={onPick ? (tier) => onPick("licenses", { tier }) : undefined}
+              />
+            </div>
+          </div>
+          <div className="order-6 empty:hidden 2xl:order-none">
+            {/* Section links come last: the rail already carries the same counts, so
+                the first screen leads with what to look at (first checks, needs
+                attention, the two risk axes) and keeps this strip as a way on. */}
+            <JumpCards
+              result={result}
+              hasDeps={hasDeps}
+              ai={ai}
+              hasConformance={hasConformance}
+              scanId={scanId}
+            />
+          </div>
+        </div>
       </div>
-
-      <TopRisk result={result} scanId={scanId} />
-
-      {/* Section links come last: the rail already carries the same counts, so
-          the first screen leads with what to look at (first checks, needs
-          attention, the two risk axes) and keeps this strip as a way on. */}
-      <JumpCards
-        result={result}
-        hasDeps={hasDeps}
-        ai={ai}
-        hasConformance={hasConformance}
-        scanId={scanId}
-      />
     </div>
   );
 }

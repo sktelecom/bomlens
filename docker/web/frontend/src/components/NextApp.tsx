@@ -72,6 +72,25 @@ const SCAN_KIND_KEY: Record<string, string> = {
  * the component type alone called it Source. Everything else keeps using the
  * component type, which survives a re-open where the scan MODE does not.
  */
+/** Sections that are one wide table or tree: they use the whole content width.
+ *  Every other section keeps a reading width, left-aligned under the same
+ *  header, so the title does not move when the section changes. */
+const WIDE_SECTIONS: ReadonlySet<SectionId> = new Set([
+  "components",
+  "dependencies",
+  "sourceTree",
+  "vulnerabilities",
+  "artifacts",
+]);
+
+/** Sections with a narrow column beside the main one from 2xl up: they keep a
+ *  reading width below that and take the whole content width from there. */
+const TWO_COLUMN_SECTIONS: ReadonlySet<SectionId> = new Set([
+  "overview",
+  "licenses",
+  "conformance",
+]);
+
 function scanKindKey(isAi: boolean, result: DoneEvent): string {
   if (isAi) return "result.kindAi";
   if (result.scanConfig?.source === "sbom-upload") return "result.kindAnalyze";
@@ -574,7 +593,9 @@ export function NextApp() {
       }
     >
       {isHome ? (
-        <div className="mx-auto max-w-6xl px-6 py-8">
+        <div
+          className={`px-6 py-8 ${homeView === "recent" ? "" : "mx-auto max-w-6xl"}`}
+        >
           {homeView === "recent" ? (
             <RecentScans
               scans={recent}
@@ -637,7 +658,15 @@ export function NextApp() {
           />
         </div>
       ) : (
-        <div className="mx-auto max-w-6xl space-y-6 px-6 py-8">
+        <div
+          className={`space-y-6 px-6 py-8 ${
+            TWO_COLUMN_SECTIONS.has(activeSection)
+              ? "[&>*:not(:first-child)]:max-w-6xl 2xl:[&>*:not(:first-child)]:max-w-none"
+              : WIDE_SECTIONS.has(activeSection)
+                ? ""
+                : "[&>*:not(:first-child)]:max-w-6xl"
+          }`}
+        >
           <ResultHeader
             name={projectInfo?.name}
             version={projectInfo?.version}

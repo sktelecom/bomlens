@@ -131,134 +131,148 @@ export function Licenses({
           distribution below is what narrows. */}
       <LicenseRiskBar components={components} selected={tier} onSelect={toggleTier} />
 
-      <LicenseSummary components={filtered} onPickLicense={onPickLicense} />
-
-      <LicenseObligations components={filtered} />
-
-      {outboundLicense && conflicts.length > 0 && (
-        <Card className="border-warning-border/60 bg-warning-surface/60 dark:border-warning-border/20 dark:bg-warning-surface/20">
-          <CardContent className="space-y-3 p-4">
-            <div className="flex items-center gap-2 text-body-sm font-semibold text-foreground">
-              <Scale className="h-4 w-4 text-risk-medium" aria-hidden />
-              {t("licenses.conflictTitle", { license: outboundLicense })}
-            </div>
-            <p className="text-body-sm text-muted-foreground">{t("licenses.conflictHint")}</p>
-            <div className="space-y-3">
-              {conflicts.map((g) => (
-                <div key={g.verdict} className="space-y-1.5">
-                  <div className="flex items-center gap-2 text-body-sm">
-                    <Badge tone={CONFLICT_TONE[g.verdict]}>{t(CONFLICT_LABEL[g.verdict])}</Badge>
-                    <span className="tabular-nums text-muted-foreground">
-                      {fmt(g.components.length)}
-                    </span>
+      {/* From 2xl up the distribution and the review cards sit in a main
+          column and the obligations card in a narrow one beside it. Below 2xl
+          the wrappers vanish and `order` keeps the single-column sequence. */}
+      <div className="flex flex-col gap-6 2xl:grid 2xl:grid-cols-[minmax(0,1fr)_28rem] 2xl:items-start">
+        <div className="contents 2xl:flex 2xl:min-w-0 2xl:flex-col 2xl:gap-6">
+          <div className="order-1 empty:hidden 2xl:order-none">
+            <LicenseSummary components={filtered} onPickLicense={onPickLicense} />
+          </div>
+          <div className="order-3 empty:hidden 2xl:order-none">
+            {outboundLicense && conflicts.length > 0 && (
+              <Card className="border-warning-border/60 bg-warning-surface/60 dark:border-warning-border/20 dark:bg-warning-surface/20">
+                <CardContent className="space-y-3 p-4">
+                  <div className="flex items-center gap-2 text-body-sm font-semibold text-foreground">
+                    <Scale className="h-4 w-4 text-risk-medium" aria-hidden />
+                    {t("licenses.conflictTitle", { license: outboundLicense })}
                   </div>
-                  <ul className="divide-y rounded-md border bg-card">
-                    {g.components.map((c, i) => (
-                      <li key={c.purl || `${c.name}-${i}`} className="space-y-1 px-3 py-2 text-body-sm">
-                        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                          <span className="font-mono">
-                            {c.group ? `${c.group} / ` : ""}
-                            {c.name}
-                            {c.version ? (
-                              <span className="text-muted-foreground"> {c.version}</span>
-                            ) : null}
-                          </span>
-                          <span className="text-label text-muted-foreground">
-                            {c.licenses.join(", ")}
+                  <p className="text-body-sm text-muted-foreground">{t("licenses.conflictHint")}</p>
+                  <div className="space-y-3">
+                    {conflicts.map((g) => (
+                      <div key={g.verdict} className="space-y-1.5">
+                        <div className="flex items-center gap-2 text-body-sm">
+                          <Badge tone={CONFLICT_TONE[g.verdict]}>{t(CONFLICT_LABEL[g.verdict])}</Badge>
+                          <span className="tabular-nums text-muted-foreground">
+                            {fmt(g.components.length)}
                           </span>
                         </div>
-                        {c.licenseConflictWhy ? (
-                          <p className="text-body-sm text-muted-foreground">{c.licenseConflictWhy}</p>
-                        ) : null}
-                      </li>
+                        <ul className="divide-y rounded-md border bg-card">
+                          {g.components.map((c, i) => (
+                            <li key={c.purl || `${c.name}-${i}`} className="space-y-1 px-3 py-2 text-body-sm">
+                              <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                                <span className="font-mono">
+                                  {c.group ? `${c.group} / ` : ""}
+                                  {c.name}
+                                  {c.version ? (
+                                    <span className="text-muted-foreground"> {c.version}</span>
+                                  ) : null}
+                                </span>
+                                <span className="text-label text-muted-foreground">
+                                  {c.licenses.join(", ")}
+                                </span>
+                              </div>
+                              {c.licenseConflictWhy ? (
+                                <p className="text-body-sm text-muted-foreground">{c.licenseConflictWhy}</p>
+                              ) : null}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
                     ))}
-                  </ul>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {review.length > 0 && (
-        <Card className="border-warning-border/60 bg-warning-surface/60 dark:border-warning-border/20 dark:bg-warning-surface/20">
-          <CardContent className="space-y-3 p-4">
-            <div className="flex items-center gap-2 text-body-sm font-semibold text-foreground">
-              <TriangleAlert className="h-4 w-4 text-risk-medium" aria-hidden />
-              {t("licenses.reviewTitle")}
-            </div>
-            <p className="text-body-sm text-muted-foreground">{t("licenses.reviewHint")}</p>
-            <div className="space-y-3">
-              {review.map((g) => (
-                <div key={g.flag} className="space-y-1.5">
-                  <div className="flex items-center gap-2 text-body-sm">
-                    <Badge tone="medium">{t(FLAG_LABEL[g.flag])}</Badge>
-                    <span className="tabular-nums text-muted-foreground">
-                      {fmt(g.components.length)}
-                    </span>
                   </div>
-                  <ul className="divide-y rounded-md border bg-card">
-                    {g.components.map((c, i) => (
-                      <li
-                        key={c.purl || `${c.name}-${i}`}
-                        className="flex flex-wrap items-center gap-x-2 gap-y-1 px-3 py-2 text-body-sm"
-                      >
-                        <span className="font-mono">
-                          {c.group ? `${c.group} / ` : ""}
-                          {c.name}
-                          {c.version ? (
-                            <span className="text-muted-foreground"> {c.version}</span>
-                          ) : null}
-                        </span>
-                        {c.licenses.map((l) => (
-                          <Badge key={l} variant="muted">
-                            {l}
-                          </Badge>
-                        ))}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {!outboundLicense && (
-        <Card>
-          <CardContent className="space-y-1 p-4">
-            <div className="text-body-sm font-semibold text-foreground">
-              {t("licenses.conflictOffTitle")}
-            </div>
-            <p className="text-body-sm text-muted-foreground">{t("licenses.conflictOffHint")}</p>
-            {onRescanWithLicense && (
-              <Button
-                variant="outline"
-                size="sm"
-                className="mt-2"
-                data-testid="rescan-with-license"
-                onClick={onRescanWithLicense}
-              >
-                {t("licenses.conflictOffAction")}
-              </Button>
+                </CardContent>
+              </Card>
             )}
-            <Disclosure
-              className="pt-2"
-              summary={
-                <span className="text-label text-muted-foreground">
-                  {t("licenses.conflictOffCli")}
-                </span>
-              }
-            >
-              <p className="mt-1 text-label text-muted-foreground">
-                {t("licenses.conflictOffCliBody")}
-              </p>
-            </Disclosure>
-          </CardContent>
-        </Card>
-      )}
-
+          </div>
+          <div className="order-4 empty:hidden 2xl:order-none">
+            {review.length > 0 && (
+              <Card className="border-warning-border/60 bg-warning-surface/60 dark:border-warning-border/20 dark:bg-warning-surface/20">
+                <CardContent className="space-y-3 p-4">
+                  <div className="flex items-center gap-2 text-body-sm font-semibold text-foreground">
+                    <TriangleAlert className="h-4 w-4 text-risk-medium" aria-hidden />
+                    {t("licenses.reviewTitle")}
+                  </div>
+                  <p className="text-body-sm text-muted-foreground">{t("licenses.reviewHint")}</p>
+                  <div className="space-y-3">
+                    {review.map((g) => (
+                      <div key={g.flag} className="space-y-1.5">
+                        <div className="flex items-center gap-2 text-body-sm">
+                          <Badge tone="medium">{t(FLAG_LABEL[g.flag])}</Badge>
+                          <span className="tabular-nums text-muted-foreground">
+                            {fmt(g.components.length)}
+                          </span>
+                        </div>
+                        <ul className="divide-y rounded-md border bg-card">
+                          {g.components.map((c, i) => (
+                            <li
+                              key={c.purl || `${c.name}-${i}`}
+                              className="flex flex-wrap items-center gap-x-2 gap-y-1 px-3 py-2 text-body-sm"
+                            >
+                              <span className="font-mono">
+                                {c.group ? `${c.group} / ` : ""}
+                                {c.name}
+                                {c.version ? (
+                                  <span className="text-muted-foreground"> {c.version}</span>
+                                ) : null}
+                              </span>
+                              {c.licenses.map((l) => (
+                                <Badge key={l} variant="muted">
+                                  {l}
+                                </Badge>
+                              ))}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+        </div>
+        <div className="contents 2xl:flex 2xl:min-w-0 2xl:flex-col 2xl:gap-6">
+          <div className="order-2 empty:hidden 2xl:order-none">
+            <LicenseObligations components={filtered} />
+          </div>
+          <div className="order-5 empty:hidden 2xl:order-none">
+            {!outboundLicense && (
+              <Card>
+                <CardContent className="space-y-1 p-4">
+                  <div className="text-body-sm font-semibold text-foreground">
+                    {t("licenses.conflictOffTitle")}
+                  </div>
+                  <p className="text-body-sm text-muted-foreground">{t("licenses.conflictOffHint")}</p>
+                  {onRescanWithLicense && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="mt-2"
+                      data-testid="rescan-with-license"
+                      onClick={onRescanWithLicense}
+                    >
+                      {t("licenses.conflictOffAction")}
+                    </Button>
+                  )}
+                  <Disclosure
+                    className="pt-2"
+                    summary={
+                      <span className="text-label text-muted-foreground">
+                        {t("licenses.conflictOffCli")}
+                      </span>
+                    }
+                  >
+                    <p className="mt-1 text-label text-muted-foreground">
+                      {t("licenses.conflictOffCliBody")}
+                    </p>
+                  </Disclosure>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
