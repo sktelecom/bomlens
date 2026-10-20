@@ -230,6 +230,19 @@ _a = captured["args"]
 assert "MODE=ANALYZE" in _a, _a
 assert ("ANALYZE_SBOM=%s" % up_file) in _a, _a
 assert not any(x.startswith("TARGET_FILE=") for x in _a), _a
+assert "YOCTO_FROM_BUILD=true" not in _a, _a
+# A document found in a Yocto build directory keeps that mark in the sibling.
+_saved_args = list(_a)
+captured.clear()
+rc = server.run_sibling_scan(
+    "ghcr.io/sktelecom/bomlens-deep-cve:1.5.0", "ANALYZE", run_out,
+    lambda ln: None, upload_file=up_file,
+    extra_env={"DEEP_CVE": "true", "GENERATE_SECURITY": "true", "YOCTO_FROM_BUILD": "true"},
+)
+assert rc == 0, rc
+assert "YOCTO_FROM_BUILD=true" in captured["args"], captured["args"]
+captured["args"] = _saved_args
+_a = _saved_args
 assert "DEEP_CVE=true" in _a, _a
 assert "ghcr.io/sktelecom/bomlens-deep-cve:1.5.0" in _a, _a
 # DEEP_CVE is NOT forwarded when off (kept out of the argv entirely).
@@ -2730,7 +2743,7 @@ rows = {x["id"]: x for x in c["checks"]}
 assert len(rows["versions-needed"]["explained"]) == server.MAX_CONFORMANCE_MISSING
 assert "explained" not in rows["other"], "a non-list value must be dropped"
 assert "submissionJudgedAs" not in c, "absent when nothing was relaxed"
-for value, kept in (("FIRMWARE", True), ("ROOTFS", True), ("SOURCE", False), ("<b>", False)):
+for value, kept in (("FIRMWARE", True), ("ROOTFS", True), ("YOCTO", True), ("SOURCE", False), ("<b>", False)):
     json.dump({"result": "pass", "checks": [], "submissionJudgedAs": value}, open(path, "w"))
     c = server.conformance_summary("explweb_1.0")
     assert (c.get("submissionJudgedAs") == value) == kept, (value, c.get("submissionJudgedAs"))
@@ -3897,6 +3910,7 @@ echo "[stub] scanning ${PROJECT_NAME} ${PROJECT_VERSION} (mode=$mode)"
   echo "TARGET_DIR=${TARGET_DIR:-}"
   echo "ANALYZE_SBOM=${ANALYZE_SBOM:-}"
   echo "YOCTO_BUILD_DIR=${YOCTO_BUILD_DIR:-}"
+  echo "YOCTO_FROM_BUILD=${YOCTO_FROM_BUILD:-}"
   echo "DATASET_REF=${DATASET_REF:-}"
   echo "AI_DECLARATION_FILE=${AI_DECLARATION_FILE:-}"
   echo "REACHABILITY=${REACHABILITY:-}"
@@ -5323,8 +5337,9 @@ fi
 # the file the build published, and no directory target is set.
 if grep -q '^MODE=ANALYZE$' "$WORK/stub-env" \
    && grep -q '^ANALYZE_SBOM=.*/tmp/deploy/images/qemux86-64/core-image-minimal.rootfs.spdx.json$' "$WORK/stub-env" \
+   && grep -q '^YOCTO_FROM_BUILD=true$' "$WORK/stub-env" \
    && grep -q '^TARGET_DIR=$' "$WORK/stub-env"; then
-    pass "the scanner is handed the image SBOM (ANALYZE_SBOM), not the build tree"
+    pass "the scanner is handed the image SBOM (ANALYZE_SBOM), not the build tree, marked as found in a build"
 else
     fail "wrong scan environment for a Yocto build directory" "$(cat "$WORK/stub-env")"
 fi

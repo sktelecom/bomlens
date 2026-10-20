@@ -1463,7 +1463,7 @@
     "noMatch": "No check matches this filter.",
     "report": "Report ({{ext}})",
     "qualityPassWarn": "Pass, see the note below",
-    "submissionJudgedAs": "Judged as a BomLens firmware, root filesystem or binary scan SBOM (bomlens:scanMode={{mode}}), so some general rows are shown as warnings.",
+    "submissionJudgedAs": "Judged as a BomLens firmware, root filesystem, binary or Yocto build scan SBOM (bomlens:scanMode={{mode}}), so some general rows are shown as warnings.",
     "qualityEmptyTitle": "No software components were found",
     "qualityEmptyBody": "A pass here only means no required item could be measured. It does not mean the software was found. If you scanned a folder, check that it has a dependency manifest and that the scan path is right, then scan again.",
     "qualityEmptyBodySupplied": "A pass here only means no required item could be measured. It does not mean the software is listed. Ask the supplier for an SBOM that lists the software components.",

@@ -523,10 +523,10 @@ export interface ConformanceSummary {
   /** How many more failed steps exist past the cap in pipelineStepsFailed. */
   pipelineStepsFailedMore?: number;
   /** The scan mode the skt-submission profile judged this SBOM as when it
-   *  turned some general rows into warnings (a firmware, root filesystem or
-   *  binary scan, or an SBOM marked bomlens:scanMode under --analyze). Absent
-   *  when nothing was relaxed. */
-  submissionJudgedAs?: "FIRMWARE" | "ROOTFS" | "BINARY";
+   *  turned some general rows into warnings (a firmware, root filesystem,
+   *  binary or Yocto build scan, or an SBOM marked bomlens:scanMode under
+   *  --analyze). Absent when nothing was relaxed. */
+  submissionJudgedAs?: "FIRMWARE" | "ROOTFS" | "BINARY" | "YOCTO";
   /** Components other than operating-system and file entries: what the scan
    *  identified as software. Absent on a report from before this field existed. */
   softwareComponentCount?: number;

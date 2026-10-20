@@ -14,7 +14,7 @@
   "conformance.pipeline_steps_intro": "생성 중 실패한 파이프라인 단계 (이 SBOM이 불완전할 수 있음)",
   "conformance.pipeline_steps_more": "외 %s개",
   "conformance.submit_file": "제출할 파일은 %s 하나입니다. 출력 폴더의 다른 파일은 확인용입니다.",
-  "conformance.submit_judged_as": "BomLens 펌웨어, 루트 파일시스템, 바이너리 스캔 SBOM(%s)으로 판정해 일부 일반 항목을 경고로 표시했습니다.",
+  "conformance.submit_judged_as": "BomLens 펌웨어, 루트 파일시스템, 바이너리, Yocto 빌드 스캔 SBOM(%s)으로 판정해 일부 일반 항목을 경고로 표시했습니다.",
   "conformance.meta_project": "프로젝트",
   "conformance.meta_generated": "생성 시각",
   "conformance.meta_format": "형식",

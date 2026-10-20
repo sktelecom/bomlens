@@ -740,8 +740,31 @@ scan_in "$d" --project Fw --version 1 --target dev.bin --generate-only
 in_out "Mode: FIRMWARE" && pass "--target *.bin → FIRMWARE mode (extension)" || { fail "--target .bin → FIRMWARE" "rc=$RC"; show; }
 
 d="$(new_proj rootfs)"; mkdir -p "$d/rootfs/etc" "$d/rootfs/usr/bin" "$d/rootfs/var"; printf 'x' > "$d/rootfs/usr/bin/f"
+SBOM_FIRMWARE_IMAGE=fw-absent:1 DOCKER_STUB_ABSENT_IMAGE=fw-absent:1 scan_in "$d" --project Root --version 1 --target rootfs --generate-only
+{ in_out "Mode: ROOTFS" && in_out "docker pull fw-absent:1" && ! in_out "Re-run with"; } \
+  && pass "--target directory → ROOTFS mode, with how to get the firmware image" || { fail "--target dir → ROOTFS" "rc=$RC"; show; }
+
+# With the firmware image here, a root filesystem with no package database is
+# identified by signature: the folder is mounted read-only under its own name.
 scan_in "$d" --project Root --version 1 --target rootfs --generate-only
-in_out "Mode: ROOTFS" && pass "--target directory → ROOTFS mode" || { fail "--target dir → ROOTFS" "rc=$RC"; show; }
+{ in_out "Mode: FIRMWARE" && in_out "identifying its binaries by signature" \
+  && in_log "/rootfs:/target/rootfs:ro" && in_log "TARGET_FILE=/target/rootfs"; } \
+  && pass "a rootfs with no package database → FIRMWARE when the firmware image is present" \
+  || { fail "a package-less rootfs was not routed to FIRMWARE" "rc=$RC"; show; }
+
+# --firmware takes any folder as an unpacked tree.
+d="$(new_proj fwdir)"; mkdir -p "$d/tree/usr/bin"; printf 'x' > "$d/tree/usr/bin/f"
+scan_in "$d" --project Fwd --version 1 --target tree --firmware --generate-only
+{ in_out "Mode: FIRMWARE" && in_log "/tree:/target/tree:ro" && in_log "TARGET_FILE=/target/tree"; } \
+  && pass "--firmware with a folder → FIRMWARE of the unpacked tree" \
+  || { fail "--firmware with a folder was not scanned as FIRMWARE" "rc=$RC"; show; }
+
+# A rootfs that records its packages stays ROOTFS whatever images are present.
+d="$(new_proj rootfsdb)"; mkdir -p "$d/rootfs/etc" "$d/rootfs/usr/bin" "$d/rootfs/var/lib/dpkg"; : > "$d/rootfs/var/lib/dpkg/status"
+scan_in "$d" --project Rdb --version 1 --target rootfs --generate-only
+{ in_out "Mode: ROOTFS" && ! in_out "no package database"; } \
+  && pass "a rootfs with a package database stays ROOTFS" \
+  || { fail "a rootfs with a package database left ROOTFS" "rc=$RC"; show; }
 
 d="$(new_proj analyze)"; printf '{"bomFormat":"CycloneDX"}' > "$d/supplier.json"
 scan_in "$d" --project Sup --version 1 --analyze supplier.json --generate-only
@@ -754,7 +777,7 @@ in_out "Mode: ANALYZE" && pass "--analyze <sbom> → ANALYZE mode" || { fail "--
 mk_rootfs() { mkdir -p "$1/etc" "$1/bin" "$1/usr/bin" "$1/lib"; printf 'x' > "$1/usr/bin/f"; }
 d="$(new_proj relfs)"; mk_rootfs "$d/images/rootfs"; mkdir -p "$d/images/install" "$d/images/kernel"
 printf 'x' > "$d/images/install/app"; printf 'opaque\n' > "$d/images/dev-1.0.pak"
-scan_in "$d" --project Rel --version 1 --target images --generate-only
+SBOM_FIRMWARE_IMAGE=fw-absent:1 DOCKER_STUB_ABSENT_IMAGE=fw-absent:1 scan_in "$d" --project Rel --version 1 --target images --generate-only
 { in_out "Mode: ROOTFS" && in_out "images/rootfs" && in_out "add --as-source" \
   && in_log "images/rootfs:/target"; } \
   && pass "release folder with one rootfs → ROOTFS of that rootfs, with a notice" \
@@ -778,7 +801,7 @@ scan_in "$d" --project Rel --version 1 --target images --generate-only
 # it (not a recognized firmware type) is offered as a --firmware command.
 d="$(new_proj relbig)"; mk_rootfs "$d/images/rootfs"; mkdir -p "$d/images/install"
 head -c 2097152 /dev/zero > "$d/images/vendor-image.pak"; printf 'notes\n' > "$d/images/notes.txt"
-scan_in "$d" --project Rel --version 1 --target images --generate-only
+SBOM_FIRMWARE_IMAGE=fw-absent:1 DOCKER_STUB_ABSENT_IMAGE=fw-absent:1 scan_in "$d" --project Rel --version 1 --target images --generate-only
 { in_out "Mode: ROOTFS" && in_out "no package database" \
   && in_out '--target "images/vendor-image.pak" --firmware' && ! in_out 'notes.txt'; } \
   && pass "a rootfs with no package database names the large file beside it as a --firmware command" \

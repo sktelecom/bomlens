@@ -773,14 +773,10 @@ fi
 
 # ========================================================
 # Test 9c: a Yocto build directory with no SPDX document (read from its own
-# manifests instead) must not claim a conformance report was "requested but
-# not produced": there is no submitted document to measure conformance
-# against, so entrypoint.sh's ANALYZE case deliberately skips it. Before the
-# fix, the scan summary expected conformance for every ANALYZE run
-# unconditionally and printed that warning on an otherwise fully successful
-# Yocto scan, pointing at an unrelated `docker pull` suggestion.
+# manifests instead) writes a conformance report for the SBOM read from the
+# build, judged as a Yocto build scan, and the summary does not call it missing.
 # ========================================================
-print_test "Test 9c/15: Yocto manifest fallback does not warn about missing conformance"
+print_test "Test 9c/15: Yocto manifest fallback writes a conformance report"
 
 mkdir -p yocto-nospdx/tmp/deploy/images/qemux86-64 yocto-nospdx/tmp/deploy/licenses/qemux86-64 yocto-nospdx/tmp/log/cve
 cat > yocto-nospdx/tmp/deploy/images/qemux86-64/core-image-minimal-qemux86-64.rootfs.manifest <<'EOF'
@@ -800,14 +796,32 @@ if run_scan_with_logs "test-yocto-nospdx" "YoctoNoSpdx" "1.0.0" "--target yocto-
     # identity read from the build (e.g. "core-image-minimal-qemux86-64"), not
     # the --project value, the same supplier-identity-is-not-ours-to-overwrite
     # rule ANALYZE mode follows for a submitted SBOM. Checked directly instead.
+    # The conformance report comes from the scanner image. An image published
+    # before this change cannot write it, so against such an image only the
+    # manifest path is checked; the report and the scan mode are checked once
+    # the image has the feature.
+    YN_IMAGE="${SBOM_SCANNER_IMAGE:-ghcr.io/sktelecom/bomlens:latest}"
+    YN_FEATURE=false
+    if docker run --rm --entrypoint sh "$YN_IMAGE" -c 'grep -q YOCTO_FROM_BUILD /usr/local/bin/run-scan' >/dev/null 2>&1; then
+        YN_FEATURE=true
+    fi
+    YN_OK=false
     if [ -n "$YN_BOM" ] \
        && jq -e '.bomFormat == "CycloneDX" and ((.components | type) == "array")' "$YN_BOM" >/dev/null 2>&1 \
-       && grep -q "No SPDX in this build" "$LOG_DIR/test-yocto-nospdx.log" \
-       && ! grep -q "requested but not produced" "$LOG_DIR/test-yocto-nospdx.log"; then
-        print_success "Yocto manifest fallback (no false conformance warning)"
+       && grep -q "No SPDX in this build" "$LOG_DIR/test-yocto-nospdx.log"; then
+        YN_OK=true
+        if [ "$YN_FEATURE" = "true" ]; then
+            jq -e '[.metadata.properties[]? | select(.name == "bomlens:scanMode") | .value] == ["YOCTO"]' "$YN_BOM" >/dev/null 2>&1 \
+                && [ -f "$(dirname "$YN_BOM")/YoctoNoSpdx_1.0.0_conformance.json" ] \
+                && ! grep -q "requested but not produced" "$LOG_DIR/test-yocto-nospdx.log" \
+                || YN_OK=false
+        fi
+    fi
+    if [ "$YN_OK" = "true" ]; then
+        print_success "Yocto manifest fallback (manifest path taken; conformance report and scan mode checked: $YN_FEATURE)"
         PASSED=$((PASSED + 1))
     else
-        print_error "Yocto manifest fallback (manifest path not taken, or a conformance warning was printed)"
+        print_error "Yocto manifest fallback (manifest path not taken, no conformance report, or a warning was printed)"
         show_failure_log "test-yocto-nospdx"
         FAILED=$((FAILED + 1))
     fi
