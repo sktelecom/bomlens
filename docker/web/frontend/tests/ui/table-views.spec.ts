@@ -138,6 +138,13 @@ test.describe("preset views", () => {
     await expect(page.getByText("CVE-2024-4301")).toHaveCount(0);
   });
 
+  test("the no-fix view holds only the rows with no published fix", async ({ page }) => {
+    await open(page, "vulnerabilities?view=unfixed");
+    await expect(page.getByRole("button", { name: /^No fix yet/ })).toHaveAttribute("aria-pressed", "true");
+    await expect(page.getByText("CVE-2024-4006")).toBeVisible();
+    await expect(page.getByText("CVE-2024-4001")).toHaveCount(0);
+  });
+
   test("choosing a view puts it in the URL and survives a reload", async ({ page }) => {
     await open(page, "vulnerabilities");
     await page.getByRole("button", { name: /^Critical and High/ }).click();

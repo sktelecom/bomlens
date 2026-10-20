@@ -67,6 +67,23 @@ export function composeRootfsTarget(scanRoot: string, target: string): string {
   return sub ? `${scanRoot}/${sub}` : scanRoot;
 }
 
+/** The same rule the server applies to a branch, tag or commit (git_ref). */
+export function isValidGitRef(ref: string): boolean {
+  return /^[A-Za-z0-9][A-Za-z0-9._/@+-]{0,199}$/.test(ref) && !ref.includes("..");
+}
+
+/** The same rule the server applies to an excluded path: relative to the scanned
+ *  folder, no "..", no glob characters, no backslash. */
+export function isValidExcludePath(path: string): boolean {
+  return (
+    !path.startsWith("/") &&
+    !path.includes("\\") &&
+    !/[*?[\u0000-\u001f]/.test(path) &&
+    !path.split("/").includes("..") &&
+    path !== "."
+  );
+}
+
 /** Per-field validation errors; values are i18n keys for the inline message.
  *  Keys double as the input element ids, so the first invalid field can be
  *  focused directly on a failed submit. */
@@ -74,6 +91,8 @@ export interface FieldErrors {
   project?: string;
   version?: string;
   target?: string;
+  gitRef?: string;
+  exclude?: string;
   file?: string;
   uploadUrl?: string;
   uploadToken?: string;
@@ -81,7 +100,7 @@ export interface FieldErrors {
 }
 
 const FIELD_ORDER: Array<keyof FieldErrors> = [
-  "project", "version", "target", "file", "uploadUrl", "uploadToken", "truscaProjectId",
+  "project", "version", "target", "gitRef", "exclude", "file", "uploadUrl", "uploadToken", "truscaProjectId",
 ];
 
 export interface OptionToggle {
@@ -130,6 +149,9 @@ export function useScanForm({
   // instead — safe_scan_dir accepts it as-is, so no root matching is needed.
   const [scanRoot, setScanRootRaw] = useState("");
   const [gitToken, setGitToken] = useState("");
+  const [gitRef, setGitRefRaw] = useState(() => initialConfig?.gitRef ?? "");
+  // One path per line; a re-scan fills it from the earlier scan.
+  const [exclude, setExcludeRaw] = useState(() => (initialConfig?.exclude ?? []).join("\n"));
   const [file, setFileRaw] = useState<File | null>(null);
   const [notice, setNotice] = useState(() => initialConfig?.notice ?? true);
   const [security, setSecurity] = useState(() => initialConfig?.security ?? true);
@@ -248,6 +270,8 @@ export function useScanForm({
   // Vendored-OSS identification only applies to a scanned source tree.
   const isSourceScan =
     source === "current-dir" || source === "git-url" || source === "zip-upload";
+  // Excluded paths need a source tree, like the vendored-code scan.
+  const showExclude = isSourceScan || effectiveSource === "scan-target-src";
   const showVendored = Boolean(capabilities.scanoss) && isSourceScan;
   // Deep license (ScanCode) needs a source tree too, so like SCANOSS it only
   // applies to source scans — not Docker images, SBOM uploads, firmware or AI
@@ -326,6 +350,14 @@ export function useScanForm({
     clearError("target");
     setTargetRaw(v);
   };
+  const setGitRef = (v: string) => {
+    clearError("gitRef");
+    setGitRefRaw(v);
+  };
+  const setExclude = (v: string) => {
+    clearError("exclude");
+    setExcludeRaw(v);
+  };
   const setScanRoot = (v: string) => {
     clearError("target");
     setScanRootRaw(v);
@@ -400,6 +432,7 @@ export function useScanForm({
     setTargetRaw("");
     setScanRootRaw("");
     setGitToken("");
+    setGitRefRaw("");
     setUsage("");
     setUploadError(null);
     setErrors({});
@@ -412,6 +445,10 @@ export function useScanForm({
     if (!version.trim()) errs.version = "validation.version";
     if (isText && !target.trim() && !activeScanRoot)
       errs.target = "validation.target";
+    if (source === "git-url" && gitRef.trim() && !isValidGitRef(gitRef.trim()))
+      errs.gitRef = "validation.gitRef";
+    if (showExclude && exclude.split("\n").some((l) => l.trim() && !isValidExcludePath(l.trim().replace(/^(\.\/)+/, "").replace(/\/+$/, ""))))
+      errs.exclude = "validation.exclude";
     if (uploadKind && !file) errs.file = "validation.file";
     if (showUpload && uploadEnabled) {
       if (!uploadUrl.trim()) errs.uploadUrl = "validation.uploadUrl";
@@ -497,6 +534,10 @@ export function useScanForm({
       target: isText ? effectiveTarget : undefined,
       token,
       cred,
+      gitRef: source === "git-url" ? gitRef.trim() : undefined,
+      exclude: showExclude
+        ? exclude.split("\n").map((line) => line.trim()).filter(Boolean)
+        : undefined,
       scanossCred,
       // Which language the pipeline's own generated prose (notice, conformance,
       // security, AI-profile reports, model/dataset risk reasons) renders in.
@@ -556,6 +597,8 @@ export function useScanForm({
     scanRoot, setScanRoot, scanRoots,
     deepSource, setDeepSource, showDeepSource,
     gitToken, setGitToken,
+    gitRef, setGitRef,
+    exclude, setExclude, showExclude,
     usage, setUsage,
     file, setFile,
     deepLicense, setDeepLicense,

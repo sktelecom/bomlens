@@ -4648,6 +4648,75 @@ else
     fail "git clone failure contract violated" "$events"
 fi
 
+# A git URL scan can name a branch, tag or commit (git_ref). The ref reaches
+# git as the argument of --branch, so a value that could pass as an option or a
+# path escape is refused, and a ref the repository does not have fails the clone.
+GITREPO="$WORK/gitref-repo"
+git init -q "$GITREPO" && git -C "$GITREPO" -c user.email=t@t -c user.name=t commit -q --allow-empty -m one \
+    && git -C "$GITREPO" tag v1 && git -C "$GITREPO" -c user.email=t@t -c user.name=t commit -q --allow-empty -m two
+code=$(curl -s -o /dev/null -w '%{http_code}' "$BASE2/scan-stream?project=gr&version=1.0&source=git-url&target=file://$GITREPO&git_ref=--upload-pack%3Dx")
+[ "$code" = "400" ] && pass "a git_ref that starts with a dash is refused before the stream starts" \
+    || fail "git_ref starting with a dash was not refused" "HTTP $code"
+events=$(sse_events "project=gr&version=1.0&source=git-url&target=file://$GITREPO&git_ref=no-such-ref")
+if echo "$events" | python3 -c "
+import sys, json
+evs = json.load(sys.stdin)
+assert any(e['event'] == 'error' and 'git clone failed' in e['data']['detail'] for e in evs), evs
+"; then
+    pass "a git_ref the repository does not have fails the clone"
+else
+    fail "unknown git_ref did not fail the clone" "$events"
+fi
+events=$(sse_events "project=gr&version=1.0&source=git-url&target=file://$GITREPO&git_ref=v1")
+if echo "$events" | python3 -c "
+import sys, json
+evs = json.load(sys.stdin)
+logs = [e['data'] for e in evs if e['event'] == 'log']
+assert any('(ref: v1)' in str(l) for l in logs), logs
+assert not any(e['event'] == 'error' and 'git clone failed' in str(e['data']) for e in evs), evs
+"; then
+    pass "a tag as git_ref clones and is named in the log"
+else
+    fail "tag git_ref contract violated" "$events"
+fi
+
+events=$(sse_events "project=gr&version=1.0&source=git-url&target=file://$GITREPO&git_ref=$(git -C "$GITREPO" rev-parse v1)")
+if echo "$events" | python3 -c "
+import sys, json
+evs = json.load(sys.stdin)
+logs = [str(e['data']) for e in evs if e['event'] == 'log']
+assert any('retrying as a full clone' in l for l in logs), logs
+assert not any(e['event'] == 'error' and 'git clone failed' in str(e['data']) for e in evs), evs
+"; then
+    pass "a commit id as git_ref falls back to a full clone and checks it out"
+else
+    fail "commit git_ref contract violated" "$events"
+fi
+
+# A source scan can leave paths out (exclude, one per line). A path that could
+# leave the scanned folder is refused before the stream starts; a path that
+# exists is deleted from the clone and counted, one that does not is reported.
+EXREPO="$WORK/exclude-repo"
+git init -q "$EXREPO" && mkdir -p "$EXREPO/vendor/legacy" "$EXREPO/src" && echo x > "$EXREPO/vendor/legacy/f" && echo y > "$EXREPO/src/m" \
+    && git -C "$EXREPO" add -A && git -C "$EXREPO" -c user.email=t@t -c user.name=t commit -q -m one
+for bad in "..%2Fetc" "%2Fetc%2Fpasswd" "a%2F..%2Fb" "vendor%2F*"; do
+    code=$(curl -s -o /dev/null -w '%{http_code}' "$BASE2/scan-stream?project=ex&version=1.0&source=git-url&target=file://$EXREPO&exclude=$bad")
+    [ "$code" = "400" ] && pass "exclude $bad is refused before the stream starts" \
+        || fail "exclude $bad was not refused" "HTTP $code"
+done
+events=$(sse_events "project=ex&version=1.0&source=git-url&target=file://$EXREPO&exclude=vendor%2Flegacy%0Anope")
+if echo "$events" | python3 -c "
+import sys, json
+evs = json.load(sys.stdin)
+logs = [str(e['data']) for e in evs if e['event'] == 'log']
+assert any('Excluded 1 path(s)' in l for l in logs), logs
+assert any('not found, ignored: nope' in l for l in logs), logs
+"; then
+    pass "an exclude path is deleted from the clone; a missing one is reported"
+else
+    fail "exclude contract violated" "$events"
+fi
+
 echo "== zip-upload: hostile archives are rejected before extraction (zip-slip / tar traversal / tar symlink) =="
 # safe_extract_zip() and the zip-upload tar branch (server.py) are the only
 # things standing between an uploaded archive and the filesystem outside the

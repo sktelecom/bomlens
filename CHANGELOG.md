@@ -9,16 +9,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- The Vulnerabilities table has a "No fix yet" preset view next to "Fix available", so findings with no published fixed version can be listed on their own.
+- A GitHub URL scan in the web UI takes an optional branch, tag or commit, as `--branch` does on the command line. A commit id falls back to a full clone and a checkout. A re-scan fills the field from the earlier scan.
 - `CITATION.cff`, so GitHub offers a "Cite this repository" entry.
 - The release verification guide has a Windows section: the PowerShell commands that download the installer, verify the signature on its checksum file and compare the installer's hash.
+- `--exclude <path>` leaves a path out of a source scan (repeatable), and the web UI has a matching "Paths to leave out" box for source scans. The scan runs on a tree without the excluded paths, so the build, the license scan and the file tree all skip them. A re-scan fills the box from the earlier scan.
 
 ### Changed
 
+- The medium-severity amber and the success green are darker in the light theme, so bars, dots and progress fills reach 3:1 against the page (they were 2.8:1 and 2.4:1). A new check, `npm run token:contrast`, fails when a text color falls under 4.5:1 or a fill color under 3:1 in either theme. The web UI reference has an Accessibility section that lists what is measured and what is not.
 - The risk report (Markdown and HTML, English and Korean) now says when the scanned source stated version ranges and shipped no lock file: the versions in the SBOM are what a fresh install resolved on the scan day, and the vulnerability counts were measured against them. Before, only the web UI and the SBOM property `bomlens:source:versionPinning` said so.
 - The README says which Docker engines the desktop app works with on Windows: Rancher Desktop or Docker Desktop, not WSL2 + docker-ce (CLI only).
 - The conformance check flags a top-level component name that is a fixed value instead of a product name (`.`, `..`, `/` or `/scan`): it fails under `--conformance-profile skt-submission` and warns under the default profile. The supplier SBOM guide now lists what the check does not cover.
 
 ## [v1.13.7] - 2026-10-17
+- The New scan form shows an inline error for a branch, tag or commit and for excluded paths the server would refuse, and its hints are tied to their inputs. The outbound license and SBOM author fields use the shared input style, so their focus ring matches the rest of the form. The License obligations card tells screen readers how many components each license has and whether the list is expanded. The medium-severity and success tint backgrounds follow the darker light-theme fills.
 
 ### Upgrade note
 

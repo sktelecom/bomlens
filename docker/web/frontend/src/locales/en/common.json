@@ -37,6 +37,12 @@
     "gitUrl": "GitHub URL",
     "gitHint": "Public repos clone directly; for private repos enter a token below.",
     "gitPlaceholder": "https://github.com/org/repo",
+    "gitRef": "Branch, tag or commit (optional)",
+    "gitRefPlaceholder": "main, v1.2.0 or a commit id",
+    "exclude": "Paths to leave out (optional)",
+    "excludePlaceholder": "vendor/legacy\ntest/fixtures",
+    "excludeHint": "One path per line, relative to the scanned folder. Globs and .. are not accepted.",
+    "gitRefHint": "Leave empty to scan the default branch.",
     "gitToken": "Token (private repo, optional)",
     "gitTokenPlaceholder": "ghp_… (Personal Access Token)",
     "gitTokenHint": "Only for private repos. Used once for the clone; never stored or logged.",
@@ -389,6 +395,7 @@
     "vulnViews": "Preset views",
     "vulnViewAll": "All",
     "vulnViewFixable": "Fix available",
+    "vulnViewUnfixed": "No fix yet",
     "vulnViewExploited": "Known exploited",
     "vulnViewCriticalHigh": "Critical and High",
     "vulnLayout": "Layout",
@@ -1333,7 +1340,27 @@
     "conflictOffHint": "This scan did not declare the license the project ships under, so dependencies could not be compared against it. Set the license in the New scan form and scan again to turn the check on.",
     "conflictOffAction": "Set the license and re-scan",
     "conflictOffCli": "Command line",
-    "conflictOffCliBody": "Pass --license <spdx-id> (or set PROJECT_LICENSE) when you run the scan."
+    "conflictOffCliBody": "Pass --license <spdx-id> (or set PROJECT_LICENSE) when you run the scan.",
+    "obligationsTitle": "What each license asks of you",
+    "obligationsComponentCount_one": "{{count}} component",
+    "obligationsComponentCount_other": "{{count}} components",
+    "obligationsHint": "Conditions on redistributing the component, from public license summaries. A documentation aid, not a legal determination. A license that is not listed shows \"Needs checking\".",
+    "obligationsUnknown": "Needs checking",
+    "obligationsNone": "No conditions",
+    "obligationsChooseOne": "Choose one:",
+    "obligationsAll": "All apply:",
+    "obligationsShowAll": "Show all {{count}} licenses",
+    "obligationsShowLess": "Show fewer",
+    "obligation": {
+      "includeCopyright": "Keep copyright and license notice",
+      "includeCopyrightSource": "Keep notice in source form",
+      "documentChanges": "State changes",
+      "discloseSource": "Disclose source",
+      "networkUseDisclose": "Source for network users",
+      "sameLicense": "Same license",
+      "sameLicenseFile": "Same license (per file)",
+      "sameLicenseLibrary": "Same license (library)"
+    }
   },
   "recent": {
     "title": "Scan management",
@@ -1384,6 +1411,8 @@
     "target": "Enter the scan target.",
     "uploadUrl": "Enter the upload server URL.",
     "uploadToken": "Enter the upload API token.",
+    "gitRef": "Use a branch, tag or commit id: letters, digits and . _ / @ + - only, without \"..\".",
+    "exclude": "Use a relative path with no .. , no wildcard and no backslash, one per line.",
     "truscaProjectId": "Enter the TRUSCA project id."
   },
   "provenance": {

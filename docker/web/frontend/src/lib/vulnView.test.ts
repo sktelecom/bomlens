@@ -31,6 +31,10 @@ describe("applyVulnView", () => {
     expect(applyVulnView(ITEMS, "fixable").map((x) => x.id)).toEqual(["A", "C"]);
   });
 
+  it("narrows to rows with no published fix", () => {
+    expect(applyVulnView(ITEMS, "unfixed").map((x) => x.id)).toEqual(["B", "D"]);
+  });
+
   it("narrows to actively exploited rows", () => {
     expect(applyVulnView(ITEMS, "exploited").map((x) => x.id)).toEqual(["A"]);
   });
@@ -42,7 +46,7 @@ describe("applyVulnView", () => {
 
 describe("viewCounts", () => {
   it("counts each preset over the whole list", () => {
-    expect(viewCounts(ITEMS)).toEqual({ all: 4, fixable: 2, exploited: 1, "critical-high": 2 });
+    expect(viewCounts(ITEMS)).toEqual({ all: 4, fixable: 2, unfixed: 2, exploited: 1, "critical-high": 2 });
   });
 });
 
