@@ -136,7 +136,7 @@ export function SourceFileTree({
   }
 
   return (
-    <div className="max-h-[44rem] min-h-[16rem] resize-y overflow-auto rounded-md border p-1">
+    <div className="max-h-[max(44rem,calc(100vh-21rem))] min-h-[16rem] resize-y overflow-auto rounded-md border p-1">
       <ul>
         {nodes.map((n) => (
           <FileRow

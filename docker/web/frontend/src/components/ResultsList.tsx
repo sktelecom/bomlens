@@ -461,7 +461,7 @@ export function ResultsList({
       {/* Two columns: the cards are short and were stacked one per row, so four
           of them filled a screen and left the lower half empty. The headline
           deliverable keeps the full width. */}
-      <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-3 lg:grid-cols-2 2xl:grid-cols-3">
         {artifacts.map((a) => (
           <ArtifactCard
             key={a.key}
