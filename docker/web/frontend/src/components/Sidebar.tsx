@@ -151,12 +151,12 @@ export function Sidebar({
                     className={cn(
                       RAIL_ROW,
                       collapsed && "justify-center",
-                      // The active row is a neutral fill plus a thin bar on its
-                      // left edge. The brand red is not used here: it would read
-                      // as a warning on the one row that is simply "where you
-                      // are". The label stays at foreground contrast (AA).
+                      // The active row is a neutral fill only. The brand red is not
+                      // used here: it would read as a warning on the one row that
+                      // is simply "where you are". The label stays at foreground
+                      // contrast (AA).
                       active
-                        ? "bg-muted font-semibold text-foreground before:absolute before:inset-y-1.5 before:left-0 before:w-0.5 before:rounded-full before:bg-foreground"
+                        ? "bg-muted font-semibold text-foreground"
                         : RAIL_ROW_IDLE,
                     )}
                   >

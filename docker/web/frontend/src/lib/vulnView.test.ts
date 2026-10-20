@@ -42,11 +42,22 @@ describe("applyVulnView", () => {
   it("narrows to Critical and High", () => {
     expect(applyVulnView(ITEMS, "critical-high").map((x) => x.id)).toEqual(["A", "B"]);
   });
+
+  it("narrows to Critical or High rows that have a fix", () => {
+    expect(applyVulnView(ITEMS, "fixable-severe").map((x) => x.id)).toEqual(["A"]);
+  });
 });
 
 describe("viewCounts", () => {
   it("counts each preset over the whole list", () => {
-    expect(viewCounts(ITEMS)).toEqual({ all: 4, fixable: 2, unfixed: 2, exploited: 1, "critical-high": 2 });
+    expect(viewCounts(ITEMS)).toEqual({
+      all: 4,
+      fixable: 2,
+      unfixed: 2,
+      exploited: 1,
+      "critical-high": 2,
+      "fixable-severe": 1,
+    });
   });
 });
 
@@ -59,6 +70,10 @@ describe("view query", () => {
     const q = vulnViewToQuery("fixable", "package");
     expect(q).toEqual({ view: "fixable", group: "package" });
     expect(vulnViewFromQuery(q)).toEqual({ view: "fixable", layout: "package" });
+  });
+
+  it("reads the link-only fixable-severe view", () => {
+    expect(vulnViewFromQuery({ view: "fixable-severe" }).view).toBe("fixable-severe");
   });
 
   it("reads an unknown or missing value as the default", () => {

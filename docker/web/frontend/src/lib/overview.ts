@@ -20,6 +20,8 @@ export interface AttentionItem {
   tone: "critical" | "high" | "info";
   /** Section to open when the item is actioned. */
   target: SectionId;
+  /** Filter to open it with, when the section can apply one. */
+  query?: Record<string, string>;
 }
 
 /**
@@ -66,6 +68,8 @@ export function needsAttention(result: DoneEvent): AttentionItem[] {
         count: crit + high,
         tone: crit > 0 ? "critical" : "high",
         target: "vulnerabilities",
+        // Opens the Critical and High rows this count is made of.
+        query: { view: "critical-high" },
       });
     }
   }
@@ -203,6 +207,8 @@ export function firstChecks(result: DoneEvent, limit = 3): FirstCheck[] {
       id: "knownExploited",
       count: kev,
       target: "vulnerabilities",
+      // The preset that lists exactly the rows counted.
+      query: { view: "exploited" },
       source: "vulnerabilities",
       ...partial(),
     });
@@ -212,14 +218,13 @@ export function firstChecks(result: DoneEvent, limit = 3): FirstCheck[] {
     (v) => (v.severity === "CRITICAL" || v.severity === "HIGH") && Boolean(v.fixed),
   );
   if (fixable.length > 0) {
-    // Open the table on the worst severity present, so the first row seen is
-    // the first of the counted rows.
-    const worst = fixable.some((v) => v.severity === "CRITICAL") ? "CRITICAL" : "HIGH";
+    // One preset that lists exactly the counted rows: a severity filter alone
+    // would drop either the Critical or the High ones, or keep unfixed rows.
     items.push({
       id: "fixableSevere",
       count: fixable.length,
       target: "vulnerabilities",
-      query: { severity: worst },
+      query: { view: "fixable-severe" },
       source: "vulnerabilities",
       ...partial(),
     });

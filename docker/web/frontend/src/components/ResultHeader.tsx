@@ -26,6 +26,7 @@ export function ResultHeader({
   status,
   title,
   headingRef,
+  projectTitle = false,
 }: {
   name?: string;
   version?: string;
@@ -36,22 +37,26 @@ export function ResultHeader({
   status: ResultStatus;
   title: string;
   headingRef?: Ref<HTMLHeadingElement>;
+  /** Use the project and version as the title (the Overview), so the meta
+   *  line above it does not repeat them. */
+  projectTitle?: boolean;
 }) {
   const { t, i18n } = useTranslation();
   const when = generatedAt ? formatDateTime(generatedAt, i18n.language) : "";
+  const asProject = projectTitle && Boolean(name);
   return (
     <div>
       <div
         className="flex flex-wrap items-center gap-x-2 gap-y-1 text-body-sm text-muted-foreground"
         data-testid="result-meta"
       >
-        {name && (
+        {!asProject && name && (
           <span className="max-w-[28rem] truncate font-medium text-foreground" title={name}>
             {name}
           </span>
         )}
-        {version && <span className="font-mono text-label">{version}</span>}
-        {name && <Dot />}
+        {!asProject && version && <span className="font-mono text-label">{version}</span>}
+        {!asProject && name && <Dot />}
         <span data-testid="result-kind" title={t("result.metaScanType")}>
           {kind}
         </span>
@@ -74,7 +79,18 @@ export function ResultHeader({
         tabIndex={-1}
         className="mt-2 text-title font-semibold tracking-tight text-foreground focus:outline-none"
       >
-        {title}
+        {asProject ? (
+          <>
+            <span className="break-words">{name}</span>
+            {version && (
+              <span className="ml-2 font-mono text-heading font-normal text-muted-foreground">
+                {version}
+              </span>
+            )}
+          </>
+        ) : (
+          title
+        )}
       </h1>
     </div>
   );

@@ -651,6 +651,7 @@ export function NextApp() {
                   : "ok"
             }
             title={t(`nav.${activeSection}`)}
+            projectTitle={activeSection === "overview"}
             headingRef={headingRef}
           />
 
