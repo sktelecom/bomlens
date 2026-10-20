@@ -2,7 +2,7 @@
   "project": "BertBaseUncased",
   "format": "CycloneDX",
   "result": "pass",
-  "generatedAt": "2026-10-20T12:28:31Z",
+  "generatedAt": "2026-10-20T15:16:35Z",
   "profile": "default",
   "untraceableComponents": 0,
   "checks": [
@@ -30,7 +30,7 @@
       "label": "Timestamp (metadata.timestamp)",
       "required": true,
       "status": "pass",
-      "detail": "2026-10-20T12:28:28+00:00",
+      "detail": "2026-10-20T15:16:33+00:00",
       "missing": [],
       "regulations": [
         {
@@ -42,7 +42,7 @@
         }
       ],
       "label_ko": "타임스탬프 (metadata.timestamp)",
-      "detail_ko": "2026-10-20T12:28:28+00:00"
+      "detail_ko": "2026-10-20T15:16:33+00:00"
     },
     {
       "id": "tools",
@@ -2534,7 +2534,7 @@
             "label": "Timestamp (metadata.timestamp)",
             "status": "pass",
             "source": null,
-            "detail": "2026-10-20T12:28:28+00:00",
+            "detail": "2026-10-20T15:16:33+00:00",
             "refs": [
               "Section 5.2.1"
             ]

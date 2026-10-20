@@ -22,7 +22,7 @@
         "pkg:maven/com.example/sbom-example-app@1.1.0?type=jar"
       ],
       "text": "This Software Bill-of-Materials (SBOM) document was created on Tuesday, October 20, 2026 with cdxgen. The data was captured during the build lifecycle phase. The document describes an application named 'sbom-example-app' with version '1.1.0'. The package type in this SBOM is maven with 50 purl namespaces described under components. The components were identified from the source files: pom.xml.",
-      "timestamp": "2026-10-20T12:28:04Z"
+      "timestamp": "2026-10-20T15:16:15Z"
     }
   ],
   "bomFormat": "CycloneDX",
@@ -9369,7 +9369,7 @@
         "value": "unknown-to-author"
       }
     ],
-    "timestamp": "2026-10-20T12:28:04Z",
+    "timestamp": "2026-10-20T15:16:15Z",
     "tools": {
       "components": [
         {
@@ -9390,12 +9390,12 @@
           "name": "BomLens",
           "publisher": "SK Telecom",
           "type": "application",
-          "version": "1.13.8"
+          "version": "1.13.9"
         }
       ]
     }
   },
-  "serialNumber": "urn:uuid:e32cb739-5b43-4aa0-b714-7cf78fb58236",
+  "serialNumber": "urn:uuid:c3ad8fce-2d05-4bc5-99e3-ee669aaf3d83",
   "services": [],
   "specVersion": "1.6",
   "version": 1,
