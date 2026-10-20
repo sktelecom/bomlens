@@ -216,8 +216,13 @@ export function SourceControls({ state }: { state: ScanFormState }) {
             placeholder={t("source.gitRefPlaceholder")}
             disabled={busy}
             autoComplete="off"
+            spellCheck={false}
+            autoCapitalize="off"
+            aria-invalid={errors.gitRef ? true : undefined}
+            aria-describedby={errors.gitRef ? "gitRef-error gitRef-hint" : "gitRef-hint"}
           />
-          <p className="text-body-sm text-muted-foreground">{t("source.gitRefHint")}</p>
+          <FieldError id="gitRef-error" msgKey={errors.gitRef} />
+          <p id="gitRef-hint" className="text-body-sm text-muted-foreground">{t("source.gitRefHint")}</p>
         </div>
       )}
 
@@ -233,8 +238,10 @@ export function SourceControls({ state }: { state: ScanFormState }) {
             rows={3}
             spellCheck={false}
             autoCapitalize="off"
-            aria-describedby="exclude-hint"
+            aria-invalid={errors.exclude ? true : undefined}
+            aria-describedby={errors.exclude ? "exclude-error exclude-hint" : "exclude-hint"}
           />
+          <FieldError id="exclude-error" msgKey={errors.exclude} />
           <p id="exclude-hint" className="text-body-sm text-muted-foreground">{t("source.excludeHint")}</p>
         </div>
       )}
@@ -598,7 +605,7 @@ export function FormatOptions({ state }: { state: ScanFormState }) {
           <label htmlFor="outbound-license" className="text-body-sm font-medium text-foreground">
             {t("options.outboundLicense")}
           </label>
-          <input
+          <Input
             id="outbound-license"
             type="text"
             value={outboundLicense}
@@ -606,7 +613,6 @@ export function FormatOptions({ state }: { state: ScanFormState }) {
             disabled={busy}
             placeholder="Apache-2.0"
             spellCheck={false}
-            className="w-full rounded-md border bg-background px-3 py-2 text-body-sm disabled:opacity-60"
             aria-describedby="outbound-license-hint"
           />
           <p id="outbound-license-hint" className="text-body-sm text-muted-foreground">
@@ -619,7 +625,7 @@ export function FormatOptions({ state }: { state: ScanFormState }) {
           <label htmlFor="sbom-author" className="text-body-sm font-medium text-foreground">
             {t("options.sbomAuthor")}
           </label>
-          <input
+          <Input
             id="sbom-author"
             type="text"
             value={sbomAuthor}
@@ -627,7 +633,6 @@ export function FormatOptions({ state }: { state: ScanFormState }) {
             disabled={busy}
             placeholder="SK Telecom Co., Ltd."
             spellCheck={false}
-            className="w-full rounded-md border bg-background px-3 py-2 text-body-sm disabled:opacity-60"
             aria-describedby="sbom-author-hint"
           />
           <p id="sbom-author-hint" className="text-body-sm text-muted-foreground">

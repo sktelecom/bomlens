@@ -1342,6 +1342,8 @@
     "conflictOffCli": "명령줄에서는",
     "conflictOffCliBody": "스캔을 실행할 때 --license <spdx-id>를 지정하거나 PROJECT_LICENSE를 설정하세요.",
     "obligationsTitle": "라이선스별 준수 사항",
+    "obligationsComponentCount_one": "구성요소 {{count}}개",
+    "obligationsComponentCount_other": "구성요소 {{count}}개",
     "obligationsHint": "구성요소를 재배포할 때 붙는 조건이며, 공개된 라이선스 요약에서 가져왔습니다. 문서 작성 보조이며 법적 판정이 아닙니다. 목록에 없는 라이선스는 \"확인 필요\"로 표시합니다.",
     "obligationsUnknown": "확인 필요",
     "obligationsNone": "조건 없음",
@@ -1409,6 +1411,8 @@
     "target": "스캔 대상을 입력하세요.",
     "uploadUrl": "업로드 서버 주소를 입력하세요.",
     "uploadToken": "업로드 API 토큰을 입력하세요.",
+    "gitRef": "브랜치, 태그 또는 커밋 ID로 입력하세요. 영문, 숫자, . _ / @ + - 만 쓸 수 있고 \"..\"은 쓸 수 없습니다.",
+    "exclude": "한 줄에 상대 경로 하나를 입력하세요. .., 와일드카드, 역슬래시는 쓸 수 없습니다.",
     "truscaProjectId": "TRUSCA 프로젝트 id를 입력하세요."
   },
   "provenance": {

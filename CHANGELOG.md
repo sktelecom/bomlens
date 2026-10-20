@@ -23,6 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The conformance check flags a top-level component name that is a fixed value instead of a product name (`.`, `..`, `/` or `/scan`): it fails under `--conformance-profile skt-submission` and warns under the default profile. The supplier SBOM guide now lists what the check does not cover.
 
 ## [v1.13.7] - 2026-10-17
+- The New scan form shows an inline error for a branch, tag or commit and for excluded paths the server would refuse, and its hints are tied to their inputs. The outbound license and SBOM author fields use the shared input style, so their focus ring matches the rest of the form. The License obligations card tells screen readers how many components each license has and whether the list is expanded. The medium-severity and success tint backgrounds follow the darker light-theme fills.
 
 ### Upgrade note
 

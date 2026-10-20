@@ -67,6 +67,7 @@ export function VulnViewBar({
             onClick={() => onView(v)}
           >
             {t(VIEW_LABEL[v])}
+            <span className="sr-only">, </span>
             <span className="ml-1.5 tabular-nums">{fmt(counts[v])}</span>
           </FilterChip>
         ))}

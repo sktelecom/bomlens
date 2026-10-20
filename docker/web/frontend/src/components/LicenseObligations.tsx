@@ -33,11 +33,11 @@ const TAG_LABEL: Record<ObligationTag, string> = {
 function Chips({ tags }: { tags: ObligationTag[] | null }) {
   const { t } = useTranslation();
   if (tags === null) return <Badge variant="outline">{t("licenses.obligationsUnknown")}</Badge>;
-  if (tags.length === 0) return <Badge variant="muted">{t("licenses.obligationsNone")}</Badge>;
+  if (tags.length === 0) return <Badge variant="muted" className="hover:bg-muted">{t("licenses.obligationsNone")}</Badge>;
   return (
     <>
       {tags.map((tag) => (
-        <Badge key={tag} variant="muted">
+        <Badge key={tag} variant="muted" className="hover:bg-muted">
           {t(TAG_LABEL[tag])}
         </Badge>
       ))}
@@ -80,16 +80,17 @@ export function LicenseObligations({ components }: { components: ComponentItem[]
           {t("licenses.obligationsTitle")}
         </div>
         <p className="text-body-sm text-muted-foreground">{t("licenses.obligationsHint")}</p>
-        <ul className="divide-y rounded-md border bg-card">
+        <ul id="license-obligations-list" className="divide-y rounded-md border bg-card">
           {shown.map((g) => {
             const r = licenseObligations(g.name);
             return (
               <li key={g.name} className="space-y-1.5 px-3 py-2 text-body-sm">
                 <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                   <span className="font-mono">{g.name}</span>
-                  <span className="tabular-nums text-label text-muted-foreground">
+                  <span className="tabular-nums text-label text-muted-foreground" aria-hidden="true">
                     {fmt(g.count)}
                   </span>
+                  <span className="sr-only">{t("licenses.obligationsComponentCount", { count: g.count })}</span>
                   {r.kind === "known" && <Chips tags={r.tags} />}
                   {r.kind === "unknown" && <Chips tags={null} />}
                 </div>
@@ -117,7 +118,13 @@ export function LicenseObligations({ components }: { components: ComponentItem[]
           })}
         </ul>
         {groups.length > TOP && (
-          <Button variant="outline" size="sm" onClick={() => setAll((v) => !v)}>
+          <Button
+            variant="outline"
+            size="sm"
+            aria-expanded={all}
+            aria-controls="license-obligations-list"
+            onClick={() => setAll((v) => !v)}
+          >
             {all ? t("licenses.obligationsShowLess") : t("licenses.obligationsShowAll", { count: groups.length })}
           </Button>
         )}
