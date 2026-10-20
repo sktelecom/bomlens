@@ -1,5 +1,5 @@
 Third-party Open Source Licenses for FlaskDataService
-Generated: 2026-10-14T18:04:23Z
+Generated: 2026-10-17T13:47:18Z
 Total components: 39 · Distinct licenses: 9
 
 This product includes the following open source software.

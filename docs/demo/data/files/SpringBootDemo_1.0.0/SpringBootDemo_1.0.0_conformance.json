@@ -2,7 +2,7 @@
   "project": "SpringBootDemo",
   "format": "CycloneDX",
   "result": "pass",
-  "generatedAt": "2026-10-14T18:06:09Z",
+  "generatedAt": "2026-10-17T13:49:07Z",
   "profile": "default",
   "untraceableComponents": 0,
   "checks": [
@@ -30,7 +30,7 @@
       "label": "Timestamp (metadata.timestamp)",
       "required": true,
       "status": "pass",
-      "detail": "2026-10-14T18:06:06Z",
+      "detail": "2026-10-17T13:49:04Z",
       "missing": [],
       "regulations": [
         {
@@ -42,7 +42,7 @@
         }
       ],
       "label_ko": "타임스탬프 (metadata.timestamp)",
-      "detail_ko": "2026-10-14T18:06:06Z"
+      "detail_ko": "2026-10-17T13:49:04Z"
     },
     {
       "id": "tools",
@@ -1083,7 +1083,7 @@
             "label": "Timestamp (metadata.timestamp)",
             "status": "pass",
             "source": null,
-            "detail": "2026-10-14T18:06:06Z",
+            "detail": "2026-10-17T13:49:04Z",
             "refs": [
               "Section 5.2.1"
             ]

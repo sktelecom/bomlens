@@ -8,6 +8,7 @@ import { useTranslation } from "react-i18next";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { SELECTED_OUTLINE, UNSELECTED_OUTLINE } from "@/components/ui/selectable";
 import { Input } from "@/components/ui/input";
 import { EmptyState } from "@/components/ui/state";
 import { PipelineStepsFailedNote } from "@/components/PipelineStepsFailedNote";
@@ -23,6 +24,7 @@ import {
   CISA_CLUSTER_ORDER,
   crosswalkTotals,
   dedupeMissing,
+  explainedEntries,
   groupByCluster,
   groupG7ByCluster,
   isNotApplicable,
@@ -78,8 +80,8 @@ function CrosswalkBlock({
     <Card>
       <CardContent className="space-y-4 p-4">
         <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-          <div className="text-sm font-semibold text-foreground">{t("crosswalk.title")}</div>
-          <span className="text-xs tabular-nums text-muted-foreground">
+          <div className="text-body-sm font-semibold text-foreground">{t("crosswalk.title")}</div>
+          <span className="text-label tabular-nums text-muted-foreground">
             {t("crosswalk.totals", {
               present: totals.present,
               gap: totals.gap,
@@ -90,9 +92,9 @@ function CrosswalkBlock({
           </span>
         </div>
         <div className="overflow-x-auto">
-          <table className="min-w-full text-sm">
+          <table className="min-w-full text-body-sm">
             <thead>
-              <tr className="border-b text-left text-xs text-muted-foreground">
+              <tr className="border-b text-left text-label text-muted-foreground">
                 <th className="whitespace-nowrap py-1.5 pr-3 font-medium">{t("crosswalk.thFramework")}</th>
                 <th className="whitespace-nowrap py-1.5 px-2 text-right font-medium tabular-nums">{t("crosswalk.present")}</th>
                 <th className="whitespace-nowrap py-1.5 px-2 text-right font-medium tabular-nums">{t("crosswalk.gap")}</th>
@@ -117,7 +119,7 @@ function CrosswalkBlock({
                         {fw.elements.map((el, i) => {
                           const { Icon, color } = statusOfValue(el.status);
                           return (
-                            <li key={`${el.label}-${i}`} className="flex items-start gap-1.5 text-xs">
+                            <li key={`${el.label}-${i}`} className="flex items-start gap-1.5 text-label">
                               <Icon className={cn("mt-0.5 h-3 w-3 shrink-0", color)} aria-hidden />
                               <span className="text-muted-foreground">
                                 {el.label}
@@ -130,7 +132,7 @@ function CrosswalkBlock({
                         })}
                       </ul>
                     </Disclosure>
-                    <div className="text-xs text-muted-foreground">{fw.source}</div>
+                    <div className="text-label text-muted-foreground">{fw.source}</div>
                   </td>
                   <td className="py-1.5 px-2 text-right tabular-nums text-foreground">{fw.present}</td>
                   <td className="py-1.5 px-2 text-right tabular-nums text-foreground">{fw.gap}</td>
@@ -142,7 +144,7 @@ function CrosswalkBlock({
             </tbody>
           </table>
         </div>
-        <p className="text-xs text-muted-foreground">{t("crosswalk.disclaimer")}</p>
+        <p className="text-body-sm text-muted-foreground">{t("crosswalk.disclaimer")}</p>
       </CardContent>
     </Card>
   );
@@ -221,6 +223,9 @@ function CheckRow({ check }: { check: ConformanceCheck }) {
   const detail = (isKo && check.detailKo) || check.detail;
   const missing = dedupeMissing(check.missing ?? []);
   const overflow = missingOverflow(check);
+  // Components the supplier explained instead of versioning. Shown on a passing
+  // row too: the count passed, but each reason is still the reviewer's call.
+  const explained = explainedEntries(check);
   // Supplied by the report itself (validate-sbom.sh joins docker/lib/g7-guidance.json),
   // so the CLI artifacts and this panel show the same fragment. Runs from before
   // the guidance registry carry none.
@@ -229,40 +234,40 @@ function CheckRow({ check }: { check: ConformanceCheck }) {
     <li className="flex items-start gap-2.5 px-3 py-2.5">
       <Icon className={cn("mt-0.5 h-4 w-4 shrink-0", color)} aria-hidden />
       <div className="min-w-0 flex-1">
-        <div className="flex flex-wrap items-center gap-2 text-sm">
+        <div className="flex flex-wrap items-center gap-2 text-body-sm">
           <span className="text-foreground">{label}</span>
           {check.required ? (
             <Badge variant="muted">{t("g7.required")}</Badge>
           ) : null}
           {fromRegistry ? <SourceBadge source={check.source} naKind={check.naKind} met={check.status === "pass"} /> : null}
           {detail && !notMet ? (
-            <span className="text-xs tabular-nums text-muted-foreground">{detail}</span>
+            <span className="text-label tabular-nums text-muted-foreground">{detail}</span>
           ) : null}
           <span className="sr-only">{t(key)}</span>
         </div>
         {regText ? (
-          <div className="mt-0.5 text-xs text-muted-foreground">
+          <div className="mt-0.5 text-label text-muted-foreground">
             <span className="font-medium">{t("crosswalk.refs")}</span> {regText}
           </div>
         ) : null}
         {detail && notMet ? (
-          <div className="mt-0.5 text-xs tabular-nums text-muted-foreground">{detail}</div>
+          <div className="mt-0.5 text-label tabular-nums text-muted-foreground">{detail}</div>
         ) : null}
         {what && notMet ? (
           // Only where there is something to do. A met element's description is
           // read once and then re-read on every visit: forty of them turned a
           // list a reader scans into a page a reader scrolls.
-          <div className="mt-1 text-xs leading-relaxed text-muted-foreground">{what}</div>
+          <div className="mt-1 text-label leading-relaxed text-muted-foreground">{what}</div>
         ) : null}
         {notMet && (check.missing?.length ?? 0) > 0 ? (
           // Which items lack the element (e.g. the model components without a
           // license) — the count in detail says how many, this names them.
-          <div className="mt-1 flex flex-wrap items-center gap-1 text-xs text-muted-foreground">
+          <div className="mt-1 flex flex-wrap items-center gap-1 text-label text-muted-foreground">
             <span className="font-medium">{t("g7.missing")}</span>
             {missing.map(({ name, count }: { name: string; count: number }) => (
               <code
                 key={name}
-                className="rounded bg-muted px-1.5 py-0.5 font-mono text-[11px] text-foreground"
+                className="break-all rounded bg-muted px-1.5 py-0.5 font-mono text-mono text-foreground"
               >
                 {count > 1 ? `${name} ×${count}` : name}
               </code>
@@ -272,20 +277,36 @@ function CheckRow({ check }: { check: ConformanceCheck }) {
             ) : null}
           </div>
         ) : null}
+        {explained.length > 0 ? (
+          <div className="mt-1 flex flex-wrap items-center gap-1 text-label text-muted-foreground">
+            <span className="font-medium">{t("g7.explained")}</span>
+            {explained.map(({ name, reason }, i) => (
+              <code
+                key={`${name}-${i}`}
+                className="break-all rounded bg-muted px-1.5 py-0.5 font-mono text-mono text-foreground"
+              >
+                {name}{" "}
+                <span className="font-sans text-muted-foreground">
+                  ({t(`g7.explainedReason.${reason}`)})
+                </span>
+              </code>
+            ))}
+          </div>
+        ) : null}
         {evidence.length > 0 ? (
           // Folded: the values that satisfied an element are worth having, and
           // worth having on request. Open by default they made every met row as
           // tall as an unmet one.
           <Disclosure
             className="mt-1"
-            summaryClassName="text-xs font-medium text-muted-foreground"
+            summaryClassName="text-label font-medium text-muted-foreground"
             summary={<span>{t("g7.evidence")}</span>}
           >
-            <div className="mt-0.5 flex flex-wrap items-center gap-1 text-xs text-muted-foreground">
+            <div className="mt-0.5 flex flex-wrap items-center gap-1 text-label text-muted-foreground">
               {evidence.map((e, i) => (
                 <code
                   key={`${e}-${i}`}
-                  className="rounded bg-muted px-1.5 py-0.5 font-mono text-[11px] text-foreground"
+                  className="break-all rounded bg-muted px-1.5 py-0.5 font-mono text-mono text-foreground"
                 >
                   {e}
                 </code>
@@ -294,12 +315,12 @@ function CheckRow({ check }: { check: ConformanceCheck }) {
           </Disclosure>
         ) : null}
         {fix ? (
-          <div className="mt-1 rounded-md bg-muted/50 px-2.5 py-1.5 text-xs leading-relaxed text-foreground">
+          <div className="mt-1 rounded-md bg-muted/50 px-2.5 py-1.5 text-label leading-relaxed text-foreground">
             <span className="font-medium">{t("g7.howToFix")}</span> {fix}
           </div>
         ) : null}
         {reviewHow ? (
-          <div className="mt-1 rounded-md bg-muted/50 px-2.5 py-1.5 text-xs leading-relaxed text-foreground">
+          <div className="mt-1 rounded-md bg-muted/50 px-2.5 py-1.5 text-label leading-relaxed text-foreground">
             <span className="font-medium">{t("g7.needsPerson")}</span> {reviewHow}
           </div>
         ) : null}
@@ -309,10 +330,10 @@ function CheckRow({ check }: { check: ConformanceCheck }) {
           // decided to act on that row.
           <Disclosure
             className="mt-1"
-            summaryClassName="text-xs font-medium text-muted-foreground"
+            summaryClassName="text-label font-medium text-muted-foreground"
             summary={<span>{t("g7.example")}</span>}
           >
-            <pre className="mt-0.5 overflow-x-auto rounded-md bg-muted px-2.5 py-2 text-[11px] leading-relaxed text-foreground">
+            <pre className="mt-0.5 overflow-x-auto rounded-md bg-muted px-2.5 py-2 text-mono leading-relaxed text-foreground">
               <code className="font-mono">{guidance.snippet}</code>
             </pre>
           </Disclosure>
@@ -322,7 +343,7 @@ function CheckRow({ check }: { check: ConformanceCheck }) {
             href={guidance.docUrl}
             target="_blank"
             rel="noreferrer"
-            className="mt-1 inline-block text-xs font-medium text-primary hover:underline"
+            className="mt-1 inline-block text-label font-medium text-primary hover:underline"
           >
             {t("g7.learnMore")}
           </a>
@@ -371,8 +392,7 @@ function KindChip({
         // Rest-state border so this reads as pressable next to identical-looking
         // but inert badges elsewhere (see SeverityBar's own for why this is a
         // real `border`, not a low-contrast `ring`).
-        isSel ? "ring-2 ring-foreground ring-offset-1" : "border-border",
-        Boolean(selected) && !isSel && "opacity-60",
+        isSel ? SELECTED_OUTLINE : UNSELECTED_OUTLINE,
       )}
     >
       <Badge tone={KIND_TONE[kind]} variant={kind === "na" ? "muted" : undefined}>
@@ -398,11 +418,11 @@ export function CheckGroup({
   return (
     <Disclosure
       defaultOpen={defaultOpen}
-      summaryClassName="text-xs font-semibold text-foreground"
+      summaryClassName="text-label font-semibold text-foreground"
       summary={
         <span className="flex flex-wrap items-baseline gap-x-2">
           <span>{title}</span>
-          <span className="text-xs font-normal tabular-nums text-muted-foreground">
+          <span className="text-label font-normal tabular-nums text-muted-foreground">
             {checks.length}
           </span>
           {trailing}
@@ -435,8 +455,8 @@ function ResultQualityNote({
       className="rounded-md border border-warning-border/60 bg-warning-surface px-4 py-3 text-warning dark:border-warning-border/20 dark:bg-warning-surface/30"
       data-testid={testId}
     >
-      <div className="text-sm font-medium">{title}</div>
-      <p className="mt-1 text-xs">{body}</p>
+      <div className="text-body-sm font-medium">{title}</div>
+      <p className="mt-1 text-body-sm">{body}</p>
     </div>
   );
   if (quality.empty) {
@@ -455,7 +475,7 @@ function ResultQualityNote({
     );
   }
   return (
-    <p className="text-xs text-muted-foreground" data-testid="conformance-license-coverage">
+    <p className="text-body-sm text-muted-foreground" data-testid="conformance-license-coverage">
       {t("conf.qualityLicenseFigure", quality.license)}
     </p>
   );
@@ -564,8 +584,13 @@ export function ConformancePanel({
         isSuppliedDocument={isSuppliedDocument}
         testId="conformance-pipeline-steps-failed"
       />
+      {conformance.submissionJudgedAs ? (
+        <p className="text-body-sm text-muted-foreground" data-testid="conformance-judged-as">
+          {t("conf.submissionJudgedAs", { mode: conformance.submissionJudgedAs })}
+        </p>
+      ) : null}
       <div className="space-y-1.5">
-        <div className="flex flex-wrap items-center gap-2 text-sm">
+        <div className="flex flex-wrap items-center gap-2 text-body-sm">
           {conformance.format ? (
             <span className="font-medium text-foreground">{conformance.format}</span>
           ) : null}
@@ -596,8 +621,8 @@ export function ConformancePanel({
             scanned software. Reachable for every scan except a self-generated
             AI SBOM, whose G7 rollup lives on Models & datasets instead (see
             nav.ts) to avoid showing it twice. */}
-        <p className="max-w-3xl text-sm text-muted-foreground">{t("g7.panelIntro")}</p>
-        <p className="text-sm text-foreground">
+        <p className="max-w-3xl text-body-sm text-muted-foreground">{t("g7.panelIntro")}</p>
+        <p className="text-body-sm text-foreground">
           <span className="font-medium">
             {t("g7.verdictFailed", { count: verdict.mandatoryFailed })}
           </span>
@@ -623,10 +648,10 @@ export function ConformancePanel({
             onChange={(e) => setQuery(e.target.value)}
             placeholder={t("conf.searchPlaceholder")}
             aria-label={t("conf.searchPlaceholder")}
-            className="h-8 w-full max-w-xs text-sm"
+            className="h-8 w-full max-w-xs text-body-sm"
           />
         </div>
-        <p className="text-xs text-muted-foreground">
+        <p className="text-body-sm text-muted-foreground">
           {kind === null && !query
             ? t("conf.showingAll", { count: checks.length })
             : t("conf.showingFiltered", { count: shown.length, total: checks.length })}
@@ -653,7 +678,7 @@ export function ConformancePanel({
             checks={base}
             defaultOpen={openByDefault || base.some((c) => checkKind(c) === "actionable")}
             trailing={
-              <span className="text-xs font-normal text-muted-foreground">
+              <span className="text-label font-normal text-muted-foreground">
                 {t("g7.baseMandatory", {
                   passed: verdict.mandatoryPassed,
                   total: verdict.mandatoryTotal,
@@ -673,11 +698,11 @@ export function ConformancePanel({
             <Card>
               <CardContent className="space-y-4 p-4">
                 <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-                  <div className="text-sm font-semibold text-foreground">{t("cisa.subtitle")}</div>
-                  <div className="text-lg font-semibold tabular-nums text-foreground">
+                  <div className="text-body-sm font-semibold text-foreground">{t("cisa.subtitle")}</div>
+                  <div className="text-heading font-semibold tabular-nums text-foreground">
                     {t("g7.present", { present: cisaT.present, total: cisaT.autoTotal })}
                   </div>
-                  <p className="text-xs text-muted-foreground">{t("cisa.allAdvisory")}</p>
+                  <p className="text-body-sm text-muted-foreground">{t("cisa.allAdvisory")}</p>
                 </div>
                 <div className="space-y-3">
                   {cisaGroups.map((group) => (
@@ -699,11 +724,11 @@ export function ConformancePanel({
             <Card>
               <CardContent className="space-y-4 p-4">
                 <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-                  <div className="text-sm font-semibold text-foreground">{t("g7.subtitle")}</div>
-                  <div className="text-lg font-semibold tabular-nums text-foreground">
+                  <div className="text-body-sm font-semibold text-foreground">{t("g7.subtitle")}</div>
+                  <div className="text-heading font-semibold tabular-nums text-foreground">
                     {t("g7.present", { present: g7t.present, total: g7t.autoTotal })}
                   </div>
-                  <p className="text-xs text-muted-foreground">{t("g7.allAdvisory")}</p>
+                  <p className="text-body-sm text-muted-foreground">{t("g7.allAdvisory")}</p>
                 </div>
                 <div className="space-y-3">
                   {g7groups.map((group) => (

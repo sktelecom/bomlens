@@ -4,8 +4,10 @@
 import { useTranslation } from "react-i18next";
 
 import { Badge } from "@/components/ui/badge";
+import { SELECTED_OUTLINE, UNSELECTED_OUTLINE } from "@/components/ui/selectable";
 import { SEVERITY_ORDER, type SecuritySummary, type Severity } from "@/lib/api";
 import { cn } from "@/lib/utils";
+import { useFormatNumber } from "@/lib/format";
 
 const TONE: Record<Severity, "critical" | "high" | "medium" | "low" | "info"> = {
   CRITICAL: "critical",
@@ -26,7 +28,7 @@ const BAR: Record<Severity, string> = {
 interface Props {
   security: SecuritySummary;
   /**
-   * When set, the bar segments and legend badges become filter controls: the
+   * When set, the legend badges become filter controls: the
    * caller owns `selected` and `onSelect` toggles it (re-selecting clears).
    * Omit for a static read-out (e.g. the Overview).
    */
@@ -36,19 +38,20 @@ interface Props {
 
 export function SeverityBar({ security, selected = "", onSelect }: Props) {
   const { t } = useTranslation();
+  const fmt = useFormatNumber();
   const total = security.TOTAL;
   const interactive = Boolean(onSelect);
 
   return (
     <div className="space-y-3">
       <div className="flex items-baseline justify-between gap-3">
-        <span className="text-sm font-medium">{t("result.severityTitle")}</span>
+        <span className="text-body-sm font-medium">{t("result.severityTitle")}</span>
         {interactive && total > 0 && (
-          <span className="text-xs text-muted-foreground">{t("result.severityFilterHint")}</span>
+          <span className="text-label text-muted-foreground">{t("result.severityFilterHint")}</span>
         )}
       </div>
       {total === 0 ? (
-        <p className="text-sm text-muted-foreground">
+        <p className="text-body-sm text-muted-foreground">
           {security.uncheckedCount
             ? t("result.noVulnsSomeUnchecked", { count: security.uncheckedCount })
             : security.notReachableCount
@@ -57,38 +60,27 @@ export function SeverityBar({ security, selected = "", onSelect }: Props) {
         </p>
       ) : (
         <>
+          {/* The bar only displays the split. Its smallest segments can be a few
+              pixels wide, below the 24px target size (WCAG 2.5.8), so picking a
+              band is left to the chips underneath, which are always full size. */}
           <div
             className="flex h-2.5 w-full origin-left animate-grow-x overflow-hidden rounded-full bg-muted"
-            role={interactive ? "group" : "img"}
+            role="img"
             aria-label={t("result.severityTitle")}
           >
             {SEVERITY_ORDER.map((s) => {
               if (security[s] === 0) return null;
-              const segClass = cn(
-                BAR[s],
-                "h-full transition-[opacity,filter] duration-fast ease-out-soft",
-                // Dim the non-selected bands while a filter is active.
-                selected && selected !== s && "opacity-30",
-              );
-              const segStyle = { width: `${(security[s] / total) * 100}%` };
-              const segTitle = `${t(`severity.${s}`)}: ${security[s]}`;
-              if (!interactive) {
-                return <div key={s} className={segClass} style={segStyle} title={segTitle} />;
-              }
               return (
-                <button
+                <div
                   key={s}
-                  type="button"
-                  aria-pressed={selected === s}
-                  aria-label={`${t(`severity.${s}`)} ${security[s]}`}
-                  onClick={() => onSelect?.(s)}
                   className={cn(
-                    segClass,
-                    "cursor-pointer hover:brightness-110",
-                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                    BAR[s],
+                    "h-full transition-[opacity,filter] duration-fast ease-out-soft",
+                    // Dim the non-selected bands while a filter is active.
+                    selected && selected !== s && "opacity-30",
                   )}
-                  style={segStyle}
-                  title={segTitle}
+                  style={{ width: `${(security[s] / total) * 100}%` }}
+                  title={`${t(`severity.${s}`)}: ${fmt(security[s])}`}
                 />
               );
             })}
@@ -96,8 +88,8 @@ export function SeverityBar({ security, selected = "", onSelect }: Props) {
           <div className="flex flex-wrap gap-1.5">
             {SEVERITY_ORDER.map((s) => {
               const badge = (
-                <Badge tone={TONE[s]}>
-                  {t(`severity.${s}`)} {security[s]}
+                <Badge tone={TONE[s]} mark>
+                  {t(`severity.${s}`)} {fmt(security[s])}
                 </Badge>
               );
               if (!interactive) return <span key={s}>{badge}</span>;
@@ -125,10 +117,7 @@ export function SeverityBar({ security, selected = "", onSelect }: Props) {
                     // the pinned Playwright container (measured: byte-identical
                     // screenshots before/after adding it), while the same colour
                     // as an actual border always paints.
-                    isSel
-                      ? "ring-2 ring-foreground ring-offset-1"
-                      : "border-border",
-                    Boolean(selected) && !isSel && "opacity-60",
+                    isSel ? SELECTED_OUTLINE : UNSELECTED_OUTLINE,
                   )}
                 >
                   {badge}

@@ -2686,6 +2686,62 @@ else
     echo "  SKIP: jq not available for conformance generation"
 fi
 
+echo "== conformance_summary passes through the supplier's version explanations =="
+# The versions-needed row of the skt-submission profile lists the components the
+# supplier explained instead of versioning. The row can pass with a non-empty
+# list, and the reviewer still needs to see it, so the list rides on the row.
+# Only the three known reasons survive, non-dict entries drop, the list is capped,
+# and the key is absent when nothing is explained.
+if SBOM_OUTPUT_DIR="$OUT" python3 - "$ROOT_DIR" "$OUT/explweb_1.0_conformance.json" <<'PY'
+import sys, os, json
+sys.path.insert(0, os.path.join(sys.argv[1], "docker", "web"))
+import server
+path = sys.argv[2]
+explained = [
+    {"name": "libradius", "reason": "own-code"},
+    {"name": "vendor-blob", "reason": "not-open-source"},
+    {"name": "quagga", "reason": "version-unknown"},
+    {"name": "bogus", "reason": "made-up"},
+    "not-a-dict",
+    {"name": "noreason"},
+]
+json.dump({"result": "pass", "checks": [
+    {"id": "versions-needed", "required": True, "status": "pass",
+     "detail": "0 without a version, 3 explained by the supplier",
+     "detail_ko": "버전 없음 0개, 공급사 소명 3개", "missing": [],
+     "explained": explained},
+    {"id": "name-version", "required": True, "status": "pass", "detail": "", "missing": []},
+]}, open(path, "w"))
+c = server.conformance_summary("explweb_1.0")
+rows = {x["id"]: x for x in c["checks"]}
+assert rows["versions-needed"]["explained"] == [
+    {"name": "libradius", "reason": "own-code"},
+    {"name": "vendor-blob", "reason": "not-open-source"},
+    {"name": "quagga", "reason": "version-unknown"},
+], rows["versions-needed"].get("explained")
+assert "explained" not in rows["name-version"], "an empty list must be omitted"
+many = [{"name": f"c{i}", "reason": "own-code"} for i in range(server.MAX_CONFORMANCE_MISSING + 10)]
+json.dump({"result": "pass", "checks": [
+    {"id": "versions-needed", "status": "pass", "explained": many},
+    {"id": "other", "status": "pass", "explained": "not-a-list"},
+]}, open(path, "w"))
+c = server.conformance_summary("explweb_1.0")
+rows = {x["id"]: x for x in c["checks"]}
+assert len(rows["versions-needed"]["explained"]) == server.MAX_CONFORMANCE_MISSING
+assert "explained" not in rows["other"], "a non-list value must be dropped"
+assert "submissionJudgedAs" not in c, "absent when nothing was relaxed"
+for value, kept in (("FIRMWARE", True), ("ROOTFS", True), ("SOURCE", False), ("<b>", False)):
+    json.dump({"result": "pass", "checks": [], "submissionJudgedAs": value}, open(path, "w"))
+    c = server.conformance_summary("explweb_1.0")
+    assert (c.get("submissionJudgedAs") == value) == kept, (value, c.get("submissionJudgedAs"))
+PY
+then
+    pass "conformance_summary passes through explained, filtered and capped"
+else
+    fail "conformance_summary explained pass-through wrong"
+fi
+rm -f "$OUT"/explweb_1.0_*
+
 echo "== ai profile summary (ai_profile_summary) =="
 # generate-ai-profile.sh re-aggregates the conformance + SBOM artifacts into a
 # governance card. ai_profile_summary must return the light rollup for an AI SBOM
@@ -2864,6 +2920,63 @@ else
     fail "sbomToolDegraded not surfaced correctly"
 fi
 rm -f "$OUT"/deg_1.0_* "$OUT"/clean_1.0_*
+
+echo "== credential masking: a long input without a closing @ stays fast, the same strings are masked =="
+# The userinfo pattern backtracked over every colon of a long input (16,000 colons
+# took two seconds). It must stay linear, and it must still mask what it did before.
+if python3 - "$ROOT_DIR" <<'PY'
+import sys, os, time
+sys.path.insert(0, os.path.join(sys.argv[1], "docker", "web"))
+import server
+for text, want in [
+    ("clone https://user:pw@host/x", "clone https://***@host/x"),
+    ("clone https://us:er:pw@host/x", "clone https://***@host/x"),
+    ("clone https://tok@host/x", "clone https://***@host/x"),
+    ("clone git@github.com:o/r.git", "clone git@github.com:o/r.git"),
+]:
+    got = server._mask_credentials(text)
+    assert got == want, (text, got, want)
+for hostile in ("://" + "a:" * 40000, "://" + "a:" * 20000 + "b", "://" + ":" * 40000):
+    t = time.time()
+    server._mask_credentials(hostile)
+    assert time.time() - t < 1.0, "masking a hostile line took %.2fs" % (time.time() - t)
+PY
+then
+    pass "userinfo masking keeps its results and is linear on a line full of colons"
+else
+    fail "credential masking changed or is slow on a hostile line"
+fi
+
+echo "== detection property (sbom_summary) =="
+# A scan that read a lock file records bomlens:detection=static; the summary shows
+# it with the lock file's name. The property can come from a supplier's SBOM, so
+# any other value is dropped and the source must look like a file name.
+cat > "$OUT/det_1.0_bom.json" <<'JSON'
+{"bomFormat":"CycloneDX","metadata":{"component":{"name":"det","version":"1.0"},"properties":[{"name":"bomlens:detection","value":"static"},{"name":"bomlens:detection-source","value":"package-lock.json"}]},"components":[{"name":"flask","version":"2.0","type":"library","purl":"pkg:pypi/flask@2.0"}]}
+JSON
+cat > "$OUT/detbad_1.0_bom.json" <<'JSON'
+{"bomFormat":"CycloneDX","metadata":{"component":{"name":"detbad","version":"1.0"},"properties":[{"name":"bomlens:detection","value":"<b>x</b>"},{"name":"bomlens:detection-source","value":"<img src=x>"}]},"components":[{"name":"flask","version":"2.0","type":"library","purl":"pkg:pypi/flask@2.0"}]}
+JSON
+cat > "$OUT/detsrc_1.0_bom.json" <<'JSON'
+{"bomFormat":"CycloneDX","metadata":{"component":{"name":"detsrc","version":"1.0"},"properties":[{"name":"bomlens:detection","value":"static"},{"name":"bomlens:detection-source","value":"<img src=x>"}]},"components":[{"name":"flask","version":"2.0","type":"library","purl":"pkg:pypi/flask@2.0"}]}
+JSON
+if SBOM_OUTPUT_DIR="$OUT" python3 - "$ROOT_DIR" <<'PY'
+import sys, os
+sys.path.insert(0, os.path.join(sys.argv[1], "docker", "web"))
+import server
+s = server.sbom_summary("det_1.0")
+assert s["detection"] == "static" and s["detectionSource"] == "package-lock.json"
+b = server.sbom_summary("detbad_1.0")
+assert b["detection"] is None and b["detectionSource"] is None
+c = server.sbom_summary("detsrc_1.0")
+assert c["detection"] == "static" and c["detectionSource"] is None
+PY
+then
+    pass "detection surfaced from metadata, only the value this scan writes, source cut to a file-name shape"
+else
+    fail "detection not surfaced correctly"
+fi
+rm -f "$OUT"/det_1.0_* "$OUT"/detbad_1.0_* "$OUT"/detsrc_1.0_*
 
 echo "== pipeline-step-failed property (sbom_summary) =="
 # mark_pipeline_warning (docker/lib/pipeline-step.sh) appends one
@@ -3778,6 +3891,7 @@ echo "[stub] scanning ${PROJECT_NAME} ${PROJECT_VERSION} (mode=$mode)"
   echo "SBOM_AUTHOR=${SBOM_AUTHOR:-}"
   echo "CYCLONEDX_SPEC_VERSION=${CYCLONEDX_SPEC_VERSION:-}"
   echo "REPORT_LANG=${REPORT_LANG:-}"
+  echo "DETECTION=${DETECTION:-}"
   echo "MODE=${MODE:-}"
   echo "TARGET_FILE=${TARGET_FILE:-}"
   echo "TARGET_DIR=${TARGET_DIR:-}"
@@ -4534,6 +4648,75 @@ else
     fail "git clone failure contract violated" "$events"
 fi
 
+# A git URL scan can name a branch, tag or commit (git_ref). The ref reaches
+# git as the argument of --branch, so a value that could pass as an option or a
+# path escape is refused, and a ref the repository does not have fails the clone.
+GITREPO="$WORK/gitref-repo"
+git init -q "$GITREPO" && git -C "$GITREPO" -c user.email=t@t -c user.name=t commit -q --allow-empty -m one \
+    && git -C "$GITREPO" tag v1 && git -C "$GITREPO" -c user.email=t@t -c user.name=t commit -q --allow-empty -m two
+code=$(curl -s -o /dev/null -w '%{http_code}' "$BASE2/scan-stream?project=gr&version=1.0&source=git-url&target=file://$GITREPO&git_ref=--upload-pack%3Dx")
+[ "$code" = "400" ] && pass "a git_ref that starts with a dash is refused before the stream starts" \
+    || fail "git_ref starting with a dash was not refused" "HTTP $code"
+events=$(sse_events "project=gr&version=1.0&source=git-url&target=file://$GITREPO&git_ref=no-such-ref")
+if echo "$events" | python3 -c "
+import sys, json
+evs = json.load(sys.stdin)
+assert any(e['event'] == 'error' and 'git clone failed' in e['data']['detail'] for e in evs), evs
+"; then
+    pass "a git_ref the repository does not have fails the clone"
+else
+    fail "unknown git_ref did not fail the clone" "$events"
+fi
+events=$(sse_events "project=gr&version=1.0&source=git-url&target=file://$GITREPO&git_ref=v1")
+if echo "$events" | python3 -c "
+import sys, json
+evs = json.load(sys.stdin)
+logs = [e['data'] for e in evs if e['event'] == 'log']
+assert any('(ref: v1)' in str(l) for l in logs), logs
+assert not any(e['event'] == 'error' and 'git clone failed' in str(e['data']) for e in evs), evs
+"; then
+    pass "a tag as git_ref clones and is named in the log"
+else
+    fail "tag git_ref contract violated" "$events"
+fi
+
+events=$(sse_events "project=gr&version=1.0&source=git-url&target=file://$GITREPO&git_ref=$(git -C "$GITREPO" rev-parse v1)")
+if echo "$events" | python3 -c "
+import sys, json
+evs = json.load(sys.stdin)
+logs = [str(e['data']) for e in evs if e['event'] == 'log']
+assert any('retrying as a full clone' in l for l in logs), logs
+assert not any(e['event'] == 'error' and 'git clone failed' in str(e['data']) for e in evs), evs
+"; then
+    pass "a commit id as git_ref falls back to a full clone and checks it out"
+else
+    fail "commit git_ref contract violated" "$events"
+fi
+
+# A source scan can leave paths out (exclude, one per line). A path that could
+# leave the scanned folder is refused before the stream starts; a path that
+# exists is deleted from the clone and counted, one that does not is reported.
+EXREPO="$WORK/exclude-repo"
+git init -q "$EXREPO" && mkdir -p "$EXREPO/vendor/legacy" "$EXREPO/src" && echo x > "$EXREPO/vendor/legacy/f" && echo y > "$EXREPO/src/m" \
+    && git -C "$EXREPO" add -A && git -C "$EXREPO" -c user.email=t@t -c user.name=t commit -q -m one
+for bad in "..%2Fetc" "%2Fetc%2Fpasswd" "a%2F..%2Fb" "vendor%2F*"; do
+    code=$(curl -s -o /dev/null -w '%{http_code}' "$BASE2/scan-stream?project=ex&version=1.0&source=git-url&target=file://$EXREPO&exclude=$bad")
+    [ "$code" = "400" ] && pass "exclude $bad is refused before the stream starts" \
+        || fail "exclude $bad was not refused" "HTTP $code"
+done
+events=$(sse_events "project=ex&version=1.0&source=git-url&target=file://$EXREPO&exclude=vendor%2Flegacy%0Anope")
+if echo "$events" | python3 -c "
+import sys, json
+evs = json.load(sys.stdin)
+logs = [str(e['data']) for e in evs if e['event'] == 'log']
+assert any('Excluded 1 path(s)' in l for l in logs), logs
+assert any('not found, ignored: nope' in l for l in logs), logs
+"; then
+    pass "an exclude path is deleted from the clone; a missing one is reported"
+else
+    fail "exclude contract violated" "$events"
+fi
+
 echo "== zip-upload: hostile archives are rejected before extraction (zip-slip / tar traversal / tar symlink) =="
 # safe_extract_zip() and the zip-upload tar branch (server.py) are the only
 # things standing between an uploaded archive and the filesystem outside the
@@ -4826,6 +5009,27 @@ if [ "$(sed -n 's/^TARGET_DIR_FILES=//p' "$WORK/stub-env")" -gt 0 ] 2>/dev/null;
 else
     fail "wheel was not extracted" "$(cat "$WORK/stub-env")"
 fi
+
+echo "== detection: the form's choice reaches the scan env as one of two literals =="
+echo ok > "$STUB_MODE_FILE"
+rm -f "$WORK/stub-env"
+sse_events "project=det1&version=1.0&source=current-dir&detection=build" >/dev/null
+d1="$(sed -n 's/^DETECTION=//p' "$WORK/stub-env")"
+rm -f "$WORK/stub-env"
+sse_events "project=det2&version=1.0&source=current-dir" >/dev/null
+d2="$(sed -n 's/^DETECTION=//p' "$WORK/stub-env")"
+rm -f "$WORK/stub-env"
+sse_events "project=det3&version=1.0&source=current-dir&detection=static;rm" >/dev/null
+d3="$(sed -n 's/^DETECTION=//p' "$WORK/stub-env")"
+if [ "$d1" = build ] && [ "$d2" = auto ] && [ "$d3" = auto ]; then
+    pass "detection=build -> DETECTION=build; omitted or anything else -> auto"
+else
+    fail "detection did not map to the scan env" "build=$d1 omitted=$d2 other=$d3"
+fi
+det_cfg="$(python3 -c "import json,glob;print(json.load(open(glob.glob('$OUT2/det1_1.0/.scanmeta.json')[0])).get('detection',''))" 2>/dev/null)"
+[ "$det_cfg" = build ] \
+    && pass "the scan's recorded settings keep detection=build, so a re-scan refills the toggle" \
+    || fail "scanmeta detection: '$det_cfg'"
 
 echo "== license: the outbound license reaches the scan env, and only when given =="
 echo ok > "$STUB_MODE_FILE"

@@ -36,6 +36,7 @@ docker pull ghcr.io/sktelecom/bomlens:latest
 | cosign | v3.1.3 | SBOM 서명 |
 | jq | — | SBOM 정규화와 고지문 생성 |
 | ScanCode Toolkit | 32.5.0 | 정밀 라이선스 탐지 (opt-in 빌드에만 포함) |
+| SCANOSS | 1.54.2 | C/C++ 소스에 복사해 넣은 오픈소스 식별(`--identify-vendored`) |
 | docker CLI | 29.9.0 | 웹 UI가 소스 스캔에서 cdxgen 컨테이너를 sibling으로 띄울 때 사용 |
 | cdxgen | 13.3.0 | 모델 계보 정보 보강(`bomlens-aibom` 이미지 전용) |
 
@@ -104,7 +105,7 @@ MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL='*' docker run --rm \
   ghcr.io/sktelecom/bomlens:latest
 ```
 
-직접 실행의 `SOURCE` 모드는 컨테이너 안에서 syft가 패키지 매니페스트를 읽는 방식이라 직접 의존성만 잡힐 수 있습니다. 전이 의존성까지 필요하면 cdxgen 언어 이미지를 라우팅하는 `scan-sbom.sh`를 쓰세요. syft의 매니페스트 판독기는 의존성을 하나라도 풀어내려면 락파일(Node는 `package-lock.json`, `npm-shrinkwrap.json`, `yarn.lock`, `pnpm-lock.yaml`, 다른 생태계도 마찬가지)이 있어야 합니다. 락파일이 없으면 직접 실행의 `SOURCE` 모드는 읽을 것이 없어, 빈 결과를 완료로 보고하는 대신 안내와 함께 실패합니다.
+직접 실행의 `SOURCE` 모드는 트리 전체를 덮는 lock 파일(`package-lock.json`, `npm-shrinkwrap.json`, `pnpm-lock.yaml`, `bun.lock`, `gradle.lockfile` 중 하나이고 루트 아래 다른 매니페스트가 없을 때)을 빌드도 Docker 소켓도 없이 그대로 읽고, 빠진 라이선스는 패키지 레지스트리에서 채웁니다. SBOM에는 이 방식이 `bomlens:detection`으로 남습니다. 사이드 컨테이너를 띄울 Docker가 없는 환경, 예를 들어 이 이미지를 작업 이미지로 쓰는 CI 작업에서 쓰는 형태입니다. 그 밖의 트리는 컨테이너 안에서 syft가 패키지 매니페스트를 읽는 방식이라 직접 의존성만 잡힐 수 있습니다. 전이 의존성까지 필요하면 cdxgen 언어 이미지를 라우팅하는 `scan-sbom.sh`를 쓰세요. syft의 매니페스트 판독기는 의존성을 하나라도 풀어내려면 락파일(Node는 `package-lock.json`, `npm-shrinkwrap.json`, `yarn.lock`, `pnpm-lock.yaml`, 다른 생태계도 마찬가지)이 있어야 합니다. 락파일이 없으면 직접 실행의 `SOURCE` 모드는 읽을 것이 없어, 빈 결과를 완료로 보고하는 대신 안내와 함께 실패합니다.
 
 ### 고지문과 보고서까지 한 번에
 
@@ -150,11 +151,12 @@ MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL='*' docker run --rm \
 | `DEEP_LICENSE_MAX_FILES` | — | `20000` | `DEEP_LICENSE`: 프로젝트 자체 파일이 이보다 많은 트리는 검사하지 않음 |
 | `DEEP_LICENSE_TIMEOUT` | — | `600` | `DEEP_LICENSE`: scancode를 멈출 때까지의 초 |
 | `BOMLENS_DEEP_LICENSE_ALL` | — | — | `DEEP_LICENSE`: `1`이면 의존성, 빌드, 도구 폴더까지 검사 (기본은 제외) |
+| `DETECTION` | — | `auto` | `SOURCE` 모드 전용. `auto`는 트리를 덮는 lock 파일이 있으면 정적으로 읽고 그 외에는 예전처럼 빌드나 syft 경로를 쓴다. `static`은 항상 정적으로 읽고, `build`는 정적으로 읽지 않는다(CLI `--detection`). 정적 검출은 빠진 라이선스를 패키지 레지스트리에서 채우므로 `BYTE_STABLE=true`나 `FETCH_LICENSE=false`에서는 `auto`가 빌드한다 |
 | `REACHABILITY` | — | `false` | 각 Go 보안 권고의 코드에 도달하는지 govulncheck로 판정 (CLI `--reachability`). `BINARY` 모드는 실행 파일을 읽고, `SOURCE`와 `POSTPROCESS`는 1단계가 남긴 govulncheck 출력을 읽는다(CLI가 이미지의 govulncheck를 1단계에 넘긴다) |
-| `GENERATE_REPORT` | — | `false` | 오픈소스위험분석보고서 생성 (CLI 기본값과 달리 직접 실행은 꺼짐) |
+| `GENERATE_REPORT` | — | `false` | 오픈소스 위험 보고서 생성 (CLI 기본값과 달리 직접 실행은 꺼짐) |
 | `ENRICH_MAVEN_CPE` | — | `true` | maven 컴포넌트에 groupId로 유도한 NVD 매칭용 `cpe:2.3`을 부여해 CPE 기반 엔진이 NVD 전용 CVE를 찾게 함. 매핑 불가한 group은 CPE를 붙이지 않음 (AI SBOM은 건너뜀) |
 | `ENRICH_GITHUB_CPE` | — | `true` | 소수의 손검증된 `pkg:github/` 컴포넌트(패키지 매니저 생태계가 없는 대형 C/C++ 프로젝트에 흔한, 소스 저장소 좌표로만 식별되는 컴포넌트)에 NVD 매칭용 `cpe:2.3`을 부여해 CPE 기반 엔진이 NVD 전용 CVE를 찾게 함. 큐레이션 목록에 없으면 CPE를 붙이지 않음 (AI SBOM은 건너뜀) |
-| `ENRICH_UPSTREAM_PURL` | — | `true` | 펌웨어, 루트 파일시스템, 바이너리 스캔에서 purl이 없거나 `pkg:generic`, `pkg:opkg` purl인 컴포넌트에 upstream 소스 저장소 purl(`pkg:github/<owner>/<repo>@<tag>`, `pkg:sourceforge`, `pkg:gnu`)을 붙임. `docker/lib/upstream-purl-map.json`의 변환표에 있는 프로젝트만 바꾸고, 나머지는 원래 식별자를 둠 |
+| `ENRICH_UPSTREAM_PURL` | — | `true` | 펌웨어, 루트 파일시스템, 바이너리 스캔과 Yocto 빌드의 기록에서 읽은 SBOM에서 purl이 없거나 `pkg:generic`, `pkg:opkg` purl인 컴포넌트에 upstream 소스 저장소 purl(`pkg:github/<owner>/<repo>@<tag>`, `pkg:sourceforge`, `pkg:gnu`)을 붙임. `docker/lib/upstream-purl-map.json`의 변환표에 있는 프로젝트와, 소스 내려받기 주소가 GitHub이나 GNU 릴리스를 밝히는 컴포넌트만 바꾸고, 나머지는 원래 식별자를 둠 |
 | `ENRICH_INTERPRETER_CPE` | — | `true` | 소수의 손검증된 인터프리터 컴포넌트(예: conda나 NuGet 패키지로 배포된 Python)에 NVD 매칭용 `cpe:2.3`을 부여해 CPE 기반 엔진이 NVD 전용 CVE를 찾게 함. 큐레이션 목록에 없으면 CPE를 붙이지 않음 (AI SBOM은 건너뜀) |
 | `SECURITY_NVD_VERIFY` | — | `false` | `--deep-cve` 사용 시: grype `nvd:cpe` 결과를 실시간 NVD 버전 범위로 검증해 범위 밖 오탐을 제거 (`NVD_API_KEY`·네트워크 필요, 수 분 추가). 기본 off — 결과는 유지하되 버전 미검증으로 표시 |
 | `NVD_API_KEY` | `SECURITY_NVD_VERIFY`에 필요 | — | deep-cve 버전 필터가 쓰는 NVD API 키. 컨테이너에 이름으로만 전달(값은 인라인하지 않음) |
@@ -196,7 +198,7 @@ MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL='*' docker run --rm \
 | `LICENSE_REGISTRY_VERIFY` | — | GPL, AGPL, SSPL-1.0, BUSL-1.1, CC-BY-NC 식별자 | 하나뿐일 때 레지스트리와 대조할 SPDX 식별자(공백 또는 쉼표 구분) |
 | `LICENSE_REGISTRY_BUDGET` | — | `240` | 조회 전체에 허용하는 시간(초). 시간 안에 조회하지 못한 컴포넌트는 그대로 두고 단계를 degraded로 기록한다 |
 | `LICENSE_REGISTRY_API` | — | `https://api.deps.dev/v3` | deps.dev v3 버전 조회에 같은 형식으로 답하는 서버의 기본 URL. 레지스트리에 자체 미러나 프록시로만 닿는 네트워크용. 응답이 없으면 컴포넌트는 그대로 두고 단계를 degraded(`unavailable`)로 기록한다 |
-| `PURL_RESOLVE` | — | `false` | `--analyze` 전용(스크립트의 `--resolve-purl`). 각 식별자를 패키지 저장소(deps.dev)에 조회해 적합성 보고서에 권고 항목으로 덧붙인다. 네트워크를 사용 |
+| `PURL_RESOLVE` | — | `false` | `--analyze` 전용(스크립트의 `--resolve-purl`). 각 식별자를 패키지 저장소(deps.dev)에 조회해 적합성 검사 보고서에 권고 항목으로 덧붙인다. 네트워크를 사용 |
 | `PURL_RESOLVE_IGNORE` | — | — | 조회에서 제외할 네임스페이스 접두사(공백 또는 쉼표 구분). 사내 저장소에만 올리는 네임스페이스에 쓴다. 잘못된 식별자와 구분할 수 없기 때문이다 |
 | `PURL_RESOLVE_BUDGET` | — | `240` | 조회 전체에 허용하는 시간(초). 시간 안에 조회하지 못한 식별자는 없음이 아니라 확인 불가로 보고한다 |
 

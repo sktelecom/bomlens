@@ -108,7 +108,7 @@ note "$M_TITLE"
 note "$M_SEP"
 
 # 1) Docker installed
-if docker version >/dev/null 2>&1; then
+if command -v docker >/dev/null 2>&1; then
     ok "$M_O_INSTALLED"
 else
     bad "$M_X_NO_DOCKER"

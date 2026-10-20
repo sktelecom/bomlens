@@ -46,13 +46,18 @@
     --destructive: 0 72% 51%; /* ~#dc2626 — aligns with risk-critical */
     --destructive-foreground: 0 0% 98%;
 
-    --ring: 240 6% 10%;
+    /* Keyboard focus is the one place the brand red is a state marker. A
+     * selected control is drawn with a fill and a dark border instead, so the
+     * two can never be confused (they used to share the same dark ring). Red is
+     * 4.4:1 on the page and 4.6:1 on the card, above the 3:1 non-text floor. */
+    --ring: 349 100% 46%;
 
     /* Brand — SKT accent (SK Red #EA002C primary, SK Orange #F47725 secondary).
-     * Used for active navigation, selection/focus accents and primary calls to
-     * action. Stored as HSL triplets so `bg-brand/10`, `text-brand` etc. compose.
-     * Neutral `--primary` (near-black) is intentionally left untouched so the
-     * existing UI keeps working while the new shell adopts the brand accent. */
+     * Scope: the primary action button, the logo and focus marks. NOT data: no
+     * graph node, badge, chart fill or active-menu fill (token-lint checks the
+     * graph and the badges). Stored as HSL triplets so `bg-brand/10`,
+     * `text-brand` etc. compose. Neutral `--primary` (near-black) is
+     * intentionally left untouched. */
     --brand: 349 100% 46%; /* SK Red #EA002C */
     --brand-foreground: 0 0% 100%;
     /* Brand red as TEXT on the page surface. Separate from --brand because
@@ -74,6 +79,46 @@
 
     --radius: 0.375rem;
 
+    /* Type scale: eight roles, each a size and a line height. Components name the
+     * role (text-body-sm), never a pixel value; token-lint rejects text-[Npx]
+     * and the old Tailwind names (text-xs ...). Sizes are rem so the user's
+     * browser font setting still scales them. Line heights are unitless-safe
+     * rem pairs; Pretendard (Korean) is set at the same height as Inter, and
+     * 20px leading on 14px text (1.43) keeps Hangul rows from touching.
+     *   display   page title (h1)                       30px / 36px
+     *   title     section title, large stat             20px / 28px
+     *   heading   card title, metric value              18px / 28px
+     *   body      reading text, dialog title            16px / 24px
+     *   body-sm   descriptions, hints, table cells      14px / 20px
+     *   label     badges, chips, table headers, meta    12px / 16px
+     *   caption   keycap, rail group title, tiny meta   11px / 16px
+     *   mono      code, identifiers, hashes             12px / 16px
+     * The --font-size-* values are exported to bomlens-tokens.css; the line
+     * heights stay here (they are not colours or sizes the other surfaces read). */
+    --font-size-display: 1.875rem;
+    --font-size-title: 1.25rem;
+    --font-size-heading: 1.125rem;
+    --font-size-body: 1rem;
+    --font-size-body-sm: 0.875rem;
+    --font-size-label: 0.75rem;
+    --font-size-caption: 0.6875rem;
+    --font-size-mono: 0.75rem;
+    --line-height-display: 2.25rem;
+    --line-height-title: 1.75rem;
+    --line-height-heading: 1.75rem;
+    --line-height-body: 1.5rem;
+    --line-height-body-sm: 1.25rem;
+    --line-height-label: 1rem;
+    --line-height-caption: 1rem;
+    --line-height-mono: 1rem;
+
+    /* Spacing: Tailwind's 4px scale is kept as is. The steps a layout uses are
+     * 4, 8, 12, 16, 24, 32 and 48px (p-1, p-2, p-3, p-4, p-6, p-8, p-12): 4 and 8
+     * inside a control, 12 between a label and its field, 16 inside a card, 24
+     * between cards, 32 and 48 around a page section. Half steps (0.5, 1.5, 2.5)
+     * are for icon and badge padding only. Table rows are 32px (dense) or 40px
+     * (regular). Nothing enforces this: it is a convention, not a lint rule. */
+
     --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.04);
     --shadow-md: 0 2px 8px -2px rgb(0 0 0 / 0.08), 0 1px 2px 0 rgb(0 0 0 / 0.04);
     --shadow-lg: 0 10px 28px -8px rgb(0 0 0 / 0.12), 0 3px 8px -3px rgb(0 0 0 / 0.06);
@@ -83,41 +128,119 @@
     --duration-slow: 250ms;
     --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
 
-    /* Risk severity — domain meaning fixed (shared with portal). */
-    --risk-critical: 220 38 38;
-    --risk-high: 234 88 12;
-    --risk-medium: 202 138 4;
-    --risk-low: 37 99 235;
-    --risk-info: 113 113 122;
-
-    /* Success and warning — the two state colours that were spelled out as
-     * palette literals in components. Channels, like the risk tokens, so that
-     * the existing alpha modifiers (`/10`, `/60`) keep working.
+    /* Colour roles. Six meanings, four shades each, one scheme for the whole UI:
+     *   fg        the colour a label is written in (>= 4.5:1, AA, on its own
+     *             muted surface, on the card and on the page; ratios below)
+     *   muted     the pale opaque surface a badge or callout sits on
+     *   emphasis  the saturated fill of a bar, dot or marker (not for text)
+     *   border    the outline of a callout or chip
+     * danger = critical, severe = high, attention = medium and caution,
+     * info = low and informational, success = resolved or passing, neutral =
+     * unknown or not applicable.
      *
-     * Three shades each because the components need three distinct jobs, not
-     * one: the foreground a label is written in, the solid a bar or dot is
-     * filled with, and the tinted surface a badge or card sits on. Collapsing
-     * them would change the rendering. */
-    --success: 4 120 87; /* emerald-700 */
-    --success-solid: 16 185 129; /* emerald-500 */
-    --success-surface: 209 250 229; /* emerald-100 */
+     * Channels ("234 88 12"), not colours, so rgb(var(--x) / <alpha>) composes
+     * and DependencyGraph can convert them for the canvas. Keep that form.
+     *
+     * The brand red is deliberately NOT a role. It marks the primary action, the
+     * logo and the keyboard focus ring only; reading it as data is how "this is
+     * the SK colour" became "this is a problem". token-lint enforces that for
+     * the graph and for badges.
+     *
+     * Ratios come from the WCAG relative-luminance formula. muted is the
+     * emphasis colour at 12% over the white card (16% over the dark card in the
+     * .dark block). */
+    --role-danger-fg: 185 28 28; /* 5.4:1 on muted, 6.5:1 on card, 6.2:1 on page */
+    --role-danger-muted: 251 229 229; /* emphasis at 12% over the card */
+    --role-danger-emphasis: 220 38 38; /* 4.8:1 on card (fills, bars) */
+    --role-danger-border: 239 157 157;
 
-    --warning: 120 53 15; /* amber-900 */
-    --warning-solid: 245 158 11; /* amber-500 */
-    --warning-border: 252 211 77; /* amber-300 */
-    --warning-surface: 255 251 235; /* amber-50 */
+    --role-severe-fg: 154 52 18; /* 6.3:1 on muted, 7.3:1 on card, 7.0:1 on page */
+    --role-severe-muted: 252 235 226; /* emphasis at 12% over the card */
+    --role-severe-emphasis: 234 88 12; /* 3.6:1 on card (fills, bars) */
+    --role-severe-border: 246 180 146;
 
-    /* Severity label colours. The risk tokens above are the hue a bar or a tint
-     * is filled with; these are the darker cut of the same hue that a label can
-     * be written in and still meet contrast on the tint. Two tokens per severity
-     * rather than one because a fill and a label have different jobs: the fill
-     * at label darkness is a heavy block, and the label at fill lightness fails
-     * contrast. */
-    --risk-critical-fg: 185 28 28; /* red-700 */
-    --risk-high-fg: 154 52 18; /* orange-800 */
-    --risk-medium-fg: 133 77 14; /* yellow-800 */
-    --risk-low-fg: 29 78 216; /* blue-700 */
-    --risk-info-fg: 71 85 105; /* slate-600 */
+    --role-attention-fg: 133 77 14; /* 6.1:1 on muted, 6.9:1 on card, 6.6:1 on page */
+    --role-attention-muted: 247 240 225; /* emphasis at 12% over the card */
+    --role-attention-emphasis: 190 129 3; /* 3.3:1 on card, 3.2:1 on page, 3.0:1 on muted (fills, bars) */
+    --role-attention-border: 231 202 142;
+
+    --role-info-fg: 29 78 216; /* 5.7:1 on muted, 6.7:1 on card, 6.4:1 on page */
+    --role-info-muted: 229 236 253; /* emphasis at 12% over the card */
+    --role-info-emphasis: 37 99 235; /* 5.2:1 on card (fills, bars) */
+    --role-info-border: 157 185 246;
+
+    --role-success-fg: 6 95 70; /* 6.9:1 on muted, 7.7:1 on card, 7.4:1 on page */
+    --role-success-muted: 226 243 238; /* emphasis at 12% over the card */
+    --role-success-emphasis: 10 155 110; /* 3.5:1 on card, 3.4:1 on page, 3.2:1 on muted (fills, bars) */
+    --role-success-border: 147 224 198;
+
+    --role-neutral-fg: 63 63 70; /* 9.0:1 on muted, 10.4:1 on card, 10.0:1 on page */
+    --role-neutral-muted: 238 238 239; /* emphasis at 12% over the card */
+    --role-neutral-emphasis: 113 113 122; /* 4.8:1 on card (fills, bars) */
+    --role-neutral-border: 191 191 195;
+
+    /* Category palette for classifications that are not severities (the licence
+     * tiers). Six tiers, six hues spread around the wheel and kept muted:
+     *   permissive teal 175, weak-copyleft indigo 230, strong-copyleft violet
+     *   280, network-copyleft magenta 328, review-needed brown 28, and the
+     *   neutral grey of role-neutral for uncategorized.
+     * The three copyleft tiers used to sit 25 to 30 degrees apart (265, 290,
+     * 320) and read as one purple; they are now 48 to 50 degrees apart. They
+     * stay off the alarm hues (red, orange, yellow) and the info blue, so a
+     * licence row never reads as a finding, and the tier is also carried by a
+     * marker shape and its name, so colour is never the only signal. Same four
+     * shades and the same contrast rules as the roles. Ratios (WCAG relative
+     * luminance): the four recoloured tiers have fg at least 8.4:1 on their
+     * muted surface, 10.4:1 on the card and 9.9:1 on the page in both themes;
+     * teal (unchanged) is 6.0, 7.0 and 6.7 light, all above the 4.5:1 floor.
+     * Emphasis fills are at least 4.4:1 on the card in light and 5.4:1 in dark. */
+    --cat-permissive-fg: 12 100 91; /* 6.0:1 on muted, 7.0:1 on card, 6.7:1 on page */
+    --cat-permissive-muted: 227 240 239; /* emphasis at 12% over the card */
+    --cat-permissive-emphasis: 24 134 123; /* 4.4:1 on card (fills, bars) */
+    --cat-permissive-border: 151 201 196;
+
+    --cat-weak-fg: 31 45 111; /* 10.6:1 on muted, 12.6:1 on card, 12.1:1 on page */
+    --cat-weak-muted: 232 235 247; /* emphasis at 12% over the card */
+    --cat-weak-emphasis: 66 87 189; /* 6.3:1 on card (fills, bars) */
+    --cat-weak-border: 170 179 225;
+
+    --cat-strong-fg: 82 40 103; /* 9.6:1 on muted, 11.3:1 on card, 10.8:1 on page */
+    --cat-strong-muted: 241 234 244; /* emphasis at 12% over the card */
+    --cat-strong-emphasis: 137 78 166; /* 5.7:1 on card (fills, bars) */
+    --cat-strong-border: 202 175 215;
+
+    --cat-network-fg: 107 36 74; /* 9.0:1 on muted, 10.6:1 on card, 10.2:1 on page */
+    --cat-network-muted: 244 233 239; /* emphasis at 12% over the card */
+    --cat-network-emphasis: 167 68 121; /* 5.6:1 on card (fills, bars) */
+    --cat-network-border: 215 171 195;
+
+    --cat-review-fg: 80 60 43; /* 8.9:1 on muted, 10.4:1 on card, 9.9:1 on page */
+    --cat-review-muted: 240 237 234; /* emphasis at 12% over the card */
+    --cat-review-emphasis: 131 106 84; /* 5.1:1 on card (fills, bars) */
+    --cat-review-border: 199 188 178;
+
+    /* Legacy names, kept as aliases of the roles so existing call sites keep
+     * working. New code should name the role directly. The alias lives in :root
+     * only: the roles change under .dark and the alias follows them. */
+    --risk-critical: var(--role-danger-emphasis);
+    --risk-high: var(--role-severe-emphasis);
+    --risk-medium: var(--role-attention-emphasis);
+    --risk-low: var(--role-info-emphasis);
+    --risk-info: var(--role-neutral-emphasis);
+    --risk-critical-fg: var(--role-danger-fg);
+    --risk-high-fg: var(--role-severe-fg);
+    --risk-medium-fg: var(--role-attention-fg);
+    --risk-low-fg: var(--role-info-fg);
+    --risk-info-fg: var(--role-neutral-fg);
+
+    --success: var(--role-success-fg);
+    --success-solid: var(--role-success-emphasis);
+    --success-surface: var(--role-success-muted);
+
+    --warning: var(--role-attention-fg);
+    --warning-solid: var(--role-attention-emphasis);
+    --warning-border: var(--role-attention-border);
+    --warning-surface: var(--role-attention-muted);
 
     /* Syntax colours for the source viewer. Its own small palette rather than
      * borrowed severity hues: a keyword is not a warning, and reusing the risk
@@ -157,7 +280,7 @@
     --destructive: 0 72% 51%;
     --destructive-foreground: 0 0% 98%;
 
-    --ring: 240 5% 65%;
+    --ring: 349 100% 62%; /* 5.1:1 on the dark card, 5.7:1 on the page */
 
     /* Brand — SK Red/Orange against the near-black canvas. Kept at a lightness
      * where white text on a solid brand fill (the New scan CTA pill) still meets
@@ -176,35 +299,65 @@
     --shadow-md: 0 2px 8px -2px rgb(0 0 0 / 0.5), 0 1px 2px 0 rgb(0 0 0 / 0.3);
     --shadow-lg: 0 10px 28px -8px rgb(0 0 0 / 0.6), 0 3px 8px -3px rgb(0 0 0 / 0.4);
 
-    /* Slightly brighter risk hues read better on the dark canvas. */
-    --risk-critical: 248 113 113;
-    --risk-high: 251 146 60;
-    --risk-medium: 250 204 21;
-    --risk-low: 96 165 250;
-    --risk-info: 161 161 170;
+    /* Roles lift on the dark canvas: the label goes lighter so it stays legible,
+     * the surface becomes a low wash of the emphasis colour. The legacy aliases
+     * in :root follow these. Attention is deliberately desaturated here (a dull
+     * gold, not the bright yellow of the light theme): medium is the commonest
+     * severity, and a bright yellow made it the loudest band in every chart. */
+    --role-danger-fg: 252 165 165; /* 7.4:1 on muted, 9.3:1 on card, 10.4:1 on page */
+    --role-danger-muted: 60 38 41; /* emphasis at 16% over the card */
+    --role-danger-emphasis: 248 113 113; /* 6.4:1 on card */
+    --role-danger-border: 125 64 66;
 
-    /* Success and warning lift the same way the risk hues do: the foreground
-     * goes lighter so it stays legible on the near-black canvas, the surface
-     * goes darker so the tint stays a tint.
-     *
-     * The dark success surface is the solid hue, not a pale one, because on
-     * this canvas the badge renders it at `/15` — a low-alpha wash of the
-     * saturated green rather than a light fill. */
-    --success: 110 231 183; /* emerald-300 */
-    --success-solid: 16 185 129; /* emerald-500 */
-    --success-surface: 16 185 129; /* emerald-500, used at /15 */
+    --role-severe-fg: 253 186 116; /* 7.9:1 on muted, 10.5:1 on card, 11.7:1 on page */
+    --role-severe-muted: 60 44 32; /* emphasis at 16% over the card */
+    --role-severe-emphasis: 251 146 60; /* 7.8:1 on card */
+    --role-severe-border: 126 79 42;
 
-    --warning: 253 230 138; /* amber-200 */
-    --warning-solid: 245 158 11; /* amber-500 */
-    --warning-border: 251 191 36; /* amber-400 */
-    --warning-surface: 69 26 3; /* amber-950 */
+    --role-attention-fg: 232 200 110; /* 8.2:1 on muted, 10.9:1 on card, 12.2:1 on page */
+    --role-attention-muted: 53 47 34; /* emphasis at 16% over the card */
+    --role-attention-emphasis: 205 170 70; /* 8.0:1 on card */
+    --role-attention-border: 105 90 46;
 
-    /* Severity labels lift on the dark canvas the same way the fills do. */
-    --risk-critical-fg: 252 165 165; /* red-300 */
-    --risk-high-fg: 253 186 116; /* orange-300 */
-    --risk-medium-fg: 253 224 71; /* yellow-300 */
-    --risk-low-fg: 147 197 253; /* blue-300 */
-    --risk-info-fg: 203 213 225; /* slate-300 */
+    --role-info-fg: 147 197 253; /* 7.5:1 on muted, 9.8:1 on card, 11.0:1 on page */
+    --role-info-muted: 36 47 63; /* emphasis at 16% over the card */
+    --role-info-emphasis: 96 165 250; /* 7.0:1 on card */
+    --role-info-border: 56 87 127;
+
+    --role-success-fg: 110 231 183; /* 8.5:1 on muted, 11.6:1 on card, 13.0:1 on page */
+    --role-success-muted: 28 54 47; /* emphasis at 16% over the card */
+    --role-success-emphasis: 52 211 153; /* 9.2:1 on card */
+    --role-success-border: 37 108 84;
+
+    --role-neutral-fg: 212 212 216; /* 9.1:1 on muted, 12.0:1 on card, 13.4:1 on page */
+    --role-neutral-muted: 46 46 50; /* emphasis at 16% over the card */
+    --role-neutral-emphasis: 161 161 170; /* 6.9:1 on card */
+    --role-neutral-border: 86 86 91;
+
+    --cat-permissive-fg: 134 234 224; /* 9.6:1 on muted, 12.5:1 on card, 14.0:1 on page */
+    --cat-permissive-muted: 27 50 51; /* emphasis at 16% over the card */
+    --cat-permissive-emphasis: 40 189 174; /* 7.6:1 on card */
+    --cat-permissive-border: 31 98 93;
+
+    --cat-weak-fg: 194 201 240; /* 8.4:1 on muted, 10.6:1 on card, 11.9:1 on page */
+    --cat-weak-muted: 43 45 59; /* emphasis at 16% over the card */
+    --cat-weak-emphasis: 124 139 218; /* 5.4:1 on card */
+    --cat-weak-border: 71 77 114;
+
+    --cat-strong-fg: 223 198 235; /* 8.6:1 on muted, 11.0:1 on card, 12.3:1 on page */
+    --cat-strong-muted: 52 44 58; /* emphasis at 16% over the card */
+    --cat-strong-emphasis: 183 134 208; /* 6.0:1 on card */
+    --cat-strong-border: 97 75 110;
+
+    --cat-network-fg: 237 196 218; /* 8.6:1 on muted, 11.1:1 on card, 12.4:1 on page */
+    --cat-network-muted: 57 43 52; /* emphasis at 16% over the card */
+    --cat-network-emphasis: 213 129 174; /* 6.2:1 on card */
+    --cat-network-border: 111 73 94;
+
+    --cat-review-fg: 230 216 204; /* 9.1:1 on muted, 12.3:1 on card, 13.8:1 on page */
+    --cat-review-muted: 54 50 48; /* emphasis at 16% over the card */
+    --cat-review-emphasis: 196 169 146; /* 7.7:1 on card */
+    --cat-review-border: 103 91 82;
 
     /* Syntax colours lift for the dark card (#18181b); ratios against it. */
     --code-keyword: 255 123 114; /* 7.03:1 */
@@ -249,6 +402,23 @@
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
+}
+
+/* Row density of the result tables (see lib/tableDensity.ts). A data row is
+   at least 32px (compact) or 40px (comfortable) tall; a row whose content
+   wraps, such as a CVE title, grows past that. Cells that span columns (the
+   expanded detail, a package header, a recycled-chunk spacer) keep their own
+   padding. */
+.table-density-compact td:not([colspan]) {
+  height: 2rem;
+  padding-top: 0.25rem;
+  padding-bottom: 0.25rem;
+}
+
+.table-density-comfortable td:not([colspan]) {
+  height: 2.5rem;
+  padding-top: 0.5rem;
+  padding-bottom: 0.5rem;
 }
 
 /* Syntax highlighting for the source viewer.

@@ -1,6 +1,8 @@
 # 사용자 문서 사이트 설정. 정본 마크다운은 docs/에 있고, 이 설정으로 GitHub Pages에
 # 렌더링한다(검색, 사이드바, 한국어/영어). 룩은 Gemini API 문서(Google DevSite) 인상을
-# MkDocs Material과 docs/stylesheets/extra.css로 재현하되, 강조색만 SK 브랜드 색을 쓴다.
+# MkDocs Material과 docs/stylesheets/extra.css로 재현한다. 색과 글꼴 크기는 앱과 공유하는
+# 토큰(docker/shared/bomlens-tokens.css, hooks/shared_tokens.py가 빌드 때 포함)을 쓰고,
+# SK 브랜드 색은 주 버튼, 로고, 초점 표시에만 쓴다.
 # internal/은 사이트 빌드에서 제외한다(exclude_docs 참고).
 site_name: BomLens
 site_description: BomLens is a local-first SBOM generator and open-source risk assessor. Produce a CycloneDX SBOM, an open-source notice, and a security and license risk report from source code, containers, binaries, firmware, or an SBOM you received — from the CLI or a browser UI, with no SaaS.
@@ -24,8 +26,8 @@ theme:
   logo: images/logo.svg
   favicon: images/logo-mark.svg
   font:
-    text: Roboto
-    code: Roboto Mono
+    text: Inter
+    code: JetBrains Mono
   palette:
     - media: "(prefers-color-scheme: light)"
       scheme: default
@@ -53,7 +55,12 @@ theme:
     - content.code.copy
     - content.tabs.link
 
+hooks:
+  - hooks/sitemap_alias.py
+  - hooks/shared_tokens.py
+
 extra_css:
+  - stylesheets/bomlens-tokens.css
   - stylesheets/extra.css
 
 extra_javascript:
@@ -97,6 +104,7 @@ plugins:
           build: true
           nav_translations:
             Home: 홈
+            Live demo: 데모 둘러보기
             Get started: 빠른 시작
             What is an SBOM: SBOM이란
             First scan: 시작하기
@@ -112,9 +120,11 @@ plugins:
             Server SBOM: 서버 SBOM
             Upload: 업로드
             CI/CD: CI/CD 연동
+            Verify a release: 릴리스 검증
             Outputs: 산출물
             Artifacts: 산출물 종류
             Reading reports: 보고서 읽는 법
+            How dependencies are resolved: 의존성을 해석하는 방식
             Advanced: 고급
             CLI reference: CLI 레퍼런스
             Docker image: Docker 이미지
@@ -124,6 +134,7 @@ plugins:
             Architecture: 아키텍처
             Pipeline by input: 입력 형태별 파이프라인
             Local-first: 로컬 우선 설계
+            Limitations: 한계
             Package managers: 패키지 매니저
             Testing: 테스트
             Release process: 릴리스 절차
@@ -205,9 +216,11 @@ nav:
       - Server SBOM: guides/server-delivery.md
       - Upload: guides/upload.md
       - CI/CD: guides/ci-cd.md
+      - Verify a release: guides/verify-release.md
   - Outputs:
       - Artifacts: reference/artifacts.md
       - Reading reports: concepts/reports-explained.md
+      - How dependencies are resolved: concepts/dependency-resolution.md
   - Advanced:
       - CLI reference: reference/cli.md
       - Docker image: reference/docker-image.md
@@ -217,6 +230,7 @@ nav:
       - Architecture: concepts/architecture.md
       - Pipeline by input: concepts/pipeline-by-input.md
       - Local-first: concepts/local-first.md
+      - Limitations: concepts/limitations.md
       - Package managers: contribute/package-managers.md
       - Testing: contribute/testing.md
   - News: talks/index.md

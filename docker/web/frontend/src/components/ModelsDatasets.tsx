@@ -172,13 +172,13 @@ function ModelsDatasetsBody({
       ))}
       {data.datasets.length > 0 && (
         <div className="space-y-2">
-          <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
+          <div className="flex items-center gap-2 text-body-sm font-semibold text-foreground">
             <Database className="h-4 w-4 text-muted-foreground" aria-hidden />
             {t("models.datasets")}
             <span className="tabular-nums text-muted-foreground">{data.datasets.length}</span>
           </div>
           <div className="overflow-x-auto rounded-md border">
-            <table className="w-full text-left text-xs">
+            <table className="w-full text-left text-label">
               <thead className="border-b bg-muted/40 text-muted-foreground">
                 <tr>
                   <th scope="col" className="px-3 py-2 font-medium">
@@ -293,7 +293,7 @@ function ModelsDatasetsBody({
         </div>
       )}
       {hasAssessment && (
-        <p className="text-xs text-muted-foreground">{t("models.disclaimer")}</p>
+        <p className="text-body-sm text-muted-foreground">{t("models.disclaimer")}</p>
       )}
       {conformance ? <G7Disclosure conformance={conformance} /> : null}
     </div>
@@ -365,17 +365,17 @@ function G7Disclosure({ conformance }: { conformance: ConformanceSummary }) {
   return (
     <div className="space-y-3 border-t pt-6">
       <div className="space-y-1">
-        <div className="text-sm font-semibold text-foreground">{t("models.g7SectionTitle")}</div>
-        <p className="max-w-3xl text-xs text-muted-foreground">{t("models.g7SectionIntro")}</p>
+        <div className="text-body-sm font-semibold text-foreground">{t("models.g7SectionTitle")}</div>
+        <p className="max-w-3xl text-body-sm text-muted-foreground">{t("models.g7SectionIntro")}</p>
       </div>
       <Card>
         <CardContent className="space-y-4 p-4">
           <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-            <div className="text-sm font-semibold text-foreground">{t("g7.subtitle")}</div>
-            <div className="text-lg font-semibold tabular-nums text-foreground">
+            <div className="text-body-sm font-semibold text-foreground">{t("g7.subtitle")}</div>
+            <div className="text-heading font-semibold tabular-nums text-foreground">
               {t("g7.present", { present: g7t.present, total: g7t.autoTotal })}
             </div>
-            <p className="text-xs text-muted-foreground">{t("g7.allAdvisory")}</p>
+            <p className="text-body-sm text-muted-foreground">{t("g7.allAdvisory")}</p>
           </div>
           <div className="space-y-3">
             {g7groups.map((group) => (
@@ -405,16 +405,16 @@ function DeclaredServiceCard({ service: s }: { service: DeclaredService }) {
       <CardContent className="space-y-4 p-4">
         <div className="flex flex-wrap items-center gap-2">
           <Server className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
-          <span className="text-xs text-muted-foreground">{t("models.service.kind")}</span>
-          <span className="text-sm font-medium text-foreground">
+          <span className="text-label text-muted-foreground">{t("models.service.kind")}</span>
+          <span className="text-body-sm font-medium text-foreground">
             {s.name}
             {s.version ? <span className="text-muted-foreground"> {s.version}</span> : null}
           </span>
           <Badge tone="info">{t("models.service.declared")}</Badge>
         </div>
-        <p className="max-w-3xl text-xs text-muted-foreground">{t("models.service.note")}</p>
+        <p className="max-w-3xl text-body-sm text-muted-foreground">{t("models.service.note")}</p>
         {s.description && (
-          <p className="max-w-3xl text-sm leading-relaxed text-muted-foreground">{s.description}</p>
+          <p className="max-w-3xl text-body-sm leading-relaxed text-muted-foreground">{s.description}</p>
         )}
         <div className="grid max-w-4xl grid-cols-2 gap-4 sm:grid-cols-4">
           <Field label={t("models.service.provider")}>
@@ -422,7 +422,7 @@ function DeclaredServiceCard({ service: s }: { service: DeclaredService }) {
           </Field>
           <Field label={t("models.service.runs")}>
             {s.models.length ? (
-              <span className="break-all font-mono text-xs">{s.models.join(", ")}</span>
+              <span className="break-all font-mono text-label">{s.models.join(", ")}</span>
             ) : (
               <span className="text-muted-foreground">{t("models.service.notStated")}</span>
             )}
@@ -432,7 +432,7 @@ function DeclaredServiceCard({ service: s }: { service: DeclaredService }) {
           </Field>
           {s.endpoint && (
             <Field label={t("models.service.endpoint")}>
-              <span className="break-all font-mono text-xs">{s.endpoint}</span>
+              <span className="break-all font-mono text-label">{s.endpoint}</span>
             </Field>
           )}
         </div>
@@ -448,7 +448,7 @@ function DeclaredServiceCard({ service: s }: { service: DeclaredService }) {
                       {[m.provider, m.version].filter(Boolean).join(", ")}
                     </span>
                   )}
-                  {m.endpoint && <span className="ml-1 break-all font-mono text-xs text-muted-foreground">{m.endpoint}</span>}
+                  {m.endpoint && <span className="ml-1 break-all font-mono text-label text-muted-foreground">{m.endpoint}</span>}
                 </li>
               ))}
             </ul>
@@ -464,8 +464,8 @@ function DeclaredServiceCard({ service: s }: { service: DeclaredService }) {
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="space-y-0.5">
-      <div className="text-xs text-muted-foreground">{label}</div>
-      <div className="text-sm">{children}</div>
+      <div className="text-label text-muted-foreground">{label}</div>
+      <div className="text-body-sm">{children}</div>
     </div>
   );
 }
@@ -495,11 +495,11 @@ function AssessmentBlock({
   return (
     <div className="space-y-3 rounded-md border bg-muted/30 p-3">
       <div className="flex flex-wrap items-center gap-2">
-        <span className="text-xs text-muted-foreground">{t("models.assessment")}</span>
+        <span className="text-label text-muted-foreground">{t("models.assessment")}</span>
         {axes.map(({ key, label, grade }) => (
           <span
             key={key}
-            className="inline-flex items-center gap-1.5 rounded-md border bg-background px-2 py-1 text-xs text-foreground"
+            className="inline-flex items-center gap-1.5 rounded-md border bg-background px-2 py-1 text-label text-foreground"
           >
             {label}
             {grade ? (
@@ -524,7 +524,7 @@ function AssessmentBlock({
 
       {a.reasons.length > 0 && (
         <Field label={t("models.reasons")}>
-          <ul className="list-inside list-disc text-sm text-muted-foreground">
+          <ul className="list-inside list-disc text-body-sm text-muted-foreground">
             {a.reasons.map((r, i) => (
               <li key={i}>{r}</li>
             ))}
@@ -534,14 +534,14 @@ function AssessmentBlock({
 
       {customLicenseQuote && (
         <Field label={t("models.customLicenseQuote")}>
-          <p className="border-l-2 border-border pl-3 text-sm italic text-muted-foreground">
+          <p className="border-l-2 border-border pl-3 text-body-sm italic text-muted-foreground">
             {customLicenseQuote}
           </p>
         </Field>
       )}
 
       {lineageConflictWith && (
-        <p className="flex items-start gap-1.5 text-xs text-foreground">
+        <p className="flex items-start gap-1.5 text-body-sm text-foreground">
           <TriangleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0 text-risk-high" aria-hidden />
           {t("models.lineageConflict", { name: lineageConflictWith })}
         </p>
@@ -564,7 +564,7 @@ function ModelCardView({ model: m }: { model: ModelCard }) {
       <CardContent className="space-y-4 p-4">
         <div className="flex flex-wrap items-center gap-2">
           <Boxes className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
-          <span className="font-mono text-sm font-medium text-foreground">
+          <span className="font-mono text-body-sm font-medium text-foreground">
             {m.group ? `${m.group} / ` : ""}
             {m.name}
             {m.version ? <span className="text-muted-foreground"> {m.version}</span> : null}
@@ -589,7 +589,7 @@ function ModelCardView({ model: m }: { model: ModelCard }) {
         )}
 
         {m.description && (
-          <p className="max-w-3xl text-sm leading-relaxed text-muted-foreground">
+          <p className="max-w-3xl text-body-sm leading-relaxed text-muted-foreground">
             {m.description}
           </p>
         )}
@@ -607,7 +607,7 @@ function ModelCardView({ model: m }: { model: ModelCard }) {
 
         {m.purl && (
           <Field label={t("models.identifier")}>
-            <span className="break-all font-mono text-xs">{m.purl}</span>
+            <span className="break-all font-mono text-label">{m.purl}</span>
           </Field>
         )}
 
@@ -625,18 +625,18 @@ function ModelCardView({ model: m }: { model: ModelCard }) {
               {t(`models.localScan_${m.localScan.replace("-", "_")}`)}
             </span>
             {m.localScanFindings && (
-              <span className="ml-1 break-all font-mono text-xs text-muted-foreground">
+              <span className="ml-1 break-all font-mono text-label text-muted-foreground">
                 {m.localScanFindings}
               </span>
             )}
             {m.localScanTool && (
-              <span className="ml-1 text-xs text-muted-foreground">({m.localScanTool})</span>
+              <span className="ml-1 text-label text-muted-foreground">({m.localScanTool})</span>
             )}
           </Field>
         )}
 
         <div className="space-y-1.5">
-          <div className="text-xs text-muted-foreground" title={t("models.disclosureHint")}>
+          <div className="text-label text-muted-foreground" title={t("models.disclosureHint")}>
             {t("models.disclosure")}
           </div>
           <div className="flex flex-wrap gap-2">
@@ -647,7 +647,7 @@ function ModelCardView({ model: m }: { model: ModelCard }) {
                 <span
                   key={key}
                   className={cn(
-                    "inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-xs",
+                    "inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-label",
                     on ? "text-foreground" : "text-muted-foreground",
                   )}
                   title={on ? t("models.documented") : t("models.notDocumented")}
@@ -668,7 +668,7 @@ function ModelCardView({ model: m }: { model: ModelCard }) {
 
         {m.limitations.length > 0 && (
           <Field label={t("models.limitations")}>
-            <ul className="list-inside list-disc text-sm text-muted-foreground">
+            <ul className="list-inside list-disc text-body-sm text-muted-foreground">
               {m.limitations.map((l, i) => (
                 <li key={i}>{l}</li>
               ))}

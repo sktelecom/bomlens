@@ -21,6 +21,8 @@
  * project/version. Omitting `id` falls back to the legacy flat layout.
  */
 
+import spdx3Map from "@spdx3-map";
+
 import { DEMO_DATA_BASE, IS_STATIC_DEMO } from "./demo";
 
 /**
@@ -134,6 +136,10 @@ export interface SbomSummary {
    *  failed on its own) | "cdxgen-unavailable" (cdxgen never ran at all).
    *  Drives a result banner. */
   sbomToolDegraded?: string | null;
+  /** "static" when the scan read a lock file instead of building (the lock
+   *  file's name in `detectionSource`); absent when it built. */
+  detection?: string | null;
+  detectionSource?: string | null;
   /** Best-effort post-process steps that failed during this scan (docker/lib/
    *  pipeline-step.sh's bomlens:pipeline-step-failed property), by step id: a
    *  valid SBOM was still produced, but that step's output may be missing or
@@ -420,6 +426,19 @@ export interface ConformanceCheck {
   /** The Korean detail line ("측정할 패키지 없음"), from the same join. Empty when
    *  the detail is a bare value (a timestamp, a purl) that needs no translation. */
   detailKo?: string;
+  /** Components the supplier gave a reason for instead of a version (the
+   *  versions-needed row of the skt-submission profile). The row can pass while
+   *  this list is non-empty, so it is shown either way. Absent when empty. */
+  explained?: ExplainedComponent[];
+}
+
+/** Why the supplier left a component without a version. */
+export type ExplainedReason = "own-code" | "not-open-source" | "version-unknown";
+
+/** One component the supplier explained instead of versioning. */
+export interface ExplainedComponent {
+  name: string;
+  reason: ExplainedReason;
 }
 
 /** What a person has to establish for one element. */
@@ -503,6 +522,11 @@ export interface ConformanceSummary {
   pipelineStepsFailed?: string[];
   /** How many more failed steps exist past the cap in pipelineStepsFailed. */
   pipelineStepsFailedMore?: number;
+  /** The scan mode the skt-submission profile judged this SBOM as when it
+   *  turned some general rows into warnings (a firmware, root filesystem or
+   *  binary scan, or an SBOM marked bomlens:scanMode under --analyze). Absent
+   *  when nothing was relaxed. */
+  submissionJudgedAs?: "FIRMWARE" | "ROOTFS" | "BINARY";
   /** Components other than operating-system and file entries: what the scan
    *  identified as software. Absent on a report from before this field existed. */
   softwareComponentCount?: number;
@@ -618,6 +642,11 @@ export interface ScanConfig {
   source: SourceType;
   /** git URL / docker image (empty for current-folder and upload sources). */
   target: string;
+  /** Branch, tag or commit a git URL scan was told to use. Empty or absent means
+   *  the default branch. */
+  gitRef?: string;
+  /** Paths the scan was told to leave out, relative to the scanned folder. */
+  exclude?: string[];
   /** What the user actually picked, when `target` cannot say it: the uploaded
    *  file's name, or the folder a CLI scan ran against. Shown as the scan's
    *  provenance (see lib/provenance.ts); absent on scans that predate it.
@@ -634,6 +663,9 @@ export interface ScanConfig {
   deepLicense: boolean;
   identifyVendored: boolean;
   byteStable: boolean;
+  /** "build" when the scan was told not to read a lock file statically; absent
+   *  or "auto" otherwise. */
+  detection?: string;
   /** Conformance check strictness this scan actually ran with ("default" or
    *  "skt-submission"). Absent on scans that predate the profile. */
   conformanceProfile?: string;
@@ -796,12 +828,19 @@ export interface ScanParams {
   target?: string; // git URL OR docker image name
   token?: string; // server-side token from /upload
   cred?: string; // single-use credId from /git-cred (private git URL)
+  /** Branch, tag or commit of a git URL scan; empty or omitted clones the default branch. */
+  gitRef?: string;
+  /** Paths to leave out of a source scan, relative to the scanned folder. */
+  exclude?: string[];
   scanossCred?: string; // single-use credId for a SCANOSS/OSSKB token
   notice: boolean;
   security: boolean;
   deepLicense: boolean;
   identifyVendored: boolean;
   byteStable: boolean;
+  /** "build" turns off reading a covering lock file instead of building (server
+   *  DETECTION); "auto" or omitted leaves it on. Source scans only. */
+  detection?: "auto" | "build";
   /** Conformance check strictness. Read server-side as the exact
    *  `conformance_profile` parameter; omitted (sent empty) lets the server pick
    *  the per-mode default ("skt-submission" for ANALYZE, "default" otherwise). */
@@ -1327,7 +1366,10 @@ export async function checkAiDeclaration(
 /** The field mapping the declaration screens draw their questions from
  *  (`docker/lib/spdx3-ai-map.json`). Null when the server has none. */
 export async function fetchSpdx3Map(): Promise<unknown | null> {
-  if (IS_STATIC_DEMO) return null;
+  // The demo has no server, and its data folder is overwritten by each
+  // capture, so the mapping ships inside the demo bundle (see the
+  // `@spdx3-map` alias in vite.config.ts).
+  if (IS_STATIC_DEMO) return spdx3Map;
   try {
     const res = await fetch("/spdx3-map");
     if (!res.ok) return null;
@@ -1617,12 +1659,15 @@ export function startScan(params: ScanParams, handlers: ScanHandlers): EventSour
     target: params.target ?? "",
     token: params.token ?? "",
     cred: params.cred ?? "",
+    git_ref: params.gitRef ?? "",
+    exclude: (params.exclude ?? []).join("\n"),
     scanoss_cred: params.scanossCred ?? "",
     notice: String(params.notice),
     security: String(params.security),
     deep_license: String(params.deepLicense),
     identify_vendored: String(params.identifyVendored),
     byte_stable: String(params.byteStable),
+    detection: params.detection ?? "auto",
     conformance_profile: params.conformanceProfile ?? "",
     license: params.license ?? "",
     sbom_author: params.sbomAuthor ?? "",

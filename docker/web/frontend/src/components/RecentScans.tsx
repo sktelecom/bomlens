@@ -5,6 +5,7 @@ import {
   ArrowDown,
   ArrowUp,
   ArrowUpDown,
+  ExternalLink,
   FileJson,
   FolderOpen,
   Plus,
@@ -20,14 +21,17 @@ import { type ReactNode, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { Badge } from "@/components/ui/badge";
+import { FOCUS_RING, SELECTED_SOLID } from "@/components/ui/selectable";
 import { buttonVariants } from "@/components/ui/button";
-import { IS_STATIC_DEMO } from "@/lib/demo";
+import { demoUrl, IS_STATIC_DEMO } from "@/lib/demo";
 import { Card, CardContent } from "@/components/ui/card";
+import { DemoStartHere } from "@/components/DemoStartHere";
 import { Input } from "@/components/ui/input";
 import type { RecentScan, Severity } from "@/lib/api";
 import {
   filterRecent,
   formatRelativeTime,
+  middleEllipsis,
   presentTypes,
   scanComparison,
   type RecentSortDir,
@@ -40,7 +44,9 @@ import {
   summarizeRecent,
 } from "@/lib/recent";
 import { scanHash } from "@/lib/route";
+import { NARROW_QUERY, useMediaQuery } from "@/lib/useMediaQuery";
 import { cn } from "@/lib/utils";
+import { useFormatNumber } from "@/lib/format";
 
 interface Props {
   scans: RecentScan[];
@@ -60,53 +66,6 @@ const SEV_TONE: Record<
   LOW: "low",
   UNKNOWN: "info",
 };
-
-function SummaryCard({
-  label,
-  value,
-  accent,
-  onClick,
-  active,
-}: {
-  label: string;
-  value: number;
-  accent?: boolean;
-  /** When set, the card becomes a toggle that filters the list. */
-  onClick?: () => void;
-  active?: boolean;
-}) {
-  const body = (
-    <CardContent className="flex flex-col gap-1.5 p-5">
-      <span className="text-xs text-muted-foreground">{label}</span>
-      <span
-        className={cn(
-          "text-3xl font-semibold tabular-nums",
-          accent && "text-brand-accent",
-        )}
-      >
-        {value}
-      </span>
-    </CardContent>
-  );
-  if (!onClick) return <Card>{body}</Card>;
-  return (
-    <Card
-      className={cn(
-        "transition-colors duration-fast ease-out-soft",
-        active ? "border-brand bg-brand/5" : "hover:bg-muted/40",
-      )}
-    >
-      <button
-        type="button"
-        onClick={onClick}
-        aria-pressed={active}
-        className="w-full rounded-lg text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-      >
-        {body}
-      </button>
-    </Card>
-  );
-}
 
 const TH = "whitespace-nowrap px-4 py-3 text-left font-medium";
 
@@ -142,16 +101,138 @@ function FilterChip({
       aria-pressed={active}
       onClick={onClick}
       className={cn(
-        "inline-flex h-9 items-center rounded-full border px-3.5 text-sm",
+        "inline-flex h-9 items-center rounded-full border px-3.5 text-body-sm",
         "transition-[color,border-color,background-color,box-shadow] duration-fast ease-out-soft",
-        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+        FOCUS_RING,
         active
-          ? "ring-2 ring-foreground ring-offset-1 font-medium text-foreground"
+          ? SELECTED_SOLID
           : "border-input text-muted-foreground hover:bg-muted hover:text-foreground",
       )}
     >
       {children}
     </button>
+  );
+}
+
+/** Longest name shown in full before the middle is replaced with an ellipsis. */
+const NAME_MAX = 40;
+
+/**
+ * A scan's name and version as one link label. A long name (a firmware image's
+ * file name, say) is shortened in the middle so the start and the end both stay
+ * readable and the version is never pushed out; the full text stays in the
+ * tooltip and is what assistive technology reads.
+ */
+function ScanLabel({ scan }: { scan: RecentScan }) {
+  const shown = middleEllipsis(scan.project, NAME_MAX);
+  const full = scan.version ? `${scan.project} @${scan.version}` : scan.project;
+  return (
+    <span title={shown === scan.project ? undefined : full}>
+      <span aria-hidden={shown === scan.project ? undefined : true} className="font-medium text-foreground">
+        {shown}
+      </span>
+      {shown !== scan.project && <span className="sr-only">{scan.project}</span>}
+      {scan.version && (
+        <span className="text-muted-foreground">
+          {" @"}
+          {scan.version}
+        </span>
+      )}
+    </span>
+  );
+}
+
+/** The type chip, shared by the table and the stacked rows. */
+function TypeBadge({ scan }: { scan: RecentScan }) {
+  const { t } = useTranslation();
+  return scanType(scan) === "ai" ? (
+    <Badge variant="outline" className="font-semibold">
+      {t(scanTypeLabelKey(scan))}
+    </Badge>
+  ) : (
+    <Badge variant="muted">{t(scanTypeLabelKey(scan))}</Badge>
+  );
+}
+
+/**
+ * The narrow-screen form of the scan list: one stacked row per scan instead of
+ * a five-column table that would run off the edge. Name and version on top,
+ * the type and severity chips under it, then component count and date as
+ * secondary text. Sorting is the default (newest first) on this layout.
+ */
+function ScanRows({
+  scans,
+  all,
+  now,
+  onDelete,
+}: {
+  scans: RecentScan[];
+  all: RecentScan[];
+  now: number;
+  onDelete: (id: string) => void;
+}) {
+  const { t, i18n } = useTranslation();
+  if (scans.length === 0) {
+    return (
+      <p className="px-4 py-8 text-center text-body-sm text-muted-foreground">
+        {t("recent.noMatch")}
+      </p>
+    );
+  }
+  return (
+    <ul>
+      {scans.map((s) => {
+        const cmp = scanComparison(all, s.id);
+        return (
+          <li
+            key={s.id}
+            className="flex items-start gap-2 border-b px-4 py-3 last:border-0"
+          >
+            <div className="min-w-0 flex-1 space-y-1.5">
+              <a
+                href={scanHash(s.id)}
+                className="block break-words rounded text-body-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              >
+                <ScanLabel scan={s} />
+              </a>
+              <div className="flex flex-wrap items-center gap-1.5">
+                <TypeBadge scan={s} />
+                {s.maxSeverity ? (
+                  <Badge tone={SEV_TONE[s.maxSeverity]} mark>
+                    {t(`severity.${s.maxSeverity}`)}
+                  </Badge>
+                ) : null}
+                {cmp && cmp.severityDir !== "same" && (
+                  <TrendArrow
+                    up={cmp.severityDir === "up"}
+                    label={t(
+                      cmp.severityDir === "up" ? "recent.sevUp" : "recent.sevDown",
+                    )}
+                  />
+                )}
+              </div>
+              <p className="text-label tabular-nums text-muted-foreground">
+                {t("recent.rowMeta", {
+                  count: s.components,
+                  date: formatRelativeTime(s.generatedAt, now, i18n.language),
+                })}
+              </p>
+            </div>
+            {!IS_STATIC_DEMO && (
+              <button
+                type="button"
+                onClick={() => onDelete(s.id)}
+                aria-label={t("recent.delete")}
+                title={t("recent.delete")}
+                className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors duration-fast ease-out-soft hover:bg-destructive/10 hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              >
+                <Trash2 className="h-4 w-4" aria-hidden />
+              </button>
+            )}
+          </li>
+        );
+      })}
+    </ul>
   );
 }
 
@@ -203,7 +284,9 @@ function SortHeader({
  */
 export function RecentScans({ scans, newHref, onDelete }: Props) {
   const { t, i18n } = useTranslation();
+  const fmt = useFormatNumber();
   const summary = summarizeRecent(scans);
+  const narrow = useMediaQuery(NARROW_QUERY);
   const now = Date.now();
   const [sort, setSort] = useState<RecentSort>({ key: "generated", dir: "desc" });
   const [query, setQuery] = useState("");
@@ -224,10 +307,10 @@ export function RecentScans({ scans, newHref, onDelete }: Props) {
   return (
     <div className="space-y-6">
       <div className="space-y-1.5">
-        <h1 className="text-3xl font-semibold tracking-tight text-foreground">
+        <h1 className="text-display font-semibold tracking-tight text-foreground">
           {t("recent.title")}
         </h1>
-        <p className="text-sm text-muted-foreground">
+        <p className="text-body-sm text-muted-foreground">
           {t(IS_STATIC_DEMO ? "recent.demoSubtitle" : "recent.subtitle")}
         </p>
       </div>
@@ -237,14 +320,14 @@ export function RecentScans({ scans, newHref, onDelete }: Props) {
         // so orient them — what BomLens does, how to start, and what it produces.
         <Card>
           <CardContent className="flex flex-col items-center gap-5 px-6 py-12 text-center">
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-brand/10 text-brand">
+            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-muted text-foreground">
               <ScanLine className="h-6 w-6" aria-hidden />
             </div>
             <div className="space-y-1.5">
-              <h2 className="text-xl font-semibold tracking-tight text-foreground">
+              <h2 className="text-title font-semibold tracking-tight text-foreground">
                 {t("recent.emptyTitle")}
               </h2>
-              <p className="mx-auto max-w-md text-sm text-muted-foreground">
+              <p className="mx-auto max-w-md text-body-sm text-muted-foreground">
                 {t("recent.emptyBody")}
               </p>
             </div>
@@ -252,7 +335,21 @@ export function RecentScans({ scans, newHref, onDelete }: Props) {
               <Plus className="h-4 w-4" aria-hidden />
               {t("shell.newScan")}
             </a>
-            <ul className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1.5 text-xs text-muted-foreground">
+            {/* A second way in for someone who wants to see a result before
+                scanning anything of their own. */}
+            {!IS_STATIC_DEMO && (
+              <a
+                href={demoUrl()}
+                target="_blank"
+                rel="noreferrer noopener"
+                data-testid="empty-demo-link"
+                className="inline-flex items-center gap-1.5 text-body-sm font-medium text-foreground underline underline-offset-2 hover:no-underline"
+              >
+                {t("recent.emptyDemo")}
+                <ExternalLink className="h-3.5 w-3.5" aria-hidden />
+              </a>
+            )}
+            <ul className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1.5 text-label text-muted-foreground">
               {[
                 { icon: FileJson, label: t("recent.emptyOutSbom") },
                 { icon: ScrollText, label: t("recent.emptyOutNotice") },
@@ -268,20 +365,7 @@ export function RecentScans({ scans, newHref, onDelete }: Props) {
         </Card>
       ) : (
         <>
-          <div className="grid grid-cols-3 gap-4">
-            <SummaryCard label={t("recent.total")} value={summary.total} />
-            <SummaryCard
-              label={t("recent.atRisk")}
-              value={summary.atRisk}
-              accent={summary.atRisk > 0}
-              active={atRisk}
-              onClick={
-                summary.atRisk > 0 ? () => setAtRisk((v) => !v) : undefined
-              }
-            />
-            <SummaryCard label={t("recent.projects")} value={summary.projects} />
-          </div>
-
+          {IS_STATIC_DEMO && <DemoStartHere scans={scans} />}
           <div className="flex flex-wrap items-center gap-2">
             <div className="relative">
               <Search
@@ -297,8 +381,15 @@ export function RecentScans({ scans, newHref, onDelete }: Props) {
                 className="h-9 w-56 pl-8"
               />
             </div>
-            {/* Type chips only when there's more than one type to choose between.
-                Risk filtering lives on the "At risk" summary card above. */}
+            {/* The at-risk filter is a chip like the type chips, with its count on
+                it. It stays while active so it can be turned off. */}
+            {(summary.atRisk > 0 || atRisk) && (
+              <FilterChip active={atRisk} onClick={() => setAtRisk((v) => !v)}>
+                {t("recent.atRisk")}
+                <span className="ml-1.5 tabular-nums">{fmt(summary.atRisk)}</span>
+              </FilterChip>
+            )}
+            {/* Type chips only when there's more than one type to choose between. */}
             {types.length > 1 &&
               types.map((ty) => (
                 <FilterChip
@@ -310,17 +401,29 @@ export function RecentScans({ scans, newHref, onDelete }: Props) {
                 </FilterChip>
               ))}
             {filtering && (
-              <span className="text-xs tabular-nums text-muted-foreground">
+              <span className="text-label tabular-nums text-muted-foreground">
                 {t("recent.shown", { shown: sorted.length, total: scans.length })}
               </span>
             )}
+            {/* Totals: plain text, not controls. */}
+            <span className="ml-auto flex gap-4 text-label tabular-nums text-muted-foreground">
+              <span>
+                {t("recent.total")} {fmt(summary.total)}
+              </span>
+              <span>
+                {t("recent.projects")} {fmt(summary.projects)}
+              </span>
+            </span>
           </div>
 
           <Card>
             <CardContent className="p-0">
-              <table className="w-full text-sm">
+              {narrow ? (
+                <ScanRows scans={sorted} all={scans} now={now} onDelete={onDelete} />
+              ) : (
+              <table className="w-full text-body-sm">
                 <thead>
-                  <tr className="border-b text-xs text-muted-foreground">
+                  <tr className="border-b text-label text-muted-foreground">
                     <SortHeader label={t("recent.colScan")} sortKey="scan" sort={sort} onSort={onSort} />
                     <th className={TH}>{t("recent.colType")}</th>
                     <SortHeader label={t("recent.colGenerated")} sortKey="generated" sort={sort} onSort={onSort} />
@@ -344,7 +447,7 @@ export function RecentScans({ scans, newHref, onDelete }: Props) {
                     <tr>
                       <td
                         colSpan={6}
-                        className="px-4 py-8 text-center text-sm text-muted-foreground"
+                        className="px-4 py-8 text-center text-body-sm text-muted-foreground"
                       >
                         {t("recent.noMatch")}
                       </td>
@@ -362,25 +465,11 @@ export function RecentScans({ scans, newHref, onDelete }: Props) {
                           href={scanHash(s.id)}
                           className="rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                         >
-                          <span className="font-medium text-foreground">
-                            {s.project}
-                          </span>
-                          {s.version && (
-                            <span className="text-muted-foreground">
-                              {" @"}
-                              {s.version}
-                            </span>
-                          )}
+                          <ScanLabel scan={s} />
                         </a>
                       </td>
                       <td className="px-4 py-3">
-                        {scanType(s) === "ai" ? (
-                          <Badge className="border-transparent bg-brand/10 text-brand-strong">
-                            {t(scanTypeLabelKey(s))}
-                          </Badge>
-                        ) : (
-                          <Badge variant="muted">{t(scanTypeLabelKey(s))}</Badge>
-                        )}
+                        <TypeBadge scan={s} />
                       </td>
                       <td className="px-4 py-3 text-muted-foreground">
                         {formatRelativeTime(s.generatedAt, now, i18n.language)}
@@ -390,21 +479,21 @@ export function RecentScans({ scans, newHref, onDelete }: Props) {
                           once has nothing to compare against and shows nothing,
                           rather than a "0" that would read as "unchanged". */}
                       <td className="px-4 py-3 text-right tabular-nums">
-                        {s.components}
+                        {fmt(s.components)}
                         {cmp && cmp.componentsDelta !== 0 && (
                           <span
-                            className="ml-1.5 text-xs text-muted-foreground"
+                            className="ml-1.5 text-label text-muted-foreground"
                             title={t("recent.vsPrevious")}
                           >
                             {cmp.componentsDelta > 0 ? "+" : ""}
-                            {cmp.componentsDelta}
+                            {fmt(cmp.componentsDelta)}
                           </span>
                         )}
                       </td>
                       <td className="px-4 py-3">
                         <span className="inline-flex items-center gap-1.5">
                           {s.maxSeverity ? (
-                            <Badge tone={SEV_TONE[s.maxSeverity]}>
+                            <Badge tone={SEV_TONE[s.maxSeverity]} mark>
                               {t(`severity.${s.maxSeverity}`)}
                             </Badge>
                           ) : (
@@ -443,13 +532,14 @@ export function RecentScans({ scans, newHref, onDelete }: Props) {
                   )}
                 </tbody>
               </table>
+              )}
             </CardContent>
           </Card>
 
           {/* Where the list comes from — true of a local run, false of the
               demo, whose list is a fixed capture and not a folder on disk. */}
           {!IS_STATIC_DEMO && (
-            <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <p className="flex items-center gap-1.5 text-body-sm text-muted-foreground">
               <FolderOpen className="h-3.5 w-3.5" aria-hidden />
               <code className="rounded bg-muted px-1.5 py-0.5 font-mono">
                 ~/sbom-output

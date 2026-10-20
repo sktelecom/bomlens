@@ -16,7 +16,7 @@
     "noUnusedParameters": false,
     "noFallthroughCasesInSwitch": true,
     "baseUrl": ".",
-    "paths": { "@/*": ["./src/*"] }
+    "paths": { "@/*": ["./src/*"], "@spdx3-map": ["./src/lib/spdx3-map-stub.json"] }
   },
   "include": ["src", "vite.config.ts"]
 }

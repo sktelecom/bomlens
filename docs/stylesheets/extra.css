@@ -5,10 +5,12 @@
 
 /*
  * Gemini API 문서(Google DevSite) 인상에 맞춘 테마 보정.
- * 헤더는 밝게 두고, SK 브랜드 색은 링크/버튼/강조에만 절제해서 쓴다.
- * 색 값은 [[skt-brand-colors]] 기준.
- *   SK Red    #EA002C  흰 배경 대비 약 4.63:1 (본문 텍스트 AA 충족) — 1차 강조
- *   SK Orange #F47725  흰 배경 대비 약 2.8:1 (본문 텍스트 불가) — hover/보조 강조만
+ * 색은 앱과 공유하는 토큰(bomlens-tokens.css, 빌드 때 hooks/shared_tokens.py가 넣는다)에서
+ * 가져온다. 규칙은 앱과 같다.
+ *   - 본문 링크와 강조는 중립 전경색에 밑줄로 표시한다.
+ *   - SK Red(--brand)는 주 버튼, 로고, 키보드 초점 표시에만 쓴다.
+ *   - 표, 코드, 안내 상자의 의미 색은 --role-* 와 --code-* 토큰을 쓴다.
+ * 토큰 값은 HSL 또는 RGB 세 값이라 hsl(var(--x)), rgb(var(--x))로 감싸 쓴다.
  */
 
 /* ---- 루트 글자 크기 고정 ----
@@ -28,39 +30,80 @@
   }
 }
 
-/* ---- 강조색 토큰 (primary가 custom일 때 Material이 data 속성을 붙인다) ---- */
-[data-md-color-primary="custom"] {
-  --md-primary-fg-color: #ea002c;
-  --md-primary-fg-color--light: #ff3355;
-  --md-primary-fg-color--dark: #b0001f;
-  --md-primary-bg-color: #ffffff;
-  --md-primary-bg-color--light: rgba(255, 255, 255, 0.7);
+/* ---- Material 변수를 토큰에 연결 ----
+ * Material은 라이트(default)와 다크(slate) 스킴 변수를 같은 특이성으로 정의하므로
+ * 두 선택자를 함께 쓰고, 뒤에 로드되는 이 파일이 이긴다. */
+[data-md-color-scheme="default"],
+[data-md-color-scheme="slate"] {
+  --md-text-font: "Inter", "Pretendard Variable", "Pretendard", -apple-system, "Segoe UI",
+    "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans KR", sans-serif;
+  --md-code-font: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+  --md-default-bg-color: hsl(var(--background));
+  --md-default-fg-color: hsl(var(--foreground));
+  --md-default-fg-color--light: hsl(var(--muted-foreground));
+  --md-default-fg-color--lighter: hsl(var(--border));
+  --md-default-fg-color--lightest: hsl(var(--muted));
+  --md-typeset-color: hsl(var(--foreground));
+  --md-typeset-a-color: hsl(var(--foreground));
+
+  --md-primary-fg-color: hsl(var(--foreground));
+  --md-primary-fg-color--light: hsl(var(--muted-foreground));
+  --md-primary-fg-color--dark: hsl(var(--foreground));
+  --md-primary-bg-color: hsl(var(--background));
+  --md-primary-bg-color--light: hsl(var(--muted-foreground));
+  --md-accent-fg-color: hsl(var(--foreground));
+  --md-accent-fg-color--transparent: hsl(var(--muted));
+  --md-accent-bg-color: hsl(var(--background));
+
+  --md-code-bg-color: hsl(var(--muted));
+  --md-code-fg-color: hsl(var(--foreground));
+  --md-code-hl-color: hsl(var(--muted));
+  --md-code-hl-keyword-color: rgb(var(--code-keyword));
+  --md-code-hl-string-color: rgb(var(--code-string));
+  --md-code-hl-comment-color: hsl(var(--muted-foreground));
+  --md-code-hl-number-color: rgb(var(--code-number));
+  --md-code-hl-constant-color: rgb(var(--code-number));
+  --md-code-hl-function-color: rgb(var(--code-title));
+  --md-code-hl-special-color: rgb(var(--code-title));
+  --md-code-hl-name-color: hsl(var(--foreground));
+  --md-code-hl-operator-color: hsl(var(--foreground));
+  --md-code-hl-punctuation-color: hsl(var(--muted-foreground));
+  --md-code-hl-variable-color: hsl(var(--foreground));
+  --md-code-hl-generic-color: hsl(var(--foreground));
+
+  --md-footer-bg-color: hsl(var(--muted));
+  --md-footer-bg-color--dark: hsl(var(--muted));
+  --md-footer-fg-color: hsl(var(--foreground));
+  --md-footer-fg-color--light: hsl(var(--muted-foreground));
+  --md-footer-fg-color--lighter: hsl(var(--muted-foreground));
+  --md-shadow-z1: 0 1px 2px hsl(var(--foreground) / 0.08);
 }
 
-[data-md-color-accent="custom"] {
-  --md-accent-fg-color: #f47725;
-  --md-accent-fg-color--transparent: rgba(244, 119, 37, 0.1);
+/* 키보드 초점은 브랜드색이 상태 표시로 쓰이는 두 곳 중 하나다(다른 하나는 주 버튼) */
+.md-typeset :is(a, button, summary):focus-visible,
+.md-header :is(a, button, label, input):focus-visible,
+.md-nav :is(a, label):focus-visible,
+.md-search__input:focus-visible,
+.md-footer a:focus-visible {
+  outline: 2px solid hsl(var(--ring));
+  outline-offset: 2px;
 }
 
-/* ---- 밝은 헤더 (레드 블록 대신 흰 배경 + 어두운 글자) ---- */
+/* ---- 헤더: 카드 표면 + 옅은 구분선 (레드 블록을 쓰지 않는다) ---- */
 .md-header {
-  background-color: #ffffff;
-  color: #1f1f1f;
+  background-color: hsl(var(--card));
+  color: hsl(var(--foreground));
   box-shadow: none;
-  border-bottom: 1px solid #e8eaed;
+  border-bottom: 1px solid hsl(var(--border));
 }
 .md-header--shadow {
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
+  box-shadow: 0 2px 6px hsl(var(--foreground) / 0.06);
 }
 .md-header__title,
 .md-header__topic,
 .md-header__button {
-  color: #1f1f1f;
-}
-/* 로고 마크는 SK 레드 악센트로 브랜드감 유지 */
-.md-header .md-logo img,
-.md-header .md-logo svg {
-  color: #ea002c;
+  color: hsl(var(--foreground));
 }
 /* 헤더 브랜드: 락업 로고(아이콘+워드마크+부제)를 키워서 쓰고, 데스크톱에서는
    중복되는 사이트명 텍스트를 숨긴다. 모바일에서는 Material이 로고를 숨기므로
@@ -79,54 +122,42 @@
   display: none;
 }
 
-/* 검색: 밝은 헤더용 옅은 회색 필드 */
+/* 검색: 중립 필드 */
 .md-search__form {
-  background-color: #f1f3f4;
+  background-color: hsl(var(--muted));
   box-shadow: none;
+  border-radius: 0.375rem;
 }
 .md-search__form:hover {
-  background-color: #e8eaed;
+  background-color: hsl(var(--accent));
+}
+.md-search__input,
+.md-search__input::placeholder,
+.md-search__icon {
+  color: hsl(var(--muted-foreground));
 }
 .md-search__input {
-  color: #1f1f1f;
-}
-.md-search__input::placeholder {
-  color: #5f6368;
-}
-.md-search__icon {
-  color: #5f6368;
+  color: hsl(var(--foreground));
 }
 
-/* ---- 다크 모드 헤더: 어두운 표면 + 밝은 글자 ---- */
-[data-md-color-scheme="slate"] .md-header {
-  background-color: #1f1f23;
-  color: #e8eaed;
-  border-bottom-color: #2d2d31;
-}
-[data-md-color-scheme="slate"] .md-header__title,
-[data-md-color-scheme="slate"] .md-header__topic,
-[data-md-color-scheme="slate"] .md-header__button {
-  color: #e8eaed;
-}
-[data-md-color-scheme="slate"] .md-search__form {
-  background-color: #2d2d31;
-}
-[data-md-color-scheme="slate"] .md-search__input {
-  color: #e8eaed;
-}
-
-/* ---- 본문 링크: 1차 강조(SK Red), hover는 보조 강조(SK Orange) ---- */
+/* ---- 본문 링크: 중립 전경색 + 밑줄(앱과 같은 규칙). 색에만 의존하지 않는다 ---- */
 .md-typeset a {
-  color: #ea002c;
+  color: hsl(var(--foreground));
+  text-decoration: underline;
+  text-decoration-color: hsl(var(--muted-foreground));
+  text-underline-offset: 0.15em;
 }
 .md-typeset a:hover {
-  color: #f47725;
+  color: hsl(var(--foreground));
+  text-decoration-color: hsl(var(--foreground));
+  text-decoration-thickness: 2px;
 }
-[data-md-color-scheme="slate"] .md-typeset a {
-  color: #ff4d6a;
-}
-[data-md-color-scheme="slate"] .md-typeset a:hover {
-  color: #f9914f;
+/* 제목 옆 앵커, 버튼, 카드 링크, 목차는 밑줄을 붙이지 않는다 */
+.md-typeset .headerlink,
+.md-typeset .md-button,
+.md-typeset .md-button:hover,
+.md-typeset .grid.cards a {
+  text-decoration: none;
 }
 
 /* ---- 타이포그래피와 여백 (Gemini의 여유로운 느낌) ---- */
@@ -137,26 +168,23 @@
   font-size: 0.8rem;
   line-height: 1.75;
 }
-/* 제목: Material 기본은 옅은 회색 + 두꺼움이라 둔탁하다. 어둡게, 조금 가볍게. */
+.md-typeset h1,
+.md-typeset h2,
+.md-typeset h3,
+.md-typeset h4 {
+  color: hsl(var(--foreground));
+}
 .md-typeset h1 {
-  color: #202124;
   font-weight: 500;
   letter-spacing: -0.015em;
 }
 .md-typeset h2 {
-  color: #202124;
   margin-top: 2.2em;
   font-weight: 600;
   letter-spacing: -0.01em;
 }
 .md-typeset h3 {
-  color: #202124;
   font-weight: 600;
-}
-[data-md-color-scheme="slate"] .md-typeset h1,
-[data-md-color-scheme="slate"] .md-typeset h2,
-[data-md-color-scheme="slate"] .md-typeset h3 {
-  color: #e8eaed;
 }
 
 /* ---- 좌측 사이드바: 상위(섹션)와 하위(페이지) 구분 ---- */
@@ -171,98 +199,73 @@
 .md-nav--primary > .md-nav__list > .md-nav__item:first-child {
   display: none;
 }
-
-/* 섹션(상위) 헤더: 하위보다 크고 굵고 어둡게 — 상위가 더 두드러진다 */
 .md-nav--primary .md-nav__item--section > .md-nav__link {
-  color: #202124;
+  color: hsl(var(--foreground));
   font-size: 0.84rem;
   font-weight: 700;
   letter-spacing: -0.005em;
   margin: 1.6em 0 0.5em;
   opacity: 1;
 }
-[data-md-color-scheme="slate"] .md-nav--primary .md-nav__item--section > .md-nav__link {
-  color: #e8eaed;
-}
-/* 하위 페이지 링크: 일반 무게, 약간 작게, 차분한 색 */
 .md-nav--primary .md-nav__link {
   font-size: 0.74rem;
   font-weight: 400;
-  color: #3c4043;
+  color: hsl(var(--muted-foreground));
 }
-[data-md-color-scheme="slate"] .md-nav--primary .md-nav__link {
-  color: #c4c7ca;
+.md-nav--primary .md-nav__link:hover {
+  color: hsl(var(--foreground));
 }
-/* 활성 페이지: SK 레드 강조 */
+/* 활성 페이지: 중립 전경색 + 굵기. 브랜드색은 쓰지 않는다 */
 .md-nav--primary .md-nav__link--active {
-  color: #ea002c;
+  color: hsl(var(--foreground));
   font-weight: 600;
 }
-[data-md-color-scheme="slate"] .md-nav--primary .md-nav__link--active {
-  color: #ff4d6a;
+.md-nav--secondary .md-nav__link {
+  color: hsl(var(--muted-foreground));
+}
+.md-nav--secondary .md-nav__link--active {
+  color: hsl(var(--foreground));
 }
 
-/* ---- 코드 블록: 옅은 배경 + 보더 + 라운드로 정제 ---- */
-[data-md-color-scheme="default"] {
-  --md-code-bg-color: #f6f8fa;
-}
-[data-md-color-scheme="slate"] {
-  --md-code-bg-color: #1a1a1f;
-}
+/* ---- 코드 블록: 토큰 배경 + 보더 + 라운드 ---- */
 .md-typeset pre {
   border-radius: 0.5rem;
 }
 .md-typeset pre > code {
-  border: 1px solid #e8eaed;
+  border: 1px solid hsl(var(--border));
   border-radius: 0.5rem;
   padding: 0.9em 1em;
-}
-[data-md-color-scheme="slate"] .md-typeset pre > code {
-  border-color: #2d2d31;
 }
 .md-typeset code {
   border-radius: 0.25rem;
 }
 
-/* ---- 표: DevSite 톤 (헤더 음영, 여백, 옅은 구분선, 행 hover) ---- */
+/* ---- 표 ---- */
 .md-typeset table:not([class]) {
-  border: 1px solid #e8eaed;
+  border: 1px solid hsl(var(--border));
   border-radius: 0.4rem;
   font-size: 0.74rem;
+  background-color: hsl(var(--card));
 }
 .md-typeset table:not([class]) th {
-  background-color: #f8f9fa;
+  background-color: hsl(var(--muted));
   font-weight: 600;
-  color: #202124;
+  color: hsl(var(--foreground));
 }
 .md-typeset table:not([class]) th,
 .md-typeset table:not([class]) td {
   padding: 0.7em 0.9em;
-  border-bottom: 1px solid #eef0f2;
+  border-bottom: 1px solid hsl(var(--border));
 }
 .md-typeset table:not([class]) tr:hover {
-  background-color: #fafbfc;
-}
-[data-md-color-scheme="slate"] .md-typeset table:not([class]) {
-  border-color: #2d2d31;
-}
-[data-md-color-scheme="slate"] .md-typeset table:not([class]) th {
-  background-color: #26262b;
-  color: #e8eaed;
-}
-[data-md-color-scheme="slate"] .md-typeset table:not([class]) th,
-[data-md-color-scheme="slate"] .md-typeset table:not([class]) td {
-  border-bottom-color: #2d2d31;
-}
-[data-md-color-scheme="slate"] .md-typeset table:not([class]) tr:hover {
-  background-color: #1f1f23;
+  background-color: hsl(var(--muted) / 0.6);
 }
 
-/* ---- 블록쿼트: 평범한 인용 대신 차분한 콜아웃 박스 ---- */
+/* ---- 블록쿼트와 안내 상자: 의미 색은 역할 토큰 ---- */
 .md-typeset blockquote {
   color: inherit;
-  border-left: 3px solid #f47725;
-  background-color: #faf7f4;
+  border-left: 3px solid hsl(var(--border));
+  background-color: hsl(var(--muted));
   border-radius: 0 0.3rem 0.3rem 0;
   padding: 0.5em 0.9em;
 }
@@ -272,63 +275,167 @@
 .md-typeset blockquote > :last-child {
   margin-bottom: 0;
 }
-[data-md-color-scheme="slate"] .md-typeset blockquote {
-  background-color: #26221f;
-  border-left-color: #f47725;
+.md-typeset :is(.admonition, details) {
+  border: 1px solid rgb(var(--role-border, var(--role-neutral-border)));
+  border-left-width: 4px;
+  border-radius: 0.375rem;
+  background-color: rgb(var(--role-muted, var(--role-neutral-muted)) / 0.5);
+  box-shadow: none;
+  color: hsl(var(--foreground));
+}
+.md-typeset :is(.admonition, details) > :is(.admonition-title, summary) {
+  background-color: rgb(var(--role-muted, var(--role-neutral-muted)));
+  color: rgb(var(--role-fg, var(--role-neutral-fg)));
+  font-weight: 600;
+}
+.md-typeset :is(.admonition, details) > :is(.admonition-title, summary)::before,
+.md-typeset :is(.admonition, details) > summary::after {
+  background-color: rgb(var(--role-emphasis, var(--role-neutral-emphasis)));
+}
+.md-typeset :is(.admonition, details):is(.note, .info, .todo, .abstract, .summary, .tldr) {
+  --role-fg: var(--role-info-fg);
+  --role-muted: var(--role-info-muted);
+  --role-emphasis: var(--role-info-emphasis);
+  --role-border: var(--role-info-border);
+}
+.md-typeset :is(.admonition, details):is(.tip, .hint, .important, .success, .check, .done) {
+  --role-fg: var(--role-success-fg);
+  --role-muted: var(--role-success-muted);
+  --role-emphasis: var(--role-success-emphasis);
+  --role-border: var(--role-success-border);
+}
+.md-typeset :is(.admonition, details):is(.warning, .caution, .attention, .question, .help, .faq) {
+  --role-fg: var(--role-attention-fg);
+  --role-muted: var(--role-attention-muted);
+  --role-emphasis: var(--role-attention-emphasis);
+  --role-border: var(--role-attention-border);
+}
+.md-typeset :is(.admonition, details):is(.danger, .error, .failure, .fail, .missing, .bug) {
+  --role-fg: var(--role-danger-fg);
+  --role-muted: var(--role-danger-muted);
+  --role-emphasis: var(--role-danger-emphasis);
+  --role-border: var(--role-danger-border);
+}
+.md-typeset :is(.admonition, details):is(.example, .quote, .cite) {
+  --role-fg: var(--role-neutral-fg);
+  --role-muted: var(--role-neutral-muted);
+  --role-emphasis: var(--role-neutral-emphasis);
+  --role-border: var(--role-neutral-border);
 }
 
-/* ---- 1차 다운로드 버튼: SK Red 채움 + 흰 글자, hover는 약간 어둡게 ---- */
+/* ---- 버튼: 앱과 같은 모서리(--radius 0.375rem)와 굵기. 주 버튼만 SK Red 채움 ---- */
+.md-typeset .md-button {
+  border-radius: 0.375rem;
+  font-weight: 500;
+  padding: 0.55em 1.3em;
+  color: hsl(var(--foreground));
+  background-color: transparent;
+  border: 1px solid hsl(var(--border));
+}
+.md-typeset .md-button:hover,
+.md-typeset .md-button:focus {
+  color: hsl(var(--foreground));
+  background-color: hsl(var(--accent));
+  border-color: hsl(var(--muted-foreground));
+}
 .md-typeset .md-button--primary {
-  background-color: #ea002c;
-  border-color: #ea002c;
-  color: #ffffff;
+  background-color: hsl(var(--brand));
+  border-color: hsl(var(--brand));
+  color: hsl(var(--brand-foreground));
 }
 .md-typeset .md-button--primary:hover,
 .md-typeset .md-button--primary:focus {
-  background-color: #b0001f;
-  border-color: #b0001f;
-  color: #ffffff;
+  background-color: hsl(var(--brand) / 0.9);
+  border-color: hsl(var(--brand) / 0.9);
+  color: hsl(var(--brand-foreground));
 }
 
-/* ---- grid cards: DevSite 카드 느낌 ---- */
+/* ---- grid cards ---- */
 .md-typeset .grid.cards > ul > li {
   border-radius: 0.5rem;
   padding: 1em 1.1em;
+  border-color: hsl(var(--border));
+  background-color: hsl(var(--card));
   transition: box-shadow 200ms, border-color 200ms;
 }
 .md-typeset .grid.cards > ul > li:hover {
-  border-color: #f47725;
-  box-shadow: 0 4px 16px -6px rgba(0, 0, 0, 0.18);
+  border-color: hsl(var(--muted-foreground));
+  box-shadow: 0 4px 16px -6px hsl(var(--foreground) / 0.18);
 }
-/* 카드 하단 링크: 기본은 본문색으로 차분하게, hover에서만 브랜드색.
-   화면 전체에 빨강이 반복되는 것을 줄인다. */
 .md-typeset .grid.cards a {
-  color: #3c4043;
-}
-[data-md-color-scheme="slate"] .md-typeset .grid.cards a {
-  color: #c4c7ca;
+  color: hsl(var(--muted-foreground));
 }
 .md-typeset .grid.cards a:hover,
 .md-typeset .grid.cards > ul > li:hover a {
-  color: #ea002c;
+  color: hsl(var(--foreground));
 }
-[data-md-color-scheme="slate"] .md-typeset .grid.cards a:hover,
-[data-md-color-scheme="slate"] .md-typeset .grid.cards > ul > li:hover a {
-  color: #ff4d6a;
+
+/* ---- 푸터 ---- */
+.md-footer-meta,
+.md-footer-meta__inner {
+  background-color: hsl(var(--muted));
+}
+.md-copyright,
+.md-copyright__highlight,
+.md-footer-meta .md-social__link {
+  color: hsl(var(--muted-foreground));
+}
+.md-copyright a {
+  color: hsl(var(--foreground));
 }
 
 /* ---- 홈 히어로 스크린샷: 카드형 테두리와 옅은 그림자 ---- */
 .md-typeset img.home-shot {
   margin-top: 1.2em;
-  border: 1px solid #e8eaed;
+  border: 1px solid hsl(var(--border));
   border-radius: 0.5rem;
-  box-shadow: 0 10px 28px -14px rgba(0, 0, 0, 0.22);
-}
-[data-md-color-scheme="slate"] .md-typeset img.home-shot {
-  border-color: #2d2d31;
+  box-shadow: 0 10px 28px -14px hsl(var(--foreground) / 0.3);
 }
 
 /* ---- 개념 다이어그램: 항상 본문 폭을 가득 채워 라벨이 읽히게 (2x PNG라 선명) ---- */
 .md-typeset img[src*="images/diagrams/"] {
   width: 100%;
+}
+
+/* ---- 홈 히어로: 제목, 짧은 부제, 버튼 둘, 조용한 보조 링크 ---- */
+.home-hero {
+  max-width: 40rem;
+  padding: 1.2rem 0 0.4rem;
+}
+.md-typeset .home-hero h1 {
+  font-size: 1.9rem;
+  line-height: 1.25;
+  margin: 0 0 0.8em;
+  text-wrap: balance;
+}
+.home-hero p {
+  font-size: 0.95rem;
+  line-height: 1.7;
+}
+.md-typeset .home-hero p.home-hero__aside {
+  margin-top: 1.1rem;
+  font-size: 0.72rem;
+  color: hsl(var(--muted-foreground));
+}
+.md-typeset .home-hero p.home-hero__aside a {
+  color: inherit;
+}
+.md-typeset .home-hero .md-button {
+  margin: 0.4rem 0.4rem 0 0;
+}
+/* 홈의 하위 제목은 카드 묶음 라벨이라 본문 제목보다 작게 */
+.md-typeset h3 {
+  font-size: 0.9rem;
+}
+/* 홈의 카드 묶음은 항상 2열로 두어 카드 수가 짝수일 때 남는 카드가 생기지 않게 한다 */
+@media screen and (min-width: 40em) {
+  .md-typeset .grid.cards {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* 한국어는 어절 단위로 줄을 바꿔 단어 중간에서 끊기지 않게 한다 */
+html[lang="ko"] .md-typeset :is(h1, h2, h3, p, li) {
+  word-break: keep-all;
+  overflow-wrap: break-word;
 }

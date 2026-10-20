@@ -18,13 +18,13 @@ description: BomLens가 생성하는 산출물 파일 목록과 생성 조건, �
 | `{Project}_{Version}_spdx3-check.json` / `.md` | SPDX 3.0.1 문서와 함께 | 요소마다 각 필드가 스캔에서 왔는지, 선언에서 왔는지, 비어 있는지와, 채워지지 않은 필수 필드, 모델 공개자가 판단해야 할 항목(개인정보, 안전 위험, 자율성)을 정리한 검사 결과. `service.state`는 선언한 서비스와 모델 값이 CycloneDX SBOM에 들어 있는지를 알린다. `none`(선언도 없고 SBOM에도 없음), `applied`(SBOM이 선언과 같음), `pendingScan`(둘이 다르며 다시 스캔하면 반영됨) 중 하나다. 법적 자문이 아닌 안내 |
 | `{Project}_{Version}_ai-declaration.template.json` | SPDX 3.0.1 문서와 함께 | 이 스캔의 빈 선언 양식. 모델과 데이터셋, 스캔이 찾은 기반 모델마다 사람이 채울 필드가 들어 있다. 채워서 `--ai-declare`로 다시 넘긴다 |
 | `{Project}_{Version}_ai-declaration.json` | `--ai-declare <file>`(받아들인 파일), 또는 웹 UI에서 저장한 선언 | 모델 공개자가 선언한 내용. `_vex.json`처럼 같은 프로젝트와 버전을 다시 스캔해도 지워지지 않고, 다시 스캔하면 다시 적용된다. 새 스캔에 없는 데이터셋이나 기반 모델을 적은 파일은 거부하며, 그 경우 문서는 초안으로 남는다. 데이터셋 항목에는 `sources[]`를 적을 수 있다. 허브 데이터셋은 `{"ref": "huggingface:<id>", "relation": "extended"}`로 적으며 다음 스캔에서 허브에서 읽어 그 데이터셋과 함께 판정한다. 문장으로만 아는 원천은 `{"name": "...", "license": "<허브 라이선스 태그나 SPDX ID>", "relation": "other"}`로 적으며 SPDX 3.0.1 문서에만 기록되고 확인되지 않은 것으로 표시된다. SPDX ID가 아닌 라이선스는 문장으로만 남는다. 허브에 없는 데이터에는 문장으로 적는 원천만 넣을 수 있다. `model.license`(허브 라이선스 태그나 SPDX ID)는 모델 자체의 라이선스다. 스캔이 라이선스를 읽지 못했거나 `other`만 읽었을 때 SPDX 문서에 들어가고(SPDX 라이선스 하나에 대응하는 허브 태그나 `LicenseRef-`일 때만 SPDX 식으로 기록), 선언만으로 만든 모델은 SBOM에도 이 라이선스가 들어가 이것으로 판정한다. 선언에는 모델을 실행하는 서비스(`service`)와 모델의 입력과 출력 종류, 규제 제출용 값도 적을 수 있다. [선언한 AI 서비스](#선언한-ai-서비스)를 참고한다 |
-| `{Project}_{Version}_component-versions.template.csv` | 버전 없는 컴포넌트를 찾은 펌웨어, 루트 파일시스템, 바이너리 스캔 | 그 컴포넌트의 이름을 `--component-versions` 형식(CSV, `name,version`)으로 적고 버전은 비워 둔 파일. 채워서 `--component-versions`로 다시 넘긴다 |
-| `{Project}_{Version}_NOTICE.txt` / `.html` | `--notice` / `--all` / 위험분석보고서 기본 | 오픈소스 고지문 |
+| `{Project}_{Version}_component-versions.template.csv` | 버전 없는 컴포넌트를 찾은 펌웨어, 루트 파일시스템, 바이너리 스캔 | 그 컴포넌트의 이름을 `--component-versions` 형식(`name,version,reason` 머리글의 CSV)으로 적고 버전은 비워 둔 파일. 세 가지 사유를 설명하는 주석 줄이 함께 들어 있고, 이미 사유가 붙은 컴포넌트는 넣지 않는다. 버전을, 버전이 없으면 사유를 채워 `--component-versions`로 다시 넘긴다 |
+| `{Project}_{Version}_NOTICE.txt` / `.html` | `--notice` / `--all` / 오픈소스 위험 보고서 기본 | 오픈소스 고지문 |
 | `{Project}_{Version}_NOTICE.pdf` | 위와 동일한 조건, 이미지에 PDF 렌더러가 포함된 경우(`--build-arg SBOM_PDF=true`) | 고지문을 PDF로 렌더링한 파일. 렌더러가 없으면 로그만 남기고 건너뜀 |
-| `{Project}_{Version}_security.json` / `.md` / `.html` | `--security` / `--all` / 위험분석보고서 기본 | Trivy 보안보고서 |
-| `{Project}_{Version}_risk-report.md` / `.html` | 기본(전 모드) — `--no-report`로 생략 | 오픈소스위험분석보고서 |
-| `{Project}_{Version}_conformance.json` / `.md` / `.html` | SBOM을 생성하는 모든 스캔에서 만들어지며 `--no-report`를 줘도 생략되지 않는다(`--no-report`는 위험 분석 보고서만 건너뛴다). `--analyze`도 만든다(그것이 검증 대상이므로) | 포맷 적합성 보고서. 모든 SBOM에 규제 크로스워크 집계가 함께 담긴다(EU 사이버복원력법은 BSI TR-03183-2로, 2026년판 미국 SBOM 최소 요소 — 참고용이며 준수 판정 아님). AI SBOM이면 G7 검사와 함께, 아직 비어 있는 권고 요소마다 이를 충족하는 CycloneDX 조각을 담는다. 보고서를 만드는 중 best-effort 후처리 단계가 실패하면 그 단계 이름을 기록하므로, 통과 판정이 모든 단계가 문제없이 돌았다는 증명은 아니다. 통과/실패 판정이나 개별 검사 항목의 상태에는 영향을 주지 않는다. 예시는 [적합성 보고서](../samples/aether-7b-5attn_conformance.ko.html)를 참고한다 |
-| `{Project}_{Version}_ai-profile.json` / `.md` | AI SBOM (`--model`, 또는 모델 컴포넌트가 있는 SBOM에 `--analyze`) | AI 준수 개요: G7 요약, 메울 수 있는 공백과 참고 링크, 라이선스 표시 컴포넌트, 규제 크로스워크, 모델 위험 판정(`riskAssessment`: 모델별 ok/conditional/caution/review 판정과 조건, 근거, 사용 형태. 법적 자문이 아닌 안내). 같은 요약이 적합성 보고서 HTML 맨 위에 나오므로 별도 HTML은 만들지 않는다 |
+| `{Project}_{Version}_security.json` / `.md` / `.html` | `--security` / `--all` / 오픈소스 위험 보고서 기본 | Trivy 보안보고서 |
+| `{Project}_{Version}_risk-report.md` / `.html` | 기본(전 모드) — `--no-report`로 생략 | 오픈소스 위험 보고서 |
+| `{Project}_{Version}_conformance.json` / `.md` / `.html` | SBOM을 생성하는 모든 스캔에서 만들어지며 `--no-report`를 줘도 생략되지 않는다(`--no-report`는 오픈소스 위험 보고서만 건너뛴다). `--analyze`도 만든다(그것이 검증 대상이므로) | 적합성 검사 보고서. 모든 SBOM에 규제 크로스워크 집계가 함께 담긴다(EU 사이버복원력법은 BSI TR-03183-2로, 2026년판 미국 SBOM 최소 요소 — 참고용이며 준수 판정 아님). AI SBOM이면 G7 검사와 함께, 아직 비어 있는 권고 요소마다 이를 충족하는 CycloneDX 조각을 담는다. 보고서를 만드는 중 best-effort 후처리 단계가 실패하면 그 단계 이름을 기록하므로, 통과 판정이 모든 단계가 문제없이 돌았다는 증명은 아니다. 통과/실패 판정이나 개별 검사 항목의 상태에는 영향을 주지 않는다. 예시는 [적합성 검사 보고서](../samples/aether-7b-5attn_conformance.ko.html)를 참고한다 |
+| `{Project}_{Version}_ai-profile.json` / `.md` | AI SBOM (`--model`, 또는 모델 컴포넌트가 있는 SBOM에 `--analyze`) | AI 준수 개요: G7 요약, 메울 수 있는 공백과 참고 링크, 라이선스 표시 컴포넌트, 규제 크로스워크, 모델 위험 판정(`riskAssessment`: 모델별 ok/conditional/caution/review 판정과 조건, 근거, 사용 형태. 법적 자문이 아닌 안내). 같은 요약이 적합성 검사 보고서 HTML 맨 위에 나오므로 별도 HTML은 만들지 않는다 |
 | `{Project}_{Version}_scancode.json` | `--deep-license` | scancode 원본 결과 |
 | `{Project}_{Version}_files.json` | 소스를 갖는 스캔(펌웨어 스캔은 항상, 다른 모드는 `--deep-license`가 아직 `_scancode.json`을 만들지 않은 경우) | 소스 트리 뷰를 뒷받침하는 ScanCode 형식 파일 트리 인벤토리(구조만, 라이선스 없음) |
 | `{Project}_{Version}_source.json` | 소스를 갖는 스캔 | 스캔한 트리의 파일 내용 스냅샷, 파일 뷰어를 뒷받침(스캔한 트리 자체는 컨테이너 종료와 함께 사라짐) |
@@ -113,6 +113,8 @@ compositions[]     의존성 그래프 완전성 (아래 참고)
 
 컴포넌트의 `supplier.name`은 패키지 메타데이터에 이미 적힌 값으로만 채웁니다. 생성 도구가 읽은 `publisher`(Maven POM의 `<organization>`, npm 게시자), `authors`(PyPI, RubyGems, Composer), 예전 형식의 `author` 필드 순서로 처음 있는 값을 씁니다. 값 안의 꺾쇠괄호 부분은 지우고, 괄호나 대괄호는 안에 이메일 주소나 URL만 있을 때 지웁니다. 그래서 npm 형식 `Name <email> (url)`의 이메일 주소와 URL이 빠지고, `Example (Holdings), Inc.`처럼 다른 내용이 든 괄호는 그대로 남습니다. 괄호 밖에 있는 이메일 주소와 URL(`http://`, `https://`, `ftp://`, `www.`)도 지우며, 그 앞에 닫히지 않은 괄호가 있으면 함께 지웁니다. 그래서 `Alice <a@x.org>, Bob <b@y.org>`는 `Alice, Bob`, `Jane Doe jane@example.org`는 `Jane Doe`, `Bob <b@x.org>; Carol <c@y.org>`는 `Bob; Carol`이 됩니다. 이메일 주소나 URL만 있는 값은 쓰지 않으며, 작성자가 여럿이면 쉼표로 잇습니다. 어느 필드에서 왔는지는 `bomlens:supplierSource` 속성(`publisher`, `authors`, `author`)에 남습니다. 세 필드가 모두 없는 컴포넌트에는 공급자를 넣지 않고, 이미 공급자가 있는 컴포넌트는 그대로 둡니다. 하위 컴포넌트(`components[].components`)에도 같은 규칙을 적용합니다. 배포판과 펌웨어 패키지(`pkg:deb`, `pkg:rpm`, `pkg:apk`, `pkg:alpm`, `pkg:opkg`, `pkg:generic`)와 `operating-system` 컴포넌트에는 공급자를 넣지 않습니다. 생성 도구가 이 패키지에서 읽는 게시자는 패키지 관리자이고 대개 개인 한 명이며, 배포판 이름을 추정해 대신 넣지도 않습니다. `--analyze`로 받은 공급사 SBOM과 `--merge` 결과는 작성된 그대로 둡니다.
 
+소스 스캔은 프로젝트가 버전을 고정했는지도 `metadata.component.properties`에 기록합니다. `bomlens:source:versionPinning` 값이 `pinned`이면 lock 파일이 있거나 `requirements.txt`의 모든 줄에 정확한 버전이 있는 것이고, `unpinned`이면 `requirements.txt`, `package.json`, `pyproject.toml`, `setup.py`, `setup.cfg` 옆에 lock 파일이 없고 모든 버전이 고정되어 있지 않은 것입니다. `unpinned`일 때 SBOM의 버전은 스캔한 날 새로 설치하면 받게 될 버전이어서, 실제로 실행한 버전과 다를 수 있습니다. 웹 UI가 안내를 보이고, 위험 보고서는 취약점 집계 아래에 같은 내용을 적습니다. 스캔이 판단하지 못했으면 이 속성은 없습니다.
+
 ## 의존성 그래프 완전성
 
 생성된 SBOM은 의존성 그래프가 얼마나 완전한지 나타내는 `compositions[0].aggregate` 항목을 담습니다.
@@ -125,6 +127,6 @@ compositions[]     의존성 그래프 완전성 (아래 참고)
 
 분석 대상 공급사 SBOM이 자체 `compositions` 선언을 이미 가지고 있다면 절대 덮어쓰지 않습니다.
 
-적합성 보고서의 전이 의존성 검사는 이 값을 detail 문구에 덧붙입니다(예: "12 edge(s), declared complete"). 통과/실패 판정에는 영향을 주지 않습니다.
+적합성 검사 보고서의 전이 의존성 검사는 이 값을 detail 문구에 덧붙입니다(예: "12 edge(s), declared complete"). 통과/실패 판정에는 영향을 주지 않습니다.
 
 전처리 단계가 돌았거나 이미 커밋된 lock 파일로 충족된 경우, 성공·실패와 무관하게 `bomlens:prep-step-applied` 속성에 기록됩니다. `bomlens:pipeline-step-failed`는 실패만 기록합니다. 위 `aggregate` 값은 둘을 함께 봐서 정해집니다.

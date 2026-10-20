@@ -12,6 +12,7 @@ import {
 } from "@/lib/nav";
 import { scanHash } from "@/lib/route";
 import { cn } from "@/lib/utils";
+import { useFormatNumber } from "@/lib/format";
 
 interface SidebarProps {
   scan?: ScanContext;
@@ -45,7 +46,7 @@ interface SidebarProps {
 // each of the two gaps, 2px at each side padding. Re-check this budget before
 // lengthening any label — nav.ts carries a note on the one that hit it.
 const RAIL_ROW =
-  "group relative flex w-full items-center gap-2 rounded-md px-1 py-2 text-sm " +
+  "group relative flex w-full items-center gap-2 rounded-md px-1 py-2 text-body-sm " +
   "transition-colors duration-fast ease-out-soft " +
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-sidebar";
 
@@ -59,7 +60,7 @@ const RAIL_ROW_IDLE =
  * appear only for AI/ANALYZE scans). The global block repeats what the TopBar
  * offers, spelled out in words: from a result screen the only labelled way back
  * to the scan list was the logo, which reads as decoration. Tokens only; the
- * brand accent marks the active section. Collapses to an icon rail on narrow
+ * neutral fill and a thin bar mark the active section. Collapses to an icon rail on narrow
  * widths or via the header toggle.
  */
 export function Sidebar({
@@ -74,6 +75,7 @@ export function Sidebar({
   onNewScan,
 }: SidebarProps) {
   const { t } = useTranslation();
+  const fmt = useFormatNumber();
   const groups = visibleGroups(scan);
 
   return (
@@ -130,7 +132,7 @@ export function Sidebar({
       {groups.map((group) => (
         <div key={group.id} className="mb-2">
           {!collapsed && (
-            <p className="px-2 pb-1 pt-2 text-[0.6875rem] font-semibold uppercase tracking-wider text-muted-foreground">
+            <p className="px-2 pb-1 pt-2 text-caption font-semibold uppercase tracking-wider text-muted-foreground">
               {t(group.labelKey)}
             </p>
           )}
@@ -149,24 +151,26 @@ export function Sidebar({
                     className={cn(
                       RAIL_ROW,
                       collapsed && "justify-center",
-                      // Label stays at foreground contrast (AA); the brand accent
-                      // lives in the icon + left indicator, not the text.
+                      // The active row is a neutral fill plus a thin bar on its
+                      // left edge. The brand red is not used here: it would read
+                      // as a warning on the one row that is simply "where you
+                      // are". The label stays at foreground contrast (AA).
                       active
-                        ? "bg-brand/10 font-semibold text-foreground"
+                        ? "bg-muted font-semibold text-foreground before:absolute before:inset-y-1.5 before:left-0 before:w-0.5 before:rounded-full before:bg-foreground"
                         : RAIL_ROW_IDLE,
                     )}
                   >
                     <Icon
-                      className={cn("h-4 w-4 shrink-0", active && "text-brand")}
+                      className={cn("h-4 w-4 shrink-0", active && "text-foreground")}
                       aria-hidden
                     />
                     {!collapsed && <span className="truncate">{label}</span>}
                     {!collapsed && count !== undefined && (
                       <span
                         className={cn(
-                          "ml-auto shrink-0 tabular-nums text-xs",
-                          // Muted fails AA on the active row's brand tint — keep
-                          // the count at foreground contrast there, like the label.
+                          "ml-auto shrink-0 tabular-nums text-label",
+                          // Keep the count at foreground contrast on the active row,
+                          // like the label.
                           active ? "text-foreground" : "text-muted-foreground",
                         )}
                         // Every badge sits in the same place in the same type,
@@ -187,7 +191,7 @@ export function Sidebar({
                             : undefined
                         }
                       >
-                        {count}
+                        {typeof count === "number" ? fmt(count) : count}
                       </span>
                     )}
                   </a>

@@ -11,6 +11,9 @@
 
 set -e
 
+# The arguments as given, so a static detection that fails can run again as a build.
+ORIG_ARGS=("$@")
+
 # ========================================================
 # SBOM Scan Orchestrator (2-stage architecture)
 #
@@ -65,6 +68,23 @@ case "$(uname -s 2>/dev/null)" in
         GUARD_STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/bomlens/guard"
         BOMLENS_CACHE_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/bomlens" ;;
 esac
+
+# Trivy keeps its vulnerability database inside the scan container, which is
+# thrown away after the scan, so without a cache folder every scan downloaded the
+# database again (about 100 MB and 15 to 25 seconds). The default is now a folder
+# under the BomLens cache; the database is about 1.5 GB there. SBOM_TRIVY_CACHE
+# names another folder, and SBOM_TRIVY_CACHE= (set and empty) goes back to a
+# download per scan.
+SBOM_TRIVY_CACHE="${SBOM_TRIVY_CACHE-$BOMLENS_CACHE_DIR/trivy}"
+
+# Package downloads a scan would otherwise repeat every time, because the
+# container that does the work is thrown away afterwards: "<folder under the
+# BomLens cache>:<where the build tools look for it inside the container>". The
+# Maven and Gradle ones are mounted separately (their settings files go beside
+# them); these are the Cargo registry, the Go module and build caches, and pip's
+# and npm's download caches.
+PKG_CACHE_PAIRS=("cargo/registry:/usr/local/cargo/registry" "go/mod:/tmp/sbomhome/go/pkg/mod"
+                 "go/build:/tmp/sbomhome/go-build" "pip:/tmp/sbomhome/.cache/pip" "npm:/tmp/sbomhome/.npm")
 
 POSTPROCESS_IMAGE="${SBOM_SCANNER_IMAGE:-ghcr.io/sktelecom/bomlens:latest}"           # legacy aliases: sbom-generator, sbom-scanner
 
@@ -197,6 +217,10 @@ REACHABILITY="false"; REACHABILITY_NONCE=""
 # turning security on: only an explicit request is worth answering when a mode
 # cannot produce the report.
 SECURITY_REQUESTED="false"
+# How a source scan finds its dependencies: build (resolve them in a cdxgen
+# language image), static (read the lock file, no build) or auto (static when a
+# lock file of a verified kind covers the whole tree, a build otherwise).
+DETECTION="${DETECTION:-auto}"
 SIGN_SBOM="false"; BYTE_STABLE="false"; UI_MODE="false"; UI_PORT="${UI_PORT:-8080}"
 # The web UI is a local tool: it reaches the engine socket to run scans, so it
 # is published to the loopback interface only. Set UI_BIND_ADDRESS=0.0.0.0 to
@@ -213,6 +237,7 @@ CONFORMANCE_PROFILE="${CONFORMANCE_PROFILE:-default}"
 # it is the only part of the conformance check that uses the network.
 PURL_RESOLVE="${PURL_RESOLVE:-false}"
 # Registry licences (--license-registry). Off unless asked: it uses the network.
+_LICENSE_REGISTRY_USER="${LICENSE_REGISTRY-}"
 LICENSE_REGISTRY="${LICENSE_REGISTRY:-false}"
 # CI gate: exit non-zero when this scan's own conformance report says "fail".
 # Host-only logic (see the check near the end of this script); nothing is
@@ -263,8 +288,53 @@ hf_dataset_ref() {
     fi
     return 2
 }
-GIT_URL=""; GIT_REF=""; NO_REPORT="false"; GENERATE_REPORT="false"
+GIT_URL=""; GIT_REF=""; SCAN_EXCLUDE=""; NO_REPORT="false"; GENERATE_REPORT="false"
 INGEST_SOURCE="false"; INGEST_ROOTFS="false"; INGEST_ARCHIVE=""; SCAN_INPUT_DIR=""; CLEANUP_DIRS=()
+
+# --exclude <path>: a path inside the scanned folder to leave out of a source
+# scan. Kept as a newline-separated list in SCAN_EXCLUDE. Only a plain relative
+# path is accepted (no "..", no absolute path, no glob), so it can never name
+# anything outside the scanned tree.
+add_scan_exclude() {
+    local p="$1"
+    [ -n "$p" ] || { echo "[ERROR] --exclude requires a path, e.g. --exclude vendor/legacy"; exit 1; }
+    while :; do
+        case "$p" in ./*) p="${p#./}" ;; */) p="${p%/}" ;; *) break ;; esac
+    done
+    case "$p" in
+        ""|"."|/*|*\\*|*[[:cntrl:]]*|*"*"*|*"?"*|*"["*)
+            echo "[ERROR] --exclude takes a relative path inside the scanned folder (no glob, no absolute path): $1"; exit 1 ;;
+    esac
+    case "/$p/" in
+        */../*) echo "[ERROR] --exclude must stay inside the scanned folder (no \"..\"): $1"; exit 1 ;;
+    esac
+    SCAN_EXCLUDE="${SCAN_EXCLUDE:+$SCAN_EXCLUDE
+}$p"
+}
+
+# Copies $1 to $2 without the paths in SCAN_EXCLUDE ($3 is the path of $1
+# relative to the scanned root). A directory is descended into only when an
+# excluded path lies below it; everything else is copied whole. Entries in
+# SCAN_EXCLUDE_SKIP (the output folder and the copy itself) are never copied.
+copy_without_excluded() {
+    local src="$1" dst="$2" rel="$3" entry name path
+    mkdir -p "$dst"
+    for entry in "$src"/* "$src"/.[!.]* "$src"/..?*; do
+        [ -e "$entry" ] || [ -L "$entry" ] || continue
+        case " $SCAN_EXCLUDE_SKIP " in *" $entry "*) continue ;; esac
+        name="${entry##*/}"
+        path="${rel:+$rel/}$name"
+        if printf '%s\n' "$SCAN_EXCLUDE" | grep -Fxq -- "$path"; then
+            continue
+        fi
+        if [ -d "$entry" ] && [ ! -L "$entry" ] \
+           && printf '%s\n' "$SCAN_EXCLUDE" | awk -v p="$path/" 'index($0, p) == 1 { f = 1 } END { exit !f }'; then
+            copy_without_excluded "$entry" "$dst/$name" "$path"
+        else
+            cp -pPR "$entry" "$dst/" || return 1
+        fi
+    done
+}
 MERGE_FILES=()
 MERGE_ROOT=""
 DIFF_OLD=""; DIFF_NEW=""
@@ -312,6 +382,7 @@ while [[ "$#" -gt 0 ]]; do
             shift 2 ;;
         --git) GIT_URL="$2"; shift ;;
         --branch|--ref) GIT_REF="$2"; shift ;;
+        --exclude) add_scan_exclude "${2:-}"; shift ;;
         --no-report) NO_REPORT="true" ;;
         --generate-only) GENERATE_ONLY="true" ;;
         --upload-target) UPLOAD_TARGET="$2"; shift ;;
@@ -330,6 +401,7 @@ while [[ "$#" -gt 0 ]]; do
         --verify-weights) VERIFY_WEIGHTS="true" ;;
         --sign) SIGN_SBOM="true" ;;
         --byte-stable) BYTE_STABLE="true" ;;
+        --detection) DETECTION="${2:-}"; shift ;;
         --fail-on-conformance) FAIL_ON_CONFORMANCE="true" ;;
         # Repeatable. The list of conditions is closed (checked below), so a typo
         # fails here instead of quietly gating on nothing.
@@ -409,13 +481,16 @@ Options:
                          rest comes from the declaration (base image).
   --component-versions <file>
                          For a firmware, root filesystem or binary scan: a CSV
-                         file with two columns, name,version, giving the version
-                         of components the scan found but could not read a
+                         file, name,version[,reason], giving the version of
+                         components the scan found but could not read a
                          version for. A version the scan read from the delivered
                          files is kept (a warning names both), and a name the
                          scan did not find is added as a supplier-declared
-                         component. Every such scan writes the components still
-                         missing a version to
+                         component. With no version to give, leave it empty and
+                         write a reason: own-code, not-open-source or
+                         version-unknown (recorded as bomlens:versionReason).
+                         Every such scan writes the components still missing a
+                         version to
                          <Project>_<Version>_component-versions.template.csv,
                          in this format, to fill in and pass back.
   --no-spdx3             For an AI model or dataset scan: do not write the
@@ -444,6 +519,9 @@ Options:
                          with --target/--analyze/--firmware.
   --branch <ref>         Branch, tag, or commit for --git (alias: --ref;
                          default: repo default)
+  --exclude <path>       Leave a path out of a source scan (repeatable). Relative
+                         to the scanned folder, e.g. --exclude vendor/legacy.
+                         The scan runs on a copy of the tree without it.
   --firmware             Force firmware mode for --target (opt-in image). Works
                          on an archive too: the firmware unpacker reads it
                          directly, nested formats and all, instead of the
@@ -519,7 +597,7 @@ Options:
                          and dataset SBOMs are always 1.7
   --all                  --notice --security --spdx
   --no-report            Skip the open-source risk report (risk-report). By default
-                         the risk report (+notice+security) is generated in
+                         the open-source risk report (+notice+security) is generated in
                          every mode; --no-report opts out.
   --deep-license         scancode deep license (opt-in image)
   --deep-cve             Also match maven components against NVD by CPE via grype
@@ -553,8 +631,16 @@ Options:
                          default 5 files / 2 GiB each), so this is opt-in, unlike
                          the metadata-only file-security lookup.
   --byte-stable          Deterministic SBOM output
-  --fail-on-conformance  Exit 2 if this scan's own conformance report says
-                         "fail" (exit 3 if no conformance report was produced
+  --detection <how>      How a source scan finds dependencies: build, static or
+                         auto (default). static reads the lock file and does not
+                         build (no cdxgen image, a few seconds shorter; a
+                         project without a complete lock file comes out short).
+                         auto chooses static only when a package-lock.json,
+                         npm-shrinkwrap.json, pnpm-lock.yaml, bun.lock or
+                         gradle.lockfile covers the whole tree, and builds
+                         otherwise. DETECTION=<how> in the environment does the same
+  --fail-on-conformance  Exit 2 if this scan's own conformance check report says
+                         "fail" (exit 3 if no conformance check report was produced
                          for this scan). Not offered with --ui. See "Exit
                          codes" in the CLI reference.
   --fail-on <condition>  Exit 4 when this scan meets the condition (exit 5 when it
@@ -592,7 +678,7 @@ Options:
                          default; uses the network.
   --resolve-purl         --analyze only: ask each package repository whether the
                          identifiers in the submitted SBOM name packages that
-                         exist, and add the answer to the conformance report as
+                         exist, and add the answer to the conformance check report as
                          an advisory row. Off by default; it is the only part of
                          the check that uses the network. An identifier that
                          resolves to nothing is reported, never failed: a
@@ -621,7 +707,9 @@ Environment:
   SECURITY_ENRICH        Enrich the security report with EPSS + CISA KEV
                          signals (default: true; set false for air-gapped)
   SBOM_TRIVY_CACHE       Host folder kept as Trivy's cache (database downloaded
-                         once); HTTP(S)_PROXY, NO_PROXY, TRIVY_*, EPSS_API and
+                         once; default: the BomLens cache folder, 'trivy' under it,
+                         about 1.5 GB; set it empty to download on every scan);
+                         HTTP(S)_PROXY, NO_PROXY, TRIVY_*, EPSS_API and
                          KEV_URL are passed on to the containers by name
   ENRICH_EOL             Flag components past their end-of-life from a bundled
                          endoflife.date snapshot (default: true; runs OFFLINE,
@@ -697,7 +785,7 @@ Architecture: source SBOM generation uses cdxgen's per-language images
 (on-demand); this tool orchestrates + post-processes.
 EOF
             exit 0 ;;
-        *) echo "[ERROR] Unknown option: $1"; exit 1 ;;
+        *) echo "[ERROR] Unknown option: $1 (see ./scripts/scan-sbom.sh --help for the options)"; exit 1 ;;
     esac
     shift
 done
@@ -706,8 +794,8 @@ done
 # Docker checks
 # ========================================================
 docker_check() {
-    command -v docker &>/dev/null || { echo "[ERROR] Docker not installed."; echo "  https://www.docker.com/products/docker-desktop/"; exit 1; }
-    docker info >/dev/null 2>&1 || { echo "[ERROR] Docker daemon not running. Start Docker Desktop and retry."; exit 1; }
+    command -v docker &>/dev/null || { echo "[ERROR] Docker is not installed, or not on PATH. BomLens needs a Docker engine (Docker Desktop, Rancher Desktop, Colima, or docker-ce)."; echo "  Install steps: https://sktelecom.github.io/bomlens/start/first-scan/#requirements"; exit 1; }
+    docker info >/dev/null 2>&1 || { echo "[ERROR] Cannot reach the Docker engine. Start Docker Desktop or Rancher Desktop (or run 'colima start'), wait until it is ready, then retry. To check: docker info"; exit 1; }
 }
 
 # `docker run` only auto-pulls an image that is entirely ABSENT locally; once a
@@ -902,8 +990,28 @@ if [ "$UI_MODE" = "true" ]; then
     echo "=========================================="
     echo "  BomLens Web UI — http://localhost:${UI_PORT}  (Ctrl+C to stop)"
     echo "=========================================="
-    ( sleep 2; (command -v open >/dev/null 2>&1 && open "http://localhost:${UI_PORT}") \
-        || (command -v xdg-open >/dev/null 2>&1 && xdg-open "http://localhost:${UI_PORT}") ) >/dev/null 2>&1 &
+    # Open the browser once the server answers (the first start can take about a
+    # minute while the image is extracted). Without curl or wget, fall back to a
+    # fixed short wait. After 120 s with no answer the browser is left alone.
+    (
+        UI_URL="http://localhost:${UI_PORT}"
+        ui_ready() {
+            if command -v curl >/dev/null 2>&1; then curl -fs -o /dev/null --max-time 2 "$UI_URL"
+            elif command -v wget >/dev/null 2>&1; then wget -q -O /dev/null -T 2 "$UI_URL"
+            else sleep 2; return 0; fi
+        }
+        n=0
+        until ui_ready; do
+            n=$((n+1))
+            if [ "$n" -ge 120 ]; then
+                echo "  The web UI is still starting. Open $UI_URL in your browser when it is ready."
+                exit 0
+            fi
+            sleep 1
+        done
+        (command -v open >/dev/null 2>&1 && open "$UI_URL") \
+            || (command -v xdg-open >/dev/null 2>&1 && xdg-open "$UI_URL")
+    ) 2>/dev/null &
     # -it only when attached to a terminal: docker refuses -t without one
     # (CI, pipes), and Ctrl+C passthrough is moot there anyway.
     TTY_FLAGS=()
@@ -913,6 +1021,18 @@ if [ "$UI_MODE" = "true" ]; then
     # to keep a secret, so it comes from the environment that launched the tool.
     HF_FLAGS=()
     if [ -n "$HF_TOKEN" ]; then HF_FLAGS=(-e HF_TOKEN); fi
+    # The web UI starts each source scan's cdxgen container with --volumes-from this
+    # one, so the package caches the CLI mounts into stage 1 are mounted here, at the
+    # same places, for the UI's scans to find. The UI itself never reads them.
+    UI_CACHE_FLAGS=()
+    mkdir -p "$BOMLENS_CACHE_DIR/m2/repository" 2>/dev/null \
+        && UI_CACHE_FLAGS+=(-v "$(hostpath "$BOMLENS_CACHE_DIR/m2"):/tmp/sbomhome/.m2")
+    mkdir -p "$BOMLENS_CACHE_DIR/gradle" 2>/dev/null \
+        && UI_CACHE_FLAGS+=(-v "$(hostpath "$BOMLENS_CACHE_DIR/gradle"):/root/.gradle")
+    for _cm in "${PKG_CACHE_PAIRS[@]}"; do
+        mkdir -p "$BOMLENS_CACHE_DIR/${_cm%%:*}" 2>/dev/null \
+            && UI_CACHE_FLAGS+=(-v "$(hostpath "$BOMLENS_CACHE_DIR/${_cm%%:*}"):${_cm#*:}")
+    done
     # Go toolchain and module proxy settings for Go dependency resolution. A
     # name-only -e is skipped by docker when the variable is unset.
     GO_ENV_FLAGS=(-e GOTOOLCHAIN -e GOPROXY -e GOSUMDB)
@@ -943,7 +1063,7 @@ if [ "$UI_MODE" = "true" ]; then
     ensure_image_fresh "$POSTPROCESS_IMAGE"
     exec "${DOCKER_ENV[@]}" docker run --rm "${TTY_FLAGS[@]}" -p "${UI_BIND_ADDRESS}:${UI_PORT}:8080" \
         -v "$(hostpath "$UI_BASE")":/src -v "$(hostpath "$UI_BASE")":/host-output \
-        "${MOUNT_FLAGS[@]}" "${HF_FLAGS[@]}" "${GO_ENV_FLAGS[@]}" "${PREP_ENV_FLAGS[@]}" "${CANCEL_ENV_FLAGS[@]}" "${TRIVY_CACHE_FLAGS[@]}" "${CDXGEN_ENV_FLAGS[@]}" \
+        "${MOUNT_FLAGS[@]}" "${HF_FLAGS[@]}" "${GO_ENV_FLAGS[@]}" "${PREP_ENV_FLAGS[@]}" "${CANCEL_ENV_FLAGS[@]}" "${TRIVY_CACHE_FLAGS[@]}" "${UI_CACHE_FLAGS[@]}" "${CDXGEN_ENV_FLAGS[@]}" \
         "${UI_GUARD_FLAGS[@]}" "${UI_IMAGE_FLAGS[@]}" \
         -v /var/run/docker.sock:/var/run/docker.sock \
         -e MODE=UI -e UI_PORT=8080 -e SBOM_UI_HOST_DIR="$(hostpath "$UI_BASE")" \
@@ -1218,6 +1338,10 @@ setup_guard_state() {
 # license fetched in one scan but not the next would make two otherwise-identical
 # scans differ. Pin the lookup off for byte-stable scans.
 FETCH_LICENSE="${FETCH_LICENSE:-true}"
+case "$DETECTION" in
+    build|static|auto) ;;
+    *) echo "[ERROR] --detection takes build, static or auto (got '$DETECTION')."; exit 1 ;;
+esac
 [ "$BYTE_STABLE" = "true" ] && FETCH_LICENSE="false"
 # EPSS + CISA KEV enrichment defaults on, but the host setting must reach the
 # post-process container so SECURITY_ENRICH=false works for air-gapped runs.
@@ -1274,6 +1398,18 @@ pp_env() {
 # The docker CLI forwards a name-only `-e VAR` from its own environment, so the
 # secret values must be exported for pp_env/cosign_run to carry them. API_KEY is
 # the resolved DEFAULT_API_KEY; the others come straight from the host env.
+# True when the CycloneDX file lists at least one component. Uses jq when the
+# host has it; otherwise looks for a package URL, which every component the
+# fallback scan writes carries.
+sbom_has_components() {
+    [ -s "$1" ] || return 1
+    if command -v jq >/dev/null 2>&1; then
+        [ "$(jq '[.components[]?] | length' "$1" 2>/dev/null || echo 0)" -gt 0 ]
+    else
+        grep -q '"purl"' "$1" 2>/dev/null
+    fi
+}
+
 export_scan_secrets() { export API_KEY="$DEFAULT_API_KEY" SCANOSS_API_KEY COSIGN_PASSWORD; }
 
 # cosign key mount + env, only when --sign is set with a real key. The private
@@ -2020,12 +2156,12 @@ fi
 if [ -n "$COMPONENT_VERSIONS_FILE" ]; then
     if [ ! -f "$COMPONENT_VERSIONS_FILE" ]; then
         echo "[ERROR] --component-versions file not found: $COMPONENT_VERSIONS_FILE"
-        echo "[ERROR] Pass a CSV file with two columns, name,version. A firmware, root filesystem or binary scan writes one to start from: <Project>_<Version>_component-versions.template.csv."; exit 1
+        echo "[ERROR] Pass a CSV file with the columns name,version[,reason]. A firmware, root filesystem or binary scan writes one to start from: <Project>_<Version>_component-versions.template.csv."; exit 1
     fi
     # The container checks every row; refusing an oversized file here saves
     # starting the scan for it.
     if [ "$(wc -c < "$COMPONENT_VERSIONS_FILE" | tr -d ' ')" -gt 262144 ]; then
-        echo "[ERROR] --component-versions: the file is larger than 256 KiB. It lists one component per line (name,version)."; exit 1
+        echo "[ERROR] --component-versions: the file is larger than 256 KiB. It lists one component per line (name,version[,reason])."; exit 1
     fi
 fi
 
@@ -2351,6 +2487,10 @@ elif [ -n "$TARGET" ]; then
         case "$TARGET" in
             -*) echo "[ERROR] --target '$TARGET' starts with '-': no file or folder has that name, and an image name cannot start with '-'. Give the image reference itself, for example --target alpine:3.20."; exit 1 ;;
         esac
+        case "$TARGET" in
+            .*|/*|~*|*.zip|*.tar|*.tar.gz|*.tgz|*.bin)
+                echo "[WARN] --target '$TARGET' is not a file or folder under $(pwd), so it is treated as a Docker image name. If you meant a path, check the spelling and the folder you ran this from." ;;
+        esac
         MODE="IMAGE"
     fi
 elif [ "$FORCE_FIRMWARE" = "true" ]; then
@@ -2524,6 +2664,34 @@ case "$OUTPUT_HOST_DIR" in
     "$SCAN_INPUT_DIR"/*) SRC_TREE_EXCLUDE="$RUN_NAME" ;;
 esac
 
+# --exclude: scan a copy of the tree that lacks the named paths, so every step
+# below (language detection, build, cdxgen, license and vendored-code scans, the
+# file tree) sees the same smaller tree and none needs its own exclusion list.
+# The copy sits in the output folder, which Docker already shares.
+if [ -n "$SCAN_EXCLUDE" ]; then
+    if [ "$MODE" != "SOURCE" ]; then
+        echo "[ERROR] --exclude applies to a source scan (a folder, --git or an archive), not to $MODE mode."
+        exit 1
+    fi
+    while IFS= read -r _ex; do
+        if [ ! -e "$SCAN_INPUT_DIR/$_ex" ] && [ ! -L "$SCAN_INPUT_DIR/$_ex" ]; then
+            echo "[WARN] --exclude path not found in the scanned folder, ignored: $_ex"
+        fi
+    done <<EOF_EXCLUDE
+$SCAN_EXCLUDE
+EOF_EXCLUDE
+    _view="$OUTPUT_HOST_DIR/.scan-view"
+    rm -rf -- "$_view"
+    CLEANUP_DIRS+=("$_view")
+    # A flat layout writes straight into the scanned folder; only the copy is skipped then.
+    SCAN_EXCLUDE_SKIP="$_view"
+    [ "$OUTPUT_HOST_DIR" = "$SCAN_INPUT_DIR" ] || SCAN_EXCLUDE_SKIP="$OUTPUT_HOST_DIR $_view"
+    echo "[INFO] Excluding $(printf '%s\n' "$SCAN_EXCLUDE" | grep -c .) path(s) from the scan; scanning a copy of the tree."
+    copy_without_excluded "$SCAN_INPUT_DIR" "$_view" "" \
+        || { echo "[ERROR] could not copy the source tree for --exclude"; exit 1; }
+    SCAN_INPUT_DIR="$_view"
+fi
+
 # ========================================================
 # Stage 1: produce SBOM
 # ========================================================
@@ -2533,6 +2701,22 @@ if [ "$MODE" = "SOURCE" ]; then
     # separate from the scanned tree, even for --git/zip ingestion.
     [ -n "$(ls -A "$SCAN_INPUT_DIR" 2>/dev/null)" ] || { echo "[ERROR] source directory is empty: $SCAN_INPUT_DIR"; exit 1; }
     LANG_DET=$(detect_lang "$SCAN_INPUT_DIR")
+    # Build or static? Static needs the registry lookup to fill the licenses a lock
+    # file does not carry, so "auto" leaves it to a build when that lookup is off
+    # (--byte-stable, FETCH_LICENSE=false) or the user turned it off.
+    DETECTION_USED="build"; DETECTION_WHY=""
+    if [ "$DETECTION" = static ]; then
+        DETECTION_USED="static"; DETECTION_WHY="requested"
+        if ! static_detection_check "$SCAN_INPUT_DIR" "$LANG_DET"; then
+            echo "[WARN] --detection static: $STATIC_DETECTION_WHY; the SBOM may be incomplete."
+        fi
+    elif [ "$DETECTION" = auto ] && [ "$BYTE_STABLE" != "true" ] && [ "$FETCH_LICENSE" = "true" ] \
+         && [ "$_LICENSE_REGISTRY_USER" != "false" ] && static_detection_check "$SCAN_INPUT_DIR" "$LANG_DET"; then
+        DETECTION_USED="static"; DETECTION_WHY="$STATIC_DETECTION_WHY"
+    fi
+    if [ "$DETECTION_USED" = static ] && [ "$FETCH_LICENSE" = "true" ] && [ "$_LICENSE_REGISTRY_USER" != "false" ] && [ "$BYTE_STABLE" != "true" ]; then
+        LICENSE_REGISTRY="true"
+    fi
     warn_low_engine_memory_for "$LANG_DET" "$SCAN_INPUT_DIR"
     if [ "$LANG_DET" = "android" ]; then
         API=$(android_api "$SCAN_INPUT_DIR")
@@ -2574,6 +2758,12 @@ if [ "$MODE" = "SOURCE" ]; then
             echo "[WARN]   If this is C/C++ embedded source, --identify-vendored finds open source copied in (opt-in image)."
         fi
     fi
+    HOST_GOTOOLCHAIN="${GOTOOLCHAIN:-}"
+    STAGE1_FALLBACK_ENV=""; STAGE1_FAILED=""; STAGE1_LOG=""
+    if [ "$DETECTION_USED" = static ]; then
+        echo "[INFO] Detection: static ($DETECTION_WHY); the dependency build is skipped."
+        STAGE1_FALLBACK_ENV=" -e BOMLENS_DETECTION=static -e BOMLENS_DETECTION_WHY=$DETECTION_WHY"
+    else
     echo "[1/2] Generating SBOM (cdxgen)..."
     # Stage 1 runs as root, so the Maven and Gradle caches it writes are
     # BomLens's own folders, not ~/.m2 or ~/.gradle: root-owned files there
@@ -2597,6 +2787,16 @@ if [ "$MODE" = "SOURCE" ]; then
         done
         [ -d "$HOME/.gradle/init.d" ] && CACHE_MOUNTS="$CACHE_MOUNTS -v \"$(hostpath "$HOME/.gradle/init.d")\":/bomlens-settings/gradle/init.d:ro"
     fi
+    # Package downloads that every scan repeated because the container is thrown away
+    # afterwards: the Cargo registry, the Go module and build caches, pip's and npm's
+    # download caches. Each is a folder of its own under the BomLens cache, so a
+    # scan reads only what an earlier scan downloaded from the same registries.
+    for _cm in "${PKG_CACHE_PAIRS[@]}"; do
+        _cm_host="${_cm%%:*}"
+        if mkdir -p "$BOMLENS_CACHE_DIR/$_cm_host" 2>/dev/null; then
+            CACHE_MOUNTS="$CACHE_MOUNTS -v \"$(hostpath "$BOMLENS_CACHE_DIR/$_cm_host")\":${_cm#*:}"
+        fi
+    done
     # HOME=/tmp/sbomhome: writable for both root and non-root (cyclonedx) images,
     # so maven/cargo/etc. caches resolve regardless of the base image's user.
     # -u 0:0: the all-in-one fallback image runs as a non-root user and could not
@@ -2701,6 +2901,7 @@ if [ "$MODE" = "SOURCE" ]; then
         $GUARD_STATE_ARGS \
         -e HOME=/tmp/sbomhome \
         -e "\"MAVEN_OPTS=-Duser.home=/tmp/sbomhome -Dmaven.repo.local=/tmp/sbomhome/.m2/repository\"" \
+        -e GOPATH=/tmp/sbomhome/go -e GOMODCACHE=/tmp/sbomhome/go/pkg/mod -e GOCACHE=/tmp/sbomhome/go-build \
         -e FETCH_LICENSE="$FETCH_LICENSE" \
         -e PROJECT_NAME="\"$PROJECT_NAME\"" \
         -e PROJECT_VERSION="\"$PROJECT_VERSION\"" \
@@ -2752,6 +2953,7 @@ if [ "$MODE" = "SOURCE" ]; then
     else
         "${DOCKER_ENV[@]}" docker rm -f "$STAGE1_CONTAINER" >/dev/null 2>&1
         rm -f "$STAGE1_LOG"
+    fi
     fi
 
     echo "[2/2] Post-processing..."
@@ -2919,13 +3121,26 @@ EOF
         -e MODE=POSTPROCESS -e BOMLENS_RUN_INPUT="$OUTPUT_FILE" -e NESTED_ROOTFS_HINT="\"$NESTED_ROOTFS_HINT\"" -e BOMLENS_DEEP_LICENSE_FALLBACK="\"${DEEP_LICENSE_FALLBACK_FROM:-}\"" -e BOMLENS_DEEP_CVE_FALLBACK="\"${DEEP_CVE_FALLBACK_FROM:-}\"" -e BOMLENS_INCLUDE_NON_SHIPPED${STAGE1_FALLBACK_ENV}${STAGE1_FINGERPRINT_ENV}${PP_ENV} $(pp_env)$(cosign_run)$(vex_run)$(declare_run)$(gate_run) \
         "\"$PP_IMAGE\"" || {
         _pp_rc=$?
+        if [ "$DETECTION_USED" = static ] && [ ! -s "$OUTPUT_HOST_DIR/$OUTPUT_FILE" ]; then
+            if [ "$DETECTION" = auto ]; then
+                echo "[WARN] Static detection could not read the lock file; scanning again with a build."
+                exec "$0" "${ORIG_ARGS[@]}" --detection build
+            fi
+            echo "[ERROR] Static detection failed. Scan again with --detection build."
+        fi
         if [ -n "$STAGE1_FAILED" ] && [ ! -s "$OUTPUT_HOST_DIR/$OUTPUT_FILE" ]; then
             echo "[ERROR] SBOM generation failed (stage 1), and the manifest-only fallback also failed or was discarded (see the guidance above, if any). Full cdxgen log: $STAGE1_LOG"
         fi
         exit "$_pp_rc"
     }
     if [ -n "$STAGE1_FAILED" ]; then
-        echo "[WARN] Manifest-only fallback used (direct dependencies only, no transitive resolution). Full cdxgen log: $STAGE1_LOG"
+        # The fallback reads manifests only. When it found no component, "direct
+        # dependencies only" would say the opposite of what the SBOM holds.
+        if sbom_has_components "$OUTPUT_HOST_DIR/$OUTPUT_FILE"; then
+            echo "[WARN] Manifest-only fallback used (direct dependencies only, no transitive resolution). Full cdxgen log: $STAGE1_LOG"
+        else
+            echo "[WARN] Manifest-only fallback used and it found no components: this SBOM does not list the project's dependencies. A dependency file with fixed versions (a lock file or pinned requirements) is what the fallback can read. Fix the cause in the cdxgen log and re-scan: $STAGE1_LOG"
+        fi
     fi
 else
     # image / binary / rootfs / firmware / aibom / analyze / merge: scanner image
@@ -3070,8 +3285,11 @@ summary_line() {  # <label> <file> [more files…] — prints iff the first exis
 missing=""
 note_missing() { missing="${missing:+$missing }$1"; }
 
-echo "=========================================="
-echo "  Analysis Complete!"
+# The heading depends on whether anything requested is missing, which is only
+# known after the lines below are decided, so they are buffered first. A group
+# (not a subshell) keeps note_missing's variable.
+SUMMARY_BUF="$(mktemp)"
+{
 if [ "$GENERATE_ONLY" = "true" ]; then
     P="${SAFE_PROJECT}_${SAFE_VERSION}"
     echo "  Output dir: ${OUTPUT_HOST_DIR}"
@@ -3122,11 +3340,11 @@ if [ "$GENERATE_ONLY" = "true" ]; then
     if { [ "$MODE" = "ANALYZE" ] && ! { [ -n "${YOCTO_BUILD_DIR:-}" ] && [ -z "$ANALYZE_SBOM" ]; }; } \
         || [ "$MODE" = "AIBOM" ] || [ "$MODE" = "DATASET" ] || [ "$MODE" = "AIDECLARE" ]; then
         summary_line "Conformance:" "${P}_conformance.json" "${P}_conformance.md" "${P}_conformance.html" \
-            || note_missing "conformance report"
+            || note_missing "conformance check report"
     fi
     if [ "$GENERATE_REPORT" = "true" ]; then
         summary_line "Risk report:" "${P}_risk-report.md" "${P}_risk-report.html" \
-            || note_missing "risk report"
+            || note_missing "open-source risk report"
     fi
     if [ -n "$missing" ]; then
         echo ""
@@ -3137,6 +3355,15 @@ if [ "$GENERATE_ONLY" = "true" ]; then
         echo "  Otherwise the step degraded — check the log above for its warning."
     fi
 fi
+} > "$SUMMARY_BUF"
+echo "=========================================="
+if [ -n "$missing" ]; then
+    echo "  Analysis finished with errors"
+else
+    echo "  Analysis Complete!"
+fi
+cat "$SUMMARY_BUF"
+rm -f "$SUMMARY_BUF"
 # What the result holds, in every mode: the numbers come from the scan's own
 # measurement (validate-sbom.sh), not from a count made here. Absent (an older
 # image, an AI SBOM) it prints nothing.
@@ -3246,7 +3473,7 @@ fi
 # failed, 3 means this run produced no conformance report to judge at all.
 if [ "$FAIL_ON_CONFORMANCE" = "true" ]; then
     if [ ! -f "$CONFORMANCE_RESULT_FILE" ]; then
-        echo "[ERROR] --fail-on-conformance: this scan produced no conformance report to judge."
+        echo "[ERROR] --fail-on-conformance: this scan produced no conformance check report to judge."
         exit 3
     fi
     if [ "$(cat "$CONFORMANCE_RESULT_FILE")" = "fail" ]; then

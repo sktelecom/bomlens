@@ -23,21 +23,23 @@ BomLens는 Docker 엔진 위에서 동작하지만, 데스크톱 앱과 웹 UI�
 실행 외에는 명령어가 거의 필요 없습니다. 브라우저에서 실행해 스캔하고 결과를 내려받습니다.
 
 ```bash
-git clone https://github.com/sktelecom/bomlens.git && cd bomlens
+git clone --depth 1 https://github.com/sktelecom/bomlens.git && cd bomlens
 ./scripts/scan-sbom.sh --ui     # http://localhost:8080 이 열리고, 산출물은 현재 폴더 아래 하위 폴더에 저장됩니다
 #   Windows: scripts\sbom-ui.bat 더블클릭
 ```
 
-실행한 폴더가 산출물 베이스이고, 스캔마다 그 아래 `{Project}_{Version}/` 하위 폴더에 저장됩니다(자세한 규칙은 [산출물 위치](../reference/cli.ko.md#산출물-위치) 참고). 포트가 충돌하면 `UI_PORT=9090`을 앞에 붙입니다(bash 전용 — Windows에서는 `sbom-ui.bat` 옆의 `scripts\bomlens.settings.txt`에 `UI_PORT=9090`을 적으세요. [설정 파일](no-cli.ko.md#설정-파일-명령줄-불필요) 참고). 현재 폴더 소스를 스캔하려면 그 프로젝트 폴더에서 실행하고, GitHub URL이나 ZIP, SBOM, 펌웨어, Docker 이미지는 UI에서 입력을 직접 주므로 아무 폴더에서나 실행해도 됩니다.
+`--depth 1`은 저장소 이력을 받지 않아 내려받는 양이 약 465MB에서 약 50MB로 줄어듭니다. 처음 실행할 때는 화면이 뜨기까지 1~2분 걸릴 수 있습니다. 스캐너 이미지가 없으면 받고(약 250MB), 있으면 새 버전이 있는지 확인하는 동안 서버가 아직 준비되지 않아, 자동으로 열린 브라우저 탭에 연결 오류가 보일 수 있습니다. 터미널에 `BomLens Web UI listening`이 나오면 탭을 새로고침하세요.
+
+실행한 폴더가 산출물 베이스이고, 스캔마다 그 아래 `{Project}_{Version}/` 하위 폴더에 저장됩니다(자세한 규칙은 [산출물 위치](../reference/cli.ko.md#산출물-위치) 참고). 포트가 충돌하면 `UI_PORT=9090`을 앞에 붙입니다(bash 전용, Windows에서는 `sbom-ui.bat` 옆의 `scripts\bomlens.settings.txt`에 `UI_PORT=9090`을 적으세요. [설정 파일](no-cli.ko.md#설정-파일-명령줄-불필요) 참고). 현재 폴더 소스를 스캔하려면 그 프로젝트 폴더에서 실행하고(클론 직후의 현재 폴더는 BomLens 저장소 자체이므로, 처음 한 번 써 볼 때는 `cd examples/nodejs && ../../scripts/scan-sbom.sh --ui`로 실행하세요. 결과는 그 폴더 안에 저장됩니다), GitHub URL이나 ZIP, SBOM, 펌웨어, Docker 이미지는 UI에서 입력을 직접 주므로 아무 폴더에서나 실행해도 됩니다.
 
 ![BomLens 웹 UI](../images/web-ui.png)
 
 1. 프로젝트 이름과 버전을 입력합니다.
 2. 스캔 대상을 고릅니다. 현재 폴더, GitHub URL, ZIP 업로드, SBOM 업로드, 펌웨어 업로드, Docker 이미지 중에서 선택합니다.
 3. 스캔 실행을 누르면 진행 로그가 실시간으로 표시됩니다.
-4. 완료되면 SBOM, 고지문, 위험분석 보고서, 보안 보고서를 열거나 내려받습니다.
+4. 완료되면 SBOM, 고지문, 오픈소스 위험 보고서, 보안 보고서를 열거나 내려받습니다.
 
-![결과 화면 — 종류별 결과물 카드와 전체 ZIP 다운로드](../images/app-results-ko.png)
+![결과 화면 — 종류별 산출물 카드와 전체 ZIP 다운로드](../images/app-results-ko.png)
 
 > 펌웨어 업로드 타일은 Docker 엔진이 켜져 있으면 자동으로 나타납니다. 자세한 동작은 [펌웨어 분석 가이드](../guides/firmware.ko.md)를 참고하세요.
 
@@ -45,7 +47,7 @@ UI 화면 구성과 스캔 대상별 상세는 [웹 UI 레퍼런스](../referenc
 
 ## 첫 번째 SBOM 생성 (CLI)
 
-자동화와 CI를 위한 고급 방식입니다. 클론한 저장소에서 실행합니다. 아래 명령은 번들로 포함된 Node.js 예제를 스캔합니다. 자신의 폴더를 스캔하려면 `--target`을 그 경로로 바꾸고, 현재 디렉터리를 스캔하려면 `--target`을 빼면 됩니다.
+자동화와 CI를 위한 고급 방식입니다. 클론한 저장소에서 실행합니다. 처음 실행하면 스캐너 이미지(약 250MB)와 언어별 이미지(0.6~1.7GB)를 받으므로 몇 분 걸립니다. 아래 명령은 번들로 포함된 Node.js 예제를 스캔합니다. 자신의 폴더를 스캔하려면 `--target`을 그 경로로 바꾸고, 현재 디렉터리를 스캔하려면 `--target`을 빼면 됩니다.
 
 <!-- runnable -->
 ```bash
@@ -60,7 +62,7 @@ UI 화면 구성과 스캔 대상별 상세는 [웹 UI 레퍼런스](../referenc
 
 ZIP 소스(`--target app.zip`), 기존 SBOM(`--analyze sbom.json`), 펌웨어(`--target dev.bin --firmware`), Docker 이미지(`--target nginx:latest`) 등 입력 형태별 처리는 [시나리오별 가이드](../guides/by-input.ko.md)에 정리되어 있습니다.
 
-> `--generate-only`는 산출물을 업로드 없이 로컬에만 저장합니다(취약점 스캔은 그대로 수행). `--all`은 고지문, SBOM, 위험분석 보고서를 한 번에 만듭니다. 전체 옵션은 [CLI 레퍼런스](../reference/cli.ko.md#옵션-레퍼런스)에, 업로드는 `--trusca <project_id>`(또는 `UPLOAD_TARGET`)로 하며 절차는 [업로드 가이드](../guides/upload.ko.md)에 있습니다.
+> `--generate-only`는 산출물을 업로드 없이 로컬에만 저장합니다(취약점 스캔은 그대로 수행). `--all`은 고지문, SBOM, 오픈소스 위험 보고서를 한 번에 만듭니다. 전체 옵션은 [CLI 레퍼런스](../reference/cli.ko.md#옵션-레퍼런스)에, 업로드는 `--trusca <project_id>`(또는 `UPLOAD_TARGET`)로 하며 절차는 [업로드 가이드](../guides/upload.ko.md)에 있습니다.
 
 ## 결과 파일 이해하기
 
@@ -71,7 +73,7 @@ ZIP 소스(`--target app.zip`), 기존 SBOM(`--analyze sbom.json`), 펌웨어(`-
 | `{Project}_{Version}_bom.json` | SBOM (CycloneDX 1.6) |
 | `{Project}_{Version}_NOTICE.{txt,html}` | 라이선스별로 묶은 오픈소스 고지문 |
 | `{Project}_{Version}_security.{json,md,html}` | Trivy 취약점 보고서 |
-| `{Project}_{Version}_risk-report.{md,html}` | 오픈소스 위험분석 보고서(기본 생성) |
+| `{Project}_{Version}_risk-report.{md,html}` | 오픈소스 위험 보고서(기본 생성) |
 
 SBOM은 [CycloneDX 1.6](https://cyclonedx.org/) 형식의 JSON입니다.
 
@@ -140,11 +142,22 @@ opt-in인 `--firmware`, `--deep-cve` 이미지를 포함해 발행되는 모든 
 
 이 메모리 기준은 호스트 컴퓨터가 아니라 Docker 엔진 자체(Docker Desktop, Rancher Desktop, macOS의 Colima가 띄우는 가상 머신)에 해당합니다. Colima는 기본값이 2 GB인데, 매니페스트만 읽는 스캔에는 충분하지만 전이 의존성을 얻기 위해 실제로 빌드까지 실행해야 하는 언어(Java/Gradle, Java/Maven)에는 부족합니다. 4 GB 미만이면 이 빌드 단계가 메모리 부족으로 죽고, 스캔은 더 얕은 결과(직접 의존성만)로 대체됩니다. 엔진 메모리가 대략 4 GB 미만인 상태에서 Maven이나 Gradle 빌드를 돌리는 스캔(Java, Android, 또는 `pom.xml`이나 `build.gradle`이 있는 혼합 프로젝트)을 하면 빌드를 시작하기 전에 경고를 출력하고 바꿀 설정도 알려 줍니다(Colima는 `colima stop && colima start --memory 4`, Docker Desktop은 Settings > Resources > Memory이며, WSL 2 백엔드나 Windows의 Rancher Desktop, WSL2의 docker-ce는 `%UserProfile%\.wslconfig`에 `memory=4GB`를 적고 `wsl --shutdown`을 실행합니다). 이 경고는 참고용이며 스캔을 막지 않습니다. 그래도 의존성 그래프가 부실해 보인다면 스캔 결과의 경고 메시지에 관련 안내가 있는지 확인하세요.
 
-이미 Docker를 쓰고 있다면(Docker Desktop, Rancher Desktop, WSL2의 docker-ce 등 무엇이든) 동작만 확인하고 넘어가세요.
+이미 Docker를 쓰고 있다면(Docker Desktop, Rancher Desktop, Colima, WSL2의 docker-ce 등 무엇이든) 동작만 확인하고 넘어가세요. macOS, Linux, WSL2에서는 클론한 저장소의 점검 스크립트가 Docker 설치, 엔진 실행, 스캐너 이미지, 엔진 메모리, UI 포트를 한 번에 확인하고 항목마다 할 일을 알려 줍니다.
 
 ```bash
+bash scripts/check-setup.sh
 docker run --rm hello-world
 ```
+
+BomLens가 `Cannot reach the Docker engine`(Docker 엔진에 연결할 수 없음)이라며 멈추면 `docker` 명령은 있지만 엔진이 켜져 있지 않은 것입니다. Docker Desktop이나 Rancher Desktop을 켜고 아이콘이 안정될 때까지 기다리거나, Colima라면 `colima start`를 실행한 뒤 같은 명령을 다시 실행하세요.
+
+### macOS와 Linux에서 Docker를 처음 설치할 때
+
+| 환경 | 명령 또는 내려받기 |
+|------|------------------|
+| macOS, 무료이고 GUI 없음 | `brew install colima docker` 실행 후 `colima start --memory 4` |
+| macOS, GUI | [Rancher Desktop](https://rancherdesktop.io/) 또는 Docker Desktop |
+| Linux | `curl -fsSL https://get.docker.com \| sudo sh` 실행 후 `sudo usermod -aG docker "$USER"` 하고 다시 로그인 |
 
 ### Windows에서 Docker를 처음 설치한다면
 
@@ -179,7 +192,7 @@ docker pull ghcr.io/sktelecom/bomlens:latest
 | 목표 | 문서 |
 |------|------|
 | 입력 형태(GitHub, ZIP, SBOM, 펌웨어 등)별 처리 | [시나리오별 가이드](../guides/by-input.ko.md) |
-| 고지문, 보안 보고서, 위험분석보고서, 웹 UI | [고지문·보안 보고서 가이드](../guides/reports.ko.md) |
+| 고지문, 보안 보고서, 오픈소스 위험 보고서, 웹 UI | [고지문·보안 보고서 가이드](../guides/reports.ko.md) |
 | 전체 옵션과 CI/CD 연동 방법 | [CLI 레퍼런스](../reference/cli.ko.md) |
 | 언어별 예제 프로젝트 실습 | [지원 생태계](../reference/ecosystems.ko.md) |
 | 내부 구조 이해 | [아키텍처](../concepts/architecture.ko.md) |

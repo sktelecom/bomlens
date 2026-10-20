@@ -10,11 +10,29 @@ import animate from "tailwindcss-animate";
  * custom properties; this file maps them to utility classes. Dark mode IS
  * populated here (BomLens ships a dark theme — see index.css `.dark`).
  */
+/** The four shades every role and category carries; see index.css. */
+const SHADES = ["fg", "muted", "emphasis", "border"] as const;
+const shadeSet = (prefix: string) =>
+  Object.fromEntries(SHADES.map((s) => [s, `rgb(var(--${prefix}-${s}) / <alpha-value>)`]));
+
 const config: Config = {
   content: ["./index.html", "./src/**/*.{ts,tsx}"],
   darkMode: ["class"],
   theme: {
     container: { center: true, padding: "1rem", screens: { "2xl": "1400px" } },
+    // The type scale replaces Tailwind's default sizes on purpose: text-xs, text-sm
+    // and the rest no longer exist, so a component has to name a role. Values are
+    // the CSS variables in src/index.css, size and line height as a pair.
+    fontSize: {
+      display: ["var(--font-size-display)", { lineHeight: "var(--line-height-display)" }],
+      title: ["var(--font-size-title)", { lineHeight: "var(--line-height-title)" }],
+      heading: ["var(--font-size-heading)", { lineHeight: "var(--line-height-heading)" }],
+      body: ["var(--font-size-body)", { lineHeight: "var(--line-height-body)" }],
+      "body-sm": ["var(--font-size-body-sm)", { lineHeight: "var(--line-height-body-sm)" }],
+      label: ["var(--font-size-label)", { lineHeight: "var(--line-height-label)" }],
+      caption: ["var(--font-size-caption)", { lineHeight: "var(--line-height-caption)" }],
+      mono: ["var(--font-size-mono)", { lineHeight: "var(--line-height-mono)" }],
+    },
     extend: {
       colors: {
         border: "hsl(var(--border))",
@@ -85,6 +103,25 @@ const config: Config = {
           "medium-fg": "rgb(var(--risk-medium-fg) / <alpha-value>)",
           "low-fg": "rgb(var(--risk-low-fg) / <alpha-value>)",
           "info-fg": "rgb(var(--risk-info-fg) / <alpha-value>)",
+        },
+        // Colour roles: `text-role-danger-fg`, `bg-role-info-muted`,
+        // `border-role-attention-border`, `bg-role-severe-emphasis`. The legacy
+        // risk/success/warning names below are aliases of these (index.css).
+        role: {
+          danger: shadeSet("role-danger"),
+          severe: shadeSet("role-severe"),
+          attention: shadeSet("role-attention"),
+          info: shadeSet("role-info"),
+          success: shadeSet("role-success"),
+          neutral: shadeSet("role-neutral"),
+        },
+        // Category palette for non-severity classifications (licence tiers).
+        cat: {
+          permissive: shadeSet("cat-permissive"),
+          weak: shadeSet("cat-weak"),
+          strong: shadeSet("cat-strong"),
+          network: shadeSet("cat-network"),
+          review: shadeSet("cat-review"),
         },
         // Success and warning states — same channel form as `risk` above, and
         // for the same reason: components tint these with alpha modifiers.

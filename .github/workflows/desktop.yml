@@ -197,6 +197,12 @@ jobs:
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           # Stay unsigned on macOS unless a Developer ID cert is provided.
           CSC_IDENTITY_AUTO_DISCOVERY: ${{ secrets.CSC_LINK != '' }}
+      # The start screens read bomlens-tokens.css from next to themselves. The file lives
+      # outside electron/ and reaches the package only through electron-builder.yml, so a
+      # development run cannot prove it shipped. Fail here if the packaged app.asar lacks it.
+      - name: Packaged assets check (design tokens present)
+        run: npm run check:package
+
       # Installer smoke: the artifact users actually download was never
       # installed or launched anywhere — release verification checked size and
       # checksum only, so a packaging regression (missing asar entry, broken

@@ -85,3 +85,67 @@ test("the open menu has no axe violations", async ({ page }) => {
     .analyze();
   expect(results.violations).toEqual([]);
 });
+
+test("the menu offers getting started, shortcuts and what changed", async ({ page }) => {
+  await open(page, "1.10.5");
+  await page.getByTestId("help-menu").click();
+  await expect(page.getByTestId("help-start")).toHaveAttribute("href", /\/start\/first-scan\/$/);
+  await expect(page.getByTestId("help-shortcuts")).toBeVisible();
+  await expect(page.getByTestId("help-whats-new")).toHaveAttribute(
+    "href",
+    "https://github.com/sktelecom/bomlens/releases/tag/v1.10.5",
+  );
+});
+
+test("a build with no version stamp links the release list", async ({ page }) => {
+  await open(page, "");
+  await page.getByTestId("help-menu").click();
+  await expect(page.getByTestId("help-whats-new")).toHaveAttribute(
+    "href",
+    "https://github.com/sktelecom/bomlens/releases",
+  );
+});
+
+test("the shortcut list opens from the menu and closes with Escape", async ({ page }) => {
+  await open(page, "1.10.5");
+  await page.getByTestId("help-menu").click();
+  await page.getByTestId("help-shortcuts").click();
+  const dialog = page.getByRole("dialog", { name: "Keyboard shortcuts" });
+  await expect(dialog).toBeVisible();
+  await expect(page.getByTestId("shortcut-list").getByRole("listitem")).not.toHaveCount(0);
+  const results = await new AxeBuilder({ page })
+    .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
+    .analyze();
+  expect(results.violations).toEqual([]);
+  await page.keyboard.press("Escape");
+  await expect(dialog).toHaveCount(0);
+  // Focus returns to the control that opened it.
+  await expect(page.getByTestId("help-menu")).toBeFocused();
+});
+
+test("? opens the shortcut list, but not while typing in a field", async ({ page }) => {
+  await open(page, "1.10.5");
+  await page.locator("#project").focus();
+  await page.keyboard.press("?");
+  await expect(page.locator("#project")).toHaveValue("?");
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+
+  await page.locator("body").click({ position: { x: 5, y: 5 } });
+  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+  await page.keyboard.press("?");
+  await expect(page.getByRole("dialog", { name: "Keyboard shortcuts" })).toBeVisible();
+});
+
+test("the empty scan list offers the demo next to the first scan", async ({ page }) => {
+  await page.route("**/capabilities", (r) =>
+    r.fulfill({ contentType: "application/json", body: JSON.stringify({ firmware: false, scanoss: false, docker: true }) }),
+  );
+  await page.route("**/scans", (r) => r.fulfill({ contentType: "application/json", body: "[]" }));
+  await page.route("**/results", (r) => r.fulfill({ contentType: "application/json", body: "[]" }));
+  await page.goto("/?ui=next#/");
+  await expect(page.getByText("Generate your first SBOM")).toBeVisible();
+  await expect(page.getByRole("link", { name: "New scan" }).first()).toBeVisible();
+  const demo = page.getByTestId("empty-demo-link");
+  await expect(demo).toHaveAttribute("href", /\/demo\/$/);
+  await expect(demo).toHaveAttribute("target", "_blank");
+});

@@ -98,7 +98,7 @@ test.describe("id and purl lookups", () => {
     await expect(page.getByText("10", { exact: true })).toBeVisible();
     await expect(page.getByText("GHSA-jfh8-c2jp-5v3q")).toBeVisible();
     await expect(
-      page.getByRole("link", { name: /logging\.apache\.org/ }),
+      page.getByRole("link", { name: /^https:\/\/logging\.apache\.org\// }),
     ).toHaveAttribute("target", "_blank");
 
     // Neither the ecosystem picker nor the version field applies to an

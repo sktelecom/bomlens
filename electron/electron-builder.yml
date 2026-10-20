@@ -9,6 +9,14 @@ files:
   - lib/**/*
   - assets/**/*
   - package.json
+  # The start screens read the shared design tokens (generated from the web app's index.css
+  # into docker/shared). That file lives outside this directory, so it is pulled in with a
+  # from/to file set and lands next to status.html inside the package. A development run reads
+  # the same file straight from docker/shared. scripts/check-package.mjs verifies it shipped.
+  - from: ../docker/shared
+    to: assets
+    filter:
+      - bomlens-tokens.css
 # 설치본이 자기 이용 조건을 담고 나가게 한다. Apache-2.0 §4는 재배포자에게 라이선스
 # 사본과 NOTICE 내용을 요구하고, 설치본을 받는 쪽이 재배포자가 된다. files가 아니라
 # extraResources인 이유는 files의 경로가 app 디렉터리(electron/) 기준이라 저장소

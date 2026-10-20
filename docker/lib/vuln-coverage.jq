@@ -29,13 +29,14 @@ def vc_cpe_index_candidate:
   vc_no_ecosystem_purl or any(.properties[]?; .name == "bomlens:purlSource");
 
 # A CPE the index can be asked about: the application part, in either form
-# firmware-cpe-match.py parses.
-def vc_app_cpe: (.cpe // "") | test("^cpe:(2\\.3:|/)a:");
+# firmware-cpe-match.py parses, or a 2.3 CPE whose part is '*' (Yocto's
+# CVE_PRODUCT, read as an application there).
+def vc_app_cpe: (.cpe // "") | test("^cpe:(2\\.3:[a*]:[^:]*|/a:[^:]*):[^:*-][^:]*");
 
 # The version field of an application CPE, "" for any other CPE or none.
 def vc_cpe_version:
   (.cpe // "") as $c
-  | if ($c | startswith("cpe:2.3:a:")) then ($c | split(":")[5] // "")
+  | if ($c | test("^cpe:2\\.3:[a*]:")) then ($c | split(":")[5] // "")
     elif ($c | startswith("cpe:/a:")) then ($c | split(":")[4] // "")
     else "" end;
 

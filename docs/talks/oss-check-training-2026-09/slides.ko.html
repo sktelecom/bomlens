@@ -608,7 +608,7 @@ h2.t .lo{color:var(--faint);font-weight:700}
   <div class="body">
     <div class="tiles">
       <div class="tile on"><div class="tn">소스코드</div><div class="td">Java · Node.js · Python · Go · Ruby · PHP · Rust · .NET · Swift · Modelica</div></div>
-      <div class="tile"><div class="tn">빌드 결과물과 컨테이너</div><div class="td">이미지째로</div></div>
+      <div class="tile"><div class="tn">빌드 산출물과 컨테이너</div><div class="td">이미지째로</div></div>
       <div class="tile"><div class="tn">펌웨어</div><div class="td">기기에 올라가는 이미지</div></div>
     </div>
     <div class="tiles" style="grid-template-columns:1fr 1fr 1fr;margin-top:16px">
@@ -719,7 +719,7 @@ h2.t .lo{color:var(--faint);font-weight:700}
       <div class="check"><span class="cn">대상 지정</span><div><div class="ct">--target 생략 시 현재 디렉터리</div>
         <div class="cd">ZIP(--target app.zip), 기존 SBOM(--analyze), 펌웨어(--firmware), Docker 이미지, --git으로 클론 없이 바로도 됩니다.</div></div></div>
       <div class="check"><span class="cn">용도</span><div><div class="ct">자동화와 CI 파이프라인</div>
-        <div class="cd">--all은 고지문·SBOM·위험분석을 한 번에, --generate-only는 업로드 없이 로컬에만 저장합니다.</div></div></div>
+        <div class="cd">--all은 고지문·SBOM·위험 보고서를 한 번에, --generate-only는 업로드 없이 로컬에만 저장합니다.</div></div></div>
     </div>
     <div class="refs"><span class="lb">참고</span><span><a href="https://sktelecom.github.io/bomlens/ko/reference/cli/" target="_blank">CLI 레퍼런스</a> <span class="u">sktelecom.github.io/bomlens/ko/reference/cli/</span></span></div>
   </div>
@@ -863,7 +863,7 @@ h2.t .lo{color:var(--faint);font-weight:700}
       <div class="pane">
         <div class="k">내부 검토용</div>
         <div class="trig-item">보안 보고서<span class="trig-note">취약점과 대응 기한</span></div>
-        <div class="trig-item">위험분석보고서<span class="trig-note">라이선스 분류와 위험</span></div>
+        <div class="trig-item">오픈소스 위험 보고서<span class="trig-note">라이선스 분류와 위험</span></div>
       </div>
     </div>
     <div class="refs">
@@ -1227,7 +1227,7 @@ h2.t .lo{color:var(--faint);font-weight:700}
         <div class="d">배포물에는 반드시 함께 넣어야 합니다</div></div>
     </div>
     <div class="out" style="margin-top:30px">
-      <div class="oh">위험분석보고서에 이미 정리돼 있습니다</div>
+      <div class="oh">오픈소스 위험 보고서에 이미 정리돼 있습니다</div>
       <div class="od">01·03은 보고서 마지막 "Next steps" 항목 그대로이고, 02는 같은 보고서의 라이선스 분류표(Uncategorized)에서 나온 것입니다.</div>
     </div>
   </div>
@@ -1268,7 +1268,7 @@ h2.t .lo{color:var(--faint);font-weight:700}
       <div class="pane">
         <div class="k">BomLens</div>
         <div class="figbox" style="border-color:var(--line-strong)">
-          <div class="lbl" style="font-size:22px;font-weight:600">스캔 1회 = 결과물 1개</div>
+          <div class="lbl" style="font-size:22px;font-weight:600">스캔 1회 = 산출물 1세트</div>
           <div class="cap">오늘 다룬 생성 도구입니다</div>
         </div>
       </div>

@@ -41,7 +41,53 @@ def license_flag($s):
 # Known permissive SPDX ids (uppercased). An allowlist, not a heuristic — keep
 # in sync with the PERMISSIVE set in licenses.ts (single line: the drift guard
 # extracts the quoted ids from this def).
-def permissive_ids: ["MIT","MIT-0","ISC","0BSD","BSD-2-CLAUSE","BSD-3-CLAUSE","BSD-3-CLAUSE-LBNL","APACHE-2.0","APACHE-1.1","ZLIB","UNLICENSE","BSL-1.0","PSF-2.0","PYTHON-2.0","CC0-1.0","WTFPL","NCSA","X11","MIT-X11"];
+def permissive_ids: ["MIT","MIT-0","ISC","0BSD","BSD-2-CLAUSE","BSD-3-CLAUSE","BSD-3-CLAUSE-LBNL","APACHE-2.0","APACHE-1.1","ZLIB","UNLICENSE","BSL-1.0","PSF-2.0","PYTHON-2.0","CC0-1.0","WTFPL","NCSA","X11","MIT-X11","UNICODE-3.0","UNICODE-DFS-2016"];
+
+# Worst-of ranking across a component's licenses (licenses.ts TIER_RANK):
+# network > strong > weak > uncategorized > permissive. Known copyleft outranks
+# an unknown license; an unknown license outranks known-permissive.
+def class_rank: {"network-copyleft": 5, "strong-copyleft": 4, "weak-copyleft": 3, "uncategorized": 2, "permissive": 1};
+
+# ---------------------------------------------------------------------------
+# Strict SPDX expression parser: parentheses, AND over OR, WITH.
+#
+# MIRROR of parseSpdxExpression in licenses.ts. A term is ONE token (an id,
+# optionally `<id> WITH <exception>`), so prose that merely contains the word "or"
+# ("GNU General Public License v2 or later") does not parse and the callers fall
+# back to what they did before. The result is disjunctive normal form, the same
+# shape parse_license_expr returns: a list of OR alternatives, each a list of AND
+# terms. Distributing AND over OR is exact for the two combinators used on it
+# (best of the alternatives, worst of the terms), so nesting needs no new
+# evaluation rule. More than 64 alternatives, a stray parenthesis or an operator
+# in the wrong place gives [] ("could not be parsed").
+# ---------------------------------------------------------------------------
+def spdx_dnf_or($t; $start):
+  def prim($i):
+    ($t[$i] // "") as $x
+    | if $x == "(" then
+        spdx_dnf_or($t; $i + 1) as $r
+        | if ($t[$r.i] // "") == ")" then {n: $r.n, i: ($r.i + 1)} else error("unbalanced") end
+      elif $x == "" or ($x | test("^(and|or|\\))$"; "i")) then error("syntax")
+      elif (($t[$i + 1] // "") | ascii_upcase) == "WITH" then
+        (($t[$i + 2] // "") as $e
+         | if $e == "" or ($e | test("^(and|or|[()])$"; "i")) then error("syntax")
+           else {n: [[($x + " WITH " + $e)]], i: ($i + 3)} end)
+      else {n: [[$x]], i: ($i + 1)} end;
+  def andp($i):
+    prim($i)
+    | until((($t[.i] // "") | ascii_upcase) != "AND";
+            prim(.i + 1) as $r | {n: [.n[] as $a | $r.n[] as $b | $a + $b], i: $r.i});
+  andp($start)
+  | until((($t[.i] // "") | ascii_upcase) != "OR";
+          andp(.i + 1) as $r | {n: (.n + $r.n), i: $r.i});
+
+def spdx_dnf($s):
+  ((($s // "") | gsub("\\("; " ( ") | gsub("\\)"; " ) ")) | [splits("\\s+")] | map(select(. != ""))) as $t
+  | if ($t | length) == 0 then []
+    else
+      (try spdx_dnf_or($t; 0) catch null)
+      | if . == null or .i != ($t | length) or (.n | length) > 64 then [] else .n end
+    end;
 
 # Classify ONE license id/name/expression. Order matters: AGPL and LGPL are
 # matched before the bare GPL test so they don't fall to strong-copyleft, and a
@@ -65,8 +111,16 @@ def permissive_ids: ["MIT","MIT-0","ISC","0BSD","BSD-2-CLAUSE","BSD-3-CLAUSE","B
 # already caught there. CC-BY-ND is not, and neither axis currently says so.
 def license_class($s):
   (($s // "") | sub("^\\s+"; "") | sub("\\s+$"; "")) as $id
-  | if $id == "" then "uncategorized"
+  | (if (([$id | scan("/")] | length) == 1 and ($id | test("://") | not)) then ($id | sub("\\s*/\\s*"; " OR ")) else $id end) as $x
+  | (if ($x | test("\\s(and|or)\\s|[()]"; "i")) then spdx_dnf($x) | flatten | unique else [] end) as $terms
+  | if ($terms | length) > 1 or (($terms | length) == 1 and $terms[0] != $id) then
+      # An SPDX expression: the strength of the worst term. The label is a warning, so
+      # it never takes the most permissive branch of an OR (the verdict does that).
+      $terms | map(license_class(.)) | max_by(class_rank[.])
+    elif $id == "" then "uncategorized"
     elif ((permissive_ids | index($id | ascii_upcase)) != null) then "permissive"
+    elif ($id | test("^\\S+\\s+WITH\\s+\\S+$"; "i"))
+         and ((permissive_ids | index($id | sub("\\s+WITH\\s+.*$"; "") | ascii_upcase)) != null) then "permissive"
     elif ($id | test("\\bAGPL"; "i")) then "network-copyleft"
     elif ($id | test("\\bLGPL"; "i")) then "weak-copyleft"
     elif ($id | test("\\b(MPL|EPL|CDDL|CPL|OSL|EUPL|CeCILL|Sleepycat)\\b"; "i")) then "weak-copyleft"
@@ -76,10 +130,6 @@ def license_class($s):
     elif ($id | test("\\bCC-BY\\b"; "i")) then "permissive"
     else "uncategorized" end;
 
-# Worst-of ranking across a component's licenses (licenses.ts TIER_RANK):
-# network > strong > weak > uncategorized > permissive. Known copyleft outranks
-# an unknown license; an unknown license outranks known-permissive.
-def class_rank: {"network-copyleft": 5, "strong-copyleft": 4, "weak-copyleft": 3, "uncategorized": 2, "permissive": 1};
 
 # ---------------------------------------------------------------------------
 # Generic-classifier redundancy, MIRRORED in licenses.ts (worstTier).
@@ -156,15 +206,15 @@ def component_license_class:
 # bad term condemns it). license_class above deliberately ignores the operators
 # and takes the worst term — safe for a strength label, wrong for a verdict.
 #
-# Scope: flat expressions only. Parentheses are NOT parsed — a nested expression
-# yields no terms and the caller records "unknown" rather than guessing. AND
-# binds tighter than OR (per the SPDX spec), which falls out of splitting on OR
-# first and then on AND.
+# Scope: flat expressions are split on OR and then on AND (AND binds tighter, per
+# the SPDX spec). A parenthesised expression goes through spdx_dnf (above), which
+# parses the nesting strictly and returns the same shape; one it cannot parse
+# yields no terms and the caller records "unknown" rather than guessing.
 #
 # Shape: [[term, …], …] — a list of OR alternatives, each a list of AND terms.
 #   "MIT OR Apache-2.0"      -> [["MIT"], ["Apache-2.0"]]
 #   "EPL-1.0 AND LGPL-2.1"   -> [["EPL-1.0", "LGPL-2.1"]]
-#   "(A OR B) AND C"         -> []            (parenthesised: not parsed)
+#   "(A OR B) AND C"         -> [["A","C"],["B","C"]]   (nesting distributed)
 # ---------------------------------------------------------------------------
 
 # A slash is the other OR spelling seen in the wild ("MIT/X11"). Only treated as
@@ -175,7 +225,8 @@ def slash_is_or($s):
 
 def parse_license_expr($s):
   (($s // "") | sub("^\\s+"; "") | sub("\\s+$"; "")) as $e
-  | if $e == "" or ($e | test("[()]")) then []
+  | if $e == "" then []
+    elif ($e | test("[()]")) then spdx_dnf($e)
     else
       (if slash_is_or($e) then ($e | sub("\\s*/\\s*"; " OR ")) else $e end)
       | [ splits("\\s+OR\\s+"; "i") ]

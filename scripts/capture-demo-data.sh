@@ -157,6 +157,22 @@ for run in "${RUNS[@]}"; do
     enc="$(python3 -c 'import sys,urllib.parse;print(urllib.parse.quote(sys.argv[1],safe=""))' "$run")"
     fetch "/scan?id=$enc" "$DEST/scan-$run.json"
     fetch "/results?id=$enc" "$DEST/results-$run.json"
+    # A source scan records the folder it read as an absolute path on the capture
+    # machine (a CI runner's work directory). The demo shows it as the scan's
+    # origin, so keep the part that means something to a reader: the path inside
+    # the repository.
+    python3 - "$DEST/scan-$run.json" <<'PY'
+import json, re, sys
+p = sys.argv[1]
+d = json.load(open(p))
+cfg = d.get("scanConfig") or {}
+label = cfg.get("sourceLabel") or ""
+m = re.search(r"/((?:docs|examples)/.*)$", label)
+if label[:1] in ("~", "/") and m:
+    cfg["sourceLabel"] = m.group(1)
+    with open(p, "w") as fh:
+        json.dump(d, fh)
+PY
     mkdir -p "$DEST/files/$run"
     # Artifacts are copied rather than re-fetched: /file streams the same bytes
     # and copying keeps the run folder's names exactly as results[] reports them.

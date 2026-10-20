@@ -23,12 +23,14 @@ Prefer scripts over an installer? The `sbom-ui.bat` alternative is covered step 
 No commands beyond launching it: run in the browser, scan, and download results.
 
 ```bash
-git clone https://github.com/sktelecom/bomlens.git && cd bomlens
+git clone --depth 1 https://github.com/sktelecom/bomlens.git && cd bomlens
 ./scripts/scan-sbom.sh --ui     # opens http://localhost:8080; results save under the current folder
 #   Windows: double-click scripts\sbom-ui.bat
 ```
 
-The folder you run from is the output base — each scan saves to a `{Project}_{Version}/` subfolder under it (details in [Where outputs go](../reference/cli.md#where-outputs-go)). If the port is taken, prefix `UI_PORT=9090` (bash only — on Windows, put `UI_PORT=9090` in `scripts\bomlens.settings.txt` next to `sbom-ui.bat` instead; see [Settings file](no-cli.md#settings-file-no-command-line-needed)). To scan the current folder as the source, run from that project folder; for a GitHub URL, ZIP, SBOM, firmware, or Docker image you supply the input in the UI, so any folder works.
+`--depth 1` skips the repository history, which cuts the download from about 465 MB to about 50 MB. The first launch can take a minute or two before the page loads: the script downloads the scanner image if it is missing (about 250 MB), or checks for a newer one, and the browser tab it opens can show a connection error until the server is up. Reload the tab once the terminal prints `BomLens Web UI listening`.
+
+The folder you run from is the output base: each scan saves to a `{Project}_{Version}/` subfolder under it (details in [Where outputs go](../reference/cli.md#where-outputs-go)). If the port is taken, prefix `UI_PORT=9090` (bash only; on Windows, put `UI_PORT=9090` in `scripts\bomlens.settings.txt` next to `sbom-ui.bat` instead; see [Settings file](no-cli.md#settings-file-no-command-line-needed)). To scan the current folder as the source, run from that project folder (right after cloning, that is the BomLens repository itself, so for a quick first try use `cd examples/nodejs && ../../scripts/scan-sbom.sh --ui` instead, and the results are saved inside that folder); for a GitHub URL, ZIP, SBOM, firmware, or Docker image you supply the input in the UI, so any folder works.
 
 ![BomLens web UI — name a project, pick a scan target, and choose what to generate](../images/web-ui-en.png)
 
@@ -41,7 +43,7 @@ Screen layout and per-target details are in the [web UI reference](../reference/
 
 ## Your first SBOM (CLI)
 
-Advanced — for automation and CI. Run from the cloned repo. The command below scans the bundled Node.js example; point `--target` at your own folder, or drop `--target` to scan the current directory instead.
+Advanced, for automation and CI. Run from the cloned repo. The first run downloads the scanner image (about 250 MB) and a language image (0.6-1.7 GB), so allow a few minutes. The command below scans the bundled Node.js example; point `--target` at your own folder, or drop `--target` to scan the current directory instead.
 
 <!-- runnable -->
 ```bash
@@ -138,11 +140,22 @@ Every published image, including the opt-in `--firmware` and `--deep-cve` ones, 
 
 The memory figure is for the engine itself (the VM behind Docker Desktop, Rancher Desktop, or Colima on macOS), not the host machine. Tools like Colima default to 2 GB, which is enough for a manifest-only scan but too tight for languages where BomLens has to run an actual build to resolve transitive dependencies (Java/Gradle, Java/Maven). Under 4 GB, that build step can be killed for running out of memory, and the scan falls back to a shallower, direct-dependencies-only result. A scan that runs a Maven or Gradle build (Java, Android, or a mixed project with a `pom.xml` or `build.gradle`) on an engine with less than about 4 GB prints a warning before the build starts, with the setting to change (`colima stop && colima start --memory 4` for Colima, Settings > Resources > Memory for Docker Desktop; with the WSL 2 backend, Rancher Desktop on Windows or docker-ce in WSL2, set `memory=4GB` in `%UserProfile%\.wslconfig` and run `wsl --shutdown`). The warning is a hint and does not stop the scan. If the dependency graph still looks thin, check the scan's warnings for a note about it.
 
-If you already run a Docker engine (Docker Desktop, Rancher Desktop, docker-ce in WSL2, anything), just confirm it works:
+If you already run a Docker engine (Docker Desktop, Rancher Desktop, Colima, docker-ce in WSL2, anything), confirm it works. On macOS, Linux and WSL2 the cloned repo has a check that tests Docker, the engine, the scanner image, engine memory and the UI port in one go and says what to do about each:
 
 ```bash
+bash scripts/check-setup.sh
 docker run --rm hello-world
 ```
+
+If BomLens stops with `Cannot reach the Docker engine`, the `docker` command exists but the engine is not running. Start Docker Desktop or Rancher Desktop and wait for its icon to settle, or run `colima start` for Colima, then run the command again.
+
+### Installing Docker on macOS and Linux for the first time
+
+| System | Command or download |
+|--------|---------------------|
+| macOS, free and no GUI | `brew install colima docker`, then `colima start --memory 4` |
+| macOS, GUI | [Rancher Desktop](https://rancherdesktop.io/) or Docker Desktop |
+| Linux | `curl -fsSL https://get.docker.com \| sudo sh`, then `sudo usermod -aG docker "$USER"` and log in again |
 
 ### Installing Docker on Windows for the first time
 

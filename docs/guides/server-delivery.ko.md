@@ -112,7 +112,7 @@ $SBOM --project mms-relay-server --version 1.0.0 \
   --generate-only
 ```
 
-이 명령은 `mms-relay-server_1.0.0/mms-relay-server_1.0.0_bom.json`을 만들고, `metadata.component`를 서버 제품으로 설정하며, 병합된 컴포넌트 집합 위에 고지문과 위험분석보고서를 생성합니다. 각 컴포넌트에는 그 층을 스캔할 때 쓴 `--project` 값이 `bomlens:layer` 속성으로 남으므로 층별로 걸러 볼 수 있습니다(`jq '.components[] | select(.properties[]?.value == "mms-relay-os")'`).
+이 명령은 `mms-relay-server_1.0.0/mms-relay-server_1.0.0_bom.json`을 만들고, `metadata.component`를 서버 제품으로 설정하며, 병합된 컴포넌트 집합 위에 고지문과 오픈소스 위험 보고서를 생성합니다. 각 컴포넌트에는 그 층을 스캔할 때 쓴 `--project` 값이 `bomlens:layer` 속성으로 남으므로 층별로 걸러 볼 수 있습니다(`jq '.components[] | select(.properties[]?.value == "mms-relay-os")'`).
 
 병합본은 각 층의 `dependencies` 그래프를 보존합니다(ref 기준으로 엣지를 합침). 따라서 전이 의존성 정보가 그대로 남아 적합성 검증의 전이 의존성 항목을 통과합니다. 생태계가 달라 `bom-ref` 충돌은 드물고, 같은 ref는 dependsOn 목록을 합칩니다.
 

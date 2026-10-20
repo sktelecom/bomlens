@@ -37,6 +37,13 @@ describe("formatBytes", () => {
 describe("cn", () => {
   it("merges and de-conflicts tailwind classes", () => {
     expect(cn("px-2", "px-4")).toBe("px-4");
-    expect(cn("text-sm", false && "hidden", "font-bold")).toBe("text-sm font-bold");
+    expect(cn("text-body-sm", false && "hidden", "font-bold")).toBe("text-body-sm font-bold");
+  });
+
+  it("keeps a role font size next to a text colour and replaces another size", () => {
+    expect(cn("text-body-sm", "text-muted-foreground")).toBe("text-body-sm text-muted-foreground");
+    expect(cn("text-muted-foreground", "text-label")).toBe("text-muted-foreground text-label");
+    expect(cn("text-label", "text-body-sm")).toBe("text-body-sm");
+    expect(cn("text-caption font-mono", "text-mono")).toBe("font-mono text-mono");
   });
 });

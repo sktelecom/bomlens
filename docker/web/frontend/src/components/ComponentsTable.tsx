@@ -6,6 +6,8 @@ import { useTranslation } from "react-i18next";
 import { ArrowDown, ArrowUp, ArrowUpDown, Download, Package, Search, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { DensityToggle, useDensity } from "@/components/ui/density-toggle";
+import { FilterChip } from "@/components/ui/filter-chip";
 import { Button } from "@/components/ui/button";
 import { CheckMenu, type CheckMenuItem } from "@/components/ui/check-menu";
 import { Select } from "@/components/ui/select";
@@ -31,6 +33,10 @@ import {
 import { buildQuery, parseQuery, type RouteQuery } from "@/lib/route";
 import { componentsFromQuery, componentsToQuery } from "@/lib/section-query";
 import { cn } from "@/lib/utils";
+import { useFormatNumber } from "@/lib/format";
+import { densityClass, ROW_HEIGHT_PX } from "@/lib/tableDensity";
+import { ComponentRow } from "./components-table/ComponentRow";
+import { SortHeader, type Sort } from "./components-table/SortHeader";
 
 interface Props {
   items: ComponentItem[];
@@ -51,26 +57,14 @@ interface Props {
   onPickDependency?: (name: string, version?: string) => void;
 }
 
-type Sort = { key: ComponentSortKey; dir: SortDir };
-
 /** Rows are rendered in chunks of this size, one <tbody> per chunk. Chunks far
  *  from the viewport are recycled into a single spacer row of their measured
  *  height, so a large SBOM scrolls the full list while the DOM stays small.
  *  Row heights may vary (wrapping license badges, the expanded detail row), so
  *  spacers use per-chunk measurements, not a global fixed row height. */
 const CHUNK = 100;
-/** Height estimate for a chunk that has never been rendered (single-line row). */
-const ROW_ESTIMATE = 37;
 /** Chunks live from the start, before the observer has seen anything. */
 const INITIAL_LIVE: ReadonlySet<number> = new Set([0, 1, 2]);
-
-const SEV_TONE: Record<Severity, "critical" | "high" | "medium" | "low" | "info"> = {
-  CRITICAL: "critical",
-  HIGH: "high",
-  MEDIUM: "medium",
-  LOW: "low",
-  UNKNOWN: "info",
-};
 
 /** Distinct, sorted, non-empty values. */
 function distinct(values: string[]): string[] {
@@ -79,74 +73,11 @@ function distinct(values: string[]): string[] {
   );
 }
 
-function SortHeader({
-  label,
-  sortKey,
-  sort,
-  onSort,
-  className,
-}: {
-  label: string;
-  sortKey: ComponentSortKey;
-  sort: Sort | null;
-  onSort: (key: ComponentSortKey) => void;
-  className?: string;
-}) {
-  const active = sort?.key === sortKey;
-  const Icon = !active ? ArrowUpDown : sort.dir === "asc" ? ArrowUp : ArrowDown;
-  return (
-    // whitespace-nowrap: CJK text breaks between any two characters, so a
-    // two-character Korean header in a narrow column split down the middle.
-    <th
-      className={cn("whitespace-nowrap px-3 py-2 font-medium", className)}
-      aria-sort={active ? (sort.dir === "asc" ? "ascending" : "descending") : "none"}
-    >
-      <button
-        type="button"
-        onClick={() => onSort(sortKey)}
-        className="inline-flex items-center gap-1 hover:text-foreground"
-      >
-        {label}
-        <Icon
-          className={cn("h-3 w-3", active ? "text-foreground" : "text-muted-foreground/60")}
-          aria-hidden
-        />
-      </button>
-    </th>
-  );
-}
-
-function FilterChip({
-  active,
-  onClick,
-  children,
-}: {
-  active: boolean;
-  onClick: () => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      aria-pressed={active}
-      onClick={onClick}
-      className={cn(
-        "rounded-md border px-2.5 py-1 text-xs font-medium transition-colors duration-fast ease-out-soft",
-        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1",
-        active
-          ? "border-brand/40 bg-brand/10 text-foreground"
-          : "border-border text-muted-foreground hover:text-foreground",
-      )}
-    >
-      {children}
-    </button>
-  );
-}
-
 /** Searchable, sortable, filterable table of detected SBOM components, with
  *  decision-first Scope and Risk columns (shown when the scan carries that data). */
 export function ComponentsTable({ items, total, truncated, scanId, query, onQueryChange, onPickVulns, onPickDependency }: Props) {
   const { t } = useTranslation();
+  const fmt = useFormatNumber();
   const [filters, setFilters] = useState<ComponentFilters>(
     () => componentsFromQuery(query).filters,
   );
@@ -177,6 +108,7 @@ export function ComponentsTable({ items, total, truncated, scanId, query, onQuer
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filters, sort]);
   const [openKey, setOpenKey] = useState<string | null>(null);
+  const [density, setDensity] = useDensity();
   // Which columns the reader has hidden, read once from browser-local storage
   // (the same place the theme and language live — no account, nothing sent).
   const [hiddenCols, setHiddenCols] = useState<string[]>(() =>
@@ -432,9 +364,10 @@ export function ComponentsTable({ items, total, truncated, scanId, query, onQuer
           <Download className="mr-1.5 h-3.5 w-3.5" aria-hidden />
           {t("result.exportCsv")}
         </Button>
+        <DensityToggle density={density} onChange={setDensity} />
         {/* The count closes the toolbar rather than starting a line of its own,
             which is what made the controls read as four stacked rows. */}
-        <div className="ml-auto text-xs text-muted-foreground">
+        <div className="ml-auto text-label text-muted-foreground">
           {t("result.componentsCount", { shown: filtered.length, total })}
           {/* "list truncated" left the reader guessing how much they were
               looking at. items.length is what the server sent for this scan. */}
@@ -462,7 +395,7 @@ export function ComponentsTable({ items, total, truncated, scanId, query, onQuer
                 licenseUnclear: false,
               })
             }
-            className="rounded text-xs text-muted-foreground underline-offset-2 hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+            className="rounded text-label text-muted-foreground underline-offset-2 hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
           >
             {t("result.clearFilters")}
           </button>
@@ -470,7 +403,7 @@ export function ComponentsTable({ items, total, truncated, scanId, query, onQuer
       )}
 
       <div ref={scrollRef} className="max-h-[44rem] resize-y overflow-auto rounded-md border">
-        <table className="w-full text-left text-xs">
+        <table className={cn("w-full text-left text-label", densityClass(density))}>
           <thead className="sticky top-0 z-10 bg-muted/95 backdrop-blur">
             <tr className="border-b">
               {/* The name column is pinned: reading the columns on the right of a
@@ -509,274 +442,23 @@ export function ComponentsTable({ items, total, truncated, scanId, query, onQuer
             {chunkItems.map((c, i) => {
               const key = rowKey(c, ci * CHUNK + i);
               const isOpen = openKey === key;
-              const toggle = () => setOpenKey(isOpen ? null : key);
-              const lic = licenseBadges(c.licenses);
               return (
-              <Fragment key={key}>
-              {/* role="button" makes aria-expanded valid here (it is not allowed
-                  on a plain table row) and, with tabIndex + the key handler,
-                  keeps the expandable row reachable by keyboard. */}
-              <tr
-                className="group cursor-pointer border-b last:border-0 hover:bg-accent/50"
-                role="button"
-                tabIndex={0}
-                aria-expanded={isOpen}
-                aria-label={t("result.componentRowToggle")}
-                onClick={toggle}
-                onKeyDown={(e: React.KeyboardEvent) => {
-                  if (e.key === "Enter" || e.key === " ") {
-                    e.preventDefault();
-                    toggle();
-                  }
-                }}
-              >
-                {/* Pinned like its header. The row tint is painted per-cell here
-                    (group-hover) because a pinned cell needs its own opaque
-                    background and would otherwise stay unhighlighted. */}
-                <td className="sticky left-0 z-10 max-w-80 bg-background px-3 py-2 group-hover:bg-accent/50">
-                  <div className="flex items-center gap-2">
-                    <Package className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                    <span
-                      className="truncate font-mono"
-                      title={`${c.group ? `${c.group} / ` : ""}${c.name}`}
-                    >
-                      {c.group ? `${c.group} / ` : ""}
-                      {c.name}
-                    </span>
-                    {c.vendored && (
-                      <Badge
-                        variant="muted"
-                        title={
-                          c.matchConfidence
-                            ? `${t("result.vendoredBadgeHint")} (${t("result.vendoredMatch", { pct: c.matchConfidence })})`
-                            : t("result.vendoredBadgeHint")
-                        }
-                      >
-                        {t("result.vendoredBadge")}
-                      </Badge>
-                    )}
-                    {/* Leads the badges: a package to remove outranks anything
-                        that is merely out of date or vulnerable. */}
-                    {c.malicious && (
-                      <Badge
-                        tone="critical"
-                        title={
-                          c.maliciousId
-                            ? `${t("result.maliciousBadgeHint")} (${c.maliciousId}${c.maliciousSource ? `, ${c.maliciousSource}` : ""})`
-                            : t("result.maliciousBadgeHint")
-                        }
-                      >
-                        {t("result.maliciousBadge")}
-                      </Badge>
-                    )}
-                    {c.eol === "true" && (
-                      <Badge tone="high" title={t("result.eolBadgeHint")}>
-                        {t("result.eolBadge")}
-                        {c.eolDate ? ` · ${t("result.eolSince", { date: c.eolDate })}` : ""}
-                      </Badge>
-                    )}
-                    {/* Weaker emphasis than EOL: a supported component that simply
-                        has a newer patch available. Muted, not warning-toned. */}
-                    {c.outdated === "true" && (
-                      <Badge variant="muted" title={t("result.outdatedBadgeHint")}>
-                        {t("result.outdatedBadge")}
-                        {c.latestVersion
-                          ? ` · ${t("result.outdatedLatest", { version: c.latestVersion })}`
-                          : ""}
-                      </Badge>
-                    )}
-                  </div>
-                </td>
-                {/* A presence-only row has no version by construction, so an
-                    em dash here would read as a gap in the data rather than as
-                    the finding it is: the component is there, the version is
-                    not recoverable, and no advisory lookup applies to it. */}
-                {showVersion && (
-                <td className="whitespace-nowrap px-3 py-2 font-mono tabular-nums text-muted-foreground">
-                  {c.version || (c.presenceOnly ? (
-                    <span
-                      className="font-sans text-xs"
-                      title={t("result.presenceOnlyHint")}
-                    >
-                      {t("result.presenceOnlyVersion")}
-                    </span>
-                  ) : "—")}
-                </td>
-                )}
-                {showType && (
-                <td className="whitespace-nowrap px-3 py-2 text-muted-foreground">{c.type || "—"}</td>
-                )}
-                {showScope && (
-                  <td className="whitespace-nowrap px-3 py-2">
-                    {c.scope ? (
-                      <span
-                        className={
-                          c.scope === "direct"
-                            ? "font-medium text-foreground"
-                            : "text-muted-foreground"
-                        }
-                      >
-                        {t(c.scope === "direct" ? "result.scopeDirect" : "result.scopeTransitive")}
-                      </span>
-                    ) : (
-                      <span className="text-muted-foreground">—</span>
-                    )}
-                  </td>
-                )}
-                {showRisk && (
-                  <td className="whitespace-nowrap px-3 py-2">
-                    {c.maxSeverity ? (
-                      <Badge tone={SEV_TONE[c.maxSeverity]}>
-                        {t(`severity.${c.maxSeverity}`)}
-                        {c.vulnCount ? ` · ${c.vulnCount}` : ""}
-                      </Badge>
-                    ) : (
-                      <span className="text-muted-foreground">—</span>
-                    )}
-                  </td>
-                )}
-                {/* Badges past the limit fold into a count so a component with a
-                    dozen licenses does not stand three rows tall. The expanded
-                    row below lists them all. */}
-                {showLicense && (
-                <td className="whitespace-nowrap px-3 py-2">
-                  {c.licenses.length ? (
-                    <div className="flex items-center gap-1">
-                      {lic.shown.map((l, j) => (
-                        <Badge key={j} variant="muted">
-                          {l}
-                        </Badge>
-                      ))}
-                      {lic.hidden > 0 && (
-                        <span
-                          className="text-muted-foreground"
-                          title={c.licenses.join(", ")}
-                        >
-                          {t("result.licenseMore", { count: lic.hidden })}
-                        </span>
-                      )}
-                    </div>
-                  ) : (
-                    <span className="text-muted-foreground">{t("result.licenseNone")}</span>
-                  )}
-                </td>
-                )}
-              </tr>
-              {isOpen && (
-                <tr className="border-b last:border-0">
-                  <td colSpan={colCount} className="bg-muted/30 px-3 py-3">
-                    <dl className="grid grid-cols-[max-content,1fr] gap-x-4 gap-y-1.5 text-xs">
-                      {c.purl ? (
-                        <>
-                          <dt className="font-medium text-muted-foreground">purl</dt>
-                          <dd className="break-all font-mono">{c.purl}</dd>
-                        </>
-                      ) : null}
-                      {c.source ? (
-                        <>
-                          <dt className="font-medium text-muted-foreground">{t("result.colSource")}</dt>
-                          <dd>
-                            <a
-                              href={c.source}
-                              target="_blank"
-                              rel="noreferrer"
-                              onClick={(e) => e.stopPropagation()}
-                              className="break-all text-primary underline-offset-2 hover:underline"
-                            >
-                              {c.source}
-                            </a>
-                          </dd>
-                        </>
-                      ) : null}
-                      {c.copyright ? (
-                        <>
-                          <dt className="font-medium text-muted-foreground">{t("result.colCopyright")}</dt>
-                          <dd className="break-words">{c.copyright}</dd>
-                        </>
-                      ) : null}
-                      {c.licenses.length > 0 ? (
-                        <>
-                          <dt className="font-medium text-muted-foreground">{t("result.colLicense")}</dt>
-                          <dd>{c.licenses.join(", ")}</dd>
-                        </>
-                      ) : null}
-                      {c.eol === "true" ? (
-                        <>
-                          <dt className="font-medium text-muted-foreground">{t("result.colEol")}</dt>
-                          <dd>
-                            {t("result.eolBadge")}
-                            {c.eolDate ? ` (${c.eolDate})` : ""}
-                          </dd>
-                        </>
-                      ) : null}
-                      {c.outdated === "true" ? (
-                        <>
-                          <dt className="font-medium text-muted-foreground">{t("result.colCurrency")}</dt>
-                          <dd>
-                            {c.latestVersion
-                              ? t("result.outdatedLatest", { version: c.latestVersion })
-                              : t("result.outdatedBadge")}
-                            {typeof c.releasesBehind === "number"
-                              ? ` · ${t("result.outdatedReleasesBehind", { count: c.releasesBehind })}`
-                              : ""}
-                            {c.lastReleased
-                              ? ` · ${t("result.outdatedLastReleased", { date: c.lastReleased })}`
-                              : ""}
-                          </dd>
-                        </>
-                      ) : null}
-                      {c.vulnCount ? (
-                        <>
-                          <dt className="font-medium text-muted-foreground">{t("nav.vulnerabilities")}</dt>
-                          <dd className="flex flex-wrap items-baseline gap-2">
-                            <span>
-                              {c.maxSeverity ? `${t(`severity.${c.maxSeverity}`)} · ` : ""}
-                              {c.vulnCount}
-                            </span>
-                            {/* Into the CVEs behind this row. It sits in the
-                                expanded detail rather than on the risk badge
-                                because the row itself is the toggle control,
-                                and a control inside a control is not announced
-                                reliably. */}
-                            {onPickVulns && (
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  onPickVulns(c.name);
-                                }}
-                                className="rounded text-primary underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                              >
-                                {t("result.viewInVulns", { name: c.name })}
-                              </button>
-                            )}
-                          </dd>
-                        </>
-                      ) : null}
-                      {onPickDependency && (
-                        <>
-                          <dt className="font-medium text-muted-foreground">{t("nav.dependencies")}</dt>
-                          <dd>
-                            {/* Same reason as View in Vulnerabilities above: the
-                                row itself is the toggle control. */}
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                onPickDependency(c.name, c.version);
-                              }}
-                              className="rounded text-primary underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                            >
-                              {t("result.viewInDependencies", { name: c.name })}
-                            </button>
-                          </dd>
-                        </>
-                      )}
-                    </dl>
-                  </td>
-                </tr>
-              )}
-              </Fragment>
+                <ComponentRow
+                  key={key}
+                  item={c}
+                  isOpen={isOpen}
+                  onToggle={() => setOpenKey(isOpen ? null : key)}
+                  shown={{
+                    version: showVersion,
+                    type: showType,
+                    scope: showScope,
+                    risk: showRisk,
+                    license: showLicense,
+                  }}
+                  colCount={colCount}
+                  onPickVulns={onPickVulns}
+                  onPickDependency={onPickDependency}
+                />
               );
             })}
               </tbody>
@@ -791,7 +473,7 @@ export function ComponentsTable({ items, total, truncated, scanId, query, onQuer
                     style={{
                       height:
                         chunkHeights.current.get(ci) ??
-                        chunkItems.length * ROW_ESTIMATE,
+                        chunkItems.length * (ROW_HEIGHT_PX[density] + 1),
                       padding: 0,
                     }}
                   />

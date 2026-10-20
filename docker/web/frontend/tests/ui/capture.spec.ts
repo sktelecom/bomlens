@@ -48,14 +48,14 @@ const STR: Record<Lang, {
   vulnCount: string; // substring of attnVulns
 }> = {
   en: {
-    scanOptions: "Advanced scan options",
+    scanOptions: "Result quality",
     identifyVendored: "Detect copied-in open source",
     vendoredHint: "C/C++ embedded source",
     spdxExport: "Export as SPDX",
     vulnCount: "critical or high vulnerabilities",
   },
   ko: {
-    scanOptions: "고급 스캔 옵션",
+    scanOptions: "결과 품질",
     identifyVendored: "복사해 넣은 오픈소스 탐지",
     vendoredHint: "C/C++ 임베디드 소스",
     spdxExport: "SPDX",
@@ -455,7 +455,7 @@ for (const lang of ["en", "ko"] as Lang[]) {
     await page.goto("/#/new");
     await page.locator("#project").waitFor();
     await killAnim(page);
-    // The vendored-ID toggle lives inside the collapsed "Advanced scan options"
+    // The vendored-ID toggle lives inside the collapsed "Result quality"
     // disclosure, expand it and capture the whole open section (summary +
     // toggle) so the guide shows users where to find it, not just the switch.
     await page.getByText(s.scanOptions).click();

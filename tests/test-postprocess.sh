@@ -755,7 +755,9 @@ else
 fi
 # Tier regex patterns, in match order (order decides AGPL/LGPL vs bare GPL).
 ts_pat=$(sed -n '/^export function licenseRiskTier/,/^}/p' "$LTS" | grep -oE '/\\b[^/]+/i' | sed 's:^/::; s:/i$::')
-jq_pat=$(sed -n '/^def license_class/,/^def class_rank/p' "$LFJ" | grep -oE 'test\("[^"]+"' | sed 's/^test("//; s/"$//; s/\\\\/\\/g')
+# Only the strength patterns (they start with \b); the expression gate and the
+# WITH test sit in the same function but have no counterpart pattern in licenses.ts.
+jq_pat=$(sed -n '/^def license_class/,/^def generic_license_synonym_family/p' "$LFJ" | grep -oE 'test\("[^"]+"' | sed 's/^test("//; s/"$//; s/\\\\/\\/g' | grep -F '\b')
 if [ -z "$ts_pat" ] || [ -z "$jq_pat" ]; then
     fail "could not extract the tier patterns (licenses.ts / license-flags.jq changed shape?)"
 elif [ "$ts_pat" = "$jq_pat" ]; then
@@ -1089,6 +1091,33 @@ osl_under BSD-2-Clause libxxhash0 && osl_under GPL-2.0-only libxxhash0 \
     && pass "the NOTICE lists a deb package under each of its licenses" \
     || fail "NOTICE grouping of libxxhash0" "$(grep -n -E '^License: |libxxhash0' "$OSLT/n_NOTICE.txt" 2>/dev/null | head -10)"
 
+echo "== SPDX expressions: class, nesting and conflict (the same cases licenses.test.ts checks) =="
+spdx_class() { jq -n -r --arg e "$1" 'include "license-flags"; {licenses:[{expression:$e}]} | component_license_class' -L "$LIB"; }
+spdx_dnf_of() { jq -n -c --arg e "$1" 'include "license-flags"; parse_license_expr($e)' -L "$LIB"; }
+spdx_verdict() { jq -n -r --arg e "$1" --argjson c "$(cat "$LIB/license-compat.json")" 'include "license-flags"; expr_verdict($e; "Apache-2.0"; $c).verdict' -L "$LIB"; }
+for pair in "MIT OR Apache-2.0|permissive" "Unlicense/MIT|permissive" "(MIT OR Apache-2.0) AND Unicode-3.0|permissive" \
+            "Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT|permissive" "GPL-3.0-only OR MIT|strong-copyleft" \
+            "Apache-2.0 AND (MIT OR GPL-2.0-only)|strong-copyleft" "MPL-2.0 OR MIT|weak-copyleft" "Foo-1.0 OR MIT|uncategorized" \
+            "(MIT|uncategorized" "BSD License|uncategorized" "GNU General Public License v2 or later (GPLv2+)|strong-copyleft"; do
+    e="${pair%|*}"; want="${pair##*|}"; got="$(spdx_class "$e")"
+    [ "$got" = "$want" ] && pass "class of '$e' is $want" || fail "class of '$e': wanted $want, got $got"
+done
+[ "$(spdx_dnf_of '(A OR B) AND C')" = '[["A","C"],["B","C"]]' ] \
+    && [ "$(spdx_dnf_of 'A AND (B OR (C AND D))')" = '[["A","B"],["A","C","D"]]' ] \
+    && [ "$(spdx_dnf_of '(MIT)')" = '[["MIT"]]' ] \
+    && pass "a parenthesised expression is distributed into OR alternatives of AND terms" \
+    || fail "spdx nesting: $(spdx_dnf_of '(A OR B) AND C') / $(spdx_dnf_of 'A AND (B OR (C AND D))')"
+bad_ok=1
+for bad in "(A OR B" "A OR B)" "(A OR)" "(OR A)" "(A AND)" "( )" "(A WITH)"; do
+    [ "$(spdx_dnf_of "$bad")" = '[]' ] || { bad_ok=0; echo "  not refused: $bad -> $(spdx_dnf_of "$bad")"; }
+done
+[ "$bad_ok" = 1 ] && pass "an expression that cannot be parsed gives no terms (the verdict stays unknown)" || fail "unparseable expressions were not refused"
+[ "$(spdx_verdict '(MIT OR GPL-2.0-only) AND BSD-3-Clause')" = compatible ] \
+    && [ "$(spdx_verdict 'GPL-3.0-only AND (MIT OR BSD-2-Clause)')" = incompatible ] \
+    && [ "$(spdx_verdict '(GPL-3.0-only AND MIT) OR Apache-2.0')" = compatible ] \
+    && pass "the conflict verdict combines a nested expression: AND is the worst, OR the best" \
+    || fail "nested verdicts: $(spdx_verdict '(MIT OR GPL-2.0-only) AND BSD-3-Clause') $(spdx_verdict 'GPL-3.0-only AND (MIT OR BSD-2-Clause)') $(spdx_verdict '(GPL-3.0-only AND MIT) OR Apache-2.0')"
+
 echo "== license-conflict drift guard: the jq parser and licenses.ts share one grammar =="
 # Same contract as the license-class guard above: the SPDX operator patterns and
 # the exception test are hand-mirrored, so extract both sides and diff them.
@@ -1140,6 +1169,42 @@ if [ -f "$RMD" ] && [ -f "$RHTML" ]; then
 else
     fail "generate-risk-report.sh produced no md/html with a BOM present"
 fi
+# A source that stated version ranges and shipped no lock file says so in the report,
+# in both languages; a pinned or unmarked one does not.
+for pin in unpinned pinned none; do
+    d="$WORK/risk-pin-$pin"; mkdir -p "$d"
+    if [ "$pin" = none ]; then cp "$WORK/lc.json" "$d/p_1.0_bom.json"
+    else jq --arg v "$pin" '.metadata.component.properties = ((.metadata.component.properties // []) + [{name:"bomlens:source:versionPinning", value:$v}])' "$WORK/lc.json" > "$d/p_1.0_bom.json"; fi
+    printf 'License: MIT\n' > "$d/p_1.0_NOTICE.txt"
+    ( cd "$d" && bash "$LIB/generate-risk-report.sh" p_1.0 p >/dev/null 2>&1 && mkdir ko && cd ko && cp ../p_1.0_bom.json ../p_1.0_NOTICE.txt . && REPORT_LANG=ko bash "$LIB/generate-risk-report.sh" p_1.0 p >/dev/null 2>&1 )
+    en_n=$(grep -c 'states version ranges and ships no lock file' "$d/p_1.0_risk-report.md" "$d/p_1.0_risk-report.html" | awk -F: '{s+=$2} END{print s}')
+    ko_n=$(grep -c '버전을 범위로 적었고 고정 파일이 없어서' "$d/ko/p_1.0_risk-report.md" "$d/ko/p_1.0_risk-report.html" | awk -F: '{s+=$2} END{print s}')
+    if [ "$pin" = unpinned ]; then want=2; else want=0; fi
+    [ "$en_n" = "$want" ] && [ "$ko_n" = "$want" ] \
+        && pass "risk report ($pin source): the version-ranges note appears $want time(s) in md+html, en and ko" \
+        || fail "risk report ($pin source): note count en=$en_n ko=$ko_n, expected $want"
+done
+# An AI model scan's root component is the model under review, not the scanner's
+# own project: its license is counted and classified. A model with no dependent
+# dataset has no other component and used to read as 0 licenses.
+mkdir -p "$WORK/risk-ai"
+printf '%s' '{"bomFormat":"CycloneDX","specVersion":"1.6","metadata":{"component":{"type":"machine-learning-model","name":"m","licenses":[{"license":{"id":"Apache-2.0"}}]}},"components":[]}' \
+    > "$WORK/risk-ai/m_1.0_bom.json"
+: > "$WORK/risk-ai/m_1.0_NOTICE.txt"
+( cd "$WORK/risk-ai" && bash "$LIB/generate-risk-report.sh" m_1.0 m AIBOM >/dev/null 2>&1 )
+grep -q '^- Distinct licenses identified: 1 ' "$WORK/risk-ai/m_1.0_risk-report.md" \
+    && grep -q '^| 0 | 0 | 0 | 1 | 0 |$' "$WORK/risk-ai/m_1.0_risk-report.md" \
+    && pass "an AI model scan counts and classifies the model's own license" \
+    || fail "AI model license count" "$(grep -E 'Distinct licenses|^\| [0-9]' "$WORK/risk-ai/m_1.0_risk-report.md")"
+# A source scan still leaves its own project out.
+printf '%s' '{"bomFormat":"CycloneDX","specVersion":"1.6","metadata":{"component":{"type":"application","name":"p","licenses":[{"license":{"id":"GPL-3.0-only"}}]}},"components":[{"type":"library","name":"a","version":"1","licenses":[{"license":{"id":"MIT"}}]}]}' \
+    > "$WORK/risk-ai/p_1.0_bom.json"
+printf 'License: MIT\n' > "$WORK/risk-ai/p_1.0_NOTICE.txt"
+( cd "$WORK/risk-ai" && bash "$LIB/generate-risk-report.sh" p_1.0 p >/dev/null 2>&1 )
+grep -q '^- Distinct licenses identified: 1 ' "$WORK/risk-ai/p_1.0_risk-report.md" \
+    && grep -q '^| 0 | 0 | 0 | 1 | 0 |$' "$WORK/risk-ai/p_1.0_risk-report.md" \
+    && pass "a source scan leaves its own project's license out" \
+    || fail "source scan license count" "$(grep -E 'Distinct licenses|^\| [0-9]' "$WORK/risk-ai/p_1.0_risk-report.md")"
 # The Korean report prints the same class names as the English one. Four of the
 # five were hardcoded English while "Uncategorized" went through a translation
 # key, so a Korean table read "... | Permissive | 미분류 |" and disagreed with
@@ -2471,6 +2536,21 @@ if [ -f "$WORK/tv_conformance.json" ] && [ -f "$WORK/tv_conformance.md" ] && [ -
 else
     fail "validate-sbom.sh produced no conformance report for clean Tag-Value input"
 fi
+
+echo "== conformance: a fixed value as the top-level component name =="
+for nm in "/scan" "." "my-device"; do
+    jq --arg n "$nm" '.metadata.component.name = $n' "$FIX/good-cyclonedx.json" > "$WORK/topname.json"
+    for prof in default skt-submission; do
+        CONFORMANCE_PROFILE=$prof bash "$LIB/validate-sbom.sh" "$WORK/topname.json" "$WORK/topname-$prof" "supplier" >/dev/null 2>&1
+        st=$(jq -r '.checks[] | select(.id=="top-component") | .status' "$WORK/topname-${prof}_conformance.json")
+        case "$nm:$prof" in
+            "my-device:"*) want=pass ;;
+            *:default)     want=warn ;;
+            *)             want=fail ;;
+        esac
+        [ "$st" = "$want" ] && pass "top-level name '$nm' under $prof is $want" || fail "top-level name '$nm' under $prof is '$st', expected $want"
+    done
+done
 
 echo "== input-format: UTF-16 / BOM-encoded SBOMs are normalized, not rejected =="
 # A supplier SBOM saved as UTF-16 (common from Windows tooling) or with a UTF-8
@@ -4313,6 +4393,8 @@ rows = [
   ("busybox", "busybox", "1.00", None, None, None, None, "CVE-2099-0002", "HIGH", "3", 7.5),
   ("openssl", "openssl", None, "1.0.2", 1, "1.0.2i", 0, "CVE-2099-0003", "HIGH", "3", 7.5),
   ("python", "flask", None, None, None, "9.0", 0, "CVE-2099-0004", "LOW", "3", 2.0),
+  ("vendor_a", "shared", None, None, None, "9.0", 0, "CVE-2099-0005", "LOW", "3", 2.0),
+  ("vendor_b", "shared", None, None, None, "9.0", 0, "CVE-2099-0006", "LOW", "3", 2.0),
 ]
 c.executemany("INSERT INTO cpe_match VALUES (?,?,?,?,?,?,?,?,?,?,?)", rows)
 c.commit()
@@ -4338,6 +4420,25 @@ JSON
     [ "$(printf '%s' "$fwo_counts" | jq -c .)" = '{"offered":2,"components":2,"cves":2}' ] \
         && pass "the step reports offered/components/cves counts" \
         || fail "counts are '$fwo_counts'"
+    # Yocto writes its CVE_PRODUCT as a CPE whose part, and often vendor, is
+    # '*'. The part is read as an application; a '*' vendor is looked up by the
+    # product alone, as Yocto's own cve-check does.
+    cat > "$WORK/yoc.json" <<'JSON'
+{"bomFormat":"CycloneDX","specVersion":"1.6","components":[
+  {"type":"library","name":"busybox-hwclock","version":"1.00","cpe":"cpe:2.3:*:*:busybox:1.00:*:*:*:*:*:*:*"},
+  {"type":"library","name":"openssh","version":"6.2p2","cpe":"cpe:2.3:*:openbsd:openssh:6.2p2:*:*:*:*:*:*:*"},
+  {"type":"library","name":"libother","version":"1.0","cpe":"cpe:2.3:*:*:*:1.0:*:*:*:*:*:*:*"},
+  {"type":"library","name":"shared","version":"1.0","cpe":"cpe:2.3:*:*:shared:1.0:*:*:*:*:*:*:*"}]}
+JSON
+    FW_CPE_INDEX="$CPEIDX" bash "$LIB/match-cpe-index.sh" "$WORK/yoc.json" "$WORK/yoc" >/dev/null 2>&1
+    yoc_ids="$(jq -r '[.Results[].Vulnerabilities[] | "\(.PkgName)@\(.InstalledVersion)=\(.VulnerabilityID)"] | sort | join(" ")' \
+        "$WORK/yoc_security_cvebintool.json" 2>/dev/null)"
+    [ "$yoc_ids" = "busybox@1.00=CVE-2099-0002 openssh@6.2p2=CVE-2099-0001 shared@1.0=CVE-2099-0005 shared@1.0=CVE-2099-0006" ] \
+        && pass "Yocto CPEs with '*' as the part or the vendor are matched, a '*' vendor across every vendor of the product; one with no product is not" \
+        || fail "Yocto-shaped CPEs matched: '${yoc_ids:-nothing}'"
+    jq -e "$(cat "$LIB/vuln-coverage.jq") (.components[0] | vc_app_cpe and (vc_cpe_version == \"1.00\")) and (.components[2] | vc_app_cpe | not)" "$WORK/yoc.json" >/dev/null \
+        && pass "the coverage check counts a '*' part CPE as one the index can be asked about, and one with no product as not" \
+        || fail "vuln-coverage does not read a '*' part CPE"
 
     # The pipeline runs the match after every CPE enrichment step, and the
     # firmware script no longer matches (or writes the sidecar) on its own.
@@ -4357,9 +4458,11 @@ JSON
     else
         pass "scan-firmware.sh leaves CVE matching to the pipeline step (no second pass)"
     fi
-    grep -q 'FIRMWARE|ROOTFS|BINARY)' "$_ep" \
-        && pass "the step runs for firmware, rootfs and binary scans" \
-        || fail "the CPE index step is not scoped to FIRMWARE|ROOTFS|BINARY"
+    grep -q 'case "$_cpe_mode" in FIRMWARE|ROOTFS|BINARY|YOCTO)' "$_ep" \
+        && grep -q 'case "$_upstream_mode" in' "$_ep" \
+        && grep -q '\[ "\$YOCTO_ARCHIVE" = "true" \] && YOCTO_CPE_MATCH=true' "$_ep" \
+        && pass "the CPE step runs for firmware, rootfs and binary scans and a Yocto SPDX 2.2 archive only; the upstream purl step for any Yocto records" \
+        || fail "the CPE index or upstream purl step is not scoped as expected"
 
     # rootfs / binary: syft's pkg:generic binary and a purl-less OS component are
     # offered; an ecosystem purl stays with Trivy even when it carries a CPE.
@@ -5043,6 +5146,27 @@ else
         fail "a non-empty SBOM still printed the 0-components diagnostic" "$NRH_LOG4"
     fi
     unset NESTED_ROOTFS_HINT
+
+    # An npm project whose production set was resolved and came out empty:
+    # the warning also says only development dependencies are left out.
+    printf '{"components":[],"metadata":{"properties":[{"name":"bomlens:prep-step-applied","value":"npm-production-set"}]}}' > "$WORK/devonly.json"
+    # shellcheck disable=SC2034  # read by the sourced snippet
+    OUTPUT_FILE="$WORK/devonly.json"
+    NRH_LOG5="$(. "$WORK/nested-rootfs-warn.sh" 2>&1)"
+    if printf '%s' "$NRH_LOG5" | grep -q "no runtime dependencies" \
+        && printf '%s' "$NRH_LOG5" | grep -q "BOMLENS_NODE_FULL_GRAPH=1"; then
+        pass "an empty npm production set says only development dependencies were left out"
+    else
+        fail "the development-only note is missing" "$NRH_LOG5"
+    fi
+    # shellcheck disable=SC2034  # read by the sourced snippet
+    OUTPUT_FILE="$WORK/empty.json"
+    NRH_LOG6="$(. "$WORK/nested-rootfs-warn.sh" 2>&1)"
+    if printf '%s' "$NRH_LOG6" | grep -q "no runtime dependencies"; then
+        fail "the development-only note appeared without the npm production-set marker" "$NRH_LOG6"
+    else
+        pass "no production-set marker -> no development-only note"
+    fi
 fi
 unset OUTPUT_FILE
 
@@ -5881,6 +6005,9 @@ for pn, pv, lic, cpe in [
                       "externalRefs": [{"referenceCategory": "SECURITY",
                                         "referenceType": "http://spdx.org/rdf/references/cpe23Type",
                                         "referenceLocator": cpe}]}]
+    if pn == "busybox":
+        d["packages"].append({"SPDXID": "SPDXRef-busybox-source-1", "name": "busybox-source-1",
+                              "downloadLocation": "https://busybox.net/downloads/busybox-1.36.1.tar.bz2"})
     recipes["recipe-" + pn] = d
 
 packages = {}
@@ -5982,6 +6109,10 @@ PYGEN
     [ "$arch_names" = "busybox,busybox-syslog,libz1" ] \
         && pass "the archive-only read finds the same installed set" \
         || fail "archive-only components='$arch_names'"
+    arch_src=$(jq -c '[.components[] | [.name, ([.properties[] | select(.name == "bomlens:yocto:recipe") | .value][0]), ([.properties[] | select(.name == "bomlens:sourceUrl") | .value][0])]]' "$WORK/y22arch.cdx.json" 2>/dev/null)
+    [ "$arch_src" = '[["busybox",null,"https://busybox.net/downloads/busybox-1.36.1.tar.bz2"],["busybox-syslog","busybox","https://busybox.net/downloads/busybox-1.36.1.tar.bz2"],["libz1","zlib",null]]' ] \
+        && pass "each package records the recipe it was built from and the recipe's first source" \
+        || fail "recipe and source per package: $arch_src"
     [ "$(jq -r '.metadata.component.name' "$WORK/y22arch.cdx.json")" = "core-image-minimal" ] \
         && pass "the image inside the archive names the root component" \
         || fail "archive-only root component wrong"
@@ -10987,9 +11118,19 @@ mbedtls|2.28.9|pkg:github/mbed-tls/mbedtls@v2.28.9
 python|2.7.11|pkg:github/python/cpython@v2.7.11
 boa|0.94.13|pkg:sourceforge/boa@0.94.13
 readline|5.2|pkg:gnu/readline@5.2
+openssl|3.0.13|pkg:github/openssl/openssl@openssl-3.0.13
+libssl3|3.5.7|pkg:github/openssl/openssl@openssl-3.5.7
+OpenSSH|9.6p1|pkg:github/openssh/openssh-portable@V_9_6_P1
+jansson|2.14-3|pkg:github/akheron/jansson@v2.14
+json-c|0.16|pkg:github/json-c/json-c@json-c-0.16-20220414
+libjson-c|0.18-1|pkg:github/json-c/json-c@json-c-0.18-20240915
+libbpf|1.2.2-1|pkg:github/libbpf/libbpf@v1.2.2
+iproute2|6.3.0-1|pkg:github/shemminger/iproute2@v6.3.0
+musl|1.2.4|pkg:github/kraj/musl@v1.2.4
+util-linux|2.39.3|pkg:github/util-linux/util-linux@v2.39.3
 PAIRS
 # Not in the table, or a version form it does not cover: no purl, never a guess.
-for up_case in "musl 1.2.4" "dnsmasq 2.90" "hostapd 2.10" "openssl 3.0.13" "ncurses 6.4-20230520" "openssh 9.8" "hydra 0.1.8"; do
+for up_case in "dnsmasq 2.90" "hostapd 2.10" "openssl 0.9.8zh" "openssl 3.2.0-alpha1" "openssl 3.0" "ncurses 6.4-20230520" "openssh 9.8" "hydra 0.1.8" "json-c 0.12.2" "nftables 1.0.8"; do
     up_got=$(python3 "$UPP" --resolve ${up_case})
     [ -z "$up_got" ] && pass "no purl for $up_case" || fail "$up_case resolved to '$up_got'" "expected nothing"
 done
@@ -11047,10 +11188,51 @@ upp_got=$(upp_os otherver "$UPP_OS,{\"type\":\"library\",\"name\":\"busybox\",\"
 [ "$upp_got" = "operating-system=pkg:github/mirror/busybox@1_35_0 library=pkg:github/mirror/busybox@1_36_1" ] \
     && pass "the same name at a different version: each component gets its own upstream purl" \
     || fail "busybox os + other version: $upp_got"
+# The name of what a component was built from: a Yocto recipe, an OpenWrt
+# source package (the last part of syft:metadata:source), or the product of a
+# CPE whose vendor is '*'. A toolchain package is not read as anything.
+upp_one() {  # <label> <component json>
+    printf '{"bomFormat":"CycloneDX","specVersion":"1.6","components":[%s]}' "$2" > "$WORK/upp1-$1.json"
+    python3 "$UPP" "$WORK/upp1-$1.json" >/dev/null 2>&1
+    jq -r '.components[0].purl // "-"' "$WORK/upp1-$1.json"
+}
+[ "$(upp_one recipe '{"type":"library","name":"openssl-bin","version":"3.5.7","properties":[{"name":"bomlens:yocto:recipe","value":"openssl"}]}')" = "pkg:github/openssl/openssl@openssl-3.5.7" ] \
+    && pass "a Yocto package is matched by the recipe it was built from" || fail "Yocto recipe name"
+[ "$(upp_one opkg '{"type":"library","name":"libmbedtls12","version":"2.28.9-1","properties":[{"name":"syft:metadata:source","value":"feeds/base/libs/mbedtls"}]}')" = "pkg:github/mbed-tls/mbedtls@v2.28.9" ] \
+    && pass "an opkg package is matched by its source package" || fail "opkg source package"
+[ "$(upp_one tc '{"type":"library","name":"libc","version":"1.2.4-4","properties":[{"name":"syft:metadata:source","value":"feeds/base/libs/toolchain"}]}')" = "-" ] \
+    && pass "a toolchain package gets no purl" || fail "toolchain libc got a purl"
+[ "$(upp_one kmod '{"type":"library","name":"kmod-nf-conntrack","version":"5.15.137-1","purl":"pkg:opkg/kmod-nf-conntrack@5.15.137-1","properties":[{"name":"syft:metadata:source","value":"package/kernel/linux"}]}')" = "pkg:opkg/kmod-nf-conntrack@5.15.137-1" ] \
+    && pass "a kernel module package is not given the kernel's purl once more" || fail "kmod got the kernel purl"
+[ "$(upp_one cpestar '{"type":"library","name":"libz1","version":"1.3.1","cpe":"cpe:2.3:*:*:zlib:1.3.1:*:*:*:*:*:*:*"}')" = "pkg:github/madler/zlib@v1.3.1" ] \
+    && [ "$(upp_one cpepart '{"type":"library","name":"zz","version":"1.3.1","cpe":"cpe:2.3:*:zlib:zlib:1.3.1:*:*:*:*:*:*:*"}')" = "pkg:github/madler/zlib@v1.3.1" ] \
+    && pass "a CPE with '*' as its part or vendor still names the project" || fail "CPE with '*'"
+[ "$(upp_one clash '{"type":"library","name":"zlib","version":"1.3.1","properties":[{"name":"bomlens:yocto:recipe","value":"busybox"}]}')" = "-" ] \
+    && pass "a name and a recipe that mean two different projects give no purl" || fail "name and recipe disagree"
+# A source address that states the release: a GitHub release asset or tag
+# archive, or a GNU release whose version agrees. A plain tarball or a git
+# commit is not a release.
+upp_url() { upp_one "url$1" "{\"type\":\"library\",\"name\":\"$2\",\"version\":\"$3\",\"properties\":[{\"name\":\"bomlens:sourceUrl\",\"value\":\"$4\"}]}"; }
+[ "$(upp_url 1 xz 5.4.7 https://github.com/tukaani-project/xz/releases/download/v5.4.7/xz-5.4.7.tar.gz)" = "pkg:github/tukaani-project/xz@v5.4.7" ] \
+    && [ "$(upp_url 2 libffi 3.4.6 https://github.com/libffi/libffi/releases//download/v3.4.6/libffi-3.4.6.tar.gz)" = "pkg:github/libffi/libffi@v3.4.6" ] \
+    && [ "$(upp_url 3 foo 1.2 https://github.com/Owner/Foo/archive/refs/tags/v1.2.tar.gz)" = "pkg:github/owner/foo@v1.2" ] \
+    && pass "a GitHub release address gives that repository at that tag" || fail "GitHub release address"
+[ "$(upp_url 4 bash 5.2.21 https://ftpmirror.gnu.org/gnu/bash/bash-5.2.21.tar.gz)" = "pkg:gnu/bash@5.2.21" ] \
+    && [ "$(upp_url 5 bash 5.2.15 https://ftpmirror.gnu.org/gnu/bash/bash-5.2.21.tar.gz)" = "-" ] \
+    && pass "a GNU release address gives pkg:gnu, only when its version is the component's" || fail "GNU release address"
+[ "$(upp_url 8 foo 2.0 https://github.com/o/foo/releases/download/v1.0/foo-1.0.tar.gz)" = "-" ] \
+    && [ "$(upp_url 9 foo 1.0 https://github.com/o/foo/releases/download/nightly/foo.tar.gz)" = "-" ] \
+    && pass "a GitHub release that is not the component's version gives no purl" || fail "GitHub tag and version disagree"
+[ "$(upp_one urlclash '{"type":"library","name":"zlib","version":"1.0","properties":[{"name":"bomlens:yocto:recipe","value":"busybox"},{"name":"bomlens:sourceUrl","value":"https://github.com/x/y/releases/download/v1.0/y-1.0.tar.gz"}]}')" = "-" ] \
+    && [ "$(upp_one urlver '{"type":"library","name":"openssl","version":"3.2.0-alpha1","properties":[{"name":"bomlens:sourceUrl","value":"https://github.com/openssl/openssl/releases/download/openssl-3.2.0-alpha1/openssl-3.2.0-alpha1.tar.gz"}]}')" = "-" ] \
+    && pass "a project the table knows is never given a purl from its address" || fail "address used for a project in the table"
+[ "$(upp_url 6 file 5.45 git+https://github.com/file/file.git@4cbd5c8f0851201d203755b76cb66ba991ffd8be)" = "-" ] \
+    && [ "$(upp_url 7 bzip2 1.0.8 https://sourceware.org/pub/bzip2/bzip2-1.0.8.tar.gz)" = "-" ] \
+    && pass "a git commit or a plain tarball address gives no purl" || fail "commit or tarball address"
 # The table is the only source of identities: no entry for a project this
 # change was not asked to cover.
 up_ids=$(jq -r '[.entries[].id] | join(" ")' "$LIB/upstream-purl-map.json")
-[ "$up_ids" = "busybox curl openssl-1 openssh linux zlib u-boot net-snmp ncurses net-tools libxml2 sqlite glibc dropbear mbedtls python boa readline" ] \
+[ "$up_ids" = "busybox curl openssl-1 openssl-3 openssh linux zlib u-boot net-snmp ncurses net-tools libxml2 sqlite glibc dropbear mbedtls jansson json-c libbpf iproute2 musl util-linux python boa readline" ] \
     && pass "the mapping table holds exactly the checked projects" || fail "mapping table entries: $up_ids"
 
 echo "== component versions: a supplier file fills what the scan could not read =="
@@ -11088,7 +11270,7 @@ bash "$LIB/normalize-sbom.sh" "$WORK/cv-norm.json" >/dev/null 2>&1
 [ "$(jq -r '.components[] | select(.name == "3c59x") | .version' "$WORK/cv-norm.json")" = "5.10.0" ] \
     && pass "normalize keeps a version filled in place of UNKNOWN" \
     || fail "3c59x after normalize: $(jq -c '.components[] | select(.name == "3c59x")' "$WORK/cv-norm.json")"
-[ "$(grep -v '^#' "$WORK/cvp_component-versions.template.csv" | tr '\n' ' ')" = "name,version libxml2, " ] \
+[ "$(grep -v '^#' "$WORK/cvp_component-versions.template.csv" | tr '\n' ' ')" = "name,version,reason libxml2,, " ] \
     && grep -q "1 component(s) still have no version: libxml2" "$WORK/cv.out" \
     && grep -q "1 component(s) with no version have a name the --component-versions file cannot hold, so they are not in the template: 'Vendor Utility'" "$WORK/cv.out" \
     && pass "the components still missing a version are listed and written as a template; a name the format cannot hold is listed apart" \
@@ -11105,12 +11287,12 @@ python3 "$CVP" "$WORK/cv.json" "$WORK/cvp" "$WORK/cv2.csv" >/dev/null 2>&1
 # Without a file the scan still lists what is missing.
 cp "$FIX/firmware-upstream-purl.json" "$WORK/cv3.json"
 python3 "$CVP" "$WORK/cv3.json" "$WORK/cv3" >/dev/null 2>&1
-[ "$(grep -v '^#' "$WORK/cv3_component-versions.template.csv" | tr '\n' ' ')" = "name,version 3c59x, libxml2, ncurses, " ] \
+[ "$(grep -v '^#' "$WORK/cv3_component-versions.template.csv" | tr '\n' ' ')" = "name,version,reason 3c59x,, libxml2,, ncurses,, " ] \
     && diff -q "$FIX/firmware-upstream-purl.json" "$WORK/cv3.json" >/dev/null \
     && pass "without a file the SBOM is unchanged and the template lists the versionless and UNKNOWN components" \
     || fail "no-file template: $(cat "$WORK/cv3_component-versions.template.csv" 2>&1)"
 # The template round-trips as written: one row filled, the rest left empty.
-sed 's/^ncurses,$/ncurses,6.1/' "$WORK/cv3_component-versions.template.csv" > "$WORK/cv3-filled.csv"
+sed 's/^ncurses,,$/ncurses,6.1,/' "$WORK/cv3_component-versions.template.csv" > "$WORK/cv3-filled.csv"
 python3 "$CVP" "$WORK/cv3.json" "$WORK/cv3" "$WORK/cv3-filled.csv" >/dev/null 2>&1; cv3_rc=$?
 [ "$cv3_rc" = 0 ] && [ "$(jq -r '.components[] | select(.name == "ncurses") | .version' "$WORK/cv3.json")" = "6.1" ] \
     && pass "a template filled in part is accepted" || fail "partly filled template: rc=$cv3_rc"
@@ -11127,12 +11309,62 @@ cv_refuse() {  # <label> <expected message part> ; file content on stdin
 }
 printf 'name,version\n../../etc/passwd,1.0\n' | cv_refuse "a path in the name" "is not a component name"
 printf 'name,version\nVendor Utility,1.0\n' | cv_refuse "a space in a name given a version" "is not a component name"
-printf 'ncurses,5.7,extra\n' | cv_refuse "a row with three fields" "expected two fields"
+printf 'ncurses,5.7,,extra\n' | cv_refuse "a row with four fields" "expected two or three fields"
+printf 'name,version,reason\nncurses,,unknown\n' | cv_refuse "a reason that is not one of the three" "is not a reason"
+printf 'ncurses,,own-code\nncurses,,version-unknown\n' | cv_refuse "one name with two reasons" "given two reasons"
+printf 'name,version,reason\nVendor Utility,,own-code\n' | cv_refuse "a space in a name given a reason" "is not a component name"
+cp "$FIX/firmware-upstream-purl.json" "$WORK/cvc.json"
+printf 'libxml2,,Own-Code\nncurses,,own-code\nncurses,6.1,not-open-source\n' > "$WORK/cvc.csv"
+python3 "$CVP" "$WORK/cvc.json" "$WORK/cvc" "$WORK/cvc.csv" >/dev/null 2> "$WORK/cvc.err"; cvc_rc=$?
+[ "$cvc_rc" = 0 ] \
+    && [ "$(jq -r '.components[] | select(.name == "libxml2") | [.properties[]? | select(.name == "bomlens:versionReason") | .value][0]' "$WORK/cvc.json")" = own-code ] \
+    && [ "$(grep -c 'ncurses: the file gives a version, so the reason' "$WORK/cvc.err")" = 2 ] \
+    && pass "a reason is read whatever its case, and every reason a version overrides is reported" \
+    || fail "reason case / ignored reasons: rc=$cvc_rc" "$(cat "$WORK/cvc.err")"
 printf 'ncurses,5.7\nncurses,6.0\n' | cv_refuse "one name with two versions" "given two versions"
 printf 'ncurses,$(id)\n' | cv_refuse "a shell expression as the version" "is not a version"
 printf 'ncurses,5.7\000\n' | cv_refuse "a NUL byte" "NUL byte"
 printf 'ncurses,5.\3777\n' | cv_refuse "bytes that are not UTF-8" "not UTF-8"
 head -c 300000 /dev/zero | tr '\0' 'a' | cv_refuse "a file over the size limit" "the limit is"
+
+echo "== component versions: a reason stands in for a version the supplier cannot give =="
+cp "$FIX/firmware-upstream-purl.json" "$WORK/cvr.json"
+printf 'name,version,reason\nlibxml2,,own-code\n3c59x,5.10.0,version-unknown\nbusybox,,not-open-source\nghostlib,,own-code\n' > "$WORK/cvr.csv"
+python3 "$CVP" "$WORK/cvr.json" "$WORK/cvr" "$WORK/cvr.csv" > "$WORK/cvr.out" 2> "$WORK/cvr.err"; cvr_rc=$?
+[ "$cvr_rc" = 0 ] && pass "a three-column file is accepted" || fail "component-versions.py exited $cvr_rc" "$(cat "$WORK/cvr.err")"
+[ "$(jq -c '[.components[] | select(.name == "libxml2") | (.version // null), ([.properties[]? | select(.name == "bomlens:versionReason") | .value][0])]' "$WORK/cvr.json")" = '[null,"own-code"]' ] \
+    && pass "a reason is recorded as bomlens:versionReason and the component keeps no version" \
+    || fail "libxml2: $(jq -c '.components[] | select(.name == "libxml2")' "$WORK/cvr.json")"
+[ "$(jq -c '[.components[] | select(.name == "3c59x") | .version, ([.properties[]? | select(.name == "bomlens:versionReason")] | length)]' "$WORK/cvr.json")" = '["5.10.0",0]' ] \
+    && grep -q "3c59x: the file gives a version, so the reason version-unknown is ignored" "$WORK/cvr.err" \
+    && pass "a row with a version and a reason applies the version and warns about the reason" \
+    || fail "3c59x: $(jq -c '.components[] | select(.name == "3c59x")' "$WORK/cvr.json")" "$(cat "$WORK/cvr.err")"
+! jq -e 'any(.components[]; .name == "busybox" and ((.properties // []) | any(.name == "bomlens:versionReason")))' "$WORK/cvr.json" >/dev/null \
+    && grep -q "busybox: the reason not-open-source is ignored, because the scan read version" "$WORK/cvr.err" \
+    && pass "a reason for a component the scan read a version for is ignored, with a warning" \
+    || fail "busybox reason" "$(cat "$WORK/cvr.err")"
+[ "$(jq '[.components[] | select(.name == "ghostlib")] | length' "$WORK/cvr.json")" = 0 ] \
+    && grep -q "ghostlib: the reason own-code is ignored, because the scan did not find it" "$WORK/cvr.err" \
+    && pass "a reason for a name the scan did not find adds nothing, with a warning" \
+    || fail "ghostlib" "$(cat "$WORK/cvr.err")"
+[ "$(grep -v '^#' "$WORK/cvr_component-versions.template.csv" | tr '\n' ' ')" = "name,version,reason ncurses,, " ] \
+    && grep -q '^#   own-code ' "$WORK/cvr_component-versions.template.csv" \
+    && grep -q '^#   not-open-source ' "$WORK/cvr_component-versions.template.csv" \
+    && grep -q '^#   version-unknown ' "$WORK/cvr_component-versions.template.csv" \
+    && grep -q "recorded the reason 1 component(s) have no version (bomlens:versionReason): libxml2 (own-code)" "$WORK/cvr.out" \
+    && pass "the template explains the three reasons and leaves out the explained components" \
+    || fail "template with reasons: $(cat "$WORK/cvr_component-versions.template.csv" 2>&1)" "$(cat "$WORK/cvr.out")"
+cp "$WORK/cvr.json" "$WORK/cvr-norm.json"
+bash "$LIB/normalize-sbom.sh" "$WORK/cvr-norm.json" >/dev/null 2>&1
+[ "$(jq -r '.components[] | select(.name == "libxml2") | [.properties[]? | select(.name == "bomlens:versionReason") | .value][0]' "$WORK/cvr-norm.json")" = "own-code" ] \
+    && pass "normalize keeps the recorded reason" || fail "reason after normalize: $(jq -c '.components[] | select(.name == "libxml2")' "$WORK/cvr-norm.json")"
+# A two-column file gives the same SBOM as before the reason column existed.
+cp "$FIX/firmware-upstream-purl.json" "$WORK/cv2c.json"
+printf 'name,version\nlibxml2,2.9.14\n' > "$WORK/cv2c.csv"
+python3 "$CVP" "$WORK/cv2c.json" "$WORK/cv2c" "$WORK/cv2c.csv" >/dev/null 2>&1
+! grep -q 'bomlens:versionReason' "$WORK/cv2c.json" \
+    && [ "$(jq -r '.components[] | select(.name == "libxml2") | .version' "$WORK/cv2c.json")" = "2.9.14" ] \
+    && pass "a two-column file is read as before" || fail "two-column file"
 
 echo "== conformance: skt-submission names what to fix and which file to submit =="
 # The pipeline's order: normalize (which removes UNKNOWN) before upstream-purl.
@@ -11147,8 +11379,9 @@ sk_v=$(jq -c '.checks[] | select(.id == "versions-needed") | [.required, .status
 [ "$sk_v" = '[true,"fail","4 without a version",["Vendor Utility","libxml2","ncurses","3c59x"]]' ] \
     && pass "version needed: a required row listing the components without a version" || fail "versions-needed row: $sk_v"
 sk_u=$(jq -c '.checks[] | select(.id == "upstream-purl") | [.required, .status, .missing]' "$WORK/sk_1.0_conformance.json")
-[ "$sk_u" = '[true,"fail",["busybox@1.35.0","gcc@9.3.0","openssl@3.0.13"]]' ] \
-    && pass "no upstream purl: a required row listing the versioned components still without one" || fail "upstream-purl row: $sk_u"
+[ "$sk_u" = '[false,"warn",["busybox@1.35.0","gcc@9.3.0","openssl@0.9.8zh"]]' ] \
+    && jq -e '.checks[] | select(.id == "upstream-purl") | (.reviewGuide.how | contains("does not block the submission")) and (.reviewGuide.how_ko | contains("SK텔레콤"))' "$WORK/sk_1.0_conformance.json" >/dev/null \
+    && pass "no upstream purl: an advisory row listing the versioned components still without one, for SK Telecom to check" || fail "upstream-purl row: $sk_u"
 jq -e '.checks[] | select(.id == "versions-needed") | .reviewGuide.how | contains("sk_1.0_component-versions.template.csv") and contains("--component-versions")' \
     "$WORK/sk_1.0_conformance.json" >/dev/null && pass "the version row points at the template and the option" \
     || fail "versions-needed guidance does not name the template"
@@ -11169,7 +11402,7 @@ jq -e 'has("submitFile") | not' "$WORK/ska_conformance.json" >/dev/null && ! gre
 # Under --analyze no template is written and --component-versions is not
 # offered: the rows stay, worded as what to ask the supplier for.
 jq -e '[.checks[] | select(.id == "versions-needed" or .id == "upstream-purl")] as $r
-       | ($r | length) == 2 and all($r[]; .status == "fail" and (.reviewGuide.how | contains("Ask the supplier"))
+       | ($r | length) == 2 and ([$r[].status] == ["fail", "warn"]) and all($r[]; (.reviewGuide.how | contains("Ask the supplier"))
                                      and (.reviewGuide.how | contains("template.csv") | not)
                                      and (.reviewGuide.how_ko | contains("공급사에"))
                                      and (.reviewGuide.how | contains("upstream purl table") | not))' \
@@ -11182,6 +11415,96 @@ jq -e '([.checks[] | select(.id == "versions-needed" or .id == "upstream-purl")]
        and (.checks[] | select(.id == "purl-type") | .status == "warn") and (has("submitFile") | not)' "$WORK/skd_conformance.json" >/dev/null \
     && pass "the default profile is unchanged: no extra rows, pkg:gnu still an undefined type" \
     || fail "default profile changed: $(jq -c '[.checks[] | select(.id == "purl-type" or .id == "versions-needed")]' "$WORK/skd_conformance.json")"
+
+echo "== conformance: skt-submission lists what the supplier explained and defers the generic rows =="
+# What a firmware scan writes once the supplier has given every version it can
+# and a reason for the rest: no dependency graph, some versioned components
+# without an upstream purl.
+cat > "$WORK/skr.json" <<'JSON'
+{"bomFormat":"CycloneDX","specVersion":"1.6","metadata":{"timestamp":"2026-10-15T00:00:00Z","tools":{"components":[{"type":"application","name":"bomlens"}]},
+ "component":{"type":"firmware","name":"fw","version":"1.0"}},
+ "compositions":[{"aggregate":"unknown"}],
+ "components":[
+  {"type":"library","name":"busybox","version":"1.35.0","purl":"pkg:github/mirror/busybox@1_35_0"},
+  {"type":"library","name":"dhcpcd","version":"1.3.22"},
+  {"type":"library","name":"msntp","version":"1.6","purl":"pkg:generic/msntp@1.6"},
+  {"type":"library","name":"libvendor","properties":[{"name":"bomlens:versionReason","value":"own-code"}]},
+  {"type":"library","name":"quagga","properties":[{"name":"bomlens:versionReason","value":"version-unknown"}]}]}
+JSON
+CONFORMANCE_PROFILE=skt-submission MODE=FIRMWARE bash "$LIB/validate-sbom.sh" "$WORK/skr.json" "$WORK/skr" "skr" >/dev/null 2>&1
+skr_v=$(jq -c '.checks[] | select(.id == "versions-needed") | [.status, .detail, .detail_ko, .missing, .explained]' "$WORK/skr_conformance.json")
+[ "$skr_v" = '["pass","0 without a version, 2 explained by the supplier","버전 없음 0개, 공급사 소명 2개",[],[{"name":"libvendor","reason":"own-code"},{"name":"quagga","reason":"version-unknown"}]]' ] \
+    && pass "version needed: explained components pass the row and are listed with their reason" || fail "versions-needed with reasons: $skr_v"
+skr_d=$(jq -c '[.checks[] | select(.id == "name-version" or .id == "purl" or .id == "no-generic" or .id == "transitive") | "\(.id)=\(.required)/\(.status)"]' "$WORK/skr_conformance.json")
+[ "$skr_d" = '["name-version=true/warn","purl=true/warn","no-generic=true/warn","transitive=true/warn"]' ] \
+    && jq -e '.checks[] | select(.id == "transitive") | .detail | contains("not a dependency graph")' "$WORK/skr_conformance.json" >/dev/null \
+    && jq -e '.checks[] | select(.id == "name-version") | .detail_ko | contains("공급사 소명 2개")' "$WORK/skr_conformance.json" >/dev/null \
+    && pass "the generic rows defer to the submission rows and say why" || fail "deferred rows: $skr_d"
+[ "$(jq -r '.result' "$WORK/skr_conformance.json")" = pass ] \
+    && pass "a firmware SBOM with every version given or explained passes the submission profile" \
+    || fail "result: $(jq -c '[.checks[] | select(.required and .status == "fail") | .id]' "$WORK/skr_conformance.json")"
+grep -q '^## Explained by the supplier' "$WORK/skr_conformance.md" && grep -qx -- '- libvendor: own-code' "$WORK/skr_conformance.md" \
+    && grep -q '<li>quagga: version-unknown</li>' "$WORK/skr_conformance.html" \
+    && pass "the Markdown and HTML reports list the explanations" || fail "explained section missing"
+# One component with neither a version nor a reason: the row and the result fail.
+jq '.components += [{"type":"library","name":"telnetd"}]' "$WORK/skr.json" > "$WORK/skr2.json"
+CONFORMANCE_PROFILE=skt-submission MODE=FIRMWARE bash "$LIB/validate-sbom.sh" "$WORK/skr2.json" "$WORK/skr2" "skr" >/dev/null 2>&1
+[ "$(jq -c '[.result, (.checks[] | select(.id == "versions-needed" or .id == "name-version" or .id == "purl") | "\(.id)=\(.status)")]' "$WORK/skr2_conformance.json")" = '["fail","name-version=fail","purl=fail","versions-needed=fail"]' ] \
+    && pass "a component with no version and no reason still fails" \
+    || fail "unexplained: $(jq -c '[.result, (.checks[] | select(.id == "versions-needed" or .id == "name-version" or .id == "purl") | [.id, .status])]' "$WORK/skr2_conformance.json")"
+# Nothing is relaxed for a firmware SBOM that names no package (a file
+# inventory only), nor while a component has neither a version nor a reason,
+# even one that carries a purl.
+cat > "$WORK/skf.json" <<'JSON'
+{"bomFormat":"CycloneDX","specVersion":"1.6","metadata":{"timestamp":"2026-10-15T00:00:00Z","tools":{"components":[{"type":"application","name":"bomlens"}]},
+ "component":{"type":"firmware","name":"fw","version":"1.0"}},
+ "components":[{"type":"file","name":"bin/a","hashes":[{"alg":"SHA-256","content":"aa"}]},
+               {"type":"file","name":"bin/b","hashes":[{"alg":"SHA-256","content":"bb"}]}]}
+JSON
+CONFORMANCE_PROFILE=skt-submission MODE=FIRMWARE bash "$LIB/validate-sbom.sh" "$WORK/skf.json" "$WORK/skf" "skf" >/dev/null 2>&1
+[ "$(jq -c '[.result, (has("submissionJudgedAs")), (.checks[] | select(.id == "name-version" or .id == "purl" or .id == "transitive") | .status)]' "$WORK/skf_conformance.json")" = '["fail",false,"fail","fail","fail"]' ] \
+    && pass "a firmware SBOM listing only files is not relaxed" \
+    || fail "file-only firmware SBOM: $(jq -c '[.result, (.checks[] | select(.id == "name-version" or .id == "purl" or .id == "transitive") | [.id, .status])]' "$WORK/skf_conformance.json")"
+jq '.components += [{"type":"library","name":"libfoo","purl":"pkg:generic/libfoo"}]' "$WORK/skr.json" > "$WORK/skp.json"
+CONFORMANCE_PROFILE=skt-submission MODE=FIRMWARE bash "$LIB/validate-sbom.sh" "$WORK/skp.json" "$WORK/skp" "skr" >/dev/null 2>&1
+[ "$(jq -c '[.result, (.checks[] | select(.id == "versions-needed" or .id == "purl" or .id == "no-generic" or .id == "transitive") | "\(.id)=\(.status)")]' "$WORK/skp_conformance.json")" = '["fail","purl=fail","no-generic=fail","transitive=fail","versions-needed=fail"]' ] \
+    && pass "an unexplained versionless component with a purl keeps every general row as measured" \
+    || fail "unexplained with purl: $(jq -c '[.result, (.checks[] | select(.id == "versions-needed" or .id == "purl" or .id == "no-generic" or .id == "transitive") | [.id, .status])]' "$WORK/skp_conformance.json")"
+# Under --analyze the SBOM's own properties drive the same list. With no
+# bomlens:scanMode (another tool, or a BomLens SBOM older than the marker) the
+# generic rows stay as measured.
+MODE=ANALYZE CONFORMANCE_PROFILE=skt-submission bash "$LIB/validate-sbom.sh" "$WORK/skr.json" "$WORK/skra" "skr" >/dev/null 2>&1
+[ "$(jq -c '[.result, (.checks[] | select(.id == "versions-needed") | [.status, (.explained | length)]), (.checks[] | select(.id == "name-version" or .id == "purl" or .id == "transitive") | .status)]' "$WORK/skra_conformance.json")" = '["fail",["pass",2],"fail","fail","fail"]' ] \
+    && pass "under --analyze an SBOM with no scan mode keeps the generic rows as measured, and still lists the reasons" \
+    || fail "analyze with reasons: $(jq -c '[.result, (.checks[] | select(.id == "versions-needed" or .id == "name-version" or .id == "purl" or .id == "transitive") | [.id, .status])]' "$WORK/skra_conformance.json")"
+# An SBOM that states a BomLens firmware scan wrote it is judged as one under
+# --analyze, and the report says so.
+jq '.metadata.properties = [{"name":"bomlens:scanMode","value":"FIRMWARE"}]' "$WORK/skr.json" > "$WORK/skrm.json"
+MODE=ANALYZE CONFORMANCE_PROFILE=skt-submission bash "$LIB/validate-sbom.sh" "$WORK/skrm.json" "$WORK/skrm" "skr" >/dev/null 2>&1
+[ "$(jq -c '[.result, .submissionJudgedAs, (.checks[] | select(.id == "name-version" or .id == "purl" or .id == "transitive") | .status)]' "$WORK/skrm_conformance.json")" = '["pass","FIRMWARE","warn","warn","warn"]' ] \
+    && grep -q 'Judged as a BomLens firmware, root filesystem or binary scan SBOM (bomlens:scanMode=FIRMWARE)' "$WORK/skrm_conformance.md" \
+    && grep -q 'submit-judged' "$WORK/skrm_conformance.html" \
+    && pass "under --analyze an SBOM marked bomlens:scanMode=FIRMWARE is judged as a firmware scan, and the summary says so" \
+    || fail "analyze with scanMode: $(jq -c '[.result, .submissionJudgedAs]' "$WORK/skrm_conformance.json")"
+REPORT_LANG=ko MODE=ANALYZE CONFORMANCE_PROFILE=skt-submission bash "$LIB/validate-sbom.sh" "$WORK/skrm.json" "$WORK/skrmk" "skr" >/dev/null 2>&1
+grep -q 'BomLens 펌웨어, 루트 파일시스템, 바이너리 스캔 SBOM(bomlens:scanMode=FIRMWARE)으로 판정해' "$WORK/skrmk_conformance.md" \
+    && pass "the Korean report gives the same reason" || fail "ko judged-as line"
+jq '.metadata.properties = [{"name":"bomlens:scanMode","value":"SOURCE"}]' "$WORK/skr.json" > "$WORK/skrs.json"
+MODE=ANALYZE CONFORMANCE_PROFILE=skt-submission bash "$LIB/validate-sbom.sh" "$WORK/skrs.json" "$WORK/skrs" "skr" >/dev/null 2>&1
+jq -e '.result == "fail" and (has("submissionJudgedAs") | not)' "$WORK/skrs_conformance.json" >/dev/null \
+    && pass "any other scan mode is judged as measured" || fail "scanMode SOURCE relaxed"
+[ "$(jq -r '.submissionJudgedAs' "$WORK/skr_conformance.json")" = FIRMWARE ] \
+    && grep -q 'bomlens:scanMode=FIRMWARE' "$WORK/skr_conformance.md" \
+    && pass "a firmware scan's own report names the basis too" || fail "scan-time judged-as line"
+# A source scan under the same profile: no relaxation either.
+MODE=SOURCE CONFORMANCE_PROFILE=skt-submission bash "$LIB/validate-sbom.sh" "$WORK/skr.json" "$WORK/skr3" "skr" >/dev/null 2>&1
+[ "$(jq -c '[.checks[] | select(.id == "purl" or .id == "transitive") | .status]' "$WORK/skr3_conformance.json")" = '["fail","fail"]' ] \
+    && pass "a source scan keeps the purl and transitive rows as measured" || fail "source scan rows: $(jq -c '[.checks[] | select(.id == "purl" or .id == "transitive") | [.id, .status]]' "$WORK/skr3_conformance.json")"
+# The default profile ignores the reasons.
+bash "$LIB/validate-sbom.sh" "$WORK/skr.json" "$WORK/skrd" "skr" >/dev/null 2>&1
+[ "$(jq -c '[.checks[] | select(.id == "name-version" or .id == "transitive") | .status]' "$WORK/skrd_conformance.json")" = '["fail","fail"]' ] \
+    && ! grep -q 'Explained by the supplier' "$WORK/skrd_conformance.md" \
+    && pass "the default profile is unchanged by recorded reasons" || fail "default profile with reasons"
 
 echo "== normalize: the file entry syft writes for a binary it identified is folded into the binary =="
 cat > "$WORK/bf.json" <<'JSON'
@@ -11778,6 +12101,260 @@ RCH_STAGE1_LOG="$RS1/log" BOMLENS_REACHABILITY=true BOMLENS_GOVULNCHECK="$RS1/bi
 too_large 21 20" ] && [ ! -e "$BIG/out/b_1_govulncheck_stage1.json" ] \
     && pass "21 Go modules: govulncheck does not run, and the run list records too_large" \
     || fail "module limit" "$(cat "$RS1/log" "$BIG/out/b_1_govulncheck_stage1.rc" 2>&1)"
+
+echo "== reports: shared design tokens, print rules, time format and the missing-tokens fallback =="
+# The four HTML reports inline docker/shared/bomlens-tokens.css (report-common.sh).
+# A report that lost the tokens must be loud about it, never quietly unstyled.
+RC="$FIX/report-contrast"
+RT="$WORK/rt"; mkdir -p "$RT/bin"
+cat > "$RT/bin/trivy" <<'STUB'
+#!/bin/bash
+out=""; prev=""
+for a in "$@"; do [ "$prev" = "--output" ] && out="$a"; prev="$a"; done
+cp "$RC_TRIVY_FIXTURE" "$out"
+STUB
+chmod +x "$RT/bin/trivy"
+RTP="$RT/t_1.0"
+( export RC_TRIVY_FIXTURE="$RC/trivy.json" PATH="$RT/bin:$PATH" SECURITY_ENRICH=false DEEP_CVE=false
+  bash "$LIB/validate-sbom.sh" "$RC/sbom.json" "$RTP" t >/dev/null 2>&1
+  bash "$LIB/scan-security.sh" "$RC/sbom.json" "$RTP" t >/dev/null 2>&1
+  bash "$LIB/generate-notice.sh" "$RC/sbom.json" "$RTP" t >/dev/null 2>&1
+  cp "$RC/risk-bom.json" "${RTP}_bom.json"
+  bash "$LIB/generate-risk-report.sh" "$RTP" t ANALYZE >/dev/null 2>&1 )
+for kind in risk-report security NOTICE conformance; do
+    H="${RTP}_$kind.html"
+    if [ ! -s "$H" ]; then fail "$kind report was not generated for the token checks"; continue; fi
+    if grep -q -- '--background:' "$H" && grep -q -- '--role-danger-fg:' "$H" && grep -q -- '--font-size-body:' "$H"; then
+        pass "$kind report carries the design tokens (--background, --role-danger-fg, --font-size-body)"
+    else
+        fail "$kind report lacks the design tokens"
+    fi
+    grep -q 'bomlens-report: built-in fallback' "$H" \
+        && fail "$kind report used the fallback palette although the tokens file exists" \
+        || pass "$kind report uses the real tokens file, not the fallback"
+    if grep -q '@media print' "$H" && grep -q 'thead{display:table-header-group' "$H" \
+       && grep -q 'a\[href^="http"\]::after' "$H" && grep -q 'break-inside:avoid' "$H"; then
+        pass "$kind report has the print rules (repeating table header, no row splits, external link addresses)"
+    else
+        fail "$kind report lacks the print rules"
+    fi
+    grep -qE '<time datetime="[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z">[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2} UTC</time>' "$H" \
+        && pass "$kind report shows a readable generation time with its zone, ISO value kept in datetime" \
+        || fail "$kind report time is not <time datetime=ISO>YYYY-MM-DD HH:MM UTC</time>"
+done
+for kind in risk-report security conformance; do
+    grep -q '<thead><tr>' "${RTP}_$kind.html" && grep -q '</tbody></table>' "${RTP}_$kind.html" \
+        && pass "$kind report tables have a real <thead> (so the header can repeat in print)" \
+        || fail "$kind report tables lack <thead>"
+done
+for kind in risk-report security; do
+    grep -q '<td class="id">CVE-' "${RTP}_$kind.html" && grep -q 'td.id{white-space:nowrap' "${RTP}_$kind.html" \
+        && pass "$kind report keeps a CVE id on one line" || fail "$kind report CVE column may wrap"
+done
+grep -q '<h1>Open-source risk report</h1>' "${RTP}_risk-report.html" \
+    && grep -q '<p class="subtitle">Supplier SBOM under review</p>' "${RTP}_risk-report.html" \
+    && pass "supplier risk report: GLOSSARY title with the supplier review as subtitle" \
+    || fail "supplier risk report title/subtitle"
+grep -q '^_Supplier SBOM under review_$' "${RTP}_risk-report.md" \
+    && pass "supplier risk report markdown carries the subtitle" || fail "supplier risk report markdown subtitle"
+grep -q '<h1>Conformance check report</h1>' "${RTP}_conformance.html" \
+    && pass "conformance report is titled Conformance check report" || fail "conformance report title"
+# No retired term in any generated English report (GLOSSARY.md).
+for f in "${RTP}_risk-report.html" "${RTP}_conformance.html" "${RTP}_security.html" "${RTP}_NOTICE.html"; do
+    if grep -qE 'risk analysis report|Supplier SBOM risk report|SBOM Conformance Report|format validation' "$f"; then
+        fail "$(basename "$f") still uses a term GLOSSARY.md retired"
+    else
+        pass "$(basename "$f") uses no retired term"
+    fi
+done
+( cd "$RT" && REPORT_LANG=ko bash "$LIB/generate-risk-report.sh" t_1.0 t ANALYZE >/dev/null 2>&1 )
+grep -q '<h1>오픈소스 위험 보고서</h1>' "${RTP}_risk-report.html" && grep -q '공급사 SBOM 검토' "${RTP}_risk-report.html" \
+    && pass "ko supplier risk report: 오픈소스 위험 보고서 with 공급사 SBOM 검토 as subtitle" \
+    || fail "ko supplier risk report title/subtitle"
+if grep -qE '위험 ?분석 ?보고서|적합성 보고서|결과물|포맷 검증' "${RTP}_risk-report.html" "${RTP}_risk-report.md" \
+   "$LIB/i18n/report-strings.ko.json"; then
+    fail "the ko report strings still use a term GLOSSARY.md retired"
+else
+    pass "the ko report strings use no retired term"
+fi
+
+# Missing tokens file: a warning, and the built-in palette inside the report.
+SOLO="$RT/solo"; mkdir -p "$SOLO"; cp "$LIB/report-common.sh" "$SOLO/"
+NOTOK="$( ( . "$SOLO/report-common.sh"; report_style ) 2>"$RT/solo.err" )"
+NOTOK_TOKENS="$( ( . "$SOLO/report-common.sh"; report_tokens_css ) 2>/dev/null )"
+if grep -q 'WARN: bomlens-tokens.css not found' "$RT/solo.err" \
+   && printf '%s' "$NOTOK" | grep -q 'bomlens-report: built-in fallback' \
+   && printf '%s' "$NOTOK" | grep -q -- '--role-danger-fg:' && printf '%s' "$NOTOK" | grep -q -- '--background:'; then
+    pass "no tokens file: a warning is printed and the report embeds the fallback palette"
+else
+    fail "no tokens file: no warning or no fallback" "$(cat "$RT/solo.err")"
+fi
+# An unusable tokens file (empty, or without the role colours) counts as missing.
+: > "$RT/empty.css"
+EMPTYTOK="$( ( export BOMLENS_TOKENS_CSS="$RT/empty.css"; . "$SOLO/report-common.sh"; report_style ) 2>/dev/null )"
+printf '%s' "$EMPTYTOK" | grep -q 'bomlens-report: built-in fallback' \
+    && pass "an empty tokens file falls back instead of producing an unstyled report" \
+    || fail "an empty tokens file produced a report without the fallback"
+# BOMLENS_TOKENS_CSS wins over the bundled copy, and .dark becomes a media rule.
+printf ':root{--role-danger-fg: 1 2 3;--background: 9 9 9%%;}\n.dark {\n  --background: 8 8 8%%;\n}\n' > "$RT/custom.css"
+CUSTOM="$( ( export BOMLENS_TOKENS_CSS="$RT/custom.css"; . "$SOLO/report-common.sh"; report_style ) 2>/dev/null )"
+if printf '%s' "$CUSTOM" | grep -q -- '--background: 9 9 9%' \
+   && printf '%s' "$CUSTOM" | grep -q 'prefers-color-scheme: dark'; then
+    pass "BOMLENS_TOKENS_CSS overrides the bundled tokens; the .dark block becomes a prefers-color-scheme rule"
+else
+    fail "BOMLENS_TOKENS_CSS override" "$CUSTOM"
+fi
+# The fallback must not drift from the real tokens: every declaration in it is
+# also in docker/shared/bomlens-tokens.css, with the same value, light and dark.
+norm_css() { awk 'BEGIN{d=0} /\.dark|prefers-color-scheme/{d=1}
+    { n=split($0,a,";"); for(i=1;i<=n;i++){ s=a[i];
+        if (match(s,/--[a-z0-9-]+: *[^;{}]+$/)) { v=substr(s,RSTART,RLENGTH); gsub(/: */,":",v); gsub(/[[:space:]]+$/,"",v); print (d?"D ":"L ") v } } }'; }
+DRIFT="$(comm -23 <(printf '%s\n' "$NOTOK_TOKENS" | norm_css | sort -u) <(norm_css < "$ROOT_DIR/docker/shared/bomlens-tokens.css" | sort -u))"
+FBN="$(printf '%s\n' "$NOTOK_TOKENS" | norm_css | wc -l | tr -d ' ')"
+if [ -z "$DRIFT" ] && [ "$FBN" -gt 100 ]; then
+    pass "the fallback palette ($FBN declarations) matches bomlens-tokens.css exactly"
+else
+    fail "the fallback palette drifted from bomlens-tokens.css" "$DRIFT"
+fi
+# Image bundle: the Dockerfile must install the tokens next to the scripts, the
+# build context must not exclude them, and the file must exist in the checkout.
+grep -q '^COPY shared/bomlens-tokens.css /usr/local/lib/sbom/bomlens-tokens.css$' "$ROOT_DIR/docker/Dockerfile" \
+    && pass "Dockerfile installs bomlens-tokens.css beside the report scripts" \
+    || fail "Dockerfile does not COPY shared/bomlens-tokens.css into /usr/local/lib/sbom/"
+grep -q 'test -s /usr/local/lib/sbom/bomlens-tokens.css' "$ROOT_DIR/docker/Dockerfile" \
+    && pass "Dockerfile fails the build when the installed tokens file is missing or empty" \
+    || fail "Dockerfile has no build-time check of the tokens file"
+if [ -s "$ROOT_DIR/docker/shared/bomlens-tokens.css" ] \
+   && ! grep -Eq '^(\*\*/)?(shared|docker/shared|bomlens-tokens)' "$ROOT_DIR/docker/.dockerignore"; then
+    pass "the tokens file exists and .dockerignore does not exclude it"
+else
+    fail "the tokens file is missing or excluded from the build context"
+fi
+
+echo ""
+echo "== sbom_has_components (decides the manifest-only fallback warning) =="
+eval "$(sed -n '/^sbom_has_components() {/,/^}/p' "$ROOT_DIR/scripts/scan-sbom.sh")"
+SHC="$(mktemp -d)"
+printf '{"bomFormat":"CycloneDX","components":[{"type":"library","name":"a","purl":"pkg:pypi/a@1"}]}\n' > "$SHC/full.json"
+printf '{"bomFormat":"CycloneDX","components":[]}\n' > "$SHC/empty.json"
+printf '{"bomFormat":"CycloneDX"}\n' > "$SHC/none.json"
+: > "$SHC/zero-bytes.json"
+sbom_has_components "$SHC/full.json" && pass "an SBOM with a component counts as non-empty" || fail "an SBOM with a component was read as empty"
+sbom_has_components "$SHC/empty.json" && fail "an empty components array was read as non-empty" || pass "an empty components array is empty"
+sbom_has_components "$SHC/none.json" && fail "an SBOM with no components key was read as non-empty" || pass "an SBOM with no components key is empty"
+sbom_has_components "$SHC/zero-bytes.json" && fail "an empty file was read as non-empty" || pass "an empty file is empty"
+sbom_has_components "$SHC/missing.json" && fail "a missing file was read as non-empty" || pass "a missing file is empty"
+# Without jq the check falls back to looking for a package URL.
+SAVE_PATH="$PATH"; NOJQ="$(mktemp -d)"
+for t in grep cat sed tr head tail wc awk; do ln -s "$(command -v $t)" "$NOJQ/$t" 2>/dev/null; done
+PATH="$NOJQ"
+sbom_has_components "$SHC/full.json" && pass "without jq, a package URL marks a non-empty SBOM" || fail "without jq, a component was read as empty"
+sbom_has_components "$SHC/empty.json" && fail "without jq, an empty SBOM was read as non-empty" || pass "without jq, an empty SBOM is empty"
+PATH="$SAVE_PATH"
+rm -rf "$SHC" "$NOJQ"
+
+echo ""
+echo "== Trivy cache folder (default on, shared between scans) =="
+grep -q '^SBOM_TRIVY_CACHE="${SBOM_TRIVY_CACHE-$BOMLENS_CACHE_DIR/trivy}"$' "$ROOT_DIR/scripts/scan-sbom.sh" \
+    && pass "scan-sbom.sh defaults SBOM_TRIVY_CACHE to a folder under the BomLens cache, and an empty value turns it off" \
+    || fail "scan-sbom.sh does not default SBOM_TRIVY_CACHE (unset must mean the default, empty must mean off)"
+grep -q 'TRIVY_CACHE_BACKEND=memory' "$ROOT_DIR/docker/entrypoint.sh" \
+    && pass "entrypoint.sh keeps Trivy's per-scan cache in memory when the shared cache folder is mounted" \
+    || fail "entrypoint.sh does not set TRIVY_CACHE_BACKEND=memory for the shared cache folder"
+eval "$(sed -n '/^trivy_cache_args() {/,/^}/p' "$ROOT_DIR/docker/lib/source-detect.sh")"
+TC="$(mktemp -d)"
+out="$(SBOM_TRIVY_CACHE="$TC/cache" trivy_cache_args | wc -l | tr -d ' ')"
+[ "$out" = "4" ] && [ -d "$TC/cache" ] \
+    && pass "a cache folder is created and mounted as -v <dir>:/trivy-cache -e TRIVY_CACHE_DIR" \
+    || fail "trivy_cache_args did not print the four mount words for a cache folder" "lines=$out"
+[ -z "$(SBOM_TRIVY_CACHE="" trivy_cache_args)" ] \
+    && pass "an empty SBOM_TRIVY_CACHE mounts nothing" \
+    || fail "an empty SBOM_TRIVY_CACHE still mounted a folder"
+rm -rf "$TC"
+
+echo ""
+echo "== static detection: which trees a lock file covers, and the SBOM read from it =="
+SD_OUT="$( {
+  . "$ROOT_DIR/docker/lib/source-detect.sh"
+  SD="$(mktemp -d)"
+  chk() { # <name> <expect: static|build> <why-fragment> -> runs detect + check in $SD/<name>
+    local l; l="$(detect_lang "$SD/$1")"
+    if static_detection_check "$SD/$1" "$l"; then got=static; else got=build; fi
+    if [ "$got" = "$2" ] && printf '%s' "$STATIC_DETECTION_WHY" | grep -qF -- "$3"; then
+      echo "PASS: $4 ($got: $STATIC_DETECTION_WHY)"
+    else
+      echo "FAIL: $4 (wanted $2 / '$3', got $got / '$STATIC_DETECTION_WHY')"
+    fi
+  }
+  mkdir -p "$SD/npm" "$SD/pnpm/packages/a" "$SD/pnpm/packages/b" "$SD/nolock" "$SD/maven" "$SD/gradle/gradle/wrapper" "$SD/nested/web" "$SD/leftout/test/app" "$SD/python" "$SD/ws"
+  echo '{"name":"a"}' > "$SD/npm/package.json"; echo '{}' > "$SD/npm/package-lock.json"
+  echo '{"name":"a"}' > "$SD/pnpm/package.json"; echo 'lock' > "$SD/pnpm/pnpm-lock.yaml"; echo 'packages: ["packages/*"]' > "$SD/pnpm/pnpm-workspace.yaml"
+  echo '{"name":"a1"}' > "$SD/pnpm/packages/a/package.json"; echo '{"name":"b1"}' > "$SD/pnpm/packages/b/package.json"
+  echo '{"name":"a","dependencies":{"x":"^1"}}' > "$SD/nolock/package.json"
+  echo '<project/>' > "$SD/maven/pom.xml"; echo 'x' > "$SD/maven/gradle.lockfile"
+  echo "plugins {}" > "$SD/gradle/build.gradle"; echo "x" > "$SD/gradle/gradle.lockfile"; echo jar > "$SD/gradle/gradle/wrapper/gradle-wrapper.jar"
+  echo '{"name":"a"}' > "$SD/nested/package.json"; echo '{}' > "$SD/nested/package-lock.json"; echo '{"name":"w"}' > "$SD/nested/web/package.json"
+  echo '{"name":"a"}' > "$SD/leftout/package.json"; echo '{}' > "$SD/leftout/package-lock.json"; echo '{"name":"t"}' > "$SD/leftout/test/app/package.json"
+  echo 'requests==2.0' > "$SD/python/requirements.txt"
+  echo '{"name":"a","workspaces":["p/*"]}' > "$SD/ws/package.json"; echo '{}' > "$SD/ws/package-lock.json"; mkdir -p "$SD/ws/p/x"; echo '{"name":"x"}' > "$SD/ws/p/x/package.json"
+  chk npm static package-lock.json "a Node project with a package-lock.json"
+  chk pnpm build "another manifest below the root" "a pnpm workspace (its members' dependencies come into a static read)"
+  chk ws build "another manifest below the root" "an npm workspace"
+  chk gradle static gradle.lockfile "a Gradle project with gradle.lockfile (the wrapper jar is not a manifest)"
+  chk nolock build "no package-lock.json" "a Node project with no lock file"
+  chk maven build "Maven" "a Maven project, even beside a gradle.lockfile"
+  chk nested build "another manifest below the root" "a second project below the root"
+  chk leftout build "left out" "manifests under a test folder"
+  chk python build "no lock file kind is verified" "a Python project (no verified lock kind)"
+  rm -rf "$SD"
+} 2>&1 )"
+while IFS= read -r line; do
+  case "$line" in PASS:*) pass "${line#PASS: }" ;; FAIL:*) fail "${line#FAIL: }" ;; esac
+done <<< "$SD_OUT"
+
+GS="$(mktemp -d)"; mkdir -p "$GS/bin" "$GS/src"
+# A stand-in for `trivy fs`: writes a CycloneDX 1.7 document with a root, a lock
+# file entry (an application with no purl) and two packages.
+cat > "$GS/bin/trivy" <<'STUB'
+#!/bin/bash
+out=""; prev=""
+for a in "$@"; do [ "$prev" = "-o" ] && out="$a"; prev="$a"; done
+[ -n "${TRIVY_STUB_FAIL:-}" ] && exit 1
+cat > "$out" <<'JSON'
+{"bomFormat":"CycloneDX","specVersion":"1.7","metadata":{"component":{"type":"application","name":"/src"}},
+ "components":[{"type":"application","name":"package-lock.json"},
+             {"type":"library","name":"debug","version":"4.3.1","purl":"pkg:npm/debug@4.3.1"},
+             {"type":"library","name":"ms","version":"2.1.2","purl":"pkg:npm/ms@2.1.2"}]}
+JSON
+STUB
+chmod +x "$GS/bin/trivy"
+GS_OUT="$( {
+  . "$ROOT_DIR/docker/lib/source-detect.sh"
+  export PATH="$GS/bin:$PATH" LIBDIR="$ROOT_DIR/docker/lib"
+  CDX_SPEC_VERSION=1.6 generate_sbom_static "$GS/src" "$GS/out16.json" \
+    && [ "$(jq -r .specVersion "$GS/out16.json")" = "1.6" ] \
+    && [ "$(jq '[.components[]]|length' "$GS/out16.json")" = "2" ] \
+    && [ "$(jq -r '.metadata.component.name' "$GS/out16.json")" = "/src" ] \
+    && echo "PASS: the SBOM read from a lock file drops the lock file entry, keeps the root, and is written as 1.6 when 1.6 is asked" \
+    || echo "FAIL: generate_sbom_static to 1.6"
+  CDX_SPEC_VERSION=1.7 generate_sbom_static "$GS/src" "$GS/out17.json" \
+    && [ "$(jq -r .specVersion "$GS/out17.json")" = "1.7" ] \
+    && echo "PASS: a 1.7 document stays 1.7 when 1.7 is asked" \
+    || echo "FAIL: generate_sbom_static to 1.7"
+  TRIVY_STUB_FAIL=1 CDX_SPEC_VERSION=1.6 generate_sbom_static "$GS/src" "$GS/outf.json" \
+    && echo "FAIL: a failing trivy was reported as success" \
+    || { [ ! -e "$GS/outf.json" ] && echo "PASS: a failing trivy returns 1 and leaves no file, so the caller can build"; }
+  mark_sbom_detection "$GS/out16.json" static package-lock.json
+  [ "$(jq -r '[.metadata.properties[]|select(.name=="bomlens:detection")|.value]|first' "$GS/out16.json")" = "static" ] \
+    && [ "$(jq -r '[.metadata.properties[]|select(.name=="bomlens:detection-source")|.value]|first' "$GS/out16.json")" = "package-lock.json" ] \
+    && echo "PASS: the SBOM says it was read statically and from which lock file" \
+    || echo "FAIL: mark_sbom_detection"
+  true
+} 2>&1 )"
+while IFS= read -r line; do
+  case "$line" in PASS:*) pass "${line#PASS: }" ;; FAIL:*) fail "${line#FAIL: }" ;; esac
+done <<< "$GS_OUT"
+rm -rf "$GS"
 
 echo ""
 echo "Results: ${PASS} passed, ${FAIL} failed"

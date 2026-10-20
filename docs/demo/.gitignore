@@ -2,10 +2,11 @@
 # workflow, not committed. Only data/ (captured by scripts/capture-demo-data.sh)
 # is tracked, because it is the demo's input rather than a build output.
 #
-# inputs/ holds the one scan input that a name alone does not reproduce: the
-# supplier SBOM the demo analyzes arrives as an uploaded file. Every other
-# published scan is reachable from an identifier — a path in examples/, an image
-# tag, a model id, a firmware URL — so the capture workflow can re-run them all.
+# inputs/ holds the scan inputs that a name alone does not reproduce: the
+# supplier SBOM the demo analyzes arrives as an uploaded file, and the second
+# version of the Java project is a changed copy of the example's pom.xml. Every
+# other published scan is reachable from an identifier — a path in examples/, an
+# image tag, a model id, a firmware URL — so the capture workflow can re-run them all.
 *
 !.gitignore
 !data/

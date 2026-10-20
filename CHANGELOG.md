@@ -7,6 +7,106 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- The Vulnerabilities table has a "No fix yet" preset view next to "Fix available", so findings with no published fixed version can be listed on their own.
+- A GitHub URL scan in the web UI takes an optional branch, tag or commit, as `--branch` does on the command line. A commit id falls back to a full clone and a checkout. A re-scan fills the field from the earlier scan.
+- `CITATION.cff`, so GitHub offers a "Cite this repository" entry.
+- The release verification guide has a Windows section: the PowerShell commands that download the installer, verify the signature on its checksum file and compare the installer's hash.
+- `--exclude <path>` leaves a path out of a source scan (repeatable), and the web UI has a matching "Paths to leave out" box for source scans. The scan runs on a tree without the excluded paths, so the build, the license scan and the file tree all skip them. A re-scan fills the box from the earlier scan.
+
+### Changed
+
+- The medium-severity amber and the success green are darker in the light theme, so bars, dots and progress fills reach 3:1 against the page (they were 2.8:1 and 2.4:1). A new check, `npm run token:contrast`, fails when a text color falls under 4.5:1 or a fill color under 3:1 in either theme. The web UI reference has an Accessibility section that lists what is measured and what is not.
+- The risk report (Markdown and HTML, English and Korean) now says when the scanned source stated version ranges and shipped no lock file: the versions in the SBOM are what a fresh install resolved on the scan day, and the vulnerability counts were measured against them. Before, only the web UI and the SBOM property `bomlens:source:versionPinning` said so.
+- The README says which Docker engines the desktop app works with on Windows: Rancher Desktop or Docker Desktop, not WSL2 + docker-ce (CLI only).
+- The conformance check flags a top-level component name that is a fixed value instead of a product name (`.`, `..`, `/` or `/scan`): it fails under `--conformance-profile skt-submission` and warns under the default profile. The supplier SBOM guide now lists what the check does not cover.
+
+## [v1.13.7] - 2026-10-17
+- The New scan form shows an inline error for a branch, tag or commit and for excluded paths the server would refuse, and its hints are tied to their inputs. The outbound license and SBOM author fields use the shared input style, so their focus ring matches the rest of the form. The License obligations card tells screen readers how many components each license has and whether the list is expanded. The medium-severity and success tint backgrounds follow the darker light-theme fills.
+
+### Upgrade note
+
+- A source scan reads a lock file instead of building when one covers the whole tree: `--detection auto` is the default (`--detection build` is the old behaviour, `DETECTION=build` in the environment does the same). Only a `package-lock.json`, `npm-shrinkwrap.json`, `pnpm-lock.yaml`, `bun.lock` or `gradle.lockfile` counts, with no manifest below the root (a workspace is built: its members' dependencies would come into a static read) and no manifest under a folder that is left out of the scan. On the benchmark's lock-file projects and on a real package-lock.json with 38 development dependencies the static SBOM has the same components and the same licenses as the built one, in 4 to 5 seconds instead of 11 to 21, and no cdxgen language image is pulled. The licenses a lock file does not carry come from the package registry, so `--byte-stable` and `FETCH_LICENSE=false` keep the build. The SBOM says which way it was made (`bomlens:detection`, `bomlens:detection-source`). If reading the lock file fails, `auto` builds. A project with no complete lock file is built as before. The image's own source scan (`MODE=SOURCE`, which the web UI and a CI job that runs the image directly use) reads a covering lock file the same way, with no Docker socket, so a runner without Docker can use it (`DETECTION=build|static|auto` in the environment; the CI guide has a GitLab job). In a direct run the `--fail-on` verdict is the `*_gate.result` file, not an exit code.
+- The CLI and the web UI keep Trivy's vulnerability database in a host folder by default (`~/.cache/bomlens/trivy`, `%LOCALAPPDATA%\bomlens\cache\trivy` on Windows; about 1.5 GB) instead of downloading it inside the scan container on every scan. A scan with the security report is 15 to 25 seconds shorter after the first one. Set `SBOM_TRIVY_CACHE=` (empty) to download on every scan as before, or point it at another folder. The engine contract and the plan format are unchanged.
+
+### Changed
+
+- The web UI's source scans use the same package caches as the CLI: `scan-sbom.sh --ui` mounts the Maven, Gradle, Cargo, Go, pip and npm cache folders into the UI container, which the cdxgen container of each source scan inherits. Before, a UI scan downloaded everything again (a small Rust project took 29 s the first time and takes 12 s after).
+- The CLI keeps the package downloads a source scan repeated every time in folders under the BomLens cache (`cargo/registry`, `go/mod`, `go/build`, `pip`, `npm`, beside the Maven and Gradle ones that were already there), instead of in the throwaway scan container. On a small Rust project the dependency step took 30 s and now takes 13 s from the second scan; Go, Python and Node projects with few dependencies change little, larger ones save the downloads. The folders can be deleted at any time. The web UI's source scans and the engine contract are unchanged.
+- Scans that share the cache folder keep Trivy's per-scan layer cache in memory, so several scans can run at once. Before, a second scan opening the same cache file at the same time failed with "cache may be in use by another process" and its security report was incomplete.
+
+### Added
+
+- Two documentation pages: [Verify a release](docs/guides/verify-release.md) (the cosign commands for the release checksum file, the container image and the SBOM attached to it as a signed attestation, run against a real release) and [What BomLens does not do](docs/concepts/limitations.md) (the limits we know about), in English and Korean, linked from the README and SECURITY.md. The CI guide has a GitLab job that runs the scanner image as the job image where there is no Docker.
+- The New scan form has "Read a lock file instead of building" (on by default) for a source scan. Turning it off sends `detection=build`, the web UI's `--detection build`. The choice is kept with the scan, so a re-scan refills the toggle.
+- The web UI's Overview says "Read from the lock file (package-lock.json), no build" for a scan that read a lock file instead of building, so the speed and what the dependency list rests on are not a surprise. A scan that built says nothing.
+
+### Fixed
+
+- The pattern that masks `user:password@` in a URL took time proportional to the square of the input on a long line full of colons with no `@` (16,000 colons took two seconds); it is now linear and masks the same strings. The web UI reads a query-string key such as `__proto__` as data, the third-party notices build step reads a license file without checking it first, and a test anchors the URL it matches. All four were reported by code scanning.
+- A license written as an SPDX expression was classed `uncategorized` even when every term was known: 77 of the 98 crates of a Rust project (`MIT OR Apache-2.0`) read as needing a license decision. The license class of an expression is now the strongest of its terms (a copyleft branch of an OR still shows, because the class is a warning; the conflict verdict still takes the best branch of an OR), `<permissive id> WITH <exception>` stays permissive, a single `/` between two ids reads as OR, and Unicode-3.0 and Unicode-DFS-2016 are permissive. A string that is not an expression, such as `GNU General Public License v2 or later`, is read whole as before.
+- The license conflict verdict reads a parenthesised expression (`(MIT OR Apache-2.0) AND Unicode-3.0`, `A AND (B OR C)`) with AND over OR, where it used to answer `unknown`. An expression it cannot parse (an unbalanced parenthesis, an operator in the wrong place) is still `unknown`.
+- When the dependency resolver failed and the manifest-only fallback found no component, the CLI no longer says the SBOM holds "direct dependencies only". It says the fallback found none, that the SBOM does not list the project's dependencies, and that a dependency file with fixed versions is what the fallback can read.
+
+## [v1.13.6] - 2026-10-17
+
+### Upgrade note
+
+- The titles of the HTML reports and the Korean names of the rail groups changed to the interface's glossary terms. File names, JSON fields, the artifact list and the engine contract version are unchanged.
+
+### Added
+
+- The web UI's Help menu has Getting started, Keyboard shortcuts and What's new in this version; `?` outside a text field opens the shortcut list. An empty scan list links to an example result next to the New scan button.
+- The New scan form groups the options by purpose (Result quality, Output format, External transfer), marks each option that sends data off the machine (the SCANOSS lookup and the server upload) the same way, and keeps the scan button pinned below the scrolling settings. The Licenses section's "not checked" notice has a button that opens the form on the outbound-license field; the command-line form of the advice is folded below it.
+- The result screens have a compact header with a summary strip, an "Items to check first" card (a reference order, not a ranking), a skip link, per-package upgrade bundles in the vulnerability table (the single upgrade that resolves the most CVEs), shareable preset views, a row density switch, and a tree view that opens first for dependency graphs of more than 60 packages (it was 150). Package groups of a long list start open only for the first three; a short list (five or fewer) starts open.
+- The desktop app's start screen shows start-up as three steps with download progress and a next action when one fails.
+- The demo has a second version of one project, so its Overview shows the comparison with the earlier version, and its start strip links there. A demo-mode check keeps every screen free of sideways scrolling at 390px and the demo free of axe violations.
+
+### Changed
+
+- A scan that ends without a requested artifact closes with the heading "Analysis finished with errors" (the exit code stays 0), and the web UI launchers open the browser only once the server answers.
+- When an npm project's SBOM has 0 components because the project declares only development dependencies, the warning says the lock file was read and names `BOMLENS_NODE_FULL_GRAPH=1` to list them.
+- One set of design tokens (`docker/shared/bomlens-tokens.css`, checked by `npm run tokens:check`) drives the web UI, the four HTML reports, the documentation site and the desktop start screen. Brand red is limited to the primary button, the logo and the focus ring; roles (severity, license class, status) have their own colours, each also carries a shape so colour is never the only signal, and selection and focus are separate states. The font sizes follow an eight-step scale.
+- The reports use the same terms as the interface: "Open-source risk report" and "Conformance check report". They print cleanly, show times in a readable form, and the build fails if the image lacks the token file. Zero colour-contrast findings in the four reports is enforced in CI.
+- The Korean rail groups are named 구성 정보 and 규정 준수 (they were 인벤토리 and 컴플라이언스), and the Korean pipeline diagrams and training slides use the glossary terms.
+- "Needs attention" no longer repeats a failed conformance check that "Items to check first" already lists.
+- The documentation site uses the app's fonts, links and buttons, and its build now runs axe over representative pages in both languages and both colour schemes.
+- The demo data is recaptured from this code; a source scan shows its path inside the repository instead of the capture machine's.
+- `@electron/asar` is a declared, pinned dev dependency of the desktop package.
+
+### Fixed
+
+- Hidden text no longer extends the web UI's scrolling content area, which let the page scroll into blank space.
+
+## [v1.13.5] - 2026-10-16
+
+### Upgrade note
+
+- In a `MODE=PLAN` plan, stage 1's `env` also sets `GOPATH=/tmp/sbomhome/go`, `GOMODCACHE=/tmp/sbomhome/go/pkg/mod` and `GOCACHE=/tmp/sbomhome/go-build`, so `go mod tidy` runs when stage 1 has a read-only root filesystem and only `/tmp` writable (before, it failed on `mkdir /go/pkg`, `go-mod-tidy` was recorded as `failed` and the run read `succeeded_degraded`). A Go toolchain that `go.mod` asks for is downloaded into `GOMODCACHE`. The CLI and the UI's scan set the same variables for stage 1. The engine contract version is unchanged: it is an additive `env` entry, like `MAVEN_OPTS` and `cache-maven` in v1.13.3, and no field, step or role changes.
+- Under `--conformance-profile skt-submission`, the "No upstream purl" row (`upstream-purl`) is no longer required: it still lists the versioned components without an upstream purl, as a warning, and no longer makes the result `fail`. For a firmware, root filesystem or binary scan, the name+version, PURL coverage, `pkg:generic` and transitive-dependency rows also warn instead of failing on what the "Version needed" and "No upstream purl" rows cover; none of them is relaxed while any component has neither a version nor a reason, or for an SBOM that lists no package. These scans now record `bomlens:scanMode` (`FIRMWARE`, `ROOTFS` or `BINARY`) in `metadata.properties`, and `--analyze` relaxes the same rows only for an SBOM that carries it, saying so in the report summary (`submissionJudgedAs` in the conformance JSON). Source scans, other SBOMs under `--analyze`, including firmware SBOMs from earlier BomLens versions, and the default profile are judged as before. A caller that reads the overall result of a firmware submission sees `pass` where it saw `fail`.
+- An SBOM read from a Yocto build's records (a Yocto build directory, its SPDX or its manifests) now gets the upstream repository PURL step that firmware, root filesystem and binary scans already had: components that had no PURL get `pkg:github/...` or `pkg:gnu/...` with `bomlens:purlSource=upstream-map`. Set `ENRICH_UPSTREAM_PURL=false` to keep the earlier PURLs. A build that published SPDX 2.2 also gets, with `--security`, the CPE index match, so the security report lists the CVEs matched from Yocto's CPEs where it listed none. SPDX 2.2 does not record which CVEs a recipe patched, so these can include CVEs the recipe already patched; an SPDX 3.0 build and the manifest reader keep Yocto's own verdicts and are not matched again.
+
+### Added
+
+- `--component-versions` takes an optional third column, `reason`: `own-code`, `not-open-source` or `version-unknown`, for a component the supplier has no version to give. The component stays in the SBOM without a version and carries `bomlens:versionReason`. Under `skt-submission` the "Version needed" row fails only on components with neither a version nor a reason and lists the explained ones with their reason (`explained` in the conformance JSON, "Explained by the supplier" in the reports and the web UI), also under `--analyze`. Two-column files are read as before. Any other reason value refuses the file with the line number; a row with both a version and a reason applies the version and warns. The template `<Project>_<Version>_component-versions.template.csv` now has the header `name,version,reason` and explains the three values.
+- The upstream PURL step matches a component by the name of what it was built from as well as its own: the Yocto recipe (`bomlens:yocto:recipe`, now also written by the SPDX 2.2 reader), the OpenWrt source package (the last part of `syft:metadata:source`, so `libmbedtls12` is read as Mbed TLS and `ip-full` as iproute2), and the product of a CPE whose vendor is `*`. OpenWrt's toolchain packages (`libc`) and kernel module packages (`kmod-*`) are left alone.
+- The upstream PURL table covers OpenSSL 3.x, jansson, json-c (0.13.1 to 0.19), libbpf, iproute2, musl and util-linux.
+- A component the table does not cover at all gets a PURL from its source address (`bomlens:sourceUrl`, written by the Yocto SPDX 2.2 reader) when the address states the release of the component's version: a GitHub release asset or tag archive, or a GNU release.
+- The CPE index match reads a 2.3 CPE whose part is `*` as an application, and looks one whose vendor is `*` up by product alone, across every vendor, as Yocto's own cve-check does. New images index the product column for that lookup.
+
+### Changed
+
+- The web UI says what a vulnerability's package status means: a status of "fixed" reads "Fix available" in a neutral tone, since a fixed version is published but the installed one is still affected until it is upgraded. Green stays for states that really mean resolved. Notices about what a scan did not cover (components that could not be checked, kernel advisories left out of the counts) use a neutral notice box instead of the red one.
+- Counts are grouped by thousands in the interface language (`60,123`), and `<html lang>` matches the interface language from the first render.
+- One set of terms across the interface, kept in `docker/web/frontend/src/locales/GLOSSARY.md` and enforced by `npm run i18n:check`: "Conformance check" (적합성 검사), "Artifacts" (산출물) for what a scan writes, "Build artifact" (빌드 산출물) for the New scan input category, "Re-scan" (다시 스캔). License classes keep their English names and carry a plain-words hint in the interface language.
+- The advanced option selects stay inside the settings card. In the read-only demo, the scan list opens with a start-here strip, long scan names are shortened in the middle, the list becomes stacked rows on narrow screens, and the model information questions open (only their last step, starting a scan, needs a server).
+- Documentation: the home page leads with the live demo and a short subtitle, the home screenshot is per language at the current release, Korean pages have their own share title, description and image, and the language switch now keeps the page you are on. The install guides use a shallow clone and say what the first run downloads and how long the web UI takes to answer. `scan-sbom.sh` says what to do next for a missing Docker, an unreachable engine and an unknown option, and warns when a `--target` that looks like a path is treated as an image name; `check-setup.sh` no longer reports a stopped engine as a missing Docker.
+
+### Fixed
+
+- The risk report of an AI model or dataset scan left the model or dataset itself out of the license count and the license classification, so a model with no dependent dataset read as 0 licenses. Its own license is now counted; source and image scans still leave their own project out.
+
 ## [v1.13.4] - 2026-10-15
 
 ### Fixed

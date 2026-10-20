@@ -12,11 +12,19 @@
 [![OpenSSF Best Practices](https://www.bestpractices.dev/projects/13059/badge)](https://www.bestpractices.dev/projects/13059)
 [![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/sktelecom/bomlens/badge)](https://securityscorecards.dev/viewer/?uri=github.com/sktelecom/bomlens)
 
+한국어 문서: [sktelecom.github.io/bomlens/ko](https://sktelecom.github.io/bomlens/ko/). 한국어로 질문하거나 이슈를 남겨도 됩니다.
+
 Try it without installing anything: the [live demo](https://sktelecom.github.io/bomlens/demo/) holds one finished scan of each kind — a Spring Boot project from source, a container image (1,393 components), a Raspberry Pi OS device image as firmware, an AI model as a CycloneDX ML-BOM checked against the G7 minimum elements, and a supplier SBOM checked against the format requirements. Read-only, nothing to install, nothing uploaded. To run your own scans, download the installer for [Windows](https://github.com/sktelecom/bomlens/releases/latest/download/BomLens-Setup.exe) or [macOS](https://github.com/sktelecom/bomlens/releases/latest/download/BomLens-Setup.dmg), or go straight to the [CLI](#cli-advanced).
 
 <p align="center">
   <img src="docs/images/web-ui-demo.png" alt="BomLens web UI Overview screen for a finished scan: component/vulnerability/dependency/artifact counts, a needs-attention banner, and the severity and license classification distributions" width="860" />
 </p>
+
+## Why it exists
+
+SK Telecom asks its suppliers to submit an SBOM, and BomLens was built so that a supplier can produce one that meets the [submission requirements](https://sktelecom.github.io/guide/supply-chain/for-suppliers/requirements/), understand what is in its software, and act on the vulnerabilities found. The `skt-submission` conformance profile checks an SBOM against those requirements (see the [supplier SBOM guide](docs/guides/supplier-sbom.md)). Anyone can use it, whether or not they supply SK Telecom.
+
+BomLens runs on one machine, which makes it easy to install and use but means it does not manage a whole organization's open source. For company-wide governance (project inventory, vulnerability triage, license policy gates) SK Telecom uses [TRUSCA](https://github.com/trustedoss/trusca), an open source SCA platform that can run BomLens as its scan engine. BomLens output is CycloneDX, so it can be uploaded to TRUSCA or to Dependency-Track (see the [upload guide](docs/guides/upload.md)).
 
 ## What it does
 
@@ -33,11 +41,13 @@ Full docs — searchable, English and Korean — live at **[sktelecom.github.io/
 - [Input scenarios](docs/guides/by-input.md) — GitHub URL, ZIP, local source, an existing SBOM, firmware
 - [CLI reference](docs/reference/cli.md) — every option and environment variable
 - [CI/CD integration](docs/guides/ci-cd.md) — gate a pipeline on scan results
+- [Verify a release](docs/guides/verify-release.md) — check the signatures and read the SBOM that ships with the image
+- [What BomLens does not do](docs/concepts/limitations.md) — the limits we know about
 - Contributing to the tool itself — [CONTRIBUTING](CONTRIBUTING.md) and the [architecture](docs/concepts/architecture.md)
 
 ## Quick Start
 
-Everything runs on a Docker engine (20.10+). The desktop app and web UI manage the image for you; only the CLI asks you to pull it. On Windows, free [Rancher Desktop](https://rancherdesktop.io/) or WSL2 + docker-ce works well; Docker Desktop also works, with licensing caveats for larger organizations.
+Everything runs on a Docker engine (20.10+). The desktop app and web UI manage the image for you; only the CLI asks you to pull it. On Windows, the desktop app needs [Rancher Desktop](https://rancherdesktop.io/) (free) or Docker Desktop (licensing caveats for larger organizations). WSL2 + docker-ce also works, but for the CLI only: the desktop app cannot see a Docker engine inside WSL2.
 
 ### Desktop app — no command line (recommended)
 
@@ -48,14 +58,14 @@ Download the installer and double-click it: [BomLens-Setup.exe](https://github.c
 ### Web UI
 
 ```bash
-git clone https://github.com/sktelecom/bomlens.git && cd bomlens
+git clone --depth 1 https://github.com/sktelecom/bomlens.git && cd bomlens   # --depth 1: about 50 MB instead of the full history
 ./scripts/scan-sbom.sh --ui     # opens http://localhost:8080; results save to the current folder
 #   Windows: double-click scripts\sbom-ui.bat
 ```
 
 > **PowerShell**: don't paste the block above as-is — `.sh` has no default handler there, so it fails silently with no error and no output. Double-click `scripts\sbom-ui.bat` instead.
 
-Enter a project name and version, pick a scan target (current folder, GitHub URL, ZIP, SBOM, firmware upload, or Docker image), click Run scan, then view or download the results; live logs stream as it runs. To scan a folder outside the launch directory, add `--mount <dir>` (repeatable, or `--mount /` for the whole host); the desktop app has an Add folder button for the same.
+The page can take up to a minute to load the first time while the image is checked, so reload the tab if it shows a connection error. Enter a project name and version, pick a scan target (current folder, GitHub URL, ZIP, SBOM, firmware upload, or Docker image), click Run scan, then view or download the results; live logs stream as it runs. To scan a folder outside the launch directory, add `--mount <dir>` (repeatable, or `--mount /` for the whole host); the desktop app has an Add folder button for the same.
 
 ### CLI (advanced)
 

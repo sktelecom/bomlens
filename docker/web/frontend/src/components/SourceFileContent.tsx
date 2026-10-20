@@ -87,10 +87,10 @@ export function SourceFileContent({
           <Badge variant="muted">{t("sourceViewer.symlink")}</Badge>
         </FileHeader>
         <div className="flex flex-1 items-center justify-center p-6">
-          <p className="flex flex-wrap items-center justify-center gap-2 text-sm text-muted-foreground">
+          <p className="flex flex-wrap items-center justify-center gap-2 text-body-sm text-muted-foreground">
             <FileSymlink className="h-4 w-4 shrink-0" />
             {t("sourceViewer.symlinkTo")}
-            <code className="break-all rounded bg-muted px-1.5 py-0.5 font-mono text-xs text-foreground">
+            <code className="break-all rounded bg-muted px-1.5 py-0.5 font-mono text-label text-foreground">
               {linkTarget}
             </code>
           </p>
@@ -111,7 +111,7 @@ export function SourceFileContent({
       <div className="flex h-full flex-col">
         <FileHeader path={path} />
         <div className="flex flex-1 items-center justify-center p-6">
-          <p className="flex items-center gap-2 text-sm text-muted-foreground">
+          <p className="flex items-center gap-2 text-body-sm text-muted-foreground">
             <FileWarning className="h-4 w-4 shrink-0" />
             {t(key)}
           </p>
@@ -126,10 +126,10 @@ export function SourceFileContent({
   return (
     <div className="flex h-full flex-col">
       <FileHeader path={path}>
-        <span className="shrink-0 text-xs text-muted-foreground">
+        <span className="shrink-0 text-label text-muted-foreground">
           {t("sourceViewer.lines", { count: lineCount(file.content) })}
         </span>
-        <span className="shrink-0 text-xs text-muted-foreground">
+        <span className="shrink-0 text-label text-muted-foreground">
           {formatBytes(file.size)}
         </span>
         {file.truncated && (
@@ -138,7 +138,7 @@ export function SourceFileContent({
       </FileHeader>
 
       <div className="flex-1 overflow-auto">
-        <table className="w-full border-collapse font-mono text-xs">
+        <table className="w-full border-collapse font-mono text-label">
           <tbody>
             {shown.map((line, i) => (
               <tr key={i} className="align-top">
@@ -172,7 +172,7 @@ export function SourceFileContent({
           </div>
         )}
         {file.truncated && expanded && (
-          <p className="border-t p-2 text-center text-xs text-muted-foreground">
+          <p className="border-t p-2 text-center text-label text-muted-foreground">
             {t("sourceViewer.truncatedFoot")}
           </p>
         )}
@@ -190,7 +190,7 @@ function FileHeader({
 }) {
   return (
     <div className="flex items-center gap-3 border-b px-3 py-2">
-      <span className="truncate font-mono text-xs" title={path}>
+      <span className="truncate font-mono text-label" title={path}>
         {path}
       </span>
       <span className="ml-auto flex items-center gap-3">{children}</span>

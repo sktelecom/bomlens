@@ -514,6 +514,18 @@ describe("startScan", () => {
   beforeEach(() => vi.stubGlobal("EventSource", FakeEventSource));
   afterEach(() => vi.unstubAllGlobals());
 
+  it("sends the branch, tag or commit of a git scan", () => {
+    startScan({ ...PARAMS, gitRef: "v1.2.0" }, handlers());
+    const qs = new URLSearchParams(FakeEventSource.last!.url.split("?")[1]);
+    expect(qs.get("git_ref")).toBe("v1.2.0");
+  });
+
+  it("sends the excluded paths one per line", () => {
+    startScan({ ...PARAMS, exclude: ["vendor/legacy", "test/fixtures"] }, handlers());
+    const qs = new URLSearchParams(FakeEventSource.last!.url.split("?")[1]);
+    expect(qs.get("exclude")).toBe("vendor/legacy\ntest/fixtures");
+  });
+
   it("builds the scan-stream query from params", () => {
     startScan(PARAMS, handlers());
     const url = FakeEventSource.last!.url;
@@ -523,6 +535,7 @@ describe("startScan", () => {
     expect(qs.get("version")).toBe("1.0");
     expect(qs.get("source")).toBe("git-url");
     expect(qs.get("target")).toBe("https://example.com/r.git");
+    expect(qs.get("git_ref")).toBe("");
     expect(qs.get("security")).toBe("true");
     expect(qs.get("deep_license")).toBe("false");
     expect(qs.get("identify_vendored")).toBe("false");

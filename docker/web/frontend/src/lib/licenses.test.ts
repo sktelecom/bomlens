@@ -127,8 +127,35 @@ describe("licenseRiskTier", () => {
     // The core safety property: unknown is uncategorized, not safe.
     expect(licenseRiskTier("Foo-1.0")).toBe("uncategorized");
     expect(licenseRiskTier("Proprietary")).toBe("uncategorized");
-    expect(licenseRiskTier("MIT OR Apache-2.0")).toBe("uncategorized");
+    expect(licenseRiskTier("Foo-1.0 OR MIT")).toBe("uncategorized");
+    expect(licenseRiskTier("(MIT OR Foo-1.0) AND Apache-2.0")).toBe("uncategorized");
     expect(licenseRiskTier("")).toBe("uncategorized");
+  });
+});
+
+describe("licenseRiskTier of an SPDX expression", () => {
+  // Measured on a real Rust project: 77 of 98 crates declare an expression such as
+  // "MIT OR Apache-2.0" and were all counted as uncategorized.
+  it("takes the strength of the worst term", () => {
+    expect(licenseRiskTier("MIT OR Apache-2.0")).toBe("permissive");
+    expect(licenseRiskTier("Unlicense/MIT")).toBe("permissive");
+    expect(licenseRiskTier("(MIT OR Apache-2.0) AND Unicode-3.0")).toBe("permissive");
+    expect(licenseRiskTier("Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT")).toBe("permissive");
+    // The label is a warning, so a copyleft branch of an OR is not hidden.
+    expect(licenseRiskTier("GPL-3.0-only OR MIT")).toBe("strong-copyleft");
+    expect(licenseRiskTier("Apache-2.0 AND (MIT OR GPL-2.0-only)")).toBe("strong-copyleft");
+    expect(licenseRiskTier("MPL-2.0 OR MIT")).toBe("weak-copyleft");
+  });
+
+  it("reads a string that is not an expression as before", () => {
+    expect(licenseRiskTier("GNU General Public License v2 or later (GPLv2+)")).toBe("strong-copyleft");
+    expect(licenseRiskTier("BSD License")).toBe("uncategorized");
+    expect(licenseRiskTier("(MIT")).toBe("uncategorized");
+  });
+
+  it("calls an expression of permissive licenses permissive, so it needs no decision", () => {
+    expect(licenseNeedsDecision(["MIT OR Apache-2.0"])).toBe(false);
+    expect(licenseNeedsDecision(["Foo-1.0 OR MIT"])).toBe(true);
   });
 });
 
@@ -214,8 +241,28 @@ describe("parseLicenseExpression", () => {
     ]);
   });
 
-  it("refuses a parenthesised expression rather than guessing", () => {
-    expect(parseLicenseExpression("(A OR B) AND C")).toEqual([]);
+  it("distributes a parenthesised expression into alternatives of AND terms", () => {
+    expect(parseLicenseExpression("(A OR B) AND C")).toEqual([["A", "C"], ["B", "C"]]);
+    expect(parseLicenseExpression("(MIT OR Apache-2.0) AND Unicode-3.0")).toEqual([
+      ["MIT", "Unicode-3.0"],
+      ["Apache-2.0", "Unicode-3.0"],
+    ]);
+    expect(parseLicenseExpression("A AND (B OR (C AND D))")).toEqual([["A", "B"], ["A", "C", "D"]]);
+    expect(parseLicenseExpression("(MIT)")).toEqual([["MIT"]]);
+  });
+
+  it("keeps an exception clause with its license", () => {
+    expect(parseLicenseExpression("(Apache-2.0 WITH LLVM-exception OR MIT) AND Zlib")).toEqual([
+      ["Apache-2.0 WITH LLVM-exception", "Zlib"],
+      ["MIT", "Zlib"],
+    ]);
+  });
+
+  it("refuses what it cannot parse rather than guessing", () => {
+    // (A string with no parenthesis is the flat reader's, which is unchanged.)
+    for (const bad of ["(A OR B", "A OR B)", "(A OR)", "(OR A)", "(A AND)", "( )", "(A WITH)"]) {
+      expect(parseLicenseExpression(bad), bad).toEqual([]);
+    }
   });
 
   it("is empty for an empty string", () => {
@@ -272,14 +319,23 @@ describe("componentConflict", () => {
   const deb = (licenses: string[], outbound = "Apache-2.0") =>
     componentConflict(licenses, outbound, RULES, DEB).verdict;
 
+  it("reads a parenthesised expression with the same rules as a flat one", () => {
+    // AND applies every term (worst verdict), OR lets the consumer pick (best).
+    expect(v(["(MIT OR GPL-2.0-only) AND BSD-3-Clause"])).toBe("compatible");
+    expect(v(["GPL-3.0-only AND (MIT OR BSD-2-Clause)"])).toBe("incompatible");
+    expect(v(["(GPL-3.0-only AND MIT) OR Apache-2.0"])).toBe("compatible");
+    // One that cannot be parsed stays unknown.
+    expect(v(["(MIT OR"])).toBe("unknown");
+  });
+
   it("reads a Debian package's license entries as all applying", () => {
     expect(deb(["BSD-2-Clause", "GPL-2.0-only"])).toBe("incompatible");
     expect(v(["BSD-2-Clause", "GPL-2.0-only"])).toBe("compatible");
   });
 
   it("never clears a Debian package past an entry it cannot parse", () => {
-    expect(deb(["MIT", "(MIT)"])).toBe("unknown");
-    expect(deb(["(MIT)", "GPL-2.0-only"])).toBe("incompatible");
+    expect(deb(["MIT", "(MIT"])).toBe("unknown");
+    expect(deb(["(MIT", "GPL-2.0-only"])).toBe("incompatible");
   });
 
   it("classes Debian's MIT-X11 license as permissive", () => {
