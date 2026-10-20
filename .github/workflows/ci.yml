@@ -475,6 +475,7 @@ jobs:
       examples: ${{ steps.filter.outputs.examples }}
       desktop: ${{ steps.filter.outputs.desktop }}
       code: ${{ steps.filter.outputs.code }}
+      reports: ${{ steps.filter.outputs.reports }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -502,10 +503,11 @@ jobs:
           }
 
           emit web      '^(docker/web/|docker/Dockerfile|docker/entrypoint\.sh|scripts/scan-sbom\.sh|tests/test-web-e2e\.sh|\.github/workflows/heavy-e2e\.yml)'
-          emit frontend '^(docker/web/frontend/|docker/entrypoint\.sh$|docker/lib/(build-prep|scan-firmware)\.sh$)'
+          emit frontend '^(docker/web/frontend/|docker/shared/|docker/entrypoint\.sh$|docker/lib/(build-prep|scan-firmware)\.sh$)'
           emit docs     '(\.md$|^docs/|^mkdocs\.yml$|^\.github/markdown-link-check-config\.json$)'
           emit examples '^examples/'
           emit desktop  '^(electron/|docker/web/server\.py$)'
+          emit reports  '^(docker/lib/(generate-risk-report|generate-notice|scan-security|validate-sbom|report-common)\.sh$|docker/lib/i18n/|docker/shared/|tests/(test-report-contrast\.sh|report-contrast/|fixtures/report-contrast/)|docker/web/frontend/package-lock\.json$)'
 
           # True when at least one changed file lies outside the docs surface
           # above. This is the negation of "docs", not another membership
@@ -798,6 +800,10 @@ jobs:
         run: npm run typecheck
       - name: Token lint (no hardcoded colours)
         run: npm run token:lint
+      - name: Token contrast (text 4.5:1, fills 3:1)
+        run: npm run token:contrast
+      - name: Shared tokens CSS in sync with src/index.css
+        run: npm run tokens:check
       - name: i18n coverage (en ≡ ko)
         run: npm run i18n:check
       - name: Lib test gate (every src/lib module has a unit test)
@@ -815,6 +821,38 @@ jobs:
         run: npx playwright install --with-deps chromium
       - name: Run UI tests (functional + axe)
         run: npm run test:ui
+
+  # Enforces the generated HTML reports' colour contrast with axe: zero
+  # color-contrast violations in all four reports, in the light and the dark
+  # scheme, measured on demo-scale fixtures (EPSS and KEV columns included).
+  # Reuses the frontend's @axe-core/playwright, so it shares that job's npm ci
+  # and Playwright browser install.
+  report-contrast:
+    name: Report Contrast (axe)
+    runs-on: ${{ fromJSON(vars.CI_LINUX_RUNNER || '["self-hosted","linux","bomlens-wsl"]') }}
+    timeout-minutes: 15
+    needs: [changes]
+    if: >-
+      !cancelled() && (
+        github.event_name != 'pull_request' ||
+        needs.changes.outputs.reports != 'false')
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Set up Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 20
+      - name: Install frontend dependencies
+        working-directory: docker/web/frontend
+        run: npm ci
+      - name: Install Playwright browser
+        working-directory: docker/web/frontend
+        run: npx playwright install --with-deps chromium
+      - name: Fail on any report colour-contrast violation
+        run: tests/test-report-contrast.sh --max-risk 0 --max-security 0 --max-notice 0 --max-conformance 0
 
   # Visual regression runs in the pinned Playwright container so screenshots are
   # pixel-deterministic and match the committed baselines. First run on a branch

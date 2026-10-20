@@ -2,302 +2,811 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>BomLens</title>
+    <!--
+      Design tokens come from the shared bomlens-tokens.css (generated from the web app's
+      index.css). A packaged app finds it next to this file (electron-builder copies it into
+      assets/); a development run finds it in docker/shared. The one that is missing just fails
+      to load. If neither loads, the fallback colours in the style block below keep the screen
+      readable (see the "tokens" class set by the script after the links).
+    -->
+    <link rel="stylesheet" href="bomlens-tokens.css" />
+    <link rel="stylesheet" href="../../docker/shared/bomlens-tokens.css" />
     <style>
-      /* 색은 커스텀 프로퍼티로 모으고, OS가 라이트 모드면 아래 미디어 쿼리가 덮어쓴다. */
       :root {
         color-scheme: light dark;
-        --bg: #0a0a0c;
-        --fg: #e7e7ea;
-        --muted: #9a9aa2;
-        --dim: #6f6f77;
-        --panel: #131316;
-        --border: #26262b;
-        --line: #c7c7cd;
-        --line-latest: #ffffff;
+        /* Fallback palette, used only when the token CSS did not load. */
+        --s-bg: #f5f5f7;
+        --s-fg: #1c1c21;
+        --s-muted: #6b6b74;
+        --s-card: #ffffff;
+        --s-border: #d9d9de;
+        --s-track: #ececf0;
+        --s-primary: #1c1c21;
+        --s-brand: #ea002c;
+        --s-brand-fg: #ffffff;
+        --s-ring: #ea002c;
+        --s-success: #065f46;
+        --s-danger: #b91c1c;
+        --s-danger-bg: #fbe5e5;
+        --s-danger-border: #ef9d9d;
+        --s-info: #1d4ed8;
+        --s-fs-title: 1.25rem;
+        --s-fs-body: 1rem;
+        --s-fs-sm: 0.875rem;
+        --s-fs-label: 0.75rem;
+        --s-fs-mono: 0.75rem;
       }
-      @media (prefers-color-scheme: light) {
-        :root {
-          --bg: #f5f5f7;
-          --fg: #1c1c21;
-          --muted: #6b6b74;
-          --dim: #8a8a92;
-          --panel: #ffffff;
-          --border: #d9d9de;
-          --line: #3c3c44;
-          --line-latest: #000000;
-        }
+      :root.dark {
+        --s-bg: #0a0a0c;
+        --s-fg: #e7e7ea;
+        --s-muted: #9a9aa2;
+        --s-card: #131316;
+        --s-border: #26262b;
+        --s-track: #1c1c21;
+        --s-primary: #e7e7ea;
+        --s-ring: #ff5c7c;
+        --s-success: #6ee7b7;
+        --s-danger: #fca5a5;
+        --s-danger-bg: #3c2629;
+        --s-danger-border: #7d4042;
+        --s-info: #93c5fd;
+      }
+      /* Token-driven values win once the shared CSS is present. */
+      :root.tokens {
+        --s-bg: hsl(var(--background));
+        --s-fg: hsl(var(--foreground));
+        --s-muted: hsl(var(--muted-foreground));
+        --s-card: hsl(var(--card));
+        --s-border: hsl(var(--border));
+        --s-track: hsl(var(--muted));
+        --s-primary: hsl(var(--primary));
+        --s-brand: hsl(var(--brand));
+        --s-brand-fg: hsl(var(--brand-foreground));
+        --s-ring: hsl(var(--ring));
+        --s-success: rgb(var(--role-success-fg));
+        --s-danger: rgb(var(--role-danger-fg));
+        --s-danger-bg: rgb(var(--role-danger-muted));
+        --s-danger-border: rgb(var(--role-danger-border));
+        --s-info: rgb(var(--role-info-fg));
+        --s-fs-title: var(--font-size-title);
+        --s-fs-body: var(--font-size-body);
+        --s-fs-sm: var(--font-size-body-sm);
+        --s-fs-label: var(--font-size-label);
+        --s-fs-mono: var(--font-size-mono);
+      }
+      * {
+        box-sizing: border-box;
       }
       body {
         margin: 0;
+        min-height: 100vh;
         font-family: -apple-system, "Segoe UI", "Malgun Gothic", system-ui, sans-serif;
-        background: var(--bg);
-        color: var(--fg);
-        height: 100vh;
-        display: flex;
-        flex-direction: column;
+        font-size: var(--s-fs-body);
+        background: var(--s-bg);
+        color: var(--s-fg);
       }
-      header {
-        padding: 28px 32px 12px;
+      :focus-visible {
+        outline: 2px solid var(--s-ring);
+        outline-offset: 2px;
       }
-      header h1 {
-        margin: 0;
-        font-size: 18px;
-        font-weight: 600;
-      }
-      header p {
-        margin: 6px 0 0;
-        font-size: 13px;
-        color: var(--muted);
-      }
-      #log {
-        flex: 1;
-        margin: 8px 32px 28px;
-        padding: 16px;
-        background: var(--panel);
-        border: 1px solid var(--border);
-        border-radius: 8px;
-        overflow-y: auto;
-        font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
-        font-size: 12.5px;
-        line-height: 1.7;
-        white-space: pre-wrap;
-        word-break: break-all;
-      }
-      .line {
-        color: var(--line);
-      }
-      .line.latest {
-        color: var(--line-latest);
-      }
-      /* pull 진행 요약: 로그 위에 고정된 한 줄. 비어 있으면 자리를 차지하지 않는다. */
-      #progress {
-        margin: 0 32px;
-        font-size: 12.5px;
-        font-weight: 600;
-        color: var(--fg);
-        min-height: 0;
-      }
-      #progress:not(:empty) {
-        margin-bottom: 6px;
-      }
-      /* 실패 사유별 조치 안내. 로그와 구분되게 본문 서체로 둔다. */
-      #help {
-        margin: 0 32px 20px;
-        padding: 14px 16px;
-        background: var(--panel);
-        border: 1px solid var(--border);
-        border-left: 3px solid #ea002c;
-        border-radius: 6px;
-        font-size: 13px;
-        line-height: 1.65;
-        color: var(--fg);
-      }
-      #retry,
-      #open-logs {
-        display: none;
-        margin: 0 32px 24px;
-        align-self: flex-start;
-        padding: 8px 18px;
-        font-size: 13px;
-        font-weight: 600;
-        color: #ffffff;
-        background: #ea002c;
-        border: none;
-        border-radius: 6px;
-        cursor: pointer;
-      }
-      #retry:disabled {
-        opacity: 0.5;
-        cursor: default;
-      }
-      /* 보조 동작이므로 재시도보다 약하게. */
-      #open-logs {
-        margin-top: -12px;
-        color: var(--fg);
-        background: none;
-        border: 1px solid var(--border);
-      }
-      /* 보조 링크: 항상 보이되 눈에 띄지 않게. 메뉴바가 숨겨진 OS에서도 신고 양식에 닿는 길. */
-      #report {
-        display: inline-block;
-        margin: 0;
-        padding: 0 32px 14px;
-        font-size: 11.5px;
-        color: var(--dim);
-      }
-      #report:hover {
-        color: var(--fg);
-      }
-      #version {
-        margin: 0;
-        padding: 0 32px 14px;
-        font-size: 11.5px;
-        color: var(--dim);
+      .sr-only {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        margin: -1px;
+        padding: 0;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
+        border: 0;
       }
       #lang-toggle {
         position: fixed;
-        top: 20px;
+        top: 16px;
         right: 24px;
-        font-size: 12px;
-        color: var(--dim);
+        font-size: var(--s-fs-label);
+        color: var(--s-muted);
         user-select: none;
       }
       #lang-toggle button {
-        padding: 2px 4px;
-        font-size: 12px;
+        padding: 4px 6px;
+        font: inherit;
         font-weight: 600;
-        color: var(--muted);
+        color: var(--s-muted);
         background: none;
         border: none;
+        border-radius: 4px;
         cursor: pointer;
       }
       #lang-toggle button:disabled {
-        color: var(--fg);
+        color: var(--s-fg);
         cursor: default;
       }
+      main {
+        max-width: 640px;
+        margin: 0 auto;
+        padding: 40px 32px 72px;
+      }
+      .logo {
+        display: block;
+        height: 40px;
+        width: auto;
+      }
+      h1 {
+        margin: 28px 0 0;
+        font-size: var(--s-fs-title);
+        font-weight: 600;
+      }
+      #subtitle {
+        margin: 6px 0 0;
+        font-size: var(--s-fs-sm);
+        color: var(--s-muted);
+      }
+      #steps {
+        list-style: none;
+        margin: 24px 0 0;
+        padding: 0;
+        background: var(--s-card);
+        border: 1px solid var(--s-border);
+        border-radius: 8px;
+      }
+      .step {
+        display: grid;
+        grid-template-columns: 20px 1fr auto;
+        column-gap: 12px;
+        padding: 16px 18px;
+        border-top: 1px solid var(--s-border);
+      }
+      .step:first-child {
+        border-top: none;
+      }
+      .mk {
+        width: 18px;
+        height: 18px;
+        margin-top: 2px;
+        color: var(--s-muted);
+      }
+      .mk g {
+        display: none;
+      }
+      .step[data-state="done"] .mk {
+        color: var(--s-success);
+      }
+      .step[data-state="current"] .mk {
+        color: var(--s-fg);
+      }
+      .step[data-state="failed"] .mk {
+        color: var(--s-danger);
+      }
+      .step[data-state="done"] .mk [data-mk="done"],
+      .step[data-state="current"] .mk [data-mk="current"],
+      .step[data-state="pending"] .mk [data-mk="pending"],
+      .step[data-state="failed"] .mk [data-mk="failed"] {
+        display: inline;
+      }
+      .label {
+        font-size: var(--s-fs-body);
+        font-weight: 600;
+        line-height: 1.5;
+      }
+      .step[data-state="pending"] .label {
+        color: var(--s-muted);
+        font-weight: 500;
+      }
+      .state-text {
+        font-size: var(--s-fs-label);
+        line-height: 1.5;
+        padding-top: 2px;
+        color: var(--s-muted);
+      }
+      .step[data-state="done"] .state-text {
+        color: var(--s-success);
+      }
+      .step[data-state="failed"] .state-text {
+        color: var(--s-danger);
+        font-weight: 600;
+      }
+      .step-body {
+        grid-column: 2 / 4;
+        margin-top: 4px;
+        font-size: var(--s-fs-sm);
+        line-height: 1.6;
+        color: var(--s-muted);
+      }
+      .step-body:empty {
+        display: none;
+      }
+      .step-body p {
+        margin: 0;
+      }
+      .step-body p + p {
+        margin-top: 6px;
+      }
+      .bar {
+        height: 8px;
+        margin: 10px 0 8px;
+        background: var(--s-track);
+        border: 1px solid var(--s-border);
+        border-radius: 999px;
+        overflow: hidden;
+      }
+      .bar > span {
+        display: block;
+        height: 100%;
+        width: 0;
+        background: var(--s-primary);
+        border-radius: 999px;
+        transition: width 0.3s ease;
+      }
+      /* No layer is known yet: a short moving segment instead of a fake percentage. */
+      .bar.indeterminate > span {
+        width: 30%;
+        animation: slide 1.4s ease-in-out infinite;
+      }
+      @keyframes slide {
+        0% {
+          margin-left: -30%;
+        }
+        100% {
+          margin-left: 100%;
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .bar.indeterminate > span {
+          animation: none;
+          margin-left: 0;
+        }
+        .bar > span {
+          transition: none;
+        }
+      }
+      .pull-meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px 16px;
+        color: var(--s-fg);
+        font-variant-numeric: tabular-nums;
+      }
+      .failure {
+        margin-top: 12px;
+        padding: 14px 16px;
+        background: var(--s-danger-bg);
+        border: 1px solid var(--s-danger-border);
+        border-radius: 6px;
+        color: var(--s-fg);
+      }
+      .failure[hidden] {
+        display: none;
+      }
+      .failure h2 {
+        margin: 0 0 6px;
+        font-size: var(--s-fs-body);
+        font-weight: 600;
+      }
+      #help {
+        margin: 0;
+        font-size: var(--s-fs-sm);
+        line-height: 1.65;
+      }
+      .actions {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 8px;
+        margin-top: 14px;
+      }
+      .btn {
+        padding: 8px 16px;
+        font: inherit;
+        font-size: var(--s-fs-sm);
+        font-weight: 600;
+        color: var(--s-fg);
+        background: var(--s-card);
+        border: 1px solid var(--s-border);
+        border-radius: 6px;
+        cursor: pointer;
+        text-decoration: none;
+      }
+      /* Brand red is reserved for the one primary action, the logo and the focus ring. */
+      .btn.primary {
+        color: var(--s-brand-fg);
+        background: var(--s-brand);
+        border-color: transparent;
+      }
+      .btn:disabled {
+        opacity: 0.5;
+        cursor: default;
+      }
+      #copy-feedback {
+        font-size: var(--s-fs-label);
+        color: var(--s-muted);
+      }
+      details {
+        margin-top: 20px;
+      }
+      summary {
+        display: list-item;
+        list-style-position: inside;
+        padding: 4px 2px;
+        font-size: var(--s-fs-sm);
+        font-weight: 600;
+        color: var(--s-fg);
+        cursor: pointer;
+      }
+      #log {
+        max-height: 220px;
+        margin-top: 8px;
+        padding: 12px 14px;
+        background: var(--s-card);
+        border: 1px solid var(--s-border);
+        border-radius: 8px;
+        overflow-y: auto;
+        font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+        font-size: var(--s-fs-mono);
+        line-height: 1.7;
+        white-space: pre-wrap;
+        word-break: break-all;
+        color: var(--s-muted);
+      }
+      #log .latest {
+        color: var(--s-fg);
+      }
+      #log:empty::before {
+        content: attr(data-empty);
+      }
+      footer {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px 16px;
+        margin-top: 28px;
+        font-size: var(--s-fs-label);
+        color: var(--s-muted);
+      }
+      footer a {
+        color: var(--s-muted);
+      }
+      footer a:hover {
+        color: var(--s-fg);
+      }
     </style>
+    <script>
+      // Runs after the token links above have loaded (stylesheets block scripts), so the
+      // custom property is readable when the tokens are present and empty when they are not.
+      (function () {
+        var root = document.documentElement;
+        if (getComputedStyle(root).getPropertyValue("--background").trim()) {
+          root.classList.add("tokens");
+        }
+        // The token CSS switches theme with a .dark class. Follow the OS setting, live.
+        var mq = window.matchMedia("(prefers-color-scheme: dark)");
+        function apply() {
+          root.classList.toggle("dark", mq.matches);
+        }
+        apply();
+        if (mq.addEventListener) mq.addEventListener("change", apply);
+      })();
+    </script>
+    <script src="steps.cjs"></script>
   </head>
   <body>
     <nav id="lang-toggle" aria-label="Language">
       <button type="button" data-lang="ko">KO</button>|<button type="button" data-lang="en">EN</button>
     </nav>
-    <header>
-      <img src="logo.svg" alt="BomLens: SBOM Generator" style="height: 40px; width: auto; display: block" />
+    <main>
+      <img class="logo" src="logo.svg" alt="BomLens: SBOM Generator" />
+      <h1 id="title"></h1>
       <p id="subtitle"></p>
-    </header>
-    <div id="progress" aria-live="polite"></div>
-    <div id="log" aria-live="polite"></div>
-    <div id="help" hidden></div>
-    <button id="retry" type="button"></button>
-    <button id="open-logs" type="button"></button>
-    <footer id="version"></footer>
-    <a id="report" target="_blank" rel="noreferrer noopener" href="https://github.com/sktelecom/bomlens/issues/new?template=bug_report.yml"></a>
+      <ol id="steps"></ol>
+      <p id="live" class="sr-only" role="status"></p>
+
+      <!-- Moved into the failing step by the script; hidden while the boot is healthy. -->
+      <div id="failure" class="failure" role="alert" hidden>
+        <h2 id="failure-title"></h2>
+        <p id="help"></p>
+        <div class="actions">
+          <button id="retry" class="btn primary" type="button"></button>
+          <a id="docker-help" class="btn" href="#"></a>
+          <button id="copy-log" class="btn" type="button"></button>
+          <button id="open-logs" class="btn" type="button"></button>
+          <span id="copy-feedback" role="status"></span>
+        </div>
+      </div>
+
+      <details id="log-details">
+        <summary id="log-summary"></summary>
+        <div id="log" tabindex="0" role="log" aria-labelledby="log-summary"></div>
+      </details>
+
+      <footer>
+        <span id="version"></span>
+        <a id="report" target="_blank" rel="noreferrer noopener" href="https://github.com/sktelecom/bomlens/issues/new?template=bug_report.yml"></a>
+      </footer>
+    </main>
     <script>
-      // 언어는 main.mjs가 ?lang= 쿼리로 넘긴다(ko 또는 en, 기본 en).
-      const params = new URLSearchParams(location.search);
-      const lang = params.get("lang") === "ko" ? "ko" : "en";
+      var Steps = window.BomLensSteps;
+
+      // Language comes from main.mjs as ?lang= (ko or en, default en).
+      var params = new URLSearchParams(location.search);
+      var lang = params.get("lang") === "ko" ? "ko" : "en";
       document.documentElement.lang = lang;
 
-      // 앱 버전은 main.mjs가 ?v= 쿼리로 넘긴다. 파일을 직접 열어 쿼리가 없으면 표시하지 않는다.
-      const version = params.get("v");
-      if (version) document.getElementById("version").textContent = `BomLens v${version}`;
+      // App version comes from main.mjs as ?v=. Absent when the file is opened directly.
+      var version = params.get("v");
+      if (version) document.getElementById("version").textContent = "BomLens v" + version;
 
-      // 언어 토글: lang 쿼리만 바꾸고 나머지 쿼리(v 등)는 보존한 채 같은 화면을 다시 연다.
-      // 현재 언어 버튼은 비활성으로 표시한다.
-      for (const button of document.querySelectorAll("#lang-toggle button")) {
+      // Language toggle: swap only the lang query and reopen the same screen.
+      for (var button of document.querySelectorAll("#lang-toggle button")) {
         if (button.dataset.lang === lang) {
           button.disabled = true;
         } else {
-          button.addEventListener("click", () => {
-            const next = new URLSearchParams(location.search);
-            next.set("lang", button.dataset.lang);
-            location.replace(`${location.pathname}?${next}`);
+          button.addEventListener("click", function (event) {
+            var next = new URLSearchParams(location.search);
+            next.set("lang", event.currentTarget.dataset.lang);
+            location.replace(location.pathname + "?" + next);
           });
         }
       }
-      const STR = {
+
+      var STR = {
         ko: {
-          subtitle: "준비 중입니다. 처음 실행이면 스캐너 이미지를 내려받느라 수 분 걸릴 수 있어요.",
+          title: "BomLens를 준비하고 있습니다",
+          subtitle: "처음 실행에서는 스캐너 이미지를 한 번 내려받습니다.",
+          stepsLabel: "시작 단계",
+          steps: {
+            docker: "Docker 확인",
+            image: "스캐너 이미지 내려받기",
+            ui: "UI 시작",
+          },
+          stateText: { done: "완료", current: "진행 중", pending: "대기 중", failed: "실패" },
+          live: function (n, total, label, state) {
+            return total + "단계 중 " + n + "단계, " + label + ": " + state;
+          },
+          detail: {
+            docker: "Docker가 설치되어 있고 실행 중인지 확인합니다.",
+            contacting: "레지스트리에 접속하는 중입니다.",
+            ui: "스캐너 컨테이너를 시작하는 중입니다.",
+          },
+          pull: {
+            layers: function (c, t) {
+              return "레이어 " + t + "개 중 " + c + "개 완료";
+            },
+            elapsed: function (t) {
+              return "경과 시간 " + t;
+            },
+            barLabel: "이미지 내려받기 진행",
+            first: "처음 한 번만 받습니다. 네트워크에 따라 수 분 걸립니다.",
+            update: "새 스캐너 이미지를 받는 중입니다. 수 분 걸릴 수 있습니다.",
+          },
+          failureTitle: {
+            docker: "Docker를 사용할 수 없습니다",
+            image: "이미지 내려받기에 실패했습니다",
+            ui: "UI를 시작하지 못했습니다",
+          },
           retry: "다시 시도",
+          dockerHelp: "Docker 설치와 실행 안내",
+          copyLog: "로그 복사",
+          copied: "로그를 복사했습니다.",
+          copyFailed: "복사하지 못했습니다. 로그 폴더를 열어 파일을 확인해 주세요.",
           openLogs: "로그 폴더 열기",
+          logSummary: "자세한 로그",
+          logEmpty: "아직 기록된 내용이 없습니다.",
           report: "문제 신고",
           help: {
-            // 사내 프록시는 데모 현장에서 가장 흔한 실패다. 핵심은 "앱이 아니라 데몬이 받는다".
+            docker: "Docker가 설치되어 있지 않거나 실행 중이 아닙니다. 설치와 실행 안내를 확인한 뒤 다시 시도해 주세요.",
+            // A corporate proxy is the most common failure at demo venues. The point is that
+            // the daemon downloads the image, not the app.
             proxy:
-              "회사 프록시에 막힌 것으로 보입니다. 이미지는 BomLens가 아니라 Docker 데몬이 내려받으므로, 앱에 프록시 설정을 넣어도 효과가 없습니다. Docker Desktop → Settings → Resources → Proxies, 또는 Rancher Desktop → Preferences → WSL → Proxy 에서 프록시를 설정한 뒤 다시 시도를 눌러 주세요.",
-            dns: "레지스트리 주소를 찾지 못했습니다(DNS). 네트워크 연결과 사내 DNS/VPN 설정을 확인해 주세요.",
+              "회사 프록시에 막힌 것으로 보입니다. 이미지는 BomLens가 아니라 Docker 데몬이 내려받으므로, 앱에 프록시 설정을 넣어도 효과가 없습니다. Docker Desktop > Settings > Resources > Proxies, 또는 Rancher Desktop > Preferences > WSL > Proxy에서 프록시를 설정한 뒤 다시 시도를 눌러 주세요.",
+            dns: "레지스트리 주소를 찾지 못했습니다(DNS). 네트워크 연결과 사내 DNS 또는 VPN 설정을 확인해 주세요.",
             auth: "레지스트리 접근이 거부되었습니다. 이미지 이름이 맞는지, 비공개 이미지라면 docker login이 되어 있는지 확인해 주세요.",
             disk: "디스크 공간이 부족합니다. 이미지에는 약 4GB의 여유 공간이 필요합니다.",
             timeout:
               "다운로드가 진행되지 않아 중단했습니다. 네트워크가 매우 느리거나 방화벽에 막혔을 수 있습니다. 오프라인 이미지 파일(tar)로 설치하는 방법은 관리자에게 문의해 주세요.",
-            notag: "이 버전에 맞는 스캐너 이미지를 레지스트리에서 찾지 못했습니다. 발행이 아직 끝나지 않았을 수 있습니다. 잠시 뒤 다시 시도해 보시고, 계속 같은 오류가 나면 배포자에게 알려 주세요.",
-            unknown: "아래 로그의 마지막 줄에 원인이 적혀 있습니다.",
+            notag:
+              "이 버전에 맞는 스캐너 이미지를 레지스트리에서 찾지 못했습니다. 발행이 아직 끝나지 않았을 수 있습니다. 잠시 뒤 다시 시도해 보시고, 계속 같은 오류가 나면 배포자에게 알려 주세요.",
+            unknown: "아래 자세한 로그의 마지막 줄에 원인이 적혀 있습니다.",
+            "run-failed": "Docker가 스캐너 컨테이너를 시작하지 못했습니다. Docker가 실행 중이고 디스크 공간이 충분한지 확인한 뒤 다시 시도해 주세요.",
+            "exited-early": "스캐너 컨테이너가 시작 도중 종료되었습니다. 아래 자세한 로그에서 원인을 확인해 주세요.",
+            "not-ready": "스캐너가 제한 시간 안에 준비되지 않았습니다. 컴퓨터가 바쁘면 더 걸릴 수 있으니 다시 시도해 주세요.",
+            start: "아래 자세한 로그의 마지막 줄에 원인이 적혀 있습니다.",
+            died: "스캐너 컨테이너가 중지되었습니다. 다시 시도를 누르면 다시 시작합니다.",
           },
         },
         en: {
-          subtitle:
-            "Getting ready. On the first run, downloading the scanner image can take a few minutes.",
+          title: "Getting BomLens ready",
+          subtitle: "The first run downloads the scanner image once.",
+          stepsLabel: "Startup steps",
+          steps: {
+            docker: "Check Docker",
+            image: "Download scanner image",
+            ui: "Start the UI",
+          },
+          stateText: { done: "Done", current: "In progress", pending: "Waiting", failed: "Failed" },
+          live: function (n, total, label, state) {
+            return "Step " + n + " of " + total + ", " + label + ": " + state;
+          },
+          detail: {
+            docker: "Checking that Docker is installed and running.",
+            contacting: "Contacting the registry.",
+            ui: "Starting the scanner container.",
+          },
+          pull: {
+            layers: function (c, t) {
+              return c + " of " + t + " layers done";
+            },
+            elapsed: function (t) {
+              return "Elapsed " + t;
+            },
+            barLabel: "Image download progress",
+            first: "Only on the first run. It takes a few minutes, depending on your network.",
+            update: "Downloading a newer scanner image. This can take a few minutes.",
+          },
+          failureTitle: {
+            docker: "Docker is not available",
+            image: "Image download failed",
+            ui: "The UI did not start",
+          },
           retry: "Try again",
+          dockerHelp: "Docker install and start guide",
+          copyLog: "Copy log",
+          copied: "Log copied.",
+          copyFailed: "Could not copy. Open the log folder to find the file.",
           openLogs: "Open log folder",
+          logSummary: "Detailed log",
+          logEmpty: "Nothing has been logged yet.",
           report: "Report a problem",
           help: {
+            docker: "Docker is not installed or is not running. Check the install and start guide, then try again.",
             proxy:
-              "This looks like a corporate proxy blocking the download. The image is fetched by the Docker daemon, not by BomLens, so setting proxy variables for this app has no effect. Configure the proxy in Docker Desktop -> Settings -> Resources -> Proxies, or Rancher Desktop -> Preferences -> WSL -> Proxy, then press Try again.",
-            dns: "The registry hostname could not be resolved (DNS). Check your network connection and any corporate DNS/VPN settings.",
+              "This looks like a corporate proxy blocking the download. The image is fetched by the Docker daemon, not by BomLens, so setting proxy variables for this app has no effect. Configure the proxy in Docker Desktop > Settings > Resources > Proxies, or Rancher Desktop > Preferences > WSL > Proxy, then press Try again.",
+            dns: "The registry hostname could not be resolved (DNS). Check your network connection and any corporate DNS or VPN settings.",
             auth: "The registry refused access. Check that the image name is correct, and run docker login if it is a private image.",
             disk: "Not enough disk space. The scanner image needs roughly 4 GB free.",
             timeout:
               "The download stopped making progress and was cancelled. Your network may be very slow or blocked by a firewall. Ask your organiser about installing from the offline image file (tar) instead.",
-            notag: "The registry has no scanner image for this version of the app. Its publication may not have finished yet. Wait a moment and try again; if the same error keeps coming back, tell whoever distributed this build.",
-            unknown: "The last lines of the log below show what went wrong.",
+            notag:
+              "The registry has no scanner image for this version of the app. Its publication may not have finished yet. Wait a moment and try again; if the same error keeps coming back, tell whoever distributed this build.",
+            unknown: "The last lines of the detailed log below show what went wrong.",
+            "run-failed": "Docker could not start the scanner container. Check that Docker is running and has free disk space, then try again.",
+            "exited-early": "The scanner container stopped while starting. The detailed log below shows why.",
+            "not-ready": "The scanner did not finish starting in time. A busy computer can need longer, so try again.",
+            start: "The last lines of the detailed log below show what went wrong.",
+            died: "The scanner container stopped. Press Try again to start it again.",
           },
         },
       };
-      const s = STR[lang];
-      document.getElementById("subtitle").textContent = s.subtitle;
+      var s = STR[lang];
 
-      const log = document.getElementById("log");
-      function add(line) {
-        const prev = log.querySelector(".latest");
+      document.getElementById("title").textContent = s.title;
+      document.getElementById("subtitle").textContent = s.subtitle;
+      document.getElementById("report").textContent = s.report;
+      document.getElementById("log-summary").textContent = s.logSummary;
+      document.getElementById("log").dataset.empty = s.logEmpty;
+      document.getElementById("retry").textContent = s.retry;
+      document.getElementById("copy-log").textContent = s.copyLog;
+      document.getElementById("open-logs").textContent = s.openLogs;
+      var stepsEl = document.getElementById("steps");
+      stepsEl.setAttribute("aria-label", s.stepsLabel);
+
+      // The Docker guide is the same screen the app shows when Docker is missing. The platform
+      // comes from main.mjs (?platform=), because a window has no access to process.platform.
+      var dockerHelp = document.getElementById("docker-help");
+      dockerHelp.textContent = s.dockerHelp;
+      var guide = new URLSearchParams({ reason: "not-running", lang: lang, from: "status" });
+      if (params.get("platform")) guide.set("platform", params.get("platform"));
+      if (version) guide.set("v", version);
+      dockerHelp.href = "docker-missing.html?" + guide;
+
+      // Marker shapes differ per state, so the state never relies on colour alone:
+      // ring with a check = done, ring with a dot = in progress, dashed ring = waiting,
+      // filled circle with a cross = failed.
+      var SVG_NS = "http://www.w3.org/2000/svg";
+      function marker() {
+        var svg = document.createElementNS(SVG_NS, "svg");
+        svg.setAttribute("class", "mk");
+        svg.setAttribute("viewBox", "0 0 18 18");
+        svg.setAttribute("aria-hidden", "true");
+        svg.setAttribute("focusable", "false");
+        svg.innerHTML =
+          '<g data-mk="done" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="9" r="7.5"/><path d="M5.6 9.3l2.4 2.4 4.5-5"/></g>' +
+          '<g data-mk="current" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="9" cy="9" r="7.5"/><circle cx="9" cy="9" r="3" fill="currentColor" stroke="none"/></g>' +
+          '<g data-mk="pending" fill="none" stroke="currentColor" stroke-width="1.8" stroke-dasharray="3 2.6"><circle cx="9" cy="9" r="7.5"/></g>' +
+          '<g data-mk="failed"><circle cx="9" cy="9" r="8.2" fill="currentColor"/><path d="M6 6l6 6M12 6l-6 6" stroke="var(--s-card)" stroke-width="1.9" stroke-linecap="round"/></g>';
+        return svg;
+      }
+
+      var stepEls = {};
+      for (var id of Steps.STEP_IDS) {
+        var li = document.createElement("li");
+        li.className = "step";
+        li.dataset.step = id;
+        li.dataset.state = "pending";
+        var label = document.createElement("span");
+        label.className = "label";
+        label.textContent = s.steps[id];
+        var stateText = document.createElement("span");
+        stateText.className = "state-text";
+        var body = document.createElement("div");
+        body.className = "step-body";
+        li.append(marker(), label, stateText, body);
+        stepsEl.appendChild(li);
+        stepEls[id] = { li: li, stateText: stateText, body: body };
+      }
+
+      // Latest pull payload from main; rendered into the image step while it is current.
+      var lastPull = null;
+      var currentState = "idle";
+      var failure = document.getElementById("failure");
+      var live = document.getElementById("live");
+      var logDetails = document.getElementById("log-details");
+
+      function line(text, cls) {
+        var p = document.createElement("p");
+        if (cls) p.className = cls;
+        p.textContent = text;
+        return p;
+      }
+
+      function renderImageBody(body) {
+        body.textContent = "";
+        var view = Steps.pullView(lastPull);
+        var note = view.update ? s.pull.update : s.pull.first;
+        var bar = document.createElement("div");
+        bar.className = "bar" + (view.fraction === null ? " indeterminate" : "");
+        bar.setAttribute("role", "progressbar");
+        bar.setAttribute("aria-label", s.pull.barLabel);
+        bar.setAttribute("aria-valuemin", "0");
+        var fill = document.createElement("span");
+        bar.appendChild(fill);
+        if (view.fraction === null) {
+          // Indeterminate: no aria-valuenow, the text below says what is happening.
+          body.appendChild(line(s.detail.contacting));
+        } else {
+          bar.setAttribute("aria-valuemax", String(view.total));
+          bar.setAttribute("aria-valuenow", String(view.complete));
+          bar.setAttribute("aria-valuetext", s.pull.layers(view.complete, view.total));
+          fill.style.width = Math.round(view.fraction * 100) + "%";
+        }
+        body.appendChild(bar);
+        var meta = document.createElement("div");
+        meta.className = "pull-meta";
+        if (view.fraction !== null) {
+          var layers = document.createElement("span");
+          layers.textContent = s.pull.layers(view.complete, view.total);
+          meta.appendChild(layers);
+        }
+        var elapsed = document.createElement("span");
+        elapsed.textContent = s.pull.elapsed(Steps.formatElapsed(view.secs));
+        meta.appendChild(elapsed);
+        body.appendChild(meta);
+        body.appendChild(line(note));
+      }
+
+      function renderBody(id, state) {
+        var body = stepEls[id].body;
+        if (state === "current" && id === "image") return renderImageBody(body);
+        body.textContent = "";
+        if (state === "current" && id === "docker") body.appendChild(line(s.detail.docker));
+        if (state === "current" && id === "ui") body.appendChild(line(s.detail.ui));
+      }
+
+      function render(state, reason) {
+        currentState = state;
+        var states = Steps.stepStates(state);
+        var failedId = Steps.failedStep(state);
+        var announce = "";
+        Steps.STEP_IDS.forEach(function (id, index) {
+          var el = stepEls[id];
+          el.li.dataset.state = states[id];
+          if (states[id] === "current") el.li.setAttribute("aria-current", "step");
+          else el.li.removeAttribute("aria-current");
+          el.stateText.textContent = s.stateText[states[id]];
+          renderBody(id, states[id]);
+          if (states[id] === "current" || states[id] === "failed") {
+            announce = s.live(index + 1, Steps.STEP_IDS.length, s.steps[id], s.stateText[states[id]]);
+          }
+        });
+        live.textContent = announce;
+
+        // Failure panel: sits inside the failed step so the cause and the next action read
+        // as part of the step that broke. Opened log makes the cause visible without a click.
+        var info = Steps.failureKey(state, reason);
+        if (info) {
+          document.getElementById("failure-title").textContent = s.failureTitle[info.step];
+          document.getElementById("help").textContent = s.help[info.key] || s.help.unknown;
+          stepEls[failedId].body.appendChild(failure);
+          failure.hidden = false;
+          document.getElementById("retry").disabled = false;
+          logDetails.open = true;
+        } else {
+          failure.hidden = true;
+          document.querySelector("main").appendChild(failure); // park it outside the list
+        }
+      }
+
+      // Log: every line stays in memory for "Copy log" even though the panel is collapsed.
+      var logLines = [];
+      var log = document.getElementById("log");
+      function add(text) {
+        logLines.push(text);
+        var prev = log.querySelector(".latest");
         if (prev) prev.classList.remove("latest");
-        const el = document.createElement("div");
-        el.className = "line latest";
-        el.textContent = line;
+        var el = document.createElement("div");
+        el.className = "latest";
+        el.textContent = text;
         log.appendChild(el);
         log.scrollTop = log.scrollHeight;
       }
-      if (window.sbomDesktop && window.sbomDesktop.onStatus) {
-        window.sbomDesktop.onStatus(add);
-      }
 
-      // 진행 요약은 append가 아니라 제자리 갱신이다(로그는 흐르고 요약은 고정된 자리에 남는다).
-      const progress = document.getElementById("progress");
-      if (window.sbomDesktop && window.sbomDesktop.onStatusProgress) {
-        window.sbomDesktop.onStatusProgress((line) => {
-          progress.textContent = line;
-        });
-      }
-
-      // 실패 종착 상태(failed-*)면 재시도 버튼을 보여준다. 재시도가 시작되면(checking)
-      // main이 상태를 브로드캐스트하므로 그때 다시 숨긴다.
-      const retry = document.getElementById("retry");
-      const help = document.getElementById("help");
-      const openLogs = document.getElementById("open-logs");
-      retry.textContent = s.retry;
-      openLogs.textContent = s.openLogs;
-      document.getElementById("report").textContent = s.report;
-      if (window.sbomDesktop && window.sbomDesktop.onStartupState) {
-        window.sbomDesktop.onStartupState(({ state, reason }) => {
-          const failed = String(state).startsWith("failed-");
-          retry.style.display = failed ? "block" : "none";
-          // 재시도 이후에도 실패 화면이 그대로면 진단정보를 건네줄 수단이 필요하다.
-          openLogs.style.display = failed ? "block" : "none";
-          if (failed) retry.disabled = false;
-
-          // 진행 요약은 상태가 바뀌는 순간 반드시 비운다. 남겨두면 실패 화면에 직전
-          // 퍼센트가 그대로 붙어 있어 아직 받는 중인 것처럼 보인다.
-          progress.textContent = "";
-
-          // pull 실패는 사유별로 조치가 완전히 다르다(프록시/DNS/인증/디스크).
-          if (state === "failed-pull") {
-            help.textContent = s.help[reason] || s.help.unknown;
-            help.hidden = false;
-          } else {
-            help.textContent = "";
-            help.hidden = true;
+      var bridge = window.sbomDesktop;
+      if (bridge && bridge.onStatus) bridge.onStatus(add);
+      if (bridge && bridge.onStatusProgress) {
+        bridge.onStatusProgress(function (payload) {
+          lastPull = payload;
+          if (currentState === "pulling" || currentState === "idle" || currentState === "checking") {
+            // A pull payload only exists while an image is being downloaded.
+            if (currentState !== "pulling") render("pulling", null);
+            else renderBody("image", "current");
           }
         });
       }
-      openLogs.addEventListener("click", () => {
-        if (window.sbomDesktop && window.sbomDesktop.openLogs) window.sbomDesktop.openLogs();
+      if (bridge && bridge.onStartupState) {
+        bridge.onStartupState(function (payload) {
+          // A new state invalidates the old pull numbers (a retry starts from zero).
+          if (payload.state !== "pulling") lastPull = null;
+          render(String(payload.state), payload.reason);
+        });
+      }
+
+      document.getElementById("open-logs").addEventListener("click", function () {
+        if (bridge && bridge.openLogs) bridge.openLogs();
       });
-      retry.addEventListener("click", async () => {
+
+      var copyFeedback = document.getElementById("copy-feedback");
+      var copyTimer = null;
+      function showCopy(text) {
+        copyFeedback.textContent = text;
+        clearTimeout(copyTimer);
+        copyTimer = setTimeout(function () {
+          copyFeedback.textContent = "";
+        }, 4000);
+      }
+      document.getElementById("copy-log").addEventListener("click", async function () {
+        var text = (version ? "BomLens v" + version + "\n" : "") + logLines.join("\n");
+        try {
+          await navigator.clipboard.writeText(text);
+          showCopy(s.copied);
+        } catch (err) {
+          // Clipboard API refused (permissions): fall back to a selection copy.
+          var area = document.createElement("textarea");
+          area.value = text;
+          area.setAttribute("aria-hidden", "true");
+          area.style.position = "fixed";
+          area.style.opacity = "0";
+          document.body.appendChild(area);
+          area.select();
+          var ok = false;
+          try {
+            ok = document.execCommand("copy");
+          } catch (e) {
+            ok = false;
+          }
+          area.remove();
+          showCopy(ok ? s.copied : s.copyFailed);
+        }
+      });
+
+      var retry = document.getElementById("retry");
+      retry.addEventListener("click", async function () {
         retry.disabled = true;
-        const result = await window.sbomDesktop.retryStartup();
-        // 가드에 걸려 거절되면(ok:false) 다시 누를 수 있게 되돌린다.
+        var result = await bridge.retryStartup();
+        // A refused retry (guard hit) must leave the button usable again.
         if (!result || !result.ok) retry.disabled = false;
       });
+
+      render("idle", null);
     </script>
   </body>
 </html>

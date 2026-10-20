@@ -31,7 +31,7 @@ function StateShell({
     <div
       data-testid={testId}
       className={cn(
-        "flex flex-col items-center justify-center gap-2 px-4 py-8 text-center text-sm text-muted-foreground",
+        "flex flex-col items-center justify-center gap-2 px-4 py-8 text-center text-body-sm text-muted-foreground",
         className,
       )}
     >
@@ -94,7 +94,7 @@ export function EmptyState({
           and darkening it there would change screens this section never
           touched. */}
       <span className={hint ? "text-foreground" : undefined}>{children}</span>
-      {hint ? <p className="max-w-prose text-xs">{hint}</p> : null}
+      {hint ? <p className="max-w-prose text-body-sm">{hint}</p> : null}
       {action ? <div className="mt-1">{action}</div> : null}
     </StateShell>
   );

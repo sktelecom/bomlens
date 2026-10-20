@@ -104,7 +104,77 @@ const PERMISSIVE = new Set([
   "NCSA",
   "X11",
   "MIT-X11",
+  "UNICODE-3.0",
+  "UNICODE-DFS-2016",
 ]);
+
+/**
+ * Strict SPDX expression parser: parentheses, AND over OR, WITH.
+ *
+ * MIRROR of spdx_dnf in docker/lib/license-flags.jq. A term is ONE token (an id,
+ * optionally `<id> WITH <exception>`), so prose that merely contains the word
+ * "or" ("GNU General Public License v2 or later") does not parse and the callers
+ * fall back to what they did before. The result is disjunctive normal form, the
+ * shape parseLicenseExpression returns: OR alternatives, each a list of AND
+ * terms. Distributing AND over OR is exact for the two combinators used on it
+ * (best of the alternatives, worst of the terms). More than 64 alternatives, a
+ * stray parenthesis or a misplaced operator gives `[]`.
+ */
+export function parseSpdxExpression(s: string): string[][] {
+  const t = (s ?? "")
+    .replace(/\(/g, " ( ")
+    .replace(/\)/g, " ) ")
+    .split(/\s+/)
+    .filter(Boolean);
+  if (t.length === 0) return [];
+  const isOp = (x: string | undefined, op: string) => (x ?? "").toUpperCase() === op;
+  const fail = (): never => {
+    throw new Error("syntax");
+  };
+  let i = 0;
+  const parseOr = (): string[][] => {
+    let alts = parseAnd();
+    while (isOp(t[i], "OR")) {
+      i += 1;
+      alts = alts.concat(parseAnd());
+    }
+    return alts;
+  };
+  const parseAnd = (): string[][] => {
+    let alts = parsePrim();
+    while (isOp(t[i], "AND")) {
+      i += 1;
+      const rhs = parsePrim();
+      alts = alts.flatMap((a) => rhs.map((b) => a.concat(b)));
+    }
+    return alts;
+  };
+  const parsePrim = (): string[][] => {
+    const x = t[i];
+    if (x === "(") {
+      i += 1;
+      const inner = parseOr();
+      if (t[i] !== ")") fail();
+      i += 1;
+      return inner;
+    }
+    if (x === undefined || /^(and|or|\))$/i.test(x)) fail();
+    if (isOp(t[i + 1], "WITH")) {
+      const e = t[i + 2];
+      if (e === undefined || /^(and|or|[()])$/i.test(e)) fail();
+      i += 3;
+      return [[`${x} WITH ${e}`]];
+    }
+    i += 1;
+    return [[x]];
+  };
+  try {
+    const alts = parseOr();
+    return i === t.length && alts.length <= 64 ? alts : [];
+  } catch {
+    return [];
+  }
+}
 
 /**
  * Classify a single license id by copyleft strength. Order matters: AGPL and
@@ -125,7 +195,22 @@ const PERMISSIVE = new Set([
 export function licenseRiskTier(license: string): LicenseRiskTier {
   const id = license.trim();
   if (!id) return "uncategorized";
+  // An SPDX expression takes the strength of its worst term: the label is a
+  // warning, so it never takes the most permissive branch of an OR (the conflict
+  // verdict does that). A string that does not parse as one is read whole, as before.
+  const x = slashIsOr(id) ? id.replace(/\s*\/\s*/, " OR ") : id;
+  if (/\s(and|or)\s|[()]/i.test(x)) {
+    const terms = [...new Set(parseSpdxExpression(x).flat())];
+    if (terms.length > 1 || (terms.length === 1 && terms[0] !== id)) {
+      return terms
+        .map((term) => licenseRiskTier(term))
+        .reduce((w, t) => (TIER_RANK[t] > TIER_RANK[w] ? t : w), "permissive" as LicenseRiskTier);
+    }
+  }
   if (PERMISSIVE.has(id.toUpperCase())) return "permissive";
+  // A permissive license with an exception clause stays permissive.
+  if (/^\S+\s+WITH\s+\S+$/i.test(id) && PERMISSIVE.has(id.replace(/\s+WITH\s+.*$/i, "").toUpperCase()))
+    return "permissive";
   if (/\bAGPL/i.test(id)) return "network-copyleft";
   if (/\bLGPL/i.test(id)) return "weak-copyleft";
   if (/\b(MPL|EPL|CDDL|CPL|OSL|EUPL|CeCILL|Sleepycat)\b/i.test(id))
@@ -298,9 +383,10 @@ export function reviewCount(components: ComponentItem[]): number {
 // consumer pick one, AND applies every term — so licenseRiskTier's worst-of
 // rule, right for a strength label, is wrong here.
 //
-// Flat expressions only: a parenthesised expression yields no terms and the
-// caller reports "unknown" rather than guessing. AND binds tighter than OR, as
-// in the SPDX spec.
+// A flat expression is split on OR and then on AND (AND binds tighter, as in the
+// SPDX spec). A parenthesised one goes through parseSpdxExpression, which parses
+// the nesting strictly and returns the same shape; one it cannot parse yields no
+// terms and the caller reports "unknown" rather than guessing.
 // ---------------------------------------------------------------------------
 
 /** A slash is the other OR spelling in the wild ("MIT/X11") — only when there
@@ -312,7 +398,8 @@ function slashIsOr(s: string): boolean {
 /** OR alternatives, each a list of AND terms. `[]` when nothing is parseable. */
 export function parseLicenseExpression(s: string): string[][] {
   const e = (s ?? "").trim();
-  if (!e || /[()]/.test(e)) return [];
+  if (!e) return [];
+  if (/[()]/.test(e)) return parseSpdxExpression(e);
   const flat = slashIsOr(e) ? e.replace(/\s*\/\s*/, " OR ") : e;
   return flat
     .split(/\s+OR\s+/i)

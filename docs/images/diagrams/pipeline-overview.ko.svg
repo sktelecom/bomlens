@@ -31,6 +31,6 @@
 <text x="872.0" y="137.0" text-anchor="middle" font-family="'Apple SD Gothic Neo','Noto Sans CJK KR','Malgun Gothic',sans-serif" font-size="14" fill="#5c6773">SBOM</text>
 <text x="872.0" y="157.0" text-anchor="middle" font-family="'Apple SD Gothic Neo','Noto Sans CJK KR','Malgun Gothic',sans-serif" font-size="14" fill="#5c6773">고지문</text>
 <text x="872.0" y="177.0" text-anchor="middle" font-family="'Apple SD Gothic Neo','Noto Sans CJK KR','Malgun Gothic',sans-serif" font-size="14" fill="#5c6773">보안 보고서</text>
-<text x="872.0" y="197.0" text-anchor="middle" font-family="'Apple SD Gothic Neo','Noto Sans CJK KR','Malgun Gothic',sans-serif" font-size="14" fill="#5c6773">위험분석 보고서</text>
+<text x="872.0" y="197.0" text-anchor="middle" font-family="'Apple SD Gothic Neo','Noto Sans CJK KR','Malgun Gothic',sans-serif" font-size="14" fill="#5c6773">오픈소스 위험 보고서</text>
 <path d="M766,152 L806,152" fill="none" stroke="#9aa4af" stroke-width="1.5" marker-end="url(#arr)"/>
 </svg>

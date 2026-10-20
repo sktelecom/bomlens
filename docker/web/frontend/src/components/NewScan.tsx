@@ -20,6 +20,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
 import { Card, CardContent } from "@/components/ui/card";
+import { FOCUS_RING, SELECTED_TILE } from "@/components/ui/selectable";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import type { Capabilities, ScanConfig, ScanParams, SourceType } from "@/lib/api";
@@ -30,6 +31,7 @@ import { cn } from "@/lib/utils";
 import {
   FieldError,
   FormMessages,
+  FormatOptions,
   GenerationOptions,
   RequiredMark,
   RunButton,
@@ -48,6 +50,9 @@ interface Props {
   /** Called once after `initialConfig` is read so the parent can clear the
    *  pending config — a later plain New scan then starts blank. */
   onConfigConsumed?: () => void;
+  /** Field to open and focus on arrival, for a prompt that sends the reader
+   *  here to fill one in (the Licenses section's outbound-license notice). */
+  focusField?: "license" | null;
 }
 
 const SOURCE_META: Record<SourceType, { labelKey: string; icon: LucideIcon }> = {
@@ -79,7 +84,7 @@ const SOURCE_GROUPS: Array<{ key: string; sources: SourceType[] }> = [
 ];
 
 const SECTION_LABEL =
-  "text-xs font-semibold uppercase tracking-wider text-muted-foreground";
+  "text-label font-semibold uppercase tracking-wider text-muted-foreground";
 
 /** Collapsed-by-default panel section, on the shared disclosure.
  *  Keeps the settings panel within one viewport: only identity, outputs and
@@ -104,7 +109,7 @@ function PanelDisclosure({
         <>
           <span className={SECTION_LABEL}>{label}</span>
           {badge && (
-            <span className="ml-auto rounded-full bg-brand/10 px-2 py-0.5 text-xs font-medium text-brand">
+            <span className="ml-auto rounded-full bg-muted px-2 py-0.5 text-label font-medium text-foreground">
               {badge}
             </span>
           )}
@@ -128,6 +133,7 @@ export function NewScan({
   onRun,
   initialConfig,
   onConfigConsumed,
+  focusField,
 }: Props) {
   const { t } = useTranslation();
   const state = useScanForm({ running, capabilities, onRun, initialConfig });
@@ -143,23 +149,37 @@ export function NewScan({
     }
   }, [initialConfig, onConfigConsumed]);
 
-  // How many advanced toggles are on (seeded by a re-scan config). Drives the
-  // disclosure's initial open state and its collapsed badge.
+  // How many toggles are on in each folded group (seeded by a re-scan config).
+  // Drives the disclosure's initial open state and its collapsed badge.
   const scanOptionsOn = [
     state.identifyVendored,
     state.deepLicense,
     state.deepCve,
     state.reachability,
     state.byteStable,
+    // On by default, so it counts only when it was turned off.
+    state.showDetection && !state.readLockFile,
   ].filter(Boolean).length;
+  const formatOptionsOn = [
+    state.outboundLicense.trim() !== "",
+    state.sbomAuthor.trim() !== "",
+    state.specVersion !== "1.6",
+    state.conformanceProfile !== "default",
+  ].filter(Boolean).length;
+
+  // Arriving from a prompt that asks for one field: the field's group is already
+  // open (see `defaultOpen` below), so only the focus is left to move.
+  useEffect(() => {
+    if (focusField === "license") document.getElementById("outbound-license")?.focus();
+  }, [focusField]);
 
   return (
     <div className="space-y-6">
       <div className="space-y-1.5">
-        <h1 className="text-3xl font-semibold tracking-tight text-foreground">
+        <h1 className="text-display font-semibold tracking-tight text-foreground">
           {t("newscan.title")}
         </h1>
-        <p className="text-sm text-muted-foreground">{t("newscan.subtitle")}</p>
+        <p className="text-body-sm text-muted-foreground">{t("newscan.subtitle")}</p>
       </div>
 
       <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
@@ -202,15 +222,15 @@ export function NewScan({
                             if (!locked) state.changeSource(s);
                           }}
                           className={cn(
-                            "flex items-center gap-2 rounded-lg border px-3 py-2.5 text-left text-sm",
+                            "flex items-center gap-2 rounded-lg border px-3 py-2.5 text-left text-body-sm",
                             "transition-[color,border-color,background-color,box-shadow] duration-fast ease-out-soft",
-                            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+                            FOCUS_RING,
                             "disabled:pointer-events-none disabled:opacity-50",
                             locked
                               ? "cursor-not-allowed border-dashed text-muted-foreground"
                               : active
-                                ? "ring-2 ring-foreground ring-offset-1 font-medium text-foreground"
-                                : "text-foreground hover:border-brand/40 hover:bg-muted/50 hover:shadow-md",
+                                ? SELECTED_TILE
+                                : "text-foreground hover:border-foreground/30 hover:bg-muted/50 hover:shadow-md",
                           )}
                         >
                           <Icon
@@ -219,7 +239,7 @@ export function NewScan({
                               locked
                                 ? "text-muted-foreground/60"
                                 : active
-                                  ? "text-brand"
+                                  ? "text-foreground"
                                   : "text-muted-foreground",
                             )}
                             aria-hidden
@@ -236,7 +256,7 @@ export function NewScan({
                     })}
                   </div>
                   {lockReason && (
-                    <p className="text-xs text-muted-foreground">{lockReason}</p>
+                    <p className="text-body-sm text-muted-foreground">{lockReason}</p>
                   )}
                 </div>
               );
@@ -250,9 +270,11 @@ export function NewScan({
           </Card>
         </div>
 
-        {/* Right: sticky settings panel — identity, outputs, generate. */}
-        <Card className="animate-fade-in lg:sticky lg:top-6">
-          <CardContent className="space-y-5 p-5">
+        {/* Right: sticky settings panel — identity, outputs, then the folded
+            groups scroll inside it while the run action stays pinned below, so
+            opening every group never pushes the button off screen. */}
+        <Card className="flex animate-fade-in flex-col lg:sticky lg:top-6 lg:max-h-[calc(100vh-3rem)]">
+          <CardContent className="min-h-0 flex-1 space-y-5 overflow-y-auto p-5">
             <div className="space-y-3">
               <p className={SECTION_LABEL}>{t("newscan.settings")}</p>
               <div className="space-y-2">
@@ -277,7 +299,7 @@ export function NewScan({
                 />
                 {/* A declared model has no hub name: the project becomes its name. */}
                 {state.source === "ai-declare" && (
-                  <p id="project-hint" className="text-xs text-muted-foreground">
+                  <p id="project-hint" className="text-body-sm text-muted-foreground">
                     {t("form.projectHintDeclare")}
                   </p>
                 )}
@@ -307,7 +329,7 @@ export function NewScan({
               <GenerationOptions state={state} />
             </div>
 
-            {/* Advanced scan options are how the scan analyzes the source, a
+            {/* The result-quality group is how the scan analyzes the source, a
                 different altitude from the output artifacts above — their own
                 sections, folded by default so the panel fits one viewport.
                 A section seeded with non-default values (re-scan) opens
@@ -326,6 +348,20 @@ export function NewScan({
               </PanelDisclosure>
             )}
 
+            {state.showFormatOptions && (
+              <PanelDisclosure
+                label={t("newscan.formatOptions")}
+                badge={
+                  formatOptionsOn > 0
+                    ? t("newscan.enabledCount", { n: formatOptionsOn })
+                    : undefined
+                }
+                defaultOpen={formatOptionsOn > 0 || focusField === "license"}
+              >
+                <FormatOptions state={state} />
+              </PanelDisclosure>
+            )}
+
             {state.showUpload && (
               <PanelDisclosure
                 label={t("newscan.upload")}
@@ -335,12 +371,12 @@ export function NewScan({
                 <UploadOptions state={state} />
               </PanelDisclosure>
             )}
-
-            <div className="space-y-3 border-t pt-4">
-              <FormMessages state={state} />
-              <RunButton state={state} running={running} />
-            </div>
           </CardContent>
+
+          <div className="space-y-3 border-t bg-card p-5">
+            <FormMessages state={state} />
+            <RunButton state={state} running={running} />
+          </div>
         </Card>
       </div>
     </div>

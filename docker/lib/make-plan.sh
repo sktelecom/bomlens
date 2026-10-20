@@ -143,6 +143,9 @@ jq -n \
           env: ({
             HOME: "/tmp/sbomhome",
             MAVEN_OPTS: "-Duser.home=/tmp/sbomhome -Dmaven.repo.local=/tmp/sbomhome/.m2/repository",
+            GOPATH: "/tmp/sbomhome/go",
+            GOMODCACHE: "/tmp/sbomhome/go/pkg/mod",
+            GOCACHE: "/tmp/sbomhome/go-build",
             FETCH_LICENSE: $fetch,
             PROJECT_NAME: $pname,
             PROJECT_VERSION: $pver

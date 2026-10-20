@@ -1,5 +1,5 @@
 ---
-description: GitHub URL, ZIP, 로컬 소스, 기존 SBOM, Yocto 빌드 디렉터리, 펌웨어, HuggingFace AI 모델 등 7가지 입력 형태별로 BomLens가 SBOM과 오픈소스 고지문, 위험분석보고서를 만드는 방법을 정리합니다.
+description: GitHub URL, ZIP, 로컬 소스, 기존 SBOM, Yocto 빌드 디렉터리, 펌웨어, HuggingFace AI 모델 등 7가지 입력 형태별로 BomLens가 SBOM과 오픈소스 고지문, 오픈소스 위험 보고서를 만드는 방법을 정리합니다.
 ---
 
 # 입력 시나리오별 처리 가이드
@@ -14,10 +14,10 @@ description: GitHub URL, ZIP, 로컬 소스, 기존 SBOM, Yocto 빌드 디렉터
 |--------|------|------|
 | 오픈소스 고지문 | `{Project}_{Version}_NOTICE.{txt,html}` | 라이선스 의무 이행을 위한 고지문 |
 | SBOM | `{Project}_{Version}_bom.json` | CycloneDX 1.6 구성요소 명세(`--spec-version 1.7`이면 1.7) |
-| 오픈소스위험분석보고서 | `{Project}_{Version}_risk-report.{md,html}` | 라이선스+취약점 위험 집계(대응 기한 포함) |
-| 적합성 보고서 | `{Project}_{Version}_conformance.{json,md,html}` | 제출 품질 기준 충족 여부와 누락 항목 |
+| 오픈소스 위험 보고서 | `{Project}_{Version}_risk-report.{md,html}` | 라이선스+취약점 위험 집계(대응 기한 포함) |
+| 적합성 검사 보고서 | `{Project}_{Version}_conformance.{json,md,html}` | 제출 품질 기준 충족 여부와 누락 항목 |
 
-적합성 보고서 파일은 항상 생성되지만, 웹 UI에서 통과/실패를 판정하는 화면은 검사 대상이 공급받은 SBOM일 때(`--analyze` 경로)만 나타납니다. 자기가 생성한 SBOM이 자기를 채점하는 건 대부분의 검사 항목에서 의미 있는 신호가 아니기 때문입니다. 자체 생성 스캔이라면 파일을 직접 열어 보거나, 결과물을 다시 `--analyze`로 넣어 화면으로 확인하세요. [적합성 보고서 읽기](supplier-sbom.ko.md#적합성-보고서-읽기)를 참고하세요.
+적합성 검사 보고서 파일은 항상 생성되지만, 웹 UI에서 통과/실패를 판정하는 화면은 검사 대상이 공급받은 SBOM일 때(`--analyze` 경로)만 나타납니다. 자기가 생성한 SBOM이 자기를 채점하는 건 대부분의 검사 항목에서 의미 있는 신호가 아니기 때문입니다. 자체 생성 스캔이라면 파일을 직접 열어 보거나, 산출물을 다시 `--analyze`로 넣어 화면으로 확인하세요. [적합성 검사 보고서 읽기](supplier-sbom.ko.md#적합성-검사-보고서-읽기)를 참고하세요.
 
 어떤 입력 형태든 `--all --generate-only`를 붙이면 위 4종이 한 번에 생성됩니다(전부 기본 생성이며 `--no-report`로만 끕니다).
 
@@ -43,7 +43,7 @@ SBOM=/path/to/bomlens/scripts/scan-sbom.sh
 
 | 입력 형태 | 모드 | 핵심 명령(요약) | 산출물 |
 |-----------|------|-----------------|--------|
-| GitHub URL | SOURCE | `$SBOM --git <url> --all --generate-only` | 고지문, SBOM, 위험분석보고서, 적합성 보고서 |
+| GitHub URL | SOURCE | `$SBOM --git <url> --all --generate-only` | 고지문, SBOM, 오픈소스 위험 보고서, 적합성 검사 보고서 |
 | 소스 ZIP | SOURCE | `$SBOM --target app.zip --all --generate-only` | 〃 |
 | 로컬 디렉터리(C/C++) | SOURCE | `cd dir && $SBOM --all --generate-only` | 〃 |
 | 기존 SBOM JSON | ANALYZE | `$SBOM --analyze sbom.json --generate-only` | 〃(단 SBOM은 새로 생성이 아니라 입력을 변환한 것) |
@@ -52,10 +52,10 @@ SBOM=/path/to/bomlens/scripts/scan-sbom.sh
 | 설치 파일(`.exe`, `.msi`, `.dmg`) | FIRMWARE | `$SBOM --target installer.exe --all --generate-only` | 〃 |
 | 모바일 앱(`.apk`, `.ipa`) | FIRMWARE | `$SBOM --target app.apk --all --generate-only` | 〃 |
 | 펌웨어 `.bin` | FIRMWARE | `$SBOM --target dev.bin --firmware --all --generate-only` | 〃 |
-| AI 모델(HuggingFace) | AIBOM | `$SBOM --model owner/name --generate-only` | 고지문, ML-BOM(1.7), 위험분석보고서(보안 없음) |
-| AI 모델 파일(GGUF, safetensors 등) | MODELFILE | `$SBOM --model-file ./model.gguf --generate-only` | 고지문, ML-BOM(1.7), 위험분석보고서(보안 없음) |
-| 공개 데이터셋(Figshare, HuggingFace) | DATASET | `$SBOM --model <항목 주소 또는 datasets/owner/name> --generate-only` | 고지문, ML-BOM(1.7), 위험분석보고서(보안 없음) |
-| 아직 공개하지 않은 모델(선언만 있음) | AIDECLARE | `$SBOM --ai-declare declaration.json --generate-only` | 고지문, ML-BOM(1.7), 위험분석보고서(보안 없음), SPDX 3.0.1 AI 문서 |
+| AI 모델(HuggingFace) | AIBOM | `$SBOM --model owner/name --generate-only` | 고지문, ML-BOM(1.7), 오픈소스 위험 보고서(보안 없음) |
+| AI 모델 파일(GGUF, safetensors 등) | MODELFILE | `$SBOM --model-file ./model.gguf --generate-only` | 고지문, ML-BOM(1.7), 오픈소스 위험 보고서(보안 없음) |
+| 공개 데이터셋(Figshare, HuggingFace) | DATASET | `$SBOM --model <항목 주소 또는 datasets/owner/name> --generate-only` | 고지문, ML-BOM(1.7), 오픈소스 위험 보고서(보안 없음) |
+| 아직 공개하지 않은 모델(선언만 있음) | AIDECLARE | `$SBOM --ai-declare declaration.json --generate-only` | 고지문, ML-BOM(1.7), 오픈소스 위험 보고서(보안 없음), SPDX 3.0.1 AI 문서 |
 
 > 모든 명령에 `--project <이름> --version <버전>`이 필요합니다(아래 예시 참고).
 >
@@ -93,7 +93,7 @@ $SBOM --project team2-app --version 1.0.0 \
 - 지원 형식: `.zip`, `.tar.gz`, `.tgz`, `.tar.bz2`, `.tar.xz`, `.tar`
 - zip-slip(경로 탈출) 검사 후 임시 디렉터리에 해제하며, 최상위 폴더가 하나면 자동으로 그 안으로 진입합니다.
 
-**산출물**: 고지문, SBOM, 위험분석보고서, 적합성 보고서 (4종)
+**산출물**: 고지문, SBOM, 오픈소스 위험 보고서, 적합성 검사 보고서 (4종)
 
 ## 시나리오 3 — 로컬 C/C++ 소스 디렉터리
 
@@ -105,11 +105,11 @@ $SBOM --project team3-dev --version 1.0.0 --all --deep-license --generate-only
 ```
 
 - 패키지 매니저가 있으면(Conan `conanfile.txt` / vcpkg `vcpkg.json`) 의존성이 해석되어 SBOM에 반영됩니다.
-- 순수 CMake/Make 소스는 매니저 메타데이터가 없어 SBOM이 희소할 수 있습니다. 이때는 `--deep-license`로 1st-party 소스의 라이선스 헤더를 보강하는데(후처리 단계는 ScanCode가 들어 있는 `ghcr.io/sktelecom/bomlens-deep-license` 이미지에서 실행되며 이 이미지는 자동으로 받습니다. 받을 수 없으면 라이선스 스캔 없이 기본 이미지로 진행하고, 경고를 출력하며 결과 매니페스트에 이 단계를 `skipped`(`fallback`)로 기록합니다), 빌드 산출물(설치된 라이브러리가 있는 staging/rootfs)은 별도로 `$SBOM --target <build-dir> --all --generate-only`(syft)로 분석합니다. OS rootfs와 애플리케이션, 정적 링크 의존성을 층별로 나눠 만드는 서버 SBOM 전체 흐름은 [서버 SBOM 작성 가이드](server-delivery.ko.md)를 참고하세요. 웹 UI에서는 `--deep-license`가 고급 스캔 옵션의 **라이선스 스캔 (ScanCode)** 토글에 대응합니다. 선언된 의존성이 아니라 내 소스 파일(`/src`)을 스캔하며 느리므로, 파일 단위 라이선스 탐지가 필요할 때만 켜세요.
-- 패키지 매니저 없이(순수 Make/CMake) 오픈소스를 소스 트리에 통째로 복사(vendored)해 쓰는 경우 — 임베디드와 펌웨어 소스에서 흔합니다 — `--identify-vendored`를 강력히 권장합니다. 이 옵션이 없으면 SBOM이 희소해 내장 라이브러리를 놓치고, 켜면 이들을 CPE가 붙은 이름 있는 구성요소로 탐지해 위험분석보고서가 CVE를 연결할 수 있습니다. [내장 오픈소스 식별](identify-vendored.ko.md)을 참고하세요. BomLens는 이 상황을 감지하면 자동으로 이 옵션을 안내하기도 합니다.
-- 패키지 매니저가 없어도 위험분석보고서는 생성되며, 탐지된 구성요소의 라이선스와 취약점을 집계합니다.
+- 순수 CMake/Make 소스는 매니저 메타데이터가 없어 SBOM이 희소할 수 있습니다. 이때는 `--deep-license`로 1st-party 소스의 라이선스 헤더를 보강하는데(후처리 단계는 ScanCode가 들어 있는 `ghcr.io/sktelecom/bomlens-deep-license` 이미지에서 실행되며 이 이미지는 자동으로 받습니다. 받을 수 없으면 라이선스 스캔 없이 기본 이미지로 진행하고, 경고를 출력하며 결과 매니페스트에 이 단계를 `skipped`(`fallback`)로 기록합니다), 빌드 산출물(설치된 라이브러리가 있는 staging/rootfs)은 별도로 `$SBOM --target <build-dir> --all --generate-only`(syft)로 분석합니다. OS rootfs와 애플리케이션, 정적 링크 의존성을 층별로 나눠 만드는 서버 SBOM 전체 흐름은 [서버 SBOM 작성 가이드](server-delivery.ko.md)를 참고하세요. 웹 UI에서는 `--deep-license`가 결과 품질 묶음의 **라이선스 스캔 (ScanCode)** 토글에 대응합니다. 선언된 의존성이 아니라 내 소스 파일(`/src`)을 스캔하며 느리므로, 파일 단위 라이선스 탐지가 필요할 때만 켜세요.
+- 패키지 매니저 없이(순수 Make/CMake) 오픈소스를 소스 트리에 통째로 복사(vendored)해 쓰는 경우 — 임베디드와 펌웨어 소스에서 흔합니다 — `--identify-vendored`를 강력히 권장합니다. 이 옵션이 없으면 SBOM이 희소해 내장 라이브러리를 놓치고, 켜면 이들을 CPE가 붙은 이름 있는 구성요소로 탐지해 오픈소스 위험 보고서가 CVE를 연결할 수 있습니다. [내장 오픈소스 식별](identify-vendored.ko.md)을 참고하세요. BomLens는 이 상황을 감지하면 자동으로 이 옵션을 안내하기도 합니다.
+- 패키지 매니저가 없어도 오픈소스 위험 보고서는 생성되며, 탐지된 구성요소의 라이선스와 취약점을 집계합니다.
 
-**산출물**: 고지문, SBOM, 위험분석보고서, 적합성 보고서 (4종)
+**산출물**: 고지문, SBOM, 오픈소스 위험 보고서, 적합성 검사 보고서 (4종)
 
 ## 시나리오 4 — 기존 SBOM JSON
 
@@ -124,9 +124,9 @@ $SBOM --project team4-proj --version 2.0.0 \
 
 - CycloneDX(JSON/XML)와 SPDX(JSON/Tag-Value) 모두 입력 가능하며 내부에서 CycloneDX로 변환합니다. SPDX RDF/XML은 아직 지원하지 않습니다.
 - `--analyze`는 고지문과 보안을 자동으로 켜므로 `--all`을 따로 붙일 필요가 없습니다.
-- 추가로 포맷 적합성 보고서(`_conformance.{json,md,html}`)가 생성됩니다. 받은 SBOM이 필수 항목(이름, 버전, 식별자 등)을 갖췄는지 점검한 결과이며, 위험분석보고서 1절에도 요약이 들어갑니다. 받은 SBOM을 검증하고 공급사에 보완을 요청하는 흐름은 [공급사 SBOM 검증](../guides/supplier-sbom.ko.md)을 참고하세요.
+- 추가로 적합성 검사 보고서(`_conformance.{json,md,html}`)가 생성됩니다. 받은 SBOM이 필수 항목(이름, 버전, 식별자 등)을 갖췄는지 점검한 결과이며, 오픈소스 위험 보고서 1절에도 요약이 들어갑니다. 받은 SBOM을 검증하고 공급사에 보완을 요청하는 흐름은 [공급사 SBOM 검증](../guides/supplier-sbom.ko.md)을 참고하세요.
 
-**산출물**: 고지문, SBOM(변환본), 위험분석보고서, 적합성 보고서
+**산출물**: 고지문, SBOM(변환본), 오픈소스 위험 보고서, 적합성 검사 보고서
 
 ## 시나리오 5 — Yocto 빌드 디렉터리
 
@@ -141,11 +141,12 @@ $SBOM --project team5-image --version 1.0.0 \
 - `conf/local.conf`에 `INHERIT += "create-spdx-3.0"`과 `INHERIT += "vex"`를 넣고 빌드하면 가장 많은 정보를 얻습니다. 넣지 않아도 BomLens는 빌드가 기본으로 남긴 것을 읽습니다. SPDX 버전별 호환 표와 SPDX가 전혀 없는 빌드의 처리 방식은 [Yocto 이미지](supplier-sbom.ko.md#yocto-이미지)를 참고하세요.
 - 분석 대상은 `tmp/deploy/images/<machine>/` 아래의 이미지 SBOM입니다. 빌드 트리 자체는 훑지 않습니다. 이미지에 들어가지 않는 sysroot와 빌드용 도구가 결과에 섞이기 때문입니다.
 - 구성요소는 이미지에 설치된 패키지이고, 취약점에는 빌드가 내린 판정(레시피가 패치함, 해당 없음, 아직 남음)이 함께 담깁니다. 남은 것만 발견 항목으로 셉니다.
+- [펌웨어 가이드](firmware.ko.md#upstream-저장소-purl)에 나온 프로젝트의 컴포넌트에는 upstream 저장소 purl이 붙습니다. SPDX 2.2만 쓴 빌드는 빌드 판정이 없어서 `--security`를 켜면 대신 CPE를 이미지에 들어 있는 NVD CPE 인덱스와 대조합니다. SPDX 2.2는 레시피가 어떤 CVE를 패치했는지 기록하지 않으므로, 이렇게 찾은 CVE에는 레시피가 이미 패치한 것이 섞일 수 있습니다. SPDX 3.0은 이를 기록합니다.
 - 머신이나 이미지를 여럿 빌드했다면 가장 최근 SBOM을 분석하고 후보 전체를 로그에 남깁니다. 다른 것을 고르려면 `--analyze <파일>`로 지정합니다.
 - 웹 UI에서는 **디렉터리 / rootfs** 입력으로 그 폴더를 고르면 됩니다(`--ui --mount ~/poky/build`로 마운트하거나 데스크톱 앱의 폴더 추가 사용). 같은 감지가 동작합니다.
 - 자세한 동작과 한계는 [공급사 SBOM 가이드의 Yocto 이미지 절](supplier-sbom.ko.md#yocto-이미지)을 참고하세요.
 
-**산출물**: 고지문, SBOM, 위험분석보고서, 적합성 보고서
+**산출물**: 고지문, SBOM, 오픈소스 위험 보고서, 적합성 검사 보고서
 
 ## 시나리오 6 — 펌웨어 바이너리
 
@@ -161,7 +162,7 @@ $SBOM --project team6-fw --version 1.0.0 \
 - 인식 가능한 확장자(`.bin/.img/.squashfs/.ubi/...`)는 `--firmware` 없이도 자동 감지되지만, 명시를 권장합니다.
 - 자세한 동작과 한계는 [펌웨어 분석](../guides/firmware.ko.md)을 참고하세요.
 
-**산출물**: 고지문, SBOM, 위험분석보고서, 적합성 보고서 (4종)
+**산출물**: 고지문, SBOM, 오픈소스 위험 보고서, 적합성 검사 보고서 (4종)
 
 ## 시나리오 7 — AI 모델(HuggingFace)
 
@@ -175,10 +176,10 @@ $SBOM --project bert-base --version 1.0.0 \
 
 - opt-in aibom 이미지(`ghcr.io/sktelecom/bomlens-aibom:latest`)가 필요하며 자동으로 받습니다. 다른 태그는 `SBOM_AIBOM_IMAGE`로 지정합니다.
 - `--model`은 `--target`/`--analyze`/`--git`/`--merge`와 함께 쓸 수 없습니다.
-- CycloneDX 1.7 **ML-BOM**(1.6 아님), 고지문, 위험분석보고서와 G7 최소 요소 적합성 검사를 만듭니다. **보안 보고서는 없습니다.** 모델에는 패키지 CVE가 없습니다.
+- CycloneDX 1.7 **ML-BOM**(1.6 아님), 고지문, 오픈소스 위험 보고서와 G7 최소 요소 적합성 검사를 만듭니다. **보안 보고서는 없습니다.** 모델에는 패키지 CVE가 없습니다.
 - 모델 카드, 데이터셋, G7 세부는 [AI 모델 가이드](ai-model.ko.md)를 참고하세요.
 
-**산출물**: 고지문, ML-BOM(CycloneDX 1.7), 위험분석보고서, G7 적합성
+**산출물**: 고지문, ML-BOM(CycloneDX 1.7), 오픈소스 위험 보고서, G7 적합성
 
 ### 모델이 아니라 공개된 데이터셋이라면
 
@@ -201,7 +202,7 @@ $SBOM --project tulu --version 1.0 \
 
 버전 지정 방법, 라이선스를 SPDX로 옮기는 규칙, 비공개·엠바고 항목 처리, HuggingFace 데이터셋의 원천을 따라가는 방식은 AI 모델 가이드의 [공개된 데이터셋 스캔](ai-model.ko.md#공개된-데이터셋-스캔)을 참고하세요.
 
-**산출물**: 고지문, ML-BOM(CycloneDX 1.7), 위험분석보고서, 적합성 검사
+**산출물**: 고지문, ML-BOM(CycloneDX 1.7), 오픈소스 위험 보고서, 적합성 검사
 
 ### 모델에 아직 저장소도 파일도 없다면
 
@@ -214,7 +215,7 @@ $SBOM --project tulu --version 1.0 \
 
 선언 파일에는 기반 모델(`model.baseModels[].ref`)과 HuggingFace 데이터셋(`datasets[].ref`, `huggingface:<owner>/<name>` 형식)을 적고, 이들은 모델 스캔과 같은 방식으로 허브에서 id로 읽어 옵니다. 허브에 없는 데이터는 `datasets[].local`에 적습니다. 스캔은 기본 이미지에서 실행되며, `HF_TOKEN`이 설정되어 있으면 함께 넘깁니다. 웹 UI에서는 AI 모델 묶음의 **모델 정보 직접 입력** 타일이 같은 내용을 단계별로 묻고, 그 답을 선언으로 씁니다. 자세한 내용은 AI 모델 가이드의 [SPDX 3.0.1 AI 문서](ai-model.ko.md#spdx-301-ai-문서)를 참고하세요.
 
-**산출물**: 고지문, ML-BOM(CycloneDX 1.7), 위험분석보고서, G7 적합성, SPDX 3.0.1 AI 문서
+**산출물**: 고지문, ML-BOM(CycloneDX 1.7), 오픈소스 위험 보고서, G7 적합성, SPDX 3.0.1 AI 문서
 
 ### 모델 id가 아니라 모델 파일을 받았다면
 
@@ -234,8 +235,8 @@ $SBOM --project internal-llm --version 1.0.0 \
 
 - **고지문(NOTICE)**: 라이선스별로 구성요소를 묶어 표기합니다. 배포할 때 동봉하거나 고지하는 의무를 이행하는 데 씁니다.
 - **SBOM**: 기본은 CycloneDX 1.6이고, `--spec-version 1.7`을 주면 1.7입니다. 취약점 관리 시스템에 올릴 때 기준이 되는 산출물입니다.
-- **오픈소스위험분석보고서**: 취약점을 심각도별로 집계하고 권고 대응 기한(Critical 7일, High 30일)을 명시합니다. 라이선스 요약과 포맷 적합성 결과도 담습니다.
-- **적합성 보고서**: SBOM이 제출 품질 기준(필수 항목, PURL 보유율, 전이 의존성 등)을 충족하는지 항목별로 점검한 결과입니다. 파일은 다른 세 산출물과 함께 기본 생성되지만, 화면은 `--analyze` 경로에서만 나타납니다(위 설명 참고). 자세한 읽는 법은 공급사 SBOM 검증 가이드의 [적합성 보고서 읽기](supplier-sbom.ko.md#적합성-보고서-읽기)를 참고하세요.
+- **오픈소스 위험 보고서**: 취약점을 심각도별로 집계하고 권고 대응 기한(Critical 7일, High 30일)을 명시합니다. 라이선스 요약과 적합성 검사 결과도 담습니다.
+- **적합성 검사 보고서**: SBOM이 제출 품질 기준(필수 항목, PURL 보유율, 전이 의존성 등)을 충족하는지 항목별로 점검한 결과입니다. 파일은 다른 세 산출물과 함께 기본 생성되지만, 화면은 `--analyze` 경로에서만 나타납니다(위 설명 참고). 자세한 읽는 법은 공급사 SBOM 검증 가이드의 [적합성 검사 보고서 읽기](supplier-sbom.ko.md#적합성-검사-보고서-읽기)를 참고하세요.
 
 ## 웹 UI로 한 번에
 
@@ -264,9 +265,9 @@ UI 상단에서 스캔 대상을 고르고 각 형태에 맞게 입력합니다.
 
 이 표는 이 가이드가 다루는 시나리오 기준입니다. 전체 12개 스캔 대상은 [웹 UI 레퍼런스](../reference/ui.ko.md#새-스캔)를 참고하세요.
 
-소스 코드 스캔(현재 폴더, GitHub URL, ZIP 업로드)에서는 **고급 스캔 옵션** 섹션이 어떤 파일을 만들지가 아니라 소스를 어떻게 분석할지를 바꾸는 토글(라이선스 스캔/ScanCode, 파일 단위 식별/SCANOSS)을 제공하며, 둘 다 기본은 꺼져 있습니다. 각 토글이 하는 일과 스캔 대상별 제공 여부는 [웹 UI 레퍼런스](../reference/ui.ko.md#새-스캔)의 고급 스캔 옵션 설명을 참고하세요.
+소스 코드 스캔(현재 폴더, GitHub URL, ZIP 업로드)에서는 **결과 품질** 묶음이 어떤 파일을 만들지가 아니라 소스를 어떻게 분석할지를 바꾸는 토글(라이선스 스캔/ScanCode, 파일 단위 식별/SCANOSS)을 제공하며, 둘 다 기본은 꺼져 있습니다. 각 토글이 하는 일과 스캔 대상별 제공 여부는 [웹 UI 레퍼런스](../reference/ui.ko.md#새-스캔)의 결과 품질 설명을 참고하세요.
 
-실행하면 진행 로그가 실시간으로 표시되고, 완료 후에는 고지문과 SBOM, 위험분석보고서를 화면에서 보거나 내려받을 수 있습니다. 적합성 보고서 파일도 내려받을 수 있지만, 판정 화면은 업로드한 SBOM을 분석한 경우(`--analyze`)에만 나타납니다.
+실행하면 진행 로그가 실시간으로 표시되고, 완료 후에는 고지문과 SBOM, 오픈소스 위험 보고서를 화면에서 보거나 내려받을 수 있습니다. 적합성 검사 보고서 파일도 내려받을 수 있지만, 판정 화면은 업로드한 SBOM을 분석한 경우(`--analyze`)에만 나타납니다.
 
 > 펌웨어 업로드 탭은 Docker 엔진이 켜져 있으면 자동으로 나타납니다. 동작 방식과 이미지 태그를
 > 바꾸는 방법은 [펌웨어 분석 가이드](firmware.ko.md)를 참고하세요.

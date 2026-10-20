@@ -4,7 +4,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { ComponentItem, DoneEvent } from "./api";
-import { needsAttention, riskyComponentCount, topRiskComponents } from "./overview";
+import { firstChecks, needsAttention, riskyComponentCount, topRiskComponents } from "./overview";
 
 function result(over: Partial<DoneEvent> = {}): DoneEvent {
   return {
@@ -320,5 +320,88 @@ describe("needsAttention on an AI scan", () => {
     );
     expect(items.map((i) => i.id)).not.toContain("conformance");
     expect(items.map((i) => i.id)).not.toContain("conformanceGap");
+  });
+});
+
+describe("firstChecks", () => {
+  const vuln = (over: Record<string, unknown>) => ({
+    id: "CVE-1", severity: "MEDIUM", pkg: "p", installed: "1", fixed: "", title: "", ...over,
+  });
+  const withVulns = (vulns: unknown[], total = vulns.length) =>
+    result({
+      security: { ...sev({ TOTAL: total }), vulnerabilities: vulns } as DoneEvent["security"],
+    });
+
+  it("is empty when nothing applies, so the block stays out", () => {
+    expect(firstChecks(result())).toEqual([]);
+    expect(firstChecks(withVulns([vuln({}), vuln({ id: "CVE-2", severity: "CRITICAL" })]))).toEqual([]);
+  });
+
+  it("counts known exploited rows and opens the vulnerabilities section", () => {
+    const items = firstChecks(withVulns([vuln({ kev: true }), vuln({ id: "CVE-2", kev: true }), vuln({ id: "CVE-3" })]));
+    expect(items).toEqual([
+      { id: "knownExploited", count: 2, target: "vulnerabilities", source: "vulnerabilities" },
+    ]);
+  });
+
+  it("counts only Critical or High rows that carry a fixed version", () => {
+    const items = firstChecks(
+      withVulns([
+        vuln({ id: "A", severity: "HIGH", fixed: "2" }),
+        vuln({ id: "B", severity: "HIGH", fixed: "" }),
+        vuln({ id: "C", severity: "MEDIUM", fixed: "2" }),
+      ]),
+    );
+    expect(items).toHaveLength(1);
+    expect(items[0]).toMatchObject({ id: "fixableSevere", count: 1, query: { severity: "HIGH" } });
+  });
+
+  it("opens the fixable list on Critical when one is present", () => {
+    const items = firstChecks(
+      withVulns([vuln({ severity: "CRITICAL", fixed: "2" }), vuln({ id: "B", severity: "HIGH", fixed: "3" })]),
+    );
+    expect(items[0].query).toEqual({ severity: "CRITICAL" });
+    expect(items[0].count).toBe(2);
+  });
+
+  it("says when the rows counted are fewer than the scan total", () => {
+    const items = firstChecks(withVulns([vuln({ kev: true })], 17399));
+    expect(items[0]).toMatchObject({ rowsListed: 1, rowsTotal: 17399 });
+    // Complete lists carry no such note.
+    expect(firstChecks(withVulns([vuln({ kev: true })]))[0].rowsListed).toBeUndefined();
+  });
+
+  it("lists open required conformance items last, in the fixed reference order", () => {
+    const items = firstChecks(
+      result({
+        mode: "SOURCE",
+        security: { ...sev({ TOTAL: 1 }), vulnerabilities: [vuln({ kev: true, severity: "CRITICAL", fixed: "2" })] } as DoneEvent["security"],
+        conformance: {
+          result: "fail",
+          checks: [{ id: "supplier", label: "Supplier", required: true, status: "fail", detail: "" }],
+        },
+      }),
+    );
+    expect(items.map((i) => i.id)).toEqual(["knownExploited", "fixableSevere", "requiredItems"]);
+    expect(items[2]).toMatchObject({ count: 1, target: "conformance", source: "conformance" });
+  });
+
+  it("skips conformance for a self-generated AI SBOM, whose section is not shown", () => {
+    const items = firstChecks(
+      result({
+        sbom: { components: 1, componentList: [comp({ type: "machine-learning-model" })] },
+        conformance: {
+          result: "fail",
+          checks: [{ id: "supplier", label: "Supplier", required: true, status: "fail", detail: "" }],
+        },
+      }),
+    );
+    expect(items).toEqual([]);
+  });
+
+  it("honours the limit", () => {
+    const all = withVulns([vuln({ kev: true, severity: "CRITICAL", fixed: "2" })]);
+    expect(firstChecks(all, 1).map((i) => i.id)).toEqual(["knownExploited"]);
+    expect(firstChecks(all, 0)).toEqual([]);
   });
 });

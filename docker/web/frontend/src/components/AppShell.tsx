@@ -1,7 +1,8 @@
 // Copyright 2026 SK Telecom Co., Ltd.
 // SPDX-License-Identifier: Apache-2.0
 
-import { type ReactNode, useEffect, useState } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 
 import { DemoBanner } from "./DemoBanner";
 import { Sidebar } from "./Sidebar";
@@ -85,6 +86,8 @@ export function AppShell({
   version,
 }: AppShellProps) {
   // `null` until the user toggles manually; until then we follow the viewport.
+  const { t } = useTranslation();
+  const mainRef = useRef<HTMLElement>(null);
   const [manualCollapsed, setManualCollapsed] = useState<boolean | null>(null);
   const [narrow, setNarrow] = useState(false);
 
@@ -100,6 +103,20 @@ export function AppShell({
 
   return (
     <div className="flex h-screen flex-col bg-background">
+      {/* The first Tab stop: jumps past the top bar and the rail (WCAG 2.4.1).
+          Visible only while focused, in the ring colour rather than the brand
+          colour. The route lives in the URL hash, so a real in-page anchor would
+          rewrite it: the click moves focus to the content area instead. */}
+      <a
+        href="#main-content"
+        onClick={(e) => {
+          e.preventDefault();
+          mainRef.current?.focus();
+        }}
+        className="sr-only rounded-md border bg-background px-3 py-2 text-body-sm font-medium text-foreground shadow-md focus:not-sr-only focus:fixed focus:left-3 focus:top-3 focus:z-50 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-background"
+      >
+        {t("shell.skipToMain")}
+      </a>
       <TopBar
         project={project}
         search={search}
@@ -132,7 +149,16 @@ export function AppShell({
         {/* tabIndex makes the scrollable region keyboard-accessible (axe
             scrollable-region-focusable / WCAG 2.1.1): a mouse-free user can
             focus it and scroll with the arrow keys. */}
-        <main tabIndex={0} className="min-w-0 flex-1 overflow-y-auto animate-fade-in">
+        {/* `relative` makes main the containing block of absolutely positioned
+            descendants (the sr-only text). Without it they sit outside main's
+            clipping and stretch the page to the depth of the content, so the
+            document scrolls on into blank space under the shell. */}
+        <main
+          id="main-content"
+          ref={mainRef}
+          tabIndex={0}
+          className="relative min-w-0 flex-1 overflow-y-auto animate-fade-in"
+        >
           {children}
         </main>
       </div>

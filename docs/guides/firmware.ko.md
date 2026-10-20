@@ -63,22 +63,22 @@ SBOM_FIRMWARE_IMAGE=<사내 미러>:<태그> ./scripts/scan-sbom.sh --ui
 ```
 
 - 인식 가능한 확장자(`.bin`, `.img`, `.squashfs`, `.sqsh`, `.ubi`, `.ubifs`, `.trx`, `.chk`, `.fw`, `.rom`, `.dlf`, `.bix`)는 `--firmware` 없이도 자동 감지되지만, 명시를 권장합니다.
-- 산출물은 일반 스캔과 같은 3종입니다. 고지문(`_NOTICE`), SBOM(`_bom.json`), 위험분석보고서(`_risk-report`).
+- 산출물은 일반 스캔과 같은 3종입니다. 고지문(`_NOTICE`), SBOM(`_bom.json`), 오픈소스 위험 보고서(`_risk-report`).
 - 릴리스 폴더를 그대로 넘겨도 됩니다. `--target`이 최상위에 매니페스트나 빌드 파일이 없는 폴더이고, 바로 아래에 펌웨어 이미지나 압축을 푼 루트 파일시스템을 하나만 담고 있으면(예: `rootfs/`, `install/`, 커널, 이미지 파일이 함께 있는 `images/`) 그 이미지나 루트 파일시스템을 분석하고 무엇을 골랐는지 출력합니다. 펌웨어 이미지는 펌웨어나 파일시스템 시그니처, 또는 펌웨어에 쓰는 확장자(`.bix`, `.trx`, `.chk`, `.dlf`, `.ubi`, `.ubifs`, `.squashfs`, `.sqsh`, `.rom`, `.fw`, `.jffs2`, `.cramfs`)로 판단하며, `.bin`과 `.img`는 시그니처가 있어야 합니다. 최상위에 실행 파일, 공유 라이브러리, `.asar`, `node_modules`, 모델 가중치나 토크나이저 파일이 있거나 최상위 파일이 20개를 넘는 폴더는 소스로 분석합니다. 압축을 푼 데스크톱 앱, 모델 스냅샷, 빌드 결과 스테이징 폴더가 여기에 해당합니다. 여러 개가 있으면 스캔을 멈추고 각각에 쓸 `--target`을 보여 줍니다. 고른 루트 파일시스템에 패키지 데이터베이스가 없으면, 경고에 같은 폴더의 큰 파일(1 MiB 초과, 최대 5개)을 `--target "<파일>" --firmware` 명령으로 함께 보여 줍니다. 폴더 자체를 소스로 분석하려면 `--as-source`를 붙입니다.
 
 ## 결과 읽는 법
 
-산출물은 다른 스캔과 같은 고지문, SBOM, 위험분석보고서입니다(일반적인 구성은 [보고서 읽는 법](../concepts/reports-explained.ko.md)과 [산출물 레퍼런스](../reference/artifacts.ko.md) 참고). 다만 펌웨어 SBOM을 읽기 전에 알아둘 점이 하나 있습니다. 일부 컴포넌트는 버전이 아예 없습니다. 바이너리의 버전 문자열이 빌드 과정에서 남지 않은 경우에도, BomLens는 그 라이브러리가 링크돼 있다는 사실만은 기록합니다. 문자열 매칭이 아니라 ELF의 SONAME·NEEDED 항목이라는 구조 자체에서 읽은 것이며, 이런 컴포넌트에는 `bomlens:evidenceGrade = presence-only` 속성이 붙습니다. 버전이 없다고 해서 스캔이 놓친 것이 아니라, 바이너리 자체에 읽을 버전이 없다는 뜻이며 컴포넌트 자체는 실재합니다. 라이선스 의무 판단에는 이것으로 충분하지만(어느 릴리스인지와 무관하게 그 라이브러리는 존재하므로), 버전 기반 CVE 매칭은 이 컴포넌트를 판단할 근거가 없습니다.
+산출물은 다른 스캔과 같은 고지문, SBOM, 오픈소스 위험 보고서입니다(일반적인 구성은 [보고서 읽는 법](../concepts/reports-explained.ko.md)과 [산출물 레퍼런스](../reference/artifacts.ko.md) 참고). 다만 펌웨어 SBOM을 읽기 전에 알아둘 점이 하나 있습니다. 일부 컴포넌트는 버전이 아예 없습니다. 바이너리의 버전 문자열이 빌드 과정에서 남지 않은 경우에도, BomLens는 그 라이브러리가 링크돼 있다는 사실만은 기록합니다. 문자열 매칭이 아니라 ELF의 SONAME·NEEDED 항목이라는 구조 자체에서 읽은 것이며, 이런 컴포넌트에는 `bomlens:evidenceGrade = presence-only` 속성이 붙습니다. 버전이 없다고 해서 스캔이 놓친 것이 아니라, 바이너리 자체에 읽을 버전이 없다는 뜻이며 컴포넌트 자체는 실재합니다. 라이선스 의무 판단에는 이것으로 충분하지만(어느 릴리스인지와 무관하게 그 라이브러리는 존재하므로), 버전 기반 CVE 매칭은 이 컴포넌트를 판단할 근거가 없습니다.
 
-언패커는 이미지를 어디까지 열 수 있었는지도 함께 보고하며, BomLens는 이를 결과 옆에 기록합니다. 합계는 펌웨어 컴포넌트의 `bomlens:firmware:*` 속성(`input-bytes`, `recognized-regions`, `unknown-regions`, `unknown-bytes`, `unknown-top-level-percent`, `nested-unknown-regions`, `encrypted-regions`, `extraction-failed`, `extraction-failed-formats`, `missing-extractors`)으로 남고, 열지 못한 부분이 있으면 위험분석보고서에 "펌웨어 분석 범위" 절이 추가됩니다. 이 값은 스캔의 범위로 읽습니다. 식별하지 못한 영역, 암호화된 영역, 스캐너 이미지에 없는 추출 도구가 필요한 영역 안의 컴포넌트는 SBOM에 없으므로, 취약점이 0건이어도 그것은 열어 볼 수 있었던 범위에 대한 결과입니다. 식별하지 못한 비율과 바이트 수는 이미지 최상위 기준이고, 추출된 내용 안의 미식별 영역은 따로 셉니다. 이 절은 BomLens가 직접 실행한 스캔에만 쓰며, 검토용으로 제출받은 SBOM에는 쓰지 않습니다. 합계만 남기며, 언패커의 전체 보고서는 산출물 폴더에 쓰지 않습니다.
+언패커는 이미지를 어디까지 열 수 있었는지도 함께 보고하며, BomLens는 이를 결과 옆에 기록합니다. 합계는 펌웨어 컴포넌트의 `bomlens:firmware:*` 속성(`input-bytes`, `recognized-regions`, `unknown-regions`, `unknown-bytes`, `unknown-top-level-percent`, `nested-unknown-regions`, `encrypted-regions`, `extraction-failed`, `extraction-failed-formats`, `missing-extractors`)으로 남고, 열지 못한 부분이 있으면 오픈소스 위험 보고서에 "펌웨어 분석 범위" 절이 추가됩니다. 이 값은 스캔의 범위로 읽습니다. 식별하지 못한 영역, 암호화된 영역, 스캐너 이미지에 없는 추출 도구가 필요한 영역 안의 컴포넌트는 SBOM에 없으므로, 취약점이 0건이어도 그것은 열어 볼 수 있었던 범위에 대한 결과입니다. 식별하지 못한 비율과 바이트 수는 이미지 최상위 기준이고, 추출된 내용 안의 미식별 영역은 따로 셉니다. 이 절은 BomLens가 직접 실행한 스캔에만 쓰며, 검토용으로 제출받은 SBOM에는 쓰지 않습니다. 합계만 남기며, 언패커의 전체 보고서는 산출물 폴더에 쓰지 않습니다.
 
 syft의 패키지 식별 단계가 실패해도 스캔은 멈추지 않습니다. syft 자체의 오류가 스캔 로그에 남고, SBOM에는 어느 단계가 실패했는지 `bomlens:pipeline-step-failed`로 기록됩니다(메인 rootfs는 `firmware-packages`, 압축 해제 중 함께 발견되는 별도 패키지 소스, 예를 들어 내장된 컨테이너 이미지 저장소나 독자적인 패키지 데이터베이스를 가진 파일시스템은 `firmware-extra-roots`). 예상보다 컴포넌트 수가 적으면 펌웨어에 실제로 그만큼만 있다고 단정하기 전에 스캔 로그에서 이 기록부터 확인하는 편이 좋습니다.
 
 ## upstream 저장소 purl
 
-바이너리나 펌웨어의 패키지 데이터베이스에서 읽은 컴포넌트에는 purl이 없거나, `pkg:generic` 또는 `pkg:opkg` purl이 붙습니다. 어느 것도 프로젝트를 가리키지 않으므로, purl로 컴포넌트를 조회하는 도구는 이름과 버전이 맞아도 그 컴포넌트를 식별하지 못합니다. 펌웨어, 루트 파일시스템, 바이너리 스캔에서 BomLens는 프로젝트의 upstream 소스 저장소와 릴리스 태그로 purl을 붙입니다. 예를 들어 `pkg:github/mirror/busybox@1_22_1`, `pkg:github/gregkh/linux@v3.10.18`, `pkg:sourceforge/boa@0.94.13`, `pkg:gnu/readline@5.2`입니다.
+바이너리나 펌웨어의 패키지 데이터베이스에서 읽은 컴포넌트에는 purl이 없거나, `pkg:generic` 또는 `pkg:opkg` purl이 붙습니다. 어느 것도 프로젝트를 가리키지 않으므로, purl로 컴포넌트를 조회하는 도구는 이름과 버전이 맞아도 그 컴포넌트를 식별하지 못합니다. Yocto 빌드가 남긴 기록에서 읽은 컴포넌트도 마찬가지입니다. 펌웨어, 루트 파일시스템, 바이너리 스캔과 Yocto 빌드의 기록에서 읽은 SBOM(`--target`으로 지정한 Yocto 빌드 디렉터리, 또는 `--analyze`로 넘긴 그 빌드의 SPDX나 매니페스트)에서 BomLens는 프로젝트의 upstream 소스 저장소와 릴리스 태그로 purl을 붙입니다. 예를 들어 `pkg:github/mirror/busybox@1_22_1`, `pkg:github/gregkh/linux@v3.10.18`, `pkg:sourceforge/boa@0.94.13`, `pkg:gnu/readline@5.2`입니다.
 
-변환에는 저장소와 태그 표기를 확인한 프로젝트만 담은 변환표(`docker/lib/upstream-purl-map.json`)를 씁니다. BusyBox, curl, OpenSSL 1.x, OpenSSH, Linux, zlib, U-Boot, Net-SNMP, ncurses, net-tools, libxml2, SQLite, glibc, Dropbear, Mbed TLS, Python, Boa, readline이 들어 있습니다. 컴포넌트는 이름이나 CPE로 찾고, 변환표가 다루는 형식의 버전이 있을 때만 바꿉니다. 이때 `-1` 같은 패키지 재빌드 번호와 커널 빌드 해시는 먼저 떼고, `5.4.0`처럼 적힌 Linux와 glibc의 기본 릴리스는 `5.4`의 태그로 바꿉니다. 변환표에 없는 컴포넌트는 원래 식별자를 그대로 둡니다. 저장소나 태그를 추측하면 다른 버전을 가리키게 되기 때문입니다. syft가 BusyBox를 운영체제 컴포넌트와 바이너리 컴포넌트로 함께 보고할 때처럼 같은 purl이 운영체제 컴포넌트와 패키지나 바이너리 컴포넌트에 함께 붙게 되면 패키지나 바이너리 쪽에만 붙입니다. 버전, CPE, 식별 근거는 바꾸지 않으므로 이를 근거로 찾은 CVE도 보고서에 그대로 남습니다. 새 purl에는 `bomlens:purlSource = upstream-map`이 붙고, 바꾸기 전 purl은 `bomlens:originalPurl`에 남습니다. 끄려면 `ENRICH_UPSTREAM_PURL=false`를 설정합니다.
+변환에는 저장소와 태그 표기를 확인한 프로젝트만 담은 변환표(`docker/lib/upstream-purl-map.json`)를 씁니다. BusyBox, curl, OpenSSL 1.x와 3.x, OpenSSH, Linux, zlib, U-Boot, Net-SNMP, ncurses, net-tools, libxml2, SQLite, glibc, Dropbear, Mbed TLS, Python, Boa, readline, jansson, json-c, libbpf, iproute2, musl, util-linux가 들어 있습니다. json-c는 태그에 릴리스 날짜가 들어 있어, 변환표에 적은 0.13.1부터 0.19까지의 버전만 다룹니다. 컴포넌트는 자기 이름, 빌드에 쓰인 소스의 이름, CPE 가운데 하나로 찾습니다. 빌드에 쓰인 소스의 이름으로는 Yocto 레시피(`bomlens:yocto:recipe`), OpenWrt 소스 패키지(`syft:metadata:source`의 마지막 부분), 벤더가 `*`인 CPE의 제품명을 씁니다. Yocto는 `CVE_PRODUCT`를 이 형태로 적습니다. 예를 들어 Yocto의 `openssl-bin`과 `libssl3`은 레시피 이름에 따라 `openssl`로, OpenWrt의 `libmbedtls12`와 `ip-full`은 소스 패키지 이름에 따라 `mbedtls`와 `iproute2`로 읽습니다. 툴체인 패키지(`libc`처럼 OpenWrt 소스 경로가 `toolchain`으로 끝나는 패키지)와 커널 모듈 패키지(`package/kernel/linux`에서 빌드한 `kmod-*`)는 소스 패키지 이름으로 찾지 않습니다. 그래서 원래 식별자를 그대로 두고, `kmod-*` 패키지에 커널의 purl이 붙지 않습니다. 찾은 뒤에는 변환표가 다루는 형식의 버전이 있을 때만 바꿉니다. 이때 `-1` 같은 패키지 재빌드 번호와 커널 빌드 해시는 먼저 떼고, `5.4.0`처럼 적힌 Linux와 glibc의 기본 릴리스는 `5.4`의 태그로 바꿉니다. 변환표에 없는 컴포넌트는 원래 식별자를 그대로 둡니다. 저장소나 태그를 추측하면 다른 버전을 가리키게 되기 때문입니다. 예외는 변환표에 없는 프로젝트의 소스 내려받기 주소가 릴리스를 직접 밝히는 경우입니다. 변환표에 있는 프로젝트는 변환표로만 정합니다. Yocto SPDX 2.2 판독기는 레시피의 첫 번째 소스 주소를 `bomlens:sourceUrl`에 기록합니다. 그 주소가 GitHub 릴리스 파일이나 태그 압축 파일이고 태그가 컴포넌트 버전을 나타내면(`v1.2`, `V_1_2`, `name-1.2`, `1.2`) `pkg:github/<owner>/<repo>@<tag>`를 붙이고, GNU 릴리스(`ftp.gnu.org`나 `ftpmirror.gnu.org`의 `/gnu/<name>/<name>-<version>.tar.*`)이면 그 버전이 컴포넌트 버전과 같을 때만 `pkg:gnu/<name>@<version>`을 붙입니다. 다른 곳의 일반 압축 파일이나 git 커밋은 릴리스로 보지 않습니다. syft가 BusyBox를 운영체제 컴포넌트와 바이너리 컴포넌트로 함께 보고할 때처럼 같은 purl이 운영체제 컴포넌트와 패키지나 바이너리 컴포넌트에 함께 붙게 되면 패키지나 바이너리 쪽에만 붙입니다. 버전, CPE, 식별 근거는 바꾸지 않으므로 이를 근거로 찾은 CVE도 보고서에 그대로 남습니다. 새 purl에는 `bomlens:purlSource = upstream-map`이 붙고, 바꾸기 전 purl은 `bomlens:originalPurl`에 남습니다. 끄려면 `ENRICH_UPSTREAM_PURL=false`를 설정합니다.
 
 ## 스캔이 읽지 못한 버전 채우기
 
@@ -90,11 +90,23 @@ syft의 패키지 식별 단계가 실패해도 스캔은 멈추지 않습니다
   --component-versions device-fw_1.0.0_component-versions.template.csv --generate-only
 ```
 
-파일은 `name,version` 두 열로 된 CSV입니다. `#`으로 시작하는 줄과 버전을 비워 둔 행은 건너뜁니다. 양식 파일은 그 자리에서 채워도 됩니다. 넘긴 파일이 그 양식이면 스캔은 적은 내용을 그대로 두고, 아직 빠진 항목만 알려 줍니다. 채운 버전에는 `bomlens:versionSource = supplier-declared`가 붙고, 위의 upstream purl도 붙습니다. 스캔이 배포 파일에서 버전을 읽었다면 그 버전을 유지하고 두 값을 경고로 보여 줍니다. 소스 트리에는 한 프로젝트의 여러 릴리스가 함께 있을 수 있고, 실제로 들어간 것은 바이너리가 보여 주기 때문입니다. 스캔이 찾지 못한 이름은 `bomlens:identifiedBy = supplier-declared` 컴포넌트로 추가합니다. 256 KiB를 넘는 파일, 두 열이 아닌 행, 영문자와 숫자와 `. _ + ~ -` 밖의 문자가 든 이름이나 버전, 한 이름에 두 버전을 적은 파일은 줄 번호와 함께 거부합니다. 이때 SBOM과 다른 파일은 그 파일의 버전 없이 쓰고, 스캔은 1로 끝납니다. 버전이 `UNKNOWN`인 컴포넌트(메타데이터에 버전이 없는 커널 모듈)는 버전이 없는 것으로 보고 양식에 넣습니다. 이름에 공백 같은 다른 문자가 든 컴포넌트는 양식 대신 콘솔에 따로 보여 줍니다.
+파일은 `name,version,reason` 세 열로 된 CSV입니다. 세 번째 열은 넣지 않아도 되므로 `name,version` 두 열 파일도 전처럼 읽습니다. `#`으로 시작하는 줄과 버전도 사유도 비워 둔 행은 건너뜁니다. 양식 파일은 그 자리에서 채워도 됩니다. 넘긴 파일이 그 양식이면 스캔은 적은 내용을 그대로 두고, 아직 빠진 항목만 알려 줍니다. 채운 버전에는 `bomlens:versionSource = supplier-declared`가 붙고, 위의 upstream purl도 붙습니다. 스캔이 배포 파일에서 버전을 읽었다면 그 버전을 유지하고 두 값을 경고로 보여 줍니다. 소스 트리에는 한 프로젝트의 여러 릴리스가 함께 있을 수 있고, 실제로 들어간 것은 바이너리가 보여 주기 때문입니다. 스캔이 찾지 못한 이름은 `bomlens:identifiedBy = supplier-declared` 컴포넌트로 추가합니다. 256 KiB를 넘는 파일, 두 열이나 세 열이 아닌 행, 영문자와 숫자와 `. _ + ~ -` 밖의 문자가 든 이름이나 버전, 한 이름에 두 버전을 적은 파일은 줄 번호와 함께 거부합니다. 이때 SBOM과 다른 파일은 그 파일의 버전 없이 쓰고, 스캔은 1로 끝납니다. 버전이 `UNKNOWN`인 컴포넌트(메타데이터에 버전이 없는 커널 모듈)는 버전이 없는 것으로 보고 양식에 넣습니다. 이름에 공백 같은 다른 문자가 든 컴포넌트는 양식 대신 콘솔에 따로 보여 줍니다.
+
+넣을 버전이 없는 컴포넌트는 버전을 비우고 사유를 적습니다. 사유는 `own-code`(제조사가 직접 작성한 코드), `not-open-source`(이름만 오픈소스 프로젝트와 같음), `version-unknown`(오픈소스이지만 제품에 들어간 버전을 확인할 수 없음) 중 하나이며, 대소문자는 구분하지 않습니다. 다른 값을 적거나 한 이름에 서로 다른 사유를 적으면 줄 번호와 함께 파일 전체를 거부합니다. 사유를 적은 컴포넌트는 버전 없이 SBOM에 남고 `bomlens:versionReason` 속성에 그 사유가 담깁니다. 한 행에 버전과 사유를 함께 적으면 버전을 적용하고 사유는 경고와 함께 무시합니다. 스캔이 버전을 읽은 컴포넌트나 스캔이 찾지 못한 이름에 적은 사유도 경고와 함께 무시합니다. `version-unknown` 컴포넌트는 보안 보고서에서 여전히 확인하지 못한 컴포넌트 목록에 나옵니다.
+
+```text
+name,version,reason
+busybox,1.36.1,
+libvendor,,own-code
+telnetd,,not-open-source
+libfoo,,version-unknown
+```
+
+양식 파일은 `name,version,reason` 머리글과 세 가지 사유를 설명하는 주석 줄로 시작하며, 이미 사유가 붙은 컴포넌트는 넣지 않습니다.
 
 ## CVE 대조 방식
 
-Trivy는 컴포넌트를 패키지 PURL로 대조하며, 다른 스캔과 마찬가지로 스캔할 때 데이터베이스를 내려받습니다. 패키지 PURL이 없는 컴포넌트(PURL이 없거나 `pkg:generic`, `pkg:opkg`, 또는 `pkg:github`처럼 소스 저장소를 가리키는 경우)는 CPE를 이미지에 들어 있는 NVD CPE 인덱스(`cpe_match.sqlite`)와 대조하고, 찾은 CVE를 같은 보안 보고서에 합칩니다. 이 대조는 펌웨어, 루트 파일시스템, 바이너리 스캔에서 `--security`를 켰을 때 CPE를 붙이는 단계가 모두 끝난 뒤 한 번 실행됩니다. 그래서 시그니처 검사기가 CPE를 붙인 컴포넌트뿐 아니라, BomLens가 관리하는 이름별 CPE 목록(`cpe-name-map.json`)으로 이름과 버전에서 CPE를 얻은 컴포넌트(예: OpenSSH, BusyBox)도 대조합니다. 결과 매니페스트에는 이 단계가 `match-cpe`로 남고 `offered`, `components`, `cves` 개수가 함께 기록됩니다.
+Trivy는 컴포넌트를 패키지 PURL로 대조하며, 다른 스캔과 마찬가지로 스캔할 때 데이터베이스를 내려받습니다. 패키지 PURL이 없는 컴포넌트(PURL이 없거나 `pkg:generic`, `pkg:opkg`, 또는 `pkg:github`처럼 소스 저장소를 가리키는 경우)는 CPE를 이미지에 들어 있는 NVD CPE 인덱스(`cpe_match.sqlite`)와 대조하고, 찾은 CVE를 같은 보안 보고서에 합칩니다. 이 대조는 펌웨어, 루트 파일시스템, 바이너리 스캔과 Yocto SPDX 2.2 아카이브(`<image>.spdx.tar.zst`)에서 `--security`를 켰을 때 CPE를 붙이는 단계가 모두 끝난 뒤 한 번 실행됩니다. 그래서 시그니처 검사기가 CPE를 붙인 컴포넌트뿐 아니라, BomLens가 관리하는 이름별 CPE 목록(`cpe-name-map.json`)으로 이름과 버전에서 CPE를 얻은 컴포넌트(예: OpenSSH, BusyBox)도 대조합니다. Yocto SPDX 3.0 문서와 매니페스트로 읽은 빌드는 이렇게 대조하지 않습니다. 이미 Yocto가 내린 판정을 담고 있어서, CPE로 다시 대조하면 Yocto가 패치했거나 해당 없다고 판정한 CVE를 열린 것으로 보고하게 되기 때문입니다. Yocto는 CPE를 `cpe:2.3:*:*:busybox:1.36.1`처럼 적습니다. 종류가 `*`이면 애플리케이션으로 읽고, 벤더가 `*`이면 Yocto의 cve-check와 같이 그 제품명을 쓰는 모든 벤더에서 제품명으로 찾습니다. 여러 벤더 아래 올라 있는 제품은 대부분 NVD가 한 프로젝트를 여러 이름으로 등록한 경우입니다(`linux_kernel`은 `linux`와 `kernel`, `curl`은 `haxx`, `curl`, `daniel_stenberg`). Yocto는 맞지 않는 벤더의 CVE를 `CVE_STATUS`의 `cpe-incorrect`로 걸러 내지만 SPDX 2.2 빌드에는 이 정보가 담기지 않으므로, 다른 프로젝트와 제품명이 같으면 그 프로젝트의 CVE도 함께 나올 수 있습니다. SPDX 2.2를 쓴 빌드는 레시피가 어떤 CVE를 패치했는지도 기록하지 않으므로, 이렇게 찾은 CVE에는 레시피가 이미 패치한 것이 섞일 수 있습니다. SPDX 3.0은 이를 기록합니다(`INHERIT += "create-spdx-3.0"`). 결과 매니페스트에는 이 단계가 `match-cpe`로 남고 `offered`, `components`, `cves` 개수가 함께 기록됩니다.
 
 인덱스는 이미지를 빌드할 때 NVD 데이터에서 추려 만들므로, 대조에는 네트워크도 NVD API 키도 필요 없고 데이터는 이미지를 빌드한 시점 기준입니다. 최신 데이터가 필요하면 새 이미지를 받습니다. cve-bin-tool은 바이너리 식별에만 쓰며, 취약점 데이터베이스를 내려받거나 읽지 않습니다. `CVE_BIN_TOOL_MODE=components-only`로 두면 식별은 그대로 하고 CPE 대조만 끕니다. `--build-arg SBOM_CPE_INDEX=false`로 빌드한 이미지에는 인덱스가 없으며, 이때 이 단계는 `skipped`(`not_installed`)로 기록됩니다.
 
@@ -111,7 +123,7 @@ Trivy는 컴포넌트를 패키지 PURL로 대조하며, 다른 스캔과 마찬
 - 오픈소스 도구 스택의 검출률은 약 60~85%이며, 펌웨어 종류와 strip 정도, 언팩 성공 여부에 크게 좌우됩니다.
 - 함수 수준 바이너리 핑거프린팅이 없어서 strip되거나 인라인된 컴포넌트, 버전 문자열이 제거된 바이너리는 놓칩니다.
 - 정적 링크 라이브러리와 벤더가 변형한 squashfs, 암호화·서명된 펌웨어, 사명을 바꾼 라이브러리는 검출하지 못하거나 부정확합니다.
-- 결과 SBOM은 완전하지 않은 근사 추정이므로, 법적 라이선스 컴플라이언스의 단일 근거로 사용하지 마세요.
+- 결과 SBOM은 완전하지 않은 근사 추정이므로, 라이선스 준수 여부를 법적으로 판단하는 단일 근거로 사용하지 마세요.
 
 ---
 

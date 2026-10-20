@@ -2435,7 +2435,7 @@
         },
         {
           "name": "bomlens:licenseClass",
-          "value": "uncategorized"
+          "value": "permissive"
         }
       ],
       "purl": "pkg:pypi/greenlet@3.5.4",
@@ -3933,7 +3933,7 @@
         },
         {
           "name": "bomlens:licenseClass",
-          "value": "uncategorized"
+          "value": "permissive"
         }
       ],
       "purl": "pkg:pypi/packaging@26.2",

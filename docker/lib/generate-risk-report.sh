@@ -92,6 +92,15 @@ TOTAL=$(echo "$FINDINGS" | jq 'length')
 # They carry no version, purl or CPE, so no vulnerability database can be asked
 # about them. Printing the severity table without saying so lets "0 vulnerabilities"
 # read as covering the whole SBOM when part of it was never eligible to be checked.
+# The source stated version ranges and shipped no lock file (detect-version-pinning.sh),
+# so the SBOM lists what a fresh install resolves at scan time. The severity table is
+# then a statement about those versions, which may not be the ones that were run.
+UNPINNED=0
+if [ -f "${OUT_PREFIX}_bom.json" ] && jq -e '[.metadata.component.properties[]?
+        | select(.name == "bomlens:source:versionPinning" and .value == "unpinned")] | length > 0' \
+        "${OUT_PREFIX}_bom.json" >/dev/null 2>&1; then
+    UNPINNED=1
+fi
 PRESENCE_ONLY=0
 if [ -f "${OUT_PREFIX}_bom.json" ] && jq empty "${OUT_PREFIX}_bom.json" >/dev/null 2>&1; then
     PRESENCE_ONLY=$(jq '[.components[]? | select(any(.properties[]?;
@@ -150,7 +159,7 @@ if [ "$SCAN_MODE" = "ANALYZE" ] && [ "$CONF_RESULT" != "N/A" ]; then
     S_CONF=1; S_VULN=2; S_LIC=3; S_NEXT=4
 else
     HAS_CONF=false
-    # Self mode: no format-validation section, so numbering starts at vulnerabilities.
+    # Self mode: no conformance check section, so numbering starts at vulnerabilities.
     S_CONF=""; S_VULN=1; S_LIC=2; S_NEXT=3
 fi
 
@@ -171,10 +180,32 @@ fi
 # --------------------------------------------------------
 BOM="${OUT_PREFIX}_bom.json"
 LIB_DIR="$(cd "$(dirname "$0")" && pwd)"
+# Shared look of the HTML reports (design tokens, print rules, time format).
+if [ ! -f "$LIB_DIR/report-common.sh" ]; then
+    echo "[risk] report-common.sh not found next to $0; the image is incomplete. Fix: rebuild the scanner image." >&2
+    exit 1
+fi
+# shellcheck source=report-common.sh
+. "$LIB_DIR/report-common.sh"
+# The components whose licenses this report counts. For a source or image scan
+# the root component is the scanned project itself, whose own license is not a
+# third-party obligation, so it is left out (as the NOTICE file leaves it out).
+# For an AI model or dataset scan the root is the model or dataset under
+# review, and its license is the one that matters most: a model with no
+# dependent datasets has no other component at all, and read as 0 licenses.
+# shellcheck disable=SC2016
+LIC_SUBJECTS='((if ((.metadata.component.type // "") | IN("machine-learning-model", "data"))
+                then [.metadata.component] else [] end) + [ .components[]? ])'
 LIC_CLASS='null'
+if [ -f "$BOM" ] && jq empty "$BOM" >/dev/null 2>&1 \
+   && jq -e '(.metadata.component.type // "") | IN("machine-learning-model", "data")' "$BOM" >/dev/null 2>&1; then
+    LIC_COUNT=$(jq -r "$LIC_SUBJECTS"'
+      | [ .[] | (.licenses // [])[] | (.license.id // .license.name // .expression // empty) ]
+      | unique | length' "$BOM" 2>/dev/null || echo "$LIC_COUNT")
+fi
 if [ -f "$BOM" ] && [ -f "$LIB_DIR/license-flags.jq" ] && jq empty "$BOM" >/dev/null 2>&1; then
-    LIC_CLASS=$(jq -c "$(cat "$LIB_DIR/license-flags.jq")"'
-      [ .components[]? | { class: component_license_class,
+    LIC_CLASS=$(jq -c "$(cat "$LIB_DIR/license-flags.jq")$LIC_SUBJECTS"'
+      | [ .[] | { class: component_license_class,
                            label: ((.name // "?") + "@" + (.version // "?")) } ] as $rows
       | { nc: ([$rows[] | select(.class=="network-copyleft") | .label]),
           sc: ([$rows[] | select(.class=="strong-copyleft")  | .label]),
@@ -280,11 +311,9 @@ tfmt() { local f; f="$(kstr "$1")"; shift; printf -- "$f" "$@"; }
 CONF_UP=$(echo "$CONF_RESULT" | tr '[:lower:]' '[:upper:]')
 
 if [ "$REPORT_LANG" = "ko" ]; then
-    if [ "$HAS_CONF" = "true" ]; then
-        P_TITLE=$(tfmt risk.md_title_supplier "$PROJECT"); P_H1=$(kstr risk.h1_supplier)
-    else
-        P_TITLE=$(tfmt risk.md_title_self "$PROJECT"); P_H1=$(kstr risk.h1_self)
-    fi
+    P_TITLE=$(tfmt risk.md_title "$PROJECT"); P_H1=$(kstr risk.h1)
+    P_SUBTITLE=""
+    if [ "$HAS_CONF" = "true" ]; then P_SUBTITLE=$(kstr risk.subtitle_supplier); fi
     P_MD_GEN=$(tfmt risk.md_generated "$GEN_AT")
     P_MD_INTRO=$(kstr risk.md_intro)
     P_H2_CONF=$(kstr risk.h2_conf)
@@ -305,6 +334,7 @@ if [ "$REPORT_LANG" = "ko" ]; then
     P_VULN_NONE_MD=$(kstr risk.vuln_none_md); P_VULN_NONE_HTML=$(kstr risk.vuln_none_html)
     P_PRESENCE_MD=$(tfmt risk.presence_only_md "$PRESENCE_ONLY" "$PRESENCE_ONLY")
     P_PRESENCE_HTML=$(tfmt risk.presence_only_html "$PRESENCE_ONLY" "$PRESENCE_ONLY")
+    P_UNPINNED_MD=$(kstr risk.unpinned_md); P_UNPINNED_HTML=$(kstr risk.unpinned_html)
     P_UNCHECKED_MD=$(tfmt risk.unchecked_md "$UNCHECKED_N")
     P_UNREACHED_MD=$(tfmt risk.unreached_md "$UNREACHED_N")
     P_UNREACHED_HTML=$(tfmt risk.unreached_html "$UNREACHED_N")
@@ -352,20 +382,18 @@ if [ "$REPORT_LANG" = "ko" ]; then
     P_KIND=$(kstr risk.kind)
     P_META_PROJECT=$(kstr risk.meta_project); P_META_GENERATED=$(kstr risk.meta_generated); P_META_FORMAT=$(kstr risk.meta_format)
 else
-    if [ "$HAS_CONF" = "true" ]; then
-        P_TITLE="Supplier SBOM risk report — ${PROJECT}"; P_H1="Supplier SBOM risk report"
-    else
-        P_TITLE="Open-source risk analysis report — ${PROJECT}"; P_H1="Open-source risk analysis report"
-    fi
+    P_TITLE="Open-source risk report — ${PROJECT}"; P_H1="Open-source risk report"
+    P_SUBTITLE=""
+    if [ "$HAS_CONF" = "true" ]; then P_SUBTITLE="Supplier SBOM under review"; fi
     P_MD_GEN="- Generated: ${GEN_AT}"
     P_MD_INTRO="- This report re-aggregates the vulnerability and license artifacts already produced, without running a new scan."
-    P_H2_CONF="Requirements met (format validation)"
+    P_H2_CONF="Requirements met (conformance check)"
     P_MD_CONF_FMT="- Input format: ${CONF_FORMAT}"
-    P_MD_CONF_RESULT="- Validation result: **${CONF_UP}**"
-    P_MD_CONF_FAIL="> ⚠️ **Unmet format-validation items** — the required items below are missing. We recommend fixing them and re-validating."
-    P_CONF_RESULT_LBL="Validation result:"
-    P_CONF_FAIL_B="Unmet format-validation items"
-    P_CONF_FAIL_TXT=" — the required items below are missing. We recommend fixing them and re-validating."
+    P_MD_CONF_RESULT="- Check result: **${CONF_UP}**"
+    P_MD_CONF_FAIL="> ⚠️ **Unmet conformance check items** — the required items below are missing. We recommend fixing them and checking again."
+    P_CONF_RESULT_LBL="Check result:"
+    P_CONF_FAIL_B="Unmet conformance check items"
+    P_CONF_FAIL_TXT=" — the required items below are missing. We recommend fixing them and checking again."
     P_H2_VULN="Vulnerability analysis and remediation deadlines"
     P_DL_LEAD="Recommended remediation deadlines: "
     P_DL_TAIL=". We recommend preparing a remediation plan or risk justification."
@@ -379,6 +407,8 @@ else
     P_VULN_NONE_HTML="No known vulnerabilities, or no security artifact was produced."
     P_PRESENCE_MD="> ${PRESENCE_ONLY} component(s) were proved present but no version could be recovered. With no version there is nothing to ask a vulnerability database about, so the counts above do not cover them. The licence obligations still apply."
     P_PRESENCE_HTML="<b>${PRESENCE_ONLY} component(s)</b> were proved present but no version could be recovered. With no version there is nothing to ask a vulnerability database about, so the counts above do not cover them. The licence obligations still apply."
+    P_UNPINNED_MD="> The source states version ranges and ships no lock file, so the versions in this SBOM are what a fresh install resolves at scan time, not necessarily the versions that were used. The counts above were measured against these versions. To judge a specific environment, scan a manifest that pins exact versions."
+    P_UNPINNED_HTML="The source states version ranges and ships no lock file, so the versions in this SBOM are what a fresh install resolves at scan time, not necessarily the versions that were used. The counts above were measured against these versions. To judge a specific environment, scan a manifest that pins exact versions."
     P_UNREACHED_MD="> ${UNREACHED_N} finding(s) are not reachable: govulncheck found that the affected Go code is not called or not in the executable (--reachability). They are not in the counts above; the security report lists them."
     P_UNREACHED_HTML="<b>${UNREACHED_N} finding(s) are not reachable</b>: govulncheck found that the affected Go code is not called or not in the executable (--reachability). They are not in the counts above; the security report lists them."
     P_UNCHECKED_MD="> ${UNCHECKED_N} component(s) could not be checked: they have no version, or no package purl and no CPE that was matched, so no vulnerability database was asked about them. The counts above do not cover them."
@@ -427,10 +457,10 @@ else
     P_NEXT1_PRE="Prepare a "
     P_NEXT1_BOLD="remediation plan or risk justification"
     P_NEXT1_POST=" within the recommended deadlines above."
-    P_NEXT2_CONF="If format validation failed, fill the missing items and regenerate the SBOM."
+    P_NEXT2_CONF="If the conformance check failed, fill the missing items and regenerate the SBOM."
     P_NEXT2_SELF_MD="Keep and distribute the notice (\`${OUT_PREFIX}_NOTICE.{txt,html}\`) together with the SBOM (\`${OUT_PREFIX}_bom.json\`)."
     P_NEXT2_SELF_HTML="Keep and distribute the notice (NOTICE) together with the SBOM."
-    P_KIND="Risk Report"
+    P_KIND="Open-source risk report"
     P_META_PROJECT="Project:"; P_META_GENERATED="Generated:"; P_META_FORMAT="Input format:"
 fi
 
@@ -444,6 +474,15 @@ if [ "$FW_SCOPE" = "true" ]; then
     FW_SCOPE_TEXT="${FW_SCOPE_TEXT:+$FW_SCOPE_TEXT }${P_FW_TAIL}"
 fi
 
+# The supplier review is a subtitle, not a second report name: the report is the
+# open-source risk report either way (docker/web/frontend/src/locales/GLOSSARY.md).
+SUBTITLE_MD=""; SUBTITLE_HTML=""
+if [ -n "$P_SUBTITLE" ]; then
+    SUBTITLE_MD="_${P_SUBTITLE}_"
+    SUBTITLE_HTML="<p class=\"subtitle\">${P_SUBTITLE}</p>
+"
+fi
+
 # Shared composites (built from the localized pieces above; identical structure
 # in both languages, so the deadline note stays one place).
 P_VULN_NOTE_MD="> ${P_DL_LEAD}**${P_DL_BOLD_CRIT}, ${P_DL_BOLD_HIGH}**${P_DL_TAIL}"
@@ -455,6 +494,7 @@ P_VULN_NOTE_HTML="<div class=\"note\">${P_DL_LEAD}<b>${P_DL_BOLD_CRIT}</b>, <b>$
 {
     echo "# ${P_TITLE}"
     echo ""
+    if [ -n "$SUBTITLE_MD" ]; then echo "${SUBTITLE_MD}"; echo ""; fi
     echo "${P_MD_GEN}"
     echo "${P_MD_INTRO}"
     echo ""
@@ -496,6 +536,10 @@ P_VULN_NOTE_HTML="<div class=\"note\">${P_DL_LEAD}<b>${P_DL_BOLD_CRIT}</b>, <b>$
         echo ""
     elif [ "${PRESENCE_ONLY:-0}" -gt 0 ]; then
         echo "${P_PRESENCE_MD}"
+        echo ""
+    fi
+    if [ "${UNPINNED:-0}" -eq 1 ]; then
+        echo "${P_UNPINNED_MD}"
         echo ""
     fi
     if [ "$FW_SCOPE" = "true" ]; then
@@ -610,80 +654,17 @@ META_FORMAT=""; [ "$HAS_CONF" = "true" ] && META_FORMAT=" &middot; ${P_META_FORM
 <meta charset="utf-8">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline';">
 <title>${P_H1} — $(esc "$PROJECT")</title>
-<style>
- :root{
-  --bg:#fafafa;--surface:#ffffff;--text:#18181b;--muted:#6c6c75;--border:#e5e5ea;
-  --brand:#EA002C;--brand-2:#F47725;--th-bg:#f4f4f5;--row-hover:#fafafa;
-  --radius:.375rem;--radius-card:.5rem;
-  --shadow:0 1px 2px rgb(0 0 0/.04),0 2px 8px -2px rgb(0 0 0/.08);
-  --font:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;
-  --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
- }
- @media (prefers-color-scheme:dark){:root{
-  --bg:#0a0a0c;--surface:#18181b;--text:#fafafa;--muted:#a1a1aa;--border:#27272a;
-  --th-bg:#1f1f23;--row-hover:#202024;
-  --shadow:0 1px 2px rgb(0 0 0/.3),0 2px 8px -2px rgb(0 0 0/.5);
- }}
- *{box-sizing:border-box;}
- body{font-family:var(--font);background:var(--bg);color:var(--text);
-  max-width:1040px;margin:0 auto;padding:2.5rem 1.5rem 4rem;line-height:1.55;
-  -webkit-font-smoothing:antialiased;}
- a{color:var(--brand);}
- .report-header{display:flex;align-items:flex-end;justify-content:space-between;
-  gap:1rem;flex-wrap:wrap;padding-bottom:.85rem;border-bottom:1px solid var(--border);
-  margin-bottom:1.5rem;}
- .wordmark{display:flex;align-items:center;gap:.5rem;font-size:1.15rem;font-weight:800;
-  letter-spacing:-.02em;color:var(--brand);}
- .wordmark .tag{font-size:.62rem;font-weight:700;letter-spacing:.1em;color:var(--muted);
-  border:1px solid var(--border);border-radius:999px;padding:.15rem .5rem;background:var(--surface);}
- .report-kind{font-size:.78rem;font-weight:600;color:var(--muted);
-  text-transform:uppercase;letter-spacing:.07em;}
- h1{font-size:1.55rem;font-weight:700;letter-spacing:-.01em;margin:.2rem 0 .35rem;}
- h2{font-size:1.15rem;font-weight:600;letter-spacing:-.01em;margin:2.1rem 0 .8rem;}
- h3{font-size:.95rem;font-weight:600;margin:1.3rem 0 .4rem;}
- .meta{color:var(--muted);font-size:.875rem;margin:.15rem 0 0;}
- .cards{display:flex;gap:.5rem;flex-wrap:wrap;margin:1.1rem 0 1.3rem;}
- .pill{display:inline-flex;align-items:center;gap:.4rem;padding:.3rem .7rem;
-  border-radius:999px;font-size:.8rem;font-weight:600;line-height:1.1;}
- .pill .count{font-variant-numeric:tabular-nums;}
- .pill-crit{background:rgba(220,38,38,.12);color:#dc2626;}
- .pill-high{background:rgba(234,88,12,.12);color:#ea580c;}
- .pill-med{background:rgba(202,138,4,.14);color:#ca8a04;}
- .pill-low{background:rgba(37,99,235,.12);color:#2563eb;}
- .pill-info{background:rgba(113,113,122,.14);color:#71717a;}
- .pill-kev{background:rgba(234,0,44,.12);color:#EA002C;}
- .pill-pass{background:rgba(22,163,74,.12);color:#16a34a;}
- .pill-fail{background:rgba(220,38,38,.12);color:#dc2626;}
- .pill-warn{background:rgba(202,138,4,.14);color:#ca8a04;}
- .note{background:rgba(244,119,37,.09);border-left:3px solid var(--brand-2);
-  border-radius:var(--radius);padding:.75rem 1rem;margin:1rem 0 1.3rem;font-size:.875rem;}
- .note b{color:var(--text);}
- .table-wrap{border:1px solid var(--border);border-radius:var(--radius-card);
-  overflow-x:auto;box-shadow:var(--shadow);background:var(--surface);margin:1rem 0 1.5rem;}
- table{border-collapse:collapse;width:100%;font-size:.85rem;}
- th{background:var(--th-bg);text-align:left;font-size:.7rem;font-weight:600;
-  text-transform:uppercase;letter-spacing:.05em;color:var(--muted);
-  padding:.6rem .8rem;border-bottom:1px solid var(--border);white-space:nowrap;}
- td{padding:.6rem .8rem;border-bottom:1px solid var(--border);vertical-align:top;}
- tr:last-child td{border-bottom:none;}
- tr:hover td{background:var(--row-hover);}
- td.num{text-align:right;font-variant-numeric:tabular-nums;}
- .sev-CRITICAL{color:#dc2626;font-weight:700;}
- .sev-HIGH{color:#ea580c;font-weight:700;}
- .sev-MEDIUM{color:#ca8a04;font-weight:600;}
- .sev-LOW{color:#2563eb;font-weight:600;}
- .sev-UNKNOWN{color:#71717a;}
- .mono li{font-family:var(--mono);font-size:.82rem;}
- ol,ul{margin:.5rem 0 0;padding-left:1.3rem;}
- li{margin:.3rem 0;}
-</style></head><body>
+HTMLHEAD
+    report_style
+    cat <<HTMLHEAD2
+</head><body>
 <header class="report-header">
  <div class="wordmark">BomLens<span class="tag">SBOM</span></div>
  <div class="report-kind">${P_KIND}</div>
 </header>
 <h1>${P_H1}</h1>
-<p class="meta">${P_META_PROJECT} $(esc "$PROJECT") &middot; ${P_META_GENERATED} ${GEN_AT}${META_FORMAT}</p>
-HTMLHEAD
+${SUBTITLE_HTML}<p class="meta">${P_META_PROJECT} $(esc "$PROJECT") &middot; ${P_META_GENERATED} $(report_time_html "$GEN_AT")${META_FORMAT}</p>
+HTMLHEAD2
 
     if [ "$HAS_CONF" = "true" ]; then
         echo "<h2>${S_CONF}. ${P_H2_CONF}</h2>"
@@ -722,6 +703,9 @@ HTMLSEC
     elif [ "${PRESENCE_ONLY:-0}" -gt 0 ]; then
         echo "<div class=\"note\">${P_PRESENCE_HTML}</div>"
     fi
+    if [ "${UNPINNED:-0}" -eq 1 ]; then
+        echo "<div class=\"note\">${P_UNPINNED_HTML}</div>"
+    fi
     if [ "$FW_SCOPE" = "true" ]; then
         echo "<div class=\"note\"><b>${P_FW_LABEL}</b> ${FW_SCOPE_TEXT}"
         if [ -n "$FW_FAILED_FORMATS" ]; then echo "<br>${P_FW_FORMATS}"; fi
@@ -730,14 +714,14 @@ HTMLSEC
     fi
 
     if [ "$TOTAL" -gt 0 ]; then
-        echo "<div class=\"table-wrap\"><table><tr><th>Severity</th><th>CVE</th><th>Package</th><th>Installed</th><th>Fixed</th><th>${P_TH_DEADLINE}</th></tr>"
+        echo "<div class=\"table-wrap\"><table><thead><tr><th>Severity</th><th>CVE</th><th>Package</th><th>Installed</th><th>Fixed</th><th>${P_TH_DEADLINE}</th></tr></thead><tbody>"
         # shellcheck disable=SC2016
         echo "$FINDINGS" | jq -r --arg cd "$P_DL_CRIT" --arg hd "$P_DL_HIGH" --arg pol "$P_DL_POLICY" '.[] |
             "<tr><td class=\"sev-\(.severity)\">" + (.severity|@html) + "</td>" +
-            "<td>" + (.id|@html) + "</td><td>" + (.pkg|@html) + "</td>" +
+            "<td class=\"id\">" + (.id|@html) + "</td><td>" + (.pkg|@html) + "</td>" +
             "<td>" + (.version|@html) + "</td><td>" + (.fixed|@html) + "</td>" +
             "<td>" + ((if .severity=="CRITICAL" then $cd elif .severity=="HIGH" then $hd else $pol end)|@html) + "</td></tr>"'
-        echo "</table></div>"
+        echo "</tbody></table></div>"
     elif [ "${UNCHECKED_N:-0}" -gt 0 ]; then
         echo "<p>${P_VULN_NONE_CHECKED_HTML}</p>"
     else
@@ -755,11 +739,11 @@ HTMLSEC
         echo "<p>${P_LICCLASS_INTRO_A}<code>bomlens:licenseClass</code>${P_LICCLASS_INTRO_B}</p>"
         cat <<HTMLLIC
 <div class="cards">
- <span class="pill pill-crit">Network copyleft <span class="count">${NC}</span></span>
- <span class="pill pill-high">Strong copyleft <span class="count">${SC}</span></span>
- <span class="pill pill-med">Weak copyleft <span class="count">${WK}</span></span>
- <span class="pill pill-pass">Permissive <span class="count">${PM}</span></span>
- <span class="pill pill-info">Uncategorized <span class="count">${UN}</span></span>
+ <span class="pill pill-cat-network">Network copyleft <span class="count">${NC}</span></span>
+ <span class="pill pill-cat-strong">Strong copyleft <span class="count">${SC}</span></span>
+ <span class="pill pill-cat-weak">Weak copyleft <span class="count">${WK}</span></span>
+ <span class="pill pill-cat-permissive">Permissive <span class="count">${PM}</span></span>
+ <span class="pill pill-cat-review">Uncategorized <span class="count">${UN}</span></span>
 </div>
 HTMLLIC
         if [ "$COPYLEFT_TOTAL" -gt 0 ]; then

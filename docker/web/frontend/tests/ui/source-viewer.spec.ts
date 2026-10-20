@@ -157,7 +157,7 @@ test("a binary file says why it has no preview instead of showing nothing", asyn
   await page.getByRole("button", { name: /app\.bin/ }).click();
   await expect(
     page.getByText(
-      "No preview — this file is binary, so only its path was recorded.",
+      "No preview. This file is binary, so only its path was recorded.",
     ),
   ).toBeVisible();
 });

@@ -161,7 +161,7 @@ export const NAV_GROUPS: NavGroup[] = [
       // here would duplicate what Models & datasets already carries
       // (AiSummaryCard + this section's own CheckGroup rendering, reused
       // there) — so hasInputSbom still gates it for that one case.
-      // nav.conformance ("SBOM Validation" in English) is close to the rail's
+      // nav.conformance ("Conformance check" in English) is close to the rail's
       // per-row width budget — see the RAIL_ROW comment in Sidebar.tsx —
       // check the rendered rail before lengthening it further.
       {

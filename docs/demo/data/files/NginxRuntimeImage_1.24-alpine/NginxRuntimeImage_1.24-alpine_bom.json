@@ -40358,7 +40358,7 @@
         },
         {
           "name": "bomlens:licenseClass",
-          "value": "uncategorized"
+          "value": "permissive"
         },
         {
           "name": "bomlens:cpeSource",
@@ -45896,7 +45896,7 @@
         "value": "unknown-to-author"
       }
     ],
-    "timestamp": "2026-10-14T18:06:27Z",
+    "timestamp": "2026-10-17T13:49:45Z",
     "tools": {
       "components": [
         {
@@ -45909,12 +45909,12 @@
           "name": "BomLens",
           "publisher": "SK Telecom",
           "type": "application",
-          "version": "1.13.4"
+          "version": "1.13.7"
         }
       ]
     }
   },
-  "serialNumber": "urn:uuid:06d16f8d-a43d-47f7-b2fb-7b21a52bb918",
+  "serialNumber": "urn:uuid:3c5a1a22-22d6-4eb6-aaac-d9287a8b3216",
   "specVersion": "1.6",
   "version": 1,
   "compositions": [

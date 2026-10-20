@@ -1,0 +1,222 @@
+{
+  "_comment": "Conditions each license attaches to redistribution, as tags. A documentation aid, never a legal determination. A license absent here is shown as 'needs checking', never guessed.",
+  "_source": "https://github.com/github/choosealicense.com (_licenses/*.txt, conditions field), MIT License, retrieved 2026-10-19",
+  "aliases": {
+    "GPL-2.0-ONLY": "GPL-2.0",
+    "GPL-2.0-OR-LATER": "GPL-2.0",
+    "GPL-2.0+": "GPL-2.0",
+    "GPL-3.0-ONLY": "GPL-3.0",
+    "GPL-3.0-OR-LATER": "GPL-3.0",
+    "GPL-3.0+": "GPL-3.0",
+    "LGPL-2.1-ONLY": "LGPL-2.1",
+    "LGPL-2.1-OR-LATER": "LGPL-2.1",
+    "LGPL-2.1+": "LGPL-2.1",
+    "LGPL-3.0-ONLY": "LGPL-3.0",
+    "LGPL-3.0-OR-LATER": "LGPL-3.0",
+    "LGPL-3.0+": "LGPL-3.0",
+    "AGPL-3.0-ONLY": "AGPL-3.0",
+    "AGPL-3.0-OR-LATER": "AGPL-3.0",
+    "AGPL-3.0+": "AGPL-3.0",
+    "GFDL-1.3-ONLY": "GFDL-1.3",
+    "GFDL-1.3-OR-LATER": "GFDL-1.3",
+    "GFDL-1.3+": "GFDL-1.3"
+  },
+  "licenses": {
+    "0BSD": [],
+    "AFL-3.0": [
+      "include-copyright",
+      "document-changes"
+    ],
+    "AGPL-3.0": [
+      "include-copyright",
+      "document-changes",
+      "disclose-source",
+      "network-use-disclose",
+      "same-license"
+    ],
+    "Apache-2.0": [
+      "include-copyright",
+      "document-changes"
+    ],
+    "Artistic-2.0": [
+      "include-copyright",
+      "document-changes"
+    ],
+    "BlueOak-1.0.0": [
+      "include-copyright"
+    ],
+    "BSD-2-Clause-Patent": [
+      "include-copyright"
+    ],
+    "BSD-2-Clause": [
+      "include-copyright"
+    ],
+    "BSD-3-Clause-Clear": [
+      "include-copyright"
+    ],
+    "BSD-3-Clause": [
+      "include-copyright"
+    ],
+    "BSD-4-Clause": [
+      "include-copyright"
+    ],
+    "BSL-1.0": [
+      "include-copyright--source"
+    ],
+    "CC-BY-4.0": [
+      "include-copyright",
+      "document-changes"
+    ],
+    "CC-BY-SA-4.0": [
+      "include-copyright",
+      "document-changes",
+      "same-license"
+    ],
+    "CC0-1.0": [],
+    "CECILL-2.1": [
+      "include-copyright",
+      "network-use-disclose",
+      "disclose-source",
+      "same-license"
+    ],
+    "CERN-OHL-P-2.0": [
+      "include-copyright",
+      "document-changes"
+    ],
+    "CERN-OHL-S-2.0": [
+      "include-copyright",
+      "document-changes",
+      "disclose-source",
+      "same-license"
+    ],
+    "CERN-OHL-W-2.0": [
+      "include-copyright",
+      "document-changes",
+      "disclose-source",
+      "same-license--library"
+    ],
+    "ECL-2.0": [
+      "include-copyright",
+      "document-changes"
+    ],
+    "EPL-1.0": [
+      "disclose-source",
+      "include-copyright",
+      "same-license"
+    ],
+    "EPL-2.0": [
+      "disclose-source",
+      "include-copyright",
+      "same-license"
+    ],
+    "EUPL-1.1": [
+      "include-copyright",
+      "disclose-source",
+      "document-changes",
+      "network-use-disclose",
+      "same-license"
+    ],
+    "EUPL-1.2": [
+      "include-copyright",
+      "disclose-source",
+      "document-changes",
+      "network-use-disclose",
+      "same-license"
+    ],
+    "GFDL-1.3": [
+      "include-copyright",
+      "disclose-source",
+      "same-license",
+      "document-changes"
+    ],
+    "GPL-2.0": [
+      "include-copyright",
+      "document-changes",
+      "disclose-source",
+      "same-license"
+    ],
+    "GPL-3.0": [
+      "include-copyright",
+      "document-changes",
+      "disclose-source",
+      "same-license"
+    ],
+    "ISC": [
+      "include-copyright"
+    ],
+    "LGPL-2.1": [
+      "include-copyright",
+      "disclose-source",
+      "document-changes",
+      "same-license--library"
+    ],
+    "LGPL-3.0": [
+      "include-copyright",
+      "disclose-source",
+      "document-changes",
+      "same-license--library"
+    ],
+    "LPPL-1.3c": [
+      "include-copyright",
+      "document-changes",
+      "disclose-source"
+    ],
+    "MIT-0": [],
+    "MIT": [
+      "include-copyright"
+    ],
+    "MPL-2.0": [
+      "disclose-source",
+      "include-copyright",
+      "same-license--file"
+    ],
+    "MS-PL": [
+      "include-copyright"
+    ],
+    "MS-RL": [
+      "disclose-source",
+      "include-copyright",
+      "same-license--file"
+    ],
+    "MulanPSL-2.0": [
+      "include-copyright"
+    ],
+    "NCSA": [
+      "include-copyright"
+    ],
+    "ODbL-1.0": [
+      "disclose-source",
+      "include-copyright",
+      "same-license"
+    ],
+    "OFL-1.1": [
+      "include-copyright",
+      "same-license"
+    ],
+    "OSL-3.0": [
+      "include-copyright",
+      "disclose-source",
+      "document-changes",
+      "network-use-disclose",
+      "same-license"
+    ],
+    "PostgreSQL": [
+      "include-copyright"
+    ],
+    "Unlicense": [],
+    "UPL-1.0": [
+      "include-copyright"
+    ],
+    "Vim": [
+      "include-copyright",
+      "document-changes",
+      "disclose-source",
+      "same-license"
+    ],
+    "WTFPL": [],
+    "Zlib": [
+      "include-copyright--source",
+      "document-changes"
+    ]
+  }
+}

@@ -554,7 +554,10 @@ def _classify_git_failure(text):
 # _ScanErrorTracker (that drop is unconditional regardless of indentation;
 # these patterns are a second, explicit layer in case such a line were ever
 # folded into a block some other way).
-_URL_USERINFO_RE = re.compile(r"://[^/\s@]+:[^/\s@]+@")
+# The user part excludes ':' so the split point is the first colon. With ':' allowed
+# in both parts the pattern backtracked over every colon of a long input with no '@'
+# (16,000 colons took two seconds); the strings it matches are the same.
+_URL_USERINFO_RE = re.compile(r"://[^/\s@:]+:[^/\s@]+@")
 # A URL whose userinfo is a bare token (`https://<token>@host`). `git@` is the
 # ssh account name, not a credential, so it stays.
 _URL_TOKEN_USERINFO_RE = re.compile(r"://(?!git@)[^/\s@:]+@")
@@ -1001,6 +1004,81 @@ def copy_scan_target_tree(src, dest):
     return dest
 
 
+def parse_scan_exclude(raw):
+    """Turn the form's exclude field (one path per line) into a clean list.
+
+    Returns (paths, error). A path is relative to the scanned folder; an absolute
+    path, a '..' segment, a glob character or a control character is refused, so
+    a path can never point outside the tree. Same rules as the CLI's --exclude."""
+    paths = []
+    for line in (raw or "").splitlines():
+        p = line.strip()
+        while p.startswith("./") or (p.endswith("/") and len(p) > 1):
+            p = p[2:] if p.startswith("./") else p[:-1]
+        if not p:
+            continue
+        if (p == "." or p.startswith("/") or "\\" in p or any(c in p for c in "*?[")
+                or any(ord(c) < 32 for c in p) or ".." in p.split("/")):
+            return None, p
+        if p not in paths:
+            paths.append(p)
+    if len(paths) > 100:
+        return None, "more than 100 paths"
+    return paths, None
+
+
+def find_scan_entry(root, rel):
+    """The path of `rel` inside `root`, or None when it is not there.
+
+    Each component is matched against a directory listing, so the returned path
+    comes from the filesystem and not from the request, and no link is followed
+    on the way (a link in the middle of the path counts as not found)."""
+    here = os.path.realpath(root)
+    parts = rel.split("/")
+    for n, part in enumerate(parts):
+        try:
+            with os.scandir(here) as it:
+                found = next((e for e in it if e.name == part), None)
+        except OSError:
+            return None
+        if found is None or (n < len(parts) - 1 and (found.is_symlink() or not found.is_dir())):
+            return None
+        here = found.path
+    return here
+
+
+def prune_scan_tree(root, paths):
+    """Delete the excluded paths from a tree the scan owns (a clone, an extracted
+    archive or a working copy). Returns the paths that were not found. A link is
+    removed as a link, never followed."""
+    missing = []
+    for rel in paths:
+        target = find_scan_entry(root, rel)
+        if target is None:
+            missing.append(rel)
+        elif os.path.islink(target) or os.path.isfile(target):
+            os.remove(target)
+        else:
+            shutil.rmtree(target, ignore_errors=True)
+    return missing
+
+
+def copy_tree_without(src, dest, paths):
+    """Copy a tree the scan must not change (the launch folder) to dest without
+    the excluded paths and without the output folder. Returns the paths that
+    were not found."""
+    real_src = os.path.realpath(src)
+    found = {rel: find_scan_entry(real_src, rel) for rel in paths}
+    skip = {p for p in found.values() if p}
+    skip.add(os.path.realpath(OUTPUT_DIR))
+
+    def _ignore(d, names):
+        return [n for n in names if os.path.join(d, n) in skip]
+    shutil.copytree(real_src, dest, ignore=_ignore, symlinks=True,
+                    ignore_dangling_symlinks=True, dirs_exist_ok=True)
+    return [rel for rel, p in found.items() if not p]
+
+
 def firmware_capable():
     """The firmware tools (unblob) are only built into the firmware image."""
     return shutil.which("unblob") is not None
@@ -1183,6 +1261,8 @@ MAX_UNCHECKED_ROWS = 500  # components listed whose vulnerabilities were not che
 MAX_ADVISORY_ROWS = 500  # advisories with no CVE listed apart from the findings
 MAX_VULN_ALIASES = 12  # advisory numbers shown next to one CVE
 MAX_CONFORMANCE_MISSING = 50  # missing items per conformance check
+# Reasons a supplier may give instead of a component version (validate-sbom.sh).
+EXPLAINED_REASONS = ("own-code", "not-open-source", "version-unknown")
 MAX_CHECK_REGULATIONS = 12  # regulation refs mapped to one conformance check
 MAX_GUIDANCE_SNIPPET = 2000  # chars of the CycloneDX fill-in fragment per check
 MAX_CROSSWALK_FRAMEWORKS = 20  # frameworks in the regulatory crosswalk view
@@ -2279,6 +2359,27 @@ def sbom_summary(run_id):
         ),
         None,
     )
+    # detection: "static" when the scan read a lock file instead of building
+    # (bomlens:detection, with the lock file's name in bomlens:detection-source).
+    # The property can come from a supplier's SBOM, so only the one value this
+    # scan writes is accepted and the source is cut to a file-name shape.
+    detection = next(
+        (p.get("value") for p in meta_props if p.get("name") == "bomlens:detection"),
+        None,
+    )
+    detection = "static" if detection == "static" else None
+    detection_source = None
+    if detection:
+        raw = next(
+            (
+                p.get("value")
+                for p in meta_props
+                if p.get("name") == "bomlens:detection-source"
+            ),
+            None,
+        )
+        if isinstance(raw, str) and re.fullmatch(r"[A-Za-z0-9._-]{1,64}", raw):
+            detection_source = raw
     # pipeline-step-failed: set by docker/lib/pipeline-step.sh's
     # mark_pipeline_warning for every best-effort post-process step that
     # failed (normalize, CPE/EOL/malicious enrichment, conformance, notice
@@ -2375,6 +2476,8 @@ def sbom_summary(run_id):
         "truncated": len(comps) > MAX_COMPONENT_ROWS,
         "suggestIdentifyVendored": suggest,
         "sbomToolDegraded": degraded,
+        "detection": detection,
+        "detectionSource": detection_source,
         "pipelineStepsFailed": pipeline_steps_failed,
         "pipelineStepsFailedMore": pipeline_steps_failed_more,
         "firmwareScope": _firmware_scope(_as_dict(data.get("metadata"))),
@@ -2585,6 +2688,18 @@ def conformance_summary(run_id):
         ][:MAX_CHECK_REGULATIONS]
         if regs:
             row["regulations"] = regs
+        # Components the supplier gave a reason for instead of a version (the
+        # versions-needed row of the skt-submission profile). The row can pass
+        # while this list is non-empty, and the reviewer still needs to see it.
+        # Only the three reasons validate-sbom.sh writes are accepted; omitted
+        # when empty, like regulations.
+        explained = [
+            {"name": str(e.get("name") or ""), "reason": e.get("reason")}
+            for e in _as_list(c.get("explained"))
+            if isinstance(e, dict) and e.get("reason") in EXPLAINED_REASONS
+        ][:MAX_CONFORMANCE_MISSING]
+        if explained:
+            row["explained"] = explained
         # Fill-in guidance for this element (validate-sbom.sh joins
         # docker/lib/g7-guidance.json by element id): the CycloneDX fragment that
         # would satisfy it, plus a reference link. Runs produced before the
@@ -2646,6 +2761,12 @@ def conformance_summary(run_id):
     xwalk = _crosswalk_view(data.get("regulatoryCrosswalk"))
     if xwalk is not None:
         out["regulatoryCrosswalk"] = xwalk
+    # The scan mode the submission profile judged this SBOM as, when it relaxed
+    # some general rows for a firmware, root filesystem or binary scan. The
+    # reviewer needs the basis next to the verdict; only the three modes pass.
+    judged = data.get("submissionJudgedAs")
+    if judged in ("FIRMWARE", "ROOTFS", "BINARY"):
+        out["submissionJudgedAs"] = judged
     return out
 
 
@@ -6154,6 +6275,23 @@ class Handler(BaseHTTPRequestHandler):
             return
         spec_version = _CDX_SPEC_VERSIONS[_CDX_SPEC_VERSIONS.index(spec_version)]
 
+        # Branch, tag or commit to scan for a git URL (--branch on the CLI).
+        # Passed to git as an argument after `--branch`, never through a shell, but
+        # a value that starts with '-' or carries '..' is refused all the same.
+        git_ref = g("git_ref").strip() if source == "git-url" else ""
+        if git_ref and (not re.match(r"^[A-Za-z0-9][A-Za-z0-9._/@+-]{0,199}$", git_ref)
+                        or ".." in git_ref):
+            self._send(400, json.dumps({"error": "invalid git_ref"}))
+            return
+
+        # Paths to leave out of a source scan (--exclude on the CLI), one per line.
+        scan_exclude, bad_exclude = parse_scan_exclude(g("exclude"))
+        if scan_exclude is None:
+            self._send(400, json.dumps({"error": "invalid exclude path: %s" % bad_exclude[:80]}))
+            return
+        if source not in ("current-dir", "git-url", "zip-upload", "scan-target-src"):
+            scan_exclude = []
+
         # Optional AI usage scenario (--usage on the CLI) scoping the model risk
         # assessment. Closed allowlist: an out-of-list value is refused before
         # the stream starts, and the literal REBOUND from _USAGE_CONTEXTS (never
@@ -6272,8 +6410,13 @@ class Handler(BaseHTTPRequestHandler):
                 "byteStable": g("byte_stable") == "true",
                 "deepCve": g("deep_cve") == "true",
                 "reachability": g("reachability") == "true",
+                # How a source scan finds its dependencies: "build" never reads a
+                # lock file statically, anything else is "auto" (the default).
+                "detection": "build" if g("detection") == "build" else "auto",
                 "sbomAuthor": sbom_author,
                 "specVersion": spec_version,
+                "gitRef": git_ref,
+                "exclude": scan_exclude,
             }
             write_scanmeta(run_out, scan_config)
 
@@ -6395,6 +6538,10 @@ class Handler(BaseHTTPRequestHandler):
             # the server's environment, pass through via env.copy() above.
             "IDENTIFY_VENDORED": "true" if g("identify_vendored") == "true" else "false",
             "BYTE_STABLE": "true" if g("byte_stable") == "true" else "false",
+            # Source scans read a lock file that covers the tree instead of building
+            # (entrypoint.sh, DETECTION). "build" is the form's way to turn that off;
+            # only these two literals are ever passed on.
+            "DETECTION": "build" if g("detection") == "build" else "auto",
             # Opt-in deep CVE matching (maven NVD-CPE via grype). Consumed by
             # scan-security.sh in the deep-cve image; a plain boolean from a fixed
             # literal, no user text. SECURITY_NVD_VERIFY stays off (network/NVD key).
@@ -6679,12 +6826,30 @@ class Handler(BaseHTTPRequestHandler):
                 with _scan_lock:
                     _active_upload_tokens.add(os.path.basename(cleanup_dir))
                 clone_dest = os.path.join(cleanup_dir, "repo")
-                sse("log", json.dumps("▶ Cloning %s ..." % target))
+                sse("log", json.dumps("▶ Cloning %s%s ..." % (target, " (ref: %s)" % git_ref if git_ref else "")))
+                git_env = {**os.environ, "GIT_TERMINAL_PROMPT": "0"}
+                clone_cmd = ["git", "clone", "--depth", "1", "--single-branch"]
+                if git_ref:
+                    clone_cmd += ["--branch", git_ref]
                 cp = subprocess.run(
-                    ["git", "clone", "--depth", "1", "--single-branch", "--", clone_url, clone_dest],
-                    env={**os.environ, "GIT_TERMINAL_PROMPT": "0"},
-                    stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
+                    clone_cmd + ["--", clone_url, clone_dest],
+                    env=git_env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
                 )
+                if cp.returncode != 0 and git_ref:
+                    # `clone --branch` resolves only a branch or a tag, so a commit
+                    # id fails here. Retry as a full clone and a local checkout,
+                    # the same fallback the CLI's --branch has.
+                    sse("log", json.dumps("▶ Shallow clone of %s failed; retrying as a full clone ..." % git_ref))
+                    shutil.rmtree(clone_dest, ignore_errors=True)
+                    cp = subprocess.run(
+                        ["git", "clone", "--", clone_url, clone_dest],
+                        env=git_env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
+                    )
+                    if cp.returncode == 0:
+                        cp = subprocess.run(
+                            ["git", "-C", clone_dest, "checkout", "--quiet", git_ref + "^{commit}", "--"],
+                            env=git_env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
+                        )
                 if cp.returncode != 0:
                     out = re.sub(r"x-access-token:[^@]*@", "x-access-token:***@", (cp.stdout or "").strip()[-500:])
                     fail("git clone failed: %s" % out, _classify_git_failure(out)); return
@@ -6903,6 +7068,25 @@ class Handler(BaseHTTPRequestHandler):
 
             else:
                 fail("unknown input type: %s" % source[:40]); return
+
+            # Leave the excluded paths out. A clone, an extracted archive and a
+            # picked-folder copy belong to this scan, so the paths are deleted from
+            # them. The launch folder is the user's own: it is copied without them.
+            if scan_exclude and env.get("MODE") == "SOURCE" and env.get("SOURCE_ROOT"):
+                if source == "current-dir":
+                    cleanup_dir = os.path.join(OUTPUT_DIR, ".srccopy-" + secrets.token_hex(8))
+                    sse("log", json.dumps("▶ Copying the folder without %d excluded path(s) ..." % len(scan_exclude)))
+                    try:
+                        gone = copy_tree_without(env["SOURCE_ROOT"], cleanup_dir, scan_exclude)
+                    except (OSError, shutil.Error) as exc:
+                        fail("could not prepare the folder for --exclude: %s" % exc)
+                        return
+                    env["SOURCE_ROOT"] = cleanup_dir
+                else:
+                    gone = prune_scan_tree(env["SOURCE_ROOT"], scan_exclude)
+                for e in gone:
+                    sse("log", json.dumps("▶ Exclude path not found, ignored: %s" % e))
+                sse("log", json.dumps("▶ Excluded %d path(s) from the scan" % (len(scan_exclude) - len(gone))))
 
             # For a source scan, hand the entrypoint the HOST path of the scanned
             # tree so it can run a cdxgen language image as a sibling container
@@ -7123,7 +7307,7 @@ class Handler(BaseHTTPRequestHandler):
             token_dir = upload_token_dir(token)
             if token_dir:
                 shutil.rmtree(token_dir, ignore_errors=True)
-            if cleanup_dir and source in ("git-url", "scan-target-src"):
+            if cleanup_dir and (source in ("git-url", "scan-target-src") or (source == "current-dir" and scan_exclude)):
                 shutil.rmtree(cleanup_dir, ignore_errors=True)
                 if source == "git-url":
                     with _scan_lock:

@@ -11,7 +11,8 @@ contextBridge.exposeInMainWorld("sbomDesktop", {
     if (typeof cb !== "function") return;
     ipcRenderer.on("status", (_event, line) => cb(line));
   },
-  // pull 진행 요약: onStatus와 달리 한 줄을 제자리에서 갱신하는 용도.
+  // pull progress: a structured payload ({complete, total, secs, update}) the start screen
+  // renders in place, unlike onStatus which appends log lines.
   onStatusProgress: (cb) => {
     if (typeof cb !== "function") return;
     ipcRenderer.on("status-progress", (_event, line) => cb(line));

@@ -4,24 +4,36 @@ hide:
   - toc
 ---
 
+<div class="home-hero" markdown>
+
 # 로컬에서 SBOM 생성과 오픈소스 위험 평가를 한 번에
 
+소스, 컨테이너, 바이너리, 펌웨어, 받은 SBOM을 넣으면
+한 번의 실행으로 SBOM과 오픈소스 고지문, 위험 보고서가 나옵니다.
+SaaS도 계정도 필요 없습니다.
+
+[데모 둘러보기](https://sktelecom.github.io/bomlens/demo/){ .md-button .md-button--primary }
+[시작하기](start/first-scan.ko.md){ .md-button }
+
+<p class="home-hero__aside" markdown>[Windows용 내려받기 (.exe)](https://github.com/sktelecom/bomlens/releases/latest/download/BomLens-Setup.exe). Docker 엔진이 미리 켜져 있어야 합니다.</p>
+
+</div>
+
+![완료된 스캔의 BomLens 웹 UI 개요 화면: 컴포넌트, 취약점, 의존성, 산출물 개수, 확인 필요 배너, 심각도와 라이선스 분류 분포](images/web-ui-demo-ko.png){ .home-shot }
+
+## 무엇을 하는 도구인가
+
 SaaS 없이 로컬에서 단일 프로젝트의 [SBOM](concepts/what-is-sbom.ko.md)(CycloneDX 1.6)을 생성하고 오픈소스 리스크를 평가하는 도구입니다. 소스 코드, 컨테이너 이미지, 바이너리, 펌웨어, 받은 SBOM, HuggingFace AI 모델에서 SBOM과 오픈소스 고지문, 보안 위험 보고서를 한 번에 만듭니다. AI 모델은 CycloneDX ML-BOM을 만들고 [AI를 위한 G7 최소 요소](guides/ai-model.ko.md)로 검사합니다. 이 요소들은 EU 인공지능법(AI Act) Annex IV와 상당 부분 겹칩니다.
-
-[시작하기](start/first-scan.ko.md){ .md-button .md-button--primary }
-[데모 둘러보기](https://sktelecom.github.io/bomlens/demo/){ .md-button }
-[Windows용 내려받기 (.exe)](https://github.com/sktelecom/bomlens/releases/latest/download/BomLens-Setup.exe){ .md-button }
-
-[![최신 릴리스](https://img.shields.io/github/v/release/sktelecom/bomlens)](https://github.com/sktelecom/bomlens/releases/latest)
-Windows 설치 파일은 Docker 엔진이 미리 켜져 있어야 동작합니다. 아래 [비개발자 빠른 시작](start/no-cli.ko.md)을 참고하세요.
 
 설치하기 전에 결과가 어떤 모습인지 보고 싶다면 [데모](https://sktelecom.github.io/bomlens/demo/)를 둘러보세요. 입력 종류별로 완료된 스캔을 하나씩 담은 실제 웹 UI입니다. 소스로 스캔한 Spring Boot 프로젝트, 컨테이너 이미지, 언패킹한 기기 펌웨어 이미지, CycloneDX ML-BOM으로 만든 AI 모델, 그리고 형식 요건을 검사한 공급사 SBOM입니다. 설치할 것이 없고 아무것도 업로드되지 않습니다. 평범한 로컬 실행으로 나온 결과를 그대로 담아 둔 화면입니다.
 
 CLI가 부담스럽다면 설치 파일을 받아 더블클릭하세요. 단계별 안내는 [비개발자 빠른 시작](start/no-cli.ko.md)에 있습니다. Docker 엔진이 필요하며, Windows에서는 무료 [Rancher Desktop](https://rancherdesktop.io/)이 잘 맞습니다.
 
-![완료된 스캔의 BomLens 웹 UI 개요 화면: 컴포넌트·취약점·의존성·산출물 개수, 확인 필요 배너, 심각도와 라이선스 분류 분포](images/web-ui-demo.png){ .home-shot }
+[![최신 릴리스](https://img.shields.io/github/v/release/sktelecom/bomlens)](https://github.com/sktelecom/bomlens/releases/latest)
 
-## 무엇부터 볼까
+## 어디서 시작할까
+
+### 직접 써 보려는 경우
 
 <div class="grid cards" markdown>
 
@@ -49,22 +61,34 @@ CLI가 부담스럽다면 설치 파일을 받아 더블클릭하세요. 단계�
 
     [:octicons-arrow-right-24: 공급사 SBOM 검증](guides/supplier-sbom.ko.md)
 
--   :material-robot-outline: __AI 모델 SBOM__
+</div>
 
-    HuggingFace 모델의 ML-BOM을 만들고 G7 최소 요소로 검사, EU 인공지능법과 대응.
+### CI에서 운영하거나 레퍼런스가 필요한 경우
 
-    [:octicons-arrow-right-24: AI 모델 SBOM](guides/ai-model.ko.md)
+<div class="grid cards" markdown>
 
 -   :material-cog: __CLI 레퍼런스__
 
-    전체 옵션, 분석 모드, CI/CD 연동.
+    전체 옵션과 분석 모드.
 
     [:octicons-arrow-right-24: CLI 레퍼런스](reference/cli.ko.md)
+
+-   :material-source-branch: __CI/CD 연동__
+
+    파이프라인에서 스캔을 실행하고 결과로 통과 여부를 가릅니다.
+
+    [:octicons-arrow-right-24: CI/CD 연동](guides/ci-cd.ko.md)
 
 -   :material-shield-check: __고지문과 보안 보고서__
 
     산출물 생성과 해석, 웹 UI 사용법.
 
     [:octicons-arrow-right-24: 고지문·보안 보고서](guides/reports.ko.md)
+
+-   :material-robot-outline: __AI 모델 SBOM__
+
+    HuggingFace 모델의 ML-BOM을 만들고 G7 최소 요소로 검사, EU 인공지능법과 대응.
+
+    [:octicons-arrow-right-24: AI 모델 SBOM](guides/ai-model.ko.md)
 
 </div>

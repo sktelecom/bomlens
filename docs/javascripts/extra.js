@@ -17,3 +17,19 @@ document.addEventListener("DOMContentLoaded", function () {
     if (e.key === "Enter" || e.key === " ") { e.preventDefault(); goHome(); }
   });
 });
+
+/* 접근성 보정: Material이 이름 없이 내보내는 대화상자와 중복 랜드마크에 이름을 붙인다.
+ * 검색 영역(role="dialog")과, 주 탐색과 같은 이름을 쓰는 탐색 경로, 코드 블록마다 반복되는
+ * nav를 구분하는 용도다. 문구는 문서 언어를 따른다. */
+document.addEventListener("DOMContentLoaded", function () {
+  var ko = document.documentElement.lang === "ko";
+  var search = document.querySelector(".md-search");
+  if (search && !search.getAttribute("aria-label")) {
+    search.setAttribute("aria-label", ko ? "검색" : "Search");
+  }
+  var path = document.querySelector(".md-path");
+  if (path) path.setAttribute("aria-label", ko ? "현재 위치" : "Breadcrumb");
+  document.querySelectorAll(".md-code__nav").forEach(function (nav) {
+    nav.setAttribute("role", "none");
+  });
+});

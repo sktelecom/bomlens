@@ -724,6 +724,21 @@ P="$(plan_run node-opts "$PSRC" BYTE_STABLE=true GOTOOLCHAIN=local HOST_UID=501 
 [ "$(jq -r '.stages[0].env | "\(.FETCH_LICENSE) \(.HOST_GOTOOLCHAIN)"' "$P/bomlens-plan.json")" = "false local" ] \
     && pass "BYTE_STABLE turns stage 1's license lookup off; GOTOOLCHAIN reaches it as HOST_GOTOOLCHAIN" \
     || fail "stage 1 env: $(jq -c '.stages[0].env' "$P/bomlens-plan.json")"
+[ "$(jq -r '.stages[0].env | "\(.GOPATH) \(.GOMODCACHE) \(.GOCACHE)"' "$P/bomlens-plan.json")" = "/tmp/sbomhome/go /tmp/sbomhome/go/pkg/mod /tmp/sbomhome/go-build" ] \
+    && pass "stage 1 env keeps the Go module and build caches under /tmp/sbomhome (a read-only root filesystem has no /go/pkg)" \
+    || fail "stage 1 Go cache env: $(jq -c '.stages[0].env' "$P/bomlens-plan.json")"
+if command -v go >/dev/null 2>&1; then
+    # No Docker needed: the plan's env alone decides where go puts its caches.
+    # HOME and the default GOPATH are made unusable, as in a read-only root.
+    go_plan_env=()
+    while IFS= read -r _l; do go_plan_env+=("$_l"); done < <(jq -r '.stages[0].env | to_entries[] | select(.key | test("^GO(PATH|MODCACHE|CACHE)$")) | "\(.key)=\(.value)"' "$P/bomlens-plan.json")
+    go_env_out="$(env -i PATH="$PATH" HOME=/nonexistent GOTOOLCHAIN=local "${go_plan_env[@]}" go env GOMODCACHE GOPATH GOCACHE 2>&1 | tr '\n' ' ')"
+    [ "$go_env_out" = "/tmp/sbomhome/go/pkg/mod /tmp/sbomhome/go /tmp/sbomhome/go-build " ] \
+        && pass "go resolves GOMODCACHE, GOPATH and GOCACHE from the stage 1 env alone, not under /go or HOME" \
+        || fail "go env under the plan's stage 1 env: $go_env_out"
+else
+    echo "  SKIP: go is not installed here, so go env under the plan's stage 1 env was not checked"
+fi
 P="$(plan_run node-badtc "$PSRC" GOTOOLCHAIN='local;rm -rf /')"
 [ "$(jq -r '.stages[0].env.HOST_GOTOOLCHAIN // "absent"' "$P/bomlens-plan.json")" = "absent" ] \
     && pass "a GOTOOLCHAIN that is not a toolchain name is not passed on" || fail "HOST_GOTOOLCHAIN: $(jq -r '.stages[0].env.HOST_GOTOOLCHAIN' "$P/bomlens-plan.json")"
@@ -2027,7 +2042,7 @@ EOF
 chmod +x "$WORK/bin-syft/syft"
 UB="$(new_run upstream-binary empty)"
 printf 'x' > "$WORK/upstream-fw.bin"
-printf 'name,version\nncurses,5.7\n' > "$WORK/upstream-versions.csv"
+printf 'name,version,reason\nncurses,5.7,\nlibxml2,,version-unknown\n' > "$WORK/upstream-versions.csv"
 ( cd "$UB" && env PATH="$WORK/bin-syft:$WORK/bin:$PATH" MODE=BINARY TARGET_FILE="$WORK/upstream-fw.bin" \
     PROJECT_NAME=demo PROJECT_VERSION=1.0 HOST_OUTPUT_DIR="$UB" BOMLENS_LIBDIR="$ROOT_DIR/docker/lib" \
     BOMLENS_ARTIFACT_CLEANUP=1 UPLOAD_ENABLED=false GENERATE_SECURITY=false SECURITY_ENRICH=false \
@@ -2039,13 +2054,20 @@ printf 'name,version\nncurses,5.7\n' > "$WORK/upstream-versions.csv"
 [ "$(jq -r '.components[] | select(.name == "ncurses") | "\(.version) \(.purl)"' "$UB/demo_1.0_bom.json" 2>/dev/null)" = "5.7 pkg:github/mirror/ncurses@v5.7" ] \
     && pass "a version from the file reaches the SBOM with its upstream purl" \
     || fail "ncurses: $(jq -c '.components[] | select(.name == "ncurses")' "$UB/demo_1.0_bom.json" 2>&1)"
-[ "$(grep -v '^#' "$UB/demo_1.0_component-versions.template.csv" 2>/dev/null | tr '\n' ' ')" = "name,version 3c59x, libxml2, " ] \
+[ "$(grep -v '^#' "$UB/demo_1.0_component-versions.template.csv" 2>/dev/null | tr '\n' ' ')" = "name,version,reason 3c59x,, " ] \
     && jq -e 'any(.outputs[]; .path == "demo_1.0_component-versions.template.csv")' "$UB/bomlens-result.json" >/dev/null \
     && pass "the template of what is still missing is written and listed in the outputs" \
     || fail "template: $(cat "$UB/demo_1.0_component-versions.template.csv" 2>&1)"
-[ "$(jq -c '[.checks[] | select(.id == "versions-needed" or .id == "upstream-purl") | .missing] + [.submitFile]' "$UB/demo_1.0_conformance.json" 2>/dev/null)" = '[["Vendor Utility","libxml2","3c59x"],["gcc@9.3.0","openssl@3.0.13"],"demo_1.0_bom.json"]' ] \
+[ "$(jq -c '[.checks[] | select(.id == "versions-needed" or .id == "upstream-purl") | .missing] + [.submitFile]' "$UB/demo_1.0_conformance.json" 2>/dev/null)" = '[["Vendor Utility","3c59x"],["gcc@9.3.0","openssl@0.9.8zh"],"demo_1.0_bom.json"]' ] \
     && pass "the submission profile names what is missing and the file to submit" \
     || fail "conformance: $(jq -c '[.checks[] | select(.id == "versions-needed" or .id == "upstream-purl")] + [.submitFile]' "$UB/demo_1.0_conformance.json" 2>&1)"
+# A reason the supplier gave survives the rest of the pipeline (normalize,
+# upstream purl) and the submission profile lists it as explained.
+[ "$(jq -c '[.components[] | select(.name == "libxml2") | (.version // null), ([.properties[]? | select(.name == "bomlens:versionReason") | .value][0])]' "$UB/demo_1.0_bom.json" 2>/dev/null)" = '[null,"version-unknown"]' ] \
+    && [ "$(jq -c '.checks[] | select(.id == "versions-needed") | .explained' "$UB/demo_1.0_conformance.json" 2>/dev/null)" = '[{"name":"libxml2","reason":"version-unknown"}]' ] \
+    && [ "$(jq -r '.metadata.properties[]? | select(.name == "bomlens:scanMode") | .value' "$UB/demo_1.0_bom.json" 2>/dev/null)" = BINARY ] \
+    && pass "a reason from the file reaches the SBOM and the version-needed row; the SBOM states its scan mode" \
+    || fail "reason: $(jq -c '.components[] | select(.name == "libxml2")' "$UB/demo_1.0_bom.json" 2>&1)"
 # The template filled in place and passed back is the supplier's record: the
 # run reads it, and neither sweeps nor rewrites it.
 printf '# filled\nname,version\n3c59x,\nlibxml2,2.9.14\n' > "$UB/demo_1.0_component-versions.template.csv"

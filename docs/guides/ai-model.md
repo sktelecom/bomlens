@@ -74,7 +74,7 @@ HF_TOKEN=hf_... ./scripts/scan-sbom.sh --project my-llm --version 0.9.0 \
 
 `HUGGING_FACE_HUB_TOKEN` is accepted as well. The value is passed to the container by name, never as a command-line argument, so it does not appear in the process list, and it is not written to the SBOM or any report.
 
-This is what lets you review a model before you publish it: push it to a private repository, generate the ML-BOM, close the gaps the conformance report shows, and only then make the repository public. For a gated repository, the token's account also needs its access request approved — a token alone is not enough. The same token is what resolves the model's training datasets, so a model whose data sits in a private repository needs it too.
+This is what lets you review a model before you publish it: push it to a private repository, generate the ML-BOM, close the gaps the conformance check report shows, and only then make the repository public. For a gated repository, the token's account also needs its access request approved — a token alone is not enough. The same token is what resolves the model's training datasets, so a model whose data sits in a private repository needs it too.
 
 The web UI reads the same variable from the environment that launched it, so start it with `HF_TOKEN=hf_... ./scripts/scan-sbom.sh --ui`. There is no token field in the interface: the server keeps no credentials, and a token sent over HTTP would linger in its logs.
 
@@ -165,7 +165,7 @@ In the web UI, an AI/ML SBOM adds two sections to the left rail.
 
 ![Conformance — the G7 advisory sub-block for an AI SBOM](../images/web-ui-g7.png)
 
-The same data is in the artifacts: the ML-BOM (`_bom.json`, CycloneDX 1.7) and the conformance report (`_conformance.*`).
+The same data is in the artifacts: the ML-BOM (`_bom.json`, CycloneDX 1.7) and the conformance check report (`_conformance.*`).
 
 ## The SPDX 3.0.1 AI document
 
@@ -258,7 +258,7 @@ The model also takes `inputModality` and `outputModality` (`text`, `image`, `aud
 
 BomLens v1.13 and earlier do not know these keys. They refuse a declaration that has a `service`, or one of the new model keys, with "unknown key(s)" rather than dropping the values without a word; read such a file with a version that has them, or remove the keys. The SPDX 2.3 export and `--diff` do not carry services: the SPDX 2.3 copy is converted from the components of the CycloneDX SBOM, and `--diff` compares models and components.
 
-## Reading the conformance report
+## Reading the conformance check report
 
 The G7 block leads with a headline such as "N / 41 present". The denominator counts only the checks that have an automated source (41 of the 51), so the number states what the tool could verify on its own. The 10 review-only elements appear next to it as a separate "need review" count, and any automated check that found nothing is counted as advisory. Four of the ten, the system data flow, data usage, input/output properties and application area, leave the review count and join the denominator once the SBOM holds a value for them, which a [declared service](#the-service-a-model-runs-in) supplies.
 
@@ -299,7 +299,7 @@ Because the card lists its datasets, BomLens looks up all seven the model was tr
 
 The lookup is what makes the next part visible. Three of the seven datasets carry a license — `odc-by` on the FineWeb-Edu family, MIT on the OpenCoder corpus — and three declare none at all: both HAERAE-HUB sets and open-web-math. Counting dataset names would have called this model's training data fully open. Reading the datasets shows a model published under Apache-2.0 whose training corpus is, in part, of unstated license. That is not a finding the tool judges; it is the one a reviewer needs before release, and it only appears once each dataset is looked up.
 
-The report this run produced is here to open as-is: the [conformance report](../samples/aether-7b-5attn_conformance.html) for the base model, which opens with the same G7 rollup the AI compliance profile carries in JSON and Markdown. Add `--lang ko` for the same reports in Korean; the SBOM and the JSON reports stay English either way.
+The report this run produced is here to open as-is: the [conformance check report](../samples/aether-7b-5attn_conformance.html) for the base model, which opens with the same G7 rollup the AI compliance profile carries in JSON and Markdown. Add `--lang ko` for the same reports in Korean; the SBOM and the JSON reports stay English either way.
 
 ## Next steps
 
@@ -315,7 +315,7 @@ If you are preparing a model for release inside a company, the approval steps an
 
 "G7 Software Bill of Materials for AI — Minimum Elements" is a guideline published in May 2026 under the G7, led by Germany's BSI and Italy's ACN. It defines 50 minimum elements, grouped into seven clusters, that an SBOM for an AI model should carry: who made the model, what it is, what data it was trained on, how it is secured, and how it performs. It is a non-binding recommendation, not a regulation.
 
-It still matters for regulation. The EU AI Act's high-risk and transparency obligations apply from 2 August 2026, and the technical documentation its Annex IV asks for overlaps substantially with the G7 clusters. What the conformance report gives you is visibility: element by element, it shows what your model's documentation already covers and what a person still has to supply — a concrete way to prepare, not a compliance verdict (see [Limits](#limits) for what it does not certify).
+It still matters for regulation. The EU AI Act's high-risk and transparency obligations apply from 2 August 2026, and the technical documentation its Annex IV asks for overlaps substantially with the G7 clusters. What the conformance check report gives you is visibility: element by element, it shows what your model's documentation already covers and what a person still has to supply — a concrete way to prepare, not a compliance verdict (see [Limits](#limits) for what it does not certify).
 
 BomLens shows the 50 elements as 51 checks. Model openness (whether weights, architecture, training data and training process are disclosed) is one facet of the Model license element in the G7 text, but it is worth seeing on its own, so it gets a separate row.
 
@@ -333,7 +333,7 @@ Ten elements have no automated source, such as the intended application area or 
 
 ## Regulatory crosswalk
 
-The conformance report links each check that maps to a regulation to the specific documentation obligation it touches. It answers a reviewer's question: when a check comes back short, which regulatory requirement does that gap concern? The reference sits under the requirement it belongs to in the check tables, and a crosswalk section above the detail rolls the coverage up — one row per framework, counting how many mapped checks are present, a gap, or review-only.
+The conformance check report links each check that maps to a regulation to the specific documentation obligation it touches. It answers a reviewer's question: when a check comes back short, which regulatory requirement does that gap concern? The reference sits under the requirement it belongs to in the check tables, and a crosswalk section above the detail rolls the coverage up — one row per framework, counting how many mapped checks are present, a gap, or review-only.
 
 Two frameworks cover every analyzed SBOM, AI or not:
 
@@ -391,7 +391,7 @@ The verdicts are guidance, not legal advice, and every report that prints them s
 - The result is only as complete as the HuggingFace model card. A sparse card yields a sparse ML-BOM, and the G7 checks reflect what the card documents — not an audit of the model.
 - Dataset entries record what a dataset declares about itself. The verdict now shows when a source's recorded terms are stricter than the derived dataset's, but whether the declared license is the right one, and whether the source was relicensed for the derived use, is a judgement the report leaves to a reviewer. Sources a card does not name cannot be traced.
 - A compound SPDX license expression (`MIT OR Apache-2.0`) is assessed as a whole rather than by resolving the choice, so a dual-licensed model can read `review` where either option alone would be `ok`. The direction is deliberately cautious — it never under-warns — but it may over-flag; the report names the exact expression so a reviewer can confirm.
-- The conformance report does not certify compliance with the EU AI Act, the Korean AI Framework Act, or any other regulation. It makes documentation gaps visible so a person can close them.
+- The conformance check report does not certify compliance with the EU AI Act, the Korean AI Framework Act, or any other regulation. It makes documentation gaps visible so a person can close them.
 - It fetches metadata over the network, so offline use is not supported. Private and gated models need `HF_TOKEN` (see [Private and gated models](#private-and-gated-models)).
 - The model id must be `org/model`. A collection name or a full URL will not resolve.
 

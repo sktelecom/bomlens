@@ -98,11 +98,11 @@ export function scanHash(id: string, section?: SectionId, query?: RouteQuery): s
 
 /** Parse a query string into a plain map, dropping empty values. */
 export function parseQuery(search: string): RouteQuery {
-  const out: Record<string, string> = {};
-  for (const [k, v] of new URLSearchParams(search)) {
-    if (k && v) out[k] = v;
-  }
-  return out;
+  // fromEntries defines each key as an own property, so a key such as "__proto__"
+  // from the address bar stays data instead of writing through to the prototype.
+  return Object.fromEntries(
+    [...new URLSearchParams(search)].filter(([k, v]) => k && v),
+  );
 }
 
 /** Serialise a query map, dropping empty values and sorting keys. */

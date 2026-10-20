@@ -15,6 +15,10 @@ Security fixes are provided for the latest release. The `ghcr.io/sktelecom/bomle
 
 If you are on an older version, please upgrade to the latest release first and check whether the issue still reproduces.
 
+## Verifying a release
+
+Release files and container images are signed with keyless cosign, and each image carries its SBOM as a signed attestation. [Verify a release](docs/guides/verify-release.md) has the commands.
+
 ## Reporting a vulnerability
 
 Please do **not** open a public issue. Report privately through one of the two channels below.

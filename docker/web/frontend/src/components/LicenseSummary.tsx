@@ -7,8 +7,9 @@ import { useTranslation } from "react-i18next";
 import { BarList, type BarDatum } from "@/components/ui/barlist";
 import type { ComponentItem } from "@/lib/api";
 import { licenseGroups, licenseRiskTier } from "@/lib/licenses";
+import { useFormatNumber } from "@/lib/format";
 
-import { TIER_FILL, TIER_FLAGGED, TierBadge } from "./LicenseRiskBar";
+import { TIER_FILL, TierBadge } from "./LicenseRiskBar";
 
 /** Rows shown before the "+N more" line, when the caller asks for a short list. */
 const TOP = 8;
@@ -37,6 +38,7 @@ export function LicenseSummary({
   onPickLicense?: (license: string) => void;
 }) {
   const { t } = useTranslation();
+  const fmt = useFormatNumber();
   const { groups, unlicensed } = useMemo(
     () => licenseGroups(components),
     [components],
@@ -59,7 +61,7 @@ export function LicenseSummary({
       label: g.name,
       value: g.count,
       fill: TIER_FILL[tier],
-      badge: TIER_FLAGGED.has(tier) ? <TierBadge tier={tier} /> : undefined,
+      badge: <TierBadge tier={tier} />,
     };
   });
   if (unlicensed > 0) {
@@ -74,14 +76,14 @@ export function LicenseSummary({
   return (
     <div className="space-y-3">
       <div className="flex items-baseline justify-between gap-3">
-        <span className="text-sm font-medium">
+        <span className="text-body-sm font-medium">
           {t("result.licenseSummaryTitle")}{" "}
           {groups.length > 0 && (
-            <span className="tabular-nums text-muted-foreground">{groups.length}</span>
+            <span className="tabular-nums text-muted-foreground">{fmt(groups.length)}</span>
           )}
         </span>
         {onPickLicense && (
-          <span className="text-xs text-muted-foreground">
+          <span className="text-label text-muted-foreground">
             {t("result.licenseRowHint")}
           </span>
         )}
@@ -94,7 +96,7 @@ export function LicenseSummary({
         activateHint={onPickLicense ? t("result.licenseRowHint") : undefined}
       />
       {more > 0 && (
-        <div className="text-xs text-muted-foreground">
+        <div className="text-label text-muted-foreground">
           {t("result.licenseMore", { count: more })}
         </div>
       )}

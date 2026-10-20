@@ -99,12 +99,12 @@ export function FileDropzone({
           data-over={over ? "" : undefined}
           className={[
             "flex flex-col items-center gap-2 rounded-md border border-dashed px-4 py-6 text-center transition-colors duration-fast ease-out-soft",
-            over ? "border-brand bg-brand/5" : "border-input bg-muted/30",
+            over ? "border-foreground/60 bg-muted" : "border-input bg-muted/30",
             disabled ? "opacity-50" : "",
           ].join(" ")}
         >
           <Upload className="h-5 w-5 text-muted-foreground" aria-hidden />
-          <p className="text-sm text-muted-foreground">{t("source.dropHere")}</p>
+          <p className="text-body-sm text-muted-foreground">{t("source.dropHere")}</p>
           <Button type="button" variant="outline" size="sm" onClick={open} disabled={disabled}>
             {t("source.browse")}
           </Button>
@@ -116,15 +116,15 @@ export function FileDropzone({
           data-over={over ? "" : undefined}
           className={[
             "rounded-md border px-3 py-2.5 transition-colors duration-fast ease-out-soft",
-            over ? "border-brand bg-brand/5" : "border-input bg-background",
+            over ? "border-foreground/60 bg-muted" : "border-input bg-background",
           ].join(" ")}
         >
           <div className="flex items-center gap-2">
             <Paperclip className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
-            <span className="min-w-0 flex-1 truncate text-sm" data-testid="dropzone-name">
+            <span className="min-w-0 flex-1 truncate text-body-sm" data-testid="dropzone-name">
               {file.name}
             </span>
-            <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
+            <span className="shrink-0 text-label tabular-nums text-muted-foreground">
               {formatBytes(file.size)}
             </span>
             <Button
@@ -159,7 +159,7 @@ export function FileDropzone({
                 aria-label={t("source.uploading")}
                 indicatorClassName={percent === 100 ? "bg-success-solid" : undefined}
               />
-              <p className="text-xs tabular-nums text-muted-foreground" role="status">
+              <p className="text-label tabular-nums text-muted-foreground" role="status">
                 {t("source.uploadingPercent", { percent })}
               </p>
             </div>

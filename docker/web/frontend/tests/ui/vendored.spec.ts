@@ -52,11 +52,11 @@ async function fillAndRun(page: Page) {
 test("Vendored toggle is offered under scan options when scanoss is available", async ({ page }) => {
   await stub(page, { firmware: false, scanoss: true, docker: true });
   await page.goto("/#/new");
-  // "Advanced scan options" is a collapsed disclosure in the settings panel
+  // "Result quality" is a collapsed disclosure in the settings panel
   // (folded so the panel fits one viewport); expanding it reveals the
   // vendored-ID toggle, off by default. Discovery for users who never open
   // it is handled by the post-scan suggestion banner (covered below).
-  await page.getByText("Advanced scan options").click();
+  await page.getByText("Result quality").click();
   const toggle = page.getByText("Detect copied-in open source");
   await expect(toggle).toBeVisible();
   await expect(page.locator("#scanossToken")).toHaveCount(0);

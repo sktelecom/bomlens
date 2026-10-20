@@ -61,7 +61,25 @@ export function docsUrl(language: string | undefined): string {
   return `${DOCS_BASE}/${korean ? "ko/" : ""}`;
 }
 
+/** What changed in a version: its release page, or the list when the build
+ *  carries no version stamp. */
+export function releaseNotesUrl(version: string | undefined): string {
+  const base = "https://github.com/sktelecom/bomlens/releases";
+  // A pre-release stamp (1.2.3-dev) has no release page of its own.
+  return version && !version.includes("-") ? `${base}/tag/v${version.replace(/^v/, "")}` : base;
+}
+
 /** The public demo, for showing someone the tool without installing it. */
 export function demoUrl(): string {
   return `${DOCS_BASE}/demo/`;
+}
+
+/**
+ * What the primary action of the New scan form does in the demo. Running a
+ * scan is refused everywhere, but the model questionnaire ("ai-declare") runs
+ * in the browser and only needs a server for its last step, so it stays
+ * reachable: its button opens the questions.
+ */
+export function demoRunAction(source: string): "questions" | "disabled" {
+  return source === "ai-declare" ? "questions" : "disabled";
 }

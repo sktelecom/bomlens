@@ -814,7 +814,7 @@ if grep -qE "Critical \| High" "$atmp/rr_risk-report.md" && grep -q "CVE-2024-00
 else
     fail "risk report: severity table + CVE rows present"
 fi
-if grep -q "Unmet format-validation" "$atmp/rr_risk-report.md"; then
+if grep -q "Unmet conformance check" "$atmp/rr_risk-report.md"; then
     pass "risk report: surfaces unmet conformance items (en default)"
 else
     fail "risk report: surfaces unmet conformance items (en default)"
@@ -822,7 +822,7 @@ fi
 # REPORT_LANG=ko renders the same report in Korean (deadlines + unmet-items note).
 REPORT_LANG=ko bash "$LIB/generate-risk-report.sh" "$atmp/rr" "demo" ANALYZE >/dev/null 2>&1
 if grep -q "7일 이내" "$atmp/rr_risk-report.md" && grep -q "30일 이내" "$atmp/rr_risk-report.md" \
-   && grep -q "포맷 검증 미충족 항목" "$atmp/rr_risk-report.md" && grep -q 'lang="ko"' "$atmp/rr_risk-report.html"; then
+   && grep -q "적합성 검사 미충족 항목" "$atmp/rr_risk-report.md" && grep -q 'lang="ko"' "$atmp/rr_risk-report.html"; then
     pass "risk report (ko): deadlines + unmet-items note localized"
 else
     fail "risk report (ko): deadlines + unmet-items note localized"
@@ -830,8 +830,8 @@ fi
 rm -rf "$atmp"
 
 # Self-generated risk report (no conformance artifact) — the all-modes default.
-# Without a *_conformance.json the report must drop the format-validation section
-# and retitle to the open-source risk analysis report with sections renumbered
+# Without a *_conformance.json the report must drop the conformance check section
+# and retitle to the open-source risk report with sections renumbered
 # from 1. English is the default; REPORT_LANG=ko swaps to Korean.
 stmp="$(mktemp -d)"
 cat > "$stmp/self_security.json" <<'EOF'
@@ -841,11 +841,11 @@ cat > "$stmp/self_security.json" <<'EOF'
 EOF
 printf 'License: MIT\nLicense: Apache-2.0\n' > "$stmp/self_NOTICE.txt"
 bash "$LIB/generate-risk-report.sh" "$stmp/self" "SelfApp" >/dev/null 2>&1
-if grep -q "Open-source risk analysis report" "$stmp/self_risk-report.md" \
-   && ! grep -q "format validation" "$stmp/self_risk-report.md"; then
-    pass "risk report (self): titled Open-source risk analysis report, no format-validation section"
+if grep -q "Open-source risk report" "$stmp/self_risk-report.md" \
+   && ! grep -q "Requirements met" "$stmp/self_risk-report.md"; then
+    pass "risk report (self): titled Open-source risk report, no conformance check section"
 else
-    fail "risk report (self): titled Open-source risk analysis report, no format-validation section"
+    fail "risk report (self): titled Open-source risk report, no conformance check section"
 fi
 if grep -q "## 1. Vulnerability" "$stmp/self_risk-report.md" \
    && grep -q "7 days" "$stmp/self_risk-report.md" && grep -q "CVE-2025-0001" "$stmp/self_risk-report.md"; then
@@ -853,18 +853,18 @@ if grep -q "## 1. Vulnerability" "$stmp/self_risk-report.md" \
 else
     fail "risk report (self): renumbered from 1, vuln table present"
 fi
-if grep -q "<h1>Open-source risk analysis report</h1>" "$stmp/self_risk-report.html"; then
-    pass "risk report (self): html titled Open-source risk analysis report"
+if grep -q "<h1>Open-source risk report</h1>" "$stmp/self_risk-report.html"; then
+    pass "risk report (self): html titled Open-source risk report"
 else
-    fail "risk report (self): html titled Open-source risk analysis report"
+    fail "risk report (self): html titled Open-source risk report"
 fi
 REPORT_LANG=ko bash "$LIB/generate-risk-report.sh" "$stmp/self" "SelfApp" >/dev/null 2>&1
-if grep -q "오픈소스 위험 분석 보고서" "$stmp/self_risk-report.md" \
-   && ! grep -q "포맷 검증" "$stmp/self_risk-report.md" \
-   && grep -q "<h1>오픈소스 위험 분석 보고서</h1>" "$stmp/self_risk-report.html"; then
-    pass "risk report (self, ko): titled 오픈소스 위험 분석 보고서, no 포맷 검증 section"
+if grep -q "오픈소스 위험 보고서" "$stmp/self_risk-report.md" \
+   && ! grep -q "요구사항 충족" "$stmp/self_risk-report.md" \
+   && grep -q "<h1>오픈소스 위험 보고서</h1>" "$stmp/self_risk-report.html"; then
+    pass "risk report (self, ko): titled 오픈소스 위험 보고서, no 적합성 검사 section"
 else
-    fail "risk report (self, ko): titled 오픈소스 위험 분석 보고서, no 포맷 검증 section"
+    fail "risk report (self, ko): titled 오픈소스 위험 보고서, no 적합성 검사 section"
 fi
 rm -rf "$stmp"
 
@@ -904,10 +904,10 @@ else
         fi
         # Risk report is now generated in SOURCE mode too (not only ANALYZE).
         if [ -f "$w/testapp_1.0_risk-report.md" ] && [ -f "$w/testapp_1.0_risk-report.html" ] \
-           && grep -q "Open-source risk analysis report" "$w/testapp_1.0_risk-report.md"; then
-            pass "nodejs SOURCE: Open-source risk analysis report generated (all-modes default)"
+           && grep -q "Open-source risk report" "$w/testapp_1.0_risk-report.md"; then
+            pass "nodejs SOURCE: Open-source risk report generated (all-modes default)"
         else
-            fail "nodejs SOURCE: Open-source risk analysis report generated (all-modes default)"
+            fail "nodejs SOURCE: Open-source risk report generated (all-modes default)"
         fi
         # Conformance check now runs on generation modes too (not only ANALYZE/AI SBOM).
         [ -f "$w/testapp_1.0_conformance.json" ] && pass "nodejs SOURCE: conformance artifact generated" || fail "nodejs SOURCE: conformance artifact generated"
@@ -1074,6 +1074,28 @@ else
     else
         skip "examples/nodejs not found"
     fi
+
+    # 3d': the same direct run on a tree whose lock file covers it. It is read as it
+    # is, with no docker socket and no build: the components come from the lock
+    # file, the SBOM says it was read statically, and the lock file entry itself
+    # is not one of the components.
+    w="$(mktemp -d "$WORK_ROOT/static.XXXXXX")"; mkdir -p "$w/src" "$w/out"
+    printf '{"name":"a","version":"1.0.0","dependencies":{"ms":"2.1.2"}}' > "$w/src/package.json"
+    printf '{"name":"a","version":"1.0.0","lockfileVersion":3,"requires":true,"packages":{"":{"name":"a","version":"1.0.0","dependencies":{"ms":"2.1.2"}},"node_modules/ms":{"version":"2.1.2","resolved":"https://registry.npmjs.org/ms/-/ms-2.1.2.tgz"}}}' > "$w/src/package-lock.json"
+    docker run --rm -v "$w/src":/src:ro -v "$w/out":/host-output -w /host-output \
+        -e MODE=SOURCE -e PROJECT_NAME=statictest -e PROJECT_VERSION=1.0 -e UPLOAD_ENABLED=false \
+        "$SCANNER_IMG" > "$w/_scan.log" 2>&1
+    rc=$?
+    sb="$w/out/statictest_1.0_bom.json"
+    if [ "$rc" -eq 0 ] && grep -q "static: source dir" "$w/_scan.log" && [ -f "$sb" ] \
+        && [ "$(jq -r '[.components[]|select(.purl=="pkg:npm/ms@2.1.2")]|length' "$sb")" = "1" ] \
+        && [ "$(jq -r '[.components[]|select((.purl // "")=="")]|length' "$sb")" = "0" ] \
+        && [ "$(jq -r '[.metadata.properties[]?|select(.name=="bomlens:detection")|.value]|first' "$sb")" = "static" ]; then
+        pass "no-docker static read: a lock file that covers the tree is read as it is, with no build"
+    else
+        fail "no-docker static read: a lock file that covers the tree is read as it is, with no build" "rc=$rc $(tail -8 "$w/_scan.log" 2>/dev/null | tr '\n' '|')"
+    fi
+    rm -rf "$w"
 
     # 3e: interrupt regression, driven through the real script path (not a
     # stub): interrupt a SOURCE scan while cdxgen is actually mid-resolve and

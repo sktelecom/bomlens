@@ -562,6 +562,17 @@ def _cpe_of(pkg):
     return None
 
 
+def _first_source_url(recipe_doc):
+    """The download address of the recipe's first source (<recipe>-source-1)."""
+    for pkg in recipe_doc.get("packages") or []:
+        if not isinstance(pkg, dict) or not str(pkg.get("name") or "").endswith("-source-1"):
+            continue
+        loc = pkg.get("downloadLocation")
+        if isinstance(loc, str) and loc not in ("", "NOASSERTION", "NONE"):
+            return loc[:1024]
+    return None
+
+
 def extract_spdx2(image_doc, archive):
     """(components, image name, image version) from a 2.2 image document plus
     its archive. Empty when the archive cannot be read or holds nothing the
@@ -611,6 +622,16 @@ def extract_spdx2(image_doc, archive):
                 cpe = _cpe_of(recipe_pkg) if recipe_pkg else None
                 if cpe:
                     comp["cpe"] = cpe
+                # The recipe a package was built from names the upstream project
+                # (openssl-bin and libssl3 both come from openssl), and its first
+                # source is where that project was fetched. upstream-purl.py reads
+                # both to give the package its upstream repository purl.
+                recipe_name = (recipe_pkg or {}).get("name") or ""
+                if recipe_name and recipe_name != comp["name"]:
+                    comp["properties"].append({"name": "bomlens:yocto:recipe", "value": recipe_name})
+                source_url = _first_source_url(recipe_doc)
+                if source_url:
+                    comp["properties"].append({"name": "bomlens:sourceUrl", "value": source_url})
                 if not comp.get("licenses") and recipe_pkg:
                     fallback = _licenses_cdx(_spdx2_license(recipe_pkg))
                     if fallback:

@@ -34,12 +34,23 @@ except Exception:  # pragma: no cover - only when run outside the firmware image
 
 
 def parse_cpe(cpe):
-    """Return (vendor, product, version) from a CPE 2.2 URI or 2.3 string, else None."""
+    """Return (vendor, product, version) from a CPE 2.2 URI or 2.3 string, else None.
+
+    A 2.3 CPE whose part is '*' is read as an application: Yocto writes its
+    CVE_PRODUCT that way (cpe:2.3:*:*:busybox:1.36.1), often with the vendor '*'
+    too. main() looks such a CPE up by product alone, across every vendor, as
+    Yocto's own cve-check does. Most products listed under more than one vendor
+    are one project NVD filed under several names (linux_kernel under linux and
+    kernel, curl under haxx, curl and daniel_stenberg), so keeping one vendor
+    loses real findings by the thousand. What Yocto then drops with CVE_STATUS
+    "cpe-incorrect" an SPDX 2.2 build does not carry, so a product name another
+    project shares can bring that project's CVEs.
+    """
     if not cpe:
         return None
     if cpe.startswith("cpe:2.3:"):
         f = cpe.split(":")
-        if len(f) >= 6 and f[2] == "a":
+        if len(f) >= 6 and f[2] in ("a", "*") and f[4] not in ("", "*", "-"):
             return f[3], f[4], f[5]
         return None
     if cpe.startswith("cpe:/"):
@@ -171,6 +182,18 @@ def main():
 
     conn = sqlite3.connect(db_path)
     out = []
+    cols = ("SELECT exact_version, version_start, vs_incl, version_end, ve_incl, "
+            "cve_id, severity, cvss_version, cvss_score FROM cpe_match ")
+    # Rows by product, cached: a Yocto image repeats a product across the
+    # packages of one recipe, and an index built before the product index
+    # existed answers each by a full scan.
+    by_product = {}
+
+    def product_rows(product):
+        if product not in by_product:
+            by_product[product] = conn.execute(cols + "WHERE product=?", (product,)).fetchall()
+        return by_product[product]
+
     for comp in sbom.get("components", []):
         parsed = parse_cpe(comp.get("cpe"))
         if not parsed:
@@ -183,12 +206,11 @@ def main():
         if not usable_version(version):
             continue
         seen = set()
-        for row in conn.execute(
-            "SELECT exact_version, version_start, vs_incl, version_end, ve_incl, "
-            "cve_id, severity, cvss_version, cvss_score "
-            "FROM cpe_match WHERE vendor=? AND product=?",
-            (vendor, product),
-        ):
+        if vendor in ("*", "-", ""):
+            rows = product_rows(product)
+        else:
+            rows = conn.execute(cols + "WHERE vendor=? AND product=?", (vendor, product))
+        for row in rows:
             exact, vstart, vs_incl, vend, ve_incl, cve_id, sev, cvss_ver, score = row
             if cve_id in seen:
                 continue

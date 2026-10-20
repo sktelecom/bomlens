@@ -45,9 +45,9 @@ cd "$FRONTEND"
 npm ci --no-audit --no-fund
 BASE_PATH="$BASE_PATH" VITE_DEMO_DATA_BASE="$DATA_BASE" npm run build
 
-# Replace the previous bundle but keep data/ — it is the committed input, not
-# an output, and rebuilding must never be able to delete it.
-find "$DEST" -mindepth 1 -maxdepth 1 ! -name data ! -name '.gitignore' \
+# Replace the previous bundle but keep data/ and inputs/ — they are committed
+# inputs, not outputs, and rebuilding must never be able to delete them.
+find "$DEST" -mindepth 1 -maxdepth 1 ! -name data ! -name inputs ! -name '.gitignore' \
     -exec rm -rf {} +
 cp -R "$FRONTEND/dist/." "$DEST/"
 
