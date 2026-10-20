@@ -4,7 +4,7 @@ description: 릴리스 파일과 컨테이너 이미지가 이 프로젝트가 �
 
 # 릴리스 검증
 
-공급망을 다루는 도구라면 그 도구의 공급망도 확인할 수 있어야 합니다. 모든 릴리스는 프로젝트의 GitHub Actions 워크플로가 빌드하고 키 없는(keyless) [cosign](https://docs.sigstore.dev/cosign/overview/)(Sigstore)으로 서명합니다. 그래서 누군가 건네준 키를 믿지 않고도, 내려받은 파일이 이 저장소에서 빌드된 것인지 확인할 수 있습니다.
+공급망을 다루는 도구라면 그 도구의 공급망도 확인할 수 있어야 합니다. 모든 릴리스는 프로젝트의 GitHub Actions 워크플로가 빌드하고 키 없는(keyless) [cosign](https://docs.sigstore.dev/signing/quickstart/)(Sigstore)으로 서명합니다. 그래서 누군가 건네준 키를 믿지 않고도, 내려받은 파일이 이 저장소에서 빌드된 것인지 확인할 수 있습니다.
 
 아래 명령은 v1.13.7으로 실행해 확인했습니다. 내려받은 버전으로 바꿔 쓰세요. `cosign` v2가 필요하고, 체크섬 확인에는 `sha256sum`(macOS는 `shasum -a 256`)이 필요합니다.
 
