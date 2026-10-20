@@ -37,6 +37,12 @@
     "gitUrl": "GitHub URL",
     "gitHint": "공개 저장소는 그대로, 비공개는 아래 토큰을 입력하세요.",
     "gitPlaceholder": "https://github.com/org/repo",
+    "gitRef": "브랜치, 태그 또는 커밋 (선택)",
+    "gitRefPlaceholder": "main, v1.2.0 또는 커밋 ID",
+    "exclude": "스캔에서 뺄 경로 (선택)",
+    "excludePlaceholder": "vendor/legacy\ntest/fixtures",
+    "excludeHint": "한 줄에 경로 하나, 스캔할 폴더 기준 상대 경로입니다. 글롭과 ..은 쓸 수 없습니다.",
+    "gitRefHint": "비워 두면 기본 브랜치를 스캔합니다.",
     "gitToken": "토큰 (비공개 저장소, 선택)",
     "gitTokenPlaceholder": "ghp_… (Personal Access Token)",
     "gitTokenHint": "비공개 저장소일 때만 입력. 토큰은 클론에 1회용으로만 쓰이고 저장·로그에 남지 않습니다.",
@@ -389,6 +395,7 @@
     "vulnViews": "미리 정한 보기",
     "vulnViewAll": "전체",
     "vulnViewFixable": "수정 버전 있음",
+    "vulnViewUnfixed": "수정 버전 없음",
     "vulnViewExploited": "알려진 악용",
     "vulnViewCriticalHigh": "Critical과 High",
     "vulnLayout": "배치",
@@ -1333,7 +1340,27 @@
     "conflictOffHint": "이 스캔에서 프로젝트가 배포되는 라이선스를 선언하지 않아 의존성과 대조할 수 없었습니다. 새 스캔 폼에서 배포 라이선스를 지정해 다시 스캔하면 검사가 켜집니다.",
     "conflictOffAction": "배포 라이선스를 지정해 다시 스캔",
     "conflictOffCli": "명령줄에서는",
-    "conflictOffCliBody": "스캔을 실행할 때 --license <spdx-id>를 지정하거나 PROJECT_LICENSE를 설정하세요."
+    "conflictOffCliBody": "스캔을 실행할 때 --license <spdx-id>를 지정하거나 PROJECT_LICENSE를 설정하세요.",
+    "obligationsTitle": "라이선스별 준수 사항",
+    "obligationsComponentCount_one": "구성요소 {{count}}개",
+    "obligationsComponentCount_other": "구성요소 {{count}}개",
+    "obligationsHint": "구성요소를 재배포할 때 붙는 조건이며, 공개된 라이선스 요약에서 가져왔습니다. 문서 작성 보조이며 법적 판정이 아닙니다. 목록에 없는 라이선스는 \"확인 필요\"로 표시합니다.",
+    "obligationsUnknown": "확인 필요",
+    "obligationsNone": "조건 없음",
+    "obligationsChooseOne": "하나를 선택:",
+    "obligationsAll": "모두 적용:",
+    "obligationsShowAll": "라이선스 {{count}}개 모두 보기",
+    "obligationsShowLess": "줄여서 보기",
+    "obligation": {
+      "includeCopyright": "저작권·라이선스 고지 유지",
+      "includeCopyrightSource": "소스 형태에서 고지 유지",
+      "documentChanges": "변경 사항 표시",
+      "discloseSource": "소스 공개",
+      "networkUseDisclose": "네트워크 이용자에게 소스 제공",
+      "sameLicense": "동일 라이선스 적용",
+      "sameLicenseFile": "동일 라이선스 적용(파일 단위)",
+      "sameLicenseLibrary": "동일 라이선스 적용(라이브러리)"
+    }
   },
   "recent": {
     "title": "스캔 관리",
@@ -1384,6 +1411,8 @@
     "target": "스캔 대상을 입력하세요.",
     "uploadUrl": "업로드 서버 주소를 입력하세요.",
     "uploadToken": "업로드 API 토큰을 입력하세요.",
+    "gitRef": "브랜치, 태그 또는 커밋 ID로 입력하세요. 영문, 숫자, . _ / @ + - 만 쓸 수 있고 \"..\"은 쓸 수 없습니다.",
+    "exclude": "한 줄에 상대 경로 하나를 입력하세요. .., 와일드카드, 역슬래시는 쓸 수 없습니다.",
     "truscaProjectId": "TRUSCA 프로젝트 id를 입력하세요."
   },
   "provenance": {

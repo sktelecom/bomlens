@@ -642,6 +642,11 @@ export interface ScanConfig {
   source: SourceType;
   /** git URL / docker image (empty for current-folder and upload sources). */
   target: string;
+  /** Branch, tag or commit a git URL scan was told to use. Empty or absent means
+   *  the default branch. */
+  gitRef?: string;
+  /** Paths the scan was told to leave out, relative to the scanned folder. */
+  exclude?: string[];
   /** What the user actually picked, when `target` cannot say it: the uploaded
    *  file's name, or the folder a CLI scan ran against. Shown as the scan's
    *  provenance (see lib/provenance.ts); absent on scans that predate it.
@@ -823,6 +828,10 @@ export interface ScanParams {
   target?: string; // git URL OR docker image name
   token?: string; // server-side token from /upload
   cred?: string; // single-use credId from /git-cred (private git URL)
+  /** Branch, tag or commit of a git URL scan; empty or omitted clones the default branch. */
+  gitRef?: string;
+  /** Paths to leave out of a source scan, relative to the scanned folder. */
+  exclude?: string[];
   scanossCred?: string; // single-use credId for a SCANOSS/OSSKB token
   notice: boolean;
   security: boolean;
@@ -1650,6 +1659,8 @@ export function startScan(params: ScanParams, handlers: ScanHandlers): EventSour
     target: params.target ?? "",
     token: params.token ?? "",
     cred: params.cred ?? "",
+    git_ref: params.gitRef ?? "",
+    exclude: (params.exclude ?? []).join("\n"),
     scanoss_cred: params.scanossCred ?? "",
     notice: String(params.notice),
     security: String(params.security),

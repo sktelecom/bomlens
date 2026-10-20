@@ -800,6 +800,8 @@ jobs:
         run: npm run typecheck
       - name: Token lint (no hardcoded colours)
         run: npm run token:lint
+      - name: Token contrast (text 4.5:1, fills 3:1)
+        run: npm run token:contrast
       - name: Shared tokens CSS in sync with src/index.css
         run: npm run tokens:check
       - name: i18n coverage (en ≡ ko)

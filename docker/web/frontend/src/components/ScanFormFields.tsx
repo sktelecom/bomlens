@@ -7,6 +7,7 @@ import { useTranslation } from "react-i18next";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { FileDropzone } from "@/components/FileDropzone";
@@ -75,7 +76,7 @@ export function FieldError({ id, msgKey }: { id: string; msgKey?: string }) {
 /** Source-specific control: current-folder hint / free-text target / git token / upload. */
 export function SourceControls({ state }: { state: ScanFormState }) {
   const { t } = useTranslation();
-  const { source, target, setTarget, scanRoot, setScanRoot, scanRoots, deepSource, setDeepSource, showDeepSource, gitToken, setGitToken, file, setFile, uploadPercent, uploadKind, textInput, isAnalyze, busy, capabilities, errors } = state;
+  const { source, target, setTarget, scanRoot, setScanRoot, scanRoots, deepSource, setDeepSource, showDeepSource, gitToken, setGitToken, gitRef, setGitRef, exclude, setExclude, showExclude, file, setFile, uploadPercent, uploadKind, textInput, isAnalyze, busy, capabilities, errors } = state;
 
   // Extra --mount scan targets make the rootfs-dir path a subpath inside the
   // chosen base — and optional when a mounted base is selected (empty = scan
@@ -202,6 +203,46 @@ export function SourceControls({ state }: { state: ScanFormState }) {
           <p className="text-body-sm text-muted-foreground">
             {targetOptional ? t("source.rootfsSubpathHint") : t(textInput.hint)}
           </p>
+        </div>
+      )}
+
+      {source === "git-url" && (
+        <div className="space-y-2">
+          <Label htmlFor="gitRef">{t("source.gitRef")}</Label>
+          <Input
+            id="gitRef"
+            value={gitRef}
+            onChange={(e) => setGitRef(e.target.value)}
+            placeholder={t("source.gitRefPlaceholder")}
+            disabled={busy}
+            autoComplete="off"
+            spellCheck={false}
+            autoCapitalize="off"
+            aria-invalid={errors.gitRef ? true : undefined}
+            aria-describedby={errors.gitRef ? "gitRef-error gitRef-hint" : "gitRef-hint"}
+          />
+          <FieldError id="gitRef-error" msgKey={errors.gitRef} />
+          <p id="gitRef-hint" className="text-body-sm text-muted-foreground">{t("source.gitRefHint")}</p>
+        </div>
+      )}
+
+      {showExclude && (
+        <div className="space-y-2">
+          <Label htmlFor="exclude">{t("source.exclude")}</Label>
+          <Textarea
+            id="exclude"
+            value={exclude}
+            onChange={(e) => setExclude(e.target.value)}
+            placeholder={t("source.excludePlaceholder")}
+            disabled={busy}
+            rows={3}
+            spellCheck={false}
+            autoCapitalize="off"
+            aria-invalid={errors.exclude ? true : undefined}
+            aria-describedby={errors.exclude ? "exclude-error exclude-hint" : "exclude-hint"}
+          />
+          <FieldError id="exclude-error" msgKey={errors.exclude} />
+          <p id="exclude-hint" className="text-body-sm text-muted-foreground">{t("source.excludeHint")}</p>
         </div>
       )}
 
@@ -564,7 +605,7 @@ export function FormatOptions({ state }: { state: ScanFormState }) {
           <label htmlFor="outbound-license" className="text-body-sm font-medium text-foreground">
             {t("options.outboundLicense")}
           </label>
-          <input
+          <Input
             id="outbound-license"
             type="text"
             value={outboundLicense}
@@ -572,7 +613,6 @@ export function FormatOptions({ state }: { state: ScanFormState }) {
             disabled={busy}
             placeholder="Apache-2.0"
             spellCheck={false}
-            className="w-full rounded-md border bg-background px-3 py-2 text-body-sm disabled:opacity-60"
             aria-describedby="outbound-license-hint"
           />
           <p id="outbound-license-hint" className="text-body-sm text-muted-foreground">
@@ -585,7 +625,7 @@ export function FormatOptions({ state }: { state: ScanFormState }) {
           <label htmlFor="sbom-author" className="text-body-sm font-medium text-foreground">
             {t("options.sbomAuthor")}
           </label>
-          <input
+          <Input
             id="sbom-author"
             type="text"
             value={sbomAuthor}
@@ -593,7 +633,6 @@ export function FormatOptions({ state }: { state: ScanFormState }) {
             disabled={busy}
             placeholder="SK Telecom Co., Ltd."
             spellCheck={false}
-            className="w-full rounded-md border bg-background px-3 py-2 text-body-sm disabled:opacity-60"
             aria-describedby="sbom-author-hint"
           />
           <p id="sbom-author-hint" className="text-body-sm text-muted-foreground">

@@ -258,6 +258,32 @@ Chromium's third-party set includes LGPL-2.1-or-later components, FFmpeg among t
 
 BomLens's own terms travel with the installer as well: `LICENSE`, `NOTICE` and this document are placed in the app's resources folder (`electron/electron-builder.yml`).
 
+## Web UI: license obligation data
+
+The web UI's Licenses section shows what each well-known license asks of a redistributor (keep the notice, disclose source, share alike). That list is derived from the `conditions` field of the license data published by choosealicense.com (`github/choosealicense.com`), under the MIT License. It is a documentation aid, not legal advice.
+
+```
+Copyright (c) GitHub, Inc. and contributors
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
+```
+
 ## Debian packages in every image
 
 Every BomLens image is built on `python:3.12-slim`, a Debian-based image. Alongside the tools listed above it therefore contains Debian system packages, and most of them are copyleft: of the 128 packages in the base image, more than a hundred carry GPL or LGPL terms. bash, coreutils, grep, sed, gzip, findutils, wget and tar are GPL-3.0-or-later; git and mawk are GPL-2.0; the GNU C library is LGPL-2.1-or-later. No GPL-free Linux base image exists — Alpine ships BusyBox under GPL-2.0, and every glibc-based image ships LGPL — so this is a property of container images generally rather than a choice made here.

@@ -288,8 +288,53 @@ hf_dataset_ref() {
     fi
     return 2
 }
-GIT_URL=""; GIT_REF=""; NO_REPORT="false"; GENERATE_REPORT="false"
+GIT_URL=""; GIT_REF=""; SCAN_EXCLUDE=""; NO_REPORT="false"; GENERATE_REPORT="false"
 INGEST_SOURCE="false"; INGEST_ROOTFS="false"; INGEST_ARCHIVE=""; SCAN_INPUT_DIR=""; CLEANUP_DIRS=()
+
+# --exclude <path>: a path inside the scanned folder to leave out of a source
+# scan. Kept as a newline-separated list in SCAN_EXCLUDE. Only a plain relative
+# path is accepted (no "..", no absolute path, no glob), so it can never name
+# anything outside the scanned tree.
+add_scan_exclude() {
+    local p="$1"
+    [ -n "$p" ] || { echo "[ERROR] --exclude requires a path, e.g. --exclude vendor/legacy"; exit 1; }
+    while :; do
+        case "$p" in ./*) p="${p#./}" ;; */) p="${p%/}" ;; *) break ;; esac
+    done
+    case "$p" in
+        ""|"."|/*|*\\*|*[[:cntrl:]]*|*"*"*|*"?"*|*"["*)
+            echo "[ERROR] --exclude takes a relative path inside the scanned folder (no glob, no absolute path): $1"; exit 1 ;;
+    esac
+    case "/$p/" in
+        */../*) echo "[ERROR] --exclude must stay inside the scanned folder (no \"..\"): $1"; exit 1 ;;
+    esac
+    SCAN_EXCLUDE="${SCAN_EXCLUDE:+$SCAN_EXCLUDE
+}$p"
+}
+
+# Copies $1 to $2 without the paths in SCAN_EXCLUDE ($3 is the path of $1
+# relative to the scanned root). A directory is descended into only when an
+# excluded path lies below it; everything else is copied whole. Entries in
+# SCAN_EXCLUDE_SKIP (the output folder and the copy itself) are never copied.
+copy_without_excluded() {
+    local src="$1" dst="$2" rel="$3" entry name path
+    mkdir -p "$dst"
+    for entry in "$src"/* "$src"/.[!.]* "$src"/..?*; do
+        [ -e "$entry" ] || [ -L "$entry" ] || continue
+        case " $SCAN_EXCLUDE_SKIP " in *" $entry "*) continue ;; esac
+        name="${entry##*/}"
+        path="${rel:+$rel/}$name"
+        if printf '%s\n' "$SCAN_EXCLUDE" | grep -Fxq -- "$path"; then
+            continue
+        fi
+        if [ -d "$entry" ] && [ ! -L "$entry" ] \
+           && printf '%s\n' "$SCAN_EXCLUDE" | awk -v p="$path/" 'index($0, p) == 1 { f = 1 } END { exit !f }'; then
+            copy_without_excluded "$entry" "$dst/$name" "$path"
+        else
+            cp -pPR "$entry" "$dst/" || return 1
+        fi
+    done
+}
 MERGE_FILES=()
 MERGE_ROOT=""
 DIFF_OLD=""; DIFF_NEW=""
@@ -337,6 +382,7 @@ while [[ "$#" -gt 0 ]]; do
             shift 2 ;;
         --git) GIT_URL="$2"; shift ;;
         --branch|--ref) GIT_REF="$2"; shift ;;
+        --exclude) add_scan_exclude "${2:-}"; shift ;;
         --no-report) NO_REPORT="true" ;;
         --generate-only) GENERATE_ONLY="true" ;;
         --upload-target) UPLOAD_TARGET="$2"; shift ;;
@@ -473,6 +519,9 @@ Options:
                          with --target/--analyze/--firmware.
   --branch <ref>         Branch, tag, or commit for --git (alias: --ref;
                          default: repo default)
+  --exclude <path>       Leave a path out of a source scan (repeatable). Relative
+                         to the scanned folder, e.g. --exclude vendor/legacy.
+                         The scan runs on a copy of the tree without it.
   --firmware             Force firmware mode for --target (opt-in image). Works
                          on an archive too: the firmware unpacker reads it
                          directly, nested formats and all, instead of the
@@ -2614,6 +2663,34 @@ SRC_TREE_EXCLUDE=""
 case "$OUTPUT_HOST_DIR" in
     "$SCAN_INPUT_DIR"/*) SRC_TREE_EXCLUDE="$RUN_NAME" ;;
 esac
+
+# --exclude: scan a copy of the tree that lacks the named paths, so every step
+# below (language detection, build, cdxgen, license and vendored-code scans, the
+# file tree) sees the same smaller tree and none needs its own exclusion list.
+# The copy sits in the output folder, which Docker already shares.
+if [ -n "$SCAN_EXCLUDE" ]; then
+    if [ "$MODE" != "SOURCE" ]; then
+        echo "[ERROR] --exclude applies to a source scan (a folder, --git or an archive), not to $MODE mode."
+        exit 1
+    fi
+    while IFS= read -r _ex; do
+        if [ ! -e "$SCAN_INPUT_DIR/$_ex" ] && [ ! -L "$SCAN_INPUT_DIR/$_ex" ]; then
+            echo "[WARN] --exclude path not found in the scanned folder, ignored: $_ex"
+        fi
+    done <<EOF_EXCLUDE
+$SCAN_EXCLUDE
+EOF_EXCLUDE
+    _view="$OUTPUT_HOST_DIR/.scan-view"
+    rm -rf -- "$_view"
+    CLEANUP_DIRS+=("$_view")
+    # A flat layout writes straight into the scanned folder; only the copy is skipped then.
+    SCAN_EXCLUDE_SKIP="$_view"
+    [ "$OUTPUT_HOST_DIR" = "$SCAN_INPUT_DIR" ] || SCAN_EXCLUDE_SKIP="$OUTPUT_HOST_DIR $_view"
+    echo "[INFO] Excluding $(printf '%s\n' "$SCAN_EXCLUDE" | grep -c .) path(s) from the scan; scanning a copy of the tree."
+    copy_without_excluded "$SCAN_INPUT_DIR" "$_view" "" \
+        || { echo "[ERROR] could not copy the source tree for --exclude"; exit 1; }
+    SCAN_INPUT_DIR="$_view"
+fi
 
 # ========================================================
 # Stage 1: produce SBOM
