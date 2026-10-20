@@ -534,7 +534,7 @@ function AssessmentBlock({
 
       {customLicenseQuote && (
         <Field label={t("models.customLicenseQuote")}>
-          <p className="border-l-2 border-border pl-3 text-body-sm italic text-muted-foreground">
+          <p className="text-body-sm italic text-muted-foreground">
             {customLicenseQuote}
           </p>
         </Field>

@@ -28,7 +28,7 @@ export function UpgradeBundles({
     <section
       data-testid="upgrade-bundles"
       aria-labelledby="upgrade-bundles-title"
-      className="space-y-2 rounded-md border border-l-4 border-l-role-info-border bg-card px-3 py-2.5"
+      className="space-y-2 rounded-md border bg-card px-3 py-2.5"
     >
       <h3
         id="upgrade-bundles-title"

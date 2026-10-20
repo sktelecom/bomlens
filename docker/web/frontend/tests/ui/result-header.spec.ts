@@ -54,8 +54,11 @@ test("the header is one meta line over the section title, with no status badge o
   await openScan(page, { ...DONE, sbom: { ...DONE.sbom, componentType: "application" } });
 
   const meta = page.getByTestId("result-meta");
-  await expect(meta).toContainText("demo");
-  await expect(meta).toContainText("1.0");
+  // On the Overview the project and version are the title, so the meta line
+  // above it carries only the scan type and time.
+  await expect(page.locator("main h1")).toContainText("demo");
+  await expect(page.locator("main h1")).toContainText("1.0");
+  await expect(meta).not.toContainText("demo");
   await expect(page.getByTestId("result-kind")).toHaveText("Source");
   await expect(meta.locator("time")).toHaveAttribute("datetime", new Date(GENERATED_AT * 1000).toISOString());
   await expect(meta.locator("time")).toContainText("2023");
@@ -123,10 +126,10 @@ test("the Overview names up to three items to check first, with source and scan 
   await expect(rows.nth(2)).toContainText("Required conformance items to fill in");
   await expect(rows.nth(2)).toContainText("Source: this scan's conformance check");
 
-  // The fixable row opens the table on the worst severity it counted.
+  // The fixable row opens the preset that lists exactly the rows it counted.
   await rows.nth(1).getByRole("link").click();
   await expect(page.locator("main h1")).toHaveText("Vulnerabilities");
-  expect(page.url()).toContain("severity=CRITICAL");
+  expect(page.url()).toContain("view=fixable-severe");
 });
 
 test("the Overview leaves the first-checks block out when nothing applies", async ({ page }) => {
@@ -143,12 +146,12 @@ test("the needs-attention card is the same neutral card for a source and an AI s
   await openScan(page, DONE);
   const card = page.getByTestId("needs-attention");
   await expect(card).toBeVisible();
-  // A thin left bar carries the role colour; the fill stays the card surface.
+  // No accent bar on one edge: the border is the same width on every side.
   const style = await card.evaluate((el) => {
     const cs = getComputedStyle(el);
-    return { bar: cs.borderLeftWidth, bg: cs.backgroundColor, cardBg: getComputedStyle(document.body).backgroundColor };
+    return { left: cs.borderLeftWidth, top: cs.borderTopWidth, bg: cs.backgroundColor };
   });
-  expect(style.bar).toBe("3px");
+  expect(style.left).toBe(style.top);
   expect(style.bg).not.toBe("rgba(0, 0, 0, 0)");
 });
 

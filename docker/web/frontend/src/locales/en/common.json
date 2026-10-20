@@ -398,6 +398,7 @@
     "vulnViewUnfixed": "No fix yet",
     "vulnViewExploited": "Known exploited",
     "vulnViewCriticalHigh": "Critical and High",
+    "vulnViewFixableSevere": "Critical and High with a fix",
     "vulnLayout": "Layout",
     "vulnLayoutList": "List",
     "vulnLayoutPackage": "By package",

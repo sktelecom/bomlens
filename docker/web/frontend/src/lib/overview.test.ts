@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 
 import type { ComponentItem, DoneEvent } from "./api";
 import { firstChecks, needsAttention, riskyComponentCount, topRiskComponents } from "./overview";
+import { applyVulnView, vulnViewFromQuery } from "./vulnView";
 
 function result(over: Partial<DoneEvent> = {}): DoneEvent {
   return {
@@ -29,6 +30,11 @@ const comp = (over: Partial<ComponentItem>): ComponentItem => ({
 describe("needsAttention", () => {
   it("is empty for a clean scan", () => {
     expect(needsAttention(result())).toEqual([]);
+  });
+
+  it("opens the critical and high rows for the vulnerabilities item", () => {
+    const items = needsAttention(result({ security: sev({ CRITICAL: 1, HIGH: 2, TOTAL: 3 }) }));
+    expect(items[0]).toMatchObject({ id: "vulns", count: 3, query: { view: "critical-high" } });
   });
 
   it("puts malicious packages above everything else", () => {
@@ -339,8 +345,15 @@ describe("firstChecks", () => {
 
   it("counts known exploited rows and opens the vulnerabilities section", () => {
     const items = firstChecks(withVulns([vuln({ kev: true }), vuln({ id: "CVE-2", kev: true }), vuln({ id: "CVE-3" })]));
+    // The link carries the preset that lists exactly the rows counted.
     expect(items).toEqual([
-      { id: "knownExploited", count: 2, target: "vulnerabilities", source: "vulnerabilities" },
+      {
+        id: "knownExploited",
+        count: 2,
+        target: "vulnerabilities",
+        query: { view: "exploited" },
+        source: "vulnerabilities",
+      },
     ]);
   });
 
@@ -353,15 +366,28 @@ describe("firstChecks", () => {
       ]),
     );
     expect(items).toHaveLength(1);
-    expect(items[0]).toMatchObject({ id: "fixableSevere", count: 1, query: { severity: "HIGH" } });
+    expect(items[0]).toMatchObject({ id: "fixableSevere", count: 1, query: { view: "fixable-severe" } });
   });
 
-  it("opens the fixable list on Critical when one is present", () => {
+  it("opens a list that holds exactly the counted rows, whatever the severity mix", () => {
     const items = firstChecks(
       withVulns([vuln({ severity: "CRITICAL", fixed: "2" }), vuln({ id: "B", severity: "HIGH", fixed: "3" })]),
     );
-    expect(items[0].query).toEqual({ severity: "CRITICAL" });
+    expect(items[0].query).toEqual({ view: "fixable-severe" });
     expect(items[0].count).toBe(2);
+  });
+
+  it("opens a list whose row count equals the count it showed", () => {
+    const rows = [
+      vuln({ id: "A", severity: "CRITICAL", fixed: "2", kev: true }),
+      vuln({ id: "B", severity: "HIGH", fixed: "3" }),
+      vuln({ id: "C", severity: "HIGH", fixed: "" }),
+      vuln({ id: "D", severity: "MEDIUM", fixed: "1", kev: true }),
+    ];
+    for (const item of firstChecks(withVulns(rows))) {
+      const { view } = vulnViewFromQuery(item.query);
+      expect(applyVulnView(rows as never, view)).toHaveLength(item.count);
+    }
   });
 
   it("says when the rows counted are fewer than the scan total", () => {

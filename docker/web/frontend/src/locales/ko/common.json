@@ -398,6 +398,7 @@
     "vulnViewUnfixed": "수정 버전 없음",
     "vulnViewExploited": "알려진 악용",
     "vulnViewCriticalHigh": "Critical과 High",
+    "vulnViewFixableSevere": "수정 버전이 있는 Critical과 High",
     "vulnLayout": "배치",
     "vulnLayoutList": "목록",
     "vulnLayoutPackage": "패키지별",

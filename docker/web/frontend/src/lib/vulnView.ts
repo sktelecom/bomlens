@@ -16,11 +16,21 @@
 import type { VulnItem } from "./api";
 import type { RouteQuery } from "./route";
 
-export type VulnView = "all" | "fixable" | "unfixed" | "exploited" | "critical-high";
+export type VulnView =
+  | "all"
+  | "fixable"
+  | "unfixed"
+  | "exploited"
+  | "critical-high"
+  | "fixable-severe";
 export type VulnLayout = "list" | "package";
 
 /** In the order the chips show. */
 export const VULN_VIEWS: readonly VulnView[] = ["all", "fixable", "unfixed", "exploited", "critical-high"];
+/** Every view a link can name. `fixable-severe` (Critical or High with a fixed
+ *  version) is opened from the Overview's first checks, so it matches that
+ *  count exactly; its chip shows only while it is the active view. */
+export const LINKABLE_VULN_VIEWS: readonly VulnView[] = [...VULN_VIEWS, "fixable-severe"];
 export const DEFAULT_VULN_VIEW: VulnView = "all";
 export const DEFAULT_VULN_LAYOUT: VulnLayout = "list";
 
@@ -33,6 +43,7 @@ const PRESETS: Record<VulnView, (v: VulnItem) => boolean> = {
   unfixed: (v) => !v.fixed,
   exploited: (v) => Boolean(v.kev),
   "critical-high": (v) => v.severity === "CRITICAL" || v.severity === "HIGH",
+  "fixable-severe": (v) => (v.severity === "CRITICAL" || v.severity === "HIGH") && Boolean(v.fixed),
 };
 
 export function applyVulnView(items: VulnItem[], view: VulnView): VulnItem[] {
@@ -42,7 +53,7 @@ export function applyVulnView(items: VulnItem[], view: VulnView): VulnItem[] {
 /** How many rows each preset would show, for the chip labels. */
 export function viewCounts(items: VulnItem[]): Record<VulnView, number> {
   const out = {} as Record<VulnView, number>;
-  for (const view of VULN_VIEWS) out[view] = items.filter(PRESETS[view]).length;
+  for (const view of LINKABLE_VULN_VIEWS) out[view] = items.filter(PRESETS[view]).length;
   return out;
 }
 
@@ -59,7 +70,7 @@ export function vulnViewFromQuery(query: RouteQuery | undefined): {
 } {
   const q = query ?? {};
   return {
-    view: VULN_VIEWS.find((v) => v === q.view) ?? DEFAULT_VULN_VIEW,
+    view: LINKABLE_VULN_VIEWS.find((v) => v === q.view) ?? DEFAULT_VULN_VIEW,
     layout: q.group === "package" ? "package" : DEFAULT_VULN_LAYOUT,
   };
 }

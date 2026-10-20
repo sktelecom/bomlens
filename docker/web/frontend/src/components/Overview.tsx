@@ -68,16 +68,6 @@ const TONE_ICON: Record<AttentionItem["tone"], string> = {
   high: "text-risk-high", // token-lint-ignore
   info: "text-risk-info", // token-lint-ignore
 };
-/** The "Needs attention" card is the same neutral card for every scan kind;
- *  only the thin left bar carries the role colour, keyed to the worst tone among
- *  its items (the list is already sorted most-urgent-first, see
- *  needsAttention()). No tinted fill: a coloured surface would read as a failed
- *  scan, and the bar plus the item icons already say which role it is. */
-const ATTN_BAR: Record<AttentionItem["tone"], string> = {
-  critical: "border-l-[3px] border-l-risk-critical",
-  high: "border-l-[3px] border-l-risk-high",
-  info: "border-l-[3px] border-l-risk-info",
-};
 const ATTN_ICON: Record<AttentionItem["id"], LucideIcon> = {
   malicious: Biohazard,
   conformance: FileCheck2,
@@ -893,7 +883,7 @@ export function Overview({
       <FirstChecks result={result} scanId={scanId} generatedAt={generatedAt} />
 
       {attention.length > 0 && (
-        <Card className={ATTN_BAR[attention[0].tone]} data-testid="needs-attention">
+        <Card data-testid="needs-attention">
           <CardContent className="p-4">
             <div className="mb-2 text-body-sm font-semibold text-foreground">
               {t("overview.needsAttention")}

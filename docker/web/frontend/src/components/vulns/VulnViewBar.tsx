@@ -18,6 +18,7 @@ const VIEW_LABEL: Record<VulnView, string> = {
   unfixed: "result.vulnViewUnfixed",
   exploited: "result.vulnViewExploited",
   "critical-high": "result.vulnViewCriticalHigh",
+  "fixable-severe": "result.vulnViewFixableSevere",
 };
 
 const LAYOUTS: { value: VulnLayout; labelKey: string; Icon: typeof List }[] = [
@@ -57,7 +58,9 @@ export function VulnViewBar({
         data-testid="vuln-views"
         className="flex flex-wrap items-center gap-1.5"
       >
-        {VULN_VIEWS.map((v) => (
+        {/* The Critical-or-High-with-a-fix view is opened from the Overview and
+            has a chip only while it is the one on screen. */}
+        {(view === "fixable-severe" ? [...VULN_VIEWS, view] : VULN_VIEWS).map((v) => (
           <FilterChip
             key={v}
             active={view === v}
