@@ -7,8 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v1.13.8] - 2026-10-20
+
 ### Added
 
+- The Overview opens with "Items to check first" (known exploited vulnerabilities, and Critical or High findings that have a fix), and the links to the other sections moved to the end of the page.
+- The Licenses section has a card that lists what each license in the scan asks of you when you redistribute (keep the notice, state changes, disclose source, share alike), for 47 well-known licenses.
 - The Vulnerabilities table has a "No fix yet" preset view next to "Fix available", so findings with no published fixed version can be listed on their own.
 - A GitHub URL scan in the web UI takes an optional branch, tag or commit, as `--branch` does on the command line. A commit id falls back to a full clone and a checkout. A re-scan fills the field from the earlier scan.
 - `CITATION.cff`, so GitHub offers a "Cite this repository" entry.
@@ -17,13 +21,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- The Overview is titled with the project name and version instead of "Overview". The Needs attention card, the upgrade bundle card, the active sidebar row and the model quotation no longer have a coloured bar on their left edge. The Overview links open the Vulnerabilities table on the same set of findings as the number they sit next to: a new "Critical and High with a fix" view backs the fixable count.
+- The default button's hover colour is darker, so its white label keeps 4.5:1 contrast while hovered.
 - The medium-severity amber and the success green are darker in the light theme, so bars, dots and progress fills reach 3:1 against the page (they were 2.8:1 and 2.4:1). A new check, `npm run token:contrast`, fails when a text color falls under 4.5:1 or a fill color under 3:1 in either theme. The web UI reference has an Accessibility section that lists what is measured and what is not.
 - The risk report (Markdown and HTML, English and Korean) now says when the scanned source stated version ranges and shipped no lock file: the versions in the SBOM are what a fresh install resolved on the scan day, and the vulnerability counts were measured against them. Before, only the web UI and the SBOM property `bomlens:source:versionPinning` said so.
 - The README says which Docker engines the desktop app works with on Windows: Rancher Desktop or Docker Desktop, not WSL2 + docker-ce (CLI only).
 - The conformance check flags a top-level component name that is a fixed value instead of a product name (`.`, `..`, `/` or `/scan`): it fails under `--conformance-profile skt-submission` and warns under the default profile. The supplier SBOM guide now lists what the check does not cover.
 
-## [v1.13.7] - 2026-10-17
+### Fixed
+
+- The input fingerprint of a scan is computed over files in sorted order, so the same input gives the same fingerprint on every filesystem.
+- The top-bar search field is wide enough to show its placeholder.
 - The New scan form shows an inline error for a branch, tag or commit and for excluded paths the server would refuse, and its hints are tied to their inputs. The outbound license and SBOM author fields use the shared input style, so their focus ring matches the rest of the form. The License obligations card tells screen readers how many components each license has and whether the list is expanded. The medium-severity and success tint backgrounds follow the darker light-theme fills.
+
+## [v1.13.7] - 2026-10-17
 
 ### Upgrade note
 
