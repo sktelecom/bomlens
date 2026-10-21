@@ -132,8 +132,9 @@ NON_SHIPPED_PATH_FILE_RE='(^|/)(\.github/workflows/[^/]+\.ya?ml|gradle/wrapper/[
 # here covers the whole tree. Cargo.lock, poetry.lock, uv.lock and yarn.lock are not
 # listed on purpose: a static read of a Cargo project has the same packages as a
 # build but not the 73 of 98 copyright notices the build reads from the downloaded
-# crates, poetry.lock's dev group differs from what a build installs, and yarn.lock
-# and uv.lock list the project itself as a package.
+# crates, poetry.lock's dev group differs from what a build installs, and the
+# component lists of yarn.lock and uv.lock have not been measured against a build
+# since a static read stopped listing the project itself.
 #
 # static_detection_check <dir> <lang>: returns 0 and sets STATIC_DETECTION_WHY to
 # the lock file when the tree is covered by one; returns 1 and sets it to the
@@ -348,10 +349,63 @@ non_shipped_manifests() {
         | LC_ALL=C sort
 }
 
+# static_project_name <root>: the project's own package name, for the two lock
+# file kinds that list the project as a package (yarn.lock beside package.json,
+# uv.lock beside pyproject.toml). Prints nothing for any other tree.
+static_project_name() {
+    local root="$1"
+    if [ -f "$root/yarn.lock" ] && [ -f "$root/package.json" ]; then
+        jq -r '.name // empty' "$root/package.json" 2>/dev/null
+    elif [ -f "$root/uv.lock" ] && [ -f "$root/pyproject.toml" ]; then
+        awk '
+            /^\[project\][[:space:]]*$/ { sec=1; next }
+            /^\[/ { sec=0 }
+            sec && /^[[:space:]]*name[[:space:]]*=/ {
+                v=$0; sub(/^[^=]*=[[:space:]]*/, "", v)
+                gsub(/^["'"'"']|["'"'"'][[:space:]]*(#.*)?$/, "", v)
+                print v; exit }' "$root/pyproject.toml" 2>/dev/null
+    fi
+}
+
+# static_drop_project_package <root> <sbom>: takes the project's own package out
+# of a static read. Trivy lists it for yarn.lock and uv.lock, where a build does
+# not, and puts it between the lock file and the direct dependencies; the
+# dependencies it held move up to whatever listed it, so the graph still reaches
+# every package. Nothing changes when the tree has neither lock file or no
+# component carries the project's name.
+static_drop_project_package() {
+    local root="$1" sbom="$2" name py=false tmp="$2.self.tmp"
+    name="$(static_project_name "$root")"
+    [ -n "$name" ] || return 0
+    [ -f "$root/uv.lock" ] && py=true
+    if jq --arg name "$name" --argjson py "$py" '
+        def norm: if $py then ascii_downcase | gsub("[-_.]+"; "-") else . end;
+        def full: if (.group // "") != "" then "\(.group)/\(.name)" else (.name // "") end;
+        ([.components[]?
+          | select(.type == "library" and ((.purl // "") | startswith(if $py then "pkg:pypi/" else "pkg:npm/" end))
+                   and ((full | norm) == ($name | norm)))
+          | ."bom-ref"]) as $self
+        | if ($self | length) == 0 then .
+          else
+            ([.dependencies[]? | select(.ref as $r | $self | any(. == $r)) | .dependsOn[]?] | unique) as $kids
+            | .components |= map(select(."bom-ref" as $r | $self | any(. == $r) | not))
+            | if has("dependencies") then
+                .dependencies |= (map(select(.ref as $r | $self | any(. == $r) | not))
+                  | map(if ((.dependsOn // []) | any(. as $d | $self | any(. == $d)))
+                        then .dependsOn = (((.dependsOn - $self) + $kids) | unique) else . end))
+              else . end
+          end' "$sbom" > "$tmp" 2>/dev/null; then
+        mv "$tmp" "$sbom"
+    else
+        rm -f "$tmp"; return 1
+    fi
+}
+
 # generate_sbom_static <root> <out>: the SBOM of a source tree read from its lock
 # file, with no build. `trivy fs` reads the lock files (the license scanner is
 # the one that needs no vulnerability database), the lock files themselves come
-# out of the list (Trivy lists each as a component without a purl), and a
+# out of the list (Trivy lists each as a component without a purl), the project's
+# own package comes out for yarn.lock and uv.lock (static_drop_project_package), and a
 # Trivy's 1.7 document is lowered to 1.6 when the pipeline emits 1.6. Returns 1
 # when anything fails, so the caller can fall back to a build.
 generate_sbom_static() {
@@ -366,6 +420,7 @@ generate_sbom_static() {
         rm -f "$tmp" "$out"; return 1
     fi
     rm -f "$tmp"
+    static_drop_project_package "$root" "$out" || { rm -f "$out"; return 1; }
     # Trivy writes 1.7. The pipeline's later step raises a 1.6 document to 1.7 when
     # asked, and lowering 1.7 to 1.6 is what cdx-copy-as-1.6.sh does (syft's own
     # convert would turn the root component into a component).
