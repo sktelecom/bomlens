@@ -167,6 +167,7 @@ test("status screen styles both color schemes with the first-paint colors", asyn
   });
   try {
     const win = await app.firstWindow();
+    await win.waitForLoadState("domcontentloaded");
     await win.emulateMedia({ colorScheme: "light" });
     await expect
       .poll(() => win.evaluate(() => getComputedStyle(document.body).backgroundColor))

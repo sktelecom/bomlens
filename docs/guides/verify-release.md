@@ -4,7 +4,7 @@ description: Check that a BomLens release file or container image is the one the
 
 # Verify a release
 
-A tool that reports on supply chains should have a supply chain you can check. Every release is built by the project's own GitHub Actions workflows and signed with keyless [cosign](https://docs.sigstore.dev/cosign/overview/) (Sigstore), so you can confirm that what you downloaded was built from this repository, without trusting a key that someone could hand you.
+A tool that reports on supply chains should have a supply chain you can check. Every release is built by the project's own GitHub Actions workflows and signed with keyless [cosign](https://docs.sigstore.dev/signing/quickstart/) (Sigstore), so you can confirm that what you downloaded was built from this repository, without trusting a key that someone could hand you.
 
 The commands below were run against v1.13.7. Replace the version with the one you downloaded. They need `cosign` v2 and, for the checksum step, `sha256sum` (`shasum -a 256` on macOS).
 
