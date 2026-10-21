@@ -12365,6 +12365,80 @@ GS_OUT="$( {
 while IFS= read -r line; do
   case "$line" in PASS:*) pass "${line#PASS: }" ;; FAIL:*) fail "${line#FAIL: }" ;; esac
 done <<< "$GS_OUT"
+
+# yarn.lock and uv.lock: Trivy lists the project itself as a package between the
+# lock file and the direct dependencies, which a build does not. A stand-in that
+# writes that shape, chosen by the lock file in the root it is given.
+mkdir -p "$GS/bin-self" "$GS/yarn" "$GS/uv" "$GS/scoped" "$GS/npm"
+cat > "$GS/bin-self/trivy" <<'STUB'
+#!/bin/bash
+out=""; prev=""; root=""
+for a in "$@"; do [ "$prev" = "-o" ] && out="$a"; prev="$a"; root="$a"; done
+if [ -f "$root/uv.lock" ]; then
+cat > "$out" <<'JSON'
+{"bomFormat":"CycloneDX","specVersion":"1.7","metadata":{"component":{"type":"application","name":"uv","bom-ref":"root"}},
+ "components":[{"type":"application","name":"uv.lock","bom-ref":"lock"},
+   {"type":"library","name":"idna","version":"3.4","purl":"pkg:pypi/idna@3.4","bom-ref":"pkg:pypi/idna@3.4"},
+   {"type":"library","name":"uv-app","version":"1.0.0","purl":"pkg:pypi/uv-app@1.0.0","bom-ref":"pkg:pypi/uv-app@1.0.0"}],
+ "dependencies":[{"ref":"root","dependsOn":["lock"]},{"ref":"lock","dependsOn":["pkg:pypi/uv-app@1.0.0"]},
+   {"ref":"pkg:pypi/idna@3.4","dependsOn":[]},{"ref":"pkg:pypi/uv-app@1.0.0","dependsOn":["pkg:pypi/idna@3.4"]}]}
+JSON
+elif [ -f "$root/package.json" ] && grep -q '@acme/web-app' "$root/package.json"; then
+cat > "$out" <<'JSON'
+{"bomFormat":"CycloneDX","specVersion":"1.7","metadata":{"component":{"type":"application","name":"scoped","bom-ref":"root"}},
+ "components":[{"type":"application","name":"yarn.lock","bom-ref":"lock"},
+   {"type":"library","group":"@acme","name":"web-app","version":"2.0.0","purl":"pkg:npm/%40acme/web-app@2.0.0","bom-ref":"pkg:npm/%40acme/web-app@2.0.0"},
+   {"type":"library","name":"debug","version":"4.3.1","purl":"pkg:npm/debug@4.3.1","bom-ref":"pkg:npm/debug@4.3.1"}],
+ "dependencies":[{"ref":"root","dependsOn":["lock"]},{"ref":"lock","dependsOn":["pkg:npm/%40acme/web-app@2.0.0"]},
+   {"ref":"pkg:npm/%40acme/web-app@2.0.0","dependsOn":["pkg:npm/debug@4.3.1"]},{"ref":"pkg:npm/debug@4.3.1","dependsOn":[]}]}
+JSON
+else
+cat > "$out" <<'JSON'
+{"bomFormat":"CycloneDX","specVersion":"1.7","metadata":{"component":{"type":"application","name":"yarn","bom-ref":"root"}},
+ "components":[{"type":"application","name":"yarn.lock","bom-ref":"lock"},
+   {"type":"library","name":"debug","version":"4.3.1","purl":"pkg:npm/debug@4.3.1","bom-ref":"pkg:npm/debug@4.3.1"},
+   {"type":"library","name":"ms","version":"2.1.2","purl":"pkg:npm/ms@2.1.2","bom-ref":"pkg:npm/ms@2.1.2"},
+   {"type":"library","name":"yarn-app","version":"1.0.0","purl":"pkg:npm/yarn-app@1.0.0","bom-ref":"pkg:npm/yarn-app@1.0.0"}],
+ "dependencies":[{"ref":"root","dependsOn":["lock"]},{"ref":"lock","dependsOn":["pkg:npm/yarn-app@1.0.0"]},
+   {"ref":"pkg:npm/debug@4.3.1","dependsOn":["pkg:npm/ms@2.1.2"]},{"ref":"pkg:npm/ms@2.1.2","dependsOn":[]},
+   {"ref":"pkg:npm/yarn-app@1.0.0","dependsOn":["pkg:npm/debug@4.3.1"]}]}
+JSON
+fi
+STUB
+chmod +x "$GS/bin-self/trivy"
+echo '{"name":"yarn-app","version":"1.0.0","dependencies":{"debug":"4.3.1"}}' > "$GS/yarn/package.json"; echo '# yarn lockfile v1' > "$GS/yarn/yarn.lock"
+echo '{"name":"@acme/web-app","version":"2.0.0","dependencies":{"debug":"4.3.1"}}' > "$GS/scoped/package.json"; echo '# yarn lockfile v1' > "$GS/scoped/yarn.lock"
+printf '[project]\nname = "Uv_App"  # the project\nversion = "1.0.0"\ndependencies = ["idna>=3.0"]\n' > "$GS/uv/pyproject.toml"; echo 'version = 1' > "$GS/uv/uv.lock"
+echo '{"name":"yarn-app","version":"1.0.0","dependencies":{"debug":"4.3.1"}}' > "$GS/npm/package.json"; echo '{}' > "$GS/npm/package-lock.json"
+SELF_OUT="$( {
+  . "$ROOT_DIR/docker/lib/source-detect.sh"
+  export PATH="$GS/bin-self:$PATH" LIBDIR="$ROOT_DIR/docker/lib" CDX_SPEC_VERSION=1.6
+  # every package, listed once, reachable from the lock file node after the project is gone
+  reach() { jq -r '[.components[].purl] | sort | join(",")' "$1"; }
+  generate_sbom_static "$GS/yarn" "$GS/self-yarn.json" \
+    && [ "$(reach "$GS/self-yarn.json")" = "pkg:npm/debug@4.3.1,pkg:npm/ms@2.1.2" ] \
+    && [ "$(jq -r '[.dependencies[]|select(.ref=="lock")|.dependsOn[]]|join(",")' "$GS/self-yarn.json")" = "pkg:npm/debug@4.3.1" ] \
+    && [ "$(jq '[.dependencies[]|select(.ref=="pkg:npm/yarn-app@1.0.0")]|length' "$GS/self-yarn.json")" = "0" ] \
+    && echo "PASS: a static read of yarn.lock leaves the project itself out and keeps the graph reaching every package" \
+    || echo "FAIL: yarn.lock project package"
+  generate_sbom_static "$GS/uv" "$GS/self-uv.json" \
+    && [ "$(reach "$GS/self-uv.json")" = "pkg:pypi/idna@3.4" ] \
+    && [ "$(jq -r '[.dependencies[]|select(.ref=="lock")|.dependsOn[]]|join(",")' "$GS/self-uv.json")" = "pkg:pypi/idna@3.4" ] \
+    && echo "PASS: a static read of uv.lock leaves the project itself out, matching its name as PEP 503 does (Uv_App is uv-app)" \
+    || echo "FAIL: uv.lock project package"
+  generate_sbom_static "$GS/scoped" "$GS/self-scoped.json" \
+    && [ "$(reach "$GS/self-scoped.json")" = "pkg:npm/debug@4.3.1" ] \
+    && echo "PASS: a scoped package name (@acme/web-app) is matched through its group and name" \
+    || echo "FAIL: scoped project package"
+  generate_sbom_static "$GS/npm" "$GS/self-npm.json" \
+    && [ "$(reach "$GS/self-npm.json")" = "pkg:npm/debug@4.3.1,pkg:npm/ms@2.1.2,pkg:npm/yarn-app@1.0.0" ] \
+    && echo "PASS: a tree with no yarn.lock or uv.lock keeps every component, even one named like the project" \
+    || echo "FAIL: package-lock.json tree was changed"
+  true
+} 2>&1 )"
+while IFS= read -r line; do
+  case "$line" in PASS:*) pass "${line#PASS: }" ;; FAIL:*) fail "${line#FAIL: }" ;; esac
+done <<< "$SELF_OUT"
 rm -rf "$GS"
 
 echo ""
