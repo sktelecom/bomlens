@@ -100,6 +100,7 @@ for (const [theme, selector] of [["light", ":root"], ["dark", ".dark"]]) {
   }
   check("ring on page", t.ring, t.background, 3);
   check("ring on card", t.ring, t.card, 3);
+  check("selected-foreground on selected", t["selected-foreground"], t.selected, 4.5);
 }
 
 if (failures.length) {

@@ -7,6 +7,7 @@ import { useTranslation } from "react-i18next";
 
 import { Button } from "@/components/ui/button";
 import { SELECTED_SOLID } from "@/components/ui/selectable";
+import { SEGMENT, SEGMENT_GROUP } from "@/components/ui/toolbar";
 import { ErrorState, LoadingState } from "@/components/ui/state";
 import type { ComponentItem } from "@/lib/api";
 import { severityFor, vulnSeverityIndex } from "@/lib/dependencies";
@@ -97,14 +98,18 @@ export function DependenciesPanel({
 
   return (
     <div className="space-y-3">
-      <div className="inline-flex rounded-md border p-0.5">
+      <div className={SEGMENT_GROUP}>
         <Button
           type="button"
           size="sm"
           variant="ghost"
           data-testid="deps-view-graph"
           aria-pressed={view === "graph"}
-          className={cn(view === "graph" && SELECTED_SOLID)}
+          className={cn(
+            "h-auto",
+            SEGMENT,
+            view === "graph" ? SELECTED_SOLID : "text-muted-foreground hover:text-foreground",
+          )}
           onClick={() => setPicked("graph")}
         >
           <GitFork className="h-4 w-4" />
@@ -116,7 +121,11 @@ export function DependenciesPanel({
           variant="ghost"
           data-testid="deps-view-tree"
           aria-pressed={view === "tree"}
-          className={cn(view === "tree" && SELECTED_SOLID)}
+          className={cn(
+            "h-auto",
+            SEGMENT,
+            view === "tree" ? SELECTED_SOLID : "text-muted-foreground hover:text-foreground",
+          )}
           onClick={() => setPicked("tree")}
         >
           <ListTree className="h-4 w-4" />

@@ -10,7 +10,8 @@ import { DensityToggle, useDensity } from "@/components/ui/density-toggle";
 import { FilterChip } from "@/components/ui/filter-chip";
 import { Button } from "@/components/ui/button";
 import { CheckMenu, type CheckMenuItem } from "@/components/ui/check-menu";
-import { Select } from "@/components/ui/select";
+import { ToolbarSelect } from "@/components/ui/select";
+import { TOOLBAR_CONTROL } from "@/components/ui/toolbar";
 import { EmptyState } from "@/components/ui/state";
 import type { ComponentItem, Severity } from "@/lib/api";
 import {
@@ -312,11 +313,11 @@ export function ComponentsTable({ items, total, truncated, scanId, query, onQuer
             value={filters.query}
             onChange={(e) => patch({ query: e.target.value })}
             placeholder={t("result.componentsSearch")}
-            className="pl-8"
+            className={cn(TOOLBAR_CONTROL, "pl-8")}
           />
         </div>
         {types.length > 1 && (
-          <Select
+          <ToolbarSelect
             value={filters.type}
             onChange={(e) => patch({ type: e.target.value })}
             aria-label={t("result.allTypes")}
@@ -330,12 +331,12 @@ export function ComponentsTable({ items, total, truncated, scanId, query, onQuer
                 {ty}
               </option>
             ))}
-          </Select>
+          </ToolbarSelect>
         )}
         {/* Also shown for a single license when one is selected — a filter
             routed in from the Licenses section must stay clearable. */}
         {(licenses.length > 1 || filters.license) && (
-          <Select
+          <ToolbarSelect
             value={filters.license}
             onChange={(e) => patch({ license: e.target.value })}
             aria-label={t("result.allLicenses")}
@@ -347,7 +348,7 @@ export function ComponentsTable({ items, total, truncated, scanId, query, onQuer
                 {l}
               </option>
             ))}
-          </Select>
+          </ToolbarSelect>
         )}
         {filterItems.length > 0 && (
           <CheckMenu label={t("result.filters")} items={filterItems} />
@@ -357,7 +358,7 @@ export function ComponentsTable({ items, total, truncated, scanId, query, onQuer
           type="button"
           variant="outline"
           size="sm"
-          className="shrink-0"
+          className={cn(TOOLBAR_CONTROL, "shrink-0")}
           disabled={filtered.length === 0}
           onClick={exportCsv}
         >
@@ -395,14 +396,14 @@ export function ComponentsTable({ items, total, truncated, scanId, query, onQuer
                 licenseUnclear: false,
               })
             }
-            className="rounded text-label text-muted-foreground underline-offset-2 hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+            className="rounded text-label text-muted-foreground underline underline-offset-2 hover:text-foreground hover:no-underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
           >
             {t("result.clearFilters")}
           </button>
         </div>
       )}
 
-      <div ref={scrollRef} className="max-h-[max(44rem,calc(100vh-21rem))] resize-y overflow-auto rounded-md border">
+      <div ref={scrollRef} className="max-h-[max(44rem,calc(100vh-21rem))] overflow-auto rounded-md border">
         <table className={cn("w-full text-left text-label", densityClass(density))}>
           <thead className="sticky top-0 z-10 bg-muted/95 backdrop-blur">
             <tr className="border-b">

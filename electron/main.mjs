@@ -199,9 +199,9 @@ async function createWindow() {
   mainWindow = new BrowserWindow({
     ...bounds,
     // First-paint background in the OS theme so there is no white/black flash. These are the
-    // computed values of the shared tokens' --background (hsl(0 0% 98%) light, hsl(240 6% 6%)
+    // computed values of the shared tokens' --background (hsl(0 0% 98%) light, hsl(240 6% 7%)
     // dark), which is what the start screen paints once its CSS loads.
-    backgroundColor: nativeTheme.shouldUseDarkColors ? "#0e0e10" : "#fafafa",
+    backgroundColor: nativeTheme.shouldUseDarkColors ? "#111113" : "#fafafa",
     title: "BomLens",
     // Windows/Linux에서 메뉴바를 숨긴다(Alt로 꺼낼 수 있고 Edit 단축키는 유지된다).
     // Menu.setApplicationMenu(null)은 단축키까지 없애므로 쓰지 않는다.

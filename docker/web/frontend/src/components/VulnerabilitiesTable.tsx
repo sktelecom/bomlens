@@ -38,7 +38,9 @@ import { IS_STATIC_DEMO } from "@/lib/demo";
 
 import { NotReachableFindings } from "./NotReachableFindings";
 import { AdvisoriesWithoutCve } from "./AdvisoriesWithoutCve";
-import { CoverageNotice } from "@/components/ui/coverage-notice";
+import { CALLOUT } from "@/components/ui/coverage-notice";
+import { Disclosure } from "@/components/ui/disclosure";
+import { TOOLBAR_CONTROL } from "@/components/ui/toolbar";
 import { SeverityBar } from "./SeverityBar";
 import { UncheckedComponents } from "./UncheckedComponents";
 import { PackageGroupRow } from "./vulns/PackageGroupRow";
@@ -296,7 +298,7 @@ export function VulnerabilitiesTable({
           scanId ? (
             <a
               href={scanHash(scanId, "components")}
-              className="rounded text-label text-primary underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1"
+              className="rounded text-label text-primary underline underline-offset-2 hover:no-underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1"
             >
               {t("result.noVulnsAction")}
             </a>
@@ -364,9 +366,22 @@ export function VulnerabilitiesTable({
         // old kernel carries thousands, nearly all for subsystems the image
         // never compiled in, and the SBOM cannot tell which — so counting them
         // here would bury the findings this screen exists to show.
-        <CoverageNotice testId="kernel-advisories-notice">
-          {t("result.kernelAdvisories", { count: security.kernelCount })}
-        </CoverageNotice>
+        // One line, with the reason folded away: it is a secondary note above
+        // the table, not a finding.
+        <div
+          role="note"
+          data-testid="kernel-advisories-notice"
+          data-coverage-notice=""
+          className={CALLOUT}
+        >
+          <Disclosure
+            summary={
+              <span>{t("result.kernelAdvisories", { count: security.kernelCount })}</span>
+            }
+          >
+            <p className="mt-1 pl-5">{t("result.kernelAdvisoriesWhy")}</p>
+          </Disclosure>
+        </div>
       ) : null}
       <UncheckedComponents security={security} />
       <NotReachableFindings security={security} />
@@ -385,7 +400,7 @@ export function VulnerabilitiesTable({
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder={t("result.vulnSearchPlaceholder")}
-          className="h-9 max-w-xs"
+          className={cn(TOOLBAR_CONTROL, "max-w-xs")}
           aria-label={t("result.vulnSearchPlaceholder")}
         />
         {(q || severityFilter || view !== "all") && (
@@ -416,6 +431,7 @@ export function VulnerabilitiesTable({
                 type="button"
                 variant="outline"
                 size="sm"
+                className={TOOLBAR_CONTROL}
                 disabled={importing}
                 onClick={() => importInput.current?.click()}
               >
@@ -429,6 +445,7 @@ export function VulnerabilitiesTable({
               type="button"
               variant="outline"
               size="sm"
+              className={TOOLBAR_CONTROL}
               disabled={exportingVex}
               onClick={runVexExport}
             >
@@ -440,6 +457,7 @@ export function VulnerabilitiesTable({
             type="button"
             variant="outline"
             size="sm"
+            className={TOOLBAR_CONTROL}
             disabled={visible.length === 0}
             onClick={exportCsv}
           >
@@ -448,7 +466,7 @@ export function VulnerabilitiesTable({
           </Button>
         </div>
       </div>
-      <div className="max-h-[max(44rem,calc(100vh-21rem))] resize-y overflow-auto rounded-md border">
+      <div className="max-h-[max(44rem,calc(100vh-21rem))] overflow-auto rounded-md border">
         <table className={cn("w-full text-left text-label", densityClass(density))}>
         <thead className="sticky top-0 z-10 bg-muted/95 backdrop-blur">
           <tr className="border-b">

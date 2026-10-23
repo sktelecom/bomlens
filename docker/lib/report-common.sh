@@ -91,8 +91,8 @@ report_tokens_css() {
   --font-size-caption:0.6875rem;--font-size-mono:0.75rem;
 }
 @media screen and (prefers-color-scheme: dark){:root{
-  --background:240 6% 6%;--foreground:0 0% 98%;--card:240 4% 11%;--muted:240 4% 16%;
-  --muted-foreground:240 5% 65%;--border:240 4% 16%;--brand:349 100% 46%;
+  --background:240 6% 7%;--foreground:0 0% 98%;--card:240 4% 12%;--muted:240 4% 16%;
+  --muted-foreground:240 5% 65%;--border:240 4% 24%;--brand:349 100% 46%;
   --brand-strong:349 100% 68%;--role-danger-fg:252 165 165;--role-danger-muted:60 38 41;
   --role-danger-emphasis:248 113 113;--role-danger-border:125 64 66;--role-severe-fg:253 186 116;
   --role-severe-muted:60 44 32;--role-severe-emphasis:251 146 60;--role-severe-border:126 79 42;

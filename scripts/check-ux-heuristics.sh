@@ -140,7 +140,7 @@ parsed_flags="$(grep -oE '^[[:space:]]*--[a-z][a-z-]*(\|--[a-z][a-z-]*)*\)' scri
 undocumented=""
 while IFS= read -r flag; do
   [ -n "$flag" ] || continue
-  printf '%s' "$help_text" | grep -qE -- "(^|[^a-z])$flag([^a-z]|$)" || undocumented="$undocumented $flag"
+  grep -qE -- "(^|[^a-z])$flag([^a-z]|$)" <<<"$help_text" || undocumented="$undocumented $flag"
 done <<EOF
 $parsed_flags
 EOF

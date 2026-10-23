@@ -6,6 +6,7 @@ import { useTranslation } from "react-i18next";
 import { Rows2, Rows4 } from "lucide-react";
 
 import { FOCUS_RING, SELECTED_SOLID } from "@/components/ui/selectable";
+import { SEGMENT, SEGMENT_GROUP } from "@/components/ui/toolbar";
 import { type Density, readDensity, writeDensity } from "@/lib/tableDensity";
 import { cn } from "@/lib/utils";
 
@@ -40,7 +41,7 @@ export function DensityToggle({
       role="group"
       aria-label={t("result.density")}
       data-testid="density-toggle"
-      className="inline-flex shrink-0 rounded-md border p-0.5"
+      className={SEGMENT_GROUP}
     >
       {OPTIONS.map(({ value, labelKey, Icon }) => (
         <button
@@ -50,7 +51,8 @@ export function DensityToggle({
           title={t(labelKey)}
           onClick={() => onChange(value)}
           className={cn(
-            "inline-flex items-center rounded border border-transparent px-2 py-1 transition-colors duration-fast ease-out-soft",
+            SEGMENT,
+            "transition-colors duration-fast ease-out-soft",
             FOCUS_RING,
             density === value
               ? SELECTED_SOLID

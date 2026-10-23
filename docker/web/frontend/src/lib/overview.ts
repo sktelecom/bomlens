@@ -248,3 +248,23 @@ export function firstChecks(result: DoneEvent, limit = 3): FirstCheck[] {
 
   return items.slice(0, Math.max(0, limit));
 }
+
+/**
+ * The "Needs attention" rows the Overview shows beside the first-checks block,
+ * without the rows that block already carries. A failed conformance is always
+ * its "required items" row (same count, same target). The Critical-and-High
+ * row is dropped only when every one of those findings has a fixed version, so
+ * the "with a fixed version" row counts exactly the same findings; when some
+ * have no fix the two numbers differ and both stay.
+ */
+export function overviewAttention(result: DoneEvent): AttentionItem[] {
+  const shown = firstChecks(result);
+  const fixable = shown.find((c) => c.id === "fixableSevere");
+  return needsAttention(result).filter((i) => {
+    if (i.id === "conformance") return false;
+    if (i.id === "vulns" && fixable && fixable.rowsListed === undefined) {
+      return fixable.count !== i.count;
+    }
+    return true;
+  });
+}

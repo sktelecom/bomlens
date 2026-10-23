@@ -5,6 +5,7 @@ import {
   ArrowDown,
   ArrowUp,
   ArrowUpDown,
+  Cpu,
   ExternalLink,
   FileJson,
   FolderOpen,
@@ -101,7 +102,7 @@ function FilterChip({
       aria-pressed={active}
       onClick={onClick}
       className={cn(
-        "inline-flex h-9 items-center rounded-full border px-3.5 text-body-sm",
+        "inline-flex h-9 items-center rounded-md border px-3.5 text-body-sm",
         "transition-[color,border-color,background-color,box-shadow] duration-fast ease-out-soft",
         FOCUS_RING,
         active
@@ -142,15 +143,16 @@ function ScanLabel({ scan }: { scan: RecentScan }) {
   );
 }
 
-/** The type chip, shared by the table and the stacked rows. */
+/** The type chip, shared by the table and the stacked rows. Every type is the
+ *  same muted chip; an AI scan adds the icon its Models section uses in the
+ *  rail, so it stands out without a heavier outline. */
 function TypeBadge({ scan }: { scan: RecentScan }) {
   const { t } = useTranslation();
-  return scanType(scan) === "ai" ? (
-    <Badge variant="outline" className="font-semibold">
+  return (
+    <Badge variant="muted">
+      {scanType(scan) === "ai" && <Cpu className="h-3 w-3" aria-hidden />}
       {t(scanTypeLabelKey(scan))}
     </Badge>
-  ) : (
-    <Badge variant="muted">{t(scanTypeLabelKey(scan))}</Badge>
   );
 }
 
@@ -258,7 +260,9 @@ function SortHeader({
   const Icon = !active ? ArrowUpDown : sort.dir === "asc" ? ArrowUp : ArrowDown;
   return (
     <th
-      className={cn("whitespace-nowrap px-4 py-3 font-medium", className)}
+      // Left by default, like the plain headers (TH) and the cells under them;
+      // a numeric column passes text-right.
+      className={cn("whitespace-nowrap px-4 py-3 text-left font-medium", className)}
       aria-sort={active ? (sort.dir === "asc" ? "ascending" : "descending") : "none"}
     >
       <button
@@ -378,7 +382,7 @@ export function RecentScans({ scans, newHref, onDelete }: Props) {
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder={t("recent.searchPlaceholder")}
                 aria-label={t("recent.searchPlaceholder")}
-                className="h-9 w-56 pl-8"
+                className="h-9 w-56 rounded-md pl-8"
               />
             </div>
             {/* The at-risk filter is a chip like the type chips, with its count on

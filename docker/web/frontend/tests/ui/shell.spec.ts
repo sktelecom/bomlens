@@ -167,7 +167,13 @@ test("Recent menu re-opens a past scan from the top bar", async ({ page }) => {
   await recent.click();
 
   await expect(page.getByRole("link", { name: /^Overview/ })).toHaveAttribute("aria-current", "page");
-  await expect(page.getByText("2 critical or high vulnerabilities")).toBeVisible();
+  // The scan's two Critical/High findings, both fixable, counted on the row.
+  const fixable = page
+    .getByTestId("first-checks")
+    .getByRole("listitem")
+    .filter({ hasText: "Critical or High with a fixed version" });
+  await expect(fixable).toBeVisible();
+  await expect(fixable.getByText("2", { exact: true })).toBeVisible();
 });
 test("a project scanned twice shows how it moved", async ({ page }) => {
   await page.route("**/capabilities", (r) =>
@@ -905,8 +911,10 @@ test("a scan with nothing against any component shows no risk block", async ({ p
 test("Overview leads with needs-attention and jumps into sections", async ({ page }) => {
   await stubAndRun(page);
 
-  // Needs-attention surfaces the critical/high vulnerabilities (1+1) and links out.
-  const attention = page.getByRole("link", { name: /critical or high vulnerabilities/ });
+  // Both critical/high findings (1+1) have a fixed version, so the first-checks
+  // row already counts them and needs-attention does not repeat the figure.
+  await expect(page.getByRole("link", { name: /critical or high vulnerabilities/ })).toHaveCount(0);
+  const attention = page.getByTestId("first-checks").getByRole("link", { name: /Critical or High with a fixed version/ });
   await expect(attention).toBeVisible();
   await attention.click();
   await expect(page.getByRole("link", { name: /^Vulnerabilities/ })).toHaveAttribute("aria-current", "page");
@@ -975,7 +983,7 @@ test("section navigation moves focus to the section heading", async ({ page }) =
 
 test("overview has no axe violations", async ({ page }) => {
   await stubAndRun(page);
-  await expect(page.getByText(/critical or high vulnerabilities/)).toBeVisible();
+  await expect(page.getByTestId("first-checks")).toBeVisible();
   const results = await new AxeBuilder({ page })
     .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
     .analyze();

@@ -7,8 +7,10 @@ import { useTranslation } from "react-i18next";
 
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { TOOLBAR_CONTROL } from "@/components/ui/toolbar";
 import type { Severity } from "@/lib/api";
 import { findFirstMatch, findPathToRef, type TreeNode } from "@/lib/sbomGraph";
+import { cn } from "@/lib/utils";
 
 const VULN_TONE: Record<Severity, "critical" | "high" | "medium" | "low" | "info"> = {
   CRITICAL: "critical",
@@ -251,7 +253,7 @@ export function DependencyTree({
       )}
       <div className="relative">
         <Search
-          className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground"
+          className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
           aria-hidden
         />
         <Input
@@ -259,14 +261,14 @@ export function DependencyTree({
           value={query}
           onChange={(e) => onSearchChange(e.target.value)}
           placeholder={t("deps.search")}
-          className="h-8 pl-8 text-label"
+          className={cn(TOOLBAR_CONTROL, "pl-8")}
           aria-label={t("deps.search")}
         />
       </div>
       {noMatch && (
         <p className="text-body-sm text-muted-foreground">{t("deps.searchNoMatch")}</p>
       )}
-      <div className="max-h-[max(44rem,calc(100vh-21rem))] resize-y overflow-auto rounded-md border p-1">
+      <div className="max-h-[max(44rem,calc(100vh-21rem))] overflow-auto rounded-md border p-1">
         <ul role="tree" aria-label={t("deps.treeLabel")}>
           {rows.map((row, i) => {
             const { node } = row;
@@ -289,7 +291,7 @@ export function DependencyTree({
                 className="rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
                 <div
-                  className="flex items-center gap-2 rounded-sm px-1.5 py-1 hover:bg-accent/50"
+                  className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-sm px-1.5 py-1 hover:bg-accent/50 xl:flex-nowrap"
                   style={{ paddingLeft: `${(row.level - 1) * 16 + 6}px` }}
                 >
                   {row.hasChildren ? (
@@ -318,36 +320,55 @@ export function DependencyTree({
                   )}
 
                   <Package className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden />
-                  <span className="font-mono text-label">
+                  {/* The name wraps instead of being cut short, so all of it is on
+                      screen for every reader, keyboard focus included. */}
+                  <span className="min-w-[6rem] flex-1 font-mono text-label [overflow-wrap:anywhere] xl:min-w-0">
                     {node.name}
                     {node.version ? (
                       <span className="text-muted-foreground"> {node.version}</span>
                     ) : null}
                   </span>
-
-                  {node.vuln && (
-                    <Badge tone={VULN_TONE[node.vuln]} mark className="ml-1" title={t("deps.hasVuln")}>
-                      {t(`severity.${node.vuln}`)}
-                    </Badge>
-                  )}
+                  {/* Where the node sits in the tree stays beside its name. */}
                   {row.level === 1 && (
-                    <Badge tone="info" className="ml-1">
+                    <Badge tone="info" className="shrink-0">
                       {t("deps.direct")}
                     </Badge>
                   )}
                   {node.cycle && (
-                    <Badge variant="muted" className="ml-1">
+                    <Badge variant="muted" className="shrink-0">
                       {t("deps.cycle")}
                     </Badge>
                   )}
-                  {node.licenses.slice(0, 2).map((l) => (
-                    <Badge key={l} variant="muted">
-                      {l}
-                    </Badge>
-                  ))}
-                  {node.licenses.length > 2 && (
-                    <Badge variant="muted">+{node.licenses.length - 2}</Badge>
-                  )}
+
+                  {/* From xl up, severity and licences sit in fixed columns on the
+                      right, so they line up from row to row whatever the name's
+                      length. Narrower, they follow the name and wrap under it
+                      rather than squeezing it. A long licence value (a hash, a
+                      full licence text) is cut short, with the whole value in
+                      the tooltip. */}
+                  <span className="ml-auto flex shrink-0 justify-end xl:w-24">
+                    {node.vuln && (
+                      <Badge tone={VULN_TONE[node.vuln]} mark title={t("deps.hasVuln")}>
+                        {t(`severity.${node.vuln}`)}
+                      </Badge>
+                    )}
+                  </span>
+                  <span className="flex min-w-0 flex-wrap justify-end gap-1 xl:w-72 xl:shrink-0 xl:flex-nowrap">
+                    {node.licenses.slice(0, 2).map((l) => (
+                      <Badge key={l} variant="muted" className="min-w-0 max-w-[7.5rem]" title={l}>
+                        <span className="truncate">{l}</span>
+                      </Badge>
+                    ))}
+                    {node.licenses.length > 2 && (
+                      <Badge
+                        variant="muted"
+                        className="shrink-0"
+                        title={node.licenses.slice(2).join(", ")}
+                      >
+                        +{node.licenses.length - 2}
+                      </Badge>
+                    )}
+                  </span>
                 </div>
               </li>
             );

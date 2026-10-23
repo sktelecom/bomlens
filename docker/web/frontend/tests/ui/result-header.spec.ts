@@ -143,7 +143,17 @@ test("the Overview leaves the first-checks block out when nothing applies", asyn
 
 test("the needs-attention card is the same neutral card for a source and an AI scan", async ({ page }) => {
   await seedThemeLang(page, "light", "en");
-  await openScan(page, DONE);
+  // One High finding without a fix, so the Critical-and-High count differs from
+  // the fixable one in first checks and the card has a row of its own.
+  await openScan(page, {
+    ...DONE,
+    security: {
+      ...DONE.security,
+      vulnerabilities: DONE.security.vulnerabilities.map((v) =>
+        v.severity === "HIGH" ? { ...v, fixed: "" } : v,
+      ),
+    },
+  });
   const card = page.getByTestId("needs-attention");
   await expect(card).toBeVisible();
   // No accent bar on one edge: the border is the same width on every side.
