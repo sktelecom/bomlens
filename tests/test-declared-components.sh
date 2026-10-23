@@ -1058,6 +1058,24 @@ rc="$(yocto_apply ybb "$WORK/ybb.cdx.json")"
   && [ "$(jq -r '.components[] | select(.name == "busybox") | .licenses[0].license.id' "$WORK/ybb.bom.json")" = "GPL-2.0-only" ] \
     && pass "a recipe named like its package matches it, and a declaration with no licence keeps the build's" \
     || fail "busybox by name: exit $rc" "$(cat "$WORK/ybb.log")"
+# A declared package keeps what the reader wrote on it: later steps read
+# bomlens:identifiedBy (vulnerability coverage) and bomlens:yocto:recipe (the
+# upstream repository purl), so libz1, declared through its recipe zlib, still
+# gets zlib's repository purl.
+cat > "$WORK/yz.cdx.json" <<'EOF'
+{"bomFormat": "CycloneDX", "components": [{"type": "library", "name": "zlib",
+  "supplier": {"name": "zlib authors", "url": ["https://zlib.net"]},
+  "properties": [{"name": "bomlens:origin", "value": "third-party"}, {"name": "bomlens:yocto-recipe", "value": "zlib"}]}]}
+EOF
+yocto_read yz 5x
+rc="$(yocto_apply yz "$WORK/yz.cdx.json")"
+python3 -I "$LIB/upstream-purl.py" "$WORK/yz.bom.json" >/dev/null 2>&1
+Z="$(comp "$WORK/yz.bom.json" libz1)"
+[ "$rc" = 0 ] && [ "$(prop "$Z" bomlens:identifiedBy)|$(prop "$Z" bomlens:yocto:recipe)|$(prop "$Z" bomlens:layer)|$(prop "$Z" bomlens:yocto-recipe)|$(prop "$Z" bomlens:declared)" = "yocto-spdx|zlib|yocto|zlib|true" ] \
+  && [ "$(printf '%s' "$Z" | jq -r .purl)" = "pkg:github/madler/zlib@v1.3.1" ] \
+    && pass "a declared package keeps bomlens:identifiedBy, bomlens:yocto:recipe and bomlens:layer, and still gets its upstream purl" \
+    || fail "reader properties on a declared package: exit $rc" "$Z"
+
 # The SBOM the 5.x reader wrote is unchanged except for the declared packages.
 yocto_read y5plain 5x
 [ "$(jq -c '[.components[] | select(.name | test("^(busybox|busybox-syslog|libz1)$"))]' "$WORK/y5plain.bom.json")" \
@@ -1213,6 +1231,26 @@ FM="$WORK/yemanifests.out/ExampleImage_1.0_bom.json"
 [ "$(jq -r '.metadata.timestamp // "" | test("^20[0-9][0-9]-")' "$FM")" = true ] && [ "$(jq -c "$UNREACHED" "$FM")" = "[]" ] \
     && pass "manifests: a timestamp is written (the manifests carry none) and the graph reaches every package" \
     || fail "manifests stamped" "$(jq -c '[.metadata.timestamp, .metadata.component]' "$FM")"
+# A --license CycloneDX has no field for is refused when the container starts,
+# before anything is generated, in every mode that records it (here a Yocto
+# build directory and a source scan's post-processing), whoever started the
+# run; a received SBOM, which records no --license, is not stopped by it.
+rc="$(run_yocto yelic 6x PROJECT_LICENSE="Proprietary")"
+[ "$rc" = 1 ] && grep -qF "[license] ERROR: the licence 'Proprietary' is not an SPDX license id" "$WORK/yelic.out.log" \
+  && grep -qF "[ERROR] --license was refused (the reason is above); the run stops before an SBOM is written." "$WORK/yelic.out.log" \
+  && ! grep -qF "[yocto-spdx]" "$WORK/yelic.out.log" && [ ! -f "$WORK/yelic.out/ExampleImage_1.0_bom.json" ] \
+    && pass "a free-text --license stops a Yocto build scan before the reader runs" \
+    || fail "early licence refusal (Yocto): exit $rc" "$(tail -4 "$WORK/yelic.out.log")"
+P="$(new_project entry-lic)"
+rc="$(run_entry elic "$P" DECLARED_COMPONENTS_SKIP=1 PROJECT_LICENSE="MIT AND")"
+[ "$rc" = 1 ] && grep -qF "is not a licence expression: it ends where a licence should come" "$WORK/elic.out.log" \
+  && ! grep -qF "[stamp]" "$WORK/elic.out.log" \
+    && pass "an incomplete --license expression stops post-processing before the SBOM is stamped" \
+    || fail "early licence refusal (POSTPROCESS): exit $rc" "$(tail -4 "$WORK/elic.out.log")"
+rc="$(run_yocto yelicrecv 6x YOCTO_FROM_BUILD=false PROJECT_LICENSE="Proprietary")"
+[ "$rc" = 0 ] && ! grep -qF "[license] ERROR" "$WORK/yelicrecv.out.log" \
+    && pass "a received SBOM, which records no --license, is not stopped by one" \
+    || fail "licence with a received SBOM: exit $rc" "$(tail -4 "$WORK/yelicrecv.out.log")"
 # The same document passed with --analyze on its own is someone else's SBOM:
 # none of it is stamped, whatever options are given.
 rc="$(run_yocto yerecv 6x YOCTO_FROM_BUILD=false "${YBSI[@]}")"
@@ -1285,7 +1323,7 @@ else
 fi
 # A --license CycloneDX has no field for is refused before the scan starts,
 # with the helper the container uses.
-cli_out="$(bash "$SCRIPT" --project x --version 1 --license "Proprietary" --target "$WORK/no-such-dir" 2>&1)"; cli_rc=$?
+cli_out="$(bash "$SCRIPT" --project x --version 1 --license "Proprietary" --target "$(new_project cli-lic)" 2>&1)"; cli_rc=$?
 if printf '%s' "$cli_out" | grep -qF "Cannot reach the Docker engine"; then
     echo "  SKIP: scan-sbom.sh --license with free text (no Docker engine)"
 else
@@ -1298,7 +1336,7 @@ yroot_rc=0
 PROJECT_LICENSE="Proprietary" bash "$LIB/stamp-yocto-root.sh" "$WORK/yroot.bom.json" > "$WORK/yroot.log" 2>&1 || yroot_rc=$?
 PROJECT_LICENSE="mit or apache-2.0" PROJECT_VERSION=1 bash "$LIB/stamp-yocto-root.sh" "$WORK/yroot.bom.json" >/dev/null 2>&1
 [ "$yroot_rc" = 1 ] && grep -qF "LicenseRef-Proprietary" "$WORK/yroot.log" \
-  && [ "$(jq -c '.metadata.component.licenses' "$WORK/yroot.bom.json")" = '[{"expression":"mit OR apache-2.0","acknowledgement":"concluded"}]' ] \
+  && [ "$(jq -c '.metadata.component.licenses' "$WORK/yroot.bom.json")" = '[{"expression":"MIT OR Apache-2.0","acknowledgement":"concluded"}]' ] \
     && pass "stamp-yocto-root.sh refuses a free-text --license and writes an expression as one" \
     || fail "yocto root licence: exit $yroot_rc" "$(cat "$WORK/yroot.log"; jq -c .metadata.component "$WORK/yroot.bom.json")"
 

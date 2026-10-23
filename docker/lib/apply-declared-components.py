@@ -1083,7 +1083,12 @@ def check_build_names(comps, declared, yocto_recipes, problems):
 def apply_recipes(recipe_matches, yocto_files):
     """Put each recipe declaration on the packages of the recipe, with their
     files nested under them."""
-    reserved = (ORIGIN, RECIPE, MARK) + READER_OWNED
+    # The package keeps every property the reader wrote (bomlens:identifiedBy,
+    # bomlens:yocto:recipe and the rest, which later steps read); only the
+    # three this step writes are replaced. The declaration's own properties
+    # never bring a reader-owned one (refused earlier, and left out here).
+    replaced = (ORIGIN, RECIPE, MARK)
+    reserved = replaced + READER_OWNED
     for decl, matched in recipe_matches:
         origin = props(decl, ORIGIN)[0]
         extra = [p for p in decl.get("properties", []) if p.get("name") not in reserved]
@@ -1094,7 +1099,7 @@ def apply_recipes(recipe_matches, yocto_files):
             if decl.get("externalReferences"):
                 refs = c.get("externalReferences") if isinstance(c.get("externalReferences"), list) else []
                 c["externalReferences"] = refs + [r for r in copy.deepcopy(decl["externalReferences"]) if r not in refs]
-            kept = [p for p in c.get("properties") or [] if p.get("name") not in reserved]
+            kept = [p for p in c.get("properties") or [] if p.get("name") not in replaced]
             c["properties"] = (kept + [copy.deepcopy(p) for p in extra if p not in kept]
                                + [{"name": ORIGIN, "value": origin}, {"name": RECIPE, "value": decl["_recipe"]},
                                   {"name": MARK, "value": "true"}])
