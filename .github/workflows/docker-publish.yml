@@ -337,7 +337,7 @@ jobs:
           cosign sign --yes "$gen"
           cosign sign --yes "$leg"
           # CycloneDX SBOM of our own image, attached as a signed attestation.
-          syft "$bl" -o cyclonedx-json=sbom.cdx.json
+          TMPDIR="$RUNNER_TEMP" syft "$bl" -o cyclonedx-json=sbom.cdx.json
           cosign attest --yes --predicate sbom.cdx.json --type cyclonedx "$bl"
           cosign attest --yes --predicate sbom.cdx.json --type cyclonedx "$gen"
           cosign attest --yes --predicate sbom.cdx.json --type cyclonedx "$leg"
@@ -579,7 +579,7 @@ jobs:
           set -euo pipefail
           bl="${REGISTRY}/${OWNER}/bomlens-firmware@${DIGEST}"
           leg="${REGISTRY}/${OWNER}/sbom-scanner-firmware@${DIGEST}"
-          syft "$bl" -o cyclonedx-json=sbom-firmware.cdx.json
+          TMPDIR="$RUNNER_TEMP" syft "$bl" -o cyclonedx-json=sbom-firmware.cdx.json
           cosign attest --yes --predicate sbom-firmware.cdx.json --type cyclonedx "$bl"
           cosign attest --yes --predicate sbom-firmware.cdx.json --type cyclonedx "$leg"
       - name: Install Trivy (pinned release tarball)
@@ -738,7 +738,7 @@ jobs:
           set -euo pipefail
           bl="${REGISTRY}/${OWNER}/bomlens-aibom@${DIGEST}"
           leg="${REGISTRY}/${OWNER}/sbom-scanner-aibom@${DIGEST}"
-          syft "$bl" -o cyclonedx-json=sbom-aibom.cdx.json
+          TMPDIR="$RUNNER_TEMP" syft "$bl" -o cyclonedx-json=sbom-aibom.cdx.json
           cosign attest --yes --predicate sbom-aibom.cdx.json --type cyclonedx "$bl"
           cosign attest --yes --predicate sbom-aibom.cdx.json --type cyclonedx "$leg"
       - name: Install Trivy (pinned release tarball)
@@ -918,7 +918,7 @@ jobs:
         run: |
           set -euo pipefail
           bl="${REGISTRY}/${OWNER}/bomlens-deep-cve@${DIGEST}"
-          syft "$bl" -o cyclonedx-json=sbom-deep-cve.cdx.json
+          TMPDIR="$RUNNER_TEMP" syft "$bl" -o cyclonedx-json=sbom-deep-cve.cdx.json
           cosign attest --yes --predicate sbom-deep-cve.cdx.json --type cyclonedx "$bl"
       - name: Install Trivy (pinned release tarball)
         if: steps.flags.outputs.push == 'true'
@@ -1094,7 +1094,7 @@ jobs:
         run: |
           set -euo pipefail
           bl="${REGISTRY}/${OWNER}/bomlens-deep-license@${DIGEST}"
-          syft "$bl" -o cyclonedx-json=sbom-deep-license.cdx.json
+          TMPDIR="$RUNNER_TEMP" syft "$bl" -o cyclonedx-json=sbom-deep-license.cdx.json
           cosign attest --yes --predicate sbom-deep-license.cdx.json --type cyclonedx "$bl"
       - name: Install Trivy (pinned release tarball)
         if: steps.flags.outputs.push == 'true'
