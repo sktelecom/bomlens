@@ -300,6 +300,29 @@ PROJECT_LICENSE=Apache-2.0 PROJECT_LICENSE_FROM_MANIFEST=1 bash "$LIB/stamp-meta
   && [ "$(jq -c '.metadata.component.licenses' "$WORK/lic-empty.json")" = '[{"license":{"id":"Apache-2.0","acknowledgement":"declared"}}]' ] \
     && pass "--license replaces a generator's MIT root licence as concluded; a manifest licence leaves it and fills only an empty one, as declared" \
     || fail "root licence" "$(jq -c '.metadata.component.licenses' "$WORK/lic-explicit.json" "$WORK/lic-manifest.json" "$WORK/lic-empty.json")"
+# license.id takes only an SPDX list id: a LicenseRef- goes in license.name and
+# a compound expression in expression, both still concluded.
+cp "$WORK/lic-mit.json" "$WORK/lic-ref.json"; cp "$WORK/lic-mit.json" "$WORK/lic-expr.json"
+printf '%s' "$DOC" | jq '.metadata.component = {"type": "application", "name": "x", "version": "1"}' > "$WORK/lic-ref-manifest.json"
+PROJECT_LICENSE=LicenseRef-ExampleCorp-Proprietary bash "$LIB/stamp-metadata.sh" "$WORK/lic-ref.json" x 1 >/dev/null 2>&1
+PROJECT_LICENSE="Apache-2.0 OR MIT" bash "$LIB/stamp-metadata.sh" "$WORK/lic-expr.json" x 1 >/dev/null 2>&1
+PROJECT_LICENSE=LicenseRef-Custom PROJECT_LICENSE_FROM_MANIFEST=1 bash "$LIB/stamp-metadata.sh" "$WORK/lic-ref-manifest.json" x 1 >/dev/null 2>&1
+lic_ref_log="$(PROJECT_LICENSE=LicenseRef-ExampleCorp-Proprietary bash "$LIB/stamp-metadata.sh" "$WORK/lic-ref.json" x 1 2>&1)"
+[ "$(jq -c '.metadata.component.licenses' "$WORK/lic-ref.json")" = '[{"license":{"name":"LicenseRef-ExampleCorp-Proprietary","acknowledgement":"concluded"}}]' ] \
+  && [ "$(jq -c '.metadata.component.licenses' "$WORK/lic-expr.json")" = '[{"expression":"Apache-2.0 OR MIT","acknowledgement":"concluded"}]' ] \
+  && [ "$(jq -c '.metadata.component.licenses' "$WORK/lic-ref-manifest.json")" = '[{"license":{"name":"LicenseRef-Custom","acknowledgement":"declared"}}]' ] \
+  && printf '%s' "$lic_ref_log" | grep -qF "outbound license declared: LicenseRef-ExampleCorp-Proprietary" \
+    && pass "--license: a LicenseRef- is written as license.name and a compound as expression, not as license.id" \
+    || fail "root licence shapes" "$(jq -c '.metadata.component.licenses' "$WORK/lic-ref.json" "$WORK/lic-expr.json" "$WORK/lic-ref-manifest.json") $lic_ref_log"
+if [ "${BOMLENS_CDX_SCHEMA:-}" = "1" ] || command -v cyclonedx >/dev/null 2>&1 || [ -n "${CYCLONEDX_CLI:-}" ]; then
+    if licout=$(bash "$ROOT_DIR/scripts/check-cdx-schema.sh" "$WORK/lic-ref.json" "$WORK/lic-expr.json" "$WORK/lic-ref-manifest.json" "$WORK/lic-explicit.json" 2>&1); then
+        pass "root licences stamped by --license validate against the CycloneDX schema"
+    else
+        fail "a root licence stamped by --license fails the CycloneDX schema" "$licout"
+    fi
+else
+    echo "  SKIP: CycloneDX CLI not available (set BOMLENS_CDX_SCHEMA=1 to download the pinned one)"
+fi
 # Running twice must not append a second BomLens entry (the pipeline may restamp).
 BOMLENS_VERSION=9.9.9 bash "$LIB/stamp-document-metadata.sh" "$WORK/doc-auth.json" FIRMWARE >/dev/null 2>&1
 dcount=$(jq '[.metadata.tools.components[] | select(.name=="BomLens")] | length' "$WORK/doc-auth.json")

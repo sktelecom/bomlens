@@ -459,11 +459,15 @@ Options:
   --project <name>       Project name (required)
   --version <ver>        Version (required)
   --license <spdx-id>    Outbound license the project is distributed under
-                         (e.g. Apache-2.0). Recorded on the SBOM's root
-                         component and used to flag dependencies whose terms
-                         clash with it. Source scans cannot infer this, and
-                         without it no conflict verdict is produced. An
-                         existing root license in the SBOM is never replaced.
+                         (e.g. Apache-2.0, a LicenseRef- name, or an
+                         expression). Recorded on the SBOM's root component as
+                         "concluded", replacing a root license the generator
+                         read, and used to flag dependencies whose terms clash
+                         with it. Without it, a license read from the project
+                         manifest only fills an empty root license, as
+                         "declared", and a source scan that finds none gives
+                         no conflict verdict. A supplier SBOM's own root
+                         license under --analyze is never replaced.
   --vex <file>           A CycloneDX VEX document (JSON) a supplier sent for this
                          product. The statements that apply to a component of the
                          scanned SBOM are kept in <Project>_<Version>_vex_imported.json,
