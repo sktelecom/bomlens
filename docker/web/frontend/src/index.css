@@ -38,6 +38,13 @@
     --primary: 240 6% 10%; /* #18181b */
     --primary-foreground: 0 0% 98%;
 
+    /* Fill of a chosen segment or chip (filters, list or by-package, graph or
+     * tree). In light it is the near-black primary. In dark it is a quieter
+     * raised grey instead of the near-white primary, which made a filter the
+     * brightest thing on the screen (a secondary-container style fill). */
+    --selected: 240 6% 10%;
+    --selected-foreground: 0 0% 98%;
+
     --secondary: 240 5% 96%;
     --secondary-foreground: 240 6% 10%;
     --accent: 240 5% 96%;
@@ -255,22 +262,27 @@
 
   /* Dark theme — populated (mirrors the portal's reserved token names). */
   .dark {
-    --background: 240 6% 6%; /* #0a0a0c */
+    --background: 240 6% 7%; /* #111113 */
     --foreground: 0 0% 98%; /* #fafafa */
 
-    --card: 240 4% 11%; /* #18181b */
+    --card: 240 4% 12%; /* #1d1d20 */
     --card-foreground: 0 0% 98%;
-    --popover: 240 4% 11%;
+    --popover: 240 4% 12%;
     --popover-foreground: 0 0% 98%;
 
     --muted: 240 4% 16%; /* #27272a */
     --muted-foreground: 240 5% 65%;
 
-    --border: 240 4% 16%;
-    --input: 240 4% 16%;
+    /* Kept clearly above --muted: when the two were equal an outline on a muted
+     * surface vanished. --radius is a brand decision and stays as in :root. */
+    --border: 240 4% 24%; /* #3b3b40 */
+    --input: 240 4% 24%;
 
     --primary: 0 0% 98%;
     --primary-foreground: 240 6% 10%;
+
+    --selected: 240 5% 30%; /* #494950, 8.5:1 under the foreground label */
+    --selected-foreground: 0 0% 98%;
 
     --secondary: 240 4% 16%;
     --secondary-foreground: 0 0% 98%;
@@ -291,9 +303,9 @@
     --brand-strong: 349 100% 68%;
     --brand-accent: 24 90% 60%;
 
-    --sidebar: 240 5% 9%; /* one step above --background (6%) */
+    --sidebar: 240 5% 10%; /* one step above --background (7%) */
     --sidebar-foreground: 0 0% 98%;
-    --sidebar-border: 240 4% 16%;
+    --sidebar-border: 240 4% 24%;
 
     --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.3);
     --shadow-md: 0 2px 8px -2px rgb(0 0 0 / 0.5), 0 1px 2px 0 rgb(0 0 0 / 0.3);

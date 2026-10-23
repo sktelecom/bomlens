@@ -21,12 +21,23 @@
 export const FOCUS_RING =
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background";
 
+/** Keyboard focus on a text field or select: the field's own outline turns
+ *  dark and doubles to 2px (an outlined-field focus style). A field takes focus
+ *  on its own (autoFocus, a click), and the brand-red ring there sat next to
+ *  the red required marks and read as an error. The red ring stays on buttons,
+ *  links and pickable controls. Foreground on the page clears the 3:1 non-text
+ *  floor in both themes, so focus stays plainly visible (WCAG 2.4.7). */
+export const FIELD_FOCUS =
+  "focus-visible:outline-none focus-visible:border-foreground focus-visible:ring-1 focus-visible:ring-foreground focus-visible:ring-offset-0";
+
 /** Selected tile or card: pale fill plus a dark 1px border. */
 export const SELECTED_TILE = "border-foreground bg-muted font-medium text-foreground";
 
-/** Selected segment or chip in a compact control: the inverted (solid) fill. */
+/** Selected segment or chip in a compact control: the solid fill from
+ *  --selected (near-black in light, a quieter raised grey in dark) with the
+ *  foreground border every selected control carries. */
 export const SELECTED_SOLID =
-  "border-primary bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground";
+  "border-foreground bg-selected text-selected-foreground hover:bg-selected/90 hover:text-selected-foreground";
 
 /** Selected pill that wraps a coloured badge: the border darkens, nothing else
  *  moves, so the badge keeps its own colours and contrast. */

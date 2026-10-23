@@ -185,30 +185,30 @@ test("graph/tree switch: the chosen segment is solid, the tabbed-to segment has 
   const graph = page.getByTestId("deps-view-graph");
   const tree = page.getByTestId("deps-view-tree");
   const ring = await tokenColour(page, "hsl(var(--ring))");
-  const primary = await tokenColour(page, "hsl(var(--primary))");
+  const selectedFill = await tokenColour(page, "hsl(var(--selected))");
 
   await expect(graph).toHaveAttribute("aria-pressed", "true");
   const chosen = await look(graph);
-  expect(chosen.background).toBe(primary);
+  expect(chosen.background).toBe(selectedFill);
   expect(chosen.shadow, "selection is a fill, not a ring").not.toContain(ring);
   const other = await look(tree);
-  expect(other.background).not.toBe(primary);
+  expect(other.background).not.toBe(selectedFill);
 
   // Tab onto the unselected segment: the ring appears, the fill does not move.
   await tabTo(page, (el) => el.getAttribute("data-testid") === "deps-view-tree");
   const focused = await look(tree);
   expect(focused.shadow).toContain(ring);
-  expect(focused.background).not.toBe(primary);
+  expect(focused.background).not.toBe(selectedFill);
   // The chosen segment kept its fill and gained no ring while focus was elsewhere.
   const stillChosen = await look(graph);
-  expect(stillChosen.background).toBe(primary);
+  expect(stillChosen.background).toBe(selectedFill);
   expect(stillChosen.shadow).not.toContain(ring);
 
   // Space selects it: now it is both chosen and focused, and shows both cues.
   await page.keyboard.press("Space");
   await expect(tree).toHaveAttribute("aria-pressed", "true");
   const both = await look(tree);
-  expect(both.background).toBe(primary);
+  expect(both.background).toBe(selectedFill);
   expect(both.shadow).toContain(ring);
 });
 
@@ -352,7 +352,7 @@ for (const theme of ["light", "dark"] as Theme[]) {
     await openChipSection(page, "components?vulns=1&direct=1");
 
     const ring = await tokenColour(page, "hsl(var(--ring))");
-    const primary = await tokenColour(page, "hsl(var(--primary))");
+    const selectedFill = await tokenColour(page, "hsl(var(--selected))");
     // The density switch beside them is pressable too, but it is not a filter chip.
     const chips = page.locator('main :not([data-testid="density-toggle"]) > button[aria-pressed]');
     await expect(chips).toHaveCount(2);
@@ -362,7 +362,7 @@ for (const theme of ["light", "dark"] as Theme[]) {
     for (const chip of [first, second]) {
       await expect(chip).toHaveAttribute("aria-pressed", "true");
       const l = await look(chip);
-      expect(l.background, "an active filter chip is a solid fill").toBe(primary);
+      expect(l.background, "an active filter chip is a solid fill").toBe(selectedFill);
       expect(l.opacity).toBe("1");
       expect(l.shadow, "selection is not a ring").not.toContain(ring);
     }
@@ -371,18 +371,18 @@ for (const theme of ["light", "dark"] as Theme[]) {
     await focusByKeyboard(page, first);
     const focused = await look(first);
     expect(focused.shadow, "focus draws the ring").toContain(ring);
-    expect(focused.background, "focus does not move the fill").toBe(primary);
+    expect(focused.background, "focus does not move the fill").toBe(selectedFill);
     expect(sig(focused)).not.toBe(sig(rest));
     // The neighbour was not focused, so it carries the fill but no ring.
     const neighbour = await look(second);
     expect(neighbour.shadow).not.toContain(ring);
-    expect(neighbour.background).toBe(primary);
+    expect(neighbour.background).toBe(selectedFill);
 
     await page.keyboard.press("Tab");
     await expect(first).not.toBeFocused();
     const after = await look(first);
     expect(after.shadow).not.toContain(ring);
-    expect(after.background).toBe(primary);
+    expect(after.background).toBe(selectedFill);
     expect(after.opacity).toBe("1");
   });
 }
