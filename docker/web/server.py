@@ -3713,7 +3713,7 @@ _SIBLING_MODES = ("FIRMWARE", "AIBOM", "ANALYZE", "SOURCE", "IMAGE", "ROOTFS", "
 # only one of these exact literals — never the request string — reaches the scan
 # environment or a docker-run argv.
 _USAGE_CONTEXTS = ("internal", "product", "redistribute", "outputs-only")
-_CONFORMANCE_PROFILES = ("default", "skt-submission")
+_CONFORMANCE_PROFILES = ("default", "skt-submission", "bsi-tr-03183-2")
 # CycloneDX versions a scan may be asked to write (the CLI's --spec-version,
 # docker/lib/cdx-version.sh). The same closed-allowlist rule as _USAGE_CONTEXTS:
 # only one of these literals reaches the scan environment or a docker-run argv.

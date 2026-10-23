@@ -5369,6 +5369,13 @@ if grep -q '^CONFORMANCE_PROFILE=skt-submission$' "$WORK/stub-env"; then
 else
     fail "explicit conformance_profile" "$(cat "$WORK/stub-env")"
 fi
+rm -f "$WORK/stub-env"
+sse_events "project=cp4&version=1.0&source=current-dir&conformance_profile=bsi-tr-03183-2" >/dev/null
+if grep -q '^CONFORMANCE_PROFILE=bsi-tr-03183-2$' "$WORK/stub-env"; then
+    pass "the bsi-tr-03183-2 conformance_profile is passed through"
+else
+    fail "bsi-tr-03183-2 conformance_profile" "$(cat "$WORK/stub-env")"
+fi
 # An unrecognized value is not a client error (unlike usage=): it warns and
 # falls back to the per-mode default, same rule scan-sbom.sh applies to an
 # unknown --conformance-profile.
