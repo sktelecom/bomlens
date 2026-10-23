@@ -2,7 +2,7 @@
 # Copyright 2026 SK Telecom Co., Ltd.
 # SPDX-License-Identifier: Apache-2.0
 # Licensed under the Apache License, Version 2.0.
-"""Add the components a declaration file lists to the SBOM of a source scan.
+"""Add the components a declaration file lists to a source or Yocto SBOM.
 
 Usage: apply-declared-components.py <bom.json> <scan-root> <declaration.json>...
 
@@ -65,6 +65,29 @@ The labels the user knows the files by (the paths given on the command line)
 come from DECLARED_COMPONENTS_LABELS, one per line in the order of the
 arguments; without it the path is used.
 
+A Yocto build (DECLARED_COMPONENTS_YOCTO=1: the SBOM was read from the
+build's SPDX document or its manifests) has no build output folder to name a
+file in, and a package's files sit in a different work directory for every
+machine. There a component names its recipe instead, in bomlens:yocto-recipe
+(the recipe name, PN), and does not add a component: the declaration is
+applied to every package installed in the image that the recipe built (the
+packages that carry bomlens:yocto:recipe = PN, or that are named PN and carry
+no bomlens:yocto:recipe, which the readers leave out when it is the package
+name). Each gets the declared type, supplier, manufacturer, authors,
+licences (concluded), copyright, description, external references and
+properties, bomlens:origin and the mark, and keeps its name, version, purl,
+CPE and hashes. Its files and their hashes, as the build recorded them, are
+nested under it as type "file" components with their file names, when the
+reader listed them (DECLARED_COMPONENTS_YOCTO_FILES, written by
+parse-yocto-spdx.py from its YOCTO_FILES_OUT). No package hash is made up:
+Yocto hashes files, SHA-256 and from 6.1 also SHA-512. A recipe that built no
+installed package, a recipe declared twice, a version that is not the one the
+build recorded, a field the build decides (hashes, purl, cpe, bom-ref, group,
+mime-type), bomlens:artifact or bomlens:distribution-url beside the recipe, or
+a recipe declaration outside a Yocto build are refused. In a Yocto build a
+component without bomlens:yocto-recipe is added as anywhere else, but cannot
+name a bomlens:artifact.
+
 Every component added here carries bomlens:declared = true. Any component
 of the input SBOM that carries a bomlens:declared property at all (what an
 earlier run added, or a component claiming the mark) is removed first, so
@@ -94,6 +117,18 @@ HEAD_BYTES = 0x8800
 MAX_PE_OFFSET = 16 * 1024 * 1024
 ORIGIN = "bomlens:origin"
 ARTIFACT = "bomlens:artifact"
+RECIPE = "bomlens:yocto-recipe"
+# The recipe the Yocto readers record on a package built from a recipe of
+# another name, and the readers' own marks.
+BUILT_FROM = "bomlens:yocto:recipe"
+YOCTO_READERS = ("yocto-spdx", "yocto-manifest")
+# A recipe name (PN) as bitbake allows it.
+RECIPE_NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9+._-]*$")
+# Fields the build decides for a package declared by recipe.
+FROM_BUILD = ("hashes", "purl", "cpe", "bom-ref", "group", "mime-type")
+# Fields a recipe declaration sets on each package of the recipe.
+TO_PACKAGES = ("type", "supplier", "manufacturer", "authors", "author", "publisher",
+               "licenses", "copyright", "description", "scope", "tags")
 MARK = "bomlens:declared"
 DIST_URL = "bomlens:distribution-url"
 ORIGINS = ("first-party", "third-party")
@@ -529,7 +564,43 @@ def load_declaration(path, label):
     return doc
 
 
-def check_component(comp, where, product_version, problems):
+def check_recipe(comp, where, yocto, problems):
+    """The rules for bomlens:yocto-recipe, and for bomlens:artifact in a Yocto
+    build. Returns the recipe name, or "" when the component names none."""
+    recipes = props(comp, RECIPE)
+    if not recipes:
+        if yocto and props(comp, ARTIFACT):
+            problems.append("%s: bomlens:artifact names a file of a build output folder, which a Yocto build scan "
+                            "does not read; name the recipe that installs it in bomlens:yocto-recipe instead" % where)
+        return ""
+    recipe = recipes[0]
+    if len(recipes) > 1:
+        problems.append("%s: has bomlens:yocto-recipe more than once; declare each recipe in its own component" % where)
+    elif not RECIPE_NAME.match(recipe):
+        problems.append("%s: bomlens:yocto-recipe '%s' is not a recipe name (PN, such as media-daemon)"
+                        % (where, recipe.encode("unicode_escape").decode()))
+    if props(comp, ARTIFACT):
+        problems.append("%s: names both bomlens:artifact and bomlens:yocto-recipe; a package of a Yocto build is "
+                        "named by its recipe only" % where)
+    if not yocto:
+        problems.append("%s: bomlens:yocto-recipe applies to a Yocto build scan only (a build directory, or its "
+                        "SPDX document given with --analyze); for a source scan name the build output in "
+                        "bomlens:artifact" % where)
+    for key in FROM_BUILD:
+        if key in comp:
+            problems.append("%s: %s is taken from the Yocto build for the packages of recipe '%s'; remove it"
+                            % (where, key, recipe))
+    if props(comp, DIST_URL):
+        problems.append("%s: %s names one file, and recipe '%s' installs packages of files; remove it"
+                        % (where, DIST_URL, recipe))
+    for key in KIND_VALUES:
+        if props(comp, key):
+            problems.append("%s: %s describes one file, and recipe '%s' installs packages of files; remove it"
+                            % (where, key, recipe))
+    return recipe
+
+
+def check_component(comp, where, product_version, problems, yocto=False):
     """A cleaned copy of a declared component, or None when it is refused."""
     if not isinstance(comp, dict):
         problems.append("%s: is not a JSON object" % where)
@@ -600,14 +671,18 @@ def check_component(comp, where, product_version, problems):
     if len(props(comp, ARTIFACT)) > 1 and any(props(comp, key) for key in KIND_VALUES):
         problems.append("%s: has several bomlens:artifact files, so it cannot give one %s value for all of them"
                         % (where, "/".join(KIND_VALUES)))
+    recipe = check_recipe(comp, where, yocto, problems)
     version = comp.get("version", "").strip()
-    if not version and origin == ["third-party"]:
+    # A package declared by recipe has the version the build recorded.
+    if not version and origin == ["third-party"] and not recipe:
         problems.append("%s: is third-party and has no version; write the version the supplier gave" % where)
     if len(problems) > bad:
         return None
     out = copy.deepcopy(comp)
     out["name"] = name
-    out["version"] = version or product_version
+    out["version"] = version if recipe else (version or product_version)
+    if recipe:
+        out["_recipe"] = recipe
     for entry in out.get("licenses", []):
         target = entry["license"] if "license" in entry else entry
         target.setdefault("acknowledgement", "concluded")
@@ -672,9 +747,12 @@ def is_declared(comp):
         isinstance(p, dict) and p.get("name") == MARK for p in properties)
 
 
-def read_files(files, labels, root, given_root, product, product_version, existing_refs, existing_purls, problems):
+def read_files(files, labels, root, given_root, product, product_version, existing_refs, existing_purls, problems,
+               yocto=False):
     seen = {}          # (name, version) -> label
     declared = []      # (label, component)
+    by_recipe = []     # (label, component) declared by bomlens:yocto-recipe
+    recipes_seen = {}  # recipe -> label
     file_deps = []     # (label, dependencies or None, [refs of the file])
     refs_seen = {}
     for path, label in zip(files, labels):
@@ -692,10 +770,19 @@ def read_files(files, labels, root, given_root, product, product_version, existi
                 log("WARN: %s lists no components" % label)
             file_refs = []
             for i, raw in enumerate(doc["components"]):
-                comp = check_component(raw, "%s: component #%d" % (label, i + 1), product_version, problems)
+                comp = check_component(raw, "%s: component #%d" % (label, i + 1), product_version, problems, yocto)
                 if comp is None:
                     continue
                 where = "%s: component '%s'" % (label, comp["name"])
+                if "_recipe" in comp:
+                    recipe = comp["_recipe"]
+                    if recipe in recipes_seen:
+                        problems.append("recipe '%s' is declared twice (%s and %s); keep it in one place"
+                                        % (recipe, recipes_seen[recipe], label))
+                        continue
+                    recipes_seen[recipe] = label
+                    by_recipe.append((label, comp))
+                    continue
                 key = (comp["name"], comp["version"])
                 if key in seen:
                     problems.append("%s@%s is declared twice (%s and %s); keep it in one place"
@@ -741,7 +828,7 @@ def read_files(files, labels, root, given_root, product, product_version, existi
             del problems[before:]
             problems.append("%s: could not be read as a declaration file (%s); check it against the CycloneDX 1.6 component format"
                             % (label, exc.__class__.__name__))
-    return declared, file_deps, refs_seen
+    return declared, file_deps, refs_seen, by_recipe
 
 
 def artifact_facts(comp, resolved, where, problems):
@@ -847,6 +934,125 @@ def fill_artifacts(declared):
         comp["hashes"] = [h for h in comp.get("hashes") or [] if h.get("alg") not in FILLED_HASHES]
         if not comp["hashes"]:
             del comp["hashes"]
+
+
+def built_by(comp, recipe):
+    """Whether a component of a Yocto build's SBOM is a package of `recipe`."""
+    if not isinstance(comp, dict) or not _properties(comp.get("properties", [])):
+        return False
+    if not any(r in YOCTO_READERS for r in props(comp, "bomlens:identifiedBy")):
+        return False
+    built = props(comp, BUILT_FROM)
+    if built:
+        return recipe in built
+    return comp.get("name") == recipe
+
+
+def load_yocto_files(path):
+    """{package bom-ref: [{"name", "hashes"}]} the Yocto reader listed, or {}."""
+    if not path:
+        return {}
+    try:
+        with open(path, encoding="utf-8") as fh:
+            files = json.load(fh).get("files")
+    except (OSError, ValueError, AttributeError, RecursionError) as exc:
+        log("WARN: the file list of the Yocto build could not be read (%s); the packages are declared "
+            "without their files" % exc.__class__.__name__)
+        return {}
+    return files if isinstance(files, dict) else {}
+
+
+def package_file_entries(listed):
+    """The listed files of one package that are usable: a path, each once,
+    with the hashes in their CycloneDX shape."""
+    out, seen = [], set()
+    for f in listed if isinstance(listed, list) else []:
+        if not isinstance(f, dict):
+            continue
+        path = f.get("name")
+        if not isinstance(path, str) or not path or CONTROL.search(path) or path in seen:
+            continue
+        seen.add(path)
+        hashes = f.get("hashes") if _hashes(f.get("hashes", [])) else []
+        out.append((path, hashes))
+    return out
+
+
+def match_recipes(comps, by_recipe, yocto_files, all_refs, problems):
+    """[(declaration, [package components])] for each recipe declared, with
+    every refusal (no package, another version, a reference in use) noted."""
+    out = []
+    child_refs = set()
+    for label, decl in by_recipe:
+        recipe = decl["_recipe"]
+        where = "%s: component '%s'" % (label, decl["name"])
+        matched = [c for c in comps if built_by(c, recipe)]
+        if not matched:
+            hint = ""
+            named = [c for c in comps if isinstance(c, dict) and c.get("name") == recipe and props(c, BUILT_FROM)]
+            if named:
+                hint = "; the package named '%s' comes from recipe '%s'" % (recipe, props(named[0], BUILT_FROM)[0])
+            problems.append("%s: recipe '%s' (bomlens:yocto-recipe) built no package installed in this image%s. "
+                            "Give the recipe name (PN) of a package the image installs, or remove the component"
+                            % (where, recipe, hint))
+            continue
+        version = decl.get("version")
+        if version:
+            recorded = sorted({str(c.get("version") or "") for c in matched} - {version})
+            if recorded:
+                problems.append("%s: version '%s' is not the one the build recorded for recipe '%s' (%s); "
+                                "remove the version, the packages keep theirs"
+                                % (where, version, recipe, ", ".join(recorded)))
+                continue
+        for c in matched:
+            ref = c.get("bom-ref")
+            if not isinstance(ref, str):
+                continue
+            for path, _ in package_file_entries(yocto_files.get(ref)):
+                child = "%s#%s" % (ref, path)
+                if child in all_refs or child in child_refs:
+                    problems.append("%s: the reference '%s' the file %s of package '%s' would get is already used"
+                                    % (where, child, path, c.get("name")))
+                child_refs.add(child)
+        out.append((decl, matched))
+    return out
+
+
+def apply_recipes(recipe_matches, yocto_files):
+    """Put each recipe declaration on the packages of the recipe, with their
+    files nested under them."""
+    reserved = (ORIGIN, RECIPE, MARK)
+    for decl, matched in recipe_matches:
+        origin = props(decl, ORIGIN)[0]
+        extra = [p for p in decl.get("properties", []) if p.get("name") not in reserved]
+        for c in matched:
+            for key in TO_PACKAGES:
+                if key in decl:
+                    c[key] = copy.deepcopy(decl[key])
+            if decl.get("externalReferences"):
+                refs = c.get("externalReferences") if isinstance(c.get("externalReferences"), list) else []
+                c["externalReferences"] = refs + [r for r in copy.deepcopy(decl["externalReferences"]) if r not in refs]
+            kept = [p for p in c.get("properties") or [] if p.get("name") not in reserved]
+            c["properties"] = (kept + [copy.deepcopy(p) for p in extra if p not in kept]
+                               + [{"name": ORIGIN, "value": origin}, {"name": RECIPE, "value": decl["_recipe"]},
+                                  {"name": MARK, "value": "true"}])
+            ref = c.get("bom-ref")
+            entries = package_file_entries(yocto_files.get(ref)) if isinstance(ref, str) else []
+            if not entries:
+                continue
+            children = []
+            for path, hashes in entries:
+                child = {"type": "file", "bom-ref": "%s#%s" % (ref, path), "name": path}
+                if c.get("version"):
+                    child["version"] = c["version"]
+                if isinstance(c.get("supplier"), dict):
+                    child["supplier"] = copy.deepcopy(c["supplier"])
+                if hashes:
+                    child["hashes"] = copy.deepcopy(hashes)
+                child["properties"] = [{"name": ORIGIN, "value": origin}, {"name": MARK, "value": "true"},
+                                       {"name": FILENAME, "value": path.rsplit("/", 1)[-1]}]
+                children.append(child)
+            c["components"] = children
 
 
 def link_graph(product, product_version, deps, declared, file_deps, all_refs):
@@ -980,10 +1186,13 @@ def main(argv):
         return 1
     existing_purls = {c.get("purl") for c in comps if isinstance(c.get("purl"), str)}
 
+    yocto = os.environ.get("DECLARED_COMPONENTS_YOCTO") == "1"
     problems = []
-    declared, file_deps, refs_seen = read_files(files, labels, root, given_root, product, product_version,
-                                                existing_refs, existing_purls, problems)
+    declared, file_deps, refs_seen, by_recipe = read_files(files, labels, root, given_root, product, product_version,
+                                                           existing_refs, existing_purls, problems, yocto)
     all_refs = check_refs(declared, file_deps, refs_seen, existing_refs, problems)
+    yocto_files = load_yocto_files(os.environ.get("DECLARED_COMPONENTS_YOCTO_FILES", "")) if by_recipe else {}
+    recipe_matches = match_recipes(comps, by_recipe, yocto_files, all_refs, problems)
     if problems:
         for p in problems[:MAX_PROBLEMS]:
             log("ERROR: " + p)
@@ -996,7 +1205,11 @@ def main(argv):
     except OSError as exc:
         log("ERROR: a build output could not be read: %s" % exc)
         return 1
-    link_graph(product, product_version, deps, declared, file_deps, all_refs)
+    # Packages declared by recipe are already in the graph the build recorded;
+    # a file of recipe declarations alone adds nothing to it.
+    if declared or not by_recipe:
+        link_graph(product, product_version, deps, declared, file_deps, all_refs)
+    apply_recipes(recipe_matches, yocto_files)
 
     bom["components"] = comps + [comp for _, comp in declared]
     bom["dependencies"] = deps
@@ -1014,8 +1227,14 @@ def main(argv):
             pass
         return 1
     first = sum(1 for _, c in declared if props(c, ORIGIN) == ["first-party"])
-    print("[declared-components] added %d declared component(s) (%d first-party, %d third-party) from %d file(s)"
-          % (len(declared), first, len(declared) - first, len(files)))
+    if declared or not by_recipe:
+        print("[declared-components] added %d declared component(s) (%d first-party, %d third-party) from %d file(s)"
+              % (len(declared), first, len(declared) - first, len(files)))
+    for decl, matched in recipe_matches:
+        nested = sum(len(c.get("components") or []) for c in matched)
+        print("[declared-components] recipe '%s' (%s): declared on %d package(s): %s; %d file(s) with their hashes"
+              % (decl["_recipe"], props(decl, ORIGIN)[0], len(matched),
+                 ", ".join(sorted(str(c.get("name")) for c in matched)), nested))
     return 0
 
 

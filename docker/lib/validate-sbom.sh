@@ -760,11 +760,15 @@ g7_ai_checks() {
 # entry of its own (a leaf should have one with an empty dependsOn) is listed
 # on an advisory row. Nothing here writes a completeness value.
 #
-# A component read from a Yocto build's SPDX document (bomlens:identifiedBy
-# yocto-spdx, or bomlens:yocto-recipe on a declaration) has no SHA-512 when
-# the build did not write one: Yocto writes file hashes only, and SHA-512 only
-# from 6.1. Its missing SHA-512 is reported as not in the source SBOM, and
-# stays advisory.
+# A component read from a Yocto build's SPDX document or its manifests
+# (bomlens:identifiedBy yocto-spdx or yocto-manifest, or bomlens:yocto-recipe
+# on a declaration) has no SHA-512 when the build did not write one: Yocto
+# writes file hashes only, and SHA-512 only from 6.1. Its missing SHA-512 is
+# reported as not in the source SBOM, and stays advisory. So are a missing
+# filename (the manifests list no files) and missing file properties (no Yocto
+# record says whether a file is executable, an archive or structured): a
+# package declared by recipe gets the files the build listed, not the files
+# themselves.
 #
 # Nested type "file" components (a component with several build outputs)
 # count for the component that holds them, as everywhere else in this file.
@@ -798,7 +802,9 @@ bsi_checks() {
     def sha512_ok: own_or_files(sha512_here);
     def fprops_ok: own_or_files(props("bsi:component:executable") as $e | props("bsi:component:archive") as $a
                                 | props("bsi:component:structured") as $s | ($e|length) > 0 and ($a|length) > 0 and ($s|length) > 0);
-    def yocto_src: (props("bomlens:identifiedBy") | index("yocto-spdx")) != null or (props("bomlens:yocto-recipe") | length > 0);
+    def yocto_src: (props("bomlens:identifiedBy") | any(. == "yocto-spdx" or . == "yocto-manifest")) or (props("bomlens:yocto-recipe") | length > 0);
+    # The declared rows where a Yocto package lacks what the build did not record.
+    def from_build($id): $id == "bsi-declared-sha512" or $id == "bsi-declared-filename" or $id == "bsi-declared-file-properties";
     # A declared component is delivered as a file when it names a build
     # output, carries a filename, holds file components, or is a package of
     # a Yocto build (installed as files).
@@ -855,8 +861,8 @@ bsi_checks() {
     # is reported as not in the source SBOM.
     | def drow($id; $lbl; $lbl_ko; $subject; f; $ref):
         ([ $subject[] | select(f | not) ]) as $bad
-        | ([ $bad[] | select(($id == "bsi-declared-sha512") and yocto_src) | clabel + " (not in the source SBOM)" ]) as $nosrc
-        | ([ $bad[] | select((($id == "bsi-declared-sha512") and yocto_src) | not) | clabel ]) as $miss
+        | ([ $bad[] | select(from_build($id) and yocto_src) | clabel + " (not in the source SBOM)" ]) as $nosrc
+        | ([ $bad[] | select((from_build($id) and yocto_src) | not) | clabel ]) as $miss
         | ($subject | length) as $n
         | {id: $id, label: $lbl, label_ko: $lbl_ko, required: true,
            source: (if $n == 0 then "na" else "auto" end),

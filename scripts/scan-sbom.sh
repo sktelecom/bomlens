@@ -525,6 +525,13 @@ Options:
                          scan target, or the same name and version is declared
                          twice; the SBOM written so far is then kept as
                          <Project>_<Version>_bom.refused.json.
+                         For a Yocto build (a build directory, or its SPDX
+                         document with --analyze): a component names its
+                         recipe in bomlens:yocto-recipe instead of
+                         bomlens:artifact, and the declaration goes on every
+                         installed package of that recipe, with the files and
+                         hashes the build recorded. A recipe that installed no
+                         package fails the scan.
   --no-components        For a source scan: do not read sbom-declared.cdx.json
                          at the scan target root (for a scan made before the
                          build outputs it names exist). Cannot be combined
@@ -2633,9 +2640,15 @@ fi
 if [ -n "$COMPONENT_VERSIONS_FILE" ] && [ "$MODE" != "FIRMWARE" ] && [ "$MODE" != "ROOTFS" ] && [ "$MODE" != "BINARY" ]; then
     echo "[ERROR] --component-versions applies to firmware, root filesystem and binary scans only (this target is scanned as $MODE)."; exit 1
 fi
-if { [ "${#COMPONENTS_FILES[@]}" -gt 0 ] || [ "$NO_COMPONENTS" = "true" ]; } && [ "$MODE" != "SOURCE" ]; then
-    _flag="--components"; [ "$NO_COMPONENTS" = "true" ] && _flag="--no-components"
-    echo "[ERROR] $_flag applies to source scans only (this target is scanned as $MODE)."; exit 1
+# A Yocto build (a build directory, or its SPDX document given with --analyze)
+# takes --components too, for components declared by recipe
+# (bomlens:yocto-recipe). Whether an --analyze document is one a Yocto build
+# wrote is decided in the container, which reads it.
+if [ "$NO_COMPONENTS" = "true" ] && [ "$MODE" != "SOURCE" ]; then
+    echo "[ERROR] --no-components applies to source scans only (this target is scanned as $MODE)."; exit 1
+fi
+if [ "${#COMPONENTS_FILES[@]}" -gt 0 ] && [ "$MODE" != "SOURCE" ] && [ "$MODE" != "ANALYZE" ]; then
+    echo "[ERROR] --components applies to source scans and Yocto builds only (this target is scanned as $MODE)."; exit 1
 fi
 
 if { [ -n "$AI_DECLARE_FILE" ] || [ "$GENERATE_SPDX3" = "false" ]; } \
@@ -3411,7 +3424,7 @@ else
     # shellcheck disable=SC2046
     eval "$DOCKER_MSYS"docker run --rm $VOL \
         --add-host=host.docker.internal:host-gateway \
-        -e MODE="$MODE" -e BOMLENS_ARTIFACT_CLEANUP=1 $ENVV $(pp_env)$(cosign_run)$(vex_run)$(declare_run)$(component_versions_run)$(gate_run) \
+        -e MODE="$MODE" -e BOMLENS_ARTIFACT_CLEANUP=1 $ENVV $(pp_env)$(cosign_run)$(vex_run)$(declare_run)$(component_versions_run)$(components_run)$(gate_run) \
         "\"$RUN_IMAGE\""
 fi
 

@@ -1,0 +1,26 @@
+{
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.6",
+  "components": [
+    {
+      "type": "application",
+      "name": "media-daemon",
+      "supplier": { "name": "Example Corp", "url": ["https://example.com"] },
+      "licenses": [ { "license": { "name": "LicenseRef-ExampleCorp-Proprietary" } } ],
+      "properties": [
+        { "name": "bomlens:origin", "value": "first-party" },
+        { "name": "bomlens:yocto-recipe", "value": "media-daemon" }
+      ]
+    },
+    {
+      "type": "firmware",
+      "name": "vendor-dsp",
+      "supplier": { "name": "Example Chip Vendor", "url": ["https://chip.example.com"] },
+      "licenses": [ { "license": { "name": "LicenseRef-Vendor-Binary" } } ],
+      "properties": [
+        { "name": "bomlens:origin", "value": "third-party" },
+        { "name": "bomlens:yocto-recipe", "value": "vendor-dsp" }
+      ]
+    }
+  ]
+}

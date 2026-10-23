@@ -758,6 +758,9 @@ echo "=========================================="
 # would report as open what Yocto already judged.
 YOCTO_SBOM=false
 YOCTO_CPE_MATCH=false
+# The file list parse-yocto-spdx.py writes for the declared-components step
+# (set only when there are --components files).
+YOCTO_FILES_LIST=""
 # The document came out of a Yocto build directory the user pointed at, not from
 # a supplier: the SBOM this scan writes is the one to submit, so it is the one
 # checked for conformance (below), not the build's own document. YOCTO_FROM_BUILD
@@ -1254,11 +1257,20 @@ EOF
         # rc=3 means "not a Yocto document" and is the normal path for every other
         # supplier SBOM; any other non-zero rc is a real failure that still falls back
         # so a parser bug cannot block a scan.
+        # With --components, the files of each installed package (and their
+        # hashes) are listed for the declared-components step below, which nests
+        # them under the packages a declaration names by recipe.
         YOCTO_RC=3
         if command -v python3 >/dev/null 2>&1 && [ -f "$LIBDIR/parse-yocto-spdx.py" ]; then
             YOCTO_RC=0
-            python3 "$LIBDIR/parse-yocto-spdx.py" "$ANALYZE_SBOM" "$OUTPUT_FILE" "$OUT_PREFIX" \
-                || YOCTO_RC=$?
+            if [ -n "${DECLARED_COMPONENTS_FILES:-}" ]; then
+                YOCTO_FILES_LIST="$(mktemp)"
+                YOCTO_FILES_OUT="$YOCTO_FILES_LIST" python3 "$LIBDIR/parse-yocto-spdx.py" "$ANALYZE_SBOM" "$OUTPUT_FILE" "$OUT_PREFIX" \
+                    || YOCTO_RC=$?
+            else
+                python3 "$LIBDIR/parse-yocto-spdx.py" "$ANALYZE_SBOM" "$OUTPUT_FILE" "$OUT_PREFIX" \
+                    || YOCTO_RC=$?
+            fi
         fi
         if [ "$YOCTO_RC" != 0 ] && [ "$YOCTO_ARCHIVE" = "true" ]; then
             # An archive is never CycloneDX or SPDX text, so the generic converter
@@ -1676,10 +1688,37 @@ esac
 # components marked bomlens:declared were written by this step in this run,
 # which the first-party exemption from the PURL rows relies on
 # (validate-sbom.sh). It is never taken from the caller's environment.
+#
+# A Yocto build (ANALYZE, with the SBOM read from the build's SPDX document or
+# its manifests: YOCTO_SBOM) runs the step too, on the --components files only:
+# there is no source tree whose root could hold a default file, and the build
+# directory is not where a supplier keeps its declarations. There a component
+# names its recipe (bomlens:yocto-recipe) rather than a build output, and the
+# declaration goes on the installed packages of that recipe
+# (DECLARED_COMPONENTS_YOCTO=1), with the files parse-yocto-spdx.py listed
+# (YOCTO_FILES_LIST). Any other supplier SBOM given with --components is
+# refused: it was not read from a build, so there is nothing to declare on.
 unset DECLARED_COMPONENTS_APPLIED
-case "$SCAN_MODE" in
-    SOURCE|POSTPROCESS)
+_dc_mode="$SCAN_MODE"
+if [ "$SCAN_MODE" = ANALYZE ] && [ -n "${DECLARED_COMPONENTS_FILES:-}" ]; then
+    if [ "$YOCTO_SBOM" = true ]; then
+        _dc_mode=YOCTO
+    else
+        echo "[ERROR] --components applies to a source scan and a Yocto build; $(basename "${ANALYZE_SBOM:-the input}") is not an SBOM a Yocto build wrote."
+        echo "[ERROR] Scan the Yocto build directory, or its SPDX document with --analyze, or drop --components."
+        exit 1
+    fi
+fi
+case "$_dc_mode" in
+    SOURCE|POSTPROCESS|YOCTO)
         _dc_root="${SOURCE_ROOT:-/src}"
+        _dc_yocto=0
+        if [ "$_dc_mode" = YOCTO ]; then
+            _dc_yocto=1
+            # Not read for a default file or a build output here; the step only
+            # needs a folder that exists.
+            _dc_root="${YOCTO_BUILD_DIR:-$(dirname "$ANALYZE_SBOM")}"
+        fi
         _dc_files=()
         _dc_default=0
         if [ -n "${DECLARED_COMPONENTS_FILES:-}" ]; then
@@ -1697,6 +1736,7 @@ case "$SCAN_MODE" in
             _dc_rc=0
             _dc_err="$(mktemp)"
             DECLARED_COMPONENTS_LABELS="${DECLARED_COMPONENTS_LABELS:-}" DECLARED_COMPONENTS_DEFAULT="$_dc_default" \
+                DECLARED_COMPONENTS_YOCTO="$_dc_yocto" DECLARED_COMPONENTS_YOCTO_FILES="$YOCTO_FILES_LIST" \
                 python3 "$LIBDIR/apply-declared-components.py" "$OUTPUT_FILE" "$_dc_root" "${_dc_files[@]}" 2> "$_dc_err" || _dc_rc=$?
             cat "$_dc_err" >&2
             if [ "$_dc_rc" -eq 0 ]; then
@@ -1728,9 +1768,11 @@ case "$SCAN_MODE" in
             fi
             rm -f "$_dc_err"
         fi
-        unset _dc_root _dc_files _dc_rc _dc_err _dc_count _dc_first _dc_default
+        unset _dc_root _dc_files _dc_rc _dc_err _dc_count _dc_first _dc_default _dc_yocto
         ;;
 esac
+unset _dc_mode
+[ -z "$YOCTO_FILES_LIST" ] || rm -f "$YOCTO_FILES_LIST"
 
 # ========================================================
 # Record who generated this SBOM, with what, and at which lifecycle phase — the
