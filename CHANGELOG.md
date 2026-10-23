@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v1.14.0] - 2026-10-24
+
+### Added
+
+- Declared components: a source scan merges components that no package manager reports, such as the product's own executables, vendor binaries or vendored sources, from a CycloneDX fragment. `--components <file>` (repeatable) names it; without it, `sbom-declared.cdx.json` at the scan target root is read when present, and `--no-components` skips that file. Each component states `bomlens:origin` (`first-party` or `third-party`). For each `bomlens:artifact` path the scan adds SHA-512 and SHA-256, the BSI TR-03183-2 file properties and a `distribution` external reference. A file that cannot be accepted stops the run with exit 1 and a message naming the component and the reason; the SBOM written so far is kept as `_bom.refused.json`. First-party components are left out of the NOTICE. See the new guide "Declaring your own components".
+- A Yocto declaration can name a recipe with `bomlens:yocto-recipe`. Every package the build recorded for that recipe gets the declared supplier, licence, origin and marker, and the per-file hashes Yocto recorded are attached as nested file components.
+- `--conformance-profile bsi-tr-03183-2` checks the SBOM against BSI TR-03183-2 v2.1.0: creator with a URL or email, timestamp, CycloneDX 1.6 or later, a dependency graph reachable from the product, stated completeness, and for the product and each declared component the creator, name, version, concluded licence and, for build outputs, file name, SHA-512 and file properties. Scanned components are measured on an advisory row.
+- `--supplier "Name <url-or-email>"` and a Product supplier field in the web UI write the product supplier. `--sbom-author "Name <email>"` records the email.
+- An SBOM read from a Yocto build directory is stamped like a generated scan: `--sbom-author`, `--supplier`, `--license`, the tool entry, lifecycle and an image root that depends on every installed package. `SPDX_PACKAGE_SUPPLIER` set in the build is read as the package supplier.
+
+### Changed
+
+- `--license` accepts an SPDX id, a `LicenseRef-` name or an SPDX expression and writes it in the CycloneDX field that takes it. An explicit `--license` replaces the root licence the generator read, as `concluded`. Free text such as `Proprietary` is refused before the scan starts, with the `LicenseRef-` name to use.
+- `--conformance-profile skt-submission`: first-party components added by this scan's declaration step, with a supplier and a SHA-512, are exempt from the purl requirement and are listed by name.
+- Compositions list the refs their aggregate applies to.
+- Web UI: status badges sit under the CVE id, toolbars share one height, the dark theme uses a quieter selected fill and stronger borders, text links are underlined, the licence list shows the top 20 with a show-all toggle, met G7 checks on the Models page are folded, and licence conflict and model assessment reasons are shown in the UI language.
+- The AI model guide states the current regulation crosswalk counts and the regenerated Aether-7B sample figures.
+
+### Fixed
+
+- Yocto 6.x SPDX 3.0 image documents gave no licences and no VEX judgements. Licences now fall back to the declared licence, judgements on a recipe apply to the packages it generates, and `software_packageUrl` becomes the component purl.
+- A static read (`--detection static`) of `yarn.lock` or `uv.lock` listed the project itself as a component.
+- A nested fold in the web UI looked open when only its parent was open.
+
 ## [v1.13.9] - 2026-10-20
 
 ### Added
