@@ -105,6 +105,56 @@ generate-sbom:
       - "*/*_security.*"
 ```
 
+## CI에서 선언 구성요소 사용
+
+직접 만든 실행 파일, 라이브러리, 펌웨어와, 스캔이 찾지 못하는 벤더 바이너리나 복사한 소스는 저장소에 둔 선언 파일에 적습니다([자체 구성요소 선언](declared-components.ko.md) 참고). 스캔은 이 파일이 가리키는 빌드 산출물을 읽으므로, 작업은 먼저 빌드한 뒤 스캔합니다. 아래 릴리스 작업은 결과를 BSI TR-03183-2 기준으로 검사하고 버전을 태그에서 가져옵니다.
+
+```yaml
+name: Release SBOM
+
+on:
+  push:
+    tags: ['v*']
+
+jobs:
+  sbom:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build
+        run: make   # sbom-declared.cdx.json이 가리키는 파일(예: out/bin/media-daemon)을 만든다
+      - run: git clone --depth 1 https://github.com/sktelecom/bomlens.git /tmp/bomlens
+      - run: docker pull ghcr.io/sktelecom/bomlens:latest
+      - name: Generate SBOM
+        run: |
+          /tmp/bomlens/scripts/scan-sbom.sh \
+            --project "${{ github.event.repository.name }}" \
+            --version "${GITHUB_REF_NAME#v}" \
+            --components sbom-declared.cdx.json \
+            --conformance-profile bsi-tr-03183-2 --fail-on-conformance \
+            --supplier "Example Corp <https://example.com>" \
+            --sbom-author "Example Corp <sbom@example.com>" \
+            --license Apache-2.0 \
+            --generate-only
+
+      # 선언 파일이 거부되면(가리킨 빌드 산출물이 없거나, 구성요소에
+      # bomlens:origin이 없는 경우 등) 이 step은 종료 1로 실패한다. 이때 SBOM은
+      # _bom.json이 아니라 {project}_{version}_bom.refused.json으로 남으므로
+      # 뒤 단계가 불완전한 SBOM을 가져가지 않는다. BSI 항목이 실패하면
+      # 종료 2로 끝난다(--fail-on-conformance).
+
+      - uses: actions/upload-artifact@v4
+        if: always()   # 적합성 보고서와 거부된 SBOM도 보존
+        with:
+          name: sbom
+          path: |
+            */*_bom.json
+            */*_conformance.*
+            */*_bom.refused.json
+```
+
+`${GITHUB_REF_NAME#v}`는 태그 `v2.1.0`을 `2.1.0`으로 바꾸며, 자체 `version`이 없는 `first-party` 구성요소가 이 값을 씁니다. `--components`로 파일을 명시했지만, 옵션이 없어도 저장소 루트의 `sbom-declared.cdx.json`은 읽습니다. `--license`에는 SPDX 식별자를 줍니다.
+
 ## 러너에 Docker가 없을 때
 
 `scan-sbom.sh`는 컨테이너를 띄우므로 Docker 엔진이 필요합니다. 엔진이 없는 러너(쿠버네티스 러너, `docker:dind`를 쓰지 않는 GitLab 작업)에서는 위 예시를 쓸 수 없습니다. 이때는 스캐너 이미지를 작업 이미지로 그대로 씁니다. lock 파일이 트리 전체를 덮으면(`package-lock.json`, `npm-shrinkwrap.json`, `pnpm-lock.yaml`, `bun.lock`, `gradle.lockfile` 중 하나이고 루트 아래 다른 매니페스트가 없을 때) 이미지 안의 소스 스캔은 Docker 소켓 없이 lock 파일을 그대로 읽고, 빠진 라이선스는 패키지 레지스트리에서 채웁니다. 그런 lock 파일이 없는 트리는 syft가 매니페스트를 읽어 직접 의존성만 나오므로(의존성을 선언했는데 lock 파일이 없는 Node 프로젝트는 안내와 함께 거부됩니다) lock 파일을 커밋하거나 Docker가 있는 러너를 쓰세요.
