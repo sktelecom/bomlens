@@ -1590,10 +1590,10 @@ test("AI scan exposes G7 conformance with present/advisory split", async ({ page
   // "advisory / need review" counts that said the same thing three times.
   await expect(page.getByRole("button", { name: /^Can be fixed \d+$/ })).toBeVisible();
   await expect(page.getByRole("button", { name: /^Needs a person \d+$/ })).toBeVisible();
-  // The element no scan can settle carries a "Review needed" provenance badge,
-  // and lives under the chip that says so.
+  // The element no scan can settle carries a provenance badge with the chip's
+  // own word, and lives under the chip that says so.
   await page.getByRole("button", { name: /^Needs a person \d+$/ }).click();
-  await expect(page.getByText("Review needed").first()).toBeVisible();
+  await expect(page.locator("main li").getByText("Needs a person", { exact: true }).first()).toBeVisible();
   // Clearing the chip shows every check again, grouped into its clusters. The
   // groups fold, and an unfiltered panel opens only the ones holding something
   // to act on, so open them all for the assertions below.
@@ -2024,6 +2024,106 @@ test("Licenses section lists outbound-license conflicts worst first", async ({ p
     .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
     .analyze();
   expect(results.violations).toEqual([]);
+});
+
+// Real sentences from docker/lib/license-compat.json, as the scanner records
+// them: the UI recognises these and shows them in the UI language.
+const WHY_WEAK =
+  "File- or library-level reciprocity: changes to the dependency stay under its license, and static linking adds obligations. Distributing your own code under the permissive license is still fine.";
+const WHY_UNKNOWN = "The dependency's license was not recognised.";
+
+/** 25 licenses, one component each, plus three that conflict with Apache-2.0. */
+const MANY_LICENSES_DONE = {
+  ok: true,
+  mode: "SOURCE",
+  id: "many_1.0",
+  results: [{ name: "many_1.0_bom.json", size: 100 }],
+  security: null,
+  conformance: null,
+  sbom: {
+    components: 28,
+    outboundLicense: "Apache-2.0",
+    conflictCounts: { incompatible: 0, conditional: 2, unknown: 1, compatible: 25 },
+    componentList: [
+      ...Array.from({ length: 25 }, (_, i) => ({
+        name: `lib-${i}`, version: "1", group: "", purl: "", type: "library",
+        licenses: [`LicenseRef-L${String(i).padStart(2, "0")}`], licenseConflict: "compatible",
+      })),
+      { name: "lgpl-a", version: "1", group: "", purl: "", type: "library", licenses: ["LGPL-2.1-only"], licenseConflict: "conditional", licenseConflictWhy: WHY_WEAK },
+      { name: "lgpl-b", version: "1", group: "", purl: "", type: "library", licenses: ["LGPL-2.1-only"], licenseConflict: "conditional", licenseConflictWhy: WHY_WEAK },
+      { name: "odd-c", version: "1", group: "", purl: "", type: "library", licenses: ["Some Odd License"], licenseConflict: "unknown", licenseConflictWhy: WHY_UNKNOWN },
+    ],
+  },
+};
+
+test("a long license list opens on the busiest twenty with a button for the rest", async ({ page }) => {
+  await stubAndRunWithDone(page, MANY_LICENSES_DONE);
+  await page.getByRole("link", { name: /^Licenses/ }).first().click();
+
+  const toggle = page.getByTestId("license-summary-toggle");
+  // 27 distinct licenses: the 25 refs, LGPL-2.1-only and the odd one.
+  await expect(toggle).toHaveText("Show all 27 licenses");
+  await expect(toggle).toHaveAttribute("aria-expanded", "false");
+  const controls = await toggle.getAttribute("aria-controls");
+  expect(controls).toBeTruthy();
+  const list = page.locator(`[id="${controls}"]`).getByRole("listitem");
+  await expect(list).toHaveCount(20);
+
+  await toggle.click();
+  await expect(toggle).toHaveAttribute("aria-expanded", "true");
+  await expect(toggle).toHaveText("Show fewer");
+  await expect(list).toHaveCount(27);
+});
+
+test("a conflict reason is shown once per group, in the UI language", async ({ page }) => {
+  await stubAndRunWithDone(page, MANY_LICENSES_DONE, "ko");
+  await page.getByRole("navigation").locator('a[href$="/licenses"]').first().click();
+
+  // The Korean sentence for the weak-copyleft rule, once for its two rows.
+  await expect(page.getByText(/^파일이나 라이브러리 단위의 상호주의 조건입니다\./)).toHaveCount(1);
+  await expect(page.getByText("의존성의 라이선스를 식별하지 못했습니다.")).toHaveCount(1);
+  await expect(page.getByText("lgpl-a")).toBeVisible();
+  await expect(page.getByText("lgpl-b")).toBeVisible();
+  // The recorded English sentence is kept only as the tooltip.
+  await expect(page.getByText(WHY_WEAK)).toHaveCount(0);
+  await expect(page.locator(`[title="${WHY_WEAK}"]`)).toHaveCount(1);
+});
+
+test("Models & datasets folds the met G7 checks of an open group", async ({ page }) => {
+  // A self-generated AI SBOM (no submitted input): its G7 checks show here.
+  const selfAi = { ...AI_DONE, mode: "AI", results: [{ name: "model_1.0_bom.json", size: 200 }] };
+  await seedThemeLang(page, "light", "en");
+  await page.route("**/capabilities", (r) =>
+    r.fulfill({ contentType: "application/json", body: JSON.stringify({ firmware: false, scanoss: false, docker: true }) }),
+  );
+  await page.route("**/results", (r) => r.fulfill({ contentType: "application/json", body: "[]" }));
+  await page.route("**/file**", (r) => r.fulfill({ contentType: "application/json", body: JSON.stringify(AI_SBOM) }));
+  await page.route("**/scan-stream**", (r) =>
+    r.fulfill({ contentType: "text/event-stream", body: `event: done\ndata: ${JSON.stringify(selfAi)}\n\n` }),
+  );
+  await page.goto("/?ui=next#/new");
+  await page.fill("#project", "model");
+  await page.fill("#version", "1.0");
+  await page.getByTestId("run-scan").click();
+  await page.getByRole("navigation").getByRole("link", { name: /Models & datasets/ }).click();
+
+  // The models cluster has gaps, so it opens; its three met checks sit in a
+  // closed fold below them.
+  const metFold = page.locator("main details").filter({ has: page.locator("> summary", { hasText: /^Met 3$/ }) });
+  await expect(metFold).toHaveCount(1);
+  await expect(metFold).not.toHaveAttribute("open", /.*/);
+  await expect(page.getByText("Model hash value")).toBeVisible();
+  await expect(page.getByText("Model identifier")).toBeHidden();
+  await metFold.locator("> summary").click();
+  await expect(page.getByText("Model identifier")).toBeVisible();
+
+  // A group of met checks only is closed already, and opening it shows the
+  // checks straight away rather than a second fold.
+  const metadata = page.locator("main details").filter({ has: page.locator("> summary", { hasText: /^Metadata/ }) });
+  await expect(metadata).not.toHaveAttribute("open", /.*/);
+  await metadata.locator("> summary").click();
+  await expect(metadata.getByText("SBOM author")).toBeVisible();
+  await expect(metadata.locator("details")).toHaveCount(0);
 });
 
 test("Licenses section says so when no outbound license was declared", async ({ page }) => {

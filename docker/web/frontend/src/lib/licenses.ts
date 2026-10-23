@@ -569,3 +569,22 @@ export function conflictGroups(components: ComponentItem[]): ConflictGroup[] {
     components: byVerdict.get(verdict)!,
   }));
 }
+
+export interface ConflictReasonGroup {
+  /** The shared reason, verbatim from the SBOM; "" when none was recorded. */
+  why: string;
+  components: ComponentItem[];
+}
+
+/** One verdict's components split by their recorded reason, in first-seen
+ *  order, so a reason shared by many rows is shown once above them. */
+export function conflictReasonGroups(components: ComponentItem[]): ConflictReasonGroup[] {
+  const byWhy = new Map<string, ComponentItem[]>();
+  for (const c of components) {
+    const why = (c.licenseConflictWhy ?? "").trim();
+    const list = byWhy.get(why) ?? [];
+    list.push(c);
+    byWhy.set(why, list);
+  }
+  return [...byWhy].map(([why, list]) => ({ why, components: list }));
+}

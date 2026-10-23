@@ -113,6 +113,19 @@ test("a collapsible section shows that it can be opened, and opens", async ({ pa
   await expect(evidence).not.toHaveAttribute("open", /.*/);
 });
 
+test("a closed fold inside an open one keeps its chevron unturned", async ({ page }) => {
+  // The chevron used to follow any open ancestor, so the evidence fold of a
+  // check inside an open group showed "open" while closed.
+  await open(page, "conformance");
+  const evidence = evidenceFold(page);
+  const chevron = evidence.locator("> summary > svg");
+  const transform = () => chevron.evaluate((el) => getComputedStyle(el).transform);
+  await expect(evidence).not.toHaveAttribute("open", /.*/);
+  expect(await transform()).toBe("none");
+  await evidence.locator("> summary").click();
+  await expect.poll(transform).not.toBe("none");
+});
+
 test("a collapsible section opens from the keyboard", async ({ page }) => {
   await open(page, "conformance");
   const evidence = evidenceFold(page);

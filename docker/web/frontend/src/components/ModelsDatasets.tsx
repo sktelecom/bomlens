@@ -10,7 +10,7 @@ import {
   Server,
   TriangleAlert,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { Badge } from "@/components/ui/badge";
@@ -24,6 +24,7 @@ import {
   type DatasetRef,
   type DeclaredService,
   datasetTreeRows,
+  GRADE_TONE,
   GradeBadge,
   type ModelAssessment,
   type ModelCard,
@@ -31,6 +32,8 @@ import {
   parseModelCards,
   USAGE_LABEL_KEY,
 } from "@/lib/models";
+import { renderLocalized } from "@/lib/localized";
+import { localizeReasons } from "@/lib/modelReasons";
 import { loadSbom } from "@/lib/sbomGraph";
 import { CheckGroup } from "./ConformancePanel";
 import { Spdx3Panel } from "./Spdx3Panel";
@@ -240,7 +243,7 @@ function ModelsDatasetsBody({
                           href={d.url}
                           target="_blank"
                           rel="noreferrer"
-                          className="mt-0.5 flex items-center gap-1 break-all text-primary underline-offset-2 hover:underline"
+                          className="mt-0.5 flex items-center gap-1 break-all text-primary underline underline-offset-2 hover:no-underline"
                         >
                           <ExternalLink className="h-3 w-3 shrink-0" aria-hidden />
                           {d.url}
@@ -329,7 +332,9 @@ function DatasetSources({ dataset: d }: { dataset: DatasetRef }) {
       {d.unverifiedSources.map((s) => (
         <div key={s} className="flex flex-wrap items-center gap-1.5">
           <span className="break-all">{s}</span>
-          <Badge variant="muted">{t("models.dsSourceUnverified")}</Badge>
+          {/* The pipeline grades such a source "review"; same tone as that
+              grade's badge, since the Korean label is the same word. */}
+          <Badge tone={GRADE_TONE.review}>{t("models.dsSourceUnverified")}</Badge>
         </div>
       ))}
       {d.trace === "depth-limit" && (
@@ -384,6 +389,10 @@ function G7Disclosure({ conformance }: { conformance: ConformanceSummary }) {
                 title={t(`g7.cluster.${group.cluster}`, { defaultValue: group.cluster })}
                 checks={group.checks}
                 defaultOpen={group.checks.some((c) => checkKind(c) === "actionable")}
+                // This page has no filter chips to start on the gaps, as the
+                // Conformance screen does; folding the met elements away in
+                // each open group does the same job.
+                foldMet
               />
             ))}
           </div>
@@ -491,6 +500,7 @@ function AssessmentBlock({
     { key: "datasets", label: t("models.assessDatasets"), grade: a.datasets },
     { key: "trainingData", label: t("models.assessTrainingData"), grade: a.trainingData },
   ];
+  const reasons = useMemo(() => localizeReasons(a.reasons), [a.reasons]);
 
   return (
     <div className="space-y-3 rounded-md border bg-muted/30 p-3">
@@ -525,9 +535,18 @@ function AssessmentBlock({
       {a.reasons.length > 0 && (
         <Field label={t("models.reasons")}>
           <ul className="list-inside list-disc text-body-sm text-muted-foreground">
-            {a.reasons.map((r, i) => (
-              <li key={i}>{r}</li>
-            ))}
+            {/* Stamped in the scan's language; an English sentence the
+                scanner writes is shown in the UI language, with the stamped
+                text kept as the tooltip. Anything else stays verbatim. */}
+            {reasons.map(({ text, key }, i) =>
+              key ? (
+                <li key={i} title={text}>
+                  {renderLocalized(t, key)}
+                </li>
+              ) : (
+                <li key={i}>{text}</li>
+              ),
+            )}
           </ul>
         </Field>
       )}
@@ -685,7 +704,7 @@ function ModelCardView({ model: m }: { model: ModelCard }) {
                     href={r.url}
                     target="_blank"
                     rel="noreferrer"
-                    className="inline-flex items-center gap-1 break-all text-primary underline-offset-2 hover:underline"
+                    className="inline-flex items-center gap-1 break-all text-primary underline underline-offset-2 hover:no-underline"
                   >
                     <ExternalLink className="h-3 w-3 shrink-0" aria-hidden />
                     <span className="text-muted-foreground">{r.type}:</span> {r.url}

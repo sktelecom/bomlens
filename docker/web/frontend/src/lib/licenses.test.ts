@@ -7,6 +7,7 @@ import type { ComponentItem } from "./api";
 import {
   componentConflict,
   conflictGroups,
+  conflictReasonGroups,
   isCopyleft,
   licenseNeedsDecision,
   licenseGroups,
@@ -460,5 +461,21 @@ describe("worstTier via licenseRiskSummary (generic-classifier redundancy)", () 
       c({ licenses: ["Apache-2.0", "Other/Proprietary License"] }),
     ]);
     expect(s.uncategorized).toBe(1);
+  });
+});
+
+describe("conflictReasonGroups", () => {
+  it("groups one verdict's components by their shared reason, first seen first", () => {
+    const g = conflictReasonGroups([
+      c({ name: "a", licenseConflictWhy: "R1" }),
+      c({ name: "b", licenseConflictWhy: "R2" }),
+      c({ name: "c", licenseConflictWhy: "R1 " }),
+      c({ name: "d" }),
+    ]);
+    expect(g.map((x) => [x.why, x.components.map((y) => y.name)])).toEqual([
+      ["R1", ["a", "c"]],
+      ["R2", ["b"]],
+      ["", ["d"]],
+    ]);
   });
 });

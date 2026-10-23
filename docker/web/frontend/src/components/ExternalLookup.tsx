@@ -160,7 +160,7 @@ function AdvisoryCard({ advisory }: { advisory: AdvisoryRecord }) {
                     href={href}
                     target="_blank"
                     rel="noreferrer"
-                    className="inline-flex items-center gap-1 break-all text-label text-primary underline-offset-2 hover:underline"
+                    className="inline-flex items-center gap-1 break-all text-label text-primary underline underline-offset-2 hover:no-underline"
                   >
                     <ExternalLink className="h-3 w-3 shrink-0" aria-hidden />
                     {href}
