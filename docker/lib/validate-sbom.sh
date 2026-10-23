@@ -240,6 +240,19 @@ cdx_checks() {
        --arg advnsre "$NS_ADV_PURL_NS_REGEX" \
        --arg advtypes "$NS_ADVISORY_LABEL" "
     $PCT_DEF
+    # A component made of several delivered files (a declared component with
+    # more than one bomlens:artifact) carries the per-file fields, hashes
+    # included, on its nested type \"file\" components, not on itself: it
+    # counts as having a field when every one of those files has it.
+    def bsi_files_all(f): ([ (.components // [])[] | select(.type == \"file\") ]) as \$k
+                          | (\$k | length) > 0 and all(\$k[]; f);
+    def has_hash: (.hashes // []) | length > 0;
+    def bsi_fname: (.properties // []) | any(.name == \"bsi:component:filename\");
+    def bsi_sha512: (.hashes // []) | any(.alg == \"SHA-512\");
+    def bsi_fprops: (.properties // []) as \$props
+                    | (\$props | any(.name == \"bsi:component:executable\"))
+                      and (\$props | any(.name == \"bsi:component:archive\"))
+                      and (\$props | any(.name == \"bsi:component:structured\"));
     ([.components[]?]) as \$c
     | (\$c|length) as \$tot
     | (.metadata.tools) as \$t
@@ -300,7 +313,7 @@ cdx_checks() {
     | (\$okvers | split(\" \")) as \$vers
     | ((.specVersion // \"\") | tostring) as \$sv
     | ((\$c | map(select((.licenses // []) | length > 0)) | length)) as \$lic_ok
-    | ((\$c | map(select((.hashes // []) | length > 0)) | length)) as \$hash_ok
+    | ((\$c | map(select(has_hash or bsi_files_all(has_hash))) | length)) as \$hash_ok
     | ([ .dependencies[]? | .dependsOn[]? ] | length) as \$dep_edges
     # The graph-completeness self-declaration BomLens writes to
     # compositions[0].aggregate (complete/incomplete/unknown), when present.
@@ -318,19 +331,7 @@ cdx_checks() {
     # component because a dataset can carry a checksum.
     | ([ \$pkg[] | select(((.authors // []) | length > 0) or ((.publisher // \"\") != \"\")
                           or (((.supplier // {}) | length) > 0) or (((.manufacturer // {}) | length) > 0)) ] | length) as \$creator_ok
-    # A component made of several delivered files (a declared component with
-    # more than one bomlens:artifact) carries the per-file fields on its nested
-    # type \"file\" components, not on itself: it counts as having a field when
-    # every one of those files has it.
-    | def bsi_files_all(f): ([ (.components // [])[] | select(.type == \"file\") ]) as \$k
-                           | (\$k | length) > 0 and all(\$k[]; f);
-      def bsi_fname: (.properties // []) | any(.name == \"bsi:component:filename\");
-      def bsi_sha512: (.hashes // []) | any(.alg == \"SHA-512\");
-      def bsi_fprops: (.properties // []) as \$props
-                      | (\$props | any(.name == \"bsi:component:executable\"))
-                        and (\$props | any(.name == \"bsi:component:archive\"))
-                        and (\$props | any(.name == \"bsi:component:structured\"));
-      ([ \$pkg[] | select(bsi_fname or bsi_files_all(bsi_fname)) ] | length) as \$fname_ok
+    | ([ \$pkg[] | select(bsi_fname or bsi_files_all(bsi_fname)) ] | length) as \$fname_ok
     | ([ \$c[] | select(bsi_sha512 or bsi_files_all(bsi_sha512)) ] | length) as \$sha512_ok
     | ([ \$pkg[] | select((.externalReferences // []) | any(.type == \"vcs\" or .type == \"distribution\")) ] | length) as \$uri_ok
     | ([ \$pkg[] | select(bsi_fprops or bsi_files_all(bsi_fprops)) ] | length) as \$fprops_ok
@@ -673,7 +674,17 @@ spdx_json_checks() {
        --arg advnsre "$NS_ADV_PURL_NS_REGEX" \
        --arg advtypes "$NS_ADVISORY_LABEL" "
     $PCT_DEF
-    ([.packages[]?]) as \$p
+    # A package for one file of a multi-file component (primaryPackagePurpose
+    # FILE, which spdx-declared.py writes) is not a package of its own here,
+    # as a CycloneDX file component is not: the component that CONTAINS it is
+    # counted, and has checksums when every file it contains has them.
+    ([.packages[]? | select((.primaryPackagePurpose // \"\") == \"FILE\")]) as \$fpk
+    | ([.packages[]? | select((.primaryPackagePurpose // \"\") != \"FILE\")]) as \$p
+    | (reduce \$fpk[] as \$f ({}; .[\$f.SPDXID] = (((\$f.checksums // []) | length) > 0))) as \$fsum
+    | (reduce (.relationships // [])[] as \$r ({};
+          if \$r.relationshipType == \"CONTAINS\" and (\$fsum | has(\$r.relatedSpdxElement // \"\"))
+          then .[\$r.spdxElementId] = ((.[\$r.spdxElementId] // []) + [\$fsum[\$r.relatedSpdxElement]])
+          else . end)) as \$kids
     | (\$p|length) as \$tot
     | ([ .creationInfo.creators[]? | select(startswith(\"Tool:\")) ] | length) as \$tools
     | (.creationInfo.created // \"\") as \$ts
@@ -698,7 +709,8 @@ spdx_json_checks() {
     | (\$okvers | split(\" \")) as \$vers
     | (.spdxVersion // \"\") as \$sv
     | ((\$p | map(select(((.licenseConcluded // \"NOASSERTION\") != \"NOASSERTION\") or ((.licenseDeclared // \"NOASSERTION\") != \"NOASSERTION\"))) | length)) as \$lic_ok
-    | ((\$p | map(select((.checksums // [])|length>0)) | length)) as \$hash_ok
+    | ((\$p | map(select(((.checksums // [])|length>0)
+                          or ((\$kids[.SPDXID] // []) as \$k | (\$k | length) > 0 and all(\$k[]; .)))) | length)) as \$hash_ok
     | ([ .relationships[]? | select(.relationshipType==\"DEPENDS_ON\" or .relationshipType==\"DEPENDENCY_OF\") ] | length) as \$dep_edges
     | (.name // \"\") as \$docname
     | ((.documentDescribes // []) | length) as \$describes
@@ -871,7 +883,10 @@ spdx_json_signal() {
     jq -c '
       def declared($v): ($v // "NOASSERTION") | (ascii_upcase != "NOASSERTION" and ascii_upcase != "NONE");
       ([ (.documentDescribes // [])[]?, (.relationships[]? | select(.relationshipType == "DESCRIBES" and .spdxElementId == "SPDXRef-DOCUMENT") | .relatedSpdxElement) ]) as $roots
-      | ([ .packages[]? | select((.SPDXID // "") as $id | ($roots | index($id)) == null) ]) as $p
+      # A FILE package (one file of a multi-file component) is left out, as
+      # cdx_signal leaves out a file component.
+      | ([ .packages[]? | select((.SPDXID // "") as $id | ($roots | index($id)) == null)
+                        | select((.primaryPackagePurpose // "") != "FILE") ]) as $p
       | ($p | length) as $n
       | ([ $p[] | select(declared(.licenseConcluded) or declared(.licenseDeclared)) ] | length) as $d
       | { softwareComponentCount: $n, emptyResult: ($n == 0),
