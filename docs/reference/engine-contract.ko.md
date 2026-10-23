@@ -77,7 +77,7 @@ BomLens 이미지를 스캔 엔진으로 쓰는 프로그램은 모든 스캔이
 | `suggest-vendored` | C/C++ 프로젝트 스캔 결과가 거의 비었을 때 위 식별을 권함 |
 | `cocoapods` | `Podfile.lock`의 CocoaPods 의존성 추가 |
 | `stamp-metadata` | 루트 컴포넌트를 프로젝트 이름과 버전으로 지정. 실패하면 실행이 멈춤 |
-| `declared-components` | 소스 스캔에서 `--components` 파일이나 `sbom-declared.cdx.json`에 적은 컴포넌트를 추가. 읽을 파일이 있을 때만 기록하며, 선언한 컴포넌트 수를 `counts`에 적음. 파일을 거부하면 `failed`이고 이유를 `detail`에 적으며, 실행은 1로 끝남 |
+| `declared-components` | 소스 스캔에서 `--components` 파일이나 `sbom-declared.cdx.json`에 적은 컴포넌트를 추가. Yocto 빌드에서는 `--components` 파일을 `bomlens:yocto-recipe`에 적은 레시피의 패키지에 적용. 읽을 파일이 있을 때만 기록하며, `bomlens:declared`로 표시된 컴포넌트 수를 `counts`에 적음. 파일을 거부하면 `failed`이고 이유를 `detail`에 적으며, 실행은 1로 끝남 |
 | `docmeta` | 문서 작성자, 도구, 수명 주기 단계 기록 |
 | `license-registry` | 패키지 레지스트리에서 빠진 라이선스를 조회하고, 하나뿐인 강한 카피레프트나 비상업 라이선스를 확인(`--license-registry`). `counts`에 `candidates`, `filled`, `superseded`, `confirmed`, `no_answer`, `not_found`, `non_standard`, `lookup_failed`, `budget_reached`를 기록 |
 | `component-versions` | 펌웨어, 루트 파일시스템, 바이너리 스캔에서 `--component-versions`로 받은 버전을 채우고 사유는 `bomlens:versionReason`으로 기록하며, 버전도 사유도 없는 컴포넌트를 `_component-versions.template.csv`로 씀. 파일을 거부하면 `failed`이고 이유를 `detail`에 적으며, 실행은 1로 끝남 |

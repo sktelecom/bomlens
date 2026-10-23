@@ -136,6 +136,47 @@ The web UI reads the same folder: pick it with the Directory input (mount it fir
 
 The conformance check report of a build directory scan measures the SBOM the scan writes (`<Project>_<Version>_bom.json`), which is the file to submit, rather than the build's own document. That SBOM records `bomlens:scanMode` `YOCTO`, and under `--conformance-profile skt-submission` it is judged the way a firmware scan is: it records the packages installed, not a dependency graph. A Yocto document passed to `--analyze` is judged as it was written.
 
+### Your own recipes and vendor binaries
+
+The build records every package it installed, your in-house recipes and a chip vendor's binary recipes included, but nothing in it says which of them are yours or who supplied them. Say so in a declaration file and pass it with `--components`. A component names its recipe (PN, the recipe name without its version) in `bomlens:yocto-recipe`, not a file path, since the paths differ for every machine and work directory:
+
+```json
+{
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.6",
+  "components": [
+    {
+      "type": "application",
+      "name": "media-daemon",
+      "supplier": { "name": "Example Corp", "url": ["https://example.com"] },
+      "licenses": [ { "license": { "name": "LicenseRef-ExampleCorp-Proprietary" } } ],
+      "properties": [
+        { "name": "bomlens:origin", "value": "first-party" },
+        { "name": "bomlens:yocto-recipe", "value": "media-daemon" }
+      ]
+    }
+  ]
+}
+```
+
+```bash
+./scripts/scan-sbom.sh --project my-image --version 1.0.0 \
+  --target ~/poky/build --components meta-example/sbom-declared.cdx.json
+```
+
+The declaration goes on every package of that recipe installed in the image (`media-daemon` and `media-daemon-cli`, for example). Each keeps the name, version, purl and CPE the build wrote, gets the declared type, supplier, licence (as `concluded`) and `bomlens:origin`, and is marked `bomlens:declared`. The files the SPDX document lists for the package are nested under it with their hashes and file names. Yocto hashes files, not packages: SPDX 3.0 gives SHA-256, and SHA-512 from Yocto 6.1; SPDX 2.2 gives SHA-1 and SHA-256; the manifests give no files. BomLens does not make up a package hash, so under `--conformance-profile bsi-tr-03183-2` a SHA-512 or file name the build did not record, and the file properties no Yocto record gives, are reported as not in the source SBOM, a warning. Under `skt-submission` the first-party exemption from the PURL rows needs a SHA-512, so on a build before 6.1 your packages keep needing a purl (their `pkg:yocto` purl counts as one without an upstream repository).
+
+The scan fails, naming the recipe, when a declared recipe installed no package in the image; the SBOM written so far is kept as `<Project>_<Version>_bom.refused.json`. A recipe declaration cannot also give `bomlens:artifact`, or the `hashes`, `purl` or `cpe` the build decides. A component with neither a recipe nor a file, such as a blob the device loads at run time, is added as in a source scan.
+
+The supplier alone can also come from the build. With SPDX 3.0, set it per recipe in your layer and build again:
+
+```
+SPDX_PACKAGE_SUPPLIER_name:pn-media-daemon = "Example Corp"
+SPDX_PACKAGE_SUPPLIER_type:pn-media-daemon = "organization"
+```
+
+Yocto writes it as the package's `suppliedBy`, which BomLens reads as its supplier. It is a name only, with no URL or email (which BSI TR-03183-2 asks of a creator), and it does not mark the package as yours, so the declaration file is still the way to state `bomlens:origin`. SPDX 2.2 writes `SPDX_SUPPLIER`, whose default names OpenEmbedded rather than the actual supplier, and BomLens does not read it.
+
 ### A build that produced no SPDX at all
 
 Turning `create-spdx` on is a build-configuration change, and whoever holds a finished build directory cannot always make one. A build records what it shipped regardless, and those records are read instead:
