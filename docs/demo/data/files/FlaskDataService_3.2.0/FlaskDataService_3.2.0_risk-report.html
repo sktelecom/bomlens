@@ -17,6 +17,8 @@
   --input: 240 5% 91%;
   --primary: 240 6% 10%;
   --primary-foreground: 0 0% 98%;
+  --selected: 240 6% 10%;
+  --selected-foreground: 0 0% 98%;
   --secondary: 240 5% 96%;
   --secondary-foreground: 240 6% 10%;
   --accent: 240 5% 96%;
@@ -91,18 +93,20 @@
 }
 @media screen and (prefers-color-scheme: dark) {
 :root {
-  --background: 240 6% 6%;
+  --background: 240 6% 7%;
   --foreground: 0 0% 98%;
-  --card: 240 4% 11%;
+  --card: 240 4% 12%;
   --card-foreground: 0 0% 98%;
-  --popover: 240 4% 11%;
+  --popover: 240 4% 12%;
   --popover-foreground: 0 0% 98%;
   --muted: 240 4% 16%;
   --muted-foreground: 240 5% 65%;
-  --border: 240 4% 16%;
-  --input: 240 4% 16%;
+  --border: 240 4% 24%;
+  --input: 240 4% 24%;
   --primary: 0 0% 98%;
   --primary-foreground: 240 6% 10%;
+  --selected: 240 5% 30%;
+  --selected-foreground: 0 0% 98%;
   --secondary: 240 4% 16%;
   --secondary-foreground: 0 0% 98%;
   --accent: 240 4% 16%;
@@ -114,9 +118,9 @@
   --brand-foreground: 0 0% 100%;
   --brand-strong: 349 100% 68%;
   --brand-accent: 24 90% 60%;
-  --sidebar: 240 5% 9%;
+  --sidebar: 240 5% 10%;
   --sidebar-foreground: 0 0% 98%;
-  --sidebar-border: 240 4% 16%;
+  --sidebar-border: 240 4% 24%;
   --role-danger-fg: 252 165 165;
   --role-danger-muted: 60 38 41;
   --role-danger-emphasis: 248 113 113;
@@ -319,20 +323,22 @@ pre code{font-family:var(--mono);font-size:var(--font-size-mono);white-space:pre
 </header>
 <h1>Open-source risk report</h1>
 <p class="subtitle">Supplier SBOM under review</p>
-<p class="meta">Project: FlaskDataService &middot; Generated: <time datetime="2026-10-20T15:13:46Z">2026-10-20 15:13 UTC</time> &middot; Input format: CycloneDX</p>
+<p class="meta">Project: FlaskDataService &middot; Generated: <time datetime="2026-10-23T22:46:03Z">2026-10-23 22:46 UTC</time> &middot; Input format: CycloneDX</p>
 <h2>1. Requirements met (conformance check)</h2>
 <div class="cards"><span class="pill pill-pass">Check result: PASS</span></div>
 <h2>2. Vulnerability analysis and remediation deadlines</h2>
 <div class="note">Recommended remediation deadlines: <b>Critical → within 7 days</b>, <b>High → within 30 days</b>. We recommend preparing a remediation plan or risk justification.</div>
 <div class="cards">
- <span class="pill pill-crit">Critical <span class="count">0</span></span>
- <span class="pill pill-high">High <span class="count">7</span></span>
+ <span class="pill pill-crit">Critical <span class="count">1</span></span>
+ <span class="pill pill-high">High <span class="count">8</span></span>
  <span class="pill pill-med">Medium <span class="count">14</span></span>
  <span class="pill pill-low">Low <span class="count">1</span></span>
  <span class="pill pill-info">Unknown <span class="count">0</span></span>
 </div>
 <div class="table-wrap"><table><thead><tr><th>Severity</th><th>CVE</th><th>Package</th><th>Installed</th><th>Fixed</th><th>Deadline</th></tr></thead><tbody>
+<tr><td class="sev-CRITICAL">CRITICAL</td><td class="id">GHSA-6q48-6c7w-9gw2</td><td>certifi</td><td>2026.7.22</td><td>2026.10.19</td><td>within 7 days</td></tr>
 <tr><td class="sev-HIGH">HIGH</td><td class="id">CVE-2024-34069</td><td>Werkzeug</td><td>3.0.1</td><td>3.0.3</td><td>within 30 days</td></tr>
+<tr><td class="sev-HIGH">HIGH</td><td class="id">CVE-2026-114134</td><td>black</td><td>23.12.1</td><td>26.10.1</td><td>within 30 days</td></tr>
 <tr><td class="sev-HIGH">HIGH</td><td class="id">CVE-2025-66418</td><td>urllib3</td><td>2.1.0</td><td>2.6.0</td><td>within 30 days</td></tr>
 <tr><td class="sev-HIGH">HIGH</td><td class="id">CVE-2025-66471</td><td>urllib3</td><td>2.1.0</td><td>2.6.0</td><td>within 30 days</td></tr>
 <tr><td class="sev-HIGH">HIGH</td><td class="id">CVE-2026-21441</td><td>urllib3</td><td>2.1.0</td><td>2.6.3</td><td>within 30 days</td></tr>

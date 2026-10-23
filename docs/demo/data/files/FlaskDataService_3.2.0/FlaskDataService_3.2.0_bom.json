@@ -7305,7 +7305,50 @@
   "version": 1,
   "compositions": [
     {
-      "aggregate": "unknown"
+      "aggregate": "unknown",
+      "dependencies": [
+        "FlaskDataService@3.2.0",
+        "pkg:pypi/annotated-types@0.8.0",
+        "pkg:pypi/app@latest",
+        "pkg:pypi/black@23.12.1",
+        "pkg:pypi/blinker@1.9.0",
+        "pkg:pypi/certifi@2026.7.22",
+        "pkg:pypi/charset-normalizer@3.4.9",
+        "pkg:pypi/click@8.1.7",
+        "pkg:pypi/coverage@7.15.2",
+        "pkg:pypi/flake8@6.1.0",
+        "pkg:pypi/flask@3.0.0",
+        "pkg:pypi/greenlet@3.5.4",
+        "pkg:pypi/idna@3.18",
+        "pkg:pypi/iniconfig@2.3.0",
+        "pkg:pypi/itsdangerous@2.2.0",
+        "pkg:pypi/jinja2@3.1.6",
+        "pkg:pypi/markupsafe@3.0.3",
+        "pkg:pypi/mccabe@0.7.0",
+        "pkg:pypi/mypy-extensions@1.1.0",
+        "pkg:pypi/numpy@1.26.2",
+        "pkg:pypi/packaging@26.2",
+        "pkg:pypi/pandas@2.1.4",
+        "pkg:pypi/pathspec@1.1.1",
+        "pkg:pypi/platformdirs@4.11.0",
+        "pkg:pypi/pluggy@1.6.0",
+        "pkg:pypi/pycodestyle@2.11.1",
+        "pkg:pypi/pydantic-core@2.14.5",
+        "pkg:pypi/pydantic@2.5.2",
+        "pkg:pypi/pyflakes@3.1.0",
+        "pkg:pypi/pytest-cov@4.1.0",
+        "pkg:pypi/pytest@7.4.3",
+        "pkg:pypi/python-dateutil@2.9.0.post0",
+        "pkg:pypi/python-dotenv@1.0.0",
+        "pkg:pypi/pytz@2026.3.post1",
+        "pkg:pypi/requests@2.31.0",
+        "pkg:pypi/six@1.17.0",
+        "pkg:pypi/sqlalchemy@2.0.23",
+        "pkg:pypi/typing-extensions@4.16.0",
+        "pkg:pypi/tzdata@2026.3",
+        "pkg:pypi/urllib3@2.1.0",
+        "pkg:pypi/werkzeug@3.0.1"
+      ]
     }
   ]
 }
