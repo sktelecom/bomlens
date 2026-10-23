@@ -10,7 +10,7 @@ import {
   Server,
   TriangleAlert,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { Badge } from "@/components/ui/badge";
@@ -33,7 +33,7 @@ import {
   USAGE_LABEL_KEY,
 } from "@/lib/models";
 import { renderLocalized } from "@/lib/localized";
-import { modelReasonKey } from "@/lib/modelReasons";
+import { localizeReasons } from "@/lib/modelReasons";
 import { loadSbom } from "@/lib/sbomGraph";
 import { CheckGroup } from "./ConformancePanel";
 import { Spdx3Panel } from "./Spdx3Panel";
@@ -500,6 +500,7 @@ function AssessmentBlock({
     { key: "datasets", label: t("models.assessDatasets"), grade: a.datasets },
     { key: "trainingData", label: t("models.assessTrainingData"), grade: a.trainingData },
   ];
+  const reasons = useMemo(() => localizeReasons(a.reasons), [a.reasons]);
 
   return (
     <div className="space-y-3 rounded-md border bg-muted/30 p-3">
@@ -534,19 +535,18 @@ function AssessmentBlock({
       {a.reasons.length > 0 && (
         <Field label={t("models.reasons")}>
           <ul className="list-inside list-disc text-body-sm text-muted-foreground">
-            {a.reasons.map((r, i) => {
-              // Stamped in the scan's language; an English sentence the
-              // scanner writes is shown in the UI language, with the stamped
-              // text kept as the tooltip. Anything else stays verbatim.
-              const key = modelReasonKey(r);
-              return key ? (
-                <li key={i} title={r}>
+            {/* Stamped in the scan's language; an English sentence the
+                scanner writes is shown in the UI language, with the stamped
+                text kept as the tooltip. Anything else stays verbatim. */}
+            {reasons.map(({ text, key }, i) =>
+              key ? (
+                <li key={i} title={text}>
                   {renderLocalized(t, key)}
                 </li>
               ) : (
-                <li key={i}>{r}</li>
-              );
-            })}
+                <li key={i}>{text}</li>
+              ),
+            )}
           </ul>
         </Field>
       )}

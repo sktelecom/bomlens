@@ -88,10 +88,10 @@ const RULES: Rule[] = [
     new RegExp(`^custom license text: restrictive wording found \u2014 (.+) \\(${V}\\)$`),
     (m) => ({ key: k("customFound"), params: { quote: m[1], verdict: verdict(m[2]) } }),
   ],
-  // Written as one sentence with a ";" in it, so the reasons splitter hands
-  // it over in two halves.
-  [/^custom license text: no known restrictive wording matched$/, () => ({ key: k("customNoMatch") })],
-  [new RegExp(`^human review still required \\(${V}\\)$`), (m) => ({ key: k("humanReview"), params: { verdict: verdict(m[1]) } })],
+  [
+    new RegExp(`^custom license text: no known restrictive wording matched; human review still required \\(${V}\\)$`),
+    (m) => ({ key: k("customNoMatch"), params: { verdict: verdict(m[1]) } }),
+  ],
   [
     new RegExp(`^lineage: conditions of base model (.+) may be inherited but are not declared here \\(${V}\\)$`),
     (m) => ({ key: k("lineage"), params: { model: m[1], verdict: verdict(m[2]) } }),
@@ -157,14 +157,14 @@ const RULES: Rule[] = [
     (m) => ({ key: k("sourcesDepth"), params: { verdict: verdict(m[1]) } }),
   ],
   [
-    new RegExp(`^source (.+?) \\(through (.+?)\\): (.+) \\(${V}\\)$`),
+    new RegExp(`^source ([^()]+?) \\(through ([^()]+?)\\): (.+) \\(${V}\\)$`),
     (m) => ({
       key: k("sourceThrough"),
       params: { source: m[1], through: m[2], why: sourceWhy(m[3]), verdict: verdict(m[4]) },
     }),
   ],
   [
-    new RegExp(`^source (.+?): (.+) \\(${V}\\)$`),
+    new RegExp(`^source ([^()]+?): (.+) \\(${V}\\)$`),
     (m) => ({ key: k("source"), params: { source: m[1], why: sourceWhy(m[2]), verdict: verdict(m[3]) } }),
   ],
   [
@@ -184,13 +184,58 @@ const RULES: Rule[] = [
   ],
 ];
 
+/** Longer than any sentence the scanner writes with real values in it: past
+ *  this a reason is shown as is rather than run through the patterns. */
+const MAX_REASON = 1000;
+
 /** The i18n key for one reason, or null when it is not an English sentence
  *  assess-ai-risk.sh writes. */
 export function modelReasonKey(reason: string): LocalizedText | null {
   const s = reason.trim();
+  if (s.length > MAX_REASON) return null;
   for (const [re, build] of RULES) {
     const m = re.exec(s);
     if (m) return build(m);
   }
   return null;
+}
+
+/** Sentences that can carry a ";" of their own: the "no known wording"
+ *  sentence is written with one, and a restrictive-wording quote or a local
+ *  scan finding is copied text that may hold several hits joined by "; ". */
+const RUNS_ON = [
+  "custom license text: no known restrictive wording matched",
+  "custom license text: restrictive wording found",
+  "file security: local file scan found a code-execution risk",
+  "file security: local file scan found something that needs review",
+];
+const ENDS_WITH_VERDICT = new RegExp(`\\(${V}\\)$`);
+
+/**
+ * The reasons property is one string joined with "; ", and the parser splits
+ * it on every ";", which also cuts the sentences above. Put those back
+ * together: such a sentence runs on until a piece ends in a verdict, so its
+ * tail can never be read as a reason of its own.
+ */
+export function joinReasonPieces(pieces: string[]): string[] {
+  const out: string[] = [];
+  for (let i = 0; i < pieces.length; i++) {
+    let s = pieces[i];
+    if (RUNS_ON.some((p) => s.startsWith(p))) {
+      while (!ENDS_WITH_VERDICT.test(s) && i + 1 < pieces.length) s = `${s}; ${pieces[++i]}`;
+    }
+    out.push(s);
+  }
+  return out;
+}
+
+export interface ShownReason {
+  /** The reason as stamped, after re-joining. */
+  text: string;
+  key: LocalizedText | null;
+}
+
+/** Reasons ready to show: re-joined, then matched. */
+export function localizeReasons(pieces: string[]): ShownReason[] {
+  return joinReasonPieces(pieces).map((text) => ({ text, key: modelReasonKey(text) }));
 }
