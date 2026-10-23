@@ -11,6 +11,8 @@
 #   writes <out.cdx.json>                   (CycloneDX 1.6, installed packages)
 #   writes <out_prefix>_security_yocto.json (Trivy-shaped, unpatched CVEs only)
 #   writes <out_prefix>_yocto_vex.json      (patched / ignored / unpatched counts)
+#   writes $YOCTO_FILES_OUT, when set       (each package's recipe, for the
+#                                            declared-components step)
 #
 # Turning create-spdx on is a build-configuration change, and someone holding a
 # finished build directory cannot always make one. But a build records what it
@@ -286,10 +288,10 @@ def build(build_dir):
     left nothing to read."""
     manifest = find_image_manifest(build_dir)
     if not manifest:
-        return None, [], {}, ""
+        return None, [], {}, "", {}
     installed = parse_image_manifest(manifest)
     if not installed:
-        return None, [], {}, ""
+        return None, [], {}, "", {}
 
     image_name = image_identity(manifest)
     licenses = parse_license_manifest(find_license_manifest(build_dir, image_name) or "")
@@ -327,7 +329,8 @@ def build(build_dir):
 
     summary = find_cve_summary(build_dir)
     rows, counts = parse_cve_summary(summary, recipe_of) if summary else ([], {})
-    return components, rows, counts, image_name
+    recipes = {"yocto-pkg-%s" % name: recipe for name, recipe in recipe_of.items()}
+    return components, rows, counts, image_name, recipes
 
 
 def write_cyclonedx(path, components, image_name):
@@ -396,7 +399,7 @@ def main():
         print("[yocto-manifest] not a directory: %s" % build_dir, file=sys.stderr)
         return 1
 
-    components, rows, counts, image_name = build(build_dir)
+    components, rows, counts, image_name, recipes = build(build_dir)
     if not components:
         print(
             "[yocto-manifest] no image package manifest in this build directory.",
@@ -407,6 +410,14 @@ def main():
     write_cyclonedx(out, components, image_name)
     if out_prefix:
         write_sidecars(out_prefix, rows, counts)
+    # For the declaration step, as parse-yocto-spdx.py writes it: the recipe of
+    # every package license.manifest names, by bom-ref. The manifests list no
+    # files, so there are none to nest.
+    files_path = os.environ.get("YOCTO_FILES_OUT", "")
+    if files_path:
+        with open(files_path, "w", encoding="utf-8") as fh:
+            json.dump({"files": {}, "recipes": recipes}, fh)
+            fh.write("\n")
 
     if counts:
         print(

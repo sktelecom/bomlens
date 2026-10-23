@@ -136,6 +136,51 @@ Kirkstone에서는 위 설정을 쓸 수 없습니다. 그 빌드는 SPDX 2.2를
 
 빌드 디렉터리 스캔의 적합성 검사 보고서는 빌드가 만든 문서가 아니라 스캔이 쓴 SBOM(`<Project>_<Version>_bom.json`)을 점검합니다. 제출할 파일이 이것이기 때문입니다. 이 SBOM에는 `bomlens:scanMode`로 `YOCTO`가 기록되고, `--conformance-profile skt-submission`에서는 펌웨어 스캔과 같은 방식으로 판정합니다. 의존 관계 그래프가 아니라 설치된 패키지를 기록하기 때문입니다. `--analyze`로 넘긴 Yocto 문서는 적힌 그대로 판정합니다.
 
+이 SBOM은 스캔이 직접 만든 것이므로 다른 스캔이 만든 SBOM과 같은 방식으로 정보를 채웁니다. `--sbom-author`, `--supplier`, `--license`(`concluded`)를 기록하고, 도구 목록에 BomLens를, 수명 주기 단계로 `build`를 적습니다. 이미지는 빌드가 정한 이름을 그대로 두고 `bom-ref`를 받으며, 빌드가 버전을 적지 않았으면 `--version`을 받고, 설치된 모든 패키지에 의존하는 것으로 기록됩니다. 빌드가 생성 시각을 적지 않았으면(매니페스트에는 없음) 스캔 시각을 적습니다. 이 세 옵션을 주면 `bsi-tr-03183-2`의 SBOM 작성자, 의존 관계 그래프, 최상위 구성요소 항목이 통과할 수 있습니다. `--analyze`로 따로 넘긴 Yocto 문서는 다른 사람이 만든 SBOM이므로 이 처리를 하지 않습니다.
+
+### 자체 레시피와 공급사 바이너리
+
+빌드는 설치한 패키지를 모두 기록합니다. 사내 레시피와 칩 제조사의 바이너리 레시피도 여기에 들어 있지만, 어느 것이 자체개발이고 누가 공급했는지는 빌드 기록에 없습니다. 이 정보는 선언 파일에 적어 `--components`로 넘깁니다. 산출물 경로는 머신과 작업 디렉터리마다 다르므로, 구성요소에는 파일 경로 대신 `bomlens:yocto-recipe`에 레시피 이름(버전을 뺀 PN)을 적습니다.
+
+```json
+{
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.6",
+  "components": [
+    {
+      "type": "application",
+      "name": "media-daemon",
+      "supplier": { "name": "Example Corp", "url": ["https://example.com"] },
+      "licenses": [ { "license": { "name": "LicenseRef-ExampleCorp-Proprietary" } } ],
+      "properties": [
+        { "name": "bomlens:origin", "value": "first-party" },
+        { "name": "bomlens:yocto-recipe", "value": "media-daemon" }
+      ]
+    }
+  ]
+}
+```
+
+```bash
+./scripts/scan-sbom.sh --project my-image --version 1.0.0 \
+  --target ~/poky/build --components meta-example/sbom-declared.cdx.json
+```
+
+선언은 이미지에 설치된 그 레시피의 패키지 전부(예: `media-daemon`과 `media-daemon-cli`)에 적용됩니다. 각 패키지는 빌드가 기록한 이름, 버전, purl, CPE를 그대로 두고, 선언한 유형, 공급자, 라이선스(`concluded`), `bomlens:origin`을 받으며 `bomlens:declared`로 표시됩니다. SPDX 문서가 그 패키지에 기록한 파일은 해시, 파일 이름과 함께 패키지 아래 하위 구성요소로 들어갑니다. Yocto는 패키지가 아니라 파일 단위로 해시를 냅니다. SPDX 3.0은 SHA-256을, Yocto 6.1부터는 SHA-512도 기록하고, SPDX 2.2는 SHA-1과 SHA-256을 기록하며, 매니페스트에는 파일 목록이 없습니다. BomLens는 패키지 해시를 따로 만들지 않습니다. 그래서 `--conformance-profile bsi-tr-03183-2`에서는 빌드가 기록하지 않은 SHA-512와 파일 이름, Yocto 기록에 없는 파일 속성을 원본 SBOM에 없음으로 보고하고 경고로 표시합니다. `skt-submission`에서 자체개발 구성요소가 PURL 항목에서 빠지려면 SHA-512가 있어야 하므로, 6.1 이전 빌드에서는 자체 패키지에도 purl이 필요합니다(이 패키지의 `pkg:yocto` purl은 upstream 저장소가 없는 purl로 셉니다).
+
+선언한 레시피가 이미지에 패키지를 하나도 설치하지 않았으면 스캔은 레시피 이름을 알리며 실패하고, 그때까지 만든 SBOM을 `<Project>_<Version>_bom.refused.json`으로 남깁니다. 레시피 선언에는 `bomlens:artifact`를 함께 적을 수 없고, 빌드가 정하는 `hashes`, `purl`, `cpe`도 적을 수 없습니다. 레시피도 파일도 없는 구성요소(예: 장치가 실행 중에 불러오는 바이너리)는 소스 스캔과 같은 방식으로 추가됩니다. 다만 이미지에 설치된 패키지와 이름이 같으면 거부하며, 그 패키지는 레시피로 선언합니다.
+
+패키지는 빌드가 기록한 레시피로만 맞춥니다(SPDX 문서, SPDX가 없는 빌드에서는 `license.manifest`). 빌드가 레시피를 기록하지 않은 패키지는 이름이 같아도 맞추지 않으며, 거부 메시지에 그 패키지 이름이 나옵니다. 레시피의 멀티립과 SDK 변형(`lib32-media-daemon`, `nativesdk-media-daemon`)은 별도 레시피이므로 따로 선언하며, 이미지에 설치된 변형이 있으면 로그에 경고가 나옵니다. 선언은 `--target`으로 준 빌드 디렉터리에 적용됩니다. `--analyze`로 준 SBOM은 받은 SBOM이므로 바꾸지 않으며, `--components`와 함께 쓰면 거부합니다. 웹 UI에서는 아직 Yocto 레시피를 선언할 수 없습니다.
+
+공급자만은 빌드에서 가져올 수도 있습니다. SPDX 3.0에서는 레이어에 레시피별로 다음과 같이 지정하고 다시 빌드합니다.
+
+```
+SPDX_PACKAGE_SUPPLIER_name:pn-media-daemon = "Example Corp"
+SPDX_PACKAGE_SUPPLIER_type:pn-media-daemon = "organization"
+```
+
+Yocto는 이 값을 패키지의 `suppliedBy`로 기록하고, BomLens는 이를 공급자로 읽습니다. 다만 이름만 있고 BSI TR-03183-2가 제작자에 요구하는 URL이나 이메일은 없으며, 자체개발 여부도 표시하지 않습니다. 그래서 `bomlens:origin`은 여전히 선언 파일에 적습니다. SPDX 2.2는 `SPDX_SUPPLIER`를 기록하는데, 기본값이 실제 공급자가 아니라 OpenEmbedded이므로 BomLens는 이 값을 읽지 않습니다.
+
 ### SPDX를 전혀 만들지 않은 빌드
 
 `create-spdx`를 켜는 것은 빌드 설정을 바꾸는 일이라, 완료된 빌드 디렉터리만 가진 사람은 그렇게 하지 못할 수 있습니다. 빌드는 SPDX가 없어도 무엇을 넣었는지 기록해 두므로, 그 기록을 대신 읽습니다.
@@ -166,7 +211,7 @@ SPDX 2.2도 읽지만 담기는 정보가 적습니다. Yocto 4.0 Kirkstone과 5
 
 PURL에 기대는 적합성 항목은 실패합니다. Yocto는 패키지를 PURL이 아니라 CPE로 식별하므로 PURL 적용률과 거기서 파생되는 항목은 통과할 수 없습니다. 보고서에는 몇 개가 CPE로 식별됐는지 함께 적히고, 그 행 아래에 두 식별자를 모두 인정하는 기준(BSI TR-03183-2, 미국 SBOM 최소 요소)이 표시됩니다. 즉 이 판정은 기준이 아니라 제출 요구사항의 것입니다. 기본 취약점 매칭이 PURL을 키로 쓰기 때문에 여기서는 PURL을 요구합니다.
 
-필수 항목 하나가 더 실패하는데, 도구가 아니라 문서 쪽 사정입니다. 최상위 컴포넌트가 버전이 없어 실패합니다. bitbake가 이미지 패키지에 이름만 쓰고 `software_packageVersion`을 넣지 않습니다(기준 이미지 `core-image-minimal`에서 확인).
+필수 항목 하나가 더 실패하는데, 도구가 아니라 문서 쪽 사정입니다. 최상위 컴포넌트가 버전이 없어 실패합니다. bitbake가 이미지 패키지에 이름만 쓰고 `software_packageVersion`을 넣지 않습니다(기준 이미지 `core-image-minimal`에서 확인). 빌드 디렉터리를 스캔하면 이미지가 대신 `--version`을 받습니다.
 
 업로드 크기는 100MB까지 받습니다. 참고로 기준 이미지인 `core-image-minimal` 문서는 설치 패키지 35개에 15.8MB입니다. `--target`으로 빌드 디렉터리를 스캔할 때는 디스크에서 파일을 읽으므로 이 제한이 적용되지 않습니다.
 

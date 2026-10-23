@@ -82,7 +82,20 @@ fi
 # shellcheck source=docker/lib/engine-result.sh
 . "$LIBDIR/engine-result.sh"
 er_init
-trap er_exit_trap EXIT
+# Run-scoped files of a Yocto build scan (set further down), removed on every
+# way out, a refused declaration included.
+YOCTO_FILES_LIST=""
+YOCTO_READER_REFS=""
+entry_exit_trap() {
+    local rc=$?
+    set +e
+    [ -z "$YOCTO_FILES_LIST" ] || rm -f "$YOCTO_FILES_LIST"
+    [ -z "$YOCTO_READER_REFS" ] || rm -f "$YOCTO_READER_REFS"
+    # er_exit_trap reads the exit code from $?.
+    ( exit "$rc" )
+    er_exit_trap
+}
+trap entry_exit_trap EXIT
 trap 'exit 130' INT
 trap 'exit 143' TERM
 
@@ -764,6 +777,25 @@ YOCTO_CPE_MATCH=false
 # is set by scan-sbom.sh and server.py when they found the document in the build.
 YOCTO_FROM_BUILD="${YOCTO_FROM_BUILD:-false}"
 [ -n "${YOCTO_BUILD_DIR:-}" ] && YOCTO_FROM_BUILD=true
+
+# --license (PROJECT_LICENSE) is recorded on the root of the SBOM in the modes
+# below (stamp-metadata.sh, stamp-yocto-root.sh). A value CycloneDX has no
+# field for would stop the run at that step, after the whole scan; it is
+# checked here instead, before anything is generated, with the same helper and
+# the same message, whoever started the run (the CLI, the web UI or a CI job).
+# A licence the entrypoint reads from the project manifest later is not
+# PROJECT_LICENSE yet, and is only left out when it does not fit.
+case "$SCAN_MODE" in
+    SOURCE|POSTPROCESS|ROOTFS) _lic_mode=true ;;
+    ANALYZE) _lic_mode="$YOCTO_FROM_BUILD" ;;
+    *) _lic_mode=false ;;
+esac
+if [ "$_lic_mode" = true ] && [ -n "${PROJECT_LICENSE:-}" ] \
+   && ! bash "$LIBDIR/license-entry.sh" "$PROJECT_LICENSE" >/dev/null; then
+    echo "[ERROR] --license was refused (the reason is above); the run stops before an SBOM is written."
+    exit 1
+fi
+unset _lic_mode
 case "$SCAN_MODE" in
     SOURCE)
         # Local web UI source scan (current dir / extracted ZIP / cloned git repo).
@@ -1196,12 +1228,23 @@ EOF
         # read into the same CycloneDX the SPDX path produces, and the rest of the
         # pipeline continues unchanged. Set by scan-sbom.sh / server.py only after
         # they have established the folder is a build directory with no SBOM.
+        # --components changes the SBOM, so it applies to the one this scan
+        # generates from a Yocto build directory (YOCTO_FROM_BUILD) and never to
+        # a received SBOM. With it, the Yocto readers also list each installed
+        # package's recipe and files (YOCTO_FILES_OUT) for the
+        # declared-components step below.
+        if [ -n "${DECLARED_COMPONENTS_FILES:-}" ] && [ "$YOCTO_FROM_BUILD" != true ]; then
+            echo "[ERROR] --components applies to a source scan and a Yocto build directory; $(basename "${ANALYZE_SBOM:-the input}") was passed with --analyze, and a received SBOM is not changed."
+            echo "[ERROR] Scan the Yocto build directory itself (--target <build dir>), or drop --components."
+            exit 1
+        fi
+        [ -z "${DECLARED_COMPONENTS_FILES:-}" ] || YOCTO_FILES_LIST="$(mktemp)"
         if [ -n "${YOCTO_BUILD_DIR:-}" ] && [ -z "$ANALYZE_SBOM" ]; then
             if [ ! -d "$YOCTO_BUILD_DIR" ]; then
                 echo "[ERROR] YOCTO_BUILD_DIR not found: $YOCTO_BUILD_DIR"; exit 1
             fi
             echo "[1/2] Reading the Yocto build's own records (no SPDX in this build)..."
-            if ! python3 "$LIBDIR/parse-yocto-manifests.py" \
+            if ! YOCTO_FILES_OUT="$YOCTO_FILES_LIST" python3 "$LIBDIR/parse-yocto-manifests.py" \
                     "$YOCTO_BUILD_DIR" "$OUTPUT_FILE" "$OUT_PREFIX"; then
                 echo "[ERROR] this build directory holds no image package manifest to read."
                 exit 1
@@ -1257,7 +1300,7 @@ EOF
         YOCTO_RC=3
         if command -v python3 >/dev/null 2>&1 && [ -f "$LIBDIR/parse-yocto-spdx.py" ]; then
             YOCTO_RC=0
-            python3 "$LIBDIR/parse-yocto-spdx.py" "$ANALYZE_SBOM" "$OUTPUT_FILE" "$OUT_PREFIX" \
+            YOCTO_FILES_OUT="$YOCTO_FILES_LIST" python3 "$LIBDIR/parse-yocto-spdx.py" "$ANALYZE_SBOM" "$OUTPUT_FILE" "$OUT_PREFIX" \
                 || YOCTO_RC=$?
         fi
         if [ "$YOCTO_RC" != 0 ] && [ "$YOCTO_ARCHIVE" = "true" ]; then
@@ -1279,6 +1322,21 @@ EOF
                 echo "[ERROR] could not convert supplier SBOM to CycloneDX."; exit 1
             fi
         fi
+        fi
+        # The components a Yocto reader wrote in this run, by bom-ref, for the
+        # conformance check (validate-sbom.sh): a package of the build may lack
+        # a SHA-512, a file name or file properties because the build did not
+        # record them, which is reported as not in the source SBOM. Only for the
+        # SBOM generated from a build directory, and only from this file, which
+        # neither a declaration nor an input SBOM can write
+        # (bomlens:identifiedBy alone could be typed into either).
+        if [ "$YOCTO_SBOM" = true ] && [ "$YOCTO_FROM_BUILD" = true ]; then
+            YOCTO_READER_REFS="$(mktemp)"
+            if jq '[.components[]? | .["bom-ref"]? | strings] | map({(.): true}) | add // {}' "$OUTPUT_FILE" > "$YOCTO_READER_REFS" 2>/dev/null; then
+                export YOCTO_READER_REFS
+            else
+                rm -f "$YOCTO_READER_REFS"; YOCTO_READER_REFS=""
+            fi
         fi
         ;;
 
@@ -1655,6 +1713,24 @@ case "$SCAN_MODE" in
         esac
         er_phase_end
         ;;
+    ANALYZE)
+        # An SBOM read from a Yocto build directory the user pointed at is one
+        # this scan generates, not one it received: YOCTO_FROM_BUILD is set by
+        # scan-sbom.sh and server.py only when they found the document (or the
+        # manifests) in a build directory, and YOCTO_SBOM only when a Yocto
+        # reader wrote the SBOM. Its image root gets a bom-ref, the --version
+        # when the build wrote none, the --license as concluded, and an edge to
+        # every installed package (stamp-yocto-root.sh). A document passed
+        # with --analyze on its own sets no YOCTO_FROM_BUILD and is left as
+        # its author wrote it. Before the declared-components step, so a
+        # declared component is linked from this same root.
+        if [ "$YOCTO_SBOM" = true ] && [ "$YOCTO_FROM_BUILD" = true ]; then
+            er_phase stamp-metadata
+            bash "$LIBDIR/stamp-yocto-root.sh" "$OUTPUT_FILE"
+            er_record stamp-metadata ok "" "" "$ER_PHASE_STARTED"
+            er_phase_end
+        fi
+        ;;
 esac
 
 # Components a declaration file lists: what a source scan cannot find, such as
@@ -1676,10 +1752,38 @@ esac
 # components marked bomlens:declared were written by this step in this run,
 # which the first-party exemption from the PURL rows relies on
 # (validate-sbom.sh). It is never taken from the caller's environment.
+#
+# A Yocto build directory (ANALYZE, with the SBOM read from the build's SPDX
+# document or its manifests: YOCTO_SBOM and YOCTO_FROM_BUILD; a received SBOM
+# with --components was refused above) runs the step too, on the --components files only:
+# there is no source tree whose root could hold a default file, and the build
+# directory is not where a supplier keeps its declarations. There a component
+# names its recipe (bomlens:yocto-recipe) rather than a build output, and the
+# declaration goes on the installed packages of that recipe
+# (DECLARED_COMPONENTS_YOCTO=1), with the files parse-yocto-spdx.py listed
+# (YOCTO_FILES_LIST). A build directory whose records no Yocto reader could
+# read (the generic converter took it) is refused: there is nothing to declare on.
 unset DECLARED_COMPONENTS_APPLIED
-case "$SCAN_MODE" in
-    SOURCE|POSTPROCESS)
+_dc_mode="$SCAN_MODE"
+if [ "$SCAN_MODE" = ANALYZE ] && [ -n "${DECLARED_COMPONENTS_FILES:-}" ]; then
+    if [ "$YOCTO_SBOM" = true ] && [ "$YOCTO_FROM_BUILD" = true ]; then
+        _dc_mode=YOCTO
+    else
+        echo "[ERROR] --components applies to a source scan and a Yocto build directory; $(basename "${ANALYZE_SBOM:-the input}") is not an SBOM a Yocto build wrote."
+        echo "[ERROR] Drop --components, or point --target at a Yocto build directory whose SPDX or manifests can be read."
+        exit 1
+    fi
+fi
+case "$_dc_mode" in
+    SOURCE|POSTPROCESS|YOCTO)
         _dc_root="${SOURCE_ROOT:-/src}"
+        _dc_yocto=0
+        if [ "$_dc_mode" = YOCTO ]; then
+            _dc_yocto=1
+            # Not read for a default file or a build output here; the step only
+            # needs a folder that exists.
+            _dc_root="${YOCTO_BUILD_DIR:-$(dirname "$ANALYZE_SBOM")}"
+        fi
         _dc_files=()
         _dc_default=0
         if [ -n "${DECLARED_COMPONENTS_FILES:-}" ]; then
@@ -1697,6 +1801,7 @@ case "$SCAN_MODE" in
             _dc_rc=0
             _dc_err="$(mktemp)"
             DECLARED_COMPONENTS_LABELS="${DECLARED_COMPONENTS_LABELS:-}" DECLARED_COMPONENTS_DEFAULT="$_dc_default" \
+                DECLARED_COMPONENTS_YOCTO="$_dc_yocto" DECLARED_COMPONENTS_YOCTO_FILES="$YOCTO_FILES_LIST" \
                 python3 "$LIBDIR/apply-declared-components.py" "$OUTPUT_FILE" "$_dc_root" "${_dc_files[@]}" 2> "$_dc_err" || _dc_rc=$?
             cat "$_dc_err" >&2
             if [ "$_dc_rc" -eq 0 ]; then
@@ -1728,9 +1833,11 @@ case "$SCAN_MODE" in
             fi
             rm -f "$_dc_err"
         fi
-        unset _dc_root _dc_files _dc_rc _dc_err _dc_count _dc_first _dc_default
+        unset _dc_root _dc_files _dc_rc _dc_err _dc_count _dc_first _dc_default _dc_yocto
         ;;
 esac
+unset _dc_mode
+[ -z "$YOCTO_FILES_LIST" ] || rm -f "$YOCTO_FILES_LIST"
 
 # ========================================================
 # Record who generated this SBOM, with what, and at which lifecycle phase — the
@@ -1759,6 +1866,13 @@ case "$SCAN_MODE" in
         ;;
     SOURCE|POSTPROCESS|ROOTFS|IMAGE|AIBOM|DATASET|AIDECLARE|MERGE)
         run_optional_step docmeta bash "$LIBDIR/stamp-document-metadata.sh" "$OUTPUT_FILE" "$SCAN_MODE"
+        ;;
+    ANALYZE)
+        # Only the SBOM this scan generated from a Yocto build directory (see
+        # stamp-yocto-root.sh above); a received SBOM keeps its own authorship.
+        if [ "$YOCTO_SBOM" = true ] && [ "$YOCTO_FROM_BUILD" = true ]; then
+            run_optional_step docmeta bash "$LIBDIR/stamp-document-metadata.sh" "$OUTPUT_FILE" YOCTO
+        fi
         ;;
 esac
 

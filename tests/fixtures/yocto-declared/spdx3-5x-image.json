@@ -1,0 +1,459 @@
+{
+ "@context": "https://spdx.org/rdf/3.0.1/spdx-context.jsonld",
+ "@graph": [
+  {
+   "type": "CreationInfo",
+   "@id": "_:ci",
+   "specVersion": "3.0.1",
+   "created": "2026-10-01T00:00:00Z",
+   "createdBy": [
+    "urn:agent:oe"
+   ],
+   "createdUsing": [
+    "urn:agent:bitbake"
+   ]
+  },
+  {
+   "type": "Organization",
+   "spdxId": "urn:agent:oe",
+   "name": "OpenEmbedded",
+   "creationInfo": "_:ci"
+  },
+  {
+   "type": "Tool",
+   "spdxId": "urn:agent:bitbake",
+   "name": "bitbake",
+   "creationInfo": "_:ci"
+  },
+  {
+   "type": "SpdxDocument",
+   "spdxId": "urn:doc",
+   "name": "example-image",
+   "creationInfo": "_:ci",
+   "rootElement": [
+    "urn:sbom"
+   ]
+  },
+  {
+   "type": "software_Sbom",
+   "spdxId": "urn:sbom",
+   "creationInfo": "_:ci",
+   "name": "example-image-qemux86-64.rootfs-20261001000000",
+   "rootElement": [
+    "urn:pkg:image"
+   ]
+  },
+  {
+   "type": "software_Package",
+   "spdxId": "urn:pkg:image",
+   "creationInfo": "_:ci",
+   "name": "example-image",
+   "software_primaryPurpose": "archive"
+  },
+  {
+   "type": "build_Build",
+   "spdxId": "urn:build:busybox",
+   "creationInfo": "_:ci",
+   "name": "busybox:do_create_spdx:recipe",
+   "build_buildType": "http://openembedded.org/bitbake/do_create_spdx/recipe"
+  },
+  {
+   "type": "simplelicensing_LicenseExpression",
+   "spdxId": "urn:lic:busybox",
+   "creationInfo": "_:ci",
+   "simplelicensing_licenseExpression": "GPL-2.0-only"
+  },
+  {
+   "type": "software_Package",
+   "spdxId": "urn:pkg:busybox",
+   "creationInfo": "_:ci",
+   "name": "busybox",
+   "software_packageVersion": "1.36.1",
+   "software_primaryPurpose": "install"
+  },
+  {
+   "type": "software_File",
+   "spdxId": "urn:file:busybox:1",
+   "creationInfo": "_:ci",
+   "name": "bin/busybox.nosuid",
+   "verifiedUsing": [
+    {
+     "type": "Hash",
+     "algorithm": "sha256",
+     "hashValue": "04b16c69c99d23c9b35954936743a808ee7a12a36d92d332aca28ce798a22c3a"
+    }
+   ]
+  },
+  {
+   "type": "software_File",
+   "spdxId": "urn:file:busybox:2",
+   "creationInfo": "_:ci",
+   "name": "bin/busybox.suid",
+   "verifiedUsing": [
+    {
+     "type": "Hash",
+     "algorithm": "sha256",
+     "hashValue": "5fc52a79e9c4cc5045bf2f639090391b41bd0aa53b27e9e79e28400b374a4d66"
+    }
+   ]
+  },
+  {
+   "type": "software_Package",
+   "spdxId": "urn:pkg:busybox-syslog",
+   "creationInfo": "_:ci",
+   "name": "busybox-syslog",
+   "software_packageVersion": "1.36.1",
+   "software_primaryPurpose": "install"
+  },
+  {
+   "type": "software_File",
+   "spdxId": "urn:file:busybox-syslog:1",
+   "creationInfo": "_:ci",
+   "name": "etc/init.d/syslog",
+   "verifiedUsing": [
+    {
+     "type": "Hash",
+     "algorithm": "sha256",
+     "hashValue": "fac1df208c3aa00f7d61c50bf8fb3e2c2c87b92b39a8e456ada6c62edbf7f0e9"
+    }
+   ]
+  },
+  {
+   "type": "build_Build",
+   "spdxId": "urn:build:zlib",
+   "creationInfo": "_:ci",
+   "name": "zlib:do_create_spdx:recipe",
+   "build_buildType": "http://openembedded.org/bitbake/do_create_spdx/recipe"
+  },
+  {
+   "type": "simplelicensing_LicenseExpression",
+   "spdxId": "urn:lic:zlib",
+   "creationInfo": "_:ci",
+   "simplelicensing_licenseExpression": "Zlib"
+  },
+  {
+   "type": "software_Package",
+   "spdxId": "urn:pkg:libz1",
+   "creationInfo": "_:ci",
+   "name": "libz1",
+   "software_packageVersion": "1.3.1",
+   "software_primaryPurpose": "install"
+  },
+  {
+   "type": "software_File",
+   "spdxId": "urn:file:libz1:1",
+   "creationInfo": "_:ci",
+   "name": "usr/lib/libz.so.1.3.1",
+   "verifiedUsing": [
+    {
+     "type": "Hash",
+     "algorithm": "sha256",
+     "hashValue": "266547f2fca1420960c24dd72bce0a1b73af652e0e2c7f15d907e164b18cab62"
+    }
+   ]
+  },
+  {
+   "type": "build_Build",
+   "spdxId": "urn:build:media-daemon",
+   "creationInfo": "_:ci",
+   "name": "media-daemon:do_create_spdx:recipe",
+   "build_buildType": "http://openembedded.org/bitbake/do_create_spdx/recipe"
+  },
+  {
+   "type": "software_Package",
+   "spdxId": "urn:pkg:media-daemon",
+   "creationInfo": "_:ci",
+   "name": "media-daemon",
+   "software_packageVersion": "3.1.0",
+   "software_primaryPurpose": "install"
+  },
+  {
+   "type": "software_File",
+   "spdxId": "urn:file:media-daemon:1",
+   "creationInfo": "_:ci",
+   "name": "usr/bin/media-daemon",
+   "verifiedUsing": [
+    {
+     "type": "Hash",
+     "algorithm": "sha256",
+     "hashValue": "d0c56dea31874bb82ec1afc654c341f3fd0a18c2a3eed9d0764a689cbfda6b8c"
+    }
+   ]
+  },
+  {
+   "type": "software_File",
+   "spdxId": "urn:file:media-daemon:2",
+   "creationInfo": "_:ci",
+   "name": "etc/media-daemon.conf",
+   "verifiedUsing": [
+    {
+     "type": "Hash",
+     "algorithm": "sha256",
+     "hashValue": "c82a8a9dfc87c26a22e0a213c5b68ca487534720bb55ada834870ad2e0ddfa67"
+    }
+   ]
+  },
+  {
+   "type": "software_Package",
+   "spdxId": "urn:pkg:media-daemon-cli",
+   "creationInfo": "_:ci",
+   "name": "media-daemon-cli",
+   "software_packageVersion": "3.1.0",
+   "software_primaryPurpose": "install"
+  },
+  {
+   "type": "software_File",
+   "spdxId": "urn:file:media-daemon-cli:1",
+   "creationInfo": "_:ci",
+   "name": "usr/bin/media-ctl",
+   "verifiedUsing": [
+    {
+     "type": "Hash",
+     "algorithm": "sha256",
+     "hashValue": "841a3903813417deff5df7a599142b46e18e29b45db49c35abe6ea7ee837cda9"
+    }
+   ]
+  },
+  {
+   "type": "build_Build",
+   "spdxId": "urn:build:vendor-dsp",
+   "creationInfo": "_:ci",
+   "name": "vendor-dsp:do_create_spdx:recipe",
+   "build_buildType": "http://openembedded.org/bitbake/do_create_spdx/recipe"
+  },
+  {
+   "type": "simplelicensing_LicenseExpression",
+   "spdxId": "urn:lic:vendor-dsp",
+   "creationInfo": "_:ci",
+   "simplelicensing_licenseExpression": "LicenseRef-Vendor-Binary"
+  },
+  {
+   "type": "software_Package",
+   "spdxId": "urn:pkg:vendor-dsp-firmware",
+   "creationInfo": "_:ci",
+   "name": "vendor-dsp-firmware",
+   "software_packageVersion": "7.2",
+   "software_primaryPurpose": "install"
+  },
+  {
+   "type": "software_File",
+   "spdxId": "urn:file:vendor-dsp-firmware:1",
+   "creationInfo": "_:ci",
+   "name": "lib/firmware/dsp.bin",
+   "verifiedUsing": [
+    {
+     "type": "Hash",
+     "algorithm": "sha256",
+     "hashValue": "9e6980486fa5f3674c73ce4dd1c323ee551452e7637bfe7607c33d2966112cde"
+    }
+   ]
+  },
+  {
+   "type": "software_File",
+   "spdxId": "urn:file:src",
+   "creationInfo": "_:ci",
+   "name": "media-daemon.c",
+   "software_primaryPurpose": "source",
+   "verifiedUsing": [
+    {
+     "type": "Hash",
+     "algorithm": "sha256",
+     "hashValue": "25a6634263c1b1f6fc4697a04e2b9904ea4b042a89af59dc93ec1f5d44848a26"
+    }
+   ]
+  },
+  {
+   "type": "Relationship",
+   "spdxId": "urn:rel:out:busybox",
+   "creationInfo": "_:ci",
+   "from": "urn:build:busybox",
+   "relationshipType": "hasOutput",
+   "to": [
+    "urn:pkg:busybox"
+   ]
+  },
+  {
+   "type": "Relationship",
+   "spdxId": "urn:rel:lic:busybox",
+   "creationInfo": "_:ci",
+   "from": "urn:pkg:busybox",
+   "relationshipType": "hasConcludedLicense",
+   "to": [
+    "urn:lic:busybox"
+   ]
+  },
+  {
+   "type": "Relationship",
+   "spdxId": "urn:rel:contains:busybox",
+   "creationInfo": "_:ci",
+   "from": "urn:pkg:busybox",
+   "relationshipType": "contains",
+   "to": [
+    "urn:file:busybox:1",
+    "urn:file:busybox:2"
+   ]
+  },
+  {
+   "type": "Relationship",
+   "spdxId": "urn:rel:out:busybox-syslog",
+   "creationInfo": "_:ci",
+   "from": "urn:build:busybox",
+   "relationshipType": "hasOutput",
+   "to": [
+    "urn:pkg:busybox-syslog"
+   ]
+  },
+  {
+   "type": "Relationship",
+   "spdxId": "urn:rel:lic:busybox-syslog",
+   "creationInfo": "_:ci",
+   "from": "urn:pkg:busybox-syslog",
+   "relationshipType": "hasConcludedLicense",
+   "to": [
+    "urn:lic:busybox"
+   ]
+  },
+  {
+   "type": "Relationship",
+   "spdxId": "urn:rel:contains:busybox-syslog",
+   "creationInfo": "_:ci",
+   "from": "urn:pkg:busybox-syslog",
+   "relationshipType": "contains",
+   "to": [
+    "urn:file:busybox-syslog:1"
+   ]
+  },
+  {
+   "type": "Relationship",
+   "spdxId": "urn:rel:out:libz1",
+   "creationInfo": "_:ci",
+   "from": "urn:build:zlib",
+   "relationshipType": "hasOutput",
+   "to": [
+    "urn:pkg:libz1"
+   ]
+  },
+  {
+   "type": "Relationship",
+   "spdxId": "urn:rel:lic:libz1",
+   "creationInfo": "_:ci",
+   "from": "urn:pkg:libz1",
+   "relationshipType": "hasConcludedLicense",
+   "to": [
+    "urn:lic:zlib"
+   ]
+  },
+  {
+   "type": "Relationship",
+   "spdxId": "urn:rel:contains:libz1",
+   "creationInfo": "_:ci",
+   "from": "urn:pkg:libz1",
+   "relationshipType": "contains",
+   "to": [
+    "urn:file:libz1:1"
+   ]
+  },
+  {
+   "type": "Relationship",
+   "spdxId": "urn:rel:out:media-daemon",
+   "creationInfo": "_:ci",
+   "from": "urn:build:media-daemon",
+   "relationshipType": "hasOutput",
+   "to": [
+    "urn:pkg:media-daemon"
+   ]
+  },
+  {
+   "type": "Relationship",
+   "spdxId": "urn:rel:lic:media-daemon",
+   "creationInfo": "_:ci",
+   "from": "urn:pkg:media-daemon",
+   "relationshipType": "hasConcludedLicense",
+   "to": [
+    "https://spdx.org/rdf/3.0.1/terms/Core/NoneElement"
+   ]
+  },
+  {
+   "type": "Relationship",
+   "spdxId": "urn:rel:contains:media-daemon",
+   "creationInfo": "_:ci",
+   "from": "urn:pkg:media-daemon",
+   "relationshipType": "contains",
+   "to": [
+    "urn:file:media-daemon:1",
+    "urn:file:media-daemon:2"
+   ]
+  },
+  {
+   "type": "Relationship",
+   "spdxId": "urn:rel:out:media-daemon-cli",
+   "creationInfo": "_:ci",
+   "from": "urn:build:media-daemon",
+   "relationshipType": "hasOutput",
+   "to": [
+    "urn:pkg:media-daemon-cli"
+   ]
+  },
+  {
+   "type": "Relationship",
+   "spdxId": "urn:rel:lic:media-daemon-cli",
+   "creationInfo": "_:ci",
+   "from": "urn:pkg:media-daemon-cli",
+   "relationshipType": "hasConcludedLicense",
+   "to": [
+    "https://spdx.org/rdf/3.0.1/terms/Core/NoneElement"
+   ]
+  },
+  {
+   "type": "Relationship",
+   "spdxId": "urn:rel:contains:media-daemon-cli",
+   "creationInfo": "_:ci",
+   "from": "urn:pkg:media-daemon-cli",
+   "relationshipType": "contains",
+   "to": [
+    "urn:file:media-daemon-cli:1"
+   ]
+  },
+  {
+   "type": "Relationship",
+   "spdxId": "urn:rel:out:vendor-dsp-firmware",
+   "creationInfo": "_:ci",
+   "from": "urn:build:vendor-dsp",
+   "relationshipType": "hasOutput",
+   "to": [
+    "urn:pkg:vendor-dsp-firmware"
+   ]
+  },
+  {
+   "type": "Relationship",
+   "spdxId": "urn:rel:lic:vendor-dsp-firmware",
+   "creationInfo": "_:ci",
+   "from": "urn:pkg:vendor-dsp-firmware",
+   "relationshipType": "hasConcludedLicense",
+   "to": [
+    "urn:lic:vendor-dsp"
+   ]
+  },
+  {
+   "type": "Relationship",
+   "spdxId": "urn:rel:contains:vendor-dsp-firmware",
+   "creationInfo": "_:ci",
+   "from": "urn:pkg:vendor-dsp-firmware",
+   "relationshipType": "contains",
+   "to": [
+    "urn:file:vendor-dsp-firmware:1"
+   ]
+  },
+  {
+   "type": "LifecycleScopedRelationship",
+   "spdxId": "urn:rel:dep:cli",
+   "creationInfo": "_:ci",
+   "from": "urn:pkg:media-daemon-cli",
+   "relationshipType": "dependsOn",
+   "scope": "runtime",
+   "to": [
+    "urn:pkg:media-daemon"
+   ]
+  }
+ ]
+}

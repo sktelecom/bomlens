@@ -300,6 +300,107 @@ PROJECT_LICENSE=Apache-2.0 PROJECT_LICENSE_FROM_MANIFEST=1 bash "$LIB/stamp-meta
   && [ "$(jq -c '.metadata.component.licenses' "$WORK/lic-empty.json")" = '[{"license":{"id":"Apache-2.0","acknowledgement":"declared"}}]' ] \
     && pass "--license replaces a generator's MIT root licence as concluded; a manifest licence leaves it and fills only an empty one, as declared" \
     || fail "root licence" "$(jq -c '.metadata.component.licenses' "$WORK/lic-explicit.json" "$WORK/lic-manifest.json" "$WORK/lic-empty.json")"
+# license.id takes only an SPDX list id: a LicenseRef- goes in license.name and
+# a compound expression in expression, both still concluded.
+cp "$WORK/lic-mit.json" "$WORK/lic-ref.json"; cp "$WORK/lic-mit.json" "$WORK/lic-expr.json"
+printf '%s' "$DOC" | jq '.metadata.component = {"type": "application", "name": "x", "version": "1"}' > "$WORK/lic-ref-manifest.json"
+PROJECT_LICENSE=LicenseRef-ExampleCorp-Proprietary bash "$LIB/stamp-metadata.sh" "$WORK/lic-ref.json" x 1 >/dev/null 2>&1
+PROJECT_LICENSE="Apache-2.0 OR MIT" bash "$LIB/stamp-metadata.sh" "$WORK/lic-expr.json" x 1 >/dev/null 2>&1
+PROJECT_LICENSE=LicenseRef-Custom PROJECT_LICENSE_FROM_MANIFEST=1 bash "$LIB/stamp-metadata.sh" "$WORK/lic-ref-manifest.json" x 1 >/dev/null 2>&1
+lic_ref_log="$(PROJECT_LICENSE=LicenseRef-ExampleCorp-Proprietary bash "$LIB/stamp-metadata.sh" "$WORK/lic-ref.json" x 1 2>&1)"
+[ "$(jq -c '.metadata.component.licenses' "$WORK/lic-ref.json")" = '[{"license":{"name":"LicenseRef-ExampleCorp-Proprietary","acknowledgement":"concluded"}}]' ] \
+  && [ "$(jq -c '.metadata.component.licenses' "$WORK/lic-expr.json")" = '[{"expression":"Apache-2.0 OR MIT","acknowledgement":"concluded"}]' ] \
+  && [ "$(jq -c '.metadata.component.licenses' "$WORK/lic-ref-manifest.json")" = '[{"license":{"name":"LicenseRef-Custom","acknowledgement":"declared"}}]' ] \
+  && printf '%s' "$lic_ref_log" | grep -qF "outbound license declared: LicenseRef-ExampleCorp-Proprietary" \
+    && pass "--license: a LicenseRef- is written as license.name and a compound as expression, not as license.id" \
+    || fail "root licence shapes" "$(jq -c '.metadata.component.licenses' "$WORK/lic-ref.json" "$WORK/lic-expr.json" "$WORK/lic-ref-manifest.json") $lic_ref_log"
+# The shared helper (license-entry.sh, also used for a Yocto image root):
+# operators in any letter case and around a tab, parentheses, and an id in
+# another letter case; free text is refused for --license and left out, with
+# a warning, when it was read from the manifest.
+lic_case() {  # <name> <licence> [VAR=value...]: stamps a copy of lic-mit.json
+    local n="$1" l="$2"; shift 2
+    cp "$WORK/lic-mit.json" "$WORK/lic-$n.json"
+    env PROJECT_LICENSE="$l" "$@" bash "$LIB/stamp-metadata.sh" "$WORK/lic-$n.json" x 1 > "$WORK/lic-$n.log" 2>&1
+}
+lic_case lower "apache-2.0 or mit"
+lic_case tab "$(printf 'GPL-2.0-only\twith\tLinux-syscall-note')"
+lic_case paren "MIT AND (Apache-2.0 OR BSD-3-Clause)"
+lic_case idcase "apache-2.0"
+lic_case docref "DocumentRef-spdx-tool-1.2:LicenseRef-MIT-Style-2"
+lic_free_rc=0; lic_case free "Proprietary" || lic_free_rc=$?
+lic_case freeman "Proprietary" PROJECT_LICENSE_FROM_MANIFEST=1
+[ "$(jq -c '.metadata.component.licenses' "$WORK/lic-lower.json")" = '[{"expression":"Apache-2.0 OR MIT","acknowledgement":"concluded"}]' ] \
+  && [ "$(jq -c '.metadata.component.licenses' "$WORK/lic-tab.json")" = '[{"expression":"GPL-2.0-only WITH Linux-syscall-note","acknowledgement":"concluded"}]' ] \
+  && [ "$(jq -c '.metadata.component.licenses' "$WORK/lic-paren.json")" = '[{"expression":"MIT AND (Apache-2.0 OR BSD-3-Clause)","acknowledgement":"concluded"}]' ] \
+  && [ "$(jq -c '.metadata.component.licenses' "$WORK/lic-idcase.json")" = '[{"license":{"id":"Apache-2.0","acknowledgement":"concluded"}}]' ] \
+  && [ "$(jq -c '.metadata.component.licenses' "$WORK/lic-docref.json")" = '[{"license":{"name":"DocumentRef-spdx-tool-1.2:LicenseRef-MIT-Style-2","acknowledgement":"concluded"}}]' ] \
+    && pass "--license: lower-case operators and tabs make an expression (operators and ids in their SPDX spelling), parentheses too, and an id takes the SPDX list's letter case" \
+    || fail "licence edge cases" "$(jq -c '.metadata.component.licenses' "$WORK/lic-lower.json" "$WORK/lic-tab.json" "$WORK/lic-paren.json" "$WORK/lic-idcase.json" "$WORK/lic-docref.json")"
+[ "$lic_free_rc" = 1 ] && grep -qF "[license] ERROR: the licence 'Proprietary' is not an SPDX license id, a LicenseRef- name or a licence expression, so CycloneDX has no field for it. Write a licence the SPDX list does not hold as LicenseRef-Proprietary" "$WORK/lic-free.log" \
+  && [ "$(jq -c '.metadata.component.licenses' "$WORK/lic-free.json")" = '[{"license":{"id":"MIT"}}]' ] \
+  && [ "$(jq -c '.metadata.component.licenses' "$WORK/lic-freeman.json")" = '[{"license":{"id":"MIT"}}]' ] \
+  && grep -qF "[stamp] WARN: the licence read from the project manifest (Proprietary) is not an SPDX license id, a LicenseRef- name or a licence expression, so it is not recorded" "$WORK/lic-freeman.log" \
+  && ! grep -qF "[license] ERROR" "$WORK/lic-freeman.log" \
+    && pass "--license with free text stops the stamp with the LicenseRef- name to use; the same text from a manifest is left out with a warning" \
+    || fail "free-text licence: exit $lic_free_rc" "$(cat "$WORK/lic-free.log" "$WORK/lic-freeman.log")"
+# An expression is read token by token: every operand an SPDX id or a
+# LicenseRef- name, AND/OR between them, WITH before an exception id, and
+# balanced parentheses. Anything else is refused with the reason.
+lic_entry() { bash "$LIB/license-entry.sh" "$1" 2>&1; }
+lic_bad=""
+for l in "Proprietary or commercial" "MIT AND" "(MIT" "MIT)" '$(id)' "MIT WITH" "GPL-2.0-or-later WITH MIT" "Linux-syscall-note"; do
+    if bash "$LIB/license-entry.sh" "$l" >/dev/null 2>&1; then lic_bad="$lic_bad [$l]"; fi
+done
+[ -z "$lic_bad" ] \
+  && [ "$(lic_entry "Proprietary or commercial")" = "[license] ERROR: the licence 'Proprietary or commercial' is not a licence expression: \"Proprietary\" is not an SPDX license id or a LicenseRef- name. Write SPDX license ids and LicenseRef- names joined by AND, OR or WITH, for example --license \"MIT OR LicenseRef-ExampleCorp-Commercial\"." ] \
+  && lic_entry "(MIT" | grep -qF "a parenthesis is not closed" && lic_entry "MIT AND" | grep -qF "it ends where a licence should come" \
+  && lic_entry "GPL-2.0-or-later WITH MIT" | grep -qF '"MIT" after WITH is not an SPDX exception id' \
+  && [ "$(lic_entry "gpl-2.0-only with classpath-exception-2.0 or licenseref-corp")" = '{"expression":"GPL-2.0-only WITH Classpath-exception-2.0 OR LicenseRef-corp","acknowledgement":"concluded"}' ] \
+    && pass "--license: an expression is checked operand by operand (ids, exceptions, LicenseRef-, operators, parentheses) and refused with the reason" \
+    || fail "licence expressions" "accepted:$lic_bad / $(lic_entry "Proprietary or commercial") / $(lic_entry "gpl-2.0-only with classpath-exception-2.0 or licenseref-corp")"
+[ "$(lic_entry "licenseref-acme")" = '{"license":{"name":"LicenseRef-acme","acknowledgement":"concluded"}}' ] \
+  && lic_entry "!!!" | grep -qF "as LicenseRef-<your-name> (for example --license LicenseRef-<your-name>)" \
+  && lic_entry "LicenseRef-" | grep -qF "as LicenseRef-<your-name>" \
+  && lic_entry "My Licence" | grep -qF "as LicenseRef-My-Licence" \
+    && pass "--license: a licenseref- prefix is read in any letter case; a value with nothing to keep is pointed to LicenseRef-<your-name>" \
+    || fail "licence prefixes and suggestions" "$(lic_entry "licenseref-acme") / $(lic_entry "!!!")"
+
+# The CLI bundles (release.yml: bomlens-cli-linux.tar.gz, bomlens-cli-windows.zip)
+# carry only the host-side files scan-sbom.sh uses. The --license check before
+# a scan needs license-entry.sh and the id list; laid out as the Linux bundle
+# is, the helper reads MIT as an id, and scan-sbom.sh only runs the check when
+# both files are there (an older bundle leaves it to the container).
+REL="$ROOT_DIR/.github/workflows/release.yml"
+cli_bundle_files() {  # <archive name>: the docker/lib files of that bundle
+    awk -v a="$1" 'index($0, "release-assets/" a) { on = 1 } on { print } on && !/\\$/ { exit }' "$REL" | grep -o 'docker/lib/[A-Za-z0-9._-]*' | sort -u
+}
+bundle_ok=true
+for a in bomlens-cli-linux.tar.gz bomlens-cli-windows.zip; do
+    for f in docker/lib/source-detect.sh docker/lib/cdx-version.sh docker/lib/build-prep.sh docker/lib/license-entry.sh docker/lib/cdx-spdx-ids.json docker/lib/identify-conda.py; do
+        cli_bundle_files "$a" | grep -qx "$f" || { bundle_ok=false; echo "        $a lacks $f"; }
+    done
+done
+rm -rf "$WORK/cli-bundle"; mkdir -p "$WORK/cli-bundle/scripts" "$WORK/cli-bundle/docker/lib"
+cp "$ROOT_DIR/scripts/scan-sbom.sh" "$WORK/cli-bundle/scripts/"
+for f in $(cli_bundle_files bomlens-cli-linux.tar.gz); do cp "$ROOT_DIR/$f" "$WORK/cli-bundle/$f"; done
+[ "$bundle_ok" = true ] \
+  && [ "$(bash "$WORK/cli-bundle/docker/lib/license-entry.sh" MIT 2>&1)" = '{"license":{"id":"MIT","acknowledgement":"concluded"}}' ] \
+  && bash "$WORK/cli-bundle/scripts/scan-sbom.sh" --help >/dev/null 2>&1 \
+  && grep -qF '[ -f "$REPO_DIR/docker/lib/license-entry.sh" ] && [ -f "$REPO_DIR/docker/lib/cdx-spdx-ids.json" ]' "$ROOT_DIR/scripts/scan-sbom.sh" \
+    && pass "the CLI bundles carry the --license helper and its id list, MIT is an id when laid out as the Linux bundle, and the check is skipped without them" \
+    || fail "CLI bundle --license files"
+
+if [ "${BOMLENS_CDX_SCHEMA:-}" = "1" ] || command -v cyclonedx >/dev/null 2>&1 || [ -n "${CYCLONEDX_CLI:-}" ]; then
+    if licout=$(bash "$ROOT_DIR/scripts/check-cdx-schema.sh" "$WORK/lic-ref.json" "$WORK/lic-expr.json" "$WORK/lic-ref-manifest.json" "$WORK/lic-explicit.json" \
+                 "$WORK/lic-lower.json" "$WORK/lic-tab.json" "$WORK/lic-paren.json" "$WORK/lic-idcase.json" "$WORK/lic-docref.json" 2>&1); then
+        pass "root licences stamped by --license validate against the CycloneDX schema"
+    else
+        fail "a root licence stamped by --license fails the CycloneDX schema" "$licout"
+    fi
+else
+    echo "  SKIP: CycloneDX CLI not available (set BOMLENS_CDX_SCHEMA=1 to download the pinned one)"
+fi
 # Running twice must not append a second BomLens entry (the pipeline may restamp).
 BOMLENS_VERSION=9.9.9 bash "$LIB/stamp-document-metadata.sh" "$WORK/doc-auth.json" FIRMWARE >/dev/null 2>&1
 dcount=$(jq '[.metadata.tools.components[] | select(.name=="BomLens")] | length' "$WORK/doc-auth.json")
@@ -3680,9 +3781,12 @@ done
 [ "$(bsi_row "$WORK/bsi" bsi-declared-without-file)" = "warn|false|hal@4.2" ] \
     && pass "bsi: a declared library with no file of its own is listed on an advisory row, not failed on the file rows" \
     || fail "bsi declared without file" "$(bsi_row "$WORK/bsi" bsi-declared-without-file)"
-[ "$(bsi_row "$WORK/bsi" bsi-scanned-components)" = "warn|false|lodash@4.17.21: creator, filename, SHA-512, file properties, concluded licence;yocto-pkg@1.0: creator, filename, SHA-512 (not in the source SBOM), file properties, concluded licence" ] \
-  && jq -e '.checks[] | select(.id == "bsi-scanned-components") | .detail | startswith("creator 0/2, version 2/2, filename 0/2, SHA-512 0/2 (1 not in the source SBOM)")' "$WORK/bsi_conformance.json" >/dev/null \
-    && pass "bsi: the scanned components are advisory, with counts and the gaps of each, a Yocto package's SHA-512 as not in the source SBOM" \
+# yocto-pkg says it was read by the Yocto SPDX reader, but this SBOM is not
+# one a scan generated from a Yocto build in this run: its missing SHA-512 is
+# a plain gap (the generated case is checked below with YOCTO_READER_REFS).
+[ "$(bsi_row "$WORK/bsi" bsi-scanned-components)" = "warn|false|lodash@4.17.21: creator, filename, SHA-512, file properties, concluded licence;yocto-pkg@1.0: creator, filename, SHA-512, file properties, concluded licence" ] \
+  && jq -e '.checks[] | select(.id == "bsi-scanned-components") | .detail | (startswith("creator 0/2, version 2/2, filename 0/2, SHA-512 0/2") and (contains("not in the source SBOM") | not))' "$WORK/bsi_conformance.json" >/dev/null \
+    && pass "bsi: the scanned components are advisory, with counts and the gaps of each; a claimed Yocto package outside a Yocto build scan gets no allowance" \
     || fail "bsi scanned components" "$(jq -c '.checks[] | select(.id == "bsi-scanned-components") | [.status, .detail, .missing]' "$WORK/bsi_conformance.json")"
 [ "$(bsi_row "$WORK/bsi" purl)" = "warn|false|multi;hal" ] \
   && ! jq -e 'any(.checks[]; .id == "file-properties")' "$WORK/bsi_conformance.json" >/dev/null \
@@ -3697,7 +3801,6 @@ grep -q '^- BSI TR-03183-2 v2.1.0: the fields of section 5.2.2 are required for 
 REPORT_LANG=ko CONFORMANCE_PROFILE=bsi-tr-03183-2 bash "$LIB/validate-sbom.sh" "$WORK/bsi.json" "$WORK/bsiko" "supplier" >/dev/null 2>&1
 grep -q '선언 파일로 추가한 구성요소(bomlens:origin)에 필수' "$WORK/bsiko_conformance.md" \
   && grep -q '선언 구성요소: 실행, 압축, 구조 속성' "$WORK/bsiko_conformance.md" \
-  && grep -q '원본 SBOM에 없음 1개' "$WORK/bsiko_conformance.md" \
   && grep -q 'PURL 포함률 (90% 이상, 권고)' "$WORK/bsiko_conformance.md" \
     && pass "bsi: the Korean report carries the note, labels and details" || fail "bsi ko report" "$(grep -n 'BSI\|선언\|PURL 포함률' "$WORK/bsiko_conformance.md" | head -5)"
 
@@ -3761,16 +3864,37 @@ jq --arg h "$H512" '.metadata.component.hashes = [{alg: "SHA-512", content: $h}]
   && [ "$(bsi_row "$WORK/bsi-k" bsi-primary-component-file | cut -d'|' -f1)" = "pass" ] \
     && pass "bsi: the product needs a creator and a concluded licence, and its file fields once it names a file" \
     || fail "bsi primary component" "$(bsi_row "$WORK/bsi-j" bsi-primary-component) / $(bsi_row "$WORK/bsi-k" bsi-primary-component)"
-# A declared Yocto recipe package with no SHA-512: not in the source SBOM, a warning.
-jq '.components += [{type: "library", name: "my-recipe", version: "2.0", "bom-ref": "R",
+# A declared Yocto recipe package with no SHA-512. Reported as not in the
+# source SBOM (a warning) only for an SBOM a scan generated from a Yocto build
+# in this run (MODE YOCTO) and only for the components a Yocto reader wrote in
+# it, which entrypoint.sh lists by bom-ref in YOCTO_READER_REFS. Properties in
+# the document (bomlens:identifiedBy, bomlens:yocto-recipe) are not enough:
+# anyone could have written them.
+jq '.components += [{type: "application", name: "my-recipe", version: "2.0", "bom-ref": "R",
       supplier: {name: "Example Corp", url: ["https://example.com"]}, licenses: [{license: {id: "MIT", acknowledgement: "concluded"}}],
       hashes: [{alg: "SHA-256", content: "cc"}],
-      properties: [{name: "bomlens:origin", value: "first-party"}, {name: "bomlens:yocto-recipe", value: "my-recipe"}]}]
-    | .dependencies[0].dependsOn += ["R"] | .dependencies += [{ref: "R", dependsOn: []}]' "$WORK/bsi.json" > "$WORK/bsi-e.json"; bsi_run "$WORK/bsi-e.json" "$WORK/bsi-e"
+      properties: [{name: "bomlens:origin", value: "first-party"}, {name: "bomlens:yocto-recipe", value: "my-recipe"},
+                   {name: "bomlens:identifiedBy", value: "yocto-spdx"}]}]
+    | .dependencies[0].dependsOn += ["R"] | .dependencies += [{ref: "R", dependsOn: []}]' "$WORK/bsi.json" > "$WORK/bsi-e.json"
+printf '%s' '{"Y": true, "R": true}' > "$WORK/bsi-e.refs.json"
+MODE=YOCTO YOCTO_READER_REFS="$WORK/bsi-e.refs.json" bsi_run "$WORK/bsi-e.json" "$WORK/bsi-e"
+bsi_run "$WORK/bsi-e.json" "$WORK/bsi-e-recv"
+MODE=YOCTO bsi_run "$WORK/bsi-e.json" "$WORK/bsi-e-norefs"
+YOCTO_READER_REFS="$WORK/bsi-e.refs.json" bsi_run "$WORK/bsi-e.json" "$WORK/bsi-e-nomode"
 [ "$(bsi_row "$WORK/bsi-e" bsi-declared-sha512)" = "warn|true|my-recipe@2.0 (not in the source SBOM)" ] \
   && jq -e '.checks[] | select(.id == "bsi-declared-sha512") | .detail | endswith("; 1 not in the source SBOM")' "$WORK/bsi-e_conformance.json" >/dev/null \
-    && pass "bsi: a declared Yocto package without SHA-512 is reported as not in the source SBOM, as a warning" \
-    || fail "bsi yocto" "$(jq -c '.checks[] | select(.id == "bsi-declared-sha512") | [.status, .detail, .missing]' "$WORK/bsi-e_conformance.json")"
+  && jq -e '.checks[] | select(.id == "bsi-scanned-components") | .missing | index("yocto-pkg@1.0: creator, filename, SHA-512 (not in the source SBOM), file properties, concluded licence") != null' "$WORK/bsi-e_conformance.json" >/dev/null \
+    && pass "bsi: in a Yocto build scan, a package the reader wrote without SHA-512 is reported as not in the source SBOM, as a warning" \
+    || fail "bsi yocto" "$(jq -c '.checks[] | select(.id == "bsi-declared-sha512" or .id == "bsi-scanned-components") | [.status, .detail, .missing]' "$WORK/bsi-e_conformance.json")"
+REPORT_LANG=ko MODE=YOCTO YOCTO_READER_REFS="$WORK/bsi-e.refs.json" bsi_run "$WORK/bsi-e.json" "$WORK/bsi-e-ko"
+grep -q '원본 SBOM에 없음 1개' "$WORK/bsi-e-ko_conformance.md" \
+    && pass "bsi: the Korean report says how many are not in the source SBOM" || fail "bsi ko not in source"
+[ "$(bsi_row "$WORK/bsi-e-recv" bsi-declared-sha512)" = "fail|true|my-recipe@2.0" ] \
+  && [ "$(bsi_row "$WORK/bsi-e-norefs" bsi-declared-sha512)" = "fail|true|my-recipe@2.0" ] \
+  && [ "$(bsi_row "$WORK/bsi-e-nomode" bsi-declared-sha512)" = "fail|true|my-recipe@2.0" ] \
+  && [ "$(bsi_row "$WORK/bsi-e-recv" bsi-declared-file-properties | cut -d'|' -f1)" = "fail" ] \
+    && pass "bsi: bomlens:identifiedBy or bomlens:yocto-recipe in the document alone, or MODE YOCTO without this run's reader list, gives no allowance" \
+    || fail "bsi yocto spoof" "$(bsi_row "$WORK/bsi-e-recv" bsi-declared-sha512) / $(bsi_row "$WORK/bsi-e-norefs" bsi-declared-sha512) / $(bsi_row "$WORK/bsi-e-nomode" bsi-declared-sha512)"
 # CycloneDX 1.6 or later; any other document gets a failing bsi-evaluation row.
 jq '.specVersion = "1.5"' "$WORK/bsi.json" > "$WORK/bsi-f.json"; bsi_run "$WORK/bsi-f.json" "$WORK/bsi-f"
 bsi_run "$FIX/good-spdx.json" "$WORK/bsi-g"
@@ -10590,11 +10714,11 @@ JSON
         fail "pnpm workspace-member filter result unexpected" "$(jq -c '.components[].purl' "$WORK/pwmf-bom.json" 2>&1)"
     fi
     if jq -e '
-        ([.metadata.properties[] | select(.name=="bomlens:excluded-members") | .value][0]
+        ([.metadata.properties[] | select(.name=="bomlens:excluded-components") | .value][0]) as $c
+        | ([.metadata.properties[] | select(.name=="bomlens:excluded-members") | .value][0]
           == "pnpm:playground/demo (@ex/demo)")
-        and ([.metadata.properties[] | select(.name=="bomlens:excluded-components") | .value][0]) as $c
-        | ($c | contains("%40ex%2Fdemo@1.0.0")) and ($c | contains("left-pad@1.3.0"))
-          and ($c | contains("obug") | not) and ($c | contains("string-width") | not)
+        and ($c | contains("%40ex%2Fdemo@1.0.0")) and ($c | contains("left-pad@1.3.0"))
+        and ($c | contains("obug") | not) and ($c | contains("string-width") | not)
     ' "$WORK/pwmf-bom.json" >/dev/null 2>&1; then
         pass "excluded workspace member and dropped component (including the scoped member itself) are recorded, protected packages excluded from the list"
     else

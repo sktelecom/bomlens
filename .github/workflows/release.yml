@@ -184,7 +184,9 @@ jobs:
           # are preserved so the scan-sbom(.bat) -> scan-sbom.sh ->
           # REPO_DIR/docker/lib resolution works after extraction. Omitting
           # either sourced file makes even `scan-sbom.sh --help` exit 1 before
-          # any scan.
+          # any scan. license-entry.sh and the SPDX id list it reads
+          # (cdx-spdx-ids.json) check --license before a scan starts; the
+          # check is skipped without them, and the container then checks it.
           # Every bundle carries the same three license documents. Apache-2.0
           # section 4 asks a redistributor for a copy of the License and the
           # NOTICE contents, and whoever downloads a bundle becomes one;
@@ -197,7 +199,7 @@ jobs:
           # shellcheck disable=SC2086  # word splitting is how the file list expands
           tar -czf release-assets/bomlens-cli-linux.tar.gz \
             scripts/scan-sbom.sh docker/lib/source-detect.sh docker/lib/build-prep.sh \
-            docker/lib/cdx-version.sh $LICENSE_FILES
+            docker/lib/cdx-version.sh docker/lib/license-entry.sh docker/lib/cdx-spdx-ids.json docker/lib/identify-conda.py $LICENSE_FILES
 
           # Windows runtime bundle: both launchers, the orchestration script,
           # and the host-side lib files above. sbom-ui.bat is self-contained
@@ -210,7 +212,7 @@ jobs:
             scripts/scan-sbom.sh scripts/scan-sbom.bat scripts/sbom-ui.bat \
             scripts/check-setup.bat scripts/bomlens.settings.example.txt \
             docker/lib/source-detect.sh docker/lib/build-prep.sh \
-            docker/lib/cdx-version.sh $LICENSE_FILES
+            docker/lib/cdx-version.sh docker/lib/license-entry.sh docker/lib/cdx-spdx-ids.json docker/lib/identify-conda.py $LICENSE_FILES
 
           # Examples
           # shellcheck disable=SC2086

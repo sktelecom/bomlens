@@ -136,6 +136,51 @@ The web UI reads the same folder: pick it with the Directory input (mount it fir
 
 The conformance check report of a build directory scan measures the SBOM the scan writes (`<Project>_<Version>_bom.json`), which is the file to submit, rather than the build's own document. That SBOM records `bomlens:scanMode` `YOCTO`, and under `--conformance-profile skt-submission` it is judged the way a firmware scan is: it records the packages installed, not a dependency graph. A Yocto document passed to `--analyze` is judged as it was written.
 
+Because that SBOM is the scan's own, it is completed the way a generated SBOM is. `--sbom-author`, `--supplier` and `--license` (as `concluded`) are recorded, BomLens is listed as a tool with the `build` lifecycle phase, and the image keeps the name the build gave it but gets a `bom-ref`, the `--version` when the build wrote none, and a dependency on every installed package. A timestamp is written when the build gave none, as the manifests do not. With these three options the `bsi-tr-03183-2` rows for the SBOM creator, the dependency graph and the primary component can pass. A Yocto document passed to `--analyze` on its own is someone else's SBOM and none of this is applied to it.
+
+### Your own recipes and vendor binaries
+
+The build records every package it installed, your in-house recipes and a chip vendor's binary recipes included, but nothing in it says which of them are yours or who supplied them. Say so in a declaration file and pass it with `--components`. A component names its recipe (PN, the recipe name without its version) in `bomlens:yocto-recipe`, not a file path, since the paths differ for every machine and work directory:
+
+```json
+{
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.6",
+  "components": [
+    {
+      "type": "application",
+      "name": "media-daemon",
+      "supplier": { "name": "Example Corp", "url": ["https://example.com"] },
+      "licenses": [ { "license": { "name": "LicenseRef-ExampleCorp-Proprietary" } } ],
+      "properties": [
+        { "name": "bomlens:origin", "value": "first-party" },
+        { "name": "bomlens:yocto-recipe", "value": "media-daemon" }
+      ]
+    }
+  ]
+}
+```
+
+```bash
+./scripts/scan-sbom.sh --project my-image --version 1.0.0 \
+  --target ~/poky/build --components meta-example/sbom-declared.cdx.json
+```
+
+The declaration goes on every package of that recipe installed in the image (`media-daemon` and `media-daemon-cli`, for example). Each keeps the name, version, purl and CPE the build wrote, gets the declared type, supplier, licence (as `concluded`) and `bomlens:origin`, and is marked `bomlens:declared`. The files the SPDX document lists for the package are nested under it with their hashes and file names. Yocto hashes files, not packages: SPDX 3.0 gives SHA-256, and SHA-512 from Yocto 6.1; SPDX 2.2 gives SHA-1 and SHA-256; the manifests give no files. BomLens does not make up a package hash, so under `--conformance-profile bsi-tr-03183-2` a SHA-512 or file name the build did not record, and the file properties no Yocto record gives, are reported as not in the source SBOM, a warning. Under `skt-submission` the first-party exemption from the PURL rows needs a SHA-512, so on a build before 6.1 your packages keep needing a purl (their `pkg:yocto` purl counts as one without an upstream repository).
+
+The scan fails, naming the recipe, when a declared recipe installed no package in the image; the SBOM written so far is kept as `<Project>_<Version>_bom.refused.json`. A recipe declaration cannot also give `bomlens:artifact`, or the `hashes`, `purl` or `cpe` the build decides. A component with neither a recipe nor a file, such as a blob the device loads at run time, is added as in a source scan, unless it has the name of a package the image installs: that one is declared by its recipe.
+
+A package is matched only by the recipe the build recorded for it (in the SPDX document, or in `license.manifest` for a build without SPDX); one whose recipe was not recorded is not matched by its name, and the refusal names it. A multilib or SDK variant of a recipe (`lib32-media-daemon`, `nativesdk-media-daemon`) is a recipe of its own: declare it separately, and the log warns about any the image installs. Declarations apply to the build directory given with `--target`; `--components` is refused with `--analyze`, since an SBOM passed there is received and is not changed. The web UI cannot declare Yocto recipes yet.
+
+The supplier alone can also come from the build. With SPDX 3.0, set it per recipe in your layer and build again:
+
+```
+SPDX_PACKAGE_SUPPLIER_name:pn-media-daemon = "Example Corp"
+SPDX_PACKAGE_SUPPLIER_type:pn-media-daemon = "organization"
+```
+
+Yocto writes it as the package's `suppliedBy`, which BomLens reads as its supplier. It is a name only, with no URL or email (which BSI TR-03183-2 asks of a creator), and it does not mark the package as yours, so the declaration file is still the way to state `bomlens:origin`. SPDX 2.2 writes `SPDX_SUPPLIER`, whose default names OpenEmbedded rather than the actual supplier, and BomLens does not read it.
+
 ### A build that produced no SPDX at all
 
 Turning `create-spdx` on is a build-configuration change, and whoever holds a finished build directory cannot always make one. A build records what it shipped regardless, and those records are read instead:
@@ -164,7 +209,7 @@ SPDX 2.2 is read, but with less in it. Yocto 4.0 (Kirkstone) and 5.0 (Scarthgap)
 
 Conformance checks that depend on PURL will fail. Yocto identifies packages with CPE rather than PURL, so PURL coverage and the checks derived from it cannot pass. The report says how many components carry a CPE instead, and the row cites the baselines — BSI TR-03183-2 and the US SBOM minimum elements — that accept either identifier. The verdict is the submission criteria's, not theirs: PURL is required here because the default vulnerability matching keys on it.
 
-Two more required checks behave differently on a Yocto image, for reasons in the document rather than in the tool. The top-level component fails for want of a version: bitbake writes the image package with a name and no `software_packageVersion` (measured on the reference `core-image-minimal`).
+Two more required checks behave differently on a Yocto image, for reasons in the document rather than in the tool. The top-level component fails for want of a version: bitbake writes the image package with a name and no `software_packageVersion` (measured on the reference `core-image-minimal`). Scanned from a build directory, the image takes `--version` instead.
 
 Uploads are capped at 100 MB. For scale, the reference `core-image-minimal` document is 15.8 MB with 35 installed packages. A build directory scanned with `--target` reads the file from disk, so the cap does not apply there.
 

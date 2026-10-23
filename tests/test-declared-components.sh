@@ -21,7 +21,11 @@
 # component from the product; and each refusal rule stops the run with the
 # file, the component and the reason. Then the same through entrypoint.sh
 # (POSTPROCESS, as test-engine-contract.sh runs it), and the CLI's mount of
-# --components files. Needs bash 4+, jq and python3.
+# --components files. Last, components a Yocto build declares by recipe
+# (bomlens:yocto-recipe, tests/fixtures/yocto-declared): read from SPDX 3.0 in
+# the 5.x and 6.x shapes and from the manifests, each refusal, and the same
+# through entrypoint.sh (ANALYZE) with the BSI and submission profiles. Needs
+# bash 4+, jq, python3.
 set -u
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -900,10 +904,10 @@ P="$(new_project entry-link)"
 rm "$P/sbom-declared.cdx.json"
 cp "$FIX/project/sbom-declared.cdx.json" "$WORK/outside-declared.cdx.json"
 ln -s "$WORK/outside-declared.cdx.json" "$P/sbom-declared.cdx.json"
-rc="$(run_entry e5 "$P")"
-[ "$rc" = 1 ] && grep -qF "sbom-declared.cdx.json (at the scan target root): leads outside the scan target through a symbolic link" "$WORK/e5.out.log" \
+rc="$(run_entry e7 "$P")"
+[ "$rc" = 1 ] && grep -qF "sbom-declared.cdx.json (at the scan target root): leads outside the scan target through a symbolic link" "$WORK/e7.out.log" \
     && pass "a default file that links out of the scan target is refused" \
-    || fail "linked default file: exit $rc" "$(tail -5 "$WORK/e5.out.log")"
+    || fail "linked default file: exit $rc" "$(tail -5 "$WORK/e7.out.log")"
 
 echo "== scan-sbom.sh: --components files reach the container =="
 extract_fn() {
@@ -970,8 +974,438 @@ grep -q '^            COMPONENTS_FILES+=("$2"); shift ;;' "$SCRIPT" && grep -q '
     && pass "--components is parsed (repeatable) and in the help" || fail "--components parsing or help missing"
 grep -q '(components_run)' "$SCRIPT" && pass "the post-process container gets the mounts" || fail "components_run is not used"
 
+echo "== Yocto: components declared by recipe (bomlens:yocto-recipe) =="
+# tests/fixtures/yocto-declared: one image in the SPDX 3.0 shape of 5.x
+# (build_Build hasOutput) and of 6.x (specification recipe generates, with
+# SHA-512 file hashes as 6.1 writes them), and the manifests of a build with
+# no SPDX. The image installs busybox (two packages), zlib (libz1), the
+# in-house recipe media-daemon (LICENSE = "CLOSED", two packages) and a chip
+# vendor's binary recipe vendor-dsp (one package, vendor-dsp-firmware).
+YFIX="$ROOT_DIR/tests/fixtures/yocto-declared"
+YDECL="$YFIX/sbom-declared.cdx.json"
+# yocto_read <name> <5x|6x|manifests>: the reader's SBOM in $WORK/<name>.bom.json,
+# and for SPDX the file list in $WORK/<name>.files.json.
+yocto_read() {
+    case "$2" in
+        manifests) YOCTO_FILES_OUT="$WORK/$1.files.json" python3 -I "$LIB/parse-yocto-manifests.py" "$YFIX/build-manifests" "$WORK/$1.bom.json" "$WORK/$1" >/dev/null 2>&1 ;;
+        *) YOCTO_FILES_OUT="$WORK/$1.files.json" python3 -I "$LIB/parse-yocto-spdx.py" "$YFIX/spdx3-$2-image.json" "$WORK/$1.bom.json" "$WORK/$1" >/dev/null 2>&1 ;;
+    esac
+}
+# yocto_apply <name> <file>...: the step as entrypoint.sh runs it for a Yocto build.
+yocto_apply() {
+    local name="$1" rc=0
+    shift
+    DECLARED_COMPONENTS_YOCTO=1 DECLARED_COMPONENTS_YOCTO_FILES="$( [ -f "$WORK/$name.files.json" ] && printf '%s' "$WORK/$name.files.json")" \
+        DECLARED_COMPONENTS_LABELS="$(basename "$1")" python3 -I "$APPLY" "$WORK/$name.bom.json" "$YFIX" "$@" > "$WORK/$name.log" 2>&1 || rc=$?
+    printf '%s' "$rc"
+}
+# One line per package: name|type|origin|recipe|supplier|licence|own hashes|files|file hash algs
+YPKGS='[.components[] | select(.name | test("^(busybox|busybox-syslog|libz1|media-daemon|media-daemon-cli|vendor-dsp-firmware)$"))
+        | [.name, .type, ([.properties[] | select(.name == "bomlens:origin") | .value] | join(",")),
+           ([.properties[] | select(.name == "bomlens:yocto-recipe") | .value] | join(",")),
+           (.supplier.name // ""), ((.licenses // [])[0] | ((.license.name // .license.id // .expression // "") + "/" + (.license.acknowledgement // .acknowledgement // ""))),
+           ((.hashes // []) | length | tostring), ((.components // []) | length | tostring),
+           ([(.components // [])[] | [.hashes[].alg] | join("+")] | unique | join(","))] | join("|")] | join("\n")'
+
+for shape in 5x 6x; do
+    yocto_read "y$shape" "$shape"
+    before="$(jq '.components | length' "$WORK/y$shape.bom.json")"
+    rc="$(yocto_apply "y$shape" "$YDECL")"
+    [ "$rc" = 0 ] && [ "$(jq '.components | length' "$WORK/y$shape.bom.json")" = "$before" ] \
+        && grep -qF "recipe 'media-daemon' (first-party): declared on 2 package(s): media-daemon, media-daemon-cli; 3 file(s) with their hashes" "$WORK/y$shape.log" \
+        && pass "$shape: the declaration goes on the packages already in the SBOM, adding none" \
+        || fail "$shape apply: exit $rc" "$(cat "$WORK/y$shape.log")"
+    want_algs="SHA-256"; [ "$shape" = 6x ] && want_algs="SHA-256+SHA-512"
+    got="$(jq -r "$YPKGS" "$WORK/y$shape.bom.json")"
+    # The packages of busybox and zlib are not declared: they keep the
+    # licence the build gave them.
+    ywant="busybox|library||||GPL-2.0-only/|0|0|
+busybox-syslog|library||||GPL-2.0-only/|0|0|
+libz1|library||||Zlib/|0|0|
+media-daemon|application|first-party|media-daemon|Example Corp|LicenseRef-ExampleCorp-Proprietary/concluded|0|2|$want_algs
+media-daemon-cli|application|first-party|media-daemon|Example Corp|LicenseRef-ExampleCorp-Proprietary/concluded|0|1|$want_algs
+vendor-dsp-firmware|firmware|third-party|vendor-dsp|Example Chip Vendor|LicenseRef-Vendor-Binary/concluded|0|1|$want_algs"
+    [ "$got" = "$ywant" ] && pass "$shape: every package of each declared recipe gets the type, origin, recipe, supplier and concluded licence; the files the build hashed are nested, with no package hash made up" \
+        || fail "$shape packages" "got:
+$got"
+    D="$(comp "$WORK/y$shape.bom.json" media-daemon)"
+    sha="$(python3 -I -c 'import hashlib,sys; print(hashlib.sha256(sys.argv[1].encode()).hexdigest())' usr/bin/media-daemon)"
+    [ "$(printf '%s' "$D" | jq -r '.components[] | select(.name == "usr/bin/media-daemon") | [.type, .version, (.hashes[] | select(.alg == "SHA-256") | .content), ([.properties[] | select(.name == "bsi:component:filename") | .value] | join(",")), .supplier.name, .["bom-ref"]] | join("|")')" \
+        = "file|3.1.0|$sha|media-daemon|Example Corp|urn:pkg:media-daemon#usr/bin/media-daemon" ] \
+      && [ "$(prop "$D" bomlens:declared)" = "true" ] && [ "$(printf '%s' "$D" | jq -r .version)" = "3.1.0" ] \
+        && pass "$shape: a nested file carries the hash, file name and version the build recorded; the package keeps its version and is marked" \
+        || fail "$shape media-daemon" "$D"
+done
+[ "$(jq -r '.components[] | select(.name == "media-daemon") | .purl' "$WORK/y6x.bom.json")" = "pkg:yocto/meta-example/media-daemon@3.1.0" ] \
+    && pass "6x: the package keeps the purl the build wrote" || fail "6x purl" "$(comp "$WORK/y6x.bom.json" media-daemon)"
+# The manifests list no files: the declaration still goes on the packages.
+yocto_read ym manifests
+rc="$(yocto_apply ym "$YDECL")"
+[ "$rc" = 0 ] && [ "$(jq -r "$YPKGS" "$WORK/ym.bom.json" | grep -c '|0|0|$')" = 6 ] \
+  && [ "$(jq -r '[.components[] | select(any(.properties[]?; .name == "bomlens:origin")) | .name] | join(",")' "$WORK/ym.bom.json")" = "media-daemon,media-daemon-cli,vendor-dsp-firmware" ] \
+    && pass "manifests: the packages of each declared recipe (from license.manifest) are declared, with no files to nest" \
+    || fail "manifests apply: exit $rc" "$(cat "$WORK/ym.log"; jq -r "$YPKGS" "$WORK/ym.bom.json")"
+# busybox is a package named after its recipe, which the readers do not repeat
+# in bomlens:yocto:recipe; a recipe declaration still finds it.
+cat > "$WORK/ybb.cdx.json" <<'EOF'
+{"bomFormat": "CycloneDX", "components": [{"type": "library", "name": "busybox", "version": "1.36.1",
+  "supplier": {"name": "BusyBox", "url": ["https://busybox.net"]},
+  "properties": [{"name": "bomlens:origin", "value": "third-party"}, {"name": "bomlens:yocto-recipe", "value": "busybox"}]}]}
+EOF
+yocto_read ybb 5x
+rc="$(yocto_apply ybb "$WORK/ybb.cdx.json")"
+[ "$rc" = 0 ] && [ "$(jq -r '[.components[] | select(any(.properties[]?; .name == "bomlens:yocto-recipe")) | .name] | join(",")' "$WORK/ybb.bom.json")" = "busybox,busybox-syslog" ] \
+  && [ "$(jq -r '.components[] | select(.name == "busybox") | .licenses[0].license.id' "$WORK/ybb.bom.json")" = "GPL-2.0-only" ] \
+    && pass "a recipe named like its package matches it, and a declaration with no licence keeps the build's" \
+    || fail "busybox by name: exit $rc" "$(cat "$WORK/ybb.log")"
+# A declared package keeps what the reader wrote on it: later steps read
+# bomlens:identifiedBy (vulnerability coverage) and bomlens:yocto:recipe (the
+# upstream repository purl), so libz1, declared through its recipe zlib, still
+# gets zlib's repository purl.
+cat > "$WORK/yz.cdx.json" <<'EOF'
+{"bomFormat": "CycloneDX", "components": [{"type": "library", "name": "zlib",
+  "supplier": {"name": "zlib authors", "url": ["https://zlib.net"]},
+  "properties": [{"name": "bomlens:origin", "value": "third-party"}, {"name": "bomlens:yocto-recipe", "value": "zlib"}]}]}
+EOF
+yocto_read yz 5x
+rc="$(yocto_apply yz "$WORK/yz.cdx.json")"
+python3 -I "$LIB/upstream-purl.py" "$WORK/yz.bom.json" >/dev/null 2>&1
+Z="$(comp "$WORK/yz.bom.json" libz1)"
+[ "$rc" = 0 ] && [ "$(prop "$Z" bomlens:identifiedBy)|$(prop "$Z" bomlens:yocto:recipe)|$(prop "$Z" bomlens:layer)|$(prop "$Z" bomlens:yocto-recipe)|$(prop "$Z" bomlens:declared)" = "yocto-spdx|zlib|yocto|zlib|true" ] \
+  && [ "$(printf '%s' "$Z" | jq -r .purl)" = "pkg:github/madler/zlib@v1.3.1" ] \
+    && pass "a declared package keeps bomlens:identifiedBy, bomlens:yocto:recipe and bomlens:layer, and still gets its upstream purl" \
+    || fail "reader properties on a declared package: exit $rc" "$Z"
+
+# The SBOM the 5.x reader wrote is unchanged except for the declared packages.
+yocto_read y5plain 5x
+[ "$(jq -c '[.components[] | select(.name | test("^(busybox|busybox-syslog|libz1)$"))]' "$WORK/y5plain.bom.json")" \
+    = "$(jq -c '[.components[] | select(.name | test("^(busybox|busybox-syslog|libz1)$"))]' "$WORK/y5x.bom.json")" ] \
+  && [ "$(jq -c .dependencies "$WORK/y5plain.bom.json")" = "$(jq -c .dependencies "$WORK/y5x.bom.json")" ] \
+  && [ "$(jq -c .metadata "$WORK/y5plain.bom.json")" = "$(jq -c .metadata "$WORK/y5x.bom.json")" ] \
+    && pass "packages not declared, the dependencies and the metadata stay as the reader wrote them" \
+    || fail "untouched parts changed"
+python3 -I "$LIB/parse-yocto-spdx.py" "$YFIX/spdx3-6x-image.json" "$WORK/y6nofiles.bom.json" >/dev/null 2>&1
+YOCTO_FILES_OUT="$WORK/y6again.files.json" python3 -I "$LIB/parse-yocto-spdx.py" "$YFIX/spdx3-6x-image.json" "$WORK/y6again.bom.json" >/dev/null 2>&1
+cmp -s "$WORK/y6nofiles.bom.json" "$WORK/y6again.bom.json" \
+  && [ "$(jq -r '.files | keys | length' "$WORK/y6again.files.json")" = 6 ] \
+  && ! jq -e '.files[][] | select(.name == "media-daemon.c")' "$WORK/y6again.files.json" >/dev/null \
+    && pass "YOCTO_FILES_OUT lists the files of each installed package (not the recipe's sources) and leaves the SBOM as it was" \
+    || fail "file list" "$(jq -c '.files | keys' "$WORK/y6again.files.json" 2>&1)"
+# SPDX_PACKAGE_SUPPLIER_name:pn-vendor-dsp gives the package a suppliedBy,
+# read as its supplier; a declaration without a supplier leaves it.
+cat > "$WORK/ysup.cdx.json" <<'EOF'
+{"bomFormat": "CycloneDX", "components": [{"type": "firmware", "name": "vendor-dsp",
+  "properties": [{"name": "bomlens:origin", "value": "third-party"}, {"name": "bomlens:yocto-recipe", "value": "vendor-dsp"}]}]}
+EOF
+yocto_read ysup 6x
+[ "$(jq -c '[.components[] | select(.supplier) | [.name, .supplier.name]]' "$WORK/ysup.bom.json")" = '[["vendor-dsp-firmware","Example Chip Vendor"]]' ] \
+  && [ "$(yocto_apply ysup "$WORK/ysup.cdx.json")" = 0 ] \
+  && [ "$(jq -r '.components[] | select(.name == "vendor-dsp-firmware") | .supplier.name + "|" + .type' "$WORK/ysup.bom.json")" = "Example Chip Vendor|firmware" ] \
+    && pass "the supplier the build wrote (suppliedBy) is read, and kept when the declaration gives none" \
+    || fail "build supplier" "$(comp "$WORK/ysup.bom.json" vendor-dsp-firmware)"
+
+echo "== Yocto: each refusal names the recipe =="
+# yrefuse <name> <declaration json> [env...]: exit code of the step on a fresh 6.x read
+yrefuse() {
+    local name="$1" json="$2"
+    shift 2
+    printf '%s\n' "$json" > "$WORK/$name.cdx.json"
+    yocto_read "$name" 6x
+    env "$@" bash -c 'rc=0; DECLARED_COMPONENTS_YOCTO="${DECLARED_COMPONENTS_YOCTO-1}" DECLARED_COMPONENTS_YOCTO_FILES="$3" DECLARED_COMPONENTS_LABELS="$(basename "$2")" python3 -I "$4" "$1" "$5" "$2" > "$1.log" 2>&1 || rc=$?; printf "%s" "$rc"' \
+        _ "$WORK/$name.bom.json" "$WORK/$name.cdx.json" "$WORK/$name.files.json" "$APPLY" "$YFIX"
+}
+yerr() { grep -F "[declared-components] ERROR: " "$WORK/$1.bom.json.log" | head -1; }
+YC='{"bomFormat": "CycloneDX", "components": [{"type": "application", "name": "x", "supplier": {"name": "E"}, "properties": [{"name": "bomlens:origin", "value": "first-party"}'
+rc="$(yrefuse yr1 "$YC, {\"name\": \"bomlens:yocto-recipe\", \"value\": \"no-such-recipe\"}]}]}")"
+[ "$rc" = 3 ] && [ "$(yerr yr1)" = "[declared-components] ERROR: yr1.cdx.json: component 'x': recipe 'no-such-recipe' (bomlens:yocto-recipe) built no package installed in this image. Give the recipe name (PN) of a package the image installs, or remove the component" ] \
+  && cmp -s "$WORK/yr1.bom.json" "$WORK/y6nofiles.bom.json" \
+    && pass "a recipe that installed no package is refused by name, and the SBOM is left as it was" \
+    || fail "missing recipe: exit $rc" "$(yerr yr1)"
+rc="$(yrefuse yr2 "$YC, {\"name\": \"bomlens:yocto-recipe\", \"value\": \"libz1\"}]}]}")"
+[ "$rc" = 3 ] && yerr yr2 | grep -qF "recipe 'libz1' (bomlens:yocto-recipe) built no package installed in this image; the package named 'libz1' comes from recipe 'zlib'." \
+    && pass "a package name given for the recipe is refused with the recipe it comes from" || fail "package name as recipe: exit $rc" "$(yerr yr2)"
+rc="$(yrefuse yr3 "$YC, {\"name\": \"bomlens:yocto-recipe\", \"value\": \"media-daemon\"}, {\"name\": \"bomlens:artifact\", \"value\": \"out/x\"}]}]}")"
+[ "$rc" = 3 ] && grep -qF "component #1 'x': names both bomlens:artifact and bomlens:yocto-recipe" "$WORK/yr3.bom.json.log" \
+    && pass "bomlens:artifact and bomlens:yocto-recipe together are refused" || fail "both: exit $rc" "$(yerr yr3)"
+rc="$(yrefuse yr4 "$YC, {\"name\": \"bomlens:yocto-recipe\", \"value\": \"media-daemon\"}]}]}" DECLARED_COMPONENTS_YOCTO=0)"
+[ "$rc" = 3 ] && grep -qF "component #1 'x': bomlens:yocto-recipe applies to a Yocto build scan only" "$WORK/yr4.bom.json.log" \
+    && pass "a recipe declaration outside a Yocto build is refused" || fail "recipe in a source scan: exit $rc" "$(yerr yr4)"
+rc="$(yrefuse yr5 "$YC, {\"name\": \"bomlens:artifact\", \"value\": \"out/x\"}]}]}")"
+[ "$rc" = 3 ] && grep -qF "component #1 'x': bomlens:artifact names a file of a build output folder, which a Yocto build scan does not read; name the recipe that installs it in bomlens:yocto-recipe instead" "$WORK/yr5.bom.json.log" \
+    && pass "bomlens:artifact in a Yocto build is refused, pointing to bomlens:yocto-recipe" || fail "artifact in yocto: exit $rc" "$(yerr yr5)"
+rc="$(yrefuse yr6 "$(printf '%s' "$YC" | sed 's/"name": "x"/"name": "x", "version": "9.9"/'), {\"name\": \"bomlens:yocto-recipe\", \"value\": \"media-daemon\"}]}]}")"
+[ "$rc" = 3 ] && grep -qF "component 'x': version '9.9' is not the one the build recorded for recipe 'media-daemon' (3.1.0)" "$WORK/yr6.bom.json.log" \
+    && pass "a version other than the build's is refused" || fail "version: exit $rc" "$(yerr yr6)"
+rc="$(yrefuse yr7 "$(printf '%s' "$YC" | sed 's/"name": "x"/"name": "x", "purl": "pkg:generic\/x@1", "hashes": [{"alg": "SHA-256", "content": "'"$(printf 'a%.0s' $(seq 1 64))"'"}]/'), {\"name\": \"bomlens:yocto-recipe\", \"value\": \"media-daemon\"}, {\"name\": \"bsi:component:executable\", \"value\": \"executable\"}]}]}")"
+[ "$rc" = 3 ] && grep -qF "component #1 'x': hashes is taken from the Yocto build for the packages of recipe 'media-daemon'; remove it" "$WORK/yr7.bom.json.log" \
+  && grep -qF "component #1 'x': purl is taken from the Yocto build" "$WORK/yr7.bom.json.log" \
+  && grep -qF "component #1 'x': bsi:component:executable describes one file, and recipe 'media-daemon' installs packages of files; remove it" "$WORK/yr7.bom.json.log" \
+    && pass "fields the build decides (hashes, purl) and one-file properties are refused on a recipe declaration" || fail "build fields: exit $rc" "$(cat "$WORK/yr7.bom.json.log")"
+rc="$(yrefuse yr8 "$YC, {\"name\": \"bomlens:yocto-recipe\", \"value\": \"media-daemon\"}]}, {\"type\": \"application\", \"name\": \"y\", \"properties\": [{\"name\": \"bomlens:origin\", \"value\": \"first-party\"}, {\"name\": \"bomlens:yocto-recipe\", \"value\": \"media-daemon\"}]}]}")"
+[ "$rc" = 3 ] && grep -qF "recipe 'media-daemon' is declared twice (yr8.cdx.json and yr8.cdx.json); keep it in one place" "$WORK/yr8.bom.json.log" \
+    && pass "a recipe declared twice is refused" || fail "twice: exit $rc" "$(yerr yr8)"
+rc="$(yrefuse yr9 "$YC, {\"name\": \"bomlens:yocto-recipe\", \"value\": \"../x\"}]}]}")"
+[ "$rc" = 3 ] && grep -qF "component #1 'x': bomlens:yocto-recipe '../x' is not a recipe name" "$WORK/yr9.bom.json.log" \
+    && pass "a recipe value that is not a recipe name is refused" || fail "recipe name: exit $rc" "$(yerr yr9)"
+# A component with no recipe and no build output (a blob the image loads at
+# run time) is added in a Yocto build as anywhere else.
+rc="$(yrefuse yr10 '{"bomFormat": "CycloneDX", "components": [{"type": "firmware", "name": "modem-blob", "version": "5", "supplier": {"name": "M"}, "properties": [{"name": "bomlens:origin", "value": "third-party"}]}]}')"
+[ "$rc" = 0 ] && [ "$(jq -r '[.components[] | select(.name == "modem-blob")] | length' "$WORK/yr10.bom.json")" = 1 ] \
+  && [ "$(jq -r '.metadata.component["bom-ref"] as $r | [.dependencies[] | select(.ref == $r) | .dependsOn[]] | index("declared:modem-blob@5") != null' "$WORK/yr10.bom.json")" = true ] \
+    && pass "a component with neither a recipe nor a file is added to a Yocto build's SBOM and linked from the image" \
+    || fail "blob in yocto: exit $rc" "$(cat "$WORK/yr10.bom.json.log")"
+
+echo "== Yocto: through entrypoint.sh (ANALYZE, as a build directory scan runs it) =="
+# run_yocto <name> <5x|6x|manifests> [VAR=value ...]: prints the exit code;
+# the output folder is $WORK/<name>.out.
+run_yocto() {
+    local name="$1" shape="$2" out="$WORK/$1.out" rc=0 input
+    shift 2
+    mkdir -p "$out"
+    if [ "$shape" = manifests ]; then input="YOCTO_BUILD_DIR=$YFIX/build-manifests"; else input="ANALYZE_SBOM=$YFIX/spdx3-$shape-image.json"; fi
+    ( cd "$out" && env PATH="$WORK/bin:$PATH" MODE=ANALYZE PROJECT_NAME=ExampleImage PROJECT_VERSION=1.0 \
+        HOST_OUTPUT_DIR="$out" BOMLENS_LIBDIR="$LIB" "$input" YOCTO_FROM_BUILD=true \
+        UPLOAD_ENABLED=false GENERATE_SECURITY=false GENERATE_NOTICE=false DEEP_CVE=false SECURITY_ENRICH=false \
+        ENRICH_EOL=false ENRICH_MALICIOUS=false ENRICH_STALENESS=false LICENSE_REGISTRY=false "$@" bash "$ENTRY" ) > "$out.log" 2>&1 || rc=$?
+    printf '%s' "$rc"
+}
+# What a supplier passes for BSI TR-03183-2: --sbom-author, --supplier, --license.
+YBSI=(CONFORMANCE_PROFILE=bsi-tr-03183-2 SBOM_AUTHOR="Example Corp <sbom@example.com>"
+      PRODUCT_SUPPLIER="Example Corp <https://example.com>" PROJECT_LICENSE=LicenseRef-ExampleCorp-Proprietary)
+for shape in 5x 6x manifests; do
+    rc="$(run_yocto "ye$shape" "$shape" DECLARED_COMPONENTS_FILES="$YDECL" DECLARED_COMPONENTS_LABELS=sbom-declared.cdx.json "${YBSI[@]}")"
+    O="$WORK/ye$shape.out"
+    F="$O/ExampleImage_1.0_bom.json"
+    [ "$rc" = 0 ] && [ "$(step "$O")" = '{"status":"ok","reason":null,"counts":{"components":3}}' ] \
+      && [ "$(jq -r '[.components[] | select(any(.properties[]?; .name == "bomlens:yocto-recipe")) | .name] | sort | join(",")' "$F")" = "media-daemon,media-daemon-cli,vendor-dsp-firmware" ] \
+        && pass "$shape: the declared-components step runs for a Yocto build and its packages reach the final SBOM" \
+        || fail "$shape through entrypoint: exit $rc, step $(step "$O")" "$(grep -E 'ERROR|declared' "$O.log" | head -5)"
+    cp "$F" "$WORK/yocto-final-$shape.json" 2>/dev/null
+done
+# The BSI rows for the declared packages. 6.1 hashes every file with SHA-512;
+# the 5.x document has SHA-256 only and the manifests list no files, which the
+# report says are not in the source SBOM. No Yocto record gives the file
+# properties.
+ybsi() {  # <shape> <row id>: status|missing
+    jq -r --arg id "$2" '.checks[] | select(.id == $id) | "\(.status)|\(.missing | sort | join(";"))"' "$WORK/ye$1.out/ExampleImage_1.0_conformance.json" 2>/dev/null
+}
+NOSRC3="media-daemon-cli@3.1.0 (not in the source SBOM);media-daemon@3.1.0 (not in the source SBOM);vendor-dsp-firmware@7.2 (not in the source SBOM)"
+[ "$(ybsi 6x bsi-declared-sha512)" = "pass|" ] && [ "$(ybsi 6x bsi-declared-filename)" = "pass|" ] \
+  && [ "$(ybsi 6x bsi-declared-file-properties)" = "warn|$NOSRC3" ] \
+  && [ "$(ybsi 6x bsi-declared-creator)" = "pass|" ] && [ "$(ybsi 6x bsi-declared-license)" = "pass|" ] && [ "$(ybsi 6x bsi-declared-name-version)" = "pass|" ] \
+    && pass "6x: SHA-512 and file names come from the build's file hashes; file properties are not in the source SBOM" \
+    || fail "6x bsi rows" "$(jq -c '[.checks[] | select(.id | startswith("bsi-declared")) | [.id, .status, .missing]]' "$WORK/ye6x.out/ExampleImage_1.0_conformance.json" 2>&1)"
+[ "$(ybsi 5x bsi-declared-sha512)" = "warn|$NOSRC3" ] && [ "$(ybsi 5x bsi-declared-filename)" = "pass|" ] \
+  && [ "$(ybsi manifests bsi-declared-sha512)" = "warn|$NOSRC3" ] && [ "$(ybsi manifests bsi-declared-filename)" = "warn|$NOSRC3" ] \
+    && pass "5x and manifests: the SHA-512 (and with no file list the file name) is reported as not in the source SBOM, a warning" \
+    || fail "5x/manifests bsi rows" "$(ybsi 5x bsi-declared-sha512) / $(ybsi manifests bsi-declared-filename)"
+for shape in 5x 6x manifests; do
+    [ "$(jq -r '[.checks[] | select(.id | startswith("bsi-declared")) | select(.status == "fail") | .id] | join(",")' "$WORK/ye$shape.out/ExampleImage_1.0_conformance.json")" = "" ] \
+        && pass "$shape: no declared-component BSI row fails" \
+        || fail "$shape failing declared rows" "$(jq -c '[.checks[] | select(.id | startswith("bsi-declared")) | select(.status == "fail") | [.id, .missing]]' "$WORK/ye$shape.out/ExampleImage_1.0_conformance.json")"
+done
+
+echo "== Yocto: an SBOM read from a build directory is stamped as a generated one =="
+# YOCTO_FROM_BUILD (the CLI and the web server set it only for a document or
+# manifests found in a build directory): the SBOM is this scan's, so its
+# document metadata and image root are completed, and with --sbom-author,
+# --supplier and --license every required BSI row passes.
+for shape in 6x manifests; do
+    C="$WORK/ye$shape.out/ExampleImage_1.0_conformance.json"
+    [ "$(jq -r .result "$C")" = pass ] \
+      && [ "$(jq -r '[.checks[] | select(.required and .status == "fail") | .id] | join(",")' "$C")" = "" ] \
+      && [ "$(jq -r '[.checks[] | select(.id == "bsi-sbom-creator" or .id == "bsi-dependency-graph" or .id == "bsi-primary-component") | .status] | join(",")' "$C")" = "pass,pass,pass" ] \
+        && pass "$shape: bsi-tr-03183-2 passes, with the SBOM creator, the dependency graph and the primary component met" \
+        || fail "$shape bsi result" "$(jq -c '[.result, (.checks[] | select(.required and .status != "pass") | [.id, .status, .detail])]' "$C")"
+done
+F="$WORK/ye6x.out/ExampleImage_1.0_bom.json"
+[ "$(jq -c '.metadata | [.component["bom-ref"], .component.name, .component.version, .component.supplier.url[0], .component.licenses[0].license.name, .component.licenses[0].license.acknowledgement, .authors[0].email, .lifecycles[0].phase, ([.tools.components[].name] | index("BomLens") != null), .timestamp]' "$F")" \
+    = '["yocto-image:example-image@1.0","example-image","1.0","https://example.com","LicenseRef-ExampleCorp-Proprietary","concluded","sbom@example.com","build",true,"2026-10-01T00:00:00Z"]' ] \
+    && pass "6x: the image keeps its name and gets a bom-ref, the --version, --supplier and --license (concluded); the document gets the author, BomLens and the build phase, and keeps the build's creation time" \
+    || fail "6x stamped metadata" "$(jq -c .metadata "$F")"
+[ "$(jq -c '.metadata.component["bom-ref"] as $r | [.dependencies[] | select(.ref == $r) | .dependsOn | sort] | first' "$F")" = "$(jq -c '[.components[]["bom-ref"]] | sort' "$F")" ] \
+  && [ "$(jq -c "$UNREACHED" "$F")" = "[]" ] \
+    && pass "6x: the image depends on every installed package, so the graph reaches them all" \
+    || fail "6x root edges" "$(jq -c '.dependencies' "$F")"
+FM="$WORK/yemanifests.out/ExampleImage_1.0_bom.json"
+[ "$(jq -r '.metadata.timestamp // "" | test("^20[0-9][0-9]-")' "$FM")" = true ] && [ "$(jq -c "$UNREACHED" "$FM")" = "[]" ] \
+    && pass "manifests: a timestamp is written (the manifests carry none) and the graph reaches every package" \
+    || fail "manifests stamped" "$(jq -c '[.metadata.timestamp, .metadata.component]' "$FM")"
+# A --license CycloneDX has no field for is refused when the container starts,
+# before anything is generated, in every mode that records it (here a Yocto
+# build directory and a source scan's post-processing), whoever started the
+# run; a received SBOM, which records no --license, is not stopped by it.
+rc="$(run_yocto yelic 6x PROJECT_LICENSE="Proprietary")"
+[ "$rc" = 1 ] && grep -qF "[license] ERROR: the licence 'Proprietary' is not an SPDX license id" "$WORK/yelic.out.log" \
+  && grep -qF "[ERROR] --license was refused (the reason is above); the run stops before an SBOM is written." "$WORK/yelic.out.log" \
+  && ! grep -qF "[yocto-spdx]" "$WORK/yelic.out.log" && [ ! -f "$WORK/yelic.out/ExampleImage_1.0_bom.json" ] \
+    && pass "a free-text --license stops a Yocto build scan before the reader runs" \
+    || fail "early licence refusal (Yocto): exit $rc" "$(tail -4 "$WORK/yelic.out.log")"
+P="$(new_project entry-lic)"
+rc="$(run_entry elic "$P" DECLARED_COMPONENTS_SKIP=1 PROJECT_LICENSE="MIT AND")"
+[ "$rc" = 1 ] && grep -qF "is not a licence expression: it ends where a licence should come" "$WORK/elic.out.log" \
+  && ! grep -qF "[stamp]" "$WORK/elic.out.log" \
+    && pass "an incomplete --license expression stops post-processing before the SBOM is stamped" \
+    || fail "early licence refusal (POSTPROCESS): exit $rc" "$(tail -4 "$WORK/elic.out.log")"
+rc="$(run_yocto yelicrecv 6x YOCTO_FROM_BUILD=false PROJECT_LICENSE="Proprietary")"
+[ "$rc" = 0 ] && ! grep -qF "[license] ERROR" "$WORK/yelicrecv.out.log" \
+    && pass "a received SBOM, which records no --license, is not stopped by one" \
+    || fail "licence with a received SBOM: exit $rc" "$(tail -4 "$WORK/yelicrecv.out.log")"
+# The same document passed with --analyze on its own is someone else's SBOM:
+# none of it is stamped, whatever options are given.
+rc="$(run_yocto yerecv 6x YOCTO_FROM_BUILD=false "${YBSI[@]}")"
+FR="$WORK/yerecv.out/ExampleImage_1.0_bom.json"
+[ "$rc" = 0 ] && [ "$(jq -c '.metadata | [.component["bom-ref"], .component.version, .component.supplier, .component.licenses, .authors, .lifecycles, ([(.tools.components // [])[].name] | index("BomLens"))]' "$FR")" = '[null,null,null,null,null,null,null]' ] \
+  && [ "$(jq -r '.metadata.component as $m | [.dependencies[]? | select(.ref == ($m["bom-ref"] // "-"))] | length' "$FR")" = 0 ] \
+  && ! grep -qF "[yocto-root]" "$WORK/yerecv.out.log" && ! grep -qF "[docmeta]" "$WORK/yerecv.out.log" \
+    && pass "a Yocto document passed with --analyze (not from a build directory) is not stamped" \
+    || fail "received document: exit $rc" "$(jq -c .metadata "$FR" 2>&1; grep -E 'yocto-root|docmeta' "$WORK/yerecv.out.log")"
+# skt-submission: the first-party exemption from the PURL rows needs a
+# supplier and a SHA-512, which a 6.1 build gives every file; on 5.x the
+# in-house packages keep needing a purl, and the vendor's never get it.
+for shape in 5x 6x; do
+    run_yocto "ys$shape" "$shape" DECLARED_COMPONENTS_FILES="$YDECL" CONFORMANCE_PROFILE=skt-submission >/dev/null
+done
+YS6="$WORK/ys6x.out/ExampleImage_1.0_conformance.json"
+YS5="$WORK/ys5x.out/ExampleImage_1.0_conformance.json"
+[ "$(jq -c '.checks[] | select(.id == "first-party-exempt") | .missing | sort' "$YS6" 2>/dev/null)" = '["media-daemon-cli@3.1.0","media-daemon@3.1.0"]' ] \
+  && ! jq -e 'any(.checks[]; .id == "first-party-exempt")' "$YS5" >/dev/null \
+  && jq -e '[.checks[] | select(.id == "purl") | .missing[]] | index("media-daemon") != null' "$YS5" >/dev/null \
+    && pass "skt-submission: 6.1 file SHA-512s exempt the in-house packages from the PURL rows; 5.x (SHA-256 only) leaves them needing a purl" \
+    || fail "submission exemption" "$(jq -c '[.checks[] | select(.id == "purl" or .id == "first-party-exempt") | [.id, .missing]]' "$YS6" "$YS5" 2>&1)"
+
+printf '%s\n' '{"bomFormat": "CycloneDX", "components": [{"type": "application", "name": "x", "properties": [{"name": "bomlens:origin", "value": "first-party"}, {"name": "bomlens:yocto-recipe", "value": "no-such-recipe"}]}]}' > "$WORK/ymiss.cdx.json"
+rc="$(run_yocto yemiss 6x DECLARED_COMPONENTS_FILES="$WORK/ymiss.cdx.json" DECLARED_COMPONENTS_LABELS=layers/meta-example/sbom-declared.cdx.json)"
+O="$WORK/yemiss.out"
+[ "$rc" = 1 ] && [ "$(step "$O" | jq -r .status)" = failed ] \
+  && grep -qF "[declared-components] ERROR: layers/meta-example/sbom-declared.cdx.json: component 'x': recipe 'no-such-recipe' (bomlens:yocto-recipe) built no package installed in this image" "$O.log" \
+  && [ ! -f "$O/ExampleImage_1.0_bom.json" ] && [ -s "$O/ExampleImage_1.0_bom.refused.json" ] && [ ! -f "$O/ExampleImage_1.0_conformance.json" ] \
+    && pass "a recipe the image does not install stops the Yocto scan (exit 1), naming the recipe, with the SBOM kept as _bom.refused.json" \
+    || fail "missing recipe through entrypoint: exit $rc, step $(step "$O")" "$(tail -6 "$O.log"; ls "$O")"
+rc="$(run_yocto yeplain 6x)"
+[ "$rc" = 0 ] && [ "$(step "$WORK/yeplain.out")" = "null" ] \
+    && pass "a Yocto build without --components runs no declaration step" || fail "no files: exit $rc" "$(tail -5 "$WORK/yeplain.out.log")"
+# --components changes the SBOM, so a received one (--analyze, with no build
+# directory: YOCTO_FROM_BUILD unset) is refused, a Yocto document included.
+rc="$(run_yocto yerecvc 6x YOCTO_FROM_BUILD=false DECLARED_COMPONENTS_FILES="$YDECL")"
+[ "$rc" = 1 ] && grep -qF "[ERROR] --components applies to a source scan and a Yocto build directory; spdx3-6x-image.json was passed with --analyze, and a received SBOM is not changed." "$WORK/yerecvc.out.log" \
+  && [ ! -f "$WORK/yerecvc.out/ExampleImage_1.0_bom.json" ] \
+    && pass "--components with a Yocto document passed with --analyze on its own is refused, and no SBOM is written" \
+    || fail "received Yocto document with --components: exit $rc" "$(tail -4 "$WORK/yerecvc.out.log")"
+mkdir -p "$WORK/yenot.out"
+rc=0
+( cd "$WORK/yenot.out" && env PATH="$WORK/bin:$PATH" MODE=ANALYZE PROJECT_NAME=Supplier PROJECT_VERSION=1 HOST_OUTPUT_DIR="$WORK/yenot.out" \
+    BOMLENS_LIBDIR="$LIB" ANALYZE_SBOM="$ROOT_DIR/tests/fixtures/good-cyclonedx.json" UPLOAD_ENABLED=false GENERATE_SECURITY=false GENERATE_NOTICE=false \
+    DEEP_CVE=false SECURITY_ENRICH=false ENRICH_EOL=false ENRICH_MALICIOUS=false ENRICH_STALENESS=false LICENSE_REGISTRY=false \
+    DECLARED_COMPONENTS_FILES="$YDECL" bash "$ENTRY" ) > "$WORK/yenot.out.log" 2>&1 || rc=$?
+[ "$rc" = 1 ] && grep -qF "[ERROR] --components applies to a source scan and a Yocto build directory; good-cyclonedx.json was passed with --analyze, and a received SBOM is not changed." "$WORK/yenot.out.log" \
+    && pass "--components with any other received SBOM is refused" \
+    || fail "non-Yocto analyze: exit $rc" "$(tail -4 "$WORK/yenot.out.log")"
+# A build directory whose document no Yocto reader could read (the generic
+# converter took it) has no packages to declare on.
+mkdir -p "$WORK/yenot2.out"
+rc=0
+( cd "$WORK/yenot2.out" && env PATH="$WORK/bin:$PATH" MODE=ANALYZE PROJECT_NAME=Supplier PROJECT_VERSION=1 HOST_OUTPUT_DIR="$WORK/yenot2.out" \
+    BOMLENS_LIBDIR="$LIB" ANALYZE_SBOM="$ROOT_DIR/tests/fixtures/good-cyclonedx.json" YOCTO_FROM_BUILD=true UPLOAD_ENABLED=false GENERATE_SECURITY=false GENERATE_NOTICE=false \
+    DEEP_CVE=false SECURITY_ENRICH=false ENRICH_EOL=false ENRICH_MALICIOUS=false ENRICH_STALENESS=false LICENSE_REGISTRY=false \
+    DECLARED_COMPONENTS_FILES="$YDECL" bash "$ENTRY" ) > "$WORK/yenot2.out.log" 2>&1 || rc=$?
+[ "$rc" = 1 ] && grep -qF "[ERROR] --components applies to a source scan and a Yocto build directory; good-cyclonedx.json is not an SBOM a Yocto build wrote." "$WORK/yenot2.out.log" \
+    && pass "--components with a build directory whose document is not a Yocto one is refused" \
+    || fail "non-Yocto build document: exit $rc" "$(tail -4 "$WORK/yenot2.out.log")"
+# The CLI refuses it before starting a container (needs a Docker engine to get
+# that far).
+cli_out="$(bash "$SCRIPT" --project x --version 1 --analyze "$YFIX/spdx3-6x-image.json" --components "$YDECL" 2>&1)"; cli_rc=$?
+if printf '%s' "$cli_out" | grep -qF "Cannot reach the Docker engine"; then
+    echo "  SKIP: scan-sbom.sh --analyze with --components (no Docker engine)"
+else
+    [ "$cli_rc" = 1 ] && printf '%s' "$cli_out" | grep -qF "[ERROR] --components cannot be used with --analyze: the SBOM passed there is received, and is not changed." \
+        && pass "scan-sbom.sh refuses --components with --analyze" || fail "CLI --analyze with --components: exit $cli_rc" "$(printf '%s' "$cli_out" | tail -3)"
+fi
+# A --license CycloneDX has no field for is refused before the scan starts,
+# with the helper the container uses.
+cli_out="$(bash "$SCRIPT" --project x --version 1 --license "Proprietary" --target "$(new_project cli-lic)" 2>&1)"; cli_rc=$?
+if printf '%s' "$cli_out" | grep -qF "Cannot reach the Docker engine"; then
+    echo "  SKIP: scan-sbom.sh --license with free text (no Docker engine)"
+else
+    [ "$cli_rc" = 1 ] && printf '%s' "$cli_out" | grep -qF "[license] ERROR: the licence 'Proprietary' is not an SPDX license id" \
+        && pass "scan-sbom.sh refuses a free-text --license before scanning" || fail "CLI free-text --license: exit $cli_rc" "$(printf '%s' "$cli_out" | tail -3)"
+fi
+# The image root of a Yocto build uses the same helper.
+yocto_read yroot 6x
+yroot_rc=0
+PROJECT_LICENSE="Proprietary" bash "$LIB/stamp-yocto-root.sh" "$WORK/yroot.bom.json" > "$WORK/yroot.log" 2>&1 || yroot_rc=$?
+PROJECT_LICENSE="mit or apache-2.0" PROJECT_VERSION=1 bash "$LIB/stamp-yocto-root.sh" "$WORK/yroot.bom.json" >/dev/null 2>&1
+[ "$yroot_rc" = 1 ] && grep -qF "LicenseRef-Proprietary" "$WORK/yroot.log" \
+  && [ "$(jq -c '.metadata.component.licenses' "$WORK/yroot.bom.json")" = '[{"expression":"MIT OR Apache-2.0","acknowledgement":"concluded"}]' ] \
+    && pass "stamp-yocto-root.sh refuses a free-text --license and writes an expression as one" \
+    || fail "yocto root licence: exit $yroot_rc" "$(cat "$WORK/yroot.log"; jq -c .metadata.component "$WORK/yroot.bom.json")"
+
+echo "== Yocto: properties only the readers write cannot be declared =="
+# bomlens:identifiedBy and the other reader properties are what mark a
+# component as a package the build recorded; a declaration that carries one is
+# refused in any scan, so it cannot pass a component of its own off as one.
+P="$(new_project spoof)"
+B="$(new_bom spoof)"
+jq '.components[0].properties += [{"name": "bomlens:identifiedBy", "value": "yocto-spdx"}]' "$FIX/project/sbom-declared.cdx.json" > "$WORK/spoof.cdx.json"
+rc="$(apply "$B" "$P" "$WORK/spoof.cdx.json")"
+[ "$rc" = 3 ] && grep -qF "component #1 'media-daemon': bomlens:identifiedBy is written by the scan, not by a declaration; remove it" "$B.log" \
+    && pass "a source declaration that claims bomlens:identifiedBy is refused" || fail "identifiedBy spoof: exit $rc" "$(cat "$B.log")"
+rc="$(yrefuse yr11 "$YC, {\"name\": \"bomlens:yocto-recipe\", \"value\": \"media-daemon\"}, {\"name\": \"bomlens:layer\", \"value\": \"yocto\"}, {\"name\": \"bomlens:yocto:recipe\", \"value\": \"media-daemon\"}]}]}")"
+[ "$rc" = 3 ] && grep -qF "component #1 'x': bomlens:layer is written by the scan, not by a declaration; remove it" "$WORK/yr11.bom.json.log" \
+  && grep -qF "component #1 'x': bomlens:yocto:recipe is written by the scan, not by a declaration; remove it" "$WORK/yr11.bom.json.log" \
+    && pass "a recipe declaration that carries bomlens:layer or bomlens:yocto:recipe is refused" || fail "reader props: exit $rc" "$(yerr yr11)"
+
+echo "== Yocto: a package is matched only by the recipe the build recorded =="
+# A plain declaration with the name of an installed package is refused: that
+# package is declared by its recipe.
+rc="$(yrefuse yr12 '{"bomFormat": "CycloneDX", "components": [{"type": "library", "name": "libz1", "version": "1.3.1", "supplier": {"name": "Z"}, "properties": [{"name": "bomlens:origin", "value": "third-party"}]}]}')"
+[ "$rc" = 3 ] && grep -qF "yr12.cdx.json: component 'libz1': a package of that name is installed in the image by recipe 'zlib'; declare it by its recipe (bomlens:yocto-recipe = zlib) rather than adding it again" "$WORK/yr12.bom.json.log" \
+    && pass "a plain declaration named like an installed package is refused, pointing to its recipe" || fail "duplicate name: exit $rc" "$(yerr yr12)"
+# A package whose recipe the build did not record is not matched by its name.
+yocto_read yunk 6x
+jq '.components += [{"bom-ref": "urn:pkg:mystery", "type": "library", "name": "mystery", "version": "1",
+      "properties": [{"name": "bomlens:layer", "value": "yocto"}, {"name": "bomlens:identifiedBy", "value": "yocto-spdx"}]}]' \
+    "$WORK/yunk.bom.json" > "$WORK/yunk.tmp" && mv "$WORK/yunk.tmp" "$WORK/yunk.bom.json"
+printf '%s\n' "$YC, {\"name\": \"bomlens:yocto-recipe\", \"value\": \"mystery\"}]}]}" > "$WORK/yunk.cdx.json"
+rc="$(yocto_apply yunk "$WORK/yunk.cdx.json")"
+[ "$rc" = 3 ] && grep -qF "component 'x': the build did not record which recipe built the installed package 'mystery', so recipe 'mystery' (bomlens:yocto-recipe) cannot be matched to it" "$WORK/yunk.log" \
+    && pass "a package whose recipe the build did not record is not matched by name, and the refusal names it" \
+    || fail "unknown recipe: exit $rc" "$(cat "$WORK/yunk.log")"
+# The multilib and SDK variants of a recipe are recipes of their own: a
+# declaration of zlib is not put on lib32-zlib's packages, and says so.
+yocto_read yml 6x
+jq '.components += [{"bom-ref": "urn:pkg:lib32-libz1", "type": "library", "name": "lib32-libz1", "version": "1.3.1",
+      "properties": [{"name": "bomlens:identifiedBy", "value": "yocto-spdx"}, {"name": "bomlens:yocto:recipe", "value": "lib32-zlib"}]}]' \
+    "$WORK/yml.bom.json" > "$WORK/yml.tmp" && mv "$WORK/yml.tmp" "$WORK/yml.bom.json"
+printf '%s\n' '{"bomFormat": "CycloneDX", "components": [{"type": "library", "name": "zlib", "supplier": {"name": "Z"}, "properties": [{"name": "bomlens:origin", "value": "third-party"}, {"name": "bomlens:yocto-recipe", "value": "zlib"}]}]}' > "$WORK/yml.cdx.json"
+rc="$(yocto_apply yml "$WORK/yml.cdx.json")"
+[ "$rc" = 0 ] && grep -qF "WARN: yml.cdx.json: component 'zlib': recipe 'lib32-zlib' also installed packages in this image; a declaration of 'zlib' does not cover them, so declare that recipe separately" "$WORK/yml.log" \
+  && [ "$(jq -r '[.components[] | select(any(.properties[]?; .name == "bomlens:yocto-recipe")) | .name] | join(",")' "$WORK/yml.bom.json")" = "libz1" ] \
+    && pass "a lib32- variant of a declared recipe is not covered, and a warning names it" \
+    || fail "multilib: exit $rc" "$(cat "$WORK/yml.log")"
+
+echo "== Yocto: file hashes the build wrote are taken only when they are hex digests of their algorithm =="
+jq '(."@graph"[] | select(.spdxId == "urn:file:media-daemon:1") | .verifiedUsing) =
+      [{"type": "Hash", "algorithm": "sha256", "hashValue": ("0x" + ("a" * 62))},
+       {"type": "Hash", "algorithm": "sha512", "hashValue": ("a" * 64)}]
+    | (."@graph"[] | select(.spdxId == "urn:file:media-daemon:2") | .verifiedUsing) =
+      [{"type": "Hash", "algorithm": "sha256", "hashValue": ("z" * 64)},
+       {"type": "Hash", "algorithm": "sha1", "hashValue": ("A" * 40)}]' "$YFIX/spdx3-6x-image.json" > "$WORK/yhex.spdx.json"
+YOCTO_FILES_OUT="$WORK/yhex.files.json" python3 -I "$LIB/parse-yocto-spdx.py" "$WORK/yhex.spdx.json" "$WORK/yhex.bom.json" >/dev/null 2>&1
+[ "$(jq -c '[.files["urn:pkg:media-daemon"][] | [.name, [.hashes[] | .alg + ":" + (.content | length | tostring)]]]' "$WORK/yhex.files.json")" \
+    = '[["usr/bin/media-daemon",[]],["etc/media-daemon.conf",["SHA-1:40"]]]' ] \
+  && [ "$(jq -r '.files["urn:pkg:media-daemon"][1].hashes[0].content' "$WORK/yhex.files.json")" = "$(printf 'a%.0s' $(seq 1 40))" ] \
+    && pass "a 0x prefix, a non-hex digit or a length other than the algorithm's drops the hash; a valid one is kept in lower case" \
+    || fail "hex digests" "$(jq -c '.files["urn:pkg:media-daemon"]' "$WORK/yhex.files.json")"
+
 if [ "${BOMLENS_CDX_SCHEMA:-}" = "1" ] || command -v cyclonedx >/dev/null 2>&1 || [ -n "${CYCLONEDX_CLI:-}" ]; then
     mkdir -p "$WORK/cdx"
+    cp "$WORK/y5x.bom.json" "$WORK/cdx/yocto-5x.json"
+    cp "$WORK/y6x.bom.json" "$WORK/cdx/yocto-6x.json"
+    cp "$WORK/ym.bom.json" "$WORK/cdx/yocto-manifests.json"
+    for shape in 5x 6x manifests; do
+        cp "$WORK/yocto-final-$shape.json" "$WORK/cdx/yocto-final-$shape.json"
+    done
     cp "$WORK/ok.bom.json" "$WORK/cdx/declared.json"
     cp "$WORK/multi.bom.json" "$WORK/cdx/multi.json"
     cp "$WORK/deps.bom.json" "$WORK/cdx/deps.json"

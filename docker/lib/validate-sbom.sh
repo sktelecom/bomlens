@@ -760,16 +760,26 @@ g7_ai_checks() {
 # entry of its own (a leaf should have one with an empty dependsOn) is listed
 # on an advisory row. Nothing here writes a completeness value.
 #
-# A component read from a Yocto build's SPDX document (bomlens:identifiedBy
-# yocto-spdx, or bomlens:yocto-recipe on a declaration) has no SHA-512 when
-# the build did not write one: Yocto writes file hashes only, and SHA-512 only
-# from 6.1. Its missing SHA-512 is reported as not in the source SBOM, and
-# stays advisory.
+# A package read from a Yocto build has no SHA-512 when the build did not
+# write one: Yocto writes file hashes only, and SHA-512 only from 6.1. Its
+# missing SHA-512 is reported as not in the source SBOM, and stays advisory.
+# So are a missing filename (the manifests list no files) and missing file
+# properties (no Yocto record says whether a file is executable, an archive or
+# structured): a package declared by recipe gets the files the build listed,
+# not the files themselves. This holds only for the SBOM a scan generated from
+# a Yocto build directory in this run (MODE YOCTO), and only for the
+# components a Yocto reader wrote in it, which entrypoint.sh lists by bom-ref
+# in the file YOCTO_READER_REFS names. A property in the document
+# (bomlens:identifiedBy) could be written by anyone, so it is not read for this.
 #
 # Nested type "file" components (a component with several build outputs)
 # count for the component that holds them, as everywhere else in this file.
+YOCTO_REFS_FILE=/dev/null
+if [ "${MODE:-}" = "YOCTO" ] && [ -n "${YOCTO_READER_REFS:-}" ] && [ -f "${YOCTO_READER_REFS}" ]; then
+    YOCTO_REFS_FILE="$YOCTO_READER_REFS"
+fi
 bsi_checks() {
-    jq -c --argjson cap "$MISSING_CAP" '
+    jq -c --argjson cap "$MISSING_CAP" --slurpfile yrefs "$YOCTO_REFS_FILE" '
     def props($n): [ (.properties // [])[]? | select(.name? == $n) | .value ];
     def kids: [ (.components // [])[]? | select(.type? == "file") ];
     def own_or_files(f): f or (kids as $k | ($k | length) > 0 and all($k[]; f));
@@ -798,7 +808,9 @@ bsi_checks() {
     def sha512_ok: own_or_files(sha512_here);
     def fprops_ok: own_or_files(props("bsi:component:executable") as $e | props("bsi:component:archive") as $a
                                 | props("bsi:component:structured") as $s | ($e|length) > 0 and ($a|length) > 0 and ($s|length) > 0);
-    def yocto_src: (props("bomlens:identifiedBy") | index("yocto-spdx")) != null or (props("bomlens:yocto-recipe") | length > 0);
+    def yocto_src: (.["bom-ref"] // "") as $r | ($r | type) == "string" and ((($yrefs[0] // {}) | if type == "object" then .[$r] else null end) == true);
+    # The declared rows where a Yocto package lacks what the build did not record.
+    def from_build($id): $id == "bsi-declared-sha512" or $id == "bsi-declared-filename" or $id == "bsi-declared-file-properties";
     # A declared component is delivered as a file when it names a build
     # output, carries a filename, holds file components, or is a package of
     # a Yocto build (installed as files).
@@ -855,8 +867,8 @@ bsi_checks() {
     # is reported as not in the source SBOM.
     | def drow($id; $lbl; $lbl_ko; $subject; f; $ref):
         ([ $subject[] | select(f | not) ]) as $bad
-        | ([ $bad[] | select(($id == "bsi-declared-sha512") and yocto_src) | clabel + " (not in the source SBOM)" ]) as $nosrc
-        | ([ $bad[] | select((($id == "bsi-declared-sha512") and yocto_src) | not) | clabel ]) as $miss
+        | ([ $bad[] | select(from_build($id) and yocto_src) | clabel + " (not in the source SBOM)" ]) as $nosrc
+        | ([ $bad[] | select((from_build($id) and yocto_src) | not) | clabel ]) as $miss
         | ($subject | length) as $n
         | {id: $id, label: $lbl, label_ko: $lbl_ko, required: true,
            source: (if $n == 0 then "na" else "auto" end),

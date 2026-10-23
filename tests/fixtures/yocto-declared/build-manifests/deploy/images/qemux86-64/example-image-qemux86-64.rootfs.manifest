@@ -1,0 +1,6 @@
+busybox core2_64 1.36.1
+busybox-syslog core2_64 1.36.1
+libz1 core2_64 1.3.1
+media-daemon core2_64 3.1.0
+media-daemon-cli core2_64 3.1.0
+vendor-dsp-firmware all 7.2

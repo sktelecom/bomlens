@@ -29,6 +29,9 @@
 # "acknowledgement": "concluded", as BSI TR-03183-2 gives the distribution
 # licence. Read from the project manifest by entrypoint.sh
 # (PROJECT_LICENSE_FROM_MANIFEST=1), it only fills an empty value, as "declared".
+# license-entry.sh decides the field: an SPDX list id goes in license.id, a
+# LicenseRef- in license.name and an expression in expression; free text is
+# refused for --license and left out, with a warning, from a manifest.
 # The modes that carry a supplier's own root component (ANALYZE/MERGE) do not
 # call this file at all, so a received SBOM's declaration can never be overwritten.
 set -e
@@ -55,8 +58,27 @@ if ! jq empty "$SBOM" 2>/dev/null; then
     exit 1
 fi
 
+# The licence entry, in the CycloneDX field its form takes (license-entry.sh).
+# A --license that fits none is refused, which stops the run before an SBOM
+# with an invalid licence is written; a licence read from the manifest that
+# fits none is left out with a warning, since nobody typed it.
+LIC_JSON="null"
+if [ -n "${PROJECT_LICENSE:-}" ]; then
+    if [ "${PROJECT_LICENSE_FROM_MANIFEST:-}" = "1" ]; then
+        if _entry="$(LICENSE_ENTRY_QUIET=1 bash "$(dirname "$0")/license-entry.sh" "$PROJECT_LICENSE" declared)"; then
+            [ -z "$_entry" ] || LIC_JSON="$_entry"
+        else
+            echo "[stamp] WARN: the licence read from the project manifest ($PROJECT_LICENSE) is not an SPDX license id, a LicenseRef- name or a licence expression, so it is not recorded; pass --license to give the outbound licence." >&2
+        fi
+    elif _entry="$(bash "$(dirname "$0")/license-entry.sh" "$PROJECT_LICENSE" concluded)"; then
+        [ -z "$_entry" ] || LIC_JSON="$_entry"
+    else
+        exit 1
+    fi
+fi
+
 TMP="$(mktemp)"
-if jq --arg n "$NAME" --arg v "$VERSION" --arg lic "${PROJECT_LICENSE:-}" --arg manifest "${PROJECT_LICENSE_FROM_MANIFEST:-}" \
+if jq --arg n "$NAME" --arg v "$VERSION" --argjson licentry "$LIC_JSON" --arg manifest "${PROJECT_LICENSE_FROM_MANIFEST:-}" \
     '.metadata.component.name = $n
      | .metadata.component.version = $v
      | (.metadata.component) |= del(.purl)
@@ -69,16 +91,16 @@ if jq --arg n "$NAME" --arg v "$VERSION" --arg lic "${PROJECT_LICENSE:-}" --arg 
      # marked concluded. Read from the manifest instead (entrypoint.sh sets
      # PROJECT_LICENSE_FROM_MANIFEST=1), it only fills an empty value and is
      # what the project declares.
-     | (if $lic == "" then .
-        elif $manifest != "1" then .metadata.component.licenses = [{license: {id: $lic, acknowledgement: "concluded"}}]
+     | (if $licentry == null then .
+        elif $manifest != "1" then .metadata.component.licenses = [$licentry]
         elif (((.metadata.component.licenses // []) | length) == 0)
-        then .metadata.component.licenses = [{license: {id: $lic, acknowledgement: "declared"}}]
+        then .metadata.component.licenses = [$licentry]
         else . end)' \
     "$SBOM" > "$TMP" 2>/dev/null; then
     mv "$TMP" "$SBOM"
     echo "[stamp] metadata.component set to ${NAME}@${VERSION}: $SBOM"
-    if [ -n "${PROJECT_LICENSE:-}" ]; then
-        if jq -e '((.metadata.component.licenses // [])[0].license.id // "") == $ENV.PROJECT_LICENSE' "$SBOM" >/dev/null 2>&1; then
+    if [ "$LIC_JSON" != null ]; then
+        if jq -e --argjson e "$LIC_JSON" '((.metadata.component.licenses // [])[0]) == $e' "$SBOM" >/dev/null 2>&1; then
             echo "[stamp] outbound license declared: ${PROJECT_LICENSE} (drives the license-conflict check)"
         else
             echo "[stamp] outbound license read from the manifest (${PROJECT_LICENSE}) not applied: the SBOM already names one; pass --license to replace it"

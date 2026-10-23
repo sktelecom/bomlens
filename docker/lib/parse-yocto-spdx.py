@@ -26,11 +26,18 @@
 #   - externalIdentifier[cpe23]                                   -> component.cpe.
 #     Yocto writes these from CVE_PRODUCT with a wildcard vendor.
 #   - software_packageUrl (6.0 and later)                         -> component.purl.
+#   - suppliedBy (SPDX_PACKAGE_SUPPLIER_name, unset by default)   -> component.supplier.
 #   - the recipe (generates, or build_Build hasOutput)            -> bomlens:yocto:recipe.
 #   - hasAssociatedVulnerability edges + the VEX relationship types. From 6.0
 #     they hang off the recipe (primaryPurpose "specification"), and are read
 #     on every installed package the recipe `generates`, which is where 5.x
 #     put them.
+#   - `contains` edges from an installed package to its software_File elements,
+#     with the hashes in their verifiedUsing (sha256, and sha512 from 6.1).
+#     Written only to the file YOCTO_FILES_OUT names, when it is set, with the
+#     recipe of every package whose recipe the document names: the
+#     declaration step (apply-declared-components.py) finds the packages of a
+#     recipe there and nests their files. The SBOM itself is unchanged.
 #
 # The VEX split is the point. Yocto knows whether it applied the patch, so a CVE it
 # reports as `fixedIn` is genuinely closed on this image — an outside scanner keyed
@@ -61,6 +68,7 @@
 # the caller always receives a valid (possibly empty) CycloneDX envelope.
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -134,6 +142,18 @@ def _package_url(pkg):
     return purl[:1024] if purl else None
 
 
+def _supplier_name(by_id, pkg):
+    """The name of the agent a package is suppliedBy, or None. Yocto writes it
+    from SPDX_PACKAGE_SUPPLIER_name (and _type), which a layer can set per
+    recipe with :pn-<recipe>; a default build sets none."""
+    for ref in _as_list(pkg.get("suppliedBy")):
+        agent = by_id.get(ref) if isinstance(ref, str) else ref
+        name = agent.get("name") if isinstance(agent, dict) else None
+        if isinstance(name, str) and name.strip():
+            return name.strip()[:1024]
+    return None
+
+
 def _licenses_cdx(expression):
     """CycloneDX licenses[] for one SPDX license expression.
 
@@ -151,6 +171,109 @@ def _licenses_cdx(expression):
     if expression.startswith("LicenseRef-") or ":LicenseRef-" in expression:
         return [{"license": {"name": expression}}]
     return [{"license": {"id": expression}}]
+
+
+# Hash algorithms as SPDX 3.0 (HashAlgorithm) and SPDX 2.2 (checksum
+# algorithm) name them, to the CycloneDX name. One CycloneDX has no name for
+# (sha224, for example) is left out.
+HASH_NAMES = {
+    "md5": "MD5", "sha1": "SHA-1", "sha256": "SHA-256", "sha384": "SHA-384",
+    "sha512": "SHA-512", "sha3_256": "SHA3-256", "sha3_384": "SHA3-384",
+    "sha3_512": "SHA3-512", "blake2b256": "BLAKE2b-256", "blake2b384": "BLAKE2b-384",
+    "blake2b512": "BLAKE2b-512", "blake3": "BLAKE3",
+    "MD5": "MD5", "SHA1": "SHA-1", "SHA256": "SHA-256", "SHA384": "SHA-384",
+    "SHA512": "SHA-512", "SHA3-256": "SHA3-256", "SHA3-384": "SHA3-384",
+    "SHA3-512": "SHA3-512", "BLAKE2b-256": "BLAKE2b-256", "BLAKE2b-384": "BLAKE2b-384",
+    "BLAKE2b-512": "BLAKE2b-512", "BLAKE3": "BLAKE3",
+}
+# The digest length, in hex digits, of each algorithm. BLAKE3 is read at its
+# default 256-bit output.
+HASH_LENGTHS = {
+    "MD5": 32, "SHA-1": 40, "SHA-256": 64, "SHA-384": 96, "SHA-512": 128,
+    "SHA3-256": 64, "SHA3-384": 96, "SHA3-512": 128, "BLAKE2b-256": 64,
+    "BLAKE2b-384": 96, "BLAKE2b-512": 128, "BLAKE3": 64,
+}
+HEX = re.compile(r"[0-9a-fA-F]+")
+
+
+def _hash_entry(alg, value):
+    """A CycloneDX hash, or None when the algorithm is not one CycloneDX names or
+    the digest is not hex of that algorithm's length."""
+    name = HASH_NAMES.get(alg) if isinstance(alg, str) else None
+    if not name or not isinstance(value, str) or len(value) != HASH_LENGTHS[name]:
+        return None
+    if not HEX.fullmatch(value):
+        return None
+    return {"alg": name, "content": value.lower()}
+
+
+def _file_path(name):
+    """A file name as the build recorded it, relative to the image root."""
+    if not isinstance(name, str):
+        return ""
+    name = name.strip()
+    while name.startswith("./"):
+        name = name[2:]
+    return name.lstrip("/")[:4096]
+
+
+def package_files(doc):
+    """{installed package spdxId: [{"name", "hashes"}]} from an SPDX 3.0
+    document: the software_File elements each installed package `contains`."""
+    graph = _iter_graph(doc)
+    by_id = {e["spdxId"]: e for e in graph if isinstance(e, dict) and e.get("spdxId")}
+    installed = {e["spdxId"] for e in graph
+                 if e.get("type") == "software_Package" and e.get("software_primaryPurpose") == "install"
+                 and e.get("spdxId")}
+    out = {}
+    for rel in graph:
+        if rel.get("type") not in REL_TYPES or rel.get("relationshipType") != "contains":
+            continue
+        if rel.get("from") not in installed:
+            continue
+        for target in _as_list(rel.get("to")):
+            element = by_id.get(target) or {}
+            if element.get("type") != "software_File":
+                continue
+            path = _file_path(element.get("name"))
+            if not path:
+                continue
+            hashes = []
+            for h in _as_list(element.get("verifiedUsing")):
+                if isinstance(h, dict) and h.get("type") in (None, "Hash"):
+                    entry = _hash_entry(h.get("algorithm"), h.get("hashValue"))
+                    if entry and entry["alg"] not in [x["alg"] for x in hashes]:
+                        hashes.append(entry)
+            out.setdefault(rel["from"], []).append({"name": path, "hashes": hashes})
+    return out
+
+
+def _spdx2_package_files(doc, pkg):
+    """[{"name", "hashes"}] for the files a 2.2 package document lists for its package."""
+    wanted = set(_as_list(pkg.get("hasFiles")))
+    out = []
+    for f in doc.get("files") or []:
+        if not isinstance(f, dict) or (wanted and f.get("SPDXID") not in wanted):
+            continue
+        path = _file_path(f.get("fileName"))
+        if not path:
+            continue
+        hashes = []
+        for c in f.get("checksums") or []:
+            if isinstance(c, dict):
+                entry = _hash_entry(c.get("algorithm"), c.get("checksumValue"))
+                if entry and entry["alg"] not in [x["alg"] for x in hashes]:
+                    hashes.append(entry)
+        out.append({"name": path, "hashes": hashes})
+    return out
+
+
+def write_files(path, files, recipes):
+    """The per-package file lists and the recipe of every package whose recipe
+    the build names, by bom-ref, for the declaration step (YOCTO_FILES_OUT)."""
+    with open(path, "w", encoding="utf-8") as fh:
+        json.dump({"files": files, "recipes": recipes}, fh)
+        fh.write("\n")
 
 
 def load_document(path):
@@ -197,7 +320,9 @@ def yocto_spdx2_index(doc):
 
 
 def extract(doc):
-    """Return (components, vuln_rows, counts, dependencies) from a Yocto SPDX 3.0 document."""
+    """Return (components, vuln_rows, counts, dependencies, recipes) from a Yocto
+    SPDX 3.0 document; recipes maps a component's bom-ref to the recipe (PN) it
+    was built from, for every package whose recipe the document names."""
     graph = _iter_graph(doc)
     by_id = {e["spdxId"]: e for e in graph if isinstance(e, dict) and e.get("spdxId")}
 
@@ -330,6 +455,9 @@ def extract(doc):
         cpes = _ext_ids(pkg, "cpe23")
         if cpes:
             comp["cpe"] = cpes[0]
+        supplier = _supplier_name(by_id, pkg)
+        if supplier:
+            comp["supplier"] = {"name": supplier}
         # Up to 5.x every installed package had a concluded license. From 6.0
         # Yocto writes the declared one (LICENSE) and a concluded one only when
         # SPDX_CONCLUDED_LICENSE is set, so the concluded one wins when present.
@@ -387,7 +515,8 @@ def extract(doc):
         {"ref": ref, "dependsOn": sorted(set(targets))}
         for ref, targets in sorted(depends_of.items())
     ]
-    return components, vuln_rows, counts, dependencies
+    recipes = {c["bom-ref"]: recipe_of[c["bom-ref"]] for c in components if c["bom-ref"] in recipe_of}
+    return components, vuln_rows, counts, dependencies, recipes
 
 
 def document_metadata(doc_graph, fallback_name):
@@ -702,10 +831,11 @@ def _first_source_url(recipe_doc):
     return None
 
 
-def extract_spdx2(image_doc, archive):
+def extract_spdx2(image_doc, archive, files_out=None, recipes_out=None):
     """(components, image name, image version) from a 2.2 image document plus
     its archive. Empty when the archive cannot be read or holds nothing the
-    image says it contains."""
+    image says it contains. With files_out (a dict), the files each package
+    document lists are put in it under the component's bom-ref."""
     refs = _installed_refs(image_doc)
     if not refs:
         return [], "", ""
@@ -727,6 +857,10 @@ def extract_spdx2(image_doc, archive):
         if recipe:
             recipe_wanted[recipe[0]] = recipe[1]
         packages.append((pkg, recipe))
+        if files_out is not None:
+            listed = _spdx2_package_files(doc, pkg)
+            if listed:
+                files_out[pkg.get("SPDXID") or pkg.get("name")] = listed
     recipes = _read_bundle(archive, set(recipe_wanted)) if recipe_wanted else {}
 
     components = []
@@ -756,6 +890,8 @@ def extract_spdx2(image_doc, archive):
                 # source is where that project was fetched. upstream-purl.py reads
                 # both to give the package its upstream repository purl.
                 recipe_name = (recipe_pkg or {}).get("name") or ""
+                if recipe_name and recipes_out is not None:
+                    recipes_out[comp["bom-ref"]] = recipe_name
                 if recipe_name and recipe_name != comp["name"]:
                     comp["properties"].append({"name": "bomlens:yocto:recipe", "value": recipe_name})
                 source_url = _first_source_url(recipe_doc)
@@ -834,6 +970,9 @@ def main():
         return 2
     src, out = sys.argv[1], sys.argv[2]
     out_prefix = sys.argv[3] if len(sys.argv) > 3 else ""
+    files_path = os.environ.get("YOCTO_FILES_OUT", "")
+    files = {} if files_path else None
+    recipes = {} if files_path else None
 
     # A deploy directory of an SPDX 2.x build holds the archive and nothing else,
     # so it is an input in its own right: the image document is inside it.
@@ -843,7 +982,7 @@ def main():
             print("[yocto-spdx] no image document inside %s." % os.path.basename(src),
                   file=sys.stderr)
             return 3
-        components, image_name, image_version = extract_spdx2(image_doc, src)
+        components, image_name, image_version = extract_spdx2(image_doc, src, files, recipes)
         if not components:
             print("[yocto-spdx] %s holds no package its image says it contains."
                   % os.path.basename(src), file=sys.stderr)
@@ -852,6 +991,8 @@ def main():
         write_cyclonedx_spdx2(
             out, components, os.path.basename(src), image_name, image_version, created
         )
+        if files_path:
+            write_files(files_path, files, recipes)
         print(
             "[yocto-spdx] SPDX 2.x archive: %d installed package(s) from %s. "
             "Vulnerabilities are matched from the CPEs, not from the build — "
@@ -876,12 +1017,14 @@ def main():
         # packages are in the archive beside it. Read that when it is there.
         archive = spdx2_bundle_path(src)
         if archive:
-            components, image_name, image_version = extract_spdx2(doc, archive)
+            components, image_name, image_version = extract_spdx2(doc, archive, files, recipes)
             if components:
                 created = (doc.get("creationInfo") or {}).get("created") or ""
                 write_cyclonedx_spdx2(
                     out, components, os.path.basename(src), image_name, image_version, created
                 )
+                if files_path:
+                    write_files(files_path, files, recipes)
                 print(
                     "[yocto-spdx] SPDX 2.x bundle: %d installed package(s) from %s. "
                     "Vulnerabilities are matched from the CPEs, not from the build — "
@@ -912,7 +1055,7 @@ def main():
         print("[yocto-spdx] not a Yocto SPDX 3.x document; leaving it to syft.", file=sys.stderr)
         return 3
 
-    components, vuln_rows, counts, dependencies = extract(doc)
+    components, vuln_rows, counts, dependencies, recipes = extract(doc)
     if not components:
         # A Yocto document with no installed packages means we read the wrong
         # element set — fail rather than hand the pipeline an empty SBOM that
@@ -924,6 +1067,8 @@ def main():
         return 1
 
     write_cyclonedx(out, components, os.path.basename(src), _iter_graph(doc), dependencies)
+    if files_path:
+        write_files(files_path, package_files(doc), recipes)
     if out_prefix:
         write_sidecars(out_prefix, vuln_rows, counts)
 

@@ -459,11 +459,18 @@ Options:
   --project <name>       Project name (required)
   --version <ver>        Version (required)
   --license <spdx-id>    Outbound license the project is distributed under
-                         (e.g. Apache-2.0). Recorded on the SBOM's root
-                         component and used to flag dependencies whose terms
-                         clash with it. Source scans cannot infer this, and
-                         without it no conflict verdict is produced. An
-                         existing root license in the SBOM is never replaced.
+                         (e.g. Apache-2.0, a LicenseRef- name, or an
+                         expression). Recorded on the SBOM's root component as
+                         "concluded", replacing a root license the generator
+                         read, and used to flag dependencies whose terms clash
+                         with it. Without it, a license read from the project
+                         manifest only fills an empty root license, as
+                         "declared", and a source scan that finds none gives
+                         no conflict verdict. A supplier SBOM's own root
+                         license under --analyze is never replaced. Free text
+                         (write LicenseRef-<name>) and an expression that is
+                         not made of SPDX ids and LicenseRef- names are
+                         refused before the scan starts.
   --vex <file>           A CycloneDX VEX document (JSON) a supplier sent for this
                          product. The statements that apply to a component of the
                          scanned SBOM are kept in <Project>_<Version>_vex_imported.json,
@@ -525,6 +532,15 @@ Options:
                          scan target, or the same name and version is declared
                          twice; the SBOM written so far is then kept as
                          <Project>_<Version>_bom.refused.json.
+                         For a Yocto build directory given as --target: a
+                         component names its recipe in bomlens:yocto-recipe
+                         instead of bomlens:artifact, and the declaration goes
+                         on every installed package of that recipe, with the
+                         files and hashes the build recorded (multilib and
+                         nativesdk variants, such as lib32-<recipe>, are
+                         declared separately). A recipe that installed no
+                         package fails the scan. Not with --analyze: a
+                         received SBOM is not changed.
   --no-components        For a source scan: do not read sbom-declared.cdx.json
                          at the scan target root (for a scan made before the
                          build outputs it names exist). Cannot be combined
@@ -2633,9 +2649,37 @@ fi
 if [ -n "$COMPONENT_VERSIONS_FILE" ] && [ "$MODE" != "FIRMWARE" ] && [ "$MODE" != "ROOTFS" ] && [ "$MODE" != "BINARY" ]; then
     echo "[ERROR] --component-versions applies to firmware, root filesystem and binary scans only (this target is scanned as $MODE)."; exit 1
 fi
-if { [ "${#COMPONENTS_FILES[@]}" -gt 0 ] || [ "$NO_COMPONENTS" = "true" ]; } && [ "$MODE" != "SOURCE" ]; then
-    _flag="--components"; [ "$NO_COMPONENTS" = "true" ] && _flag="--no-components"
-    echo "[ERROR] $_flag applies to source scans only (this target is scanned as $MODE)."; exit 1
+# A Yocto build directory given as --target takes --components too, for
+# components declared by recipe (bomlens:yocto-recipe): its SBOM is the one
+# this scan generates. A document passed with --analyze is a received SBOM,
+# which is not changed.
+# --license: in the modes that record it on the SBOM's root (a source scan, a
+# root filesystem, a Yocto build directory), checked here with the helper the
+# container uses (docker/lib/license-entry.sh), so a value CycloneDX has no
+# field for is refused before any container starts. The container checks it
+# again before it generates anything, for every caller; so where this machine
+# lacks jq, the helper or its id list (an older or partial CLI bundle), the
+# check is left to it.
+case "$MODE" in
+    SOURCE|ROOTFS) _lic_mode=true ;;
+    ANALYZE) _lic_mode=false; [ -z "$YOCTO_BUILD_DIR" ] || _lic_mode=true ;;
+    *) _lic_mode=false ;;
+esac
+if [ "$_lic_mode" = true ] && [ -n "${PROJECT_LICENSE:-}" ] && command -v jq >/dev/null 2>&1 \
+   && [ -f "$REPO_DIR/docker/lib/license-entry.sh" ] && [ -f "$REPO_DIR/docker/lib/cdx-spdx-ids.json" ] \
+   && ! bash "$REPO_DIR/docker/lib/license-entry.sh" "$PROJECT_LICENSE" >/dev/null; then
+    echo "[ERROR] --license was refused (the reason is above); nothing was scanned."; exit 1
+fi
+unset _lic_mode
+
+if [ "$NO_COMPONENTS" = "true" ] && [ "$MODE" != "SOURCE" ]; then
+    echo "[ERROR] --no-components applies to source scans only (this target is scanned as $MODE)."; exit 1
+fi
+if [ "${#COMPONENTS_FILES[@]}" -gt 0 ] && [ "$MODE" = "ANALYZE" ] && [ -z "$YOCTO_BUILD_DIR" ]; then
+    echo "[ERROR] --components cannot be used with --analyze: the SBOM passed there is received, and is not changed. For a Yocto build, point --target at the build directory instead."; exit 1
+fi
+if [ "${#COMPONENTS_FILES[@]}" -gt 0 ] && [ "$MODE" != "SOURCE" ] && [ "$MODE" != "ANALYZE" ]; then
+    echo "[ERROR] --components applies to source scans and Yocto build directories only (this target is scanned as $MODE)."; exit 1
 fi
 
 if { [ -n "$AI_DECLARE_FILE" ] || [ "$GENERATE_SPDX3" = "false" ]; } \
@@ -3411,7 +3455,7 @@ else
     # shellcheck disable=SC2046
     eval "$DOCKER_MSYS"docker run --rm $VOL \
         --add-host=host.docker.internal:host-gateway \
-        -e MODE="$MODE" -e BOMLENS_ARTIFACT_CLEANUP=1 $ENVV $(pp_env)$(cosign_run)$(vex_run)$(declare_run)$(component_versions_run)$(gate_run) \
+        -e MODE="$MODE" -e BOMLENS_ARTIFACT_CLEANUP=1 $ENVV $(pp_env)$(cosign_run)$(vex_run)$(declare_run)$(component_versions_run)$(components_run)$(gate_run) \
         "\"$RUN_IMAGE\""
 fi
 
