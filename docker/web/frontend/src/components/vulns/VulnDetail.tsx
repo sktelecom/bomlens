@@ -107,7 +107,7 @@ export function VulnDetail({
                   href={href}
                   target="_blank"
                   rel="noreferrer"
-                  className="inline-flex items-center gap-1 break-all text-primary underline-offset-2 hover:underline"
+                  className="inline-flex items-center gap-1 break-all text-primary underline underline-offset-2 hover:no-underline"
                 >
                   <ExternalLink className="h-3 w-3 shrink-0" aria-hidden />
                   {href}
@@ -127,7 +127,7 @@ export function VulnDetail({
             e.stopPropagation();
             onPickComponent(vuln.pkg);
           }}
-          className="rounded text-primary underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          className="rounded text-primary underline underline-offset-2 hover:no-underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
           {t("result.viewInComponents", { name: vuln.pkg })}
         </button>
@@ -139,7 +139,7 @@ export function VulnDetail({
             e.stopPropagation();
             onPickDependency(vuln.pkg, vuln.installed);
           }}
-          className="ml-3 rounded text-primary underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          className="ml-3 rounded text-primary underline underline-offset-2 hover:no-underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
           {t("result.viewInDependencies", { name: vuln.pkg })}
         </button>

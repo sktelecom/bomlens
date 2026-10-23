@@ -4,15 +4,17 @@
 import { useTranslation } from "react-i18next";
 import { PackageCheck } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { CALLOUT } from "@/components/ui/coverage-notice";
 import { severityTone } from "@/lib/severity";
 import { bundleSteps, type PackageGroup } from "@/lib/vulnGroups";
+import { cn } from "@/lib/utils";
 
 /** Bundles shown before the rest are summarised as a count. */
-const SHOWN = 5;
+const SHOWN = 3;
 
 /**
- * "One upgrade resolves more than one CVE". A neutral card with an info-role
- * edge and icon (the brand colour is not a data colour), one line per package,
+ * "One upgrade resolves more than one CVE". The same callout surface as the
+ * coverage notices above the table, with an info-role icon (the brand colour is not a data colour), one line per package,
  * worst severity first. Clicking a line searches the table for that package.
  */
 export function UpgradeBundles({
@@ -28,7 +30,7 @@ export function UpgradeBundles({
     <section
       data-testid="upgrade-bundles"
       aria-labelledby="upgrade-bundles-title"
-      className="space-y-2 rounded-md border bg-card px-3 py-2.5"
+      className={cn("space-y-2", CALLOUT)}
     >
       <h3
         id="upgrade-bundles-title"
@@ -59,7 +61,7 @@ export function UpgradeBundles({
               <button
                 type="button"
                 onClick={() => onPick(g.pkg)}
-                className="rounded text-left text-label text-primary underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                className="rounded text-left text-label text-primary underline underline-offset-2 hover:no-underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
                 {line}
               </button>

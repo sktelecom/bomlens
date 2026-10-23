@@ -6,6 +6,11 @@ import type { ReactNode } from "react";
 
 import { cn } from "@/lib/utils";
 
+/** The one callout surface for the notes above a findings table (coverage
+ *  notices, upgrade bundles, the kernel note): a quiet border on a muted wash. */
+export const CALLOUT =
+  "rounded-md border bg-muted/30 px-3 py-2 text-left text-label text-muted-foreground";
+
 /**
  * A notice about what a result does NOT cover (components that could not be
  * checked, advisories kept out of the counts). It states a limit of the data,
@@ -31,7 +36,8 @@ export function CoverageNotice({
       data-testid={testId}
       data-coverage-notice=""
       className={cn(
-        "space-y-2 rounded-md border bg-muted/30 px-3 py-2 text-left text-label text-muted-foreground",
+        "space-y-2",
+        CALLOUT,
         className,
       )}
     >

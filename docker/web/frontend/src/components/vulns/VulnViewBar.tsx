@@ -7,6 +7,7 @@ import { Layers, List } from "lucide-react";
 import { DensityToggle } from "@/components/ui/density-toggle";
 import { FilterChip } from "@/components/ui/filter-chip";
 import { FOCUS_RING, SELECTED_SOLID } from "@/components/ui/selectable";
+import { SEGMENT, SEGMENT_GROUP } from "@/components/ui/toolbar";
 import { useFormatNumber } from "@/lib/format";
 import type { Density } from "@/lib/tableDensity";
 import { cn } from "@/lib/utils";
@@ -80,7 +81,7 @@ export function VulnViewBar({
           role="group"
           aria-label={t("result.vulnLayout")}
           data-testid="vuln-layout"
-          className="inline-flex shrink-0 rounded-md border p-0.5"
+          className={SEGMENT_GROUP}
         >
           {LAYOUTS.map(({ value, labelKey, Icon }) => (
             <button
@@ -89,7 +90,8 @@ export function VulnViewBar({
               aria-pressed={layout === value}
               onClick={() => onLayout(value)}
               className={cn(
-                "inline-flex items-center gap-1 rounded border border-transparent px-2 py-1 text-label font-medium transition-colors duration-fast ease-out-soft",
+                SEGMENT,
+                "text-label font-medium transition-colors duration-fast ease-out-soft",
                 FOCUS_RING,
                 layout === value
                   ? SELECTED_SOLID

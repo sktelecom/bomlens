@@ -73,6 +73,12 @@ export function VulnRow({
     Boolean(vex.state) ||
     Boolean(received);
   const aliases = vulnAliases(v);
+  const hasStatus =
+    Boolean(v.status) ||
+    Boolean(vex.state) ||
+    Boolean(received) ||
+    v.reachability?.state === "exploitable" ||
+    Boolean(v.kev);
   return (
     <Fragment>
       <tr
@@ -112,34 +118,6 @@ export function VulnRow({
             <Badge tone={severityTone(v.severity)} mark>
               {t(`severity.${v.severity}`)}
             </Badge>
-            {v.status && (
-              <Badge
-                tone={STATUS_TONE[v.status] ?? "info"}
-                title={STATUS_HINT_KEY[v.status] ? t(STATUS_HINT_KEY[v.status]) : undefined}
-              >
-                {STATUS_LABEL_KEY[v.status] ? t(STATUS_LABEL_KEY[v.status]) : v.status}
-              </Badge>
-            )}
-            {vex.state && (
-              <Badge tone={VEX_TONE[vex.state]} title={t("result.vexSectionHint")}>
-                {t("result.vexBadge", { state: t(VEX_LABEL_KEY[vex.state]) })}
-              </Badge>
-            )}
-            {received && (
-              <Badge tone={VEX_TONE[received.state]} title={t("result.vexReceivedHint")}>
-                {t("result.vexReceivedBadge", { state: t(VEX_LABEL_KEY[received.state]) })}
-              </Badge>
-            )}
-            {v.reachability?.state === "exploitable" && (
-              <Badge tone="medium" title={v.reachability.detail || t("result.reachedHint")}>
-                {t("result.reachedBadge")}
-              </Badge>
-            )}
-            {v.kev && (
-              <Badge tone="critical" title={t("result.kevHint")}>
-                {t("result.kevBadge")}
-              </Badge>
-            )}
           </div>
         </td>
         <td className="px-3 py-2 font-mono tabular-nums">
@@ -163,6 +141,41 @@ export function VulnRow({
         )}
         <td className="px-3 py-2">
           <span className="font-mono">{v.id}</span>
+          {/* Status badges sit under the ID rather than beside the severity:
+              three in one cell made the severity column wide enough to push
+              the fixed-version column out of a 1440px window. */}
+          {hasStatus ? (
+            <div className="mt-1 flex flex-wrap items-center gap-1">
+              {v.status && (
+                <Badge
+                  tone={STATUS_TONE[v.status] ?? "info"}
+                  title={STATUS_HINT_KEY[v.status] ? t(STATUS_HINT_KEY[v.status]) : undefined}
+                >
+                  {STATUS_LABEL_KEY[v.status] ? t(STATUS_LABEL_KEY[v.status]) : v.status}
+                </Badge>
+              )}
+              {vex.state && (
+                <Badge tone={VEX_TONE[vex.state]} title={t("result.vexSectionHint")}>
+                  {t("result.vexBadge", { state: t(VEX_LABEL_KEY[vex.state]) })}
+                </Badge>
+              )}
+              {received && (
+                <Badge tone={VEX_TONE[received.state]} title={t("result.vexReceivedHint")}>
+                  {t("result.vexReceivedBadge", { state: t(VEX_LABEL_KEY[received.state]) })}
+                </Badge>
+              )}
+              {v.reachability?.state === "exploitable" && (
+                <Badge tone="medium" title={v.reachability.detail || t("result.reachedHint")}>
+                  {t("result.reachedBadge")}
+                </Badge>
+              )}
+              {v.kev && (
+                <Badge tone="critical" title={t("result.kevHint")}>
+                  {t("result.kevBadge")}
+                </Badge>
+              )}
+            </div>
+          ) : null}
           {aliases.length > 0 ? (
             <div className="mt-0.5 text-muted-foreground">
               {t("result.vulnAliases")} <span className="font-mono">{aliases.join(", ")}</span>
@@ -170,16 +183,19 @@ export function VulnRow({
           ) : null}
           {v.title ? <div className="mt-0.5 max-w-md text-muted-foreground">{v.title}</div> : null}
         </td>
-        <td className="px-3 py-2 font-mono">{v.pkg}</td>
-        <td className="px-3 py-2 font-mono tabular-nums text-muted-foreground">
+        <td className="px-3 py-2 font-mono [overflow-wrap:anywhere]">{v.pkg}</td>
+        <td className="px-3 py-2 font-mono tabular-nums text-muted-foreground [overflow-wrap:anywhere]">
           {v.installed || "—"}
         </td>
         {/* Fixed version carries the success foreground, which is set to the
             darker green on light surfaces: the lighter one measures 3.77 there,
             under the 4.5 minimum. */}
-        <td className="px-3 py-2 font-mono tabular-nums">
+        <td className="px-3 py-2 font-mono tabular-nums [overflow-wrap:anywhere]">
           {v.fixed ? (
-            <span className="text-success">{v.fixed}</span>
+            // A list of fixed versions wraps after each comma. A single long
+            // version (a Debian revision) can still break, so it never pushes
+            // the column out of the table.
+            <span className="text-success">{v.fixed.split(/,\s*/).join(", ")}</span>
           ) : (
             <span className="text-muted-foreground">—</span>
           )}

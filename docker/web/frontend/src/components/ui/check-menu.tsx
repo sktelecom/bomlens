@@ -5,6 +5,7 @@ import { ChevronDown } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
 
 import { cn } from "@/lib/utils";
+import { TOOLBAR_CONTROL } from "@/components/ui/toolbar";
 
 export interface CheckMenuItem {
   /** Stable id, used as the React key. */
@@ -73,7 +74,8 @@ export function CheckMenu({
         aria-expanded={open}
         aria-controls={open ? panelId : undefined}
         className={cn(
-          "inline-flex h-9 items-center gap-1.5 rounded-full border border-input bg-background px-3.5 text-body-sm",
+          TOOLBAR_CONTROL,
+          "inline-flex items-center gap-1.5 border border-input bg-background px-3.5 text-body-sm",
           "shadow-sm transition-colors duration-fast ease-out-soft hover:bg-accent hover:text-accent-foreground",
           "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
         )}
