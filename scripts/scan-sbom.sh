@@ -229,9 +229,10 @@ UI_BIND_ADDRESS="${UI_BIND_ADDRESS:-127.0.0.1}"
 # Report language for the conformance + AI-profile reports: en (default) or ko.
 # Only these two are honored; anything else is normalized to en further down.
 REPORT_LANG="${REPORT_LANG:-en}"
-# Conformance profile: default, or skt-submission for the stricter thresholds
+# Conformance profile: default, skt-submission for the stricter thresholds
 # the SKT supplier submission review applies (100% PURL coverage, pkg:generic
-# required). Passed through as-is; validate-sbom.sh normalizes unknown values.
+# required), or bsi-tr-03183-2 for the fields of BSI TR-03183-2. Passed
+# through as-is; validate-sbom.sh normalizes unknown values.
 CONFORMANCE_PROFILE="${CONFORMANCE_PROFILE:-default}"
 # Repository resolution for a submitted SBOM (--resolve-purl). Off unless asked:
 # it is the only part of the conformance check that uses the network.
@@ -534,7 +535,8 @@ Options:
                          person running the scan, not the tool and not whoever
                          wrote the software. Use the full name, no acronyms.
                          Nothing here can discover it, so the field is left out
-                         of the SBOM when it is not given.
+                         of the SBOM when it is not given. "Name <email>"
+                         records the email as well.
   --target <target>      Not set: source (current dir) | image name | file |
                          directory | .zip/.tar.gz archive (auto-extracted).
                          An archive is routed by what it holds, not by its
@@ -699,11 +701,16 @@ Options:
   --lang <en|ko>         Language for the human-facing conformance and AI-profile
                          reports (.md/.html). Default en. The SBOM and the JSON
                          reports stay English regardless.
-  --conformance-profile <default|skt-submission>
+  --conformance-profile <default|skt-submission|bsi-tr-03183-2>
                          Conformance check strictness. Default: default (90%
                          PURL coverage, pkg:generic advisory). skt-submission
                          requires 100% PURL coverage and fails on pkg:generic,
                          matching the SKT supplier submission review.
+                         bsi-tr-03183-2 requires CycloneDX 1.6 or later, an SBOM
+                         creator with an email or URL, a dependency graph that
+                         reaches every component, and the BSI TR-03183-2 fields
+                         of each component listed in the declaration file;
+                         scanned components are reported, not required.
   --license-registry     Ask the package registry (deps.dev) for the licence of a
                          component that has none, and check a single
                          strong-copyleft or non-commercial licence against it,
@@ -1401,11 +1408,11 @@ case "$REPORT_LANG" in
     *) echo "[WARN] --lang '$REPORT_LANG' not supported (use en or ko); defaulting to en."; REPORT_LANG="en" ;;
 esac
 
-# Normalize the conformance profile the same way: default or skt-submission
-# reach the container, anything else is a typo.
+# Normalize the conformance profile the same way: default, skt-submission or
+# bsi-tr-03183-2 reach the container, anything else is a typo.
 case "$CONFORMANCE_PROFILE" in
-    default|skt-submission) ;;
-    *) echo "[WARN] --conformance-profile '$CONFORMANCE_PROFILE' not supported (use default or skt-submission); defaulting to default."; CONFORMANCE_PROFILE="default" ;;
+    default|skt-submission|bsi-tr-03183-2) ;;
+    *) echo "[WARN] --conformance-profile '$CONFORMANCE_PROFILE' not supported (use default, skt-submission or bsi-tr-03183-2); defaulting to default."; CONFORMANCE_PROFILE="default" ;;
 esac
 
 # Common -e flags for the post-process image.

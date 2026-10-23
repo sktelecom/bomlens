@@ -586,6 +586,51 @@ bash "$LIB/validate-sbom.sh" "$WORK/multi-nohash.json" "$WORK/multi-nohash" x >/
     && pass "a file without a hash leaves its component without one in both rows" \
     || fail "partial child hashes" "$(cisa_missing "$WORK/multi-nohash_conformance.json" cisa-component-hash-value)"
 
+echo "== the bsi-tr-03183-2 profile on the fixture =="
+# As declared, the fixture's components give their licence as a name
+# ("Proprietary") rather than an SPDX identifier or LicenseRef-, the HAL's
+# supplier has no URL, and the SBOM names no creator: those rows fail, by
+# component. The file rows pass on what the build outputs gave.
+bsi_rows() {  # <conformance.json>: id=status:missing, one per bsi-* row
+    jq -r '.checks[] | select(.id | startswith("bsi-")) | "\(.id)=\(.status):\(.missing | join(","))"' "$1" 2>/dev/null
+}
+CONFORMANCE_PROFILE=bsi-tr-03183-2 bash "$LIB/validate-sbom.sh" "$WORK/ok.bom.json" "$WORK/bsi-ok" x >/dev/null 2>&1
+want_bsi='bsi-sbom-creator=fail:
+bsi-dependency-graph=pass:
+bsi-declared-creator=fail:vendor-hal@4.2.0
+bsi-declared-name-version=pass:
+bsi-declared-license=fail:media-daemon@3.1.0,media-ctl@2.0.1
+bsi-declared-filename=pass:
+bsi-declared-sha512=pass:
+bsi-declared-file-properties=pass:
+bsi-declared-without-file=warn:vendor-hal@4.2.0
+bsi-scanned-components=warn:zlib@1.3.1: creator, filename, SHA-512, file properties'
+[ "$(bsi_rows "$WORK/bsi-ok_conformance.json")" = "$want_bsi" ] \
+    && pass "bsi-tr-03183-2 names, row by row, which declared component misses what; zlib is advisory" \
+    || fail "bsi rows on the fixture" "$(bsi_rows "$WORK/bsi-ok_conformance.json")"
+# With the licences as LicenseRef-, a URL for the HAL's supplier and an SBOM
+# author with an email (--sbom-author "Example Corp <sbom@example.com>"), the
+# fixture passes on what its declared components carry.
+P="$(new_project bsi)"
+B="$(new_bom bsi)"
+jq '.components[0].licenses = [{"license": {"name": "LicenseRef-ExampleCorp-Proprietary"}}]
+    | .components[1].licenses = [{"license": {"name": "LicenseRef-ExampleCorp-Proprietary"}}]
+    | .components[2].supplier.url = ["https://chip.example.com"]' \
+    "$P/sbom-declared.cdx.json" > "$P/bsi.cdx.json"
+rc="$(apply "$B" "$P" "$P/bsi.cdx.json")"
+SBOM_AUTHOR="Example Corp <sbom@example.com>" bash "$LIB/stamp-document-metadata.sh" "$B" SOURCE >/dev/null 2>&1
+CONFORMANCE_PROFILE=bsi-tr-03183-2 bash "$LIB/validate-sbom.sh" "$B" "$WORK/bsi-pass" x >/dev/null 2>&1
+[ "$rc" = 0 ] && [ "$(jq -r .result "$WORK/bsi-pass_conformance.json" 2>/dev/null)" = pass ] \
+  && [ "$(jq -r '[.checks[] | select(.id | startswith("bsi-declared-") or . == "bsi-sbom-creator") | select(.required) | .status] | unique | join(",")' "$WORK/bsi-pass_conformance.json")" = pass ] \
+    && pass "the fixture passes bsi-tr-03183-2 once its declarations carry the BSI fields" \
+    || fail "bsi pass on the fixture" "rc=$rc $(jq -c '[.result, (.checks[] | select(.required and .status != "pass") | [.id, .detail, .missing])]' "$WORK/bsi-pass_conformance.json" 2>&1)"
+# skt-submission: the two first-party programs carry a supplier and SHA-512,
+# so they need no purl; the third-party HAL does.
+CONFORMANCE_PROFILE=skt-submission bash "$LIB/validate-sbom.sh" "$WORK/ok.bom.json" "$WORK/skt-ok" x >/dev/null 2>&1
+[ "$(jq -c '.checks[] | select(.id == "purl") | [.status, .missing]' "$WORK/skt-ok_conformance.json" 2>/dev/null)" = '["fail",["vendor-hal"]]' ] \
+    && pass "skt-submission asks a purl of the third-party HAL only" \
+    || fail "skt-submission on the fixture" "$(jq -c '.checks[] | select(.id == "purl")' "$WORK/skt-ok_conformance.json" 2>&1)"
+
 echo "== SPDX 2.3 export keeps the declared components' checksums and files =="
 if command -v syft >/dev/null 2>&1; then
     bash "$LIB/convert-to-spdx.sh" "$WORK/ok.bom.json" "$WORK/ok.spdx.json" --stable >/dev/null 2>&1
