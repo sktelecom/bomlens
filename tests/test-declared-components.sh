@@ -121,18 +121,19 @@ elf256="$(python3 -I -c 'import hashlib,sys; print(hashlib.sha256(open(sys.argv[
 [ "$(prop "$D" bsi:component:filename)" = "media-daemon" ] && [ "$(prop "$C" bsi:component:filename)" = "media-ctl.exe" ] \
     && pass "bsi:component:filename is the file name without the path" \
     || fail "file names: $(prop "$D" bsi:component:filename) $(prop "$C" bsi:component:filename)"
-[ "$(prop "$D" bsi:component:executable)/$(prop "$D" bsi:component:archive)" = "executable/no archive" ] \
-  && [ "$(prop "$C" bsi:component:executable)/$(prop "$C" bsi:component:archive)" = "executable/no archive" ] \
-    && pass "an ELF and a PE executable are marked executable and not an archive" \
+[ "$(prop "$D" bsi:component:executable)/$(prop "$D" bsi:component:archive)/$(prop "$D" bsi:component:structured)" = "executable/no archive/unstructured" ] \
+  && [ "$(prop "$C" bsi:component:executable)/$(prop "$C" bsi:component:archive)/$(prop "$C" bsi:component:structured)" = "executable/no archive/unstructured" ] \
+    && pass "an ELF and a PE executable are executable, not an archive, unstructured" \
     || fail "executable properties" "$D $C"
-[ -z "$(prop "$D" bsi:component:structured)" ] && pass "bsi:component:structured is not written" || fail "structured written"
+[ "$(prop "$D" bomlens:declared)" = "true" ] && [ "$(prop "$(comp "$B" zlib)" bomlens:declared)" = "" ] \
+    && pass "a declared component carries bomlens:declared = true; a scanned one does not" || fail "declared mark" "$D"
 [ "$(prop "$D" bomlens:origin) $(prop "$C" bomlens:origin) $(prop "$H" bomlens:origin)" = "first-party first-party third-party" ] \
     && pass "bomlens:origin is kept as declared" || fail "origins" "$D $H"
 [ "$(printf '%s' "$D" | jq -r .version) $(printf '%s' "$C" | jq -r .version)" = "3.1.0 2.0.1" ] \
     && pass "a first-party component with no version takes the product's; a declared one is kept" \
     || fail "versions" "$D $C"
 [ "$(printf '%s' "$H" | jq -c '[.version, (.hashes // [] | length), (.properties | length), .supplier.name, .licenses[0].license.id]')" \
-    = '["4.2.0",0,1,"Example Chip Vendor","BSD-3-Clause"]' ] \
+    = '["4.2.0",0,2,"Example Chip Vendor","BSD-3-Clause"]' ] \
     && pass "the third-party component with no file is written as declared, with no hashes" \
     || fail "vendor-hal" "$H"
 [ "$(printf '%s' "$D" | jq -c '[.supplier.name, .licenses[0].license.name, .type]')" = '["Example Corp","Proprietary","application"]' ] \
@@ -173,13 +174,13 @@ EOF
 rc="$(apply "$B" "$P" "$WORK/multi.cdx.json")"
 M="$(comp "$B" media-plugins)"
 [ "$rc" = 0 ] && [ "$(printf '%s' "$M" | jq -c '[(.hashes // [] | length), [.properties[].name], [.components[].name]]')" \
-    = '[0,["bomlens:origin","bomlens:artifact","bomlens:artifact"],["out/bin/media-plugin.so","out/pkg/media-plugins.tar.gz"]]' ] \
+    = '[0,["bomlens:origin","bomlens:artifact","bomlens:artifact","bomlens:declared"],["out/bin/media-plugin.so","out/pkg/media-plugins.tar.gz"]]' ] \
     && pass "each output is a nested file component; the declared one carries no hashes of its own" \
     || fail "multi-artifact: exit $rc" "$M $(cat "$B.log")"
 [ "$(printf '%s' "$M" | jq -c '[.components[] | [.type, .version, .supplier.name, ([.hashes[].alg] | join("+")),
         ([.properties[] | select(.name | startswith("bsi:")) | .value] | join("|")), .["bom-ref"]]]')" \
-    = '[["file","3.1.0","Example Corp","SHA-512+SHA-256","media-plugin.so|executable|no archive","declared:media-plugins@3.1.0#out/bin/media-plugin.so"],["file","3.1.0","Example Corp","SHA-512+SHA-256","media-plugins.tar.gz|non-executable|archive","declared:media-plugins@3.1.0#out/pkg/media-plugins.tar.gz"]]' ] \
-    && pass "a nested file has its own hashes, file name and properties (a shared object is executable, a .tar.gz an archive)" \
+    = '[["file","3.1.0","Example Corp","SHA-512+SHA-256","media-plugin.so|executable|no archive|unstructured","declared:media-plugins@3.1.0#out/bin/media-plugin.so"],["file","3.1.0","Example Corp","SHA-512+SHA-256","media-plugins.tar.gz|non-executable|archive|structured","declared:media-plugins@3.1.0#out/pkg/media-plugins.tar.gz"]]' ] \
+    && pass "a nested file has its own hashes, file name and properties (a shared object is executable, a .tar.gz a structured archive)" \
     || fail "nested files" "$M"
 
 echo "== the type of a file is read from its first bytes =="
@@ -194,10 +195,20 @@ printf '!<arch>\nrest' > "$K/libx.a"
 { printf '\312\376\272\276\000\000\000\064'; head -c 24 /dev/zero; } > "$K/Main.class"
 write_elf "$K/object.o" 001
 printf 'just text\n' > "$K/notes.txt"
+gzip -c "$K/notes.txt" > "$K/notes.txt.gz"
+gzip -c "$K/a.tar" > "$K/a.tar.gz"
+python3 -I -c 'import bz2,lzma,sys; d=open(sys.argv[1],"rb").read(); open(sys.argv[2],"wb").write(lzma.compress(d)); open(sys.argv[3],"wb").write(bz2.compress(d))' \
+    "$K/a.tar" "$K/a.tar.xz" "$K/a.tar.bz2"
+{ printf '070701'; head -c 120 /dev/zero; } > "$K/a.cpio"
+{ head -c 32769 /dev/zero; printf 'CD001'; head -c 100 /dev/zero; } > "$K/a.iso"
+head -c 4096 /dev/zero > "$K/fw.bin"
+# A PE header past the first 512 bytes, and an MZ file with no PE header.
+{ printf 'MZ'; head -c 58 /dev/zero; printf '\130\002\000\000'; head -c 536 /dev/zero; printf 'PE\000\000'; head -c 32 /dev/zero; } > "$K/far.exe"
+{ printf 'MZ'; head -c 58 /dev/zero; printf '\100\000\000\000NOPE'; head -c 60 /dev/zero; } > "$K/dos.com"
 {
     printf '{"bomFormat": "CycloneDX", "components": ['
     sep=""
-    for f in a.zip a.xz a.tar libx.a macho universal Main.class object.o notes.txt; do
+    for f in a.zip a.xz a.tar libx.a macho universal Main.class object.o notes.txt notes.txt.gz a.tar.gz a.tar.xz a.tar.bz2 a.cpio a.iso fw.bin far.exe dos.com; do
         printf '%s{"type": "file", "name": "%s", "properties": [{"name": "bomlens:origin", "value": "first-party"}, {"name": "bomlens:artifact", "value": "k/%s"}]}' "$sep" "$f" "$f"
         sep=","
     done
@@ -206,11 +217,30 @@ printf 'just text\n' > "$K/notes.txt"
 B="$(new_bom kinds)"
 rc="$(apply "$B" "$P" "$WORK/kinds.cdx.json")"
 got="$(jq -r '[.components[] | select(.properties[]?.name == "bsi:component:filename")
-              | "\(.name)=\([.properties[] | select(.name == "bsi:component:executable" or .name == "bsi:component:archive") | .value] | join("/"))"] | join(" ")' "$B")"
-want="a.zip=non-executable/archive a.xz=non-executable/archive a.tar=non-executable/archive libx.a=non-executable/archive macho=executable/no archive universal=executable/no archive Main.class=non-executable/no archive object.o=non-executable/no archive notes.txt=non-executable/no archive"
+              | "\(.name)=\([.properties[] | select(.name | test("^bsi:component:(executable|archive|structured)$")) | .value] | join("/"))"] | join(" ")' "$B")"
+want="a.zip=non-executable/archive/structured a.xz=non-executable/archive/unstructured a.tar=non-executable/archive/structured"
+want="$want libx.a=non-executable/archive/structured macho=executable/no archive/unstructured universal=executable/no archive/unstructured"
+want="$want Main.class=non-executable/no archive/unstructured object.o=non-executable/no archive/unstructured notes.txt=non-executable/no archive/unstructured"
+want="$want notes.txt.gz=non-executable/archive/unstructured a.tar.gz=non-executable/archive/structured a.tar.xz=non-executable/archive/structured"
+want="$want a.tar.bz2=non-executable/archive/structured a.cpio=non-executable/archive/structured a.iso=non-executable/archive/structured"
+want="$want fw.bin=non-executable/no archive/unstructured far.exe=executable/no archive/unstructured dos.com=non-executable/no archive/unstructured"
 [ "$rc" = 0 ] && [ "$got" = "$want" ] \
-    && pass "zip, xz, tar and ar are archives; Mach-O (also universal) is executable; a Java class, an object file and text are neither" \
-    || fail "file kinds: exit $rc" "$got"
+    && pass "file kinds: archives with an index (zip, tar, also compressed, ar, cpio, ISO) are structured; a single compressed stream, executables, firmware images and text are not" \
+    || fail "file kinds: exit $rc" "$(printf '%s\n' "$got" | tr ' ' '\n' | diff - <(printf '%s\n' "$want" | tr ' ' '\n'))"
+[ "$(jq -r '[.components[] | select(.name == "far.exe" or .name == "dos.com") | .name] | join(" ")' "$B")" = "far.exe dos.com" ] \
+    && pass "a PE header is looked for where e_lfanew points, also past the first bytes read" || fail "PE components missing"
+
+echo "== a kind the declaration gives itself wins over the one read from the file =="
+P="$(new_project override)"
+B="$(new_bom override)"
+jq '.components[0].properties += [{"name": "bsi:component:structured", "value": "structured"},
+                                  {"name": "bsi:component:archive", "value": "archive"}]' \
+    "$P/sbom-declared.cdx.json" > "$WORK/override.cdx.json"
+rc="$(apply "$B" "$P" "$WORK/override.cdx.json")"
+D="$(comp "$B" media-daemon)"
+[ "$rc" = 0 ] && [ "$(prop "$D" bsi:component:executable)/$(prop "$D" bsi:component:archive)/$(prop "$D" bsi:component:structured)" = "executable/archive/structured" ] \
+    && pass "declared archive and structured values are kept; executable is read from the file" \
+    || fail "override: exit $rc" "$D $(cat "$B.log")"
 
 echo "== dependencies written in the declaration file are used =="
 P="$(new_project deps)"
@@ -327,6 +357,95 @@ refused "several problems are all reported" \
 grep -q "is an absolute path" "$WORK/several problems are all reported.bom.json.log" \
     && pass "the first problem is reported with the second" || fail "only one problem reported"
 
+echo "== references stay unique =="
+refused "the same build output twice in one component" \
+    "component 'media-daemon': lists bomlens:artifact 'out/bin/media-daemon' more than once" \
+    "$(variant r1 '.components[0].properties += [{"name": "bomlens:artifact", "value": "./out//bin/media-daemon"}]')"
+refused "a file reference that another declared component already uses" \
+    "component 'media-daemon': the reference 'md#out/bin/media-ctl.exe' its file out/bin/media-ctl.exe would get is already used" \
+    "$(variant r2 '.components[0]["bom-ref"] = "md" | .components[0].properties += [{"name": "bomlens:artifact", "value": "out/bin/media-ctl.exe"}]
+                   | .components[1]["bom-ref"] = "md#out/bin/media-ctl.exe"')"
+SAVED_BASE="$BASE"
+BASE="$WORK/r3.base.json"
+jq '.components += [{"type": "file", "name": "x", "bom-ref": "md#out/bin/media-daemon"}]' "$SAVED_BASE" > "$BASE"
+refused "a file reference that a scanned component already uses" \
+    "the reference 'md#out/bin/media-daemon' its file out/bin/media-daemon would get is already used" \
+    "$(variant r3 '.components[0]["bom-ref"] = "md" | .components[0].properties += [{"name": "bomlens:artifact", "value": "out/bin/media-ctl.exe"}]')"
+BASE="$SAVED_BASE"
+
+echo "== only CycloneDX component fields, in their CycloneDX shape, are taken =="
+refused "a field the declaration may not carry" \
+    "component #1 'media-daemon': field 'evidence' is not read from a declaration file" \
+    "$(variant w1 '.components[0].evidence = {"identity": {"field": "name"}}')"
+refused "licenses written as a string" \
+    "component #3 'vendor-hal': licenses is not a list of" \
+    "$(variant w2 '.components[2].licenses = "MIT"')"
+refused "a supplier written as a string" \
+    "component #1 'media-daemon': supplier is not an organization" \
+    "$(variant w3 '.components[0].supplier = "Example Corp"')"
+refused "a hash with an algorithm CycloneDX does not name" \
+    "component #3 'vendor-hal': hashes is not a list" \
+    "$(variant w4 '.components[2].hashes = [{"alg": "CRC32", "content": "deadbeef"}]')"
+refused "an external reference of an unknown type" \
+    "component #3 'vendor-hal': externalReferences is not a list" \
+    "$(variant w5 '.components[2].externalReferences = [{"url": "https://example.com", "type": "homepage"}]')"
+refused "a licence with both an id and a name" \
+    "component #3 'vendor-hal': licenses is not a list of" \
+    "$(variant w6 '.components[2].licenses = [{"license": {"id": "MIT", "name": "MIT License"}}]')"
+refused "an expression mixed with licence objects" \
+    "component #3 'vendor-hal': licenses is not a list of" \
+    "$(variant w7 '.components[2].licenses = [{"expression": "MIT OR Apache-2.0"}, {"license": {"id": "MIT"}}]')"
+refused "a purl that is not a package URL" \
+    "component #3 'vendor-hal': purl 'vendor-hal@4.2.0' is not a package URL" \
+    "$(variant w8 '.components[2].purl = "vendor-hal@4.2.0"')"
+refused "a name with a line break" \
+    "holds a control character" \
+    "$(variant w9 '.components[1].name = "media\nctl"')"
+refused "a name that is only spaces" \
+    "sbom-declared.cdx.json: component #2: has no name" \
+    "$(variant w10 '.components[1].name = "   "')"
+refused "a file kind value BSI does not define" \
+    "component #1 'media-daemon': bsi:component:executable must be given once, as 'executable' or 'non-executable'" \
+    "$(variant w11 '.components[0].properties += [{"name": "bsi:component:executable", "value": "yes"}]')"
+refused "one file kind for a component of several files" \
+    "has several bomlens:artifact files, so it cannot give one" \
+    "$(variant w12 '.components[0].properties += [{"name": "bomlens:artifact", "value": "out/bin/media-ctl.exe"}, {"name": "bsi:component:structured", "value": "structured"}]')"
+mkdir -p "$WORK/w13"
+python3 -I -c 'import sys; open(sys.argv[1], "w").write("{\"bomFormat\": \"CycloneDX\", \"components\": [" + "[" * 100000 + "]" * 100000 + "]}")' "$WORK/w13/deep.cdx.json"
+# Whether the JSON reader itself gives up on this depth depends on the Python
+# version; either way the file is refused with a reason, not a traceback.
+cp "$BASE" "$WORK/w13.bom.json"
+rc="$(apply "$WORK/w13.bom.json" "$P" "$WORK/w13/deep.cdx.json")"
+[ "$rc" = 3 ] && grep -qE "deep.cdx.json: (cannot be read \(RecursionError\)|component #1: is not a JSON object)" "$WORK/w13.bom.json.log" \
+  && ! grep -q Traceback "$WORK/w13.bom.json.log" \
+    && pass "a file nested too deeply is refused with a reason" \
+    || fail "deep file: exit $rc" "$(tail -3 "$WORK/w13.bom.json.log")"
+jq '.components[1].name = "  media-ctl  " | .components[0].properties += [{"name": "bomlens:declared", "value": "false"}]' \
+    "$DECL" > "$WORK/w14.cdx.json"
+cp "$BASE" "$WORK/w14.bom.json"
+rc="$(apply "$WORK/w14.bom.json" "$P" "$WORK/w14.cdx.json")"
+[ "$rc" = 0 ] && [ "$(comp "$WORK/w14.bom.json" media-ctl | jq -r .name)" = "media-ctl" ] \
+  && [ "$(prop "$(comp "$WORK/w14.bom.json" media-daemon)" bomlens:declared)" = "true" ] \
+    && pass "a name is trimmed, and a bomlens:declared value in the file is replaced by the step's own" \
+    || fail "trim: exit $rc" "$(cat "$WORK/w14.bom.json.log")"
+
+echo "== the SBOM the step adds to =="
+jq '.components = "zlib"' "$BASE" > "$WORK/badbom.json"
+cp "$WORK/badbom.json" "$WORK/badbom.orig.json"
+rc="$(apply "$WORK/badbom.json" "$P" "$DECL")"
+[ "$rc" = 1 ] && grep -qF "cannot take declared components: components is not a list of objects" "$WORK/badbom.json.log" \
+  && cmp -s "$WORK/badbom.json" "$WORK/badbom.orig.json" \
+    && pass "a stage 1 SBOM of the wrong shape is reported, not crashed on" \
+    || fail "bad SBOM: exit $rc" "$(cat "$WORK/badbom.json.log")"
+# A component the scan wrote with a bomlens:origin of its own (no
+# bomlens:declared mark) is not taken for an earlier run's declared one.
+jq '.components += [{"type": "library", "name": "scanned-lib", "version": "1",
+                     "properties": [{"name": "bomlens:origin", "value": "first-party"}]}]' "$BASE" > "$WORK/keep.json"
+rc="$(apply "$WORK/keep.json" "$P" "$DECL")"
+[ "$rc" = 0 ] && [ "$(jq '[.components[] | select(.name == "scanned-lib")] | length' "$WORK/keep.json")" = 1 ] \
+    && pass "only components this step marked are replaced on a second run" \
+    || fail "scanned component with bomlens:origin: exit $rc" "$(jq -c '[.components[].name]' "$WORK/keep.json")"
+
 echo "== a build output that --exclude left out is reported as excluded =="
 P="$(new_project excluded)"
 rm -rf "$P/out/bin"   # what the scanned copy looks like with --exclude out/bin
@@ -338,6 +457,69 @@ SCAN_EXCLUDE_PATHS="vendor/legacy
 SCAN_EXCLUDE_PATHS="out/bi" refused "an exclude path that only shares a prefix is not blamed" \
     "bomlens:artifact 'out/bin/media-daemon' does not exist in the scan target" \
     "$P/sbom-declared.cdx.json"
+SCAN_EXCLUDE_PATHS="Out/BIN" refused "an exclude path is matched without regard to case" \
+    "bomlens:artifact 'out/bin/media-daemon' is under 'Out/BIN', which --exclude leaves out of the scan" \
+    "$P/sbom-declared.cdx.json"
+DECLARED_COMPONENTS_DEFAULT=1 refused "a missing build output in the default file points to --no-components" \
+    "this file was read because it is at the scan target root, so pass --no-components to scan without it" \
+    "$P/sbom-declared.cdx.json"
+refused "a file given with --components does not mention --no-components" \
+    "does not exist in the scan target; build it before the scan, or fix the path" \
+    "$P/sbom-declared.cdx.json"
+grep -q -- "--no-components" "$WORK/a file given with --components does not mention --no-components.bom.json.log" \
+    && fail "--no-components suggested for a file given with --components" \
+    || pass "the --no-components hint is only for the default file"
+
+echo "== the conformance report counts a component of several files by its files =="
+bash "$LIB/validate-sbom.sh" "$WORK/multi.bom.json" "$WORK/multi" x >/dev/null 2>&1
+[ "$(jq -c '[.checks[] | select(.id == "component-filename" or .id == "file-properties" or .id == "hash-algorithm") | "\(.id)=\(.detail)"]' "$WORK/multi_conformance.json" 2>/dev/null)" \
+    = '["hash-algorithm=50% (1/2)","component-filename=50% (1/2)","file-properties=50% (1/2)"]' ] \
+    && pass "media-plugins, whose two files carry SHA-512, a file name and the three kinds, counts as having them; zlib does not" \
+    || fail "BSI tallies" "$(jq -c '[.checks[] | select(.id == "component-filename" or .id == "file-properties" or .id == "hash-algorithm") | {id, detail}]' "$WORK/multi_conformance.json" 2>&1)"
+jq '(.components[] | select(.name == "media-plugins") | .components[1].properties) |= map(select(.name != "bsi:component:filename"))' \
+    "$WORK/multi.bom.json" > "$WORK/multi-gap.json"
+bash "$LIB/validate-sbom.sh" "$WORK/multi-gap.json" "$WORK/multi-gap" x >/dev/null 2>&1
+[ "$(jq -r '.checks[] | select(.id == "component-filename") | .detail' "$WORK/multi-gap_conformance.json" 2>/dev/null)" = "0% (0/2)" ] \
+    && pass "one file without a file name leaves the component without one" \
+    || fail "partial children" "$(jq -c '.checks[] | select(.id == "component-filename")' "$WORK/multi-gap_conformance.json" 2>&1)"
+
+echo "== SPDX 2.3 export keeps the declared components' checksums and files =="
+if command -v syft >/dev/null 2>&1; then
+    bash "$LIB/convert-to-spdx.sh" "$WORK/ok.bom.json" "$WORK/ok.spdx.json" --stable >/dev/null 2>&1
+    bash "$LIB/convert-to-spdx.sh" "$WORK/multi.bom.json" "$WORK/multi.spdx.json" --stable >/dev/null 2>&1
+    elf512="$(jq -r '.components[] | select(.name == "media-daemon") | .hashes[] | select(.alg == "SHA-512") | .content' "$WORK/ok.bom.json")"
+    [ "$(jq -c --arg h "$elf512" '[.packages[] | select(.name == "media-daemon") | [([.checksums[].algorithm] | sort), (.checksums[] | select(.algorithm == "SHA512") | .checksumValue == $h), .packageFileName]]' "$WORK/ok.spdx.json")" \
+        = '[[["SHA256","SHA512"],true,"media-daemon"]]' ] \
+        && pass "a declared component's package has its SHA512 and SHA256 and file name" \
+        || fail "SPDX checksums" "$(jq -c '[.packages[] | {name, checksums, packageFileName}]' "$WORK/ok.spdx.json")"
+    [ "$(jq -c '[.packages[] | select(.name == "vendor-hal") | has("checksums")]' "$WORK/ok.spdx.json")" = '[false]' ] \
+        && pass "a declared component without a build output gets no checksums" || fail "vendor-hal checksums"
+    [ "$(jq -c '(.packages[] | select(.name == "media-plugins") | .SPDXID) as $p
+               | [.relationships[] | select(.spdxElementId == $p and .relationshipType == "CONTAINS") | .relatedSpdxElement] as $kids
+               | [.packages[] | select(.SPDXID as $i | $kids | index($i)) | [.name, .primaryPackagePurpose, ([.checksums[].algorithm] | sort), .packageFileName, .filesAnalyzed]]' "$WORK/multi.spdx.json")" \
+        = '[["out/bin/media-plugin.so","FILE",["SHA256","SHA512"],"media-plugin.so",false],["out/pkg/media-plugins.tar.gz","FILE",["SHA256","SHA512"],"media-plugins.tar.gz",false]]' ] \
+        && pass "each file of a multi-file component is a FILE package with checksums that the component CONTAINS" \
+        || fail "SPDX nested files" "$(jq -c '[.packages[] | {SPDXID, name, checksums}] , .relationships' "$WORK/multi.spdx.json")"
+    # SPDX 2.3 rules the export must keep: unique SPDXIDs, every relationship
+    # end defined, and the fields a package requires.
+    for f in ok multi; do
+        [ "$(jq -r '
+            ([.packages[].SPDXID] | (length == (unique | length))) as $uniq
+            | ([.packages[].SPDXID] + ["SPDXRef-DOCUMENT"]) as $ids
+            | ([.relationships[] | .spdxElementId, .relatedSpdxElement] | all(. as $r | $ids | index($r))) as $ends
+            | ([.packages[] | has("SPDXID") and has("name") and has("downloadLocation")] | all) as $req
+            | ([.packages[].checksums[]? | (.algorithm | IN("SHA1","SHA224","SHA256","SHA384","SHA512","MD5")) and (.checksumValue | test("^[0-9a-f]+$"))] | all) as $sums
+            | $uniq and $ends and $req and $sums' "$WORK/$f.spdx.json")" = true ] \
+            && pass "$f: the SPDX file keeps unique ids, defined relationship ends and valid checksums" \
+            || fail "$f: SPDX structure"
+    done
+    if command -v pyspdxtools >/dev/null 2>&1; then
+        pyspdxtools -i "$WORK/multi.spdx.json" >/dev/null 2>&1 && pyspdxtools -i "$WORK/ok.spdx.json" >/dev/null 2>&1 \
+            && pass "pyspdxtools validates both SPDX 2.3 files" || fail "pyspdxtools rejects an SPDX file" "$(pyspdxtools -i "$WORK/multi.spdx.json" 2>&1 | tail -5)"
+    fi
+else
+    echo "  SKIP: syft is not installed (the post-process CI job installs it)"
+fi
 
 echo "== NOTICE: third-party only =="
 N="$WORK/notice"; mkdir -p "$N"
@@ -389,7 +571,7 @@ F="$O/MediaSuite_3.1.0_bom.json"
     || fail "default file: exit $rc, step $(step "$O")" "$(tail -5 "$O.log")"
 D="$(comp "$F" media-daemon)"
 [ "$(printf '%s' "$D" | jq -c '[.version, ([.hashes[].alg] | sort), ([.properties[] | select(.name | startswith("bsi:")) | .value])]')" \
-    = '["3.1.0",["SHA-256","SHA-512"],["media-daemon","executable","no archive"]]' ] \
+    = '["3.1.0",["SHA-256","SHA-512"],["media-daemon","executable","no archive","unstructured"]]' ] \
     && pass "the declared fields survive normalize and the rest of the pipeline" \
     || fail "final SBOM component" "$D"
 [ "$(jq -c "$UNREACHED" "$F")" = "[]" ] && pass "the final SBOM's graph reaches every component from the product" \
@@ -419,6 +601,17 @@ O="$WORK/e3.out"
     || fail "refused run: exit $rc, step $(step "$O")" "$(tail -8 "$O.log")"
 [ ! -f "$O/MediaSuite_3.1.0_conformance.json" ] && pass "nothing after the refusal runs (no conformance report)" \
     || fail "the run went on after the refusal"
+[ ! -f "$O/MediaSuite_3.1.0_bom.json" ] && [ -s "$O/MediaSuite_3.1.0_bom.refused.json" ] \
+  && grep -qF "kept as MediaSuite_3.1.0_bom.refused.json, not as MediaSuite_3.1.0_bom.json" "$O.log" \
+    && pass "the incomplete SBOM is renamed to _bom.refused.json, so nothing can take it for the result" \
+    || fail "refused SBOM name" "$(ls "$O")"
+grep -qF "pass --no-components to scan without it" "$O.log" \
+    && pass "the refusal of the default file points to --no-components" || fail "no --no-components hint" "$(grep ERROR "$O.log")"
+rc="$(run_entry e3 "$P" DECLARED_COMPONENTS_SKIP=1)"
+[ "$rc" = 0 ] && [ "$(step "$O")" = "null" ] && [ -s "$O/MediaSuite_3.1.0_bom.json" ] && [ ! -f "$O/MediaSuite_3.1.0_bom.refused.json" ] \
+  && grep -qF -- "--no-components: sbom-declared.cdx.json at the scan target root is not read" "$O.log" \
+    && pass "--no-components leaves the default file unread, and the next run sweeps the refused SBOM away" \
+    || fail "--no-components: exit $rc, step $(step "$O")" "$(ls "$O"; tail -5 "$O.log")"
 
 P="$(new_project entry-none)"
 rm "$P/sbom-declared.cdx.json"
@@ -450,6 +643,7 @@ if [ -z "$body" ]; then
 else
     eval "$body"
     hostpath() { printf '%s' "$1"; }
+    NO_COMPONENTS="false"
     mkdir -p "$WORK/cli dir"
     printf '{}' > "$WORK/cli dir/a b.cdx.json"
     printf '{}' > "$WORK/second.cdx.json"
@@ -465,7 +659,18 @@ else
     # shellcheck disable=SC2034 # read by components_run, lifted above
     COMPONENTS_FILES=()
     [ -z "$(components_run)" ] && pass "no --components, no mount" || fail "mount without --components"
+    # shellcheck disable=SC2034 # read by components_run, lifted above
+    NO_COMPONENTS="true"
+    [ "$(components_run)" = " -e DECLARED_COMPONENTS_SKIP=1" ] && pass "--no-components reaches the container as DECLARED_COMPONENTS_SKIP=1" \
+        || fail "--no-components gave '$(components_run)'"
 fi
+out="$(bash "$SCRIPT" --project x --version 1 --components 2>&1)"; rc=$?
+[ "$rc" = 1 ] && [ "$out" = "[ERROR] --components requires a file, e.g. --components sbom-declared.cdx.json" ] \
+    && pass "--components as the last argument says it needs a file" || fail "--components last: exit $rc" "$out"
+out="$(bash "$SCRIPT" --project x --version 1 --no-components --components "$FIX/project/sbom-declared.cdx.json" --target "$WORK/no-such-dir" 2>&1)"; rc=$?
+[ "$rc" = 1 ] && printf '%s' "$out" | grep -qF "[ERROR] --no-components cannot be combined with --components" \
+    && pass "--no-components and --components together are refused" || fail "--no-components with --components: exit $rc" "$out"
+grep -q '^  --no-components ' "$SCRIPT" && pass "--no-components is in the help" || fail "--no-components missing from the help"
 body="$(extract_fn exclude_run)"
 if [ -z "$body" ]; then
     fail "could not lift exclude_run out of scan-sbom.sh"
@@ -477,7 +682,7 @@ else
 fi
 grep -q '(components_run)$(exclude_run)' "$SCRIPT" && grep -q '^    export SCAN_EXCLUDE_PATHS' "$SCRIPT" \
     && pass "the post-process container gets the --exclude paths" || fail "exclude_run is not used"
-grep -q '^        --components) COMPONENTS_FILES+=' "$SCRIPT" && grep -q '^  --components <file>' "$SCRIPT" \
+grep -q '^            COMPONENTS_FILES+=("$2"); shift ;;' "$SCRIPT" && grep -q '^  --components <file>' "$SCRIPT" \
     && pass "--components is parsed (repeatable) and in the help" || fail "--components parsing or help missing"
 grep -q '(components_run)' "$SCRIPT" && pass "the post-process container gets the mounts" || fail "components_run is not used"
 
