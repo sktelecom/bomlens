@@ -136,13 +136,13 @@ Such components are listed by name on the advisory row "First-party components i
   --conformance-profile bsi-tr-03183-2 --fail-on-conformance \
   --supplier "Example Corp <https://example.com>" \
   --sbom-author "Example Corp <sbom@example.com>" \
-  --license Apache-2.0
+  --license LicenseRef-ExampleCorp-Proprietary
 ```
 
 The profile measures BSI TR-03183-2 v2.1.0. It requires CycloneDX 1.6 or later (the default output), and:
 
 - an SBOM creator with an email address or URL: `--sbom-author "Name <email>"` writes it to `metadata.authors`
-- the product (`metadata.component`) with a creator that has a URL or email (`--supplier "Name <https://...>"` or `"Name <email>"`), a name, a version (`--version`), and a concluded licence (`--license`, an SPDX identifier, written as `concluded`)
+- the product (`metadata.component`) with a creator that has a URL or email (`--supplier "Name <https://...>"` or `"Name <email>"`), a name, a version (`--version`), and a concluded licence (`--license`, an SPDX identifier, expression or `LicenseRef-` name, written as `concluded`)
 - a dependency graph that reaches every component from the product. The row warns when the SBOM does not state its completeness (`compositions`)
 - for each declared component, a supplier or manufacturer with a URL or contact email, a name and version, and a concluded licence as an SPDX identifier, expression or `LicenseRef-` name
 - for each declared component that names a build output, its file name, SHA-512 and the three file properties, which BomLens fills from `bomlens:artifact`

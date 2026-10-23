@@ -136,13 +136,13 @@ description: 자체 실행 파일, 라이브러리, 펌웨어나 벤더가 준 �
   --conformance-profile bsi-tr-03183-2 --fail-on-conformance \
   --supplier "Example Corp <https://example.com>" \
   --sbom-author "Example Corp <sbom@example.com>" \
-  --license Apache-2.0
+  --license LicenseRef-ExampleCorp-Proprietary
 ```
 
 이 프로필은 BSI TR-03183-2 v2.1.0을 기준으로 검사합니다. CycloneDX 1.6 이상(기본 출력)이어야 하고, 다음을 요구합니다.
 
 - 이메일 주소나 URL이 있는 SBOM 작성자. `--sbom-author "Name <email>"`이 `metadata.authors`에 기록합니다
-- 제품(`metadata.component`)의 URL이나 이메일이 있는 제작자(`--supplier "Name <https://...>"` 또는 `"Name <email>"`), 이름, 버전(`--version`), 배포 라이선스(`--license`에 SPDX 식별자를 주면 `concluded`로 기록)
+- 제품(`metadata.component`)의 URL이나 이메일이 있는 제작자(`--supplier "Name <https://...>"` 또는 `"Name <email>"`), 이름, 버전(`--version`), 배포 라이선스(`--license`에 SPDX 식별자, 표현식, `LicenseRef-` 이름 중 하나를 주면 `concluded`로 기록)
 - 제품에서 모든 구성요소에 닿는 의존성 그래프. SBOM이 완전성(`compositions`)을 밝히지 않으면 이 항목은 경고입니다
 - 선언 구성요소마다 URL이나 연락처 이메일이 있는 supplier 또는 manufacturer, 이름과 버전, SPDX 식별자나 표현식이나 `LicenseRef-` 이름으로 적은 concluded 라이선스
 - 빌드 산출물을 지정한 선언 구성요소마다 파일 이름, SHA-512, 세 파일 속성. BomLens가 `bomlens:artifact`에서 채웁니다
