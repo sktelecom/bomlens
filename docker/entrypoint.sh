@@ -777,6 +777,25 @@ YOCTO_CPE_MATCH=false
 # is set by scan-sbom.sh and server.py when they found the document in the build.
 YOCTO_FROM_BUILD="${YOCTO_FROM_BUILD:-false}"
 [ -n "${YOCTO_BUILD_DIR:-}" ] && YOCTO_FROM_BUILD=true
+
+# --license (PROJECT_LICENSE) is recorded on the root of the SBOM in the modes
+# below (stamp-metadata.sh, stamp-yocto-root.sh). A value CycloneDX has no
+# field for would stop the run at that step, after the whole scan; it is
+# checked here instead, before anything is generated, with the same helper and
+# the same message, whoever started the run (the CLI, the web UI or a CI job).
+# A licence the entrypoint reads from the project manifest later is not
+# PROJECT_LICENSE yet, and is only left out when it does not fit.
+case "$SCAN_MODE" in
+    SOURCE|POSTPROCESS|ROOTFS) _lic_mode=true ;;
+    ANALYZE) _lic_mode="$YOCTO_FROM_BUILD" ;;
+    *) _lic_mode=false ;;
+esac
+if [ "$_lic_mode" = true ] && [ -n "${PROJECT_LICENSE:-}" ] \
+   && ! bash "$LIBDIR/license-entry.sh" "$PROJECT_LICENSE" >/dev/null; then
+    echo "[ERROR] --license was refused (the reason is above); the run stops before an SBOM is written."
+    exit 1
+fi
+unset _lic_mode
 case "$SCAN_MODE" in
     SOURCE)
         # Local web UI source scan (current dir / extracted ZIP / cloned git repo).

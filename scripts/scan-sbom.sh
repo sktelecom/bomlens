@@ -467,7 +467,10 @@ Options:
                          manifest only fills an empty root license, as
                          "declared", and a source scan that finds none gives
                          no conflict verdict. A supplier SBOM's own root
-                         license under --analyze is never replaced.
+                         license under --analyze is never replaced. Free text
+                         (write LicenseRef-<name>) and an expression that is
+                         not made of SPDX ids and LicenseRef- names are
+                         refused before the scan starts.
   --vex <file>           A CycloneDX VEX document (JSON) a supplier sent for this
                          product. The statements that apply to a component of the
                          scanned SBOM are kept in <Project>_<Version>_vex_imported.json,
@@ -2281,15 +2284,6 @@ if [ -n "$COMPONENT_VERSIONS_FILE" ]; then
     fi
 fi
 
-# --license: checked here with the helper the container uses
-# (docker/lib/license-entry.sh), so a value CycloneDX has no field for is
-# refused before the scan starts rather than at its end. Without jq on this
-# machine the container still checks it.
-if [ -n "${PROJECT_LICENSE:-}" ] && command -v jq >/dev/null 2>&1 \
-   && ! bash "$REPO_DIR/docker/lib/license-entry.sh" "$PROJECT_LICENSE" >/dev/null; then
-    echo "[ERROR] --license was refused (the reason is above); nothing was scanned."; exit 1
-fi
-
 if [ "$NO_COMPONENTS" = "true" ] && [ "${#COMPONENTS_FILES[@]}" -gt 0 ]; then
     echo "[ERROR] --no-components cannot be combined with --components: the first reads no declaration file, the second names one."; exit 1
 fi
@@ -2659,6 +2653,25 @@ fi
 # components declared by recipe (bomlens:yocto-recipe): its SBOM is the one
 # this scan generates. A document passed with --analyze is a received SBOM,
 # which is not changed.
+# --license: in the modes that record it on the SBOM's root (a source scan, a
+# root filesystem, a Yocto build directory), checked here with the helper the
+# container uses (docker/lib/license-entry.sh), so a value CycloneDX has no
+# field for is refused before any container starts. The container checks it
+# again before it generates anything, for every caller; so where this machine
+# lacks jq, the helper or its id list (an older or partial CLI bundle), the
+# check is left to it.
+case "$MODE" in
+    SOURCE|ROOTFS) _lic_mode=true ;;
+    ANALYZE) _lic_mode=false; [ -z "$YOCTO_BUILD_DIR" ] || _lic_mode=true ;;
+    *) _lic_mode=false ;;
+esac
+if [ "$_lic_mode" = true ] && [ -n "${PROJECT_LICENSE:-}" ] && command -v jq >/dev/null 2>&1 \
+   && [ -f "$REPO_DIR/docker/lib/license-entry.sh" ] && [ -f "$REPO_DIR/docker/lib/cdx-spdx-ids.json" ] \
+   && ! bash "$REPO_DIR/docker/lib/license-entry.sh" "$PROJECT_LICENSE" >/dev/null; then
+    echo "[ERROR] --license was refused (the reason is above); nothing was scanned."; exit 1
+fi
+unset _lic_mode
+
 if [ "$NO_COMPONENTS" = "true" ] && [ "$MODE" != "SOURCE" ]; then
     echo "[ERROR] --no-components applies to source scans only (this target is scanned as $MODE)."; exit 1
 fi

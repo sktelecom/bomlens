@@ -64,11 +64,14 @@ fi
 # fits none is left out with a warning, since nobody typed it.
 LIC_JSON="null"
 if [ -n "${PROJECT_LICENSE:-}" ]; then
-    _ack=concluded; [ "${PROJECT_LICENSE_FROM_MANIFEST:-}" = "1" ] && _ack=declared
-    if _entry="$(bash "$(dirname "$0")/license-entry.sh" "$PROJECT_LICENSE" "$_ack")"; then
+    if [ "${PROJECT_LICENSE_FROM_MANIFEST:-}" = "1" ]; then
+        if _entry="$(LICENSE_ENTRY_QUIET=1 bash "$(dirname "$0")/license-entry.sh" "$PROJECT_LICENSE" declared)"; then
+            [ -z "$_entry" ] || LIC_JSON="$_entry"
+        else
+            echo "[stamp] WARN: the licence read from the project manifest ($PROJECT_LICENSE) is not an SPDX license id, a LicenseRef- name or a licence expression, so it is not recorded; pass --license to give the outbound licence." >&2
+        fi
+    elif _entry="$(bash "$(dirname "$0")/license-entry.sh" "$PROJECT_LICENSE" concluded)"; then
         [ -z "$_entry" ] || LIC_JSON="$_entry"
-    elif [ "${PROJECT_LICENSE_FROM_MANIFEST:-}" = "1" ]; then
-        echo "[stamp] WARN: the licence read from the project manifest ($PROJECT_LICENSE) is not recorded (see above); pass --license to give it." >&2
     else
         exit 1
     fi

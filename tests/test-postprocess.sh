@@ -330,19 +330,67 @@ lic_case idcase "apache-2.0"
 lic_case docref "DocumentRef-spdx-tool-1.2:LicenseRef-MIT-Style-2"
 lic_free_rc=0; lic_case free "Proprietary" || lic_free_rc=$?
 lic_case freeman "Proprietary" PROJECT_LICENSE_FROM_MANIFEST=1
-[ "$(jq -c '.metadata.component.licenses' "$WORK/lic-lower.json")" = '[{"expression":"apache-2.0 OR mit","acknowledgement":"concluded"}]' ] \
+[ "$(jq -c '.metadata.component.licenses' "$WORK/lic-lower.json")" = '[{"expression":"Apache-2.0 OR MIT","acknowledgement":"concluded"}]' ] \
   && [ "$(jq -c '.metadata.component.licenses' "$WORK/lic-tab.json")" = '[{"expression":"GPL-2.0-only WITH Linux-syscall-note","acknowledgement":"concluded"}]' ] \
   && [ "$(jq -c '.metadata.component.licenses' "$WORK/lic-paren.json")" = '[{"expression":"MIT AND (Apache-2.0 OR BSD-3-Clause)","acknowledgement":"concluded"}]' ] \
   && [ "$(jq -c '.metadata.component.licenses' "$WORK/lic-idcase.json")" = '[{"license":{"id":"Apache-2.0","acknowledgement":"concluded"}}]' ] \
   && [ "$(jq -c '.metadata.component.licenses' "$WORK/lic-docref.json")" = '[{"license":{"name":"DocumentRef-spdx-tool-1.2:LicenseRef-MIT-Style-2","acknowledgement":"concluded"}}]' ] \
-    && pass "--license: lower-case operators and tabs make an expression (operators in upper case), parentheses too, and an id takes the SPDX list's letter case" \
+    && pass "--license: lower-case operators and tabs make an expression (operators and ids in their SPDX spelling), parentheses too, and an id takes the SPDX list's letter case" \
     || fail "licence edge cases" "$(jq -c '.metadata.component.licenses' "$WORK/lic-lower.json" "$WORK/lic-tab.json" "$WORK/lic-paren.json" "$WORK/lic-idcase.json" "$WORK/lic-docref.json")"
 [ "$lic_free_rc" = 1 ] && grep -qF "[license] ERROR: the licence 'Proprietary' is not an SPDX license id, a LicenseRef- name or a licence expression, so CycloneDX has no field for it. Write a licence the SPDX list does not hold as LicenseRef-Proprietary" "$WORK/lic-free.log" \
   && [ "$(jq -c '.metadata.component.licenses' "$WORK/lic-free.json")" = '[{"license":{"id":"MIT"}}]' ] \
   && [ "$(jq -c '.metadata.component.licenses' "$WORK/lic-freeman.json")" = '[{"license":{"id":"MIT"}}]' ] \
-  && grep -qF "the licence read from the project manifest (Proprietary) is not recorded" "$WORK/lic-freeman.log" \
+  && grep -qF "[stamp] WARN: the licence read from the project manifest (Proprietary) is not an SPDX license id, a LicenseRef- name or a licence expression, so it is not recorded" "$WORK/lic-freeman.log" \
+  && ! grep -qF "[license] ERROR" "$WORK/lic-freeman.log" \
     && pass "--license with free text stops the stamp with the LicenseRef- name to use; the same text from a manifest is left out with a warning" \
     || fail "free-text licence: exit $lic_free_rc" "$(cat "$WORK/lic-free.log" "$WORK/lic-freeman.log")"
+# An expression is read token by token: every operand an SPDX id or a
+# LicenseRef- name, AND/OR between them, WITH before an exception id, and
+# balanced parentheses. Anything else is refused with the reason.
+lic_entry() { bash "$LIB/license-entry.sh" "$1" 2>&1; }
+lic_bad=""
+for l in "Proprietary or commercial" "MIT AND" "(MIT" "MIT)" '$(id)' "MIT WITH" "GPL-2.0-or-later WITH MIT" "Linux-syscall-note"; do
+    if bash "$LIB/license-entry.sh" "$l" >/dev/null 2>&1; then lic_bad="$lic_bad [$l]"; fi
+done
+[ -z "$lic_bad" ] \
+  && [ "$(lic_entry "Proprietary or commercial")" = "[license] ERROR: the licence 'Proprietary or commercial' is not a licence expression: \"Proprietary\" is not an SPDX license id or a LicenseRef- name. Write SPDX license ids and LicenseRef- names joined by AND, OR or WITH, for example --license \"MIT OR LicenseRef-ExampleCorp-Commercial\"." ] \
+  && lic_entry "(MIT" | grep -qF "a parenthesis is not closed" && lic_entry "MIT AND" | grep -qF "it ends where a licence should come" \
+  && lic_entry "GPL-2.0-or-later WITH MIT" | grep -qF '"MIT" after WITH is not an SPDX exception id' \
+  && [ "$(lic_entry "gpl-2.0-only with classpath-exception-2.0 or licenseref-corp")" = '{"expression":"GPL-2.0-only WITH Classpath-exception-2.0 OR LicenseRef-corp","acknowledgement":"concluded"}' ] \
+    && pass "--license: an expression is checked operand by operand (ids, exceptions, LicenseRef-, operators, parentheses) and refused with the reason" \
+    || fail "licence expressions" "accepted:$lic_bad / $(lic_entry "Proprietary or commercial") / $(lic_entry "gpl-2.0-only with classpath-exception-2.0 or licenseref-corp")"
+[ "$(lic_entry "licenseref-acme")" = '{"license":{"name":"LicenseRef-acme","acknowledgement":"concluded"}}' ] \
+  && lic_entry "!!!" | grep -qF "as LicenseRef-<your-name> (for example --license LicenseRef-<your-name>)" \
+  && lic_entry "LicenseRef-" | grep -qF "as LicenseRef-<your-name>" \
+  && lic_entry "My Licence" | grep -qF "as LicenseRef-My-Licence" \
+    && pass "--license: a licenseref- prefix is read in any letter case; a value with nothing to keep is pointed to LicenseRef-<your-name>" \
+    || fail "licence prefixes and suggestions" "$(lic_entry "licenseref-acme") / $(lic_entry "!!!")"
+
+# The CLI bundles (release.yml: bomlens-cli-linux.tar.gz, bomlens-cli-windows.zip)
+# carry only the host-side files scan-sbom.sh uses. The --license check before
+# a scan needs license-entry.sh and the id list; laid out as the Linux bundle
+# is, the helper reads MIT as an id, and scan-sbom.sh only runs the check when
+# both files are there (an older bundle leaves it to the container).
+REL="$ROOT_DIR/.github/workflows/release.yml"
+cli_bundle_files() {  # <archive name>: the docker/lib files of that bundle
+    awk -v a="$1" 'index($0, "release-assets/" a) { on = 1 } on { print } on && !/\\$/ { exit }' "$REL" | grep -o 'docker/lib/[A-Za-z0-9._-]*' | sort -u
+}
+bundle_ok=true
+for a in bomlens-cli-linux.tar.gz bomlens-cli-windows.zip; do
+    for f in docker/lib/source-detect.sh docker/lib/cdx-version.sh docker/lib/build-prep.sh docker/lib/license-entry.sh docker/lib/cdx-spdx-ids.json; do
+        cli_bundle_files "$a" | grep -qx "$f" || { bundle_ok=false; echo "        $a lacks $f"; }
+    done
+done
+rm -rf "$WORK/cli-bundle"; mkdir -p "$WORK/cli-bundle/scripts" "$WORK/cli-bundle/docker/lib"
+cp "$ROOT_DIR/scripts/scan-sbom.sh" "$WORK/cli-bundle/scripts/"
+for f in $(cli_bundle_files bomlens-cli-linux.tar.gz); do cp "$ROOT_DIR/$f" "$WORK/cli-bundle/$f"; done
+[ "$bundle_ok" = true ] \
+  && [ "$(bash "$WORK/cli-bundle/docker/lib/license-entry.sh" MIT 2>&1)" = '{"license":{"id":"MIT","acknowledgement":"concluded"}}' ] \
+  && bash "$WORK/cli-bundle/scripts/scan-sbom.sh" --help >/dev/null 2>&1 \
+  && grep -qF '[ -f "$REPO_DIR/docker/lib/license-entry.sh" ] && [ -f "$REPO_DIR/docker/lib/cdx-spdx-ids.json" ]' "$ROOT_DIR/scripts/scan-sbom.sh" \
+    && pass "the CLI bundles carry the --license helper and its id list, MIT is an id when laid out as the Linux bundle, and the check is skipped without them" \
+    || fail "CLI bundle --license files"
+
 if [ "${BOMLENS_CDX_SCHEMA:-}" = "1" ] || command -v cyclonedx >/dev/null 2>&1 || [ -n "${CYCLONEDX_CLI:-}" ]; then
     if licout=$(bash "$ROOT_DIR/scripts/check-cdx-schema.sh" "$WORK/lic-ref.json" "$WORK/lic-expr.json" "$WORK/lic-ref-manifest.json" "$WORK/lic-explicit.json" \
                  "$WORK/lic-lower.json" "$WORK/lic-tab.json" "$WORK/lic-paren.json" "$WORK/lic-idcase.json" "$WORK/lic-docref.json" 2>&1); then
