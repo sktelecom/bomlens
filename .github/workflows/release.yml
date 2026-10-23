@@ -199,7 +199,7 @@ jobs:
           # shellcheck disable=SC2086  # word splitting is how the file list expands
           tar -czf release-assets/bomlens-cli-linux.tar.gz \
             scripts/scan-sbom.sh docker/lib/source-detect.sh docker/lib/build-prep.sh \
-            docker/lib/cdx-version.sh docker/lib/license-entry.sh docker/lib/cdx-spdx-ids.json $LICENSE_FILES
+            docker/lib/cdx-version.sh docker/lib/license-entry.sh docker/lib/cdx-spdx-ids.json docker/lib/identify-conda.py $LICENSE_FILES
 
           # Windows runtime bundle: both launchers, the orchestration script,
           # and the host-side lib files above. sbom-ui.bat is self-contained
@@ -212,7 +212,7 @@ jobs:
             scripts/scan-sbom.sh scripts/scan-sbom.bat scripts/sbom-ui.bat \
             scripts/check-setup.bat scripts/bomlens.settings.example.txt \
             docker/lib/source-detect.sh docker/lib/build-prep.sh \
-            docker/lib/cdx-version.sh docker/lib/license-entry.sh docker/lib/cdx-spdx-ids.json $LICENSE_FILES
+            docker/lib/cdx-version.sh docker/lib/license-entry.sh docker/lib/cdx-spdx-ids.json docker/lib/identify-conda.py $LICENSE_FILES
 
           # Examples
           # shellcheck disable=SC2086

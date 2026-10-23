@@ -377,7 +377,7 @@ cli_bundle_files() {  # <archive name>: the docker/lib files of that bundle
 }
 bundle_ok=true
 for a in bomlens-cli-linux.tar.gz bomlens-cli-windows.zip; do
-    for f in docker/lib/source-detect.sh docker/lib/cdx-version.sh docker/lib/build-prep.sh docker/lib/license-entry.sh docker/lib/cdx-spdx-ids.json; do
+    for f in docker/lib/source-detect.sh docker/lib/cdx-version.sh docker/lib/build-prep.sh docker/lib/license-entry.sh docker/lib/cdx-spdx-ids.json docker/lib/identify-conda.py; do
         cli_bundle_files "$a" | grep -qx "$f" || { bundle_ok=false; echo "        $a lacks $f"; }
     done
 done
