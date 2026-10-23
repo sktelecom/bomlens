@@ -230,6 +230,42 @@ want="$want fw.bin=non-executable/no archive/unstructured far.exe=executable/no 
 [ "$(jq -r '[.components[] | select(.name == "far.exe" or .name == "dos.com") | .name] | join(" ")' "$B")" = "far.exe dos.com" ] \
     && pass "a PE header is looked for where e_lfanew points, also past the first bytes read" || fail "PE components missing"
 
+echo "== a compressed tar is recognized at full size =="
+# A bzip2 block of data that does not compress is close to 1 MB, and nothing
+# comes out of it before it is read whole.
+P="$(new_project bigkinds)"
+python3 -I -c '
+import bz2, gzip, io, lzma, os, sys, tarfile
+buf = io.BytesIO()
+with tarfile.open(fileobj=buf, mode="w") as t:
+    data = os.urandom(1536 * 1024)
+    info = tarfile.TarInfo("payload.bin"); info.size = len(data)
+    t.addfile(info, io.BytesIO(data))
+raw = buf.getvalue()
+d = sys.argv[1]
+open(d + "/big.tar.bz2", "wb").write(bz2.compress(raw))
+open(d + "/big.tar.gz", "wb").write(gzip.compress(raw))
+open(d + "/big.tar.xz", "wb").write(lzma.compress(raw))
+open(d + "/big.bz2", "wb").write(bz2.compress(os.urandom(1536 * 1024)))
+' "$P"
+{
+    printf '{"bomFormat": "CycloneDX", "components": ['
+    sep=""
+    for f in big.tar.bz2 big.tar.gz big.tar.xz big.bz2; do
+        printf '%s{"type": "file", "name": "%s", "properties": [{"name": "bomlens:origin", "value": "first-party"}, {"name": "bomlens:artifact", "value": "%s"}]}' "$sep" "$f" "$f"
+        sep=","
+    done
+    printf ']}'
+} > "$WORK/bigkinds.cdx.json"
+B="$(new_bom bigkinds)"
+rc="$(apply "$B" "$P" "$WORK/bigkinds.cdx.json")"
+got="$(jq -r '[.components[] | select(.properties[]?.name == "bsi:component:filename")
+              | "\(.name)=\([.properties[] | select(.name == "bsi:component:structured") | .value] | join(""))"] | join(" ")' "$B")"
+[ "$rc" = 0 ] && [ "$got" = "big.tar.bz2=structured big.tar.gz=structured big.tar.xz=structured big.bz2=unstructured" ] \
+  && [ "$(stat -f %z "$P/big.tar.bz2" 2>/dev/null || stat -c %s "$P/big.tar.bz2")" -gt 1048576 ] \
+    && pass "a tar of over 1 MB of random data is structured in bzip2, gzip and xz; a bzip2 stream that is not a tar is not" \
+    || fail "big compressed tars: exit $rc" "$got"
+
 echo "== a kind the declaration gives itself wins over the one read from the file =="
 P="$(new_project override)"
 B="$(new_bom override)"
@@ -373,6 +409,38 @@ refused "a file reference that a scanned component already uses" \
     "$(variant r3 '.components[0]["bom-ref"] = "md" | .components[0].properties += [{"name": "bomlens:artifact", "value": "out/bin/media-ctl.exe"}]')"
 BASE="$SAVED_BASE"
 
+echo "== hashes a declaration gives for a build output are checked against it =="
+P="$(new_project givenhash)"
+md5="$(python3 -I -c 'import hashlib,sys; print(hashlib.md5(open(sys.argv[1],"rb").read()).hexdigest())' "$P/out/bin/media-daemon")"
+sha1="$(python3 -I -c 'import hashlib,sys; print(hashlib.sha1(open(sys.argv[1],"rb").read()).hexdigest())' "$P/out/bin/media-daemon")"
+b2="$(python3 -I -c 'import hashlib,sys; print(hashlib.blake2b(open(sys.argv[1],"rb").read(), digest_size=32).hexdigest())' "$P/out/bin/media-daemon")"
+jq --arg md5 "$md5" --arg sha1 "$sha1" --arg b2 "$b2" \
+    '.components[0].hashes = [{"alg": "MD5", "content": $md5}, {"alg": "SHA-1", "content": ($sha1 | ascii_upcase)}, {"alg": "BLAKE2b-256", "content": $b2}]' \
+    "$P/sbom-declared.cdx.json" > "$WORK/givenhash.cdx.json"
+B="$(new_bom givenhash)"
+rc="$(apply "$B" "$P" "$WORK/givenhash.cdx.json")"
+[ "$rc" = 0 ] && [ "$(comp "$B" media-daemon | jq -c '[.hashes[].alg]')" = '["MD5","SHA-1","BLAKE2b-256","SHA-512","SHA-256"]' ] \
+    && pass "MD5, SHA-1 (in capitals) and BLAKE2b-256 that match the file are kept with SHA-512 and SHA-256" \
+    || fail "matching declared hashes: exit $rc" "$(cat "$B.log")"
+P="$(new_project refuse-hash)"
+BASE="$(new_bom refuse-hash)"
+DECL="$P/sbom-declared.cdx.json"
+refused "a declared hash that does not match the file" \
+    "component 'media-daemon': the SHA-256 hash it gives does not match" \
+    "$(variant h1 '.components[0].hashes = [{"alg": "SHA-256", "content": "0000000000000000000000000000000000000000000000000000000000000000"}]')"
+grep -qF "component 'media-daemon': the SHA-256 hash it gives does not match out/bin/media-daemon (the file has " "$WORK/a declared hash that does not match the file.bom.json.log" \
+    && pass "the mismatch names the algorithm, the file and the value the file has" || fail "mismatch message" "$(cat "$WORK/a declared hash that does not match the file.bom.json.log")"
+refused "a declared hash this step cannot compute" \
+    "component 'media-daemon': gives a BLAKE3 hash, which cannot be computed here to check it against out/bin/media-daemon; remove it" \
+    "$(variant h2 '.components[0].hashes = [{"alg": "BLAKE3", "content": "0000000000000000000000000000000000000000000000000000000000000000"}]')"
+refused "hashes on a component of several files" \
+    "component 'media-daemon': gives hashes but has several bomlens:artifact files" \
+    "$(variant h3 '.components[0].properties += [{"name": "bomlens:artifact", "value": "out/bin/media-ctl.exe"}]
+                   | .components[0].hashes = [{"alg": "MD5", "content": "00000000000000000000000000000000"}]')"
+P="$(new_project refuse)"
+BASE="$WORK/refuse.bom.json"
+DECL="$P/sbom-declared.cdx.json"
+
 echo "== only CycloneDX component fields, in their CycloneDX shape, are taken =="
 refused "a field the declaration may not carry" \
     "component #1 'media-daemon': field 'evidence' is not read from a declaration file" \
@@ -472,8 +540,12 @@ SCAN_EXCLUDE_PATHS="vendor/legacy
 SCAN_EXCLUDE_PATHS="out/bi" refused "an exclude path that only shares a prefix is not blamed" \
     "bomlens:artifact 'out/bin/media-daemon' does not exist in the scan target" \
     "$P/sbom-declared.cdx.json"
-SCAN_EXCLUDE_PATHS="Out/BIN" refused "an exclude path is matched without regard to case" \
-    "bomlens:artifact 'out/bin/media-daemon' is under 'Out/BIN', which --exclude leaves out of the scan" \
+SCAN_EXCLUDE_PATHS="Out/BIN" refused "an exclude path that matches only without regard to case says so" \
+    "bomlens:artifact 'out/bin/media-daemon' does not exist in the scan target. It matches --exclude 'Out/BIN' if letter case is ignored, as it is on macOS and Windows" \
+    "$P/sbom-declared.cdx.json"
+SCAN_EXCLUDE_PATHS="Out/BIN
+out/bin" refused "an exact --exclude match wins over one that ignores case" \
+    "bomlens:artifact 'out/bin/media-daemon' is under 'out/bin', which --exclude leaves out of the scan" \
     "$P/sbom-declared.cdx.json"
 DECLARED_COMPONENTS_DEFAULT=1 refused "a missing build output in the default file points to --no-components" \
     "this file was read because it is at the scan target root, so pass --no-components to scan without it" \
@@ -497,6 +569,22 @@ bash "$LIB/validate-sbom.sh" "$WORK/multi-gap.json" "$WORK/multi-gap" x >/dev/nu
 [ "$(jq -r '.checks[] | select(.id == "component-filename") | .detail' "$WORK/multi-gap_conformance.json" 2>/dev/null)" = "0% (0/2)" ] \
     && pass "one file without a file name leaves the component without one" \
     || fail "partial children" "$(jq -c '.checks[] | select(.id == "component-filename")' "$WORK/multi-gap_conformance.json" 2>&1)"
+[ "$(jq -r '.checks[] | select(.id == "hash") | .detail' "$WORK/multi_conformance.json" 2>/dev/null)" = "50% (1/2)" ] \
+    && pass "the hash coverage row counts media-plugins by the hashes of its files" \
+    || fail "hash row" "$(jq -c '.checks[] | select(.id == "hash")' "$WORK/multi_conformance.json" 2>&1)"
+cisa_missing() {  # <conformance.json> <check id>
+    jq -c --arg id "$2" '[.checks[] | select(.id == $id) | .missing] | first' "$1" 2>/dev/null
+}
+[ "$(cisa_missing "$WORK/multi_conformance.json" cisa-component-hash-value)" = '["MediaSuite","zlib"]' ] \
+  && [ "$(cisa_missing "$WORK/multi_conformance.json" cisa-component-identifiers)" = '["MediaSuite"]' ] \
+    && pass "the CISA hash value and identifier rows count media-plugins by its files (the product and zlib have no hash)" \
+    || fail "CISA rows" "$(jq -c '[.checks[] | select(.id | startswith("cisa-component-h") or . == "cisa-component-identifiers") | {id, status, missing}]' "$WORK/multi_conformance.json" 2>&1)"
+jq '(.components[] | select(.name == "media-plugins") | .components[0].hashes) = []' "$WORK/multi.bom.json" > "$WORK/multi-nohash.json"
+bash "$LIB/validate-sbom.sh" "$WORK/multi-nohash.json" "$WORK/multi-nohash" x >/dev/null 2>&1
+[ "$(cisa_missing "$WORK/multi-nohash_conformance.json" cisa-component-hash-value)" = '["MediaSuite","zlib","media-plugins"]' ] \
+  && [ "$(jq -r '.checks[] | select(.id == "hash") | .detail' "$WORK/multi-nohash_conformance.json")" = "0% (0/2)" ] \
+    && pass "a file without a hash leaves its component without one in both rows" \
+    || fail "partial child hashes" "$(cisa_missing "$WORK/multi-nohash_conformance.json" cisa-component-hash-value)"
 
 echo "== SPDX 2.3 export keeps the declared components' checksums and files =="
 if command -v syft >/dev/null 2>&1; then
@@ -528,6 +616,19 @@ if command -v syft >/dev/null 2>&1; then
             && pass "$f: the SPDX file keeps unique ids, defined relationship ends and valid checksums" \
             || fail "$f: SPDX structure"
     done
+    # The conformance check of the SPDX file counts packages the way the
+    # CycloneDX check counts components: the FILE packages are not packages of
+    # their own, and media-plugins has checksums through them.
+    bash "$LIB/validate-sbom.sh" "$WORK/multi.spdx.json" "$WORK/multi-spdx" x >/dev/null 2>&1
+    spdx_total="$(jq '[.packages[] | select((.primaryPackagePurpose // "") != "FILE")] | length' "$WORK/multi.spdx.json")"
+    spdx_summed="$(jq '[.packages[] | select((.primaryPackagePurpose // "") != "FILE") | select((.checksums // []) | length > 0)] | length' "$WORK/multi.spdx.json")"
+    [ "$(jq -r '.checks[] | select(.id == "name-version") | .detail' "$WORK/multi-spdx_conformance.json" 2>/dev/null | cut -d/ -f2)" = "$spdx_total" ] \
+        && pass "the SPDX conformance check leaves the FILE packages out of the package count ($spdx_total)" \
+        || fail "SPDX package count" "$(jq -c '[.checks[] | select(.id == "name-version" or .id == "hash") | {id, detail}]' "$WORK/multi-spdx_conformance.json" 2>&1)"
+    [ "$(jq -r '.checks[] | select(.id == "hash") | .detail' "$WORK/multi-spdx_conformance.json" 2>/dev/null)" \
+        = "$(( (spdx_summed + 1) * 100 / spdx_total ))% ($((spdx_summed + 1))/$spdx_total)" ] \
+        && pass "the SPDX hash row counts media-plugins through the checksums of the files it contains" \
+        || fail "SPDX hash row" "$(jq -c '.checks[] | select(.id == "hash")' "$WORK/multi-spdx_conformance.json" 2>&1) summed=$spdx_summed total=$spdx_total"
     if command -v pyspdxtools >/dev/null 2>&1; then
         pyspdxtools -i "$WORK/multi.spdx.json" >/dev/null 2>&1 && pyspdxtools -i "$WORK/ok.spdx.json" >/dev/null 2>&1 \
             && pass "pyspdxtools validates both SPDX 2.3 files" || fail "pyspdxtools rejects an SPDX file" "$(pyspdxtools -i "$WORK/multi.spdx.json" 2>&1 | tail -5)"
@@ -686,6 +787,14 @@ out="$(bash "$SCRIPT" --project x --version 1 --no-components --components "$FIX
 [ "$rc" = 1 ] && printf '%s' "$out" | grep -qF "[ERROR] --no-components cannot be combined with --components" \
     && pass "--no-components and --components together are refused" || fail "--no-components with --components: exit $rc" "$out"
 grep -q '^  --no-components ' "$SCRIPT" && pass "--no-components is in the help" || fail "--no-components missing from the help"
+# An earlier run's _bom.refused.json is removed with the earlier SBOM, before
+# stage 1, so the check after stage 2 reads only this run's refusal.
+rm_line="$(grep -n '^rm -f "${OUTPUT_HOST_DIR}/${OUTPUT_FILE%_bom.json}_bom.refused.json"$' "$SCRIPT" | cut -d: -f1)"
+stage1_line="$(grep -n '^# Stage 1: produce SBOM' "$SCRIPT" | cut -d: -f1)"
+check_line="$(grep -n '_bom.refused.json" \]; then' "$SCRIPT" | cut -d: -f1)"
+[ -n "$rm_line" ] && [ -n "$stage1_line" ] && [ -n "$check_line" ] && [ "$rm_line" -lt "$stage1_line" ] && [ "$stage1_line" -lt "$check_line" ] \
+    && pass "a stale _bom.refused.json is removed before stage 1 and checked only after stage 2" \
+    || fail "stale refused SBOM: rm at '$rm_line', stage 1 at '$stage1_line', check at '$check_line'"
 body="$(extract_fn exclude_run)"
 if [ -z "$body" ]; then
     fail "could not lift exclude_run out of scan-sbom.sh"
