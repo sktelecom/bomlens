@@ -76,7 +76,7 @@ Each step also has `stage` (1 for the SBOM a language image generated before thi
 | `vendored` | identify open source copied into the sources (`--identify-vendored`) |
 | `suggest-vendored` | suggest that identification when a C/C++ project scanned near-empty |
 | `cocoapods` | add CocoaPods dependencies from `Podfile.lock` |
-| `stamp-metadata` | set the root component to the project name and version; the run stops if this fails |
+| `stamp-metadata` | set the root component to the project name and version; for an SBOM read from a Yocto build directory, give the image a bom-ref, the version when the build wrote none, the `--license` and an edge to every installed package; the run stops if this fails |
 | `declared-components` | a source scan: add the components listed in `--components` files or `sbom-declared.cdx.json`; a Yocto build: apply the `--components` files to the packages of each recipe named in `bomlens:yocto-recipe`; recorded only when there is a file to read, with the number of components marked `bomlens:declared` in `counts`; `failed` when a file is refused, with the reason in `detail`, and the run then exits 1 |
 | `docmeta` | record the document's author, tool and lifecycle phase |
 | `license-registry` | ask the package registry for missing licences and check a single strong-copyleft or non-commercial one (`--license-registry`); `counts` gives `candidates`, `filled`, `superseded`, `confirmed`, `no_answer`, `not_found`, `non_standard`, `lookup_failed`, `budget_reached` |

@@ -136,6 +136,8 @@ The web UI reads the same folder: pick it with the Directory input (mount it fir
 
 The conformance check report of a build directory scan measures the SBOM the scan writes (`<Project>_<Version>_bom.json`), which is the file to submit, rather than the build's own document. That SBOM records `bomlens:scanMode` `YOCTO`, and under `--conformance-profile skt-submission` it is judged the way a firmware scan is: it records the packages installed, not a dependency graph. A Yocto document passed to `--analyze` is judged as it was written.
 
+Because that SBOM is the scan's own, it is completed the way a generated SBOM is. `--sbom-author`, `--supplier` and `--license` (as `concluded`) are recorded, BomLens is listed as a tool with the `build` lifecycle phase, and the image keeps the name the build gave it but gets a `bom-ref`, the `--version` when the build wrote none, and a dependency on every installed package. A timestamp is written when the build gave none, as the manifests do not. With these three options the `bsi-tr-03183-2` rows for the SBOM creator, the dependency graph and the primary component can pass. A Yocto document passed to `--analyze` on its own is someone else's SBOM and none of this is applied to it.
+
 ### Your own recipes and vendor binaries
 
 The build records every package it installed, your in-house recipes and a chip vendor's binary recipes included, but nothing in it says which of them are yours or who supplied them. Say so in a declaration file and pass it with `--components`. A component names its recipe (PN, the recipe name without its version) in `bomlens:yocto-recipe`, not a file path, since the paths differ for every machine and work directory:
@@ -205,7 +207,7 @@ SPDX 2.2 is read, but with less in it. Yocto 4.0 (Kirkstone) and 5.0 (Scarthgap)
 
 Conformance checks that depend on PURL will fail. Yocto identifies packages with CPE rather than PURL, so PURL coverage and the checks derived from it cannot pass. The report says how many components carry a CPE instead, and the row cites the baselines — BSI TR-03183-2 and the US SBOM minimum elements — that accept either identifier. The verdict is the submission criteria's, not theirs: PURL is required here because the default vulnerability matching keys on it.
 
-Two more required checks behave differently on a Yocto image, for reasons in the document rather than in the tool. The top-level component fails for want of a version: bitbake writes the image package with a name and no `software_packageVersion` (measured on the reference `core-image-minimal`).
+Two more required checks behave differently on a Yocto image, for reasons in the document rather than in the tool. The top-level component fails for want of a version: bitbake writes the image package with a name and no `software_packageVersion` (measured on the reference `core-image-minimal`). Scanned from a build directory, the image takes `--version` instead.
 
 Uploads are capped at 100 MB. For scale, the reference `core-image-minimal` document is 15.8 MB with 35 installed packages. A build directory scanned with `--target` reads the file from disk, so the cap does not apply there.
 

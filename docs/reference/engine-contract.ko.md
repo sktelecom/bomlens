@@ -76,7 +76,7 @@ BomLens 이미지를 스캔 엔진으로 쓰는 프로그램은 모든 스캔이
 | `vendored` | 소스에 복사해 넣은 오픈소스 식별(`--identify-vendored`) |
 | `suggest-vendored` | C/C++ 프로젝트 스캔 결과가 거의 비었을 때 위 식별을 권함 |
 | `cocoapods` | `Podfile.lock`의 CocoaPods 의존성 추가 |
-| `stamp-metadata` | 루트 컴포넌트를 프로젝트 이름과 버전으로 지정. 실패하면 실행이 멈춤 |
+| `stamp-metadata` | 루트 컴포넌트를 프로젝트 이름과 버전으로 지정. Yocto 빌드 디렉터리에서 읽은 SBOM이면 이미지에 bom-ref, 빌드가 적지 않은 버전, `--license`, 설치된 모든 패키지로 가는 의존 관계를 넣음. 실패하면 실행이 멈춤 |
 | `declared-components` | 소스 스캔에서 `--components` 파일이나 `sbom-declared.cdx.json`에 적은 컴포넌트를 추가. Yocto 빌드에서는 `--components` 파일을 `bomlens:yocto-recipe`에 적은 레시피의 패키지에 적용. 읽을 파일이 있을 때만 기록하며, `bomlens:declared`로 표시된 컴포넌트 수를 `counts`에 적음. 파일을 거부하면 `failed`이고 이유를 `detail`에 적으며, 실행은 1로 끝남 |
 | `docmeta` | 문서 작성자, 도구, 수명 주기 단계 기록 |
 | `license-registry` | 패키지 레지스트리에서 빠진 라이선스를 조회하고, 하나뿐인 강한 카피레프트나 비상업 라이선스를 확인(`--license-registry`). `counts`에 `candidates`, `filled`, `superseded`, `confirmed`, `no_answer`, `not_found`, `non_standard`, `lookup_failed`, `budget_reached`를 기록 |
