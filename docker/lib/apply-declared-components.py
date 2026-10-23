@@ -65,9 +65,11 @@ The labels the user knows the files by (the paths given on the command line)
 come from DECLARED_COMPONENTS_LABELS, one per line in the order of the
 arguments; without it the path is used.
 
-Every component added here carries bomlens:declared = true. Components an
-earlier run added (that mark and a bomlens:origin value) are replaced, so
-applying the same files twice gives the same SBOM.
+Every component added here carries bomlens:declared = true. Any component
+of the input SBOM that carries a bomlens:declared property at all (what an
+earlier run added, or a component claiming the mark) is removed first, so
+applying the same files twice gives the same SBOM and every marked component
+afterwards is one this run wrote.
 
 Exit 0 when applied, 3 when a file is refused (every problem is printed, and
 the SBOM is left as it was), 1 when the SBOM itself cannot be read or written.
@@ -658,9 +660,16 @@ def distribution_reference(value):
 
 
 def is_declared(comp):
-    """A component an earlier run of this step added."""
-    return isinstance(comp, dict) and props(comp, MARK) == ["true"] \
-        and len(props(comp, ORIGIN)) == 1 and props(comp, ORIGIN)[0] in ORIGINS
+    """A component that carries this step's mark at all, with any value and
+    any number of times: one an earlier run added, or one that claims to be.
+    Either way it is taken out, so after this step every marked component in
+    the SBOM is one this run wrote (the first-party exemption of the
+    conformance check relies on that)."""
+    if not isinstance(comp, dict):
+        return False
+    properties = comp.get("properties")
+    return isinstance(properties, list) and any(
+        isinstance(p, dict) and p.get("name") == MARK for p in properties)
 
 
 def read_files(files, labels, root, given_root, product, product_version, existing_refs, existing_purls, problems):

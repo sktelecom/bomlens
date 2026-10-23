@@ -621,8 +621,7 @@ generate_sbom_cdxgen() {
 
 # Declare how complete this SBOM's dependency graph is, in CycloneDX's own
 # compositions.aggregate field (one document-level entry whose dependencies
-# names the primary component's bom-ref, when it has one; assemblies stay
-# empty). `complete` is used only when there is POSITIVE evidence
+# lists every bom-ref with a dependencies entry; assemblies stay empty). `complete` is used only when there is POSITIVE evidence
 # the graph is whole, never merely because nothing failed: an unresolved leaf
 # (e.g. one Maven coordinate cdxgen could not fetch) leaves no trace in the
 # SBOM or in any log, so "no failure seen" cannot mean "complete" (measured).
@@ -696,13 +695,16 @@ mark_compositions_aggregate() {
     esac
     [ -n "$aggregate" ] || return 0
     tmp="${file}.compositions.tmp"
-    # The entry names the graph its aggregate is about: the dependencies of the
-    # primary component (compositions[].dependencies), so a reader such as a
-    # BSI TR-03183-2 check sees the completeness stated for the dependency
-    # graph rather than for an unnamed set. The aggregate value is unchanged.
+    # compositions[].dependencies lists every bom-ref that has an entry in the
+    # dependencies array, and the aggregate is stated for each of them: it says
+    # how complete the dependsOn list of each listed component is, which is
+    # the claim this function makes, rather than leaving the set it applies to
+    # unnamed (a BSI TR-03183-2 check reads it per listed ref). The aggregate
+    # value itself is decided above and not changed here. Sorted, so the output
+    # stays byte-stable.
     if jq --arg agg "$aggregate" '
-        ((.metadata.component["bom-ref"] // "") | if type == "string" then . else "" end) as $root
-        | .compositions = [{aggregate: $agg} + (if $root != "" then {dependencies: [$root]} else {} end)]' \
+        ([ (.dependencies // [])[]? | objects | .ref | strings | select(length > 0) ] | unique) as $refs
+        | .compositions = [{aggregate: $agg} + (if ($refs | length) > 0 then {dependencies: $refs} else {} end)]' \
         "$file" > "$tmp" 2>/dev/null; then
         mv "$tmp" "$file"
     else
@@ -1625,6 +1627,8 @@ case "$SCAN_MODE" in
         # --license. Read the manifest here instead. An explicit --license still
         # wins, and a manifest we cannot read confidently yields nothing, which
         # leaves the check off rather than inventing a licence to compare against.
+        # Set only below, when the licence is read from the manifest.
+        unset PROJECT_LICENSE_FROM_MANIFEST
         if [ -z "${PROJECT_LICENSE:-}" ] && command -v python3 >/dev/null 2>&1; then
             _lic_src="${SOURCE_ROOT:-/src}"
             [ -d "$_lic_src" ] || _lic_src=""
@@ -1632,7 +1636,8 @@ case "$SCAN_MODE" in
                 _detected="$(python3 "$LIBDIR/detect-project-license.py" "$_lic_src" 2>/dev/null || true)"
                 if [ -n "$_detected" ]; then
                     PROJECT_LICENSE="$_detected"
-                    export PROJECT_LICENSE
+                    PROJECT_LICENSE_FROM_MANIFEST=1
+                    export PROJECT_LICENSE PROJECT_LICENSE_FROM_MANIFEST
                     echo "[license] outbound license read from the project manifest: $PROJECT_LICENSE"
                 fi
             fi

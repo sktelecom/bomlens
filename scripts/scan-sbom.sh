@@ -540,7 +540,7 @@ Options:
                          records the email as well.
   --supplier <supplier>  Supplier of the product this SBOM describes, as
                          "Name <https://...>" or "Name <email>" (recorded in
-                         metadata.component.supplier and metadata.supplier).
+                         metadata.component.supplier).
                          The bsi-tr-03183-2 profile needs it with a URL or email.
   --target <target>      Not set: source (current dir) | image name | file |
                          directory | .zip/.tar.gz archive (auto-extracted).

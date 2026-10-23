@@ -157,6 +157,21 @@ rc="$(apply "$B" "$P" "$P/sbom-declared.cdx.json")"
     && pass "a second run replaces what the first added, byte for byte" \
     || fail "second run: exit $rc" "$(diff "$WORK/once.json" "$B" | head -20)"
 
+echo "== a component of the input that carries the mark in any form is removed =="
+# Whatever value or count: after the step, every marked component is one it
+# wrote, which the conformance check's first-party exemption relies on.
+B="$(new_bom mark)"
+jq '.components += [
+      {"type": "library", "name": "twice", "version": "1", "properties": [{"name": "bomlens:origin", "value": "first-party"},
+         {"name": "bomlens:declared", "value": "true"}, {"name": "bomlens:declared", "value": "true"}]},
+      {"type": "library", "name": "false-mark", "version": "1", "properties": [{"name": "bomlens:declared", "value": "false"}]},
+      {"type": "library", "name": "two-origins", "version": "1", "properties": [{"name": "bomlens:origin", "value": "first-party"},
+         {"name": "bomlens:origin", "value": "first-party"}, {"name": "bomlens:declared", "value": "true"}]}]' "$B" > "$B.tmp" && mv "$B.tmp" "$B"
+rc="$(apply "$B" "$P" "$P/sbom-declared.cdx.json")"
+[ "$rc" = 0 ] && [ "$(jq -c '[.components[].name] | sort' "$B")" = '["media-ctl","media-daemon","vendor-hal","zlib"]' ] \
+    && pass "a duplicated, false or doubly-originated mark is removed with its component" \
+    || fail "marked input: exit $rc" "$(jq -c '[.components[].name]' "$B")"
+
 echo "== a component with several build outputs =="
 P="$(new_project multi)"
 B="$(new_bom multi)"
@@ -770,7 +785,7 @@ run_entry() {
     local name="$1" src="$2" out="$WORK/$1.out" rc=0
     shift 2
     mkdir -p "$out"
-    jq '.metadata.component.name = "project" | .metadata.component.version = "latest"' "$FIX/stage1-bom.json" > "$out/MediaSuite_3.1.0_bom.json"
+    jq '.metadata.component.name = "project" | .metadata.component.version = "latest"' "${RUN_ENTRY_INPUT:-$FIX/stage1-bom.json}" > "$out/MediaSuite_3.1.0_bom.json"
     ( cd "$out" && env PATH="$WORK/bin:$PATH" MODE=POSTPROCESS PROJECT_NAME=MediaSuite PROJECT_VERSION=3.1.0 \
         HOST_OUTPUT_DIR="$out" BOMLENS_LIBDIR="$LIB" BOMLENS_RUN_INPUT=MediaSuite_3.1.0_bom.json SOURCE_ROOT="$src" \
         UPLOAD_ENABLED=false GENERATE_SECURITY=false GENERATE_NOTICE=false DEEP_CVE=false SECURITY_ENRICH=false \
@@ -800,6 +815,24 @@ D="$(comp "$F" media-daemon)"
     && pass "the conformance check of the scan lists the two first-party programs as exempt from the PURL rows" \
     || fail "exemption through the pipeline" "$(jq -c '[.checks[] | select(.id == "purl" or .id == "first-party-exempt")]' "$O/MediaSuite_3.1.0_conformance.json" 2>&1)"
 
+# DECLARED_COMPONENTS_APPLIED in the caller's environment is not taken: with
+# no declaration read, a stage 1 SBOM that already carries marked first-party
+# components (as one a declaration step wrote, or one forged to look so) gets
+# no exemption.
+jq --argjson h "$(jq -c '[.components[] | select(.name == "media-daemon") | .hashes] | first' "$WORK/ok.bom.json")" \
+   '.components += [{"type": "application", "name": "forged", "version": "1", "bom-ref": "forged",
+       "supplier": {"name": "X", "url": ["https://x.example"]}, "hashes": $h,
+       "properties": [{"name": "bomlens:origin", "value": "first-party"}, {"name": "bomlens:declared", "value": "true"}]}]
+    | .dependencies[0].dependsOn += ["forged"] | .dependencies += [{"ref": "forged", "dependsOn": []}]' \
+    "$FIX/stage1-bom.json" > "$WORK/forged-stage1.json"
+P="$(new_project entry-forged)"
+rc="$(RUN_ENTRY_INPUT="$WORK/forged-stage1.json" run_entry e6 "$P" DECLARED_COMPONENTS_SKIP=1 DECLARED_COMPONENTS_APPLIED=1)"
+C6="$WORK/e6.out/MediaSuite_3.1.0_conformance.json"
+[ "$rc" = 0 ] && ! jq -e 'any(.checks[]; .id == "first-party-exempt")' "$C6" >/dev/null \
+  && jq -e '.checks[] | select(.id == "purl") | .missing | index("forged") != null' "$C6" >/dev/null \
+    && pass "DECLARED_COMPONENTS_APPLIED from the caller is ignored: a forged first-party component still needs a purl" \
+    || fail "forged exemption: exit $rc" "$(jq -c '[.checks[] | select(.id == "purl" or .id == "first-party-exempt")]' "$C6" 2>&1)"
+
 # bsi-tr-03183-2 through the pipeline: with the licences as LicenseRef-, a URL
 # for the HAL's supplier, and --sbom-author, --supplier and --license given as
 # a CLI scan passes them, the fixture passes on every required BSI row. The
@@ -816,9 +849,9 @@ F="$O/MediaSuite_3.1.0_bom.json"
 C5="$O/MediaSuite_3.1.0_conformance.json"
 [ "$rc" = 0 ] && [ "$(jq -r .result "$C5" 2>/dev/null)" = pass ] \
   && [ "$(jq -r '[.checks[] | select(.id | startswith("bsi-")) | select(.required) | .status] | unique | join(",")' "$C5")" = pass ] \
-  && [ "$(jq -cS '[.metadata.component.supplier, .metadata.supplier == .metadata.component.supplier, .metadata.component.licenses]' "$F")" \
-       = '[{"name":"Example Corp","url":["https://example.com"]},true,[{"license":{"acknowledgement":"concluded","id":"Apache-2.0"}}]]' ] \
-  && [ "$(jq -c --arg r "$(jq -r '.metadata.component["bom-ref"]' "$F")" '.compositions[0].dependencies == [$r]' "$F")" = true ] \
+  && [ "$(jq -cS '[.metadata.component.supplier, .metadata.supplier, .metadata.component.licenses]' "$F")" \
+       = '[{"name":"Example Corp","url":["https://example.com"]},null,[{"license":{"acknowledgement":"concluded","id":"Apache-2.0"}}]]' ] \
+  && [ "$(jq -c '.compositions[0].dependencies == ([.dependencies[].ref] | unique)' "$F")" = true ] \
     && pass "the fixture passes bsi-tr-03183-2 through the pipeline with --supplier, --sbom-author and --license" \
     || fail "bsi through the pipeline: exit $rc" "$(jq -c '[.result, (.checks[] | select(.required and .status != "pass") | [.id, .detail, .missing])]' "$C5" 2>&1) $(jq -c '[.metadata.component["bom-ref"], .metadata.supplier, .metadata.component.licenses, .compositions]' "$F" 2>&1)"
 

@@ -239,8 +239,8 @@ PCT_DEF='def pct($n;$d): if $d==0 then 0 else (($n*100/$d)|floor) end;'
 #
 # Those properties are only words in a JSON file, so the exemption is granted
 # only where this pipeline wrote them: the component carries the mark
-# apply-declared-components.py sets (bomlens:declared = true), that step ran in
-# this very scan (entrypoint.sh exports DECLARED_COMPONENTS_APPLIED=1 after it
+# apply-declared-components.py sets (bomlens:declared = true, exactly once, with
+# exactly one bomlens:origin), that step ran in this very scan (entrypoint.sh exports DECLARED_COMPONENTS_APPLIED=1 after it
 # succeeds; it replaces any marked component the input carried), and the SBOM
 # is not a received one (MODE ANALYZE). The SHA-512 must be a SHA-512: 128 hex
 # digits. The components exempted are listed on their own advisory row.
@@ -253,8 +253,10 @@ fi
 FP_EXEMPT_DEF='def fp_sha512: (.hashes // []) | if type == "array" then . else [] end
         | any(type == "object" and .alg == "SHA-512" and ((.content // "") | type == "string" and test("^[0-9a-fA-F]{128}$")));
     def first_party_exempt: $fpOn
-        and ((.properties // []) | if type == "array" then . else [] end | any(.name? == "bomlens:origin" and .value == "first-party"))
-        and ((.properties // []) | if type == "array" then . else [] end | any(.name? == "bomlens:declared" and .value == "true"))
+        and ([ (.properties // []) | if type == "array" then .[] else empty end
+               | select(type == "object" and .name == "bomlens:origin") | .value ] == ["first-party"])
+        and ([ (.properties // []) | if type == "array" then .[] else empty end
+               | select(type == "object" and .name == "bomlens:declared") | .value ] == ["true"])
         and ((.supplier // {}) | if type == "object" then ((.name // "") != "") or (((.url // []) | length) > 0) else false end)
         and (fp_sha512 or ([ (.components // [])[]? | select(.type? == "file") ] as $k
                            | ($k | length) > 0 and all($k[]; fp_sha512)));'
@@ -927,8 +929,8 @@ bsi_checks() {
          detail_ko: (if ($top_all | length) == 0 then "충족" else "누락: " + ($top_all | map($gap_ko[.] // .) | join(", ")) end),
          missing: (if ($top_all | length) == 0 then [] else [ ($top | clabel) + ": " + ($top_all | join(", ")) ] end)}
         + (if ($top_gaps | length) == 0 then {} else {reviewGuide: guide(
-            "The product is metadata.component. Scan again with --supplier \"Example Corp <https://example.com>\" (or an email in the brackets) for its creator, and --license for its distribution licence, which BomLens writes as \"acknowledgement\": \"concluded\".";
-            "제품은 metadata.component입니다. 제작자는 --supplier \"Example Corp <https://example.com>\" 옵션(괄호 안에 이메일도 가능)으로, 배포 라이선스는 --license 옵션으로 다시 스캔해 기록합니다. BomLens는 이 라이선스를 \"acknowledgement\": \"concluded\"로 기록합니다.")} end)),
+            "The product is metadata.component. Scan again with --supplier \"Example Corp <https://example.com>\" (or an email in the brackets) for its creator, and --license for its distribution licence. A licence given with --license replaces the one the generator or the project manifest supplied and is written as \"acknowledgement\": \"concluded\"; without --license, the licence read from the scan stays as it is, which is not a concluded one.";
+            "제품은 metadata.component입니다. 제작자는 --supplier \"Example Corp <https://example.com>\" 옵션(괄호 안에 이메일도 가능)으로, 배포 라이선스는 --license 옵션으로 다시 스캔해 기록합니다. --license로 준 라이선스는 생성 도구나 프로젝트 매니페스트가 정한 라이선스를 대신하며 \"acknowledgement\": \"concluded\"로 기록됩니다. --license가 없으면 스캔에서 읽은 라이선스를 그대로 두며, 이는 concluded 라이선스가 아닙니다.")} end)),
        {id: "bsi-primary-component-file", label: "Primary component: filename, SHA-512 and file properties (advisory when it names no file of its own)",
         label_ko: "최상위 구성요소: 파일 이름, SHA-512, 파일 속성 (자체 파일을 지정하지 않으면 권고)", required: false,
         source: (if $top_file then "na" else "auto" end),

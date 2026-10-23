@@ -261,20 +261,45 @@ SBOM_AUTHOR="Example Corp <sbom team>" bash "$LIB/stamp-document-metadata.sh" "$
     && pass "an author written as Name <email> is recorded with its email" \
     || fail "author email" "$(jq -c '.metadata.authors' "$WORK/doc-auth-mail.json" "$WORK/doc-auth-nomail.json")"
 # --supplier (PRODUCT_SUPPLIER): the product's supplier, with a URL or an
-# email, on metadata.component.supplier and metadata.supplier.
-sup_case() {  # <name> <value>: prints the supplier written, then whether both places agree
+# email, on metadata.component.supplier only. metadata.supplier is left alone:
+# the SBOM-author rows read it.
+sup_case() {  # <name> <value>: prints the product supplier written, then metadata.supplier
     printf '%s' "$DOC" > "$WORK/doc-sup-$1.json"
     PRODUCT_SUPPLIER="$2" bash "$LIB/stamp-document-metadata.sh" "$WORK/doc-sup-$1.json" SOURCE > /dev/null 2> "$WORK/doc-sup-$1.err"
-    jq -c '[.metadata.supplier, (.metadata.component.supplier == .metadata.supplier)]' "$WORK/doc-sup-$1.json"
+    jq -c '[.metadata.component.supplier, .metadata.supplier]' "$WORK/doc-sup-$1.json"
 }
-[ "$(sup_case url 'Example Corp <https://example.com>')" = '[{"name":"Example Corp","url":["https://example.com"]},true]' ] \
-  && [ "$(sup_case mail ' Example Corp <oss@example.com> ')" = '[{"name":"Example Corp","contact":[{"email":"oss@example.com"}]},true]' ] \
-  && [ "$(sup_case bare 'Example Corp')" = '[{"name":"Example Corp"},true]' ] \
+[ "$(sup_case url 'Example Corp <https://example.com>')" = '[{"name":"Example Corp","url":["https://example.com"]},null]' ] \
+  && [ "$(sup_case mail ' Example Corp <oss@example.com> ')" = '[{"name":"Example Corp","contact":[{"email":"oss@example.com"}]},null]' ] \
+  && [ "$(sup_case bare 'Example Corp')" = '[{"name":"Example Corp"},null]' ] \
   && grep -q 'gives no URL or email' "$WORK/doc-sup-bare.err" \
-  && [ "$(sup_case ftp 'Example Corp <ftp://example.com>')" = '[{"name":"Example Corp <ftp://example.com>"},true]' ] \
-  && [ "$(sup_case none '')" = '[null,true]' ] \
-    && pass "--supplier writes the product supplier with its URL or email; a bare name is kept and warned about" \
-    || fail "product supplier" "$(for c in url mail bare ftp none; do cat "$WORK/doc-sup-$c.json" | jq -c '.metadata.supplier'; done)"
+  && [ "$(sup_case ftp 'Example Corp <ftp://example.com>')" = '[{"name":"Example Corp <ftp://example.com>"},null]' ] \
+  && [ "$(sup_case nameless-url '<https://example.com>')" = '[{"url":["https://example.com"]},null]' ] \
+  && [ "$(sup_case nameless-mail ' <oss@example.com>')" = '[{"contact":[{"email":"oss@example.com"}]},null]' ] \
+  && [ "$(sup_case none '')" = '[null,null]' ] \
+  && [ "$(sup_case blank '   ')" = '[null,null]' ] && [ ! -s "$WORK/doc-sup-blank.err" ] \
+    && pass "--supplier writes the product supplier only, with its URL or email (a name is optional); a bare name warns; blank writes nothing" \
+    || fail "product supplier" "$(for c in url mail bare ftp nameless-url nameless-mail none blank; do jq -c '[.metadata.component.supplier, .metadata.supplier]' "$WORK/doc-sup-$c.json"; done)"
+# The SBOM-author rows are not satisfied by the product supplier.
+bash "$LIB/validate-sbom.sh" "$WORK/doc-sup-none.json" "$WORK/doc-sup-none" x >/dev/null 2>&1
+bash "$LIB/validate-sbom.sh" "$WORK/doc-sup-url.json" "$WORK/doc-sup-url" x >/dev/null 2>&1
+[ "$(jq -c '[.checks[] | select(.id == "cisa-sbom-author") | .status]' "$WORK/doc-sup-url_conformance.json")" \
+    = "$(jq -c '[.checks[] | select(.id == "cisa-sbom-author") | .status]' "$WORK/doc-sup-none_conformance.json")" ] \
+  && [ "$(jq -r '.checks[] | select(.id == "cisa-sbom-author") | .status' "$WORK/doc-sup-url_conformance.json")" != pass ] \
+    && pass "--supplier alone does not satisfy the SBOM-author row" \
+    || fail "author row with --supplier" "$(jq -c '.checks[] | select(.id == "cisa-sbom-author")' "$WORK/doc-sup-url_conformance.json")"
+# --license given explicitly replaces a root licence the generator read and is
+# concluded; one read from the manifest only fills an empty value, as declared.
+printf '%s' "$DOC" | jq '.metadata.component = {"type": "application", "name": "x", "version": "1", "licenses": [{"license": {"id": "MIT"}}]}' > "$WORK/lic-mit.json"
+cp "$WORK/lic-mit.json" "$WORK/lic-explicit.json"; cp "$WORK/lic-mit.json" "$WORK/lic-manifest.json"
+printf '%s' "$DOC" | jq '.metadata.component = {"type": "application", "name": "x", "version": "1"}' > "$WORK/lic-empty.json"
+PROJECT_LICENSE=Apache-2.0 bash "$LIB/stamp-metadata.sh" "$WORK/lic-explicit.json" x 1 >/dev/null 2>&1
+PROJECT_LICENSE=Apache-2.0 PROJECT_LICENSE_FROM_MANIFEST=1 bash "$LIB/stamp-metadata.sh" "$WORK/lic-manifest.json" x 1 >/dev/null 2>&1
+PROJECT_LICENSE=Apache-2.0 PROJECT_LICENSE_FROM_MANIFEST=1 bash "$LIB/stamp-metadata.sh" "$WORK/lic-empty.json" x 1 >/dev/null 2>&1
+[ "$(jq -c '.metadata.component.licenses' "$WORK/lic-explicit.json")" = '[{"license":{"id":"Apache-2.0","acknowledgement":"concluded"}}]' ] \
+  && [ "$(jq -c '.metadata.component.licenses' "$WORK/lic-manifest.json")" = '[{"license":{"id":"MIT"}}]' ] \
+  && [ "$(jq -c '.metadata.component.licenses' "$WORK/lic-empty.json")" = '[{"license":{"id":"Apache-2.0","acknowledgement":"declared"}}]' ] \
+    && pass "--license replaces a generator's MIT root licence as concluded; a manifest licence leaves it and fills only an empty one, as declared" \
+    || fail "root licence" "$(jq -c '.metadata.component.licenses' "$WORK/lic-explicit.json" "$WORK/lic-manifest.json" "$WORK/lic-empty.json")"
 # Running twice must not append a second BomLens entry (the pipeline may restamp).
 BOMLENS_VERSION=9.9.9 bash "$LIB/stamp-document-metadata.sh" "$WORK/doc-auth.json" FIRMWARE >/dev/null 2>&1
 dcount=$(jq '[.metadata.tools.components[] | select(.name=="BomLens")] | length' "$WORK/doc-auth.json")
@@ -3800,6 +3825,15 @@ jq '(.components[] | select(.name == "fw-tool") | .properties) |= map(select(.na
   && [ "$(bsi_row "$WORK/fpx2" purl)" = "fail|true|multi" ] \
     && pass "the exemption needs the declaration step in this scan, no --analyze, its mark, a 128-digit SHA-512 and a first-party component" \
     || fail "first-party exemption limits" "$(bsi_row "$WORK/fpn1" no-generic) / $(bsi_row "$WORK/fpn2" no-generic) / $(bsi_row "$WORK/fpx2" no-generic) / $(bsi_row "$WORK/fpx2" purl)"
+# A mark or an origin given twice is not the one the declaration step writes.
+jq '(.components[] | select(.name == "fw-tool") | .properties) += [{name: "bomlens:declared", value: "true"}]
+    | (.components[] | select(.name == "multi") | .properties) += [{name: "bomlens:origin", value: "first-party"}]' \
+    "$WORK/bsi.json" > "$WORK/fpdup.json"; fp_run "$WORK/fpdup.json" "$WORK/fpdup"
+[ "$(bsi_row "$WORK/fpdup" no-generic)" = "fail|true|yocto-pkg;fw-tool" ] \
+  && [ "$(bsi_row "$WORK/fpdup" purl)" = "fail|true|multi;hal" ] \
+  && ! jq -e 'any(.checks[]; .id == "first-party-exempt")' "$WORK/fpdup_conformance.json" >/dev/null \
+    && pass "a duplicated bomlens:declared or bomlens:origin property gets no exemption" \
+    || fail "duplicate properties" "$(bsi_row "$WORK/fpdup" no-generic) / $(bsi_row "$WORK/fpdup" purl)"
 fp_run "$WORK/bsi.json" "$WORK/fpx3" default
 jq -e '.checks[] | select(.id == "purl") | .detail | endswith("2 first-party component(s) identified by supplier and SHA-512 instead")' "$WORK/fpx3_conformance.json" >/dev/null \
     && pass "the default profile applies the same exemption" || fail "default exemption" "$(bsi_row "$WORK/fpx3" purl)"
@@ -11005,15 +11039,15 @@ JSON
         && pass "ANALYZE with no compositions of its own declares unknown" \
         || fail "expected unknown" "$(mca_agg "$WORK/mca-analyze-none.json")"
 
-    # The entry names the graph its aggregate is about: the primary
-    # component's dependencies. With no bom-ref there is nothing to name.
-    jq '.metadata.component = {"type": "application", "name": "p", "version": "1", "bom-ref": "root"}' \
-        "$WORK/mca-analyze-none.json" > "$WORK/mca-root.json"
-    jq 'del(.compositions)' "$WORK/mca-root.json" > "$WORK/mca-root.tmp" && mv "$WORK/mca-root.tmp" "$WORK/mca-root.json"
+    # The entry lists every bom-ref that has a dependencies entry, sorted:
+    # the aggregate is stated for each of them. With no entries it lists none.
+    jq '.metadata.component = {"type": "application", "name": "p", "version": "1", "bom-ref": "root"}
+        | .dependencies = [{"ref": "root", "dependsOn": ["b", "a"]}, {"ref": "b", "dependsOn": []}, {"ref": "a", "dependsOn": []}]
+        | del(.compositions)' "$WORK/mca-analyze-none.json" > "$WORK/mca-root.json"
     SCAN_MODE=SOURCE mark_compositions_aggregate "$WORK/mca-root.json"
-    [ "$(jq -c '.compositions' "$WORK/mca-root.json")" = '[{"aggregate":"unknown","dependencies":["root"]}]' ] \
+    [ "$(jq -c '.compositions' "$WORK/mca-root.json")" = '[{"aggregate":"unknown","dependencies":["a","b","root"]}]' ] \
       && [ "$(jq -c '.compositions' "$WORK/mca-analyze-none.json")" = '[{"aggregate":"unknown"}]' ] \
-        && pass "compositions names the primary component's dependencies when it has a bom-ref, with the aggregate unchanged" \
+        && pass "compositions lists every ref with a dependencies entry, with the aggregate unchanged" \
         || fail "compositions dependencies" "$(jq -c '.compositions' "$WORK/mca-root.json" "$WORK/mca-analyze-none.json")"
 
     # --byte-stable determinism: compositions is written AFTER normalize --stable
