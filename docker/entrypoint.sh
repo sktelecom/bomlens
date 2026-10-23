@@ -1667,6 +1667,24 @@ case "$SCAN_MODE" in
         esac
         er_phase_end
         ;;
+    ANALYZE)
+        # An SBOM read from a Yocto build directory the user pointed at is one
+        # this scan generates, not one it received: YOCTO_FROM_BUILD is set by
+        # scan-sbom.sh and server.py only when they found the document (or the
+        # manifests) in a build directory, and YOCTO_SBOM only when a Yocto
+        # reader wrote the SBOM. Its image root gets a bom-ref, the --version
+        # when the build wrote none, the --license as concluded, and an edge to
+        # every installed package (stamp-yocto-root.sh). A document passed
+        # with --analyze on its own sets no YOCTO_FROM_BUILD and is left as
+        # its author wrote it. Before the declared-components step, so a
+        # declared component is linked from this same root.
+        if [ "$YOCTO_SBOM" = true ] && [ "$YOCTO_FROM_BUILD" = true ]; then
+            er_phase stamp-metadata
+            bash "$LIBDIR/stamp-yocto-root.sh" "$OUTPUT_FILE"
+            er_record stamp-metadata ok "" "" "$ER_PHASE_STARTED"
+            er_phase_end
+        fi
+        ;;
 esac
 
 # Components a declaration file lists: what a source scan cannot find, such as
@@ -1801,6 +1819,13 @@ case "$SCAN_MODE" in
         ;;
     SOURCE|POSTPROCESS|ROOTFS|IMAGE|AIBOM|DATASET|AIDECLARE|MERGE)
         run_optional_step docmeta bash "$LIBDIR/stamp-document-metadata.sh" "$OUTPUT_FILE" "$SCAN_MODE"
+        ;;
+    ANALYZE)
+        # Only the SBOM this scan generated from a Yocto build directory (see
+        # stamp-yocto-root.sh above); a received SBOM keeps its own authorship.
+        if [ "$YOCTO_SBOM" = true ] && [ "$YOCTO_FROM_BUILD" = true ]; then
+            run_optional_step docmeta bash "$LIBDIR/stamp-document-metadata.sh" "$OUTPUT_FILE" YOCTO
+        fi
         ;;
 esac
 

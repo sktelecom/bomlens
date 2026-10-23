@@ -48,7 +48,6 @@
    "spdxId": "urn:pkg:image",
    "creationInfo": "_:ci",
    "name": "example-image",
-   "software_packageVersion": "1.0",
    "software_primaryPurpose": "archive"
   },
   {

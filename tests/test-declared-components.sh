@@ -1151,7 +1151,9 @@ run_yocto() {
         ENRICH_EOL=false ENRICH_MALICIOUS=false ENRICH_STALENESS=false LICENSE_REGISTRY=false "$@" bash "$ENTRY" ) > "$out.log" 2>&1 || rc=$?
     printf '%s' "$rc"
 }
-YBSI=(CONFORMANCE_PROFILE=bsi-tr-03183-2 SBOM_AUTHOR="Example Corp <sbom@example.com>")
+# What a supplier passes for BSI TR-03183-2: --sbom-author, --supplier, --license.
+YBSI=(CONFORMANCE_PROFILE=bsi-tr-03183-2 SBOM_AUTHOR="Example Corp <sbom@example.com>"
+      PRODUCT_SUPPLIER="Example Corp <https://example.com>" PROJECT_LICENSE=LicenseRef-ExampleCorp-Proprietary)
 for shape in 5x 6x manifests; do
     rc="$(run_yocto "ye$shape" "$shape" DECLARED_COMPONENTS_FILES="$YDECL" DECLARED_COMPONENTS_LABELS=sbom-declared.cdx.json "${YBSI[@]}")"
     O="$WORK/ye$shape.out"
@@ -1184,6 +1186,42 @@ for shape in 5x 6x manifests; do
         && pass "$shape: no declared-component BSI row fails" \
         || fail "$shape failing declared rows" "$(jq -c '[.checks[] | select(.id | startswith("bsi-declared")) | select(.status == "fail") | [.id, .missing]]' "$WORK/ye$shape.out/ExampleImage_1.0_conformance.json")"
 done
+
+echo "== Yocto: an SBOM read from a build directory is stamped as a generated one =="
+# YOCTO_FROM_BUILD (the CLI and the web server set it only for a document or
+# manifests found in a build directory): the SBOM is this scan's, so its
+# document metadata and image root are completed, and with --sbom-author,
+# --supplier and --license every required BSI row passes.
+for shape in 6x manifests; do
+    C="$WORK/ye$shape.out/ExampleImage_1.0_conformance.json"
+    [ "$(jq -r .result "$C")" = pass ] \
+      && [ "$(jq -r '[.checks[] | select(.required and .status == "fail") | .id] | join(",")' "$C")" = "" ] \
+      && [ "$(jq -r '[.checks[] | select(.id == "bsi-sbom-creator" or .id == "bsi-dependency-graph" or .id == "bsi-primary-component") | .status] | join(",")' "$C")" = "pass,pass,pass" ] \
+        && pass "$shape: bsi-tr-03183-2 passes, with the SBOM creator, the dependency graph and the primary component met" \
+        || fail "$shape bsi result" "$(jq -c '[.result, (.checks[] | select(.required and .status != "pass") | [.id, .status, .detail])]' "$C")"
+done
+F="$WORK/ye6x.out/ExampleImage_1.0_bom.json"
+[ "$(jq -c '.metadata | [.component["bom-ref"], .component.name, .component.version, .component.supplier.url[0], .component.licenses[0].license.name, .component.licenses[0].license.acknowledgement, .authors[0].email, .lifecycles[0].phase, ([.tools.components[].name] | index("BomLens") != null), .timestamp]' "$F")" \
+    = '["yocto-image:example-image@1.0","example-image","1.0","https://example.com","LicenseRef-ExampleCorp-Proprietary","concluded","sbom@example.com","build",true,"2026-10-01T00:00:00Z"]' ] \
+    && pass "6x: the image keeps its name and gets a bom-ref, the --version, --supplier and --license (concluded); the document gets the author, BomLens and the build phase, and keeps the build's creation time" \
+    || fail "6x stamped metadata" "$(jq -c .metadata "$F")"
+[ "$(jq -c '.metadata.component["bom-ref"] as $r | [.dependencies[] | select(.ref == $r) | .dependsOn | sort] | first' "$F")" = "$(jq -c '[.components[]["bom-ref"]] | sort' "$F")" ] \
+  && [ "$(jq -c "$UNREACHED" "$F")" = "[]" ] \
+    && pass "6x: the image depends on every installed package, so the graph reaches them all" \
+    || fail "6x root edges" "$(jq -c '.dependencies' "$F")"
+FM="$WORK/yemanifests.out/ExampleImage_1.0_bom.json"
+[ "$(jq -r '.metadata.timestamp // "" | test("^20[0-9][0-9]-")' "$FM")" = true ] && [ "$(jq -c "$UNREACHED" "$FM")" = "[]" ] \
+    && pass "manifests: a timestamp is written (the manifests carry none) and the graph reaches every package" \
+    || fail "manifests stamped" "$(jq -c '[.metadata.timestamp, .metadata.component]' "$FM")"
+# The same document passed with --analyze on its own is someone else's SBOM:
+# none of it is stamped, whatever options are given.
+rc="$(run_yocto yerecv 6x YOCTO_FROM_BUILD=false "${YBSI[@]}")"
+FR="$WORK/yerecv.out/ExampleImage_1.0_bom.json"
+[ "$rc" = 0 ] && [ "$(jq -c '.metadata | [.component["bom-ref"], .component.version, .component.supplier, .component.licenses, .authors, .lifecycles, ([(.tools.components // [])[].name] | index("BomLens"))]' "$FR")" = '[null,null,null,null,null,null,null]' ] \
+  && [ "$(jq -r '.metadata.component as $m | [.dependencies[]? | select(.ref == ($m["bom-ref"] // "-"))] | length' "$FR")" = 0 ] \
+  && ! grep -qF "[yocto-root]" "$WORK/yerecv.out.log" && ! grep -qF "[docmeta]" "$WORK/yerecv.out.log" \
+    && pass "a Yocto document passed with --analyze (not from a build directory) is not stamped" \
+    || fail "received document: exit $rc" "$(jq -c .metadata "$FR" 2>&1; grep -E 'yocto-root|docmeta' "$WORK/yerecv.out.log")"
 # skt-submission: the first-party exemption from the PURL rows needs a
 # supplier and a SHA-512, which a 6.1 build gives every file; on 5.x the
 # in-house packages keep needing a purl, and the vendor's never get it.

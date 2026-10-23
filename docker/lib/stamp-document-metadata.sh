@@ -16,7 +16,10 @@
 #
 # Not called for ANALYZE. That mode converts a supplier's own SBOM, and the
 # supplier authored the data — stamping our name onto the conversion would claim
-# authorship of a document we only reformatted. MERGE is different and IS stamped:
+# authorship of a document we only reformatted. The one exception is an SBOM
+# read from a Yocto build directory the user pointed at, which this scan
+# generates from the build's records: entrypoint.sh calls this with MODE=YOCTO
+# for it, and never for a Yocto document passed with --analyze on its own. MERGE is different and IS stamped:
 # merge-sbom.sh writes a new document, and it already records itself as the tool
 # that produced it.
 set -e
@@ -71,6 +74,8 @@ case "$MODE" in
     ROOTFS|IMAGE|BINARY|FIRMWARE|AIBOM|MODELFILE) LIFECYCLE="post-build" ;;
     MERGE|DATASET)                      LIFECYCLE="" ;;
     AIDECLARE)                          LIFECYCLE="design" ;;
+    # Read from what the Yocto build recorded while it built the image.
+    YOCTO)                              LIFECYCLE="build" ;;
     *)
         echo "[docmeta] WARN: no lifecycle phase defined for MODE=$MODE; leaving it unset." >&2
         ;;
@@ -123,7 +128,8 @@ fi
 # generator wrote there: the caller said who it is. metadata.supplier is left
 # alone, because the SBOM-author checks read it and the product's supplier is
 # not the SBOM's author. A value that is empty after trimming writes nothing.
-# ANALYZE never reaches this file, so a received SBOM's supplier is kept.
+# ANALYZE never reaches this file (a Yocto build directory comes as YOCTO), so
+# a received SBOM's supplier is kept.
 PRODUCT_SUPPLIER="${PRODUCT_SUPPLIER:-}"
 SUPPLIER_JSON="null"
 if [ -n "$PRODUCT_SUPPLIER" ]; then
