@@ -48,6 +48,7 @@ const UPLOAD_LABEL: Record<UploadKind, string> = {
 const CONFORMANCE_PROFILE_LABEL_KEY: Record<ConformanceProfile, string> = {
   default: "options.conformanceProfileDefault",
   "skt-submission": "options.conformanceProfileSktSubmission",
+  "bsi-tr-03183-2": "options.conformanceProfileBsi",
 };
 
 /** Red asterisk marking a required field; hidden from AT — the input itself

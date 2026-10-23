@@ -807,11 +807,12 @@ export const USAGE_CONTEXTS: UsageContext[] = [
  *  submission review (100% PURL, pkg:generic required). Kept as a named
  *  profile rather than a boolean so a later addition (e.g. an EU CRA
  *  profile) is a third option here, not a rewrite of the contract. */
-export type ConformanceProfile = "default" | "skt-submission";
+export type ConformanceProfile = "default" | "skt-submission" | "bsi-tr-03183-2";
 
 export const CONFORMANCE_PROFILES: ConformanceProfile[] = [
   "default",
   "skt-submission",
+  "bsi-tr-03183-2",
 ];
 
 /** CycloneDX version the scan writes the SBOM as (the CLI's --spec-version).

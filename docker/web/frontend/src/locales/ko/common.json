@@ -110,6 +110,7 @@
     "conformanceProfileAnalyzeHint": "제출 전 점검용 문서 검사라 여기서는 SKT 제출 기준이 기본값입니다.",
     "conformanceProfileDefault": "기본 (PURL 포함률 90%, pkg:generic 권고)",
     "conformanceProfileSktSubmission": "SKT 제출 기준 (PURL 포함률 100%, pkg:generic 필수)",
+    "conformanceProfileBsi": "BSI TR-03183-2 (독일, 선언된 구성요소에 BSI 필드 필수)",
     "upload": "서버로 업로드",
     "uploadHint": "스캔 후 생성된 SBOM을 Dependency-Track 또는 TRUSCA 서버로 보냅니다. 서버 주소와 토큰은 이 실행에만 쓰이고 저장하지 않습니다.",
     "outboundLicense": "배포 라이선스 (선택)",

@@ -110,6 +110,7 @@
     "conformanceProfileAnalyzeHint": "SKT submission is the default here because this scans a document for the submission review.",
     "conformanceProfileDefault": "Default (90% PURL coverage, pkg:generic advisory)",
     "conformanceProfileSktSubmission": "SKT submission (100% PURL coverage, pkg:generic required)",
+    "conformanceProfileBsi": "BSI TR-03183-2 (Germany, BSI fields required on declared components)",
     "upload": "Upload to a server",
     "uploadHint": "Send the generated SBOM to a Dependency-Track or TRUSCA server after the scan. The server URL and token are used for this run only and never stored.",
     "outboundLicense": "Outbound license (optional)",

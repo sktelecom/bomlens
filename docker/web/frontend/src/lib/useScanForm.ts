@@ -10,6 +10,7 @@
 import { type Dispatch, type SetStateAction, useEffect, useState } from "react";
 
 import {
+  CONFORMANCE_PROFILES,
   describeUploadError,
   formSourceOf,
   stashGitCred,
@@ -255,11 +256,13 @@ export function useScanForm({
   // an explicit choice. A named profile (not a boolean) so a later addition
   // (an EU CRA profile, say) is a third option, not a contract rewrite.
   const [conformanceProfile, setConformanceProfile] = useState<ConformanceProfile>(
-    () => (initialConfig?.conformanceProfile === "skt-submission"
-      ? "skt-submission"
-      : initialConfig?.conformanceProfile === "default"
-        ? "default"
-        : isAnalyze ? "skt-submission" : "default"),
+    () => {
+      const seeded = initialConfig?.conformanceProfile;
+      if (seeded && (CONFORMANCE_PROFILES as string[]).includes(seeded)) {
+        return seeded as ConformanceProfile;
+      }
+      return isAnalyze ? "skt-submission" : "default";
+    },
   );
   // AI-model scans have no source tree and no package CVEs, so the security
   // report (Trivy → 0 results) and deep-license (needs /src) don't apply. True
