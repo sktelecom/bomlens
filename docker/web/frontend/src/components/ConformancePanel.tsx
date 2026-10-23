@@ -154,7 +154,7 @@ function CrosswalkBlock({
 
 // Provenance badge: where a satisfied value comes from. Reuses existing badge
 // tones (no invented colours); the word carries the meaning, colour only backs
-// it. "na" (no automated source) takes the review-needed tone.
+// it. "na" (no automated source) says "Needs a person" in that chip's tone.
 // A met element whose source is "declared" holds the publisher's declaration
 // (a declared service, for instance), which the tool did not check: it says so
 // rather than reading as something still to declare.
@@ -426,8 +426,12 @@ export function CheckGroup({
 }) {
   const { t } = useTranslation();
   if (checks.length === 0) return null;
-  const met = foldMet ? checks.filter((c) => checkKind(c) === "pass") : [];
-  const rest = foldMet ? checks.filter((c) => checkKind(c) !== "pass") : checks;
+  // A group of met checks only is already closed; folding them a second time
+  // inside it would take two clicks to see anything.
+  const pass = checks.filter((c) => checkKind(c) === "pass");
+  const split = foldMet && pass.length > 0 && pass.length < checks.length;
+  const met = split ? pass : [];
+  const rest = split ? checks.filter((c) => checkKind(c) !== "pass") : checks;
   return (
     <Disclosure
       defaultOpen={defaultOpen}

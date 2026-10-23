@@ -928,10 +928,9 @@
       "noLicense": "No license declared ({{verdict}})",
       "notInRegistry": "License {{license}}: not in the license-terms registry ({{verdict}})",
       "licenseTerms": "License {{license}}: {{name}} ({{verdict}})",
-      "licenseTermsFor": "License {{license}}: {{name}} ({{verdict}} for {{usage}})",
+      "licenseTermsFor": "License {{license}}: {{name}} ({{verdict}}; assessed for: {{usage}})",
       "customFound": "Custom license text: restrictive wording found, {{quote}} ({{verdict}})",
-      "customNoMatch": "Custom license text: no known restrictive wording matched",
-      "humanReview": "A person still has to read it ({{verdict}})",
+      "customNoMatch": "Custom license text: no known restrictive wording matched; a person still has to read it ({{verdict}})",
       "lineage": "Lineage: conditions of base model {{model}} may be inherited but are not declared here ({{verdict}})",
       "hfFlags": "File security: the HuggingFace scan flags {{status}} content ({{verdict}})",
       "hfSafe": "File security: the HuggingFace scan reports all files safe ({{verdict}})",
@@ -956,7 +955,7 @@
       "sourceNoLicense": "no license declared",
       "datasets": "Datasets: {{count}} referenced, worst grade {{verdict}}",
       "datasetsNamed": "Datasets: {{count}} referenced, worst grade {{verdict}} ({{names}})",
-      "viaSources": "{{name}}, via its sources",
+      "viaSources": "{{name}} (via its sources)",
       "trainingUndisclosed": "Training data undisclosed: the terms of the data this model learned from were not declared"
     }
   },

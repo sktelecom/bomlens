@@ -35,7 +35,7 @@ import { LicenseSummary } from "./LicenseSummary";
  *  hundred; the busiest twenty cover most components. */
 const LICENSE_LIST_TOP = 20;
 
-const FLAG_LABEL:Record<LicenseReview, string> = {
+const FLAG_LABEL: Record<LicenseReview, string> = {
   "behavioral-use": "licenses.flagBehavioral",
   "non-commercial": "licenses.flagNonCommercial",
 };
