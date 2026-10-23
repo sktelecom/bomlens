@@ -41,7 +41,7 @@ export function Disclosure({
   const [initialOpen] = useState(defaultOpen);
   return (
     <details
-      className={cn("group", className)}
+      className={className}
       open={initialOpen}
       onToggle={onToggle ? (e) => onToggle(e.currentTarget.open) : undefined}
     >
@@ -55,9 +55,12 @@ export function Disclosure({
           summaryClassName,
         )}
       >
+        {/* Turns on its OWN <details> only. A `group-open:` variant matches any
+            open ancestor, so a closed fold inside an open one showed a turned
+            chevron; the child combinators pin it to the nearest details. */}
         <ChevronRight
           className={cn(
-            "shrink-0 text-muted-foreground transition-transform duration-fast ease-out-soft group-open:rotate-90",
+            "shrink-0 text-muted-foreground transition-transform duration-fast ease-out-soft [details[open]>summary>&]:rotate-90",
             size === "md" ? "h-4 w-4" : "h-3.5 w-3.5",
           )}
           aria-hidden
