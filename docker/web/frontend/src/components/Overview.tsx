@@ -1185,7 +1185,9 @@ function JumpCards({
                 >
                   {typeof value === "number" ? fmt(value) : (value ?? "—")}
                 </span>
-                <span className="min-w-0 truncate text-body-sm text-muted-foreground">{text}</span>
+                <span className="min-w-0 truncate text-body-sm text-muted-foreground" title={text}>
+                  {text}
+                </span>
                 {/* Takes only the room the column has left, cut short with the
                     full text in the tooltip, so every entry stays one line. */}
                 {sub && (

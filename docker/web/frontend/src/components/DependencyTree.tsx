@@ -291,7 +291,7 @@ export function DependencyTree({
                 className="rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
                 <div
-                  className="flex items-center gap-2 rounded-sm px-1.5 py-1 hover:bg-accent/50"
+                  className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-sm px-1.5 py-1 hover:bg-accent/50 xl:flex-nowrap"
                   style={{ paddingLeft: `${(row.level - 1) * 16 + 6}px` }}
                 >
                   {row.hasChildren ? (
@@ -320,7 +320,9 @@ export function DependencyTree({
                   )}
 
                   <Package className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden />
-                  <span className="min-w-0 truncate font-mono text-label" title={label}>
+                  {/* The name wraps instead of being cut short, so all of it is on
+                      screen for every reader, keyboard focus included. */}
+                  <span className="min-w-[6rem] flex-1 font-mono text-label [overflow-wrap:anywhere] xl:min-w-0">
                     {node.name}
                     {node.version ? (
                       <span className="text-muted-foreground"> {node.version}</span>
@@ -338,18 +340,20 @@ export function DependencyTree({
                     </Badge>
                   )}
 
-                  {/* Severity and licences sit in fixed columns on the right, so
-                      they line up from row to row whatever the name's length. A
-                      long licence value (a hash, a full licence text) is cut
-                      short, with the whole value in the tooltip. */}
-                  <span className="ml-auto flex w-24 shrink-0 justify-end">
+                  {/* From xl up, severity and licences sit in fixed columns on the
+                      right, so they line up from row to row whatever the name's
+                      length. Narrower, they follow the name and wrap under it
+                      rather than squeezing it. A long licence value (a hash, a
+                      full licence text) is cut short, with the whole value in
+                      the tooltip. */}
+                  <span className="ml-auto flex shrink-0 justify-end xl:w-24">
                     {node.vuln && (
                       <Badge tone={VULN_TONE[node.vuln]} mark title={t("deps.hasVuln")}>
                         {t(`severity.${node.vuln}`)}
                       </Badge>
                     )}
                   </span>
-                  <span className="flex w-72 shrink-0 justify-end gap-1">
+                  <span className="flex min-w-0 flex-wrap justify-end gap-1 xl:w-72 xl:shrink-0 xl:flex-nowrap">
                     {node.licenses.slice(0, 2).map((l) => (
                       <Badge key={l} variant="muted" className="min-w-0 max-w-[7.5rem]" title={l}>
                         <span className="truncate">{l}</span>

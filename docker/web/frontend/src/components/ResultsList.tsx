@@ -279,9 +279,10 @@ function ArtifactCard({
       className={
         "rounded-lg border bg-card p-4 transition-all duration-fast ease-out-soft hover:bg-accent/40 hover:shadow-md" +
         // The featured card stands out by its place (first, full width), its
-        // larger icon and title, and a resting elevation. A dark border read as
-        // a selected or focused card.
-        (primary ? " shadow-sm lg:col-span-2" : "")
+        // larger icon and title, and a resting elevation (a light wash in dark,
+        // where a shadow does not show). A dark border read as a selected or
+        // focused card.
+        (primary ? " shadow-sm lg:col-span-2 dark:bg-muted/50" : "")
       }
     >
       <div className="flex items-start gap-3">

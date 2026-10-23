@@ -167,7 +167,13 @@ test("Recent menu re-opens a past scan from the top bar", async ({ page }) => {
   await recent.click();
 
   await expect(page.getByRole("link", { name: /^Overview/ })).toHaveAttribute("aria-current", "page");
-  await expect(page.getByTestId("first-checks")).toContainText("Critical or High with a fixed version");
+  // The scan's two Critical/High findings, both fixable, counted on the row.
+  const fixable = page
+    .getByTestId("first-checks")
+    .getByRole("listitem")
+    .filter({ hasText: "Critical or High with a fixed version" });
+  await expect(fixable).toBeVisible();
+  await expect(fixable.getByText("2", { exact: true })).toBeVisible();
 });
 test("a project scanned twice shows how it moved", async ({ page }) => {
   await page.route("**/capabilities", (r) =>

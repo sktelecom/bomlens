@@ -386,3 +386,28 @@ for (const theme of ["light", "dark"] as Theme[]) {
     expect(after.opacity).toBe("1");
   });
 }
+
+// Text fields take focus on their own (autoFocus, a click), so their focus is a
+// darker outline in the foreground colour, not the brand ring that marks
+// buttons and links: next to the red required marks the ring read as an error.
+for (const theme of ["light", "dark"] as Theme[]) {
+  test(`a Tab-focused text field gets a foreground outline, not the brand ring (${theme})`, async ({ page }) => {
+    await seedThemeLang(page, theme, "en");
+    await stubNewScan(page);
+    await page.goto("/#/new");
+    const field = page.locator("#version");
+    await field.waitFor();
+    await page.mouse.move(0, 0);
+
+    const ring = await tokenColour(page, "hsl(var(--ring))");
+    const foreground = await tokenColour(page, "hsl(var(--foreground))");
+    const rest = await look(field);
+    expect(rest.border, "a field at rest has the quiet input border").not.toBe(foreground);
+
+    await focusByKeyboard(page, field);
+    const focused = await look(field);
+    expect(focused.border, "focus darkens the field's own outline").toBe(foreground);
+    expect(focused.shadow).toContain(foreground);
+    expect(focused.shadow, "no brand ring on a text field").not.toContain(ring);
+  });
+}
