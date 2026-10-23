@@ -17,6 +17,8 @@
   --input: 240 5% 91%;
   --primary: 240 6% 10%;
   --primary-foreground: 0 0% 98%;
+  --selected: 240 6% 10%;
+  --selected-foreground: 0 0% 98%;
   --secondary: 240 5% 96%;
   --secondary-foreground: 240 6% 10%;
   --accent: 240 5% 96%;
@@ -91,18 +93,20 @@
 }
 @media screen and (prefers-color-scheme: dark) {
 :root {
-  --background: 240 6% 6%;
+  --background: 240 6% 7%;
   --foreground: 0 0% 98%;
-  --card: 240 4% 11%;
+  --card: 240 4% 12%;
   --card-foreground: 0 0% 98%;
-  --popover: 240 4% 11%;
+  --popover: 240 4% 12%;
   --popover-foreground: 0 0% 98%;
   --muted: 240 4% 16%;
   --muted-foreground: 240 5% 65%;
-  --border: 240 4% 16%;
-  --input: 240 4% 16%;
+  --border: 240 4% 24%;
+  --input: 240 4% 24%;
   --primary: 0 0% 98%;
   --primary-foreground: 240 6% 10%;
+  --selected: 240 5% 30%;
+  --selected-foreground: 0 0% 98%;
   --secondary: 240 4% 16%;
   --secondary-foreground: 0 0% 98%;
   --accent: 240 4% 16%;
@@ -114,9 +118,9 @@
   --brand-foreground: 0 0% 100%;
   --brand-strong: 349 100% 68%;
   --brand-accent: 24 90% 60%;
-  --sidebar: 240 5% 9%;
+  --sidebar: 240 5% 10%;
   --sidebar-foreground: 0 0% 98%;
-  --sidebar-border: 240 4% 16%;
+  --sidebar-border: 240 4% 24%;
   --role-danger-fg: 252 165 165;
   --role-danger-muted: 60 38 41;
   --role-danger-emphasis: 248 113 113;
@@ -318,7 +322,7 @@ pre code{font-family:var(--mono);font-size:var(--font-size-mono);white-space:pre
  <div class="report-kind">Security Report</div>
 </header>
 <h1>Security Report</h1>
-<p class="meta">Project: SpringBootDemo &middot; Generated: <time datetime="2026-10-20T15:15:43Z">2026-10-20 15:15 UTC</time> &middot; Engine: Trivy</p>
+<p class="meta">Project: SpringBootDemo &middot; Generated: <time datetime="2026-10-23T22:47:43Z">2026-10-23 22:47 UTC</time> &middot; Engine: Trivy</p>
 <div class="cards">
  <span class="pill pill-crit">Critical <span class="count">8</span></span>
  <span class="pill pill-high">High <span class="count">35</span></span>
@@ -365,13 +369,13 @@ pre code{font-family:var(--mono);font-size:var(--font-size-mono);white-space:pre
 <tr><td class="sev-HIGH">HIGH</td><td></td><td class="num">7.5</td><td class="num">0.004</td><td class="id">CVE-2026-68494</td><td>com.fasterxml.jackson.core:jackson-core</td><td>2.16.0</td><td>2.18.8, 2.21.4</td><td>com.fasterxml.jackson.core/jackson-core: tools.jackson.core/jackson-core: jackson-core: Denial of Service via incomplete</td></tr>
 <tr><td class="sev-HIGH">HIGH</td><td></td><td class="num">7.5</td><td class="num">0.004</td><td class="id">CVE-2026-34483</td><td>org.apache.tomcat.embed:tomcat-embed-core</td><td>10.1.16</td><td>9.0.116, 10.1.54, 11.0.21</td><td>Apache Tomcat: Apache Tomcat: Information disclosure due to improper encoding in JsonAccessLogValve</td></tr>
 <tr><td class="sev-HIGH">HIGH</td><td></td><td class="num">7.5</td><td class="num">0.004</td><td class="id">CVE-2025-41249</td><td>org.springframework:spring-core</td><td>6.1.1</td><td>6.2.11</td><td>org.springframework/spring-core: Spring Framework Annotation Detection Vulnerability</td></tr>
-<tr><td class="sev-HIGH">HIGH</td><td></td><td class="num">7.5</td><td class="num">0.004</td><td class="id">CVE-2026-41850</td><td>org.springframework:spring-expression</td><td>6.1.1</td><td>7.0.8, 6.2.19</td><td>spring-framework: Spring Framework: Denial of Service via specially crafted SpEL expressions</td></tr>
-<tr><td class="sev-HIGH">HIGH</td><td></td><td class="num">7.5</td><td class="num">0.004</td><td class="id">CVE-2026-41842</td><td>org.springframework:spring-webmvc</td><td>6.1.1</td><td>7.0.8, 6.2.19</td><td>spring-framework: Spring Framework: Denial of Service when resolving static resources</td></tr>
 <tr><td class="sev-HIGH">HIGH</td><td></td><td class="num">7.5</td><td class="num">0.004</td><td class="id">CVE-2026-91776</td><td>com.fasterxml.jackson.core:jackson-databind</td><td>2.16.0</td><td>2.18.11, 2.21.7, 2.22.3</td><td>jackson-databind: com.fasterxml.jackson/jackson-core: jackson-databind: Denial of Service via unbounded cache growth in </td></tr>
 <tr><td class="sev-HIGH">HIGH</td><td></td><td class="num">7.5</td><td class="num">0.004</td><td class="id">CVE-2026-91777</td><td>com.fasterxml.jackson.core:jackson-databind</td><td>2.16.0</td><td>2.21.7, 2.18.11, 2.22.3</td><td>com.fasterxml.jackson.core/jackson-databind: tools.jackson.core:jackson-databind: Jackson-databind: Denial of Service vi</td></tr>
 <tr><td class="sev-HIGH">HIGH</td><td></td><td class="num">7.5</td><td class="num">0.004</td><td class="id">CVE-2026-34487</td><td>org.apache.tomcat.embed:tomcat-embed-core</td><td>10.1.16</td><td>9.0.117, 10.1.54, 11.0.21</td><td>Apache Tomcat: Apache Tomcat: Information disclosure via sensitive data in log files</td></tr>
 <tr><td class="sev-HIGH">HIGH</td><td></td><td class="num">7.3</td><td class="num">0.004</td><td class="id">CVE-2025-22235</td><td>org.springframework.boot:spring-boot</td><td>3.2.0</td><td>3.3.11, 3.4.5</td><td>org.springframework.boot/spring-boot: Spring Boot EndpointRequest.to() creates wrong matcher if actuator endpoint is not</td></tr>
-<tr><td class="sev-HIGH">HIGH</td><td></td><td class="num">7.1</td><td class="num">0.002</td><td class="id">CVE-2026-41845</td><td>org.springframework:spring-webmvc</td><td>6.1.1</td><td>7.0.8, 6.2.19</td><td>org.springframework: Spring Framework: Cross-site scripting (XSS) via incorrect JavaScript escaping</td></tr>
+<tr><td class="sev-HIGH">HIGH</td><td></td><td class="num">7.5</td><td class="num">0.003</td><td class="id">CVE-2026-41842</td><td>org.springframework:spring-webmvc</td><td>6.1.1</td><td>7.0.8, 6.2.19</td><td>spring-framework: Spring Framework: Denial of Service when resolving static resources</td></tr>
+<tr><td class="sev-HIGH">HIGH</td><td></td><td class="num">7.5</td><td class="num">0.003</td><td class="id">CVE-2026-41850</td><td>org.springframework:spring-expression</td><td>6.1.1</td><td>7.0.8, 6.2.19</td><td>spring-framework: Spring Framework: Denial of Service via specially crafted SpEL expressions</td></tr>
+<tr><td class="sev-HIGH">HIGH</td><td></td><td class="num">7.1</td><td class="num">0.001</td><td class="id">CVE-2026-41845</td><td>org.springframework:spring-webmvc</td><td>6.1.1</td><td>7.0.8, 6.2.19</td><td>org.springframework: Spring Framework: Cross-site scripting (XSS) via incorrect JavaScript escaping</td></tr>
 <tr><td class="sev-MEDIUM">MEDIUM</td><td></td><td class="num">7.5</td><td class="num">0.613</td><td class="id">CVE-2025-31650</td><td>org.apache.tomcat.embed:tomcat-embed-core</td><td>10.1.16</td><td>9.0.104, 10.1.40, 11.0.6</td><td>tomcat: Apache Tomcat: DoS via malformed HTTP/2 PRIORITY_UPDATE frame</td></tr>
 <tr><td class="sev-MEDIUM">MEDIUM</td><td></td><td class="num">7.5</td><td class="num">0.23</td><td class="id">CVE-2024-24549</td><td>org.apache.tomcat.embed:tomcat-embed-core</td><td>10.1.16</td><td>8.5.99, 9.0.86, 10.1.19, 11.0.0-M17</td><td>Tomcat: HTTP/2 header handling DoS</td></tr>
 <tr><td class="sev-MEDIUM">MEDIUM</td><td></td><td class="num">7.5</td><td class="num">0.034</td><td class="id">CVE-2025-49125</td><td>org.apache.tomcat.embed:tomcat-embed-core</td><td>10.1.16</td><td>11.0.8, 10.1.42, 9.0.106</td><td>tomcat: Apache Tomcat: Security constraint bypass for pre/post-resources</td></tr>
@@ -380,33 +384,33 @@ pre code{font-family:var(--mono);font-size:var(--font-size-mono);white-space:pre
 <tr><td class="sev-MEDIUM">MEDIUM</td><td></td><td class="num">5.9</td><td class="num">0.021</td><td class="id">CVE-2025-41242</td><td>org.springframework:spring-webmvc</td><td>6.1.1</td><td>6.2.10</td><td>org.springframework/spring-webmvc: Spring Framework MVC path traversal vulnerability</td></tr>
 <tr><td class="sev-MEDIUM">MEDIUM</td><td></td><td class="num">6.5</td><td class="num">0.008</td><td class="id">CVE-2025-55668</td><td>org.apache.tomcat.embed:tomcat-embed-core</td><td>10.1.16</td><td>11.0.8, 10.1.42, 9.0.106</td><td>org.apache.tomcat/tomcat-catalina: tomcat: Apache Tomcat: session fixation via rewrite valve</td></tr>
 <tr><td class="sev-MEDIUM">MEDIUM</td><td></td><td class="num">5.3</td><td class="num">0.008</td><td class="id">CVE-2024-38809</td><td>org.springframework:spring-web</td><td>6.1.1</td><td>5.3.38, 6.0.23, 6.1.12</td><td>org.springframework:spring-web: Spring Framework DoS via conditional HTTP request</td></tr>
-<tr><td class="sev-MEDIUM">MEDIUM</td><td></td><td class="num">5.9</td><td class="num">0.008</td><td class="id">CVE-2026-49844</td><td>org.apache.logging.log4j:log4j-api</td><td>2.21.1</td><td>2.25.5, 2.26.1</td><td>org.apache.logging.log4j/log4j-api: Apache Log4j API: Malformed JSON output due to improper encoding of floating-point v</td></tr>
 <tr><td class="sev-MEDIUM">MEDIUM</td><td></td><td class="num">5.6</td><td class="num">0.007</td><td class="id">CVE-2026-83557</td><td>com.fasterxml.jackson.core:jackson-databind</td><td>2.16.0</td><td>2.18.10, 2.21.6, 2.22.2</td><td>com.fasterxml.jackson.core/jackson-databind: tools.jackson.core/jackson-databind: jackson-databind: Path traversal via i</td></tr>
 <tr><td class="sev-MEDIUM">MEDIUM</td><td></td><td class="num">5.3</td><td class="num">0.006</td><td class="id">CVE-2024-38820</td><td>org.springframework:spring-context</td><td>6.1.1</td><td>6.1.14</td><td>The fix for CVE-2022-22968 made disallowedFieldspatterns in DataBinder ...</td></tr>
 <tr><td class="sev-MEDIUM">MEDIUM</td><td></td><td class="num">5.3</td><td class="num">0.006</td><td class="id">CVE-2024-38820</td><td>org.springframework:spring-web</td><td>6.1.1</td><td>6.1.14</td><td>The fix for CVE-2022-22968 made disallowedFieldspatterns in DataBinder ...</td></tr>
 <tr><td class="sev-MEDIUM">MEDIUM</td><td></td><td class="num">6.5</td><td class="num">0.006</td><td class="id">CVE-2025-41234</td><td>org.springframework:spring-web</td><td>6.1.1</td><td>6.2.8, 6.1.21</td><td>springframework: Reflected download attack in Spring Framework with non-ASCII headers</td></tr>
+<tr><td class="sev-MEDIUM">MEDIUM</td><td></td><td class="num">5.9</td><td class="num">0.005</td><td class="id">CVE-2026-49844</td><td>org.apache.logging.log4j:log4j-api</td><td>2.21.1</td><td>2.25.5, 2.26.1</td><td>org.apache.logging.log4j/log4j-api: Apache Log4j API: Malformed JSON output due to improper encoding of floating-point v</td></tr>
 <tr><td class="sev-MEDIUM">MEDIUM</td><td></td><td class="num">5.3</td><td class="num">0.005</td><td class="id">CVE-2026-19032</td><td>com.fasterxml.jackson.core:jackson-databind</td><td>2.16.0</td><td>2.18.10, 2.21.6, 2.22.2</td><td>com.fasterxml.jackson.core/jackson-databind: tools.jackson.core/jackson-databind: Jackson-databind: Uncontrolled URI sch</td></tr>
 <tr><td class="sev-MEDIUM">MEDIUM</td><td></td><td class="num">6.1</td><td class="num">0.005</td><td class="id">CVE-2026-25854</td><td>org.apache.tomcat.embed:tomcat-embed-core</td><td>10.1.16</td><td>9.0.116, 10.1.53, 11.0.20</td><td>Apache Tomcat: Apache Tomcat: Open Redirect vulnerability via LoadBalancerDrainingValve</td></tr>
-<tr><td class="sev-MEDIUM">MEDIUM</td><td></td><td class="num">7.5</td><td class="num">0.004</td><td class="id">CVE-2026-41851</td><td>org.springframework:spring-expression</td><td>6.1.1</td><td>7.0.8, 6.2.19</td><td>Spring Framework: Spring Framework: Denial of Service via unbounded cache growth in SpEL evaluation</td></tr>
 <tr><td class="sev-MEDIUM">MEDIUM</td><td></td><td class="num">5.5</td><td class="num">0.004</td><td class="id">CVE-2024-12798</td><td>ch.qos.logback:logback-core</td><td>1.4.11</td><td>1.5.13, 1.3.15</td><td>logback-core: arbitrary code execution via JaninoEventEvaluator</td></tr>
 <tr><td class="sev-MEDIUM">MEDIUM</td><td></td><td class="num">5.3</td><td class="num">0.004</td><td class="id">CVE-2026-54515</td><td>com.fasterxml.jackson.core:jackson-databind</td><td>2.16.0</td><td>3.1.4, 2.18.9, 2.21.5, 2.22.1</td><td>jackson-databind: jackson-databind: Ignored properties can be unexpectedly modified</td></tr>
 <tr><td class="sev-MEDIUM">MEDIUM</td><td></td><td class="num">5.9</td><td class="num">0.004</td><td class="id">CVE-2026-41721</td><td>org.springframework.data:spring-data-commons</td><td>3.2.0</td><td>4.0.6, 3.5.12</td><td>Spring Data Commons: Spring Data Commons: Denial of Service via specially crafted HTTP request with @ProjectedPayload</td></tr>
 <tr><td class="sev-MEDIUM">MEDIUM</td><td></td><td class="num">6.5</td><td class="num">0.004</td><td class="id">CVE-2026-59888</td><td>com.fasterxml.jackson.core:jackson-databind</td><td>2.16.0</td><td>2.18.8, 2.21.4</td><td>com.fasterxml.jackson.core/jackson-databind: tools.jackson.core/jackson-databind: jackson-databind: @JsonIgnore bypass i</td></tr>
 <tr><td class="sev-MEDIUM">MEDIUM</td><td></td><td class="num">5.3</td><td class="num">0.004</td><td class="id">CVE-2026-18401</td><td>com.fasterxml.jackson.core:jackson-core</td><td>2.16.0</td><td>2.21.1, 2.18.6</td><td>tools.jackson.core/jackson-core: com.fasterxml.jackson.core/jackson-core: jackson-core: Denial of Service due to number </td></tr>
 <tr><td class="sev-MEDIUM">MEDIUM</td><td></td><td class="num">6.5</td><td class="num">0.004</td><td class="id">CVE-2026-22737</td><td>org.springframework:spring-webmvc</td><td>6.1.1</td><td>7.0.6, 6.2.17</td><td>Spring Framework: Spring Framework: Information disclosure via Java scripting engine enabled template views</td></tr>
-<tr><td class="sev-MEDIUM">MEDIUM</td><td></td><td class="num">6.5</td><td class="num">0.003</td><td class="id">CVE-2026-59889</td><td>com.fasterxml.jackson.core:jackson-databind</td><td>2.16.0</td><td>2.21.5, 2.18.9, 2.22.1</td><td>com.fasterxml.jackson.core/jackson-databind: Jackson-databind: Privilege escalation via improper handling of @JsonUnwrap</td></tr>
+<tr><td class="sev-MEDIUM">MEDIUM</td><td></td><td class="num">7.5</td><td class="num">0.003</td><td class="id">CVE-2026-41851</td><td>org.springframework:spring-expression</td><td>6.1.1</td><td>7.0.8, 6.2.19</td><td>Spring Framework: Spring Framework: Denial of Service via unbounded cache growth in SpEL evaluation</td></tr>
 <tr><td class="sev-MEDIUM">MEDIUM</td><td></td><td class="num">5.9</td><td class="num">0.003</td><td class="id">CVE-2026-41843</td><td>org.springframework:spring-webmvc</td><td>6.1.1</td><td>7.0.8, 6.2.19</td><td>spring-webflux: spring-webmvc: Spring Framework: Information Disclosure via Path Traversal</td></tr>
 <tr><td class="sev-MEDIUM">MEDIUM</td><td></td><td class="num">5.3</td><td class="num">0.003</td><td class="id">CVE-2026-54514</td><td>com.fasterxml.jackson.core:jackson-databind</td><td>2.16.0</td><td>2.18.8, 2.21.4, 3.1.4</td><td>jackson-databind: jackson-databind: Information Disclosure via Eager DNS Resolution</td></tr>
 <tr><td class="sev-MEDIUM">MEDIUM</td><td></td><td class="num">5.9</td><td class="num">0.003</td><td class="id">CVE-2026-41711</td><td>org.springframework.data:spring-data-commons</td><td>3.2.0</td><td>4.0.6, 3.5.12</td><td>Spring Data Commons: Spring Data Commons: Denial of Service via parsing Sort parameters</td></tr>
 <tr><td class="sev-MEDIUM">MEDIUM</td><td></td><td class="num">8.4</td><td class="num">0.003</td><td class="id">CVE-2025-49124</td><td>org.apache.tomcat.embed:tomcat-embed-core</td><td>10.1.16</td><td>11.0.8, 10.1.42, 9.0.106</td><td>Apache Tomcat installer for Windows has an untrusted search path vulnerability</td></tr>
+<tr><td class="sev-MEDIUM">MEDIUM</td><td></td><td class="num">6.5</td><td class="num">0.003</td><td class="id">CVE-2026-59889</td><td>com.fasterxml.jackson.core:jackson-databind</td><td>2.16.0</td><td>2.21.5, 2.18.9, 2.22.1</td><td>com.fasterxml.jackson.core/jackson-databind: Jackson-databind: Privilege escalation via improper handling of @JsonUnwrap</td></tr>
 <tr><td class="sev-MEDIUM">MEDIUM</td><td></td><td class="num">5.3</td><td class="num">0.003</td><td class="id">CVE-2026-22745</td><td>org.springframework:spring-webmvc</td><td>6.1.1</td><td>7.0.7, 6.2.18</td><td>spring-webflux: Spring MVC and Spring WebFlux: Denial of Service via slow static resource resolution on Windows</td></tr>
 <tr><td class="sev-MEDIUM">MEDIUM</td><td></td><td class="num">5.9</td><td class="num">0.003</td><td class="id">CVE-2026-41841</td><td>org.springframework:spring-webmvc</td><td>6.1.1</td><td>7.0.8, 6.2.19</td><td>Spring Framework: Spring MVC and WebFlux applications: Information Disclosure via static resource resolution</td></tr>
 <tr><td class="sev-MEDIUM">MEDIUM</td><td></td><td class="num">5.3</td><td class="num">0.003</td><td class="id">CVE-2026-77310</td><td>com.fasterxml.jackson.core:jackson-databind</td><td>2.16.0</td><td>2.18.9, 2.21.5, 2.22.1</td><td>com.fasterxml.jackson.core/jackson-databind: jackson-databind: Server-Side Request Forgery and internal host enumeration</td></tr>
-<tr><td class="sev-MEDIUM">MEDIUM</td><td></td><td class="num">5.3</td><td class="num">0.003</td><td class="id">CVE-2026-41853</td><td>org.springframework:spring-webmvc</td><td>6.1.1</td><td>7.0.8, 6.2.19</td><td>Spring Framework: Spring Framework: Request smuggling vulnerability in Spring MVC and WebFlux</td></tr>
 <tr><td class="sev-MEDIUM">MEDIUM</td><td></td><td class="num">9.1</td><td class="num">0.002</td><td class="id">CVE-2025-66614</td><td>org.apache.tomcat.embed:tomcat-embed-core</td><td>10.1.16</td><td>11.0.15, 10.1.50, 9.0.113</td><td>tomcat: Client certificate verification bypass due to virtual host mapping</td></tr>
-<tr><td class="sev-MEDIUM">MEDIUM</td><td></td><td class="num">6.8</td><td class="num">0.002</td><td class="id">CVE-2026-41846</td><td>org.springframework:spring-webmvc</td><td>6.1.1</td><td>7.0.8, 6.2.19</td><td>Spring Framework: Spring Framework: Cross-site scripting (XSS) via user-supplied values in JSP form tags</td></tr>
-<tr><td class="sev-MEDIUM">MEDIUM</td><td></td><td class="num">6.1</td><td class="num">0.002</td><td class="id">CVE-2026-41844</td><td>org.springframework:spring-webmvc</td><td>6.1.1</td><td>7.0.8, 6.2.19</td><td>Spring Framework: Spring Framework: Open Redirect via crafted link</td></tr>
 <tr><td class="sev-MEDIUM">MEDIUM</td><td></td><td class="num">6.4</td><td class="num">0.001</td><td class="id">CVE-2025-11226</td><td>ch.qos.logback:logback-core</td><td>1.4.11</td><td>1.5.19, 1.3.16</td><td>ch.qos.logback/logback-core: Conditional abitrary code execution in logback-core</td></tr>
+<tr><td class="sev-MEDIUM">MEDIUM</td><td></td><td class="num">5.3</td><td class="num">0.001</td><td class="id">CVE-2026-41853</td><td>org.springframework:spring-webmvc</td><td>6.1.1</td><td>7.0.8, 6.2.19</td><td>Spring Framework: Spring Framework: Request smuggling vulnerability in Spring MVC and WebFlux</td></tr>
+<tr><td class="sev-MEDIUM">MEDIUM</td><td></td><td class="num">6.8</td><td class="num">0.001</td><td class="id">CVE-2026-41846</td><td>org.springframework:spring-webmvc</td><td>6.1.1</td><td>7.0.8, 6.2.19</td><td>Spring Framework: Spring Framework: Cross-site scripting (XSS) via user-supplied values in JSP form tags</td></tr>
+<tr><td class="sev-MEDIUM">MEDIUM</td><td></td><td class="num">6.1</td><td class="num">0.001</td><td class="id">CVE-2026-41844</td><td>org.springframework:spring-webmvc</td><td>6.1.1</td><td>7.0.8, 6.2.19</td><td>Spring Framework: Spring Framework: Open Redirect via crafted link</td></tr>
 <tr><td class="sev-LOW">LOW</td><td></td><td class="num">9.7</td><td class="num">0.101</td><td class="id">CVE-2025-55754</td><td>org.apache.tomcat.embed:tomcat-embed-core</td><td>10.1.16</td><td>11.0.11, 10.1.45, 9.0.109</td><td>org.apache.tomcat/tomcat-juli: tomcat: Apache Tomcat: console manipulation</td></tr>
 <tr><td class="sev-LOW">LOW</td><td></td><td class="num">9.8</td><td class="num">0.041</td><td class="id">CVE-2025-31651</td><td>org.apache.tomcat.embed:tomcat-embed-core</td><td>10.1.16</td><td>9.0.104, 10.1.40, 11.0.6</td><td>tomcat: Apache Tomcat: Bypass of rules in Rewrite Valve</td></tr>
 <tr><td class="sev-LOW">LOW</td><td></td><td class="num">7.3</td><td class="num">0.029</td><td class="id">CVE-2025-46701</td><td>org.apache.tomcat.embed:tomcat-embed-core</td><td>10.1.16</td><td>9.0.105, 10.1.41, 11.0.7</td><td>tomcat: Apache Tomcat: Security constraint bypass for CGI scripts</td></tr>
@@ -414,11 +418,11 @@ pre code{font-family:var(--mono);font-size:var(--font-size-mono);white-space:pre
 <tr><td class="sev-LOW">LOW</td><td></td><td class="num"></td><td class="num">0.005</td><td class="id">CVE-2026-9828</td><td>ch.qos.logback:logback-core</td><td>1.4.11</td><td>1.5.33</td><td>Deserialization of untrusted data vulnerability in QOS.CH Sarl logback ...</td></tr>
 <tr><td class="sev-LOW">LOW</td><td></td><td class="num">3.7</td><td class="num">0.005</td><td class="id">CVE-2026-43514</td><td>org.apache.tomcat.embed:tomcat-embed-core</td><td>10.1.16</td><td>9.0.118, 10.1.55, 11.0.22</td><td>tomcat: Apache Tomcat: Information disclosure via AJP secret timing discrepancy</td></tr>
 <tr><td class="sev-LOW">LOW</td><td></td><td class="num">3.1</td><td class="num">0.004</td><td class="id">CVE-2025-22233</td><td>org.springframework:spring-context</td><td>6.1.1</td><td>6.2.7, 6.1.20</td><td>CVE-2024-38820 ensured Locale-independent, lowercase conversion for bo ...</td></tr>
-<tr><td class="sev-LOW">LOW</td><td></td><td class="num">7.5</td><td class="num">0.004</td><td class="id">CVE-2026-41848</td><td>org.springframework:spring-core</td><td>6.1.1</td><td>7.0.8, 6.2.19</td><td>spring-framework: Spring Framework: Regular Expression Denial of Service in AntPathMatcher</td></tr>
 <tr><td class="sev-LOW">LOW</td><td></td><td class="num"></td><td class="num">0.003</td><td class="id">CVE-2026-10532</td><td>ch.qos.logback:logback-core</td><td>1.4.11</td><td>1.5.34</td><td>Deserialization of untrusted data vulnerability in QOS.CH Sarl logback ...</td></tr>
-<tr><td class="sev-LOW">LOW</td><td></td><td class="num">5.3</td><td class="num">0.002</td><td class="id">CVE-2026-41852</td><td>org.springframework:spring-expression</td><td>6.1.1</td><td>7.0.8, 6.2.19</td><td>spring-framework: org.springframework/spring-expression: Spring Framework: SpEL vulnerability allows unintended applicat</td></tr>
+<tr><td class="sev-LOW">LOW</td><td></td><td class="num">7.5</td><td class="num">0.003</td><td class="id">CVE-2026-41848</td><td>org.springframework:spring-core</td><td>6.1.1</td><td>7.0.8, 6.2.19</td><td>spring-framework: Spring Framework: Regular Expression Denial of Service in AntPathMatcher</td></tr>
 <tr><td class="sev-LOW">LOW</td><td></td><td class="num">5.9</td><td class="num">0.002</td><td class="id">CVE-2026-22741</td><td>org.springframework:spring-webmvc</td><td>6.1.1</td><td>7.0.7, 6.2.18</td><td>Spring MVC: Spring WebFlux: Spring MVC and Spring WebFlux: Denial of Service via cache poisoning</td></tr>
 <tr><td class="sev-LOW">LOW</td><td></td><td class="num">3.3</td><td class="num">0.002</td><td class="id">CVE-2024-12801</td><td>ch.qos.logback:logback-core</td><td>1.4.11</td><td>1.5.13, 1.3.15</td><td>logback-core: SaxEventRecorder vulnerable to Server-Side Request Forgery (SSRF) attacks</td></tr>
+<tr><td class="sev-LOW">LOW</td><td></td><td class="num">5.3</td><td class="num">0.001</td><td class="id">CVE-2026-41852</td><td>org.springframework:spring-expression</td><td>6.1.1</td><td>7.0.8, 6.2.19</td><td>spring-framework: org.springframework/spring-expression: Spring Framework: SpEL vulnerability allows unintended applicat</td></tr>
 <tr><td class="sev-LOW">LOW</td><td></td><td class="num">5</td><td class="num">0.001</td><td class="id">CVE-2026-1225</td><td>ch.qos.logback:logback-core</td><td>1.4.11</td><td>1.5.25</td><td>ch.qos.logback/logback-core: Malicious logback.xml configuration file allows instantiation of arbitrary classes</td></tr>
 <tr><td class="sev-LOW">LOW</td><td></td><td class="num">2.6</td><td class="num">0.001</td><td class="id">CVE-2026-22735</td><td>org.springframework:spring-webmvc</td><td>6.1.1</td><td>7.0.6, 6.2.17</td><td>org.springframework/spring-webmvc: org.springframework/spring-webflux: Spring MVC and WebFlux: Stream corruption vulnera</td></tr>
 </tbody></table></div>

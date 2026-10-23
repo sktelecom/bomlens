@@ -771,11 +771,11 @@
         },
         {
           "name": "cdx:huggingface:downloads",
-          "value": "30080477"
+          "value": "28236987"
         },
         {
           "name": "cdx:huggingface:downloadsAllTime",
-          "value": "3268083388"
+          "value": "3270123540"
         },
         {
           "name": "cdx:huggingface:fileCount",
@@ -799,7 +799,7 @@
         },
         {
           "name": "cdx:huggingface:likes",
-          "value": "3041"
+          "value": "3051"
         },
         {
           "name": "cdx:huggingface:private",
@@ -856,7 +856,7 @@
         "value": "unknown-to-author"
       }
     ],
-    "timestamp": "2026-10-20T15:16:33+00:00",
+    "timestamp": "2026-10-23T22:48:37+00:00",
     "tools": {
       "components": [
         {
@@ -872,17 +872,22 @@
           "name": "BomLens",
           "publisher": "SK Telecom",
           "type": "application",
-          "version": "1.13.9"
+          "version": "1.14.0"
         }
       ]
     }
   },
-  "serialNumber": "urn:uuid:f73e1ca3-2d1a-4445-9d7b-41dcaccf3d5c",
+  "serialNumber": "urn:uuid:f5162eb7-59c7-48f7-a3eb-5bead9267558",
   "specVersion": "1.7",
   "version": 1,
   "compositions": [
     {
-      "aggregate": "unknown"
+      "aggregate": "unknown",
+      "dependencies": [
+        "dataset:huggingface/bookcorpus",
+        "dataset:huggingface/wikipedia",
+        "pkg:huggingface/google-bert/bert-base-uncased@86b5e093"
+      ]
     }
   ]
 }

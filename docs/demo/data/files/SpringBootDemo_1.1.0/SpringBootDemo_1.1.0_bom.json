@@ -21,8 +21,8 @@
       "subjects": [
         "pkg:maven/com.example/sbom-example-app@1.1.0?type=jar"
       ],
-      "text": "This Software Bill-of-Materials (SBOM) document was created on Tuesday, October 20, 2026 with cdxgen. The data was captured during the build lifecycle phase. The document describes an application named 'sbom-example-app' with version '1.1.0'. The package type in this SBOM is maven with 50 purl namespaces described under components. The components were identified from the source files: pom.xml.",
-      "timestamp": "2026-10-20T15:16:15Z"
+      "text": "This Software Bill-of-Materials (SBOM) document was created on Friday, October 23, 2026 with cdxgen. The data was captured during the build lifecycle phase. The document describes an application named 'sbom-example-app' with version '1.1.0'. The package type in this SBOM is maven with 50 purl namespaces described under components. The components were identified from the source files: pom.xml.",
+      "timestamp": "2026-10-23T22:48:12Z"
     }
   ],
   "bomFormat": "CycloneDX",
@@ -4900,7 +4900,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-10-20"
+          "value": "endoflife.date@2026-10-23"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -5050,7 +5050,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-10-20"
+          "value": "endoflife.date@2026-10-23"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -5200,7 +5200,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-10-20"
+          "value": "endoflife.date@2026-10-23"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -5350,7 +5350,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-10-20"
+          "value": "endoflife.date@2026-10-23"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -5500,7 +5500,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-10-20"
+          "value": "endoflife.date@2026-10-23"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -5651,7 +5651,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-10-20"
+          "value": "endoflife.date@2026-10-23"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -5801,7 +5801,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-10-20"
+          "value": "endoflife.date@2026-10-23"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -5952,7 +5952,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-10-20"
+          "value": "endoflife.date@2026-10-23"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -6102,7 +6102,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-10-20"
+          "value": "endoflife.date@2026-10-23"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -6253,7 +6253,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-10-20"
+          "value": "endoflife.date@2026-10-23"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -6404,7 +6404,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-10-20"
+          "value": "endoflife.date@2026-10-23"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -6556,7 +6556,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-10-20"
+          "value": "endoflife.date@2026-10-23"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -6707,7 +6707,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-10-20"
+          "value": "endoflife.date@2026-10-23"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -7105,7 +7105,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-10-20"
+          "value": "endoflife.date@2026-10-23"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -7259,7 +7259,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-10-20"
+          "value": "endoflife.date@2026-10-23"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -7413,7 +7413,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-10-20"
+          "value": "endoflife.date@2026-10-23"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -7567,7 +7567,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-10-20"
+          "value": "endoflife.date@2026-10-23"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -7721,7 +7721,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-10-20"
+          "value": "endoflife.date@2026-10-23"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -7875,7 +7875,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-10-20"
+          "value": "endoflife.date@2026-10-23"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -8029,7 +8029,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-10-20"
+          "value": "endoflife.date@2026-10-23"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -8184,7 +8184,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-10-20"
+          "value": "endoflife.date@2026-10-23"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -8338,7 +8338,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-10-20"
+          "value": "endoflife.date@2026-10-23"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -8492,7 +8492,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-10-20"
+          "value": "endoflife.date@2026-10-23"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -8646,7 +8646,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-10-20"
+          "value": "endoflife.date@2026-10-23"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -8800,7 +8800,7 @@
         },
         {
           "name": "bomlens:eol:source",
-          "value": "endoflife.date@2026-10-20"
+          "value": "endoflife.date@2026-10-23"
         },
         {
           "name": "bomlens:currency:latestPatch",
@@ -9328,6 +9328,7 @@
       "licenses": [
         {
           "license": {
+            "acknowledgement": "declared",
             "id": "Apache-2.0"
           }
         }
@@ -9369,7 +9370,7 @@
         "value": "unknown-to-author"
       }
     ],
-    "timestamp": "2026-10-20T15:16:15Z",
+    "timestamp": "2026-10-23T22:48:12Z",
     "tools": {
       "components": [
         {
@@ -9390,18 +9391,92 @@
           "name": "BomLens",
           "publisher": "SK Telecom",
           "type": "application",
-          "version": "1.13.9"
+          "version": "1.14.0"
         }
       ]
     }
   },
-  "serialNumber": "urn:uuid:c3ad8fce-2d05-4bc5-99e3-ee669aaf3d83",
+  "serialNumber": "urn:uuid:6b046a55-252e-47bb-ab74-49e3d3aeaf75",
   "services": [],
   "specVersion": "1.6",
   "version": 1,
   "compositions": [
     {
-      "aggregate": "unknown"
+      "aggregate": "unknown",
+      "dependencies": [
+        "pkg:maven/ch.qos.logback/logback-classic@1.5.11?type=jar",
+        "pkg:maven/ch.qos.logback/logback-core@1.5.11?type=jar",
+        "pkg:maven/com.example/sbom-example-app@1.1.0?type=jar",
+        "pkg:maven/com.fasterxml.jackson.core/jackson-annotations@2.17.2?type=jar",
+        "pkg:maven/com.fasterxml.jackson.core/jackson-core@2.17.2?type=jar",
+        "pkg:maven/com.fasterxml.jackson.core/jackson-databind@2.17.2?type=jar",
+        "pkg:maven/com.fasterxml.jackson.datatype/jackson-datatype-jdk8@2.17.2?type=jar",
+        "pkg:maven/com.fasterxml.jackson.datatype/jackson-datatype-jsr310@2.17.2?type=jar",
+        "pkg:maven/com.fasterxml.jackson.module/jackson-module-parameter-names@2.17.2?type=jar",
+        "pkg:maven/com.fasterxml/classmate@1.5.1?type=jar",
+        "pkg:maven/com.h2database/h2@2.3.232?type=jar",
+        "pkg:maven/com.sun.istack/istack-commons-runtime@4.1.1?type=jar",
+        "pkg:maven/com.zaxxer/HikariCP@5.1.0?type=jar",
+        "pkg:maven/io.micrometer/micrometer-commons@1.13.6?type=jar",
+        "pkg:maven/io.micrometer/micrometer-core@1.13.6?type=jar",
+        "pkg:maven/io.micrometer/micrometer-jakarta9@1.13.6?type=jar",
+        "pkg:maven/io.micrometer/micrometer-observation@1.13.6?type=jar",
+        "pkg:maven/io.smallrye/jandex@3.1.2?type=jar",
+        "pkg:maven/jakarta.activation/jakarta.activation-api@2.1.3?type=jar",
+        "pkg:maven/jakarta.annotation/jakarta.annotation-api@2.1.1?type=jar",
+        "pkg:maven/jakarta.inject/jakarta.inject-api@2.0.1?type=jar",
+        "pkg:maven/jakarta.persistence/jakarta.persistence-api@3.1.0?type=jar",
+        "pkg:maven/jakarta.transaction/jakarta.transaction-api@2.0.1?type=jar",
+        "pkg:maven/jakarta.xml.bind/jakarta.xml.bind-api@4.0.2?type=jar",
+        "pkg:maven/net.bytebuddy/byte-buddy@1.14.15?type=jar",
+        "pkg:maven/org.antlr/antlr4-runtime@4.13.0?type=jar",
+        "pkg:maven/org.apache.commons/commons-lang3@3.17.0?type=jar",
+        "pkg:maven/org.apache.logging.log4j/log4j-api@2.23.1?type=jar",
+        "pkg:maven/org.apache.logging.log4j/log4j-to-slf4j@2.23.1?type=jar",
+        "pkg:maven/org.apache.tomcat.embed/tomcat-embed-core@10.1.31?type=jar",
+        "pkg:maven/org.apache.tomcat.embed/tomcat-embed-el@10.1.31?type=jar",
+        "pkg:maven/org.apache.tomcat.embed/tomcat-embed-websocket@10.1.31?type=jar",
+        "pkg:maven/org.aspectj/aspectjweaver@1.9.22.1?type=jar",
+        "pkg:maven/org.eclipse.angus/angus-activation@2.0.0?type=jar",
+        "pkg:maven/org.glassfish.jaxb/jaxb-core@4.0.2?type=jar",
+        "pkg:maven/org.glassfish.jaxb/jaxb-runtime@4.0.2?type=jar",
+        "pkg:maven/org.glassfish.jaxb/txw2@4.0.2?type=jar",
+        "pkg:maven/org.hdrhistogram/HdrHistogram@2.2.2?type=jar",
+        "pkg:maven/org.hibernate.common/hibernate-commons-annotations@6.0.6.Final?type=jar",
+        "pkg:maven/org.hibernate.orm/hibernate-core@6.5.3.Final?type=jar",
+        "pkg:maven/org.jboss.logging/jboss-logging@3.5.0.Final?type=jar",
+        "pkg:maven/org.latencyutils/LatencyUtils@2.0.3?type=jar",
+        "pkg:maven/org.slf4j/jul-to-slf4j@2.0.16?type=jar",
+        "pkg:maven/org.slf4j/slf4j-api@2.0.2?type=jar",
+        "pkg:maven/org.springframework.boot/spring-boot-actuator-autoconfigure@3.3.5?type=jar",
+        "pkg:maven/org.springframework.boot/spring-boot-actuator@3.3.5?type=jar",
+        "pkg:maven/org.springframework.boot/spring-boot-autoconfigure@3.3.5?type=jar",
+        "pkg:maven/org.springframework.boot/spring-boot-starter-actuator@3.3.5?type=jar",
+        "pkg:maven/org.springframework.boot/spring-boot-starter-aop@3.3.5?type=jar",
+        "pkg:maven/org.springframework.boot/spring-boot-starter-data-jpa@3.3.5?type=jar",
+        "pkg:maven/org.springframework.boot/spring-boot-starter-jdbc@3.3.5?type=jar",
+        "pkg:maven/org.springframework.boot/spring-boot-starter-json@3.3.5?type=jar",
+        "pkg:maven/org.springframework.boot/spring-boot-starter-logging@3.3.5?type=jar",
+        "pkg:maven/org.springframework.boot/spring-boot-starter-tomcat@3.3.5?type=jar",
+        "pkg:maven/org.springframework.boot/spring-boot-starter-web@3.3.5?type=jar",
+        "pkg:maven/org.springframework.boot/spring-boot-starter@3.3.5?type=jar",
+        "pkg:maven/org.springframework.boot/spring-boot@3.3.5?type=jar",
+        "pkg:maven/org.springframework.data/spring-data-commons@3.3.5?type=jar",
+        "pkg:maven/org.springframework.data/spring-data-jpa@3.3.5?type=jar",
+        "pkg:maven/org.springframework/spring-aop@6.1.14?type=jar",
+        "pkg:maven/org.springframework/spring-aspects@6.1.14?type=jar",
+        "pkg:maven/org.springframework/spring-beans@6.1.14?type=jar",
+        "pkg:maven/org.springframework/spring-context@6.1.14?type=jar",
+        "pkg:maven/org.springframework/spring-core@6.1.14?type=jar",
+        "pkg:maven/org.springframework/spring-expression@6.1.14?type=jar",
+        "pkg:maven/org.springframework/spring-jcl@6.1.14?type=jar",
+        "pkg:maven/org.springframework/spring-jdbc@6.1.14?type=jar",
+        "pkg:maven/org.springframework/spring-orm@6.1.14?type=jar",
+        "pkg:maven/org.springframework/spring-tx@6.1.14?type=jar",
+        "pkg:maven/org.springframework/spring-web@6.1.14?type=jar",
+        "pkg:maven/org.springframework/spring-webmvc@6.1.14?type=jar",
+        "pkg:maven/org.yaml/snakeyaml@2.2?type=jar"
+      ]
     }
   ]
 }

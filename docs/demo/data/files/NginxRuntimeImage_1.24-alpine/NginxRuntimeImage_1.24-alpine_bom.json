@@ -45896,7 +45896,7 @@
         "value": "unknown-to-author"
       }
     ],
-    "timestamp": "2026-10-20T15:16:24Z",
+    "timestamp": "2026-10-23T22:48:23Z",
     "tools": {
       "components": [
         {
@@ -45909,17 +45909,75 @@
           "name": "BomLens",
           "publisher": "SK Telecom",
           "type": "application",
-          "version": "1.13.9"
+          "version": "1.14.0"
         }
       ]
     }
   },
-  "serialNumber": "urn:uuid:e5bcd78b-1071-433e-b70f-e2d089fa7bbf",
+  "serialNumber": "urn:uuid:23c68a83-502f-4518-96dd-2de75d7a463b",
   "specVersion": "1.6",
   "version": 1,
   "compositions": [
     {
-      "aggregate": "unknown"
+      "aggregate": "unknown",
+      "dependencies": [
+        "pkg:apk/alpine/alpine-baselayout@3.4.0-r0?arch=x86_64&distro=alpine-3.17.7&package-id=6e97ac524b16262e",
+        "pkg:apk/alpine/aom-libs@3.5.0-r0?arch=x86_64&distro=alpine-3.17.7&package-id=7bddfa32a11390db&upstream=aom",
+        "pkg:apk/alpine/apk-tools@2.12.10-r1?arch=x86_64&distro=alpine-3.17.7&package-id=16afe072554310ee",
+        "pkg:apk/alpine/brotli-libs@1.0.9-r9?arch=x86_64&distro=alpine-3.17.7&package-id=005491e94a33d00b&upstream=brotli",
+        "pkg:apk/alpine/busybox-binsh@1.35.0-r29?arch=x86_64&distro=alpine-3.17.7&package-id=93ba00f9117dea1c&upstream=busybox",
+        "pkg:apk/alpine/busybox@1.35.0-r29?arch=x86_64&distro=alpine-3.17.7&package-id=ca8e18476c9977b9",
+        "pkg:apk/alpine/ca-certificates@20230506-r0?arch=x86_64&distro=alpine-3.17.7&package-id=2f9f5fc1478eaf42",
+        "pkg:apk/alpine/curl@8.5.0-r0?arch=x86_64&distro=alpine-3.17.7&package-id=0b571a3ed57ccc52",
+        "pkg:apk/alpine/fontconfig@2.14.1-r0?arch=x86_64&distro=alpine-3.17.7&package-id=660c2ab4c7c0a9f5",
+        "pkg:apk/alpine/freetype@2.12.1-r0?arch=x86_64&distro=alpine-3.17.7&package-id=c9946c882a3cff61",
+        "pkg:apk/alpine/geoip@1.6.12-r3?arch=x86_64&distro=alpine-3.17.7&package-id=09dceaf46b58b8ee",
+        "pkg:apk/alpine/libavif@0.11.1-r0?arch=x86_64&distro=alpine-3.17.7&package-id=d26cde9e5b1b8a93",
+        "pkg:apk/alpine/libbsd@0.11.7-r0?arch=x86_64&distro=alpine-3.17.7&package-id=b76c4a1effdce309",
+        "pkg:apk/alpine/libbz2@1.0.8-r4?arch=x86_64&distro=alpine-3.17.7&package-id=2f0f3e827b7bfd4f&upstream=bzip2",
+        "pkg:apk/alpine/libc-utils@0.7.2-r3?arch=x86_64&distro=alpine-3.17.7&package-id=b1c2651bdcbb8d9c&upstream=libc-dev",
+        "pkg:apk/alpine/libcrypto3@3.0.12-r4?arch=x86_64&distro=alpine-3.17.7&package-id=b10e908f307dcdea&upstream=openssl",
+        "pkg:apk/alpine/libcurl@8.5.0-r0?arch=x86_64&distro=alpine-3.17.7&package-id=8bba5df3475ec4ab&upstream=curl",
+        "pkg:apk/alpine/libdav1d@1.0.0-r2?arch=x86_64&distro=alpine-3.17.7&package-id=b82627e9d94a773b&upstream=dav1d",
+        "pkg:apk/alpine/libedit@20221030.3.1-r0?arch=x86_64&distro=alpine-3.17.7&package-id=14b4efd093d0cc73",
+        "pkg:apk/alpine/libexpat@2.6.2-r0?arch=x86_64&distro=alpine-3.17.7&package-id=f843f8e4dd1ce5d5&upstream=expat",
+        "pkg:apk/alpine/libgcrypt@1.10.1-r0?arch=x86_64&distro=alpine-3.17.7&package-id=f7f0de7b422d2a79",
+        "pkg:apk/alpine/libgd@2.3.3-r3?arch=x86_64&distro=alpine-3.17.7&package-id=a02d7378826239fe&upstream=gd",
+        "pkg:apk/alpine/libgpg-error@1.46-r1?arch=x86_64&distro=alpine-3.17.7&package-id=a944500415d5c0d2",
+        "pkg:apk/alpine/libice@1.0.10-r1?arch=x86_64&distro=alpine-3.17.7&package-id=a2ceccc1179ea7a1",
+        "pkg:apk/alpine/libintl@0.21.1-r1?arch=x86_64&distro=alpine-3.17.7&package-id=29e6a9b16de12cd9&upstream=gettext",
+        "pkg:apk/alpine/libjpeg-turbo@2.1.4-r0?arch=x86_64&distro=alpine-3.17.7&package-id=a3f400796abb0452",
+        "pkg:apk/alpine/libmd@1.0.4-r0?arch=x86_64&distro=alpine-3.17.7&package-id=3b1ada4b7d623a84",
+        "pkg:apk/alpine/libpng@1.6.39-r0?arch=x86_64&distro=alpine-3.17.7&package-id=7c1ba0840ebd6223",
+        "pkg:apk/alpine/libsm@1.2.3-r1?arch=x86_64&distro=alpine-3.17.7&package-id=803004cbe152d9fe",
+        "pkg:apk/alpine/libssl3@3.0.12-r4?arch=x86_64&distro=alpine-3.17.7&package-id=ae67f981f2be9e5a&upstream=openssl",
+        "pkg:apk/alpine/libuuid@2.38.1-r1?arch=x86_64&distro=alpine-3.17.7&package-id=abb8fc11a74159c0&upstream=util-linux",
+        "pkg:apk/alpine/libwebp@1.2.4-r3?arch=x86_64&distro=alpine-3.17.7&package-id=1e0ab57302189d9c",
+        "pkg:apk/alpine/libx11@1.8.7-r0?arch=x86_64&distro=alpine-3.17.7&package-id=d4603b28db29ff29",
+        "pkg:apk/alpine/libxau@1.0.10-r0?arch=x86_64&distro=alpine-3.17.7&package-id=f7facf15deeb76ad",
+        "pkg:apk/alpine/libxcb@1.15-r0?arch=x86_64&distro=alpine-3.17.7&package-id=3a45efceaf770ece",
+        "pkg:apk/alpine/libxdmcp@1.1.4-r0?arch=x86_64&distro=alpine-3.17.7&package-id=ff29eb9b850be859",
+        "pkg:apk/alpine/libxext@1.3.5-r0?arch=x86_64&distro=alpine-3.17.7&package-id=1bb7617caccafb21",
+        "pkg:apk/alpine/libxml2@2.10.4-r0?arch=x86_64&distro=alpine-3.17.7&package-id=f09a8c2ed073953a",
+        "pkg:apk/alpine/libxpm@3.5.15-r0?arch=x86_64&distro=alpine-3.17.7&package-id=9a268a7f89debeb5",
+        "pkg:apk/alpine/libxslt@1.1.37-r1?arch=x86_64&distro=alpine-3.17.7&package-id=c80b355e26c33f48",
+        "pkg:apk/alpine/libxt@1.2.1-r0?arch=x86_64&distro=alpine-3.17.7&package-id=88e7d7ee3d55e00b",
+        "pkg:apk/alpine/musl-utils@1.2.3-r5?arch=x86_64&distro=alpine-3.17.7&package-id=bc4a891b3ccf1867&upstream=musl",
+        "pkg:apk/alpine/ncurses-libs@6.3_p20221119-r1?arch=x86_64&distro=alpine-3.17.7&package-id=a33387e463bcd6a8&upstream=ncurses",
+        "pkg:apk/alpine/nghttp2-libs@1.51.0-r2?arch=x86_64&distro=alpine-3.17.7&package-id=61c5885b62788e64&upstream=nghttp2",
+        "pkg:apk/alpine/nginx-module-geoip@1.24.0-r1?arch=x86_64&distro=alpine-3.17.7&package-id=e1714bd3992e0b50",
+        "pkg:apk/alpine/nginx-module-image-filter@1.24.0-r1?arch=x86_64&distro=alpine-3.17.7&package-id=24c266d25d51870e",
+        "pkg:apk/alpine/nginx-module-njs@1.24.0.0.7.12-r1?arch=x86_64&distro=alpine-3.17.7&package-id=e2216ab0609277b2",
+        "pkg:apk/alpine/nginx-module-xslt@1.24.0-r1?arch=x86_64&distro=alpine-3.17.7&package-id=36612e86b15f0ae1",
+        "pkg:apk/alpine/nginx@1.24.0-r1?arch=x86_64&distro=alpine-3.17.7&package-id=907a1ddaad3cf576",
+        "pkg:apk/alpine/pcre2@10.42-r0?arch=x86_64&distro=alpine-3.17.7&package-id=7a6d329fd83fbe68",
+        "pkg:apk/alpine/scanelf@1.3.5-r1?arch=x86_64&distro=alpine-3.17.7&package-id=aa189d4fe94178ae&upstream=pax-utils",
+        "pkg:apk/alpine/ssl_client@1.35.0-r29?arch=x86_64&distro=alpine-3.17.7&package-id=8827bc68b60ba6d0&upstream=busybox",
+        "pkg:apk/alpine/tiff@4.4.0-r4?arch=x86_64&distro=alpine-3.17.7&package-id=570e283921452f67",
+        "pkg:apk/alpine/xz-libs@5.2.9-r0?arch=x86_64&distro=alpine-3.17.7&package-id=ef9c11af2472497f&upstream=xz",
+        "pkg:apk/alpine/zlib@1.2.13-r0?arch=x86_64&distro=alpine-3.17.7&package-id=0f6f64aa11912270",
+        "pkg:apk/alpine/zstd-libs@1.5.5-r0?arch=x86_64&distro=alpine-3.17.7&package-id=47bd720affa207ad&upstream=zstd"
+      ]
     }
   ]
 }

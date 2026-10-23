@@ -21,11 +21,11 @@
       "type": "directory"
     },
     {
-      "path": "pom.xml",
+      "path": "README.md",
       "type": "file"
     },
     {
-      "path": "README.md",
+      "path": "pom.xml",
       "type": "file"
     },
     {
@@ -34,10 +34,6 @@
     },
     {
       "path": "src/main/.gitkeep",
-      "type": "file"
-    },
-    {
-      "path": "src/main/java/.gitkeep",
       "type": "file"
     },
     {
@@ -50,6 +46,10 @@
     },
     {
       "path": "src/main/java/com/example/Application.java",
+      "type": "file"
+    },
+    {
+      "path": "src/main/java/.gitkeep",
       "type": "file"
     }
   ]

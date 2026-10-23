@@ -17,6 +17,8 @@
   --input: 240 5% 91%;
   --primary: 240 6% 10%;
   --primary-foreground: 0 0% 98%;
+  --selected: 240 6% 10%;
+  --selected-foreground: 0 0% 98%;
   --secondary: 240 5% 96%;
   --secondary-foreground: 240 6% 10%;
   --accent: 240 5% 96%;
@@ -91,18 +93,20 @@
 }
 @media screen and (prefers-color-scheme: dark) {
 :root {
-  --background: 240 6% 6%;
+  --background: 240 6% 7%;
   --foreground: 0 0% 98%;
-  --card: 240 4% 11%;
+  --card: 240 4% 12%;
   --card-foreground: 0 0% 98%;
-  --popover: 240 4% 11%;
+  --popover: 240 4% 12%;
   --popover-foreground: 0 0% 98%;
   --muted: 240 4% 16%;
   --muted-foreground: 240 5% 65%;
-  --border: 240 4% 16%;
-  --input: 240 4% 16%;
+  --border: 240 4% 24%;
+  --input: 240 4% 24%;
   --primary: 0 0% 98%;
   --primary-foreground: 240 6% 10%;
+  --selected: 240 5% 30%;
+  --selected-foreground: 0 0% 98%;
   --secondary: 240 4% 16%;
   --secondary-foreground: 0 0% 98%;
   --accent: 240 4% 16%;
@@ -114,9 +118,9 @@
   --brand-foreground: 0 0% 100%;
   --brand-strong: 349 100% 68%;
   --brand-accent: 24 90% 60%;
-  --sidebar: 240 5% 9%;
+  --sidebar: 240 5% 10%;
   --sidebar-foreground: 0 0% 98%;
-  --sidebar-border: 240 4% 16%;
+  --sidebar-border: 240 4% 24%;
   --role-danger-fg: 252 165 165;
   --role-danger-muted: 60 38 41;
   --role-danger-emphasis: 248 113 113;
@@ -318,7 +322,7 @@ pre code{font-family:var(--mono);font-size:var(--font-size-mono);white-space:pre
  <div class="report-kind">Security Report</div>
 </header>
 <h1>Security Report</h1>
-<p class="meta">Project: NginxRuntimeImage &middot; Generated: <time datetime="2026-10-20T15:16:29Z">2026-10-20 15:16 UTC</time> &middot; Engine: Trivy</p>
+<p class="meta">Project: NginxRuntimeImage &middot; Generated: <time datetime="2026-10-23T22:48:31Z">2026-10-23 22:48 UTC</time> &middot; Engine: Trivy</p>
 <div class="cards">
  <span class="pill pill-crit">Critical <span class="count">2</span></span>
  <span class="pill pill-high">High <span class="count">11</span></span>
@@ -333,8 +337,8 @@ pre code{font-family:var(--mono);font-size:var(--font-size-mono);white-space:pre
 <tr><td class="sev-CRITICAL">CRITICAL</td><td></td><td class="num">9.8</td><td class="num">0.011</td><td class="id">CVE-2024-45491</td><td>libexpat</td><td>2.6.2-r0</td><td>2.6.3-r0</td><td>libexpat: Integer Overflow or Wraparound</td></tr>
 <tr><td class="sev-HIGH">HIGH</td><td></td><td class="num">7.5</td><td class="num">0.665</td><td class="id">CVE-2024-6119</td><td>libcrypto3</td><td>3.0.12-r4</td><td>3.0.15-r0</td><td>openssl: Possible denial of service in X.509 name checks</td></tr>
 <tr><td class="sev-HIGH">HIGH</td><td></td><td class="num">7.5</td><td class="num">0.665</td><td class="id">CVE-2024-6119</td><td>libssl3</td><td>3.0.12-r4</td><td>3.0.15-r0</td><td>openssl: Possible denial of service in X.509 name checks</td></tr>
-<tr><td class="sev-HIGH">HIGH</td><td></td><td class="num">9.8</td><td class="num">0.524</td><td class="id">CVE-2025-15467</td><td>libcrypto3</td><td>3.0.12-r4</td><td>3.0.19-r0</td><td>openssl: OpenSSL: Remote code execution or Denial of Service via oversized Initialization Vector in CMS parsing</td></tr>
-<tr><td class="sev-HIGH">HIGH</td><td></td><td class="num">9.8</td><td class="num">0.524</td><td class="id">CVE-2025-15467</td><td>libssl3</td><td>3.0.12-r4</td><td>3.0.19-r0</td><td>openssl: OpenSSL: Remote code execution or Denial of Service via oversized Initialization Vector in CMS parsing</td></tr>
+<tr><td class="sev-HIGH">HIGH</td><td></td><td class="num">9.8</td><td class="num">0.558</td><td class="id">CVE-2025-15467</td><td>libcrypto3</td><td>3.0.12-r4</td><td>3.0.19-r0</td><td>openssl: OpenSSL: Remote code execution or Denial of Service via oversized Initialization Vector in CMS parsing</td></tr>
+<tr><td class="sev-HIGH">HIGH</td><td></td><td class="num">9.8</td><td class="num">0.558</td><td class="id">CVE-2025-15467</td><td>libssl3</td><td>3.0.12-r4</td><td>3.0.19-r0</td><td>openssl: OpenSSL: Remote code execution or Denial of Service via oversized Initialization Vector in CMS parsing</td></tr>
 <tr><td class="sev-HIGH">HIGH</td><td></td><td class="num">7.5</td><td class="num">0.042</td><td class="id">CVE-2024-6197</td><td>curl</td><td>8.5.0-r0</td><td>8.9.0-r0</td><td>curl: freeing stack buffer in utf8asn1str</td></tr>
 <tr><td class="sev-HIGH">HIGH</td><td></td><td class="num">7.5</td><td class="num">0.042</td><td class="id">CVE-2024-6197</td><td>libcurl</td><td>8.5.0-r0</td><td>8.9.0-r0</td><td>curl: freeing stack buffer in utf8asn1str</td></tr>
 <tr><td class="sev-HIGH">HIGH</td><td></td><td class="num">7.5</td><td class="num">0.016</td><td class="id">CVE-2024-45490</td><td>libexpat</td><td>2.6.2-r0</td><td>2.6.3-r0</td><td>libexpat: Negative Length Parsing Vulnerability in libexpat</td></tr>
@@ -383,8 +387,8 @@ pre code{font-family:var(--mono);font-size:var(--font-size-mono);white-space:pre
 <tr><td class="sev-LOW">LOW</td><td></td><td class="num">5.3</td><td class="num">0.016</td><td class="id">CVE-2024-2004</td><td>libcurl</td><td>8.5.0-r0</td><td>8.7.1-r0</td><td>curl: Usage of disabled protocol</td></tr>
 <tr><td class="sev-LOW">LOW</td><td></td><td class="num">5.3</td><td class="num">0.011</td><td class="id">CVE-2024-4603</td><td>libcrypto3</td><td>3.0.12-r4</td><td>3.0.13-r0</td><td>openssl: Excessive time spent checking DSA keys and parameters</td></tr>
 <tr><td class="sev-LOW">LOW</td><td></td><td class="num">5.3</td><td class="num">0.011</td><td class="id">CVE-2024-4603</td><td>libssl3</td><td>3.0.12-r4</td><td>3.0.13-r0</td><td>openssl: Excessive time spent checking DSA keys and parameters</td></tr>
-<tr><td class="sev-LOW">LOW</td><td></td><td class="num">7.5</td><td class="num">0.008</td><td class="id">CVE-2025-69420</td><td>libcrypto3</td><td>3.0.12-r4</td><td>3.0.19-r0</td><td>openssl: OpenSSL: Denial of Service via malformed TimeStamp Response</td></tr>
-<tr><td class="sev-LOW">LOW</td><td></td><td class="num">7.5</td><td class="num">0.008</td><td class="id">CVE-2025-69420</td><td>libssl3</td><td>3.0.12-r4</td><td>3.0.19-r0</td><td>openssl: OpenSSL: Denial of Service via malformed TimeStamp Response</td></tr>
+<tr><td class="sev-LOW">LOW</td><td></td><td class="num">7.5</td><td class="num">0.009</td><td class="id">CVE-2025-69420</td><td>libcrypto3</td><td>3.0.12-r4</td><td>3.0.19-r0</td><td>openssl: OpenSSL: Denial of Service via malformed TimeStamp Response</td></tr>
+<tr><td class="sev-LOW">LOW</td><td></td><td class="num">7.5</td><td class="num">0.009</td><td class="id">CVE-2025-69420</td><td>libssl3</td><td>3.0.12-r4</td><td>3.0.19-r0</td><td>openssl: OpenSSL: Denial of Service via malformed TimeStamp Response</td></tr>
 <tr><td class="sev-LOW">LOW</td><td></td><td class="num">4.7</td><td class="num">0.006</td><td class="id">CVE-2024-13176</td><td>libcrypto3</td><td>3.0.12-r4</td><td>3.0.19-r0</td><td>openssl: Timing side-channel in ECDSA signature computation</td></tr>
 <tr><td class="sev-LOW">LOW</td><td></td><td class="num">4.7</td><td class="num">0.006</td><td class="id">CVE-2024-13176</td><td>libssl3</td><td>3.0.12-r4</td><td>3.0.19-r0</td><td>openssl: Timing side-channel in ECDSA signature computation</td></tr>
 <tr><td class="sev-LOW">LOW</td><td></td><td class="num">5.9</td><td class="num">0.005</td><td class="id">CVE-2026-22796</td><td>libcrypto3</td><td>3.0.12-r4</td><td>3.0.19-r0</td><td>openssl: OpenSSL: Denial of Service via type confusion in PKCS#7 signature verification</td></tr>
