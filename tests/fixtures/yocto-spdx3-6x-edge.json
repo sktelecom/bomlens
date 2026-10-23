@@ -1,0 +1,46 @@
+{
+  "_comment": "Edge cases of a Yocto 6.x SPDX 3.0 image SBOM for parse-yocto-spdx.py. Licenses: a concluded NOASSERTION falling back to a real declared license (lic-fallback), declared NONE and CLOSED written as expressions (lic-none, lic-closed), a single LicenseRef (lic-ref). A purl with a percent-encoded version (libc6, as Yocto writes 2.44+git). One vulnerability linked from two recipes that judge it differently: fixed for liba, affected for libb. The image (primaryPurpose archive) also `generates` liba1 and has a vulnerability; only a specification package is a recipe, so neither its name nor its CVE reaches liba1. Expected parse: 7 components, licenses BSD-3-Clause / none / none / LicenseRef-Vendor-EULA (as a name); counts 1 fixed + 0 not-affected + 1 unresolved, the unresolved one on libb1.",
+  "@context": "https://spdx.org/rdf/3.0.1/spdx-context.jsonld",
+  "@graph": [
+    {"type":"CreationInfo","@id":"_:ci","specVersion":"3.0.1","created":"2026-03-01T00:00:00Z","createdBy":["urn:agent:oe"],"createdUsing":["urn:agent:bitbake"]},
+    {"type":"Tool","spdxId":"urn:agent:bitbake","name":"bitbake","creationInfo":"_:ci"},
+    {"type":"SpdxDocument","spdxId":"urn:doc","name":"core-image-minimal","creationInfo":"_:ci","rootElement":["urn:sbom"]},
+    {"type":"software_Sbom","spdxId":"urn:sbom","creationInfo":"_:ci","name":"core-image-minimal-qemux86-64.rootfs","rootElement":["urn:pkg:image"]},
+    {"type":"software_Package","spdxId":"urn:pkg:image","creationInfo":"_:ci","name":"core-image-minimal","software_primaryPurpose":"archive"},
+
+    {"type":"software_Package","spdxId":"urn:pkg:lic-fallback","creationInfo":"_:ci","name":"lic-fallback","software_packageVersion":"1.0","software_primaryPurpose":"install"},
+    {"type":"software_Package","spdxId":"urn:pkg:lic-none","creationInfo":"_:ci","name":"lic-none","software_packageVersion":"1.0","software_primaryPurpose":"install"},
+    {"type":"software_Package","spdxId":"urn:pkg:lic-closed","creationInfo":"_:ci","name":"lic-closed","software_packageVersion":"1.0","software_primaryPurpose":"install"},
+    {"type":"software_Package","spdxId":"urn:pkg:lic-ref","creationInfo":"_:ci","name":"lic-ref","software_packageVersion":"1.0","software_primaryPurpose":"install"},
+    {"type":"simplelicensing_LicenseExpression","spdxId":"urn:lic:noassertion","creationInfo":"_:ci","simplelicensing_licenseExpression":"NOASSERTION"},
+    {"type":"simplelicensing_LicenseExpression","spdxId":"urn:lic:bsd3","creationInfo":"_:ci","simplelicensing_licenseExpression":"BSD-3-Clause"},
+    {"type":"simplelicensing_LicenseExpression","spdxId":"urn:lic:none","creationInfo":"_:ci","simplelicensing_licenseExpression":"NONE"},
+    {"type":"simplelicensing_LicenseExpression","spdxId":"urn:lic:closed","creationInfo":"_:ci","simplelicensing_licenseExpression":"CLOSED"},
+    {"type":"simplelicensing_LicenseExpression","spdxId":"urn:lic:ref","creationInfo":"_:ci","simplelicensing_licenseExpression":"LicenseRef-Vendor-EULA"},
+    {"type":"Relationship","spdxId":"urn:rel:l1","creationInfo":"_:ci","from":"urn:pkg:lic-fallback","relationshipType":"hasConcludedLicense","to":["urn:lic:noassertion"]},
+    {"type":"Relationship","spdxId":"urn:rel:l2","creationInfo":"_:ci","from":"urn:pkg:lic-fallback","relationshipType":"hasDeclaredLicense","to":["urn:lic:bsd3"]},
+    {"type":"Relationship","spdxId":"urn:rel:l3","creationInfo":"_:ci","from":"urn:pkg:lic-none","relationshipType":"hasDeclaredLicense","to":["urn:lic:none"]},
+    {"type":"Relationship","spdxId":"urn:rel:l4","creationInfo":"_:ci","from":"urn:pkg:lic-closed","relationshipType":"hasDeclaredLicense","to":["urn:lic:closed"]},
+    {"type":"Relationship","spdxId":"urn:rel:l5","creationInfo":"_:ci","from":"urn:pkg:lic-ref","relationshipType":"hasDeclaredLicense","to":["urn:lic:ref"]},
+
+    {"type":"software_Package","spdxId":"urn:pkg:libc6","creationInfo":"_:ci","name":"libc6","software_packageVersion":"2.44+git","software_primaryPurpose":"install",
+     "software_packageUrl":"pkg:yocto/core/glibc@2.44%2Bgit"},
+
+    {"type":"software_Package","spdxId":"urn:recipe:liba","creationInfo":"_:ci","name":"liba","software_packageVersion":"1.0","software_primaryPurpose":"specification"},
+    {"type":"software_Package","spdxId":"urn:recipe:libb","creationInfo":"_:ci","name":"libb","software_packageVersion":"1.0","software_primaryPurpose":"specification"},
+    {"type":"software_Package","spdxId":"urn:pkg:liba1","creationInfo":"_:ci","name":"liba1","software_packageVersion":"1.0","software_primaryPurpose":"install"},
+    {"type":"software_Package","spdxId":"urn:pkg:libb1","creationInfo":"_:ci","name":"libb1","software_packageVersion":"1.0","software_primaryPurpose":"install"},
+    {"type":"LifecycleScopedRelationship","spdxId":"urn:rel:g0","creationInfo":"_:ci","from":"urn:pkg:image","relationshipType":"generates","scope":"build","to":["urn:pkg:liba1"]},
+    {"type":"Relationship","spdxId":"urn:rel:v0","creationInfo":"_:ci","from":"urn:pkg:image","relationshipType":"hasAssociatedVulnerability","to":["urn:vuln:image"]},
+    {"type":"security_Vulnerability","spdxId":"urn:vuln:image","creationInfo":"_:ci",
+     "externalIdentifier":[{"type":"ExternalIdentifier","externalIdentifierType":"cve","identifier":"CVE-2026-10002"}]},
+    {"type":"LifecycleScopedRelationship","spdxId":"urn:rel:g1","creationInfo":"_:ci","from":"urn:recipe:liba","relationshipType":"generates","scope":"build","to":["urn:pkg:liba1"]},
+    {"type":"LifecycleScopedRelationship","spdxId":"urn:rel:g2","creationInfo":"_:ci","from":"urn:recipe:libb","relationshipType":"generates","scope":"build","to":["urn:pkg:libb1"]},
+    {"type":"security_Vulnerability","spdxId":"urn:vuln:shared","creationInfo":"_:ci",
+     "externalIdentifier":[{"type":"ExternalIdentifier","externalIdentifierType":"cve","identifier":"CVE-2026-10001"}]},
+    {"type":"Relationship","spdxId":"urn:rel:v1","creationInfo":"_:ci","from":"urn:recipe:liba","relationshipType":"hasAssociatedVulnerability","to":["urn:vuln:shared"]},
+    {"type":"Relationship","spdxId":"urn:rel:v2","creationInfo":"_:ci","from":"urn:recipe:libb","relationshipType":"hasAssociatedVulnerability","to":["urn:vuln:shared"]},
+    {"type":"security_VexFixedVulnAssessmentRelationship","spdxId":"urn:vex:a","creationInfo":"_:ci","from":"urn:vuln:shared","relationshipType":"fixedIn","to":["urn:recipe:liba"]},
+    {"type":"security_VexAffectedVulnAssessmentRelationship","spdxId":"urn:vex:b","creationInfo":"_:ci","from":"urn:vuln:shared","relationshipType":"affects","to":["urn:recipe:libb"]}
+  ]
+}

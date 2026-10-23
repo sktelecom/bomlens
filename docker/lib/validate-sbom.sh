@@ -1113,7 +1113,7 @@ if [ "$CONFORMANCE_PROFILE" = "skt-submission" ] && [ "$FORMAT" = "CycloneDX" ];
         | [ $versionless[] | select(reason == null) | (.name // "(unnamed)") ] as $nover
         | [ $versionless[] | select(reason != null) | {name: (.name // "(unnamed)"), reason: reason} ] as $explained
         | [ $pkg[] | select(((.version // "") | tostring) != "")
-                   | select(((.purl // "") == "") or ((.purl // "") | test("^pkg:(generic|opkg|openwrt)/"; "i")))
+                   | select(((.purl // "") == "") or ((.purl // "") | test("^pkg:(generic|opkg|openwrt|yocto)/"; "i")))
                    | ((.name // "(unnamed)") + "@" + (.version | tostring)) ] as $noup
         # What the generic rows would still fail on once the explained and the
         # no-upstream-purl components are excused (see the note above).
@@ -1164,8 +1164,8 @@ if [ "$CONFORMANCE_PROFILE" = "skt-submission" ] && [ "$FORMAT" = "CycloneDX" ];
              status: (if ($noup | length) == 0 then "pass" else "warn" end),
              detail: "\($noup | length) without an upstream purl", missing: ($noup[0:$cap]),
              reviewGuide: (if $analyze then {
-               how: "These components have a version but no purl that names their source repository (none, pkg:generic, pkg:opkg or pkg:openwrt), so they cannot be looked up by purl. Ask the supplier for an SBOM that gives each one the purl of its source repository at the release tag, for example by scanning again with a current BomLens firmware, root filesystem or binary scan.",
-               how_ko: "버전은 있지만 소스 저장소를 가리키는 purl이 없어(purl 없음, pkg:generic, pkg:opkg, pkg:openwrt) purl로 조회할 수 없는 구성요소입니다. 각 구성요소에 릴리스 태그 기준 소스 저장소 purl을 넣은 SBOM을 공급사에 요청합니다. 최신 BomLens로 펌웨어, 루트 파일시스템, 바이너리를 다시 스캔하는 방법이 있습니다.",
+               how: "These components have a version but no purl that names their source repository (none, pkg:generic, pkg:opkg, pkg:openwrt or pkg:yocto), so they cannot be looked up by purl. Ask the supplier for an SBOM that gives each one the purl of its source repository at the release tag, for example by scanning again with a current BomLens firmware, root filesystem or binary scan.",
+               how_ko: "버전은 있지만 소스 저장소를 가리키는 purl이 없어(purl 없음, pkg:generic, pkg:opkg, pkg:openwrt, pkg:yocto) purl로 조회할 수 없는 구성요소입니다. 각 구성요소에 릴리스 태그 기준 소스 저장소 purl을 넣은 SBOM을 공급사에 요청합니다. 최신 BomLens로 펌웨어, 루트 파일시스템, 바이너리를 다시 스캔하는 방법이 있습니다.",
                docUrl: "https://sktelecom.github.io/bomlens/guides/supplier-sbom/"}
              else {
                how: "These components have a version but no purl that names their source repository, because the upstream purl table does not cover the project or that version form. This is not for the supplier to fix and does not block the submission: submit the SBOM as it is, and SK Telecom checks these components separately. Do not edit the SBOM by hand.",

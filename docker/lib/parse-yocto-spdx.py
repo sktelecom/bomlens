@@ -20,11 +20,17 @@
 # What this reads instead (all verified against that sample):
 #   - software_Package with software_primaryPurpose == "install"  -> the shipped set.
 #     The other 92 packages are upstream source tarballs consumed by the build.
-#   - hasConcludedLicense edges                                   -> licenses.
+#   - hasConcludedLicense edges, else hasDeclaredLicense          -> licenses.
 #     All 35 installed packages carry one directly; no need to walk build edges.
+#     From 6.0 the declared one is the one Yocto always writes.
 #   - externalIdentifier[cpe23]                                   -> component.cpe.
 #     Yocto writes these from CVE_PRODUCT with a wildcard vendor.
-#   - hasAssociatedVulnerability edges + the two VEX relationship types.
+#   - software_packageUrl (6.0 and later)                         -> component.purl.
+#   - the recipe (generates, or build_Build hasOutput)            -> bomlens:yocto:recipe.
+#   - hasAssociatedVulnerability edges + the VEX relationship types. From 6.0
+#     they hang off the recipe (primaryPurpose "specification"), and are read
+#     on every installed package the recipe `generates`, which is where 5.x
+#     put them.
 #
 # The VEX split is the point. Yocto knows whether it applied the patch, so a CVE it
 # reports as `fixedIn` is genuinely closed on this image — an outside scanner keyed
@@ -36,12 +42,17 @@
 #
 # Vulnerabilities that hang off build-host recipes (`-native`, `-cross`, ...) never
 # link to an installed package, so filtering by recipe name is unnecessary: reading
-# only the hasAssociatedVulnerability edges of installed packages excludes them.
+# only the hasAssociatedVulnerability edges of installed packages, and of the
+# recipes that generate them, excludes them.
 #
 # Measured against published Yocto artifacts, not only fixtures. These numbers
 # are what a change here has to keep:
 #   3.0 document, Scarthgap core-image-minimal   35 packages, 12255 fixed / 63 not-affected / 0 open
 #   3.0 document, Walnascar 5.2.4 core-image-minimal  39 packages = its manifest, 9 / 63 / 0
+#   3.0 document, 6.0.4 core-image-minimal       38 packages, 38 licensed, 39 / 71 / 0
+#   3.0 document, 6.1 core-image-minimal         36 packages, 36 licensed, 17 / 77 / 28
+#                                                (the 28 are 7 kernel CVEs stated affected,
+#                                                on each of the 4 kernel packages)
 #   2.2 archive,  Scarthgap 5.0.14 core-image-minimal 36 packages = its manifest,
 #                                                36 licensed, 35 with a CPE
 #   2.2 archive,  Scarthgap 5.0.14 full-cmdline  443 packages = its manifest, ~0.5 s
@@ -66,7 +77,12 @@ if os.environ.get("CYCLONEDX_SPEC_VERSION") == "1.7":
 # vulnerability unresolved, which is the safe direction (it stays visible).
 VEX_FIXED = "security_VexFixedVulnAssessmentRelationship"
 VEX_NOT_AFFECTED = "security_VexNotAffectedVulnAssessmentRelationship"
+# security_VexAffectedVulnAssessmentRelationship (written from 6.1 for an
+# unpatched CVE) needs no set of its own: it is counted with the vulnerabilities
+# that have no statement, as affected, and both reach the security sidecar.
 REL_TYPES = ("Relationship", "LifecycleScopedRelationship")
+# How bitbake names the build of a recipe's packages: "<PN>:do_create_spdx:recipe".
+RECIPE_BUILD_SUFFIX = ":do_create_spdx:recipe"
 
 
 def _iter_graph(doc):
@@ -91,17 +107,49 @@ def _as_list(v):
     return v if isinstance(v, list) else [v]
 
 
+# License values that state no license. Yocto links a package whose LICENSE is
+# CLOSED to NoneElement, which is not an element of the graph and so resolves
+# to nothing; the strings cover a generator that writes them as an expression.
+NO_LICENSE = ("NONE", "NOASSERTION", "CLOSED")
+
+
+def _license_expression(by_id, to):
+    """The license expression a license relationship points at, or None."""
+    targets = _as_list(to)
+    if not targets:
+        return None
+    lic = by_id.get(targets[0]) or {}
+    expr = lic.get("simplelicensing_licenseExpression")
+    if not isinstance(expr, str) or expr.strip() in ("",) + NO_LICENSE:
+        return None
+    return expr
+
+
+def _package_url(pkg):
+    """The purl Yocto wrote for a package (6.0 and later), or None."""
+    purl = pkg.get("software_packageUrl")
+    if not isinstance(purl, str) or not purl.startswith("pkg:"):
+        purl = next((p for p in _ext_ids(pkg, "packageUrl")
+                     if isinstance(p, str) and p.startswith("pkg:")), None)
+    return purl[:1024] if purl else None
+
+
 def _licenses_cdx(expression):
     """CycloneDX licenses[] for one SPDX license expression.
 
     A compound expression (AND/OR) is not a license id, so it goes in `expression`;
     a bare id goes in `license.id`. Same shape enrich-cpe.sh produces, so downstream
     license classification sees one format regardless of which path built the SBOM.
+    A LicenseRef (Yocto writes one for every license outside the SPDX list, such
+    as the kernel's LicenseRef-GPL-2.0-with-Linux-syscall-note) is not a list id,
+    which is all CycloneDX allows in `license.id`, so it goes in `license.name`.
     """
     if not expression:
         return []
     if " AND " in expression or " OR " in expression or " WITH " in expression:
         return [{"expression": expression}]
+    if expression.startswith("LicenseRef-") or ":LicenseRef-" in expression:
+        return [{"license": {"name": expression}}]
     return [{"license": {"id": expression}}]
 
 
@@ -161,10 +209,73 @@ def extract(doc):
         and e.get("spdxId")
     }
 
-    fixed_ids = {e.get("from") for e in graph if e.get("type") == VEX_FIXED}
-    not_affected_ids = {e.get("from") for e in graph if e.get("type") == VEX_NOT_AFFECTED}
+    # A VEX statement judges a vulnerability for the elements in its `to`: the
+    # installed package in 5.x, the recipe from 6.0. The judgement is kept per
+    # (vulnerability, element), so a statement about one recipe never decides
+    # the same vulnerability for another. A statement naming no element judges
+    # the vulnerability wherever it is linked.
+    fixed_for = set()
+    not_affected_for = set()
+    for e in graph:
+        if e.get("type") == VEX_FIXED:
+            judged = fixed_for
+        elif e.get("type") == VEX_NOT_AFFECTED:
+            judged = not_affected_for
+        else:
+            continue
+        for target in _as_list(e.get("to")) or [None]:
+            judged.add((e.get("from"), target))
 
-    license_of = {}
+    def _judged(judged, vid, subjects):
+        return (vid, None) in judged or any((vid, s) in judged for s in subjects)
+
+    # From 6.0 the recipe, not each package it builds, carries the vulnerability
+    # links: a software_Package with primaryPurpose "specification" whose
+    # `generates` edges name the installed packages. Map each recipe to the
+    # installed packages it built so its links can be read on them below.
+    generated_by = {}
+    recipes_of = {}
+    for rel in graph:
+        if rel.get("type") in REL_TYPES and rel.get("relationshipType") == "generates":
+            source = by_id.get(rel.get("from")) or {}
+            if (source.get("type") != "software_Package"
+                    or source.get("software_primaryPurpose") != "specification"):
+                continue
+            targets = [t for t in _as_list(rel.get("to")) if t in installed]
+            if targets:
+                generated_by.setdefault(rel.get("from"), []).extend(targets)
+                for pkg_id in targets:
+                    recipes_of.setdefault(pkg_id, []).append(rel.get("from"))
+
+    # The recipe each installed package was built from (PN), which names the
+    # upstream project: openssl builds libssl3 and openssl-bin. 6.x names it on
+    # the specification package that generates the package; 5.x and 6.x both
+    # name the build_Build "<PN>:do_create_spdx:recipe" whose hasOutput is the
+    # package, read when there is no specification package.
+    recipe_of = {}
+    for recipe_id, pkg_ids in generated_by.items():
+        recipe_name = (by_id.get(recipe_id) or {}).get("name")
+        if isinstance(recipe_name, str) and recipe_name:
+            for pkg_id in pkg_ids:
+                recipe_of.setdefault(pkg_id, recipe_name)
+    for rel in graph:
+        if rel.get("type") not in REL_TYPES or rel.get("relationshipType") != "hasOutput":
+            continue
+        build = by_id.get(rel.get("from")) or {}
+        build_name = build.get("name")
+        if build.get("type") != "build_Build" or not isinstance(build_name, str):
+            continue
+        if not build_name.endswith(RECIPE_BUILD_SUFFIX):
+            continue
+        recipe_name = build_name[: -len(RECIPE_BUILD_SUFFIX)]
+        if not recipe_name:
+            continue
+        for pkg_id in _as_list(rel.get("to")):
+            if pkg_id in installed:
+                recipe_of.setdefault(pkg_id, recipe_name)
+
+    concluded_of = {}
+    declared_of = {}
     vulns_of = {}
     depends_of = {}
     for rel in graph:
@@ -172,6 +283,10 @@ def extract(doc):
             continue
         rtype = rel.get("relationshipType")
         src = rel.get("from")
+        if rtype == "hasAssociatedVulnerability" and src in generated_by:
+            for pkg_id in generated_by[src]:
+                vulns_of.setdefault(pkg_id, []).extend(_as_list(rel.get("to")))
+            continue
         if src not in installed:
             continue
         if rtype == "dependsOn":
@@ -185,13 +300,11 @@ def extract(doc):
             targets = [t for t in _as_list(rel.get("to")) if t in installed]
             if targets:
                 depends_of.setdefault(src, []).extend(targets)
-        elif rtype == "hasConcludedLicense":
-            targets = _as_list(rel.get("to"))
-            if targets:
-                lic = by_id.get(targets[0], {})
-                expr = lic.get("simplelicensing_licenseExpression")
-                if expr:
-                    license_of[src] = expr
+        elif rtype in ("hasConcludedLicense", "hasDeclaredLicense"):
+            expr = _license_expression(by_id, rel.get("to"))
+            if expr:
+                target = concluded_of if rtype == "hasConcludedLicense" else declared_of
+                target[src] = expr
         elif rtype == "hasAssociatedVulnerability":
             vulns_of.setdefault(src, []).extend(_as_list(rel.get("to")))
 
@@ -211,12 +324,23 @@ def extract(doc):
                 {"name": "bomlens:identifiedBy", "value": "yocto-spdx"},
             ],
         }
+        purl = _package_url(pkg)
+        if purl:
+            comp["purl"] = purl
         cpes = _ext_ids(pkg, "cpe23")
         if cpes:
             comp["cpe"] = cpes[0]
-        licenses = _licenses_cdx(license_of.get(spdx_id))
+        # Up to 5.x every installed package had a concluded license. From 6.0
+        # Yocto writes the declared one (LICENSE) and a concluded one only when
+        # SPDX_CONCLUDED_LICENSE is set, so the concluded one wins when present.
+        licenses = _licenses_cdx(concluded_of.get(spdx_id) or declared_of.get(spdx_id))
         if licenses:
             comp["licenses"] = licenses
+        # As the 2.2 reader does: upstream-purl.py reads it to give the package
+        # its upstream repository purl. Not repeated when it is the package name.
+        recipe_name = recipe_of.get(spdx_id)
+        if recipe_name and recipe_name != name:
+            comp["properties"].append({"name": "bomlens:yocto:recipe", "value": recipe_name})
         components.append(comp)
 
     counts = {"fixed": 0, "notAffected": 0, "affected": 0}
@@ -224,16 +348,21 @@ def extract(doc):
     seen = set()
     for spdx_id, vuln_ids in vulns_of.items():
         pkg = installed[spdx_id]
-        for vid in vuln_ids:
+        # What a statement may name for this package: the package or its recipe.
+        subjects = [spdx_id] + recipes_of.get(spdx_id, [])
+        # A link read twice (on the package and on its recipe) is one judgement.
+        for vid in dict.fromkeys(vuln_ids):
             vuln = by_id.get(vid)
             if not vuln:
                 continue
-            if vid in fixed_ids:
+            if _judged(fixed_for, vid, subjects):
                 counts["fixed"] += 1
                 continue
-            if vid in not_affected_ids:
+            if _judged(not_affected_for, vid, subjects):
                 counts["notAffected"] += 1
                 continue
+            # Stated affected (6.1 and later write it for an unpatched CVE) or
+            # left without a statement: either way it is open on this image.
             counts["affected"] += 1
             cve_ids = _ext_ids(vuln, "cve")
             cve = cve_ids[0] if cve_ids else None

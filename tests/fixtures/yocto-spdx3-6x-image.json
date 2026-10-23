@@ -1,0 +1,66 @@
+{
+  "_comment": "Shrunk Yocto SPDX 3.0 image SBOM in the shape Yocto 6.x writes (checked against public 6.0.4 and 6.1 core-image-minimal output). Licenses come from hasDeclaredLicense, with hasConcludedLicense winning when present; a CLOSED package points at NoneElement. Vulnerabilities and VEX hang off the recipe (primaryPurpose specification), which generates the installed packages; a native recipe that generates nothing installed carries one too and must be ignored. One vulnerability is stated affected (VexAffected, 6.1), one has no statement. Packages carry software_packageUrl, or only a packageUrl externalIdentifier. The recipe that generates a package is recorded when its name differs (busybox-syslog from busybox, libz1 from zlib). Expected parse: 4 components (busybox, busybox-syslog, closed-app, libz1), 3 licensed, 4 with a purl; counts 2 fixed + 2 not-affected + 4 unresolved.",
+  "@context": "https://spdx.org/rdf/3.0.1/spdx-context.jsonld",
+  "@graph": [
+    {"type":"CreationInfo","@id":"_:ci","specVersion":"3.0.1","created":"2026-02-01T00:00:00Z","createdBy":["urn:agent:oe"],"createdUsing":["urn:agent:bitbake"]},
+    {"type":"Organization","spdxId":"urn:agent:oe","name":"OpenEmbedded","creationInfo":"_:ci"},
+    {"type":"Tool","spdxId":"urn:agent:bitbake","name":"bitbake","creationInfo":"_:ci"},
+    {"type":"SpdxDocument","spdxId":"urn:doc","name":"core-image-minimal","creationInfo":"_:ci","rootElement":["urn:sbom"]},
+    {"type":"software_Sbom","spdxId":"urn:sbom","creationInfo":"_:ci","name":"core-image-minimal-qemux86-64.rootfs-20260201000000","rootElement":["urn:pkg:image"]},
+    {"type":"software_Package","spdxId":"urn:pkg:image","creationInfo":"_:ci","name":"core-image-minimal","software_primaryPurpose":"archive"},
+
+    {"type":"software_Package","spdxId":"urn:recipe:busybox","creationInfo":"_:ci","name":"busybox","software_packageVersion":"1.36.1","software_primaryPurpose":"specification",
+     "software_packageUrl":"pkg:yocto/core/busybox@1.36.1",
+     "externalIdentifier":[{"type":"ExternalIdentifier","externalIdentifierType":"cpe23","identifier":"cpe:2.3:*:*:busybox:1.36.1:*:*:*:*:*:*:*"}]},
+    {"type":"software_Package","spdxId":"urn:recipe:zlib","creationInfo":"_:ci","name":"zlib","software_packageVersion":"1.3.1","software_primaryPurpose":"specification",
+     "software_packageUrl":"pkg:yocto/core/zlib@1.3.1"},
+    {"type":"software_Package","spdxId":"urn:recipe:bison-native","creationInfo":"_:ci","name":"bison-native","software_packageVersion":"3.8.2","software_primaryPurpose":"specification"},
+
+    {"type":"software_Package","spdxId":"urn:pkg:busybox","creationInfo":"_:ci","name":"busybox","software_packageVersion":"1.36.1","software_primaryPurpose":"install",
+     "software_packageUrl":"pkg:yocto/core/busybox@1.36.1",
+     "externalIdentifier":[{"type":"ExternalIdentifier","externalIdentifierType":"packageUrl","identifier":"pkg:yocto/core/busybox@1.36.1"},{"type":"ExternalIdentifier","externalIdentifierType":"cpe23","identifier":"cpe:2.3:*:*:busybox:1.36.1:*:*:*:*:*:*:*"}]},
+    {"type":"software_Package","spdxId":"urn:pkg:busybox-syslog","creationInfo":"_:ci","name":"busybox-syslog","software_packageVersion":"1.36.1","software_primaryPurpose":"install",
+     "software_packageUrl":"pkg:yocto/core/busybox@1.36.1"},
+    {"type":"software_Package","spdxId":"urn:pkg:libz1","creationInfo":"_:ci","name":"libz1","software_packageVersion":"1.3.1","software_primaryPurpose":"install",
+     "externalIdentifier":[{"type":"ExternalIdentifier","externalIdentifierType":"packageUrl","identifier":"pkg:yocto/core/zlib@1.3.1"}]},
+    {"type":"software_Package","spdxId":"urn:pkg:closed-app","creationInfo":"_:ci","name":"closed-app","software_packageVersion":"2.0","software_primaryPurpose":"install",
+     "software_packageUrl":"pkg:yocto/meta-vendor/closed-app@2.0"},
+
+    {"type":"LifecycleScopedRelationship","spdxId":"urn:rel:gen1","creationInfo":"_:ci","from":"urn:recipe:busybox","relationshipType":"generates","scope":"build","to":["urn:pkg:busybox"]},
+    {"type":"LifecycleScopedRelationship","spdxId":"urn:rel:gen2","creationInfo":"_:ci","from":"urn:recipe:busybox","relationshipType":"generates","scope":"build","to":["urn:pkg:busybox-syslog"]},
+    {"type":"LifecycleScopedRelationship","spdxId":"urn:rel:gen3","creationInfo":"_:ci","from":"urn:recipe:zlib","relationshipType":"generates","scope":"build","to":["urn:pkg:libz1"]},
+
+    {"type":"simplelicensing_LicenseExpression","spdxId":"urn:lic:busybox","creationInfo":"_:ci","simplelicensing_licenseExpression":"GPL-2.0-only AND bzip2-1.0.6"},
+    {"type":"simplelicensing_LicenseExpression","spdxId":"urn:lic:zlib","creationInfo":"_:ci","simplelicensing_licenseExpression":"Zlib"},
+    {"type":"simplelicensing_LicenseExpression","spdxId":"urn:lic:mit","creationInfo":"_:ci","simplelicensing_licenseExpression":"MIT"},
+    {"type":"simplelicensing_LicenseExpression","spdxId":"urn:lic:noassertion","creationInfo":"_:ci","simplelicensing_licenseExpression":"NOASSERTION"},
+    {"type":"Relationship","spdxId":"urn:rel:lic1","creationInfo":"_:ci","from":"urn:pkg:busybox","relationshipType":"hasDeclaredLicense","to":["urn:lic:busybox"]},
+    {"type":"Relationship","spdxId":"urn:rel:lic2","creationInfo":"_:ci","from":"urn:pkg:busybox-syslog","relationshipType":"hasDeclaredLicense","to":["urn:lic:busybox"]},
+    {"type":"Relationship","spdxId":"urn:rel:lic3","creationInfo":"_:ci","from":"urn:pkg:libz1","relationshipType":"hasConcludedLicense","to":["urn:lic:zlib"]},
+    {"type":"Relationship","spdxId":"urn:rel:lic4","creationInfo":"_:ci","from":"urn:pkg:libz1","relationshipType":"hasDeclaredLicense","to":["urn:lic:mit"]},
+    {"type":"Relationship","spdxId":"urn:rel:lic5","creationInfo":"_:ci","from":"urn:pkg:closed-app","relationshipType":"hasDeclaredLicense","to":["https://spdx.org/rdf/3.0.1/terms/Core/NoneElement"]},
+    {"type":"Relationship","spdxId":"urn:rel:lic6","creationInfo":"_:ci","from":"urn:pkg:closed-app","relationshipType":"hasConcludedLicense","to":["urn:lic:noassertion"]},
+
+    {"type":"security_Vulnerability","spdxId":"urn:vuln:fixed","creationInfo":"_:ci",
+     "externalIdentifier":[{"type":"ExternalIdentifier","externalIdentifierType":"cve","identifier":"CVE-2023-42364"}]},
+    {"type":"security_Vulnerability","spdxId":"urn:vuln:notaffected","creationInfo":"_:ci",
+     "externalIdentifier":[{"type":"ExternalIdentifier","externalIdentifierType":"cve","identifier":"CVE-2019-1010022"}]},
+    {"type":"security_Vulnerability","spdxId":"urn:vuln:affected","creationInfo":"_:ci",
+     "externalIdentifier":[{"type":"ExternalIdentifier","externalIdentifierType":"cve","identifier":"CVE-2022-48174"}]},
+    {"type":"security_Vulnerability","spdxId":"urn:vuln:open","creationInfo":"_:ci",
+     "externalIdentifier":[{"type":"ExternalIdentifier","externalIdentifierType":"cve","identifier":"CVE-2022-28391"}]},
+    {"type":"security_Vulnerability","spdxId":"urn:vuln:native","creationInfo":"_:ci",
+     "externalIdentifier":[{"type":"ExternalIdentifier","externalIdentifierType":"cve","identifier":"CVE-2020-24240"}]},
+
+    {"type":"Relationship","spdxId":"urn:rel:vuln1","creationInfo":"_:ci","from":"urn:recipe:busybox","relationshipType":"hasAssociatedVulnerability","to":["urn:vuln:fixed","urn:vuln:notaffected","urn:vuln:affected","urn:vuln:open"]},
+    {"type":"Relationship","spdxId":"urn:rel:vuln2","creationInfo":"_:ci","from":"urn:pkg:busybox","relationshipType":"hasAssociatedVulnerability","to":["urn:vuln:fixed"]},
+    {"type":"Relationship","spdxId":"urn:rel:vuln3","creationInfo":"_:ci","from":"urn:recipe:bison-native","relationshipType":"hasAssociatedVulnerability","to":["urn:vuln:native"]},
+
+    {"type":"LifecycleScopedRelationship","spdxId":"urn:rel:dep1","creationInfo":"_:ci","from":"urn:pkg:busybox-syslog","relationshipType":"dependsOn","scope":"runtime","to":["urn:pkg:busybox"]},
+    {"type":"LifecycleScopedRelationship","spdxId":"urn:rel:dep2","creationInfo":"_:ci","from":"urn:recipe:busybox","relationshipType":"dependsOn","scope":"build","to":["urn:recipe:bison-native"]},
+
+    {"type":"security_VexFixedVulnAssessmentRelationship","spdxId":"urn:vex:fixed","creationInfo":"_:ci","from":"urn:vuln:fixed","relationshipType":"fixedIn","to":["urn:recipe:busybox"]},
+    {"type":"security_VexNotAffectedVulnAssessmentRelationship","spdxId":"urn:vex:na","creationInfo":"_:ci","from":"urn:vuln:notaffected","relationshipType":"doesNotAffect","to":["urn:recipe:busybox"]},
+    {"type":"security_VexAffectedVulnAssessmentRelationship","spdxId":"urn:vex:aff","creationInfo":"_:ci","from":"urn:vuln:affected","relationshipType":"affects","to":["urn:recipe:busybox"]}
+  ]
+}
