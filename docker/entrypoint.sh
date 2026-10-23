@@ -620,8 +620,9 @@ generate_sbom_cdxgen() {
 }
 
 # Declare how complete this SBOM's dependency graph is, in CycloneDX's own
-# compositions.aggregate field (one document-level entry; assemblies/dependencies
-# refs stay empty). `complete` is used only when there is POSITIVE evidence
+# compositions.aggregate field (one document-level entry whose dependencies
+# names the primary component's bom-ref, when it has one; assemblies stay
+# empty). `complete` is used only when there is POSITIVE evidence
 # the graph is whole, never merely because nothing failed: an unresolved leaf
 # (e.g. one Maven coordinate cdxgen could not fetch) leaves no trace in the
 # SBOM or in any log, so "no failure seen" cannot mean "complete" (measured).
@@ -695,7 +696,14 @@ mark_compositions_aggregate() {
     esac
     [ -n "$aggregate" ] || return 0
     tmp="${file}.compositions.tmp"
-    if jq --arg agg "$aggregate" '.compositions = [{aggregate: $agg}]' "$file" > "$tmp" 2>/dev/null; then
+    # The entry names the graph its aggregate is about: the dependencies of the
+    # primary component (compositions[].dependencies), so a reader such as a
+    # BSI TR-03183-2 check sees the completeness stated for the dependency
+    # graph rather than for an unnamed set. The aggregate value is unchanged.
+    if jq --arg agg "$aggregate" '
+        ((.metadata.component["bom-ref"] // "") | if type == "string" then . else "" end) as $root
+        | .compositions = [{aggregate: $agg} + (if $root != "" then {dependencies: [$root]} else {} end)]' \
+        "$file" > "$tmp" 2>/dev/null; then
         mv "$tmp" "$file"
     else
         rm -f "$tmp"

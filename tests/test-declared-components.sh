@@ -674,28 +674,8 @@ bsi-scanned-components=warn:zlib@1.3.1: creator, filename, SHA-512, file propert
 [ "$(bsi_rows "$WORK/bsi-ok_conformance.json")" = "$want_bsi" ] \
     && pass "bsi-tr-03183-2 names, row by row, which declared component misses what; zlib is advisory" \
     || fail "bsi rows on the fixture" "$(bsi_rows "$WORK/bsi-ok_conformance.json")"
-# With the licences as LicenseRef-, a URL for the HAL's supplier, an SBOM
-# author with an email (--sbom-author "Example Corp <sbom@example.com>"), the
-# product licence from --license, the graph completeness normalize-sbom.sh
-# states and a supplier for the product (which no option writes yet, so it is
-# set here), the fixture passes.
-P="$(new_project bsi)"
-B="$(new_bom bsi)"
-jq '.components[0].licenses = [{"license": {"name": "LicenseRef-ExampleCorp-Proprietary"}}]
-    | .components[1].licenses = [{"license": {"name": "LicenseRef-ExampleCorp-Proprietary"}}]
-    | .components[2].supplier.url = ["https://chip.example.com"]' \
-    "$P/sbom-declared.cdx.json" > "$P/bsi.cdx.json"
-rc="$(apply "$B" "$P" "$P/bsi.cdx.json")"
-SBOM_AUTHOR="Example Corp <sbom@example.com>" bash "$LIB/stamp-document-metadata.sh" "$B" SOURCE >/dev/null 2>&1
-PROJECT_LICENSE=Apache-2.0 bash "$LIB/stamp-metadata.sh" "$B" MediaSuite 3.1.0 >/dev/null 2>&1
-jq '.metadata.component.supplier = {"name": "Example Corp", "url": ["https://example.com"]}
-    | .compositions = [{"aggregate": "complete", "assemblies": [.metadata.component["bom-ref"]]}]' "$B" > "$B.tmp" && mv "$B.tmp" "$B"
-CONFORMANCE_PROFILE=bsi-tr-03183-2 bash "$LIB/validate-sbom.sh" "$B" "$WORK/bsi-pass" x >/dev/null 2>&1
-[ "$rc" = 0 ] && [ "$(jq -r .result "$WORK/bsi-pass_conformance.json" 2>/dev/null)" = pass ] \
-  && [ "$(jq -r '[.checks[] | select(.id | startswith("bsi-")) | select(.required) | .status] | unique | join(",")' "$WORK/bsi-pass_conformance.json")" = pass ] \
-  && [ "$(jq -c '.metadata.component.licenses' "$B")" = '[{"license":{"id":"Apache-2.0","acknowledgement":"concluded"}}]' ] \
-    && pass "the fixture passes bsi-tr-03183-2 once its declarations carry the BSI fields" \
-    || fail "bsi pass on the fixture" "rc=$rc $(jq -c '[.result, (.checks[] | select(.required and .status != "pass") | [.id, .detail, .missing])]' "$WORK/bsi-pass_conformance.json" 2>&1)"
+# The fixture passing the profile, once its declarations carry the BSI
+# fields, is checked through entrypoint.sh below.
 # skt-submission, in a scan where the declaration step ran: the two
 # first-party programs carry a supplier and SHA-512, so they need no purl and
 # are listed as exempted; the third-party HAL does. Without that step in the
@@ -820,6 +800,28 @@ D="$(comp "$F" media-daemon)"
     && pass "the conformance check of the scan lists the two first-party programs as exempt from the PURL rows" \
     || fail "exemption through the pipeline" "$(jq -c '[.checks[] | select(.id == "purl" or .id == "first-party-exempt")]' "$O/MediaSuite_3.1.0_conformance.json" 2>&1)"
 
+# bsi-tr-03183-2 through the pipeline: with the licences as LicenseRef-, a URL
+# for the HAL's supplier, and --sbom-author, --supplier and --license given as
+# a CLI scan passes them, the fixture passes on every required BSI row. The
+# compositions entry the pipeline writes names the product's dependencies.
+P="$(new_project entry-bsi)"
+jq '.components[0].licenses = [{"license": {"name": "LicenseRef-ExampleCorp-Proprietary"}}]
+    | .components[1].licenses = [{"license": {"name": "LicenseRef-ExampleCorp-Proprietary"}}]
+    | .components[2].supplier.url = ["https://chip.example.com"]' \
+    "$FIX/project/sbom-declared.cdx.json" > "$P/sbom-declared.cdx.json"
+rc="$(run_entry e5 "$P" CONFORMANCE_PROFILE=bsi-tr-03183-2 SBOM_AUTHOR="Example Corp <sbom@example.com>" \
+    PRODUCT_SUPPLIER="Example Corp <https://example.com>" PROJECT_LICENSE=Apache-2.0)"
+O="$WORK/e5.out"
+F="$O/MediaSuite_3.1.0_bom.json"
+C5="$O/MediaSuite_3.1.0_conformance.json"
+[ "$rc" = 0 ] && [ "$(jq -r .result "$C5" 2>/dev/null)" = pass ] \
+  && [ "$(jq -r '[.checks[] | select(.id | startswith("bsi-")) | select(.required) | .status] | unique | join(",")' "$C5")" = pass ] \
+  && [ "$(jq -cS '[.metadata.component.supplier, .metadata.supplier == .metadata.component.supplier, .metadata.component.licenses]' "$F")" \
+       = '[{"name":"Example Corp","url":["https://example.com"]},true,[{"license":{"acknowledgement":"concluded","id":"Apache-2.0"}}]]' ] \
+  && [ "$(jq -c --arg r "$(jq -r '.metadata.component["bom-ref"]' "$F")" '.compositions[0].dependencies == [$r]' "$F")" = true ] \
+    && pass "the fixture passes bsi-tr-03183-2 through the pipeline with --supplier, --sbom-author and --license" \
+    || fail "bsi through the pipeline: exit $rc" "$(jq -c '[.result, (.checks[] | select(.required and .status != "pass") | [.id, .detail, .missing])]' "$C5" 2>&1) $(jq -c '[.metadata.component["bom-ref"], .metadata.supplier, .metadata.component.licenses, .compositions]' "$F" 2>&1)"
+
 cat > "$WORK/given.cdx.json" <<'EOF'
 {"bomFormat": "CycloneDX", "components": [{"type": "firmware", "name": "dsp-blob", "version": "7",
   "properties": [{"name": "bomlens:origin", "value": "third-party"}]}]}
@@ -942,6 +944,7 @@ if [ "${BOMLENS_CDX_SCHEMA:-}" = "1" ] || command -v cyclonedx >/dev/null 2>&1 |
     cp "$WORK/deps.bom.json" "$WORK/cdx/deps.json"
     cp "$WORK/distu.bom.json" "$WORK/cdx/distu.json"
     cp "$WORK/colon.bom.json" "$WORK/cdx/colon.json"
+    cp "$WORK/e5.out/MediaSuite_3.1.0_bom.json" "$WORK/cdx/bsi-final.json"
     cp "$WORK/e1.out/MediaSuite_3.1.0_bom.json" "$WORK/cdx/final.json"
     if cdxout=$(bash "$ROOT_DIR/scripts/check-cdx-schema.sh" "$WORK"/cdx/*.json 2>&1); then
         pass "SBOMs with declared components validate against the CycloneDX 1.6 schema"

@@ -260,6 +260,21 @@ SBOM_AUTHOR="Example Corp <sbom team>" bash "$LIB/stamp-document-metadata.sh" "$
   && [ "$(jq -c '.metadata.authors' "$WORK/doc-auth-nomail.json")" = '[{"name":"Example Corp <sbom team>"}]' ] \
     && pass "an author written as Name <email> is recorded with its email" \
     || fail "author email" "$(jq -c '.metadata.authors' "$WORK/doc-auth-mail.json" "$WORK/doc-auth-nomail.json")"
+# --supplier (PRODUCT_SUPPLIER): the product's supplier, with a URL or an
+# email, on metadata.component.supplier and metadata.supplier.
+sup_case() {  # <name> <value>: prints the supplier written, then whether both places agree
+    printf '%s' "$DOC" > "$WORK/doc-sup-$1.json"
+    PRODUCT_SUPPLIER="$2" bash "$LIB/stamp-document-metadata.sh" "$WORK/doc-sup-$1.json" SOURCE > /dev/null 2> "$WORK/doc-sup-$1.err"
+    jq -c '[.metadata.supplier, (.metadata.component.supplier == .metadata.supplier)]' "$WORK/doc-sup-$1.json"
+}
+[ "$(sup_case url 'Example Corp <https://example.com>')" = '[{"name":"Example Corp","url":["https://example.com"]},true]' ] \
+  && [ "$(sup_case mail ' Example Corp <oss@example.com> ')" = '[{"name":"Example Corp","contact":[{"email":"oss@example.com"}]},true]' ] \
+  && [ "$(sup_case bare 'Example Corp')" = '[{"name":"Example Corp"},true]' ] \
+  && grep -q 'gives no URL or email' "$WORK/doc-sup-bare.err" \
+  && [ "$(sup_case ftp 'Example Corp <ftp://example.com>')" = '[{"name":"Example Corp <ftp://example.com>"},true]' ] \
+  && [ "$(sup_case none '')" = '[null,true]' ] \
+    && pass "--supplier writes the product supplier with its URL or email; a bare name is kept and warned about" \
+    || fail "product supplier" "$(for c in url mail bare ftp none; do cat "$WORK/doc-sup-$c.json" | jq -c '.metadata.supplier'; done)"
 # Running twice must not append a second BomLens entry (the pipeline may restamp).
 BOMLENS_VERSION=9.9.9 bash "$LIB/stamp-document-metadata.sh" "$WORK/doc-auth.json" FIRMWARE >/dev/null 2>&1
 dcount=$(jq '[.metadata.tools.components[] | select(.name=="BomLens")] | length' "$WORK/doc-auth.json")
@@ -10989,6 +11004,17 @@ JSON
     [ "$(mca_agg "$WORK/mca-analyze-none.json")" = "unknown" ] \
         && pass "ANALYZE with no compositions of its own declares unknown" \
         || fail "expected unknown" "$(mca_agg "$WORK/mca-analyze-none.json")"
+
+    # The entry names the graph its aggregate is about: the primary
+    # component's dependencies. With no bom-ref there is nothing to name.
+    jq '.metadata.component = {"type": "application", "name": "p", "version": "1", "bom-ref": "root"}' \
+        "$WORK/mca-analyze-none.json" > "$WORK/mca-root.json"
+    jq 'del(.compositions)' "$WORK/mca-root.json" > "$WORK/mca-root.tmp" && mv "$WORK/mca-root.tmp" "$WORK/mca-root.json"
+    SCAN_MODE=SOURCE mark_compositions_aggregate "$WORK/mca-root.json"
+    [ "$(jq -c '.compositions' "$WORK/mca-root.json")" = '[{"aggregate":"unknown","dependencies":["root"]}]' ] \
+      && [ "$(jq -c '.compositions' "$WORK/mca-analyze-none.json")" = '[{"aggregate":"unknown"}]' ] \
+        && pass "compositions names the primary component's dependencies when it has a bom-ref, with the aggregate unchanged" \
+        || fail "compositions dependencies" "$(jq -c '.compositions' "$WORK/mca-root.json" "$WORK/mca-analyze-none.json")"
 
     # --byte-stable determinism: compositions is written AFTER normalize --stable
     # in the real pipeline (entrypoint.sh), so two identical scans must still
