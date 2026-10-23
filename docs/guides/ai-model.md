@@ -286,7 +286,7 @@ A concrete run helps read the rest. `FINAL-Bench/Aether-7B-5Attn` is a foundatio
   --model "FINAL-Bench/Aether-7B-5Attn" --generate-only
 ```
 
-The run reports `result=pass` with 33 of 41 G7 elements present. All 14 Models-cluster checks pass, and the disclosure panel reads open on every axis:
+A scan on 2026-10-23 (model revision `da711bdb`) reports `result=pass` with 30 of 41 G7 elements present. The figures follow the model card, so a later revision can give different ones. In the Models cluster 12 of 14 checks pass; the SBOM has no model timestamp and no model description. The disclosure panel reads open on every axis:
 
 | Axis | Value |
 | --- | --- |
@@ -297,9 +297,9 @@ The run reports `result=pass` with 33 of 41 G7 elements present. All 14 Models-c
 
 Because the card lists its datasets, BomLens looks up all seven the model was trained on (FineWeb-Edu, the SmolLM corpus, FineMath, open-web-math, an OpenCoder code corpus, and two Korean sets from HAERAE-HUB) and records what each one declares. Eight of the ten Dataset-properties elements come back present. The two that remain are the statistical properties of the data and whether it contains personal or copyrighted material; neither can be read from a repository, so the report asks a person rather than guessing.
 
-The lookup is what makes the next part visible. Three of the seven datasets carry a license — `odc-by` on the FineWeb-Edu family, MIT on the OpenCoder corpus — and three declare none at all: both HAERAE-HUB sets and open-web-math. Counting dataset names would have called this model's training data fully open. Reading the datasets shows a model published under Apache-2.0 whose training corpus is, in part, of unstated license. That is not a finding the tool judges; it is the one a reviewer needs before release, and it only appears once each dataset is looked up.
+The lookup is what makes the next part visible. Four of the seven datasets carry a license: `odc-by` on FineWeb-Edu, FineMath and the SmolLM corpus, and MIT on the OpenCoder corpus. The other three declare none at all: both HAERAE-HUB sets and open-web-math. Counting dataset names would have called this model's training data fully open. Reading the datasets shows a model published under Apache-2.0 whose training corpus is, in part, of unstated license. That is not a finding the tool judges; it is the one a reviewer needs before release, and it only appears once each dataset is looked up.
 
-The report this run produced is here to open as-is: the [conformance check report](../samples/aether-7b-5attn_conformance.html) for the base model, which opens with the same G7 rollup the AI compliance profile carries in JSON and Markdown. Add `--lang ko` for the same reports in Korean; the SBOM and the JSON reports stay English either way.
+A report from the same command is here to open as-is: the [conformance check report](../samples/aether-7b-5attn_conformance.html) for the base model. It comes from the same 2026-10-23 run as the figures above. It opens with the same G7 rollup the AI compliance profile carries in JSON and Markdown. Add `--lang ko` for the same reports in Korean; the SBOM and the JSON reports stay English either way.
 
 ## Next steps
 
@@ -349,7 +349,7 @@ For an AI SBOM, two more frameworks map onto the G7 elements:
 
 The crosswalk is a preparation aid, not a compliance verdict (see [Limits](#limits)). Each mapping carries the interpretive basis for the link so a person can judge it, and the crosswalk never changes a check's status or the overall result — it only regroups findings the checks already produced.
 
-The mapping lives in `docker/lib/regulation-crosswalk.json`, keyed by check id — the G7 element ids for the AI checks and the plain CycloneDX check ids for the base format checks. It is deliberately conservative: only checks with a defensible correspondence are mapped (38 today), and a test validates every mapped id against the registry so the crosswalk cannot drift silently when a check is renamed.
+The mapping lives in `docker/lib/regulation-crosswalk.json`, keyed by check id — the G7 element ids for the AI checks and the plain CycloneDX check ids for the base format checks. It is deliberately conservative: only checks with a defensible correspondence are mapped. Today that is 60 check ids with 70 links across the four frameworks, since one check can point at more than one framework. A test validates every mapped id against the registry so the crosswalk cannot drift silently when a check is renamed.
 
 ## AI compliance profile
 
