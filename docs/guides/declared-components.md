@@ -26,7 +26,7 @@ Whichever file a component is written in, a `bomlens:artifact` path is relative 
 
 `--no-components` skips the file at the root, for a scan made before the build outputs it names exist. It cannot be combined with `--components`.
 
-Declaration files are read by source scans only; a firmware, image, binary or `--analyze` run stops with an error when given `--components`. The web UI has no `--components` option: put `sbom-declared.cdx.json` at the root of the folder you scan.
+Declaration files are read by source scans and by a Yocto build directory given as `--target` (see [A Yocto image](#a-yocto-image)); a firmware, image, binary or `--analyze` run stops with an error when given `--components`. The web UI has no `--components` option: put `sbom-declared.cdx.json` at the root of the folder you scan.
 
 ## What does the file look like?
 
@@ -268,7 +268,38 @@ Under the BSI profile the two libraries appear on the advisory row for declared 
 
 ### A Yocto image
 
-A Yocto build records its packages in its own SPDX output, which BomLens reads from the build directory. See [Yocto images](supplier-sbom.md#yocto-images) in the supplier SBOM guide.
+A Yocto build records its packages in its own SPDX output, which BomLens reads from the build directory (see [Yocto images](supplier-sbom.md#yocto-images) in the supplier SBOM guide). The packages are already there, with their versions, purls and file hashes, so a declaration names the recipe (PN) in `bomlens:yocto-recipe` instead of a build output, and adds what the build does not know: the supplier, the concluded licence and the origin.
+
+```json
+{
+  "type": "application",
+  "name": "media-daemon",
+  "supplier": { "name": "Example Corp", "url": ["https://example.com"] },
+  "licenses": [ { "license": { "name": "LicenseRef-ExampleCorp-Proprietary" } } ],
+  "properties": [
+    { "name": "bomlens:origin", "value": "first-party" },
+    { "name": "bomlens:yocto-recipe", "value": "media-daemon" }
+  ]
+},
+{
+  "type": "firmware",
+  "name": "vendor-dsp",
+  "supplier": { "name": "Example Chip Vendor", "url": ["https://chip.example.com"] },
+  "licenses": [ { "license": { "name": "LicenseRef-Vendor-Binary" } } ],
+  "properties": [
+    { "name": "bomlens:origin", "value": "third-party" },
+    { "name": "bomlens:yocto-recipe", "value": "vendor-dsp" }
+  ]
+}
+```
+
+```bash
+./scripts/scan-sbom.sh --project MediaBox --version 2.1.0 \
+  --target build --components sbom-declared.cdx.json \
+  --conformance-profile bsi-tr-03183-2
+```
+
+Every package the image installs from that recipe, such as `media-daemon` and `media-daemon-cli`, gets the declared type, supplier, licence and origin, and keeps its own name, version, purl and CPE. The files the build recorded for each package are nested under it with their hashes (SHA-512 from Yocto 6.1). A version may be left out; one that differs from the build's is refused. A Yocto build directory has no default file, so `--components` is always given. A multilib or SDK variant such as `lib32-media-daemon` is a recipe of its own and is declared separately. A recipe the image did not install, or a component added by name with the name of an installed package, is refused.
 
 ## Using it in CI
 

@@ -26,7 +26,7 @@ description: 자체 실행 파일, 라이브러리, 펌웨어나 벤더가 준 �
 
 `--no-components`는 루트의 파일을 읽지 않게 합니다. 파일이 가리키는 빌드 산출물이 아직 없을 때 하는 스캔에 씁니다. `--components`와 함께 쓸 수 없습니다.
 
-선언 파일은 소스 스캔에서만 읽습니다. 펌웨어, 이미지, 바이너리 스캔이나 `--analyze`에 `--components`를 주면 오류로 멈춥니다. 웹 UI에는 `--components` 옵션이 없으므로 스캔할 폴더의 루트에 `sbom-declared.cdx.json`을 둡니다.
+선언 파일은 소스 스캔과 `--target`으로 준 Yocto 빌드 디렉터리에서 읽습니다([Yocto 이미지](#yocto-이미지) 참고). 펌웨어, 이미지, 바이너리 스캔이나 `--analyze`에 `--components`를 주면 오류로 멈춥니다. 웹 UI에는 `--components` 옵션이 없으므로 스캔할 폴더의 루트에 `sbom-declared.cdx.json`을 둡니다.
 
 ## 파일 형식
 
@@ -268,7 +268,38 @@ BSI 프로필에서 두 라이브러리는 자체 파일이 없는 선언 라이
 
 ### Yocto 이미지
 
-Yocto 빌드는 자체 SPDX 출력에 패키지를 기록하고, BomLens는 빌드 디렉터리에서 그 출력을 읽습니다. 공급사 SBOM 가이드의 [Yocto 이미지](supplier-sbom.ko.md#yocto-이미지)를 참고하세요.
+Yocto 빌드는 자체 SPDX 출력에 패키지를 기록하고, BomLens는 빌드 디렉터리에서 그 출력을 읽습니다(공급사 SBOM 가이드의 [Yocto 이미지](supplier-sbom.ko.md#yocto-이미지) 참고). 패키지와 버전, purl, 파일 해시는 이미 들어 있으므로, 선언에는 빌드 산출물 대신 `bomlens:yocto-recipe`에 레시피 이름(PN)을 적고 빌드가 모르는 공급자, 배포 라이선스, 출처만 더합니다.
+
+```json
+{
+  "type": "application",
+  "name": "media-daemon",
+  "supplier": { "name": "Example Corp", "url": ["https://example.com"] },
+  "licenses": [ { "license": { "name": "LicenseRef-ExampleCorp-Proprietary" } } ],
+  "properties": [
+    { "name": "bomlens:origin", "value": "first-party" },
+    { "name": "bomlens:yocto-recipe", "value": "media-daemon" }
+  ]
+},
+{
+  "type": "firmware",
+  "name": "vendor-dsp",
+  "supplier": { "name": "Example Chip Vendor", "url": ["https://chip.example.com"] },
+  "licenses": [ { "license": { "name": "LicenseRef-Vendor-Binary" } } ],
+  "properties": [
+    { "name": "bomlens:origin", "value": "third-party" },
+    { "name": "bomlens:yocto-recipe", "value": "vendor-dsp" }
+  ]
+}
+```
+
+```bash
+./scripts/scan-sbom.sh --project MediaBox --version 2.1.0 \
+  --target build --components sbom-declared.cdx.json \
+  --conformance-profile bsi-tr-03183-2
+```
+
+이미지가 그 레시피에서 설치한 패키지(예: `media-daemon`, `media-daemon-cli`)는 모두 선언한 유형, 공급자, 라이선스, 출처를 받고, 이름과 버전, purl, CPE는 그대로 둡니다. 빌드가 패키지마다 기록한 파일은 해시와 함께 그 패키지 아래에 들어갑니다(Yocto 6.1부터 SHA-512 포함). 버전은 생략해도 되며, 빌드와 다른 버전을 적으면 거부합니다. Yocto 빌드 디렉터리에는 기본 파일이 없으므로 `--components`를 항상 줍니다. `lib32-media-daemon` 같은 멀티립이나 SDK 변형은 별도 레시피이므로 따로 선언합니다. 이미지가 설치하지 않은 레시피나, 설치된 패키지와 같은 이름으로 이름만 적어 추가한 구성요소는 거부합니다.
 
 ## CI에서 쓰기
 
