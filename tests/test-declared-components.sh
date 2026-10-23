@@ -262,7 +262,7 @@ rc="$(apply "$B" "$P" "$WORK/bigkinds.cdx.json")"
 got="$(jq -r '[.components[] | select(.properties[]?.name == "bsi:component:filename")
               | "\(.name)=\([.properties[] | select(.name == "bsi:component:structured") | .value] | join(""))"] | join(" ")' "$B")"
 [ "$rc" = 0 ] && [ "$got" = "big.tar.bz2=structured big.tar.gz=structured big.tar.xz=structured big.bz2=unstructured" ] \
-  && [ "$(stat -f %z "$P/big.tar.bz2" 2>/dev/null || stat -c %s "$P/big.tar.bz2")" -gt 1048576 ] \
+  && [ "$(wc -c < "$P/big.tar.bz2" | tr -d ' ')" -gt 1048576 ] \
     && pass "a tar of over 1 MB of random data is structured in bzip2, gzip and xz; a bzip2 stream that is not a tar is not" \
     || fail "big compressed tars: exit $rc" "$got"
 
