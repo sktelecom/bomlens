@@ -20,8 +20,8 @@
 #   - the version --version gives (PROJECT_VERSION), when it has none; the
 #     image name the build wrote is kept;
 #   - the licence --license gives (PROJECT_LICENSE), marked "concluded", as
-#     stamp-metadata.sh records it for a source scan (an expression or a
-#     LicenseRef- in the CycloneDX field that takes it);
+#     stamp-metadata.sh records it for a source scan, in the CycloneDX field
+#     license-entry.sh picks for its form;
 #   - a dependencies entry in which the image depends on every installed
 #     package (every top-level component), kept with what the entry already
 #     lists;
@@ -43,20 +43,23 @@ if ! command -v jq >/dev/null 2>&1; then
     exit 1
 fi
 
+# The licence entry, in the field its form takes (license-entry.sh); a
+# --license that fits none stops the run.
+LIC_JSON="null"
+if [ -n "${PROJECT_LICENSE:-}" ]; then
+    LIC_JSON="$(bash "$(dirname "$0")/license-entry.sh" "$PROJECT_LICENSE" concluded)" || exit 1
+    [ -n "$LIC_JSON" ] || LIC_JSON="null"
+fi
+
 TMP="$(mktemp)"
-if jq --arg name "${PROJECT_NAME:-}" --arg v "${PROJECT_VERSION:-}" --arg lic "${PROJECT_LICENSE:-}" \
+if jq --arg name "${PROJECT_NAME:-}" --arg v "${PROJECT_VERSION:-}" --argjson licentry "$LIC_JSON" \
       --arg now "$(date -u +%Y-%m-%dT%H:%M:%SZ)" '
     .metadata = (.metadata // {})
     | .metadata.component = (.metadata.component // {})
     | (if ((.metadata.component.type // "") == "") then .metadata.component.type = "operating-system" else . end)
     | (if ((.metadata.component.name // "") == "") then .metadata.component.name = $name else . end)
     | (if (((.metadata.component.version // "") | tostring) == "") and $v != "" then .metadata.component.version = $v else . end)
-    # CycloneDX takes only an SPDX list id in license.id: an expression goes
-    # in expression, and a LicenseRef- (a closed product licence) in name.
-    | (if $lic == "" then .
-       elif ($lic | test(" (AND|OR|WITH) ")) then .metadata.component.licenses = [{expression: $lic, acknowledgement: "concluded"}]
-       elif ($lic | startswith("LicenseRef-")) then .metadata.component.licenses = [{license: {name: $lic, acknowledgement: "concluded"}}]
-       else .metadata.component.licenses = [{license: {id: $lic, acknowledgement: "concluded"}}] end)
+    | (if $licentry == null then . else .metadata.component.licenses = [$licentry] end)
     | ([.components[]? | .["bom-ref"]? | strings] + [(.dependencies // [])[]? | .ref? | strings]) as $used
     | (if ((.metadata.component["bom-ref"] // "") == "")
        then ("yocto-image:" + .metadata.component.name + "@" + ((.metadata.component.version // "") | tostring)) as $base
