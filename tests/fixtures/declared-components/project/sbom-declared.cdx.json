@@ -1,0 +1,37 @@
+{
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.6",
+  "components": [
+    {
+      "type": "application",
+      "name": "media-daemon",
+      "supplier": { "name": "Example Corp", "url": [ "https://example.com" ] },
+      "licenses": [ { "license": { "name": "Proprietary" } } ],
+      "properties": [
+        { "name": "bomlens:origin", "value": "first-party" },
+        { "name": "bomlens:artifact", "value": "out/bin/media-daemon" }
+      ]
+    },
+    {
+      "type": "application",
+      "name": "media-ctl",
+      "version": "2.0.1",
+      "supplier": { "name": "Example Corp", "url": [ "https://example.com" ] },
+      "licenses": [ { "license": { "name": "Proprietary" } } ],
+      "properties": [
+        { "name": "bomlens:origin", "value": "first-party" },
+        { "name": "bomlens:artifact", "value": "out/bin/media-ctl.exe" }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "vendor-hal",
+      "version": "4.2.0",
+      "supplier": { "name": "Example Chip Vendor" },
+      "licenses": [ { "license": { "id": "BSD-3-Clause" } } ],
+      "properties": [
+        { "name": "bomlens:origin", "value": "third-party" }
+      ]
+    }
+  ]
+}

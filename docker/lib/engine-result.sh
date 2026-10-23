@@ -28,7 +28,7 @@ ENGINE_RESULT_NAME="bomlens-result.json"
 # stage 1) carries that run's post-process labels. tests/test-engine-contract.sh
 # checks this list against entrypoint.sh.
 ER_POSTPROCESS_STEPS="assess-ai-risk cocoapods component-versions conformance
-declared-service declared-sources deep-cve deep-license describe-input docmeta
+declared-components declared-service declared-sources deep-cve deep-license describe-input docmeta
 enrich-aibom enrich-cpe enrich-distro-supplier enrich-eol enrich-github-cpe
 enrich-interpreter-cpe enrich-malicious enrich-maven-cpe enrich-os-context
 enrich-staleness generate-notice generate-risk-report license-registry

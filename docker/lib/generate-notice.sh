@@ -175,7 +175,13 @@ def src($c):
 #
 # Everything folded here remains in the SBOM under its own name. What changes is
 # a document written for a person to act on.
-LICENSE_MAP=$(jq -r "$NORMALIZE_DEF$SRC_DEF"'
+#
+# The supplier's own components are left out. A source scan's declaration file
+# marks each component it adds with bomlens:origin; one marked first-party is
+# the supplier's own work, which no third-party notice is owed for. It stays in
+# the SBOM and in the licence and risk reports.
+FIRST_PARTY_DEF='def first_party: any(.properties[]?; .name == "bomlens:origin" and .value == "first-party");'
+LICENSE_MAP=$(jq -r "$NORMALIZE_DEF$SRC_DEF$FIRST_PARTY_DEF"'
   def kmod_of($c):
     if any($c.properties[]?;
            .name == "syft:package:type" and .value == "linux-kernel-module")
@@ -192,7 +198,7 @@ LICENSE_MAP=$(jq -r "$NORMALIZE_DEF$SRC_DEF"'
     [ .metadata.component // empty ]
     | map(select((.type // "") == "data"
                  and ((.properties // []) | any(.name == "bomlens:dataset:collectedBy"))));
-  [ collected_root[], .components[]?
+  [ collected_root[], (.components[]? | select(first_party | not))
     | . as $c
     | { comp: (($c.name // "unknown") + (if $c.version then "@" + $c.version else "" end)
                + (if ($c.type // "") == "data" then " [dataset]" else "" end)),
@@ -239,10 +245,10 @@ LICENSE_MAP=$(jq -r "$NORMALIZE_DEF$SRC_DEF"'
   | sort_by(.license)
 ' "$SBOM")
 
-TOTAL_COMP=$(jq '[ ([.metadata.component // empty]
+TOTAL_COMP=$(jq "$FIRST_PARTY_DEF"'[ ([.metadata.component // empty]
                    | map(select((.type // "") == "data"
                                 and ((.properties // []) | any(.name == "bomlens:dataset:collectedBy")))))[],
-                   .components[]? ] | length' "$SBOM")
+                   (.components[]? | select(first_party | not)) ] | length' "$SBOM")
 TOTAL_LIC=$(echo "$LICENSE_MAP" | jq 'length')
 GEN_AT=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 

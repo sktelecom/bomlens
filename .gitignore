@@ -50,6 +50,7 @@ bom.json
 *_security_grype.json
 *_security_trivy.json
 *_reachability.cdx.json
+*_bom.refused.json
 *_govulncheck_stage1.json
 *_govulncheck_stage1.err
 *_govulncheck_stage1.rc

@@ -12,7 +12,7 @@ The format is checked against [`schemas/engine-result-1.json`](https://github.co
 
 `bomlens-result.json` has a fixed name, so give each scan its own output folder. A manifest left in the folder by an earlier run is removed when the run starts, before anything else is checked, and the new one is written when the run ends, also when it stops early on an error. A folder with no manifest after the run means the engine was killed before it could write one.
 
-The scan's exit code is unchanged by the contract. A run that produced its SBOM exits 0 even when a step failed along the way; the manifest is where that failure is reported. The one exception is a `--component-versions` file that is refused: every file is still written, and the run exits 1, since the versions it was given were not applied.
+The scan's exit code is unchanged by the contract. A run that produced its SBOM exits 0 even when a step failed along the way; the manifest is where that failure is reported. There are two exceptions. A `--component-versions` file that is refused: every file is still written, and the run exits 1, since the versions it was given were not applied. And a `--components` file (or `sbom-declared.cdx.json`) that is refused: unlike `--component-versions`, the run stops at once, before the SBOM is normalized, signed or uploaded, and exits 1, since an SBOM without the declared components is not the one that was asked for. The SBOM written up to that point is renamed to `{Project}_{Version}_bom.refused.json`, so a step that picks up `_bom.json` cannot take the incomplete one.
 
 | Field | Meaning |
 |---|---|
@@ -77,6 +77,7 @@ Each step also has `stage` (1 for the SBOM a language image generated before thi
 | `suggest-vendored` | suggest that identification when a C/C++ project scanned near-empty |
 | `cocoapods` | add CocoaPods dependencies from `Podfile.lock` |
 | `stamp-metadata` | set the root component to the project name and version; the run stops if this fails |
+| `declared-components` | a source scan: add the components listed in `--components` files or `sbom-declared.cdx.json`; recorded only when there is a file to read, with the number of declared components in `counts`; `failed` when a file is refused, with the reason in `detail`, and the run then exits 1 |
 | `docmeta` | record the document's author, tool and lifecycle phase |
 | `license-registry` | ask the package registry for missing licences and check a single strong-copyleft or non-commercial one (`--license-registry`); `counts` gives `candidates`, `filled`, `superseded`, `confirmed`, `no_answer`, `not_found`, `non_standard`, `lookup_failed`, `budget_reached` |
 | `component-versions` | a firmware, root filesystem or binary scan: fill the versions given with `--component-versions`, record the reasons given as `bomlens:versionReason`, and write the components still missing a version and a reason to `_component-versions.template.csv`; `failed` when the file is refused, with the reason in `detail`, and the run then exits 1 |

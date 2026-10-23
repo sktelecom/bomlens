@@ -250,6 +250,12 @@ fail_on_bad_coverage() {
 FORCE_FIRMWARE="false"; FORCE_SOURCE="false"; RELEASE_FOLDER_DIR=""; ANALYZE_SBOM=""; MODEL=""; MODEL_FILE=""; VEX_FILE=""
 AI_DECLARE_FILE=""; GENERATE_SPDX3="true"
 COMPONENT_VERSIONS_FILE=""
+# --components <file>, repeatable: CycloneDX files listing components a source
+# scan cannot find. With none, the container reads sbom-declared.cdx.json at
+# the scan target root when it exists.
+COMPONENTS_FILES=()
+# --no-components: leave sbom-declared.cdx.json at the scan target root unread.
+NO_COMPONENTS="false"
 # Set when --target turned out to be a Yocto build directory: the folder the
 # user pointed at, while ANALYZE_SBOM holds the image SBOM found inside it.
 YOCTO_BUILD_DIR=""
@@ -288,7 +294,7 @@ hf_dataset_ref() {
     fi
     return 2
 }
-GIT_URL=""; GIT_REF=""; SCAN_EXCLUDE=""; NO_REPORT="false"; GENERATE_REPORT="false"
+GIT_URL=""; GIT_REF=""; SCAN_EXCLUDE=""; SCAN_EXCLUDE_PATHS=""; NO_REPORT="false"; GENERATE_REPORT="false"
 INGEST_SOURCE="false"; INGEST_ROOTFS="false"; INGEST_ARCHIVE=""; SCAN_INPUT_DIR=""; CLEANUP_DIRS=()
 
 # --exclude <path>: a path inside the scanned folder to leave out of a source
@@ -359,6 +365,10 @@ while [[ "$#" -gt 0 ]]; do
         --vex) VEX_FILE="$2"; GENERATE_SECURITY="true"; shift ;;
         --ai-declare) AI_DECLARE_FILE="$2"; shift ;;
         --component-versions) COMPONENT_VERSIONS_FILE="$2"; shift ;;
+        --components)
+            [ "$#" -ge 2 ] || { echo "[ERROR] --components requires a file, e.g. --components sbom-declared.cdx.json"; exit 1; }
+            COMPONENTS_FILES+=("$2"); shift ;;
+        --no-components) NO_COMPONENTS="true" ;;
         --no-spdx3) GENERATE_SPDX3="false" ;;
         --usage) USAGE_CONTEXT="$2"; shift ;;
         --merge)
@@ -493,6 +503,30 @@ Options:
                          version to
                          <Project>_<Version>_component-versions.template.csv,
                          in this format, to fill in and pass back.
+  --components <file>    For a source scan: a CycloneDX file (JSON) listing the
+                         components the scan cannot find, such as your own
+                         build outputs and third-party parts added by hand.
+                         Repeat the option for several files. Without it,
+                         sbom-declared.cdx.json at the scan target root is read
+                         when it exists. Each component needs the property
+                         bomlens:origin (first-party or third-party), and a
+                         third-party one needs a version; a first-party one
+                         without a version takes --version. A build output
+                         named in bomlens:artifact (a path relative to the scan
+                         target root) gets its SHA-512 and SHA-256 hashes, file
+                         name and executable/archive/structured properties
+                         filled in. Only CycloneDX 1.6 component fields are
+                         read (no nested components), and a license id must be
+                         on the SPDX license list (otherwise use a license name
+                         or LicenseRef-). The scan fails, naming the file and
+                         component, when a named file is missing or outside the
+                         scan target, or the same name and version is declared
+                         twice; the SBOM written so far is then kept as
+                         <Project>_<Version>_bom.refused.json.
+  --no-components        For a source scan: do not read sbom-declared.cdx.json
+                         at the scan target root (for a scan made before the
+                         build outputs it names exist). Cannot be combined
+                         with --components.
   --no-spdx3             For an AI model or dataset scan: do not write the
                          SPDX 3.0.1 AI document (<Project>_<Version>_bom.spdx3.json)
                          and its check
@@ -954,6 +988,8 @@ if [ "$UI_MODE" = "true" ]; then
     [ -z "$VEX_FILE" ] || { echo "[ERROR] --vex is not offered with --ui (import a VEX from the Vulnerabilities screen instead)."; exit 1; }
     [ -z "$AI_DECLARE_FILE" ] || { echo "[ERROR] --ai-declare is not offered with --ui (fill the declaration on the Models & datasets screen instead)."; exit 1; }
     [ -z "$COMPONENT_VERSIONS_FILE" ] || { echo "[ERROR] --component-versions is not offered with --ui (it applies to one firmware, root filesystem or binary scan)."; exit 1; }
+    [ "${#COMPONENTS_FILES[@]}" -eq 0 ] || { echo "[ERROR] --components is not offered with --ui (put sbom-declared.cdx.json at the root of the folder to scan instead)."; exit 1; }
+    [ "$NO_COMPONENTS" = "false" ] || { echo "[ERROR] --no-components is not offered with --ui (it applies to one source scan)."; exit 1; }
     [ "${#FAIL_ON[@]}" -eq 0 ] || { echo "[ERROR] --fail-on is not offered with --ui (it exits on one scan's result; the UI runs many)."; exit 1; }
     [ "$FAIL_ON_CONFORMANCE" = "true" ] && { echo "[ERROR] --fail-on-conformance is not offered with --ui (it exits on one scan's result; the UI runs many)."; exit 1; }
     docker_check
@@ -1083,6 +1119,8 @@ if [ -n "$DIFF_OLD" ]; then
     [ -z "$VEX_FILE" ] || { echo "[ERROR] --vex cannot be combined with --diff (a diff writes no SBOM to attach statements to)."; exit 1; }
     [ -z "$AI_DECLARE_FILE" ] || { echo "[ERROR] --ai-declare cannot be combined with --diff (a diff writes no AI document to declare into)."; exit 1; }
     [ -z "$COMPONENT_VERSIONS_FILE" ] || { echo "[ERROR] --component-versions cannot be combined with --diff (a diff writes no SBOM to add versions to)."; exit 1; }
+    [ "${#COMPONENTS_FILES[@]}" -eq 0 ] || { echo "[ERROR] --components cannot be combined with --diff (a diff writes no SBOM to add components to)."; exit 1; }
+    [ "$NO_COMPONENTS" = "false" ] || { echo "[ERROR] --no-components cannot be combined with --diff (a diff reads no source tree)."; exit 1; }
     docker_check
     [ -f "$DIFF_OLD" ] || { echo "[ERROR] --diff: old SBOM not found: $DIFF_OLD"; exit 1; }
     [ -f "$DIFF_NEW" ] || { echo "[ERROR] --diff: new SBOM not found: $DIFF_NEW"; exit 1; }
@@ -1202,6 +1240,9 @@ rm -f "${OUTPUT_HOST_DIR}/${OUTPUT_FILE}"
 # The conda sidecar stage 1 may write beside it is kept by stage 2's cleanup
 # for the same reason, so an old one is cleared here too.
 rm -f "${OUTPUT_HOST_DIR}/${OUTPUT_FILE%_bom.json}_conda.cdx.json"
+# An earlier run's refused SBOM (declared components that were refused) is not
+# this run's: the check after stage 2 reads its presence as this run's refusal.
+rm -f "${OUTPUT_HOST_DIR}/${OUTPUT_FILE%_bom.json}_bom.refused.json"
 
 # Temp dirs (git clone / archive extract) are cleaned on any exit. A container
 # build step (e.g. npm install during a source scan) can leave root-owned files
@@ -1457,6 +1498,35 @@ component_versions_run() {
     local d f
     d="$(cd "$(dirname "$COMPONENT_VERSIONS_FILE")" && pwd)"; f="$(basename "$COMPONENT_VERSIONS_FILE")"
     printf ' -v %q:/component-versions-in/versions.csv:ro -e COMPONENT_VERSIONS_FILE=/component-versions-in/versions.csv' "$(hostpath "$d/$f")"
+}
+
+# --components: each file is mounted on its own, read-only, at a fixed container
+# path (/components-in/<n>.cdx.json), for the reason given at vex_run. The
+# names the user gave travel by name only (-e DECLARED_COMPONENTS_LABELS, the
+# value read from this process's environment, set where the files are
+# checked), so a name with a space never reaches the eval'd command line.
+components_run() {
+    if [ "$NO_COMPONENTS" = "true" ]; then
+        printf ' -e DECLARED_COMPONENTS_SKIP=1'
+        return 0
+    fi
+    [ "${#COMPONENTS_FILES[@]}" -gt 0 ] || return 0
+    local d f i=0 list=""
+    for f in "${COMPONENTS_FILES[@]}"; do
+        d="$(cd "$(dirname "$f")" && pwd)"
+        printf ' -v %q:/components-in/%d.cdx.json:ro' "$(hostpath "$d/$(basename "$f")")" "$i"
+        list="${list:+$list }/components-in/$i.cdx.json"
+        i=$((i + 1))
+    done
+    printf ' -e DECLARED_COMPONENTS_FILES=%q -e DECLARED_COMPONENTS_LABELS' "$list"
+}
+
+# --exclude: the excluded paths, for the declared-components step's messages.
+# By name only, as DECLARED_COMPONENTS_LABELS above (the value is the exported
+# newline-separated list, set where the copy without them is made).
+exclude_run() {
+    [ -n "${SCAN_EXCLUDE_PATHS:-}" ] || return 0
+    printf ' -e SCAN_EXCLUDE_PATHS'
 }
 
 # --fail-on: the conditions travel to the container as one comma-separated value.
@@ -2186,6 +2256,32 @@ if [ -n "$COMPONENT_VERSIONS_FILE" ]; then
     fi
 fi
 
+if [ "$NO_COMPONENTS" = "true" ] && [ "${#COMPONENTS_FILES[@]}" -gt 0 ]; then
+    echo "[ERROR] --no-components cannot be combined with --components: the first reads no declaration file, the second names one."; exit 1
+fi
+if [ "${#COMPONENTS_FILES[@]}" -gt 0 ]; then
+    DECLARED_COMPONENTS_LABELS=""
+    for _cf in "${COMPONENTS_FILES[@]}"; do
+        if [ -z "$_cf" ]; then
+            echo "[ERROR] --components requires a file, e.g. --components sbom-declared.cdx.json"; exit 1
+        fi
+        if [ ! -f "$_cf" ]; then
+            echo "[ERROR] --components file not found: $_cf"
+            echo "[ERROR] Pass the path of a CycloneDX file (JSON) that lists the components the scan cannot find, e.g. --components sbom-declared.cdx.json."; exit 1
+        fi
+        # The container checks every component; refusing an oversized file
+        # here saves starting the scan for it.
+        if [ "$(wc -c < "$_cf" | tr -d ' ')" -gt 4194304 ]; then
+            echo "[ERROR] --components: $_cf is larger than 4 MiB."; exit 1
+        fi
+        # One name per line, in the order of the files (see components_run).
+        DECLARED_COMPONENTS_LABELS="${DECLARED_COMPONENTS_LABELS:+$DECLARED_COMPONENTS_LABELS
+}$(printf '%s' "$_cf" | tr '\n\r' '  ')"
+    done
+    export DECLARED_COMPONENTS_LABELS
+    unset _cf
+fi
+
 if [ -n "$GIT_URL" ]; then
     [ -z "$TARGET" ]      || { echo "[ERROR] --git is mutually exclusive with --target."; exit 1; }
     [ -z "$ANALYZE_SBOM" ] || { echo "[ERROR] --git is mutually exclusive with --analyze."; exit 1; }
@@ -2525,6 +2621,10 @@ fi
 if [ -n "$COMPONENT_VERSIONS_FILE" ] && [ "$MODE" != "FIRMWARE" ] && [ "$MODE" != "ROOTFS" ] && [ "$MODE" != "BINARY" ]; then
     echo "[ERROR] --component-versions applies to firmware, root filesystem and binary scans only (this target is scanned as $MODE)."; exit 1
 fi
+if { [ "${#COMPONENTS_FILES[@]}" -gt 0 ] || [ "$NO_COMPONENTS" = "true" ]; } && [ "$MODE" != "SOURCE" ]; then
+    _flag="--components"; [ "$NO_COMPONENTS" = "true" ] && _flag="--no-components"
+    echo "[ERROR] $_flag applies to source scans only (this target is scanned as $MODE)."; exit 1
+fi
 
 if { [ -n "$AI_DECLARE_FILE" ] || [ "$GENERATE_SPDX3" = "false" ]; } \
    && [ "$MODE" != "AIBOM" ] && [ "$MODE" != "MODELFILE" ] && [ "$MODE" != "DATASET" ] && [ "$MODE" != "AIDECLARE" ]; then
@@ -2717,6 +2817,10 @@ EOF_EXCLUDE
     copy_without_excluded "$SCAN_INPUT_DIR" "$_view" "" \
         || { echo "[ERROR] could not copy the source tree for --exclude"; exit 1; }
     SCAN_INPUT_DIR="$_view"
+    # For the declared-components step, which says when a bomlens:artifact is
+    # missing because it is under one of these paths (see exclude_run).
+    SCAN_EXCLUDE_PATHS="$SCAN_EXCLUDE"
+    export SCAN_EXCLUDE_PATHS
 fi
 
 # ========================================================
@@ -3145,9 +3249,14 @@ EOF
         -v "\"$(hostpath "$SCAN_INPUT_DIR")\"":/src -v "\"$(hostpath "$OUTPUT_HOST_DIR")\"":/host-output \
         -w /host-output \
         --add-host=host.docker.internal:host-gateway \
-        -e MODE=POSTPROCESS -e BOMLENS_RUN_INPUT="$OUTPUT_FILE" -e NESTED_ROOTFS_HINT="\"$NESTED_ROOTFS_HINT\"" -e BOMLENS_DEEP_LICENSE_FALLBACK="\"${DEEP_LICENSE_FALLBACK_FROM:-}\"" -e BOMLENS_DEEP_CVE_FALLBACK="\"${DEEP_CVE_FALLBACK_FROM:-}\"" -e BOMLENS_INCLUDE_NON_SHIPPED${STAGE1_FALLBACK_ENV}${STAGE1_FINGERPRINT_ENV}${PP_ENV} $(pp_env)$(cosign_run)$(vex_run)$(declare_run)$(gate_run) \
+        -e MODE=POSTPROCESS -e BOMLENS_RUN_INPUT="$OUTPUT_FILE" -e NESTED_ROOTFS_HINT="\"$NESTED_ROOTFS_HINT\"" -e BOMLENS_DEEP_LICENSE_FALLBACK="\"${DEEP_LICENSE_FALLBACK_FROM:-}\"" -e BOMLENS_DEEP_CVE_FALLBACK="\"${DEEP_CVE_FALLBACK_FROM:-}\"" -e BOMLENS_INCLUDE_NON_SHIPPED${STAGE1_FALLBACK_ENV}${STAGE1_FINGERPRINT_ENV}${PP_ENV} $(pp_env)$(cosign_run)$(vex_run)$(declare_run)$(components_run)$(exclude_run)$(gate_run) \
         "\"$PP_IMAGE\"" || {
         _pp_rc=$?
+        # Refused declared components rename the SBOM to _bom.refused.json and
+        # say why; that is not a generation failure to retry or explain.
+        if [ -f "$OUTPUT_HOST_DIR/${OUTPUT_FILE%_bom.json}_bom.refused.json" ]; then
+            exit "$_pp_rc"
+        fi
         if [ "$DETECTION_USED" = static ] && [ ! -s "$OUTPUT_HOST_DIR/$OUTPUT_FILE" ]; then
             if [ "$DETECTION" = auto ]; then
                 echo "[WARN] Static detection could not read the lock file; scanning again with a build."

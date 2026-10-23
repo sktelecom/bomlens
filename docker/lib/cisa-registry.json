@@ -106,7 +106,7 @@
           "label": "Component identifiers",
           "label_ko": "구성요소 식별자",
           "source": "auto",
-          "missingPath": "[ $subjects[] | select(((.purl // \"\") == \"\") and ((.cpe // \"\") == \"\") and (((.hashes // []) | length) == 0) and ((.swhid // \"\") == \"\")) | (.name // \"(unnamed)\") ]",
+          "missingPath": "[ $subjects[] | select(((.purl // \"\") == \"\") and ((.cpe // \"\") == \"\") and (((.hashes // []) | length) == 0) and ((.swhid // \"\") == \"\") and ((([ (.components // [])[] | select(.type == \"file\") ]) as $k | ($k | length) > 0 and all($k[]; [ (.hashes // [])[] | select((.content // \"\") != \"\") ] | length > 0)) | not)) | (.name // \"(unnamed)\") ]",
           "evidencePath": "[ $subjects[] | (.purl // .cpe) | select(. != null and . != \"\") ] | unique"
         },
         {
@@ -121,7 +121,7 @@
           "label": "Component hash value",
           "label_ko": "구성요소 해시 값",
           "source": "auto",
-          "missingPath": "[ $subjects[] | select([ (.hashes // [])[] | select((.content // \"\") != \"\") ] | length == 0) | (.name // \"(unnamed)\") ]"
+          "missingPath": "[ $subjects[] | select(([ (.hashes // [])[] | select((.content // \"\") != \"\") ] | length == 0) and ((([ (.components // [])[] | select(.type == \"file\") ]) as $k | ($k | length) > 0 and all($k[]; [ (.hashes // [])[] | select((.content // \"\") != \"\") ] | length > 0)) | not)) | (.name // \"(unnamed)\") ]"
         },
         {
           "id": "cisa-component-hash-algorithm",
