@@ -97,7 +97,11 @@ SBOM_AUTHOR="${SBOM_AUTHOR:-}"
 AUTHORS_JSON="[]"
 AUTHOR_SOURCE=""
 if [ -n "$SBOM_AUTHOR" ]; then
-    AUTHORS_JSON=$(jq -cn --arg a "$SBOM_AUTHOR" '[{name: $a}]')
+    # "Name <address>" gives the author an email as well, which BSI
+    # TR-03183-2 (5.2.1) asks of the SBOM creator. Anything else is the name.
+    AUTHORS_JSON=$(jq -cn --arg a "$SBOM_AUTHOR" '
+        (($a | capture("^\\s*(?<n>[^<>]*[^<>\\s])\\s*<(?<e>[^<>\\s@]+@[^<>\\s@]+)>\\s*$")?) // null) as $m
+        | if $m then [{name: $m.n, email: $m.e}] else [{name: $a}] end')
 elif [ "$MODE" = "AIDECLARE" ] && [ -n "${AI_DECLARATION_FILE:-}" ] && [ -f "$AI_DECLARATION_FILE" ]; then
     _declared=$(jq -c '[(.document.createdBy // [])[]? | objects | .name | strings
                         | gsub("^\\s+|\\s+$"; "") | select(length > 0) | {name: .}]
