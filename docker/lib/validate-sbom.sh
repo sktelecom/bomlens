@@ -728,11 +728,15 @@ bsi_checks() {
              or (((.contact // []) | if type == "array" then . else [] end) | any(type == "object" and ((.email // "") != ""))));
     def creator_ok: [.supplier, .manufacturer] | any(contact_ok);
     def nv_ok: ((.name // "") != "") and (((.version // "") | tostring) != "");
-    # A licence BSI can read: an SPDX identifier or expression, or a
-    # LicenseRef- for a licence the SPDX list does not hold (TR-03183-2 6.1).
+    # The distribution licence as BSI TR-03183-2 reads it: an SPDX identifier
+    # or expression, or a LicenseRef- for a licence the SPDX list does not
+    # hold (6.1), marked "acknowledgement": "concluded" (section 8 gives the
+    # distribution licence that way, and "declared" to the original one).
     def lic_ok: (.licenses // []) | if type == "array" then . else [] end
-        | any(type == "object" and (((.expression // "") != "") or ((.license.id // "") != "")
-              or ((.license.name // "") | test("^LicenseRef-[A-Za-z0-9.-]+$"))));
+        | any(type == "object"
+              and (((.expression // "") != "" and .acknowledgement == "concluded")
+                   or ((.license // {}) | type == "object" and .acknowledgement == "concluded"
+                       and (((.id // "") != "") or ((.name // "") | test("^LicenseRef-[A-Za-z0-9.-]+$"))))));
     def fname_ok: own_or_files(props("bsi:component:filename") | length > 0);
     def sha512_here: ((.hashes // []) | any(.alg? == "SHA-512" and ((.content // "") != "")))
         or ((.externalReferences // []) | any(.type? == "distribution" and ((.hashes // []) | any(.alg? == "SHA-512"))));
@@ -805,7 +809,7 @@ bsi_checks() {
             (if fname_ok then empty else "filename" end),
             (if sha512_ok then empty elif yocto_src then "SHA-512 (not in the source SBOM)" else "SHA-512" end),
             (if fprops_ok then empty else "file properties" end),
-            (if lic_ok then empty else "licence" end) ]) as $gaps
+            (if lic_ok then empty else "concluded licence" end) ]) as $gaps
        | select(($gaps | length) > 0) | ($x | clabel) + ": " + ($gaps | join(", ")) ]) as $scan_gaps
     | def cnt(f): [ $scan[] | select(f) ] | length;
     ($scan | length) as $sn
@@ -841,10 +845,10 @@ bsi_checks() {
        drow("bsi-declared-name-version"; "Declared components: name and version"; "선언 구성요소: 이름과 버전"; $decl; nv_ok;
             guide("Give each listed component a name and a version in the declaration file.";
                   "선언 파일에서 표시된 구성요소에 이름과 버전을 적습니다.")),
-       drow("bsi-declared-license"; "Declared components: distribution licence as an SPDX identifier, expression or LicenseRef-";
-            "선언 구성요소: SPDX 식별자, 표현식, LicenseRef- 형식의 배포 라이선스"; $decl; lic_ok;
-            guide("Give each listed component its distribution licence as an SPDX identifier or expression, or as a LicenseRef- name for a licence the SPDX list does not hold, for example {\"license\": {\"name\": \"LicenseRef-ExampleCorp-Proprietary\"}}.";
-                  "선언 파일에서 표시된 구성요소의 배포 라이선스를 SPDX 식별자나 표현식으로 적고, SPDX 목록에 없는 라이선스는 LicenseRef- 이름으로 적습니다. 예: {\"license\": {\"name\": \"LicenseRef-ExampleCorp-Proprietary\"}}")),
+       drow("bsi-declared-license"; "Declared components: concluded distribution licence as an SPDX identifier, expression or LicenseRef-";
+            "선언 구성요소: SPDX 식별자, 표현식, LicenseRef- 형식의 배포 라이선스(concluded)"; $decl; lic_ok;
+            guide("Give each listed component its distribution licence as an SPDX identifier or expression, or as a LicenseRef- name for a licence the SPDX list does not hold, for example {\"license\": {\"name\": \"LicenseRef-ExampleCorp-Proprietary\"}}. BomLens marks a declared licence \"acknowledgement\": \"concluded\" unless the declaration says \"declared\"; the distribution licence has to be the concluded one.";
+                  "선언 파일에서 표시된 구성요소의 배포 라이선스를 SPDX 식별자나 표현식으로 적고, SPDX 목록에 없는 라이선스는 LicenseRef- 이름으로 적습니다. 예: {\"license\": {\"name\": \"LicenseRef-ExampleCorp-Proprietary\"}}. BomLens는 선언 파일이 \"declared\"로 적지 않은 라이선스에 \"acknowledgement\": \"concluded\"를 붙이며, 배포 라이선스는 concluded여야 합니다.")),
        drow("bsi-declared-filename"; "Declared components: filename (bsi:component:filename)";
             "선언 구성요소: 파일 이름(bsi:component:filename)"; $dfile; fname_ok;
             guide("Name the build output of each listed component in bomlens:artifact; the scan writes its file name.";
@@ -873,11 +877,11 @@ bsi_checks() {
         detail: (if $sn == 0 then "no scanned components"
                  else "creator \(cnt(creator_ok))/\($sn), version \(cnt(nv_ok))/\($sn), filename \(cnt(fname_ok))/\($sn), SHA-512 \(cnt(sha512_ok))/\($sn)"
                       + (if $scan_nosrc > 0 then " (\($scan_nosrc) not in the source SBOM)" else "" end)
-                      + ", file properties \(cnt(fprops_ok))/\($sn), licence \(cnt(lic_ok))/\($sn)" end),
+                      + ", file properties \(cnt(fprops_ok))/\($sn), concluded licence \(cnt(lic_ok))/\($sn)" end),
         detail_ko: (if $sn == 0 then "스캔한 구성요소 없음"
                     else "제작자 \(cnt(creator_ok))/\($sn), 버전 \(cnt(nv_ok))/\($sn), 파일 이름 \(cnt(fname_ok))/\($sn), SHA-512 \(cnt(sha512_ok))/\($sn)"
                          + (if $scan_nosrc > 0 then " (원본 SBOM에 없음 \($scan_nosrc)개)" else "" end)
-                         + ", 파일 속성 \(cnt(fprops_ok))/\($sn), 라이선스 \(cnt(lic_ok))/\($sn)" end),
+                         + ", 파일 속성 \(cnt(fprops_ok))/\($sn), 배포 라이선스(concluded) \(cnt(lic_ok))/\($sn)" end),
         missing: ($scan_gaps[0:$cap])}
       ]' "$SBOM"
 }

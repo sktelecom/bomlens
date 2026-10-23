@@ -3605,15 +3605,15 @@ jq -n --argjson bp "$BSI_PROPS" --argjson h "$SHA512" '{
      licenses: [{license: {id: "MIT"}}], properties: [{name: "bomlens:identifiedBy", value: "yocto-spdx"}]},
     {type: "application", name: "fw-tool", version: "1.0", purl: "pkg:generic/fw-tool@1.0", "bom-ref": "F",
      supplier: {name: "Example Corp", url: ["https://example.com"]}, hashes: $h,
-     licenses: [{license: {name: "LicenseRef-ExampleCorp-Proprietary"}}],
+     licenses: [{license: {name: "LicenseRef-ExampleCorp-Proprietary", acknowledgement: "concluded"}}],
      properties: ([{name: "bomlens:origin", value: "first-party"}, {name: "bomlens:artifact", value: "out/f"}] + $bp)},
     {type: "application", name: "multi", version: "1.0", "bom-ref": "M",
      supplier: {name: "Example Corp", contact: [{email: "dev@example.com"}]},
-     licenses: [{expression: "LicenseRef-ExampleCorp-Proprietary"}],
+     licenses: [{expression: "LicenseRef-ExampleCorp-Proprietary", acknowledgement: "concluded"}],
      properties: [{name: "bomlens:origin", value: "first-party"}, {name: "bomlens:artifact", value: "out/a"}, {name: "bomlens:artifact", value: "out/b"}],
      components: [{type: "file", name: "out/a", hashes: $h, properties: $bp}, {type: "file", name: "out/b", hashes: $h, properties: $bp}]},
     {type: "library", name: "hal", version: "4.2", "bom-ref": "H",
-     supplier: {name: "Chip Vendor", url: ["https://chip.example.com"]}, licenses: [{license: {id: "BSD-3-Clause"}}],
+     supplier: {name: "Chip Vendor", url: ["https://chip.example.com"]}, licenses: [{license: {id: "BSD-3-Clause", acknowledgement: "concluded"}}],
      properties: [{name: "bomlens:origin", value: "third-party"}]}],
   dependencies: [{ref: "app", dependsOn: ["L", "Y", "F", "M", "H"]}, {ref: "L", dependsOn: []}, {ref: "Y", dependsOn: []},
                  {ref: "F", dependsOn: []}, {ref: "M", dependsOn: []}, {ref: "H", dependsOn: []}]}' > "$WORK/bsi.json"
@@ -3635,7 +3635,7 @@ done
 [ "$(bsi_row "$WORK/bsi" bsi-declared-without-file)" = "warn|false|hal@4.2" ] \
     && pass "bsi: a declared component with no file of its own is listed on an advisory row, not failed on the file rows" \
     || fail "bsi declared without file" "$(bsi_row "$WORK/bsi" bsi-declared-without-file)"
-[ "$(bsi_row "$WORK/bsi" bsi-scanned-components)" = "warn|false|lodash@4.17.21: creator, filename, SHA-512, file properties;yocto-pkg@1.0: creator, filename, SHA-512 (not in the source SBOM), file properties" ] \
+[ "$(bsi_row "$WORK/bsi" bsi-scanned-components)" = "warn|false|lodash@4.17.21: creator, filename, SHA-512, file properties, concluded licence;yocto-pkg@1.0: creator, filename, SHA-512 (not in the source SBOM), file properties, concluded licence" ] \
   && jq -e '.checks[] | select(.id == "bsi-scanned-components") | .detail | startswith("creator 0/2, version 2/2, filename 0/2, SHA-512 0/2 (1 not in the source SBOM)")' "$WORK/bsi_conformance.json" >/dev/null \
     && pass "bsi: the scanned components are advisory, with counts and the gaps of each, a Yocto package's SHA-512 as not in the source SBOM" \
     || fail "bsi scanned components" "$(jq -c '.checks[] | select(.id == "bsi-scanned-components") | [.status, .detail, .missing]' "$WORK/bsi_conformance.json")"
@@ -3665,16 +3665,17 @@ jq 'del(.metadata.component["bom-ref"])' "$WORK/bsi.json" > "$WORK/bsi-c2.json";
     && pass "bsi: a component the graph does not reach from the product fails the graph row, by name" \
     || fail "bsi graph" "$(bsi_row "$WORK/bsi-c" bsi-dependency-graph) / $(bsi_row "$WORK/bsi-c2" bsi-dependency-graph)"
 jq '(.components[] | select(.name == "multi") | .components[1].hashes) = [{alg: "SHA-256", content: "bb"}]
-    | (.components[] | select(.name == "fw-tool") | .licenses) = [{license: {name: "Proprietary"}}]
+    | (.components[] | select(.name == "fw-tool") | .licenses) = [{license: {name: "Proprietary", acknowledgement: "concluded"}}]
+    | (.components[] | select(.name == "multi") | .licenses[0].acknowledgement) = "declared"
     | (.components[] | select(.name == "hal") | .supplier) = {name: "Chip Vendor"}
     | (.components[] | select(.name == "fw-tool") | .properties) |= map(select(.name != "bsi:component:archive"))' \
     "$WORK/bsi.json" > "$WORK/bsi-d.json"; bsi_run "$WORK/bsi-d.json" "$WORK/bsi-d"
 [ "$(bsi_row "$WORK/bsi-d" bsi-declared-sha512)" = "fail|true|multi@1.0" ] \
-  && [ "$(bsi_row "$WORK/bsi-d" bsi-declared-license)" = "fail|true|fw-tool@1.0" ] \
+  && [ "$(bsi_row "$WORK/bsi-d" bsi-declared-license)" = "fail|true|fw-tool@1.0;multi@1.0" ] \
   && [ "$(bsi_row "$WORK/bsi-d" bsi-declared-creator)" = "fail|true|hal@4.2" ] \
   && [ "$(bsi_row "$WORK/bsi-d" bsi-declared-file-properties)" = "fail|true|fw-tool@1.0" ] \
   && [ "$(bsi_row "$WORK/bsi-d" bsi-declared-filename)" = "pass|true|" ] \
-    && pass "bsi: a nested file without SHA-512, a licence that is only a name, a creator with no URL and a missing property fail their rows by name" \
+    && pass "bsi: a nested file without SHA-512, a licence that is only a name or not concluded, a creator with no URL and a missing property fail their rows by name" \
     || fail "bsi declared rows" "$(for i in sha512 license creator file-properties filename; do bsi_row "$WORK/bsi-d" "bsi-declared-$i"; done | tr '\n' ' ')"
 # A declared Yocto recipe package with no SHA-512: not in the source SBOM, a warning.
 jq '.components += [{type: "library", name: "my-recipe", version: "2.0", "bom-ref": "R",
