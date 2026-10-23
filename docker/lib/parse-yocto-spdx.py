@@ -26,6 +26,7 @@
 #   - externalIdentifier[cpe23]                                   -> component.cpe.
 #     Yocto writes these from CVE_PRODUCT with a wildcard vendor.
 #   - software_packageUrl (6.1)                                   -> component.purl.
+#   - the recipe (generates, or build_Build hasOutput)            -> bomlens:yocto:recipe.
 #   - hasAssociatedVulnerability edges + the VEX relationship types. From 6.0
 #     they hang off the recipe (primaryPurpose "specification"), and are read
 #     on every installed package the recipe `generates`, which is where 5.x
@@ -79,6 +80,8 @@ VEX_NOT_AFFECTED = "security_VexNotAffectedVulnAssessmentRelationship"
 # unpatched CVE) needs no set of its own: it is counted with the vulnerabilities
 # that have no statement, as affected, and both reach the security sidecar.
 REL_TYPES = ("Relationship", "LifecycleScopedRelationship")
+# How bitbake names the build of a recipe's packages: "<PN>:do_create_spdx:recipe".
+RECIPE_BUILD_SUFFIX = ":do_create_spdx:recipe"
 
 
 def _iter_graph(doc):
@@ -214,6 +217,33 @@ def extract(doc):
             if targets and rel.get("from") not in installed:
                 generated_by.setdefault(rel.get("from"), []).extend(targets)
 
+    # The recipe each installed package was built from (PN), which names the
+    # upstream project: openssl builds libssl3 and openssl-bin. 6.x names it on
+    # the specification package that generates the package; 5.x and 6.x both
+    # name the build_Build "<PN>:do_create_spdx:recipe" whose hasOutput is the
+    # package, read when there is no specification package.
+    recipe_of = {}
+    for recipe_id, pkg_ids in generated_by.items():
+        recipe_name = (by_id.get(recipe_id) or {}).get("name")
+        if isinstance(recipe_name, str) and recipe_name:
+            for pkg_id in pkg_ids:
+                recipe_of.setdefault(pkg_id, recipe_name)
+    for rel in graph:
+        if rel.get("type") not in REL_TYPES or rel.get("relationshipType") != "hasOutput":
+            continue
+        build = by_id.get(rel.get("from")) or {}
+        build_name = build.get("name")
+        if build.get("type") != "build_Build" or not isinstance(build_name, str):
+            continue
+        if not build_name.endswith(RECIPE_BUILD_SUFFIX):
+            continue
+        recipe_name = build_name[: -len(RECIPE_BUILD_SUFFIX)]
+        if not recipe_name:
+            continue
+        for pkg_id in _as_list(rel.get("to")):
+            if pkg_id in installed:
+                recipe_of.setdefault(pkg_id, recipe_name)
+
     concluded_of = {}
     declared_of = {}
     vulns_of = {}
@@ -276,9 +306,14 @@ def extract(doc):
         licenses = _licenses_cdx(concluded_of.get(spdx_id) or declared_of.get(spdx_id))
         if licenses:
             comp["licenses"] = licenses
+        # As the 2.2 reader does: upstream-purl.py reads it to give the package
+        # its upstream repository purl. Not repeated when it is the package name.
+        recipe_name = recipe_of.get(spdx_id)
+        if recipe_name and recipe_name != name:
+            comp["properties"].append({"name": "bomlens:yocto:recipe", "value": recipe_name})
         components.append(comp)
 
-    counts = {"fixed": 0, "notAffected": 0, "affected": 0}
+    counts ={"fixed": 0, "notAffected": 0, "affected": 0}
     vuln_rows = []
     seen = set()
     for spdx_id, vuln_ids in vulns_of.items():

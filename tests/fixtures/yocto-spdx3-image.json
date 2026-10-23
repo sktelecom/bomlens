@@ -1,5 +1,5 @@
 {
-  "_comment": "Shrunk Yocto SPDX 3.0 image SBOM, shaped after a real core-image-minimal (Scarthgap) so parse-yocto-spdx.py's branches are all exercised: an installed package with and without a CPE, a source tarball that must NOT become a component, a compound license expression, and one vulnerability of each VEX outcome (fixed / not-affected / unjudged). Expected parse: 2 components, 2 licenses, 1 cpe, counts 1 fixed + 1 not-affected + 1 unresolved.",
+  "_comment": "Shrunk Yocto SPDX 3.0 image SBOM, shaped after a real core-image-minimal (Scarthgap) so parse-yocto-spdx.py's branches are all exercised: an installed package with and without a CPE, a source tarball that must NOT become a component, a compound license expression, and one vulnerability of each VEX outcome (fixed / not-affected / unjudged). The recipe of each package is named by the build_Build '<PN>:do_create_spdx:recipe' that outputs it. Expected parse: 2 components, 2 licenses, 1 cpe, counts 1 fixed + 1 not-affected + 1 unresolved, libz1 with recipe zlib (busybox's recipe is its own name, so not recorded).",
   "@context": "https://spdx.org/rdf/3.0.1/spdx-context.jsonld",
   "@graph": [
     {"type":"CreationInfo","@id":"_:ci","specVersion":"3.0.1","created":"2026-01-01T00:00:00Z","createdBy":["urn:agent:oe"],"createdUsing":["urn:agent:bitbake"]},
@@ -28,6 +28,13 @@
      "externalIdentifier":[{"type":"ExternalIdentifier","externalIdentifierType":"cve","identifier":"CVE-2022-28391"}]},
 
     {"type":"Relationship","spdxId":"urn:rel:vuln1","creationInfo":"_:ci","from":"urn:pkg:busybox","relationshipType":"hasAssociatedVulnerability","to":["urn:vuln:fixed","urn:vuln:notaffected","urn:vuln:open"]},
+
+    {"type":"build_Build","spdxId":"urn:build:busybox","creationInfo":"_:ci","name":"busybox:do_create_spdx:recipe","build_buildType":"http://openembedded.org/bitbake/do_create_spdx/recipe"},
+    {"type":"build_Build","spdxId":"urn:build:zlib","creationInfo":"_:ci","name":"zlib:do_create_spdx:recipe","build_buildType":"http://openembedded.org/bitbake/do_create_spdx/recipe"},
+    {"type":"build_Build","spdxId":"urn:build:rootfs","creationInfo":"_:ci","name":"core-image-minimal:do_create_rootfs_spdx:rootfs","build_buildType":"http://openembedded.org/bitbake/do_create_rootfs_spdx/rootfs"},
+    {"type":"Relationship","spdxId":"urn:rel:out1","creationInfo":"_:ci","from":"urn:build:busybox","relationshipType":"hasOutput","to":["urn:pkg:busybox"]},
+    {"type":"Relationship","spdxId":"urn:rel:out2","creationInfo":"_:ci","from":"urn:build:zlib","relationshipType":"hasOutput","to":["urn:pkg:libz1"]},
+    {"type":"Relationship","spdxId":"urn:rel:out3","creationInfo":"_:ci","from":"urn:build:rootfs","relationshipType":"hasOutput","to":["urn:pkg:image"]},
 
     {"type":"LifecycleScopedRelationship","spdxId":"urn:rel:dep1","creationInfo":"_:ci","from":"urn:pkg:busybox","relationshipType":"dependsOn","scope":"runtime","to":["urn:pkg:libz1"]},
     {"type":"LifecycleScopedRelationship","spdxId":"urn:rel:dep2","creationInfo":"_:ci","from":"urn:pkg:busybox","relationshipType":"dependsOn","scope":"build","to":["urn:pkg:libz1"]},

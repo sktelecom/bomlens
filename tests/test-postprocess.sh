@@ -5958,6 +5958,19 @@ python3 "$LIB/parse-yocto-spdx.py" "$FIX/good-cyclonedx.json" "$WORK/nope.json" 
 [ "$(jq '[.components[] | select(.purl)] | length' "$WORK/yocto.cdx.json")" = "0" ] \
     && pass "a 5.x-shaped Yocto document gets no purl" \
     || fail "purls on the 5.x fixture: $(jq -c '[.components[].purl]' "$WORK/yocto.cdx.json")"
+# The recipe names the upstream project (zlib builds libz1). 5.x records it as
+# the build "<PN>:do_create_spdx:recipe" that outputs the package; as on the 2.2
+# path it is kept only where it differs from the package name. With it the
+# upstream step can give libz1, which has no CPE here, its repository purl.
+y5rec=$(jq -r '[.components[] | "\(.name)=\([.properties[] | select(.name=="bomlens:yocto:recipe") | .value] | join("+"))"] | join(" ")' "$WORK/yocto.cdx.json" 2>/dev/null)
+[ "$y5rec" = "busybox= libz1=zlib" ] \
+    && pass "5.x: the recipe is read from the build that outputs the package" \
+    || fail "5.x recipes: $y5rec"
+cp "$WORK/yocto.cdx.json" "$WORK/yocto-upp.cdx.json"
+python3 "$LIB/upstream-purl.py" "$WORK/yocto-upp.cdx.json" >/dev/null 2>&1
+[ "$(jq -r '.components[] | select(.name=="libz1") | .purl' "$WORK/yocto-upp.cdx.json" 2>/dev/null)" = "pkg:github/madler/zlib@v1.3.1" ] \
+    && pass "5.x: a package with no CPE gets its upstream purl through its recipe" \
+    || fail "5.x libz1 purl: $(jq -c '.components[] | select(.name=="libz1") | .purl' "$WORK/yocto-upp.cdx.json" 2>/dev/null)"
 
 echo "== yocto: SPDX 3.0 image SBOM in the 6.x shape (declared licenses, recipe VEX, purl) =="
 # Yocto 6.0 writes the declared license and links vulnerabilities to the recipe,
@@ -5994,6 +6007,13 @@ python3 "$LIB/upstream-purl.py" "$WORK/y6-upp.cdx.json" >/dev/null 2>&1
 [ "$(jq -r '.components[] | select(.name=="busybox") | [.purl, ([.properties[] | select(.name=="bomlens:originalPurl") | .value][0])] | join(" ")' "$WORK/y6-upp.cdx.json" 2>/dev/null)" = "pkg:github/mirror/busybox@1_36_1 pkg:yocto/core/busybox@1.36.1" ] \
     && pass "6.x: a pkg:yocto purl is replaced by the upstream repository purl and kept as the original" \
     || fail "6.x upstream purl: $(jq -c '[.components[] | select(.name=="busybox") | .purl, .properties]' "$WORK/y6-upp.cdx.json" 2>/dev/null)"
+y6rec=$(jq -r '[.components[] | "\(.name)=\([.properties[] | select(.name=="bomlens:yocto:recipe") | .value] | join("+"))"] | join(" ")' "$WORK/y6.cdx.json" 2>/dev/null)
+[ "$y6rec" = "busybox= busybox-syslog=busybox closed-app= libz1=zlib" ] \
+    && pass "6.x: the recipe is read from the specification package that generates the package" \
+    || fail "6.x recipes: $y6rec"
+[ "$(jq -r '.components[] | select(.name=="libz1") | .purl' "$WORK/y6-upp.cdx.json" 2>/dev/null)" = "pkg:github/madler/zlib@v1.3.1" ] \
+    && pass "6.x: a package with no CPE gets its upstream purl through its recipe" \
+    || fail "6.x libz1 purl: $(jq -c '.components[] | select(.name=="libz1") | .purl' "$WORK/y6-upp.cdx.json" 2>/dev/null)"
 cp "$WORK/y6.cdx.json" "$WORK/y6-novex.cdx.json"
 BOMLENS_CPE_INDEX_MATCHED=false PATH="$FAKEBIN:$PATH" SECURITY_ENRICH=false DEEP_CVE=false \
     bash "$LIB/scan-security.sh" "$WORK/y6-novex.cdx.json" "$WORK/y6-novex" proj >/dev/null 2>&1
