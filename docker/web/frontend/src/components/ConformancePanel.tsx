@@ -45,7 +45,9 @@ import { cn } from "@/lib/utils";
 // `color` is applied to an aria-hidden Icon at each usage site, not read
 // directly as body text.
 const STATUS = {
-  pass: { Icon: CircleCheck, color: "text-risk-low", key: "g7.sPass" }, // token-lint-ignore
+  // Success role, the same green as the "Met" chip: a met element is a pass,
+  // not an informational note, so it does not take the info blue.
+  pass: { Icon: CircleCheck, color: "text-role-success-emphasis", key: "g7.sPass" }, // token-lint-ignore
   fail: { Icon: CircleX, color: "text-risk-critical", key: "g7.sFail" }, // token-lint-ignore
   warn: { Icon: CircleAlert, color: "text-risk-medium", key: "g7.sWarn" }, // token-lint-ignore
   // Nothing in this document to judge. Muted on purpose: it is neither a gap the
@@ -173,7 +175,11 @@ function SourceBadge({ source, naKind, met }: { source?: string; naKind?: string
     case "inferred":
       return <Badge tone="info">{label}</Badge>;
     case "na":
-      return <Badge tone="medium">{label}</Badge>;
+      // No automated source is exactly what puts a check under the "Needs a
+      // person" chip (checkKind), so the badge uses that chip's word and tone.
+      // It used to say "Review needed" in the attention tone, the same word the
+      // model grade badge shows in the severe tone.
+      return <Badge tone={KIND_TONE.review}>{t("conf.kind.review")}</Badge>;
     case "declared":
     default:
       return <Badge variant="muted">{label}</Badge>;
@@ -343,7 +349,7 @@ function CheckRow({ check }: { check: ConformanceCheck }) {
             href={guidance.docUrl}
             target="_blank"
             rel="noreferrer"
-            className="mt-1 inline-block text-label font-medium text-primary hover:underline"
+            className="mt-1 inline-block text-label font-medium text-primary underline underline-offset-2 hover:no-underline"
           >
             {t("g7.learnMore")}
           </a>
@@ -402,19 +408,26 @@ function KindChip({
   );
 }
 
-/** A named group of checks, folded away when it holds nothing to act on. */
+/** A named group of checks, folded away when it holds nothing to act on.
+ *  With `foldMet`, the met checks of an open group sit in their own closed
+ *  fold below the rest, so opening a group shows what needs filling first. */
 export function CheckGroup({
   title,
   checks,
   defaultOpen,
   trailing,
+  foldMet = false,
 }: {
   title: string;
   checks: ConformanceCheck[];
   defaultOpen: boolean;
   trailing?: React.ReactNode;
+  foldMet?: boolean;
 }) {
+  const { t } = useTranslation();
   if (checks.length === 0) return null;
+  const met = foldMet ? checks.filter((c) => checkKind(c) === "pass") : [];
+  const rest = foldMet ? checks.filter((c) => checkKind(c) !== "pass") : checks;
   return (
     <Disclosure
       defaultOpen={defaultOpen}
@@ -429,11 +442,26 @@ export function CheckGroup({
         </span>
       }
     >
-      <ul className="mt-2 divide-y rounded-md border">
-        {sortByAttention(checks).map((c) => (
-          <CheckRow key={c.id} check={c} />
-        ))}
-      </ul>
+      {rest.length > 0 && (
+        <ul className="mt-2 divide-y rounded-md border">
+          {sortByAttention(rest).map((c) => (
+            <CheckRow key={c.id} check={c} />
+          ))}
+        </ul>
+      )}
+      {met.length > 0 && (
+        <Disclosure
+          className="mt-2"
+          summaryClassName="text-label font-medium text-muted-foreground"
+          summary={<span>{t("g7.metFold", { count: met.length })}</span>}
+        >
+          <ul className="mt-2 divide-y rounded-md border">
+            {sortByAttention(met).map((c) => (
+              <CheckRow key={c.id} check={c} />
+            ))}
+          </ul>
+        </Disclosure>
+      )}
     </Disclosure>
   );
 }

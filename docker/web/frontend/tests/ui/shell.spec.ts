@@ -1590,10 +1590,10 @@ test("AI scan exposes G7 conformance with present/advisory split", async ({ page
   // "advisory / need review" counts that said the same thing three times.
   await expect(page.getByRole("button", { name: /^Can be fixed \d+$/ })).toBeVisible();
   await expect(page.getByRole("button", { name: /^Needs a person \d+$/ })).toBeVisible();
-  // The element no scan can settle carries a "Review needed" provenance badge,
-  // and lives under the chip that says so.
+  // The element no scan can settle carries a provenance badge with the chip's
+  // own word, and lives under the chip that says so.
   await page.getByRole("button", { name: /^Needs a person \d+$/ }).click();
-  await expect(page.getByText("Review needed").first()).toBeVisible();
+  await expect(page.locator("main li").getByText("Needs a person", { exact: true }).first()).toBeVisible();
   // Clearing the chip shows every check again, grouped into its clusters. The
   // groups fold, and an unfiltered panel opens only the ones holding something
   // to act on, so open them all for the assertions below.

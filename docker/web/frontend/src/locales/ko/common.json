@@ -488,7 +488,9 @@
     },
     "partial": "일부 단계 실패",
     "metaScanType": "스캔 유형",
-    "metaGenerated": "스캔 시각"
+    "metaGenerated": "스캔 시각",
+    "licenseShowAll": "라이선스 {{count}}개 모두 보기",
+    "licenseShowLess": "줄여서 보기"
   },
   "deps": {
     "loading": "의존성을 불러오는 중…",
@@ -921,6 +923,41 @@
       "externalModels": "호출하는 외부 AI 모델",
       "noExternal": "선언한 것 없음",
       "notStated": "적지 않음"
+    },
+    "reason": {
+      "noLicense": "라이선스 미선언 ({{verdict}})",
+      "notInRegistry": "라이선스 {{license}}: 등록된 라이선스 조건 목록에 없음 ({{verdict}})",
+      "licenseTerms": "라이선스 {{license}}: {{name}} ({{verdict}})",
+      "licenseTermsFor": "라이선스 {{license}}: {{name}} ({{usage}} 시 {{verdict}})",
+      "customFound": "라이선스 원문 검토: 제약 문구 발견, {{quote}} ({{verdict}})",
+      "customNoMatch": "라이선스 원문 검토: 알려진 제약 문구는 없었음",
+      "humanReview": "사람이 직접 확인해야 함 ({{verdict}})",
+      "lineage": "계보: 기반 모델 {{model}}의 조건을 물려받을 수 있으나 여기에는 선언되지 않음 ({{verdict}})",
+      "hfFlags": "파일 보안: HuggingFace 스캔에서 {{status}} 콘텐츠로 판정됨 ({{verdict}})",
+      "hfSafe": "파일 보안: HuggingFace 스캔에서 모든 파일이 안전하다고 보고함 ({{verdict}})",
+      "hfStatus": "파일 보안: 스캔 상태 {{status}} ({{verdict}})",
+      "hfStatusPickle": "파일 보안: 스캔 상태 {{status}}, pickle 형식 가중치 포함 ({{verdict}})",
+      "localUnsafe": "파일 보안: 로컬 파일 스캔에서 코드 실행 위험 발견 ({{verdict}})",
+      "localUnsafeFindings": "파일 보안: 로컬 파일 스캔에서 코드 실행 위험 발견, {{findings}} ({{verdict}})",
+      "localSuspicious": "파일 보안: 로컬 파일 스캔에서 검토가 필요한 항목 발견 ({{verdict}})",
+      "localSuspiciousFindings": "파일 보안: 로컬 파일 스캔에서 검토가 필요한 항목 발견, {{findings}} ({{verdict}})",
+      "localClean": "파일 보안: 로컬 파일 스캔에서 코드 실행 위험 없음 (정적 분석일 뿐 악성코드 검사는 아님) ({{verdict}})",
+      "localNotApplicable": "파일 보안: 이 가중치 형식은 로드 시 코드를 실행하지 않음 ({{verdict}})",
+      "localUnreadable": "파일 보안: 로컬 파일 스캔이 파일을 읽지 못함 ({{verdict}})",
+      "datasetSignal": "데이터셋 신호 {{signal}} ({{verdict}})",
+      "datasetVisibility": "데이터셋 공개 범위 {{visibility}}: 접근 제한됨 ({{verdict}})",
+      "sourceText": "원천 \"{{source}}\": 허브 참조가 아니라 확인 필요 ({{verdict}})",
+      "sourcesDepth": "깊이 상한 아래 원천은 읽지 않음 ({{verdict}})",
+      "source": "원천 {{source}}: {{why}} ({{verdict}})",
+      "sourceThrough": "원천 {{source}} ({{through}}를 거쳐): {{why}} ({{verdict}})",
+      "sourceUnread": "읽을 수 없음",
+      "sourceWordsOnly": "자신의 원천을 문장으로만 적음",
+      "sourceDepth": "깊이 상한 아래 원천은 읽지 않음",
+      "sourceNoLicense": "라이선스 미선언",
+      "datasets": "데이터셋: {{count}}개 참조, 최악 등급 {{verdict}}",
+      "datasetsNamed": "데이터셋: {{count}}개 참조, 최악 등급 {{verdict}} ({{names}})",
+      "viaSources": "{{name}}, 원천 때문",
+      "trainingUndisclosed": "학습 데이터 미공개: 이 모델이 학습한 데이터의 이용 조건이 선언되지 않음"
     }
   },
   "aiSummary": {
@@ -1293,7 +1330,8 @@
     "missingMore": "외 {{count}}개",
     "needsPerson": "확인할 것:",
     "sNa": "해당 없음",
-    "notApplicable": "해당 없음 {{count}}건"
+    "notApplicable": "해당 없음 {{count}}건",
+    "metFold": "충족 {{count}}개"
   },
   "crosswalk": {
     "title": "규제 대응표",
@@ -1362,6 +1400,32 @@
       "sameLicense": "동일 라이선스 적용",
       "sameLicenseFile": "동일 라이선스 적용(파일 단위)",
       "sameLicenseLibrary": "동일 라이선스 적용(라이브러리)"
+    },
+    "why": {
+      "permissivePermissive": "둘 다 허용형 라이선스입니다. 고지문은 유지하세요.",
+      "permissiveWeak": "파일이나 라이브러리 단위의 상호주의 조건입니다. 의존성을 수정한 부분은 그 라이선스를 따르고, 정적 링크 시 의무가 더해집니다. 자체 코드는 허용형 라이선스로 배포해도 됩니다.",
+      "permissiveStrong": "결합 저작물을 배포하려면 전체를 카피레프트 라이선스로 제공해야 하는데, 선언한 허용형 배포 라이선스는 그렇게 하지 않습니다.",
+      "permissiveNetwork": "네트워크 카피레프트는 네트워크로 서비스를 받는 사용자에게까지 상호주의 조건을 넓히며, 선언한 허용형 배포 라이선스로는 이를 충족할 수 없습니다.",
+      "unrecognised": "의존성의 라이선스를 식별하지 못했습니다.",
+      "weakPermissive": "허용형 의존성은 상호주의 의무를 지우지 않습니다.",
+      "weakWeak": "파일이나 라이브러리 단위 상호주의 라이선스 두 개입니다. 각자 적용 범위가 있으므로 결합 저작물에서 범위가 겹치지 않는지 확인하세요.",
+      "weakStrong": "의존성은 결합 저작물 전체를 자신의 조건으로 제공하도록 요구하는데, 상호주의 범위가 더 좁은 배포 라이선스로는 이를 제공하지 못합니다.",
+      "weakNetwork": "의존성은 네트워크 이용에도 상호주의 조건을 더하는데, 선언한 배포 라이선스에는 그런 조건이 없습니다.",
+      "strongPermissive": "강한 카피레프트 라이선스로 배포하면서도 허용형 조건을 충족할 수 있습니다.",
+      "strongWeak": "대개 강한 카피레프트 저작물에 포함할 수 있지만, 일부 파일 단위 상호주의 라이선스는 명시적인 호환 조항이 있어야 합니다. 해당 조합을 확인하세요.",
+      "strongStrong": "같은 계열이지만 버전마다 호환성이 다릅니다. 특히 GPL-2.0-only는 GPL-3.0 코드와 결합할 수 없습니다. 버전을 확인하세요.",
+      "strongNetwork": "네트워크 카피레프트는 선언한 배포 라이선스보다 많은 의무를 더하며, 결합은 한 방향으로만 허용됩니다. 어느 방향인지 확인하세요.",
+      "networkPermissive": "네트워크 카피레프트 라이선스로 배포하면서도 허용형 조건을 충족할 수 있습니다.",
+      "networkWeak": "대개 포함할 수 있지만, 의존성의 상호주의 범위에 명시적인 호환 조항이 있는지 확인하세요.",
+      "networkStrong": "AGPL-3.0과 GPL-3.0은 결합하도록 설계되었지만, 이전 버전의 강한 카피레프트 라이선스는 그렇지 않습니다. 버전을 확인하세요.",
+      "networkNetwork": "상호주의 범위가 같습니다.",
+      "gpl2Apache2": "FSF는 Apache-2.0의 특허 종료 조항과 면책 조항을 GPL-2.0이 허용하지 않는 추가 제한으로 봅니다. GPL-3.0에는 이 문제가 없습니다.",
+      "gpl2Apache11": "광고 조항과 이름 사용 조항은 GPL-2.0이 허용하지 않는 추가 제한입니다.",
+      "noRule": "이 조합에 대한 규칙이 없습니다.",
+      "noLicense": "컴포넌트가 라이선스를 선언하지 않았습니다.",
+      "unparsedDeclared": "선언된 라이선스를 SPDX 식으로 해석하지 못했습니다.",
+      "unparsedLicense": "라이선스 \"{{license}}\"를 SPDX 식으로 해석하지 못했습니다.",
+      "exception": "의존성에 바로 이 조합을 허용하려고 둔 예외 조항이 있습니다. 예외가 사용 방식에 해당하는지 확인하세요. ({{inner}})"
     }
   },
   "recent": {

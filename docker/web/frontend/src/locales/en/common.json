@@ -488,7 +488,9 @@
     },
     "partial": "Some steps failed",
     "metaScanType": "Scan type",
-    "metaGenerated": "Scan time"
+    "metaGenerated": "Scan time",
+    "licenseShowAll": "Show all {{count}} licenses",
+    "licenseShowLess": "Show fewer"
   },
   "deps": {
     "loading": "Loading dependencies…",
@@ -921,6 +923,41 @@
       "externalModels": "External AI models it calls",
       "noExternal": "None declared",
       "notStated": "Not stated"
+    },
+    "reason": {
+      "noLicense": "No license declared ({{verdict}})",
+      "notInRegistry": "License {{license}}: not in the license-terms registry ({{verdict}})",
+      "licenseTerms": "License {{license}}: {{name}} ({{verdict}})",
+      "licenseTermsFor": "License {{license}}: {{name}} ({{verdict}} for {{usage}})",
+      "customFound": "Custom license text: restrictive wording found, {{quote}} ({{verdict}})",
+      "customNoMatch": "Custom license text: no known restrictive wording matched",
+      "humanReview": "A person still has to read it ({{verdict}})",
+      "lineage": "Lineage: conditions of base model {{model}} may be inherited but are not declared here ({{verdict}})",
+      "hfFlags": "File security: the HuggingFace scan flags {{status}} content ({{verdict}})",
+      "hfSafe": "File security: the HuggingFace scan reports all files safe ({{verdict}})",
+      "hfStatus": "File security: scan {{status}} ({{verdict}})",
+      "hfStatusPickle": "File security: scan {{status}}, pickle-format weights present ({{verdict}})",
+      "localUnsafe": "File security: the local file scan found a code-execution risk ({{verdict}})",
+      "localUnsafeFindings": "File security: the local file scan found a code-execution risk, {{findings}} ({{verdict}})",
+      "localSuspicious": "File security: the local file scan found something that needs review ({{verdict}})",
+      "localSuspiciousFindings": "File security: the local file scan found something that needs review, {{findings}} ({{verdict}})",
+      "localClean": "File security: the local file scan found no code-execution risk (static analysis only, not a malware scan) ({{verdict}})",
+      "localNotApplicable": "File security: this weight format does not execute code on load ({{verdict}})",
+      "localUnreadable": "File security: the local file scan could not read the file ({{verdict}})",
+      "datasetSignal": "Dataset signal {{signal}} ({{verdict}})",
+      "datasetVisibility": "Dataset visibility {{visibility}}: access-restricted ({{verdict}})",
+      "sourceText": "Source \"{{source}}\": not a hub reference, needs checking ({{verdict}})",
+      "sourcesDepth": "Sources past the depth limit were not read ({{verdict}})",
+      "source": "Source {{source}}: {{why}} ({{verdict}})",
+      "sourceThrough": "Source {{source}} (through {{through}}): {{why}} ({{verdict}})",
+      "sourceUnread": "could not be read",
+      "sourceWordsOnly": "names its own sources only in words",
+      "sourceDepth": "its sources past the depth limit were not read",
+      "sourceNoLicense": "no license declared",
+      "datasets": "Datasets: {{count}} referenced, worst grade {{verdict}}",
+      "datasetsNamed": "Datasets: {{count}} referenced, worst grade {{verdict}} ({{names}})",
+      "viaSources": "{{name}}, via its sources",
+      "trainingUndisclosed": "Training data undisclosed: the terms of the data this model learned from were not declared"
     }
   },
   "aiSummary": {
@@ -1293,7 +1330,8 @@
     "missingMore": "and {{count}} more",
     "needsPerson": "What to establish:",
     "sNa": "N/A",
-    "notApplicable": "{{count}} not applicable"
+    "notApplicable": "{{count}} not applicable",
+    "metFold": "Met {{count}}"
   },
   "crosswalk": {
     "title": "Regulatory crosswalk",
@@ -1362,6 +1400,32 @@
       "sameLicense": "Same license",
       "sameLicenseFile": "Same license (per file)",
       "sameLicenseLibrary": "Same license (library)"
+    },
+    "why": {
+      "permissivePermissive": "Both are permissive; keep the notices.",
+      "permissiveWeak": "File- or library-level reciprocity: changes to the dependency stay under its license, and static linking adds obligations. Distributing your own code under the permissive license is still fine.",
+      "permissiveStrong": "Distributing a combined work requires the whole work to be offered under the copyleft license, which the declared permissive outbound license does not do.",
+      "permissiveNetwork": "Network copyleft extends the reciprocity to users served over a network, which the declared permissive outbound license cannot satisfy.",
+      "unrecognised": "The dependency's license was not recognised.",
+      "weakPermissive": "A permissive dependency imposes no reciprocal obligation.",
+      "weakWeak": "Two file- or library-level reciprocal licenses. Each keeps its own scope, so check that the boundaries do not overlap in the combined work.",
+      "weakStrong": "The dependency requires the combined work to be offered under its terms, which a weaker reciprocal outbound license does not provide.",
+      "weakNetwork": "The dependency adds network-use reciprocity that the declared outbound license does not carry.",
+      "strongPermissive": "Permissive terms can be met while distributing under a strong copyleft license.",
+      "strongWeak": "Usually absorbable into a strong copyleft work, but some file-level reciprocal licenses need an explicit compatibility clause. Check the specific pair.",
+      "strongStrong": "Same family, but versions differ in compatibility. Notably, GPL-2.0-only cannot be combined with GPL-3.0 code. Check the versions.",
+      "strongNetwork": "Network copyleft adds obligations beyond the declared outbound license; combining is allowed in one direction only. Check which way this goes.",
+      "networkPermissive": "Permissive terms can be met while distributing under a network copyleft license.",
+      "networkWeak": "Usually absorbable, but check whether the dependency's reciprocal scope has an explicit compatibility clause.",
+      "networkStrong": "AGPL-3.0 and GPL-3.0 are designed to combine; older strong copyleft versions are not. Check the versions.",
+      "networkNetwork": "Same reciprocal scope.",
+      "gpl2Apache2": "The FSF treats Apache-2.0's patent termination and indemnification terms as further restrictions that GPL-2.0 does not permit. GPL-3.0 does not have this problem.",
+      "gpl2Apache11": "The advertising and naming clauses are further restrictions that GPL-2.0 does not permit.",
+      "noRule": "No rule for this combination.",
+      "noLicense": "The component declares no license.",
+      "unparsedDeclared": "The declared license could not be parsed as an SPDX expression.",
+      "unparsedLicense": "The license \"{{license}}\" could not be parsed as an SPDX expression.",
+      "exception": "The dependency carries an exception clause, which exists to permit exactly this combination. Confirm the exception covers your use. ({{inner}})"
     }
   },
   "recent": {

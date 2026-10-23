@@ -83,12 +83,15 @@ const WIDE_SECTIONS: ReadonlySet<SectionId> = new Set([
   "artifacts",
 ]);
 
-/** Sections with a narrow column beside the main one from 2xl up: they keep a
- *  reading width below that and take the whole content width from there. */
+/** Sections that keep a reading width below 2xl and take the whole content
+ *  width from there: the ones with a narrow column beside the main one, and
+ *  Models & datasets, whose dataset table and G7 checklist would otherwise
+ *  stop two thirds across a wide screen while every other section fills it. */
 const TWO_COLUMN_SECTIONS: ReadonlySet<SectionId> = new Set([
   "overview",
   "licenses",
   "conformance",
+  "models",
 ]);
 
 function scanKindKey(isAi: boolean, result: DoneEvent): string {

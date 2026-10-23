@@ -14,6 +14,7 @@ import type { ComponentItem } from "@/lib/api";
 import {
   componentRiskTier,
   conflictGroups,
+  conflictReasonGroups,
   type ConflictVerdict,
   type LicenseReview,
   type LicenseRiskTier,
@@ -23,12 +24,18 @@ import {
 import { buildQuery, parseQuery, type RouteQuery } from "@/lib/route";
 import { licensesFromQuery, licensesToQuery } from "@/lib/section-query";
 import { useFormatNumber } from "@/lib/format";
+import { conflictWhyKey } from "@/lib/licenseWhy";
+import { renderLocalized } from "@/lib/localized";
 
 import { LicenseObligations } from "./LicenseObligations";
 import { LicenseRiskBar } from "./LicenseRiskBar";
 import { LicenseSummary } from "./LicenseSummary";
 
-const FLAG_LABEL: Record<LicenseReview, string> = {
+/** Licenses listed before the "show all" button. An OS image declares a few
+ *  hundred; the busiest twenty cover most components. */
+const LICENSE_LIST_TOP = 20;
+
+const FLAG_LABEL:Record<LicenseReview, string> = {
   "behavioral-use": "licenses.flagBehavioral",
   "non-commercial": "licenses.flagNonCommercial",
 };
@@ -120,6 +127,13 @@ export function Licenses({
     );
   }
 
+  // The scanner records the reason in English; show it in the UI language
+  // when it is one of the sentences BomLens writes, verbatim otherwise.
+  const localizeWhy = (why: string) => {
+    const key = conflictWhyKey(why);
+    return key ? renderLocalized(t, key) : why;
+  };
+
   const toggleTier = (next: LicenseRiskTier) => {
     setTier((cur) => (cur === next ? "" : next));
   };
@@ -137,7 +151,11 @@ export function Licenses({
       <div className="flex flex-col gap-6 2xl:grid 2xl:grid-cols-[minmax(0,1fr)_28rem] 2xl:items-start">
         <div className="contents 2xl:flex 2xl:min-w-0 2xl:flex-col 2xl:gap-6">
           <div className="order-1 empty:hidden 2xl:order-none">
-            <LicenseSummary components={filtered} onPickLicense={onPickLicense} />
+            <LicenseSummary
+              components={filtered}
+              collapseAfter={LICENSE_LIST_TOP}
+              onPickLicense={onPickLicense}
+            />
           </div>
           <div className="order-3 empty:hidden 2xl:order-none">
             {outboundLicense && conflicts.length > 0 && (
@@ -157,27 +175,38 @@ export function Licenses({
                             {fmt(g.components.length)}
                           </span>
                         </div>
-                        <ul className="divide-y rounded-md border bg-card">
-                          {g.components.map((c, i) => (
-                            <li key={c.purl || `${c.name}-${i}`} className="space-y-1 px-3 py-2 text-body-sm">
-                              <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                                <span className="font-mono">
-                                  {c.group ? `${c.group} / ` : ""}
-                                  {c.name}
-                                  {c.version ? (
-                                    <span className="text-muted-foreground"> {c.version}</span>
-                                  ) : null}
-                                </span>
-                                <span className="text-label text-muted-foreground">
-                                  {c.licenses.join(", ")}
-                                </span>
-                              </div>
-                              {c.licenseConflictWhy ? (
-                                <p className="text-body-sm text-muted-foreground">{c.licenseConflictWhy}</p>
-                              ) : null}
-                            </li>
-                          ))}
-                        </ul>
+                        {/* Most components in one verdict share a reason (it
+                            comes from the license class pair), so the reason
+                            is said once above the components it applies to
+                            and the rows carry only component and license. */}
+                        {conflictReasonGroups(g.components).map((r) => (
+                          <div key={r.why} className="space-y-1.5">
+                            {r.why ? (
+                              <p className="text-body-sm text-muted-foreground" title={r.why}>
+                                {localizeWhy(r.why)}
+                              </p>
+                            ) : null}
+                            <ul className="divide-y rounded-md border bg-card">
+                              {r.components.map((c, i) => (
+                                <li
+                                  key={c.purl || `${c.name}-${i}`}
+                                  className="flex flex-wrap items-center gap-x-2 gap-y-1 px-3 py-2 text-body-sm"
+                                >
+                                  <span className="font-mono">
+                                    {c.group ? `${c.group} / ` : ""}
+                                    {c.name}
+                                    {c.version ? (
+                                      <span className="text-muted-foreground"> {c.version}</span>
+                                    ) : null}
+                                  </span>
+                                  <span className="text-label text-muted-foreground">
+                                    {c.licenses.join(", ")}
+                                  </span>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        ))}
                       </div>
                     ))}
                   </div>

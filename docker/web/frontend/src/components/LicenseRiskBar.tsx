@@ -73,19 +73,21 @@ export function useTierHint(): (tier: LicenseRiskTier) => string {
 }
 
 /**
- * Fill for a row in the distribution list: the tier's category colour at a low
- * alpha, so the row says which tier it is without the loud fill of the bar.
- * Permissive and uncategorized stay neutral: neither is a finding, and tinting
- * every row would leave nothing standing out. The tier is also named by the
- * marker shape and its tooltip, so the tint is never the only signal.
+ * Fill for a row in the distribution list: the same hue as the tier's segment
+ * in the bar above (BAR), at a low alpha, so the row says which tier it is
+ * without the loud fill of the bar. Permissive takes its teal here too: the
+ * bar and its legend already call it teal, and a grey row under a teal segment
+ * read as a different class. Uncategorized is grey in both places. The tier is
+ * also named by the marker shape and its tooltip, so the tint is never the only
+ * signal.
  */
 export const TIER_FILL: Record<LicenseRiskTier, string> = {
   "network-copyleft": "bg-cat-network-emphasis/20",
   "strong-copyleft": "bg-cat-strong-emphasis/20",
   "weak-copyleft": "bg-cat-weak-emphasis/20",
   "review-needed": "bg-cat-review-emphasis/20",
-  uncategorized: "bg-muted-foreground/20",
-  permissive: "bg-muted-foreground/20",
+  uncategorized: "bg-role-neutral-emphasis/20",
+  permissive: "bg-cat-permissive-emphasis/20",
 };
 
 /** Label colour per tier, the fg shade of its category (AA on card and page). */
