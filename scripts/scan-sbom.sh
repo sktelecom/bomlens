@@ -229,9 +229,10 @@ UI_BIND_ADDRESS="${UI_BIND_ADDRESS:-127.0.0.1}"
 # Report language for the conformance + AI-profile reports: en (default) or ko.
 # Only these two are honored; anything else is normalized to en further down.
 REPORT_LANG="${REPORT_LANG:-en}"
-# Conformance profile: default, or skt-submission for the stricter thresholds
+# Conformance profile: default, skt-submission for the stricter thresholds
 # the SKT supplier submission review applies (100% PURL coverage, pkg:generic
-# required). Passed through as-is; validate-sbom.sh normalizes unknown values.
+# required), or bsi-tr-03183-2 for the fields of BSI TR-03183-2. Passed
+# through as-is; validate-sbom.sh normalizes unknown values.
 CONFORMANCE_PROFILE="${CONFORMANCE_PROFILE:-default}"
 # Repository resolution for a submitted SBOM (--resolve-purl). Off unless asked:
 # it is the only part of the conformance check that uses the network.
@@ -356,6 +357,7 @@ while [[ "$#" -gt 0 ]]; do
         --version) PROJECT_VERSION="$2"; shift ;;
         --license) PROJECT_LICENSE="$2"; shift ;;
         --sbom-author) SBOM_AUTHOR="$2"; shift ;;
+        --supplier) PRODUCT_SUPPLIER="$2"; shift ;;
         --target) TARGET="$2"; shift ;;
         --analyze|--sbom) ANALYZE_SBOM="$2"; shift ;;
         --model) MODEL="$2"; shift ;;
@@ -534,7 +536,12 @@ Options:
                          person running the scan, not the tool and not whoever
                          wrote the software. Use the full name, no acronyms.
                          Nothing here can discover it, so the field is left out
-                         of the SBOM when it is not given.
+                         of the SBOM when it is not given. "Name <email>"
+                         records the email as well.
+  --supplier <supplier>  Supplier of the product this SBOM describes, as
+                         "Name <https://...>" or "Name <email>" (recorded in
+                         metadata.component.supplier).
+                         The bsi-tr-03183-2 profile needs it with a URL or email.
   --target <target>      Not set: source (current dir) | image name | file |
                          directory | .zip/.tar.gz archive (auto-extracted).
                          An archive is routed by what it holds, not by its
@@ -699,11 +706,16 @@ Options:
   --lang <en|ko>         Language for the human-facing conformance and AI-profile
                          reports (.md/.html). Default en. The SBOM and the JSON
                          reports stay English regardless.
-  --conformance-profile <default|skt-submission>
+  --conformance-profile <default|skt-submission|bsi-tr-03183-2>
                          Conformance check strictness. Default: default (90%
                          PURL coverage, pkg:generic advisory). skt-submission
                          requires 100% PURL coverage and fails on pkg:generic,
                          matching the SKT supplier submission review.
+                         bsi-tr-03183-2 requires CycloneDX 1.6 or later, an SBOM
+                         creator with an email or URL, a dependency graph that
+                         reaches every component, and the BSI TR-03183-2 fields
+                         of each component listed in the declaration file;
+                         scanned components are reported, not required.
   --license-registry     Ask the package registry (deps.dev) for the licence of a
                          component that has none, and check a single
                          strong-copyleft or non-commercial licence against it,
@@ -1401,11 +1413,11 @@ case "$REPORT_LANG" in
     *) echo "[WARN] --lang '$REPORT_LANG' not supported (use en or ko); defaulting to en."; REPORT_LANG="en" ;;
 esac
 
-# Normalize the conformance profile the same way: default or skt-submission
-# reach the container, anything else is a typo.
+# Normalize the conformance profile the same way: default, skt-submission or
+# bsi-tr-03183-2 reach the container, anything else is a typo.
 case "$CONFORMANCE_PROFILE" in
-    default|skt-submission) ;;
-    *) echo "[WARN] --conformance-profile '$CONFORMANCE_PROFILE' not supported (use default or skt-submission); defaulting to default."; CONFORMANCE_PROFILE="default" ;;
+    default|skt-submission|bsi-tr-03183-2) ;;
+    *) echo "[WARN] --conformance-profile '$CONFORMANCE_PROFILE' not supported (use default, skt-submission or bsi-tr-03183-2); defaulting to default."; CONFORMANCE_PROFILE="default" ;;
 esac
 
 # Common -e flags for the post-process image.
@@ -1416,8 +1428,8 @@ pp_env() {
     # secret never lands on the `docker run` argv where a local `ps` could read
     # it. Their values ride the exported shell env (see the export before each
     # `docker run`), matching the web-server path. Non-secret fields keep =value.
-    printf ' -e GENERATE_NOTICE=%s -e GENERATE_SECURITY=%s -e GENERATE_SPDX=%s -e SECURITY_ENRICH=%s -e GENERATE_REPORT=%s -e DEEP_LICENSE=%s -e IDENTIFY_VENDORED=%s -e SCANOSS_API_URL=%q -e SCANOSS_API_KEY -e SIGN_SBOM=%s -e BYTE_STABLE=%s -e REPORT_LANG=%s -e UPLOAD_ENABLED=%s -e PROJECT_NAME=%q -e PROJECT_VERSION=%q -e HOST_OUTPUT_DIR=/host-output -e HOST_UID=%s -e HOST_GID=%s -e API_KEY -e API_URL=%q -e UPLOAD_TARGET=%q -e TRUSCA_PROJECT_ID=%q -e TRUSCA_REF=%q -e TRUSCA_RELEASE=%q -e ENRICH_CDXGEN=%s -e ENRICH_EOL=%s -e ENRICH_MALICIOUS=%s -e STALENESS_ENRICH=%s -e DEEP_CVE=%s -e SECURITY_NVD_VERIFY=%s -e ENRICH_HF_SECURITY=%s -e VERIFY_MODEL_WEIGHTS=%s -e AIBOM_VERIFY_MAX_FILES=%q -e AIBOM_VERIFY_MAX_BYTES=%q -e AIBOM_DATASET_DEPTH=%q -e AIBOM_DATASET_MAX_LOOKUPS=%q -e GENERATE_SPDX3=%s -e AI_USAGE_CONTEXT=%q -e PROJECT_LICENSE=%q -e SBOM_AUTHOR=%q -e SRC_TREE_EXCLUDE=%q -e SOURCE_TREE_MAX=%q -e SOURCE_SNAPSHOT_MAX_TOTAL=%q -e SOURCE_SNAPSHOT_MAX_FILE=%q -e SOURCE_SNAPSHOT_MAX_FILES=%q -e FW_VERSTR_MAX_FILES=%q -e FW_VERSTR_MAX_BYTES=%q -e FW_ELF_MAX_FILES=%q -e FW_KERNEL_MAX_FILES=%q -e FW_KERNEL_MAX_BYTES=%q -e FW_KERNEL_MAX_VERSIONS=%q -e FW_EXTRA_ROOTS=%q -e FW_MAX_EXTRA_ROOTS=%q -e FW_CONTAINER_MEMBERSHIP=%q -e PURL_MIN_PCT=%q -e LICENSE_MIN_PCT=%q -e HASH_MIN_PCT=%q -e FIELD_MIN_PCT=%q -e CONFORMANCE_PROFILE=%s -e PURL_RESOLVE=%s -e PURL_RESOLVE_IGNORE -e PURL_RESOLVE_BUDGET -e LICENSE_REGISTRY=%s -e REACHABILITY=%s -e REACHABILITY_NONCE=%s -e LICENSE_REGISTRY_VERIFY -e LICENSE_REGISTRY_BUDGET -e LICENSE_REGISTRY_API -e DEEP_LICENSE_MAX_FILES -e DEEP_LICENSE_TIMEOUT -e BOMLENS_DEEP_LICENSE_ALL' \
-        "$GENERATE_NOTICE" "$GENERATE_SECURITY" "$GENERATE_SPDX" "$SECURITY_ENRICH" "$GENERATE_REPORT" "$DEEP_LICENSE" "$IDENTIFY_VENDORED" "$SCANOSS_API_URL" "$SIGN_SBOM" "$BYTE_STABLE" "$REPORT_LANG" "$UPLOAD_VAR" "$PROJECT_NAME" "$PROJECT_VERSION" "$(id -u)" "$(id -g)" "$SERVER_URL" "$UPLOAD_TARGET" "$TRUSCA_PROJECT_ID" "$TRUSCA_REF" "$TRUSCA_RELEASE" "${ENRICH_CDXGEN:-true}" "${ENRICH_EOL:-true}" "${ENRICH_MALICIOUS:-true}" "${STALENESS_ENRICH:-false}" "$DEEP_CVE" "${SECURITY_NVD_VERIFY:-false}" "${ENRICH_HF_SECURITY:-true}" "$VERIFY_WEIGHTS" "${AIBOM_VERIFY_MAX_FILES:-}" "${AIBOM_VERIFY_MAX_BYTES:-}" "${AIBOM_DATASET_DEPTH:-}" "${AIBOM_DATASET_MAX_LOOKUPS:-}" "$GENERATE_SPDX3" "${USAGE_CONTEXT:-${AI_USAGE_CONTEXT:-}}" "${PROJECT_LICENSE:-}" "${SBOM_AUTHOR:-}" "${SRC_TREE_EXCLUDE:-}" \
+    printf ' -e GENERATE_NOTICE=%s -e GENERATE_SECURITY=%s -e GENERATE_SPDX=%s -e SECURITY_ENRICH=%s -e GENERATE_REPORT=%s -e DEEP_LICENSE=%s -e IDENTIFY_VENDORED=%s -e SCANOSS_API_URL=%q -e SCANOSS_API_KEY -e SIGN_SBOM=%s -e BYTE_STABLE=%s -e REPORT_LANG=%s -e UPLOAD_ENABLED=%s -e PROJECT_NAME=%q -e PROJECT_VERSION=%q -e HOST_OUTPUT_DIR=/host-output -e HOST_UID=%s -e HOST_GID=%s -e API_KEY -e API_URL=%q -e UPLOAD_TARGET=%q -e TRUSCA_PROJECT_ID=%q -e TRUSCA_REF=%q -e TRUSCA_RELEASE=%q -e ENRICH_CDXGEN=%s -e ENRICH_EOL=%s -e ENRICH_MALICIOUS=%s -e STALENESS_ENRICH=%s -e DEEP_CVE=%s -e SECURITY_NVD_VERIFY=%s -e ENRICH_HF_SECURITY=%s -e VERIFY_MODEL_WEIGHTS=%s -e AIBOM_VERIFY_MAX_FILES=%q -e AIBOM_VERIFY_MAX_BYTES=%q -e AIBOM_DATASET_DEPTH=%q -e AIBOM_DATASET_MAX_LOOKUPS=%q -e GENERATE_SPDX3=%s -e AI_USAGE_CONTEXT=%q -e PROJECT_LICENSE=%q -e SBOM_AUTHOR=%q -e PRODUCT_SUPPLIER=%q -e SRC_TREE_EXCLUDE=%q -e SOURCE_TREE_MAX=%q -e SOURCE_SNAPSHOT_MAX_TOTAL=%q -e SOURCE_SNAPSHOT_MAX_FILE=%q -e SOURCE_SNAPSHOT_MAX_FILES=%q -e FW_VERSTR_MAX_FILES=%q -e FW_VERSTR_MAX_BYTES=%q -e FW_ELF_MAX_FILES=%q -e FW_KERNEL_MAX_FILES=%q -e FW_KERNEL_MAX_BYTES=%q -e FW_KERNEL_MAX_VERSIONS=%q -e FW_EXTRA_ROOTS=%q -e FW_MAX_EXTRA_ROOTS=%q -e FW_CONTAINER_MEMBERSHIP=%q -e PURL_MIN_PCT=%q -e LICENSE_MIN_PCT=%q -e HASH_MIN_PCT=%q -e FIELD_MIN_PCT=%q -e CONFORMANCE_PROFILE=%s -e PURL_RESOLVE=%s -e PURL_RESOLVE_IGNORE -e PURL_RESOLVE_BUDGET -e LICENSE_REGISTRY=%s -e REACHABILITY=%s -e REACHABILITY_NONCE=%s -e LICENSE_REGISTRY_VERIFY -e LICENSE_REGISTRY_BUDGET -e LICENSE_REGISTRY_API -e DEEP_LICENSE_MAX_FILES -e DEEP_LICENSE_TIMEOUT -e BOMLENS_DEEP_LICENSE_ALL' \
+        "$GENERATE_NOTICE" "$GENERATE_SECURITY" "$GENERATE_SPDX" "$SECURITY_ENRICH" "$GENERATE_REPORT" "$DEEP_LICENSE" "$IDENTIFY_VENDORED" "$SCANOSS_API_URL" "$SIGN_SBOM" "$BYTE_STABLE" "$REPORT_LANG" "$UPLOAD_VAR" "$PROJECT_NAME" "$PROJECT_VERSION" "$(id -u)" "$(id -g)" "$SERVER_URL" "$UPLOAD_TARGET" "$TRUSCA_PROJECT_ID" "$TRUSCA_REF" "$TRUSCA_RELEASE" "${ENRICH_CDXGEN:-true}" "${ENRICH_EOL:-true}" "${ENRICH_MALICIOUS:-true}" "${STALENESS_ENRICH:-false}" "$DEEP_CVE" "${SECURITY_NVD_VERIFY:-false}" "${ENRICH_HF_SECURITY:-true}" "$VERIFY_WEIGHTS" "${AIBOM_VERIFY_MAX_FILES:-}" "${AIBOM_VERIFY_MAX_BYTES:-}" "${AIBOM_DATASET_DEPTH:-}" "${AIBOM_DATASET_MAX_LOOKUPS:-}" "$GENERATE_SPDX3" "${USAGE_CONTEXT:-${AI_USAGE_CONTEXT:-}}" "${PROJECT_LICENSE:-}" "${SBOM_AUTHOR:-}" "${PRODUCT_SUPPLIER:-}" "${SRC_TREE_EXCLUDE:-}" \
         "${SOURCE_TREE_MAX:-}" "${SOURCE_SNAPSHOT_MAX_TOTAL:-}" "${SOURCE_SNAPSHOT_MAX_FILE:-}" "${SOURCE_SNAPSHOT_MAX_FILES:-}" \
         "${FW_VERSTR_MAX_FILES:-}" "${FW_VERSTR_MAX_BYTES:-}" "${FW_ELF_MAX_FILES:-}" \
         "${FW_KERNEL_MAX_FILES:-}" "${FW_KERNEL_MAX_BYTES:-}" "${FW_KERNEL_MAX_VERSIONS:-}" \

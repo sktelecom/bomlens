@@ -250,6 +250,56 @@ SBOM_AUTHOR="SK Telecom Co., Ltd." BOMLENS_VERSION=9.9.9 bash "$LIB/stamp-docume
 da=$(jq -rc '"\(.metadata.lifecycles[0].phase)|\(.metadata.authors[0].name)"' "$WORK/doc-auth.json")
 [ "$da" = 'post-build|SK Telecom Co., Ltd.' ] \
     && pass "a firmware scan records post-build and the declared author" || fail "declared author: $da"
+# "Name <email>" records the email too (BSI TR-03183-2 asks the SBOM creator
+# for one); a bracketed value that is not an email stays the name.
+printf '%s' "$DOC" > "$WORK/doc-auth-mail.json"
+SBOM_AUTHOR="Example Corp <sbom@example.com>" bash "$LIB/stamp-document-metadata.sh" "$WORK/doc-auth-mail.json" SOURCE >/dev/null 2>&1
+printf '%s' "$DOC" > "$WORK/doc-auth-nomail.json"
+SBOM_AUTHOR="Example Corp <sbom team>" bash "$LIB/stamp-document-metadata.sh" "$WORK/doc-auth-nomail.json" SOURCE >/dev/null 2>&1
+[ "$(jq -c '.metadata.authors' "$WORK/doc-auth-mail.json")" = '[{"name":"Example Corp","email":"sbom@example.com"}]' ] \
+  && [ "$(jq -c '.metadata.authors' "$WORK/doc-auth-nomail.json")" = '[{"name":"Example Corp <sbom team>"}]' ] \
+    && pass "an author written as Name <email> is recorded with its email" \
+    || fail "author email" "$(jq -c '.metadata.authors' "$WORK/doc-auth-mail.json" "$WORK/doc-auth-nomail.json")"
+# --supplier (PRODUCT_SUPPLIER): the product's supplier, with a URL or an
+# email, on metadata.component.supplier only. metadata.supplier is left alone:
+# the SBOM-author rows read it.
+sup_case() {  # <name> <value>: prints the product supplier written, then metadata.supplier
+    printf '%s' "$DOC" > "$WORK/doc-sup-$1.json"
+    PRODUCT_SUPPLIER="$2" bash "$LIB/stamp-document-metadata.sh" "$WORK/doc-sup-$1.json" SOURCE > /dev/null 2> "$WORK/doc-sup-$1.err"
+    jq -c '[.metadata.component.supplier, .metadata.supplier]' "$WORK/doc-sup-$1.json"
+}
+[ "$(sup_case url 'Example Corp <https://example.com>')" = '[{"name":"Example Corp","url":["https://example.com"]},null]' ] \
+  && [ "$(sup_case mail ' Example Corp <oss@example.com> ')" = '[{"name":"Example Corp","contact":[{"email":"oss@example.com"}]},null]' ] \
+  && [ "$(sup_case bare 'Example Corp')" = '[{"name":"Example Corp"},null]' ] \
+  && grep -q 'gives no URL or email' "$WORK/doc-sup-bare.err" \
+  && [ "$(sup_case ftp 'Example Corp <ftp://example.com>')" = '[{"name":"Example Corp <ftp://example.com>"},null]' ] \
+  && [ "$(sup_case nameless-url '<https://example.com>')" = '[{"url":["https://example.com"]},null]' ] \
+  && [ "$(sup_case nameless-mail ' <oss@example.com>')" = '[{"contact":[{"email":"oss@example.com"}]},null]' ] \
+  && [ "$(sup_case none '')" = '[null,null]' ] \
+  && [ "$(sup_case blank '   ')" = '[null,null]' ] && [ ! -s "$WORK/doc-sup-blank.err" ] \
+    && pass "--supplier writes the product supplier only, with its URL or email (a name is optional); a bare name warns; blank writes nothing" \
+    || fail "product supplier" "$(for c in url mail bare ftp nameless-url nameless-mail none blank; do jq -c '[.metadata.component.supplier, .metadata.supplier]' "$WORK/doc-sup-$c.json"; done)"
+# The SBOM-author rows are not satisfied by the product supplier.
+bash "$LIB/validate-sbom.sh" "$WORK/doc-sup-none.json" "$WORK/doc-sup-none" x >/dev/null 2>&1
+bash "$LIB/validate-sbom.sh" "$WORK/doc-sup-url.json" "$WORK/doc-sup-url" x >/dev/null 2>&1
+[ "$(jq -c '[.checks[] | select(.id == "cisa-sbom-author") | .status]' "$WORK/doc-sup-url_conformance.json")" \
+    = "$(jq -c '[.checks[] | select(.id == "cisa-sbom-author") | .status]' "$WORK/doc-sup-none_conformance.json")" ] \
+  && [ "$(jq -r '.checks[] | select(.id == "cisa-sbom-author") | .status' "$WORK/doc-sup-url_conformance.json")" != pass ] \
+    && pass "--supplier alone does not satisfy the SBOM-author row" \
+    || fail "author row with --supplier" "$(jq -c '.checks[] | select(.id == "cisa-sbom-author")' "$WORK/doc-sup-url_conformance.json")"
+# --license given explicitly replaces a root licence the generator read and is
+# concluded; one read from the manifest only fills an empty value, as declared.
+printf '%s' "$DOC" | jq '.metadata.component = {"type": "application", "name": "x", "version": "1", "licenses": [{"license": {"id": "MIT"}}]}' > "$WORK/lic-mit.json"
+cp "$WORK/lic-mit.json" "$WORK/lic-explicit.json"; cp "$WORK/lic-mit.json" "$WORK/lic-manifest.json"
+printf '%s' "$DOC" | jq '.metadata.component = {"type": "application", "name": "x", "version": "1"}' > "$WORK/lic-empty.json"
+PROJECT_LICENSE=Apache-2.0 bash "$LIB/stamp-metadata.sh" "$WORK/lic-explicit.json" x 1 >/dev/null 2>&1
+PROJECT_LICENSE=Apache-2.0 PROJECT_LICENSE_FROM_MANIFEST=1 bash "$LIB/stamp-metadata.sh" "$WORK/lic-manifest.json" x 1 >/dev/null 2>&1
+PROJECT_LICENSE=Apache-2.0 PROJECT_LICENSE_FROM_MANIFEST=1 bash "$LIB/stamp-metadata.sh" "$WORK/lic-empty.json" x 1 >/dev/null 2>&1
+[ "$(jq -c '.metadata.component.licenses' "$WORK/lic-explicit.json")" = '[{"license":{"id":"Apache-2.0","acknowledgement":"concluded"}}]' ] \
+  && [ "$(jq -c '.metadata.component.licenses' "$WORK/lic-manifest.json")" = '[{"license":{"id":"MIT"}}]' ] \
+  && [ "$(jq -c '.metadata.component.licenses' "$WORK/lic-empty.json")" = '[{"license":{"id":"Apache-2.0","acknowledgement":"declared"}}]' ] \
+    && pass "--license replaces a generator's MIT root licence as concluded; a manifest licence leaves it and fills only an empty one, as declared" \
+    || fail "root licence" "$(jq -c '.metadata.component.licenses' "$WORK/lic-explicit.json" "$WORK/lic-manifest.json" "$WORK/lic-empty.json")"
 # Running twice must not append a second BomLens entry (the pipeline may restamp).
 BOMLENS_VERSION=9.9.9 bash "$LIB/stamp-document-metadata.sh" "$WORK/doc-auth.json" FIRMWARE >/dev/null 2>&1
 dcount=$(jq '[.metadata.tools.components[] | select(.name=="BomLens")] | length' "$WORK/doc-auth.json")
@@ -3573,6 +3623,223 @@ profos=$(jq -r '"\(.checks[]|select(.id=="purl")|.detail)|\(.checks[]|select(.id
 [ "$profos" = "100% (2/2)|2/2" ] \
     && pass "skt-submission profile: operating-system component excluded, PURL/name-version both 100%" \
     || fail "skt-submission profile operating-system-component exclusion" "$profos"
+
+echo "== CONFORMANCE_PROFILE: bsi-tr-03183-2, and the first-party exemption from the PURL rows =="
+# The product (with its supplier and concluded licence) carries a scanned
+# package (lodash), a scanned Yocto package with no hash (yocto-pkg), two
+# first-party components the declaration file added (fw-tool with its file
+# fields on itself and a pkg:generic purl, multi with them on two nested file
+# components) and a third-party library with no file of its own (hal).
+BSI_PROPS='[{"name":"bsi:component:filename","value":"f"},{"name":"bsi:component:executable","value":"executable"},{"name":"bsi:component:archive","value":"no archive"},{"name":"bsi:component:structured","value":"unstructured"}]'
+H512="$(printf 'a%.0s' $(seq 1 128))"
+SHA512="[{\"alg\":\"SHA-512\",\"content\":\"$H512\"}]"
+DECL_MARK='{"name":"bomlens:declared","value":"true"}'
+jq -n --argjson bp "$BSI_PROPS" --argjson h "$SHA512" --argjson mk "$DECL_MARK" '{
+  bomFormat: "CycloneDX", specVersion: "1.6",
+  metadata: {timestamp: "2026-10-23T00:00:00Z",
+             tools: {components: [{type: "application", name: "BomLens", version: "1"}]},
+             authors: [{name: "Example Corp", email: "sbom@example.com"}],
+             component: {type: "application", name: "product", version: "1.0", "bom-ref": "app",
+                         supplier: {name: "Example Corp", url: ["https://example.com"]},
+                         licenses: [{license: {id: "Apache-2.0", acknowledgement: "concluded"}}]}},
+  components: [
+    {type: "library", name: "lodash", version: "4.17.21", purl: "pkg:npm/lodash@4.17.21", "bom-ref": "L",
+     licenses: [{license: {id: "MIT"}}]},
+    {type: "library", name: "yocto-pkg", version: "1.0", purl: "pkg:generic/yocto-pkg@1.0", "bom-ref": "Y",
+     licenses: [{license: {id: "MIT"}}], properties: [{name: "bomlens:identifiedBy", value: "yocto-spdx"}]},
+    {type: "application", name: "fw-tool", version: "1.0", purl: "pkg:generic/fw-tool@1.0", "bom-ref": "F",
+     supplier: {name: "Example Corp", url: ["https://example.com"]}, hashes: $h,
+     licenses: [{license: {name: "LicenseRef-ExampleCorp-Proprietary", acknowledgement: "concluded"}}],
+     properties: ([{name: "bomlens:origin", value: "first-party"}, {name: "bomlens:artifact", value: "out/f"}, $mk] + $bp)},
+    {type: "application", name: "multi", version: "1.0", "bom-ref": "M",
+     supplier: {name: "Example Corp", contact: [{email: "dev@example.com"}]},
+     licenses: [{expression: "LicenseRef-ExampleCorp-Proprietary", acknowledgement: "concluded"}],
+     properties: [{name: "bomlens:origin", value: "first-party"}, {name: "bomlens:artifact", value: "out/a"}, {name: "bomlens:artifact", value: "out/b"}, $mk],
+     components: [{type: "file", name: "out/a", hashes: $h, properties: $bp}, {type: "file", name: "out/b", hashes: $h, properties: $bp}]},
+    {type: "library", name: "hal", version: "4.2", "bom-ref": "H",
+     supplier: {name: "Chip Vendor", url: ["https://chip.example.com"]}, licenses: [{license: {id: "BSD-3-Clause", acknowledgement: "concluded"}}],
+     properties: [{name: "bomlens:origin", value: "third-party"}, $mk]}],
+  dependencies: [{ref: "app", dependsOn: ["L", "Y", "F", "M", "H"]}, {ref: "L", dependsOn: []}, {ref: "Y", dependsOn: []},
+                 {ref: "F", dependsOn: []}, {ref: "M", dependsOn: []}, {ref: "H", dependsOn: []}],
+  compositions: [{aggregate: "complete", assemblies: ["app"]}]}' > "$WORK/bsi.json"
+bsi_run() {  # <sbom> <out prefix> [profile]: runs the check, prints nothing
+    CONFORMANCE_PROFILE="${3:-bsi-tr-03183-2}" bash "$LIB/validate-sbom.sh" "$1" "$2" "supplier" >/dev/null 2>&1
+}
+bsi_row() {  # <out prefix> <check id>: status|required|missing (joined by ;)
+    jq -r --arg id "$2" '.checks[] | select(.id == $id) | "\(.status)|\(.required)|\(.missing | join(";"))"' "$1_conformance.json"
+}
+bsi_run "$WORK/bsi.json" "$WORK/bsi"
+[ "$(jq -r '"\(.result)|\(.profile)"' "$WORK/bsi_conformance.json")" = "pass|bsi-tr-03183-2" ] \
+    && pass "bsi-tr-03183-2: an SBOM whose product and declared components carry every field passes" \
+    || fail "bsi pass" "$(jq -c '[.result, (.checks[] | select(.required and .status == "fail") | [.id, .detail, .missing])]' "$WORK/bsi_conformance.json")"
+for id in bsi-sbom-creator bsi-dependency-graph bsi-primary-component bsi-declared-creator bsi-declared-name-version \
+          bsi-declared-license bsi-declared-filename bsi-declared-sha512 bsi-declared-file-properties; do
+    [ "$(bsi_row "$WORK/bsi" "$id")" = "pass|true|" ] && pass "bsi: $id is required and met" \
+        || fail "bsi row $id" "$(bsi_row "$WORK/bsi" "$id")"
+done
+[ "$(bsi_row "$WORK/bsi" bsi-declared-without-file)" = "warn|false|hal@4.2" ] \
+    && pass "bsi: a declared library with no file of its own is listed on an advisory row, not failed on the file rows" \
+    || fail "bsi declared without file" "$(bsi_row "$WORK/bsi" bsi-declared-without-file)"
+[ "$(bsi_row "$WORK/bsi" bsi-scanned-components)" = "warn|false|lodash@4.17.21: creator, filename, SHA-512, file properties, concluded licence;yocto-pkg@1.0: creator, filename, SHA-512 (not in the source SBOM), file properties, concluded licence" ] \
+  && jq -e '.checks[] | select(.id == "bsi-scanned-components") | .detail | startswith("creator 0/2, version 2/2, filename 0/2, SHA-512 0/2 (1 not in the source SBOM)")' "$WORK/bsi_conformance.json" >/dev/null \
+    && pass "bsi: the scanned components are advisory, with counts and the gaps of each, a Yocto package's SHA-512 as not in the source SBOM" \
+    || fail "bsi scanned components" "$(jq -c '.checks[] | select(.id == "bsi-scanned-components") | [.status, .detail, .missing]' "$WORK/bsi_conformance.json")"
+[ "$(bsi_row "$WORK/bsi" purl)" = "warn|false|multi;hal" ] \
+  && ! jq -e 'any(.checks[]; .id == "file-properties")' "$WORK/bsi_conformance.json" >/dev/null \
+  && [ "$(bsi_row "$WORK/bsi" bsi-primary-component-file)" = "warn|false|" ] \
+  && [ "$(bsi_row "$WORK/bsi" bsi-dependency-entries)" = "pass|false|" ] \
+    && pass "bsi: PURL coverage is advisory, the general file-properties row is replaced, the product's file fields are advisory without a file" \
+    || fail "bsi general rows" "$(bsi_row "$WORK/bsi" purl) / $(bsi_row "$WORK/bsi" bsi-primary-component-file)"
+grep -q '^- BSI TR-03183-2 v2.1.0: the fields of section 5.2.2 are required for the components the declaration file added' "$WORK/bsi_conformance.md" \
+  && grep -q 'class="meta bsi-profile"' "$WORK/bsi_conformance.html" \
+    && pass "bsi: the report says what is required of declared and of scanned components" \
+    || fail "bsi report note"
+REPORT_LANG=ko CONFORMANCE_PROFILE=bsi-tr-03183-2 bash "$LIB/validate-sbom.sh" "$WORK/bsi.json" "$WORK/bsiko" "supplier" >/dev/null 2>&1
+grep -q '선언 파일로 추가한 구성요소(bomlens:origin)에 필수' "$WORK/bsiko_conformance.md" \
+  && grep -q '선언 구성요소: 실행, 압축, 구조 속성' "$WORK/bsiko_conformance.md" \
+  && grep -q '원본 SBOM에 없음 1개' "$WORK/bsiko_conformance.md" \
+  && grep -q 'PURL 포함률 (90% 이상, 권고)' "$WORK/bsiko_conformance.md" \
+    && pass "bsi: the Korean report carries the note, labels and details" || fail "bsi ko report" "$(grep -n 'BSI\|선언\|PURL 포함률' "$WORK/bsiko_conformance.md" | head -5)"
+
+# Each missing field fails its row and names the component.
+jq '.metadata.authors = [{name: "Example Corp"}]' "$WORK/bsi.json" > "$WORK/bsi-a.json"; bsi_run "$WORK/bsi-a.json" "$WORK/bsi-a"
+jq 'del(.metadata.authors) | .metadata.manufacturer = {name: "Example Corp", url: ["https://example.com"]}' "$WORK/bsi.json" > "$WORK/bsi-b.json"; bsi_run "$WORK/bsi-b.json" "$WORK/bsi-b"
+[ "$(bsi_row "$WORK/bsi-a" bsi-sbom-creator)" = "fail|true|" ] && [ "$(jq -r .result "$WORK/bsi-a_conformance.json")" = fail ] \
+  && [ "$(bsi_row "$WORK/bsi-b" bsi-sbom-creator)" = "pass|true|" ] \
+    && pass "bsi: an SBOM author without an email fails; metadata.manufacturer with a URL passes" \
+    || fail "bsi SBOM creator" "$(bsi_row "$WORK/bsi-a" bsi-sbom-creator) / $(bsi_row "$WORK/bsi-b" bsi-sbom-creator)"
+jq '.dependencies[0].dependsOn -= ["H"]' "$WORK/bsi.json" > "$WORK/bsi-c.json"; bsi_run "$WORK/bsi-c.json" "$WORK/bsi-c"
+jq 'del(.metadata.component["bom-ref"])' "$WORK/bsi.json" > "$WORK/bsi-c2.json"; bsi_run "$WORK/bsi-c2.json" "$WORK/bsi-c2"
+jq 'del(.compositions) | .dependencies |= map(select(.ref != "L"))' "$WORK/bsi.json" > "$WORK/bsi-c3.json"; bsi_run "$WORK/bsi-c3.json" "$WORK/bsi-c3"
+[ "$(bsi_row "$WORK/bsi-c" bsi-dependency-graph)" = "fail|true|hal@4.2" ] \
+  && [ "$(bsi_row "$WORK/bsi-c2" bsi-dependency-graph | cut -d'|' -f1)" = "fail" ] \
+    && pass "bsi: a component the graph does not reach from the product fails the graph row, by name" \
+    || fail "bsi graph" "$(bsi_row "$WORK/bsi-c" bsi-dependency-graph) / $(bsi_row "$WORK/bsi-c2" bsi-dependency-graph)"
+[ "$(bsi_row "$WORK/bsi-c3" bsi-dependency-graph)" = "warn|true|" ] \
+  && jq -e '.checks[] | select(.id == "bsi-dependency-graph") | .detail | test("completeness is not indicated \\(no compositions entry\\)")' "$WORK/bsi-c3_conformance.json" >/dev/null \
+  && [ "$(bsi_row "$WORK/bsi-c3" bsi-dependency-entries)" = "warn|false|lodash@4.17.21" ] \
+  && [ "$(jq '.compositions // "none"' "$WORK/bsi-c3.json")" = '"none"' ] \
+    && pass "bsi: with no compositions entry the graph row warns and says why; a leaf with no dependencies entry is listed" \
+    || fail "bsi completeness" "$(bsi_row "$WORK/bsi-c3" bsi-dependency-graph) / $(bsi_row "$WORK/bsi-c3" bsi-dependency-entries)"
+jq '(.components[] | select(.name == "multi") | .components[1].hashes) = [{alg: "SHA-256", content: "bb"}]
+    | (.components[] | select(.name == "fw-tool") | .licenses) = [{license: {name: "Proprietary", acknowledgement: "concluded"}}]
+    | (.components[] | select(.name == "multi") | .licenses[0].acknowledgement) = "declared"
+    | (.components[] | select(.name == "hal") | .supplier) = {name: "Chip Vendor"}
+    | (.components[] | select(.name == "fw-tool") | .properties) |= map(select(.name != "bsi:component:archive"))' \
+    "$WORK/bsi.json" > "$WORK/bsi-d.json"; bsi_run "$WORK/bsi-d.json" "$WORK/bsi-d"
+[ "$(bsi_row "$WORK/bsi-d" bsi-declared-sha512)" = "fail|true|multi@1.0" ] \
+  && [ "$(bsi_row "$WORK/bsi-d" bsi-declared-license)" = "fail|true|fw-tool@1.0;multi@1.0" ] \
+  && [ "$(bsi_row "$WORK/bsi-d" bsi-declared-creator)" = "fail|true|hal@4.2" ] \
+  && [ "$(bsi_row "$WORK/bsi-d" bsi-declared-file-properties)" = "fail|true|fw-tool@1.0" ] \
+  && [ "$(bsi_row "$WORK/bsi-d" bsi-declared-filename)" = "pass|true|" ] \
+    && pass "bsi: a nested file without SHA-512, a licence that is only a name or not concluded, a creator with no URL and a missing property fail their rows by name" \
+    || fail "bsi declared rows" "$(for i in sha512 license creator file-properties filename; do bsi_row "$WORK/bsi-d" "bsi-declared-$i"; done | tr '\n' ' ')"
+# A SHA-512 has to be one: 128 hex digits, on the component or on a
+# distribution reference.
+jq --arg h "$H512" '(.components[] | select(.name == "fw-tool") | .hashes) = [{alg: "SHA-512", content: "abc"}]
+    | (.components[] | select(.name == "fw-tool") | .externalReferences) = [{type: "distribution", url: "out/f", hashes: [{alg: "SHA-512", content: ""}]}]
+    | (.components[] | select(.name == "multi") | .components[] | .hashes) = []
+    | (.components[] | select(.name == "multi") | .components[] | .externalReferences) = [{type: "distribution", url: "out/a", hashes: [{alg: "SHA-512", content: $h}]}]' \
+    "$WORK/bsi.json" > "$WORK/bsi-h.json"; bsi_run "$WORK/bsi-h.json" "$WORK/bsi-h"
+[ "$(bsi_row "$WORK/bsi-h" bsi-declared-sha512)" = "fail|true|fw-tool@1.0" ] \
+    && pass "bsi: a SHA-512 that is not 128 hex digits does not count, on the component or a distribution reference; one on a distribution reference does" \
+    || fail "bsi SHA-512 content" "$(bsi_row "$WORK/bsi-h" bsi-declared-sha512)"
+# Only a library or framework may lack a file; a declared application fails
+# the file rows without one.
+jq '(.components[] | select(.name == "hal") | .type) = "firmware"' "$WORK/bsi.json" > "$WORK/bsi-i.json"; bsi_run "$WORK/bsi-i.json" "$WORK/bsi-i"
+[ "$(bsi_row "$WORK/bsi-i" bsi-declared-filename)" = "fail|true|hal@4.2" ] \
+  && [ "$(bsi_row "$WORK/bsi-i" bsi-declared-sha512)" = "fail|true|hal@4.2" ] \
+  && [ "$(bsi_row "$WORK/bsi-i" bsi-declared-without-file)" = "pass|false|" ] \
+    && pass "bsi: a declared firmware with no file fails the file rows" \
+    || fail "bsi no-file types" "$(bsi_row "$WORK/bsi-i" bsi-declared-filename) / $(bsi_row "$WORK/bsi-i" bsi-declared-without-file)"
+# The primary component: creator, name, version and a concluded licence are
+# required; its file fields only when it names a file.
+jq 'del(.metadata.component.supplier) | .metadata.component.licenses = [{license: {id: "Apache-2.0"}}]' "$WORK/bsi.json" > "$WORK/bsi-j.json"; bsi_run "$WORK/bsi-j.json" "$WORK/bsi-j"
+jq --arg h "$H512" '.metadata.component.hashes = [{alg: "SHA-512", content: $h}]' "$WORK/bsi.json" > "$WORK/bsi-k.json"; bsi_run "$WORK/bsi-k.json" "$WORK/bsi-k"
+[ "$(bsi_row "$WORK/bsi-j" bsi-primary-component)" = "fail|true|product@1.0: creator, concluded licence" ] \
+  && [ "$(bsi_row "$WORK/bsi-k" bsi-primary-component)" = "fail|true|product@1.0: filename, file properties" ] \
+  && [ "$(bsi_row "$WORK/bsi-k" bsi-primary-component-file | cut -d'|' -f1)" = "pass" ] \
+    && pass "bsi: the product needs a creator and a concluded licence, and its file fields once it names a file" \
+    || fail "bsi primary component" "$(bsi_row "$WORK/bsi-j" bsi-primary-component) / $(bsi_row "$WORK/bsi-k" bsi-primary-component)"
+# A declared Yocto recipe package with no SHA-512: not in the source SBOM, a warning.
+jq '.components += [{type: "library", name: "my-recipe", version: "2.0", "bom-ref": "R",
+      supplier: {name: "Example Corp", url: ["https://example.com"]}, licenses: [{license: {id: "MIT", acknowledgement: "concluded"}}],
+      hashes: [{alg: "SHA-256", content: "cc"}],
+      properties: [{name: "bomlens:origin", value: "first-party"}, {name: "bomlens:yocto-recipe", value: "my-recipe"}]}]
+    | .dependencies[0].dependsOn += ["R"] | .dependencies += [{ref: "R", dependsOn: []}]' "$WORK/bsi.json" > "$WORK/bsi-e.json"; bsi_run "$WORK/bsi-e.json" "$WORK/bsi-e"
+[ "$(bsi_row "$WORK/bsi-e" bsi-declared-sha512)" = "warn|true|my-recipe@2.0 (not in the source SBOM)" ] \
+  && jq -e '.checks[] | select(.id == "bsi-declared-sha512") | .detail | endswith("; 1 not in the source SBOM")' "$WORK/bsi-e_conformance.json" >/dev/null \
+    && pass "bsi: a declared Yocto package without SHA-512 is reported as not in the source SBOM, as a warning" \
+    || fail "bsi yocto" "$(jq -c '.checks[] | select(.id == "bsi-declared-sha512") | [.status, .detail, .missing]' "$WORK/bsi-e_conformance.json")"
+# CycloneDX 1.6 or later; any other document gets a failing bsi-evaluation row.
+jq '.specVersion = "1.5"' "$WORK/bsi.json" > "$WORK/bsi-f.json"; bsi_run "$WORK/bsi-f.json" "$WORK/bsi-f"
+bsi_run "$FIX/good-spdx.json" "$WORK/bsi-g"
+[ "$(bsi_row "$WORK/bsi-f" spec-version | cut -d'|' -f1)" = "fail" ] && [ "$(bsi_row "$WORK/bsi-g" spec-version | cut -d'|' -f1)" = "fail" ] \
+  && [ "$(bsi_row "$WORK/bsi-g" bsi-evaluation)" = "fail|true|" ] \
+  && [ "$(bsi_row "$WORK/bsi" spec-version | cut -d'|' -f1)" = "pass" ] \
+    && pass "bsi: CycloneDX 1.5 fails the spec version row; an SPDX 2.3 document fails it and gets the failing bsi-evaluation row" \
+    || fail "bsi spec version" "$(bsi_row "$WORK/bsi-f" spec-version) / $(bsi_row "$WORK/bsi-g" bsi-evaluation)"
+# SPDX 3.0 with no syft to convert it: the BSI verdict does not rest on the
+# general rows. PATH holds only the tools the check needs, without syft.
+NOSYFT="$WORK/nosyft-bin"; mkdir -p "$NOSYFT"
+for t in jq python3; do ln -sf "$(command -v "$t")" "$NOSYFT/$t"; done
+PATH="$NOSYFT:/usr/bin:/bin" CONFORMANCE_PROFILE=bsi-tr-03183-2 bash "$LIB/validate-sbom.sh" "$FIX/good-spdx3-jsonld.json" "$WORK/bsi-s3" "supplier" >/dev/null 2>&1
+[ "$(jq -r .format "$WORK/bsi-s3_conformance.json" 2>/dev/null)" = "SPDX-3.0" ] \
+  && [ "$(bsi_row "$WORK/bsi-s3" bsi-evaluation)" = "fail|true|" ] && [ "$(jq -r .result "$WORK/bsi-s3_conformance.json")" = fail ] \
+    && pass "bsi: an SPDX 3.0 document that could not be converted fails on the bsi-evaluation row" \
+    || fail "bsi SPDX 3.0 without syft" "$(jq -c '[.result, .format, [.checks[].id]]' "$WORK/bsi-s3_conformance.json" 2>&1)"
+# The bsi-* rows belong to that profile only.
+bsi_run "$WORK/bsi.json" "$WORK/bsi-def" default
+[ "$(jq '[.checks[] | select(.id | startswith("bsi-"))] | length' "$WORK/bsi-def_conformance.json")" = "0" ] \
+    && pass "the default profile adds no bsi-* row" || fail "bsi rows under default"
+
+# The first-party exemption: fw-tool (pkg:generic) and multi (no purl) carry
+# the declaration step's mark, name their supplier and carry a SHA-512, so in
+# a scan where that step ran neither counts against PURL coverage or
+# pkg:generic; hal is third-party and still does.
+fp_run() {  # <sbom> <out prefix> [profile] [MODE]: as the scan does after the declaration step
+    DECLARED_COMPONENTS_APPLIED=1 MODE="${4:-SOURCE}" CONFORMANCE_PROFILE="${3:-skt-submission}" \
+        bash "$LIB/validate-sbom.sh" "$1" "$2" "supplier" >/dev/null 2>&1
+}
+fp_run "$WORK/bsi.json" "$WORK/fpx"
+[ "$(bsi_row "$WORK/fpx" purl)" = "fail|true|hal" ] \
+  && [ "$(bsi_row "$WORK/fpx" no-generic)" = "fail|true|yocto-pkg" ] \
+  && [ "$(bsi_row "$WORK/fpx" first-party-exempt)" = "warn|false|fw-tool@1.0;multi@1.0" ] \
+  && jq -e '.checks[] | select(.id == "purl") | .detail == "66% (2/3); 2 first-party component(s) identified by supplier and SHA-512 instead"' "$WORK/fpx_conformance.json" >/dev/null \
+  && jq -e '.checks[] | select(.id == "upstream-purl") | .missing | index("fw-tool@1.0") == null and index("hal@4.2") != null' "$WORK/fpx_conformance.json" >/dev/null \
+    && pass "skt-submission: first-party components the declaration step marked, with a supplier and SHA-512, need no purl and are listed by name; a third-party one needs one" \
+    || fail "first-party exemption" "$(jq -c '[.checks[] | select(.id == "purl" or .id == "no-generic" or .id == "upstream-purl" or .id == "first-party-exempt") | [.id, .status, .detail, .missing]]' "$WORK/fpx_conformance.json")"
+# The exemption is not granted on the SBOM's word alone: not without the
+# declaration step in this run, not under --analyze, not without its mark, not
+# for a SHA-512 that is not 128 hex digits, not for a third-party component.
+bsi_run "$WORK/bsi.json" "$WORK/fpn1" skt-submission
+fp_run "$WORK/bsi.json" "$WORK/fpn2" skt-submission ANALYZE
+jq '(.components[] | select(.name == "fw-tool") | .properties) |= map(select(.name != "bomlens:declared"))
+    | (.components[] | select(.name == "multi") | .components[0].hashes) = [{alg: "SHA-512", content: "00"}]
+    | (.components[] | select(.name == "hal")) += {hashes: $h, purl: "pkg:generic/hal@4.2"}' --argjson h "$SHA512" \
+    "$WORK/bsi.json" > "$WORK/fpx2.json"; fp_run "$WORK/fpx2.json" "$WORK/fpx2"
+[ "$(bsi_row "$WORK/fpn1" no-generic)" = "fail|true|yocto-pkg;fw-tool" ] \
+  && [ "$(bsi_row "$WORK/fpn2" no-generic)" = "fail|true|yocto-pkg;fw-tool" ] \
+  && ! jq -e 'any(.checks[]; .id == "first-party-exempt")' "$WORK/fpn1_conformance.json" "$WORK/fpn2_conformance.json" >/dev/null \
+  && [ "$(bsi_row "$WORK/fpx2" no-generic)" = "fail|true|yocto-pkg;fw-tool;hal" ] \
+  && [ "$(bsi_row "$WORK/fpx2" purl)" = "fail|true|multi" ] \
+    && pass "the exemption needs the declaration step in this scan, no --analyze, its mark, a 128-digit SHA-512 and a first-party component" \
+    || fail "first-party exemption limits" "$(bsi_row "$WORK/fpn1" no-generic) / $(bsi_row "$WORK/fpn2" no-generic) / $(bsi_row "$WORK/fpx2" no-generic) / $(bsi_row "$WORK/fpx2" purl)"
+# A mark or an origin given twice is not the one the declaration step writes.
+jq '(.components[] | select(.name == "fw-tool") | .properties) += [{name: "bomlens:declared", value: "true"}]
+    | (.components[] | select(.name == "multi") | .properties) += [{name: "bomlens:origin", value: "first-party"}]' \
+    "$WORK/bsi.json" > "$WORK/fpdup.json"; fp_run "$WORK/fpdup.json" "$WORK/fpdup"
+[ "$(bsi_row "$WORK/fpdup" no-generic)" = "fail|true|yocto-pkg;fw-tool" ] \
+  && [ "$(bsi_row "$WORK/fpdup" purl)" = "fail|true|multi;hal" ] \
+  && ! jq -e 'any(.checks[]; .id == "first-party-exempt")' "$WORK/fpdup_conformance.json" >/dev/null \
+    && pass "a duplicated bomlens:declared or bomlens:origin property gets no exemption" \
+    || fail "duplicate properties" "$(bsi_row "$WORK/fpdup" no-generic) / $(bsi_row "$WORK/fpdup" purl)"
+fp_run "$WORK/bsi.json" "$WORK/fpx3" default
+jq -e '.checks[] | select(.id == "purl") | .detail | endswith("2 first-party component(s) identified by supplier and SHA-512 instead")' "$WORK/fpx3_conformance.json" >/dev/null \
+    && pass "the default profile applies the same exemption" || fail "default exemption" "$(bsi_row "$WORK/fpx3" purl)"
+REPORT_LANG=ko DECLARED_COMPONENTS_APPLIED=1 MODE=SOURCE bash "$LIB/validate-sbom.sh" "$WORK/bsi.json" "$WORK/fpxko" "supplier" >/dev/null 2>&1
+jq -e '.checks[] | select(.id == "purl") | .detail_ko | endswith("자체개발 구성요소 2개는 공급자와 SHA-512로 식별")' "$WORK/fpxko_conformance.json" >/dev/null \
+    && pass "the exemption note has its Korean wording" || fail "exemption ko" "$(jq -c '.checks[] | select(.id == "purl") | .detail_ko' "$WORK/fpxko_conformance.json")"
 
 # SPDX JSON: version range + purl syntax over externalRefs locators.
 jq '.spdxVersion="SPDX-2.1"' "$FIX/good-spdx.json" > "$WORK/spdx-old.json"
@@ -10771,6 +11038,17 @@ JSON
     [ "$(mca_agg "$WORK/mca-analyze-none.json")" = "unknown" ] \
         && pass "ANALYZE with no compositions of its own declares unknown" \
         || fail "expected unknown" "$(mca_agg "$WORK/mca-analyze-none.json")"
+
+    # The entry lists every bom-ref that has a dependencies entry, sorted:
+    # the aggregate is stated for each of them. With no entries it lists none.
+    jq '.metadata.component = {"type": "application", "name": "p", "version": "1", "bom-ref": "root"}
+        | .dependencies = [{"ref": "root", "dependsOn": ["b", "a"]}, {"ref": "b", "dependsOn": []}, {"ref": "a", "dependsOn": []}]
+        | del(.compositions)' "$WORK/mca-analyze-none.json" > "$WORK/mca-root.json"
+    SCAN_MODE=SOURCE mark_compositions_aggregate "$WORK/mca-root.json"
+    [ "$(jq -c '.compositions' "$WORK/mca-root.json")" = '[{"aggregate":"unknown","dependencies":["a","b","root"]}]' ] \
+      && [ "$(jq -c '.compositions' "$WORK/mca-analyze-none.json")" = '[{"aggregate":"unknown"}]' ] \
+        && pass "compositions lists every ref with a dependencies entry, with the aggregate unchanged" \
+        || fail "compositions dependencies" "$(jq -c '.compositions' "$WORK/mca-root.json" "$WORK/mca-analyze-none.json")"
 
     # --byte-stable determinism: compositions is written AFTER normalize --stable
     # in the real pipeline (entrypoint.sh), so two identical scans must still

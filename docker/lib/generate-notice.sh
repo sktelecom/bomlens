@@ -124,6 +124,10 @@ def purl_src($purl):
 # else the raw purl string, else null. The notice never leaves source blank when a
 # purl is present.
 #
+# A distribution reference that is a path inside the delivery (what a declared
+# build output gets) is not a place to fetch the source from, so only one
+# with a scheme counts.
+#
 # pypi is the one exception to "distribution wins": that externalReference is a
 # single resolved wheel/sdist URL, and a wheel's filename bakes in a platform/ABI
 # tag (e.g. "-cp311-cp311-manylinux...whl" or "-macosx_..."). Nothing upstream of
@@ -141,7 +145,7 @@ def src($c):
   | ([ $c.externalReferences[]? | select(.url != null and .url != "") ]) as $refs
   | ( [ $refs[] | select((.type // "") == "vcs") | .url ][0]
       // (if $ptype == "pypi" then null
-          else [ $refs[] | select((.type // "") == "distribution") | .url ][0] end)
+          else [ $refs[] | select((.type // "") == "distribution" and (.url | test("^[A-Za-z][A-Za-z0-9+.-]*:"))) | .url ][0] end)
       // [ $refs[] | select((.type // "") == "website") | .url ][0]
       // purl_src($c.purl)
       // ($c.purl // null) );'

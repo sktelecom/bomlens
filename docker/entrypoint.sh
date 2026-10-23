@@ -620,8 +620,8 @@ generate_sbom_cdxgen() {
 }
 
 # Declare how complete this SBOM's dependency graph is, in CycloneDX's own
-# compositions.aggregate field (one document-level entry; assemblies/dependencies
-# refs stay empty). `complete` is used only when there is POSITIVE evidence
+# compositions.aggregate field (one document-level entry whose dependencies
+# lists every bom-ref with a dependencies entry; assemblies stay empty). `complete` is used only when there is POSITIVE evidence
 # the graph is whole, never merely because nothing failed: an unresolved leaf
 # (e.g. one Maven coordinate cdxgen could not fetch) leaves no trace in the
 # SBOM or in any log, so "no failure seen" cannot mean "complete" (measured).
@@ -695,7 +695,17 @@ mark_compositions_aggregate() {
     esac
     [ -n "$aggregate" ] || return 0
     tmp="${file}.compositions.tmp"
-    if jq --arg agg "$aggregate" '.compositions = [{aggregate: $agg}]' "$file" > "$tmp" 2>/dev/null; then
+    # compositions[].dependencies lists every bom-ref that has an entry in the
+    # dependencies array, and the aggregate is stated for each of them: it says
+    # how complete the dependsOn list of each listed component is, which is
+    # the claim this function makes, rather than leaving the set it applies to
+    # unnamed (a BSI TR-03183-2 check reads it per listed ref). The aggregate
+    # value itself is decided above and not changed here. Sorted, so the output
+    # stays byte-stable.
+    if jq --arg agg "$aggregate" '
+        ([ (.dependencies // [])[]? | objects | .ref | strings | select(length > 0) ] | unique) as $refs
+        | .compositions = [{aggregate: $agg} + (if ($refs | length) > 0 then {dependencies: $refs} else {} end)]' \
+        "$file" > "$tmp" 2>/dev/null; then
         mv "$tmp" "$file"
     else
         rm -f "$tmp"
@@ -1617,6 +1627,8 @@ case "$SCAN_MODE" in
         # --license. Read the manifest here instead. An explicit --license still
         # wins, and a manifest we cannot read confidently yields nothing, which
         # leaves the check off rather than inventing a licence to compare against.
+        # Set only below, when the licence is read from the manifest.
+        unset PROJECT_LICENSE_FROM_MANIFEST
         if [ -z "${PROJECT_LICENSE:-}" ] && command -v python3 >/dev/null 2>&1; then
             _lic_src="${SOURCE_ROOT:-/src}"
             [ -d "$_lic_src" ] || _lic_src=""
@@ -1624,7 +1636,8 @@ case "$SCAN_MODE" in
                 _detected="$(python3 "$LIBDIR/detect-project-license.py" "$_lic_src" 2>/dev/null || true)"
                 if [ -n "$_detected" ]; then
                     PROJECT_LICENSE="$_detected"
-                    export PROJECT_LICENSE
+                    PROJECT_LICENSE_FROM_MANIFEST=1
+                    export PROJECT_LICENSE PROJECT_LICENSE_FROM_MANIFEST
                     echo "[license] outbound license read from the project manifest: $PROJECT_LICENSE"
                 fi
             fi
@@ -1658,6 +1671,12 @@ esac
 # that picks up _bom.json cannot take it for the result. --no-components
 # (DECLARED_COMPONENTS_SKIP=1) leaves the default file unread.
 # Recorded only when there is a file to read.
+#
+# DECLARED_COMPONENTS_APPLIED=1 tells the conformance check that the
+# components marked bomlens:declared were written by this step in this run,
+# which the first-party exemption from the PURL rows relies on
+# (validate-sbom.sh). It is never taken from the caller's environment.
+unset DECLARED_COMPONENTS_APPLIED
 case "$SCAN_MODE" in
     SOURCE|POSTPROCESS)
         _dc_root="${SOURCE_ROOT:-/src}"
@@ -1684,6 +1703,7 @@ case "$SCAN_MODE" in
                 _dc_count="$(jq '[.components[]? | select(any(.properties[]?; .name == "bomlens:declared" and .value == "true"))] | length' "$OUTPUT_FILE" 2>/dev/null || echo 0)"
                 er_record declared-components ok "" "" "$ER_PHASE_STARTED" "" "{\"components\":${_dc_count:-0}}"
                 er_phase_end
+                export DECLARED_COMPONENTS_APPLIED=1
             else
                 _dc_first="$(sed -n 's/^\[declared-components\] ERROR: //p' "$_dc_err" | head -n 1)"
                 er_record declared-components failed failed "${_dc_first:-the declaration could not be applied}" "$ER_PHASE_STARTED"

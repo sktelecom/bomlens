@@ -3713,7 +3713,7 @@ _SIBLING_MODES = ("FIRMWARE", "AIBOM", "ANALYZE", "SOURCE", "IMAGE", "ROOTFS", "
 # only one of these exact literals — never the request string — reaches the scan
 # environment or a docker-run argv.
 _USAGE_CONTEXTS = ("internal", "product", "redistribute", "outputs-only")
-_CONFORMANCE_PROFILES = ("default", "skt-submission")
+_CONFORMANCE_PROFILES = ("default", "skt-submission", "bsi-tr-03183-2")
 # CycloneDX versions a scan may be asked to write (the CLI's --spec-version,
 # docker/lib/cdx-version.sh). The same closed-allowlist rule as _USAGE_CONTEXTS:
 # only one of these literals reaches the scan environment or a docker-run argv.
@@ -3757,6 +3757,22 @@ def _env_flag_value(value):
     is verified end-to-end through its `eval "$DOCKER_MSYS"docker run ...
     $(printf ... %q ...)` path, which is exactly what %q exists to make safe)."""
     return re.sub(r"[^\w.+:/ @=&(),'-]", "", (value or ""))[:256]
+
+
+def _env_contact_value(value):
+    """_env_flag_value for a "Name <https://...>" or "Name <address@host>"
+    value (SBOM author, product supplier): the same allowlist plus the angle
+    brackets that mark the URL or email, which stamp-document-metadata.sh reads
+    to record it. Like every other byte kept here, `<` and `>` stay inside the
+    one argv element (shell=False) and reach the entrypoint as literal text."""
+    return re.sub(r"[^\w.+:/ @=&(),'<>-]", "", (value or ""))[:256]
+
+
+def _one_line_field(value, limit):
+    """A free-text form field reduced to one bounded line: control characters
+    (newlines included) become spaces, surrounding whitespace is dropped, and
+    the result is cut to `limit` characters."""
+    return re.sub(r"[\x00-\x1f\x7f]", " ", value or "").strip()[:limit]
 
 
 def _pct_env(name):
@@ -4088,7 +4104,10 @@ def run_sibling_scan(image, mode, out_dir, on_log, *, upload_file=None, model_id
         # but harmless to forward regardless: the frontend never sends it for
         # ANALYZE (showSbomAuthor), and entrypoint.sh's own docmeta dispatch
         # already excludes ANALYZE (it converts a document we did not author).
-        "-e", "SBOM_AUTHOR=%s" % _env_flag_value(env.get("SBOM_AUTHOR", "")),
+        "-e", "SBOM_AUTHOR=%s" % _env_contact_value(env.get("SBOM_AUTHOR", "")),
+        # Product supplier (metadata.component.supplier), "Name <url-or-email>".
+        # Same handling as SBOM_AUTHOR; empty means docmeta writes no supplier.
+        "-e", "PRODUCT_SUPPLIER=%s" % _env_contact_value(env.get("PRODUCT_SUPPLIER", "")),
         "-e", "HOST_OUTPUT_DIR=%s" % out_dir,  # container path, contained in OUTPUT_DIR
         "-e", "GENERATE_NOTICE=%s" % _bool_env("GENERATE_NOTICE"),
         "-e", "GENERATE_SECURITY=%s" % _bool_env("GENERATE_SECURITY"),
@@ -6265,7 +6284,15 @@ class Handler(BaseHTTPRequestHandler):
         # hides this field for ANALYZE, but a direct API call could still send
         # it, so it stays here rather than in a per-mode branch: entrypoint.sh's
         # own docmeta dispatch is what actually excludes ANALYZE.
-        sbom_author = g("sbom_author").strip()[:128]
+        sbom_author = _one_line_field(g("sbom_author"), 128)
+
+        # Optional product supplier (--supplier on the CLI), written as
+        # "Name <https://...>" or "Name <address@host>" and recorded on
+        # metadata.component.supplier. Handled like the SBOM author: one bounded
+        # line here, sanitized again at the docker-run boundary, and an empty
+        # value writes no supplier. Longer cap than the author, since it
+        # carries a URL.
+        supplier = _one_line_field(g("supplier"), 256)
 
         # CycloneDX version of the SBOM (--spec-version on the CLI): 1.6 (the
         # default, also when the field is not sent) or 1.7. Anything else is
@@ -6419,6 +6446,7 @@ class Handler(BaseHTTPRequestHandler):
                 # lock file statically, anything else is "auto" (the default).
                 "detection": "build" if g("detection") == "build" else "auto",
                 "sbomAuthor": sbom_author,
+                "supplier": supplier,
                 "specVersion": spec_version,
                 "gitRef": git_ref,
                 "exclude": scan_exclude,
@@ -6514,6 +6542,7 @@ class Handler(BaseHTTPRequestHandler):
             "PROJECT_VERSION": version,
             "PROJECT_LICENSE": outbound_license,
             "SBOM_AUTHOR": sbom_author,
+            "PRODUCT_SUPPLIER": supplier,
             # Allowlisted above. Always set, so an operator's own
             # CYCLONEDX_SPEC_VERSION in this container does not override the
             # version the form shows.

@@ -63,9 +63,21 @@ SIGN_ATTEMPT_FAILED="${SIGN_FAILED:-0}"
 # both pkg:generic and a purl type that purl-spec does not define required
 # (failing) checks instead of advisory ones; "default" keeps the existing
 # thresholds. Unknown values fall back to "default".
+#
+# "bsi-tr-03183-2" measures the SBOM against BSI TR-03183-2 v2.1.0: CycloneDX
+# 1.6 or later (SPDX 3.0 or later), and the bsi-* rows below (bsi_checks). PURL
+# coverage is advisory there, because the guideline lists other identifiers
+# among the additional fields (5.2.4), to be given where they exist.
 CONFORMANCE_PROFILE="${CONFORMANCE_PROFILE:-default}"
+PURL_REQUIRED=true
+# BSI TR-03183-2 section 4: CycloneDX 1.6 or later, SPDX 3.0.1 or later.
+BSI_CYCLONEDX_SPEC_VERSIONS="1.6 1.7"
+BSI_SPDX_SPEC_VERSIONS="SPDX-3.0"
 case "$CONFORMANCE_PROFILE" in
     skt-submission) _PURL_DEFAULT=100; GENERIC_REQUIRED=true;  PURL_TYPE_REQUIRED=true ;;
+    bsi-tr-03183-2) _PURL_DEFAULT=90;  GENERIC_REQUIRED=false; PURL_TYPE_REQUIRED=false; PURL_REQUIRED=false
+                    CYCLONEDX_SPEC_VERSIONS="${CYCLONEDX_SPEC_VERSIONS:-$BSI_CYCLONEDX_SPEC_VERSIONS}"
+                    SPDX_SPEC_VERSIONS="${SPDX_SPEC_VERSIONS:-$BSI_SPDX_SPEC_VERSIONS}" ;;
     default|"")     _PURL_DEFAULT=90;  GENERIC_REQUIRED=false; PURL_TYPE_REQUIRED=false ;;
     *)              echo "[validate] WARN: unknown CONFORMANCE_PROFILE '$CONFORMANCE_PROFILE'; using default." >&2
                      _PURL_DEFAULT=90; GENERIC_REQUIRED=false; PURL_TYPE_REQUIRED=false ;;
@@ -217,6 +229,38 @@ echo "[validate] detected format: $FORMAT"
 # shellcheck disable=SC2016
 PCT_DEF='def pct($n;$d): if $d==0 then 0 else (($n*100/$d)|floor) end;'
 
+# The first-party exemption from the PURL rows. A first-party component (one
+# the declaration file added: bomlens:origin = first-party) that names its
+# supplier and carries a SHA-512 is identified by those two. It is not
+# published to a package repository, so there is no purl for it to carry, and
+# it is left out of the PURL coverage, pkg:generic and upstream-purl rows. A
+# third-party declared component is not: it came from somewhere, and that
+# place may well have an identifier.
+#
+# Those properties are only words in a JSON file, so the exemption is granted
+# only where this pipeline wrote them: the component carries the mark
+# apply-declared-components.py sets (bomlens:declared = true, exactly once, with
+# exactly one bomlens:origin), that step ran in this very scan (entrypoint.sh exports DECLARED_COMPONENTS_APPLIED=1 after it
+# succeeds; it replaces any marked component the input carried), and the SBOM
+# is not a received one (MODE ANALYZE). The SHA-512 must be a SHA-512: 128 hex
+# digits. The components exempted are listed on their own advisory row.
+if [ "${DECLARED_COMPONENTS_APPLIED:-}" = "1" ] && [ "${MODE:-}" != "ANALYZE" ]; then
+    FP_EXEMPT_ON=true
+else
+    FP_EXEMPT_ON=false
+fi
+# shellcheck disable=SC2016  # jq source; $fpOn and $k are jq variables.
+FP_EXEMPT_DEF='def fp_sha512: (.hashes // []) | if type == "array" then . else [] end
+        | any(type == "object" and .alg == "SHA-512" and ((.content // "") | type == "string" and test("^[0-9a-fA-F]{128}$")));
+    def first_party_exempt: $fpOn
+        and ([ (.properties // []) | if type == "array" then .[] else empty end
+               | select(type == "object" and .name == "bomlens:origin") | .value ] == ["first-party"])
+        and ([ (.properties // []) | if type == "array" then .[] else empty end
+               | select(type == "object" and .name == "bomlens:declared") | .value ] == ["true"])
+        and ((.supplier // {}) | if type == "object" then ((.name // "") != "") or (((.url // []) | length) > 0) else false end)
+        and (fp_sha512 or ([ (.components // [])[]? | select(.type? == "file") ] as $k
+                           | ($k | length) > 0 and all($k[]; fp_sha512)));'
+
 # --------------------------------------------------------
 # Per-format check arrays. Each emits a JSON array of:
 #   {id,label,required(bool),status("pass"|"fail"|"warn"),detail,missing[]}
@@ -231,6 +275,8 @@ cdx_checks() {
        --argjson cap "$MISSING_CAP" \
        --argjson genericRequired "$GENERIC_REQUIRED" \
        --argjson typeRequired "$PURL_TYPE_REQUIRED" \
+       --argjson purlRequired "$PURL_REQUIRED" \
+       --argjson fpOn "$FP_EXEMPT_ON" \
        --argjson knowntypes "$PURL_KNOWN_TYPES" \
        --arg okvers "${1:-$CYCLONEDX_SPEC_VERSIONS}" \
        --arg purlre "$PURL_SYNTAX_REGEX" \
@@ -253,6 +299,8 @@ cdx_checks() {
                     | (\$props | any(.name == \"bsi:component:executable\"))
                       and (\$props | any(.name == \"bsi:component:archive\"))
                       and (\$props | any(.name == \"bsi:component:structured\"));
+    # The first-party exemption (FP_EXEMPT_DEF above).
+    $FP_EXEMPT_DEF
     ([.components[]?]) as \$c
     | (\$c|length) as \$tot
     | (.metadata.tools) as \$t
@@ -283,7 +331,10 @@ cdx_checks() {
     # the intrinsic identifier they DO carry, a hash. License and checksum
     # coverage still count every component, because those they can carry.
     | ([ \$pkg[] | select((.name==null) or (.version==null)) | (.name // .purl // \"(unnamed)\") ]) as \$miss_nv
-    | ([ \$pkg[] | select(.purl==null) | (.name // \"(unnamed)\") ]) as \$miss_purl
+    | ([ \$pkg[] | select(first_party_exempt) | (.name // \"(unnamed)\") + (if ((.version // \"\") | tostring) != \"\" then \"@\" + (.version | tostring) else \"\" end) ]) as \$fp_names
+    | (\$fp_names | length) as \$fp_exempt
+    | (\$ptot - \$fp_exempt) as \$purl_tot
+    | ([ \$pkg[] | select(.purl==null) | select(first_party_exempt | not) | (.name // \"(unnamed)\") ]) as \$miss_purl
     # Packages that carry a CPE where they carry no PURL. The submission criteria
     # require a PURL, so this does not change the verdict. It reads as
     # unidentified components when the truth can be identified another way,
@@ -296,7 +347,7 @@ cdx_checks() {
     # \"identified\" means for a file and the coverage is measured on its own.
     | ([ \$file[] | select((.hashes // []) | length > 0) ] | length) as \$fhash_ok
     | ([ \$file[] | select(((.hashes // []) | length) == 0) | (.name // \"(unnamed)\") ]) as \$miss_fid
-    | ([ \$c[] | select((.purl // \"\") | startswith(\"pkg:generic\")) | (.name // .purl) ]) as \$generic
+    | ([ \$c[] | select((.purl // \"\") | startswith(\"pkg:generic\")) | select(first_party_exempt | not) | (.name // .purl) ]) as \$generic
     | ([ \$c[] | (.purl // empty) | select(test(\$purlre) | not) ]) as \$badpurl
     | ([ \$c[] | (.purl // empty) | select(test(\$nsre)) ]) as \$ns_purl
     | ([ \$ns_purl[] | select(test(\$nsnsre) | not) ]) as \$ns_nons
@@ -322,7 +373,8 @@ cdx_checks() {
     | ((.compositions[0].aggregate // \"\")) as \$agg
     | (.metadata.timestamp // \"\") as \$ts
     | (.metadata.component // {}) as \$top
-    | (\$ptot - (\$miss_purl|length)) as \$purl_ok
+    | (\$purl_tot - (\$miss_purl|length)) as \$purl_ok
+    | (if \$fp_exempt > 0 then \"; \(\$fp_exempt) first-party component(s) identified by supplier and SHA-512 instead\" else \"\" end) as \$fp_note
     # Per-component fields named by the regulatory crosswalk (BSI TR-03183-2 /
     # NTIA). All advisory: they describe how well the SBOM would answer a
     # regulator, and never move the submission verdict. Measured over \$pkg for
@@ -375,15 +427,20 @@ cdx_checks() {
                                    else \"no packages to measure\" end)
                 else \"\(\$ptot - (\$miss_nv|length))/\(\$ptot)\" end),
         missing:(\$miss_nv[0:\$cap])},
-       {id:\"purl\", label:\"PURL coverage (>= \(\$purlmin)%)\", required:true,
+       # Every package being an exempt first-party component leaves nothing
+       # to measure, and nothing missing either: that passes, saying why.
+       {id:\"purl\", label:(if \$purlRequired then \"PURL coverage (>= \(\$purlmin)%)\" else \"PURL coverage (>= \(\$purlmin)%, advisory)\" end), required:\$purlRequired,
         source:(if \$ptot==0 and \$ftot==0 then \"na\" else \"auto\" end),
         naKind:(if \$ptot==0 and \$ftot==0 then \"not-applicable\" else \"\" end),
-        status:(if \$ptot==0 then (if \$ftot>0 then \"fail\" else \"warn\" end)
-                elif pct(\$purl_ok;\$ptot) >= \$purlmin then \"pass\" else \"fail\" end),
+        status:(if \$ptot==0 then (if \$ftot>0 and \$purlRequired then \"fail\" else \"warn\" end)
+                elif \$purl_tot==0 then \"pass\"
+                elif pct(\$purl_ok;\$purl_tot) >= \$purlmin then \"pass\"
+                elif \$purlRequired then \"fail\" else \"warn\" end),
         detail:(if \$ptot==0 then (if \$ftot>0 then \"no package components (file inventory only)\"
                                    else \"no packages to measure\" end)
-                else \"\(pct(\$purl_ok;\$ptot))% (\(\$purl_ok)/\(\$ptot))\"
-                     + (if \$cpe_only > 0 then \"; \(\$cpe_only) identified by CPE instead\" else \"\" end) end),
+                elif \$purl_tot==0 then \"0/0\" + \$fp_note
+                else \"\(pct(\$purl_ok;\$purl_tot))% (\(\$purl_ok)/\(\$purl_tot))\"
+                     + (if \$cpe_only > 0 then \"; \(\$cpe_only) identified by CPE instead\" else \"\" end) + \$fp_note end),
         missing:(\$miss_purl[0:\$cap])},
        {id:\"file-identifier\", label:\"File component identifier coverage (hash, >= \(\$fieldmin)%, recommended)\", required:false,
         source:(if \$ftot==0 then \"na\" else \"auto\" end),
@@ -473,7 +530,14 @@ cdx_checks() {
         detail:(if \$ptot==0 then \"no packages to measure\"
                 elif \$fprops_ok==0 then \"requires inspecting the delivered files (no automated source in this scan)\"
                 else \"\(pct(\$fprops_ok;\$ptot))% (\(\$fprops_ok)/\(\$ptot))\" end), missing:[]}
-      ]" "$SBOM"
+      ]
+      # Which components the first-party exemption took out of the PURL rows,
+      # by name, so a reviewer can check each one. Only when there are any.
+      + (if \$fp_exempt == 0 then [] else
+         [{id:\"first-party-exempt\", label:\"First-party components identified by supplier and SHA-512 instead of a purl (advisory)\",
+           label_ko:\"purl 대신 공급자와 SHA-512로 식별한 자체개발 구성요소 (권고)\", required:false,
+           status:\"warn\", detail:\"\(\$fp_exempt) component(s) left out of the PURL rows\",
+           detail_ko:\"PURL 항목에서 제외한 구성요소 \(\$fp_exempt)개\", missing:(\$fp_names[0:\$cap])}] end)" "$SBOM"
 }
 
 # Registry-driven minimum-element checks. A registry is a declarative file listing
@@ -657,6 +721,276 @@ g7_ai_checks() {
     join_guidance "$out" "${G7_GUIDANCE:-$(dirname "$0")/g7-guidance.json}" "G7"
 }
 
+# BSI TR-03183-2 v2.1.0 rows (profile bsi-tr-03183-2, CycloneDX only). Section
+# 5.2.1 asks of the SBOM a creator given as an email address or URL and a
+# timestamp (the timestamp row above already requires one), and section 5.2.2
+# asks of every component its creator, name, version, filename, dependencies,
+# distribution licence, SHA-512 of the deployable component and the
+# executable, archive and structured properties.
+#
+# What is required depends on where a component came from. A component the
+# declaration file added (it carries bomlens:origin) is one whose supplier said
+# what it is and, through bomlens:artifact, which file it is: BomLens reads the
+# file and fills in the hashes and the properties, so those rows fail when a
+# field is missing. A component the scan found is described by what its
+# package manager publishes, and no scan can give every one of them a
+# filename and a SHA-512 (open question 1 of the first-party plan). Those are
+# measured on one advisory row, with counts and the gaps of each component, and
+# never move the result.
+#
+# A declared library or framework that names no build output (linked into a
+# program, so with no file of its own) has no filename, hash or file
+# properties to give; it is listed on an advisory row instead of failing the
+# three file rows. Any other type (an application, firmware, a container, a
+# driver) is a deliverable, and fails them without a file.
+#
+# The primary component (metadata.component) is the product: its creator,
+# name, version and concluded licence are required, and its filename, SHA-512
+# and file properties too when it names its file (hashes or bomlens:artifact);
+# otherwise those three are reported on an advisory row.
+#
+# Creators are read where sbomqs v2.1.3 reads them (checked on the fixture):
+# metadata.authors with an email, or metadata.manufacturer with a url or
+# contact email, for the SBOM; supplier or manufacturer with a url or contact
+# email for a component.
+#
+# The dependency graph has to reach every component from the primary one, and
+# its completeness has to be indicated clearly (5.2.2): with no compositions
+# entry the row warns rather than passing. A component with no dependencies
+# entry of its own (a leaf should have one with an empty dependsOn) is listed
+# on an advisory row. Nothing here writes a completeness value.
+#
+# A component read from a Yocto build's SPDX document (bomlens:identifiedBy
+# yocto-spdx, or bomlens:yocto-recipe on a declaration) has no SHA-512 when
+# the build did not write one: Yocto writes file hashes only, and SHA-512 only
+# from 6.1. Its missing SHA-512 is reported as not in the source SBOM, and
+# stays advisory.
+#
+# Nested type "file" components (a component with several build outputs)
+# count for the component that holds them, as everywhere else in this file.
+bsi_checks() {
+    jq -c --argjson cap "$MISSING_CAP" '
+    def props($n): [ (.properties // [])[]? | select(.name? == $n) | .value ];
+    def kids: [ (.components // [])[]? | select(.type? == "file") ];
+    def own_or_files(f): f or (kids as $k | ($k | length) > 0 and all($k[]; f));
+    def contact_ok: type == "object"
+        and ((((.url // []) | if type == "array" then . else [] end) | any(type == "string" and length > 0))
+             or (((.contact // []) | if type == "array" then . else [] end) | any(type == "object" and ((.email // "") != ""))));
+    def creator_ok: [.supplier, .manufacturer] | any(contact_ok);
+    def nv_ok: ((.name // "") != "") and (((.version // "") | tostring) != "");
+    # The distribution licence as BSI TR-03183-2 reads it: an SPDX identifier
+    # or expression, or a LicenseRef- for a licence the SPDX list does not
+    # hold (6.1), marked "acknowledgement": "concluded" (section 8 gives the
+    # distribution licence that way, and "declared" to the original one).
+    def lic_ok: (.licenses // []) | if type == "array" then . else [] end
+        | any(type == "object"
+              and (((.expression // "") != "" and .acknowledgement == "concluded")
+                   or ((.license // {}) | type == "object" and .acknowledgement == "concluded"
+                       and (((.id // "") != "") or ((.name // "") | test("^LicenseRef-[A-Za-z0-9.-]+$"))))));
+    def fname_ok: own_or_files(props("bsi:component:filename") | length > 0);
+    # A SHA-512 is 128 hex digits, on the component or on a distribution
+    # reference (where section 8 puts the hash of the deployable file).
+    def sha512_list: (. // []) | if type == "array" then . else [] end
+        | any(type == "object" and .alg == "SHA-512" and ((.content // "") | type == "string" and test("^[0-9a-fA-F]{128}$")));
+    def sha512_here: (.hashes | sha512_list)
+        or ((.externalReferences // []) | if type == "array" then . else [] end
+            | any(type == "object" and .type == "distribution" and (.hashes | sha512_list)));
+    def sha512_ok: own_or_files(sha512_here);
+    def fprops_ok: own_or_files(props("bsi:component:executable") as $e | props("bsi:component:archive") as $a
+                                | props("bsi:component:structured") as $s | ($e|length) > 0 and ($a|length) > 0 and ($s|length) > 0);
+    def yocto_src: (props("bomlens:identifiedBy") | index("yocto-spdx")) != null or (props("bomlens:yocto-recipe") | length > 0);
+    # A declared component is delivered as a file when it names a build
+    # output, carries a filename, holds file components, or is a package of
+    # a Yocto build (installed as files).
+    def has_file: (props("bomlens:artifact") | length > 0) or fname_ok or (kids | length > 0) or yocto_src;
+    def may_lack_file: .type == "library" or .type == "framework";
+    def clabel: (.name // "(unnamed)") + (if ((.version // "") | tostring) != "" then "@" + (.version | tostring) else "" end);
+    # Components the dependency graph reaches from the primary component,
+    # walked one level at a time.
+    def reach($g; $root): {seen: {($root): true}, front: [$root]}
+        | until((.front | length) == 0;
+            .seen as $s
+            | ([ .front[] | ($g[.] // [])[] | select(type == "string") ] | unique | map(select($s[.] | not))) as $new
+            | .seen = (reduce $new[] as $n (.seen; .[$n] = true))
+            | .front = $new)
+        | .seen;
+
+    ([ .components[]? | select(type == "object") ]) as $c
+    | ([ $c[] | select(.type != "data" and .type != "file" and .type != "operating-system") ]) as $pkg
+    | ([ $pkg[] | select(props("bomlens:origin") | length > 0) ]) as $decl
+    | ([ $pkg[] | select(props("bomlens:origin") | length == 0) ]) as $scan
+    | ([ $decl[] | select(has_file or (may_lack_file | not)) ]) as $dfile
+    | ([ $decl[] | select((has_file | not) and may_lack_file) | clabel ]) as $dnofile
+    | ($decl | length) as $dn | ($dfile | length) as $dfn
+    # SBOM creator (5.2.1).
+    | (.metadata // {}) as $m
+    | (if ($m.manufacturer | contact_ok) then "metadata.manufacturer"
+       elif (($m.authors // []) | if type == "array" then . else [] end | any(type == "object" and ((.email // "") != ""))) then "metadata.authors"
+       else "" end) as $sbom_creator
+    # Dependency graph (5.2.1, 5.2.2): every component reached from the
+    # primary one.
+    | (($m.component // {})["bom-ref"] // "") as $root
+    | (reduce (.dependencies // [])[]? as $d ({};
+          if ($d | type) == "object" and (($d.ref // "") | type) == "string"
+          then .[$d.ref] = ((.[$d.ref] // []) + (($d.dependsOn // []) | if type == "array" then . else [] end))
+          else . end)) as $g
+    | (if $root == "" then {} else reach($g; $root) end) as $reached
+    | ([ $c[] | select((.["bom-ref"] // "") as $r | $r == "" or ($reached[$r] | not)) | clabel ]) as $unreached
+    | (((.compositions // [])[0].aggregate) // "") as $agg
+    | ([ (.dependencies // [])[]? | select(type == "object" and ((.dependsOn // null) | type) == "array") | .ref ]) as $has_entry
+    | ([ $c[] | select((.["bom-ref"] // "") as $r | $r == "" or ($has_entry | index($r)) == null) | clabel ]) as $no_entry
+    # The primary component.
+    | ($m.component // {}) as $top
+    | ($top | (has_file or ((.hashes // []) | length > 0))) as $top_file
+    | ($top | [ (if creator_ok then empty else "creator" end),
+                (if nv_ok then empty else "name and version" end),
+                (if lic_ok then empty else "concluded licence" end) ]) as $top_gaps
+    | ($top | [ (if fname_ok then empty else "filename" end),
+                (if sha512_ok then empty else "SHA-512" end),
+                (if fprops_ok then empty else "file properties" end) ]) as $top_file_gaps
+    | ($top_gaps + (if $top_file then $top_file_gaps else [] end)) as $top_all
+    | {"creator": "제작자", "name and version": "이름과 버전", "concluded licence": "배포 라이선스(concluded)",
+       "filename": "파일 이름", "SHA-512": "SHA-512", "file properties": "파일 속성"} as $gap_ko
+    # One row per field over the declared components: what fails and what
+    # is reported as not in the source SBOM.
+    | def drow($id; $lbl; $lbl_ko; $subject; f; $ref):
+        ([ $subject[] | select(f | not) ]) as $bad
+        | ([ $bad[] | select(($id == "bsi-declared-sha512") and yocto_src) | clabel + " (not in the source SBOM)" ]) as $nosrc
+        | ([ $bad[] | select((($id == "bsi-declared-sha512") and yocto_src) | not) | clabel ]) as $miss
+        | ($subject | length) as $n
+        | {id: $id, label: $lbl, label_ko: $lbl_ko, required: true,
+           source: (if $n == 0 then "na" else "auto" end),
+           naKind: (if $n == 0 then "not-applicable" else "" end),
+           status: (if $n == 0 then "warn" elif ($miss | length) > 0 then "fail" elif ($nosrc | length) > 0 then "warn" else "pass" end),
+           detail: (if $n == 0 then (if $dn == 0 then "no declared components" else "no declared component has a file of its own" end)
+                    else "\($n - ($bad | length))/\($n) declared component(s)"
+                         + (if ($nosrc | length) > 0 then "; \($nosrc | length) not in the source SBOM" else "" end) end),
+           detail_ko: (if $n == 0 then (if $dn == 0 then "선언한 구성요소 없음" else "자체 파일이 있는 선언 구성요소 없음" end)
+                       else "선언 구성요소 \($n - ($bad | length))/\($n)개"
+                            + (if ($nosrc | length) > 0 then ", 원본 SBOM에 없음 \($nosrc | length)개" else "" end) end),
+           missing: (($miss + $nosrc)[0:$cap]),
+           reviewGuide: (if ($miss | length) > 0 then $ref else null end)}
+        | if .reviewGuide == null then del(.reviewGuide) else . end;
+    def guide($how; $how_ko): {how: $how, how_ko: $how_ko, docUrl: "https://sktelecom.github.io/bomlens/reference/cli/"};
+    # The advisory row for the components the scan found: the gaps of each.
+    ([ $scan[] | . as $x
+       | ([ (if creator_ok then empty else "creator" end),
+            (if nv_ok then empty else "version" end),
+            (if fname_ok then empty else "filename" end),
+            (if sha512_ok then empty elif yocto_src then "SHA-512 (not in the source SBOM)" else "SHA-512" end),
+            (if fprops_ok then empty else "file properties" end),
+            (if lic_ok then empty else "concluded licence" end) ]) as $gaps
+       | select(($gaps | length) > 0) | ($x | clabel) + ": " + ($gaps | join(", ")) ]) as $scan_gaps
+    | def cnt(f): [ $scan[] | select(f) ] | length;
+    ($scan | length) as $sn
+    | ([ $scan[] | select((sha512_ok | not) and yocto_src) ] | length) as $scan_nosrc
+    | [
+       {id: "bsi-sbom-creator", label: "SBOM creator with an email address or URL",
+        label_ko: "이메일 주소나 URL이 있는 SBOM 작성자", required: true,
+        status: (if $sbom_creator != "" then "pass" else "fail" end),
+        detail: (if $sbom_creator != "" then $sbom_creator else "no metadata.manufacturer with a url or contact email, and no metadata.authors entry with an email" end),
+        detail_ko: (if $sbom_creator != "" then $sbom_creator else "url이나 연락처 이메일이 있는 metadata.manufacturer도, 이메일이 있는 metadata.authors도 없음" end),
+        missing: []}
+       + (if $sbom_creator != "" then {} else {reviewGuide: guide(
+           "Name the SBOM creator with an email address: scan again with --sbom-author \"Example Corp <sbom@example.com>\", which BomLens writes to metadata.authors with the email.";
+           "이메일 주소와 함께 SBOM 작성자를 적습니다. --sbom-author \"Example Corp <sbom@example.com>\" 옵션으로 다시 스캔하면 BomLens가 이메일을 포함해 metadata.authors에 기록합니다.")} end),
+       {id: "bsi-dependency-graph", label: "Every component reached from the primary component in the dependency graph",
+        label_ko: "의존 관계 그래프에서 최상위 구성요소로부터 모든 구성요소에 도달", required: true,
+        source: (if ($c | length) == 0 then "na" else "auto" end),
+        naKind: (if ($c | length) == 0 then "not-applicable" else "" end),
+        status: (if ($c | length) == 0 then "warn" elif $root == "" or ($unreached | length) > 0 then "fail"
+                 elif $agg == "" then "warn" else "pass" end),
+        detail: (if ($c | length) == 0 then "nothing to relate"
+                 elif $root == "" then "the primary component (metadata.component) has no bom-ref"
+                 else "\(($c | length) - ($unreached | length))/\($c | length) component(s) reached" end
+                 + (if $agg == "" then "; completeness is not indicated (no compositions entry), which BSI TR-03183-2 5.2.2 requires to be indicated clearly"
+                    else ", completeness indicated as \($agg)" end)),
+        detail_ko: (if ($c | length) == 0 then "연결할 구성요소 없음"
+                    elif $root == "" then "최상위 구성요소(metadata.component)에 bom-ref가 없음"
+                    else "구성요소 \(($c | length) - ($unreached | length))/\($c | length)개 도달" end
+                    + (if $agg == "" then "; 완전성 표시가 없음(compositions 항목 없음). BSI TR-03183-2 5.2.2는 완전성을 분명히 표시하도록 요구함"
+                       else ", 완전성 표시 \($agg)" end)),
+        missing: ($unreached[0:$cap])},
+       {id: "bsi-dependency-entries", label: "Every component has its own dependencies entry, empty for a leaf (advisory)",
+        label_ko: "모든 구성요소에 자체 dependencies 항목 있음, 말단 구성요소는 빈 항목 (권고)", required: false,
+        source: (if ($c | length) == 0 then "na" else "auto" end),
+        naKind: (if ($c | length) == 0 then "not-applicable" else "" end),
+        status: (if ($no_entry | length) == 0 then "pass" else "warn" end),
+        detail: "\(($c | length) - ($no_entry | length))/\($c | length) component(s) with an entry",
+        detail_ko: "dependencies 항목이 있는 구성요소 \(($c | length) - ($no_entry | length))/\($c | length)개",
+        missing: ($no_entry[0:$cap])},
+       ({id: "bsi-primary-component", label: ("Primary component: creator with an email address or URL, name, version and concluded licence"
+                                             + (if $top_file then ", filename, SHA-512 and file properties" else "" end)),
+         label_ko: ("최상위 구성요소: 이메일 주소나 URL이 있는 제작자, 이름, 버전, 배포 라이선스(concluded)"
+                    + (if $top_file then ", 파일 이름, SHA-512, 파일 속성" else "" end)),
+         required: true,
+         status: (if ($top_all | length) == 0 then "pass" else "fail" end),
+         detail: (if ($top_all | length) == 0 then "met" else "missing: " + ($top_all | join(", ")) end),
+         detail_ko: (if ($top_all | length) == 0 then "충족" else "누락: " + ($top_all | map($gap_ko[.] // .) | join(", ")) end),
+         missing: (if ($top_all | length) == 0 then [] else [ ($top | clabel) + ": " + ($top_all | join(", ")) ] end)}
+        + (if ($top_gaps | length) == 0 then {} else {reviewGuide: guide(
+            "The product is metadata.component. Scan again with --supplier \"Example Corp <https://example.com>\" (or an email in the brackets) for its creator, and --license for its distribution licence. A licence given with --license replaces the one the generator or the project manifest supplied and is written as \"acknowledgement\": \"concluded\"; without --license, the licence read from the scan stays as it is, which is not a concluded one.";
+            "제품은 metadata.component입니다. 제작자는 --supplier \"Example Corp <https://example.com>\" 옵션(괄호 안에 이메일도 가능)으로, 배포 라이선스는 --license 옵션으로 다시 스캔해 기록합니다. --license로 준 라이선스는 생성 도구나 프로젝트 매니페스트가 정한 라이선스를 대신하며 \"acknowledgement\": \"concluded\"로 기록됩니다. --license가 없으면 스캔에서 읽은 라이선스를 그대로 두며, 이는 concluded 라이선스가 아닙니다.")} end)),
+       {id: "bsi-primary-component-file", label: "Primary component: filename, SHA-512 and file properties (advisory when it names no file of its own)",
+        label_ko: "최상위 구성요소: 파일 이름, SHA-512, 파일 속성 (자체 파일을 지정하지 않으면 권고)", required: false,
+        source: (if $top_file then "na" else "auto" end),
+        naKind: (if $top_file then "not-applicable" else "" end),
+        status: (if $top_file or ($top_file_gaps | length) == 0 then "pass" else "warn" end),
+        detail: (if $top_file then "measured on the primary component row"
+                 else "the primary component names no delivered file (no hashes or bomlens:artifact), so these are advisory"
+                      + (if ($top_file_gaps | length) > 0 then "; missing: " + ($top_file_gaps | join(", ")) else "" end) end),
+        detail_ko: (if $top_file then "최상위 구성요소 항목에서 확인"
+                    else "최상위 구성요소가 배포 파일을 지정하지 않아(해시나 bomlens:artifact 없음) 권고로 보고함"
+                         + (if ($top_file_gaps | length) > 0 then "; 누락: " + ($top_file_gaps | map($gap_ko[.] // .) | join(", ")) else "" end) end),
+        missing: []},
+       drow("bsi-declared-creator"; "Declared components: creator with an email address or URL (supplier or manufacturer)";
+            "선언 구성요소: 이메일 주소나 URL이 있는 제작자(supplier 또는 manufacturer)"; $decl; creator_ok;
+            guide("Give each listed component a supplier (or manufacturer) with a url or a contact email in the declaration file.";
+                  "선언 파일에서 표시된 구성요소의 supplier(또는 manufacturer)에 url이나 연락처 이메일을 적습니다.")),
+       drow("bsi-declared-name-version"; "Declared components: name and version"; "선언 구성요소: 이름과 버전"; $decl; nv_ok;
+            guide("Give each listed component a name and a version in the declaration file.";
+                  "선언 파일에서 표시된 구성요소에 이름과 버전을 적습니다.")),
+       drow("bsi-declared-license"; "Declared components: concluded distribution licence as an SPDX identifier, expression or LicenseRef-";
+            "선언 구성요소: SPDX 식별자, 표현식, LicenseRef- 형식의 배포 라이선스(concluded)"; $decl; lic_ok;
+            guide("Give each listed component its distribution licence as an SPDX identifier or expression, or as a LicenseRef- name for a licence the SPDX list does not hold, for example {\"license\": {\"name\": \"LicenseRef-ExampleCorp-Proprietary\"}}. BomLens marks a declared licence \"acknowledgement\": \"concluded\" unless the declaration says \"declared\"; the distribution licence has to be the concluded one.";
+                  "선언 파일에서 표시된 구성요소의 배포 라이선스를 SPDX 식별자나 표현식으로 적고, SPDX 목록에 없는 라이선스는 LicenseRef- 이름으로 적습니다. 예: {\"license\": {\"name\": \"LicenseRef-ExampleCorp-Proprietary\"}}. BomLens는 선언 파일이 \"declared\"로 적지 않은 라이선스에 \"acknowledgement\": \"concluded\"를 붙이며, 배포 라이선스는 concluded여야 합니다.")),
+       drow("bsi-declared-filename"; "Declared components: filename (bsi:component:filename)";
+            "선언 구성요소: 파일 이름(bsi:component:filename)"; $dfile; fname_ok;
+            guide("Name the build output of each listed component in bomlens:artifact; the scan writes its file name.";
+                  "표시된 구성요소의 빌드 산출물 경로를 bomlens:artifact에 적으면 스캔이 파일 이름을 기록합니다.")),
+       drow("bsi-declared-sha512"; "Declared components: SHA-512 of the deployable file";
+            "선언 구성요소: 배포 파일의 SHA-512"; $dfile; sha512_ok;
+            guide("Name the build output of each listed component in bomlens:artifact; the scan computes its SHA-512.";
+                  "표시된 구성요소의 빌드 산출물 경로를 bomlens:artifact에 적으면 스캔이 SHA-512를 계산합니다.")),
+       drow("bsi-declared-file-properties"; "Declared components: executable, archive and structured properties";
+            "선언 구성요소: 실행, 압축, 구조 속성"; $dfile; fprops_ok;
+            guide("Name the build output of each listed component in bomlens:artifact; the scan reads the three properties from the file.";
+                  "표시된 구성요소의 빌드 산출물 경로를 bomlens:artifact에 적으면 스캔이 파일에서 세 속성을 읽습니다.")),
+       {id: "bsi-declared-without-file", label: "Declared libraries and frameworks with no file of their own, linked into another component (filename, SHA-512 and file properties not required, advisory)",
+        label_ko: "다른 구성요소에 링크되어 자체 파일이 없는 선언 라이브러리와 프레임워크 (파일 이름, SHA-512, 파일 속성은 필수 아님, 권고)", required: false,
+        source: (if $dn == 0 then "na" else "auto" end),
+        naKind: (if $dn == 0 then "not-applicable" else "" end),
+        status: (if ($dnofile | length) == 0 then "pass" else "warn" end),
+        detail: (if $dn == 0 then "no declared components" else "\($dnofile | length) of \($dn) declared component(s); a declared component of any other type fails the file rows without a file" end),
+        detail_ko: (if $dn == 0 then "선언한 구성요소 없음" else "선언 구성요소 \($dn)개 중 \($dnofile | length)개. 그 밖의 유형은 파일이 없으면 파일 항목에서 실패함" end),
+        missing: ($dnofile[0:$cap])},
+       {id: "bsi-scanned-components", label: "Components the scan found: BSI TR-03183-2 component fields (advisory, not required for scanned components)",
+        label_ko: "스캔이 찾은 구성요소: BSI TR-03183-2 구성요소 필드 (권고, 스캔한 구성요소에는 필수 아님)", required: false,
+        source: (if $sn == 0 then "na" else "auto" end),
+        naKind: (if $sn == 0 then "not-applicable" else "" end),
+        status: (if ($scan_gaps | length) == 0 then "pass" else "warn" end),
+        detail: (if $sn == 0 then "no scanned components"
+                 else "creator \(cnt(creator_ok))/\($sn), version \(cnt(nv_ok))/\($sn), filename \(cnt(fname_ok))/\($sn), SHA-512 \(cnt(sha512_ok))/\($sn)"
+                      + (if $scan_nosrc > 0 then " (\($scan_nosrc) not in the source SBOM)" else "" end)
+                      + ", file properties \(cnt(fprops_ok))/\($sn), concluded licence \(cnt(lic_ok))/\($sn)" end),
+        detail_ko: (if $sn == 0 then "스캔한 구성요소 없음"
+                    else "제작자 \(cnt(creator_ok))/\($sn), 버전 \(cnt(nv_ok))/\($sn), 파일 이름 \(cnt(fname_ok))/\($sn), SHA-512 \(cnt(sha512_ok))/\($sn)"
+                         + (if $scan_nosrc > 0 then " (원본 SBOM에 없음 \($scan_nosrc)개)" else "" end)
+                         + ", 파일 속성 \(cnt(fprops_ok))/\($sn), 배포 라이선스(concluded) \(cnt(lic_ok))/\($sn)" end),
+        missing: ($scan_gaps[0:$cap])}
+      ]' "$SBOM"
+}
+
 spdx_json_checks() {
     jq -c \
        --argjson purlmin "$PURL_MIN_PCT" \
@@ -665,6 +999,7 @@ spdx_json_checks() {
        --argjson cap "$MISSING_CAP" \
        --argjson genericRequired "$GENERIC_REQUIRED" \
        --argjson typeRequired "$PURL_TYPE_REQUIRED" \
+       --argjson purlRequired "$PURL_REQUIRED" \
        --argjson knowntypes "$PURL_KNOWN_TYPES" \
        --arg okvers "$SPDX_SPEC_VERSIONS" \
        --arg purlre "$PURL_SYNTAX_REGEX" \
@@ -737,10 +1072,10 @@ spdx_json_checks() {
         detail:(if \$tot==0 then \"no packages to measure\"
                 else \"\(\$tot - (\$miss_nv|length))/\(\$tot)\" end),
         missing:(\$miss_nv[0:\$cap])},
-       {id:\"purl\", label:\"PURL coverage (>= \(\$purlmin)%)\", required:true,
+       {id:\"purl\", label:(if \$purlRequired then \"PURL coverage (>= \(\$purlmin)%)\" else \"PURL coverage (>= \(\$purlmin)%, advisory)\" end), required:\$purlRequired,
         source:(if \$tot==0 then \"na\" else \"auto\" end),
         naKind:(if \$tot==0 then \"not-applicable\" else \"\" end),
-        status:(if \$tot==0 then \"warn\" elif pct(\$purl_ok;\$tot) >= \$purlmin then \"pass\" else \"fail\" end),
+        status:(if \$tot==0 then \"warn\" elif pct(\$purl_ok;\$tot) >= \$purlmin then \"pass\" elif \$purlRequired then \"fail\" else \"warn\" end),
         detail:(if \$tot==0 then \"no packages to measure\"
                 else \"\(pct(\$purl_ok;\$tot))% (\(\$purl_ok)/\(\$tot))\"
                      + (if \$cpe_only > 0 then \"; \(\$cpe_only) identified by CPE instead\" else \"\" end) end),
@@ -832,14 +1167,15 @@ spdx_tv_checks() {
        --argjson advp "$adv_purls" --argjson advok "$adv_ns_ok" \
        --argjson knownok "$known_ok" --argjson knowntypes "$PURL_KNOWN_TYPES" \
        --arg advtypes "$NS_ADVISORY_LABEL" --arg okvers "$SPDX_SPEC_VERSIONS" \
-       --argjson genericRequired "$GENERIC_REQUIRED" --argjson typeRequired "$PURL_TYPE_REQUIRED" '
+       --argjson genericRequired "$GENERIC_REQUIRED" --argjson typeRequired "$PURL_TYPE_REQUIRED" \
+       --argjson purlRequired "$PURL_REQUIRED" '
     [
       {id:"spec-version", label:"Spec version (\($okvers|split(" ")|join("/")))", required:true, status:(if $specok>0 then "pass" else "fail" end), detail:"\($specok) accepted SPDXVersion line(s)", missing:[]},
       {id:"timestamp", label:"Timestamp (Created:)", required:true, status:(if $ts>0 then "pass" else "fail" end), detail:"\($ts) found", missing:[]},
       {id:"tools", label:"Tool info (Creator: Tool:)", required:true, status:(if $tools>0 then "pass" else "fail" end), detail:"\($tools) tool(s)", missing:[]},
       {id:"top-component", label:"Document/package present", required:true, status:(if $names>0 then "pass" else "fail" end), detail:"\($names) package(s)", missing:[]},
       {id:"name-version", label:"PackageName + PackageVersion present", required:true, status:(if $names>0 and $vers>=$names then "pass" else "fail" end), detail:"names=\($names), versions=\($vers)", missing:[]},
-      {id:"purl", label:"PURL external refs present", required:true, status:(if $purls>0 and $purls>=$names then "pass" else "fail" end), detail:"\($purls) purl ref(s) for \($names) package(s)", missing:[]},
+      {id:"purl", label:(if $purlRequired then "PURL external refs present" else "PURL external refs present (advisory)" end), required:$purlRequired, status:(if $purls>0 and $purls>=$names then "pass" elif $purlRequired then "fail" else "warn" end), detail:"\($purls) purl ref(s) for \($names) package(s)", missing:[]},
       {id:"no-generic", label:(if $genericRequired then "Traceable PURL (no pkg:generic)" else "Traceable PURL (no pkg:generic, advisory)" end), required:$genericRequired, status:(if $generic==0 then "pass" elif $genericRequired then "fail" else "warn" end), detail:"\($generic) untraceable", missing:[]},
       {id:"purl-syntax", label:"PURL syntax (pkg:type/[namespace/]name)", required:true, status:(if $purls<=$purlok then "pass" else "fail" end), detail:"\($purls - $purlok) malformed", missing:[]},
       {id:"purl-namespace", label:"PURL namespace where the type requires it (pkg:maven/<groupId>/name)", required:true, source:(if $nsp==0 then "na" else "auto" end), naKind:(if $nsp==0 then "not-applicable" else "" end), status:(if $nsp<=$nsok then "pass" else "fail" end), detail:(if $nsp==0 then "no identifiers of a type that requires a namespace" else "\($nsp - $nsok) without namespace" end), missing:[]},
@@ -912,6 +1248,34 @@ spdx_tv_signal() {
         licenseCoverage: { declared: $d, total: $n, pct: (if $n == 0 then null else (($d * 100 / $n) | floor) end) } }'
 }
 
+# The bsi-* rows, under the bsi-tr-03183-2 profile, for a CycloneDX document
+# (an SPDX 3.0 one is measured on its CycloneDX conversion). If they cannot be
+# evaluated, a failing row says so: a BSI verdict without them would be a pass
+# on the generic rows alone.
+add_bsi_checks() {
+    [ "$CONFORMANCE_PROFILE" = "bsi-tr-03183-2" ] || return 0
+    local bsi
+    if bsi=$(bsi_checks) && [ -n "$bsi" ]; then
+        # The general file-properties row reads "no automated source" when no
+        # component carries the properties, which would contradict the
+        # bsi-declared-file-properties row; the bsi-* rows replace it here.
+        CHECKS=$(printf '%s\n%s' "$CHECKS" "$bsi" | jq -cs 'add | map(select(.id != "file-properties"))')
+        echo "[validate] added the BSI TR-03183-2 checks"
+    else
+        bsi_unmeasured "could not evaluate" "검사를 수행하지 못함"
+    fi
+}
+
+# A failing bsi-evaluation row, for an SBOM the bsi-* rows could not be
+# measured on: a BSI verdict must not rest on the general rows alone.
+# $1/$2: the reason, English and Korean.
+bsi_unmeasured() {
+    echo "[validate] WARN: the BSI TR-03183-2 checks were not evaluated ($1); a failing row stands in for them." >&2
+    CHECKS=$(printf '%s\n%s' "$CHECKS" "$(jq -cn --arg d "$1" --arg dk "$2" '[{id: "bsi-evaluation",
+        label: "BSI TR-03183-2 checks evaluated", label_ko: "BSI TR-03183-2 검사 수행", required: true,
+        status: "fail", detail: $d, detail_ko: $dk, missing: []}]')" | jq -cs 'add')
+}
+
 # --------------------------------------------------------
 # Compute checks for the detected format.
 # --------------------------------------------------------
@@ -967,6 +1331,7 @@ case "$FORMAT" in
             CHECKS=$(printf '%s\n%s' "$CHECKS" "$CISA" | jq -cs 'add')
             echo "[validate] added the 2026 SBOM minimum-element checks"
         fi
+        add_bsi_checks
         ;;
     SPDX-JSON)     CHECKS=$(spdx_json_checks); SIGNAL=$(spdx_json_signal) ;;
     SPDX-3.0)
@@ -989,6 +1354,7 @@ case "$FORMAT" in
             SBOM="$SPDX3_CDX"
             CHECKS=$(cdx_checks "$CYCLONEDX_SPEC_VERSIONS")
             SIGNAL=$(cdx_signal)
+            add_bsi_checks
             rm -f "$SPDX3_CDX"
             echo "[validate] SPDX 3.0 (Yocto) measured on the installed package set"
         elif command -v syft >/dev/null 2>&1 \
@@ -997,6 +1363,7 @@ case "$FORMAT" in
             SBOM="$SPDX3_CDX"
             CHECKS=$(cdx_checks "$CYCLONEDX_SPEC_VERSIONS")
             SIGNAL=$(cdx_signal)
+            add_bsi_checks
             rm -f "$SPDX3_CDX"
             echo "[validate] SPDX 3.0 measured via CycloneDX conversion"
         else
@@ -1009,6 +1376,13 @@ case "$FORMAT" in
         CHECKS='[{"id":"format","label":"Recognized SBOM format","required":true,"status":"fail","detail":"not CycloneDX or SPDX","missing":[]}]'
         ;;
 esac
+# Under the BSI profile, a document no bsi-* row was measured on (SPDX 2.x,
+# Tag-Value, SPDX 3.0 without syft, an unknown format) gets the failing row.
+if [ "$CONFORMANCE_PROFILE" = "bsi-tr-03183-2" ] && [ -n "$CHECKS" ] \
+   && ! printf '%s' "$CHECKS" | jq -e 'any(.[]; .id | startswith("bsi-"))' >/dev/null 2>&1; then
+    bsi_unmeasured "the BSI checks read CycloneDX, and this $FORMAT document could not be measured as CycloneDX" \
+        "BSI 검사는 CycloneDX를 읽으며, 이 $FORMAT 문서는 CycloneDX로 확인할 수 없음"
+fi
 [ -n "$CHECKS" ] || CHECKS='[{"id":"parse","label":"Parseable SBOM","required":true,"status":"fail","detail":"could not evaluate","missing":[]}]'
 
 # --------------------------------------------------------
@@ -1102,17 +1476,19 @@ if [ "$CONFORMANCE_PROFILE" = "skt-submission" ] && [ "$FORMAT" = "CycloneDX" ];
     [ "${MODE:-}" = "ANALYZE" ] && _submit_analyze=true
     _submit_fwmode=false
     case "${MODE:-}" in FIRMWARE|ROOTFS|BINARY|YOCTO) _submit_fwmode=true ;; esac
-    if SUBMIT_ROWS=$(jq -c --argjson cap "$MISSING_CAP" --argjson analyze "$_submit_analyze" \
+    if SUBMIT_ROWS=$(jq -c --argjson cap "$MISSING_CAP" --argjson analyze "$_submit_analyze" --argjson fpOn "$FP_EXEMPT_ON" \
             --arg fwmode "$_submit_fwmode" --arg scanmode "${MODE:-}" \
             --arg tmpl "$(basename "$OUT_PREFIX")_component-versions.template.csv" '
         [ .components[]? | select(.type != "data" and .type != "file" and .type != "operating-system") ] as $pkg
         | ["own-code", "not-open-source", "version-unknown"] as $reasons
         | def reason: [ (.properties // [])[]? | select(.name? == "bomlens:versionReason") | .value ]
                       | map(select(. as $v | $reasons | index($v))) | first;
+        # The first-party exemption of the PURL rows (FP_EXEMPT_DEF).
+        '"$FP_EXEMPT_DEF"'
         [ $pkg[] | select(((.version // "") | tostring) == "") ] as $versionless
         | [ $versionless[] | select(reason == null) | (.name // "(unnamed)") ] as $nover
         | [ $versionless[] | select(reason != null) | {name: (.name // "(unnamed)"), reason: reason} ] as $explained
-        | [ $pkg[] | select(((.version // "") | tostring) != "")
+        | [ $pkg[] | select(((.version // "") | tostring) != "") | select(first_party_exempt | not)
                    | select(((.purl // "") == "") or ((.purl // "") | test("^pkg:(generic|opkg|openwrt|yocto)/"; "i")))
                    | ((.name // "(unnamed)") + "@" + (.version | tostring)) ] as $noup
         # What the generic rows would still fail on once the explained and the
@@ -1230,6 +1606,7 @@ if [ -f "$KO_CATALOG" ] && [ -f "$KO_REG" ]; then
           if ($RK[$id] != null) then $RK[$id]
           elif ($en|test("^Spec version \\(CycloneDX ")) then ($C["conformance.label.spec_cdx"] | gsub("%v%"; ($en|capture("^Spec version \\(CycloneDX (?<v>.+)\\)$").v)))
           elif ($en|test("^Spec version \\(")) then ($C["conformance.label.spec_other"] | gsub("%v%"; ($en|capture("^Spec version \\((?<v>.+)\\)$").v)))
+          elif ($en|test("^PURL coverage .*, advisory\\)$")) then ($C["conformance.label.purl"] | gsub("%n%"; ($en|capture("(?<n>[0-9]+)").n)) | sub("\\)$"; ", 권고)"))
           elif ($en|test("^PURL coverage ")) then ($C["conformance.label.purl"] | gsub("%n%"; ($en|capture("(?<n>[0-9]+)").n)))
           elif ($en|test("^License coverage ")) then ($C["conformance.label.license"] | gsub("%n%"; ($en|capture("(?<n>[0-9]+)").n)))
           elif ($en|test("^Hash coverage ")) then ($C["conformance.label.hash"] | gsub("%n%"; ($en|capture("(?<n>[0-9]+)").n)))
@@ -1284,8 +1661,12 @@ if [ -f "$KO_CATALOG" ] && [ -f "$KO_REG" ]; then
           elif ($d|test("^[0-9]+ license field\\(s\\)$")) then ($C["conformance.detail.license_field"]|gsub("%n%";($d|capture("(?<n>[0-9]+)").n)))
           elif ($d|test("^[0-9]+ checksum\\(s\\)$")) then ($C["conformance.detail.checksum"]|gsub("%n%";($d|capture("(?<n>[0-9]+)").n)))
           else $d end;
+      # A row that carries its own Korean detail (the bsi-* rows) keeps it.
       map(.label_ko = (if (.label_ko // "") != "" then .label_ko else llabel(.id; .label) end)
-          | .detail_ko = ldetail(.detail))
+          | .detail_ko = (if (.detail_ko // "") != "" then .detail_ko
+                          else ldetail(.detail)
+                               | sub("; (?<n>[0-9]+) first-party component\\(s\\) identified by supplier and SHA-512 instead$";
+                                     "; 자체개발 구성요소 \(.n)개는 공급자와 SHA-512로 식별") end))
     ' 2>/dev/null); then
         CHECKS="$KO_JOINED"
     else
@@ -1706,6 +2087,18 @@ if [ -n "$SUBMIT_NOTE_FILE" ]; then
         C_SUBMIT_MD="- Submit \`${SUBMIT_NOTE_FILE}\` only. The other files in the output folder are for your own review."
         C_SUBMIT_HTML="<p class=\"meta submit-file\">Submit <code>${_sf_html}</code> only. The other files in the output folder are for your own review.</p>"
     fi
+fi
+# What the BSI profile requires of which components (see bsi_checks).
+if [ "$CONFORMANCE_PROFILE" = "bsi-tr-03183-2" ]; then
+    if [ "$REPORT_LANG" = "ko" ]; then
+        _bn=$(kstr conformance.bsi_profile_note)
+    else
+        _bn="BSI TR-03183-2 v2.1.0: the fields of section 5.2.2 are required for the components the declaration file added (bomlens:origin), and reported with counts, as advisory, for the components the scan found."
+    fi
+    C_SUBMIT_MD="${C_SUBMIT_MD:+$C_SUBMIT_MD
+}- ${_bn}"
+    C_SUBMIT_HTML="${C_SUBMIT_HTML:+$C_SUBMIT_HTML
+}<p class=\"meta bsi-profile\">${_bn}</p>"
 fi
 # Why some general rows read as warnings (see SUBMIT_RELAXED_MODE). The mode is
 # one of four fixed words, so it needs no escaping.

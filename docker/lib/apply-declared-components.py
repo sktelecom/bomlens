@@ -33,6 +33,21 @@ under the declared one (a CycloneDX assembly), carrying its own hashes and
 properties, and the declared component carries none: one set of hashes cannot
 describe several files.
 
+Each build output is also named on an externalReferences entry of type
+"distribution" carrying its SHA-512, which is where BSI TR-03183-2 v2.1.0
+(section 8) puts the hash of the deployable component. Its url is the
+component's bomlens:distribution-url when the declaration gives one (an
+http(s) URL or a relative path), otherwise the build output's path relative
+to the scan root. A component with several build outputs gets one entry per
+nested file, each with its own path, so it cannot give one
+bomlens:distribution-url for all of them. The component's own hashes stay as
+they are.
+
+A licence the declaration gives without an acknowledgement is marked
+"concluded": it is the licence the supplier distributes the component under,
+the distribution licence of BSI TR-03183-2. An acknowledgement it does give
+is kept.
+
 A first-party component with no version takes the product's version
 (metadata.component.version). A file that has `dependencies` keeps them, and
 the product depends on each of its components that nothing else in the file
@@ -50,9 +65,11 @@ The labels the user knows the files by (the paths given on the command line)
 come from DECLARED_COMPONENTS_LABELS, one per line in the order of the
 arguments; without it the path is used.
 
-Every component added here carries bomlens:declared = true. Components an
-earlier run added (that mark and a bomlens:origin value) are replaced, so
-applying the same files twice gives the same SBOM.
+Every component added here carries bomlens:declared = true. Any component
+of the input SBOM that carries a bomlens:declared property at all (what an
+earlier run added, or a component claiming the mark) is removed first, so
+applying the same files twice gives the same SBOM and every marked component
+afterwards is one this run wrote.
 
 Exit 0 when applied, 3 when a file is refused (every problem is printed, and
 the SBOM is left as it was), 1 when the SBOM itself cannot be read or written.
@@ -65,6 +82,7 @@ import lzma
 import os
 import re
 import sys
+import urllib.parse
 import zlib
 
 MAX_DECLARATION_BYTES = 4 * 1024 * 1024
@@ -77,6 +95,7 @@ MAX_PE_OFFSET = 16 * 1024 * 1024
 ORIGIN = "bomlens:origin"
 ARTIFACT = "bomlens:artifact"
 MARK = "bomlens:declared"
+DIST_URL = "bomlens:distribution-url"
 ORIGINS = ("first-party", "third-party")
 FILENAME = "bsi:component:filename"
 EXECUTABLE = "bsi:component:executable"
@@ -113,6 +132,12 @@ SPDX_ID = re.compile(r"^[A-Za-z0-9.+-]+$")
 PURL = re.compile(r"^pkg:[A-Za-z.+-][A-Za-z0-9.+-]*/.+")
 MIME = re.compile(r"^[-+a-z0-9.]+/[-+a-z0-9.]+$")
 CONTROL = re.compile(r"[\x00-\x1f\x7f]")
+# A '%' that does not start a percent escape (%XX).
+BAD_ESCAPE = re.compile(r"%(?![0-9A-Fa-f]{2})")
+HTTP_URL = re.compile(r"^https?://[^\s<>\"{}|\\^`]+$", re.IGNORECASE)
+# Characters left as they are when a build output path becomes a relative
+# reference (RFC 3987 iri-reference); the rest are percent-encoded.
+PATH_SAFE = "/-._~!$&'()*+,;=:@"
 
 STRING_FIELDS = ("name", "version", "bom-ref", "group", "description", "copyright",
                  "cpe", "purl", "publisher", "author", "mime-type")
@@ -544,9 +569,10 @@ def check_component(comp, where, product_version, problems):
         for entry in comp.get("licenses", []):
             lid = (entry.get("license") or {}).get("id")
             if lid is not None and lid not in known:
-                problems.append("%s: license id '%s' is not on the SPDX license list; write it as "
-                                "{\"license\": {\"name\": \"%s\"}}, or name it LicenseRef-<your-name> in a "
-                                "license name or an expression" % (where, lid, lid))
+                problems.append("%s: license id '%s' is not on the SPDX license list; name it LicenseRef-<name> "
+                                "in a license name ({\"license\": {\"name\": \"LicenseRef-%s\"}}) or in an "
+                                "expression, which BSI TR-03183-2 reads where a plain name is not"
+                                % (where, lid, re.sub(r"[^A-Za-z0-9.-]", "-", lid)))
     if len(problems) > bad:
         return None
     origin = props(comp, ORIGIN)
@@ -560,6 +586,17 @@ def check_component(comp, where, product_version, problems):
         given = props(comp, key)
         if len(given) > 1 or any(v not in values for v in given):
             problems.append("%s: %s must be given once, as %s" % (where, key, " or ".join("'%s'" % v for v in values)))
+    dist = props(comp, DIST_URL)
+    if len(dist) > 1:
+        problems.append("%s: has %s more than once" % (where, DIST_URL))
+    elif dist and not distribution_url_ok(dist[0]):
+        problems.append("%s: %s '%s' is neither an http(s) URL nor a relative path inside the delivery "
+                        "(no spaces, control characters, backslashes, '..', leading '/', scheme, or '%%' "
+                        "that is not a %%XX escape)"
+                        % (where, DIST_URL, dist[0].encode("unicode_escape").decode()))
+    elif dist and len(props(comp, ARTIFACT)) > 1:
+        problems.append("%s: has several bomlens:artifact files, so it cannot give one %s for all of them; "
+                        "each file is named by its own path" % (where, DIST_URL))
     if len(props(comp, ARTIFACT)) > 1 and any(props(comp, key) for key in KIND_VALUES):
         problems.append("%s: has several bomlens:artifact files, so it cannot give one %s value for all of them"
                         % (where, "/".join(KIND_VALUES)))
@@ -571,16 +608,68 @@ def check_component(comp, where, product_version, problems):
     out = copy.deepcopy(comp)
     out["name"] = name
     out["version"] = version or product_version
+    for entry in out.get("licenses", []):
+        target = entry["license"] if "license" in entry else entry
+        target.setdefault("acknowledgement", "concluded")
     # The mark is this step's own; one written in the file is not trusted.
     out["properties"] = [p for p in out.get("properties", []) if p.get("name") != MARK] \
         + [{"name": MARK, "value": "true"}]
     return out
 
 
+def distribution_url_ok(value):
+    """An http(s) URL, or a relative path that stays inside the delivery."""
+    if not value or CONTROL.search(value) or re.search(r"\s", value) or BAD_ESCAPE.search(value):
+        return False
+    if HTTP_URL.match(value):
+        return True
+    if value.startswith("/") or "\\" in value or re.match(r"^[A-Za-z][A-Za-z0-9+.-]*:", value):
+        return False
+    return ".." not in value.split("/")
+
+
+def add_distribution(comp, url, hashes):
+    """Name the deployable file on a distribution reference, with its SHA-512."""
+    refs = comp.setdefault("externalReferences", [])
+    sha512 = [h for h in hashes if h.get("alg") == "SHA-512"]
+    for ref in refs:
+        if ref.get("type") == "distribution" and ref.get("url") == url:
+            if sha512:
+                ref["hashes"] = [h for h in ref.get("hashes") or [] if h.get("alg") != "SHA-512"] + sha512
+            return
+    entry = {"type": "distribution", "url": url}
+    if sha512:
+        entry["hashes"] = sha512
+    refs.append(entry)
+
+
+def path_reference(rel, keep_escapes=False):
+    """A relative path as a relative reference (iri-reference): characters
+    outside PATH_SAFE are percent-encoded (escapes a declaration already
+    wrote are kept when keep_escapes), and a colon in the first segment is
+    put behind "./" so the reference never reads as a scheme."""
+    ref = urllib.parse.quote(rel, safe=PATH_SAFE + ("%" if keep_escapes else ""))
+    if ":" in ref.split("/", 1)[0]:
+        ref = "./" + ref
+    return ref
+
+
+def distribution_reference(value):
+    """The url of a declared bomlens:distribution-url (already checked)."""
+    return value if HTTP_URL.match(value) else path_reference(value, keep_escapes=True)
+
+
 def is_declared(comp):
-    """A component an earlier run of this step added."""
-    return isinstance(comp, dict) and props(comp, MARK) == ["true"] \
-        and len(props(comp, ORIGIN)) == 1 and props(comp, ORIGIN)[0] in ORIGINS
+    """A component that carries this step's mark at all, with any value and
+    any number of times: one an earlier run added, or one that claims to be.
+    Either way it is taken out, so after this step every marked component in
+    the SBOM is one this run wrote (the first-party exemption of the
+    conformance check relies on that)."""
+    if not isinstance(comp, dict):
+        return False
+    properties = comp.get("properties")
+    return isinstance(properties, list) and any(
+        isinstance(p, dict) and p.get("name") == MARK for p in properties)
 
 
 def read_files(files, labels, root, given_root, product, product_version, existing_refs, existing_purls, problems):
@@ -716,7 +805,10 @@ def fill_artifacts(declared):
     for _, comp in declared:
         resolved = comp.pop("_artifacts")
         all_facts = comp.pop("_facts")
+        dist = props(comp, DIST_URL)
         if not resolved:
+            if dist:
+                add_distribution(comp, distribution_reference(dist[0]), [])
             continue
         origin = props(comp, ORIGIN)[0]
         if len(resolved) == 1:
@@ -731,6 +823,7 @@ def fill_artifacts(declared):
             comp["properties"] = [p for p in comp["properties"] if p.get("name") not in (FILENAME,) + tuple(KIND_VALUES)] \
                 + [{"name": FILENAME, "value": os.path.basename(rel)}] \
                 + [{"name": key, "value": kinds[key]} for key in KIND_VALUES]
+            add_distribution(comp, distribution_reference(dist[0]) if dist else path_reference(rel), facts["hashes"])
             continue
         files_out = []
         for (_, rel), facts in zip(resolved, all_facts):
@@ -747,6 +840,7 @@ def fill_artifacts(declared):
             }
             if isinstance(comp.get("supplier"), dict):
                 child["supplier"] = copy.deepcopy(comp["supplier"])
+            add_distribution(child, path_reference(rel), facts["hashes"])
             files_out.append(child)
         comp["components"] = files_out
         comp["properties"] = [p for p in comp["properties"] if p.get("name") != FILENAME]

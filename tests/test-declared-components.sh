@@ -157,6 +157,21 @@ rc="$(apply "$B" "$P" "$P/sbom-declared.cdx.json")"
     && pass "a second run replaces what the first added, byte for byte" \
     || fail "second run: exit $rc" "$(diff "$WORK/once.json" "$B" | head -20)"
 
+echo "== a component of the input that carries the mark in any form is removed =="
+# Whatever value or count: after the step, every marked component is one it
+# wrote, which the conformance check's first-party exemption relies on.
+B="$(new_bom mark)"
+jq '.components += [
+      {"type": "library", "name": "twice", "version": "1", "properties": [{"name": "bomlens:origin", "value": "first-party"},
+         {"name": "bomlens:declared", "value": "true"}, {"name": "bomlens:declared", "value": "true"}]},
+      {"type": "library", "name": "false-mark", "version": "1", "properties": [{"name": "bomlens:declared", "value": "false"}]},
+      {"type": "library", "name": "two-origins", "version": "1", "properties": [{"name": "bomlens:origin", "value": "first-party"},
+         {"name": "bomlens:origin", "value": "first-party"}, {"name": "bomlens:declared", "value": "true"}]}]' "$B" > "$B.tmp" && mv "$B.tmp" "$B"
+rc="$(apply "$B" "$P" "$P/sbom-declared.cdx.json")"
+[ "$rc" = 0 ] && [ "$(jq -c '[.components[].name] | sort' "$B")" = '["media-ctl","media-daemon","vendor-hal","zlib"]' ] \
+    && pass "a duplicated, false or doubly-originated mark is removed with its component" \
+    || fail "marked input: exit $rc" "$(jq -c '[.components[].name]' "$B")"
+
 echo "== a component with several build outputs =="
 P="$(new_project multi)"
 B="$(new_bom multi)"
@@ -467,7 +482,7 @@ refused "a purl that is not a package URL" \
     "component #3 'vendor-hal': purl 'vendor-hal@4.2.0' is not a package URL" \
     "$(variant w8 '.components[2].purl = "vendor-hal@4.2.0"')"
 refused "a license id that is not on the SPDX license list" \
-    "component #3 'vendor-hal': license id 'Proprietary' is not on the SPDX license list; write it as {\"license\": {\"name\": \"Proprietary\"}}, or name it LicenseRef-" \
+    "component #3 'vendor-hal': license id 'Proprietary' is not on the SPDX license list; name it LicenseRef-<name> in a license name ({\"license\": {\"name\": \"LicenseRef-Proprietary\"}})" \
     "$(variant w8a '.components[2].licenses = [{"license": {"id": "Proprietary"}}]')"
 refused "a LicenseRef- written as a license id" \
     "license id 'LicenseRef-ExampleCorp' is not on the SPDX license list" \
@@ -586,6 +601,108 @@ bash "$LIB/validate-sbom.sh" "$WORK/multi-nohash.json" "$WORK/multi-nohash" x >/
     && pass "a file without a hash leaves its component without one in both rows" \
     || fail "partial child hashes" "$(cisa_missing "$WORK/multi-nohash_conformance.json" cisa-component-hash-value)"
 
+echo "== build outputs on distribution references, declared licences concluded =="
+# BSI TR-03183-2 section 8 puts the SHA-512 of the deployable file on an
+# externalReferences entry of type distribution, and gives the distribution
+# licence as "concluded".
+dist_of() {  # <bom> <name>: the distribution references of a component, compact
+    jq -c --arg n "$2" '[.components[] | select(.name == $n) | (.externalReferences // [])[] | select(.type == "distribution")]' "$1"
+}
+d512="$(jq -r '.components[] | select(.name == "media-daemon") | .hashes[] | select(.alg == "SHA-512") | .content' "$WORK/ok.bom.json")"
+[ "$(dist_of "$WORK/ok.bom.json" media-daemon)" = "[{\"type\":\"distribution\",\"url\":\"out/bin/media-daemon\",\"hashes\":[{\"alg\":\"SHA-512\",\"content\":\"$d512\"}]}]" ] \
+  && [ "$(jq -r '.components[] | select(.name == "media-daemon") | [.hashes[].alg] | join("+")' "$WORK/ok.bom.json")" = "SHA-512+SHA-256" ] \
+  && [ "$(dist_of "$WORK/ok.bom.json" vendor-hal)" = "[]" ] \
+    && pass "a build output is named on a distribution reference by its path, with its SHA-512; the component keeps its hashes" \
+    || fail "distribution reference" "$(dist_of "$WORK/ok.bom.json" media-daemon) $(dist_of "$WORK/ok.bom.json" vendor-hal)"
+[ "$(jq -c '[.components[] | select(.name == "media-plugins") | .components[] | .externalReferences[0] | [.url, (.hashes | map(.alg) | join("+"))]]' "$WORK/multi.bom.json")" \
+    = '[["out/bin/media-plugin.so","SHA-512"],["out/pkg/media-plugins.tar.gz","SHA-512"]]' ] \
+  && [ "$(dist_of "$WORK/multi.bom.json" media-plugins)" = "[]" ] \
+    && pass "with several build outputs, each nested file has its own distribution reference" \
+    || fail "nested distribution references" "$(jq -c '.components[] | select(.name == "media-plugins")' "$WORK/multi.bom.json")"
+[ "$(jq -c '[.components[] | select(.name == "media-daemon" or .name == "vendor-hal") | .licenses[0].license.acknowledgement]' "$WORK/ok.bom.json")" = '["concluded","concluded"]' ] \
+    && pass "a declared licence with no acknowledgement is marked concluded" \
+    || fail "concluded licences" "$(jq -c '[.components[] | .licenses]' "$WORK/ok.bom.json")"
+DP="$(new_project distu)"
+B="$(new_bom distu)"
+rc="$(apply "$B" "$DP" "$(variant du1 '.components[0].properties += [{"name": "bomlens:distribution-url", "value": "https://downloads.example.com/media-daemon"}]
+    | .components[2].properties += [{"name": "bomlens:distribution-url", "value": "firmware/hal.bin"}]
+    | .components[2].licenses[0].license.acknowledgement = "declared"
+    | .components[1].licenses = [{"expression": "LicenseRef-ExampleCorp-Proprietary"}]')")"
+[ "$rc" = 0 ] && [ "$(dist_of "$B" media-daemon | jq -r '.[0].url + " " + (.[0].hashes | length | tostring)')" = "https://downloads.example.com/media-daemon 1" ] \
+  && [ "$(dist_of "$B" vendor-hal)" = '[{"type":"distribution","url":"firmware/hal.bin"}]' ] \
+  && [ "$(jq -c '[.components[] | select(.name == "vendor-hal" or .name == "media-ctl") | .licenses[0] | (.license.acknowledgement // .acknowledgement)]' "$B")" = '["concluded","declared"]' ] \
+    && pass "bomlens:distribution-url names the reference (with no build output, without a hash); an acknowledgement the declaration gives is kept" \
+    || fail "distribution-url: exit $rc" "$(dist_of "$B" media-daemon) $(dist_of "$B" vendor-hal) $(cat "$B.log")"
+refused "a distribution URL with another scheme" \
+    "sbom-declared.cdx.json: component #1 'media-daemon': bomlens:distribution-url 'file:///etc/passwd' is neither an http(s) URL nor a relative path" \
+    "$(variant du2 '.components[0].properties += [{"name": "bomlens:distribution-url", "value": "file:///etc/passwd"}]')"
+refused "a distribution path that leaves the delivery" \
+    "bomlens:distribution-url 'out/../../x' is neither an http(s) URL nor a relative path" \
+    "$(variant du3 '.components[0].properties += [{"name": "bomlens:distribution-url", "value": "out/../../x"}]')"
+refused "a distribution URL with a control character" \
+    "bomlens:distribution-url 'https://e.example/a\\nb' is neither" \
+    "$(variant du4 '.components[0].properties += [{"name": "bomlens:distribution-url", "value": "https://e.example/a\nb"}]')"
+# A colon in the first segment of a path is put behind "./", so the
+# reference does not read as a scheme; a percent escape already written is
+# kept, other characters are encoded; a '%' that starts no escape is refused.
+CP="$(new_project colon)"
+mkdir -p "$CP/build:1"
+write_elf "$CP/build:1/tool bin"
+B="$(new_bom colon)"
+rc="$(apply "$B" "$CP" "$(variant du6 '.components[0].properties[1].value = "build:1/tool bin"
+    | .components[1].properties += [{"name": "bomlens:distribution-url", "value": "dl/media%20ctl.exe"}]')")"
+[ "$rc" = 0 ] && [ "$(dist_of "$B" media-daemon | jq -r '.[0].url')" = "./build:1/tool%20bin" ] \
+  && [ "$(dist_of "$B" media-ctl | jq -r '.[0].url')" = "dl/media%20ctl.exe" ] \
+    && pass "a path with a colon in its first segment is written as ./build:1/tool%20bin; an escape the declaration wrote is kept" \
+    || fail "path references: exit $rc" "$(dist_of "$B" media-daemon) $(dist_of "$B" media-ctl) $(cat "$B.log")"
+refused "a distribution path with a stray percent sign" \
+    "bomlens:distribution-url 'dl/100%' is neither" \
+    "$(variant du7 '.components[0].properties += [{"name": "bomlens:distribution-url", "value": "dl/100%"}]')"
+refused "two distribution URLs" \
+    "component #1 'media-daemon': has bomlens:distribution-url more than once" \
+    "$(variant du5 '.components[0].properties += [{"name": "bomlens:distribution-url", "value": "a"}, {"name": "bomlens:distribution-url", "value": "b"}]')"
+
+echo "== the bsi-tr-03183-2 profile on the fixture =="
+# As declared, the fixture's components give their licence as a name
+# ("Proprietary") rather than an SPDX identifier or LicenseRef-, the HAL's
+# supplier has no URL, the SBOM names no creator, and the product has no
+# supplier or licence: those rows fail, by component. The stage 1 SBOM states
+# no graph completeness, so that row warns. The file rows pass on what the
+# build outputs gave.
+bsi_rows() {  # <conformance.json>: id=status:missing, one per bsi-* row
+    jq -r '.checks[] | select(.id | startswith("bsi-")) | "\(.id)=\(.status):\(.missing | join(","))"' "$1" 2>/dev/null
+}
+CONFORMANCE_PROFILE=bsi-tr-03183-2 bash "$LIB/validate-sbom.sh" "$WORK/ok.bom.json" "$WORK/bsi-ok" x >/dev/null 2>&1
+want_bsi='bsi-sbom-creator=fail:
+bsi-dependency-graph=warn:
+bsi-dependency-entries=pass:
+bsi-primary-component=fail:MediaSuite@3.1.0: creator, concluded licence
+bsi-primary-component-file=warn:
+bsi-declared-creator=fail:vendor-hal@4.2.0
+bsi-declared-name-version=pass:
+bsi-declared-license=fail:media-daemon@3.1.0,media-ctl@2.0.1
+bsi-declared-filename=pass:
+bsi-declared-sha512=pass:
+bsi-declared-file-properties=pass:
+bsi-declared-without-file=warn:vendor-hal@4.2.0
+bsi-scanned-components=warn:zlib@1.3.1: creator, filename, SHA-512, file properties, concluded licence'
+[ "$(bsi_rows "$WORK/bsi-ok_conformance.json")" = "$want_bsi" ] \
+    && pass "bsi-tr-03183-2 names, row by row, which declared component misses what; zlib is advisory" \
+    || fail "bsi rows on the fixture" "$(bsi_rows "$WORK/bsi-ok_conformance.json")"
+# The fixture passing the profile, once its declarations carry the BSI
+# fields, is checked through entrypoint.sh below.
+# skt-submission, in a scan where the declaration step ran: the two
+# first-party programs carry a supplier and SHA-512, so they need no purl and
+# are listed as exempted; the third-party HAL does. Without that step in the
+# scan (or under --analyze) nothing is exempted.
+DECLARED_COMPONENTS_APPLIED=1 MODE=SOURCE CONFORMANCE_PROFILE=skt-submission bash "$LIB/validate-sbom.sh" "$WORK/ok.bom.json" "$WORK/skt-ok" x >/dev/null 2>&1
+CONFORMANCE_PROFILE=skt-submission bash "$LIB/validate-sbom.sh" "$WORK/ok.bom.json" "$WORK/skt-no" x >/dev/null 2>&1
+[ "$(jq -c '.checks[] | select(.id == "purl") | [.status, .missing]' "$WORK/skt-ok_conformance.json" 2>/dev/null)" = '["fail",["vendor-hal"]]' ] \
+  && [ "$(jq -c '.checks[] | select(.id == "first-party-exempt") | .missing' "$WORK/skt-ok_conformance.json" 2>/dev/null)" = '["media-daemon@3.1.0","media-ctl@2.0.1"]' ] \
+  && [ "$(jq -c '.checks[] | select(.id == "purl") | .missing' "$WORK/skt-no_conformance.json" 2>/dev/null)" = '["media-daemon","media-ctl","vendor-hal"]' ] \
+    && pass "skt-submission asks a purl of the third-party HAL only, and lists the exempted programs, in a scan that applied the declaration" \
+    || fail "skt-submission on the fixture" "$(jq -c '[.checks[] | select(.id == "purl" or .id == "first-party-exempt")]' "$WORK/skt-ok_conformance.json" "$WORK/skt-no_conformance.json" 2>&1)"
+
 echo "== SPDX 2.3 export keeps the declared components' checksums and files =="
 if command -v syft >/dev/null 2>&1; then
     bash "$LIB/convert-to-spdx.sh" "$WORK/ok.bom.json" "$WORK/ok.spdx.json" --stable >/dev/null 2>&1
@@ -668,7 +785,7 @@ run_entry() {
     local name="$1" src="$2" out="$WORK/$1.out" rc=0
     shift 2
     mkdir -p "$out"
-    jq '.metadata.component.name = "project" | .metadata.component.version = "latest"' "$FIX/stage1-bom.json" > "$out/MediaSuite_3.1.0_bom.json"
+    jq '.metadata.component.name = "project" | .metadata.component.version = "latest"' "${RUN_ENTRY_INPUT:-$FIX/stage1-bom.json}" > "$out/MediaSuite_3.1.0_bom.json"
     ( cd "$out" && env PATH="$WORK/bin:$PATH" MODE=POSTPROCESS PROJECT_NAME=MediaSuite PROJECT_VERSION=3.1.0 \
         HOST_OUTPUT_DIR="$out" BOMLENS_LIBDIR="$LIB" BOMLENS_RUN_INPUT=MediaSuite_3.1.0_bom.json SOURCE_ROOT="$src" \
         UPLOAD_ENABLED=false GENERATE_SECURITY=false GENERATE_NOTICE=false DEEP_CVE=false SECURITY_ENRICH=false \
@@ -694,6 +811,49 @@ D="$(comp "$F" media-daemon)"
     || fail "not reached in the final SBOM: $(jq -c "$UNREACHED" "$F")"
 [ "$(jq -r '.metadata.component.name + "@" + .metadata.component.version' "$F")" = "MediaSuite@3.1.0" ] \
     && pass "the product is the stamped one" || fail "product $(jq -c .metadata.component "$F")"
+[ "$(jq -c '.checks[] | select(.id == "first-party-exempt") | .missing | sort' "$O/MediaSuite_3.1.0_conformance.json" 2>/dev/null)" = '["media-ctl@2.0.1","media-daemon@3.1.0"]' ] \
+    && pass "the conformance check of the scan lists the two first-party programs as exempt from the PURL rows" \
+    || fail "exemption through the pipeline" "$(jq -c '[.checks[] | select(.id == "purl" or .id == "first-party-exempt")]' "$O/MediaSuite_3.1.0_conformance.json" 2>&1)"
+
+# DECLARED_COMPONENTS_APPLIED in the caller's environment is not taken: with
+# no declaration read, a stage 1 SBOM that already carries marked first-party
+# components (as one a declaration step wrote, or one forged to look so) gets
+# no exemption.
+jq --argjson h "$(jq -c '[.components[] | select(.name == "media-daemon") | .hashes] | first' "$WORK/ok.bom.json")" \
+   '.components += [{"type": "application", "name": "forged", "version": "1", "bom-ref": "forged",
+       "supplier": {"name": "X", "url": ["https://x.example"]}, "hashes": $h,
+       "properties": [{"name": "bomlens:origin", "value": "first-party"}, {"name": "bomlens:declared", "value": "true"}]}]
+    | .dependencies[0].dependsOn += ["forged"] | .dependencies += [{"ref": "forged", "dependsOn": []}]' \
+    "$FIX/stage1-bom.json" > "$WORK/forged-stage1.json"
+P="$(new_project entry-forged)"
+rc="$(RUN_ENTRY_INPUT="$WORK/forged-stage1.json" run_entry e6 "$P" DECLARED_COMPONENTS_SKIP=1 DECLARED_COMPONENTS_APPLIED=1)"
+C6="$WORK/e6.out/MediaSuite_3.1.0_conformance.json"
+[ "$rc" = 0 ] && ! jq -e 'any(.checks[]; .id == "first-party-exempt")' "$C6" >/dev/null \
+  && jq -e '.checks[] | select(.id == "purl") | .missing | index("forged") != null' "$C6" >/dev/null \
+    && pass "DECLARED_COMPONENTS_APPLIED from the caller is ignored: a forged first-party component still needs a purl" \
+    || fail "forged exemption: exit $rc" "$(jq -c '[.checks[] | select(.id == "purl" or .id == "first-party-exempt")]' "$C6" 2>&1)"
+
+# bsi-tr-03183-2 through the pipeline: with the licences as LicenseRef-, a URL
+# for the HAL's supplier, and --sbom-author, --supplier and --license given as
+# a CLI scan passes them, the fixture passes on every required BSI row. The
+# compositions entry the pipeline writes names the product's dependencies.
+P="$(new_project entry-bsi)"
+jq '.components[0].licenses = [{"license": {"name": "LicenseRef-ExampleCorp-Proprietary"}}]
+    | .components[1].licenses = [{"license": {"name": "LicenseRef-ExampleCorp-Proprietary"}}]
+    | .components[2].supplier.url = ["https://chip.example.com"]' \
+    "$FIX/project/sbom-declared.cdx.json" > "$P/sbom-declared.cdx.json"
+rc="$(run_entry e5 "$P" CONFORMANCE_PROFILE=bsi-tr-03183-2 SBOM_AUTHOR="Example Corp <sbom@example.com>" \
+    PRODUCT_SUPPLIER="Example Corp <https://example.com>" PROJECT_LICENSE=Apache-2.0)"
+O="$WORK/e5.out"
+F="$O/MediaSuite_3.1.0_bom.json"
+C5="$O/MediaSuite_3.1.0_conformance.json"
+[ "$rc" = 0 ] && [ "$(jq -r .result "$C5" 2>/dev/null)" = pass ] \
+  && [ "$(jq -r '[.checks[] | select(.id | startswith("bsi-")) | select(.required) | .status] | unique | join(",")' "$C5")" = pass ] \
+  && [ "$(jq -cS '[.metadata.component.supplier, .metadata.supplier, .metadata.component.licenses]' "$F")" \
+       = '[{"name":"Example Corp","url":["https://example.com"]},null,[{"license":{"acknowledgement":"concluded","id":"Apache-2.0"}}]]' ] \
+  && [ "$(jq -c '.compositions[0].dependencies == ([.dependencies[].ref] | unique)' "$F")" = true ] \
+    && pass "the fixture passes bsi-tr-03183-2 through the pipeline with --supplier, --sbom-author and --license" \
+    || fail "bsi through the pipeline: exit $rc" "$(jq -c '[.result, (.checks[] | select(.required and .status != "pass") | [.id, .detail, .missing])]' "$C5" 2>&1) $(jq -c '[.metadata.component["bom-ref"], .metadata.supplier, .metadata.component.licenses, .compositions]' "$F" 2>&1)"
 
 cat > "$WORK/given.cdx.json" <<'EOF'
 {"bomFormat": "CycloneDX", "components": [{"type": "firmware", "name": "dsp-blob", "version": "7",
@@ -815,6 +975,9 @@ if [ "${BOMLENS_CDX_SCHEMA:-}" = "1" ] || command -v cyclonedx >/dev/null 2>&1 |
     cp "$WORK/ok.bom.json" "$WORK/cdx/declared.json"
     cp "$WORK/multi.bom.json" "$WORK/cdx/multi.json"
     cp "$WORK/deps.bom.json" "$WORK/cdx/deps.json"
+    cp "$WORK/distu.bom.json" "$WORK/cdx/distu.json"
+    cp "$WORK/colon.bom.json" "$WORK/cdx/colon.json"
+    cp "$WORK/e5.out/MediaSuite_3.1.0_bom.json" "$WORK/cdx/bsi-final.json"
     cp "$WORK/e1.out/MediaSuite_3.1.0_bom.json" "$WORK/cdx/final.json"
     if cdxout=$(bash "$ROOT_DIR/scripts/check-cdx-schema.sh" "$WORK"/cdx/*.json 2>&1); then
         pass "SBOMs with declared components validate against the CycloneDX 1.6 schema"

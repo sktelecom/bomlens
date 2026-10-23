@@ -163,6 +163,7 @@ export function NewScan({
   const formatOptionsOn = [
     state.outboundLicense.trim() !== "",
     state.sbomAuthor.trim() !== "",
+    state.supplier.trim() !== "",
     state.specVersion !== "1.6",
     state.conformanceProfile !== "default",
   ].filter(Boolean).length;

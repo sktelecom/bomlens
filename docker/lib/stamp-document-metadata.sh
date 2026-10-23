@@ -97,7 +97,11 @@ SBOM_AUTHOR="${SBOM_AUTHOR:-}"
 AUTHORS_JSON="[]"
 AUTHOR_SOURCE=""
 if [ -n "$SBOM_AUTHOR" ]; then
-    AUTHORS_JSON=$(jq -cn --arg a "$SBOM_AUTHOR" '[{name: $a}]')
+    # "Name <address>" gives the author an email as well, which BSI
+    # TR-03183-2 (5.2.1) asks of the SBOM creator. Anything else is the name.
+    AUTHORS_JSON=$(jq -cn --arg a "$SBOM_AUTHOR" '
+        (($a | capture("^\\s*(?<n>[^<>]*[^<>\\s])\\s*<(?<e>[^<>\\s@]+@[^<>\\s@]+)>\\s*$")?) // null) as $m
+        | if $m then [{name: $m.n, email: $m.e}] else [{name: $a}] end')
 elif [ "$MODE" = "AIDECLARE" ] && [ -n "${AI_DECLARATION_FILE:-}" ] && [ -f "$AI_DECLARATION_FILE" ]; then
     _declared=$(jq -c '[(.document.createdBy // [])[]? | objects | .name | strings
                         | gsub("^\\s+|\\s+$"; "") | select(length > 0) | {name: .}]
@@ -106,6 +110,34 @@ elif [ "$MODE" = "AIDECLARE" ] && [ -n "${AI_DECLARATION_FILE:-}" ] && [ -f "$AI
     if [ -n "$_declared" ] && [ "$_declared" != "[]" ]; then
         AUTHORS_JSON="$_declared"
         AUTHOR_SOURCE="declaration"
+    fi
+fi
+
+# The product's supplier (--supplier, PRODUCT_SUPPLIER): the organisation that
+# supplies the product this SBOM describes, which BSI TR-03183-2 asks of every
+# component, the primary one included, with an email address or URL. Like the
+# author, nothing in a scan can discover it. "Name <https://...>" gives it a
+# url, "Name <address@host>" a contact email, a bare value only a name, and
+# "<https://...>" or "<address@host>" alone the url or email without a name.
+# It is written to metadata.component.supplier only, and replaces what a
+# generator wrote there: the caller said who it is. metadata.supplier is left
+# alone, because the SBOM-author checks read it and the product's supplier is
+# not the SBOM's author. A value that is empty after trimming writes nothing.
+# ANALYZE never reaches this file, so a received SBOM's supplier is kept.
+PRODUCT_SUPPLIER="${PRODUCT_SUPPLIER:-}"
+SUPPLIER_JSON="null"
+if [ -n "$PRODUCT_SUPPLIER" ]; then
+    SUPPLIER_JSON=$(jq -cn --arg s "$PRODUCT_SUPPLIER" '
+        ($s | gsub("^\\s+|\\s+$"; "")) as $t
+        | (($t | capture("^(?<n>[^<>]*?)\\s*<(?<c>[^<>\\s]+)>$")?) // null) as $m
+        | (if $m == null or $m.n == "" then {} else {name: $m.n} end) as $nm
+        | if $t == "" then null
+          elif $m == null then {name: $t}
+          elif ($m.c | test("^https?://[^\\s<>\"]+$"; "i")) then $nm + {url: [$m.c]}
+          elif ($m.c | test("^[^@\\s]+@[^@\\s]+$")) then $nm + {contact: [{email: $m.c}]}
+          else {name: $t} end') || SUPPLIER_JSON="null"
+    if [ "$SUPPLIER_JSON" != "null" ] && ! printf '%s' "$SUPPLIER_JSON" | jq -e 'has("url") or has("contact")' >/dev/null 2>&1; then
+        echo "[docmeta] WARN: --supplier '$PRODUCT_SUPPLIER' gives no URL or email; write it as \"Name <https://...>\" or \"Name <address@host>\" (BSI TR-03183-2 asks for one)." >&2
     fi
 fi
 
@@ -169,7 +201,7 @@ fi
 TMP="$(mktemp)"
 if jq --arg lifecycle "$LIFECYCLE" \
       --arg spec "$CDX_SPEC_VERSION" \
-      --argjson authors "$AUTHORS_JSON" \
+      --argjson authors "$AUTHORS_JSON" --argjson supplier "$SUPPLIER_JSON" \
       --arg authorsource "$AUTHOR_SOURCE" \
       --arg toolver "$TOOL_VERSION" \
       --arg undeclared "$UNDECLARED_POLICY" \
@@ -216,6 +248,9 @@ if jq --arg lifecycle "$LIFECYCLE" \
     | (if ($authors | length) > 0
        then .metadata.authors = $authors
        else (.metadata) |= del(.authors) end)
+    | (if $supplier != null and ((.metadata.component | type) == "object")
+       then .metadata.component.supplier = $supplier
+       else . end)
     # An existing hash is left alone: a scanner that already recorded one was
     # looking at the same artifact and may have used a different algorithm.
     | (if $artifactsha != "" and (((.metadata.component.hashes // []) | length) == 0)

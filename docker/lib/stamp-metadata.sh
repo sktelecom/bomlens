@@ -24,8 +24,12 @@
 # source scan cannot infer it: cdxgen leaves metadata.component.licenses empty for
 # maven and gradle trees (only npm fills it, from package.json), so without a
 # declaration the license-conflict check has nothing to compare dependencies
-# against. Only ever FILLS an empty value — an existing root license is left alone,
-# and the modes that carry a supplier's own root component (ANALYZE/MERGE) do not
+# against. Given with --license, it is the licence the product is distributed
+# under: it replaces the root licence the generator read and is written with
+# "acknowledgement": "concluded", as BSI TR-03183-2 gives the distribution
+# licence. Read from the project manifest by entrypoint.sh
+# (PROJECT_LICENSE_FROM_MANIFEST=1), it only fills an empty value, as "declared".
+# The modes that carry a supplier's own root component (ANALYZE/MERGE) do not
 # call this file at all, so a received SBOM's declaration can never be overwritten.
 set -e
 
@@ -52,7 +56,7 @@ if ! jq empty "$SBOM" 2>/dev/null; then
 fi
 
 TMP="$(mktemp)"
-if jq --arg n "$NAME" --arg v "$VERSION" --arg lic "${PROJECT_LICENSE:-}" \
+if jq --arg n "$NAME" --arg v "$VERSION" --arg lic "${PROJECT_LICENSE:-}" --arg manifest "${PROJECT_LICENSE_FROM_MANIFEST:-}" \
     '.metadata.component.name = $n
      | .metadata.component.version = $v
      | (.metadata.component) |= del(.purl)
@@ -60,8 +64,15 @@ if jq --arg n "$NAME" --arg v "$VERSION" --arg lic "${PROJECT_LICENSE:-}" \
      # at all for a tree with no dependencies, so the root built above would
      # otherwise carry only a name and version and fail schema validation.
      | (if ((.metadata.component.type // "") == "") then .metadata.component.type = "application" else . end)
-     | (if $lic != "" and (((.metadata.component.licenses // []) | length) == 0)
-        then .metadata.component.licenses = [{license: {id: $lic}}]
+     # Given with --license, it is the licence the user states the product
+     # is distributed under: it replaces what the generator read and is
+     # marked concluded. Read from the manifest instead (entrypoint.sh sets
+     # PROJECT_LICENSE_FROM_MANIFEST=1), it only fills an empty value and is
+     # what the project declares.
+     | (if $lic == "" then .
+        elif $manifest != "1" then .metadata.component.licenses = [{license: {id: $lic, acknowledgement: "concluded"}}]
+        elif (((.metadata.component.licenses // []) | length) == 0)
+        then .metadata.component.licenses = [{license: {id: $lic, acknowledgement: "declared"}}]
         else . end)' \
     "$SBOM" > "$TMP" 2>/dev/null; then
     mv "$TMP" "$SBOM"
@@ -70,7 +81,7 @@ if jq --arg n "$NAME" --arg v "$VERSION" --arg lic "${PROJECT_LICENSE:-}" \
         if jq -e '((.metadata.component.licenses // [])[0].license.id // "") == $ENV.PROJECT_LICENSE' "$SBOM" >/dev/null 2>&1; then
             echo "[stamp] outbound license declared: ${PROJECT_LICENSE} (drives the license-conflict check)"
         else
-            echo "[stamp] outbound license already present in the SBOM; PROJECT_LICENSE=${PROJECT_LICENSE} not applied"
+            echo "[stamp] outbound license read from the manifest (${PROJECT_LICENSE}) not applied: the SBOM already names one; pass --license to replace it"
         fi
     fi
 else

@@ -675,6 +675,10 @@ export interface ScanConfig {
   /** The SBOM author declared for this scan (CycloneDX metadata.authors).
    *  Empty or absent means none was declared. */
   sbomAuthor?: string;
+  /** The product supplier declared for this scan (CycloneDX
+   *  metadata.component.supplier), as "Name <url-or-email>". Empty or absent
+   *  means none was declared. */
+  supplier?: string;
   /** The CycloneDX version this scan was asked to write ("1.6" or "1.7").
    *  Absent on scans that predate the option, which wrote 1.6. */
   specVersion?: string;
@@ -807,11 +811,12 @@ export const USAGE_CONTEXTS: UsageContext[] = [
  *  submission review (100% PURL, pkg:generic required). Kept as a named
  *  profile rather than a boolean so a later addition (e.g. an EU CRA
  *  profile) is a third option here, not a rewrite of the contract. */
-export type ConformanceProfile = "default" | "skt-submission";
+export type ConformanceProfile = "default" | "skt-submission" | "bsi-tr-03183-2";
 
 export const CONFORMANCE_PROFILES: ConformanceProfile[] = [
   "default",
   "skt-submission",
+  "bsi-tr-03183-2",
 ];
 
 /** CycloneDX version the scan writes the SBOM as (the CLI's --spec-version).
@@ -854,6 +859,12 @@ export interface ScanParams {
    *  for ANALYZE (see showSbomAuthor): that mode converts a document someone
    *  else authored. */
   sbomAuthor?: string;
+  /** The organisation that supplies the product this SBOM describes
+   *  (CycloneDX metadata.component.supplier), as "Name <https://url>" or
+   *  "Name <email>". Read server-side as the exact `supplier` parameter; empty
+   *  leaves the SBOM's own value. Hidden for ANALYZE, like sbomAuthor: that
+   *  mode keeps the received SBOM's supplier. */
+  supplier?: string;
   /** CycloneDX version of the SBOM. Read server-side as the exact
    *  `spec_version` parameter; empty means the default, 1.6, and any value
    *  other than "1.6"/"1.7" is refused with a 400. Hidden for ANALYZE (see
@@ -1671,6 +1682,7 @@ export function startScan(params: ScanParams, handlers: ScanHandlers): EventSour
     conformance_profile: params.conformanceProfile ?? "",
     license: params.license ?? "",
     sbom_author: params.sbomAuthor ?? "",
+    supplier: params.supplier ?? "",
     spec_version: params.specVersion ?? "",
     lang: params.lang ?? "",
     usage: params.usage ?? "",

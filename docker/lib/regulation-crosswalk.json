@@ -139,6 +139,48 @@
         "basis": "required per-component fields: the executable, archive and structured properties, each determined by inspecting the delivered file"
       }
     ],
+    "bsi-sbom-creator": [
+      { "framework": "bsi-tr-03183-2", "ref": "Section 5.2.1", "basis": "required SBOM-level field: creator of the SBOM, given as an email address or URL" }
+    ],
+    "bsi-dependency-graph": [
+      { "framework": "bsi-tr-03183-2", "ref": "Section 5.2.2", "basis": "required per-component field: dependencies on other components, resolved recursively within the scope of delivery" }
+    ],
+    "bsi-declared-creator": [
+      { "framework": "bsi-tr-03183-2", "ref": "Section 5.2.2", "basis": "required per-component field: component creator, given as an email address or URL" }
+    ],
+    "bsi-declared-name-version": [
+      { "framework": "bsi-tr-03183-2", "ref": "Section 5.2.2", "basis": "required per-component fields: component name and component version" }
+    ],
+    "bsi-declared-license": [
+      { "framework": "bsi-tr-03183-2", "ref": "Section 5.2.2", "basis": "required per-component field: the distribution licence, given as an SPDX identifier or expression" }
+    ],
+    "bsi-declared-filename": [
+      { "framework": "bsi-tr-03183-2", "ref": "Section 5.2.2", "basis": "required per-component field: the actual filename of the component" }
+    ],
+    "bsi-declared-sha512": [
+      { "framework": "bsi-tr-03183-2", "ref": "Section 5.2.2", "basis": "required per-component field: SHA-512 of the deployable component" }
+    ],
+    "bsi-declared-file-properties": [
+      { "framework": "bsi-tr-03183-2", "ref": "Section 5.2.2", "basis": "required per-component fields: the executable, archive and structured properties" }
+    ],
+    "bsi-declared-without-file": [
+      { "framework": "bsi-tr-03183-2", "ref": "Section 5.2.2", "basis": "per-component file fields, which a library linked into another component has no file of its own to carry" }
+    ],
+    "bsi-dependency-entries": [
+      { "framework": "bsi-tr-03183-2", "ref": "Section 5.2.2", "basis": "dependencies on other components, enumerated for every component, a leaf included" }
+    ],
+    "bsi-primary-component": [
+      { "framework": "bsi-tr-03183-2", "ref": "Section 5.2.2", "basis": "the required per-component fields, for the primary component the SBOM describes" }
+    ],
+    "bsi-primary-component-file": [
+      { "framework": "bsi-tr-03183-2", "ref": "Section 5.2.2", "basis": "filename, SHA-512 and file properties of the primary component's deployable file" }
+    ],
+    "bsi-evaluation": [
+      { "framework": "bsi-tr-03183-2", "ref": "Section 4; 5.2", "basis": "the SBOM-level and per-component fields, which could not be measured on this document" }
+    ],
+    "bsi-scanned-components": [
+      { "framework": "bsi-tr-03183-2", "ref": "Section 5.2.2", "basis": "the same per-component fields, measured on the components the scan found" }
+    ],
     "g7-slp-name": [
       {
         "framework": "eu-ai-act",
