@@ -15,7 +15,7 @@
   "conformance.pipeline_steps_more": "외 %s개",
   "conformance.submit_file": "제출할 파일은 %s 하나입니다. 출력 폴더의 다른 파일은 확인용입니다.",
   "conformance.bsi_profile_note": "BSI TR-03183-2 v2.1.0: 5.2.2절 필드는 선언 파일로 추가한 구성요소(bomlens:origin)에 필수이고, 스캔이 찾은 구성요소에는 권고로서 개수와 함께 보고합니다.",
-  "conformance.submit_judged_as":"BomLens 펌웨어, 루트 파일시스템, 바이너리, Yocto 빌드 스캔 SBOM(%s)으로 판정해 일부 일반 항목을 경고로 표시했습니다.",
+  "conformance.submit_judged_as": "BomLens 펌웨어, 루트 파일시스템, 바이너리, Yocto 빌드 스캔 SBOM(%s)으로 판정해 일부 일반 항목을 경고로 표시했습니다.",
   "conformance.meta_project": "프로젝트",
   "conformance.meta_generated": "생성 시각",
   "conformance.meta_format": "형식",

@@ -27,6 +27,9 @@
 # against. Only ever FILLS an empty value — an existing root license is left alone,
 # and the modes that carry a supplier's own root component (ANALYZE/MERGE) do not
 # call this file at all, so a received SBOM's declaration can never be overwritten.
+# The outbound license is the one the product is distributed under, so it is
+# written with "acknowledgement": "concluded", as BSI TR-03183-2 gives the
+# distribution licence.
 set -e
 
 SBOM="$1"
@@ -61,7 +64,7 @@ if jq --arg n "$NAME" --arg v "$VERSION" --arg lic "${PROJECT_LICENSE:-}" \
      # otherwise carry only a name and version and fail schema validation.
      | (if ((.metadata.component.type // "") == "") then .metadata.component.type = "application" else . end)
      | (if $lic != "" and (((.metadata.component.licenses // []) | length) == 0)
-        then .metadata.component.licenses = [{license: {id: $lic}}]
+        then .metadata.component.licenses = [{license: {id: $lic, acknowledgement: "concluded"}}]
         else . end)' \
     "$SBOM" > "$TMP" 2>/dev/null; then
     mv "$TMP" "$SBOM"

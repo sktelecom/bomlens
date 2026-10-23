@@ -1373,9 +1373,12 @@ unknown=$(comm -23 <(jq -r '.map | keys[] | select(startswith("g7-"))' "$XW" | s
 [ -z "$unknown" ] && pass "every crosswalk G7 element id exists in g7-registry.json" || fail "crosswalk maps unknown G7 element id(s)" "$unknown"
 # The bsi-* rows are emitted under the bsi-tr-03183-2 profile only, so their
 # ids are read from a run under that profile.
+# bsi-evaluation appears only on a document the bsi-* rows cannot measure, so
+# an SPDX 2.3 one is run too.
 CONFORMANCE_PROFILE=bsi-tr-03183-2 bash "$LIB/validate-sbom.sh" "$FIX/aibom-owasp-1_7.json" "$WORK/conf-bsi" "bert-base-uncased" >/dev/null 2>&1
+CONFORMANCE_PROFILE=bsi-tr-03183-2 bash "$LIB/validate-sbom.sh" "$FIX/good-spdx.json" "$WORK/conf-bsi-spdx" "x" >/dev/null 2>&1
 unknown_chk=$(comm -23 <(jq -r '.map | keys[] | select(startswith("g7-") | not)' "$XW" | sort -u) \
-                       <(jq -r '.checks[].id' "$CONF" "$WORK/conf-bsi_conformance.json" | sort -u))
+                       <(jq -r '.checks[].id' "$CONF" "$WORK/conf-bsi_conformance.json" "$WORK/conf-bsi-spdx_conformance.json" | sort -u))
 [ -z "$unknown_chk" ] && pass "every non-G7 crosswalk id is a check validate-sbom.sh emits" || fail "crosswalk maps unknown check id(s)" "$unknown_chk"
 undecl=$(comm -23 <(jq -r '.map[][].framework' "$XW" | sort -u) \
                   <(jq -r '.frameworks | keys[]' "$XW" | sort -u))

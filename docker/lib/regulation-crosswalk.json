@@ -163,6 +163,21 @@
     "bsi-declared-file-properties": [
       { "framework": "bsi-tr-03183-2", "ref": "Section 5.2.2", "basis": "required per-component fields: the executable, archive and structured properties" }
     ],
+    "bsi-declared-without-file": [
+      { "framework": "bsi-tr-03183-2", "ref": "Section 5.2.2", "basis": "per-component file fields, which a library linked into another component has no file of its own to carry" }
+    ],
+    "bsi-dependency-entries": [
+      { "framework": "bsi-tr-03183-2", "ref": "Section 5.2.2", "basis": "dependencies on other components, enumerated for every component, a leaf included" }
+    ],
+    "bsi-primary-component": [
+      { "framework": "bsi-tr-03183-2", "ref": "Section 5.2.2", "basis": "the required per-component fields, for the primary component the SBOM describes" }
+    ],
+    "bsi-primary-component-file": [
+      { "framework": "bsi-tr-03183-2", "ref": "Section 5.2.2", "basis": "filename, SHA-512 and file properties of the primary component's deployable file" }
+    ],
+    "bsi-evaluation": [
+      { "framework": "bsi-tr-03183-2", "ref": "Section 4; 5.2", "basis": "the SBOM-level and per-component fields, which could not be measured on this document" }
+    ],
     "bsi-scanned-components": [
       { "framework": "bsi-tr-03183-2", "ref": "Section 5.2.2", "basis": "the same per-component fields, measured on the components the scan found" }
     ],

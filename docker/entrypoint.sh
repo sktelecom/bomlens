@@ -1658,6 +1658,12 @@ esac
 # that picks up _bom.json cannot take it for the result. --no-components
 # (DECLARED_COMPONENTS_SKIP=1) leaves the default file unread.
 # Recorded only when there is a file to read.
+#
+# DECLARED_COMPONENTS_APPLIED=1 tells the conformance check that the
+# components marked bomlens:declared were written by this step in this run,
+# which the first-party exemption from the PURL rows relies on
+# (validate-sbom.sh). It is never taken from the caller's environment.
+unset DECLARED_COMPONENTS_APPLIED
 case "$SCAN_MODE" in
     SOURCE|POSTPROCESS)
         _dc_root="${SOURCE_ROOT:-/src}"
@@ -1684,6 +1690,7 @@ case "$SCAN_MODE" in
                 _dc_count="$(jq '[.components[]? | select(any(.properties[]?; .name == "bomlens:declared" and .value == "true"))] | length' "$OUTPUT_FILE" 2>/dev/null || echo 0)"
                 er_record declared-components ok "" "" "$ER_PHASE_STARTED" "" "{\"components\":${_dc_count:-0}}"
                 er_phase_end
+                export DECLARED_COMPONENTS_APPLIED=1
             else
                 _dc_first="$(sed -n 's/^\[declared-components\] ERROR: //p' "$_dc_err" | head -n 1)"
                 er_record declared-components failed failed "${_dc_first:-the declaration could not be applied}" "$ER_PHASE_STARTED"

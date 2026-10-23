@@ -130,6 +130,8 @@ SPDX_ID = re.compile(r"^[A-Za-z0-9.+-]+$")
 PURL = re.compile(r"^pkg:[A-Za-z.+-][A-Za-z0-9.+-]*/.+")
 MIME = re.compile(r"^[-+a-z0-9.]+/[-+a-z0-9.]+$")
 CONTROL = re.compile(r"[\x00-\x1f\x7f]")
+# A '%' that does not start a percent escape (%XX).
+BAD_ESCAPE = re.compile(r"%(?![0-9A-Fa-f]{2})")
 HTTP_URL = re.compile(r"^https?://[^\s<>\"{}|\\^`]+$", re.IGNORECASE)
 # Characters left as they are when a build output path becomes a relative
 # reference (RFC 3987 iri-reference); the rest are percent-encoded.
@@ -565,9 +567,10 @@ def check_component(comp, where, product_version, problems):
         for entry in comp.get("licenses", []):
             lid = (entry.get("license") or {}).get("id")
             if lid is not None and lid not in known:
-                problems.append("%s: license id '%s' is not on the SPDX license list; write it as "
-                                "{\"license\": {\"name\": \"%s\"}}, or name it LicenseRef-<your-name> in a "
-                                "license name or an expression" % (where, lid, lid))
+                problems.append("%s: license id '%s' is not on the SPDX license list; name it LicenseRef-<name> "
+                                "in a license name ({\"license\": {\"name\": \"LicenseRef-%s\"}}) or in an "
+                                "expression, which BSI TR-03183-2 reads where a plain name is not"
+                                % (where, lid, re.sub(r"[^A-Za-z0-9.-]", "-", lid)))
     if len(problems) > bad:
         return None
     origin = props(comp, ORIGIN)
@@ -586,7 +589,8 @@ def check_component(comp, where, product_version, problems):
         problems.append("%s: has %s more than once" % (where, DIST_URL))
     elif dist and not distribution_url_ok(dist[0]):
         problems.append("%s: %s '%s' is neither an http(s) URL nor a relative path inside the delivery "
-                        "(no spaces, control characters, backslashes, '..' or leading '/')"
+                        "(no spaces, control characters, backslashes, '..', leading '/', scheme, or '%%' "
+                        "that is not a %%XX escape)"
                         % (where, DIST_URL, dist[0].encode("unicode_escape").decode()))
     elif dist and len(props(comp, ARTIFACT)) > 1:
         problems.append("%s: has several bomlens:artifact files, so it cannot give one %s for all of them; "
@@ -613,7 +617,7 @@ def check_component(comp, where, product_version, problems):
 
 def distribution_url_ok(value):
     """An http(s) URL, or a relative path that stays inside the delivery."""
-    if not value or CONTROL.search(value) or re.search(r"\s", value):
+    if not value or CONTROL.search(value) or re.search(r"\s", value) or BAD_ESCAPE.search(value):
         return False
     if HTTP_URL.match(value):
         return True
@@ -637,8 +641,20 @@ def add_distribution(comp, url, hashes):
     refs.append(entry)
 
 
-def path_reference(rel):
-    return urllib.parse.quote(rel, safe=PATH_SAFE)
+def path_reference(rel, keep_escapes=False):
+    """A relative path as a relative reference (iri-reference): characters
+    outside PATH_SAFE are percent-encoded (escapes a declaration already
+    wrote are kept when keep_escapes), and a colon in the first segment is
+    put behind "./" so the reference never reads as a scheme."""
+    ref = urllib.parse.quote(rel, safe=PATH_SAFE + ("%" if keep_escapes else ""))
+    if ":" in ref.split("/", 1)[0]:
+        ref = "./" + ref
+    return ref
+
+
+def distribution_reference(value):
+    """The url of a declared bomlens:distribution-url (already checked)."""
+    return value if HTTP_URL.match(value) else path_reference(value, keep_escapes=True)
 
 
 def is_declared(comp):
@@ -783,7 +799,7 @@ def fill_artifacts(declared):
         dist = props(comp, DIST_URL)
         if not resolved:
             if dist:
-                add_distribution(comp, dist[0], [])
+                add_distribution(comp, distribution_reference(dist[0]), [])
             continue
         origin = props(comp, ORIGIN)[0]
         if len(resolved) == 1:
@@ -798,7 +814,7 @@ def fill_artifacts(declared):
             comp["properties"] = [p for p in comp["properties"] if p.get("name") not in (FILENAME,) + tuple(KIND_VALUES)] \
                 + [{"name": FILENAME, "value": os.path.basename(rel)}] \
                 + [{"name": key, "value": kinds[key]} for key in KIND_VALUES]
-            add_distribution(comp, dist[0] if dist else path_reference(rel), facts["hashes"])
+            add_distribution(comp, distribution_reference(dist[0]) if dist else path_reference(rel), facts["hashes"])
             continue
         files_out = []
         for (_, rel), facts in zip(resolved, all_facts):
