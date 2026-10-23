@@ -118,6 +118,7 @@ plugins:
             AI model: AI 모델
             Identify bundled OSS (C/C++): 번들 OSS 식별 (C/C++)
             Server SBOM: 서버 SBOM
+            Declare your own components: 자체 구성요소 선언
             Upload: 업로드
             CI/CD: CI/CD 연동
             Verify a release: 릴리스 검증
@@ -214,6 +215,7 @@ nav:
       - AI model: guides/ai-model.md
       - Identify bundled OSS (C/C++): guides/identify-vendored.md
       - Server SBOM: guides/server-delivery.md
+      - Declare your own components: guides/declared-components.md
       - Upload: guides/upload.md
       - CI/CD: guides/ci-cd.md
       - Verify a release: guides/verify-release.md

@@ -106,6 +106,56 @@ generate-sbom:
       - "*/*_security.*"
 ```
 
+## Declared components in CI
+
+Your own executables, libraries and firmware, and the vendor binaries or copied sources a scan cannot find, are listed in a declaration file kept in the repository (see [Declaring your own components](declared-components.md)). The scan reads the build outputs that file names, so the job builds first and scans after. This release job also checks the result against BSI TR-03183-2 and takes the version from the tag.
+
+```yaml
+name: Release SBOM
+
+on:
+  push:
+    tags: ['v*']
+
+jobs:
+  sbom:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build
+        run: make   # writes the files sbom-declared.cdx.json names, e.g. out/bin/media-daemon
+      - run: git clone --depth 1 https://github.com/sktelecom/bomlens.git /tmp/bomlens
+      - run: docker pull ghcr.io/sktelecom/bomlens:latest
+      - name: Generate SBOM
+        run: |
+          /tmp/bomlens/scripts/scan-sbom.sh \
+            --project "${{ github.event.repository.name }}" \
+            --version "${GITHUB_REF_NAME#v}" \
+            --components sbom-declared.cdx.json \
+            --conformance-profile bsi-tr-03183-2 --fail-on-conformance \
+            --supplier "Example Corp <https://example.com>" \
+            --sbom-author "Example Corp <sbom@example.com>" \
+            --license Apache-2.0 \
+            --generate-only
+
+      # A declaration file that is refused (a build output it names is missing,
+      # a component has no bomlens:origin, and so on) fails this step with exit
+      # 1. The SBOM is then kept as {project}_{version}_bom.refused.json, not
+      # _bom.json, so nothing downstream takes the incomplete one. A BSI row
+      # that fails ends the step with exit 2 (--fail-on-conformance).
+
+      - uses: actions/upload-artifact@v4
+        if: always()   # keep the conformance report and a refused SBOM too
+        with:
+          name: sbom
+          path: |
+            */*_bom.json
+            */*_conformance.*
+            */*_bom.refused.json
+```
+
+`${GITHUB_REF_NAME#v}` turns the tag `v2.1.0` into `2.1.0`, which a `first-party` component without its own `version` takes. `--components` names the file explicitly; without it, `sbom-declared.cdx.json` at the repository root is read anyway. `--license` takes an SPDX identifier.
+
 ## When the runner has no Docker
 
 `scan-sbom.sh` starts containers, so it needs a Docker engine: a runner without one (a Kubernetes runner, a GitLab job without `docker:dind`) cannot use the examples above. Run the scanner image itself as the job image instead. A source scan inside it needs no Docker socket when a lock file covers the whole tree (a `package-lock.json`, `npm-shrinkwrap.json`, `pnpm-lock.yaml`, `bun.lock` or `gradle.lockfile`, with no other manifest below the root): it reads the lock file as it is and fills the licenses it lacks from the package registry. A tree without such a lock file is read by syft from its manifests, which gives direct dependencies only (a Node project with none is refused with guidance), so commit a lock file or use a runner that has Docker.
