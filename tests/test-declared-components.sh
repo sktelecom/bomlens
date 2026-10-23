@@ -586,6 +586,51 @@ bash "$LIB/validate-sbom.sh" "$WORK/multi-nohash.json" "$WORK/multi-nohash" x >/
     && pass "a file without a hash leaves its component without one in both rows" \
     || fail "partial child hashes" "$(cisa_missing "$WORK/multi-nohash_conformance.json" cisa-component-hash-value)"
 
+echo "== build outputs on distribution references, declared licences concluded =="
+# BSI TR-03183-2 section 8 puts the SHA-512 of the deployable file on an
+# externalReferences entry of type distribution, and gives the distribution
+# licence as "concluded".
+dist_of() {  # <bom> <name>: the distribution references of a component, compact
+    jq -c --arg n "$2" '[.components[] | select(.name == $n) | (.externalReferences // [])[] | select(.type == "distribution")]' "$1"
+}
+d512="$(jq -r '.components[] | select(.name == "media-daemon") | .hashes[] | select(.alg == "SHA-512") | .content' "$WORK/ok.bom.json")"
+[ "$(dist_of "$WORK/ok.bom.json" media-daemon)" = "[{\"type\":\"distribution\",\"url\":\"out/bin/media-daemon\",\"hashes\":[{\"alg\":\"SHA-512\",\"content\":\"$d512\"}]}]" ] \
+  && [ "$(jq -r '.components[] | select(.name == "media-daemon") | [.hashes[].alg] | join("+")' "$WORK/ok.bom.json")" = "SHA-512+SHA-256" ] \
+  && [ "$(dist_of "$WORK/ok.bom.json" vendor-hal)" = "[]" ] \
+    && pass "a build output is named on a distribution reference by its path, with its SHA-512; the component keeps its hashes" \
+    || fail "distribution reference" "$(dist_of "$WORK/ok.bom.json" media-daemon) $(dist_of "$WORK/ok.bom.json" vendor-hal)"
+[ "$(jq -c '[.components[] | select(.name == "media-plugins") | .components[] | .externalReferences[0] | [.url, (.hashes | map(.alg) | join("+"))]]' "$WORK/multi.bom.json")" \
+    = '[["out/bin/media-plugin.so","SHA-512"],["out/pkg/media-plugins.tar.gz","SHA-512"]]' ] \
+  && [ "$(dist_of "$WORK/multi.bom.json" media-plugins)" = "[]" ] \
+    && pass "with several build outputs, each nested file has its own distribution reference" \
+    || fail "nested distribution references" "$(jq -c '.components[] | select(.name == "media-plugins")' "$WORK/multi.bom.json")"
+[ "$(jq -c '[.components[] | select(.name == "media-daemon" or .name == "vendor-hal") | .licenses[0].license.acknowledgement]' "$WORK/ok.bom.json")" = '["concluded","concluded"]' ] \
+    && pass "a declared licence with no acknowledgement is marked concluded" \
+    || fail "concluded licences" "$(jq -c '[.components[] | .licenses]' "$WORK/ok.bom.json")"
+DP="$(new_project distu)"
+B="$(new_bom distu)"
+rc="$(apply "$B" "$DP" "$(variant du1 '.components[0].properties += [{"name": "bomlens:distribution-url", "value": "https://downloads.example.com/media-daemon"}]
+    | .components[2].properties += [{"name": "bomlens:distribution-url", "value": "firmware/hal.bin"}]
+    | .components[2].licenses[0].license.acknowledgement = "declared"
+    | .components[1].licenses = [{"expression": "LicenseRef-ExampleCorp-Proprietary"}]')")"
+[ "$rc" = 0 ] && [ "$(dist_of "$B" media-daemon | jq -r '.[0].url + " " + (.[0].hashes | length | tostring)')" = "https://downloads.example.com/media-daemon 1" ] \
+  && [ "$(dist_of "$B" vendor-hal)" = '[{"type":"distribution","url":"firmware/hal.bin"}]' ] \
+  && [ "$(jq -c '[.components[] | select(.name == "vendor-hal" or .name == "media-ctl") | .licenses[0] | (.license.acknowledgement // .acknowledgement)]' "$B")" = '["concluded","declared"]' ] \
+    && pass "bomlens:distribution-url names the reference (with no build output, without a hash); an acknowledgement the declaration gives is kept" \
+    || fail "distribution-url: exit $rc" "$(dist_of "$B" media-daemon) $(dist_of "$B" vendor-hal) $(cat "$B.log")"
+refused "a distribution URL with another scheme" \
+    "sbom-declared.cdx.json: component #1 'media-daemon': bomlens:distribution-url 'file:///etc/passwd' is neither an http(s) URL nor a relative path" \
+    "$(variant du2 '.components[0].properties += [{"name": "bomlens:distribution-url", "value": "file:///etc/passwd"}]')"
+refused "a distribution path that leaves the delivery" \
+    "bomlens:distribution-url 'out/../../x' is neither an http(s) URL nor a relative path" \
+    "$(variant du3 '.components[0].properties += [{"name": "bomlens:distribution-url", "value": "out/../../x"}]')"
+refused "a distribution URL with a control character" \
+    "bomlens:distribution-url 'https://e.example/a\\nb' is neither" \
+    "$(variant du4 '.components[0].properties += [{"name": "bomlens:distribution-url", "value": "https://e.example/a\nb"}]')"
+refused "two distribution URLs" \
+    "component #1 'media-daemon': has bomlens:distribution-url more than once" \
+    "$(variant du5 '.components[0].properties += [{"name": "bomlens:distribution-url", "value": "a"}, {"name": "bomlens:distribution-url", "value": "b"}]')"
+
 echo "== the bsi-tr-03183-2 profile on the fixture =="
 # As declared, the fixture's components give their licence as a name
 # ("Proprietary") rather than an SPDX identifier or LicenseRef-, the HAL's
@@ -604,7 +649,7 @@ bsi-declared-filename=pass:
 bsi-declared-sha512=pass:
 bsi-declared-file-properties=pass:
 bsi-declared-without-file=warn:vendor-hal@4.2.0
-bsi-scanned-components=warn:zlib@1.3.1: creator, filename, SHA-512, file properties'
+bsi-scanned-components=warn:zlib@1.3.1: creator, filename, SHA-512, file properties, concluded licence'
 [ "$(bsi_rows "$WORK/bsi-ok_conformance.json")" = "$want_bsi" ] \
     && pass "bsi-tr-03183-2 names, row by row, which declared component misses what; zlib is advisory" \
     || fail "bsi rows on the fixture" "$(bsi_rows "$WORK/bsi-ok_conformance.json")"
@@ -860,6 +905,7 @@ if [ "${BOMLENS_CDX_SCHEMA:-}" = "1" ] || command -v cyclonedx >/dev/null 2>&1 |
     cp "$WORK/ok.bom.json" "$WORK/cdx/declared.json"
     cp "$WORK/multi.bom.json" "$WORK/cdx/multi.json"
     cp "$WORK/deps.bom.json" "$WORK/cdx/deps.json"
+    cp "$WORK/distu.bom.json" "$WORK/cdx/distu.json"
     cp "$WORK/e1.out/MediaSuite_3.1.0_bom.json" "$WORK/cdx/final.json"
     if cdxout=$(bash "$ROOT_DIR/scripts/check-cdx-schema.sh" "$WORK"/cdx/*.json 2>&1); then
         pass "SBOMs with declared components validate against the CycloneDX 1.6 schema"
