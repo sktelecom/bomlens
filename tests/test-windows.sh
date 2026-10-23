@@ -269,7 +269,7 @@ HELP="$(bash "$SCAN" --help 2>&1)"; hrc=$?
 for flag in --project --version --target --git --branch --exclude --firmware --analyze \
             --generate-only --notice --security --all --no-report --deep-license \
             --byte-stable --sign --output-dir --timestamp --ui \
-            --license --sbom-author --model --model-file --usage --merge --merge-root \
+            --license --sbom-author --supplier --model --model-file --usage --merge --merge-root \
             --diff --trusca --upload-target --deep-cve --identify-vendored --verify-weights --spdx --lang \
             --conformance-profile --fail-on-conformance --fail-on --vex --ai-declare --no-spdx3 --as-source --component-versions --reachability; do
   if printf '%s' "$HELP" | grep -q -- "$flag"; then pass "help documents $flag"
@@ -1183,12 +1183,12 @@ section "Pass-through flags reach the container"
 # --------------------------------------------------------
 d="$(new_proj passthrough)"; printf 'ELFish\n' > "$d/app.out"
 scan_in "$d" --project PT --version 1 --target app.out --generate-only \
-  --license Apache-2.0 --sbom-author "ACME Corp" --identify-vendored --deep-cve \
+  --license Apache-2.0 --sbom-author "ACME Corp" --supplier "ACME Corp <https://acme.example>" --identify-vendored --deep-cve \
   --trusca proj-123
-{ in_log "PROJECT_LICENSE=Apache-2.0" && in_log "SBOM_AUTHOR=ACME Corp" \
+{ in_log "PROJECT_LICENSE=Apache-2.0" && in_log "SBOM_AUTHOR=ACME Corp" && in_log "PRODUCT_SUPPLIER=ACME Corp <https://acme.example>" \
     && in_log "IDENTIFY_VENDORED=true" && in_log "UPLOAD_TARGET=trusca" \
     && in_log "TRUSCA_PROJECT_ID=proj-123" && in_log "bomlens-deep-cve"; } \
-  && pass "--license/--sbom-author/--identify-vendored/--trusca/--deep-cve reach the container" \
+  && pass "--license/--sbom-author/--supplier/--identify-vendored/--trusca/--deep-cve reach the container" \
   || { fail "pass-through flags reach the container"; show; }
 
 d="$(new_proj reach-bin)"; printf 'ELFish\n' > "$d/app.out"

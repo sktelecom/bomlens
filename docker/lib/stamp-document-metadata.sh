@@ -113,6 +113,30 @@ elif [ "$MODE" = "AIDECLARE" ] && [ -n "${AI_DECLARATION_FILE:-}" ] && [ -f "$AI
     fi
 fi
 
+# The product's supplier (--supplier, PRODUCT_SUPPLIER): the organisation that
+# supplies the product this SBOM describes, which BSI TR-03183-2 asks of every
+# component, the primary one included, with an email address or URL. Like the
+# author, nothing in a scan can discover it. "Name <https://...>" gives it a
+# url, "Name <address@host>" a contact email, a bare value only a name. It is
+# written to metadata.component.supplier and to metadata.supplier (the
+# supplier of what the BOM describes, which the minimum-element checks read)
+# and replaces what a generator wrote there: the caller said who it is.
+# ANALYZE never reaches this file, so a received SBOM's supplier is kept.
+PRODUCT_SUPPLIER="${PRODUCT_SUPPLIER:-}"
+SUPPLIER_JSON="null"
+if [ -n "$PRODUCT_SUPPLIER" ]; then
+    SUPPLIER_JSON=$(jq -cn --arg s "$PRODUCT_SUPPLIER" '
+        ($s | gsub("^\\s+|\\s+$"; "")) as $t
+        | (($t | capture("^(?<n>[^<>]*[^<>\\s])\\s*<(?<c>[^<>\\s]+)>$")?) // null) as $m
+        | if $m == null then {name: $t}
+          elif ($m.c | test("^https?://[^\\s<>\"]+$"; "i")) then {name: $m.n, url: [$m.c]}
+          elif ($m.c | test("^[^@\\s]+@[^@\\s]+$")) then {name: $m.n, contact: [{email: $m.c}]}
+          else {name: $t} end') || SUPPLIER_JSON="null"
+    if [ "$SUPPLIER_JSON" != "null" ] && ! printf '%s' "$SUPPLIER_JSON" | jq -e 'has("url") or has("contact")' >/dev/null 2>&1; then
+        echo "[docmeta] WARN: --supplier '$PRODUCT_SUPPLIER' gives no URL or email; write it as \"Name <https://...>\" or \"Name <address@host>\" (BSI TR-03183-2 asks for one)." >&2
+    fi
+fi
+
 # SBOM Tool Version. BOMLENS_VERSION is baked in at image build time; a local
 # build without it reports the version as unknown, which is what the minimum
 # elements ask for when no version identifier is available.
@@ -173,7 +197,7 @@ fi
 TMP="$(mktemp)"
 if jq --arg lifecycle "$LIFECYCLE" \
       --arg spec "$CDX_SPEC_VERSION" \
-      --argjson authors "$AUTHORS_JSON" \
+      --argjson authors "$AUTHORS_JSON" --argjson supplier "$SUPPLIER_JSON" \
       --arg authorsource "$AUTHOR_SOURCE" \
       --arg toolver "$TOOL_VERSION" \
       --arg undeclared "$UNDECLARED_POLICY" \
@@ -220,6 +244,10 @@ if jq --arg lifecycle "$LIFECYCLE" \
     | (if ($authors | length) > 0
        then .metadata.authors = $authors
        else (.metadata) |= del(.authors) end)
+    | (if $supplier != null
+       then .metadata.supplier = $supplier
+            | (if (.metadata.component | type) == "object" then .metadata.component.supplier = $supplier else . end)
+       else . end)
     # An existing hash is left alone: a scanner that already recorded one was
     # looking at the same artifact and may have used a different algorithm.
     | (if $artifactsha != "" and (((.metadata.component.hashes // []) | length) == 0)

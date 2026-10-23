@@ -927,8 +927,8 @@ bsi_checks() {
          detail_ko: (if ($top_all | length) == 0 then "충족" else "누락: " + ($top_all | map($gap_ko[.] // .) | join(", ")) end),
          missing: (if ($top_all | length) == 0 then [] else [ ($top | clabel) + ": " + ($top_all | join(", ")) ] end)}
         + (if ($top_gaps | length) == 0 then {} else {reviewGuide: guide(
-            "The product is metadata.component. Give it a supplier or manufacturer with a url or contact email, and its distribution licence with \"acknowledgement\": \"concluded\" (--license writes it so). BomLens has no option for the product supplier yet.";
-            "제품은 metadata.component입니다. url이나 연락처 이메일이 있는 supplier 또는 manufacturer와 \"acknowledgement\": \"concluded\"인 배포 라이선스를 적습니다(--license 옵션이 그렇게 기록합니다). 제품 공급자를 지정하는 BomLens 옵션은 아직 없습니다.")} end)),
+            "The product is metadata.component. Scan again with --supplier \"Example Corp <https://example.com>\" (or an email in the brackets) for its creator, and --license for its distribution licence, which BomLens writes as \"acknowledgement\": \"concluded\".";
+            "제품은 metadata.component입니다. 제작자는 --supplier \"Example Corp <https://example.com>\" 옵션(괄호 안에 이메일도 가능)으로, 배포 라이선스는 --license 옵션으로 다시 스캔해 기록합니다. BomLens는 이 라이선스를 \"acknowledgement\": \"concluded\"로 기록합니다.")} end)),
        {id: "bsi-primary-component-file", label: "Primary component: filename, SHA-512 and file properties (advisory when it names no file of its own)",
         label_ko: "최상위 구성요소: 파일 이름, SHA-512, 파일 속성 (자체 파일을 지정하지 않으면 권고)", required: false,
         source: (if $top_file then "na" else "auto" end),
