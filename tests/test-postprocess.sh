@@ -10714,11 +10714,11 @@ JSON
         fail "pnpm workspace-member filter result unexpected" "$(jq -c '.components[].purl' "$WORK/pwmf-bom.json" 2>&1)"
     fi
     if jq -e '
-        ([.metadata.properties[] | select(.name=="bomlens:excluded-members") | .value][0]
+        ([.metadata.properties[] | select(.name=="bomlens:excluded-components") | .value][0]) as $c
+        | ([.metadata.properties[] | select(.name=="bomlens:excluded-members") | .value][0]
           == "pnpm:playground/demo (@ex/demo)")
-        and ([.metadata.properties[] | select(.name=="bomlens:excluded-components") | .value][0]) as $c
-        | ($c | contains("%40ex%2Fdemo@1.0.0")) and ($c | contains("left-pad@1.3.0"))
-          and ($c | contains("obug") | not) and ($c | contains("string-width") | not)
+        and ($c | contains("%40ex%2Fdemo@1.0.0")) and ($c | contains("left-pad@1.3.0"))
+        and ($c | contains("obug") | not) and ($c | contains("string-width") | not)
     ' "$WORK/pwmf-bom.json" >/dev/null 2>&1; then
         pass "excluded workspace member and dropped component (including the scoped member itself) are recorded, protected packages excluded from the list"
     else

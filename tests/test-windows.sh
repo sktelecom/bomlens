@@ -272,7 +272,7 @@ for flag in --project --version --target --git --branch --exclude --firmware --a
             --license --sbom-author --supplier --model --model-file --usage --merge --merge-root \
             --diff --trusca --upload-target --deep-cve --identify-vendored --verify-weights --spdx --lang \
             --conformance-profile --fail-on-conformance --fail-on --vex --ai-declare --no-spdx3 --as-source --component-versions --reachability; do
-  if printf '%s' "$HELP" | grep -q -- "$flag"; then pass "help documents $flag"
+  if grep -q -- "$flag" <<<"$HELP"; then pass "help documents $flag"
   else fail "help documents $flag"; fi
 done
 
