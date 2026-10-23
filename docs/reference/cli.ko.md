@@ -22,7 +22,7 @@ BomLens의 전체 옵션과 분석 모드, CI/CD 통합 방법, 트러블슈팅�
 |------|--------|------|
 | `--project <이름>` | — | **(필수)** 프로젝트 이름 |
 | `--version <버전>` | — | **(필수)** 프로젝트 버전 |
-| `--supplier <supplier>` | — | 이 SBOM이 설명하는 제품의 공급자. `"Name <https://...>"`(`url`로 기록) 또는 `"Name <email>"`(연락처 `email`로 기록) 형식으로 쓰며, `metadata.component.supplier`와 `metadata.supplier`에 기록한다. 이름만 쓰면 기록은 하되 경고한다. `bsi-tr-03183-2` 검사 기준은 공급자의 URL이나 이메일을 요구하기 때문이다. `--analyze`에서는 공급사 SBOM을 그대로 두므로 기록하지 않는다 |
+| `--supplier <supplier>` | — | 이 SBOM이 설명하는 제품의 공급자. `"Name <https://...>"`(`url`로 기록) 또는 `"Name <email>"`(연락처 `email`로 기록) 형식으로 쓰며, `metadata.component.supplier`에 기록한다. 이름 없이 `"<https://...>"`만 쓰면 URL만 기록하고, 앞뒤 공백을 지우고 빈 값이면 기록하지 않는다. `metadata.supplier`는 SBOM 작성자로 읽히므로 건드리지 않는다. 이름만 쓰면 기록은 하되 경고한다. `bsi-tr-03183-2` 검사 기준은 공급자의 URL이나 이메일을 요구하기 때문이다. `--analyze`에서는 공급사 SBOM을 그대로 두므로 기록하지 않는다 |
 | `--target <대상>` | 현재 디렉터리 | 분석 대상: 디렉터리(소스 트리, 또는 OS rootfs·빌드 산출물 staging), Docker 이미지, 바이너리 파일, `.zip`/`.tar.gz` 아카이브. Yocto 빌드 디렉터리는 그렇게 인식해서, 빌드 트리를 훑는 대신 `tmp/deploy/images/` 아래에 빌드가 만든 이미지 SBOM을 분석합니다([공급사 SBOM 가이드](../guides/supplier-sbom.ko.md#yocto-이미지) 참고). 소스 트리가 아닌 폴더(최상위에 매니페스트, 잠금 파일, 빌드 파일이 없는 폴더)가 루트 파일시스템이나 펌웨어 이미지를 바로 아래에 하나만 담고 있으면(릴리스의 `images/` 폴더 등) 그 루트 파일시스템이나 이미지를 분석하고, 그렇게 했다고 알려 줍니다. 펌웨어 이미지는 시그니처나 `.bix`, `.trx` 같은 펌웨어 확장자로 판단하며, `.bin`과 `.img`는 시그니처가 있어야 합니다. 최상위에 실행 파일, 공유 라이브러리, `node_modules`, 모델 파일이 있거나 최상위 파일이 20개를 넘는 폴더는 소스로 분석합니다. 여러 개를 담고 있으면 스캔을 멈추고 각각에 쓸 `--target`을 보여 줍니다 |
 | `--git <url>` | — | git/GitHub URL을 얕은 클론(shallow) 후 소스로 분석 (비공개 저장소: `GIT_TOKEN` 환경변수) |
 | `--branch <ref>` | 기본 브랜치 | `--git` 대상의 브랜치, 태그, 커밋 (별칭 `--ref`) |
@@ -32,7 +32,7 @@ BomLens의 전체 옵션과 분석 모드, CI/CD 통합 방법, 트러블슈팅�
 | `--analyze <sbom>` | — | 공급사 SBOM 검증·분석 (별칭 `--sbom`). CycloneDX/SPDX. `--target`와 배타 |
 | `--model <참조>` | — | AI SBOM(CycloneDX 1.7 ML-BOM)을 생성한다. HuggingFace 모델 ID(`조직/모델`)는 OWASP AIBOM Generator로 처리한다(opt-in `bomlens-aibom` 이미지; 모델 카드 메타데이터를 네트워크로 가져옴). Figshare 항목은 페이지 주소나 DOI, 항목 번호로 주면 공개 항목 조회로 데이터셋으로 기술하며 계정도 별도 이미지도 필요 없다. 이름에 "figshare"가 없는 기관 DOI는 다른 DOI와 구분할 수 없으므로 항목 주소를 준다. HuggingFace 데이터셋은 `datasets/<owner>/<name>`, `https://huggingface.co/datasets/<owner>/<name>`(이름 뒤의 `/tree/main` 같은 부분은 무시), `hf:<owner>/<name>` 중 하나로 주면 기본 이미지에서 데이터셋으로 기술하며, 카드의 `source_datasets`에 적힌 데이터셋도 함께 읽는다(`AIBOM_DATASET_DEPTH`, `AIBOM_DATASET_MAX_LOOKUPS`). HuggingFace가 모델과 데이터셋에 같은 형식을 쓰므로 앞에 아무것도 붙이지 않은 `owner/name`은 항상 모델 id로 읽는다. 접근 제한이 있거나 비공개인 데이터셋은 `HF_TOKEN`이 필요하다. `--target`/`--analyze`/`--git`/`--merge`와 배타 |
 | `--model-file <경로>` | — | AI 모델 파일 하나를 읽어 그 헤더만으로 기술한다. GGUF, safetensors, PyTorch(`.pt`/`.pth`/`.ckpt`), pickle, npz, npy, ONNX를 인식한다. 오프라인으로 동작하고 HuggingFace 계정이 필요 없어 공개하지 않은 모델도 스캔할 수 있다. 채울 수 있는 정보는 형식마다 다르다. GGUF는 이름과 라이선스, 아키텍처를 담고 있지만 safetensors는 대개 텐서 정보만 있으며, 파일이 선언하지 않은 값은 추측하지 않고 비워 둔다. `--target`에 `.gguf`나 `.safetensors`, `.pt` 같은 경로를 주면 이 방식으로 읽는다. `--target`/`--analyze`/`--git`와 배타 |
-| `--license <spdx-id>` | — | 프로젝트를 배포하는 배포 라이선스(예: `Apache-2.0`). SBOM 루트 컴포넌트에 기록하고, 조건이 충돌하는 의존성을 표시하는 데 쓴다. 소스 스캔으로는 알아낼 수 없어(cdxgen이 maven과 gradle에서 루트 라이선스를 비워 둔다) 지정하지 않으면 충돌 판정을 내리지 않는다. SBOM에 이미 있는 루트 라이선스(공급사가 선언한 값)는 덮어쓰지 않는다 |
+| `--license <spdx-id>` | — | 프로젝트를 배포하는 배포 라이선스(예: `Apache-2.0`). SBOM 루트 컴포넌트에 `acknowledgement`를 `concluded`(배포 라이선스)로 기록하고, 조건이 충돌하는 의존성을 표시하는 데 쓴다. 생성 도구가 읽은 루트 라이선스는 이 값으로 바꾼다. 소스 스캔으로는 알아낼 수 없어(cdxgen이 maven과 gradle에서 루트 라이선스를 비워 둔다) 지정하지 않으면 충돌 판정을 내리지 않는다. 대신 프로젝트 매니페스트에서 읽은 라이선스는 루트 라이선스가 비어 있을 때만 `declared`로 채운다. `--analyze`에서 공급사 SBOM이 적은 루트 라이선스는 덮어쓰지 않는다 |
 | `--sbom-author <name>` | — | 이 SBOM을 생성한 주체. 스캔을 실행하는 조직이나 사람을 가리키며, 도구도 소프트웨어를 만든 쪽도 아니다. `metadata.authors`에 정식 명칭으로 기록하고 약어는 쓰지 않는다. 스캔으로는 알아낼 수 없는 값이라 지정하지 않으면 자리표시자를 채우지 않고 필드를 빼 둔다. `Name <email>` 형식(예: `"Example Corp <sbom@example.com>"`)으로 쓰면 `bsi-tr-03183-2` 검사 기준이 SBOM 작성자에게 요구하는 이메일도 함께 기록한다 |
 | `--ai-declare <file>` | — | AI 모델이나 데이터셋 스캔에서, 스캔으로 읽을 수 없는 내용을 모델 공개자가 선언한 파일(JSON). 출시일, 모델과 데이터를 만든 주체, 학습과 평가에 쓴 데이터셋, 기반 모델 리비전, 배포 가중치 범위 같은 값이다. 선언한 값은 대부분 SPDX 3.0.1 AI 문서에만 반영한다. 예외는 모델을 실행하는 서비스(`service`)와 모델의 입력과 출력 종류, 학습 연산량, 적대적 시험 여부이며, 이 값들은 CycloneDX SBOM에도 발행자 선언으로 표시되어 들어간다([아래 예시](#ai-선언-파일) 참고). 모든 AI 스캔이 시작점으로 쓸 빈 양식 `{Project}_{Version}_ai-declaration.template.json`을 만든다. 스캔에 없는 필드, 값, 데이터셋, 기반 모델을 적은 파일은 이유와 함께 거부하고, 문서는 선언 없이 초안으로 만든다. 받아들인 파일은 `{Project}_{Version}_ai-declaration.json`으로 보관하고 같은 버전을 다시 스캔할 때 다시 적용한다. `--model`, `--model-file`, `--target` 없이 이 옵션만 주면 허브 저장소나 파일이 아직 없는 모델을 기술한다(`MODE=AIDECLARE`, 기본 이미지). `model.baseModels[].ref`의 기반 모델과 `datasets[].ref`(`huggingface:<owner>/<name>`)의 데이터셋은 허브에서 id로 읽고, `datasets[].local`에는 허브에 없는 데이터를 적으며, 모델 이름과 버전은 `--project`와 `--version`을 쓴다. 내려받기 주소와 공급자를 선언하지 않으면 SPDX 문서는 초안으로 남는다. `--ui`(모델 · 데이터셋 화면 사용)와 `--diff`에는 쓸 수 없다 |
 | `--no-spdx3` | false | AI 모델이나 데이터셋 스캔에서 SPDX 3.0.1 AI 문서와 그 검사 결과, 선언 양식을 만들지 않는다 |
@@ -73,6 +73,8 @@ BomLens의 전체 옵션과 분석 모드, CI/CD 통합 방법, 트러블슈팅�
 | `--mount <dir>` | — | `--ui`와 함께: 호스트 디렉터리를 웹 UI의 **디렉터리 경로** 입력에서 고를 수 있는 읽기 전용 스캔 대상으로 추가(여러 번 지정 가능). 실행 폴더 밖의 OS 트리를 스캔할 수 있고, `--mount /`로 실행 중인 호스트 OS도 스캔합니다. 결과는 그대로 실행 폴더에 저장됩니다 |
 | `--help` | — | 도움말 출력 |
 
+`--analyze` 모드에서는 이 가운데 여섯 옵션이 다르게 동작합니다. `--project`, `--version`, `--license`, `--sbom-author`, `--supplier`는 공급사 SBOM이 이미 적은 이름, 버전, 루트 라이선스, 작성자, 공급자를 덮어쓰지 않습니다. 이 값은 문서에 적힌 사실이며 이번 실행이 바꿀 수 있는 값이 아니기 때문입니다. `--no-report`는 효과가 없습니다. 검토 중인 공급사 SBOM에는 위험 보고서를 항상 만들기 때문입니다. 제출된 SBOM에 이런 필드가 아예 없어도(루트 라이선스, `metadata.authors`, 제품 공급자가 없는 경우) 옵션으로 채우지 않으며, 필드는 빈 채로 두고 적합성 검사가 그 상태로 판정합니다.
+
 환경변수로 동작을 조정할 수 있습니다.
 
 | 환경변수 | 기본값 | 설명 |
@@ -110,7 +112,7 @@ BomLens의 전체 옵션과 분석 모드, CI/CD 통합 방법, 트러블슈팅�
 | `GOPROXY` | `https://proxy.golang.org,direct` | Go 소스 스캔에서 모듈과 툴체인을 내려받을 프록시. `proxy.golang.org`에 접근할 수 없는 사내망에서 지정한다. `GOSUMDB`도 같은 방식으로 전달된다 |
 | `PROJECT_LICENSE` | — | `--license`와 같다. 프로젝트의 배포 라이선스를 SPDX 식별자로 지정한다. `bomlens:licenseConflict` 판정과 위험 보고서의 충돌 절을 만든다 |
 | `SBOM_AUTHOR` | — | `--sbom-author`와 같다. SBOM을 생성한 주체를 `metadata.authors`에 기록한다 |
-| `PRODUCT_SUPPLIER` | — | `--supplier`와 같다. 제품의 공급자를 `metadata.component.supplier`와 `metadata.supplier`에 기록한다 |
+| `PRODUCT_SUPPLIER` | — | `--supplier`와 같다. 제품의 공급자를 `metadata.component.supplier`에 기록한다 |
 | `SECURITY_ENRICH` | `true` | 보안 보고서에 EPSS와 CISA KEV 신호를 보강. 폐쇄망에서는 `false`로 외부 조회 생략 |
 | `HTTP_PROXY`, `HTTPS_PROXY`, `NO_PROXY` | — | 스캔 컨테이너에 이름으로 전달(소문자 이름도). 이 컴퓨터의 루프백 주소(`127.0.0.1`, `localhost`)에 있는 프록시는 넘기지 않는다. 컨테이너 안에서는 그 주소가 컨테이너 자신이기 때문이다. 이때는 Docker의 프록시 설정이 적용된다 |
 | `TRIVY_*` | — | Trivy 설정을 이름으로 그대로 전달. 예: 데이터베이스 미러 `TRIVY_DB_REPOSITORY`, 오프라인 `TRIVY_SKIP_DB_UPDATE=true`. `TRIVY_CACHE_DIR`은 호스트 경로라 전달하지 않으므로 `SBOM_TRIVY_CACHE`를 쓴다 |
