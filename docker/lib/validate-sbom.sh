@@ -680,10 +680,10 @@ spdx_json_checks() {
     # counted, and has checksums when every file it contains has them.
     ([.packages[]? | select((.primaryPackagePurpose // \"\") == \"FILE\")]) as \$fpk
     | ([.packages[]? | select((.primaryPackagePurpose // \"\") != \"FILE\")]) as \$p
-    | (reduce \$fpk[] as \$f ({}; .[\$f.SPDXID] = (((\$f.checksums // []) | length) > 0))) as \$fsum
+    | (reduce \$fpk[] as \$f ({}; .[\$f.SPDXID // \"\"] = (((\$f.checksums // []) | length) > 0))) as \$fsum
     | (reduce (.relationships // [])[] as \$r ({};
           if \$r.relationshipType == \"CONTAINS\" and (\$fsum | has(\$r.relatedSpdxElement // \"\"))
-          then .[\$r.spdxElementId] = ((.[\$r.spdxElementId] // []) + [\$fsum[\$r.relatedSpdxElement]])
+          then .[\$r.spdxElementId // \"\"] = ((.[\$r.spdxElementId // \"\"] // []) + [\$fsum[\$r.relatedSpdxElement]])
           else . end)) as \$kids
     | (\$p|length) as \$tot
     | ([ .creationInfo.creators[]? | select(startswith(\"Tool:\")) ] | length) as \$tools
@@ -710,7 +710,7 @@ spdx_json_checks() {
     | (.spdxVersion // \"\") as \$sv
     | ((\$p | map(select(((.licenseConcluded // \"NOASSERTION\") != \"NOASSERTION\") or ((.licenseDeclared // \"NOASSERTION\") != \"NOASSERTION\"))) | length)) as \$lic_ok
     | ((\$p | map(select(((.checksums // [])|length>0)
-                          or ((\$kids[.SPDXID] // []) as \$k | (\$k | length) > 0 and all(\$k[]; .)))) | length)) as \$hash_ok
+                          or ((\$kids[.SPDXID // \"\"] // []) as \$k | (\$k | length) > 0 and all(\$k[]; .)))) | length)) as \$hash_ok
     | ([ .relationships[]? | select(.relationshipType==\"DEPENDS_ON\" or .relationshipType==\"DEPENDENCY_OF\") ] | length) as \$dep_edges
     | (.name // \"\") as \$docname
     | ((.documentDescribes // []) | length) as \$describes
