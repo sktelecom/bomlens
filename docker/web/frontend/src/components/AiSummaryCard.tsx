@@ -17,7 +17,7 @@ import { cn } from "@/lib/utils";
 /** Text link style shared with the Overview's jump-through links (Overview.tsx
  *  `topRiskAll`), so the card's two links read as the same kind of thing. */
 const LINK_CLASS =
-  "rounded text-label text-muted-foreground underline-offset-2 hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1";
+  "rounded text-label text-muted-foreground underline underline-offset-2 hover:text-foreground hover:no-underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1";
 
 /** First tile's sub-line: a single graded model's condition count, or (several
  *  models / no single model to name) a grade distribution — either way with the

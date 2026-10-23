@@ -220,7 +220,7 @@ export function ComponentRow({
                     target="_blank"
                     rel="noreferrer"
                     onClick={(e) => e.stopPropagation()}
-                    className="break-all text-primary underline-offset-2 hover:underline"
+                    className="break-all text-primary underline underline-offset-2 hover:no-underline"
                   >
                     {c.source}
                   </a>
@@ -284,7 +284,7 @@ export function ComponentRow({
                         e.stopPropagation();
                         onPickVulns(c.name);
                       }}
-                      className="rounded text-primary underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      className="rounded text-primary underline underline-offset-2 hover:no-underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                     >
                       {t("result.viewInVulns", { name: c.name })}
                     </button>
@@ -304,7 +304,7 @@ export function ComponentRow({
                       e.stopPropagation();
                       onPickDependency(c.name, c.version);
                     }}
-                    className="rounded text-primary underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    className="rounded text-primary underline underline-offset-2 hover:no-underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   >
                     {t("result.viewInDependencies", { name: c.name })}
                   </button>
