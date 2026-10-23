@@ -30,6 +30,9 @@ depends on; a file without them makes the product depend on each component.
 Any declared component still not reachable from the product afterwards is
 linked from it too.
 
+A build output that is missing because --exclude left its folder out of the
+scanned copy (SCAN_EXCLUDE_PATHS, one path per line) is reported as such.
+
 The labels the user knows the files by (the paths given on the command line)
 come from DECLARED_COMPONENTS_LABELS, one per line in the order of the
 arguments; without it the path is used.
@@ -139,6 +142,18 @@ def read_artifact(path):
     }
 
 
+def excluded_paths():
+    """The paths --exclude took out of the scanned copy (SCAN_EXCLUDE_PATHS,
+    one relative path per line), so a missing artifact under one of them is
+    reported as excluded rather than as not built."""
+    out = []
+    for line in os.environ.get("SCAN_EXCLUDE_PATHS", "").split("\n"):
+        p = "/".join(x for x in line.strip().split("/") if x not in ("", "."))
+        if p:
+            out.append(p)
+    return out
+
+
 def resolve_artifact(root, value):
     """The real path of an artifact inside root, or raise Refused with why."""
     if not isinstance(value, str) or not value.strip():
@@ -159,6 +174,11 @@ def resolve_artifact(root, value):
     if os.path.commonpath([root, real]) != root:
         raise Refused("bomlens:artifact '%s' leads outside the scan target through a symbolic link" % value)
     if not os.path.exists(real):
+        rel = "/".join(parts)
+        for ex in excluded_paths():
+            if rel == ex or rel.startswith(ex + "/"):
+                raise Refused("bomlens:artifact '%s' is under '%s', which --exclude leaves out of the scan; "
+                              "drop that --exclude or list the file elsewhere" % (value, ex))
         raise Refused("bomlens:artifact '%s' does not exist in the scan target; build it before the scan, or fix the path" % value)
     if not os.path.isfile(real):
         raise Refused("bomlens:artifact '%s' is not a regular file" % value)

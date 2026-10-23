@@ -292,7 +292,7 @@ hf_dataset_ref() {
     fi
     return 2
 }
-GIT_URL=""; GIT_REF=""; SCAN_EXCLUDE=""; NO_REPORT="false"; GENERATE_REPORT="false"
+GIT_URL=""; GIT_REF=""; SCAN_EXCLUDE=""; SCAN_EXCLUDE_PATHS=""; NO_REPORT="false"; GENERATE_REPORT="false"
 INGEST_SOURCE="false"; INGEST_ROOTFS="false"; INGEST_ARCHIVE=""; SCAN_INPUT_DIR=""; CLEANUP_DIRS=()
 
 # --exclude <path>: a path inside the scanned folder to leave out of a source
@@ -1496,6 +1496,14 @@ components_run() {
         i=$((i + 1))
     done
     printf ' -e DECLARED_COMPONENTS_FILES=%q -e DECLARED_COMPONENTS_LABELS' "$list"
+}
+
+# --exclude: the excluded paths, for the declared-components step's messages.
+# By name only, as DECLARED_COMPONENTS_LABELS above (the value is the exported
+# newline-separated list, set where the copy without them is made).
+exclude_run() {
+    [ -n "${SCAN_EXCLUDE_PATHS:-}" ] || return 0
+    printf ' -e SCAN_EXCLUDE_PATHS'
 }
 
 # --fail-on: the conditions travel to the container as one comma-separated value.
@@ -2782,6 +2790,10 @@ EOF_EXCLUDE
     copy_without_excluded "$SCAN_INPUT_DIR" "$_view" "" \
         || { echo "[ERROR] could not copy the source tree for --exclude"; exit 1; }
     SCAN_INPUT_DIR="$_view"
+    # For the declared-components step, which says when a bomlens:artifact is
+    # missing because it is under one of these paths (see exclude_run).
+    SCAN_EXCLUDE_PATHS="$SCAN_EXCLUDE"
+    export SCAN_EXCLUDE_PATHS
 fi
 
 # ========================================================
@@ -3210,7 +3222,7 @@ EOF
         -v "\"$(hostpath "$SCAN_INPUT_DIR")\"":/src -v "\"$(hostpath "$OUTPUT_HOST_DIR")\"":/host-output \
         -w /host-output \
         --add-host=host.docker.internal:host-gateway \
-        -e MODE=POSTPROCESS -e BOMLENS_RUN_INPUT="$OUTPUT_FILE" -e NESTED_ROOTFS_HINT="\"$NESTED_ROOTFS_HINT\"" -e BOMLENS_DEEP_LICENSE_FALLBACK="\"${DEEP_LICENSE_FALLBACK_FROM:-}\"" -e BOMLENS_DEEP_CVE_FALLBACK="\"${DEEP_CVE_FALLBACK_FROM:-}\"" -e BOMLENS_INCLUDE_NON_SHIPPED${STAGE1_FALLBACK_ENV}${STAGE1_FINGERPRINT_ENV}${PP_ENV} $(pp_env)$(cosign_run)$(vex_run)$(declare_run)$(components_run)$(gate_run) \
+        -e MODE=POSTPROCESS -e BOMLENS_RUN_INPUT="$OUTPUT_FILE" -e NESTED_ROOTFS_HINT="\"$NESTED_ROOTFS_HINT\"" -e BOMLENS_DEEP_LICENSE_FALLBACK="\"${DEEP_LICENSE_FALLBACK_FROM:-}\"" -e BOMLENS_DEEP_CVE_FALLBACK="\"${DEEP_CVE_FALLBACK_FROM:-}\"" -e BOMLENS_INCLUDE_NON_SHIPPED${STAGE1_FALLBACK_ENV}${STAGE1_FINGERPRINT_ENV}${PP_ENV} $(pp_env)$(cosign_run)$(vex_run)$(declare_run)$(components_run)$(exclude_run)$(gate_run) \
         "\"$PP_IMAGE\"" || {
         _pp_rc=$?
         if [ "$DETECTION_USED" = static ] && [ ! -s "$OUTPUT_HOST_DIR/$OUTPUT_FILE" ]; then

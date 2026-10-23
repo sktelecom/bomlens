@@ -327,6 +327,35 @@ refused "several problems are all reported" \
 grep -q "is an absolute path" "$WORK/several problems are all reported.bom.json.log" \
     && pass "the first problem is reported with the second" || fail "only one problem reported"
 
+echo "== a build output that --exclude left out is reported as excluded =="
+P="$(new_project excluded)"
+rm -rf "$P/out/bin"   # what the scanned copy looks like with --exclude out/bin
+BASE="$(new_bom excluded)"
+SCAN_EXCLUDE_PATHS="vendor/legacy
+./out/bin/" refused "an artifact under an --exclude path" \
+    "sbom-declared.cdx.json: component 'media-daemon': bomlens:artifact 'out/bin/media-daemon' is under 'out/bin', which --exclude leaves out of the scan" \
+    "$P/sbom-declared.cdx.json"
+SCAN_EXCLUDE_PATHS="out/bi" refused "an exclude path that only shares a prefix is not blamed" \
+    "bomlens:artifact 'out/bin/media-daemon' does not exist in the scan target" \
+    "$P/sbom-declared.cdx.json"
+
+echo "== NOTICE: third-party only =="
+N="$WORK/notice"; mkdir -p "$N"
+( cd "$N" && bash "$LIB/generate-notice.sh" "$WORK/ok.bom.json" "$N/ms" MediaSuite > "$N/log" 2>&1 )
+if [ -f "$N/ms_NOTICE.txt" ] && [ -f "$N/ms_NOTICE.html" ]; then
+    ! grep -q 'media-daemon\|media-ctl' "$N/ms_NOTICE.txt" "$N/ms_NOTICE.html" \
+      && grep -q 'vendor-hal@4.2.0' "$N/ms_NOTICE.txt" && grep -q 'zlib@1.3.1' "$N/ms_NOTICE.txt" \
+        && pass "first-party components are left out of the NOTICE; the declared third-party one and zlib are in it" \
+        || fail "NOTICE content" "$(grep -n 'media\|vendor\|zlib' "$N/ms_NOTICE.txt")"
+    grep -q 'Total components: 2 ' "$N/ms_NOTICE.txt" && ! grep -q 'Proprietary' "$N/ms_NOTICE.txt" \
+        && pass "the NOTICE counts only what it lists, and the first-party licence is not in it" \
+        || fail "NOTICE header" "$(grep -n 'Total\|Proprietary' "$N/ms_NOTICE.txt")"
+    [ "$(jq '[.components[] | select(any(.properties[]?; .name == "bomlens:origin" and .value == "first-party"))] | length' "$WORK/ok.bom.json")" = 2 ] \
+        && pass "the first-party components stay in the SBOM" || fail "first-party components missing from the SBOM"
+else
+    fail "generate-notice.sh wrote no NOTICE" "$(cat "$N/log")"
+fi
+
 echo "== through entrypoint.sh (POSTPROCESS, as a CLI source scan runs it) =="
 mkdir -p "$WORK/bin"
 cat > "$WORK/bin/trivy" <<'EOF'
@@ -437,6 +466,17 @@ else
     COMPONENTS_FILES=()
     [ -z "$(components_run)" ] && pass "no --components, no mount" || fail "mount without --components"
 fi
+body="$(extract_fn exclude_run)"
+if [ -z "$body" ]; then
+    fail "could not lift exclude_run out of scan-sbom.sh"
+else
+    eval "$body"
+    [ "$(SCAN_EXCLUDE_PATHS="" exclude_run)" = "" ] && [ "$(SCAN_EXCLUDE_PATHS="out/bin" exclude_run)" = " -e SCAN_EXCLUDE_PATHS" ] \
+        && pass "the --exclude paths reach the container by variable name, only when there are some" \
+        || fail "exclude_run gave '$(SCAN_EXCLUDE_PATHS="out/bin" exclude_run)'"
+fi
+grep -q '(components_run)$(exclude_run)' "$SCRIPT" && grep -q '^    export SCAN_EXCLUDE_PATHS' "$SCRIPT" \
+    && pass "the post-process container gets the --exclude paths" || fail "exclude_run is not used"
 grep -q '^        --components) COMPONENTS_FILES+=' "$SCRIPT" && grep -q '^  --components <file>' "$SCRIPT" \
     && pass "--components is parsed (repeatable) and in the help" || fail "--components parsing or help missing"
 grep -q '(components_run)' "$SCRIPT" && pass "the post-process container gets the mounts" || fail "components_run is not used"
