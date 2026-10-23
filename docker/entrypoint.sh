@@ -1644,6 +1644,56 @@ case "$SCAN_MODE" in
         ;;
 esac
 
+# Components a declaration file lists: what a source scan cannot find, such as
+# the supplier's own build outputs and third-party parts added by hand. The
+# files come from --components (DECLARED_COMPONENTS_FILES, space-separated
+# container paths, with the names the user gave them in
+# DECLARED_COMPONENTS_LABELS); without it, sbom-declared.cdx.json at the scan
+# target root is read when it exists. After stamp-metadata, so a first-party
+# component with no version takes the product's, and before normalize, so what
+# is added is normalized with the rest. A refused file (exit 3) stops the run
+# here with the reasons, before the SBOM is normalized, signed or uploaded:
+# an SBOM without the declared components is not the one that was asked for.
+# Recorded only when there is a file to read.
+case "$SCAN_MODE" in
+    SOURCE|POSTPROCESS)
+        _dc_root="${SOURCE_ROOT:-/src}"
+        _dc_files=()
+        if [ -n "${DECLARED_COMPONENTS_FILES:-}" ]; then
+            read -r -a _dc_files <<< "$DECLARED_COMPONENTS_FILES"
+        elif [ -f "$_dc_root/sbom-declared.cdx.json" ]; then
+            _dc_files=("$_dc_root/sbom-declared.cdx.json")
+            DECLARED_COMPONENTS_LABELS="sbom-declared.cdx.json (at the scan target root)"
+        fi
+        if [ "${#_dc_files[@]}" -gt 0 ]; then
+            er_phase declared-components
+            _dc_rc=0
+            _dc_err="$(mktemp)"
+            DECLARED_COMPONENTS_LABELS="${DECLARED_COMPONENTS_LABELS:-}" \
+                python3 "$LIBDIR/apply-declared-components.py" "$OUTPUT_FILE" "$_dc_root" "${_dc_files[@]}" 2> "$_dc_err" || _dc_rc=$?
+            cat "$_dc_err" >&2
+            if [ "$_dc_rc" -eq 0 ]; then
+                _dc_count="$(jq '[.components[]? | select(any(.properties[]?; .name == "bomlens:origin"))] | length' "$OUTPUT_FILE" 2>/dev/null || echo 0)"
+                er_record declared-components ok "" "" "$ER_PHASE_STARTED" "" "{\"components\":${_dc_count:-0}}"
+                er_phase_end
+            else
+                _dc_first="$(sed -n 's/^\[declared-components\] ERROR: //p' "$_dc_err" | head -n 1)"
+                er_record declared-components failed failed "${_dc_first:-the declaration could not be applied}" "$ER_PHASE_STARTED"
+                er_phase_end
+                rm -f "$_dc_err"
+                if [ "$_dc_rc" -eq 3 ]; then
+                    echo "[ERROR] the declared components were refused (reasons above), so the SBOM is not complete. Fix the declaration file and scan again."
+                else
+                    echo "[ERROR] the declared components could not be added to the SBOM (see above)."
+                fi
+                exit 1
+            fi
+            rm -f "$_dc_err"
+        fi
+        unset _dc_root _dc_files _dc_rc _dc_err _dc_count _dc_first
+        ;;
+esac
+
 # ========================================================
 # Record who generated this SBOM, with what, and at which lifecycle phase — the
 # document-level fields the 2026 SBOM minimum elements ask every SBOM to carry.
