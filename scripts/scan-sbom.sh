@@ -254,6 +254,8 @@ COMPONENT_VERSIONS_FILE=""
 # scan cannot find. With none, the container reads sbom-declared.cdx.json at
 # the scan target root when it exists.
 COMPONENTS_FILES=()
+# --no-components: leave sbom-declared.cdx.json at the scan target root unread.
+NO_COMPONENTS="false"
 # Set when --target turned out to be a Yocto build directory: the folder the
 # user pointed at, while ANALYZE_SBOM holds the image SBOM found inside it.
 YOCTO_BUILD_DIR=""
@@ -363,7 +365,10 @@ while [[ "$#" -gt 0 ]]; do
         --vex) VEX_FILE="$2"; GENERATE_SECURITY="true"; shift ;;
         --ai-declare) AI_DECLARE_FILE="$2"; shift ;;
         --component-versions) COMPONENT_VERSIONS_FILE="$2"; shift ;;
-        --components) COMPONENTS_FILES+=("${2:-}"); shift ;;
+        --components)
+            [ "$#" -ge 2 ] || { echo "[ERROR] --components requires a file, e.g. --components sbom-declared.cdx.json"; exit 1; }
+            COMPONENTS_FILES+=("$2"); shift ;;
+        --no-components) NO_COMPONENTS="true" ;;
         --no-spdx3) GENERATE_SPDX3="false" ;;
         --usage) USAGE_CONTEXT="$2"; shift ;;
         --merge)
@@ -513,6 +518,10 @@ Options:
                          scan fails, naming the file and component, when a
                          named file is missing or outside the scan target, or
                          the same name and version is declared twice.
+  --no-components        For a source scan: do not read sbom-declared.cdx.json
+                         at the scan target root (for a scan made before the
+                         build outputs it names exist). Cannot be combined
+                         with --components.
   --no-spdx3             For an AI model or dataset scan: do not write the
                          SPDX 3.0.1 AI document (<Project>_<Version>_bom.spdx3.json)
                          and its check
@@ -975,6 +984,7 @@ if [ "$UI_MODE" = "true" ]; then
     [ -z "$AI_DECLARE_FILE" ] || { echo "[ERROR] --ai-declare is not offered with --ui (fill the declaration on the Models & datasets screen instead)."; exit 1; }
     [ -z "$COMPONENT_VERSIONS_FILE" ] || { echo "[ERROR] --component-versions is not offered with --ui (it applies to one firmware, root filesystem or binary scan)."; exit 1; }
     [ "${#COMPONENTS_FILES[@]}" -eq 0 ] || { echo "[ERROR] --components is not offered with --ui (put sbom-declared.cdx.json at the root of the folder to scan instead)."; exit 1; }
+    [ "$NO_COMPONENTS" = "false" ] || { echo "[ERROR] --no-components is not offered with --ui (it applies to one source scan)."; exit 1; }
     [ "${#FAIL_ON[@]}" -eq 0 ] || { echo "[ERROR] --fail-on is not offered with --ui (it exits on one scan's result; the UI runs many)."; exit 1; }
     [ "$FAIL_ON_CONFORMANCE" = "true" ] && { echo "[ERROR] --fail-on-conformance is not offered with --ui (it exits on one scan's result; the UI runs many)."; exit 1; }
     docker_check
@@ -1105,6 +1115,7 @@ if [ -n "$DIFF_OLD" ]; then
     [ -z "$AI_DECLARE_FILE" ] || { echo "[ERROR] --ai-declare cannot be combined with --diff (a diff writes no AI document to declare into)."; exit 1; }
     [ -z "$COMPONENT_VERSIONS_FILE" ] || { echo "[ERROR] --component-versions cannot be combined with --diff (a diff writes no SBOM to add versions to)."; exit 1; }
     [ "${#COMPONENTS_FILES[@]}" -eq 0 ] || { echo "[ERROR] --components cannot be combined with --diff (a diff writes no SBOM to add components to)."; exit 1; }
+    [ "$NO_COMPONENTS" = "false" ] || { echo "[ERROR] --no-components cannot be combined with --diff (a diff reads no source tree)."; exit 1; }
     docker_check
     [ -f "$DIFF_OLD" ] || { echo "[ERROR] --diff: old SBOM not found: $DIFF_OLD"; exit 1; }
     [ -f "$DIFF_NEW" ] || { echo "[ERROR] --diff: new SBOM not found: $DIFF_NEW"; exit 1; }
@@ -1487,6 +1498,10 @@ component_versions_run() {
 # value read from this process's environment, set where the files are
 # checked), so a name with a space never reaches the eval'd command line.
 components_run() {
+    if [ "$NO_COMPONENTS" = "true" ]; then
+        printf ' -e DECLARED_COMPONENTS_SKIP=1'
+        return 0
+    fi
     [ "${#COMPONENTS_FILES[@]}" -gt 0 ] || return 0
     local d f i=0 list=""
     for f in "${COMPONENTS_FILES[@]}"; do
@@ -2233,6 +2248,9 @@ if [ -n "$COMPONENT_VERSIONS_FILE" ]; then
     fi
 fi
 
+if [ "$NO_COMPONENTS" = "true" ] && [ "${#COMPONENTS_FILES[@]}" -gt 0 ]; then
+    echo "[ERROR] --no-components cannot be combined with --components: the first reads no declaration file, the second names one."; exit 1
+fi
 if [ "${#COMPONENTS_FILES[@]}" -gt 0 ]; then
     DECLARED_COMPONENTS_LABELS=""
     for _cf in "${COMPONENTS_FILES[@]}"; do
@@ -2595,8 +2613,9 @@ fi
 if [ -n "$COMPONENT_VERSIONS_FILE" ] && [ "$MODE" != "FIRMWARE" ] && [ "$MODE" != "ROOTFS" ] && [ "$MODE" != "BINARY" ]; then
     echo "[ERROR] --component-versions applies to firmware, root filesystem and binary scans only (this target is scanned as $MODE)."; exit 1
 fi
-if [ "${#COMPONENTS_FILES[@]}" -gt 0 ] && [ "$MODE" != "SOURCE" ]; then
-    echo "[ERROR] --components applies to source scans only (this target is scanned as $MODE)."; exit 1
+if { [ "${#COMPONENTS_FILES[@]}" -gt 0 ] || [ "$NO_COMPONENTS" = "true" ]; } && [ "$MODE" != "SOURCE" ]; then
+    _flag="--components"; [ "$NO_COMPONENTS" = "true" ] && _flag="--no-components"
+    echo "[ERROR] $_flag applies to source scans only (this target is scanned as $MODE)."; exit 1
 fi
 
 if { [ -n "$AI_DECLARE_FILE" ] || [ "$GENERATE_SPDX3" = "false" ]; } \
@@ -3225,6 +3244,11 @@ EOF
         -e MODE=POSTPROCESS -e BOMLENS_RUN_INPUT="$OUTPUT_FILE" -e NESTED_ROOTFS_HINT="\"$NESTED_ROOTFS_HINT\"" -e BOMLENS_DEEP_LICENSE_FALLBACK="\"${DEEP_LICENSE_FALLBACK_FROM:-}\"" -e BOMLENS_DEEP_CVE_FALLBACK="\"${DEEP_CVE_FALLBACK_FROM:-}\"" -e BOMLENS_INCLUDE_NON_SHIPPED${STAGE1_FALLBACK_ENV}${STAGE1_FINGERPRINT_ENV}${PP_ENV} $(pp_env)$(cosign_run)$(vex_run)$(declare_run)$(components_run)$(exclude_run)$(gate_run) \
         "\"$PP_IMAGE\"" || {
         _pp_rc=$?
+        # Refused declared components rename the SBOM to _bom.refused.json and
+        # say why; that is not a generation failure to retry or explain.
+        if [ -f "$OUTPUT_HOST_DIR/${OUTPUT_FILE%_bom.json}_bom.refused.json" ]; then
+            exit "$_pp_rc"
+        fi
         if [ "$DETECTION_USED" = static ] && [ ! -s "$OUTPUT_HOST_DIR/$OUTPUT_FILE" ]; then
             if [ "$DETECTION" = auto ]; then
                 echo "[WARN] Static detection could not read the lock file; scanning again with a build."

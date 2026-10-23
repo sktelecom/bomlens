@@ -186,7 +186,7 @@ KNOWN_ARTIFACT_SUFFIXES=(
     _modelica.cdx.json _cocoapods.cdx.json _conda.cdx.json
     _security_cvebintool.json _security_grype.json _security_yocto.json
     _security_trivy.json _component-versions.template.csv
-    _reachability.cdx.json
+    _reachability.cdx.json _bom.refused.json
 )
 # Only a caller that knows about this cleanup runs it at all. An old
 # scan-sbom.sh or server.py (built before this existed) sends neither signal
@@ -1653,27 +1653,35 @@ esac
 # component with no version takes the product's, and before normalize, so what
 # is added is normalized with the rest. A refused file (exit 3) stops the run
 # here with the reasons, before the SBOM is normalized, signed or uploaded:
-# an SBOM without the declared components is not the one that was asked for.
+# an SBOM without the declared components is not the one that was asked for,
+# so the SBOM written so far is renamed to _bom.refused.json, where a CI step
+# that picks up _bom.json cannot take it for the result. --no-components
+# (DECLARED_COMPONENTS_SKIP=1) leaves the default file unread.
 # Recorded only when there is a file to read.
 case "$SCAN_MODE" in
     SOURCE|POSTPROCESS)
         _dc_root="${SOURCE_ROOT:-/src}"
         _dc_files=()
+        _dc_default=0
         if [ -n "${DECLARED_COMPONENTS_FILES:-}" ]; then
             read -r -a _dc_files <<< "$DECLARED_COMPONENTS_FILES"
+        elif [ "${DECLARED_COMPONENTS_SKIP:-}" = "1" ]; then
+            [ -f "$_dc_root/sbom-declared.cdx.json" ] \
+                && echo "[INFO] --no-components: sbom-declared.cdx.json at the scan target root is not read."
         elif [ -f "$_dc_root/sbom-declared.cdx.json" ]; then
             _dc_files=("$_dc_root/sbom-declared.cdx.json")
+            _dc_default=1
             DECLARED_COMPONENTS_LABELS="sbom-declared.cdx.json (at the scan target root)"
         fi
         if [ "${#_dc_files[@]}" -gt 0 ]; then
             er_phase declared-components
             _dc_rc=0
             _dc_err="$(mktemp)"
-            DECLARED_COMPONENTS_LABELS="${DECLARED_COMPONENTS_LABELS:-}" \
+            DECLARED_COMPONENTS_LABELS="${DECLARED_COMPONENTS_LABELS:-}" DECLARED_COMPONENTS_DEFAULT="$_dc_default" \
                 python3 "$LIBDIR/apply-declared-components.py" "$OUTPUT_FILE" "$_dc_root" "${_dc_files[@]}" 2> "$_dc_err" || _dc_rc=$?
             cat "$_dc_err" >&2
             if [ "$_dc_rc" -eq 0 ]; then
-                _dc_count="$(jq '[.components[]? | select(any(.properties[]?; .name == "bomlens:origin"))] | length' "$OUTPUT_FILE" 2>/dev/null || echo 0)"
+                _dc_count="$(jq '[.components[]? | select(any(.properties[]?; .name == "bomlens:declared" and .value == "true"))] | length' "$OUTPUT_FILE" 2>/dev/null || echo 0)"
                 er_record declared-components ok "" "" "$ER_PHASE_STARTED" "" "{\"components\":${_dc_count:-0}}"
                 er_phase_end
             else
@@ -1681,16 +1689,26 @@ case "$SCAN_MODE" in
                 er_record declared-components failed failed "${_dc_first:-the declaration could not be applied}" "$ER_PHASE_STARTED"
                 er_phase_end
                 rm -f "$_dc_err"
+                _dc_refused="${OUT_PREFIX}_bom.refused.json"
+                mv -f "$OUTPUT_FILE" "$_dc_refused" 2>/dev/null || true
+                # The copy already synced to the host (an output folder that
+                # is not this one) is renamed there too.
+                if [ -n "${HOST_OUTPUT_DIR:-}" ] && [ -f "$HOST_OUTPUT_DIR/$OUTPUT_FILE" ]; then
+                    mv -f "$HOST_OUTPUT_DIR/$OUTPUT_FILE" "$HOST_OUTPUT_DIR/$_dc_refused" 2>/dev/null || true
+                fi
+                ARTIFACTS=("$_dc_refused")
+                sync_artifacts
                 if [ "$_dc_rc" -eq 3 ]; then
                     echo "[ERROR] the declared components were refused (reasons above), so the SBOM is not complete. Fix the declaration file and scan again."
                 else
                     echo "[ERROR] the declared components could not be added to the SBOM (see above)."
                 fi
+                echo "[ERROR] The SBOM without them is kept as $_dc_refused, not as $OUTPUT_FILE."
                 exit 1
             fi
             rm -f "$_dc_err"
         fi
-        unset _dc_root _dc_files _dc_rc _dc_err _dc_count _dc_first
+        unset _dc_root _dc_files _dc_rc _dc_err _dc_count _dc_first _dc_default
         ;;
 esac
 
