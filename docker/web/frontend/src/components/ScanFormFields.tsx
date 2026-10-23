@@ -563,10 +563,13 @@ export function FormatOptions({ state }: { state: ScanFormState }) {
     setOutboundLicense,
     sbomAuthor,
     setSbomAuthor,
+    supplier,
+    setSupplier,
     specVersion,
     setSpecVersion,
     showOutboundLicense,
     showSbomAuthor,
+    showSupplier,
     showSpecVersion,
     showConformanceProfile,
     busy,
@@ -638,6 +641,26 @@ export function FormatOptions({ state }: { state: ScanFormState }) {
           />
           <p id="sbom-author-hint" className="text-body-sm text-muted-foreground">
             {t("options.sbomAuthorHint")}
+          </p>
+        </div>
+      )}
+      {showSupplier && (
+        <div className="space-y-1.5">
+          <label htmlFor="product-supplier" className="text-body-sm font-medium text-foreground">
+            {t("options.supplier")}
+          </label>
+          <Input
+            id="product-supplier"
+            type="text"
+            value={supplier}
+            onChange={(e) => setSupplier(e.target.value)}
+            disabled={busy}
+            placeholder="SK Telecom Co., Ltd. <https://www.sktelecom.com>"
+            spellCheck={false}
+            aria-describedby="product-supplier-hint"
+          />
+          <p id="product-supplier-hint" className="text-body-sm text-muted-foreground">
+            {t("options.supplierHint")}
           </p>
         </div>
       )}

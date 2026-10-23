@@ -186,6 +186,11 @@ export function useScanForm({
   const [sbomAuthor, setSbomAuthor] = useState(
     () => initialConfig?.sbomAuthor ?? "",
   );
+  // Product supplier (CycloneDX metadata.component.supplier), written as
+  // "Name <https://url>" or "Name <email>". Free text; empty leaves it out.
+  const [supplier, setSupplier] = useState(
+    () => initialConfig?.supplier ?? "",
+  );
   // CycloneDX version of the SBOM (--spec-version). A re-scan keeps the
   // version the earlier scan wrote; anything unrecognized falls back to 1.6.
   const [specVersion, setSpecVersion] = useState<CdxSpecVersion>(() =>
@@ -299,6 +304,8 @@ export function useScanForm({
   // converts a document someone else authored, and stamping our own name on it
   // would misattribute it (entrypoint.sh's own reason for excluding ANALYZE).
   const showSbomAuthor = !isAnalyze;
+  // Same rule as the SBOM author: ANALYZE keeps the received SBOM's supplier.
+  const showSupplier = !isAnalyze;
   // Same rule as the SBOM author: ANALYZE delivers the supplier's document at
   // the version they wrote it in.
   const showSpecVersion = !isAnalyze;
@@ -330,7 +337,7 @@ export function useScanForm({
     showDeepLicense || showVendored || showByteStable || showDeepCve || showReachability ||
     showDetection;
   const showFormatOptions =
-    showOutboundLicense || showSbomAuthor || showSpecVersion || showConformanceProfile;
+    showOutboundLicense || showSbomAuthor || showSupplier || showSpecVersion || showConformanceProfile;
   // Any scan produces an SBOM, so upload is offered for every source.
   // A declaration opens questions before any scan; a credential stashed now
   // would sit on the server if they were cancelled, so it is not offered here.
@@ -561,6 +568,8 @@ export function useScanForm({
       license: showOutboundLicense ? outboundLicense.trim() : "",
       // SBOM author: hidden (and so never sent) for ANALYZE (see showSbomAuthor).
       sbomAuthor: showSbomAuthor ? sbomAuthor.trim() : "",
+      // Product supplier: hidden like the SBOM author (see showSupplier).
+      supplier: showSupplier ? supplier.trim() : "",
       // CycloneDX version: not sent for ANALYZE (see showSpecVersion).
       specVersion: showSpecVersion ? specVersion : undefined,
       // AI-model only: grade the assessment against the chosen usage.
@@ -613,6 +622,7 @@ export function useScanForm({
     conformanceProfile, setConformanceProfile,
     outboundLicense, setOutboundLicense,
     sbomAuthor, setSbomAuthor,
+    supplier, setSupplier,
     specVersion, setSpecVersion,
     scanossToken, setScanossToken,
     uploadEnabled, setUploadEnabled,
@@ -624,6 +634,7 @@ export function useScanForm({
     busy, uploadKind, textInput, isText, isAnalyze, isAiModel, showVendored,
     showDeepLicense, showDeepCve, showReachability, showByteStable, showOutboundLicense,
     showSbomAuthor,
+    showSupplier,
     showSpecVersion,
     showConformanceProfile,
     showScanOptions, showFormatOptions, showUpload,

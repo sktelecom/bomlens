@@ -117,6 +117,8 @@
     "outboundLicenseHint": "The SPDX id your project ships under, e.g. Apache-2.0. Dependencies whose terms clash with it are then flagged. A source scan cannot infer this, so without it the check stays off.",
     "sbomAuthor": "SBOM author (optional)",
     "sbomAuthorHint": "The organisation or person running this scan, not the tool and not whoever wrote the software. Use the full legal name, no acronyms. Add an email as \"Name <email>\" to record a contact, which the BSI TR-03183-2 profile requires. Left out of the SBOM when empty.",
+    "supplier": "Product supplier",
+    "supplierHint": "The organisation that supplies this product, as \"Name <https://url>\" or \"Name <email>\". Required for the BSI TR-03183-2 profile. Left out when empty.",
     "specVersion": "CycloneDX version",
     "specVersionDefault": "CycloneDX 1.6 (default)",
     "specVersion17": "CycloneDX 1.7",
