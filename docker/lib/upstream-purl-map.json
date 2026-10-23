@@ -3,7 +3,7 @@
 
   "_comment_fields": "names: lower-cased component names that mean this project. cpe: vendor:product pairs (NVD CPE dictionary) that mean it, matched when the name is not listed. purl: everything before '@'. version: the regular expression the normalized version must match in full; a version of any other shape is left alone rather than guessed at. tag: how the release tag is spelled, with {v} the version, {v_} the version with '.' replaced by '_', and {1}, {2}, ... the groups of the version expression. tags: instead of tag, for a project whose tag carries something the version does not (a release date): the normalized version -> its tag, for the checked versions only; any other version is left alone. normalize: suffixes removed before matching; 'release' is a trailing package rebuild count (-1, -r2; at most three digits, so a date such as -20230520 is kept), 'build-hash' a trailing build hash of 20 or more hex digits (kernel packages carry one), 'zero-sublevel' a third part of 0 removed (5.4.0 becomes 5.4) for a project that tags a base release with two parts. verified: the versions whose release tag the entry was checked to reproduce.",
 
-  "replaceablePurlTypes": ["generic", "opkg", "openwrt"],
+  "replaceablePurlTypes": ["generic", "opkg", "openwrt", "yocto"],
 
   "entries": [
     { "id": "busybox", "names": ["busybox"], "cpe": ["busybox:busybox"],

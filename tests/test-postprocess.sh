@@ -5954,6 +5954,52 @@ BOMLENS_CPE_INDEX_MATCHED=false PATH="$FAKEBIN:$PATH" SECURITY_ENRICH=false DEEP
 # every other supplier SBOM.
 python3 "$LIB/parse-yocto-spdx.py" "$FIX/good-cyclonedx.json" "$WORK/nope.json" >/dev/null 2>&1
 [ "$?" = "3" ] && pass "non-Yocto input is declined with rc=3 (generic path takes over)" || fail "parser did not decline CycloneDX input"
+# Up to 5.x Yocto wrote no purl, and the output keeps having none.
+[ "$(jq '[.components[] | select(.purl)] | length' "$WORK/yocto.cdx.json")" = "0" ] \
+    && pass "a 5.x-shaped Yocto document gets no purl" \
+    || fail "purls on the 5.x fixture: $(jq -c '[.components[].purl]' "$WORK/yocto.cdx.json")"
+
+echo "== yocto: SPDX 3.0 image SBOM in the 6.x shape (declared licenses, recipe VEX, purl) =="
+# Yocto 6.0 writes the declared license and links vulnerabilities to the recipe,
+# which generates the installed packages; 6.1 adds the affected VEX state and a
+# purl per package. Read as 5.x was, this shape gave no license and no verdict.
+python3 "$LIB/parse-yocto-spdx.py" "$FIX/yocto-spdx3-6x-image.json" "$WORK/y6.cdx.json" "$WORK/y6" >/dev/null 2>&1
+y6rc=$?
+[ "$y6rc" = "0" ] && pass "parser accepts a Yocto 6.x SPDX 3.0 document" || fail "parser rc=$y6rc on the 6.x fixture"
+[ "$(jq -r '[.components[].name] | join(",")' "$WORK/y6.cdx.json" 2>/dev/null)" = "busybox,busybox-syslog,closed-app,libz1" ] \
+    && pass "6.x: only installed packages become components (recipes dropped)" \
+    || fail "6.x components: $(jq -c '[.components[].name]' "$WORK/y6.cdx.json" 2>/dev/null)"
+y6lic=$(jq -r '[.components[] | "\(.name)=\(.licenses[0] // {} | .expression // .license.id // "-")"] | join(" ")' "$WORK/y6.cdx.json" 2>/dev/null)
+[ "$y6lic" = "busybox=GPL-2.0-only AND bzip2-1.0.6 busybox-syslog=GPL-2.0-only AND bzip2-1.0.6 closed-app=- libz1=Zlib" ] \
+    && pass "6.x: declared license read, concluded one preferred, NoneElement and NOASSERTION give none" \
+    || fail "6.x licenses: $y6lic"
+y6purl=$(jq -r '[.components[] | "\(.name)=\(.purl // "-")"] | join(" ")' "$WORK/y6.cdx.json" 2>/dev/null)
+[ "$y6purl" = "busybox=pkg:yocto/core/busybox@1.36.1 busybox-syslog=pkg:yocto/core/busybox@1.36.1 closed-app=pkg:yocto/meta-vendor/closed-app@2.0 libz1=pkg:yocto/core/zlib@1.3.1" ] \
+    && pass "6.x: software_packageUrl, or the packageUrl identifier, becomes the purl" \
+    || fail "6.x purls: $y6purl"
+# The recipe's links apply to each package it generates, as 5.x listed them on
+# each package. busybox also carries one of them directly, counted once; the
+# native recipe generates nothing installed, so its CVE is not counted.
+[ "$(jq -r '[.judgements.fixed, .judgements.notAffected, .judgements.affected] | join("/")' "$WORK/y6_yocto_vex.json" 2>/dev/null)" = "2/2/4" ] \
+    && pass "6.x: recipe VEX verdicts reach the packages it generates" \
+    || fail "6.x vex counts=$(jq -c '.judgements' "$WORK/y6_yocto_vex.json" 2>/dev/null)"
+[ "$(jq -r '[.Results[].Vulnerabilities[] | "\(.VulnerabilityID):\(.PkgName)"] | sort | join(",")' "$WORK/y6_security_yocto.json" 2>/dev/null)" = "CVE-2022-28391:busybox,CVE-2022-28391:busybox-syslog,CVE-2022-48174:busybox,CVE-2022-48174:busybox-syslog" ] \
+    && pass "6.x: the stated-affected and the unjudged CVE reach the sidecar, on each generated package" \
+    || fail "6.x sidecar: $(jq -c '[.Results[].Vulnerabilities[] | [.VulnerabilityID, .PkgName]]' "$WORK/y6_security_yocto.json" 2>/dev/null)"
+# pkg:yocto names a recipe in a layer, which no advisory source keys on: the
+# upstream step may replace it, keeping it as the original, and without the
+# build's judgements the packages are listed as unchecked as before.
+cp "$WORK/y6.cdx.json" "$WORK/y6-upp.cdx.json"
+python3 "$LIB/upstream-purl.py" "$WORK/y6-upp.cdx.json" >/dev/null 2>&1
+[ "$(jq -r '.components[] | select(.name=="busybox") | [.purl, ([.properties[] | select(.name=="bomlens:originalPurl") | .value][0])] | join(" ")' "$WORK/y6-upp.cdx.json" 2>/dev/null)" = "pkg:github/mirror/busybox@1_36_1 pkg:yocto/core/busybox@1.36.1" ] \
+    && pass "6.x: a pkg:yocto purl is replaced by the upstream repository purl and kept as the original" \
+    || fail "6.x upstream purl: $(jq -c '[.components[] | select(.name=="busybox") | .purl, .properties]' "$WORK/y6-upp.cdx.json" 2>/dev/null)"
+cp "$WORK/y6.cdx.json" "$WORK/y6-novex.cdx.json"
+BOMLENS_CPE_INDEX_MATCHED=false PATH="$FAKEBIN:$PATH" SECURITY_ENRICH=false DEEP_CVE=false \
+    bash "$LIB/scan-security.sh" "$WORK/y6-novex.cdx.json" "$WORK/y6-novex" proj >/dev/null 2>&1
+[ "$(jq -r '[.UncheckedComponents.Components[] | "\(.Name):\(.Reason)"] | join(" ")' "$WORK/y6-novex_security.json" 2>/dev/null)" = "busybox:no-identifier busybox-syslog:no-identifier closed-app:no-identifier libz1:no-identifier" ] \
+    && pass "6.x: a pkg:yocto purl is not taken for an identifier an advisory source reads" \
+    || fail "6.x unchecked: $(jq -c '.UncheckedComponents' "$WORK/y6-novex_security.json" 2>/dev/null)"
 
 # Yocto SPDX 2.x writes a near-empty top-level document and puts the real package
 # set in a sibling tarball. Converting it succeeds and finds nothing, so the user
