@@ -42,7 +42,7 @@ import type { LicenseRiskTier } from "@/lib/licenses";
 import type { SectionId } from "@/lib/nav";
 import {
   type AttentionItem,
-  needsAttention,
+  overviewAttention,
   riskyComponentCount,
   topRiskComponents,
 } from "@/lib/overview";
@@ -194,7 +194,7 @@ function TopRisk({
           {scanId && (
             <a
               href={scanHash(scanId, "components")}
-              className="rounded text-label text-muted-foreground underline-offset-2 hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1"
+              className="rounded text-label text-muted-foreground underline underline-offset-2 hover:text-foreground hover:no-underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1"
             >
               {t("overview.topRiskAll")}
             </a>
@@ -215,18 +215,22 @@ function TopRisk({
                   {c.group ? `${c.group} / ` : ""}
                   {c.name}
                 </span>
+                {/* Fixed-width version and badge cells, so the versions line up
+                    in one column whatever the badge text's length. */}
                 <span
-                  className="min-w-0 max-w-[9rem] truncate font-mono text-label text-muted-foreground"
+                  className="w-20 shrink-0 truncate text-right font-mono text-label text-muted-foreground sm:w-36"
                   title={c.version}
                 >
                   {c.version}
                 </span>
-                {c.maxSeverity && (
-                  <Badge tone={SEV_TONE[c.maxSeverity]} mark className="shrink-0">
-                    {t(`severity.${c.maxSeverity}`)}
-                    {c.vulnCount ? ` · ${fmt(c.vulnCount)}` : ""}
-                  </Badge>
-                )}
+                <span className="flex shrink-0 sm:w-32">
+                  {c.maxSeverity && (
+                    <Badge tone={SEV_TONE[c.maxSeverity]} mark>
+                      {t(`severity.${c.maxSeverity}`)}
+                      {c.vulnCount ? ` · ${fmt(c.vulnCount)}` : ""}
+                    </Badge>
+                  )}
+                </span>
                 <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
               </a>
             </li>
@@ -275,9 +279,9 @@ export function Overview({
   ) => void;
 }) {
   const { t, i18n } = useTranslation();
-  // A failed conformance is already the "required items" row of the first-checks
-  // card (same count, same target), so it is not listed a second time here.
-  const attention = needsAttention(result).filter((i) => i.id !== "conformance");
+  // Rows the first-checks card already carries (a failed conformance, the
+  // Critical-and-High count when all of it is fixable) are not listed twice.
+  const attention = overviewAttention(result);
   const hasDeps = Boolean(sbomFileName(result));
   const ai = isAiScan(result);
   // Mirrors nav.ts's gate on the Conformance section itself: a jump card that
@@ -944,7 +948,14 @@ export function Overview({
           <div className="order-4 empty:hidden 2xl:order-none">
             {/* The two risk axes side by side; clicking a band routes into its
                 section with that filter applied. */}
-            <div className="grid grid-cols-1 gap-x-8 gap-y-6 lg:grid-cols-2 2xl:grid-cols-1">
+            {/* Two columns only when there are two axes: an AI scan has no
+                security report, and the licence axis alone took half the width. */}
+            <div
+              className={cn(
+                "grid grid-cols-1 gap-x-8 gap-y-6",
+                result.security && "lg:grid-cols-2 2xl:grid-cols-1",
+              )}
+            >
               {result.security && (
                 <SeverityBar
                   security={result.security}
@@ -1140,21 +1151,26 @@ function JumpCards({
     { id: "artifacts", icon: Package, value: result.results.length },
   ];
 
-  // One compact strip instead of a row of tall cards. The set is conditional
-  // (2 to 7 entries), so the entries wrap onto a second line instead of
-  // shrinking: each keeps its own width and nothing breaks mid-entry.
+  // One compact set of entries instead of a row of tall cards. The set is
+  // conditional (2 to 7 entries), so it is an even grid of equal columns: a
+  // wrapped flex row left one entry alone on the second line, and in the narrow
+  // right column at 2xl it collapses to one entry per line. A secondary figure
+  // goes on its own line inside the entry instead of widening it.
   return (
     <div>
-      <ul aria-label={t("overview.summaryLabel")} className="flex flex-wrap gap-2">
+      <ul
+        aria-label={t("overview.summaryLabel")}
+        className="grid grid-cols-[repeat(auto-fill,minmax(12.5rem,1fr))] gap-2"
+      >
         {jumps.map(({ id, key, icon: Icon, value, sub, label, valueClass }) => {
           const text = label ?? t(`nav.${id}`);
           return (
-            <li key={key ?? id} className="min-w-0 max-w-full">
+            <li key={key ?? id} className="flex min-w-0">
               <a
                 href={scanId ? scanHash(scanId, id) : undefined}
                 aria-label={t("overview.jumpHint", { section: text })}
                 className={cn(
-                  "group flex max-w-full items-center gap-2 rounded-lg border bg-card px-3 py-2",
+                  "group flex w-full min-w-0 items-center gap-2 rounded-lg border bg-card px-3 py-2",
                   "transition-[border-color,background-color] duration-fast ease-out-soft",
                   "hover:border-foreground/30 hover:bg-muted/50",
                   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
@@ -1169,17 +1185,19 @@ function JumpCards({
                 >
                   {typeof value === "number" ? fmt(value) : (value ?? "—")}
                 </span>
-                <span className="text-body-sm text-muted-foreground">{text}</span>
+                <span className="min-w-0 truncate text-body-sm text-muted-foreground">{text}</span>
+                {/* Takes only the room the column has left, cut short with the
+                    full text in the tooltip, so every entry stays one line. */}
                 {sub && (
                   <span
-                    className="min-w-0 max-w-[14rem] truncate text-label text-muted-foreground"
+                    className="min-w-0 flex-1 truncate text-label text-muted-foreground"
                     title={sub}
                   >
                     {sub}
                   </span>
                 )}
                 <ChevronRight
-                  className="h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-fast ease-out-soft group-hover:translate-x-0.5"
+                  className="ml-auto h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-fast ease-out-soft group-hover:translate-x-0.5"
                   aria-hidden
                 />
               </a>

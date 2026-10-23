@@ -4,7 +4,13 @@
 import { describe, expect, it } from "vitest";
 
 import type { ComponentItem, DoneEvent } from "./api";
-import { firstChecks, needsAttention, riskyComponentCount, topRiskComponents } from "./overview";
+import {
+  firstChecks,
+  needsAttention,
+  overviewAttention,
+  riskyComponentCount,
+  topRiskComponents,
+} from "./overview";
 import { applyVulnView, vulnViewFromQuery } from "./vulnView";
 
 function result(over: Partial<DoneEvent> = {}): DoneEvent {
@@ -429,5 +435,50 @@ describe("firstChecks", () => {
     const all = withVulns([vuln({ kev: true, severity: "CRITICAL", fixed: "2" })]);
     expect(firstChecks(all, 1).map((i) => i.id)).toEqual(["knownExploited"]);
     expect(firstChecks(all, 0)).toEqual([]);
+  });
+});
+
+describe("overviewAttention", () => {
+  const vuln = (over: Record<string, unknown>) => ({
+    id: "CVE-1", severity: "HIGH", pkg: "p", installed: "1", fixed: "", title: "", ...over,
+  });
+  const scan = (vulns: Record<string, unknown>[], total = vulns.length) => {
+    const crit = vulns.filter((v) => v.severity === "CRITICAL").length;
+    const high = vulns.filter((v) => v.severity === "HIGH").length;
+    return result({
+      security: {
+        ...sev({ CRITICAL: crit, HIGH: high, TOTAL: total }),
+        vulnerabilities: vulns,
+      } as unknown as DoneEvent["security"],
+    });
+  };
+
+  it("drops the Critical and High row when the fixable row counts the same findings", () => {
+    const r = scan([vuln({ severity: "CRITICAL", fixed: "2" }), vuln({ id: "B", fixed: "3" })]);
+    expect(needsAttention(r).map((i) => i.id)).toEqual(["vulns"]);
+    expect(firstChecks(r).find((c) => c.id === "fixableSevere")?.count).toBe(2);
+    expect(overviewAttention(r)).toEqual([]);
+  });
+
+  it("keeps it when some of those findings have no fix, so the counts differ", () => {
+    const r = scan([vuln({ severity: "CRITICAL", fixed: "2" }), vuln({ id: "B" })]);
+    expect(overviewAttention(r).map((i) => i.id)).toEqual(["vulns"]);
+  });
+
+  it("keeps it when the rows listed are only part of the scan, so the counts cannot be compared", () => {
+    const r = scan([vuln({ fixed: "2" })], 500);
+    expect(overviewAttention(r).map((i) => i.id)).toEqual(["vulns"]);
+  });
+
+  it("never repeats a failed conformance, which is a first-checks row", () => {
+    const r = result({
+      conformance: {
+        result: "fail",
+        format: "CycloneDX",
+        checks: [{ id: "timestamp", label: "Timestamp", required: true, status: "fail", detail: "" }],
+      } as DoneEvent["conformance"],
+    });
+    expect(needsAttention(r).map((i) => i.id)).toContain("conformance");
+    expect(overviewAttention(r).map((i) => i.id)).not.toContain("conformance");
   });
 });
