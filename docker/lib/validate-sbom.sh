@@ -318,13 +318,22 @@ cdx_checks() {
     # component because a dataset can carry a checksum.
     | ([ \$pkg[] | select(((.authors // []) | length > 0) or ((.publisher // \"\") != \"\")
                           or (((.supplier // {}) | length) > 0) or (((.manufacturer // {}) | length) > 0)) ] | length) as \$creator_ok
-    | ([ \$pkg[] | select((.properties // []) | any(.name == \"bsi:component:filename\")) ] | length) as \$fname_ok
-    | ([ \$c[] | select((.hashes // []) | any(.alg == \"SHA-512\")) ] | length) as \$sha512_ok
+    # A component made of several delivered files (a declared component with
+    # more than one bomlens:artifact) carries the per-file fields on its nested
+    # type \"file\" components, not on itself: it counts as having a field when
+    # every one of those files has it.
+    | def bsi_files_all(f): ([ (.components // [])[] | select(.type == \"file\") ]) as \$k
+                           | (\$k | length) > 0 and all(\$k[]; f);
+      def bsi_fname: (.properties // []) | any(.name == \"bsi:component:filename\");
+      def bsi_sha512: (.hashes // []) | any(.alg == \"SHA-512\");
+      def bsi_fprops: (.properties // []) as \$props
+                      | (\$props | any(.name == \"bsi:component:executable\"))
+                        and (\$props | any(.name == \"bsi:component:archive\"))
+                        and (\$props | any(.name == \"bsi:component:structured\"));
+      ([ \$pkg[] | select(bsi_fname or bsi_files_all(bsi_fname)) ] | length) as \$fname_ok
+    | ([ \$c[] | select(bsi_sha512 or bsi_files_all(bsi_sha512)) ] | length) as \$sha512_ok
     | ([ \$pkg[] | select((.externalReferences // []) | any(.type == \"vcs\" or .type == \"distribution\")) ] | length) as \$uri_ok
-    | ([ \$pkg[] | select((.properties // []) as \$props
-                          | (\$props | any(.name == \"bsi:component:executable\"))
-                            and (\$props | any(.name == \"bsi:component:archive\"))
-                            and (\$props | any(.name == \"bsi:component:structured\"))) ] | length) as \$fprops_ok
+    | ([ \$pkg[] | select(bsi_fprops or bsi_files_all(bsi_fprops)) ] | length) as \$fprops_ok
     | [
        {id:\"spec-version\", label:(\"Spec version (CycloneDX \" + (\$vers|unique|join(\"/\")) + \")\"), required:true,
         status:(if (\$vers | index(\$sv)) != null then \"pass\" else \"fail\" end),

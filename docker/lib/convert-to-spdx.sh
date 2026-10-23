@@ -81,6 +81,15 @@ if [ -f "$SPDX_CONTAINERS" ] && command -v python3 >/dev/null 2>&1; then
         || echo "[spdx] WARN: containers were not carried into the SPDX file." >&2
 fi
 
+# Declared components (a source scan's declaration file): the checksums of
+# their build outputs, and the files of one with several, which syft convert
+# drops. See spdx-declared.py.
+SPDX_DECLARED="$LIB_DIR/spdx-declared.py"
+if [ -f "$SPDX_DECLARED" ] && command -v python3 >/dev/null 2>&1; then
+    python3 "$SPDX_DECLARED" "$INPUT" "$OUTPUT" \
+        || echo "[spdx] WARN: the declared components' checksums were not carried into the SPDX file." >&2
+fi
+
 if [ "$MODE" = "--stable" ]; then
     # syft stamps the current time in creationInfo.created and a random UUID in
     # documentNamespace; pin both so BYTE_STABLE runs stay byte-identical.
