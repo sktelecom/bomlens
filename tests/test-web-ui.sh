@@ -3902,6 +3902,7 @@ echo "[stub] scanning ${PROJECT_NAME} ${PROJECT_VERSION} (mode=$mode)"
   echo "CONFORMANCE_PROFILE=${CONFORMANCE_PROFILE:-}"
   echo "PROJECT_LICENSE=${PROJECT_LICENSE:-}"
   echo "SBOM_AUTHOR=${SBOM_AUTHOR:-}"
+  echo "PRODUCT_SUPPLIER=${PRODUCT_SUPPLIER:-}"
   echo "CYCLONEDX_SPEC_VERSION=${CYCLONEDX_SPEC_VERSION:-}"
   echo "REPORT_LANG=${REPORT_LANG:-}"
   echo "DETECTION=${DETECTION:-}"
@@ -5102,6 +5103,48 @@ else
     fail "(주)에스케이 & 파트너스 was mangled" "$(cat "$WORK/stub-env")"
 fi
 
+echo "== supplier: the product supplier reaches the scan env as one line, and only when given =="
+rm -f "$WORK/stub-env"
+sse_events "project=sup1&version=1.0&source=current-dir&supplier=$(urlenc 'SK Telecom Co., Ltd. <https://www.sktelecom.com>')" >/dev/null
+if [ "$(sed -n 's/^PRODUCT_SUPPLIER=//p' "$WORK/stub-env")" = "SK Telecom Co., Ltd. <https://www.sktelecom.com>" ]; then
+    pass "supplier=Name <url> -> PRODUCT_SUPPLIER in the run-scan env unchanged"
+else
+    fail "the product supplier did not reach the scan env" "$(cat "$WORK/stub-env")"
+fi
+rm -f "$WORK/stub-env"
+sse_events "project=sup2&version=1.0&source=current-dir" >/dev/null
+if grep -q '^PRODUCT_SUPPLIER=$' "$WORK/stub-env" 2>/dev/null; then
+    pass "no supplier param -> PRODUCT_SUPPLIER stays empty (no supplier written)"
+else
+    fail "PRODUCT_SUPPLIER was set without a supplier param" "$(cat "$WORK/stub-env")"
+fi
+rm -f "$WORK/stub-env"
+sse_events "project=sup3&version=1.0&source=current-dir&supplier=$(urlenc '   ')" >/dev/null
+if grep -q '^PRODUCT_SUPPLIER=$' "$WORK/stub-env" 2>/dev/null; then
+    pass "a whitespace-only supplier -> PRODUCT_SUPPLIER stays empty"
+else
+    fail "a whitespace-only supplier was forwarded" "$(cat "$WORK/stub-env")"
+fi
+# A newline would otherwise split the stub's KEY=value line (and put a second
+# line into the SBOM's supplier name); control characters become spaces, for
+# the SBOM author too.
+rm -f "$WORK/stub-env"
+sse_events "project=sup4&version=1.0&source=current-dir&supplier=$(urlenc $'ACME\nCorp\t<sbom@acme.example>\r')&sbom_author=$(urlenc $'Jane\nDoe')" >/dev/null
+if [ "$(sed -n 's/^PRODUCT_SUPPLIER=//p' "$WORK/stub-env")" = "ACME Corp <sbom@acme.example>" ] \
+   && [ "$(sed -n 's/^SBOM_AUTHOR=//p' "$WORK/stub-env")" = "Jane Doe" ] \
+   && [ "$(grep -c '^Corp' "$WORK/stub-env")" = "0" ] && [ "$(grep -c '^Doe' "$WORK/stub-env")" = "0" ]; then
+    pass "control characters in supplier and sbom_author become spaces (one line each)"
+else
+    fail "a control character reached PRODUCT_SUPPLIER or SBOM_AUTHOR" "$(cat "$WORK/stub-env")"
+fi
+rm -f "$WORK/stub-env"
+sse_events "project=sup5&version=1.0&source=current-dir&supplier=$(python3 -c 'print("x"*400)')" >/dev/null
+if [ "$(sed -n 's/^PRODUCT_SUPPLIER=//p' "$WORK/stub-env" | tr -d '\n' | wc -c | tr -d ' ')" = "256" ]; then
+    pass "a 400-character supplier is cut to 256 characters"
+else
+    fail "the supplier length cap did not hold" "$(cat "$WORK/stub-env")"
+fi
+
 echo "== spec_version: the CycloneDX version reaches the scan env as 1.6 or 1.7, anything else is a 400 =="
 rm -f "$WORK/stub-env"
 sse_events "project=sv1&version=1.0&source=current-dir&spec_version=1.7" >/dev/null
@@ -5193,9 +5236,18 @@ assert mangled == "Evil (touch /tmp/PWNED) touch /tmp/PWNED2", mangled
 
 # Still bounded.
 assert len(server._env_flag_value("x" * 300)) == 256
+
+# The SBOM author and product supplier keep the angle brackets that mark their
+# URL or email ("Name <https://...>", "Name <address@host>") on the sibling
+# docker-run path, and lose the same shell bytes as every other value.
+for v in ("SK Telecom Co., Ltd. <https://www.sktelecom.com>", "ACME <sbom@acme.example>"):
+    assert server._env_contact_value(v) == v, server._env_contact_value(v)
+assert server._env_contact_value("A <b> $(x) `y`;|") == "A <b> (x) y", server._env_contact_value("A <b> $(x) `y`;|")
+assert len(server._env_contact_value("x" * 300)) == 256
+assert server._one_line_field(" a\nb\x7f ", 10) == "a b", repr(server._one_line_field(" a\nb\x7f ", 10))
 PY
 then
-    pass "_env_flag_value keeps legal-entity punctuation and still strips shell metacharacters"
+    pass "_env_flag_value and _env_contact_value keep legal-entity punctuation (and <> for contacts) and still strip shell metacharacters"
 else
     fail "_env_flag_value sanitizer check failed (see assertion above)"
 fi
