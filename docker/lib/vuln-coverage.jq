@@ -16,7 +16,7 @@ def vc_purl_type:
 # A purl no advisory source Trivy reads is keyed on: none at all, `pkg:generic`,
 # one that points at a source repository or project site (github, gitlab,
 # bitbucket, git, sourceforge, gnu), an OpenWrt package (opkg), or a Yocto
-# recipe (yocto, written from 6.1). For these a CPE is the only identifier a
+# recipe (yocto, written from 6.0). For these a CPE is the only identifier a
 # check can use.
 def vc_no_ecosystem_purl:
   vc_purl_type | IN("", "generic", "github", "gitlab", "bitbucket", "git", "sourceforge", "gnu", "opkg", "yocto");
