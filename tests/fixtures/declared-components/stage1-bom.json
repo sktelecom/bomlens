@@ -1,0 +1,34 @@
+{
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.6",
+  "serialNumber": "urn:uuid:5a1b2c3d-0000-4000-8000-000000000001",
+  "version": 1,
+  "metadata": {
+    "timestamp": "2026-10-23T00:00:00Z",
+    "tools": {
+      "components": [
+        { "type": "application", "name": "cdxgen", "version": "12.0.0" }
+      ]
+    },
+    "component": {
+      "type": "application",
+      "name": "project",
+      "version": "latest",
+      "bom-ref": "pkg:generic/project@latest"
+    }
+  },
+  "components": [
+    {
+      "type": "library",
+      "name": "zlib",
+      "version": "1.3.1",
+      "purl": "pkg:conan/zlib@1.3.1",
+      "bom-ref": "pkg:conan/zlib@1.3.1",
+      "licenses": [ { "license": { "id": "Zlib" } } ]
+    }
+  ],
+  "dependencies": [
+    { "ref": "pkg:generic/project@latest", "dependsOn": [ "pkg:conan/zlib@1.3.1" ] },
+    { "ref": "pkg:conan/zlib@1.3.1", "dependsOn": [] }
+  ]
+}

@@ -392,6 +392,16 @@ jobs:
           BOMLENS_CDX_SCHEMA: "1"
         run: bash tests/test-declared-service.sh
 
+      # No Docker: the declaration file of a source scan (--components, or
+      # sbom-declared.cdx.json at the scan target root). Declared components
+      # reach the SBOM with the hashes and file properties of their build
+      # outputs, the graph reaches them from the product, each refusal rule
+      # stops the run, and the result is valid CycloneDX 1.6.
+      - name: Declared components tests
+        env:
+          BOMLENS_CDX_SCHEMA: "1"
+        run: bash tests/test-declared-components.sh
+
       # No Docker: reads model files built on the spot (GGUF, safetensors, torch
       # archive, pickle, npz) and asserts the header facts that end up in the
       # SBOM — including that the magic bytes, not the extension, decide the
