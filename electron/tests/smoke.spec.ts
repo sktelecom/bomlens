@@ -156,7 +156,7 @@ test("status screen displays the app version", async () => {
 
 // Light/dark contract: the status screen's CSS must follow prefers-color-scheme
 // with exactly the colors main.mjs paints the window background with (#fafafa
-// light / #0e0e10 dark, the computed shared --background token) — if either side
+// light / #111113 dark, the computed shared --background token) — if either side
 // drifts, the app flashes the wrong color on first paint. The scheme is emulated at the page level: overriding
 // nativeTheme.themeSource in the main process does not reach a file:// page's
 // media query in this Electron version, and the app itself never overrides it.
@@ -175,7 +175,7 @@ test("status screen styles both color schemes with the first-paint colors", asyn
     await win.emulateMedia({ colorScheme: "dark" });
     await expect
       .poll(() => win.evaluate(() => getComputedStyle(document.body).backgroundColor))
-      .toBe("rgb(14, 14, 16)");
+      .toBe("rgb(17, 17, 19)");
   } finally {
     await app.close();
   }
