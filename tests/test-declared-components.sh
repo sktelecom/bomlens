@@ -398,6 +398,21 @@ refused "an expression mixed with licence objects" \
 refused "a purl that is not a package URL" \
     "component #3 'vendor-hal': purl 'vendor-hal@4.2.0' is not a package URL" \
     "$(variant w8 '.components[2].purl = "vendor-hal@4.2.0"')"
+refused "a license id that is not on the SPDX license list" \
+    "component #3 'vendor-hal': license id 'Proprietary' is not on the SPDX license list; write it as {\"license\": {\"name\": \"Proprietary\"}}, or name it LicenseRef-" \
+    "$(variant w8a '.components[2].licenses = [{"license": {"id": "Proprietary"}}]')"
+refused "a LicenseRef- written as a license id" \
+    "license id 'LicenseRef-ExampleCorp' is not on the SPDX license list" \
+    "$(variant w8b '.components[2].licenses = [{"license": {"id": "LicenseRef-ExampleCorp"}}]')"
+jq '.components[2].licenses = [{"expression": "BSD-3-Clause OR LicenseRef-ExampleCorp"}]
+    | .components[1].licenses = [{"license": {"id": "Classpath-exception-2.0"}}, {"license": {"name": "LicenseRef-ExampleCorp"}}]' \
+    "$DECL" > "$WORK/w8c.cdx.json"
+cp "$BASE" "$WORK/w8c.bom.json"
+rc="$(apply "$WORK/w8c.bom.json" "$P" "$WORK/w8c.cdx.json")"
+[ "$rc" = 0 ] && pass "SPDX ids on the list, LicenseRef- in a name and in an expression are accepted" \
+    || fail "valid licences refused: exit $rc" "$(cat "$WORK/w8c.bom.json.log")"
+[ "$(jq '.ids | length' "$LIB/cdx-spdx-ids.json")" -gt 600 ] && jq -e '.ids | index("MIT") and index("Apache-2.0")' "$LIB/cdx-spdx-ids.json" >/dev/null \
+    && pass "the SPDX id list from the CycloneDX 1.6 schema is bundled with the step" || fail "cdx-spdx-ids.json is missing or short"
 refused "a name with a line break" \
     "holds a control character" \
     "$(variant w9 '.components[1].name = "media\nctl"')"

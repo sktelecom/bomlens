@@ -221,6 +221,24 @@ def _properties(value):
         for p in value)
 
 
+_SPDX_IDS = []
+
+
+def spdx_ids():
+    """The SPDX ids the CycloneDX 1.6 schema accepts in license.id
+    (cdx-spdx-ids.json, from its spdx.schema.json), or None when the list is
+    missing, in which case only the shape of an id is checked."""
+    if not _SPDX_IDS:
+        try:
+            with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "cdx-spdx-ids.json"),
+                      encoding="utf-8") as fh:
+                ids = json.load(fh).get("ids")
+            _SPDX_IDS.append(set(ids) if isinstance(ids, list) else None)
+        except (OSError, ValueError, AttributeError):
+            _SPDX_IDS.append(None)
+    return _SPDX_IDS[0]
+
+
 SHAPES = {
     "supplier": (_entity, 'an organization ({"name": ..., "url": [...], "contact": [...]})'),
     "manufacturer": (_entity, 'an organization ({"name": ..., "url": [...], "contact": [...]})'),
@@ -448,6 +466,14 @@ def check_component(comp, where, product_version, problems):
     for key, (check, shape) in SHAPES.items():
         if key in comp and not check(comp[key]):
             problems.append("%s: %s is not %s" % (where, key, shape))
+    known = spdx_ids()
+    if known is not None and SHAPES["licenses"][0](comp.get("licenses", [])):
+        for entry in comp.get("licenses", []):
+            lid = (entry.get("license") or {}).get("id")
+            if lid is not None and lid not in known:
+                problems.append("%s: license id '%s' is not on the SPDX license list; write it as "
+                                "{\"license\": {\"name\": \"%s\"}}, or name it LicenseRef-<your-name> in a "
+                                "license name or an expression" % (where, lid, lid))
     if len(problems) > bad:
         return None
     origin = props(comp, ORIGIN)

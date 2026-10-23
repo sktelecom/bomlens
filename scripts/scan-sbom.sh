@@ -514,10 +514,15 @@ Options:
                          without a version takes --version. A build output
                          named in bomlens:artifact (a path relative to the scan
                          target root) gets its SHA-512 and SHA-256 hashes, file
-                         name and executable/archive properties filled in. The
-                         scan fails, naming the file and component, when a
-                         named file is missing or outside the scan target, or
-                         the same name and version is declared twice.
+                         name and executable/archive/structured properties
+                         filled in. Only CycloneDX 1.6 component fields are
+                         read (no nested components), and a license id must be
+                         on the SPDX license list (otherwise use a license name
+                         or LicenseRef-). The scan fails, naming the file and
+                         component, when a named file is missing or outside the
+                         scan target, or the same name and version is declared
+                         twice; the SBOM written so far is then kept as
+                         <Project>_<Version>_bom.refused.json.
   --no-components        For a source scan: do not read sbom-declared.cdx.json
                          at the scan target root (for a scan made before the
                          build outputs it names exist). Cannot be combined
