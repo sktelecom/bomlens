@@ -116,7 +116,7 @@
     "outboundLicense": "배포 라이선스 (선택)",
     "outboundLicenseHint": "프로젝트를 배포하는 SPDX 식별자입니다(예: Apache-2.0). 지정하면 조건이 충돌하는 의존성을 표시합니다. 소스 스캔으로는 알아낼 수 없어 지정하지 않으면 검사하지 않습니다.",
     "sbomAuthor": "SBOM 작성자 (선택)",
-    "sbomAuthorHint": "이 스캔을 실행하는 조직이나 개인입니다. 도구도 아니고 소프트웨어를 만든 쪽도 아닙니다. 약칭 없이 정식 명칭을 씁니다. 비워 두면 SBOM에서 빠집니다.",
+    "sbomAuthorHint": "이 스캔을 실행하는 조직이나 개인입니다. 도구도 아니고 소프트웨어를 만든 쪽도 아닙니다. 약칭 없이 정식 명칭을 씁니다. \"이름 <이메일>\" 형식으로 이메일을 함께 적으면 연락처가 기록되며, BSI TR-03183-2 프로필은 이를 요구합니다. 비워 두면 SBOM에서 빠집니다.",
     "specVersion": "CycloneDX 버전",
     "specVersionDefault": "CycloneDX 1.6 (기본값)",
     "specVersion17": "CycloneDX 1.7",
