@@ -1240,6 +1240,9 @@ rm -f "${OUTPUT_HOST_DIR}/${OUTPUT_FILE}"
 # The conda sidecar stage 1 may write beside it is kept by stage 2's cleanup
 # for the same reason, so an old one is cleared here too.
 rm -f "${OUTPUT_HOST_DIR}/${OUTPUT_FILE%_bom.json}_conda.cdx.json"
+# An earlier run's refused SBOM (declared components that were refused) is not
+# this run's: the check after stage 2 reads its presence as this run's refusal.
+rm -f "${OUTPUT_HOST_DIR}/${OUTPUT_FILE%_bom.json}_bom.refused.json"
 
 # Temp dirs (git clone / archive extract) are cleaned on any exit. A container
 # build step (e.g. npm install during a source scan) can leave root-owned files

@@ -24,7 +24,10 @@ SHA-512 and SHA-256 hashes, its file name (bsi:component:filename) and what
 kind of file it is (bsi:component:executable, bsi:component:archive and
 bsi:component:structured, from the file's own bytes) are filled in. A value
 for one of the three kinds that the declaration gives itself is kept instead
-of the one read from the file. With one artifact these go on the component
+of the one read from the file. A hash the declaration gives for a component
+with one build output is computed from the file and must match; an algorithm
+the standard library cannot compute (BLAKE3) is refused, since it cannot be
+checked. With one artifact these go on the component
 itself. With several, each file becomes a nested component of type "file"
 under the declared one (a CycloneDX assembly), carrying its own hashes and
 properties, and the declared component carries none: one set of hashes cannot
@@ -254,22 +257,69 @@ SHAPES = {
 
 
 # ---------------------------------------------------------------- file type
-def _decompressed_head(head):
-    """The first bytes inside a gzip, bzip2 or xz stream, or None."""
-    try:
-        if head[:2] == b"\x1f\x8b":
-            return zlib.decompressobj(16 + zlib.MAX_WBITS).decompress(head, 512)
-        if head[:3] == b"BZh":
-            return bz2.BZ2Decompressor().decompress(head, 512)
-        if head[:6] == b"\xfd7zXZ\x00":
-            return lzma.LZMADecompressor().decompress(head, 512)
-    except (zlib.error, OSError, EOFError, lzma.LZMAError, ValueError):
+# How much of a compressed file is fed to its decompressor to see whether a
+# tar is inside. A bzip2 block is decompressed only once it is read whole, and
+# one block of incompressible data is close to 1 MB, so the first bytes alone
+# are not enough.
+MAX_INNER_INPUT = 2 * 1024 * 1024
+INNER_BYTES = 512
+
+
+def _new_decompressor(head):
+    if head[:2] == b"\x1f\x8b":
+        return "zlib", zlib.decompressobj(16 + zlib.MAX_WBITS)
+    if head[:3] == b"BZh":
+        return "bz2", bz2.BZ2Decompressor()
+    if head[:6] == b"\xfd7zXZ\x00":
+        return "lzma", lzma.LZMADecompressor()
+    return None, None
+
+
+def inner_head(fh, head):
+    """The first bytes inside a gzip, bzip2 or xz file, or None.
+
+    The file is fed in pieces until INNER_BYTES come out, at most
+    MAX_INNER_INPUT bytes of it; the output is bounded the same way.
+    """
+    kind, dec = _new_decompressor(head)
+    if dec is None:
         return None
-    return None
+    out = b""
+    fed = 0
+    fh.seek(0)
+    try:
+        while len(out) < INNER_BYTES:
+            if kind == "zlib":
+                data = dec.unconsumed_tail
+                if not data:
+                    if fed >= MAX_INNER_INPUT:
+                        break
+                    data = fh.read(64 * 1024)
+                    fed += len(data)
+                    if not data:
+                        break
+                out += dec.decompress(data, INNER_BYTES - len(out))
+            else:
+                data = b""
+                if dec.needs_input:
+                    if fed >= MAX_INNER_INPUT:
+                        break
+                    data = fh.read(64 * 1024)
+                    fed += len(data)
+                    if not data:
+                        break
+                out += dec.decompress(data, INNER_BYTES - len(out))
+            if dec.eof:
+                break
+    except (zlib.error, OSError, EOFError, lzma.LZMAError, ValueError):
+        return out or None
+    return out
 
 
-def file_kind(head, pe_signature=b""):
-    """(executable, archive, structured) from the first bytes of a file.
+def file_kind(head, pe_signature=b"", inner=None):
+    """(executable, archive, structured) from the first bytes of a file, the
+    four bytes where its PE header would be, and the first bytes inside it
+    when it is a compressed stream.
 
     structured follows BSI TR-03183-2 v2.1.0 (8.1.6): an archive that holds
     metadata about what it contains (zip, tar, also compressed, 7z, rar, rpm,
@@ -305,16 +355,29 @@ def file_kind(head, pe_signature=b""):
                   or tar)
     stream = (head[:2] == b"\x1f\x8b" or head[:3] == b"BZh" or head[:6] == b"\xfd7zXZ\x00"
               or head[:4] == b"\x28\xb5\x2f\xfd" or head[:4] == b"\x04\x22\x4d\x18")
-    inner = _decompressed_head(head) if stream else None
-    compressed_tar = inner is not None and inner[257:262] == b"ustar"
+    compressed_tar = stream and inner is not None and inner[257:262] == b"ustar"
     archive = with_index or stream
     structured = with_index or compressed_tar
     return executable, archive, structured
 
 
-def read_artifact(path):
-    sha512 = hashlib.sha512()
-    sha256 = hashlib.sha256()
+# Declared hash algorithms the standard library can compute, so a declared
+# value can be checked against the file. BLAKE3 is not among them.
+HASHLIB = {
+    "MD5": lambda: hashlib.md5(), "SHA-1": lambda: hashlib.sha1(),
+    "SHA-256": lambda: hashlib.sha256(), "SHA-384": lambda: hashlib.sha384(),
+    "SHA-512": lambda: hashlib.sha512(), "SHA3-256": lambda: hashlib.sha3_256(),
+    "SHA3-384": lambda: hashlib.sha3_384(), "SHA3-512": lambda: hashlib.sha3_512(),
+    "BLAKE2b-256": lambda: hashlib.blake2b(digest_size=32),
+    "BLAKE2b-384": lambda: hashlib.blake2b(digest_size=48),
+    "BLAKE2b-512": lambda: hashlib.blake2b(digest_size=64),
+}
+
+
+def read_artifact(path, algs=()):
+    """Hashes (SHA-512, SHA-256 and each of `algs`) and kinds of a file."""
+    wanted = ["SHA-512", "SHA-256"] + [a for a in algs if a not in ("SHA-512", "SHA-256")]
+    digests = {a: HASHLIB[a]() for a in wanted}
     head = b""
     with open(path, "rb") as fh:
         while True:
@@ -323,8 +386,8 @@ def read_artifact(path):
                 break
             if len(head) < HEAD_BYTES:
                 head += chunk[:HEAD_BYTES - len(head)]
-            sha512.update(chunk)
-            sha256.update(chunk)
+            for d in digests.values():
+                d.update(chunk)
         signature = b""
         if head[:2] == b"MZ" and len(head) >= 64:
             # The PE header sits where e_lfanew says, which can be past the
@@ -333,10 +396,12 @@ def read_artifact(path):
             if 64 <= offset <= MAX_PE_OFFSET:
                 fh.seek(offset)
                 signature = fh.read(4)
-    executable, archive, structured = file_kind(head, signature)
+        inner = inner_head(fh, head)
+    executable, archive, structured = file_kind(head, signature, inner)
     return {
-        "hashes": [{"alg": "SHA-512", "content": sha512.hexdigest()},
-                   {"alg": "SHA-256", "content": sha256.hexdigest()}],
+        "hashes": [{"alg": "SHA-512", "content": digests["SHA-512"].hexdigest()},
+                   {"alg": "SHA-256", "content": digests["SHA-256"].hexdigest()}],
+        "computed": {a: d.hexdigest() for a, d in digests.items()},
         "kinds": {
             EXECUTABLE: "executable" if executable else "non-executable",
             ARCHIVE: "archive" if archive else "no archive",
@@ -378,12 +443,20 @@ def resolve_artifact(root, value):
         raise Refused("bomlens:artifact '%s' leads outside the scan target through a symbolic link" % value)
     if not os.path.exists(real):
         rel = "/".join(parts)
-        # Compared without regard to case: on a file system that ignores it
-        # (macOS, Windows) the copy left out the path whatever case it had.
-        for ex in excluded_paths():
-            if rel.lower() == ex.lower() or rel.lower().startswith(ex.lower() + "/"):
+        # An exact match first. Whether the scanned folder's file system tells
+        # case apart is not known here, so a match that holds only without
+        # regard to case says so instead of claiming the --exclude did it.
+        excluded = excluded_paths()
+        for ex in excluded:
+            if rel == ex or rel.startswith(ex + "/"):
                 raise Refused("bomlens:artifact '%s' is under '%s', which --exclude leaves out of the scan; "
                               "drop that --exclude or list the file elsewhere" % (value, ex))
+        for ex in excluded:
+            if rel.lower() == ex.lower() or rel.lower().startswith(ex.lower() + "/"):
+                raise Refused("bomlens:artifact '%s' does not exist in the scan target. It matches --exclude '%s' "
+                              "if letter case is ignored, as it is on macOS and Windows; if that is the folder "
+                              "you meant, drop that --exclude or list the file elsewhere, otherwise build it "
+                              "before the scan or fix the path" % (value, ex))
         hint = "build it before the scan, or fix the path"
         if os.environ.get("DECLARED_COMPONENTS_DEFAULT") == "1":
             hint += ("; this file was read because it is at the scan target root, "
@@ -563,7 +636,11 @@ def read_files(files, labels, root, given_root, product, product_version, existi
                 if twice:
                     problems.append("%s: lists bomlens:artifact '%s' more than once" % (where, twice[0]))
                     continue
+                facts = artifact_facts(comp, resolved, where, problems)
+                if facts is None:
+                    continue
                 comp["_artifacts"] = resolved
+                comp["_facts"] = facts
                 if comp.get("purl") in existing_purls:
                     log("WARN: %s: the scan already lists %s; both are kept" % (where, comp["purl"]))
                 declared.append((label, comp))
@@ -576,6 +653,36 @@ def read_files(files, labels, root, given_root, product, product_version, existi
             problems.append("%s: could not be read as a declaration file (%s); check it against the CycloneDX 1.6 component format"
                             % (label, exc.__class__.__name__))
     return declared, file_deps, refs_seen
+
+
+def artifact_facts(comp, resolved, where, problems):
+    """What each build output says about itself, with the hashes the
+    declaration gives checked against the file; None when refused."""
+    declared = comp.get("hashes") or []
+    if not resolved:
+        return []
+    if declared and len(resolved) > 1:
+        problems.append("%s: gives hashes but has several bomlens:artifact files, which one set of hashes "
+                        "cannot describe; remove the hashes (each file gets its own)" % where)
+        return None
+    algs = [h["alg"] for h in declared]
+    unverifiable = sorted({a for a in algs if a not in HASHLIB})
+    if unverifiable:
+        problems.append("%s: gives a %s hash, which cannot be computed here to check it against %s; remove it"
+                        % (where, "/".join(unverifiable), resolved[0][1]))
+        return None
+    try:
+        facts = [read_artifact(real, algs) for real, _ in resolved]
+    except OSError as exc:
+        problems.append("%s: a build output could not be read (%s)" % (where, exc.strerror or exc))
+        return None
+    for h in declared:
+        actual = facts[0]["computed"][h["alg"]]
+        if actual != h["content"].lower():
+            problems.append("%s: the %s hash it gives does not match %s (the file has %s)"
+                            % (where, h["alg"], resolved[0][1], actual))
+            return None
+    return facts
 
 
 def check_refs(declared, file_deps, refs_seen, existing_refs, problems):
@@ -608,12 +715,13 @@ def fill_artifacts(declared):
     """Fill what the build outputs say about themselves."""
     for _, comp in declared:
         resolved = comp.pop("_artifacts")
+        all_facts = comp.pop("_facts")
         if not resolved:
             continue
         origin = props(comp, ORIGIN)[0]
         if len(resolved) == 1:
-            real, rel = resolved[0]
-            facts = read_artifact(real)
+            _, rel = resolved[0]
+            facts = all_facts[0]
             kinds = facts["kinds"]
             for key in KIND_VALUES:
                 given = props(comp, key)
@@ -625,8 +733,7 @@ def fill_artifacts(declared):
                 + [{"name": key, "value": kinds[key]} for key in KIND_VALUES]
             continue
         files_out = []
-        for real, rel in resolved:
-            facts = read_artifact(real)
+        for (_, rel), facts in zip(resolved, all_facts):
             child = {
                 "type": "file",
                 "bom-ref": "%s#%s" % (comp["bom-ref"], rel),
