@@ -529,13 +529,15 @@ Options:
                          scan target, or the same name and version is declared
                          twice; the SBOM written so far is then kept as
                          <Project>_<Version>_bom.refused.json.
-                         For a Yocto build (a build directory, or its SPDX
-                         document with --analyze): a component names its
-                         recipe in bomlens:yocto-recipe instead of
-                         bomlens:artifact, and the declaration goes on every
-                         installed package of that recipe, with the files and
-                         hashes the build recorded. A recipe that installed no
-                         package fails the scan.
+                         For a Yocto build directory given as --target: a
+                         component names its recipe in bomlens:yocto-recipe
+                         instead of bomlens:artifact, and the declaration goes
+                         on every installed package of that recipe, with the
+                         files and hashes the build recorded (multilib and
+                         nativesdk variants, such as lib32-<recipe>, are
+                         declared separately). A recipe that installed no
+                         package fails the scan. Not with --analyze: a
+                         received SBOM is not changed.
   --no-components        For a source scan: do not read sbom-declared.cdx.json
                          at the scan target root (for a scan made before the
                          build outputs it names exist). Cannot be combined
@@ -2279,6 +2281,15 @@ if [ -n "$COMPONENT_VERSIONS_FILE" ]; then
     fi
 fi
 
+# --license: checked here with the helper the container uses
+# (docker/lib/license-entry.sh), so a value CycloneDX has no field for is
+# refused before the scan starts rather than at its end. Without jq on this
+# machine the container still checks it.
+if [ -n "${PROJECT_LICENSE:-}" ] && command -v jq >/dev/null 2>&1 \
+   && ! bash "$REPO_DIR/docker/lib/license-entry.sh" "$PROJECT_LICENSE" >/dev/null; then
+    echo "[ERROR] --license was refused (the reason is above); nothing was scanned."; exit 1
+fi
+
 if [ "$NO_COMPONENTS" = "true" ] && [ "${#COMPONENTS_FILES[@]}" -gt 0 ]; then
     echo "[ERROR] --no-components cannot be combined with --components: the first reads no declaration file, the second names one."; exit 1
 fi
@@ -2644,15 +2655,18 @@ fi
 if [ -n "$COMPONENT_VERSIONS_FILE" ] && [ "$MODE" != "FIRMWARE" ] && [ "$MODE" != "ROOTFS" ] && [ "$MODE" != "BINARY" ]; then
     echo "[ERROR] --component-versions applies to firmware, root filesystem and binary scans only (this target is scanned as $MODE)."; exit 1
 fi
-# A Yocto build (a build directory, or its SPDX document given with --analyze)
-# takes --components too, for components declared by recipe
-# (bomlens:yocto-recipe). Whether an --analyze document is one a Yocto build
-# wrote is decided in the container, which reads it.
+# A Yocto build directory given as --target takes --components too, for
+# components declared by recipe (bomlens:yocto-recipe): its SBOM is the one
+# this scan generates. A document passed with --analyze is a received SBOM,
+# which is not changed.
 if [ "$NO_COMPONENTS" = "true" ] && [ "$MODE" != "SOURCE" ]; then
     echo "[ERROR] --no-components applies to source scans only (this target is scanned as $MODE)."; exit 1
 fi
+if [ "${#COMPONENTS_FILES[@]}" -gt 0 ] && [ "$MODE" = "ANALYZE" ] && [ -z "$YOCTO_BUILD_DIR" ]; then
+    echo "[ERROR] --components cannot be used with --analyze: the SBOM passed there is received, and is not changed. For a Yocto build, point --target at the build directory instead."; exit 1
+fi
 if [ "${#COMPONENTS_FILES[@]}" -gt 0 ] && [ "$MODE" != "SOURCE" ] && [ "$MODE" != "ANALYZE" ]; then
-    echo "[ERROR] --components applies to source scans and Yocto builds only (this target is scanned as $MODE)."; exit 1
+    echo "[ERROR] --components applies to source scans and Yocto build directories only (this target is scanned as $MODE)."; exit 1
 fi
 
 if { [ -n "$AI_DECLARE_FILE" ] || [ "$GENERATE_SPDX3" = "false" ]; } \

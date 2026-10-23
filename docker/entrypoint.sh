@@ -82,7 +82,20 @@ fi
 # shellcheck source=docker/lib/engine-result.sh
 . "$LIBDIR/engine-result.sh"
 er_init
-trap er_exit_trap EXIT
+# Run-scoped files of a Yocto build scan (set further down), removed on every
+# way out, a refused declaration included.
+YOCTO_FILES_LIST=""
+YOCTO_READER_REFS=""
+entry_exit_trap() {
+    local rc=$?
+    set +e
+    [ -z "$YOCTO_FILES_LIST" ] || rm -f "$YOCTO_FILES_LIST"
+    [ -z "$YOCTO_READER_REFS" ] || rm -f "$YOCTO_READER_REFS"
+    # er_exit_trap reads the exit code from $?.
+    ( exit "$rc" )
+    er_exit_trap
+}
+trap entry_exit_trap EXIT
 trap 'exit 130' INT
 trap 'exit 143' TERM
 
@@ -758,9 +771,6 @@ echo "=========================================="
 # would report as open what Yocto already judged.
 YOCTO_SBOM=false
 YOCTO_CPE_MATCH=false
-# The file list parse-yocto-spdx.py writes for the declared-components step
-# (set only when there are --components files).
-YOCTO_FILES_LIST=""
 # The document came out of a Yocto build directory the user pointed at, not from
 # a supplier: the SBOM this scan writes is the one to submit, so it is the one
 # checked for conformance (below), not the build's own document. YOCTO_FROM_BUILD
@@ -1199,12 +1209,23 @@ EOF
         # read into the same CycloneDX the SPDX path produces, and the rest of the
         # pipeline continues unchanged. Set by scan-sbom.sh / server.py only after
         # they have established the folder is a build directory with no SBOM.
+        # --components changes the SBOM, so it applies to the one this scan
+        # generates from a Yocto build directory (YOCTO_FROM_BUILD) and never to
+        # a received SBOM. With it, the Yocto readers also list each installed
+        # package's recipe and files (YOCTO_FILES_OUT) for the
+        # declared-components step below.
+        if [ -n "${DECLARED_COMPONENTS_FILES:-}" ] && [ "$YOCTO_FROM_BUILD" != true ]; then
+            echo "[ERROR] --components applies to a source scan and a Yocto build directory; $(basename "${ANALYZE_SBOM:-the input}") was passed with --analyze, and a received SBOM is not changed."
+            echo "[ERROR] Scan the Yocto build directory itself (--target <build dir>), or drop --components."
+            exit 1
+        fi
+        [ -z "${DECLARED_COMPONENTS_FILES:-}" ] || YOCTO_FILES_LIST="$(mktemp)"
         if [ -n "${YOCTO_BUILD_DIR:-}" ] && [ -z "$ANALYZE_SBOM" ]; then
             if [ ! -d "$YOCTO_BUILD_DIR" ]; then
                 echo "[ERROR] YOCTO_BUILD_DIR not found: $YOCTO_BUILD_DIR"; exit 1
             fi
             echo "[1/2] Reading the Yocto build's own records (no SPDX in this build)..."
-            if ! python3 "$LIBDIR/parse-yocto-manifests.py" \
+            if ! YOCTO_FILES_OUT="$YOCTO_FILES_LIST" python3 "$LIBDIR/parse-yocto-manifests.py" \
                     "$YOCTO_BUILD_DIR" "$OUTPUT_FILE" "$OUT_PREFIX"; then
                 echo "[ERROR] this build directory holds no image package manifest to read."
                 exit 1
@@ -1257,20 +1278,11 @@ EOF
         # rc=3 means "not a Yocto document" and is the normal path for every other
         # supplier SBOM; any other non-zero rc is a real failure that still falls back
         # so a parser bug cannot block a scan.
-        # With --components, the files of each installed package (and their
-        # hashes) are listed for the declared-components step below, which nests
-        # them under the packages a declaration names by recipe.
         YOCTO_RC=3
         if command -v python3 >/dev/null 2>&1 && [ -f "$LIBDIR/parse-yocto-spdx.py" ]; then
             YOCTO_RC=0
-            if [ -n "${DECLARED_COMPONENTS_FILES:-}" ]; then
-                YOCTO_FILES_LIST="$(mktemp)"
-                YOCTO_FILES_OUT="$YOCTO_FILES_LIST" python3 "$LIBDIR/parse-yocto-spdx.py" "$ANALYZE_SBOM" "$OUTPUT_FILE" "$OUT_PREFIX" \
-                    || YOCTO_RC=$?
-            else
-                python3 "$LIBDIR/parse-yocto-spdx.py" "$ANALYZE_SBOM" "$OUTPUT_FILE" "$OUT_PREFIX" \
-                    || YOCTO_RC=$?
-            fi
+            YOCTO_FILES_OUT="$YOCTO_FILES_LIST" python3 "$LIBDIR/parse-yocto-spdx.py" "$ANALYZE_SBOM" "$OUTPUT_FILE" "$OUT_PREFIX" \
+                || YOCTO_RC=$?
         fi
         if [ "$YOCTO_RC" != 0 ] && [ "$YOCTO_ARCHIVE" = "true" ]; then
             # An archive is never CycloneDX or SPDX text, so the generic converter
@@ -1291,6 +1303,21 @@ EOF
                 echo "[ERROR] could not convert supplier SBOM to CycloneDX."; exit 1
             fi
         fi
+        fi
+        # The components a Yocto reader wrote in this run, by bom-ref, for the
+        # conformance check (validate-sbom.sh): a package of the build may lack
+        # a SHA-512, a file name or file properties because the build did not
+        # record them, which is reported as not in the source SBOM. Only for the
+        # SBOM generated from a build directory, and only from this file, which
+        # neither a declaration nor an input SBOM can write
+        # (bomlens:identifiedBy alone could be typed into either).
+        if [ "$YOCTO_SBOM" = true ] && [ "$YOCTO_FROM_BUILD" = true ]; then
+            YOCTO_READER_REFS="$(mktemp)"
+            if jq '[.components[]? | .["bom-ref"]? | strings] | map({(.): true}) | add // {}' "$OUTPUT_FILE" > "$YOCTO_READER_REFS" 2>/dev/null; then
+                export YOCTO_READER_REFS
+            else
+                rm -f "$YOCTO_READER_REFS"; YOCTO_READER_REFS=""
+            fi
         fi
         ;;
 
@@ -1707,23 +1734,24 @@ esac
 # which the first-party exemption from the PURL rows relies on
 # (validate-sbom.sh). It is never taken from the caller's environment.
 #
-# A Yocto build (ANALYZE, with the SBOM read from the build's SPDX document or
-# its manifests: YOCTO_SBOM) runs the step too, on the --components files only:
+# A Yocto build directory (ANALYZE, with the SBOM read from the build's SPDX
+# document or its manifests: YOCTO_SBOM and YOCTO_FROM_BUILD; a received SBOM
+# with --components was refused above) runs the step too, on the --components files only:
 # there is no source tree whose root could hold a default file, and the build
 # directory is not where a supplier keeps its declarations. There a component
 # names its recipe (bomlens:yocto-recipe) rather than a build output, and the
 # declaration goes on the installed packages of that recipe
 # (DECLARED_COMPONENTS_YOCTO=1), with the files parse-yocto-spdx.py listed
-# (YOCTO_FILES_LIST). Any other supplier SBOM given with --components is
-# refused: it was not read from a build, so there is nothing to declare on.
+# (YOCTO_FILES_LIST). A build directory whose records no Yocto reader could
+# read (the generic converter took it) is refused: there is nothing to declare on.
 unset DECLARED_COMPONENTS_APPLIED
 _dc_mode="$SCAN_MODE"
 if [ "$SCAN_MODE" = ANALYZE ] && [ -n "${DECLARED_COMPONENTS_FILES:-}" ]; then
-    if [ "$YOCTO_SBOM" = true ]; then
+    if [ "$YOCTO_SBOM" = true ] && [ "$YOCTO_FROM_BUILD" = true ]; then
         _dc_mode=YOCTO
     else
-        echo "[ERROR] --components applies to a source scan and a Yocto build; $(basename "${ANALYZE_SBOM:-the input}") is not an SBOM a Yocto build wrote."
-        echo "[ERROR] Scan the Yocto build directory, or its SPDX document with --analyze, or drop --components."
+        echo "[ERROR] --components applies to a source scan and a Yocto build directory; $(basename "${ANALYZE_SBOM:-the input}") is not an SBOM a Yocto build wrote."
+        echo "[ERROR] Drop --components, or point --target at a Yocto build directory whose SPDX or manifests can be read."
         exit 1
     fi
 fi

@@ -70,10 +70,14 @@ build's SPDX document or its manifests) has no build output folder to name a
 file in, and a package's files sit in a different work directory for every
 machine. There a component names its recipe instead, in bomlens:yocto-recipe
 (the recipe name, PN), and does not add a component: the declaration is
-applied to every package installed in the image that the recipe built (the
-packages that carry bomlens:yocto:recipe = PN, or that are named PN and carry
-no bomlens:yocto:recipe, which the readers leave out when it is the package
-name). Each gets the declared type, supplier, manufacturer, authors,
+applied to every package installed in the image that the recipe built: the
+packages whose recipe the build recorded as PN, in the list the reader wrote
+in this run (YOCTO_FILES_OUT, read through DECLARED_COMPONENTS_YOCTO_FILES)
+or in bomlens:yocto:recipe. A package whose recipe the build did not record is
+not matched by its name, and is named in the refusal or a warning. The
+variants bitbake builds for another multilib or the SDK (lib32-PN, lib64-PN,
+libx32-PN, nativesdk-PN) are recipes of their own; a warning names any the
+image installs. Each gets the declared type, supplier, manufacturer, authors,
 licences (concluded), copyright, description, external references and
 properties, bomlens:origin and the mark, and keeps its name, version, purl,
 CPE and hashes. Its files and their hashes, as the build recorded them, are
@@ -86,7 +90,10 @@ build recorded, a field the build decides (hashes, purl, cpe, bom-ref, group,
 mime-type), bomlens:artifact or bomlens:distribution-url beside the recipe, or
 a recipe declaration outside a Yocto build are refused. In a Yocto build a
 component without bomlens:yocto-recipe is added as anywhere else, but cannot
-name a bomlens:artifact.
+name a bomlens:artifact, nor take the name of a package the image installs
+(that one is declared by its recipe). A declaration may not carry the
+properties only the readers write (READER_OWNED: bomlens:identifiedBy,
+bomlens:yocto:recipe, bomlens:layer, bomlens:yocto:arch), in any scan.
 
 Every component added here carries bomlens:declared = true. Any component
 of the input SBOM that carries a bomlens:declared property at all (what an
@@ -122,6 +129,9 @@ RECIPE = "bomlens:yocto-recipe"
 # another name, and the readers' own marks.
 BUILT_FROM = "bomlens:yocto:recipe"
 YOCTO_READERS = ("yocto-spdx", "yocto-manifest")
+# Properties only the readers write: a declaration that carries one could pass
+# a component of its own off as a package the build recorded.
+READER_OWNED = ("bomlens:identifiedBy", BUILT_FROM, "bomlens:layer", "bomlens:yocto:arch")
 # A recipe name (PN) as bitbake allows it.
 RECIPE_NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9+._-]*$")
 # Fields the build decides for a package declared by recipe.
@@ -671,6 +681,9 @@ def check_component(comp, where, product_version, problems, yocto=False):
     if len(props(comp, ARTIFACT)) > 1 and any(props(comp, key) for key in KIND_VALUES):
         problems.append("%s: has several bomlens:artifact files, so it cannot give one %s value for all of them"
                         % (where, "/".join(KIND_VALUES)))
+    for key in READER_OWNED:
+        if props(comp, key):
+            problems.append("%s: %s is written by the scan, not by a declaration; remove it" % (where, key))
     recipe = check_recipe(comp, where, yocto, problems)
     version = comp.get("version", "").strip()
     # A package declared by recipe has the version the build recorded.
@@ -936,30 +949,39 @@ def fill_artifacts(declared):
             del comp["hashes"]
 
 
-def built_by(comp, recipe):
-    """Whether a component of a Yocto build's SBOM is a package of `recipe`."""
-    if not isinstance(comp, dict) or not _properties(comp.get("properties", [])):
-        return False
-    if not any(r in YOCTO_READERS for r in props(comp, "bomlens:identifiedBy")):
-        return False
+def is_build_package(comp):
+    """A component one of the Yocto readers wrote (the step only runs on an
+    SBOM a reader wrote in this run, and a declaration cannot carry these
+    properties)."""
+    return isinstance(comp, dict) and _properties(comp.get("properties", [])) \
+        and any(r in YOCTO_READERS for r in props(comp, "bomlens:identifiedBy"))
+
+
+def recipe_of(comp, recipes):
+    """The recipe (PN) the build recorded for a package, or None when it
+    recorded none: the readers' list by bom-ref, else bomlens:yocto:recipe."""
+    ref = comp.get("bom-ref")
+    known = recipes.get(ref) if isinstance(ref, str) else None
+    if isinstance(known, str) and known:
+        return known
     built = props(comp, BUILT_FROM)
-    if built:
-        return recipe in built
-    return comp.get("name") == recipe
+    return built[0] if built and isinstance(built[0], str) and built[0] else None
 
 
-def load_yocto_files(path):
-    """{package bom-ref: [{"name", "hashes"}]} the Yocto reader listed, or {}."""
+def load_yocto_facts(path):
+    """({package bom-ref: [{"name", "hashes"}]}, {package bom-ref: recipe}) the
+    Yocto reader listed (YOCTO_FILES_OUT), or two empty maps."""
     if not path:
-        return {}
+        return {}, {}
     try:
         with open(path, encoding="utf-8") as fh:
-            files = json.load(fh).get("files")
+            doc = json.load(fh)
+        files, recipes = doc.get("files"), doc.get("recipes")
     except (OSError, ValueError, AttributeError, RecursionError) as exc:
-        log("WARN: the file list of the Yocto build could not be read (%s); the packages are declared "
-            "without their files" % exc.__class__.__name__)
-        return {}
-    return files if isinstance(files, dict) else {}
+        log("WARN: the package list of the Yocto build could not be read (%s); only packages that name "
+            "their recipe in bomlens:yocto:recipe can be declared, without their files" % exc.__class__.__name__)
+        return {}, {}
+    return (files if isinstance(files, dict) else {}), (recipes if isinstance(recipes, dict) else {})
 
 
 def package_file_entries(listed):
@@ -978,24 +1000,48 @@ def package_file_entries(listed):
     return out
 
 
-def match_recipes(comps, by_recipe, yocto_files, all_refs, problems):
+# The prefixes bitbake gives the variants of a recipe built for another
+# multilib or for the SDK (lib32-zlib, nativesdk-zlib). They are recipes of
+# their own, and a declaration of zlib does not cover them.
+VARIANT = re.compile(r"^(lib32|lib64|libx32|nativesdk)-(.+)$")
+
+
+def match_recipes(comps, by_recipe, yocto_files, yocto_recipes, all_refs, problems):
     """[(declaration, [package components])] for each recipe declared, with
-    every refusal (no package, another version, a reference in use) noted."""
+    every refusal (no package, another version, a reference in use) noted.
+    A package matches only when the build recorded its recipe."""
     out = []
     child_refs = set()
+    known = [(c, recipe_of(c, yocto_recipes)) for c in comps if is_build_package(c)]
     for label, decl in by_recipe:
         recipe = decl["_recipe"]
         where = "%s: component '%s'" % (label, decl["name"])
-        matched = [c for c in comps if built_by(c, recipe)]
+        matched = [c for c, r in known if r == recipe]
+        unknown = sorted(str(c.get("name")) for c, r in known if r is None and c.get("name") == recipe)
         if not matched:
+            if unknown:
+                problems.append("%s: the build did not record which recipe built the installed package '%s', so "
+                                "recipe '%s' (bomlens:yocto-recipe) cannot be matched to it. Build with create-spdx, "
+                                "or keep license.manifest beside the image manifest, so the recipe is recorded"
+                                % (where, unknown[0], recipe))
+                continue
             hint = ""
-            named = [c for c in comps if isinstance(c, dict) and c.get("name") == recipe and props(c, BUILT_FROM)]
+            named = [r for c, r in known if r and c.get("name") == recipe]
             if named:
-                hint = "; the package named '%s' comes from recipe '%s'" % (recipe, props(named[0], BUILT_FROM)[0])
+                hint = "; the package named '%s' comes from recipe '%s'" % (recipe, named[0])
             problems.append("%s: recipe '%s' (bomlens:yocto-recipe) built no package installed in this image%s. "
                             "Give the recipe name (PN) of a package the image installs, or remove the component"
                             % (where, recipe, hint))
             continue
+        if unknown:
+            log("WARN: %s: the build did not record the recipe of the installed package '%s', so recipe '%s' "
+                "is not declared on it" % (where, unknown[0], recipe))
+        variants = sorted({r for _, r in known if r and VARIANT.match(r) and VARIANT.match(r).group(2) == recipe})
+        if variants:
+            log("WARN: %s: %s also installed packages in this image; a declaration of '%s' does not cover "
+                "them, so declare %s separately"
+                % (where, ", ".join("recipe '%s'" % v for v in variants), recipe,
+                   "those recipes" if len(variants) > 1 else "that recipe"))
         version = decl.get("version")
         if version:
             recorded = sorted({str(c.get("version") or "") for c in matched} - {version})
@@ -1018,10 +1064,26 @@ def match_recipes(comps, by_recipe, yocto_files, all_refs, problems):
     return out
 
 
+def check_build_names(comps, declared, yocto_recipes, problems):
+    """In a Yocto build, a component added by name only must not be a package
+    the image already installs: that one is declared by its recipe."""
+    installed = {}
+    for c in comps:
+        if is_build_package(c) and isinstance(c.get("name"), str):
+            installed.setdefault(c["name"], recipe_of(c, yocto_recipes))
+    for label, comp in declared:
+        if comp["name"] in installed:
+            recipe = installed[comp["name"]]
+            problems.append("%s: component '%s': a package of that name is installed in the image%s; declare it "
+                            "by its recipe (bomlens:yocto-recipe%s) rather than adding it again"
+                            % (label, comp["name"], " by recipe '%s'" % recipe if recipe else "",
+                               " = %s" % recipe if recipe else ""))
+
+
 def apply_recipes(recipe_matches, yocto_files):
     """Put each recipe declaration on the packages of the recipe, with their
     files nested under them."""
-    reserved = (ORIGIN, RECIPE, MARK)
+    reserved = (ORIGIN, RECIPE, MARK) + READER_OWNED
     for decl, matched in recipe_matches:
         origin = props(decl, ORIGIN)[0]
         extra = [p for p in decl.get("properties", []) if p.get("name") not in reserved]
@@ -1191,8 +1253,11 @@ def main(argv):
     declared, file_deps, refs_seen, by_recipe = read_files(files, labels, root, given_root, product, product_version,
                                                            existing_refs, existing_purls, problems, yocto)
     all_refs = check_refs(declared, file_deps, refs_seen, existing_refs, problems)
-    yocto_files = load_yocto_files(os.environ.get("DECLARED_COMPONENTS_YOCTO_FILES", "")) if by_recipe else {}
-    recipe_matches = match_recipes(comps, by_recipe, yocto_files, all_refs, problems)
+    yocto_files, yocto_recipes = load_yocto_facts(os.environ.get("DECLARED_COMPONENTS_YOCTO_FILES", "")) \
+        if yocto else ({}, {})
+    recipe_matches = match_recipes(comps, by_recipe, yocto_files, yocto_recipes, all_refs, problems)
+    if yocto:
+        check_build_names(comps, declared, yocto_recipes, problems)
     if problems:
         for p in problems[:MAX_PROBLEMS]:
             log("ERROR: " + p)
