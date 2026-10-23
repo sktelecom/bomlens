@@ -10,7 +10,7 @@ import { bundleSteps, type PackageGroup } from "@/lib/vulnGroups";
 import { cn } from "@/lib/utils";
 
 /** Bundles shown before the rest are summarised as a count. */
-const SHOWN = 3;
+const SHOWN = 5;
 
 /**
  * "One upgrade resolves more than one CVE". The same callout surface as the
