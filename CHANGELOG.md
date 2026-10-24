@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v1.14.1] - 2026-10-24
+
+### Added
+
+- Web UI: a "Read sbom-declared.cdx.json" switch under Result quality, on by default. Turning it off skips the declaration file, as `--no-components` does.
+- Web UI: a Yocto build directory scan reads `sbom-declared.cdx.json` at the root of the picked folder. Only a regular file is accepted.
+- Web UI: when a declaration is refused, the Overview shows the reasons with links to view or download `_bom.refused.json`. The run stays in Recent scans with a badge and reopens on that card.
+- Web UI: declared components carry a first-party or third-party badge in the Components table.
+
+### Changed
+
+- The image SBOM attestation in the publish workflow gives syft the runner's temporary directory.
+
 ## [v1.14.0] - 2026-10-24
 
 ### Added
