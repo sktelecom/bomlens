@@ -1552596,7 +1552596,7 @@
         "value": "FIRMWARE"
       }
     ],
-    "timestamp": "2026-10-23T22:49:04Z",
+    "timestamp": "2026-10-24T14:32:47Z",
     "tools": {
       "components": [
         {
@@ -1552618,7 +1552618,7 @@
           "name": "BomLens",
           "publisher": "SK Telecom",
           "type": "application",
-          "version": "1.14.0"
+          "version": "1.14.1"
         }
       ]
     }
