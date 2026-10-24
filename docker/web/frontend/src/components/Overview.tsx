@@ -348,7 +348,11 @@ export function Overview({
           _ScanErrorTracker); same title/fallback copy as the running-scan
           failure card, so the two read consistently. */}
       {!result.ok && result.declarationRefused && (
-        <DeclarationRefusedCard refused={result.declarationRefused} scanId={result.id ?? scanId} />
+        <DeclarationRefusedCard
+          refused={result.declarationRefused}
+          scanId={result.id ?? scanId}
+          errorMessage={result.errorMessage}
+        />
       )}
       {!result.ok && !result.declarationRefused && (
         <Card role="alert" className="border-destructive/40 bg-destructive/5">

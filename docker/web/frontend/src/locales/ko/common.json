@@ -733,7 +733,7 @@
     "failedTitle": "스캔을 끝내지 못했습니다",
     "failedBody": "스캔이 완료되기 전에 문제가 발생했습니다. 아래 실행 로그에서 원인을 확인한 뒤 다시 시도하세요.",
     "declarationRefusedTitle": "선언 파일이 거부되었습니다",
-    "declarationRefusedBody": "선언된 구성요소가 규칙에 맞지 않아 SBOM을 완성하기 전에 스캔을 멈췄습니다. 그때까지 만든 SBOM은 결과가 아니라 {{file}}로 남겼습니다.",
+    "declarationRefusedBody": "선언된 구성요소를 SBOM에 추가하지 못해 SBOM을 완성하기 전에 스캔을 멈췄습니다. 그때까지 만든 SBOM은 결과가 아니라 {{file}}로 남겼습니다.",
     "declarationRefusedFix": "선언 파일을 고친 뒤 다시 스캔하세요. 파일 없이 스캔하려면 결과 품질에서 \"sbom-declared.cdx.json 읽기\"를 끄세요.",
     "declarationRefusedView": "거부된 SBOM 보기",
     "declarationRefusedDownload": "다운로드",

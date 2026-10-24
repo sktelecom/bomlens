@@ -138,3 +138,16 @@ test("declared components carry an origin badge in the components table", async 
   await expect(badges.nth(0)).toHaveText("first-party");
   await expect(badges.nth(1)).toHaveText("third-party");
 });
+
+test("a declaration step that failed without reasons shows the scan's own error", async ({ page }) => {
+  const failed = {
+    ...REFUSED,
+    errorMessage: "[ERROR] the declared components could not be added to the SBOM (see above).",
+    declarationRefused: { file: "demo_1.0_bom.refused.json", reasons: [] },
+  };
+  await openForm(page, failed);
+  await page.getByRole("button", { name: /Run scan/i }).click();
+  const card = page.getByTestId("declaration-refused");
+  await expect(card.getByText(/could not be added to the SBOM \(see above\)/)).toBeVisible();
+  await expect(card.getByRole("link", { name: "Download" })).toBeVisible();
+});

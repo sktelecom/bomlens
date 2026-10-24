@@ -19,9 +19,13 @@ import { cn } from "@/lib/utils";
 export function DeclarationRefusedCard({
   refused,
   scanId,
+  errorMessage,
 }: {
   refused: DeclarationRefused;
   scanId: string | null;
+  /** The scan's own [ERROR] text, shown when the step gave no reasons (it
+   *  failed rather than refused the file). */
+  errorMessage?: string | null;
 }) {
   const { t } = useTranslation();
   const href = fileUrl(scanId, refused.file);
@@ -35,6 +39,11 @@ export function DeclarationRefusedCard({
         <p className="text-body-sm text-muted-foreground">
           {t("run.declarationRefusedBody", { file: refused.file })}
         </p>
+        {refused.reasons.length === 0 && errorMessage && (
+          <p className="whitespace-pre-wrap break-words font-mono text-label text-muted-foreground">
+            {errorMessage}
+          </p>
+        )}
         {refused.reasons.length > 0 && (
           <ul className="list-disc space-y-1 pl-5 text-body-sm text-foreground">
             {refused.reasons.map((reason) => (

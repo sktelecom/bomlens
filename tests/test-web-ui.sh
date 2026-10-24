@@ -3944,6 +3944,14 @@ case "$mode" in
         echo "[ERROR] The SBOM without them is kept as ${PROJECT_NAME}_${PROJECT_VERSION}_bom.refused.json, not as ${PROJECT_NAME}_${PROJECT_VERSION}_bom.json."
         exit 1
         ;;
+    # The declaration step failed for a reason other than a refusal (exit
+    # other than 3): the SBOM is renamed all the same, with no reason lines.
+    declared-error)
+        write_bom
+        mv "${PROJECT_NAME}_${PROJECT_VERSION}_bom.json" "${PROJECT_NAME}_${PROJECT_VERSION}_bom.refused.json"
+        echo "[ERROR] the declared components could not be added to the SBOM (see above)."
+        exit 1
+        ;;
     # An SBOM holding one component a declaration file added, one the scan found.
     declared-ok)
         printf '%s' '{"bomFormat":"CycloneDX","specVersion":"1.6","version":1,"components":[{"type":"application","name":"fw-app","version":"1.0","properties":[{"name":"bomlens:declared","value":"true"},{"name":"bomlens:origin","value":"first-party"}]},{"type":"library","name":"hal","version":"2.1","properties":[{"name":"bomlens:declared","value":"true"},{"name":"bomlens:origin","value":"third-party"}]},{"type":"library","name":"zlib","version":"1.3","properties":[{"name":"bomlens:origin","value":"first-party"}]}]}' \
@@ -5195,7 +5203,7 @@ printf '%s' "$DECL_JSON" > "$YOCTOROOT/sbom-declared.cdx.json"
 rm -f "$WORK/stub-env"
 yev=$(sse_events "project=ydecl&version=1.0&source=rootfs-dir&target=$YOCTOROOT")
 if grep -q '^DECLARED_COMPONENTS_FILES=/.*/out2/ydecl_1\.0/\.declared-components\.cdx\.json$' "$WORK/stub-env" \
-   && grep -qx 'DECLARED_COMPONENTS_LABELS=sbom-declared.cdx.json (at the root of the build directory)' "$WORK/stub-env" \
+   && grep -qx 'DECLARED_COMPONENTS_LABELS=sbom-declared.cdx.json (at the root of the scanned folder)' "$WORK/stub-env" \
    && grep -qxF "DECLARED_FILE_CONTENT=$DECL_JSON" "$WORK/stub-env" \
    && grep -qx 'MODE=ANALYZE' "$WORK/stub-env" \
    && echo "$yev" | python3 -c "
@@ -5246,6 +5254,19 @@ else
     fail "a symlinked declaration file was followed or not reported" "$yev"
 fi
 rm -f "$YOCTOROOT/sbom-declared.cdx.json"
+mkdir "$YOCTOROOT/sbom-declared.cdx.json"
+yev=$(sse_events "project=ydecl6&version=1.0&source=rootfs-dir&target=$YOCTOROOT")
+if echo "$yev" | python3 -c "
+import sys, json
+evs = json.load(sys.stdin)
+errs = [e['data']['detail'] for e in evs if e['event'] == 'error']
+assert errs and 'not a regular file' in errs[0], evs
+"; then
+    pass "a folder named sbom-declared.cdx.json is not read; the scan stops and says why"
+else
+    fail "a folder in place of the declaration file" "$yev"
+fi
+rmdir "$YOCTOROOT/sbom-declared.cdx.json"
 rm -f "$WORK/stub-env"
 sse_events "project=ydecl4&version=1.0&source=rootfs-dir&target=$YOCTOROOT" >/dev/null
 if grep -qx 'DECLARED_COMPONENTS_FILES=' "$WORK/stub-env"; then
@@ -5284,6 +5305,29 @@ if [ "$(curl -s -o /dev/null -w '%{http_code}' "$BASE2/file?id=refd_1.0&name=ref
     pass "the refused SBOM is served by /file"
 else
     fail "/file does not serve the refused SBOM"
+fi
+echo fail > "$STUB_MODE_FILE"
+events=$(sse_events "project=refd&version=1.0&source=current-dir")
+if [ ! -e "$OUT2/refd_1.0/refd_1.0_bom.refused.json" ] && echo "$events" | python3 -c "
+import sys, json
+d = [e for e in json.load(sys.stdin) if e['event'] == 'done'][0]['data']
+assert d['ok'] is False and d['declarationRefused'] is None, d
+"; then
+    pass "an earlier run's refused SBOM is removed, so a later failure is not reported as a refusal"
+else
+    fail "a stale _bom.refused.json was taken for this run's refusal" "$events"
+fi
+echo declared-error > "$STUB_MODE_FILE"
+events=$(sse_events "project=refd3&version=1.0&source=current-dir")
+if echo "$events" | python3 -c "
+import sys, json
+d = [e for e in json.load(sys.stdin) if e['event'] == 'done'][0]['data']
+assert d['declarationRefused'] == {'file': 'refd3_1.0_bom.refused.json', 'reasons': []}, d
+assert 'could not be added' in (d['errorMessage'] or ''), d
+"; then
+    pass "a declaration step that failed without reasons still names the kept SBOM, with the error message"
+else
+    fail "declaration step failure without reasons" "$events"
 fi
 echo fail > "$STUB_MODE_FILE"
 events=$(sse_events "project=refd2&version=1.0&source=current-dir")

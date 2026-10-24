@@ -3803,7 +3803,7 @@ def _one_line_field(value, limit):
 DECLARED_DEFAULT_NAME = "sbom-declared.cdx.json"
 DECLARED_COPY_NAME = ".declared-components.cdx.json"
 # What the refusal and warning messages call the file (DECLARED_COMPONENTS_LABELS).
-DECLARED_YOCTO_LABEL = "sbom-declared.cdx.json (at the root of the build directory)"
+DECLARED_YOCTO_LABEL = "sbom-declared.cdx.json (at the root of the scanned folder)"
 # apply-declared-components.py refuses a file over 4 MiB. One byte more is
 # copied, so it is that script, not this server, that says the file is too large.
 _DECLARED_MAX_BYTES = 4 * 1024 * 1024
@@ -3833,12 +3833,22 @@ def stage_yocto_declaration(build_dir, run_out):
         with os.fdopen(fd, "rb") as fh:
             fd = None
             data = fh.read(_DECLARED_MAX_BYTES + 1)
+    except OSError:
+        return None, "cannot be read"
     finally:
         if fd is not None:
             os.close(fd)
     dst = os.path.join(run_out, DECLARED_COPY_NAME)
-    with open(dst, "wb") as out:
-        out.write(data)
+    try:
+        # Written fresh, never through whatever already sits at that name.
+        if os.path.lexists(dst):
+            os.remove(dst)
+        out_fd = os.open(dst, os.O_WRONLY | os.O_CREAT | os.O_EXCL
+                         | getattr(os, "O_NOFOLLOW", 0), 0o644)
+        with os.fdopen(out_fd, "wb") as out:
+            out.write(data)
+    except OSError:
+        return None, "could not be copied into the run folder"
     return dst, None
 
 
@@ -6861,19 +6871,19 @@ class Handler(BaseHTTPRequestHandler):
                 if no_components:
                     if os.path.lexists(os.path.join(yocto_dir, DECLARED_DEFAULT_NAME)):
                         sse("log", json.dumps(
-                            "▶ sbom-declared.cdx.json at the root of the build directory "
+                            "▶ sbom-declared.cdx.json at the root of the scanned folder "
                             "is not read (turned off for this scan)."))
                 else:
                     staged, why = stage_yocto_declaration(yocto_dir, run_out)
                     if why:
-                        fail("sbom-declared.cdx.json at the root of the build directory %s, "
+                        fail("sbom-declared.cdx.json at the root of the scanned folder %s, "
                              "so it was not read. Put the file itself there, or turn off "
                              "reading it and scan again." % why)
                         return
                     if staged:
                         sse("log", json.dumps(
                             "▶ Declared components: sbom-declared.cdx.json at the root of "
-                            "the build directory"))
+                            "the scanned folder"))
                         env["DECLARED_COMPONENTS_FILES"] = staged
                         env["DECLARED_COMPONENTS_LABELS"] = DECLARED_YOCTO_LABEL
 
@@ -7306,6 +7316,15 @@ class Handler(BaseHTTPRequestHandler):
                 "skt-submission" if mode == "ANALYZE" else "default")
             scan_config["conformanceProfile"] = env["CONFORMANCE_PROFILE"]
             write_scanmeta(run_out, scan_config)
+
+            # A refused SBOM left by an earlier run of this folder would read as
+            # this run's refusal if this one failed before the entrypoint's own
+            # sweep (a sibling that never started, say). Only this run's counts.
+            for _stale in glob.glob(os.path.join(run_out, "*_bom.refused.json")):
+                try:
+                    os.remove(_stale)
+                except OSError:
+                    pass
 
             sse("log", json.dumps("▶ Starting %s scan: %s %s" % (mode.lower(), project, version)))
             ok = False
