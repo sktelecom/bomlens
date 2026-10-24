@@ -193,6 +193,16 @@ describe("scanComparison", () => {
     expect(cmp?.severityDir).toBe("up"); // HIGH → CRITICAL
   });
 
+  it("leaves a run whose declaration was refused out of the comparison", () => {
+    const withRefused = [
+      scan({ id: "cur", components: 13, generatedAt: 300 }),
+      scan({ id: "ref", components: 0, generatedAt: 200, refused: true }),
+      scan({ id: "prev", components: 10, generatedAt: 100 }),
+    ];
+    expect(scanComparison(withRefused, "cur")?.prev.id).toBe("prev");
+    expect(scanComparison(withRefused, "ref")).toBeNull();
+  });
+
   it("reports a drop and an unchanged severity by rank", () => {
     expect(
       scanComparison(

@@ -281,6 +281,56 @@ assert not any(x.startswith("TARGET_FILE=") for x in _a), _a
 assert not any(x.startswith("TARGET_DIR=") for x in _a), _a
 assert not any(x.startswith("TARGET_IMAGE=") for x in _a), _a
 assert not any(x.startswith("ANALYZE_SBOM=") for x in _a), _a
+assert not any(x.startswith("DECLARED_COMPONENTS_") for x in _a), _a
+
+# Declared components on the deep CVE sibling. --no-components on a source
+# scan is forwarded as the fixed literal; an operator's own
+# DECLARED_COMPONENTS_* in this server's environment never is.
+captured.clear()
+rc = server.run_sibling_scan(
+    "ghcr.io/sktelecom/bomlens-deep-cve:1.5.0", "SOURCE", run_out,
+    lambda ln: None, source_root=src_root,
+    extra_env={"DEEP_CVE": "true", "DECLARED_COMPONENTS_SKIP": "1"},
+)
+assert rc == 0 and "DECLARED_COMPONENTS_SKIP=1" in captured["args"], captured["args"]
+os.environ["DECLARED_COMPONENTS_SKIP"] = "1"
+os.environ["DECLARED_COMPONENTS_FILES"] = "/etc/passwd"
+captured.clear()
+rc = server.run_sibling_scan(
+    "ghcr.io/sktelecom/bomlens-deep-cve:1.5.0", "SOURCE", run_out,
+    lambda ln: None, source_root=src_root, extra_env={"DEEP_CVE": "true"},
+)
+assert rc == 0, rc
+assert not any(x.startswith("DECLARED_COMPONENTS_") for x in captured["args"]), captured["args"]
+assert "DECLARED_COMPONENTS_SKIP" not in (captured["env"] or {}), "operator SKIP reached the sibling env"
+# A Yocto document with a staged declaration file: its fixed path in the run
+# folder and the fixed label are forwarded; the operator's FILES is not.
+os.makedirs(run_out, exist_ok=True)
+staged = os.path.join(run_out, server.DECLARED_COPY_NAME)
+open(staged, "w").write("{}")
+captured.clear()
+rc = server.run_sibling_scan(
+    "ghcr.io/sktelecom/bomlens-deep-cve:1.5.0", "ANALYZE", run_out,
+    lambda ln: None, upload_file=up_file,
+    extra_env={"DEEP_CVE": "true", "YOCTO_FROM_BUILD": "true",
+               "DECLARED_COMPONENTS_FILES": staged,
+               "DECLARED_COMPONENTS_LABELS": "anything the request said"},
+)
+assert rc == 0, rc
+_a = captured["args"]
+assert ("DECLARED_COMPONENTS_FILES=%s" % staged) in _a, _a
+assert ("DECLARED_COMPONENTS_LABELS=%s" % server.DECLARED_YOCTO_LABEL) in _a, _a
+assert not any(x == "DECLARED_COMPONENTS_SKIP=1" for x in _a), _a
+# Without a request value the operator's /etc/passwd is not forwarded.
+captured.clear()
+server.run_sibling_scan(
+    "ghcr.io/sktelecom/bomlens-deep-cve:1.5.0", "ANALYZE", run_out,
+    lambda ln: None, upload_file=up_file,
+    extra_env={"DEEP_CVE": "true", "YOCTO_FROM_BUILD": "true"},
+)
+assert not any(x.startswith("DECLARED_COMPONENTS_") for x in captured["args"]), captured["args"]
+os.remove(staged)
+del os.environ["DECLARED_COMPONENTS_SKIP"], os.environ["DECLARED_COMPONENTS_FILES"]
 
 captured.clear()
 rc = server.run_sibling_scan(
@@ -3916,6 +3966,12 @@ echo "[stub] scanning ${PROJECT_NAME} ${PROJECT_VERSION} (mode=$mode)"
   echo "AI_DECLARATION_FILE=${AI_DECLARATION_FILE:-}"
   echo "REACHABILITY=${REACHABILITY:-}"
   echo "GENERATE_SECURITY=${GENERATE_SECURITY:-}"
+  echo "DECLARED_COMPONENTS_SKIP=${DECLARED_COMPONENTS_SKIP:-}"
+  echo "DECLARED_COMPONENTS_FILES=${DECLARED_COMPONENTS_FILES:-}"
+  echo "DECLARED_COMPONENTS_LABELS=${DECLARED_COMPONENTS_LABELS:-}"
+  # Read while the scan runs: the server removes its copy once the scan ends.
+  echo "DECLARED_FILE_CONTENT=$([ -n "${DECLARED_COMPONENTS_FILES:-}" ] && cat "$DECLARED_COMPONENTS_FILES" 2>/dev/null)"
+  echo "DECLARED_FILE_MODE=$([ -n "${DECLARED_COMPONENTS_FILES:-}" ] && python3 -c 'import os,sys; print(oct(os.stat(sys.argv[1]).st_mode & 0o777))' "$DECLARED_COMPONENTS_FILES" 2>/dev/null)"
   # Counted here, while the scan is running: an extracted upload tree is removed
   # once the scan finishes, so a later check would always find it empty.
   echo "TARGET_DIR_FILES=$([ -n "${TARGET_DIR:-}" ] && find "$TARGET_DIR" -type f 2>/dev/null | wc -l | tr -d ' ' || echo 0)"; } > "${STUB_ENV_FILE:-/dev/null}"
@@ -3928,6 +3984,31 @@ case "$mode" in
     progress) echo "[firmware-cvedb-progress] 42%"; write_bom ;;
     deepcve-progress) echo "[deep-cve-progress] 55%"; write_bom ;;
     fail) echo "[stub] scanner exploded" >&2; exit 1 ;;
+    # entrypoint.sh's declared-components refusal: the step's reasons, its
+    # [ERROR] lines, and the SBOM written so far kept as _bom.refused.json.
+    declared-refused)
+        write_bom
+        mv "${PROJECT_NAME}_${PROJECT_VERSION}_bom.json" "${PROJECT_NAME}_${PROJECT_VERSION}_bom.refused.json"
+        echo "[declared-components] ERROR: sbom-declared.cdx.json (at the scan target root): component 'fw-app' 1.0: bomlens:artifact out/fw-app.bin does not exist"
+        echo "[declared-components] ERROR: sbom-declared.cdx.json (at the scan target root): component 'hal': bomlens:origin is missing"
+        echo "[declared-components] ERROR: sbom-declared.cdx.json (at the scan target root): component 'fw': the SHA-256 hash it gives does not match out/fw.bin (the file has aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa)"
+        echo "[ERROR] the declared components were refused (reasons above), so the SBOM is not complete. Fix the declaration file and scan again."
+        echo "[ERROR] The SBOM without them is kept as ${PROJECT_NAME}_${PROJECT_VERSION}_bom.refused.json, not as ${PROJECT_NAME}_${PROJECT_VERSION}_bom.json."
+        exit 1
+        ;;
+    # The declaration step failed for a reason other than a refusal (exit
+    # other than 3): the SBOM is renamed all the same, with no reason lines.
+    declared-error)
+        write_bom
+        mv "${PROJECT_NAME}_${PROJECT_VERSION}_bom.json" "${PROJECT_NAME}_${PROJECT_VERSION}_bom.refused.json"
+        echo "[ERROR] the declared components could not be added to the SBOM (see above)."
+        exit 1
+        ;;
+    # An SBOM holding one component a declaration file added, one the scan found.
+    declared-ok)
+        printf '%s' '{"bomFormat":"CycloneDX","specVersion":"1.6","version":1,"components":[{"type":"application","name":"fw-app","version":"1.0","properties":[{"name":"bomlens:declared","value":"true"},{"name":"bomlens:origin","value":"first-party"}]},{"type":"library","name":"hal","version":"2.1","properties":[{"name":"bomlens:declared","value":"true"},{"name":"bomlens:origin","value":"third-party"}]},{"type":"library","name":"zlib","version":"1.3","properties":[{"name":"bomlens:origin","value":"first-party"}]}]}' \
+            > "${PROJECT_NAME}_${PROJECT_VERSION}_bom.json"
+        ;;
     # Mirrors #109's Node fallback quality gate: an [ERROR] block explaining
     # what happened, then a separate one-line [ERROR] right before exit. Both
     # must reach the failed-scan card, not just the last ("see above") line.
@@ -4005,6 +4086,7 @@ $PLAINROOT|/host/plainroot" \
     SBOM_LIB_DIR="$WORK/no-such-lib" \
     STUB_MODE_FILE="$STUB_MODE_FILE" STUB_HEARTBEAT="$STUB_HEARTBEAT" \
     STUB_ENV_FILE="$WORK/stub-env" \
+    DECLARED_COMPONENTS_FILES="$WORK/not-from-the-request.json" DECLARED_COMPONENTS_SKIP=1 \
     python3 "$SERVER" > "$WORK/server2.log" 2>&1 &
 SRV2_PID=$!
 disown "$SRV2_PID" 2>/dev/null || true
@@ -5144,6 +5226,243 @@ if [ "$(sed -n 's/^PRODUCT_SUPPLIER=//p' "$WORK/stub-env" | tr -d '\n' | wc -c |
 else
     fail "the supplier length cap did not hold" "$(cat "$WORK/stub-env")"
 fi
+
+echo "== no_components: a source scan leaves sbom-declared.cdx.json unread, and only when asked =="
+echo ok > "$STUB_MODE_FILE"
+rm -f "$WORK/stub-env"
+events=$(sse_events "project=nc1&version=1.0&source=current-dir&no_components=true")
+if grep -qx 'DECLARED_COMPONENTS_SKIP=1' "$WORK/stub-env" && echo "$events" | python3 -c "
+import sys, json
+d = [e for e in json.load(sys.stdin) if e['event'] == 'done'][0]['data']
+assert d['ok'] is True and d['scanConfig']['noComponents'] is True, d['scanConfig']
+"; then
+    pass "no_components=true -> DECLARED_COMPONENTS_SKIP=1, recorded for a re-scan"
+else
+    fail "no_components did not reach the scan env" "$(cat "$WORK/stub-env" 2>/dev/null)"
+fi
+rm -f "$WORK/stub-env"
+sse_events "project=nc2&version=1.0&source=current-dir" >/dev/null
+if grep -qx 'DECLARED_COMPONENTS_SKIP=' "$WORK/stub-env" \
+   && [ "$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1])).get("noComponents"))' "$OUT2/nc2_1.0/.scanmeta.json")" = "False" ]; then
+    pass "without no_components the declaration file is read (DECLARED_COMPONENTS_SKIP empty)"
+else
+    fail "DECLARED_COMPONENTS_SKIP set without no_components" "$(cat "$WORK/stub-env" 2>/dev/null)"
+fi
+
+echo "== Yocto build directory: sbom-declared.cdx.json at its root is handed to the scan =="
+DECL_JSON='{"bomFormat":"CycloneDX","specVersion":"1.6","components":[{"type":"application","name":"busybox","properties":[{"name":"bomlens:origin","value":"third-party"},{"name":"bomlens:yocto-recipe","value":"busybox"}]}]}'
+printf '%s' "$DECL_JSON" > "$YOCTOROOT/sbom-declared.cdx.json"
+rm -f "$WORK/stub-env"
+# The stub writes an SBOM holding declared components, as the scanner would.
+echo declared-ok > "$STUB_MODE_FILE"
+yev=$(sse_events "project=ydecl&version=1.0&source=rootfs-dir&target=$YOCTOROOT")
+if grep -q '^DECLARED_COMPONENTS_FILES=/.*/out2/ydecl_1\.0/\.declared-components\.cdx\.json$' "$WORK/stub-env" \
+   && grep -qx 'DECLARED_COMPONENTS_LABELS=sbom-declared.cdx.json (at the root of the scanned folder)' "$WORK/stub-env" \
+   && grep -qxF "DECLARED_FILE_CONTENT=$DECL_JSON" "$WORK/stub-env" \
+   && grep -qx 'DECLARED_FILE_MODE=0o600' "$WORK/stub-env" \
+   && grep -qx 'MODE=ANALYZE' "$WORK/stub-env" \
+   && echo "$yev" | python3 -c "
+import sys, json
+evs = json.load(sys.stdin)
+assert any('Declared components' in str(e['data']) for e in evs if e['event'] == 'log'), evs
+assert [e for e in evs if e['event'] == 'done'][0]['data']['ok'] is True, evs
+"; then
+    pass "the build directory's declaration file reaches the scan as a copy in the run folder, with its label"
+else
+    fail "the Yocto declaration file was not handed to the scan" "$(cat "$WORK/stub-env" 2>/dev/null)"
+fi
+if [ ! -e "$OUT2/ydecl_1.0/.declared-components.cdx.json" ] && echo "$yev" | python3 -c "
+import sys, json
+d = [e for e in json.load(sys.stdin) if e['event'] == 'done'][0]['data']
+assert not [r for r in d['results'] if r['name'].startswith('.')], d['results']
+"; then
+    pass "the copy is removed once the scan ends and is never listed"
+else
+    fail "the declaration copy was left behind or listed" "$(ls -A "$OUT2/ydecl_1.0")"
+fi
+# A scanner that ignored the file (an older image) leaves no declared component:
+# the scan fails instead of passing as one that applied the declaration.
+echo ok > "$STUB_MODE_FILE"
+yev=$(sse_events "project=ydecl7&version=1.0&source=rootfs-dir&target=$YOCTOROOT")
+if echo "$yev" | python3 -c "
+import sys, json
+evs = json.load(sys.stdin)
+errs = [e['data']['detail'] for e in evs if e['event'] == 'error']
+assert errs and 'was not applied' in errs[0], evs
+assert [e for e in evs if e['event'] == 'done'][0]['data']['ok'] is False, evs
+"; then
+    pass "a declaration the scan did not apply fails the scan"
+else
+    fail "an unapplied declaration passed as ok" "$yev"
+fi
+rm -f "$WORK/stub-env"
+yev=$(sse_events "project=ydecl2&version=1.0&source=rootfs-dir&target=$YOCTOROOT&no_components=true")
+if grep -qx 'DECLARED_COMPONENTS_FILES=' "$WORK/stub-env" && grep -qx 'DECLARED_COMPONENTS_SKIP=' "$WORK/stub-env" \
+   && echo "$yev" | python3 -c "
+import sys, json
+evs = json.load(sys.stdin)
+assert any('is not read' in str(e['data']) for e in evs if e['event'] == 'log'), evs
+"; then
+    pass "no_components=true leaves the build directory's declaration file unread, and says so"
+else
+    fail "no_components on a Yocto build directory" "$(cat "$WORK/stub-env" 2>/dev/null)"
+fi
+rm -f "$YOCTOROOT/sbom-declared.cdx.json"
+echo '{}' > "$WORK/elsewhere.json"
+ln -s "$WORK/elsewhere.json" "$YOCTOROOT/sbom-declared.cdx.json"
+rm -f "$WORK/stub-env"
+yev=$(sse_events "project=ydecl3&version=1.0&source=rootfs-dir&target=$YOCTOROOT")
+if [ ! -f "$WORK/stub-env" ] && echo "$yev" | python3 -c "
+import sys, json
+evs = json.load(sys.stdin)
+errs = [e['data']['detail'] for e in evs if e['event'] == 'error']
+assert errs and 'symbolic link' in errs[0], evs
+assert [e for e in evs if e['event'] == 'done'][0]['data']['ok'] is False, evs
+"; then
+    pass "a symbolic link in place of the declaration file is not followed; the scan stops and says why"
+else
+    fail "a symlinked declaration file was followed or not reported" "$yev"
+fi
+rm -f "$YOCTOROOT/sbom-declared.cdx.json"
+mkdir "$YOCTOROOT/sbom-declared.cdx.json"
+yev=$(sse_events "project=ydecl6&version=1.0&source=rootfs-dir&target=$YOCTOROOT")
+if echo "$yev" | python3 -c "
+import sys, json
+evs = json.load(sys.stdin)
+errs = [e['data']['detail'] for e in evs if e['event'] == 'error']
+assert errs and 'not a regular file' in errs[0], evs
+"; then
+    pass "a folder named sbom-declared.cdx.json is not read; the scan stops and says why"
+else
+    fail "a folder in place of the declaration file" "$yev"
+fi
+rmdir "$YOCTOROOT/sbom-declared.cdx.json"
+printf '%s' "$DECL_JSON" > "$WORK/declared-elsewhere.json"
+ln "$WORK/declared-elsewhere.json" "$YOCTOROOT/sbom-declared.cdx.json"
+yev=$(sse_events "project=ydecl8&version=1.0&source=rootfs-dir&target=$YOCTOROOT")
+if echo "$yev" | python3 -c "
+import sys, json
+evs = json.load(sys.stdin)
+errs = [e['data']['detail'] for e in evs if e['event'] == 'error']
+assert errs and 'hard link' in errs[0], evs
+"; then
+    pass "a hard link in place of the declaration file is not read; the scan stops and says why"
+else
+    fail "a hard-linked declaration file was read" "$yev"
+fi
+rm -f "$YOCTOROOT/sbom-declared.cdx.json"
+rm -f "$WORK/stub-env"
+sse_events "project=ydecl4&version=1.0&source=rootfs-dir&target=$YOCTOROOT" >/dev/null
+if grep -qx 'DECLARED_COMPONENTS_FILES=' "$WORK/stub-env"; then
+    pass "a build directory without the file scans without a declaration"
+else
+    fail "a declaration was handed over with no file present" "$(cat "$WORK/stub-env" 2>/dev/null)"
+fi
+rm -f "$WORK/stub-env"
+sse_events "project=ydecl5&version=1.0&source=current-dir" >/dev/null
+if grep -qx 'DECLARED_COMPONENTS_FILES=' "$WORK/stub-env"; then
+    pass "the server's own DECLARED_COMPONENTS_* environment never reaches a scan"
+else
+    fail "DECLARED_COMPONENTS_FILES leaked from the server environment" "$(cat "$WORK/stub-env" 2>/dev/null)"
+fi
+
+echo "== a refused declaration file: done names the refused SBOM and the reasons =="
+echo declared-refused > "$STUB_MODE_FILE"
+events=$(sse_events "project=refd&version=1.0&source=current-dir")
+if echo "$events" | python3 -c "
+import sys, json
+d = [e for e in json.load(sys.stdin) if e['event'] == 'done'][0]['data']
+assert d['ok'] is False, d
+r = d['declarationRefused']
+assert r['file'] == 'refd_1.0_bom.refused.json', r
+assert len(r['reasons']) == 3, r
+# The hash the build output really has is shown, not masked.
+assert r['reasons'][2].endswith('(the file has aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa)'), r
+assert r['reasons'][0].startswith('sbom-declared.cdx.json (at the scan target root): component'), r
+assert 'bomlens:origin is missing' in r['reasons'][1], r
+assert any(f['name'] == 'refd_1.0_bom.refused.json' for f in d['results']), d['results']
+assert 'refused' in (d['errorMessage'] or ''), d['errorMessage']
+"; then
+    pass "declarationRefused carries the refused SBOM's name and each reason; the file is listed"
+else
+    fail "refused declaration not reported" "$events"
+fi
+if [ "$(curl -s -o /dev/null -w '%{http_code}' "$BASE2/file?id=refd_1.0&name=refd_1.0_bom.refused.json")" = "200" ]; then
+    pass "the refused SBOM is served by /file"
+else
+    fail "/file does not serve the refused SBOM"
+fi
+if curl -s "$BASE2/scan?id=refd_1.0" | python3 -c "
+import sys, json
+d = json.load(sys.stdin)
+assert d['ok'] is False and d['sbom'] is None, d
+assert d['declarationRefused']['file'] == 'refd_1.0_bom.refused.json', d
+assert len(d['declarationRefused']['reasons']) == 3, d
+assert 'declarationRefused' not in d['scanConfig'], d['scanConfig']
+# No SBOM to name it: the header reads the project and version from here.
+assert d['scanConfig']['project'] == 'refd' and d['scanConfig']['version'] == '1.0', d['scanConfig']
+assert 'refused' in (d['errorMessage'] or ''), d
+" && curl -s "$BASE2/scans" | python3 -c "
+import sys, json
+rows = [r for r in json.load(sys.stdin) if r['id'] == 'refd_1.0']
+assert rows and rows[0]['refused'] is True and rows[0]['project'] == 'refd', rows
+"; then
+    pass "a refused run reopens with its refusal and is listed in recent scans"
+else
+    fail "a refused run cannot be reopened" "$(curl -s "$BASE2/scan?id=refd_1.0")"
+fi
+echo fail > "$STUB_MODE_FILE"
+events=$(sse_events "project=refd&version=1.0&source=current-dir")
+if [ ! -e "$OUT2/refd_1.0/refd_1.0_bom.refused.json" ] && echo "$events" | python3 -c "
+import sys, json
+d = [e for e in json.load(sys.stdin) if e['event'] == 'done'][0]['data']
+assert d['ok'] is False and d['declarationRefused'] is None, d
+"; then
+    pass "an earlier run's refused SBOM is removed, so a later failure is not reported as a refusal"
+else
+    fail "a stale _bom.refused.json was taken for this run's refusal" "$events"
+fi
+echo declared-error > "$STUB_MODE_FILE"
+events=$(sse_events "project=refd3&version=1.0&source=current-dir")
+if echo "$events" | python3 -c "
+import sys, json
+d = [e for e in json.load(sys.stdin) if e['event'] == 'done'][0]['data']
+assert d['declarationRefused'] == {'file': 'refd3_1.0_bom.refused.json', 'reasons': []}, d
+assert 'could not be added' in (d['errorMessage'] or ''), d
+"; then
+    pass "a declaration step that failed without reasons still names the kept SBOM, with the error message"
+else
+    fail "declaration step failure without reasons" "$events"
+fi
+echo fail > "$STUB_MODE_FILE"
+events=$(sse_events "project=refd2&version=1.0&source=current-dir")
+if echo "$events" | python3 -c "
+import sys, json
+d = [e for e in json.load(sys.stdin) if e['event'] == 'done'][0]['data']
+assert d['ok'] is False and d['declarationRefused'] is None, d
+"; then
+    pass "any other failure has declarationRefused null"
+else
+    fail "declarationRefused set on an unrelated failure" "$events"
+fi
+
+echo "== declared components carry their origin in the component list =="
+echo declared-ok > "$STUB_MODE_FILE"
+events=$(sse_events "project=dorg&version=1.0&source=current-dir")
+if echo "$events" | python3 -c "
+import sys, json
+d = [e for e in json.load(sys.stdin) if e['event'] == 'done'][0]['data']
+rows = {r['name']: r for r in d['sbom']['componentList']}
+assert rows['fw-app'].get('declaredOrigin') == 'first-party', rows['fw-app']
+assert rows['hal'].get('declaredOrigin') == 'third-party', rows['hal']
+# bomlens:origin without bomlens:declared is not a declared component.
+assert 'declaredOrigin' not in rows['zlib'], rows['zlib']
+"; then
+    pass "declaredOrigin is first-party/third-party on declared rows only"
+else
+    fail "declaredOrigin missing or wrong" "$events"
+fi
+echo ok > "$STUB_MODE_FILE"
 
 echo "== spec_version: the CycloneDX version reaches the scan env as 1.6 or 1.7, anything else is a 400 =="
 rm -f "$WORK/stub-env"

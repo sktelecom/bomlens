@@ -87,6 +87,15 @@ const GROUPS: GroupSpec[] = [
     match: (n) => n.endsWith("_bom.json") || n.endsWith("_bom.spdx.json"),
   },
   {
+    // The SBOM written before a declaration file was refused, kept under its
+    // own name so it is never taken for the result (entrypoint.sh).
+    key: "refusedSbom",
+    Icon: FileJson,
+    primary: false,
+    rank: 1.1,
+    match: (n) => n.endsWith("_bom.refused.json"),
+  },
+  {
     // The SPDX 3.0.1 AI document (AI scans) with the check of what it holds.
     key: "spdx3",
     Icon: BrainCircuit,

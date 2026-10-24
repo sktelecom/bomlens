@@ -54,6 +54,7 @@ import { diffComponents, diffVulnerabilities, type ComponentDiff, type VulnDiff 
 import { cn, formatBytes } from "@/lib/utils";
 import { useFormatNumber } from "@/lib/format";
 
+import { DeclarationRefusedCard } from "./DeclarationRefusedCard";
 import { FirstChecks } from "./FirstChecks";
 import { LicenseRiskBar } from "./LicenseRiskBar";
 import { PipelineStepsFailedNote } from "./PipelineStepsFailedNote";
@@ -346,7 +347,14 @@ export function Overview({
           server had no other classification for the failure (see server.py's
           _ScanErrorTracker); same title/fallback copy as the running-scan
           failure card, so the two read consistently. */}
-      {!result.ok && (
+      {!result.ok && result.declarationRefused && (
+        <DeclarationRefusedCard
+          refused={result.declarationRefused}
+          scanId={result.id ?? scanId}
+          errorMessage={result.errorMessage}
+        />
+      )}
+      {!result.ok && !result.declarationRefused && (
         <Card role="alert" className="border-destructive/40 bg-destructive/5">
           <CardContent className="space-y-1 p-4">
             <div className="flex items-center gap-2 text-body-sm font-semibold text-foreground">

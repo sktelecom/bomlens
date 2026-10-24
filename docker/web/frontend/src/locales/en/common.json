@@ -103,6 +103,8 @@
     "reachabilityHint": "For Go source or a Go executable, govulncheck checks whether the code each Go advisory names is reached. Findings that are not reached are listed apart and left out of the counts. Reads the Go vulnerability database online, and turns the security report on with it.",
     "readLockFile": "Read a lock file instead of building",
     "readLockFileHint": "When a package-lock.json, pnpm-lock.yaml, bun.lock or gradle.lockfile covers the whole project, BomLens reads it as it is: a few seconds instead of a build, with the same components and licenses. Turn it off to always resolve the dependencies by building (a project that is not covered by such a lock file is built either way).",
+    "readDeclared": "Read sbom-declared.cdx.json",
+    "readDeclaredHint": "Adds the components listed in sbom-declared.cdx.json at the root of the scanned folder, such as your own build outputs. Applies to source scans and to Yocto build directories, where the file declares components by recipe; any other folder is scanned the same either way. Turn it off to scan without the file, for example before the build outputs it names exist.",
     "byteStable": "Reproducible output",
     "byteStableHint": "Produces a byte-for-byte identical SBOM when the same input is re-scanned, so outputs can be diffed and checksummed. Skips network license lookups, which can otherwise vary between runs.",
     "conformanceProfile": "Conformance profile",
@@ -191,6 +193,10 @@
     "scanossNoMatchBody": "SCANOSS searched successfully but found no third-party open source copied directly into the source: either there is none, or the code isn't in OSSKB.",
     "vendoredBadge": "vendored",
     "vendoredBadgeHint": "Identified by SCANOSS as open source copied into the sources",
+    "declaredFirstParty": "first-party",
+    "declaredFirstPartyHint": "Added from the declaration file as your own component (bomlens:origin first-party), not found by the scan",
+    "declaredThirdParty": "third-party",
+    "declaredThirdPartyHint": "Added from the declaration file as a third-party component (bomlens:origin third-party), not found by the scan",
     "presenceOnlyVersion": "no version",
     "presenceOnlyHint": "Proved present by the ELF structure (library file or NEEDED entry), but no version string survived. With no version there is nothing to look up in a vulnerability database, so the vulnerability results do not cover this component. The licence obligations still apply.",
     "vendoredMatch": "match {{pct}}",
@@ -220,6 +226,10 @@
       "sbom": {
         "title": "SBOM (CycloneDX)",
         "desc": "The normalized software bill of materials in CycloneDX JSON. Export an SPDX 2.3 copy whenever you need one."
+      },
+      "refusedSbom": {
+        "title": "SBOM kept after a refused declaration",
+        "desc": "What the scan wrote before the declaration file was refused. The declared components are missing, so this is not the SBOM to submit."
       },
       "notice": {
         "title": "Open-source notice",
@@ -722,6 +732,11 @@
     "stageReport": "Report",
     "failedTitle": "The scan didn't finish",
     "failedBody": "Something went wrong before the scan could complete. Check the run log below for details, then try again.",
+    "declarationRefusedTitle": "The declaration file was refused",
+    "declarationRefusedBody": "The scan stopped before the SBOM was finished, because the declared components could not be added. The SBOM written so far is kept as {{file}}, not as the result.",
+    "declarationRefusedFix": "Fix the declaration file and scan again. To scan without it, turn off \"Read sbom-declared.cdx.json\" under Result quality.",
+    "declarationRefusedView": "View the refused SBOM",
+    "declarationRefusedDownload": "Download",
     "errorGitNotFoundOrPrivate": "The repository could not be found, or it's private. Check the URL, or add a token if it's private.",
     "errorGitNetwork": "The repository host could not be reached. Check the network connection and try again.",
     "showDetail": "Show detail",
@@ -1469,7 +1484,9 @@
     "demoCompare": "See what changed between two versions of {{project}}",
     "demoStart": "These are real, finished scans. Open one to see its SBOM, vulnerabilities and licenses. Three to begin with:",
     "rowMeta_one": "{{count}} component, {{date}}",
-    "rowMeta_other": "{{count}} components, {{date}}"
+    "rowMeta_other": "{{count}} components, {{date}}",
+    "refused": "Declaration refused",
+    "refusedHint": "The scan stopped because its declaration file was refused, so it has no SBOM. Open it for the reasons and the refused SBOM."
   },
   "validation": {
     "required": "Fill in the required fields marked above.",

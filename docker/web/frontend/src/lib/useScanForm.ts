@@ -176,6 +176,11 @@ export function useScanForm({
   const [byteStable, setByteStable] = useState(
     () => initialConfig?.byteStable ?? false,
   );
+  // Read sbom-declared.cdx.json at the root of the scanned folder (on by
+  // default; off is the CLI's --no-components). Seeded from a re-scan.
+  const [readDeclared, setReadDeclared] = useState(
+    () => initialConfig?.noComponents !== true,
+  );
   // Outbound license (SPDX id) switching the license-conflict check on. Free
   // text, since any SPDX id is valid; empty simply leaves the check off.
   const [outboundLicense, setOutboundLicense] = useState(
@@ -294,6 +299,15 @@ export function useScanForm({
   const showByteStable = !isAnalyze && !isAiModel;
   // Only a source tree has a lock file to read in place of a build.
   const showDetection = isSourceScan;
+  // A declaration file sits at the root of a source tree, or of a Yocto build
+  // directory picked with the folder input (the server reads it there).
+  const showReadDeclared =
+    isSourceScan || effectiveSource === "scan-target-src" || source === "rootfs-dir";
+  // A plain directory scan acts on it only when the folder turns out to be a
+  // Yocto build directory, which is not known before the scan, so turning it
+  // off there does not count as a changed option.
+  const readDeclaredChanged =
+    showReadDeclared && !readDeclared && effectiveSource !== "rootfs-dir";
   // A received SBOM carries its supplier's own root license and an AI model has
   // no outbound license of ours, so the field is offered only where we generate
   // the SBOM and therefore own what it ships under.
@@ -335,7 +349,7 @@ export function useScanForm({
   const securityForced = isAnalyze || deepCveOn || reachabilityOn;
   const showScanOptions =
     showDeepLicense || showVendored || showByteStable || showDeepCve || showReachability ||
-    showDetection;
+    showDetection || showReadDeclared;
   const showFormatOptions =
     showOutboundLicense || showSbomAuthor || showSupplier || showSpecVersion || showConformanceProfile;
   // Any scan produces an SBOM, so upload is offered for every source.
@@ -563,6 +577,7 @@ export function useScanForm({
       identifyVendored: showVendored ? identifyVendored : false,
       byteStable: showByteStable ? byteStable : false,
       detection: showDetection && !readLockFile ? "build" : "auto",
+      noComponents: showReadDeclared && !readDeclared,
       conformanceProfile: showConformanceProfile ? conformanceProfile : undefined,
       // Outbound license: only where we generate the SBOM (see showOutboundLicense).
       license: showOutboundLicense ? outboundLicense.trim() : "",
@@ -619,6 +634,7 @@ export function useScanForm({
     reachability, setReachability,
     byteStable, setByteStable,
     readLockFile, setReadLockFile, showDetection,
+    readDeclared, setReadDeclared, showReadDeclared, readDeclaredChanged,
     conformanceProfile, setConformanceProfile,
     outboundLicense, setOutboundLicense,
     sbomAuthor, setSbomAuthor,

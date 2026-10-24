@@ -26,7 +26,7 @@ Whichever file a component is written in, a `bomlens:artifact` path is relative 
 
 `--no-components` skips the file at the root, for a scan made before the build outputs it names exist. It cannot be combined with `--components`.
 
-Declaration files are read by source scans and by a Yocto build directory given as `--target` (see [A Yocto image](#a-yocto-image)); a firmware, image, binary or `--analyze` run stops with an error when given `--components`. The web UI has no `--components` option: put `sbom-declared.cdx.json` at the root of the folder you scan.
+Declaration files are read by source scans and by a Yocto build directory given as `--target` (see [A Yocto image](#a-yocto-image)); a firmware, image, binary or `--analyze` run stops with an error when given `--components`. The web UI has no `--components` option: put `sbom-declared.cdx.json` at the root of the folder you scan, a source tree or a Yocto build directory. Its **Read sbom-declared.cdx.json** switch under Result quality, on by default, is the UI's `--no-components`. When the file is refused, the failed scan lists the reasons and offers the `_bom.refused.json` to view or download, and in a finished scan the Components section marks each declared component with a "first-party" or "third-party" badge. See the [web UI reference](../reference/ui.md).
 
 ## What does the file look like?
 
@@ -299,7 +299,7 @@ A Yocto build records its packages in its own SPDX output, which BomLens reads f
   --conformance-profile bsi-tr-03183-2
 ```
 
-Every package the image installs from that recipe, such as `media-daemon` and `media-daemon-cli`, gets the declared type, supplier, licence and origin, and keeps its own name, version, purl and CPE. The files the build recorded for each package are nested under it with their hashes (SHA-512 from Yocto 6.1). A version may be left out; one that differs from the build's is refused. A Yocto build directory has no default file, so `--components` is always given. A multilib or SDK variant such as `lib32-media-daemon` is a recipe of its own and is declared separately. A recipe the image did not install, or a component added by name with the name of an installed package, is refused.
+Every package the image installs from that recipe, such as `media-daemon` and `media-daemon-cli`, gets the declared type, supplier, licence and origin, and keeps its own name, version, purl and CPE. The files the build recorded for each package are nested under it with their hashes (SHA-512 from Yocto 6.1). A version may be left out; one that differs from the build's is refused. On the command line a Yocto build directory has no default file, so `--components` is always given. The web UI, which cannot name a file, reads `sbom-declared.cdx.json` at the root of the build directory picked with the Directory input. A multilib or SDK variant such as `lib32-media-daemon` is a recipe of its own and is declared separately. A recipe the image did not install, or a component added by name with the name of an installed package, is refused.
 
 ## Using it in CI
 

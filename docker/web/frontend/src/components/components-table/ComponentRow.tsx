@@ -94,6 +94,25 @@ export function ComponentRow({
               {t("result.vendoredBadge")}
             </Badge>
           )}
+          {/* Added from a declaration file, not found by the scan. Neutral
+              tones: where a component came from is not a risk signal. */}
+          {c.declaredOrigin && (
+            <Badge
+              variant={c.declaredOrigin === "first-party" ? "outline" : "muted"}
+              title={t(
+                c.declaredOrigin === "first-party"
+                  ? "result.declaredFirstPartyHint"
+                  : "result.declaredThirdPartyHint",
+              )}
+              data-testid="declared-origin"
+            >
+              {t(
+                c.declaredOrigin === "first-party"
+                  ? "result.declaredFirstParty"
+                  : "result.declaredThirdParty",
+              )}
+            </Badge>
+          )}
           {/* Leads the badges: a package to remove outranks anything
               that is merely out of date or vulnerable. */}
           {c.malicious && (

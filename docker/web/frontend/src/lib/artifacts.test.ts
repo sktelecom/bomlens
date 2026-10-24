@@ -86,6 +86,13 @@ describe("groupArtifacts", () => {
     expect(cv.formats.map((f) => [f.ext, f.viewable])).toEqual([["csv", true]]);
   });
 
+  it("gives the SBOM kept after a refused declaration its own viewable card, not the SBOM card", () => {
+    const groups = groupArtifacts([file(`${PREFIX}_bom.refused.json`)]);
+    expect(groups.map((g) => g.key)).toEqual(["refusedSbom"]);
+    expect(groups[0].titleKey).toBe("result.kind.refusedSbom.title");
+    expect(groups[0].formats.map((f) => [f.ext, f.viewable])).toEqual([["json", true]]);
+  });
+
   it("never puts the SPDX 3.0.1 signature on the SBOM card", () => {
     const groups = groupArtifacts([file(`${PREFIX}_bom.json`), file(`${PREFIX}_bom.spdx3.json`), file(`${PREFIX}_bom.spdx3.json.sig`)]);
     expect(groups.find((g) => g.key === "sbom")?.signature).toBeUndefined();

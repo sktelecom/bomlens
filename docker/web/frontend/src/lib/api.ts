@@ -91,6 +91,10 @@ export interface ComponentItem {
   malicious?: boolean;
   /** The OSV advisory id (MAL-…) behind that flag. */
   maliciousId?: string;
+  /** Added from a declaration file (sbom-declared.cdx.json or --components)
+   *  rather than found by the scan, with the origin the declaration gave
+   *  (bomlens:origin). Absent on components the scan found. */
+  declaredOrigin?: "first-party" | "third-party";
   /** Which snapshot said so, e.g. "osv.dev@2026-07-28" — a clean result means
    *  "not in this snapshot", so the date is part of the answer. */
   maliciousSource?: string;
@@ -666,6 +670,9 @@ export interface ScanConfig {
   /** "build" when the scan was told not to read a lock file statically; absent
    *  or "auto" otherwise. */
   detection?: string;
+  /** True when the scan was told not to read sbom-declared.cdx.json (the CLI's
+   *  --no-components). Absent on scans that predate the option. */
+  noComponents?: boolean;
   /** Conformance check strictness this scan actually ran with ("default" or
    *  "skt-submission"). Absent on scans that predate the profile. */
   conformanceProfile?: string;
@@ -733,6 +740,15 @@ export interface DoneEvent {
    *  from the front, with a leading "..." when it is). Shown verbatim on the
    *  failed-scan card in place of the generic fallback body. */
   errorMessage?: string | null;
+  /** Set when the scan failed because a declaration file was refused: the SBOM
+   *  written so far, kept as `{Project}_{Version}_bom.refused.json` (`file`),
+   *  and each reason the declaration step gave. Null or absent otherwise. */
+  declarationRefused?: DeclarationRefused | null;
+}
+
+export interface DeclarationRefused {
+  file: string;
+  reasons: string[];
 }
 
 /** Input types the UI offers; each maps to a backend MODE in server.py. */
@@ -846,6 +862,10 @@ export interface ScanParams {
   /** "build" turns off reading a covering lock file instead of building (server
    *  DETECTION); "auto" or omitted leaves it on. Source scans only. */
   detection?: "auto" | "build";
+  /** Leave sbom-declared.cdx.json unread: at the root of a source tree (the
+   *  CLI's --no-components) and at the root of a Yocto build directory, which
+   *  the web UI reads in place of --components. Sent as `no_components`. */
+  noComponents?: boolean;
   /** Conformance check strictness. Read server-side as the exact
    *  `conformance_profile` parameter; omitted (sent empty) lets the server pick
    *  the per-mode default ("skt-submission" for ANALYZE, "default" otherwise). */
@@ -1519,6 +1539,9 @@ export interface RecentScan {
   inputSource: SourceType | null;
   /** Unix seconds of the SBOM file mtime. */
   generatedAt: number;
+  /** The run stopped because its declaration file was refused: it has no
+   *  SBOM (components is 0), and opening it shows the refusal. */
+  refused?: boolean;
 }
 
 /** List past scans (newest first). Empty on any failure — history is optional. */
@@ -1679,6 +1702,7 @@ export function startScan(params: ScanParams, handlers: ScanHandlers): EventSour
     identify_vendored: String(params.identifyVendored),
     byte_stable: String(params.byteStable),
     detection: params.detection ?? "auto",
+    no_components: params.noComponents ? "true" : "",
     conformance_profile: params.conformanceProfile ?? "",
     license: params.license ?? "",
     sbom_author: params.sbomAuthor ?? "",
