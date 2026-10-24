@@ -3197,7 +3197,9 @@ def scan_detail(run_id):
             "sbom": None,
             "security": None,
             "conformance": None,
-            "scanConfig": _public_scan_config(meta),
+            # The header names the project from here, since there is no SBOM;
+            # a sidecar without the name falls back to the run folder's.
+            "scanConfig": {"project": run_id, "version": "", **_public_scan_config(meta)},
             "scanWarnings": meta.get("warnings") or [],
             "errorMessage": meta.get("errorMessage"),
             "declarationRefused": refused,

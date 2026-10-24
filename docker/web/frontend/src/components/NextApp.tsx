@@ -267,10 +267,16 @@ export function NextApp() {
         setStatus(done.ok ? "done" : "error");
         setActiveSection(section);
         const meta = recent.find((s) => s.id === id);
+        // Not in the loaded list yet (a direct link or reload): the settings
+        // the scan ran with name the project too, also for a run with no SBOM
+        // such as one stopped by a refused declaration.
+        const config = done.scanConfig;
         setProjectInfo(
           meta
             ? { name: meta.project, version: meta.version || undefined }
-            : { name: id },
+            : config?.project
+              ? { name: config.project, version: config.version || undefined }
+              : { name: id },
         );
       });
     },

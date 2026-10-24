@@ -5399,6 +5399,8 @@ assert d['ok'] is False and d['sbom'] is None, d
 assert d['declarationRefused']['file'] == 'refd_1.0_bom.refused.json', d
 assert len(d['declarationRefused']['reasons']) == 3, d
 assert 'declarationRefused' not in d['scanConfig'], d['scanConfig']
+# No SBOM to name it: the header reads the project and version from here.
+assert d['scanConfig']['project'] == 'refd' and d['scanConfig']['version'] == '1.0', d['scanConfig']
 assert 'refused' in (d['errorMessage'] or ''), d
 " && curl -s "$BASE2/scans" | python3 -c "
 import sys, json

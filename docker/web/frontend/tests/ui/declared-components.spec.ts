@@ -175,3 +175,28 @@ test("a refused run is listed and reopens on its refusal", async ({ page }) => {
     "/file?id=demo_1.0&name=demo_1.0_bom.refused.json",
   );
 });
+
+test("a refused run opened by its link names the project and version in the header", async ({ page }) => {
+  await page.route("**/capabilities", (r) =>
+    r.fulfill({ contentType: "application/json", body: JSON.stringify({ firmware: false, scanoss: false, docker: true }) }),
+  );
+  await page.route("**/results", (r) => r.fulfill({ contentType: "application/json", body: "[]" }));
+  // Not in the recent list: the header has only the scan's own settings to go on.
+  await page.route("**/scans", (r) => r.fulfill({ contentType: "application/json", body: "[]" }));
+  await page.route("**/scan?id=acme_fw_2.3", (r) =>
+    r.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        ...REFUSED,
+        mode: null,
+        id: "acme_fw_2.3",
+        scanConfig: { source: "current-dir", target: "", project: "acme_fw", version: "2.3" },
+      }),
+    }),
+  );
+  await page.goto("/#/scan/acme_fw_2.3");
+  await expect(page.getByTestId("declaration-refused")).toBeVisible();
+  await expect(page.locator("main h1")).toContainText("acme_fw");
+  await expect(page.locator("main h1")).toContainText("2.3");
+  await expect(page.locator("main h1")).not.toContainText("acme_fw_2.3");
+});
