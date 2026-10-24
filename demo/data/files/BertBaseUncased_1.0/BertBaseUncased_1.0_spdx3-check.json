@@ -1,0 +1,455 @@
+{
+  "schema": "bomlens-spdx3-check/1",
+  "spec": "3.0.1",
+  "draft": true,
+  "counts": {
+    "auto": 24,
+    "declared": 0,
+    "optional": 31,
+    "judgment": 5,
+    "missingRequired": 8,
+    "noAssertion": 0,
+    "omitted": 3,
+    "review": 2
+  },
+  "elements": [
+    {
+      "spdxId": "https://github.com/sktelecom/bomlens/spdxdocs/BertBaseUncased_1.0/spdx3/document/BertBaseUncased_1.0",
+      "type": "CreationInfo",
+      "label": "document",
+      "fields": [
+        {
+          "id": "createdBy",
+          "status": "missingRequired"
+        }
+      ],
+      "declarationKey": "document"
+    },
+    {
+      "spdxId": "https://github.com/sktelecom/bomlens/spdxdocs/BertBaseUncased_1.0/spdx3/model/pkg%3Ahuggingface%2Fgoogle-bert%2Fbert-base-uncased%4086b5e093",
+      "type": "ai_AIPackage",
+      "label": "bert-base-uncased",
+      "fields": [
+        {
+          "id": "name",
+          "status": "auto",
+          "display": "bert-base-uncased",
+          "source": "cdx:name"
+        },
+        {
+          "id": "packageVersion",
+          "status": "auto",
+          "display": "86b5e093",
+          "source": "cdx:version"
+        },
+        {
+          "id": "downloadLocation",
+          "status": "auto",
+          "display": "https://huggingface.co/google-bert/bert-base-uncased/tree/main",
+          "source": "cdx:modelDownload"
+        },
+        {
+          "id": "primaryPurpose",
+          "status": "auto",
+          "display": "model"
+        },
+        {
+          "id": "suppliedBy",
+          "status": "auto",
+          "display": "google-bert",
+          "source": "cdx:supplier",
+          "meaning": "huggingface-publisher"
+        },
+        {
+          "id": "releaseTime",
+          "status": "missingRequired"
+        },
+        {
+          "id": "builtTime",
+          "status": "optional"
+        },
+        {
+          "id": "originatedBy",
+          "status": "optional"
+        },
+        {
+          "id": "packageUrl",
+          "status": "auto",
+          "display": "pkg:huggingface/google-bert/bert-base-uncased@86b5e093",
+          "source": "cdx:purl"
+        },
+        {
+          "id": "homePage",
+          "status": "auto",
+          "display": "https://huggingface.co/google-bert/bert-base-uncased",
+          "source": "cdx:homePage"
+        },
+        {
+          "id": "description",
+          "status": "omitted"
+        },
+        {
+          "id": "typeOfModel",
+          "status": "auto",
+          "display": "bert",
+          "source": "cdx:architecture"
+        },
+        {
+          "id": "limitation",
+          "status": "omitted"
+        },
+        {
+          "id": "metric",
+          "status": "omitted"
+        },
+        {
+          "id": "domain",
+          "status": "optional"
+        },
+        {
+          "id": "informationAboutApplication",
+          "status": "optional"
+        },
+        {
+          "id": "informationAboutTraining",
+          "status": "optional"
+        },
+        {
+          "id": "hyperparameter",
+          "status": "optional"
+        },
+        {
+          "id": "modelDataPreprocessing",
+          "status": "optional"
+        },
+        {
+          "id": "modelExplainability",
+          "status": "optional"
+        },
+        {
+          "id": "standardCompliance",
+          "status": "optional"
+        },
+        {
+          "id": "useSensitivePersonalInformation",
+          "status": "judgment"
+        },
+        {
+          "id": "autonomyType",
+          "status": "judgment"
+        },
+        {
+          "id": "safetyRiskAssessment",
+          "status": "judgment"
+        },
+        {
+          "id": "weightsScope",
+          "status": "optional"
+        },
+        {
+          "id": "inputModality",
+          "status": "optional"
+        },
+        {
+          "id": "outputModality",
+          "status": "optional"
+        },
+        {
+          "id": "trainingComputeFlops",
+          "status": "optional"
+        },
+        {
+          "id": "trainingComputeBasis",
+          "status": "optional"
+        },
+        {
+          "id": "adversarialTesting",
+          "status": "optional"
+        }
+      ],
+      "declarationKey": "model"
+    },
+    {
+      "spdxId": "https://github.com/sktelecom/bomlens/spdxdocs/BertBaseUncased_1.0/spdx3/dataset/dataset%3Ahuggingface%2Fbookcorpus",
+      "type": "dataset_DatasetPackage",
+      "label": "bookcorpus",
+      "fields": [
+        {
+          "id": "name",
+          "status": "auto",
+          "display": "bookcorpus",
+          "source": "cdx:name"
+        },
+        {
+          "id": "downloadLocation",
+          "status": "auto",
+          "display": "https://huggingface.co/datasets/bookcorpus",
+          "source": "cdx:datasetDownload"
+        },
+        {
+          "id": "primaryPurpose",
+          "status": "auto",
+          "display": "data"
+        },
+        {
+          "id": "originatedBy",
+          "status": "missingRequired"
+        },
+        {
+          "id": "suppliedBy",
+          "status": "auto",
+          "display": "bookcorpus",
+          "source": "cdx:supplier",
+          "meaning": "huggingface-publisher"
+        },
+        {
+          "id": "builtTime",
+          "status": "missingRequired"
+        },
+        {
+          "id": "releaseTime",
+          "status": "missingRequired"
+        },
+        {
+          "id": "datasetType",
+          "status": "auto",
+          "display": "text",
+          "source": "rule:datasetType"
+        },
+        {
+          "id": "packageVersion",
+          "status": "auto",
+          "display": "d917559b",
+          "source": "cdx:version"
+        },
+        {
+          "id": "description",
+          "status": "auto",
+          "display": "Books are a rich source of both fine-grained information, how a character, an object or a scene looks like, as well as high-level semantics, what someone is thinking, feeling and how these states evol",
+          "source": "cdx:description"
+        },
+        {
+          "id": "hasSensitivePersonalInformation",
+          "status": "judgment"
+        },
+        {
+          "id": "datasetAvailability",
+          "status": "auto",
+          "display": "directDownload",
+          "source": "rule:availability"
+        },
+        {
+          "id": "intendedUse",
+          "status": "optional"
+        },
+        {
+          "id": "knownBias",
+          "status": "optional"
+        },
+        {
+          "id": "confidentialityLevel",
+          "status": "optional"
+        },
+        {
+          "id": "dataCollectionProcess",
+          "status": "optional"
+        },
+        {
+          "id": "anonymizationMethodUsed",
+          "status": "optional"
+        },
+        {
+          "id": "dataPreprocessing",
+          "status": "optional"
+        },
+        {
+          "id": "datasetNoise",
+          "status": "optional"
+        },
+        {
+          "id": "datasetUpdateMechanism",
+          "status": "optional"
+        }
+      ],
+      "declarationKey": "huggingface:bookcorpus"
+    },
+    {
+      "spdxId": "https://github.com/sktelecom/bomlens/spdxdocs/BertBaseUncased_1.0/spdx3/dataset/dataset%3Ahuggingface%2Fwikipedia",
+      "type": "dataset_DatasetPackage",
+      "label": "wikipedia",
+      "fields": [
+        {
+          "id": "name",
+          "status": "auto",
+          "display": "wikipedia",
+          "source": "cdx:name"
+        },
+        {
+          "id": "downloadLocation",
+          "status": "auto",
+          "display": "https://huggingface.co/datasets/wikipedia",
+          "source": "cdx:datasetDownload"
+        },
+        {
+          "id": "primaryPurpose",
+          "status": "auto",
+          "display": "data"
+        },
+        {
+          "id": "originatedBy",
+          "status": "missingRequired"
+        },
+        {
+          "id": "suppliedBy",
+          "status": "auto",
+          "display": "legacy-datasets",
+          "source": "cdx:supplier",
+          "meaning": "huggingface-publisher"
+        },
+        {
+          "id": "builtTime",
+          "status": "missingRequired"
+        },
+        {
+          "id": "releaseTime",
+          "status": "missingRequired"
+        },
+        {
+          "id": "datasetType",
+          "status": "auto",
+          "display": "text",
+          "source": "rule:datasetType"
+        },
+        {
+          "id": "packageVersion",
+          "status": "auto",
+          "display": "97a0b052",
+          "source": "cdx:version"
+        },
+        {
+          "id": "description",
+          "status": "auto",
+          "display": "Wikipedia dataset containing cleaned articles of all languages.\nThe datasets are built from the Wikipedia dump\n(https://dumps.wikimedia.org/) with one split per language. Each example\ncontains the con",
+          "source": "cdx:description"
+        },
+        {
+          "id": "hasSensitivePersonalInformation",
+          "status": "judgment"
+        },
+        {
+          "id": "datasetAvailability",
+          "status": "auto",
+          "display": "directDownload",
+          "source": "rule:availability"
+        },
+        {
+          "id": "intendedUse",
+          "status": "optional"
+        },
+        {
+          "id": "knownBias",
+          "status": "optional"
+        },
+        {
+          "id": "confidentialityLevel",
+          "status": "optional"
+        },
+        {
+          "id": "dataCollectionProcess",
+          "status": "optional"
+        },
+        {
+          "id": "anonymizationMethodUsed",
+          "status": "optional"
+        },
+        {
+          "id": "dataPreprocessing",
+          "status": "optional"
+        },
+        {
+          "id": "datasetNoise",
+          "status": "optional"
+        },
+        {
+          "id": "datasetUpdateMechanism",
+          "status": "optional"
+        }
+      ],
+      "declarationKey": "huggingface:wikipedia"
+    }
+  ],
+  "relationships": [
+    {
+      "type": "hasDeclaredLicense",
+      "from": "https://github.com/sktelecom/bomlens/spdxdocs/BertBaseUncased_1.0/spdx3/model/pkg%3Ahuggingface%2Fgoogle-bert%2Fbert-base-uncased%4086b5e093",
+      "to": [
+        "https://github.com/sktelecom/bomlens/spdxdocs/BertBaseUncased_1.0/spdx3/license/Apache-2.0"
+      ],
+      "status": "auto"
+    },
+    {
+      "type": "contains",
+      "from": "https://github.com/sktelecom/bomlens/spdxdocs/BertBaseUncased_1.0/spdx3/model/pkg%3Ahuggingface%2Fgoogle-bert%2Fbert-base-uncased%4086b5e093",
+      "to": [
+        "https://github.com/sktelecom/bomlens/spdxdocs/BertBaseUncased_1.0/spdx3/file/coreml%2Ffill-mask%2Ffloat32_model.mlpackage%2FData%2Fcom.apple.CoreML%2Fweights%2Fweight.bin%40c0c9f4914b4f",
+        "https://github.com/sktelecom/bomlens/spdxdocs/BertBaseUncased_1.0/spdx3/file/flax_model.msgpack%40ea201fabe466",
+        "https://github.com/sktelecom/bomlens/spdxdocs/BertBaseUncased_1.0/spdx3/file/model.onnx%4044d7a2896d34",
+        "https://github.com/sktelecom/bomlens/spdxdocs/BertBaseUncased_1.0/spdx3/file/model.safetensors%4068d45e234eb4",
+        "https://github.com/sktelecom/bomlens/spdxdocs/BertBaseUncased_1.0/spdx3/file/pytorch_model.bin%40097417381d6c",
+        "https://github.com/sktelecom/bomlens/spdxdocs/BertBaseUncased_1.0/spdx3/file/tf_model.h5%40a7a17d6d844b"
+      ],
+      "status": "auto"
+    },
+    {
+      "type": "hasDeclaredLicense",
+      "from": "https://github.com/sktelecom/bomlens/spdxdocs/BertBaseUncased_1.0/spdx3/dataset/dataset%3Ahuggingface%2Fbookcorpus",
+      "to": [
+        "expandedlicensing_NoAssertionLicense"
+      ],
+      "status": "noAssertion"
+    },
+    {
+      "type": "hasDeclaredLicense",
+      "from": "https://github.com/sktelecom/bomlens/spdxdocs/BertBaseUncased_1.0/spdx3/dataset/dataset%3Ahuggingface%2Fwikipedia",
+      "to": [
+        "https://github.com/sktelecom/bomlens/spdxdocs/BertBaseUncased_1.0/spdx3/license/CC-BY-SA-3.0"
+      ],
+      "status": "auto"
+    },
+    {
+      "type": "other",
+      "from": "https://github.com/sktelecom/bomlens/spdxdocs/BertBaseUncased_1.0/spdx3/model/pkg%3Ahuggingface%2Fgoogle-bert%2Fbert-base-uncased%4086b5e093",
+      "to": [
+        "https://github.com/sktelecom/bomlens/spdxdocs/BertBaseUncased_1.0/spdx3/dataset/dataset%3Ahuggingface%2Fbookcorpus"
+      ],
+      "status": "review",
+      "note": "card-declared dataset, role not stated"
+    },
+    {
+      "type": "other",
+      "from": "https://github.com/sktelecom/bomlens/spdxdocs/BertBaseUncased_1.0/spdx3/model/pkg%3Ahuggingface%2Fgoogle-bert%2Fbert-base-uncased%4086b5e093",
+      "to": [
+        "https://github.com/sktelecom/bomlens/spdxdocs/BertBaseUncased_1.0/spdx3/dataset/dataset%3Ahuggingface%2Fwikipedia"
+      ],
+      "status": "review",
+      "note": "card-declared dataset, role not stated"
+    }
+  ],
+  "messages": [
+    {
+      "level": "info",
+      "text": "This check is guidance, not legal advice."
+    }
+  ],
+  "service": {
+    "state": "none"
+  },
+  "inputs": {
+    "bom": "17fbaac5ec9cc89627ecb858925aea10a26f8ce5dcde05900725aec9006d7fb0",
+    "declaration": null,
+    "tool": "e2253ce9ed5c642dc2bd6a50ded34dccc2905df1497cc182b0416b0a7024fd22"
+  },
+  "declaration": {
+    "state": "none"
+  }
+}
