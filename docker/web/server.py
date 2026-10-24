@@ -3104,6 +3104,29 @@ def list_scans():
         with _scans_cache_lock:
             _scans_cache[cache_slot] = (cache_key, row)
 
+    def add_refused(run_id):
+        """A run stopped by a refused declaration: listed so it can be reopened,
+        with no component count or severity (it produced no SBOM)."""
+        hit = refused_scan_meta(run_id)
+        if hit is None:
+            return
+        meta, refused = hit
+        sig = _stat_sig(run_file(run_id, "_bom.refused.json"))
+        if sig is None:
+            return
+        scans.append({
+            "id": run_id,
+            "project": str(meta.get("project") or run_id),
+            "version": str(meta.get("version") or ""),
+            "components": 0,
+            "maxSeverity": None,
+            "isAiScan": False,
+            "componentType": None,
+            "inputSource": meta.get("source"),
+            "generatedAt": sig[0] // 1_000_000_000,
+            "refused": True,
+        })
+
     for entry in os.listdir(OUTPUT_DIR):
         if entry.startswith("."):  # .uploads and other dotfiles are not scans
             continue
@@ -3116,6 +3139,8 @@ def list_scans():
             boms = sorted(glob.glob(os.path.join(d, "*_bom.json")))
             if boms:
                 add_scan(entry, boms[0])
+            else:
+                add_refused(entry)
         elif os.path.isfile(full) and entry.endswith("_bom.json"):
             # Legacy flat layout: id is the {prefix}.
             add_scan(entry[: -len("_bom.json")], full)
@@ -3136,14 +3161,47 @@ def _public_scan_config(meta):
     server-side."""
     if not isinstance(meta, dict):
         return meta
-    return {k: v for k, v in meta.items() if k not in ("mode", "ok", "errorMessage")}
+    return {k: v for k, v in meta.items()
+            if k not in ("mode", "ok", "errorMessage", "declarationRefused")}
+
+
+def refused_scan_meta(run_id):
+    """The saved refusal of a run whose declaration file was refused, or None.
+    Needs both the sidecar's record and the kept _bom.refused.json."""
+    meta = scanmeta(run_id) or {}
+    refused = meta.get("declarationRefused")
+    if not isinstance(refused, dict) or not run_file(run_id, "_bom.refused.json"):
+        return None
+    p = run_file(run_id, "_bom.refused.json")
+    if not os.path.isfile(p):
+        return None
+    reasons = [str(r)[:300] for r in _as_list(refused.get("reasons")) if isinstance(r, str)]
+    return meta, {"file": os.path.basename(p), "reasons": reasons[:MAX_DECLARED_REASONS]}
 
 
 def scan_detail(run_id):
     """A past scan as a done-event payload (its own artifacts only)."""
     sbom = sbom_summary(run_id)
     if sbom is None:
-        return None
+        # A run stopped by a refused declaration has no _bom.json; reopen it
+        # as the failed scan it was, so the refusal and its file stay reachable.
+        hit = refused_scan_meta(run_id)
+        if hit is None:
+            return None
+        meta, refused = hit
+        return {
+            "ok": False,
+            "mode": None,
+            "id": run_id,
+            "results": list_results(run_id),
+            "sbom": None,
+            "security": None,
+            "conformance": None,
+            "scanConfig": _public_scan_config(meta),
+            "scanWarnings": meta.get("warnings") or [],
+            "errorMessage": meta.get("errorMessage"),
+            "declarationRefused": refused,
+        }
     return {
         "ok": True,
         "mode": None,
@@ -3810,6 +3868,9 @@ _DECLARED_MAX_BYTES = 4 * 1024 * 1024
 # How the declaration step prints each reason a file was refused.
 _DECLARED_ERROR_RE = re.compile(r"^\[declared-components\] ERROR: (.+)$")
 MAX_DECLARED_REASONS = 20
+# The declaration step's environment, set by a scan request only.
+DECLARED_ENV_NAMES = ("DECLARED_COMPONENTS_FILES", "DECLARED_COMPONENTS_LABELS",
+                      "DECLARED_COMPONENTS_SKIP", "DECLARED_COMPONENTS_APPLIED")
 
 
 def stage_yocto_declaration(build_dir, run_out):
@@ -3828,8 +3889,12 @@ def stage_yocto_declaration(build_dir, run_out):
             return None, "is a symbolic link"
         return None, "cannot be read"
     try:
-        if not stat.S_ISREG(os.fstat(fd).st_mode):
+        st = os.fstat(fd)
+        if not stat.S_ISREG(st.st_mode):
             return None, "is not a regular file"
+        # A hard link is as good as a symbolic one at naming a file elsewhere.
+        if st.st_nlink > 1:
+            return None, "is a hard link (it has %d names)" % st.st_nlink
         with os.fdopen(fd, "rb") as fh:
             fd = None
             data = fh.read(_DECLARED_MAX_BYTES + 1)
@@ -3844,12 +3909,42 @@ def stage_yocto_declaration(build_dir, run_out):
         if os.path.lexists(dst):
             os.remove(dst)
         out_fd = os.open(dst, os.O_WRONLY | os.O_CREAT | os.O_EXCL
-                         | getattr(os, "O_NOFOLLOW", 0), 0o644)
+                         | getattr(os, "O_NOFOLLOW", 0), 0o600)
         with os.fdopen(out_fd, "wb") as out:
             out.write(data)
     except OSError:
         return None, "could not be copied into the run folder"
     return dst, None
+
+
+def _declaration_component_count(path):
+    """How many components the staged declaration file lists (0 if unreadable)."""
+    try:
+        with open(path, encoding="utf-8") as fh:
+            return len(_dicts(_as_dict(json.load(fh)).get("components")))
+    except (OSError, ValueError, RecursionError):
+        return 0
+
+
+def declaration_applied(run_id):
+    """Whether this run's SBOM carries a component the declaration step marked
+    (bomlens:declared), top level or nested."""
+    p = run_file(run_id, "_bom.json")
+    if not p:
+        return False
+    try:
+        with open(p, encoding="utf-8") as fh:
+            data = json.load(fh)
+    except (OSError, ValueError, RecursionError):
+        return False
+    stack = list(_dicts(_as_dict(data).get("components")))
+    while stack:
+        c = stack.pop()
+        if any(q.get("name") == "bomlens:declared" and q.get("value") == "true"
+               for q in _dicts(c.get("properties"))):
+            return True
+        stack.extend(_dicts(c.get("components")))
+    return False
 
 
 def declaration_refused(run_id, reasons):
@@ -3867,7 +3962,9 @@ def declared_refusal_reason(line):
     if not isinstance(line, str):
         return None
     m = _DECLARED_ERROR_RE.match(line.strip())
-    return _scrub_error_text(m.group(1))[:300] if m else None
+    # Credential masking only, as the log line itself gets: a reason names the
+    # hash a build output really has, and _scrub_error_text would hide it.
+    return _mask_credentials(m.group(1))[:300] if m else None
 
 
 def _pct_env(name):
@@ -4159,6 +4256,11 @@ def run_sibling_scan(image, mode, out_dir, on_log, *, upload_file=None, model_id
         model_id = _m.group(0)
 
     env = dict(os.environ)
+    # The declaration step's inputs come from the request (extra_env) only, as
+    # on the in-process path: an operator's own DECLARED_COMPONENTS_* never
+    # decides what the sibling reads.
+    for _dc_name in DECLARED_ENV_NAMES:
+        env.pop(_dc_name, None)
     if extra_env:
         env.update(extra_env)
 
@@ -6595,7 +6697,7 @@ class Handler(BaseHTTPRequestHandler):
             except (BrokenPipeError, ConnectionResetError):
                 disconnected[0] = True
 
-        def record_outcome(ok_, error_text=None, warnings=None):
+        def record_outcome(ok_, error_text=None, warnings=None, refused=None):
             """Save how this run ended into the run folder's sidecar, for the
             diagnostics summary (GET /diagnostics). Written from a COPY of
             scan_config: the settings echoed back to the browser (`scanConfig`)
@@ -6608,6 +6710,9 @@ class Handler(BaseHTTPRequestHandler):
                 meta["errorMessage"] = _scrub_error_text(str(error_text))[:_SCAN_ERROR_MAX_CHARS]
             if warnings:
                 meta["warnings"] = warnings
+            if refused:
+                # Reopens the refusal card (scan_detail) and lists the run.
+                meta["declarationRefused"] = refused
             write_scanmeta(run_out, meta)
 
         def fail(msg, key=None):
@@ -6646,8 +6751,7 @@ class Handler(BaseHTTPRequestHandler):
         env = os.environ.copy()
         # The declaration step's inputs come from this request only, never from
         # whatever this server's own environment happens to carry.
-        for _dc_name in ("DECLARED_COMPONENTS_FILES", "DECLARED_COMPONENTS_LABELS",
-                         "DECLARED_COMPONENTS_SKIP", "DECLARED_COMPONENTS_APPLIED"):
+        for _dc_name in DECLARED_ENV_NAMES:
             env.pop(_dc_name, None)
         env.update({
             # Tells this run's entrypoint.sh it may sweep known-suffix
@@ -7438,6 +7542,24 @@ class Handler(BaseHTTPRequestHandler):
                     error_detail = "Failed to launch scan: %s" % exc
                     sse("error", json.dumps({"detail": error_detail, "key": None}))
 
+            # A Yocto build directory's declaration file reaches the scan as an
+            # environment variable an older scanner image ignores: a deep CVE
+            # sibling on another version (SBOM_DEEP_CVE_IMAGE, or :latest when
+            # SBOM_SCANNER_IMAGE is unset) would then finish without it. A
+            # declaration that lists components and left none in the SBOM fails
+            # the scan rather than passing as one that applied it.
+            staged_decl = env.get("DECLARED_COMPONENTS_FILES")
+            if (ok and staged_decl and _declaration_component_count(staged_decl) > 0
+                    and not declaration_applied(run_id)):
+                ok = False
+                error_sent = True
+                error_detail = (
+                    "The declaration file was not applied: the SBOM carries none of its "
+                    "components. The scanner image that ran (%s) may be older than this "
+                    "web UI. Use a matching image, or scan without deep CVE matching."
+                    % (sibling["image"] if sibling is not None else "this image"))
+                sse("error", json.dumps({"detail": error_detail, "key": None}))
+
             # Artifacts landed in run_out (the run folder named run_id); the
             # summary helpers glob it by suffix. The done event carries id=run_id
             # so the frontend's later /file, /download-all and /scan requests
@@ -7479,7 +7601,7 @@ class Handler(BaseHTTPRequestHandler):
             if scan_warnings:
                 # Also echoed to the browser, as it was before the summary existed.
                 scan_config["warnings"] = scan_warnings
-            record_outcome(ok, outcome_error, scan_warnings)
+            record_outcome(ok, outcome_error, scan_warnings, done["declarationRefused"])
             sse("done", json.dumps(done))
         except Exception as exc:  # noqa: BLE001
             # The summary helpers are defended against malformed artifacts, so a

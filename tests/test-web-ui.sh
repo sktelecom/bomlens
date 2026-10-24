@@ -281,6 +281,56 @@ assert not any(x.startswith("TARGET_FILE=") for x in _a), _a
 assert not any(x.startswith("TARGET_DIR=") for x in _a), _a
 assert not any(x.startswith("TARGET_IMAGE=") for x in _a), _a
 assert not any(x.startswith("ANALYZE_SBOM=") for x in _a), _a
+assert not any(x.startswith("DECLARED_COMPONENTS_") for x in _a), _a
+
+# Declared components on the deep CVE sibling. --no-components on a source
+# scan is forwarded as the fixed literal; an operator's own
+# DECLARED_COMPONENTS_* in this server's environment never is.
+captured.clear()
+rc = server.run_sibling_scan(
+    "ghcr.io/sktelecom/bomlens-deep-cve:1.5.0", "SOURCE", run_out,
+    lambda ln: None, source_root=src_root,
+    extra_env={"DEEP_CVE": "true", "DECLARED_COMPONENTS_SKIP": "1"},
+)
+assert rc == 0 and "DECLARED_COMPONENTS_SKIP=1" in captured["args"], captured["args"]
+os.environ["DECLARED_COMPONENTS_SKIP"] = "1"
+os.environ["DECLARED_COMPONENTS_FILES"] = "/etc/passwd"
+captured.clear()
+rc = server.run_sibling_scan(
+    "ghcr.io/sktelecom/bomlens-deep-cve:1.5.0", "SOURCE", run_out,
+    lambda ln: None, source_root=src_root, extra_env={"DEEP_CVE": "true"},
+)
+assert rc == 0, rc
+assert not any(x.startswith("DECLARED_COMPONENTS_") for x in captured["args"]), captured["args"]
+assert "DECLARED_COMPONENTS_SKIP" not in (captured["env"] or {}), "operator SKIP reached the sibling env"
+# A Yocto document with a staged declaration file: its fixed path in the run
+# folder and the fixed label are forwarded; the operator's FILES is not.
+os.makedirs(run_out, exist_ok=True)
+staged = os.path.join(run_out, server.DECLARED_COPY_NAME)
+open(staged, "w").write("{}")
+captured.clear()
+rc = server.run_sibling_scan(
+    "ghcr.io/sktelecom/bomlens-deep-cve:1.5.0", "ANALYZE", run_out,
+    lambda ln: None, upload_file=up_file,
+    extra_env={"DEEP_CVE": "true", "YOCTO_FROM_BUILD": "true",
+               "DECLARED_COMPONENTS_FILES": staged,
+               "DECLARED_COMPONENTS_LABELS": "anything the request said"},
+)
+assert rc == 0, rc
+_a = captured["args"]
+assert ("DECLARED_COMPONENTS_FILES=%s" % staged) in _a, _a
+assert ("DECLARED_COMPONENTS_LABELS=%s" % server.DECLARED_YOCTO_LABEL) in _a, _a
+assert not any(x == "DECLARED_COMPONENTS_SKIP=1" for x in _a), _a
+# Without a request value the operator's /etc/passwd is not forwarded.
+captured.clear()
+server.run_sibling_scan(
+    "ghcr.io/sktelecom/bomlens-deep-cve:1.5.0", "ANALYZE", run_out,
+    lambda ln: None, upload_file=up_file,
+    extra_env={"DEEP_CVE": "true", "YOCTO_FROM_BUILD": "true"},
+)
+assert not any(x.startswith("DECLARED_COMPONENTS_") for x in captured["args"]), captured["args"]
+os.remove(staged)
+del os.environ["DECLARED_COMPONENTS_SKIP"], os.environ["DECLARED_COMPONENTS_FILES"]
 
 captured.clear()
 rc = server.run_sibling_scan(
@@ -3921,6 +3971,7 @@ echo "[stub] scanning ${PROJECT_NAME} ${PROJECT_VERSION} (mode=$mode)"
   echo "DECLARED_COMPONENTS_LABELS=${DECLARED_COMPONENTS_LABELS:-}"
   # Read while the scan runs: the server removes its copy once the scan ends.
   echo "DECLARED_FILE_CONTENT=$([ -n "${DECLARED_COMPONENTS_FILES:-}" ] && cat "$DECLARED_COMPONENTS_FILES" 2>/dev/null)"
+  echo "DECLARED_FILE_MODE=$([ -n "${DECLARED_COMPONENTS_FILES:-}" ] && python3 -c 'import os,sys; print(oct(os.stat(sys.argv[1]).st_mode & 0o777))' "$DECLARED_COMPONENTS_FILES" 2>/dev/null)"
   # Counted here, while the scan is running: an extracted upload tree is removed
   # once the scan finishes, so a later check would always find it empty.
   echo "TARGET_DIR_FILES=$([ -n "${TARGET_DIR:-}" ] && find "$TARGET_DIR" -type f 2>/dev/null | wc -l | tr -d ' ' || echo 0)"; } > "${STUB_ENV_FILE:-/dev/null}"
@@ -3940,6 +3991,7 @@ case "$mode" in
         mv "${PROJECT_NAME}_${PROJECT_VERSION}_bom.json" "${PROJECT_NAME}_${PROJECT_VERSION}_bom.refused.json"
         echo "[declared-components] ERROR: sbom-declared.cdx.json (at the scan target root): component 'fw-app' 1.0: bomlens:artifact out/fw-app.bin does not exist"
         echo "[declared-components] ERROR: sbom-declared.cdx.json (at the scan target root): component 'hal': bomlens:origin is missing"
+        echo "[declared-components] ERROR: sbom-declared.cdx.json (at the scan target root): component 'fw': the SHA-256 hash it gives does not match out/fw.bin (the file has aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa)"
         echo "[ERROR] the declared components were refused (reasons above), so the SBOM is not complete. Fix the declaration file and scan again."
         echo "[ERROR] The SBOM without them is kept as ${PROJECT_NAME}_${PROJECT_VERSION}_bom.refused.json, not as ${PROJECT_NAME}_${PROJECT_VERSION}_bom.json."
         exit 1
@@ -5201,10 +5253,13 @@ echo "== Yocto build directory: sbom-declared.cdx.json at its root is handed to 
 DECL_JSON='{"bomFormat":"CycloneDX","specVersion":"1.6","components":[{"type":"application","name":"busybox","properties":[{"name":"bomlens:origin","value":"third-party"},{"name":"bomlens:yocto-recipe","value":"busybox"}]}]}'
 printf '%s' "$DECL_JSON" > "$YOCTOROOT/sbom-declared.cdx.json"
 rm -f "$WORK/stub-env"
+# The stub writes an SBOM holding declared components, as the scanner would.
+echo declared-ok > "$STUB_MODE_FILE"
 yev=$(sse_events "project=ydecl&version=1.0&source=rootfs-dir&target=$YOCTOROOT")
 if grep -q '^DECLARED_COMPONENTS_FILES=/.*/out2/ydecl_1\.0/\.declared-components\.cdx\.json$' "$WORK/stub-env" \
    && grep -qx 'DECLARED_COMPONENTS_LABELS=sbom-declared.cdx.json (at the root of the scanned folder)' "$WORK/stub-env" \
    && grep -qxF "DECLARED_FILE_CONTENT=$DECL_JSON" "$WORK/stub-env" \
+   && grep -qx 'DECLARED_FILE_MODE=0o600' "$WORK/stub-env" \
    && grep -qx 'MODE=ANALYZE' "$WORK/stub-env" \
    && echo "$yev" | python3 -c "
 import sys, json
@@ -5224,6 +5279,21 @@ assert not [r for r in d['results'] if r['name'].startswith('.')], d['results']
     pass "the copy is removed once the scan ends and is never listed"
 else
     fail "the declaration copy was left behind or listed" "$(ls -A "$OUT2/ydecl_1.0")"
+fi
+# A scanner that ignored the file (an older image) leaves no declared component:
+# the scan fails instead of passing as one that applied the declaration.
+echo ok > "$STUB_MODE_FILE"
+yev=$(sse_events "project=ydecl7&version=1.0&source=rootfs-dir&target=$YOCTOROOT")
+if echo "$yev" | python3 -c "
+import sys, json
+evs = json.load(sys.stdin)
+errs = [e['data']['detail'] for e in evs if e['event'] == 'error']
+assert errs and 'was not applied' in errs[0], evs
+assert [e for e in evs if e['event'] == 'done'][0]['data']['ok'] is False, evs
+"; then
+    pass "a declaration the scan did not apply fails the scan"
+else
+    fail "an unapplied declaration passed as ok" "$yev"
 fi
 rm -f "$WORK/stub-env"
 yev=$(sse_events "project=ydecl2&version=1.0&source=rootfs-dir&target=$YOCTOROOT&no_components=true")
@@ -5267,6 +5337,20 @@ else
     fail "a folder in place of the declaration file" "$yev"
 fi
 rmdir "$YOCTOROOT/sbom-declared.cdx.json"
+printf '%s' "$DECL_JSON" > "$WORK/declared-elsewhere.json"
+ln "$WORK/declared-elsewhere.json" "$YOCTOROOT/sbom-declared.cdx.json"
+yev=$(sse_events "project=ydecl8&version=1.0&source=rootfs-dir&target=$YOCTOROOT")
+if echo "$yev" | python3 -c "
+import sys, json
+evs = json.load(sys.stdin)
+errs = [e['data']['detail'] for e in evs if e['event'] == 'error']
+assert errs and 'hard link' in errs[0], evs
+"; then
+    pass "a hard link in place of the declaration file is not read; the scan stops and says why"
+else
+    fail "a hard-linked declaration file was read" "$yev"
+fi
+rm -f "$YOCTOROOT/sbom-declared.cdx.json"
 rm -f "$WORK/stub-env"
 sse_events "project=ydecl4&version=1.0&source=rootfs-dir&target=$YOCTOROOT" >/dev/null
 if grep -qx 'DECLARED_COMPONENTS_FILES=' "$WORK/stub-env"; then
@@ -5291,7 +5375,9 @@ d = [e for e in json.load(sys.stdin) if e['event'] == 'done'][0]['data']
 assert d['ok'] is False, d
 r = d['declarationRefused']
 assert r['file'] == 'refd_1.0_bom.refused.json', r
-assert len(r['reasons']) == 2, r
+assert len(r['reasons']) == 3, r
+# The hash the build output really has is shown, not masked.
+assert r['reasons'][2].endswith('(the file has aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa)'), r
 assert r['reasons'][0].startswith('sbom-declared.cdx.json (at the scan target root): component'), r
 assert 'bomlens:origin is missing' in r['reasons'][1], r
 assert any(f['name'] == 'refd_1.0_bom.refused.json' for f in d['results']), d['results']
@@ -5305,6 +5391,23 @@ if [ "$(curl -s -o /dev/null -w '%{http_code}' "$BASE2/file?id=refd_1.0&name=ref
     pass "the refused SBOM is served by /file"
 else
     fail "/file does not serve the refused SBOM"
+fi
+if curl -s "$BASE2/scan?id=refd_1.0" | python3 -c "
+import sys, json
+d = json.load(sys.stdin)
+assert d['ok'] is False and d['sbom'] is None, d
+assert d['declarationRefused']['file'] == 'refd_1.0_bom.refused.json', d
+assert len(d['declarationRefused']['reasons']) == 3, d
+assert 'declarationRefused' not in d['scanConfig'], d['scanConfig']
+assert 'refused' in (d['errorMessage'] or ''), d
+" && curl -s "$BASE2/scans" | python3 -c "
+import sys, json
+rows = [r for r in json.load(sys.stdin) if r['id'] == 'refd_1.0']
+assert rows and rows[0]['refused'] is True and rows[0]['project'] == 'refd', rows
+"; then
+    pass "a refused run reopens with its refusal and is listed in recent scans"
+else
+    fail "a refused run cannot be reopened" "$(curl -s "$BASE2/scan?id=refd_1.0")"
 fi
 echo fail > "$STUB_MODE_FILE"
 events=$(sse_events "project=refd&version=1.0&source=current-dir")
