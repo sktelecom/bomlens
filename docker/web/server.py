@@ -32,6 +32,7 @@ import re
 import secrets
 import shutil
 import signal
+import stat
 import subprocess
 import sys
 import tempfile
@@ -275,6 +276,10 @@ ARTIFACT_SUFFIXES = (
     # govulncheck's judgement of each Go advisory (--reachability), a CycloneDX
     # VEX document. security_summary reads its result through _security.json.
     "_reachability.cdx.json",
+    # The SBOM a scan wrote before its declaration file was refused
+    # (entrypoint.sh renames _bom.json so it is not taken for the result). The
+    # failed-scan card offers it for viewing and download.
+    "_bom.refused.json",
 )
 
 # Recent-scans sidebar shows the newest N; older scans stay on disk but are not
@@ -2166,6 +2171,17 @@ def sbom_summary(run_id):
         if review:
             row["licenseReview"] = review
 
+        # Added from a declaration file (sbom-declared.cdx.json / --components)
+        # rather than found by the scan: bomlens:declared plus the origin the
+        # declaration gave. Only the two values the step accepts are passed on.
+        if any(p.get("name") == "bomlens:declared" and p.get("value") == "true" for p in props):
+            origin = next(
+                (p.get("value") for p in props if p.get("name") == "bomlens:origin"),
+                "",
+            )
+            if origin in ("first-party", "third-party"):
+                row["declaredOrigin"] = origin
+
         # Outbound-license conflict, set by normalize-sbom.sh only when the SBOM's
         # root component declares a license (--license / PROJECT_LICENSE). Absent
         # means "not assessed" — the UI says so rather than implying an all-clear.
@@ -3775,6 +3791,75 @@ def _one_line_field(value, limit):
     return re.sub(r"[\x00-\x1f\x7f]", " ", value or "").strip()[:limit]
 
 
+# Declared components (scripts/scan-sbom.sh --components / --no-components).
+# A source scan reads sbom-declared.cdx.json at its own root (entrypoint.sh).
+# A Yocto build directory has no such default in the CLI, which takes the file
+# with --components; the web UI cannot name a host file, so it reads the file
+# of that name at the root of the build directory the user picked. The file is
+# copied into the run folder under a fixed name, as the CLI mounts each
+# --components file at a fixed container path: the scan never opens a path the
+# request chose, and a name with a space cannot split the space-separated
+# DECLARED_COMPONENTS_FILES list.
+DECLARED_DEFAULT_NAME = "sbom-declared.cdx.json"
+DECLARED_COPY_NAME = ".declared-components.cdx.json"
+# What the refusal and warning messages call the file (DECLARED_COMPONENTS_LABELS).
+DECLARED_YOCTO_LABEL = "sbom-declared.cdx.json (at the root of the build directory)"
+# apply-declared-components.py refuses a file over 4 MiB. One byte more is
+# copied, so it is that script, not this server, that says the file is too large.
+_DECLARED_MAX_BYTES = 4 * 1024 * 1024
+# How the declaration step prints each reason a file was refused.
+_DECLARED_ERROR_RE = re.compile(r"^\[declared-components\] ERROR: (.+)$")
+MAX_DECLARED_REASONS = 20
+
+
+def stage_yocto_declaration(build_dir, run_out):
+    """Copy sbom-declared.cdx.json from the root of a Yocto build directory into
+    the run folder. Returns (copied path, None), (None, None) when the build
+    directory has no such file, or (None, reason) when it has one that is not a
+    regular file (a symbolic link is not followed: it could point anywhere)."""
+    src = os.path.join(build_dir, DECLARED_DEFAULT_NAME)
+    flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_NONBLOCK", 0)
+    try:
+        fd = os.open(src, flags)
+    except FileNotFoundError:
+        return None, None
+    except OSError:
+        if os.path.islink(src):
+            return None, "is a symbolic link"
+        return None, "cannot be read"
+    try:
+        if not stat.S_ISREG(os.fstat(fd).st_mode):
+            return None, "is not a regular file"
+        with os.fdopen(fd, "rb") as fh:
+            fd = None
+            data = fh.read(_DECLARED_MAX_BYTES + 1)
+    finally:
+        if fd is not None:
+            os.close(fd)
+    dst = os.path.join(run_out, DECLARED_COPY_NAME)
+    with open(dst, "wb") as out:
+        out.write(data)
+    return dst, None
+
+
+def declaration_refused(run_id, reasons):
+    """{"file": <name of the _bom.refused.json>, "reasons": [...]} when this
+    run's declaration file was refused, else None. The file is what decides it:
+    entrypoint.sh writes it only on that path."""
+    p = run_file(run_id, "_bom.refused.json")
+    if not p or not os.path.isfile(p):
+        return None
+    return {"file": os.path.basename(p), "reasons": list(reasons)}
+
+
+def declared_refusal_reason(line):
+    """The reason in one '[declared-components] ERROR: ...' log line, or None."""
+    if not isinstance(line, str):
+        return None
+    m = _DECLARED_ERROR_RE.match(line.strip())
+    return _scrub_error_text(m.group(1))[:300] if m else None
+
+
 def _pct_env(name):
     """Read a conformance-threshold percentage (PURL/LICENSE/HASH/FIELD_MIN_PCT)
     from this process's own environment, validated to an int 0-100, or None if
@@ -4244,6 +4329,13 @@ def run_sibling_scan(image, mode, out_dir, on_log, *, upload_file=None, model_id
             # SBOM it writes, not the build's document (entrypoint.sh).
             if env.get("YOCTO_FROM_BUILD") == "true":
                 args += ["-e", "YOCTO_FROM_BUILD=true"]
+                # The build directory's declaration file, copied into this run
+                # folder (stage_yocto_declaration), which --volumes-from shares.
+                # Only that one fixed path and the fixed label are forwarded.
+                staged = os.path.join(out_dir, DECLARED_COPY_NAME)
+                if env.get("DECLARED_COMPONENTS_FILES") == staged and os.path.isfile(staged):
+                    args += ["-e", "DECLARED_COMPONENTS_FILES=%s" % staged,
+                             "-e", "DECLARED_COMPONENTS_LABELS=%s" % DECLARED_YOCTO_LABEL]
         else:
             args += ["-e", "TARGET_FILE=%s" % upload_file]
     if source_root is not None:
@@ -4285,6 +4377,9 @@ def run_sibling_scan(image, mode, out_dir, on_log, *, upload_file=None, model_id
     # a source scan; forward the flag and, when set, the credential by NAME ONLY
     # (mirrors API_KEY/HF_TOKEN below — the value stays out of the argv/`ps`).
     if mode == "SOURCE":
+        # --no-components: leave the tree's sbom-declared.cdx.json unread.
+        if env.get("DECLARED_COMPONENTS_SKIP") == "1":
+            args += ["-e", "DECLARED_COMPONENTS_SKIP=1"]
         if env.get("IDENTIFY_VENDORED") == "true":
             args += ["-e", "IDENTIFY_VENDORED=true"]
         if env.get("SCANOSS_API_KEY"):
@@ -6324,6 +6419,12 @@ class Handler(BaseHTTPRequestHandler):
         if source not in ("current-dir", "git-url", "zip-upload", "scan-target-src"):
             scan_exclude = []
 
+        # Leave sbom-declared.cdx.json unread (--no-components on the CLI): at
+        # the root of a source tree, and at the root of a Yocto build directory,
+        # where the web UI reads it in place of --components (see
+        # stage_yocto_declaration). A plain boolean; anything but "true" reads it.
+        no_components = g("no_components") == "true"
+
         # Optional AI usage scenario (--usage on the CLI) scoping the model risk
         # assessment. Closed allowlist: an out-of-list value is refused before
         # the stream starts, and the literal REBOUND from _USAGE_CONTEXTS (never
@@ -6450,6 +6551,7 @@ class Handler(BaseHTTPRequestHandler):
                 "specVersion": spec_version,
                 "gitRef": git_ref,
                 "exclude": scan_exclude,
+                "noComponents": no_components,
             }
             write_scanmeta(run_out, scan_config)
 
@@ -6532,6 +6634,11 @@ class Handler(BaseHTTPRequestHandler):
 
         # Build the run-scan environment + working dir for the chosen source.
         env = os.environ.copy()
+        # The declaration step's inputs come from this request only, never from
+        # whatever this server's own environment happens to carry.
+        for _dc_name in ("DECLARED_COMPONENTS_FILES", "DECLARED_COMPONENTS_LABELS",
+                         "DECLARED_COMPONENTS_SKIP", "DECLARED_COMPONENTS_APPLIED"):
+            env.pop(_dc_name, None)
         env.update({
             # Tells this run's entrypoint.sh it may sweep known-suffix
             # leftovers of an earlier scan of the same project/version before
@@ -6747,6 +6854,28 @@ class Handler(BaseHTTPRequestHandler):
                         else:
                             fail("Deep CVE matching requires Docker (to run the deep-cve "
                                  "image) or relaunching the UI from the deep-cve image."); return
+
+                # Components declared by recipe (bomlens:yocto-recipe): the CLI
+                # takes the file with --components, the web UI reads the file of
+                # the default name at the root of the picked build directory.
+                if no_components:
+                    if os.path.lexists(os.path.join(yocto_dir, DECLARED_DEFAULT_NAME)):
+                        sse("log", json.dumps(
+                            "▶ sbom-declared.cdx.json at the root of the build directory "
+                            "is not read (turned off for this scan)."))
+                else:
+                    staged, why = stage_yocto_declaration(yocto_dir, run_out)
+                    if why:
+                        fail("sbom-declared.cdx.json at the root of the build directory %s, "
+                             "so it was not read. Put the file itself there, or turn off "
+                             "reading it and scan again." % why)
+                        return
+                    if staged:
+                        sse("log", json.dumps(
+                            "▶ Declared components: sbom-declared.cdx.json at the root of "
+                            "the build directory"))
+                        env["DECLARED_COMPONENTS_FILES"] = staged
+                        env["DECLARED_COMPONENTS_LABELS"] = DECLARED_YOCTO_LABEL
 
             elif source == "docker-image":
                 if not target:
@@ -7164,6 +7293,12 @@ class Handler(BaseHTTPRequestHandler):
                 if route:
                     sibling = route
 
+            # --no-components: the entrypoint leaves the source tree's own
+            # sbom-declared.cdx.json unread. A source scan only; a Yocto build
+            # directory was handled where it was detected.
+            if no_components and mode == "SOURCE":
+                env["DECLARED_COMPONENTS_SKIP"] = "1"
+
             # Conformance profile the scan actually runs with: the user's explicit
             # choice if they made one, otherwise skt-submission for a document
             # under review (ANALYZE) and default for everything that generates one.
@@ -7194,8 +7329,15 @@ class Handler(BaseHTTPRequestHandler):
             error_tracker = _ScanErrorTracker()
             error_sent = False
             error_detail = None
+            # The reasons the declaration step gave for refusing a declaration
+            # file, for the failed-scan card (see declarationRefused below).
+            declared_reasons = []
 
             def note_log(ln):
+                reason = declared_refusal_reason(ln)
+                if (reason and reason not in declared_reasons
+                        and len(declared_reasons) < MAX_DECLARED_REASONS):
+                    declared_reasons.append(reason)
                 if isinstance(ln, str) and ln.lstrip().startswith("[WARN]"):
                     text = _mask_credentials(ln.strip())
                     if text not in scan_warnings and len(scan_warnings) < MAX_SCAN_WARNINGS:
@@ -7305,6 +7447,11 @@ class Handler(BaseHTTPRequestHandler):
                 # _ScanErrorTracker. None when the run succeeded or nothing
                 # matched the [ERROR] convention.
                 "errorMessage": None if (ok or error_sent) else error_tracker.result(),
+                # A declaration file was refused: the scan stopped and kept the
+                # SBOM written so far as _bom.refused.json. Names that file and
+                # the reasons the declaration step logged, so the failed-scan
+                # card can say why and offer the file. None otherwise.
+                "declarationRefused": None if ok else declaration_refused(run_id, declared_reasons),
             }
             # Outcome for the diagnostics summary (GET /diagnostics), which must
             # work for a failed run too: the tracker's scrubbed [ERROR] text, or
@@ -7344,6 +7491,11 @@ class Handler(BaseHTTPRequestHandler):
             token_dir = upload_token_dir(token)
             if token_dir:
                 shutil.rmtree(token_dir, ignore_errors=True)
+            # The copy of a Yocto build directory's declaration file.
+            try:
+                os.remove(os.path.join(run_out, DECLARED_COPY_NAME))
+            except OSError:
+                pass
             if cleanup_dir and (source in ("git-url", "scan-target-src") or (source == "current-dir" and scan_exclude)):
                 shutil.rmtree(cleanup_dir, ignore_errors=True)
                 if source == "git-url":
