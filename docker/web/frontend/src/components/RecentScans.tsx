@@ -199,6 +199,11 @@ function ScanRows({
               </a>
               <div className="flex flex-wrap items-center gap-1.5">
                 <TypeBadge scan={s} />
+                {s.refused && (
+                  <Badge tone="critical" title={t("recent.refusedHint")}>
+                    {t("recent.refused")}
+                  </Badge>
+                )}
                 {s.maxSeverity ? (
                   <Badge tone={SEV_TONE[s.maxSeverity]} mark>
                     {t(`severity.${s.maxSeverity}`)}
@@ -496,6 +501,11 @@ export function RecentScans({ scans, newHref, onDelete }: Props) {
                       </td>
                       <td className="px-4 py-3">
                         <span className="inline-flex items-center gap-1.5">
+                          {s.refused && (
+                            <Badge tone="critical" title={t("recent.refusedHint")}>
+                              {t("recent.refused")}
+                            </Badge>
+                          )}
                           {s.maxSeverity ? (
                             <Badge tone={SEV_TONE[s.maxSeverity]} mark>
                               {t(`severity.${s.maxSeverity}`)}

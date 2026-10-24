@@ -1539,6 +1539,9 @@ export interface RecentScan {
   inputSource: SourceType | null;
   /** Unix seconds of the SBOM file mtime. */
   generatedAt: number;
+  /** The run stopped because its declaration file was refused: it has no
+   *  SBOM (components is 0), and opening it shows the refusal. */
+  refused?: boolean;
 }
 
 /** List past scans (newest first). Empty on any failure — history is optional. */

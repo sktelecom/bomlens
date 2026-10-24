@@ -303,6 +303,11 @@ export function useScanForm({
   // directory picked with the folder input (the server reads it there).
   const showReadDeclared =
     isSourceScan || effectiveSource === "scan-target-src" || source === "rootfs-dir";
+  // A plain directory scan acts on it only when the folder turns out to be a
+  // Yocto build directory, which is not known before the scan, so turning it
+  // off there does not count as a changed option.
+  const readDeclaredChanged =
+    showReadDeclared && !readDeclared && effectiveSource !== "rootfs-dir";
   // A received SBOM carries its supplier's own root license and an AI model has
   // no outbound license of ours, so the field is offered only where we generate
   // the SBOM and therefore own what it ships under.
@@ -629,7 +634,7 @@ export function useScanForm({
     reachability, setReachability,
     byteStable, setByteStable,
     readLockFile, setReadLockFile, showDetection,
-    readDeclared, setReadDeclared, showReadDeclared,
+    readDeclared, setReadDeclared, showReadDeclared, readDeclaredChanged,
     conformanceProfile, setConformanceProfile,
     outboundLicense, setOutboundLicense,
     sbomAuthor, setSbomAuthor,

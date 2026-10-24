@@ -208,10 +208,12 @@ export function scanComparison(
   currentId: string,
 ): ScanComparison | null {
   const current = recent.find((s) => s.id === currentId);
-  if (!current) return null;
+  // A refused run has no SBOM, so it has nothing to compare and is no baseline.
+  if (!current || current.refused) return null;
   const prev = recent
     .filter(
       (s) =>
+        !s.refused &&
         s.id !== currentId &&
         s.project === current.project &&
         s.generatedAt < current.generatedAt,

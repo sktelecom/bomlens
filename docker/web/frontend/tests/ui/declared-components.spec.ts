@@ -151,3 +151,27 @@ test("a declaration step that failed without reasons shows the scan's own error"
   await expect(card.getByText(/could not be added to the SBOM \(see above\)/)).toBeVisible();
   await expect(card.getByRole("link", { name: "Download" })).toBeVisible();
 });
+
+test("a refused run is listed and reopens on its refusal", async ({ page }) => {
+  await page.route("**/capabilities", (r) =>
+    r.fulfill({ contentType: "application/json", body: JSON.stringify({ firmware: false, scanoss: false, docker: true }) }),
+  );
+  await page.route("**/results", (r) => r.fulfill({ contentType: "application/json", body: "[]" }));
+  await page.route("**/scans", (r) =>
+    r.fulfill({ contentType: "application/json", body: JSON.stringify([
+      { id: "demo_1.0", project: "demo", version: "1.0", components: 0, maxSeverity: null, isAiScan: false, componentType: null, inputSource: "current-dir", generatedAt: 1700000000, refused: true },
+    ]) }),
+  );
+  await page.route("**/scan?id=demo_1.0", (r) =>
+    r.fulfill({ contentType: "application/json", body: JSON.stringify({ ...REFUSED, mode: null }) }),
+  );
+  await page.goto("/#/");
+  await expect(page.getByText("Declaration refused").first()).toBeVisible();
+  await page.goto("/#/scan/demo_1.0");
+  const card = page.getByTestId("declaration-refused");
+  await expect(card.getByText(/bomlens:origin is missing/)).toBeVisible();
+  await expect(card.getByRole("link", { name: "Download" })).toHaveAttribute(
+    "href",
+    "/file?id=demo_1.0&name=demo_1.0_bom.refused.json",
+  );
+});

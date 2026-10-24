@@ -159,7 +159,7 @@ export function NewScan({
     state.byteStable,
     // On by default, so it counts only when it was turned off.
     state.showDetection && !state.readLockFile,
-    state.showReadDeclared && !state.readDeclared,
+    state.readDeclaredChanged,
   ].filter(Boolean).length;
   const formatOptionsOn = [
     state.outboundLicense.trim() !== "",
