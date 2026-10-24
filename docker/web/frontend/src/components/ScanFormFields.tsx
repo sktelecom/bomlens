@@ -457,6 +457,9 @@ export function ScanOptions({ state }: { state: ScanFormState }) {
     readLockFile,
     setReadLockFile,
     showDetection,
+    readDeclared,
+    setReadDeclared,
+    showReadDeclared,
     scanossToken,
     setScanossToken,
     showVendored,
@@ -537,6 +540,14 @@ export function ScanOptions({ state }: { state: ScanFormState }) {
           labelKey="readLockFile"
           checked={readLockFile}
           onChange={setReadLockFile}
+          disabled={busy}
+        />
+      )}
+      {showReadDeclared && (
+        <ToggleRow
+          labelKey="readDeclared"
+          checked={readDeclared}
+          onChange={setReadDeclared}
           disabled={busy}
         />
       )}
