@@ -3875,12 +3875,25 @@ DECLARED_ENV_NAMES = ("DECLARED_COMPONENTS_FILES", "DECLARED_COMPONENTS_LABELS",
                       "DECLARED_COMPONENTS_SKIP", "DECLARED_COMPONENTS_APPLIED")
 
 
+def declared_source_path(build_dir):
+    """The declaration file at the root of a build directory, or None when the
+    joined path does not stay directly inside that directory. build_dir comes
+    from safe_scan_dir; the check is repeated here at the point of use."""
+    base = os.path.realpath(build_dir)
+    src = os.path.normpath(os.path.join(base, DECLARED_DEFAULT_NAME))
+    if not src.startswith(base + os.sep) or os.path.dirname(src) != base:
+        return None
+    return src
+
+
 def stage_yocto_declaration(build_dir, run_out):
     """Copy sbom-declared.cdx.json from the root of a Yocto build directory into
     the run folder. Returns (copied path, None), (None, None) when the build
     directory has no such file, or (None, reason) when it has one that is not a
     regular file (a symbolic link is not followed: it could point anywhere)."""
-    src = os.path.join(build_dir, DECLARED_DEFAULT_NAME)
+    src = declared_source_path(build_dir)
+    if src is None:
+        return None, "is outside the scanned folder"
     flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_NONBLOCK", 0)
     try:
         fd = os.open(src, flags)
@@ -6975,7 +6988,8 @@ class Handler(BaseHTTPRequestHandler):
                 # takes the file with --components, the web UI reads the file of
                 # the default name at the root of the picked build directory.
                 if no_components:
-                    if os.path.lexists(os.path.join(yocto_dir, DECLARED_DEFAULT_NAME)):
+                    declared_src = declared_source_path(yocto_dir)
+                    if declared_src and os.path.lexists(declared_src):
                         sse("log", json.dumps(
                             "▶ sbom-declared.cdx.json at the root of the scanned folder "
                             "is not read (turned off for this scan)."))
