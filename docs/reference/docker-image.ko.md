@@ -38,7 +38,7 @@ docker pull ghcr.io/sktelecom/bomlens:latest
 | ScanCode Toolkit | 32.5.0 | 정밀 라이선스 탐지 (opt-in 빌드에만 포함) |
 | SCANOSS | 1.54.2 | C/C++ 소스에 복사해 넣은 오픈소스 식별(`--identify-vendored`) |
 | docker CLI | 29.9.0 | 웹 UI가 소스 스캔에서 cdxgen 컨테이너를 sibling으로 띄울 때 사용 |
-| cdxgen | 13.3.0 | 모델 계보 정보 보강(`bomlens-aibom` 이미지 전용) |
+| cdxgen | 13.5.0 | 모델 계보 정보 보강(`bomlens-aibom` 이미지 전용) |
 
 도구 버전은 `docker/Dockerfile`의 `ARG`로 고정됩니다.
 

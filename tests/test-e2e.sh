@@ -1021,20 +1021,20 @@ else
         skip "go-newer-toolchain fixture not found"
     fi
 
-    # 3g: cdxgen crashes on a `retract (` block right after a `replace (`
-    # block (getGoPkgComponent builds a purl with no name), unrelated to the
-    # GOTOOLCHAIN fix above. The CLI now falls back to syft (direct deps via
-    # go.sum, no cdxgen) instead of exiting 1 on a raw stack trace, and
-    # records why.
+    # 3g: cdxgen up to 13.3.0 crashed on a `retract (` block right after a
+    # `replace (` block (getGoPkgComponent built a purl with no name), and the
+    # CLI fell back to syft. cdxgen 13.5.0 reads this go.mod, so the scan
+    # stays on cdxgen. The syft fallback itself is covered by
+    # test-engine-contract.sh.
     gra="$REPO/tests/fixtures/go-retract-after-replace"
     if [ -d "$gra" ]; then
         w="$(run_source_scan "$gra")"
         if jq -e '([.components[]?.purl // empty] | any(startswith("pkg:golang/github.com/spf13/cobra@")))
-                  and ([.metadata.properties[]? | select(.name=="bomlens:sbom-tool-degraded") | .value][0] == "cdxgen-crash")' \
+                  and ([.metadata.properties[]? | select(.name=="bomlens:sbom-tool-degraded")] | length == 0)' \
                "$w/testapp_1.0_bom.json" >/dev/null 2>&1; then
-            pass "go retract-after-replace: cdxgen crash falls back to syft and records cdxgen-crash"
+            pass "go retract-after-replace: cdxgen reads the go.mod and finds cobra"
         else
-            fail "go retract-after-replace: cdxgen crash falls back to syft and records cdxgen-crash" "$(tail -5 "$w/_scan.log" 2>/dev/null)"; show_log_if_verbose "$w"
+            fail "go retract-after-replace: cdxgen reads the go.mod and finds cobra" "$(tail -5 "$w/_scan.log" 2>/dev/null)"; show_log_if_verbose "$w"
         fi
         if grep -qE 'TypeError|Invalid purl|Schema validation failed' "$w/_scan.log" 2>/dev/null; then
             fail "go retract-after-replace: raw cdxgen stack trace reached the terminal output" "$(grep -E 'TypeError|Invalid purl|Schema validation failed' "$w/_scan.log")"
@@ -1111,7 +1111,7 @@ else
         # (no local layer cache) the pull itself can take longer than a
         # resolve step would, and the wait below is measuring build-prep.sh's
         # own responsiveness, not network/registry variance.
-        docker pull -q "ghcr.io/cdxgen/cdxgen-debian-swift:${CDXGEN_TAG:-13.3.0}" >/dev/null 2>&1
+        docker pull -q "ghcr.io/cdxgen/cdxgen-debian-swift:${CDXGEN_TAG:-13.5.0}" >/dev/null 2>&1
         w="$(mktemp -d "$WORK_ROOT/interrupt.XXXXXX")"
         out="$(mktemp -d "$WORK_ROOT/interrupt-out.XXXXXX")"
         cp -R "$swiftsrc/." "$w/"

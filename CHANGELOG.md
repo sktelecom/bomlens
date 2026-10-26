@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v1.14.3] - 2026-10-26
+
+### Security
+
+- Source scans run cdxgen 13.5.0, whose language images ship Node.js 24.22.1, for CVE-2026-111497 in the Brotli decoder. The Android image and the AIBOM image move to cdxgen 13.5.0 too.
+
 ## [v1.14.2] - 2026-10-26
 
 ### Security

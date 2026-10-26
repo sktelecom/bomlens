@@ -17,7 +17,7 @@ ARG ANDROID_API=35
 # On a network that reaches only a registry mirror, pass
 # --build-arg CDXGEN_IMAGE_PREFIX=<mirror path>/ (see CDXGEN_IMAGE_PREFIX).
 ARG CDXGEN_IMAGE_PREFIX=ghcr.io/cdxgen/
-FROM ${CDXGEN_IMAGE_PREFIX}cdxgen-temurin-java21:13.3.0@sha256:b36f1a050402125db00774562b806a147c2502982f2fd704be2da426887f0485
+FROM ${CDXGEN_IMAGE_PREFIX}cdxgen-temurin-java21:13.5.0@sha256:7c8d39f65c7e2c7a43692785ef50edbb5f6a1d4fd77b5aabae30e650c0ce4275
 
 ARG ANDROID_API=35
 ARG ANDROID_BUILD_TOOLS=${ANDROID_API}.0.0
