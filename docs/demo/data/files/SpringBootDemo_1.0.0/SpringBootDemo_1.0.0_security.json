@@ -3,8 +3,8 @@
   "Trivy": {
     "Version": "0.75.0"
   },
-  "ReportID": "01a16e52-ee9a-72b9-b663-4f88a2098b83",
-  "CreatedAt": "2026-10-24T14:31:31.226180165Z",
+  "ReportID": "01a177d6-6bee-7476-af21-119c7360e091",
+  "CreatedAt": "2026-10-26T10:51:43.470294893Z",
   "ArtifactName": "SpringBootDemo_1.0.0_bom.json",
   "ArtifactType": "cyclonedx",
   "Results": [
@@ -1744,7 +1744,7 @@
             "https://www.cve.org/CVERecord?id=CVE-2026-54512"
           ],
           "PublishedDate": "2026-06-23T21:17:02.203Z",
-          "LastModifiedDate": "2026-06-27T21:01:36.47Z"
+          "LastModifiedDate": "2026-10-25T23:10:00.167Z"
         },
         {
           "VulnerabilityID": "CVE-2026-54513",
@@ -1842,7 +1842,7 @@
             "https://www.cve.org/CVERecord?id=CVE-2026-54513"
           ],
           "PublishedDate": "2026-06-23T21:17:02.333Z",
-          "LastModifiedDate": "2026-09-14T13:18:40.63Z"
+          "LastModifiedDate": "2026-10-25T23:10:00.167Z"
         },
         {
           "VulnerabilityID": "CVE-2026-68497",
@@ -1876,6 +1876,7 @@
           ],
           "VendorSeverity": {
             "alma": 3,
+            "amazon": 3,
             "ghsa": 3,
             "oracle-oval": 3,
             "redhat": 3,
@@ -1949,6 +1950,7 @@
             "CWE-400"
           ],
           "VendorSeverity": {
+            "amazon": 3,
             "ghsa": 3,
             "redhat": 3,
             "ubuntu": 2
@@ -2013,6 +2015,7 @@
           ],
           "VendorSeverity": {
             "alma": 3,
+            "amazon": 3,
             "ghsa": 3,
             "oracle-oval": 3,
             "redhat": 3,
@@ -2088,7 +2091,7 @@
             "CWE-610"
           ],
           "VendorSeverity": {
-            "amazon": 2,
+            "amazon": 3,
             "ghsa": 2,
             "redhat": 2
           },
@@ -2177,7 +2180,7 @@
             "https://www.cve.org/CVERecord?id=CVE-2026-54514"
           ],
           "PublishedDate": "2026-06-23T21:17:02.467Z",
-          "LastModifiedDate": "2026-06-27T20:55:09.61Z"
+          "LastModifiedDate": "2026-10-25T23:10:00.167Z"
         },
         {
           "VulnerabilityID": "CVE-2026-54515",
@@ -2235,7 +2238,7 @@
             "https://www.cve.org/CVERecord?id=CVE-2026-54515"
           ],
           "PublishedDate": "2026-06-23T21:17:02.597Z",
-          "LastModifiedDate": "2026-06-29T13:38:59.057Z"
+          "LastModifiedDate": "2026-10-25T23:10:00.167Z"
         },
         {
           "VulnerabilityID": "CVE-2026-59888",
@@ -2293,7 +2296,7 @@
             "https://www.cve.org/CVERecord?id=CVE-2026-59888"
           ],
           "PublishedDate": "2026-07-14T17:17:15.137Z",
-          "LastModifiedDate": "2026-07-15T20:18:23.677Z"
+          "LastModifiedDate": "2026-10-24T21:10:00.13Z"
         },
         {
           "VulnerabilityID": "CVE-2026-59889",
@@ -2351,7 +2354,7 @@
             "https://www.cve.org/CVERecord?id=CVE-2026-59889"
           ],
           "PublishedDate": "2026-07-14T21:17:06.16Z",
-          "LastModifiedDate": "2026-10-19T20:19:19.487Z"
+          "LastModifiedDate": "2026-10-24T21:10:00.13Z"
         },
         {
           "VulnerabilityID": "CVE-2026-77310",
@@ -2446,7 +2449,7 @@
             "CWE-915"
           ],
           "VendorSeverity": {
-            "amazon": 2,
+            "amazon": 3,
             "ghsa": 2,
             "redhat": 2
           },
@@ -2611,7 +2614,7 @@
             "https://www.cve.org/CVERecord?id=CVE-2026-49844"
           ],
           "PublishedDate": "2026-07-10T22:16:42.54Z",
-          "LastModifiedDate": "2026-07-14T20:03:09.91Z"
+          "LastModifiedDate": "2026-10-25T15:10:00.147Z"
         },
         {
           "VulnerabilityID": "CVE-2025-24813",
@@ -2953,7 +2956,7 @@
             "https://www.cve.org/CVERecord?id=CVE-2026-43512"
           ],
           "PublishedDate": "2026-05-12T16:16:17.99Z",
-          "LastModifiedDate": "2026-06-17T10:49:50.59Z"
+          "LastModifiedDate": "2026-10-26T00:10:00.15Z"
         },
         {
           "VulnerabilityID": "CVE-2026-43515",
