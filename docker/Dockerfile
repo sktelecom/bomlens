@@ -248,7 +248,7 @@ ARG CDXGEN_VERSION=13.3.0
 # cosign/docker above (this file's established pattern for external tools),
 # arch-mapped via uname -m.
 # renovate: datasource=github-releases depName=nodejs/node
-ARG NODE_VERSION=v24.21.0
+ARG NODE_VERSION=v24.22.1
 # npm as bundled with that Node release carries its own vulnerable copies of
 # tar, ip-address and brace-expansion, and npm stays in the image (it installs
 # cdxgen), so it is replaced by a pinned release with those fixed.

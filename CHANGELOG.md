@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v1.14.2] - 2026-10-26
+
+### Security
+
+- The AIBOM image installs Node.js 24.22.1 and the firmware image brotli 1.2.1, for CVE-2026-111497 in the Brotli decoder.
+
 ## [v1.14.1] - 2026-10-24
 
 ### Added
