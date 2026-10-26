@@ -3,8 +3,8 @@
   "Trivy": {
     "Version": "0.75.0"
   },
-  "ReportID": "01a16e51-a9f6-754d-8125-4f8429ef8641",
-  "CreatedAt": "2026-10-24T14:30:08.118348505Z",
+  "ReportID": "01a177d5-0d52-7652-a68b-6c401e985d03",
+  "CreatedAt": "2026-10-26T10:50:13.71441682Z",
   "ArtifactName": "FlaskDataService_3.2.0_bom.json",
   "ArtifactType": "cyclonedx",
   "Results": [
