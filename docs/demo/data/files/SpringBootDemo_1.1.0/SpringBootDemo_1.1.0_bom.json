@@ -8,13 +8,13 @@
               "name": "OWASP Foundation"
             }
           ],
-          "bom-ref": "pkg:npm/@cdxgen/cdxgen@13.3.0",
+          "bom-ref": "pkg:npm/@cdxgen/cdxgen@13.5.0",
           "group": "@cdxgen",
           "name": "cdxgen",
           "publisher": "OWASP Foundation",
-          "purl": "pkg:npm/%40cdxgen/cdxgen@13.3.0",
+          "purl": "pkg:npm/%40cdxgen/cdxgen@13.5.0",
           "type": "application",
-          "version": "13.3.0"
+          "version": "13.5.0"
         }
       },
       "bom-ref": "metadata-annotations",
@@ -22,7 +22,7 @@
         "pkg:maven/com.example/sbom-example-app@1.1.0?type=jar"
       ],
       "text": "This Software Bill-of-Materials (SBOM) document was created on Monday, October 26, 2026 with cdxgen. The data was captured during the build lifecycle phase. The document describes an application named 'sbom-example-app' with version '1.1.0'. The package type in this SBOM is maven with 50 purl namespaces described under components. The components were identified from the source files: pom.xml.",
-      "timestamp": "2026-10-26T10:52:07Z"
+      "timestamp": "2026-10-26T16:56:30Z"
     }
   ],
   "bomFormat": "CycloneDX",
@@ -418,6 +418,10 @@
           "value": "Both are permissive; keep the notices."
         },
         {
+          "name": "bomlens:supplierSource",
+          "value": "publisher"
+        },
+        {
           "name": "bsi:component:filename",
           "value": "jackson-annotations-2.17.2.jar"
         },
@@ -426,8 +430,12 @@
           "value": "maven-groupid"
         }
       ],
+      "publisher": "FasterXML",
       "purl": "pkg:maven/com.fasterxml.jackson.core/jackson-annotations@2.17.2?type=jar",
       "scope": "required",
+      "supplier": {
+        "name": "FasterXML"
+      },
       "type": "library",
       "version": "2.17.2",
       "cpe": "cpe:2.3:a:fasterxml:jackson-annotations:2.17.2:*:*:*:*:*:*:*"
@@ -529,6 +537,10 @@
           "value": "Both are permissive; keep the notices."
         },
         {
+          "name": "bomlens:supplierSource",
+          "value": "publisher"
+        },
+        {
           "name": "bsi:component:filename",
           "value": "jackson-core-2.17.2.jar"
         },
@@ -537,8 +549,12 @@
           "value": "maven-groupid"
         }
       ],
+      "publisher": "FasterXML",
       "purl": "pkg:maven/com.fasterxml.jackson.core/jackson-core@2.17.2?type=jar",
       "scope": "required",
+      "supplier": {
+        "name": "FasterXML"
+      },
       "type": "library",
       "version": "2.17.2",
       "cpe": "cpe:2.3:a:fasterxml:jackson-core:2.17.2:*:*:*:*:*:*:*"
@@ -640,6 +656,10 @@
           "value": "Both are permissive; keep the notices."
         },
         {
+          "name": "bomlens:supplierSource",
+          "value": "publisher"
+        },
+        {
           "name": "bsi:component:filename",
           "value": "jackson-databind-2.17.2.jar"
         },
@@ -648,8 +668,12 @@
           "value": "maven-groupid"
         }
       ],
+      "publisher": "FasterXML",
       "purl": "pkg:maven/com.fasterxml.jackson.core/jackson-databind@2.17.2?type=jar",
       "scope": "required",
+      "supplier": {
+        "name": "FasterXML"
+      },
       "type": "library",
       "version": "2.17.2",
       "cpe": "cpe:2.3:a:fasterxml:jackson-databind:2.17.2:*:*:*:*:*:*:*"
@@ -724,7 +748,7 @@
                 "value": "false"
               }
             ],
-            "url": "https://github.com/FasterXML/jackson-modules-java8/blob/2.x/LICENSE"
+            "url": "https://opensource.org/licenses/Apache-2.0"
           }
         }
       ],
@@ -751,6 +775,10 @@
           "value": "Both are permissive; keep the notices."
         },
         {
+          "name": "bomlens:supplierSource",
+          "value": "publisher"
+        },
+        {
           "name": "bsi:component:filename",
           "value": "jackson-datatype-jdk8-2.17.2.jar"
         },
@@ -759,8 +787,12 @@
           "value": "maven-groupid"
         }
       ],
+      "publisher": "FasterXML",
       "purl": "pkg:maven/com.fasterxml.jackson.datatype/jackson-datatype-jdk8@2.17.2?type=jar",
       "scope": "required",
+      "supplier": {
+        "name": "FasterXML"
+      },
       "type": "library",
       "version": "2.17.2",
       "cpe": "cpe:2.3:a:fasterxml:datatype:2.17.2:*:*:*:*:*:*:*"
@@ -835,7 +867,7 @@
                 "value": "false"
               }
             ],
-            "url": "https://github.com/FasterXML/jackson-modules-java8/blob/2.x/LICENSE"
+            "url": "https://opensource.org/licenses/Apache-2.0"
           }
         }
       ],
@@ -862,6 +894,10 @@
           "value": "Both are permissive; keep the notices."
         },
         {
+          "name": "bomlens:supplierSource",
+          "value": "publisher"
+        },
+        {
           "name": "bsi:component:filename",
           "value": "jackson-datatype-jsr310-2.17.2.jar"
         },
@@ -870,8 +906,12 @@
           "value": "maven-groupid"
         }
       ],
+      "publisher": "FasterXML",
       "purl": "pkg:maven/com.fasterxml.jackson.datatype/jackson-datatype-jsr310@2.17.2?type=jar",
       "scope": "required",
+      "supplier": {
+        "name": "FasterXML"
+      },
       "type": "library",
       "version": "2.17.2",
       "cpe": "cpe:2.3:a:fasterxml:datatype:2.17.2:*:*:*:*:*:*:*"
@@ -946,7 +986,7 @@
                 "value": "false"
               }
             ],
-            "url": "https://github.com/FasterXML/jackson-modules-java8/blob/2.x/LICENSE"
+            "url": "https://opensource.org/licenses/Apache-2.0"
           }
         }
       ],
@@ -973,6 +1013,10 @@
           "value": "Both are permissive; keep the notices."
         },
         {
+          "name": "bomlens:supplierSource",
+          "value": "publisher"
+        },
+        {
           "name": "bsi:component:filename",
           "value": "jackson-module-parameter-names-2.17.2.jar"
         },
@@ -981,8 +1025,12 @@
           "value": "maven-groupid"
         }
       ],
+      "publisher": "FasterXML",
       "purl": "pkg:maven/com.fasterxml.jackson.module/jackson-module-parameter-names@2.17.2?type=jar",
       "scope": "required",
+      "supplier": {
+        "name": "FasterXML"
+      },
       "type": "library",
       "version": "2.17.2",
       "cpe": "cpe:2.3:a:fasterxml:module:2.17.2:*:*:*:*:*:*:*"
@@ -1250,6 +1298,7 @@
     },
     {
       "bom-ref": "pkg:maven/com.sun.istack/istack-commons-runtime@4.1.1?type=jar",
+      "description": "istack common utility code",
       "evidence": {
         "identity": [
           {
@@ -1266,6 +1315,12 @@
           }
         ]
       },
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/eclipse-ee4j/jaxb-istack-commons"
+        }
+      ],
       "group": "com.sun.istack",
       "hashes": [
         {
@@ -1288,30 +1343,7 @@
       "licenses": [
         {
           "license": {
-            "id": "BSD-3-Clause",
-            "properties": [
-              {
-                "name": "cdx:license:category",
-                "value": "Permissive"
-              },
-              {
-                "name": "cdx:license:foss",
-                "value": "true"
-              },
-              {
-                "name": "cdx:license:osiApproved",
-                "value": "true"
-              },
-              {
-                "name": "cdx:license:fsfLibre",
-                "value": "true"
-              },
-              {
-                "name": "cdx:license:deprecated",
-                "value": "false"
-              }
-            ],
-            "url": "https://opensource.org/licenses/BSD-3-Clause"
+            "id": "BSD-3-Clause"
           }
         }
       ],
@@ -1319,7 +1351,7 @@
       "properties": [
         {
           "name": "cdx:license:category",
-          "value": "Permissive"
+          "value": "Unstated License"
         },
         {
           "name": "internal:SrcFile",
@@ -1338,6 +1370,10 @@
           "value": "Both are permissive; keep the notices."
         },
         {
+          "name": "bomlens:supplierSource",
+          "value": "publisher"
+        },
+        {
           "name": "bsi:component:filename",
           "value": "istack-commons-runtime-4.1.1.jar"
         },
@@ -1346,8 +1382,12 @@
           "value": "maven-groupid"
         }
       ],
+      "publisher": "Eclipse Foundation",
       "purl": "pkg:maven/com.sun.istack/istack-commons-runtime@4.1.1?type=jar",
       "scope": "required",
+      "supplier": {
+        "name": "Eclipse Foundation"
+      },
       "type": "library",
       "version": "4.1.1",
       "cpe": "cpe:2.3:a:sun:istack:4.1.1:*:*:*:*:*:*:*"
@@ -1899,6 +1939,7 @@
     },
     {
       "bom-ref": "pkg:maven/io.smallrye/jandex@3.1.2?type=jar",
+      "description": "SmallRye Build Parent POM",
       "evidence": {
         "identity": [
           {
@@ -1966,7 +2007,7 @@
                 "value": "false"
               }
             ],
-            "url": "https://github.com/smallrye/jandex/blob/main/LICENSE.txt"
+            "url": "https://opensource.org/licenses/Apache-2.0"
           }
         }
       ],
@@ -2084,6 +2125,10 @@
           "value": "Both are permissive; keep the notices."
         },
         {
+          "name": "bomlens:supplierSource",
+          "value": "publisher"
+        },
+        {
           "name": "bsi:component:filename",
           "value": "jakarta.activation-api-2.1.3.jar"
         },
@@ -2092,8 +2137,12 @@
           "value": "maven-groupid"
         }
       ],
+      "publisher": "Eclipse Foundation",
       "purl": "pkg:maven/jakarta.activation/jakarta.activation-api@2.1.3?type=jar",
       "scope": "required",
+      "supplier": {
+        "name": "Eclipse Foundation"
+      },
       "type": "library",
       "version": "2.1.3",
       "cpe": "cpe:2.3:a:activation:activation:2.1.3:*:*:*:*:*:*:*"
@@ -2166,6 +2215,10 @@
           "value": "The dependency's license was not recognised."
         },
         {
+          "name": "bomlens:supplierSource",
+          "value": "publisher"
+        },
+        {
           "name": "bsi:component:filename",
           "value": "jakarta.annotation-api-2.1.1.jar"
         },
@@ -2174,8 +2227,12 @@
           "value": "maven-groupid"
         }
       ],
+      "publisher": "Eclipse Foundation",
       "purl": "pkg:maven/jakarta.annotation/jakarta.annotation-api@2.1.1?type=jar",
       "scope": "required",
+      "supplier": {
+        "name": "Eclipse Foundation"
+      },
       "type": "library",
       "version": "2.1.1",
       "cpe": "cpe:2.3:a:annotation:annotation:2.1.1:*:*:*:*:*:*:*"
@@ -2277,6 +2334,10 @@
           "value": "Both are permissive; keep the notices."
         },
         {
+          "name": "bomlens:supplierSource",
+          "value": "publisher"
+        },
+        {
           "name": "bsi:component:filename",
           "value": "jakarta.inject-api-2.0.1.jar"
         },
@@ -2285,14 +2346,19 @@
           "value": "maven-groupid"
         }
       ],
+      "publisher": "Eclipse Foundation",
       "purl": "pkg:maven/jakarta.inject/jakarta.inject-api@2.0.1?type=jar",
       "scope": "required",
+      "supplier": {
+        "name": "Eclipse Foundation"
+      },
       "type": "library",
       "version": "2.0.1",
       "cpe": "cpe:2.3:a:inject:inject:2.0.1:*:*:*:*:*:*:*"
     },
     {
       "bom-ref": "pkg:maven/jakarta.persistence/jakarta.persistence-api@3.1.0?type=jar",
+      "description": "Eclipse Enterprise for Java (EE4J) is an open source initiative to create standard APIs,\nimplementations of those APIs, and technology compatibility kits for Java runtimes\nthat enable development, deployment, and management of server-side and cloud-native applications.",
       "evidence": {
         "identity": [
           {
@@ -2392,6 +2458,10 @@
           "value": "Both are permissive; keep the notices."
         },
         {
+          "name": "bomlens:supplierSource",
+          "value": "publisher"
+        },
+        {
           "name": "bsi:component:filename",
           "value": "jakarta.persistence-api-3.1.0.jar"
         },
@@ -2400,8 +2470,12 @@
           "value": "maven-groupid"
         }
       ],
+      "publisher": "Eclipse Foundation",
       "purl": "pkg:maven/jakarta.persistence/jakarta.persistence-api@3.1.0?type=jar",
       "scope": "required",
+      "supplier": {
+        "name": "Eclipse Foundation"
+      },
       "type": "library",
       "version": "3.1.0",
       "cpe": "cpe:2.3:a:persistence:persistence:3.1.0:*:*:*:*:*:*:*"
@@ -2498,6 +2572,7 @@
     },
     {
       "bom-ref": "pkg:maven/jakarta.xml.bind/jakarta.xml.bind-api@4.0.2?type=jar",
+      "description": "Jakarta XML Binding API",
       "evidence": {
         "identity": [
           {
@@ -2514,6 +2589,12 @@
           }
         ]
       },
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/jakartaee/jaxb-api.git"
+        }
+      ],
       "group": "jakarta.xml.bind",
       "hashes": [
         {
@@ -2536,30 +2617,7 @@
       "licenses": [
         {
           "license": {
-            "id": "BSD-3-Clause",
-            "properties": [
-              {
-                "name": "cdx:license:category",
-                "value": "Permissive"
-              },
-              {
-                "name": "cdx:license:foss",
-                "value": "true"
-              },
-              {
-                "name": "cdx:license:osiApproved",
-                "value": "true"
-              },
-              {
-                "name": "cdx:license:fsfLibre",
-                "value": "true"
-              },
-              {
-                "name": "cdx:license:deprecated",
-                "value": "false"
-              }
-            ],
-            "url": "https://opensource.org/licenses/BSD-3-Clause"
+            "id": "BSD-3-Clause"
           }
         }
       ],
@@ -2567,7 +2625,7 @@
       "properties": [
         {
           "name": "cdx:license:category",
-          "value": "Permissive"
+          "value": "Unstated License"
         },
         {
           "name": "internal:SrcFile",
@@ -2586,6 +2644,10 @@
           "value": "Both are permissive; keep the notices."
         },
         {
+          "name": "bomlens:supplierSource",
+          "value": "publisher"
+        },
+        {
           "name": "bsi:component:filename",
           "value": "jakarta.xml.bind-api-4.0.2.jar"
         },
@@ -2594,8 +2656,15 @@
           "value": "maven-groupid"
         }
       ],
+      "publisher": "Eclipse Foundation",
       "purl": "pkg:maven/jakarta.xml.bind/jakarta.xml.bind-api@4.0.2?type=jar",
       "scope": "required",
+      "supplier": {
+        "name": "Eclipse Foundation"
+      },
+      "tags": [
+        "xml"
+      ],
       "type": "library",
       "version": "4.0.2",
       "cpe": "cpe:2.3:a:xml:bind:4.0.2:*:*:*:*:*:*:*"
@@ -2724,6 +2793,12 @@
           }
         ]
       },
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/antlr/antlr4/tree/master"
+        }
+      ],
       "group": "org.antlr",
       "hashes": [
         {
@@ -2796,6 +2871,10 @@
           "value": "Both are permissive; keep the notices."
         },
         {
+          "name": "bomlens:supplierSource",
+          "value": "publisher"
+        },
+        {
           "name": "bsi:component:filename",
           "value": "antlr4-runtime-4.13.0.jar"
         },
@@ -2804,8 +2883,12 @@
           "value": "maven-groupid"
         }
       ],
+      "publisher": "ANTLR",
       "purl": "pkg:maven/org.antlr/antlr4-runtime@4.13.0?type=jar",
       "scope": "required",
+      "supplier": {
+        "name": "ANTLR"
+      },
       "type": "library",
       "version": "4.13.0",
       "cpe": "cpe:2.3:a:antlr:antlr:4.13.0:*:*:*:*:*:*:*"
@@ -2907,6 +2990,10 @@
           "value": "Both are permissive; keep the notices."
         },
         {
+          "name": "bomlens:supplierSource",
+          "value": "publisher"
+        },
+        {
           "name": "bsi:component:filename",
           "value": "commons-lang3-3.17.0.jar"
         },
@@ -2915,8 +3002,12 @@
           "value": "maven-groupid"
         }
       ],
+      "publisher": "The Apache Software Foundation",
       "purl": "pkg:maven/org.apache.commons/commons-lang3@3.17.0?type=jar",
       "scope": "required",
+      "supplier": {
+        "name": "The Apache Software Foundation"
+      },
       "tags": [
         "framework"
       ],
@@ -2943,6 +3034,12 @@
           }
         ]
       },
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/apache/logging-log4j2"
+        }
+      ],
       "group": "org.apache.logging.log4j",
       "hashes": [
         {
@@ -3015,6 +3112,10 @@
           "value": "Both are permissive; keep the notices."
         },
         {
+          "name": "bomlens:supplierSource",
+          "value": "publisher"
+        },
+        {
           "name": "bsi:component:filename",
           "value": "log4j-api-2.23.1.jar"
         },
@@ -3023,8 +3124,12 @@
           "value": "maven-groupid"
         }
       ],
+      "publisher": "The Apache Software Foundation",
       "purl": "pkg:maven/org.apache.logging.log4j/log4j-api@2.23.1?type=jar",
       "scope": "required",
+      "supplier": {
+        "name": "The Apache Software Foundation"
+      },
       "tags": [
         "framework"
       ],
@@ -3051,6 +3156,12 @@
           }
         ]
       },
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/apache/logging-log4j2"
+        }
+      ],
       "group": "org.apache.logging.log4j",
       "hashes": [
         {
@@ -3123,6 +3234,10 @@
           "value": "Both are permissive; keep the notices."
         },
         {
+          "name": "bomlens:supplierSource",
+          "value": "publisher"
+        },
+        {
           "name": "bsi:component:filename",
           "value": "log4j-to-slf4j-2.23.1.jar"
         },
@@ -3131,8 +3246,12 @@
           "value": "maven-groupid"
         }
       ],
+      "publisher": "The Apache Software Foundation",
       "purl": "pkg:maven/org.apache.logging.log4j/log4j-to-slf4j@2.23.1?type=jar",
       "scope": "required",
+      "supplier": {
+        "name": "The Apache Software Foundation"
+      },
       "tags": [
         "api",
         "framework",
@@ -3599,6 +3718,12 @@
           }
         ]
       },
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/eclipse-ee4j/angus-activation"
+        }
+      ],
       "group": "org.eclipse.angus",
       "hashes": [
         {
@@ -3621,30 +3746,7 @@
       "licenses": [
         {
           "license": {
-            "id": "BSD-3-Clause",
-            "properties": [
-              {
-                "name": "cdx:license:category",
-                "value": "Permissive"
-              },
-              {
-                "name": "cdx:license:foss",
-                "value": "true"
-              },
-              {
-                "name": "cdx:license:osiApproved",
-                "value": "true"
-              },
-              {
-                "name": "cdx:license:fsfLibre",
-                "value": "true"
-              },
-              {
-                "name": "cdx:license:deprecated",
-                "value": "false"
-              }
-            ],
-            "url": "https://opensource.org/licenses/BSD-3-Clause"
+            "id": "BSD-3-Clause"
           }
         }
       ],
@@ -3652,7 +3754,7 @@
       "properties": [
         {
           "name": "cdx:license:category",
-          "value": "Permissive"
+          "value": "Unstated License"
         },
         {
           "name": "internal:SrcFile",
@@ -3671,6 +3773,10 @@
           "value": "Both are permissive; keep the notices."
         },
         {
+          "name": "bomlens:supplierSource",
+          "value": "publisher"
+        },
+        {
           "name": "bsi:component:filename",
           "value": "angus-activation-2.0.0.jar"
         },
@@ -3679,8 +3785,12 @@
           "value": "maven-groupid"
         }
       ],
+      "publisher": "Eclipse Foundation",
       "purl": "pkg:maven/org.eclipse.angus/angus-activation@2.0.0?type=jar",
       "scope": "required",
+      "supplier": {
+        "name": "Eclipse Foundation"
+      },
       "type": "library",
       "version": "2.0.0",
       "cpe": "cpe:2.3:a:eclipse:angus_mail:2.0.0:*:*:*:*:*:*:*"
@@ -3704,6 +3814,12 @@
           }
         ]
       },
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/eclipse-ee4j/jaxb-ri.git"
+        }
+      ],
       "group": "org.glassfish.jaxb",
       "hashes": [
         {
@@ -3726,30 +3842,7 @@
       "licenses": [
         {
           "license": {
-            "id": "BSD-3-Clause",
-            "properties": [
-              {
-                "name": "cdx:license:category",
-                "value": "Permissive"
-              },
-              {
-                "name": "cdx:license:foss",
-                "value": "true"
-              },
-              {
-                "name": "cdx:license:osiApproved",
-                "value": "true"
-              },
-              {
-                "name": "cdx:license:fsfLibre",
-                "value": "true"
-              },
-              {
-                "name": "cdx:license:deprecated",
-                "value": "false"
-              }
-            ],
-            "url": "https://opensource.org/licenses/BSD-3-Clause"
+            "id": "BSD-3-Clause"
           }
         }
       ],
@@ -3757,7 +3850,7 @@
       "properties": [
         {
           "name": "cdx:license:category",
-          "value": "Permissive"
+          "value": "Unstated License"
         },
         {
           "name": "internal:SrcFile",
@@ -3776,6 +3869,10 @@
           "value": "Both are permissive; keep the notices."
         },
         {
+          "name": "bomlens:supplierSource",
+          "value": "publisher"
+        },
+        {
           "name": "bsi:component:filename",
           "value": "jaxb-core-4.0.2.jar"
         },
@@ -3784,8 +3881,12 @@
           "value": "maven-groupid"
         }
       ],
+      "publisher": "Eclipse Foundation",
       "purl": "pkg:maven/org.glassfish.jaxb/jaxb-core@4.0.2?type=jar",
       "scope": "required",
+      "supplier": {
+        "name": "Eclipse Foundation"
+      },
       "type": "library",
       "version": "4.0.2",
       "cpe": "cpe:2.3:a:glassfish:jaxb:4.0.2:*:*:*:*:*:*:*"
@@ -3809,6 +3910,12 @@
           }
         ]
       },
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/eclipse-ee4j/jaxb-ri.git"
+        }
+      ],
       "group": "org.glassfish.jaxb",
       "hashes": [
         {
@@ -3831,30 +3938,7 @@
       "licenses": [
         {
           "license": {
-            "id": "BSD-3-Clause",
-            "properties": [
-              {
-                "name": "cdx:license:category",
-                "value": "Permissive"
-              },
-              {
-                "name": "cdx:license:foss",
-                "value": "true"
-              },
-              {
-                "name": "cdx:license:osiApproved",
-                "value": "true"
-              },
-              {
-                "name": "cdx:license:fsfLibre",
-                "value": "true"
-              },
-              {
-                "name": "cdx:license:deprecated",
-                "value": "false"
-              }
-            ],
-            "url": "https://opensource.org/licenses/BSD-3-Clause"
+            "id": "BSD-3-Clause"
           }
         }
       ],
@@ -3862,7 +3946,7 @@
       "properties": [
         {
           "name": "cdx:license:category",
-          "value": "Permissive"
+          "value": "Unstated License"
         },
         {
           "name": "internal:SrcFile",
@@ -3881,6 +3965,10 @@
           "value": "Both are permissive; keep the notices."
         },
         {
+          "name": "bomlens:supplierSource",
+          "value": "publisher"
+        },
+        {
           "name": "bsi:component:filename",
           "value": "jaxb-runtime-4.0.2.jar"
         },
@@ -3889,8 +3977,12 @@
           "value": "maven-groupid"
         }
       ],
+      "publisher": "Eclipse Foundation",
       "purl": "pkg:maven/org.glassfish.jaxb/jaxb-runtime@4.0.2?type=jar",
       "scope": "required",
+      "supplier": {
+        "name": "Eclipse Foundation"
+      },
       "type": "library",
       "version": "4.0.2",
       "cpe": "cpe:2.3:a:glassfish:jaxb:4.0.2:*:*:*:*:*:*:*"
@@ -3914,6 +4006,12 @@
           }
         ]
       },
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/eclipse-ee4j/jaxb-ri.git"
+        }
+      ],
       "group": "org.glassfish.jaxb",
       "hashes": [
         {
@@ -3936,30 +4034,7 @@
       "licenses": [
         {
           "license": {
-            "id": "BSD-3-Clause",
-            "properties": [
-              {
-                "name": "cdx:license:category",
-                "value": "Permissive"
-              },
-              {
-                "name": "cdx:license:foss",
-                "value": "true"
-              },
-              {
-                "name": "cdx:license:osiApproved",
-                "value": "true"
-              },
-              {
-                "name": "cdx:license:fsfLibre",
-                "value": "true"
-              },
-              {
-                "name": "cdx:license:deprecated",
-                "value": "false"
-              }
-            ],
-            "url": "https://opensource.org/licenses/BSD-3-Clause"
+            "id": "BSD-3-Clause"
           }
         }
       ],
@@ -3967,7 +4042,7 @@
       "properties": [
         {
           "name": "cdx:license:category",
-          "value": "Permissive"
+          "value": "Unstated License"
         },
         {
           "name": "internal:SrcFile",
@@ -3986,6 +4061,10 @@
           "value": "Both are permissive; keep the notices."
         },
         {
+          "name": "bomlens:supplierSource",
+          "value": "publisher"
+        },
+        {
           "name": "bsi:component:filename",
           "value": "txw2-4.0.2.jar"
         },
@@ -3994,8 +4073,12 @@
           "value": "maven-groupid"
         }
       ],
+      "publisher": "Eclipse Foundation",
       "purl": "pkg:maven/org.glassfish.jaxb/txw2@4.0.2?type=jar",
       "scope": "required",
+      "supplier": {
+        "name": "Eclipse Foundation"
+      },
       "tags": [
         "xml"
       ],
@@ -4429,6 +4512,10 @@
           "value": "Both are permissive; keep the notices."
         },
         {
+          "name": "bomlens:supplierSource",
+          "value": "publisher"
+        },
+        {
           "name": "bsi:component:filename",
           "value": "jboss-logging-3.5.0.Final.jar"
         },
@@ -4437,8 +4524,12 @@
           "value": "maven-groupid"
         }
       ],
+      "publisher": "JBoss by Red Hat",
       "purl": "pkg:maven/org.jboss.logging/jboss-logging@3.5.0.Final?type=jar",
       "scope": "required",
+      "supplier": {
+        "name": "JBoss by Red Hat"
+      },
       "tags": [
         "framework",
         "logging"
@@ -4576,6 +4667,12 @@
           }
         ]
       },
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/qos-ch/slf4j"
+        }
+      ],
       "group": "org.slf4j",
       "hashes": [
         {
@@ -4598,19 +4695,42 @@
       "licenses": [
         {
           "license": {
-            "id": "MIT"
+            "id": "MIT",
+            "properties": [
+              {
+                "name": "cdx:license:category",
+                "value": "Permissive"
+              },
+              {
+                "name": "cdx:license:foss",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:osiApproved",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:fsfLibre",
+                "value": "true"
+              },
+              {
+                "name": "cdx:license:deprecated",
+                "value": "false"
+              }
+            ],
+            "url": "https://opensource.org/licenses/MIT"
           }
         }
       ],
       "name": "jul-to-slf4j",
       "properties": [
         {
-          "name": "internal:SrcFile",
-          "value": "pom.xml"
+          "name": "cdx:license:category",
+          "value": "Permissive"
         },
         {
-          "name": "bomlens:licenseSource",
-          "value": "parent POM"
+          "name": "internal:SrcFile",
+          "value": "pom.xml"
         },
         {
           "name": "bomlens:licenseClass",
@@ -6927,7 +7047,7 @@
                 "value": "false"
               }
             ],
-            "url": "https://github.com/spring-projects/spring-data-jpa/blob/main/LICENSE.txt"
+            "url": "https://opensource.org/licenses/Apache-2.0"
           }
         }
       ],
@@ -6954,6 +7074,10 @@
           "value": "Both are permissive; keep the notices."
         },
         {
+          "name": "bomlens:supplierSource",
+          "value": "publisher"
+        },
+        {
           "name": "bsi:component:filename",
           "value": "spring-data-jpa-3.3.5.jar"
         },
@@ -6966,8 +7090,12 @@
           "value": "[\"cpe:2.3:a:pivotal_software:spring_framework:3.3.5:*:*:*:*:*:*:*\", \"cpe:2.3:a:springsource:spring_framework:3.3.5:*:*:*:*:*:*:*\"]"
         }
       ],
+      "publisher": "Pivotal Software, Inc.",
       "purl": "pkg:maven/org.springframework.data/spring-data-jpa@3.3.5?type=jar",
       "scope": "required",
+      "supplier": {
+        "name": "Pivotal Software, Inc."
+      },
       "tags": [
         "framework"
       ],
@@ -9370,7 +9498,7 @@
         "value": "unknown-to-author"
       }
     ],
-    "timestamp": "2026-10-26T10:52:07Z",
+    "timestamp": "2026-10-26T16:56:30Z",
     "tools": {
       "components": [
         {
@@ -9379,24 +9507,24 @@
               "name": "OWASP Foundation"
             }
           ],
-          "bom-ref": "pkg:npm/@cdxgen/cdxgen@13.3.0",
+          "bom-ref": "pkg:npm/@cdxgen/cdxgen@13.5.0",
           "group": "@cdxgen",
           "name": "cdxgen",
           "publisher": "OWASP Foundation",
-          "purl": "pkg:npm/%40cdxgen/cdxgen@13.3.0",
+          "purl": "pkg:npm/%40cdxgen/cdxgen@13.5.0",
           "type": "application",
-          "version": "13.3.0"
+          "version": "13.5.0"
         },
         {
           "name": "BomLens",
           "publisher": "SK Telecom",
           "type": "application",
-          "version": "1.14.2"
+          "version": "1.14.3"
         }
       ]
     }
   },
-  "serialNumber": "urn:uuid:fdc4fbd1-316c-46e1-ba69-08ae70f05392",
+  "serialNumber": "urn:uuid:d557bb31-8b21-465f-8f57-0395472662cb",
   "services": [],
   "specVersion": "1.6",
   "version": 1,
