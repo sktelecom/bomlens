@@ -14,7 +14,7 @@
 # Each version is the lowest release that clears the alert and is at least
 # 14 days old (renovate.json minimumReleaseAge), checked against the GitHub
 # Advisory Database before it was added.
-aiohttp==3.14.3  # replaces aiohttp==3.13.5 (CVE-2026-69244 and older aiohttp advisories)
+aiohttp==3.14.5  # replaces aiohttp==3.13.5 (CVE-2026-69244 and older aiohttp advisories)
 anyio==4.14.2  # replaces anyio==4.13.0 (CVE-2026-63374, CVE-2026-64847)
 datasets==5.0.1  # replaces datasets==4.8.4 (CVE-2026-66007; datasets 4.x caps fsspec at 2026.2.0)
 fsspec==2026.6.0  # replaces fsspec==2026.2.0 (CVE-2026-104851)
