@@ -4,7 +4,7 @@
     "version": "1.3.0"
   },
   "engine": {
-    "version": "1.14.2",
+    "version": "1.14.3",
     "image": null,
     "image_digest": null
   },
@@ -16,8 +16,8 @@
   "run": {
     "status": "succeeded",
     "reason": null,
-    "started_at": "2026-10-26T10:50:08Z",
-    "ended_at": "2026-10-26T10:50:16Z",
+    "started_at": "2026-10-26T16:54:57Z",
+    "ended_at": "2026-10-26T16:55:08Z",
     "exit_code": 0
   },
   "steps": [
@@ -26,8 +26,8 @@
       "status": "ok",
       "reason": null,
       "detail": null,
-      "started_at": "2026-10-26T10:50:08Z",
-      "ended_at": "2026-10-26T10:50:08Z",
+      "started_at": "2026-10-26T16:54:57Z",
+      "ended_at": "2026-10-26T16:54:58Z",
       "stage": 2
     },
     {
@@ -35,8 +35,8 @@
       "status": "ok",
       "reason": null,
       "detail": null,
-      "started_at": "2026-10-26T10:50:08Z",
-      "ended_at": "2026-10-26T10:50:08Z",
+      "started_at": "2026-10-26T16:54:58Z",
+      "ended_at": "2026-10-26T16:54:58Z",
       "stage": 2
     },
     {
@@ -44,8 +44,8 @@
       "status": "ok",
       "reason": null,
       "detail": null,
-      "started_at": "2026-10-26T10:50:08Z",
-      "ended_at": "2026-10-26T10:50:08Z",
+      "started_at": "2026-10-26T16:54:57Z",
+      "ended_at": "2026-10-26T16:54:58Z",
       "counts": {
         "components": 39
       },
@@ -56,8 +56,8 @@
       "status": "ok",
       "reason": null,
       "detail": null,
-      "started_at": "2026-10-26T10:50:08Z",
-      "ended_at": "2026-10-26T10:50:08Z",
+      "started_at": "2026-10-26T16:54:58Z",
+      "ended_at": "2026-10-26T16:54:58Z",
       "stage": 2
     },
     {
@@ -65,8 +65,8 @@
       "status": "disabled",
       "reason": null,
       "detail": null,
-      "started_at": "2026-10-26T10:50:08Z",
-      "ended_at": "2026-10-26T10:50:08Z",
+      "started_at": "2026-10-26T16:54:58Z",
+      "ended_at": "2026-10-26T16:54:58Z",
       "stage": 2
     },
     {
@@ -74,8 +74,8 @@
       "status": "ok",
       "reason": null,
       "detail": null,
-      "started_at": "2026-10-26T10:50:08Z",
-      "ended_at": "2026-10-26T10:50:08Z",
+      "started_at": "2026-10-26T16:54:58Z",
+      "ended_at": "2026-10-26T16:54:58Z",
       "stage": 2
     },
     {
@@ -83,8 +83,8 @@
       "status": "ok",
       "reason": null,
       "detail": null,
-      "started_at": "2026-10-26T10:50:08Z",
-      "ended_at": "2026-10-26T10:50:08Z",
+      "started_at": "2026-10-26T16:54:58Z",
+      "ended_at": "2026-10-26T16:54:58Z",
       "stage": 2
     },
     {
@@ -92,8 +92,8 @@
       "status": "ok",
       "reason": null,
       "detail": null,
-      "started_at": "2026-10-26T10:50:08Z",
-      "ended_at": "2026-10-26T10:50:08Z",
+      "started_at": "2026-10-26T16:54:58Z",
+      "ended_at": "2026-10-26T16:54:58Z",
       "stage": 2
     },
     {
@@ -101,8 +101,8 @@
       "status": "ok",
       "reason": null,
       "detail": null,
-      "started_at": "2026-10-26T10:50:08Z",
-      "ended_at": "2026-10-26T10:50:08Z",
+      "started_at": "2026-10-26T16:54:58Z",
+      "ended_at": "2026-10-26T16:54:58Z",
       "stage": 2
     },
     {
@@ -110,8 +110,8 @@
       "status": "ok",
       "reason": null,
       "detail": null,
-      "started_at": "2026-10-26T10:50:08Z",
-      "ended_at": "2026-10-26T10:50:08Z",
+      "started_at": "2026-10-26T16:54:58Z",
+      "ended_at": "2026-10-26T16:54:58Z",
       "stage": 2
     },
     {
@@ -119,8 +119,8 @@
       "status": "ok",
       "reason": null,
       "detail": null,
-      "started_at": "2026-10-26T10:50:08Z",
-      "ended_at": "2026-10-26T10:50:08Z",
+      "started_at": "2026-10-26T16:54:58Z",
+      "ended_at": "2026-10-26T16:54:58Z",
       "stage": 2
     },
     {
@@ -128,8 +128,8 @@
       "status": "ok",
       "reason": null,
       "detail": null,
-      "started_at": "2026-10-26T10:50:08Z",
-      "ended_at": "2026-10-26T10:50:08Z",
+      "started_at": "2026-10-26T16:54:58Z",
+      "ended_at": "2026-10-26T16:54:58Z",
       "stage": 2
     },
     {
@@ -137,8 +137,8 @@
       "status": "ok",
       "reason": null,
       "detail": null,
-      "started_at": "2026-10-26T10:50:08Z",
-      "ended_at": "2026-10-26T10:50:09Z",
+      "started_at": "2026-10-26T16:54:58Z",
+      "ended_at": "2026-10-26T16:54:59Z",
       "stage": 2
     },
     {
@@ -146,8 +146,8 @@
       "status": "disabled",
       "reason": null,
       "detail": null,
-      "started_at": "2026-10-26T10:50:09Z",
-      "ended_at": "2026-10-26T10:50:09Z",
+      "started_at": "2026-10-26T16:54:59Z",
+      "ended_at": "2026-10-26T16:54:59Z",
       "stage": 2
     },
     {
@@ -155,8 +155,8 @@
       "status": "ok",
       "reason": null,
       "detail": null,
-      "started_at": "2026-10-26T10:50:09Z",
-      "ended_at": "2026-10-26T10:50:09Z",
+      "started_at": "2026-10-26T16:54:59Z",
+      "ended_at": "2026-10-26T16:54:59Z",
       "stage": 2
     },
     {
@@ -164,8 +164,8 @@
       "status": "ok",
       "reason": null,
       "detail": null,
-      "started_at": "2026-10-26T10:50:09Z",
-      "ended_at": "2026-10-26T10:50:09Z",
+      "started_at": "2026-10-26T16:54:59Z",
+      "ended_at": "2026-10-26T16:54:59Z",
       "stage": 2
     },
     {
@@ -173,8 +173,8 @@
       "status": "ok",
       "reason": null,
       "detail": null,
-      "started_at": "2026-10-26T10:50:09Z",
-      "ended_at": "2026-10-26T10:50:15Z",
+      "started_at": "2026-10-26T16:54:59Z",
+      "ended_at": "2026-10-26T16:55:06Z",
       "stage": 2
     },
     {
@@ -182,8 +182,8 @@
       "status": "disabled",
       "reason": null,
       "detail": null,
-      "started_at": "2026-10-26T10:50:15Z",
-      "ended_at": "2026-10-26T10:50:15Z",
+      "started_at": "2026-10-26T16:55:06Z",
+      "ended_at": "2026-10-26T16:55:06Z",
       "stage": 2
     },
     {
@@ -191,8 +191,8 @@
       "status": "ok",
       "reason": null,
       "detail": null,
-      "started_at": "2026-10-26T10:50:15Z",
-      "ended_at": "2026-10-26T10:50:15Z",
+      "started_at": "2026-10-26T16:55:06Z",
+      "ended_at": "2026-10-26T16:55:06Z",
       "stage": 2
     },
     {
@@ -200,8 +200,8 @@
       "status": "disabled",
       "reason": null,
       "detail": null,
-      "started_at": "2026-10-26T10:50:15Z",
-      "ended_at": "2026-10-26T10:50:15Z",
+      "started_at": "2026-10-26T16:55:06Z",
+      "ended_at": "2026-10-26T16:55:06Z",
       "stage": 2
     }
   ],
@@ -216,8 +216,8 @@
   "data_sources": {
     "trivy_db": {
       "schema_version": 2,
-      "updated_at": "2026-10-26T07:15:18.945937093Z",
-      "downloaded_at": "2026-10-26T10:50:13.453938468Z"
+      "updated_at": "2026-10-26T14:38:04.845305817Z",
+      "downloaded_at": "2026-10-26T16:55:04.097142667Z"
     }
   },
   "outputs": [
@@ -236,49 +236,49 @@
     {
       "role": "other",
       "path": "FlaskDataService_3.2.0_NOTICE.txt",
-      "sha256": "efe6de4b1e1d8343984cd61678aa7d1c3a622e23c40a8f060da32bf1b149c22b",
+      "sha256": "f9427f1dcb9609d26ec97d04d624497f60d9b8439cb7c14926e11efaaf972997",
       "bytes": 34174
     },
     {
       "role": "other",
       "path": "FlaskDataService_3.2.0_NOTICE.html",
-      "sha256": "ba4820d01d0aef50d800ab8a9c64bb6a90965e1045ee62e70a9a6364e659547f",
+      "sha256": "1e8d8e582f676086f4066d1f299032b8d2fe799388867e4c5802c21007253ff6",
       "bytes": 54632
     },
     {
       "role": "vulnerabilities.all",
       "path": "FlaskDataService_3.2.0_security.json",
-      "sha256": "d081ecab89c1fdff8d517836dcb51ded0df85aea2d35fea0cbbff43228615eea",
-      "bytes": 113370
+      "sha256": "da79994d42337744261450164290ac2ec0f711c28bf0cb5d3cf933b16d87a661",
+      "bytes": 113563
     },
     {
       "role": "other",
       "path": "FlaskDataService_3.2.0_security.md",
-      "sha256": "6b28e38e72dfb6350e6570b7a0b3484a28dcc70b82e4ad6e51e6fcbc50b1d1f7",
+      "sha256": "474234ba0fc0a71325694f016cfe6f73d2c6eee2d9f1358e09698c2500bb391a",
       "bytes": 2214
     },
     {
       "role": "other",
       "path": "FlaskDataService_3.2.0_security.html",
-      "sha256": "dd9db76a7cb6a6cdb9624772cb58a960f5079d8d1756d47d645c8b6641bbed61",
+      "sha256": "3417830be69b8e588a6f27dde9b19baf8fe1601a50b30cb6ecc18c11649533f8",
       "bytes": 22979
     },
     {
       "role": "conformance",
       "path": "FlaskDataService_3.2.0_conformance.json",
-      "sha256": "62e72878bc22f02762d291b46d1d07a1bbadb0fbee46c7d9ae9d59d535445d60",
+      "sha256": "3afc77f03fb58c7f27883c0bcbd86239b49bae879f5f79932a438d42614c58d6",
       "bytes": 47635
     },
     {
       "role": "other",
       "path": "FlaskDataService_3.2.0_conformance.md",
-      "sha256": "7cdf4cd00a6f245402dc6b8e8308a69bdfbd7dcbbb246a5059e36c42b9fda1b6",
+      "sha256": "99d111e4ce8719142b1a5148f9b6e50ea2f471c7f70aa3f376446d4b0447663d",
       "bytes": 10400
     },
     {
       "role": "other",
       "path": "FlaskDataService_3.2.0_conformance.html",
-      "sha256": "a282454cfcc9486de4a8d380e98635adfc8e7e33be821ee46cb737e5a20fce6f",
+      "sha256": "47f86ebfcb9f688e9bc7261823ea591d18ceb07104a83fafc70db16cd1cabe65",
       "bytes": 32641
     },
     {
@@ -296,13 +296,13 @@
     {
       "role": "other",
       "path": "FlaskDataService_3.2.0_risk-report.md",
-      "sha256": "521d04c0b94e04a736c2592b2c0473f2860f0e98473bc2360ebefec61879ff94",
+      "sha256": "863e8dcf5debc754c2870610cab952ac43003814476d13c71d11ae606dd0d5b3",
       "bytes": 3111
     },
     {
       "role": "other",
       "path": "FlaskDataService_3.2.0_risk-report.html",
-      "sha256": "6a00c2d475973c3e8052a856296e089e0e06f28360c1c6604efaa305e0269eda",
+      "sha256": "6f3d216caf49dc46201bd8a13907d1b1880883fe8d29075e6f3d3fb9e40d07b3",
       "bytes": 21168
     },
     {
@@ -314,8 +314,8 @@
     {
       "role": "vulnerabilities.trivy",
       "path": "FlaskDataService_3.2.0_security.json",
-      "sha256": "d081ecab89c1fdff8d517836dcb51ded0df85aea2d35fea0cbbff43228615eea",
-      "bytes": 113370
+      "sha256": "da79994d42337744261450164290ac2ec0f711c28bf0cb5d3cf933b16d87a661",
+      "bytes": 113563
     }
   ]
 }
