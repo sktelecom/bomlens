@@ -11,7 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
-- The AIBOM image installs Node.js 24.22.1, the firmware image brotli 1.2.1, and the Android SDK image builds on cdxgen-temurin-java21 13.5.0 (Node.js 24.22.1), for CVE-2026-111497 in the Brotli decoder.
+- The AIBOM image installs Node.js 24.22.1 and the firmware image brotli 1.2.1, for CVE-2026-111497 in the Brotli decoder.
 
 ## [v1.14.1] - 2026-10-24
 
