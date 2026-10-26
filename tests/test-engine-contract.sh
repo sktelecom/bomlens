@@ -697,7 +697,7 @@ P="$(plan_run node "$PSRC")"
 [ -f "$P/bomlens-plan.json" ] && pass "MODE=PLAN writes bomlens-plan.json" || fail "no plan" "$(tail -5 "$P.log")"
 err="$(plan_schema_errors "$P/bomlens-plan.json")"
 [ -z "$err" ] && pass "the plan validates against schemas/engine-plan-1.json" || fail "plan schema errors" "$err"
-[ "$(jq -r '.status + " " + .input.detected_ecosystem + " " + .stages[0].image' "$P/bomlens-plan.json")" = "ok node ghcr.io/cdxgen/cdxgen-alpine-node24:13.3.0" ] \
+[ "$(jq -r '.status + " " + .input.detected_ecosystem + " " + .stages[0].image' "$P/bomlens-plan.json")" = "ok node ghcr.io/cdxgen/cdxgen-alpine-node24:13.5.0" ] \
     && pass "a Node.js source plans the cdxgen Node.js image" || fail "plan: $(jq -c '[.status, .input, .stages[0].image]' "$P/bomlens-plan.json")"
 [ "$(jq -r '.stages[0].image_digest' "$P/bomlens-plan.json")" = "$(jq -r '.digests["ghcr.io/cdxgen/cdxgen-alpine-node24"]' "$ROOT_DIR/docker/lib/cdxgen-images.json")" ] \
     && pass "stage 1 is pinned by digest" || fail "stage 1 digest is $(jq -r '.stages[0].image_digest' "$P/bomlens-plan.json")"

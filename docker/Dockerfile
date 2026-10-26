@@ -241,7 +241,7 @@ ARG AIBOM_GENERATOR_REF=c5a3f2f647b801ab4ab7569aade4a6cdaf1f9591
 # harvest model pedigree / performance metrics that the OWASP tool omits. Opt-in
 # with the aibom image only; enrich-aibom.sh degrades gracefully when it is absent.
 # renovate: datasource=npm depName=@cdxgen/cdxgen
-ARG CDXGEN_VERSION=13.3.0
+ARG CDXGEN_VERSION=13.5.0
 # cdxgen 13 requires Node.js >= 24; Debian's own nodejs package (bundled in the
 # python:3.12-slim base) is still on the 20.x line, so Node is installed from
 # the official upstream release tarball instead of apt. Pinned like syft/trivy/

@@ -38,7 +38,7 @@ It is a lightweight image (based on python 3.12 slim) without language toolchain
 | ScanCode Toolkit | 32.5.0 | Precise license detection (included only in opt-in builds) |
 | SCANOSS | 1.54.2 | Identifies open source copied into C/C++ source (`--identify-vendored`) |
 | docker CLI | 29.9.0 | Starts a sibling cdxgen container when the web UI runs a source scan |
-| cdxgen | 13.3.0 | Model pedigree enrichment (`bomlens-aibom` image only) |
+| cdxgen | 13.5.0 | Model pedigree enrichment (`bomlens-aibom` image only) |
 
 Tool versions are pinned with `ARG` in `docker/Dockerfile`.
 

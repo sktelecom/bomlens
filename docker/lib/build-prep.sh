@@ -2146,7 +2146,7 @@ fi
 # when nothing else reaches it: the walk starts from the root and from every
 # component outside that set, and skips only the edges from the root into a
 # marked component (npm markers: from a workspace member too, since cdxgen
-# 13.3.0 computes them over the whole workspace, so a package any member's
+# 13.5.0 computes them over the whole workspace, so a package any member's
 # production dependencies reach is not marked). An edge from a member into a
 # component with any other marker is followed, so what a Cargo or uv workspace
 # member lists, its dev-dependencies and dependency groups included, stays.
