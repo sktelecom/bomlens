@@ -17,10 +17,13 @@ What a result says, and how far to trust it:
                  When several fit (mbed TLS builds that leave the version out, for one), the
                  component is reported without a version and `bomlens:versionCandidates` lists them,
                  so nothing is matched against a release nobody could pick.
-  newer          `bomlens:versionMayBeNewer` marks a result that is the newest release the
-                 database has. The shipped version can be newer; reading it as exact would hide
-                 that. The measured failure of this kind of identification is a version that is not
-                 in the database coming back as its nearest neighbour.
+  newer          When the one release that fits is the newest the database has, the shipped version
+                 can be newer, and a version that is not in the database comes back as its nearest
+                 neighbour (a measured failure: zlib 1.2.13 read as 1.2.11 and matched against four
+                 vulnerabilities it does not have). The component is then reported without a version,
+                 with `bomlens:versionMayBeNewer` and the release as `bomlens:versionCandidates`, and
+                 lands in the component-versions template for the supplier to fill. Set
+                 FW_BINKB_TRUST_NEWEST=true to write the version anyway, with the same marker.
   presence only  A component found by constant tables alone has no version.
 
 A review file (FW_BINARY_KB_DECISIONS, a JSON list) records what a person decided about a result:
@@ -111,6 +114,7 @@ def main():
         print("[]")
         return 0
     include_other = os.environ.get("FW_BINKB_NONELF", "") == "true"
+    trust_newest = os.environ.get("FW_BINKB_TRUST_NEWEST", "") == "true"
     decisions = load_decisions(os.environ.get("FW_BINARY_KB_DECISIONS", ""))
 
     # component -> best result and the files it was found in
@@ -168,14 +172,19 @@ def main():
             props.append({"name": "bomlens:kbScore", "value": str(hit["score"])})
             props.append({"name": "bomlens:kbUniqueStrings", "value": str(hit["unique"])})
             cands = hit["versions"]
-            if len(cands) == 1:
+            if len(cands) == 1 and (trust_newest or not hit["latest"]):
                 version = cands[0]
                 props.append({"name": "bomlens:versionBasis", "value": "kb-release-strings"})
                 if hit["latest"]:
                     props.append({"name": "bomlens:versionMayBeNewer", "value": "true"})
             elif cands:
+                # Several releases fit, or the one that fits is the newest the base has. In the second
+                # case the shipped version can be newer, and a version nobody read would be matched
+                # against vulnerabilities that a newer release has already fixed.
                 props.append({"name": "bomlens:versionCandidates", "value": ",".join(cands[:50])})
-                props.append({"name": "bomlens:versionRange", "value": f"{cands[0]}..{cands[-1]}"})
+                props.append({"name": "bomlens:versionRange", "value": f"{cands[0]}..{cands[-1]}" if len(cands) > 1 else f"{cands[0]} or later"})
+                if hit["latest"]:
+                    props.append({"name": "bomlens:versionMayBeNewer", "value": "true"})
         props.append({"name": "bomlens:kbEvidenceFile", "value": b["file"]})
         props.append({"name": "bomlens:kbEvidenceSha256", "value": b["sha256"]})
         if hit and hit.get("sample"):

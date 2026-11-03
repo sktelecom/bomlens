@@ -100,10 +100,15 @@ if [ -z "$(prop "$out" bomlens:versionMayBeNewer)" ]; then
 else fail "a middle release was marked as possibly newer"; fi
 
 out="$(ident newest)"
-if [ "$(jq -r '.[] | select(.name == "alpha") | .version' <<<"$out")" = "1.2" ] \
-   && [ "$(prop "$out" bomlens:versionMayBeNewer)" = "true" ]; then
-    pass "the newest release the base has is marked bomlens:versionMayBeNewer"
-else fail "the newest release was not marked" "$out"; fi
+if [ "$(jq -r '.[] | select(.name == "alpha") | has("version")' <<<"$out")" = "false" ] \
+   && [ "$(prop "$out" bomlens:versionMayBeNewer)" = "true" ] && [ "$(prop "$out" bomlens:versionCandidates)" = "1.2" ] \
+   && [ "$(prop "$out" bomlens:evidenceGrade)" = "presence-only" ]; then
+    pass "the newest release the base has is not written as the version: it may be newer, so the supplier is asked"
+else fail "the newest release was written as a version" "$out"; fi
+out="$(ident newest FW_BINKB_TRUST_NEWEST=true)"
+if [ "$(jq -r '.[] | select(.name == "alpha") | .version' <<<"$out")" = "1.2" ] && [ "$(prop "$out" bomlens:versionMayBeNewer)" = "true" ]; then
+    pass "FW_BINKB_TRUST_NEWEST=true writes that version, still marked"
+else fail "the override did not write the version" "$out"; fi
 
 out="$(ident only-core)"
 if [ "$(jq -r '.[] | select(.name == "alpha") | has("version")' <<<"$out")" = "false" ] \

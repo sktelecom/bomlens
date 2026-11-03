@@ -126,7 +126,7 @@ python3 docker/lib/binarykb.py build --kb kb.csv --bg ./background-tarballs \
 결과에 담기는 것은 다음과 같다.
 
 - 베이스에서 맞는 릴리스가 정확히 하나일 때만 `version`을 쓴다. 여럿이 맞으면 버전 없이 보고하고 `bomlens:versionCandidates`와 `bomlens:versionRange`에 후보를 적는다. 아무도 고를 수 없는 릴리스에 취약점을 대조하지 않기 위해서다.
-- `bomlens:versionMayBeNewer`는 베이스가 가진 가장 새 릴리스로 나온 결과에 붙는다. 베이스에 없는 버전은 가장 가까운 이웃으로 나오고, 베이스의 모든 릴리스보다 새 버전이면 그 이웃은 마지막 릴리스다. 이런 버전은 "이 릴리스 이상"으로 읽는다.
+- 맞는 릴리스가 하나이고 그것이 베이스가 가진 가장 새 릴리스이면, 버전 없이 보고하고 `bomlens:versionMayBeNewer`를 붙이며 그 릴리스를 `bomlens:versionCandidates`에 적는다. 베이스에 없는 버전은 가장 가까운 이웃으로 나오고, 베이스의 모든 릴리스보다 새 버전이면 그 이웃은 마지막 릴리스다. 이것을 버전으로 쓰면 더 새 릴리스가 이미 고친 취약점에 대조하게 된다. 이런 컴포넌트는 버전 보충용 템플릿에 들어가 직접 채우게 한다. `FW_BINKB_TRUST_NEWEST=true`를 주면 버전을 그대로 쓰되 표시는 남긴다.
 - `bomlens:identifiedBy`는 `binary-kb`이고, 근거로 `bomlens:kbRelease`, `bomlens:kbScore`, `bomlens:kbUniqueStrings`(또는 `bomlens:kbTables`)와 찾은 파일(`evidence.occurrences`)이 붙는다.
 - 상수 테이블로만 찾은 컴포넌트는 버전이 없고 `presence-only`로 표시한다.
 

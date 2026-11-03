@@ -65,7 +65,7 @@ def items_of(bom):
             sample = []
         cands = [x for x in props.get("bomlens:versionCandidates", "").split(",") if x]
         reasons = []
-        if not c.get("version") and cands:
+        if not c.get("version") and len(cands) > 1:
             reasons.append("range")
         if props.get("bomlens:versionMayBeNewer") == "true":
             reasons.append("newer")
@@ -151,7 +151,7 @@ details.auto summary { cursor:pointer; padding:6px 10px; color:var(--muted); }
     if (i.reasons.indexOf('tables') >= 0) out.push(T.why_tables);
     return out.length ? out.join(' ') : T.why_ok;
   }
-  function verText(i) { return i.version || (i.candidates.length ? i.candidates[0] + '..' + i.candidates[i.candidates.length - 1] : T.none); }
+  function verText(i) { return i.version || (i.candidates.length > 1 ? i.candidates[0] + '..' + i.candidates[i.candidates.length - 1] : (i.candidates.length ? i.candidates[0] + '+' : T.none)); }
   function order() { return items.map(function (_, n) { return n; }); }
   function todo() { return items.filter(function (i, n) { return need(i) && !decisions[n] && !i.reviewed; }).length; }
   function render() {
