@@ -354,6 +354,13 @@ jobs:
       - name: Firmware unpack unit tests
         run: bash tests/test-firmware-unpack.sh
 
+      # No Docker: guards the binary knowledge base layer. A version is written only
+      # when one release fits, the newest release the base has is marked (a version
+      # newer than the base comes back as that release), shared code is credited to
+      # the component it came from, and ELF files of every class and byte order read.
+      - name: Binary knowledge base unit tests
+        run: bash tests/test-binary-kb.sh
+
       # No Docker (docker itself is stubbed): guards SBOM_PULL/ensure_image_fresh.
       # `docker run` only auto-pulls a MISSING image, so a once-pulled :latest
       # was reused forever even after the registry published a newer image.
