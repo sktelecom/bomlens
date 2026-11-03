@@ -140,6 +140,14 @@ What a result carries:
 - `bomlens:identifiedBy` is `binary-kb`, with `bomlens:kbRelease`, `bomlens:kbScore` and `bomlens:kbUniqueStrings` (or `bomlens:kbTables`) as the evidence, and the files it was found in as `evidence.occurrences`.
 - A component found only by constant tables has no version and is tagged `presence-only`.
 
+A review page turns the results into a queue to decide. It is one HTML file that loads nothing from the network:
+
+```bash
+python3 docker/lib/binary-kb-review.py device-fw_1.0.0/device-fw_1.0.0_bom.json --lang en > kb-review.html
+```
+
+The components that need a decision come first: no single release fits, the version may be newer than the base knows, or only constant tables matched. The ones whose evidence is clear are listed but folded. Each result shows its score, the files it was found in, the longest strings that matched and the hash of the evidence file. Press `1` to confirm, `2` to exclude, `3` to correct the version (both ask for a reason), `4` to decide later, `j` and `k` to move and `u` to undo. **Download decisions** writes the file below; what you decided stays in the browser while the tab is open.
+
 A person can record a decision about a result in a JSON file and pass it with `--kb-decisions`:
 
 ```json

@@ -176,6 +176,10 @@ def main():
             elif cands:
                 props.append({"name": "bomlens:versionCandidates", "value": ",".join(cands[:50])})
                 props.append({"name": "bomlens:versionRange", "value": f"{cands[0]}..{cands[-1]}"})
+        props.append({"name": "bomlens:kbEvidenceFile", "value": b["file"]})
+        props.append({"name": "bomlens:kbEvidenceSha256", "value": b["sha256"]})
+        if hit and hit.get("sample"):
+            props.append({"name": "bomlens:kbEvidenceStrings", "value": json.dumps(hit["sample"], ensure_ascii=False)})
         if b["tables"]:
             props.append({"name": "bomlens:kbTables", "value": f"{b['tables'][0]} tables, {b['tables'][1]} bytes"})
         if version is None:

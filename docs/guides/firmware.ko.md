@@ -130,6 +130,14 @@ python3 docker/lib/binarykb.py build --kb kb.csv --bg ./background-tarballs \
 - `bomlens:identifiedBy`는 `binary-kb`이고, 근거로 `bomlens:kbRelease`, `bomlens:kbScore`, `bomlens:kbUniqueStrings`(또는 `bomlens:kbTables`)와 찾은 파일(`evidence.occurrences`)이 붙는다.
 - 상수 테이블로만 찾은 컴포넌트는 버전이 없고 `presence-only`로 표시한다.
 
+검토 화면은 결과를 판정할 대기열로 바꿔 준다. 네트워크에서 아무것도 불러오지 않는 HTML 파일 하나다.
+
+```bash
+python3 docker/lib/binary-kb-review.py device-fw_1.0.0/device-fw_1.0.0_bom.json --lang ko > kb-review.html
+```
+
+판정이 필요한 컴포넌트가 먼저 나온다. 맞는 릴리스가 하나로 정해지지 않은 것, 실제 버전이 베이스가 아는 것보다 새것일 수 있는 것, 상수 테이블로만 찾은 것이다. 근거가 분명한 것은 목록에 있지만 접혀 있다. 결과마다 점수, 찾은 파일, 맞은 문자열(긴 순), 근거 파일의 해시를 보여 준다. `1`은 맞음, `2`는 제외, `3`은 버전 정정(둘 다 사유를 묻는다), `4`는 나중에, `j`와 `k`는 이동, `u`는 되돌리기다. **판정 파일 내려받기**는 아래 형식의 파일을 쓰고, 탭이 열려 있는 동안 판정한 내용은 브라우저에 남는다.
+
 결과에 대해 사람이 내린 판정은 JSON 파일에 적어 `--kb-decisions`로 넘긴다.
 
 ```json

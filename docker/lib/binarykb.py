@@ -373,7 +373,9 @@ class KnowledgeBase:
             cands = [vers[b] for b in range(len(vers)) if counts[b] == best] if best else []
             result[name] = {'score': round(score[p], 1), 'unique': unique[p], 'versions': cands, 'n': len(assigned[p]), 'best': best,
                             # the candidates reach the newest release the database has: the shipped one may be newer
-                            'latest': bool(cands) and vers[-1] in cands}
+                            'latest': bool(cands) and vers[-1] in cands,
+                            # the longest strings that matched, as evidence a person can check against the file
+                            'sample': [t[:80] for t in (x.decode('latin-1').strip() for x in sorted(assigned[p], key=lambda x: (-len(x), x))[:12]) if t][:8]}
         return result
 
     def table_hits(self, data):

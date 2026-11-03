@@ -134,6 +134,13 @@ if jq -e '.[0] | (.["bom-ref"] | startswith("binary-kb:")) and .type == "library
     pass "a result names its pass, the base release and the files it was found in, and invents no purl"
 else fail "the component record is malformed" "$out"; fi
 
+if jq -e --arg sha "$(python3 -c 'import hashlib,sys;print(hashlib.sha256(open(sys.argv[1],"rb").read()).hexdigest())' "$TMP/root-release-1.1/usr/bin/prog")" \
+      '.[0] | ([.properties[] | select(.name == "bomlens:kbEvidenceSha256" and .value == $sha)] | length == 1)
+            and ([.properties[] | select(.name == "bomlens:kbEvidenceFile" and .value == "usr/bin/prog")] | length == 1)
+            and ([.properties[] | select(.name == "bomlens:kbEvidenceStrings") | .value | fromjson | length >= 1] | all)' <<<"$out" >/dev/null; then
+    pass "a result carries the hash of its evidence file and the longest strings that matched, for a reviewer to check"
+else fail "the evidence file hash or matched strings are missing" "$out"; fi
+
 # ---- review decisions -------------------------------------------------------------------
 sha="$(python3 -c 'import hashlib,sys;print(hashlib.sha256(open(sys.argv[1],"rb").read()).hexdigest())' "$TMP/root-release-1.1/usr/bin/prog")"
 dec() { printf '%s' "$1" > "$TMP/dec.json"; ident release-1.1 FW_BINARY_KB_DECISIONS="$TMP/dec.json"; }
@@ -228,6 +235,30 @@ done
 out="$(python3 "$LIB/identify-binary-kb.py" "$TMP/root-release-1.1" "$KB" 2>/dev/null)"
 if [ "$out" = "[]" ]; then pass "a file that is not ELF is not read unless FW_BINKB_NONELF=true"
 else fail "a non-ELF file was read by default" "$out"; fi
+
+# ---- review page ---------------------------------------------------------------------------------
+REVIEW="$LIB/binary-kb-review.py"
+ident release-1.1 > "$TMP/r1.json"; ident only-core > "$TMP/r2.json"
+jq -n --slurpfile a "$TMP/r1.json" --slurpfile b "$TMP/r2.json" \
+   '{metadata: {component: {name: "device-fw", version: "1.0"}}, components: ($a[0] + $b[0] + [{name: "x</script><img src=x onerror=alert(1)>", properties: [{name: "bomlens:identifiedBy", value: "binary-kb"}]}])}' > "$TMP/bom.json"
+if python3 "$REVIEW" "$TMP/bom.json" --lang en > "$TMP/review.html" 2>/dev/null \
+   && python3 - "$TMP/review.html" <<'PY'
+import json, re, sys
+h = open(sys.argv[1]).read()
+m = re.search(r'<script id="data" type="application/json">(.*?)</script>', h, re.S)
+d = json.loads(m.group(1))
+names = [i["name"] for i in d["items"]]
+assert d["project"] == "device-fw 1.0", d["project"]
+assert len(names) == 3 and names[-1] == "alpha", names   # the ones to decide come first, the one with a single release last
+assert d["items"][-1]["version"] == "1.1" and not d["items"][-1]["reasons"]
+assert "</script><img" not in h and "innerHTML" not in h
+PY
+then pass "the review page lists what needs a decision first, escapes hostile names and never uses innerHTML"
+else fail "the review page is malformed or unsafe"; fi
+if python3 "$REVIEW" "$TMP/bom.json" --lang ko 2>/dev/null | grep -q '바이너리 지식 베이스 검토'; then pass "the review page has a Korean version"
+else fail "the Korean review page is missing"; fi
+if ! python3 -c 'import re,sys; h=re.sub(r"<script id=\"data\".*?</script>", "", open(sys.argv[1]).read(), flags=re.S); sys.exit(1 if re.search(r"https?://|src=|<link", h) else 0)' "$TMP/review.html"; then fail "the review page references an external resource"
+else pass "the review page loads nothing from the network"; fi
 
 # ---- wiring -------------------------------------------------------------------------------------
 if grep -q 'identify-binary-kb.py' "$LIB/scan-firmware.sh" && grep -q -- '--slurpfile g "\$BINKB_COMPS"' "$LIB/scan-firmware.sh" \
