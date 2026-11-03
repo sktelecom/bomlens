@@ -290,15 +290,14 @@ def build(args):
     con.executescript(SCHEMA_SQL)
     meta = {'schema': SCHEMA, 'release': args.release, 'rule': DEFAULT_RULE, 'kernel_only': sorted(args.kernel_only or [])}
     con.executemany('INSERT INTO meta VALUES (?,?)', [(k, json.dumps(v)) for k, v in meta.items()])
-    con.executemany('INSERT INTO comp VALUES (?,?,?)', [(i, n, kinds[n]) for n, i in names.items()])
-    con.executemany('INSERT INTO ver VALUES (?,?,?)', [(names[c], j, v) for c, vs in versions.items() for j, v in enumerate(vs)])
-    con.executemany('INSERT INTO str VALUES (?,?)', ((s, ','.join(str(i) for i in sorted(o))) for s, o in owners.items()))
-    con.executemany('INSERT INTO strv VALUES (?,?,?)', ((s, names[c], m) for c, d in vmask.items() for s, m in d.items()))
-    n = 0
-    for key, ents in index.items():
-        for data, k, c, name in ents:
-            n += 1
-            con.execute('INSERT INTO tbl VALUES (?,?,?,?,?,?)', (n, c, name, k, key, data))
+    con.executemany('INSERT INTO comp VALUES (?,?,?)', [(i, n, kinds[n]) for n, i in sorted(names.items(), key=lambda x: x[1])])
+    con.executemany('INSERT INTO ver VALUES (?,?,?)', [(names[c], j, v) for c in sorted(versions) for j, v in enumerate(versions[c])])
+    # Rows go in sorted, so the same inputs give the same file bytes whatever the hash seed or the machine.
+    con.executemany('INSERT INTO str VALUES (?,?)', ((s, ','.join(str(i) for i in sorted(owners[s]))) for s in sorted(owners)))
+    con.executemany('INSERT INTO strv VALUES (?,?,?)', ((s, names[c], vmask[c][s]) for c in sorted(vmask) for s in sorted(vmask[c])))
+    rows_t = sorted((key, k, c, name, data) for key, ents in index.items() for data, k, c, name in ents)
+    for n, (key, k, c, name, data) in enumerate(rows_t, 1):
+        con.execute('INSERT INTO tbl VALUES (?,?,?,?,?,?)', (n, c, name, k, key, data))
     con.commit(); con.close()
     print(f'db: {len(owners)} distinct strings, {sum(1 for _ in per)} components with table signatures '
           f'({sum(per.values())} tables, {sum(dropped.values())} dropped as background)', file=sys.stderr)
