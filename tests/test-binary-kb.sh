@@ -267,6 +267,71 @@ else fail "the Korean review page is missing"; fi
 if ! python3 -c 'import re,sys; h=re.sub(r"<script id=\"data\".*?</script>", "", open(sys.argv[1]).read(), flags=re.S); sys.exit(1 if re.search(r"https?://|src=|<link", h) else 0)' "$TMP/review.html"; then fail "the review page references an external resource"
 else pass "the review page loads nothing from the network"; fi
 
+# ---- constant tables ---------------------------------------------------------------------------------
+# Hand-made ELF files: an unstripped reference with five 1 KiB read-only tables as OBJECT symbols
+# (32-bit little endian), and stripped targets of other classes and byte orders carrying the same
+# tables with their 4-byte elements reversed on the big-endian ones.
+python3 - "$TMP" <<'PY'
+import os, random, struct, sys
+tmp = sys.argv[1]
+rnd = random.Random(5)
+tables = [bytes(rnd.randrange(256) for _ in range(1024)) for _ in range(5)]
+def swap4(b): return b''.join(b[i:i + 4][::-1] for i in range(0, len(b), 4))
+def elf(path, bits, order, tabs, symbols):
+    e = '<' if order == 'little' else '>'
+    ro = b''.join(tabs)
+    shstr = b'\0.rodata\0.symtab\0.strtab\0.shstrtab\0'
+    strtab = b'\0' + b''.join(f'tab{i}\0'.encode() for i in range(len(tabs))) if symbols else b'\0'
+    syms = b''
+    if symbols:
+        syms = b'\0' * (16 if bits == 32 else 24)
+        off = 0; noff = 1
+        for i, t in enumerate(tabs):
+            if bits == 32: syms += struct.pack(e + 'IIIBBH', noff, off, len(t), 0x11, 0, 1)
+            else: syms += struct.pack(e + 'IBBHQQ', noff, 0x11, 0, 1, off, len(t))
+            off += len(t); noff += len(f'tab{i}\0')
+    ehsz, shentsize = (52, 40) if bits == 32 else (64, 64)
+    o_ro = ehsz; o_sym = o_ro + len(ro); o_str = o_sym + len(syms); o_shs = o_str + len(strtab); o_sh = (o_shs + len(shstr) + 7) & ~7
+    def sh(name, typ, off, size, link=0, ent=0):
+        if bits == 32: return struct.pack(e + 'IIIIIIIIII', name, typ, 0, 0, off, size, link, 0, 1, ent)
+        return struct.pack(e + 'IIQQQQIIQQ', name, typ, 0, 0, off, size, link, 0, 1, ent)
+    secs = sh(0, 0, 0, 0) + sh(1, 1, o_ro, len(ro)) + sh(9, 2, o_sym, len(syms), 3, 16 if bits == 32 else 24) + sh(17, 3, o_str, len(strtab)) + sh(25, 3, o_shs, len(shstr))
+    ident = b'\x7fELF' + bytes([1 if bits == 32 else 2, 1 if order == 'little' else 2, 1]) + b'\0' * 9
+    if bits == 64: hdr = ident + struct.pack(e + 'HHIQQQIHHHHHH', 2, 62, 1, 0, 0, o_sh, 0, ehsz, 0, 0, shentsize, 5, 4)
+    else: hdr = ident + struct.pack(e + 'HHIIIIIHHHHHH', 2, 8, 1, 0, 0, o_sh, 0, ehsz, 0, 0, shentsize, 5, 4)
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    open(path, 'wb').write(hdr + ro + syms + strtab + shstr + b'\0' * (o_sh - o_shs - len(shstr)) + secs)
+elf(f'{tmp}/ref/tabcomp', 32, 'little', tables, True)
+open(f'{tmp}/tabs.csv', 'w').write(f'tabcomp,{tmp}/ref/tabcomp\n')
+elf(f'{tmp}/root-tab-le32/bin/prog', 32, 'little', tables, False)
+elf(f'{tmp}/root-tab-be64/bin/prog', 64, 'big', [swap4(t) for t in tables], False)
+elf(f'{tmp}/root-tab-be32-part/bin/prog', 32, 'big', [swap4(t) for t in tables[:3]], False)
+elf(f'{tmp}/root-tab-be32-four/bin/prog', 32, 'big', [swap4(t) for t in tables[:4]], False)
+open(f'{tmp}/bgfile', 'wb').write(b'header ' + tables[4] + b' trailer')
+open(f'{tmp}/bg.txt', 'w').write(f'{tmp}/bgfile\n')
+PY
+mkdir -p "$TMP/kbt"
+python3 "$LIB/binarykb.py" build --kb "$TMP/kb.csv" --bg "$TMP/bg" --ref "$TMP/tabs.csv" --release tab-1 --out "$TMP/kbt/kb.sqlite3" 2>"$TMP/tab.err"
+mkdir -p "$TMP/kbt2"
+python3 "$LIB/binarykb.py" build --kb "$TMP/kb.csv" --bg "$TMP/bg" --ref "$TMP/tabs.csv" --ref-bg "$TMP/bg.txt" --release tab-2 --out "$TMP/kbt2/kb.sqlite3" 2>"$TMP/tab2.err"
+tabident() { python3 "$LIB/identify-binary-kb.py" "$TMP/root-$2" "$1" 2>/dev/null; }
+for t in tab-le32 tab-be64; do
+    out="$(tabident "$TMP/kbt/kb.sqlite3" $t)"
+    if [ "$(jq -r '.[0].name' <<<"$out")" = "tabcomp" ] && [ "$(jq -r '.[0].properties[] | select(.name == "bomlens:kbTables") | .value' <<<"$out")" = "5 tables, 5120 bytes" ]; then
+        pass "five constant tables found in $t, reported without a version"
+    else fail "tables not found in $t" "$out $(tail -2 "$TMP/tab.err")"; fi
+done
+out="$(tabident "$TMP/kbt/kb.sqlite3" tab-be32-part)"
+if [ "$(jq 'length' <<<"$out")" = "0" ]; then pass "three tables are below the threshold and report nothing"
+else fail "three tables were enough" "$out"; fi
+out="$(tabident "$TMP/kbt/kb.sqlite3" tab-be32-four)"
+if [ "$(jq -r '.[0].name' <<<"$out")" = "tabcomp" ]; then pass "four tables of 4 KiB in total reach the threshold"
+else fail "four tables were not enough" "$out"; fi
+out="$(tabident "$TMP/kbt2/kb.sqlite3" tab-be32-four)"; out2="$(tabident "$TMP/kbt2/kb.sqlite3" tab-be64)"
+if [ "$(jq 'length' <<<"$out")" = "1" ] && [ "$(jq -r '.[0].properties[] | select(.name == "bomlens:kbTables") | .value' <<<"$out2")" = "4 tables, 4096 bytes" ]; then
+    pass "a table found in a background file is dropped from the signatures"
+else fail "the background table was kept" "$out2 $(grep -c background "$TMP/tab2.err")"; fi
+
 # ---- wiring -------------------------------------------------------------------------------------
 if grep -q 'identify-binary-kb.py' "$LIB/scan-firmware.sh" && grep -q -- '--slurpfile g "\$BINKB_COMPS"' "$LIB/scan-firmware.sh" \
    && grep -q '\$a\[0\] + \$b\[0\] + \$c\[0\] + \$d\[0\] + \$f\[0\] + \$e\[0\] + \$g\[0\]' "$LIB/scan-firmware.sh"; then
