@@ -183,6 +183,13 @@ h1="$(python3 "$LIB/binarykb.py" info "$KB" | jq -r .content_sha256)"; h2="$(pyt
 if cmp -s "$KB" "$TMP/kb2/kb.sqlite3" && [ -n "$h1" ] && [ "$h1" = "$h2" ]; then
     pass "two builds from the same inputs give the same file and the same content hash"
 else fail "the build is not reproducible" "$h1 vs $h2"; fi
+# The thresholds are stored in the base and can be set when it is built.
+mkdir -p "$TMP/kb3"
+python3 "$LIB/binarykb.py" build --kb "$TMP/kb.csv" --bg "$TMP/bg" --release strict --rule-score 100000 --out "$TMP/kb3/kb.sqlite3" 2>/dev/null
+out="$(python3 "$LIB/identify-binary-kb.py" "$TMP/root-release-1.1" "$TMP/kb3/kb.sqlite3" 2>/dev/null; FW_BINKB_NONELF=true python3 "$LIB/identify-binary-kb.py" "$TMP/root-release-1.1" "$TMP/kb3/kb.sqlite3" 2>/dev/null)"
+if [ "$(python3 "$LIB/binarykb.py" info "$TMP/kb3/kb.sqlite3" | jq -r .rule.score)" = "100000" ] && [ "$(jq -s 'map(length) | add' <<<"$out")" = "0" ]; then
+    pass "a threshold set at build time is stored in the base and applied"
+else fail "the stored threshold was not applied" "$out"; fi
 # The base is opened read-only: writing through the reader's connection must fail.
 if python3 - "$LIB" "$KB" <<'PY' 2>/dev/null
 import sys, sqlite3

@@ -31,6 +31,10 @@ Usage:
                  symbol becomes a table signature.
       files.txt  one path per line; a table found in one of these files is not a signature.
       --kernel-only NAME   report NAME only for kernel images and modules.
+      --rule-score N, --rule-unique N, --rule-table-count N, --rule-table-bytes N
+                 the detection thresholds stored in the base (defaults 300, 10, 4, 4096). The right values
+                 depend on the base: measure false positives on binaries that hold none of its components
+                 and raise the score until they stop.
   binarykb.py info kb.sqlite3
 
 The database is SQLite, opened read-only, and holds no code.
@@ -288,7 +292,11 @@ def build(args):
 
     con = sqlite3.connect(args.out)
     con.executescript(SCHEMA_SQL)
-    meta = {'schema': SCHEMA, 'release': args.release, 'rule': DEFAULT_RULE, 'kernel_only': sorted(args.kernel_only or [])}
+    rule = dict(DEFAULT_RULE)
+    for k in rule:
+        if getattr(args, 'rule_' + k, None) is not None:
+            rule[k] = getattr(args, 'rule_' + k)
+    meta = {'schema': SCHEMA, 'release': args.release, 'rule': rule, 'kernel_only': sorted(args.kernel_only or [])}
     con.executemany('INSERT INTO meta VALUES (?,?)', [(k, json.dumps(v)) for k, v in meta.items()])
     con.executemany('INSERT INTO comp VALUES (?,?,?)', [(i, n, kinds[n]) for n, i in sorted(names.items(), key=lambda x: x[1])])
     con.executemany('INSERT INTO ver VALUES (?,?,?)', [(names[c], j, v) for c in sorted(versions) for j, v in enumerate(versions[c])])
@@ -428,6 +436,8 @@ def main(argv=None):
     b = sub.add_parser('build'); b.add_argument('--kb', required=True); b.add_argument('--bg', action='append')
     b.add_argument('--ref'); b.add_argument('--ref-bg'); b.add_argument('--kernel-only', action='append')
     b.add_argument('--release', required=True); b.add_argument('--out', required=True)
+    for k, v in DEFAULT_RULE.items():
+        b.add_argument('--rule-' + k.replace('_', '-'), dest='rule_' + k, type=int, help=f'detection threshold stored in the base (default {v})')
     i = sub.add_parser('info'); i.add_argument('db')
     args = ap.parse_args(argv)
     {'build': build, 'info': info}[args.cmd](args)
