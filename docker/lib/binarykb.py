@@ -402,9 +402,21 @@ class KnowledgeBase:
         return hits, tables
 
 
+def content_hash(con):
+    """SHA-256 of the rows of every table in key order. Two builds from the same inputs agree on it even when
+    the SQLite library that wrote them differs, which changes the file bytes but not the content."""
+    import hashlib
+    h = hashlib.sha256()
+    for table, order in (('meta', 'key'), ('comp', 'id'), ('ver', 'comp, idx'), ('str', 's'), ('strv', 's, comp'), ('tbl', 'id')):
+        h.update(table.encode())
+        for row in con.execute(f'SELECT * FROM {table} ORDER BY {order}'):
+            h.update(repr(row).encode())
+    return h.hexdigest()
+
+
 def info(args):
     kb = KnowledgeBase(args.db)
-    print(json.dumps({'release': kb.release, 'rule': kb.rule, 'kernel_only': sorted(kb.kernel_only),
+    print(json.dumps({'release': kb.release, 'content_sha256': content_hash(kb.con), 'rule': kb.rule, 'kernel_only': sorted(kb.kernel_only),
                       'components': {kb.comps[c][0]: {'versions': len(v), 'first': v[0], 'last': v[-1]} for c, v in kb.versions.items()},
                       'background': sum(1 for n, k in kb.comps.values() if k == 'bg'), 'table_signatures': len(kb.table_size)},
                      indent=2, ensure_ascii=False))

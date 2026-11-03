@@ -176,6 +176,13 @@ python3 "$LIB/binarykb.py" info "$KB" >"$TMP/info.json" 2>&1
 if [ "$(jq -r '.release' "$TMP/info.json")" = "test-1" ] && [ "$(jq -r '.components.alpha.last' "$TMP/info.json")" = "1.2" ]; then
     pass "releases are stored in release order, not in file order (1.2 listed first)"
 else fail "info does not show release order" "$(cat "$TMP/info.json")"; fi
+# The same inputs give the same base whatever the hash seed: equal file bytes here, and an equal content
+# hash that also holds across machines and SQLite versions (the file header records the library version).
+PYTHONHASHSEED=7 python3 "$LIB/binarykb.py" build --kb "$TMP/kb.csv" --bg "$TMP/bg" --release test-1 --out "$TMP/kb2/kb.sqlite3" 2>/dev/null
+h1="$(python3 "$LIB/binarykb.py" info "$KB" | jq -r .content_sha256)"; h2="$(python3 "$LIB/binarykb.py" info "$TMP/kb2/kb.sqlite3" | jq -r .content_sha256)"
+if cmp -s "$KB" "$TMP/kb2/kb.sqlite3" && [ -n "$h1" ] && [ "$h1" = "$h2" ]; then
+    pass "two builds from the same inputs give the same file and the same content hash"
+else fail "the build is not reproducible" "$h1 vs $h2"; fi
 # The base is opened read-only: writing through the reader's connection must fail.
 if python3 - "$LIB" "$KB" <<'PY' 2>/dev/null
 import sys, sqlite3
