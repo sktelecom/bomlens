@@ -251,6 +251,7 @@ fail_on_bad_coverage() {
 FORCE_FIRMWARE="false"; FORCE_SOURCE="false"; RELEASE_FOLDER_DIR=""; ANALYZE_SBOM=""; MODEL=""; MODEL_FILE=""; VEX_FILE=""
 AI_DECLARE_FILE=""; GENERATE_SPDX3="true"
 COMPONENT_VERSIONS_FILE=""
+BINARY_KB_PATH=""; BINARY_KB_DECISIONS=""
 # --components <file>, repeatable: CycloneDX files listing components a source
 # scan cannot find. With none, the container reads sbom-declared.cdx.json at
 # the scan target root when it exists.
@@ -367,6 +368,8 @@ while [[ "$#" -gt 0 ]]; do
         --vex) VEX_FILE="$2"; GENERATE_SECURITY="true"; shift ;;
         --ai-declare) AI_DECLARE_FILE="$2"; shift ;;
         --component-versions) COMPONENT_VERSIONS_FILE="$2"; shift ;;
+        --binary-kb) BINARY_KB_PATH="$2"; shift ;;
+        --kb-decisions) BINARY_KB_DECISIONS="$2"; shift ;;
         --components)
             [ "$#" -ge 2 ] || { echo "[ERROR] --components requires a file, e.g. --components sbom-declared.cdx.json"; exit 1; }
             COMPONENTS_FILES+=("$2"); shift ;;
@@ -512,6 +515,20 @@ Options:
                          version to
                          <Project>_<Version>_component-versions.template.csv,
                          in this format, to fill in and pass back.
+  --binary-kb <path>     For a firmware, root filesystem or binary scan: a binary
+                         knowledge base (a kb.sqlite3 file, or the folder that
+                         holds it) built from the release sources of the
+                         components to look for. It finds what left no version
+                         string and no package record, such as a library linked
+                         into a program. A version is written only when one
+                         release fits; otherwise the candidates are listed in
+                         bomlens:versionCandidates. The base is read-only and
+                         never replaces a version another pass already read.
+  --kb-decisions <file>  With --binary-kb: a JSON list recording what a person
+                         decided about a result, each entry
+                         {"component", "decision": "exclude"|"confirm"|"version",
+                         "version", "reason", "reviewer", "evidence_sha256"}.
+                         An entry without a reason is ignored.
   --components <file>    For a source scan: a CycloneDX file (JSON) listing the
                          components the scan cannot find, such as your own
                          build outputs and third-party parts added by hand.
@@ -1015,6 +1032,7 @@ SBOM_PULL="${SBOM_PULL:-missing}"
 if [ "$UI_MODE" = "true" ]; then
     [ -z "$VEX_FILE" ] || { echo "[ERROR] --vex is not offered with --ui (import a VEX from the Vulnerabilities screen instead)."; exit 1; }
     [ -z "$AI_DECLARE_FILE" ] || { echo "[ERROR] --ai-declare is not offered with --ui (fill the declaration on the Models & datasets screen instead)."; exit 1; }
+    [ -z "$BINARY_KB_PATH" ] || { echo "[ERROR] --binary-kb is not offered with --ui (it applies to one firmware, root filesystem or binary scan)."; exit 1; }
     [ -z "$COMPONENT_VERSIONS_FILE" ] || { echo "[ERROR] --component-versions is not offered with --ui (it applies to one firmware, root filesystem or binary scan)."; exit 1; }
     [ "${#COMPONENTS_FILES[@]}" -eq 0 ] || { echo "[ERROR] --components is not offered with --ui (put sbom-declared.cdx.json at the root of the folder to scan instead)."; exit 1; }
     [ "$NO_COMPONENTS" = "false" ] || { echo "[ERROR] --no-components is not offered with --ui (it applies to one source scan)."; exit 1; }
@@ -1146,6 +1164,7 @@ if [ -n "$DIFF_OLD" ]; then
     [ "${#FAIL_ON[@]}" -eq 0 ] || { echo "[ERROR] --fail-on cannot be combined with --diff (a diff judges no scan)."; exit 1; }
     [ -z "$VEX_FILE" ] || { echo "[ERROR] --vex cannot be combined with --diff (a diff writes no SBOM to attach statements to)."; exit 1; }
     [ -z "$AI_DECLARE_FILE" ] || { echo "[ERROR] --ai-declare cannot be combined with --diff (a diff writes no AI document to declare into)."; exit 1; }
+    [ -z "$BINARY_KB_PATH" ] || { echo "[ERROR] --binary-kb cannot be combined with --diff (a diff writes no SBOM to read a base into)."; exit 1; }
     [ -z "$COMPONENT_VERSIONS_FILE" ] || { echo "[ERROR] --component-versions cannot be combined with --diff (a diff writes no SBOM to add versions to)."; exit 1; }
     [ "${#COMPONENTS_FILES[@]}" -eq 0 ] || { echo "[ERROR] --components cannot be combined with --diff (a diff writes no SBOM to add components to)."; exit 1; }
     [ "$NO_COMPONENTS" = "false" ] || { echo "[ERROR] --no-components cannot be combined with --diff (a diff reads no source tree)."; exit 1; }
@@ -1526,6 +1545,25 @@ component_versions_run() {
     local d f
     d="$(cd "$(dirname "$COMPONENT_VERSIONS_FILE")" && pwd)"; f="$(basename "$COMPONENT_VERSIONS_FILE")"
     printf ' -v %q:/component-versions-in/versions.csv:ro -e COMPONENT_VERSIONS_FILE=/component-versions-in/versions.csv' "$(hostpath "$d/$f")"
+}
+
+# --binary-kb and --kb-decisions: the base (a file or the folder holding it) and
+# the review file are mounted read-only at fixed container paths; the container
+# opens the base read-only and checks every review entry.
+binary_kb_run() {
+    local d f
+    if [ -n "$BINARY_KB_PATH" ]; then
+        if [ -d "$BINARY_KB_PATH" ]; then
+            printf ' -v %q:/binary-kb-in:ro -e FW_BINARY_KB=/binary-kb-in' "$(hostpath "$(cd "$BINARY_KB_PATH" && pwd)")"
+        else
+            d="$(cd "$(dirname "$BINARY_KB_PATH")" && pwd)"; f="$(basename "$BINARY_KB_PATH")"
+            printf ' -v %q:/binary-kb-in:ro -e FW_BINARY_KB=/binary-kb-in/%q' "$(hostpath "$d")" "$f"
+        fi
+    fi
+    if [ -n "$BINARY_KB_DECISIONS" ]; then
+        d="$(cd "$(dirname "$BINARY_KB_DECISIONS")" && pwd)"; f="$(basename "$BINARY_KB_DECISIONS")"
+        printf ' -v %q:/kb-decisions-in/decisions.json:ro -e FW_BINARY_KB_DECISIONS=/kb-decisions-in/decisions.json' "$(hostpath "$d/$f")"
+    fi
 }
 
 # --components: each file is mounted on its own, read-only, at a fixed container
@@ -2284,6 +2322,22 @@ if [ -n "$COMPONENT_VERSIONS_FILE" ]; then
     fi
 fi
 
+if [ -n "$BINARY_KB_PATH" ]; then
+    if [ ! -f "$BINARY_KB_PATH" ] && [ ! -f "$BINARY_KB_PATH/kb.sqlite3" ]; then
+        echo "[ERROR] --binary-kb: no knowledge base at $BINARY_KB_PATH (pass the kb.sqlite3 file, or the folder that holds it)."; exit 1
+    fi
+fi
+if [ -n "$BINARY_KB_DECISIONS" ]; then
+    if [ -z "$BINARY_KB_PATH" ]; then
+        echo "[ERROR] --kb-decisions needs --binary-kb: the review file records decisions about its results."; exit 1
+    fi
+    if [ ! -f "$BINARY_KB_DECISIONS" ]; then
+        echo "[ERROR] --kb-decisions file not found: $BINARY_KB_DECISIONS"; exit 1
+    fi
+    if [ "$(wc -c < "$BINARY_KB_DECISIONS" | tr -d ' ')" -gt 1048576 ]; then
+        echo "[ERROR] --kb-decisions: the file is larger than 1 MiB."; exit 1
+    fi
+fi
 if [ "$NO_COMPONENTS" = "true" ] && [ "${#COMPONENTS_FILES[@]}" -gt 0 ]; then
     echo "[ERROR] --no-components cannot be combined with --components: the first reads no declaration file, the second names one."; exit 1
 fi
@@ -2645,6 +2699,9 @@ fi
 
 if [ -n "${USAGE_CONTEXT:-}" ] && [ "$MODE" != "AIBOM" ] && [ "$MODE" != "MODELFILE" ] && [ "$MODE" != "DATASET" ] && [ "$MODE" != "AIDECLARE" ]; then
     echo "[ERROR] --usage applies to AI model and dataset scans only (use it with --model or --model-file)."; exit 1
+fi
+if [ -n "$BINARY_KB_PATH" ] && [ "$MODE" != "FIRMWARE" ] && [ "$MODE" != "ROOTFS" ] && [ "$MODE" != "BINARY" ]; then
+    echo "[ERROR] --binary-kb applies to firmware, root filesystem and binary scans only (this target is scanned as $MODE)."; exit 1
 fi
 if [ -n "$COMPONENT_VERSIONS_FILE" ] && [ "$MODE" != "FIRMWARE" ] && [ "$MODE" != "ROOTFS" ] && [ "$MODE" != "BINARY" ]; then
     echo "[ERROR] --component-versions applies to firmware, root filesystem and binary scans only (this target is scanned as $MODE)."; exit 1
@@ -3455,7 +3512,7 @@ else
     # shellcheck disable=SC2046
     eval "$DOCKER_MSYS"docker run --rm $VOL \
         --add-host=host.docker.internal:host-gateway \
-        -e MODE="$MODE" -e BOMLENS_ARTIFACT_CLEANUP=1 $ENVV $(pp_env)$(cosign_run)$(vex_run)$(declare_run)$(component_versions_run)$(components_run)$(gate_run) \
+        -e MODE="$MODE" -e BOMLENS_ARTIFACT_CLEANUP=1 $ENVV $(pp_env)$(cosign_run)$(vex_run)$(declare_run)$(component_versions_run)$(binary_kb_run)$(components_run)$(gate_run) \
         "\"$RUN_IMAGE\""
 fi
 

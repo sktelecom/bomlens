@@ -782,6 +782,26 @@ if [ "${FW_VERSION_STRINGS:-true}" != "false" ] && command -v python3 >/dev/null
 fi
 
 # --------------------------------------------------------
+# ③.72 Components a binary knowledge base recognises, opt-in.
+# --------------------------------------------------------
+# A knowledge base built from the release sources of each component (binarykb.py)
+# finds what left no version string and no package record: a library linked into
+# a program, a daemon whose banner was compiled out. Nothing is read unless
+# --binary-kb names a knowledge base; the base is a SQLite file, opened read-only.
+# It fills gaps and never overrides: a record that already carries a version wins
+# in the merge below.
+BINKB_COMPS="$WORK/binkb-comps.json"
+echo '[]' > "$BINKB_COMPS"
+if [ -n "${FW_BINARY_KB:-}" ] && command -v python3 >/dev/null 2>&1; then
+    echo "[firmware] identifying components with the binary knowledge base..."
+    python3 "$(dirname "$0")/identify-binary-kb.py" "$ROOTFS" "$FW_BINARY_KB" > "$WORK/binkb-out.json" \
+        || echo '[]' > "$WORK/binkb-out.json"
+    if [ -s "$WORK/binkb-out.json" ] && jq -e 'type == "array"' "$WORK/binkb-out.json" >/dev/null 2>&1; then
+        cp "$WORK/binkb-out.json" "$BINKB_COMPS"
+    fi
+fi
+
+# --------------------------------------------------------
 # ③.75 The kernel is read from wherever in the image it sits, not from $ROOTFS.
 # --------------------------------------------------------
 # Every pass above — cve-bin-tool's own checkers, identify-elf-presence.py,
@@ -897,7 +917,8 @@ fi
 # matches on; the other record only fills in what the base lacks.
 jq -n --slurpfile a "$WORK/pkg-comps.json" --slurpfile b "$WORK/bin-comps.json" \
       --slurpfile c "$ELF_COMPS" --slurpfile d "$VERSTR_COMPS" \
-      --slurpfile e "$EXTRA_COMPS" --slurpfile f "$APP_COMPS" '
+      --slurpfile e "$EXTRA_COMPS" --slurpfile f "$APP_COMPS" \
+      --slurpfile g "$BINKB_COMPS" '
     def merge_group:
       . as $g
       | (([$g[] | select(.purl)] + $g) | .[0]) as $base
@@ -953,7 +974,7 @@ jq -n --slurpfile a "$WORK/pkg-comps.json" --slurpfile b "$WORK/bin-comps.json" 
     # The extra roots come last so that a record from the rootfs stays the base of
     # a merged group: the rootfs is the filesystem the device actually boots, and
     # its judgement is the one to keep when two roots describe one component.
-    ($a[0] + $b[0] + $c[0] + $d[0] + $f[0] + $e[0]) as $with_presence
+    ($a[0] + $b[0] + $c[0] + $d[0] + $f[0] + $e[0] + $g[0]) as $with_presence
     # A presence-only judgement next to a versioned one for the same component
     # says nothing the versioned one does not. Reporting both lists the component
     # twice, once without a version, which reads as two findings.

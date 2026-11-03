@@ -115,6 +115,50 @@ libfoo,,version-unknown
 
 The template has the header `name,version,reason` and comment lines that explain the three reasons, and it leaves out components that already carry a reason.
 
+## Identifying components with a binary knowledge base
+
+Signature checkers read a version out of a string the build left behind. A library linked into a program, or a daemon whose banner was compiled out, leaves none, so the component is missing from the SBOM or has no version. A binary knowledge base fills that gap from the other side: it is built from the release sources of the components you want to find, and a binary is matched against the string literals and the large constant tables those releases contain.
+
+It is opt-in and local. Nothing is downloaded and no database is shipped in the image; you build the base once from sources you trust and pass it to a scan.
+
+```bash
+# kb.csv: one line per release, component,version,path-to-tarball. List every release of a
+# component: a version missing from the list comes back as the nearest release that is there.
+python3 docker/lib/binarykb.py build --kb kb.csv --bg ./background-tarballs \
+  --release my-kb-2026-11 --out kb/kb.sqlite3
+
+./scripts/scan-sbom.sh --project device-fw --version 1.0.0 \
+  --target "./device.bin" --firmware --binary-kb ./kb --generate-only
+```
+
+The `--bg` folder holds tarballs of packages you do not want reported. Their strings only lower the weight of strings they share with a reported component, which is how a library copied into several programs is credited to the package it came from. Put the neighbours of what you scan in it (the C library, the shell utilities, the router's own daemons); a base without them reports components that merely share code with them. A reference build with symbols per component (`--ref refs.csv`) adds constant-table signatures that survive static linking, and `--ref-bg` lists files whose tables are not signatures. The base is a SQLite file and holds no code; it is opened read-only. The detection thresholds are stored in it (`--rule-score` and `--rule-unique` set them at build time, defaults 300 and 10). They depend on the base: scan root filesystems that hold none of its components, and raise the score until the false positives stop.
+
+What a result carries:
+
+- A component has a `version` only when exactly one release in the base fits. When several fit, the component has no version and `bomlens:versionCandidates` and `bomlens:versionRange` list them, so no vulnerability is matched against a release nobody could pick.
+- When the one release that fits is the newest the base has, the component is reported without a version, with `bomlens:versionMayBeNewer` and that release in `bomlens:versionCandidates`. A version that is not in the base comes back as its nearest neighbour, and for a version newer than every release in the base that neighbour is the last one; written as the version, it would be matched against vulnerabilities a newer release has fixed. The component goes into the component-versions template for you to fill. Set `FW_BINKB_TRUST_NEWEST=true` to write the version anyway, still marked.
+- `bomlens:identifiedBy` is `binary-kb`, with `bomlens:kbRelease`, `bomlens:kbScore` and `bomlens:kbUniqueStrings` (or `bomlens:kbTables`) as the evidence, and the files it was found in as `evidence.occurrences`.
+- A component found only by constant tables has no version and is tagged `presence-only`.
+
+A review page turns the results into a queue to decide. It is one HTML file that loads nothing from the network:
+
+```bash
+python3 docker/lib/binary-kb-review.py device-fw_1.0.0/device-fw_1.0.0_bom.json --lang en > kb-review.html
+```
+
+The components that need a decision come first: no single release fits, the version may be newer than the base knows, or only constant tables matched. The ones whose evidence is clear are listed but folded. Each result shows its score, the files it was found in, the longest strings that matched and the hash of the evidence file. Press `1` to confirm, `2` to exclude, `3` to correct the version (both ask for a reason), `4` to decide later, `j` and `k` to move and `u` to undo. **Download decisions** writes the file below; what you decided stays in the browser while the tab is open.
+
+A person can record a decision about a result in a JSON file and pass it with `--kb-decisions`:
+
+```json
+[{"component": "busybox", "decision": "version", "version": "1.36.1",
+  "reason": "banner read in /bin/busybox", "reviewer": "name", "evidence_sha256": "<sha256 of the file>"}]
+```
+
+`exclude` drops the component, `version` replaces the version and `confirm` marks the result reviewed; each is recorded as `bomlens:review`. An entry without a reason is ignored. With `evidence_sha256` the entry applies only while the file the result was found in has that hash, so a file that changed goes back to review.
+
+Limits: a component the base does not contain is not found; a program that links only a small part of a library may keep too few strings and tables to reach the thresholds; and a vendor that applies a security fix without changing the version string looks like the old release, here as in every version-based check.
+
 ## How CVEs are matched
 
 Trivy matches components by their package PURL, with a database it downloads at scan time as in any other scan. A component with no package PURL (none, `pkg:generic`, `pkg:opkg`, or a source repository PURL such as `pkg:github`) is matched by its CPE against the NVD CPE index built into the image (`cpe_match.sqlite`), and its CVEs go into the same security report. This match runs with `--security` in firmware, root filesystem and binary scans and for a Yocto SPDX 2.2 archive (`<image>.spdx.tar.zst`), once, after every step that adds CPEs. A component identified by name and version through BomLens's name list (`cpe-name-map.json`), OpenSSH or BusyBox for example, is matched as well as one the signature checkers gave a CPE. A Yocto SPDX 3.0 document and a build read through its manifests are not matched this way: they already carry Yocto's own verdicts, and matching their CPEs again would report as open what Yocto judged patched or not affected. Yocto writes a CPE such as `cpe:2.3:*:*:busybox:1.36.1`. A part of `*` is read as an application, and a vendor of `*` is looked up by product alone across every vendor of that product, as Yocto's own cve-check does. Most products listed under more than one vendor are one project that NVD filed under several names (`linux_kernel` under `linux` and `kernel`, `curl` under `haxx`, `curl` and `daniel_stenberg`). Yocto drops the wrong vendors' CVEs with `CVE_STATUS` `cpe-incorrect`, which an SPDX 2.2 build does not carry, so a product name another project shares can bring that project's CVEs too. An SPDX 2.2 build does not record which CVEs a recipe patched either, so the CVEs matched this way can include ones the recipe already patched; SPDX 3.0 records it (`INHERIT += "create-spdx-3.0"`). The result manifest records the step as `match-cpe` with `offered`, `components` and `cves` counts.

@@ -105,6 +105,50 @@ libfoo,,version-unknown
 
 양식 파일은 `name,version,reason` 머리글과 세 가지 사유를 설명하는 주석 줄로 시작하며, 이미 사유가 붙은 컴포넌트는 넣지 않습니다.
 
+## 바이너리 지식 베이스로 컴포넌트 식별하기
+
+서명 검사기는 빌드가 남긴 문자열에서 버전을 읽는다. 프로그램에 링크된 라이브러리나 배너를 컴파일에서 뺀 데몬은 그런 문자열이 없어서, 컴포넌트가 SBOM에 빠지거나 버전 없이 나온다. 바이너리 지식 베이스는 반대쪽에서 이 틈을 메운다. 찾으려는 컴포넌트의 릴리스 소스로 베이스를 만들고, 바이너리에서 그 릴리스들이 가진 문자열 리터럴과 큰 상수 테이블을 찾는다.
+
+옵트인이며 로컬에서만 동작한다. 이미지에는 베이스가 들어 있지 않고 아무것도 내려받지 않는다. 믿을 수 있는 소스로 베이스를 한 번 만들어 스캔에 넘긴다.
+
+```bash
+# kb.csv: 릴리스마다 한 줄, 컴포넌트,버전,tarball 경로. 컴포넌트의 모든 릴리스를 적는다.
+# 목록에 없는 버전은 목록에 있는 가장 가까운 릴리스로 나온다.
+python3 docker/lib/binarykb.py build --kb kb.csv --bg ./background-tarballs \
+  --release my-kb-2026-11 --out kb/kb.sqlite3
+
+./scripts/scan-sbom.sh --project device-fw --version 1.0.0 \
+  --target "./device.bin" --firmware --binary-kb ./kb --generate-only
+```
+
+`--bg` 폴더에는 보고하지 않을 패키지의 tarball을 넣는다. 이 패키지의 문자열은 보고 대상 컴포넌트와 공유하는 문자열의 비중을 낮출 뿐이며, 여러 프로그램에 복사된 라이브러리가 원래 패키지의 것으로 판정되는 근거가 된다. 스캔 대상의 이웃(C 라이브러리, 셸 도구, 공유기의 자체 데몬)을 넣어야 한다. 이웃이 없는 베이스는 코드만 공유하는 다른 프로그램을 컴포넌트로 보고한다. 컴포넌트마다 심볼이 있는 참조 빌드(`--ref refs.csv`)를 주면 정적 링크에서도 남는 상수 테이블 서명이 더해지고, `--ref-bg`에는 테이블을 서명에서 뺄 파일 목록을 준다. 베이스는 SQLite 파일이며 코드를 담지 않고 읽기 전용으로 연다. 판정 기준값은 베이스에 저장되며, 만들 때 `--rule-score`와 `--rule-unique`로 정한다(기본값 300과 10). 적정값은 베이스마다 다르다. 베이스의 컴포넌트가 하나도 없는 루트 파일시스템을 스캔해서, 오탐이 사라질 때까지 점수 기준을 올린다.
+
+결과에 담기는 것은 다음과 같다.
+
+- 베이스에서 맞는 릴리스가 정확히 하나일 때만 `version`을 쓴다. 여럿이 맞으면 버전 없이 보고하고 `bomlens:versionCandidates`와 `bomlens:versionRange`에 후보를 적는다. 아무도 고를 수 없는 릴리스에 취약점을 대조하지 않기 위해서다.
+- 맞는 릴리스가 하나이고 그것이 베이스가 가진 가장 새 릴리스이면, 버전 없이 보고하고 `bomlens:versionMayBeNewer`를 붙이며 그 릴리스를 `bomlens:versionCandidates`에 적는다. 베이스에 없는 버전은 가장 가까운 이웃으로 나오고, 베이스의 모든 릴리스보다 새 버전이면 그 이웃은 마지막 릴리스다. 이것을 버전으로 쓰면 더 새 릴리스가 이미 고친 취약점에 대조하게 된다. 이런 컴포넌트는 버전 보충용 템플릿에 들어가 직접 채우게 한다. `FW_BINKB_TRUST_NEWEST=true`를 주면 버전을 그대로 쓰되 표시는 남긴다.
+- `bomlens:identifiedBy`는 `binary-kb`이고, 근거로 `bomlens:kbRelease`, `bomlens:kbScore`, `bomlens:kbUniqueStrings`(또는 `bomlens:kbTables`)와 찾은 파일(`evidence.occurrences`)이 붙는다.
+- 상수 테이블로만 찾은 컴포넌트는 버전이 없고 `presence-only`로 표시한다.
+
+검토 화면은 결과를 판정할 대기열로 바꿔 준다. 네트워크에서 아무것도 불러오지 않는 HTML 파일 하나다.
+
+```bash
+python3 docker/lib/binary-kb-review.py device-fw_1.0.0/device-fw_1.0.0_bom.json --lang ko > kb-review.html
+```
+
+판정이 필요한 컴포넌트가 먼저 나온다. 맞는 릴리스가 하나로 정해지지 않은 것, 실제 버전이 베이스가 아는 것보다 새것일 수 있는 것, 상수 테이블로만 찾은 것이다. 근거가 분명한 것은 목록에 있지만 접혀 있다. 결과마다 점수, 찾은 파일, 맞은 문자열(긴 순), 근거 파일의 해시를 보여 준다. `1`은 맞음, `2`는 제외, `3`은 버전 정정(둘 다 사유를 묻는다), `4`는 나중에, `j`와 `k`는 이동, `u`는 되돌리기다. **판정 파일 내려받기**는 아래 형식의 파일을 쓰고, 탭이 열려 있는 동안 판정한 내용은 브라우저에 남는다.
+
+결과에 대해 사람이 내린 판정은 JSON 파일에 적어 `--kb-decisions`로 넘긴다.
+
+```json
+[{"component": "busybox", "decision": "version", "version": "1.36.1",
+  "reason": "/bin/busybox에서 배너를 읽음", "reviewer": "이름", "evidence_sha256": "<파일의 sha256>"}]
+```
+
+`exclude`는 컴포넌트를 빼고, `version`은 버전을 바꾸고, `confirm`은 결과를 검토한 것으로 표시한다. 각각 `bomlens:review`로 기록한다. 사유가 없는 항목은 무시한다. `evidence_sha256`을 적으면 결과가 나온 파일의 해시가 그대로일 때만 적용되므로, 바뀐 파일은 다시 검토 대상이 된다.
+
+한계: 베이스에 없는 컴포넌트는 찾지 못한다. 라이브러리의 일부만 링크한 프로그램은 문자열과 테이블이 기준에 못 미칠 수 있다. 보안 수정을 적용하고도 버전 문자열을 그대로 둔 제조사 제품은 모든 버전 기반 검사와 마찬가지로 옛 릴리스처럼 보인다.
+
 ## CVE 대조 방식
 
 Trivy는 컴포넌트를 패키지 PURL로 대조하며, 다른 스캔과 마찬가지로 스캔할 때 데이터베이스를 내려받습니다. 패키지 PURL이 없는 컴포넌트(PURL이 없거나 `pkg:generic`, `pkg:opkg`, 또는 `pkg:github`처럼 소스 저장소를 가리키는 경우)는 CPE를 이미지에 들어 있는 NVD CPE 인덱스(`cpe_match.sqlite`)와 대조하고, 찾은 CVE를 같은 보안 보고서에 합칩니다. 이 대조는 펌웨어, 루트 파일시스템, 바이너리 스캔과 Yocto SPDX 2.2 아카이브(`<image>.spdx.tar.zst`)에서 `--security`를 켰을 때 CPE를 붙이는 단계가 모두 끝난 뒤 한 번 실행됩니다. 그래서 시그니처 검사기가 CPE를 붙인 컴포넌트뿐 아니라, BomLens가 관리하는 이름별 CPE 목록(`cpe-name-map.json`)으로 이름과 버전에서 CPE를 얻은 컴포넌트(예: OpenSSH, BusyBox)도 대조합니다. Yocto SPDX 3.0 문서와 매니페스트로 읽은 빌드는 이렇게 대조하지 않습니다. 이미 Yocto가 내린 판정을 담고 있어서, CPE로 다시 대조하면 Yocto가 패치했거나 해당 없다고 판정한 CVE를 열린 것으로 보고하게 되기 때문입니다. Yocto는 CPE를 `cpe:2.3:*:*:busybox:1.36.1`처럼 적습니다. 종류가 `*`이면 애플리케이션으로 읽고, 벤더가 `*`이면 Yocto의 cve-check와 같이 그 제품명을 쓰는 모든 벤더에서 제품명으로 찾습니다. 여러 벤더 아래 올라 있는 제품은 대부분 NVD가 한 프로젝트를 여러 이름으로 등록한 경우입니다(`linux_kernel`은 `linux`와 `kernel`, `curl`은 `haxx`, `curl`, `daniel_stenberg`). Yocto는 맞지 않는 벤더의 CVE를 `CVE_STATUS`의 `cpe-incorrect`로 걸러 내지만 SPDX 2.2 빌드에는 이 정보가 담기지 않으므로, 다른 프로젝트와 제품명이 같으면 그 프로젝트의 CVE도 함께 나올 수 있습니다. SPDX 2.2를 쓴 빌드는 레시피가 어떤 CVE를 패치했는지도 기록하지 않으므로, 이렇게 찾은 CVE에는 레시피가 이미 패치한 것이 섞일 수 있습니다. SPDX 3.0은 이를 기록합니다(`INHERIT += "create-spdx-3.0"`). 결과 매니페스트에는 이 단계가 `match-cpe`로 남고 `offered`, `components`, `cves` 개수가 함께 기록됩니다.
