@@ -32,6 +32,15 @@ BomLens를 발표한 자리와 외부에 소개된 기사를 모읍니다. 행�
 
 [슬라이드 보기](kwg-31-supply-chain-tools/slides.ko.html){ .md-button .md-button--primary target=_blank }
 
+### 투명성 확보를 위한 AI-BOM — ICOTEC 2026
+
+- **행사:** [ICOTEC 2026 국제저작권기술 콘퍼런스 (한국저작권위원회)](http://www.icotec.or.kr/)
+- **일자:** 2026년 11월 4일
+- **장소:** 서울 JW 메리어트 동대문 스퀘어 호텔 그랜드볼룸
+- **형식:** 20분 세션
+
+[슬라이드 보기](icotec-2026/slides.ko.html){ .md-button .md-button--primary target=_blank }
+
 ## 외부 소개
 
 ### 서울경제 (한국)

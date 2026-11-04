@@ -33,6 +33,16 @@ Where BomLens has been presented or covered, with slides and links for each. If 
 
 [View slides](kwg-31-supply-chain-tools/slides.html){ .md-button .md-button--primary target=_blank }
 
+### Transparency Through AI-BOM — ICOTEC 2026
+
+- **Event:** [ICOTEC 2026, International Copyright Technology Conference (Korea Copyright Commission)](http://www.icotec.or.kr/)
+- **Date:** 4 November 2026
+- **Location:** JW Marriott Dongdaemun Square Seoul, Seoul, Korea
+- **Format:** 20-minute session
+- **Language:** Slides are in Korean
+
+[View slides](icotec-2026/slides.ko.html){ .md-button .md-button--primary target=_blank }
+
 ## Press
 
 ### Seoul Economic Daily (Korea)
