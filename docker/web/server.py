@@ -4359,6 +4359,8 @@ def run_sibling_scan(image, mode, out_dir, on_log, *, upload_file=None, model_id
         # reason, and read the same way. entrypoint.sh runs it on the ANALYZE
         # path only, so passing it for every mode costs nothing.
         "-e", "PURL_RESOLVE=%s" % ("true" if env.get("PURL_RESOLVE") == "true" else "false"),
+        # CPE index match for a submitted SBOM (upstream-table components only).
+        "-e", "ANALYZE_CPE_INDEX=%s" % ("true" if env.get("ANALYZE_CPE_INDEX") == "true" else "false"),
         # Go reachability: the scan form's opt-in toggle, read the same way.
         "-e", "REACHABILITY=%s" % ("true" if env.get("REACHABILITY") == "true" else "false"),
     ]

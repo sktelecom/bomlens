@@ -368,7 +368,7 @@ export interface AdvisoryItem {
 }
 
 /** Why a component's vulnerabilities were not checked. */
-export type UncheckedReason = "no-version" | "no-identifier" | "unknown";
+export type UncheckedReason = "no-version" | "no-identifier" | "repository-purl" | "unknown";
 
 export interface UncheckedComponent {
   name: string;

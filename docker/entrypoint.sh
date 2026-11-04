@@ -2427,15 +2427,24 @@ fi
 # scan-security.sh is told whether it ran, so it can name the components no
 # check reached.
 BOMLENS_CPE_INDEX_MATCHED=false
+BOMLENS_CPE_INDEX_SCOPE=""
 _cpe_mode="$SCAN_MODE"
 [ "$YOCTO_CPE_MATCH" = true ] && _cpe_mode=YOCTO
-case "$_cpe_mode" in FIRMWARE|ROOTFS|BINARY|YOCTO)
+# A received SBOM (--analyze) is matched only when asked (ANALYZE_CPE_INDEX=true),
+# and then only the components BomLens's own upstream table identified
+# (bomlens:purlSource=upstream-map). A name and version a supplier typed is not
+# matched against the index.
+if [ "$_cpe_mode" = ANALYZE ] && [ "${ANALYZE_CPE_INDEX:-false}" = "true" ]; then
+    _cpe_mode=ANALYZE_UPSTREAM
+    BOMLENS_CPE_INDEX_SCOPE=upstream-map
+fi
+case "$_cpe_mode" in FIRMWARE|ROOTFS|BINARY|YOCTO|ANALYZE_UPSTREAM)
     if [ "${GENERATE_SECURITY:-false}" != "true" ]; then
         er_record match-cpe disabled
     else
         _mc_started="$(er_now)"; er_event step.start match-cpe
         _mc_rc=0
-        _mc_counts="$(bash "$LIBDIR/match-cpe-index.sh" "$OUTPUT_FILE" "$OUT_PREFIX")" || _mc_rc=$?
+        _mc_counts="$(CPE_INDEX_SCOPE="$BOMLENS_CPE_INDEX_SCOPE" bash "$LIBDIR/match-cpe-index.sh" "$OUTPUT_FILE" "$OUT_PREFIX")" || _mc_rc=$?
         case "$_mc_rc" in
             0) BOMLENS_CPE_INDEX_MATCHED=true
                er_record match-cpe ok "" "" "$_mc_started" "" "$_mc_counts" ;;
@@ -2447,7 +2456,19 @@ case "$_cpe_mode" in FIRMWARE|ROOTFS|BINARY|YOCTO)
         esac
     fi ;;
 esac
-export BOMLENS_CPE_INDEX_MATCHED
+export BOMLENS_CPE_INDEX_MATCHED BOMLENS_CPE_INDEX_SCOPE
+# A received SBOM (--analyze) is matched against the CPE index only for the
+# upstream-table components, and only when asked; the security report says what
+# was left out next to the components that only that step could have reached.
+BOMLENS_CPE_INDEX_SKIPPED=""
+if [ "$SCAN_MODE" = "ANALYZE" ] && [ "$YOCTO_CPE_MATCH" != true ]; then
+    if [ "$BOMLENS_CPE_INDEX_MATCHED" = true ] && [ "$BOMLENS_CPE_INDEX_SCOPE" = upstream-map ]; then
+        BOMLENS_CPE_INDEX_SKIPPED="analyze-upstream-map-only"
+    else
+        BOMLENS_CPE_INDEX_SKIPPED="analyze-mode"
+    fi
+fi
+export BOMLENS_CPE_INDEX_SKIPPED
 # Go reachability (--reachability, opt-in): govulncheck judges whether the code
 # each Go advisory lives in is reached, from the source's call graph (run in
 # stage 1, which has the Go toolchain) or from a Go executable's symbols. The

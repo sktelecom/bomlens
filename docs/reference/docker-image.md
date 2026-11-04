@@ -201,6 +201,7 @@ MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL='*' docker run --rm \
 | `PURL_RESOLVE` | — | `false` | `--analyze` only (the script's `--resolve-purl`): look each identifier up in its package repository (deps.dev) and add the answer to the conformance check report as an advisory row. Uses the network |
 | `PURL_RESOLVE_IGNORE` | — | — | Namespace prefixes to leave out of that lookup, space- or comma-separated. Use it for namespaces published only to an internal repository, which cannot be told apart from a wrong identifier |
 | `PURL_RESOLVE_BUDGET` | — | `240` | Seconds the lookup may take in total. Identifiers it does not reach are reported as unchecked, never as missing |
+| `ANALYZE_CPE_INDEX` | — | `false` | `--analyze` only (the script's `--analyze-cpe-index`): match the components carrying `bomlens:purlSource=upstream-map` against the bundled CPE index. |
 
 > TRUSCA's (formerly TrustedOSS Portal) native ingest endpoint (`POST /v1/projects/{id}/sbom-ingest`, Bearer auth) is not Dependency-Track compatible. To push to a regular Dependency-Track server, keep `UPLOAD_TARGET=dependency-track` (the default).
 

@@ -464,6 +464,7 @@
     "uncheckedReason": {
       "noVersion": "버전 없음",
       "noIdentifier": "식별자 없음",
+      "repositoryPurl": "저장소 purl(Trivy가 조회하지 않음)",
       "unknown": "알 수 없음"
     },
     "uncheckedTruncated": "전체 {{count}}개 중 처음 {{shown}}개를 표시합니다.",

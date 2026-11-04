@@ -83,9 +83,11 @@ WORK="$(mktemp -d)"
 # which is a different question from what this index answers, and the two
 # disagree: measured on one switch OS, giving `snmp` and `pkgconf` a purl and
 # taking them out of this pass cost four CVEs that nothing else reported.
-if ! jq "$(cat "$SCRIPT_DIR/vuln-coverage.jq")"'
+# CPE_INDEX_SCOPE=upstream-map (a received SBOM, --analyze-cpe-index) offers only
+# the components BomLens's upstream table identified.
+if ! jq --arg scope "${CPE_INDEX_SCOPE:-}" "$(cat "$SCRIPT_DIR/vuln-coverage.jq")"'
     {components: [ (.components // [])[] | recurse(.components[]?)
-                   | select(vc_cpe_index_candidate) ]}' "$SBOM" > "$WORK/cpe-in.json" 2>"$WORK/err"; then
+                   | select(vc_cpe_index_candidate_scoped($scope)) ]}' "$SBOM" > "$WORK/cpe-in.json" 2>"$WORK/err"; then
     echo "[cpe-index] could not read the components to match: $(head -c 300 "$WORK/err")" >&2
     exit 1
 fi
@@ -125,7 +127,9 @@ fi
 NCVE="$(jq 'length' "$WORK/vulns.json")"
 NCOMP="$(jq '[.[] | [.PkgName, .InstalledVersion]] | unique | length' "$WORK/vulns.json")"
 if [ "${NCVE:-0}" -gt 0 ]; then
-    jq '{ Results: [ { Target: "CPE index (NVD)", Class: "firmware", Vulnerabilities: . } ] }' \
+    _target="CPE index (NVD)"
+    [ "${CPE_INDEX_SCOPE:-}" != "upstream-map" ] || _target="CPE index (NVD, upstream table)"
+    jq --arg t "$_target" '{ Results: [ { Target: $t, Class: "firmware", Vulnerabilities: . } ] }' \
         "$WORK/vulns.json" > "$SIDE"
 fi
 # Required NVD attribution: the bundled index is derived from NVD data.

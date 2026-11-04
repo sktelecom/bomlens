@@ -464,6 +464,7 @@
     "uncheckedReason": {
       "noVersion": "No version",
       "noIdentifier": "No identifier",
+      "repositoryPurl": "Repository purl (not queried by Trivy)",
       "unknown": "Unknown"
     },
     "uncheckedTruncated": "Showing the first {{shown}} of {{count}}.",

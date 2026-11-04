@@ -342,6 +342,7 @@ if [ "$REPORT_LANG" = "ko" ]; then
     P_UNCHECKED_MORE=$(tfmt risk.unchecked_more "$((UNCHECKED_N - UNCHECKED_LIST_MAX))")
     P_REASON_NO_VERSION=$(kstr risk.unchecked_no_version)
     P_REASON_NO_ID=$(kstr risk.unchecked_no_identifier)
+    P_REASON_REPO_PURL=$(kstr risk.unchecked_repository_purl)
     P_VULN_NONE_CHECKED_MD=$(kstr risk.vuln_none_checked_md); P_VULN_NONE_CHECKED_HTML=$(kstr risk.vuln_none_checked_html)
     P_FW_SCOPE_H=$(kstr risk.fw_scope_h)
     P_FW_LABEL=$(kstr risk.fw_scope_label)
@@ -411,11 +412,12 @@ else
     P_UNPINNED_HTML="The source states version ranges and ships no lock file, so the versions in this SBOM are what a fresh install resolves at scan time, not necessarily the versions that were used. The counts above were measured against these versions. To judge a specific environment, scan a manifest that pins exact versions."
     P_UNREACHED_MD="> ${UNREACHED_N} finding(s) are not reachable: govulncheck found that the affected Go code is not called or not in the executable (--reachability). They are not in the counts above; the security report lists them."
     P_UNREACHED_HTML="<b>${UNREACHED_N} finding(s) are not reachable</b>: govulncheck found that the affected Go code is not called or not in the executable (--reachability). They are not in the counts above; the security report lists them."
-    P_UNCHECKED_MD="> ${UNCHECKED_N} component(s) could not be checked: they have no version, or no package purl and no CPE that was matched, so no vulnerability database was asked about them. The counts above do not cover them."
-    P_UNCHECKED_HTML="<b>${UNCHECKED_N} component(s) could not be checked</b>: they have no version, or no package purl and no CPE that was matched, so no vulnerability database was asked about them. The counts above do not cover them."
+    P_UNCHECKED_MD="> ${UNCHECKED_N} component(s) could not be checked: they have no version, or no package purl that Trivy can query and no CPE that was matched, so no vulnerability database was asked about them. The counts above do not cover them."
+    P_UNCHECKED_HTML="<b>${UNCHECKED_N} component(s) could not be checked</b>: they have no version, or no package purl that Trivy can query and no CPE that was matched, so no vulnerability database was asked about them. The counts above do not cover them."
     P_UNCHECKED_MORE="… and $((UNCHECKED_N - UNCHECKED_LIST_MAX)) more (the security report lists them all)"
     P_REASON_NO_VERSION="no version"
-    P_REASON_NO_ID="no package purl or matched CPE"
+    P_REASON_NO_ID="no package purl and no matched CPE"
+    P_REASON_REPO_PURL="repository purl (pkg:github, ...), which Trivy does not query"
     P_VULN_NONE_CHECKED_MD="_No vulnerability was found in the components that were checked. The components that could not be checked are listed above._"
     P_VULN_NONE_CHECKED_HTML="No vulnerability was found in the components that were checked. The components that could not be checked are listed above."
     P_FW_SCOPE_H="Firmware analysis scope"
@@ -529,9 +531,9 @@ P_VULN_NOTE_HTML="<div class=\"note\">${P_DL_LEAD}<b>${P_DL_BOLD_CRIT}</b>, <b>$
         echo "${P_UNCHECKED_MD}"
         echo ""
         # shellcheck disable=SC2016
-        echo "$UNCHECKED_TOP" | jq -r --arg nv "$P_REASON_NO_VERSION" --arg ni "$P_REASON_NO_ID" '.[] |
+        echo "$UNCHECKED_TOP" | jq -r --arg nv "$P_REASON_NO_VERSION" --arg ni "$P_REASON_NO_ID" --arg rp "$P_REASON_REPO_PURL" '.[] |
             "- `" + (.name | gsub("`"; "")) + "`" + (if .version != "" then " " + .version else "" end)
-            + " (" + (if .reason == "no-version" then $nv elif .reason == "no-identifier" then $ni else .reason end) + ")"'
+            + " (" + (if .reason == "no-version" then $nv elif .reason == "no-identifier" then $ni elif .reason == "repository-purl" then $rp else .reason end) + ")"'
         if [ "$UNCHECKED_N" -gt "$UNCHECKED_LIST_MAX" ]; then echo "- ${P_UNCHECKED_MORE}"; fi
         echo ""
     elif [ "${PRESENCE_ONLY:-0}" -gt 0 ]; then
@@ -695,9 +697,9 @@ HTMLSEC
     if [ "${UNCHECKED_N:-0}" -gt 0 ]; then
         echo "<div class=\"note\">${P_UNCHECKED_HTML}<ul>"
         # shellcheck disable=SC2016
-        echo "$UNCHECKED_TOP" | jq -r --arg nv "$P_REASON_NO_VERSION" --arg ni "$P_REASON_NO_ID" '.[] |
+        echo "$UNCHECKED_TOP" | jq -r --arg nv "$P_REASON_NO_VERSION" --arg ni "$P_REASON_NO_ID" --arg rp "$P_REASON_REPO_PURL" '.[] |
             "<li><code>" + (.name | @html) + "</code>" + (if .version != "" then " " + (.version | @html) else "" end)
-            + " (" + ((if .reason == "no-version" then $nv elif .reason == "no-identifier" then $ni else .reason end) | @html) + ")</li>"'
+            + " (" + ((if .reason == "no-version" then $nv elif .reason == "no-identifier" then $ni elif .reason == "repository-purl" then $rp else .reason end) | @html) + ")</li>"'
         if [ "$UNCHECKED_N" -gt "$UNCHECKED_LIST_MAX" ]; then echo "<li>$(esc "$P_UNCHECKED_MORE")</li>"; fi
         echo "</ul></div>"
     elif [ "${PRESENCE_ONLY:-0}" -gt 0 ]; then

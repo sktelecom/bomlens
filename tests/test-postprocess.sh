@@ -4849,10 +4849,10 @@ JSON
     else
         pass "scan-firmware.sh leaves CVE matching to the pipeline step (no second pass)"
     fi
-    grep -q 'case "$_cpe_mode" in FIRMWARE|ROOTFS|BINARY|YOCTO)' "$_ep" \
+    grep -q 'case "$_cpe_mode" in FIRMWARE|ROOTFS|BINARY|YOCTO|ANALYZE_UPSTREAM)' "$_ep" \
         && grep -q 'case "$_upstream_mode" in' "$_ep" \
         && grep -q '\[ "\$YOCTO_ARCHIVE" = "true" \] && YOCTO_CPE_MATCH=true' "$_ep" \
-        && pass "the CPE step runs for firmware, rootfs and binary scans and a Yocto SPDX 2.2 archive only; the upstream purl step for any Yocto records" \
+        && pass "the CPE step runs for firmware, rootfs and binary scans a Yocto SPDX 2.2 archive and, when asked, the upstream-table components of a received SBOM; the upstream purl step for any Yocto records" \
         || fail "the CPE index or upstream purl step is not scoped as expected"
 
     # rootfs / binary: syft's pkg:generic binary and a purl-less OS component are
@@ -4925,6 +4925,65 @@ SH
         && grep -q "3 component(s) could not be checked" "$WORK/unm_security.html" \
         && pass "the markdown and HTML reports say how many and list them" \
         || fail "the report does not name the unchecked components"
+
+    # A repository purl is worded apart from "no purl", and a received SBOM
+    # (--analyze) says the CPE index did not run. The counts do not change.
+    cat > "$WORK/repo.json" <<'JSON'
+{"bomFormat":"CycloneDX","specVersion":"1.6","metadata":{"component":{"type":"application","name":"sup","version":"1"}},
+ "components":[
+  {"type":"library","name":"curl","version":"8.5.0","purl":"pkg:github/curl/curl@curl-8_5_0"},
+  {"type":"library","name":"zlib-x","version":"1.2","purl":"pkg:generic/zlib-x@1.2"}]}
+JSON
+    BOMLENS_CPE_INDEX_SKIPPED=analyze-mode PATH="$FAKEBIN:$PATH" SECURITY_ENRICH=false DEEP_CVE=false \
+        bash "$LIB/scan-security.sh" "$WORK/repo.json" "$WORK/repo" proj >/dev/null 2>&1
+    [ "$(jq -r '[.UncheckedComponents.Components[] | "\(.Name):\(.Reason)"] | join(" ")' "$WORK/repo_security.json")" = "curl:repository-purl zlib-x:no-identifier" ] \
+        && [ "$(jq '.UncheckedComponents.Count' "$WORK/repo_security.json")" = 2 ] \
+        && grep -q "repository purl (pkg:github, ...), which Trivy does not query" "$WORK/repo_security.md" \
+        && grep -q "received SBOM (--analyze)" "$WORK/repo_security.md" \
+        && grep -q "received SBOM (--analyze)" "$WORK/repo_security.html" \
+        && pass "a repository purl has its own reason and a received SBOM gets the note" \
+        || fail "repository-purl reason or the --analyze note is wrong"
+    PATH="$FAKEBIN:$PATH" SECURITY_ENRICH=false DEEP_CVE=false \
+        bash "$LIB/scan-security.sh" "$WORK/repo.json" "$WORK/repo2" proj >/dev/null 2>&1
+    grep -q "received SBOM (--analyze)" "$WORK/repo2_security.md" \
+        && fail "the --analyze note appears outside --analyze" \
+        || pass "the --analyze note is absent when the index step was not skipped for the mode"
+
+    # --analyze-cpe-index: a received SBOM offers the index only the components
+    # whose bomlens:purlSource is upstream-map (not another value, not absent).
+    cat > "$WORK/an.json" <<'JSON'
+{"bomFormat":"CycloneDX","specVersion":"1.6","metadata":{"component":{"type":"application","name":"sup","version":"1"}},
+ "components":[
+  {"type":"library","name":"openssl","version":"1.0.2h","purl":"pkg:github/openssl/openssl@OpenSSL_1_0_2h","cpe":"cpe:2.3:a:openssl:openssl:1.0.2h:*:*:*:*:*:*:*",
+   "properties":[{"name":"bomlens:purlSource","value":"upstream-map"}]},
+  {"type":"library","name":"openssl-other","version":"1.0.2h","purl":"pkg:github/openssl/openssl@OpenSSL_1_0_2h","cpe":"cpe:2.3:a:openssl:openssl:1.0.2h:*:*:*:*:*:*:*"},
+  {"type":"library","name":"openssl-distro","version":"1.0.2h","purl":"pkg:deb/ubuntu/openssl@1.0.2h","cpe":"cpe:2.3:a:openssl:openssl:1.0.2h:*:*:*:*:*:*:*",
+   "properties":[{"name":"bomlens:purlSource","value":"container-store-distro"}]}]}
+JSON
+    jq '.components |= .[1:]' "$WORK/an.json" > "$WORK/an-none.json"
+    an_off="$(CPE_INDEX_SCOPE=upstream-map FW_CPE_INDEX="$CPEIDX" bash "$LIB/match-cpe-index.sh" "$WORK/an.json" "$WORK/an" 2>/dev/null | jq -c .offered)"
+    an_none="$(CPE_INDEX_SCOPE=upstream-map FW_CPE_INDEX="$CPEIDX" bash "$LIB/match-cpe-index.sh" "$WORK/an-none.json" "$WORK/an-none" 2>/dev/null | jq -c .offered)"
+    an_all="$(FW_CPE_INDEX="$CPEIDX" bash "$LIB/match-cpe-index.sh" "$WORK/an.json" "$WORK/an-all" 2>/dev/null | jq -c .offered)"
+    [ "$an_off" = 1 ] && [ "$an_none" = 0 ] && [ "$an_all" = 3 ] \
+        && pass "the scoped index match offers only upstream-map components (1 of 3; none of an SBOM without the property)" \
+        || fail "scoped offered=$an_off, without the property=$an_none, unscoped=$an_all (expected 1, 0, 3)"
+    grep -q "upstream table" "$WORK/an_security_cvebintool.json" 2>/dev/null \
+        && pass "a scoped match names its basis in the result" \
+        || fail "the scoped result does not name the upstream table"
+    PATH="$FAKEBIN:$PATH" SECURITY_ENRICH=false DEEP_CVE=false BOMLENS_CPE_INDEX_MATCHED=true BOMLENS_CPE_INDEX_SCOPE=upstream-map \
+        BOMLENS_CPE_INDEX_SKIPPED=analyze-upstream-map-only BOMLENS_VERSION=9.9.9 \
+        bash "$LIB/scan-security.sh" "$WORK/an.json" "$WORK/an" proj >/dev/null 2>&1
+    [ "$(jq -r '[.UncheckedComponents.Components[] | "\(.Name):\(.Reason)"] | join(" ")' "$WORK/an_security.json")" = "openssl-other:repository-purl" ] \
+        && grep -q "BomLens 9.9.9" "$WORK/an_security.md" \
+        && grep -q "upstream-map" "$WORK/an_security.md" \
+        && pass "with the opt-in only the upstream-map component is checked, and the note says so" \
+        || fail "scoped unchecked list is wrong"
+    PATH="$FAKEBIN:$PATH" SECURITY_ENRICH=false DEEP_CVE=false BOMLENS_CPE_INDEX_SKIPPED=analyze-mode \
+        bash "$LIB/scan-security.sh" "$WORK/an.json" "$WORK/an-off" proj >/dev/null 2>&1
+    [ "$(jq '.UncheckedComponents.Count' "$WORK/an-off_security.json")" = 2 ] \
+        && grep -q "unless --analyze-cpe-index is given" "$WORK/an-off_security.md" \
+        && pass "without the opt-in both repository-purl components stay unchecked and the note names the flag" \
+        || fail "opt-in off: unchecked list or note is wrong"
 
     # With the match done, only what it could not reach is left, and the CVE
     # Trivy and the index would both report is counted once.
