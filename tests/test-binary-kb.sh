@@ -75,6 +75,8 @@ roots = {
 for name, strings in roots.items():
     os.makedirs(f'{tmp}/root-{name}/usr/bin')
     open(f'{tmp}/root-{name}/usr/bin/prog', 'wb').write(blob(strings) + b'\0' * 64)
+os.makedirs(f'{tmp}/root-own-lib/usr/lib')
+open(f'{tmp}/root-own-lib/usr/lib/libalpha.so.1', 'wb').write(blob(A + SHARED + B + D) + b'\0' * 64)
 PY
 
 KB="$TMP/kb/kb.sqlite3"; mkdir -p "$TMP/kb"
@@ -145,6 +147,15 @@ if jq -e --arg sha "$(python3 -c 'import hashlib,sys;print(hashlib.sha256(open(s
             and ([.properties[] | select(.name == "bomlens:kbEvidenceStrings") | .value | fromjson | length >= 1] | all)' <<<"$out" >/dev/null; then
     pass "a result carries the hash of its evidence file and the longest strings that matched, for a reviewer to check"
 else fail "the evidence file hash or matched strings are missing" "$out"; fi
+
+# ---- static link relation -------------------------------------------------------------
+if [ "$(prop "$out" bomlens:linkage)" = "embedded" ] && [ "$(prop "$out" bomlens:embeddedIn)" = "usr/bin/prog" ]; then
+    pass "a component found inside a program that is not its own file is reported as embedded in that program"
+else fail "the embedded relation is missing" "$out"; fi
+own="$(ident own-lib)"
+if [ -z "$(prop "$own" bomlens:linkage)" ] && [ -z "$(prop "$own" bomlens:embeddedIn)" ]; then
+    pass "a component found in its own library file is not marked as embedded"
+else fail "an own library was marked as embedded" "$own"; fi
 
 # ---- review decisions -------------------------------------------------------------------
 sha="$(python3 -c 'import hashlib,sys;print(hashlib.sha256(open(sys.argv[1],"rb").read()).hexdigest())' "$TMP/root-release-1.1/usr/bin/prog")"

@@ -68,6 +68,18 @@ MAX_FILES = cap("FW_BINKB_MAX_FILES", 20000)
 MAX_BYTES = cap("FW_BINKB_MAX_BYTES", 64 * 1024 * 1024)
 
 
+def is_own_file(component, rel):
+    """True when a file looks like the component itself (libz.so.1 for zlib, bin/busybox for busybox).
+
+    A hit in any other file means the component's code is inside a program that was built
+    from it or linked it statically, which is the case a package record never shows.
+    """
+    base = os.path.basename(rel).lower()
+    key = re.sub(r"[^a-z0-9]", "", component.lower())
+    flat = re.sub(r"[^a-z0-9]", "", base)
+    return key in flat
+
+
 def locate(arg):
     """The database file named by a path or a directory holding kb.sqlite3, or None."""
     if not arg:
@@ -217,6 +229,11 @@ def main():
             if verdict.get("reviewer"):
                 props.append({"name": "bomlens:reviewer", "value": str(verdict["reviewer"])})
 
+        hosts = sorted({f for f, _ in e["files"] if not is_own_file(name, f)})
+        if hosts:
+            # The component's code was found inside other files: a static link or a copied source file.
+            props.append({"name": "bomlens:linkage", "value": "embedded" if len(hosts) == len(e["files"]) else "own-file-and-embedded"})
+            props.append({"name": "bomlens:embeddedIn", "value": ",".join(hosts[:MAX_EVIDENCE_FILES])})
         occurrences = [{"location": f} for f, _ in e["files"][:MAX_EVIDENCE_FILES]]
         comp = {"bom-ref": f"binary-kb:{name}@{version or 'unversioned'}", "type": "library", "name": name,
                 "properties": props, "evidence": {"occurrences": occurrences}}

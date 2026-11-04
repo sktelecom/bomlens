@@ -137,6 +137,7 @@ What a result carries:
 
 - A component has a `version` only when exactly one release in the base fits. When several fit, the component has no version and `bomlens:versionCandidates` and `bomlens:versionRange` list them, so no vulnerability is matched against a release nobody could pick.
 - When the one release that fits is the newest the base has, the component is reported without a version, with `bomlens:versionMayBeNewer` and that release in `bomlens:versionCandidates`. A version that is not in the base comes back as its nearest neighbour, and for a version newer than every release in the base that neighbour is the last one; written as the version, it would be matched against vulnerabilities a newer release has fixed. The component goes into the component-versions template for you to fill. Set `FW_BINKB_TRUST_NEWEST=true` to write the version anyway, still marked.
+- When a component's code is found inside a file that is not its own library or program (a static link, or a copied source file), the result carries `bomlens:linkage` (`embedded`, or `own-file-and-embedded` when its own file is present too) and `bomlens:embeddedIn` with those files, so a vulnerable library inside a program can be traced to the program that carries it.
 - `bomlens:identifiedBy` is `binary-kb`, with `bomlens:kbRelease`, `bomlens:kbScore` and `bomlens:kbUniqueStrings` (or `bomlens:kbTables`) as the evidence, and the files it was found in as `evidence.occurrences`.
 - A component found only by constant tables has no version and is tagged `presence-only`.
 
