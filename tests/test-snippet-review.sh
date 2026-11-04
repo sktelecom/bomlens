@@ -32,7 +32,12 @@ cat > "$TMP/raw.json" <<'JSON'
  "src/e.c":[{"id":"file","matched":"100%","lines":"all","purl":["pkg:github/acme/nolic"],"component":"nolic","version":"1.0","licenses":[],"file_hash":"ee55"}],
  "src/f.c":[{"id":"snippet","matched":"80%","lines":"1-30","purl":["pkg:github/acme/one"],"component":"one","version":"1","licenses":[{"name":"MIT"}],"file_hash":"ff66"},
             {"id":"snippet","matched":"75%","lines":"1-30","purl":["pkg:github/acme/two"],"component":"two","version":"1","licenses":[{"name":"MIT"}],"file_hash":"ff66"}],
- "src/g.c":[{"id":"none"}]}
+ "src/g.c":[{"id":"none"}],
+ "src/h.c":[{"id":"snippet","matched":"30%","lines":"1-30","purl":["pkg:github/acme/one"],"component":"one","version":"1","licenses":[{"name":"MIT"}],"file_hash":"hh77"},
+            {"id":"snippet","matched":"30%","lines":"100-130","purl":["pkg:github/acme/two"],"component":"two","version":"1","licenses":[{"name":"MIT"}],"file_hash":"hh77"}],
+ "src/big.c":[{"id":"snippet","matched":"6%","lines":"200-260","purl":["pkg:github/acme/hugefile"],"component":"hugefile","version":"2","licenses":[{"name":"GPL-2.0-only"}],"file_hash":"bg88"}],
+ "src/m.c":[{"id":"snippet","matched":"90%","lines":"1-40","purl":["pkg:github/acme/permis"],"component":"permis","version":"1","licenses":[{"name":"MIT"}],"file_hash":"mm99"},
+            {"id":"snippet","matched":"85%","lines":"1-40","purl":["pkg:github/acme/strong"],"component":"strong","version":"1","licenses":[{"name":"GPL-3.0-only"}],"file_hash":"mm99"}]}
 JSON
 tier() { python3 - "$TOOL" "$TMP/raw.json" "$1" <<'PY'
 import importlib.util, json, sys
@@ -47,11 +52,11 @@ PY
 [ "$(tier pkg:github/acme/libbar)" = "decide:partial" ] && pass "a partial copy of 11 lines or more and 40% or more needs a decision" || fail "libbar is not decide:partial" "$(tier pkg:github/acme/libbar)"
 [ "$(tier pkg:github/acme/tiny)" = "reference:" ] && pass "a match of 10 lines or fewer is shown for information only" || fail "tiny is not reference"
 [ "$(tier pkg:github/acme/nolic)" = "decide:license" ] && pass "a whole-file match with no license found needs a decision" || fail "nolic is not decide:license"
-[ "$(tier pkg:github/acme/one)" = "decide:partial,split" ] && pass "a file claimed by several sources is marked as split" || fail "split file not marked" "$(tier pkg:github/acme/one)"
+[ "$(tier pkg:github/acme/hugefile)" = "decide:partial" ] && pass "a long copy inside a big file needs a decision however small its share of the file" || fail "a diluted copy was not asked about" "$(tier pkg:github/acme/hugefile)"
 
 # ---- queue ----------------------------------------------------------------------------
-q="$(python3 "$TOOL" queue "$TMP/raw.json" 2>/dev/null | cut -f1 | sort | tr '\n' ' ')"
-[ "$q" = "pkg:github/acme/libbar pkg:github/acme/nolic pkg:github/acme/one pkg:github/acme/two " ] && pass "the queue lists only the groups that need a decision" || fail "unexpected queue" "$q"
+q="$(python3 "$TOOL" queue "$TMP/raw.json" 2>/dev/null | awk -F'\t' '{print $2}' | sort | uniq -c | tr -s ' ' | tr '\n' ';')"
+[ "$q" = " 2 contest; 4 group;" ] || [ "$q" = " 2 contest; 3 group;" ] && pass "the queue lists the groups and the contests that need a decision" || fail "unexpected queue" "$q"
 
 # ---- decisions ------------------------------------------------------------------------
 cat > "$TMP/comps.json" <<'JSON'
@@ -68,7 +73,7 @@ if [ "$(jq 'length' <<<"$out")" = "3" ] \
 else fail "undecided groups were dropped or not marked" "$out"; fi
 
 cat > "$TMP/dec.json" <<'JSON'
-[{"component":"pkg:github/acme/libbar","decision":"ours","reason":"https://git.example/ours/repo","reviewer":"a","files":[{"hash":"cc33","lines":"10-60"}]},
+[{"component":"pkg:github/acme/libbar","decision":"ours","reason":"https://git.example/ours/repo","reviewer":"a","files":[{"key":"cc33:10-60"}]},
  {"component":"pkg:github/acme/nolic","decision":"version","version":"1.1","reason":"checked the tag","reviewer":"a"}]
 JSON
 out="$(python3 "$TOOL" apply "$TMP/comps.json" "$TMP/raw.json" "$TMP/dec.json" 2>/dev/null)"
@@ -76,7 +81,7 @@ if [ "$(jq -r '[.[].name] | join(",")' <<<"$out")" = "libfoo,nolic" ] && [ "$(jq
     pass "code decided to be our own leaves the SBOM, and a corrected version replaces the detected one"
 else fail "decisions were not applied" "$out"; fi
 
-sed 's/"cc33"/"changed"/' "$TMP/dec.json" > "$TMP/dec-stale.json"
+sed 's/cc33/changed/' "$TMP/dec.json" > "$TMP/dec-stale.json"
 out="$(python3 "$TOOL" apply "$TMP/comps.json" "$TMP/raw.json" "$TMP/dec-stale.json" 2>/dev/null)"
 if [ "$(jq -r '[.[] | select(.name=="libbar") | .properties[] | select(.name=="bomlens:review") | .value] | first' <<<"$out")" = "pending" ]; then
     pass "a decision pinned to files that no longer match goes back to the queue instead of applying"
@@ -93,6 +98,97 @@ out="$(python3 "$TOOL" apply "$TMP/comps.json" "$TMP/raw.json" "$TMP/dec-add.jso
 if [ "$(jq -r '[.[] | select(.name=="libbar") | .properties[] | select(.name=="bomlens:review") | .value] | first' <<<"$out")" = "add: checked" ]; then
     pass "an accepted match stays in the SBOM and records the review"
 else fail "the add decision was not recorded" "$out"; fi
+
+# ---- contests -------------------------------------------------------------------------
+contest() { python3 - "$TOOL" "$1" <<'PY'
+import importlib.util, json, sys
+s = importlib.util.spec_from_file_location("sr", sys.argv[1]); m = importlib.util.module_from_spec(s); s.loader.exec_module(m)
+items = m.groups_of(json.load(open(sys.argv[2])))
+cs = [i for i in items if i["kind"] == "contest"]
+print(json.dumps([{"name": c["name"], "n": len(c["files"]), "differs": c["differs"], "key": c["key"], "purls": sorted(f["purl"] for f in c["files"])} for c in cs]))
+PY
+}
+cj="$(contest "$TMP/raw.json")"
+if [ "$(jq 'length' <<<"$cj")" = "2" ] && [ "$(jq -r '[.[] | select(.name=="src/f.c") | .n][0]' <<<"$cj")" = "2" ] && [ "$(jq -r '[.[] | select(.name=="src/f.c") | .differs][0]' <<<"$cj")" = "false" ]; then
+    pass "two sources matching the same lines of one file form one contest"
+else fail "the contest was not detected" "$cj"; fi
+[ "$(jq -r '[.[] | select(.name=="src/h.c")] | length' <<<"$cj")" = "0" ] && pass "two sources matching different regions of one file are a combination, not a contest" || fail "a combination was treated as a contest"
+[ "$(jq -r '[.[] | select(.name=="src/m.c") | .differs][0]' <<<"$cj")" = "true" ] && pass "a contest between a permissive and a strong copyleft source is marked as differing in obligation" || fail "the obligation difference was not flagged"
+ck="$(jq -r '[.[] | select(.name=="src/f.c") | .key][0]' <<<"$cj")"
+cat > "$TMP/comps2.json" <<'JSON'
+[{"type":"library","name":"one","version":"1","properties":[]},{"type":"library","name":"two","version":"1","properties":[]},
+ {"type":"library","name":"libfoo","version":"1.2.0","properties":[]}]
+JSON
+out="$(python3 "$TOOL" apply "$TMP/comps2.json" "$TMP/raw.json" "$TMP/none.json" 2>/dev/null)"
+if [ "$(jq '[.[] | select(.name=="one" or .name=="two") | .properties[] | select(.name=="bomlens:review" and .value=="pending")] | length' <<<"$out")" -ge 1 ] && [ "$(jq 'length' <<<"$out")" = "3" ]; then
+    pass "an undecided contest keeps every candidate in the SBOM, marked pending, so nothing is silently dropped"
+else fail "an undecided contest dropped a candidate or was not marked" "$out"; fi
+cat > "$TMP/dec-c.json" <<JSON
+[{"contest":"$ck","decision":"origin","choice":"pkg:github/acme/one","version":"1","reason":"header names the project","reviewer":"a",
+  "others":[{"purl":"pkg:github/acme/two","version":"1","license":"MIT"}]}]
+JSON
+out="$(python3 "$TOOL" apply "$TMP/comps2.json" "$TMP/raw.json" "$TMP/dec-c.json" 2>/dev/null)"
+if [ "$(jq -r '[.[].name] | sort | join(",")' <<<"$out")" = "libfoo,one,two" ] && [ "$(jq -r '[.[] | select(.name=="one") | .properties[] | select(.name=="bomlens:alsoMatched") | .value][0]' <<<"$out")" = "pkg:github/acme/two@1 (permissive)" ]; then
+    pass "choosing the origin keeps that source and records the other as also matched; a source with other files of its own stays"
+else fail "the origin choice was not applied" "$out"; fi
+mk="$(jq -r '[.[] | select(.name=="src/m.c") | .key][0]' <<<"$cj")"
+cat > "$TMP/comps3.json" <<'JSON'
+[{"type":"library","name":"permis","version":"1","properties":[]},{"type":"library","name":"strong","version":"1","properties":[]}]
+JSON
+cat > "$TMP/dec-m.json" <<JSON
+[{"contest":"$mk","decision":"origin","choice":"pkg:github/acme/permis","version":"1","reason":"header says permis","reviewer":"a",
+  "others":[{"purl":"pkg:github/acme/strong","version":"1","license":"GPL-3.0-only"}]}]
+JSON
+out="$(python3 "$TOOL" apply "$TMP/comps3.json" "$TMP/raw.json" "$TMP/dec-m.json" 2>"$TMP/m.err")"
+if [ "$(jq -r '[.[].name] | join(",")' <<<"$out")" = "permis" ] && grep -q "weaker than candidate" "$TMP/m.err"; then
+    pass "a source whose every file went to the other is dropped, and picking the weaker obligation is reported for sampling"
+else fail "the weaker-obligation choice was not handled" "$(cat "$TMP/m.err")"; fi
+echo "[{\"contest\":\"$ck\",\"decision\":\"origin\",\"choice\":\"pkg:github/acme/one\",\"reviewer\":\"a\"}]" > "$TMP/dec-c-bad.json"
+out="$(python3 "$TOOL" apply "$TMP/comps2.json" "$TMP/raw.json" "$TMP/dec-c-bad.json" 2>/dev/null)"
+[ "$(jq 'length' <<<"$out")" = "3" ] && pass "an origin choice without its reason is ignored" || fail "an origin choice without a reason was applied"
+# a candidate that appears later with a different obligation sends the decision back to the queue
+python3 - "$TMP/raw.json" "$TMP/raw-new.json" <<'PY'
+import json, sys
+r = json.load(open(sys.argv[1]))
+r["src/f.c"].append({"id": "snippet", "matched": "70%", "lines": "1-30", "purl": ["pkg:github/acme/gplfork"], "component": "gplfork", "version": "1", "licenses": [{"name": "GPL-2.0-only"}], "file_hash": "ff66"})
+json.dump(r, open(sys.argv[2], "w"))
+PY
+nk="$(contest "$TMP/raw-new.json" | jq -r '[.[] | select(.name=="src/f.c") | .key][0]')"
+sed "s/$ck/$nk/" "$TMP/dec-c.json" > "$TMP/dec-c2.json"
+out="$(python3 "$TOOL" apply "$TMP/comps2.json" "$TMP/raw-new.json" "$TMP/dec-c2.json" 2>/dev/null)"
+if [ "$(jq -r '[.[] | select(.name=="two")] | length' <<<"$out")" = "1" ]; then
+    pass "a new candidate with a different obligation sends an earlier origin choice back to the queue"
+else fail "a stale origin choice still applied after a new candidate appeared"; fi
+
+# ---- accepted sources the scan's own list did not carry --------------------------------------
+echo '[{"component":"pkg:github/acme/libbar","decision":"add","reason":"checked"}]' > "$TMP/dec-add2.json"
+echo '[]' > "$TMP/empty-comps.json"
+out="$(python3 "$TOOL" apply "$TMP/empty-comps.json" "$TMP/raw.json" "$TMP/dec-add2.json" 2>/dev/null)"
+[ "$(jq -r '.[0].name' <<<"$out")" = "libbar" ] && pass "accepting a partial copy adds the component even when the scan's own list did not carry it" || fail "the accepted partial copy did not reach the SBOM" "$out"
+echo '[{"component":"pkg:github/acme/libbar","decision":"add"}]' > "$TMP/dec-add3.json"
+[ "$(python3 "$TOOL" apply "$TMP/empty-comps.json" "$TMP/raw.json" "$TMP/dec-add3.json" 2>/dev/null | jq 'length')" = "0" ] && pass "an add decision without a reason is ignored" || fail "an add without a reason was applied"
+
+# ---- keys -----------------------------------------------------------------------------
+python3 - "$TOOL" "$TMP" <<'PY' && pass "a decision follows the matched lines, not their line numbers or the rest of the file" || fail "the region key changed with unrelated edits"
+import importlib.util, os, sys
+s = importlib.util.spec_from_file_location("sr", sys.argv[1]); m = importlib.util.module_from_spec(s); s.loader.exec_module(m)
+tmp = sys.argv[2]; body = [f"matched line {i}" for i in range(20)]
+os.makedirs(tmp + "/ka", exist_ok=True); os.makedirs(tmp + "/kb", exist_ok=True)
+open(tmp + "/ka/x.c", "w").write("\n".join(["a"] + body + ["b"]) + "\n")
+open(tmp + "/kb/x.c", "w").write("\n".join(["new header", "another"] + body + ["different tail", "more"]) + "\n")
+fa = {"path": "x.c", "lines": "2-21", "hash": "", "source_hash": ""}; fb = {"path": "x.c", "lines": "3-22", "hash": "", "source_hash": ""}
+ha, ra = m.local_keys(tmp + "/ka", fa); hb, rb = m.local_keys(tmp + "/kb", fb)
+sys.exit(0 if ra == rb and ha != hb else 1)
+PY
+if grep -q "'bomlens-snippet-review:' + D.id" "$TOOL"; then pass "the page keeps its drafts per scan, so another scan's page does not show them"; else fail "the page storage key is not per scan"; fi
+mkdir -p "$TMP/rel2"; : > "$TMP/rel2/libx-1.2.10.tar.gz"; tar -czf "$TMP/rel2/libx-1.2.10.tar.gz" -C "$TMP/origin" libbar-3.0
+python3 - "$TOOL" "$TMP/rel2" <<'PY' && pass "a release named libx-1.2.10 is not taken for libx-1.2" || fail "the source release name matched across a version boundary"
+import importlib.util, sys
+s = importlib.util.spec_from_file_location("sr", sys.argv[1]); m = importlib.util.module_from_spec(s); s.loader.exec_module(m)
+f = {"origin_file": "lib/bar.c", "component": "libx", "version": "1.2", "path": "p", "origin_tree": ""}
+v = m.origin_view(sys.argv[2], [f], m.Budget(10**6))
+sys.exit(0 if not v["texts"] and not v["trees"] else 1)
+PY
 
 # ---- page -----------------------------------------------------------------------------
 mkdir -p "$TMP/src"; seq 1 80 | sed 's/^/line /' > "$TMP/src/c.c"

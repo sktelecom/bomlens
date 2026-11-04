@@ -37,18 +37,21 @@ never silently left out of the SBOM.
 """
 import argparse
 import collections
+import hashlib
 import json
 import os
 import re
 import sys
 import tarfile
 
-MIN_LINES = 11
-MIN_PERCENT = 40.0
+MIN_LINES = 11       # a partial copy shorter than this is shown for information only
+MIN_PERCENT = 40.0   # ... unless it covers this share of the file
+BIG_LINES = 50       # ... or is this long, however large the file: a long copy inside a big file still counts
 MAX_TEXT_CHARS = 400_000   # one file's text in the page
 MAX_PAGE_TEXT = 8_000_000  # all file text in the page
 MAX_TREE = 5000            # paths in one tree
-DECISIONS = ("add", "ours", "coincidence", "declared", "version")
+DECISIONS = ("add", "ours", "coincidence", "declared", "version", "origin")
+CLASS_RANK = {"unknown": 0, "permissive": 1, "weak": 2, "strong": 3}
 
 STRINGS = {
     "en": {
@@ -67,6 +70,7 @@ STRINGS = {
         "need_reason": "A reason is required.", "need_name": "A name is required.", "need_version": "A version is required.",
         "decision_add": "Added", "decision_ours": "Our own code", "decision_coincidence": "Coincidence", "decision_declared": "Declared elsewhere", "decision_version": "Version corrected",
         "add_reason": "Checked in the review page: the code is third-party",
+        "why_contest": "Several sources match the same lines of this file. Pick the one the code was taken from.", "why_differs": "The candidates carry different license obligations: the choice changes what you must do, so give the reason.", "contest_tag": "[same code]", "keys_contest": "Keys: 1-9 pick the source the code was taken from, o our own code, x coincidence, l later, n/p region, [/] candidate, j/k move, u undo", "candidates": "Candidates", "origin_is": "Taken from", "origin_reason": "Why this source (for example the header, the version, or where the supplier says it came from)", "decision_origin": "Origin chosen",
     },
     "ko": {
         "title": "소스 일치 검토", "progress": "판정 필요 {need}건 중 {todo}건 남음", "auto": "근거로 확정됨 ({n}건)",
@@ -84,6 +88,7 @@ STRINGS = {
         "need_reason": "사유가 필요합니다.", "need_name": "이름이 필요합니다.", "need_version": "버전이 필요합니다.",
         "decision_add": "추가", "decision_ours": "원본은 우리 쪽", "decision_coincidence": "우연한 일치", "decision_declared": "다른 이름으로 선언됨", "decision_version": "버전 정정",
         "add_reason": "검토 화면에서 외부 코드임을 확인함",
+        "why_contest": "같은 줄을 여러 출처가 가리킵니다. 이 코드를 가져온 출처를 고르세요.", "why_differs": "후보의 라이선스 의무가 서로 다릅니다. 무엇을 골랐는지에 따라 지켜야 할 의무가 달라지므로 사유를 적어야 합니다.", "contest_tag": "[같은 코드]", "keys_contest": "단축키: 1~9 코드를 가져온 출처 선택, o 원본은 우리 쪽, x 우연한 일치, l 나중에, n/p 구간, [/] 후보, j/k 이동, u 되돌리기", "candidates": "후보", "origin_is": "가져온 곳:", "origin_reason": "이 출처로 본 이유(예: 파일 머리말, 버전, 공급사가 밝힌 출처)", "decision_origin": "원본 출처 선택",
     },
 }
 
@@ -109,58 +114,172 @@ def line_count(lines, whole):
     return total
 
 
-def group_key(m):
-    purl = (m.get("purl") or [None])[0]
-    return purl or m.get("component") or ""
+def name_key(m):
+    """What identify-vendored.sh groups by: the component name in lower case."""
+    purl = (m.get("purl") or [""])[0]
+    return (m.get("component") or re.sub(r"^pkg:[^/]+/", "", purl)).lower()
+
+
+def license_class(names):
+    """strong, weak, permissive or unknown for a set of license names; the strictest one wins."""
+    best = "unknown"
+    for n in names:
+        u = str(n).upper()
+        if re.search(r"LGPL|MPL|EPL|CDDL|CLASSPATH|GCC-EXCEPTION|LINKING-EXCEPTION", u):
+            c = "weak"
+        elif re.search(r"GPL|SSPL|EUPL|OSL", u):
+            c = "strong"
+        elif re.search(r"MIT|BSD|APACHE|ISC|ZLIB|UNLICENSE|CC0|PYTHON|OPENSSL|BOOST|BSL|X11|WTFPL", u):
+            c = "permissive"
+        else:
+            continue
+        if CLASS_RANK[c] > CLASS_RANK[best]:
+            best = c
+    return best
+
+
+def parse_regions(spec):
+    """[(first, last)] of a line spec such as `10-60,100-190`; `all` covers the whole file."""
+    if not spec or spec == "all":
+        return [(1, 10 ** 9)]
+    out = []
+    for part in str(spec).split(","):
+        a, _, b = part.partition("-")
+        try:
+            lo, hi = int(a), int(b or a)
+        except ValueError:
+            continue
+        if 0 < lo <= hi:
+            out.append((lo, hi))
+    return out or [(1, 10 ** 9)]
+
+
+def overlap(r1, r2):
+    return any(a1 <= b2 and a2 <= b1 for a1, b1 in r1 for a2, b2 in r2)
+
+
+def read_local(root, rel):
+    """Bytes of one of the user's files, or None. A path that leaves the tree is never read."""
+    base = os.path.realpath(root)
+    p = os.path.realpath(os.path.join(base, rel))
+    if not p.startswith(base + os.sep) or not os.path.isfile(p):
+        return None
+    try:
+        with open(p, "rb") as fh:
+            return fh.read(16_000_000)
+    except OSError:
+        return None
+
+
+def local_keys(root, f):
+    """Hash of the user's file and of the matched lines, so a decision follows the content, not the path or the scan."""
+    data = read_local(root, f["path"]) if root else None
+    if data is None:
+        base = f.get("source_hash") or f.get("hash") or ""
+        return base, f"{base}:{f['lines']}"
+    lines = data.decode("utf8", "replace").splitlines()
+    region = "\n".join("\n".join(lines[a - 1:b]) for a, b in parse_regions(f["lines"]))
+    return hashlib.sha256(data).hexdigest(), hashlib.sha256(region.encode()).hexdigest()
 
 
 def groups_of(raw, root=None, origin=None, budget=None):
-    """Group the matches of a raw scan by source component and judge each group."""
+    """Group the matches of a raw scan by source component and judge each group.
+
+    Returns groups and contests. A contest is one file whose matched lines overlap between two or more
+    sources: the sources compete for the same code, so a person picks the origin instead of approving each.
+    Sources that match different regions of one file are a combination, not a contest.
+    """
+    budget = budget or Budget(MAX_PAGE_TEXT)
     by = collections.OrderedDict()
-    claimed = collections.defaultdict(set)   # path -> sources that claim it
+    per_path = collections.defaultdict(list)
     for path in sorted(raw):
         for m in raw[path] if isinstance(raw[path], list) else []:
             if not isinstance(m, dict) or m.get("id") not in ("file", "snippet"):
                 continue
-            key = group_key(m)
-            if not key:
+            nk = name_key(m)
+            if not nk:
                 continue
-            claimed[path].add(key)
-            g = by.setdefault(key, {"key": key, "name": m.get("component") or key, "purl": (m.get("purl") or [""])[0],
-                                    "versions": collections.Counter(), "licenses": set(), "files": [], "urls": set()})
+            g = by.setdefault(nk, {"name": m.get("component") or nk, "purls": collections.Counter(), "versions": collections.Counter(),
+                                   "licenses": set(), "files": [], "urls": set()})
+            if m.get("purl"):
+                g["purls"][m["purl"][0]] += 1
             if m.get("version"):
                 g["versions"][m["version"]] += 1
-            g["licenses"].update(l.get("name") for l in m.get("licenses") or [] if isinstance(l, dict) and l.get("name"))
+            lic = [l.get("name") for l in m.get("licenses") or [] if isinstance(l, dict) and l.get("name")]
+            g["licenses"].update(lic)
             if m.get("url"):
                 g["urls"].add(m["url"])
-            g["files"].append({"path": path, "id": m["id"], "matched": percent(m.get("matched")), "lines": m.get("lines") or "all",
-                               "oss_lines": m.get("oss_lines") or "", "hash": m.get("file_hash") or "", "version": m.get("version") or "",
-                               "origin_file": m.get("file") or "", "component": m.get("component") or "", "origin_tree": ""})
+            f = {"path": path, "id": m["id"], "matched": percent(m.get("matched")), "lines": m.get("lines") or "all",
+                 "oss_lines": m.get("oss_lines") or "", "hash": m.get("file_hash") or "", "source_hash": m.get("source_hash") or "",
+                 "version": m.get("version") or "", "origin_file": m.get("file") or "", "component": m.get("component") or "",
+                 "origin_tree": "", "name_key": nk, "licenses": lic, "class": license_class(lic),
+                 "purl": (m.get("purl") or [""])[0]}
+            f["file_hash"], f["rkey"] = local_keys(root, f)
+            g["files"].append(f)
+            per_path[path].append(f)
+
+    # contests: files whose matched regions overlap between different sources
+    contested = set()
+    contests = []
+    for path, fs in per_path.items():
+        parent = list(range(len(fs)))
+        def find(i):
+            while parent[i] != i:
+                parent[i] = parent[parent[i]]; i = parent[i]
+            return i
+        for i in range(len(fs)):
+            for j in range(i + 1, len(fs)):
+                if fs[i]["name_key"] != fs[j]["name_key"] and overlap(parse_regions(fs[i]["lines"]), parse_regions(fs[j]["lines"])):
+                    parent[find(i)] = find(j)
+        clusters = collections.defaultdict(list)
+        for i in range(len(fs)):
+            clusters[find(i)].append(fs[i])
+        for members in clusters.values():
+            if len({m["name_key"] for m in members}) < 2:
+                continue
+            for m in members:
+                contested.add(id(m))
+            cid = hashlib.sha256("|".join(sorted({m["rkey"] for m in members})).encode()).hexdigest()[:24]
+            classes = sorted({m["class"] for m in members})
+            c = {"kind": "contest", "key": "contest:" + cid, "name": path, "purl": "", "versions": {}, "licenses": [], "urls": [],
+                 "tier": "decide", "reasons": ["contest"], "best": max(m["matched"] for m in members), "small": 0,
+                 "files": sorted(members, key=lambda m: (-m["matched"], m["name_key"])), "classes": classes,
+                 "differs": len(classes) > 1}
+            if root:
+                c["ours"] = ours_view(root, c["files"][:1], budget)
+            if origin:
+                c["origin"] = origin_view(origin, c["files"], budget)
+            contests.append(c)
+
     out = []
-    for g in by.values():
-        files = g["files"]
-        partial = [f for f in files if f["id"] == "snippet" and (line_count(f["lines"], 0) >= MIN_LINES and f["matched"] >= MIN_PERCENT)]
-        small = [f for f in files if f["id"] == "snippet" and f not in partial]
+    for nk, g in by.items():
+        files = [f for f in g["files"] if id(f) not in contested]
+        key = g["purls"].most_common(1)[0][0] if g["purls"] else nk
+        small = [f for f in files if f["id"] == "snippet" and line_count(f["lines"], 0) < MIN_LINES]
+        big = [f for f in files if f["id"] == "snippet" and (line_count(f["lines"], 0) >= BIG_LINES or
+                                                              (line_count(f["lines"], 0) >= MIN_LINES and f["matched"] >= MIN_PERCENT))]
+        small_total = sum(line_count(f["lines"], 0) for f in files if f["id"] == "snippet")
         reasons = []
-        if partial:
+        if big or (files and small_total >= BIG_LINES and any(f["id"] == "snippet" for f in files)):
             reasons.append("partial")
-        if any(len(claimed[f["path"]]) > 1 for f in files):
-            reasons.append("split")
         if not g["licenses"] and any(f["id"] == "file" for f in files):
             reasons.append("license")
         if len(g["versions"]) > 1:
             reasons.append("versions")
+        if not files:
+            continue    # every file of this source is in a contest; the contests carry the decision
         tier = "decide" if reasons else ("auto" if all(f["id"] == "file" for f in files) else "reference")
-        item = {"key": g["key"], "name": g["name"], "purl": g["purl"], "versions": dict(g["versions"].most_common()),
-                "licenses": sorted(g["licenses"]), "urls": sorted(g["urls"])[:3], "tier": tier, "reasons": reasons,
-                "best": max((f["matched"] for f in files), default=0), "files": files, "small": len(small)}
-        budget = budget or Budget(MAX_PAGE_TEXT)
+        item = {"kind": "group", "key": key, "name": g["name"], "name_key": nk, "purl": key if key.startswith("pkg:") else "",
+                "versions": dict(g["versions"].most_common()), "licenses": sorted(g["licenses"]), "urls": sorted(g["urls"])[:3],
+                "tier": tier, "reasons": reasons, "best": max((f["matched"] for f in files), default=0), "files": files, "small": len(small),
+                "class": license_class(g["licenses"])}
         if root:
             item["ours"] = ours_view(root, files, budget)
         if origin:
             item["origin"] = origin_view(origin, files, budget)
         out.append(item)
-    out.sort(key=lambda i: ({"decide": 0, "auto": 1, "reference": 2}[i["tier"]], -len(i["files"]), i["name"].lower()))
+    out.extend(contests)
+    out.sort(key=lambda i: ({"decide": 0, "auto": 1, "reference": 2}[i["tier"]], i["kind"] != "contest", -len(i["files"]), i["name"].lower()))
     return out
 
 
@@ -218,7 +337,8 @@ def origin_view(folder, files, budget):
         if not (f["origin_file"] and f["component"] and f["version"]):
             continue
         prefix = f"{f['component']}-{f['version']}".lower()
-        name = next((n for n in names if n.lower().startswith(prefix) and re.search(r"\.(tar(\.\w+)?|tgz)$", n)), None)
+        # the name must end right after the version (libfoo-1.2 is not libfoo-1.2.10)
+        name = next((n for n in names if re.match(re.escape(prefix) + r"([._-](src|source|orig|dfsg)[\w.+-]*)?\.(tar(\.\w+)?|tgz)$", n.lower())), None)
         if name:
             wanted[name][f["origin_file"]] = f["path"]
             f["origin_tree"] = re.sub(r"\.(tar(\.\w+)?|tgz)$", "", name)
@@ -242,22 +362,42 @@ def origin_view(folder, files, budget):
     return {"trees": trees, "texts": texts}
 
 
-def covers(decision, group):
-    """True when a decision still holds for the group as it is now."""
-    if decision.get("component") != group["key"]:
+def covers(d, item):
+    """True when a decision still holds for the group or contest as it is now."""
+    if item.get("kind") == "contest":
+        if d.get("contest") != item["key"]:
+            return False
+        if d["decision"] != "origin":
+            return True
+        cands = {(c["purl"] or c["name_key"]): c for c in item["files"]}
+        choice = d.get("choice")
+        if choice not in cands:
+            return False                                   # the chosen source is no longer a candidate
+        known = {choice} | {o.get("purl") for o in d.get("others") or [] if isinstance(o, dict)}
+        for k, c in cands.items():
+            if k not in known and c["class"] != cands[choice]["class"]:
+                return False                               # a new candidate with a different obligation: ask again
+        return True
+    if d.get("component") != item["key"]:
         return False
-    pinned = decision.get("files")
+    pinned = d.get("files")
     if not pinned:
         return True
-    now = sorted((f["hash"], str(f["lines"])) for f in group["files"])
-    then = sorted((str(p.get("hash", "")), str(p.get("lines", ""))) for p in pinned if isinstance(p, dict))
+    now = sorted(f["rkey"] for f in item["files"])
+    then = sorted(str(p.get("key", "")) for p in pinned if isinstance(p, dict))
     return now == then
 
 
 def valid(d):
-    if not isinstance(d, dict) or d.get("decision") not in DECISIONS or not d.get("component"):
+    if not isinstance(d, dict) or d.get("decision") not in DECISIONS:
         return False
-    need = {"ours": "reason", "version": "version", "declared": "declared_as"}.get(d["decision"])
+    if d["decision"] == "origin":
+        return bool(d.get("contest")) and bool(str(d.get("choice", "")).strip()) and bool(str(d.get("reason", "")).strip())
+    if d.get("decision") in ("ours", "coincidence") and d.get("contest"):
+        return d["decision"] != "ours" or bool(str(d.get("reason", "")).strip())
+    if not d.get("component"):
+        return False
+    need = {"ours": "reason", "version": "version", "declared": "declared_as", "add": "reason"}.get(d["decision"])
     return not need or bool(str(d.get(need, "")).strip())
 
 
@@ -278,12 +418,11 @@ def load_decisions(path):
     return good
 
 
-def verdict_of(group, decisions):
-    found = None
-    for d in decisions:
-        if covers(d, group):
-            found = d
-    return found
+def verdict_of(item, decisions):
+    hits = [d for d in decisions if covers(d, item)]
+    if len({(d["decision"], d.get("choice", ""), d.get("version", "")) for d in hits}) > 1:
+        print(f"[snippet-review] WARN: {item['key']} has conflicting decisions; the last one is used", file=sys.stderr)
+    return hits[-1] if hits else None
 
 
 PAGE = r"""<!DOCTYPE html>
@@ -318,6 +457,7 @@ div.pair { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:
 ul.tree, ul.tree ul { list-style:none; margin:0; padding-left:16px; } ul.tree { padding-left:0; max-height:200px; overflow:auto; border:1px solid var(--line); border-radius:8px; padding:6px 8px; }
 ul.tree summary { cursor:pointer; color:var(--muted); } ul.tree button.leaf { all:unset; cursor:pointer; padding:1px 6px; border-radius:6px; font:13px ui-monospace,Menlo,monospace; color:var(--muted); } ul.tree button.leaf.hit { color:var(--text); font-weight:600; }
 ul.tree button.leaf.sel { background:var(--panel); outline:2px solid var(--accent); } ul.tree button.leaf:disabled { cursor:default; } ul.tree button.leaf:focus-visible { outline:3px solid var(--focus); }
+.cands tr.sel td { background:var(--panel); font-weight:600; } .cands tr { cursor:pointer; } .cands td { overflow-wrap:anywhere; }
 .bar { display:flex; flex-wrap:wrap; gap:10px; align-items:center; justify-content:space-between; margin:6px 0; } .navs button { font:inherit; padding:4px 10px; margin-left:6px; border-radius:8px; border:1px solid var(--line); background:var(--bg); color:var(--text); cursor:pointer; }
 .navs kbd { font:12px ui-monospace,Menlo,monospace; border:1px solid var(--line); border-radius:4px; padding:0 5px; margin-right:5px; background:var(--panel); }
 .code { height:420px; overflow:auto; border:1px solid var(--line); border-radius:8px; background:var(--panel); font:13px/19px ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; } .code:focus-visible { outline:3px solid var(--focus); }
@@ -344,7 +484,7 @@ footer { position:sticky; bottom:0; padding:12px 24px; background:var(--bg); bor
 <script id="data" type="application/json">__DATA__</script>
 <script>
 (function () {
-  var D = JSON.parse(document.getElementById('data').textContent), T = D.t, items = D.items, key = 'bomlens-snippet-review';
+  var D = JSON.parse(document.getElementById('data').textContent), T = D.t, items = D.items, key = 'bomlens-snippet-review:' + D.id, rkey = 'bomlens-snippet-review:reviewer';
   var decisions = {}, history = [], cur = 0, form = null;
   try { decisions = JSON.parse(localStorage.getItem(key) || '{}'); } catch (e) { decisions = {}; }
   items.forEach(function (i, n) { if (!decisions[n] && D.preset && D.preset[n]) decisions[n] = D.preset[n]; });
@@ -354,6 +494,7 @@ footer { position:sticky; bottom:0; padding:12px 24px; background:var(--bg); bor
   function need(i) { return i.tier === 'decide'; }
   function verText(i) { var v = Object.keys(i.versions); return v.length ? (v.length > 1 ? v[0] + ' +' + (v.length - 1) : v[0]) : ''; }
   function why(i) {
+    if (i.kind === 'contest') return T.why_contest + (i.differs ? ' ' + T.why_differs : '');
     if (i.tier === 'reference') return T.why_ref;
     var out = [];
     if (i.reasons.indexOf('partial') >= 0) out.push(T.why_partial);
@@ -373,9 +514,9 @@ footer { position:sticky; bottom:0; padding:12px 24px; background:var(--bg); bor
     var refD = el('details', { 'class': 'fold' }); refD.appendChild(el('summary', { text: fmt(T.ref, { n: items.filter(function (i) { return i.tier === 'reference'; }).length }) }));
     items.forEach(function (i, n) {
       var done = decisions[n];
-      var b = el('button', { type: 'button', 'data-n': n }, [el('span', { 'class': 'n', text: i.name + ' ' + verText(i) })]);
-      b.firstChild.appendChild(el('span', { 'class': 'tag ' + (done ? 'done' : (need(i) ? 'pending' : '')), text: done ? T['decision_' + done.decision] : (need(i) ? T.need : '') }));
-      b.appendChild(el('span', { 'class': 's', text: i.files.length + ' ' + T.files.toLowerCase() + ', ' + Math.round(i.best) + '%' }));
+      var b = el('button', { type: 'button', 'data-n': n }, [el('span', { 'class': 'n', text: (i.kind === 'contest' ? T.contest_tag + ' ' : '') + i.name + ' ' + verText(i) })]);
+      b.firstChild.appendChild(el('span', { 'class': 'tag ' + (done ? 'done' : (need(i) ? 'pending' : '')), text: done ? (T['decision_' + done.decision] || done.decision) : (need(i) ? T.need : '') }));
+      b.appendChild(el('span', { 'class': 's', text: i.kind === 'contest' ? i.files.length + ' ' + T.candidates.toLowerCase() : i.files.length + ' ' + T.files.toLowerCase() + ', ' + Math.round(i.best) + '%' }));
       if (n === cur) b.setAttribute('aria-current', 'true');
       b.addEventListener('click', function () { cur = n; sel = 0; region = 0; form = null; render(); });
       (need(i) ? q : (i.tier === 'auto' ? autoD : refD)).appendChild(b);
@@ -426,7 +567,7 @@ footer { position:sticky; bottom:0; padding:12px 24px; background:var(--bg); bor
     if (sel >= i.files.length) sel = 0;
     var f = i.files[sel], ours = i.ours || {}, ot = ours.texts || {}, org = i.origin || {}, ottexts = org.texts || {};
     var mine = {}, theirs = {};
-    i.files.forEach(function (x) { mine[x.path] = Math.round(x.matched) + '%'; if (x.origin_file) theirs[x.origin_file] = Math.round(x.matched) + '%'; });
+    i.files.forEach(function (x) { mine[x.path] = Math.max(parseInt(mine[x.path] || '0', 10), Math.round(x.matched)) + '%'; if (x.origin_file) theirs[x.origin_file] = Math.round(x.matched) + '%'; });
     var trees = el('div', { 'class': 'trees' });
     var left = el('div'), right = el('div');
     left.appendChild(el('div', { 'class': 'cap', text: T.tree_ours }));
@@ -462,22 +603,45 @@ footer { position:sticky; bottom:0; padding:12px 24px; background:var(--bg); bor
   function move(i, delta) { if (!cmpState) return; var n = cmpState.mr.length; region = (region + delta + n) % n; scrollTo('code-mine', cmpState.mr[region][0]); scrollTo('code-orig', (cmpState.orr[region] || cmpState.orr[0])[0]); renderBar(i); }
   function renderBar(i) { renderDetail(); }
   function moveFile(i, delta) { sel = (sel + delta + i.files.length) % i.files.length; region = 0; renderDetail(); }
+  function candidateTable(i) {
+    var tb = el('table', { 'class': 'cands' }), hd = el('tr');
+    ['#', T.source, T.versions, T.licenses, '%', T.lines].forEach(function (h) { hd.appendChild(el('th', { text: h })); }); tb.appendChild(hd);
+    i.files.forEach(function (c, n) {
+      var r = el('tr', n === sel ? { 'class': 'sel', 'aria-current': 'true' } : {});
+      [String(n + 1), c.purl || c.component, c.version, (c.licenses.join(', ') || T.unknown) + ' [' + c.class + ']', Math.round(c.matched) + '%', c.lines + (c.oss_lines ? ' → ' + c.oss_lines : '')].forEach(function (x) { r.appendChild(el('td', { text: x })); });
+      r.addEventListener('click', function () { sel = n; region = 0; renderDetail(); }); tb.appendChild(r);
+    });
+    return tb;
+  }
+  function chooseOrigin(n) { if (n >= items[cur].files.length) return; sel = n; form = 'origin'; renderDetail(); }
   function renderDetail() {
     var d = document.getElementById('detail'); d.textContent = '';
     if (!items.length) { d.appendChild(el('p', { text: T.empty })); return; }
     var i = items[cur], dec = decisions[cur];
     d.appendChild(el('h2', { text: i.name })); d.appendChild(el('div', { 'class': 'why', text: why(i) }));
+    if (i.kind !== 'contest') {
     var dl = el('dl');
     row(dl, T.source, i.purl || i.name); row(dl, T.versions, Object.keys(i.versions).map(function (v) { return v + ' (' + i.versions[v] + ')'; }).join(', '));
     row(dl, T.licenses, i.licenses.length ? i.licenses.join(', ') : T.unknown); row(dl, T.best, Math.round(i.best) + '%');
     if (i.urls.length) row(dl, 'URL', el('span', { 'class': 'mono', text: i.urls.join('  ') }));
-    if (dec) row(dl, T['decision_' + dec.decision], (dec.reason || '') + (dec.version ? ' (' + dec.version + ')' : '') + (dec.declared_as ? ' (' + dec.declared_as + ')' : ''));
+    if (dec) row(dl, T['decision_' + dec.decision] || dec.decision, (dec.reason || '') + (dec.choice ? ' (' + dec.choice + ')' : '') + (dec.version ? ' (' + dec.version + ')' : '') + (dec.declared_as ? ' (' + dec.declared_as + ')' : ''));
     d.appendChild(dl);
     var tb = el('table'), hd = el('tr'); [T.files, '%', T.lines].forEach(function (h) { hd.appendChild(el('th', { text: h })); }); tb.appendChild(hd);
     i.files.slice(0, 200).forEach(function (f) { var r = el('tr'); [f.path, Math.round(f.matched) + '%', f.lines].forEach(function (c, k) { r.appendChild(el('td', { 'class': k === 0 ? 'mono' : '', text: String(c) })); }); tb.appendChild(r); });
     d.appendChild(tb);
+    }
+    if (i.kind === 'contest') d.appendChild(candidateTable(i));
     d.appendChild(compare(i));
     var act = el('div', { 'class': 'actions' });
+    if (i.kind === 'contest') {
+      i.files.slice(0, 9).forEach(function (c, n) {
+        var b = el('button', { type: 'button', 'class': n === sel ? 'primary' : '' }, [el('kbd', { text: String(n + 1) }), document.createTextNode(T.origin_is + ' ' + c.component + ' ' + c.version)]);
+        b.addEventListener('click', function () { chooseOrigin(n); }); act.appendChild(b);
+      });
+      [['ours', 'o'], ['coincidence', 'x'], ['later', 'l']].forEach(function (a) {
+        var b = el('button', { type: 'button' }, [el('kbd', { text: a[1] }), document.createTextNode(T[a[0]])]); b.addEventListener('click', function () { act_(a[0]); }); act.appendChild(b);
+      });
+    } else
     [['add', 1, true], ['ours', 2], ['coincidence', 3], ['later', 4], ['declared', 5], ['version', 6]].forEach(function (a) {
       var b = el('button', { type: 'button', 'class': a[2] ? 'primary' : '' }, [el('kbd', { text: String(a[1]) }), document.createTextNode(T[a[0]])]);
       b.addEventListener('click', function () { act_(a[0]); }); act.appendChild(b);
@@ -485,15 +649,15 @@ footer { position:sticky; bottom:0; padding:12px 24px; background:var(--bg); bor
     var u = el('button', { type: 'button' }, [el('kbd', { text: 'u' }), document.createTextNode(T.undo)]); u.addEventListener('click', undo); act.appendChild(u);
     d.appendChild(act);
     if (form) d.appendChild(renderForm());
-    d.appendChild(el('p', { 'class': 'keys', text: T.keys }));
+    d.appendChild(el('p', { 'class': 'keys', text: i.kind === 'contest' ? T.keys_contest : T.keys }));
   }
   function renderForm() {
     var f = el('div', { 'class': 'form', role: 'group', 'aria-label': T[form] });
     if (form === 'declared') { f.appendChild(el('label', { 'for': 'f-name', text: T.declared_as })); f.appendChild(el('input', { id: 'f-name', type: 'text', autocomplete: 'off' })); }
     if (form === 'version') { f.appendChild(el('label', { 'for': 'f-ver', text: T.newver })); f.appendChild(el('input', { id: 'f-ver', type: 'text', autocomplete: 'off' })); }
-    f.appendChild(el('label', { 'for': 'f-reason', text: form === 'ours' ? T.source_ref : T.reason })); f.appendChild(el('textarea', { id: 'f-reason', rows: '2' }));
+    f.appendChild(el('label', { 'for': 'f-reason', text: form === 'ours' ? T.source_ref : (form === 'origin' ? T.origin_reason : T.reason) })); f.appendChild(el('textarea', { id: 'f-reason', rows: '2' }));
     f.appendChild(el('label', { 'for': 'f-who', text: T.reviewer })); var who = el('input', { id: 'f-who', type: 'text', autocomplete: 'name' });
-    try { who.value = localStorage.getItem(key + ':reviewer') || ''; } catch (e) {}
+    try { who.value = localStorage.getItem(rkey) || ''; } catch (e) {}
     f.appendChild(who); f.appendChild(el('div', { 'class': 'err', id: 'f-err', 'aria-live': 'assertive' }));
     var ok = el('button', { type: 'button', text: T.save }); ok.addEventListener('click', commit);
     var no = el('button', { type: 'button', text: T.cancel }); no.addEventListener('click', function () { form = null; renderDetail(); });
@@ -503,23 +667,35 @@ footer { position:sticky; bottom:0; padding:12px 24px; background:var(--bg); bor
   }
   function record(n, dec) { history.push({ n: n, prev: decisions[n] || null }); decisions[n] = dec; save(); }
   function next() { for (var k = 1; k <= items.length; k++) { var m = (cur + k) % items.length; if (need(items[m]) && !decisions[m]) { cur = m; return; } } }
-  function pinned(i) { return i.files.map(function (f) { return { hash: f.hash, lines: String(f.lines) }; }); }
-  function who() { try { return localStorage.getItem(key + ':reviewer') || ''; } catch (e) { return ''; } }
+  function pinned(i) { return i.files.map(function (f) { return { key: f.rkey }; }); }
+  function who() { try { return localStorage.getItem(rkey) || ''; } catch (e) { return ''; } }
   function make(i, kind, reason, extra) { var d = { component: i.key, decision: kind, reason: reason, reviewer: who(), files: pinned(i) }; for (var k in (extra || {})) if (extra[k]) d[k] = extra[k]; return d; }
   function commit() {
     var i = items[cur], reason = document.getElementById('f-reason').value.trim(), w = document.getElementById('f-who').value.trim(), err = document.getElementById('f-err');
     var nm = form === 'declared' ? document.getElementById('f-name').value.trim() : '', ver = form === 'version' ? document.getElementById('f-ver').value.trim() : '';
-    if ((form === 'ours' || (form === 'coincidence' && i.files.length >= 5)) && !reason) { err.textContent = T.need_reason; return; }
+    if ((form === 'ours' || form === 'origin' || (form === 'coincidence' && i.files.length >= 5 && i.kind !== 'contest')) && !reason) { err.textContent = T.need_reason; return; }
     if (form === 'declared' && !nm) { err.textContent = T.need_name; return; }
     if (form === 'version' && !ver) { err.textContent = T.need_version; return; }
-    try { localStorage.setItem(key + ':reviewer', w); } catch (e) {}
+    try { localStorage.setItem(rkey, w); } catch (e) {}
+    if (i.kind === 'contest') {
+      var d2 = { contest: i.key, decision: form, reason: reason, reviewer: w, files: pinned(i) };
+      if (form === 'origin') {
+        var win = i.files[sel], classes = { unknown: 0, permissive: 1, weak: 2, strong: 3 };
+        d2.choice = win.purl || win.name_key; d2.version = win.version; d2.component = d2.choice;
+        d2.others = i.files.filter(function (c, n) { return n !== sel; }).map(function (c) { return { purl: c.purl || c.name_key, version: c.version, license: c.licenses.join(', ') }; });
+        if (i.files.some(function (c) { return classes[c['class']] > classes[win['class']]; })) d2.needs_sample = true;
+      }
+      record(cur, d2); form = null; next(); render(); return;
+    }
     record(cur, make(i, form, reason, { declared_as: nm, version: ver })); form = null; next(); render();
   }
+  function commitNow() { var i = items[cur], d2 = { contest: i.key, decision: 'coincidence', reason: '', reviewer: who(), files: pinned(i) }; record(cur, d2); form = null; next(); render(); }
   function act_(a) {
     if (!items.length) return;
     var i = items[cur];
-    if (a === 'add') { record(cur, make(i, 'add', T.add_reason)); next(); render(); }
+    if (a === 'add' && i.kind !== 'contest') { record(cur, make(i, 'add', T.add_reason)); next(); render(); }
     else if (a === 'later') { form = null; next(); render(); }
+    else if (a === 'coincidence' && i.kind === 'contest') { form = a; commitNow(); }
     else { form = a; renderDetail(); }
   }
   function undo() { var h = history.pop(); if (!h) return; if (h.prev) decisions[h.n] = h.prev; else delete decisions[h.n]; save(); cur = h.n; form = null; render(); }
@@ -538,6 +714,8 @@ footer { position:sticky; bottom:0; padding:12px 24px; background:var(--bg); bor
     if (k === 'j' || k === 'ArrowDown') { cur = (cur + 1) % items.length; sel = 0; region = 0; form = null; render(); e.preventDefault(); }
     else if (k === 'k' || k === 'ArrowUp') { cur = (cur - 1 + items.length) % items.length; sel = 0; region = 0; form = null; render(); e.preventDefault(); }
     else if (k === 'n') { move(items[cur], 1); } else if (k === 'p') { move(items[cur], -1); } else if (k === ']') { moveFile(items[cur], 1); } else if (k === '[') { moveFile(items[cur], -1); }
+    else if (items[cur].kind === 'contest' && /^[1-9]$/.test(k)) { chooseOrigin(parseInt(k, 10) - 1); e.preventDefault(); }
+    else if (items[cur].kind === 'contest' && k === 'o') { act_('ours'); e.preventDefault(); } else if (items[cur].kind === 'contest' && k === 'x') { act_('coincidence'); } else if (items[cur].kind === 'contest' && k === 'l') { act_('later'); }
     else if (k === '1') act_('add'); else if (k === '2') { act_('ours'); e.preventDefault(); } else if (k === '3') { act_('coincidence'); e.preventDefault(); }
     else if (k === '4') act_('later'); else if (k === '5') { act_('declared'); e.preventDefault(); } else if (k === '6') { act_('version'); e.preventDefault(); }
     else if (k === 'u') undo();
@@ -567,7 +745,8 @@ def cmd_page(args):
     done = load_decisions(args.decisions)
     t = STRINGS[args.lang]
     # '</' is escaped so the data can never close the script element it sits in.
-    data = json.dumps({"t": t, "items": items, "preset": [verdict_of(i, done) for i in items]}, ensure_ascii=False).replace("</", "<\\/")
+    ident = hashlib.sha256("|".join(sorted(i["key"] + ":" + ",".join(sorted(f["rkey"] for f in i["files"])) for i in items)).encode()).hexdigest()[:16]
+    data = json.dumps({"t": t, "id": ident, "items": items, "preset": [verdict_of(i, done) for i in items]}, ensure_ascii=False).replace("</", "<\\/")
     sys.stdout.write(PAGE.replace("__LANG__", args.lang).replace("__TITLE__", t["title"]).replace("__DATA__", data))
     print(f"[snippet-review] {len(items)} group(s), {sum(1 for i in items if i['tier'] == 'decide')} to decide.", file=sys.stderr)
     return 0
@@ -580,9 +759,23 @@ def cmd_queue(args):
     done = load_decisions(args.decisions)
     pending = [i for i in groups_of(raw) if i["tier"] == "decide" and not verdict_of(i, done)]
     for i in pending:
-        print(f"{i['key']}\t{len(i['files'])} file(s)\t{','.join(i['reasons'])}")
-    print(f"[snippet-review] {len(pending)} group(s) waiting for a decision.", file=sys.stderr)
+        print(f"{i['key']}\t{i['kind']}\t{len(i['files'])} file(s)\t{','.join(i['reasons'])}")
+    print(f"[snippet-review] {len(pending)} item(s) waiting for a decision.", file=sys.stderr)
     return 0
+
+
+def component_of(item, review):
+    """A component for a source a person accepted although the scan's own list did not carry it."""
+    vers = item.get("versions") or {}
+    props = [{"name": "bomlens:layer", "value": "vendored"}, {"name": "bomlens:identifiedBy", "value": "scanoss"},
+             {"name": "bomlens:scanoss:files", "value": str(len(item["files"]))},
+             {"name": "bomlens:scanoss:match", "value": f"{int(item['best'])}%"},
+             {"name": "bomlens:scanoss:purl", "value": item["key"] if item["key"].startswith("pkg:") else ""},
+             {"name": "bomlens:evidenceGrade", "value": "reviewed-match"}, {"name": "bomlens:review", "value": review}]
+    c = {"type": "library", "name": item["name"], "version": next(iter(vers), ""), "purl": item["purl"] or None,
+         "licenses": [{"license": {"name": n}} for n in item.get("licenses") or []],
+         "properties": [p for p in props if p["value"]]}
+    return {k: v for k, v in c.items() if v not in (None, "", [])}
 
 
 def cmd_apply(args):
@@ -591,30 +784,79 @@ def cmd_apply(args):
     except (OSError, ValueError) as exc:
         print(f"[snippet-review] cannot read {args.components}: {exc}", file=sys.stderr)
         return 1
-    raw = read_raw(args.raw)
-    groups = {g["key"]: g for g in groups_of(raw)} if raw else {}
+    raw = read_raw(args.raw) or {}
+    items = groups_of(raw)
+    groups = {i["name_key"]: i for i in items if i["kind"] == "group"}
     done = load_decisions(args.decisions)
+    chosen_names, rejected, support, also, pending_contest = set(), set(), collections.Counter(), collections.defaultdict(list), set()
+    for c in (i for i in items if i["kind"] == "contest"):
+        v = verdict_of(c, done)
+        cands = {(f["purl"] or f["name_key"]): f for f in c["files"]}
+        if v is None:
+            for f in c["files"]:
+                support[f["name_key"]] += 1; pending_contest.add(f["name_key"])
+        elif v["decision"] == "origin":
+            win = cands[v["choice"]]
+            support[win["name_key"]] += 1; chosen_names.add(win["name_key"])
+            for k, f in cands.items():
+                if f is not win:
+                    also[win["name_key"]].append(f"{f['purl'] or f['name_key']}@{f['version']} ({f['class']})")
+                    if f["class"] != "unknown" and CLASS_RANK[win["class"]] < CLASS_RANK[f["class"]]:
+                        print(f"[snippet-review] {c['name']}: origin {win['name_key']} ({win['class']}) is weaker than candidate {f['name_key']} ({f['class']}); sample it", file=sys.stderr)
+        # ours / coincidence: no candidate is supported by this file
+    contest_names = {f["name_key"] for c in items if c["kind"] == "contest" for f in c["files"]}
     kept, dropped, pending = [], 0, 0
-    for c in comps if isinstance(comps, list) else []:
-        props = {p.get("name"): p.get("value") for p in c.get("properties") or []}
-        key = props.get("bomlens:scanoss:purl") or c.get("purl") or c.get("name")
-        g = groups.get(key) or groups.get(c.get("name")) or {"key": key, "files": [], "tier": "auto"}
-        d = verdict_of(g, done)
+    seen = set()
+    for comp in comps if isinstance(comps, list) else []:
+        props = {p.get("name"): p.get("value") for p in comp.get("properties") or []}
+        nk = str(comp.get("name", "")).lower()
+        g = groups.get(nk)
+        seen.add(nk)
+        d = verdict_of(g, done) if g else None
         if d and d["decision"] in ("ours", "coincidence", "declared"):
             dropped += 1
-            print(f"[snippet-review] {c.get('name')}: left out ({d['decision']}): {d.get('reason') or d.get('declared_as', '')}", file=sys.stderr)
+            print(f"[snippet-review] {comp.get('name')}: left out ({d['decision']}): {d.get('reason') or d.get('declared_as', '')}", file=sys.stderr)
             continue
-        c = dict(c)
-        c["properties"] = list(c.get("properties") or [])
+        if g:
+            own = len(g["files"]) + support[nk]
+        elif nk in contest_names:
+            own = support[nk]            # every file of this source is in a contest, so only a win keeps it
+        else:
+            own = 1
+        if own == 0:
+            dropped += 1
+            print(f"[snippet-review] {comp.get('name')}: left out (every file of it went to another source or was ruled out)", file=sys.stderr)
+            continue
+        comp = dict(comp)
+        comp["properties"] = list(comp.get("properties") or [])
         if d:
             if d["decision"] == "version":
-                c["version"] = str(d["version"]).strip()
-                c["properties"].append({"name": "bomlens:versionBasis", "value": "review"})
-            c["properties"].append({"name": "bomlens:review", "value": f"{d['decision']}: {d.get('reason', '')}".strip()})
-        elif g["tier"] == "decide":
+                comp["version"] = str(d["version"]).strip()
+                comp["properties"].append({"name": "bomlens:versionBasis", "value": "review"})
+            comp["properties"].append({"name": "bomlens:review", "value": f"{d['decision']}: {d.get('reason', '')}".strip()})
+        elif g and g["tier"] == "decide":
             pending += 1
-            c["properties"].append({"name": "bomlens:review", "value": "pending"})
-        kept.append(c)
+            comp["properties"].append({"name": "bomlens:review", "value": "pending"})
+        if nk in pending_contest:
+            comp["properties"].append({"name": "bomlens:contested", "value": "pending"})
+            if not any(p["name"] == "bomlens:review" for p in comp["properties"]):
+                pending += 1
+                comp["properties"].append({"name": "bomlens:review", "value": "pending"})
+        for a in also.get(nk, []):
+            comp["properties"].append({"name": "bomlens:alsoMatched", "value": a})
+        kept.append(comp)
+    # accepted sources the scan's own list did not carry: a partial copy, or the origin chosen in a contest
+    for nk, g in groups.items():
+        d = verdict_of(g, done)
+        if nk not in seen and d and d["decision"] == "add":
+            kept.append(component_of(g, f"add: {d.get('reason', '')}"))
+    for nk in chosen_names - seen:
+        f = next(f for c in items if c["kind"] == "contest" for f in c["files"] if f["name_key"] == nk)
+        item = groups.get(nk) or {"key": f["purl"] or nk, "name": f["component"] or nk, "purl": f["purl"], "versions": {f["version"]: 1} if f["version"] else {},
+                                  "licenses": f["licenses"], "files": [f], "best": f["matched"]}
+        comp = component_of(item, "origin: chosen in review")
+        comp["properties"].extend({"name": "bomlens:alsoMatched", "value": a} for a in also.get(nk, []))
+        kept.append(comp)
     print(json.dumps(kept, ensure_ascii=False))
     print(f"[snippet-review] {len(kept)} component(s) kept, {dropped} left out by review, {pending} waiting for a decision.", file=sys.stderr)
     return 0
