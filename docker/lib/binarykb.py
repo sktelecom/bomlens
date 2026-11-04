@@ -171,6 +171,13 @@ def _unescape(m):
     return e
 
 
+# A literal that is only an upper-case constant name (X509_V_ERR_UNABLE_TO_GET_ISSUER_CERT, CKR_SESSION_COUNT)
+# says nothing about which package it came from: the package that defines the constant writes it through a
+# macro, so it never appears as a literal in that package's own source, while every other package that
+# prints the name does carry it. Such names would be credited to whichever release spells them out.
+CONSTANT_NAME = re.compile(rb'^[A-Z][A-Z0-9]*(?:_[A-Z0-9]+){2,}$')
+
+
 def source_strings(tarball):
     """Printable runs of every C string literal (adjacent literals joined, as the compiler does)."""
     out = set()
@@ -183,7 +190,7 @@ def source_strings(tarball):
                 if t.group(1) is None:
                     continue
                 text = b''.join(ESCAPE.sub(_unescape, x) for x in LITERAL.findall(t.group(1)))
-                out.update(PRINTABLE_RUN.findall(text))
+                out.update(r for r in PRINTABLE_RUN.findall(text) if not CONSTANT_NAME.match(r))
     return out
 
 

@@ -46,6 +46,7 @@ import binarykb  # noqa: E402
 # `<image>.extracted/`. The same rootfs lands under both, so one file is seen twice.
 MARKER = re.compile(r".*(?:_extract/|\.extracted/)")
 MAX_EVIDENCE_FILES = 10
+WEAK_FACTOR = 2.5   # a score under this multiple of the stored threshold is reported as low confidence
 
 
 def cap(name, default):
@@ -66,6 +67,18 @@ def cap(name, default):
 
 MAX_FILES = cap("FW_BINKB_MAX_FILES", 20000)
 MAX_BYTES = cap("FW_BINKB_MAX_BYTES", 64 * 1024 * 1024)
+
+
+def is_own_file(component, rel):
+    """True when a file looks like the component itself (libz.so.1 for zlib, bin/busybox for busybox).
+
+    A hit in any other file means the component's code is inside a program that was built
+    from it or linked it statically, which is the case a package record never shows.
+    """
+    base = os.path.basename(rel).lower()
+    key = re.sub(r"[^a-z0-9]", "", component.lower())
+    flat = re.sub(r"[^a-z0-9]", "", base)
+    return key in flat
 
 
 def locate(arg):
@@ -171,6 +184,9 @@ def main():
         if hit:
             props.append({"name": "bomlens:kbScore", "value": str(hit["score"])})
             props.append({"name": "bomlens:kbUniqueStrings", "value": str(hit["unique"])})
+            # A score only a little above the base's threshold is where neighbouring packages that
+            # share source strings show up, so such a result is marked for a person to look at.
+            props.append({"name": "bomlens:kbConfidence", "value": "high" if hit["score"] >= WEAK_FACTOR * kb.rule["score"] else "low"})
             cands = hit["versions"]
             if len(cands) == 1 and (trust_newest or not hit["latest"]):
                 version = cands[0]
@@ -217,6 +233,11 @@ def main():
             if verdict.get("reviewer"):
                 props.append({"name": "bomlens:reviewer", "value": str(verdict["reviewer"])})
 
+        hosts = sorted({f for f, _ in e["files"] if not is_own_file(name, f)})
+        if hosts:
+            # The component's code was found inside other files: a static link or a copied source file.
+            props.append({"name": "bomlens:linkage", "value": "embedded" if len(hosts) == len(e["files"]) else "own-file-and-embedded"})
+            props.append({"name": "bomlens:embeddedIn", "value": ",".join(hosts[:MAX_EVIDENCE_FILES])})
         occurrences = [{"location": f} for f, _ in e["files"][:MAX_EVIDENCE_FILES]]
         comp = {"bom-ref": f"binary-kb:{name}@{version or 'unversioned'}", "type": "library", "name": name,
                 "properties": props, "evidence": {"occurrences": occurrences}}

@@ -75,6 +75,8 @@ roots = {
 for name, strings in roots.items():
     os.makedirs(f'{tmp}/root-{name}/usr/bin')
     open(f'{tmp}/root-{name}/usr/bin/prog', 'wb').write(blob(strings) + b'\0' * 64)
+os.makedirs(f'{tmp}/root-own-lib/usr/lib')
+open(f'{tmp}/root-own-lib/usr/lib/libalpha.so.1', 'wb').write(blob(A + SHARED + B + D) + b'\0' * 64)
 PY
 
 KB="$TMP/kb/kb.sqlite3"; mkdir -p "$TMP/kb"
@@ -145,6 +147,40 @@ if jq -e --arg sha "$(python3 -c 'import hashlib,sys;print(hashlib.sha256(open(s
             and ([.properties[] | select(.name == "bomlens:kbEvidenceStrings") | .value | fromjson | length >= 1] | all)' <<<"$out" >/dev/null; then
     pass "a result carries the hash of its evidence file and the longest strings that matched, for a reviewer to check"
 else fail "the evidence file hash or matched strings are missing" "$out"; fi
+
+# ---- static link relation -------------------------------------------------------------
+if [ "$(prop "$out" bomlens:linkage)" = "embedded" ] && [ "$(prop "$out" bomlens:embeddedIn)" = "usr/bin/prog" ]; then
+    pass "a component found inside a program that is not its own file is reported as embedded in that program"
+else fail "the embedded relation is missing" "$out"; fi
+own="$(ident own-lib)"
+if [ -z "$(prop "$own" bomlens:linkage)" ] && [ -z "$(prop "$own" bomlens:embeddedIn)" ]; then
+    pass "a component found in its own library file is not marked as embedded"
+else fail "an own library was marked as embedded" "$own"; fi
+
+# ---- constant names --------------------------------------------------------------------
+if python3 - "$LIB" "$TMP" <<'PY'
+import io, sys, tarfile
+sys.path.insert(0, sys.argv[1]); import binarykb
+p = sys.argv[2] + '/const.tar.gz'
+body = b'const char *a = "X509_V_ERR_UNABLE_TO_GET_ISSUER_CERT_LOCALLY"; const char *b = "unable to get issuer certificate locally";\n'
+with tarfile.open(p, 'w:gz') as t:
+    i = tarfile.TarInfo('x/a.c'); i.size = len(body); t.addfile(i, io.BytesIO(body))
+got = binarykb.source_strings(p)
+sys.exit(0 if b'unable to get issuer certificate locally' in got and b'X509_V_ERR_UNABLE_TO_GET_ISSUER_CERT_LOCALLY' not in got else 1)
+PY
+then pass "a literal that is only an upper-case constant name is not stored, a sentence is"
+else fail "constant names are stored in the base, or ordinary strings were dropped"; fi
+
+# ---- confidence ---------------------------------------------------------------------
+if [ "$(prop "$(ident only-core)" bomlens:kbConfidence)" = "high" ]; then
+    pass "a score well above the stored threshold is marked high confidence"
+else fail "a strong result was not marked high confidence"; fi
+mkdir -p "$TMP/kb-near"
+python3 "$LIB/binarykb.py" build --kb "$TMP/kb.csv" --bg "$TMP/bg" --release test-near --rule-score 1500 --out "$TMP/kb-near/kb.sqlite3" 2>/dev/null
+near="$(env FW_BINKB_NONELF=true python3 "$LIB/identify-binary-kb.py" "$TMP/root-only-core" "$TMP/kb-near/kb.sqlite3" 2>/dev/null)"
+if [ "$(prop "$near" bomlens:kbConfidence)" = "low" ]; then
+    pass "a score close to the stored threshold is marked low confidence, for the review page to list first"
+else fail "a near-threshold result was not marked low confidence" "$near"; fi
 
 # ---- review decisions -------------------------------------------------------------------
 sha="$(python3 -c 'import hashlib,sys;print(hashlib.sha256(open(sys.argv[1],"rb").read()).hexdigest())' "$TMP/root-release-1.1/usr/bin/prog")"
