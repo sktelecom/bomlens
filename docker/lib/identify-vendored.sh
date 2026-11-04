@@ -106,13 +106,9 @@ SKIP_ARGS+=(--skip-size 256)
 # component by default — so without this flag every uploaded/cloned source
 # fingerprints zero files and never matches. The SKIP_FOLDERS list below still
 # excludes .git/.gradle/etc., so this only re-includes the real source tree.
-# Snippet matching is off by default: whole-file matches only. SCANOSS_SNIPPETS=true also asks for partial
-# matches, which the review page (snippet-review.py) shows; they never become components without a decision.
-SNIPPET_ARG="--skip-snippets"
-[ "${SCANOSS_SNIPPETS:-}" = "true" ] && SNIPPET_ARG=""
 echo "[vendored] SCANOSS: fingerprinting $SRC (file hashes only; source stays local)..."
 # shellcheck disable=SC2086
-if ! scanoss-py scan "$SRC" --all-hidden ${SNIPPET_ARG:+"$SNIPPET_ARG"} "${SKIP_ARGS[@]}" --output "$RAW" \
+if ! scanoss-py scan "$SRC" --all-hidden --skip-snippets "${SKIP_ARGS[@]}" --output "$RAW" \
         ${SCANOSS_API_URL:+--apiurl "$SCANOSS_API_URL"} \
         ${SCANOSS_API_KEY:+--key "$SCANOSS_API_KEY"} >/dev/null 2>&1; then
     echo "[vendored] WARN: SCANOSS scan failed (no network / rate limit / bad endpoint); no vendored components." >&2
@@ -201,21 +197,6 @@ jq -c --argjson minfiles "$MIN_FILES" '
 # lands here, and reporting that as "no-match" would be a false all-clear.
 if [ ! -s "$COMPS_FILE" ] || ! jq -e 'type=="array"' "$COMPS_FILE" >/dev/null 2>&1; then
     echo '[]' > "$COMPS_FILE"; TRANSFORM_OK=0
-fi
-
-# Keep the raw match result for the review page when asked, and apply a review decisions file: code a
-# person decided is their own, a coincidence or already declared leaves the list, and every group that
-# still needs a decision is marked pending instead of being dropped.
-if [ -n "${SCANOSS_RAW_OUT:-}" ]; then
-    cp "$RAW" "$SCANOSS_RAW_OUT" 2>/dev/null || echo "[vendored] WARN: could not write $SCANOSS_RAW_OUT" >&2
-fi
-if [ -n "${SCANOSS_DECISIONS:-}" ] && [ -f "$SCANOSS_DECISIONS" ] && [ "$TRANSFORM_OK" = "1" ]; then
-    if python3 "$SCRIPT_DIR/snippet-review.py" apply "$COMPS_FILE" "$RAW" "$SCANOSS_DECISIONS" --root "$SRC" > "$WORK/reviewed.json" \
-            && jq -e 'type=="array"' "$WORK/reviewed.json" >/dev/null 2>&1; then
-        mv "$WORK/reviewed.json" "$COMPS_FILE"
-    else
-        echo "[vendored] WARN: could not apply $SCANOSS_DECISIONS; keeping every match." >&2
-    fi
 fi
 
 NCOMP=$(jq 'length' "$COMPS_FILE" 2>/dev/null || echo 0)
