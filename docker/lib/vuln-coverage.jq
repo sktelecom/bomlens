@@ -21,6 +21,12 @@ def vc_purl_type:
 def vc_no_ecosystem_purl:
   vc_purl_type | IN("", "generic", "github", "gitlab", "bitbucket", "git", "sourceforge", "gnu", "opkg", "yocto");
 
+# A purl that names a source repository or project site. Trivy has no advisory
+# source keyed on these, so the report words them apart from a component with no
+# purl at all.
+def vc_repository_purl:
+  vc_purl_type | IN("github", "gitlab", "bitbucket", "git", "sourceforge", "gnu");
+
 # Offered to the bundled CPE index. A component with an ecosystem purl is left
 # to the purl path: a CPE for a language package is derived from its name, and
 # two projects that share a name do not share a version line. A purl
@@ -77,12 +83,14 @@ def vc_in_scope:
 
 # Why no check could reach a component, or empty when one could.
 #   no-version     there is no version to compare against an advisory
-#   no-identifier  no ecosystem purl, and no CPE the index was asked about
+#   no-identifier  no purl (or pkg:generic, opkg, yocto), and no CPE the index was asked about
+#   repository-purl  a purl that names a source repository (pkg:github, ...) and no
+#                    CPE the index was asked about; Trivy does not query these
 # $yocto_checked: the Yocto build's own CVE check ran (a _yocto_vex.json with
 # judgements), so the recipes it read were checked there.
 def vc_unchecked_reason($cpe_matched; $yocto_checked):
   if ($yocto_checked and vc_yocto_component) then empty
   elif (vc_usable_version | not) then "no-version"
-  elif vc_no_ecosystem_purl and (($cpe_matched and vc_app_cpe) | not) then "no-identifier"
+  elif vc_no_ecosystem_purl and (($cpe_matched and vc_app_cpe) | not) then (if vc_repository_purl then "repository-purl" else "no-identifier" end)
   else empty end;
 def vc_unchecked_reason($cpe_matched): vc_unchecked_reason($cpe_matched; false);

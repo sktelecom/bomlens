@@ -2448,6 +2448,13 @@ case "$_cpe_mode" in FIRMWARE|ROOTFS|BINARY|YOCTO)
     fi ;;
 esac
 export BOMLENS_CPE_INDEX_MATCHED
+# A received SBOM (--analyze) is not matched against the CPE index; the security
+# report says so next to the components that only that step could have reached.
+BOMLENS_CPE_INDEX_SKIPPED=""
+if [ "$SCAN_MODE" = "ANALYZE" ] && [ "$YOCTO_CPE_MATCH" != true ]; then
+    BOMLENS_CPE_INDEX_SKIPPED="analyze-mode"
+fi
+export BOMLENS_CPE_INDEX_SKIPPED
 # Go reachability (--reachability, opt-in): govulncheck judges whether the code
 # each Go advisory lives in is reached, from the source's call graph (run in
 # stage 1, which has the Go toolchain) or from a Go executable's symbols. The

@@ -4926,6 +4926,29 @@ SH
         && pass "the markdown and HTML reports say how many and list them" \
         || fail "the report does not name the unchecked components"
 
+    # A repository purl is worded apart from "no purl", and a received SBOM
+    # (--analyze) says the CPE index did not run. The counts do not change.
+    cat > "$WORK/repo.json" <<'JSON'
+{"bomFormat":"CycloneDX","specVersion":"1.6","metadata":{"component":{"type":"application","name":"sup","version":"1"}},
+ "components":[
+  {"type":"library","name":"curl","version":"8.5.0","purl":"pkg:github/curl/curl@curl-8_5_0"},
+  {"type":"library","name":"zlib-x","version":"1.2","purl":"pkg:generic/zlib-x@1.2"}]}
+JSON
+    BOMLENS_CPE_INDEX_SKIPPED=analyze-mode PATH="$FAKEBIN:$PATH" SECURITY_ENRICH=false DEEP_CVE=false \
+        bash "$LIB/scan-security.sh" "$WORK/repo.json" "$WORK/repo" proj >/dev/null 2>&1
+    [ "$(jq -r '[.UncheckedComponents.Components[] | "\(.Name):\(.Reason)"] | join(" ")' "$WORK/repo_security.json")" = "curl:repository-purl zlib-x:no-identifier" ] \
+        && [ "$(jq '.UncheckedComponents.Count' "$WORK/repo_security.json")" = 2 ] \
+        && grep -q "repository purl (pkg:github, ...), which Trivy does not query" "$WORK/repo_security.md" \
+        && grep -q "received SBOM (--analyze)" "$WORK/repo_security.md" \
+        && grep -q "received SBOM (--analyze)" "$WORK/repo_security.html" \
+        && pass "a repository purl has its own reason and a received SBOM gets the note" \
+        || fail "repository-purl reason or the --analyze note is wrong"
+    PATH="$FAKEBIN:$PATH" SECURITY_ENRICH=false DEEP_CVE=false \
+        bash "$LIB/scan-security.sh" "$WORK/repo.json" "$WORK/repo2" proj >/dev/null 2>&1
+    grep -q "received SBOM (--analyze)" "$WORK/repo2_security.md" \
+        && fail "the --analyze note appears outside --analyze" \
+        || pass "the --analyze note is absent when the index step was not skipped for the mode"
+
     # With the match done, only what it could not reach is left, and the CVE
     # Trivy and the index would both report is counted once.
     cat > "$FAKEBIN/trivy" <<'SH'

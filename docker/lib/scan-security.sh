@@ -463,6 +463,10 @@ if [ -z "$SCAN_ERR" ] && [ -f "$SCRIPT_DIR/vuln-coverage.jq" ]; then
         > "$tmp_u" 2>/dev/null; then mv "$tmp_u" "$JSON"; else rm -f "$tmp_u"; fi
 fi
 UNCHECKED_N=$(echo "$UNCHECKED" | jq 'length')
+# Said once a received SBOM (--analyze) has components only the CPE index could
+# have reached: the step does not run in that mode, so it is a limit of the
+# check and not a statement about the SBOM.
+UNCHECKED_NOTE="This report was made from a received SBOM (--analyze). BomLens does not match a received SBOM against its CPE index, so components identified only by a repository purl or a CPE were not looked up. This is a limit of this check, not a finding about the SBOM. Where a package-ecosystem purl exists (pkg:maven, pkg:npm and so on), adding it lets Trivy check the component."
 # The report lists at most this many; the rest are in _security.json.
 UNCHECKED_MAX=200
 
@@ -569,14 +573,18 @@ KEV_COUNT=$(echo "$FINDINGS" | jq '[.[] | select(.kev)] | length')
         echo "## Components that could not be checked"
         echo ""
         echo "${UNCHECKED_N} component(s) could not be checked against a vulnerability database:"
-        echo "they have no version, or no package purl and no CPE that was matched. A clean"
-        echo "result does not cover them."
+        echo "they have no version, or no package purl that Trivy can query and no CPE that was"
+        echo "matched. A clean result does not cover them."
+        if [ -n "${BOMLENS_CPE_INDEX_SKIPPED:-}" ] && echo "$UNCHECKED" | jq -e 'any(.[]; .Reason != "no-version")' >/dev/null 2>&1; then
+            echo ""
+            echo "$UNCHECKED_NOTE"
+        fi
         echo ""
         echo "| Component | Version | PURL | Reason |"
         echo "|-----------|---------|------|--------|"
         echo "$UNCHECKED" | jq -r --argjson max "$UNCHECKED_MAX" 'def cell: tostring | gsub("[|\n]"; " ");
             .[0:$max][] |
-            "| \(.Name | cell) | \(.Version | cell) | \(.PURL | cell) | \({"no-version": "no version", "no-identifier": "no package purl or matched CPE"}[.Reason] // .Reason) |"'
+            "| \(.Name | cell) | \(.Version | cell) | \(.PURL | cell) | \({"no-version": "no version", "no-identifier": "no package purl and no matched CPE", "repository-purl": "repository purl (pkg:github, ...), which Trivy does not query"}[.Reason] // .Reason) |"'
         if [ "$UNCHECKED_N" -gt "$UNCHECKED_MAX" ]; then
             echo ""
             echo "… and $((UNCHECKED_N - UNCHECKED_MAX)) more, listed in \`UncheckedComponents\` in \`$(basename "$JSON")\`."
@@ -686,12 +694,15 @@ HTMLHEAD2
     fi
     if [ "${UNCHECKED_N:-0}" -gt 0 ]; then
         echo "<h2>Components that could not be checked</h2>"
-        echo "<p class=\"meta\">They have no version, or no package purl and no CPE that was matched, so no vulnerability database was asked about them. A clean result does not cover them.</p>"
+        echo "<p class=\"meta\">They have no version, or no package purl that Trivy can query and no CPE that was matched, so no vulnerability database was asked about them. A clean result does not cover them.</p>"
+        if [ -n "${BOMLENS_CPE_INDEX_SKIPPED:-}" ] && echo "$UNCHECKED" | jq -e 'any(.[]; .Reason != "no-version")' >/dev/null 2>&1; then
+            echo "<p class=\"meta\">$(esc "$UNCHECKED_NOTE")</p>"
+        fi
         echo "<div class=\"table-wrap\"><table><thead><tr><th>Component</th><th>Version</th><th>PURL</th><th>Reason</th></tr></thead><tbody>"
         echo "$UNCHECKED" | jq -r --argjson max "$UNCHECKED_MAX" '.[0:$max][] |
             "<tr><td>" + (.Name|@html) + "</td><td>" + (.Version|@html) + "</td>" +
             "<td>" + (.PURL|@html) + "</td>" +
-            "<td>" + ({"no-version": "no version", "no-identifier": "no package purl or matched CPE"}[.Reason] // .Reason | @html) + "</td></tr>"'
+            "<td>" + ({"no-version": "no version", "no-identifier": "no package purl and no matched CPE", "repository-purl": "repository purl (pkg:github, ...), which Trivy does not query"}[.Reason] // .Reason | @html) + "</td></tr>"'
         echo "</tbody></table></div>"
         if [ "$UNCHECKED_N" -gt "$UNCHECKED_MAX" ]; then
             echo "<p class=\"meta\">&hellip; and $((UNCHECKED_N - UNCHECKED_MAX)) more, listed in <code>UncheckedComponents</code> in <code>$(esc "$(basename "$JSON")")</code>.</p>"
