@@ -157,6 +157,20 @@ if [ -z "$(prop "$own" bomlens:linkage)" ] && [ -z "$(prop "$own" bomlens:embedd
     pass "a component found in its own library file is not marked as embedded"
 else fail "an own library was marked as embedded" "$own"; fi
 
+# ---- constant names --------------------------------------------------------------------
+if python3 - "$LIB" "$TMP" <<'PY'
+import io, sys, tarfile
+sys.path.insert(0, sys.argv[1]); import binarykb
+p = sys.argv[2] + '/const.tar.gz'
+body = b'const char *a = "X509_V_ERR_UNABLE_TO_GET_ISSUER_CERT_LOCALLY"; const char *b = "unable to get issuer certificate locally";\n'
+with tarfile.open(p, 'w:gz') as t:
+    i = tarfile.TarInfo('x/a.c'); i.size = len(body); t.addfile(i, io.BytesIO(body))
+got = binarykb.source_strings(p)
+sys.exit(0 if b'unable to get issuer certificate locally' in got and b'X509_V_ERR_UNABLE_TO_GET_ISSUER_CERT_LOCALLY' not in got else 1)
+PY
+then pass "a literal that is only an upper-case constant name is not stored, a sentence is"
+else fail "constant names are stored in the base, or ordinary strings were dropped"; fi
+
 # ---- confidence ---------------------------------------------------------------------
 if [ "$(prop "$(ident only-core)" bomlens:kbConfidence)" = "high" ]; then
     pass "a score well above the stored threshold is marked high confidence"
