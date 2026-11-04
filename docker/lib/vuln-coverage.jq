@@ -35,6 +35,19 @@ def vc_repository_purl:
 def vc_cpe_index_candidate:
   vc_no_ecosystem_purl or any(.properties[]?; .name == "bomlens:purlSource");
 
+# A component BomLens's own upstream table gave its repository purl
+# (upstream-purl.py writes bomlens:purlSource=upstream-map). The value is read,
+# not just the property: container-membership.py writes the same property with
+# another value for a purl it synthesized from an os-release.
+def vc_upstream_map:
+  any(.properties[]?; .name == "bomlens:purlSource" and .value == "upstream-map");
+
+# The components a received SBOM (--analyze --analyze-cpe-index) offers the
+# index: only those the upstream table identified. An SBOM from another tool
+# carries no such property, so nothing of it is offered.
+def vc_cpe_index_candidate_scoped($scope):
+  if $scope == "upstream-map" then vc_upstream_map else vc_cpe_index_candidate end;
+
 # A CPE the index can be asked about: the application part, in either form
 # firmware-cpe-match.py parses, or a 2.3 CPE whose part is '*' (Yocto's
 # CVE_PRODUCT, read as an application there).
@@ -88,9 +101,16 @@ def vc_in_scope:
 #                    CPE the index was asked about; Trivy does not query these
 # $yocto_checked: the Yocto build's own CVE check ran (a _yocto_vex.json with
 # judgements), so the recipes it read were checked there.
+# $cpe_matched: true when the index was asked about every candidate, the string
+# "upstream-map" when it was asked only about the upstream-table components of a
+# received SBOM, false when it did not run.
+def vc_cpe_asked($cpe_matched):
+  if $cpe_matched == true then true
+  elif $cpe_matched == "upstream-map" then vc_upstream_map
+  else false end;
 def vc_unchecked_reason($cpe_matched; $yocto_checked):
   if ($yocto_checked and vc_yocto_component) then empty
   elif (vc_usable_version | not) then "no-version"
-  elif vc_no_ecosystem_purl and (($cpe_matched and vc_app_cpe) | not) then (if vc_repository_purl then "repository-purl" else "no-identifier" end)
+  elif vc_no_ecosystem_purl and ((vc_cpe_asked($cpe_matched) and vc_app_cpe) | not) then (if vc_repository_purl then "repository-purl" else "no-identifier" end)
   else empty end;
 def vc_unchecked_reason($cpe_matched): vc_unchecked_reason($cpe_matched; false);

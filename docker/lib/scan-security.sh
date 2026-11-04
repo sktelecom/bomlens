@@ -433,6 +433,8 @@ if [ -z "$SCAN_ERR" ] && [ -f "$SCRIPT_DIR/vuln-coverage.jq" ]; then
     _cpe_matched=false
     if [ "${BOMLENS_CPE_INDEX_MATCHED:-false}" = "true" ]; then
         _cpe_matched=true
+        # A received SBOM matched only for its upstream-table components.
+        [ "${BOMLENS_CPE_INDEX_SCOPE:-}" != "upstream-map" ] || _cpe_matched='"upstream-map"'
     fi
     _yocto_checked=false
     if [ -f "${OUT_PREFIX}_yocto_vex.json" ] \
@@ -466,7 +468,11 @@ UNCHECKED_N=$(echo "$UNCHECKED" | jq 'length')
 # Said once a received SBOM (--analyze) has components only the CPE index could
 # have reached: the step does not run in that mode, so it is a limit of the
 # check and not a statement about the SBOM.
-UNCHECKED_NOTE="This report was made from a received SBOM (--analyze). BomLens does not match a received SBOM against its CPE index, so components identified only by a repository purl or a CPE were not looked up. This is a limit of this check, not a finding about the SBOM. Where a package-ecosystem purl exists (pkg:maven, pkg:npm and so on), adding it lets Trivy check the component."
+if [ "${BOMLENS_CPE_INDEX_SKIPPED:-}" = "analyze-upstream-map-only" ]; then
+    UNCHECKED_NOTE="This report was made from a received SBOM (--analyze) with --analyze-cpe-index${BOMLENS_VERSION:+ (BomLens $BOMLENS_VERSION)}. Only components that carry bomlens:purlSource=upstream-map, written by BomLens when it generated the SBOM, were matched against the CPE index, by name and version through its upstream table. Other components identified only by a repository purl or a CPE were not looked up. This is a limit of this check, not a finding about the SBOM."
+else
+    UNCHECKED_NOTE="This report was made from a received SBOM (--analyze). BomLens does not match a received SBOM against its CPE index unless --analyze-cpe-index is given, so components identified only by a repository purl or a CPE were not looked up. This is a limit of this check, not a finding about the SBOM. Where a package-ecosystem purl exists (pkg:maven, pkg:npm and so on), adding it lets Trivy check the component."
+fi
 # The report lists at most this many; the rest are in _security.json.
 UNCHECKED_MAX=200
 

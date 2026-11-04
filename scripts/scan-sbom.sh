@@ -237,6 +237,9 @@ CONFORMANCE_PROFILE="${CONFORMANCE_PROFILE:-default}"
 # Repository resolution for a submitted SBOM (--resolve-purl). Off unless asked:
 # it is the only part of the conformance check that uses the network.
 PURL_RESOLVE="${PURL_RESOLVE:-false}"
+# CPE index match for a submitted SBOM (--analyze-cpe-index). Off unless asked;
+# it covers only the components BomLens's upstream table identified.
+ANALYZE_CPE_INDEX="${ANALYZE_CPE_INDEX:-false}"
 # Registry licences (--license-registry). Off unless asked: it uses the network.
 _LICENSE_REGISTRY_USER="${LICENSE_REGISTRY-}"
 LICENSE_REGISTRY="${LICENSE_REGISTRY:-false}"
@@ -439,6 +442,7 @@ while [[ "$#" -gt 0 ]]; do
         --lang) REPORT_LANG="$2"; shift ;;
         --conformance-profile) CONFORMANCE_PROFILE="$2"; shift ;;
         --resolve-purl) PURL_RESOLVE="true" ;;
+        --analyze-cpe-index) ANALYZE_CPE_INDEX="true" ;;
         --license-registry) LICENSE_REGISTRY="true" ;;
         --firmware) FORCE_FIRMWARE="true" ;;
         --as-source) FORCE_SOURCE="true" ;;
@@ -764,6 +768,10 @@ Options:
                          package published only to an internal repository
                          answers the same way. PURL_RESOLVE_IGNORE skips
                          namespaces you know are internal.
+  --analyze-cpe-index    --analyze only: also match the components of a BomLens-
+                         generated SBOM that carry bomlens:purlSource=upstream-
+                         map against the bundled CPE index, as a generating scan
+                         does. Other components are not matched. Off by default.
   --sign                 cosign sign (requires COSIGN_KEY)
   --output-dir <dir>     Base directory for outputs (alias: -o; default: current
                          dir). Each scan lands in a <project>_<version>/ subfolder
@@ -1471,6 +1479,7 @@ pp_env() {
         "${FW_EXTRA_ROOTS:-}" "${FW_MAX_EXTRA_ROOTS:-}" "${FW_CONTAINER_MEMBERSHIP:-}" \
         "${PURL_MIN_PCT:-}" "${LICENSE_MIN_PCT:-}" "${HASH_MIN_PCT:-}" "${FIELD_MIN_PCT:-}" "$CONFORMANCE_PROFILE" "${PURL_RESOLVE:-false}" "${LICENSE_REGISTRY:-false}" "$REACHABILITY" "$REACHABILITY_NONCE"
     printf ' -e CYCLONEDX_SPEC_VERSION=%s' "$CDX_SPEC_VERSION"
+    printf ' -e ANALYZE_CPE_INDEX=%s' "${ANALYZE_CPE_INDEX:-false}"
     # Proxy, Trivy database and EPSS/KEV settings, by name.
     printf ' %s' "$(stage2_network_env_args)"
     # Debian package licenses from Trivy (image/rootfs scans), on unless set false.
@@ -2767,6 +2776,11 @@ fi
 if [ "$PURL_RESOLVE" = "true" ] && [ "$MODE" != "ANALYZE" ]; then
     echo "[WARN] --resolve-purl applies to --analyze only; ignoring it for this scan."
     PURL_RESOLVE="false"
+fi
+
+if [ "$ANALYZE_CPE_INDEX" = "true" ] && [ "$MODE" != "ANALYZE" ]; then
+    echo "[WARN] --analyze-cpe-index applies to --analyze only; ignoring it for this scan."
+    ANALYZE_CPE_INDEX="false"
 fi
 
 if [ "$FORCE_FIRMWARE" = "true" ] && [ "$MODE" != "FIRMWARE" ]; then
