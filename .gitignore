@@ -156,3 +156,6 @@ scripts/check-doc-style.sh
 # corpus run scratch
 .corpus-work/
 .corpus-baseline/
+
+# downloaded wheels
+*.whl
