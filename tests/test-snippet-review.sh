@@ -97,11 +97,12 @@ else fail "the add decision was not recorded" "$out"; fi
 # ---- page -----------------------------------------------------------------------------
 mkdir -p "$TMP/src"; seq 1 80 | sed 's/^/line /' > "$TMP/src/c.c"
 python3 "$TOOL" page "$TMP/raw.json" --root "$TMP" > "$TMP/page.html" 2>/dev/null
-if ! grep -q -E 'https?://[^"]*\.(js|css)|<link |src="http' "$TMP/page.html" && grep -q 'line 10' "$TMP/page.html"; then
-    pass "the page loads nothing from the network and shows the user's own matched lines"
-else fail "the page references the network or lacks the excerpt"; fi
+if ! grep -q -E 'https?://[^"]*\.(js|css)|<link |src="http' "$TMP/page.html" && grep -q 'line 80' "$TMP/page.html" && grep -q 'line 1\\n' "$TMP/page.html"; then
+    pass "the page loads nothing from the network and carries the whole of the user's matched file"
+else fail "the page references the network or lacks the file text"; fi
+if grep -q '"tree": \[[^]]*"src/c.c"' "$TMP/page.html"; then pass "the user's source tree is listed with the matched files in it"; else fail "the source tree is missing"; fi
 echo '{"../../etc/hosts":[{"id":"snippet","matched":"90%","lines":"1-30","purl":["pkg:x/y"],"component":"y","version":"1","licenses":[],"file_hash":"zz"}]}' > "$TMP/trav.json"
-python3 "$TOOL" page "$TMP/trav.json" --root "$TMP/src" 2>/dev/null | grep -q '"excerpts": {}' && pass "a path that leaves --root is never read" || fail "a path outside --root was read"
+python3 "$TOOL" page "$TMP/trav.json" --root "$TMP/src" 2>/dev/null | grep -q '"texts": {}' && pass "a path that leaves --root is never read" || fail "a path outside --root was read"
 echo '{"x.c":[{"id":"snippet","matched":"90%","lines":"1-30","purl":["pkg:x/y"],"component":"</script><b>","version":"1","licenses":[],"file_hash":"q"}]}' > "$TMP/xss.json"
 python3 "$TOOL" page "$TMP/xss.json" 2>/dev/null | grep -c '</script><b>' | grep -qx 0 && pass "data that contains a closing script tag cannot break out of the page" || fail "unescaped data in the page"
 if grep -q "innerHTML" "$TOOL"; then fail "the page uses innerHTML"; else pass "the page builds its content without innerHTML"; fi
@@ -111,9 +112,9 @@ mkdir -p "$TMP/origin/libbar-3.0/lib"; seq 1 300 | sed 's/^/orig /' > "$TMP/orig
 tar -czf "$TMP/rel/libbar-3.0.tar.gz" -C "$TMP/origin" libbar-3.0 2>/dev/null || { mkdir -p "$TMP/rel"; tar -czf "$TMP/rel/libbar-3.0.tar.gz" -C "$TMP/origin" libbar-3.0; }
 sed 's#"oss_lines":"200-250"#"oss_lines":"200-250","file":"lib/bar.c"#' "$TMP/raw.json" > "$TMP/raw-origin.json"
 python3 "$TOOL" page "$TMP/raw-origin.json" --origin "$TMP/rel" > "$TMP/page-origin.html" 2>/dev/null
-if grep -q 'orig 200' "$TMP/page-origin.html" && ! grep -q 'orig 199' "$TMP/page-origin.html"; then
-    pass "with the release sources the page carries the original lines, starting at the matched line"
-else fail "the original lines are missing or start at the wrong line"; fi
+if grep -q 'orig 300' "$TMP/page-origin.html" && grep -q '"lib/bar.c"' "$TMP/page-origin.html" && grep -q '"oss_lines": "200-250"' "$TMP/page-origin.html"; then
+    pass "with the release sources the page carries the whole original file, its tree, and the matched region"
+else fail "the original file, its tree or the region is missing"; fi
 python3 "$TOOL" page "$TMP/raw.json" > "$TMP/page-noorigin.html" 2>/dev/null
 grep -q 'orig 200' "$TMP/page-noorigin.html" && fail "original lines appeared without --origin" || pass "without --origin no original text is shown, only the address and line numbers"
 

@@ -45,8 +45,9 @@ import tarfile
 
 MIN_LINES = 11
 MIN_PERCENT = 40.0
-MAX_EXCERPT_LINES = 60
-MAX_EXCERPT_FILES = 30
+MAX_TEXT_CHARS = 400_000   # one file's text in the page
+MAX_PAGE_TEXT = 8_000_000  # all file text in the page
+MAX_TREE = 5000            # paths in one tree
 DECISIONS = ("add", "ours", "coincidence", "declared", "version")
 
 STRINGS = {
@@ -61,7 +62,7 @@ STRINGS = {
         "why_license": "No license was found for this source.", "why_versions": "The files match different versions: {v}",
         "why_ok": "Whole files match one source with a known license.", "why_ref": "Small matches, listed for information only.",
         "source": "Source", "versions": "Versions", "licenses": "Licenses", "files": "Files", "best": "Best match", "unknown": "unknown",
-        "excerpt": "Your code", "original": "Original code", "no_original": "The original is not available offline; use the source address.", "original_lines": "Original lines:", "lines": "lines", "keys": "Keys: 1 add, 2 our own code, 3 coincidence, 4 later, 5 declared elsewhere, 6 correct version, j/k move, u undo",
+        "excerpt": "Your file", "original": "Original file", "tree_ours": "Your source tree (matched files in bold)", "tree_origin": "Source tree of the original", "region": "Matched region", "prev_region": "Previous region", "next_region": "Next region", "prev_file": "Previous file", "next_file": "Next file", "no_ours": "Give --root to show your own file.", "no_original": "The original is not available offline; use the source address.", "original_lines": "Original lines:", "lines": "lines", "keys": "Keys: 1 add, 2 our own code, 3 coincidence, 4 later, 5 declared elsewhere, 6 correct version, j/k move group, n/p region, [/] file, u undo",
         "left": "{n} still undecided: the download lists only what you decided.",
         "need_reason": "A reason is required.", "need_name": "A name is required.", "need_version": "A version is required.",
         "decision_add": "Added", "decision_ours": "Our own code", "decision_coincidence": "Coincidence", "decision_declared": "Declared elsewhere", "decision_version": "Version corrected",
@@ -78,7 +79,7 @@ STRINGS = {
         "why_license": "이 출처의 라이선스를 찾지 못했습니다.", "why_versions": "파일마다 맞는 버전이 다릅니다: {v}",
         "why_ok": "파일 전체가 라이선스가 확인된 한 출처와 일치합니다.", "why_ref": "작은 일치이며 참고로만 보여 줍니다.",
         "source": "출처", "versions": "버전", "licenses": "라이선스", "files": "파일", "best": "가장 높은 일치", "unknown": "알 수 없음",
-        "excerpt": "우리 코드", "original": "원본 코드", "no_original": "원본은 오프라인으로 볼 수 없습니다. 출처 주소를 확인하세요.", "original_lines": "원본 줄:", "lines": "줄", "keys": "단축키: 1 추가, 2 원본은 우리 쪽, 3 우연한 일치, 4 나중에, 5 다른 이름으로 선언됨, 6 버전 정정, j/k 이동, u 되돌리기",
+        "excerpt": "우리 파일", "original": "원본 파일", "tree_ours": "우리 소스 트리(일치한 파일은 굵게)", "tree_origin": "원본의 소스 트리", "region": "일치 구간", "prev_region": "이전 구간", "next_region": "다음 구간", "prev_file": "이전 파일", "next_file": "다음 파일", "no_ours": "우리 파일을 보려면 --root를 지정하세요.", "no_original": "원본은 오프라인으로 볼 수 없습니다. 출처 주소를 확인하세요.", "original_lines": "원본 줄:", "lines": "줄", "keys": "단축키: 1 추가, 2 원본은 우리 쪽, 3 우연한 일치, 4 나중에, 5 다른 이름으로 선언됨, 6 버전 정정, j/k 묶음 이동, n/p 구간, [/] 파일, u 되돌리기",
         "left": "아직 {n}건을 판정하지 않았습니다. 내려받는 파일에는 판정한 것만 들어갑니다.",
         "need_reason": "사유가 필요합니다.", "need_name": "이름이 필요합니다.", "need_version": "버전이 필요합니다.",
         "decision_add": "추가", "decision_ours": "원본은 우리 쪽", "decision_coincidence": "우연한 일치", "decision_declared": "다른 이름으로 선언됨", "decision_version": "버전 정정",
@@ -113,7 +114,7 @@ def group_key(m):
     return purl or m.get("component") or ""
 
 
-def groups_of(raw, root=None, origin=None):
+def groups_of(raw, root=None, origin=None, budget=None):
     """Group the matches of a raw scan by source component and judge each group."""
     by = collections.OrderedDict()
     claimed = collections.defaultdict(set)   # path -> sources that claim it
@@ -134,7 +135,7 @@ def groups_of(raw, root=None, origin=None):
                 g["urls"].add(m["url"])
             g["files"].append({"path": path, "id": m["id"], "matched": percent(m.get("matched")), "lines": m.get("lines") or "all",
                                "oss_lines": m.get("oss_lines") or "", "hash": m.get("file_hash") or "", "version": m.get("version") or "",
-                               "origin_file": m.get("file") or "", "component": m.get("component") or ""})
+                               "origin_file": m.get("file") or "", "component": m.get("component") or "", "origin_tree": ""})
     out = []
     for g in by.values():
         files = g["files"]
@@ -153,63 +154,92 @@ def groups_of(raw, root=None, origin=None):
         item = {"key": g["key"], "name": g["name"], "purl": g["purl"], "versions": dict(g["versions"].most_common()),
                 "licenses": sorted(g["licenses"]), "urls": sorted(g["urls"])[:3], "tier": tier, "reasons": reasons,
                 "best": max((f["matched"] for f in files), default=0), "files": files, "small": len(small)}
+        budget = budget or Budget(MAX_PAGE_TEXT)
         if root:
-            item["excerpts"] = excerpts(root, files)
+            item["ours"] = ours_view(root, files, budget)
         if origin:
-            item["origins"] = origins(origin, files)
+            item["origin"] = origin_view(origin, files, budget)
         out.append(item)
     out.sort(key=lambda i: ({"decide": 0, "auto": 1, "reference": 2}[i["tier"]], -len(i["files"]), i["name"].lower()))
     return out
 
 
-def excerpts(root, files):
-    """The first lines of each matched region of the user's own files, for the page to show."""
-    out = {}
+class Budget:
+    """Caps how much file text one page carries, so a large scan still yields a page that opens."""
+    def __init__(self, total):
+        self.left = total
+
+    def take(self, text):
+        if self.left <= 0:
+            return None
+        text = text[:MAX_TEXT_CHARS]
+        self.left -= len(text)
+        return text
+
+
+def ours_view(root, files, budget):
+    """The scanned source tree (paths) and the full text of each matched file, for the page's left side."""
     base = os.path.realpath(root)
-    for f in files[:MAX_EXCERPT_FILES]:
+    matched = [f["path"] for f in files]
+    tree, seen = list(dict.fromkeys(matched)), set(matched)
+    for dirpath, dirnames, filenames in os.walk(base):
+        dirnames[:] = sorted(d for d in dirnames if not d.startswith("."))
+        for fn in sorted(filenames):
+            rel = os.path.relpath(os.path.join(dirpath, fn), base)
+            if rel not in seen and len(tree) < MAX_TREE:
+                tree.append(rel); seen.add(rel)
+        if len(tree) >= MAX_TREE:
+            break
+    texts = {}
+    for f in files:
         p = os.path.realpath(os.path.join(base, f["path"]))
         if not p.startswith(base + os.sep) or not os.path.isfile(p):   # a path outside the tree is never read
             continue
         try:
             with open(p, "r", errors="replace") as fh:
-                text = fh.read().splitlines()
+                t = budget.take(fh.read())
         except OSError:
             continue
-        first = re.match(r"\d+", str(f["lines"]))
-        start = int(first.group()) if first else 1
-        out[f["path"]] = {"start": start, "text": "\n".join(text[start - 1:start - 1 + MAX_EXCERPT_LINES])}
-    return out
+        if t is not None:
+            texts[f["path"]] = t
+    return {"tree": sorted(tree), "texts": texts}
 
 
-def origins(folder, files):
-    """The original lines of each matched file, read from the release sources the base was built from."""
-    out = {}
+def origin_view(folder, files, budget):
+    """The release trees and the full text of each matched original file, read from the sources the base was built from."""
     base = os.path.realpath(folder)
     try:
         names = sorted(os.listdir(base))
     except OSError:
-        return out
-    for f in files[:MAX_EXCERPT_FILES]:
-        if not f["origin_file"] or not f["component"] or not f["version"]:
+        return {"trees": {}, "texts": {}}
+    trees, texts = {}, {}
+    wanted = collections.defaultdict(dict)       # tarball name -> {origin path: our path}
+    for f in files:
+        if not (f["origin_file"] and f["component"] and f["version"]):
             continue
         prefix = f"{f['component']}-{f['version']}".lower()
-        for name in names:
-            if not name.lower().startswith(prefix) or not re.search(r"\.(tar(\.\w+)?|tgz)$", name):
-                continue
-            try:
-                with tarfile.open(os.path.join(base, name)) as tf:
-                    for m in tf:
-                        parts = m.name.split("/", 1)
-                        if m.isfile() and len(parts) == 2 and parts[1] == f["origin_file"]:
-                            text = tf.extractfile(m).read().decode("utf8", "replace").splitlines()
-                            first = re.match(r"\d+", str(f["oss_lines"]))
-                            start = int(first.group()) if first else 1
-                            out[f["path"]] = {"start": start, "text": "\n".join(text[start - 1:start - 1 + MAX_EXCERPT_LINES])}
-                            break
-            except (tarfile.TarError, OSError):
-                pass
-            break
-    return out
+        name = next((n for n in names if n.lower().startswith(prefix) and re.search(r"\.(tar(\.\w+)?|tgz)$", n)), None)
+        if name:
+            wanted[name][f["origin_file"]] = f["path"]
+            f["origin_tree"] = re.sub(r"\.(tar(\.\w+)?|tgz)$", "", name)
+    for name, need in wanted.items():
+        key = re.sub(r"\.(tar(\.\w+)?|tgz)$", "", name)
+        try:
+            with tarfile.open(os.path.join(base, name)) as tf:
+                paths = []
+                for m in tf:
+                    parts = m.name.split("/", 1)
+                    if not m.isfile() or len(parts) < 2:
+                        continue
+                    paths.append(parts[1])
+                    if parts[1] in need:
+                        t = budget.take(tf.extractfile(m).read().decode("utf8", "replace"))
+                        if t is not None:
+                            texts[f"{key}:{parts[1]}"] = t
+                trees[key] = sorted(paths)[:MAX_TREE]
+        except (tarfile.TarError, OSError):
+            pass
+    return {"trees": trees, "texts": texts}
 
 
 def covers(decision, group):
@@ -269,7 +299,7 @@ PAGE = r"""<!DOCTYPE html>
 body { margin:0; background:var(--bg); color:var(--text); font:15px/1.5 system-ui,-apple-system,"Segoe UI","Noto Sans KR",sans-serif; }
 header { padding:20px 24px 12px; border-bottom:1px solid var(--line); display:flex; gap:16px; align-items:baseline; flex-wrap:wrap; }
 h1 { font-size:20px; margin:0; font-weight:650; } #progress { margin-left:auto; font-weight:600; }
-main { display:grid; grid-template-columns:minmax(260px,340px) 1fr; min-height:calc(100vh - 140px); }
+main { display:grid; grid-template-columns:minmax(220px,300px) minmax(0,1fr); min-height:calc(100vh - 140px); }
 nav { border-right:1px solid var(--line); padding:12px 8px; overflow:auto; }
 nav h2 { font-size:12px; text-transform:uppercase; letter-spacing:.06em; color:var(--muted); margin:14px 10px 6px; font-weight:600; }
 nav button { all:unset; display:block; width:calc(100% - 8px); margin:2px 4px; padding:8px 10px; border-radius:8px; cursor:pointer; box-sizing:border-box; }
@@ -278,12 +308,21 @@ nav button:focus-visible, .actions button:focus-visible, #export:focus-visible, 
 nav .n { font-weight:600; } nav .s { display:block; font-size:13px; color:var(--muted); }
 .tag { display:inline-block; font-size:12px; padding:1px 7px; border-radius:999px; border:1px solid var(--line); margin-left:6px; color:var(--muted); }
 .tag.done { color:var(--ok); border-color:var(--ok); } .tag.pending { color:var(--warn); border-color:var(--warn); }
-section#detail { padding:20px 28px 60px; max-width:960px; } section#detail h2 { margin:0 0 4px; font-size:22px; }
-.why { margin:6px 0 18px; padding:10px 14px; background:var(--panel); border-radius:10px; }
+section#detail { padding:20px 24px 60px; min-width:0; } section#detail h2 { margin:0 0 4px; font-size:22px; }
+.why { max-width:100%; margin:6px 0 18px; padding:10px 14px; background:var(--panel); border-radius:10px; }
 dl { display:grid; grid-template-columns:max-content 1fr; gap:6px 18px; margin:0 0 16px; } dt { color:var(--muted); } dd { margin:0; overflow-wrap:anywhere; }
 code, .mono, pre { font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; font-size:13px; }
 table { border-collapse:collapse; width:100%; margin:6px 0 16px; } th, td { text-align:left; padding:5px 8px; border-bottom:1px solid var(--line); } th { color:var(--muted); font-weight:600; font-size:13px; }
-div.pair { display:grid; grid-template-columns:1fr 1fr; gap:12px; } .cap { color:var(--muted); font-size:13px; margin:4px 0; }
+div.pair { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:12px; } .pane { min-width:0; } .cap { color:var(--muted); font-size:13px; margin:4px 0; } .pad { padding:10px; }
+.cmp { margin:8px 0 14px; } .trees { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:12px; margin-bottom:10px; } .trees > div { min-width:0; }
+ul.tree, ul.tree ul { list-style:none; margin:0; padding-left:16px; } ul.tree { padding-left:0; max-height:200px; overflow:auto; border:1px solid var(--line); border-radius:8px; padding:6px 8px; }
+ul.tree summary { cursor:pointer; color:var(--muted); } ul.tree button.leaf { all:unset; cursor:pointer; padding:1px 6px; border-radius:6px; font:13px ui-monospace,Menlo,monospace; color:var(--muted); } ul.tree button.leaf.hit { color:var(--text); font-weight:600; }
+ul.tree button.leaf.sel { background:var(--panel); outline:2px solid var(--accent); } ul.tree button.leaf:disabled { cursor:default; } ul.tree button.leaf:focus-visible { outline:3px solid var(--focus); }
+.bar { display:flex; flex-wrap:wrap; gap:10px; align-items:center; justify-content:space-between; margin:6px 0; } .navs button { font:inherit; padding:4px 10px; margin-left:6px; border-radius:8px; border:1px solid var(--line); background:var(--bg); color:var(--text); cursor:pointer; }
+.navs kbd { font:12px ui-monospace,Menlo,monospace; border:1px solid var(--line); border-radius:4px; padding:0 5px; margin-right:5px; background:var(--panel); }
+.code { height:420px; overflow:auto; border:1px solid var(--line); border-radius:8px; background:var(--panel); font:13px/19px ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; } .code:focus-visible { outline:3px solid var(--focus); }
+.ln { display:flex; min-height:19px; white-space:pre; } .ln .no { flex:0 0 52px; text-align:right; padding-right:10px; color:var(--muted); user-select:none; } .ln.hit { background:rgba(234,0,44,.13); } .ln.hit .no { color:var(--accent); font-weight:700; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .ln.hit { background:rgba(255,90,114,.18); } }
 pre { background:var(--panel); border-radius:8px; padding:10px 12px; overflow:auto; max-height:320px; white-space:pre; margin:6px 0; }
 .actions { display:flex; flex-wrap:wrap; gap:10px; margin:20px 0 8px; }
 .actions button, #export, .form button { font:inherit; padding:9px 16px; border-radius:10px; border:1px solid var(--line); background:var(--bg); color:var(--text); cursor:pointer; }
@@ -338,13 +377,91 @@ footer { position:sticky; bottom:0; padding:12px 24px; background:var(--bg); bor
       b.firstChild.appendChild(el('span', { 'class': 'tag ' + (done ? 'done' : (need(i) ? 'pending' : '')), text: done ? T['decision_' + done.decision] : (need(i) ? T.need : '') }));
       b.appendChild(el('span', { 'class': 's', text: i.files.length + ' ' + T.files.toLowerCase() + ', ' + Math.round(i.best) + '%' }));
       if (n === cur) b.setAttribute('aria-current', 'true');
-      b.addEventListener('click', function () { cur = n; form = null; render(); });
+      b.addEventListener('click', function () { cur = n; sel = 0; region = 0; form = null; render(); });
       (need(i) ? q : (i.tier === 'auto' ? autoD : refD)).appendChild(b);
     });
     q.appendChild(autoD); q.appendChild(refD);
     renderDetail();
   }
   function row(dl, k, v) { if (v === '' || v == null) return; dl.appendChild(el('dt', { text: k })); var dd = el('dd'); dd.appendChild(typeof v === 'string' ? document.createTextNode(v) : v); dl.appendChild(dd); }
+  var sel = 0, region = 0;
+  function regions(spec, total) {
+    if (!spec || spec === 'all') return [[1, total]];
+    var out = [];
+    String(spec).split(',').forEach(function (part) { var m = part.split('-'), a = parseInt(m[0], 10), b = parseInt(m[1] || m[0], 10); if (a > 0 && b >= a) out.push([a, b]); });
+    return out.length ? out : [[1, total]];
+  }
+  function inRegions(n, rs) { for (var k = 0; k < rs.length; k++) if (n >= rs[k][0] && n <= rs[k][1]) return true; return false; }
+  function buildTree(paths, mark, picked, onPick) {
+    var root = {}; paths.forEach(function (p) { var node = root; p.split('/').forEach(function (seg, k, arr) { node = (node[seg] = node[seg] || (k === arr.length - 1 ? { __f: p } : {})); }); });
+    function hasMark(node) { if (node.__f) return !!mark[node.__f]; return Object.keys(node).some(function (k) { return hasMark(node[k]); }); }
+    function make(node, name) {
+      if (node.__f) {
+        var f = node.__f, b = el('button', { type: 'button', 'class': 'leaf' + (mark[f] ? ' hit' : '') + (f === picked ? ' sel' : ''), text: name + (mark[f] ? '  ' + mark[f] : '') });
+        if (mark[f]) b.addEventListener('click', function () { onPick(f); }); else b.disabled = true; return el('li', {}, [b]);
+      }
+      var det = el('details'); if (hasMark(node)) det.setAttribute('open', '');
+      det.appendChild(el('summary', { text: name + '/' })); var ul = el('ul');
+      Object.keys(node).sort(function (x, y) { var dx = !node[x].__f, dy = !node[y].__f; return dx === dy ? (x < y ? -1 : 1) : (dx ? -1 : 1); }).forEach(function (k) { ul.appendChild(make(node[k], k)); });
+      det.appendChild(ul); return el('li', {}, [det]);
+    }
+    var top = el('ul', { 'class': 'tree' });
+    Object.keys(root).sort(function (x, y) { var dx = !root[x].__f, dy = !root[y].__f; return dx === dy ? (x < y ? -1 : 1) : (dx ? -1 : 1); }).forEach(function (k) { top.appendChild(make(root[k], k)); });
+    return top;
+  }
+  function codePane(title, text, rs, id, missing) {
+    var wrap = el('div', { 'class': 'pane' }); wrap.appendChild(el('div', { 'class': 'cap', text: title }));
+    var box = el('div', { 'class': 'code', id: id, tabindex: '0', role: 'region', 'aria-label': title });
+    if (text == null) { box.appendChild(el('p', { 'class': 'cap pad', text: missing })); wrap.appendChild(box); return wrap; }
+    var lines = text.split('\n'), frag = document.createDocumentFragment();
+    lines.slice(0, 20000).forEach(function (t, k) {
+      var hit = inRegions(k + 1, rs);
+      frag.appendChild(el('div', { 'class': 'ln' + (hit ? ' hit' : ''), 'data-n': k + 1 }, [el('span', { 'class': 'no', text: String(k + 1) }), el('span', { 'class': 'tx', text: t === '' ? ' ' : t })]));
+    });
+    box.appendChild(frag); wrap.appendChild(box); return wrap;
+  }
+  function scrollTo(id, line) { var b = document.getElementById(id); if (b) b.scrollTop = Math.max(0, (line - 1) * 19 - 60); }
+  function compare(i) {
+    var box = el('div', { 'class': 'cmp' });
+    if (sel >= i.files.length) sel = 0;
+    var f = i.files[sel], ours = i.ours || {}, ot = ours.texts || {}, org = i.origin || {}, ottexts = org.texts || {};
+    var mine = {}, theirs = {};
+    i.files.forEach(function (x) { mine[x.path] = Math.round(x.matched) + '%'; if (x.origin_file) theirs[x.origin_file] = Math.round(x.matched) + '%'; });
+    var trees = el('div', { 'class': 'trees' });
+    var left = el('div'), right = el('div');
+    left.appendChild(el('div', { 'class': 'cap', text: T.tree_ours }));
+    left.appendChild(buildTree(ours.tree || i.files.map(function (x) { return x.path; }), mine, f.path, function (p) { sel = i.files.findIndex(function (x) { return x.path === p; }); region = 0; renderDetail(); }));
+    right.appendChild(el('div', { 'class': 'cap', text: T.tree_origin + (f.origin_tree ? ' (' + f.origin_tree + ')' : '') }));
+    var otree = (org.trees || {})[f.origin_tree];
+    if (otree) {
+      var m2 = {}; i.files.forEach(function (x) { if (x.origin_tree === f.origin_tree && x.origin_file) m2[x.origin_file] = Math.round(x.matched) + '%'; });
+      right.appendChild(buildTree(otree, m2, f.origin_file, function (p) { var k = i.files.findIndex(function (x) { return x.origin_tree === f.origin_tree && x.origin_file === p; }); if (k >= 0) { sel = k; region = 0; renderDetail(); } }));
+    } else right.appendChild(el('p', { 'class': 'cap', text: T.no_original + (f.origin_file ? ' ' + f.origin_file : '') }));
+    trees.appendChild(left); trees.appendChild(right); box.appendChild(trees);
+    var myText = ot[f.path], theirText = ottexts[f.origin_tree + ':' + f.origin_file];
+    var total = myText == null ? 1 : myText.split('\n').length, otot = theirText == null ? 1 : theirText.split('\n').length;
+    var mr = regions(f.lines, total), orr = regions(f.oss_lines, otot);
+    if (region >= mr.length) region = 0;
+    var bar = el('div', { 'class': 'bar' });
+    bar.appendChild(el('span', { 'class': 'mono', text: f.path + '  ' + Math.round(f.matched) + '%  ' + T.lines + ' ' + f.lines + (f.oss_lines ? ' → ' + f.oss_lines : '') }));
+    function nav(label, key, delta) { var b = el('button', { type: 'button' }, [el('kbd', { text: key }), document.createTextNode(label)]); b.addEventListener('click', function () { move(i, delta); }); return b; }
+    var nb = el('span', { 'class': 'navs' }); nb.appendChild(el('span', { text: T.region + ' ' + (region + 1) + '/' + mr.length + '  ' }));
+    nb.appendChild(nav(T.prev_region, 'p', -1)); nb.appendChild(nav(T.next_region, 'n', 1));
+    var pf = el('button', { type: 'button' }, [el('kbd', { text: '[' }), document.createTextNode(T.prev_file)]); pf.addEventListener('click', function () { moveFile(i, -1); });
+    var nf = el('button', { type: 'button' }, [el('kbd', { text: ']' }), document.createTextNode(T.next_file)]); nf.addEventListener('click', function () { moveFile(i, 1); });
+    nb.appendChild(pf); nb.appendChild(nf); bar.appendChild(nb); box.appendChild(bar);
+    var pair = el('div', { 'class': 'pair' });
+    pair.appendChild(codePane(T.excerpt + ': ' + f.path, myText == null ? null : myText, mr, 'code-mine', T.no_ours));
+    pair.appendChild(codePane(T.original + (f.origin_file ? ': ' + f.origin_file : ''), theirText == null ? null : theirText, orr, 'code-orig', T.no_original));
+    box.appendChild(pair);
+    setTimeout(function () { scrollTo('code-mine', mr[region][0]); scrollTo('code-orig', (orr[region] || orr[0])[0]); }, 0);
+    box._rs = { mr: mr, orr: orr }; cmpState = box._rs;
+    return box;
+  }
+  var cmpState = null;
+  function move(i, delta) { if (!cmpState) return; var n = cmpState.mr.length; region = (region + delta + n) % n; scrollTo('code-mine', cmpState.mr[region][0]); scrollTo('code-orig', (cmpState.orr[region] || cmpState.orr[0])[0]); renderBar(i); }
+  function renderBar(i) { renderDetail(); }
+  function moveFile(i, delta) { sel = (sel + delta + i.files.length) % i.files.length; region = 0; renderDetail(); }
   function renderDetail() {
     var d = document.getElementById('detail'); d.textContent = '';
     if (!items.length) { d.appendChild(el('p', { text: T.empty })); return; }
@@ -359,18 +476,7 @@ footer { position:sticky; bottom:0; padding:12px 24px; background:var(--bg); bor
     var tb = el('table'), hd = el('tr'); [T.files, '%', T.lines].forEach(function (h) { hd.appendChild(el('th', { text: h })); }); tb.appendChild(hd);
     i.files.slice(0, 200).forEach(function (f) { var r = el('tr'); [f.path, Math.round(f.matched) + '%', f.lines].forEach(function (c, k) { r.appendChild(el('td', { 'class': k === 0 ? 'mono' : '', text: String(c) })); }); tb.appendChild(r); });
     d.appendChild(tb);
-    var paths = Object.keys(i.excerpts || {}); Object.keys(i.origins || {}).forEach(function (p) { if (paths.indexOf(p) < 0) paths.push(p); });
-    paths.slice(0, 3).forEach(function (p) {
-      var mine = (i.excerpts || {})[p], orig = (i.origins || {})[p], det = el('details'); if (p === paths[0]) det.setAttribute('open', '');
-      det.appendChild(el('summary', { text: p }));
-      var grid = el('div', { 'class': 'pair' });
-      [[T.excerpt, mine], [T.original, orig]].forEach(function (c) {
-        var col = el('div'); col.appendChild(el('div', { 'class': 'cap', text: c[0] + (c[1] ? ' (' + T.lines + ' ' + c[1].start + '~)' : '') }));
-        col.appendChild(c[1] ? el('pre', { text: c[1].text }) : el('p', { 'class': 'cap', text: T.no_original })); grid.appendChild(col);
-      });
-      det.appendChild(grid); d.appendChild(det);
-    });
-    if (!paths.length && i.files.some(function (f) { return f.oss_lines; })) d.appendChild(el('p', { 'class': 'cap', text: T.no_original + ' ' + T.original_lines + ' ' + i.files.map(function (f) { return f.oss_lines; }).filter(Boolean).slice(0, 5).join(', ') }));
+    d.appendChild(compare(i));
     var act = el('div', { 'class': 'actions' });
     [['add', 1, true], ['ours', 2], ['coincidence', 3], ['later', 4], ['declared', 5], ['version', 6]].forEach(function (a) {
       var b = el('button', { type: 'button', 'class': a[2] ? 'primary' : '' }, [el('kbd', { text: String(a[1]) }), document.createTextNode(T[a[0]])]);
@@ -429,8 +535,9 @@ footer { position:sticky; bottom:0; padding:12px 24px; background:var(--bg); bor
     if (e.key === 'Escape' && form) { form = null; renderDetail(); return; }
     if (tag === 'input' || tag === 'textarea' || e.ctrlKey || e.metaKey || e.altKey || !items.length) return;
     var k = e.key;
-    if (k === 'j' || k === 'ArrowDown') { cur = (cur + 1) % items.length; form = null; render(); e.preventDefault(); }
-    else if (k === 'k' || k === 'ArrowUp') { cur = (cur - 1 + items.length) % items.length; form = null; render(); e.preventDefault(); }
+    if (k === 'j' || k === 'ArrowDown') { cur = (cur + 1) % items.length; sel = 0; region = 0; form = null; render(); e.preventDefault(); }
+    else if (k === 'k' || k === 'ArrowUp') { cur = (cur - 1 + items.length) % items.length; sel = 0; region = 0; form = null; render(); e.preventDefault(); }
+    else if (k === 'n') { move(items[cur], 1); } else if (k === 'p') { move(items[cur], -1); } else if (k === ']') { moveFile(items[cur], 1); } else if (k === '[') { moveFile(items[cur], -1); }
     else if (k === '1') act_('add'); else if (k === '2') { act_('ours'); e.preventDefault(); } else if (k === '3') { act_('coincidence'); e.preventDefault(); }
     else if (k === '4') act_('later'); else if (k === '5') { act_('declared'); e.preventDefault(); } else if (k === '6') { act_('version'); e.preventDefault(); }
     else if (k === 'u') undo();
@@ -456,7 +563,7 @@ def cmd_page(args):
     raw = read_raw(args.raw)
     if raw is None:
         return 1
-    items = groups_of(raw, args.root, args.origin)
+    items = groups_of(raw, args.root, args.origin, Budget(MAX_PAGE_TEXT))
     done = load_decisions(args.decisions)
     t = STRINGS[args.lang]
     # '</' is escaped so the data can never close the script element it sits in.
