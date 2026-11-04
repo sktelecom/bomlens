@@ -78,3 +78,18 @@ Attribution can also point at the wrong project. A file that many projects copy 
 Separately, scanning source that is itself published in a public repository will match that repository (your own first-party files can match your own public project) — this does not occur for the intended case of private supplier source.
 
 Results are a best-effort estimate that benefits from human review. See the OSSKB terms and license notes in [THIRD_PARTY_LICENSES.md](https://github.com/sktelecom/bomlens/blob/main/THIRD_PARTY_LICENSES.md).
+
+## Reviewing the matches
+
+`docker/lib/snippet-review.py` turns the raw match result into a review queue. Set `SCANOSS_RAW_OUT=<file>` to keep the raw result of a scan, then:
+
+```bash
+python3 docker/lib/snippet-review.py page  scan-raw.json --root <your source> [--origin <release sources>] > review.html
+python3 docker/lib/snippet-review.py queue scan-raw.json --decisions snippet-decisions.json
+```
+
+Matches are grouped by the source they came from, so one decision covers every file of a group. Groups that need a decision are listed first: a partial copy (11 lines or more and 40% or more of the file), a file that several sources claim, a source with no license found, or files that match different versions. Whole files from one licensed source are listed as confirmed by evidence, and small partial matches (10 lines or fewer) are shown for information only. Neither is hidden.
+
+The page needs no server and loads nothing from the network. With `--root` it shows your own code in the matched lines; with `--origin` (the folder holding the release sources a knowledge base was built from) it shows the original lines beside them. A scan against a public service sends only hashes, so there the page shows the source address and the line numbers the service returned.
+
+Keys: `1` third-party code (adds it to the SBOM), `2` our own code (asks where the original is), `3` coincidence, `4` later, `5` already declared under another name, `6` correct the version, `j` and `k` to move, `u` to undo. The page downloads a decisions file. Set `SCANOSS_DECISIONS=<file>` on the next scan: code decided to be your own, a coincidence or already declared leaves the list, a corrected version replaces the detected one, and every group that still needs a decision is marked `bomlens:review=pending` rather than dropped. A decision records the hash and region of the files it covered, so a file that changed goes back to the queue.

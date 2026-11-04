@@ -199,6 +199,21 @@ if [ ! -s "$COMPS_FILE" ] || ! jq -e 'type=="array"' "$COMPS_FILE" >/dev/null 2>
     echo '[]' > "$COMPS_FILE"; TRANSFORM_OK=0
 fi
 
+# Keep the raw match result for the review page when asked, and apply a review decisions file: code a
+# person decided is their own, a coincidence or already declared leaves the list, and every group that
+# still needs a decision is marked pending instead of being dropped.
+if [ -n "${SCANOSS_RAW_OUT:-}" ]; then
+    cp "$RAW" "$SCANOSS_RAW_OUT" 2>/dev/null || echo "[vendored] WARN: could not write $SCANOSS_RAW_OUT" >&2
+fi
+if [ -n "${SCANOSS_DECISIONS:-}" ] && [ -f "$SCANOSS_DECISIONS" ] && [ "$TRANSFORM_OK" = "1" ]; then
+    if python3 "$SCRIPT_DIR/snippet-review.py" apply "$COMPS_FILE" "$RAW" "$SCANOSS_DECISIONS" > "$WORK/reviewed.json" \
+            && jq -e 'type=="array"' "$WORK/reviewed.json" >/dev/null 2>&1; then
+        mv "$WORK/reviewed.json" "$COMPS_FILE"
+    else
+        echo "[vendored] WARN: could not apply $SCANOSS_DECISIONS; keeping every match." >&2
+    fi
+fi
+
 NCOMP=$(jq 'length' "$COMPS_FILE" 2>/dev/null || echo 0)
 # matched when SCANOSS returned full-file hits; no-match when the search ran
 # cleanly but found nothing vendored; unavailable when the search or its
