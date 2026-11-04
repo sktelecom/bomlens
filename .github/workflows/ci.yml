@@ -361,6 +361,12 @@ jobs:
       - name: Binary knowledge base unit tests
         run: bash tests/test-binary-kb.sh
 
+      # No Docker: guards the source match review. Matches are grouped by source and tiered, a
+      # decision needs its reason and goes stale when the matched files change, and nothing that
+      # still needs a decision is dropped from the SBOM.
+      - name: Source match review unit tests
+        run: bash tests/test-snippet-review.sh
+
       # No Docker (docker itself is stubbed): guards SBOM_PULL/ensure_image_fresh.
       # `docker run` only auto-pulls a MISSING image, so a once-pulled :latest
       # was reused forever even after the registry published a newer image.

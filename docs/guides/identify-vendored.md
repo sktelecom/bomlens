@@ -78,3 +78,28 @@ Attribution can also point at the wrong project. A file that many projects copy 
 Separately, scanning source that is itself published in a public repository will match that repository (your own first-party files can match your own public project) — this does not occur for the intended case of private supplier source.
 
 Results are a best-effort estimate that benefits from human review. See the OSSKB terms and license notes in [THIRD_PARTY_LICENSES.md](https://github.com/sktelecom/bomlens/blob/main/THIRD_PARTY_LICENSES.md).
+
+## Reviewing the matches
+
+`docker/lib/snippet-review.py` turns the raw match result into a review queue. Set `SCANOSS_RAW_OUT=<file>` to keep the raw result of a scan, then:
+
+```bash
+python3 docker/lib/snippet-review.py page  scan-raw.json --root <your source> [--origin <release sources>] > review.html
+python3 docker/lib/snippet-review.py queue scan-raw.json --decisions snippet-decisions.json
+```
+
+Matches are grouped by the source they came from, so one decision covers every file of a group. Groups that need a decision are listed first: a partial copy (11 lines or more and 40% or more of the file), a file that several sources claim, a source with no license found, or files that match different versions. Whole files from one licensed source are listed as confirmed by evidence, and small partial matches (10 lines or fewer) are shown for information only. Neither is hidden.
+
+The page needs no server and loads nothing from the network. With `--root` it shows your source tree and, for the selected file, the whole file with the matched regions highlighted. With `--origin` (the folder holding the release sources a knowledge base was built from) it shows the source tree of the original release and the whole original file beside yours, with its matched regions highlighted. `n` and `p` move between the matched regions of a file and scroll both sides to them; `[` and `]` move between the files of the group. A scan against a public service sends only hashes, so there the page shows the source address and the line numbers the service returned.
+
+Keys: `1` third-party code (adds it to the SBOM), `2` our own code (asks where the original is), `3` coincidence, `4` later, `5` already declared under another name, `6` correct the version, `j` and `k` to move, `u` to undo. The page downloads a decisions file. Set `SCANOSS_DECISIONS=<file>` on the next scan: code decided to be your own, a coincidence or already declared leaves the list, a corrected version replaces the detected one, and every group that still needs a decision is marked `bomlens:review=pending` rather than dropped. A decision records the hash and region of the files it covered, so a file that changed goes back to the queue.
+
+### When one file matches several sources
+
+If the matched lines of one file overlap between two or more sources, the page shows one contest for that file instead of one group per source. It lists the candidates with their versions, licenses, the obligation class of each license (strong copyleft, weak copyleft, permissive, unknown), the share matched and the lines, and shows each candidate's original beside your file. You pick the source the code was taken from (keys `1` to `9`), or mark it as your own code (`o`), a coincidence (`x`) or later (`l`). A choice always asks for a reason. When the candidates carry different obligations, the page says so, and a choice that lands on a weaker obligation than another candidate is marked `needs_sample` in the decisions file and reported by `apply`, so that a second person can look at it. Sources that match different regions of one file are a combination, not a contest, and stay as separate groups.
+
+The system does not pick an origin by itself. The oldest release is not used either: it is not a reliable sign of where a supplier took the code from. Until a decision exists, `apply` keeps every candidate in the SBOM with `bomlens:review=pending` and `bomlens:contested=pending`. After a decision, the chosen source stays, the others are recorded on it as `bomlens:alsoMatched` (they do not become components), and a source whose every file went to another source is left out. A source that still has files of its own stays.
+
+A decision is keyed by the hash of the matched lines, so it survives a moved or renamed file and edits elsewhere in the file. It records the chosen source and the other candidates. When a later scan finds the chosen source gone, or a new candidate with a different obligation, the decision no longer applies and the contest returns to the queue.
+
+Partial copies only reach the SBOM through a decision: accepting one adds the component even though the scan's own list did not carry it. Snippet matching is off by default; set `SCANOSS_SNIPPETS=true` to ask for it. A long copy needs a decision even inside a large file (50 lines or more, or 11 lines and 40% of the file), and many small matches from one source count together.
