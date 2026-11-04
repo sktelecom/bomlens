@@ -41,7 +41,7 @@ Where BomLens has been presented or covered, with slides and links for each. If 
 - **Format:** 20-minute session
 - **Language:** Slides are in Korean
 
-[View slides](icotec-2026/slides.ko.html){ .md-button .md-button--primary target=_blank }
+[View slides](icotec-2026/slides.html){ .md-button .md-button--primary target=_blank }
 
 ## Press
 
