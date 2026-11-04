@@ -210,7 +210,7 @@ if [ -n "${SCANOSS_RAW_OUT:-}" ]; then
     cp "$RAW" "$SCANOSS_RAW_OUT" 2>/dev/null || echo "[vendored] WARN: could not write $SCANOSS_RAW_OUT" >&2
 fi
 if [ -n "${SCANOSS_DECISIONS:-}" ] && [ -f "$SCANOSS_DECISIONS" ] && [ "$TRANSFORM_OK" = "1" ]; then
-    if python3 "$SCRIPT_DIR/snippet-review.py" apply "$COMPS_FILE" "$RAW" "$SCANOSS_DECISIONS" > "$WORK/reviewed.json" \
+    if python3 "$SCRIPT_DIR/snippet-review.py" apply "$COMPS_FILE" "$RAW" "$SCANOSS_DECISIONS" --root "$SRC" > "$WORK/reviewed.json" \
             && jq -e 'type=="array"' "$WORK/reviewed.json" >/dev/null 2>&1; then
         mv "$WORK/reviewed.json" "$COMPS_FILE"
     else
