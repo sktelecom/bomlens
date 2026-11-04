@@ -30,7 +30,7 @@ STRINGS = {
         "confirm": "Confirm", "exclude": "Exclude", "version": "Correct version", "skip": "Later", "undo": "Undo", "export": "Download decisions",
         "reason": "Reason", "reviewer": "Reviewer", "newver": "Version shipped", "save": "Save", "cancel": "Cancel",
         "why_range": "No single release fits. Candidates: {c}", "why_newer": "The newest release the base has. The shipped version may be newer.",
-        "why_tables": "Found by constant tables only, no version.", "why_ok": "One release fits the strings found.",
+        "why_tables": "Found by constant tables only, no version.", "why_weak": "The score is close to the detection threshold. Check that the files are really this component.", "why_ok": "One release fits the strings found.",
         "evidence": "Evidence", "files": "Found in", "strings": "Longest matched strings", "score": "Score", "unique": "Strings only this component has",
         "tables": "Constant tables", "release": "Knowledge base release", "sha": "Evidence file SHA-256", "keys": "Keys: 1 confirm, 2 exclude, 3 correct version, 4 later, j/k move, u undo",
         "left": "{n} still undecided: the download lists only what you decided.", "version_label": "Version", "none": "none",
@@ -43,7 +43,7 @@ STRINGS = {
         "confirm": "맞음", "exclude": "아님(제외)", "version": "버전 정정", "skip": "나중에", "undo": "되돌리기", "export": "판정 파일 내려받기",
         "reason": "사유", "reviewer": "검토자", "newver": "실제 버전", "save": "저장", "cancel": "취소",
         "why_range": "맞는 릴리스가 하나로 정해지지 않습니다. 후보: {c}", "why_newer": "베이스가 가진 가장 새 릴리스입니다. 실제 버전은 더 새것일 수 있습니다.",
-        "why_tables": "상수 테이블로만 찾았고 버전이 없습니다.", "why_ok": "찾은 문자열에 맞는 릴리스가 하나입니다.",
+        "why_tables": "상수 테이블로만 찾았고 버전이 없습니다.", "why_weak": "점수가 판정 기준에 가깝습니다. 파일이 정말 이 컴포넌트인지 확인하세요.", "why_ok": "찾은 문자열에 맞는 릴리스가 하나입니다.",
         "evidence": "근거", "files": "찾은 위치", "strings": "맞은 문자열(긴 순)", "score": "점수", "unique": "이 컴포넌트에만 있는 문자열",
         "tables": "상수 테이블", "release": "지식 베이스 릴리스", "sha": "근거 파일 SHA-256", "keys": "단축키: 1 맞음, 2 제외, 3 버전 정정, 4 나중에, j/k 이동, u 되돌리기",
         "left": "아직 {n}건을 판정하지 않았습니다. 내려받는 파일에는 판정한 것만 들어갑니다.", "version_label": "버전", "none": "없음",
@@ -71,6 +71,8 @@ def items_of(bom):
             reasons.append("newer")
         if not c.get("version") and not cands:
             reasons.append("tables")
+        if props.get("bomlens:kbConfidence") == "low":
+            reasons.append("weak")
         out.append({
             "name": c.get("name", ""), "version": c.get("version", ""), "candidates": cands, "reasons": reasons,
             "score": props.get("bomlens:kbScore", ""), "unique": props.get("bomlens:kbUniqueStrings", ""),
@@ -149,6 +151,7 @@ details.auto summary { cursor:pointer; padding:6px 10px; color:var(--muted); }
     if (i.reasons.indexOf('range') >= 0) out.push(fmt(T.why_range, { c: i.candidates.join(', ') }));
     if (i.reasons.indexOf('newer') >= 0) out.push(T.why_newer);
     if (i.reasons.indexOf('tables') >= 0) out.push(T.why_tables);
+    if (i.reasons.indexOf('weak') >= 0) out.push(T.why_weak);
     return out.length ? out.join(' ') : T.why_ok;
   }
   function verText(i) { return i.version || (i.candidates.length > 1 ? i.candidates[0] + '..' + i.candidates[i.candidates.length - 1] : (i.candidates.length ? i.candidates[0] + '+' : T.none)); }

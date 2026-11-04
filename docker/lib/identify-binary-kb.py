@@ -46,6 +46,7 @@ import binarykb  # noqa: E402
 # `<image>.extracted/`. The same rootfs lands under both, so one file is seen twice.
 MARKER = re.compile(r".*(?:_extract/|\.extracted/)")
 MAX_EVIDENCE_FILES = 10
+WEAK_FACTOR = 2.5   # a score under this multiple of the stored threshold is reported as low confidence
 
 
 def cap(name, default):
@@ -183,6 +184,9 @@ def main():
         if hit:
             props.append({"name": "bomlens:kbScore", "value": str(hit["score"])})
             props.append({"name": "bomlens:kbUniqueStrings", "value": str(hit["unique"])})
+            # A score only a little above the base's threshold is where neighbouring packages that
+            # share source strings show up, so such a result is marked for a person to look at.
+            props.append({"name": "bomlens:kbConfidence", "value": "high" if hit["score"] >= WEAK_FACTOR * kb.rule["score"] else "low"})
             cands = hit["versions"]
             if len(cands) == 1 and (trust_newest or not hit["latest"]):
                 version = cands[0]

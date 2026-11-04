@@ -157,6 +157,17 @@ if [ -z "$(prop "$own" bomlens:linkage)" ] && [ -z "$(prop "$own" bomlens:embedd
     pass "a component found in its own library file is not marked as embedded"
 else fail "an own library was marked as embedded" "$own"; fi
 
+# ---- confidence ---------------------------------------------------------------------
+if [ "$(prop "$(ident only-core)" bomlens:kbConfidence)" = "high" ]; then
+    pass "a score well above the stored threshold is marked high confidence"
+else fail "a strong result was not marked high confidence"; fi
+mkdir -p "$TMP/kb-near"
+python3 "$LIB/binarykb.py" build --kb "$TMP/kb.csv" --bg "$TMP/bg" --release test-near --rule-score 1500 --out "$TMP/kb-near/kb.sqlite3" 2>/dev/null
+near="$(env FW_BINKB_NONELF=true python3 "$LIB/identify-binary-kb.py" "$TMP/root-only-core" "$TMP/kb-near/kb.sqlite3" 2>/dev/null)"
+if [ "$(prop "$near" bomlens:kbConfidence)" = "low" ]; then
+    pass "a score close to the stored threshold is marked low confidence, for the review page to list first"
+else fail "a near-threshold result was not marked low confidence" "$near"; fi
+
 # ---- review decisions -------------------------------------------------------------------
 sha="$(python3 -c 'import hashlib,sys;print(hashlib.sha256(open(sys.argv[1],"rb").read()).hexdigest())' "$TMP/root-release-1.1/usr/bin/prog")"
 dec() { printf '%s' "$1" > "$TMP/dec.json"; ident release-1.1 FW_BINARY_KB_DECISIONS="$TMP/dec.json"; }
