@@ -8,55 +8,16 @@ BomLens를 발표한 자리와 외부에 소개된 기사를 모읍니다. 행�
 
 ## 발표
 
-### OSPOlogy Asia 2026 — 도쿄
-
-- **행사:** [OSPOlogy Asia 2026 (Linux Foundation)](https://community.linuxfoundation.org/events/details/lfhq-ospology-asia-presents-ospology-asia/)
-- **일자:** 2026년 7월 27일
-- **장소:** 일본 도쿄
-- **형식:** 30분 라이브 데모
-
-[슬라이드 보기](ospology-asia-2026-tokyo/slides.html){ .md-button .md-button--primary target=_blank }
-
-### AI 시대 오픈소스 점검 교육
-
-- **형식:** 온라인 교육
-- **일자:** 2026년 9월 7일
-
-[슬라이드 보기](oss-check-training-2026-09/slides.ko.html){ .md-button .md-button--primary target=_blank }
-
-### 오픈소스 공급망 보안 도구 — OpenChain Korea Work Group
-
-- **행사:** [OpenChain Korea Work Group 31차 정기모임](https://openchain-project.github.io/OpenChain-KWG/)
-- **일자:** 2026년 9월 8일
-- **형식:** 25분 세션
-
-[슬라이드 보기](kwg-31-supply-chain-tools/slides.ko.html){ .md-button .md-button--primary target=_blank }
-
-### 투명성 확보를 위한 AI-BOM — ICOTEC 2026
-
-- **행사:** [ICOTEC 2026 국제저작권기술 콘퍼런스 (한국저작권위원회)](http://www.icotec.or.kr/)
-- **일자:** 2026년 11월 4일
-- **장소:** 서울 JW 메리어트 동대문 스퀘어 호텔 그랜드볼룸
-- **형식:** 20분 세션
-
-[슬라이드 보기](icotec-2026/slides.ko.html){ .md-button .md-button--primary target=_blank }
+| 일자 | 내용 | 링크 |
+|------|------|------|
+| 2026-11-04 | **투명성 확보를 위한 AI-BOM**<br>[ICOTEC 2026 국제저작권기술 콘퍼런스](http://www.icotec.or.kr/)(한국저작권위원회), 서울 JW 메리어트 동대문 스퀘어 호텔 그랜드볼룸, 20분 세션 | [슬라이드](icotec-2026/slides.ko.html){ target=_blank } |
+| 2026-09-08 | **오픈소스 공급망 보안 도구**<br>[OpenChain Korea Work Group 31차 정기모임](https://openchain-project.github.io/OpenChain-KWG/), 25분 세션 | [슬라이드](kwg-31-supply-chain-tools/slides.ko.html){ target=_blank } |
+| 2026-09-07 | **AI 시대 오픈소스 점검 교육**<br>온라인 교육 | [슬라이드](oss-check-training-2026-09/slides.ko.html){ target=_blank } |
+| 2026-07-27 | **OSPOlogy Asia 2026, 도쿄**<br>[Linux Foundation 행사](https://community.linuxfoundation.org/events/details/lfhq-ospology-asia-presents-ospology-asia/), 일본 도쿄, 30분 라이브 데모 | [슬라이드](ospology-asia-2026-tokyo/slides.html){ target=_blank } |
 
 ## 외부 소개
 
-### 서울경제 (한국)
-
-- **매체:** [서울경제](https://www.sedaily.com/)
-- **일자:** 2026년 10월 14일
-- **언어:** 한국어
-- **제목:** 통신업계, 협력사 '보안 구멍'까지 막는다
-- **내용:** 통신사들의 선제적 보안 대응을 다룬 기사. SK텔레콤이 개발해 GitHub로 배포하는 BomLens를, 소프트웨어 공급사가 제품에 포함된 오픈소스를 확인하고 취약점을 점검하는 데 쓰는 도구로 소개
-
-[기사 보기](https://www.sedaily.com/article/20101683){ .md-button .md-button--primary target=_blank }
-
-### Open Culture Foundation (대만)
-
-- **매체:** [Open Culture Foundation](https://ocf.tw/)
-- **언어:** 중국어(번체)
-- **내용:** OSPOlogy Asia 2026 발표와 직접 써본 경험을 바탕으로 대만 오픈소스 커뮤니티에 BomLens를 소개한 기사
-
-[기사 보기](https://ocf.tw/story/ospos-9-korea-bomlens/){ .md-button .md-button--primary target=_blank }
+| 일자 | 내용 | 링크 |
+|------|------|------|
+| 2026-10-14 | **통신업계, 협력사 '보안 구멍'까지 막는다**<br>[서울경제](https://www.sedaily.com/), 한국어. 통신사들의 선제적 보안 대응을 다룬 기사입니다. SK텔레콤이 개발해 GitHub로 배포하는 BomLens를, 소프트웨어 공급사가 제품에 포함된 오픈소스를 확인하고 취약점을 점검하는 데 쓰는 도구로 소개합니다. | [기사](https://www.sedaily.com/article/20101683){ target=_blank } |
+| 2026-09-15 | **【開源治理系列 09】讓麻瓜也看懂 SBOM：韓國 BomLens 如何從個人手上的風險介接到公司治理**<br>[Open Culture Foundation](https://ocf.tw/)(대만), 중국어(번체). OSPOlogy Asia 2026 발표와 직접 써본 경험을 바탕으로 대만 오픈소스 커뮤니티에 BomLens를 소개한 기사입니다. | [기사](https://ocf.tw/story/ospos-9-korea-bomlens/){ target=_blank } |
