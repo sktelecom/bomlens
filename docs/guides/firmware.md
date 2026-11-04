@@ -140,7 +140,7 @@ What a result carries:
 - When a component's code is found inside a file that is not its own library or program (a static link, or a copied source file), the result carries `bomlens:linkage` (`embedded`, or `own-file-and-embedded` when its own file is present too) and `bomlens:embeddedIn` with those files, so a vulnerable library inside a program can be traced to the program that carries it.
 - A result whose score is under 2.5 times the base's stored threshold carries `bomlens:kbConfidence=low`; the review page lists it first with a note to check that the files are really that component. Strong results carry `high`.
 - The builder does not store a string literal that is only an upper-case constant name (for example `X509_V_ERR_UNABLE_TO_GET_ISSUER_CERT_LOCALLY`). The package that defines such a name writes it through a macro, so it never appears as a literal in that package's own source, while every other package that prints it would be credited with it.
-- `bomlens:identifiedBy` is `binary-kb`, with `bomlens:kbRelease`, `bomlens:kbScore` and `bomlens:kbUniqueStrings` (or `bomlens:kbTables`) as the evidence, and the files it was found in as `evidence.occurrences`.
+- `bomlens:identifiedBy` is `binary-kb`, with `bomlens:kbRelease`, `bomlens:kbSha256` (the hash of the base file), `bomlens:kbScore` and `bomlens:kbUniqueStrings` (or `bomlens:kbTables`) as the evidence, and the files it was found in as `evidence.occurrences`.
 - A component found only by constant tables has no version and is tagged `presence-only`.
 
 A review page turns the results into a queue to decide. It is one HTML file that loads nothing from the network:

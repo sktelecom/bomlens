@@ -396,6 +396,111 @@ if grep -q 'def cap(name, default)' "$LIB/identify-binary-kb.py"; then
     pass "identify-binary-kb falls back when a cap arrives empty or malformed"
 else fail "identify-binary-kb reads its cap with a bare int()"; fi
 
+# ---- defects found in review ----------------------------------------------------------------
+# A version newer than the base comes back as the last release of its own series, so the newest of the
+# whole base is not enough to mark it.
+if python3 - "$LIB" <<'PY'
+import sys
+sys.path.insert(0, sys.argv[1])
+import binarykb as b
+v = ['1.2.11', '1.2.12', '1.3.0']
+ok = [b.KnowledgeBase._newest_of_series(v, c) for c in v] == [False, True, True]
+sys.exit(0 if ok else 1)
+PY
+then pass "the last release of a series is marked as possibly newer even when another series follows it"
+else fail "the newest-of-series check is wrong"; fi
+
+# Overlapping or oversized section headers cannot expand the bytes read beyond the file.
+if python3 - "$LIB" <<'PY'
+import struct, sys
+sys.path.insert(0, sys.argv[1])
+import binarykb as b
+body = b'x' * 200000
+shstr = b'\0.rodata\0.shstrtab\0'
+n = 2000
+shoff = 64 + len(body) + len(shstr)
+hdr = bytearray(64)
+hdr[:4] = b'\x7fELF'; hdr[4] = 2; hdr[5] = 1
+struct.pack_into('<Q', hdr, 0x28, shoff); struct.pack_into('<H', hdr, 0x3a, 64)
+struct.pack_into('<H', hdr, 0x3c, n + 1); struct.pack_into('<H', hdr, 0x3e, n)
+def sh(name, typ, off, size):
+    e = bytearray(64); struct.pack_into('<II', e, 0, name, typ); struct.pack_into('<Q', e, 0x18, off); struct.pack_into('<Q', e, 0x20, size); return bytes(e)
+secs = b''.join(sh(1, 1, 64, len(body)) for _ in range(n)) + sh(9, 3, 64 + len(body), len(shstr))
+data = bytes(hdr) + body + shstr + secs
+out, is_elf = b.string_bytes(data)
+bad = bytearray(data); struct.pack_into('<H', bad, 0x3c, 65535)
+out2, is_elf2 = b.string_bytes(bytes(bad))
+sys.exit(0 if is_elf and len(out) <= len(data) and not is_elf2 else 1)
+PY
+then pass "overlapping sections are read once and a header claiming thousands of sections is not trusted"
+else fail "a crafted section table expanded the bytes read"; fi
+
+# Own-file judgement: the name must be the component's, not merely contain it.
+if python3 - "$LIB" <<'PY'
+import importlib.util, sys
+spec = importlib.util.spec_from_file_location('ibk', sys.argv[1] + '/identify-binary-kb.py')
+m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
+yes = [('zlib', 'usr/lib/libz.so.1'), ('openssl', 'usr/lib/libcrypto.so.1.1'), ('mbedtls', 'lib/libmbedcrypto.so.7'),
+       ('iproute2', 'sbin/ip'), ('hostapd', 'usr/sbin/wpad'), ('busybox', 'bin/busybox'), ('alpha', 'usr/lib/libalpha.so.1')]
+no = [('zlib', 'usr/lib/libzstd.so.1'), ('ip', 'usr/bin/zip'), ('alpha', 'usr/bin/alphabet'), ('zlib', 'bin/busybox')]
+sys.exit(0 if all(m.is_own_file(*x) for x in yes) and not any(m.is_own_file(*x) for x in no) else 1)
+PY
+then pass "own files are told from hosts by name: libz.so for zlib, wpad for hostapd, but not libzstd for zlib"
+else fail "the own-file judgement is wrong"; fi
+
+# Two releases of one component in two files give two components.
+mkdir -p "$TMP/root-two/usr/lib" "$TMP/root-two/usr/bin"
+cp "$TMP/root-release-1.1/usr/bin/prog" "$TMP/root-two/usr/lib/libalpha.so.1"
+cp "$TMP/root-newest/usr/bin/prog" "$TMP/root-two/usr/bin/other"
+out="$(ident two FW_BINKB_TRUST_NEWEST=true)"
+if [ "$(jq -r '[.[] | select(.name == "alpha") | .version] | sort | join(",")' <<<"$out")" = "1.1,1.2" ]; then
+    pass "two releases of one component in two files are two components"
+else fail "two releases were merged into one" "$out"; fi
+
+# The walk is sorted, so the cap keeps the same files on every run.
+mkdir -p "$TMP/root-order/a" "$TMP/root-order/b"
+cp "$TMP/root-release-1.1/usr/bin/prog" "$TMP/root-order/a/prog"
+cp "$TMP/root-beta-only/usr/bin/prog" "$TMP/root-order/b/prog"
+out="$(ident order FW_BINKB_MAX_FILES=1)"
+if [ "$(jq -r '[.[] | .name] | join(",")' <<<"$out")" = "alpha" ]; then
+    pass "the file cap keeps the first files in sorted order"
+else fail "the file cap kept files in directory order" "$out"; fi
+
+# The result names the base it came from, and a base that fails midway is reported.
+want="$(python3 -c 'import hashlib,sys;print(hashlib.sha256(open(sys.argv[1],"rb").read()).hexdigest())' "$KB")"
+out="$(ident release-1.1)"
+if [ "$(prop "$out" bomlens:kbSha256)" = "$want" ]; then pass "the result carries the hash of the base file"
+else fail "the base hash is missing from the result" "$out"; fi
+mkdir -p "$TMP/kb4"; cp "$KB" "$TMP/kb4/kb.sqlite3"
+python3 - "$TMP/kb4/kb.sqlite3" <<'PY'
+import os, sys
+p = sys.argv[1]; n = os.path.getsize(p)
+with open(p, 'r+b') as f:
+    f.seek(4096)
+    f.write(os.urandom(max(n - 4096, 0)))
+PY
+out="$(FW_BINKB_NONELF=true python3 "$LIB/identify-binary-kb.py" "$TMP/root-release-1.1" "$TMP/kb4/kb.sqlite3" 2>"$TMP/dmg.err")"
+if jq -e 'type == "array"' <<<"$out" >/dev/null 2>&1 && grep -q "WARN" "$TMP/dmg.err"; then
+    pass "a base damaged after the header is reported and the scan goes on"
+else fail "a damaged base was not reported" "$(cat "$TMP/dmg.err")"; fi
+
+# A presence-only record whose candidate releases exclude the version found elsewhere is kept by the merge;
+# one whose candidates include that version is a repeat and is dropped.
+python3 - "$LIB/scan-firmware.sh" "$TMP/merge.jq" <<'PY'
+import sys
+s = open(sys.argv[1]).read()
+k = "--slurpfile g \"$BINKB_COMPS\" '"
+open(sys.argv[2], 'w').write(s[s.index(k) + len(k):s.index("' > \"$WORK/merged.json\"")])
+PY
+echo '[{"name":"openssl","version":"1.1.1","type":"library"},{"name":"zlib","version":"1.2.11","type":"library"}]' > "$TMP/m-a.json"
+echo '[]' > "$TMP/m-e.json"
+echo '[{"name":"openssl","type":"library","properties":[{"name":"bomlens:evidenceGrade","value":"presence-only"},{"name":"bomlens:versionCandidates","value":"3.0.1,3.0.2"}]},{"name":"zlib","type":"library","properties":[{"name":"bomlens:evidenceGrade","value":"presence-only"},{"name":"bomlens:versionCandidates","value":"1.2.11"}]}]' > "$TMP/m-g.json"
+mout="$(jq -n --slurpfile a "$TMP/m-a.json" --slurpfile b "$TMP/m-e.json" --slurpfile c "$TMP/m-e.json" --slurpfile d "$TMP/m-e.json" \
+    --slurpfile e "$TMP/m-e.json" --slurpfile f "$TMP/m-e.json" --slurpfile g "$TMP/m-g.json" -f "$TMP/merge.jq" 2>&1)"
+if [ "$(jq -r '[.[] | "\(.name)@\(.version // "none")"] | join(",")' <<<"$mout")" = "openssl@none,openssl@1.1.1,zlib@1.2.11" ]; then
+    pass "the merge keeps a presence-only record that names other releases and drops one that repeats a version"
+else fail "the merge handled presence-only records wrongly" "$mout"; fi
+
 echo
 echo "binary knowledge base: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]

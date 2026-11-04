@@ -37,6 +37,7 @@ import hashlib
 import json
 import os
 import re
+import sqlite3
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -69,16 +70,31 @@ MAX_FILES = cap("FW_BINKB_MAX_FILES", 20000)
 MAX_BYTES = cap("FW_BINKB_MAX_BYTES", 64 * 1024 * 1024)
 
 
+# Files that are a component's own although the name does not carry the component's name.
+OWN_NAMES = {
+    "zlib": ("libz",), "openssl": ("libcrypto", "libssl", "openssl"), "mbedtls": ("libmbedcrypto", "libmbedtls", "libmbedx509"),
+    "iproute2": ("ip", "tc", "ss", "bridge"), "hostapd": ("hostapd", "wpad"), "wpa_supplicant": ("wpa_supplicant", "wpad"),
+    "libpng": ("libpng",), "expat": ("libexpat",), "libcurl": ("libcurl",), "curl": ("curl", "libcurl"),
+}
+
+
 def is_own_file(component, rel):
-    """True when a file looks like the component itself (libz.so.1 for zlib, bin/busybox for busybox).
+    """True when a file is the component itself (libz.so.1 for zlib, bin/busybox for busybox).
 
     A hit in any other file means the component's code is inside a program that was built
     from it or linked it statically, which is the case a package record never shows.
+    The name must start with the component's name or a known own name, followed by the end of the
+    name, a dot, a dash or a digit; a name that only contains it (libzstd for zlib) is another file.
     """
     base = os.path.basename(rel).lower()
-    key = re.sub(r"[^a-z0-9]", "", component.lower())
-    flat = re.sub(r"[^a-z0-9]", "", base)
-    return key in flat
+    comp = component.lower()
+    names = {re.sub(r"[^a-z0-9_]", "", comp), re.sub(r"[^a-z0-9]", "", comp)}
+    names.update(OWN_NAMES.get(comp, ()))
+    for key in names:
+        for stem in (key, "lib" + key):
+            if re.match(re.escape(stem) + r"(?:$|[.\-_0-9])", base):
+                return True
+    return False
 
 
 def locate(arg):
@@ -126,14 +142,20 @@ def main():
         print(f"[binary-kb] WARN: cannot open {db_path} ({exc}); skipping", file=sys.stderr)
         print("[]")
         return 0
+    h256 = hashlib.sha256()
+    with open(db_path, "rb") as fh:
+        for blk in iter(lambda: fh.read(1 << 20), b""):
+            h256.update(blk)
+    kb_sha = h256.hexdigest()
     include_other = os.environ.get("FW_BINKB_NONELF", "") == "true"
     trust_newest = os.environ.get("FW_BINKB_TRUST_NEWEST", "") == "true"
     decisions = load_decisions(os.environ.get("FW_BINARY_KB_DECISIONS", ""))
 
     # component -> best result and the files it was found in
     found = {}
-    seen, scanned, capped = set(), 0, False
-    for dirpath, _dirnames, filenames in os.walk(root):
+    seen, scanned, capped, unreadable, damaged = set(), 0, False, 0, False
+    for dirpath, dirnames, filenames in os.walk(root):
+        dirnames.sort()   # the order decides which files fall under the cap and which copy of a file is kept
         for fn in sorted(filenames):
             p = os.path.join(dirpath, fn)
             if os.path.islink(p) or not os.path.isfile(p):
@@ -158,28 +180,54 @@ def main():
             scanned += 1
             try:
                 hits, tables = kb.scan_bytes(data, rel)
-            except (ValueError, IndexError) as exc:
+            except sqlite3.DatabaseError as exc:   # the base itself is damaged: every later file would fail the same way
+                print(f"[binary-kb] WARN: the knowledge base cannot be read ({exc}); the result is incomplete", file=sys.stderr)
+                damaged = True
+                break
+            except (ValueError, IndexError, OverflowError, MemoryError) as exc:
+                unreadable += 1
                 print(f"[binary-kb] WARN: cannot read {rel} ({exc})", file=sys.stderr)
                 continue
             for name in kb.detected(hits, tables, rel):
                 h = hits.get(name)
                 by_strings = bool(h) and h["unique"] >= kb.rule["unique"] and h["score"] >= kb.rule["score"]
-                e = found.setdefault(name, {"files": [], "best": None})
-                e["files"].append((rel, hashlib.sha256(data).hexdigest()))
-                rank = (h["score"] if by_strings else 0, tables.get(name, [0, 0])[1])
-                if e["best"] is None or rank > e["best"]["rank"]:
-                    e["best"] = {"rank": rank, "hit": h if by_strings else None, "tables": tables.get(name),
-                                 "file": rel, "sha256": e["files"][-1][1]}
-        if capped:
+                e = found.setdefault(name, {"per": []})
+                sha = hashlib.sha256(data).hexdigest()
+                cands = h["versions"] if by_strings else []
+                resolved = cands[0] if len(cands) == 1 and (trust_newest or not h["latest"]) else None
+                e["per"].append({"file": rel, "sha256": sha, "rank": (h["score"] if by_strings else 0, tables.get(name, [0, 0])[1]),
+                                 "hit": h if by_strings else None, "tables": tables.get(name), "resolved": resolved, "cands": cands})
+        if capped or damaged:
             break
     if capped:
         print(f"[binary-kb] WARN: stopped at {MAX_FILES} files; raise FW_BINKB_MAX_FILES to cover the rest.", file=sys.stderr)
 
-    components, dropped = [], 0
+    def group(per):
+        files = [(x["file"], x["sha256"]) for x in per]
+        best = max(per, key=lambda x: x["rank"])
+        return {"files": files, "best": {"hit": best["hit"], "tables": best["tables"], "file": best["file"], "sha256": best["sha256"]}}
+
+    # One result per name, unless the files disagree on the version: a library of one release next to a
+    # program that carries another release is two components, and one of them must not hide the other.
+    # A file that could not name a single version joins the groups whose version it still allows.
+    entries = []
     for name in sorted(found):
-        e = found[name]; b = e["best"]; hit = b["hit"]
+        per = found[name]["per"]
+        versions = sorted({x["resolved"] for x in per if x["resolved"]})
+        if len(versions) < 2:
+            entries.append((name, group(per)))
+            continue
+        for v in versions:
+            entries.append((name, group([x for x in per if x["resolved"] == v or (not x["resolved"] and v in x["cands"])])))
+
+    components, dropped = [], 0
+    for name, e in entries:
+        b = e["best"]; hit = b["hit"]
         props = [{"name": "bomlens:identifiedBy", "value": "binary-kb"},
-                 {"name": "bomlens:kbRelease", "value": kb.release}]
+                 {"name": "bomlens:kbRelease", "value": kb.release},
+                 {"name": "bomlens:kbSha256", "value": kb_sha}]
+        if damaged or unreadable:
+            props.append({"name": "bomlens:kbResultIncomplete", "value": "true"})
         version = None
         if hit:
             props.append({"name": "bomlens:kbScore", "value": str(hit["score"])})
@@ -247,7 +295,8 @@ def main():
 
     print(json.dumps(components, ensure_ascii=False))
     print(f"[binary-kb] {scanned} file(s) read against release {kb.release}; {len(components)} component(s) identified"
-          f"{f', {dropped} excluded by review' if dropped else ''}.", file=sys.stderr)
+          f"{f', {dropped} excluded by review' if dropped else ''}"
+          f"{f', {unreadable} file(s) unreadable' if unreadable else ''}{', INCOMPLETE: knowledge base damaged' if damaged else ''}.", file=sys.stderr)
     return 0
 
 
