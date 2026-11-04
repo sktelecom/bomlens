@@ -7,7 +7,7 @@
 Usage:
   snippet-review.py page  <scan-raw.json> [--lang en|ko] [--root <source dir>] [--origin <release sources dir>] [--decisions file.json] > review.html
   snippet-review.py queue <scan-raw.json> [--decisions file.json]
-  snippet-review.py apply <components.json> <scan-raw.json> <decisions.json> > components.json
+  snippet-review.py apply <components.json> <scan-raw.json> <decisions.json> [--root <source dir>] > components.json
 
 <scan-raw.json> is the raw result of a match scan: an object keyed by file path whose values are lists of
 matches ({"id": "file" | "snippet" | "none", "matched": "87%", "lines": "10-52", "oss_lines": "100-142",
@@ -21,7 +21,8 @@ line numbers the service returned.
 Matches are grouped by the component they came from, so one decision covers every file of the group.
 Each group lands in one of three tiers:
 
-  auto       every file is a whole-file match from one source with a known license
+  auto       every file is a whole-file match from one source with a known license that carries no
+             copyleft obligation
   decide     a partial copy (11 lines or more and 40% or more of the file), files that several sources
              claim, a license nobody found, or versions that disagree
   reference  small partial matches (10 lines or fewer, or under 40%); shown, never asked for
@@ -63,7 +64,7 @@ STRINGS = {
         "declared_as": "Name it is declared under", "newver": "Version in use", "save": "Save", "cancel": "Cancel",
         "why_partial": "Part of a file was copied from this source.", "why_split": "Several sources claim the same file.",
         "why_license": "No license was found for this source.", "why_versions": "The files match different versions: {v}",
-        "why_ok": "Whole files match one source with a known license.", "why_ref": "Small matches, listed for information only.",
+        "why_copyleft": "The license of this source carries a copyleft obligation. The scan names one best match per file and may point to a copy of the code in another project: confirm the source is the one the code was taken from.", "why_ok": "Whole files match one source with a known license.", "why_ref": "Small matches, listed for information only.",
         "source": "Source", "versions": "Versions", "licenses": "Licenses", "files": "Files", "best": "Best match", "unknown": "unknown",
         "excerpt": "Your file", "original": "Original file", "tree_ours": "Your source tree (matched files in bold)", "tree_origin": "Source tree of the original", "region": "Matched region", "prev_region": "Previous region", "next_region": "Next region", "prev_file": "Previous file", "next_file": "Next file", "no_ours": "Give --root to show your own file.", "no_original": "The original is not available offline; use the source address.", "original_lines": "Original lines:", "lines": "lines", "keys": "Keys: 1 add, 2 our own code, 3 coincidence, 4 later, 5 declared elsewhere, 6 correct version, j/k move group, n/p region, [/] file, u undo",
         "left": "{n} still undecided: the download lists only what you decided.",
@@ -81,7 +82,7 @@ STRINGS = {
         "declared_as": "선언된 이름", "newver": "사용 중인 버전", "save": "저장", "cancel": "취소",
         "why_partial": "이 출처의 파일 일부를 가져온 것으로 보입니다.", "why_split": "같은 파일을 여러 출처가 가리킵니다.",
         "why_license": "이 출처의 라이선스를 찾지 못했습니다.", "why_versions": "파일마다 맞는 버전이 다릅니다: {v}",
-        "why_ok": "파일 전체가 라이선스가 확인된 한 출처와 일치합니다.", "why_ref": "작은 일치이며 참고로만 보여 줍니다.",
+        "why_copyleft": "이 출처의 라이선스는 복제 의무(copyleft)를 담고 있습니다. 스캔은 파일마다 가장 가까운 일치 하나만 알려 주므로 같은 코드를 담은 다른 프로젝트를 가리킬 수 있습니다. 코드를 가져온 출처가 맞는지 확인하세요.", "why_ok": "파일 전체가 라이선스가 확인된 한 출처와 일치합니다.", "why_ref": "작은 일치이며 참고로만 보여 줍니다.",
         "source": "출처", "versions": "버전", "licenses": "라이선스", "files": "파일", "best": "가장 높은 일치", "unknown": "알 수 없음",
         "excerpt": "우리 파일", "original": "원본 파일", "tree_ours": "우리 소스 트리(일치한 파일은 굵게)", "tree_origin": "원본의 소스 트리", "region": "일치 구간", "prev_region": "이전 구간", "next_region": "다음 구간", "prev_file": "이전 파일", "next_file": "다음 파일", "no_ours": "우리 파일을 보려면 --root를 지정하세요.", "no_original": "원본은 오프라인으로 볼 수 없습니다. 출처 주소를 확인하세요.", "original_lines": "원본 줄:", "lines": "줄", "keys": "단축키: 1 추가, 2 원본은 우리 쪽, 3 우연한 일치, 4 나중에, 5 다른 이름으로 선언됨, 6 버전 정정, j/k 묶음 이동, n/p 구간, [/] 파일, u 되돌리기",
         "left": "아직 {n}건을 판정하지 않았습니다. 내려받는 파일에는 판정한 것만 들어갑니다.",
@@ -215,6 +216,9 @@ def groups_of(raw, root=None, origin=None, budget=None):
                  "origin_tree": "", "name_key": nk, "licenses": lic, "class": license_class(lic),
                  "purl": (m.get("purl") or [""])[0]}
             f["file_hash"], f["rkey"] = local_keys(root, f)
+            # The scan's own hash of the user's file (source_hash, an MD5) plus the lines: a second key that
+            # needs no --root, so a decision made on a page built with --root still matches an apply without it.
+            f["akey"] = f"{f['source_hash']}:{f['lines']}" if f["source_hash"] else ""
             g["files"].append(f)
             per_path[path].append(f)
 
@@ -266,6 +270,8 @@ def groups_of(raw, root=None, origin=None, budget=None):
             reasons.append("license")
         if len(g["versions"]) > 1:
             reasons.append("versions")
+        if license_class(g["licenses"]) in ("strong", "weak"):
+            reasons.append("copyleft")     # a match that carries a copyleft obligation is never settled without a person
         if not files:
             continue    # every file of this source is in a contest; the contests carry the decision
         tier = "decide" if reasons else ("auto" if all(f["id"] == "file" for f in files) else "reference")
@@ -383,9 +389,11 @@ def covers(d, item):
     pinned = d.get("files")
     if not pinned:
         return True
-    now = sorted(f["rkey"] for f in item["files"])
-    then = sorted(str(p.get("key", "")) for p in pinned if isinstance(p, dict))
-    return now == then
+    entries = [p for p in pinned if isinstance(p, dict)]
+    if sorted(f["rkey"] for f in item["files"]) == sorted(str(p.get("key", "")) for p in entries):
+        return True
+    alts = [f["akey"] for f in item["files"]]
+    return all(alts) and sorted(alts) == sorted(str(p.get("alt", "")) for p in entries)
 
 
 def valid(d):
@@ -501,6 +509,7 @@ footer { position:sticky; bottom:0; padding:12px 24px; background:var(--bg); bor
     if (i.reasons.indexOf('split') >= 0) out.push(T.why_split);
     if (i.reasons.indexOf('license') >= 0) out.push(T.why_license);
     if (i.reasons.indexOf('versions') >= 0) out.push(fmt(T.why_versions, { v: Object.keys(i.versions).join(', ') }));
+    if (i.reasons.indexOf('copyleft') >= 0) out.push(T.why_copyleft);
     return out.length ? out.join(' ') : T.why_ok;
   }
   function todo() { return items.filter(function (i, n) { return need(i) && !decisions[n]; }).length; }
@@ -667,7 +676,7 @@ footer { position:sticky; bottom:0; padding:12px 24px; background:var(--bg); bor
   }
   function record(n, dec) { history.push({ n: n, prev: decisions[n] || null }); decisions[n] = dec; save(); }
   function next() { for (var k = 1; k <= items.length; k++) { var m = (cur + k) % items.length; if (need(items[m]) && !decisions[m]) { cur = m; return; } } }
-  function pinned(i) { return i.files.map(function (f) { return { key: f.rkey }; }); }
+  function pinned(i) { return i.files.map(function (f) { return { key: f.rkey, alt: f.akey }; }); }
   function who() { try { return localStorage.getItem(rkey) || ''; } catch (e) { return ''; } }
   function make(i, kind, reason, extra) { var d = { component: i.key, decision: kind, reason: reason, reviewer: who(), files: pinned(i) }; for (var k in (extra || {})) if (extra[k]) d[k] = extra[k]; return d; }
   function commit() {
@@ -785,7 +794,7 @@ def cmd_apply(args):
         print(f"[snippet-review] cannot read {args.components}: {exc}", file=sys.stderr)
         return 1
     raw = read_raw(args.raw) or {}
-    items = groups_of(raw)
+    items = groups_of(raw, args.root)
     groups = {i["name_key"]: i for i in items if i["kind"] == "group"}
     done = load_decisions(args.decisions)
     chosen_names, rejected, support, also, pending_contest = set(), set(), collections.Counter(), collections.defaultdict(list), set()
@@ -868,7 +877,7 @@ def main(argv=None):
     p = sub.add_parser("page"); p.add_argument("raw"); p.add_argument("--lang", choices=sorted(STRINGS), default="en")
     p.add_argument("--root"); p.add_argument("--origin"); p.add_argument("--decisions"); p.set_defaults(fn=cmd_page)
     q = sub.add_parser("queue"); q.add_argument("raw"); q.add_argument("--decisions"); q.set_defaults(fn=cmd_queue)
-    a = sub.add_parser("apply"); a.add_argument("components"); a.add_argument("raw"); a.add_argument("decisions"); a.set_defaults(fn=cmd_apply)
+    a = sub.add_parser("apply"); a.add_argument("components"); a.add_argument("raw"); a.add_argument("decisions"); a.add_argument("--root"); a.set_defaults(fn=cmd_apply)
     args = ap.parse_args(argv)
     return args.fn(args)
 

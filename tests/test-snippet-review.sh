@@ -49,10 +49,28 @@ PY
 
 # ---- tiers ----------------------------------------------------------------------------
 [ "$(tier pkg:github/acme/libfoo)" = "auto:" ] && pass "whole files from one source with a license are confirmed by evidence" || fail "libfoo is not auto"
-[ "$(tier pkg:github/acme/libbar)" = "decide:partial" ] && pass "a partial copy of 11 lines or more and 40% or more needs a decision" || fail "libbar is not decide:partial" "$(tier pkg:github/acme/libbar)"
+[ "$(tier pkg:github/acme/libbar)" = "decide:partial,copyleft" ] && pass "a partial copy of 11 lines or more and 40% or more needs a decision" || fail "libbar is not decide:partial" "$(tier pkg:github/acme/libbar)"
 [ "$(tier pkg:github/acme/tiny)" = "reference:" ] && pass "a match of 10 lines or fewer is shown for information only" || fail "tiny is not reference"
 [ "$(tier pkg:github/acme/nolic)" = "decide:license" ] && pass "a whole-file match with no license found needs a decision" || fail "nolic is not decide:license"
-[ "$(tier pkg:github/acme/hugefile)" = "decide:partial" ] && pass "a long copy inside a big file needs a decision however small its share of the file" || fail "a diluted copy was not asked about" "$(tier pkg:github/acme/hugefile)"
+[ "$(tier pkg:github/acme/hugefile)" = "decide:partial,copyleft" ] && pass "a long copy inside a big file needs a decision however small its share of the file" || fail "a diluted copy was not asked about" "$(tier pkg:github/acme/hugefile)"
+
+# the shape of a real answer: a whole-file match to another project whose license text carries a GPL clause
+cat > "$TMP/real.json" <<'JSON'
+{"adler32.c":[{"id":"file","matched":"100%","lines":"all","oss_lines":"all","purl":["pkg:sourceforge/api-simple-completa/api-"],"component":"api-simple-completa/api-","version":"2025-03",
+  "licenses":[{"name":"GPL-2.0-or-later AND GPL-1.0-or-later AND Zlib"},{"name":"HPND-Pbmplus"}],"file_hash":"2edfc7ec","source_hash":"4dc406b7","file":"adler32.c","release_date":"2025-03-01"}]}
+JSON
+rt="$(python3 - "$TOOL" "$TMP/real.json" <<'PY'
+import importlib.util, json, sys
+s = importlib.util.spec_from_file_location("sr", sys.argv[1]); m = importlib.util.module_from_spec(s); s.loader.exec_module(m)
+g = m.groups_of(json.load(open(sys.argv[2])))[0]
+print(g["tier"] + ":" + ",".join(g["reasons"]) + ":" + g["files"][0]["akey"])
+PY
+)"
+[ "$rt" = "decide:copyleft:4dc406b7:all" ] && pass "a whole-file match whose license carries a copyleft obligation is not confirmed on its own, and keeps the scan's own hash of the user's file as a second key" || fail "a copyleft whole-file match was auto-confirmed" "$rt"
+printf '[{"component":"pkg:sourceforge/api-simple-completa/api-","decision":"coincidence","reviewer":"a","files":[{"key":"unmatched-root-key","alt":"4dc406b7:all"}]}]' > "$TMP/dec-alt.json"
+echo '[{"type":"library","name":"api-simple-completa/api-","version":"2025-03","properties":[]}]' > "$TMP/comps-real.json"
+out="$(python3 "$TOOL" apply "$TMP/comps-real.json" "$TMP/real.json" "$TMP/dec-alt.json" 2>/dev/null)"
+[ "$(jq 'length' <<<"$out")" = "0" ] && pass "a decision made on a page built with the source tree still applies from the scan's own hash when no tree is given" || fail "the second key did not match" "$out"
 
 # ---- queue ----------------------------------------------------------------------------
 q="$(python3 "$TOOL" queue "$TMP/raw.json" 2>/dev/null | awk -F'\t' '{print $2}' | sort | uniq -c | tr -s ' ' | tr '\n' ';')"
