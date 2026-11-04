@@ -130,7 +130,7 @@ python3 docker/lib/binarykb.py build --kb kb.csv --bg ./background-tarballs \
 - 컴포넌트의 코드가 그 컴포넌트 자체 라이브러리나 프로그램이 아닌 파일 안에서 발견되면(정적 링크나 복사된 소스 파일), 결과에 `bomlens:linkage`(`embedded`, 자체 파일도 함께 있으면 `own-file-and-embedded`)와 그 파일 목록을 담은 `bomlens:embeddedIn`이 붙는다. 취약한 라이브러리가 어느 프로그램에 들어 있는지 따라갈 수 있다.
 - 점수가 베이스에 저장된 판정 기준의 2.5배 미만인 결과에는 `bomlens:kbConfidence=low`가 붙고, 검토 화면이 이 항목을 먼저 보여 주며 파일이 정말 그 컴포넌트인지 확인하라고 안내한다. 점수가 높은 결과에는 `high`가 붙는다.
 - 빌더는 대문자 상수 이름뿐인 문자열 리터럴(예: `X509_V_ERR_UNABLE_TO_GET_ISSUER_CERT_LOCALLY`)을 저장하지 않는다. 그 이름을 정의한 패키지는 매크로로 쓰므로 자기 소스에는 리터럴로 나타나지 않고, 그 이름을 출력하는 다른 패키지가 대신 점수를 가져가기 때문이다.
-- `bomlens:identifiedBy`는 `binary-kb`이고, 근거로 `bomlens:kbRelease`, `bomlens:kbScore`, `bomlens:kbUniqueStrings`(또는 `bomlens:kbTables`)와 찾은 파일(`evidence.occurrences`)이 붙는다.
+- `bomlens:identifiedBy`는 `binary-kb`이고, 근거로 `bomlens:kbRelease`, `bomlens:kbSha256`(DB 파일의 해시), `bomlens:kbScore`, `bomlens:kbUniqueStrings`(또는 `bomlens:kbTables`)와 찾은 파일(`evidence.occurrences`)이 붙는다.
 - 상수 테이블로만 찾은 컴포넌트는 버전이 없고 `presence-only`로 표시한다.
 
 검토 화면은 결과를 판정할 대기열로 바꿔 준다. 네트워크에서 아무것도 불러오지 않는 HTML 파일 하나다.

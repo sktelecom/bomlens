@@ -978,10 +978,19 @@ jq -n --slurpfile a "$WORK/pkg-comps.json" --slurpfile b "$WORK/bin-comps.json" 
     # A presence-only judgement next to a versioned one for the same component
     # says nothing the versioned one does not. Reporting both lists the component
     # twice, once without a version, which reads as two findings.
+    # The exception is a record that lists the releases it can be, none of which is
+    # a version found elsewhere: that is a second copy of the component, not a repeat.
+    | ([$with_presence[] | select(presence_only | not) | select((.version // "") != "")
+        | {f: ((.name // "") | name_form), v: .version}]
+       | group_by(.f) | map({key: .[0].f, value: map(.v)}) | from_entries) as $known
     | ([$with_presence[] | select(presence_only | not) | (.name // "") | name_form]
        | unique) as $versioned
-    | [$with_presence[]
-       | select((presence_only and (((.name // "") | name_form) | IN($versioned[]))) | not)]
+    | def other_release:
+        ([.properties[]? | select(.name == "bomlens:versionCandidates") | .value | split(",")[]]) as $c
+        | ($known[((.name // "") | name_form)] // []) as $k
+        | ($c | length) > 0 and all($c[]; . as $x | ($k | index($x)) == null);
+      [$with_presence[]
+       | select((presence_only and (((.name // "") | name_form) | IN($versioned[])) and (other_release | not)) | not)]
       as $all
     | ([$all[] | select(mergeable | not)]
        | group_by([((.name // "") | ascii_downcase), (.version // ""),

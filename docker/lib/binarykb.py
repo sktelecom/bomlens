@@ -64,6 +64,8 @@ PRINTABLE_RUN = re.compile(rb'[\x20-\x7e\t]{%d,}' % MIN_LEN)
 
 # --------------------------------------------------------------------------- ELF
 
+MAX_SECTIONS = 4096   # real images stay far below this; a header claiming more is crafted or damaged
+
 def elf_header(data):
     """(is64, byte order) of an ELF file, or None."""
     if data[:4] != b'\x7fELF' or len(data) < 64 or data[4] not in (1, 2) or data[5] not in (1, 2):
@@ -80,6 +82,8 @@ def elf_sections(data):
     i = lambda off, n: int.from_bytes(data[off:off + n], order)
     shoff, shentsize, shnum, shstrndx = (i(0x28, 8), i(0x3a, 2), i(0x3c, 2), i(0x3e, 2)) if is64 \
         else (i(0x20, 4), i(0x2e, 2), i(0x30, 2), i(0x32, 2))
+    if shentsize < (64 if is64 else 40) or shnum > MAX_SECTIONS:
+        return None
     if not shoff or shstrndx >= shnum or shoff + shnum * shentsize > len(data):
         return None
     secs = []
@@ -105,8 +109,13 @@ def string_bytes(data):
         secs = None
     if secs is None:
         return data, False
-    parts = [data[off:off + size] for name, typ, _, off, size, _, _ in secs
-             if typ != 8 and (name.startswith(b'.rodata') or name in (b'.data', b'.modinfo'))]   # 8 = NOBITS
+    spans = sorted((off, min(off + size, len(data))) for name, typ, _, off, size, _, _ in secs
+                   if typ != 8 and off < len(data) and (name.startswith(b'.rodata') or name in (b'.data', b'.modinfo')))   # 8 = NOBITS
+    parts, end = [], 0
+    for a, b in spans:   # sections that overlap are read once, so the result never exceeds the file
+        a = max(a, end)
+        if b > a:
+            parts.append(data[a:b]); end = b
     return b'\0'.join(parts), True
 
 
@@ -388,10 +397,21 @@ class KnowledgeBase:
             cands = [vers[b] for b in range(len(vers)) if counts[b] == best] if best else []
             result[name] = {'score': round(score[p], 1), 'unique': unique[p], 'versions': cands, 'n': len(assigned[p]), 'best': best,
                             # the candidates reach the newest release the database has: the shipped one may be newer
-                            'latest': bool(cands) and vers[-1] in cands,
+                            'latest': any(self._newest_of_series(vers, c) for c in cands),
                             # the longest strings that matched, as evidence a person can check against the file
                             'sample': [t[:80] for t in (x.decode('latin-1').strip() for x in sorted(assigned[p], key=lambda x: (-len(x), x))[:12]) if t][:8]}
         return result
+
+    @staticmethod
+    def _newest_of_series(vers, cand):
+        """True when no later release of the same series (every number but the last: 1.2.x) is in the database.
+        A version newer than the database comes back as the last release of its own series, so the single newest
+        release of the whole database is not enough to tell: 1.2.13 would read as 1.2.12 while 1.3.0 exists."""
+        def series(v):   # every number but the last: 1.2.12 -> (1, 2), 1.2 -> (1,)
+            nums = tuple(t[1] for t in version_key(v) if t[0] == 0)
+            return nums[:max(1, len(nums) - 1)]
+        i = vers.index(cand)
+        return not any(series(v) == series(cand) for v in vers[i + 1:])
 
     def table_hits(self, data):
         """{component name: [distinct tables found, their total bytes]}."""
