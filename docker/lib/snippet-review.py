@@ -50,6 +50,10 @@ BIG_LINES = 50       # ... or is this long, however large the file: a long copy 
 MAX_TEXT_CHARS = 400_000   # one file's text in the page
 MAX_PAGE_TEXT = 8_000_000  # all file text in the page
 MAX_TREE = 5000            # paths in one tree
+MIN_CODE_LINES = 3   # a partial match with fewer code lines than this is a license header or a skeleton, not copied code
+# Languages whose comments are `//` and `/* */`; other files are never judged as header-only.
+COMMENT_STYLE_EXT = (".c", ".h", ".cc", ".cpp", ".cxx", ".hpp", ".hh", ".java", ".js", ".ts", ".go", ".rs", ".swift", ".cs", ".kt")
+SCAFFOLD = re.compile(r"^\s*#\s*(include|pragma|ifndef|ifdef|if|else|endif|define\s+\w+\s*$)|^\s*extern\s+\"C\"|^\s*[{}]\s*$")
 DECISIONS = ("add", "ours", "coincidence", "declared", "version", "origin")
 CLASS_RANK = {"unknown": 0, "permissive": 1, "weak": 2, "strong": 3}
 
@@ -63,7 +67,7 @@ STRINGS = {
         "declared_as": "Name it is declared under", "newver": "Version in use", "save": "Save", "cancel": "Cancel",
         "why_partial": "Part of a file was copied from this source.", "why_split": "Several sources claim the same file.",
         "why_license": "No license was found for this source.", "why_versions": "The files match different versions: {v}",
-        "why_ok": "Whole files match one source with a known license.", "why_ref": "Small matches, listed for information only.",
+        "why_ok": "Whole files match one source with a known license.", "why_ref": "Small matches, listed for information only.", "why_header": "Only license header or skeleton lines match, not code.",
         "source": "Source", "versions": "Versions", "licenses": "Licenses", "files": "Files", "best": "Best match", "unknown": "unknown",
         "excerpt": "Your file", "original": "Original file", "tree_ours": "Your source tree (matched files in bold)", "tree_origin": "Source tree of the original", "region": "Matched region", "prev_region": "Previous region", "next_region": "Next region", "prev_file": "Previous file", "next_file": "Next file", "no_ours": "Give --root to show your own file.", "no_original": "The original is not available offline; use the source address.", "original_lines": "Original lines:", "lines": "lines", "keys": "Keys: 1 add, 2 our own code, 3 coincidence, 4 later, 5 declared elsewhere, 6 correct version, j/k move group, n/p region, [/] file, u undo",
         "left": "{n} still undecided: the download lists only what you decided.",
@@ -81,7 +85,7 @@ STRINGS = {
         "declared_as": "선언된 이름", "newver": "사용 중인 버전", "save": "저장", "cancel": "취소",
         "why_partial": "이 출처의 파일 일부를 가져온 것으로 보입니다.", "why_split": "같은 파일을 여러 출처가 가리킵니다.",
         "why_license": "이 출처의 라이선스를 찾지 못했습니다.", "why_versions": "파일마다 맞는 버전이 다릅니다: {v}",
-        "why_ok": "파일 전체가 라이선스가 확인된 한 출처와 일치합니다.", "why_ref": "작은 일치이며 참고로만 보여 줍니다.",
+        "why_ok": "파일 전체가 라이선스가 확인된 한 출처와 일치합니다.", "why_ref": "작은 일치이며 참고로만 보여 줍니다.", "why_header": "라이선스 머리말이나 뼈대 줄만 일치하고 코드는 일치하지 않습니다.",
         "source": "출처", "versions": "버전", "licenses": "라이선스", "files": "파일", "best": "가장 높은 일치", "unknown": "알 수 없음",
         "excerpt": "우리 파일", "original": "원본 파일", "tree_ours": "우리 소스 트리(일치한 파일은 굵게)", "tree_origin": "원본의 소스 트리", "region": "일치 구간", "prev_region": "이전 구간", "next_region": "다음 구간", "prev_file": "이전 파일", "next_file": "다음 파일", "no_ours": "우리 파일을 보려면 --root를 지정하세요.", "no_original": "원본은 오프라인으로 볼 수 없습니다. 출처 주소를 확인하세요.", "original_lines": "원본 줄:", "lines": "줄", "keys": "단축키: 1 추가, 2 원본은 우리 쪽, 3 우연한 일치, 4 나중에, 5 다른 이름으로 선언됨, 6 버전 정정, j/k 묶음 이동, n/p 구간, [/] 파일, u 되돌리기",
         "left": "아직 {n}건을 판정하지 않았습니다. 내려받는 파일에는 판정한 것만 들어갑니다.",
@@ -182,6 +186,50 @@ def local_keys(root, f):
     return hashlib.sha256(data).hexdigest(), hashlib.sha256(region.encode()).hexdigest()
 
 
+def comment_flags(text):
+    """For each line, True when the line is blank or holds only comment text (`//` and `/* */` styles)."""
+    flags, in_block = [], False
+    for line in text.split("\n"):
+        out, i = [], 0
+        while i < len(line):
+            if in_block:
+                j = line.find("*/", i)
+                if j < 0:
+                    i = len(line)
+                else:
+                    in_block, i = False, j + 2
+                continue
+            if line.startswith("/*", i):
+                in_block, i = True, i + 2
+                continue
+            if line.startswith("//", i):
+                break
+            out.append(line[i])
+            i += 1
+        flags.append(not "".join(out).strip())
+    return flags
+
+
+def header_only(root, f):
+    """True when a partial match covers only comment, blank, include and guard lines: a license header or a skeleton.
+
+    Needs the user's own file (--root); without it nothing is judged. Whole-file matches are never header-only.
+    """
+    if f["id"] != "snippet" or not root or not f["path"].lower().endswith(COMMENT_STYLE_EXT):
+        return False
+    data = read_local(root, f["path"])
+    if data is None:
+        return False
+    body = data.decode("utf8", "replace").split("\n")
+    flags = comment_flags("\n".join(body))
+    code = 0
+    for a, b in parse_regions(f["lines"]):
+        for k in range(a, min(b, len(body)) + 1):
+            if not flags[k - 1] and not SCAFFOLD.match(body[k - 1]):
+                code += 1
+    return code < MIN_CODE_LINES
+
+
 def groups_of(raw, root=None, origin=None, budget=None):
     """Group the matches of a raw scan by source component and judge each group.
 
@@ -215,8 +263,10 @@ def groups_of(raw, root=None, origin=None, budget=None):
                  "origin_tree": "", "name_key": nk, "licenses": lic, "class": license_class(lic),
                  "purl": (m.get("purl") or [""])[0]}
             f["file_hash"], f["rkey"] = local_keys(root, f)
+            f["header"] = header_only(root, f)
             g["files"].append(f)
-            per_path[path].append(f)
+            if not f["header"]:     # a license header cannot compete for an origin
+                per_path[path].append(f)
 
     # contests: files whose matched regions overlap between different sources
     contested = set()
@@ -256,9 +306,9 @@ def groups_of(raw, root=None, origin=None, budget=None):
         files = [f for f in g["files"] if id(f) not in contested]
         key = g["purls"].most_common(1)[0][0] if g["purls"] else nk
         small = [f for f in files if f["id"] == "snippet" and line_count(f["lines"], 0) < MIN_LINES]
-        big = [f for f in files if f["id"] == "snippet" and (line_count(f["lines"], 0) >= BIG_LINES or
+        big = [f for f in files if f["id"] == "snippet" and not f["header"] and (line_count(f["lines"], 0) >= BIG_LINES or
                                                               (line_count(f["lines"], 0) >= MIN_LINES and f["matched"] >= MIN_PERCENT))]
-        small_total = sum(line_count(f["lines"], 0) for f in files if f["id"] == "snippet")
+        small_total = sum(line_count(f["lines"], 0) for f in files if f["id"] == "snippet" and not f["header"])
         reasons = []
         if big or (files and small_total >= BIG_LINES and any(f["id"] == "snippet" for f in files)):
             reasons.append("partial")
@@ -272,6 +322,7 @@ def groups_of(raw, root=None, origin=None, budget=None):
         item = {"kind": "group", "key": key, "name": g["name"], "name_key": nk, "purl": key if key.startswith("pkg:") else "",
                 "versions": dict(g["versions"].most_common()), "licenses": sorted(g["licenses"]), "urls": sorted(g["urls"])[:3],
                 "tier": tier, "reasons": reasons, "best": max((f["matched"] for f in files), default=0), "files": files, "small": len(small),
+                "header": sum(1 for f in files if f["header"]),
                 "class": license_class(g["licenses"])}
         if root:
             item["ours"] = ours_view(root, files, budget)
@@ -495,7 +546,7 @@ footer { position:sticky; bottom:0; padding:12px 24px; background:var(--bg); bor
   function verText(i) { var v = Object.keys(i.versions); return v.length ? (v.length > 1 ? v[0] + ' +' + (v.length - 1) : v[0]) : ''; }
   function why(i) {
     if (i.kind === 'contest') return T.why_contest + (i.differs ? ' ' + T.why_differs : '');
-    if (i.tier === 'reference') return T.why_ref;
+    if (i.tier === 'reference') return (i.header && i.header === i.files.length) ? T.why_header : T.why_ref;
     var out = [];
     if (i.reasons.indexOf('partial') >= 0) out.push(T.why_partial);
     if (i.reasons.indexOf('split') >= 0) out.push(T.why_split);

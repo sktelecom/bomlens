@@ -190,6 +190,27 @@ v = m.origin_view(sys.argv[2], [f], m.Budget(10**6))
 sys.exit(0 if not v["texts"] and not v["trees"] else 1)
 PY
 
+# ---- license header ---------------------------------------------------------------------
+mkdir -p "$TMP/hdr/src"
+{ echo '/*'; for i in 1 2 3 4 5 6 7 8 9 10 11 12; do echo " * Copyright (C) 2001 Acme Foundation, license text line $i"; done; echo ' */'
+  echo '#include <stdio.h>'; echo '#ifndef LIC_H'; echo '#define LIC_H'; echo 'int mine(void);'; echo '#endif'; } > "$TMP/hdr/src/lic.c"
+{ for i in $(seq 1 40); do echo "int copied_$i(int x) { return x + $i; }"; done; } > "$TMP/hdr/src/code.c"
+cat > "$TMP/hdr/raw.json" <<'JSON'
+{"src/lic.c":[{"id":"snippet","matched":"70%","lines":"1-18","purl":["pkg:github/acme/licsrc"],"component":"licsrc","version":"1","licenses":[{"name":"GPL-2.0-only"}],"file_hash":"l1"}],
+ "src/code.c":[{"id":"snippet","matched":"90%","lines":"1-40","purl":["pkg:github/acme/codesrc"],"component":"codesrc","version":"1","licenses":[{"name":"GPL-2.0-only"}],"file_hash":"c1"}]}
+JSON
+htier() { python3 - "$TOOL" "$TMP/hdr/raw.json" "$1" "$2" <<'PY'
+import importlib.util, json, sys
+s = importlib.util.spec_from_file_location("sr", sys.argv[1]); m = importlib.util.module_from_spec(s); s.loader.exec_module(m)
+root = sys.argv[4] or None
+g = {i["key"]: i for i in m.groups_of(json.load(open(sys.argv[2])), root=root)}
+print(g[sys.argv[3]]["tier"] + ":" + ",".join(g[sys.argv[3]]["reasons"]))
+PY
+}
+[ "$(htier pkg:github/acme/licsrc "$TMP/hdr")" = "reference:" ] && pass "a partial match that covers only a license header and include lines is for information only" || fail "a license-header match was queued" "$(htier pkg:github/acme/licsrc "$TMP/hdr")"
+[ "$(htier pkg:github/acme/codesrc "$TMP/hdr")" = "decide:partial" ] && pass "a partial match that covers code still needs a decision" || fail "a code match was filtered" "$(htier pkg:github/acme/codesrc "$TMP/hdr")"
+[ "$(htier pkg:github/acme/licsrc "")" = "decide:partial" ] && pass "without --root nothing is judged header-only" || fail "a match was filtered without the local file"
+
 # ---- page -----------------------------------------------------------------------------
 mkdir -p "$TMP/src"; seq 1 80 | sed 's/^/line /' > "$TMP/src/c.c"
 python3 "$TOOL" page "$TMP/raw.json" --root "$TMP" > "$TMP/page.html" 2>/dev/null
