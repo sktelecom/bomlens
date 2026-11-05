@@ -1,0 +1,504 @@
+{
+  "contract": {
+    "name": "bomlens-engine",
+    "version": "1.3.0"
+  },
+  "engine": {
+    "version": "1.14.3",
+    "image": null,
+    "image_digest": null
+  },
+  "input": {
+    "kind": "source",
+    "mode": "POSTPROCESS",
+    "target": null
+  },
+  "run": {
+    "status": "succeeded",
+    "reason": null,
+    "started_at": "2026-10-26T16:56:15Z",
+    "ended_at": "2026-10-26T16:56:18Z",
+    "exit_code": 0
+  },
+  "steps": [
+    {
+      "id": "generate",
+      "status": "ok",
+      "reason": null,
+      "detail": null,
+      "started_at": "2026-10-26T16:56:15Z",
+      "ended_at": "2026-10-26T16:56:15Z",
+      "counts": {
+        "components": 64
+      },
+      "stage": 1,
+      "reused": false,
+      "reuse_unsafe": false,
+      "input_fingerprint": {
+        "algorithm": "bomlens-input-1",
+        "sha256": null,
+        "reusable": false,
+        "reasons": [
+          "registry-resolution"
+        ],
+        "components": [
+          {
+            "kind": "engine",
+            "name": "build-prep.sh",
+            "sha256": "c18ff557bf390d22c28b2178791b2d30d713c0a216f87ed2810e234aee0c96a1"
+          },
+          {
+            "kind": "engine",
+            "name": "identify-conda.py",
+            "sha256": "6e54eae725304bd2ba4727805467e2058fd7f6f36eeca7be97e3cc9c09f689b7"
+          },
+          {
+            "kind": "engine",
+            "name": "scan-sbom.sh",
+            "sha256": "d0a1fa78c0ce9454af108e55a0034cbf7fd84c67880737e94b5976d26f098426"
+          },
+          {
+            "kind": "file",
+            "name": ".",
+            "sha256": "69b9f7227d57129234e3ac561cf6e8363fdd2424ba2886e4e45f6a824c58c052",
+            "count": 8
+          },
+          {
+            "kind": "image",
+            "name": "bomlens",
+            "sha256": null
+          },
+          {
+            "kind": "image",
+            "name": "stage1",
+            "sha256": "7c8d39f65c7e2c7a43692785ef50edbb5f6a1d4fd77b5aabae30e650c0ce4275"
+          },
+          {
+            "kind": "setting",
+            "name": "BOMLENS_ANDROID_FULL_GRAPH",
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          {
+            "kind": "setting",
+            "name": "BOMLENS_INCLUDE_DEV_DEPENDENCIES",
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          {
+            "kind": "setting",
+            "name": "BOMLENS_INCLUDE_NON_SHIPPED",
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          {
+            "kind": "setting",
+            "name": "BOMLENS_KEEP_BUILD_OUTPUT",
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          {
+            "kind": "setting",
+            "name": "BOMLENS_MAVEN_FULL_GRAPH",
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          {
+            "kind": "setting",
+            "name": "BOMLENS_NODE_FULL_GRAPH",
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          {
+            "kind": "setting",
+            "name": "BOMLENS_NO_CARGO_LICENSE",
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          {
+            "kind": "setting",
+            "name": "BOMLENS_NO_COPYRIGHT",
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          {
+            "kind": "setting",
+            "name": "BOMLENS_PHP_FULL_GRAPH",
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          {
+            "kind": "setting",
+            "name": "BOMLENS_PREP_TIMEOUT",
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          {
+            "kind": "setting",
+            "name": "CDX_SPEC_VERSION",
+            "sha256": "ec6c168f4411ec8fa9ab8d47dd25954ce53728404fed0e7a9bc7f29dab38c30d"
+          },
+          {
+            "kind": "setting",
+            "name": "FETCH_LICENSE",
+            "sha256": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b"
+          },
+          {
+            "kind": "setting",
+            "name": "HOST_GOTOOLCHAIN",
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          {
+            "kind": "setting",
+            "name": "PROJECT_NAME",
+            "sha256": "7b5013e08aa04e9ef68ec38d1285fdd322ed2554c8bd0980b3d5137f5e6b766b"
+          },
+          {
+            "kind": "setting",
+            "name": "PROJECT_VERSION",
+            "sha256": "92521fc3cbd964bdc9f584a991b89fddaa5754ed1cc96d6d42445338669c1305"
+          },
+          {
+            "kind": "setting",
+            "name": "detected_ecosystem",
+            "sha256": "38a0963a6364b09ad867aa9a66c6d009673c21e182015461da236ec361877f77"
+          }
+        ]
+      }
+    },
+    {
+      "id": "vendored",
+      "status": "disabled",
+      "reason": null,
+      "detail": null,
+      "started_at": "2026-10-26T16:56:15Z",
+      "ended_at": "2026-10-26T16:56:15Z",
+      "stage": 2
+    },
+    {
+      "id": "suggest-vendored",
+      "status": "ok",
+      "reason": null,
+      "detail": null,
+      "started_at": "2026-10-26T16:56:15Z",
+      "ended_at": "2026-10-26T16:56:15Z",
+      "stage": 2
+    },
+    {
+      "id": "stamp-metadata",
+      "status": "ok",
+      "reason": null,
+      "detail": null,
+      "started_at": "2026-10-26T16:56:16Z",
+      "ended_at": "2026-10-26T16:56:16Z",
+      "stage": 2
+    },
+    {
+      "id": "docmeta",
+      "status": "ok",
+      "reason": null,
+      "detail": null,
+      "started_at": "2026-10-26T16:56:16Z",
+      "ended_at": "2026-10-26T16:56:16Z",
+      "stage": 2
+    },
+    {
+      "id": "normalize",
+      "status": "ok",
+      "reason": null,
+      "detail": null,
+      "started_at": "2026-10-26T16:56:16Z",
+      "ended_at": "2026-10-26T16:56:16Z",
+      "stage": 2
+    },
+    {
+      "id": "license-registry",
+      "status": "disabled",
+      "reason": null,
+      "detail": null,
+      "started_at": "2026-10-26T16:56:16Z",
+      "ended_at": "2026-10-26T16:56:16Z",
+      "stage": 2
+    },
+    {
+      "id": "enrich-cpe",
+      "status": "ok",
+      "reason": null,
+      "detail": null,
+      "started_at": "2026-10-26T16:56:16Z",
+      "ended_at": "2026-10-26T16:56:16Z",
+      "stage": 2
+    },
+    {
+      "id": "enrich-os-context",
+      "status": "ok",
+      "reason": null,
+      "detail": null,
+      "started_at": "2026-10-26T16:56:16Z",
+      "ended_at": "2026-10-26T16:56:16Z",
+      "stage": 2
+    },
+    {
+      "id": "enrich-distro-supplier",
+      "status": "ok",
+      "reason": null,
+      "detail": null,
+      "started_at": "2026-10-26T16:56:16Z",
+      "ended_at": "2026-10-26T16:56:16Z",
+      "stage": 2
+    },
+    {
+      "id": "enrich-maven-cpe",
+      "status": "ok",
+      "reason": null,
+      "detail": null,
+      "started_at": "2026-10-26T16:56:16Z",
+      "ended_at": "2026-10-26T16:56:16Z",
+      "stage": 2
+    },
+    {
+      "id": "enrich-github-cpe",
+      "status": "ok",
+      "reason": null,
+      "detail": null,
+      "started_at": "2026-10-26T16:56:16Z",
+      "ended_at": "2026-10-26T16:56:16Z",
+      "stage": 2
+    },
+    {
+      "id": "enrich-interpreter-cpe",
+      "status": "ok",
+      "reason": null,
+      "detail": null,
+      "started_at": "2026-10-26T16:56:16Z",
+      "ended_at": "2026-10-26T16:56:16Z",
+      "stage": 2
+    },
+    {
+      "id": "enrich-eol",
+      "status": "ok",
+      "reason": null,
+      "detail": null,
+      "started_at": "2026-10-26T16:56:16Z",
+      "ended_at": "2026-10-26T16:56:16Z",
+      "stage": 2
+    },
+    {
+      "id": "enrich-malicious",
+      "status": "ok",
+      "reason": null,
+      "detail": null,
+      "started_at": "2026-10-26T16:56:16Z",
+      "ended_at": "2026-10-26T16:56:16Z",
+      "stage": 2
+    },
+    {
+      "id": "enrich-staleness",
+      "status": "disabled",
+      "reason": null,
+      "detail": null,
+      "started_at": "2026-10-26T16:56:16Z",
+      "ended_at": "2026-10-26T16:56:16Z",
+      "stage": 2
+    },
+    {
+      "id": "conformance",
+      "status": "ok",
+      "reason": null,
+      "detail": null,
+      "started_at": "2026-10-26T16:56:16Z",
+      "ended_at": "2026-10-26T16:56:17Z",
+      "stage": 2
+    },
+    {
+      "id": "deep-license",
+      "status": "disabled",
+      "reason": null,
+      "detail": null,
+      "started_at": "2026-10-26T16:56:17Z",
+      "ended_at": "2026-10-26T16:56:17Z",
+      "stage": 2
+    },
+    {
+      "id": "source-file-tree",
+      "status": "ok",
+      "reason": null,
+      "detail": null,
+      "started_at": "2026-10-26T16:56:17Z",
+      "ended_at": "2026-10-26T16:56:17Z",
+      "stage": 2
+    },
+    {
+      "id": "source-snapshot",
+      "status": "ok",
+      "reason": null,
+      "detail": null,
+      "started_at": "2026-10-26T16:56:17Z",
+      "ended_at": "2026-10-26T16:56:17Z",
+      "stage": 2
+    },
+    {
+      "id": "generate-notice",
+      "status": "ok",
+      "reason": null,
+      "detail": null,
+      "started_at": "2026-10-26T16:56:17Z",
+      "ended_at": "2026-10-26T16:56:17Z",
+      "stage": 2
+    },
+    {
+      "id": "reachability",
+      "status": "disabled",
+      "reason": null,
+      "detail": null,
+      "started_at": "2026-10-26T16:56:17Z",
+      "ended_at": "2026-10-26T16:56:17Z",
+      "stage": 2
+    },
+    {
+      "id": "scan-security",
+      "status": "ok",
+      "reason": null,
+      "detail": null,
+      "started_at": "2026-10-26T16:56:17Z",
+      "ended_at": "2026-10-26T16:56:18Z",
+      "stage": 2
+    },
+    {
+      "id": "deep-cve",
+      "status": "disabled",
+      "reason": null,
+      "detail": null,
+      "started_at": "2026-10-26T16:56:18Z",
+      "ended_at": "2026-10-26T16:56:18Z",
+      "stage": 2
+    },
+    {
+      "id": "generate-risk-report",
+      "status": "ok",
+      "reason": null,
+      "detail": null,
+      "started_at": "2026-10-26T16:56:18Z",
+      "ended_at": "2026-10-26T16:56:18Z",
+      "stage": 2
+    },
+    {
+      "id": "sign",
+      "status": "disabled",
+      "reason": null,
+      "detail": null,
+      "started_at": "2026-10-26T16:56:18Z",
+      "ended_at": "2026-10-26T16:56:18Z",
+      "stage": 2
+    }
+  ],
+  "tools": {
+    "cdxgen": "13.5.0",
+    "syft": "1.54.1",
+    "trivy": "0.75.0"
+  },
+  "engines": [
+    "trivy"
+  ],
+  "data_sources": {
+    "trivy_db": {
+      "schema_version": 2,
+      "updated_at": "2026-10-26T14:38:04.845305817Z",
+      "downloaded_at": "2026-10-26T16:55:04.097142667Z"
+    }
+  },
+  "outputs": [
+    {
+      "role": "sbom.cyclonedx",
+      "path": "SpringBootDemo_1.0.0_bom.json",
+      "sha256": "03e5130cbe996619d0f2127e1eabfcd4f109bba6718de3e11ace0eb56ea3b04e",
+      "bytes": 244808
+    },
+    {
+      "role": "other",
+      "path": "SpringBootDemo_1.0.0_files.json",
+      "sha256": "20399818726302a07b9be5b90d0455508bd3d3f4e7bae147975c9de54e06a06a",
+      "bytes": 956
+    },
+    {
+      "role": "other",
+      "path": "SpringBootDemo_1.0.0_source.json",
+      "sha256": "b1c9e37f9e10646d33243de6950df5264a0665fafd920da1d25b55db1262f0e4",
+      "bytes": 9502
+    },
+    {
+      "role": "other",
+      "path": "SpringBootDemo_1.0.0_NOTICE.txt",
+      "sha256": "50962bd79ecf3ef8b75eb8bee4d5328b17444599f52aef099910d7704f817193",
+      "bytes": 115995
+    },
+    {
+      "role": "other",
+      "path": "SpringBootDemo_1.0.0_NOTICE.html",
+      "sha256": "b25a32c18008078c78fe3a1b4141c5c06f770309e3f5bc7f08635cb472ab92ce",
+      "bytes": 139930
+    },
+    {
+      "role": "vulnerabilities.all",
+      "path": "SpringBootDemo_1.0.0_security.json",
+      "sha256": "c01ba3d6d1e7e2721eb2027e0b347f901a71101ae86fd8bd99744499dd185952",
+      "bytes": 435707
+    },
+    {
+      "role": "other",
+      "path": "SpringBootDemo_1.0.0_security.md",
+      "sha256": "9d90cd95ea3637bc45ebc7dc6d6f1429a87764469ef0f3f9ba4d9b0752d28f26",
+      "bytes": 11095
+    },
+    {
+      "role": "other",
+      "path": "SpringBootDemo_1.0.0_security.html",
+      "sha256": "25590bea02cf90baf6a56e9f49580aa3737cc15372a5092f9027ccef1ae4e717",
+      "bytes": 45933
+    },
+    {
+      "role": "conformance",
+      "path": "SpringBootDemo_1.0.0_conformance.json",
+      "sha256": "73f929ef40a02fe5c50266259b9512ed1819369cc69ce662b5f037bb4f14ec72",
+      "bytes": 50190
+    },
+    {
+      "role": "other",
+      "path": "SpringBootDemo_1.0.0_conformance.md",
+      "sha256": "da83561d3302df130a9cea7401bc00f5d3b4814e8426b5ccdde5fa26769c8e70",
+      "bytes": 12635
+    },
+    {
+      "role": "other",
+      "path": "SpringBootDemo_1.0.0_conformance.html",
+      "sha256": "ab1bb88d9163fe11087c3dd8630a1094484aaba84c64a0230410b2c023449512",
+      "bytes": 34883
+    },
+    {
+      "role": "other",
+      "path": "SpringBootDemo_1.0.0_conformance.result",
+      "sha256": "d74ff0ee8da3b9806b18c877dbf29bbde50b5bd8e4dad7a3a725000feb82e8f1",
+      "bytes": 4
+    },
+    {
+      "role": "other",
+      "path": "SpringBootDemo_1.0.0_summary.result",
+      "sha256": "4d370e70c2d574e51de63dc9b67f8cd110986183bc135b608fd7060eadf7ea6c",
+      "bytes": 61
+    },
+    {
+      "role": "other",
+      "path": "SpringBootDemo_1.0.0_risk-report.md",
+      "sha256": "57695b6a8184613ba94acd102aa4a98b8b0c5d85aeca8a52cf87e9319d853f19",
+      "bytes": 12240
+    },
+    {
+      "role": "other",
+      "path": "SpringBootDemo_1.0.0_risk-report.html",
+      "sha256": "788e957617cf19fd10ee78f4146bfb73d8f615eba9e4bc1e9f606b49c838e08f",
+      "bytes": 35321
+    },
+    {
+      "role": "other",
+      "path": "SpringBootDemo_1.0.0_security_epss.json",
+      "sha256": "9b764120d68d1c6a75295601a32afc91247b8bd555ddc888f64a9d6eb32d7d40",
+      "bytes": 6209
+    },
+    {
+      "role": "vulnerabilities.trivy",
+      "path": "SpringBootDemo_1.0.0_security.json",
+      "sha256": "c01ba3d6d1e7e2721eb2027e0b347f901a71101ae86fd8bd99744499dd185952",
+      "bytes": 435707
+    }
+  ]
+}

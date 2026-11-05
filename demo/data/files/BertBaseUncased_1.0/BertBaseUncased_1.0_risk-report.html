@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline';">
+<title>Open-source risk report — BertBaseUncased</title>
+<style>
+:root {
+  --background: 0 0% 98%;
+  --foreground: 240 6% 10%;
+  --card: 0 0% 100%;
+  --card-foreground: 240 6% 10%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 240 6% 10%;
+  --muted: 240 5% 96%;
+  --muted-foreground: 240 4% 44%;
+  --border: 240 5% 91%;
+  --input: 240 5% 91%;
+  --primary: 240 6% 10%;
+  --primary-foreground: 0 0% 98%;
+  --selected: 240 6% 10%;
+  --selected-foreground: 0 0% 98%;
+  --secondary: 240 5% 96%;
+  --secondary-foreground: 240 6% 10%;
+  --accent: 240 5% 96%;
+  --accent-foreground: 240 6% 10%;
+  --destructive: 0 72% 51%;
+  --destructive-foreground: 0 0% 98%;
+  --ring: 349 100% 46%;
+  --brand: 349 100% 46%;
+  --brand-foreground: 0 0% 100%;
+  --brand-strong: 349 100% 38%;
+  --brand-accent: 24 90% 55%;
+  --sidebar: 0 0% 100%;
+  --sidebar-foreground: 240 6% 10%;
+  --sidebar-border: 240 5% 91%;
+  --font-size-display: 1.875rem;
+  --font-size-title: 1.25rem;
+  --font-size-heading: 1.125rem;
+  --font-size-body: 1rem;
+  --font-size-body-sm: 0.875rem;
+  --font-size-label: 0.75rem;
+  --font-size-caption: 0.6875rem;
+  --font-size-mono: 0.75rem;
+  --role-danger-fg: 185 28 28;
+  --role-danger-muted: 251 229 229;
+  --role-danger-emphasis: 220 38 38;
+  --role-danger-border: 239 157 157;
+  --role-severe-fg: 154 52 18;
+  --role-severe-muted: 252 235 226;
+  --role-severe-emphasis: 234 88 12;
+  --role-severe-border: 246 180 146;
+  --role-attention-fg: 133 77 14;
+  --role-attention-muted: 247 240 225;
+  --role-attention-emphasis: 190 129 3;
+  --role-attention-border: 231 202 142;
+  --role-info-fg: 29 78 216;
+  --role-info-muted: 229 236 253;
+  --role-info-emphasis: 37 99 235;
+  --role-info-border: 157 185 246;
+  --role-success-fg: 6 95 70;
+  --role-success-muted: 226 243 238;
+  --role-success-emphasis: 10 155 110;
+  --role-success-border: 147 224 198;
+  --role-neutral-fg: 63 63 70;
+  --role-neutral-muted: 238 238 239;
+  --role-neutral-emphasis: 113 113 122;
+  --role-neutral-border: 191 191 195;
+  --cat-permissive-fg: 12 100 91;
+  --cat-permissive-muted: 227 240 239;
+  --cat-permissive-emphasis: 24 134 123;
+  --cat-permissive-border: 151 201 196;
+  --cat-weak-fg: 31 45 111;
+  --cat-weak-muted: 232 235 247;
+  --cat-weak-emphasis: 66 87 189;
+  --cat-weak-border: 170 179 225;
+  --cat-strong-fg: 82 40 103;
+  --cat-strong-muted: 241 234 244;
+  --cat-strong-emphasis: 137 78 166;
+  --cat-strong-border: 202 175 215;
+  --cat-network-fg: 107 36 74;
+  --cat-network-muted: 244 233 239;
+  --cat-network-emphasis: 167 68 121;
+  --cat-network-border: 215 171 195;
+  --cat-review-fg: 80 60 43;
+  --cat-review-muted: 240 237 234;
+  --cat-review-emphasis: 131 106 84;
+  --cat-review-border: 199 188 178;
+  --code-keyword: 207 34 46;
+  --code-string: 10 48 105;
+  --code-comment: 110 119 129;
+  --code-number: 5 80 174;
+  --code-title: 102 57 186;
+}
+@media screen and (prefers-color-scheme: dark) {
+:root {
+  --background: 240 6% 7%;
+  --foreground: 0 0% 98%;
+  --card: 240 4% 12%;
+  --card-foreground: 0 0% 98%;
+  --popover: 240 4% 12%;
+  --popover-foreground: 0 0% 98%;
+  --muted: 240 4% 16%;
+  --muted-foreground: 240 5% 65%;
+  --border: 240 4% 24%;
+  --input: 240 4% 24%;
+  --primary: 0 0% 98%;
+  --primary-foreground: 240 6% 10%;
+  --selected: 240 5% 30%;
+  --selected-foreground: 0 0% 98%;
+  --secondary: 240 4% 16%;
+  --secondary-foreground: 0 0% 98%;
+  --accent: 240 4% 16%;
+  --accent-foreground: 0 0% 98%;
+  --destructive: 0 72% 51%;
+  --destructive-foreground: 0 0% 98%;
+  --ring: 349 100% 62%;
+  --brand: 349 100% 46%;
+  --brand-foreground: 0 0% 100%;
+  --brand-strong: 349 100% 68%;
+  --brand-accent: 24 90% 60%;
+  --sidebar: 240 5% 10%;
+  --sidebar-foreground: 0 0% 98%;
+  --sidebar-border: 240 4% 24%;
+  --role-danger-fg: 252 165 165;
+  --role-danger-muted: 60 38 41;
+  --role-danger-emphasis: 248 113 113;
+  --role-danger-border: 125 64 66;
+  --role-severe-fg: 253 186 116;
+  --role-severe-muted: 60 44 32;
+  --role-severe-emphasis: 251 146 60;
+  --role-severe-border: 126 79 42;
+  --role-attention-fg: 232 200 110;
+  --role-attention-muted: 53 47 34;
+  --role-attention-emphasis: 205 170 70;
+  --role-attention-border: 105 90 46;
+  --role-info-fg: 147 197 253;
+  --role-info-muted: 36 47 63;
+  --role-info-emphasis: 96 165 250;
+  --role-info-border: 56 87 127;
+  --role-success-fg: 110 231 183;
+  --role-success-muted: 28 54 47;
+  --role-success-emphasis: 52 211 153;
+  --role-success-border: 37 108 84;
+  --role-neutral-fg: 212 212 216;
+  --role-neutral-muted: 46 46 50;
+  --role-neutral-emphasis: 161 161 170;
+  --role-neutral-border: 86 86 91;
+  --cat-permissive-fg: 134 234 224;
+  --cat-permissive-muted: 27 50 51;
+  --cat-permissive-emphasis: 40 189 174;
+  --cat-permissive-border: 31 98 93;
+  --cat-weak-fg: 194 201 240;
+  --cat-weak-muted: 43 45 59;
+  --cat-weak-emphasis: 124 139 218;
+  --cat-weak-border: 71 77 114;
+  --cat-strong-fg: 223 198 235;
+  --cat-strong-muted: 52 44 58;
+  --cat-strong-emphasis: 183 134 208;
+  --cat-strong-border: 97 75 110;
+  --cat-network-fg: 237 196 218;
+  --cat-network-muted: 57 43 52;
+  --cat-network-emphasis: 213 129 174;
+  --cat-network-border: 111 73 94;
+  --cat-review-fg: 230 216 204;
+  --cat-review-muted: 54 50 48;
+  --cat-review-emphasis: 196 169 146;
+  --cat-review-border: 103 91 82;
+  --code-keyword: 255 123 114;
+  --code-string: 165 214 255;
+  --code-comment: 145 152 161;
+  --code-number: 121 192 255;
+  --code-title: 210 168 255;
+}
+}
+:root{
+  color-scheme:light dark;
+  --bg:hsl(var(--background));--surface:hsl(var(--card));--text:hsl(var(--foreground));
+  --text-muted:hsl(var(--muted-foreground));--line:hsl(var(--border));--th-bg:hsl(var(--muted));
+  --link:hsl(var(--brand-strong));
+  --radius:.375rem;--radius-card:.5rem;
+  --shadow:0 1px 2px rgb(0 0 0/.04),0 2px 8px -2px rgb(0 0 0/.08);
+  --font:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;
+  --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+}
+@media screen and (prefers-color-scheme:dark){:root{
+  --shadow:0 1px 2px rgb(0 0 0/.3),0 2px 8px -2px rgb(0 0 0/.5);
+}}
+*{box-sizing:border-box;}
+body{font-family:var(--font);font-size:var(--font-size-body);background:var(--bg);color:var(--text);
+  max-width:1040px;margin:0 auto;padding:2.5rem 1.5rem 4rem;line-height:1.55;
+  -webkit-font-smoothing:antialiased;}
+a{color:var(--link);}
+.report-header{display:flex;align-items:flex-end;justify-content:space-between;
+  gap:1rem;flex-wrap:wrap;padding-bottom:.85rem;border-bottom:1px solid var(--line);
+  margin-bottom:1.5rem;}
+.wordmark{display:flex;align-items:center;gap:.5rem;font-size:var(--font-size-title);font-weight:800;
+  letter-spacing:-.02em;color:hsl(var(--brand));}
+.wordmark .tag{font-size:var(--font-size-caption);font-weight:700;letter-spacing:.1em;color:var(--text-muted);
+  border:1px solid var(--line);border-radius:999px;padding:.15rem .5rem;background:var(--surface);}
+.report-kind{font-size:var(--font-size-label);font-weight:600;color:var(--text-muted);
+  text-transform:uppercase;letter-spacing:.07em;}
+h1{font-size:var(--font-size-display);font-weight:700;letter-spacing:-.01em;line-height:1.25;margin:.2rem 0 .35rem;}
+h2{font-size:var(--font-size-title);font-weight:600;letter-spacing:-.01em;margin:2.1rem 0 .8rem;}
+h3{font-size:var(--font-size-heading);font-weight:600;margin:1.3rem 0 .4rem;}
+.subtitle{font-size:var(--font-size-body);color:var(--text-muted);margin:0 0 .35rem;}
+.meta{color:var(--text-muted);font-size:var(--font-size-body-sm);margin:.15rem 0 0;}
+time{white-space:nowrap;}
+.cards{display:flex;gap:.5rem;flex-wrap:wrap;margin:1.1rem 0 1.3rem;}
+.pill{display:inline-flex;align-items:center;gap:.4rem;padding:.3rem .7rem;
+  border:1px solid rgb(var(--role-neutral-border));border-radius:999px;
+  background:rgb(var(--role-neutral-muted));color:rgb(var(--role-neutral-fg));
+  font-size:var(--font-size-body-sm);font-weight:600;line-height:1.1;white-space:nowrap;}
+.pill .count{font-variant-numeric:tabular-nums;}
+.pill-crit,.pill-fail,.pill-kev{background:rgb(var(--role-danger-muted));color:rgb(var(--role-danger-fg));border-color:rgb(var(--role-danger-border));}
+.pill-high{background:rgb(var(--role-severe-muted));color:rgb(var(--role-severe-fg));border-color:rgb(var(--role-severe-border));}
+.pill-med,.pill-warn{background:rgb(var(--role-attention-muted));color:rgb(var(--role-attention-fg));border-color:rgb(var(--role-attention-border));}
+.pill-low{background:rgb(var(--role-info-muted));color:rgb(var(--role-info-fg));border-color:rgb(var(--role-info-border));}
+.pill-pass{background:rgb(var(--role-success-muted));color:rgb(var(--role-success-fg));border-color:rgb(var(--role-success-border));}
+.pill-info{background:rgb(var(--role-neutral-muted));color:rgb(var(--role-neutral-fg));border-color:rgb(var(--role-neutral-border));}
+.pill-cat-network{background:rgb(var(--cat-network-muted));color:rgb(var(--cat-network-fg));border-color:rgb(var(--cat-network-border));}
+.pill-cat-strong{background:rgb(var(--cat-strong-muted));color:rgb(var(--cat-strong-fg));border-color:rgb(var(--cat-strong-border));}
+.pill-cat-weak{background:rgb(var(--cat-weak-muted));color:rgb(var(--cat-weak-fg));border-color:rgb(var(--cat-weak-border));}
+.pill-cat-permissive{background:rgb(var(--cat-permissive-muted));color:rgb(var(--cat-permissive-fg));border-color:rgb(var(--cat-permissive-border));}
+.pill-cat-review{background:rgb(var(--cat-review-muted));color:rgb(var(--cat-review-fg));border-color:rgb(var(--cat-review-border));}
+.note{background:rgb(var(--role-attention-muted));border-left:3px solid rgb(var(--role-attention-emphasis));
+  border-radius:var(--radius);padding:.75rem 1rem;margin:1rem 0 1.3rem;font-size:var(--font-size-body-sm);}
+.note b{color:var(--text);}
+.table-wrap{border:1px solid var(--line);border-radius:var(--radius-card);
+  overflow-x:auto;box-shadow:var(--shadow);background:var(--surface);margin:1rem 0 1.5rem;}
+table{border-collapse:collapse;width:100%;font-size:var(--font-size-body-sm);}
+th{background:var(--th-bg);text-align:left;font-size:var(--font-size-label);font-weight:600;
+  text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted);
+  padding:.6rem .8rem;border-bottom:1px solid var(--line);white-space:nowrap;}
+td{padding:.6rem .8rem;border-bottom:1px solid var(--line);vertical-align:top;}
+tr:last-child td{border-bottom:none;}
+tr:hover td{background:var(--th-bg);}
+td.num{text-align:right;font-variant-numeric:tabular-nums;}
+td.id{white-space:nowrap;font-variant-numeric:tabular-nums;}
+td[class^="sev-"]{white-space:nowrap;}
+.sev-CRITICAL{color:rgb(var(--role-danger-fg));font-weight:700;}
+.sev-HIGH{color:rgb(var(--role-severe-fg));font-weight:700;}
+.sev-MEDIUM{color:rgb(var(--role-attention-fg));font-weight:600;}
+.sev-LOW{color:rgb(var(--role-info-fg));font-weight:600;}
+.sev-UNKNOWN{color:rgb(var(--role-neutral-fg));}
+.kevbadge{display:inline-block;background:rgb(var(--role-danger-muted));color:rgb(var(--role-danger-fg));
+  border:1px solid rgb(var(--role-danger-border));
+  border-radius:999px;padding:.12rem .5rem;font-size:var(--font-size-label);font-weight:700;}
+.mono li{font-family:var(--mono);font-size:var(--font-size-mono);}
+ol,ul{margin:.5rem 0 0;padding-left:1.3rem;}
+li{margin:.3rem 0;}
+code{font-family:var(--mono);font-size:var(--font-size-mono);}
+/* NOTICE */
+.review{background:rgb(var(--role-attention-muted));border-left:3px solid rgb(var(--role-attention-emphasis));
+  border-radius:var(--radius);padding:.9rem 1.1rem;margin:1.2rem 0;}
+.review h2{color:rgb(var(--role-attention-fg));margin:.1rem 0 .3rem;font-size:var(--font-size-heading);font-weight:600;}
+.review .meta{margin:.2rem 0 .4rem;color:var(--text);}
+.review ul{list-style:none;padding:0;margin:.5rem 0 0;}
+.review li{font-family:var(--mono);font-size:var(--font-size-mono);margin:.3rem 0;}
+.lic{background:var(--surface);border:1px solid var(--line);
+  border-radius:var(--radius-card);box-shadow:var(--shadow);
+  padding:1rem 1.15rem;margin:1rem 0;}
+.lic h2{margin:0;font-size:var(--font-size-heading);font-weight:700;}
+.lic .count{display:block;color:var(--text-muted);font-size:var(--font-size-body-sm);margin:.15rem 0 .5rem;}
+.lic ul{list-style:none;padding:0;margin:0;}
+.lic li{font-family:var(--mono);font-size:var(--font-size-mono);padding:.45rem 0;
+  border-top:1px solid var(--line);margin:0;}
+.lic li:first-child{border-top:none;}
+.src{display:block;color:var(--text-muted);font-size:var(--font-size-label);margin-top:.25rem;}
+.src a{color:var(--link);text-decoration:none;word-break:break-all;}
+.attr{display:block;color:var(--text-muted);font-size:var(--font-size-label);margin-top:.1rem;}
+.lic .unverified{color:rgb(var(--role-attention-fg));font-size:var(--font-size-label);margin:.1rem 0 0;}
+.texts{margin-top:2.5rem;border-top:1px solid var(--line);padding-top:1.25rem;}
+.texts pre{background:var(--th-bg);border:1px solid var(--line);
+  border-radius:var(--radius);padding:1rem;overflow:auto;font-size:var(--font-size-mono);
+  line-height:1.45;white-space:pre-wrap;}
+/* Conformance */
+.s-pass{color:rgb(var(--role-success-fg));font-weight:700;}
+.s-fail{color:rgb(var(--role-danger-fg));font-weight:700;}
+.s-warn{color:rgb(var(--role-attention-fg));font-weight:700;}
+.s-review{color:rgb(var(--role-info-fg));font-weight:700;}
+.s-na{color:var(--text-muted);font-weight:700;}
+td.num:first-child{color:var(--text-muted);}
+th.num{text-align:right;}
+td.req{white-space:nowrap;}
+td.s-pass,td.s-fail,td.s-warn,td.s-review,td.s-na{white-space:nowrap;}
+details.fix{margin:.4rem 0 0;}
+details.fix summary{cursor:pointer;color:var(--link);font-size:var(--font-size-body-sm);font-weight:600;}
+details.fix pre{margin:.4rem 0 .2rem;}
+details.fix .meta{font-size:var(--font-size-body-sm);}
+.mono{list-style:none;padding-left:0;}
+pre{background:var(--th-bg);border:1px solid var(--line);border-radius:var(--radius);
+  padding:.6rem .75rem;overflow-x:auto;margin:.5rem 0;}
+pre code{font-family:var(--mono);font-size:var(--font-size-mono);white-space:pre;}
+/* Print: always light (the dark tokens apply to screens only), no page
+   background or shadows, table headers repeat on every page, rows and cards do
+   not split, and an external link shows its address because paper cannot be
+   clicked. */
+@page{margin:16mm 14mm;}
+@media print{
+  body{max-width:none;margin:0;padding:0;background:#fff;font-size:10.5pt;line-height:1.45;}
+  .table-wrap,.lic,.texts pre,pre{box-shadow:none;background:transparent;overflow:visible;}
+  .table-wrap{border:0;border-top:1px solid var(--line);border-radius:0;margin:.6rem 0 1rem;}
+  table{font-size:9pt;}
+  th,td{padding:.3rem .4rem;}
+  th{white-space:normal;}
+  table .meta{font-size:8.5pt;}
+  pre,pre code{white-space:pre-wrap;overflow-wrap:anywhere;}
+  th,.wordmark .tag{background:transparent;}
+  thead{display:table-header-group;}
+  tfoot{display:table-footer-group;}
+  tr,.lic,.note,.review,li{break-inside:avoid;page-break-inside:avoid;}
+  h1,h2,h3{break-after:avoid;page-break-after:avoid;}
+  tr:hover td{background:transparent;}
+  a[href^="http"]::after{content:" (" attr(href) ")";font-size:var(--font-size-label);word-break:break-all;}
+  .src a::after{content:none;}
+  details.fix summary{color:var(--text);}
+}
+</style>
+</head><body>
+<header class="report-header">
+ <div class="wordmark">BomLens<span class="tag">SBOM</span></div>
+ <div class="report-kind">Open-source risk report</div>
+</header>
+<h1>Open-source risk report</h1>
+<p class="meta">Project: BertBaseUncased &middot; Generated: <time datetime="2026-10-26T16:56:54Z">2026-10-26 16:56 UTC</time></p>
+<h2>1. Vulnerability analysis and remediation deadlines</h2>
+<div class="note">Recommended remediation deadlines: <b>Critical → within 7 days</b>, <b>High → within 30 days</b>. We recommend preparing a remediation plan or risk justification.</div>
+<div class="cards">
+ <span class="pill pill-crit">Critical <span class="count">0</span></span>
+ <span class="pill pill-high">High <span class="count">0</span></span>
+ <span class="pill pill-med">Medium <span class="count">0</span></span>
+ <span class="pill pill-low">Low <span class="count">0</span></span>
+ <span class="pill pill-info">Unknown <span class="count">0</span></span>
+</div>
+<p>No known vulnerabilities, or no security artifact was produced.</p>
+<h2>2. License summary</h2>
+<p>Distinct licenses identified: <b>3</b> (see the NOTICE artifact for details).</p>
+<h3>License classification (copyleft strength)</h3>
+<p>Each component is also recorded in the SBOM with a <code>bomlens:licenseClass</code> property. An unrecognized license is left uncategorized rather than assumed permissive.</p>
+<div class="cards">
+ <span class="pill pill-cat-network">Network copyleft <span class="count">0</span></span>
+ <span class="pill pill-cat-strong">Strong copyleft <span class="count">0</span></span>
+ <span class="pill pill-cat-weak">Weak copyleft <span class="count">1</span></span>
+ <span class="pill pill-cat-permissive">Permissive <span class="count">1</span></span>
+ <span class="pill pill-cat-review">Uncategorized <span class="count">1</span></span>
+</div>
+<h3>Outbound-license conflicts</h3>
+<p>Dependencies checked against the declared outbound license. Advisory only — it surfaces combinations that need a person to look, and makes no legal determination.</p>
+<p><code>Apache-2.0</code></p>
+<div class="cards">
+ <span class="pill pill-crit">Incompatible <span class="count">0</span></span>
+ <span class="pill pill-med">Conditional <span class="count">1</span></span>
+ <span class="pill pill-info">Unknown <span class="count">1</span></span>
+</div>
+<h3>AI model risk assessment</h3>
+<p>Per-model rationale and conditions are in the AI compliance profile artifact. This assessment is guidance, not legal advice.</p>
+<div class="cards">
+ <span class="pill pill-pass">No restriction signals <span class="count">0</span></span>
+ <span class="pill pill-med">Conditional use <span class="count">0</span></span>
+ <span class="pill pill-high">Caution <span class="count">0</span></span>
+ <span class="pill pill-info">Needs review <span class="count">1</span></span>
+</div>
+<h2>3. Next steps</h2>
+<ol>
+ <li>Prepare a <b>remediation plan or risk justification</b> within the recommended deadlines above.</li>
+ <li>Keep and distribute the notice (NOTICE) together with the SBOM.</li>
+</ol>
+</body></html>

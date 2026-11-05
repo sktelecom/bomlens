@@ -1,0 +1,35 @@
+// Copyright 2026 SK Telecom Co., Ltd.
+// SPDX-License-Identifier: Apache-2.0
+
+/* 헤더의 사이트명(BomLens)을 클릭해도 로고처럼 홈으로 이동시킨다.
+ * Material 테마는 로고 이미지에만 링크를 걸기 때문에, 로고 링크의 href를
+ * 그대로 재사용해 현재 언어(ko/en)의 홈으로 보낸다. */
+document.addEventListener("DOMContentLoaded", function () {
+  var logo = document.querySelector(".md-header .md-logo");
+  var title = document.querySelector(".md-header__title");
+  if (!logo || !title) return;
+  title.style.cursor = "pointer";
+  title.setAttribute("role", "link");
+  title.setAttribute("tabindex", "0");
+  function goHome() { window.location.href = logo.href; }
+  title.addEventListener("click", goHome);
+  title.addEventListener("keydown", function (e) {
+    if (e.key === "Enter" || e.key === " ") { e.preventDefault(); goHome(); }
+  });
+});
+
+/* 접근성 보정: Material이 이름 없이 내보내는 대화상자와 중복 랜드마크에 이름을 붙인다.
+ * 검색 영역(role="dialog")과, 주 탐색과 같은 이름을 쓰는 탐색 경로, 코드 블록마다 반복되는
+ * nav를 구분하는 용도다. 문구는 문서 언어를 따른다. */
+document.addEventListener("DOMContentLoaded", function () {
+  var ko = document.documentElement.lang === "ko";
+  var search = document.querySelector(".md-search");
+  if (search && !search.getAttribute("aria-label")) {
+    search.setAttribute("aria-label", ko ? "검색" : "Search");
+  }
+  var path = document.querySelector(".md-path");
+  if (path) path.setAttribute("aria-label", ko ? "현재 위치" : "Breadcrumb");
+  document.querySelectorAll(".md-code__nav").forEach(function (nav) {
+    nav.setAttribute("role", "none");
+  });
+});
