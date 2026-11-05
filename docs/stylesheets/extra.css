@@ -439,3 +439,8 @@ html[lang="ko"] .md-typeset :is(h1, h2, h3, p, li) {
   word-break: keep-all;
   overflow-wrap: break-word;
 }
+
+/* 소식 페이지 표의 날짜가 칸 안에서 줄바꿈되지 않게 한다 */
+.md-typeset .news-list td:first-child {
+  white-space: nowrap;
+}
