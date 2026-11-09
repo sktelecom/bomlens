@@ -552,6 +552,15 @@ describe("startScan", () => {
     expect(qs.get("reachability")).toBe("true");
   });
 
+  it("sends the CPE index match as analyze_cpe_index, off when absent", () => {
+    startScan({ ...PARAMS }, handlers());
+    let qs = new URLSearchParams(FakeEventSource.last!.url.split("?")[1]);
+    expect(qs.get("analyze_cpe_index")).toBe("false");
+    startScan({ ...PARAMS, analyzeCpeIndex: true }, handlers());
+    qs = new URLSearchParams(FakeEventSource.last!.url.split("?")[1]);
+    expect(qs.get("analyze_cpe_index")).toBe("true");
+  });
+
   it("sends the CycloneDX version as spec_version, empty when not chosen", () => {
     startScan({ ...PARAMS, specVersion: "1.7" }, handlers());
     let qs = new URLSearchParams(FakeEventSource.last!.url.split("?")[1]);

@@ -105,6 +105,8 @@
     "readLockFileHint": "When a package-lock.json, pnpm-lock.yaml, bun.lock or gradle.lockfile covers the whole project, BomLens reads it as it is: a few seconds instead of a build, with the same components and licenses. Turn it off to always resolve the dependencies by building (a project that is not covered by such a lock file is built either way).",
     "readDeclared": "Read sbom-declared.cdx.json",
     "readDeclaredHint": "Adds the components listed in sbom-declared.cdx.json at the root of the scanned folder, such as your own build outputs. Applies to source scans and to Yocto build directories, where the file declares components by recipe; any other folder is scanned the same either way. Turn it off to scan without the file, for example before the build outputs it names exist.",
+    "analyzeCpeIndex": "Match against the CPE index",
+    "analyzeCpeIndexHint": "Also matches the components of an SBOM that BomLens generated, those carrying bomlens:purlSource=upstream-map, against the bundled CPE index, as a generating scan does. Other components are not matched. Off by default.",
     "byteStable": "Reproducible output",
     "byteStableHint": "Produces a byte-for-byte identical SBOM when the same input is re-scanned, so outputs can be diffed and checksummed. Skips network license lookups, which can otherwise vary between runs.",
     "conformanceProfile": "Conformance profile",

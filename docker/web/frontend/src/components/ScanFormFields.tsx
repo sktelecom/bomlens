@@ -454,6 +454,8 @@ export function ScanOptions({ state }: { state: ScanFormState }) {
     setReachability,
     byteStable,
     setByteStable,
+    analyzeCpeIndex,
+    setAnalyzeCpeIndex,
     readLockFile,
     setReadLockFile,
     showDetection,
@@ -467,6 +469,7 @@ export function ScanOptions({ state }: { state: ScanFormState }) {
     showDeepCve,
     showReachability,
     showByteStable,
+    showAnalyzeCpeIndex,
     capabilities,
     busy,
   } = state;
@@ -548,6 +551,14 @@ export function ScanOptions({ state }: { state: ScanFormState }) {
           labelKey="readDeclared"
           checked={readDeclared}
           onChange={setReadDeclared}
+          disabled={busy}
+        />
+      )}
+      {showAnalyzeCpeIndex && (
+        <ToggleRow
+          labelKey="analyzeCpeIndex"
+          checked={analyzeCpeIndex}
+          onChange={setAnalyzeCpeIndex}
           disabled={busy}
         />
       )}

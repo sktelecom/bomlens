@@ -157,6 +157,7 @@ export function NewScan({
     state.deepCve,
     state.reachability,
     state.byteStable,
+    state.analyzeCpeIndex && state.showAnalyzeCpeIndex,
     // On by default, so it counts only when it was turned off.
     state.showDetection && !state.readLockFile,
     state.readDeclaredChanged,

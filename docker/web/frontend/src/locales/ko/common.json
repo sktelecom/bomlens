@@ -105,6 +105,8 @@
     "readLockFileHint": "package-lock.json, pnpm-lock.yaml, bun.lock, gradle.lockfile 중 하나가 프로젝트 전체를 덮으면 그대로 읽습니다. 빌드 대신 몇 초 만에 끝나고 구성요소와 라이선스는 같습니다. 끄면 항상 빌드로 의존성을 해석합니다(그런 lock 파일이 덮지 않는 프로젝트는 어느 쪽이든 빌드합니다).",
     "readDeclared": "sbom-declared.cdx.json 읽기",
     "readDeclaredHint": "스캔하는 폴더 최상위의 sbom-declared.cdx.json에 적힌 구성요소(자체 빌드 산출물 등)를 SBOM에 추가합니다. 소스 스캔과 Yocto 빌드 디렉터리에 적용되며, Yocto 빌드 디렉터리에서는 이 파일로 레시피별 구성요소를 선언합니다. 그 밖의 폴더는 켜든 끄든 같은 결과가 나옵니다. 파일에 적힌 빌드 산출물이 아직 없을 때처럼 파일 없이 스캔하려면 끕니다.",
+    "analyzeCpeIndex": "CPE 색인과 대조",
+    "analyzeCpeIndexHint": "BomLens가 생성한 SBOM에서 bomlens:purlSource=upstream-map 속성이 붙은 구성요소를 번들 CPE 색인에도 대조합니다. 생성 스캔과 같은 방식입니다. 나머지 구성요소는 대조하지 않습니다. 기본은 꺼짐입니다.",
     "byteStable": "재현 가능한 출력",
     "byteStableHint": "같은 입력을 다시 스캔하면 바이트 단위로 동일한 SBOM을 만들어, 출력을 비교하고 체크섬으로 검증할 수 있습니다. 실행마다 결과가 달라질 수 있는 네트워크 라이선스 조회는 건너뜁니다.",
     "conformanceProfile": "적합성 검사 기준",
