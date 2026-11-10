@@ -738,6 +738,23 @@ assert rc == 0, rc
 assert "DEEP_LICENSE=false" in captured["args"], captured["args"]
 assert "BYTE_STABLE=false" in captured["args"], captured["args"]
 
+# ANALYZE_CPE_INDEX: the Analyze form's opt-in toggle, read like DEEP_LICENSE.
+captured.clear()
+rc = server.run_sibling_scan(
+    "ghcr.io/sktelecom/bomlens-deep-cve:1.5.0", "ANALYZE", run_out,
+    lambda ln: None, upload_file=up_file,
+    extra_env={"ANALYZE_CPE_INDEX": "true"},
+)
+assert rc == 0, rc
+assert "ANALYZE_CPE_INDEX=true" in captured["args"], captured["args"]
+captured.clear()
+rc = server.run_sibling_scan(
+    "ghcr.io/sktelecom/bomlens-deep-cve:1.5.0", "ANALYZE", run_out,
+    lambda ln: None, upload_file=up_file,
+)
+assert rc == 0, rc
+assert "ANALYZE_CPE_INDEX=false" in captured["args"], captured["args"]
+
 # SECURITY_ENRICH/ENRICH_MALICIOUS: an operator's own container environment
 # (docs/reference/cli.md, docs/reference/docker-image.md), not a request
 # field -- same as the PCT vars, forwarded via extra_env the way

@@ -176,6 +176,9 @@ export function useScanForm({
   const [byteStable, setByteStable] = useState(
     () => initialConfig?.byteStable ?? false,
   );
+  const [analyzeCpeIndex, setAnalyzeCpeIndex] = useState(
+    () => initialConfig?.analyzeCpeIndex ?? false,
+  );
   // Read sbom-declared.cdx.json at the root of the scanned folder (on by
   // default; off is the CLI's --no-components). Seeded from a re-scan.
   const [readDeclared, setReadDeclared] = useState(
@@ -297,6 +300,8 @@ export function useScanForm({
   // Reproducible output applies to any generated SBOM. It is a near no-op for a
   // supplier SBOM we only analyze, and for an AI model, so hide it there.
   const showByteStable = !isAnalyze && !isAiModel;
+  // The CPE index match is for a submitted SBOM only (--analyze-cpe-index).
+  const showAnalyzeCpeIndex = isAnalyze;
   // Only a source tree has a lock file to read in place of a build.
   const showDetection = isSourceScan;
   // A declaration file sits at the root of a source tree, or of a Yocto build
@@ -348,7 +353,7 @@ export function useScanForm({
   const reachabilityOn = showReachability && reachability;
   const securityForced = isAnalyze || deepCveOn || reachabilityOn;
   const showScanOptions =
-    showDeepLicense || showVendored || showByteStable || showDeepCve || showReachability ||
+    showDeepLicense || showVendored || showByteStable || showDeepCve || showReachability || showAnalyzeCpeIndex ||
     showDetection || showReadDeclared;
   const showFormatOptions =
     showOutboundLicense || showSbomAuthor || showSupplier || showSpecVersion || showConformanceProfile;
@@ -576,6 +581,7 @@ export function useScanForm({
       deepLicense: showDeepLicense ? deepLicense : false,
       identifyVendored: showVendored ? identifyVendored : false,
       byteStable: showByteStable ? byteStable : false,
+      analyzeCpeIndex: showAnalyzeCpeIndex ? analyzeCpeIndex : false,
       detection: showDetection && !readLockFile ? "build" : "auto",
       noComponents: showReadDeclared && !readDeclared,
       conformanceProfile: showConformanceProfile ? conformanceProfile : undefined,
@@ -633,6 +639,7 @@ export function useScanForm({
     deepCve, setDeepCve,
     reachability, setReachability,
     byteStable, setByteStable,
+    analyzeCpeIndex, setAnalyzeCpeIndex,
     readLockFile, setReadLockFile, showDetection,
     readDeclared, setReadDeclared, showReadDeclared, readDeclaredChanged,
     conformanceProfile, setConformanceProfile,
@@ -648,7 +655,7 @@ export function useScanForm({
     truscaProjectId, setTruscaProjectId,
     errors, uploadError, uploading, uploadPercent,
     busy, uploadKind, textInput, isText, isAnalyze, isAiModel, showVendored,
-    showDeepLicense, showDeepCve, showReachability, showByteStable, showOutboundLicense,
+    showDeepLicense, showDeepCve, showReachability, showByteStable, showAnalyzeCpeIndex, showOutboundLicense,
     showSbomAuthor,
     showSupplier,
     showSpecVersion,

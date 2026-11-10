@@ -60,6 +60,8 @@ cd ~/sbom-output      # 출력 폴더(아무 곳이나 가능)
 
 **Reproducible output** 토글은 실행마다 바이트 단위로 동일한 SBOM을 만듭니다(CLI `--byte-stable`에 해당). 소스·이미지·펌웨어 스캔에서 쓸 수 있고, SBOM 분석과 AI 모델에는 없습니다.
 
+SBOM 분석에는 **CPE 색인과 대조** 토글이 있습니다(기본은 꺼짐, CLI `--analyze-cpe-index`에 해당). BomLens가 생성한 SBOM에서 `bomlens:purlSource=upstream-map` 속성이 붙은 구성요소를 번들 CPE 색인에도 대조합니다. 나머지 구성요소는 대조하지 않습니다.
+
 결과 품질의 **sbom-declared.cdx.json 읽기** 토글은 기본으로 켜져 있으며, 스캔하는 폴더 최상위의 `sbom-declared.cdx.json`에 적힌 구성요소를 SBOM에 추가합니다. 소스 스캔의 폴더와, 디렉터리 입력으로 고른 [Yocto 빌드 디렉터리](#yocto-빌드-디렉터리)에 적용됩니다. 폴더가 Yocto 빌드 디렉터리인지는 스캔을 시작해야 알 수 있으므로, 그 밖의 디렉터리는 켜든 끄든 같은 결과가 나옵니다. 파일에 적힌 빌드 산출물이 아직 없을 때 하는 스캔이라면 끕니다. 소스 스캔에서는 CLI `--no-components`에 해당합니다. UI는 이 이름의 파일만 읽으며, `--components`처럼 다른 파일을 지정할 수는 없습니다. [선언 구성요소 가이드](../guides/declared-components.ko.md)를 참고하세요.
 
 **배포 라이선스** 칸에는 프로젝트를 배포하는 SPDX 식별자를 넣습니다(예: `Apache-2.0`, CLI `--license`에 해당). 값을 넣으면 라이선스 섹션이 그 라이선스와 조건이 충돌하는 의존성을 알려 주고, 비워 두면 검사하지 않으며 섹션이 그 사실을 그대로 알려 줍니다. BomLens가 SBOM을 직접 만드는 경우에만 나타나므로, 공급사 SBOM 분석(공급사 선언이 이미 들어 있습니다)과 AI 모델에는 없습니다.
