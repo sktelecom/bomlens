@@ -3620,6 +3620,200 @@ ktd=$(jq -r '.checks[] | select(.id=="purl-type") | "\(.status)|\(.detail)"' "$W
 [ "$ktd" = "pass|0 undefined type(s)" ] && pass "defined purl types pass the type check" \
     || fail "purl-type on defined types = '$ktd', expected 'pass|0 undefined type(s)'"
 
+echo "== conformance: an rpm/deb/apk namespace must be a distribution id, a version must look like one =="
+# A vendor name in the namespace slot (pkg:rpm/<company>/glibc) is well formed and
+# carries a namespace, so purl-namespace passes it; a version such as
+# "Specification-Vendor: ..." is a manifest line read as a version. Both fail the
+# submission profile and warn elsewhere.
+jq '.components += [
+  {"type":"library","name":"glibc","version":"2.28-251.ex1","purl":"pkg:rpm/examplevendor/glibc@2.28-251.ex1?distro=rhel-8"},
+  {"type":"library","name":"zlib","version":"1.2.11","purl":"pkg:rpm/examplevendor/zlib@1.2.11"},
+  {"type":"library","name":"commons-dbcp","version":"Specification-Vendor: The Apache Software Foundation","purl":"pkg:maven/commons-dbcp/commons-dbcp@1.4","group":"commons-dbcp"},
+  {"type":"library","name":"padded","version":" 2.0 ","purl":"pkg:npm/padded@2.0"}
+]' "$FIX/good-cyclonedx.json" > "$WORK/semantic-cdx.json"
+sem_sum_before=$(shasum "$WORK/semantic-cdx.json" | cut -d' ' -f1)
+bash "$LIB/validate-sbom.sh" "$WORK/semantic-cdx.json" "$WORK/sed" "supplier" >/dev/null 2>&1
+sem_def=$(jq -r '"\(.result)|\(.checks[]|select(.id=="purl-namespace-os")|"\(.required)|\(.status)")|\(.checks[]|select(.id=="version-sanity")|"\(.required)|\(.status)")"' "$WORK/sed_conformance.json")
+[ "$sem_def" = "pass|false|warn|false|warn" ] \
+    && pass "default profile: a vendor namespace and a malformed version warn and do not fail the SBOM" \
+    || fail "default profile rows = '$sem_def', expected 'pass|false|warn|false|warn'"
+CONFORMANCE_PROFILE=skt-submission bash "$LIB/validate-sbom.sh" "$WORK/semantic-cdx.json" "$WORK/ses" "supplier" >/dev/null 2>&1
+sem_skt=$(jq -r '"\(.result)|\(.checks[]|select(.id=="purl-namespace-os")|"\(.required)|\(.status)")|\(.checks[]|select(.id=="version-sanity")|"\(.required)|\(.status)")"' "$WORK/ses_conformance.json")
+[ "$sem_skt" = "fail|true|fail|true|fail" ] \
+    && pass "skt-submission: a vendor namespace and a malformed version are required failures" \
+    || fail "skt-submission rows = '$sem_skt', expected 'fail|true|fail|true|fail'"
+jq -e '.checks[] | select(.id=="purl-namespace-os") | select(.detail | test("examplevendor \\(2\\)"))' \
+    "$WORK/ses_conformance.json" >/dev/null \
+    && pass "the namespace row names the offending value and its count" \
+    || fail "the namespace row does not name examplevendor (2)"
+jq -e '.checks[] | select(.id=="version-sanity") | .missing | (index("commons-dbcp@Specification-Vendor: The Apache Software Foundation") != null) and (index("padded@ 2.0 ") != null)' \
+    "$WORK/ses_conformance.json" >/dev/null \
+    && pass "the version row lists name@version for each malformed value" \
+    || fail "the version row lacks the malformed name@version entries"
+jq -e '.checks[] | select(.id=="purl-namespace-os") | select(.label_ko != null and .detail_ko != null)' \
+    "$WORK/ses_conformance.json" >/dev/null \
+    && pass "the namespace row carries Korean label and detail" || fail "the namespace row has no Korean wording"
+grep -q "PURL namespace of rpm/deb/apk" "$WORK/ses_conformance.md" \
+    && grep -q "PURL namespace of rpm/deb/apk" "$WORK/ses_conformance.html" \
+    && pass "both rows appear in the Markdown and HTML reports" || fail "the new rows are missing from the md/html reports"
+sem_cr=$(cat "$WORK/ses_conformance.result")
+[ "$sem_cr" = "fail" ] && pass "the .result sidecar follows the required failures (--fail-on-conformance)" \
+    || fail "the .result sidecar = '$sem_cr', expected fail"
+
+# A distribution id passes, in any case; a missing namespace is purl-namespace's
+# business and is not counted again.
+jq '.components += [
+  {"type":"library","name":"bash","version":"5.1","purl":"pkg:rpm/rhel/bash@5.1?distro=rhel-9"},
+  {"type":"library","name":"curl","version":"8.0","purl":"pkg:deb/Debian/curl@8.0"},
+  {"type":"library","name":"musl","version":"1.2","purl":"pkg:apk/alpine/musl@1.2"},
+  {"type":"library","name":"openssl","version":"3.0.7","purl":"pkg:rpm/openssl@3.0.7?distro=rhel-9"}
+]' "$FIX/good-cyclonedx.json" > "$WORK/semantic-ok.json"
+CONFORMANCE_PROFILE=skt-submission bash "$LIB/validate-sbom.sh" "$WORK/semantic-ok.json" "$WORK/seo" "supplier" >/dev/null 2>&1
+sem_ok=$(jq -r '"\(.checks[]|select(.id=="purl-namespace-os")|"\(.status)|\(.detail)")|\(.checks[]|select(.id=="version-sanity")|.status)"' "$WORK/seo_conformance.json")
+[ "$sem_ok" = "pass|all namespaces are distribution ids|pass" ] \
+    && pass "pkg:rpm/rhel, pkg:deb/Debian and pkg:apk/alpine pass; a missing namespace is not counted twice" \
+    || fail "valid distribution namespaces = '$sem_ok'"
+
+# SPDX JSON and Tag-Value run the same rows.
+jq '.packages += [{
+  "name":"glibc","SPDXID":"SPDXRef-Package-glibc","versionInfo":"2.28 ex1","downloadLocation":"NOASSERTION",
+  "externalRefs":[{"referenceCategory":"PACKAGE-MANAGER","referenceType":"purl",
+                   "referenceLocator":"pkg:rpm/examplevendor/glibc@2.28"}]}]' "$FIX/good-spdx.json" > "$WORK/semantic-spdx.json"
+CONFORMANCE_PROFILE=skt-submission bash "$LIB/validate-sbom.sh" "$WORK/semantic-spdx.json" "$WORK/ses2" "supplier" >/dev/null 2>&1
+sem_spdx=$(jq -r '"\(.checks[]|select(.id=="purl-namespace-os")|.status)|\(.checks[]|select(.id=="version-sanity")|.status)"' "$WORK/ses2_conformance.json")
+[ "$sem_spdx" = "fail|fail" ] && pass "SPDX JSON: the namespace and version rows fail" \
+    || fail "SPDX JSON rows = '$sem_spdx', expected 'fail|fail'"
+{
+    cat "$FIX/supplier-clean-tagvalue.spdx"
+    printf '\nPackageName: glibc\nSPDXID: SPDXRef-Package-glibc\nPackageVersion: 2.28 ex1\nPackageDownloadLocation: NOASSERTION\nExternalRef: PACKAGE-MANAGER purl pkg:rpm/examplevendor/glibc@2.28\n'
+} > "$WORK/semantic-tv.spdx"
+CONFORMANCE_PROFILE=skt-submission bash "$LIB/validate-sbom.sh" "$WORK/semantic-tv.spdx" "$WORK/ses3" "supplier" >/dev/null 2>&1
+sem_tv=$(jq -r '"\(.format)|\(.checks[]|select(.id=="purl-namespace-os")|.status)|\(.checks[]|select(.id=="version-sanity")|.status)"' "$WORK/ses3_conformance.json")
+[ "$sem_tv" = "SPDX-TagValue|fail|fail" ] && pass "SPDX Tag-Value: the namespace and version rows fail" \
+    || fail "SPDX Tag-Value rows = '$sem_tv', expected 'SPDX-TagValue|fail|fail'"
+
+echo "== conformance: suggested fixes are rule-based, offline and leave the input alone =="
+sem_sug=$(jq -c '.suggestions' "$WORK/ses_conformance.json")
+jq -e '.suggestions | map(select(.check=="purl-namespace-os" and .name=="glibc")) | .[0]
+       | (.candidates == ["pkg:rpm/rhel/glibc@2.28-251.ex1?distro=rhel-8"])
+         and .basis == "distro qualifier in the purl" and .confidence == "high"' \
+    "$WORK/ses_conformance.json" >/dev/null \
+    && pass "a vendor namespace with a distro qualifier gets a candidate, with its basis and high confidence" \
+    || fail "no candidate for the glibc namespace" "$sem_sug"
+jq -e '.suggestions | map(select(.check=="purl-namespace-os" and .name=="zlib")) | .[0]
+       | (.candidates == []) and .confidence == "none" and (.note | test("base distribution"))' \
+    "$WORK/ses_conformance.json" >/dev/null \
+    && pass "with no distro qualifier or OS component there is no candidate, and the report says the base distribution is needed" \
+    || fail "an ambiguous namespace got a candidate" "$sem_sug"
+jq -e '.suggestions | map(select(.check=="version-sanity" and .name=="padded")) | .[0]
+       | (.candidates == ["2.0"]) and .basis == "leading or trailing whitespace removed"' \
+    "$WORK/ses_conformance.json" >/dev/null \
+    && pass "a version padded with whitespace gets the trimmed token" \
+    || fail "no trimmed candidate for the padded version" "$sem_sug"
+jq -e '.suggestions | map(select(.check=="version-sanity" and .name=="commons-dbcp")) | .[0].candidates == []' \
+    "$WORK/ses_conformance.json" >/dev/null \
+    && pass "a garbage version gets no candidate" || fail "a garbage version got a candidate" "$sem_sug"
+jq '.components += [{"type":"library","name":"openssl","version":"3.0.7","purl":"pkg:rpm/openssl@3.0.7?distro=rhel-9"},
+                    {"type":"library","name":"guava","version":"33.0","group":"com.google.guava","purl":"pkg:maven/guava@33.0"},
+                    {"type":"library","name":"lib-x","version":"1.0","purl":"pkg:maven/lib-x@1.0"}]' \
+    "$FIX/good-cyclonedx.json" > "$WORK/suggest-ns.json"
+bash "$LIB/validate-sbom.sh" "$WORK/suggest-ns.json" "$WORK/sgn" "supplier" >/dev/null 2>&1
+jq -e '.suggestions | (map(select(.name=="openssl")) | .[0].candidates == ["pkg:rpm/rhel/openssl@3.0.7?distro=rhel-9"])
+       and (map(select(.name=="guava")) | .[0].candidates == ["pkg:maven/com.google.guava/guava@33.0"])
+       and (map(select(.name=="lib-x")) | .[0].candidates == [])' "$WORK/sgn_conformance.json" >/dev/null \
+    && pass "a missing namespace is suggested from the distro qualifier or the group field, and left empty when neither is there" \
+    || fail "purl-namespace suggestions are wrong" "$(jq -c .suggestions "$WORK/sgn_conformance.json")"
+grep -q "^## Suggested fixes" "$WORK/ses_conformance.md" && grep -q "<h2>Suggested fixes</h2>" "$WORK/ses_conformance.html" \
+    && grep -q "was not changed" "$WORK/ses_conformance.md" \
+    && pass "the Markdown and HTML reports have a Suggested fixes section that says the file was not changed" \
+    || fail "the Suggested fixes section is missing"
+REPORT_LANG=ko CONFORMANCE_PROFILE=skt-submission bash "$LIB/validate-sbom.sh" "$WORK/semantic-cdx.json" "$WORK/sek" "supplier" >/dev/null 2>&1
+grep -q "^## 수정 제안" "$WORK/sek_conformance.md" && grep -q "<h2>수정 제안</h2>" "$WORK/sek_conformance.html" \
+    && pass "the Korean reports title the section 수정 제안" || fail "the Korean Suggested fixes section is missing"
+sem_sum_after=$(shasum "$WORK/semantic-cdx.json" | cut -d' ' -f1)
+[ "$sem_sum_before" = "$sem_sum_after" ] && pass "the submitted SBOM is byte-identical after the check" \
+    || fail "the input SBOM changed during the conformance check"
+jq -e '.suggestions | map(select(.name=="bash" or .name=="curl" or .name=="musl")) | length == 0' "$WORK/seo_conformance.json" >/dev/null \
+    && pass "components that pass are not in the suggestions" || fail "a passing component appears in the suggestions"
+
+echo "== conformance: operating-system hint, type match, declared distribution, new ids =="
+semrun() {   # $1 jq filter adding components, $2 out prefix; skt-submission, extra env via SEMENV
+    jq "$1" "$FIX/good-cyclonedx.json" > "$WORK/$2.json"
+    env CONFORMANCE_PROFILE=skt-submission ${SEMENV:-} bash "$LIB/validate-sbom.sh" "$WORK/$2.json" "$WORK/$2" "supplier" >/dev/null 2>&1
+}
+semrun '.components += [
+  {"type":"operating-system","name":"alpine","version":"3.20"},
+  {"type":"library","name":"musl","version":"1.2","purl":"pkg:apk/acme/musl@1.2"},
+  {"type":"library","name":"g","version":"1","purl":"pkg:rpm/acme/g@1"},
+  {"type":"library","name":"i","version":"1","purl":"pkg:deb/acme/i@1"}]' osa
+jq -e '.suggestions | (map(select(.name=="musl")) | .[0] | (.candidates == ["pkg:apk/alpine/musl@1.2"]) and .confidence == "medium")
+       and (map(select(.name=="g" or .name=="i")) | all(.candidates == []))' "$WORK/osa_conformance.json" >/dev/null \
+    && pass "an alpine operating-system component suggests alpine for apk (medium) and nothing for rpm or deb" \
+    || fail "operating-system hint ignores the package type" "$(jq -c .suggestions "$WORK/osa_conformance.json")"
+semrun '.components += [
+  {"type":"operating-system","name":"rhel","version":"9"},
+  {"type":"library","name":"g","version":"1","purl":"pkg:rpm/acme/g@1"},
+  {"type":"library","name":"h","version":"1","purl":"pkg:rpm/acme/h@1?distro=acmeos-9"}]' osb
+jq -e '.suggestions | (map(select(.name=="g")) | .[0] | (.candidates == ["pkg:rpm/rhel/g@1"]) and .confidence == "medium")
+       and (map(select(.name=="h")) | .[0].candidates == [])' "$WORK/osb_conformance.json" >/dev/null \
+    && pass "a matching operating-system component gives a medium candidate; an unrecognized distro qualifier gives none and no fallback" \
+    || fail "operating-system fallback is wrong" "$(jq -c .suggestions "$WORK/osb_conformance.json")"
+# A distribution the document or the purl itself declares is accepted.
+semrun '.components += [
+  {"type":"operating-system","name":"acmeos","version":"1"},
+  {"type":"library","name":"a","version":"1","purl":"pkg:rpm/acmeos/a@1"},
+  {"type":"library","name":"b","version":"1","purl":"pkg:rpm/otheros/b@1?distro=otheros-2"}]' osc
+jq -e '.checks[] | select(.id=="purl-namespace-os") | .status == "pass"' "$WORK/osc_conformance.json" >/dev/null \
+    && pass "a namespace equal to the operating-system component or to the purl's own distro id is accepted" \
+    || fail "a declared distribution was rejected"
+semrun '.components += [
+  {"type":"library","name":"a","version":"1","purl":"pkg:rpm/sle-micro/a@1"},
+  {"type":"library","name":"b","version":"1","purl":"pkg:rpm/opensuse.leap/b@1"},
+  {"type":"library","name":"c","version":"1","purl":"pkg:rpm/rhcos/c@1"},
+  {"type":"library","name":"d","version":"1","purl":"pkg:rpm/poky/d@1"},
+  {"type":"library","name":"e","version":"1","purl":"pkg:rpm/opencloudos/e@1"},
+  {"type":"library","name":"f","version":"1","purl":"pkg:rpm/amzn/f@1"},
+  {"type":"library","name":"g","version":"1","purl":"pkg:rpm/ol/g@1"}]' osd
+jq -e '.checks[] | select(.id=="purl-namespace-os") | .status == "pass"' "$WORK/osd_conformance.json" >/dev/null \
+    && pass "sle-micro, opensuse.leap, rhcos, poky, opencloudos, amzn and ol are accepted ids" \
+    || fail "a listed distribution id was rejected" "$(jq -c '.checks[]|select(.id=="purl-namespace-os")|.detail' "$WORK/osd_conformance.json")"
+
+echo "== conformance: the maven group field is a medium hint and never contradicts the purl name =="
+semrun '.components += [
+  {"type":"library","name":"foo","version":"1","group":"org.foo","purl":"pkg:maven/org.foo:foo@1"},
+  {"type":"library","name":"org.bar-core","version":"1","group":"org.bar","purl":"pkg:maven/org.bar-core@1"},
+  {"type":"library","name":"guava","version":"33.0","group":"com.google.guava","purl":"pkg:maven/guava@33.0"}]' mvg
+jq -e '.suggestions | (map(select(.name=="foo" or .name=="org.bar-core")) | all(.candidates == []))
+       and (map(select(.name=="guava")) | .[0] | (.candidates == ["pkg:maven/com.google.guava/guava@33.0"]) and .confidence == "medium")' \
+    "$WORK/mvg_conformance.json" >/dev/null \
+    && pass "no candidate when the purl name has a colon or starts with the group; otherwise the group gives a medium candidate" \
+    || fail "maven group rule is wrong" "$(jq -c .suggestions "$WORK/mvg_conformance.json")"
+
+echo "== conformance: firmware, rootfs and Yocto scans defer the two value rows to warnings =="
+SEMENV="MODE=FIRMWARE" semrun '.components += [
+  {"type":"library","name":"g","version":"1","purl":"pkg:rpm/examplevendor/g@1"},
+  {"type":"library","name":"v","version":"a: b","purl":"pkg:npm/v@1"}]' fwd
+fwd=$(jq -r '"\(.result)|\(.checks[]|select(.id=="purl-namespace-os")|.status)|\(.checks[]|select(.id=="version-sanity")|.status)"' "$WORK/fwd_conformance.json")
+[ "$fwd" = "pass|warn|warn" ] && pass "MODE=FIRMWARE under skt-submission: both rows warn instead of failing" \
+    || fail "firmware deferral = '$fwd', expected 'pass|warn|warn'"
+semrun '.components += [{"type":"library","name":"g","version":"1","purl":"pkg:rpm/examplevendor/g@1"}]' fwn
+[ "$(jq -r '.checks[]|select(.id=="purl-namespace-os")|.status' "$WORK/fwn_conformance.json")" = "fail" ] \
+    && pass "a source scan keeps the row as a required failure" || fail "the row was deferred outside firmware modes"
+
+echo "== conformance: CRLF Tag-Value and control characters =="
+sed 's/$/\r/' "$WORK/semantic-tv.spdx" > "$WORK/semantic-crlf.spdx"
+CONFORMANCE_PROFILE=skt-submission bash "$LIB/validate-sbom.sh" "$WORK/semantic-crlf.spdx" "$WORK/crlf" "supplier" >/dev/null 2>&1
+crlf=$(jq -r '"\(.checks[]|select(.id=="version-sanity")|.detail|startswith("1 malformed"))|\(.suggestions|map(select(.name=="glibc"))|length)|\(.suggestions|map(.name)|any(test("\\s$")))"' "$WORK/crlf_conformance.json")
+[ "$crlf" = "true|2|false" ] && pass "a CRLF Tag-Value file reports only the real malformed version and leaves no trailing space in names" \
+    || fail "CRLF Tag-Value = '$crlf', expected 'true|2|false'"
+semrun '.components += [{"type":"library","name":"bad\u0001na|me\nx","version":"a: b","purl":"pkg:npm/x@1"}]' ctl
+jq -e '.suggestions | all(.name | test("[\\x00-\\x1f]") | not)' "$WORK/ctl_conformance.json" >/dev/null \
+    && ! grep -q "$(printf '\001')" "$WORK/ctl_conformance.md" \
+    && pass "control characters in a component name are cleaned in the JSON suggestions and the Markdown report" \
+    || fail "a control character reached the suggestions or the Markdown report"
+grep -A8 "^## Suggested fixes" "$WORK/ctl_conformance.md" | grep -q '^| bad na me x' \
+    && pass "a pipe or newline in a name cannot break the Markdown table" || fail "the Markdown table cell was not escaped"
+
 echo "== conformance: CycloneDX 1.7 is an accepted submission version =="
 # 1.7 has been released since October 2025 and generators emit it. What this
 # pipeline writes is still 1.6 (the bundled Trivy cannot read 1.7), which is a

@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- The conformance check now reports an rpm, deb or apk identifier whose namespace is not a distribution id (`pkg:rpm/examplevendor/glibc@…`) and a component version that is clearly malformed (whitespace, `key: value` shape, control characters, over 128 characters). Both warn under the default profile and fail under `skt-submission`. The accepted ids are in `docker/lib/os-distros.json`; a namespace equal to the SBOM's operating-system component or to the identifier's own `distro=` id is accepted too, and firmware, root filesystem, binary and Yocto build scans warn instead of failing.
+- The conformance report has a "Suggested fixes" section (`suggestions` in the JSON) with rule-based candidates, each with its basis and confidence, and none when the answer is ambiguous. A candidate must fit the package type, and a Maven `group` candidate is medium confidence. The submitted SBOM is not changed.
+
 ## [v1.14.3] - 2026-10-26
 
 ### Security
