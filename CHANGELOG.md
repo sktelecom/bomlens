@@ -7,10 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v1.14.4] - 2026-11-12
+
 ### Added
 
 - The conformance check now reports an rpm, deb or apk identifier whose namespace is not a distribution id (`pkg:rpm/examplevendor/glibc@…`) and a component version that is clearly malformed (whitespace, `key: value` shape, control characters, over 128 characters). Both warn under the default profile and fail under `skt-submission`. The accepted ids are in `docker/lib/os-distros.json`; a namespace equal to the SBOM's operating-system component or to the identifier's own `distro=` id is accepted too, and firmware, root filesystem, binary and Yocto build scans warn instead of failing.
 - The conformance report has a "Suggested fixes" section (`suggestions` in the JSON) with rule-based candidates, each with its basis and confidence, and none when the answer is ambiguous. A candidate must fit the package type, and a Maven `group` candidate is medium confidence. The submitted SBOM is not changed.
+- `--analyze-cpe-index` (env `ANALYZE_CPE_INDEX=true`, off by default) matches the components of a received SBOM whose `bomlens:purlSource` is `upstream-map` against the bundled CPE index. Results are labeled "CPE index (NVD, upstream table)". The web UI has a matching toggle in the SBOM analysis options.
+- Experimental: `--binary-kb <path>` and `--kb-decisions <file>` add an opt-in pass to the firmware, root filesystem and binary scans that identifies components from a knowledge base built from release sources. A version is written only when exactly one release fits; otherwise the candidates are listed in `bomlens:versionCandidates`, and a result that is the newest release in the base carries `bomlens:versionMayBeNewer`. A component found inside a file that is not its own library or program carries `bomlens:linkage` and `bomlens:embeddedIn`. Nothing runs without the option and no base ships in the images. Results for small or statically linked components can be incomplete.
+
+### Changed
+
+- The unchecked-components list names a repository purl (`pkg:github` and similar) as `repository-purl`, apart from a component with no purl. A received SBOM (`--analyze`) gets a note that the CPE index step does not run in that mode. Counts are unchanged.
+
+### Fixed
+
+- The binary knowledge base pass checks the version per release series, bounds its ELF section reads, matches a component's own files by name, reports one component per release found, sorts its file walk, reports a damaged base and records the base hash.
 
 ## [v1.14.3] - 2026-10-26
 
