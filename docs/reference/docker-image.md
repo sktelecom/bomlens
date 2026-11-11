@@ -193,6 +193,7 @@ MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL='*' docker run --rm \
 | `HASH_MIN_PCT` | — | `50` | Conformance check: minimum percentage of components with a hash (recommended, warn only). Applies to a `--deep-cve` scan too, CLI or web UI |
 | `FIELD_MIN_PCT` | — | `80` | Conformance check: minimum percentage coverage for advisory per-component regulatory fields. Applies to a `--deep-cve` scan too, CLI or web UI |
 | `PURL_TYPES_FILE` | — | `docker/lib/purl-types.json` | Conformance check: the purl-spec type data that says which types exist and which of them require a namespace |
+| `OS_DISTROS_FILE` | — | `docker/lib/os-distros.json` | Conformance check: the distribution ids an rpm, deb or apk namespace may carry |
 | `NS_ADVISORY_TYPES` | — | `golang huggingface` | Conformance check: types whose missing namespace is reported on the advisory row instead of failing the SBOM (space-separated) |
 | `LICENSE_REGISTRY` | — | `false` | The script's `--license-registry`: look up missing licences, and check a single strong-copyleft or non-commercial licence, in the package registry (deps.dev). Uses the network |
 | `LICENSE_REGISTRY_VERIFY` | — | GPL, AGPL, SSPL-1.0, BUSL-1.1 and CC-BY-NC ids | SPDX ids whose single occurrence is checked against the registry, space- or comma-separated |

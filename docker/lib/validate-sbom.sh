@@ -1289,6 +1289,77 @@ bsi_unmeasured() {
 }
 
 # --------------------------------------------------------
+# Value checks on purls and versions, and suggested fixes.
+#
+# purl-namespace-os: an rpm, deb or apk purl whose namespace is a company name
+# instead of the distribution id the package repository uses. version-sanity: a
+# component version that is clearly not a version (whitespace, "key: value"
+# shape, control characters, over 128 characters). Both fail only under the
+# submission profile and warn elsewhere. The suggestions for the components
+# they and purl-namespace flag are computed from the same pass, offline, and
+# are written to the report only: the document under test is never modified.
+# The rules live in conformance-semantic.jq; the accepted distribution ids are
+# data in os-distros.json.
+#
+# $1: cdx | spdx-json | spdx-tv, the shape of the document in $SBOM.
+# --------------------------------------------------------
+SUGGESTIONS='[]'
+DISTROS_FILE="${OS_DISTROS_FILE:-$(dirname "$0")/os-distros.json}"
+SEMANTIC_JQ="$(dirname "$0")/conformance-semantic.jq"
+add_semantic_checks() {
+    local input rows sem required=false
+    if [ ! -f "$DISTROS_FILE" ] || [ ! -f "$SEMANTIC_JQ" ]; then
+        echo "[validate] WARN: $DISTROS_FILE or $SEMANTIC_JQ not found; the namespace value, version and suggestion checks are skipped." >&2
+        return 0
+    fi
+    [ "$CONFORMANCE_PROFILE" = "skt-submission" ] && required=true
+    case "$1" in
+        cdx)
+            input=$(jq -c '{components: [ .components[]? | select(.type != "file")
+                              | {ref: (."bom-ref" // null), name: (.name // null), version: (.version // null),
+                                 purl: (.purl // null), group: (.group // null)} ],
+                            osNames: [ .components[]? | select(.type == "operating-system") | .name // empty ]}' "$SBOM" 2>/dev/null) || input="" ;;
+        spdx-json)
+            input=$(jq -c '{components: [ .packages[]? | select((.primaryPackagePurpose // "") != "FILE")
+                              | {ref: (.SPDXID // null), name: (.name // null), version: (.versionInfo // null),
+                                 purl: ([ .externalRefs[]? | select(.referenceType == "purl") | .referenceLocator ] | first),
+                                 group: null} ],
+                            osNames: []}' "$SBOM" 2>/dev/null) || input="" ;;
+        spdx-tv)
+            input=$(awk '
+                function flush() { if (inpkg) printf "%s\t%s\t%s\t%s\n", id, name, ver, purl }
+                function val(s,   v) { v = s; sub(/^[A-Za-z]+: */, "", v); sub(/\r$/, "", v); gsub(/\r|\t/, " ", v); sub(/ +$/, "", v); return v }
+                /^PackageName:/ { flush(); inpkg = 1; name = val($0); ver = ""; purl = ""; id = ""; next }
+                /^FileName:/ { flush(); inpkg = 0; next }
+                inpkg && /^SPDXID:/ { id = val($0); next }
+                inpkg && /^PackageVersion:/ { ver = val($0); next }
+                inpkg && /^ExternalRef: *PACKAGE-MANAGER purl/ { v = $0; sub(/^ExternalRef: *PACKAGE-MANAGER purl +/, "", v); gsub(/[ \r\t]+$/, "", v); purl = v; next }
+                END { flush() }' "$SBOM" 2>/dev/null \
+                | jq -Rsc '{components: (split("\n") | map(select(length > 0) | split("\t"))
+                              | map({ref: (if .[0] == "" then null else .[0] end), name: .[1],
+                                     version: (if .[2] == "" then null else .[2] end),
+                                     purl: (if .[3] == "" then null else .[3] end), group: null})),
+                            osNames: []}' 2>/dev/null) || input="" ;;
+        *) return 0 ;;
+    esac
+    if [ -z "$input" ]; then
+        echo "[validate] WARN: could not read components for the namespace value and version checks; they are skipped." >&2
+        return 0
+    fi
+    if sem=$(printf '%s' "$input" | jq -c \
+            --argjson distros "$(jq -c '{all: ([.ids[], .apk[], .deb[]] | map(ascii_downcase) | unique), apk: (.apk | map(ascii_downcase)), deb: (.deb | map(ascii_downcase))}' "$DISTROS_FILE" 2>/dev/null)" \
+            --argjson required "$required" --argjson cap "$MISSING_CAP" \
+            --arg nsre "$NS_PURL_TYPE_REGEX" --arg nsnsre "$NS_PURL_NS_REGEX" \
+            -f "$SEMANTIC_JQ" 2>/dev/null) && [ -n "$sem" ]; then
+        rows=$(printf '%s' "$sem" | jq -c '.rows')
+        CHECKS=$(printf '%s\n%s' "$CHECKS" "$rows" | jq -cs 'add')
+        SUGGESTIONS=$(printf '%s' "$sem" | jq -c '.suggestions')
+    else
+        echo "[validate] WARN: could not evaluate the namespace value and version checks; they are skipped." >&2
+    fi
+}
+
+# --------------------------------------------------------
 # Compute checks for the detected format.
 # --------------------------------------------------------
 case "$FORMAT" in
@@ -1343,9 +1414,10 @@ case "$FORMAT" in
             CHECKS=$(printf '%s\n%s' "$CHECKS" "$CISA" | jq -cs 'add')
             echo "[validate] added the 2026 SBOM minimum-element checks"
         fi
+        add_semantic_checks cdx
         add_bsi_checks
         ;;
-    SPDX-JSON)     CHECKS=$(spdx_json_checks); SIGNAL=$(spdx_json_signal) ;;
+    SPDX-JSON)     CHECKS=$(spdx_json_checks); SIGNAL=$(spdx_json_signal); add_semantic_checks spdx-json ;;
     SPDX-3.0)
         # SPDX 3.0 is JSON-LD (@graph); the 2.x package/relationship shape the
         # spdx_json checks read does not exist. Measure conformance on the
@@ -1366,6 +1438,7 @@ case "$FORMAT" in
             SBOM="$SPDX3_CDX"
             CHECKS=$(cdx_checks "$CYCLONEDX_SPEC_VERSIONS")
             SIGNAL=$(cdx_signal)
+            add_semantic_checks cdx
             add_bsi_checks
             rm -f "$SPDX3_CDX"
             echo "[validate] SPDX 3.0 (Yocto) measured on the installed package set"
@@ -1375,6 +1448,7 @@ case "$FORMAT" in
             SBOM="$SPDX3_CDX"
             CHECKS=$(cdx_checks "$CYCLONEDX_SPEC_VERSIONS")
             SIGNAL=$(cdx_signal)
+            add_semantic_checks cdx
             add_bsi_checks
             rm -f "$SPDX3_CDX"
             echo "[validate] SPDX 3.0 measured via CycloneDX conversion"
@@ -1383,7 +1457,7 @@ case "$FORMAT" in
             CHECKS='[{"id":"spec-version","label":"Spec version (SPDX-3.0)","required":true,"status":"pass","detail":"SPDX-3.0 (recognized; not measured without syft)","missing":[]}]'
         fi
         ;;
-    SPDX-TagValue) CHECKS=$(spdx_tv_checks); SIGNAL=$(spdx_tv_signal) ;;
+    SPDX-TagValue) CHECKS=$(spdx_tv_checks); SIGNAL=$(spdx_tv_signal); add_semantic_checks spdx-tv ;;
     *)
         CHECKS='[{"id":"format","label":"Recognized SBOM format","required":true,"status":"fail","detail":"not CycloneDX or SPDX","missing":[]}]'
         ;;
@@ -1707,6 +1781,9 @@ if [ -n "$SUBMIT_EXCUSE" ]; then
             elif .id == "no-generic" and $x.generic_block == 0 then
               defer("listed on the version-needed and upstream-purl rows";
                     "버전 보충 필요, upstream purl 없음 항목에 표시")
+            elif (.id == "purl-namespace-os" or .id == "version-sanity") and $x.fw then
+              defer("a firmware, root filesystem, binary or Yocto build SBOM takes these values from the files it found, so the supplier cannot correct them by editing the SBOM";
+                    "펌웨어, 루트 파일시스템, 바이너리, Yocto 빌드 SBOM은 찾은 파일에서 값을 가져오므로 공급사가 SBOM을 고쳐서는 바로잡을 수 없음")
             elif .id == "transitive" and $x.fw then
               defer("a firmware, root filesystem, binary or Yocto build SBOM records the packages found, not a dependency graph";
                     "펌웨어, 루트 파일시스템, 바이너리, Yocto 빌드 SBOM은 의존 관계 그래프 없이 찾은 패키지를 기록함")
@@ -1857,7 +1934,9 @@ fi
 # that passes or warns on an empty denominator. Neither changes RESULT nor any
 # check. SIGNAL is set per format above (empty when the format was not measured).
 [ -n "${SIGNAL:-}" ] || SIGNAL='{}'
-jq -n \
+# The suggestions go in by stdin: a large submission can have thousands, more than
+# one argument can carry.
+printf '%s' "$SUGGESTIONS" | jq -n --slurpfile suggestions /dev/stdin \
    --arg project "$PROJECT" --arg format "$FORMAT" --arg result "$RESULT" \
    --arg ts "$GEN_AT" --argjson checks "$CHECKS" --argjson xwalk "$XW_SUMMARY" \
    --argjson untraceable "$N_UNTRACEABLE" --arg profile "$CONFORMANCE_PROFILE" \
@@ -1865,7 +1944,8 @@ jq -n \
    --argjson signal "$SIGNAL" --arg submitFile "$SUBMIT_NOTE_FILE" --arg relaxedAs "$SUBMIT_RELAXED_MODE" '
 { project: $project, format: $format, result: $result, generatedAt: $ts,
   profile: $profile, untraceableComponents: $untraceable, checks: $checks,
-  pipelineStepsFailed: $pipelineStepsFailed, pipelineStepsFailedMore: $pipelineStepsFailedMore }
+  pipelineStepsFailed: $pipelineStepsFailed, pipelineStepsFailedMore: $pipelineStepsFailedMore,
+  suggestions: ($suggestions[0] // []) }
 + $signal
 + (if $submitFile != "" then { submitFile: $submitFile } else {} end)
 + (if $relaxedAs != "" then { submissionJudgedAs: $relaxedAs } else {} end)
@@ -2004,6 +2084,10 @@ if [ "$REPORT_LANG" = "ko" ]; then
     C_H2_G7CHK=$(kstr conformance.h2_g7checks); C_G7CHK_INTRO=$(kstr conformance.g7checks_intro)
     C_H2_MISSING=$(kstr conformance.h2_missing); C_H2_FILL=$(kstr conformance.h2_fill)
     C_H2_EXPLAINED=$(kstr conformance.h2_explained)
+    C_H2_SUG=$(kstr conformance.h2_suggestions); C_SUG_INTRO=$(kstr conformance.suggestions_intro)
+    C_TH_SUG_COMP=$(kstr conformance.th_sug_component); C_TH_SUG_CUR=$(kstr conformance.th_sug_current)
+    C_TH_SUG_CAND=$(kstr conformance.th_sug_candidate); C_TH_SUG_BASIS=$(kstr conformance.th_sug_basis)
+    C_TH_SUG_CONF=$(kstr conformance.th_sug_confidence)
     C_H2_REVIEW=$(kstr conformance.h2_review); C_REVIEW_INTRO=$(kstr conformance.review_intro)
     C_FILL_INTRO=$(kstr conformance.fill_intro); C_H2_XWALK=$(kstr conformance.h2_crosswalk)
     C_YES=$(kstr common.yes); C_NO=$(kstr common.no)
@@ -2037,6 +2121,10 @@ else
     C_G7CHK_INTRO="Advisory elements from the G7 \"Software Bill of Materials for AI — Minimum Elements\". Being advisory they never move the result, and elements with no automated source are marked for review."
     C_H2_MISSING="Missing / non-conformant items"; C_H2_FILL="How to fill the gaps"
     C_H2_EXPLAINED="Explained by the supplier (no version, with a reason)"
+    C_H2_SUG="Suggested fixes"
+    C_SUG_INTRO="Rule-based suggestions. The submitted file was not changed; the supplier should correct the SBOM and submit it again. A row without a candidate means no unambiguous answer can be derived."
+    C_TH_SUG_COMP="Component"; C_TH_SUG_CUR="Current value"; C_TH_SUG_CAND="Candidate"
+    C_TH_SUG_BASIS="Basis"; C_TH_SUG_CONF="Confidence"
     C_H2_REVIEW="What needs a person"; C_REVIEW_INTRO="Items no scan can settle, and what to establish for each."
     C_FILL_INTRO="Each element below is advisory and does not affect the result. The fragment shows the shape that would satisfy it."
     C_H2_XWALK="Regulatory crosswalk"
@@ -2126,6 +2214,39 @@ if [ -n "$SUBMIT_RELAXED_MODE" ]; then
 }<p class=\"meta submit-judged\">${_rx}</p>"
 fi
 
+# Suggested fixes (see add_semantic_checks): the first SUG_SHOWN rows, in the
+# report's language. The full list is in the JSON; the reports say how many more.
+SUG_SHOWN=50
+SUG_TOTAL=$(printf '%s' "$SUGGESTIONS" | jq 'length')
+SUG_VIEW='[]'
+SUG_MORE_NOTE=""
+if [ "${SUG_TOTAL:-0}" -gt 0 ]; then
+    if [ "$REPORT_LANG" = "ko" ]; then
+        _sc_high=$(kstr conformance.sug_confidence_high); _sc_med=$(kstr conformance.sug_confidence_medium)
+        _sc_none=$(kstr conformance.sug_confidence_none)
+    else
+        _sc_high="high"; _sc_med="medium"; _sc_none="none"
+    fi
+    SUG_VIEW=$(printf '%s' "$SUGGESTIONS" | jq -c --arg lang "$REPORT_LANG" --argjson n "$SUG_SHOWN" \
+        --arg ch "$_sc_high" --arg cm "$_sc_med" --arg cn "$_sc_none" '
+        .[0:$n] | map({
+          component: (((.name // .ref // "(unnamed)") | tostring)
+                      + (if .field == "purl" and (.version // "") != "" then "@" + .version else "" end)),
+          current: .original,
+          candidate: (if (.candidates | length) > 0 then (.candidates | join(", ")) else "-" end),
+          basis: (if (.candidates | length) > 0
+                  then (if $lang == "ko" then .basis_ko else .basis end)
+                  else (if $lang == "ko" then .note_ko else .note end) end),
+          confidence: (if .confidence == "high" then $ch elif .confidence == "medium" then $cm else $cn end) })')
+    if [ "$SUG_TOTAL" -gt "$SUG_SHOWN" ]; then
+        if [ "$REPORT_LANG" = "ko" ]; then
+            SUG_MORE_NOTE=$(tfmt conformance.suggestions_more "$((SUG_TOTAL - SUG_SHOWN))")
+        else
+            SUG_MORE_NOTE="$((SUG_TOTAL - SUG_SHOWN)) more in the JSON file."
+        fi
+    fi
+fi
+
 # --------------------------------------------------------
 # Markdown report
 # --------------------------------------------------------
@@ -2194,7 +2315,19 @@ fi
         echo "## ${C_H2_MISSING}"
         echo ""
         echo "$RCHECKS" | jq -r '.[] | select(.status!="pass" and (.missing|length>0)) |
-            "### \(.label)\n" + (.missing | map("- " + (. | tostring)) | join("\n")) + "\n"'
+            "### \(.label)\n" + (.missing | map("- " + (. | tostring | gsub("[\\x00-\\x1f\\x7f]"; " "))) | join("\n")) + "\n"'
+    fi
+    if [ "${SUG_TOTAL:-0}" -gt 0 ]; then
+        echo "## ${C_H2_SUG}"
+        echo ""
+        echo "${C_SUG_INTRO}"
+        echo ""
+        echo "| ${C_TH_SUG_COMP} | ${C_TH_SUG_CUR} | ${C_TH_SUG_CAND} | ${C_TH_SUG_BASIS} | ${C_TH_SUG_CONF} |"
+        echo "|-----------|-----------|-----------|-----------|:------:|"
+        echo "$SUG_VIEW" | jq -r '.[] | "| " + ([.component, .current, .candidate, .basis, .confidence]
+            | map(tostring | gsub("[|\n\r]"; " ")) | join(" | ")) + " |"'
+        echo ""
+        if [ -n "$SUG_MORE_NOTE" ]; then echo "$SUG_MORE_NOTE"; echo ""; fi
     fi
     # The components the supplier gave a reason for instead of a version
     # (submission profile, version-needed row). Listed whether the row passed or
@@ -2386,6 +2519,15 @@ HTMLHEAD2
         echo "<h2>${C_H2_MISSING}</h2>"
         echo "$RCHECKS" | jq -r '.[] | select(.status!="pass" and (.missing|length>0)) |
             "<h3>" + (.label|@html) + "</h3><ul class=\"mono\">" + (.missing | map("<li>" + (.|tostring|@html) + "</li>") | join("")) + "</ul>"'
+    fi
+    if [ "${SUG_TOTAL:-0}" -gt 0 ]; then
+        echo "<h2>${C_H2_SUG}</h2>"
+        echo "<p class=\"meta\">${C_SUG_INTRO}</p>"
+        echo "<div class=\"table-wrap\"><table><thead><tr><th>${C_TH_SUG_COMP}</th><th>${C_TH_SUG_CUR}</th><th>${C_TH_SUG_CAND}</th><th>${C_TH_SUG_BASIS}</th><th>${C_TH_SUG_CONF}</th></tr></thead><tbody>"
+        echo "$SUG_VIEW" | jq -r '.[] | "<tr>" + ([.component, .current, .candidate, .basis, .confidence]
+            | map("<td>" + (tostring | @html) + "</td>") | join("")) + "</tr>"'
+        echo "</tbody></table></div>"
+        if [ -n "$SUG_MORE_NOTE" ]; then echo "<p class=\"meta\">${SUG_MORE_NOTE}</p>"; fi
     fi
     if echo "$RCHECKS" | jq -e 'any(.[]; (.explained // []) | length > 0)' >/dev/null; then
         echo "<h2>${C_H2_EXPLAINED}</h2>"
