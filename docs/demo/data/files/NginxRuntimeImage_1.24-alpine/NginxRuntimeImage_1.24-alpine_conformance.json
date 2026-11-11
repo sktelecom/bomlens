@@ -2,7 +2,7 @@
   "project": "NginxRuntimeImage",
   "format": "CycloneDX",
   "result": "pass",
-  "generatedAt": "2026-10-26T16:56:44Z",
+  "generatedAt": "2026-11-11T16:46:40Z",
   "profile": "default",
   "untraceableComponents": 0,
   "checks": [
@@ -30,7 +30,7 @@
       "label": "Timestamp (metadata.timestamp)",
       "required": true,
       "status": "pass",
-      "detail": "2026-10-26T16:56:39Z",
+      "detail": "2026-11-11T16:46:35Z",
       "missing": [],
       "regulations": [
         {
@@ -42,7 +42,7 @@
         }
       ],
       "label_ko": "타임스탬프 (metadata.timestamp)",
-      "detail_ko": "2026-10-26T16:56:39Z"
+      "detail_ko": "2026-11-11T16:46:35Z"
     },
     {
       "id": "tools",
@@ -1202,6 +1202,32 @@
       "detail_ko": "사람 검토 필요 (자동 확인 불가)"
     },
     {
+      "id": "purl-namespace-os",
+      "label": "PURL namespace of rpm/deb/apk is a distribution id (advisory)",
+      "label_ko": "rpm/deb/apk PURL 네임스페이스가 배포판 식별자 (권고)",
+      "required": false,
+      "source": "auto",
+      "naKind": "",
+      "status": "pass",
+      "detail": "all namespaces are distribution ids",
+      "detail_ko": "모든 네임스페이스가 배포판 식별자임",
+      "missing": [],
+      "regulations": []
+    },
+    {
+      "id": "version-sanity",
+      "label": "Component version is a plain version string (advisory)",
+      "label_ko": "구성요소 버전이 정상적인 버전 문자열 (권고)",
+      "required": false,
+      "source": "auto",
+      "naKind": "",
+      "status": "pass",
+      "detail": "0 malformed version(s) (whitespace, \"key: value\" shape, control character or over 128 characters)",
+      "detail_ko": "비정상 버전 0개 (공백, \"키: 값\" 형태, 제어 문자 또는 128자 초과)",
+      "missing": [],
+      "regulations": []
+    },
+    {
       "id": "purl-resolution",
       "label": "PURL resolves in its repository (advisory)",
       "required": false,
@@ -1217,6 +1243,7 @@
   ],
   "pipelineStepsFailed": [],
   "pipelineStepsFailedMore": 0,
+  "suggestions": [],
   "softwareComponentCount": 62,
   "emptyResult": false,
   "licenseCoverage": {
@@ -1252,7 +1279,7 @@
             "label": "Timestamp (metadata.timestamp)",
             "status": "pass",
             "source": null,
-            "detail": "2026-10-26T16:56:39Z",
+            "detail": "2026-11-11T16:46:35Z",
             "refs": [
               "Section 5.2.1"
             ]

@@ -4,7 +4,7 @@
     "version": "1.3.0"
   },
   "engine": {
-    "version": "1.14.3",
+    "version": "1.14.4",
     "image": null,
     "image_digest": null
   },
@@ -16,8 +16,8 @@
   "run": {
     "status": "succeeded",
     "reason": null,
-    "started_at": "2026-10-26T16:56:32Z",
-    "ended_at": "2026-10-26T16:56:35Z",
+    "started_at": "2026-11-11T16:46:27Z",
+    "ended_at": "2026-11-11T16:46:30Z",
     "exit_code": 0
   },
   "steps": [
@@ -26,8 +26,8 @@
       "status": "ok",
       "reason": null,
       "detail": null,
-      "started_at": "2026-10-26T16:56:32Z",
-      "ended_at": "2026-10-26T16:56:32Z",
+      "started_at": "2026-11-11T16:46:27Z",
+      "ended_at": "2026-11-11T16:46:27Z",
       "counts": {
         "components": 71
       },
@@ -55,7 +55,7 @@
           {
             "kind": "engine",
             "name": "scan-sbom.sh",
-            "sha256": "d0a1fa78c0ce9454af108e55a0034cbf7fd84c67880737e94b5976d26f098426"
+            "sha256": "a92f4a9971ce6970029ce01b2d96c9ea8f9a6c3f7155aa729a6a4d68c7f4702b"
           },
           {
             "kind": "file",
@@ -71,7 +71,7 @@
           {
             "kind": "image",
             "name": "stage1",
-            "sha256": "7c8d39f65c7e2c7a43692785ef50edbb5f6a1d4fd77b5aabae30e650c0ce4275"
+            "sha256": "2b3694ec7aa9b630ac61b971a6a4e5de9a91f181d0b5c8ff92f252258659e851"
           },
           {
             "kind": "setting",
@@ -161,8 +161,8 @@
       "status": "disabled",
       "reason": null,
       "detail": null,
-      "started_at": "2026-10-26T16:56:32Z",
-      "ended_at": "2026-10-26T16:56:32Z",
+      "started_at": "2026-11-11T16:46:27Z",
+      "ended_at": "2026-11-11T16:46:27Z",
       "stage": 2
     },
     {
@@ -170,8 +170,8 @@
       "status": "ok",
       "reason": null,
       "detail": null,
-      "started_at": "2026-10-26T16:56:32Z",
-      "ended_at": "2026-10-26T16:56:32Z",
+      "started_at": "2026-11-11T16:46:27Z",
+      "ended_at": "2026-11-11T16:46:27Z",
       "stage": 2
     },
     {
@@ -179,8 +179,8 @@
       "status": "ok",
       "reason": null,
       "detail": null,
-      "started_at": "2026-10-26T16:56:32Z",
-      "ended_at": "2026-10-26T16:56:32Z",
+      "started_at": "2026-11-11T16:46:27Z",
+      "ended_at": "2026-11-11T16:46:27Z",
       "stage": 2
     },
     {
@@ -188,8 +188,8 @@
       "status": "ok",
       "reason": null,
       "detail": null,
-      "started_at": "2026-10-26T16:56:32Z",
-      "ended_at": "2026-10-26T16:56:32Z",
+      "started_at": "2026-11-11T16:46:27Z",
+      "ended_at": "2026-11-11T16:46:27Z",
       "stage": 2
     },
     {
@@ -197,8 +197,8 @@
       "status": "ok",
       "reason": null,
       "detail": null,
-      "started_at": "2026-10-26T16:56:32Z",
-      "ended_at": "2026-10-26T16:56:33Z",
+      "started_at": "2026-11-11T16:46:27Z",
+      "ended_at": "2026-11-11T16:46:28Z",
       "stage": 2
     },
     {
@@ -206,8 +206,8 @@
       "status": "disabled",
       "reason": null,
       "detail": null,
-      "started_at": "2026-10-26T16:56:33Z",
-      "ended_at": "2026-10-26T16:56:33Z",
+      "started_at": "2026-11-11T16:46:28Z",
+      "ended_at": "2026-11-11T16:46:28Z",
       "stage": 2
     },
     {
@@ -215,8 +215,8 @@
       "status": "ok",
       "reason": null,
       "detail": null,
-      "started_at": "2026-10-26T16:56:33Z",
-      "ended_at": "2026-10-26T16:56:33Z",
+      "started_at": "2026-11-11T16:46:28Z",
+      "ended_at": "2026-11-11T16:46:28Z",
       "stage": 2
     },
     {
@@ -224,8 +224,8 @@
       "status": "ok",
       "reason": null,
       "detail": null,
-      "started_at": "2026-10-26T16:56:33Z",
-      "ended_at": "2026-10-26T16:56:33Z",
+      "started_at": "2026-11-11T16:46:28Z",
+      "ended_at": "2026-11-11T16:46:28Z",
       "stage": 2
     },
     {
@@ -233,8 +233,8 @@
       "status": "ok",
       "reason": null,
       "detail": null,
-      "started_at": "2026-10-26T16:56:33Z",
-      "ended_at": "2026-10-26T16:56:33Z",
+      "started_at": "2026-11-11T16:46:28Z",
+      "ended_at": "2026-11-11T16:46:28Z",
       "stage": 2
     },
     {
@@ -242,8 +242,8 @@
       "status": "ok",
       "reason": null,
       "detail": null,
-      "started_at": "2026-10-26T16:56:33Z",
-      "ended_at": "2026-10-26T16:56:33Z",
+      "started_at": "2026-11-11T16:46:28Z",
+      "ended_at": "2026-11-11T16:46:28Z",
       "stage": 2
     },
     {
@@ -251,8 +251,8 @@
       "status": "ok",
       "reason": null,
       "detail": null,
-      "started_at": "2026-10-26T16:56:33Z",
-      "ended_at": "2026-10-26T16:56:33Z",
+      "started_at": "2026-11-11T16:46:28Z",
+      "ended_at": "2026-11-11T16:46:28Z",
       "stage": 2
     },
     {
@@ -260,8 +260,8 @@
       "status": "ok",
       "reason": null,
       "detail": null,
-      "started_at": "2026-10-26T16:56:33Z",
-      "ended_at": "2026-10-26T16:56:33Z",
+      "started_at": "2026-11-11T16:46:28Z",
+      "ended_at": "2026-11-11T16:46:28Z",
       "stage": 2
     },
     {
@@ -269,8 +269,8 @@
       "status": "ok",
       "reason": null,
       "detail": null,
-      "started_at": "2026-10-26T16:56:33Z",
-      "ended_at": "2026-10-26T16:56:33Z",
+      "started_at": "2026-11-11T16:46:28Z",
+      "ended_at": "2026-11-11T16:46:28Z",
       "stage": 2
     },
     {
@@ -278,8 +278,8 @@
       "status": "ok",
       "reason": null,
       "detail": null,
-      "started_at": "2026-10-26T16:56:33Z",
-      "ended_at": "2026-10-26T16:56:33Z",
+      "started_at": "2026-11-11T16:46:28Z",
+      "ended_at": "2026-11-11T16:46:28Z",
       "stage": 2
     },
     {
@@ -287,8 +287,8 @@
       "status": "disabled",
       "reason": null,
       "detail": null,
-      "started_at": "2026-10-26T16:56:33Z",
-      "ended_at": "2026-10-26T16:56:33Z",
+      "started_at": "2026-11-11T16:46:28Z",
+      "ended_at": "2026-11-11T16:46:28Z",
       "stage": 2
     },
     {
@@ -296,8 +296,8 @@
       "status": "ok",
       "reason": null,
       "detail": null,
-      "started_at": "2026-10-26T16:56:33Z",
-      "ended_at": "2026-10-26T16:56:34Z",
+      "started_at": "2026-11-11T16:46:28Z",
+      "ended_at": "2026-11-11T16:46:29Z",
       "stage": 2
     },
     {
@@ -305,8 +305,8 @@
       "status": "disabled",
       "reason": null,
       "detail": null,
-      "started_at": "2026-10-26T16:56:34Z",
-      "ended_at": "2026-10-26T16:56:34Z",
+      "started_at": "2026-11-11T16:46:29Z",
+      "ended_at": "2026-11-11T16:46:29Z",
       "stage": 2
     },
     {
@@ -314,8 +314,8 @@
       "status": "ok",
       "reason": null,
       "detail": null,
-      "started_at": "2026-10-26T16:56:34Z",
-      "ended_at": "2026-10-26T16:56:34Z",
+      "started_at": "2026-11-11T16:46:29Z",
+      "ended_at": "2026-11-11T16:46:29Z",
       "stage": 2
     },
     {
@@ -323,8 +323,8 @@
       "status": "ok",
       "reason": null,
       "detail": null,
-      "started_at": "2026-10-26T16:56:34Z",
-      "ended_at": "2026-10-26T16:56:34Z",
+      "started_at": "2026-11-11T16:46:29Z",
+      "ended_at": "2026-11-11T16:46:29Z",
       "stage": 2
     },
     {
@@ -332,8 +332,8 @@
       "status": "ok",
       "reason": null,
       "detail": null,
-      "started_at": "2026-10-26T16:56:34Z",
-      "ended_at": "2026-10-26T16:56:34Z",
+      "started_at": "2026-11-11T16:46:29Z",
+      "ended_at": "2026-11-11T16:46:29Z",
       "stage": 2
     },
     {
@@ -341,8 +341,8 @@
       "status": "disabled",
       "reason": null,
       "detail": null,
-      "started_at": "2026-10-26T16:56:34Z",
-      "ended_at": "2026-10-26T16:56:34Z",
+      "started_at": "2026-11-11T16:46:29Z",
+      "ended_at": "2026-11-11T16:46:29Z",
       "stage": 2
     },
     {
@@ -350,8 +350,8 @@
       "status": "ok",
       "reason": null,
       "detail": null,
-      "started_at": "2026-10-26T16:56:34Z",
-      "ended_at": "2026-10-26T16:56:35Z",
+      "started_at": "2026-11-11T16:46:29Z",
+      "ended_at": "2026-11-11T16:46:30Z",
       "stage": 2
     },
     {
@@ -359,8 +359,8 @@
       "status": "disabled",
       "reason": null,
       "detail": null,
-      "started_at": "2026-10-26T16:56:35Z",
-      "ended_at": "2026-10-26T16:56:35Z",
+      "started_at": "2026-11-11T16:46:30Z",
+      "ended_at": "2026-11-11T16:46:30Z",
       "stage": 2
     },
     {
@@ -368,8 +368,8 @@
       "status": "ok",
       "reason": null,
       "detail": null,
-      "started_at": "2026-10-26T16:56:35Z",
-      "ended_at": "2026-10-26T16:56:35Z",
+      "started_at": "2026-11-11T16:46:30Z",
+      "ended_at": "2026-11-11T16:46:30Z",
       "stage": 2
     },
     {
@@ -377,8 +377,8 @@
       "status": "disabled",
       "reason": null,
       "detail": null,
-      "started_at": "2026-10-26T16:56:35Z",
-      "ended_at": "2026-10-26T16:56:35Z",
+      "started_at": "2026-11-11T16:46:30Z",
+      "ended_at": "2026-11-11T16:46:30Z",
       "stage": 2
     }
   ],
@@ -393,16 +393,16 @@
   "data_sources": {
     "trivy_db": {
       "schema_version": 2,
-      "updated_at": "2026-10-26T14:38:04.845305817Z",
-      "downloaded_at": "2026-10-26T16:55:04.097142667Z"
+      "updated_at": "2026-11-11T13:00:47.186797699Z",
+      "downloaded_at": "2026-11-11T16:45:02.75501859Z"
     }
   },
   "outputs": [
     {
       "role": "sbom.cyclonedx",
       "path": "SpringBootDemo_1.1.0_bom.json",
-      "sha256": "03056163f4eb5cd6878c6efe6d67d9aa22687d96f82ed718032cfedc65944938",
-      "bytes": 272824
+      "sha256": "c4f936a8d1009fdcb163e88eff177f066f8d14e46dd642f9cf53ca18a8c6142a",
+      "bytes": 272828
     },
     {
       "role": "other",
@@ -419,50 +419,50 @@
     {
       "role": "other",
       "path": "SpringBootDemo_1.1.0_NOTICE.txt",
-      "sha256": "6aa0076ddd3455464efe0dc20994fa07fded21da943965e7e9e7d23fff360486",
+      "sha256": "3ba9a89d69c97ef486b7485bcec9c070357e7ca9eae4027e1636508540a3522d",
       "bytes": 116953
     },
     {
       "role": "other",
       "path": "SpringBootDemo_1.1.0_NOTICE.html",
-      "sha256": "e0eb4737fc7dcf0e3f344460744ec722c2190e1291dc9a7f5c9abcaeafbbb5a8",
+      "sha256": "855bef5f9ba25c83e3f3370ef58edc8ca5473fb04fb20eff8949d23d609e79c1",
       "bytes": 141683
     },
     {
       "role": "vulnerabilities.all",
       "path": "SpringBootDemo_1.1.0_security.json",
-      "sha256": "d6796cf26333d0220abc60381ae34696d48faa1c689ff0863984168d785964e9",
-      "bytes": 410010
+      "sha256": "1c9ad0f9fcb3f21ae6f0d58b9ba0c4f97e5682b75c52bbe9e2e96b7f7b328d57",
+      "bytes": 466393
     },
     {
       "role": "other",
       "path": "SpringBootDemo_1.1.0_security.md",
-      "sha256": "d3b96b4c7ec51399ce6faabfca67d2422717e90caf55ac997273749916e0fcaf",
-      "bytes": 10229
+      "sha256": "ac4667a0cd9ed2c7e5cc5a81e8e230d4ee1890d1440f37fa094791c71f27d69f",
+      "bytes": 10726
     },
     {
       "role": "other",
       "path": "SpringBootDemo_1.1.0_security.html",
-      "sha256": "f6f0a7e7471d14941b66d1c8f7ae571daeb90d878d51e75743422761c64fe623",
-      "bytes": 43890
+      "sha256": "590296113465d819d7eb9f9c38c04741a69d882be66d348adada43fd0acfff72",
+      "bytes": 45224
     },
     {
       "role": "conformance",
       "path": "SpringBootDemo_1.1.0_conformance.json",
-      "sha256": "2bc8ed130ed81e5c7e66d8d593c5d4ec901fc3f239c330a5fe2c13f9c895d560",
-      "bytes": 50253
+      "sha256": "ce6f6d8ed86200c45b9bcebb4c55ec2d77fe04e7f44615393179cf8c85f9b70f",
+      "bytes": 51354
     },
     {
       "role": "other",
       "path": "SpringBootDemo_1.1.0_conformance.md",
-      "sha256": "ab7126c8052a113ef567eeccf049717066ab263f0f4571bee1bc4a98fb740071",
-      "bytes": 12662
+      "sha256": "4ced0c4e64ec3fb0ad17170502ac2a8a8016afc17a6f9100d2aba2601e65be98",
+      "bytes": 12965
     },
     {
       "role": "other",
       "path": "SpringBootDemo_1.1.0_conformance.html",
-      "sha256": "d69f53212148b8eb7c756f16bd02132f72ef39802dd4d17d23d6ec9b3276dd30",
-      "bytes": 34934
+      "sha256": "0c53f9bbb7505770716d8fd95a862bfe2ae0e0d7f33cba85fe92ee584a9b8f37",
+      "bytes": 35422
     },
     {
       "role": "other",
@@ -479,26 +479,26 @@
     {
       "role": "other",
       "path": "SpringBootDemo_1.1.0_risk-report.md",
-      "sha256": "24df3000af44553454d7f232ecd51d5ba566dfde66bd49f0da5ff41586da8eed",
-      "bytes": 11394
+      "sha256": "9dcdcfee74b65dd6f10af443a817dd8efadc11501141442e472465442206842d",
+      "bytes": 11887
     },
     {
       "role": "other",
       "path": "SpringBootDemo_1.1.0_risk-report.html",
-      "sha256": "5b923e91c8586541ca057afcb51f9301f39468311bb289c668e182ace3b227f1",
-      "bytes": 33891
+      "sha256": "8c09fe99d156539afe21ecac230839725cb9cee5424d8061f4fcdffbe7768ed3",
+      "bytes": 34678
     },
     {
       "role": "other",
       "path": "SpringBootDemo_1.1.0_security_epss.json",
-      "sha256": "aaac24467dbfa3ce17fa265702b24bc9f0e5263ab50e4cd3d47ea172410612a3",
-      "bytes": 5796
+      "sha256": "f64a914c1dc57d4c62f95094bcd60f15b7582ec96bf1ff28ea793537f67ef369",
+      "bytes": 6072
     },
     {
       "role": "vulnerabilities.trivy",
       "path": "SpringBootDemo_1.1.0_security.json",
-      "sha256": "d6796cf26333d0220abc60381ae34696d48faa1c689ff0863984168d785964e9",
-      "bytes": 410010
+      "sha256": "1c9ad0f9fcb3f21ae6f0d58b9ba0c4f97e5682b75c52bbe9e2e96b7f7b328d57",
+      "bytes": 466393
     }
   ]
 }
