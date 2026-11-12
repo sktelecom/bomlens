@@ -91,7 +91,10 @@ npm, Python(pip), Go, Rust(Cargo) 패키지는 소스 스캔이 설치된 패키
 cdxgen Java 이미지에는 JDK가 하나씩만 있고, Gradle 빌드에서는 두 가지가 필요한 JDK를 정합니다. 툴체인은 지정한 버전의 JDK를 정확히 요구합니다. Gradle 래퍼(`gradlew`와 `gradle/wrapper/gradle-wrapper.properties`)는 그 Gradle 버전이 지원하는 JDK에서만 실행됩니다. 예를 들어 6.9.4 래퍼는 Java 21에서 "Unsupported class file major version 65"로 실패합니다. 스캔은 두 가지를 모두 읽습니다.
 
 - 툴체인은 `JavaLanguageVersion.of(N)`(`languageVersion = ...` 또는 `languageVersion.set(...)` 형태)과 Kotlin `jvmToolchain(N)`에서 읽습니다. 스캔한 폴더와 그 아래 다섯 단계까지의 `*.gradle`과 `*.gradle.kts` 파일(`buildSrc`와 컨벤션 플러그인 포함)에서 찾고, 가장 높은 버전을 씁니다.
-- 래퍼의 Gradle 버전은 `distributionUrl`에서 읽습니다(마일스톤과 릴리스 후보는 해당 정식 버전으로 봅니다). 옆에 `gradlew`가 있을 때만 읽고, 없으면 이미지에 든 Gradle 8.14.5가 실행됩니다. 스캔한 폴더의 래퍼로 정하고, 그 폴더에 래퍼가 없으면 아래 빌드들의 래퍼 중 가장 낮은 버전을 씁니다. 모든 빌드가 실행되어야 하기 때문입니다.
+- 래퍼의 Gradle 버전은 `distributionUrl` 끝의 파일 이름에서 읽습니다. Gradle 배포 파일 이름 형식(`gradle-X.Y[.Z]-bin.zip` 또는 `-all.zip`)이어야 하고, 마일스톤과 릴리스 후보, 스냅숏은 해당 정식 버전으로 봅니다. 래퍼는 옆에 `gradlew`가 있을 때만 셈하고, 없으면 이미지에 든 Gradle 8.14.5가 실행됩니다. 어느 래퍼를 셈할지는 스캔한 폴더에 따라 다릅니다.
+    - `gradlew`가 있으면 그 폴더의 래퍼만 셈합니다. 버전을 읽지 못하면(예: 이름을 바꾼 배포 파일) `[INFO]` 줄로 알리고 툴체인만으로 고릅니다.
+    - Gradle 설정 파일이나 빌드 파일이 있고 `gradlew`가 없으면 래퍼를 셈하지 않습니다. 그 폴더에서 이미지의 Gradle이 한 번 실행됩니다.
+    - 둘 다 없으면 아래 다섯 단계까지에서 설정 파일이나 빌드 파일 옆에 `gradlew`가 있는 빌드의 래퍼를 모두 셈합니다. `buildSrc`, `build-logic`, 점으로 시작하는 폴더, 다른 빌드가 `includeBuild(...)`로 지정한 빌드는 건너뜁니다. 이미지는 이 래퍼를 모두 실행할 수 있어야 하며, 그런 이미지가 없으면 가장 낮은 버전에 맞춰 고르고 `[WARN]` 줄로 알립니다.
 
 주석과 위에 적은 배포하지 않는 폴더는 건너뜁니다(`BOMLENS_INCLUDE_NON_SHIPPED=1`이면 그 폴더도 읽습니다). 이미지별 JDK와 그 JDK에서 실행되는 Gradle 버전은 다음과 같습니다([Gradle 호환성 표](https://docs.gradle.org/current/userguide/compatibility.html) 기준).
 

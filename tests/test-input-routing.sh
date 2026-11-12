@@ -639,7 +639,7 @@ wrapper_case() {  # wrapper_case <distribution file> <want> <description>
 wrapper_case gradle-4.10.3-bin.zip "$J8" "a Gradle 4.10.3 wrapper picks the Java 8 image"
 wrapper_case gradle-5.6.4-all.zip "$J11" "a Gradle 5.6.4 wrapper picks the Java 11 image"
 wrapper_case gradle-6.9.4-bin.zip "$J11" "a Gradle 6.9.4 wrapper picks the Java 11 image"
-note_case "a Gradle 6.9.4 wrapper says why" java_image_note "[INFO] The Gradle wrapper is Gradle 6.9.4, which cannot run on Java 21; using the cdxgen Java 11 image."
+note_case "a Gradle 6.9.4 wrapper says why" java_image_note "[INFO] The Gradle wrapper (Gradle 6.9.4) cannot run on Java 21; using the cdxgen Java 11 image."
 wrapper_case gradle-7.2-bin.zip "$J11" "a Gradle 7.2 wrapper picks the Java 11 image"
 wrapper_case gradle-7.3-bin.zip "$J17" "a Gradle 7.3 wrapper picks the Java 17 image"
 wrapper_case gradle-7.5.1-bin.zip "$J17" "a Gradle 7.5.1 wrapper picks the Java 17 image"
@@ -671,21 +671,71 @@ wrapper_at . gradle-6.9.4-bin.zip
 java_case "$J11" "a Java 21 toolchain with a Gradle 6.9.4 wrapper picks the Java 11 image the wrapper runs on"
 note_case "that conflict warns and says why the image is not Java 21" java_image_note \
     "[WARN] The Gradle build declares a Java 21 toolchain, but its wrapper (Gradle 6.9.4) cannot run on Java 21" \
-    "[INFO] The Gradle wrapper is Gradle 6.9.4"
+    "[INFO] The Gradle wrapper (Gradle 6.9.4)"
 gradle_tree build.gradle.kts 'kotlin { jvmToolchain(8) }\n'
 wrapper_at . gradle-9.6.0-bin.zip
 java_case "$J21" "a Java 8 toolchain with a Gradle 9 wrapper (needs Java 17 or later) stays on the Java 21 image"
 
-# Wrappers in nested builds: the scanned folder's decides, else the lowest.
-gradle_tree settings.gradle.kts 'rootProject.name = "x"\n'
-wrapper_at a gradle-8.14.3-bin.zip
-wrapper_at b gradle-6.9.4-bin.zip
-java_case "$J11" "with no wrapper at the root, the lowest nested wrapper decides"
-wrapper_at . gradle-8.10-bin.zip
-java_case "$J21" "the scanned folder's own wrapper wins over nested ones"
-gradle_tree settings.gradle.kts 'rootProject.name = "x"\n'
-wrapper_at examples/demo gradle-4.10.3-bin.zip
-java_case "$J21" "a wrapper under examples/ (not shipped) is not read"
+# How the wrapper version is read: the file name at the end of distributionUrl.
+gradle_tree build.gradle "plugins { id 'java' }\n"
+wrapper_at . gradle-6.9.4-bin.zip
+printf 'distributionUrl=https\\://repo.example/gradle-8.5/dist/gradle-6.9.4-bin.zip\n' > "$LANGDIR/proj/gradle/wrapper/gradle-wrapper.properties"
+java_case "$J11" "a gradle-8.5 folder in the URL does not hide the gradle-6.9.4-bin.zip file name"
+printf 'distributionUrl https\\://services.gradle.org/distributions/gradle-6.9.4-bin.zip\n' > "$LANGDIR/proj/gradle/wrapper/gradle-wrapper.properties"
+java_case "$J11" "a space between the key and the value is read like ="
+printf 'distributionUrl=https\\://services.gradle.org/distributions-snapshots/gradle-8.6-20231215224233+0000-bin.zip\n' > "$LANGDIR/proj/gradle/wrapper/gradle-wrapper.properties"
+java_case "$J21" "a snapshot distribution counts as its release"
+printf 'distributionUrl=https\\://repo.example/tools/our-gradle-6.9.4.zip\n' > "$LANGDIR/proj/gradle/wrapper/gradle-wrapper.properties"
+java_case "$J21" "a custom distribution file name is not read as a version"
+note_case "an unreadable wrapper version is reported" java_image_note \
+    "[INFO] The Gradle wrapper version could not be read from gradle/wrapper/gradle-wrapper.properties"
+
+# Which wrappers run. With gradlew at the root only its wrapper runs, even when
+# its version cannot be read; with a Gradle file at the root and no gradlew
+# the image's Gradle runs there and no nested wrapper does.
+gradle_tree build.gradle "plugins { id 'java' }\n"
+wrapper_at . our-gradle.zip
+gradle_tree_add() { mkdir -p "$LANGDIR/proj/$1"; printf "plugins { id 'java' }\n" > "$LANGDIR/proj/$1/build.gradle"; }
+gradle_tree_add legacy; wrapper_at legacy gradle-4.10.3-bin.zip
+java_case "$J21" "a root gradlew with an unreadable version does not fall through to a nested old wrapper"
+note_case "and the unreadable root version is reported" java_image_note "[INFO] The Gradle wrapper version could not be read"
+gradle_tree build.gradle "plugins { id 'java' }\n"
+gradle_tree_add legacy; wrapper_at legacy gradle-4.10.3-bin.zip
+java_case "$J21" "a root build file with no gradlew ignores a nested old wrapper"
+
+# A root with no Gradle file: the builds below it, each with its own wrapper.
+nested_root() { rm -rf "${LANGDIR:?}/proj" && mkdir -p "$LANGDIR/proj"; }
+nested_root
+gradle_tree_add a; wrapper_at a gradle-8.4-bin.zip
+gradle_tree_add b; wrapper_at b gradle-6.9.4-bin.zip
+java_case "$J11" "nested wrappers 8.4 and 6.9.4 share Java 11 and 8, and get Java 11"
+nested_root
+gradle_tree_add a; wrapper_at a gradle-9.6.0-bin.zip
+gradle_tree_add b; wrapper_at b gradle-6.9.4-bin.zip
+java_case "$J11" "nested wrappers with no common JDK are chosen for the lowest one"
+note_case "and warn with both versions and CDXGEN_JAVA_IMAGE" java_image_note \
+    "[WARN] No cdxgen Java image runs every Gradle wrapper in this tree (Gradle 9.6.0, 6.9.4)" "CDXGEN_JAVA_IMAGE"
+nested_root
+gradle_tree_add a; wrapper_at a gradle-8.14.3-bin.zip
+mkdir -p "$LANGDIR/proj/b/gradle/wrapper"; wrapper_at b gradle-4.10.3-bin.zip
+java_case "$J21" "a nested gradlew with no settings or build file beside it is not a build"
+nested_root
+for skip in buildSrc build-logic .hidden examples/demo; do
+    gradle_tree_add "$skip"; wrapper_at "$skip" gradle-4.10.3-bin.zip
+done
+gradle_tree_add app; wrapper_at app gradle-8.14.3-bin.zip
+java_case "$J21" "wrappers under buildSrc, build-logic, dot folders and examples/ are not read"
+nested_root
+gradle_tree_add app; wrapper_at app gradle-8.14.3-bin.zip
+printf 'includeBuild("tools")\n' > "$LANGDIR/proj/app/settings.gradle"
+gradle_tree_add app/tools; wrapper_at app/tools gradle-4.10.3-bin.zip
+java_case "$J21" "a build named in another's includeBuild(...) is not read on its own"
+nested_root
+gradle_tree_add a/b/c/d/e; wrapper_at a/b/c/d/e gradle-6.9.4-bin.zip
+java_case "$J11" "a build five folders down is read"
+nested_root
+gradle_tree_add a/b/c/d/e/f; wrapper_at a/b/c/d/e/f gradle-6.9.4-bin.zip
+java_case "$J21" "a build six folders down is not read"
 
 # A mixed tree runs in the all-in-one image; only a warning for the toolchain.
 gradle_tree build.gradle.kts 'kotlin { jvmToolchain(25) }\n'
