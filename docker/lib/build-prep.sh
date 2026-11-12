@@ -2187,17 +2187,27 @@ fi
 # cdx:go:indirect property too). An indirect module is often compiled into the
 # program, and readers that leave out optional components (the NOTICE, a
 # vulnerability gate) then drop real dependencies. So the modules the build
-# uses are listed here with the same `go list -deps ./...` cdxgen runs (default
+# uses are listed here with `go list -e -deps ./...`: the same ./... package
+# pattern cdxgen runs, so the list covers what cdxgen read and no more (default
 # flags, so the same readonly or vendor mode, and the same go.work), once per
 # go.mod as cdxgen's own search finds them, and a pkg:golang/ component with
-# scope optional that is in that list becomes required. cdx:go:indirect is left
-# as it is. A module outside every list keeps optional. A module whose
-# `go list` fails adds nothing to the list; when none succeeds the SBOM is left
-# untouched. A replaced module is listed under the module that replaces it, the
-# name cdxgen gives the component (a local replacement keeps the original path
-# and has no version). Up to _gscope_max modules are listed.
+# scope optional that is in that list becomes required. -e keeps the modules
+# of the packages that did load when one package has an error. cdx:go:indirect
+# is left as it is. A module outside every list keeps optional. A module whose
+# `go list` fails or takes longer than _gscope_timeout seconds adds nothing to
+# the list; when none succeeds the SBOM is left untouched. When go-mod-tidy
+# failed (no route to the module proxy, most often), go.sum is incomplete and
+# what go list reads cannot be trusted, so nothing is changed. A replaced
+# module is listed under the module that replaces it, the name cdxgen gives the
+# component (a local replacement keeps the original path and has no version).
+# Up to _gscope_max modules are listed.
 _gscope_max=20
-if [ "${rc:-1}" -eq 0 ] && [ -f "$OUT" ] && command -v go >/dev/null 2>&1 \
+_gscope_timeout=120
+_gscope_tidy_failed=""
+case " $PREP_FAILED " in *" go-mod-tidy "*) _gscope_tidy_failed=1 ;; esac
+if [ -n "$_gscope_tidy_failed" ] && grep -q '"pkg:golang/' "$OUT" 2>/dev/null; then
+    log "go: go-mod-tidy failed, so indirect modules keep the scope cdxgen gave them"
+elif [ "${rc:-1}" -eq 0 ] && [ -f "$OUT" ] && command -v go >/dev/null 2>&1 \
    && command -v node >/dev/null 2>&1 && grep -q '"pkg:golang/' "$OUT" 2>/dev/null; then
     set -- -name vendor -o -name node_modules -o -name build -o -name test-fixtures -o -name '.?*'
     if [ -n "$EXCLUDE_NON_SHIPPED" ]; then
@@ -2213,14 +2223,14 @@ if [ "${rc:-1}" -eq 0 ] && [ -f "$OUT" ] && command -v go >/dev/null 2>&1 \
     _gscope_tmpl='{{with .Module}}{{if not .Main}}{{.Path}}@{{.Version}}{{"\n"}}{{.Path}}@{{with .Replace}}{{if .Version}}{{"\n"}}{{.Path}}@{{.Version}}{{end}}{{end}}{{end}}{{end}}'
     while IFS= read -r _gscope_d; do
         [ -n "$_gscope_d" ] || continue
-        run_supervised_timeout "$PREP_TIMEOUT_DEFAULT" sh -c 'cd "$1" && go list -deps -f "$2" ./... > "$3" 2>/dev/null' \
+        run_supervised_timeout "$_gscope_timeout" sh -c 'cd "$1" && go list -e -deps -f "$2" ./... > "$3" 2>/dev/null' \
             _ "$_gscope_d" "$_gscope_tmpl" "$_gscope_one"
         _gscope_rc=$?
         if [ "$_gscope_rc" -eq 0 ]; then
             cat "$_gscope_one" >> "$_gscope_list"
             _gscope_ok=$((_gscope_ok + 1))
         else
-            log "go: could not list the build graph of $_gscope_d (go list -deps rc=$_gscope_rc); its indirect modules keep the scope cdxgen gave them"
+            log "go: could not list the build graph of $_gscope_d (go list -e -deps rc=$_gscope_rc); its indirect modules keep the scope cdxgen gave them"
         fi
     done <<EOF
 $_gscope_mods

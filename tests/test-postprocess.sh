@@ -6154,6 +6154,16 @@ STUB
             *"could not list the build graph"*) pass "build-prep block: go list failure is logged" ;;
             *) fail "go list failure not logged" "$_gs_log" ;;
         esac
+        _gs_log=$(PREP_FAILED="go-mod-tidy" _gs_run 0)
+        if cmp -s "$WORK/go-scope-bom.orig.json" "$WORK/gs-proj/bom.json"; then
+            pass "build-prep block: go-mod-tidy failed, SBOM left untouched"
+        else
+            fail "build-prep block changed the SBOM although go-mod-tidy failed"
+        fi
+        case "$_gs_log" in
+            *"go-mod-tidy failed"*) pass "build-prep block: the skipped correction is logged" ;;
+            *) fail "skipped Go scope correction not logged" "$_gs_log" ;;
+        esac
     else
         fail "could not extract the Go scope correction from build-prep.sh"
     fi
