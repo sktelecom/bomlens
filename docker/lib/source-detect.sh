@@ -51,9 +51,10 @@ BUILD_PREP_ENV_NAMES="BOMLENS_KEEP_BUILD_OUTPUT BOMLENS_MAVEN_FULL_GRAPH BOMLENS
 
 # Settings for the network the post-processing container reaches: the proxy,
 # where Trivy gets its vulnerability database (a mirror, or a cache with the
-# update skipped) and the EPSS and KEV lookups (off, or a mirror). Passed on
+# update skipped) and the EPSS and KEV lookups (off, or a mirror), and which
+# Go vulnerability database export it reads (BOMLENS_GO_VULNDB*). Passed on
 # by name, so a value is never on a command line.
-STAGE2_NETWORK_ENV_NAMES="$PROXY_ENV_NAMES TRIVY_DB_REPOSITORY TRIVY_JAVA_DB_REPOSITORY TRIVY_SKIP_DB_UPDATE TRIVY_SKIP_JAVA_DB_UPDATE TRIVY_OFFLINE_SCAN TRIVY_USERNAME TRIVY_PASSWORD TRIVY_REGISTRY_TOKEN TRIVY_INSECURE BOMLENS_TRIVY_DB_MAX_AGE_DAYS BOMLENS_GRYPE_DB_MAX_AGE_DAYS GRYPE_DB_UPDATE_URL KEV_URL EPSS_API"
+STAGE2_NETWORK_ENV_NAMES="$PROXY_ENV_NAMES TRIVY_DB_REPOSITORY TRIVY_JAVA_DB_REPOSITORY TRIVY_SKIP_DB_UPDATE TRIVY_SKIP_JAVA_DB_UPDATE TRIVY_OFFLINE_SCAN TRIVY_USERNAME TRIVY_PASSWORD TRIVY_REGISTRY_TOKEN TRIVY_INSECURE BOMLENS_TRIVY_DB_MAX_AGE_DAYS BOMLENS_GRYPE_DB_MAX_AGE_DAYS GRYPE_DB_UPDATE_URL BOMLENS_GO_VULNDB BOMLENS_GO_VULNDB_PATH BOMLENS_GO_VULNDB_MAX_AGE_DAYS BOMLENS_GO_VULNDB_URL KEV_URL EPSS_API"
 
 # Prints "-e NAME" for the names above and for any other TRIVY_* variable set
 # here, except TRIVY_CACHE_DIR: a path on this host means nothing in the
@@ -102,6 +103,22 @@ trivy_cache_args() {
         return 0
     fi
     printf '%s\n' -v "$(cd "$SBOM_TRIVY_CACHE" && pwd):/trivy-cache" -e TRIVY_CACHE_DIR=/trivy-cache
+}
+
+# SBOM_GO_VULNDB: a Go vulnerability database export on this host (vulndb.zip
+# from https://vuln.go.dev/vulndb.zip, or that archive unpacked into a folder),
+# read in place of the snapshot the image carries. Prints the host path and the
+# path inside the container, one per line; the caller mounts the first at the
+# second, read-only, and sets BOMLENS_GO_VULNDB_PATH to the second.
+go_vulndb_mount() {
+    [ -n "${SBOM_GO_VULNDB:-}" ] || return 0
+    if [ -f "$SBOM_GO_VULNDB" ]; then
+        printf '%s\n' "$(cd "$(dirname "$SBOM_GO_VULNDB")" && pwd)/$(basename "$SBOM_GO_VULNDB")" /go-vulndb.zip
+    elif [ -d "$SBOM_GO_VULNDB" ]; then
+        printf '%s\n' "$(cd "$SBOM_GO_VULNDB" && pwd)" /go-vulndb
+    else
+        echo "[WARN] SBOM_GO_VULNDB=$SBOM_GO_VULNDB is neither a file nor a folder; the Go vulnerability database snapshot in the image is used. Download https://vuln.go.dev/vulndb.zip and point SBOM_GO_VULNDB at it." >&2
+    fi
 }
 
 # Folders whose manifests a source scan leaves out by default: test suites and

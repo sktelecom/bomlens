@@ -6,7 +6,7 @@ description: BomLens 이미지를 스캔 엔진으로 쓰는 프로그램을 위
 
 BomLens 이미지를 스캔 엔진으로 쓰는 프로그램은 모든 스캔이 출력 폴더에 남기는 `bomlens-result.json`을 읽습니다. 이 파일에는 실행이 어떻게 끝났는지, 각 단계가 실행됐는지, 설정으로 꺼졌는지, 실행할 수 없었는지, 실패했는지, 그리고 폴더의 어떤 파일이 어떤 역할인지가 들어 있습니다. 그래서 호출하는 프로그램이 로그를 해석하거나 파일 이름을 추측하지 않아도 됩니다.
 
-형식은 CI의 `tests/test-engine-contract.sh`가 [`schemas/engine-result-1.json`](https://github.com/sktelecom/bomlens/blob/main/schemas/engine-result-1.json)으로 검사합니다. 이 문서는 계약 버전 `1.3.0`을 설명합니다.
+형식은 CI의 `tests/test-engine-contract.sh`가 [`schemas/engine-result-1.json`](https://github.com/sktelecom/bomlens/blob/main/schemas/engine-result-1.json)으로 검사합니다. 이 문서는 계약 버전 `1.4.0`을 설명합니다.
 
 ## 파일
 
@@ -22,8 +22,9 @@ BomLens 이미지를 스캔 엔진으로 쓰는 프로그램은 모든 스캔이
 | `run` | `status`, `reason`, `started_at`, `ended_at`(UTC), `exit_code` |
 | `steps[]` | 단계마다 하나씩, 기록된 순서대로. 단계는 끝날 때 기록됨(아래 표) |
 | `tools` | 도구 이름과 버전입니다. SBOM에 적힌 생성 도구, syft, 취약점 스캔이 돌았다면 Trivy가 들어갑니다 |
-| `engines` | 이번 실행에서 결과를 낸 취약점 엔진(`trivy`, `grype`, `cve-bin-tool`, `yocto`) |
+| `engines` | 이번 실행에서 결과를 낸 취약점 엔진(`trivy`, `grype`, `cve-bin-tool`, `yocto`, `go-vulndb`) |
 | `data_sources.trivy_db` | 취약점 스캔이 돌았을 때 Trivy 데이터베이스의 스키마 버전, `updated_at`, `downloaded_at` |
+| `data_sources.go_vulndb` | Go 취약점 데이터베이스를 읽었을 때 그 데이터베이스의 `updated_at` |
 | `outputs[]` | 실행이 쓴 파일마다 `role`, `path`(출력 폴더 기준 상대 경로), `sha256`, `bytes` |
 
 ## 실행 상태
@@ -106,6 +107,7 @@ BomLens 이미지를 스캔 엔진으로 쓰는 프로그램은 모든 스캔이
 | `reachability` | Go 소스나 Go 실행 파일 스캔에서 각 Go 보안 권고의 코드에 도달하는지 govulncheck로 판정(`--reachability`, `REACHABILITY=true`). `counts`는 `exploitable`, `not_affected`, `components`. Go 취약점 데이터베이스를 읽지 못하면 `skipped`(`unavailable`), SBOM에 Go 컴포넌트가 없거나 1단계가 이 실행의 govulncheck 출력을 남기지 않았으면 `skipped`(`no_input`), 소스 트리의 Go 모듈이 20개를 넘으면 `skipped`(`too_large`), Go 모듈이 GOOS linux, darwin, windows 어디에서도 빌드되지 않아 판정하지 못하면 `degraded`(`unavailable`), govulncheck가 없는 이미지면 `skipped`(`not_installed`), 옵션이 없으면 `disabled` |
 | `scan-security` | Trivy로 취약점 매칭 |
 | `deep-cve` | `--security`를 켰을 때 CPE가 있는 컴포넌트와 `bomlens:cpeAlternates`의 추가 CPE를 grype로 NVD와 대조(`--deep-cve`, deep-cve 이미지). grype가 없는 이미지에서 요청하면 `skipped`(`not_installed`), CLI가 deep-cve 이미지 없이 실행했으면 `skipped`(`fallback`, 이미지를 내려받지 못했거나 스캐너 이미지가 로컬 빌드, 1.13.2보다 낮은 버전, BomLens 이름이 아닌 이미지여서이며 `detail`에 이유를 적음. 그대로 둔 이미지에 grype가 있으면(`SBOM_DEEP_CVE=true`로 빌드) 대조를 실행하고 실제 결과를 기록), 요청하지 않았거나 `--security`가 꺼져 있거나 펌웨어 또는 AI 모델 스캔이면 `disabled`. grype 데이터베이스가 `BOMLENS_GRYPE_DB_MAX_AGE_DAYS`일(7일)보다 오래됐으면 먼저 갱신하고, 갱신하지 못하면 그대로 읽은 뒤 `degraded`(`unavailable`)로 기록하며 `detail`에 경과 일수를 적는다. grype가 실패하면 `detail`에 오류 출력의 마지막 부분을 적는다 |
+| `go-vulndb` | `--security`를 켰을 때 `pkg:golang` 컴포넌트를 이미지에 든 Go 취약점 데이터베이스 스냅숏(또는 `BOMLENS_GO_VULNDB_PATH`)과 대조하고, 어느 엔진도 보고하지 않은 결과만 더함(CVE, GHSA, GO 식별자로 비교). `counts`에 `components`, `findings`, `already_reported`를 적음. 읽을 수 있는 버전의 Go 모듈이 없거나 보안 스캔이 대조 전에 멈췄으면 `skipped`(`no_input`)이며 `detail`에 이유를 적음(예: 이미지에 Trivy가 없음). 스냅숏이 없으면 `skipped`(`not_installed`), 데이터베이스를 읽을 수 없거나 보안 스캔이 대조 전에 실패했으면 `failed`, 읽은 데이터베이스가 `BOMLENS_GO_VULNDB_MAX_AGE_DAYS`일(7일)보다 오래됐으면 `degraded`(`unavailable`). 이만큼 오래된 이미지 스냅숏은 오프라인 스캔이 아니면 먼저 내려받은 데이터베이스로 바꾸며, `detail`에 경과 일수와 바꾸지 못한 이유를 적음. `BOMLENS_GO_VULNDB=false`이거나 `--security`가 꺼져 있으면 `disabled` |
 | `generate-risk-report` | 위험 보고서 작성 |
 | `model-security` | AI 모델 파일의 위험한 내용 검사 |
 | `verify-weights` | 공개된 모델 가중치가 해시와 맞는지 확인 |
@@ -122,7 +124,7 @@ BomLens 이미지를 스캔 엔진으로 쓰는 프로그램은 모든 스캔이
 | `sbom.spdx3` | `_bom.spdx3.json` |
 | `vulnerabilities.trivy` | Trivy 자체 결과입니다. 아무것도 고치지 않았으면 `_security.json`이고, 다른 엔진이 결과를 더했거나 항목의 번호를 바꿨거나 `Advisories`로 옮겼으면 따로 남긴 `_security_trivy.json`입니다([보안 보고서](../guides/reports.ko.md) 참고) |
 | `vulnerabilities.all` | `_security.json`. Trivy 결과에 다른 엔진의 결과를 병합하고, 배포판 권고 번호로 보고된 항목을 관련 CVE로 바꾸거나 최상위 `Advisories` 목록으로 옮긴 파일 |
-| `vulnerabilities.other` | 다른 엔진의 결과(`_security_grype.json`, `_security_cvebintool.json`, `_security_yocto.json`) |
+| `vulnerabilities.other` | 다른 엔진의 결과(`_security_grype.json`, `_security_cvebintool.json`, `_security_yocto.json`, `_security_govulndb.json`) |
 | `license-scan.scancode` | `_scancode.json` |
 | `vendored.cyclonedx` | `_vendored.cdx.json` |
 | `vex.reachability` | `_reachability.cdx.json`(`--reachability`) |

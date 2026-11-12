@@ -798,6 +798,17 @@ Environment:
                          about 1.5 GB; set it empty to download on every scan);
                          HTTP(S)_PROXY, NO_PROXY, TRIVY_*, EPSS_API and
                          KEV_URL are passed on to the containers by name
+  BOMLENS_GO_VULNDB      With --security, also match Go modules against the Go
+                         vulnerability database snapshot in the image (default:
+                         true; set false to skip). A snapshot older than
+                         BOMLENS_GO_VULNDB_MAX_AGE_DAYS (default 7) days is
+                         replaced for the scan by a download (3.6 MB) from
+                         BOMLENS_GO_VULNDB_URL (default vuln.go.dev), unless
+                         TRIVY_OFFLINE_SCAN or TRIVY_SKIP_DB_UPDATE is true
+  SBOM_GO_VULNDB         A vulndb.zip from https://vuln.go.dev/vulndb.zip (or
+                         that archive unpacked into a folder) on this host, read
+                         in place of the image's snapshot and never replaced;
+                         one older than the limit is flagged as out of date
   ENRICH_EOL             Flag components past their end-of-life from a bundled
                          endoflife.date snapshot (default: true; runs OFFLINE,
                          so it is air-gap safe; set false to skip)
@@ -1516,6 +1527,13 @@ pp_env() {
     local _tc=() _l
     while IFS= read -r _l; do _tc+=("$_l"); done < <(trivy_cache_args)
     [ "${#_tc[@]}" -eq 4 ] && printf ' -v %q -e TRIVY_CACHE_DIR=/trivy-cache' "$(hostpath "${_tc[1]%:/trivy-cache}"):/trivy-cache"
+    # SBOM_GO_VULNDB: a Go vulnerability database export on this host, read
+    # in place of the snapshot in the image (mounted read-only).
+    local _gv=()
+    while IFS= read -r _l; do _gv+=("$_l"); done < <(go_vulndb_mount)
+    if [ "${#_gv[@]}" -eq 2 ]; then
+        printf ' -v %q -e BOMLENS_GO_VULNDB_PATH=%s' "$(hostpath "${_gv[0]}"):${_gv[1]}:ro" "${_gv[1]}"
+    fi
 }
 
 # The docker CLI forwards a name-only `-e VAR` from its own environment, so the

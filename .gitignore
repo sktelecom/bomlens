@@ -48,6 +48,7 @@ bom.json
 *_component-versions.template.csv
 *_security_cvebintool.json
 *_security_grype.json
+*_security_govulndb.json
 *_security_trivy.json
 *_reachability.cdx.json
 *_bom.refused.json

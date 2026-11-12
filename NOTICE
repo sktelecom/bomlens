@@ -13,10 +13,12 @@ This product also bundles reduced snapshots of third-party data so that its
 offline checks need no network access at scan time: end-of-life dates from
 endoflife.date (MIT), and malicious-package advisories from the OSV bulk
 archives, whose MAL- records are published by the OpenSSF Package Analysis
-project (ossf/malicious-packages, Apache-2.0). The images also carry a CPE
-applicability index derived from the U.S. National Vulnerability Database,
-with its own attribution and notices in CVE-DATA-NOTICE.txt beside it.
-Neither project endorses or certifies this product. Details are in
+project (ossf/malicious-packages, Apache-2.0). It also bundles, unmodified,
+the offline export of the Go vulnerability database (https://vuln.go.dev,
+CC-BY-4.0, https://creativecommons.org/licenses/by/4.0/). The images also
+carry a CPE applicability index derived from the U.S. National Vulnerability
+Database, with its own attribution and notices in CVE-DATA-NOTICE.txt beside
+it. None of these projects endorses or certifies this product. Details are in
 THIRD_PARTY_LICENSES.md.
 
 The tools BomLens installs into its base image (ghcr.io/sktelecom/bomlens) are

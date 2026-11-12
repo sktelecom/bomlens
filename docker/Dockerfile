@@ -139,7 +139,7 @@ LABEL org.opencontainers.image.licenses="Apache-2.0"
 # The engine contract this image follows (docs/reference/engine-contract.md),
 # the same value as ENGINE_CONTRACT_VERSION in docker/lib/engine-result.sh.
 # The CLI reads it to tell an image too old for the stage 1 hand-off.
-LABEL com.sktelecom.sbom.engine-contract="1.3.0"
+LABEL com.sktelecom.sbom.engine-contract="1.4.0"
 
 ENV DEBIAN_FRONTEND=noninteractive
 
@@ -617,6 +617,17 @@ RUN timeout 1200 python3 /tmp/build-malicious-index.py \
         /usr/local/lib/sbom/malicious-index.json \
     || echo "[build] OSV malicious snapshot skipped; the check will be inactive at scan time" \
     ; rm -f /tmp/build-malicious-index.py
+
+# Bundle a snapshot of the Go vulnerability database (vuln.go.dev/vulndb.zip,
+# about 3.6 MB, kept as published) beside scan-go-vulndb.py, so the security
+# step matches Go modules against it OFFLINE. A newer export can be mounted
+# at scan time and named with BOMLENS_GO_VULNDB_PATH; a scan that is not
+# offline downloads a newer one when this snapshot is older than
+# BOMLENS_GO_VULNDB_MAX_AGE_DAYS (7) days, with the same checks as here.
+# Best-effort in the same way: if the fetch fails no file is written and the
+# go-vulndb step is skipped at scan time. See scan-go-vulndb.py --fetch.
+RUN timeout 300 python3 /usr/local/lib/sbom/scan-go-vulndb.py --fetch /usr/local/lib/sbom/go-vulndb.zip \
+    || echo "[build] Go vulnerability database snapshot skipped; the go-vulndb step will be skipped at scan time"
 
 WORKDIR /src
 
