@@ -6161,6 +6161,113 @@ else
     echo "  SKIP: node unavailable, skipping Go scope test"
 fi
 
+echo "== gradle-same-name: a subproject named like the root gets its dependencies task =="
+# Guards docker/lib/build-prep.sh: cdxgen skips `<sub>:dependencies` for a
+# subproject whose purl equals the root's, so the task is handed to cdxgen in
+# GRADLE_ARGS_DEPENDENCIES. Extract the real block and drive it on settings
+# files (no logic duplication).
+if command -v node >/dev/null 2>&1; then
+    PREP="$ROOT_DIR/docker/lib/build-prep.sh"
+    _gsn_block=$(sed -n '/^# Gradle subproject named like the root project/,/^fi$/p' "$PREP")
+    if [ -n "$_gsn_block" ]; then
+        _gsn_run() {  # <settings file name> <content> [GRADLE_ARGS_DEPENDENCIES]
+            rm -rf "$WORK/gsn"; mkdir -p "$WORK/gsn"
+            printf '%s\n' "$2" > "$WORK/gsn/$1"
+            ( cd "$WORK/gsn" && GRADLE_ARGS_DEPENDENCIES="${3:-}" \
+                bash -c 'log() { :; }; '"$_gsn_block"'; printf "%s" "${GRADLE_ARGS_DEPENDENCIES:-}"' )
+        }
+        _gsn_out=$(_gsn_run settings.gradle.kts 'rootProject.name = "demo"
+include("demo")')
+        if [ "$_gsn_out" = ":demo:dependencies" ]; then
+            pass "include(\"demo\") under rootProject demo: :demo:dependencies handed to cdxgen"
+        else
+            fail "same-name subproject task not set" "got [$_gsn_out]"
+        fi
+        _gsn_out=$(_gsn_run settings.gradle "rootProject.name = 'demo'
+// include 'old:demo'
+include 'core',
+        'apps:demo'")
+        if [ "$_gsn_out" = ":apps:demo:dependencies" ]; then
+            pass "Groovy include across lines, nested path, commented include ignored"
+        else
+            fail "Groovy settings not read as expected" "got [$_gsn_out]"
+        fi
+        _gsn_out=$(_gsn_run settings.gradle.kts 'rootProject.name = "demo-root"
+include("demo")')
+        if [ -z "$_gsn_out" ]; then
+            pass "subproject named differently from the root: nothing added"
+        else
+            fail "task added although the names differ" "got [$_gsn_out]"
+        fi
+        _gsn_out=$(_gsn_run settings.gradle.kts 'rootProject.name = "demo"
+include("demo")' "--configuration runtimeClasspath")
+        if [ "$_gsn_out" = "--configuration runtimeClasspath :demo:dependencies --configuration runtimeClasspath" ]; then
+            pass "a GRADLE_ARGS_DEPENDENCIES the caller set is kept for the root task and the added one"
+        else
+            fail "caller GRADLE_ARGS_DEPENDENCIES not kept" "got [$_gsn_out]"
+        fi
+    else
+        fail "could not extract the Gradle same-name block from build-prep.sh"
+    fi
+else
+    echo "  SKIP: node unavailable, skipping Gradle same-name test"
+fi
+
+echo "== gradle-packages: a Gradle build with no Gradle-resolved package is recorded =="
+# Guards docker/lib/build-prep.sh: a build file that declares external
+# dependencies with no pkg:maven component from Gradle's resolution (a jar in
+# the tree does not count) marks the gradle-packages step failed, so generate
+# reads degraded. Extract the real block and drive it on small trees (java is
+# a stand-in function: the block runs only where Gradle can run).
+if command -v node >/dev/null 2>&1; then
+    PREP="$ROOT_DIR/docker/lib/build-prep.sh"
+    _gpk_block=$(sed -n '/^# Gradle build with no Gradle-resolved package/,/^fi$/p' "$PREP")
+    if [ -n "$_gpk_block" ]; then
+        _gpk_jar='{"components":[{"name":"junit","version":"4.13.2","purl":"pkg:maven/junit/junit@4.13.2?type=jar","evidence":{"identity":[{"field":"purl","methods":[{"technique":"filename","value":"libs/junit-4.13.2.jar"}]}]}}]}'
+        _gpk_gradle='{"components":[{"name":"guava","version":"33.0.0-jre","purl":"pkg:maven/com.google.guava/guava@33.0.0-jre?type=jar","properties":[{"name":"internal:GradleProfileName","value":"compileClasspath"},{"name":"cdx:gradle:GradleRootPath","value":"/app"}]}]}'
+        _gpk_run() {  # <bom json> <build file path> <build file content>
+            rm -rf "$WORK/gpk"; mkdir -p "$WORK/gpk/$(dirname "$2")"
+            printf '%s\n' "$1" > "$WORK/gpk/bom.json"
+            printf '%s\n' "$3" > "$WORK/gpk/$2"
+            ( cd "$WORK/gpk" && OUT="$WORK/gpk/bom.json" bash -c 'log() { :; }; mark_prep_failed() { echo "MARK-FAILED $1"; }; java() { :; }; rc=0; EXCLUDE_NON_SHIPPED=1; NON_SHIPPED_DIRS="examples test"; NON_SHIPPED_PATHS="gradle/wrapper"; '"$_gpk_block" 2>&1 )
+        }
+        _gpk_deps='plugins { java }
+dependencies {
+    implementation("com.google.guava:guava:33.0.0-jre") // the library
+}'
+        case "$(_gpk_run "$_gpk_jar" demo/build.gradle.kts "$_gpk_deps")" in
+            *"MARK-FAILED gradle-packages"*) pass "declared dependency, only a jar-file component: gradle-packages failed" ;;
+            *) fail "jar-only SBOM of a Gradle build with dependencies not recorded" ;;
+        esac
+        case "$(_gpk_run "$_gpk_gradle" demo/build.gradle.kts "$_gpk_deps")" in
+            *"MARK-FAILED"*) fail "a Gradle-resolved component was not recognized" ;;
+            *) pass "a component with the Gradle origin properties: nothing recorded" ;;
+        esac
+        case "$(_gpk_run "$_gpk_jar" build.gradle "dependencies {
+    implementation project(':core')
+    runtimeOnly files('libs/a.jar')
+}")" in
+            *"MARK-FAILED"*) fail "project() and files() dependencies counted as declared" ;;
+            *) pass "only project() and files() dependencies: nothing recorded" ;;
+        esac
+        case "$(_gpk_run "$_gpk_jar" examples/app/build.gradle "dependencies { }
+implementation 'com.google.guava:guava:33.0.0-jre'")" in
+            *"MARK-FAILED"*) fail "a build file under a non-shipped folder was read" ;;
+            *) pass "build file under a non-shipped folder: nothing recorded" ;;
+        esac
+        case "$(_gpk_run "$_gpk_jar" build.gradle "dependencies {
+    implementation libs.guava
+}")" in
+            *"MARK-FAILED gradle-packages"*) pass "version catalog alias counts as a declared dependency" ;;
+            *) fail "libs.<alias> dependency not read as declared" ;;
+        esac
+    else
+        fail "could not extract the Gradle packages block from build-prep.sh"
+    fi
+else
+    echo "  SKIP: node unavailable, skipping Gradle packages test"
+fi
+
 echo "== maven-hashes: build-prep fetches dependency jars where cdxgen reads them for hashes =="
 # cdxgen computes a Maven component's hashes only from its jar under
 # $HOME/.m2/repository, and its dependency:tree run downloads poms, not jars.

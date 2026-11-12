@@ -888,6 +888,58 @@ fi
 if { [ -f build.gradle ] || [ -f build.gradle.kts ] || [ -f settings.gradle ] || [ -f settings.gradle.kts ]; }; then
     gradle_settings_copy
 fi
+
+# Gradle subproject named like the root project. cdxgen runs
+# `<subproject>:dependencies` only for a subproject whose purl differs from the
+# root's, so a subproject with the root's name (and, through allprojects, its
+# group and version) is never resolved and none of its dependencies reach the
+# SBOM. cdxgen appends GRADLE_ARGS_DEPENDENCIES after every dependencies task it
+# runs, so the task of each such subproject is put there: Gradle runs a task
+# named twice once, and cdxgen reads that output under the subproject's path,
+# as it does for any other subproject. A GRADLE_ARGS_DEPENDENCIES the caller
+# set is kept, after the root's task and after each task added here. The root
+# name is rootProject.name in settings.gradle(.kts), or the folder name.
+if { [ -f settings.gradle ] || [ -f settings.gradle.kts ]; } && command -v node >/dev/null 2>&1; then
+    _gsame_js=$(mktemp)
+    cat > "$_gsame_js" <<'GRADLE_SAME_NAME_JS'
+const fs = require('fs');
+const path = require('path');
+const [dir] = process.argv.slice(2);
+let text = '';
+for (const f of ['settings.gradle.kts', 'settings.gradle']) {
+  try { text = fs.readFileSync(path.join(dir, f), 'utf8'); break; } catch (e) { /* next */ }
+}
+// Comments out, so a commented include is not read.
+text = text.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:"'])\/\/.*$/gm, '$1');
+const nameMatch = /rootProject\.name\s*=\s*["']([^"']+)["']/.exec(text);
+const rootName = nameMatch ? nameMatch[1] : path.basename(path.resolve(dir));
+const out = new Set();
+// include("a", ":b:c") / include 'a', 'b' / include(listOf("a")), across lines.
+const inc = /\binclude\s*\(?\s*(?:listOf\s*\()?((?:\s*["'][^"'\n]+["']\s*,?)+)/g;
+let m;
+while ((m = inc.exec(text)) !== null) {
+  for (const s of m[1].match(/["'][^"'\n]+["']/g) || []) {
+    let p = s.slice(1, -1).trim();
+    if (!/^:?[A-Za-z0-9_.\-]+(:[A-Za-z0-9_.\-]+)*$/.test(p)) continue;
+    if (!p.startsWith(':')) p = ':' + p;
+    if (p.split(':').pop() === rootName) out.add(p);
+  }
+}
+process.stdout.write([...out].sort().map(p => p + ':dependencies').join(' '));
+GRADLE_SAME_NAME_JS
+    _gsame_tasks=$(node "$_gsame_js" . 2>/dev/null)
+    rm -f "$_gsame_js"
+    if [ -n "$_gsame_tasks" ]; then
+        log "gradle: a subproject has the root project's name; asking cdxgen for $_gsame_tasks"
+        if [ -n "${GRADLE_ARGS_DEPENDENCIES:-}" ]; then
+            _gsame_args="$GRADLE_ARGS_DEPENDENCIES"
+            for _gsame_t in $_gsame_tasks; do _gsame_args="$_gsame_args $_gsame_t $GRADLE_ARGS_DEPENDENCIES"; done
+        else
+            _gsame_args="$_gsame_tasks"
+        fi
+        export GRADLE_ARGS_DEPENDENCIES="$_gsame_args"
+    fi
+fi
 # Python — install the requirements so transitive deps are visible
 # (requirements.txt without a lockfile) and so the license-evidence pass near the
 # end of this script has real dist-info metadata to read.
@@ -1599,6 +1651,61 @@ CARGO_LIC
         log "cargo: could not read crate licenses (cargo metadata failed, is the registry reachable?); licenses left as the generator resolved them"
     fi
     rm -f "$_clmeta"
+fi
+
+# Gradle build with no Gradle-resolved package. A build file that declares
+# external dependencies (an implementation, api, compileOnly, runtimeOnly,
+# compile, runtime, annotationProcessor, kapt or ksp line that is not a
+# project(), files() or fileTree() dependency) should give at least one
+# pkg:maven component from Gradle's resolution. cdxgen marks every component it
+# reads from a dependencies task with cdx:gradle:GradleRootPath and, under the
+# configuration it came from, internal:GradleProfileName (GradleProfileName in
+# older releases); a jar found in the tree carries neither. When the SBOM has
+# no such component, cdxgen resolved nothing for the build (a task it skipped,
+# a build that did not configure), whatever other files added: recorded as the
+# gradle-packages step failing, so the generate step reads degraded and the
+# SBOM is not taken as complete. The build files are searched like the
+# non-shipped exclusion cdxgen is given, and not under build/ or .gradle/.
+# Only in an image that can run Gradle (java or gradle on PATH): a build file
+# beside the scanned language (the android/ folder of a JavaScript app read in
+# a Node image) is not one cdxgen was in a position to resolve.
+if [ "${rc:-1}" -eq 0 ] && [ -f "$OUT" ] && command -v node >/dev/null 2>&1 \
+   && { command -v java >/dev/null 2>&1 || command -v gradle >/dev/null 2>&1; }; then
+    set -- -name build -o -name .gradle -o -name node_modules -o -name '.?*'
+    if [ -n "$EXCLUDE_NON_SHIPPED" ]; then
+        for _gpk_x in $NON_SHIPPED_DIRS; do set -- "$@" -o -name "$_gpk_x"; done
+        for _gpk_x in $NON_SHIPPED_PATHS; do set -- "$@" -o -path "./$_gpk_x"; done
+    fi
+    _gpk_decl=$(find . -type d \( "$@" \) ! -path . -prune -o -type f \( -name build.gradle -o -name build.gradle.kts \) -print 2>/dev/null \
+        | while IFS= read -r _gpk_f; do
+            if sed 's#//.*##' "$_gpk_f" 2>/dev/null \
+                | grep -E '^[[:space:]]*(implementation|api|compileOnly|runtimeOnly|compile|runtime|annotationProcessor|kapt|ksp)([[:space:]]*[("'"'"']|[[:space:]]+[a-zA-Z])' \
+                | grep -vqE '^[[:space:]]*[a-zA-Z]+[[:space:]]*\(?[[:space:]]*(project|files|fileTree)[[:space:]]*\('; then
+                printf '%s\n' "${_gpk_f#./}"
+            fi
+        done | LC_ALL=C sort | head -n 5)
+    set --
+    if [ -n "$_gpk_decl" ]; then
+        _gpk_js=$(mktemp)
+        cat > "$_gpk_js" <<'GRADLE_PACKAGES_JS'
+const fs = require('fs');
+let bom;
+try { bom = JSON.parse(fs.readFileSync(process.argv[2], 'utf8')); } catch (e) { process.exit(0); }
+const ORIGIN = new Set(['cdx:gradle:GradleRootPath', 'internal:GradleProfileName', 'GradleProfileName']);
+const fromGradle = c => String(c.purl || '').startsWith('pkg:maven/')
+  && (c.properties || []).some(p => p && ORIGIN.has(p.name));
+const any = list => (list || []).some(c => c && (fromGradle(c) || any(c.components)));
+process.stdout.write(any(bom.components) ? 'yes' : 'no');
+GRADLE_PACKAGES_JS
+        _gpk_found=$(node "$_gpk_js" "$OUT" 2>/dev/null)
+        rm -f "$_gpk_js"
+        if [ "$_gpk_found" = "no" ]; then
+            _gpk_list=$(printf '%s\n' "$_gpk_decl" | tr '\n' ',' | sed 's/,$//; s/,/, /g')
+            echo "[build-prep] gradle: [WARN] the build declares dependencies ($_gpk_list) but cdxgen resolved no Gradle package; the SBOM lacks them." >&2
+            echo "[build-prep] gradle: run './gradlew dependencies' for each subproject to see what Gradle reports, or re-scan with CDXGEN_DEBUG_MODE=debug." >&2
+            mark_prep_failed gradle-packages
+        fi
+    fi
 fi
 
 # Record each prep_step that failed or timed out (PREP_FAILED, space-separated

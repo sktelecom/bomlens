@@ -668,6 +668,35 @@ D="$(new_run empty-declared-mutant empty)"; empty_bom "$D"; run_engine "$D" "$MU
     && pass "without the manifest check the same run reads succeeded, so the check above can fail" \
     || fail "the mutant run is $(jq -r .run.status "$D/bomlens-result.json" 2>/dev/null)"
 
+echo "== a Gradle build whose declared dependencies cdxgen did not resolve =="
+# build-prep.sh records gradle-packages as failed when a build file declares
+# dependencies and no component came from Gradle's resolution, even though
+# other files (a jar in the tree) added components: generate reads degraded,
+# the run is not a plain success, the closing log says so and the SBOM is not
+# declared complete.
+D="$(new_run gradle-packages)"
+jq '.metadata.properties = ((.metadata.properties // []) + [{"name":"bomlens:prep-step-applied","value":"gradle-dependencies"},{"name":"bomlens:pipeline-step-failed","value":"gradle-packages"}])' \
+    "$D/demo_1.0_bom.json" > "$D/x" && mv "$D/x" "$D/demo_1.0_bom.json"
+run_engine "$D" "$ROOT_DIR/docker/lib"
+got="$(jq -r '.run.status + " " + ([.steps[] | select(.id=="generate")][0] | "\(.status) \(.reason) \(.detail)")' "$D/bomlens-result.json" 2>/dev/null)"
+if [ "$got" = "succeeded_degraded degraded failed steps that failed: gradle-packages" ]; then
+    pass "gradle-packages: generate degraded (failed), run succeeded_degraded"
+else
+    fail "gradle-packages: $got" "$(tail -5 "$D.log")"
+fi
+if grep -q "\[WARN\] the Gradle build declares dependencies but cdxgen resolved no Gradle package" "$D.log"; then
+    pass "gradle-packages: the run log warns"
+else
+    fail "gradle-packages: no warning in the run log" "$(tail -5 "$D.log")"
+fi
+if [ "$(jq -r '.compositions[0].aggregate // "none"' "$D/demo_1.0_bom.json")" = "incomplete" ]; then
+    pass "gradle-packages: compositions aggregate is incomplete"
+else
+    fail "gradle-packages: aggregate is $(jq -r '.compositions[0].aggregate // "none"' "$D/demo_1.0_bom.json")"
+fi
+err="$(schema_errors "$D/bomlens-result.json")"
+if [ -z "$err" ]; then pass "gradle-packages: the manifest validates against the schema"; else fail "schema errors" "$err"; fi
+
 echo "== MODE=PLAN: the execution plan of a source scan =="
 PLAN_SCHEMA="$ROOT_DIR/schemas/engine-plan-1.json"
 plan_schema_errors() {

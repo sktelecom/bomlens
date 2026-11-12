@@ -3018,6 +3018,8 @@ if [ "$MODE" = "SOURCE" ]; then
     fi
     HOST_GOTOOLCHAIN="${GOTOOLCHAIN:-}"
     STAGE1_FALLBACK_ENV=""; STAGE1_FAILED=""; STAGE1_LOG=""
+    # A cdxgen log an earlier run kept (see below) is not this run's.
+    rm -f "$OUTPUT_HOST_DIR/${SAFE_PROJECT}_${SAFE_VERSION}_cdxgen.log"
     if [ "$DETECTION_USED" = static ]; then
         echo "[INFO] Detection: static ($DETECTION_WHY); the dependency build is skipped."
         STAGE1_FALLBACK_ENV=" -e BOMLENS_DETECTION=static -e BOMLENS_DETECTION_WHY=$DETECTION_WHY"
@@ -3210,7 +3212,24 @@ if [ "$MODE" = "SOURCE" ]; then
         STAGE1_FALLBACK_ENV="$STAGE1_FALLBACK_ENV -e BOMLENS_STAGE1_REASON=$STAGE1_FAIL_REASON"
     else
         "${DOCKER_ENV[@]}" docker rm -f "$STAGE1_CONTAINER" >/dev/null 2>&1
-        rm -f "$STAGE1_LOG"
+        # A preprocessing step that failed (build-prep.sh records it on the
+        # SBOM as bomlens:pipeline-step-failed, a Gradle build with no
+        # resolved package included) leaves an SBOM that is short of what the
+        # project declares; the log is what says why, so it is kept beside the
+        # outputs instead of being removed.
+        if grep -q '"bomlens:pipeline-step-failed"' "$OUTPUT_HOST_DIR/$OUTPUT_FILE" 2>/dev/null; then
+            _s1_kept="$OUTPUT_HOST_DIR/${SAFE_PROJECT}_${SAFE_VERSION}_cdxgen.log"
+            _s1_steps=""
+            if command -v jq >/dev/null 2>&1; then
+                _s1_steps="$(jq -r '[.metadata.properties[]? | select(.name == "bomlens:pipeline-step-failed") | .value | strings] | unique | join(", ")' "$OUTPUT_HOST_DIR/$OUTPUT_FILE" 2>/dev/null)"
+            fi
+            if mv "$STAGE1_LOG" "$_s1_kept" 2>/dev/null; then
+                STAGE1_LOG="$_s1_kept"
+            fi
+            echo "[WARN] cdxgen finished, but a preprocessing step failed${_s1_steps:+ ($_s1_steps)}; the SBOM may lack dependencies. cdxgen log: $STAGE1_LOG"
+        else
+            rm -f "$STAGE1_LOG"
+        fi
     fi
     fi
 
