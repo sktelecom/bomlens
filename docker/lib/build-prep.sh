@@ -898,7 +898,13 @@ fi
 # named twice once, and cdxgen reads that output under the subproject's path,
 # as it does for any other subproject. A GRADLE_ARGS_DEPENDENCIES the caller
 # set is kept, after the root's task and after each task added here. The root
-# name is rootProject.name in settings.gradle(.kts), or the folder name.
+# name is rootProject.name in settings.gradle(.kts), or else the folder name,
+# which is Gradle's own default: under the CLI's /app mount that is `app`, so an
+# Android project with `include ':app'` and no rootProject.name also gets
+# `:app:dependencies` (its root and app purls are the same, so cdxgen skips it
+# too). An include that may sit in a conditional (an `if (` or `when` on a line
+# before it or on its own line) is not read reliably here, so then nothing is
+# added and that is logged.
 if { [ -f settings.gradle ] || [ -f settings.gradle.kts ]; } && command -v node >/dev/null 2>&1; then
     _gsame_js=$(mktemp)
     cat > "$_gsame_js" <<'GRADLE_SAME_NAME_JS'
@@ -914,22 +920,31 @@ text = text.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:"'])\/\/.*$/gm, '$1'
 const nameMatch = /rootProject\.name\s*=\s*["']([^"']+)["']/.exec(text);
 const rootName = nameMatch ? nameMatch[1] : path.basename(path.resolve(dir));
 const out = new Set();
+let conditional = false;
 // include("a", ":b:c") / include 'a', 'b' / include(listOf("a")), across lines.
 const inc = /\binclude\s*\(?\s*(?:listOf\s*\()?((?:\s*["'][^"'\n]+["']\s*,?)+)/g;
 let m;
 while ((m = inc.exec(text)) !== null) {
+  // The text up to the end of the include's first line.
+  const eol = text.indexOf('\n', m.index);
+  const upTo = text.slice(0, eol < 0 ? text.length : eol);
   for (const s of m[1].match(/["'][^"'\n]+["']/g) || []) {
     let p = s.slice(1, -1).trim();
     if (!/^:?[A-Za-z0-9_.\-]+(:[A-Za-z0-9_.\-]+)*$/.test(p)) continue;
     if (!p.startsWith(':')) p = ':' + p;
-    if (p.split(':').pop() === rootName) out.add(p);
+    if (p.split(':').pop() !== rootName) continue;
+    if (/\bif\s*\(|\bwhen\b/.test(upTo)) conditional = true;
+    out.add(p);
   }
 }
-process.stdout.write([...out].sort().map(p => p + ':dependencies').join(' '));
+if (conditional) process.stdout.write('conditional');
+else process.stdout.write([...out].sort().map(p => p + ':dependencies').join(' '));
 GRADLE_SAME_NAME_JS
     _gsame_tasks=$(node "$_gsame_js" . 2>/dev/null)
     rm -f "$_gsame_js"
-    if [ -n "$_gsame_tasks" ]; then
+    if [ "$_gsame_tasks" = conditional ]; then
+        log "gradle: a subproject has the root project's name, but its include may be conditional; its dependencies task is left to cdxgen"
+    elif [ -n "$_gsame_tasks" ]; then
         log "gradle: a subproject has the root project's name; asking cdxgen for $_gsame_tasks"
         if [ -n "${GRADLE_ARGS_DEPENDENCIES:-}" ]; then
             _gsame_args="$GRADLE_ARGS_DEPENDENCIES"
@@ -1656,7 +1671,8 @@ fi
 # Gradle build with no Gradle-resolved package. A build file that declares
 # external dependencies (an implementation, api, compileOnly, runtimeOnly,
 # compile, runtime, annotationProcessor, kapt or ksp line that is not a
-# project(), files() or fileTree() dependency) should give at least one
+# dependency on a project of the build, on local files or on Gradle itself)
+# should give at least one
 # pkg:maven component from Gradle's resolution. cdxgen marks every component it
 # reads from a dependencies task with cdx:gradle:GradleRootPath and, under the
 # configuration it came from, internal:GradleProfileName (GradleProfileName in
@@ -1666,25 +1682,78 @@ fi
 # gradle-packages step failing, so the generate step reads degraded and the
 # SBOM is not taken as complete. The build files are searched like the
 # non-shipped exclusion cdxgen is given, and not under build/ or .gradle/.
-# Only in an image that can run Gradle (java or gradle on PATH): a build file
-# beside the scanned language (the android/ folder of a JavaScript app read in
-# a Node image) is not one cdxgen was in a position to resolve.
-if [ "${rc:-1}" -eq 0 ] && [ -f "$OUT" ] && command -v node >/dev/null 2>&1 \
-   && { command -v java >/dev/null 2>&1 || command -v gradle >/dev/null 2>&1; }; then
-    set -- -name build -o -name .gradle -o -name node_modules -o -name '.?*'
-    if [ -n "$EXCLUDE_NON_SHIPPED" ]; then
-        for _gpk_x in $NON_SHIPPED_DIRS; do set -- "$@" -o -name "$_gpk_x"; done
-        for _gpk_x in $NON_SHIPPED_PATHS; do set -- "$@" -o -path "./$_gpk_x"; done
+# Only for a build cdxgen was in a position to resolve: a Gradle build at the
+# scan root, with ./gradlew and java or with gradle on PATH, or a folder below
+# it that has its own gradlew next to its settings or build file, with java.
+# A build file beside the scanned language (the android/ folder of a Flutter
+# or JavaScript app with no gradlew, read in an image without Gradle) is left
+# alone. buildSrc, build-logic and the builds settings.gradle(.kts) names in
+# includeBuild(...) hold build logic, not the product, and are not searched.
+# Dependencies on other projects of the build (project(...), projects.<name>,
+# a platform of one) and on Gradle itself (gradleApi(), localGroovy(),
+# gradleTestKit()) are not external. When gradle-dependencies already failed,
+# that label explains the gap and this one is not added.
+_gpk_skip=""
+case " $PREP_FAILED " in *" gradle-dependencies "*) _gpk_skip=1 ;; esac
+if [ "${rc:-1}" -eq 0 ] && [ -f "$OUT" ] && [ -z "$_gpk_skip" ] && command -v node >/dev/null 2>&1; then
+    _gpk_has_java=""; command -v java >/dev/null 2>&1 && _gpk_has_java=1
+    _gpk_has_gradle=""; command -v gradle >/dev/null 2>&1 && _gpk_has_gradle=1
+    # The folders to leave out of a search from $1: the fixed names, the
+    # non-shipped ones, and the included builds its settings file names.
+    gpk_prune_args() {
+        set -- "$1" -name build -o -name .gradle -o -name node_modules -o -name buildSrc -o -name build-logic -o -name '.?*'
+        _gpk_r="$1"; shift
+        if [ -n "$EXCLUDE_NON_SHIPPED" ]; then
+            for _gpk_x in $NON_SHIPPED_DIRS; do set -- "$@" -o -name "$_gpk_x"; done
+            for _gpk_x in $NON_SHIPPED_PATHS; do set -- "$@" -o -path "$_gpk_r/$_gpk_x"; done
+        fi
+        for _gpk_x in $(cat "$_gpk_r/settings.gradle" "$_gpk_r/settings.gradle.kts" 2>/dev/null \
+                        | sed 's#//.*##' \
+                        | grep -oE 'includeBuild[[:space:]]*\(?[[:space:]]*["'"'"'][A-Za-z0-9_./-]+["'"'"']' \
+                        | sed -E 's/^includeBuild[[:space:]]*\(?[[:space:]]*["'"'"']//; s/["'"'"']$//; s#^\./##; s#/$##'); do
+            case "$_gpk_x" in ''|/*|..|../*|*/../*|*/..) continue ;; esac
+            set -- "$@" -o -path "$_gpk_r/$_gpk_x"
+        done
+        for _gpk_x in "$@"; do printf '%s\n' "$_gpk_x"; done
+    }
+    # The Gradle builds to check, one folder per line.
+    _gpk_roots=""
+    if [ -f build.gradle ] || [ -f build.gradle.kts ] || [ -f settings.gradle ] || [ -f settings.gradle.kts ]; then
+        if { [ -f ./gradlew ] && [ -n "$_gpk_has_java" ]; } || [ -n "$_gpk_has_gradle" ]; then
+            _gpk_roots="."
+        fi
+    elif [ -n "$_gpk_has_java" ]; then
+        _gpk_args=$(gpk_prune_args .)
+        _gpk_old_ifs="$IFS"; IFS='
+'
+        # shellcheck disable=SC2086 # one find argument per line, globbing off
+        set -f; set -- $_gpk_args; set +f
+        IFS="$_gpk_old_ifs"
+        _gpk_roots=$(find . -type d \( "$@" \) ! -path . -prune -o -type f -name gradlew -print 2>/dev/null \
+            | sed 's#/gradlew$##' | while IFS= read -r _gpk_d; do
+                if [ -f "$_gpk_d/settings.gradle" ] || [ -f "$_gpk_d/settings.gradle.kts" ] \
+                   || [ -f "$_gpk_d/build.gradle" ] || [ -f "$_gpk_d/build.gradle.kts" ]; then
+                    printf '%s\n' "$_gpk_d"
+                fi
+            done | LC_ALL=C sort)
+        set --
     fi
-    _gpk_decl=$(find . -type d \( "$@" \) ! -path . -prune -o -type f \( -name build.gradle -o -name build.gradle.kts \) -print 2>/dev/null \
-        | while IFS= read -r _gpk_f; do
+    _gpk_decl=$(printf '%s\n' "$_gpk_roots" | while IFS= read -r _gpk_root; do
+        [ -n "$_gpk_root" ] || continue
+        _gpk_args=$(gpk_prune_args "$_gpk_root")
+        _gpk_old_ifs="$IFS"; IFS='
+'
+        # shellcheck disable=SC2086 # one find argument per line, globbing off
+        set -f; set -- $_gpk_args; set +f
+        IFS="$_gpk_old_ifs"
+        find "$_gpk_root" -type d \( "$@" \) ! -path "$_gpk_root" -prune -o -type f \( -name build.gradle -o -name build.gradle.kts \) -print 2>/dev/null
+    done | while IFS= read -r _gpk_f; do
             if sed 's#//.*##' "$_gpk_f" 2>/dev/null \
                 | grep -E '^[[:space:]]*(implementation|api|compileOnly|runtimeOnly|compile|runtime|annotationProcessor|kapt|ksp)([[:space:]]*[("'"'"']|[[:space:]]+[a-zA-Z])' \
-                | grep -vqE '^[[:space:]]*[a-zA-Z]+[[:space:]]*\(?[[:space:]]*(project|files|fileTree)[[:space:]]*\('; then
+                | grep -vqE '^[[:space:]]*[a-zA-Z]+[[:space:]]*\(?[[:space:]]*((enforcedPlatform|platform)[[:space:]]*\(?[[:space:]]*)?(project[[:space:]]*\(|projects\.|files[[:space:]]*\(|fileTree[[:space:]]*\(|gradleApi[[:space:]]*\(|localGroovy[[:space:]]*\(|gradleTestKit[[:space:]]*\()'; then
                 printf '%s\n' "${_gpk_f#./}"
             fi
-        done | LC_ALL=C sort | head -n 5)
-    set --
+        done | LC_ALL=C sort -u | head -n 5)
     if [ -n "$_gpk_decl" ]; then
         _gpk_js=$(mktemp)
         cat > "$_gpk_js" <<'GRADLE_PACKAGES_JS'

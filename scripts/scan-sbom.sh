@@ -1245,6 +1245,24 @@ fi
 # Use the same rule here, or a name such as "@acme/lib" is looked for under a name
 # the container never wrote ("SBOM not found on host", and no result file found).
 container_safe() { printf '%s' "$1" | sed 's/[^a-zA-Z0-9.-]/_/g' | sed 's/__*/_/g' | sed 's/^_//; s/_$//'; }
+
+# mask_log_secrets <in> <out>: copy a tool log with what can identify a
+# credential masked, for a copy kept beside the outputs: the user and password
+# of a URL (scheme://user:pass@ becomes scheme://***@), the value of an
+# Authorization header, a Bearer or Basic credential, and a value given to a
+# token, password, secret or API key name. Returns non-zero (and writes
+# nothing) when sed fails.
+mask_log_secrets() {
+    local q="[\"']"
+    sed -E \
+        -e "s#([A-Za-z][A-Za-z0-9+.-]*://)[^/@[:space:]\"']+@#\\1***@#g" \
+        -e "s#([Aa][Uu][Tt][Hh][Oo][Rr][Ii][Zz][Aa][Tt][Ii][Oo][Nn]${q}?[[:space:]]*[:=][[:space:]]*${q}?)([A-Za-z]+[[:space:]]+)?[^[:space:]\"',;]+#\\1\\2***#g" \
+        -e "s#([Bb][Ee][Aa][Rr][Ee][Rr]|[Bb][Aa][Ss][Ii][Cc])[[:space:]]+[A-Za-z0-9._~+/=-]{8,}#\\1 ***#g" \
+        -e "s#(([Tt][Oo][Kk][Ee][Nn]|[Pp][Aa][Ss][Ss][Ww][Oo][Rr][Dd]|[Pp][Aa][Ss][Ss][Ww][Dd]|[Ss][Ee][Cc][Rr][Ee][Tt]|[Aa][Pp][Ii][_-]?[Kk][Ee][Yy])${q}?[[:space:]]*[:=][[:space:]]*${q}?)[^[:space:]\"',;&]+#\\1***#g" \
+        "$1" > "$2.tmp" 2>/dev/null && mv "$2.tmp" "$2" && return 0
+    rm -f "$2.tmp"
+    return 1
+}
 SAFE_PROJECT=$(container_safe "$PROJECT_NAME")
 SAFE_VERSION=$(container_safe "$PROJECT_VERSION")
 OUTPUT_FILE="${SAFE_PROJECT}_${SAFE_VERSION}_bom.json"
@@ -1280,6 +1298,9 @@ GATE_RESULT_FILE="${OUTPUT_HOST_DIR}/${SAFE_PROJECT}_${SAFE_VERSION}_gate.result
 # The closing summary's facts (docker/lib/validate-sbom.sh) belong to this run only.
 SUMMARY_RESULT_FILE="${OUTPUT_HOST_DIR}/${SAFE_PROJECT}_${SAFE_VERSION}_summary.result"
 rm -f "$SUMMARY_RESULT_FILE"
+# A cdxgen log an earlier source scan kept (see stage 1 below) is not this
+# run's, whatever mode this run is.
+rm -f "${OUTPUT_HOST_DIR}/${SAFE_PROJECT}_${SAFE_VERSION}_cdxgen.log"
 
 # A SOURCE scan writes $OUTPUT_FILE in two containers: stage 1 (cdxgen) here on
 # the host first, stage 2 (POSTPROCESS, entrypoint.sh) after. entrypoint.sh's
@@ -3018,8 +3039,6 @@ if [ "$MODE" = "SOURCE" ]; then
     fi
     HOST_GOTOOLCHAIN="${GOTOOLCHAIN:-}"
     STAGE1_FALLBACK_ENV=""; STAGE1_FAILED=""; STAGE1_LOG=""
-    # A cdxgen log an earlier run kept (see below) is not this run's.
-    rm -f "$OUTPUT_HOST_DIR/${SAFE_PROJECT}_${SAFE_VERSION}_cdxgen.log"
     if [ "$DETECTION_USED" = static ]; then
         echo "[INFO] Detection: static ($DETECTION_WHY); the dependency build is skipped."
         STAGE1_FALLBACK_ENV=" -e BOMLENS_DETECTION=static -e BOMLENS_DETECTION_WHY=$DETECTION_WHY"
@@ -3217,16 +3236,33 @@ if [ "$MODE" = "SOURCE" ]; then
         # resolved package included) leaves an SBOM that is short of what the
         # project declares; the log is what says why, so it is kept beside the
         # outputs instead of being removed.
+        # The kept copy has credentials in URLs and token-like values masked
+        # (mask_log_secrets); when masking fails the log is removed instead.
+        # A gradle-packages failure is announced by stage 2 itself, so it is
+        # not repeated here; the log path is still printed.
         if grep -q '"bomlens:pipeline-step-failed"' "$OUTPUT_HOST_DIR/$OUTPUT_FILE" 2>/dev/null; then
             _s1_kept="$OUTPUT_HOST_DIR/${SAFE_PROJECT}_${SAFE_VERSION}_cdxgen.log"
             _s1_steps=""
             if command -v jq >/dev/null 2>&1; then
-                _s1_steps="$(jq -r '[.metadata.properties[]? | select(.name == "bomlens:pipeline-step-failed") | .value | strings] | unique | join(", ")' "$OUTPUT_HOST_DIR/$OUTPUT_FILE" 2>/dev/null)"
+                # A truncated SBOM makes jq fail; the run goes on to stage 2,
+                # which reports an unreadable SBOM the usual way.
+                _s1_steps="$(jq -r '[.metadata.properties[]? | select(.name == "bomlens:pipeline-step-failed") | .value | strings] | unique | join(", ")' "$OUTPUT_HOST_DIR/$OUTPUT_FILE" 2>/dev/null)" || _s1_steps=""
             fi
-            if mv "$STAGE1_LOG" "$_s1_kept" 2>/dev/null; then
+            _s1_other="$(printf '%s\n' "$_s1_steps" | tr ',' '\n' | sed 's/^ *//; s/ *$//' | grep -vx 'gradle-packages' | grep . | tr '\n' ',' | sed 's/,$//; s/,/, /g')" || _s1_other=""
+            if mask_log_secrets "$STAGE1_LOG" "$_s1_kept"; then
+                rm -f "$STAGE1_LOG"
                 STAGE1_LOG="$_s1_kept"
+                _s1_where="cdxgen log (a diagnostic file with credentials in URLs masked, not meant for distribution): $STAGE1_LOG"
+            else
+                rm -f "$STAGE1_LOG" "$_s1_kept"
+                STAGE1_LOG=""
+                _s1_where="the cdxgen log could not be masked, so it was not kept."
             fi
-            echo "[WARN] cdxgen finished, but a preprocessing step failed${_s1_steps:+ ($_s1_steps)}; the SBOM may lack dependencies. cdxgen log: $STAGE1_LOG"
+            if [ -n "$_s1_other" ] || [ -z "$_s1_steps" ]; then
+                echo "[WARN] cdxgen finished, but a preprocessing step failed${_s1_other:+ ($_s1_other)}; the SBOM may lack dependencies. ${_s1_where}"
+            else
+                echo "[INFO] ${_s1_where}"
+            fi
         else
             rm -f "$STAGE1_LOG"
         fi
