@@ -2075,6 +2075,96 @@ NWMF_JS
     rm -f "$_nwmf"
 fi
 
+# Go scope: cdxgen sets scope "optional" on every module go.mod marks
+# `// indirect` (it reads the flag as direct vs indirect, and keeps it in the
+# cdx:go:indirect property too). An indirect module is often compiled into the
+# program, and readers that leave out optional components (the NOTICE, a
+# vulnerability gate) then drop real dependencies. So the modules the build
+# uses are listed here with the same `go list -deps ./...` cdxgen runs (default
+# flags, so the same readonly or vendor mode, and the same go.work), once per
+# go.mod as cdxgen's own search finds them, and a pkg:golang/ component with
+# scope optional that is in that list becomes required. cdx:go:indirect is left
+# as it is. A module outside every list keeps optional. A module whose
+# `go list` fails adds nothing to the list; when none succeeds the SBOM is left
+# untouched. A replaced module is listed under the module that replaces it, the
+# name cdxgen gives the component (a local replacement keeps the original path
+# and has no version). Up to _gscope_max modules are listed.
+_gscope_max=20
+if [ "${rc:-1}" -eq 0 ] && [ -f "$OUT" ] && command -v go >/dev/null 2>&1 \
+   && command -v node >/dev/null 2>&1 && grep -q '"pkg:golang/' "$OUT" 2>/dev/null; then
+    set -- -name vendor -o -name node_modules -o -name build -o -name test-fixtures -o -name '.?*'
+    if [ -n "$EXCLUDE_NON_SHIPPED" ]; then
+        for _gscope_x in $NON_SHIPPED_DIRS; do set -- "$@" -o -name "$_gscope_x"; done
+        for _gscope_x in $NON_SHIPPED_PATHS; do set -- "$@" -o -path "./$_gscope_x"; done
+    fi
+    _gscope_mods=$(find . -type d \( "$@" \) ! -path . -prune -o -type f -name go.mod -print 2>/dev/null \
+        | sed 's|/go\.mod$||' | LC_ALL=C sort | head -n "$_gscope_max")
+    set --
+    _gscope_list=$(mktemp)
+    _gscope_one=$(mktemp)
+    _gscope_ok=0
+    _gscope_tmpl='{{with .Module}}{{if not .Main}}{{.Path}}@{{.Version}}{{"\n"}}{{.Path}}@{{with .Replace}}{{if .Version}}{{"\n"}}{{.Path}}@{{.Version}}{{end}}{{end}}{{end}}{{end}}'
+    while IFS= read -r _gscope_d; do
+        [ -n "$_gscope_d" ] || continue
+        run_supervised_timeout "$PREP_TIMEOUT_DEFAULT" sh -c 'cd "$1" && go list -deps -f "$2" ./... > "$3" 2>/dev/null' \
+            _ "$_gscope_d" "$_gscope_tmpl" "$_gscope_one"
+        _gscope_rc=$?
+        if [ "$_gscope_rc" -eq 0 ]; then
+            cat "$_gscope_one" >> "$_gscope_list"
+            _gscope_ok=$((_gscope_ok + 1))
+        else
+            log "go: could not list the build graph of $_gscope_d (go list -deps rc=$_gscope_rc); its indirect modules keep the scope cdxgen gave them"
+        fi
+    done <<EOF
+$_gscope_mods
+EOF
+    if [ "$_gscope_ok" -gt 0 ]; then
+        _gscope_js=$(mktemp)
+        cat > "$_gscope_js" <<'GOSCOPE_JS'
+const fs = require('fs');
+const [bomPath, listPath] = process.argv.slice(2);
+let bom;
+try { bom = JSON.parse(fs.readFileSync(bomPath, 'utf8')); } catch (e) { process.exit(0); }
+if (!Array.isArray(bom.components)) process.exit(0);
+// path@version, one per line, from `go list -deps`; a module path with no
+// version (a local replacement) ends in a bare @.
+const built = new Set(fs.readFileSync(listPath, 'utf8').split('\n')
+  .map(l => l.trim().toLowerCase()).filter(l => l.includes('@')));
+if (built.size === 0) process.exit(0);
+// pkg:golang/<path>@<version>[?qualifiers][#subpath], percent-encoded.
+function keyOf(purl) {
+  const m = /^pkg:golang\/([^?#]+)/.exec(purl || '');
+  if (!m) return null;
+  const body = m[1];
+  const at = body.lastIndexOf('@');
+  let name = at >= 0 ? body.slice(0, at) : body;
+  let version = at >= 0 ? body.slice(at + 1) : '';
+  try { name = decodeURIComponent(name); version = decodeURIComponent(version); } catch (e) { return null; }
+  return (name + '@' + version).toLowerCase();
+}
+let changed = 0;
+const visit = list => {
+  for (const c of list || []) {
+    if (c && c.scope === 'optional') {
+      const k = keyOf(c.purl);
+      if (k && built.has(k)) { c.scope = 'required'; changed++; }
+    }
+    if (c && Array.isArray(c.components)) visit(c.components);
+  }
+};
+visit(bom.components);
+if (changed === 0) process.exit(0);
+fs.writeFileSync(bomPath, JSON.stringify(bom, null, 2));
+process.stderr.write('[build-prep] go: ' + changed + ' indirect module(s) in the build graph marked required (cdx:go:indirect kept)\n');
+GOSCOPE_JS
+        node "$_gscope_js" "$OUT" "$_gscope_list" || log "go: scope correction skipped (non-fatal)"
+        rm -f "$_gscope_js"
+    elif [ -n "$_gscope_mods" ]; then
+        log "go: no build graph could be listed; indirect modules keep scope optional"
+    fi
+    rm -f "$_gscope_list" "$_gscope_one"
+fi
+
 # Scope filter (Maven, PHP/Composer): cdxgen tags each component's resolved
 # scope itself (Maven: compile/runtime -> required, test -> optional,
 # provided/system -> excluded; Composer: require -> required, require-dev ->

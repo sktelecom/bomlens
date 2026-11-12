@@ -6070,6 +6070,97 @@ else
         || fail "filter turned on with no composer.json present" "got [$_t_nocomposer]"
 fi
 
+echo "== go-scope: indirect Go modules in the build graph become required =="
+# Guards docker/lib/build-prep.sh's Go scope correction: cdxgen marks every
+# `// indirect` module scope optional, so the ones `go list -deps ./...` lists
+# are set to required, cdx:go:indirect is kept, and a module outside the list
+# keeps optional. Extract the real JS and shell block (no logic duplication)
+# and drive the block with a stand-in go.
+if command -v node >/dev/null 2>&1; then
+    PREP="$ROOT_DIR/docker/lib/build-prep.sh"
+    GSJS="$WORK/go-scope.js"
+    sed -n "/<<'GOSCOPE_JS'/,/^GOSCOPE_JS\$/p" "$PREP" | sed '1d;$d' > "$GSJS"
+    _gs_block=$(sed -n '/^# Go scope: cdxgen sets/,/^fi$/p' "$PREP")
+    if [ -s "$GSJS" ] && [ -n "$_gs_block" ]; then
+        cat > "$WORK/go-scope-bom.json" <<'JSON'
+{"bomFormat":"CycloneDX","specVersion":"1.6",
+ "metadata":{"component":{"name":"example.com/demo","bom-ref":"root"}},
+ "components":[
+   {"name":"cobra","version":"v1.8.0","purl":"pkg:golang/github.com/spf13/cobra@v1.8.0","scope":"required","properties":[{"name":"cdx:go:indirect","value":"false"}]},
+   {"name":"pflag","version":"v1.0.5","purl":"pkg:golang/github.com/spf13/pflag@v1.0.5","scope":"optional","properties":[{"name":"cdx:go:indirect","value":"true"}]},
+   {"name":"mousetrap","version":"v1.1.0","purl":"pkg:golang/github.com/inconshreveable/mousetrap@v1.1.0","scope":"optional","properties":[{"name":"cdx:go:indirect","value":"true"}]},
+   {"name":"Azure","version":"v0.5.0","purl":"pkg:golang/github.com/Azure/go-ntlmssp@v0.5.0?type=module","scope":"optional"},
+   {"name":"fork","version":"v2.0.0","purl":"pkg:golang/example.com/fork@v2.0.0","scope":"optional","properties":[{"name":"cdx:go:replaces","value":"example.com/orig@v1.0.0"}]},
+   {"name":"local","purl":"pkg:golang/example.com/local","scope":"optional"},
+   {"name":"pyopt","version":"1.0","purl":"pkg:pypi/pyopt@1.0","scope":"optional"}
+ ]}
+JSON
+        cat > "$WORK/go-scope-list.txt" <<'LIST'
+github.com/spf13/cobra@v1.8.0
+github.com/spf13/cobra@
+github.com/spf13/pflag@v1.0.5
+github.com/spf13/pflag@
+github.com/azure/go-ntlmssp@v0.5.0
+
+example.com/orig@v1.0.0
+example.com/orig@
+example.com/fork@v2.0.0
+example.com/local@
+LIST
+        node "$GSJS" "$WORK/go-scope-bom.json" "$WORK/go-scope-list.txt" 2>/dev/null
+        _gs_scopes=$(jq -r '[.components[] | "\(.name)=\(.scope)"] | join(",")' "$WORK/go-scope-bom.json")
+        if [ "$_gs_scopes" = "cobra=required,pflag=required,mousetrap=optional,Azure=required,fork=required,local=required,pyopt=optional" ]; then
+            pass "listed indirect modules (replaced and local included) required; unlisted Go and non-Go optional kept"
+        else
+            fail "unexpected scopes after the Go scope correction" "$_gs_scopes"
+        fi
+        if [ "$(jq -r '.components[] | select(.name=="pflag") | .properties[] | select(.name=="cdx:go:indirect") | .value' "$WORK/go-scope-bom.json")" = "true" ]; then
+            pass "cdx:go:indirect kept on a promoted module"
+        else
+            fail "cdx:go:indirect lost on pflag"
+        fi
+
+        # The shell block: a stand-in go prints the list, or fails.
+        _gs_bin="$WORK/gs-bin"; mkdir -p "$_gs_bin"
+        cat > "$_gs_bin/go" <<'STUB'
+#!/bin/sh
+[ "$GS_FAIL" = 1 ] && { echo "go: updates to go.mod needed" >&2; exit 1; }
+cat "$GS_LIST"
+STUB
+        chmod +x "$_gs_bin/go"
+        _gs_prelude='log() { echo "[build-prep] $*"; }; run_supervised_timeout() { shift; "$@"; }; PREP_TIMEOUT_DEFAULT=5; rc=0; EXCLUDE_NON_SHIPPED=1; NON_SHIPPED_DIRS="test testdata"; NON_SHIPPED_PATHS=".github/workflows"'
+        _gs_run() {  # <fail>
+            rm -rf "$WORK/gs-proj"; mkdir -p "$WORK/gs-proj"
+            printf 'module example.com/demo\n' > "$WORK/gs-proj/go.mod"
+            cp "$WORK/go-scope-bom.orig.json" "$WORK/gs-proj/bom.json"
+            ( cd "$WORK/gs-proj" && PATH="$_gs_bin:$PATH" GS_FAIL="$1" GS_LIST="$WORK/go-scope-list.txt" \
+                OUT="$WORK/gs-proj/bom.json" bash -c "$_gs_prelude; $_gs_block" ) 2>&1
+        }
+        jq '(.components[] | select(.purl | startswith("pkg:golang/")) | select(.name != "cobra")) .scope = "optional"' \
+            "$WORK/go-scope-bom.json" > "$WORK/go-scope-bom.orig.json"
+        _gs_run 0 >/dev/null
+        if [ "$(jq -r '.components[] | select(.name=="pflag") | .scope' "$WORK/gs-proj/bom.json")" = "required" ]; then
+            pass "build-prep block: go list succeeds, pflag promoted"
+        else
+            fail "build-prep block did not promote pflag"
+        fi
+        _gs_log=$(_gs_run 1)
+        if cmp -s "$WORK/go-scope-bom.orig.json" "$WORK/gs-proj/bom.json"; then
+            pass "build-prep block: go list fails, SBOM left untouched"
+        else
+            fail "build-prep block changed the SBOM although go list failed"
+        fi
+        case "$_gs_log" in
+            *"could not list the build graph"*) pass "build-prep block: go list failure is logged" ;;
+            *) fail "go list failure not logged" "$_gs_log" ;;
+        esac
+    else
+        fail "could not extract the Go scope correction from build-prep.sh"
+    fi
+else
+    echo "  SKIP: node unavailable, skipping Go scope test"
+fi
+
 echo "== maven-hashes: build-prep fetches dependency jars where cdxgen reads them for hashes =="
 # cdxgen computes a Maven component's hashes only from its jar under
 # $HOME/.m2/repository, and its dependency:tree run downloads poms, not jars.
