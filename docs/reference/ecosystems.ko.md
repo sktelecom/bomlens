@@ -88,6 +88,8 @@ npm, Python(pip), Go, Rust(Cargo) 패키지는 소스 스캔이 설치된 패키
 
 > 주의: Maven과 마찬가지로 해석하려면 컨테이너가 Maven Central(또는 사내 미러)에 접속할 수 있어야 합니다. 접속하지 못하면 직접 의존성만 담기고 라이선스가 빌 수 있습니다. 컴포넌트 수가 예상보다 훨씬 적으면 네트워크 접속부터 확인하세요.
 
+Gradle 툴체인은 지정한 버전의 JDK를 정확히 요구하는데, cdxgen 이미지에는 그 이미지의 JDK 하나만 있습니다. 그래서 스캔은 빌드가 선언한 툴체인을 보고 이미지를 고릅니다. 읽는 선언은 `JavaLanguageVersion.of(N)`(`languageVersion = ...` 또는 `languageVersion.set(...)` 형태)과 Kotlin `jvmToolchain(N)`이고, 여섯 단계 아래까지의 `*.gradle`과 `*.gradle.kts` 파일(`buildSrc`와 컨벤션 플러그인 포함)에서 찾습니다. 가장 높은 버전이 Java 21보다 새로우면 `cdxgen-temurin-java25`에서 실행하고 그 사실을 `[INFO]` 줄로 알립니다. 그 밖에는 `cdxgen-temurin-java21`에서 실행합니다. 속성이나 버전 카탈로그에서 가져온 버전은 읽지 못합니다. 이런 경우나 공개된 이미지에 없는 JDK가 필요하면 `CDXGEN_JAVA_IMAGE`로 쓸 이미지를 지정합니다([CLI 레퍼런스](cli.ko.md)). Maven은 이런 선택이 필요 없습니다. `maven.compiler.release`와 toolchains 플러그인은 컴파일할 때 적용되고, 의존성 해석은 이것 없이 실행됩니다.
+
 ---
 
 ## Android

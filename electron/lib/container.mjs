@@ -545,6 +545,8 @@ export class UiContainer {
       // docker takes the value from this process's environment, if set.
       "-e",
       "CDXGEN_IMAGE_PREFIX",
+      "-e",
+      "CDXGEN_JAVA_IMAGE",
       this.image,
     ];
     const r = await run(dockerBin, args);

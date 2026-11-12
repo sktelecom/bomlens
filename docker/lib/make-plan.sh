@@ -73,7 +73,7 @@ case "$lang" in
         detail="Android needs a locally built SDK image (${ANDROID_IMAGE_PREFIX}$(android_api "$SRC")); it is not published"
         ;;
     *)
-        image="$(img_for_lang "$lang")"
+        image="$(img_for_lang "$lang" "$SRC")"
         digest="$(cdxgen_pinned_digest "$image" "$LIBDIR")"
         if [ -z "$digest" ]; then
             status="unsupported"; reason="no-pinned-digest"

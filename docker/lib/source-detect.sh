@@ -677,13 +677,83 @@ detect_lang() {
     if [ "$#" -eq 1 ]; then echo "$1"; elif [ "$#" -eq 0 ]; then echo "unknown"; else echo "mixed"; fi
 }
 
+# The highest Java toolchain version the Gradle builds under $1 declare, or
+# nothing. A Gradle toolchain asks for that exact JDK, and without a toolchain
+# download repository the build fails to resolve its dependencies when the
+# image has another one. Read from *.gradle and *.gradle.kts files up to six
+# levels down (buildSrc and build-logic convention plugins sit that deep),
+# skipping the folders _detect_first skips and commented-out lines:
+#   JavaLanguageVersion.of(25)  (languageVersion.set(...), languageVersion = ...)
+#   jvmToolchain(25)            (Kotlin)
+# A version taken from a property or a version catalog is not read. Maven is
+# not read either: maven.compiler.release and the toolchains plugin take effect
+# when the build compiles, and dependency resolution (dependency:tree) runs
+# without them on the image's JDK.
+java_toolchain_version() {
+    local d="$1" n prune=()
+    [ -n "$d" ] && [ -d "$d" ] || return 0
+    for n in .git .gradle node_modules vendor build target bin obj .build Pods .venv ${NON_SHIPPED_DIRS:-}; do
+        prune+=(-o -name "$n")
+    done
+    (cd "$d" 2>/dev/null && find . -maxdepth 6 \( "${prune[@]:1}" \) -prune -o -type f \( -name '*.gradle' -o -name '*.gradle.kts' \) \
+        -exec grep -hE 'JavaLanguageVersion\.of[[:space:]]*\(|jvmToolchain[[:space:]]*\(' {} + 2>/dev/null) \
+        | grep -vE '^[[:space:]]*(//|/\*|\*)' \
+        | grep -oE "(JavaLanguageVersion\.of|jvmToolchain)[[:space:]]*\([[:space:]]*[\"']?[0-9]+" \
+        | grep -oE '[0-9]+$' | sort -n | tail -1 || true
+}
+
+# The JDK of the default cdxgen Java image, and the newest one published.
+CDXGEN_JAVA_DEFAULT=21
+CDXGEN_JAVA_NEWEST=25
+
+# CDXGEN_JAVA_IMAGE when it is set and reads as an image reference, else
+# nothing. The value reaches a docker command line.
+_java_image_override() {
+    case "${CDXGEN_JAVA_IMAGE:-}" in
+        '') return 0 ;;
+        [A-Za-z0-9]*) case "$CDXGEN_JAVA_IMAGE" in *[!A-Za-z0-9._/:@-]*) return 0 ;; esac
+                      echo "$CDXGEN_JAVA_IMAGE" ;;
+    esac
+}
+
+# java_image_note <dir>: the lines that say why img_for_lang picked the Java
+# image it did for <dir>; nothing for the default image.
+java_image_note() {
+    local v
+    if [ -n "${CDXGEN_JAVA_IMAGE:-}" ]; then
+        if [ -n "$(_java_image_override)" ]; then
+            echo "[INFO] Java image from CDXGEN_JAVA_IMAGE: $CDXGEN_JAVA_IMAGE"
+            return 0
+        fi
+        echo "[WARN] CDXGEN_JAVA_IMAGE is not an image reference and is ignored: $CDXGEN_JAVA_IMAGE"
+    fi
+    v="$(java_toolchain_version "${1:-}")"
+    [ -n "$v" ] && [ "$v" -gt "$CDXGEN_JAVA_DEFAULT" ] || return 0
+    echo "[INFO] The Gradle build declares a Java $v toolchain; using the cdxgen Java $CDXGEN_JAVA_NEWEST image."
+    if [ "$v" -gt "$CDXGEN_JAVA_NEWEST" ]; then
+        echo "[WARN]   No published cdxgen image has Java $v, so dependency resolution can fail."
+        echo "[WARN]   Set CDXGEN_JAVA_IMAGE to an image with a Java $v JDK."
+    fi
+}
+
+# img_for_lang <lang> [dir]: the cdxgen image for a detected language. For
+# java, <dir> is the scanned tree, and a declared toolchain newer than the
+# default image's JDK picks the newest Java image. CDXGEN_JAVA_IMAGE, a full
+# image reference, wins over both.
 img_for_lang() {
-    local p="$CDXGEN_IMAGE_PREFIX"
+    local p="$CDXGEN_IMAGE_PREFIX" v=""
     case "$1" in
         rust)   echo "${p}cdxgen-debian-rust:$CDXGEN_TAG" ;;
         go)     echo "${p}cdxgen-debian-golang124:$CDXGEN_TAG" ;;
         ruby)   echo "${p}cdxgen-debian-ruby34:$CDXGEN_TAG" ;;
-        java)   echo "${p}cdxgen-temurin-java21:$CDXGEN_TAG" ;;
+        java)   v="$(_java_image_override)"
+                if [ -n "$v" ]; then echo "$v"; return 0; fi
+                v="$(java_toolchain_version "${2:-}")"
+                if [ -n "$v" ] && [ "$v" -gt "$CDXGEN_JAVA_DEFAULT" ]; then
+                    echo "${p}cdxgen-temurin-java${CDXGEN_JAVA_NEWEST}:$CDXGEN_TAG"
+                else
+                    echo "${p}cdxgen-temurin-java${CDXGEN_JAVA_DEFAULT}:$CDXGEN_TAG"
+                fi ;;
         python) echo "${p}cdxgen-python312:$CDXGEN_TAG" ;;
         node)   echo "${p}cdxgen-alpine-node24:$CDXGEN_TAG" ;;
         php)    echo "${p}cdxgen-debian-php84:$CDXGEN_TAG" ;;

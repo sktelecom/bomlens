@@ -514,6 +514,60 @@ got="$(detect_lang "$LANGDIR/proj")"
 [ "$got" = "dotnet" ] && pass "a root .slnx detects as dotnet" \
     || fail "a root .slnx detects as '$got'"
 
+echo "== a declared Java toolchain picks the cdxgen Java image =="
+# A Gradle toolchain asks for that exact JDK. The Java 21 image cannot resolve
+# the dependencies of a build that declares Java 25, so the SBOM had none.
+J21="${CDXGEN_IMAGE_PREFIX}cdxgen-temurin-java21:$CDXGEN_TAG"
+J25="${CDXGEN_IMAGE_PREFIX}cdxgen-temurin-java25:$CDXGEN_TAG"
+java_case() {  # java_case <want> <description> [CDXGEN_JAVA_IMAGE]
+    local got
+    got="$(CDXGEN_JAVA_IMAGE="${3:-}" img_for_lang java "$LANGDIR/proj")"
+    [ "$got" = "$1" ] && pass "$2" || fail "$2" "got '$got', want '$1'"
+}
+gradle_tree() {  # gradle_tree <path under proj> <content>
+    rm -rf "${LANGDIR:?}/proj" && mkdir -p "$LANGDIR/proj/$(dirname "$1")"
+    printf 'rootProject.name = "demo"\n' > "$LANGDIR/proj/settings.gradle.kts"
+    printf '%b' "$2" > "$LANGDIR/proj/$1"
+}
+gradle_tree build.gradle.kts 'plugins { java }\njava {\n    toolchain {\n        languageVersion = JavaLanguageVersion.of(25)\n    }\n}\n'
+[ "$(detect_lang "$LANGDIR/proj")" = java ] && pass "the toolchain 25 fixture detects as java" || fail "toolchain fixture is not java"
+java_case "$J25" "Kotlin DSL languageVersion = JavaLanguageVersion.of(25) picks the Java 25 image"
+note="$(java_image_note "$LANGDIR/proj")"
+case "$note" in "[INFO] "*"Java 25 toolchain"*) pass "the INFO line names the Java 25 toolchain" ;;
+    *) fail "no INFO line for the Java 25 toolchain" "$note" ;; esac
+[ "$(img_for_lang java)" = "$J21" ] && pass "without a scanned folder, java stays on the Java 21 image" \
+    || fail "img_for_lang java with no folder: $(img_for_lang java)"
+java_case "registry.example/java25:1" "CDXGEN_JAVA_IMAGE wins over the declared toolchain" "registry.example/java25:1"
+java_case "$J25" "a CDXGEN_JAVA_IMAGE that is not an image reference is ignored" 'bad;rm -rf /'
+case "$(CDXGEN_JAVA_IMAGE='bad;x' java_image_note "$LANGDIR/proj")" in
+    *"[WARN] CDXGEN_JAVA_IMAGE is not an image reference"*) pass "an unusable CDXGEN_JAVA_IMAGE is reported" ;;
+    *) fail "an unusable CDXGEN_JAVA_IMAGE is not reported" ;; esac
+[ "$(CDXGEN_IMAGE_PREFIX=registry.example/mirror/cdxgen/ img_for_lang java "$LANGDIR/proj")" = "registry.example/mirror/cdxgen/cdxgen-temurin-java25:$CDXGEN_TAG" ] \
+    && pass "the Java 25 image comes from CDXGEN_IMAGE_PREFIX too" || fail "the Java 25 image ignores CDXGEN_IMAGE_PREFIX"
+
+gradle_tree build.gradle.kts 'plugins { java }\njava { toolchain { languageVersion = JavaLanguageVersion.of(21) } }\n'
+java_case "$J21" "a Java 21 toolchain stays on the Java 21 image"
+[ -z "$(java_image_note "$LANGDIR/proj")" ] && pass "a Java 21 toolchain prints no note" || fail "a Java 21 toolchain prints a note"
+gradle_tree build.gradle.kts 'plugins { java }\ndependencies { implementation("a:b:1") }\n'
+java_case "$J21" "a build with no toolchain stays on the Java 21 image"
+gradle_tree build.gradle 'java {\n  toolchain {\n    languageVersion.set(JavaLanguageVersion.of("25"))\n  }\n}\n'
+java_case "$J25" "Groovy DSL languageVersion.set(JavaLanguageVersion.of(\"25\")) picks the Java 25 image"
+gradle_tree build.gradle.kts 'kotlin {\n    jvmToolchain(25)\n}\n'
+java_case "$J25" "Kotlin jvmToolchain(25) picks the Java 25 image"
+gradle_tree buildSrc/src/main/kotlin/java-conventions.gradle.kts 'java { toolchain { languageVersion.set(JavaLanguageVersion.of(25)) } }\n'
+java_case "$J25" "a buildSrc convention plugin's toolchain picks the Java 25 image"
+gradle_tree build.gradle.kts 'java {\n    // languageVersion = JavaLanguageVersion.of(25)\n    toolchain { languageVersion = JavaLanguageVersion.of(17) }\n}\n'
+java_case "$J21" "a commented-out toolchain line is not read"
+gradle_tree examples/demo/build.gradle.kts 'kotlin { jvmToolchain(25) }\n'
+java_case "$J21" "a toolchain under examples/ (not shipped) is not read"
+gradle_tree app/build.gradle.kts 'kotlin { jvmToolchain(17) }\n'
+printf 'kotlin { jvmToolchain(25) }\n' > "$LANGDIR/proj/build.gradle.kts"
+java_case "$J25" "the highest toolchain across modules decides"
+gradle_tree build.gradle.kts 'kotlin { jvmToolchain(26) }\n'
+java_case "$J25" "a toolchain newer than any image still gets the newest one"
+case "$(java_image_note "$LANGDIR/proj")" in *"[WARN]"*"CDXGEN_JAVA_IMAGE"*) pass "a toolchain newer than any image points at CDXGEN_JAVA_IMAGE" ;;
+    *) fail "no CDXGEN_JAVA_IMAGE hint for a Java 26 toolchain" ;; esac
+
 echo "== --model routes a Figshare item to the dataset path =="
 # One option takes both AI inputs a person is handed a link to, so the reference
 # itself decides which path runs. The server applies the same rule on the string

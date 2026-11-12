@@ -836,6 +836,10 @@ Environment:
   CDXGEN_IMAGE_PREFIX    Where the cdxgen images come from (language and
                          all-in-one), everything before the image name (default
                          ghcr.io/cdxgen/); set it to a registry mirror's path
+  CDXGEN_JAVA_IMAGE      The cdxgen image for a Java source scan, a full image
+                         reference used as is. Unset, a Gradle toolchain newer
+                         than Java 21 picks cdxgen-temurin-java25, otherwise
+                         cdxgen-temurin-java21
   SBOM_FIRMWARE_IMAGE    Override the firmware image
   SBOM_AIBOM_IMAGE       Override the AI SBOM (OWASP AIBOM Generator) image
   SBOM_DEEP_CVE_IMAGE    Override the deep-cve (grype) image
@@ -1138,7 +1142,7 @@ if [ "$UI_MODE" = "true" ]; then
     # itself; a host-side default here would never be seen there).
     CANCEL_ENV_FLAGS=(-e BOMLENS_CANCEL_GRACE)
     # The web UI's source scans pull the cdxgen images from the same mirror.
-    CDXGEN_ENV_FLAGS=(-e CDXGEN_IMAGE_PREFIX -e BOMLENS_OS_LICENSES)
+    CDXGEN_ENV_FLAGS=(-e CDXGEN_IMAGE_PREFIX -e CDXGEN_JAVA_IMAGE -e BOMLENS_OS_LICENSES)
     # /bomlens-state: the same host-persistent guard-state directory
     # the CLI path uses, so a directory scan launched through --ui can also
     # recover a source tree a prior, too-hard-killed scan left dirty. entrypoint.sh
@@ -3000,8 +3004,9 @@ if [ "$MODE" = "SOURCE" ]; then
             exit 1
         fi
     else
-        CDX_IMG=$(img_for_lang "$LANG_DET")
+        CDX_IMG=$(img_for_lang "$LANG_DET" "$SCAN_INPUT_DIR")
         echo "[INFO] Language: $LANG_DET -> $CDX_IMG"
+        if [ "$LANG_DET" = "java" ]; then java_image_note "$SCAN_INPUT_DIR"; fi
         if [ "$LANG_DET" = "swift" ]; then
             echo "[INFO] iOS/Swift: SPM (Package.resolved) and CocoaPods (Podfile.lock) are read from the committed lockfiles; commit them for a complete result."
             echo "[WARN]   UIKit platform and Xcode-driven dependencies require macOS and are NOT resolved in this Linux container."

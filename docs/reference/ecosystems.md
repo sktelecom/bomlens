@@ -88,6 +88,8 @@ Detected file: `build.gradle` or `build.gradle.kts`
 
 > Note: as with Maven, resolution needs the container to reach Maven Central, or your mirror. When it cannot, the result can hold only the direct dependencies, with no licenses. If the component count is far below what you expect, check network access first.
 
+A Gradle toolchain asks for that exact JDK, and the cdxgen image has only its own, so the scan picks the image from the toolchain the build declares: `JavaLanguageVersion.of(N)` (as `languageVersion = ...` or `languageVersion.set(...)`) or Kotlin `jvmToolchain(N)`, in the `*.gradle` and `*.gradle.kts` files up to six folders down, `buildSrc` and convention plugins included. When the highest one is newer than Java 21, the scan runs in `cdxgen-temurin-java25` and prints an `[INFO]` line that says so; otherwise in `cdxgen-temurin-java21`. A version read from a property or a version catalog is not seen. In that case, or for a JDK no published image has, set `CDXGEN_JAVA_IMAGE` to the image to use ([CLI reference](cli.md)). Maven needs no such choice: `maven.compiler.release` and the toolchains plugin apply when the build compiles, and dependency resolution runs without them.
+
 ---
 
 ## Android

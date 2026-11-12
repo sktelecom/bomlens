@@ -818,8 +818,16 @@ P="$(plan_run empty "$EMPTYSRC")"
     && [ ! -f "$P/bomlens-plan.json" ] && [ "$(jq -r '[.steps[] | select(.id=="plan")][0].status' "$P/bomlens-result.json")" = "failed" ] \
     && pass "an empty source is refused: no plan, plan step failed" \
     || fail "empty source: rc $(cat "$P.rc"), $(jq -c '[.run.status, .steps]' "$P/bomlens-result.json")"
+# A Gradle build with a Java 25 toolchain: the plan names the Java 25 image, pinned.
+J25SRC="$WORK/plan-src-java25"; mkdir -p "$J25SRC"
+printf 'plugins { java }\njava { toolchain { languageVersion = JavaLanguageVersion.of(25) } }\n' > "$J25SRC/build.gradle.kts"
+P="$(plan_run java25 "$J25SRC")"
+[ "$(jq -r '.stages[0] | .image + " " + .image_digest' "$P/bomlens-plan.json")" = "ghcr.io/cdxgen/cdxgen-temurin-java25:$(jq -r '.tag + " " + .digests["ghcr.io/cdxgen/cdxgen-temurin-java25"]' "$ROOT_DIR/docker/lib/cdxgen-images.json")" ] \
+    && [ "$(jq -r .status "$P/bomlens-plan.json")" = ok ] \
+    && pass "a Java 25 toolchain names the pinned cdxgen Java 25 image in the plan" \
+    || fail "java25 plan: $(jq -c '{status, s: .stages[0] | {image, image_digest}}' "$P/bomlens-plan.json" 2>&1)"
 missing=""
-for lang in rust go ruby java python node php dotnet swift unknown; do
+for lang in rust go ruby java "java '$J25SRC'" python node php dotnet swift unknown; do
     img="$(bash -c ". '$ROOT_DIR/docker/lib/source-detect.sh' >/dev/null 2>&1; img_for_lang $lang")"
     jq -e --arg i "${img%:*}" --arg t "${img##*:}" '.tag == $t and (.digests[$i] // "" | startswith("sha256:"))' \
         "$ROOT_DIR/docker/lib/cdxgen-images.json" >/dev/null || missing="$missing $img"
