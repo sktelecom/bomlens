@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v1.14.5] - 2026-11-12
+
+### Added
+
+- With `--security`, Go modules (`pkg:golang`) are also matched against the Go vulnerability database (vuln.go.dev), by module path and by the package paths an advisory names. Findings another engine already reports under the same CVE, GHSA or GO id are not added again. The image carries a snapshot; when it is older than `BOMLENS_GO_VULNDB_MAX_AGE_DAYS` (7) days and the scan is online, a fresh copy is downloaded for that scan, otherwise the new `go-vulndb` step is recorded as degraded. `BOMLENS_GO_VULNDB=false` turns it off, `BOMLENS_GO_VULNDB_PATH` and `SBOM_GO_VULNDB` name another export, `BOMLENS_GO_VULNDB_URL` a mirror. The engine contract is 1.4.0 (`go-vulndb` engine, `data_sources.go_vulndb`).
+- A Java source scan picks the cdxgen Java image from the declared Gradle toolchain and the Gradle wrapper version: `cdxgen-temurin-java8`, `cdxgen-java11`, `cdxgen-java17`, `cdxgen-temurin-java21`, `cdxgen-temurin-java24` or `cdxgen-temurin-java25`. A wrapper older than 8.5 no longer runs on Java 21, and a Java 25 toolchain resolves. `CDXGEN_JAVA_IMAGE` names the image directly.
+- `--deep-cve` adds package-style Maven CPE candidates (`<groupId>:<artifactId>`, `target_sw=maven`) and hands every CPE candidate to grype in one run.
+
+### Changed
+
+- `--deep-cve` updates a grype database older than `BOMLENS_GRYPE_DB_MAX_AGE_DAYS` (7) days before the match. When it cannot (offline, or the update fails), it reads the old one and records the `deep-cve` step as degraded with its age. `GRYPE_DB_UPDATE_URL` names a mirror.
+- A Maven CPE derived from the groupId takes its product from the artifactId when the last groupId segment does not name the artifact (`apache:httpclient5` instead of `apache:client5`).
+- The Maven pom.xml fallback leaves out test, provided, system and optional dependencies, as the resolved tree does (`BOMLENS_MAVEN_FULL_GRAPH=1` keeps them).
+- A CLI source scan keeps the stage 1 log as `{Project}_{Version}_cdxgen.log`, with credentials masked, when a dependency preparation step failed.
+
+### Fixed
+
+- `--deep-cve` no longer stops matching five days after the deep-cve image was built.
+- Go modules marked `// indirect` that are part of the build are `required`, not `optional`.
+- A Gradle build that declares dependencies but whose packages cdxgen did not resolve records the `generate` step as degraded (`gradle-packages`), and a subproject named like the root project has its dependencies resolved.
+- A pom.xml that Maven 3.10 refuses for a duplicate dependency declaration is resolved with the project's Maven wrapper or Maven 3.9; when no Maven reads it, the `maven-dependency-tree` step is recorded as failed.
+
 ## [v1.14.4] - 2026-11-12
 
 ### Added
