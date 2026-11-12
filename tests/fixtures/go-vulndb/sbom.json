@@ -1,0 +1,18 @@
+{
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.6",
+  "version": 1,
+  "metadata": {"component": {"type": "application", "name": "demo", "version": "1.0", "bom-ref": "demo"}},
+  "components": [
+    {"type": "library", "bom-ref": "docker", "name": "github.com/docker/docker", "version": "v20.10.7+incompatible", "purl": "pkg:golang/github.com/docker/docker@v20.10.7%2Bincompatible"},
+    {"type": "library", "bom-ref": "cli", "name": "github.com/docker/cli", "version": "v20.10.12+incompatible", "purl": "pkg:golang/github.com/docker/cli@v20.10.12+incompatible"},
+    {"type": "library", "bom-ref": "moby", "name": "github.com/moby/moby", "version": "v28.0.0+incompatible", "purl": "pkg:golang/github.com/moby/moby@v28.0.0%2Bincompatible"},
+    {"type": "library", "bom-ref": "zstd", "name": "github.com/klauspost/compress/zstd", "version": "v1.17.0", "purl": "pkg:golang/github.com/klauspost/compress/zstd@v1.17.0"},
+    {"type": "library", "bom-ref": "compress-fixed", "name": "github.com/klauspost/compress", "version": "v1.15.15", "purl": "pkg:golang/github.com/klauspost/compress@v1.15.15"},
+    {"type": "library", "bom-ref": "aws", "name": "github.com/aws/aws-sdk-go", "version": "v1.44.49", "purl": "pkg:golang/github.com/aws/aws-sdk-go@v1.44.49"},
+    {"type": "library", "bom-ref": "stdlib", "name": "stdlib", "version": "go1.21.3", "purl": "pkg:golang/stdlib@go1.21.3"},
+    {"type": "library", "bom-ref": "pseudo", "name": "github.com/example/pseudo", "version": "v0.0.0-20210601000000-abcdefabcdef", "purl": "pkg:golang/github.com/example/pseudo@v0.0.0-20210601000000-abcdefabcdef"},
+    {"type": "library", "bom-ref": "pseudo-v2", "name": "github.com/example/pseudo/v2", "version": "v2.0.0", "purl": "pkg:golang/github.com/example/pseudo/v2@v2.0.0"},
+    {"type": "library", "bom-ref": "lodash", "name": "lodash", "version": "4.17.20", "purl": "pkg:npm/lodash@4.17.20"}
+  ]
+}

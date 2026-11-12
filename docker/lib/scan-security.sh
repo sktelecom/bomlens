@@ -10,7 +10,8 @@
 #             <out_prefix>_security.md      (human summary)
 #             <out_prefix>_security.html    (visual summary)
 #
-# Engine: Trivy (pinned in Dockerfile). DB: NVD + OSV + GHSA.
+# Engine: Trivy (pinned in Dockerfile). DB: NVD + OSV + GHSA. Go modules are
+# also matched against the Go vulnerability database (scan-go-vulndb.py).
 set -e
 
 SBOM="$1"
@@ -196,6 +197,32 @@ if command -v grype >/dev/null 2>&1 && [ "${DEEP_CVE:-true}" != "false" ]; then
         || echo "[security] WARN: grype CPE (deep-cve) scan failed; reporting Trivy results only." >&2
 fi
 
+# Go vulnerability database (default on): Trivy's Go advisories come from the
+# GitHub Advisory Database only, so a Go module whose advisory exists only in
+# vuln.go.dev (GO- ids), or is filed there under another module or a package
+# path, is not reported. scan-go-vulndb.py matches each pkg:golang component
+# against the database snapshot bundled in the image (or BOMLENS_GO_VULNDB_PATH:
+# vulndb.zip from vuln.go.dev, or a folder holding it unpacked) and writes the
+# findings no report above already lists, by CVE, GHSA or GO id, as
+# _security_govulndb.json. No network. BOMLENS_GO_VULNDB=false turns it off.
+# entrypoint.sh records the step (go-vulndb) from this file.
+GOVULNDB_SIDECAR="${OUT_PREFIX}_security_govulndb.json"
+rm -f "$GOVULNDB_SIDECAR"
+GOVULNDB_DB="${BOMLENS_GO_VULNDB_PATH:-$SCRIPT_DIR/go-vulndb.zip}"
+if [ "${BOMLENS_GO_VULNDB:-true}" != "false" ] && [ -e "$GOVULNDB_DB" ] && [ -f "$SCRIPT_DIR/scan-go-vulndb.py" ]; then
+    _gv_reports=("$JSON")
+    for _gv_engine in cvebintool grype; do
+        [ -f "${OUT_PREFIX}_security_${_gv_engine}.json" ] && _gv_reports+=("${OUT_PREFIX}_security_${_gv_engine}.json")
+    done
+    _gv_rc=0
+    python3 "$SCRIPT_DIR/scan-go-vulndb.py" "$SBOM" "$OUT_PREFIX" "$GOVULNDB_DB" "${_gv_reports[@]}" || _gv_rc=$?
+    case "$_gv_rc" in
+        0|11) ;;
+        *) rm -f "$GOVULNDB_SIDECAR"
+           echo "[security] WARN: the Go vulnerability database check failed (exit $_gv_rc); reporting the other engines' results only." >&2 ;;
+    esac
+fi
+
 # Merge Trivy-shaped CVE sidecars from other engines, if present:
 #   _security_cvebintool.json: components with no package purl, matched by CPE
 #                                against the bundled NVD index (match-cpe-index.sh)
@@ -210,7 +237,10 @@ fi
 #                                (parse-yocto-manifests.py). The ones the build
 #                                patched or judged not applicable are counted in
 #                                _yocto_vex.json instead of listed here.
-for engine in cvebintool grype yocto; do
+#   _security_govulndb.json    : Go modules matched against the Go
+#                                vulnerability database, less what the
+#                                reports above already list (by alias)
+for engine in cvebintool grype yocto govulndb; do
     SIDECAR="${OUT_PREFIX}_security_${engine}.json"
     [ -f "$SIDECAR" ] && jq -e '.Results' "$SIDECAR" >/dev/null 2>&1 || continue
     SIDE_N=$(jq '[.Results[].Vulnerabilities[]?] | length' "$SIDECAR" 2>/dev/null || echo 0)
@@ -294,6 +324,13 @@ if [ -n "$REACH_DOC" ] && [ -f "$REACH_DOC" ] && jq -e '.vulnerabilities | type 
         rm -f "$tmp_r"
         echo "[security] WARN: could not apply the reachability judgements; the report lists every finding as reported." >&2
     fi
+fi
+
+# The Go vulnerability database is named beside Trivy when it was read for
+# this report, with the date of the snapshot.
+GOVULNDB_ENGINE=""
+if [ -f "$GOVULNDB_SIDECAR" ]; then
+    GOVULNDB_ENGINE="$(jq -r '"Go vulnerability database" + (if (.GoVulnDB.Modified // "") != "" then " (snapshot " + (.GoVulnDB.Modified | .[0:10]) + ")" else "" end)' "$GOVULNDB_SIDECAR" 2>/dev/null)" || GOVULNDB_ENGINE=""
 fi
 
 ADVISORIES=$(jq -c '[ (.Advisories // [])[] | {
@@ -486,7 +523,7 @@ KEV_COUNT=$(echo "$FINDINGS" | jq '[.[] | select(.kev)] | length')
     echo "# Security Report — ${PROJECT}"
     echo ""
     echo "- Generated: ${GEN_AT}"
-    echo "- Engine: Trivy (SBOM scan)"
+    echo "- Engine: Trivy (SBOM scan)${GOVULNDB_ENGINE:+, $GOVULNDB_ENGINE}"
     echo ""
     echo "## Summary"
     echo ""
@@ -644,7 +681,7 @@ HTMLHEAD
  <div class="report-kind">Security Report</div>
 </header>
 <h1>Security Report</h1>
-<p class="meta">Project: ${PROJECT_ESC} &middot; Generated: $(report_time_html "$GEN_AT") &middot; Engine: Trivy</p>
+<p class="meta">Project: ${PROJECT_ESC} &middot; Generated: $(report_time_html "$GEN_AT") &middot; Engine: Trivy${GOVULNDB_ENGINE:+, $(esc "$GOVULNDB_ENGINE")}</p>
 <div class="cards">
  <span class="pill pill-crit">Critical <span class="count">${C}</span></span>
  <span class="pill pill-high">High <span class="count">${H}</span></span>

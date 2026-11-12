@@ -198,7 +198,7 @@ KNOWN_ARTIFACT_SUFFIXES=(
     _bom.spdx3.json _bom.spdx3.json.sig _spdx3-check.json _spdx3-check.md _ai-declaration.template.json
     _modelica.cdx.json _cocoapods.cdx.json _conda.cdx.json
     _security_cvebintool.json _security_grype.json _security_yocto.json
-    _security_trivy.json _component-versions.template.csv
+    _security_govulndb.json _security_trivy.json _component-versions.template.csv
     _reachability.cdx.json _bom.refused.json
 )
 # Only a caller that knows about this cleanup runs it at all. An old
@@ -2567,6 +2567,46 @@ case "$SCAN_MODE" in
            er_record deep-cve failed failed "grype did not write its result"
        fi ;;
 esac
+
+# Go vulnerability database (default on, BOMLENS_GO_VULNDB=false turns it off):
+# scan-security.sh matched the SBOM's Go modules against the snapshot bundled
+# in this image, or the export BOMLENS_GO_VULNDB_PATH names (vulndb.zip from
+# vuln.go.dev, or that archive unpacked), and left _security_govulndb.json.
+# Recorded here from that file. A snapshot older than
+# BOMLENS_GO_VULNDB_MAX_AGE_DAYS (30) days, counted from the database's own
+# modified date, degrades the step: advisories published since are missing.
+_gv_db="${BOMLENS_GO_VULNDB_PATH:-$LIBDIR/go-vulndb.zip}"
+_gv_sidecar="${OUT_PREFIX}_security_govulndb.json"
+if [ "${GENERATE_SECURITY:-false}" != "true" ] || [ "${BOMLENS_GO_VULNDB:-true}" = "false" ]; then
+    er_record go-vulndb disabled
+elif [ "$_trivy_db_ready" != true ]; then
+    er_record go-vulndb skipped no_input "the security scan did not run"
+elif ! jq -e '[.components[]? | recurse(.components[]?) | .purl? | strings | select(test("^pkg:golang/[^@]+@."; "i"))] | length > 0' "$OUTPUT_FILE" >/dev/null 2>&1; then
+    er_record go-vulndb skipped no_input "no Go module (pkg:golang) in the SBOM"
+elif [ ! -e "$_gv_db" ]; then
+    if [ -n "${BOMLENS_GO_VULNDB_PATH:-}" ]; then
+        echo "[WARN] Go vulnerability database check skipped: BOMLENS_GO_VULNDB_PATH ($_gv_db) does not exist inside the container. Mount vulndb.zip from https://vuln.go.dev/vulndb.zip and point the variable at its path inside the container." >&2
+        er_record go-vulndb skipped not_installed "BOMLENS_GO_VULNDB_PATH ($_gv_db) does not exist"
+    else
+        echo "[WARN] Go vulnerability database check skipped: this image has no snapshot of it ($_gv_db; the download failed when the image was built). Refresh the image (docker pull), or mount vulndb.zip from https://vuln.go.dev/vulndb.zip and set BOMLENS_GO_VULNDB_PATH to it." >&2
+        er_record go-vulndb skipped not_installed "no Go vulnerability database snapshot in this image ($_gv_db)"
+    fi
+elif [ ! -f "$_gv_sidecar" ]; then
+    er_record go-vulndb failed failed "could not read the Go vulnerability database at $_gv_db"
+else
+    _gv_counts="$(jq -c '.GoVulnDB | {components: (.Components // 0), findings: (.New // 0), already_reported: (.AlreadyReported // 0)}' "$_gv_sidecar" 2>/dev/null)" || _gv_counts=""
+    _gv_age="$(jq -r '.GoVulnDB.AgeDays // empty' "$_gv_sidecar" 2>/dev/null)" || _gv_age=""
+    _gv_max="${BOMLENS_GO_VULNDB_MAX_AGE_DAYS:-30}"
+    case "$_gv_max" in ''|*[!0-9]*) _gv_max=30 ;; esac
+    if [ "$(jq -r '.GoVulnDB.Components // 0' "$_gv_sidecar" 2>/dev/null)" = "0" ]; then
+        er_record go-vulndb skipped no_input "no Go module with a semantic version in the SBOM" "" "" "$_gv_counts"
+    elif [[ "$_gv_age" =~ ^[0-9]+$ ]] && [ "$_gv_age" -gt "$_gv_max" ]; then
+        echo "[WARN] the Go vulnerability database ($_gv_db) is $_gv_age days old; Go advisories published since are not reported. Refresh the image, or mount a newer vulndb.zip with BOMLENS_GO_VULNDB_PATH." >&2
+        er_record go-vulndb degraded unavailable "the Go vulnerability database is $_gv_age days old (over $_gv_max)" "" "" "$_gv_counts"
+    else
+        er_record go-vulndb ok "" "" "" "" "$_gv_counts"
+    fi
+fi
 
 # A supplier's CycloneDX VEX (--vex): keep the statements that apply to this
 # SBOM in ${OUT_PREFIX}_vex_imported.json. The SBOM and the security report are
