@@ -76,6 +76,8 @@ Detected file: `pom.xml`
 
 > Note: dependency and license resolution need the container to reach Maven Central, or your mirror. When it cannot, the result holds only the dependencies written in `pom.xml`, with no transitive dependencies and no licenses, and the scan finishes without a warning. If the component count is far below what you expect, check network access first.
 
+> Note: Maven 3.10 and later refuse a `pom.xml` that declares the same dependency twice (`'dependencies.dependency.(groupId:artifactId:type:classifier)' must be unique`), where Maven 3.9 only warns, and the cdxgen images ship Maven 3.10. When BomLens sees this error before cdxgen runs, it tries a Maven that accepts the POM: the project's Maven wrapper when `.mvn/wrapper/maven-wrapper.properties` names a Maven before 3.10, otherwise Apache Maven 3.9.16. That Maven is fetched through the image's Maven, so the mirror, proxy and offline settings of your `settings.xml` apply, or from Maven Central when that fails and Maven is not offline. The archive is used only when it matches the SHA-512 checksum built into BomLens. cdxgen then builds the dependency tree with it. When no Maven reads the POM, the result holds only the dependencies written in `pom.xml` (still without the test and provided ones), the failed step `maven-dependency-tree` is recorded, and `generate` reads `degraded`. Removing the repeated `<dependency>` entries fixes this for every Maven version.
+
 ---
 
 ## Java (Gradle)

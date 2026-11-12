@@ -76,6 +76,8 @@ npm, Python(pip), Go, Rust(Cargo) 패키지는 소스 스캔이 설치된 패키
 
 > 주의: 의존성과 라이선스를 해석하려면 컨테이너가 Maven Central(또는 사내 미러)에 접속할 수 있어야 합니다. 접속하지 못하면 `pom.xml`에 적힌 의존성만 담기고 전이 의존성과 라이선스는 비며, 스캔은 경고 없이 끝납니다. 컴포넌트 수가 예상보다 훨씬 적으면 네트워크 접속부터 확인하세요.
 
+> 주의: Maven 3.10 이상은 같은 의존성을 두 번 선언한 `pom.xml`을 거부합니다(`'dependencies.dependency.(groupId:artifactId:type:classifier)' must be unique`). Maven 3.9는 경고만 했고, cdxgen 이미지에는 Maven 3.10이 들어 있습니다. BomLens는 cdxgen을 실행하기 전에 이 오류를 확인하면 이 POM을 받아들이는 Maven으로 다시 시도합니다. `.mvn/wrapper/maven-wrapper.properties`가 3.10보다 낮은 Maven을 지정하면 프로젝트의 Maven 래퍼를 쓰고, 그렇지 않으면 Apache Maven 3.9.16을 씁니다. 이 Maven은 이미지에 든 Maven으로 내려받으므로 `settings.xml`의 미러, 프록시, 오프라인 설정이 그대로 적용됩니다. 그 방법이 실패하고 Maven이 오프라인이 아니면 Maven Central에서 직접 내려받습니다. 내려받은 압축 파일은 BomLens에 들어 있는 SHA-512 체크섬과 일치할 때만 씁니다. 그다음 cdxgen이 이 Maven으로 의존성 트리를 만듭니다. 어떤 Maven도 POM을 읽지 못하면 결과에는 `pom.xml`에 적힌 의존성만 담기고(test·provided 의존성은 여전히 빠집니다), 실패한 단계 `maven-dependency-tree`가 기록되며 `generate`는 `degraded`가 됩니다. 반복된 `<dependency>` 항목을 지우면 Maven 버전과 관계없이 해결됩니다.
+
 ---
 
 ## Java (Gradle)
