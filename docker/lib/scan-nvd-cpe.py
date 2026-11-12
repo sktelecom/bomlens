@@ -29,12 +29,25 @@
 # unreachable (air-gapped) the filter is skipped and every kept finding is flagged
 # bomlens:cpeVersionUnverified so the report can show the caveat instead of hiding
 # possible false positives.
+#
+# Database age: grype refuses a database built more than 5 days ago, and the
+# deep-cve image bakes its database in at build time. A database older than
+# BOMLENS_GRYPE_DB_MAX_AGE_DAYS (7) days is updated first with `grype db update`
+# (into a temporary folder when the image's cache cannot be written), unless the
+# scan is offline (TRIVY_OFFLINE_SCAN or TRIVY_SKIP_DB_UPDATE). A database that
+# is not updated is still read, with grype's own age limit raised to accept it,
+# and the step is reported as degraded with the database's age. The outcome goes
+# to the file BOMLENS_DEEP_CVE_STATUS_FILE names, when set, as JSON
+# {"status": "ok"|"degraded"|"failed", "detail": ...} for entrypoint.sh.
+import atexit
 import json
 import os
 import re
+import shutil
 import sqlite3
 import subprocess
 import sys
+import tempfile
 import time
 from datetime import datetime, timezone
 
@@ -155,20 +168,159 @@ def _nvd_cpe_vendor_severity(m, vuln, is_nvd):
     return {"nvd": n} if n is not None else None
 
 
-def _grype_db_path():
-    """Path to grype's local sqlite vulnerability DB, or None if unavailable."""
+# The environment every grype call of this run uses: the database location and
+# age limit _prepare_grype_db settled on.
+_GRYPE_ENV = None
+
+
+def _grype_env():
+    return _GRYPE_ENV if _GRYPE_ENV is not None else dict(os.environ)
+
+
+def _grype_db_status(env):
+    """`grype db status -o json` as a dict, or None when it cannot be read.
+
+    grype exits 1 for a database it considers invalid (too old, for one) but
+    still prints the status, so the exit code is not checked here."""
     try:
         p = subprocess.run([GRYPE, "db", "status", "-o", "json"],
-                            capture_output=True, text=True, timeout=30)
-        if p.returncode != 0:
-            return None
+                           capture_output=True, text=True, env=env, timeout=30)
         data = json.loads(p.stdout)
-        path = data.get("path")
-        if path and os.path.exists(path):
-            return path
     except Exception:
-        pass
+        return None
+    return data if isinstance(data, dict) else None
+
+
+def _grype_db_path():
+    """Path to grype's local sqlite vulnerability DB, or None if unavailable."""
+    data = _grype_db_status(_grype_env()) or {}
+    path = data.get("path")
+    if path and os.path.exists(path):
+        return path
     return None
+
+
+def _db_age_days(status):
+    """Whole days since the database in `status` was built, or None."""
+    raw = str((status or {}).get("built") or "").strip()
+    m = re.match(r"^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})", raw)
+    if not m:
+        return None
+    try:
+        built = datetime.strptime(m.group(1), "%Y-%m-%dT%H:%M:%S").replace(tzinfo=timezone.utc)
+    except ValueError:
+        return None
+    return max(0, int((datetime.now(timezone.utc) - built).total_seconds() // 86400))
+
+
+def _max_age_days():
+    raw = os.environ.get("BOMLENS_GRYPE_DB_MAX_AGE_DAYS", "")
+    return int(raw) if raw.isdigit() else 7
+
+
+def _offline():
+    """True when the scan was set up not to update vulnerability databases."""
+    return any(os.environ.get(n, "").lower() == "true"
+               for n in ("TRIVY_OFFLINE_SCAN", "TRIVY_SKIP_DB_UPDATE"))
+
+
+_ANSI = re.compile(r"\x1b\[[0-9;]*[A-Za-z]")
+
+
+def _stderr_cause(text, lines=3):
+    """The last few lines grype wrote to stderr, without colours or log
+    prefixes, joined into one line for a step detail."""
+    out = []
+    for line in _ANSI.sub("", text or "").splitlines():
+        line = re.sub(r"^\[\d+\]\s+(ERROR|WARN|INFO|DEBUG)\s+", "", line.strip())
+        if line:
+            out.append(line)
+    return " | ".join(out[-lines:])[:300]
+
+
+def _writable_tree(path):
+    """True when this user can write `path` and every folder under it."""
+    if not path or not os.path.isdir(path):
+        return False
+    for root, _dirs, _files in os.walk(path):
+        if not os.access(root, os.W_OK | os.X_OK):
+            return False
+    return True
+
+
+def _update_grype_db(env):
+    """Run `grype db update`. Returns (env to use, None) when the database was
+    updated, or (None, cause) when it was not. The image's cache folder is used
+    when this user can write it; otherwise a temporary folder, removed at exit."""
+    cache = env.get("GRYPE_DB_CACHE_DIR", "")
+    if not _writable_tree(cache):
+        try:
+            cache = tempfile.mkdtemp(prefix="bomlens-grype-db.")
+        except OSError as e:
+            return None, f"no writable folder for the update: {e}"
+        atexit.register(shutil.rmtree, cache, True)
+    new_env = dict(env, GRYPE_DB_CACHE_DIR=cache)
+    new_env.pop("GRYPE_DB_MAX_ALLOWED_BUILT_AGE", None)
+    try:
+        p = subprocess.run([GRYPE, "db", "update"], capture_output=True, text=True,
+                           env=new_env, timeout=300)
+    except subprocess.TimeoutExpired:
+        return None, "grype db update timed out"
+    except OSError as e:
+        return None, str(e)
+    if p.returncode != 0:
+        return None, _stderr_cause(p.stderr) or f"grype db update exited {p.returncode}"
+    st = _grype_db_status(new_env)
+    if not (st or {}).get("valid"):
+        return None, (st or {}).get("error") or "the updated database is not valid"
+    return new_env, None
+
+
+def _prepare_grype_db():
+    """Settle which grype database this run reads. Returns (env, degraded)
+    where degraded is None, or the reason the result is incomplete."""
+    env = dict(os.environ, GRYPE_MATCH_JAVA_USING_CPES="true")
+    status = _grype_db_status(env)
+    age = _db_age_days(status)
+    if age is None:
+        # No status to judge by: grype reports any problem when it runs.
+        return env, None
+    max_days = _max_age_days()
+    print(f"[nvd-cpe] grype database: built {status.get('built')} ({age} day(s) old)")
+    if age <= max_days and status.get("valid"):
+        return env, None
+    why = ""
+    if age > max_days:
+        if _offline():
+            why = "not updated, the scan is offline (TRIVY_OFFLINE_SCAN or TRIVY_SKIP_DB_UPDATE)"
+        else:
+            print(f"[nvd-cpe] the grype database is {age} days old (over {max_days}); updating it")
+            new_env, cause = _update_grype_db(env)
+            if new_env is not None:
+                built = (_grype_db_status(new_env) or {}).get("built")
+                print(f"[nvd-cpe] grype database updated (built {built})")
+                return new_env, None
+            why = f"the update failed: {cause}"
+            print(f"[nvd-cpe] WARN: grype db update failed: {cause}", file=sys.stderr)
+    # Read the database there is: grype's own limit (5 days) would refuse it.
+    env["GRYPE_DB_MAX_ALLOWED_BUILT_AGE"] = f"{(age + 1) * 24}h"
+    if age <= max_days:
+        return env, None
+    print(f"[nvd-cpe] WARN: the grype database is {age} days old; "
+          "vulnerabilities published since are not reported.", file=sys.stderr)
+    return env, f"the grype database is {age} days old (over {max_days}); {why}"
+
+
+def _write_status(status, detail=None):
+    """Tell entrypoint.sh how the step went (see the header)."""
+    path = os.environ.get("BOMLENS_DEEP_CVE_STATUS_FILE", "")
+    if not path:
+        return
+    try:
+        with open(path, "w") as f:
+            json.dump({"status": status, "detail": detail}, f)
+    except OSError:
+        pass
 
 
 def _to_iso8601(raw):
@@ -202,25 +354,31 @@ def _published_date(conn, cve):
 
 # ---- main -------------------------------------------------------------------
 def run_grype(sbom):
+    """grype's JSON result, or None after writing the cause to the status file."""
     print("[nvd-cpe] grype CPE matching started")
-    env = dict(os.environ, GRYPE_MATCH_JAVA_USING_CPES="true")
     try:
         p = subprocess.run(
             [GRYPE, f"sbom:{sbom}", "--by-cve", "-o", "json"],
-            capture_output=True, text=True, env=env, timeout=600)
+            capture_output=True, text=True, env=_grype_env(), timeout=600)
     except FileNotFoundError:
         print("[nvd-cpe] WARN: grype not installed in this image; skipping", file=sys.stderr)
+        _write_status("failed", "grype is not installed")
         return None
     except subprocess.TimeoutExpired:
         print("[nvd-cpe] WARN: grype timed out; skipping", file=sys.stderr)
+        _write_status("failed", "grype timed out")
         return None
     if p.returncode != 0:
-        print(f"[nvd-cpe] WARN: grype exited {p.returncode}; skipping", file=sys.stderr)
+        cause = _stderr_cause(p.stderr)
+        print(f"[nvd-cpe] WARN: grype exited {p.returncode}; skipping"
+              + (f": {cause}" if cause else ""), file=sys.stderr)
+        _write_status("failed", f"grype exited {p.returncode}" + (f": {cause}" if cause else ""))
         return None
     try:
         return json.loads(p.stdout)
     except ValueError:
         print("[nvd-cpe] WARN: grype output unparseable; skipping", file=sys.stderr)
+        _write_status("failed", "grype output could not be read")
         return None
 
 
@@ -231,7 +389,7 @@ def _run_grype_cpe(cpe):
     matching this script's existing "no path -> no finding" posture."""
     try:
         p = subprocess.run([GRYPE, cpe, "-o", "json"],
-                            capture_output=True, text=True, timeout=60)
+                           capture_output=True, text=True, env=_grype_env(), timeout=60)
         if p.returncode != 0:
             return []
         return json.loads(p.stdout).get("matches", [])
@@ -263,6 +421,8 @@ def _sbom_cpe_alternates(sbom_path):
 
 
 def build_sidecar(sbom_path, out_prefix):
+    global _GRYPE_ENV
+    _GRYPE_ENV, degraded = _prepare_grype_db()
     g = run_grype(sbom_path)
     if g is None:
         return
@@ -417,6 +577,7 @@ def build_sidecar(sbom_path, out_prefix):
     if unverified:
         msg += f", {unverified} version-unverified (network unavailable)"
     print(msg + f" -> {os.path.basename(out)}")
+    _write_status("degraded" if degraded else "ok", degraded)
 
 
 if __name__ == "__main__":
