@@ -6070,6 +6070,314 @@ else
         || fail "filter turned on with no composer.json present" "got [$_t_nocomposer]"
 fi
 
+echo "== go-scope: indirect Go modules in the build graph become required =="
+# Guards docker/lib/build-prep.sh's Go scope correction: cdxgen marks every
+# `// indirect` module scope optional, so the ones `go list -deps ./...` lists
+# are set to required, cdx:go:indirect is kept, and a module outside the list
+# keeps optional. Extract the real JS and shell block (no logic duplication)
+# and drive the block with a stand-in go.
+if command -v node >/dev/null 2>&1; then
+    PREP="$ROOT_DIR/docker/lib/build-prep.sh"
+    GSJS="$WORK/go-scope.js"
+    sed -n "/<<'GOSCOPE_JS'/,/^GOSCOPE_JS\$/p" "$PREP" | sed '1d;$d' > "$GSJS"
+    _gs_block=$(sed -n '/^# Go scope: cdxgen sets/,/^fi$/p' "$PREP")
+    if [ -s "$GSJS" ] && [ -n "$_gs_block" ]; then
+        cat > "$WORK/go-scope-bom.json" <<'JSON'
+{"bomFormat":"CycloneDX","specVersion":"1.6",
+ "metadata":{"component":{"name":"example.com/demo","bom-ref":"root"}},
+ "components":[
+   {"name":"cobra","version":"v1.8.0","purl":"pkg:golang/github.com/spf13/cobra@v1.8.0","scope":"required","properties":[{"name":"cdx:go:indirect","value":"false"}]},
+   {"name":"pflag","version":"v1.0.5","purl":"pkg:golang/github.com/spf13/pflag@v1.0.5","scope":"optional","properties":[{"name":"cdx:go:indirect","value":"true"}]},
+   {"name":"mousetrap","version":"v1.1.0","purl":"pkg:golang/github.com/inconshreveable/mousetrap@v1.1.0","scope":"optional","properties":[{"name":"cdx:go:indirect","value":"true"}]},
+   {"name":"Azure","version":"v0.5.0","purl":"pkg:golang/github.com/Azure/go-ntlmssp@v0.5.0?type=module","scope":"optional"},
+   {"name":"fork","version":"v2.0.0","purl":"pkg:golang/example.com/fork@v2.0.0","scope":"optional","properties":[{"name":"cdx:go:replaces","value":"example.com/orig@v1.0.0"}]},
+   {"name":"local","purl":"pkg:golang/example.com/local","scope":"optional"},
+   {"name":"pyopt","version":"1.0","purl":"pkg:pypi/pyopt@1.0","scope":"optional"}
+ ]}
+JSON
+        cat > "$WORK/go-scope-list.txt" <<'LIST'
+github.com/spf13/cobra@v1.8.0
+github.com/spf13/cobra@
+github.com/spf13/pflag@v1.0.5
+github.com/spf13/pflag@
+github.com/azure/go-ntlmssp@v0.5.0
+
+example.com/orig@v1.0.0
+example.com/orig@
+example.com/fork@v2.0.0
+example.com/local@
+LIST
+        node "$GSJS" "$WORK/go-scope-bom.json" "$WORK/go-scope-list.txt" 2>/dev/null
+        _gs_scopes=$(jq -r '[.components[] | "\(.name)=\(.scope)"] | join(",")' "$WORK/go-scope-bom.json")
+        if [ "$_gs_scopes" = "cobra=required,pflag=required,mousetrap=optional,Azure=required,fork=required,local=required,pyopt=optional" ]; then
+            pass "listed indirect modules (replaced and local included) required; unlisted Go and non-Go optional kept"
+        else
+            fail "unexpected scopes after the Go scope correction" "$_gs_scopes"
+        fi
+        if [ "$(jq -r '.components[] | select(.name=="pflag") | .properties[] | select(.name=="cdx:go:indirect") | .value' "$WORK/go-scope-bom.json")" = "true" ]; then
+            pass "cdx:go:indirect kept on a promoted module"
+        else
+            fail "cdx:go:indirect lost on pflag"
+        fi
+
+        # The shell block: a stand-in go prints the list, or fails.
+        _gs_bin="$WORK/gs-bin"; mkdir -p "$_gs_bin"
+        cat > "$_gs_bin/go" <<'STUB'
+#!/bin/sh
+[ "$GS_FAIL" = 1 ] && { echo "go: updates to go.mod needed" >&2; exit 1; }
+cat "$GS_LIST"
+STUB
+        chmod +x "$_gs_bin/go"
+        _gs_prelude='log() { echo "[build-prep] $*"; }; run_supervised_timeout() { shift; "$@"; }; PREP_TIMEOUT_DEFAULT=5; rc=0; EXCLUDE_NON_SHIPPED=1; NON_SHIPPED_DIRS="test testdata"; NON_SHIPPED_PATHS=".github/workflows"'
+        _gs_run() {  # <fail>
+            rm -rf "$WORK/gs-proj"; mkdir -p "$WORK/gs-proj"
+            printf 'module example.com/demo\n' > "$WORK/gs-proj/go.mod"
+            cp "$WORK/go-scope-bom.orig.json" "$WORK/gs-proj/bom.json"
+            ( cd "$WORK/gs-proj" && PATH="$_gs_bin:$PATH" GS_FAIL="$1" GS_LIST="$WORK/go-scope-list.txt" \
+                OUT="$WORK/gs-proj/bom.json" bash -c "$_gs_prelude; $_gs_block" ) 2>&1
+        }
+        jq '(.components[] | select(.purl | startswith("pkg:golang/")) | select(.name != "cobra")) .scope = "optional"' \
+            "$WORK/go-scope-bom.json" > "$WORK/go-scope-bom.orig.json"
+        _gs_run 0 >/dev/null
+        if [ "$(jq -r '.components[] | select(.name=="pflag") | .scope' "$WORK/gs-proj/bom.json")" = "required" ]; then
+            pass "build-prep block: go list succeeds, pflag promoted"
+        else
+            fail "build-prep block did not promote pflag"
+        fi
+        _gs_log=$(_gs_run 1)
+        if cmp -s "$WORK/go-scope-bom.orig.json" "$WORK/gs-proj/bom.json"; then
+            pass "build-prep block: go list fails, SBOM left untouched"
+        else
+            fail "build-prep block changed the SBOM although go list failed"
+        fi
+        case "$_gs_log" in
+            *"could not list the build graph"*) pass "build-prep block: go list failure is logged" ;;
+            *) fail "go list failure not logged" "$_gs_log" ;;
+        esac
+        _gs_log=$(PREP_FAILED="go-mod-tidy" _gs_run 0)
+        if cmp -s "$WORK/go-scope-bom.orig.json" "$WORK/gs-proj/bom.json"; then
+            pass "build-prep block: go-mod-tidy failed, SBOM left untouched"
+        else
+            fail "build-prep block changed the SBOM although go-mod-tidy failed"
+        fi
+        case "$_gs_log" in
+            *"go-mod-tidy failed"*) pass "build-prep block: the skipped correction is logged" ;;
+            *) fail "skipped Go scope correction not logged" "$_gs_log" ;;
+        esac
+    else
+        fail "could not extract the Go scope correction from build-prep.sh"
+    fi
+else
+    echo "  SKIP: node unavailable, skipping Go scope test"
+fi
+
+echo "== gradle-same-name: a subproject named like the root gets its dependencies task =="
+# Guards docker/lib/build-prep.sh: cdxgen skips `<sub>:dependencies` for a
+# subproject whose purl equals the root's, so the task is handed to cdxgen in
+# GRADLE_ARGS_DEPENDENCIES. Extract the real block and drive it on settings
+# files (no logic duplication).
+if command -v node >/dev/null 2>&1; then
+    PREP="$ROOT_DIR/docker/lib/build-prep.sh"
+    _gsn_block=$(sed -n '/^# Gradle subproject named like the root project/,/^fi$/p' "$PREP")
+    if [ -n "$_gsn_block" ]; then
+        _gsn_run() {  # <settings file name> <content> [GRADLE_ARGS_DEPENDENCIES] [folder name]
+            local dir="$WORK/gsn/${4:-proj}"
+            rm -rf "$WORK/gsn"; mkdir -p "$dir"; : > "$WORK/gsn.log"
+            printf '%s\n' "$2" > "$dir/$1"
+            ( cd "$dir" && GRADLE_ARGS_DEPENDENCIES="${3:-}" GSN_LOG="$WORK/gsn.log" \
+                bash -c 'log() { echo "$*" >> "$GSN_LOG"; }; '"$_gsn_block"'; printf "%s" "${GRADLE_ARGS_DEPENDENCIES:-}"' )
+        }
+        _gsn_out=$(_gsn_run settings.gradle.kts 'rootProject.name = "demo"
+include("demo")')
+        if [ "$_gsn_out" = ":demo:dependencies" ]; then
+            pass "include(\"demo\") under rootProject demo: :demo:dependencies handed to cdxgen"
+        else
+            fail "same-name subproject task not set" "got [$_gsn_out]"
+        fi
+        _gsn_out=$(_gsn_run settings.gradle "rootProject.name = 'demo'
+// include 'old:demo'
+include 'core',
+        'apps:demo'")
+        if [ "$_gsn_out" = ":apps:demo:dependencies" ]; then
+            pass "Groovy include across lines, nested path, commented include ignored"
+        else
+            fail "Groovy settings not read as expected" "got [$_gsn_out]"
+        fi
+        _gsn_out=$(_gsn_run settings.gradle.kts 'rootProject.name = "demo-root"
+include("demo")')
+        if [ -z "$_gsn_out" ]; then
+            pass "subproject named differently from the root: nothing added"
+        else
+            fail "task added although the names differ" "got [$_gsn_out]"
+        fi
+        _gsn_out=$(_gsn_run settings.gradle.kts 'rootProject.name = "demo"
+include("demo")' "--configuration runtimeClasspath")
+        if [ "$_gsn_out" = "--configuration runtimeClasspath :demo:dependencies --configuration runtimeClasspath" ]; then
+            pass "a GRADLE_ARGS_DEPENDENCIES the caller set is kept for the root task and the added one"
+        else
+            fail "caller GRADLE_ARGS_DEPENDENCIES not kept" "got [$_gsn_out]"
+        fi
+        # No rootProject.name: Gradle names the root after its folder, which
+        # is app under the CLI's /app mount, so `include ':app'` is the same name.
+        _gsn_out=$(_gsn_run settings.gradle "include ':app'" "" app)
+        if [ "$_gsn_out" = ":app:dependencies" ]; then
+            pass "no rootProject.name, folder app, include ':app': :app:dependencies handed to cdxgen"
+        else
+            fail "folder-name default not used for the root name" "got [$_gsn_out]"
+        fi
+        _gsn_out=$(_gsn_run settings.gradle.kts 'rootProject.name = "demo"
+if (System.getenv("WITH_DEMO") != null) {
+    include("demo")
+}')
+        if [ -z "$_gsn_out" ] && grep -q "may be conditional" "$WORK/gsn.log"; then
+            pass "a same-name include inside an if block: nothing added, and logged"
+        else
+            fail "conditional include not skipped" "got [$_gsn_out], log: $(cat "$WORK/gsn.log")"
+        fi
+        _gsn_out=$(_gsn_run settings.gradle.kts 'rootProject.name = "demo"
+when (mode) { "full" -> include("demo") }')
+        if [ -z "$_gsn_out" ]; then
+            pass "a same-name include on a when line: nothing added"
+        else
+            fail "include on a when line not skipped" "got [$_gsn_out]"
+        fi
+    else
+        fail "could not extract the Gradle same-name block from build-prep.sh"
+    fi
+else
+    echo "  SKIP: node unavailable, skipping Gradle same-name test"
+fi
+
+echo "== gradle-packages: a Gradle build with no Gradle-resolved package is recorded =="
+# Guards docker/lib/build-prep.sh: a build file that declares external
+# dependencies with no pkg:maven component from Gradle's resolution (a jar in
+# the tree does not count) marks the gradle-packages step failed, so generate
+# reads degraded, but only for a build cdxgen could run Gradle on. Extract the
+# real block and drive it on small trees. PATH holds only the tools the block
+# uses, so whether java or gradle is there is set per case (as functions).
+if command -v node >/dev/null 2>&1; then
+    PREP="$ROOT_DIR/docker/lib/build-prep.sh"
+    _gpk_block=$(sed -n '/^# Gradle build with no Gradle-resolved package/,/^fi$/p' "$PREP")
+    _gpk_bin="$WORK/gpk-bin"; mkdir -p "$_gpk_bin"
+    for _t in node find sed grep sort head tr cat mktemp rm; do
+        _p=$(command -v "$_t") && ln -sf "$_p" "$_gpk_bin/$_t"
+    done
+    _gpk_bash=$(command -v bash)
+    if [ -n "$_gpk_block" ]; then
+        _gpk_jar='{"components":[{"name":"junit","version":"4.13.2","purl":"pkg:maven/junit/junit@4.13.2?type=jar","evidence":{"identity":[{"field":"purl","methods":[{"technique":"filename","value":"libs/junit-4.13.2.jar"}]}]}}]}'
+        _gpk_gradle='{"components":[{"name":"guava","version":"33.0.0-jre","purl":"pkg:maven/com.google.guava/guava@33.0.0-jre?type=jar","properties":[{"name":"internal:GradleProfileName","value":"compileClasspath"},{"name":"cdx:gradle:GradleRootPath","value":"/app"}]}]}'
+        _gpk_deps='plugins { java }
+dependencies {
+    implementation("com.google.guava:guava:33.0.0-jre") // the library
+}'
+        # _gpk_run <bom json> <tools: java, gradle, java+gradle or none> [path content]...
+        # Each path is written with the content after it; a path ending in / is a folder.
+        _gpk_run() {
+            local bom="$1" tools="$2" fns=""; shift 2
+            rm -rf "$WORK/gpk"; mkdir -p "$WORK/gpk"
+            printf '%s\n' "$bom" > "$WORK/gpk/bom.json"
+            while [ $# -ge 2 ]; do
+                mkdir -p "$WORK/gpk/$(dirname "$1")"
+                printf '%s\n' "$2" > "$WORK/gpk/$1"
+                shift 2
+            done
+            case "$tools" in *java*) fns="$fns java() { :; };" ;; esac
+            case "$tools" in *gradle*) fns="$fns gradle() { :; };" ;; esac
+            ( cd "$WORK/gpk" && PATH="$_gpk_bin" OUT="$WORK/gpk/bom.json" PREP_FAILED="${GPK_PREP_FAILED:-}" "$_gpk_bash" -c 'log() { :; }; mark_prep_failed() { echo "MARK-FAILED $1"; };'"$fns"' rc=0; EXCLUDE_NON_SHIPPED=1; NON_SHIPPED_DIRS="examples test"; NON_SHIPPED_PATHS="gradle/wrapper"; '"$_gpk_block" 2>&1 )
+        }
+        _gpk_expect() {  # <marked|clean> <label> <run output>
+            local got=clean
+            case "$3" in *"MARK-FAILED gradle-packages"*) got=marked ;; esac
+            if [ "$got" = "$1" ]; then pass "$2"; else fail "$2" "$3"; fi
+        }
+        _gpk_expect marked "root build with gradlew and java, only a jar-file component: gradle-packages failed" \
+            "$(_gpk_run "$_gpk_jar" java settings.gradle.kts 'include("demo")' gradlew '#!/bin/sh' demo/build.gradle.kts "$_gpk_deps")"
+        _gpk_expect clean "a component with the Gradle origin properties: nothing recorded" \
+            "$(_gpk_run "$_gpk_gradle" java settings.gradle.kts 'include("demo")' gradlew '#!/bin/sh' demo/build.gradle.kts "$_gpk_deps")"
+        _gpk_expect marked "root build, no gradlew, gradle on PATH: checked" \
+            "$(_gpk_run "$_gpk_jar" gradle build.gradle.kts "$_gpk_deps")"
+        _gpk_expect clean "root build, no gradlew and no gradle: nothing recorded" \
+            "$(_gpk_run "$_gpk_jar" java build.gradle.kts "$_gpk_deps")"
+        _gpk_expect clean "gradle-dependencies already failed: gradle-packages not added" \
+            "$(GPK_PREP_FAILED=gradle-dependencies _gpk_run "$_gpk_jar" java gradlew '#!/bin/sh' build.gradle.kts "$_gpk_deps")"
+        _gpk_expect clean "Flutter-style android/ folder with no gradlew: nothing recorded" \
+            "$(_gpk_run "$_gpk_jar" java+gradle pubspec.yaml 'name: app' android/app/build.gradle "$_gpk_deps")"
+        _gpk_expect marked "nested build with its own gradlew, java present: checked" \
+            "$(_gpk_run "$_gpk_jar" java android/gradlew '#!/bin/sh' android/settings.gradle "include ':app'" android/app/build.gradle "$_gpk_deps")"
+        _gpk_expect clean "nested build with its own gradlew but no java: nothing recorded" \
+            "$(_gpk_run "$_gpk_jar" none android/gradlew '#!/bin/sh' android/settings.gradle "include ':app'" android/app/build.gradle "$_gpk_deps")"
+        _gpk_expect clean "build file under a non-shipped folder: nothing recorded" \
+            "$(_gpk_run "$_gpk_jar" java gradlew '#!/bin/sh' settings.gradle '' examples/app/build.gradle "dependencies {
+    implementation 'com.google.guava:guava:33.0.0-jre'
+}")"
+        _gpk_expect marked "version catalog alias counts as a declared dependency" \
+            "$(_gpk_run "$_gpk_jar" java gradlew '#!/bin/sh' build.gradle "dependencies {
+    implementation libs.guava
+}")"
+        for _gpk_line in "implementation project(':core')" 'implementation(project(":core"))' \
+                         "runtimeOnly files('libs/a.jar')" "implementation fileTree(dir: 'libs')" \
+                         'implementation(projects.core)' 'api projects.shared.model' \
+                         'implementation gradleApi()' 'implementation(localGroovy())' 'implementation(gradleTestKit())' \
+                         'implementation(platform(project(":bom")))' "api enforcedPlatform(project(':bom'))"; do
+            _gpk_expect clean "not external: $_gpk_line" \
+                "$(_gpk_run "$_gpk_jar" java gradlew '#!/bin/sh' build.gradle "dependencies {
+    $_gpk_line
+}")"
+        done
+        _gpk_expect marked "platform() of an external BOM counts as declared" \
+            "$(_gpk_run "$_gpk_jar" java gradlew '#!/bin/sh' build.gradle 'dependencies {
+    implementation(platform("org.springframework.boot:spring-boot-dependencies:3.3.0"))
+}')"
+        for _gpk_dir in buildSrc build-logic; do
+            _gpk_expect clean "a build file under $_gpk_dir is not searched" \
+                "$(_gpk_run "$_gpk_jar" java gradlew '#!/bin/sh' settings.gradle.kts 'rootProject.name = "demo"' "$_gpk_dir/build.gradle.kts" "$_gpk_deps")"
+        done
+        _gpk_expect clean "a build named in includeBuild(...) is not searched" \
+            "$(_gpk_run "$_gpk_jar" java gradlew '#!/bin/sh' settings.gradle.kts 'pluginManagement { includeBuild("tools/conventions") }' tools/conventions/build.gradle.kts "$_gpk_deps")"
+        _gpk_expect marked "a build next to an included build is still searched" \
+            "$(_gpk_run "$_gpk_jar" java gradlew '#!/bin/sh' settings.gradle.kts 'includeBuild("tools/conventions")
+include("demo")' tools/conventions/build.gradle.kts 'dependencies { }' demo/build.gradle.kts "$_gpk_deps")"
+    else
+        fail "could not extract the Gradle packages block from build-prep.sh"
+    fi
+else
+    echo "  SKIP: node unavailable, skipping Gradle packages test"
+fi
+
+echo "== cdxgen-log mask: the kept stage 1 log has credentials masked =="
+# Guards scripts/scan-sbom.sh's mask_log_secrets, used on the cdxgen log kept
+# as <prefix>_cdxgen.log. Extract the real function (no logic duplication).
+_mls_fn=$(sed -n '/^mask_log_secrets() {/,/^}/p' "$ROOT_DIR/scripts/scan-sbom.sh")
+if [ -z "$_mls_fn" ]; then
+    fail "could not extract mask_log_secrets from scan-sbom.sh"
+else
+    cat > "$WORK/mls-in.log" <<'LOG'
+Could not GET https://alice:s3cr3t@repo.internal.example/maven2/x.pom
+Authorization: Bearer abcdefghijklmnop
+header "Authorization": "Basic dXNlcjpwYXNz"
+REPO_TOKEN=abc123def npm_config_password: hunter2 apiKey="k-123456"
+Download https://repo1.maven.org/maven2/com/google/guava/guava/33.0.0-jre/guava-33.0.0-jre.pom
+Resolved 12 tokens: done
+LOG
+    bash -c "$_mls_fn; mask_log_secrets '$WORK/mls-in.log' '$WORK/mls-out.log'"
+    _mls_out=$(cat "$WORK/mls-out.log" 2>/dev/null)
+    for _mls_secret in alice s3cr3t abcdefghijklmnop dXNlcjpwYXNz abc123def hunter2 k-123456; do
+        case "$_mls_out" in
+            *"$_mls_secret"*) fail "mask_log_secrets left '$_mls_secret' in the log" "$_mls_out" ;;
+            *) pass "mask_log_secrets masks '$_mls_secret'" ;;
+        esac
+    done
+    case "$_mls_out" in
+        *"https://***@repo.internal.example/maven2/x.pom"*) pass "a URL keeps its host and path, only the user part is masked" ;;
+        *) fail "URL credentials not masked as scheme://***@" "$_mls_out" ;;
+    esac
+    case "$_mls_out" in
+        *"https://repo1.maven.org/maven2/com/google/guava/guava/33.0.0-jre/guava-33.0.0-jre.pom"*"Resolved 12 tokens: done"*)
+            pass "lines with nothing to mask are kept as they were" ;;
+        *) fail "a line with nothing to mask was changed" "$_mls_out" ;;
+    esac
+fi
+
 echo "== maven-hashes: build-prep fetches dependency jars where cdxgen reads them for hashes =="
 # cdxgen computes a Maven component's hashes only from its jar under
 # $HOME/.m2/repository, and its dependency:tree run downloads poms, not jars.
