@@ -2140,11 +2140,13 @@ mech_cpe_of() { jq -r --arg n "$1" '[.components[]|select(.name==$n)]|.[0].cpe /
 # (a) vendor=<group> (dotted, verbatim), product=<artifact> -> replaced (same
 # result as deriving from no cpe at all: org.apache.pdfbox -> apache:pdfbox).
 [ "$(mech_cpe_of pdfbox-app)" = "cpe:2.3:a:apache:pdfbox:1.8.7:*:*:*:*:*:*:*" ] && pass "mechanical group-copy cpe replaced (apache:pdfbox)" || fail "pdfbox-app cpe='$(mech_cpe_of pdfbox-app)'"
-# (b) vendor=<artifact> (verbatim), product=<artifact> -> replaced (2-segment
-# group, parts[1]==parts[-1] shape: jakarta.annotation -> annotation:annotation).
-[ "$(mech_cpe_of jakarta.annotation-api)" = "cpe:2.3:a:annotation:annotation:2.1.1:*:*:*:*:*:*:*" ] && pass "mechanical artifact-copy cpe replaced (annotation:annotation)" || fail "jakarta.annotation-api cpe='$(mech_cpe_of jakarta.annotation-api)'"
-# (c) vendor=<group>.<artifact> concatenated, product=<artifact> -> replaced.
-[ "$(mech_cpe_of HikariCP)" = "cpe:2.3:a:zaxxer:zaxxer:4.0.3:*:*:*:*:*:*:*" ] && pass "mechanical group.artifact-copy cpe replaced (zaxxer:zaxxer)" || fail "HikariCP cpe='$(mech_cpe_of HikariCP)'"
+# (b) vendor=<artifact> (verbatim), product=<artifact> -> replaced. The group's
+# last segment ("annotation") does not name the artifact, so the product is the
+# artifactId: jakarta.annotation -> annotation:jakarta.annotation-api.
+[ "$(mech_cpe_of jakarta.annotation-api)" = "cpe:2.3:a:annotation:jakarta.annotation-api:2.1.1:*:*:*:*:*:*:*" ] && pass "mechanical artifact-copy cpe replaced (annotation:jakarta.annotation-api)" || fail "jakarta.annotation-api cpe='$(mech_cpe_of jakarta.annotation-api)'"
+# (c) vendor=<group>.<artifact> concatenated, product=<artifact> -> replaced
+# (product = the lowercased artifactId, since "zaxxer" does not name HikariCP).
+[ "$(mech_cpe_of HikariCP)" = "cpe:2.3:a:zaxxer:hikaricp:4.0.3:*:*:*:*:*:*:*" ] && pass "mechanical group.artifact-copy cpe replaced (zaxxer:hikaricp)" || fail "HikariCP cpe='$(mech_cpe_of HikariCP)'"
 # (d) boundary: single-segment groupId equal to the artifactId, but the
 # pre-existing vendor ("apache-software-foundation") is not the group or
 # artifact string in any form -- it looks like a real (if possibly wrong)
@@ -2444,18 +2446,18 @@ cat > "$WORK/mvn-alt.json" <<'JSON'
 JSON
 python3 "$MVNCPE" "$WORK/mvn-alt.json" >/dev/null 2>&1
 alt_props_of() { jq -r --arg n "$1" '[.components[]|select(.name==$n)]|.[0]|[(.properties//[])[]|select(.name=="bomlens:cpeAlternates")|.value][0] // "NONE"' "$WORK/mvn-alt.json"; }
-[ "$(alt_props_of spring-context)" = '["cpe:2.3:a:pivotal_software:spring_framework:2.5.6:*:*:*:*:*:*:*", "cpe:2.3:a:springsource:spring_framework:2.5.6:*:*:*:*:*:*:*"]' ] \
+[ "$(alt_props_of spring-context)" = '["cpe:2.3:a:pivotal_software:spring_framework:2.5.6:*:*:*:*:*:*:*", "cpe:2.3:a:springsource:spring_framework:2.5.6:*:*:*:*:*:*:*", "cpe:2.3:a:org.springframework:spring-context:2.5.6:*:*:*:*:maven:*:*"]' ] \
     && pass "org.springframework carries both pivotal_software and springsource alternates" \
     || fail "spring-context alternates='$(alt_props_of spring-context)'"
-[ "$(alt_props_of spring-security-core)" = '["cpe:2.3:a:pivotal_software:spring_security:3.0.0:*:*:*:*:*:*:*"]' ] \
+[ "$(alt_props_of spring-security-core)" = '["cpe:2.3:a:pivotal_software:spring_security:3.0.0:*:*:*:*:*:*:*", "cpe:2.3:a:org.springframework.security:spring-security-core:3.0.0:*:*:*:*:maven:*:*", "cpe:2.3:a:org.springframework:spring-security-core:3.0.0:*:*:*:*:maven:*:*"]' ] \
     && pass "org.springframework.security carries the pivotal_software alternate" \
     || fail "spring-security-core alternates='$(alt_props_of spring-security-core)'"
-[ "$(alt_props_of jetty)" = '["cpe:2.3:a:eclipse:jetty:6.1.21:*:*:*:*:*:*:*"]' ] \
+[ "$(alt_props_of jetty)" = '["cpe:2.3:a:eclipse:jetty:6.1.21:*:*:*:*:*:*:*", "cpe:2.3:a:org.mortbay.jetty:jetty:6.1.21:*:*:*:*:maven:*:*", "cpe:2.3:a:org.mortbay:jetty:6.1.21:*:*:*:*:maven:*:*"]' ] \
     && pass "org.mortbay.jetty carries the eclipse:jetty alternate" \
     || fail "jetty alternates='$(alt_props_of jetty)'"
-[ "$(alt_props_of spring-boot)" = "NONE" ] \
-    && pass "org.springframework.boot (single vendor, verified no split) gets no alternates property" \
-    || fail "spring-boot wrongly got alternates='$(alt_props_of spring-boot)'"
+[ "$(alt_props_of spring-boot)" = '["cpe:2.3:a:org.springframework.boot:spring-boot:1.5.6.RELEASE:*:*:*:*:maven:*:*", "cpe:2.3:a:org.springframework:spring-boot:1.5.6.RELEASE:*:*:*:*:maven:*:*"]' ] \
+    && pass "org.springframework.boot (single vendor, verified no split) gets only the package-style candidates" \
+    || fail "spring-boot alternates='$(alt_props_of spring-boot)'"
 cp "$WORK/mvn-alt.json" "$WORK/mvn-alt2.json"; python3 "$MVNCPE" "$WORK/mvn-alt2.json" >/dev/null 2>&1
 diff -q "$WORK/mvn-alt.json" "$WORK/mvn-alt2.json" >/dev/null 2>&1 && pass "F-1c7 enrichment is idempotent" || fail "second run changed the SBOM"
 # regression: scan-nvd-cpe.py actually looks the alternates up and recovers
@@ -2509,6 +2511,131 @@ if command -v grype >/dev/null 2>&1; then
 else
     echo "  SKIP: grype not installed; skipping CVE-recovery regression (F-1c8)"
 fi
+
+echo "== F-1c9: maven CPE enrichment, package-style CPE candidates (groupId:artifactId, target_sw=maven) =="
+# Recent NVD records describe maven packages as vendor=<groupId>,
+# product=<artifactId>, target_sw=maven. Every maven component with a cpe gets
+# up to two such candidates in bomlens:cpeAlternates (the full groupId, and its
+# parent for a 3+ segment groupId). The first four purls below also had a
+# product taken from a groupId segment (client5, embed, core, snappy).
+cat > "$WORK/mvn-pkg.json" <<'JSON'
+{"bomFormat":"CycloneDX","specVersion":"1.6","components":[
+ {"type":"library","name":"httpclient5","version":"5.6.3","purl":"pkg:maven/org.apache.httpcomponents.client5/httpclient5@5.6.3"},
+ {"type":"library","name":"tomcat-embed-el","version":"11.0.25","purl":"pkg:maven/org.apache.tomcat.embed/tomcat-embed-el@11.0.25"},
+ {"type":"library","name":"jackson-databind","version":"3.1.7","purl":"pkg:maven/tools.jackson.core/jackson-databind@3.1.7"},
+ {"type":"library","name":"snappy-java","version":"1.1.10.7","purl":"pkg:maven/org.xerial.snappy/snappy-java@1.1.10.7"},
+ {"type":"library","name":"jackson-databind-2","version":"2.21.7","purl":"pkg:maven/com.fasterxml.jackson.core/jackson-databind@2.21.7"},
+ {"type":"library","name":"preset-cpe","version":"1.0","purl":"pkg:maven/com.example/preset-cpe@1.0","cpe":"cpe:2.3:a:examplevendor:preset:1.0:*:*:*:*:*:*:*"},
+ {"type":"library","name":"odd-coord","version":"1.0","purl":"pkg:maven/com.example/odd%20coord@1.0"},
+ {"type":"library","name":"struts2-core","version":"2.3.31","purl":"pkg:maven/org.apache.struts/struts2-core@2.3.31"},
+ {"type":"library","name":"derbyclient","version":"10.14.2.0","purl":"pkg:maven/org.apache.derby/derbyclient@10.14.2.0"},
+ {"type":"library","name":"fontbox","version":"2.0.0","purl":"pkg:maven/org.apache.pdfbox/fontbox@2.0.0"},
+ {"type":"library","name":"tomcat-embed-core","version":"9.0.1","purl":"pkg:maven/org.apache.tomcat.embed/tomcat-embed-core@9.0.1"},
+ {"type":"library","name":"okhttp","version":"4.9.0","purl":"pkg:maven/com.squareup.okhttp3/okhttp@4.9.0"},
+ {"type":"library","name":"guice","version":"4.0","purl":"pkg:maven/com.google.inject/guice@4.0"},
+ {"type":"library","name":"gh-lib","version":"1.0","purl":"pkg:maven/com.github.someone/gh-lib@1.0"},
+ {"type":"library","name":"jquery","version":"3.0.0","purl":"pkg:maven/org.webjars.npm/jquery@3.0.0"}]}
+JSON
+python3 "$MVNCPE" "$WORK/mvn-pkg.json" >/dev/null 2>&1
+pkg_cpe_of() { jq -r --arg n "$1" '[.components[]|select(.name==$n)]|.[0].cpe // "NONE"' "$WORK/mvn-pkg.json"; }
+pkg_alt_of() { jq -r --arg n "$1" '[.components[]|select(.name==$n)]|.[0]|[(.properties//[])[]|select(.name=="bomlens:cpeAlternates")|.value][0] // "NONE"' "$WORK/mvn-pkg.json"; }
+check_pkg() {  # name, expected primary cpe, expected alternates JSON
+    if [ "$(pkg_cpe_of "$1")" = "$2" ]; then pass "$1 primary cpe $2"; else fail "$1 cpe='$(pkg_cpe_of "$1")', expected $2"; fi
+    if [ "$(pkg_alt_of "$1")" = "$3" ]; then pass "$1 package-style alternates"; else fail "$1 alternates='$(pkg_alt_of "$1")', expected $3"; fi
+}
+check_pkg httpclient5 "cpe:2.3:a:apache:httpclient5:5.6.3:*:*:*:*:*:*:*" \
+    '["cpe:2.3:a:org.apache.httpcomponents.client5:httpclient5:5.6.3:*:*:*:*:maven:*:*", "cpe:2.3:a:org.apache.httpcomponents:httpclient5:5.6.3:*:*:*:*:maven:*:*"]'
+# Only tomcat-embed-core is the Tomcat server (apache:tomcat); the other embed
+# artifacts fall back to the generic rule (product = artifactId).
+check_pkg tomcat-embed-el "cpe:2.3:a:apache:tomcat-embed-el:11.0.25:*:*:*:*:*:*:*" \
+    '["cpe:2.3:a:org.apache.tomcat.embed:tomcat-embed-el:11.0.25:*:*:*:*:maven:*:*", "cpe:2.3:a:org.apache.tomcat:tomcat-embed-el:11.0.25:*:*:*:*:maven:*:*"]'
+check_pkg jackson-databind "cpe:2.3:a:fasterxml:jackson-databind:3.1.7:*:*:*:*:*:*:*" \
+    '["cpe:2.3:a:tools.jackson.core:jackson-databind:3.1.7:*:*:*:*:maven:*:*", "cpe:2.3:a:tools.jackson:jackson-databind:3.1.7:*:*:*:*:maven:*:*"]'
+check_pkg snappy-java "cpe:2.3:a:xerial:snappy-java:1.1.10.7:*:*:*:*:*:*:*" \
+    '["cpe:2.3:a:org.xerial.snappy:snappy-java:1.1.10.7:*:*:*:*:maven:*:*", "cpe:2.3:a:org.xerial:snappy-java:1.1.10.7:*:*:*:*:maven:*:*"]'
+check_pkg jackson-databind-2 "cpe:2.3:a:fasterxml:jackson-databind:2.21.7:*:*:*:*:*:*:*" \
+    '["cpe:2.3:a:com.fasterxml.jackson.core:jackson-databind:2.21.7:*:*:*:*:maven:*:*", "cpe:2.3:a:com.fasterxml.jackson:jackson-databind:2.21.7:*:*:*:*:maven:*:*"]'
+check_pkg tomcat-embed-core "cpe:2.3:a:apache:tomcat:9.0.1:*:*:*:*:*:*:*" \
+    '["cpe:2.3:a:org.apache.tomcat.embed:tomcat-embed-core:9.0.1:*:*:*:*:maven:*:*", "cpe:2.3:a:org.apache.tomcat:tomcat-embed-core:9.0.1:*:*:*:*:maven:*:*"]'
+# An artifactId that starts with the last groupId segment keeps the segment as
+# the product, with or without a separator (struts / struts2-core, derby /
+# derbyclient): NVD files these under apache:struts and apache:derby.
+check_pkg struts2-core "cpe:2.3:a:apache:struts:2.3.31:*:*:*:*:*:*:*" \
+    '["cpe:2.3:a:org.apache.struts:struts2-core:2.3.31:*:*:*:*:maven:*:*", "cpe:2.3:a:org.apache:struts2-core:2.3.31:*:*:*:*:maven:*:*"]'
+check_pkg derbyclient "cpe:2.3:a:apache:derby:10.14.2.0:*:*:*:*:*:*:*" \
+    '["cpe:2.3:a:org.apache.derby:derbyclient:10.14.2.0:*:*:*:*:maven:*:*", "cpe:2.3:a:org.apache:derbyclient:10.14.2.0:*:*:*:*:maven:*:*"]'
+# PDFBox subprojects stay on apache:pdfbox (curated).
+[ "$(pkg_cpe_of fontbox)" = "cpe:2.3:a:apache:pdfbox:2.0.0:*:*:*:*:*:*:*" ] && pass "fontbox -> apache:pdfbox (curated)" || fail "fontbox cpe='$(pkg_cpe_of fontbox)'"
+# The segment is a packaging detail when the artifactId does not start with it.
+[ "$(pkg_cpe_of okhttp)" = "cpe:2.3:a:squareup:okhttp:4.9.0:*:*:*:*:*:*:*" ] && pass "com.squareup.okhttp3/okhttp -> squareup:okhttp" || fail "okhttp cpe='$(pkg_cpe_of okhttp)'"
+[ "$(pkg_cpe_of guice)" = "cpe:2.3:a:google:guice:4.0:*:*:*:*:*:*:*" ] && pass "com.google.inject/guice -> google:guice" || fail "guice cpe='$(pkg_cpe_of guice)'"
+# A shared hosting namespace (com.github, org.webjars) is not used as a parent-groupId vendor.
+[ "$(pkg_alt_of gh-lib)" = '["cpe:2.3:a:com.github.someone:gh-lib:1.0:*:*:*:*:maven:*:*"]' ] \
+    && pass "no com.github parent-groupId candidate" || fail "gh-lib alternates='$(pkg_alt_of gh-lib)'"
+[ "$(pkg_alt_of jquery)" = '["cpe:2.3:a:org.webjars.npm:jquery:3.0.0:*:*:*:*:maven:*:*"]' ] \
+    && pass "no org.webjars parent-groupId candidate" || fail "jquery alternates='$(pkg_alt_of jquery)'"
+# A real pre-existing cpe is kept and gains only the package-style candidate
+# (2-segment groupId, so no parent candidate). It is not marked as derived.
+check_pkg preset-cpe "cpe:2.3:a:examplevendor:preset:1.0:*:*:*:*:*:*:*" \
+    '["cpe:2.3:a:com.example:preset-cpe:1.0:*:*:*:*:maven:*:*"]'
+preset_src=$(jq -r '[.components[]|select(.name=="preset-cpe")]|.[0]|[(.properties//[])[]|select(.name=="bomlens:cpeSource")|.value][0] // "NONE"' "$WORK/mvn-pkg.json")
+[ "$preset_src" = "NONE" ] && pass "pre-existing cpe is not marked bomlens:cpeSource" || fail "preset-cpe cpeSource='$preset_src'"
+# A coordinate that cannot be written unescaped into a cpe gets no package-style candidate.
+[ "$(pkg_alt_of odd-coord)" = "NONE" ] && pass "unsafe coordinate gets no package-style candidate" || fail "odd-coord alternates='$(pkg_alt_of odd-coord)'"
+cp "$WORK/mvn-pkg.json" "$WORK/mvn-pkg2.json"; python3 "$MVNCPE" "$WORK/mvn-pkg2.json" >/dev/null 2>&1
+diff -q "$WORK/mvn-pkg.json" "$WORK/mvn-pkg2.json" >/dev/null 2>&1 && pass "F-1c9 enrichment is idempotent" || fail "second run changed the SBOM"
+
+echo "== F-1c10: scan-nvd-cpe.py hands the alternates to grype and version-filters their matches =="
+# The alternates go to grype as syft:cpe23 properties of a temporary SBOM copy
+# (one grype run, purl kept). A match found through a package-style NVD record
+# goes through the same NVD version filter as a primary-cpe match, keyed on the
+# product of the record grype matched.
+GRYPE_SEEN="$WORK/grype-pkg-seen.json"
+cat > "$WORK/grype-pkg-stub" <<'SH'
+#!/usr/bin/env bash
+if [ "$1" = "db" ]; then echo '{}'; exit 1; fi
+cp "${1#sbom:}" "$GRYPE_SEEN"
+cat <<'JSON'
+{"matches":[
+ {"vulnerability":{"id":"CVE-2026-110879","namespace":"nvd:cpe","severity":"high"},
+  "artifact":{"name":"jackson-databind-2","version":"2.21.7","purl":"pkg:maven/com.fasterxml.jackson.core/jackson-databind@2.21.7","cpes":["cpe:2.3:a:fasterxml:jackson-databind:2.21.7:*:*:*:*:*:*:*"]},
+  "matchDetails":[{"type":"cpe-match","found":{"vulnerabilityID":"CVE-2026-110879","cpes":["cpe:2.3:a:com.fasterxml.jackson.core:jackson-databind:*:*:*:*:*:maven:*:*"]}}]},
+ {"vulnerability":{"id":"CVE-2026-000001","namespace":"nvd:cpe","severity":"high"},
+  "artifact":{"name":"jackson-databind-2","version":"2.21.7","purl":"pkg:maven/com.fasterxml.jackson.core/jackson-databind@2.21.7","cpes":["cpe:2.3:a:fasterxml:jackson-databind:2.21.7:*:*:*:*:*:*:*"]},
+  "matchDetails":[{"type":"cpe-match","found":{"vulnerabilityID":"CVE-2026-000001","cpes":["cpe:2.3:a:com.fasterxml.jackson.core:jackson-databind:*:*:*:*:*:maven:*:*"]}}]}
+]}
+JSON
+SH
+chmod +x "$WORK/grype-pkg-stub"
+cp "$WORK/mvn-pkg.json" "$WORK/mvn-pkg-scan.json"
+GRYPE_SEEN="$GRYPE_SEEN" GRYPE_BIN="$WORK/grype-pkg-stub" SECURITY_NVD_VERIFY=true \
+    python3 - "$LIB/scan-nvd-cpe.py" "$WORK/mvn-pkg-scan.json" "$WORK/mvn-pkg-out" >/dev/null 2>&1 <<'PY'
+import importlib.util, sys
+spec = importlib.util.spec_from_file_location("snc", sys.argv[1])
+m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
+crit = "cpe:2.3:a:com.fasterxml.jackson.core:jackson-databind:*:*:*:*:*:maven:*:*"
+ranges = {
+    "CVE-2026-110879": [{"criteria": crit, "vulnerable": True, "versionStartIncluding": "2.19.0", "versionEndExcluding": "2.21.8"}],
+    "CVE-2026-000001": [{"criteria": crit, "vulnerable": True, "versionEndExcluding": "2.10.0"}],
+}
+m._nvd_matches = lambda cve, key, cache: ranges.get(cve, [])
+m.build_sidecar(sys.argv[2], sys.argv[3])
+PY
+seen_cpes=$(jq -r '[.components[]|select(.name=="snappy-java")|(.properties//[])[]|select(.name=="syft:cpe23")|.value]|join(",")' "$GRYPE_SEEN" 2>/dev/null)
+[ "$seen_cpes" = "cpe:2.3:a:org.xerial.snappy:snappy-java:1.1.10.7:*:*:*:*:maven:*:*,cpe:2.3:a:org.xerial:snappy-java:1.1.10.7:*:*:*:*:maven:*:*" ] \
+    && pass "grype input carries the alternates as syft:cpe23 properties" \
+    || fail "syft:cpe23 in grype input='$seen_cpes'"
+seen_purl=$(jq -r '[.components[]|select(.name=="snappy-java")]|.[0].purl' "$GRYPE_SEEN" 2>/dev/null)
+[ "$seen_purl" = "pkg:maven/org.xerial.snappy/snappy-java@1.1.10.7" ] && pass "grype input keeps the component purl" || fail "grype input purl='$seen_purl'"
+if jq -e '[.components[]|(.properties//[])[]|select(.name=="syft:cpe23")]|length==0' "$WORK/mvn-pkg-scan.json" >/dev/null 2>&1; then
+    pass "the SBOM itself gets no syft:cpe23 properties"
+else
+    fail "scan-nvd-cpe.py wrote syft:cpe23 into the SBOM"
+fi
+pkg_kept=$(jq -r '[.Results[0].Vulnerabilities[].VulnerabilityID]|join(",")' "$WORK/mvn-pkg-out_security_grype.json" 2>/dev/null)
+[ "$pkg_kept" = "CVE-2026-110879" ] \
+    && pass "package-style match in the NVD range kept, out-of-range one dropped by the version filter" \
+    || fail "kept CVEs='$pkg_kept', expected CVE-2026-110879"
 
 echo "== F-1d: NVD version filter (scan-nvd-cpe) — drops loose-range false positives =="
 # The filter is what removes grype's over-broad nvd:cpe matches (a fixed-in-9.0.104

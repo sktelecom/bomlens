@@ -149,9 +149,37 @@ def _nvd_matches(cve, key, cache):
     return matches
 
 
+_CPE_FIELD_SPLIT = re.compile(r"(?<!\\):")
+_CPE_UNESCAPE = re.compile(r"\\(.)")
+
+
 def _cpe_product(cpe):
-    parts = (cpe or "").split(":")
-    return parts[4] if len(parts) > 4 else ""
+    """Product field of a cpe:2.3 string, unescaped and lowercased so a grype
+    CPE ("jackson\\-databind") and an NVD criteria string compare equal."""
+    parts = _CPE_FIELD_SPLIT.split(cpe or "")
+    return _CPE_UNESCAPE.sub(r"\1", parts[4]).lower() if len(parts) > 4 else ""
+
+
+def _matched_products(m):
+    """Products of the NVD CPEs this grype match was found through
+    (matchDetails[].found.cpes), so the version filter checks the record that
+    actually matched, whichever of the component's CPEs (primary or an
+    alternate) grype searched. Falls back to the component's first CPE when
+    grype reports no found CPE."""
+    out = set()
+    for d in m.get("matchDetails") or []:
+        found = d.get("found") if isinstance(d, dict) else None
+        if isinstance(found, dict):
+            for c in found.get("cpes") or []:
+                prod = _cpe_product(c)
+                if prod:
+                    out.add(prod)
+    if not out:
+        cpes = (m.get("artifact") or {}).get("cpes") or []
+        prod = _cpe_product(cpes[0]) if cpes else ""
+        if prod:
+            out.add(prod)
+    return out
 
 
 def _nvd_cpe_vendor_severity(m, vuln, is_nvd):
@@ -380,6 +408,73 @@ def _published_date(conn, cve):
 
 
 # ---- main -------------------------------------------------------------------
+def _sbom_alternates(doc):
+    """Return [(component, [alt_cpe, ...])] for every component
+    enrich-maven-cpe.py tagged with bomlens:cpeAlternates: the curated
+    alternates of a project NVD splits across more than one CPE vendor, and
+    the package-style candidates (vendor = groupId, product = artifactId,
+    target_sw = maven). A component's single cpe field cannot carry them."""
+    out = []
+    for c in doc.get("components") or []:
+        if not isinstance(c, dict):
+            continue
+        props = c.get("properties") or []
+        raw = next((p.get("value") for p in props
+                    if isinstance(p, dict) and p.get("name") == "bomlens:cpeAlternates"), None)
+        if not raw:
+            continue
+        try:
+            alt_cpes = json.loads(raw)
+        except ValueError:
+            continue
+        if isinstance(alt_cpes, list):
+            alt_cpes = [a for a in alt_cpes if isinstance(a, str) and a.startswith("cpe:2.3:")]
+            if alt_cpes:
+                out.append((c, alt_cpes))
+    return out
+
+
+def grype_input(sbom_path):
+    """Path of the SBOM grype should scan, and whether it is a temporary copy.
+
+    grype reads a CycloneDX component's cpe plus every property named
+    syft:cpe23 as that package's CPEs (syft's CycloneDX decoder), and its CPE
+    matcher searches all of them. So the alternates are written as syft:cpe23
+    properties into a temporary copy: one grype run then searches
+    every candidate with the component's own purl, type and version, instead
+    of one bare-CPE grype run per alternate. The SBOM itself is not changed."""
+    try:
+        with open(sbom_path) as f:
+            doc = json.load(f)
+    except (OSError, ValueError):
+        return sbom_path, False
+    tagged = _sbom_alternates(doc) if isinstance(doc, dict) else []
+    if not tagged:
+        return sbom_path, False
+    for c, alt_cpes in tagged:
+        props = c.setdefault("properties", [])
+        have = {c.get("cpe")} | {p.get("value") for p in props
+                                 if isinstance(p, dict) and p.get("name") == "syft:cpe23"}
+        for alt in alt_cpes:
+            if alt not in have:
+                props.append({"name": "syft:cpe23", "value": alt})
+                have.add(alt)
+    try:
+        fd, tmp = tempfile.mkstemp(prefix="bomlens-grype-", suffix=".json")
+    except OSError:
+        return sbom_path, False
+    try:
+        with os.fdopen(fd, "w") as f:
+            json.dump(doc, f, ensure_ascii=False)
+    except (OSError, TypeError, ValueError):
+        try:
+            os.remove(tmp)
+        except OSError:
+            pass
+        return sbom_path, False
+    return tmp, True
+
+
 def run_grype(sbom):
     """grype's JSON result, or None after writing the cause to the status file."""
     print("[nvd-cpe] grype CPE matching started")
@@ -409,63 +504,21 @@ def run_grype(sbom):
         return None
 
 
-def _run_grype_cpe(cpe):
-    """A single bare-CPE grype lookup (cheap: grype's local DB query, not a
-    second full-SBOM scan). Returns grype's raw matches list, or [] on any
-    failure -- an alternate CPE that can't be queried is silently skipped,
-    matching this script's existing "no path -> no finding" posture."""
-    try:
-        p = subprocess.run([GRYPE, cpe, "-o", "json"],
-                           capture_output=True, text=True, env=_grype_env(), timeout=60)
-        if p.returncode != 0:
-            return []
-        return json.loads(p.stdout).get("matches", [])
-    except Exception:
-        return []
-
-
-def _sbom_cpe_alternates(sbom_path):
-    """Yield (name, version, purl, [alt_cpe, ...]) for every maven component
-    enrich-maven-cpe.py tagged with bomlens:cpeAlternates -- a project NVD
-    splits across more than one CPE vendor (see MAVEN_CPE_MAP's alternates),
-    which a component's single cpe field cannot express on its own."""
-    try:
-        with open(sbom_path) as f:
-            doc = json.load(f)
-    except (OSError, ValueError):
-        return
-    for c in doc.get("components") or []:
-        props = c.get("properties") or []
-        raw = next((p.get("value") for p in props if p.get("name") == "bomlens:cpeAlternates"), None)
-        if not raw:
-            continue
-        try:
-            alt_cpes = json.loads(raw)
-        except ValueError:
-            continue
-        if alt_cpes:
-            yield c.get("name", ""), c.get("version", ""), c.get("purl", ""), alt_cpes
-
-
 def build_sidecar(sbom_path, out_prefix):
     global _GRYPE_ENV
     _GRYPE_ENV, degraded = _prepare_grype_db()
-    g = run_grype(sbom_path)
+    scan_path, is_tmp = grype_input(sbom_path)
+    try:
+        g = run_grype(scan_path)
+    finally:
+        if is_tmp:
+            try:
+                os.remove(scan_path)
+            except OSError:
+                pass
     if g is None:
         return
     grype_matches = g.get("matches", [])
-    # Alternate-CPE matches: fold each curated alternate's own bare-CPE lookup
-    # into the same match list (with the real component's name/version/purl
-    # substituted for grype's bare-CPE artifact, which carries no purl) so
-    # they get exactly the same NVD-verify/severity/record-building treatment
-    # as the primary SBOM scan's matches below -- no separate code path to
-    # keep in sync.
-    for name, version, purl, alt_cpes in _sbom_cpe_alternates(sbom_path):
-        for alt_cpe in alt_cpes:
-            for m in _run_grype_cpe(alt_cpe):
-                art = m.setdefault("artifact", {})
-                art["name"], art["version"], art["purl"] = name, version, purl
-                grype_matches.append(m)
     # Default off: the base behavior stays offline (air-gap safe). When on it needs
     # network + NVD_API_KEY and adds minutes per scan, so it is opt-in; without it
     # nvd:cpe findings are kept and flagged bomlens:cpeVersionUnverified.
@@ -497,9 +550,8 @@ def build_sidecar(sbom_path, out_prefix):
     last_percent = None
 
     kept, dropped, unverified = [], 0, 0
-    seen = set()  # (purl-or-name, cve): an alternate CPE lookup can rediscover
-    # a CVE the primary SBOM scan already found (their version ranges overlap),
-    # or two alternates can overlap each other -- keep the first hit only.
+    seen = set()  # (purl-or-name, cve): keep the first hit only, in case
+    # grype reports the same CVE for a component more than once.
     for m in grype_matches:
         vuln = m.get("vulnerability", {})
         cve = vuln.get("id", "")
@@ -528,8 +580,7 @@ def build_sidecar(sbom_path, out_prefix):
         # so this pass leaves them out entirely.
         if OS_PURL.match(purl):
             continue
-        cpes = art.get("cpes") or []
-        product = _cpe_product(cpes[0]) if cpes else ""
+        products = _matched_products(m)
         dedup_key = (purl or art.get("name", ""), cve)
         if dedup_key in seen:
             continue
@@ -550,7 +601,7 @@ def build_sidecar(sbom_path, out_prefix):
                 if nvd_ms is None:
                     flag_unverified = True  # network down: keep but flag
                 else:
-                    prod_m = [x for x in nvd_ms if f":{product}:" in x["criteria"].lower()]
+                    prod_m = [x for x in nvd_ms if _cpe_product(x.get("criteria", "")) in products]
                     if prod_m and not any(_in_range(ver, x) for x in prod_m):
                         dropped += 1
                         continue  # version outside every NVD range -> false positive
