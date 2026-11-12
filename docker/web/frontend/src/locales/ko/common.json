@@ -836,6 +836,7 @@
     "bundleLock": "Ruby Bundler lock 해석",
     "gradleDependencies": "Gradle 의존성 해석",
     "gradlePackages": "Gradle 패키지 해석",
+    "mavenDependencyTree": "Maven 의존성 트리 해석",
     "mavenDependencyJars": "Maven 의존성 jar 내려받기(구성요소 해시)",
     "androidReleaseClasspath": "Android release classpath 해석",
     "swiftPackageResolve": "Swift 패키지 해석",

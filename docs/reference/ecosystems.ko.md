@@ -74,7 +74,9 @@ npm, Python(pip), Go, Rust(Cargo) 패키지는 소스 스캔이 설치된 패키
 
 > 주의: cdxgen은 Maven 컴포넌트의 라이선스를 그 컴포넌트 자신의 `pom.xml`에서만 읽으므로, `<licenses>`를 선언하지 않고 부모 POM의 Maven 상속에 기대는 컴포넌트는 라이선스가 빈 채로 넘어옵니다. BomLens는 이제 그 부모 체인을 직접 따라가(리액터 자신의 모듈부터, 리액터 밖 부모는 로컬 저장소에서) 처음으로 라이선스를 선언한 조상의 값을 채우고, 어느 조상도 선언하지 않았거나 이미 라이선스가 있는 컴포넌트는 그대로 둡니다. 채운 컴포넌트에는 `bomlens:licenseSource` 속성이 `parent POM` 값으로 기록됩니다.
 
-> 주의: 의존성과 라이선스를 해석하려면 컨테이너가 Maven Central(또는 사내 미러)에 접속할 수 있어야 합니다. 접속하지 못하면 `pom.xml`에 적힌 의존성만 담기고 전이 의존성과 라이선스는 비며, 스캔은 경고 없이 끝납니다. 컴포넌트 수가 예상보다 훨씬 적으면 네트워크 접속부터 확인하세요.
+> 주의: 의존성과 라이선스를 해석하려면 컨테이너가 Maven Central(또는 사내 미러)에 접속할 수 있어야 합니다. 접속하지 못하면 `pom.xml`에 적힌 의존성만 담기고 전이 의존성과 라이선스는 비며, 스캔은 경고 없이 끝납니다. 그중 test, provided, system 스코프와 `<optional>true</optional>` 의존성은 전체 해석 때와 마찬가지로 빠지며, `BOMLENS_MAVEN_FULL_GRAPH=1`을 설정하면 남습니다. 컴포넌트 수가 예상보다 훨씬 적으면 네트워크 접속부터 확인하세요.
+
+> 주의: Maven 3.10 이상은 같은 의존성을 두 번 선언한 `pom.xml`을 거부합니다(`'dependencies.dependency.(groupId:artifactId:type:classifier)' must be unique`, `dependencyManagement`도 마찬가지). Maven 3.9는 경고만 했고, cdxgen 이미지에는 Maven 3.10이 들어 있습니다. BomLens는 cdxgen을 실행하기 전에 이 오류를 확인하면 이 POM을 받아들이는 Maven으로 다시 시도합니다. `.mvn/wrapper/maven-wrapper.properties`가 3.10보다 낮은 Maven을 지정하면 프로젝트의 Maven 래퍼를 쓰고, 그렇지 않거나 래퍼가 다른 이유로 실패하면 Apache Maven 3.9.16을 씁니다. 이 Maven은 이미지에 든 Maven으로 내려받으므로 `settings.xml`의 미러, 프록시, 오프라인 설정이 그대로 적용됩니다. 그 방법이 실패하고 Maven이 오프라인이 아니면 Maven Central에서 직접 내려받습니다. 내려받은 압축 파일은 BomLens에 들어 있는 SHA-512 체크섬과 일치할 때만 씁니다. 그다음 cdxgen이 이 Maven으로 의존성 트리를 만듭니다. 다만 프로젝트의 `mvnw`가 Maven 3.10 이상을 쓰고 같은 트리에 Gradle 빌드도 있으면 예외입니다. 이때 Maven 3.9.16을 쓰게 하려면 cdxgen이 Gradle 래퍼까지 건너뛰어야 하므로, BomLens는 래퍼를 그대로 두고 경고를 출력한 뒤 이 단계를 실패로 기록합니다. 어떤 Maven도 POM을 읽지 못하면 결과에는 `pom.xml`에 적힌 의존성만 담기고(test, provided, system 스코프와 optional 의존성은 빠집니다), 실패한 단계 `maven-dependency-tree`가 기록되며 `generate`는 `degraded`가 됩니다. 반복된 `<dependency>` 항목을 지우면 Maven 버전과 관계없이 해결됩니다.
 
 ---
 
