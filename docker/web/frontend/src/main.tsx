@@ -20,24 +20,44 @@ import "@fontsource/jetbrains-mono/400.css";
 import "pretendard/dist/web/variable/pretendardvariable-dynamic-subset.css";
 import "@fontsource/jetbrains-mono/500.css";
 
+// Primer design tokens: sizes, type, motion and the light and dark themes
+// only (no high-contrast or colour-blind themes). src/primer.css follows them
+// so its overrides win.
+import "@primer/primitives/dist/css/base/size/size.css";
+import "@primer/primitives/dist/css/base/typography/typography.css";
+import "@primer/primitives/dist/css/base/motion/motion.css";
+import "@primer/primitives/dist/css/functional/size/border.css";
+import "@primer/primitives/dist/css/functional/size/radius.css";
+import "@primer/primitives/dist/css/functional/size/size.css";
+import "@primer/primitives/dist/css/functional/typography/typography.css";
+import "@primer/primitives/dist/css/functional/themes/light.css";
+import "@primer/primitives/dist/css/functional/themes/dark.css";
+import "./primer.css";
+
 import App from "./App";
+import { PrimerRoot } from "./components/primer/PrimerRoot";
 import "./index.css";
 import "./lib/i18n";
+import { applyTheme, initialTheme, THEME_STORAGE_KEY } from "./lib/theme";
 import { ToastProvider } from "./lib/toast";
 
 // Theme: restore saved preference, else follow OS. Applied before paint so
-// there is no light→dark flash.
-const saved = localStorage.getItem("sbom.theme");
-const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-document.documentElement.classList.toggle(
-  "dark",
-  saved ? saved === "dark" : prefersDark,
+// there is no light→dark flash. applyTheme sets the `dark` class and the
+// Primer colour-mode attributes together.
+applyTheme(
+  document.documentElement,
+  initialTheme(
+    localStorage.getItem(THEME_STORAGE_KEY),
+    window.matchMedia("(prefers-color-scheme: dark)").matches,
+  ),
 );
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
-    <ToastProvider>
-      <App />
-    </ToastProvider>
+    <PrimerRoot>
+      <ToastProvider>
+        <App />
+      </ToastProvider>
+    </PrimerRoot>
   </React.StrictMode>,
 );

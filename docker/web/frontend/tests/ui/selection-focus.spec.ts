@@ -12,7 +12,7 @@ import { seedThemeLang, type Theme } from "./visual";
  *
  * Both used to be the same dark ring with an offset, so a tile you had tabbed to
  * looked chosen and the chosen tile looked focused. Now a selection is a fill
- * plus a dark border (never a ring) and focus is the brand-red ring from --ring
+ * plus a dark border (never a ring) and focus is the brand ring from --ring
  * (focus-visible only). These tests read computed styles, so they do not depend
  * on a screenshot baseline.
  */

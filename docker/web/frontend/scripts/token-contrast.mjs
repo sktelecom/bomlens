@@ -101,6 +101,56 @@ for (const [theme, selector] of [["light", ":root"], ["dark", ".dark"]]) {
   check("ring on page", t.ring, t.background, 3);
   check("ring on card", t.ring, t.card, 3);
   check("selected-foreground on selected", t["selected-foreground"], t.selected, 4.5);
+  // The brand: the white label on the primary button (rest and hover), and the
+  // brand as link text on the surfaces a link sits on.
+  check("brand-foreground on brand", t["brand-foreground"], t.brand, 4.5);
+  check("brand-foreground on brand-hover", t["brand-foreground"], t["brand-hover"], 4.5);
+  for (const [name, surface] of [["card", t.card], ["page", t.background], ["muted", t.muted]]) {
+    check(`brand-strong on ${name}`, t["brand-strong"], surface, 4.5);
+  }
+}
+
+// A brand token written as a text colour on the other surfaces (the reports,
+// the Primer overrides, the docs site, the desktop start screens) must read at
+// 4.5:1 on the page, the card and the muted surface in both themes. --brand is
+// a fill (the navy stays dark in dark mode, 2.8:1 on the dark page), so text
+// has to use --brand-strong; this catches a `color: hsl(var(--brand))` there.
+// --brand-foreground is the label on a brand fill and is checked above.
+const REPO = join(fileURLToPath(new URL(".", import.meta.url)), "..", "..", "..", "..");
+const TEXT_SOURCES = (process.env.TOKEN_CONTRAST_TEXT_SOURCES ?? [
+  "docker/lib/report-common.sh",
+  "docker/web/frontend/src/primer.css",
+  "docs/stylesheets/extra.css",
+  "electron/assets/status.html",
+  "electron/assets/docker-missing.html",
+].join(",")).split(",");
+// `color:` itself, or a custom property that is a text colour by name
+// (--link, --fgColor-*, --*-fg, --*-text).
+const BRAND_AS_TEXT =
+  /(?:(?<![\w-])color|--(?:link|fgColor-[\w-]+|[\w-]+-fg|[\w-]+-text))\s*:\s*hsl\(\s*var\(\s*--(brand(?:-[\w]+)?)\s*\)/g;
+const themes = [["light", parseTokens(block(css, ":root"))], ["dark", parseTokens(block(css, ".dark"))]];
+for (const rel of TEXT_SOURCES) {
+  let text;
+  try {
+    text = readFileSync(join(REPO, rel), "utf8");
+  } catch {
+    continue; // not in this checkout (the Docker build context holds only web/frontend/)
+  }
+  for (const m of text.matchAll(BRAND_AS_TEXT)) {
+    const token = m[1];
+    if (token === "brand-foreground") continue;
+    const line = text.slice(0, m.index).split("\n").length;
+    for (const [theme, t] of themes) {
+      for (const [name, surface] of [["card", t.card], ["page", t.background], ["muted", t.muted]]) {
+        if (!t[token] || !surface) continue;
+        const value = ratio(t[token], surface);
+        if (table) console.log(`${theme.padEnd(5)} ${`${rel}:${line} --${token} text on ${name}`.padEnd(44)} ${value.toFixed(2)}  (floor 4.5)`);
+        if (value < 4.5) {
+          failures.push(`${theme}: ${rel}:${line} uses --${token} as text, ${value.toFixed(2)}:1 on the ${name}, needs 4.5:1 (use --brand-strong)`);
+        }
+      }
+    }
+  }
 }
 
 if (failures.length) {

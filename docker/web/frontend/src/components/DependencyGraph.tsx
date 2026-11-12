@@ -40,8 +40,8 @@ const VULN_TONE: Record<Severity, "critical" | "high" | "medium" | "low" | "info
  * packages (others dim). Canvas colors are read from the CSS design tokens at
  * mount so the graph follows light/dark (the canvas can't use Tailwind
  * classes). The direct-dependency accent is the foreground colour: the brand
- * red is not a data colour, and a red dot reads as "problem" next to the
- * severity rings (token-lint rejects brand tokens in this file).
+ * colour is not a data colour, and a coloured dot next to the severity rings
+ * reads as a finding (token-lint rejects brand tokens in this file).
  *
  * Large graphs are slow to lay out and unreadable, so above NODE_CAP we skip
  * the canvas and point the user at the tree view instead.

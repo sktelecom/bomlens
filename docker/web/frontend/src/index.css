@@ -53,30 +53,30 @@
     --destructive: 0 72% 51%; /* ~#dc2626 — aligns with risk-critical */
     --destructive-foreground: 0 0% 98%;
 
-    /* Keyboard focus is the one place the brand red is a state marker. A
+    /* Keyboard focus is the one place the brand colour is a state marker. A
      * selected control is drawn with a fill and a dark border instead, so the
-     * two can never be confused (they used to share the same dark ring). Red is
-     * 4.4:1 on the page and 4.6:1 on the card, above the 3:1 non-text floor. */
-    --ring: 349 100% 46%;
+     * two can never be confused (they used to share the same dark ring). Navy
+     * #1d4ed8 is 6.4:1 on the page and 6.7:1 on the card, above the 3:1
+     * non-text floor. */
+    --ring: 224.3 76.3% 48%; /* #1d4ed8 */
 
-    /* Brand — SKT accent (SK Red #EA002C primary, SK Orange #F47725 secondary).
-     * Scope: the primary action button, the logo and focus marks. NOT data: no
-     * graph node, badge, chart fill or active-menu fill (token-lint checks the
-     * graph and the badges). Stored as HSL triplets so `bg-brand/10`,
+    /* Brand: BomLens navy (#1d4ed8). Scope: the primary action button, links,
+     * the logo and focus marks. NOT data: no graph node, badge, chart fill or
+     * active-menu fill (token-lint checks the graph and the badges). Red is
+     * reserved for Critical, errors and failures (the danger role), so the
+     * brand never reads as a problem. Stored as HSL triplets so `bg-brand/10`,
      * `text-brand` etc. compose. Neutral `--primary` (near-black) is
-     * intentionally left untouched. */
-    --brand: 349 100% 46%; /* SK Red #EA002C */
+     * intentionally left untouched. The Primer accent and primary-button
+     * variables are mapped onto these in src/primer.css. */
+    --brand: 224.3 76.3% 48%; /* #1d4ed8, white label 6.7:1 */
     --brand-foreground: 0 0% 100%;
-    /* Brand red as TEXT on the page surface. Separate from --brand because
-     * that one is also a solid fill (the New scan pill) whose white label
-     * needs it dark — so it cannot be lightened for dark mode, and a badge
-     * using it directly fell to 3.74:1 there, under the 4.5:1 AA floor.
-     * Chosen against the surface these actually sit on: a bg-brand/10 tint
-     * over the CARD, not over the page. Measured on the live UI, the badge
-     * composites to rgb(253, 229.5, 233.8) in light and rgb(47.8, 24.3,
-     * 30.4) in dark, where the old value scored 3.87 and 3.57. */
-    --brand-strong: 349 100% 38%;
-    --brand-accent: 24 90% 55%; /* SK Orange #F47725 */
+    /* Brand as TEXT (links). Separate from --brand because that one is also a
+     * solid fill (the primary button) whose white label needs it dark, so it
+     * cannot be lightened for dark mode. */
+    --brand-strong: 224.3 76.3% 48%; /* #1d4ed8, 6.4:1 on the page, 6.7:1 on the card */
+    /* Hover and pressed fill of the primary button: darker, so the white label
+     * gains contrast instead of losing it. */
+    --brand-hover: 225.9 70.7% 40.2%; /* #1e40af, white label 8.7:1 */
 
     /* Sidebar surface — a hair off the canvas so the rail reads as its own
      * plane (Google AI Studio shell language). */
@@ -148,10 +148,9 @@
      * Channels ("234 88 12"), not colours, so rgb(var(--x) / <alpha>) composes
      * and DependencyGraph can convert them for the canvas. Keep that form.
      *
-     * The brand red is deliberately NOT a role. It marks the primary action, the
-     * logo and the keyboard focus ring only; reading it as data is how "this is
-     * the SK colour" became "this is a problem". token-lint enforces that for
-     * the graph and for badges.
+     * The brand colour is deliberately NOT a role. It marks the primary action,
+     * links, the logo and the keyboard focus ring only, so it is never read as
+     * data. token-lint enforces that for the graph and for badges.
      *
      * Ratios come from the WCAG relative-luminance formula. muted is the
      * emphasis colour at 12% over the white card (16% over the dark card in the
@@ -292,16 +291,15 @@
     --destructive: 0 72% 51%;
     --destructive-foreground: 0 0% 98%;
 
-    --ring: 349 100% 62%; /* 5.1:1 on the dark card, 5.7:1 on the page */
+    --ring: 213.1 93.9% 67.8%; /* #60a5fa, 7.4:1 on the page, 6.6:1 on the card */
 
-    /* Brand — SK Red/Orange against the near-black canvas. Kept at a lightness
-     * where white text on a solid brand fill (the New scan CTA pill) still meets
-     * WCAG AA (4.5:1); a lighter red here drops the pill to ~3.8:1. */
-    --brand: 349 100% 46%;
+    /* Brand on the near-black canvas. The fill stays the light-theme navy so
+     * the white label on the primary button keeps 6.7:1 (a lighter blue fill
+     * would drop it under 4.5:1); text and focus use the lighter blue. */
+    --brand: 224.3 76.3% 48%;
     --brand-foreground: 0 0% 100%;
-    /* Lightened so brand-coloured text clears AA against the dark surface. */
-    --brand-strong: 349 100% 68%;
-    --brand-accent: 24 90% 60%;
+    --brand-strong: 213.1 93.9% 67.8%; /* #60a5fa */
+    --brand-hover: 225.9 70.7% 40.2%;
 
     --sidebar: 240 5% 10%; /* one step above --background (7%) */
     --sidebar-foreground: 0 0% 98%;

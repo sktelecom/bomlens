@@ -151,8 +151,8 @@ export function Sidebar({
                     className={cn(
                       RAIL_ROW,
                       collapsed && "justify-center",
-                      // The active row is a neutral fill only. The brand red is not
-                      // used here: it would read as a warning on the one row that
+                      // The active row is a neutral fill only. The brand colour is not
+                      // used here: it would draw the eye to the one row that
                       // is simply "where you are". The label stays at foreground
                       // contrast (AA).
                       active
