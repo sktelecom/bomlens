@@ -198,7 +198,7 @@ KNOWN_ARTIFACT_SUFFIXES=(
     _bom.spdx3.json _bom.spdx3.json.sig _spdx3-check.json _spdx3-check.md _ai-declaration.template.json
     _modelica.cdx.json _cocoapods.cdx.json _conda.cdx.json
     _security_cvebintool.json _security_grype.json _security_yocto.json
-    _security_trivy.json _component-versions.template.csv
+    _security_govulndb.json _security_trivy.json _component-versions.template.csv
     _reachability.cdx.json _bom.refused.json
 )
 # Only a caller that knows about this cleanup runs it at all. An old
@@ -2535,6 +2535,11 @@ export REACHABILITY_DOC
 # went to this file: {"status": "ok"|"degraded"|"failed", "detail": ...}.
 BOMLENS_DEEP_CVE_STATUS_FILE="$(mktemp 2>/dev/null)" || BOMLENS_DEEP_CVE_STATUS_FILE=""
 export BOMLENS_DEEP_CVE_STATUS_FILE
+# scan-go-vulndb.py (run by scan-security.sh) writes how the Go vulnerability
+# database match went to this file: {"status": ..., "detail": ...}. Empty
+# afterwards means scan-security.sh never reached the match.
+BOMLENS_GO_VULNDB_STATUS_FILE="$(mktemp 2>/dev/null)" || BOMLENS_GO_VULNDB_STATUS_FILE=""
+export BOMLENS_GO_VULNDB_STATUS_FILE
 if [ "${GENERATE_SECURITY:-false}" = "true" ] && [ "$_trivy_db_ready" = true ]; then
     run_optional_step scan-security bash "$LIBDIR/scan-security.sh" "$OUTPUT_FILE" "$OUT_PREFIX" "$PROJECT_NAME"
     _trivy_db_max="${BOMLENS_TRIVY_DB_MAX_AGE_DAYS:-7}"
@@ -2596,6 +2601,66 @@ case "$SCAN_MODE" in
        fi ;;
 esac
 if [ -n "$BOMLENS_DEEP_CVE_STATUS_FILE" ]; then rm -f "$BOMLENS_DEEP_CVE_STATUS_FILE"; fi
+
+# Go vulnerability database (default on, BOMLENS_GO_VULNDB=false turns it off):
+# scan-security.sh matched the SBOM's Go modules against the snapshot bundled
+# in this image, or the export BOMLENS_GO_VULNDB_PATH names (vulndb.zip from
+# vuln.go.dev, or that archive unpacked), and left _security_govulndb.json.
+# Recorded here from scan-go-vulndb.py's status file and that file. A
+# database older than BOMLENS_GO_VULNDB_MAX_AGE_DAYS (7) days that was not
+# replaced by a newer download degrades the step: advisories published since
+# are missing. With no status, scan-security.sh did not get as far as the
+# match, and the step follows scan-security's own outcome.
+_gv_db="${BOMLENS_GO_VULNDB_PATH:-$LIBDIR/go-vulndb.zip}"
+_gv_sidecar="${OUT_PREFIX}_security_govulndb.json"
+_gv_status=""; _gv_detail=""
+if [ -n "$BOMLENS_GO_VULNDB_STATUS_FILE" ] && [ -s "$BOMLENS_GO_VULNDB_STATUS_FILE" ]; then
+    _gv_status="$(jq -r '.status // empty' "$BOMLENS_GO_VULNDB_STATUS_FILE" 2>/dev/null || true)"
+    _gv_detail="$(jq -r '.detail // empty' "$BOMLENS_GO_VULNDB_STATUS_FILE" 2>/dev/null || true)"
+fi
+_gv_counts=""
+if [ -f "$_gv_sidecar" ]; then
+    _gv_counts="$(jq -c '.GoVulnDB | {components: (.Components // 0), findings: (.New // 0), already_reported: (.AlreadyReported // 0)}' "$_gv_sidecar" 2>/dev/null)" || _gv_counts=""
+fi
+if [ "${GENERATE_SECURITY:-false}" != "true" ] || [ "${BOMLENS_GO_VULNDB:-true}" = "false" ]; then
+    er_record go-vulndb disabled
+elif [ "$_trivy_db_ready" != true ]; then
+    er_record go-vulndb skipped no_input "the security scan did not run"
+elif ! jq -e '[.components[]? | recurse(.components[]?) | .purl? | strings | select(test("^pkg:golang/[^@]+@."; "i"))] | length > 0' "$OUTPUT_FILE" >/dev/null 2>&1; then
+    er_record go-vulndb skipped no_input "no Go module (pkg:golang) in the SBOM"
+elif [ ! -e "$_gv_db" ]; then
+    if [ -n "${BOMLENS_GO_VULNDB_PATH:-}" ]; then
+        echo "[WARN] Go vulnerability database check skipped: BOMLENS_GO_VULNDB_PATH ($_gv_db) does not exist inside the container. Mount vulndb.zip from https://vuln.go.dev/vulndb.zip and point the variable at its path inside the container." >&2
+        er_record go-vulndb skipped not_installed "BOMLENS_GO_VULNDB_PATH ($_gv_db) does not exist"
+    else
+        echo "[WARN] Go vulnerability database check skipped: this image has no snapshot of it ($_gv_db; the download failed when the image was built). Refresh the image (docker pull), or mount vulndb.zip from https://vuln.go.dev/vulndb.zip and set BOMLENS_GO_VULNDB_PATH to it." >&2
+        er_record go-vulndb skipped not_installed "no Go vulnerability database snapshot in this image ($_gv_db)"
+    fi
+elif [ -z "$_gv_status" ]; then
+    # scan-security.sh stopped before the match: Trivy is missing (the script
+    # then exits early), or the step failed or was stopped.
+    _gv_ss=""
+    if [ -n "${ER_STEPS:-}" ] && [ -f "$ER_STEPS" ]; then
+        _gv_ss="$(jq -r 'select(.id == "scan-security") | .status' "$ER_STEPS" 2>/dev/null | tail -n 1)" || _gv_ss=""
+    fi
+    if [ "$_gv_ss" = failed ]; then
+        er_record go-vulndb failed failed "the security scan failed before the Go vulnerability database match ran"
+    elif ! command -v trivy >/dev/null 2>&1; then
+        er_record go-vulndb skipped no_input "the security scan did not run: trivy is not in this image"
+    else
+        er_record go-vulndb failed failed "the security scan ended before the Go vulnerability database match ran"
+    fi
+else
+    case "$_gv_status" in
+        ok) er_record go-vulndb ok "" "" "" "" "$_gv_counts" ;;
+        degraded)
+            echo "[WARN] go-vulndb: ${_gv_detail}. Go advisories published since are not reported. Allow the download (vuln.go.dev, or a mirror in BOMLENS_GO_VULNDB_URL), refresh the image, or mount a newer vulndb.zip with BOMLENS_GO_VULNDB_PATH." >&2
+            er_record go-vulndb degraded unavailable "$_gv_detail" "" "" "$_gv_counts" ;;
+        no_input) er_record go-vulndb skipped no_input "$_gv_detail" "" "" "$_gv_counts" ;;
+        *) er_record go-vulndb failed failed "${_gv_detail:-the Go vulnerability database match failed}" ;;
+    esac
+fi
+if [ -n "$BOMLENS_GO_VULNDB_STATUS_FILE" ]; then rm -f "$BOMLENS_GO_VULNDB_STATUS_FILE"; fi
 
 # A supplier's CycloneDX VEX (--vex): keep the statements that apply to this
 # SBOM in ${OUT_PREFIX}_vex_imported.json. The SBOM and the security report are

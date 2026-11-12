@@ -6,7 +6,7 @@ description: The result manifest (bomlens-result.json) every scan writes, for a 
 
 A program that runs the BomLens image as its scan engine reads `bomlens-result.json`, written to the output folder by every scan. It says how the run ended, which steps ran, were turned off, could not run or failed, and which file in the folder plays which role, so the program does not parse the log or guess file names.
 
-The format is checked against [`schemas/engine-result-1.json`](https://github.com/sktelecom/bomlens/blob/main/schemas/engine-result-1.json) by `tests/test-engine-contract.sh` in CI. This page describes contract version `1.3.0`.
+The format is checked against [`schemas/engine-result-1.json`](https://github.com/sktelecom/bomlens/blob/main/schemas/engine-result-1.json) by `tests/test-engine-contract.sh` in CI. This page describes contract version `1.4.0`.
 
 ## The file
 
@@ -22,8 +22,9 @@ The scan's exit code is unchanged by the contract. A run that produced its SBOM 
 | `run` | `status`, `reason`, `started_at`, `ended_at` (UTC), `exit_code` |
 | `steps[]` | one entry per step, in the order they were recorded; a step is recorded when it ends (below) |
 | `tools` | tool name and version: the generator recorded in the SBOM, syft, and Trivy when the vulnerability scan ran |
-| `engines` | the vulnerability engines whose results this run produced (`trivy`, `grype`, `cve-bin-tool`, `yocto`) |
+| `engines` | the vulnerability engines whose results this run produced (`trivy`, `grype`, `cve-bin-tool`, `yocto`, `go-vulndb`) |
 | `data_sources.trivy_db` | the Trivy database's schema version, `updated_at` and `downloaded_at`, when the vulnerability scan ran |
+| `data_sources.go_vulndb` | the Go vulnerability database's `updated_at`, when it was read |
 | `outputs[]` | `role`, `path` (relative to the output folder), `sha256` and `bytes` of each file the run wrote |
 
 ## Run status
@@ -106,6 +107,7 @@ Each step also has `stage` (1 for the SBOM a language image generated before thi
 | `reachability` | a Go source or Go executable scan: judge with govulncheck whether the code each Go advisory names is reached (`--reachability`, `REACHABILITY=true`); `counts` gives `exploitable`, `not_affected` and `components`; `skipped` (`unavailable`) when the Go vulnerability database could not be read, (`no_input`) when the SBOM has no Go component or stage 1 left no govulncheck output for this run, (`too_large`) when the source tree has more than 20 Go modules, `degraded` (`unavailable`) when a Go module builds for none of GOOS linux, darwin and windows and is not judged, (`not_installed`) in an image without govulncheck; `disabled` without the option |
 | `scan-security` | match vulnerabilities with Trivy |
 | `deep-cve` | with `--security`: match the components that carry a CPE, and the extra CPEs in `bomlens:cpeAlternates`, against NVD with grype (`--deep-cve`, the deep-cve image); `skipped` (`not_installed`) when asked for in an image without grype, `skipped` (`fallback`) when the CLI ran it without the deep-cve image, because that image could not be pulled or the scanner image is a local build, a version before 1.13.2 or not a BomLens image name (`detail` says which; a kept image that has grype, built with `SBOM_DEEP_CVE=true`, runs the match and records its real outcome), `disabled` when not asked for, without `--security`, and in a firmware or AI model scan. A grype database older than `BOMLENS_GRYPE_DB_MAX_AGE_DAYS` days (7) is updated first; when it cannot be, it is read as it is and the step is `degraded` (`unavailable`) with its age in `detail`. When grype fails, `detail` carries the end of its error output |
+| `go-vulndb` | with `--security`: match `pkg:golang` components against the Go vulnerability database snapshot in the image (or `BOMLENS_GO_VULNDB_PATH`) and add the findings no engine already reported (by CVE, GHSA or GO id); `counts` gives `components`, `findings` and `already_reported`; `skipped` (`no_input`) with no Go module that has a version it can read, or when the security scan stopped before the match (`detail` says why, for one that Trivy is not in the image), `skipped` (`not_installed`) with no snapshot, `failed` when the database cannot be read or the security scan failed before the match, `degraded` (`unavailable`) when the database read is older than `BOMLENS_GO_VULNDB_MAX_AGE_DAYS` (7) days (a bundled snapshot that old is first replaced by a download unless the scan is offline; `detail` gives the age and why it was not replaced), `disabled` with `BOMLENS_GO_VULNDB=false` or without `--security` |
 | `generate-risk-report` | write the risk report |
 | `model-security` | check an AI model file for unsafe content |
 | `verify-weights` | check that a model's published weights match their hashes |
@@ -122,7 +124,7 @@ Each step also has `stage` (1 for the SBOM a language image generated before thi
 | `sbom.spdx3` | `_bom.spdx3.json` |
 | `vulnerabilities.trivy` | Trivy's own result. This is `_security.json` when nothing changed it, and `_security_trivy.json` (Trivy's result kept apart) when another engine added results or a finding was put under another id or moved to `Advisories` (see [the security report](../guides/reports.md)) |
 | `vulnerabilities.all` | `_security.json`, Trivy's result with the other engines' results merged in, and findings filed under a distribution advisory number reported under their CVE or in the top-level `Advisories` list |
-| `vulnerabilities.other` | another engine's result (`_security_grype.json`, `_security_cvebintool.json`, `_security_yocto.json`) |
+| `vulnerabilities.other` | another engine's result (`_security_grype.json`, `_security_cvebintool.json`, `_security_yocto.json`, `_security_govulndb.json`) |
 | `license-scan.scancode` | `_scancode.json` |
 | `vendored.cyclonedx` | `_vendored.cdx.json` |
 | `vex.reachability` | `_reachability.cdx.json` (`--reachability`) |

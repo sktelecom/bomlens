@@ -310,6 +310,12 @@ jobs:
       - name: Merge-mode unit tests
         run: bash tests/test-merge.sh
 
+      # No Docker, no network: the Go vulnerability database match against a
+      # fixture export, its merge into the security report, and the go-vulndb
+      # step in the result manifest.
+      - name: Go vulnerability database unit tests
+        run: bash tests/test-go-vulndb.sh
+
       # syft for the engine contract's stage 2 fallback cases (the test fails
       # in CI rather than skip when it is missing). The version pinned in
       # docker/Dockerfile, checked against the release's checksum list, into
