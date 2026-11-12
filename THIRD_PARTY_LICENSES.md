@@ -164,7 +164,7 @@ The version below matches the build ARG default in `docker/Dockerfile` (pinned; 
 |------|----------------------|---------|----------------|----------|--------|
 | grype | v0.120.1 (`GRYPE_VERSION`) | CPE-based NVD CVE matching | Apache-2.0 | permissive | https://github.com/anchore/grype |
 
-Data: the grype vulnerability database baked into the image at build time is assembled by Anchore from public vulnerability sources — NVD (public domain), GitHub Security Advisories (CC-BY-4.0), and distribution security databases (each under its own terms). The database is pinned with `GRYPE_DB_AUTO_UPDATE=false`, so no network access happens during a scan.
+Data: the grype vulnerability database baked into the image at build time is assembled by Anchore from public vulnerability sources — NVD (public domain), GitHub Security Advisories (CC-BY-4.0), and distribution security databases (each under its own terms). Automatic updates are off (`GRYPE_DB_AUTO_UPDATE=false`). A scan downloads a newer database only when the bundled one is older than `BOMLENS_GRYPE_DB_MAX_AGE_DAYS` days and the scan is not offline.
 
 ## deep-license image: `ghcr.io/sktelecom/bomlens-deep-license` (contains LGPL, opt-in)
 

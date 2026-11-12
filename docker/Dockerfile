@@ -456,7 +456,9 @@ RUN if [ "$SBOM_FIRMWARE" = "true" ]; then \
 # `grype db update` caches the DB under GRYPE_DB_CACHE_DIR at build time so the
 # image needs no network at scan time; auto-update is disabled at runtime. The
 # build FAILS if the DB is not valid, so a broken cache cannot ship a silent 0-CVE
-# deep-cve image.
+# deep-cve image. grype refuses a DB built more than 5 days ago: scan-nvd-cpe.py
+# updates one older than BOMLENS_GRYPE_DB_MAX_AGE_DAYS (7) days before the match,
+# or reads it as it is (offline) and reports the step as degraded.
 ENV GRYPE_DB_CACHE_DIR=/opt/grype-db \
     GRYPE_DB_AUTO_UPDATE=false
 RUN if [ "$SBOM_DEEP_CVE" = "true" ]; then \

@@ -2518,6 +2518,10 @@ if [ -n "$_rch_mode" ]; then
     fi
 fi
 export REACHABILITY_DOC
+# scan-nvd-cpe.py (run by scan-security.sh for --deep-cve) writes how grype
+# went to this file: {"status": "ok"|"degraded"|"failed", "detail": ...}.
+BOMLENS_DEEP_CVE_STATUS_FILE="$(mktemp 2>/dev/null)" || BOMLENS_DEEP_CVE_STATUS_FILE=""
+export BOMLENS_DEEP_CVE_STATUS_FILE
 # scan-go-vulndb.py (run by scan-security.sh) writes how the Go vulnerability
 # database match went to this file: {"status": ..., "detail": ...}. Empty
 # afterwards means scan-security.sh never reached the match.
@@ -2566,12 +2570,24 @@ case "$SCAN_MODE" in
            fi
        elif [ "$_trivy_db_ready" != true ]; then
            er_record deep-cve skipped no_input "the security scan did not run"
-       elif [ -f "${OUT_PREFIX}_security_grype.json" ]; then
-           er_record deep-cve ok
        else
-           er_record deep-cve failed failed "grype did not write its result"
+           _dc_status=""; _dc_detail=""
+           if [ -s "$BOMLENS_DEEP_CVE_STATUS_FILE" ]; then
+               _dc_status="$(jq -r '.status // empty' "$BOMLENS_DEEP_CVE_STATUS_FILE" 2>/dev/null || true)"
+               _dc_detail="$(jq -r '.detail // empty' "$BOMLENS_DEEP_CVE_STATUS_FILE" 2>/dev/null || true)"
+           fi
+           if [ -f "${OUT_PREFIX}_security_grype.json" ]; then
+               if [ "$_dc_status" = degraded ]; then
+                   er_record deep-cve degraded unavailable "$_dc_detail"
+               else
+                   er_record deep-cve ok
+               fi
+           else
+               er_record deep-cve failed failed "${_dc_detail:-grype did not write its result}"
+           fi
        fi ;;
 esac
+if [ -n "$BOMLENS_DEEP_CVE_STATUS_FILE" ]; then rm -f "$BOMLENS_DEEP_CVE_STATUS_FILE"; fi
 
 # Go vulnerability database (default on, BOMLENS_GO_VULNDB=false turns it off):
 # scan-security.sh matched the SBOM's Go modules against the snapshot bundled
