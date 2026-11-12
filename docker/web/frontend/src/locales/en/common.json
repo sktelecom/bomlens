@@ -835,6 +835,7 @@
     "goModTidy": "Go module resolution",
     "bundleLock": "Ruby Bundler lock resolution",
     "gradleDependencies": "Gradle dependency resolution",
+    "mavenDependencyTree": "Maven dependency tree resolution",
     "mavenDependencyJars": "Maven dependency jar download (component hashes)",
     "androidReleaseClasspath": "Android release classpath resolution",
     "swiftPackageResolve": "Swift package resolution",

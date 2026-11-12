@@ -43,6 +43,7 @@ const STEP_LABEL_KEY: Record<string, string> = {
   "go-mod-tidy": "pipelineSteps.goModTidy",
   "bundle-lock": "pipelineSteps.bundleLock",
   "gradle-dependencies": "pipelineSteps.gradleDependencies",
+  "maven-dependency-tree": "pipelineSteps.mavenDependencyTree",
   "maven-dependency-jars": "pipelineSteps.mavenDependencyJars",
   "android-release-classpath": "pipelineSteps.androidReleaseClasspath",
   "swift-package-resolve": "pipelineSteps.swiftPackageResolve",
