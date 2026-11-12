@@ -55,6 +55,7 @@ bom.json
 *_govulncheck_stage1.json
 *_govulncheck_stage1.err
 *_govulncheck_stage1.rc
+*_cdxgen.log
 bomlens-result.json
 bomlens-events.jsonl
 *.wfp

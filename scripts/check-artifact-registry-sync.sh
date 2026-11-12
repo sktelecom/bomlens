@@ -101,6 +101,7 @@ _bom.refused.json       :: yes :: yes :: _bom\.refused\.json
 _govulncheck_stage1.json :: no :: yes :: skip
 _govulncheck_stage1.err :: no  :: yes :: skip
 _govulncheck_stage1.rc  :: no  :: yes :: skip
+_cdxgen.log             :: no  :: yes :: _cdxgen\.log
 "
 
 # _vex.json and _vex_imported.json are deliberately absent from entrypoint.sh's
@@ -119,6 +120,9 @@ _govulncheck_stage1.rc  :: no  :: yes :: skip
 # --reachability (build-prep.sh writes them, reachability.sh reads and removes
 # them): swept at the start of stage 2, they would be gone before they are
 # read. scan-sbom.sh removes an earlier run's copies before stage 1 instead.
+# _cdxgen.log is the stage 1 log scan-sbom.sh keeps when a preprocessing step
+# failed; it is written before stage 2 starts, and scan-sbom.sh removes an
+# earlier run's copy itself.
 CLEANUP_EXEMPT="
 _vex.json
 _vex_imported.json
@@ -126,6 +130,7 @@ _ai-declaration.json
 _govulncheck_stage1.json
 _govulncheck_stage1.err
 _govulncheck_stage1.rc
+_cdxgen.log
 "
 
 [ -f "$SERVER" ] || { echo "ERROR: $SERVER not found"; exit 2; }

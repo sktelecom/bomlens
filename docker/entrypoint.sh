@@ -677,7 +677,8 @@ mark_compositions_aggregate() {
                 # and so is one whose pins could not be resolved further.
                 | ((($props | map(select(.name=="bomlens:sbom-tool-degraded")) | length) > 0)
                    or ($applied | index("poetry-requirements-partial") != null)
-                   or ($failed | index("poetry-graph") != null)) as $degraded
+                   or ($failed | index("poetry-graph") != null)
+                   or ($failed | index("gradle-packages") != null)) as $degraded
                 | (([$known[] | select(. as $l | ($applied|index($l)) and (($failed|index($l))|not))] | length) > 0) as $lock_ok
                 | ((.components // []) | length) as $components
                 | ([(.dependencies // [])[]?.dependsOn[]?] | length) as $edges
@@ -1629,6 +1630,18 @@ if [ "$SOURCE_SCAN" = "true" ] && [ -d "${SOURCE_ROOT:-/src}" ] \
         _empty_failed="$(jq -r '[.metadata.properties[]? | select(.name == "bomlens:pipeline-step-failed") | .value] | unique | join(", ")' "$OUTPUT_FILE" 2>/dev/null)"
         er_record generate degraded no_components "manifests found: $_empty_manifests${_empty_failed:+; steps that failed: $_empty_failed}" "" "" "{\"components\":0}"
     fi
+fi
+
+# ========================================================
+# A Gradle build whose declared dependencies cdxgen did not resolve, found
+# by build-prep.sh (the gradle-packages step), while other files may still
+# have added components. The generate step already reads degraded from the
+# label; this says it where the run is watched. A supplier's SBOM (ANALYZE,
+# MERGE) carries the record of its own run and is not read.
+# ========================================================
+if [ "$SCAN_MODE" != "ANALYZE" ] && [ "$SCAN_MODE" != "MERGE" ] \
+   && jq -e 'any(.metadata.properties[]?; .name == "bomlens:pipeline-step-failed" and .value == "gradle-packages")' "$OUTPUT_FILE" >/dev/null 2>&1; then
+    echo "[WARN] the Gradle build declares dependencies but cdxgen resolved no Gradle package, so the SBOM lacks them. Run './gradlew dependencies' for each subproject to see what Gradle reports."
 fi
 
 # ========================================================
