@@ -86,6 +86,7 @@ BomLens의 전체 옵션과 분석 모드, CI/CD 통합 방법, 트러블슈팅�
 | `SBOM_FIRMWARE_IMAGE` | `SBOM_SCANNER_IMAGE`가 레지스트리 경로가 있는 BomLens 이미지 이름이고 태그가 1.13.2 이상이거나 버전이 아닌 태그일 때 그것을 따른다(같은 레지스트리 경로와 태그. `.../bomlens:1.13.2`이면 `.../bomlens-firmware:1.13.2`). 그 밖에는 `ghcr.io/sktelecom/bomlens-firmware:latest` | 펌웨어 분석용 이미지 지정 |
 | `SBOM_AIBOM_IMAGE` | `SBOM_SCANNER_IMAGE`가 레지스트리 경로가 있는 BomLens 이미지 이름이고 태그가 1.13.2 이상이거나 버전이 아닌 태그일 때 그것을 따른다(같은 레지스트리 경로와 태그. `.../bomlens:1.13.2`이면 `.../bomlens-aibom:1.13.2`). 그 밖에는 `ghcr.io/sktelecom/bomlens-aibom:latest` | AI 모델(ML-BOM) 생성용 이미지 지정 |
 | `SBOM_DEEP_CVE_IMAGE` | `SBOM_SCANNER_IMAGE`가 레지스트리 경로가 있는 BomLens 이미지 이름이고 태그가 1.13.2 이상이거나 버전이 아닌 태그일 때 그것을 따른다(같은 레지스트리 경로와 태그. `.../bomlens:1.13.2`이면 `.../bomlens-deep-cve:1.13.2`). 그 밖에는 `ghcr.io/sktelecom/bomlens-deep-cve:latest` | `--deep-cve`(grype CPE 매칭)용 이미지 지정. 웹 UI의 같은 토글도 이 이미지를 쓴다 |
+| `SBOM_GO_VULNDB` | — | 이미지에 든 스냅숏 대신 읽을 이 호스트의 Go 취약점 데이터베이스 내보내기 파일(https://vuln.go.dev/vulndb.zip 의 `vulndb.zip` 또는 그 압축을 푼 폴더). 읽기 전용으로 마운트. 내려받은 데이터베이스로 바꾸지 않으며, `BOMLENS_GO_VULNDB_MAX_AGE_DAYS`보다 오래됐으면 열화로 기록 |
 | `SBOM_DEEP_LICENSE_IMAGE` | 같은 조건에서 `SBOM_SCANNER_IMAGE`를 따른다. 조건에 맞지 않으면 `SBOM_SCANNER_IMAGE` 자체, 둘 다 없으면 `ghcr.io/sktelecom/bomlens-deep-license:latest` | `--deep-license`(scancode)일 때 소스 스캔의 후처리 단계를 실행할 이미지 |
 | `SBOM_OUTPUT_FLAT` | — | `1`로 두면 실행별 하위 폴더 없이 산출물을 베이스에 평면으로 저장(격리 이전 배치, 옛 경로를 기대하는 CI용) |
 | `SBOM_OUTPUT_DIR` | `~/sbom-output` | 데스크톱 앱과 웹 UI의 산출물 베이스(CLI는 대신 `--output-dir` 사용). 스캔마다 그 아래 `{Project}_{Version}/` 하위 폴더에 저장 |
