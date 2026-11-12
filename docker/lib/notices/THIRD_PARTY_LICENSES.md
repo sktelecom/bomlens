@@ -51,11 +51,12 @@ The web UI (`--ui`) is a React single-page application. npm package code is comp
 
 The authoritative record is `third-party-licenses.txt`, generated at build time. It lists only the packages that actually reach the bundle and reproduces each one's license text in full. Open it at `/third-party-licenses.txt` in the web UI; inside the image it is at `/usr/local/lib/sbom-web/dist/third-party-licenses.txt`. It comes from the bundled module graph rather than the `package.json` declaration because the two differ: declared dependencies used only at build time (tailwindcss, typescript) never reach the distribution, and a package can be declared and installed yet dropped from the bundle because nothing imports it.
 
-The 23 packages currently in the bundle are below. All are permissive; none is copyleft.
+The 27 packages currently in the bundle are below. All are permissive; none is copyleft.
 
 | Package | Purpose | License (SPDX) |
 |---------|---------|----------------|
 | react, react-dom, scheduler | UI rendering | MIT |
+| @primer/react, @primer/primitives | Primer components and design tokens (theme, sizes, type) | MIT |
 | @radix-ui/react-label, react-progress, react-slot, react-primitive, react-context, react-compose-refs | Accessible primitives | MIT |
 | cytoscape, cytoscape-dagre, dagre, graphlib, lodash | Dependency graph rendering and layout | MIT |
 | i18next, react-i18next, i18next-browser-languagedetector | English and Korean switching | MIT |
@@ -64,6 +65,8 @@ The 23 packages currently in the bundle are below. All are permissive; none is c
 | lucide-react | Icons | ISC |
 | highlight.js | Syntax highlighting in the source viewer (grammars loaded on demand) | BSD-3-Clause |
 | @fontsource/inter, @fontsource/jetbrains-mono, pretendard | Fonts (see the section below) | OFL-1.1 |
+
+`@primer/octicons-react` (icons, MIT) is declared as well, and `@primer/react` brings these packages with it: @primer/behaviors, @primer/live-region-element, @github/relative-time-element, @github/mini-throttle, @tanstack/react-virtual, @tanstack/virtual-core, color2k, deepmerge, history, hsluv, lodash.isempty, lodash.isobject, react-intersection-observer and react-is (MIT); @lit-labs/react, @lit-labs/ssr-dom-shim and @oddbird/popover-polyfill (BSD-3-Clause); focus-visible (W3C). They reach the generated file when a screen starts using the component that needs them. @primer/react, @primer/live-region-element and @lit-labs/ssr-dom-shim ship no license file of their own, so their texts are carried in this repository under `docker/web/frontend/licenses/`, as for Pretendard.
 
 `npm run notices:check` keeps the list from going stale by checking the generated file. CI fails when a bundled package declares no license, when no license text was found to reproduce, or when any copyleft license appears.
 
