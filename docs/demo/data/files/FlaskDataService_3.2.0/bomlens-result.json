@@ -1,10 +1,10 @@
 {
   "contract": {
     "name": "bomlens-engine",
-    "version": "1.3.0"
+    "version": "1.4.0"
   },
   "engine": {
-    "version": "1.14.4",
+    "version": "latest-c3e2fb3",
     "image": null,
     "image_digest": null
   },
@@ -16,8 +16,8 @@
   "run": {
     "status": "succeeded",
     "reason": null,
-    "started_at": "2026-11-11T16:44:56Z",
-    "ended_at": "2026-11-11T16:45:06Z",
+    "started_at": "2026-11-12T09:09:30Z",
+    "ended_at": "2026-11-12T09:09:37Z",
     "exit_code": 0
   },
   "steps": [
@@ -26,8 +26,8 @@
       "status": "ok",
       "reason": null,
       "detail": null,
-      "started_at": "2026-11-11T16:44:56Z",
-      "ended_at": "2026-11-11T16:44:57Z",
+      "started_at": "2026-11-12T09:09:30Z",
+      "ended_at": "2026-11-12T09:09:30Z",
       "stage": 2
     },
     {
@@ -35,8 +35,8 @@
       "status": "ok",
       "reason": null,
       "detail": null,
-      "started_at": "2026-11-11T16:44:57Z",
-      "ended_at": "2026-11-11T16:44:57Z",
+      "started_at": "2026-11-12T09:09:30Z",
+      "ended_at": "2026-11-12T09:09:30Z",
       "stage": 2
     },
     {
@@ -44,8 +44,8 @@
       "status": "ok",
       "reason": null,
       "detail": null,
-      "started_at": "2026-11-11T16:44:56Z",
-      "ended_at": "2026-11-11T16:44:57Z",
+      "started_at": "2026-11-12T09:09:30Z",
+      "ended_at": "2026-11-12T09:09:30Z",
       "counts": {
         "components": 39
       },
@@ -56,8 +56,8 @@
       "status": "ok",
       "reason": null,
       "detail": null,
-      "started_at": "2026-11-11T16:44:57Z",
-      "ended_at": "2026-11-11T16:44:57Z",
+      "started_at": "2026-11-12T09:09:30Z",
+      "ended_at": "2026-11-12T09:09:30Z",
       "stage": 2
     },
     {
@@ -65,8 +65,8 @@
       "status": "disabled",
       "reason": null,
       "detail": null,
-      "started_at": "2026-11-11T16:44:57Z",
-      "ended_at": "2026-11-11T16:44:57Z",
+      "started_at": "2026-11-12T09:09:30Z",
+      "ended_at": "2026-11-12T09:09:30Z",
       "stage": 2
     },
     {
@@ -74,8 +74,8 @@
       "status": "ok",
       "reason": null,
       "detail": null,
-      "started_at": "2026-11-11T16:44:57Z",
-      "ended_at": "2026-11-11T16:44:57Z",
+      "started_at": "2026-11-12T09:09:30Z",
+      "ended_at": "2026-11-12T09:09:30Z",
       "stage": 2
     },
     {
@@ -83,8 +83,8 @@
       "status": "ok",
       "reason": null,
       "detail": null,
-      "started_at": "2026-11-11T16:44:57Z",
-      "ended_at": "2026-11-11T16:44:57Z",
+      "started_at": "2026-11-12T09:09:30Z",
+      "ended_at": "2026-11-12T09:09:30Z",
       "stage": 2
     },
     {
@@ -92,8 +92,8 @@
       "status": "ok",
       "reason": null,
       "detail": null,
-      "started_at": "2026-11-11T16:44:57Z",
-      "ended_at": "2026-11-11T16:44:57Z",
+      "started_at": "2026-11-12T09:09:30Z",
+      "ended_at": "2026-11-12T09:09:30Z",
       "stage": 2
     },
     {
@@ -101,8 +101,8 @@
       "status": "ok",
       "reason": null,
       "detail": null,
-      "started_at": "2026-11-11T16:44:57Z",
-      "ended_at": "2026-11-11T16:44:57Z",
+      "started_at": "2026-11-12T09:09:30Z",
+      "ended_at": "2026-11-12T09:09:30Z",
       "stage": 2
     },
     {
@@ -110,8 +110,8 @@
       "status": "ok",
       "reason": null,
       "detail": null,
-      "started_at": "2026-11-11T16:44:57Z",
-      "ended_at": "2026-11-11T16:44:57Z",
+      "started_at": "2026-11-12T09:09:30Z",
+      "ended_at": "2026-11-12T09:09:30Z",
       "stage": 2
     },
     {
@@ -119,8 +119,8 @@
       "status": "ok",
       "reason": null,
       "detail": null,
-      "started_at": "2026-11-11T16:44:57Z",
-      "ended_at": "2026-11-11T16:44:57Z",
+      "started_at": "2026-11-12T09:09:30Z",
+      "ended_at": "2026-11-12T09:09:30Z",
       "stage": 2
     },
     {
@@ -128,8 +128,8 @@
       "status": "ok",
       "reason": null,
       "detail": null,
-      "started_at": "2026-11-11T16:44:57Z",
-      "ended_at": "2026-11-11T16:44:57Z",
+      "started_at": "2026-11-12T09:09:30Z",
+      "ended_at": "2026-11-12T09:09:30Z",
       "stage": 2
     },
     {
@@ -137,8 +137,8 @@
       "status": "ok",
       "reason": null,
       "detail": null,
-      "started_at": "2026-11-11T16:44:57Z",
-      "ended_at": "2026-11-11T16:44:57Z",
+      "started_at": "2026-11-12T09:09:30Z",
+      "ended_at": "2026-11-12T09:09:31Z",
       "stage": 2
     },
     {
@@ -146,8 +146,8 @@
       "status": "disabled",
       "reason": null,
       "detail": null,
-      "started_at": "2026-11-11T16:44:57Z",
-      "ended_at": "2026-11-11T16:44:57Z",
+      "started_at": "2026-11-12T09:09:31Z",
+      "ended_at": "2026-11-12T09:09:31Z",
       "stage": 2
     },
     {
@@ -155,8 +155,8 @@
       "status": "ok",
       "reason": null,
       "detail": null,
-      "started_at": "2026-11-11T16:44:57Z",
-      "ended_at": "2026-11-11T16:44:57Z",
+      "started_at": "2026-11-12T09:09:31Z",
+      "ended_at": "2026-11-12T09:09:31Z",
       "stage": 2
     },
     {
@@ -164,8 +164,8 @@
       "status": "ok",
       "reason": null,
       "detail": null,
-      "started_at": "2026-11-11T16:44:57Z",
-      "ended_at": "2026-11-11T16:44:58Z",
+      "started_at": "2026-11-12T09:09:31Z",
+      "ended_at": "2026-11-12T09:09:31Z",
       "stage": 2
     },
     {
@@ -173,8 +173,8 @@
       "status": "ok",
       "reason": null,
       "detail": null,
-      "started_at": "2026-11-11T16:44:58Z",
-      "ended_at": "2026-11-11T16:45:05Z",
+      "started_at": "2026-11-12T09:09:31Z",
+      "ended_at": "2026-11-12T09:09:36Z",
       "stage": 2
     },
     {
@@ -182,8 +182,17 @@
       "status": "disabled",
       "reason": null,
       "detail": null,
-      "started_at": "2026-11-11T16:45:05Z",
-      "ended_at": "2026-11-11T16:45:05Z",
+      "started_at": "2026-11-12T09:09:36Z",
+      "ended_at": "2026-11-12T09:09:36Z",
+      "stage": 2
+    },
+    {
+      "id": "go-vulndb",
+      "status": "skipped",
+      "reason": "no_input",
+      "detail": "no Go module (pkg:golang) in the SBOM",
+      "started_at": "2026-11-12T09:09:36Z",
+      "ended_at": "2026-11-12T09:09:36Z",
       "stage": 2
     },
     {
@@ -191,8 +200,8 @@
       "status": "ok",
       "reason": null,
       "detail": null,
-      "started_at": "2026-11-11T16:45:05Z",
-      "ended_at": "2026-11-11T16:45:05Z",
+      "started_at": "2026-11-12T09:09:36Z",
+      "ended_at": "2026-11-12T09:09:36Z",
       "stage": 2
     },
     {
@@ -200,8 +209,8 @@
       "status": "disabled",
       "reason": null,
       "detail": null,
-      "started_at": "2026-11-11T16:45:05Z",
-      "ended_at": "2026-11-11T16:45:05Z",
+      "started_at": "2026-11-12T09:09:36Z",
+      "ended_at": "2026-11-12T09:09:36Z",
       "stage": 2
     }
   ],
@@ -216,9 +225,10 @@
   "data_sources": {
     "trivy_db": {
       "schema_version": 2,
-      "updated_at": "2026-11-11T13:00:47.186797699Z",
-      "downloaded_at": "2026-11-11T16:45:02.75501859Z"
-    }
+      "updated_at": "2026-11-12T07:01:33.828310435Z",
+      "downloaded_at": "2026-11-12T09:09:35.206565975Z"
+    },
+    "go_vulndb": null
   },
   "outputs": [
     {
@@ -236,49 +246,49 @@
     {
       "role": "other",
       "path": "FlaskDataService_3.2.0_NOTICE.txt",
-      "sha256": "72d1bc425575eac65e349e61dc27c8220877d05dd46b1297d3beaffdc53453ed",
+      "sha256": "1fcef4a559f2dae278f1a97f0d84f81656bf36897b016925353fd7e9d544f5df",
       "bytes": 34174
     },
     {
       "role": "other",
       "path": "FlaskDataService_3.2.0_NOTICE.html",
-      "sha256": "d22f0a1ee6b1aa2bdb239f75e157ee754d0039b0276465db831068399db3dd27",
+      "sha256": "406c1ba1b64ca733b708234fad67909da962930ef468e9b0262901d75acaf737",
       "bytes": 54632
     },
     {
       "role": "vulnerabilities.all",
       "path": "FlaskDataService_3.2.0_security.json",
-      "sha256": "33b4dd52e64e6a0a767677543fa05b341d63dd9a57154550740b99c17d3b403a",
+      "sha256": "8c6b7dfb67791c88a8d38eb0186a1ad60516572bb264dac054f951023b4618c0",
       "bytes": 112721
     },
     {
       "role": "other",
       "path": "FlaskDataService_3.2.0_security.md",
-      "sha256": "8dd24afbf3177b0c00d08396ec4866dde85ad25943a61f8318a9592b659bbf74",
+      "sha256": "251b667cad6bc603e485ac64973c907c645eb2d7887f0471daf236058510d42f",
       "bytes": 2221
     },
     {
       "role": "other",
       "path": "FlaskDataService_3.2.0_security.html",
-      "sha256": "01a101d0e466bbd201b5f5d5596b0f34ee9951e748e3188b8ab6f5a7adb88345",
+      "sha256": "b3dce740a4aeacc940380ed3bb00a1c30e9637c3ad9d8b831d72c4215c22254b",
       "bytes": 23001
     },
     {
       "role": "conformance",
       "path": "FlaskDataService_3.2.0_conformance.json",
-      "sha256": "31a1e6aefee5d99bd42e144cc0d4c46d077c3bbab10901b033b17450336c96b3",
+      "sha256": "16efaa64b58948934332ffc5a2e0dde0ead9f391c1b4f012634be47fa27ee654",
       "bytes": 48736
     },
     {
       "role": "other",
       "path": "FlaskDataService_3.2.0_conformance.md",
-      "sha256": "1d7f92d318e9bbc526d99fe49a55d9836104c265077af7bf806f574605918551",
+      "sha256": "bbf7111dd4741a98fae07d4ad85a2b79742fac5eec3bb16c439f461e60ddcfd2",
       "bytes": 10703
     },
     {
       "role": "other",
       "path": "FlaskDataService_3.2.0_conformance.html",
-      "sha256": "61c12c154f0c98707f1f7875e7a52243c3ef76630aac03243b26efe204056449",
+      "sha256": "f4d463aa1b2bb4fe3971ab8b0ec45bb9a4ef357c796dd296a0961874a4df44e3",
       "bytes": 33129
     },
     {
@@ -296,13 +306,13 @@
     {
       "role": "other",
       "path": "FlaskDataService_3.2.0_risk-report.md",
-      "sha256": "64f8ea91c1aeb4f448f32dd10dfeb30c4ec9407e07d06369285d4e0e1a9811c6",
+      "sha256": "4628056f37001a8f092721fa2e0ed4aadf32bf36d68d887fffeb1ded1aba22a2",
       "bytes": 3111
     },
     {
       "role": "other",
       "path": "FlaskDataService_3.2.0_risk-report.html",
-      "sha256": "a13cf2deb6e6515531c35cca31b9b6731ae85cce6832d51465d04ecd1a656395",
+      "sha256": "b996de1d5d9025e9f12b7a3e6011922f5e262b14b374d07f036fb1bf723b95b2",
       "bytes": 21168
     },
     {
@@ -314,7 +324,7 @@
     {
       "role": "vulnerabilities.trivy",
       "path": "FlaskDataService_3.2.0_security.json",
-      "sha256": "33b4dd52e64e6a0a767677543fa05b341d63dd9a57154550740b99c17d3b403a",
+      "sha256": "8c6b7dfb67791c88a8d38eb0186a1ad60516572bb264dac054f951023b4618c0",
       "bytes": 112721
     }
   ]
