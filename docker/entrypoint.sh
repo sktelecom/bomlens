@@ -674,11 +674,14 @@ mark_compositions_aggregate() {
                 | ([$props[] | select(.name=="bomlens:pipeline-step-failed") | .value]) as $failed
                 # A Poetry project converted only in part (ranges and table
                 # entries left out) is missing dependencies by construction,
-                # and so is one whose pins could not be resolved further.
+                # and so is one whose pins could not be resolved further, and a
+                # Maven project whose dependency tree could not be built
+                # (only the dependencies written in pom.xml are listed).
                 | ((($props | map(select(.name=="bomlens:sbom-tool-degraded")) | length) > 0)
                    or ($applied | index("poetry-requirements-partial") != null)
                    or ($failed | index("poetry-graph") != null)
-                   or ($failed | index("gradle-packages") != null)) as $degraded
+                   or ($failed | index("gradle-packages") != null)
+                   or ($failed | index("maven-dependency-tree") != null)) as $degraded
                 | (([$known[] | select(. as $l | ($applied|index($l)) and (($failed|index($l))|not))] | length) > 0) as $lock_ok
                 | ((.components // []) | length) as $components
                 | ([(.dependencies // [])[]?.dependsOn[]?] | length) as $edges

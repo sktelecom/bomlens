@@ -6142,9 +6142,9 @@ JSON
 
         # require-dev only (no required component at all): the same guard that
         # protects a scope-less BOM cannot tell this apart from "scopes were
-        # never populated", so it also leaves this one untouched. Inherited
-        # from the Maven filter (a maven-only reactor has the identical gap);
-        # documented here as known behavior, not fixed by this change.
+        # never populated", so it also leaves this one untouched. Documented
+        # here as known behavior (the Maven filter passes the "any" guard and
+        # does not have this gap).
         cat > "$WORK/php-devonly-bom.json" <<'JSON'
 {"bomFormat":"CycloneDX","specVersion":"1.6",
  "metadata":{"component":{"name":"app","version":"1.0.0","bom-ref":"root"}},
@@ -6158,7 +6158,7 @@ JSON
         node "$SFLT" "$WORK/php-devonly-bom.json" "pkg:composer/" 2>/dev/null
         names=$(jq -r '[.components[].name]|sort|join(",")' "$WORK/php-devonly-bom.json")
         [ "$names" = "phpunit" ] \
-            && pass "require-dev-only project (no required component): filter leaves the BOM untouched (known gap, shared with maven)" \
+            && pass "require-dev-only project (no required component): filter leaves the BOM untouched (known gap)" \
             || fail "filter unexpectedly changed a require-dev-only BOM" "$names"
     else
         fail "could not extract SFILTER_JS from build-prep.sh"
@@ -6601,6 +6601,289 @@ STUB
         && pass "a partly failed jar fetch is only logged, with the count" \
         || fail "a partly failed jar fetch: [$_mh_out]"
     rm -rf "$WORK/mh-home/.m2/repository/g" "$WORK/mh-home/.m2/repository/org"
+fi
+echo "== maven-duplicates: a pom.xml Maven 3.10 refuses gets a Maven that reads it, or is recorded =="
+# Maven 3.10 and later refuse a dependency declared twice in one POM; 3.9 only
+# warns. Drive the real Maven block of build-prep.sh with a stand-in mvn that
+# prints that error, a stand-in curl, and a stand-in Maven 3.9 archive whose
+# checksum replaces the pinned one (the block itself is not otherwise changed).
+# build-prep.sh is POSIX sh, so the cases run under bash and, when it is
+# installed, dash.
+PREP="$ROOT_DIR/docker/lib/build-prep.sh"
+_md_block=$(sed -n '/^# Maven component hashes/,/^fi$/p' "$PREP")
+_md_ver=$(printf '%s\n' "$_md_block" | sed -n 's/^MAVEN_FALLBACK_VERSION="\(.*\)"$/\1/p')
+if [ -z "$_md_block" ] || [ -z "$_md_ver" ]; then
+    fail "could not extract the Maven block (or MAVEN_FALLBACK_VERSION) from build-prep.sh"
+else
+    _md_bin="$WORK/md-bin"; mkdir -p "$_md_bin" "$WORK/md-home"
+    # mvn and mvnw: record the call; the copy goal puts MD_COPY in the output
+    # folder. A wrapper run with MD_WRAP_OK=1 reads the POM (a wrapper that pins
+    # an older Maven); with MD_WRAP_FAIL=1 it cannot download its distribution.
+    # Otherwise the duplicate-dependency error is printed.
+    cat > "$_md_bin/mvn" <<'STUB'
+#!/bin/sh
+echo "${0##*/} $*" >> "$MD_CALLS"
+case " $* " in
+    *":copy "*)
+        [ -n "$MD_COPY" ] || exit 1
+        for a in "$@"; do
+            case "$a" in -DoutputDirectory=*) cp "$MD_COPY" "${a#-DoutputDirectory=}/apache-maven-$MD_VER-bin.tar.gz" ;; esac
+        done
+        exit 0 ;;
+esac
+if [ "${0##*/}" = mvnw ]; then
+    [ "$MD_WRAP_OK" = 1 ] && exit 0
+    if [ "$MD_WRAP_FAIL" = 1 ]; then
+        echo "Exception in thread \"main\" java.net.UnknownHostException: repo.maven.apache.org"
+        exit 1
+    fi
+fi
+echo "[ERROR] [ERROR] Some problems were encountered while processing the POMs:"
+echo "[ERROR] 'dependencies.dependency.(groupId:artifactId:type:classifier)' must be unique: junit:junit:jar -> version 4.12 vs 4.13.2 @ line 9, column 17"
+exit 0
+STUB
+    cat > "$_md_bin/curl" <<'STUB'
+#!/bin/sh
+echo "curl $*" >> "$MD_CALLS"
+[ -n "$MD_CURL" ] || exit 22
+out=""; prev=""
+for a in "$@"; do [ "$prev" = "-o" ] && out="$a"; prev="$a"; done
+cp "$MD_CURL" "$out"
+STUB
+    chmod +x "$_md_bin/mvn" "$_md_bin/curl"
+    # The stand-in Maven 3.9: accepts the POM and records its call; with
+    # MD_39_FAIL=1 it refuses the POM for another model error.
+    mkdir -p "$WORK/md-dist/apache-maven-$_md_ver/bin"
+    cat > "$WORK/md-dist/apache-maven-$_md_ver/bin/mvn" <<'STUB'
+#!/bin/sh
+echo "mvn39 $*" >> "$MD_CALLS"
+if [ "$MD_39_FAIL" = 1 ]; then
+    echo "[ERROR] 'dependencies.dependency.version' for org.x:y:jar is missing. @ line 12, column 17"
+    echo "[ERROR] The build could not read 1 project -> [Help 1]"
+fi
+exit 0
+STUB
+    chmod +x "$WORK/md-dist/apache-maven-$_md_ver/bin/mvn"
+    ( cd "$WORK/md-dist" && tar czf "$WORK/md-good.tar.gz" "apache-maven-$_md_ver" )
+    printf 'not maven\n' > "$WORK/md-dist/apache-maven-$_md_ver/README.txt"
+    ( cd "$WORK/md-dist" && tar czf "$WORK/md-bad.tar.gz" "apache-maven-$_md_ver" )
+    if command -v sha512sum >/dev/null 2>&1; then _md_sum=$(sha512sum "$WORK/md-good.tar.gz" | cut -d' ' -f1)
+    else _md_sum=$(shasum -a 512 "$WORK/md-good.tar.gz" | cut -d' ' -f1); fi
+    _md_block=$(printf '%s\n' "$_md_block" | sed "s/^MAVEN_FALLBACK_SHA512=.*/MAVEN_FALLBACK_SHA512=\"$_md_sum\"/")
+    _md_prelude='log() { echo "[build-prep] $*"; }; mark_prep_failed() { echo "MARK-FAILED $1"; }; run_supervised_timeout() { shift; "$@"; }; PREP_TIMEOUT_DEFAULT=5'
+    # A PATH with the tools the block needs, less the ones named in $1 (to
+    # stand for an image without them).
+    _md_minpath() {
+        _mp="$WORK/md-min-$(printf '%s' "$1" | tr ' ' '-')"
+        rm -rf "$_mp"; mkdir -p "$_mp"
+        for _t in sh cat grep sed head tail mktemp cp rm find cut tar gzip awk sort chmod ls tr \
+                  sha512sum shasum openssl perl; do
+            case " $1 " in *" $_t "*) continue ;; esac
+            _tp=$(command -v "$_t" 2>/dev/null) && ln -s "$_tp" "$_mp/$_t"
+        done
+        printf '%s' "$_mp"
+    }
+    _md_run() {  # <dir>; MD_SHELL, MD_COPY, MD_CURL, MD_WRAP_OK, MD_WRAP_FAIL, MD_39_FAIL, MD_MAVEN_ARGS, MD_PATH from the caller
+        # build-prep's exit trap removes the unpacked Maven; this extract has none.
+        rm -rf "$WORK/md-calls" "$WORK/md-home"/bomlens-maven.*; : > "$WORK/md-calls"
+        ( cd "$1" && PATH="$_md_bin:${MD_PATH:-$PATH}" HOME="$WORK/md-home" MD_CALLS="$WORK/md-calls" MD_VER="$_md_ver" \
+            MD_COPY="${MD_COPY:-}" MD_CURL="${MD_CURL:-}" MD_WRAP_OK="${MD_WRAP_OK:-}" MD_WRAP_FAIL="${MD_WRAP_FAIL:-}" \
+            MD_39_FAIL="${MD_39_FAIL:-}" EXCLUDE_NON_SHIPPED=1 NON_SHIPPED_DIRS="test examples" \
+            MAVEN_ARGS="${MD_MAVEN_ARGS:-}" MVN_ARGS="" MAVEN_OPTS="" MAVEN_SETTINGS_ARGS="" SETTINGS_ROOT="$WORK/md-nosettings" \
+            "$MD_SHELL" -c "$_md_prelude; $_md_block"'
+                echo "RESULT MVN_CMD=${MVN_CMD:-} PINNED=${CDXGEN_JVM_TOOL_PINNED:-} DIR=${MAVEN_FALLBACK_DIR:-}"' 2>&1 )
+    }
+    mkdir -p "$WORK/md-proj" "$WORK/md-wrap/.mvn/wrapper" "$WORK/md-wrap310/.mvn/wrapper" \
+        "$WORK/md-gradle/.mvn/wrapper" "$WORK/md-gradle/android" "$WORK/md-gradle-ex/.mvn/wrapper" "$WORK/md-gradle-ex/examples/demo"
+    touch "$WORK/md-proj/pom.xml" "$WORK/md-wrap/pom.xml" "$WORK/md-wrap310/pom.xml" \
+        "$WORK/md-gradle/pom.xml" "$WORK/md-gradle/android/build.gradle" \
+        "$WORK/md-gradle-ex/pom.xml" "$WORK/md-gradle-ex/examples/demo/build.gradle.kts"
+    cp "$_md_bin/mvn" "$WORK/md-wrap/mvnw"; chmod -x "$WORK/md-wrap/mvnw"
+    for _d in md-wrap310 md-gradle md-gradle-ex; do cp "$_md_bin/mvn" "$WORK/$_d/mvnw"; done
+    echo 'distributionUrl=https://repo.maven.apache.org/maven2/org/apache/maven/apache-maven/3.9.6/apache-maven-3.9.6-bin.zip' \
+        > "$WORK/md-wrap/.mvn/wrapper/maven-wrapper.properties"
+    for _d in md-wrap310 md-gradle md-gradle-ex; do
+        echo 'distributionUrl=https://repo.maven.apache.org/maven2/org/apache/maven/apache-maven/3.10.0/apache-maven-3.10.0-bin.zip' \
+            > "$WORK/$_d/.mvn/wrapper/maven-wrapper.properties"
+    done
+
+    _md_shells=$(command -v bash)
+    if command -v dash >/dev/null 2>&1; then _md_shells="$_md_shells $(command -v dash)"
+    else echo "  NOTE: dash not installed, the maven-duplicates cases run under bash only"; fi
+    for MD_SHELL in $_md_shells; do
+    _s="[${MD_SHELL##*/}]"
+
+    # Through the image's mvn (copy goal, run outside the project).
+    _md_out=$(MD_COPY="$WORK/md-good.tar.gz" _md_run "$WORK/md-proj")
+    { printf '%s' "$_md_out" | grep -q "RESULT MVN_CMD=$WORK/md-home/bomlens-maven\.[^ ]*/apache-maven-$_md_ver/bin/mvn PINNED= " \
+        && ! printf '%s' "$_md_out" | grep -q "MARK-FAILED" \
+        && grep -q "^mvn -q -B org.apache.maven.plugins:maven-dependency-plugin:3.11.0:copy -Dartifact=org.apache.maven:apache-maven:$_md_ver:tar.gz:bin " "$WORK/md-calls" \
+        && grep -q "^mvn39 -q -B --fail-never org.apache.maven.plugins:maven-dependency-plugin:3.11.0:resolve " "$WORK/md-calls" \
+        && ! grep -q "^curl" "$WORK/md-calls"; } \
+        && pass "$_s refused pom.xml: Maven $_md_ver from the Maven repository becomes cdxgen's MVN_CMD, nothing recorded as failed" \
+        || fail "$_s refused pom.xml, Maven fetched through mvn: [$_md_out] calls: [$(cat "$WORK/md-calls")]"
+
+    # The copy goal gives nothing: curl from Maven Central.
+    _md_out=$(MD_CURL="$WORK/md-good.tar.gz" _md_run "$WORK/md-proj")
+    { printf '%s' "$_md_out" | grep -q "RESULT MVN_CMD=.*/apache-maven-$_md_ver/bin/mvn " \
+        && grep -q "^curl .*https://repo.maven.apache.org/maven2/org/apache/maven/apache-maven/$_md_ver/apache-maven-$_md_ver-bin.tar.gz" "$WORK/md-calls"; } \
+        && pass "$_s the copy goal fails: Maven $_md_ver is downloaded from Maven Central with curl" \
+        || fail "$_s curl download: [$_md_out] calls: [$(cat "$WORK/md-calls")]"
+
+    # Checksum mismatch, from both sources: refused, and recorded.
+    _md_out=$(MD_COPY="$WORK/md-bad.tar.gz" MD_CURL="$WORK/md-bad.tar.gz" _md_run "$WORK/md-proj")
+    { printf '%s' "$_md_out" | grep -q "does not match its pinned SHA-512 checksum; not used" \
+        && printf '%s' "$_md_out" | grep -q "RESULT MVN_CMD= PINNED= DIR=$" \
+        && printf '%s' "$_md_out" | grep -q "MARK-FAILED maven-dependency-tree" \
+        && ! printf '%s' "$_md_out" | grep -q "MARK-FAILED maven-dependency-jars" \
+        && ! grep -q "^mvn39" "$WORK/md-calls" \
+        && [ -z "$(find "$WORK/md-home" -maxdepth 1 -name 'bomlens-maven.*')" ]; } \
+        && pass "$_s an archive that does not match the pinned checksum is not used or kept; maven-dependency-tree is recorded in place of maven-dependency-jars" \
+        || fail "$_s checksum refusal: [$_md_out]"
+
+    # No SHA-512 tool, or no tar: said so, nothing downloaded.
+    _md_out=$(MD_PATH="$(_md_minpath "sha512sum shasum openssl")" MD_COPY="$WORK/md-good.tar.gz" _md_run "$WORK/md-proj")
+    { printf '%s' "$_md_out" | grep -q "no SHA-512 tool in this image" \
+        && ! printf '%s' "$_md_out" | grep -q "does not match" \
+        && printf '%s' "$_md_out" | grep -q "MARK-FAILED maven-dependency-tree" \
+        && ! grep -q ":copy " "$WORK/md-calls"; } \
+        && pass "$_s no SHA-512 tool: logged as such, no download, the step is recorded as failed" \
+        || fail "$_s no SHA-512 tool: [$_md_out] calls: [$(cat "$WORK/md-calls")]"
+    _md_out=$(MD_PATH="$(_md_minpath "tar")" MD_COPY="$WORK/md-good.tar.gz" _md_run "$WORK/md-proj")
+    { printf '%s' "$_md_out" | grep -q "tar or gzip is not in this image" \
+        && ! grep -q ":copy " "$WORK/md-calls"; } \
+        && pass "$_s no tar: logged as such, no download" \
+        || fail "$_s no tar: [$_md_out] calls: [$(cat "$WORK/md-calls")]"
+
+    # Offline: the copy goal runs with -o (a cached archive would do), curl is not tried.
+    _md_out=$(MD_MAVEN_ARGS="-o" MD_CURL="$WORK/md-good.tar.gz" _md_run "$WORK/md-proj")
+    { printf '%s' "$_md_out" | grep -q "Maven runs offline and Maven $_md_ver is not in the local repository" \
+        && printf '%s' "$_md_out" | grep -q "MARK-FAILED maven-dependency-tree" \
+        && grep -q "^mvn -q -B -o .*:copy " "$WORK/md-calls" \
+        && ! grep -q "^curl" "$WORK/md-calls"; } \
+        && pass "$_s offline: no download from Maven Central, the step is recorded as failed" \
+        || fail "$_s offline: [$_md_out] calls: [$(cat "$WORK/md-calls")]"
+
+    # Maven 3.9 refuses it too, for another model error: no MVN_CMD, recorded.
+    _md_out=$(MD_39_FAIL=1 MD_COPY="$WORK/md-good.tar.gz" _md_run "$WORK/md-wrap310")
+    { printf '%s' "$_md_out" | grep -q "Maven $_md_ver did not read pom.xml cleanly" \
+        && printf '%s' "$_md_out" | grep -q "RESULT MVN_CMD= PINNED= DIR=$" \
+        && printf '%s' "$_md_out" | grep -q "MARK-FAILED maven-dependency-tree" \
+        && grep -q "^mvn39 " "$WORK/md-calls"; } \
+        && pass "$_s a Maven $_md_ver retry that fails for another model error sets no MVN_CMD and records maven-dependency-tree" \
+        || fail "$_s Maven 3.9 retry failing: [$_md_out]"
+
+    # A wrapper that pins Maven 3.9 but is not executable: build-prep ran mvn,
+    # retries with the wrapper, which reads the POM; nothing is downloaded.
+    _md_out=$(MD_WRAP_OK=1 MD_COPY="$WORK/md-good.tar.gz" _md_run "$WORK/md-wrap")
+    { printf '%s' "$_md_out" | grep -q "the project's Maven wrapper (Maven 3.9.6) reads pom.xml" \
+        && printf '%s' "$_md_out" | grep -q "RESULT MVN_CMD= PINNED= " \
+        && ! printf '%s' "$_md_out" | grep -q "MARK-FAILED" \
+        && grep -q "^mvnw -q -B --fail-never .*:resolve " "$WORK/md-calls" \
+        && ! grep -q ":copy " "$WORK/md-calls"; } \
+        && pass "$_s a wrapper pinning Maven 3.9 is used for the retry and left to cdxgen; no Maven is downloaded" \
+        || fail "$_s wrapper 3.9: [$_md_out] calls: [$(cat "$WORK/md-calls")]"
+
+    # The same wrapper cannot download its distribution: go on to Maven 3.9.
+    _md_out=$(MD_WRAP_FAIL=1 MD_COPY="$WORK/md-good.tar.gz" _md_run "$WORK/md-wrap")
+    { printf '%s' "$_md_out" | grep -q "the project's Maven wrapper did not read pom.xml cleanly (rc=1)" \
+        && printf '%s' "$_md_out" | grep -q "RESULT MVN_CMD=.*/apache-maven-$_md_ver/bin/mvn PINNED=true " \
+        && ! printf '%s' "$_md_out" | grep -q "MARK-FAILED" \
+        && grep -q "^mvn39 " "$WORK/md-calls"; } \
+        && pass "$_s a wrapper that fails with a download error: Maven $_md_ver is tried and pinned" \
+        || fail "$_s wrapper download error: [$_md_out] calls: [$(cat "$WORK/md-calls")]"
+
+    # A wrapper on Maven 3.10 refuses it too: the downloaded Maven goes to
+    # cdxgen with CDXGEN_JVM_TOOL_PINNED, so cdxgen does not take the wrapper.
+    # A Gradle build under a non-shipped folder does not count.
+    for _d in md-wrap310 md-gradle-ex; do
+        _md_out=$(MD_COPY="$WORK/md-good.tar.gz" _md_run "$WORK/$_d")
+        { printf '%s' "$_md_out" | grep -q "RESULT MVN_CMD=.*/apache-maven-$_md_ver/bin/mvn PINNED=true " \
+            && grep -q "^mvnw -q -B --fail-never .*:resolve " "$WORK/md-calls" \
+            && ! printf '%s' "$_md_out" | grep -q "MARK-FAILED"; } \
+            && pass "$_s $_d: a wrapper on Maven 3.10, the downloaded Maven is pinned over the wrapper" \
+            || fail "$_s $_d wrapper 3.10: [$_md_out] calls: [$(cat "$WORK/md-calls")]"
+    done
+
+    # With a Gradle build in the tree, pinning would also turn off the Gradle
+    # wrappers: not pinned, a warning, and the step recorded as failed.
+    _md_out=$(MD_COPY="$WORK/md-good.tar.gz" _md_run "$WORK/md-gradle")
+    { printf '%s' "$_md_out" | grep -q "RESULT MVN_CMD=.*/apache-maven-$_md_ver/bin/mvn PINNED= " \
+        && printf '%s' "$_md_out" | grep -q "WARN: maven: .*Gradle wrappers" \
+        && printf '%s' "$_md_out" | grep -q "MARK-FAILED maven-dependency-tree"; } \
+        && pass "$_s a Gradle build in the tree: CDXGEN_JVM_TOOL_PINNED is not set, the Gradle wrapper consequence is warned, the step is recorded" \
+        || fail "$_s Gradle build in the tree: [$_md_out]"
+    done
+
+    # Which errors count as a repeated dependency.
+    _md_re=$(printf '%s\n' "$_md_block" | sed -n "s/^MAVEN_DUPLICATE_ERROR='\(.*\)'\$/\1/p")
+    _md_hits=""
+    for _md_l in "[ERROR] 'dependencies.dependency.(groupId:artifactId:type:classifier)' must be unique: a:b:jar" \
+                 "[ERROR] 'dependencyManagement.dependencies.dependency.(groupId:artifactId:type:classifier)' must be unique: a:b:jar" \
+                 "[ERROR] 'build.plugins.plugin.(groupId:artifactId)' must be unique but found duplicate declaration" \
+                 "[WARNING] 'dependencies.dependency.(groupId:artifactId:type:classifier)' must be unique: a:b:jar"; do
+        if printf '%s\n' "$_md_l" | grep -q "$_md_re"; then _md_hits="${_md_hits}1"; else _md_hits="${_md_hits}0"; fi
+    done
+    [ -n "$_md_re" ] && [ "$_md_hits" = "1100" ] \
+        && pass "only dependencies and dependencyManagement uniqueness errors count" \
+        || fail "MAVEN_DUPLICATE_ERROR matched [$_md_hits] (want 1100)"
+
+    # Which wrapper versions count as accepting a repeated dependency.
+    _md_fn=$(printf '%s\n' "$_md_block" | sed -n '/^maven_accepts_duplicates() {/,/^}/p')
+    _md_acc=""
+    for _md_v in 3.9.6 3.8.1 3.10.0 3.11 4.0.0 3 x.y ""; do
+        if bash -c "$_md_fn; maven_accepts_duplicates \"\$1\"" _ "$_md_v"; then _md_acc="$_md_acc $_md_v"; fi
+    done
+    [ "$_md_acc" = " 3.9.6 3.8.1" ] \
+        && pass "only a Maven 3 before 3.10 counts as accepting a repeated dependency" \
+        || fail "maven_accepts_duplicates accepted [$_md_acc]"
+    rm -rf "$WORK/md-home"/bomlens-maven.*
+fi
+
+echo "== maven-scope: the pom.xml fallback's test and provided dependencies are dropped too =="
+# When cdxgen's dependency tree fails, it lists the dependencies written in
+# pom.xml: a test one is "optional", a provided one "excluded", and one with no
+# <scope> has none, so no component is "required". The Maven filter runs with
+# the "any" guard for that; a BOM with no scope at all is still left alone.
+if command -v node >/dev/null 2>&1; then
+    SFLT="$WORK/scope-filter-maven.js"
+    sed -n "/<<'SFILTER_JS'/,/^SFILTER_JS\$/p" "$ROOT_DIR/docker/lib/build-prep.sh" | sed '1d;$d' > "$SFLT"
+    grep -q '^    run_scope_filter "pkg:maven/" "maven" any$' "$ROOT_DIR/docker/lib/build-prep.sh" \
+        && pass "the Maven scope filter runs with the any guard" \
+        || fail "the Maven scope filter does not pass the any guard"
+    cat > "$WORK/maven-pomonly-bom.json" <<'JSON'
+{"bomFormat":"CycloneDX","specVersion":"1.6",
+ "metadata":{"component":{"name":"dup-demo","version":"1.0","bom-ref":"pkg:maven/demo/dup-demo@1.0?type=jar","purl":"pkg:maven/demo/dup-demo@1.0?type=jar"}},
+ "components":[
+   {"group":"junit","name":"junit","version":"4.12","purl":"pkg:maven/junit/junit@4.12?type=jar","bom-ref":"pkg:maven/junit/junit@4.12?type=jar","scope":"optional"},
+   {"group":"com.google.guava","name":"guava","version":"33.4.8-jre","purl":"pkg:maven/com.google.guava/guava@33.4.8-jre?type=jar","bom-ref":"pkg:maven/com.google.guava/guava@33.4.8-jre?type=jar"},
+   {"group":"junit","name":"junit","version":"4.13.2","purl":"pkg:maven/junit/junit@4.13.2?type=jar","bom-ref":"pkg:maven/junit/junit@4.13.2?type=jar","scope":"optional"},
+   {"group":"javax.servlet","name":"servlet-api","version":"2.5","purl":"pkg:maven/javax.servlet/servlet-api@2.5?type=jar","bom-ref":"pkg:maven/javax.servlet/servlet-api@2.5?type=jar","scope":"excluded"}
+ ],
+ "dependencies":[
+   {"ref":"pkg:maven/demo/dup-demo@1.0?type=jar","dependsOn":["pkg:maven/junit/junit@4.12?type=jar","pkg:maven/com.google.guava/guava@33.4.8-jre?type=jar","pkg:maven/junit/junit@4.13.2?type=jar","pkg:maven/javax.servlet/servlet-api@2.5?type=jar"]}
+ ]}
+JSON
+    cp "$WORK/maven-pomonly-bom.json" "$WORK/maven-pomonly-bom-default.json"
+    node "$SFLT" "$WORK/maven-pomonly-bom.json" "pkg:maven/" any 2>/dev/null
+    names=$(jq -r '[.components[].name]|sort|join(",")' "$WORK/maven-pomonly-bom.json")
+    rootdeps=$(jq -r '.dependencies[0].dependsOn|join(",")' "$WORK/maven-pomonly-bom.json")
+    { [ "$names" = "guava" ] && [ "$rootdeps" = "pkg:maven/com.google.guava/guava@33.4.8-jre?type=jar" ]; } \
+        && pass "pom.xml fallback: test and provided dependencies dropped, the unscoped compile one kept" \
+        || fail "pom.xml fallback scope filter" "components [$names] root dependsOn [$rootdeps]"
+    node "$SFLT" "$WORK/maven-pomonly-bom-default.json" "pkg:maven/" 2>/dev/null
+    names=$(jq -r '[.components[].name]|sort|join(",")' "$WORK/maven-pomonly-bom-default.json")
+    [ "$names" = "guava,junit,junit,servlet-api" ] \
+        && pass "without the any guard (the PHP filter) a BOM with no required component is left alone" \
+        || fail "the default guard changed a BOM with no required component" "$names"
+    jq 'del(.components[].scope)' "$WORK/maven-pomonly-bom-default.json" > "$WORK/maven-noscope-bom.json"
+    node "$SFLT" "$WORK/maven-noscope-bom.json" "pkg:maven/" any 2>/dev/null
+    names=$(jq -r '[.components[].name]|sort|join(",")' "$WORK/maven-noscope-bom.json")
+    [ "$names" = "guava,junit,junit,servlet-api" ] \
+        && pass "any guard: a BOM with no scope at all (syft fallback) is still left alone" \
+        || fail "the any guard changed a BOM with no scope" "$names"
+else
+    echo "  SKIP: node unavailable, skipping the maven pom.xml fallback scope test"
 fi
 # Every caller pins the repository to the standard layout under HOME=/tmp/sbomhome,
 # the one place cdxgen looks for the jars, and mounts the Maven cache there.

@@ -513,9 +513,11 @@ fi
 guard_snapshot
 # _pg_dir: the Poetry dependency-graph run's scratch folder, while it exists.
 # gradle_settings_remove: the user's Gradle settings copied for this scan.
-trap 'stop_supervised; guard_restore; gradle_settings_remove; [ -z "${_pg_dir:-}" ] || rm -rf "$_pg_dir"' EXIT
-trap 'stop_supervised; guard_restore; gradle_settings_remove; [ -z "${_pg_dir:-}" ] || rm -rf "$_pg_dir"; exit 130' INT
-trap 'stop_supervised; guard_restore; gradle_settings_remove; [ -z "${_pg_dir:-}" ] || rm -rf "$_pg_dir"; exit 143' TERM
+# MAVEN_FALLBACK_DIR: the Maven unpacked for a refused pom.xml (Maven section).
+MAVEN_FALLBACK_DIR=""
+trap 'stop_supervised; guard_restore; gradle_settings_remove; [ -z "${_pg_dir:-}" ] || rm -rf "$_pg_dir"; [ -z "${MAVEN_FALLBACK_DIR:-}" ] || rm -rf "$MAVEN_FALLBACK_DIR"' EXIT
+trap 'stop_supervised; guard_restore; gradle_settings_remove; [ -z "${_pg_dir:-}" ] || rm -rf "$_pg_dir"; [ -z "${MAVEN_FALLBACK_DIR:-}" ] || rm -rf "$MAVEN_FALLBACK_DIR"; exit 130' INT
+trap 'stop_supervised; guard_restore; gradle_settings_remove; [ -z "${_pg_dir:-}" ] || rm -rf "$_pg_dir"; [ -z "${MAVEN_FALLBACK_DIR:-}" ] || rm -rf "$MAVEN_FALLBACK_DIR"; exit 143' TERM
 
 # Non-shipped trees: manifests under test, fixture, example, benchmark and demo
 # folders, the GitHub Actions workflows and the Gradle wrapper jar are left out
@@ -722,12 +724,169 @@ fi
 # (maven-dependency-jars), otherwise only the count is logged. Skipped when
 # the root also has a Gradle build, which cdxgen reads instead. The wrapper is
 # used only when its .mvn/wrapper files are there; otherwise mvn.
+#
+# A POM that declares the same dependency twice: Maven 3.10 and later refuse
+# it ("'dependencies.dependency.(groupId:artifactId:type:classifier)' must be
+# unique", or the same for dependencyManagement), Maven 3.9 and earlier only
+# warn. The cdxgen images ship Maven 3.10, so cdxgen's dependency tree fails
+# and it lists only the dependencies written in pom.xml. The jar fetch reads
+# the same POM, so its output shows the error before cdxgen runs. Then a Maven
+# that accepts the POM is tried, in this order. A retry counts only when it
+# exits 0 and prints no [ERROR] line at all.
+#   1. the project's wrapper, when its distributionUrl names a Maven before
+#      3.10 and it was not the one that just failed (mvnw not executable).
+#      cdxgen picks the wrapper itself, so nothing needs to be set for it.
+#      A wrapper that fails for another reason (it cannot download its
+#      distribution, say) goes on to 2.
+#   2. Apache Maven $MAVEN_FALLBACK_VERSION, fetched through the image's mvn
+#      (its settings apply: mirror, proxy, credentials, offline; the archive
+#      stays in the local repository for the next scan), or from Maven Central
+#      with curl when that fails and Maven is not offline. The archive must
+#      match the SHA-512 checksum pinned below, or it is not used. It is
+#      unpacked under $HOME and passed to cdxgen as MVN_CMD.
+#      cdxgen 13.5.0 still prefers a project's mvnw over MVN_CMD. Only
+#      CDXGEN_JVM_TOOL_PINNED=true makes it take MVN_CMD, and that also makes
+#      it skip every Gradle wrapper. So it is set only when the tree has no
+#      Gradle build outside the non-shipped folders. With a Gradle build, the
+#      Gradle wrappers are left working (losing them would break those builds
+#      with no sign of it), cdxgen may run the mvnw that refuses the POM, a
+#      warning says so, and the step is recorded as failed.
+# When no Maven reads the POM, the step is recorded as failed
+# (maven-dependency-tree) in place of maven-dependency-jars, MVN_CMD is not
+# set, and the SBOM shows that its transitive Maven dependencies are missing.
 MAVEN_DEPENDENCY_PLUGIN="org.apache.maven.plugins:maven-dependency-plugin:3.11.0"
 MAVEN_REPO_LOCAL="$HOME/.m2/repository"
 case " ${MAVEN_OPTS:-} " in
     *" -Dmaven.repo.local="*)
         MAVEN_REPO_LOCAL=$(printf '%s\n' " $MAVEN_OPTS " | sed 's/.* -Dmaven\.repo\.local=\([^ ]*\) .*/\1/') ;;
 esac
+MAVEN_FALLBACK_VERSION="3.9.16"
+MAVEN_FALLBACK_SHA512="831a8591fe20c8243b1dbe7d71e3244f31d1665b0804b2e825e38cbbe5ce0cafb8338851f90780735568773e0a6cd07bbec107cda0b896b008b861075358b6f6"
+MAVEN_FALLBACK_URL="https://repo.maven.apache.org/maven2/org/apache/maven/apache-maven/$MAVEN_FALLBACK_VERSION/apache-maven-$MAVEN_FALLBACK_VERSION-bin.tar.gz"
+MAVEN_FALLBACK_DIR=""
+MAVEN_FALLBACK_CMD=""
+# The error lines of a POM refused for a repeated dependency.
+MAVEN_DUPLICATE_ERROR='^\[ERROR\].*dependenc[^ ]*\.dependency.*must be unique'
+# Run the jar fetch with the Maven command given: output in $_mvn_err, the
+# resolved list in $_mvn_list, the exit code in $_mvn_rc.
+maven_resolve_jars() {
+    : > "$_mvn_list"
+    _mvn_rc=0
+    # shellcheck disable=SC2086 # MAVEN_SETTINGS_ARGS is a list of options
+    run_supervised_timeout "$PREP_TIMEOUT_DEFAULT" "$@" -q -B --fail-never $MAVEN_SETTINGS_ARGS \
+        "$MAVEN_DEPENDENCY_PLUGIN:resolve" -DoutputFile="$_mvn_list" -DappendOutput=true \
+        >"$_mvn_err" 2>&1 || _mvn_rc=$?
+}
+# The last run refused pom.xml for a dependency declared twice.
+maven_model_rejected() {
+    grep -q "$MAVEN_DUPLICATE_ERROR" "$_mvn_err"
+}
+# The last run went through: exit 0 and no [ERROR] line.
+maven_run_clean() {
+    [ "$_mvn_rc" -eq 0 ] && ! grep -q '^\[ERROR\]' "$_mvn_err"
+}
+# Log why the last retry did not count (its first error lines).
+maven_log_retry_failure() {
+    log "maven: $1 did not read pom.xml cleanly (rc=$_mvn_rc):"
+    { grep '^\[ERROR\]' "$_mvn_err" || tail -3 "$_mvn_err"; } | head -3 | sed 's/^/[build-prep]   /'
+}
+# The Maven version in the wrapper's distributionUrl, empty when not found.
+maven_wrapper_version() {
+    sed -n 's/^[[:space:]]*distributionUrl[[:space:]]*=.*apache-maven-\([0-9][0-9.]*\)-bin\..*/\1/p' \
+        .mvn/wrapper/maven-wrapper.properties 2>/dev/null | head -1
+}
+# True for a Maven 3 before 3.10, which only warns about a repeated dependency.
+maven_accepts_duplicates() {
+    case "$1" in [0-9]*.[0-9]*) ;; *) return 1 ;; esac
+    _mad_major=${1%%.*}; _mad_rest=${1#*.}; _mad_minor=${_mad_rest%%.*}
+    case "$_mad_major$_mad_minor" in *[!0-9]*) return 1 ;; esac
+    [ "$_mad_major" -eq 3 ] && [ "$_mad_minor" -lt 10 ]
+}
+# Maven runs offline: -o in MAVEN_ARGS or MVN_ARGS, or <offline>true</offline>
+# in the settings file it reads.
+maven_offline() {
+    case " ${MAVEN_ARGS:-} ${MVN_ARGS:-} " in *" -o "*|*" --offline "*) return 0 ;; esac
+    for _mo_s in "${SETTINGS_ROOT:-/bomlens-settings}/m2/settings.xml" "$HOME/.m2/settings.xml"; do
+        [ -f "$_mo_s" ] && grep -q '<offline>[[:space:]]*true[[:space:]]*</offline>' "$_mo_s" && return 0
+    done
+    return 1
+}
+# A Gradle build in the tree, outside .git, node_modules and (unless that is
+# turned off) the non-shipped folders.
+maven_tree_has_gradle() {
+    _mtg_prune="-name .git -o -name node_modules"
+    if [ -n "${EXCLUDE_NON_SHIPPED:-}" ]; then
+        for _mtg_d in ${NON_SHIPPED_DIRS:-}; do _mtg_prune="$_mtg_prune -o -name $_mtg_d"; done
+    fi
+    # shellcheck disable=SC2086 # _mtg_prune is a list of find operands
+    [ -n "$(find . -maxdepth 8 -type d \( $_mtg_prune \) -prune -o -type f \
+        \( -name build.gradle -o -name build.gradle.kts -o -name settings.gradle -o -name settings.gradle.kts \) \
+        -print 2>/dev/null | head -1)" ]
+}
+sha512_tool() {
+    for _st in sha512sum shasum openssl; do
+        if command -v "$_st" >/dev/null 2>&1; then echo "$_st"; return 0; fi
+    done
+    return 1
+}
+file_sha512() {
+    case "$(sha512_tool)" in
+        sha512sum) sha512sum "$1" | cut -d' ' -f1 ;;
+        shasum) shasum -a 512 "$1" | cut -d' ' -f1 ;;
+        openssl) openssl dgst -sha512 -r "$1" | cut -d' ' -f1 ;;
+    esac
+}
+# Fetch, check and unpack Apache Maven $MAVEN_FALLBACK_VERSION; on success
+# MAVEN_FALLBACK_CMD is its mvn. The folder is removed on exit.
+maven_fetch_fallback() {
+    MAVEN_FALLBACK_CMD=""
+    _mf_name="apache-maven-$MAVEN_FALLBACK_VERSION"
+    if ! command -v tar >/dev/null 2>&1 || ! command -v gzip >/dev/null 2>&1; then
+        log "maven: tar or gzip is not in this image, so Maven $MAVEN_FALLBACK_VERSION cannot be unpacked; not downloaded"
+        return 1
+    fi
+    if ! sha512_tool >/dev/null; then
+        log "maven: no SHA-512 tool in this image (sha512sum, shasum or openssl), so Maven $MAVEN_FALLBACK_VERSION cannot be checked; not downloaded"
+        return 1
+    fi
+    MAVEN_FALLBACK_DIR=$(mktemp -d "$HOME/bomlens-maven.XXXXXX" 2>/dev/null) || { MAVEN_FALLBACK_DIR=""; return 1; }
+    _mf_tgz="$MAVEN_FALLBACK_DIR/$_mf_name-bin.tar.gz"
+    _mf_offline=""
+    maven_offline && _mf_offline=1
+    if command -v mvn >/dev/null 2>&1; then
+        # Run outside the project, so Maven does not read the refused pom.xml.
+        _mf_pwd=$(pwd)
+        if cd "$MAVEN_FALLBACK_DIR"; then
+            # shellcheck disable=SC2086 # MAVEN_SETTINGS_ARGS is a list of options
+            run_supervised_timeout "$PREP_TIMEOUT_DEFAULT" mvn -q -B ${_mf_offline:+-o} $MAVEN_SETTINGS_ARGS \
+                "$MAVEN_DEPENDENCY_PLUGIN:copy" \
+                -Dartifact="org.apache.maven:apache-maven:$MAVEN_FALLBACK_VERSION:tar.gz:bin" \
+                -DoutputDirectory="$MAVEN_FALLBACK_DIR" >/dev/null 2>&1
+            cd "$_mf_pwd" || return 1
+        fi
+    fi
+    if [ ! -s "$_mf_tgz" ] && [ -z "$_mf_offline" ] && command -v curl >/dev/null 2>&1; then
+        run_supervised_timeout "$PREP_TIMEOUT_DEFAULT" curl -fsSL --connect-timeout 20 \
+            -o "$_mf_tgz" "$MAVEN_FALLBACK_URL" >/dev/null 2>&1
+    fi
+    if [ ! -s "$_mf_tgz" ]; then
+        if [ -n "$_mf_offline" ]; then
+            log "maven: Maven runs offline and Maven $MAVEN_FALLBACK_VERSION is not in the local repository, so it cannot be used"
+        else
+            log "maven: could not download Maven $MAVEN_FALLBACK_VERSION from the configured Maven repository or $MAVEN_FALLBACK_URL"
+        fi
+    elif [ "$(file_sha512 "$_mf_tgz")" != "$MAVEN_FALLBACK_SHA512" ]; then
+        log "maven: the downloaded $_mf_name-bin.tar.gz does not match its pinned SHA-512 checksum; not used"
+    elif tar xzf "$_mf_tgz" -C "$MAVEN_FALLBACK_DIR" 2>/dev/null && [ -x "$MAVEN_FALLBACK_DIR/$_mf_name/bin/mvn" ]; then
+        rm -f "$_mf_tgz"
+        MAVEN_FALLBACK_CMD="$MAVEN_FALLBACK_DIR/$_mf_name/bin/mvn"
+        return 0
+    else
+        log "maven: could not unpack $_mf_name-bin.tar.gz"
+    fi
+    rm -rf "$MAVEN_FALLBACK_DIR"; MAVEN_FALLBACK_DIR=""
+    return 1
+}
 if [ -f pom.xml ] && [ ! -f build.gradle ] && [ ! -f build.gradle.kts ]; then
     _mvn_cmd=""
     if [ -x ./mvnw ] && [ -d .mvn/wrapper ]; then _mvn_cmd=./mvnw
@@ -737,11 +896,57 @@ if [ -f pom.xml ] && [ ! -f build.gradle ] && [ ! -f build.gradle.kts ]; then
         log "maven: local repository $MAVEN_REPO_LOCAL is not $HOME/.m2/repository; cdxgen will not find jars for hashes"
     elif [ -n "$_mvn_cmd" ]; then
         _mvn_err=$(mktemp); _mvn_list=$(mktemp)
-        _mvn_rc=0
-        # shellcheck disable=SC2086 # MAVEN_SETTINGS_ARGS is a list of options
-        run_supervised_timeout "$PREP_TIMEOUT_DEFAULT" "$_mvn_cmd" -q -B --fail-never $MAVEN_SETTINGS_ARGS \
-            "$MAVEN_DEPENDENCY_PLUGIN:resolve" -DoutputFile="$_mvn_list" -DappendOutput=true \
-            >"$_mvn_err" 2>&1 || _mvn_rc=$?
+        _mvn_tree_failed=""
+        maven_resolve_jars "$_mvn_cmd"
+        if maven_model_rejected; then
+            log "maven: $_mvn_cmd refused pom.xml:"
+            grep "$MAVEN_DUPLICATE_ERROR" "$_mvn_err" | head -1 | sed 's/^/[build-prep]   /'
+            log "maven: Maven 3.10 and later refuse a dependency declared twice in one POM; earlier versions only warn"
+            _mvn_tree_ok=""
+            _mvn_wrap_v=""
+            [ -f .mvn/wrapper/maven-wrapper.properties ] && _mvn_wrap_v=$(maven_wrapper_version)
+            if [ "$_mvn_cmd" != ./mvnw ] && [ -f ./mvnw ] && [ -n "$_mvn_wrap_v" ] \
+                && maven_accepts_duplicates "$_mvn_wrap_v"; then
+                log "maven: retrying with the project's Maven wrapper (Maven $_mvn_wrap_v)"
+                maven_resolve_jars sh ./mvnw
+                if maven_run_clean; then
+                    _mvn_tree_ok=1
+                    log "maven: the project's Maven wrapper (Maven $_mvn_wrap_v) reads pom.xml; cdxgen runs the wrapper for the dependency tree"
+                else
+                    maven_log_retry_failure "the project's Maven wrapper"
+                fi
+            fi
+            if [ -z "$_mvn_tree_ok" ] && maven_fetch_fallback; then
+                log "maven: retrying with Maven $MAVEN_FALLBACK_VERSION"
+                maven_resolve_jars "$MAVEN_FALLBACK_CMD"
+                if ! maven_run_clean; then
+                    maven_log_retry_failure "Maven $MAVEN_FALLBACK_VERSION"
+                    rm -rf "$MAVEN_FALLBACK_DIR"; MAVEN_FALLBACK_DIR=""
+                elif [ -f ./mvnw ] && maven_tree_has_gradle; then
+                    # MVN_CMD still serves cdxgen if the wrapper does not start.
+                    MVN_CMD="$MAVEN_FALLBACK_CMD"
+                    export MVN_CMD
+                    echo "[build-prep] WARN: maven: Maven $MAVEN_FALLBACK_VERSION reads pom.xml, but cdxgen prefers the project's mvnw, which runs a Maven that refuses it. cdxgen is not told to skip mvnw (CDXGEN_JVM_TOOL_PINNED), because cdxgen 13.5.0 would then also skip the Gradle wrappers of the Gradle builds in this tree. The Maven dependency tree may be missing; remove the repeated <dependency> entries from pom.xml, or point .mvn/wrapper/maven-wrapper.properties at Maven 3.9, and re-scan." >&2
+                    _mvn_tree_failed=1
+                    mark_prep_failed maven-dependency-tree
+                    _mvn_tree_ok=warned
+                else
+                    _mvn_tree_ok=1
+                    MVN_CMD="$MAVEN_FALLBACK_CMD"
+                    export MVN_CMD
+                    if [ -f ./mvnw ]; then
+                        CDXGEN_JVM_TOOL_PINNED=true
+                        export CDXGEN_JVM_TOOL_PINNED
+                    fi
+                    log "maven: cdxgen runs Maven $MAVEN_FALLBACK_VERSION ($MAVEN_FALLBACK_CMD) for the dependency tree"
+                fi
+            fi
+            if [ -z "$_mvn_tree_ok" ]; then
+                log "maven: the dependency tree cannot be built, so the SBOM lists only the dependencies written in pom.xml (no transitive dependencies). Remove the repeated <dependency> entries from pom.xml and re-scan."
+                _mvn_tree_failed=1
+                mark_prep_failed maven-dependency-tree
+            fi
+        fi
         # Each resolved jar, as its path in the local repository:
         # group:artifact:jar[:classifier]:version:scope.
         _mvn_counts=$(awk -v repo="$MAVEN_REPO_LOCAL" '
@@ -764,7 +969,8 @@ if [ -f pom.xml ] && [ ! -f build.gradle ] && [ ! -f build.gradle.kts ]; then
             grep '^\[ERROR\]' "$_mvn_err" | head -5 | sed 's/^/[build-prep]   /'
             # None of this run's jars there: recorded like a failed resolver
             # step, so the result manifest shows it. Some there: the log is enough.
-            [ "${_mvn_have:-0}" -gt 0 ] || mark_prep_failed maven-dependency-jars
+            # A refused pom.xml is already recorded as maven-dependency-tree.
+            [ -n "$_mvn_tree_failed" ] || [ "${_mvn_have:-0}" -gt 0 ] || mark_prep_failed maven-dependency-jars
         fi
         rm -f "$_mvn_err" "$_mvn_list"
     fi
@@ -2360,10 +2566,16 @@ fi
 # the dependency graph to what remains. Guard: only act when cdxgen actually
 # populated scopes (at least one node of that purl prefix marked "required")
 # -- the syft fallback path emits no scope, and dropping there would gut the
-# BOM, so we leave it untouched and recall never regresses.
+# BOM, so we leave it untouched and recall never regresses. A third argument,
+# "any", lets any of the three scope values count: Maven passes it, because when
+# cdxgen's dependency tree fails it lists the dependencies written in pom.xml,
+# and those carry a scope only when the POM names one (a test or provided one
+# then, while a compile dependency usually has none), so "required" is often
+# missing although the scopes are there.
 run_scope_filter() {
     _sf_purl_prefix="$1"
     _sf_label="$2"
+    _sf_guard="${3:-required}"
     [ "${rc:-1}" -eq 0 ] || return 0
     [ -f "$OUT" ] || return 0
     command -v node >/dev/null 2>&1 || return 0
@@ -2371,12 +2583,13 @@ run_scope_filter() {
     _sflt=$(mktemp).js
     cat > "$_sflt" <<'SFILTER_JS'
 const fs = require('fs');
-const [bomPath, purlPrefix] = process.argv.slice(2);
+const [bomPath, purlPrefix, guard] = process.argv.slice(2);
 let bom;
 try { bom = JSON.parse(fs.readFileSync(bomPath, 'utf8')); } catch (e) { process.exit(0); }
 if (!Array.isArray(bom.components)) process.exit(0);
 const isTarget = c => (c.purl || '').startsWith(purlPrefix);
-const hasScopes = bom.components.some(c => isTarget(c) && c.scope === 'required');
+const guardScopes = guard === 'any' ? ['required', 'optional', 'excluded'] : ['required'];
+const hasScopes = bom.components.some(c => isTarget(c) && guardScopes.includes(c.scope));
 if (!hasScopes) process.exit(0);   // scopes not populated (e.g. syft fallback): leave as-is
 const keep = c => !isTarget(c) || (c.scope !== 'optional' && c.scope !== 'excluded');
 const before = bom.components.length;
@@ -2395,11 +2608,11 @@ if (Array.isArray(bom.dependencies)) {
 fs.writeFileSync(bomPath, JSON.stringify(bom, null, 2));
 process.stderr.write('[build-prep] ' + purlPrefix + ': kept ' + bom.components.length + ' of ' + before + ' components\n');
 SFILTER_JS
-    node "$_sflt" "$OUT" "$_sf_purl_prefix" || log "$_sf_label: filter skipped (non-fatal)"
+    node "$_sflt" "$OUT" "$_sf_purl_prefix" "$_sf_guard" || log "$_sf_label: filter skipped (non-fatal)"
     rm -f "$_sflt"
 }
 if [ -n "${MAVEN_SCOPE_FILTER:-}" ]; then
-    run_scope_filter "pkg:maven/" "maven"
+    run_scope_filter "pkg:maven/" "maven" any
 fi
 if [ -n "${PHP_SCOPE_FILTER:-}" ]; then
     run_scope_filter "pkg:composer/" "php"
