@@ -21,7 +21,7 @@ set -u
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 # The image settings of whoever runs this must not change what the plan names.
-unset CDXGEN_IMAGE_PREFIX CDXGEN_ALLINONE CDXGEN_TAG
+unset CDXGEN_IMAGE_PREFIX CDXGEN_JAVA_IMAGE CDXGEN_ALLINONE CDXGEN_TAG
 ENTRY="$ROOT_DIR/docker/entrypoint.sh"
 SCHEMA="$ROOT_DIR/schemas/engine-result-1.json"
 DOC="$ROOT_DIR/docs/reference/engine-contract.md"
@@ -951,14 +951,50 @@ P="$(plan_run empty "$EMPTYSRC")"
     && [ ! -f "$P/bomlens-plan.json" ] && [ "$(jq -r '[.steps[] | select(.id=="plan")][0].status' "$P/bomlens-result.json")" = "failed" ] \
     && pass "an empty source is refused: no plan, plan step failed" \
     || fail "empty source: rc $(cat "$P.rc"), $(jq -c '[.run.status, .steps]' "$P/bomlens-result.json")"
-missing=""
-for lang in rust go ruby java python node php dotnet swift unknown; do
+# A Gradle build with a Java 25 toolchain: the plan names the Java 25 image, pinned.
+J25SRC="$WORK/plan-src-java25"; mkdir -p "$J25SRC"
+printf 'plugins { java }\njava { toolchain { languageVersion = JavaLanguageVersion.of(25) } }\n' > "$J25SRC/build.gradle.kts"
+P="$(plan_run java25 "$J25SRC")"
+[ "$(jq -r '.stages[0] | .image + " " + .image_digest' "$P/bomlens-plan.json")" = "ghcr.io/cdxgen/cdxgen-temurin-java25:$(jq -r '.tag + " " + .digests["ghcr.io/cdxgen/cdxgen-temurin-java25"]' "$ROOT_DIR/docker/lib/cdxgen-images.json")" ] \
+    && [ "$(jq -r .status "$P/bomlens-plan.json")" = ok ] \
+    && pass "a Java 25 toolchain names the pinned cdxgen Java 25 image in the plan" \
+    || fail "java25 plan: $(jq -c '{status, s: .stages[0] | {image, image_digest}}' "$P/bomlens-plan.json" 2>&1)"
+J24SRC="$WORK/plan-src-java24"; mkdir -p "$J24SRC"
+printf 'kotlin { jvmToolchain(24) }\n' > "$J24SRC/build.gradle.kts"
+# CDXGEN_JAVA_IMAGE with a published name follows the mirror and keeps its pinned digest.
+P="$(plan_run java-override "$J25SRC" CDXGEN_IMAGE_PREFIX=registry.example/mirror/cdxgen/ \
+    CDXGEN_JAVA_IMAGE="ghcr.io/cdxgen/cdxgen-temurin-java24:$(jq -r .tag "$ROOT_DIR/docker/lib/cdxgen-images.json")")"
+[ "$(jq -r '.stages[0] | .image + " " + .image_digest' "$P/bomlens-plan.json")" = "registry.example/mirror/cdxgen/cdxgen-temurin-java24:$(jq -r '.tag + " " + .digests["ghcr.io/cdxgen/cdxgen-temurin-java24"]' "$ROOT_DIR/docker/lib/cdxgen-images.json")" ] \
+    && [ "$(jq -r .status "$P/bomlens-plan.json")" = ok ] \
+    && pass "CDXGEN_JAVA_IMAGE names the image from the mirror, with its pinned digest" \
+    || fail "CDXGEN_JAVA_IMAGE plan: $(jq -c '{status, s: .stages[0] | {image, image_digest}}' "$P/bomlens-plan.json" 2>&1)"
+for v in 8 11 17; do
+    mkdir -p "$WORK/plan-src-java$v"
+    printf 'kotlin { jvmToolchain(%s) }\n' "$v" > "$WORK/plan-src-java$v/build.gradle.kts"
+done
+# A Gradle 6.9.4 wrapper cannot run on Java 21: the plan names the Java 11
+# image (not named temurin) from the mirror, with its pinned digest.
+W69="$WORK/plan-src-wrapper69"; mkdir -p "$W69/gradle/wrapper"
+printf "plugins { id 'java' }\n" > "$W69/build.gradle"; printf '#!/bin/sh\n' > "$W69/gradlew"
+printf 'distributionUrl=https\\://services.gradle.org/distributions/gradle-6.9.4-bin.zip\n' > "$W69/gradle/wrapper/gradle-wrapper.properties"
+P="$(plan_run wrapper69 "$W69" CDXGEN_IMAGE_PREFIX=registry.example/mirror/cdxgen/)"
+[ "$(jq -r '.stages[0] | .image + " " + .image_digest' "$P/bomlens-plan.json")" = "registry.example/mirror/cdxgen/cdxgen-java11:$(jq -r '.tag + " " + .digests["ghcr.io/cdxgen/cdxgen-java11"]' "$ROOT_DIR/docker/lib/cdxgen-images.json")" ] \
+    && [ "$(jq -r .status "$P/bomlens-plan.json")" = ok ] \
+    && pass "a Gradle 6.9.4 wrapper names the pinned cdxgen-java11 image from the mirror" \
+    || fail "wrapper 6.9.4 plan: $(jq -c '{status, s: .stages[0] | {image, image_digest}}' "$P/bomlens-plan.json" 2>&1)"
+missing=""; seen=""
+for lang in rust go ruby java "java '$J24SRC'" "java '$J25SRC'" "java '$WORK/plan-src-java8'" "java '$WORK/plan-src-java11'" \
+            "java '$WORK/plan-src-java17'" python node php dotnet swift unknown; do
     img="$(bash -c ". '$ROOT_DIR/docker/lib/source-detect.sh' >/dev/null 2>&1; img_for_lang $lang")"
+    seen="$seen ${img%:*}"
     jq -e --arg i "${img%:*}" --arg t "${img##*:}" '.tag == $t and (.digests[$i] // "" | startswith("sha256:"))' \
         "$ROOT_DIR/docker/lib/cdxgen-images.json" >/dev/null || missing="$missing $img"
 done
 [ -z "$missing" ] && pass "cdxgen-images.json pins every image img_for_lang returns, at CDXGEN_TAG" \
     || fail "no pinned digest for:$missing (run scripts/update-cdxgen-digests.sh)"
+[ "$(printf '%s\n' $seen | grep -cE 'cdxgen-(temurin-)?java[0-9]+$' | tr -d ' ')" -eq 6 ] \
+    && [ "$(printf '%s\n' $seen | grep -E 'cdxgen-(temurin-)?java[0-9]+$' | sort -u | wc -l | tr -d ' ')" -eq 6 ] \
+    && pass "the coverage reaches all six cdxgen Java images" || fail "Java images covered:$seen"
 
 echo "== POSTPROCESS takes over the manifest-only fallback when told stage 1 failed =="
 if ! command -v syft >/dev/null 2>&1 && [ -n "${CI:-}" ]; then

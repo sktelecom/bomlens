@@ -90,6 +90,29 @@ Detected file: `build.gradle` or `build.gradle.kts`
 
 > Note: as with Maven, resolution needs the container to reach Maven Central, or your mirror. When it cannot, the result can hold only the direct dependencies, with no licenses. If the component count is far below what you expect, check network access first.
 
+Each cdxgen Java image has one JDK, and two things in a Gradle build decide which one it needs. A toolchain asks for that exact JDK version. A Gradle wrapper (`gradlew` with `gradle/wrapper/gradle-wrapper.properties`) runs only on the JDKs its Gradle version supports; a 6.9.4 wrapper, for example, fails on Java 21 with "Unsupported class file major version 65". The scan reads both:
+
+- the toolchain from `JavaLanguageVersion.of(N)` (as `languageVersion = ...` or `languageVersion.set(...)`) or Kotlin `jvmToolchain(N)`, in the `*.gradle` and `*.gradle.kts` files of the scanned folder and up to five folders below it, `buildSrc` and convention plugins included. The highest version counts.
+- the wrapper's Gradle version from the file name at the end of `distributionUrl`, in Gradle's own form `gradle-X.Y[.Z]-bin.zip` or `-all.zip` (a milestone, release candidate or snapshot counts as its release). A wrapper counts only where `gradlew` sits beside it; without one the image's own Gradle 8.14.5 runs. Which wrappers count depends on the scanned folder:
+    - with `gradlew`, its own wrapper alone. When its version cannot be read (a custom file name, for example), the scan says so in an `[INFO]` line and chooses by the toolchain alone.
+    - with a Gradle settings or build file and no `gradlew`, none: the image's Gradle runs there, once.
+    - with neither, the wrapper of every build below it that has `gradlew` beside a settings or build file, up to five folders down. `buildSrc`, `build-logic`, dot folders and the builds another build names in `includeBuild(...)` are skipped. The image must run every one of them; when no image does, the scan picks for the lowest version and says so in a `[WARN]` line.
+
+Comments and the non-shipped folders listed above are skipped (`BOMLENS_INCLUDE_NON_SHIPPED=1` reads those folders too). The images and the Gradle versions that run on their JDK, from [Gradle's compatibility matrix](https://docs.gradle.org/current/userguide/compatibility.html):
+
+| Image | JDK | Wrapper versions that run on it |
+|---|---|---|
+| `cdxgen-temurin-java8` | 8 | below 9.0 |
+| `cdxgen-java11` | 11 | 5.0 to 8.14.x |
+| `cdxgen-java17` | 17 | 7.3 and later |
+| `cdxgen-temurin-java21` | 21 | 8.5 and later |
+| `cdxgen-temurin-java24` | 24 | 8.14 and later |
+| `cdxgen-temurin-java25` | 25 | 9.1.0 and later |
+
+The scan takes the toolchain's image when the wrapper runs on it. Otherwise it takes `cdxgen-temurin-java21` when the wrapper runs on Java 21, and the newest image the wrapper runs on when it does not (Java 17 for a 7.3 to 8.4 wrapper, 11 for 5.0 to 7.2, 8 below 5.0). With no toolchain and no wrapper it stays on `cdxgen-temurin-java21`. A choice other than Java 21 prints an `[INFO]` line that says why.
+
+A `[WARN]` says when the build cannot get what it asks for: a toolchain no image has (22, 23, 26 and so on), or one the wrapper cannot run on (a Java 25 toolchain with an 8.14 wrapper). Gradle then cannot find the toolchain's JDK, and dependency resolution can fail unless the build configures toolchain auto-provisioning. A mixed-language tree runs in the all-in-one image whatever the toolchain, and warns the same way for a toolchain other than 21. A version read from a property or a version catalog is not seen. In these cases, set `CDXGEN_JAVA_IMAGE` to an image that has the JDK ([CLI reference](cli.md)). Maven needs no such choice: `maven.compiler.release` and the toolchains plugin apply when the build compiles, and dependency resolution runs without them.
+
 ---
 
 ## Android

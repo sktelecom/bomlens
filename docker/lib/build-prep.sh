@@ -188,10 +188,12 @@ guard_restore() {
 # setsid gives the command its own process group (pgid == its own pid), so
 # stopping it reaches the whole subtree it spawns (language tool -> package
 # manager -> git clone, etc.) with one signal instead of depending on each
-# level to forward it to the next. Confirmed present in every cdxgen image
-# build-prep.sh runs in (debian-rust/golang124/ruby34/php84/dotnet9/swift,
-# temurin-java21, python312, node20, the all-in-one image). Where it is
-# missing, falls back to a /proc-based tree walk.
+# level to forward it to the next. Confirmed present in these cdxgen images
+# (debian-rust/golang124/ruby34/php84/dotnet9/swift, temurin-java21,
+# python312, node20, the all-in-one image), and not checked in the other Java
+# images source-detect.sh can pick (temurin-java8, java11, java17,
+# temurin-java24, temurin-java25). Where it is missing, falls back to a
+# /proc-based tree walk.
 #
 # _cg_pid / _cg_pgid track whatever is currently supervised, so stop_supervised
 # and a trap can act on it without either needing to be passed the details.

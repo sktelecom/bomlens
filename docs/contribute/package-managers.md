@@ -77,7 +77,7 @@ Submit a PR following the [contributing guide](https://github.com/sktelecom/boml
 
 ## Example: adding Kotlin support
 
-Kotlin uses the Gradle build system and runs on the JVM, so it reuses the `java` branch of `detect_lang()` (which detects `*.gradle.kts`) and the `cdxgen-temurin-java21` image as is.
+Kotlin uses the Gradle build system and runs on the JVM, so it reuses the `java` branch of `detect_lang()` (which detects `*.gradle.kts`) and the Java image choice as is (by `jvmToolchain(N)` and the wrapper version, see [Java (Gradle)](../reference/ecosystems.md#java-gradle)).
 
 ### How to generate a Gradle lock file
 

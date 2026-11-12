@@ -694,13 +694,343 @@ detect_lang() {
     if [ "$#" -eq 1 ]; then echo "$1"; elif [ "$#" -eq 0 ]; then echo "unknown"; else echo "mixed"; fi
 }
 
+# The highest Java toolchain version the Gradle builds under $1 declare, or
+# nothing. A Gradle toolchain asks for that exact JDK, and without a toolchain
+# download repository (auto-provisioning) the build fails to resolve its
+# dependencies when the image has another one. Read from *.gradle and
+# *.gradle.kts files in $1 and up to five folders below it (buildSrc and
+# build-logic convention plugins sit that deep), skipping the folders
+# _detect_first skips (the non-shipped ones unless BOMLENS_INCLUDE_NON_SHIPPED
+# is set) and comments:
+#   JavaLanguageVersion.of(25)  (languageVersion.set(...), languageVersion = ...)
+#   jvmToolchain(25)            (Kotlin)
+# A version taken from a property or a version catalog is not read. Maven is
+# not read either: maven.compiler.release and the toolchains plugin take effect
+# when the build compiles, and dependency resolution (dependency:tree) runs
+# without them on the image's JDK.
+java_toolchain_version() {
+    local d="$1" n prune=()
+    [ -n "$d" ] && [ -d "$d" ] || return 0
+    for n in .git .gradle node_modules vendor build target bin obj .build Pods .venv; do
+        prune+=(-o -name "$n")
+    done
+    if non_shipped_enabled; then
+        for n in $NON_SHIPPED_DIRS; do prune+=(-o -name "$n"); done
+    fi
+    # The awk drops // line comments and /* */ blocks (across lines too, and
+    # never past the end of a file) before the declarations are matched. A
+    # line over 4096 characters holds no declaration worth reading and is
+    # skipped, which keeps the scan of a crafted file linear.
+    (cd "$d" 2>/dev/null && find . -maxdepth 6 \( "${prune[@]:1}" \) -prune -o -type f \( -name '*.gradle' -o -name '*.gradle.kts' \) \
+        -exec awk '
+            FNR == 1 { blk = 0 }
+            length($0) > 4096 { next }
+            {
+                line = $0; out = ""
+                while (line != "") {
+                    if (blk) { i = index(line, "*/"); if (!i) { line = ""; break }; line = substr(line, i + 2); blk = 0; continue }
+                    a = index(line, "/*"); b = index(line, "//")
+                    if (b && (!a || b < a)) { out = out substr(line, 1, b - 1); line = ""; break }
+                    if (a) { out = out substr(line, 1, a - 1); line = substr(line, a + 2); blk = 1; continue }
+                    out = out line; line = ""
+                }
+                print out
+            }' {} + 2>/dev/null) \
+        | grep -oE "(JavaLanguageVersion\.of|jvmToolchain)[[:space:]]*\([[:space:]]*[\"']?[0-9]+" \
+        | grep -oE '[0-9]+$' | grep -E '^[0-9]{1,3}$' | sed 's/^0*\([0-9]\)/\1/' | sort -n | tail -1 || true
+}
+
+# The JDKs the published cdxgen Java images carry, and the one used when
+# nothing in the build asks for another. Every image also has its own Gradle
+# (8.14.5), used when the build has no wrapper.
+CDXGEN_JAVA_JDKS="8 11 17 21 24 25"
+CDXGEN_JAVA_DEFAULT=21
+
+# _java_image_name <jdk>: the cdxgen image name for a JDK in CDXGEN_JAVA_JDKS.
+# The Java 11 and 17 images are not named temurin.
+_java_image_name() {
+    case "$1" in
+        11|17) echo "cdxgen-java$1" ;;
+        *)     echo "cdxgen-temurin-java$1" ;;
+    esac
+}
+
+# _java_has_image <jdk>: true when a published image has that JDK.
+_java_has_image() {
+    case " $CDXGEN_JAVA_JDKS " in *" ${1:-x} "*) return 0 ;; esac
+    return 1
+}
+
+# _gradle_wrapper_props_version <gradle-wrapper.properties>: the Gradle
+# version of the distribution its distributionUrl names, as X.Y.Z, or
+# nothing. Only the file name at the end of the URL is read, in Gradle's own
+# form: gradle-X.Y[.Z][-rc-N|-milestone-N|-<snapshot>]-(bin|all).zip. A
+# milestone, release candidate or snapshot counts as its release. The key and
+# the value may be separated by =, : or white space, as in any .properties file.
+_gradle_wrapper_props_version() {
+    local url v
+    url="$(grep -E '^[[:space:]]*distributionUrl([[:space:]]|[=:])' "$1" 2>/dev/null | head -1 \
+        | sed -E 's/^[[:space:]]*distributionUrl[[:space:]]*[=:]?[[:space:]]*//; s/[[:space:]]+$//')" || true
+    url="${url##*/}"
+    v="$(printf '%s\n' "$url" | grep -E '^gradle-[0-9]{1,3}\.[0-9]{1,3}(\.[0-9]{1,3})?(-[A-Za-z0-9.+-]+)?-(bin|all)\.zip$' \
+        | grep -oE '^gradle-[0-9]{1,3}\.[0-9]{1,3}(\.[0-9]{1,3})?')" || true
+    v="${v#gradle-}"
+    case "$v" in
+        '') return 0 ;;
+        *.*.*) echo "$v" ;;
+        *) echo "$v.0" ;;
+    esac
+}
+
+# _gradle_version_number <X.Y.Z>: the version as one comparable number.
+_gradle_version_number() {
+    local a b c
+    IFS=. read -r a b c <<EOF
+$1
+EOF
+    echo $(( 10#${a:-0} * 1000000 + 10#${b:-0} * 1000 + 10#${c:-0} ))
+}
+
+# _gradle_has_build <dir>: true when <dir> holds a Gradle settings or build file.
+_gradle_has_build() {
+    [ -f "$1/settings.gradle" ] || [ -f "$1/settings.gradle.kts" ] \
+        || [ -f "$1/build.gradle" ] || [ -f "$1/build.gradle.kts" ]
+}
+
+# _gradle_included_builds <dir>: the builds its settings file names in
+# includeBuild("..."), one relative path per line, inside <dir> only.
+_gradle_included_builds() {
+    local x
+    for x in $(cat "$1/settings.gradle" "$1/settings.gradle.kts" 2>/dev/null \
+               | sed 's#//.*##' \
+               | grep -oE 'includeBuild[[:space:]]*\(?[[:space:]]*["'"'"'][A-Za-z0-9_./-]+["'"'"']' \
+               | sed -E 's/^includeBuild[[:space:]]*\(?[[:space:]]*["'"'"']//; s/["'"'"']$//; s#^\./##; s#/$##'); do
+        case "$x" in ''|/*|..|../*|*/../*|*/..) continue ;; esac
+        printf '%s\n' "$x"
+    done
+}
+
+# gradle_wrappers <dir>: the Gradle wrappers a source scan of <dir> runs.
+# Sets GRADLE_WRAPPER_VERSIONS (their versions, space separated, or empty)
+# and GRADLE_WRAPPER_UNREADABLE (the properties files of the wrappers whose
+# version could not be read, one path per line, relative to <dir>). A wrapper counts only
+# with its gradlew script beside it; without one the image's own Gradle runs.
+#   - <dir> has gradlew: its wrapper alone runs, readable or not.
+#   - <dir> has a Gradle settings or build file and no gradlew: the image's
+#     Gradle runs once there, and no nested wrapper runs.
+#   - otherwise: every build below it with gradlew beside a settings or build
+#     file, found as build-prep.sh finds them: up to five folders below <dir>,
+#     skipping build, .gradle, node_modules, buildSrc, build-logic, dot
+#     folders, the non-shipped folders (unless BOMLENS_INCLUDE_NON_SHIPPED is
+#     set) and the builds another one's settings names in includeBuild(...).
+gradle_wrappers() {
+    local d="$1" n f b v incl prune=() roots=()
+    GRADLE_WRAPPER_VERSIONS=""; GRADLE_WRAPPER_UNREADABLE=""
+    [ -n "$d" ] && [ -d "$d" ] || return 0
+    if [ -f "$d/gradlew" ]; then
+        f="gradle/wrapper/gradle-wrapper.properties"
+        v="$(_gradle_wrapper_props_version "$d/$f")"
+        if [ -n "$v" ]; then GRADLE_WRAPPER_VERSIONS="$v"; else GRADLE_WRAPPER_UNREADABLE="$f"; fi
+        return 0
+    fi
+    _gradle_has_build "$d" && return 0
+    for n in build .gradle node_modules buildSrc build-logic '.?*'; do
+        prune+=(-o -name "$n")
+    done
+    if non_shipped_enabled; then
+        for n in $NON_SHIPPED_DIRS; do prune+=(-o -name "$n"); done
+    fi
+    while IFS= read -r f; do
+        b="${f%/gradlew}"; b="${b#./}"
+        case "$b" in ''|.|gradlew) continue ;; esac
+        if _gradle_has_build "$d/$b"; then roots+=("$b"); fi
+    done <<EOF
+$(cd "$d" 2>/dev/null && find . -maxdepth 6 -type d \( "${prune[@]:1}" \) ! -path . -prune -o -type f -name gradlew -print 2>/dev/null | LC_ALL=C sort)
+EOF
+    [ "${#roots[@]}" -gt 0 ] || return 0
+    for b in "${roots[@]}"; do
+        # An included build runs inside the build that names it.
+        for n in "${roots[@]}"; do
+            [ "$n" != "$b" ] || continue
+            while IFS= read -r incl; do
+                if [ -n "$incl" ] && [ "$n/$incl" = "$b" ]; then continue 3; fi
+            done <<EOF
+$(_gradle_included_builds "$d/$n")
+EOF
+        done
+        f="$b/gradle/wrapper/gradle-wrapper.properties"
+        v="$(_gradle_wrapper_props_version "$d/$f")"
+        if [ -n "$v" ]; then
+            GRADLE_WRAPPER_VERSIONS="${GRADLE_WRAPPER_VERSIONS:+$GRADLE_WRAPPER_VERSIONS }$v"
+        else
+            GRADLE_WRAPPER_UNREADABLE="${GRADLE_WRAPPER_UNREADABLE:+$GRADLE_WRAPPER_UNREADABLE
+}$f"
+        fi
+    done
+    return 0
+}
+
+# _gradle_runs_on <X.Y.Z> <jdk>: true when that Gradle version runs on that
+# JDK, from Gradle's compatibility matrix
+# (https://docs.gradle.org/current/userguide/compatibility.html): Java 8 runs
+# Gradle up to 8.14.x, 11 from 5.0 to 8.14.x, 17 from 7.3, 21 from 8.5, 24
+# from 8.14 and 25 from 9.1.0.
+_gradle_runs_on() {
+    local n min
+    n="$(_gradle_version_number "$1")"
+    case "$2" in
+        8)  min=0 ;;
+        11) min=5000000 ;;
+        17) min=7003000 ;;
+        21) min=8005000 ;;
+        24) min=8014000 ;;
+        25) min=9001000 ;;
+        *)  return 1 ;;
+    esac
+    [ "$n" -ge "$min" ] || return 1
+    case "$2" in 8|11) [ "$n" -lt 9000000 ] || return 1 ;; esac
+    return 0
+}
+
+# _gradle_jdks <version>...: the image JDKs every one of these Gradle
+# versions runs on, space separated (all of them for no version).
+_gradle_jdks() {
+    local j v out=""
+    for j in $CDXGEN_JAVA_JDKS; do
+        for v in "$@"; do _gradle_runs_on "$v" "$j" || continue 2; done
+        out="$out $j"
+    done
+    echo "${out# }"
+}
+
+# _java_choose <dir>: decide the Java image for <dir>. Sets JAVA_PICK_JDK (the
+# image's JDK), JAVA_PICK_TOOLCHAIN (the declared toolchain, or empty),
+# JAVA_PICK_WRAPPER (the wrapper versions, comma separated, or empty),
+# JAVA_PICK_WRAPPER_CONFLICT (true when no image JDK runs every wrapper),
+# JAVA_PICK_UNREADABLE (gradle_wrappers' GRADLE_WRAPPER_UNREADABLE) and
+# JAVA_PICK_WHY:
+#   toolchain   the declared toolchain's own image
+#   conflict    an image has the toolchain's JDK, but a wrapper cannot run on it
+#   no-image    no image has the toolchain's JDK
+#   (empty)     nothing asked for another image than the wrappers allow
+# The JDKs the wrappers run on are those every wrapper runs on; when there is
+# none, those the lowest wrapper runs on. From them the toolchain's JDK is
+# taken when it is one, else Java 21 when it is one, else the newest.
+_java_choose() {
+    local v low="" lown=0 vn runs
+    JAVA_PICK_TOOLCHAIN="$(java_toolchain_version "${1:-}")"
+    gradle_wrappers "${1:-}"
+    JAVA_PICK_UNREADABLE="$GRADLE_WRAPPER_UNREADABLE"
+    JAVA_PICK_WRAPPER=""; JAVA_PICK_WRAPPER_CONFLICT=""; JAVA_PICK_WHY=""
+    for v in $GRADLE_WRAPPER_VERSIONS; do
+        JAVA_PICK_WRAPPER="${JAVA_PICK_WRAPPER:+$JAVA_PICK_WRAPPER, }$v"
+        vn="$(_gradle_version_number "$v")"
+        if [ -z "$low" ] || [ "$vn" -lt "$lown" ]; then low="$v"; lown="$vn"; fi
+    done
+    # shellcheck disable=SC2086 # one argument per version
+    runs="$(_gradle_jdks $GRADLE_WRAPPER_VERSIONS)"
+    if [ -z "$runs" ]; then
+        JAVA_PICK_WRAPPER_CONFLICT="true"
+        runs="$(_gradle_jdks "$low")"
+    fi
+    case " $runs " in
+        *" $JAVA_PICK_TOOLCHAIN "*)
+            JAVA_PICK_JDK="$JAVA_PICK_TOOLCHAIN"
+            [ "$JAVA_PICK_JDK" = "$CDXGEN_JAVA_DEFAULT" ] || JAVA_PICK_WHY="toolchain"
+            return 0 ;;
+        *" $CDXGEN_JAVA_DEFAULT "*) JAVA_PICK_JDK="$CDXGEN_JAVA_DEFAULT" ;;
+        *) JAVA_PICK_JDK="${runs##* }" ;;
+    esac
+    if [ -n "$JAVA_PICK_TOOLCHAIN" ]; then
+        if _java_has_image "$JAVA_PICK_TOOLCHAIN"; then JAVA_PICK_WHY="conflict"; else JAVA_PICK_WHY="no-image"; fi
+    fi
+    return 0
+}
+
+# CDXGEN_JAVA_IMAGE when it is set and reads as an image reference, else
+# nothing. The value reaches a docker command line. A ghcr.io/cdxgen/ name
+# comes from CDXGEN_IMAGE_PREFIX, like CDXGEN_ALLINONE.
+_java_image_override() {
+    case "${CDXGEN_JAVA_IMAGE:-}" in
+        [A-Za-z0-9]*) case "$CDXGEN_JAVA_IMAGE" in *[!A-Za-z0-9._/:@-]*) return 0 ;; esac
+            case "$CDXGEN_JAVA_IMAGE" in
+                ghcr.io/cdxgen/*) echo "${CDXGEN_IMAGE_PREFIX}${CDXGEN_JAVA_IMAGE#ghcr.io/cdxgen/}" ;;
+                *) echo "$CDXGEN_JAVA_IMAGE" ;;
+            esac ;;
+    esac
+}
+
+# _java_toolchain_warn <version> <what the image has> <what to do>
+_java_toolchain_warn() {
+    echo "[WARN] The Gradle build declares a Java $1 toolchain, and $2."
+    echo "[WARN]   Gradle needs a Java $1 JDK, so dependency resolution can fail unless the build configures toolchain auto-provisioning."
+    echo "[WARN]   $3"
+}
+
+# java_image_note <dir>: the lines that say why img_for_lang picked the Java
+# image it did for <dir>; nothing for the default image when nothing in the
+# build asked for another.
+java_image_note() {
+    local f
+    if [ -n "${CDXGEN_JAVA_IMAGE:-}" ]; then
+        if [ -n "$(_java_image_override)" ]; then
+            echo "[INFO] Java image from CDXGEN_JAVA_IMAGE: $(_java_image_override)"
+            return 0
+        fi
+        echo "[WARN] CDXGEN_JAVA_IMAGE is not an image reference and is ignored: $CDXGEN_JAVA_IMAGE"
+    fi
+    _java_choose "${1:-}"
+    local tc="$JAVA_PICK_TOOLCHAIN" w="$JAVA_PICK_WRAPPER" j="$JAVA_PICK_JDK"
+    while IFS= read -r f; do
+        [ -n "$f" ] || continue
+        echo "[INFO] The Gradle wrapper version could not be read from $f (distributionUrl); the Java image is chosen without it."
+    done <<EOF
+$JAVA_PICK_UNREADABLE
+EOF
+    if [ -n "$JAVA_PICK_WRAPPER_CONFLICT" ]; then
+        echo "[WARN] No cdxgen Java image runs every Gradle wrapper in this tree (Gradle $w); using the cdxgen Java $j image, chosen for the lowest one."
+        echo "[WARN]   The other builds can fail to resolve their dependencies. Scan them on their own, or set CDXGEN_JAVA_IMAGE to an image with a JDK they all run on."
+    fi
+    case "$JAVA_PICK_WHY" in
+        toolchain)
+            echo "[INFO] The Gradle build declares a Java $tc toolchain; using the cdxgen Java $j image." ;;
+        conflict)
+            echo "[WARN] The Gradle build declares a Java $tc toolchain, but its wrapper (Gradle $w) cannot run on Java $tc; using the cdxgen Java $j image, which it runs on."
+            echo "[WARN]   Gradle needs a Java $tc JDK too, so dependency resolution can fail unless the build configures toolchain auto-provisioning."
+            echo "[WARN]   Set CDXGEN_JAVA_IMAGE to an image with a JDK Gradle $w runs on and a Java $tc JDK." ;;
+        no-image)
+            _java_toolchain_warn "$tc" "the cdxgen Java image has Java $j" \
+                "Set CDXGEN_JAVA_IMAGE to an image that has a Java $tc JDK." ;;
+    esac
+    if [ -n "$w" ] && [ "$j" != "$CDXGEN_JAVA_DEFAULT" ] && [ "$JAVA_PICK_WHY" != toolchain ]; then
+        echo "[INFO] The Gradle wrapper (Gradle $w) cannot run on Java $CDXGEN_JAVA_DEFAULT; using the cdxgen Java $j image."
+    fi
+}
+
+# java_mixed_note <dir>: a mixed tree runs in the all-in-one image, whatever
+# the toolchain. Warn when a Gradle build in it declares one other than the
+# default Java image's.
+java_mixed_note() {
+    local v
+    v="$(java_toolchain_version "${1:-}")"
+    [ -n "$v" ] && [ "$v" != "$CDXGEN_JAVA_DEFAULT" ] || return 0
+    _java_toolchain_warn "$v" "this mixed-language tree is scanned in the cdxgen all-in-one image, which may not have that JDK" \
+        "Scan the Java project's folder on its own, with CDXGEN_JAVA_IMAGE naming an image that has a Java $v JDK if no published one does."
+}
+
+# img_for_lang <lang> [dir]: the cdxgen image for a detected language. For
+# java, <dir> is the scanned tree, and the image follows its Gradle toolchain
+# and wrapper (_java_choose). CDXGEN_JAVA_IMAGE, a full image reference, wins.
 img_for_lang() {
-    local p="$CDXGEN_IMAGE_PREFIX"
+    local p="$CDXGEN_IMAGE_PREFIX" v=""
     case "$1" in
         rust)   echo "${p}cdxgen-debian-rust:$CDXGEN_TAG" ;;
         go)     echo "${p}cdxgen-debian-golang124:$CDXGEN_TAG" ;;
         ruby)   echo "${p}cdxgen-debian-ruby34:$CDXGEN_TAG" ;;
-        java)   echo "${p}cdxgen-temurin-java21:$CDXGEN_TAG" ;;
+        java)   v="$(_java_image_override)"
+                if [ -n "$v" ]; then echo "$v"; return 0; fi
+                _java_choose "${2:-}"
+                echo "${p}$(_java_image_name "$JAVA_PICK_JDK"):$CDXGEN_TAG" ;;
         python) echo "${p}cdxgen-python312:$CDXGEN_TAG" ;;
         node)   echo "${p}cdxgen-alpine-node24:$CDXGEN_TAG" ;;
         php)    echo "${p}cdxgen-debian-php84:$CDXGEN_TAG" ;;

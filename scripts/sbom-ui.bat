@@ -156,6 +156,7 @@ docker run --rm -it ^
     -e SBOM_UI_HOST_DIR="%OUTDIR%" ^
     -e SBOM_UI_SCAN_ROOTS="%SCAN_ROOTS%" ^
     -e CDXGEN_IMAGE_PREFIX ^
+    -e CDXGEN_JAVA_IMAGE ^
     "%DOCKER_IMAGE%"
 set "RC=%ERRORLEVEL%"
 
