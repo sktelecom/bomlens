@@ -162,9 +162,10 @@ MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL='*' docker run --rm \
 | `NVD_API_KEY` | `SECURITY_NVD_VERIFY`에 필요 | — | deep-cve 버전 필터가 쓰는 NVD API 키. 컨테이너에 이름으로만 전달(값은 인라인하지 않음) |
 | `BOMLENS_OS_LICENSES` | — | `true` | `IMAGE`와 `ROOTFS` 모드: Debian 패키지의 라이선스를 Trivy로 읽음. syft가 해시로 남기는 copyright 파일에서 Trivy가 라이선스 이름, common-licenses 참조, 라이선스 본문을 읽음. 이미지를 한 번 더 읽으며, `false`로 끔(해시는 그대로 지움) |
 | `BOMLENS_TRIVY_DB_MAX_AGE_DAYS` | — | `7` | `/trivy-db`에 Trivy 데이터베이스를 마운트했을 때(갱신 없이 오프라인으로 읽음), 보안 단계를 열화로 기록하는 경과 일수 |
-| `BOMLENS_GO_VULNDB` | — | `true` | `--security`를 켰을 때 Go 모듈을 이미지에 든 Go 취약점 데이터베이스 스냅숏과도 대조(오프라인). `false`면 건너뜀 |
-| `BOMLENS_GO_VULNDB_PATH` | — | 이미지에 든 스냅숏 | 스냅숏 대신 읽을 컨테이너 안의 Go 취약점 데이터베이스 내보내기 파일(https://vuln.go.dev/vulndb.zip 의 `vulndb.zip` 또는 그 압축을 푼 폴더) |
-| `BOMLENS_GO_VULNDB_MAX_AGE_DAYS` | — | `30` | `go-vulndb` 단계를 열화로 기록하는 Go 취약점 데이터베이스의 경과 일수 |
+| `BOMLENS_GO_VULNDB` | — | `true` | `--security`를 켰을 때 Go 모듈을 이미지에 든 Go 취약점 데이터베이스 스냅숏과도 대조. `false`면 건너뜀 |
+| `BOMLENS_GO_VULNDB_PATH` | — | 이미지에 든 스냅숏 | 스냅숏 대신 읽을 컨테이너 안의 Go 취약점 데이터베이스 내보내기 파일(https://vuln.go.dev/vulndb.zip 의 `vulndb.zip` 또는 그 압축을 푼 폴더). 내려받은 데이터베이스로 바꾸지 않으며, 오래됐으면 열화로만 기록 |
+| `BOMLENS_GO_VULNDB_MAX_AGE_DAYS` | — | `7` | Go 취약점 데이터베이스를 오래된 것으로 보는 경과 일수. 데이터베이스 자체의 날짜(`index/db.json`)부터 셈. 이미지에 든 스냅숏이 오래됐으면 그 스캔에서는 임시 폴더에 내려받은 데이터베이스(약 3.6 MB, 제한 60초)를 대신 읽고, 스캔이 끝나면 지움. 오프라인 스캔이거나(`TRIVY_OFFLINE_SCAN` 또는 `TRIVY_SKIP_DB_UPDATE`가 `true`, `/trivy-db` 마운트일 때처럼) 내려받기에 실패하면 오래된 스냅숏을 읽고 `go-vulndb` 단계를 열화로 기록 |
+| `BOMLENS_GO_VULNDB_URL` | — | `https://vuln.go.dev/vulndb.zip` | 그 내려받기의 주소. `vulndb.zip`의 미러를 지정(`http`, `https`, `file` URL). 읽기 전에 이미지 빌드 때와 같은 방법으로 검사 |
 | `ENRICH_EOL` | — | `true` | 번들된 오프라인 스냅샷으로 upstream end-of-life가 지난 컴포넌트를 표시 (AI SBOM은 건너뜀) |
 | `ENRICH_MALICIOUS` | — | `true` | 번들된 오프라인 OSV 스냅샷으로 악성 패키지(오타 도용, 계정 탈취 배포본)를 표시. 취약점과 별개 신호이며, 대응도 업그레이드가 아니라 제거와 자격 증명 교체다 |
 | `ENRICH_OS_CONTEXT` | — | `true` | 배포판 패키지 PURL(rpm·deb·apk)에서 `operating-system` 컴포넌트를 합성. Trivy가 이 컴포넌트를 보고 배포판 취약점 피드를 고르므로, 없으면 공급사 SBOM이나 rootfs 스캔의 OS 패키지는 OS CVE 매칭이 전혀 안 됨. 인식 가능한 배포판 패키지가 없으면 아무 동작도 하지 않음. Trivy가 피드를 제공하지 않는 배포판(예: OpenWRT)도 대상에서 제외 (AI SBOM은 건너뜀) |
