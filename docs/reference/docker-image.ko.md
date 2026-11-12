@@ -162,7 +162,7 @@ MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL='*' docker run --rm \
 | `NVD_API_KEY` | `SECURITY_NVD_VERIFY`에 필요 | — | deep-cve 버전 필터가 쓰는 NVD API 키. 컨테이너에 이름으로만 전달(값은 인라인하지 않음) |
 | `BOMLENS_OS_LICENSES` | — | `true` | `IMAGE`와 `ROOTFS` 모드: Debian 패키지의 라이선스를 Trivy로 읽음. syft가 해시로 남기는 copyright 파일에서 Trivy가 라이선스 이름, common-licenses 참조, 라이선스 본문을 읽음. 이미지를 한 번 더 읽으며, `false`로 끔(해시는 그대로 지움) |
 | `BOMLENS_TRIVY_DB_MAX_AGE_DAYS` | — | `7` | `/trivy-db`에 Trivy 데이터베이스를 마운트했을 때(갱신 없이 오프라인으로 읽음), 보안 단계를 열화로 기록하는 경과 일수 |
-| `BOMLENS_GRYPE_DB_MAX_AGE_DAYS` | — | `7` | `--deep-cve` 사용 시 grype 데이터베이스를 대조 전에 `grype db update`로 갱신하는 기준 경과 일수. 이미지의 캐시에 쓸 수 없으면 임시 폴더에 받고, `TRIVY_OFFLINE_SCAN`이나 `TRIVY_SKIP_DB_UPDATE`가 `true`이면 갱신하지 않는다. 갱신하지 못한 데이터베이스도 그대로 읽고, `deep-cve` 단계를 경과 일수와 함께 `degraded`로 기록한다 |
+| `BOMLENS_GRYPE_DB_MAX_AGE_DAYS` | — | `7` | `--deep-cve` 사용 시 grype 데이터베이스를 대조 전에 `grype db update`로 갱신하는 기준 경과 일수. 이미지의 캐시에 쓸 수 없으면 임시 폴더에 받고, `TRIVY_OFFLINE_SCAN`이나 `TRIVY_SKIP_DB_UPDATE`가 `true`이면 갱신하지 않는다. 갱신하지 못한 데이터베이스도 그대로 읽고, `deep-cve` 단계를 경과 일수와 함께 `degraded`로 기록한다. 갱신한 데이터베이스는 컨테이너가 끝나면 사라지므로, 이미지의 데이터베이스가 오래된 동안에는 스캔할 때마다 다시 내려받는다. `/trivy-db`에 Trivy 데이터베이스를 마운트하면 오프라인 스캔이 되어 grype도 갱신하지 않는다 |
 | `GRYPE_DB_UPDATE_URL` | — | grype 기본값 | `--deep-cve` 사용 시 `grype db update`가 grype 데이터베이스를 받는 주소. 미러를 쓸 때 지정한다 |
 | `ENRICH_EOL` | — | `true` | 번들된 오프라인 스냅샷으로 upstream end-of-life가 지난 컴포넌트를 표시 (AI SBOM은 건너뜀) |
 | `ENRICH_MALICIOUS` | — | `true` | 번들된 오프라인 OSV 스냅샷으로 악성 패키지(오타 도용, 계정 탈취 배포본)를 표시. 취약점과 별개 신호이며, 대응도 업그레이드가 아니라 제거와 자격 증명 교체다 |

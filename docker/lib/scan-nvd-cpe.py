@@ -40,10 +40,12 @@
 # to the file BOMLENS_DEEP_CVE_STATUS_FILE names, when set, as JSON
 # {"status": "ok"|"degraded"|"failed", "detail": ...} for entrypoint.sh.
 import atexit
+import fcntl
 import json
 import os
 import re
 import shutil
+import signal
 import sqlite3
 import subprocess
 import sys
@@ -210,6 +212,9 @@ def _db_age_days(status):
         built = datetime.strptime(m.group(1), "%Y-%m-%dT%H:%M:%S").replace(tzinfo=timezone.utc)
     except ValueError:
         return None
+    if built.year < 2000:
+        # A zero time: no database to date.
+        return None
     return max(0, int((datetime.now(timezone.utc) - built).total_seconds() // 86400))
 
 
@@ -251,19 +256,41 @@ def _writable_tree(path):
 def _update_grype_db(env):
     """Run `grype db update`. Returns (env to use, None) when the database was
     updated, or (None, cause) when it was not. The image's cache folder is used
-    when this user can write it; otherwise a temporary folder, removed at exit."""
+    when this user can write it, one update at a time (scans in one container
+    share it); otherwise a temporary folder, removed at exit."""
     cache = env.get("GRYPE_DB_CACHE_DIR", "")
-    if not _writable_tree(cache):
+    if _writable_tree(cache):
+        try:
+            lock = open(os.path.join(cache, ".bomlens-update.lock"), "a")
+            fcntl.flock(lock, fcntl.LOCK_EX)
+        except OSError:
+            lock = None
+        try:
+            # Another scan may have updated it while this one waited.
+            st = _grype_db_status(env)
+            age = _db_age_days(st)
+            if (st or {}).get("valid") and age is not None and age <= _max_age_days():
+                return dict(env), None
+            return _run_grype_db_update(env, cache)
+        finally:
+            if lock is not None:
+                lock.close()
+    else:
         try:
             cache = tempfile.mkdtemp(prefix="bomlens-grype-db.")
         except OSError as e:
             return None, f"no writable folder for the update: {e}"
         atexit.register(shutil.rmtree, cache, True)
+        return _run_grype_db_update(env, cache)
+
+
+def _run_grype_db_update(env, cache):
     new_env = dict(env, GRYPE_DB_CACHE_DIR=cache)
     new_env.pop("GRYPE_DB_MAX_ALLOWED_BUILT_AGE", None)
     try:
+        # grype's own limits: up to 30 s to check for an update, 300 s to download.
         p = subprocess.run([GRYPE, "db", "update"], capture_output=True, text=True,
-                           env=new_env, timeout=300)
+                           env=new_env, timeout=400)
     except subprocess.TimeoutExpired:
         return None, "grype db update timed out"
     except OSError as e:
@@ -584,4 +611,7 @@ if __name__ == "__main__":
     if len(sys.argv) < 3:
         print("usage: scan-nvd-cpe.py <sbom.json> <out_prefix>", file=sys.stderr)
         sys.exit(2)
+    # A cancelled scan ends with SIGTERM; exit through sys.exit so the atexit
+    # cleanup of a temporary database folder runs.
+    signal.signal(signal.SIGTERM, lambda _sig, _frame: sys.exit(143))
     build_sidecar(sys.argv[1], sys.argv[2])

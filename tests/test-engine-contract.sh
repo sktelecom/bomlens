@@ -512,6 +512,9 @@ if [ "$(id -u)" != 0 ]; then
         && pass "a read-only image cache: the update goes to a temporary folder, read by the match and removed after" \
         || fail "the update used '$_upd_cache'" "$(cat "$D.grype")"
 fi
+# As root the update above wrote into the image cache itself; start the next
+# case from the stale database again.
+rm -f "$WORK/grype-ro-cache/updated" 2>/dev/null || true
 
 D="$(new_run dc-age-limit)"; PATH="$WORK/grype-age-bin:$PATH" run_engine "$D" "$ROOT_DIR/docker/lib" DEEP_CVE=true \
     GRYPE_STUB_LOG="$D.grype" GRYPE_STUB_BUILT="$STALE_BUILT" GRYPE_STUB_STALE=1 GRYPE_DB_CACHE_DIR="$WORK/grype-ro-cache" BOMLENS_GRYPE_DB_MAX_AGE_DAYS=30
