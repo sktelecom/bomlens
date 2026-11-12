@@ -88,16 +88,25 @@ npm, Python(pip), Go, Rust(Cargo) 패키지는 소스 스캔이 설치된 패키
 
 > 주의: Maven과 마찬가지로 해석하려면 컨테이너가 Maven Central(또는 사내 미러)에 접속할 수 있어야 합니다. 접속하지 못하면 직접 의존성만 담기고 라이선스가 빌 수 있습니다. 컴포넌트 수가 예상보다 훨씬 적으면 네트워크 접속부터 확인하세요.
 
-Gradle 툴체인은 지정한 버전의 JDK를 정확히 요구하고, cdxgen Java 이미지에는 JDK가 하나씩만 있습니다. 그래서 스캔은 빌드가 선언한 툴체인을 보고 이미지를 고릅니다. 읽는 선언은 `JavaLanguageVersion.of(N)`(`languageVersion = ...` 또는 `languageVersion.set(...)` 형태)과 Kotlin `jvmToolchain(N)`이고, 스캔한 폴더와 그 아래 다섯 단계까지의 `*.gradle`과 `*.gradle.kts` 파일(`buildSrc`와 컨벤션 플러그인 포함)에서 찾습니다. 주석과 위에 적은 배포하지 않는 폴더는 건너뜁니다(`BOMLENS_INCLUDE_NON_SHIPPED=1`이면 그 폴더도 읽습니다). 가장 높은 버전으로 정합니다.
+cdxgen Java 이미지에는 JDK가 하나씩만 있고, Gradle 빌드에서는 두 가지가 필요한 JDK를 정합니다. 툴체인은 지정한 버전의 JDK를 정확히 요구합니다. Gradle 래퍼(`gradlew`와 `gradle/wrapper/gradle-wrapper.properties`)는 그 Gradle 버전이 지원하는 JDK에서만 실행됩니다. 예를 들어 6.9.4 래퍼는 Java 21에서 "Unsupported class file major version 65"로 실패합니다. 스캔은 두 가지를 모두 읽습니다.
 
-| 선언한 툴체인 | 이미지 |
-|---|---|
-| 없음 또는 21 | `cdxgen-temurin-java21` |
-| 24 | `cdxgen-temurin-java24` |
-| 25 | `cdxgen-temurin-java25` |
-| 그 밖의 버전(11, 17, 22, 23, 26 등) | `cdxgen-temurin-java21`, `[WARN]` 출력 |
+- 툴체인은 `JavaLanguageVersion.of(N)`(`languageVersion = ...` 또는 `languageVersion.set(...)` 형태)과 Kotlin `jvmToolchain(N)`에서 읽습니다. 스캔한 폴더와 그 아래 다섯 단계까지의 `*.gradle`과 `*.gradle.kts` 파일(`buildSrc`와 컨벤션 플러그인 포함)에서 찾고, 가장 높은 버전을 씁니다.
+- 래퍼의 Gradle 버전은 `distributionUrl`에서 읽습니다(마일스톤과 릴리스 후보는 해당 정식 버전으로 봅니다). 옆에 `gradlew`가 있을 때만 읽고, 없으면 이미지에 든 Gradle 8.14.5가 실행됩니다. 스캔한 폴더의 래퍼로 정하고, 그 폴더에 래퍼가 없으면 아래 빌드들의 래퍼 중 가장 낮은 버전을 씁니다. 모든 빌드가 실행되어야 하기 때문입니다.
 
-Java 24나 25를 고르면 `[INFO]` 줄로 알립니다. 그 밖의 버전은 공개된 이미지가 없어 Gradle이 요구하는 JDK를 찾지 못하므로, 빌드에 툴체인 자동 내려받기(auto-provisioning)를 설정하지 않았다면 의존성 해석이 실패할 수 있습니다. 경고는 이 사실을 알립니다. 여러 언어가 섞인 트리는 툴체인과 관계없이 올인원 이미지에서 실행하며, 툴체인이 21이 아니면 같은 방식으로 경고합니다. 속성이나 버전 카탈로그에서 가져온 버전은 읽지 못합니다. 이런 경우에는 `CDXGEN_JAVA_IMAGE`로 그 JDK가 있는 이미지를 지정합니다([CLI 레퍼런스](cli.ko.md)). Maven은 이런 선택이 필요 없습니다. `maven.compiler.release`와 toolchains 플러그인은 컴파일할 때 적용되고, 의존성 해석은 이것 없이 실행됩니다.
+주석과 위에 적은 배포하지 않는 폴더는 건너뜁니다(`BOMLENS_INCLUDE_NON_SHIPPED=1`이면 그 폴더도 읽습니다). 이미지별 JDK와 그 JDK에서 실행되는 Gradle 버전은 다음과 같습니다([Gradle 호환성 표](https://docs.gradle.org/current/userguide/compatibility.html) 기준).
+
+| 이미지 | JDK | 실행되는 래퍼 버전 |
+|---|---|---|
+| `cdxgen-temurin-java8` | 8 | 9.0 미만 |
+| `cdxgen-java11` | 11 | 5.0~8.14.x |
+| `cdxgen-java17` | 17 | 7.3 이상 |
+| `cdxgen-temurin-java21` | 21 | 8.5 이상 |
+| `cdxgen-temurin-java24` | 24 | 8.14 이상 |
+| `cdxgen-temurin-java25` | 25 | 9.1.0 이상 |
+
+래퍼가 툴체인의 JDK에서 실행되면 툴체인의 이미지를 고릅니다. 그렇지 않으면 래퍼가 Java 21에서 실행될 때는 `cdxgen-temurin-java21`을, 실행되지 않을 때는 래퍼가 실행되는 가장 새 이미지를 고릅니다(7.3~8.4 래퍼는 Java 17, 5.0~7.2는 11, 5.0 미만은 8). 툴체인과 래퍼가 모두 없으면 `cdxgen-temurin-java21`을 씁니다. Java 21이 아닌 이미지를 고르면 그 이유를 `[INFO]` 줄로 알립니다.
+
+빌드가 요구하는 것을 맞출 수 없으면 `[WARN]`으로 알립니다. 이미지가 없는 툴체인(22, 23, 26 등)이나 래퍼가 실행되지 않는 툴체인(8.14 래퍼에 Java 25 툴체인)이 그런 경우입니다. 이때 Gradle은 툴체인의 JDK를 찾지 못하므로, 빌드에 툴체인 자동 내려받기(auto-provisioning)를 설정하지 않았다면 의존성 해석이 실패할 수 있습니다. 여러 언어가 섞인 트리는 툴체인과 관계없이 올인원 이미지에서 실행하며, 툴체인이 21이 아니면 같은 방식으로 경고합니다. 속성이나 버전 카탈로그에서 가져온 버전은 읽지 못합니다. 이런 경우에는 `CDXGEN_JAVA_IMAGE`로 그 JDK가 있는 이미지를 지정합니다([CLI 레퍼런스](cli.ko.md)). Maven은 이런 선택이 필요 없습니다. `maven.compiler.release`와 toolchains 플러그인은 컴파일할 때 적용되고, 의존성 해석은 이것 없이 실행됩니다.
 
 ---
 

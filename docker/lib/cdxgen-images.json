@@ -13,6 +13,9 @@
     "ghcr.io/cdxgen/cdxgen-alpine-node24": "sha256:0fb2e022c564589424f8e6704e3417eae573434e5bb43540cc86fceac8a61d84",
     "ghcr.io/cdxgen/cdxgen-debian-php84": "sha256:adf952138a08ff77f3948d30c59b08249bbc3c91265b8a6a63bd5555faf1e6c9",
     "ghcr.io/cdxgen/cdxgen-debian-dotnet9": "sha256:682d26d690ce6dc32e10776f5a5cf88891c42aa69b15c53556ab3260b7bef65c",
-    "ghcr.io/cdxgen/cdxgen-debian-swift": "sha256:83aab52f62327b7ef3b705a0e4199bc8ecb6d011a9b3681b808059f228d5d3d7"
+    "ghcr.io/cdxgen/cdxgen-debian-swift": "sha256:83aab52f62327b7ef3b705a0e4199bc8ecb6d011a9b3681b808059f228d5d3d7",
+    "ghcr.io/cdxgen/cdxgen-temurin-java8": "sha256:6fc7a06392a71dfce373e239f17f21734822171313ccaaaceb634a3df7843699",
+    "ghcr.io/cdxgen/cdxgen-java11": "sha256:fbdf7cbfe285c92f1c5b2eb2e998ecc00c90d6c3d6f935831cafa1f92cd8bf07",
+    "ghcr.io/cdxgen/cdxgen-java17": "sha256:40cdd85f42ffaf7911c25a758844b22753b326a2be5c8b68d3d664709f9cbba5"
   }
 }

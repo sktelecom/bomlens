@@ -838,9 +838,9 @@ Environment:
                          ghcr.io/cdxgen/); set it to a registry mirror's path
   CDXGEN_JAVA_IMAGE      The cdxgen image for a Java source scan, a full image
                          reference (a ghcr.io/cdxgen/ one follows
-                         CDXGEN_IMAGE_PREFIX). Unset, a Gradle toolchain of
-                         Java 24 or 25 picks cdxgen-temurin-java24 or -java25;
-                         anything else gets cdxgen-temurin-java21
+                         CDXGEN_IMAGE_PREFIX). Unset, the Gradle toolchain and
+                         wrapper version pick the Java 8, 11, 17, 21, 24 or 25
+                         image; with neither, cdxgen-temurin-java21
   SBOM_FIRMWARE_IMAGE    Override the firmware image
   SBOM_AIBOM_IMAGE       Override the AI SBOM (OWASP AIBOM Generator) image
   SBOM_DEEP_CVE_IMAGE    Override the deep-cve (grype) image

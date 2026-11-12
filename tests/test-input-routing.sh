@@ -595,8 +595,19 @@ gradle_tree app/build.gradle.kts 'kotlin { jvmToolchain(21) }\n'
 printf 'kotlin { jvmToolchain(25) }\n' > "$LANGDIR/proj/build.gradle.kts"
 java_case "$J25" "the highest toolchain across modules decides"
 
+# The older JDKs have images too; the Java 11 and 17 ones are not named temurin.
+for v in 8:cdxgen-temurin-java8 11:cdxgen-java11 17:cdxgen-java17; do
+    gradle_tree build.gradle.kts "kotlin { jvmToolchain(${v%%:*}) }\n"
+    java_case "ghcr.io/cdxgen/${v#*:}:$CDXGEN_TAG" "a Java ${v%%:*} toolchain picks ${v#*:}"
+done
+[ "$(CDXGEN_IMAGE_PREFIX=registry.example/mirror/cdxgen/ img_for_lang java "$LANGDIR/proj")" = "registry.example/mirror/cdxgen/cdxgen-java17:$CDXGEN_TAG" ] \
+    && pass "cdxgen-java17 comes from CDXGEN_IMAGE_PREFIX too" || fail "cdxgen-java17 ignores CDXGEN_IMAGE_PREFIX"
+[ "$(CDXGEN_IMAGE_PREFIX=registry.example/mirror/cdxgen/ CDXGEN_JAVA_IMAGE="ghcr.io/cdxgen/cdxgen-java11:$CDXGEN_TAG" img_for_lang java "$LANGDIR/proj")" = "registry.example/mirror/cdxgen/cdxgen-java11:$CDXGEN_TAG" ] \
+    && pass "a ghcr.io/cdxgen/cdxgen-java11 CDXGEN_JAVA_IMAGE comes from CDXGEN_IMAGE_PREFIX" \
+    || fail "CDXGEN_JAVA_IMAGE=cdxgen-java11 ignores CDXGEN_IMAGE_PREFIX"
+
 # No image has these JDKs: the Java 21 image, with a warning.
-for v in 11 17 22 23 26; do
+for v in 22 23 26; do
     gradle_tree build.gradle.kts "kotlin { jvmToolchain($v) }\n"
     java_case "$J21" "a Java $v toolchain (no image has it) stays on the Java 21 image"
     note_case "a Java $v toolchain warns and points at CDXGEN_JAVA_IMAGE" java_image_note \
@@ -607,6 +618,74 @@ gradle_tree build.gradle.kts 'kotlin { jvmToolchain(99999999999999999999) }\n'
 java_case "$J21" "an overlong version number is ignored"
 gradle_tree build.gradle.kts 'kotlin { jvmToolchain(025) }\n'
 java_case "$J25" "a leading zero still reads as the version"
+
+echo "== the Gradle wrapper's version limits the cdxgen Java image =="
+# A wrapper runs only on the JDKs its Gradle supports: a 6.9.4 wrapper fails
+# on Java 21 ("Unsupported class file major version 65") and the SBOM had none.
+J8="ghcr.io/cdxgen/cdxgen-temurin-java8:$CDXGEN_TAG"
+J11="ghcr.io/cdxgen/cdxgen-java11:$CDXGEN_TAG"
+J17="ghcr.io/cdxgen/cdxgen-java17:$CDXGEN_TAG"
+wrapper_at() {  # wrapper_at <folder under proj, or .> <distribution file> [no-gradlew]
+    mkdir -p "$LANGDIR/proj/$1/gradle/wrapper"
+    printf 'distributionBase=GRADLE_USER_HOME\ndistributionUrl=https\\://services.gradle.org/distributions/%s\n' "$2" \
+        > "$LANGDIR/proj/$1/gradle/wrapper/gradle-wrapper.properties"
+    [ -n "${3:-}" ] || printf '#!/bin/sh\n' > "$LANGDIR/proj/$1/gradlew"
+}
+wrapper_case() {  # wrapper_case <distribution file> <want> <description>
+    gradle_tree build.gradle "plugins { id 'java' }\n"
+    wrapper_at . "$1"
+    java_case "$2" "$3"
+}
+wrapper_case gradle-4.10.3-bin.zip "$J8" "a Gradle 4.10.3 wrapper picks the Java 8 image"
+wrapper_case gradle-5.6.4-all.zip "$J11" "a Gradle 5.6.4 wrapper picks the Java 11 image"
+wrapper_case gradle-6.9.4-bin.zip "$J11" "a Gradle 6.9.4 wrapper picks the Java 11 image"
+note_case "a Gradle 6.9.4 wrapper says why" java_image_note "[INFO] The Gradle wrapper is Gradle 6.9.4, which cannot run on Java 21; using the cdxgen Java 11 image."
+wrapper_case gradle-7.2-bin.zip "$J11" "a Gradle 7.2 wrapper picks the Java 11 image"
+wrapper_case gradle-7.3-bin.zip "$J17" "a Gradle 7.3 wrapper picks the Java 17 image"
+wrapper_case gradle-7.5.1-bin.zip "$J17" "a Gradle 7.5.1 wrapper picks the Java 17 image"
+wrapper_case gradle-8.4-bin.zip "$J17" "a Gradle 8.4 wrapper picks the Java 17 image"
+wrapper_case gradle-8.5-bin.zip "$J21" "a Gradle 8.5 wrapper stays on the Java 21 image"
+[ -z "$(java_image_note "$LANGDIR/proj")" ] && pass "a Gradle 8.5 wrapper prints no note" || fail "a Gradle 8.5 wrapper prints a note"
+wrapper_case gradle-9.6.0-bin.zip "$J21" "a Gradle 9.6.0 wrapper stays on the Java 21 image"
+wrapper_case gradle-8.0-milestone-1-bin.zip "$J17" "a milestone wrapper counts as its release"
+wrapper_case gradle-9.0-rc-1-all.zip "$J21" "a release candidate wrapper counts as its release"
+gradle_tree build.gradle "plugins { id 'java' }\n"
+wrapper_at . gradle-6.9.4-bin.zip no-gradlew
+java_case "$J21" "a wrapper with no gradlew beside it is not used (the image's Gradle runs)"
+
+# Toolchain and wrapper together.
+gradle_tree build.gradle.kts 'kotlin { jvmToolchain(17) }\n'
+wrapper_at . gradle-7.6.4-bin.zip
+java_case "$J17" "a Java 17 toolchain with a Gradle 7.6.4 wrapper picks the Java 17 image"
+gradle_tree build.gradle.kts 'kotlin { jvmToolchain(25) }\n'
+wrapper_at . gradle-9.1.0-bin.zip
+java_case "$J25" "a Java 25 toolchain with a Gradle 9.1.0 wrapper picks the Java 25 image"
+gradle_tree build.gradle.kts 'kotlin { jvmToolchain(25) }\n'
+wrapper_at . gradle-8.14.3-bin.zip
+java_case "$J21" "a Java 25 toolchain with a Gradle 8.14.3 wrapper (no Java 25) stays on the Java 21 image"
+note_case "that conflict warns with both versions and CDXGEN_JAVA_IMAGE" java_image_note \
+    "[WARN] The Gradle build declares a Java 25 toolchain, but its wrapper (Gradle 8.14.3) cannot run on Java 25" \
+    "auto-provisioning" "CDXGEN_JAVA_IMAGE"
+gradle_tree build.gradle.kts 'kotlin { jvmToolchain(21) }\n'
+wrapper_at . gradle-6.9.4-bin.zip
+java_case "$J11" "a Java 21 toolchain with a Gradle 6.9.4 wrapper picks the Java 11 image the wrapper runs on"
+note_case "that conflict warns and says why the image is not Java 21" java_image_note \
+    "[WARN] The Gradle build declares a Java 21 toolchain, but its wrapper (Gradle 6.9.4) cannot run on Java 21" \
+    "[INFO] The Gradle wrapper is Gradle 6.9.4"
+gradle_tree build.gradle.kts 'kotlin { jvmToolchain(8) }\n'
+wrapper_at . gradle-9.6.0-bin.zip
+java_case "$J21" "a Java 8 toolchain with a Gradle 9 wrapper (needs Java 17 or later) stays on the Java 21 image"
+
+# Wrappers in nested builds: the scanned folder's decides, else the lowest.
+gradle_tree settings.gradle.kts 'rootProject.name = "x"\n'
+wrapper_at a gradle-8.14.3-bin.zip
+wrapper_at b gradle-6.9.4-bin.zip
+java_case "$J11" "with no wrapper at the root, the lowest nested wrapper decides"
+wrapper_at . gradle-8.10-bin.zip
+java_case "$J21" "the scanned folder's own wrapper wins over nested ones"
+gradle_tree settings.gradle.kts 'rootProject.name = "x"\n'
+wrapper_at examples/demo gradle-4.10.3-bin.zip
+java_case "$J21" "a wrapper under examples/ (not shipped) is not read"
 
 # A mixed tree runs in the all-in-one image; only a warning for the toolchain.
 gradle_tree build.gradle.kts 'kotlin { jvmToolchain(25) }\n'

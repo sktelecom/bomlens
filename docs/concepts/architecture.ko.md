@@ -103,7 +103,7 @@ sequenceDiagram
 | rust | `cdxgen-debian-rust` |
 | go | `cdxgen-debian-golang124` |
 | ruby | `cdxgen-debian-ruby34` |
-| java | `cdxgen-temurin-java21`. Gradle 빌드가 Java 24나 25 툴체인을 선언하면 `cdxgen-temurin-java24`나 `cdxgen-temurin-java25` (`CDXGEN_JAVA_IMAGE`가 셋 모두보다 우선) |
+| java | `cdxgen-temurin-java21`. Gradle 툴체인이나 래퍼 버전이 다른 JDK를 요구하면 `cdxgen-temurin-java8`, `cdxgen-java11`, `cdxgen-java17`, `cdxgen-temurin-java24`, `cdxgen-temurin-java25` 중 하나([Java (Gradle)](../reference/ecosystems.ko.md#java-gradle) 참고, `CDXGEN_JAVA_IMAGE`가 우선) |
 | python | `cdxgen-python312` |
 | node | `cdxgen-alpine-node24` |
 | php | `cdxgen-debian-php84` |
