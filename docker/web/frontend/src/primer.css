@@ -1,0 +1,94 @@
+/*
+ * Copyright 2026 SK Telecom Co., Ltd.
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+/* ---------------------------------------------------------------------------
+ * Primer settings for BomLens. Loaded after the @primer/primitives theme files
+ * (src/main.tsx).
+ *
+ * The primitives theme blocks match `[data-color-mode][data-light-theme]` (two
+ * attributes), so an override needs all three attributes to win. lib/theme.ts
+ * writes them on <html>, next to the `dark` class, so these rules and the
+ * index.css tokens resolve on the same element.
+ *
+ * Colours are not repeated here: every value points at an index.css token, so
+ * the navy is defined once (and exported to docker/shared/bomlens-tokens.css).
+ * ------------------------------------------------------------------------- */
+
+[data-color-mode][data-light-theme][data-dark-theme] {
+  /* Our typefaces, not Primer's. */
+  --fontStack-sansSerif: "Inter", "Pretendard Variable", ui-sans-serif, system-ui, sans-serif;
+  --fontStack-sansSerifDisplay: var(--fontStack-sansSerif);
+  --fontStack-system: var(--fontStack-sansSerif);
+  --fontStack-monospace: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+
+  /* Accent: links, focus, selected controls (checkbox, radio and toggle switch
+   * fill with --bgColor-accent-emphasis, the navy). --brand-strong and --ring
+   * are the lighter blue in dark mode, --brand stays the navy fill. */
+  --fgColor-accent: hsl(var(--brand-strong));
+  --bgColor-accent-emphasis: hsl(var(--brand));
+  --borderColor-accent-emphasis: hsl(var(--ring));
+  --focus-outline-color: hsl(var(--ring));
+  --focus-outlineColor: hsl(var(--ring));
+  --control-checked-bgColor-hover: hsl(var(--brand-hover));
+  --control-checked-bgColor-active: hsl(var(--brand-hover));
+  --underlineNav-borderColor-active: hsl(var(--brand));
+  --bgColor-accent-muted: hsl(var(--brand-strong) / 0.12);
+  --borderColor-accent-muted: hsl(var(--brand-strong) / 0.4);
+  --selection-bgColor: hsl(var(--brand) / 0.2);
+  --treeViewItem-leadingVisual-iconColor-rest: hsl(var(--brand-strong));
+
+  /* Primary button: the navy fill with a white label in both modes. */
+  --button-primary-bgColor-rest: hsl(var(--brand));
+  --button-primary-bgColor-hover: hsl(var(--brand-hover));
+  --button-primary-bgColor-active: hsl(var(--brand-hover));
+  --button-primary-bgColor-disabled: hsl(var(--brand) / 0.5);
+  --button-primary-fgColor-rest: hsl(var(--brand-foreground));
+  --button-primary-borderColor-rest: transparent;
+  --button-primary-borderColor-hover: transparent;
+  --button-primary-borderColor-active: transparent;
+  --button-primary-borderColor-disabled: transparent;
+  --button-primary-shadow-selected: none;
+
+  /* Outline button and its counter: the accent text, a navy press. */
+  --button-outline-bgColor-active: hsl(var(--brand-hover));
+  --button-outline-fgColor-disabled: hsl(var(--brand-strong) / 0.5);
+  --buttonCounter-outline-bgColor-disabled: hsl(var(--brand-strong) / 0.05);
+  --buttonCounter-outline-fgColor-disabled: hsl(var(--brand-strong) / 0.5);
+}
+
+/* Accent shades Primer sets per theme with a literal blue. */
+[data-color-mode="light"][data-light-theme][data-dark-theme] {
+  --buttonCounter-outline-bgColor-rest: hsl(var(--brand) / 0.1);
+  --buttonCounter-outline-fgColor-rest: hsl(var(--brand-hover));
+  --selectMenu-bgColor-active: color-mix(in srgb, hsl(var(--brand)) 22%, var(--bgColor-default));
+}
+
+[data-color-mode="dark"][data-light-theme][data-dark-theme] {
+  --selection-bgColor: hsl(var(--brand) / 0.7);
+  /* Primer's dark outline button rests on a near-white fill, so its label is
+   * the dark navy at rest and the lighter blue on the dark hover fill. */
+  --button-outline-fgColor-rest: hsl(var(--brand));
+  --button-outline-fgColor-hover: hsl(var(--brand-strong));
+  --buttonCounter-outline-fgColor-rest: hsl(var(--brand));
+  --buttonCounter-outline-fgColor-hover: hsl(var(--brand-strong));
+  --selectMenu-bgColor-active: color-mix(in srgb, hsl(var(--brand)) 40%, var(--bgColor-default));
+}
+
+/* No left accent bar on the current item. Primer draws one with ::after in
+ * five places: an active NavList or ActionList item, the item an ActionList
+ * keyboard cursor is on (active descendant), a collapsed group that holds the
+ * active item, the first item of a filtered list while its filter input has
+ * focus, and the current TreeView item. A thick left bar is not
+ * part of the BomLens design; the item keeps its background and weight.
+ * `:root` lifts these above Primer's own rules whatever order the stylesheets
+ * load in. src/components/primer/primer.test.ts checks this list against the
+ * installed Primer CSS. */
+:root [class*="ActionList-ActionListItem"][data-active]::after,
+:root [class*="ActionList-ActionListItem"][data-is-active-descendant]::after,
+:root [class*="ActionList-ActionListItem"][data-active] [class*="ActionList-ActionListContent"]::after,
+:root [class*="FilteredActionList-ActionListItem"][data-input-focused][data-first-child]::after,
+:root [class*="TreeView-TreeViewItem"][aria-current="true"] > [class*="TreeView-TreeViewItemContainer"]::after {
+  display: none;
+}

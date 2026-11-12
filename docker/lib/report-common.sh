@@ -69,8 +69,8 @@ report_tokens_css() {
 /* bomlens-report: built-in fallback palette (tokens file not found) */
 :root{
   --background:0 0% 98%;--foreground:240 6% 10%;--card:0 0% 100%;--muted:240 5% 96%;
-  --muted-foreground:240 4% 44%;--border:240 5% 91%;--brand:349 100% 46%;
-  --brand-strong:349 100% 38%;--role-danger-fg:185 28 28;--role-danger-muted:251 229 229;
+  --muted-foreground:240 4% 44%;--border:240 5% 91%;--brand:224.3 76.3% 48%;
+  --brand-strong:224.3 76.3% 48%;--role-danger-fg:185 28 28;--role-danger-muted:251 229 229;
   --role-danger-emphasis:220 38 38;--role-danger-border:239 157 157;--role-severe-fg:154 52 18;
   --role-severe-muted:252 235 226;--role-severe-emphasis:234 88 12;--role-severe-border:246 180 146;
   --role-attention-fg:133 77 14;--role-attention-muted:247 240 225;
@@ -92,8 +92,8 @@ report_tokens_css() {
 }
 @media screen and (prefers-color-scheme: dark){:root{
   --background:240 6% 7%;--foreground:0 0% 98%;--card:240 4% 12%;--muted:240 4% 16%;
-  --muted-foreground:240 5% 65%;--border:240 4% 24%;--brand:349 100% 46%;
-  --brand-strong:349 100% 68%;--role-danger-fg:252 165 165;--role-danger-muted:60 38 41;
+  --muted-foreground:240 5% 65%;--border:240 4% 24%;--brand:224.3 76.3% 48%;
+  --brand-strong:213.1 93.9% 67.8%;--role-danger-fg:252 165 165;--role-danger-muted:60 38 41;
   --role-danger-emphasis:248 113 113;--role-danger-border:125 64 66;--role-severe-fg:253 186 116;
   --role-severe-muted:60 44 32;--role-severe-emphasis:251 146 60;--role-severe-border:126 79 42;
   --role-attention-fg:232 200 110;--role-attention-muted:53 47 34;
@@ -140,7 +140,7 @@ a{color:var(--link);}
   gap:1rem;flex-wrap:wrap;padding-bottom:.85rem;border-bottom:1px solid var(--line);
   margin-bottom:1.5rem;}
 .wordmark{display:flex;align-items:center;gap:.5rem;font-size:var(--font-size-title);font-weight:800;
-  letter-spacing:-.02em;color:hsl(var(--brand));}
+  letter-spacing:-.02em;color:hsl(var(--brand-strong));}
 .wordmark .tag{font-size:var(--font-size-caption);font-weight:700;letter-spacing:.1em;color:var(--text-muted);
   border:1px solid var(--line);border-radius:999px;padding:.15rem .5rem;background:var(--surface);}
 .report-kind{font-size:var(--font-size-label);font-weight:600;color:var(--text-muted);

@@ -6,6 +6,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { Button } from "@/components/ui/button";
+import { saveTheme } from "@/lib/theme";
 
 export function ThemeToggle() {
   const { t } = useTranslation();
@@ -16,8 +17,7 @@ export function ThemeToggle() {
   const toggle = () => {
     const next = !dark;
     setDark(next);
-    document.documentElement.classList.toggle("dark", next);
-    localStorage.setItem("sbom.theme", next ? "dark" : "light");
+    saveTheme(document.documentElement, localStorage, next ? "dark" : "light");
   };
 
   const label = dark ? t("theme.toLight") : t("theme.toDark");

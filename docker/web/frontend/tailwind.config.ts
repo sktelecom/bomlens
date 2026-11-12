@@ -73,13 +73,13 @@ const config: Config = {
           DEFAULT: "hsl(var(--popover))",
           foreground: "hsl(var(--popover-foreground))",
         },
-        // Brand accent — SKT (SK Red primary / SK Orange secondary). Active nav,
-        // selection accents, primary CTAs. Distinct from neutral `primary`.
+        // Brand accent (BomLens navy): the primary action, links and focus.
+        // Distinct from neutral `primary`.
         brand: {
           DEFAULT: "hsl(var(--brand))",
           foreground: "hsl(var(--brand-foreground))",
-          accent: "hsl(var(--brand-accent))",
           strong: "hsl(var(--brand-strong))",
+          hover: "hsl(var(--brand-hover))",
         },
         // Sidebar surface — the left rail reads as its own plane.
         sidebar: {

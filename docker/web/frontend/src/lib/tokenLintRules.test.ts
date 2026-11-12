@@ -15,6 +15,9 @@ const lint = lintLine as (line: string, file?: string) => string[];
 const BRAND_RULE = "brand token outside the allow list (primary button, logo, focus ring only)";
 const SIZE_RULE = "arbitrary font size (use a role size: text-caption, text-label, text-body-sm ...)";
 const SHADE_RULE = "role or category shade other than -fg used as text colour";
+const LEFT_BAR_RULE = "thick left accent border (border-l-2 and up, or a left border of 2px or more)";
+const SHADOW_RULE = "arbitrary shadow (use shadow-sm/md/lg or a Primer shadow variable)";
+const RADIUS_RULE = "arbitrary corner radius (use rounded-sm/md/lg/full or a Primer radius variable)";
 
 describe("brand token rule", () => {
   it("recognises brand utilities and the CSS variable", () => {
@@ -23,7 +26,8 @@ describe("brand token rule", () => {
       "bg-brand/10",
       "text-brand-strong",
       "hover:border-brand/40",
-      "dark:bg-brand-accent",
+      "hover:bg-brand-hover",
+      "dark:text-brand-strong/80",
       'hsl("--brand")',
       "ring-brand",
     ]) {
@@ -128,6 +132,104 @@ describe("role shade rule", () => {
   });
 });
 
+describe("left accent border rule", () => {
+  it("rejects a thick left or inline-start border, as a class or an inline style", () => {
+    for (const bad of [
+      'className="border-l-2 border-role-danger-border pl-3"',
+      'className="border-l-4"',
+      'className="md:border-s-2"',
+      'className="hover:border-l-8"',
+      'className="border-l-[3px]"',
+      'style={{ borderLeft: "3px solid var(--borderColor-accent-emphasis)" }}',
+      "style={{ borderLeftWidth: 2 }}",
+      'style={{ borderInlineStart: "4px solid" }}',
+      'style={{ borderLeft: "0.25rem solid var(--x)" }}',
+      'className="border-l-[0.25rem]"',
+      'const css = "border-left: 4px solid var(--x)";',
+    ]) {
+      expect(lint(bad), bad).toContain(LEFT_BAR_RULE);
+    }
+  });
+
+  it("allows a 1px divider, no border, and left-border colours", () => {
+    for (const ok of [
+      'className="border-l border-border"',
+      'className="border-l-0"',
+      'className="border-l-[1px]"',
+      'className="border-l-[0px]"',
+      'style={{ borderLeft: "0.0625rem solid var(--x)" }}',
+      "style={{ borderLeft: 0 }}",
+      'className="border-l-border"',
+      'style={{ borderLeft: "1px solid var(--borderColor-default)" }}',
+      'className="border-r-2 border-t-2"',
+    ]) {
+      expect(lint(ok), ok).not.toContain(LEFT_BAR_RULE);
+    }
+  });
+});
+
+describe("arbitrary shadow rule", () => {
+  it("rejects a shadow typed at the call site", () => {
+    for (const bad of [
+      'className="shadow-[0_1px_2px_var(--x)]"',
+      'className="hover:shadow-[inset_0_0_0_1px_var(--x)]"',
+      'style={{ boxShadow: "0 1px 2px var(--x)" }}',
+      'style={{ boxShadow: "inset 0 0 0 1px var(--x)" }}',
+      'const css = "box-shadow: 0 0 0 2px var(--x)";',
+      'const css = "box-shadow: inset 0 1px 0 var(--x)";',
+    ]) {
+      expect(lint(bad), bad).toContain(SHADOW_RULE);
+    }
+  });
+
+  it("allows the token scale, none, a variable and a computed value", () => {
+    for (const ok of [
+      'className="shadow-sm hover:shadow-md"',
+      'style={{ boxShadow: "none" }}',
+      'style={{ boxShadow: "var(--shadow-resting-small)" }}',
+      "style={{ boxShadow: shadow }}",
+      "style={{ boxShadow: `${ring}` }}",
+      "  boxShadow: theShadow",
+      'className="shadow-[var(--shadow-resting-small)]"',
+    ]) {
+      expect(lint(ok), ok).not.toContain(SHADOW_RULE);
+    }
+  });
+});
+
+describe("arbitrary corner radius rule", () => {
+  it("rejects a radius typed at the call site", () => {
+    for (const bad of [
+      'className="rounded-[10px]"',
+      'className="rounded-tl-[4px]"',
+      'className="md:rounded-[1.5rem]"',
+      "style={{ borderRadius: 8 }}",
+      'style={{ borderRadius: "6px" }}',
+      'style={{ borderTopLeftRadius: "4px" }}',
+      'const css = "border-radius: 6px";',
+      "style={{ borderRadius: 0.5 }}",
+      'style={{ borderRadius: "0.375rem" }}',
+      'style={{ borderRadius: "0px 4px" }}',
+    ]) {
+      expect(lint(bad), bad).toContain(RADIUS_RULE);
+    }
+  });
+
+  it("allows the token scale, zero and a variable", () => {
+    for (const ok of [
+      'className="rounded-md rounded-full rounded-t-lg"',
+      "style={{ borderRadius: 0 }}",
+      'style={{ borderRadius: "var(--borderRadius-medium)" }}',
+      "style={{ borderRadius: radius }}",
+      'style={{ borderRadius: "0px" }}',
+      "  borderRadius: 0",
+      'className="rounded-[var(--borderRadius-medium)]"',
+    ]) {
+      expect(lint(ok), ok).not.toContain(RADIUS_RULE);
+    }
+  });
+});
+
 describe("the CLI", () => {
   const run = (files: Record<string, string>) => {
     const dir = mkdtempSync(join(tmpdir(), "token-lint-"));
@@ -156,6 +258,12 @@ describe("the CLI", () => {
     const r = run({ "components/X.tsx": 'const a = "text-[10px]";\n' });
     expect(r.status).toBe(1);
     expect(r.stderr).toContain("arbitrary font size");
+  });
+
+  it("fails a thick left border and names the rule", () => {
+    const r = run({ "components/Card2.tsx": 'const a = "border-l-4 pl-3";\n' });
+    expect(r.status).toBe(1);
+    expect(r.stderr).toContain("thick left accent border");
   });
 
   it("passes the same line in a button file", () => {

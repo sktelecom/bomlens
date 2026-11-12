@@ -138,7 +138,7 @@ function capList<T>(items: T[]): { shown: T[]; more: number } {
 
 /** A comparison-card diff entry's name, linking into the section it names
  *  filtered to that name (the same free-text `q` filter TopRisk's rows use).
- *  Foreground colour plus an underline, never the brand red (reserved for the
+ *  Foreground colour plus an underline, never the brand colour (reserved for the
  *  primary button, the logo and the focus ring). Underlined at rest, not just on hover:
  *  the "moved from X to Y" line sets this link next to plain muted-foreground
  *  text, and that colour pair is only 1.21:1 apart, far under the 3:1 axe

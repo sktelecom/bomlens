@@ -52,18 +52,22 @@ CPE 대응 인덱스(`/opt/cve-bin-tool-home/cpe_match.sqlite`, 기본 이미지
 
 정본은 빌드 시 생성되는 `third-party-licenses.txt`입니다. 번들에 실제로 들어간 패키지만 골라 각 패키지의 라이선스 전문을 그대로 담으며, 웹 UI에서 `/third-party-licenses.txt`로 열 수 있고 이미지 안에서는 `/usr/local/lib/sbom-web/dist/third-party-licenses.txt`에 있습니다. `package.json`의 선언 목록이 아니라 번들 그래프에서 뽑는 이유는 두 목록이 다르기 때문입니다. 선언된 의존성 중 tailwindcss나 typescript처럼 빌드에만 쓰이는 것은 배포물에 들어가지 않고, 반대로 선언되어 설치까지 되었지만 아무 곳에서도 가져다 쓰지 않아 번들에서 빠지는 것도 있습니다.
 
-아래는 현재 번들에 들어가는 23개 패키지입니다. 모두 permissive이며 copyleft는 없습니다.
+아래는 현재 번들에 들어가는 27개 패키지입니다. 모두 permissive이며 copyleft는 없습니다.
 
 | 패키지 | 용도 | 라이선스 (SPDX) |
 |--------|------|------------------|
 | react, react-dom, scheduler | UI 렌더링 | MIT |
+| @primer/react, @primer/primitives | Primer 컴포넌트와 디자인 토큰(테마, 크기, 글자) | MIT |
 | @radix-ui/react-label, react-progress, react-slot, react-primitive, react-context, react-compose-refs | 접근성 있는 기본 컴포넌트 | MIT |
 | cytoscape, cytoscape-dagre, dagre, graphlib, lodash | 의존성 그래프 시각화와 배치 | MIT |
 | i18next, react-i18next, i18next-browser-languagedetector | 한국어·영어 전환 | MIT |
 | class-variance-authority | 컴포넌트 변형 정의 | Apache-2.0 |
 | clsx, tailwind-merge | 클래스 이름 결합 | MIT |
 | lucide-react | 아이콘 | ISC |
-| @fontsource/inter, @fontsource/jetbrains-mono | 글꼴(아래 절 참고) | OFL-1.1 |
+| highlight.js | 소스 보기 화면의 구문 강조(문법 정의는 필요할 때 불러옴) | BSD-3-Clause |
+| @fontsource/inter, @fontsource/jetbrains-mono, pretendard | 글꼴(아래 절 참고) | OFL-1.1 |
+
+`@primer/octicons-react`(아이콘, MIT)도 함께 선언했습니다. `@primer/react`를 설치하면 다음 패키지가 따라 들어옵니다. MIT 라이선스인 @primer/behaviors, @primer/live-region-element, @github/relative-time-element, @github/mini-throttle, @tanstack/react-virtual, @tanstack/virtual-core, color2k, deepmerge, history, hsluv, lodash.isempty, lodash.isobject, react-intersection-observer, react-is가 있고, BSD-3-Clause인 @lit-labs/react, @lit-labs/ssr-dom-shim, @oddbird/popover-polyfill, W3C 라이선스인 focus-visible이 있습니다. 이 패키지들은 화면에서 해당 컴포넌트를 쓰기 시작할 때 생성 파일에 나타납니다. @primer/react, @primer/live-region-element, @lit-labs/ssr-dom-shim은 패키지 안에 라이선스 파일이 없어서, Pretendard처럼 전문을 이 저장소의 `docker/web/frontend/licenses/`에 두었습니다.
 
 목록이 낡지 않도록 `npm run notices:check`가 생성 파일을 검사합니다. 라이선스를 선언하지 않은 패키지, 전문을 찾지 못한 패키지, copyleft 라이선스가 하나라도 있으면 CI가 실패합니다.
 

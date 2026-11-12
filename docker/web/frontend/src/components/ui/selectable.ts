@@ -8,7 +8,7 @@
  *   default   quiet border, muted label
  *   hover     a hint of fill (and a darker border on tiles)
  *   selected  a FILL and a dark border, no ring
- *   focus     the brand-red ring with a gap (focus-visible only)
+ *   focus     the brand ring with a gap (focus-visible only)
  *   disabled  faded, not clickable
  *
  * Selection used to be a dark ring with an offset, which is exactly how the
@@ -23,8 +23,8 @@ export const FOCUS_RING =
 
 /** Keyboard focus on a text field or select: the field's own outline turns
  *  dark and doubles to 2px (an outlined-field focus style). A field takes focus
- *  on its own (autoFocus, a click), and the brand-red ring there sat next to
- *  the red required marks and read as an error. The red ring stays on buttons,
+ *  on its own (autoFocus, a click), and the brand ring (red at the time) sat next
+ *  to the red required marks and read as an error. The ring stays on buttons,
  *  links and pickable controls. Foreground on the page clears the 3:1 non-text
  *  floor in both themes, so focus stays plainly visible (WCAG 2.4.7). */
 export const FIELD_FOCUS =
