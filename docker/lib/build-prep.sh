@@ -1094,6 +1094,73 @@ fi
 if { [ -f build.gradle ] || [ -f build.gradle.kts ] || [ -f settings.gradle ] || [ -f settings.gradle.kts ]; }; then
     gradle_settings_copy
 fi
+
+# Gradle subproject named like the root project. cdxgen runs
+# `<subproject>:dependencies` only for a subproject whose purl differs from the
+# root's, so a subproject with the root's name (and, through allprojects, its
+# group and version) is never resolved and none of its dependencies reach the
+# SBOM. cdxgen appends GRADLE_ARGS_DEPENDENCIES after every dependencies task it
+# runs, so the task of each such subproject is put there: Gradle runs a task
+# named twice once, and cdxgen reads that output under the subproject's path,
+# as it does for any other subproject. A GRADLE_ARGS_DEPENDENCIES the caller
+# set is kept, after the root's task and after each task added here. The root
+# name is rootProject.name in settings.gradle(.kts), or else the folder name,
+# which is Gradle's own default: under the CLI's /app mount that is `app`, so an
+# Android project with `include ':app'` and no rootProject.name also gets
+# `:app:dependencies` (its root and app purls are the same, so cdxgen skips it
+# too). An include that may sit in a conditional (an `if (` or `when` on a line
+# before it or on its own line) is not read reliably here, so then nothing is
+# added and that is logged.
+if { [ -f settings.gradle ] || [ -f settings.gradle.kts ]; } && command -v node >/dev/null 2>&1; then
+    _gsame_js=$(mktemp)
+    cat > "$_gsame_js" <<'GRADLE_SAME_NAME_JS'
+const fs = require('fs');
+const path = require('path');
+const [dir] = process.argv.slice(2);
+let text = '';
+for (const f of ['settings.gradle.kts', 'settings.gradle']) {
+  try { text = fs.readFileSync(path.join(dir, f), 'utf8'); break; } catch (e) { /* next */ }
+}
+// Comments out, so a commented include is not read.
+text = text.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:"'])\/\/.*$/gm, '$1');
+const nameMatch = /rootProject\.name\s*=\s*["']([^"']+)["']/.exec(text);
+const rootName = nameMatch ? nameMatch[1] : path.basename(path.resolve(dir));
+const out = new Set();
+let conditional = false;
+// include("a", ":b:c") / include 'a', 'b' / include(listOf("a")), across lines.
+const inc = /\binclude\s*\(?\s*(?:listOf\s*\()?((?:\s*["'][^"'\n]+["']\s*,?)+)/g;
+let m;
+while ((m = inc.exec(text)) !== null) {
+  // The text up to the end of the include's first line.
+  const eol = text.indexOf('\n', m.index);
+  const upTo = text.slice(0, eol < 0 ? text.length : eol);
+  for (const s of m[1].match(/["'][^"'\n]+["']/g) || []) {
+    let p = s.slice(1, -1).trim();
+    if (!/^:?[A-Za-z0-9_.\-]+(:[A-Za-z0-9_.\-]+)*$/.test(p)) continue;
+    if (!p.startsWith(':')) p = ':' + p;
+    if (p.split(':').pop() !== rootName) continue;
+    if (/\bif\s*\(|\bwhen\b/.test(upTo)) conditional = true;
+    out.add(p);
+  }
+}
+if (conditional) process.stdout.write('conditional');
+else process.stdout.write([...out].sort().map(p => p + ':dependencies').join(' '));
+GRADLE_SAME_NAME_JS
+    _gsame_tasks=$(node "$_gsame_js" . 2>/dev/null)
+    rm -f "$_gsame_js"
+    if [ "$_gsame_tasks" = conditional ]; then
+        log "gradle: a subproject has the root project's name, but its include may be conditional; its dependencies task is left to cdxgen"
+    elif [ -n "$_gsame_tasks" ]; then
+        log "gradle: a subproject has the root project's name; asking cdxgen for $_gsame_tasks"
+        if [ -n "${GRADLE_ARGS_DEPENDENCIES:-}" ]; then
+            _gsame_args="$GRADLE_ARGS_DEPENDENCIES"
+            for _gsame_t in $_gsame_tasks; do _gsame_args="$_gsame_args $_gsame_t $GRADLE_ARGS_DEPENDENCIES"; done
+        else
+            _gsame_args="$_gsame_tasks"
+        fi
+        export GRADLE_ARGS_DEPENDENCIES="$_gsame_args"
+    fi
+fi
 # Python — install the requirements so transitive deps are visible
 # (requirements.txt without a lockfile) and so the license-evidence pass near the
 # end of this script has real dist-info metadata to read.
@@ -1807,6 +1874,115 @@ CARGO_LIC
     rm -f "$_clmeta"
 fi
 
+# Gradle build with no Gradle-resolved package. A build file that declares
+# external dependencies (an implementation, api, compileOnly, runtimeOnly,
+# compile, runtime, annotationProcessor, kapt or ksp line that is not a
+# dependency on a project of the build, on local files or on Gradle itself)
+# should give at least one
+# pkg:maven component from Gradle's resolution. cdxgen marks every component it
+# reads from a dependencies task with cdx:gradle:GradleRootPath and, under the
+# configuration it came from, internal:GradleProfileName (GradleProfileName in
+# older releases); a jar found in the tree carries neither. When the SBOM has
+# no such component, cdxgen resolved nothing for the build (a task it skipped,
+# a build that did not configure), whatever other files added: recorded as the
+# gradle-packages step failing, so the generate step reads degraded and the
+# SBOM is not taken as complete. The build files are searched like the
+# non-shipped exclusion cdxgen is given, and not under build/ or .gradle/.
+# Only for a build cdxgen was in a position to resolve: a Gradle build at the
+# scan root, with ./gradlew and java or with gradle on PATH, or a folder below
+# it that has its own gradlew next to its settings or build file, with java.
+# A build file beside the scanned language (the android/ folder of a Flutter
+# or JavaScript app with no gradlew, read in an image without Gradle) is left
+# alone. buildSrc, build-logic and the builds settings.gradle(.kts) names in
+# includeBuild(...) hold build logic, not the product, and are not searched.
+# Dependencies on other projects of the build (project(...), projects.<name>,
+# a platform of one) and on Gradle itself (gradleApi(), localGroovy(),
+# gradleTestKit()) are not external. When gradle-dependencies already failed,
+# that label explains the gap and this one is not added.
+_gpk_skip=""
+case " $PREP_FAILED " in *" gradle-dependencies "*) _gpk_skip=1 ;; esac
+if [ "${rc:-1}" -eq 0 ] && [ -f "$OUT" ] && [ -z "$_gpk_skip" ] && command -v node >/dev/null 2>&1; then
+    _gpk_has_java=""; command -v java >/dev/null 2>&1 && _gpk_has_java=1
+    _gpk_has_gradle=""; command -v gradle >/dev/null 2>&1 && _gpk_has_gradle=1
+    # The folders to leave out of a search from $1: the fixed names, the
+    # non-shipped ones, and the included builds its settings file names.
+    gpk_prune_args() {
+        set -- "$1" -name build -o -name .gradle -o -name node_modules -o -name buildSrc -o -name build-logic -o -name '.?*'
+        _gpk_r="$1"; shift
+        if [ -n "$EXCLUDE_NON_SHIPPED" ]; then
+            for _gpk_x in $NON_SHIPPED_DIRS; do set -- "$@" -o -name "$_gpk_x"; done
+            for _gpk_x in $NON_SHIPPED_PATHS; do set -- "$@" -o -path "$_gpk_r/$_gpk_x"; done
+        fi
+        for _gpk_x in $(cat "$_gpk_r/settings.gradle" "$_gpk_r/settings.gradle.kts" 2>/dev/null \
+                        | sed 's#//.*##' \
+                        | grep -oE 'includeBuild[[:space:]]*\(?[[:space:]]*["'"'"'][A-Za-z0-9_./-]+["'"'"']' \
+                        | sed -E 's/^includeBuild[[:space:]]*\(?[[:space:]]*["'"'"']//; s/["'"'"']$//; s#^\./##; s#/$##'); do
+            case "$_gpk_x" in ''|/*|..|../*|*/../*|*/..) continue ;; esac
+            set -- "$@" -o -path "$_gpk_r/$_gpk_x"
+        done
+        for _gpk_x in "$@"; do printf '%s\n' "$_gpk_x"; done
+    }
+    # The Gradle builds to check, one folder per line.
+    _gpk_roots=""
+    if [ -f build.gradle ] || [ -f build.gradle.kts ] || [ -f settings.gradle ] || [ -f settings.gradle.kts ]; then
+        if { [ -f ./gradlew ] && [ -n "$_gpk_has_java" ]; } || [ -n "$_gpk_has_gradle" ]; then
+            _gpk_roots="."
+        fi
+    elif [ -n "$_gpk_has_java" ]; then
+        _gpk_args=$(gpk_prune_args .)
+        _gpk_old_ifs="$IFS"; IFS='
+'
+        # shellcheck disable=SC2086 # one find argument per line, globbing off
+        set -f; set -- $_gpk_args; set +f
+        IFS="$_gpk_old_ifs"
+        _gpk_roots=$(find . -type d \( "$@" \) ! -path . -prune -o -type f -name gradlew -print 2>/dev/null \
+            | sed 's#/gradlew$##' | while IFS= read -r _gpk_d; do
+                if [ -f "$_gpk_d/settings.gradle" ] || [ -f "$_gpk_d/settings.gradle.kts" ] \
+                   || [ -f "$_gpk_d/build.gradle" ] || [ -f "$_gpk_d/build.gradle.kts" ]; then
+                    printf '%s\n' "$_gpk_d"
+                fi
+            done | LC_ALL=C sort)
+        set --
+    fi
+    _gpk_decl=$(printf '%s\n' "$_gpk_roots" | while IFS= read -r _gpk_root; do
+        [ -n "$_gpk_root" ] || continue
+        _gpk_args=$(gpk_prune_args "$_gpk_root")
+        _gpk_old_ifs="$IFS"; IFS='
+'
+        # shellcheck disable=SC2086 # one find argument per line, globbing off
+        set -f; set -- $_gpk_args; set +f
+        IFS="$_gpk_old_ifs"
+        find "$_gpk_root" -type d \( "$@" \) ! -path "$_gpk_root" -prune -o -type f \( -name build.gradle -o -name build.gradle.kts \) -print 2>/dev/null
+    done | while IFS= read -r _gpk_f; do
+            if sed 's#//.*##' "$_gpk_f" 2>/dev/null \
+                | grep -E '^[[:space:]]*(implementation|api|compileOnly|runtimeOnly|compile|runtime|annotationProcessor|kapt|ksp)([[:space:]]*[("'"'"']|[[:space:]]+[a-zA-Z])' \
+                | grep -vqE '^[[:space:]]*[a-zA-Z]+[[:space:]]*\(?[[:space:]]*((enforcedPlatform|platform)[[:space:]]*\(?[[:space:]]*)?(project[[:space:]]*\(|projects\.|files[[:space:]]*\(|fileTree[[:space:]]*\(|gradleApi[[:space:]]*\(|localGroovy[[:space:]]*\(|gradleTestKit[[:space:]]*\()'; then
+                printf '%s\n' "${_gpk_f#./}"
+            fi
+        done | LC_ALL=C sort -u | head -n 5)
+    if [ -n "$_gpk_decl" ]; then
+        _gpk_js=$(mktemp)
+        cat > "$_gpk_js" <<'GRADLE_PACKAGES_JS'
+const fs = require('fs');
+let bom;
+try { bom = JSON.parse(fs.readFileSync(process.argv[2], 'utf8')); } catch (e) { process.exit(0); }
+const ORIGIN = new Set(['cdx:gradle:GradleRootPath', 'internal:GradleProfileName', 'GradleProfileName']);
+const fromGradle = c => String(c.purl || '').startsWith('pkg:maven/')
+  && (c.properties || []).some(p => p && ORIGIN.has(p.name));
+const any = list => (list || []).some(c => c && (fromGradle(c) || any(c.components)));
+process.stdout.write(any(bom.components) ? 'yes' : 'no');
+GRADLE_PACKAGES_JS
+        _gpk_found=$(node "$_gpk_js" "$OUT" 2>/dev/null)
+        rm -f "$_gpk_js"
+        if [ "$_gpk_found" = "no" ]; then
+            _gpk_list=$(printf '%s\n' "$_gpk_decl" | tr '\n' ',' | sed 's/,$//; s/,/, /g')
+            echo "[build-prep] gradle: [WARN] the build declares dependencies ($_gpk_list) but cdxgen resolved no Gradle package; the SBOM lacks them." >&2
+            echo "[build-prep] gradle: run './gradlew dependencies' for each subproject to see what Gradle reports, or re-scan with CDXGEN_DEBUG_MODE=debug." >&2
+            mark_prep_failed gradle-packages
+        fi
+    fi
+fi
+
 # Record each prep_step that failed or timed out (PREP_FAILED, space-separated
 # labels) on the SBOM, one bomlens:pipeline-step-failed property per label,
 # the same shape docker/lib/pipeline-step.sh's mark_pipeline_warning writes.
@@ -2279,6 +2455,106 @@ process.stderr.write('[build-prep] npm: excluded ' + excludedMembers.length + ' 
 NWMF_JS
     node "$_nwmf" "$OUT" package-lock.json "$NON_SHIPPED_DIRS" || log "npm: workspace-member filter skipped (non-fatal)"
     rm -f "$_nwmf"
+fi
+
+# Go scope: cdxgen sets scope "optional" on every module go.mod marks
+# `// indirect` (it reads the flag as direct vs indirect, and keeps it in the
+# cdx:go:indirect property too). An indirect module is often compiled into the
+# program, and readers that leave out optional components (the NOTICE, a
+# vulnerability gate) then drop real dependencies. So the modules the build
+# uses are listed here with `go list -e -deps ./...`: the same ./... package
+# pattern cdxgen runs, so the list covers what cdxgen read and no more (default
+# flags, so the same readonly or vendor mode, and the same go.work), once per
+# go.mod as cdxgen's own search finds them, and a pkg:golang/ component with
+# scope optional that is in that list becomes required. -e keeps the modules
+# of the packages that did load when one package has an error. cdx:go:indirect
+# is left as it is. A module outside every list keeps optional. A module whose
+# `go list` fails or takes longer than _gscope_timeout seconds adds nothing to
+# the list; when none succeeds the SBOM is left untouched. When go-mod-tidy
+# failed (no route to the module proxy, most often), go.sum is incomplete and
+# what go list reads cannot be trusted, so nothing is changed. A replaced
+# module is listed under the module that replaces it, the name cdxgen gives the
+# component (a local replacement keeps the original path and has no version).
+# Up to _gscope_max modules are listed.
+_gscope_max=20
+_gscope_timeout=120
+_gscope_tidy_failed=""
+case " $PREP_FAILED " in *" go-mod-tidy "*) _gscope_tidy_failed=1 ;; esac
+if [ -n "$_gscope_tidy_failed" ] && grep -q '"pkg:golang/' "$OUT" 2>/dev/null; then
+    log "go: go-mod-tidy failed, so indirect modules keep the scope cdxgen gave them"
+elif [ "${rc:-1}" -eq 0 ] && [ -f "$OUT" ] && command -v go >/dev/null 2>&1 \
+   && command -v node >/dev/null 2>&1 && grep -q '"pkg:golang/' "$OUT" 2>/dev/null; then
+    set -- -name vendor -o -name node_modules -o -name build -o -name test-fixtures -o -name '.?*'
+    if [ -n "$EXCLUDE_NON_SHIPPED" ]; then
+        for _gscope_x in $NON_SHIPPED_DIRS; do set -- "$@" -o -name "$_gscope_x"; done
+        for _gscope_x in $NON_SHIPPED_PATHS; do set -- "$@" -o -path "./$_gscope_x"; done
+    fi
+    _gscope_mods=$(find . -type d \( "$@" \) ! -path . -prune -o -type f -name go.mod -print 2>/dev/null \
+        | sed 's|/go\.mod$||' | LC_ALL=C sort | head -n "$_gscope_max")
+    set --
+    _gscope_list=$(mktemp)
+    _gscope_one=$(mktemp)
+    _gscope_ok=0
+    _gscope_tmpl='{{with .Module}}{{if not .Main}}{{.Path}}@{{.Version}}{{"\n"}}{{.Path}}@{{with .Replace}}{{if .Version}}{{"\n"}}{{.Path}}@{{.Version}}{{end}}{{end}}{{end}}{{end}}'
+    while IFS= read -r _gscope_d; do
+        [ -n "$_gscope_d" ] || continue
+        run_supervised_timeout "$_gscope_timeout" sh -c 'cd "$1" && go list -e -deps -f "$2" ./... > "$3" 2>/dev/null' \
+            _ "$_gscope_d" "$_gscope_tmpl" "$_gscope_one"
+        _gscope_rc=$?
+        if [ "$_gscope_rc" -eq 0 ]; then
+            cat "$_gscope_one" >> "$_gscope_list"
+            _gscope_ok=$((_gscope_ok + 1))
+        else
+            log "go: could not list the build graph of $_gscope_d (go list -e -deps rc=$_gscope_rc); its indirect modules keep the scope cdxgen gave them"
+        fi
+    done <<EOF
+$_gscope_mods
+EOF
+    if [ "$_gscope_ok" -gt 0 ]; then
+        _gscope_js=$(mktemp)
+        cat > "$_gscope_js" <<'GOSCOPE_JS'
+const fs = require('fs');
+const [bomPath, listPath] = process.argv.slice(2);
+let bom;
+try { bom = JSON.parse(fs.readFileSync(bomPath, 'utf8')); } catch (e) { process.exit(0); }
+if (!Array.isArray(bom.components)) process.exit(0);
+// path@version, one per line, from `go list -deps`; a module path with no
+// version (a local replacement) ends in a bare @.
+const built = new Set(fs.readFileSync(listPath, 'utf8').split('\n')
+  .map(l => l.trim().toLowerCase()).filter(l => l.includes('@')));
+if (built.size === 0) process.exit(0);
+// pkg:golang/<path>@<version>[?qualifiers][#subpath], percent-encoded.
+function keyOf(purl) {
+  const m = /^pkg:golang\/([^?#]+)/.exec(purl || '');
+  if (!m) return null;
+  const body = m[1];
+  const at = body.lastIndexOf('@');
+  let name = at >= 0 ? body.slice(0, at) : body;
+  let version = at >= 0 ? body.slice(at + 1) : '';
+  try { name = decodeURIComponent(name); version = decodeURIComponent(version); } catch (e) { return null; }
+  return (name + '@' + version).toLowerCase();
+}
+let changed = 0;
+const visit = list => {
+  for (const c of list || []) {
+    if (c && c.scope === 'optional') {
+      const k = keyOf(c.purl);
+      if (k && built.has(k)) { c.scope = 'required'; changed++; }
+    }
+    if (c && Array.isArray(c.components)) visit(c.components);
+  }
+};
+visit(bom.components);
+if (changed === 0) process.exit(0);
+fs.writeFileSync(bomPath, JSON.stringify(bom, null, 2));
+process.stderr.write('[build-prep] go: ' + changed + ' indirect module(s) in the build graph marked required (cdx:go:indirect kept)\n');
+GOSCOPE_JS
+        node "$_gscope_js" "$OUT" "$_gscope_list" || log "go: scope correction skipped (non-fatal)"
+        rm -f "$_gscope_js"
+    elif [ -n "$_gscope_mods" ]; then
+        log "go: no build graph could be listed; indirect modules keep scope optional"
+    fi
+    rm -f "$_gscope_list" "$_gscope_one"
 fi
 
 # Scope filter (Maven, PHP/Composer): cdxgen tags each component's resolved

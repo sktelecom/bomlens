@@ -2140,11 +2140,13 @@ mech_cpe_of() { jq -r --arg n "$1" '[.components[]|select(.name==$n)]|.[0].cpe /
 # (a) vendor=<group> (dotted, verbatim), product=<artifact> -> replaced (same
 # result as deriving from no cpe at all: org.apache.pdfbox -> apache:pdfbox).
 [ "$(mech_cpe_of pdfbox-app)" = "cpe:2.3:a:apache:pdfbox:1.8.7:*:*:*:*:*:*:*" ] && pass "mechanical group-copy cpe replaced (apache:pdfbox)" || fail "pdfbox-app cpe='$(mech_cpe_of pdfbox-app)'"
-# (b) vendor=<artifact> (verbatim), product=<artifact> -> replaced (2-segment
-# group, parts[1]==parts[-1] shape: jakarta.annotation -> annotation:annotation).
-[ "$(mech_cpe_of jakarta.annotation-api)" = "cpe:2.3:a:annotation:annotation:2.1.1:*:*:*:*:*:*:*" ] && pass "mechanical artifact-copy cpe replaced (annotation:annotation)" || fail "jakarta.annotation-api cpe='$(mech_cpe_of jakarta.annotation-api)'"
-# (c) vendor=<group>.<artifact> concatenated, product=<artifact> -> replaced.
-[ "$(mech_cpe_of HikariCP)" = "cpe:2.3:a:zaxxer:zaxxer:4.0.3:*:*:*:*:*:*:*" ] && pass "mechanical group.artifact-copy cpe replaced (zaxxer:zaxxer)" || fail "HikariCP cpe='$(mech_cpe_of HikariCP)'"
+# (b) vendor=<artifact> (verbatim), product=<artifact> -> replaced. The group's
+# last segment ("annotation") does not name the artifact, so the product is the
+# artifactId: jakarta.annotation -> annotation:jakarta.annotation-api.
+[ "$(mech_cpe_of jakarta.annotation-api)" = "cpe:2.3:a:annotation:jakarta.annotation-api:2.1.1:*:*:*:*:*:*:*" ] && pass "mechanical artifact-copy cpe replaced (annotation:jakarta.annotation-api)" || fail "jakarta.annotation-api cpe='$(mech_cpe_of jakarta.annotation-api)'"
+# (c) vendor=<group>.<artifact> concatenated, product=<artifact> -> replaced
+# (product = the lowercased artifactId, since "zaxxer" does not name HikariCP).
+[ "$(mech_cpe_of HikariCP)" = "cpe:2.3:a:zaxxer:hikaricp:4.0.3:*:*:*:*:*:*:*" ] && pass "mechanical group.artifact-copy cpe replaced (zaxxer:hikaricp)" || fail "HikariCP cpe='$(mech_cpe_of HikariCP)'"
 # (d) boundary: single-segment groupId equal to the artifactId, but the
 # pre-existing vendor ("apache-software-foundation") is not the group or
 # artifact string in any form -- it looks like a real (if possibly wrong)
@@ -2444,18 +2446,18 @@ cat > "$WORK/mvn-alt.json" <<'JSON'
 JSON
 python3 "$MVNCPE" "$WORK/mvn-alt.json" >/dev/null 2>&1
 alt_props_of() { jq -r --arg n "$1" '[.components[]|select(.name==$n)]|.[0]|[(.properties//[])[]|select(.name=="bomlens:cpeAlternates")|.value][0] // "NONE"' "$WORK/mvn-alt.json"; }
-[ "$(alt_props_of spring-context)" = '["cpe:2.3:a:pivotal_software:spring_framework:2.5.6:*:*:*:*:*:*:*", "cpe:2.3:a:springsource:spring_framework:2.5.6:*:*:*:*:*:*:*"]' ] \
+[ "$(alt_props_of spring-context)" = '["cpe:2.3:a:pivotal_software:spring_framework:2.5.6:*:*:*:*:*:*:*", "cpe:2.3:a:springsource:spring_framework:2.5.6:*:*:*:*:*:*:*", "cpe:2.3:a:org.springframework:spring-context:2.5.6:*:*:*:*:maven:*:*"]' ] \
     && pass "org.springframework carries both pivotal_software and springsource alternates" \
     || fail "spring-context alternates='$(alt_props_of spring-context)'"
-[ "$(alt_props_of spring-security-core)" = '["cpe:2.3:a:pivotal_software:spring_security:3.0.0:*:*:*:*:*:*:*"]' ] \
+[ "$(alt_props_of spring-security-core)" = '["cpe:2.3:a:pivotal_software:spring_security:3.0.0:*:*:*:*:*:*:*", "cpe:2.3:a:org.springframework.security:spring-security-core:3.0.0:*:*:*:*:maven:*:*", "cpe:2.3:a:org.springframework:spring-security-core:3.0.0:*:*:*:*:maven:*:*"]' ] \
     && pass "org.springframework.security carries the pivotal_software alternate" \
     || fail "spring-security-core alternates='$(alt_props_of spring-security-core)'"
-[ "$(alt_props_of jetty)" = '["cpe:2.3:a:eclipse:jetty:6.1.21:*:*:*:*:*:*:*"]' ] \
+[ "$(alt_props_of jetty)" = '["cpe:2.3:a:eclipse:jetty:6.1.21:*:*:*:*:*:*:*", "cpe:2.3:a:org.mortbay.jetty:jetty:6.1.21:*:*:*:*:maven:*:*", "cpe:2.3:a:org.mortbay:jetty:6.1.21:*:*:*:*:maven:*:*"]' ] \
     && pass "org.mortbay.jetty carries the eclipse:jetty alternate" \
     || fail "jetty alternates='$(alt_props_of jetty)'"
-[ "$(alt_props_of spring-boot)" = "NONE" ] \
-    && pass "org.springframework.boot (single vendor, verified no split) gets no alternates property" \
-    || fail "spring-boot wrongly got alternates='$(alt_props_of spring-boot)'"
+[ "$(alt_props_of spring-boot)" = '["cpe:2.3:a:org.springframework.boot:spring-boot:1.5.6.RELEASE:*:*:*:*:maven:*:*", "cpe:2.3:a:org.springframework:spring-boot:1.5.6.RELEASE:*:*:*:*:maven:*:*"]' ] \
+    && pass "org.springframework.boot (single vendor, verified no split) gets only the package-style candidates" \
+    || fail "spring-boot alternates='$(alt_props_of spring-boot)'"
 cp "$WORK/mvn-alt.json" "$WORK/mvn-alt2.json"; python3 "$MVNCPE" "$WORK/mvn-alt2.json" >/dev/null 2>&1
 diff -q "$WORK/mvn-alt.json" "$WORK/mvn-alt2.json" >/dev/null 2>&1 && pass "F-1c7 enrichment is idempotent" || fail "second run changed the SBOM"
 # regression: scan-nvd-cpe.py actually looks the alternates up and recovers
@@ -2509,6 +2511,131 @@ if command -v grype >/dev/null 2>&1; then
 else
     echo "  SKIP: grype not installed; skipping CVE-recovery regression (F-1c8)"
 fi
+
+echo "== F-1c9: maven CPE enrichment, package-style CPE candidates (groupId:artifactId, target_sw=maven) =="
+# Recent NVD records describe maven packages as vendor=<groupId>,
+# product=<artifactId>, target_sw=maven. Every maven component with a cpe gets
+# up to two such candidates in bomlens:cpeAlternates (the full groupId, and its
+# parent for a 3+ segment groupId). The first four purls below also had a
+# product taken from a groupId segment (client5, embed, core, snappy).
+cat > "$WORK/mvn-pkg.json" <<'JSON'
+{"bomFormat":"CycloneDX","specVersion":"1.6","components":[
+ {"type":"library","name":"httpclient5","version":"5.6.3","purl":"pkg:maven/org.apache.httpcomponents.client5/httpclient5@5.6.3"},
+ {"type":"library","name":"tomcat-embed-el","version":"11.0.25","purl":"pkg:maven/org.apache.tomcat.embed/tomcat-embed-el@11.0.25"},
+ {"type":"library","name":"jackson-databind","version":"3.1.7","purl":"pkg:maven/tools.jackson.core/jackson-databind@3.1.7"},
+ {"type":"library","name":"snappy-java","version":"1.1.10.7","purl":"pkg:maven/org.xerial.snappy/snappy-java@1.1.10.7"},
+ {"type":"library","name":"jackson-databind-2","version":"2.21.7","purl":"pkg:maven/com.fasterxml.jackson.core/jackson-databind@2.21.7"},
+ {"type":"library","name":"preset-cpe","version":"1.0","purl":"pkg:maven/com.example/preset-cpe@1.0","cpe":"cpe:2.3:a:examplevendor:preset:1.0:*:*:*:*:*:*:*"},
+ {"type":"library","name":"odd-coord","version":"1.0","purl":"pkg:maven/com.example/odd%20coord@1.0"},
+ {"type":"library","name":"struts2-core","version":"2.3.31","purl":"pkg:maven/org.apache.struts/struts2-core@2.3.31"},
+ {"type":"library","name":"derbyclient","version":"10.14.2.0","purl":"pkg:maven/org.apache.derby/derbyclient@10.14.2.0"},
+ {"type":"library","name":"fontbox","version":"2.0.0","purl":"pkg:maven/org.apache.pdfbox/fontbox@2.0.0"},
+ {"type":"library","name":"tomcat-embed-core","version":"9.0.1","purl":"pkg:maven/org.apache.tomcat.embed/tomcat-embed-core@9.0.1"},
+ {"type":"library","name":"okhttp","version":"4.9.0","purl":"pkg:maven/com.squareup.okhttp3/okhttp@4.9.0"},
+ {"type":"library","name":"guice","version":"4.0","purl":"pkg:maven/com.google.inject/guice@4.0"},
+ {"type":"library","name":"gh-lib","version":"1.0","purl":"pkg:maven/com.github.someone/gh-lib@1.0"},
+ {"type":"library","name":"jquery","version":"3.0.0","purl":"pkg:maven/org.webjars.npm/jquery@3.0.0"}]}
+JSON
+python3 "$MVNCPE" "$WORK/mvn-pkg.json" >/dev/null 2>&1
+pkg_cpe_of() { jq -r --arg n "$1" '[.components[]|select(.name==$n)]|.[0].cpe // "NONE"' "$WORK/mvn-pkg.json"; }
+pkg_alt_of() { jq -r --arg n "$1" '[.components[]|select(.name==$n)]|.[0]|[(.properties//[])[]|select(.name=="bomlens:cpeAlternates")|.value][0] // "NONE"' "$WORK/mvn-pkg.json"; }
+check_pkg() {  # name, expected primary cpe, expected alternates JSON
+    if [ "$(pkg_cpe_of "$1")" = "$2" ]; then pass "$1 primary cpe $2"; else fail "$1 cpe='$(pkg_cpe_of "$1")', expected $2"; fi
+    if [ "$(pkg_alt_of "$1")" = "$3" ]; then pass "$1 package-style alternates"; else fail "$1 alternates='$(pkg_alt_of "$1")', expected $3"; fi
+}
+check_pkg httpclient5 "cpe:2.3:a:apache:httpclient5:5.6.3:*:*:*:*:*:*:*" \
+    '["cpe:2.3:a:org.apache.httpcomponents.client5:httpclient5:5.6.3:*:*:*:*:maven:*:*", "cpe:2.3:a:org.apache.httpcomponents:httpclient5:5.6.3:*:*:*:*:maven:*:*"]'
+# Only tomcat-embed-core is the Tomcat server (apache:tomcat); the other embed
+# artifacts fall back to the generic rule (product = artifactId).
+check_pkg tomcat-embed-el "cpe:2.3:a:apache:tomcat-embed-el:11.0.25:*:*:*:*:*:*:*" \
+    '["cpe:2.3:a:org.apache.tomcat.embed:tomcat-embed-el:11.0.25:*:*:*:*:maven:*:*", "cpe:2.3:a:org.apache.tomcat:tomcat-embed-el:11.0.25:*:*:*:*:maven:*:*"]'
+check_pkg jackson-databind "cpe:2.3:a:fasterxml:jackson-databind:3.1.7:*:*:*:*:*:*:*" \
+    '["cpe:2.3:a:tools.jackson.core:jackson-databind:3.1.7:*:*:*:*:maven:*:*", "cpe:2.3:a:tools.jackson:jackson-databind:3.1.7:*:*:*:*:maven:*:*"]'
+check_pkg snappy-java "cpe:2.3:a:xerial:snappy-java:1.1.10.7:*:*:*:*:*:*:*" \
+    '["cpe:2.3:a:org.xerial.snappy:snappy-java:1.1.10.7:*:*:*:*:maven:*:*", "cpe:2.3:a:org.xerial:snappy-java:1.1.10.7:*:*:*:*:maven:*:*"]'
+check_pkg jackson-databind-2 "cpe:2.3:a:fasterxml:jackson-databind:2.21.7:*:*:*:*:*:*:*" \
+    '["cpe:2.3:a:com.fasterxml.jackson.core:jackson-databind:2.21.7:*:*:*:*:maven:*:*", "cpe:2.3:a:com.fasterxml.jackson:jackson-databind:2.21.7:*:*:*:*:maven:*:*"]'
+check_pkg tomcat-embed-core "cpe:2.3:a:apache:tomcat:9.0.1:*:*:*:*:*:*:*" \
+    '["cpe:2.3:a:org.apache.tomcat.embed:tomcat-embed-core:9.0.1:*:*:*:*:maven:*:*", "cpe:2.3:a:org.apache.tomcat:tomcat-embed-core:9.0.1:*:*:*:*:maven:*:*"]'
+# An artifactId that starts with the last groupId segment keeps the segment as
+# the product, with or without a separator (struts / struts2-core, derby /
+# derbyclient): NVD files these under apache:struts and apache:derby.
+check_pkg struts2-core "cpe:2.3:a:apache:struts:2.3.31:*:*:*:*:*:*:*" \
+    '["cpe:2.3:a:org.apache.struts:struts2-core:2.3.31:*:*:*:*:maven:*:*", "cpe:2.3:a:org.apache:struts2-core:2.3.31:*:*:*:*:maven:*:*"]'
+check_pkg derbyclient "cpe:2.3:a:apache:derby:10.14.2.0:*:*:*:*:*:*:*" \
+    '["cpe:2.3:a:org.apache.derby:derbyclient:10.14.2.0:*:*:*:*:maven:*:*", "cpe:2.3:a:org.apache:derbyclient:10.14.2.0:*:*:*:*:maven:*:*"]'
+# PDFBox subprojects stay on apache:pdfbox (curated).
+[ "$(pkg_cpe_of fontbox)" = "cpe:2.3:a:apache:pdfbox:2.0.0:*:*:*:*:*:*:*" ] && pass "fontbox -> apache:pdfbox (curated)" || fail "fontbox cpe='$(pkg_cpe_of fontbox)'"
+# The segment is a packaging detail when the artifactId does not start with it.
+[ "$(pkg_cpe_of okhttp)" = "cpe:2.3:a:squareup:okhttp:4.9.0:*:*:*:*:*:*:*" ] && pass "com.squareup.okhttp3/okhttp -> squareup:okhttp" || fail "okhttp cpe='$(pkg_cpe_of okhttp)'"
+[ "$(pkg_cpe_of guice)" = "cpe:2.3:a:google:guice:4.0:*:*:*:*:*:*:*" ] && pass "com.google.inject/guice -> google:guice" || fail "guice cpe='$(pkg_cpe_of guice)'"
+# A shared hosting namespace (com.github, org.webjars) is not used as a parent-groupId vendor.
+[ "$(pkg_alt_of gh-lib)" = '["cpe:2.3:a:com.github.someone:gh-lib:1.0:*:*:*:*:maven:*:*"]' ] \
+    && pass "no com.github parent-groupId candidate" || fail "gh-lib alternates='$(pkg_alt_of gh-lib)'"
+[ "$(pkg_alt_of jquery)" = '["cpe:2.3:a:org.webjars.npm:jquery:3.0.0:*:*:*:*:maven:*:*"]' ] \
+    && pass "no org.webjars parent-groupId candidate" || fail "jquery alternates='$(pkg_alt_of jquery)'"
+# A real pre-existing cpe is kept and gains only the package-style candidate
+# (2-segment groupId, so no parent candidate). It is not marked as derived.
+check_pkg preset-cpe "cpe:2.3:a:examplevendor:preset:1.0:*:*:*:*:*:*:*" \
+    '["cpe:2.3:a:com.example:preset-cpe:1.0:*:*:*:*:maven:*:*"]'
+preset_src=$(jq -r '[.components[]|select(.name=="preset-cpe")]|.[0]|[(.properties//[])[]|select(.name=="bomlens:cpeSource")|.value][0] // "NONE"' "$WORK/mvn-pkg.json")
+[ "$preset_src" = "NONE" ] && pass "pre-existing cpe is not marked bomlens:cpeSource" || fail "preset-cpe cpeSource='$preset_src'"
+# A coordinate that cannot be written unescaped into a cpe gets no package-style candidate.
+[ "$(pkg_alt_of odd-coord)" = "NONE" ] && pass "unsafe coordinate gets no package-style candidate" || fail "odd-coord alternates='$(pkg_alt_of odd-coord)'"
+cp "$WORK/mvn-pkg.json" "$WORK/mvn-pkg2.json"; python3 "$MVNCPE" "$WORK/mvn-pkg2.json" >/dev/null 2>&1
+diff -q "$WORK/mvn-pkg.json" "$WORK/mvn-pkg2.json" >/dev/null 2>&1 && pass "F-1c9 enrichment is idempotent" || fail "second run changed the SBOM"
+
+echo "== F-1c10: scan-nvd-cpe.py hands the alternates to grype and version-filters their matches =="
+# The alternates go to grype as syft:cpe23 properties of a temporary SBOM copy
+# (one grype run, purl kept). A match found through a package-style NVD record
+# goes through the same NVD version filter as a primary-cpe match, keyed on the
+# product of the record grype matched.
+GRYPE_SEEN="$WORK/grype-pkg-seen.json"
+cat > "$WORK/grype-pkg-stub" <<'SH'
+#!/usr/bin/env bash
+if [ "$1" = "db" ]; then echo '{}'; exit 1; fi
+cp "${1#sbom:}" "$GRYPE_SEEN"
+cat <<'JSON'
+{"matches":[
+ {"vulnerability":{"id":"CVE-2026-110879","namespace":"nvd:cpe","severity":"high"},
+  "artifact":{"name":"jackson-databind-2","version":"2.21.7","purl":"pkg:maven/com.fasterxml.jackson.core/jackson-databind@2.21.7","cpes":["cpe:2.3:a:fasterxml:jackson-databind:2.21.7:*:*:*:*:*:*:*"]},
+  "matchDetails":[{"type":"cpe-match","found":{"vulnerabilityID":"CVE-2026-110879","cpes":["cpe:2.3:a:com.fasterxml.jackson.core:jackson-databind:*:*:*:*:*:maven:*:*"]}}]},
+ {"vulnerability":{"id":"CVE-2026-000001","namespace":"nvd:cpe","severity":"high"},
+  "artifact":{"name":"jackson-databind-2","version":"2.21.7","purl":"pkg:maven/com.fasterxml.jackson.core/jackson-databind@2.21.7","cpes":["cpe:2.3:a:fasterxml:jackson-databind:2.21.7:*:*:*:*:*:*:*"]},
+  "matchDetails":[{"type":"cpe-match","found":{"vulnerabilityID":"CVE-2026-000001","cpes":["cpe:2.3:a:com.fasterxml.jackson.core:jackson-databind:*:*:*:*:*:maven:*:*"]}}]}
+]}
+JSON
+SH
+chmod +x "$WORK/grype-pkg-stub"
+cp "$WORK/mvn-pkg.json" "$WORK/mvn-pkg-scan.json"
+GRYPE_SEEN="$GRYPE_SEEN" GRYPE_BIN="$WORK/grype-pkg-stub" SECURITY_NVD_VERIFY=true \
+    python3 - "$LIB/scan-nvd-cpe.py" "$WORK/mvn-pkg-scan.json" "$WORK/mvn-pkg-out" >/dev/null 2>&1 <<'PY'
+import importlib.util, sys
+spec = importlib.util.spec_from_file_location("snc", sys.argv[1])
+m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
+crit = "cpe:2.3:a:com.fasterxml.jackson.core:jackson-databind:*:*:*:*:*:maven:*:*"
+ranges = {
+    "CVE-2026-110879": [{"criteria": crit, "vulnerable": True, "versionStartIncluding": "2.19.0", "versionEndExcluding": "2.21.8"}],
+    "CVE-2026-000001": [{"criteria": crit, "vulnerable": True, "versionEndExcluding": "2.10.0"}],
+}
+m._nvd_matches = lambda cve, key, cache: ranges.get(cve, [])
+m.build_sidecar(sys.argv[2], sys.argv[3])
+PY
+seen_cpes=$(jq -r '[.components[]|select(.name=="snappy-java")|(.properties//[])[]|select(.name=="syft:cpe23")|.value]|join(",")' "$GRYPE_SEEN" 2>/dev/null)
+[ "$seen_cpes" = "cpe:2.3:a:org.xerial.snappy:snappy-java:1.1.10.7:*:*:*:*:maven:*:*,cpe:2.3:a:org.xerial:snappy-java:1.1.10.7:*:*:*:*:maven:*:*" ] \
+    && pass "grype input carries the alternates as syft:cpe23 properties" \
+    || fail "syft:cpe23 in grype input='$seen_cpes'"
+seen_purl=$(jq -r '[.components[]|select(.name=="snappy-java")]|.[0].purl' "$GRYPE_SEEN" 2>/dev/null)
+[ "$seen_purl" = "pkg:maven/org.xerial.snappy/snappy-java@1.1.10.7" ] && pass "grype input keeps the component purl" || fail "grype input purl='$seen_purl'"
+if jq -e '[.components[]|(.properties//[])[]|select(.name=="syft:cpe23")]|length==0' "$WORK/mvn-pkg-scan.json" >/dev/null 2>&1; then
+    pass "the SBOM itself gets no syft:cpe23 properties"
+else
+    fail "scan-nvd-cpe.py wrote syft:cpe23 into the SBOM"
+fi
+pkg_kept=$(jq -r '[.Results[0].Vulnerabilities[].VulnerabilityID]|join(",")' "$WORK/mvn-pkg-out_security_grype.json" 2>/dev/null)
+[ "$pkg_kept" = "CVE-2026-110879" ] \
+    && pass "package-style match in the NVD range kept, out-of-range one dropped by the version filter" \
+    || fail "kept CVEs='$pkg_kept', expected CVE-2026-110879"
 
 echo "== F-1d: NVD version filter (scan-nvd-cpe) — drops loose-range false positives =="
 # The filter is what removes grype's over-broad nvd:cpe matches (a fixed-in-9.0.104
@@ -6068,6 +6195,314 @@ else
     [ -z "$_t_nocomposer" ] \
         && pass "no composer.json: filter never turns on" \
         || fail "filter turned on with no composer.json present" "got [$_t_nocomposer]"
+fi
+
+echo "== go-scope: indirect Go modules in the build graph become required =="
+# Guards docker/lib/build-prep.sh's Go scope correction: cdxgen marks every
+# `// indirect` module scope optional, so the ones `go list -deps ./...` lists
+# are set to required, cdx:go:indirect is kept, and a module outside the list
+# keeps optional. Extract the real JS and shell block (no logic duplication)
+# and drive the block with a stand-in go.
+if command -v node >/dev/null 2>&1; then
+    PREP="$ROOT_DIR/docker/lib/build-prep.sh"
+    GSJS="$WORK/go-scope.js"
+    sed -n "/<<'GOSCOPE_JS'/,/^GOSCOPE_JS\$/p" "$PREP" | sed '1d;$d' > "$GSJS"
+    _gs_block=$(sed -n '/^# Go scope: cdxgen sets/,/^fi$/p' "$PREP")
+    if [ -s "$GSJS" ] && [ -n "$_gs_block" ]; then
+        cat > "$WORK/go-scope-bom.json" <<'JSON'
+{"bomFormat":"CycloneDX","specVersion":"1.6",
+ "metadata":{"component":{"name":"example.com/demo","bom-ref":"root"}},
+ "components":[
+   {"name":"cobra","version":"v1.8.0","purl":"pkg:golang/github.com/spf13/cobra@v1.8.0","scope":"required","properties":[{"name":"cdx:go:indirect","value":"false"}]},
+   {"name":"pflag","version":"v1.0.5","purl":"pkg:golang/github.com/spf13/pflag@v1.0.5","scope":"optional","properties":[{"name":"cdx:go:indirect","value":"true"}]},
+   {"name":"mousetrap","version":"v1.1.0","purl":"pkg:golang/github.com/inconshreveable/mousetrap@v1.1.0","scope":"optional","properties":[{"name":"cdx:go:indirect","value":"true"}]},
+   {"name":"Azure","version":"v0.5.0","purl":"pkg:golang/github.com/Azure/go-ntlmssp@v0.5.0?type=module","scope":"optional"},
+   {"name":"fork","version":"v2.0.0","purl":"pkg:golang/example.com/fork@v2.0.0","scope":"optional","properties":[{"name":"cdx:go:replaces","value":"example.com/orig@v1.0.0"}]},
+   {"name":"local","purl":"pkg:golang/example.com/local","scope":"optional"},
+   {"name":"pyopt","version":"1.0","purl":"pkg:pypi/pyopt@1.0","scope":"optional"}
+ ]}
+JSON
+        cat > "$WORK/go-scope-list.txt" <<'LIST'
+github.com/spf13/cobra@v1.8.0
+github.com/spf13/cobra@
+github.com/spf13/pflag@v1.0.5
+github.com/spf13/pflag@
+github.com/azure/go-ntlmssp@v0.5.0
+
+example.com/orig@v1.0.0
+example.com/orig@
+example.com/fork@v2.0.0
+example.com/local@
+LIST
+        node "$GSJS" "$WORK/go-scope-bom.json" "$WORK/go-scope-list.txt" 2>/dev/null
+        _gs_scopes=$(jq -r '[.components[] | "\(.name)=\(.scope)"] | join(",")' "$WORK/go-scope-bom.json")
+        if [ "$_gs_scopes" = "cobra=required,pflag=required,mousetrap=optional,Azure=required,fork=required,local=required,pyopt=optional" ]; then
+            pass "listed indirect modules (replaced and local included) required; unlisted Go and non-Go optional kept"
+        else
+            fail "unexpected scopes after the Go scope correction" "$_gs_scopes"
+        fi
+        if [ "$(jq -r '.components[] | select(.name=="pflag") | .properties[] | select(.name=="cdx:go:indirect") | .value' "$WORK/go-scope-bom.json")" = "true" ]; then
+            pass "cdx:go:indirect kept on a promoted module"
+        else
+            fail "cdx:go:indirect lost on pflag"
+        fi
+
+        # The shell block: a stand-in go prints the list, or fails.
+        _gs_bin="$WORK/gs-bin"; mkdir -p "$_gs_bin"
+        cat > "$_gs_bin/go" <<'STUB'
+#!/bin/sh
+[ "$GS_FAIL" = 1 ] && { echo "go: updates to go.mod needed" >&2; exit 1; }
+cat "$GS_LIST"
+STUB
+        chmod +x "$_gs_bin/go"
+        _gs_prelude='log() { echo "[build-prep] $*"; }; run_supervised_timeout() { shift; "$@"; }; PREP_TIMEOUT_DEFAULT=5; rc=0; EXCLUDE_NON_SHIPPED=1; NON_SHIPPED_DIRS="test testdata"; NON_SHIPPED_PATHS=".github/workflows"'
+        _gs_run() {  # <fail>
+            rm -rf "$WORK/gs-proj"; mkdir -p "$WORK/gs-proj"
+            printf 'module example.com/demo\n' > "$WORK/gs-proj/go.mod"
+            cp "$WORK/go-scope-bom.orig.json" "$WORK/gs-proj/bom.json"
+            ( cd "$WORK/gs-proj" && PATH="$_gs_bin:$PATH" GS_FAIL="$1" GS_LIST="$WORK/go-scope-list.txt" \
+                OUT="$WORK/gs-proj/bom.json" bash -c "$_gs_prelude; $_gs_block" ) 2>&1
+        }
+        jq '(.components[] | select(.purl | startswith("pkg:golang/")) | select(.name != "cobra")) .scope = "optional"' \
+            "$WORK/go-scope-bom.json" > "$WORK/go-scope-bom.orig.json"
+        _gs_run 0 >/dev/null
+        if [ "$(jq -r '.components[] | select(.name=="pflag") | .scope' "$WORK/gs-proj/bom.json")" = "required" ]; then
+            pass "build-prep block: go list succeeds, pflag promoted"
+        else
+            fail "build-prep block did not promote pflag"
+        fi
+        _gs_log=$(_gs_run 1)
+        if cmp -s "$WORK/go-scope-bom.orig.json" "$WORK/gs-proj/bom.json"; then
+            pass "build-prep block: go list fails, SBOM left untouched"
+        else
+            fail "build-prep block changed the SBOM although go list failed"
+        fi
+        case "$_gs_log" in
+            *"could not list the build graph"*) pass "build-prep block: go list failure is logged" ;;
+            *) fail "go list failure not logged" "$_gs_log" ;;
+        esac
+        _gs_log=$(PREP_FAILED="go-mod-tidy" _gs_run 0)
+        if cmp -s "$WORK/go-scope-bom.orig.json" "$WORK/gs-proj/bom.json"; then
+            pass "build-prep block: go-mod-tidy failed, SBOM left untouched"
+        else
+            fail "build-prep block changed the SBOM although go-mod-tidy failed"
+        fi
+        case "$_gs_log" in
+            *"go-mod-tidy failed"*) pass "build-prep block: the skipped correction is logged" ;;
+            *) fail "skipped Go scope correction not logged" "$_gs_log" ;;
+        esac
+    else
+        fail "could not extract the Go scope correction from build-prep.sh"
+    fi
+else
+    echo "  SKIP: node unavailable, skipping Go scope test"
+fi
+
+echo "== gradle-same-name: a subproject named like the root gets its dependencies task =="
+# Guards docker/lib/build-prep.sh: cdxgen skips `<sub>:dependencies` for a
+# subproject whose purl equals the root's, so the task is handed to cdxgen in
+# GRADLE_ARGS_DEPENDENCIES. Extract the real block and drive it on settings
+# files (no logic duplication).
+if command -v node >/dev/null 2>&1; then
+    PREP="$ROOT_DIR/docker/lib/build-prep.sh"
+    _gsn_block=$(sed -n '/^# Gradle subproject named like the root project/,/^fi$/p' "$PREP")
+    if [ -n "$_gsn_block" ]; then
+        _gsn_run() {  # <settings file name> <content> [GRADLE_ARGS_DEPENDENCIES] [folder name]
+            local dir="$WORK/gsn/${4:-proj}"
+            rm -rf "$WORK/gsn"; mkdir -p "$dir"; : > "$WORK/gsn.log"
+            printf '%s\n' "$2" > "$dir/$1"
+            ( cd "$dir" && GRADLE_ARGS_DEPENDENCIES="${3:-}" GSN_LOG="$WORK/gsn.log" \
+                bash -c 'log() { echo "$*" >> "$GSN_LOG"; }; '"$_gsn_block"'; printf "%s" "${GRADLE_ARGS_DEPENDENCIES:-}"' )
+        }
+        _gsn_out=$(_gsn_run settings.gradle.kts 'rootProject.name = "demo"
+include("demo")')
+        if [ "$_gsn_out" = ":demo:dependencies" ]; then
+            pass "include(\"demo\") under rootProject demo: :demo:dependencies handed to cdxgen"
+        else
+            fail "same-name subproject task not set" "got [$_gsn_out]"
+        fi
+        _gsn_out=$(_gsn_run settings.gradle "rootProject.name = 'demo'
+// include 'old:demo'
+include 'core',
+        'apps:demo'")
+        if [ "$_gsn_out" = ":apps:demo:dependencies" ]; then
+            pass "Groovy include across lines, nested path, commented include ignored"
+        else
+            fail "Groovy settings not read as expected" "got [$_gsn_out]"
+        fi
+        _gsn_out=$(_gsn_run settings.gradle.kts 'rootProject.name = "demo-root"
+include("demo")')
+        if [ -z "$_gsn_out" ]; then
+            pass "subproject named differently from the root: nothing added"
+        else
+            fail "task added although the names differ" "got [$_gsn_out]"
+        fi
+        _gsn_out=$(_gsn_run settings.gradle.kts 'rootProject.name = "demo"
+include("demo")' "--configuration runtimeClasspath")
+        if [ "$_gsn_out" = "--configuration runtimeClasspath :demo:dependencies --configuration runtimeClasspath" ]; then
+            pass "a GRADLE_ARGS_DEPENDENCIES the caller set is kept for the root task and the added one"
+        else
+            fail "caller GRADLE_ARGS_DEPENDENCIES not kept" "got [$_gsn_out]"
+        fi
+        # No rootProject.name: Gradle names the root after its folder, which
+        # is app under the CLI's /app mount, so `include ':app'` is the same name.
+        _gsn_out=$(_gsn_run settings.gradle "include ':app'" "" app)
+        if [ "$_gsn_out" = ":app:dependencies" ]; then
+            pass "no rootProject.name, folder app, include ':app': :app:dependencies handed to cdxgen"
+        else
+            fail "folder-name default not used for the root name" "got [$_gsn_out]"
+        fi
+        _gsn_out=$(_gsn_run settings.gradle.kts 'rootProject.name = "demo"
+if (System.getenv("WITH_DEMO") != null) {
+    include("demo")
+}')
+        if [ -z "$_gsn_out" ] && grep -q "may be conditional" "$WORK/gsn.log"; then
+            pass "a same-name include inside an if block: nothing added, and logged"
+        else
+            fail "conditional include not skipped" "got [$_gsn_out], log: $(cat "$WORK/gsn.log")"
+        fi
+        _gsn_out=$(_gsn_run settings.gradle.kts 'rootProject.name = "demo"
+when (mode) { "full" -> include("demo") }')
+        if [ -z "$_gsn_out" ]; then
+            pass "a same-name include on a when line: nothing added"
+        else
+            fail "include on a when line not skipped" "got [$_gsn_out]"
+        fi
+    else
+        fail "could not extract the Gradle same-name block from build-prep.sh"
+    fi
+else
+    echo "  SKIP: node unavailable, skipping Gradle same-name test"
+fi
+
+echo "== gradle-packages: a Gradle build with no Gradle-resolved package is recorded =="
+# Guards docker/lib/build-prep.sh: a build file that declares external
+# dependencies with no pkg:maven component from Gradle's resolution (a jar in
+# the tree does not count) marks the gradle-packages step failed, so generate
+# reads degraded, but only for a build cdxgen could run Gradle on. Extract the
+# real block and drive it on small trees. PATH holds only the tools the block
+# uses, so whether java or gradle is there is set per case (as functions).
+if command -v node >/dev/null 2>&1; then
+    PREP="$ROOT_DIR/docker/lib/build-prep.sh"
+    _gpk_block=$(sed -n '/^# Gradle build with no Gradle-resolved package/,/^fi$/p' "$PREP")
+    _gpk_bin="$WORK/gpk-bin"; mkdir -p "$_gpk_bin"
+    for _t in node find sed grep sort head tr cat mktemp rm; do
+        _p=$(command -v "$_t") && ln -sf "$_p" "$_gpk_bin/$_t"
+    done
+    _gpk_bash=$(command -v bash)
+    if [ -n "$_gpk_block" ]; then
+        _gpk_jar='{"components":[{"name":"junit","version":"4.13.2","purl":"pkg:maven/junit/junit@4.13.2?type=jar","evidence":{"identity":[{"field":"purl","methods":[{"technique":"filename","value":"libs/junit-4.13.2.jar"}]}]}}]}'
+        _gpk_gradle='{"components":[{"name":"guava","version":"33.0.0-jre","purl":"pkg:maven/com.google.guava/guava@33.0.0-jre?type=jar","properties":[{"name":"internal:GradleProfileName","value":"compileClasspath"},{"name":"cdx:gradle:GradleRootPath","value":"/app"}]}]}'
+        _gpk_deps='plugins { java }
+dependencies {
+    implementation("com.google.guava:guava:33.0.0-jre") // the library
+}'
+        # _gpk_run <bom json> <tools: java, gradle, java+gradle or none> [path content]...
+        # Each path is written with the content after it; a path ending in / is a folder.
+        _gpk_run() {
+            local bom="$1" tools="$2" fns=""; shift 2
+            rm -rf "$WORK/gpk"; mkdir -p "$WORK/gpk"
+            printf '%s\n' "$bom" > "$WORK/gpk/bom.json"
+            while [ $# -ge 2 ]; do
+                mkdir -p "$WORK/gpk/$(dirname "$1")"
+                printf '%s\n' "$2" > "$WORK/gpk/$1"
+                shift 2
+            done
+            case "$tools" in *java*) fns="$fns java() { :; };" ;; esac
+            case "$tools" in *gradle*) fns="$fns gradle() { :; };" ;; esac
+            ( cd "$WORK/gpk" && PATH="$_gpk_bin" OUT="$WORK/gpk/bom.json" PREP_FAILED="${GPK_PREP_FAILED:-}" "$_gpk_bash" -c 'log() { :; }; mark_prep_failed() { echo "MARK-FAILED $1"; };'"$fns"' rc=0; EXCLUDE_NON_SHIPPED=1; NON_SHIPPED_DIRS="examples test"; NON_SHIPPED_PATHS="gradle/wrapper"; '"$_gpk_block" 2>&1 )
+        }
+        _gpk_expect() {  # <marked|clean> <label> <run output>
+            local got=clean
+            case "$3" in *"MARK-FAILED gradle-packages"*) got=marked ;; esac
+            if [ "$got" = "$1" ]; then pass "$2"; else fail "$2" "$3"; fi
+        }
+        _gpk_expect marked "root build with gradlew and java, only a jar-file component: gradle-packages failed" \
+            "$(_gpk_run "$_gpk_jar" java settings.gradle.kts 'include("demo")' gradlew '#!/bin/sh' demo/build.gradle.kts "$_gpk_deps")"
+        _gpk_expect clean "a component with the Gradle origin properties: nothing recorded" \
+            "$(_gpk_run "$_gpk_gradle" java settings.gradle.kts 'include("demo")' gradlew '#!/bin/sh' demo/build.gradle.kts "$_gpk_deps")"
+        _gpk_expect marked "root build, no gradlew, gradle on PATH: checked" \
+            "$(_gpk_run "$_gpk_jar" gradle build.gradle.kts "$_gpk_deps")"
+        _gpk_expect clean "root build, no gradlew and no gradle: nothing recorded" \
+            "$(_gpk_run "$_gpk_jar" java build.gradle.kts "$_gpk_deps")"
+        _gpk_expect clean "gradle-dependencies already failed: gradle-packages not added" \
+            "$(GPK_PREP_FAILED=gradle-dependencies _gpk_run "$_gpk_jar" java gradlew '#!/bin/sh' build.gradle.kts "$_gpk_deps")"
+        _gpk_expect clean "Flutter-style android/ folder with no gradlew: nothing recorded" \
+            "$(_gpk_run "$_gpk_jar" java+gradle pubspec.yaml 'name: app' android/app/build.gradle "$_gpk_deps")"
+        _gpk_expect marked "nested build with its own gradlew, java present: checked" \
+            "$(_gpk_run "$_gpk_jar" java android/gradlew '#!/bin/sh' android/settings.gradle "include ':app'" android/app/build.gradle "$_gpk_deps")"
+        _gpk_expect clean "nested build with its own gradlew but no java: nothing recorded" \
+            "$(_gpk_run "$_gpk_jar" none android/gradlew '#!/bin/sh' android/settings.gradle "include ':app'" android/app/build.gradle "$_gpk_deps")"
+        _gpk_expect clean "build file under a non-shipped folder: nothing recorded" \
+            "$(_gpk_run "$_gpk_jar" java gradlew '#!/bin/sh' settings.gradle '' examples/app/build.gradle "dependencies {
+    implementation 'com.google.guava:guava:33.0.0-jre'
+}")"
+        _gpk_expect marked "version catalog alias counts as a declared dependency" \
+            "$(_gpk_run "$_gpk_jar" java gradlew '#!/bin/sh' build.gradle "dependencies {
+    implementation libs.guava
+}")"
+        for _gpk_line in "implementation project(':core')" 'implementation(project(":core"))' \
+                         "runtimeOnly files('libs/a.jar')" "implementation fileTree(dir: 'libs')" \
+                         'implementation(projects.core)' 'api projects.shared.model' \
+                         'implementation gradleApi()' 'implementation(localGroovy())' 'implementation(gradleTestKit())' \
+                         'implementation(platform(project(":bom")))' "api enforcedPlatform(project(':bom'))"; do
+            _gpk_expect clean "not external: $_gpk_line" \
+                "$(_gpk_run "$_gpk_jar" java gradlew '#!/bin/sh' build.gradle "dependencies {
+    $_gpk_line
+}")"
+        done
+        _gpk_expect marked "platform() of an external BOM counts as declared" \
+            "$(_gpk_run "$_gpk_jar" java gradlew '#!/bin/sh' build.gradle 'dependencies {
+    implementation(platform("org.springframework.boot:spring-boot-dependencies:3.3.0"))
+}')"
+        for _gpk_dir in buildSrc build-logic; do
+            _gpk_expect clean "a build file under $_gpk_dir is not searched" \
+                "$(_gpk_run "$_gpk_jar" java gradlew '#!/bin/sh' settings.gradle.kts 'rootProject.name = "demo"' "$_gpk_dir/build.gradle.kts" "$_gpk_deps")"
+        done
+        _gpk_expect clean "a build named in includeBuild(...) is not searched" \
+            "$(_gpk_run "$_gpk_jar" java gradlew '#!/bin/sh' settings.gradle.kts 'pluginManagement { includeBuild("tools/conventions") }' tools/conventions/build.gradle.kts "$_gpk_deps")"
+        _gpk_expect marked "a build next to an included build is still searched" \
+            "$(_gpk_run "$_gpk_jar" java gradlew '#!/bin/sh' settings.gradle.kts 'includeBuild("tools/conventions")
+include("demo")' tools/conventions/build.gradle.kts 'dependencies { }' demo/build.gradle.kts "$_gpk_deps")"
+    else
+        fail "could not extract the Gradle packages block from build-prep.sh"
+    fi
+else
+    echo "  SKIP: node unavailable, skipping Gradle packages test"
+fi
+
+echo "== cdxgen-log mask: the kept stage 1 log has credentials masked =="
+# Guards scripts/scan-sbom.sh's mask_log_secrets, used on the cdxgen log kept
+# as <prefix>_cdxgen.log. Extract the real function (no logic duplication).
+_mls_fn=$(sed -n '/^mask_log_secrets() {/,/^}/p' "$ROOT_DIR/scripts/scan-sbom.sh")
+if [ -z "$_mls_fn" ]; then
+    fail "could not extract mask_log_secrets from scan-sbom.sh"
+else
+    cat > "$WORK/mls-in.log" <<'LOG'
+Could not GET https://alice:s3cr3t@repo.internal.example/maven2/x.pom
+Authorization: Bearer abcdefghijklmnop
+header "Authorization": "Basic dXNlcjpwYXNz"
+REPO_TOKEN=abc123def npm_config_password: hunter2 apiKey="k-123456"
+Download https://repo1.maven.org/maven2/com/google/guava/guava/33.0.0-jre/guava-33.0.0-jre.pom
+Resolved 12 tokens: done
+LOG
+    bash -c "$_mls_fn; mask_log_secrets '$WORK/mls-in.log' '$WORK/mls-out.log'"
+    _mls_out=$(cat "$WORK/mls-out.log" 2>/dev/null)
+    for _mls_secret in alice s3cr3t abcdefghijklmnop dXNlcjpwYXNz abc123def hunter2 k-123456; do
+        case "$_mls_out" in
+            *"$_mls_secret"*) fail "mask_log_secrets left '$_mls_secret' in the log" "$_mls_out" ;;
+            *) pass "mask_log_secrets masks '$_mls_secret'" ;;
+        esac
+    done
+    case "$_mls_out" in
+        *"https://***@repo.internal.example/maven2/x.pom"*) pass "a URL keeps its host and path, only the user part is masked" ;;
+        *) fail "URL credentials not masked as scheme://***@" "$_mls_out" ;;
+    esac
+    case "$_mls_out" in
+        *"https://repo1.maven.org/maven2/com/google/guava/guava/33.0.0-jre/guava-33.0.0-jre.pom"*"Resolved 12 tokens: done"*)
+            pass "lines with nothing to mask are kept as they were" ;;
+        *) fail "a line with nothing to mask was changed" "$_mls_out" ;;
+    esac
 fi
 
 echo "== maven-hashes: build-prep fetches dependency jars where cdxgen reads them for hashes =="
