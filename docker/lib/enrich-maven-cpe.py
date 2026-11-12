@@ -70,9 +70,10 @@ import sys
 # current at each CVE's disclosure date rather than backfilling old ones to
 # the new name. A CycloneDX component carries exactly one cpe field, so the
 # primary entry above still drives that field; the alternates are attached
-# separately (bomlens:cpeAlternates) and looked up as their own grype CPE
-# queries by scan-nvd-cpe.py, since a single cpe:2.3 string cannot express
-# more than one vendor:product.
+# separately (bomlens:cpeAlternates), and scan-nvd-cpe.py passes them to grype
+# as extra CPEs of the same component (syft:cpe23 properties in a temporary
+# copy of the SBOM), since a single cpe:2.3 string cannot express more than
+# one vendor:product.
 MAVEN_CPE_MAP = {
     "com.fasterxml.jackson.core": ("fasterxml", "@artifact"),
     "com.fasterxml.jackson.dataformat": ("fasterxml", "@artifact"),
@@ -99,12 +100,14 @@ MAVEN_CPE_MAP = {
     # Jackson 3 moved to the tools.jackson.* groupIds; the project and its NVD
     # vendor (FasterXML) are unchanged, and the product is still the artifact.
     "tools.jackson": ("fasterxml", "@artifact"),
-    # The generic org.apache.* rule (vendor=2nd segment, product=last segment)
-    # only holds when NVD's own CPE reuses the groupId's tail. These groups
+    # The generic rule (vendor = 2nd segment, product = last segment when the
+    # artifactId starts with it, else the artifactId) only holds when NVD's own
+    # CPE reuses those names. These groups
     # need an explicit override because NVD's product (or vendor) differs from
     # what the rule would derive — each verified against NVD's own cpeMatch
     # data, not guessed.
     "log4j": ("apache", "log4j"),  # single-segment group: the generic rule needs 2+ segments, so this old-style Log4j 1.x groupId gets no CPE without an override
+    "org.apache.pdfbox": ("apache", "pdfbox"),  # fontbox, xmpbox, preflight are PDFBox subprojects that NVD files under apache:pdfbox (e.g. CVE-2018-8036 in fontbox's AFMParser); the rule would derive apache:fontbox
     "org.apache.sshd": ("apache", "mina_sshd"),  # rule would derive apache:sshd; NVD files it under mina_sshd
     "org.apache.xmlgraphics": ("apache", "batik"),  # rule would derive apache:xmlgraphics; this groupId is Batik's, and NVD's product is batik
     "com.h2database": ("h2database", "h2"),  # rule would derive h2database:h2database; NVD's product is h2 (the artifactId, not the groupId tail)
@@ -115,7 +118,6 @@ MAVEN_CPE_MAP = {
     "org.quartz-scheduler": ("softwareag", "quartz"),  # rule would derive quartz-scheduler:quartz-scheduler
     "org.codehaus.woodstox": ("fasterxml", "woodstox"),  # the pre-rename groupId; NVD files Woodstox CVEs under the current fasterxml vendor regardless of which groupId a given release used
     "org.xerial.snappy": ("xerial", "snappy-java"),  # rule would derive xerial:snappy; NVD's product is the artifactId snappy-java
-    "org.apache.tomcat.embed": ("apache", "tomcat"),  # embedded Tomcat is the Tomcat codebase, filed by NVD under apache:tomcat like org.apache.tomcat itself; the rule would derive apache:tomcat-embed-*
     "com.mchange": ("mchange", "c3p0"),  # rule would derive mchange:mchange; NVD's product is the artifactId c3p0
     "io.opentelemetry.instrumentation": ("linuxfoundation", "opentelemetry_instrumentation_for_java"),  # rule would derive opentelemetry:instrumentation
     "io.undertow": ("redhat", "undertow"),  # rule would derive undertow:undertow; NVD files it under redhat
@@ -137,10 +139,20 @@ MAVEN_CPE_MAP = {
     # the Classic side; this entry exists only to route the artemis-*
     # artifacts to apache:artemis instead. See the artifact_prefix branch in
     # derive_cpe() -- "" is the fallback for every artifactId that matches no
-    # more specific prefix.
+    # more specific prefix. A value of None means "no curated entry for these
+    # artifacts": they fall back to the generic rule.
     "org.apache.activemq": {
         "artemis-": ("apache", "artemis"),
         "": ("apache", "activemq"),
+    },
+    # tomcat-embed-core carries the embedded Tomcat server (connectors,
+    # Catalina) that NVD files under apache:tomcat. The other embed artifacts
+    # (tomcat-embed-el, -websocket, -jasper) are separate libraries, so they
+    # get no curated entry (None) and fall back to the generic rule; most
+    # Tomcat server CVEs do not apply to them.
+    "org.apache.tomcat.embed": {
+        "tomcat-embed-core": ("apache", "tomcat"),
+        "": None,
     },
 }
 
@@ -237,6 +249,20 @@ def _cpe_string(vendor, product, version, target_sw="*"):
 # left out of the package-style candidates rather than emitted half-escaped.
 _CPE_SAFE_COORD = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
 
+# groupId parents that are shared hosting namespaces, not a project: a parent
+# candidate there (com.github, org.webjars, net.sourceforge) would be a vendor
+# shared by unrelated projects, so it is not emitted.
+_HOSTING_SEGMENTS = {"github", "gitlab", "bitbucket", "sourceforge", "webjars",
+                     "googlecode", "codeberg", "sf", "jitpack"}
+
+
+def _is_hosting_namespace(parent_parts):
+    """True for a two-segment groupId parent whose second segment is a
+    code-hosting or repackaging namespace (com.github, io.github, org.gitlab,
+    net.sourceforge, org.webjars, com.googlecode)."""
+    return len(parent_parts) == 2 and parent_parts[1] in _HOSTING_SEGMENTS
+
+
 # At most this many package-style candidates per component: each one is an
 # extra CPE grype searches, so the list stays short.
 _MAX_PACKAGE_CPES = 2
@@ -248,7 +274,8 @@ def package_cpes(group, artifact, version):
     artifactId, target_sw = maven, e.g.
     cpe:2.3:a:com.fasterxml.jackson.core:jackson-databind:<v>:*:*:*:*:maven:*:*.
     A second candidate uses the groupId's parent (org.xerial for
-    org.xerial.snappy) when the groupId has 3+ segments, since NVD sometimes
+    org.xerial.snappy) when the groupId has 3+ segments and the parent is not
+    a shared hosting namespace (com.github, org.webjars), since NVD sometimes
     files a package under a shorter groupId than the one it ships with.
     Lowercased like NVD's own CPEs. [] when the version or a coordinate cannot
     be written into a cpe:2.3 string unescaped."""
@@ -259,20 +286,20 @@ def package_cpes(group, artifact, version):
     g, a = group.lower(), artifact.lower()
     vendors = [g]
     parts = g.split(".")
-    if len(parts) >= 3:
+    if len(parts) >= 3 and not _is_hosting_namespace(parts[:-1]):
         vendors.append(".".join(parts[:-1]))
     return [_cpe_string(v, a, version, "maven") for v in vendors][:_MAX_PACKAGE_CPES]
 
 
 def _segment_names_artifact(segment, artifact):
     """True when the groupId's last segment names the artifact's project: the
-    artifactId is that segment, or starts with it followed by a separator
-    (pdfbox / pdfbox-app, netty / netty-common, guava / guava). Then the segment
-    is the project name NVD uses as product. Otherwise the segment is a
-    packaging detail (client5 for httpclient5, core for jackson-databind) and
-    the artifactId is the better product."""
-    seg, art = segment.lower(), artifact.lower()
-    return art == seg or (art.startswith(seg) and art[len(seg)] in "-_.")
+    artifactId starts with that segment (pdfbox / pdfbox-app, netty /
+    netty-common, guava / guava, struts / struts2-core, derby / derbyclient).
+    Then the segment is the project name NVD uses as product. Otherwise the
+    segment is a packaging detail (client5 for httpclient5, core for
+    jackson-databind, inject for guice) and the artifactId is the better
+    product."""
+    return artifact.lower().startswith(segment.lower())
 
 
 def derive_cpe(purl):
@@ -293,6 +320,7 @@ def derive_cpe(purl):
     # 1. Curated map (longest groupId prefix wins, so *.security beats *). These
     # override the generic rule where it is known wrong (spring -> vmware, Jackson
     # product = artifact, org.json -> stleary:json-java).
+    curated = False
     for prefix in sorted(MAVEN_CPE_MAP, key=len, reverse=True):
         if group == prefix or group.startswith(prefix + "."):
             entry = MAVEN_CPE_MAP[prefix]
@@ -301,29 +329,31 @@ def derive_cpe(purl):
                 # artifactId prefix (e.g. org.apache.activemq's artemis-*
                 # artifacts vs everything else). Longest prefix wins; ""
                 # is the catch-all for whatever matches no specific prefix.
-                for art_prefix in sorted(entry, key=len, reverse=True):
-                    if artifact.startswith(art_prefix):
-                        entry = entry[art_prefix]
-                        break
-                else:
-                    break  # no prefix matched (should not happen with a "" catch-all)
-            vendor, src = entry[0], entry[1]
-            product = artifact if src == "@artifact" else src
-            alt_specs = entry[2] if len(entry) > 2 else ()
+                # None (or no matching prefix) falls back to the generic rule.
+                entry = next((entry[art_prefix]
+                              for art_prefix in sorted(entry, key=len, reverse=True)
+                              if artifact.startswith(art_prefix)), None)
+            if entry is not None:
+                vendor, src = entry[0], entry[1]
+                product = artifact if src == "@artifact" else src
+                alt_specs = entry[2] if len(entry) > 2 else ()
+                curated = True
             break
-    else:
+    if not curated:
         # 2. Generic reverse-domain rule for 2+ segment groups (parts[1]:parts[-1]):
         # org.apache.pdfbox -> apache:pdfbox, com.google.guava -> google:guava,
-        # io.netty -> netty:netty (2-segment, where parts[1] == parts[-1]). A wrong
-        # guess is self-correcting: grype produces an nvd:cpe finding only when the
-        # vendor:product actually exists in NVD, so a mis-derived product (e.g.
-        # org.springframework -> springframework:springframework) simply matches
-        # nothing — and the curated map above already overrides the ones we know
-        # (spring -> vmware). The residual risk (right product, loose version range)
-        # is handled by the NVD version filter in scan-nvd-cpe.py. A single-segment
-        # group (commons-fileupload) has no domain to split, so it is map-only.
-        # The last segment is the product only when it names the artifact's
-        # project (_segment_names_artifact); otherwise it is a packaging detail
+        # io.netty -> netty:netty (2-segment, where parts[1] == parts[-1]). A
+        # vendor:product that does not exist in NVD (e.g. org.springframework ->
+        # springframework:springframework) matches nothing, so that kind of wrong
+        # guess costs only the missed CVEs; the curated map above overrides the
+        # ones we know (spring -> vmware). A guess that hits a real but wrong
+        # NVD product is not caught: the NVD version filter in scan-nvd-cpe.py
+        # (opt-in, SECURITY_NVD_VERIFY) only drops matches whose version falls
+        # outside the NVD range, so it cannot tell that the CVE belongs to a
+        # different artifact of the same project. A single-segment group
+        # (commons-fileupload) has no domain to split, so it is map-only.
+        # The last segment is the product only when the artifactId starts with it
+        # (_segment_names_artifact); otherwise it is a packaging detail
         # (org.apache.httpcomponents.client5 / httpclient5 would give
         # apache:client5) and the artifactId is used instead (apache:httpclient5).
         parts = group.split(".")

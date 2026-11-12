@@ -283,9 +283,16 @@ def grype_input(sbom_path):
                 have.add(alt)
     try:
         fd, tmp = tempfile.mkstemp(prefix="bomlens-grype-", suffix=".json")
+    except OSError:
+        return sbom_path, False
+    try:
         with os.fdopen(fd, "w") as f:
             json.dump(doc, f, ensure_ascii=False)
-    except OSError:
+    except (OSError, TypeError, ValueError):
+        try:
+            os.remove(tmp)
+        except OSError:
+            pass
         return sbom_path, False
     return tmp, True
 

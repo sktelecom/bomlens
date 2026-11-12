@@ -2526,7 +2526,15 @@ cat > "$WORK/mvn-pkg.json" <<'JSON'
  {"type":"library","name":"snappy-java","version":"1.1.10.7","purl":"pkg:maven/org.xerial.snappy/snappy-java@1.1.10.7"},
  {"type":"library","name":"jackson-databind-2","version":"2.21.7","purl":"pkg:maven/com.fasterxml.jackson.core/jackson-databind@2.21.7"},
  {"type":"library","name":"preset-cpe","version":"1.0","purl":"pkg:maven/com.example/preset-cpe@1.0","cpe":"cpe:2.3:a:examplevendor:preset:1.0:*:*:*:*:*:*:*"},
- {"type":"library","name":"odd-coord","version":"1.0","purl":"pkg:maven/com.example/odd%20coord@1.0"}]}
+ {"type":"library","name":"odd-coord","version":"1.0","purl":"pkg:maven/com.example/odd%20coord@1.0"},
+ {"type":"library","name":"struts2-core","version":"2.3.31","purl":"pkg:maven/org.apache.struts/struts2-core@2.3.31"},
+ {"type":"library","name":"derbyclient","version":"10.14.2.0","purl":"pkg:maven/org.apache.derby/derbyclient@10.14.2.0"},
+ {"type":"library","name":"fontbox","version":"2.0.0","purl":"pkg:maven/org.apache.pdfbox/fontbox@2.0.0"},
+ {"type":"library","name":"tomcat-embed-core","version":"9.0.1","purl":"pkg:maven/org.apache.tomcat.embed/tomcat-embed-core@9.0.1"},
+ {"type":"library","name":"okhttp","version":"4.9.0","purl":"pkg:maven/com.squareup.okhttp3/okhttp@4.9.0"},
+ {"type":"library","name":"guice","version":"4.0","purl":"pkg:maven/com.google.inject/guice@4.0"},
+ {"type":"library","name":"gh-lib","version":"1.0","purl":"pkg:maven/com.github.someone/gh-lib@1.0"},
+ {"type":"library","name":"jquery","version":"3.0.0","purl":"pkg:maven/org.webjars.npm/jquery@3.0.0"}]}
 JSON
 python3 "$MVNCPE" "$WORK/mvn-pkg.json" >/dev/null 2>&1
 pkg_cpe_of() { jq -r --arg n "$1" '[.components[]|select(.name==$n)]|.[0].cpe // "NONE"' "$WORK/mvn-pkg.json"; }
@@ -2537,7 +2545,9 @@ check_pkg() {  # name, expected primary cpe, expected alternates JSON
 }
 check_pkg httpclient5 "cpe:2.3:a:apache:httpclient5:5.6.3:*:*:*:*:*:*:*" \
     '["cpe:2.3:a:org.apache.httpcomponents.client5:httpclient5:5.6.3:*:*:*:*:maven:*:*", "cpe:2.3:a:org.apache.httpcomponents:httpclient5:5.6.3:*:*:*:*:maven:*:*"]'
-check_pkg tomcat-embed-el "cpe:2.3:a:apache:tomcat:11.0.25:*:*:*:*:*:*:*" \
+# Only tomcat-embed-core is the Tomcat server (apache:tomcat); the other embed
+# artifacts fall back to the generic rule (product = artifactId).
+check_pkg tomcat-embed-el "cpe:2.3:a:apache:tomcat-embed-el:11.0.25:*:*:*:*:*:*:*" \
     '["cpe:2.3:a:org.apache.tomcat.embed:tomcat-embed-el:11.0.25:*:*:*:*:maven:*:*", "cpe:2.3:a:org.apache.tomcat:tomcat-embed-el:11.0.25:*:*:*:*:maven:*:*"]'
 check_pkg jackson-databind "cpe:2.3:a:fasterxml:jackson-databind:3.1.7:*:*:*:*:*:*:*" \
     '["cpe:2.3:a:tools.jackson.core:jackson-databind:3.1.7:*:*:*:*:maven:*:*", "cpe:2.3:a:tools.jackson:jackson-databind:3.1.7:*:*:*:*:maven:*:*"]'
@@ -2545,6 +2555,25 @@ check_pkg snappy-java "cpe:2.3:a:xerial:snappy-java:1.1.10.7:*:*:*:*:*:*:*" \
     '["cpe:2.3:a:org.xerial.snappy:snappy-java:1.1.10.7:*:*:*:*:maven:*:*", "cpe:2.3:a:org.xerial:snappy-java:1.1.10.7:*:*:*:*:maven:*:*"]'
 check_pkg jackson-databind-2 "cpe:2.3:a:fasterxml:jackson-databind:2.21.7:*:*:*:*:*:*:*" \
     '["cpe:2.3:a:com.fasterxml.jackson.core:jackson-databind:2.21.7:*:*:*:*:maven:*:*", "cpe:2.3:a:com.fasterxml.jackson:jackson-databind:2.21.7:*:*:*:*:maven:*:*"]'
+check_pkg tomcat-embed-core "cpe:2.3:a:apache:tomcat:9.0.1:*:*:*:*:*:*:*" \
+    '["cpe:2.3:a:org.apache.tomcat.embed:tomcat-embed-core:9.0.1:*:*:*:*:maven:*:*", "cpe:2.3:a:org.apache.tomcat:tomcat-embed-core:9.0.1:*:*:*:*:maven:*:*"]'
+# An artifactId that starts with the last groupId segment keeps the segment as
+# the product, with or without a separator (struts / struts2-core, derby /
+# derbyclient): NVD files these under apache:struts and apache:derby.
+check_pkg struts2-core "cpe:2.3:a:apache:struts:2.3.31:*:*:*:*:*:*:*" \
+    '["cpe:2.3:a:org.apache.struts:struts2-core:2.3.31:*:*:*:*:maven:*:*", "cpe:2.3:a:org.apache:struts2-core:2.3.31:*:*:*:*:maven:*:*"]'
+check_pkg derbyclient "cpe:2.3:a:apache:derby:10.14.2.0:*:*:*:*:*:*:*" \
+    '["cpe:2.3:a:org.apache.derby:derbyclient:10.14.2.0:*:*:*:*:maven:*:*", "cpe:2.3:a:org.apache:derbyclient:10.14.2.0:*:*:*:*:maven:*:*"]'
+# PDFBox subprojects stay on apache:pdfbox (curated).
+[ "$(pkg_cpe_of fontbox)" = "cpe:2.3:a:apache:pdfbox:2.0.0:*:*:*:*:*:*:*" ] && pass "fontbox -> apache:pdfbox (curated)" || fail "fontbox cpe='$(pkg_cpe_of fontbox)'"
+# The segment is a packaging detail when the artifactId does not start with it.
+[ "$(pkg_cpe_of okhttp)" = "cpe:2.3:a:squareup:okhttp:4.9.0:*:*:*:*:*:*:*" ] && pass "com.squareup.okhttp3/okhttp -> squareup:okhttp" || fail "okhttp cpe='$(pkg_cpe_of okhttp)'"
+[ "$(pkg_cpe_of guice)" = "cpe:2.3:a:google:guice:4.0:*:*:*:*:*:*:*" ] && pass "com.google.inject/guice -> google:guice" || fail "guice cpe='$(pkg_cpe_of guice)'"
+# A shared hosting namespace (com.github, org.webjars) is not used as a parent-groupId vendor.
+[ "$(pkg_alt_of gh-lib)" = '["cpe:2.3:a:com.github.someone:gh-lib:1.0:*:*:*:*:maven:*:*"]' ] \
+    && pass "no com.github parent-groupId candidate" || fail "gh-lib alternates='$(pkg_alt_of gh-lib)'"
+[ "$(pkg_alt_of jquery)" = '["cpe:2.3:a:org.webjars.npm:jquery:3.0.0:*:*:*:*:maven:*:*"]' ] \
+    && pass "no org.webjars parent-groupId candidate" || fail "jquery alternates='$(pkg_alt_of jquery)'"
 # A real pre-existing cpe is kept and gains only the package-style candidate
 # (2-segment groupId, so no parent candidate). It is not marked as derived.
 check_pkg preset-cpe "cpe:2.3:a:examplevendor:preset:1.0:*:*:*:*:*:*:*" \
