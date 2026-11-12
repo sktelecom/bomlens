@@ -1,5 +1,6 @@
 {"SchemaVersion":2,"Results":[{"Target":"bom","Class":"lang-pkgs","Type":"gomod","Vulnerabilities":[
  {"VulnerabilityID":"CVE-2099-1001","PkgName":"github.com/moby/moby","InstalledVersion":"v28.0.0+incompatible","PkgIdentifier":{"PURL":"pkg:golang/github.com/moby/moby@v28.0.0%2Bincompatible"},"Severity":"HIGH","SeveritySource":"ghsa","CVSS":{"ghsa":{"V3Score":8.8}}},
+ {"VulnerabilityID":"CVE-2099-1009","PkgName":"stdlib","InstalledVersion":"v1.21.3","PkgIdentifier":{"PURL":"pkg:golang/stdlib@v1.21.3"},"Severity":"MEDIUM","SeveritySource":"ghsa"},
  {"VulnerabilityID":"CVE-2099-1003","PkgName":"github.com/aws/aws-sdk-go","InstalledVersion":"v1.44.49","PkgIdentifier":{"PURL":"pkg:golang/github.com/aws/aws-sdk-go@v1.44.49"},"Severity":"MEDIUM","SeveritySource":"ghsa"}]},
  {"Target":"bom","Class":"lang-pkgs","Type":"npm","Vulnerabilities":[
  {"VulnerabilityID":"CVE-2021-23337","PkgName":"lodash","InstalledVersion":"4.17.20","PkgIdentifier":{"PURL":"pkg:npm/lodash@4.17.20"},"Severity":"HIGH","FixedVersion":"4.17.21"}]}]}

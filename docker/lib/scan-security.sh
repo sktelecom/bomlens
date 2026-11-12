@@ -197,25 +197,30 @@ if command -v grype >/dev/null 2>&1 && [ "${DEEP_CVE:-true}" != "false" ]; then
         || echo "[security] WARN: grype CPE (deep-cve) scan failed; reporting Trivy results only." >&2
 fi
 
-# Go vulnerability database (default on): Trivy's Go advisories come from the
-# GitHub Advisory Database only, so a Go module whose advisory exists only in
-# vuln.go.dev (GO- ids), or is filed there under another module or a package
-# path, is not reported. scan-go-vulndb.py matches each pkg:golang component
-# against the database snapshot bundled in the image (or BOMLENS_GO_VULNDB_PATH:
-# vulndb.zip from vuln.go.dev, or a folder holding it unpacked) and writes the
-# findings no report above already lists, by CVE, GHSA or GO id, as
-# _security_govulndb.json. No network. BOMLENS_GO_VULNDB=false turns it off.
-# entrypoint.sh records the step (go-vulndb) from this file.
+# Go vulnerability database (default on): in the Trivy database measured for
+# #977, every Go finding had DataSource.ID "ghsa", and Go advisories that exist
+# only in vuln.go.dev (GO- ids), or that the GitHub Advisory Database files
+# under another module or a package path, were not reported. scan-go-vulndb.py
+# matches each pkg:golang component against the database snapshot bundled in
+# the image (or BOMLENS_GO_VULNDB_PATH: vulndb.zip from vuln.go.dev, or a
+# folder holding it unpacked) and writes the findings no report above already
+# lists, by CVE, GHSA or GO id, as _security_govulndb.json. A bundled snapshot
+# older than BOMLENS_GO_VULNDB_MAX_AGE_DAYS is replaced for this scan by a
+# download (BOMLENS_GO_VULNDB_URL) unless the scan is offline; see the script.
+# BOMLENS_GO_VULNDB=false turns it off. entrypoint.sh records the step
+# (go-vulndb) from BOMLENS_GO_VULNDB_STATUS_FILE and this file.
 GOVULNDB_SIDECAR="${OUT_PREFIX}_security_govulndb.json"
 rm -f "$GOVULNDB_SIDECAR"
 GOVULNDB_DB="${BOMLENS_GO_VULNDB_PATH:-$SCRIPT_DIR/go-vulndb.zip}"
+_gv_flags=()
+[ -n "${BOMLENS_GO_VULNDB_PATH:-}" ] || _gv_flags=(--bundled)
 if [ "${BOMLENS_GO_VULNDB:-true}" != "false" ] && [ -e "$GOVULNDB_DB" ] && [ -f "$SCRIPT_DIR/scan-go-vulndb.py" ]; then
     _gv_reports=("$JSON")
     for _gv_engine in cvebintool grype; do
         [ -f "${OUT_PREFIX}_security_${_gv_engine}.json" ] && _gv_reports+=("${OUT_PREFIX}_security_${_gv_engine}.json")
     done
     _gv_rc=0
-    python3 "$SCRIPT_DIR/scan-go-vulndb.py" "$SBOM" "$OUT_PREFIX" "$GOVULNDB_DB" "${_gv_reports[@]}" || _gv_rc=$?
+    python3 "$SCRIPT_DIR/scan-go-vulndb.py" "${_gv_flags[@]}" "$SBOM" "$OUT_PREFIX" "$GOVULNDB_DB" "${_gv_reports[@]}" || _gv_rc=$?
     case "$_gv_rc" in
         0|11) ;;
         *) rm -f "$GOVULNDB_SIDECAR"

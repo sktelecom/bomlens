@@ -254,16 +254,22 @@ er_finish() {
     local engines="[]" e go_vulndb="null" gvf=""
     if [ "$sec_present" = true ]; then
         engines='["trivy"]'
-        for e in grype cvebintool yocto govulndb; do
+        for e in grype cvebintool yocto; do
             if [ -f "$outdir/${OUT_PREFIX}_security_${e}.json" ] || [ -f "${OUT_PREFIX}_security_${e}.json" ]; then
-                case "$e" in cvebintool) e="cve-bin-tool" ;; govulndb) e="go-vulndb" ;; esac
+                [ "$e" = cvebintool ] && e="cve-bin-tool"
                 engines="$(jq -c --arg e "$e" '. + [$e]' <<<"$engines")"
             fi
         done
+        # The Go vulnerability database counts only when it matched a
+        # component: its sidecar is also written for an SBOM whose Go modules
+        # had no version it could read, and the step is skipped then.
         if [ -f "$outdir/${OUT_PREFIX}_security_govulndb.json" ]; then gvf="$outdir/${OUT_PREFIX}_security_govulndb.json"
         elif [ -f "${OUT_PREFIX}_security_govulndb.json" ]; then gvf="${OUT_PREFIX}_security_govulndb.json"; fi
-        [ -n "$gvf" ] && go_vulndb="$(jq -c '{updated_at: ((.GoVulnDB.Modified // "") | if . == "" then null else . end)}' "$gvf" 2>/dev/null || echo null)"
-        [ -n "$go_vulndb" ] || go_vulndb="null"
+        if [ -n "$gvf" ] && jq -e '(.GoVulnDB.Components // 0) > 0' "$gvf" >/dev/null 2>&1; then
+            engines="$(jq -c '. + ["go-vulndb"]' <<<"$engines")"
+            go_vulndb="$(jq -c '{updated_at: ((.GoVulnDB.Modified // "") | if . == "" then null else . end)}' "$gvf" 2>/dev/null || echo null)"
+            [ -n "$go_vulndb" ] || go_vulndb="null"
+        fi
     fi
 
     # Tool versions: the generator recorded in the SBOM, then the bundled tools.

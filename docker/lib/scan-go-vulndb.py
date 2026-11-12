@@ -8,7 +8,10 @@
 # findings no other engine reported as a Trivy-shaped sidecar for
 # scan-security.sh to merge.
 #
-# Usage: scan-go-vulndb.py <sbom.json> <out_prefix> <vulndb> [report.json ...]
+# Usage: scan-go-vulndb.py [--bundled] <sbom.json> <out_prefix> <vulndb> [report.json ...]
+#        scan-go-vulndb.py --fetch <out.zip>     (image build: bundle the snapshot)
+#   --bundled      <vulndb> is the snapshot in the image, which may be replaced
+#                  for this scan when it is old (see below)
 #   <vulndb>       the database export: vulndb.zip from https://vuln.go.dev, or
 #                  a folder holding its index/db.json and ID/GO-*.json
 #   report.json    results already in hand (Trivy's _security.json, another
@@ -18,7 +21,18 @@
 # Exit codes: 0 the sidecar was written (it may list no finding, and
 # GoVulnDB.Components is 0 when no Go version could be read), 11 the SBOM has
 # no pkg:golang purl with a version (no sidecar), 3 the database could not be
-# read (no sidecar), 2 usage or an unreadable SBOM.
+# read (no sidecar), 2 usage or an unreadable SBOM. The outcome also goes to
+# the file BOMLENS_GO_VULNDB_STATUS_FILE names, when set, as JSON
+# {"status": "ok"|"degraded"|"failed"|"no_input", "detail": ...}.
+#
+# Database age: a database older than BOMLENS_GO_VULNDB_MAX_AGE_DAYS (7) days,
+# counted from index/db.json "modified", misses what was published since. When
+# it is the bundled snapshot and the scan is not offline (TRIVY_OFFLINE_SCAN or
+# TRIVY_SKIP_DB_UPDATE), a newer export is downloaded from BOMLENS_GO_VULNDB_URL
+# (default https://vuln.go.dev/vulndb.zip, 60 s) into a temporary folder that
+# is removed at exit, checked as the image build checks it, and read instead.
+# Otherwise the old database is read and the step is reported as degraded. A
+# database the caller named is never replaced.
 #
 # Matching:
 #   - a component is a Go module when its purl is pkg:golang/<module path>@<v>;
@@ -30,7 +44,11 @@
 #   - versions are compared as semantic versions, without the leading "v":
 #     build metadata such as +incompatible is ignored, as semver orders it,
 #     and a pseudo-version is an ordinary pre-release; the standard library
-#     (stdlib) takes Go release names (go1.21.3, go1.22rc1) too
+#     (stdlib) and toolchain take Go release names (go1.21.3, go1.22rc1) too,
+#     without what a build appends (go1.21.3 X:boringcrypto, -vendor)
+#   - a record that lists one module in several entries is judged on all of
+#     them; the fixed version given is the smallest one above the installed
+#     version that no entry still marks as affected
 #   - affected[].ranges are evaluated as OSV specifies (introduced, fixed,
 #     last_affected); a withdrawn record is skipped
 #
@@ -43,15 +61,29 @@
 # takes that rating, otherwise it is UNKNOWN.
 #
 # The database is read in place (a zip member or a file under the folder is
-# opened by its own name, nothing is extracted) and no network is used.
+# opened by its own name, nothing is extracted). The only network use is the
+# download of an old bundled snapshot's replacement described above.
+import atexit
+import io
 import json
 import os
 import re
+import shutil
+import signal
 import sys
+import tempfile
+import urllib.request
 import zipfile
 from datetime import datetime, timezone
 from urllib.parse import unquote
 
+DEFAULT_URL = "https://vuln.go.dev/vulndb.zip"
+DEFAULT_MAX_AGE_DAYS = 7
+DOWNLOAD_TIMEOUT = 60
+BUILD_DOWNLOAD_TIMEOUT = 120
+# The export is about 3.6 MB (2026-11).
+MAX_DOWNLOAD_BYTES = 256 * 1024 * 1024
+EXPORT_NAME = re.compile(r"^(index/(db|modules|vulns)\.json|ID/GO-[0-9]{4}-[0-9]+\.json)$")
 GO_VULN_URL = "https://pkg.go.dev/vuln/"
 DATA_SOURCE = {"ID": "go-vulndb", "Name": "The Go Vulnerability Database", "URL": GO_VULN_URL}
 RECORD_NAME = re.compile(r"^ID/GO-[0-9]{4}-[0-9]+\.json$")
@@ -60,7 +92,10 @@ MAX_RECORD_BYTES = 4 * 1024 * 1024
 MAX_TOTAL_BYTES = 512 * 1024 * 1024
 SEMVER = re.compile(r"^v?([0-9]+)(?:\.([0-9]+))?(?:\.([0-9]+))?"
                     r"(?:-([0-9A-Za-z.-]+))?(?:\+[0-9A-Za-z.-]+)?$")
-GO_RELEASE = re.compile(r"^go([0-9]+)(?:\.([0-9]+))?(?:\.([0-9]+))?(?:(alpha|beta|rc)([0-9]+))?$")
+GO_RELEASE = re.compile(r"^go([0-9]+)(?:\.([0-9]+))?(?:\.([0-9]+))?(?:(alpha|beta|rc)([0-9]+))?(?:[-+].*)?$")
+GO_RELEASE_PRE = re.compile(r"^(alpha|beta|rc)\.[0-9]+$")
+# The modules whose versions are Go releases.
+GO_RELEASE_PATHS = ("stdlib", "toolchain")
 
 
 class DatabaseError(Exception):
@@ -103,18 +138,54 @@ def compare(a, b):
 
 
 def stdlib_version(v):
-    """A Go release name (go1.21.3, go1.22rc1) as the semver the database uses."""
-    m = GO_RELEASE.match(v or "")
+    """A stdlib or toolchain version as the semver the database uses, or None.
+
+    Takes Go release names (go1.21.3, go1.22rc1) and semvers (v1.21.3,
+    1.21.0-rc.2). What a build appends is dropped: the part after the first
+    space (go1.21.3 X:boringcrypto) and a vendor suffix after the release
+    (go1.21.3-bigcorp, 1.21.3-bigcorp), as Go releases have no pre-release
+    other than alpha, beta and rc."""
+    v = (v or "").strip().split(" ", 1)[0]
+    m = GO_RELEASE.match(v)
+    if m:
+        out = "%s.%s.%s" % (m.group(1), m.group(2) or "0", m.group(3) or "0")
+        if m.group(4):
+            out += "-%s.%s" % (m.group(4), m.group(5))
+        return out
+    m = SEMVER.match(v)
     if not m:
-        return v
+        return None
     out = "%s.%s.%s" % (m.group(1), m.group(2) or "0", m.group(3) or "0")
-    if m.group(4):
-        out += "-%s.%s" % (m.group(4), m.group(5))
+    if m.group(4) and GO_RELEASE_PRE.match(m.group(4)):
+        out += "-" + m.group(4)
     return out
 
 
+def module_version(path, version):
+    """The version of a component as compared with the database (a string)."""
+    if path in GO_RELEASE_PATHS:
+        return stdlib_version(version)
+    return version[1:] if version[:1] == "v" else version
+
+
+def fixed_version(ver, entries):
+    """The smallest fixed version above ver that no entry still marks as
+    affected, or None. A record can list one module in several entries (one
+    range each, GO-2025-3540 for go-redis/v9): a fix in one entry can sit
+    inside another entry's range, and that is not a version to move to."""
+    cands = {}
+    for aff in entries:
+        for val in in_ranges(ver, aff)[1]:
+            cands.setdefault(val, parse_semver(val))
+    for val in sorted(cands, key=lambda x: _Key(cands[x])):
+        if not any(in_ranges(cands[val], aff)[0] for aff in entries):
+            return val
+    return None
+
+
 def in_ranges(ver, affected):
-    """(affected?, [fixed versions above ver]) for one affected[] entry."""
+    """(affected?, [fixed versions above ver in any range]) for one affected[]
+    entry."""
     hit = False
     fixes = []
     for r in affected.get("ranges") or []:
@@ -143,7 +214,7 @@ def in_ranges(ver, affected):
                 vulnerable = False
         if vulnerable:
             hit = True
-            fixes += [val for pv, kind, val in events if kind == "fixed" and compare(pv, ver) > 0]
+        fixes += [val for pv, kind, val in events if kind == "fixed" and compare(pv, ver) > 0]
     if not hit and not affected.get("ranges"):
         versions = affected.get("versions") or []
         hit = any(parse_semver(x) is not None and compare(parse_semver(x), ver) == 0
@@ -317,15 +388,17 @@ def go_component(comp):
     version = unquote(version)
     if not path or not version:
         return None
-    parsed = parse_semver(stdlib_version(version) if path == "stdlib" else version)
+    parsed = parse_semver(module_version(path, version) or "")
     if parsed is None:
         return None
     return path, version, parsed, purl
 
 
 def component_key(path, version):
-    v = version[1:] if version[:1] == "v" else version
-    return (path.lower() + "@" + v).lower()
+    """The key a component and another engine's finding on it share: the path
+    and the version as compared (go1.21.3, v1.21.3 and 1.21.3 agree)."""
+    v = module_version(path, version)
+    return (path.lower() + "@" + (v if v is not None else version)).lower()
 
 
 def finding_keys(f):
@@ -365,7 +438,7 @@ def load_reports(paths):
 
 # ---- matching -------------------------------------------------------------------
 
-def record_for(rec, aff, how, comp, fixes, rated, comp_ref):
+def record_for(rec, aff, how, comp, fixed, rated, comp_ref):
     path, version, _, purl = comp
     primary, ids = vuln_ids(rec)
     out = {
@@ -375,7 +448,7 @@ def record_for(rec, aff, how, comp, fixes, rated, comp_ref):
         "PkgName": path,
         "PkgIdentifier": {"PURL": purl, **({"BOMRef": comp_ref} if comp_ref else {})},
         "InstalledVersion": version,
-        "Status": "fixed" if fixes else "affected",
+        "Status": "fixed" if fixed else "affected",
         "Severity": "UNKNOWN",
         "PrimaryURL": GO_VULN_URL + rec["id"],
         "DataSource": dict(DATA_SOURCE),
@@ -392,9 +465,8 @@ def record_for(rec, aff, how, comp, fixes, rated, comp_ref):
                                 if isinstance(i, dict) and isinstance(i.get("path"), str)}),
         },
     }
-    if fixes:
-        uniq = sorted(set(fixes), key=lambda x: _Key(parse_semver(x)))
-        out["FixedVersion"] = ", ".join(uniq)
+    if fixed:
+        out["FixedVersion"] = fixed
     if rec.get("published"):
         out["PublishedDate"] = rec["published"]
     if rec.get("modified"):
@@ -413,12 +485,14 @@ def record_for(rec, aff, how, comp, fixes, rated, comp_ref):
 def scan(sbom, records, reports):
     index = build_index(records)
     seen, rated = load_reports(reports)
-    comps, kept = [], []
+    comps, kept, unreadable = [], [], []
     already = 0
     done = set()
     for c in walk(sbom.get("components")):
         gc = go_component(c)
         if gc is None:
+            if has_go_purl(c):
+                unreadable.append(c["purl"])
             continue
         path, version, ver, _ = gc
         key = component_key(path, version)
@@ -436,24 +510,151 @@ def scan(sbom, records, reports):
             entries = by_record[rid]
             if any(h == "module" for _, _, h in entries):
                 entries = [e for e in entries if e[2] == "module"]
-            for rec, aff, how in entries:
-                hit, fixes = in_ranges(ver, aff)
-                if not hit:
-                    continue
-                _, ids = vuln_ids(rec)
-                if reported & set(ids):
-                    already += 1
-                    break
-                kept.append(record_for(rec, aff, how, gc, fixes, rated, c.get("bom-ref")))
-                reported |= set(ids)
-                break
+            # Every entry for this path counts: one record can list a module
+            # several times, one range each.
+            hits = [e for e in entries if in_ranges(ver, e[1])[0]]
+            if not hits:
+                continue
+            rec, aff, how = hits[0]
+            _, ids = vuln_ids(rec)
+            if reported & set(ids):
+                already += 1
+                continue
+            fixed = fixed_version(ver, [e[1] for e in entries])
+            kept.append(record_for(rec, aff, how, gc, fixed, rated, c.get("bom-ref")))
+            reported |= set(ids)
+    if unreadable:
+        print("[go-vulndb] WARN: %d Go module(s) skipped: their version is not a semantic version or a Go "
+              "release (e.g. %s)" % (len(unreadable), unreadable[0]), file=sys.stderr)
     return comps, kept, already
 
 
+# ---- a newer export -------------------------------------------------------------
+
+def validate_export(blob):
+    """(record count, modified) of a vulndb.zip held in memory, or DatabaseError.
+    Every name must be one the export publishes (index/db.json, modules.json,
+    vulns.json, ID/GO-*.json), so nothing in it can name a path elsewhere."""
+    if len(blob) > MAX_DOWNLOAD_BYTES:
+        raise DatabaseError("the export is larger than %d bytes" % MAX_DOWNLOAD_BYTES)
+    try:
+        with zipfile.ZipFile(io.BytesIO(blob)) as z:
+            names = z.namelist()
+            bad = [n for n in names if not EXPORT_NAME.match(n)]
+            if bad:
+                raise DatabaseError("unexpected entries in the export (%s)" % ", ".join(bad[:3]))
+            records = [n for n in names if RECORD_NAME.match(n)]
+            try:
+                modified = json.loads(z.read("index/db.json")).get("modified", "")
+            except (KeyError, ValueError, AttributeError):
+                modified = ""
+            if not records or not isinstance(modified, str) or not modified:
+                raise DatabaseError("the export has no records or no date")
+            if z.testzip() is not None:
+                raise DatabaseError("the export is corrupt")
+    except zipfile.BadZipFile as exc:
+        raise DatabaseError("not a zip archive: %s" % exc)
+    return len(records), modified
+
+
+def fetch(url, out, timeout):
+    """Download vulndb.zip from url, check it and write it to out. Returns
+    (record count, modified); DatabaseError when it cannot be used."""
+    if not re.match(r"^(https?|file)://", url):
+        raise DatabaseError("%s is not an http, https or file URL" % url)
+    req = urllib.request.Request(url, headers={"Accept": "application/zip",
+                                               "User-Agent": "bomlens-go-vulndb"})
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:  # noqa: S310 (scheme checked above)
+            blob = resp.read(MAX_DOWNLOAD_BYTES + 1)
+    except (OSError, ValueError) as exc:
+        raise DatabaseError("download from %s failed: %s" % (url, exc))
+    n, modified = validate_export(blob)
+    tmp = out + ".tmp.%d" % os.getpid()
+    with open(tmp, "wb") as f:
+        f.write(blob)
+    os.replace(tmp, out)
+    return n, modified
+
+
+def _max_age_days():
+    raw = os.environ.get("BOMLENS_GO_VULNDB_MAX_AGE_DAYS", "")
+    return int(raw) if raw.isdigit() else DEFAULT_MAX_AGE_DAYS
+
+
+def _offline():
+    """True when the scan was set up not to update vulnerability databases."""
+    return any(os.environ.get(n, "").lower() == "true"
+               for n in ("TRIVY_OFFLINE_SCAN", "TRIVY_SKIP_DB_UPDATE"))
+
+
+def _write_status(status, detail=""):
+    """Tell entrypoint.sh how the match went: BOMLENS_GO_VULNDB_STATUS_FILE."""
+    path = os.environ.get("BOMLENS_GO_VULNDB_STATUS_FILE", "")
+    if not path:
+        return
+    try:
+        with open(path, "w") as f:
+            json.dump({"status": status, "detail": detail}, f)
+    except OSError:
+        pass
+
+
+def refresh_if_old(db_path, bundled, modified, records):
+    """(db description, modified, records, degraded reason or "").
+
+    A bundled snapshot older than the limit is replaced, for this scan only,
+    by a download from BOMLENS_GO_VULNDB_URL, unless the scan is offline. A
+    database the caller named is never replaced."""
+    max_days = _max_age_days()
+    age = age_days(modified)
+    if age is None or age <= max_days:
+        return "bundled" if bundled else "named", modified, records, ""
+    old = "the Go vulnerability database is %d days old (over %d)" % (age, max_days)
+    if not bundled:
+        return "named", modified, records, old + "; it is the one BOMLENS_GO_VULNDB_PATH names, so it is not replaced"
+    if _offline():
+        return "bundled", modified, records, old + "; not refreshed, the scan is offline (TRIVY_OFFLINE_SCAN or TRIVY_SKIP_DB_UPDATE)"
+    url = os.environ.get("BOMLENS_GO_VULNDB_URL") or DEFAULT_URL
+    print("[go-vulndb] %s; downloading a newer one from %s" % (old, url))
+    try:
+        tmpdir = tempfile.mkdtemp(prefix="bomlens-go-vulndb.")
+    except OSError as exc:
+        return "bundled", modified, records, old + "; no temporary folder for a newer one: %s" % exc
+    atexit.register(shutil.rmtree, tmpdir, True)
+    try:
+        fresh = os.path.join(tmpdir, "vulndb.zip")
+        fetch(url, fresh, DOWNLOAD_TIMEOUT)
+        new_modified, new_records = open_database(fresh)
+    except DatabaseError as exc:
+        print("[go-vulndb] WARN: %s; reading the snapshot in the image" % exc, file=sys.stderr)
+        return "bundled", modified, records, old + "; the download of a newer one failed: %s" % exc
+    print("[go-vulndb] downloaded the Go vulnerability database of %s (%d records)" % (new_modified, len(new_records)))
+    new_age = age_days(new_modified)
+    if new_age is not None and new_age > max_days:
+        return "downloaded", new_modified, new_records, (
+            "the downloaded Go vulnerability database is %d days old (over %d)" % (new_age, max_days))
+    return "downloaded", new_modified, new_records, ""
+
+
 def main(argv):
+    if len(argv) == 3 and argv[1] == "--fetch":
+        # Image build: bundle the snapshot (see docker/Dockerfile).
+        url = os.environ.get("BOMLENS_GO_VULNDB_URL") or DEFAULT_URL
+        try:
+            n, modified = fetch(url, argv[2], BUILD_DOWNLOAD_TIMEOUT)
+        except (DatabaseError, OSError) as exc:
+            print("[build] Go vulnerability database snapshot skipped: %s" % exc)
+            return 1
+        print("[build] Go vulnerability database snapshot: %d records, modified %s -> %s" % (n, modified, argv[2]))
+        return 0
+    bundled = False
+    if len(argv) > 1 and argv[1] == "--bundled":
+        bundled = True
+        argv = argv[:1] + argv[2:]
     if len(argv) < 4:
-        print("usage: scan-go-vulndb.py <sbom.json> <out_prefix> <vulndb.zip|folder> [report.json ...]",
-              file=sys.stderr)
+        print("usage: scan-go-vulndb.py [--bundled] <sbom.json> <out_prefix> <vulndb.zip|folder> [report.json ...]\n"
+              "       scan-go-vulndb.py --fetch <out.zip>", file=sys.stderr)
         return 2
     sbom_path, out_prefix, db_path, reports = argv[1], argv[2], argv[3], argv[4:]
     try:
@@ -461,15 +662,19 @@ def main(argv):
             sbom = json.load(f)
     except (OSError, ValueError) as exc:
         print("[go-vulndb] cannot read the SBOM %s: %s" % (sbom_path, exc), file=sys.stderr)
+        _write_status("failed", "cannot read the SBOM")
         return 2
     if not isinstance(sbom, dict) or not any(has_go_purl(c) for c in walk(sbom.get("components"))):
         print("[go-vulndb] no Go module (pkg:golang) in the SBOM; nothing to match.")
+        _write_status("no_input", "no Go module (pkg:golang) in the SBOM")
         return 11
     try:
         modified, records = open_database(db_path)
     except DatabaseError as exc:
         print("[go-vulndb] cannot read the Go vulnerability database: %s" % exc, file=sys.stderr)
+        _write_status("failed", "could not read the Go vulnerability database at %s: %s" % (db_path, exc))
         return 3
+    source, modified, records, degraded = refresh_if_old(db_path, bundled, modified, records)
     comps, kept, already = scan(sbom, records, reports)
     sidecar = {
         "Results": [{
@@ -481,17 +686,27 @@ def main(argv):
         "GoVulnDB": {
             "Modified": modified,
             "AgeDays": age_days(modified),
+            "Source": source,
             "Records": len(records),
             "Components": len(comps),
             "New": len(kept),
             "AlreadyReported": already,
         },
     }
+    if degraded:
+        sidecar["GoVulnDB"]["Degraded"] = degraded
     out = "%s_security_govulndb.json" % out_prefix
     tmp = out + ".tmp.%d" % os.getpid()
     with open(tmp, "w") as f:
         json.dump(sidecar, f, ensure_ascii=False)
     os.replace(tmp, out)
+    if not comps:
+        _write_status("no_input", "no Go module with a semantic version in the SBOM")
+    elif degraded:
+        print("[go-vulndb] WARN: %s; Go advisories published since are not reported" % degraded, file=sys.stderr)
+        _write_status("degraded", degraded)
+    else:
+        _write_status("ok")
     print("[go-vulndb] %d Go module(s) checked against %d record(s) (database of %s): %d new finding(s), "
           "%d already reported by another engine -> %s"
           % (len(comps), len(records), modified or "unknown date", len(kept), already, os.path.basename(out)))
@@ -499,4 +714,7 @@ def main(argv):
 
 
 if __name__ == "__main__":
+    # A cancelled scan ends with SIGTERM; exit through sys.exit so the atexit
+    # cleanup of a downloaded database runs.
+    signal.signal(signal.SIGTERM, lambda _sig, _frame: sys.exit(143))
     sys.exit(main(sys.argv))

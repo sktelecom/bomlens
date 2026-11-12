@@ -13,6 +13,9 @@
     {"type": "library", "bom-ref": "stdlib", "name": "stdlib", "version": "go1.21.3", "purl": "pkg:golang/stdlib@go1.21.3"},
     {"type": "library", "bom-ref": "pseudo", "name": "github.com/example/pseudo", "version": "v0.0.0-20210601000000-abcdefabcdef", "purl": "pkg:golang/github.com/example/pseudo@v0.0.0-20210601000000-abcdefabcdef"},
     {"type": "library", "bom-ref": "pseudo-v2", "name": "github.com/example/pseudo/v2", "version": "v2.0.0", "purl": "pkg:golang/github.com/example/pseudo/v2@v2.0.0"},
+    {"type": "library", "bom-ref": "go-redis", "name": "github.com/redis/go-redis/v9", "version": "v9.5.3", "purl": "pkg:golang/github.com/redis/go-redis/v9@v9.5.3"},
+    {"type": "library", "bom-ref": "toolchain", "name": "toolchain", "version": "go1.21.3 X:boringcrypto", "purl": "pkg:golang/toolchain@go1.21.3%20X:boringcrypto"},
+    {"type": "application", "bom-ref": "main", "name": "example.com/main", "version": "(devel)", "purl": "pkg:golang/example.com/main@(devel)"},
     {"type": "library", "bom-ref": "lodash", "name": "lodash", "version": "4.17.20", "purl": "pkg:npm/lodash@4.17.20"}
   ]
 }
