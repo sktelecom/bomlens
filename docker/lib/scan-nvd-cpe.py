@@ -29,12 +29,27 @@
 # unreachable (air-gapped) the filter is skipped and every kept finding is flagged
 # bomlens:cpeVersionUnverified so the report can show the caveat instead of hiding
 # possible false positives.
+#
+# Database age: grype refuses a database built more than 5 days ago, and the
+# deep-cve image bakes its database in at build time. A database older than
+# BOMLENS_GRYPE_DB_MAX_AGE_DAYS (7) days is updated first with `grype db update`
+# (into a temporary folder when the image's cache cannot be written), unless the
+# scan is offline (TRIVY_OFFLINE_SCAN or TRIVY_SKIP_DB_UPDATE). A database that
+# is not updated is still read, with grype's own age limit raised to accept it,
+# and the step is reported as degraded with the database's age. The outcome goes
+# to the file BOMLENS_DEEP_CVE_STATUS_FILE names, when set, as JSON
+# {"status": "ok"|"degraded"|"failed", "detail": ...} for entrypoint.sh.
+import atexit
+import fcntl
 import json
 import os
 import re
+import shutil
+import signal
 import sqlite3
 import subprocess
 import sys
+import tempfile
 import time
 from datetime import datetime, timezone
 
@@ -134,9 +149,37 @@ def _nvd_matches(cve, key, cache):
     return matches
 
 
+_CPE_FIELD_SPLIT = re.compile(r"(?<!\\):")
+_CPE_UNESCAPE = re.compile(r"\\(.)")
+
+
 def _cpe_product(cpe):
-    parts = (cpe or "").split(":")
-    return parts[4] if len(parts) > 4 else ""
+    """Product field of a cpe:2.3 string, unescaped and lowercased so a grype
+    CPE ("jackson\\-databind") and an NVD criteria string compare equal."""
+    parts = _CPE_FIELD_SPLIT.split(cpe or "")
+    return _CPE_UNESCAPE.sub(r"\1", parts[4]).lower() if len(parts) > 4 else ""
+
+
+def _matched_products(m):
+    """Products of the NVD CPEs this grype match was found through
+    (matchDetails[].found.cpes), so the version filter checks the record that
+    actually matched, whichever of the component's CPEs (primary or an
+    alternate) grype searched. Falls back to the component's first CPE when
+    grype reports no found CPE."""
+    out = set()
+    for d in m.get("matchDetails") or []:
+        found = d.get("found") if isinstance(d, dict) else None
+        if isinstance(found, dict):
+            for c in found.get("cpes") or []:
+                prod = _cpe_product(c)
+                if prod:
+                    out.add(prod)
+    if not out:
+        cpes = (m.get("artifact") or {}).get("cpes") or []
+        prod = _cpe_product(cpes[0]) if cpes else ""
+        if prod:
+            out.add(prod)
+    return out
 
 
 def _nvd_cpe_vendor_severity(m, vuln, is_nvd):
@@ -155,20 +198,184 @@ def _nvd_cpe_vendor_severity(m, vuln, is_nvd):
     return {"nvd": n} if n is not None else None
 
 
-def _grype_db_path():
-    """Path to grype's local sqlite vulnerability DB, or None if unavailable."""
+# The environment every grype call of this run uses: the database location and
+# age limit _prepare_grype_db settled on.
+_GRYPE_ENV = None
+
+
+def _grype_env():
+    return _GRYPE_ENV if _GRYPE_ENV is not None else dict(os.environ)
+
+
+def _grype_db_status(env):
+    """`grype db status -o json` as a dict, or None when it cannot be read.
+
+    grype exits 1 for a database it considers invalid (too old, for one) but
+    still prints the status, so the exit code is not checked here."""
     try:
         p = subprocess.run([GRYPE, "db", "status", "-o", "json"],
-                            capture_output=True, text=True, timeout=30)
-        if p.returncode != 0:
-            return None
+                           capture_output=True, text=True, env=env, timeout=30)
         data = json.loads(p.stdout)
-        path = data.get("path")
-        if path and os.path.exists(path):
-            return path
     except Exception:
-        pass
+        return None
+    return data if isinstance(data, dict) else None
+
+
+def _grype_db_path():
+    """Path to grype's local sqlite vulnerability DB, or None if unavailable."""
+    data = _grype_db_status(_grype_env()) or {}
+    path = data.get("path")
+    if path and os.path.exists(path):
+        return path
     return None
+
+
+def _db_age_days(status):
+    """Whole days since the database in `status` was built, or None."""
+    raw = str((status or {}).get("built") or "").strip()
+    m = re.match(r"^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})", raw)
+    if not m:
+        return None
+    try:
+        built = datetime.strptime(m.group(1), "%Y-%m-%dT%H:%M:%S").replace(tzinfo=timezone.utc)
+    except ValueError:
+        return None
+    if built.year < 2000:
+        # A zero time: no database to date.
+        return None
+    return max(0, int((datetime.now(timezone.utc) - built).total_seconds() // 86400))
+
+
+def _max_age_days():
+    raw = os.environ.get("BOMLENS_GRYPE_DB_MAX_AGE_DAYS", "")
+    return int(raw) if raw.isdigit() else 7
+
+
+def _offline():
+    """True when the scan was set up not to update vulnerability databases."""
+    return any(os.environ.get(n, "").lower() == "true"
+               for n in ("TRIVY_OFFLINE_SCAN", "TRIVY_SKIP_DB_UPDATE"))
+
+
+_ANSI = re.compile(r"\x1b\[[0-9;]*[A-Za-z]")
+
+
+def _stderr_cause(text, lines=3):
+    """The last few lines grype wrote to stderr, without colours or log
+    prefixes, joined into one line for a step detail."""
+    out = []
+    for line in _ANSI.sub("", text or "").splitlines():
+        line = re.sub(r"^\[\d+\]\s+(ERROR|WARN|INFO|DEBUG)\s+", "", line.strip())
+        if line:
+            out.append(line)
+    return " | ".join(out[-lines:])[:300]
+
+
+def _writable_tree(path):
+    """True when this user can write `path` and every folder under it."""
+    if not path or not os.path.isdir(path):
+        return False
+    for root, _dirs, _files in os.walk(path):
+        if not os.access(root, os.W_OK | os.X_OK):
+            return False
+    return True
+
+
+def _update_grype_db(env):
+    """Run `grype db update`. Returns (env to use, None) when the database was
+    updated, or (None, cause) when it was not. The image's cache folder is used
+    when this user can write it, one update at a time (scans in one container
+    share it); otherwise a temporary folder, removed at exit."""
+    cache = env.get("GRYPE_DB_CACHE_DIR", "")
+    if _writable_tree(cache):
+        try:
+            lock = open(os.path.join(cache, ".bomlens-update.lock"), "a")
+            fcntl.flock(lock, fcntl.LOCK_EX)
+        except OSError:
+            lock = None
+        try:
+            # Another scan may have updated it while this one waited.
+            st = _grype_db_status(env)
+            age = _db_age_days(st)
+            if (st or {}).get("valid") and age is not None and age <= _max_age_days():
+                return dict(env), None
+            return _run_grype_db_update(env, cache)
+        finally:
+            if lock is not None:
+                lock.close()
+    else:
+        try:
+            cache = tempfile.mkdtemp(prefix="bomlens-grype-db.")
+        except OSError as e:
+            return None, f"no writable folder for the update: {e}"
+        atexit.register(shutil.rmtree, cache, True)
+        return _run_grype_db_update(env, cache)
+
+
+def _run_grype_db_update(env, cache):
+    new_env = dict(env, GRYPE_DB_CACHE_DIR=cache)
+    new_env.pop("GRYPE_DB_MAX_ALLOWED_BUILT_AGE", None)
+    try:
+        # grype's own limits: up to 30 s to check for an update, 300 s to download.
+        p = subprocess.run([GRYPE, "db", "update"], capture_output=True, text=True,
+                           env=new_env, timeout=400)
+    except subprocess.TimeoutExpired:
+        return None, "grype db update timed out"
+    except OSError as e:
+        return None, str(e)
+    if p.returncode != 0:
+        return None, _stderr_cause(p.stderr) or f"grype db update exited {p.returncode}"
+    st = _grype_db_status(new_env)
+    if not (st or {}).get("valid"):
+        return None, (st or {}).get("error") or "the updated database is not valid"
+    return new_env, None
+
+
+def _prepare_grype_db():
+    """Settle which grype database this run reads. Returns (env, degraded)
+    where degraded is None, or the reason the result is incomplete."""
+    env = dict(os.environ, GRYPE_MATCH_JAVA_USING_CPES="true")
+    status = _grype_db_status(env)
+    age = _db_age_days(status)
+    if age is None:
+        # No status to judge by: grype reports any problem when it runs.
+        return env, None
+    max_days = _max_age_days()
+    print(f"[nvd-cpe] grype database: built {status.get('built')} ({age} day(s) old)")
+    if age <= max_days and status.get("valid"):
+        return env, None
+    why = ""
+    if age > max_days:
+        if _offline():
+            why = "not updated, the scan is offline (TRIVY_OFFLINE_SCAN or TRIVY_SKIP_DB_UPDATE)"
+        else:
+            print(f"[nvd-cpe] the grype database is {age} days old (over {max_days}); updating it")
+            new_env, cause = _update_grype_db(env)
+            if new_env is not None:
+                built = (_grype_db_status(new_env) or {}).get("built")
+                print(f"[nvd-cpe] grype database updated (built {built})")
+                return new_env, None
+            why = f"the update failed: {cause}"
+            print(f"[nvd-cpe] WARN: grype db update failed: {cause}", file=sys.stderr)
+    # Read the database there is: grype's own limit (5 days) would refuse it.
+    env["GRYPE_DB_MAX_ALLOWED_BUILT_AGE"] = f"{(age + 1) * 24}h"
+    if age <= max_days:
+        return env, None
+    print(f"[nvd-cpe] WARN: the grype database is {age} days old; "
+          "vulnerabilities published since are not reported.", file=sys.stderr)
+    return env, f"the grype database is {age} days old (over {max_days}); {why}"
+
+
+def _write_status(status, detail=None):
+    """Tell entrypoint.sh how the step went (see the header)."""
+    path = os.environ.get("BOMLENS_DEEP_CVE_STATUS_FILE", "")
+    if not path:
+        return
+    try:
+        with open(path, "w") as f:
+            json.dump({"status": status, "detail": detail}, f)
+    except OSError:
+        pass
 
 
 def _to_iso8601(raw):
@@ -201,84 +408,117 @@ def _published_date(conn, cve):
 
 
 # ---- main -------------------------------------------------------------------
-def run_grype(sbom):
-    print("[nvd-cpe] grype CPE matching started")
-    env = dict(os.environ, GRYPE_MATCH_JAVA_USING_CPES="true")
-    try:
-        p = subprocess.run(
-            [GRYPE, f"sbom:{sbom}", "--by-cve", "-o", "json"],
-            capture_output=True, text=True, env=env, timeout=600)
-    except FileNotFoundError:
-        print("[nvd-cpe] WARN: grype not installed in this image; skipping", file=sys.stderr)
-        return None
-    except subprocess.TimeoutExpired:
-        print("[nvd-cpe] WARN: grype timed out; skipping", file=sys.stderr)
-        return None
-    if p.returncode != 0:
-        print(f"[nvd-cpe] WARN: grype exited {p.returncode}; skipping", file=sys.stderr)
-        return None
-    try:
-        return json.loads(p.stdout)
-    except ValueError:
-        print("[nvd-cpe] WARN: grype output unparseable; skipping", file=sys.stderr)
-        return None
-
-
-def _run_grype_cpe(cpe):
-    """A single bare-CPE grype lookup (cheap: grype's local DB query, not a
-    second full-SBOM scan). Returns grype's raw matches list, or [] on any
-    failure -- an alternate CPE that can't be queried is silently skipped,
-    matching this script's existing "no path -> no finding" posture."""
-    try:
-        p = subprocess.run([GRYPE, cpe, "-o", "json"],
-                            capture_output=True, text=True, timeout=60)
-        if p.returncode != 0:
-            return []
-        return json.loads(p.stdout).get("matches", [])
-    except Exception:
-        return []
-
-
-def _sbom_cpe_alternates(sbom_path):
-    """Yield (name, version, purl, [alt_cpe, ...]) for every maven component
-    enrich-maven-cpe.py tagged with bomlens:cpeAlternates -- a project NVD
-    splits across more than one CPE vendor (see MAVEN_CPE_MAP's alternates),
-    which a component's single cpe field cannot express on its own."""
-    try:
-        with open(sbom_path) as f:
-            doc = json.load(f)
-    except (OSError, ValueError):
-        return
+def _sbom_alternates(doc):
+    """Return [(component, [alt_cpe, ...])] for every component
+    enrich-maven-cpe.py tagged with bomlens:cpeAlternates: the curated
+    alternates of a project NVD splits across more than one CPE vendor, and
+    the package-style candidates (vendor = groupId, product = artifactId,
+    target_sw = maven). A component's single cpe field cannot carry them."""
+    out = []
     for c in doc.get("components") or []:
+        if not isinstance(c, dict):
+            continue
         props = c.get("properties") or []
-        raw = next((p.get("value") for p in props if p.get("name") == "bomlens:cpeAlternates"), None)
+        raw = next((p.get("value") for p in props
+                    if isinstance(p, dict) and p.get("name") == "bomlens:cpeAlternates"), None)
         if not raw:
             continue
         try:
             alt_cpes = json.loads(raw)
         except ValueError:
             continue
-        if alt_cpes:
-            yield c.get("name", ""), c.get("version", ""), c.get("purl", ""), alt_cpes
+        if isinstance(alt_cpes, list):
+            alt_cpes = [a for a in alt_cpes if isinstance(a, str) and a.startswith("cpe:2.3:")]
+            if alt_cpes:
+                out.append((c, alt_cpes))
+    return out
+
+
+def grype_input(sbom_path):
+    """Path of the SBOM grype should scan, and whether it is a temporary copy.
+
+    grype reads a CycloneDX component's cpe plus every property named
+    syft:cpe23 as that package's CPEs (syft's CycloneDX decoder), and its CPE
+    matcher searches all of them. So the alternates are written as syft:cpe23
+    properties into a temporary copy: one grype run then searches
+    every candidate with the component's own purl, type and version, instead
+    of one bare-CPE grype run per alternate. The SBOM itself is not changed."""
+    try:
+        with open(sbom_path) as f:
+            doc = json.load(f)
+    except (OSError, ValueError):
+        return sbom_path, False
+    tagged = _sbom_alternates(doc) if isinstance(doc, dict) else []
+    if not tagged:
+        return sbom_path, False
+    for c, alt_cpes in tagged:
+        props = c.setdefault("properties", [])
+        have = {c.get("cpe")} | {p.get("value") for p in props
+                                 if isinstance(p, dict) and p.get("name") == "syft:cpe23"}
+        for alt in alt_cpes:
+            if alt not in have:
+                props.append({"name": "syft:cpe23", "value": alt})
+                have.add(alt)
+    try:
+        fd, tmp = tempfile.mkstemp(prefix="bomlens-grype-", suffix=".json")
+    except OSError:
+        return sbom_path, False
+    try:
+        with os.fdopen(fd, "w") as f:
+            json.dump(doc, f, ensure_ascii=False)
+    except (OSError, TypeError, ValueError):
+        try:
+            os.remove(tmp)
+        except OSError:
+            pass
+        return sbom_path, False
+    return tmp, True
+
+
+def run_grype(sbom):
+    """grype's JSON result, or None after writing the cause to the status file."""
+    print("[nvd-cpe] grype CPE matching started")
+    try:
+        p = subprocess.run(
+            [GRYPE, f"sbom:{sbom}", "--by-cve", "-o", "json"],
+            capture_output=True, text=True, env=_grype_env(), timeout=600)
+    except FileNotFoundError:
+        print("[nvd-cpe] WARN: grype not installed in this image; skipping", file=sys.stderr)
+        _write_status("failed", "grype is not installed")
+        return None
+    except subprocess.TimeoutExpired:
+        print("[nvd-cpe] WARN: grype timed out; skipping", file=sys.stderr)
+        _write_status("failed", "grype timed out")
+        return None
+    if p.returncode != 0:
+        cause = _stderr_cause(p.stderr)
+        print(f"[nvd-cpe] WARN: grype exited {p.returncode}; skipping"
+              + (f": {cause}" if cause else ""), file=sys.stderr)
+        _write_status("failed", f"grype exited {p.returncode}" + (f": {cause}" if cause else ""))
+        return None
+    try:
+        return json.loads(p.stdout)
+    except ValueError:
+        print("[nvd-cpe] WARN: grype output unparseable; skipping", file=sys.stderr)
+        _write_status("failed", "grype output could not be read")
+        return None
 
 
 def build_sidecar(sbom_path, out_prefix):
-    g = run_grype(sbom_path)
+    global _GRYPE_ENV
+    _GRYPE_ENV, degraded = _prepare_grype_db()
+    scan_path, is_tmp = grype_input(sbom_path)
+    try:
+        g = run_grype(scan_path)
+    finally:
+        if is_tmp:
+            try:
+                os.remove(scan_path)
+            except OSError:
+                pass
     if g is None:
         return
     grype_matches = g.get("matches", [])
-    # Alternate-CPE matches: fold each curated alternate's own bare-CPE lookup
-    # into the same match list (with the real component's name/version/purl
-    # substituted for grype's bare-CPE artifact, which carries no purl) so
-    # they get exactly the same NVD-verify/severity/record-building treatment
-    # as the primary SBOM scan's matches below -- no separate code path to
-    # keep in sync.
-    for name, version, purl, alt_cpes in _sbom_cpe_alternates(sbom_path):
-        for alt_cpe in alt_cpes:
-            for m in _run_grype_cpe(alt_cpe):
-                art = m.setdefault("artifact", {})
-                art["name"], art["version"], art["purl"] = name, version, purl
-                grype_matches.append(m)
     # Default off: the base behavior stays offline (air-gap safe). When on it needs
     # network + NVD_API_KEY and adds minutes per scan, so it is opt-in; without it
     # nvd:cpe findings are kept and flagged bomlens:cpeVersionUnverified.
@@ -310,9 +550,8 @@ def build_sidecar(sbom_path, out_prefix):
     last_percent = None
 
     kept, dropped, unverified = [], 0, 0
-    seen = set()  # (purl-or-name, cve): an alternate CPE lookup can rediscover
-    # a CVE the primary SBOM scan already found (their version ranges overlap),
-    # or two alternates can overlap each other -- keep the first hit only.
+    seen = set()  # (purl-or-name, cve): keep the first hit only, in case
+    # grype reports the same CVE for a component more than once.
     for m in grype_matches:
         vuln = m.get("vulnerability", {})
         cve = vuln.get("id", "")
@@ -341,8 +580,7 @@ def build_sidecar(sbom_path, out_prefix):
         # so this pass leaves them out entirely.
         if OS_PURL.match(purl):
             continue
-        cpes = art.get("cpes") or []
-        product = _cpe_product(cpes[0]) if cpes else ""
+        products = _matched_products(m)
         dedup_key = (purl or art.get("name", ""), cve)
         if dedup_key in seen:
             continue
@@ -363,7 +601,7 @@ def build_sidecar(sbom_path, out_prefix):
                 if nvd_ms is None:
                     flag_unverified = True  # network down: keep but flag
                 else:
-                    prod_m = [x for x in nvd_ms if f":{product}:" in x["criteria"].lower()]
+                    prod_m = [x for x in nvd_ms if _cpe_product(x.get("criteria", "")) in products]
                     if prod_m and not any(_in_range(ver, x) for x in prod_m):
                         dropped += 1
                         continue  # version outside every NVD range -> false positive
@@ -417,10 +655,14 @@ def build_sidecar(sbom_path, out_prefix):
     if unverified:
         msg += f", {unverified} version-unverified (network unavailable)"
     print(msg + f" -> {os.path.basename(out)}")
+    _write_status("degraded" if degraded else "ok", degraded)
 
 
 if __name__ == "__main__":
     if len(sys.argv) < 3:
         print("usage: scan-nvd-cpe.py <sbom.json> <out_prefix>", file=sys.stderr)
         sys.exit(2)
+    # A cancelled scan ends with SIGTERM; exit through sys.exit so the atexit
+    # cleanup of a temporary database folder runs.
+    signal.signal(signal.SIGTERM, lambda _sig, _frame: sys.exit(143))
     build_sidecar(sys.argv[1], sys.argv[2])

@@ -424,6 +424,110 @@ D="$(new_run dc-own-grype)"; PATH="$WORK/grype-bin:$PATH" run_engine "$D" "$ROOT
 { [ "$(dc_step "$D")" = "ok null" ] && [ -f "$D/demo_1.0_security_grype.json" ]; } \
     && pass "a kept image that has grype runs the match: ok, not skipped" || fail "deep-cve is $(dc_step "$D")"
 
+echo "== deep-cve: the age of the grype database =="
+# grype refuses a database built more than 5 days ago, and the deep-cve image
+# bakes its database in when it is built. This stub acts as grype 0.120 does:
+# `db status -o json` prints the database's build time and exits 1 when it is
+# too old; a scan fails with grype's own message unless
+# GRYPE_DB_MAX_ALLOWED_BUILT_AGE raises the limit or `db update` has written a
+# new database into GRYPE_DB_CACHE_DIR. GRYPE_STUB_STALE=1 makes the database
+# too old for grype's default limit. GRYPE_STUB_UPDATE=ok lets the update
+# work; otherwise it fails as with no network. Every call is logged.
+mkdir -p "$WORK/grype-age-bin"
+cat > "$WORK/grype-age-bin/grype" <<'EOF2'
+#!/bin/bash
+echo "$* | cache=${GRYPE_DB_CACHE_DIR:-} | maxage=${GRYPE_DB_MAX_ALLOWED_BUILT_AGE:-}" >> "$GRYPE_STUB_LOG"
+stale="${GRYPE_STUB_STALE:-}"; fresh=""
+if [ -f "${GRYPE_DB_CACHE_DIR:-/nonexistent}/updated" ]; then fresh=1; stale=""; fi
+if [ "${1:-} ${2:-}" = "db status" ]; then
+    if [ -n "$fresh" ]; then
+        printf '{"built":"%s","path":"%s/6/vulnerability.db","valid":true}\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$GRYPE_DB_CACHE_DIR"
+        exit 0
+    fi
+    if [ -z "$stale" ] || [ -n "${GRYPE_DB_MAX_ALLOWED_BUILT_AGE:-}" ]; then
+        printf '{"built":"%s","path":"/nonexistent/vulnerability.db","valid":true}\n' "$GRYPE_STUB_BUILT"
+        exit 0
+    fi
+    printf '{"built":"%s","path":"/nonexistent/vulnerability.db","valid":false,"error":"the vulnerability database was built 2 weeks ago (max allowed age is 5 days)"}\n' "$GRYPE_STUB_BUILT"
+    exit 1
+fi
+if [ "${1:-} ${2:-}" = "db update" ]; then
+    if [ "${GRYPE_STUB_UPDATE:-}" = ok ] && : > "$GRYPE_DB_CACHE_DIR/updated"; then exit 0; fi
+    printf '\033[31m[0000] ERROR unable to update vulnerability database: dial tcp: lookup grype.anchore.io: no such host\033[0m\n' >&2
+    exit 1
+fi
+if [ -n "${GRYPE_STUB_SCAN_ERROR:-}" ]; then echo "[0000] ERROR $GRYPE_STUB_SCAN_ERROR" >&2; exit 1; fi
+if [ -n "$stale" ] && [ -z "${GRYPE_DB_MAX_ALLOWED_BUILT_AGE:-}" ]; then
+    printf '\033[31m[0000] ERROR failed to load vulnerability db: the vulnerability database was built 2 weeks ago (max allowed age is 5 days)\033[0m\n' >&2
+    exit 1
+fi
+echo '{"matches":[]}'
+EOF2
+chmod +x "$WORK/grype-age-bin/grype"
+STALE_BUILT="$(python3 -c 'import datetime as d; print((d.datetime.now(d.timezone.utc) - d.timedelta(days=14, hours=1)).strftime("%Y-%m-%dT%H:%M:%SZ"))')"
+FRESH_BUILT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+dc_full() { jq -r '[.steps[] | select(.id=="deep-cve")][0] | "\(.status) \(.reason) \(.detail)"' "$1/bomlens-result.json" 2>/dev/null; }
+# The image's cache folder, read-only as in a container run as another user.
+mkdir -p "$WORK/grype-ro-cache"; chmod 555 "$WORK/grype-ro-cache"
+
+D="$(new_run dc-age-fresh)"; PATH="$WORK/grype-age-bin:$PATH" run_engine "$D" "$ROOT_DIR/docker/lib" DEEP_CVE=true \
+    GRYPE_STUB_LOG="$D.grype" GRYPE_STUB_BUILT="$FRESH_BUILT" GRYPE_DB_CACHE_DIR="$WORK/grype-ro-cache"
+{ [ "$(dc_step "$D")" = "ok null" ] && ! grep -q '^db update' "$D.grype"; } \
+    && pass "a fresh grype database: ok, and no update is tried" || fail "deep-cve is $(dc_full "$D")" "$(cat "$D.grype" 2>/dev/null)"
+
+D="$(new_run dc-age-offline)"; PATH="$WORK/grype-age-bin:$PATH" run_engine "$D" "$ROOT_DIR/docker/lib" DEEP_CVE=true \
+    GRYPE_STUB_LOG="$D.grype" GRYPE_STUB_BUILT="$STALE_BUILT" GRYPE_STUB_STALE=1 GRYPE_DB_CACHE_DIR="$WORK/grype-ro-cache" TRIVY_SKIP_DB_UPDATE=true
+case "$(dc_full "$D")" in
+    "degraded unavailable the grype database is 14 days old (over 7); not updated, the scan is offline"*)
+        if [ -f "$D/demo_1.0_security_grype.json" ] && ! grep -q '^db update' "$D.grype" \
+           && grep -q '^sbom:.*maxage=360h$' "$D.grype"; then
+            pass "a 14-day-old database offline: read with grype's age limit raised, degraded with its age, no update"
+        else
+            fail "the match did not run as expected offline" "$(cat "$D.grype")"
+        fi ;;
+    *) fail "deep-cve is $(dc_full "$D")" "$(grep -i 'nvd-cpe\|grype' "$D.log" | head -5)" ;;
+esac
+[ "$(jq -r .run.status "$D/bomlens-result.json")" = succeeded_degraded ] \
+    && pass "a stale grype database makes the run succeeded_degraded" || fail "run.status is $(jq -r .run.status "$D/bomlens-result.json")"
+
+D="$(new_run dc-age-noupdate)"; PATH="$WORK/grype-age-bin:$PATH" run_engine "$D" "$ROOT_DIR/docker/lib" DEEP_CVE=true \
+    GRYPE_STUB_LOG="$D.grype" GRYPE_STUB_BUILT="$STALE_BUILT" GRYPE_STUB_STALE=1 GRYPE_DB_CACHE_DIR="$WORK/grype-ro-cache"
+case "$(dc_full "$D")" in
+    "degraded unavailable the grype database is 14 days old (over 7); the update failed: unable to update vulnerability database: dial tcp: lookup grype.anchore.io: no such host")
+        pass "an update that fails: the old database is read and the step is degraded with the update's error" ;;
+    *) fail "deep-cve is $(dc_full "$D")" "$(cat "$D.grype")" ;;
+esac
+
+D="$(new_run dc-age-updated)"; PATH="$WORK/grype-age-bin:$PATH" run_engine "$D" "$ROOT_DIR/docker/lib" DEEP_CVE=true \
+    GRYPE_STUB_LOG="$D.grype" GRYPE_STUB_BUILT="$STALE_BUILT" GRYPE_STUB_STALE=1 GRYPE_DB_CACHE_DIR="$WORK/grype-ro-cache" GRYPE_STUB_UPDATE=ok
+if [ "$(dc_step "$D")" = "ok null" ] && [ -f "$D/demo_1.0_security_grype.json" ] && grep -q '^sbom:.*maxage=$' "$D.grype"; then
+    pass "a stale database that updates: ok, and the match reads the new one with grype's own age limit"
+else
+    fail "deep-cve is $(dc_full "$D")" "$(cat "$D.grype")"
+fi
+if [ "$(id -u)" != 0 ]; then
+    _upd_cache="$(sed -n 's/^db update | cache=\([^|]*\) |.*/\1/p' "$D.grype" | head -1)"
+    { [ -n "$_upd_cache" ] && [ "$_upd_cache" != "$WORK/grype-ro-cache" ] && [ ! -e "$_upd_cache" ] \
+      && grep -q "^sbom:.*cache=$_upd_cache " "$D.grype"; } \
+        && pass "a read-only image cache: the update goes to a temporary folder, read by the match and removed after" \
+        || fail "the update used '$_upd_cache'" "$(cat "$D.grype")"
+fi
+# As root the update above wrote into the image cache itself; start the next
+# case from the stale database again.
+rm -f "$WORK/grype-ro-cache/updated" 2>/dev/null || true
+
+D="$(new_run dc-age-limit)"; PATH="$WORK/grype-age-bin:$PATH" run_engine "$D" "$ROOT_DIR/docker/lib" DEEP_CVE=true \
+    GRYPE_STUB_LOG="$D.grype" GRYPE_STUB_BUILT="$STALE_BUILT" GRYPE_STUB_STALE=1 GRYPE_DB_CACHE_DIR="$WORK/grype-ro-cache" BOMLENS_GRYPE_DB_MAX_AGE_DAYS=30
+{ [ "$(dc_step "$D")" = "ok null" ] && ! grep -q '^db update' "$D.grype"; } \
+    && pass "BOMLENS_GRYPE_DB_MAX_AGE_DAYS=30 accepts a 14-day-old database: ok, no update" || fail "deep-cve is $(dc_full "$D")" "$(cat "$D.grype")"
+
+D="$(new_run dc-age-error)"; PATH="$WORK/grype-age-bin:$PATH" run_engine "$D" "$ROOT_DIR/docker/lib" DEEP_CVE=true \
+    GRYPE_STUB_LOG="$D.grype" GRYPE_STUB_BUILT="$FRESH_BUILT" GRYPE_DB_CACHE_DIR="$WORK/grype-ro-cache" \
+    GRYPE_STUB_SCAN_ERROR="failed to catalog: unable to decode sbom: sbom format not recognized"
+[ "$(dc_full "$D")" = "failed failed grype exited 1: failed to catalog: unable to decode sbom: sbom format not recognized" ] \
+    && pass "grype fails: the step's detail is grype's own error" || fail "deep-cve is $(dc_full "$D")"
+chmod 755 "$WORK/grype-ro-cache"
+
 # A firmware scan: the firmware image's own pipeline, stubbed here, with
 # DEEP_CVE=true as an older CLI passed it. The step is disabled and the run
 # is not degraded by it.
@@ -667,6 +771,35 @@ D="$(new_run empty-declared-mutant empty)"; empty_bom "$D"; run_engine "$D" "$MU
 [ "$(jq -r .run.status "$D/bomlens-result.json" 2>/dev/null)" = "succeeded" ] \
     && pass "without the manifest check the same run reads succeeded, so the check above can fail" \
     || fail "the mutant run is $(jq -r .run.status "$D/bomlens-result.json" 2>/dev/null)"
+
+echo "== a Gradle build whose declared dependencies cdxgen did not resolve =="
+# build-prep.sh records gradle-packages as failed when a build file declares
+# dependencies and no component came from Gradle's resolution, even though
+# other files (a jar in the tree) added components: generate reads degraded,
+# the run is not a plain success, the closing log says so and the SBOM is not
+# declared complete.
+D="$(new_run gradle-packages)"
+jq '.metadata.properties = ((.metadata.properties // []) + [{"name":"bomlens:prep-step-applied","value":"gradle-dependencies"},{"name":"bomlens:pipeline-step-failed","value":"gradle-packages"}])' \
+    "$D/demo_1.0_bom.json" > "$D/x" && mv "$D/x" "$D/demo_1.0_bom.json"
+run_engine "$D" "$ROOT_DIR/docker/lib"
+got="$(jq -r '.run.status + " " + ([.steps[] | select(.id=="generate")][0] | "\(.status) \(.reason) \(.detail)")' "$D/bomlens-result.json" 2>/dev/null)"
+if [ "$got" = "succeeded_degraded degraded failed steps that failed: gradle-packages" ]; then
+    pass "gradle-packages: generate degraded (failed), run succeeded_degraded"
+else
+    fail "gradle-packages: $got" "$(tail -5 "$D.log")"
+fi
+if grep -q "\[WARN\] the Gradle build declares dependencies but cdxgen resolved no Gradle package" "$D.log"; then
+    pass "gradle-packages: the run log warns"
+else
+    fail "gradle-packages: no warning in the run log" "$(tail -5 "$D.log")"
+fi
+if [ "$(jq -r '.compositions[0].aggregate // "none"' "$D/demo_1.0_bom.json")" = "incomplete" ]; then
+    pass "gradle-packages: compositions aggregate is incomplete"
+else
+    fail "gradle-packages: aggregate is $(jq -r '.compositions[0].aggregate // "none"' "$D/demo_1.0_bom.json")"
+fi
+err="$(schema_errors "$D/bomlens-result.json")"
+if [ -z "$err" ]; then pass "gradle-packages: the manifest validates against the schema"; else fail "schema errors" "$err"; fi
 
 echo "== MODE=PLAN: the execution plan of a source scan =="
 PLAN_SCHEMA="$ROOT_DIR/schemas/engine-plan-1.json"
