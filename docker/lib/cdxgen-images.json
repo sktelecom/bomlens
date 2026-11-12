@@ -7,6 +7,7 @@
     "ghcr.io/cdxgen/cdxgen-debian-golang124": "sha256:0d2c65a0fa19df9c07d227e362d8ad0b353bba45b3e4c466085d1ca0b3a1cc8a",
     "ghcr.io/cdxgen/cdxgen-debian-ruby34": "sha256:cbf8006ad6cc5bfe2e6eb88f7e5549bcf146b4ac87992d93fd0cbe92e6e26b24",
     "ghcr.io/cdxgen/cdxgen-temurin-java21": "sha256:7c8d39f65c7e2c7a43692785ef50edbb5f6a1d4fd77b5aabae30e650c0ce4275",
+    "ghcr.io/cdxgen/cdxgen-temurin-java24": "sha256:50616c8ac79925d93de7d986b7076450bfff15c27bc86fccfd0f82326e53252c",
     "ghcr.io/cdxgen/cdxgen-temurin-java25": "sha256:a34b3cb81964c299043194dc0a978a41c74b0187db17961c33114be26d34974c",
     "ghcr.io/cdxgen/cdxgen-python312": "sha256:f29221765f5c1a7702a8f22f552bb633db4905b13265da218052a0aaa5c1b10e",
     "ghcr.io/cdxgen/cdxgen-alpine-node24": "sha256:0fb2e022c564589424f8e6704e3417eae573434e5bb43540cc86fceac8a61d84",

@@ -21,7 +21,7 @@ set -u
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 # The image settings of whoever runs this must not change what the plan names.
-unset CDXGEN_IMAGE_PREFIX CDXGEN_ALLINONE CDXGEN_TAG
+unset CDXGEN_IMAGE_PREFIX CDXGEN_JAVA_IMAGE CDXGEN_ALLINONE CDXGEN_TAG
 ENTRY="$ROOT_DIR/docker/entrypoint.sh"
 SCHEMA="$ROOT_DIR/schemas/engine-result-1.json"
 DOC="$ROOT_DIR/docs/reference/engine-contract.md"
@@ -826,8 +826,17 @@ P="$(plan_run java25 "$J25SRC")"
     && [ "$(jq -r .status "$P/bomlens-plan.json")" = ok ] \
     && pass "a Java 25 toolchain names the pinned cdxgen Java 25 image in the plan" \
     || fail "java25 plan: $(jq -c '{status, s: .stages[0] | {image, image_digest}}' "$P/bomlens-plan.json" 2>&1)"
+J24SRC="$WORK/plan-src-java24"; mkdir -p "$J24SRC"
+printf 'kotlin { jvmToolchain(24) }\n' > "$J24SRC/build.gradle.kts"
+# CDXGEN_JAVA_IMAGE with a published name follows the mirror and keeps its pinned digest.
+P="$(plan_run java-override "$J25SRC" CDXGEN_IMAGE_PREFIX=registry.example/mirror/cdxgen/ \
+    CDXGEN_JAVA_IMAGE="ghcr.io/cdxgen/cdxgen-temurin-java24:$(jq -r .tag "$ROOT_DIR/docker/lib/cdxgen-images.json")")"
+[ "$(jq -r '.stages[0] | .image + " " + .image_digest' "$P/bomlens-plan.json")" = "registry.example/mirror/cdxgen/cdxgen-temurin-java24:$(jq -r '.tag + " " + .digests["ghcr.io/cdxgen/cdxgen-temurin-java24"]' "$ROOT_DIR/docker/lib/cdxgen-images.json")" ] \
+    && [ "$(jq -r .status "$P/bomlens-plan.json")" = ok ] \
+    && pass "CDXGEN_JAVA_IMAGE names the image from the mirror, with its pinned digest" \
+    || fail "CDXGEN_JAVA_IMAGE plan: $(jq -c '{status, s: .stages[0] | {image, image_digest}}' "$P/bomlens-plan.json" 2>&1)"
 missing=""
-for lang in rust go ruby java "java '$J25SRC'" python node php dotnet swift unknown; do
+for lang in rust go ruby java "java '$J24SRC'" "java '$J25SRC'" python node php dotnet swift unknown; do
     img="$(bash -c ". '$ROOT_DIR/docker/lib/source-detect.sh' >/dev/null 2>&1; img_for_lang $lang")"
     jq -e --arg i "${img%:*}" --arg t "${img##*:}" '.tag == $t and (.digests[$i] // "" | startswith("sha256:"))' \
         "$ROOT_DIR/docker/lib/cdxgen-images.json" >/dev/null || missing="$missing $img"

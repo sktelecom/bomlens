@@ -469,6 +469,7 @@ generate_sbom_cdxgen() {
         img=$(img_for_lang "$lang" "$src")
         echo "[INFO] Language: $lang -> $img"
         if [ "$lang" = "java" ]; then java_image_note "$src"; fi
+        if [ "$lang" = "mixed" ]; then java_mixed_note "$src"; fi
     fi
     local prep; prep=$(cat "$LIBDIR/build-prep.sh")
     # Where cdxgen writes the bom. Our working dir is the right place — a scan

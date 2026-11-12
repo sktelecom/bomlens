@@ -679,10 +679,12 @@ detect_lang() {
 
 # The highest Java toolchain version the Gradle builds under $1 declare, or
 # nothing. A Gradle toolchain asks for that exact JDK, and without a toolchain
-# download repository the build fails to resolve its dependencies when the
-# image has another one. Read from *.gradle and *.gradle.kts files up to six
-# levels down (buildSrc and build-logic convention plugins sit that deep),
-# skipping the folders _detect_first skips and commented-out lines:
+# download repository (auto-provisioning) the build fails to resolve its
+# dependencies when the image has another one. Read from *.gradle and
+# *.gradle.kts files in $1 and up to five folders below it (buildSrc and
+# build-logic convention plugins sit that deep), skipping the folders
+# _detect_first skips (the non-shipped ones unless BOMLENS_INCLUDE_NON_SHIPPED
+# is set) and comments:
 #   JavaLanguageVersion.of(25)  (languageVersion.set(...), languageVersion = ...)
 #   jvmToolchain(25)            (Kotlin)
 # A version taken from a property or a version catalog is not read. Maven is
@@ -692,53 +694,107 @@ detect_lang() {
 java_toolchain_version() {
     local d="$1" n prune=()
     [ -n "$d" ] && [ -d "$d" ] || return 0
-    for n in .git .gradle node_modules vendor build target bin obj .build Pods .venv ${NON_SHIPPED_DIRS:-}; do
+    for n in .git .gradle node_modules vendor build target bin obj .build Pods .venv; do
         prune+=(-o -name "$n")
     done
+    if non_shipped_enabled; then
+        for n in $NON_SHIPPED_DIRS; do prune+=(-o -name "$n"); done
+    fi
+    # The awk drops // line comments and /* */ blocks (across lines too, and
+    # never past the end of a file) before the declarations are matched. A
+    # line over 4096 characters holds no declaration worth reading and is
+    # skipped, which keeps the scan of a crafted file linear.
     (cd "$d" 2>/dev/null && find . -maxdepth 6 \( "${prune[@]:1}" \) -prune -o -type f \( -name '*.gradle' -o -name '*.gradle.kts' \) \
-        -exec grep -hE 'JavaLanguageVersion\.of[[:space:]]*\(|jvmToolchain[[:space:]]*\(' {} + 2>/dev/null) \
-        | grep -vE '^[[:space:]]*(//|/\*|\*)' \
+        -exec awk '
+            FNR == 1 { blk = 0 }
+            length($0) > 4096 { next }
+            {
+                line = $0; out = ""
+                while (line != "") {
+                    if (blk) { i = index(line, "*/"); if (!i) { line = ""; break }; line = substr(line, i + 2); blk = 0; continue }
+                    a = index(line, "/*"); b = index(line, "//")
+                    if (b && (!a || b < a)) { out = out substr(line, 1, b - 1); line = ""; break }
+                    if (a) { out = out substr(line, 1, a - 1); line = substr(line, a + 2); blk = 1; continue }
+                    out = out line; line = ""
+                }
+                print out
+            }' {} + 2>/dev/null) \
         | grep -oE "(JavaLanguageVersion\.of|jvmToolchain)[[:space:]]*\([[:space:]]*[\"']?[0-9]+" \
-        | grep -oE '[0-9]+$' | sort -n | tail -1 || true
+        | grep -oE '[0-9]+$' | grep -E '^[0-9]{1,3}$' | sed 's/^0*\([0-9]\)/\1/' | sort -n | tail -1 || true
 }
 
-# The JDK of the default cdxgen Java image, and the newest one published.
+# The JDKs the published cdxgen Java images carry (cdxgen-temurin-java<N>),
+# and the one used when the build declares none of them.
+CDXGEN_JAVA_JDKS="21 24 25"
 CDXGEN_JAVA_DEFAULT=21
-CDXGEN_JAVA_NEWEST=25
+
+# _java_jdk_for <version>: the JDK of the image a declared toolchain gets: the
+# same version when an image has it, else the default.
+_java_jdk_for() {
+    local j
+    for j in $CDXGEN_JAVA_JDKS; do
+        if [ "$j" = "${1:-}" ]; then echo "$j"; return 0; fi
+    done
+    echo "$CDXGEN_JAVA_DEFAULT"
+}
 
 # CDXGEN_JAVA_IMAGE when it is set and reads as an image reference, else
-# nothing. The value reaches a docker command line.
+# nothing. The value reaches a docker command line. A ghcr.io/cdxgen/ name
+# comes from CDXGEN_IMAGE_PREFIX, like CDXGEN_ALLINONE.
 _java_image_override() {
     case "${CDXGEN_JAVA_IMAGE:-}" in
-        '') return 0 ;;
         [A-Za-z0-9]*) case "$CDXGEN_JAVA_IMAGE" in *[!A-Za-z0-9._/:@-]*) return 0 ;; esac
-                      echo "$CDXGEN_JAVA_IMAGE" ;;
+            case "$CDXGEN_JAVA_IMAGE" in
+                ghcr.io/cdxgen/*) echo "${CDXGEN_IMAGE_PREFIX}${CDXGEN_JAVA_IMAGE#ghcr.io/cdxgen/}" ;;
+                *) echo "$CDXGEN_JAVA_IMAGE" ;;
+            esac ;;
     esac
 }
 
+# _java_toolchain_warn <version> <what the image has> <what to do>
+_java_toolchain_warn() {
+    echo "[WARN] The Gradle build declares a Java $1 toolchain, and $2."
+    echo "[WARN]   Gradle needs a Java $1 JDK, so dependency resolution can fail unless the build configures toolchain auto-provisioning."
+    echo "[WARN]   $3"
+}
+
 # java_image_note <dir>: the lines that say why img_for_lang picked the Java
-# image it did for <dir>; nothing for the default image.
+# image it did for <dir>; nothing for the default image with a matching or no
+# toolchain.
 java_image_note() {
-    local v
+    local v j
     if [ -n "${CDXGEN_JAVA_IMAGE:-}" ]; then
         if [ -n "$(_java_image_override)" ]; then
-            echo "[INFO] Java image from CDXGEN_JAVA_IMAGE: $CDXGEN_JAVA_IMAGE"
+            echo "[INFO] Java image from CDXGEN_JAVA_IMAGE: $(_java_image_override)"
             return 0
         fi
         echo "[WARN] CDXGEN_JAVA_IMAGE is not an image reference and is ignored: $CDXGEN_JAVA_IMAGE"
     fi
     v="$(java_toolchain_version "${1:-}")"
-    [ -n "$v" ] && [ "$v" -gt "$CDXGEN_JAVA_DEFAULT" ] || return 0
-    echo "[INFO] The Gradle build declares a Java $v toolchain; using the cdxgen Java $CDXGEN_JAVA_NEWEST image."
-    if [ "$v" -gt "$CDXGEN_JAVA_NEWEST" ]; then
-        echo "[WARN]   No published cdxgen image has Java $v, so dependency resolution can fail."
-        echo "[WARN]   Set CDXGEN_JAVA_IMAGE to an image with a Java $v JDK."
+    [ -n "$v" ] || return 0
+    j="$(_java_jdk_for "$v")"
+    if [ "$j" != "$v" ]; then
+        _java_toolchain_warn "$v" "the cdxgen Java image has Java $j" \
+            "Set CDXGEN_JAVA_IMAGE to an image that has a Java $v JDK."
+    elif [ "$v" != "$CDXGEN_JAVA_DEFAULT" ]; then
+        echo "[INFO] The Gradle build declares a Java $v toolchain; using the cdxgen Java $v image."
     fi
 }
 
+# java_mixed_note <dir>: a mixed tree runs in the all-in-one image, whatever
+# the toolchain. Warn when a Gradle build in it declares one other than the
+# default Java image's.
+java_mixed_note() {
+    local v
+    v="$(java_toolchain_version "${1:-}")"
+    [ -n "$v" ] && [ "$v" != "$CDXGEN_JAVA_DEFAULT" ] || return 0
+    _java_toolchain_warn "$v" "this mixed-language tree is scanned in the cdxgen all-in-one image, which may not have that JDK" \
+        "Scan the Java project's folder on its own, with CDXGEN_JAVA_IMAGE naming an image that has a Java $v JDK if no published one does."
+}
+
 # img_for_lang <lang> [dir]: the cdxgen image for a detected language. For
-# java, <dir> is the scanned tree, and a declared toolchain newer than the
-# default image's JDK picks the newest Java image. CDXGEN_JAVA_IMAGE, a full
+# java, <dir> is the scanned tree: the image whose JDK is the highest declared
+# toolchain, when one is published, else the default. CDXGEN_JAVA_IMAGE, a full
 # image reference, wins over both.
 img_for_lang() {
     local p="$CDXGEN_IMAGE_PREFIX" v=""
@@ -749,11 +805,7 @@ img_for_lang() {
         java)   v="$(_java_image_override)"
                 if [ -n "$v" ]; then echo "$v"; return 0; fi
                 v="$(java_toolchain_version "${2:-}")"
-                if [ -n "$v" ] && [ "$v" -gt "$CDXGEN_JAVA_DEFAULT" ]; then
-                    echo "${p}cdxgen-temurin-java${CDXGEN_JAVA_NEWEST}:$CDXGEN_TAG"
-                else
-                    echo "${p}cdxgen-temurin-java${CDXGEN_JAVA_DEFAULT}:$CDXGEN_TAG"
-                fi ;;
+                echo "${p}cdxgen-temurin-java$(_java_jdk_for "$v"):$CDXGEN_TAG" ;;
         python) echo "${p}cdxgen-python312:$CDXGEN_TAG" ;;
         node)   echo "${p}cdxgen-alpine-node24:$CDXGEN_TAG" ;;
         php)    echo "${p}cdxgen-debian-php84:$CDXGEN_TAG" ;;

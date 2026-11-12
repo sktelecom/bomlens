@@ -88,7 +88,16 @@ Detected file: `build.gradle` or `build.gradle.kts`
 
 > Note: as with Maven, resolution needs the container to reach Maven Central, or your mirror. When it cannot, the result can hold only the direct dependencies, with no licenses. If the component count is far below what you expect, check network access first.
 
-A Gradle toolchain asks for that exact JDK, and the cdxgen image has only its own, so the scan picks the image from the toolchain the build declares: `JavaLanguageVersion.of(N)` (as `languageVersion = ...` or `languageVersion.set(...)`) or Kotlin `jvmToolchain(N)`, in the `*.gradle` and `*.gradle.kts` files up to six folders down, `buildSrc` and convention plugins included. When the highest one is newer than Java 21, the scan runs in `cdxgen-temurin-java25` and prints an `[INFO]` line that says so; otherwise in `cdxgen-temurin-java21`. A version read from a property or a version catalog is not seen. In that case, or for a JDK no published image has, set `CDXGEN_JAVA_IMAGE` to the image to use ([CLI reference](cli.md)). Maven needs no such choice: `maven.compiler.release` and the toolchains plugin apply when the build compiles, and dependency resolution runs without them.
+A Gradle toolchain asks for that exact JDK version, and each cdxgen Java image has one JDK, so the scan picks the image from the toolchain the build declares: `JavaLanguageVersion.of(N)` (as `languageVersion = ...` or `languageVersion.set(...)`) or Kotlin `jvmToolchain(N)`, in the `*.gradle` and `*.gradle.kts` files of the scanned folder and up to five folders below it, `buildSrc` and convention plugins included. Comments and the non-shipped folders listed above are skipped (`BOMLENS_INCLUDE_NON_SHIPPED=1` reads those folders too). The highest version decides:
+
+| Declared toolchain | Image |
+|---|---|
+| none, or 21 | `cdxgen-temurin-java21` |
+| 24 | `cdxgen-temurin-java24` |
+| 25 | `cdxgen-temurin-java25` |
+| any other (11, 17, 22, 23, 26 and so on) | `cdxgen-temurin-java21`, with a `[WARN]` |
+
+A Java 24 or 25 choice prints an `[INFO]` line. No published image has the other versions, so Gradle cannot find the JDK it asks for and dependency resolution can fail unless the build configures toolchain auto-provisioning; the warning says so. A mixed-language tree runs in the all-in-one image whatever the toolchain, and warns the same way for a toolchain other than 21. A version read from a property or a version catalog is not seen. In these cases, set `CDXGEN_JAVA_IMAGE` to an image that has the JDK ([CLI reference](cli.md)). Maven needs no such choice: `maven.compiler.release` and the toolchains plugin apply when the build compiles, and dependency resolution runs without them.
 
 ---
 

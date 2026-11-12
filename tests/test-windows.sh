@@ -29,7 +29,7 @@ VERBOSE="${VERBOSE:-false}"
 
 WORK="$(mktemp -d "${TMPDIR:-/tmp}/sbom-win.XXXXXX")"
 # A mirror set by whoever runs this must not change the image names checked.
-unset CDXGEN_IMAGE_PREFIX
+unset CDXGEN_IMAGE_PREFIX CDXGEN_JAVA_IMAGE
 BIN="$WORK/bin"; mkdir -p "$BIN"
 cleanup() { cd "$REPO" 2>/dev/null || true; rm -rf "$WORK"; }
 trap cleanup EXIT INT TERM
@@ -408,9 +408,9 @@ scan_in "$d" --ui --reachability --output-dir "$d"
   || { fail "--ui --reachability starts the web UI" "rc=$RC"; show; }
 
 d="$(new_proj ui_mirror)"
-CDXGEN_IMAGE_PREFIX=registry.example/mirror/cdxgen/ scan_in "$d" --ui --output-dir "$d"
-in_log "-e CDXGEN_IMAGE_PREFIX" && in_log "-e BOMLENS_OS_LICENSES" \
-  && pass "CDXGEN_IMAGE_PREFIX and BOMLENS_OS_LICENSES passed to the web UI container" \
+CDXGEN_IMAGE_PREFIX=registry.example/mirror/cdxgen/ CDXGEN_JAVA_IMAGE=registry.example/java25:1 scan_in "$d" --ui --output-dir "$d"
+in_log "-e CDXGEN_IMAGE_PREFIX" && in_log "-e CDXGEN_JAVA_IMAGE" && in_log "-e BOMLENS_OS_LICENSES" \
+  && pass "CDXGEN_IMAGE_PREFIX, CDXGEN_JAVA_IMAGE and BOMLENS_OS_LICENSES passed to the web UI container" \
   || { fail "CDXGEN_IMAGE_PREFIX passed to the web UI container" "rc=$RC"; show; }
 
 # The UI's security scans keep Trivy's database in SBOM_TRIVY_CACHE too, and a

@@ -515,14 +515,28 @@ got="$(detect_lang "$LANGDIR/proj")"
     || fail "a root .slnx detects as '$got'"
 
 echo "== a declared Java toolchain picks the cdxgen Java image =="
-# A Gradle toolchain asks for that exact JDK. The Java 21 image cannot resolve
-# the dependencies of a build that declares Java 25, so the SBOM had none.
-J21="${CDXGEN_IMAGE_PREFIX}cdxgen-temurin-java21:$CDXGEN_TAG"
-J25="${CDXGEN_IMAGE_PREFIX}cdxgen-temurin-java25:$CDXGEN_TAG"
+# A Gradle toolchain asks for that exact JDK, and each cdxgen Java image has one.
+# The Java 21 image cannot resolve the dependencies of a build that declares
+# Java 25, so the SBOM had none.
+unset CDXGEN_JAVA_IMAGE CDXGEN_IMAGE_PREFIX BOMLENS_INCLUDE_NON_SHIPPED
+# shellcheck source=../docker/lib/source-detect.sh
+. "$ROOT_DIR/docker/lib/source-detect.sh"
+J21="ghcr.io/cdxgen/cdxgen-temurin-java21:$CDXGEN_TAG"
+J24="ghcr.io/cdxgen/cdxgen-temurin-java24:$CDXGEN_TAG"
+J25="ghcr.io/cdxgen/cdxgen-temurin-java25:$CDXGEN_TAG"
 java_case() {  # java_case <want> <description> [CDXGEN_JAVA_IMAGE]
     local got
     got="$(CDXGEN_JAVA_IMAGE="${3:-}" img_for_lang java "$LANGDIR/proj")"
     [ "$got" = "$1" ] && pass "$2" || fail "$2" "got '$got', want '$1'"
+}
+note_case() {  # note_case <description> <note function> <text>...: every text is in the note
+    local desc="$1" fn="$2" got t
+    shift 2
+    got="$("$fn" "$LANGDIR/proj")"
+    for t in "$@"; do
+        case "$got" in *"$t"*) ;; *) fail "$desc" "no '$t' in: $got"; return 0 ;; esac
+    done
+    pass "$desc"
 }
 gradle_tree() {  # gradle_tree <path under proj> <content>
     rm -rf "${LANGDIR:?}/proj" && mkdir -p "$LANGDIR/proj/$(dirname "$1")"
@@ -532,9 +546,7 @@ gradle_tree() {  # gradle_tree <path under proj> <content>
 gradle_tree build.gradle.kts 'plugins { java }\njava {\n    toolchain {\n        languageVersion = JavaLanguageVersion.of(25)\n    }\n}\n'
 [ "$(detect_lang "$LANGDIR/proj")" = java ] && pass "the toolchain 25 fixture detects as java" || fail "toolchain fixture is not java"
 java_case "$J25" "Kotlin DSL languageVersion = JavaLanguageVersion.of(25) picks the Java 25 image"
-note="$(java_image_note "$LANGDIR/proj")"
-case "$note" in "[INFO] "*"Java 25 toolchain"*) pass "the INFO line names the Java 25 toolchain" ;;
-    *) fail "no INFO line for the Java 25 toolchain" "$note" ;; esac
+note_case "the INFO line names the Java 25 toolchain" java_image_note "[INFO] " "Java 25 toolchain"
 [ "$(img_for_lang java)" = "$J21" ] && pass "without a scanned folder, java stays on the Java 21 image" \
     || fail "img_for_lang java with no folder: $(img_for_lang java)"
 java_case "registry.example/java25:1" "CDXGEN_JAVA_IMAGE wins over the declared toolchain" "registry.example/java25:1"
@@ -544,29 +556,67 @@ case "$(CDXGEN_JAVA_IMAGE='bad;x' java_image_note "$LANGDIR/proj")" in
     *) fail "an unusable CDXGEN_JAVA_IMAGE is not reported" ;; esac
 [ "$(CDXGEN_IMAGE_PREFIX=registry.example/mirror/cdxgen/ img_for_lang java "$LANGDIR/proj")" = "registry.example/mirror/cdxgen/cdxgen-temurin-java25:$CDXGEN_TAG" ] \
     && pass "the Java 25 image comes from CDXGEN_IMAGE_PREFIX too" || fail "the Java 25 image ignores CDXGEN_IMAGE_PREFIX"
+[ "$(CDXGEN_IMAGE_PREFIX=registry.example/mirror/cdxgen/ CDXGEN_JAVA_IMAGE="$J24" img_for_lang java "$LANGDIR/proj")" = "registry.example/mirror/cdxgen/cdxgen-temurin-java24:$CDXGEN_TAG" ] \
+    && pass "a ghcr.io/cdxgen/ CDXGEN_JAVA_IMAGE comes from CDXGEN_IMAGE_PREFIX" \
+    || fail "CDXGEN_JAVA_IMAGE ignores CDXGEN_IMAGE_PREFIX: $(CDXGEN_IMAGE_PREFIX=registry.example/mirror/cdxgen/ CDXGEN_JAVA_IMAGE="$J24" img_for_lang java "$LANGDIR/proj")"
 
 gradle_tree build.gradle.kts 'plugins { java }\njava { toolchain { languageVersion = JavaLanguageVersion.of(21) } }\n'
 java_case "$J21" "a Java 21 toolchain stays on the Java 21 image"
 [ -z "$(java_image_note "$LANGDIR/proj")" ] && pass "a Java 21 toolchain prints no note" || fail "a Java 21 toolchain prints a note"
 gradle_tree build.gradle.kts 'plugins { java }\ndependencies { implementation("a:b:1") }\n'
 java_case "$J21" "a build with no toolchain stays on the Java 21 image"
+[ -z "$(java_image_note "$LANGDIR/proj")" ] && pass "no toolchain prints no note" || fail "no toolchain prints a note"
+gradle_tree build.gradle.kts 'java { toolchain { languageVersion = JavaLanguageVersion.of(24) } }\n'
+java_case "$J24" "a Java 24 toolchain picks the Java 24 image"
 gradle_tree build.gradle 'java {\n  toolchain {\n    languageVersion.set(JavaLanguageVersion.of("25"))\n  }\n}\n'
 java_case "$J25" "Groovy DSL languageVersion.set(JavaLanguageVersion.of(\"25\")) picks the Java 25 image"
 gradle_tree build.gradle.kts 'kotlin {\n    jvmToolchain(25)\n}\n'
 java_case "$J25" "Kotlin jvmToolchain(25) picks the Java 25 image"
 gradle_tree buildSrc/src/main/kotlin/java-conventions.gradle.kts 'java { toolchain { languageVersion.set(JavaLanguageVersion.of(25)) } }\n'
 java_case "$J25" "a buildSrc convention plugin's toolchain picks the Java 25 image"
-gradle_tree build.gradle.kts 'java {\n    // languageVersion = JavaLanguageVersion.of(25)\n    toolchain { languageVersion = JavaLanguageVersion.of(17) }\n}\n'
+gradle_tree build.gradle.kts 'java {\n    // languageVersion = JavaLanguageVersion.of(25)\n    toolchain { languageVersion = JavaLanguageVersion.of(21) }\n}\n'
 java_case "$J21" "a commented-out toolchain line is not read"
+gradle_tree build.gradle.kts 'java { toolchain { languageVersion = JavaLanguageVersion.of(21) } } // JavaLanguageVersion.of(25)\n'
+java_case "$J21" "a comment at the end of a line is not read"
+gradle_tree build.gradle.kts 'java {\n    /* old:\n       languageVersion = JavaLanguageVersion.of(25)\n    */ toolchain { languageVersion = JavaLanguageVersion.of(21) }\n    /* jvmToolchain(24) */\n}\n'
+java_case "$J21" "a /* */ block comment, one line or several, is not read"
+gradle_tree build.gradle.kts '/* not closed in this file\n'
+printf 'kotlin { jvmToolchain(25) }\n' > "$LANGDIR/proj/settings.gradle.kts"
+java_case "$J25" "an unclosed block comment does not hide the next file"
+python3 -c "import sys; open(sys.argv[1], 'w').write('/*' * 200000)" "$LANGDIR/proj/build.gradle.kts"
+t0=$(date +%s); java_case "$J25" "a 400 KB line of comment openers is skipped, not read as a block"
+[ $(( $(date +%s) - t0 )) -lt 5 ] && pass "that line is read in under 5 seconds" || fail "a 400 KB comment line took $(( $(date +%s) - t0 ))s"
 gradle_tree examples/demo/build.gradle.kts 'kotlin { jvmToolchain(25) }\n'
 java_case "$J21" "a toolchain under examples/ (not shipped) is not read"
-gradle_tree app/build.gradle.kts 'kotlin { jvmToolchain(17) }\n'
+[ "$(BOMLENS_INCLUDE_NON_SHIPPED=1 img_for_lang java "$LANGDIR/proj")" = "$J25" ] \
+    && pass "BOMLENS_INCLUDE_NON_SHIPPED=1 reads the toolchain under examples/ too" \
+    || fail "BOMLENS_INCLUDE_NON_SHIPPED=1 does not read examples/"
+gradle_tree app/build.gradle.kts 'kotlin { jvmToolchain(21) }\n'
 printf 'kotlin { jvmToolchain(25) }\n' > "$LANGDIR/proj/build.gradle.kts"
 java_case "$J25" "the highest toolchain across modules decides"
-gradle_tree build.gradle.kts 'kotlin { jvmToolchain(26) }\n'
-java_case "$J25" "a toolchain newer than any image still gets the newest one"
-case "$(java_image_note "$LANGDIR/proj")" in *"[WARN]"*"CDXGEN_JAVA_IMAGE"*) pass "a toolchain newer than any image points at CDXGEN_JAVA_IMAGE" ;;
-    *) fail "no CDXGEN_JAVA_IMAGE hint for a Java 26 toolchain" ;; esac
+
+# No image has these JDKs: the Java 21 image, with a warning.
+for v in 11 17 22 23 26; do
+    gradle_tree build.gradle.kts "kotlin { jvmToolchain($v) }\n"
+    java_case "$J21" "a Java $v toolchain (no image has it) stays on the Java 21 image"
+    note_case "a Java $v toolchain warns and points at CDXGEN_JAVA_IMAGE" java_image_note \
+        "[WARN] The Gradle build declares a Java $v toolchain, and the cdxgen Java image has Java 21" \
+        "auto-provisioning" "CDXGEN_JAVA_IMAGE"
+done
+gradle_tree build.gradle.kts 'kotlin { jvmToolchain(99999999999999999999) }\n'
+java_case "$J21" "an overlong version number is ignored"
+gradle_tree build.gradle.kts 'kotlin { jvmToolchain(025) }\n'
+java_case "$J25" "a leading zero still reads as the version"
+
+# A mixed tree runs in the all-in-one image; only a warning for the toolchain.
+gradle_tree build.gradle.kts 'kotlin { jvmToolchain(25) }\n'
+: > "$LANGDIR/proj/requirements.txt"
+[ "$(detect_lang "$LANGDIR/proj")" = mixed ] && pass "the Gradle and Python fixture detects as mixed" || fail "mixed fixture is not mixed"
+note_case "a mixed tree with a Java 25 toolchain warns and points at CDXGEN_JAVA_IMAGE" java_mixed_note \
+    "[WARN] The Gradle build declares a Java 25 toolchain" "all-in-one" "CDXGEN_JAVA_IMAGE"
+gradle_tree build.gradle.kts 'kotlin { jvmToolchain(21) }\n'
+[ -z "$(java_mixed_note "$LANGDIR/proj")" ] && pass "a mixed tree with a Java 21 toolchain prints no warning" \
+    || fail "a mixed tree with a Java 21 toolchain warns"
 
 echo "== --model routes a Figshare item to the dataset path =="
 # One option takes both AI inputs a person is handed a link to, so the reference

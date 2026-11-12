@@ -77,7 +77,7 @@ examples/<language>/
 
 ## 예제: Kotlin 지원 추가
 
-Kotlin은 Gradle 빌드 시스템을 사용하며 JVM 기반이므로, `detect_lang()`의 `java` 분기(`*.gradle.kts` 감지)와 Java 이미지(`cdxgen-temurin-java21`, `jvmToolchain`이 21보다 새로우면 `cdxgen-temurin-java25`)를 그대로 재활용합니다.
+Kotlin은 Gradle 빌드 시스템을 사용하며 JVM 기반이므로, `detect_lang()`의 `java` 분기(`*.gradle.kts` 감지)와 Java 이미지(`cdxgen-temurin-java21`, `jvmToolchain(24)`나 `jvmToolchain(25)`면 `cdxgen-temurin-java24`나 `cdxgen-temurin-java25`)를 그대로 재활용합니다.
 
 ### Gradle 잠금 파일 생성 방법
 
