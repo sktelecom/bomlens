@@ -59,6 +59,7 @@ opted_out() { case "$1" in 1|true) return 0 ;; esac; return 1; }
 # to inspect what a resolution produced).
 # ---------------------------------------------------------------------------
 GUARD_DIR=""
+GUARD_NOEXEC=""
 
 # Resolver-owned paths, relative to $SRC. maxdepth 4 covers multi-module trees
 # (app/build, services/api/go.mod) without walking a whole monorepo; .git and
@@ -113,6 +114,12 @@ guard_snapshot() {
         mkdir -p "$GUARD_DIR" 2>/dev/null || GUARD_DIR=""
     fi
     [ -n "$GUARD_DIR" ] || GUARD_DIR=$(mktemp -d 2>/dev/null) || { GUARD_DIR=""; return 0; }
+    # Wrappers without the executable bit: cdxgen sets the bit before it runs
+    # them, so the restore clears it again.
+    GUARD_NOEXEC=""
+    for _w in gradlew mvnw; do
+        [ -f "$_w" ] && [ ! -x "$_w" ] && GUARD_NOEXEC="$GUARD_NOEXEC $_w"
+    done
     guard_paths f > "$GUARD_DIR/files.before" 2>/dev/null
     guard_paths d > "$GUARD_DIR/dirs.before" 2>/dev/null
     echo "$GUARD_NAMES_VERSION" > "$GUARD_DIR/names.version" 2>/dev/null
@@ -129,6 +136,10 @@ guard_restore() {
     [ -n "$GUARD_DIR" ] || return 0
     _g="$GUARD_DIR"; GUARD_DIR=""
     cd "$SRC" 2>/dev/null || { rm -rf "$_g"; return 0; }
+    for _w in ${GUARD_NOEXEC:-}; do
+        [ -x "$_w" ] && chmod a-x "$_w" 2>/dev/null
+    done
+    GUARD_NOEXEC=""
     _rst=0; _del=0
     while IFS= read -r _f; do
         [ -n "$_f" ] || continue

@@ -8903,7 +8903,13 @@ echo "== gradle: a gradlew without the executable bit runs through sh =="
 GW_ROOT="$WORK/gradle-wrapper-noexec"; mkdir -p "$GW_ROOT/bin" "$GW_ROOT/src" "$GW_ROOT/out" "$GW_ROOT/gh"
 printf "plugins { id 'java' }\n" > "$GW_ROOT/src/build.gradle"
 printf '#!/bin/sh\necho "image $*" >> "%s/calls"\n' "$GW_ROOT" > "$GW_ROOT/bin/gradle"
-printf '#!/bin/sh\nout=""; prev=""; for a in "$@"; do [ "$prev" = "-o" ] && out="$a"; prev="$a"; done\nprintf %s > "$out"\n' "'{\"bomFormat\":\"CycloneDX\",\"specVersion\":\"1.6\",\"version\":1,\"metadata\":{},\"components\":[]}'" > "$GW_ROOT/bin/cdxgen"
+# The cdxgen stub sets the executable bit, as cdxgen does before it runs gradlew.
+cat > "$GW_ROOT/bin/cdxgen" <<GWCDX
+#!/bin/sh
+chmod +x "$GW_ROOT/src/gradlew"
+out=""; prev=""; for a in "\$@"; do [ "\$prev" = "-o" ] && out="\$a"; prev="\$a"; done
+printf '%s' '{"bomFormat":"CycloneDX","specVersion":"1.6","version":1,"metadata":{},"components":[]}' > "\$out"
+GWCDX
 chmod +x "$GW_ROOT/bin/gradle" "$GW_ROOT/bin/cdxgen"
 printf '#!/bin/sh\necho "wrapper $*" >> "%s/calls"\ncase " $* " in *" --version "*) printf "\\n------------------------------------------------------------\\nGradle 5.6.4\\n------------------------------------------------------------\\n" ;; esac\n' "$GW_ROOT" > "$GW_ROOT/src/gradlew"
 chmod 644 "$GW_ROOT/src/gradlew"
@@ -8918,6 +8924,9 @@ grep -q '^\[build-prep\] gradle: sh ./gradlew runs Gradle 5.6.4$' "$GW_ROOT/log"
 [ "$(grep -c 'runs Gradle' "$GW_ROOT/log")" = 1 ] \
     && pass "the Gradle version line appears once" \
     || fail "Gradle version line count: $(grep -c 'runs Gradle' "$GW_ROOT/log")"
+grep -q '^wrapper' "$GW_ROOT/calls" && [ -f "$GW_ROOT/src/gradlew" ] && [ ! -x "$GW_ROOT/src/gradlew" ] \
+    && pass "the gradlew is left without the executable bit after the scan" \
+    || fail "gradlew mode after the scan: $(ls -l "$GW_ROOT/src/gradlew" 2>/dev/null)"
 
 echo "== gradle: cdxgen reads the POMs Gradle downloaded (GRADLE_CACHE_DIR) =="
 # HOME is not the account home Gradle uses, so cdxgen is told where Gradle's
