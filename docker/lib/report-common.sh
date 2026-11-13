@@ -518,7 +518,8 @@ report_next_id() { REPORT_BOX_N=$((REPORT_BOX_N + 1)); REPORT_BOX_ID="box-${REPO
 #   wbr(chars)     break opportunities after the given characters
 report_jq_defs() {
     cat <<'JQ'
-def num: tostring as $s | if ($s|test("^[0-9]{4,}$")) then ([$s|explode|reverse|_nwise(3)|reverse|implode]|reverse|join(",")) else $s end;
+def commas: if length <= 3 then . else (.[0:length-3] | commas) + "," + .[length-3:] end;
+def num: tostring | if test("^[0-9]{4,}$") then commas else . end;
 def sevword: ({"CRITICAL":"Critical","HIGH":"High","MEDIUM":"Medium","LOW":"Low","UNKNOWN":"Unknown"}[.] // .);
 def sevmark: ({"CRITICAL":"◆","HIGH":"▲","MEDIUM":"●","LOW":"■"}[.] // "–");
 def sevlbl: ((. // "UNKNOWN") | tostring) as $s

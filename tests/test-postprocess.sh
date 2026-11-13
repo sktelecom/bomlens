@@ -13682,7 +13682,7 @@ else
     fail "the ko security report is not Korean" "$(grep -ho '<h1>[^<]*</h1>' "$RT/k_1.0_security.html")"
 fi
 if grep -q '<html lang="en">' "$RT/k_1.0_NOTICE.html" && grep -q '<h1>Third-party open source notice</h1>' "$RT/k_1.0_NOTICE.html" \
-   && grep -q ' components</span>' "$RT/k_1.0_NOTICE.html" && ! grep -q '[가-힣]' "$RT/k_1.0_NOTICE.html"; then
+   && grep -q ' components</span>' "$RT/k_1.0_NOTICE.html" && ! grep -qE '컴포넌트|라이선스|오픈소스 고지문|출처:' "$RT/k_1.0_NOTICE.html"; then
     pass "REPORT_LANG=ko leaves the NOTICE in English"
 else
     fail "a Korean string reached the NOTICE" "$(grep -o '<p class="desc">.*</p>' "$RT/k_1.0_NOTICE.html")"

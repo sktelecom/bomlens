@@ -220,7 +220,7 @@ fi
 # declares an outbound license (see --license / PROJECT_LICENSE). With no
 # declaration no property exists and this whole block stays absent from the
 # report — an omitted section means "not assessed", never "no conflicts".
-OUTBOUND_LIC=""; LC_INCOMPAT=0; LC_COND=0; LC_UNKNOWN=0; LC_TOP='[]'; LC_ALL='[]'
+OUTBOUND_LIC=""; LC_INCOMPAT=0; LC_COND=0; LC_UNKNOWN=0; LC_TOP='[]'; LC_ROWS='[]'
 if [ -f "$BOM" ] && jq empty "$BOM" >/dev/null 2>&1; then
     OUTBOUND_LIC=$(jq -r '[ (.metadata.component.licenses // [])[]
         | (.license.id // .license.name // .expression // "") | select(. != "") ] | first // ""' "$BOM" 2>/dev/null || echo "")
@@ -238,7 +238,7 @@ if [ -f "$BOM" ] && jq empty "$BOM" >/dev/null 2>&1; then
         LC_COND=$(echo "$LC_COUNTS" | jq '.c // 0')
         LC_UNKNOWN=$(echo "$LC_COUNTS" | jq '.u // 0')
         LC_TOP=$(echo "$LC_COUNTS" | jq -c '.top // []')
-        LC_ALL=$(echo "$LC_COUNTS" | jq -c '.all // []')
+        LC_ROWS=$(echo "$LC_COUNTS" | jq -c '.all // []')
     fi
 fi
 
@@ -811,7 +811,7 @@ ${UNCHECKED_LI}
         if [ "$LC_TOTAL" -gt 0 ]; then
             echo "</span></div>"
             echo "<ul class=\"rows mono\">"
-            echo "$LC_ALL" | jq -r --arg inc "$P_LC_INC" --arg con "$P_LC_CON" --arg unk "$P_LC_UNK" '.[] | "<li>" + (.label|@html) + " <span class=\"lbl"
+            echo "$LC_ROWS" | jq -r --arg inc "$P_LC_INC" --arg con "$P_LC_CON" --arg unk "$P_LC_UNK" '.[] | "<li>" + (.label|@html) + " <span class=\"lbl"
                 + (if .v == "incompatible" then " lbl-danger" elif .v == "conditional" then " lbl-attention" else "" end)
                 + "\">" + ({"incompatible":$inc,"conditional":$con,"unknown":$unk}[.v] // .v | @html) + "</span></li>"'
             if [ "$LC_TOTAL" -gt 30 ]; then
