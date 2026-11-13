@@ -267,6 +267,7 @@ What a scan reaches over the network, and the setting for each. The execution pl
 | What | Stage | Setting |
 |------|-------|---------|
 | Proxy | 1, 2 | `HTTP_PROXY`, `HTTPS_PROXY`, `NO_PROXY` (and the lower-case forms) |
+| Proxy that inspects TLS (re-signs HTTPS with its own CA) | 1, 2 | `BOMLENS_EXTRA_CA_CERTS`, the path of the proxy's CA bundle (PEM) inside the container. It is in both stages' `env_passthrough`, but the plan has no mount for it: mount the file yourself, read-only, at the path you set (the CLI uses `/bomlens-ca/extra.pem`). Each stage adds it to the system bundle, Node.js and a copy of the JDK trust store, under `/tmp` |
 | Package registries (pip, npm, Maven and so on) | 1 | through the proxy; each package manager's own mirror settings work as usual |
 | Licences looked up by cdxgen | 1 | `FETCH_LICENSE=false` turns it off |
 | Trivy vulnerability database | 2 | the `trivy-db` mount (no network at all); or `TRIVY_DB_REPOSITORY` and `TRIVY_JAVA_DB_REPOSITORY` for a mirror. Trivy reads any other `TRIVY_*` variable set in the container (the CLI passes on all it has) |

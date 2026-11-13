@@ -185,6 +185,13 @@ SBOM(`..._bom.json`)과 오픈소스 위험 보고서(`..._risk-report.html`)도
   Docker Desktop은 `Settings > Resources > Proxies`, Rancher Desktop은 `Preferences > WSL > Proxy`
   에서 설정하세요. 프록시가 `localhost`까지 가로채면 스캔이 정상 동작해도 브라우저에 오류가 뜨므로
   프록시 우회 목록에 `localhost`를 추가하세요.
+- **스캔이 `certificate signed by unknown authority`나 `PKIX path building failed`로 실패해요**:
+  사내 프록시가 HTTPS를 검사하면서 자체 CA로 다시 서명하는데, 스캔 컨테이너가 그 CA를 신뢰하지 않아서입니다.
+  IT 담당 부서에서 그 CA 번들을 PEM 형식으로 받아 `bomlens.settings.txt`에
+  `SBOM_EXTRA_CA_CERTS=C:\경로\proxy-ca.pem`을 넣으세요(`&`, `^`, `|`, `<`, `>`, `%`, `!`가 없는 경로).
+  그러면 `sbom-ui.bat`이 이 파일을 스캔 컨테이너에 마운트합니다. 데스크톱 앱은 같은 이름의 환경변수를 읽습니다.
+  이렇게 실패한 스캔은 로그에 이 옵션을 안내하는 `[WARN]` 줄을 남깁니다. 이미지 다운로드에는 적용되지 않습니다.
+  이미지는 Docker 데몬이 내려받으므로 Docker Desktop이나 Rancher Desktop에서도 그 CA를 신뢰하도록 설정해야 합니다.
 - **쓸 수 있는 네트워크가 아예 없어요**: 다운로드 대신 파일로 설치할 수 있습니다.
   `bomlens-image.tar`를 받아 `.bat` 파일들 옆에 두면 자동으로 사용합니다 — 네트워크도 명령줄도
   필요 없습니다. 아래 "설정 파일"을 참고하세요.
