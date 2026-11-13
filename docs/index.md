@@ -12,6 +12,8 @@ From source, containers, binaries, firmware, or an SBOM you received.
 One run gives you an SBOM, an open-source notice, and a risk report.
 No SaaS and no account.
 
+BomLens is an [OWASP Incubator project](https://owasp.org/www-project-bomlens/).
+
 [Try the live demo](https://sktelecom.github.io/bomlens/demo/){ .md-button .md-button--primary }
 [Get started](start/first-scan.md){ .md-button }
 

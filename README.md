@@ -4,11 +4,12 @@
 
 <h1 align="center">BomLens</h1>
 
-> **BomLens** is a local-first [SBOM](https://sktelecom.github.io/bomlens/concepts/what-is-sbom/) generator and open-source risk assessor. It produces a CycloneDX SBOM, an open-source notice, and a security and license risk report for a single project in seconds — from source code, a container, a binary, firmware, an SBOM you received, or a HuggingFace AI model. CLI or browser UI, no SaaS.
+> **BomLens** is a local-first [SBOM](https://sktelecom.github.io/bomlens/concepts/what-is-sbom/) generator and open-source risk assessor. It produces a CycloneDX SBOM, an open-source notice, and a security and license risk report for a single project in seconds — from source code, a container, a binary, firmware, an SBOM you received, or a HuggingFace AI model. CLI or browser UI, no SaaS. BomLens is an [OWASP Incubator project](https://owasp.org/www-project-bomlens/).
 
 [![GitHub release](https://img.shields.io/github/v/release/sktelecom/bomlens?style=flat-square)](https://github.com/sktelecom/bomlens/releases)
 [![Container image](https://img.shields.io/badge/ghcr.io-bomlens-2496ED?style=flat-square&logo=docker&logoColor=white)](https://github.com/sktelecom/bomlens/pkgs/container/bomlens)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg?style=flat-square)](LICENSE)
+[![OWASP Incubator](https://img.shields.io/badge/OWASP-Incubator-blue?style=flat-square)](https://owasp.org/www-project-bomlens/)
 [![OpenSSF Best Practices](https://www.bestpractices.dev/projects/13059/badge)](https://www.bestpractices.dev/projects/13059)
 [![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/sktelecom/bomlens/badge)](https://securityscorecards.dev/viewer/?uri=github.com/sktelecom/bomlens)
 

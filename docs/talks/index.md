@@ -6,6 +6,8 @@ description: Conferences and press coverage where BomLens has been presented or 
 
 Where BomLens has been presented or covered, with slides and links for each. If you would like BomLens at your event, open an issue on [GitHub](https://github.com/sktelecom/bomlens/issues).
 
+On 2026-10-19, BomLens was accepted as an [OWASP Incubator project](https://owasp.org/www-project-bomlens/).
+
 ## Talks
 
 <div class="news-list" markdown>
