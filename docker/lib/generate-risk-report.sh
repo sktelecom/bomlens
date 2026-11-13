@@ -381,7 +381,7 @@ if [ "$REPORT_LANG" = "ko" ]; then
     P_NEXT2_SELF_MD=$(tfmt risk.next2_self_md "$OUT_PREFIX" "$OUT_PREFIX")
     P_NEXT2_SELF_HTML=$(kstr risk.next2_self_html)
     P_KIND=$(kstr risk.kind)
-    P_META_PROJECT=$(kstr risk.meta_project); P_META_GENERATED=$(kstr risk.meta_generated); P_META_FORMAT=$(kstr risk.meta_format)
+    P_META_FORMAT=$(kstr risk.meta_format)
 else
     P_TITLE="Open-source risk report — ${PROJECT}"; P_H1="Open-source risk report"
     P_SUBTITLE=""
@@ -463,7 +463,7 @@ else
     P_NEXT2_SELF_MD="Keep and distribute the notice (\`${OUT_PREFIX}_NOTICE.{txt,html}\`) together with the SBOM (\`${OUT_PREFIX}_bom.json\`)."
     P_NEXT2_SELF_HTML="Keep and distribute the notice (NOTICE) together with the SBOM."
     P_KIND="Open-source risk report"
-    P_META_PROJECT="Project:"; P_META_GENERATED="Generated:"; P_META_FORMAT="Input format:"
+    P_META_FORMAT="Input format:"
 fi
 
 # Only the parts that apply are said, so a scan that lost nothing but one tool
@@ -488,7 +488,16 @@ fi
 # Shared composites (built from the localized pieces above; identical structure
 # in both languages, so the deadline note stays one place).
 P_VULN_NOTE_MD="> ${P_DL_LEAD}**${P_DL_BOLD_CRIT}, ${P_DL_BOLD_HIGH}**${P_DL_TAIL}"
-P_VULN_NOTE_HTML="<div class=\"note\">${P_DL_LEAD}<b>${P_DL_BOLD_CRIT}</b>, <b>${P_DL_BOLD_HIGH}</b>${P_DL_TAIL}</div>"
+# HTML: the deadlines as a definition list (severity label, then its deadline)
+# under a titled box, and the recommendation as the box's closing line.
+P_DL_TITLE="${P_DL_LEAD%: }"; P_DL_TITLE="${P_DL_TITLE%:}"
+P_DL_ADVICE="${P_DL_TAIL#. }"; P_DL_ADVICE="${P_DL_ADVICE# }"
+P_VULN_NOTE_HTML="<div class=\"box\"><div class=\"box-head\"><p class=\"box-title\">${P_DL_TITLE}</p></div>
+<dl class=\"deadlines\">
+ <div><dt><span class=\"lbl sev-CRITICAL\"><span class=\"mk\" aria-hidden=\"true\">&#9670;</span>Critical</span></dt><dd>${P_DL_CRIT}</dd></div>
+ <div><dt><span class=\"lbl sev-HIGH\"><span class=\"mk\" aria-hidden=\"true\">&#9650;</span>High</span></dt><dd>${P_DL_HIGH}</dd></div>
+</dl>
+<p class=\"legend\">${P_DL_ADVICE}</p></div>"
 
 # --------------------------------------------------------
 # Markdown
@@ -642,88 +651,102 @@ P_VULN_NOTE_HTML="<div class=\"note\">${P_DL_LEAD}<b>${P_DL_BOLD_CRIT}</b>, <b>$
 } > "$MD"
 
 # --------------------------------------------------------
-# HTML (cards/table/CSP/escape pattern from scan-security.sh)
+# HTML (page head, labels, boxes and tables from report-common.sh)
 # --------------------------------------------------------
 esc() { printf '%s' "$1" | sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g'; }
-conf_class="warn"; [ "$CONF_RESULT" = "pass" ] && conf_class="pass"; [ "$CONF_RESULT" = "fail" ] && conf_class="fail"
-# Meta suffix only states the input format for supplier (ANALYZE) reports (section
-# numbers S_CONF/S_VULN/S_LIC/S_NEXT were assigned once near the top).
-META_FORMAT=""; [ "$HAS_CONF" = "true" ] && META_FORMAT=" &middot; ${P_META_FORMAT} $(esc "$CONF_FORMAT")"
+conf_class="attention"; [ "$CONF_RESULT" = "pass" ] && conf_class="success"; [ "$CONF_RESULT" = "fail" ] && conf_class="danger"
+# Page head: "Project version", then what was scanned, when, and how many
+# components. A supplier review also states the input format.
+RR_VERSION="$(report_version "$PROJECT" "$OUT_PREFIX" "$BOM")"
+RR_NCOMP="$(report_component_count "$BOM")"
+RR_COMP=""; [ -n "$RR_NCOMP" ] && RR_COMP="$(report_str components "$RR_NCOMP")"
+META_FORMAT=""; [ "$HAS_CONF" = "true" ] && META_FORMAT="${P_META_FORMAT} $(esc "$CONF_FORMAT")"
+P_FINDINGS="$(report_str findings)"
+# One label per severity: a shape marker and the word, then the count.
+sev_summary() {
+    printf '<div class="summary">\n'
+    printf ' <span class="lbl sev-CRITICAL"><span class="mk" aria-hidden="true">&#9670;</span>Critical <span class="count">%s</span></span>\n' "$C"
+    printf ' <span class="lbl sev-HIGH"><span class="mk" aria-hidden="true">&#9650;</span>High <span class="count">%s</span></span>\n' "$H"
+    printf ' <span class="lbl sev-MEDIUM"><span class="mk" aria-hidden="true">&#9679;</span>Medium <span class="count">%s</span></span>\n' "$M"
+    printf ' <span class="lbl sev-LOW"><span class="mk" aria-hidden="true">&#9632;</span>Low <span class="count">%s</span></span>\n' "$L"
+    printf ' <span class="lbl sev-UNKNOWN"><span class="mk" aria-hidden="true">&#8211;</span>Unknown <span class="count">%s</span></span>\n' "$U"
+    printf '</div>\n'
+}
 {
     cat <<HTMLHEAD
 <!DOCTYPE html>
 <html lang="${REPORT_LANG}"><head>
 <meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline';">
 <title>${P_H1} — $(esc "$PROJECT")</title>
 HTMLHEAD
     report_style
-    cat <<HTMLHEAD2
-</head><body>
-<header class="report-header">
- <div class="wordmark">BomLens<span class="tag">SBOM</span></div>
- <div class="report-kind">${P_KIND}</div>
-</header>
-<h1>${P_H1}</h1>
-${SUBTITLE_HTML}<p class="meta">${P_META_PROJECT} $(esc "$PROJECT") &middot; ${P_META_GENERATED} $(report_time_html "$GEN_AT")${META_FORMAT}</p>
-HTMLHEAD2
+    echo "</head><body>"
+    report_topbar "${P_KIND}"
+    echo '<div class="page-head">'
+    report_h1 "$(esc "$PROJECT")" "$RR_VERSION"
+    printf '%s' "${SUBTITLE_HTML}"
+    report_desc "$(esc "$(report_type_label "$SCAN_MODE" "$BOM")")" "$(report_time_html "$GEN_AT")" "$RR_COMP"
+    report_desc "$META_FORMAT"
+    echo '</div>'
 
     if [ "$HAS_CONF" = "true" ]; then
         echo "<h2>${S_CONF}. ${P_H2_CONF}</h2>"
-        echo "<div class=\"cards\"><span class=\"pill pill-${conf_class}\">${P_CONF_RESULT_LBL} ${CONF_UP}</span></div>"
+        echo "<div class=\"summary\"><span class=\"lbl lbl-${conf_class}\">${P_CONF_RESULT_LBL} ${CONF_UP}</span></div>"
         if [ "$CONF_RESULT" = "fail" ]; then
-            echo "<div class=\"note\"><b>${P_CONF_FAIL_B}</b>${P_CONF_FAIL_TXT}"
+            echo "<div class=\"banner banner-danger\"><p><b>${P_CONF_FAIL_B}</b>${P_CONF_FAIL_TXT}</p>"
             echo "<ul>"
             echo "$CONF_FAILS" | jq -r '.[] | "<li>" + (.|@html) + "</li>"'
             echo "</ul></div>"
         fi
     fi
 
-    cat <<HTMLSEC
-<h2>${S_VULN}. ${P_H2_VULN}</h2>
-${P_VULN_NOTE_HTML}
-<div class="cards">
- <span class="pill pill-crit">Critical <span class="count">${C}</span></span>
- <span class="pill pill-high">High <span class="count">${H}</span></span>
- <span class="pill pill-med">Medium <span class="count">${M}</span></span>
- <span class="pill pill-low">Low <span class="count">${L}</span></span>
- <span class="pill pill-info">Unknown <span class="count">${U}</span></span>
-</div>
-HTMLSEC
+    echo "<h2>${S_VULN}. ${P_H2_VULN}</h2>"
+    echo "${P_VULN_NOTE_HTML}"
+    sev_summary
 
+    # What the counts above do not cover, in one notice.
+    NOTES=""
     if [ "${UNREACHED_N:-0}" -gt 0 ]; then
-        echo "<div class=\"note\">${P_UNREACHED_HTML}</div>"
+        NOTES="${NOTES}<p>${P_UNREACHED_HTML}</p>"
     fi
     if [ "${UNCHECKED_N:-0}" -gt 0 ]; then
-        echo "<div class=\"note\">${P_UNCHECKED_HTML}<ul>"
         # shellcheck disable=SC2016
-        echo "$UNCHECKED_TOP" | jq -r --arg nv "$P_REASON_NO_VERSION" --arg ni "$P_REASON_NO_ID" --arg rp "$P_REASON_REPO_PURL" '.[] |
+        UNCHECKED_LI=$(echo "$UNCHECKED_TOP" | jq -r --arg nv "$P_REASON_NO_VERSION" --arg ni "$P_REASON_NO_ID" --arg rp "$P_REASON_REPO_PURL" '.[] |
             "<li><code>" + (.name | @html) + "</code>" + (if .version != "" then " " + (.version | @html) else "" end)
-            + " (" + ((if .reason == "no-version" then $nv elif .reason == "no-identifier" then $ni elif .reason == "repository-purl" then $rp else .reason end) | @html) + ")</li>"'
-        if [ "$UNCHECKED_N" -gt "$UNCHECKED_LIST_MAX" ]; then echo "<li>$(esc "$P_UNCHECKED_MORE")</li>"; fi
-        echo "</ul></div>"
+            + " (" + ((if .reason == "no-version" then $nv elif .reason == "no-identifier" then $ni elif .reason == "repository-purl" then $rp else .reason end) | @html) + ")</li>"')
+        if [ "$UNCHECKED_N" -gt "$UNCHECKED_LIST_MAX" ]; then UNCHECKED_LI="${UNCHECKED_LI}
+<li>$(esc "$P_UNCHECKED_MORE")</li>"; fi
+        NOTES="${NOTES}<p>${P_UNCHECKED_HTML}</p><ul>
+${UNCHECKED_LI}
+</ul>"
     elif [ "${PRESENCE_ONLY:-0}" -gt 0 ]; then
-        echo "<div class=\"note\">${P_PRESENCE_HTML}</div>"
+        NOTES="${NOTES}<p>${P_PRESENCE_HTML}</p>"
     fi
     if [ "${UNPINNED:-0}" -eq 1 ]; then
-        echo "<div class=\"note\">${P_UNPINNED_HTML}</div>"
+        NOTES="${NOTES}<p>${P_UNPINNED_HTML}</p>"
     fi
     if [ "$FW_SCOPE" = "true" ]; then
-        echo "<div class=\"note\"><b>${P_FW_LABEL}</b> ${FW_SCOPE_TEXT}"
-        if [ -n "$FW_FAILED_FORMATS" ]; then echo "<br>${P_FW_FORMATS}"; fi
-        if [ -n "$FW_MISSING" ]; then echo "<br>${P_FW_MISSING}"; fi
-        echo "</div>"
+        NOTES="${NOTES}<p><b>${P_FW_LABEL}</b> ${FW_SCOPE_TEXT}"
+        if [ -n "$FW_FAILED_FORMATS" ]; then NOTES="${NOTES}<br>${P_FW_FORMATS}"; fi
+        if [ -n "$FW_MISSING" ]; then NOTES="${NOTES}<br>${P_FW_MISSING}"; fi
+        NOTES="${NOTES}</p>"
+    fi
+    if [ -n "$NOTES" ]; then
+        printf '<div class="banner">%s</div>\n' "$NOTES"
     fi
 
     if [ "$TOTAL" -gt 0 ]; then
-        echo "<div class=\"table-wrap\"><table><thead><tr><th>Severity</th><th>CVE</th><th>Package</th><th>Installed</th><th>Fixed</th><th>${P_TH_DEADLINE}</th></tr></thead><tbody>"
+        echo "<div class=\"box\"><div class=\"box-head\"><span class=\"box-title\">${P_FINDINGS}</span><span class=\"counter\">${TOTAL}</span></div>"
+        echo "<div class=\"table-scroll\"><table><thead><tr><th>Severity</th><th>CVE</th><th>Package</th><th>Installed</th><th>Fixed</th><th>${P_TH_DEADLINE}</th></tr></thead><tbody>"
         # shellcheck disable=SC2016
-        echo "$FINDINGS" | jq -r --arg cd "$P_DL_CRIT" --arg hd "$P_DL_HIGH" --arg pol "$P_DL_POLICY" '.[] |
-            "<tr><td class=\"sev-\(.severity)\">" + (.severity|@html) + "</td>" +
-            "<td class=\"id\">" + (.id|@html) + "</td><td>" + (.pkg|@html) + "</td>" +
-            "<td>" + (.version|@html) + "</td><td>" + (.fixed|@html) + "</td>" +
-            "<td>" + ((if .severity=="CRITICAL" then $cd elif .severity=="HIGH" then $hd else $pol end)|@html) + "</td></tr>"'
-        echo "</tbody></table></div>"
+        echo "$FINDINGS" | jq -r --arg cd "$P_DL_CRIT" --arg hd "$P_DL_HIGH" --arg pol "$P_DL_POLICY" "$(report_jq_defs)"'.[] |
+            "<tr><td class=\"sev\">" + (.severity|sevlbl) + "</td>" +
+            "<td class=\"id\">" + (.id|@html) + "</td><td class=\"grow\">" + (.pkg|pkgcoord) + "</td>" +
+            "<td class=\"ver\">" + (.version|@html) + "</td><td class=\"fix\">" + (.fixed|fixlist) + "</td>" +
+            "<td class=\"ver\">" + ((if .severity=="CRITICAL" then $cd elif .severity=="HIGH" then $hd else $pol end)|@html) + "</td></tr>"'
+        echo "</tbody></table></div></div>"
     elif [ "${UNCHECKED_N:-0}" -gt 0 ]; then
         echo "<p>${P_VULN_NONE_CHECKED_HTML}</p>"
     else
@@ -740,22 +763,22 @@ HTMLSEC
         echo "<h3>${P_H3_LICCLASS}</h3>"
         echo "<p>${P_LICCLASS_INTRO_A}<code>bomlens:licenseClass</code>${P_LICCLASS_INTRO_B}</p>"
         cat <<HTMLLIC
-<div class="cards">
- <span class="pill pill-cat-network">Network copyleft <span class="count">${NC}</span></span>
- <span class="pill pill-cat-strong">Strong copyleft <span class="count">${SC}</span></span>
- <span class="pill pill-cat-weak">Weak copyleft <span class="count">${WK}</span></span>
- <span class="pill pill-cat-permissive">Permissive <span class="count">${PM}</span></span>
- <span class="pill pill-cat-review">Uncategorized <span class="count">${UN}</span></span>
+<div class="summary">
+ <span class="lbl lbl-cat-network">Network copyleft <span class="count">${NC}</span></span>
+ <span class="lbl lbl-cat-strong">Strong copyleft <span class="count">${SC}</span></span>
+ <span class="lbl lbl-cat-weak">Weak copyleft <span class="count">${WK}</span></span>
+ <span class="lbl lbl-cat-permissive">Permissive <span class="count">${PM}</span></span>
+ <span class="lbl lbl-cat-review">Uncategorized <span class="count">${UN}</span></span>
 </div>
 HTMLLIC
         if [ "$COPYLEFT_TOTAL" -gt 0 ]; then
-            echo "<p>${P_COPYLEFT_DRIVERS}</p>"
-            echo "<ul class=\"mono\">"
+            echo "<div class=\"box\"><div class=\"box-head\"><p class=\"box-title\">${P_COPYLEFT_DRIVERS%:}</p><span class=\"counter\">${COPYLEFT_TOTAL}</span></div>"
+            echo "<ul class=\"rows mono\">"
             echo "$COPYLEFT_TOP" | jq -r '.[] | "<li>" + (.label|@html) + " (" + .class + ")</li>"'
             if [ "$COPYLEFT_TOTAL" -gt 10 ]; then
                 echo "<li>${P_CL_MORE_PRE}$((COPYLEFT_TOTAL - 10))${P_CL_MORE_MID}<code>bomlens:licenseClass</code>${P_CL_MORE_END}</li>"
             fi
-            echo "</ul>"
+            echo "</ul></div>"
         fi
     fi
     if [ -n "$OUTBOUND_LIC" ]; then
@@ -763,39 +786,39 @@ HTMLLIC
         echo "<p>${P_LICCONFLICT_INTRO}</p>"
         echo "<p><code>$(printf '%s' "$OUTBOUND_LIC" | sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g')</code></p>"
         cat <<HTMLLC
-<div class="cards">
- <span class="pill pill-crit">Incompatible <span class="count">${LC_INCOMPAT}</span></span>
- <span class="pill pill-med">Conditional <span class="count">${LC_COND}</span></span>
- <span class="pill pill-info">Unknown <span class="count">${LC_UNKNOWN}</span></span>
+<div class="summary">
+ <span class="lbl lbl-danger">Incompatible <span class="count">${LC_INCOMPAT}</span></span>
+ <span class="lbl lbl-attention">Conditional <span class="count">${LC_COND}</span></span>
+ <span class="lbl">Unknown <span class="count">${LC_UNKNOWN}</span></span>
 </div>
 HTMLLC
         if [ "$LC_INCOMPAT" -gt 0 ]; then
-            echo "<p>${P_LICCONFLICT_DRIVERS}</p>"
-            echo "<ul class=\"mono\">"
+            echo "<div class=\"box\"><div class=\"box-head\"><p class=\"box-title\">${P_LICCONFLICT_DRIVERS%:}</p><span class=\"counter\">${LC_INCOMPAT}</span></div>"
+            echo "<ul class=\"rows mono\">"
             echo "$LC_TOP" | jq -r '.[] | "<li>" + (.|@html) + "</li>"'
-            echo "</ul>"
+            echo "</ul></div>"
         fi
     fi
 
     if [ "$MAL_COUNT" -gt 0 ]; then
         echo "<h3>${P_H3_MALICIOUS}</h3>"
         echo "<p>${P_MALICIOUS_INTRO}</p>"
-        echo "<div class=\"cards\"><span class=\"pill pill-crit\">${P_H3_MALICIOUS} <span class=\"count\">${MAL_COUNT}</span></span></div>"
-        echo "<p>${P_MALICIOUS_LIST}</p>"
-        echo "<ul class=\"mono\">"
+        echo "<div class=\"summary\"><span class=\"lbl lbl-danger\">${P_H3_MALICIOUS} <span class=\"count\">${MAL_COUNT}</span></span></div>"
+        echo "<div class=\"box\"><div class=\"box-head\"><p class=\"box-title\">${P_MALICIOUS_LIST%:}</p><span class=\"counter\">${MAL_COUNT}</span></div>"
+        echo "<ul class=\"rows mono\">"
         echo "$MAL_TOP" | jq -r '.[] | "<li>" + (.label|@html) + " (" + (.id|@html) + ")</li>"'
-        echo "</ul>"
+        echo "</ul></div>"
         echo "<p class=\"meta\">$(printf '%s' "$MAL_SNAP" | sed 's/&/\&amp;/g; s/</\&lt;/g')</p>"
     fi
     if [ "$AS_MODELS" -gt 0 ]; then
         echo "<h3>${P_H3_AI}</h3>"
         echo "<p>${P_AI_SEE_HTML} ${P_AI_DISC}</p>"
         cat <<HTMLASSESS
-<div class="cards">
- <span class="pill pill-pass">${L_OK} <span class="count">${AS_OK}</span></span>
- <span class="pill pill-med">${L_COND} <span class="count">${AS_COND}</span></span>
- <span class="pill pill-high">${L_CAU} <span class="count">${AS_CAU}</span></span>
- <span class="pill pill-info">${L_REV} <span class="count">${AS_REV}</span></span>
+<div class="summary">
+ <span class="lbl lbl-success">${L_OK} <span class="count">${AS_OK}</span></span>
+ <span class="lbl lbl-attention">${L_COND} <span class="count">${AS_COND}</span></span>
+ <span class="lbl lbl-severe">${L_CAU} <span class="count">${AS_CAU}</span></span>
+ <span class="lbl">${L_REV} <span class="count">${AS_REV}</span></span>
 </div>
 HTMLASSESS
     fi

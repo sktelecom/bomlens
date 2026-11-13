@@ -342,30 +342,32 @@ done)
 # ---------- HTML (all dynamic fields escaped to prevent XSS from package metadata) ----------
 esc() { printf '%s' "$1" | sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g'; }
 PROJECT_ESC="$(esc "$PROJECT")"
+# The NOTICE is written in English only.
+N_VERSION="$(report_version "$PROJECT" "$OUT_PREFIX" "$SBOM")"
+N_TYPE="$(REPORT_LANG=en report_type_label "" "$SBOM")"
+N_LICS="${TOTAL_LIC} licenses"; [ "$TOTAL_LIC" = "1" ] && N_LICS="1 license"
 {
     cat <<HTMLHEAD
 <!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline';">
 <title>Open Source Notice — ${PROJECT_ESC}</title>
 HTMLHEAD
     report_style
-    cat <<HTMLHEAD2
-</head>
-<body>
-<header class="report-header">
- <div class="wordmark">BomLens<span class="tag">SBOM</span></div>
- <div class="report-kind">Open Source Notice</div>
-</header>
-<h1>Third-party Open Source Notice</h1>
-<p class="meta">Project: ${PROJECT_ESC} &middot; Generated: $(report_time_html "$GEN_AT") &middot; Components: ${TOTAL_COMP} &middot; Licenses: ${TOTAL_LIC}</p>
-HTMLHEAD2
+    echo "</head>"
+    echo "<body>"
+    report_topbar "Third-party Open Source Notice"
+    echo '<div class="page-head">'
+    report_h1 "$PROJECT_ESC" "$N_VERSION"
+    report_desc "$(esc "$N_TYPE")" "$(report_time_html "$GEN_AT")" "$(REPORT_LANG=en report_str components "$TOTAL_COMP")" "$N_LICS"
+    echo '</div>'
 
     # License review banner (AI behavioral-use / non-commercial). Escaped via @html.
     if [ "$REVIEW_N" -gt 0 ]; then
-        echo '<div class="review"><h2>License review needed — AI / restrictive terms</h2>'
+        echo '<div class="banner review"><h2 class="banner-title">License review needed — AI / restrictive terms</h2>'
         echo '<p class="meta">behavioral-use = use-based restrictions (RAIL/Llama/Gemma, etc.); non-commercial = restricted commercial use. Human review required.</p><ul>'
         echo "$REVIEW" | jq -r '.[] |
             "<li><b>[" + (.flag|@html) + "]</b> " + (.license|@html) + " — "
@@ -373,10 +375,11 @@ HTMLHEAD2
         echo "</ul></div>"
     fi
 
-    # jq @html escapes license names, component identifiers, source URLs and
-    # copyright. An http(s) source is rendered as a link; a raw purl as plain text.
-    # The Copyright line renders only when component.copyright was captured; when
-    # it wasn't, attrhtml prints nothing rather than a placeholder.
+    # One box per license: the license and its count in the head, one row per
+    # component. jq @html escapes license names, component identifiers, source
+    # URLs and copyright. An http(s) source is rendered as a link; a raw purl as
+    # plain text. The Copyright line renders only when component.copyright was
+    # captured; when it wasn't, attrhtml prints nothing rather than a placeholder.
     echo "$LICENSE_MAP" | jq -r "$SPDX_SHAPE_DEF"'
         def srchtml($s):
           if $s == null then ""
@@ -388,10 +391,12 @@ HTMLHEAD2
           then "<span class=\"attr\">Copyright: " + ($c.copyright|@html) + "</span>"
           else "" end;
         .[] |
-        "<div class=\"lic\"><h2>" + (.license | @html) + "</h2>" +
+        ((.count // (.components | length)) | tostring) as $n |
+        "<div class=\"box lic\"><div class=\"box-head\"><h2>" + (.license | @html) + "</h2>" +
+        "<span class=\"counter\" title=\"" + $n + " component(s)\">" + $n + "</span>" +
         (if is_spdx_shaped(.license) then ""
          else "<p class=\"unverified\">unverified name — not an SPDX identifier; confirm against the component'"'"'s license file</p>" end) +
-        "<p class=\"count\">" + ((.count // (.components | length)) | tostring) + " component(s)</p><ul>" +
+        "</div><ul class=\"rows mono\">" +
         (.components | map("<li>" + (.comp | @html)
             + srchtml(.src)
             + attrhtml(.)
@@ -403,7 +408,7 @@ HTMLHEAD2
         echo '<div class="texts"><h2>License texts (SPDX standard)</h2>'
         for lic in $LICENSES_WITH_TEXT; do
             esc=$(sed -e 's/&/\&amp;/g' -e 's/</\&lt;/g' -e 's/>/\&gt;/g' "$LICENSE_DIR/$lic.txt")
-            printf '<h3>%s</h3><pre>%s</pre>\n' "$lic" "$esc"
+            printf '<div class="box"><div class="box-head"><h3>%s</h3></div><pre>%s</pre></div>\n' "$lic" "$esc"
         done
         echo '</div>'
     fi

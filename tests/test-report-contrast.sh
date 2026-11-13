@@ -95,7 +95,7 @@ done
 # The enrichment must really have run, or the EPSS/KEV colours go unchecked.
 grep -q 'class="kevbadge"' "${P}_security.html" \
     || { echo "the security report has no KEV badge: the stub curl was not used" >&2; exit 1; }
-grep -q '<th>EPSS</th>' "${P}_security.html" \
+grep -q '>EPSS</th>' "${P}_security.html" \
     || { echo "the security report has no EPSS column" >&2; exit 1; }
 
 # A firmware scan: the same data plus the analysis-scope note.

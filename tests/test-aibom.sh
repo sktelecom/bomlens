@@ -1527,10 +1527,10 @@ if [ -f "$PROF" ]; then
     # The rollup is built by a jq expression that silently yields [] on error, so
     # assert the table is actually populated and ordered like the G7 registry.
     rollup=$(sed -n '/G7 minimum elements by cluster/,/SBOM format requirements/p' "$WORK/conf_conformance.html")
-    rows=$(printf '%s' "$rollup" | grep -c '<tr><td>')
+    rows=$(printf '%s' "$rollup" | grep -c '<tr><td class="grow">')
     [ "$rows" -ge 7 ] && pass "the cluster rollup lists every cluster ($rows rows)" || fail "the cluster rollup is empty or short" "$rows"
     want=$(jq -r '[.clusters[].name] | join("|")' "$LIB/g7-registry.json")
-    got=$(printf '%s' "$rollup" | grep -o '<tr><td>[^<]*</td>' | sed 's/<[^>]*>//g' | paste -sd'|' -)
+    got=$(printf '%s' "$rollup" | grep -o '<tr><td class="grow">[^<]*</td>' | sed 's/<[^>]*>//g' | paste -sd'|' -)
     [ "$got" = "$want" ] && pass "the cluster rollup follows the registry order" || fail "the cluster rollup order drifted" "$got"
     # The profile lists the closable gaps and delegates the fragments to the
     # conformance report, so the two artifacts stay complementary, not duplicated.
@@ -1917,14 +1917,14 @@ else
     fail "ko conformance JSON diverged from the English JSON"
 fi
 grep -q '<html lang="ko">' "$WORK/koconf_conformance.html" && pass "ko conformance HTML sets lang=ko" || fail "ko conformance HTML lang is not ko"
-grep -q '<h1>적합성 검사 보고서</h1>' "$WORK/koconf_conformance.html" && pass "ko conformance HTML h1 is Korean" || fail "ko conformance HTML h1 not localized"
+grep -q '<p class="report-kind">적합성 검사 보고서</p>' "$WORK/koconf_conformance.html" && pass "ko conformance HTML names the report in Korean" || fail "ko conformance HTML report name not localized"
 grep -q '모델 라이선스' "$WORK/koconf_conformance.md" && pass "ko conformance MD localizes a G7 element label" || fail "ko conformance MD label not localized"
 grep -q '사람 검토 필요' "$WORK/koconf_conformance.md" && pass "ko conformance MD localizes a review detail" || fail "ko conformance MD detail not localized"
 # Data/identifiers must survive verbatim in the ko report.
 grep -q 'Apache-2.0' "$WORK/koconf_conformance.md" && pass "ko conformance keeps the license id verbatim" || fail "ko conformance dropped the license id"
 grep -q '✅' "$WORK/koconf_conformance.md" && pass "ko conformance keeps the status emoji" || fail "ko conformance dropped the status emoji"
 # The English default must be untouched (same fixture, no REPORT_LANG).
-grep -q '<h1>Conformance check report</h1>' "$WORK/conf_conformance.html" && pass "en (default) conformance stays English" || fail "en default conformance drifted"
+grep -q '<p class="report-kind">Conformance check report</p>' "$WORK/conf_conformance.html" && pass "en (default) conformance stays English" || fail "en default conformance drifted"
 
 echo "== ko AI compliance profile renders Korean while the JSON stays English =="
 cp "$WORK/conf_bom.json" "$WORK/koconf_bom.json" 2>/dev/null

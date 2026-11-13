@@ -13641,13 +13641,54 @@ for kind in risk-report security; do
     grep -q '<td class="id">CVE-' "${RTP}_$kind.html" && grep -q 'td.id{white-space:nowrap' "${RTP}_$kind.html" \
         && pass "$kind report keeps a CVE id on one line" || fail "$kind report CVE column may wrap"
 done
-grep -q '<h1>Open-source risk report</h1>' "${RTP}_risk-report.html" \
+# Page head: the title is "project version" (never the t_1.0 prefix), the report
+# kind sits in the top bar, a wide table scrolls inside its box, and no notice
+# carries a thick side stripe.
+for kind in risk-report security NOTICE conformance; do
+    H="${RTP}_$kind.html"
+    grep -q '<h1>t <span class="ver">1.0</span></h1>' "$H" \
+        && pass "$kind report is titled by project and version, not by the output prefix" \
+        || fail "$kind report title" "$(grep -m1 '<h1' "$H")"
+    grep -q '<header class="topbar">' "$H" && grep -q '<p class="report-kind">' "$H" \
+        && pass "$kind report names its kind in the top bar" || fail "$kind report has no top bar with the report kind"
+    grep -q '\.table-scroll{overflow-x:auto;}' "$H" \
+        && pass "$kind report: a wide table scrolls inside its box" \
+        || fail "$kind report: the table scroll rule is missing"
+done
+# No box with a thick stripe down its left side: no border-left or
+# border-inline-start rule and no inset box-shadow, in the shared CSS or in any
+# generated report. Notices are a banner with a 1px border all round.
+side_stripe() { grep -EnH 'border-(left|inline-start)(-width|-style|-color)?[[:space:]]*:|box-shadow:[^;}]*inset' "$@"; }
+if STRIPES="$(side_stripe "$LIB/report-common.sh" "${RTP}_risk-report.html" "${RTP}_security.html" \
+                "${RTP}_NOTICE.html" "${RTP}_conformance.html")"; then
+    fail "a left-side stripe rule is in the report CSS or a generated report" "$STRIPES"
+else
+    pass "no left-side stripe rule in the report CSS or the four generated reports"
+fi
+# The security report and the NOTICE are English only, whatever REPORT_LANG says.
+( export RC_TRIVY_FIXTURE="$RC/trivy.json" PATH="$RT/bin:$PATH" SECURITY_ENRICH=false DEEP_CVE=false REPORT_LANG=ko
+  bash "$LIB/scan-security.sh" "$RC/sbom.json" "$RT/k_1.0" k >/dev/null 2>&1
+  bash "$LIB/generate-notice.sh" "$RC/sbom.json" "$RT/k_1.0" k >/dev/null 2>&1 )
+if grep -q ' components</span>' "$RT/k_1.0_security.html" && grep -q ' components</span>' "$RT/k_1.0_NOTICE.html" \
+   && ! grep -q '컴포넌트' "$RT/k_1.0_security.html" "$RT/k_1.0_NOTICE.html"; then
+    pass "REPORT_LANG=ko leaves the English-only security report and NOTICE in English"
+else
+    fail "a Korean string reached the security report or the NOTICE" "$(grep -ho '<p class="desc">.*</p>' "$RT/k_1.0_security.html" "$RT/k_1.0_NOTICE.html")"
+fi
+grep -q '<dl class="deadlines">' "${RTP}_risk-report.html" && grep -q '<dd>within 7 days</dd>' "${RTP}_risk-report.html" \
+    && grep -q '<dd>within 30 days</dd>' "${RTP}_risk-report.html" && ! grep -q 'Critical → within' "${RTP}_risk-report.html" \
+    && pass "risk report lists the remediation deadlines as severity label and deadline" \
+    || fail "risk report deadlines are not a label list"
+grep -q '<td class="sev"><span class="lbl sev-CRITICAL"><span class="mk" aria-hidden="true">' "${RTP}_security.html" \
+    && pass "security report shows severity as a label with a shape marker and the word" \
+    || fail "security report severity cell is not a label"
+grep -q '<p class="report-kind">Open-source risk report</p>' "${RTP}_risk-report.html" \
     && grep -q '<p class="subtitle">Supplier SBOM under review</p>' "${RTP}_risk-report.html" \
     && pass "supplier risk report: GLOSSARY title with the supplier review as subtitle" \
     || fail "supplier risk report title/subtitle"
 grep -q '^_Supplier SBOM under review_$' "${RTP}_risk-report.md" \
     && pass "supplier risk report markdown carries the subtitle" || fail "supplier risk report markdown subtitle"
-grep -q '<h1>Conformance check report</h1>' "${RTP}_conformance.html" \
+grep -q '<p class="report-kind">Conformance check report</p>' "${RTP}_conformance.html" \
     && pass "conformance report is titled Conformance check report" || fail "conformance report title"
 # No retired term in any generated English report (GLOSSARY.md).
 for f in "${RTP}_risk-report.html" "${RTP}_conformance.html" "${RTP}_security.html" "${RTP}_NOTICE.html"; do
@@ -13658,7 +13699,7 @@ for f in "${RTP}_risk-report.html" "${RTP}_conformance.html" "${RTP}_security.ht
     fi
 done
 ( cd "$RT" && REPORT_LANG=ko bash "$LIB/generate-risk-report.sh" t_1.0 t ANALYZE >/dev/null 2>&1 )
-grep -q '<h1>오픈소스 위험 보고서</h1>' "${RTP}_risk-report.html" && grep -q '공급사 SBOM 검토' "${RTP}_risk-report.html" \
+grep -q '<p class="report-kind">오픈소스 위험 보고서</p>' "${RTP}_risk-report.html" && grep -q '공급사 SBOM 검토' "${RTP}_risk-report.html" \
     && pass "ko supplier risk report: 오픈소스 위험 보고서 with 공급사 SBOM 검토 as subtitle" \
     || fail "ko supplier risk report title/subtitle"
 if grep -qE '위험 ?분석 ?보고서|적합성 보고서|결과물|포맷 검증' "${RTP}_risk-report.html" "${RTP}_risk-report.md" \
