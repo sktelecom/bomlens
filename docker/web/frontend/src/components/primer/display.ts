@@ -57,7 +57,9 @@ export function severityLabelKey(severity: string | null | undefined): string {
 
 /**
  * Licence tier colours from Primer's display palette. None of them is the
- * accent or a severity hue, so a licence never reads as a finding.
+ * accent or a severity hue, so a licence never reads as a finding. Permissive
+ * needs no attention and is neutral grey like uncategorized; the two differ by
+ * shade in a bar (TIER_FILL_OVERRIDE), by marker shape and by name.
  */
 export const TIER_DISPLAY_COLOR: Readonly<Record<LicenseRiskTier, string>> = {
   "network-copyleft": "pink",
@@ -65,7 +67,12 @@ export const TIER_DISPLAY_COLOR: Readonly<Record<LicenseRiskTier, string>> = {
   "weak-copyleft": "olive",
   "review-needed": "brown",
   uncategorized: "gray",
-  permissive: "teal",
+  permissive: "gray",
+};
+
+/** A lighter grey for permissive in a bar, so it does not merge with uncategorized. */
+const TIER_FILL_OVERRIDE: Readonly<Partial<Record<LicenseRiskTier, string>>> = {
+  permissive: "var(--borderColor-emphasis)",
 };
 
 /** The i18n key of a tier's name. */
@@ -82,7 +89,7 @@ export const TIER_LABEL_KEY: Readonly<Record<LicenseRiskTier, string>> = {
 export const tierFg = (tier: LicenseRiskTier) => `var(--display-${TIER_DISPLAY_COLOR[tier]}-fgColor)`;
 /** Bar fill of a tier. */
 export const tierFill = (tier: LicenseRiskTier) =>
-  `var(--display-${TIER_DISPLAY_COLOR[tier]}-bgColor-emphasis)`;
+  TIER_FILL_OVERRIDE[tier] ?? `var(--display-${TIER_DISPLAY_COLOR[tier]}-bgColor-emphasis)`;
 /** Outline of a tier Label. */
 export const tierBorder = (tier: LicenseRiskTier) =>
   `var(--display-${TIER_DISPLAY_COLOR[tier]}-borderColor-emphasis)`;

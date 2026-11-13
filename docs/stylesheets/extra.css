@@ -264,9 +264,9 @@
 /* ---- 블록쿼트와 안내 상자: 의미 색은 역할 토큰 ---- */
 .md-typeset blockquote {
   color: inherit;
-  border-left: 3px solid hsl(var(--border));
+  border: 1px solid hsl(var(--border));
   background-color: hsl(var(--muted));
-  border-radius: 0 0.3rem 0.3rem 0;
+  border-radius: 0.375rem;
   padding: 0.5em 0.9em;
 }
 .md-typeset blockquote > :first-child {
@@ -277,7 +277,6 @@
 }
 .md-typeset :is(.admonition, details) {
   border: 1px solid rgb(var(--role-border, var(--role-neutral-border)));
-  border-left-width: 4px;
   border-radius: 0.375rem;
   background-color: rgb(var(--role-muted, var(--role-neutral-muted)) / 0.5);
   box-shadow: none;
