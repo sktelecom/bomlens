@@ -41,7 +41,7 @@ Before cdxgen reads the project, `docker/lib/build-prep.sh` prepares it. A commi
 | Ecosystem | What runs | When |
 |-----------|-----------|------|
 | Java (Maven) | cdxgen runs Maven to build the graph; the dependency jars are also fetched so components get hashes | Every scan |
-| Java (Gradle) | `gradle dependencies`, with `./gradlew` when present | Every scan |
+| Java (Gradle) | One Gradle run, with `./gradlew` when present, resolves the `runtimeClasspath` of every project for the scope filter below; when it fails for a reason other than the time limit (a Gradle older than 6.6, for one), `gradle dependencies` runs on the root project instead | Every scan |
 | Android | Gradle resolves the release runtime classpath, used for the scope filter below | Every scan |
 | Node.js (npm) | cdxgen resolves `package.json` with the npm in its image; the production set is resolved separately for the scope filter | Every scan |
 | Python | `pip install -r requirements.txt`; when the bulk install fails, each requirement is retried on its own, so one bad pin does not lose the rest | When `requirements.txt` exists |
@@ -66,9 +66,14 @@ A resolved graph includes the build and test tools. On a small Node.js app the d
 | Ecosystem | Kept | Removed | Keep everything with |
 |-----------|------|---------|----------------------|
 | Maven | `compile` and `runtime` scope | `test`, `provided`, `system` | `BOMLENS_MAVEN_FULL_GRAPH=1` |
+| Gradle (Java) | The runtime classpath of each project | Test, compile-only and annotation processor dependencies | `BOMLENS_GRADLE_FULL_GRAPH=1` |
 | Android | The release runtime classpath, or the first flavored release variant when there is none | Test, lint and build tooling | `BOMLENS_ANDROID_FULL_GRAPH=1` |
 | Node.js (npm) | The production set, resolved with `npm install --omit=dev --package-lock-only` in a scratch copy | `devDependencies` and what only they need | `BOMLENS_NODE_FULL_GRAPH=1` |
 | PHP | `require` | `require-dev` | `BOMLENS_PHP_FULL_GRAPH=1` |
+
+For Gradle (Java), one Gradle run resolves the `runtimeClasspath` of every project through an init script of BomLens (with the configuration cache turned off for that run), and the SBOM keeps what that resolves. A project without a `runtimeClasspath` (Kotlin Multiplatform, or a root with only a coverage plugin) keeps what its other configurations resolve, apart from test configurations and those of coverage, lint, compiler, documentation and annotation processing tools. The full Gradle graph is kept when the build includes other builds (`includeBuild`), when a configuration cannot be resolved, or when the Gradle run fails or times out; a Gradle older than 6.6 does not know the option that turns the configuration cache off, so it falls under the failing case. On Android, a build with no release runtime classpath (a Java Gradle build scanned in the Android SDK image) is narrowed the Java way instead, unless the Android step timed out. In both, a jar found in the source tree rather than through Gradle's resolution always stays.
+
+Reading the runtime classpath has two limits. A project that ships dependencies through another configuration (a custom `agent` or `distribution` configuration, the `shadow` configuration of the Shadow plugin) loses them from the SBOM when it also has a `runtimeClasspath`; scan such a build with `BOMLENS_GRADLE_FULL_GRAPH=1`. And a build that includes another build keeps the full graph even when the build is only included for its plugins (`pluginManagement { includeBuild("build-logic") }`, which convention plugins use), because Gradle lists such a build among the included ones and BomLens cannot tell it from a build included for its code, whose own dependencies cdxgen does add to the SBOM; in that SBOM the test and compile-only dependencies stay, as they did before this filter.
 
 A yarn, pnpm or bun workspace root without `package-lock.json` keeps the full Node.js graph, because the production set cannot see the members' dependencies. The environment variables are listed in [Docker image](../reference/docker-image.md#environment-variables), and other ecosystem-specific limits in [Supported ecosystems](../reference/ecosystems.md).
 
