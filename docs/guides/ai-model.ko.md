@@ -385,6 +385,32 @@ AI 준수 개요에는 모델별 사용 가능성 판정도 담깁니다. 개발
 
 이 판정은 법적 자문이 아닌 안내이며, 판정을 인쇄하는 모든 보고서에 그 문구가 함께 실립니다. 검토자에게 필요한 것, 곧 조건과 출처와 미확인 사항을 한곳에 모아 주고, 최종 판단은 근거를 갖춘 사람이 내리게 합니다.
 
+## 소스 스캔의 AI 사용 기록
+
+소스 스캔은 스캔한 코드가 쓰는 AI도 기록합니다. `--model`과는 별개의 기능입니다. 모델 카드를 읽지 않고, 코드가 호출하는 대상과 프로젝트가 AI 도구를 쓰도록 설정된 내용을 목록으로 남깁니다. 기본으로 실행됩니다.
+
+| 항목 | 기록 위치 | 예 |
+| --- | --- | --- |
+| 코드가 참조하는 모델 | `components[]`, 유형 `machine-learning-model` | `pkg:generic/openai/gpt-4o`인 `gpt-4o`, `pkg:huggingface/...`인 `meta-llama/Llama-3.1-8B-Instruct` |
+| 코드가 호출하는 AI 서비스 | `services[]`, 호출에 쓰는 모델은 `dependencies[]` | OpenAI API |
+| 설정 파일에 있는 MCP 서버 | `services[]` | `.vscode/mcp.json`이나 `.cursor/mcp.json`의 서버 |
+| MCP 설정 파일 | `components[]`, 유형 `file` | `.vscode/mcp.json` |
+| 에이전트 지침 파일 | `components[]`, 유형 `file`, SHA-256 포함 | `AGENTS.md`, GitHub Copilot `copilot-instructions.md`, `.cursor/rules/*.mdc` |
+
+각 항목에는 `bomlens:ai:usage`(`model`, `ai-service`, `mcp-server`, `mcp-config`, `instruction-file`)와 `bomlens:ai:scope`가 붙습니다. `bomlens:ai:scope`는 코드가 호출하는 것이면 `runtime`, 편집기와 에이전트 설정이면 `development`입니다.
+
+검토해야 할 MCP 서버에는 `bomlens:ai:reviewReason`이 하나 이상 붙습니다.
+
+- `broad-filesystem-access`: 파일 시스템 루트나 홈 폴더를 넘겨받습니다.
+- `unpinned-package`: 버전 없이 `npx`나 `uvx`로 실행되어, 새 릴리스가 검토 없이 실행됩니다.
+- `unencrypted-transport`: 다른 호스트에 평문 `http`로 접속합니다.
+
+MCP 서버에 넘기는 환경 변수 값과 헤더(토큰 등), 프롬프트 문구는 복사하지 않습니다. 접속 주소에서는 사용자 정보, 쿼리, 프래그먼트를 지웁니다.
+
+이 항목들은 목록으로만 보여 주고 측정하지 않습니다. 적합성 검사, NOTICE, 모델 위험 판정에서 빠지고, 코드가 호출만 하는 모델에는 G7 검사를 적용하지 않습니다. 이 스캔에는 그 모델의 카드가 없기 때문입니다. 모델 자체를 점검하려면 `--model`로 스캔합니다.
+
+탐지는 cdxgen의 `ai`, `mcp` 분석을 쓰며, 이 분석은 텍스트를 맞춰 보는 방식입니다. BomLens는 모델 식별자 형태이고 시험 코드나 문서가 아닌 코드에 나온 모델만 남기고, AI 서비스는 그런 모델이 연결된 경우에만 남깁니다. 그래도 프로젝트가 자료 구조에 나열한 모델은 놓칠 수 있고, 모델 식별자처럼 생긴 문자열이 기록될 수 있습니다. 이 단계를 끄려면 `BOMLENS_NO_AI_USAGE=1`을 설정합니다.
+
 ## 한계
 
 - 읽을 수 없는 모델은 SBOM을 아예 만들지 않습니다. 조회에 실패하면 생성기가 카드를 일반적인 기본값으로 채우기 때문에, BomLens는 생성기 로그를 확인해 실행을 중단합니다. 통과처럼 읽히는 껍데기 명세를 돌려주지 않기 위해서입니다.

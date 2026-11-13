@@ -385,6 +385,32 @@ The verdict can be tailored to how you will actually use the model. Pass `--usag
 
 The verdicts are guidance, not legal advice, and every report that prints them says so. They gather what a reviewer needs — the terms, the sources, the unknowns — so the final decision is made by a person with the evidence in one place.
 
+## AI usage in a source scan
+
+A source scan also records the AI the scanned code uses. This is separate from `--model`: it reads no model card, and lists what the code calls and how the project is set up to work with AI tools. It runs by default.
+
+| What | Where it goes | Example |
+| --- | --- | --- |
+| A model the code references | `components[]`, type `machine-learning-model` | `gpt-4o` as `pkg:generic/openai/gpt-4o`, `meta-llama/Llama-3.1-8B-Instruct` as `pkg:huggingface/...` |
+| An AI service the code calls | `services[]`, with the models it is called with in `dependencies[]` | OpenAI API |
+| An MCP server in a configuration file | `services[]` | a server from `.vscode/mcp.json` or `.cursor/mcp.json` |
+| The MCP configuration file | `components[]`, type `file` | `.vscode/mcp.json` |
+| An agent instruction file | `components[]`, type `file`, with its SHA-256 | `AGENTS.md`, GitHub Copilot `copilot-instructions.md`, `.cursor/rules/*.mdc` |
+
+Each item carries `bomlens:ai:usage` (`model`, `ai-service`, `mcp-server`, `mcp-config` or `instruction-file`) and `bomlens:ai:scope`: `runtime` for what the code calls, `development` for editor and agent configuration.
+
+An MCP server that needs a look gets one or more `bomlens:ai:reviewReason` values:
+
+- `broad-filesystem-access`: it is given the filesystem root or the home folder.
+- `unpinned-package`: it runs with `npx` or `uvx` and no version, so a new release runs without review.
+- `unencrypted-transport`: it is reached over plain `http` on another host.
+
+Some things are never copied: the environment values and headers an MCP server is given (tokens, for example) and prompt texts. An endpoint keeps no user info, query or fragment.
+
+These items are listed, not measured. The conformance check, the NOTICE and the model risk assessment leave them out, and a model the code only calls gets no G7 checks, because it has no card here to check. To check a model itself, scan it with `--model`.
+
+The findings come from cdxgen's `ai` and `mcp` analyses, which match text. BomLens keeps a model only when its id looks like one and it appears in code that is neither a test nor documentation, and keeps an AI service only when such a model is left under it. A model a project lists in a data structure can still be missed, and a string shaped like a model id can still be reported. Set `BOMLENS_NO_AI_USAGE=1` to turn the step off.
+
 ## Limits
 
 - A model the tool cannot read produces no SBOM at all. The generator fills the card with generic defaults when a fetch fails, so BomLens checks its log and refuses the run rather than handing back an inventory of placeholders that would read as a pass.

@@ -184,7 +184,11 @@ def src($c):
 # marks each component it adds with bomlens:origin; one marked first-party is
 # the supplier's own work, which no third-party notice is owed for. It stays in
 # the SBOM and in the licence and risk reports.
-FIRST_PARTY_DEF='def first_party: any(.properties[]?; .name == "bomlens:origin" and .value == "first-party");'
+#
+# So is the AI usage a source scan records (bomlens:ai:usage): a hosted model the
+# code calls, an MCP server or an instruction file is not software the product
+# ships, and has no licence for a notice to carry.
+FIRST_PARTY_DEF='def first_party: any(.properties[]?; (.name == "bomlens:origin" and .value == "first-party") or .name == "bomlens:ai:usage");'
 LICENSE_MAP=$(jq -r "$NORMALIZE_DEF$SRC_DEF$FIRST_PARTY_DEF"'
   def kmod_of($c):
     if any($c.properties[]?;
