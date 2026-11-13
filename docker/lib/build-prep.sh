@@ -418,6 +418,16 @@ mark_prep_failed() {
     esac
 }
 
+# Take LABEL off PREP_FAILED: a step that failed once and then succeeded
+# another way (the java-gradle runtime classpath read, then the plain warm-up).
+unmark_prep_failed() {
+    _upf=""
+    for _upf_l in $PREP_FAILED; do
+        [ "$_upf_l" = "$1" ] || _upf="${_upf:+$_upf }$_upf_l"
+    done
+    PREP_FAILED="$_upf"
+}
+
 # The user's Gradle settings (mounted under $SETTINGS_ROOT/gradle) go into
 # the Gradle user home this scan uses: the cache-gradle mount or, when that
 # cannot be written, $GRADLE_USER_HOME. A file the home already has is left
@@ -1034,7 +1044,193 @@ fi
 # ANDROID_RELEASE_SET, when set below, points at a file of "group:artifact:version"
 # lines (the deployable release runtime classpath). The post-cdxgen step near the
 # end of this script filters the generated SBOM down to that set.
+# GRADLE_RUNTIME_SET is the same for a java-gradle build: the runtime classpath
+# of every project.
 ANDROID_RELEASE_SET=""
+GRADLE_RUNTIME_SET=""
+
+# awk function shared by the two readers below: one dependency line of a
+# Gradle `dependencies` report to group:artifact:version, or "" for a line that
+# names no resolved external module ((c) constraint, (n) unresolved
+# declaration, a project of the build). After "->" Gradle prints what was
+# selected: a version only (a conflict or a dynamic version resolved), or a
+# whole group:artifact:version when a module was substituted
+# (commons-logging:commons-logging:1.2 -> org.slf4j:jcl-over-slf4j:2.0.9), or
+# a project. A rich version ({strictly 2.0.9}, {require 1.0; reject 1.1})
+# without "->" gives its first version.
+GRADLE_DEP_AWK='
+function gradle_gav(line,    i, left, right, nl, l, nr, r, g, a, v) {
+    sub(/^.*[+\\]--- /, "", line)
+    if (line ~ /\(c\)|\(n\)/ || line ~ /^project /) return ""
+    sub(/ \(\*\)$/, "", line)
+    sub(/ FAILED$/, "", line)
+    right = ""
+    i = index(line, " -> ")
+    if (i > 0) { left = substr(line, 1, i - 1); right = substr(line, i + 4) } else left = line
+    nl = split(left, l, ":")
+    g = l[1]; a = l[2]; v = (nl >= 3) ? l[3] : ""
+    if (v ~ /^\{/) {
+        gsub(/[{}]/, "", v); sub(/^(strictly|require|prefer) /, "", v); sub(/;.*$/, "", v)
+    }
+    sub(/ .*$/, "", v)
+    if (right != "") {
+        if (right ~ /^project /) return ""
+        sub(/ .*$/, "", right)
+        nr = split(right, r, ":")
+        if (nr >= 3) { g = r[1]; a = r[2]; v = r[3] }
+        else if (nr == 1) v = r[1]
+    }
+    if (g == "" || a == "" || v == "" || v ~ /[][{}(),]/) return ""
+    return g ":" a ":" v
+}'
+
+# java-gradle runtime classpath. cdxgen keeps every configuration's
+# components, so one only on a compile classpath (a compileOnly dependency, or
+# one a library's Gradle module metadata gives to compile only, as guava 33.0.0
+# does j2objc-annotations) or only on a test classpath is listed as if the
+# build shipped it. One Gradle run, the same count as the cache warm-up it
+# replaces. An init script adds a task to every project that resolves the
+# project's own configurations and writes the coordinates to a file (one file
+# per project), so nothing is read from Gradle's console output: with the
+# configuration cache on, Gradle runs the projects' tasks in parallel and
+# their console output mixes. The run is made with --no-configuration-cache
+# because a task action cannot resolve configurations under it (a stored
+# configuration would also skip the init script's own listing); Gradle older
+# than 6.6 does not know the option, the run fails, and the root warm-up below
+# runs instead. The files give GRADLE_RUNTIME_SET, which the filter near the
+# end applies to cdxgen's BOM:
+# - a project with a runtimeClasspath gives that configuration;
+# - a project with none (Kotlin Multiplatform, a root with only jacoco or
+#   kover) gives what its other configurations resolve, except test ones and
+#   build tool ones (coverage, lint, compilers, documentation, annotation
+#   processors), so nothing it ships is lost.
+# The full graph is kept when the build includes other builds (includeBuild,
+# or GRADLE_INCLUDED_BUILDS: cdxgen reads their reports too, and they are not
+# in this run), when a configuration could not be resolved, when the files are
+# incomplete, or when nothing was read. A run that fails for another reason
+# than the time limit is followed by the root project's dependencies task, as
+# the warm-up was before.
+gradle_runtime_classpath() {
+    _gr_dir=$(mktemp -d); _gr_init="$_gr_dir/bomlens-init.gradle"
+    _gr_out="$_gr_dir/out"; _gr_set="$_gr_dir/set.txt"
+    mkdir -p "$_gr_out"
+    cat > "$_gr_init" <<'GRADLE_INIT'
+// bomlens: write what every project of the build resolves, one file per project.
+if (gradle.parent == null) {
+    def outDir = System.getProperty('bomlens.gradle.out')
+    // Test configurations, and the configurations of build tools (coverage,
+    // lint, compilers, documentation), are not what a project ships.
+    def skipCfg = { String n ->
+        n ==~ /^(test|androidTest)([A-Z].*)?$/ ||
+        n ==~ /^.*[A-Za-z0-9_]Test(Fixtures)?(Compile|Runtime|Implementation|Api|Only|AnnotationProcessor|Classpath).*$/ ||
+        n.contains('-test-') ||
+        n ==~ /^(jacoco|kover|checkstyle|pmd|spotbugs|codenarc|detekt|ktlint|errorprone|annotationProcessor|kapt|ksp|dokka|lint|_internal|kotlinCompiler|kotlinNativeCompiler|kotlinKlib|kotlinBuildToolsApi|kotlinScripting).*$/ ||
+        n ==~ /^.*AnnotationProcessor(Classpath)?$/
+    }
+    gradle.allprojects { p ->
+        def path = p.path
+        p.tasks.register('bomlensResolve') { t ->
+            t.doLast {
+                def lines = ["P\t" + path]
+                def gavs = { cfg ->
+                    def found = new TreeSet()
+                    def res = cfg.incoming.resolutionResult
+                    res.allComponents.each { c ->
+                        def id = c.id
+                        if (id instanceof org.gradle.api.artifacts.component.ModuleComponentIdentifier) {
+                            found << (id.group + ':' + id.module + ':' + id.version)
+                        }
+                    }
+                    // A dependency that did not resolve is still named by what asked for it.
+                    res.allDependencies.each { d ->
+                        if (d instanceof org.gradle.api.artifacts.result.UnresolvedDependencyResult) {
+                            def s = d.requested
+                            if (s instanceof org.gradle.api.artifacts.component.ModuleComponentSelector && s.version) {
+                                found << (s.group + ':' + s.module + ':' + s.version)
+                            }
+                        }
+                    }
+                    found
+                }
+                def rt = p.configurations.findByName('runtimeClasspath')
+                if (rt != null && rt.canBeResolved) {
+                    lines << ("H\t" + path)
+                    try {
+                        gavs(rt).each { lines << ("R\t" + path + "\t" + it) }
+                    } catch (Throwable e) {
+                        lines << ("X\t" + path + "\truntimeClasspath")
+                    }
+                } else {
+                    p.configurations.toList().each { cfg ->
+                        if (cfg.canBeResolved && !skipCfg(cfg.name)) {
+                            try {
+                                gavs(cfg).each { lines << ("O\t" + path + "\t" + it) }
+                            } catch (Throwable e) {
+                                lines << ("X\t" + path + "\t" + cfg.name)
+                            }
+                        }
+                    }
+                }
+                new File(outDir, java.net.URLEncoder.encode(path, 'UTF-8') + '.txt').text = lines.join('\n') + '\n'
+            }
+        }
+    }
+    gradle.rootProject { root ->
+        root.tasks.register('bomlensRuntime') { t ->
+            t.dependsOn { root.allprojects.collect { it.tasks.named('bomlensResolve') } }
+            t.doLast {
+                def lines = []
+                gradle.includedBuilds.each { lines << ("I\t" + it.name) }
+                lines << ("Z\t" + root.allprojects.size())
+                new File(outDir, '_meta.txt').text = lines.join('\n') + '\n'
+            }
+        }
+    }
+}
+GRADLE_INIT
+    log "gradle dependencies (runtime classpath of each project)"
+    prep_step gradle-dependencies "$PREP_TIMEOUT_GRADLE" ${GRADLEW_SH:+"$GRADLEW_SH"} "$GRADLEW" --no-daemon -q --console=plain \
+        --no-configuration-cache --init-script "$_gr_init" "-Dbomlens.gradle.out=$_gr_out" bomlensRuntime >/dev/null
+    _gr_rc=$?
+    if [ "$_gr_rc" -eq 0 ]; then
+        # Lines: I <included build>, Z <number of projects>, P <project>,
+        # H <project has a runtimeClasspath>, R <project> <coordinate> (its
+        # runtimeClasspath), O <project> <coordinate> (another configuration
+        # of a project with none), X <project> <configuration> (not resolved).
+        cat "$_gr_out"/*.txt 2>/dev/null | awk -F '\t' '
+            $1 == "I" { print "!the build includes the build " $2 }
+            $1 == "Z" { want = $2; nz++ }
+            $1 == "P" { proj[$2] = 1; np++ }
+            $1 == "H" { hasrt[$2] = 1 }
+            $1 == "R" { print $3 }
+            $1 == "O" { other[$2] = other[$2] "\n" $3 }
+            $1 == "X" { bad[$2] = $3 }
+            END {
+                n = 0; for (p in proj) n++
+                if (nz != 1 || n != want || np != want) print "!the project files are incomplete (" np " of " want ")"
+                for (p in bad) print "!could not resolve " bad[p] " of project " p
+                for (p in proj) if (!(p in hasrt) && other[p] != "") print substr(other[p], 2)
+            }
+        ' > "$_gr_set"
+        if [ -n "${GRADLE_INCLUDED_BUILDS:-}" ]; then
+            log "gradle: GRADLE_INCLUDED_BUILDS is set; using full graph"
+        elif grep -q '^!' "$_gr_set"; then
+            log "gradle: $(sed -n 's/^!//p' "$_gr_set" | head -1); using full graph"
+        elif [ -s "$_gr_set" ]; then
+            GRADLE_RUNTIME_SET=$(mktemp)
+            sort -u "$_gr_set" > "$GRADLE_RUNTIME_SET"
+            log "gradle: runtime classpath set = $(wc -l < "$GRADLE_RUNTIME_SET") components"
+        else
+            log "gradle: no runtime classpath dependency found; using full graph"
+        fi
+    elif [ "$_gr_rc" -ne 124 ]; then
+        log "gradle: could not read every project's dependencies; resolving the root project only (full graph)"
+        prep_step gradle-dependencies "$PREP_TIMEOUT_GRADLE" ${GRADLEW_SH:+"$GRADLEW_SH"} "$GRADLEW" --no-daemon dependencies >/dev/null \
+            && unmark_prep_failed gradle-dependencies
+    fi
+    rm -rf "$_gr_dir"
+}
+
 if { [ -f build.gradle ] || [ -f build.gradle.kts ]; } && command -v gradle >/dev/null 2>&1; then
     # A gradlew checked out without the executable bit (a 100644 entry, common
     # from Windows) still runs, through sh: the JDK image was chosen from its
@@ -1088,11 +1284,22 @@ if { [ -f build.gradle ] || [ -f build.gradle.kts ]; } && command -v gradle >/de
         # Both Gradle calls below share one label: to a reader they are one
         # logical step (the release classpath resolve), whether it timed out
         # listing subprojects or resolving one module's dependencies.
-        _subs=$(prep_step android-release-classpath "$PREP_TIMEOUT_GRADLE" ${GRADLEW_SH:+"$GRADLEW_SH"} "$GRADLEW" --no-daemon -q --console=plain projects \
-                | sed -n "s/.*Project '\(:[A-Za-z0-9:._-]*\)'.*/\1/p")
+        # Their output goes to a file, not $(...): prep_step records the label
+        # in this shell, which a command substitution's subshell would lose.
+        _aout=$(mktemp); _atimeout=""
+        prep_step android-release-classpath "$PREP_TIMEOUT_GRADLE" ${GRADLEW_SH:+"$GRADLEW_SH"} "$GRADLEW" --no-daemon -q --console=plain projects > "$_aout"
+        [ "$?" -ne 124 ] || _atimeout=1
+        _subs=$(sed -n "s/.*Project '\(:[A-Za-z0-9:._-]*\)'.*/\1/p" "$_aout")
+        # A project path outside those characters cannot be passed on here;
+        # its module would be missing from the set, so none is made.
+        _aodd=$(grep "Project '" "$_aout" | grep -v "Project '\(:[A-Za-z0-9:._-]*\)'" | head -1)
+        [ -z "$_aodd" ] || { log "android: a project path this step cannot pass to Gradle ($_aodd); no release set"; _subs=""; }
         # Include the root ("") as a fallback for single-module projects.
         for _s in $_subs ""; do
-            _dep=$(prep_step android-release-classpath "$PREP_TIMEOUT_GRADLE" ${GRADLEW_SH:+"$GRADLEW_SH"} "$GRADLEW" --no-daemon -q --console=plain "${_s}:dependencies")
+            [ -z "$_aodd" ] || break
+            prep_step android-release-classpath "$PREP_TIMEOUT_GRADLE" ${GRADLEW_SH:+"$GRADLEW_SH"} "$GRADLEW" --no-daemon -q --console=plain "${_s}:dependencies" > "$_aout"
+            [ "$?" -ne 124 ] || _atimeout=1
+            _dep=$(cat "$_aout")
             [ -n "$_dep" ] || continue
             # Pick the deployable release runtime config for this module: prefer the
             # plain releaseRuntimeClasspath, else the first flavored release variant
@@ -1109,35 +1316,38 @@ if { [ -f build.gradle ] || [ -f build.gradle.kts ]; } && command -v gradle >/de
                    || printf '%s\n' "$_cands" | head -1)
             [ -n "$_cfg" ] || continue
             log "android: ${_s:-:} -> --configuration $_cfg"
-            # Extract that config's subtree as resolved group:artifact:version.
-            # Take the version after "->" when Gradle upgraded/downgraded it; skip
-            # (c) constraints and (n) not-resolved markers.
-            printf '%s\n' "$_dep" | awk -v cfg="$_cfg" '
+            # Extract that config's subtree as resolved group:artifact:version
+            # (gradle_gav above).
+            printf '%s\n' "$_dep" | awk -v cfg="$_cfg" "$GRADLE_DEP_AWK"'
                 $0 ~ ("^" cfg " ") { insec=1; next }
                 insec && /^[[:space:]]*$/ { insec=0 }
-                insec {
-                    line=$0
-                    if (!match(line, /[+\\]--- /)) next
-                    sub(/^.*[+\\]--- /, "", line)
-                    if (line ~ /\(c\)|\(n\)/) next
-                    resolved=""
-                    if (match(line, /-> [^ ]+/)) resolved=substr(line, RSTART+3, RLENGTH-3)
-                    split(line, a, " "); split(a[1], ga, ":")
-                    g=ga[1]; art=ga[2]; ver=ga[3]; if (resolved!="") ver=resolved
-                    gsub(/[()*]/, "", ver)
-                    if (g!="" && art!="" && ver!="") print g":"art":"ver
-                }' >> "$_relset"
+                insec && /[+\\]--- / { gav = gradle_gav($0); if (gav != "") print gav }' >> "$_relset"
         done
+        rm -f "$_aout"
         if [ -s "$_relset" ]; then
             sort -u "$_relset" -o "$_relset"
             ANDROID_RELEASE_SET="$_relset"
             log "android: release runtime set = $(wc -l < "$_relset") components"
         else
-            log "android: no release runtime configuration found; using full graph"
             rm -f "$_relset"
+            # No release configuration: not an Android app (a Java Gradle
+            # build scanned in the Android SDK image), so the java-gradle
+            # runtime classpath applies.
+            if opted_out "${BOMLENS_GRADLE_FULL_GRAPH:-}"; then
+                log "android: no release runtime configuration found; using full graph"
+            elif [ -n "$_atimeout" ]; then
+                log "android: the release classpath step timed out; using full graph"
+            else
+                log "android: no release runtime configuration found; reading the java-gradle runtime classpath"
+                gradle_runtime_classpath
+            fi
         fi
+    elif [ -z "${ANDROID_HOME:-}" ] && ! opted_out "${BOMLENS_GRADLE_FULL_GRAPH:-}"; then
+        # java-gradle: see gradle_runtime_classpath above.
+        # BOMLENS_GRADLE_FULL_GRAPH=1 opts out (keep the full graph).
+        gradle_runtime_classpath
     else
-        # java-gradle (or opted-out Android): resolve so cdxgen sees the full graph.
+        # Opted-out java-gradle or Android: resolve so cdxgen sees the full graph.
         log "gradle dependencies"
         prep_step gradle-dependencies "$PREP_TIMEOUT_GRADLE" ${GRADLEW_SH:+"$GRADLEW_SH"} "$GRADLEW" --no-daemon dependencies >/dev/null
     fi
@@ -2185,14 +2395,31 @@ fi
 # pre-resolution duplicate versions cdxgen emits from the other configurations.
 # Match on maven group:artifact:version; keep non-maven components and the app's
 # own modules (root project group). Prune the dependency graph to the kept refs.
-# A kept component of the release set with another scope is set to required.
-if [ "${rc:-1}" -eq 0 ] && [ -n "${ANDROID_RELEASE_SET:-}" ] && [ -s "$ANDROID_RELEASE_SET" ] \
+# A java-gradle build's runtime classpath set (GRADLE_RUNTIME_SET) goes through
+# the same filter, which then also keeps a Maven component cdxgen did not read
+# from a Gradle dependencies task (none of the marks the gradle-packages check
+# above reads: cdx:gradle:GradleRootPath, internal:GradleProfileName,
+# GradleProfileName): a jar found in the tree is on no resolved classpath, so
+# the set says nothing about it.
+_flt_set=""; _flt_label=""
+if [ -n "${ANDROID_RELEASE_SET:-}" ]; then
+    _flt_set="$ANDROID_RELEASE_SET"; _flt_label=android
+elif [ -n "${GRADLE_RUNTIME_SET:-}" ]; then
+    _flt_set="$GRADLE_RUNTIME_SET"; _flt_label=gradle
+fi
+if [ "${rc:-1}" -eq 0 ] && [ -n "$_flt_set" ] && [ -s "$_flt_set" ] \
    && [ -f "$OUT" ] && command -v node >/dev/null 2>&1; then
-    log "android: filtering SBOM to release runtime scope"
+    if [ "$_flt_label" = android ]; then
+        log "android: filtering SBOM to release runtime scope"
+    else
+        log "gradle: filtering SBOM to the runtime classpath"
+    fi
     _flt=$(mktemp).js
     cat > "$_flt" <<'FILTER_JS'
 const fs = require('fs');
-const [bomPath, relPath] = process.argv.slice(2);
+const [bomPath, relPath, label] = process.argv.slice(2);
+const GRADLE_ORIGIN = new Set(['cdx:gradle:GradleRootPath', 'internal:GradleProfileName', 'GradleProfileName']);
+const fromGradle = c => (c.properties || []).some(p => GRADLE_ORIGIN.has(p.name));
 let bom;
 try { bom = JSON.parse(fs.readFileSync(bomPath, 'utf8')); } catch (e) { process.exit(0); }
 const rel = new Set(fs.readFileSync(relPath, 'utf8').split('\n').filter(Boolean));
@@ -2209,13 +2436,15 @@ const keep = c => {
   const g = gav(p);
   if (!g) return true;                            // app root (single segment)
   if (rootGroup && g.split(':')[0] === rootGroup) return true; // first-party modules
+  if (label === 'gradle' && !fromGradle(c)) return true;     // not from a Gradle resolve
   return rel.has(g);
 };
 const before = bom.components.length;
 bom.components = bom.components.filter(keep);
 // cdxgen takes a component's scope from the first configuration it appears
-// under, so one on the release runtime classpath that also sits under a test
-// configuration sorted before it comes out optional. On the release set it ships.
+// under, so one on the runtime classpath set that also sits under a test
+// configuration sorted before it comes out optional. On the set it ships.
+// A component with no scope stays without one.
 let rescoped = 0;
 for (const c of bom.components) {
   const g = gav(c.purl);
@@ -2232,12 +2461,13 @@ if (Array.isArray(bom.dependencies)) {
       : d);
 }
 fs.writeFileSync(bomPath, JSON.stringify(bom, null, 2));
-process.stderr.write('[build-prep] android: kept ' + bom.components.length + ' of ' + before + ' components'
-  + (rescoped ? ', ' + rescoped + ' on the release runtime classpath set to scope required' : '') + '\n');
+process.stderr.write('[build-prep] ' + (label || 'android') + ': kept ' + bom.components.length + ' of ' + before + ' components'
+  + (rescoped ? ', ' + rescoped + ' on the runtime classpath set to scope required' : '') + '\n');
 FILTER_JS
-    node "$_flt" "$OUT" "$ANDROID_RELEASE_SET" || log "android: filter skipped (non-fatal)"
-    rm -f "$_flt" "$ANDROID_RELEASE_SET"
+    node "$_flt" "$OUT" "$_flt_set" "$_flt_label" || log "$_flt_label: filter skipped (non-fatal)"
+    rm -f "$_flt"
 fi
+rm -f ${ANDROID_RELEASE_SET:+"$ANDROID_RELEASE_SET"} ${GRADLE_RUNTIME_SET:+"$GRADLE_RUNTIME_SET"}
 
 # Node production-scope filter: keep only npm components in the resolved production
 # set; drop the devDependencies tree cdxgen pulls in from package.json. Keep non-npm
