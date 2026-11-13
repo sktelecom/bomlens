@@ -902,6 +902,10 @@ ep_run() {  # ep_run [VAR=value...]: run generate_sbom_cdxgen once, results in $
       # shellcheck disable=SC1091
       . "$EPD/fn.sh"
       self_container_id() { echo self; }
+      # The guard-state mount both launchers provide: build-prep.sh is handed
+      # over as a file there. Without it the -c fallback passes the whole
+      # script as one argument, over Linux's 128 KB limit for one.
+      GUARD_STATE_DIR="$EPD/state"; mkdir -p "$GUARD_STATE_DIR"
       generate_sbom_cdxgen "$EPD/src" b.json; echo "rc=$? reason=$CDXGEN_FAIL_REASON" > "$EPD/res"
     ) > "$EPD/stdout" 2>&1
 }
@@ -912,7 +916,8 @@ J21R="ghcr.io/cdxgen/cdxgen-temurin-java21:$CDXGEN_TAG"; J25R="ghcr.io/cdxgen/cd
 
 ep_run EP_MOUNTINFO="$EPD/mountinfo.shared"
 { grep -qx "rc=0 reason=" "$EPD/res" && [ "$(ep_runs)" -eq 2 ] && grep -qx "from=$J25R" "$EPD/out/b.json" \
-    && grep -qF "[INFO] Gradle asked for Java 25; rerunning in $J25R" "$EPD/stdout"; } \
+    && grep -qF "[INFO] Gradle asked for Java 25; rerunning in $J25R" "$EPD/stdout" \
+    && ! grep -q '^docker run.* -c ' "$EPD/log"; } \
     && pass "UI: a Java 25 toolchain failure reruns the sibling in the Java 25 image and keeps its SBOM" \
     || fail "UI: no rerun in the Java 25 image" "$(cat "$EPD/res" "$EPD/stdout")"
 ep_run EP_MOUNTINFO="$EPD/mountinfo.shared" EP_MARKER_IMG=cdxgen-temurin-java
