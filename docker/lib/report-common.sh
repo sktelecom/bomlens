@@ -265,7 +265,7 @@ td.total{font-weight:600;}
    anywhere only when one part alone is wider than the cell. */
 .pkg .pg,.pkg .pn,.pkg .pv{display:inline-block;max-width:100%;}
 .pkg .pn{font-weight:600;}
-.pkg .pg{color:var(--text-muted);}
+.pkg .pg,.pkg .psep{color:var(--text-muted);}
 .pkg .pv{font-variant-numeric:tabular-nums;}
 tr.grp th{background:var(--surface);color:var(--text);font-size:var(--font-size-body-sm);
   padding:10px 10px 6px;border-top:1px solid var(--line);}
@@ -308,8 +308,11 @@ details.fix .meta{font-size:var(--font-size-label);}
   .rows>li,.legend,.deadlines>div{padding-left:0;padding-right:0;}
   table{font-size:8.5pt;}
   th,td{padding:3px 4px;}
-  th,td,td.id,td.sev,td.st,td.req,td.dl,th.num,td.num,.lbl,.kevbadge,time{white-space:normal;}
+  /* Long values wrap; a label, an id, a number and a time stay on one line. */
+  th,td{white-space:normal;}
+  td.grow{min-width:0;}
   td.fix{max-width:none;}
+  .pkg .pg{overflow-wrap:anywhere;}
   table .meta{font-size:8pt;}
   pre,pre code{white-space:pre-wrap;overflow-wrap:anywhere;}
   .box-head,th,tr.grp th{background:transparent;}
@@ -524,7 +527,7 @@ def pkgcoordp($v; $purl): ((. // "") | strv) as $p
      then {g: ($parts[0:-1] | join(":")), n: $parts[-1]} else {g: "", n: $p} end) as $c
   | (($v // "") | strv) as $vv
   | "<span class=\"pkg\" title=\"" + ($p|@html) + "\">"
-    + (if $c.g != "" then "<span class=\"pg\">" + ($c.g|@html) + " / </span>" else "" end)
+    + (if $c.g != "" then "<span class=\"pg\">" + ($c.g|@html) + "</span><span class=\"psep\"> / </span>" else "" end)
     + "<span class=\"pn\">" + ($c.n|@html) + "</span>"
     + (if $vv != "" then " <span class=\"pv\">" + ($vv|@html) + "</span>" else "" end) + "</span>";
 def fixlist($none): ((. // "") | strv) | if . == "" then "<span class=\"nofix\">" + ($none|@html) + "</span>"

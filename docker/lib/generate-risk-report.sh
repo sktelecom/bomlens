@@ -220,7 +220,7 @@ fi
 # declares an outbound license (see --license / PROJECT_LICENSE). With no
 # declaration no property exists and this whole block stays absent from the
 # report — an omitted section means "not assessed", never "no conflicts".
-OUTBOUND_LIC=""; LC_INCOMPAT=0; LC_COND=0; LC_UNKNOWN=0; LC_TOP='[]'
+OUTBOUND_LIC=""; LC_INCOMPAT=0; LC_COND=0; LC_UNKNOWN=0; LC_TOP='[]'; LC_ALL='[]'
 if [ -f "$BOM" ] && jq empty "$BOM" >/dev/null 2>&1; then
     OUTBOUND_LIC=$(jq -r '[ (.metadata.component.licenses // [])[]
         | (.license.id // .license.name // .expression // "") | select(. != "") ] | first // ""' "$BOM" 2>/dev/null || echo "")
@@ -231,11 +231,14 @@ if [ -f "$BOM" ] && jq empty "$BOM" >/dev/null 2>&1; then
           | { i: ([$rows[] | select(.v=="incompatible")] | length),
               c: ([$rows[] | select(.v=="conditional")]  | length),
               u: ([$rows[] | select(.v=="unknown")]      | length),
-              top: ([$rows[] | select(.v=="incompatible") | .label] | .[0:10]) }' "$BOM" 2>/dev/null || echo '{}')
+              top: ([$rows[] | select(.v=="incompatible") | .label] | .[0:10]),
+              all: ([$rows[] | select(.v=="incompatible")] + [$rows[] | select(.v=="conditional")]
+                    + [$rows[] | select(.v=="unknown")] | .[0:30]) }' "$BOM" 2>/dev/null || echo '{}')
         LC_INCOMPAT=$(echo "$LC_COUNTS" | jq '.i // 0')
         LC_COND=$(echo "$LC_COUNTS" | jq '.c // 0')
         LC_UNKNOWN=$(echo "$LC_COUNTS" | jq '.u // 0')
         LC_TOP=$(echo "$LC_COUNTS" | jq -c '.top // []')
+        LC_ALL=$(echo "$LC_COUNTS" | jq -c '.all // []')
     fi
 fi
 
@@ -334,12 +337,12 @@ if [ "$REPORT_LANG" = "ko" ]; then
     P_TH_DEADLINE=$(kstr risk.th_deadline)
     P_VULN_NONE_MD=$(kstr risk.vuln_none_md); P_VULN_NONE_HTML=$(kstr risk.vuln_none_html)
     P_PRESENCE_MD=$(tfmt risk.presence_only_md "$PRESENCE_ONLY" "$PRESENCE_ONLY")
-    P_PRESENCE_HTML=$(tfmt risk.presence_only_html "$PRESENCE_ONLY" "$PRESENCE_ONLY")
+    P_PRESENCE_HTML=$(tfmt risk.presence_only_html "$(report_num "$PRESENCE_ONLY")" "$(report_num "$PRESENCE_ONLY")")
     P_UNPINNED_MD=$(kstr risk.unpinned_md); P_UNPINNED_HTML=$(kstr risk.unpinned_html)
     P_UNCHECKED_MD=$(tfmt risk.unchecked_md "$UNCHECKED_N")
     P_UNREACHED_MD=$(tfmt risk.unreached_md "$UNREACHED_N")
-    P_UNREACHED_HTML=$(tfmt risk.unreached_html "$UNREACHED_N")
-    P_UNCHECKED_HTML=$(tfmt risk.unchecked_html "$UNCHECKED_N")
+    P_UNREACHED_HTML=$(tfmt risk.unreached_html "$(report_num "$UNREACHED_N")")
+    P_UNCHECKED_HTML=$(tfmt risk.unchecked_html "$(report_num "$UNCHECKED_N")")
     P_UNCHECKED_MORE=$(tfmt risk.unchecked_more "$((UNCHECKED_N - UNCHECKED_LIST_MAX))")
     P_REASON_NO_VERSION=$(kstr risk.unchecked_no_version)
     P_REASON_NO_ID=$(kstr risk.unchecked_no_identifier)
@@ -348,6 +351,7 @@ if [ "$REPORT_LANG" = "ko" ]; then
     P_FW_SCOPE_H=$(kstr risk.fw_scope_h)
     P_FW_LABEL=$(kstr risk.fw_scope_label)
     P_FW_UNKNOWN=$(tfmt risk.fw_scope_unknown "$FW_UNKNOWN_PCT" "$FW_UNKNOWN_BYTES")
+    P_FW_UNKNOWN_HTML=$(tfmt risk.fw_scope_unknown "$FW_UNKNOWN_PCT" "$(report_num "$FW_UNKNOWN_BYTES")")
     P_FW_FAILED=$(tfmt risk.fw_scope_failed "$FW_FAILED")
     P_FW_ENCRYPTED=$(tfmt risk.fw_scope_encrypted "$FW_ENCRYPTED")
     P_FW_TAIL=$(kstr risk.fw_scope_tail)
@@ -410,13 +414,13 @@ else
     P_VULN_NONE_MD="_No known vulnerabilities, or no security artifact was produced._"
     P_VULN_NONE_HTML="No known vulnerabilities, or no security artifact was produced."
     P_PRESENCE_MD="> ${PRESENCE_ONLY} component(s) were proved present but no version could be recovered. With no version there is nothing to ask a vulnerability database about, so the counts above do not cover them. The licence obligations still apply."
-    P_PRESENCE_HTML="<b>${PRESENCE_ONLY} component(s)</b> were proved present but no version could be recovered. With no version there is nothing to ask a vulnerability database about, so the counts above do not cover them. The licence obligations still apply."
+    P_PRESENCE_HTML="<b>$(report_num "$PRESENCE_ONLY") component(s)</b> were proved present but no version could be recovered. With no version there is nothing to ask a vulnerability database about, so the counts above do not cover them. The licence obligations still apply."
     P_UNPINNED_MD="> The source states version ranges and ships no lock file, so the versions in this SBOM are what a fresh install resolves at scan time, not necessarily the versions that were used. The counts above were measured against these versions. To judge a specific environment, scan a manifest that pins exact versions."
     P_UNPINNED_HTML="The source states version ranges and ships no lock file, so the versions in this SBOM are what a fresh install resolves at scan time, not necessarily the versions that were used. The counts above were measured against these versions. To judge a specific environment, scan a manifest that pins exact versions."
     P_UNREACHED_MD="> ${UNREACHED_N} finding(s) are not reachable: govulncheck found that the affected Go code is not called or not in the executable (--reachability). They are not in the counts above; the security report lists them."
-    P_UNREACHED_HTML="<b>${UNREACHED_N} finding(s) are not reachable</b>: govulncheck found that the affected Go code is not called or not in the executable (--reachability). They are not in the counts above; the security report lists them."
+    P_UNREACHED_HTML="<b>$(report_num "$UNREACHED_N") finding(s) are not reachable</b>: govulncheck found that the affected Go code is not called or not in the executable (--reachability). They are not in the counts above; the security report lists them."
     P_UNCHECKED_MD="> ${UNCHECKED_N} component(s) could not be checked: they have no version, or no package purl that Trivy can query and no CPE that was matched, so no vulnerability database was asked about them. The counts above do not cover them."
-    P_UNCHECKED_HTML="<b>${UNCHECKED_N} component(s) could not be checked</b>: they have no version, or no package purl that Trivy can query and no CPE that was matched, so no vulnerability database was asked about them. The counts above do not cover them."
+    P_UNCHECKED_HTML="<b>$(report_num "$UNCHECKED_N") component(s) could not be checked</b>: they have no version, or no package purl that Trivy can query and no CPE that was matched, so no vulnerability database was asked about them. The counts above do not cover them."
     P_UNCHECKED_MORE="… and $((UNCHECKED_N - UNCHECKED_LIST_MAX)) more (the security report lists them all)"
     P_REASON_NO_VERSION="no version"
     P_REASON_NO_ID="no package purl and no matched CPE"
@@ -426,6 +430,7 @@ else
     P_FW_SCOPE_H="Firmware analysis scope"
     P_FW_LABEL="Analysis scope:"
     P_FW_UNKNOWN="${FW_UNKNOWN_PCT}% of the image (${FW_UNKNOWN_BYTES} bytes) was not recognized as a known format."
+    P_FW_UNKNOWN_HTML="${FW_UNKNOWN_PCT}% of the image ($(report_num "$FW_UNKNOWN_BYTES") bytes) was not recognized as a known format."
     P_FW_FAILED="${FW_FAILED} extraction step(s) did not complete."
     P_FW_ENCRYPTED="${FW_ENCRYPTED} region(s) are encrypted."
     P_FW_TAIL="Components in any part of the image that was not opened are not listed in this SBOM, so the vulnerability counts above describe only what could be opened."
@@ -472,12 +477,17 @@ fi
 
 # Only the parts that apply are said, so a scan that lost nothing but one tool
 # does not read "0% ... 0 steps ... 0 regions".
-FW_SCOPE_TEXT=""
+FW_SCOPE_TEXT=""; FW_SCOPE_TEXT_HTML=""
 if [ "$FW_SCOPE" = "true" ]; then
     [ "${FW_UNKNOWN_BYTES:-0}" -gt 0 ] && FW_SCOPE_TEXT="${FW_SCOPE_TEXT:+$FW_SCOPE_TEXT }${P_FW_UNKNOWN}"
     [ "${FW_FAILED:-0}" -gt 0 ] && FW_SCOPE_TEXT="${FW_SCOPE_TEXT:+$FW_SCOPE_TEXT }${P_FW_FAILED}"
     [ "${FW_ENCRYPTED:-0}" -gt 0 ] && FW_SCOPE_TEXT="${FW_SCOPE_TEXT:+$FW_SCOPE_TEXT }${P_FW_ENCRYPTED}"
     FW_SCOPE_TEXT="${FW_SCOPE_TEXT:+$FW_SCOPE_TEXT }${P_FW_TAIL}"
+    # The HTML notice groups the byte count's digits.
+    FW_SCOPE_TEXT_HTML="${FW_SCOPE_TEXT}"
+    if [ "${FW_UNKNOWN_BYTES:-0}" -gt 0 ]; then
+        FW_SCOPE_TEXT_HTML="${P_FW_UNKNOWN_HTML}${FW_SCOPE_TEXT#"$P_FW_UNKNOWN"}"
+    fi
 fi
 
 # The supplier review is a subtitle, not a second report name: the report is the
@@ -699,7 +709,7 @@ HTMLHEAD
     # of a firmware analysis comes first: it bounds everything else.
     NOTES=""
     if [ "$FW_SCOPE" = "true" ]; then
-        NOTES="${NOTES}<p><b>${P_FW_LABEL}</b> ${FW_SCOPE_TEXT}"
+        NOTES="${NOTES}<p><b>${P_FW_LABEL}</b> ${FW_SCOPE_TEXT_HTML}"
         if [ -n "$FW_FAILED_FORMATS" ]; then NOTES="${NOTES}<br>${P_FW_FORMATS}"; fi
         if [ -n "$FW_MISSING" ]; then NOTES="${NOTES}<br>${P_FW_MISSING}"; fi
         NOTES="${NOTES}</p>"
@@ -770,7 +780,7 @@ ${UNCHECKED_LI}
         report_lbl "lbl-cat-strong" "$SC" "Strong copyleft"; echo
         report_lbl "lbl-cat-weak" "$WK" "Weak copyleft"; echo
         report_lbl "lbl-cat-permissive" "$PM" "Permissive"; echo
-        report_lbl "lbl-cat-review" "$UN" "Uncategorized"; echo
+        report_lbl "" "$UN" "Uncategorized" "&#8211;"; echo
         echo "</div>"
         if [ "$COPYLEFT_TOTAL" -gt 0 ]; then
             echo "<div class=\"box\"><div class=\"box-head\"><p class=\"box-title\">${P_COPYLEFT_DRIVERS%:}</p><span class=\"counter\">$(report_num "$COPYLEFT_TOTAL")</span></div>"
@@ -783,20 +793,32 @@ ${UNCHECKED_LI}
         fi
     fi
     if [ -n "$OUTBOUND_LIC" ]; then
+        # The box counts every dependency a person has to look at (incompatible,
+        # conditional and unknown) and lists them, incompatible first.
+        LC_TOTAL=$((LC_INCOMPAT + LC_COND + LC_UNKNOWN))
         echo "<h3>${P_H3_LICCONFLICT}</h3>"
         echo "<p>${P_LICCONFLICT_INTRO}</p>"
-        echo "<div class=\"box\"><div class=\"box-head\"><p class=\"box-title\">${P_LC_BOX}</p><span class=\"counter\">$(report_num "$LC_INCOMPAT")</span><span class=\"end\">"
+        if [ "$LC_TOTAL" -gt 0 ]; then
+            echo "<div class=\"box lc\"><div class=\"box-head\"><p class=\"box-title\">${P_LC_BOX}</p><span class=\"counter\">$(report_num "$LC_TOTAL")</span><span class=\"end\">"
+        else
+            echo "<div class=\"summary\"><span class=\"box-title\">${P_LC_BOX}</span>"
+        fi
         report_lbl "lbl-danger" "$LC_INCOMPAT" "Incompatible"; echo
         report_lbl "lbl-attention" "$LC_COND" "Conditional"; echo
         report_lbl "" "$LC_UNKNOWN" "Unknown"; echo
-        echo "</span></div>"
-        if [ "$LC_INCOMPAT" -gt 0 ]; then
-            echo "<p class=\"legend\">${P_LICCONFLICT_DRIVERS%:}</p>"
+        if [ "$LC_TOTAL" -gt 0 ]; then
+            echo "</span></div>"
             echo "<ul class=\"rows mono\">"
-            echo "$LC_TOP" | jq -r '.[] | "<li>" + (.|@html) + "</li>"'
-            echo "</ul>"
+            echo "$LC_ALL" | jq -r '.[] | "<li>" + (.label|@html) + " <span class=\"lbl"
+                + (if .v == "incompatible" then " lbl-danger" elif .v == "conditional" then " lbl-attention" else "" end)
+                + "\">" + ({"incompatible":"Incompatible","conditional":"Conditional","unknown":"Unknown"}[.v] // .v | @html) + "</span></li>"'
+            if [ "$LC_TOTAL" -gt 30 ]; then
+                echo "<li>$(report_str and_more "$(report_num "$((LC_TOTAL - 30))")")</li>"
+            fi
+            echo "</ul></div>"
+        else
+            echo "</div>"
         fi
-        echo "</div>"
     fi
 
     if [ "$MAL_COUNT" -gt 0 ]; then

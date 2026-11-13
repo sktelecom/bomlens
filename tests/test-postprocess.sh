@@ -1402,7 +1402,7 @@ if [ -f "$FMD" ] && grep -q '^### Firmware analysis scope$' "$FMD" \
 else
     fail "firmware scope section missing from the md report" "$(grep -n -i 'scope' "$FMD" 2>/dev/null)"
 fi
-grep -q '25% of the image (250000 bytes) was not recognized' "$FHTML" 2>/dev/null \
+grep -q '25% of the image (250,000 bytes) was not recognized' "$FHTML" 2>/dev/null \
     && pass "html report carries the firmware scope note" || fail "html report lacks the firmware scope note"
 ( cd "$WORK/riskfw" && REPORT_LANG=ko bash "$LIB/generate-risk-report.sh" proj_1.0 proj FIRMWARE >/dev/null 2>&1 )
 grep -q '^### 펌웨어 분석 범위$' "$FMD" && grep -q '이미지의 25%(250000바이트)를' "$FMD" \
@@ -13706,9 +13706,9 @@ TRIVY
 EH="$ESC/x_1_security.html"
 grep -q '<span class="proj">t <span class="ver">1.0&lt;&quot;x</span></span>' "$EH" && ! grep -q '1.0<"x' "$EH" \
     && pass "the SBOM root version is escaped in the page head" || fail "root version escaping" "$(grep -o '<span class="proj">.*</header>' "$EH")"
-grep -qF '<span class="pkg" title="org.ex&quot;&lt;a:ar&lt;t"><span class="pg">org.ex&quot;&lt;a / </span><span class="pn">ar&lt;t</span> <span class="pv">1.0</span></span>' "$EH" \
+grep -qF '<span class="pkg" title="org.ex&quot;&lt;a:ar&lt;t"><span class="pg">org.ex&quot;&lt;a</span><span class="psep"> / </span><span class="pn">ar&lt;t</span> <span class="pv">1.0</span></span>' "$EH" \
     && pass "a Maven package shows group / artifact, both escaped, the full name in title" || fail "Maven package coordinate"
-grep -qF '<span class="pg">한글그룹 / </span><span class="pn">이름</span>' "$EH" \
+grep -qF '<span class="pg">한글그룹</span><span class="psep"> / </span><span class="pn">이름</span>' "$EH" \
     && pass "a non-ASCII Maven name is split by characters, not bytes" || fail "non-ASCII package split"
 grep -qF '<span class="pn">libssl3:amd64</span> <span class="pv">7</span>' "$EH" \
     && pass "a non-Maven name with a colon stays whole, and a numeric version is shown" || fail "non-Maven package or numeric version"
@@ -13721,6 +13721,27 @@ FACTS="$( ( . "$LIB/report-common.sh"; printf '{"metadata":{"component":{"versio
             report_bom_facts "$ESC/o.json"; printf '|%s|%s' "$RB_VERSION" "$RB_NCOMP" ) )"
 [ "$FACTS" = "3|application|2||" ] && pass "a numeric root version is read as text, an object one is dropped" \
     || fail "report_bom_facts" "$FACTS"
+# Print keeps a label, an id, a number and a time on one line; only long values wrap.
+if sed -n '/@media print{/,/^}/p' "${RTP}_security.html" | grep -q 'th,td{white-space:normal;}' \
+   && ! sed -n '/@media print{/,/^}/p' "${RTP}_security.html" | grep -qE '(\.lbl|\.kevbadge|td\.id|td\.num|td\.sev|time)[^{]*\{white-space:normal'; then
+    pass "print lets cells wrap but keeps labels, ids, numbers and times on one line"
+else
+    fail "print rules let a label, id, number or time wrap"
+fi
+# Outbound license conflicts: the count is everything a person has to look at,
+# and each such dependency is a row, even when none is incompatible.
+LCX="$RT/lcx"; mkdir -p "$LCX"
+jq '.metadata.component.licenses = [{"license":{"id":"Apache-2.0"}}]
+    | .components = [{"type":"library","name":"c1","version":"1","properties":[{"name":"bomlens:licenseConflict","value":"conditional"}]},
+                     {"type":"library","name":"u1","version":"2","properties":[{"name":"bomlens:licenseConflict","value":"unknown"}]}]' \
+    "$RC/risk-bom.json" > "$LCX/p_1.0_bom.json"
+printf 'License: MIT\n' > "$LCX/p_1.0_NOTICE.txt"
+( cd "$LCX" && bash "$LIB/generate-risk-report.sh" p_1.0 p >/dev/null 2>&1 )
+grep -q 'Conflicts with the outbound license (Apache-2.0)</p><span class="counter">2</span>' "$LCX/p_1.0_risk-report.html" \
+   && grep -q '<li>c1@1 <span class="lbl lbl-attention">Conditional</span></li>' "$LCX/p_1.0_risk-report.html" \
+   && grep -q '<li>u1@2 <span class="lbl">Unknown</span></li>' "$LCX/p_1.0_risk-report.html" \
+    && pass "the outbound-license box counts and lists conditional and unknown dependencies too" \
+    || fail "outbound-license box" "$(grep -o 'Conflicts with[^<]*</p><span class="counter">[^<]*' "$LCX/p_1.0_risk-report.html")"
 grep -q '<h1>Open-source risk report</h1>' "${RTP}_risk-report.html" \
     && grep -q '<p class="subtitle">Supplier SBOM under review</p>' "${RTP}_risk-report.html" \
     && pass "supplier risk report: GLOSSARY title with the supplier review as subtitle" \

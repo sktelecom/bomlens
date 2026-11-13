@@ -2013,6 +2013,8 @@ kstr() { jq -r --arg k "$1" '.[$k] // $k' "$KO_CAT"; }
 tfmt() { local f; f="$(kstr "$1")"; shift; printf -- "$f" "$@"; }
 
 RESULT_UP=$(echo "$RESULT" | tr '[:lower:]' '[:upper:]')
+# The result as the row labels write a status: a capital, then lower case.
+RESULT_WORD="$(printf '%s' "$RESULT_UP" | cut -c1)$(printf '%s' "$RESULT_UP" | cut -c2- | tr '[:upper:]' '[:lower:]')"
 PROJECT_ESC=$(printf '%s' "$PROJECT" | sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g')
 # Header link: an AI SBOM carries the model's own page as an external reference, so
 # the project name can point at it. A plain dependency SBOM has none — stays text.
@@ -2099,7 +2101,7 @@ if [ "$REPORT_LANG" = "ko" ]; then
     C_H1=$(kstr conformance.h1)
     C_META_FORMAT="$(kstr conformance.meta_format): ${FORMAT}"
     C_META_PROFILE="$(kstr conformance.meta_profile): ${CONFORMANCE_PROFILE}"
-    C_PILL_RESULT="$(kstr conformance.pill_result) ${RESULT_UP}"
+    C_PILL_RESULT="$(kstr conformance.pill_result) ${RESULT_WORD}"
     C_PILL_FAIL=$(kstr conformance.pill_failures); C_PILL_WARN=$(kstr conformance.pill_warnings)
     C_PILL_REVIEW=$(kstr conformance.pill_review); C_PILL_UNTRACE=$(kstr conformance.pill_untraceable)
     C_PILL_NA=$(kstr conformance.pill_na)
@@ -2139,7 +2141,7 @@ else
     C_H1="Conformance check report"
     C_META_FORMAT="Format: ${FORMAT}"
     C_META_PROFILE="Profile: ${CONFORMANCE_PROFILE}"
-    C_PILL_RESULT="Result: ${RESULT_UP}"
+    C_PILL_RESULT="Result: ${RESULT_WORD}"
     C_PILL_FAIL="Mandatory failures:"; C_PILL_WARN="Warnings:"; C_PILL_REVIEW="Needs review:"
     C_PILL_NA="Not applicable:"
     C_PILL_UNTRACE="Untraceable (pkg:generic):"

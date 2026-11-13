@@ -733,16 +733,16 @@ HTMLHEAD
         NOTES="${NOTES}<p>$(sec_s scan_failed '<b>Scan failed.</b> The vulnerability scan did not complete, so this report does not reflect the target'"'"'s actual exposure.')<br><code>${ERR_HTML}</code></p>"
     fi
     if [ "${UNCHECKED_N:-0}" -gt 0 ]; then
-        NOTES="${NOTES}<p>$(sec_s unchecked_note '<b>%s component(s) could not be checked</b> and are listed below. No vulnerability database was asked about them, so the counts below do not cover them.' "$UNCHECKED_N")</p>"
+        NOTES="${NOTES}<p>$(sec_s unchecked_note '<b>%s component(s) could not be checked</b> and are listed below. No vulnerability database was asked about them, so the counts below do not cover them.' "$(report_num "$UNCHECKED_N")")</p>"
     fi
     if [ "${UNREACHED_N:-0}" -gt 0 ]; then
-        NOTES="${NOTES}<p>$(sec_s unreached_note '<b>%s finding(s) are not reachable</b> and are listed at the end of this report, not in the counts below. govulncheck found that the affected Go package is not in the build (<code>code_not_present</code>), or that no affected function in it is called (source) or in the executable (binary) (<code>code_not_reachable</code>); each is recorded as <code>not_affected</code> in <code>%s</code>.' "$UNREACHED_N" "$REACH_FILE_HTML")</p>"
+        NOTES="${NOTES}<p>$(sec_s unreached_note '<b>%s finding(s) are not reachable</b> and are listed at the end of this report, not in the counts below. govulncheck found that the affected Go package is not in the build (<code>code_not_present</code>), or that no affected function in it is called (source) or in the executable (binary) (<code>code_not_reachable</code>); each is recorded as <code>not_affected</code> in <code>%s</code>.' "$(report_num "$UNREACHED_N")" "$REACH_FILE_HTML")</p>"
     fi
     if [ "${ADVISORY_N:-0}" -gt 0 ]; then
-        NOTES="${NOTES}<p>$(sec_s advisory_note '<b>%s advisories with no CVE</b> are listed below and are not included in the counts below. Each is a distribution advisory number for which the vulnerability database names no CVE.' "$ADVISORY_N")</p>"
+        NOTES="${NOTES}<p>$(sec_s advisory_note '<b>%s advisories with no CVE</b> are listed below and are not included in the counts below. Each is a distribution advisory number for which the vulnerability database names no CVE.' "$(report_num "$ADVISORY_N")")</p>"
     fi
     if [ "${KERNEL_TOTAL:-0}" -gt 0 ]; then
-        NOTES="${NOTES}<p>$(sec_s kernel_note '<b>%s kernel advisories</b> are listed at the end of this report and are not included in the counts below. Most advisories against a kernel are for subsystems a given device never compiled in, and the SBOM cannot tell which, so counting them here would bury the findings this report exists to show.' "$KERNEL_TOTAL")</p>"
+        NOTES="${NOTES}<p>$(sec_s kernel_note '<b>%s kernel advisories</b> are listed at the end of this report and are not included in the counts below. Most advisories against a kernel are for subsystems a given device never compiled in, and the SBOM cannot tell which, so counting them here would bury the findings this report exists to show.' "$(report_num "$KERNEL_TOTAL")")</p>"
     fi
     if [ -n "$NOTES" ]; then
         if [ -n "$SCAN_ERR" ]; then echo "<div class=\"banner banner-danger\">${NOTES}</div>"; else echo "<div class=\"banner\">${NOTES}</div>"; fi
@@ -784,9 +784,9 @@ HTMLHEAD
         if [ -n "$SCAN_ERR" ]; then
             echo "<p>$(sec_s none_failed 'Scan failed &mdash; no results were produced.')</p>"
         elif [ "${UNCHECKED_N:-0}" -gt 0 ]; then
-            echo "<p>$(sec_s none_unchecked 'No vulnerability was found in the components that were checked. %s component(s) could not be checked; they are listed below.' "$UNCHECKED_N")</p>"
+            echo "<p>$(sec_s none_unchecked 'No vulnerability was found in the components that were checked. %s component(s) could not be checked; they are listed below.' "$(report_num "$UNCHECKED_N")")</p>"
         elif [ "${UNREACHED_N:-0}" -gt 0 ]; then
-            echo "<p>$(sec_s none_unreached 'No reachable vulnerability was found. %s finding(s) are not reachable; they are listed below.' "$UNREACHED_N")</p>"
+            echo "<p>$(sec_s none_unreached 'No reachable vulnerability was found. %s finding(s) are not reachable; they are listed below.' "$(report_num "$UNREACHED_N")")</p>"
         else
             echo "<p>$(sec_s none 'No known vulnerabilities found.')</p>"
         fi
