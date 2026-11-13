@@ -704,10 +704,13 @@ detect_lang() {
 # is set) and comments:
 #   JavaLanguageVersion.of(25)  (languageVersion.set(...), languageVersion = ...)
 #   jvmToolchain(25)            (Kotlin)
-# A version taken from a property or a version catalog is not read. Maven is
-# not read either: maven.compiler.release and the toolchains plugin take effect
-# when the build compiles, and dependency resolution (dependency:tree) runs
-# without them on the image's JDK.
+# The argument may also be a variable defined in the same file, optionally
+# converted (.toInteger(), .toInt(), .toString(), as int); its value is read
+# from that definition (_java_toolchain_awk). A version from a version
+# catalog, from a variable of another file or from an environment variable
+# alone is not read. Maven is not read either: maven.compiler.release and the
+# toolchains plugin take effect when the build compiles, and dependency
+# resolution (dependency:tree) runs without them on the image's JDK.
 java_toolchain_version() {
     local d="$1" n prune=()
     [ -n "$d" ] && [ -d "$d" ] || return 0
@@ -717,27 +720,125 @@ java_toolchain_version() {
     if non_shipped_enabled; then
         for n in $NON_SHIPPED_DIRS; do prune+=(-o -name "$n"); done
     fi
-    # The awk drops // line comments and /* */ blocks (across lines too, and
-    # never past the end of a file) before the declarations are matched. A
-    # line over 4096 characters holds no declaration worth reading and is
-    # skipped, which keeps the scan of a crafted file linear.
     (cd "$d" 2>/dev/null && find . -maxdepth 6 \( "${prune[@]:1}" \) -prune -o -type f \( -name '*.gradle' -o -name '*.gradle.kts' \) \
-        -exec awk '
-            FNR == 1 { blk = 0 }
-            length($0) > 4096 { next }
-            {
-                line = $0; out = ""
-                while (line != "") {
-                    if (blk) { i = index(line, "*/"); if (!i) { line = ""; break }; line = substr(line, i + 2); blk = 0; continue }
-                    a = index(line, "/*"); b = index(line, "//")
-                    if (b && (!a || b < a)) { out = out substr(line, 1, b - 1); line = ""; break }
-                    if (a) { out = out substr(line, 1, a - 1); line = substr(line, a + 2); blk = 1; continue }
-                    out = out line; line = ""
-                }
-                print out
-            }' {} + 2>/dev/null) \
-        | grep -oE "(JavaLanguageVersion\.of|jvmToolchain)[[:space:]]*\([[:space:]]*[\"']?[0-9]+" \
-        | grep -oE '[0-9]+$' | grep -E '^[0-9]{1,3}$' | sed 's/^0*\([0-9]\)/\1/' | sort -n | tail -1 || true
+        -exec awk "$(_java_toolchain_awk)" {} + 2>/dev/null) \
+        | grep -E '^[0-9]{1,3}$' | sed 's/^0*\([0-9]\)/\1/' | sort -n | tail -1 || true
+}
+
+# _java_toolchain_awk: the awk program java_toolchain_version runs over the
+# build files, printing one candidate version per line. It drops // line
+# comments and /* */ blocks (across lines too, and never past the end of a
+# file) before anything is matched. A line over 4096 characters holds no
+# declaration worth reading and is skipped, in a gradle.properties file too,
+# which keeps the scan of a crafted file linear. Per file it reads:
+#   JavaLanguageVersion.of(25), jvmToolchain("25")     the number itself
+#   JavaLanguageVersion.of(v), jvmToolchain(v.toInt())  v, looked up below
+#   def v = <expression> (also val, var, final, a type, val v: String = ...)
+#                                                       the first one in the file
+#   val v: String by project                            the Gradle property v
+# A definition that reads a Gradle property p (hasProperty("p"), getProperty,
+# findProperty, property, providers.gradleProperty("p"), properties["p"]; not
+# System.getProperty) takes p=N from the gradle.properties nearest the build
+# file, up to the scanned folder. Failing that, the default it gives counts:
+# the number after its last ?: or the ternary's :, or in getOrElse("N"); or
+# the number it is set to. Only the awk features busybox, mawk and the BSD
+# awk share are used.
+_java_toolchain_awk() {
+    cat <<'AWK'
+function strip(s) {
+    sub(/^[ \t]+/, "", s); sub(/[ \t]+$/, "", s); return s
+}
+function digits(s) { gsub(/[^0-9]/, "", s); return s }
+# The value of Gradle property p in the gradle.properties nearest file f.
+function gprop(f, p,    dir, pf, line, key, val, rc) {
+    dir = f
+    while (dir ~ /\//) {
+        sub(/\/[^\/]*$/, "", dir)
+        pf = dir "/gradle.properties"
+        while ((rc = (getline line < pf)) > 0) {
+            if (length(line) > 4096) continue
+            line = strip(line)
+            if (line == "" || line ~ /^[#!]/) continue
+            if (!match(line, /[=: \t]/)) continue
+            key = substr(line, 1, RSTART - 1)
+            if (key != p) continue
+            val = substr(line, RSTART)
+            sub(/^[ \t]*[=:]?[ \t]*/, "", val)
+            val = strip(val)
+            if (val ~ /^[0-9]+$/) { close(pf); return val }
+        }
+        if (rc == 0) close(pf)
+    }
+    return ""
+}
+# The Gradle property an expression reads, or "".
+function propname(e,    pre, m) {
+    while (match(e, /([Pp]roperty[ \t]*\([ \t]*|properties[ \t]*\[[ \t]*)["'][A-Za-z0-9_.-]+["']/)) {
+        pre = substr(e, 1, RSTART - 1)
+        m = substr(e, RSTART, RLENGTH)
+        e = substr(e, RSTART + RLENGTH)
+        if (pre ~ /System\.(get)?$/) continue
+        sub(/^[^"']*["']/, "", m); sub(/["']$/, "", m)
+        return m
+    }
+    return ""
+}
+# The number an expression falls back to, or "".
+function fallback(e) {
+    if (match(e, /getOrElse[ \t]*\([ \t]*["']?[0-9]+["']?[ \t]*\)/)) return digits(substr(e, RSTART, RLENGTH))
+    if (e ~ /\?/ && match(e, /:[ \t]*\(?[ \t]*["']?[0-9]+["']?[ \t]*\)?[ \t]*(\.(toInteger|toInt|toString)\(\)|[ \t]+as[ \t]+(int|Integer))?[ \t]*\)?[ \t]*;?[ \t]*$/))
+        return digits(substr(e, RSTART, RLENGTH))
+    if (e ~ /^[ \t]*["']?[0-9]+["']?[ \t]*(\.(toInteger|toInt|toString)\(\)|[ \t]+as[ \t]+(int|Integer))?[ \t]*;?[ \t]*$/) return digits(e)
+    return ""
+}
+function flush(f,    name, e, p, v) {
+    for (name in refs) {
+        v = ""
+        if (name in byproj) v = gprop(f, name)
+        else if (name in defs) {
+            e = defs[name]
+            p = propname(e)
+            if (p != "") v = gprop(f, p)
+            if (v == "") v = fallback(e)
+        }
+        if (v != "") print v
+    }
+    split("", refs); split("", defs); split("", byproj)
+}
+FNR == 1 { if (cur != "") flush(cur); cur = FILENAME; blk = 0 }
+length($0) > 4096 { next }
+{
+    line = $0; out = ""
+    while (line != "") {
+        if (blk) { i = index(line, "*/"); if (!i) { line = ""; break }; line = substr(line, i + 2); blk = 0; continue }
+        a = index(line, "/*"); b = index(line, "//")
+        if (b && (!a || b < a)) { out = out substr(line, 1, b - 1); line = ""; break }
+        if (a) { out = out substr(line, 1, a - 1); line = substr(line, a + 2); blk = 1; continue }
+        out = out line; line = ""
+    }
+    if (match(out, /^[ \t]*val[ \t]+[A-Za-z_][A-Za-z0-9_]*([ \t]*:[ \t]*[A-Za-z?]+)?[ \t]+by[ \t]+project([^A-Za-z0-9_.]|$)/)) {
+        h = out; sub(/^[ \t]*val[ \t]+/, "", h); match(h, /^[A-Za-z_][A-Za-z0-9_]*/)
+        h = substr(h, 1, RLENGTH)
+        if (!(h in defs) && !(h in byproj)) byproj[h] = 1
+    } else if (match(out, /^[ \t]*((def|val|var|final|static|private|int|Integer|String)[ \t]+)+[A-Za-z_][A-Za-z0-9_]*([ \t]*:[ \t]*[A-Za-z?]+)?[ \t]*=/) \
+               && substr(out, RSTART + RLENGTH, 1) != "=") {
+        h = substr(out, 1, RLENGTH - 1); e = substr(out, RLENGTH + 1)
+        sub(/[ \t]*:[ \t]*[A-Za-z?]+[ \t]*$/, "", h); h = strip(h)
+        match(h, /[A-Za-z_][A-Za-z0-9_]*$/); h = substr(h, RSTART, RLENGTH)
+        if (!(h in defs) && !(h in byproj)) defs[h] = e
+    }
+    rest = out
+    while (match(rest, /(JavaLanguageVersion\.of|jvmToolchain)[ \t]*\([ \t]*/)) {
+        rest = substr(rest, RSTART + RLENGTH)
+        if (match(rest, /^["']?[0-9]+/)) { print digits(substr(rest, 1, RLENGTH)); continue }
+        if (match(rest, /^[A-Za-z_][A-Za-z0-9_]*[ \t]*(\.(toInteger|toInt|toString)\(\)|[ \t]+as[ \t]+(int|Integer))?[ \t]*\)/)) {
+            h = substr(rest, 1, RLENGTH); match(h, /^[A-Za-z_][A-Za-z0-9_]*/)
+            refs[substr(h, 1, RLENGTH)] = 1
+        }
+    }
+}
+END { if (cur != "") flush(cur) }
+AWK
 }
 
 # The JDKs the published cdxgen Java images carry, and the one used when

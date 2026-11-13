@@ -619,6 +619,55 @@ java_case "$J21" "an overlong version number is ignored"
 gradle_tree build.gradle.kts 'kotlin { jvmToolchain(025) }\n'
 java_case "$J25" "a leading zero still reads as the version"
 
+echo "== a Java toolchain taken from a variable is read from its definition =="
+# Builds that let CI override the Java version pass a variable with a default;
+# the Java 21 image was used for them and Gradle failed without a Java 25 JDK.
+J17="ghcr.io/cdxgen/cdxgen-java17:$CDXGEN_TAG"
+gradle_tree build.gradle "plugins { id 'java' }\ndef javaVersionProp = project.hasProperty('javaVer') ? project.getProperty('javaVer') : '25'\njava {\n    toolchain {\n        languageVersion = JavaLanguageVersion.of(javaVersionProp.toInteger())\n    }\n}\n"
+java_case "$J25" "Groovy: the ternary's default '25' picks the Java 25 image"
+printf 'org.gradle.jvmargs=-Xmx2g\njavaVer=17\n' > "$LANGDIR/proj/gradle.properties"
+java_case "$J17" "Groovy: javaVer=17 in gradle.properties wins over the default"
+gradle_tree build.gradle "def jv = findProperty('jv') ?: '24'\njava.toolchain.languageVersion = JavaLanguageVersion.of(jv)\n"
+java_case "$J24" "Groovy: findProperty('jv') ?: '24' picks the Java 24 image"
+gradle_tree build.gradle "def jv = project.findProperty('jv') ?: 25\njava.toolchain.languageVersion = JavaLanguageVersion.of(jv as int)\n"
+java_case "$J25" "Groovy: project.findProperty(...) ?: 25 with as int"
+gradle_tree build.gradle.kts 'val javaVersion = findProperty("javaVersion")?.toString() ?: "25"\njava { toolchain { languageVersion.set(JavaLanguageVersion.of(javaVersion.toInt())) } }\n'
+java_case "$J25" "Kotlin: findProperty(...)?.toString() ?: \"25\" picks the Java 25 image"
+printf 'javaVersion = 17\n' > "$LANGDIR/proj/gradle.properties"
+java_case "$J17" "Kotlin: javaVersion = 17 in gradle.properties wins over the default"
+gradle_tree build.gradle.kts 'val jdk = providers.gradleProperty("jdk").get()\nkotlin { jvmToolchain(jdk.toInt()) }\n'
+printf 'jdk=25\n' > "$LANGDIR/proj/gradle.properties"
+java_case "$J25" "Kotlin: providers.gradleProperty(\"jdk\") reads jdk=25 from gradle.properties"
+gradle_tree build.gradle.kts 'val jdk = providers.gradleProperty("jdk").getOrElse("24")\nkotlin { jvmToolchain(jdk.toInt()) }\n'
+java_case "$J24" "Kotlin: getOrElse(\"24\") is the default"
+gradle_tree build.gradle.kts 'val jdk: String by project\nkotlin { jvmToolchain(jdk.toInt()) }\n'
+printf 'jdk=25\n' > "$LANGDIR/proj/gradle.properties"
+java_case "$J25" "Kotlin: val jdk: String by project reads jdk=25 from gradle.properties"
+gradle_tree app/build.gradle "def v = findProperty('v') ?: '11'\njava.toolchain.languageVersion = JavaLanguageVersion.of(v)\n"
+printf 'v=25\n' > "$LANGDIR/proj/gradle.properties"
+java_case "$J25" "a module's property is read from the root gradle.properties"
+gradle_tree build.gradle.kts 'val jdk = 25\nkotlin { jvmToolchain(jdk) }\n'
+java_case "$J25" "a variable set to a number is read"
+gradle_tree build.gradle.kts 'val jdk = System.getenv("JDK") ?: "25"\nkotlin { jvmToolchain(jdk.toInt()) }\n'
+java_case "$J25" "an environment variable's default is read"
+gradle_tree build.gradle.kts 'val jdk = System.getenv("JDK")\nkotlin { jvmToolchain(jdk.toInt()) }\n'
+java_case "$J21" "an environment variable with no default is not read"
+gradle_tree build.gradle.kts 'val jdk = System.getProperty("jdk") ?: "x"\nkotlin { jvmToolchain(jdk.toInt()) }\n'
+printf 'jdk=25\n' > "$LANGDIR/proj/gradle.properties"
+java_case "$J21" "System.getProperty is not a Gradle property"
+gradle_tree build.gradle.kts '// val jdk = 25\nkotlin { jvmToolchain(jdk) }\n'
+java_case "$J21" "a commented-out definition is not read"
+gradle_tree build.gradle.kts 'val jdk = 99999\nkotlin { jvmToolchain(jdk) }\n'
+java_case "$J21" "an overlong default is ignored"
+gradle_tree build.gradle.kts 'val jdk = libs.versions.java.get()\nkotlin { jvmToolchain(jdk.toInt()) }\n'
+java_case "$J21" "a version catalog value is not read"
+gradle_tree build.gradle.kts 'kotlin { jvmToolchain(jdk.toInt()) }\n'
+printf 'val jdk = 25\n' > "$LANGDIR/proj/other.gradle.kts"
+java_case "$J21" "a variable of another file is not read"
+gradle_tree build.gradle.kts 'val jdk = providers.gradleProperty("jdk").get()\nkotlin { jvmToolchain(jdk.toInt()) }\n'
+python3 -c "import sys; open(sys.argv[1], 'w').write('jdk=' + '2' * 5000 + '\njdk=25\n')" "$LANGDIR/proj/gradle.properties"
+java_case "$J25" "a gradle.properties line over 4096 characters is skipped"
+
 echo "== the Gradle wrapper's version limits the cdxgen Java image =="
 # A wrapper runs only on the JDKs its Gradle supports: a 6.9.4 wrapper fails
 # on Java 21 ("Unsupported class file major version 65") and the SBOM had none.
