@@ -8156,6 +8156,94 @@ BOMLENS_KEEP_BUILD_OUTPUT=1 PATH="$GUARD_ROOT/bin:$PATH" \
     && pass "BOMLENS_KEEP_BUILD_OUTPUT=1 keeps the resolved tree" \
     || fail "the opt-out did not keep the resolved tree"
 
+echo "== source-tree guard: a record without a snapshot never deletes the tree (#988) =="
+# A scan whose cdxgen container never started leaves owner/path/image in the
+# guard-state folder and no files.before. The next scan's restore-only run
+# must not read that as "every resolver-owned path is new".
+STALE="$WORK/guard-stale"
+stale_tree() {
+    rm -rf "$STALE/src"; mkdir -p "$STALE/src/vendor/github.com/google/uuid" "$STALE/state"
+    printf 'module example.com/guardrepro\n\ngo 1.22\n' > "$STALE/src/go.mod"
+    printf 'github.com/google/uuid v1.6.0 h1:x=\n' > "$STALE/src/go.sum"
+    printf 'package uuid\n' > "$STALE/src/vendor/github.com/google/uuid/uuid.go"
+    printf 'package main\n' > "$STALE/src/main.go"
+}
+stale_restore_only() {
+    BOMLENS_GUARD_RESTORE_ONLY=1 BOMLENS_GUARD_ID=k1 BOMLENS_GUARD_STATE_ROOT="$STALE/state" \
+        sh "$LIB/build-prep.sh" "$STALE/src" >/dev/null 2>&1
+}
+stale_tree
+mkdir -p "$STALE/state/k1"
+printf 'bomlens-scan-1\n' > "$STALE/state/k1/owner"; printf '%s\n' "$STALE/src" > "$STALE/state/k1/path"
+printf 'nosuch/cdxgen\n' > "$STALE/state/k1/image"
+stale_restore_only
+[ -f "$STALE/src/go.mod" ] && [ -f "$STALE/src/go.sum" ] && [ -f "$STALE/src/vendor/github.com/google/uuid/uuid.go" ] \
+    && pass "restore-only with no files.before keeps go.mod, go.sum and vendor/" \
+    || fail "restore-only with no files.before deleted the user's files" "$(cd "$STALE/src" && find . | sort | tr '\n' ' ')"
+[ ! -e "$STALE/state/k1" ] \
+    && pass "the record without a snapshot is removed" \
+    || fail "the record without a snapshot was left in place"
+# Lists written but names.version missing (stopped while the snapshot was taken).
+stale_tree
+mkdir -p "$STALE/state/k1"; : > "$STALE/state/k1/files.before"; : > "$STALE/state/k1/dirs.before"
+stale_restore_only
+[ -f "$STALE/src/go.mod" ] && [ -f "$STALE/src/go.sum" ] && [ -d "$STALE/src/vendor" ] && [ ! -e "$STALE/state/k1" ] \
+    && pass "restore-only with a snapshot lacking names.version touches nothing and drops the record" \
+    || fail "an incomplete snapshot led to deletions or was kept"
+# A complete snapshot is still finished: go.sum and build/ that it did not list go.
+stale_tree; rm -f "$STALE/src/go.sum"; rm -rf "$STALE/src/vendor"
+mkdir -p "$STALE/state/k1/tree"
+printf './go.mod\n' > "$STALE/state/k1/files.before"; : > "$STALE/state/k1/dirs.before"
+cp "$STALE/src/go.mod" "$STALE/state/k1/tree/go.mod"; cp "$STALE/src/go.mod" "$STALE/go.mod.orig"
+echo 5 > "$STALE/state/k1/names.version"
+printf 'require x v1\n' >> "$STALE/src/go.mod"; printf 'x\n' > "$STALE/src/go.sum"; mkdir -p "$STALE/src/build"
+stale_restore_only
+[ ! -e "$STALE/src/go.sum" ] && [ ! -e "$STALE/src/build" ] && cmp -s "$STALE/go.mod.orig" "$STALE/src/go.mod" \
+    && [ ! -e "$STALE/state/k1" ] \
+    && pass "restore-only still finishes a complete snapshot" \
+    || fail "a complete snapshot was not finished" "$(cd "$STALE/src" && find . | sort | tr '\n' ' ')"
+# guard_restore itself refuses a folder without the lists.
+stale_tree; mkdir -p "$STALE/state/k2"
+( cd "$STALE/src" && SRC="$STALE/src" OUT="$STALE/none.json" \
+    sh -c 'log() { :; }; . "$1"; GUARD_DIR="$2"; guard_restore' _ "$LEG/guard-funcs.sh" "$STALE/state/k2" >/dev/null 2>&1 )
+[ -f "$STALE/src/go.mod" ] && [ -f "$STALE/src/go.sum" ] && [ -d "$STALE/src/vendor" ] && [ ! -e "$STALE/state/k2" ] \
+    && pass "guard_restore with no files.before deletes nothing" \
+    || fail "guard_restore with no files.before deleted the user's files"
+# A path git tracks is kept even when the snapshot does not list it.
+if command -v git >/dev/null 2>&1; then
+    stale_tree
+    ( cd "$STALE/src" && git init -q . && git add go.mod go.sum vendor \
+        && git -c user.name=t -c user.email=t@example.invalid commit -qm init ) >/dev/null 2>&1
+    printf 'x\n' > "$STALE/src/Cargo.lock"
+    mkdir -p "$STALE/state/k3"; : > "$STALE/state/k3/files.before"; : > "$STALE/state/k3/dirs.before"
+    echo 5 > "$STALE/state/k3/names.version"
+    ( cd "$STALE/src" && SRC="$STALE/src" OUT="$STALE/none.json" \
+        sh -c 'log() { :; }; . "$1"; GUARD_DIR="$2"; guard_restore' _ "$LEG/guard-funcs.sh" "$STALE/state/k3" >/dev/null 2>&1 )
+    [ -f "$STALE/src/go.mod" ] && [ -f "$STALE/src/go.sum" ] && [ -f "$STALE/src/vendor/github.com/google/uuid/uuid.go" ] \
+        && pass "guard_restore keeps files and folders git tracks" \
+        || fail "guard_restore deleted files git tracks" "$(cd "$STALE/src" && find . -path ./.git -prune -o -print | sort | tr '\n' ' ')"
+    [ ! -e "$STALE/src/Cargo.lock" ] \
+        && pass "guard_restore still removes an untracked file the run created" \
+        || fail "an untracked new Cargo.lock was kept"
+else
+    echo "  (skip: no git here for the tracked-file check)"
+fi
+# The CLI and the web UI drop their record when the cdxgen container never
+# took a snapshot, and keep one that has it (an interrupted run).
+for _gs_script in "$ROOT_DIR/scripts/scan-sbom.sh" "$ROOT_DIR/docker/entrypoint.sh"; do
+    sed -n '/^drop_unused_guard_state() {/,/^}/p' "$_gs_script" > "$STALE/drop.sh"
+    rm -rf "$STALE/hs"; mkdir -p "$STALE/hs/a" "$STALE/hs/b" "$STALE/hs/c"
+    printf 'me\n' > "$STALE/hs/a/owner"
+    printf 'me\n' > "$STALE/hs/b/owner"; : > "$STALE/hs/b/files.before"
+    printf 'other\n' > "$STALE/hs/c/owner"
+    for _gs_id in a b c; do
+        GUARD_STATE_DIR="$STALE/hs" GUARD_ID="$_gs_id" bash -c '. "$1"; drop_unused_guard_state me' _ "$STALE/drop.sh"
+    done
+    [ -s "$STALE/drop.sh" ] && [ ! -e "$STALE/hs/a" ] && [ -d "$STALE/hs/b" ] && [ -d "$STALE/hs/c" ] \
+        && pass "$(basename "$_gs_script"): a record with no snapshot is dropped, a snapshot or another owner's record is kept" \
+        || fail "$(basename "$_gs_script"): drop_unused_guard_state removed the wrong records" "$(ls "$STALE/hs" | tr '\n' ' ')"
+done
+
 echo "== source-tree guard: an interrupt stops the resolver instead of waiting it out =="
 # Regression: a plain foreground `cdxgen "$@"` deferred INT/TERM
 # handling until cdxgen finished on its own (measured: a 5-minute `docker stop`
@@ -10181,9 +10269,10 @@ DETECT="$ROOT_DIR/docker/lib/source-detect.sh"
 # clobbering nothing today but wiring a second, wrong path for the same name.
 # BOMLENS_REACHABILITY, BOMLENS_GOVULNCHECK and BOMLENS_REACHABILITY_NONCE are the
 # same kind: the launcher sets them with a value only when it hands stage 1 a
-# govulncheck binary.
+# govulncheck binary. BOMLENS_GUARD_STATE_ROOT only points the tests at a
+# folder other than /bomlens-state.
 _read=$(grep -oE 'BOMLENS_[A-Z_]+:-' "$PREP" | sed 's/:-$//' | sort -u \
-    | grep -vE '^BOMLENS_(GUARD_ID|GUARD_RESTORE_ONLY|REACHABILITY|REACHABILITY_NONCE|GOVULNCHECK)$' | tr '\n' ' ')
+    | grep -vE '^BOMLENS_(GUARD_ID|GUARD_RESTORE_ONLY|GUARD_STATE_ROOT|REACHABILITY|REACHABILITY_NONCE|GOVULNCHECK)$' | tr '\n' ' ')
 _listed=$(bash -c '. "$1"; printf "%s\n" $BUILD_PREP_ENV_NAMES' _ "$DETECT" | sort -u | tr '\n' ' ')
 [ -n "$_read" ] && [ "$_read" = "$_listed" ] \
     && pass "BUILD_PREP_ENV_NAMES matches the BOMLENS_* switches build-prep.sh reads" \

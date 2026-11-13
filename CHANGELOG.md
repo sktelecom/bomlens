@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- A source scan no longer deletes go.mod, lock files, vendor/ or other build folders from the scanned folder after an earlier scan of it whose cdxgen container never started. The cleanup of an interrupted scan runs only when that scan recorded a complete snapshot of the folder, and the CLI and the web UI remove the record a scan leaves when its cdxgen container did not get that far. The cleanup also leaves in place any file or folder that git tracks.
+
 ## [v1.14.5] - 2026-11-12
 
 ### Added
