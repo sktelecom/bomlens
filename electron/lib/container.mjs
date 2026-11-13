@@ -176,12 +176,17 @@ export function imageEnvArgs(images = {}) {
 // TLS를 검사하는 프록시의 CA 번들(SBOM_EXTRA_CA_CERTS, PEM)을 docker run 인자로 변환한다.
 // scan-sbom.sh --ui와 같은 규칙: 읽기 전용으로 /bomlens-ca/extra.pem에 붙이고
 // BOMLENS_EXTRA_CA_CERTS로 그 경로를 알린다. UI 컨테이너가 띄우는 형제 컨테이너는
-// --volumes-from으로 같은 파일을 본다. 읽을 수 없거나 PEM 인증서가 없는 파일이면 시작하지
-// 않고 그 경로와 함께 EXTRA_CA_INVALID를 던진다. 그냥 넘어가면 모든 HTTPS 호출이 나중에 실패한다.
+// --volumes-from으로 같은 파일을 본다. 읽을 수 없거나 PEM 인증서가 없는 파일, 또는 경로에
+// 쉼표나 큰따옴표가 있어 --mount 값을 나눠 버리는 파일이면 시작하지 않고 그 경로와 함께
+// EXTRA_CA_INVALID를 던진다. 그냥 넘어가면 모든 HTTPS 호출이 나중에 실패한다.
+// -v 대신 --mount를 쓴다. 엔진의 VM이 그 폴더를 공유하지 않으면(Colima, Rancher Desktop)
+// -v는 빈 폴더를 붙이지만 --mount는 docker run을 바로 실패시킨다.
 export const EXTRA_CA_TARGET = "/bomlens-ca/extra.pem";
 export function extraCaArgs({ env = process.env, readFile = (p) => fs.readFileSync(p, "utf8") } = {}) {
   const file = String(env.SBOM_EXTRA_CA_CERTS ?? "").trim();
   if (!file) return [];
+  const source = path.resolve(file);
+  if (/[,"]/.test(source)) throw new ContainerError(CONTAINER_ERR.EXTRA_CA_INVALID, file);
   let text;
   try {
     text = readFile(file);
@@ -191,7 +196,12 @@ export function extraCaArgs({ env = process.env, readFile = (p) => fs.readFileSy
   if (!String(text).includes("-----BEGIN CERTIFICATE-----")) {
     throw new ContainerError(CONTAINER_ERR.EXTRA_CA_INVALID, file);
   }
-  return ["-v", `${path.resolve(file)}:${EXTRA_CA_TARGET}:ro`, "-e", `BOMLENS_EXTRA_CA_CERTS=${EXTRA_CA_TARGET}`];
+  return [
+    "--mount",
+    `type=bind,source=${source},target=${EXTRA_CA_TARGET},readonly`,
+    "-e",
+    `BOMLENS_EXTRA_CA_CERTS=${EXTRA_CA_TARGET}`,
+  ];
 }
 
 // 추가 스캔 대상 폴더(--ui --mount의 데스크톱판)를 docker run 인자로 변환한다(순수 —

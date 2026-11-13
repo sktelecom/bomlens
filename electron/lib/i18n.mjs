@@ -47,7 +47,7 @@ const MAIN = {
         return `Docker가 스캐너 컨테이너를 시작하지 못했습니다.${detail ? ` 원인: ${detail}` : ""}`;
       if (code === "exited-early") return "스캐너 컨테이너가 기동 도중 종료되었습니다.";
       if (code === "extra-ca-invalid")
-        return `SBOM_EXTRA_CA_CERTS가 가리키는 파일을 읽을 수 없거나 PEM 인증서(-----BEGIN CERTIFICATE-----)가 없습니다: ${detail}. 프록시의 CA 번들(PEM)을 지정하거나 이 변수를 지우세요.`;
+        return `SBOM_EXTRA_CA_CERTS가 가리키는 파일을 읽을 수 없거나, PEM 인증서(-----BEGIN CERTIFICATE-----)가 없거나, 경로에 쉼표나 큰따옴표가 있습니다: ${detail}. 프록시의 CA 번들(PEM)을 지정하거나 이 변수를 지우세요.`;
       if (code === "not-ready")
         return `스캐너가 ${secs(detail)}초 안에 준비되지 않았습니다. 다시 시도를 눌러 주세요.`;
       return String(code);
@@ -81,7 +81,7 @@ const MAIN = {
         return `Docker could not start the scanner container.${detail ? ` Details: ${detail}` : ""}`;
       if (code === "exited-early") return "The scanner container stopped while starting up.";
       if (code === "extra-ca-invalid")
-        return `SBOM_EXTRA_CA_CERTS names a file that cannot be read or holds no PEM certificate (-----BEGIN CERTIFICATE-----): ${detail}. Point it at your proxy's CA bundle in PEM form, or unset it.`;
+        return `SBOM_EXTRA_CA_CERTS names a file that cannot be read, holds no PEM certificate (-----BEGIN CERTIFICATE-----), or has a comma or double quote in its path: ${detail}. Point it at your proxy's CA bundle in PEM form, or unset it.`;
       if (code === "not-ready")
         return `The scanner did not finish starting within ${secs(detail)} seconds. Press Try again.`;
       return String(code);

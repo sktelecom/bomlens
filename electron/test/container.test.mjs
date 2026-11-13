@@ -480,8 +480,8 @@ test("extraCaArgs mounts SBOM_EXTRA_CA_CERTS read-only and names it in the conta
   const pem = "-----BEGIN CERTIFICATE-----\nMIIB\n-----END CERTIFICATE-----\n";
   const args = extraCaArgs({ env: { SBOM_EXTRA_CA_CERTS: "/etc/proxy-ca.pem" }, readFile: () => pem });
   assert.deepEqual(args, [
-    "-v",
-    `${path.resolve("/etc/proxy-ca.pem")}:${EXTRA_CA_TARGET}:ro`,
+    "--mount",
+    `type=bind,source=${path.resolve("/etc/proxy-ca.pem")},target=${EXTRA_CA_TARGET},readonly`,
     "-e",
     "BOMLENS_EXTRA_CA_CERTS=/bomlens-ca/extra.pem",
   ]);
@@ -497,4 +497,10 @@ test("extraCaArgs refuses a missing file or one with no PEM certificate", () => 
       (err) => err instanceof ContainerError && err.code === CONTAINER_ERR.EXTRA_CA_INVALID && err.detail === "/nope/ca.pem",
     );
   }
+  // A comma would split the --mount value into another option.
+  const pem = () => "-----BEGIN CERTIFICATE-----\n";
+  assert.throws(
+    () => extraCaArgs({ env: { SBOM_EXTRA_CA_CERTS: "/certs/a,readonly=false/ca.pem" }, readFile: pem }),
+    (err) => err instanceof ContainerError && err.code === CONTAINER_ERR.EXTRA_CA_INVALID,
+  );
 });
