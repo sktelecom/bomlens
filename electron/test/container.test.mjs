@@ -24,6 +24,8 @@ import {
   defaultOutputDir,
   detectWsl2Docker,
   dockerStatus,
+  EXTRA_CA_TARGET,
+  extraCaArgs,
   findFreePort,
   imageEnvArgs,
   imageRef,
@@ -471,4 +473,28 @@ test("detectWsl2Docker reflects whether `wsl.exe -- docker info` succeeds", asyn
 
   const fail = async () => ({ code: 1, out: "", err: "" });
   assert.equal(await detectWsl2Docker({ runImpl: fail, platform: "win32" }), false);
+});
+
+test("extraCaArgs mounts SBOM_EXTRA_CA_CERTS read-only and names it in the container", () => {
+  assert.deepEqual(extraCaArgs({ env: {} }), []);
+  const pem = "-----BEGIN CERTIFICATE-----\nMIIB\n-----END CERTIFICATE-----\n";
+  const args = extraCaArgs({ env: { SBOM_EXTRA_CA_CERTS: "/etc/proxy-ca.pem" }, readFile: () => pem });
+  assert.deepEqual(args, [
+    "-v",
+    `${path.resolve("/etc/proxy-ca.pem")}:${EXTRA_CA_TARGET}:ro`,
+    "-e",
+    "BOMLENS_EXTRA_CA_CERTS=/bomlens-ca/extra.pem",
+  ]);
+});
+
+test("extraCaArgs refuses a missing file or one with no PEM certificate", () => {
+  const missing = () => {
+    throw new Error("ENOENT");
+  };
+  for (const readFile of [missing, () => "not a certificate"]) {
+    assert.throws(
+      () => extraCaArgs({ env: { SBOM_EXTRA_CA_CERTS: "/nope/ca.pem" }, readFile }),
+      (err) => err instanceof ContainerError && err.code === CONTAINER_ERR.EXTRA_CA_INVALID && err.detail === "/nope/ca.pem",
+    );
+  }
 });
