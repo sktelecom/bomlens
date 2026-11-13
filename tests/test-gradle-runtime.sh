@@ -26,7 +26,7 @@
 # Env:
 #   GRADLE_RUNTIME_CASES   space-separated <gradle version>:<jdk> pairs, each
 #                          the image gradle:<version>-jdk<jdk>
-#                          (default: "6.9.4:11 7.6.6:11 8.14.3:21 9.0.0:21"; a version older than 6.6 is
+#                          (default: "6.9.4:11 7.6.6:11 8.14.3:21 9.0.0:21 9.8.2:21"; a version older than 6.6 is
 #                          expected to be refused and fall back, but its
 #                          image is amd64 only)
 #   VERBOSE=true           print the step's log on failure
@@ -35,7 +35,7 @@ set -uo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO="$(cd "$SCRIPT_DIR/.." && pwd)"
 PREP="$REPO/docker/lib/build-prep.sh"
-CASES="${GRADLE_RUNTIME_CASES:-6.9.4:11 7.6.6:11 8.14.3:21 9.0.0:21}"
+CASES="${GRADLE_RUNTIME_CASES:-6.9.4:11 7.6.6:11 8.14.3:21 9.0.0:21 9.8.2:21}"
 VERBOSE="${VERBOSE:-false}"
 # Under the repo so Docker file sharing mounts it (mktemp -d is /var/folders on macOS).
 WORK="$SCRIPT_DIR/test-workspace/gradle-runtime"
@@ -56,7 +56,10 @@ FUNCS="$WORK/funcs.sh"
 {
     printf '%s\n' 'log() { echo "[build-prep] $*"; }'
     printf '%s\n' 'PREP_FAILED=""; PREP_APPLIED=""; PREP_TIMEOUT_GRADLE=1500'
-    printf '%s\n' 'prep_step() { shift 2; "$@"; }'
+    # The real prep_step, which also writes the java-toolchain-missing marker the
+    # CLI reads to rerun stage 1; only the time limit is left out.
+    printf '%s\n' 'run_supervised_timeout() { shift; "$@"; }'
+    sed -n '/^prep_step() {/,/^}/p' "$PREP"
     sed -n '/^mark_prep_failed() {/,/^}/p; /^unmark_prep_failed() {/,/^}/p' "$PREP"
     # The init script's heredoc has lines starting with "}", so the function's
     # end is found by its last statement.
@@ -79,8 +82,8 @@ grep -q '^gradle_runtime_classpath() {' "$FUNCS" || { fail "could not extract gr
 # j2objc-annotations to the compile classpath only (Gradle 6 cannot read it).
 make_build() {  # <dir> <composite: yes|no> <guava: yes|no>
     local d="$1" comp="$2" guava="$3"
-    mkdir -p "$d/app" "$d/lib" "$d/kmp"
-    printf "rootProject.name = 'demo'\ninclude 'app', 'lib', 'kmp'\n" > "$d/settings.gradle"
+    mkdir -p "$d/app" "$d/lib" "$d/kmp" "$d/plat"
+    printf "rootProject.name = 'demo'\ninclude 'app', 'lib', 'kmp', 'plat'\n" > "$d/settings.gradle"
     if [ "$comp" = yes ]; then
         mkdir -p "$d/other"
         printf "rootProject.name = 'other'\n" > "$d/other/settings.gradle"
@@ -98,8 +101,16 @@ dependencies {
     implementation 'org.apache.commons:commons-text:1.11.0'
 $extra
     testImplementation 'junit:junit:4.13.2'
+    testImplementation 'org.mockito:mockito-core:5.11.0'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher:1.10.2'
     compileOnly 'org.projectlombok:lombok:1.18.30'
+    annotationProcessor 'org.projectlombok:lombok:1.18.30'
 }
+EOF
+    # Only constraints: a project with nothing to ship that must not turn the filter off.
+    cat > "$d/plat/build.gradle" <<'EOF'
+plugins { id 'java-platform' }
+dependencies { constraints { api 'org.slf4j:slf4j-api:2.0.9' } }
 EOF
     cat > "$d/kmp/build.gradle" <<'EOF'
 repositories { mavenCentral() }
@@ -123,6 +134,11 @@ dependencies {
     compileOnly 'org.apache.commons:commons-lang3:3.14.0'
 }
 EOF
+    if [ "$comp" = tc ]; then
+        # A JDK that is not in the image, with detection and download off: the
+        # runtimeClasspath cannot be resolved.
+        printf "java { toolchain { languageVersion = JavaLanguageVersion.of(13) } }\n" >> "$d/lib/build.gradle"
+    fi
 }
 
 EXPECTED_RAW="commons-codec:commons-codec:1.16.0
@@ -150,6 +166,9 @@ run_step() {
     rm -rf "$d"; make_build "$d" "$comp" "$guava"
     if [ "$cc" = on ]; then
         printf 'org.gradle.configuration-cache=true\norg.gradle.unsafe.configuration-cache=true\norg.gradle.parallel=true\n' > "$d/gradle.properties"
+    fi
+    if [ "$comp" = tc ]; then
+        printf 'org.gradle.java.installations.auto-download=false\norg.gradle.java.installations.auto-detect=false\n' >> "$d/gradle.properties"
     fi
     docker run --rm -u 0:0 -v "$d":/app -v "$WORK/gcache":/gh -v "$WORK/funcs.sh":/funcs.sh:ro \
         -e HOME=/tmp/h -e GRADLE_USER_HOME=/gh -w /app "gradle:${v}-jdk${jdk}" sh /funcs.sh > "$WORK/$tag.log" 2>&1
@@ -185,6 +204,28 @@ if grep -q 'the build includes the build other; using full graph' "$log" && [ -z
     pass "Gradle $v: an included build is recognised and the full graph kept"
 else
     fail "Gradle $v: included build" "$(tail -5 "$log" | tr '\n' ' ')"
+fi
+
+# A toolchain no JDK matches: the run fails, so the step is recorded as failed, the
+# message names the JDK (the marker the CLI reads to rerun stage 1 in an image
+# that has it), and the root warm-up, which would fail the same way, is skipped.
+# The toolchain's JDK version attribute reaches dependency resolution from Gradle 7 on
+# (Gradle 6 resolves such a build), so the first case of 8 or later runs it.
+tcv=""; tcjdk=""
+for c in $CASES; do
+    if [ "${c%%.*}" -ge 8 ] 2>/dev/null; then tcv="${c%%:*}"; tcjdk="${c##*:}"; break; fi
+done
+[ -n "$tcv" ] || { tcv="$v"; tcjdk="$jdk"; }
+v="$tcv"; jdk="$tcjdk"
+log="$(run_step "$v" "$jdk" off tc)"
+if [ -z "$(set_of "$log")" ] \
+   && grep -q 'java-toolchain-missing=13' "$log" \
+   && grep -q 'would fail the same way' "$log" \
+   && ! grep -q 'resolving the root project only' "$log"; then
+    pass "Gradle $v: a toolchain no JDK matches fails the run, is named as java-toolchain-missing=13, and no second run is made"
+else
+    fail "Gradle $v: toolchain that no JDK matches" "$(grep -E 'build-prep\]|bomlens:' "$log" | head -6 | tr '\n' ' ')"
+    [ "$VERBOSE" = true ] && sed -n '1,40p' "$log"
 fi
 
 echo ""

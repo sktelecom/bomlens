@@ -134,6 +134,13 @@ jobs:
           ONLY: ${{ inputs.examples_only }}
         run: bash tests/test-examples-e2e.sh
 
+      # The init script behind the java-gradle runtime classpath filter, run by
+      # the real Gradle versions (6.9.4 to 9.8.2) of the official gradle images,
+      # with the configuration cache on and off. It needs Docker and Maven
+      # Central, and takes about ten minutes, so it lives here and not in ci.yml.
+      - name: Run Gradle runtime classpath e2e (test-gradle-runtime.sh)
+        run: bash tests/test-gradle-runtime.sh
+
   docs-walkthrough:
     name: Docs Walkthrough (getting-started commands)
     runs-on: ${{ fromJSON(vars.CI_LINUX_RUNNER || '["self-hosted","linux","bomlens-wsl"]') }}
