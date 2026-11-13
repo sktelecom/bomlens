@@ -39,6 +39,23 @@ CASES="${GRADLE_RUNTIME_CASES:-6.9.4:11 7.6.6:11 8.14.3:21 9.0.0:21 9.8.2:21}"
 VERBOSE="${VERBOSE:-false}"
 # Under the repo so Docker file sharing mounts it (mktemp -d is /var/folders on macOS).
 WORK="$SCRIPT_DIR/test-workspace/gradle-runtime"
+c0="${CASES%% *}"
+RECLAIM_IMAGE="gradle:${c0%%:*}-jdk${c0##*:}"
+
+# The builds run in containers as the invoking user, so what they write is theirs.
+# This hands back anything an earlier run (an older version of this script, or a
+# container that ran as root) left owned by root, which a runner whose daemon runs
+# as root would otherwise keep: its next rm -rf of $WORK and git clean would fail.
+# It needs no sudo: a short root container does the chown.
+reclaim() {
+    [ -d "$WORK" ] || return 0
+    command -v docker >/dev/null 2>&1 || return 0
+    [ -n "$(find "$WORK" ! -user "$(id -u)" -print -quit 2>/dev/null)" ] || return 0
+    docker run --rm -u 0:0 -v "$WORK":/w --entrypoint chown "$RECLAIM_IMAGE" \
+        -R "$(id -u):$(id -g)" /w >/dev/null 2>&1 || true
+}
+trap reclaim EXIT
+reclaim
 rm -rf "$WORK"; mkdir -p "$WORK/gcache"
 
 c_green='\033[0;32m'; c_red='\033[0;31m'; c_yellow='\033[0;33m'; c_reset='\033[0m'
@@ -80,8 +97,26 @@ grep -q '^gradle_runtime_classpath() {' "$FUNCS" || { fail "could not extract gr
 # build tool ones (left out) and two a project may ship (kept).
 # From Gradle 7 on, guava 33.0.0 is added, whose Gradle module metadata gives
 # j2objc-annotations to the compile classpath only (Gradle 6 cannot read it).
-make_build() {  # <dir> <composite: yes|no> <guava: yes|no>
+make_build() {  # <dir> <composite: yes|no|tc|kmptc|kmpsoft> <guava: yes|no>
     local d="$1" comp="$2" guava="$3"
+    case "$comp" in kmptc|kmpsoft)
+        # One project with no runtimeClasspath, only a configuration of its own that
+        # cannot be resolved: for a toolchain no JDK matches, or for another reason.
+        local msg="boom"
+        [ "$comp" != kmptc ] || msg="No matching toolchains found for requested specification: {languageVersion=13, vendor=any, implementation=vendor-specific}"
+        mkdir -p "$d"
+        printf "rootProject.name = 'kmp1'\n" > "$d/settings.gradle"
+        cat > "$d/build.gradle" <<EOF
+repositories { mavenCentral() }
+configurations.create('jvmRuntimeClasspath') {
+    canBeConsumed = false
+    canBeResolved = true
+    incoming.beforeResolve { throw new GradleException("$msg") }
+}
+dependencies.add('jvmRuntimeClasspath', 'commons-codec:commons-codec:1.16.0')
+EOF
+        return 0 ;;
+    esac
     mkdir -p "$d/app" "$d/lib" "$d/kmp" "$d/plat"
     printf "rootProject.name = 'demo'\ninclude 'app', 'lib', 'kmp', 'plat'\n" > "$d/settings.gradle"
     if [ "$comp" = yes ]; then
@@ -167,10 +202,10 @@ run_step() {
     if [ "$cc" = on ]; then
         printf 'org.gradle.configuration-cache=true\norg.gradle.unsafe.configuration-cache=true\norg.gradle.parallel=true\n' > "$d/gradle.properties"
     fi
-    if [ "$comp" = tc ]; then
+    if [ "$comp" = tc ] || [ "$comp" = kmptc ]; then
         printf 'org.gradle.java.installations.auto-download=false\norg.gradle.java.installations.auto-detect=false\n' >> "$d/gradle.properties"
     fi
-    docker run --rm -u 0:0 -v "$d":/app -v "$WORK/gcache":/gh -v "$WORK/funcs.sh":/funcs.sh:ro \
+    docker run --rm -u "$(id -u):$(id -g)" -v "$d":/app -v "$WORK/gcache":/gh -v "$WORK/funcs.sh":/funcs.sh:ro \
         -e HOME=/tmp/h -e GRADLE_USER_HOME=/gh -w /app "gradle:${v}-jdk${jdk}" sh /funcs.sh > "$WORK/$tag.log" 2>&1
     echo "$WORK/$tag.log"
 }
@@ -225,6 +260,29 @@ if [ -z "$(set_of "$log")" ] \
     pass "Gradle $v: a toolchain no JDK matches fails the run, is named as java-toolchain-missing=13, and no second run is made"
 else
     fail "Gradle $v: toolchain that no JDK matches" "$(grep -E 'build-prep\]|bomlens:' "$log" | head -6 | tr '\n' ' ')"
+    [ "$VERBOSE" = true ] && sed -n '1,40p' "$log"
+fi
+
+# The same for a project with no runtimeClasspath (a Kotlin Multiplatform root): a
+# toolchain failure fails the run too, any other unresolved configuration only
+# keeps the full graph.
+log="$(run_step "$v" "$jdk" off kmptc)"
+if [ -z "$(set_of "$log")" ] \
+   && grep -q 'java-toolchain-missing=13' "$log" \
+   && grep -q 'would fail the same way' "$log"; then
+    pass "Gradle $v: a project without runtimeClasspath that fails for want of a toolchain JDK fails the run and is named as java-toolchain-missing=13"
+else
+    fail "Gradle $v: toolchain failure in a project without runtimeClasspath" "$(grep -E 'build-prep\]' "$log" | head -6 | tr '\n' ' ')"
+    [ "$VERBOSE" = true ] && sed -n '1,40p' "$log"
+fi
+log="$(run_step "$v" "$jdk" off kmpsoft)"
+if [ -z "$(set_of "$log")" ] \
+   && ! grep -q 'java-toolchain-missing' "$log" \
+   && ! grep -q 'gradle-dependencies: failed' "$log" \
+   && grep -q 'could not resolve jvmRuntimeClasspath of project :.*using full graph' "$log"; then
+    pass "Gradle $v: another reason for an unresolved configuration only keeps the full graph, with the reason on stderr"
+else
+    fail "Gradle $v: soft failure in a project without runtimeClasspath" "$(grep -E 'build-prep\]|bomlens' "$log" | head -6 | tr '\n' ' ')"
     [ "$VERBOSE" = true ] && sed -n '1,40p' "$log"
 fi
 
