@@ -12,6 +12,8 @@ hide:
 한 번의 실행으로 SBOM과 오픈소스 고지문, 위험 보고서가 나옵니다.
 SaaS도 계정도 필요 없습니다.
 
+BomLens는 [OWASP Incubator 프로젝트](https://owasp.org/www-project-bomlens/)입니다.
+
 [데모 둘러보기](https://sktelecom.github.io/bomlens/demo/){ .md-button .md-button--primary }
 [시작하기](start/first-scan.ko.md){ .md-button }
 
