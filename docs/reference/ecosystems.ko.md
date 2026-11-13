@@ -92,7 +92,7 @@ npm, Python(pip), Go, Rust(Cargo) 패키지는 소스 스캔이 설치된 패키
 
 cdxgen Java 이미지에는 JDK가 하나씩만 있고, Gradle 빌드에서는 두 가지가 필요한 JDK를 정합니다. 툴체인은 지정한 버전의 JDK를 정확히 요구합니다. Gradle 래퍼(`gradlew`와 `gradle/wrapper/gradle-wrapper.properties`)는 그 Gradle 버전이 지원하는 JDK에서만 실행됩니다. 예를 들어 6.9.4 래퍼는 Java 21에서 "Unsupported class file major version 65"로 실패합니다. 스캔은 두 가지를 모두 읽습니다.
 
-- 툴체인은 `JavaLanguageVersion.of(N)`(`languageVersion = ...` 또는 `languageVersion.set(...)` 형태)과 Kotlin `jvmToolchain(N)`에서 읽습니다. 스캔한 폴더와 그 아래 다섯 단계까지의 `*.gradle`과 `*.gradle.kts` 파일(`buildSrc`와 컨벤션 플러그인 포함)에서 찾고, 가장 높은 버전을 씁니다.
+- 툴체인은 `JavaLanguageVersion.of(N)`(`languageVersion = ...` 또는 `languageVersion.set(...)` 형태)과 Kotlin `jvmToolchain(N)`에서 읽습니다. 스캔한 폴더와 그 아래 다섯 단계까지의 `*.gradle`과 `*.gradle.kts` 파일(`buildSrc`와 컨벤션 플러그인 포함)에서 찾고, 가장 높은 버전을 씁니다. 인자는 같은 파일에 정의한 변수여도 되고, `.toInteger()`, `.toInt()`, `.toString()`, `as int`로 변환한 형태도 읽습니다. 변수의 값은 그 정의가 읽는 Gradle 속성(`hasProperty`, `getProperty`, `findProperty`, `property`, `providers.gradleProperty("p")`, `properties["p"]`, Kotlin `val p: String by project`)을 가장 가까운 `gradle.properties`에서 찾은 값입니다. 그 값이 없으면 정의가 주는 기본값(`?:`나 삼항 연산자의 `:` 뒤, 또는 `getOrElse("N")` 안의 숫자)을 쓰고, 그것도 없으면 변수에 대입한 숫자를 씁니다. 일반 파일인 `gradle.properties`만 읽으며, 블록 밖의 정의를 블록 안의 정의보다 먼저 봅니다.
 - 래퍼의 Gradle 버전은 `distributionUrl` 끝의 파일 이름에서 읽습니다. Gradle 배포 파일 이름 형식(`gradle-X.Y[.Z]-bin.zip` 또는 `-all.zip`)이어야 하고, 마일스톤과 릴리스 후보, 스냅숏은 해당 정식 버전으로 봅니다. 래퍼는 옆에 `gradlew`가 있을 때만 셈하고, 없으면 이미지에 든 Gradle 8.14.5가 실행됩니다. 어느 래퍼를 셈할지는 스캔한 폴더에 따라 다릅니다.
     - `gradlew`가 있으면 그 폴더의 래퍼만 셈합니다. 버전을 읽지 못하면(예: 이름을 바꾼 배포 파일) `[INFO]` 줄로 알리고 툴체인만으로 고릅니다.
     - Gradle 설정 파일이나 빌드 파일이 있고 `gradlew`가 없으면 래퍼를 셈하지 않습니다. 그 폴더에서 이미지의 Gradle이 한 번 실행됩니다.
@@ -111,7 +111,7 @@ cdxgen Java 이미지에는 JDK가 하나씩만 있고, Gradle 빌드에서는 �
 
 래퍼가 툴체인의 JDK에서 실행되면 툴체인의 이미지를 고릅니다. 그렇지 않으면 래퍼가 Java 21에서 실행될 때는 `cdxgen-temurin-java21`을, 실행되지 않을 때는 래퍼가 실행되는 가장 새 이미지를 고릅니다(7.3~8.4 래퍼는 Java 17, 5.0~7.2는 11, 5.0 미만은 8). 툴체인과 래퍼가 모두 없으면 `cdxgen-temurin-java21`을 씁니다. Java 21이 아닌 이미지를 고르면 그 이유를 `[INFO]` 줄로 알립니다.
 
-빌드가 요구하는 것을 맞출 수 없으면 `[WARN]`으로 알립니다. 이미지가 없는 툴체인(22, 23, 26 등)이나 래퍼가 실행되지 않는 툴체인(8.14 래퍼에 Java 25 툴체인)이 그런 경우입니다. 이때 Gradle은 툴체인의 JDK를 찾지 못하므로, 빌드에 툴체인 자동 내려받기(auto-provisioning)를 설정하지 않았다면 의존성 해석이 실패할 수 있습니다. 여러 언어가 섞인 트리는 툴체인과 관계없이 올인원 이미지에서 실행하며, 툴체인이 21이 아니면 같은 방식으로 경고합니다. 속성이나 버전 카탈로그에서 가져온 버전은 읽지 못합니다. 이런 경우에는 `CDXGEN_JAVA_IMAGE`로 그 JDK가 있는 이미지를 지정합니다([CLI 레퍼런스](cli.ko.md)). Maven은 이런 선택이 필요 없습니다. `maven.compiler.release`와 toolchains 플러그인은 컴파일할 때 적용되고, 의존성 해석은 이것 없이 실행됩니다.
+빌드가 요구하는 것을 맞출 수 없으면 `[WARN]`으로 알립니다. 이미지가 없는 툴체인(22, 23, 26 등)이나 래퍼가 실행되지 않는 툴체인(8.14 래퍼에 Java 25 툴체인)이 그런 경우입니다. 이때 Gradle은 툴체인의 JDK를 찾지 못하므로, 빌드에 툴체인 자동 내려받기(auto-provisioning)를 설정하지 않았다면 의존성 해석이 실패할 수 있습니다. 여러 언어가 섞인 트리는 툴체인과 관계없이 올인원 이미지에서 실행하며, 툴체인이 21이 아니면 같은 방식으로 경고합니다. 버전 카탈로그나 다른 파일의 변수, 더 복잡한 식에서 가져온 버전은 읽지 못합니다. 그래서 툴체인에 맞는 JDK가 없어 Gradle이 실패하면, 그 JDK가 있고 래퍼도 실행되는 이미지가 있을 때 그 이미지에서 의존성 단계를 한 번 더 실행합니다(`[INFO] Gradle asked for Java N; rerunning in <image>`). 로컬에 없는 이미지는 진행 상황을 보여 주며 받고, `SBOM_PULL=always`이면 먼저 새로 받습니다. 다시 실행한 결과에 SBOM이 없으면 처음 결과를 그대로 씁니다. `CDXGEN_JAVA_IMAGE`를 지정했거나, 그 이미지가 로컬에 없고 받을 수도 없으면(`SBOM_PULL=never`이면 받지 않습니다) 다시 실행하지 않습니다. 실행 계획(`MODE=PLAN`)도 다시 실행하지 않습니다. 그래도 빌드가 JDK를 얻지 못하면 `CDXGEN_JAVA_IMAGE`로 그 JDK가 있는 이미지를 지정합니다([CLI 레퍼런스](cli.ko.md)). Maven은 이런 선택이 필요 없습니다. `maven.compiler.release`와 toolchains 플러그인은 컴파일할 때 적용되고, 의존성 해석은 이것 없이 실행됩니다.
 
 ---
 

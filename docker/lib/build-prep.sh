@@ -385,6 +385,16 @@ prep_step() {
             echo "[build-prep] $_ps_label said (last 20 lines):" >&2
             tail -20 "$_ps_err" | sed 's/^/[build-prep]   /' >&2
         fi
+        # A Gradle toolchain this image has no JDK for. The marker line is
+        # what the caller reads (java_retry_image in source-detect.sh) to run
+        # this step again in the cdxgen image with that JDK.
+        case "$_ps_label" in gradle-*)
+            _ps_jdk=$(grep -oE '(Cannot find a Java installation on your machine|No (compatible|matching) toolchains found for request(ed)? (specification|filter))[^{]*\{languageVersion=[0-9]+' "$_ps_err" 2>/dev/null \
+                | grep -oE '[0-9]+$' | grep -E '^[0-9]{1,3}$' | sort -n | tail -1)
+            if [ -n "$_ps_jdk" ]; then
+                echo "[build-prep] $_ps_label: Gradle asked for a Java $_ps_jdk toolchain, which this image does not have (java-toolchain-missing=$_ps_jdk)" >&2
+            fi ;;
+        esac
         case " $PREP_FAILED " in
             *" $_ps_label "*) ;;
             *) PREP_FAILED="${PREP_FAILED:+$PREP_FAILED }$_ps_label" ;;

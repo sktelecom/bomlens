@@ -472,3 +472,12 @@ test("detectWsl2Docker reflects whether `wsl.exe -- docker info` succeeds", asyn
   const fail = async () => ({ code: 1, out: "", err: "" });
   assert.equal(await detectWsl2Docker({ runImpl: fail, platform: "win32" }), false);
 });
+
+test("start passes the source-scan image settings to the UI container by name", () => {
+  // scan-sbom.sh --ui와 같은 계약: 값 없이 이름만 넘겨 docker가 이 프로세스의
+  // 환경에서 읽게 한다. SBOM_PULL은 Java 재실행 이미지를 받을지 정한다.
+  const src = fs.readFileSync(new URL("../lib/container.mjs", import.meta.url), "utf8");
+  for (const name of ["CDXGEN_IMAGE_PREFIX", "CDXGEN_JAVA_IMAGE", "SBOM_PULL"]) {
+    assert.match(src, new RegExp(`"-e",\\s*"${name}",`), name);
+  }
+});

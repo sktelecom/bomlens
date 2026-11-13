@@ -354,8 +354,8 @@ GUARD_ID=""
 # always mount into this container and carry to the sibling via
 # --volumes-from, so a file written here is visible to the sibling at the
 # same path -- the same trick --volumes-from already does for the scanned
-# tree. Prints nothing when that mount is missing; callers fall back to the
-# old -c injection (defensive only, both launch paths always provide it).
+# tree. Prints nothing when that mount is missing; the callers then skip the
+# cleanup or stop the scan with an error (both launch paths always mount it).
 write_prep_file() {
     [ -d "$GUARD_STATE_DIR" ] || return 1
     mkdir -p "$GUARD_STATE_DIR/prep" 2>/dev/null || return 1
@@ -412,11 +412,7 @@ setup_guard_state() {
                 "$cleanup_prep_file" "$src" >/dev/null 2>&1 || true
             rm -f "$cleanup_prep_file"
         else
-            docker run --rm -u 0:0 \
-                --volumes-from "$self" \
-                -e BOMLENS_GUARD_RESTORE_ONLY=1 -e "BOMLENS_GUARD_ID=$key" \
-                --entrypoint sh "$cleanup_image" \
-                -c "$prep" _ "$src" >/dev/null 2>&1 || true
+            echo "[WARN] could not write the cleanup script under $GUARD_STATE_DIR; leaving a previous interrupted scan's leftovers in place."
         fi
     fi
     mkdir -p "$GUARD_STATE_DIR/$key" 2>/dev/null || return 0
@@ -454,8 +450,12 @@ drop_unused_guard_state() {
 # shared mount, so the scanned tree stays untouched (see bom_path below).
 #   $1 = scanned tree, this container's path (also the sibling's, via --volumes-from)
 #   $2 = output bom filename (relative)
+#   $3 = the cdxgen image to use instead of the one img_for_lang picks (the
+#        second run java_retry_image asks for; set only by this function)
+#   $4 = non-empty when the caller keeps an earlier result if this run fails:
+#        the failure is then left for the caller to report
 generate_sbom_cdxgen() {
-    local src="$1" out="$2"
+    local src="$1" out="$2" forced_img="${3:-}" quiet="${4:-}"
     local lang img api rc=0 self
     CDXGEN_FAIL_REASON=""
     self=$(self_container_id)
@@ -465,8 +465,10 @@ generate_sbom_cdxgen() {
         return 1
     fi
     lang=$(detect_lang "$src")
-    warn_low_engine_memory_for "$lang" "$src"
-    if [ "$lang" = "android" ]; then
+    [ -n "$forced_img" ] || warn_low_engine_memory_for "$lang" "$src"
+    if [ -n "$forced_img" ]; then
+        img="$forced_img"
+    elif [ "$lang" = "android" ]; then
         api=$(android_api "$src")
         img="${ANDROID_IMAGE_PREFIX}${api}:latest"
         echo "[INFO] Android source (compileSdk=$api) -> $img"
@@ -524,10 +526,8 @@ generate_sbom_cdxgen() {
     setup_guard_state "$self" "$prep" "$src" "$sibling_name" "$img"
     local guard_env=()
     [ -n "$GUARD_ID" ] && guard_env=(-e "BOMLENS_GUARD_ID=$GUARD_ID")
-    # See write_prep_file above: run build-prep.sh by path when the guard-state
-    # mount is there (the normal case), fall back to the old -c injection
-    # otherwise (works as long as build-prep.sh stays under the kernel's
-    # 128KiB single-argument limit).
+    # See write_prep_file above: build-prep.sh runs by path from the
+    # guard-state mount; without that mount the scan stops with an error.
     local prep_file; prep_file=$(write_prep_file "$prep")
     # --reachability on Go: the sibling has the Go toolchain this image lacks,
     # so govulncheck runs there (build-prep.sh). The binary is copied into a
@@ -575,22 +575,11 @@ generate_sbom_cdxgen() {
             --entrypoint sh "$img" \
             "$prep_file" "$src" "$bom_path" "$CDX_SPEC_VERSION"
       else
-        docker run -u 0:0 \
-            --name "$sibling_name" \
-            --cidfile "$cidf" \
-            --volumes-from "$self" \
-            -e HOME=/tmp/sbomhome \
-            -e "MAVEN_OPTS=-Duser.home=/tmp/sbomhome -Dmaven.repo.local=/tmp/sbomhome/.m2/repository" \
-            -e GOPATH=/tmp/sbomhome/go -e GOMODCACHE=/tmp/sbomhome/go/pkg/mod -e GOCACHE=/tmp/sbomhome/go-build \
-            -e FETCH_LICENSE="$FETCH_LICENSE" \
-            -e PROJECT_NAME="$PROJECT_NAME" \
-            -e PROJECT_VERSION="$PROJECT_VERSION" \
-            -e HOST_GOTOOLCHAIN="${GOTOOLCHAIN:-}" -e GOPROXY -e GOSUMDB \
-            "${prep_env[@]}" \
-            "${guard_env[@]}" \
-            "${reach_env[@]}" \
-            --entrypoint sh "$img" \
-            -c "$prep" _ "$src" "$bom_path" "$CDX_SPEC_VERSION"
+        # build-prep.sh is larger than the kernel's single-argument limit, so
+        # it cannot be handed over as `sh -c`. Without the guard-state mount
+        # there is no shared place to put it.
+        echo "[ERROR] the guard-state folder ($GUARD_STATE_DIR) is not mounted, so build-prep.sh cannot be handed to the cdxgen container. Start the web UI with scan-sbom.sh --ui or the desktop app, or mount a writable folder at $GUARD_STATE_DIR."
+        false
       fi; echo $? > "$rcf" ) 2>&1 | tee "$logf" &
     local pipe_pid=$!
     # The cidfile appears as soon as the container is created, well before it
@@ -608,31 +597,79 @@ generate_sbom_cdxgen() {
     drop_unused_guard_state "$sibling_name"
     trap 'exit 130' INT
     trap 'exit 143' TERM
+    # A container that took longer than the loop above to be created (an
+    # image pulled first) has its id in the cidfile by now.
+    [ -n "$cid" ] || cid=$(cat "$cidf" 2>/dev/null)
     rc=$(cat "$rcf" 2>/dev/null || echo 1)
     rm -f "$rcf"
     remove_reach_tools
     SIBLING_CID=""
+    # A Java build whose Gradle asked for a toolchain JDK this image lacks
+    # runs once more, in the image with that JDK (java_retry_image). The
+    # first result is kept aside and used when the second run leaves none.
+    # The first run's build-prep.sh restored the tree and cleared the guard
+    # slot, so the second run's setup_guard_state starts a new one.
+    if [ -z "$forced_img" ] && [ "$lang" = java ]; then
+        java_retry_image "$src" "$logf" "$img"
+    else
+        JAVA_RETRY_IMAGE=""
+    fi
+    if [ -n "$JAVA_RETRY_IMAGE" ]; then
+        echo "[INFO] Gradle asked for Java $JAVA_RETRY_JDK; rerunning in $JAVA_RETRY_IMAGE"
+        # The exited first container is removed if a cancel comes during the pull.
+        trap 'docker rm -f "$sibling_name" >/dev/null 2>&1; exit 130' INT
+        trap 'docker rm -f "$sibling_name" >/dev/null 2>&1; exit 143' TERM
+        if ! java_retry_image_ready "$JAVA_RETRY_IMAGE"; then
+            echo "[WARN] $JAVA_RETRY_IMAGE is not here ($([ "${SBOM_PULL:-missing}" = never ] && echo "SBOM_PULL=never" || echo "could not be pulled")); keeping the result from $img."
+            JAVA_RETRY_IMAGE=""
+        fi
+        trap 'exit 130' INT
+        trap 'exit 143' TERM
+    fi
+    if [ -n "$JAVA_RETRY_IMAGE" ]; then
+        # By name as well: the id may never have been read.
+        [ -z "$cid" ] || docker rm -f "$cid" >/dev/null 2>&1
+        docker rm -f "$sibling_name" >/dev/null 2>&1
+        rm -f "$logf" "$cidf" "$prep_file"
+        local first="" first_img="$img" retry_img="$JAVA_RETRY_IMAGE"
+        if [ "$rc" -eq 0 ] && [ -s "$bom_path" ]; then
+            first=$(mktemp) || first=""
+            if [ -n "$first" ] && ! mv -f "$bom_path" "$first"; then
+                rm -f "$first"; first=""
+            fi
+        fi
+        rm -f "$bom_path"
+        if generate_sbom_cdxgen "$src" "$out" "$retry_img" "${first:+keep}"; then
+            [ -z "$first" ] || rm -f "$first"
+            return 0
+        fi
+        [ -n "$first" ] || return 1
+        echo "[WARN] The rerun in $retry_img left no SBOM (${CDXGEN_FAIL_REASON:-no output}); keeping the result from $first_img."
+        CDXGEN_FAIL_REASON=""
+        mv -f "$first" "$outdir/$out"
+        return 0
+    fi
     if [ "$rc" -ne 0 ]; then
         if [ -n "$cid" ] && [ "$(docker inspect -f '{{.State.OOMKilled}}' "$cid" 2>/dev/null)" = "true" ]; then
             CDXGEN_FAIL_REASON="oom"
-            echo "[WARN] cdxgen was killed for running out of memory (rc=$rc). Give the Docker engine more memory — Docker Desktop: Settings > Resources; Colima: 'colima start --memory N' — and re-scan for full transitive dependencies."
+            [ -n "$quiet" ] || echo "[WARN] cdxgen was killed for running out of memory (rc=$rc). Give the Docker engine more memory — Docker Desktop: Settings > Resources; Colima: 'colima start --memory N' — and re-scan for full transitive dependencies."
         elif grep -qi "no space left on device" "$logf"; then
             CDXGEN_FAIL_REASON="disk-space"
-            echo "[WARN] cdxgen failed: Docker is out of disk space (rc=$rc). Free space (e.g. 'docker system prune') and re-scan for full transitive dependencies."
+            [ -n "$quiet" ] || echo "[WARN] cdxgen failed: Docker is out of disk space (rc=$rc). Free space (e.g. 'docker system prune') and re-scan for full transitive dependencies."
         elif grep -qEi "temporary failure in name resolution|could not resolve host|network is unreachable|connection timed out|connect timed out|no route to host|ENOTFOUND|ETIMEDOUT" "$logf"; then
             # Build tools resolve the real dependency tree by reaching Maven
             # Central / npmjs / PyPI etc. from inside the sibling container;
             # a proxy, firewall or offline host breaks that even though the
             # scan's own network access (cloning the repo) already worked.
             CDXGEN_FAIL_REASON="network"
-            echo "[WARN] cdxgen couldn't reach the network while resolving dependencies (rc=$rc). Check proxy/firewall access to the package registries from the Docker engine and re-scan for full transitive dependencies."
+            [ -n "$quiet" ] || echo "[WARN] cdxgen couldn't reach the network while resolving dependencies (rc=$rc). Check proxy/firewall access to the package registries from the Docker engine and re-scan for full transitive dependencies."
         else
             # Not a resource/network failure this container could see: cdxgen
             # ran and exited non-zero on its own, most often an internal
             # exception or its own schema validator rejecting the document
             # (raw Node stack trace or validation errors, both in $logf only).
             CDXGEN_FAIL_REASON="cdxgen-crash"
-            echo "[WARN] cdxgen failed processing the dependency data (rc=$rc)."
+            [ -n "$quiet" ] || echo "[WARN] cdxgen failed processing the dependency data (rc=$rc)."
         fi
         [ -n "$cid" ] && docker rm -f "$cid" >/dev/null 2>&1
         rm -f "$logf" "$cidf" "$prep_file"
@@ -645,7 +682,8 @@ generate_sbom_cdxgen() {
     fi
     if [ ! -f "$outdir/$out" ]; then
         CDXGEN_FAIL_REASON="cdxgen-unavailable"
-        echo "[WARN] cdxgen produced no SBOM at $bom_path."; return 1
+        [ -n "$quiet" ] || echo "[WARN] cdxgen produced no SBOM at $bom_path."
+        return 1
     fi
     return 0
 }
