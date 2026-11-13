@@ -1466,6 +1466,21 @@ setup_guard_state() {
     GUARD_ID="$key"
 }
 
+# drop_unused_guard_state OWNER: after the stage 1 container has exited, remove
+# this run's record when build-prep.sh never took its snapshot there (the
+# container did not start, or stopped before build-prep.sh ran). A finished
+# run removes the record itself; one stopped after the snapshot keeps it for
+# the next scan to finish.
+drop_unused_guard_state() {
+    [ -n "$GUARD_ID" ] || return 0
+    local d="$GUARD_STATE_DIR/$GUARD_ID"
+    if [ -d "$d" ] && [ ! -f "$d/files.before" ] \
+       && [ "$(cat "$d/owner" 2>/dev/null)" = "$1" ]; then
+        rm -rf -- "$d"
+    fi
+    GUARD_ID=""
+}
+
 # A reproducible (--byte-stable) build must not resolve dependency licenses over
 # the network: registry availability (e.g. pkg.go.dev) varies between runs, so a
 # license fetched in one scan but not the next would make two otherwise-identical
@@ -3228,6 +3243,7 @@ if [ "$MODE" = "SOURCE" ]; then
     # here, aborting the script before any of the failure handling below
     # runs. The real exit code comes from `docker wait` next regardless.
     wait "$STAGE1_PID" || true
+    drop_unused_guard_state "$STAGE1_CONTAINER"
     RUNNING_CONTAINER_NAME=""
     [ -z "$REACH_TOOLS_DIR" ] || rm -rf -- "$REACH_TOOLS_DIR"
     REACH_TOOLS_DIR=""
