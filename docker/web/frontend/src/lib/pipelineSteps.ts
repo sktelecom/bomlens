@@ -53,6 +53,7 @@ const STEP_LABEL_KEY: Record<string, string> = {
   "poetry-graph": "pipelineSteps.poetryGraph",
   "cargo-workspace-metadata": "pipelineSteps.cargoWorkspaceMetadata",
   "cargo-license-metadata": "pipelineSteps.cargoLicenseMetadata",
+  "ai-usage": "pipelineSteps.aiUsage",
   "composer-install": "pipelineSteps.composerInstall",
   "pnpm-workspace-tree": "pipelineSteps.pnpmWorkspaceTree",
   "enrich-distro-supplier": "pipelineSteps.enrichDistroSupplier",

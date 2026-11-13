@@ -1991,6 +1991,73 @@ then
 else
     fail "maliciousCount was present with nothing flagged"
 fi
+echo "== AI usage listed apart from components (sbom_summary) =="
+# The fixture is the SBOM build-prep.sh's AI usage pass makes from the recorded
+# cdxgen output for tests/fixtures/ai-usage (see tests/test-ai-usage.sh): two
+# pypi packages plus models, an AI service, MCP servers and configurations,
+# and instruction files, all marked bomlens:ai:usage. Those must not be rows,
+# must not count as components, and must not make the scan an AI model scan.
+mkdir -p "$OUT/aiuse_1.0" "$OUT/aiuseno_1.0"
+cp "$ROOT_DIR/tests/fixtures/ai-usage-summary-bom.json" "$OUT/aiuse_1.0/aiuse_1.0_bom.json"
+echo '{"bomFormat":"CycloneDX","components":[{"name":"a","version":"1","type":"library","purl":"pkg:npm/a@1"}]}' \
+    > "$OUT/aiuseno_1.0/aiuseno_1.0_bom.json"
+if SBOM_OUTPUT_DIR="$OUT" python3 - "$ROOT_DIR" <<'PY'
+import sys, os
+sys.path.insert(0, os.path.join(sys.argv[1], "docker", "web"))
+import server
+s = server.sbom_summary("aiuse_1.0")
+names = sorted(r["name"] for r in s["componentList"])
+assert names == ["openai", "transformers"], names
+assert s["components"] == 2, s["components"]
+assert not any(r["type"] == "machine-learning-model" for r in s["componentList"]), s["componentList"]
+assert "assessCounts" not in s, s
+u = s["aiUsage"]
+assert "aiUsageTruncated" not in s, s
+assert [(e["kind"], e["name"]) for e in u] == [
+    ("model", "Llama-3.1-8B-Instruct"), ("model", "gpt-4o"),
+    ("ai-service", "OpenAI API"),
+    ("mcp-server", "docs"), ("mcp-server", "fs"), ("mcp-server", "github"),
+    ("mcp-config", "mcp.json"), ("mcp-config", "mcp.json"),
+    ("instruction-file", "AGENTS.md"), ("instruction-file", "copilot-instructions.md"),
+    ("instruction-file", "style.mdc"),
+], [(e["kind"], e["name"]) for e in u]
+allowed = {"kind", "name", "purl", "provider", "scope", "path", "reviewReasons", "models", "detectedBy"}
+for e in u:
+    assert set(e) <= allowed, e
+    assert e["scope"] in ("runtime", "development"), e
+    assert isinstance(e["reviewReasons"], list), e
+    assert ("models" in e) == (e["kind"] == "ai-service"), e
+gpt = u[1]
+assert gpt == {"kind": "model", "name": "gpt-4o", "purl": "pkg:generic/openai/gpt-4o",
+               "provider": "openai", "scope": "runtime", "path": "src/app.py#L14",
+               "reviewReasons": []}, gpt
+svc = u[2]
+assert svc == {"kind": "ai-service", "name": "OpenAI API", "provider": "openai",
+               "scope": "runtime", "reviewReasons": [], "models": ["gpt-4o"]}, svc
+mcp = {e["name"]: e for e in u if e["kind"] == "mcp-server"}
+assert mcp["fs"]["reviewReasons"] == ["broad-filesystem-access"], mcp["fs"]
+assert mcp["fs"]["path"] == ".vscode/mcp.json", mcp["fs"]
+assert mcp["github"]["reviewReasons"] == ["unpinned-package"], mcp["github"]
+assert mcp["docs"]["reviewReasons"] == ["unencrypted-transport"], mcp["docs"]
+assert "provider" not in mcp["fs"], mcp["fs"]
+inst = {e["name"]: e for e in u if e["kind"] == "instruction-file"}
+assert inst["style.mdc"]["path"] == ".cursor/rules/style.mdc", inst["style.mdc"]
+assert inst["style.mdc"]["detectedBy"] == "bomlens", inst["style.mdc"]
+assert "detectedBy" not in inst["AGENTS.md"], inst["AGENTS.md"]
+# No other property value reaches the summary (endpoints, commands, env).
+import json
+blob = json.dumps(u)
+assert "docs.example.com" not in blob and "npx" not in blob, blob
+# The Recent list counts and labels the scan the same way.
+row = next(r for r in server.list_scans() if r["id"] == "aiuse_1.0")
+assert row["components"] == 2 and row["isAiScan"] is False, row
+assert "aiUsage" not in server.sbom_summary("aiuseno_1.0")
+PY
+then
+    pass "AI usage kept out of componentList and counts, listed in aiUsage (shape, order, reasons, models)"
+else
+    fail "AI usage summary produced wrong values (see assertion above)"
+fi
 echo "== version currency surfaced + counted (sbom_summary) =="
 # enrich-eol.sh writes bomlens:currency:* (offline, behind latest patch in cycle);
 # enrich-staleness.py (opt-in) writes bomlens:staleness:* (deps.dev absolute). The
