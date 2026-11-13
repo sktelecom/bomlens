@@ -2118,6 +2118,7 @@ fi
 # pre-resolution duplicate versions cdxgen emits from the other configurations.
 # Match on maven group:artifact:version; keep non-maven components and the app's
 # own modules (root project group). Prune the dependency graph to the kept refs.
+# A kept component of the release set with another scope is set to required.
 if [ "${rc:-1}" -eq 0 ] && [ -n "${ANDROID_RELEASE_SET:-}" ] && [ -s "$ANDROID_RELEASE_SET" ] \
    && [ -f "$OUT" ] && command -v node >/dev/null 2>&1; then
     log "android: filtering SBOM to release runtime scope"
@@ -2145,6 +2146,14 @@ const keep = c => {
 };
 const before = bom.components.length;
 bom.components = bom.components.filter(keep);
+// cdxgen takes a component's scope from the first configuration it appears
+// under, so one on the release runtime classpath that also sits under a test
+// configuration sorted before it comes out optional. On the release set it ships.
+let rescoped = 0;
+for (const c of bom.components) {
+  const g = gav(c.purl);
+  if (g && rel.has(g) && c.scope && c.scope !== 'required') { c.scope = 'required'; rescoped++; }
+}
 const refOf = c => c['bom-ref'] || c.purl;
 const keptRefs = new Set(bom.components.map(refOf));
 if (mc) keptRefs.add(mc['bom-ref'] || mc.purl);
@@ -2156,7 +2165,8 @@ if (Array.isArray(bom.dependencies)) {
       : d);
 }
 fs.writeFileSync(bomPath, JSON.stringify(bom, null, 2));
-process.stderr.write('[build-prep] android: kept ' + bom.components.length + ' of ' + before + ' components\n');
+process.stderr.write('[build-prep] android: kept ' + bom.components.length + ' of ' + before + ' components'
+  + (rescoped ? ', ' + rescoped + ' on the release runtime classpath set to scope required' : '') + '\n');
 FILTER_JS
     node "$_flt" "$OUT" "$ANDROID_RELEASE_SET" || log "android: filter skipped (non-fatal)"
     rm -f "$_flt" "$ANDROID_RELEASE_SET"

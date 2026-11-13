@@ -7018,6 +7018,38 @@ else
     pass "build-prep.sh no longer uses the stdin-draining grep||cat idiom"
 fi
 
+echo "== android-scope: the release filter marks release runtime components required =="
+# cdxgen takes the scope from the first configuration a component appears
+# under, so a release runtime component also under a test configuration comes
+# out optional. Extract the real filter JS from build-prep.sh.
+if command -v node >/dev/null 2>&1; then
+    AFLT="$WORK/android-release-filter.js"
+    sed -n "/<<'FILTER_JS'/,/^FILTER_JS\$/p" "$ROOT_DIR/docker/lib/build-prep.sh" | sed '1d;$d' > "$AFLT"
+    if [ -s "$AFLT" ]; then
+        cat > "$WORK/android-bom.json" <<'JSON'
+{"bomFormat":"CycloneDX","specVersion":"1.6",
+ "metadata":{"component":{"name":"app","purl":"pkg:maven/com.example/app@1.0","bom-ref":"pkg:maven/com.example/app@1.0"}},
+ "components":[
+   {"group":"com.squareup.okhttp3","name":"okhttp","version":"4.12.0","scope":"optional","purl":"pkg:maven/com.squareup.okhttp3/okhttp@4.12.0?type=jar","bom-ref":"okhttp"},
+   {"group":"com.google.code.gson","name":"gson","version":"2.10.1","purl":"pkg:maven/com.google.code.gson/gson@2.10.1?type=jar","bom-ref":"gson"},
+   {"group":"com.example","name":"lib","version":"1.0","scope":"optional","purl":"pkg:maven/com.example/lib@1.0","bom-ref":"lib"},
+   {"group":"com.android.tools.utp","name":"utp-core","version":"31.0.0","scope":"optional","purl":"pkg:maven/com.android.tools.utp/utp-core@31.0.0","bom-ref":"utp"},
+   {"name":"left-pad","version":"1.3.0","scope":"optional","purl":"pkg:npm/left-pad@1.3.0","bom-ref":"lp"}
+ ]}
+JSON
+        printf 'com.squareup.okhttp3:okhttp:4.12.0\ncom.google.code.gson:gson:2.10.1\n' > "$WORK/android-rel.set"
+        node "$AFLT" "$WORK/android-bom.json" "$WORK/android-rel.set" 2>/dev/null
+        scopes=$(jq -r '[.components[] | .name + "=" + (.scope // "none")] | join(",")' "$WORK/android-bom.json")
+        [ "$scopes" = "okhttp=required,gson=none,lib=optional,left-pad=optional" ] \
+            && pass "an optional release runtime component is required; one with no scope, first-party and non-maven ones are not touched (got: $scopes)" \
+            || fail "android release filter scopes" "$scopes"
+    else
+        fail "could not extract FILTER_JS from build-prep.sh"
+    fi
+else
+    echo "  SKIP: node unavailable"
+fi
+
 echo "== EOL: offline end-of-life flagging (enrich-eol.sh) — PURL whitelist + cycle lookup =="
 cp "$FIX/eol-components.json" "$WORK/eol.json"
 EOL_DATA_FILE="$FIX/eol-data.json" bash "$LIB/enrich-eol.sh" "$WORK/eol.json" >/dev/null 2>&1
