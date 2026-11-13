@@ -866,6 +866,7 @@
     "poetryGraph": "Poetry dependency graph",
     "cargoWorkspaceMetadata": "Cargo workspace member detection",
     "cargoLicenseMetadata": "Rust crate license lookup",
+    "aiUsage": "AI usage detection",
     "composerInstall": "PHP Composer dependency resolution",
     "pnpmWorkspaceTree": "pnpm workspace dependency tree resolution",
     "enrichDistroSupplier": "OS package supplier enrichment",
@@ -1027,6 +1028,41 @@
     "spdx3Done": "Every required field is filled",
     "spdx3Fill": "Fill in empty fields in Models & datasets",
     "spdx3View": "View in Models & datasets"
+  },
+  "aiUsage": {
+    "title": "AI used by the code",
+    "count_one": "{{n}} item",
+    "count_other": "{{n}} items",
+    "reviewCount_one": "{{n}} to review",
+    "reviewCount_other": "{{n}} to review",
+    "note": "Listed, not counted: the conformance check, the NOTICE and the model risk assessment leave these items out. To check a model itself, run an AI model scan.",
+    "colName": "Name",
+    "colWhere": "Provider or file",
+    "colScope": "Scope",
+    "colReview": "Review",
+    "models": "Called with: {{models}}",
+    "truncated": "Showing the first {{n}} items. The SBOM file lists them all.",
+    "kind": {
+      "model": "Models",
+      "aiService": "AI services",
+      "mcpServer": "MCP servers",
+      "mcpConfig": "MCP configuration files",
+      "instructionFile": "Agent instruction files"
+    },
+    "scope": {
+      "runtime": "Runtime",
+      "development": "Development"
+    },
+    "reason": {
+      "broadFilesystemAccess": "Broad file access",
+      "unpinnedPackage": "Unpinned package",
+      "unencryptedTransport": "Unencrypted connection"
+    },
+    "reasonHelp": {
+      "broadFilesystemAccess": "The MCP server is given the filesystem root or the home folder.",
+      "unpinnedPackage": "It runs with npx or uvx and no version, so a new release runs without review.",
+      "unencryptedTransport": "It is reached over plain http on another host."
+    }
   },
   "g7": {
     "empty": "No conformance checks were recorded.",

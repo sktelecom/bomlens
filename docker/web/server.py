@@ -1284,6 +1284,12 @@ MAX_ASSESS_URLS = 8  # license source links per assessed model
 MAX_PIPELINE_STEP_LEN = 100  # chars per step id
 MAX_PIPELINE_STEPS = 20  # step ids listed; the rest are counted, not shown
 MAX_FIRMWARE_SCOPE_NAMES = 10  # handler or tool names listed in the firmware scope note
+MAX_AI_USAGE_ROWS = 500  # AI usage items (models, services, MCP, instruction files) listed
+# The values build-prep.sh writes to bomlens:ai:usage, in display order. A
+# supplier SBOM can carry any string there, so only these are listed.
+AI_USAGE_KINDS = ("model", "ai-service", "mcp-server", "mcp-config", "instruction-file")
+AI_USAGE_SCOPES = ("runtime", "development")
+AI_USAGE_REVIEW_REASONS = ("broad-filesystem-access", "unpinned-package", "unencrypted-transport")
 
 # Severity ranking for picking a component's worst vulnerability.
 _SEV_RANK = {"CRITICAL": 5, "HIGH": 4, "MEDIUM": 3, "LOW": 2, "UNKNOWN": 1}
@@ -2062,6 +2068,98 @@ def _firmware_scope(meta):
     return scope
 
 
+def _is_ai_usage(c):
+    """Whether a component or service is an AI usage item from a source scan
+    (bomlens:ai:usage, written by build-prep.sh). These record what the code
+    calls or configures (a hosted model, an AI service, an MCP server, an
+    instruction file), not packages, so they stay out of every package count
+    and out of the AI-model-scan detection."""
+    return isinstance(c, dict) and any(
+        p.get("name") == "bomlens:ai:usage" for p in _dicts(c.get("properties"))
+    )
+
+
+def _ai_usage_list(data):
+    """The AI usage items of one SBOM, normalized for the UI.
+
+    Returns (rows, truncated). Only the fields listed here are read: endpoints,
+    commands, environment variables and every other property stay in the SBOM.
+    """
+    comps = _dicts(data.get("components"))
+    services = _dicts(data.get("services"))
+    model_names = {
+        c.get("bom-ref"): c.get("name")
+        for c in comps
+        if c.get("type") == "machine-learning-model"
+        and isinstance(c.get("bom-ref"), str)
+        and isinstance(c.get("name"), str)
+        and c.get("name")
+    }
+    depends = {}
+    for d in _dicts(data.get("dependencies")):
+        if isinstance(d.get("ref"), str):
+            depends[d["ref"]] = [r for r in _as_list(d.get("dependsOn")) if isinstance(r, str)]
+    rows = []
+    for c in comps + services:
+        props = _dicts(c.get("properties"))
+
+        def values(name, props=props):
+            return [
+                p.get("value")
+                for p in props
+                if p.get("name") == name and isinstance(p.get("value"), str) and p.get("value")
+            ]
+
+        kind = next(iter(values("bomlens:ai:usage")), None)
+        if kind not in AI_USAGE_KINDS:
+            continue
+        row = {"kind": kind, "name": c.get("name") if isinstance(c.get("name"), str) else ""}
+        if isinstance(c.get("purl"), str) and c.get("purl"):
+            row["purl"] = c["purl"]
+        provider = None
+        if kind == "model":
+            provider = next(iter(values("cdx:ai:provider")), None)
+        elif kind == "ai-service":
+            provider = _as_dict(c.get("provider")).get("name") or c.get("group")
+        if isinstance(provider, str) and provider:
+            row["provider"] = provider
+        scope = next(iter(values("bomlens:ai:scope")), None)
+        if scope in AI_USAGE_SCOPES:
+            row["scope"] = scope
+        # The file the item was found in: the path build-prep.sh recorded, else
+        # cdxgen's source file (which may end in #L<line>, kept as is).
+        path = next(iter(values("bomlens:ai:path")), None) or next(
+            iter(values("internal:SrcFile")), None
+        )
+        if path:
+            row["path"] = path
+        row["reviewReasons"] = sorted(
+            {r for r in values("bomlens:ai:reviewReason") if r in AI_USAGE_REVIEW_REASONS}
+        )
+        # The models a service is called with, from its dependencies[] entry.
+        # An SBOM with no dependency graph gets none from the scan (adding one
+        # would change what the rest of the summary reads as direct), so the
+        # service's own cdx:ai:modelId values stand in, limited to the model
+        # components the SBOM holds.
+        if kind == "ai-service":
+            names = []
+            for ref in depends.get(c.get("bom-ref"), []):
+                n = model_names.get(ref)
+                if n and n not in names:
+                    names.append(n)
+            if not names and not depends:
+                known = set(model_names.values())
+                for n in values("cdx:ai:modelId"):
+                    if isinstance(n, str) and n in known and n not in names:
+                        names.append(n)
+            row["models"] = names
+        if "bomlens" in values("bomlens:ai:detectedBy"):
+            row["detectedBy"] = "bomlens"
+        rows.append(row)
+    rows.sort(key=lambda r: (AI_USAGE_KINDS.index(r["kind"]), r["name"]))
+    return rows[:MAX_AI_USAGE_ROWS], len(rows) > MAX_AI_USAGE_ROWS
+
+
 def sbom_summary(run_id):
     p = run_file(run_id, "_bom.json")
     if not p or not os.path.isfile(p):
@@ -2092,6 +2190,10 @@ def sbom_summary(run_id):
         _root.get("type") == "data" and _root_collected
     ):
         comps = [_root] + comps
+    # AI usage items (bomlens:ai:usage) are listed apart in aiUsage below, not
+    # as components: every count, KPI and row here is about packages, and a
+    # source scan that calls a hosted model must not read as an AI model scan.
+    comps = [c for c in comps if not _is_ai_usage(c)]
     risk_by_purl, risk_by_nv = _component_risk_index(run_id)
     scope_by_ref, has_deps = _scope_index(data)
     rows = []
@@ -2578,6 +2680,14 @@ def sbom_summary(run_id):
         summary["maliciousCount"] = malicious_count
     if assessed_models:
         summary["assessCounts"] = assess_counts
+    # What the scanned code calls or configures in the way of AI (models,
+    # AI services, MCP servers and configurations, instruction files). Omitted
+    # when there is none, so a scan without it carries no empty section.
+    ai_usage, ai_usage_truncated = _ai_usage_list(data)
+    if ai_usage:
+        summary["aiUsage"] = ai_usage
+        if ai_usage_truncated:
+            summary["aiUsageTruncated"] = True
     return summary
 
 
@@ -3058,6 +3168,10 @@ def list_scans():
         # reflects the full array length, to match sbom_summary's `components`.
         comp_count = len(_as_list(data.get("components")))
         comps = _dicts(data.get("components"))
+        # AI usage items are not packages and do not make this an AI model
+        # scan; leave them out exactly as sbom_summary does.
+        comp_count -= sum(1 for c in comps if _is_ai_usage(c))
+        comps = [c for c in comps if not _is_ai_usage(c)]
         meta = _as_dict(_as_dict(data.get("metadata")).get("component"))
         # A spec-shaped AI SBOM names the model as the document's own component
         # and lists only its datasets under components[]. Reading that array
@@ -3066,7 +3180,7 @@ def list_scans():
         # on the scan's own page. Fold a machine-learning-model root in, by the
         # same rule as sbom_summary: every other root is the scanned project
         # itself, which is not one of its own components and stays out.
-        if meta.get("type") == "machine-learning-model":
+        if meta.get("type") == "machine-learning-model" and not _is_ai_usage(meta):
             comps = [meta] + comps
             comp_count += 1
         # The OWASP AIBOM generator names the root metadata.component after its
@@ -3350,8 +3464,11 @@ def _diag_sbom_facts(run_id):
     except (OSError, json.JSONDecodeError):
         return None
     count = len(_as_list(data.get("components")))
+    # Same package count as sbom_summary: AI usage items are not components.
+    count -= sum(1 for c in _dicts(data.get("components")) if _is_ai_usage(c))
     meta = _as_dict(data.get("metadata"))
-    if _as_dict(meta.get("component")).get("type") == "machine-learning-model":
+    if _as_dict(meta.get("component")).get("type") == "machine-learning-model" \
+            and not _is_ai_usage(meta.get("component")):
         count += 1
     steps = []
     for prop in _dicts(meta.get("properties")):

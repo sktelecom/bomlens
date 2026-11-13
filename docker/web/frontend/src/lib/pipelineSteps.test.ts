@@ -30,6 +30,7 @@ describe("pipelineStepLabelKey", () => {
       "pip-install",
       "cargo-workspace-metadata",
       "cargo-license-metadata",
+      "ai-usage",
       "composer-install",
       "pnpm-workspace-tree",
       "enrich-distro-supplier",

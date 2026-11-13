@@ -54,6 +54,7 @@ import { diffComponents, diffVulnerabilities, type ComponentDiff, type VulnDiff 
 import { cn, formatBytes } from "@/lib/utils";
 import { useFormatNumber } from "@/lib/format";
 
+import { AiUsageCard } from "./AiUsageCard";
 import { DeclarationRefusedCard } from "./DeclarationRefusedCard";
 import { FirstChecks } from "./FirstChecks";
 import { LicenseRiskBar } from "./LicenseRiskBar";
@@ -950,6 +951,11 @@ export function Overview({
           )}
           <div className="order-5 empty:hidden 2xl:order-none">
             <TopRisk result={result} scanId={scanId} />
+          </div>
+          {/* The AI the scanned code uses. Listed after the worst components:
+              an inventory to read, not a finding that outranks them. */}
+          <div className="order-5 empty:hidden 2xl:order-none">
+            <AiUsageCard sbom={result.sbom} />
           </div>
         </div>
         <div className="contents 2xl:flex 2xl:min-w-0 2xl:flex-col 2xl:gap-6">

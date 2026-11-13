@@ -866,6 +866,7 @@
     "poetryGraph": "Poetry 의존 그래프",
     "cargoWorkspaceMetadata": "Cargo 워크스페이스 멤버 탐지",
     "cargoLicenseMetadata": "Rust 크레이트 라이선스 조회",
+    "aiUsage": "AI 사용 탐지",
     "composerInstall": "PHP Composer 의존성 해석",
     "pnpmWorkspaceTree": "pnpm 워크스페이스 의존성 트리 해석",
     "enrichDistroSupplier": "OS 패키지 공급자 정보 보강",
@@ -1027,6 +1028,41 @@
     "spdx3Done": "필수 항목을 모두 채움",
     "spdx3Fill": "모델과 데이터셋 화면에서 빈 항목 채우기",
     "spdx3View": "모델과 데이터셋 화면에서 보기"
+  },
+  "aiUsage": {
+    "title": "코드가 쓰는 AI",
+    "count_one": "{{n}}개 항목",
+    "count_other": "{{n}}개 항목",
+    "reviewCount_one": "검토 필요 {{n}}개",
+    "reviewCount_other": "검토 필요 {{n}}개",
+    "note": "목록으로만 보여 주고 집계하지 않습니다. 적합성 검사, NOTICE, 모델 위험 판정에서 이 항목들은 빠집니다. 모델 자체를 점검하려면 AI 모델 스캔을 실행합니다.",
+    "colName": "이름",
+    "colWhere": "제공자 또는 파일",
+    "colScope": "범위",
+    "colReview": "검토",
+    "models": "호출하는 모델: {{models}}",
+    "truncated": "처음 {{n}}개 항목만 보여 줍니다. 전체 목록은 SBOM 파일에 있습니다.",
+    "kind": {
+      "model": "모델",
+      "aiService": "AI 서비스",
+      "mcpServer": "MCP 서버",
+      "mcpConfig": "MCP 설정 파일",
+      "instructionFile": "에이전트 지침 파일"
+    },
+    "scope": {
+      "runtime": "실행 시",
+      "development": "개발 환경"
+    },
+    "reason": {
+      "broadFilesystemAccess": "넓은 파일 접근",
+      "unpinnedPackage": "버전 미고정 패키지",
+      "unencryptedTransport": "암호화되지 않은 연결"
+    },
+    "reasonHelp": {
+      "broadFilesystemAccess": "MCP 서버가 파일 시스템 루트나 홈 폴더를 넘겨받습니다.",
+      "unpinnedPackage": "버전 없이 npx나 uvx로 실행되어, 새 릴리스가 검토 없이 실행됩니다.",
+      "unencryptedTransport": "다른 호스트에 평문 http로 접속합니다."
+    }
   },
   "g7": {
     "empty": "기록된 적합성 검사가 없습니다.",
