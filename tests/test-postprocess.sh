@@ -6570,6 +6570,12 @@ STUB
     [ "$(cat "$WORK/mh-calls" 2>/dev/null)" = "mvn $_mh_goal" ] \
         && pass "mvnw without .mvn/wrapper falls back to mvn" \
         || fail "mvnw without .mvn/wrapper: [$(cat "$WORK/mh-calls" 2>/dev/null)]"
+    mkdir -p "$WORK/mh-wrapnx/.mvn/wrapper"; touch "$WORK/mh-wrapnx/pom.xml"
+    cp "$_mh_bin/mvn" "$WORK/mh-wrapnx/mvnw"; chmod -x "$WORK/mh-wrapnx/mvnw"
+    _mh_run "$WORK/mh-wrapnx" "" >/dev/null
+    [ "$(cat "$WORK/mh-calls" 2>/dev/null)" = "mvnw $_mh_goal" ] \
+        && pass "mvnw without the executable bit runs through sh, not the image's mvn" \
+        || fail "mvnw without the executable bit: [$(cat "$WORK/mh-calls" 2>/dev/null)]"
     for _mh_f in exit error; do
         if _mh_out=$(_mh_run "$WORK/mh-proj" "" "$_mh_f"); then
             printf '%s' "$_mh_out" | grep -q "some components will have no hashes (non-fatal)" \
@@ -6618,8 +6624,7 @@ else
     _md_bin="$WORK/md-bin"; mkdir -p "$_md_bin" "$WORK/md-home"
     # mvn and mvnw: record the call; the copy goal puts MD_COPY in the output
     # folder. A wrapper run with MD_WRAP_OK=1 reads the POM (a wrapper that pins
-    # an older Maven); with MD_WRAP_FAIL=1 it cannot download its distribution.
-    # Otherwise the duplicate-dependency error is printed.
+    # an older Maven). Otherwise the duplicate-dependency error is printed.
     cat > "$_md_bin/mvn" <<'STUB'
 #!/bin/sh
 echo "${0##*/} $*" >> "$MD_CALLS"
@@ -6631,13 +6636,7 @@ case " $* " in
         done
         exit 0 ;;
 esac
-if [ "${0##*/}" = mvnw ]; then
-    [ "$MD_WRAP_OK" = 1 ] && exit 0
-    if [ "$MD_WRAP_FAIL" = 1 ]; then
-        echo "Exception in thread \"main\" java.net.UnknownHostException: repo.maven.apache.org"
-        exit 1
-    fi
-fi
+if [ "${0##*/}" = mvnw ] && [ "$MD_WRAP_OK" = 1 ]; then exit 0; fi
 echo "[ERROR] [ERROR] Some problems were encountered while processing the POMs:"
 echo "[ERROR] 'dependencies.dependency.(groupId:artifactId:type:classifier)' must be unique: junit:junit:jar -> version 4.12 vs 4.13.2 @ line 9, column 17"
 exit 0
@@ -6683,11 +6682,11 @@ STUB
         done
         printf '%s' "$_mp"
     }
-    _md_run() {  # <dir>; MD_SHELL, MD_COPY, MD_CURL, MD_WRAP_OK, MD_WRAP_FAIL, MD_39_FAIL, MD_MAVEN_ARGS, MD_PATH from the caller
+    _md_run() {  # <dir>; MD_SHELL, MD_COPY, MD_CURL, MD_WRAP_OK, MD_39_FAIL, MD_MAVEN_ARGS, MD_PATH from the caller
         # build-prep's exit trap removes the unpacked Maven; this extract has none.
         rm -rf "$WORK/md-calls" "$WORK/md-home"/bomlens-maven.*; : > "$WORK/md-calls"
         ( cd "$1" && PATH="$_md_bin:${MD_PATH:-$PATH}" HOME="$WORK/md-home" MD_CALLS="$WORK/md-calls" MD_VER="$_md_ver" \
-            MD_COPY="${MD_COPY:-}" MD_CURL="${MD_CURL:-}" MD_WRAP_OK="${MD_WRAP_OK:-}" MD_WRAP_FAIL="${MD_WRAP_FAIL:-}" \
+            MD_COPY="${MD_COPY:-}" MD_CURL="${MD_CURL:-}" MD_WRAP_OK="${MD_WRAP_OK:-}" \
             MD_39_FAIL="${MD_39_FAIL:-}" EXCLUDE_NON_SHIPPED=1 NON_SHIPPED_DIRS="test examples" \
             MAVEN_ARGS="${MD_MAVEN_ARGS:-}" MVN_ARGS="" MAVEN_OPTS="" MAVEN_SETTINGS_ARGS="" SETTINGS_ROOT="$WORK/md-nosettings" \
             "$MD_SHELL" -c "$_md_prelude; $_md_block"'
@@ -6773,25 +6772,25 @@ STUB
         && pass "$_s a Maven $_md_ver retry that fails for another model error sets no MVN_CMD and records maven-dependency-tree" \
         || fail "$_s Maven 3.9 retry failing: [$_md_out]"
 
-    # A wrapper that pins Maven 3.9 but is not executable: build-prep ran mvn,
-    # retries with the wrapper, which reads the POM; nothing is downloaded.
+    # A wrapper that pins Maven 3.9 but is not executable runs through sh and
+    # reads the POM; the image's mvn is not run and nothing is downloaded.
     _md_out=$(MD_WRAP_OK=1 MD_COPY="$WORK/md-good.tar.gz" _md_run "$WORK/md-wrap")
-    { printf '%s' "$_md_out" | grep -q "the project's Maven wrapper (Maven 3.9.6) reads pom.xml" \
-        && printf '%s' "$_md_out" | grep -q "RESULT MVN_CMD= PINNED= " \
+    { printf '%s' "$_md_out" | grep -q "RESULT MVN_CMD= PINNED= " \
         && ! printf '%s' "$_md_out" | grep -q "MARK-FAILED" \
         && grep -q "^mvnw -q -B --fail-never .*:resolve " "$WORK/md-calls" \
-        && ! grep -q ":copy " "$WORK/md-calls"; } \
-        && pass "$_s a wrapper pinning Maven 3.9 is used for the retry and left to cdxgen; no Maven is downloaded" \
+        && ! grep -q "^mvn " "$WORK/md-calls"; } \
+        && pass "$_s a wrapper pinning Maven 3.9 without the executable bit runs through sh; no other Maven is run" \
         || fail "$_s wrapper 3.9: [$_md_out] calls: [$(cat "$WORK/md-calls")]"
 
-    # The same wrapper cannot download its distribution: go on to Maven 3.9.
-    _md_out=$(MD_WRAP_FAIL=1 MD_COPY="$WORK/md-good.tar.gz" _md_run "$WORK/md-wrap")
-    { printf '%s' "$_md_out" | grep -q "the project's Maven wrapper did not read pom.xml cleanly (rc=1)" \
+    # The same wrapper refuses the POM: Maven $_md_ver is tried and pinned.
+    _md_out=$(MD_COPY="$WORK/md-good.tar.gz" _md_run "$WORK/md-wrap")
+    { printf '%s' "$_md_out" | grep -q "maven: ./mvnw refused pom.xml" \
         && printf '%s' "$_md_out" | grep -q "RESULT MVN_CMD=.*/apache-maven-$_md_ver/bin/mvn PINNED=true " \
         && ! printf '%s' "$_md_out" | grep -q "MARK-FAILED" \
+        && grep -q "^mvnw -q -B --fail-never .*:resolve " "$WORK/md-calls" \
         && grep -q "^mvn39 " "$WORK/md-calls"; } \
-        && pass "$_s a wrapper that fails with a download error: Maven $_md_ver is tried and pinned" \
-        || fail "$_s wrapper download error: [$_md_out] calls: [$(cat "$WORK/md-calls")]"
+        && pass "$_s a wrapper without the executable bit that refuses the POM: Maven $_md_ver is tried and pinned" \
+        || fail "$_s non-executable wrapper refusing the POM: [$_md_out] calls: [$(cat "$WORK/md-calls")]"
 
     # A wrapper on Maven 3.10 refuses it too: the downloaded Maven goes to
     # cdxgen with CDXGEN_JVM_TOOL_PINNED, so cdxgen does not take the wrapper.
@@ -6827,16 +6826,6 @@ STUB
     [ -n "$_md_re" ] && [ "$_md_hits" = "1100" ] \
         && pass "only dependencies and dependencyManagement uniqueness errors count" \
         || fail "MAVEN_DUPLICATE_ERROR matched [$_md_hits] (want 1100)"
-
-    # Which wrapper versions count as accepting a repeated dependency.
-    _md_fn=$(printf '%s\n' "$_md_block" | sed -n '/^maven_accepts_duplicates() {/,/^}/p')
-    _md_acc=""
-    for _md_v in 3.9.6 3.8.1 3.10.0 3.11 4.0.0 3 x.y ""; do
-        if bash -c "$_md_fn; maven_accepts_duplicates \"\$1\"" _ "$_md_v"; then _md_acc="$_md_acc $_md_v"; fi
-    done
-    [ "$_md_acc" = " 3.9.6 3.8.1" ] \
-        && pass "only a Maven 3 before 3.10 counts as accepting a repeated dependency" \
-        || fail "maven_accepts_duplicates accepted [$_md_acc]"
     rm -rf "$WORK/md-home"/bomlens-maven.*
 fi
 
@@ -7027,6 +7016,38 @@ if grep -q 'grep -x releaseRuntimeClasspath || cat' "$PREP"; then
     fail "the stdin-draining '{ grep -x ... || cat; }' idiom is back in build-prep.sh"
 else
     pass "build-prep.sh no longer uses the stdin-draining grep||cat idiom"
+fi
+
+echo "== android-scope: the release filter marks release runtime components required =="
+# cdxgen takes the scope from the first configuration a component appears
+# under, so a release runtime component also under a test configuration comes
+# out optional. Extract the real filter JS from build-prep.sh.
+if command -v node >/dev/null 2>&1; then
+    AFLT="$WORK/android-release-filter.js"
+    sed -n "/<<'FILTER_JS'/,/^FILTER_JS\$/p" "$ROOT_DIR/docker/lib/build-prep.sh" | sed '1d;$d' > "$AFLT"
+    if [ -s "$AFLT" ]; then
+        cat > "$WORK/android-bom.json" <<'JSON'
+{"bomFormat":"CycloneDX","specVersion":"1.6",
+ "metadata":{"component":{"name":"app","purl":"pkg:maven/com.example/app@1.0","bom-ref":"pkg:maven/com.example/app@1.0"}},
+ "components":[
+   {"group":"com.squareup.okhttp3","name":"okhttp","version":"4.12.0","scope":"optional","purl":"pkg:maven/com.squareup.okhttp3/okhttp@4.12.0?type=jar","bom-ref":"okhttp"},
+   {"group":"com.google.code.gson","name":"gson","version":"2.10.1","purl":"pkg:maven/com.google.code.gson/gson@2.10.1?type=jar","bom-ref":"gson"},
+   {"group":"com.example","name":"lib","version":"1.0","scope":"optional","purl":"pkg:maven/com.example/lib@1.0","bom-ref":"lib"},
+   {"group":"com.android.tools.utp","name":"utp-core","version":"31.0.0","scope":"optional","purl":"pkg:maven/com.android.tools.utp/utp-core@31.0.0","bom-ref":"utp"},
+   {"name":"left-pad","version":"1.3.0","scope":"optional","purl":"pkg:npm/left-pad@1.3.0","bom-ref":"lp"}
+ ]}
+JSON
+        printf 'com.squareup.okhttp3:okhttp:4.12.0\ncom.google.code.gson:gson:2.10.1\n' > "$WORK/android-rel.set"
+        node "$AFLT" "$WORK/android-bom.json" "$WORK/android-rel.set" 2>/dev/null
+        scopes=$(jq -r '[.components[] | .name + "=" + (.scope // "none")] | join(",")' "$WORK/android-bom.json")
+        [ "$scopes" = "okhttp=required,gson=none,lib=optional,left-pad=optional" ] \
+            && pass "an optional release runtime component is required; one with no scope, first-party and non-maven ones are not touched (got: $scopes)" \
+            || fail "android release filter scopes" "$scopes"
+    else
+        fail "could not extract FILTER_JS from build-prep.sh"
+    fi
+else
+    echo "  SKIP: node unavailable"
 fi
 
 echo "== EOL: offline end-of-life flagging (enrich-eol.sh) — PURL whitelist + cycle lookup =="
@@ -8965,6 +8986,61 @@ else
         && pass "a writable ~/.gradle (the CLI's mounted cache) is left in use" \
         || fail "writable account home: gradle saw $(sort -u "$GU_ROOT/seen" 2>&1 | tr '\n' ' ')"
 fi
+
+echo "== gradle: a gradlew without the executable bit runs through sh =="
+GW_ROOT="$WORK/gradle-wrapper-noexec"; mkdir -p "$GW_ROOT/bin" "$GW_ROOT/src" "$GW_ROOT/out" "$GW_ROOT/gh"
+printf "plugins { id 'java' }\n" > "$GW_ROOT/src/build.gradle"
+printf '#!/bin/sh\necho "image $*" >> "%s/calls"\n' "$GW_ROOT" > "$GW_ROOT/bin/gradle"
+# The cdxgen stub sets the executable bit, as cdxgen does before it runs gradlew.
+cat > "$GW_ROOT/bin/cdxgen" <<GWCDX
+#!/bin/sh
+chmod +x "$GW_ROOT/src/gradlew"
+out=""; prev=""; for a in "\$@"; do [ "\$prev" = "-o" ] && out="\$a"; prev="\$a"; done
+printf '%s' '{"bomFormat":"CycloneDX","specVersion":"1.6","version":1,"metadata":{},"components":[]}' > "\$out"
+GWCDX
+chmod +x "$GW_ROOT/bin/gradle" "$GW_ROOT/bin/cdxgen"
+printf '#!/bin/sh\necho "wrapper $*" >> "%s/calls"\ncase " $* " in *" --version "*) printf "\\n------------------------------------------------------------\\nGradle 5.6.4\\n------------------------------------------------------------\\n" ;; esac\n' "$GW_ROOT" > "$GW_ROOT/src/gradlew"
+chmod 644 "$GW_ROOT/src/gradlew"
+env -u ANDROID_HOME PATH="$GW_ROOT/bin:$PATH" HOME="$GW_ROOT/home" GRADLE_USER_HOME="$GW_ROOT/gh" \
+    sh "$LIB/build-prep.sh" "$GW_ROOT/src" "$GW_ROOT/out/bom.json" > "$GW_ROOT/log" 2>&1
+{ grep -q '^wrapper --no-daemon dependencies$' "$GW_ROOT/calls" 2>/dev/null && ! grep -q '^image ' "$GW_ROOT/calls"; } \
+    && pass "build-prep runs a non-executable gradlew through sh, not the image's Gradle" \
+    || fail "non-executable gradlew: calls [$(tr '\n' ';' < "$GW_ROOT/calls" 2>/dev/null)]" "$(grep gradle "$GW_ROOT/log" | head -5)"
+grep -q '^\[build-prep\] gradle: sh ./gradlew runs Gradle 5.6.4$' "$GW_ROOT/log" \
+    && pass "the Gradle that runs is logged once, from --version" \
+    || fail "Gradle version log line missing" "$(grep 'gradle:' "$GW_ROOT/log" | head -5)"
+[ "$(grep -c 'runs Gradle' "$GW_ROOT/log")" = 1 ] \
+    && pass "the Gradle version line appears once" \
+    || fail "Gradle version line count: $(grep -c 'runs Gradle' "$GW_ROOT/log")"
+grep -q '^wrapper' "$GW_ROOT/calls" && [ -f "$GW_ROOT/src/gradlew" ] && [ ! -x "$GW_ROOT/src/gradlew" ] \
+    && pass "the gradlew is left without the executable bit after the scan" \
+    || fail "gradlew mode after the scan: $(ls -l "$GW_ROOT/src/gradlew" 2>/dev/null)"
+
+echo "== gradle: cdxgen reads the POMs Gradle downloaded (GRADLE_CACHE_DIR) =="
+# HOME is not the account home Gradle uses, so cdxgen is told where Gradle's
+# cache is, unless the caller already set GRADLE_CACHE_DIR.
+GC_ROOT="$WORK/gradle-cache-dir"; mkdir -p "$GC_ROOT/bin" "$GC_ROOT/src" "$GC_ROOT/out" "$GC_ROOT/acct" "$GC_ROOT/home"
+printf "plugins { id 'java' }\n" > "$GC_ROOT/src/build.gradle"
+printf '#!/bin/sh\necho "root:x:0:0:root:%s:/bin/sh"\n' "$GC_ROOT/acct" > "$GC_ROOT/bin/getent"
+printf '#!/bin/sh\nexit 0\n' > "$GC_ROOT/bin/gradle"
+printf '#!/bin/sh\nout=""; prev=""; for a in "$@"; do [ "$prev" = "-o" ] && out="$a"; prev="$a"; done\necho "${GRADLE_CACHE_DIR:-unset}" > "%s/seen"\nprintf %s > "$out"\n' "$GC_ROOT" "'{\"bomFormat\":\"CycloneDX\",\"specVersion\":\"1.6\",\"version\":1,\"metadata\":{},\"components\":[]}'" > "$GC_ROOT/bin/cdxgen"
+chmod +x "$GC_ROOT/bin/getent" "$GC_ROOT/bin/gradle" "$GC_ROOT/bin/cdxgen"
+_gc_run() { rm -f "$GC_ROOT/seen"
+    env -u ANDROID_HOME "$@" PATH="$GC_ROOT/bin:$PATH" HOME="$GC_ROOT/home" \
+        sh "$LIB/build-prep.sh" "$GC_ROOT/src" "$GC_ROOT/out/bom.json" > "$GC_ROOT/log" 2>&1
+    cat "$GC_ROOT/seen" 2>/dev/null; }
+_gc_seen=$(_gc_run -u GRADLE_USER_HOME -u GRADLE_CACHE_DIR)
+[ "$_gc_seen" = "$GC_ROOT/acct/.gradle/caches/modules-2/files-2.1" ] \
+    && pass "cdxgen looks for Gradle's downloads under the account home's .gradle, not HOME" \
+    || fail "GRADLE_CACHE_DIR with the account home: [$_gc_seen]" "$(grep gradle "$GC_ROOT/log" | head -5)"
+_gc_seen=$(_gc_run -u GRADLE_CACHE_DIR GRADLE_USER_HOME="$GC_ROOT/guh")
+[ "$_gc_seen" = "$GC_ROOT/guh/caches/modules-2/files-2.1" ] \
+    && pass "a GRADLE_USER_HOME is the cache cdxgen reads" \
+    || fail "GRADLE_CACHE_DIR with GRADLE_USER_HOME: [$_gc_seen]"
+_gc_seen=$(_gc_run -u GRADLE_USER_HOME GRADLE_CACHE_DIR=/elsewhere/files-2.1)
+[ "$_gc_seen" = "/elsewhere/files-2.1" ] \
+    && pass "a GRADLE_CACHE_DIR the caller set is kept" \
+    || fail "preset GRADLE_CACHE_DIR: [$_gc_seen]"
 
 echo "== prep_step: every resolution step runs through it (no bare invocation left) =="
 # The pre-prep_step patterns (silently discarded stderr, no time limit) must
