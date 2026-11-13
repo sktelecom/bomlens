@@ -1152,12 +1152,12 @@ D="$(new_run events-off)"; run_engine "$D" "$ROOT_DIR/docker/lib"
 
 echo "== the plan passes on the network settings =="
 P="$(plan_run netenv "$PSRC")"
-jq -e '(.stages[0].env_passthrough | index("HTTPS_PROXY") != null)
-       and (.stages[1].env_passthrough as $p | ["HTTPS_PROXY", "NO_PROXY", "TRIVY_DB_REPOSITORY", "TRIVY_SKIP_DB_UPDATE", "KEV_URL", "EPSS_API"] | all(. as $n | $p | index($n) != null))
+jq -e '(.stages[0].env_passthrough as $p | ["HTTPS_PROXY", "BOMLENS_EXTRA_CA_CERTS"] | all(. as $n | $p | index($n) != null))
+       and (.stages[1].env_passthrough as $p | ["HTTPS_PROXY", "NO_PROXY", "BOMLENS_EXTRA_CA_CERTS", "TRIVY_DB_REPOSITORY", "TRIVY_SKIP_DB_UPDATE", "KEV_URL", "EPSS_API"] | all(. as $n | $p | index($n) != null))
        and (.stages[1].env_passthrough | index("TRIVY_CACHE_DIR") == null)
        and (.stages[1].env.SECURITY_ENRICH == "false")
        and ([.stages[1].mounts[] | select(.role == "trivy-db")] == [{role: "trivy-db", target: "/trivy-db", mode: "ro", optional: true}])' "$P/bomlens-plan.json" >/dev/null \
-    && pass "stage 1 passes on the proxy, stage 2 the proxy, Trivy and EPSS/KEV settings; EPSS/KEV off, trivy-db mount read-only" \
+    && pass "stage 1 passes on the proxy and the CA bundle, stage 2 those, Trivy and EPSS/KEV settings; EPSS/KEV off, trivy-db mount read-only" \
     || fail "plan passthrough" "$(jq -c '[.stages[].env_passthrough]' "$P/bomlens-plan.json" 2>&1)"
 
 echo "== the CLI's stage 1 is the one the execution plan describes =="

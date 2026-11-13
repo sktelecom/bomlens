@@ -66,6 +66,12 @@ if [ "${TRIVY_CACHE_DIR:-}" = "/trivy-cache" ] && [ -z "${TRIVY_CACHE_BACKEND:-}
     export TRIVY_CACHE_BACKEND=memory
 fi
 
+# An extra CA bundle (BOMLENS_EXTRA_CA_CERTS, for a proxy that inspects TLS):
+# trusted by every tool started from here on, the web server included.
+# shellcheck source=docker/lib/extra-ca.sh
+. "$LIBDIR/extra-ca.sh"
+extra_ca_trust
+
 # --- UI mode: hand off to the web server, no project metadata needed ---
 if [ "$SCAN_MODE" = "UI" ]; then
     echo "[INFO] Starting BomLens Web UI on port ${UI_PORT:-8080}..."
@@ -596,6 +602,9 @@ generate_sbom_cdxgen() {
     rm -f "$rcf"
     remove_reach_tools
     SIBLING_CID=""
+    # A registry refused for an untrusted certificate (a proxy that inspects
+    # TLS) gets one line naming SBOM_EXTRA_CA_CERTS, failed or not.
+    tls_trust_hint "cdxgen" "$logf"
     if [ "$rc" -ne 0 ]; then
         if [ -n "$cid" ] && [ "$(docker inspect -f '{{.State.OOMKilled}}' "$cid" 2>/dev/null)" = "true" ]; then
             CDXGEN_FAIL_REASON="oom"
@@ -1205,6 +1214,7 @@ EOF
                 oom|disk-space|network|cdxgen-crash|cdxgen-unavailable) _s1_reason="$BOMLENS_STAGE1_REASON" ;;
                 *) _s1_reason="$(stage1_fail_reason "${BOMLENS_STAGE1_OOM:-}" "${_s1_log:+$HOST_OUTPUT_DIR/$_s1_log}" "$BOMLENS_STAGE1_EXIT")" ;;
             esac
+            [ -n "${_BOMLENS_CLI_FALLBACK:-}" ] || [ -z "$_s1_log" ] || tls_trust_hint "cdxgen" "$HOST_OUTPUT_DIR/$_s1_log"
             # The CLI prints its own guidance for this, before and after.
             [ -n "${_BOMLENS_CLI_FALLBACK:-}" ] || \
                 echo "[WARN] stage 1 (cdxgen) did not produce an SBOM (exit ${BOMLENS_STAGE1_EXIT}, ${_s1_reason}); falling back to a manifest-only scan (direct dependencies only)."
@@ -2547,6 +2557,10 @@ BOMLENS_GO_VULNDB_STATUS_FILE="$(mktemp 2>/dev/null)" || BOMLENS_GO_VULNDB_STATU
 export BOMLENS_GO_VULNDB_STATUS_FILE
 if [ "${GENERATE_SECURITY:-false}" = "true" ] && [ "$_trivy_db_ready" = true ]; then
     run_optional_step scan-security bash "$LIBDIR/scan-security.sh" "$OUTPUT_FILE" "$OUT_PREFIX" "$PROJECT_NAME"
+    # Trivy's database download refused for an untrusted certificate (a
+    # proxy that inspects TLS): one line naming SBOM_EXTRA_CA_CERTS.
+    _ss_scan_error="$(jq -r '.ScanError.Message // empty' "${OUT_PREFIX}_security.json" 2>/dev/null || true)"
+    [ -z "$_ss_scan_error" ] || tls_trust_hint "security scan (Trivy)" - <<< "$_ss_scan_error"
     _trivy_db_max="${BOMLENS_TRIVY_DB_MAX_AGE_DAYS:-7}"
     case "$_trivy_db_max" in ''|*[!0-9]*) _trivy_db_max=7 ;; esac
     if [[ "$_trivy_db_age" =~ ^[0-9]+$ ]] && [ "$_trivy_db_age" -gt "$_trivy_db_max" ] \
@@ -2594,6 +2608,7 @@ case "$SCAN_MODE" in
                _dc_status="$(jq -r '.status // empty' "$BOMLENS_DEEP_CVE_STATUS_FILE" 2>/dev/null || true)"
                _dc_detail="$(jq -r '.detail // empty' "$BOMLENS_DEEP_CVE_STATUS_FILE" 2>/dev/null || true)"
            fi
+           [ -z "$_dc_detail" ] || tls_trust_hint "deep-cve (grype)" - <<< "$_dc_detail"
            if [ -f "${OUT_PREFIX}_security_grype.json" ]; then
                if [ "$_dc_status" = degraded ]; then
                    er_record deep-cve degraded unavailable "$_dc_detail"
@@ -2623,6 +2638,7 @@ if [ -n "$BOMLENS_GO_VULNDB_STATUS_FILE" ] && [ -s "$BOMLENS_GO_VULNDB_STATUS_FI
     _gv_status="$(jq -r '.status // empty' "$BOMLENS_GO_VULNDB_STATUS_FILE" 2>/dev/null || true)"
     _gv_detail="$(jq -r '.detail // empty' "$BOMLENS_GO_VULNDB_STATUS_FILE" 2>/dev/null || true)"
 fi
+[ -z "$_gv_detail" ] || tls_trust_hint "go-vulndb" - <<< "$_gv_detail"
 _gv_counts=""
 if [ -f "$_gv_sidecar" ]; then
     _gv_counts="$(jq -c '.GoVulnDB | {components: (.Components // 0), findings: (.New // 0), already_reported: (.AlreadyReported // 0)}' "$_gv_sidecar" 2>/dev/null)" || _gv_counts=""

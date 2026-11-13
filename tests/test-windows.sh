@@ -163,6 +163,8 @@ case "${1:-}" in
         done
         exit 1 ;;
     esac
+    # DOCKER_STUB_RUN_OUTPUT: what a container prints (its log), verbatim.
+    [ -z "${DOCKER_STUB_RUN_OUTPUT:-}" ] || printf '%s\n' "$DOCKER_STUB_RUN_OUTPUT"
     # Drop the SBOM where the real container would: the host dir bind-mounted to
     # /host-output (post-process / single-shot) or /out (source stage 1) — i.e.
     # the per-run subfolder scan-sbom.sh now creates. Falls back to cwd so the
@@ -1024,6 +1026,41 @@ DOCKER_STUB_ARGV_DUMP=1 HTTPS_PROXY=http://proxy.example:3128 TRIVY_DB_REPOSITOR
   && in_log "trivy cache:/trivy-cache>" && in_log "<TRIVY_CACHE_DIR=/trivy-cache>" && [ -d "$WORK/trivy cache" ]; } \
   && pass "network settings go by name, a host TRIVY_CACHE_DIR does not, SBOM_TRIVY_CACHE is mounted (space in path)" \
   || { fail "network settings not passed as expected"; show; cat "$LOG"; }
+
+# SBOM_EXTRA_CA_CERTS: a proxy's CA bundle, mounted read-only into stage 1 and
+# stage 2 at a fixed path that BOMLENS_EXTRA_CA_CERTS names (a host value of
+# that variable is not passed on). A file that is missing or holds no PEM
+# certificate stops the scan before any container runs.
+printf -- '-----BEGIN CERTIFICATE-----\nMIIB\n-----END CERTIFICATE-----\n' > "$WORK/proxy ca.pem"
+CA_ABS="$(cd "$WORK" && pwd)/proxy ca.pem"
+d="$(new_proj extraca)"; printf '{"name":"a","dependencies":{"x":"1"}}' > "$d/package.json"
+DOCKER_STUB_ARGV_DUMP=1 SBOM_EXTRA_CA_CERTS="$WORK/proxy ca.pem" BOMLENS_EXTRA_CA_CERTS=/host/only/ca.pem \
+  scan_in "$d" --project CA --version 1
+{ [ "$RC" -eq 0 ] && [ "$(grep -cF "<$CA_ABS:/bomlens-ca/extra.pem:ro>" "$LOG")" -ge 2 ] \
+  && [ "$(grep -cF '<BOMLENS_EXTRA_CA_CERTS=/bomlens-ca/extra.pem>' "$LOG")" -ge 2 ] && ! in_log "/host/only/ca.pem"; } \
+  && pass "SBOM_EXTRA_CA_CERTS is mounted read-only into stage 1 and stage 2 (space in path); a host BOMLENS_EXTRA_CA_CERTS is not passed" \
+  || { fail "SBOM_EXTRA_CA_CERTS not mounted into both stages" "rc=$RC"; show; cat "$LOG"; }
+printf 'not a certificate\n' > "$WORK/not-a-ca.txt"
+for bad in "$WORK/no-such-ca.pem" "$WORK/not-a-ca.txt" "$WORK"; do
+  d="$(new_proj extraca_bad)"; printf '{"name":"a","dependencies":{"x":"1"}}' > "$d/package.json"
+  SBOM_EXTRA_CA_CERTS="$bad" scan_in "$d" --project CA --version 1
+  { [ "$RC" -ne 0 ] && in_out "[ERROR] SBOM_EXTRA_CA_CERTS=$bad" && ! grep -q "^docker run" "$LOG"; } \
+    && pass "SBOM_EXTRA_CA_CERTS=$(basename "$bad") is refused before any container runs" \
+    || { fail "a bad SBOM_EXTRA_CA_CERTS ($(basename "$bad")) was not refused" "rc=$RC"; show; }
+done
+d="$(new_proj extraca_ui)"
+DOCKER_STUB_ARGV_DUMP=1 SBOM_EXTRA_CA_CERTS="$WORK/proxy ca.pem" scan_in "$d" --ui --output-dir "$d"
+{ in_log "MODE=UI" && in_log "<$CA_ABS:/bomlens-ca/extra.pem:ro>" && in_log "<BOMLENS_EXTRA_CA_CERTS=/bomlens-ca/extra.pem>"; } \
+  && pass "--ui mounts SBOM_EXTRA_CA_CERTS into the web UI container" \
+  || { fail "--ui does not mount SBOM_EXTRA_CA_CERTS" "rc=$RC"; show; cat "$LOG"; }
+# A stage 1 log with a certificate the container did not trust gets one line
+# naming SBOM_EXTRA_CA_CERTS.
+d="$(new_proj extraca_hint)"; printf '{"name":"a","dependencies":{"x":"1"}}' > "$d/package.json"
+DOCKER_STUB_RUN_OUTPUT="Could not transfer artifact: PKIX path building failed: unable to find valid certification path" \
+  scan_in "$d" --project CA --version 1
+{ [ "$(grep -c 'a TLS certificate was not trusted' "$OUT")" = 1 ] && in_out "[WARN] cdxgen: a TLS certificate was not trusted" && in_out "Set SBOM_EXTRA_CA_CERTS"; } \
+  && pass "a PKIX failure in the stage 1 log prints one [WARN] naming SBOM_EXTRA_CA_CERTS" \
+  || { fail "no TLS trust hint for a PKIX failure in stage 1" "rc=$RC"; show; }
 
 # A registry mirror for the cdxgen images.
 d="$(new_proj mirror)"; printf '{"name":"a","dependencies":{"x":"1"}}' > "$d/package.json"

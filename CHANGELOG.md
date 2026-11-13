@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `SBOM_EXTRA_CA_CERTS=/path/to/bundle.pem` makes the scan containers trust an extra CA bundle, for a proxy that inspects TLS. The CLI (`--ui` included), `sbom-ui.bat` and the desktop app mount it read-only at `/bomlens-ca/extra.pem` and set `BOMLENS_EXTRA_CA_CERTS`. Each container adds it to a copy of the system bundle (`SSL_CERT_FILE`, `REQUESTS_CA_BUNDLE`, `CURL_CA_BUNDLE`, `CARGO_HTTP_CAINFO`, `GIT_SSL_CAINFO`, `PIP_CERT`), to `NODE_EXTRA_CA_CERTS` and to a copy of the JDK trust store named in `JAVA_TOOL_OPTIONS`, all under `/tmp`. A file that is missing or holds no PEM certificate stops the scan with the cause.
+- A step that fails on an untrusted certificate (`x509: certificate signed by unknown authority`, `PKIX path building failed`, `CERTIFICATE_VERIFY_FAILED` and the like) prints one `[WARN]` line naming `SBOM_EXTRA_CA_CERTS`.
+
 ## [v1.14.5] - 2026-11-12
 
 ### Added

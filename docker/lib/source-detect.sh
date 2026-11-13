@@ -47,6 +47,14 @@ FETCH_LICENSE="${FETCH_LICENSE:-true}"
 # The proxy variables reach the package managers cdxgen runs; passed on with
 # the options above.
 PROXY_ENV_NAMES="HTTP_PROXY HTTPS_PROXY NO_PROXY http_proxy https_proxy no_proxy"
+# The CA bundle of a proxy that inspects TLS, a path inside the container
+# (extra-ca.sh). The CLI never passes the host's own value on: it mounts
+# SBOM_EXTRA_CA_CERTS at EXTRA_CA_TARGET and sets the variable itself
+# (extra_ca_mount). The web UI container passes on the value it was given,
+# and its sibling containers see the file through --volumes-from.
+EXTRA_CA_ENV_NAMES="BOMLENS_EXTRA_CA_CERTS"
+# shellcheck disable=SC2034  # read by scan-sbom.sh
+EXTRA_CA_TARGET="/bomlens-ca/extra.pem"
 BUILD_PREP_ENV_NAMES="BOMLENS_KEEP_BUILD_OUTPUT BOMLENS_MAVEN_FULL_GRAPH BOMLENS_ANDROID_FULL_GRAPH BOMLENS_NODE_FULL_GRAPH BOMLENS_PHP_FULL_GRAPH BOMLENS_INCLUDE_NON_SHIPPED BOMLENS_INCLUDE_DEV_DEPENDENCIES BOMLENS_NO_COPYRIGHT BOMLENS_NO_CARGO_LICENSE BOMLENS_PREP_TIMEOUT"
 
 # Settings for the network the post-processing container reaches: the proxy,
@@ -54,7 +62,7 @@ BUILD_PREP_ENV_NAMES="BOMLENS_KEEP_BUILD_OUTPUT BOMLENS_MAVEN_FULL_GRAPH BOMLENS
 # update skipped) and the EPSS and KEV lookups (off, or a mirror), and which
 # Go vulnerability database export it reads (BOMLENS_GO_VULNDB*). Passed on
 # by name, so a value is never on a command line.
-STAGE2_NETWORK_ENV_NAMES="$PROXY_ENV_NAMES TRIVY_DB_REPOSITORY TRIVY_JAVA_DB_REPOSITORY TRIVY_SKIP_DB_UPDATE TRIVY_SKIP_JAVA_DB_UPDATE TRIVY_OFFLINE_SCAN TRIVY_USERNAME TRIVY_PASSWORD TRIVY_REGISTRY_TOKEN TRIVY_INSECURE BOMLENS_TRIVY_DB_MAX_AGE_DAYS BOMLENS_GRYPE_DB_MAX_AGE_DAYS GRYPE_DB_UPDATE_URL BOMLENS_GO_VULNDB BOMLENS_GO_VULNDB_PATH BOMLENS_GO_VULNDB_MAX_AGE_DAYS BOMLENS_GO_VULNDB_URL KEV_URL EPSS_API"
+STAGE2_NETWORK_ENV_NAMES="$PROXY_ENV_NAMES $EXTRA_CA_ENV_NAMES TRIVY_DB_REPOSITORY TRIVY_JAVA_DB_REPOSITORY TRIVY_SKIP_DB_UPDATE TRIVY_SKIP_JAVA_DB_UPDATE TRIVY_OFFLINE_SCAN TRIVY_USERNAME TRIVY_PASSWORD TRIVY_REGISTRY_TOKEN TRIVY_INSECURE BOMLENS_TRIVY_DB_MAX_AGE_DAYS BOMLENS_GRYPE_DB_MAX_AGE_DAYS GRYPE_DB_UPDATE_URL BOMLENS_GO_VULNDB BOMLENS_GO_VULNDB_PATH BOMLENS_GO_VULNDB_MAX_AGE_DAYS BOMLENS_GO_VULNDB_URL KEV_URL EPSS_API"
 
 # Prints "-e NAME" for the names above and for any other TRIVY_* variable set
 # here, except TRIVY_CACHE_DIR: a path on this host means nothing in the
@@ -90,7 +98,7 @@ _passable_names() {
 # is safe to splice into the eval'd docker command in scan-sbom.sh.
 build_prep_env_args() {
     local n out=""
-    for n in $BUILD_PREP_ENV_NAMES $(_passable_names $PROXY_ENV_NAMES); do out="$out -e $n"; done
+    for n in $BUILD_PREP_ENV_NAMES $(_passable_names $PROXY_ENV_NAMES) $EXTRA_CA_ENV_NAMES; do out="$out -e $n"; done
     printf '%s' "${out# }"
 }
 
@@ -119,6 +127,51 @@ go_vulndb_mount() {
     else
         echo "[WARN] SBOM_GO_VULNDB=$SBOM_GO_VULNDB is neither a file nor a folder; the Go vulnerability database snapshot in the image is used. Download https://vuln.go.dev/vulndb.zip and point SBOM_GO_VULNDB at it." >&2
     fi
+}
+
+# SBOM_EXTRA_CA_CERTS: the CA bundle (PEM) of a proxy that inspects TLS, on
+# this host. Prints its absolute path, for the caller to mount read-only at
+# EXTRA_CA_TARGET with BOMLENS_EXTRA_CA_CERTS set to that target; nothing when
+# it is unset. A path that is not a readable file holding a PEM certificate
+# is an error (exit status 1) with the cause and the fix on stderr: the scan
+# would otherwise fail later, in every HTTPS call, with less to go on.
+extra_ca_mount() {
+    local f="${SBOM_EXTRA_CA_CERTS:-}"
+    [ -n "$f" ] || return 0
+    if [ -d "$f" ] || [ ! -f "$f" ] || [ ! -r "$f" ]; then
+        echo "[ERROR] SBOM_EXTRA_CA_CERTS=$f is not a readable file. Point it at the proxy's CA bundle in PEM form (a .pem or .crt file with -----BEGIN CERTIFICATE----- lines), or unset it." >&2
+        return 1
+    fi
+    if ! grep -q -- '-----BEGIN CERTIFICATE-----' "$f" 2>/dev/null; then
+        echo "[ERROR] SBOM_EXTRA_CA_CERTS=$f holds no PEM certificate (no -----BEGIN CERTIFICATE----- line). A DER (binary) certificate converts with: openssl x509 -inform der -in ca.cer -out ca.pem" >&2
+        return 1
+    fi
+    printf '%s\n' "$(cd "$(dirname "$f")" && pwd)/$(basename "$f")"
+}
+
+# What a TLS client prints when it does not trust the certificate it was
+# shown: Go (x509), Java (PKIX), Python (CERTIFICATE_VERIFY_FAILED), Node.js
+# and OpenSSL (UNABLE_TO_GET_ISSUER_CERT_LOCALLY, UNABLE_TO_VERIFY_LEAF_SIGNATURE,
+# unable to get local issuer certificate, SELF_SIGNED_CERT_IN_CHAIN).
+TLS_TRUST_ERROR_RE='x509: certificate signed by unknown authority|PKIX path building failed|CERTIFICATE_VERIFY_FAILED|UNABLE_TO_GET_ISSUER_CERT_LOCALLY|UNABLE_TO_VERIFY_LEAF_SIGNATURE|unable to get local issuer certificate|SELF_SIGNED_CERT_IN_CHAIN|self[- ]signed certificate in certificate chain'
+
+# tls_trust_hint <step> <file|->...: when a file (or stdin, given as -) holds
+# one of those errors, prints a one-line [WARN] naming SBOM_EXTRA_CA_CERTS,
+# once per run. A step that fails this way most often sits behind a proxy
+# that inspects TLS.
+TLS_TRUST_HINT_SHOWN=""
+tls_trust_hint() {
+    local step="$1"; shift
+    [ -z "$TLS_TRUST_HINT_SHOWN" ] || return 0
+    [ "$#" -gt 0 ] || return 0
+    grep -qE -- "$TLS_TRUST_ERROR_RE" "$@" 2>/dev/null || return 0
+    TLS_TRUST_HINT_SHOWN=1
+    if [ -n "${SBOM_EXTRA_CA_CERTS:-}${BOMLENS_EXTRA_CA_CERTS:-}" ]; then
+        echo "[WARN] $step: a TLS certificate was not trusted even with the CA bundle in SBOM_EXTRA_CA_CERTS; check that the bundle holds the root CA your proxy signs with." >&2
+    else
+        echo "[WARN] $step: a TLS certificate was not trusted, most likely by a proxy that inspects HTTPS. Set SBOM_EXTRA_CA_CERTS to the proxy's CA bundle (PEM) and scan again." >&2
+    fi
+    return 0
 }
 
 # Folders whose manifests a source scan leaves out by default: test suites and

@@ -100,7 +100,7 @@ jq -n \
     --arg outfile "$OUTFILE" --arg spec "$CDX_SPEC_VERSION" \
     --arg fetch "$fetch" --arg gotc "$gotoolchain" \
     --arg pname "${PROJECT_NAME:-}" --arg pver "${PROJECT_VERSION:-}" \
-    --arg prepenv "$BUILD_PREP_ENV_NAMES $PROXY_ENV_NAMES" --arg netenv "$STAGE2_NETWORK_ENV_NAMES" \
+    --arg prepenv "$BUILD_PREP_ENV_NAMES $PROXY_ENV_NAMES $EXTRA_CA_ENV_NAMES" --arg netenv "$STAGE2_NETWORK_ENV_NAMES" \
     --arg prep2 "$BUILD_PREP_ENV_NAMES" \
     --argjson fp "$fingerprint" '
     def nn: if . == "" then null else . end;

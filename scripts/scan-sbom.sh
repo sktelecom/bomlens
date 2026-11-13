@@ -798,6 +798,10 @@ Environment:
                          about 1.5 GB; set it empty to download on every scan);
                          HTTP(S)_PROXY, NO_PROXY, TRIVY_*, EPSS_API and
                          KEV_URL are passed on to the containers by name
+  SBOM_EXTRA_CA_CERTS    A CA bundle (PEM) to trust in the scan containers, for
+                         a proxy that inspects TLS (re-signs HTTPS with its own
+                         CA); mounted read-only and added to the system bundle,
+                         Node.js and the Java trust store
   BOMLENS_GO_VULNDB      With --security, also match Go modules against the Go
                          vulnerability database snapshot in the image (default:
                          true; set false to skip). A snapshot older than
@@ -1050,6 +1054,13 @@ _pull_optin() {
 # unset SBOM_PULL is never read as empty by that call.
 SBOM_PULL="${SBOM_PULL:-missing}"
 
+# SBOM_EXTRA_CA_CERTS: the CA bundle of a proxy that inspects TLS. Checked
+# here, before any container starts, and mounted read-only into each scan
+# container at EXTRA_CA_TARGET (extra_ca_run). BOMLENS_EXTRA_CA_CERTS is that
+# path inside the container: a value in this shell is not passed on.
+unset BOMLENS_EXTRA_CA_CERTS
+EXTRA_CA_HOST="$(extra_ca_mount)" || exit 1
+
 # ========================================================
 # Web UI mode
 # ========================================================
@@ -1166,11 +1177,15 @@ if [ "$UI_MODE" = "true" ]; then
     # same way as for a CLI scan, so they follow SBOM_SCANNER_IMAGE there too.
     UI_IMAGE_FLAGS=(-e SBOM_SCANNER_IMAGE="$POSTPROCESS_IMAGE" -e SBOM_FIRMWARE_IMAGE="$FIRMWARE_IMAGE"
                     -e SBOM_AIBOM_IMAGE="$AIBOM_IMAGE" -e SBOM_DEEP_CVE_IMAGE="$DEEP_CVE_IMAGE")
+    # SBOM_EXTRA_CA_CERTS: the UI container trusts it, and the containers it
+    # starts see the same file through --volumes-from.
+    UI_CA_FLAGS=()
+    [ -z "$EXTRA_CA_HOST" ] || UI_CA_FLAGS=(-v "$(hostpath "$EXTRA_CA_HOST"):$EXTRA_CA_TARGET:ro" -e "BOMLENS_EXTRA_CA_CERTS=$EXTRA_CA_TARGET")
     ensure_image_fresh "$POSTPROCESS_IMAGE"
     exec "${DOCKER_ENV[@]}" docker run --rm "${TTY_FLAGS[@]}" -p "${UI_BIND_ADDRESS}:${UI_PORT}:8080" \
         -v "$(hostpath "$UI_BASE")":/src -v "$(hostpath "$UI_BASE")":/host-output \
         "${MOUNT_FLAGS[@]}" "${HF_FLAGS[@]}" "${GO_ENV_FLAGS[@]}" "${PREP_ENV_FLAGS[@]}" "${CANCEL_ENV_FLAGS[@]}" "${TRIVY_CACHE_FLAGS[@]}" "${UI_CACHE_FLAGS[@]}" "${CDXGEN_ENV_FLAGS[@]}" \
-        "${UI_GUARD_FLAGS[@]}" "${UI_IMAGE_FLAGS[@]}" \
+        "${UI_GUARD_FLAGS[@]}" "${UI_IMAGE_FLAGS[@]}" "${UI_CA_FLAGS[@]}" \
         -v /var/run/docker.sock:/var/run/docker.sock \
         -e MODE=UI -e UI_PORT=8080 -e SBOM_UI_HOST_DIR="$(hostpath "$UI_BASE")" \
         -e SBOM_UI_SCAN_ROOTS="$SCAN_ROOTS" -e EXTERNAL_LOOKUP="$EXTERNAL_LOOKUP" \
@@ -1534,6 +1549,15 @@ pp_env() {
     if [ "${#_gv[@]}" -eq 2 ]; then
         printf ' -v %q -e BOMLENS_GO_VULNDB_PATH=%s' "$(hostpath "${_gv[0]}"):${_gv[1]}:ro" "${_gv[1]}"
     fi
+    extra_ca_run
+}
+
+# SBOM_EXTRA_CA_CERTS (checked above as EXTRA_CA_HOST), mounted read-only at
+# EXTRA_CA_TARGET with BOMLENS_EXTRA_CA_CERTS naming it. Quoted for the eval'd
+# docker commands of stage 1 and stage 2.
+extra_ca_run() {
+    [ -n "$EXTRA_CA_HOST" ] || return 0
+    printf ' -v %q -e BOMLENS_EXTRA_CA_CERTS=%s' "$(hostpath "$EXTRA_CA_HOST"):$EXTRA_CA_TARGET:ro" "$EXTRA_CA_TARGET"
 }
 
 # The docker CLI forwards a name-only `-e VAR` from its own environment, so the
@@ -3213,6 +3237,7 @@ if [ "$MODE" = "SOURCE" ]; then
         -e HOST_GOTOOLCHAIN="\"$HOST_GOTOOLCHAIN\"" -e GOPROXY -e GOSUMDB \
         $PREP_ENV_ARGS \
         $REACH_ARGS \
+        "$(extra_ca_run)" \
         --entrypoint sh "\"$CDX_IMG\"" \
         /tmp/build-prep.sh /app "\"/out/$OUTPUT_FILE\"" "$CDX_SPEC_VERSION" > "$STAGE1_LOG" 2>&1 &
     STAGE1_PID=$!
@@ -3226,6 +3251,9 @@ if [ "$MODE" = "SOURCE" ]; then
     [ -z "$REACH_TOOLS_DIR" ] || rm -rf -- "$REACH_TOOLS_DIR"
     REACH_TOOLS_DIR=""
     STAGE1_RC=$("${DOCKER_ENV[@]}" docker wait "$STAGE1_CONTAINER" 2>/dev/null || echo 1)
+    # A package registry or download refused for an untrusted certificate (a
+    # proxy that inspects TLS) gets one line naming SBOM_EXTRA_CA_CERTS.
+    tls_trust_hint "cdxgen" "$STAGE1_LOG" 2>&1
     # When stage 1 left no SBOM, stage 2 takes its place with the manifest-only
     # syft scan: the same fallback a caller running the execution plan gets
     # (entrypoint.sh, POSTPROCESS), so the CLI and that path cannot drift
