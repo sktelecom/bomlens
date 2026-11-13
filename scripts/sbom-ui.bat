@@ -70,15 +70,19 @@ REM --- extra CA bundle (a proxy that inspects TLS) -------------------------
 REM Point SBOM_EXTRA_CA_CERTS at the proxy's CA bundle (PEM) and the UI
 REM container trusts it, as do the scan containers it starts (they see the
 REM same file through --volumes-from). Same as scan-sbom.sh --ui.
+REM A relative path is made absolute first: Docker would read a bare name as
+REM a named volume. --mount, not -v: a file the engine cannot see stops
+REM docker run instead of turning into an empty folder in the container.
 set "CA_V="
 if not defined SBOM_EXTRA_CA_CERTS goto :ca_done
-if exist "%SBOM_EXTRA_CA_CERTS%\" goto :err_ca_missing
-if not exist "%SBOM_EXTRA_CA_CERTS%" goto :err_ca_missing
 call :check_ca_chars
 if defined BAD_CHAR goto :err_ca_badchar
+for %%F in ("%SBOM_EXTRA_CA_CERTS%") do set "SBOM_EXTRA_CA_CERTS=%%~fF"
+if exist "%SBOM_EXTRA_CA_CERTS%\" goto :err_ca_missing
+if not exist "%SBOM_EXTRA_CA_CERTS%" goto :err_ca_missing
 findstr /C:"-----BEGIN CERTIFICATE-----" "%SBOM_EXTRA_CA_CERTS%" >nul 2>&1
 if errorlevel 1 goto :err_ca_not_pem
-set "CA_V=-v "%SBOM_EXTRA_CA_CERTS%":/bomlens-ca/extra.pem:ro -e BOMLENS_EXTRA_CA_CERTS=/bomlens-ca/extra.pem"
+set "CA_V=--mount "type=bind,source=%SBOM_EXTRA_CA_CERTS%,target=/bomlens-ca/extra.pem,readonly" -e BOMLENS_EXTRA_CA_CERTS=/bomlens-ca/extra.pem"
 :ca_done
 
 REM --- Docker checks (the real prerequisite) -------------------------------
@@ -299,9 +303,11 @@ if not "%SBOM_UI_MOUNT_DIR:>=%"=="%SBOM_UI_MOUNT_DIR%" set "BAD_CHAR=1"
 if not "%SBOM_UI_MOUNT_DIR:^=%"=="%SBOM_UI_MOUNT_DIR%" set "BAD_CHAR=1"
 goto :eof
 
-REM The same check for the CA bundle path.
+REM The same check for the CA bundle path, plus the comma, which would split
+REM the --mount value.
 :check_ca_chars
 set "BAD_CHAR="
+if not "%SBOM_EXTRA_CA_CERTS:,=%"=="%SBOM_EXTRA_CA_CERTS%" set "BAD_CHAR=1"
 if not "%SBOM_EXTRA_CA_CERTS:!=%"=="%SBOM_EXTRA_CA_CERTS%" set "BAD_CHAR=1"
 if not "%SBOM_EXTRA_CA_CERTS:&=%"=="%SBOM_EXTRA_CA_CERTS%" set "BAD_CHAR=1"
 if not "%SBOM_EXTRA_CA_CERTS:|=%"=="%SBOM_EXTRA_CA_CERTS%" set "BAD_CHAR=1"
@@ -434,7 +440,7 @@ set "M_ERR_NO_ENGINE=[error] The Docker engine is not running. Start Rancher Des
 set "M_ERR_MOUNT_MISSING=[error] SBOM_UI_MOUNT_DIR folder does not exist:"
 set "M_ERR_MOUNT_BADCHAR=[error] SBOM_UI_MOUNT_DIR contains a character that cannot be passed to Docker safely. Please use a path without & ^ | < > percent or exclamation marks:"
 set "M_ERR_CA_MISSING=[error] SBOM_EXTRA_CA_CERTS does not name a file. Point it at your proxy's CA bundle in PEM form, or remove it:"
-set "M_ERR_CA_BADCHAR=[error] SBOM_EXTRA_CA_CERTS contains a character that cannot be passed to Docker safely. Please use a path without & ^ | < > percent or exclamation marks:"
+set "M_ERR_CA_BADCHAR=[error] SBOM_EXTRA_CA_CERTS contains a character that cannot be passed to Docker safely. Please use a path without & ^ | < > commas, percent or exclamation marks:"
 set "M_ERR_CA_NOT_PEM=[error] SBOM_EXTRA_CA_CERTS holds no PEM certificate (no -----BEGIN CERTIFICATE----- line). Export the proxy's CA as Base-64 (PEM):"
 set "M_ERR_NO_IMAGE=[error] The scanner image is not present and SBOM_PULL is set to never:"
 set "M_ERR_LOAD_FAILED=[error] Could not load the scanner image from the file:"
@@ -470,7 +476,7 @@ set "M_ERR_NO_ENGINE=[오류] Docker 엔진이 실행 중이 아닙니다. Ranch
 set "M_ERR_MOUNT_MISSING=[오류] SBOM_UI_MOUNT_DIR 폴더가 없습니다:"
 set "M_ERR_MOUNT_BADCHAR=[오류] SBOM_UI_MOUNT_DIR에 Docker로 안전하게 넘길 수 없는 문자가 있습니다. & ^ | < > 퍼센트 느낌표가 없는 경로를 사용해 주세요:"
 set "M_ERR_CA_MISSING=[오류] SBOM_EXTRA_CA_CERTS가 가리키는 파일이 없습니다. 프록시의 CA 번들(PEM)을 지정하거나 이 설정을 지우세요:"
-set "M_ERR_CA_BADCHAR=[오류] SBOM_EXTRA_CA_CERTS에 Docker로 안전하게 넘길 수 없는 문자가 있습니다. & ^ | < > 퍼센트 느낌표가 없는 경로를 사용해 주세요:"
+set "M_ERR_CA_BADCHAR=[오류] SBOM_EXTRA_CA_CERTS에 Docker로 안전하게 넘길 수 없는 문자가 있습니다. & ^ | < > 쉼표 퍼센트 느낌표가 없는 경로를 사용해 주세요:"
 set "M_ERR_CA_NOT_PEM=[오류] SBOM_EXTRA_CA_CERTS 파일에 PEM 인증서(-----BEGIN CERTIFICATE----- 줄)가 없습니다. 프록시의 CA를 Base-64(PEM) 형식으로 내보내세요:"
 set "M_ERR_NO_IMAGE=[오류] 스캐너 이미지가 없고 SBOM_PULL이 never로 설정되어 있습니다:"
 set "M_ERR_LOAD_FAILED=[오류] 파일에서 스캐너 이미지를 불러오지 못했습니다:"
