@@ -1178,7 +1178,14 @@ if (gradle.parent == null) {
                                 gavs(cfg).each { lines << ("O\t" + path + "\t" + it) }
                             } catch (Throwable e) {
                                 lines << ("X\t" + path + "\t" + cfg.name)
-                                System.err.println("bomlens: could not resolve " + cfg.name + " of project " + path + ": " + why(e))
+                                def msg = why(e)
+                                System.err.println("bomlens: could not resolve " + cfg.name + " of project " + path + ": " + msg)
+                                // A toolchain no JDK matches fails the run here too (a project with
+                                // no runtimeClasspath, a Kotlin Multiplatform root), so the stage 1
+                                // rerun in the right JDK image can follow; any other reason does not.
+                                if (failure == null && msg =~ /Cannot find a Java installation|No (compatible|matching) toolchains found/) {
+                                    failure = "bomlens: could not resolve " + cfg.name + " of project " + path + ": " + msg
+                                }
                             }
                         }
                     }

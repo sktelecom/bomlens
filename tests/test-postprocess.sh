@@ -7205,6 +7205,15 @@ $_grs_report" ) 2>&1
         printf 'P\t:kmp\nX\t:kmp\tjvmRuntimeClasspath\n' > "$WORK/grs-x/%3Akmp.txt"
         _o=$(_grs_run GRS_REPORT="$WORK/grs-x")
         _grs_expect "an X line without a failed run (rc 0): full graph, and no marker, so the warm-up is not skipped for it" "$_o" SET ""
+        # The init script also fails the run for a toolchain error in a configuration of a
+        # project with no runtimeClasspath (that Groovy runs in tests/test-gradle-runtime.sh).
+        # Here: the texts it looks for must be ones prep_step turns into java-toolchain-missing=N.
+        if grep -qF 'msg =~ /Cannot find a Java installation|No (compatible|matching) toolchains found/' "$PREP" \
+            && grep -qF 'Cannot find a Java installation on your machine|No (compatible|matching) toolchains found for request' "$PREP"; then
+            pass "the init script's toolchain patterns match the ones prep_step turns into java-toolchain-missing=N"
+        else
+            fail "toolchain patterns of the init script and prep_step drifted"
+        fi
         _o=$(_grs_run ANDROID_HOME=/opt/android-sdk GRS_PROJ_RC=1)
         _grs_expect "ANDROID_HOME, the project list fails: android-release-classpath recorded as failed" "$_o" FAILED "android-release-classpath"
 
