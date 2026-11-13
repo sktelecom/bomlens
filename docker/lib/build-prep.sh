@@ -1125,13 +1125,23 @@ if (gradle.parent == null) {
         n ==~ /^.*[A-Za-z0-9_]Test(Fixtures)?(Compile|Runtime|Implementation|Api|Only|AnnotationProcessor|Classpath).*$/ ||
         n.contains('-test-') ||
         n ==~ /^(jacoco|kover|checkstyle|pmd|spotbugs|codenarc|detekt|ktlint|errorprone|annotationProcessor|kapt|ksp|dokka|lint|_internal|kotlinCompiler|kotlinNativeCompiler|kotlinKlib|kotlinBuildToolsApi|kotlinScripting).*$/ ||
-        n ==~ /^.*AnnotationProcessor(Classpath)?$/
+        n ==~ /^.*AnnotationProcessor(Classpath)?$/ ||
+        // Deprecated configurations Gradle 6 and 7 warn about when they are resolved.
+        n == 'archives' || n == 'default'
     }
     gradle.allprojects { p ->
         def path = p.path
         p.tasks.register('bomlensResolve') { t ->
             t.doLast {
                 def lines = ["P\t" + path]
+                def failure = null
+                // What went wrong, with its causes: a toolchain Gradle cannot find is
+                // named in a cause, and build-prep reads it from the build's stderr.
+                def why = { Throwable err ->
+                    def parts = []
+                    while (err != null && parts.size() < 6) { if (err.message) { parts << err.message }; err = err.cause }
+                    parts.join(' | ')
+                }
                 def gavs = { cfg ->
                     def found = new TreeSet()
                     def res = cfg.incoming.resolutionResult
@@ -1159,6 +1169,7 @@ if (gradle.parent == null) {
                         gavs(rt).each { lines << ("R\t" + path + "\t" + it) }
                     } catch (Throwable e) {
                         lines << ("X\t" + path + "\truntimeClasspath")
+                        failure = "bomlens: could not resolve runtimeClasspath of project " + path + ": " + why(e)
                     }
                 } else {
                     p.configurations.toList().each { cfg ->
@@ -1167,11 +1178,16 @@ if (gradle.parent == null) {
                                 gavs(cfg).each { lines << ("O\t" + path + "\t" + it) }
                             } catch (Throwable e) {
                                 lines << ("X\t" + path + "\t" + cfg.name)
+                                System.err.println("bomlens: could not resolve " + cfg.name + " of project " + path + ": " + why(e))
                             }
                         }
                     }
                 }
                 new File(outDir, java.net.URLEncoder.encode(path, 'UTF-8') + '.txt').text = lines.join('\n') + '\n'
+                // A runtimeClasspath that cannot be resolved fails the run, so the step is
+                // recorded as failed and its message reaches the log (a missing toolchain
+                // is recognised there); the shell would otherwise only see an X line.
+                if (failure != null) { throw new org.gradle.api.GradleException(failure) }
             }
         }
     }
@@ -1189,9 +1205,13 @@ if (gradle.parent == null) {
 }
 GRADLE_INIT
     log "gradle dependencies (runtime classpath of each project)"
+    # prep_step's own stderr (the failure text and the java-toolchain-missing
+    # marker) is kept to see whether the same failure would repeat, then shown.
+    _gr_err="$_gr_dir/err.txt"
     prep_step gradle-dependencies "$PREP_TIMEOUT_GRADLE" ${GRADLEW_SH:+"$GRADLEW_SH"} "$GRADLEW" --no-daemon -q --console=plain \
-        --no-configuration-cache --init-script "$_gr_init" "-Dbomlens.gradle.out=$_gr_out" bomlensRuntime >/dev/null
+        --no-configuration-cache --init-script "$_gr_init" "-Dbomlens.gradle.out=$_gr_out" bomlensRuntime >/dev/null 2>"$_gr_err"
     _gr_rc=$?
+    cat "$_gr_err" >&2
     if [ "$_gr_rc" -eq 0 ]; then
         # Lines: I <included build>, Z <number of projects>, P <project>,
         # H <project has a runtimeClasspath>, R <project> <coordinate> (its
@@ -1223,6 +1243,8 @@ GRADLE_INIT
         else
             log "gradle: no runtime classpath dependency found; using full graph"
         fi
+    elif grep -q 'java-toolchain-missing=' "$_gr_err" 2>/dev/null; then
+        log "gradle: no JDK matches the build's toolchain; the root project's dependencies would fail the same way (full graph)"
     elif [ "$_gr_rc" -ne 124 ]; then
         log "gradle: could not read every project's dependencies; resolving the root project only (full graph)"
         prep_step gradle-dependencies "$PREP_TIMEOUT_GRADLE" ${GRADLEW_SH:+"$GRADLEW_SH"} "$GRADLEW" --no-daemon dependencies >/dev/null \
