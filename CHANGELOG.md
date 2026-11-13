@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - A `gradlew` or `mvnw` without the executable bit runs through `sh` for the dependency step, instead of the image's Gradle or Maven. The Gradle version that runs is logged.
+- A Gradle source scan reads licenses from the POMs Gradle downloaded: cdxgen gets `GRADLE_CACHE_DIR` pointing at Gradle's own cache, unless it is already set.
 
 ## [v1.14.5] - 2026-11-12
 

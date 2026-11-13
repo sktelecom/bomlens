@@ -8887,6 +8887,32 @@ grep -q '^\[build-prep\] gradle: sh ./gradlew runs Gradle 5.6.4$' "$GW_ROOT/log"
     && pass "the Gradle version line appears once" \
     || fail "Gradle version line count: $(grep -c 'runs Gradle' "$GW_ROOT/log")"
 
+echo "== gradle: cdxgen reads the POMs Gradle downloaded (GRADLE_CACHE_DIR) =="
+# HOME is not the account home Gradle uses, so cdxgen is told where Gradle's
+# cache is, unless the caller already set GRADLE_CACHE_DIR.
+GC_ROOT="$WORK/gradle-cache-dir"; mkdir -p "$GC_ROOT/bin" "$GC_ROOT/src" "$GC_ROOT/out" "$GC_ROOT/acct" "$GC_ROOT/home"
+printf "plugins { id 'java' }\n" > "$GC_ROOT/src/build.gradle"
+printf '#!/bin/sh\necho "root:x:0:0:root:%s:/bin/sh"\n' "$GC_ROOT/acct" > "$GC_ROOT/bin/getent"
+printf '#!/bin/sh\nexit 0\n' > "$GC_ROOT/bin/gradle"
+printf '#!/bin/sh\nout=""; prev=""; for a in "$@"; do [ "$prev" = "-o" ] && out="$a"; prev="$a"; done\necho "${GRADLE_CACHE_DIR:-unset}" > "%s/seen"\nprintf %s > "$out"\n' "$GC_ROOT" "'{\"bomFormat\":\"CycloneDX\",\"specVersion\":\"1.6\",\"version\":1,\"metadata\":{},\"components\":[]}'" > "$GC_ROOT/bin/cdxgen"
+chmod +x "$GC_ROOT/bin/getent" "$GC_ROOT/bin/gradle" "$GC_ROOT/bin/cdxgen"
+_gc_run() { rm -f "$GC_ROOT/seen"
+    env -u ANDROID_HOME "$@" PATH="$GC_ROOT/bin:$PATH" HOME="$GC_ROOT/home" \
+        sh "$LIB/build-prep.sh" "$GC_ROOT/src" "$GC_ROOT/out/bom.json" > "$GC_ROOT/log" 2>&1
+    cat "$GC_ROOT/seen" 2>/dev/null; }
+_gc_seen=$(_gc_run -u GRADLE_USER_HOME -u GRADLE_CACHE_DIR)
+[ "$_gc_seen" = "$GC_ROOT/acct/.gradle/caches/modules-2/files-2.1" ] \
+    && pass "cdxgen looks for Gradle's downloads under the account home's .gradle, not HOME" \
+    || fail "GRADLE_CACHE_DIR with the account home: [$_gc_seen]" "$(grep gradle "$GC_ROOT/log" | head -5)"
+_gc_seen=$(_gc_run -u GRADLE_CACHE_DIR GRADLE_USER_HOME="$GC_ROOT/guh")
+[ "$_gc_seen" = "$GC_ROOT/guh/caches/modules-2/files-2.1" ] \
+    && pass "a GRADLE_USER_HOME is the cache cdxgen reads" \
+    || fail "GRADLE_CACHE_DIR with GRADLE_USER_HOME: [$_gc_seen]"
+_gc_seen=$(_gc_run -u GRADLE_USER_HOME GRADLE_CACHE_DIR=/elsewhere/files-2.1)
+[ "$_gc_seen" = "/elsewhere/files-2.1" ] \
+    && pass "a GRADLE_CACHE_DIR the caller set is kept" \
+    || fail "preset GRADLE_CACHE_DIR: [$_gc_seen]"
+
 echo "== prep_step: every resolution step runs through it (no bare invocation left) =="
 # The pre-prep_step patterns (silently discarded stderr, no time limit) must
 # not reappear alongside prep_step for the same command.

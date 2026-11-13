@@ -1082,6 +1082,20 @@ if { [ -f build.gradle ] || [ -f build.gradle.kts ] || [ -f settings.gradle ] ||
     gradle_settings_copy
 fi
 
+# cdxgen reads the POMs Gradle downloaded (licenses when its own POM request
+# fails) from $HOME/.gradle unless GRADLE_CACHE_DIR or GRADLE_USER_HOME says
+# otherwise, while Gradle uses the account's home (/root, where the CLI mounts
+# BomLens's Gradle cache) and HOME is /tmp/sbomhome. So it is pointed at
+# Gradle's own cache. A GRADLE_CACHE_DIR the caller set is kept.
+if [ -z "${GRADLE_CACHE_DIR:-}" ]; then
+    _gcd_home="${GRADLE_USER_HOME:-}"
+    if [ -z "$_gcd_home" ]; then
+        _gcd_acct="$( (getent passwd "$(id -u)" 2>/dev/null || true) | cut -d: -f6)"
+        _gcd_home="${_gcd_acct:-/root}/.gradle"
+    fi
+    export GRADLE_CACHE_DIR="$_gcd_home/caches/modules-2/files-2.1"
+fi
+
 # Gradle subproject named like the root project. cdxgen runs
 # `<subproject>:dependencies` only for a subproject whose purl differs from the
 # root's, so a subproject with the root's name (and, through allprojects, its
