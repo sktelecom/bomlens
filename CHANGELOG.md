@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A source scan no longer deletes go.mod, lock files, vendor/ or other build folders from the scanned folder after an earlier scan of it whose cdxgen container never started. The cleanup of an interrupted scan runs only when that scan recorded a complete snapshot of the folder, and the CLI and the web UI remove the record a scan leaves when its cdxgen container did not get that far. The cleanup also leaves in place any file or folder that git tracks.
 - A `gradlew` or `mvnw` without the executable bit runs through `sh` for the dependency step, instead of the image's Gradle or Maven. The Gradle version that runs is logged.
 - A Gradle source scan reads licenses from the POMs Gradle downloaded: cdxgen gets `GRADLE_CACHE_DIR` pointing at Gradle's own cache, unless it is already set.
 - An Android source scan marks the components on the release runtime classpath `scope: required`; cdxgen had marked some `optional` from a test configuration.

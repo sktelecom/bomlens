@@ -60,6 +60,9 @@ opted_out() { case "$1" in 1|true) return 0 ;; esac; return 1; }
 # ---------------------------------------------------------------------------
 GUARD_DIR=""
 GUARD_NOEXEC=""
+# The host-persistent guard-state mount. BOMLENS_GUARD_STATE_ROOT names
+# another folder (tests only).
+GUARD_STATE_ROOT="${BOMLENS_GUARD_STATE_ROOT:-/bomlens-state}"
 
 # Resolver-owned paths, relative to $SRC. maxdepth 4 covers multi-module trees
 # (app/build, services/api/go.mod) without walking a whole monorepo; .git and
@@ -109,8 +112,8 @@ guard_snapshot() {
     # run, so a later invocation can finish the restore. Falls back to the
     # normal ephemeral dir when either is absent (unset key, older caller,
     # no /bomlens-state mount) -- unchanged from before this existed.
-    if [ -n "${BOMLENS_GUARD_ID:-}" ] && [ -d /bomlens-state ]; then
-        GUARD_DIR="/bomlens-state/$BOMLENS_GUARD_ID"
+    if [ -n "${BOMLENS_GUARD_ID:-}" ] && [ -d "$GUARD_STATE_ROOT" ]; then
+        GUARD_DIR="$GUARD_STATE_ROOT/$BOMLENS_GUARD_ID"
         mkdir -p "$GUARD_DIR" 2>/dev/null || GUARD_DIR=""
     fi
     [ -n "$GUARD_DIR" ] || GUARD_DIR=$(mktemp -d 2>/dev/null) || { GUARD_DIR=""; return 0; }
@@ -122,12 +125,24 @@ guard_snapshot() {
     done
     guard_paths f > "$GUARD_DIR/files.before" 2>/dev/null
     guard_paths d > "$GUARD_DIR/dirs.before" 2>/dev/null
-    echo "$GUARD_NAMES_VERSION" > "$GUARD_DIR/names.version" 2>/dev/null
     while IFS= read -r _f; do
         [ -n "$_f" ] || continue
         mkdir -p "$GUARD_DIR/tree/$(dirname "$_f")" 2>/dev/null
         cp -p "$_f" "$GUARD_DIR/tree/$_f" 2>/dev/null
     done < "$GUARD_DIR/files.before"
+    # Written last: the restore-only mode below finishes a snapshot only when
+    # this file is there, so a run stopped while the lists were being written
+    # leaves nothing it would act on.
+    echo "$GUARD_NAMES_VERSION" > "$GUARD_DIR/names.version" 2>/dev/null
+}
+
+# guard_git_tracked PATH: true when PATH (relative to the current folder) is
+# tracked by git. Used only to keep a path the restore would otherwise remove;
+# without git, or outside a work tree, nothing counts as tracked.
+# safe.directory: the tree is often owned by another uid than this container's.
+guard_git_tracked() {
+    [ "${_g_git:-0}" = 1 ] || return 1
+    git -c safe.directory='*' ls-files --error-unmatch -- "$1" >/dev/null 2>&1
 }
 
 # Idempotent: clears GUARD_DIR first, so the explicit call and the trap that
@@ -140,6 +155,18 @@ guard_restore() {
         [ -x "$_w" ] && chmod a-x "$_w" 2>/dev/null
     done
     GUARD_NOEXEC=""
+    # Without both lists there is nothing to compare with: every resolver-owned
+    # path would read as new and be removed. Drop the state instead.
+    if [ ! -f "$_g/files.before" ] || [ ! -f "$_g/dirs.before" ]; then
+        log "source-tree snapshot incomplete; nothing restored or removed"
+        rm -rf "$_g"
+        return 0
+    fi
+    _g_git=0
+    if command -v git >/dev/null 2>&1 \
+       && [ "$(git -c safe.directory='*' rev-parse --is-inside-work-tree 2>/dev/null)" = "true" ]; then
+        _g_git=1
+    fi
     _rst=0; _del=0
     while IFS= read -r _f; do
         [ -n "$_f" ] || continue
@@ -162,6 +189,10 @@ guard_restore() {
         # the tree when the run folder is not on a shared mount.
         [ "$SRC/${_f#./}" = "$OUT" ] && continue
         grep -qxF "$_f" "$_g/files.before" 2>/dev/null && continue
+        if guard_git_tracked "$_f"; then
+            log "WARN: $_f is tracked by git; left in place"
+            continue
+        fi
         rm -f "$_f" 2>/dev/null && _del=$((_del + 1))
     done < "$_g/files.after"
     guard_paths d "$_gnv" > "$_g/dirs.after" 2>/dev/null
@@ -169,6 +200,10 @@ guard_restore() {
         [ -n "$_d" ] || continue
         [ -d "$_d" ] || continue
         grep -qxF "$_d" "$_g/dirs.before" 2>/dev/null && continue
+        if guard_git_tracked "$_d"; then
+            log "WARN: $_d holds files tracked by git; left in place"
+            continue
+        fi
         rm -rf "$_d" 2>/dev/null && _del=$((_del + 1))
         # Drop the parents the run created on the way (gradle's app/build leaves
         # an empty app/ behind when the module dir itself is new). rmdir refuses
@@ -515,10 +550,21 @@ mark_prep_applied() {
 # is gone before asking us to finish what it started; this reuses
 # guard_restore's own diff logic instead of reimplementing it host-side. No
 # resolvers, no cdxgen -- filesystem cleanup only, and fast.
+# Only a snapshot taken in full (both lists and names.version, which
+# guard_snapshot writes last) is finished. A record without one, such as the
+# one a scan whose cdxgen container never started leaves, is removed and
+# nothing in the tree is touched.
 if opted_out "${BOMLENS_GUARD_RESTORE_ONLY:-}"; then
-    if [ -n "${BOMLENS_GUARD_ID:-}" ] && [ -d "/bomlens-state/$BOMLENS_GUARD_ID" ]; then
-        GUARD_DIR="/bomlens-state/$BOMLENS_GUARD_ID"
-        guard_restore
+    if [ -n "${BOMLENS_GUARD_ID:-}" ] && [ -d "$GUARD_STATE_ROOT/$BOMLENS_GUARD_ID" ]; then
+        GUARD_DIR="$GUARD_STATE_ROOT/$BOMLENS_GUARD_ID"
+        if [ -f "$GUARD_DIR/files.before" ] && [ -f "$GUARD_DIR/dirs.before" ] \
+           && [ -f "$GUARD_DIR/names.version" ]; then
+            guard_restore
+        else
+            log "no complete source-tree snapshot for this folder; removing the record without touching the tree"
+            rm -rf "$GUARD_DIR"
+            GUARD_DIR=""
+        fi
     fi
     exit 0
 fi
