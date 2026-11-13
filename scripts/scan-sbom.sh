@@ -3176,6 +3176,12 @@ if [ "$MODE" = "SOURCE" ]; then
     # the same host can land on the same PID space at different times, or a
     # container from an earlier crashed run can still be named this if it was
     # never cleaned up.
+    # A Java build whose Gradle asked for a toolchain JDK this image lacks
+    # (java_retry_image) runs once more, in the image with that JDK; the loop
+    # below ends after the second run. A new container takes the guard slot:
+    # the first run's build-prep.sh restored the tree and cleared it.
+    STAGE1_TRY=1; STAGE1_FIRST_SBOM=""; STAGE1_FIRST_RC=""; STAGE1_FIRST_LOG=""; STAGE1_FIRST_IMG=""
+    while :; do
     RUNNING_CONTAINER_NAME="bomlens-scan-$$-$RANDOM"
     setup_guard_state
     GUARD_STATE_ARGS=""
@@ -3226,6 +3232,39 @@ if [ "$MODE" = "SOURCE" ]; then
     [ -z "$REACH_TOOLS_DIR" ] || rm -rf -- "$REACH_TOOLS_DIR"
     REACH_TOOLS_DIR=""
     STAGE1_RC=$("${DOCKER_ENV[@]}" docker wait "$STAGE1_CONTAINER" 2>/dev/null || echo 1)
+    [ "$STAGE1_TRY" -eq 1 ] && [ "$LANG_DET" = java ] || break
+    java_retry_image "$SCAN_INPUT_DIR" "$STAGE1_LOG" "$CDX_IMG"
+    [ -n "$JAVA_RETRY_IMAGE" ] || break
+    if ! java_retry_image_ready "$JAVA_RETRY_IMAGE"; then
+        _s1_why="could not be pulled"
+        [ "$SBOM_PULL" != never ] || _s1_why="SBOM_PULL=never"
+        echo "[WARN] Gradle asked for Java $JAVA_RETRY_JDK, but $JAVA_RETRY_IMAGE is not here ($_s1_why); keeping the result from $CDX_IMG."
+        break
+    fi
+    echo "[INFO] Gradle asked for Java $JAVA_RETRY_JDK; rerunning in $JAVA_RETRY_IMAGE"
+    "${DOCKER_ENV[@]}" docker rm -f "$STAGE1_CONTAINER" >/dev/null 2>&1 || true
+    # The first result stays aside until the second run has one of its own.
+    if [ -s "$OUTPUT_HOST_DIR/$OUTPUT_FILE" ] && STAGE1_FIRST_SBOM=$(mktemp) \
+       && mv -f "$OUTPUT_HOST_DIR/$OUTPUT_FILE" "$STAGE1_FIRST_SBOM"; then
+        STAGE1_FIRST_RC="$STAGE1_RC"; STAGE1_FIRST_LOG="$STAGE1_LOG"; STAGE1_FIRST_IMG="$CDX_IMG"
+    else
+        [ -z "$STAGE1_FIRST_SBOM" ] || rm -f "$STAGE1_FIRST_SBOM"
+        STAGE1_FIRST_SBOM=""
+        rm -f "$OUTPUT_HOST_DIR/$OUTPUT_FILE" "$STAGE1_LOG"
+    fi
+    CDX_IMG="$JAVA_RETRY_IMAGE"; STAGE1_TRY=2
+    done
+    if [ -n "$STAGE1_FIRST_SBOM" ]; then
+        if [ "$STAGE1_RC" -ne 0 ] || [ ! -s "$OUTPUT_HOST_DIR/$OUTPUT_FILE" ]; then
+            echo "[WARN] The rerun in $CDX_IMG left no SBOM (rc=$STAGE1_RC, log: $STAGE1_LOG); keeping the result from $STAGE1_FIRST_IMG."
+            "${DOCKER_ENV[@]}" docker rm -f "$STAGE1_CONTAINER" >/dev/null 2>&1 || true
+            mv -f "$STAGE1_FIRST_SBOM" "$OUTPUT_HOST_DIR/$OUTPUT_FILE"
+            STAGE1_RC="$STAGE1_FIRST_RC"; STAGE1_LOG="$STAGE1_FIRST_LOG"; CDX_IMG="$STAGE1_FIRST_IMG"
+        else
+            rm -f "$STAGE1_FIRST_SBOM" "$STAGE1_FIRST_LOG"
+        fi
+        STAGE1_FIRST_SBOM=""
+    fi
     # When stage 1 left no SBOM, stage 2 takes its place with the manifest-only
     # syft scan: the same fallback a caller running the execution plan gets
     # (entrypoint.sh, POSTPROCESS), so the CLI and that path cannot drift

@@ -1108,6 +1108,42 @@ EOF
     fi
 }
 
+# java_retry_image <dir> <stage-1 log> <image used>: sets JAVA_RETRY_IMAGE to
+# the cdxgen Java image to run stage 1 again in, or to nothing. Stage 1's build-prep.sh writes
+# "java-toolchain-missing=N" when Gradle failed for want of a Java N
+# toolchain, which covers a version this file cannot read (a version catalog,
+# a convention plugin's own logic). Sets JAVA_RETRY_JDK to N. Nothing when
+# CDXGEN_JAVA_IMAGE names the image, when no published image has Java N, when
+# that image is the one used, or when a Gradle wrapper of <dir> cannot run on
+# Java N (the second run would fail too).
+java_retry_image() {
+    local n img
+    JAVA_RETRY_IMAGE=""; JAVA_RETRY_JDK=""
+    [ -z "$(_java_image_override)" ] || return 0
+    [ -f "${2:-}" ] || return 0
+    n="$(grep -oE '^\[build-prep\] gradle-[a-z-]+: .*\(java-toolchain-missing=[0-9]+\)' "$2" 2>/dev/null \
+        | grep -oE '[0-9]+\)$' | tr -d ')' | grep -E '^[0-9]{1,3}$' | sed 's/^0*\([0-9]\)/\1/' | sort -n | tail -1)" || n=""
+    [ -n "$n" ] && _java_has_image "$n" || return 0
+    gradle_wrappers "${1:-}"
+    # shellcheck disable=SC2086 # one argument per version
+    case " $(_gradle_jdks $GRADLE_WRAPPER_VERSIONS) " in *" $n "*) ;; *) return 0 ;; esac
+    img="${CDXGEN_IMAGE_PREFIX}$(_java_image_name "$n"):$CDXGEN_TAG"
+    [ "$img" != "${3:-}" ] || return 0
+    # shellcheck disable=SC2034  # read by the caller after the call
+    {
+        JAVA_RETRY_IMAGE="$img"
+        JAVA_RETRY_JDK="$n"
+    }
+}
+
+# java_retry_image_ready <image>: true when the image is here or a pull of it
+# succeeds now. SBOM_PULL=never only looks, so an offline run does not try.
+java_retry_image_ready() {
+    docker image inspect "$1" >/dev/null 2>&1 && return 0
+    [ "${SBOM_PULL:-missing}" != never ] || return 1
+    docker pull -q "$1" >/dev/null 2>&1
+}
+
 # java_mixed_note <dir>: a mixed tree runs in the all-in-one image, whatever
 # the toolchain. Warn when a Gradle build in it declares one other than the
 # default Java image's.

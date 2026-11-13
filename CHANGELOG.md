@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - A Gradle toolchain declared through a variable picks the cdxgen Java image too: `JavaLanguageVersion.of(v)` and `jvmToolchain(v)` read `v` from its definition in the same file, taking the Gradle property it reads from `gradle.properties` or else its default (`def v = hasProperty('p') ? getProperty('p') : '25'`, `val v = findProperty("p")?.toString() ?: "25"`, `providers.gradleProperty("p").getOrElse("25")`, `val p: String by project`).
+- When Gradle fails in a Java source scan because no JDK matches its toolchain and another cdxgen Java image has that JDK, the dependency step runs once more in that image (`[INFO] Gradle asked for Java N; rerunning in <image>`), in the CLI and in the web UI. Not when `CDXGEN_JAVA_IMAGE` names the image, when the Gradle wrapper cannot run on that JDK, or when the image is not here and `SBOM_PULL=never`. If the second run leaves no SBOM, the first result is kept.
 
 ## [v1.14.5] - 2026-11-12
 

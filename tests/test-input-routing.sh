@@ -786,6 +786,51 @@ nested_root
 gradle_tree_add a/b/c/d/e/f; wrapper_at a/b/c/d/e/f gradle-6.9.4-bin.zip
 java_case "$J21" "a build six folders down is not read"
 
+echo "== a Gradle toolchain failure in stage 1 picks the image to run again in =="
+# build-prep.sh writes java-toolchain-missing=N when Gradle could not find a
+# Java N toolchain; java_retry_image turns that into the image to rerun in.
+RLOG="$LANGDIR/stage1.log"
+retry_case() {  # retry_case <want image or ""> <description> <image used> [CDXGEN_JAVA_IMAGE]
+    JAVA_RETRY_IMAGE="unset"
+    CDXGEN_JAVA_IMAGE="${4:-}" java_retry_image "$LANGDIR/proj" "$RLOG" "$3"
+    [ "$JAVA_RETRY_IMAGE" = "$1" ] && pass "$2" || fail "$2" "got '$JAVA_RETRY_IMAGE', want '$1'"
+}
+gradle_tree build.gradle "plugins { id 'java' }\n"
+printf '[build-prep] gradle-dependencies: failed (rc=1)\n[build-prep]   > Cannot find a Java installation on your machine (Linux 6.10 aarch64) matching: {languageVersion=25, vendor=any vendor}.\n[build-prep] gradle-dependencies: Gradle asked for a Java 25 toolchain, which this image does not have (java-toolchain-missing=25)\n' > "$RLOG"
+retry_case "$J25" "Java 25 asked for in the Java 21 image: rerun in the Java 25 image" "$J21"
+[ "$JAVA_RETRY_JDK" = 25 ] && pass "JAVA_RETRY_JDK names the JDK" || fail "JAVA_RETRY_JDK is '$JAVA_RETRY_JDK'"
+retry_case "" "no rerun in the image that already has that JDK" "$J25"
+retry_case "" "no rerun when CDXGEN_JAVA_IMAGE names the image" "registry.example/j:1" "registry.example/j:1"
+[ "$(CDXGEN_IMAGE_PREFIX=registry.example/mirror/cdxgen/ bash -c '. "$1"; java_retry_image "$2" "$3" x; echo "$JAVA_RETRY_IMAGE"' _ "$ROOT_DIR/docker/lib/source-detect.sh" "$LANGDIR/proj" "$RLOG")" \
+    = "registry.example/mirror/cdxgen/cdxgen-temurin-java25:$CDXGEN_TAG" ] \
+    && pass "the rerun image comes from CDXGEN_IMAGE_PREFIX" || fail "the rerun image ignores CDXGEN_IMAGE_PREFIX"
+wrapper_at . gradle-8.14.3-bin.zip
+retry_case "" "no rerun when the Gradle wrapper cannot run on that JDK" "$J21"
+rm -rf "${LANGDIR:?}/proj/gradlew" "${LANGDIR:?}/proj/gradle"
+printf '[build-prep] gradle-dependencies: Gradle asked for a Java 23 toolchain, which this image does not have (java-toolchain-missing=23)\n' > "$RLOG"
+retry_case "" "no rerun for a JDK no image has" "$J21"
+printf 'some task printed (java-toolchain-missing=25)\n' > "$RLOG"
+retry_case "" "the marker counts only on a build-prep line" "$J21"
+: > "$RLOG"
+retry_case "" "no marker, no rerun" "$J21"
+retry_case "" "no log, no rerun" "$J21"
+rm -f "$RLOG"
+# The marker itself: build-prep.sh reads Gradle's own messages, old and new.
+gradle_marker() {  # gradle_marker <stderr text>: what prep_step prints for it
+    local d; d=$(mktemp -d)
+    printf '%b' "$1" > "$d/err"
+    sed -n '/^prep_step() {$/,/^}$/p' "$ROOT_DIR/docker/lib/build-prep.sh" > "$d/fn.sh"
+    sh -c '. "$1/fn.sh"; PREP_APPLIED=""; PREP_FAILED=""; run_supervised_timeout() { shift; cat "$2" >&2; return 1; }; prep_step gradle-dependencies 9 x "$1/err"' _ "$d" 2>&1 \
+        | grep -o 'java-toolchain-missing=[0-9]*'
+    rm -rf "$d"
+}
+[ "$(gradle_marker '* What went wrong:\nCannot find a Java installation on your machine (Linux 6.10 aarch64) matching: {languageVersion=25, vendor=any vendor, implementation=vendor-specific}.\n')" = java-toolchain-missing=25 ] \
+    && pass "build-prep.sh marks Gradle 8/9's missing toolchain" || fail "no marker for Gradle 8/9's message"
+[ "$(gradle_marker 'No matching toolchains found for requested specification: {languageVersion=17, vendor=any, implementation=vendor-specific}.\n')" = java-toolchain-missing=17 ] \
+    && pass "build-prep.sh marks Gradle 7's missing toolchain" || fail "no marker for Gradle 7's message"
+[ -z "$(gradle_marker 'Could not resolve com.example:a:1.\n')" ] \
+    && pass "another Gradle failure gets no marker" || fail "another Gradle failure got a marker"
+
 # A mixed tree runs in the all-in-one image; only a warning for the toolchain.
 gradle_tree build.gradle.kts 'kotlin { jvmToolchain(25) }\n'
 : > "$LANGDIR/proj/requirements.txt"

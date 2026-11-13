@@ -154,6 +154,15 @@ case "${1:-}" in
           exit 0 ;;
       esac
     fi
+    # DOCKER_STUB_TOOLCHAIN_MISSING="<image text> <N>": a stage 1 run in an
+    # image whose name contains that text prints build-prep.sh's marker for a
+    # Gradle toolchain (Java N) the image lacks.
+    if [ -n "${DOCKER_STUB_TOOLCHAIN_MISSING:-}" ]; then
+      case "$*" in
+        *"${DOCKER_STUB_TOOLCHAIN_MISSING% *}"*build-prep*)
+          echo "[build-prep] gradle-dependencies: Gradle asked for a Java ${DOCKER_STUB_TOOLCHAIN_MISSING##* } toolchain, which this image does not have (java-toolchain-missing=${DOCKER_STUB_TOOLCHAIN_MISSING##* })" ;;
+      esac
+    fi
     # `docker run --rm --entrypoint sh <image> -c 'command -v grype'`: grype
     # is only in the images DOCKER_STUB_GRYPE_IMAGES names.
     case "$*" in
@@ -187,6 +196,10 @@ case "${1:-}" in
     # DOCKER_STUB_NOWRITE=1 models a container that ran and reported success but
     # whose /host-output mount never reached the host (folder outside Docker
     # Desktop file sharing / Colima's home-only mount) — nothing lands on disk.
+    # DOCKER_STUB_NOWRITE_IF: the same, for a run whose arguments contain this text.
+    if [ -n "${DOCKER_STUB_NOWRITE_IF:-}" ]; then
+      case "$*" in *"$DOCKER_STUB_NOWRITE_IF"*) pn="" ;; esac
+    fi
     if [ -n "$pn" ] && [ -n "$pv" ] && [ "${DOCKER_STUB_NOWRITE:-0}" != "1" ]; then
       dest="${hostout:-.}"; mkdir -p "$dest" 2>/dev/null
       # The container names every output with entrypoint.sh's cleaning rule (only
@@ -314,6 +327,33 @@ detect_case go     go.mod           'module x\n\ngo 1.21\n'                     
 detect_case rust   Cargo.toml       '[package]\nname="x"\nversion="0.1.0"'          rust   cdxgen-debian-rust
 detect_case ruby   Gemfile          "source 'https://rubygems.org'\ngem 'rack'"     ruby   cdxgen-debian-ruby34
 detect_case php    composer.json    '{"require":{"monolog/monolog":"^3"}}'          php    cdxgen-debian-php84
+
+# Gradle asked for a toolchain JDK the first image lacks: stage 1 runs once
+# more in the image with that JDK, unless CDXGEN_JAVA_IMAGE chose the image or
+# that image is not here under SBOM_PULL=never.
+J25_IMG="cdxgen-temurin-java25:$(sed -n 's/^CDXGEN_TAG="${CDXGEN_TAG:-\([^}]*\)}".*/\1/p' "$REPO/docker/lib/source-detect.sh")"
+d="$(new_proj gradle-retry)"
+printf 'rootProject.name = "r"\n' > "$d/settings.gradle"
+printf "plugins { id 'java' }\njava { toolchain { languageVersion = JavaLanguageVersion.of(providers.gradleProperty('jdk').get().toInteger()) } }\n" > "$d/build.gradle"
+DOCKER_STUB_TOOLCHAIN_MISSING="cdxgen-temurin-java21 25" scan_in "$d" --project Pretry --version 1.0.0 --generate-only
+{ [ "$RC" -eq 0 ] && in_out "[INFO] Gradle asked for Java 25; rerunning in ghcr.io/cdxgen/$J25_IMG" \
+    && [ "$(grep 'docker run .*build-prep' "$LOG" | grep -vc RESTORE_ONLY)" -eq 2 ] && grep 'docker run .*build-prep' "$LOG" | grep -v RESTORE_ONLY | tail -1 | grep -qF "$J25_IMG"; } \
+  && pass "a Gradle toolchain the Java 21 image lacks reruns stage 1 in the Java 25 image" \
+  || { fail "no rerun in the Java 25 image" "rc=$RC"; show; }
+DOCKER_STUB_TOOLCHAIN_MISSING="cdxgen-temurin-java21 25" CDXGEN_JAVA_IMAGE="ghcr.io/cdxgen/cdxgen-temurin-java21:x" \
+  scan_in "$d" --project Pretry --version 1.0.0 --generate-only
+{ [ "$RC" -eq 0 ] && ! in_out "rerunning in" && [ "$(grep 'docker run .*build-prep' "$LOG" | grep -vc RESTORE_ONLY)" -eq 1 ]; } \
+  && pass "CDXGEN_JAVA_IMAGE: no rerun" || { fail "a rerun despite CDXGEN_JAVA_IMAGE" "rc=$RC"; show; }
+DOCKER_STUB_TOOLCHAIN_MISSING="cdxgen-temurin-java21 25" SBOM_PULL=never DOCKER_STUB_ABSENT_IMAGE="ghcr.io/cdxgen/$J25_IMG" \
+  scan_in "$d" --project Pretry --version 1.0.0 --generate-only
+{ [ "$RC" -eq 0 ] && in_out "[WARN] Gradle asked for Java 25, but ghcr.io/cdxgen/$J25_IMG is not here" \
+    && [ "$(grep 'docker run .*build-prep' "$LOG" | grep -vc RESTORE_ONLY)" -eq 1 ] && ! in_log "docker pull -q ghcr.io/cdxgen/$J25_IMG"; } \
+  && pass "SBOM_PULL=never with the Java 25 image absent: no pull, no rerun" || { fail "SBOM_PULL=never still reruns or pulls" "rc=$RC"; show; }
+DOCKER_STUB_TOOLCHAIN_MISSING="cdxgen-temurin-java21 25" DOCKER_STUB_NOWRITE_IF="$J25_IMG" \
+  scan_in "$d" --project Pretry --version 1.0.0 --generate-only
+{ [ "$RC" -eq 0 ] && in_out "[WARN] The rerun in ghcr.io/cdxgen/$J25_IMG left no SBOM" && in_out "keeping the result from ghcr.io/cdxgen/cdxgen-temurin-java21" \
+    && ! in_out "Falling back to a manifest-only scan"; } \
+  && pass "a rerun that leaves no SBOM keeps the first result" || { fail "the first result is not kept when the rerun leaves none" "rc=$RC"; show; }
 
 # A Java build in an engine with too little memory is announced before it starts;
 # a roomy engine, an unreadable value and other languages print nothing.

@@ -439,8 +439,10 @@ setup_guard_state() {
 # shared mount, so the scanned tree stays untouched (see bom_path below).
 #   $1 = scanned tree, this container's path (also the sibling's, via --volumes-from)
 #   $2 = output bom filename (relative)
+#   $3 = the cdxgen image to use instead of the one img_for_lang picks (the
+#        second run java_retry_image asks for; set only by this function)
 generate_sbom_cdxgen() {
-    local src="$1" out="$2"
+    local src="$1" out="$2" forced_img="${3:-}"
     local lang img api rc=0 self
     CDXGEN_FAIL_REASON=""
     self=$(self_container_id)
@@ -450,8 +452,10 @@ generate_sbom_cdxgen() {
         return 1
     fi
     lang=$(detect_lang "$src")
-    warn_low_engine_memory_for "$lang" "$src"
-    if [ "$lang" = "android" ]; then
+    [ -n "$forced_img" ] || warn_low_engine_memory_for "$lang" "$src"
+    if [ -n "$forced_img" ]; then
+        img="$forced_img"
+    elif [ "$lang" = "android" ]; then
         api=$(android_api "$src")
         img="${ANDROID_IMAGE_PREFIX}${api}:latest"
         echo "[INFO] Android source (compileSdk=$api) -> $img"
@@ -596,6 +600,35 @@ generate_sbom_cdxgen() {
     rm -f "$rcf"
     remove_reach_tools
     SIBLING_CID=""
+    # A Java build whose Gradle asked for a toolchain JDK this image lacks
+    # runs once more, in the image with that JDK (java_retry_image). The
+    # first result is kept aside and used when the second run leaves none.
+    # The first run's build-prep.sh restored the tree and cleared the guard
+    # slot, so the second run's setup_guard_state starts a new one.
+    if [ -z "$forced_img" ] && [ "$lang" = java ]; then
+        java_retry_image "$src" "$logf" "$img"
+        if [ -n "$JAVA_RETRY_IMAGE" ] && ! java_retry_image_ready "$JAVA_RETRY_IMAGE"; then
+            echo "[WARN] Gradle asked for Java $JAVA_RETRY_JDK, but $JAVA_RETRY_IMAGE is not here (could not be pulled); keeping the result from $img."
+        elif [ -n "$JAVA_RETRY_IMAGE" ]; then
+            echo "[INFO] Gradle asked for Java $JAVA_RETRY_JDK; rerunning in $JAVA_RETRY_IMAGE"
+            [ -n "$cid" ] && docker rm -f "$cid" >/dev/null 2>&1
+            rm -f "$logf" "$cidf" "$prep_file"
+            local first="" first_img="$img"
+            if [ "$rc" -eq 0 ] && [ -s "$bom_path" ]; then
+                first=$(mktemp) && mv -f "$bom_path" "$first" || first=""
+            fi
+            rm -f "$bom_path"
+            if generate_sbom_cdxgen "$src" "$out" "$JAVA_RETRY_IMAGE"; then
+                [ -z "$first" ] || rm -f "$first"
+                return 0
+            fi
+            [ -n "$first" ] || return 1
+            echo "[WARN] The rerun in $JAVA_RETRY_IMAGE left no SBOM; keeping the result from $first_img."
+            CDXGEN_FAIL_REASON=""
+            mv -f "$first" "$outdir/$out"
+            return 0
+        fi
+    fi
     if [ "$rc" -ne 0 ]; then
         if [ -n "$cid" ] && [ "$(docker inspect -f '{{.State.OOMKilled}}' "$cid" 2>/dev/null)" = "true" ]; then
             CDXGEN_FAIL_REASON="oom"
