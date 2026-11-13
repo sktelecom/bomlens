@@ -130,20 +130,38 @@ go_vulndb_mount() {
 }
 
 # SBOM_EXTRA_CA_CERTS: the CA bundle (PEM) of a proxy that inspects TLS, on
-# this host. Prints its absolute path, for the caller to mount read-only at
-# EXTRA_CA_TARGET with BOMLENS_EXTRA_CA_CERTS set to that target; nothing when
-# it is unset. A path that is not a readable file holding a PEM certificate
-# is an error (exit status 1) with the cause and the fix on stderr: the scan
-# would otherwise fail later, in every HTTPS call, with less to go on.
+# this host. Prints its absolute path, for the caller to bind-mount read-only
+# at EXTRA_CA_TARGET (docker run --mount, which fails at once when the Docker
+# engine cannot see the file, where -v would mount an empty folder) with
+# BOMLENS_EXTRA_CA_CERTS set to that target; nothing when it is unset. A
+# Windows path typed with backslashes (C:\certs\ca.pem in Git Bash) is read
+# with cygpath when there is one, otherwise with the backslashes as slashes.
+# A path that is not a readable file holding a PEM certificate, or that holds
+# a comma or a double quote (they would split the --mount value), is an error
+# (exit status 1) with the cause and the fix on stderr: the scan would
+# otherwise fail later, in every HTTPS call, with less to go on.
 extra_ca_mount() {
     local f="${SBOM_EXTRA_CA_CERTS:-}"
     [ -n "$f" ] || return 0
+    case "$f" in
+        *\\*)
+            if command -v cygpath >/dev/null 2>&1; then
+                f="$(cygpath -u -- "$f" 2>/dev/null)" || f="${SBOM_EXTRA_CA_CERTS//\\//}"
+            else
+                f="${f//\\//}"
+            fi ;;
+    esac
+    case "$f" in
+        *,*|*\"*)
+            echo "[ERROR] SBOM_EXTRA_CA_CERTS=$SBOM_EXTRA_CA_CERTS has a comma or a double quote in its path, which Docker's --mount option cannot take. Copy the bundle to a path without them." >&2
+            return 1 ;;
+    esac
     if [ -d "$f" ] || [ ! -f "$f" ] || [ ! -r "$f" ]; then
-        echo "[ERROR] SBOM_EXTRA_CA_CERTS=$f is not a readable file. Point it at the proxy's CA bundle in PEM form (a .pem or .crt file with -----BEGIN CERTIFICATE----- lines), or unset it." >&2
+        echo "[ERROR] SBOM_EXTRA_CA_CERTS=$SBOM_EXTRA_CA_CERTS is not a readable file. Point it at the proxy's CA bundle in PEM form (a .pem or .crt file with -----BEGIN CERTIFICATE----- lines), or unset it." >&2
         return 1
     fi
     if ! grep -q -- '-----BEGIN CERTIFICATE-----' "$f" 2>/dev/null; then
-        echo "[ERROR] SBOM_EXTRA_CA_CERTS=$f holds no PEM certificate (no -----BEGIN CERTIFICATE----- line). A DER (binary) certificate converts with: openssl x509 -inform der -in ca.cer -out ca.pem" >&2
+        echo "[ERROR] SBOM_EXTRA_CA_CERTS=$SBOM_EXTRA_CA_CERTS holds no PEM certificate (no -----BEGIN CERTIFICATE----- line). A DER (binary) certificate converts with: openssl x509 -inform der -in ca.cer -out ca.pem" >&2
         return 1
     fi
     printf '%s\n' "$(cd "$(dirname "$f")" && pwd)/$(basename "$f")"
@@ -158,8 +176,9 @@ TLS_TRUST_ERROR_RE='x509: certificate signed by unknown authority|PKIX path buil
 # tls_trust_hint <step> <file|->...: when a file (or stdin, given as -) holds
 # one of those errors, prints a one-line [WARN] naming SBOM_EXTRA_CA_CERTS,
 # once per run. A step that fails this way most often sits behind a proxy
-# that inspects TLS.
-TLS_TRUST_HINT_SHOWN=""
+# that inspects TLS. The CLI prints it for stage 1 itself and then passes
+# _BOMLENS_TLS_HINT_SHOWN=1 to stage 2, so stage 2 does not print it again.
+TLS_TRUST_HINT_SHOWN="${_BOMLENS_TLS_HINT_SHOWN:-}"
 tls_trust_hint() {
     local step="$1"; shift
     [ -z "$TLS_TRUST_HINT_SHOWN" ] || return 0

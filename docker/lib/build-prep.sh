@@ -540,17 +540,20 @@ extra_ca_trust() {
         return 0
     fi
     _ec_n="$(grep -c -- '-----BEGIN CERTIFICATE-----' "$_ec_dir/extra.pem" 2>/dev/null)" || _ec_n=0
-    _ec_sys=""
-    for _ec_f in /etc/ssl/certs/ca-certificates.crt /etc/pki/tls/certs/ca-bundle.crt /etc/ssl/ca-bundle.pem \
+    # Extended, not replaced: a bundle the image or the caller already names
+    # comes first, the system bundle only when there is none.
+    _ec_base=""
+    for _ec_f in "${SSL_CERT_FILE:-}" "${REQUESTS_CA_BUNDLE:-}" /etc/ssl/certs/ca-certificates.crt \
+            /etc/pki/tls/certs/ca-bundle.crt /etc/ssl/ca-bundle.pem \
             /etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem /etc/ssl/cert.pem; do
-        if [ -s "$_ec_f" ]; then _ec_sys="$_ec_f"; break; fi
+        if [ -n "$_ec_f" ] && [ -f "$_ec_f" ] && [ -r "$_ec_f" ] && [ -s "$_ec_f" ]; then _ec_base="$_ec_f"; break; fi
     done
     {
-        if [ -n "$_ec_sys" ]; then cat "$_ec_sys"; echo; fi
+        if [ -n "$_ec_base" ]; then cat "$_ec_base"; echo; fi
         cat "$_ec_dir/extra.pem"
     } > "$_ec_dir/bundle.pem" 2>/dev/null || true
-    if [ -z "$_ec_sys" ]; then
-        echo "[WARN] no system CA bundle found in this image: only the certificates in BOMLENS_EXTRA_CA_CERTS are trusted for TLS outside Java and Node.js." >&2
+    if [ -z "$_ec_base" ]; then
+        echo "[WARN] no CA bundle found in this image: only the certificates in BOMLENS_EXTRA_CA_CERTS are trusted for TLS outside Java and Node.js." >&2
     fi
     SSL_CERT_FILE="$_ec_dir/bundle.pem"
     REQUESTS_CA_BUNDLE="$_ec_dir/bundle.pem"
@@ -567,19 +570,32 @@ extra_ca_trust() {
         NODE_EXTRA_CA_CERTS="$_ec_dir/extra.pem"
     fi
     export NODE_EXTRA_CA_CERTS
-    # Java: a copy of the JDK's cacerts (lib/security, or jre/lib/security on
-    # Java 8) with each certificate imported, used by every JVM started from
-    # here through JAVA_TOOL_OPTIONS. The JDK's own file is left untouched.
+    # Java. The trust store JAVA_TOOL_OPTIONS already names (with its password
+    # and type, when given) is the one extended; the other options are kept.
     _ec_java=""
+    _ec_ts_old=""; _ec_ts_pw=""; _ec_ts_type=""; _ec_jto_rest=""
+    case "$-" in *f*) _ec_glob_off=1 ;; *) _ec_glob_off="" ;; esac
+    set -f
+    for _ec_w in ${JAVA_TOOL_OPTIONS:-}; do
+        case "$_ec_w" in
+            -Djavax.net.ssl.trustStore=*) _ec_ts_old="${_ec_w#*=}" ;;
+            -Djavax.net.ssl.trustStorePassword=*) _ec_ts_pw="${_ec_w#*=}" ;;
+            -Djavax.net.ssl.trustStoreType=*) _ec_ts_type="${_ec_w#*=}" ;;
+            *) _ec_jto_rest="${_ec_jto_rest:+$_ec_jto_rest }$_ec_w" ;;
+        esac
+    done
+    [ -n "$_ec_glob_off" ] || set +f
     _ec_jh="${JAVA_HOME:-}"
     if [ -z "$_ec_jh" ] && command -v java >/dev/null 2>&1; then
         _ec_jbin="$(readlink -f "$(command -v java)" 2>/dev/null)" || _ec_jbin=""
         [ -z "$_ec_jbin" ] || _ec_jh="$(dirname "$(dirname "$_ec_jbin")")"
     fi
-    _ec_cacerts=""
-    if [ -n "$_ec_jh" ]; then
+    _ec_store=""; _ec_store_pw="changeit"; _ec_store_type=""
+    if [ -n "$_ec_ts_old" ] && [ -f "$_ec_ts_old" ] && [ -r "$_ec_ts_old" ]; then
+        _ec_store="$_ec_ts_old"; _ec_store_pw="${_ec_ts_pw:-changeit}"; _ec_store_type="$_ec_ts_type"
+    elif [ -n "$_ec_jh" ]; then
         for _ec_f in "$_ec_jh/lib/security/cacerts" "$_ec_jh/jre/lib/security/cacerts"; do
-            if [ -f "$_ec_f" ]; then _ec_cacerts="$_ec_f"; break; fi
+            if [ -f "$_ec_f" ]; then _ec_store="$_ec_f"; break; fi
         done
     fi
     _ec_keytool=""
@@ -588,32 +604,37 @@ extra_ca_trust() {
     elif command -v keytool >/dev/null 2>&1; then
         _ec_keytool="$(command -v keytool)"
     fi
-    if [ -n "$_ec_cacerts" ] && [ -n "$_ec_keytool" ]; then
+    if [ -n "$_ec_store" ] && [ -z "$_ec_keytool" ]; then
+        echo "[WARN] there is a Java trust store ($_ec_store) but no keytool in this image, so Java builds do not trust the certificates in BOMLENS_EXTRA_CA_CERTS." >&2
+    elif [ -n "$_ec_store" ]; then
         _ec_java="no"
-        if cp "$_ec_cacerts" "$_ec_dir/cacerts" 2>/dev/null && chmod 600 "$_ec_dir/cacerts" 2>/dev/null; then
+        # The JVM each keytool starts must not read a trust store set by an
+        # earlier call, so JAVA_TOOL_OPTIONS is cleared for it.
+        if JAVA_TOOL_OPTIONS="" "$_ec_keytool" -importkeystore -noprompt \
+                -srckeystore "$_ec_store" -srcstorepass "$_ec_store_pw" ${_ec_store_type:+-srcstoretype "$_ec_store_type"} \
+                -destkeystore "$_ec_dir/cacerts" -deststoretype JKS -deststorepass changeit >/dev/null 2>&1; then
+            chmod 600 "$_ec_dir/cacerts" 2>/dev/null || true
             awk -v d="$_ec_dir" '/-----BEGIN CERTIFICATE-----/ { n++; f = sprintf("%s/cert-%d.pem", d, n) }
                 f != "" { print > f } /-----END CERTIFICATE-----/ { if (f != "") close(f); f = "" }' "$_ec_dir/extra.pem" 2>/dev/null || true
             _ec_i=0; _ec_ok=0
             for _ec_f in "$_ec_dir"/cert-*.pem; do
                 [ -f "$_ec_f" ] || continue
                 _ec_i=$((_ec_i + 1))
-                # The JVM this keytool starts must not read a trust store set
-                # by an earlier call, so JAVA_TOOL_OPTIONS is cleared for it.
                 if JAVA_TOOL_OPTIONS="" "$_ec_keytool" -importcert -noprompt -trustcacerts \
                         -alias "bomlens-extra-ca-$_ec_i" -file "$_ec_f" \
-                        -keystore "$_ec_dir/cacerts" -storepass changeit >/dev/null 2>&1; then
+                        -keystore "$_ec_dir/cacerts" -storetype JKS -storepass changeit >/dev/null 2>&1; then
                     _ec_ok=$((_ec_ok + 1))
                 fi
                 rm -f "$_ec_f"
             done
             if [ "$_ec_ok" -gt 0 ]; then
-                JAVA_TOOL_OPTIONS="${JAVA_TOOL_OPTIONS:+$JAVA_TOOL_OPTIONS }-Djavax.net.ssl.trustStore=$_ec_dir/cacerts -Djavax.net.ssl.trustStorePassword=changeit"
+                JAVA_TOOL_OPTIONS="${_ec_jto_rest:+$_ec_jto_rest }-Djavax.net.ssl.trustStore=$_ec_dir/cacerts -Djavax.net.ssl.trustStorePassword=changeit -Djavax.net.ssl.trustStoreType=JKS"
                 export JAVA_TOOL_OPTIONS
                 _ec_java="yes"
             fi
         fi
         if [ "$_ec_java" != "yes" ]; then
-            echo "[WARN] could not import the certificates in BOMLENS_EXTRA_CA_CERTS into a copy of $_ec_cacerts (keytool failed, or its password is not changeit); Java builds do not trust them." >&2
+            echo "[WARN] could not import the certificates in BOMLENS_EXTRA_CA_CERTS into a copy of $_ec_store (keytool failed, or the store password is wrong); Java builds do not trust them." >&2
         fi
     fi
     BOMLENS_EXTRA_CA_APPLIED="$_ec_src"

@@ -1055,11 +1055,25 @@ _pull_optin() {
 SBOM_PULL="${SBOM_PULL:-missing}"
 
 # SBOM_EXTRA_CA_CERTS: the CA bundle of a proxy that inspects TLS. Checked
-# here, before any container starts, and mounted read-only into each scan
-# container at EXTRA_CA_TARGET (extra_ca_run). BOMLENS_EXTRA_CA_CERTS is that
+# here, before any container starts, and bind-mounted read-only into each
+# scan container at EXTRA_CA_TARGET (extra_ca_run). BOMLENS_EXTRA_CA_CERTS is that
 # path inside the container: a value in this shell is not passed on.
 unset BOMLENS_EXTRA_CA_CERTS
 EXTRA_CA_HOST="$(extra_ca_mount)" || exit 1
+# The --mount value: --mount, not -v, because when the Docker engine's VM does
+# not share the file's folder (Colima, Rancher Desktop) docker run stops with
+# "bind source path does not exist" instead of mounting an empty folder.
+extra_ca_mount_arg() {
+    printf 'type=bind,source=%s,target=%s,readonly' "$(hostpath "$EXTRA_CA_HOST")" "$EXTRA_CA_TARGET"
+}
+# The mount and BOMLENS_EXTRA_CA_CERTS, quoted for the eval'd docker commands
+# of stage 1 and stage 2. A stage 1 that already printed the TLS hint tells
+# stage 2 (_BOMLENS_TLS_HINT_SHOWN), so a run prints it once.
+extra_ca_run() {
+    [ -z "$TLS_TRUST_HINT_SHOWN" ] || printf ' -e _BOMLENS_TLS_HINT_SHOWN=1'
+    [ -n "$EXTRA_CA_HOST" ] || return 0
+    printf ' --mount %q -e BOMLENS_EXTRA_CA_CERTS=%s' "$(extra_ca_mount_arg)" "$EXTRA_CA_TARGET"
+}
 
 # ========================================================
 # Web UI mode
@@ -1180,7 +1194,7 @@ if [ "$UI_MODE" = "true" ]; then
     # SBOM_EXTRA_CA_CERTS: the UI container trusts it, and the containers it
     # starts see the same file through --volumes-from.
     UI_CA_FLAGS=()
-    [ -z "$EXTRA_CA_HOST" ] || UI_CA_FLAGS=(-v "$(hostpath "$EXTRA_CA_HOST"):$EXTRA_CA_TARGET:ro" -e "BOMLENS_EXTRA_CA_CERTS=$EXTRA_CA_TARGET")
+    [ -z "$EXTRA_CA_HOST" ] || UI_CA_FLAGS=(--mount "$(extra_ca_mount_arg)" -e "BOMLENS_EXTRA_CA_CERTS=$EXTRA_CA_TARGET")
     ensure_image_fresh "$POSTPROCESS_IMAGE"
     exec "${DOCKER_ENV[@]}" docker run --rm "${TTY_FLAGS[@]}" -p "${UI_BIND_ADDRESS}:${UI_PORT}:8080" \
         -v "$(hostpath "$UI_BASE")":/src -v "$(hostpath "$UI_BASE")":/host-output \
@@ -1550,14 +1564,6 @@ pp_env() {
         printf ' -v %q -e BOMLENS_GO_VULNDB_PATH=%s' "$(hostpath "${_gv[0]}"):${_gv[1]}:ro" "${_gv[1]}"
     fi
     extra_ca_run
-}
-
-# SBOM_EXTRA_CA_CERTS (checked above as EXTRA_CA_HOST), mounted read-only at
-# EXTRA_CA_TARGET with BOMLENS_EXTRA_CA_CERTS naming it. Quoted for the eval'd
-# docker commands of stage 1 and stage 2.
-extra_ca_run() {
-    [ -n "$EXTRA_CA_HOST" ] || return 0
-    printf ' -v %q -e BOMLENS_EXTRA_CA_CERTS=%s' "$(hostpath "$EXTRA_CA_HOST"):$EXTRA_CA_TARGET:ro" "$EXTRA_CA_TARGET"
 }
 
 # The docker CLI forwards a name-only `-e VAR` from its own environment, so the

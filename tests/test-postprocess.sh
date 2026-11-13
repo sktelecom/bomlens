@@ -10212,6 +10212,9 @@ _on=""; for v in 1 true 0 false ""; do bash -c "$_opt; opted_out \"\$1\"" _ "$v"
 
 echo "== extra CA bundle (BOMLENS_EXTRA_CA_CERTS): a proxy that inspects TLS =="
 ECA="$LIB/extra-ca.sh"
+# extra_ca_trust writes under /tmp; what these cases leave there is removed
+# at the end of the section.
+_eca_tmp_before=" $(echo /tmp/bomlens-ca.*) "
 # build-prep.sh runs alone in the cdxgen container and keeps its own copy.
 _eca_lib=$(sed -n '/^extra_ca_trust() {$/,/^}$/p' "$ECA")
 _eca_prep=$(sed -n '/^extra_ca_trust() {$/,/^}$/p' "$PREP")
@@ -10294,19 +10297,55 @@ if [ -n "${_eca_ok:-}" ]; then
     if [ -n "$_eca_jh" ] && [ -x "$_eca_jh/bin/keytool" ]; then
         _eca_ts="${_eca_jto#*-Djavax.net.ssl.trustStore=}"; _eca_ts="${_eca_ts%% *}"
         case "$_eca_jto" in
-            "-Dfile.encoding=UTF-8 -Djavax.net.ssl.trustStore=/tmp/bomlens-ca."*"/cacerts -Djavax.net.ssl.trustStorePassword=changeit")
-                pass "JAVA_TOOL_OPTIONS keeps its value and adds the trust store" ;;
+            "-Dfile.encoding=UTF-8 -Djavax.net.ssl.trustStore=/tmp/bomlens-ca."*"/cacerts -Djavax.net.ssl.trustStorePassword=changeit -Djavax.net.ssl.trustStoreType=JKS")
+                pass "JAVA_TOOL_OPTIONS keeps its value and adds the trust store (JKS)" ;;
             *) fail "JAVA_TOOL_OPTIONS is wrong" "$_eca_jto" ;;
         esac
-        _eca_aliases="$("$_eca_jh/bin/keytool" -list -keystore "$_eca_ts" -storepass changeit 2>/dev/null | grep -c '^bomlens-extra-ca-[12],')" || _eca_aliases=0
-        [ "$_eca_aliases" = 2 ] && pass "both certificates are in the copied Java trust store" \
-            || fail "the Java trust store copy holds $_eca_aliases of the 2 certificates"
+        _eca_list="$("$_eca_jh/bin/keytool" -J-Duser.language=en -list -keystore "$_eca_ts" -storetype JKS -storepass changeit 2>/dev/null)" || _eca_list=""
+        _eca_aliases="$(printf '%s\n' "$_eca_list" | grep -c '^bomlens-extra-ca-[12],')" || _eca_aliases=0
+        { [ "$_eca_aliases" = 2 ] && printf '%s\n' "$_eca_list" | grep -qi '^Keystore type: JKS' \
+          && [ "$(printf '%s\n' "$_eca_list" | grep -c 'trustedCertEntry')" -gt 2 ]; } \
+            && pass "the JKS copy of the JDK trust store holds the JDK's roots and both certificates" \
+            || fail "the Java trust store copy holds $_eca_aliases of the 2 certificates, or is not JKS with the JDK's roots"
+        # A trust store JAVA_TOOL_OPTIONS already names is extended, with its
+        # own password and type; the other options stay.
+        rm -f "$WORK/eca-own.jks"
+        "$_eca_jh/bin/keytool" -importcert -noprompt -alias own-ca -file "$WORK/eca-A.pem" -keystore "$WORK/eca-own.jks" \
+            -storetype PKCS12 -storepass s3cret-pw >/dev/null 2>&1
+        _eca_own=$(env -u SSL_CERT_FILE -u NODE_EXTRA_CA_CERTS -u BOMLENS_EXTRA_CA_APPLIED JAVA_HOME="$_eca_jh" \
+            JAVA_TOOL_OPTIONS="-Xmx1g -Djavax.net.ssl.trustStore=$WORK/eca-own.jks -Djavax.net.ssl.trustStorePassword=s3cret-pw -Djavax.net.ssl.trustStoreType=PKCS12" \
+            BOMLENS_EXTRA_CA_CERTS="$WORK/eca-B.pem" sh -c '. "$1"; extra_ca_trust 2>/dev/null; printf "%s" "$JAVA_TOOL_OPTIONS"' _ "$ECA")
+        _eca_own_ts="${_eca_own#*-Djavax.net.ssl.trustStore=}"; _eca_own_ts="${_eca_own_ts%% *}"
+        _eca_own_list="$("$_eca_jh/bin/keytool" -J-Duser.language=en -list -keystore "$_eca_own_ts" -storetype JKS -storepass changeit 2>/dev/null)" || _eca_own_list=""
+        { case "$_eca_own" in "-Xmx1g -Djavax.net.ssl.trustStore=/tmp/bomlens-ca."*"/cacerts -Djavax.net.ssl.trustStorePassword=changeit -Djavax.net.ssl.trustStoreType=JKS") true ;; *) false ;; esac \
+          && printf '%s\n' "$_eca_own_list" | grep -q '^own-ca,' && printf '%s\n' "$_eca_own_list" | grep -q '^bomlens-extra-ca-1,' \
+          && [ "$(printf '%s\n' "$_eca_own_list" | grep -c 'trustedCertEntry')" = 2 ]; } \
+            && pass "a trust store JAVA_TOOL_OPTIONS already names is extended (its password and type read), not replaced" \
+            || fail "the existing trust store was not extended" "$_eca_own / $_eca_own_list"
+        case "$_eca_own_ts" in /tmp/bomlens-ca.*/cacerts) rm -rf "${_eca_own_ts%/cacerts}" ;; esac
     else
         echo "  SKIP: no JDK with keytool here: the Java trust store is not checked"
     fi
-    for _d in /tmp/bomlens-ca.*; do
-        case "$_eca_ssl" in "$_d"/*) rm -rf "$_d" ;; esac
+    # A bundle the container already names (SSL_CERT_FILE) is extended, not
+    # replaced by the system one.
+    _eca_base=$(env -u NODE_EXTRA_CA_CERTS -u BOMLENS_EXTRA_CA_APPLIED -u JAVA_HOME SSL_CERT_FILE="$WORK/eca-A.pem" \
+        BOMLENS_EXTRA_CA_CERTS="$WORK/eca-B.pem" PATH="/usr/bin:/bin" sh -c '. "$1"; extra_ca_trust 2>/dev/null; printf "%s" "$SSL_CERT_FILE"' _ "$ECA")
+    { [ "$(grep -c 'BEGIN CERTIFICATE' "$_eca_base" 2>/dev/null)" = 2 ] \
+      && [ "$(sed -n '2p' "$_eca_base")" = "$(sed -n '2p' "$WORK/eca-A.pem")" ]; } \
+        && pass "an SSL_CERT_FILE already set is the start of the combined bundle" \
+        || fail "SSL_CERT_FILE was replaced instead of extended" "$_eca_base"
+    case "$_eca_base" in /tmp/bomlens-ca.*/bundle.pem) rm -rf "${_eca_base%/bundle.pem}" ;; esac
+    # A JDK trust store but no keytool: a warning, and nothing set for Java.
+    _eca_bin="$WORK/eca-bin"; _eca_fjh="$WORK/eca-fake-jdk"
+    mkdir -p "$_eca_bin" "$_eca_fjh/lib/security"; : > "$_eca_fjh/lib/security/cacerts"
+    for _t in sh mktemp awk tr grep cat cp chmod rm readlink dirname; do
+        _p="$(command -v "$_t" 2>/dev/null)" && ln -sf "$_p" "$_eca_bin/$_t"
     done
+    _eca_nokt=$(env -u SSL_CERT_FILE -u NODE_EXTRA_CA_CERTS -u BOMLENS_EXTRA_CA_APPLIED -u JAVA_TOOL_OPTIONS PATH="$_eca_bin" \
+        JAVA_HOME="$_eca_fjh" BOMLENS_EXTRA_CA_CERTS="$WORK/eca-B.pem" "$_eca_bin/sh" -c '. "$1"; extra_ca_trust; echo "jto=${JAVA_TOOL_OPTIONS:-}"' _ "$ECA" 2>&1)
+    { printf '%s' "$_eca_nokt" | grep -q '^\[WARN\] there is a Java trust store .* but no keytool' && printf '%s' "$_eca_nokt" | grep -qx 'jto='; } \
+        && pass "a JDK trust store with no keytool is warned about" \
+        || fail "no warning for a trust store without keytool" "$_eca_nokt"
 else
     echo "  SKIP: no openssl here: the extra CA bundle is not built"
 fi
@@ -10321,6 +10360,12 @@ printf '%s' "$_eca_hint" | grep -q 'even with the CA bundle in SBOM_EXTRA_CA_CER
     && pass "with a bundle set, the hint says the bundle did not cover it" || fail "TLS trust hint with a bundle" "$_eca_hint"
 _eca_hint=$(bash -c '. "$1"; tls_trust_hint cdxgen - <<< "connection refused"' _ "$DETECT" 2>&1)
 [ -z "$_eca_hint" ] && pass "another failure prints no TLS hint" || fail "TLS hint printed for an unrelated failure" "$_eca_hint"
+# Stage 2 of a CLI run whose stage 1 already printed it stays quiet.
+_eca_hint=$(_BOMLENS_TLS_HINT_SHOWN=1 bash -c '. "$1"; tls_trust_hint grype - <<< "x509: certificate signed by unknown authority"' _ "$DETECT" 2>&1)
+[ -z "$_eca_hint" ] && pass "_BOMLENS_TLS_HINT_SHOWN=1 keeps the hint to one per run" || fail "the hint was repeated in stage 2" "$_eca_hint"
+for _d in /tmp/bomlens-ca.*; do
+    case "$_eca_tmp_before" in *" $_d "*) ;; *) [ -d "$_d" ] && rm -rf "$_d" ;; esac
+done
 
 echo "== non-shipped trees: test/example/benchmark manifests and workflows are left out and recorded =="
 PREP="$ROOT_DIR/docker/lib/build-prep.sh"
