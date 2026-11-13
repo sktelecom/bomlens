@@ -67,7 +67,8 @@ if [ -f "$SEC" ] && jq empty "$SEC" >/dev/null 2>&1; then
           pkg: .PkgName,
           version: .InstalledVersion,
           severity: (.Severity // "UNKNOWN"),
-          fixed: (.FixedVersion // "")
+          fixed: (.FixedVersion // ""),
+          purl: ((.PkgIdentifier // {}).PURL // "")
         } ]
       | sort_by({CRITICAL:0,HIGH:1,MEDIUM:2,LOW:3,UNKNOWN:4}[.severity] // 5)
     ' "$SEC" 2>/dev/null || echo '[]')
@@ -380,8 +381,10 @@ if [ "$REPORT_LANG" = "ko" ]; then
     P_NEXT2_CONF=$(kstr risk.next2_conf)
     P_NEXT2_SELF_MD=$(tfmt risk.next2_self_md "$OUT_PREFIX" "$OUT_PREFIX")
     P_NEXT2_SELF_HTML=$(kstr risk.next2_self_html)
-    P_KIND=$(kstr risk.kind)
     P_META_FORMAT=$(kstr risk.meta_format)
+    P_TH_SEV=$(kstr risk.th_severity); P_TH_CVE=$(kstr risk.th_cve); P_TH_PKG=$(kstr risk.th_package)
+    P_TH_INST=$(kstr risk.th_installed); P_TH_FIXED=$(kstr risk.th_fixed)
+    P_LC_BOX=$(tfmt risk.lc_box "$(printf '%s' "$OUTBOUND_LIC" | sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g')")
 else
     P_TITLE="Open-source risk report — ${PROJECT}"; P_H1="Open-source risk report"
     P_SUBTITLE=""
@@ -462,8 +465,9 @@ else
     P_NEXT2_CONF="If the conformance check failed, fill the missing items and regenerate the SBOM."
     P_NEXT2_SELF_MD="Keep and distribute the notice (\`${OUT_PREFIX}_NOTICE.{txt,html}\`) together with the SBOM (\`${OUT_PREFIX}_bom.json\`)."
     P_NEXT2_SELF_HTML="Keep and distribute the notice (NOTICE) together with the SBOM."
-    P_KIND="Open-source risk report"
     P_META_FORMAT="Input format:"
+    P_TH_SEV="Severity"; P_TH_CVE="CVE"; P_TH_PKG="Package"; P_TH_INST="Installed"; P_TH_FIXED="Fixed"
+    P_LC_BOX="Conflicts with the outbound license ($(printf '%s' "$OUTBOUND_LIC" | sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g'))"
 fi
 
 # Only the parts that apply are said, so a scan that lost nothing but one tool
@@ -654,24 +658,16 @@ P_VULN_NOTE_HTML="<div class=\"box\"><div class=\"box-head\"><p class=\"box-titl
 # HTML (page head, labels, boxes and tables from report-common.sh)
 # --------------------------------------------------------
 esc() { printf '%s' "$1" | sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g'; }
-conf_class="attention"; [ "$CONF_RESULT" = "pass" ] && conf_class="success"; [ "$CONF_RESULT" = "fail" ] && conf_class="danger"
-# Page head: "Project version", then what was scanned, when, and how many
-# components. A supplier review also states the input format.
-RR_VERSION="$(report_version "$PROJECT" "$OUT_PREFIX" "$BOM")"
-RR_NCOMP="$(report_component_count "$BOM")"
-RR_COMP=""; [ -n "$RR_NCOMP" ] && RR_COMP="$(report_str components "$RR_NCOMP")"
+conf_class="lbl-attention"; [ "$CONF_RESULT" = "pass" ] && conf_class="lbl-success"; [ "$CONF_RESULT" = "fail" ] && conf_class="lbl-danger"
+# Page head: the report name, then one line with the project and version, what
+# was scanned, when, how many components and, for a supplier review, the input
+# format.
+report_bom_facts "$BOM"
+RR_VERSION="$(report_version "$PROJECT" "$OUT_PREFIX")"
+RR_COMP=""; [ -n "$RB_NCOMP" ] && RR_COMP="$(report_str components "$(report_num "$RB_NCOMP")")"
 META_FORMAT=""; [ "$HAS_CONF" = "true" ] && META_FORMAT="${P_META_FORMAT} $(esc "$CONF_FORMAT")"
 P_FINDINGS="$(report_str findings)"
-# One label per severity: a shape marker and the word, then the count.
-sev_summary() {
-    printf '<div class="summary">\n'
-    printf ' <span class="lbl sev-CRITICAL"><span class="mk" aria-hidden="true">&#9670;</span>Critical <span class="count">%s</span></span>\n' "$C"
-    printf ' <span class="lbl sev-HIGH"><span class="mk" aria-hidden="true">&#9650;</span>High <span class="count">%s</span></span>\n' "$H"
-    printf ' <span class="lbl sev-MEDIUM"><span class="mk" aria-hidden="true">&#9679;</span>Medium <span class="count">%s</span></span>\n' "$M"
-    printf ' <span class="lbl sev-LOW"><span class="mk" aria-hidden="true">&#9632;</span>Low <span class="count">%s</span></span>\n' "$L"
-    printf ' <span class="lbl sev-UNKNOWN"><span class="mk" aria-hidden="true">&#8211;</span>Unknown <span class="count">%s</span></span>\n' "$U"
-    printf '</div>\n'
-}
+P_NO_FIX="$(report_str no_fix)"
 {
     cat <<HTMLHEAD
 <!DOCTYPE html>
@@ -683,17 +679,13 @@ sev_summary() {
 HTMLHEAD
     report_style
     echo "</head><body>"
-    report_topbar "${P_KIND}"
-    echo '<div class="page-head">'
-    report_h1 "$(esc "$PROJECT")" "$RR_VERSION"
-    printf '%s' "${SUBTITLE_HTML}"
-    report_desc "$(esc "$(report_type_label "$SCAN_MODE" "$BOM")")" "$(report_time_html "$GEN_AT")" "$RR_COMP"
-    report_desc "$META_FORMAT"
-    echo '</div>'
+    report_page_head "${P_H1}" "$(esc "$PROJECT")" "$RR_VERSION" "${SUBTITLE_HTML%
+}" \
+        "$(esc "$(report_type_label "$SCAN_MODE")")" "$(report_time_html "$GEN_AT")" "$RR_COMP" "$META_FORMAT"
 
     if [ "$HAS_CONF" = "true" ]; then
         echo "<h2>${S_CONF}. ${P_H2_CONF}</h2>"
-        echo "<div class=\"summary\"><span class=\"lbl lbl-${conf_class}\">${P_CONF_RESULT_LBL} ${CONF_UP}</span></div>"
+        echo "<div class=\"summary\"><span class=\"lbl ${conf_class}\">${P_CONF_RESULT_LBL} ${CONF_UP}</span></div>"
         if [ "$CONF_RESULT" = "fail" ]; then
             echo "<div class=\"banner banner-danger\"><p><b>${P_CONF_FAIL_B}</b>${P_CONF_FAIL_TXT}</p>"
             echo "<ul>"
@@ -703,11 +695,15 @@ HTMLHEAD
     fi
 
     echo "<h2>${S_VULN}. ${P_H2_VULN}</h2>"
-    echo "${P_VULN_NOTE_HTML}"
-    sev_summary
-
-    # What the counts above do not cover, in one notice.
+    # What the counts below do not cover, in one notice above them. The limit
+    # of a firmware analysis comes first: it bounds everything else.
     NOTES=""
+    if [ "$FW_SCOPE" = "true" ]; then
+        NOTES="${NOTES}<p><b>${P_FW_LABEL}</b> ${FW_SCOPE_TEXT}"
+        if [ -n "$FW_FAILED_FORMATS" ]; then NOTES="${NOTES}<br>${P_FW_FORMATS}"; fi
+        if [ -n "$FW_MISSING" ]; then NOTES="${NOTES}<br>${P_FW_MISSING}"; fi
+        NOTES="${NOTES}</p>"
+    fi
     if [ "${UNREACHED_N:-0}" -gt 0 ]; then
         NOTES="${NOTES}<p>${P_UNREACHED_HTML}</p>"
     fi
@@ -727,52 +723,57 @@ ${UNCHECKED_LI}
     if [ "${UNPINNED:-0}" -eq 1 ]; then
         NOTES="${NOTES}<p>${P_UNPINNED_HTML}</p>"
     fi
-    if [ "$FW_SCOPE" = "true" ]; then
-        NOTES="${NOTES}<p><b>${P_FW_LABEL}</b> ${FW_SCOPE_TEXT}"
-        if [ -n "$FW_FAILED_FORMATS" ]; then NOTES="${NOTES}<br>${P_FW_FORMATS}"; fi
-        if [ -n "$FW_MISSING" ]; then NOTES="${NOTES}<br>${P_FW_MISSING}"; fi
-        NOTES="${NOTES}</p>"
-    fi
     if [ -n "$NOTES" ]; then
+        # The shared sentences say "above" because the Markdown report puts them
+        # after the table; here the notice comes first, so the counts are below.
+        NOTES="$(printf '%s' "$NOTES" | sed -e 's/counts above/counts below/g' -e 's/위 집계/아래 집계/g' -e 's/위 취약점 집계/아래 취약점 집계/g')"
         printf '<div class="banner">%s</div>\n' "$NOTES"
     fi
+    echo "${P_VULN_NOTE_HTML}"
 
     if [ "$TOTAL" -gt 0 ]; then
-        echo "<div class=\"box\"><div class=\"box-head\"><span class=\"box-title\">${P_FINDINGS}</span><span class=\"counter\">${TOTAL}</span></div>"
-        echo "<div class=\"table-scroll\"><table><thead><tr><th>Severity</th><th>CVE</th><th>Package</th><th>Installed</th><th>Fixed</th><th>${P_TH_DEADLINE}</th></tr></thead><tbody>"
+        # The severity labels sit in the head of the table they count.
+        report_next_id
+        echo "<div class=\"box\"><div class=\"box-head\"><span class=\"box-title\" id=\"${REPORT_BOX_ID}\">${P_FINDINGS}</span><span class=\"counter\">$(report_num "$TOTAL")</span><span class=\"end\">"
+        report_sev_labels "$C" "$H" "$M" "$L" "$U"
+        echo "</span></div>"
+        echo "<div class=\"table-scroll\"><table aria-labelledby=\"${REPORT_BOX_ID}\"><thead><tr><th>${P_TH_SEV}</th><th>${P_TH_CVE}</th><th>${P_TH_PKG}</th><th>${P_TH_INST}</th><th>${P_TH_FIXED}</th><th>${P_TH_DEADLINE}</th></tr></thead><tbody>"
         # shellcheck disable=SC2016
-        echo "$FINDINGS" | jq -r --arg cd "$P_DL_CRIT" --arg hd "$P_DL_HIGH" --arg pol "$P_DL_POLICY" "$(report_jq_defs)"'.[] |
+        echo "$FINDINGS" | jq -r --arg cd "$P_DL_CRIT" --arg hd "$P_DL_HIGH" --arg pol "$P_DL_POLICY" --arg nofix "$P_NO_FIX" "$(report_jq_defs)"'.[] |
             "<tr><td class=\"sev\">" + (.severity|sevlbl) + "</td>" +
-            "<td class=\"id\">" + (.id|@html) + "</td><td class=\"grow\">" + (.pkg|pkgcoord) + "</td>" +
-            "<td class=\"ver\">" + (.version|@html) + "</td><td class=\"fix\">" + (.fixed|fixlist) + "</td>" +
-            "<td class=\"ver\">" + ((if .severity=="CRITICAL" then $cd elif .severity=="HIGH" then $hd else $pol end)|@html) + "</td></tr>"'
+            "<td class=\"id\">" + (.id|strv|@html) + "</td><td class=\"grow pkgc\">" + (.purl as $u | .pkg | pkgcoordp(""; $u)) + "</td>" +
+            "<td class=\"ver\">" + (.version|strv|@html) + "</td><td class=\"fix\">" + (.fixed|fixlist($nofix)) + "</td>" +
+            "<td class=\"dl\">" + ((if .severity=="CRITICAL" then $cd elif .severity=="HIGH" then $hd else $pol end)|@html) + "</td></tr>"'
         echo "</tbody></table></div></div>"
-    elif [ "${UNCHECKED_N:-0}" -gt 0 ]; then
-        echo "<p>${P_VULN_NONE_CHECKED_HTML}</p>"
     else
-        echo "<p>${P_VULN_NONE_HTML}</p>"
+        echo "<div class=\"summary\">"
+        report_sev_labels "$C" "$H" "$M" "$L" "$U"
+        echo "</div>"
+        if [ "${UNCHECKED_N:-0}" -gt 0 ]; then
+            echo "<p>${P_VULN_NONE_CHECKED_HTML}</p>"
+        else
+            echo "<p>${P_VULN_NONE_HTML}</p>"
+        fi
     fi
 
     echo "<h2>${S_LIC}. ${P_H2_LIC}</h2>"
     if [ "$LIC_COUNT" = "N/A" ]; then
         echo "<p><em>${P_LIC_NO_NOTICE_HTML}</em></p>"
     else
-        echo "<p>${P_LIC_HTML_PRE} <b>${LIC_COUNT}</b>${P_LIC_HTML_POST}</p>"
+        echo "<p>${P_LIC_HTML_PRE} <b>$(report_num "$LIC_COUNT")</b>${P_LIC_HTML_POST}</p>"
     fi
     if [ "$HAS_LIC_CLASS" = "true" ]; then
         echo "<h3>${P_H3_LICCLASS}</h3>"
         echo "<p>${P_LICCLASS_INTRO_A}<code>bomlens:licenseClass</code>${P_LICCLASS_INTRO_B}</p>"
-        cat <<HTMLLIC
-<div class="summary">
- <span class="lbl lbl-cat-network">Network copyleft <span class="count">${NC}</span></span>
- <span class="lbl lbl-cat-strong">Strong copyleft <span class="count">${SC}</span></span>
- <span class="lbl lbl-cat-weak">Weak copyleft <span class="count">${WK}</span></span>
- <span class="lbl lbl-cat-permissive">Permissive <span class="count">${PM}</span></span>
- <span class="lbl lbl-cat-review">Uncategorized <span class="count">${UN}</span></span>
-</div>
-HTMLLIC
+        echo "<div class=\"summary\">"
+        report_lbl "lbl-cat-network" "$NC" "Network copyleft"; echo
+        report_lbl "lbl-cat-strong" "$SC" "Strong copyleft"; echo
+        report_lbl "lbl-cat-weak" "$WK" "Weak copyleft"; echo
+        report_lbl "lbl-cat-permissive" "$PM" "Permissive"; echo
+        report_lbl "lbl-cat-review" "$UN" "Uncategorized"; echo
+        echo "</div>"
         if [ "$COPYLEFT_TOTAL" -gt 0 ]; then
-            echo "<div class=\"box\"><div class=\"box-head\"><p class=\"box-title\">${P_COPYLEFT_DRIVERS%:}</p><span class=\"counter\">${COPYLEFT_TOTAL}</span></div>"
+            echo "<div class=\"box\"><div class=\"box-head\"><p class=\"box-title\">${P_COPYLEFT_DRIVERS%:}</p><span class=\"counter\">$(report_num "$COPYLEFT_TOTAL")</span></div>"
             echo "<ul class=\"rows mono\">"
             echo "$COPYLEFT_TOP" | jq -r '.[] | "<li>" + (.label|@html) + " (" + .class + ")</li>"'
             if [ "$COPYLEFT_TOTAL" -gt 10 ]; then
@@ -784,43 +785,40 @@ HTMLLIC
     if [ -n "$OUTBOUND_LIC" ]; then
         echo "<h3>${P_H3_LICCONFLICT}</h3>"
         echo "<p>${P_LICCONFLICT_INTRO}</p>"
-        echo "<p><code>$(printf '%s' "$OUTBOUND_LIC" | sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g')</code></p>"
-        cat <<HTMLLC
-<div class="summary">
- <span class="lbl lbl-danger">Incompatible <span class="count">${LC_INCOMPAT}</span></span>
- <span class="lbl lbl-attention">Conditional <span class="count">${LC_COND}</span></span>
- <span class="lbl">Unknown <span class="count">${LC_UNKNOWN}</span></span>
-</div>
-HTMLLC
+        echo "<div class=\"box\"><div class=\"box-head\"><p class=\"box-title\">${P_LC_BOX}</p><span class=\"counter\">$(report_num "$LC_INCOMPAT")</span><span class=\"end\">"
+        report_lbl "lbl-danger" "$LC_INCOMPAT" "Incompatible"; echo
+        report_lbl "lbl-attention" "$LC_COND" "Conditional"; echo
+        report_lbl "" "$LC_UNKNOWN" "Unknown"; echo
+        echo "</span></div>"
         if [ "$LC_INCOMPAT" -gt 0 ]; then
-            echo "<div class=\"box\"><div class=\"box-head\"><p class=\"box-title\">${P_LICCONFLICT_DRIVERS%:}</p><span class=\"counter\">${LC_INCOMPAT}</span></div>"
+            echo "<p class=\"legend\">${P_LICCONFLICT_DRIVERS%:}</p>"
             echo "<ul class=\"rows mono\">"
             echo "$LC_TOP" | jq -r '.[] | "<li>" + (.|@html) + "</li>"'
-            echo "</ul></div>"
+            echo "</ul>"
         fi
+        echo "</div>"
     fi
 
     if [ "$MAL_COUNT" -gt 0 ]; then
         echo "<h3>${P_H3_MALICIOUS}</h3>"
         echo "<p>${P_MALICIOUS_INTRO}</p>"
-        echo "<div class=\"summary\"><span class=\"lbl lbl-danger\">${P_H3_MALICIOUS} <span class=\"count\">${MAL_COUNT}</span></span></div>"
-        echo "<div class=\"box\"><div class=\"box-head\"><p class=\"box-title\">${P_MALICIOUS_LIST%:}</p><span class=\"counter\">${MAL_COUNT}</span></div>"
+        echo "<div class=\"box\"><div class=\"box-head\"><p class=\"box-title\">${P_MALICIOUS_LIST%:}</p><span class=\"counter\">$(report_num "$MAL_COUNT")</span><span class=\"end\">"
+        report_lbl "lbl-danger" "$MAL_COUNT" "${P_H3_MALICIOUS}"; echo
+        echo "</span></div>"
         echo "<ul class=\"rows mono\">"
         echo "$MAL_TOP" | jq -r '.[] | "<li>" + (.label|@html) + " (" + (.id|@html) + ")</li>"'
-        echo "</ul></div>"
-        echo "<p class=\"meta\">$(printf '%s' "$MAL_SNAP" | sed 's/&/\&amp;/g; s/</\&lt;/g')</p>"
+        echo "</ul>"
+        echo "<p class=\"legend\">$(printf '%s' "$MAL_SNAP" | sed 's/&/\&amp;/g; s/</\&lt;/g')</p></div>"
     fi
     if [ "$AS_MODELS" -gt 0 ]; then
         echo "<h3>${P_H3_AI}</h3>"
         echo "<p>${P_AI_SEE_HTML} ${P_AI_DISC}</p>"
-        cat <<HTMLASSESS
-<div class="summary">
- <span class="lbl lbl-success">${L_OK} <span class="count">${AS_OK}</span></span>
- <span class="lbl lbl-attention">${L_COND} <span class="count">${AS_COND}</span></span>
- <span class="lbl lbl-severe">${L_CAU} <span class="count">${AS_CAU}</span></span>
- <span class="lbl">${L_REV} <span class="count">${AS_REV}</span></span>
-</div>
-HTMLASSESS
+        echo "<div class=\"summary\">"
+        report_lbl "lbl-success" "$AS_OK" "${L_OK}"; echo
+        report_lbl "lbl-attention" "$AS_COND" "${L_COND}"; echo
+        report_lbl "lbl-severe" "$AS_CAU" "${L_CAU}"; echo
+        report_lbl "" "$AS_REV" "${L_REV}"; echo
+        echo "</div>"
     fi
 
     echo "<h2>${S_NEXT}. ${P_H2_NEXT}</h2>"

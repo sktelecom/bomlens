@@ -853,7 +853,7 @@ if grep -q "## 1. Vulnerability" "$stmp/self_risk-report.md" \
 else
     fail "risk report (self): renumbered from 1, vuln table present"
 fi
-if grep -q "<p class=\"report-kind\">Open-source risk report</p>" "$stmp/self_risk-report.html"; then
+if grep -q "<h1>Open-source risk report</h1>" "$stmp/self_risk-report.html"; then
     pass "risk report (self): html titled Open-source risk report"
 else
     fail "risk report (self): html titled Open-source risk report"
@@ -861,7 +861,7 @@ fi
 REPORT_LANG=ko bash "$LIB/generate-risk-report.sh" "$stmp/self" "SelfApp" >/dev/null 2>&1
 if grep -q "오픈소스 위험 보고서" "$stmp/self_risk-report.md" \
    && ! grep -q "요구사항 충족" "$stmp/self_risk-report.md" \
-   && grep -q "<p class=\"report-kind\">오픈소스 위험 보고서</p>" "$stmp/self_risk-report.html"; then
+   && grep -q "<h1>오픈소스 위험 보고서</h1>" "$stmp/self_risk-report.html"; then
     pass "risk report (self, ko): titled 오픈소스 위험 보고서, no 적합성 검사 section"
 else
     fail "risk report (self, ko): titled 오픈소스 위험 보고서, no 적합성 검사 section"

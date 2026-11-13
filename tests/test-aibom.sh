@@ -1433,7 +1433,7 @@ grep -q 'How to fill the gaps' "$WORK/conf_conformance.html" && fail "HTML still
 
 echo "== conformance HTML: table legibility =="
 grep -q '<td class="num">1</td>' "$WORK/conf_conformance.html" && pass "rows are numbered" || fail "rows carry no number column"
-grep -q 'class="s-review"' "$WORK/conf_conformance.html" && pass "review rows have their own status colour" || fail "review rows reuse the warn colour"
+grep -q 'class="st s-review"' "$WORK/conf_conformance.html" && pass "review rows have their own status colour" || fail "review rows reuse the warn colour"
 grep -q 'td.req{white-space:nowrap' "$WORK/conf_conformance.html" && pass "the required cell does not wrap" || fail "the required cell can wrap one glyph per line"
 grep -q 'href="https://huggingface.co/' "$WORK/conf_conformance.html" && pass "the project name links to the model repository" || fail "the project name is not linked"
 
@@ -1464,7 +1464,7 @@ badrv=$(jq -r '.review | to_entries[] | select(((.value.how // "") == "") or ((.
 grep -q "What to establish" "$WORK/conf_conformance.html" && pass "HTML surfaces the review guidance" || fail "HTML hides the review guidance"
 
 echo "== the crosswalk is a roll-up, not a second copy of the requirement tables =="
-xwtb=$(sed -n '/<h2>Regulatory crosswalk<\/h2>/,/<\/table>/p' "$WORK/conf_conformance.html")
+xwtb=$(sed -n '/<h2 id="box-[0-9]*">Regulatory crosswalk<\/h2>/,/<\/table>/p' "$WORK/conf_conformance.html")
 printf '%s' "$xwtb" | grep -q "<th>Framework</th>" && pass "crosswalk is keyed by framework" || fail "crosswalk lacks the framework column"
 printf '%s' "$xwtb" | grep -q "EU AI Act" && pass "crosswalk names the frameworks it covers" || fail "crosswalk lists no framework"
 # Regression guard for the duplication this section used to carry: it reprinted
@@ -1917,14 +1917,14 @@ else
     fail "ko conformance JSON diverged from the English JSON"
 fi
 grep -q '<html lang="ko">' "$WORK/koconf_conformance.html" && pass "ko conformance HTML sets lang=ko" || fail "ko conformance HTML lang is not ko"
-grep -q '<p class="report-kind">적합성 검사 보고서</p>' "$WORK/koconf_conformance.html" && pass "ko conformance HTML names the report in Korean" || fail "ko conformance HTML report name not localized"
+grep -q '<h1>적합성 검사 보고서</h1>' "$WORK/koconf_conformance.html" && pass "ko conformance HTML h1 is Korean" || fail "ko conformance HTML h1 not localized"
 grep -q '모델 라이선스' "$WORK/koconf_conformance.md" && pass "ko conformance MD localizes a G7 element label" || fail "ko conformance MD label not localized"
 grep -q '사람 검토 필요' "$WORK/koconf_conformance.md" && pass "ko conformance MD localizes a review detail" || fail "ko conformance MD detail not localized"
 # Data/identifiers must survive verbatim in the ko report.
 grep -q 'Apache-2.0' "$WORK/koconf_conformance.md" && pass "ko conformance keeps the license id verbatim" || fail "ko conformance dropped the license id"
 grep -q '✅' "$WORK/koconf_conformance.md" && pass "ko conformance keeps the status emoji" || fail "ko conformance dropped the status emoji"
 # The English default must be untouched (same fixture, no REPORT_LANG).
-grep -q '<p class="report-kind">Conformance check report</p>' "$WORK/conf_conformance.html" && pass "en (default) conformance stays English" || fail "en default conformance drifted"
+grep -q '<h1>Conformance check report</h1>' "$WORK/conf_conformance.html" && pass "en (default) conformance stays English" || fail "en default conformance drifted"
 
 echo "== ko AI compliance profile renders Korean while the JSON stays English =="
 cp "$WORK/conf_bom.json" "$WORK/koconf_bom.json" 2>/dev/null

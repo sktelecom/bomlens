@@ -1435,7 +1435,7 @@ jq '.metadata.component.properties = [
     "$WORK/lc.json" > "$WORK/riskfw3/proj_1.0_bom.json"
 printf 'License: MIT\n' > "$WORK/riskfw3/proj_1.0_NOTICE.txt"
 ( cd "$WORK/riskfw3" && bash "$LIB/generate-risk-report.sh" proj_1.0 proj FIRMWARE >/dev/null 2>&1 )
-grep -q 'display:none' "$WORK/riskfw3/proj_1.0_risk-report.html" \
+grep -qF '.table-wrap{display:none}' "$WORK/riskfw3/proj_1.0_risk-report.html" \
     && fail "markup in a firmware property reached the HTML report" \
     || pass "markup in a firmware property is stripped before it reaches the report"
 # A number that is not plainly a number is dropped, not repaired into a plausible
@@ -3850,12 +3850,12 @@ jq -e '.suggestions | (map(select(.name=="openssl")) | .[0].candidates == ["pkg:
        and (map(select(.name=="lib-x")) | .[0].candidates == [])' "$WORK/sgn_conformance.json" >/dev/null \
     && pass "a missing namespace is suggested from the distro qualifier or the group field, and left empty when neither is there" \
     || fail "purl-namespace suggestions are wrong" "$(jq -c .suggestions "$WORK/sgn_conformance.json")"
-grep -q "^## Suggested fixes" "$WORK/ses_conformance.md" && grep -q "<h2>Suggested fixes</h2>" "$WORK/ses_conformance.html" \
+grep -q "^## Suggested fixes" "$WORK/ses_conformance.md" && grep -qE "<h2 id=\"box-[0-9]+\">Suggested fixes</h2>" "$WORK/ses_conformance.html" \
     && grep -q "was not changed" "$WORK/ses_conformance.md" \
     && pass "the Markdown and HTML reports have a Suggested fixes section that says the file was not changed" \
     || fail "the Suggested fixes section is missing"
 REPORT_LANG=ko CONFORMANCE_PROFILE=skt-submission bash "$LIB/validate-sbom.sh" "$WORK/semantic-cdx.json" "$WORK/sek" "supplier" >/dev/null 2>&1
-grep -q "^## 수정 제안" "$WORK/sek_conformance.md" && grep -q "<h2>수정 제안</h2>" "$WORK/sek_conformance.html" \
+grep -q "^## 수정 제안" "$WORK/sek_conformance.md" && grep -qE "<h2 id=\"box-[0-9]+\">수정 제안</h2>" "$WORK/sek_conformance.html" \
     && pass "the Korean reports title the section 수정 제안" || fail "the Korean Suggested fixes section is missing"
 sem_sum_after=$(shasum "$WORK/semantic-cdx.json" | cut -d' ' -f1)
 [ "$sem_sum_before" = "$sem_sum_after" ] && pass "the submitted SBOM is byte-identical after the check" \
@@ -13388,7 +13388,7 @@ grep -q '^| 0 | 1 | 0 | 1 | 0 | 2 |$' "$RCH/sec_security.md" && grep -q '^## Not
     && grep -q 'CVE-2026-56852 | golang.org/x/text' "$RCH/sec_security.md" && grep -q 'CVE-2022-32149 ‡' "$RCH/sec_security.md" \
     && pass "markdown: the not-reachable finding is listed apart and out of the totals; the reached one is marked" \
     || fail "markdown report" "$(sed -n '1,40p' "$RCH/sec_security.md")"
-grep -q '<h2>Not reachable</h2>' "$RCH/sec_security.html" && grep -q '1 finding(s) are not reachable' "$RCH/sec_security.html" \
+grep -qE '<h2 id="box-[0-9]+">Not reachable</h2>' "$RCH/sec_security.html" && grep -q '1 finding(s) are not reachable' "$RCH/sec_security.html" \
     && pass "html: the not-reachable section and its note" || fail "html report has no not-reachable section"
 PATH="$FAKEBIN:$PATH" SECURITY_ENRICH=false DEEP_CVE=false bash "$LIB/scan-security.sh" "$RCH/bom.json" "$RCH/secoff" proj >/dev/null 2>&1
 jq -e 'has("Reachability") | not' "$RCH/secoff_security.json" >/dev/null && ! grep -q 'Not reachable' "$RCH/secoff_security.md" \
@@ -13641,39 +13641,48 @@ for kind in risk-report security; do
     grep -q '<td class="id">CVE-' "${RTP}_$kind.html" && grep -q 'td.id{white-space:nowrap' "${RTP}_$kind.html" \
         && pass "$kind report keeps a CVE id on one line" || fail "$kind report CVE column may wrap"
 done
-# Page head: the title is "project version" (never the t_1.0 prefix), the report
-# kind sits in the top bar, a wide table scrolls inside its box, and no notice
-# carries a thick side stripe.
-for kind in risk-report security NOTICE conformance; do
-    H="${RTP}_$kind.html"
-    grep -q '<h1>t <span class="ver">1.0</span></h1>' "$H" \
-        && pass "$kind report is titled by project and version, not by the output prefix" \
-        || fail "$kind report title" "$(grep -m1 '<h1' "$H")"
-    grep -q '<header class="topbar">' "$H" && grep -q '<p class="report-kind">' "$H" \
-        && pass "$kind report names its kind in the top bar" || fail "$kind report has no top bar with the report kind"
+# Page head: the top bar reads "BomLens / project version" (never the t_1.0
+# prefix), the h1 is the report name, a wide table scrolls inside its box.
+for kv in "risk-report|Open-source risk report" "security|Security report" \
+          "NOTICE|Third-party open source notice" "conformance|Conformance check report"; do
+    kind="${kv%%|*}"; title="${kv#*|}"; H="${RTP}_$kind.html"
+    grep -q '<span class="proj">t <span class="ver">1.0</span></span></header>' "$H" \
+        && pass "$kind report names the project and version in the top bar, not the output prefix" \
+        || fail "$kind report top bar" "$(grep -o '<span class="proj">.*</header>' "$H" | head -1)"
+    grep -q "<h1>${title}</h1>" "$H" \
+        && pass "$kind report is titled ${title}" || fail "$kind report title" "$(grep -m1 -o '<h1>[^<]*</h1>' "$H")"
     grep -q '\.table-scroll{overflow-x:auto;}' "$H" \
         && pass "$kind report: a wide table scrolls inside its box" \
         || fail "$kind report: the table scroll rule is missing"
 done
+grep -q '<table aria-labelledby="box-[0-9]*">' "${RTP}_security.html" && grep -q '<h2 id="box-1">Findings</h2>' "${RTP}_security.html" \
+    && pass "a table is named by the title of its box (aria-labelledby)" || fail "a table has no accessible name"
 # No box with a thick stripe down its left side: no border-left or
-# border-inline-start rule and no inset box-shadow, in the shared CSS or in any
-# generated report. Notices are a banner with a 1px border all round.
+# border-inline-start rule and no inset box-shadow, in the shared CSS, in the
+# documentation site's stylesheets or in any generated report. Notices are a
+# banner with a 1px border all round.
 side_stripe() { grep -EnH 'border-(left|inline-start)(-width|-style|-color)?[[:space:]]*:|box-shadow:[^;}]*inset' "$@"; }
-if STRIPES="$(side_stripe "$LIB/report-common.sh" "${RTP}_risk-report.html" "${RTP}_security.html" \
-                "${RTP}_NOTICE.html" "${RTP}_conformance.html")"; then
-    fail "a left-side stripe rule is in the report CSS or a generated report" "$STRIPES"
+if STRIPES="$(side_stripe "$LIB/report-common.sh" "$ROOT_DIR"/docs/stylesheets/*.css "${RTP}_risk-report.html" \
+                "${RTP}_security.html" "${RTP}_NOTICE.html" "${RTP}_conformance.html")"; then
+    fail "a left-side stripe rule is in the report CSS, the docs stylesheets or a generated report" "$STRIPES"
 else
-    pass "no left-side stripe rule in the report CSS or the four generated reports"
+    pass "no left-side stripe rule in the report CSS, the docs stylesheets or the four generated reports"
 fi
-# The security report and the NOTICE are English only, whatever REPORT_LANG says.
+# REPORT_LANG=ko: the security report is Korean; the NOTICE stays English.
 ( export RC_TRIVY_FIXTURE="$RC/trivy.json" PATH="$RT/bin:$PATH" SECURITY_ENRICH=false DEEP_CVE=false REPORT_LANG=ko
   bash "$LIB/scan-security.sh" "$RC/sbom.json" "$RT/k_1.0" k >/dev/null 2>&1
   bash "$LIB/generate-notice.sh" "$RC/sbom.json" "$RT/k_1.0" k >/dev/null 2>&1 )
-if grep -q ' components</span>' "$RT/k_1.0_security.html" && grep -q ' components</span>' "$RT/k_1.0_NOTICE.html" \
-   && ! grep -q '컴포넌트' "$RT/k_1.0_security.html" "$RT/k_1.0_NOTICE.html"; then
-    pass "REPORT_LANG=ko leaves the English-only security report and NOTICE in English"
+if grep -q '<html lang="ko">' "$RT/k_1.0_security.html" && grep -q '<h1>보안 보고서</h1>' "$RT/k_1.0_security.html" \
+   && grep -q '<th>패키지(설치 버전)</th>' "$RT/k_1.0_security.html" && grep -q '컴포넌트 [0-9,]*개</span>' "$RT/k_1.0_security.html"; then
+    pass "REPORT_LANG=ko writes the security report in Korean"
 else
-    fail "a Korean string reached the security report or the NOTICE" "$(grep -ho '<p class="desc">.*</p>' "$RT/k_1.0_security.html" "$RT/k_1.0_NOTICE.html")"
+    fail "the ko security report is not Korean" "$(grep -ho '<h1>[^<]*</h1>' "$RT/k_1.0_security.html")"
+fi
+if grep -q '<html lang="en">' "$RT/k_1.0_NOTICE.html" && grep -q '<h1>Third-party open source notice</h1>' "$RT/k_1.0_NOTICE.html" \
+   && grep -q ' components</span>' "$RT/k_1.0_NOTICE.html" && ! grep -q '[가-힣]' "$RT/k_1.0_NOTICE.html"; then
+    pass "REPORT_LANG=ko leaves the NOTICE in English"
+else
+    fail "a Korean string reached the NOTICE" "$(grep -o '<p class="desc">.*</p>' "$RT/k_1.0_NOTICE.html")"
 fi
 grep -q '<dl class="deadlines">' "${RTP}_risk-report.html" && grep -q '<dd>within 7 days</dd>' "${RTP}_risk-report.html" \
     && grep -q '<dd>within 30 days</dd>' "${RTP}_risk-report.html" && ! grep -q 'Critical → within' "${RTP}_risk-report.html" \
@@ -13682,13 +13691,43 @@ grep -q '<dl class="deadlines">' "${RTP}_risk-report.html" && grep -q '<dd>withi
 grep -q '<td class="sev"><span class="lbl sev-CRITICAL"><span class="mk" aria-hidden="true">' "${RTP}_security.html" \
     && pass "security report shows severity as a label with a shape marker and the word" \
     || fail "security report severity cell is not a label"
-grep -q '<p class="report-kind">Open-source risk report</p>' "${RTP}_risk-report.html" \
+# The new cells: package coordinates (Maven only, split by characters), fixed
+# versions, a version from the SBOM root, and escaping of every one of them.
+ESC="$RT/esc"; mkdir -p "$ESC"
+jq '.metadata.component.version = "1.0<\"x"' "$RC/sbom.json" > "$ESC/sbom.json"
+cat > "$ESC/trivy.json" <<'TRIVY'
+{"Results":[{"Target":"t","Vulnerabilities":[
+ {"VulnerabilityID":"CVE-2026-0001","PkgName":"org.ex\"<a:ar<t","InstalledVersion":"1.0","FixedVersion":"1.1, 2.0","Severity":"CRITICAL","PkgIdentifier":{"PURL":"pkg:maven/org.ex/art@1.0"}},
+ {"VulnerabilityID":"CVE-2026-0002","PkgName":"한글그룹:이름","InstalledVersion":"2","Severity":"HIGH","PkgIdentifier":{"PURL":"pkg:maven/x/y@2"}},
+ {"VulnerabilityID":"CVE-2026-0003","PkgName":"libssl3:amd64","InstalledVersion":7,"FixedVersion":"","Severity":"LOW","PkgIdentifier":{"PURL":"pkg:deb/debian/libssl3@3"}}]}]}
+TRIVY
+( export RC_TRIVY_FIXTURE="$ESC/trivy.json" PATH="$RT/bin:$PATH" SECURITY_ENRICH=false DEEP_CVE=false
+  bash "$LIB/scan-security.sh" "$ESC/sbom.json" "$ESC/x_1" t >/dev/null 2>&1 )
+EH="$ESC/x_1_security.html"
+grep -q '<span class="proj">t <span class="ver">1.0&lt;&quot;x</span></span>' "$EH" && ! grep -q '1.0<"x' "$EH" \
+    && pass "the SBOM root version is escaped in the page head" || fail "root version escaping" "$(grep -o '<span class="proj">.*</header>' "$EH")"
+grep -qF '<span class="pkg" title="org.ex&quot;&lt;a:ar&lt;t"><span class="pg">org.ex&quot;&lt;a / </span><span class="pn">ar&lt;t</span> <span class="pv">1.0</span></span>' "$EH" \
+    && pass "a Maven package shows group / artifact, both escaped, the full name in title" || fail "Maven package coordinate"
+grep -qF '<span class="pg">한글그룹 / </span><span class="pn">이름</span>' "$EH" \
+    && pass "a non-ASCII Maven name is split by characters, not bytes" || fail "non-ASCII package split"
+grep -qF '<span class="pn">libssl3:amd64</span> <span class="pv">7</span>' "$EH" \
+    && pass "a non-Maven name with a colon stays whole, and a numeric version is shown" || fail "non-Maven package or numeric version"
+grep -qF '<td class="fix"><span class="v">1.1</span>, <span class="v">2.0</span></td>' "$EH" \
+    && grep -qF '<span class="nofix">No fix yet</span>' "$EH" \
+    && pass "fixed versions are listed one by one, and a missing fix says so" || fail "fixed version cell"
+FACTS="$( ( . "$LIB/report-common.sh"; printf '{"metadata":{"component":{"version":3,"type":"application"}},"components":[{},{}]}' > "$ESC/n.json"
+            report_bom_facts "$ESC/n.json"; printf '%s|%s|%s' "$RB_VERSION" "$RB_ROOTTYPE" "$RB_NCOMP"
+            printf '{"metadata":{"component":{"version":{"x":1}}}}' > "$ESC/o.json"
+            report_bom_facts "$ESC/o.json"; printf '|%s|%s' "$RB_VERSION" "$RB_NCOMP" ) )"
+[ "$FACTS" = "3|application|2||" ] && pass "a numeric root version is read as text, an object one is dropped" \
+    || fail "report_bom_facts" "$FACTS"
+grep -q '<h1>Open-source risk report</h1>' "${RTP}_risk-report.html" \
     && grep -q '<p class="subtitle">Supplier SBOM under review</p>' "${RTP}_risk-report.html" \
     && pass "supplier risk report: GLOSSARY title with the supplier review as subtitle" \
     || fail "supplier risk report title/subtitle"
 grep -q '^_Supplier SBOM under review_$' "${RTP}_risk-report.md" \
     && pass "supplier risk report markdown carries the subtitle" || fail "supplier risk report markdown subtitle"
-grep -q '<p class="report-kind">Conformance check report</p>' "${RTP}_conformance.html" \
+grep -q '<h1>Conformance check report</h1>' "${RTP}_conformance.html" \
     && pass "conformance report is titled Conformance check report" || fail "conformance report title"
 # No retired term in any generated English report (GLOSSARY.md).
 for f in "${RTP}_risk-report.html" "${RTP}_conformance.html" "${RTP}_security.html" "${RTP}_NOTICE.html"; do
@@ -13699,7 +13738,7 @@ for f in "${RTP}_risk-report.html" "${RTP}_conformance.html" "${RTP}_security.ht
     fi
 done
 ( cd "$RT" && REPORT_LANG=ko bash "$LIB/generate-risk-report.sh" t_1.0 t ANALYZE >/dev/null 2>&1 )
-grep -q '<p class="report-kind">오픈소스 위험 보고서</p>' "${RTP}_risk-report.html" && grep -q '공급사 SBOM 검토' "${RTP}_risk-report.html" \
+grep -q '<h1>오픈소스 위험 보고서</h1>' "${RTP}_risk-report.html" && grep -q '공급사 SBOM 검토' "${RTP}_risk-report.html" \
     && pass "ko supplier risk report: 오픈소스 위험 보고서 with 공급사 SBOM 검토 as subtitle" \
     || fail "ko supplier risk report title/subtitle"
 if grep -qE '위험 ?분석 ?보고서|적합성 보고서|결과물|포맷 검증' "${RTP}_risk-report.html" "${RTP}_risk-report.md" \

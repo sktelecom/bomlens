@@ -345,7 +345,8 @@ ADVISORIES=$(jq -c '[ (.Advisories // [])[] | {
       version: (.InstalledVersion // ""),
       severity: (.Severity // "UNKNOWN"),
       fixed: (.FixedVersion // ""),
-      title: (.Title // .Description // "" | .[0:120])
+      title: (.Title // .Description // "" | .[0:120]),
+      title_full: (.Title // .Description // "" | .[0:1000])
     } ]' "$JSON" 2>/dev/null || echo '[]')
 [ -n "$ADVISORIES" ] || ADVISORIES='[]'
 ADVISORY_N=$(echo "$ADVISORIES" | jq 'length')
@@ -363,6 +364,7 @@ FINDINGS=$(jq -r '
       cvss: ([ (.CVSS // {}) | to_entries[] | .value | (.V3Score // .V2Score) ]
               | map(select(. != null)) | (max // null)),
       title: (.Title // .Description // "" | .[0:120]),
+      title_full: (.Title // .Description // "" | .[0:1000]),
       # deep-cve: a grype CPE match whose NVD version range was not verified
       # (SECURITY_NVD_VERIFY off / NVD unreachable). Surfaced so the reader sees
       # which findings may be loose-version false positives.
@@ -670,145 +672,188 @@ KEV_COUNT=$(echo "$FINDINGS" | jq '[.[] | select(.kev)] | length')
 # ---------- HTML ----------
 esc() { printf '%s' "$1" | sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g'; }
 PROJECT_ESC="$(esc "$PROJECT")"
-SEC_VERSION="$(report_version "$PROJECT" "$OUT_PREFIX" "$SBOM")"
-SEC_NCOMP="$(report_component_count "$SBOM")"
-# The security report is written in English only.
-SEC_COMP=""; [ -n "$SEC_NCOMP" ] && SEC_COMP="$(REPORT_LANG=en report_str components "$SEC_NCOMP")"
+# Localization (REPORT_LANG=ko) of the HTML report only; the Markdown and the
+# JSON stay English. sec_s KEY ENGLISH [ARGS]: the Korean string for
+# security.KEY from the catalog, or the English one, filled with printf.
+REPORT_LANG="${REPORT_LANG:-en}"; [ "$REPORT_LANG" = "ko" ] || REPORT_LANG="en"
+KO_CAT="$SCRIPT_DIR/i18n/report-strings.ko.json"
+[ -f "$KO_CAT" ] || REPORT_LANG="en"
+sec_s() {
+    local k="$1" f="$2"
+    shift 2
+    if [ "$REPORT_LANG" = "ko" ]; then
+        local t
+        t="$(jq -r --arg k "security.$k" '.[$k] // empty' "$KO_CAT" 2>/dev/null)"
+        [ -n "$t" ] && f="$t"
+    fi
+    # shellcheck disable=SC2059  # the format is a trusted built-in or catalog string
+    printf -- "$f" "$@"
+}
+report_bom_facts "$SBOM"
+SEC_VERSION="$(report_version "$PROJECT" "$OUT_PREFIX")"
+SEC_COMP=""; [ -n "$RB_NCOMP" ] && SEC_COMP="$(report_str components "$(report_num "$RB_NCOMP")")"
 REACH_FILE_HTML="$(esc "$(basename "${REACH_DOC:-reachability.cdx.json}")")"
+JSON_FILE_HTML="$(esc "$(basename "$JSON")")"
+ENGINE_HTML="$(sec_s engine 'Engine: %s' "Trivy")"
+if [ -n "$GOVULNDB_ENGINE" ]; then
+    GV_DATE="$(printf '%s' "$GOVULNDB_ENGINE" | sed -n 's/.*(snapshot \([0-9-]*\)).*/\1/p')"
+    if [ -n "$GV_DATE" ]; then
+        ENGINE_HTML="${ENGINE_HTML}, $(sec_s govulndb_dated 'Go vulnerability database (snapshot %s)' "$(esc "$GV_DATE")")"
+    else
+        ENGINE_HTML="${ENGINE_HTML}, $(sec_s govulndb 'Go vulnerability database')"
+    fi
+fi
+H_TITLE="$(sec_s title 'Security report')"
+TH_SEV="$(sec_s th_severity 'Severity')"; TH_CVSS="CVSS"; TH_EPSS="EPSS"; TH_KEV="KEV"
+TH_CVE="$(sec_s th_cve 'CVE')"; TH_PKGI="$(sec_s th_package_installed 'Package (installed)')"
+TH_FIXED="$(sec_s th_fixed 'Fixed')"; TH_TITLE="$(sec_s th_title 'Title')"; TH_WHY="$(sec_s th_why 'Why')"
+TH_ADV="$(sec_s th_advisory 'Advisory')"; TH_COMP="$(sec_s th_component 'Component')"
+TH_VER="$(sec_s th_version 'Version')"; TH_PURL="PURL"; TH_REASON="$(sec_s th_reason 'Reason')"
+NO_FIX="$(report_str no_fix)"
+R_NOVER="$(sec_s reason_no_version 'no version')"
+R_NOID="$(sec_s reason_no_identifier 'no package purl and no matched CPE')"
+R_REPO="$(sec_s reason_repository_purl 'repository purl (pkg:github, ...), which Trivy does not query')"
 {
     cat <<HTMLHEAD
 <!DOCTYPE html>
-<html lang="en"><head>
+<html lang="${REPORT_LANG}"><head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline';">
-<title>Security Report — ${PROJECT_ESC}</title>
+<title>${H_TITLE} — ${PROJECT_ESC}</title>
 HTMLHEAD
     report_style
     echo "</head><body>"
-    report_topbar "Security Report"
-    echo '<div class="page-head">'
-    report_h1 "$PROJECT_ESC" "$SEC_VERSION"
-    report_desc "$(esc "$(REPORT_LANG=en report_type_label "" "$SBOM")")" "$(report_time_html "$GEN_AT")" "$SEC_COMP"
-    echo "<p class=\"desc\">Engine: Trivy${GOVULNDB_ENGINE:+, $(esc "$GOVULNDB_ENGINE")}</p>"
-    echo '</div>'
-    cat <<HTMLSUM
-<div class="summary">
- <span class="lbl sev-CRITICAL"><span class="mk" aria-hidden="true">&#9670;</span>Critical <span class="count">${C}</span></span>
- <span class="lbl sev-HIGH"><span class="mk" aria-hidden="true">&#9650;</span>High <span class="count">${H}</span></span>
- <span class="lbl sev-MEDIUM"><span class="mk" aria-hidden="true">&#9679;</span>Medium <span class="count">${M}</span></span>
- <span class="lbl sev-LOW"><span class="mk" aria-hidden="true">&#9632;</span>Low <span class="count">${L}</span></span>
- <span class="lbl sev-UNKNOWN"><span class="mk" aria-hidden="true">&#8211;</span>Unknown <span class="count">${U}</span></span>
-HTMLSUM
-    [ "$ENRICHED" = "true" ] && echo " <span class=\"lbl lbl-danger\">KEV <span class=\"count\">${KEV_COUNT}</span></span>"
-    echo "</div>"
-    # Everything the counts above leave out, in one notice.
+    report_page_head "$H_TITLE" "$PROJECT_ESC" "$SEC_VERSION" "" \
+        "$(esc "$(report_type_label "${MODE:-}")")" "$(report_time_html "$GEN_AT")" "$SEC_COMP" "$ENGINE_HTML"
+    # Everything the counts below leave out, in one notice above them.
     NOTES=""
     if [ -n "$SCAN_ERR" ]; then
         ERR_HTML=$(printf '%s' "$SCAN_ERR" | jq -Rr '@html')
-        NOTES="${NOTES}<p><b>Scan failed.</b> The vulnerability scan did not complete, so this report does not reflect the target's actual exposure.<br><code>${ERR_HTML}</code></p>"
+        NOTES="${NOTES}<p>$(sec_s scan_failed '<b>Scan failed.</b> The vulnerability scan did not complete, so this report does not reflect the target'"'"'s actual exposure.')<br><code>${ERR_HTML}</code></p>"
     fi
     if [ "${UNCHECKED_N:-0}" -gt 0 ]; then
-        NOTES="${NOTES}<p><b>${UNCHECKED_N} component(s) could not be checked</b> and are listed below. No vulnerability database was asked about them, so the counts above do not cover them.</p>"
+        NOTES="${NOTES}<p>$(sec_s unchecked_note '<b>%s component(s) could not be checked</b> and are listed below. No vulnerability database was asked about them, so the counts below do not cover them.' "$UNCHECKED_N")</p>"
     fi
     if [ "${UNREACHED_N:-0}" -gt 0 ]; then
-        NOTES="${NOTES}<p><b>${UNREACHED_N} finding(s) are not reachable</b> and are listed at the end of this report, not in the counts above. govulncheck found that the affected Go package is not in the build (<code>code_not_present</code>), or that no affected function in it is called (source) or in the executable (binary) (<code>code_not_reachable</code>); each is recorded as <code>not_affected</code> in <code>${REACH_FILE_HTML}</code>.</p>"
+        NOTES="${NOTES}<p>$(sec_s unreached_note '<b>%s finding(s) are not reachable</b> and are listed at the end of this report, not in the counts below. govulncheck found that the affected Go package is not in the build (<code>code_not_present</code>), or that no affected function in it is called (source) or in the executable (binary) (<code>code_not_reachable</code>); each is recorded as <code>not_affected</code> in <code>%s</code>.' "$UNREACHED_N" "$REACH_FILE_HTML")</p>"
     fi
     if [ "${ADVISORY_N:-0}" -gt 0 ]; then
-        NOTES="${NOTES}<p><b>${ADVISORY_N} advisories with no CVE</b> are listed below and are not included in the counts above. Each is a distribution advisory number for which the vulnerability database names no CVE.</p>"
+        NOTES="${NOTES}<p>$(sec_s advisory_note '<b>%s advisories with no CVE</b> are listed below and are not included in the counts below. Each is a distribution advisory number for which the vulnerability database names no CVE.' "$ADVISORY_N")</p>"
     fi
     if [ "${KERNEL_TOTAL:-0}" -gt 0 ]; then
-        NOTES="${NOTES}<p><b>${KERNEL_TOTAL} kernel advisories</b> are listed at the end of this report and are not included in the counts above. Most advisories against a kernel are for subsystems a given device never compiled in, and the SBOM cannot tell which, so counting them here would bury the findings this report exists to show.</p>"
+        NOTES="${NOTES}<p>$(sec_s kernel_note '<b>%s kernel advisories</b> are listed at the end of this report and are not included in the counts below. Most advisories against a kernel are for subsystems a given device never compiled in, and the SBOM cannot tell which, so counting them here would bury the findings this report exists to show.' "$KERNEL_TOTAL")</p>"
     fi
     if [ -n "$NOTES" ]; then
         if [ -n "$SCAN_ERR" ]; then echo "<div class=\"banner banner-danger\">${NOTES}</div>"; else echo "<div class=\"banner\">${NOTES}</div>"; fi
     fi
     if [ "$TOTAL" -gt 0 ]; then
-        echo "<div class=\"box\"><div class=\"box-head\"><h2>Findings</h2><span class=\"counter\">${TOTAL}</span></div>"
+        report_next_id
+        echo "<div class=\"box\"><div class=\"box-head\"><h2 id=\"${REPORT_BOX_ID}\">$(sec_s findings 'Findings')</h2><span class=\"counter\">$(report_num "$TOTAL")</span><span class=\"end\">"
+        report_sev_labels "$C" "$H" "$M" "$L" "$U"
+        [ "$ENRICHED" = "true" ] && { report_lbl "lbl-danger" "$KEV_COUNT" "KEV"; echo; }
+        echo "</span></div>"
         # What KEV and EPSS mean and how the rows are ordered: a legend under the
         # head instead of a line of abbreviations above the table.
-        [ "$ENRICHED" = "true" ] && echo "<p class=\"legend\"><span><b>KEV</b> CISA known-exploited</span><span><b>EPSS</b> exploit probability (FIRST.org)</span><span><b>Order</b> KEV first, then severity, then EPSS</span></p>"
-        echo "<div class=\"table-scroll\"><table><thead><tr><th>Severity</th><th>KEV</th><th class=\"num\">CVSS</th><th class=\"num\">EPSS</th><th>CVE</th><th>Package (installed)</th><th>Fixed</th><th>Title</th></tr></thead><tbody>"
-        echo "$FINDINGS" | jq -r "$(report_jq_defs)"'.[] |
+        [ "$ENRICHED" = "true" ] && echo "<p class=\"legend\"><span><b>KEV</b> $(sec_s legend_kev 'CISA known-exploited')</span><span><b>EPSS</b> $(sec_s legend_epss 'exploit probability (FIRST.org)')</span><span><b>$(sec_s legend_order_h 'Order')</b> $(sec_s legend_order 'KEV first, then severity, then EPSS')</span></p>"
+        echo "<div class=\"table-scroll\"><table aria-labelledby=\"${REPORT_BOX_ID}\"><thead><tr><th>${TH_SEV}</th><th>${TH_KEV}</th><th class=\"num\">${TH_CVSS}</th><th class=\"num\">${TH_EPSS}</th><th>${TH_CVE}</th><th>${TH_PKGI}</th><th>${TH_FIXED}</th><th>${TH_TITLE}</th></tr></thead><tbody>"
+        echo "$FINDINGS" | jq -r --arg nofix "$NO_FIX" "$(report_jq_defs)"'.[] |
             "<tr><td class=\"sev\">" + (.severity|sevlbl) + "</td>" +
             "<td>" + (if .kev then "<span class=\"kevbadge\">KEV</span>" else "" end) + "</td>" +
             "<td class=\"num\">" + ((.cvss // "" )|tostring|@html) + "</td>" +
             "<td class=\"num\">" + (if .epss then ((.epss*1000|floor)/1000|tostring) else "" end) + "</td>" +
-            "<td class=\"id\">" + (.id|@html) + (if .unverified then " <span title=\"CPE-matched; NVD version range not verified\">&dagger;</span>" else "" end) + (if .reach == "exploitable" then " <span title=\"" + (.reach_detail|@html) + "\">&Dagger;</span>" else "" end) + "</td>" +
-            "<td>" + (.version as $v | .pkg | pkgcoordv($v)) + "</td>" +
-            "<td class=\"fix\">" + (.fixed|fixlist) + "</td>" +
-            "<td class=\"grow\">" + (.title|@html) + "</td></tr>"'
+            "<td class=\"id\">" + (.id|strv|@html) + (if .unverified then " <span title=\"CPE-matched; NVD version range not verified\">&dagger;</span>" else "" end) + (if .reach == "exploitable" then " <span title=\"" + (.reach_detail|@html) + "\">&Dagger;</span>" else "" end) + "</td>" +
+            "<td class=\"pkgc\">" + (.version as $v | .purl as $u | .pkg | pkgcoordp($v; $u)) + "</td>" +
+            "<td class=\"fix\">" + (.fixed|fixlist($nofix)) + "</td>" +
+            "<td class=\"grow\">" + (.title_full // .title | cut(120)) + "</td></tr>"'
         echo "</tbody></table></div>"
         FOOT=""
         if echo "$FINDINGS" | jq -e 'any(.[]; .unverified)' >/dev/null 2>&1; then
-            FOOT="${FOOT}<span>&dagger; CPE-matched against NVD but the version range was not verified (deep-cve; set <code>SECURITY_NVD_VERIFY=true</code> with network + <code>NVD_API_KEY</code> to drop loose-version false positives).</span>"
+            FOOT="${FOOT}<span>&dagger; $(sec_s foot_unverified 'CPE-matched against NVD but the version range was not verified (deep-cve; set <code>SECURITY_NVD_VERIFY=true</code> with network + <code>NVD_API_KEY</code> to drop loose-version false positives).')</span>"
         fi
         if [ "${REACHED_N:-0}" -gt 0 ]; then
-            FOOT="${FOOT}<span>&Dagger; Reached: govulncheck found a call path to the affected Go code (source) or the affected symbol in the executable (binary).</span>"
+            FOOT="${FOOT}<span>&Dagger; $(sec_s foot_reached 'Reached: govulncheck found a call path to the affected Go code (source) or the affected symbol in the executable (binary).')</span>"
         fi
         [ -n "$FOOT" ] && echo "<p class=\"legend\">${FOOT}</p>"
         echo "</div>"
-    elif [ -n "$SCAN_ERR" ]; then
-        echo "<p>Scan failed &mdash; no results were produced.</p>"
-    elif [ "${UNCHECKED_N:-0}" -gt 0 ]; then
-        echo "<p>No vulnerability was found in the components that were checked. ${UNCHECKED_N} component(s) could not be checked; they are listed below.</p>"
-    elif [ "${UNREACHED_N:-0}" -gt 0 ]; then
-        echo "<p>No reachable vulnerability was found. ${UNREACHED_N} finding(s) are not reachable; they are listed below.</p>"
     else
-        echo "<p>No known vulnerabilities found.</p>"
+        echo "<div class=\"summary\">"
+        report_sev_labels "$C" "$H" "$M" "$L" "$U"
+        [ "$ENRICHED" = "true" ] && { report_lbl "lbl-danger" "$KEV_COUNT" "KEV"; echo; }
+        echo "</div>"
+        if [ -n "$SCAN_ERR" ]; then
+            echo "<p>$(sec_s none_failed 'Scan failed &mdash; no results were produced.')</p>"
+        elif [ "${UNCHECKED_N:-0}" -gt 0 ]; then
+            echo "<p>$(sec_s none_unchecked 'No vulnerability was found in the components that were checked. %s component(s) could not be checked; they are listed below.' "$UNCHECKED_N")</p>"
+        elif [ "${UNREACHED_N:-0}" -gt 0 ]; then
+            echo "<p>$(sec_s none_unreached 'No reachable vulnerability was found. %s finding(s) are not reachable; they are listed below.' "$UNREACHED_N")</p>"
+        else
+            echo "<p>$(sec_s none 'No known vulnerabilities found.')</p>"
+        fi
     fi
     if [ "${UNCHECKED_N:-0}" -gt 0 ]; then
-        echo "<div class=\"box\"><div class=\"box-head\"><h2>Components that could not be checked</h2><span class=\"counter\">${UNCHECKED_N}</span>"
-        echo "<p class=\"meta\">They have no version, or no package purl that Trivy can query and no CPE that was matched, so no vulnerability database was asked about them. A clean result does not cover them.</p>"
+        report_next_id
+        echo "<div class=\"box\"><div class=\"box-head\"><h2 id=\"${REPORT_BOX_ID}\">$(sec_s h2_unchecked 'Components that could not be checked')</h2><span class=\"counter\">$(report_num "$UNCHECKED_N")</span>"
+        echo "<p class=\"meta\">$(sec_s unchecked_intro 'They have no version, or no package purl that Trivy can query and no CPE that was matched, so no vulnerability database was asked about them. A clean result does not cover them.')</p>"
         if [ -n "${BOMLENS_CPE_INDEX_SKIPPED:-}" ] && echo "$UNCHECKED" | jq -e 'any(.[]; .Reason != "no-version")' >/dev/null 2>&1; then
-            echo "<p class=\"meta\">$(esc "$UNCHECKED_NOTE")</p>"
+            if [ "${BOMLENS_CPE_INDEX_SKIPPED:-}" = "analyze-upstream-map-only" ]; then
+                echo "<p class=\"meta\">$(sec_s unchecked_note_upstream "$(esc "$UNCHECKED_NOTE")")</p>"
+            else
+                echo "<p class=\"meta\">$(sec_s unchecked_note_analyze "$(esc "$UNCHECKED_NOTE")")</p>"
+            fi
         fi
         echo "</div>"
-        echo "<div class=\"table-scroll\"><table><thead><tr><th>Component</th><th>Version</th><th>PURL</th><th>Reason</th></tr></thead><tbody>"
-        echo "$UNCHECKED" | jq -r --argjson max "$UNCHECKED_MAX" '.[0:$max][] |
-            "<tr><td class=\"wrap\">" + (.Name|@html) + "</td><td class=\"ver\">" + (.Version|@html) + "</td>" +
-            "<td class=\"purl\">" + (.PURL|@html) + "</td>" +
-            "<td>" + ({"no-version": "no version", "no-identifier": "no package purl and no matched CPE", "repository-purl": "repository purl (pkg:github, ...), which Trivy does not query"}[.Reason] // .Reason | @html) + "</td></tr>"'
+        echo "<div class=\"table-scroll\"><table aria-labelledby=\"${REPORT_BOX_ID}\"><thead><tr><th>${TH_COMP}</th><th>${TH_VER}</th><th>${TH_PURL}</th><th>${TH_REASON}</th></tr></thead><tbody>"
+        echo "$UNCHECKED" | jq -r --argjson max "$UNCHECKED_MAX" --arg nv "$R_NOVER" --arg ni "$R_NOID" --arg rp "$R_REPO" '.[0:$max][] |
+            "<tr><td class=\"grow\">" + (.Name|tostring|@html) + "</td><td class=\"ver\">" + (.Version|tostring|@html) + "</td>" +
+            "<td class=\"purl\">" + (.PURL|tostring|@html) + "</td>" +
+            "<td>" + ({"no-version": $nv, "no-identifier": $ni, "repository-purl": $rp}[.Reason] // .Reason | @html) + "</td></tr>"'
         echo "</tbody></table></div>"
         if [ "$UNCHECKED_N" -gt "$UNCHECKED_MAX" ]; then
-            echo "<p class=\"legend\">&hellip; and $((UNCHECKED_N - UNCHECKED_MAX)) more, listed in <code>UncheckedComponents</code> in <code>$(esc "$(basename "$JSON")")</code>.</p>"
+            echo "<p class=\"legend\">$(sec_s unchecked_more '&hellip; and %s more, listed in <code>UncheckedComponents</code> in <code>%s</code>.' "$(report_num "$((UNCHECKED_N - UNCHECKED_MAX))")" "$JSON_FILE_HTML")</p>"
         fi
         echo "</div>"
     fi
     if [ "${UNREACHED_N:-0}" -gt 0 ]; then
-        echo "<div class=\"box\"><div class=\"box-head\"><h2>Not reachable</h2><span class=\"counter\">${UNREACHED_N}</span>"
-        echo "<p class=\"meta\">govulncheck judged that the code these advisories name is not reached. They are recorded as <code>not_affected</code> with <code>code_not_present</code> or <code>code_not_reachable</code> in <code>${REACH_FILE_HTML}</code>, and are not in the counts above.</p></div>"
-        echo "<div class=\"table-scroll\"><table><thead><tr><th>Severity</th><th class=\"num\">CVSS</th><th>CVE</th><th>Package</th><th>Installed</th><th>Fixed</th><th>Why</th></tr></thead><tbody>"
-        echo "$UNREACHED_FINDINGS" | jq -r "$(report_jq_defs)"'
+        report_next_id
+        echo "<div class=\"box\"><div class=\"box-head\"><h2 id=\"${REPORT_BOX_ID}\">$(sec_s h2_unreached 'Not reachable')</h2><span class=\"counter\">$(report_num "$UNREACHED_N")</span>"
+        echo "<p class=\"meta\">$(sec_s unreached_intro 'govulncheck judged that the code these advisories name is not reached. They are recorded as <code>not_affected</code> with <code>code_not_present</code> or <code>code_not_reachable</code> in <code>%s</code>, and are not in the counts above.' "$REACH_FILE_HTML")</p></div>"
+        echo "<div class=\"table-scroll\"><table aria-labelledby=\"${REPORT_BOX_ID}\"><thead><tr><th>${TH_SEV}</th><th class=\"num\">${TH_CVSS}</th><th>${TH_CVE}</th><th>${TH_PKGI}</th><th>${TH_FIXED}</th><th>${TH_WHY}</th></tr></thead><tbody>"
+        echo "$UNREACHED_FINDINGS" | jq -r --arg nofix "$NO_FIX" "$(report_jq_defs)"'
             sort_by({CRITICAL:0,HIGH:1,MEDIUM:2,LOW:3,UNKNOWN:4}[.severity] // 5)[] |
             "<tr><td class=\"sev\">" + (.severity|sevlbl) + "</td>" +
             "<td class=\"num\">" + ((.cvss // "")|tostring|@html) + "</td>" +
-            "<td class=\"id\">" + (.id|@html) + "</td><td>" + (.pkg|pkgcoord) + "</td>" +
-            "<td class=\"ver\">" + (.version|@html) + "</td><td class=\"fix\">" + (.fixed|fixlist) + "</td>" +
-            "<td class=\"grow\">" + (.reach_detail|@html) + "</td></tr>"'
+            "<td class=\"id\">" + (.id|strv|@html) + "</td>" +
+            "<td class=\"pkgc\">" + (.version as $v | .purl as $u | .pkg | pkgcoordp($v; $u)) + "</td>" +
+            "<td class=\"fix\">" + (.fixed|fixlist($nofix)) + "</td>" +
+            "<td class=\"grow\">" + (.reach_detail|strv|@html) + "</td></tr>"'
         echo "</tbody></table></div></div>"
     fi
     if [ "${ADVISORY_N:-0}" -gt 0 ]; then
-        echo "<div class=\"box\"><div class=\"box-head\"><h2>Advisories with no CVE</h2><span class=\"counter\">${ADVISORY_N}</span>"
-        echo "<p class=\"meta\">The vulnerability database reported these under an advisory number and names no CVE for them, so they are kept out of the findings and the counts above.</p></div>"
-        echo "<div class=\"table-scroll\"><table><thead><tr><th>Severity</th><th>Advisory</th><th>Package</th><th>Installed</th><th>Fixed</th><th>Title</th></tr></thead><tbody>"
-        echo "$ADVISORIES" | jq -r "$(report_jq_defs)"'.[] |
+        report_next_id
+        echo "<div class=\"box\"><div class=\"box-head\"><h2 id=\"${REPORT_BOX_ID}\">$(sec_s h2_advisories 'Advisories with no CVE')</h2><span class=\"counter\">$(report_num "$ADVISORY_N")</span>"
+        echo "<p class=\"meta\">$(sec_s advisories_intro 'The vulnerability database reported these under an advisory number and names no CVE for them, so they are kept out of the findings and the counts above.')</p></div>"
+        echo "<div class=\"table-scroll\"><table aria-labelledby=\"${REPORT_BOX_ID}\"><thead><tr><th>${TH_SEV}</th><th>${TH_ADV}</th><th>${TH_PKGI}</th><th>${TH_FIXED}</th><th>${TH_TITLE}</th></tr></thead><tbody>"
+        echo "$ADVISORIES" | jq -r --arg nofix "$NO_FIX" "$(report_jq_defs)"'.[] |
             "<tr><td class=\"sev\">" + (.severity|sevlbl) + "</td>" +
-            "<td class=\"id\">" + (.id|@html) + "</td><td>" + (.pkg|pkgcoord) + "</td>" +
-            "<td class=\"ver\">" + (.version|@html) + "</td><td class=\"fix\">" + (.fixed|fixlist) + "</td>" +
-            "<td class=\"grow\">" + (.title|@html) + "</td></tr>"'
+            "<td class=\"id\">" + (.id|strv|@html) + "</td>" +
+            "<td class=\"pkgc\">" + (.version as $v | .purl as $u | .pkg | pkgcoordp($v; $u)) + "</td>" +
+            "<td class=\"fix\">" + (.fixed|fixlist($nofix)) + "</td>" +
+            "<td class=\"grow\">" + (.title_full // .title | cut(120)) + "</td></tr>"'
         echo "</tbody></table></div></div>"
     fi
     if [ "${KERNEL_TOTAL:-0}" -gt 0 ]; then
-        echo "<div class=\"box\"><div class=\"box-head\"><h2>Kernel advisories</h2><span class=\"counter\">${KERNEL_TOTAL}</span>"
-        echo "<p class=\"meta\">Advisories filed against the kernel this image carries. Read them against the kernel configuration, not as a list to work through: a kernel accumulates thousands and most concern subsystems a given device never built.</p></div>"
-        echo "<div class=\"table-scroll\"><table><thead><tr><th>Severity</th><th class=\"num\">CVSS</th><th>CVE</th><th>Package</th><th>Installed</th><th>Fixed</th></tr></thead><tbody>"
-        echo "$KERNEL_FINDINGS" | jq -r "$(report_jq_defs)"'sort_by(
+        report_next_id
+        echo "<div class=\"box\"><div class=\"box-head\"><h2 id=\"${REPORT_BOX_ID}\">$(sec_s h2_kernel 'Kernel advisories')</h2><span class=\"counter\">$(report_num "$KERNEL_TOTAL")</span>"
+        echo "<p class=\"meta\">$(sec_s kernel_intro 'Advisories filed against the kernel this image carries. Read them against the kernel configuration, not as a list to work through: a kernel accumulates thousands and most concern subsystems a given device never built.')</p></div>"
+        echo "<div class=\"table-scroll\"><table aria-labelledby=\"${REPORT_BOX_ID}\"><thead><tr><th>${TH_SEV}</th><th class=\"num\">${TH_CVSS}</th><th>${TH_CVE}</th><th>${TH_PKGI}</th><th>${TH_FIXED}</th></tr></thead><tbody>"
+        echo "$KERNEL_FINDINGS" | jq -r --arg nofix "$NO_FIX" "$(report_jq_defs)"'sort_by(
             {CRITICAL:0,HIGH:1,MEDIUM:2,LOW:3,UNKNOWN:4}[.severity] // 5)[] |
             "<tr><td class=\"sev\">" + (.severity|sevlbl) + "</td>" +
             "<td class=\"num\">" + ((.cvss // "")|tostring|@html) + "</td>" +
-            "<td class=\"id\">" + (.id|@html) + "</td><td>" + (.pkg|pkgcoord) + "</td>" +
-            "<td class=\"ver\">" + (.version|@html) + "</td><td class=\"fix\">" + (.fixed|fixlist) + "</td></tr>"'
+            "<td class=\"id\">" + (.id|strv|@html) + "</td>" +
+            "<td class=\"grow\">" + (.version as $v | .purl as $u | .pkg | pkgcoordp($v; $u)) + "</td>" +
+            "<td class=\"fix\">" + (.fixed|fixlist($nofix)) + "</td></tr>"'
         echo "</tbody></table></div></div>"
     fi
     echo "</body></html>"

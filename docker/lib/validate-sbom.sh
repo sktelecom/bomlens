@@ -2091,6 +2091,8 @@ if [ "$REPORT_LANG" = "ko" ]; then
     C_H2_REVIEW=$(kstr conformance.h2_review); C_REVIEW_INTRO=$(kstr conformance.review_intro)
     C_FILL_INTRO=$(kstr conformance.fill_intro); C_H2_XWALK=$(kstr conformance.h2_crosswalk)
     C_YES=$(kstr common.yes); C_NO=$(kstr common.no)
+    C_G_FIX=$(kstr conformance.group_fixable); C_G_PERSON=$(kstr conformance.group_person)
+    C_G_NA=$(kstr conformance.group_na); C_G_MET=$(kstr conformance.group_met)
     C_REF=$(kstr conformance.reference); C_REF="${C_REF%% *}"   # "참고:" prefix
     C_TH_FRAMEWORK=$(kstr aiprofile.th_framework)
     C_HTML_TITLE=$(tfmt conformance.html_title "$PROJECT_ESC")
@@ -2130,6 +2132,7 @@ else
     C_FILL_INTRO="Each element below is advisory and does not affect the result. The fragment shows the shape that would satisfy it."
     C_H2_XWALK="Regulatory crosswalk"
     C_YES="yes"; C_NO="no"
+    C_G_FIX="Can be fixed"; C_G_PERSON="Needs a person"; C_G_NA="Not applicable"; C_G_MET="Met"
     C_REF="Reference:"
     C_TH_FRAMEWORK="Framework"
     C_HTML_TITLE="SBOM conformance check — ${PROJECT_ESC}"
@@ -2381,11 +2384,12 @@ fi
 # --------------------------------------------------------
 # HTML report (page head, labels, boxes and tables from report-common.sh)
 # --------------------------------------------------------
-C_VERSION="$(report_version "$PROJECT" "$OUT_PREFIX" "$SBOM")"
-C_NCOMP="$(report_component_count "$SBOM")"
-C_COMP=""; [ -n "$C_NCOMP" ] && C_COMP="$(report_str components "$C_NCOMP")"
-C_TYPE_HTML="$(report_type_label "" "$SBOM" | sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g')"
-C_RESULT_CLASS="danger"; [ "$RESULT" = "pass" ] && C_RESULT_CLASS="success"
+report_bom_facts "$SBOM"
+C_VERSION="$(report_version "$PROJECT" "$OUT_PREFIX")"
+C_COMP=""; [ -n "$RB_NCOMP" ] && C_COMP="$(report_str components "$(report_num "$RB_NCOMP")")"
+C_TYPE_HTML="$(report_type_label "${MODE:-}" | sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g')"
+C_RESULT_CLASS="lbl-danger"; [ "$RESULT" = "pass" ] && C_RESULT_CLASS="lbl-success"
+C_AND_MORE="$(report_str and_more '%s')"
 {
     cat <<HTMLHEAD
 <!DOCTYPE html>
@@ -2397,73 +2401,86 @@ C_RESULT_CLASS="danger"; [ "$RESULT" = "pass" ] && C_RESULT_CLASS="success"
 HTMLHEAD
     report_style
     echo "</head><body>"
-    report_topbar "${C_H1}"
-    echo '<div class="page-head">'
-    report_h1 "$PROJECT_HTML" "$C_VERSION"
-    report_desc "$C_TYPE_HTML" "$(report_time_html "$GEN_AT")" "$C_COMP"
-    report_desc "$C_META_FORMAT" "$C_META_PROFILE"
-    [ -n "$C_SUBMIT_HTML" ] && printf '%s\n' "$C_SUBMIT_HTML"
-    echo '</div>'
-    cat <<HTMLSUM
-<div class="summary">
- <span class="lbl lbl-${C_RESULT_CLASS}">${C_PILL_RESULT}</span>
- <span class="lbl lbl-danger">${C_PILL_FAIL} <span class="count">${N_FAIL}</span></span>
- <span class="lbl lbl-attention">${C_PILL_WARN} <span class="count">${N_WARN}</span></span>
- <span class="lbl lbl-info">${C_PILL_REVIEW} <span class="count">${N_REVIEW}</span></span>
-$( [ "${N_NA:-0}" -gt 0 ] && echo " <span class=\"lbl\">${C_PILL_NA} <span class=\"count\">${N_NA}</span></span>" )
-$( [ "${N_UNTRACEABLE:-0}" -gt 0 ] && echo " <span class=\"lbl\">${C_PILL_UNTRACE} <span class=\"count\">${N_UNTRACEABLE}</span></span>" )
-</div>
-HTMLSUM
+    report_page_head "${C_H1}" "$PROJECT_HTML" "$C_VERSION" "$C_SUBMIT_HTML" \
+        "$C_TYPE_HTML" "$(report_time_html "$GEN_AT")" "$C_COMP" "$C_META_FORMAT" "$C_META_PROFILE"
+    echo "<div class=\"summary\">"
+    echo " <span class=\"lbl ${C_RESULT_CLASS}\">${C_PILL_RESULT}</span>"
+    report_lbl "lbl-danger" "$N_FAIL" "$C_PILL_FAIL"; echo
+    report_lbl "lbl-attention" "$N_WARN" "$C_PILL_WARN"; echo
+    report_lbl "" "$N_REVIEW" "$C_PILL_REVIEW"; echo
+    if [ "${N_NA:-0}" -gt 0 ]; then report_lbl "" "$N_NA" "$C_PILL_NA"; echo; fi
+    if [ "${N_UNTRACEABLE:-0}" -gt 0 ]; then report_lbl "" "$N_UNTRACEABLE" "$C_PILL_UNTRACE"; echo; fi
+    echo "</div>"
     [ -n "$C_PIPELINE_STEPS_HTML" ] && printf '<div class="banner">%s</div>\n' "$C_PIPELINE_STEPS_HTML"
     # Two tables, not one. The submission requirements decide the verdict; the G7
-    # elements are advisory and never do. Mixed into a single 60-row table the
-    # reader cannot tell which is which, or why a given row is there. The G7 table
-    # also drops the "required" column — every value in it would read "no".
+    # elements are advisory and never do. The G7 table drops the "required"
+    # column, every value in it would read "no".
+    #
+    # Inside each table the rows are grouped by what the reader can do: what can
+    # be fixed, what needs a person, what does not apply, and, last and compact,
+    # what is met. Each row keeps its number from the check order.
     #
     # Evidence column doubles as the fix column: an advisory element that is
-    # missing carries its fill-in fragment inline (collapsed), so the reader never
-    # has to match a row against a separate section further down the page.
+    # missing carries its fill-in fragment inline (collapsed on screen, printed in
+    # full), so the reader never has to match a row against a separate section.
     html_rows() {   # $1: "submission" | "g7"
         echo "$RCHECKS" | jq -r --arg yes "$C_YES" --arg no "$C_NO" \
             --arg fix "$C_FIX_SUMMARY" --arg chk "$C_CHECK_SUMMARY" --arg ref "$C_REF" --arg kind "$1" \
-            --arg lang "$REPORT_LANG" '
-            [ .[] | select(if $kind=="g7" then (.id|startswith("g7-")) else ((.id|startswith("g7-"))|not) end) ]
-            | to_entries[] | .key as $i | .value |
-            (if (.naKind // "")=="not-applicable" then "s-na"
-             elif (.source // "")=="na" then "s-review" else "s-\(.status)" end) as $cls |
-            "<tr><td class=\"num\">" + (($i+1)|tostring) + "</td>" +
-            "<td class=\"" + $cls + "\"><span class=\"lbl\">" + (if (.naKind // "")=="not-applicable" then "N/A"
-                                              elif (.source // "")=="na" then "REVIEW"
-                                              else (.status|ascii_upcase) end|@html) + "</span></td>" +
-            # The regulatory references ride under the requirement they belong to.
-            "<td class=\"grow\">" + (.label|@html) +
-            (((.regulations // []) | map((if $lang=="ko" then .short_ko else .short end) + " " + .ref)) as $refs
-             | if ($refs|length) > 0
-               then "<br><span class=\"meta\">" + (($refs|join(" · "))|@html) + "</span>"
-               else "" end) + "</td>" +
-            (if $kind=="g7" then "" else "<td class=\"req\">" + (if .required then $yes else $no end) + "</td>" end) +
-            "<td>" + ((.detail // "")|@html) + "</td>" +
-            "<td class=\"wrap\">" + (((.evidence // []) | join(", "))|@html) +
-            (if ((.guidance // null) != null and .status=="warn" and ((.source // "") != "na"))
-             then "<details class=\"fix\"><summary>" + ($fix|@html) + "</summary>"
-                  + "<pre><code>" + (.guidance.snippet|@html) + "</code></pre>"
-                  + (if ((.guidance.docUrl // "")|startswith("http"))
-                     then "<p class=\"meta\">" + ($ref|@html) + " <a href=\"" + (.guidance.docUrl|@html)
-                          + "\" target=\"_blank\" rel=\"noopener noreferrer\">"
-                          + ((.guidance.docUrl | capture("^https?://(?<h>[^/]+)").h)|@html) + "</a></p>"
-                     else "" end)
-                  + "</details>"
-             elif ((.reviewGuide // null) != null and .status != "pass")
-             then "<details class=\"fix\"><summary>" + ($chk|@html) + "</summary>"
-                  + "<p>" + (.reviewGuide.how|@html) + "</p>"
-                  + (if ((.reviewGuide.docUrl // "")|startswith("http"))
-                     then "<p class=\"meta\">" + ($ref|@html) + " <a href=\"" + (.reviewGuide.docUrl|@html)
-                          + "\" target=\"_blank\" rel=\"noopener noreferrer\">"
-                          + ((.reviewGuide.docUrl | capture("^https?://(?<h>[^/]+)").h)|@html) + "</a></p>"
-                     else "" end)
-                  + "</details>"
-             else "" end) +
-            "</td></tr>"'
+            --arg lang "$REPORT_LANG" --arg more "$C_AND_MORE" \
+            --arg gfix "$C_G_FIX" --arg gperson "$C_G_PERSON" --arg gna "$C_G_NA" --arg gmet "$C_G_MET" \
+            "$(report_jq_defs)"'
+            def word: {"PASS":"Pass","FAIL":"Fail","WARN":"Warn","REVIEW":"Review","N/A":"N/A"}[.] // .;
+            def linkp($u): if (($u // "")|startswith("http"))
+                then "<p class=\"meta\">" + ($ref|@html) + " <a href=\"" + ($u|@html)
+                     + "\" target=\"_blank\" rel=\"noopener noreferrer\">"
+                     + (($u | capture("^https?://(?<h>[^/]+)").h)|@html) + "</a></p>"
+                else "" end;
+            ([ .[] | select(if $kind=="g7" then (.id|startswith("g7-")) else ((.id|startswith("g7-"))|not) end) ]
+             | to_entries
+             | map(.value + {n: (.key + 1),
+                   grp: (if (.value.naKind // "")=="not-applicable" then 2
+                         elif (.value.source // "")=="na" then 1
+                         elif .value.status=="pass" then 3 else 0 end)})) as $rows
+            | (if $kind=="g7" then 5 else 6 end) as $cols
+            | [$gfix, $gperson, $gna, $gmet] as $gname
+            | range(0; 4) as $g
+            | ($rows | map(select(.grp == $g))) as $grp
+            | select($grp | length > 0)
+            | "<tbody" + (if $g == 3 then " class=\"met\"" else "" end) + "><tr class=\"grp\"><th colspan=\"" + ($cols|tostring)
+              + "\" scope=\"rowgroup\">" + ($gname[$g]|@html) + "<span class=\"counter\">" + ($grp|length|num) + "</span></th></tr>"
+              + ([ $grp[] |
+                (if (.naKind // "")=="not-applicable" then "s-na"
+                 elif (.source // "")=="na" then "s-review" else "s-\(.status)" end) as $cls |
+                ((.evidence // []) | map(tostring)) as $ev |
+                "<tr><td class=\"num\">" + (.n|tostring) + "</td>" +
+                "<td class=\"st " + $cls + "\"><span class=\"lbl\">" + ((if (.naKind // "")=="not-applicable" then "N/A"
+                                                  elif (.source // "")=="na" then "REVIEW"
+                                                  else (.status|ascii_upcase) end) | word | @html) + "</span></td>" +
+                # The regulatory references ride under the requirement they belong to.
+                "<td class=\"grow\">" + (.label|@html) +
+                (((.regulations // []) | map((if $lang=="ko" then .short_ko else .short end) + " " + .ref)) as $refs
+                 | if ($refs|length) > 0
+                   then "<br><span class=\"meta\">" + (($refs|join(" · "))|@html) + "</span>"
+                   else "" end) + "</td>" +
+                (if $kind=="g7" then "" else "<td class=\"req\">" + (if .required then $yes else $no end) + "</td>" end) +
+                "<td>" + ((.detail // "")|@html) + "</td>" +
+                "<td data-evidence=\"" + ($ev | join(", ") | @html) + "\">" +
+                (if ($ev|length) > 3
+                 then ($ev[0:3] | join(", ") | @html)
+                      + "<details class=\"more\"><summary>" + ($more | sub("%s"; ($ev|length - 3 | tostring)) | @html) + "</summary>"
+                      + ($ev[3:] | join(", ") | @html) + "</details>"
+                      + "<div class=\"print-only\">" + ($ev[3:] | join(", ") | @html) + "</div>"
+                 else ($ev | join(", ") | @html) end) +
+                (if ((.guidance // null) != null and .status=="warn" and ((.source // "") != "na"))
+                 then ("<pre><code>" + (.guidance.snippet|@html) + "</code></pre>" + linkp(.guidance.docUrl)) as $body
+                      | "<details class=\"fix\"><summary>" + ($fix|@html) + "</summary>" + $body + "</details>"
+                        + "<div class=\"print-only\"><p class=\"meta\">" + ($fix|@html) + "</p>" + $body + "</div>"
+                 elif ((.reviewGuide // null) != null and .status != "pass")
+                 then ("<p>" + (.reviewGuide.how|@html) + "</p>" + linkp(.reviewGuide.docUrl)) as $body
+                      | "<details class=\"fix\"><summary>" + ($chk|@html) + "</summary>" + $body + "</details>"
+                        + "<div class=\"print-only\"><p class=\"meta\">" + ($chk|@html) + "</p>" + $body + "</div>"
+                 else "" end) +
+                "</td></tr>" ] | join("")) + "</tbody>"'
     }
     rows_of() {     # $1: "submission" | "g7" -> the number of rows html_rows prints
         echo "$RCHECKS" | jq --arg kind "$1" '[ .[] | select(if $kind=="g7" then (.id|startswith("g7-")) else ((.id|startswith("g7-"))|not) end) ] | length'
@@ -2471,8 +2488,9 @@ HTMLSUM
     # AI SBOMs lead with the rollup: coverage per cluster and the licenses that
     # need a human decision. Everything below is the per-check detail behind it.
     if [ "$G7_CLUSTERS" != "[]" ]; then
-        echo "<div class=\"box\"><div class=\"box-head\"><h2>${C_H2_CLUSTERS}</h2></div>"
-        echo "<div class=\"table-scroll\"><table><thead><tr><th>${C_TH_CLUSTER}</th><th class=\"num\">${C_TH_PRESENT}</th><th class=\"num\">${C_TH_GAP}</th><th class=\"num\">${C_TH_REVIEWCNT}</th><th class=\"num\">${C_TH_TOTAL}</th></tr></thead><tbody>"
+        report_next_id
+        echo "<div class=\"box\"><div class=\"box-head\"><h2 id=\"${REPORT_BOX_ID}\">${C_H2_CLUSTERS}</h2></div>"
+        echo "<div class=\"table-scroll\"><table aria-labelledby=\"${REPORT_BOX_ID}\"><thead><tr><th>${C_TH_CLUSTER}</th><th class=\"num\">${C_TH_PRESENT}</th><th class=\"num\">${C_TH_GAP}</th><th class=\"num\">${C_TH_REVIEWCNT}</th><th class=\"num\">${C_TH_TOTAL}</th></tr></thead><tbody>"
         echo "$G7_CLUSTERS" | jq -r --arg lang "$REPORT_LANG" '.[] |
             "<tr><td class=\"grow\">" + ((if $lang=="ko" then .name_ko else .name end)|@html) + "</td>"
             + "<td class=\"num\">" + (.present|tostring) + "</td><td class=\"num\">" + (.gap|tostring) + "</td>"
@@ -2483,12 +2501,13 @@ HTMLSUM
             + (map(.review)|add|tostring) + "</td><td class=\"num total\">" + (map(.total)|add|tostring) + "</td></tr>"'
         echo "</tbody></table></div></div>"
         LIC_REVIEW_N="$(echo "$LIC_REVIEW" | jq 'length')"
-        echo "<div class=\"box\"><div class=\"box-head\"><h2>${C_H2_LIC}</h2><span class=\"counter\">${LIC_REVIEW_N}</span></div>"
+        report_next_id
+        echo "<div class=\"box\"><div class=\"box-head\"><h2 id=\"${REPORT_BOX_ID}\">${C_H2_LIC}</h2><span class=\"counter\">$(report_num "$LIC_REVIEW_N")</span></div>"
         if [ "$LIC_REVIEW_N" -gt 0 ]; then
-            echo "<div class=\"table-scroll\"><table><thead><tr><th>${C_TH_COMP}</th><th>${C_TH_VER}</th><th>${C_TH_LIC}</th><th>${C_TH_FLAG}</th></tr></thead><tbody>"
+            echo "<div class=\"table-scroll\"><table aria-labelledby=\"${REPORT_BOX_ID}\"><thead><tr><th>${C_TH_COMP}</th><th>${C_TH_VER}</th><th>${C_TH_LIC}</th><th>${C_TH_FLAG}</th></tr></thead><tbody>"
             echo "$LIC_REVIEW" | jq -r '.[] |
-                "<tr><td class=\"grow\">" + (.name|@html) + "</td><td class=\"ver\">" + (.version|@html) + "</td>"
-                + "<td>" + (.license|@html) + "</td><td>" + (.flag|@html) + "</td></tr>"'
+                "<tr><td class=\"grow\">" + (.name|tostring|@html) + "</td><td class=\"ver\">" + (.version|tostring|@html) + "</td>"
+                + "<td>" + (.license|tostring|@html) + "</td><td>" + (.flag|tostring|@html) + "</td></tr>"'
             echo "</tbody></table></div>"
         else
             echo "<div class=\"box-body\"><p class=\"meta\">${C_LIC_NONE}</p></div>"
@@ -2498,11 +2517,12 @@ HTMLSUM
     # Regulatory crosswalk: one row per framework, and it leads rather than
     # trails. Each mapped requirement carries its own reference down in the check
     # tables, so this answers only "how much of each framework does this SBOM
-    # document" — the question a reader wants answered before reading 50 rows.
+    # document", the question a reader wants answered before reading 50 rows.
     XW_N="$(echo "$RXW" | jq -r '.frameworks | length')"
     if [ "$XW_N" -gt 0 ]; then
-        echo "<div class=\"box\"><div class=\"box-head\"><h2>${C_H2_XWALK}</h2><span class=\"counter\">${XW_N}</span></div>"
-        echo "<div class=\"table-scroll\"><table><thead><tr><th>${C_TH_FRAMEWORK}</th><th class=\"num\">${C_TH_PRESENT}</th><th class=\"num\">${C_TH_GAP}</th><th class=\"num\">${C_TH_FAILED}</th><th class=\"num\">${C_TH_REVIEWCNT}</th><th class=\"num\">${C_TH_TOTAL}</th></tr></thead><tbody>"
+        report_next_id
+        echo "<div class=\"box\"><div class=\"box-head\"><h2 id=\"${REPORT_BOX_ID}\">${C_H2_XWALK}</h2><span class=\"counter\">${XW_N}</span></div>"
+        echo "<div class=\"table-scroll\"><table aria-labelledby=\"${REPORT_BOX_ID}\"><thead><tr><th>${C_TH_FRAMEWORK}</th><th class=\"num\">${C_TH_PRESENT}</th><th class=\"num\">${C_TH_GAP}</th><th class=\"num\">${C_TH_FAILED}</th><th class=\"num\">${C_TH_REVIEWCNT}</th><th class=\"num\">${C_TH_TOTAL}</th></tr></thead><tbody>"
         echo "$RXW" | jq -r '.frameworks[] |
             "<tr><td class=\"grow\">" + (.title|@html)
             + "<br><span class=\"meta\">" + (.source|@html) + "</span></td>"
@@ -2512,43 +2532,46 @@ HTMLSUM
         echo "</tbody></table></div>"
         echo "<p class=\"legend\">$(echo "$RXW" | jq -r '.disclaimer' | sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g')</p></div>"
     fi
-    echo "<div class=\"box\"><div class=\"box-head\"><h2>${C_H2_SUBMIT}</h2><span class=\"counter\">$(rows_of submission)</span>"
+    report_next_id
+    echo "<div class=\"box\"><div class=\"box-head\"><h2 id=\"${REPORT_BOX_ID}\">${C_H2_SUBMIT}</h2><span class=\"counter\">$(rows_of submission)</span>"
     echo "<p class=\"meta\">${C_SUBMIT_INTRO}</p></div>"
-    echo "<div class=\"table-scroll\"><table><thead><tr><th class=\"num\">#</th><th>${C_TH_STATUS}</th><th>${C_TH_REQMT}</th><th>${C_TH_REQD}</th><th>${C_TH_DETAIL}</th><th>${C_TH_EVID}</th></tr></thead><tbody>"
+    echo "<div class=\"table-scroll\"><table aria-labelledby=\"${REPORT_BOX_ID}\"><thead><tr><th class=\"num\">#</th><th>${C_TH_STATUS}</th><th>${C_TH_REQMT}</th><th>${C_TH_REQD}</th><th>${C_TH_DETAIL}</th><th>${C_TH_EVID}</th></tr></thead>"
     html_rows submission
-    echo "</tbody></table></div></div>"
+    echo "</table></div></div>"
     if echo "$RCHECKS" | jq -e 'any(.[]; .id|startswith("g7-"))' >/dev/null; then
-        echo "<div class=\"box\"><div class=\"box-head\"><h2>${C_H2_G7CHK}</h2><span class=\"counter\">$(rows_of g7)</span>"
+        report_next_id
+        echo "<div class=\"box\"><div class=\"box-head\"><h2 id=\"${REPORT_BOX_ID}\">${C_H2_G7CHK}</h2><span class=\"counter\">$(rows_of g7)</span>"
         echo "<p class=\"meta\">${C_G7CHK_INTRO}</p></div>"
-        echo "<div class=\"table-scroll\"><table><thead><tr><th class=\"num\">#</th><th>${C_TH_STATUS}</th><th>${C_TH_REQMT}</th><th>${C_TH_DETAIL}</th><th>${C_TH_EVID}</th></tr></thead><tbody>"
+        echo "<div class=\"table-scroll\"><table aria-labelledby=\"${REPORT_BOX_ID}\"><thead><tr><th class=\"num\">#</th><th>${C_TH_STATUS}</th><th>${C_TH_REQMT}</th><th>${C_TH_DETAIL}</th><th>${C_TH_EVID}</th></tr></thead>"
         html_rows g7
-        echo "</tbody></table></div></div>"
+        echo "</table></div></div>"
     fi
     if echo "$RCHECKS" | jq -e 'any(.[]; .status!="pass" and (.missing|length>0))' >/dev/null; then
         echo "<h2>${C_H2_MISSING}</h2>"
-        echo "$RCHECKS" | jq -r '.[] | select(.status!="pass" and (.missing|length>0)) |
-            "<div class=\"box\"><div class=\"box-head\"><h3>" + (.label|@html) + "</h3><span class=\"counter\">" + (.missing|length|tostring) + "</span></div>"
+        echo "$RCHECKS" | jq -r "$(report_jq_defs)"'.[] | select(.status!="pass" and (.missing|length>0)) |
+            "<div class=\"box\"><div class=\"box-head\"><h3>" + (.label|@html) + "</h3><span class=\"counter\">" + (.missing|length|num) + "</span></div>"
             + "<ul class=\"rows mono\">" + (.missing | map("<li>" + (.|tostring|@html) + "</li>") | join("")) + "</ul></div>"'
     fi
     if [ "${SUG_TOTAL:-0}" -gt 0 ]; then
-        echo "<div class=\"box\"><div class=\"box-head\"><h2>${C_H2_SUG}</h2><span class=\"counter\">${SUG_TOTAL}</span>"
+        report_next_id
+        echo "<div class=\"box\"><div class=\"box-head\"><h2 id=\"${REPORT_BOX_ID}\">${C_H2_SUG}</h2><span class=\"counter\">$(report_num "$SUG_TOTAL")</span>"
         echo "<p class=\"meta\">${C_SUG_INTRO}</p></div>"
-        echo "<div class=\"table-scroll\"><table><thead><tr><th>${C_TH_SUG_COMP}</th><th>${C_TH_SUG_CUR}</th><th>${C_TH_SUG_CAND}</th><th>${C_TH_SUG_BASIS}</th><th>${C_TH_SUG_CONF}</th></tr></thead><tbody>"
+        echo "<div class=\"table-scroll\"><table aria-labelledby=\"${REPORT_BOX_ID}\"><thead><tr><th>${C_TH_SUG_COMP}</th><th>${C_TH_SUG_CUR}</th><th>${C_TH_SUG_CAND}</th><th>${C_TH_SUG_BASIS}</th><th>${C_TH_SUG_CONF}</th></tr></thead><tbody>"
         echo "$SUG_VIEW" | jq -r '.[] | "<tr>" + ([.component, .current, .candidate, .basis, .confidence]
-            | map("<td class=\"wrap\">" + (tostring | @html) + "</td>") | join("")) + "</tr>"'
+            | map("<td>" + (tostring | @html) + "</td>") | join("")) + "</tr>"'
         echo "</tbody></table></div>"
         if [ -n "$SUG_MORE_NOTE" ]; then echo "<p class=\"legend\">${SUG_MORE_NOTE}</p>"; fi
         echo "</div>"
     fi
     if echo "$RCHECKS" | jq -e 'any(.[]; (.explained // []) | length > 0)' >/dev/null; then
-        echo "<div class=\"box\"><div class=\"box-head\"><h2>${C_H2_EXPLAINED}</h2><span class=\"counter\">$(echo "$RCHECKS" | jq '[.[] | (.explained // [])[]] | length')</span></div>"
+        echo "<div class=\"box\"><div class=\"box-head\"><h2>${C_H2_EXPLAINED}</h2><span class=\"counter\">$(report_num "$(echo "$RCHECKS" | jq '[.[] | (.explained // [])[]] | length')")</span></div>"
         echo "$RCHECKS" | jq -r '"<ul class=\"rows mono\">" + ([.[] | select((.explained // []) | length > 0) | .explained[]
             | "<li>" + (.name|tostring|@html) + ": " + (.reason|tostring|@html) + "</li>"] | join("")) + "</ul>"'
         echo "</div>"
     fi
     # The fill-in fragments used to live here as their own section; they now ride
     # in the evidence column of the row they belong to (see above). The Markdown
-    # report keeps the section — a table cell cannot hold a code block there.
+    # report keeps the section, a table cell cannot hold a code block there.
     echo "</body></html>"
 } > "$HTML"
 
