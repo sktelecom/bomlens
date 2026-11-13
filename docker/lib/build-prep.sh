@@ -5147,6 +5147,441 @@ PY_LIC
     rm -f "$_pylic"
 fi
 
+# AI usage: the models, AI services, MCP servers and agent instruction files the
+# scanned code uses, from cdxgen's own `ai` and `mcp` analyses. The language pass
+# above never reports them (they are not packages), so a project that calls a
+# hosted model or ships an MCP configuration looked the same as one that does
+# not.
+#
+# Two separate cdxgen runs, one per type, written inside this container (not to
+# a mount): asking for both types in one run, or alongside a language type,
+# labels a hosted model with the npm purl type (pkg:npm/openai/gpt-4o,
+# measured on 13.5.0). The merge below then corrects what cdxgen gets wrong on
+# its own (measured on 13.5.0):
+#   - a hub model loaded locally (transformers from_pretrained) is attributed
+#     to the hosted service's provider and hung under that service; the
+#     provider is taken from the purl instead, and a model whose provider is
+#     not the service's is attached to the project root;
+#   - only AGENTS.md is recognised among the instruction files; the other
+#     well-known names are looked up here;
+#   - internal:SrcFile is an absolute path inside the container; it is made
+#     relative to the scanned tree;
+#   - an MCP server that is given the whole filesystem, a package run without
+#     a pinned version, or a plain-http endpoint carries no warning; each one
+#     gets a bomlens:ai:reviewReason.
+# Every item added carries bomlens:ai:usage (model, ai-service, mcp-server,
+# instruction-file, mcp-config) and bomlens:ai:scope (runtime for what the code
+# calls, development for editor and agent configuration). The conformance
+# checks, the NOTICE and the AI risk assessment leave these items out: they are
+# not packages, and a hosted model has no card to measure. An MCP server's
+# environment and headers, and prompt texts, are never copied; an endpoint
+# keeps no user info, query or fragment. A run that fails or times out is
+# recorded as the ai-usage pipeline step.
+# BOMLENS_NO_AI_USAGE=1 (or true) turns the pass off; BOMLENS_AI_USAGE_TIMEOUT
+# bounds each cdxgen run (seconds, default 300).
+ai_usage_cdxgen() {  # ai_usage_cdxgen <type> <out>
+    _au_type="$1"; _au_out="$2"
+    set -- -t "$_au_type" --no-install-deps --spec-version "$SPEC" -o "$_au_out"
+    if [ -n "$EXCLUDE_NON_SHIPPED" ]; then
+        for _au_d in $NON_SHIPPED_DIRS; do set -- "$@" --exclude "**/$_au_d/**"; done
+        for _au_d in $NON_SHIPPED_PATHS; do set -- "$@" --exclude "**/$_au_d/**"; done
+    fi
+    # Installed and built trees are not the project's own code: an id in a
+    # vendored SDK or a virtualenv's transformers would read as the project's.
+    for _au_d in node_modules .git vendor .venv venv site-packages .tox __pycache__ target build dist out bin obj .gradle .build Pods; do
+        set -- "$@" --exclude "**/$_au_d/**"
+    done
+    set -- "$@" "$SRC"
+    if command -v cdxgen >/dev/null 2>&1; then
+        run_supervised_timeout "$AI_USAGE_TIMEOUT" cdxgen "$@"
+    elif [ -f /opt/cdxgen/bin/cdxgen.js ]; then
+        run_supervised_timeout "$AI_USAGE_TIMEOUT" node /opt/cdxgen/bin/cdxgen.js "$@"
+    elif [ -f /opt/bin/cdxgen ]; then
+        run_supervised_timeout "$AI_USAGE_TIMEOUT" /opt/bin/cdxgen "$@"
+    else
+        return 127
+    fi
+}
+AI_USAGE_TIMEOUT="${BOMLENS_AI_USAGE_TIMEOUT:-300}"
+case "$AI_USAGE_TIMEOUT" in ''|*[!0-9]*) AI_USAGE_TIMEOUT=300 ;; esac
+if opted_out "${BOMLENS_NO_AI_USAGE:-}"; then
+    log "ai-usage: pass off (BOMLENS_NO_AI_USAGE)"
+elif [ "${rc:-1}" -eq 0 ] && [ -f "$OUT" ] && command -v node >/dev/null 2>&1; then
+    _au_dir=$(mktemp -d)
+    _au_failed=""
+    for _au_t in ai mcp; do
+        ai_usage_cdxgen "$_au_t" "$_au_dir/$_au_t.json" >"$_au_dir/$_au_t.log" 2>&1
+        _au_rc=$?
+        if [ "$_au_rc" -ne 0 ]; then
+            log "ai-usage: cdxgen -t $_au_t did not finish (rc=$_au_rc); its findings are left out. Last lines:"
+            tail -n 5 "$_au_dir/$_au_t.log" 2>/dev/null | sed 's/^/[build-prep]   /'
+            _au_failed=1
+        fi
+    done
+    cat > "$_au_dir/merge.js" <<'AI_USAGE_JS'
+"use strict";
+const fs = require("fs");
+const path = require("path");
+const crypto = require("crypto");
+const [outPath, srcArg, aiPath, mcpPath] = process.argv.slice(2);
+const srcRoot = path.resolve(srcArg);
+
+function readJson(p) {
+  try { return JSON.parse(fs.readFileSync(p, "utf8")); } catch (e) { return null; }
+}
+const bom = readJson(outPath);
+if (!bom || typeof bom !== "object") process.exit(0);
+const parts = [readJson(aiPath), readJson(mcpPath)].filter((d) => d && typeof d === "object");
+
+const propVals = (o, n) => (Array.isArray(o.properties) ? o.properties : [])
+  .filter((p) => p && p.name === n).map((p) => String(p.value));
+const prop = (o, n) => propVals(o, n)[0];
+const hasPrefix = (o, pre) => (Array.isArray(o.properties) ? o.properties : [])
+  .some((p) => p && typeof p.name === "string" && p.name.startsWith(pre));
+function setProp(o, n, v) {
+  o.properties = (Array.isArray(o.properties) ? o.properties : []).filter((p) => p && p.name !== n);
+  o.properties.push({ name: n, value: String(v) });
+}
+function addProp(o, n, v) {
+  o.properties = Array.isArray(o.properties) ? o.properties : [];
+  if (!o.properties.some((p) => p && p.name === n && p.value === String(v))) o.properties.push({ name: n, value: String(v) });
+}
+// A path relative to the scanned tree, or null when it lies outside it.
+function rel(p) {
+  if (typeof p !== "string" || p === "") return null;
+  const abs = path.resolve(srcRoot, p);
+  if (abs === srcRoot) return ".";
+  return abs.startsWith(srcRoot + path.sep) ? abs.slice(srcRoot.length + 1).split(path.sep).join("/") : null;
+}
+function relSrcFiles(o) {
+  const occ = ((o.evidence && Array.isArray(o.evidence.occurrences)) ? o.evidence.occurrences : [])
+    .map((x) => x && x.location);
+  const files = [...new Set([...propVals(o, "internal:SrcFile"), ...occ].map(rel).filter(Boolean))].sort();
+  o.properties = (o.properties || []).filter((p) => p && p.name !== "internal:SrcFile");
+  for (const f of files) o.properties.push({ name: "internal:SrcFile", value: f });
+  return files;
+}
+// A file or folder inside the scanned tree, following no link out of it.
+let realRoot = srcRoot;
+try { realRoot = fs.realpathSync(srcRoot); } catch (e) { /* keep srcRoot */ }
+function insideTree(abs) {
+  try {
+    const real = fs.realpathSync(abs);
+    return real === realRoot || real.startsWith(realRoot + path.sep);
+  } catch (e) { return false; }
+}
+const MAX_CONFIG_BYTES = 1024 * 1024;
+function readConfig(relPath) {
+  const abs = path.join(srcRoot, relPath);
+  try {
+    if (!insideTree(abs) || !fs.statSync(abs).isFile() || fs.statSync(abs).size > MAX_CONFIG_BYTES) return null;
+  } catch (e) { return null; }
+  return readJson(abs);
+}
+// An endpoint without what may carry a credential: user info, query, fragment.
+// Left as written when it has none of them.
+function cleanUrl(v) {
+  if (typeof v !== "string" || !/^[a-z][a-z0-9+.-]*:\/\//i.test(v)) return v;
+  if (!/^[^:]+:\/\/[^/?#]*@|[?#]/.test(v)) return v;
+  try {
+    const u = new URL(v);
+    u.username = ""; u.password = ""; u.search = ""; u.hash = "";
+    return u.toString();
+  } catch (e) {
+    return v.replace(/\/\/[^/?#]*@/, "//").replace(/[?#].*$/, "");
+  }
+}
+function cleanUrls(o) {
+  if (Array.isArray(o.endpoints)) o.endpoints = o.endpoints.map(cleanUrl);
+  for (const p of Array.isArray(o.properties) ? o.properties : []) {
+    if (p && typeof p.value === "string" && p.value.includes("://")) {
+      p.value = p.value.split(",").map((x) => cleanUrl(x.trim())).join(",");
+    }
+  }
+}
+// Editor and agent configuration, as opposed to what the shipped code calls.
+const DEV_RE = /(^|\/)(\.(cursor|vscode|github|claude|windsurf|continue|zed|idea|gemini|roo|kiro|amazonq)\/|(AGENTS|CLAUDE|GEMINI)\.md$|\.(cursorrules|windsurfrules|clinerules|mcp\.json)$|mcp\.json$)/;
+const isDev = (files) => files.length > 0 && files.every((f) => DEV_RE.test(f));
+function purlProvider(purl) {
+  const m = /^pkg:([a-z0-9.+-]+)\/(?:([^/@?#]+)\/)?[^/@?#]+/i.exec(purl || "");
+  if (!m) return null;
+  if (m[1].toLowerCase() === "huggingface") return "huggingface";
+  return m[2] ? decodeURIComponent(m[2]).toLowerCase() : null;
+}
+
+const rootRef = bom.metadata && bom.metadata.component && bom.metadata.component["bom-ref"];
+bom.components = Array.isArray(bom.components) ? bom.components : [];
+bom.services = Array.isArray(bom.services) ? bom.services : [];
+bom.dependencies = Array.isArray(bom.dependencies) ? bom.dependencies : [];
+const usedRefs = new Set();
+const walk = (list) => { for (const c of list || []) { if (c && c["bom-ref"]) usedRefs.add(c["bom-ref"]); if (c && c.components) walk(c.components); } };
+walk(bom.components); walk(bom.services);
+if (rootRef) usedRefs.add(rootRef);
+const purlRef = new Map(bom.components.filter((c) => c && c.purl).map((c) => [c.purl, c["bom-ref"] || c.purl]));
+function freshRef(ref) {
+  // cdxgen names a file component by its absolute path inside this container.
+  if (typeof ref === "string") ref = ref.split(srcRoot + "/").join("");
+  let r = ref || "ai-usage:" + crypto.randomBytes(6).toString("hex");
+  if (!usedRefs.has(r)) { usedRefs.add(r); return r; }
+  let n = 2;
+  while (usedRefs.has(r + "#" + n)) n++;
+  usedRefs.add(r + "#" + n);
+  return r + "#" + n;
+}
+
+// cdxgen's ai analysis matches text, and on a codebase that talks about models
+// it reports words as models ("the", "sys.stderr.write", "ModelCard"), template
+// placeholders as hub ids (<owner>/<repo>), a storage.googleapis.com URL as the
+// Google Generative AI API and every shell script that mentions a prompt as a
+// prompt file (measured on 13.5.0 over this repository: 30 models, 66 files, 5
+// services, none of them used). What is kept has to look like what it claims:
+//   - a model: a purl with no template characters, a name shaped like a model
+//     id (letters, digits, '.', '_', '-', ':' and at least one digit or '-'),
+//     with a known provider (not cdxgen's catch-all "ai"), seen in code that is
+//     neither a test nor documentation (measured on three public agent and LLM
+//     projects: most of what survived the other rules came from docs/*.md);
+//   - an AI service: one that is left with at least one such model;
+//   - an instruction file: one of the well-known names or folders below;
+//   - an MCP configuration and server: as cdxgen reports them (read from the
+//     configuration files themselves, not matched in text).
+const TEST_RE = /(^|\/)(tests?|spec|__tests__|e2e|fixtures?|testdata)\/|[._-](test|spec)\.[a-z0-9]+$|(^|\/)test_[^/]+\.py$|_test\.(py|go)$/i;
+const DOC_RE = /(^|\/)(docs?|documentation|site|website|notebooks?|cookbook)\/|\.(md|mdx|markdown|rst|txt|adoc|ipynb|html?)$/i;
+const MODEL_NAME_RE = /^[A-Za-z0-9][A-Za-z0-9._:-]*$/;
+function plausibleModel(c, files) {
+  const purl = typeof c.purl === "string" ? c.purl : "";
+  if (!purl || /%(7B|7D|3C|3E|5B|5D|28|29|2C|20)/i.test(purl)) return false;
+  if (/^pkg:huggingface\/(datasets|docs|spaces)\//i.test(purl) || /^pkg:generic\/ai\//i.test(purl)) return false;
+  const name = String(c.name || "");
+  if (!MODEL_NAME_RE.test(name) || !/[0-9-]/.test(name)) return false;
+  const code = files.map((f) => f.replace(/#.*$/, "")).filter((f) => !TEST_RE.test(f) && !DOC_RE.test(f));
+  return files.length === 0 || code.length > 0;
+}
+const INSTRUCTION_PATH_RE = /^((.*\/)?(AGENTS|CLAUDE|GEMINI)\.md|\.(cursorrules|windsurfrules|clinerules)|\.github\/copilot-instructions\.md|\.github\/instructions\/[^/]+\.instructions\.md|\.github\/prompts\/[^/]+\.prompt\.md|\.cursor\/rules\/[^/]+\.mdc?|\.claude\/(agents|commands)\/[^/]+\.md)$/;
+const dropped = { model: 0, file: 0, service: 0 };
+
+const added = { components: [], services: [] };
+const edges = [];            // [from, to] in final refs
+const seenKey = new Set();
+const keyOf = (usage, o, files) => usage + "|" + (o.purl || "") + "|" + (o.name || "") + "|" + files.join(",");
+
+for (const part of parts) {
+  const partRoot = part.metadata && part.metadata.component && part.metadata.component["bom-ref"];
+  const map = new Map();
+  if (partRoot && rootRef) map.set(partRoot, rootRef);
+  for (const c of Array.isArray(part.components) ? part.components : []) {
+    if (!c || typeof c !== "object") continue;
+    const isModel = c.type === "machine-learning-model";
+    const isMcp = hasPrefix(c, "cdx:mcp:");
+    const isAiFile = c.type === "file" && (isMcp || hasPrefix(c, "cdx:ai:"));
+    if (!isModel && !isAiFile) continue;
+    const usage = isModel ? "model" : (isMcp ? "mcp-config" : "instruction-file");
+    if (isModel && typeof c.purl === "string" && /^pkg:npm\//.test(c.purl) && prop(c, "cdx:ai:kind") === "model") {
+      c.purl = c.purl.replace(/^pkg:npm\//, "pkg:generic/");
+    }
+    if (isModel && c.purl && purlRef.has(c.purl)) { map.set(c["bom-ref"], purlRef.get(c.purl)); continue; }
+    const files = relSrcFiles(c);
+    if (isModel && !plausibleModel(c, files)) { dropped.model++; continue; }
+    if (usage === "instruction-file" && !files.some((f) => INSTRUCTION_PATH_RE.test(f))) { dropped.file++; continue; }
+    const key = keyOf(usage, c, files);
+    if (seenKey.has(key)) continue;
+    seenKey.add(key);
+    if (isModel) {
+      const prov = purlProvider(c.purl);
+      if (prov) setProp(c, "cdx:ai:provider", prov);
+    }
+    const ref = freshRef(c["bom-ref"] || c.purl);
+    map.set(c["bom-ref"], ref);
+    c["bom-ref"] = ref;
+    if (c.purl) purlRef.set(c.purl, ref);
+    cleanUrls(c);
+    setProp(c, "bomlens:ai:usage", usage);
+    setProp(c, "bomlens:ai:scope", (usage === "model" ? false : isDev(files)) ? "development" : "runtime");
+    if (usage !== "model" && files[0]) setProp(c, "bomlens:ai:path", files[0]);
+    added.components.push(c);
+  }
+  for (const s of Array.isArray(part.services) ? part.services : []) {
+    if (!s || typeof s !== "object") continue;
+    const usage = hasPrefix(s, "cdx:mcp:") ? "mcp-server" : "ai-service";
+    const files = relSrcFiles(s);
+    const key = keyOf(usage, s, files);
+    if (seenKey.has(key)) continue;
+    seenKey.add(key);
+    const ref = freshRef(s["bom-ref"] || "urn:service:" + (s.name || "unnamed"));
+    map.set(s["bom-ref"], ref);
+    s["bom-ref"] = ref;
+    cleanUrls(s);
+    setProp(s, "bomlens:ai:usage", usage);
+    setProp(s, "bomlens:ai:scope", isDev(files) ? "development" : "runtime");
+    if (usage === "mcp-server") for (const r of mcpReview(s, files)) addProp(s, "bomlens:ai:reviewReason", r);
+    added.services.push(s);
+  }
+  for (const d of Array.isArray(part.dependencies) ? part.dependencies : []) {
+    if (!d || !map.has(d.ref)) continue;
+    for (const t of Array.isArray(d.dependsOn) ? d.dependsOn : []) {
+      if (map.has(t) && map.get(t) !== map.get(d.ref)) edges.push([map.get(d.ref), map.get(t)]);
+    }
+  }
+}
+
+// Instruction files cdxgen does not recognise. Shallow, bounded lookup.
+const INSTRUCTION_NAMES = ["AGENTS.md", "CLAUDE.md", "GEMINI.md", ".cursorrules", ".windsurfrules", ".clinerules",
+  ".github/copilot-instructions.md"];
+const INSTRUCTION_DIRS = [[".github/instructions", /\.instructions\.md$/], [".github/prompts", /\.prompt\.md$/],
+  [".cursor/rules", /\.mdc?$/], [".claude/agents", /\.md$/], [".claude/commands", /\.md$/]];
+const known = new Set(added.components.filter((c) => prop(c, "bomlens:ai:path")).map((c) => prop(c, "bomlens:ai:path")));
+const candidates = [...INSTRUCTION_NAMES];
+for (const [dir, re] of INSTRUCTION_DIRS) {
+  try {
+    if (!insideTree(path.join(srcRoot, dir))) continue;
+    for (const f of fs.readdirSync(path.join(srcRoot, dir)).slice(0, 200)) if (re.test(f)) candidates.push(dir + "/" + f);
+  } catch (e) { /* absent */ }
+}
+for (const relPath of candidates) {
+  if (known.has(relPath)) continue;
+  const abs = path.join(srcRoot, relPath);
+  let st;
+  try { st = fs.lstatSync(abs); } catch (e) { continue; }
+  if (!st.isFile() || st.size > 4 * 1024 * 1024 || !insideTree(abs)) continue;
+  let sha;
+  try { sha = crypto.createHash("sha256").update(fs.readFileSync(abs)).digest("hex"); } catch (e) { continue; }
+  const c = { type: "file", "bom-ref": freshRef("file:" + relPath), name: path.basename(relPath),
+    hashes: [{ alg: "SHA-256", content: sha }], properties: [] };
+  setProp(c, "bomlens:ai:usage", "instruction-file");
+  setProp(c, "bomlens:ai:scope", "development");
+  setProp(c, "bomlens:ai:path", relPath);
+  setProp(c, "bomlens:ai:detectedBy", "bomlens");
+  known.add(relPath);
+  added.components.push(c);
+}
+
+// Review reasons for an MCP server, read from the configuration files it came
+// from. Only the command, its arguments and the url are looked at.
+function mcpReview(s, files) {
+  const reasons = new Set();
+  const key = prop(s, "cdx:mcp:configKey") || "";
+  for (const f of files) {
+    const cfg = readConfig(f);
+    if (!cfg) continue;
+    let entry = cfg;
+    for (const k of key.split(".")) entry = entry && typeof entry === "object" ? entry[k] : undefined;
+    if (!entry || typeof entry !== "object") {
+      for (const sect of ["mcpServers", "servers", "context_servers"]) {
+        if (cfg[sect] && cfg[sect][s.name]) { entry = cfg[sect][s.name]; break; }
+      }
+    }
+    if (!entry || typeof entry !== "object") continue;
+    const cmd = path.basename(String(entry.command || "")).toLowerCase();
+    const args = (Array.isArray(entry.args) ? entry.args : []).map(String);
+    // Pinned means an exact version: not "latest", a dist-tag or a range.
+    const exact = (v) => /^v?\d+(\.\d+)*([-+][0-9A-Za-z.-]+)?$/.test(v || "");
+    if (["npx", "pnpx", "bunx", "pnpm", "yarn"].includes(cmd)) {
+      const pkg = args.find((a) => !a.startsWith("-") && !["dlx", "exec"].includes(a));
+      const m = pkg && /^(@[^/]+\/)?[^@]+(?:@(.+))?$/.exec(pkg);
+      if (pkg && !(m && exact(m[2]))) reasons.add("unpinned-package");
+    } else if (["uvx", "pipx"].includes(cmd)) {
+      const pkg = args.find((a) => !a.startsWith("-") && a !== "run");
+      const m = pkg && /^[^=@<>~!]+(?:(?:==|@)(.+))?$/.exec(pkg);
+      if (pkg && !(m && exact(m[1]))) reasons.add("unpinned-package");
+    }
+    const broad = /^(\/|~|~\/|\$HOME|\$\{HOME\}|%USERPROFILE%|[A-Za-z]:[\\/]?)$/;
+    if (args.some((a) => broad.test(a.trim()))) reasons.add("broad-filesystem-access");
+    const url = String(entry.url || entry.serverUrl || "");
+    if (/^http:\/\//i.test(url) && !/^http:\/\/(localhost|127\.0\.0\.1|\[::1\])([:/]|$)/i.test(url)) reasons.add("unencrypted-transport");
+  }
+  return [...reasons].sort();
+}
+
+// A hosted service keeps only the models of its own provider; any other model
+// it was given is used directly by the project.
+const byRef = new Map([...added.components, ...added.services].map((o) => [o["bom-ref"], o]));
+const kept = [];
+for (const [from, to] of edges) {
+  const svc = byRef.get(from), model = byRef.get(to);
+  if (svc && model && prop(svc, "bomlens:ai:usage") === "ai-service" && prop(model, "bomlens:ai:usage") === "model") {
+    const sp = String((svc.provider && svc.provider.name) || svc.group || "").toLowerCase();
+    if (sp && prop(model, "cdx:ai:provider") !== sp) continue;
+  }
+  kept.push([from, to]);
+}
+for (const svc of added.services.filter((s) => prop(s, "bomlens:ai:usage") === "ai-service")) {
+  const models = kept.filter(([f]) => f === svc["bom-ref"]).map(([, t]) => byRef.get(t)).filter(Boolean);
+  if (!models.length) {
+    dropped.service++;
+    added.services.splice(added.services.indexOf(svc), 1);
+    for (let i = kept.length - 1; i >= 0; i--) if (kept[i][0] === svc["bom-ref"] || kept[i][1] === svc["bom-ref"]) kept.splice(i, 1);
+    continue;
+  }
+  if (!propVals(svc, "cdx:ai:modelId").length) continue;
+  svc.properties = svc.properties.filter((p) => !["cdx:ai:modelId", "cdx:ai:modelFamily", "cdx:ai:modelCount"].includes(p.name));
+  for (const m of models) addProp(svc, "cdx:ai:modelId", m.name);
+  for (const fam of [...new Set(models.flatMap((m) => propVals(m, "cdx:ai:modelFamily")))]) addProp(svc, "cdx:ai:modelFamily", fam);
+  setProp(svc, "cdx:ai:modelCount", models.length);
+}
+// Everything nothing else points at hangs from the project root, but only when
+// the root already lists its direct dependencies. A root with no entry, or an
+// empty one, means "whatever nothing points at is direct" to the readers of
+// this graph (cdxgen writes it that way); filling it with AI items alone would
+// turn every package transitive.
+const hadGraph = bom.dependencies.length > 0;
+const rootEntry = bom.dependencies.find((d) => d && d.ref === rootRef);
+const rootLists = Boolean(rootRef && rootEntry && Array.isArray(rootEntry.dependsOn) && rootEntry.dependsOn.length > 0);
+if (!rootLists) for (let i = kept.length - 1; i >= 0; i--) if (kept[i][0] === rootRef) kept.splice(i, 1);
+if (rootLists) {
+  const targets = new Set(kept.map(([, t]) => t));
+  for (const o of [...added.components, ...added.services]) {
+    if (!targets.has(o["bom-ref"]) && o["bom-ref"] !== rootRef) kept.push([rootRef, o["bom-ref"]]);
+  }
+}
+
+if (!added.components.length && !added.services.length) {
+  process.stderr.write("[build-prep] ai-usage: nothing found (left out as not plausible: " + dropped.model + " model(s), "
+    + dropped.file + " file(s), " + dropped.service + " service(s))\n");
+  process.exit(0);
+}
+bom.components.push(...added.components);
+bom.services.push(...added.services);
+if (!bom.services.length) delete bom.services;
+const depIdx = new Map(bom.dependencies.map((d) => [d.ref, d]));
+for (const [from, to] of hadGraph ? kept : []) {
+  let d = depIdx.get(from);
+  if (!d) { d = { ref: from, dependsOn: [] }; bom.dependencies.push(d); depIdx.set(from, d); }
+  d.dependsOn = Array.isArray(d.dependsOn) ? d.dependsOn : [];
+  if (!d.dependsOn.includes(to)) d.dependsOn.push(to);
+}
+for (const o of hadGraph ? [...added.components, ...added.services] : []) {
+  if (!depIdx.has(o["bom-ref"])) { bom.dependencies.push({ ref: o["bom-ref"], dependsOn: [] }); depIdx.set(o["bom-ref"], true); }
+}
+const tmpOut = outPath + ".ai-usage.tmp";
+fs.writeFileSync(tmpOut, JSON.stringify(bom, null, 2));
+fs.renameSync(tmpOut, outPath);
+const count = (u) => [...added.components, ...added.services].filter((o) => prop(o, "bomlens:ai:usage") === u).length;
+process.stderr.write("[build-prep] ai-usage: " + ["model", "ai-service", "mcp-server", "instruction-file", "mcp-config"]
+  .map((u) => u + " " + count(u)).join(", ") + "; left out as not plausible: " + dropped.model + " model(s), "
+  + dropped.file + " file(s), " + dropped.service + " service(s)\n");
+AI_USAGE_JS
+    node "$_au_dir/merge.js" "$OUT" "$SRC" "$_au_dir/ai.json" "$_au_dir/mcp.json" \
+        || { log "ai-usage: merge failed (non-fatal); the SBOM is left as the language pass wrote it"; _au_failed=1; }
+    # The failed preprocessing steps were written onto the SBOM above, before
+    # this pass ran, so its own failure is added here the same way.
+    if [ -n "$_au_failed" ]; then
+        node -e '
+const fs = require("fs");
+const p = process.argv[1];
+let bom;
+try { bom = JSON.parse(fs.readFileSync(p, "utf8")); } catch (e) { process.exit(0); }
+bom.metadata = bom.metadata || {};
+const props = Array.isArray(bom.metadata.properties) ? bom.metadata.properties : [];
+if (!props.some((x) => x && x.name === "bomlens:pipeline-step-failed" && x.value === "ai-usage")) {
+  props.push({ name: "bomlens:pipeline-step-failed", value: "ai-usage" });
+}
+bom.metadata.properties = props;
+fs.writeFileSync(p + ".ai-usage.tmp", JSON.stringify(bom, null, 2));
+fs.renameSync(p + ".ai-usage.tmp", p);
+' "$OUT" || log "ai-usage: recording the failure skipped (non-fatal)"
+    fi
+    rm -rf "$_au_dir"
+fi
+
 # Copyright statements from the license files each installed package ships.
 # cdxgen leaves component.copyright empty, so the NOTICE has no attribution line
 # to print. The installed packages exist only until guard_restore below, and only

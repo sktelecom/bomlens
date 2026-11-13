@@ -199,6 +199,34 @@ fi
 . "$(dirname "$0")/sbom-detect.sh"
 SBOM="$(normalize_sbom_encoding "$SBOM" "$(dirname "$OUT_PREFIX")")"
 
+# The AI usage a source scan records (bomlens:ai:usage: the models, AI services,
+# MCP servers and instruction files the code uses) is not measured here. None of
+# it is a package: a hosted model has no version or licence to carry, and an
+# instruction file is not delivered. Counting them would fail an otherwise
+# complete SBOM, and a model the project only calls would pull in every G7
+# check for a card nobody here can read. The checks run on a copy without them.
+if jq -e '[(.components // [])[], (.services // [])[]]
+          | any(type == "object" and any(.properties[]?; .name == "bomlens:ai:usage"))' "$SBOM" >/dev/null 2>&1; then
+    AI_USAGE_FREE=$(mktemp)
+    trap 'rm -f "$AI_USAGE_FREE"' EXIT
+    if jq 'def aiu: type == "object" and any(.properties[]?; .name == "bomlens:ai:usage");
+           ([(.components // [])[], (.services // [])[] | select(aiu) | .["bom-ref"] // empty]) as $gone
+           | def kept: type != "string" or ((. as $x | $gone | index($x)) | not);
+           if (.components | type) == "array" then .components |= map(select(aiu | not)) else . end
+           | if (.services | type) == "array" then .services |= map(select(aiu | not)) else . end
+           | if (.dependencies | type) == "array" then
+               .dependencies |= map(if type == "object" then
+                                      select(.ref | kept)
+                                      | if (.dependsOn | type) == "array" then .dependsOn |= map(select(kept)) else . end
+                                    else . end)
+             else . end' "$SBOM" > "$AI_USAGE_FREE" 2>/dev/null; then
+        echo "[validate] AI usage items ($(jq '[(.components // [])[], (.services // [])[]] | map(select(type == "object" and any(.properties[]?; .name == "bomlens:ai:usage"))) | length' "$SBOM")) are listed, not measured"
+        SBOM="$AI_USAGE_FREE"
+    else
+        echo "[validate] WARN: could not set the AI usage items aside; they are measured with the rest" >&2
+    fi
+fi
+
 JSON="${OUT_PREFIX}_conformance.json"
 MD="${OUT_PREFIX}_conformance.md"
 HTML="${OUT_PREFIX}_conformance.html"
