@@ -667,6 +667,17 @@ java_case "$J21" "a variable of another file is not read"
 gradle_tree build.gradle.kts 'val jdk = providers.gradleProperty("jdk").get()\nkotlin { jvmToolchain(jdk.toInt()) }\n'
 python3 -c "import sys; open(sys.argv[1], 'w').write('jdk=' + '2' * 5000 + '\njdk=25\n')" "$LANGDIR/proj/gradle.properties"
 java_case "$J25" "a gradle.properties line over 4096 characters is skipped"
+printf 'jdk=17\njdk=25\n' > "$LANGDIR/proj/gradle.properties"
+java_case "$J25" "the last value of a key in gradle.properties counts, as in Gradle"
+# Only regular files are read: a committed symlink to /dev/zero or a FIFO
+# named gradle.properties would otherwise hang the scan.
+gradle_tree app/build.gradle "def v = findProperty('v') ?: '24'\njava.toolchain.languageVersion = JavaLanguageVersion.of(v)\n"
+ln -s /dev/zero "$LANGDIR/proj/gradle.properties"
+mkfifo "$LANGDIR/proj/app/gradle.properties" 2>/dev/null || true
+t0=$(date +%s); java_case "$J24" "a gradle.properties that is a symlink to /dev/zero or a FIFO is not read"
+[ $(( $(date +%s) - t0 )) -lt 5 ] && pass "that tree is read in under 5 seconds" || fail "a /dev/zero or FIFO gradle.properties took $(( $(date +%s) - t0 ))s"
+gradle_tree build.gradle "java { def w = '11' }\ndef w = '24'\nkotlin { jvmToolchain(w) }\n"
+java_case "$J24" "a definition outside any block wins over an earlier one inside a block"
 
 echo "== the Gradle wrapper's version limits the cdxgen Java image =="
 # A wrapper runs only on the JDKs its Gradle supports: a 6.9.4 wrapper fails
@@ -840,6 +851,99 @@ note_case "a mixed tree with a Java 25 toolchain warns and points at CDXGEN_JAVA
 gradle_tree build.gradle.kts 'kotlin { jvmToolchain(21) }\n'
 [ -z "$(java_mixed_note "$LANGDIR/proj")" ] && pass "a mixed tree with a Java 21 toolchain prints no warning" \
     || fail "a mixed tree with a Java 21 toolchain warns"
+
+echo "== the web UI's cdxgen sibling reruns once in the Java image Gradle asks for =="
+# generate_sbom_cdxgen (entrypoint.sh) against a stub docker: the stage 1
+# sibling, its name and cidfile, the SBOM it writes and the marker it prints.
+EPD="$(mktemp -d)"; mkdir -p "$EPD/bin" "$EPD/out" "$EPD/src"
+awk '/^self_container_id\(\) \{$/ { on = 1 } on { print } on && /^generate_sbom_cdxgen\(\) \{$/ { g = 1 } g && /^}$/ { exit }' \
+    "$ROOT_DIR/docker/entrypoint.sh" | sed 's#/proc/self/mountinfo#"$EP_MOUNTINFO"#' > "$EPD/fn.sh"
+cat > "$EPD/bin/docker" <<'STUB'
+#!/bin/bash
+d="$EP_DIR"; echo "docker $*" >> "$d/log"
+case "$1" in
+  run)
+    name=""; cidf=""; img=""; prev=""
+    for a in "$@"; do
+      case "$prev" in --name) name="$a" ;; --cidfile) cidf="$a" ;; --entrypoint) img="next" ;; *) [ "$img" = next ] && img="$a" ;; esac
+      prev="$a"
+    done
+    if grep -qxF "$name" "$d/names" 2>/dev/null; then echo "Conflict. The container name \"/$name\" is already in use" >&2; exit 125; fi
+    echo "$name" >> "$d/names"
+    if [ -z "${EP_NO_CID:-}" ]; then cid="cid$RANDOM"; echo "$cid" > "$cidf"; echo "$cid $name" >> "$d/cids"; fi
+    bom="${*: -2:1}"
+    case "$img" in *"${EP_MARKER_IMG:-cdxgen-temurin-java21}"*)
+      echo "[build-prep] gradle-dependencies: Gradle asked for a Java 25 toolchain, which this image does not have (java-toolchain-missing=25)" ;; esac
+    case "$img" in *"${EP_NOWRITE_IF:-x-none-x}"*) ;; *) echo "from=$img" > "$bom" ;; esac
+    exit 0 ;;
+  rm)
+    for a in "$@"; do
+      n="$(awk -v c="$a" '$1 == c { print $2 }' "$d/cids" 2>/dev/null)"
+      grep -vxF "${n:-$a}" "$d/names" > "$d/names.t" 2>/dev/null; mv -f "$d/names.t" "$d/names"
+    done
+    exit 0 ;;
+  inspect) echo false; exit 0 ;;
+  image) [ -n "${EP_ABSENT:-}" ] && case "$*" in *"$EP_ABSENT"*) exit 1 ;; esac; exit 0 ;;
+  *) exit 0 ;;
+esac
+STUB
+chmod +x "$EPD/bin/docker"
+printf "plugins { id 'java' }\n" > "$EPD/src/build.gradle"
+ep_run() {  # ep_run [VAR=value...]: run generate_sbom_cdxgen once, results in $EPD
+    rm -f "$EPD/log" "$EPD/names" "$EPD/cids" "$EPD/out/b.json" "$EPD/src/b.json" "$EPD/res"
+    ( cd "$EPD/out" || exit 1
+      set +u  # entrypoint.sh does not run under set -u
+      export PROJECT_NAME=p PROJECT_VERSION=1 CDX_SPEC_VERSION=1.6 FETCH_LICENSE=false
+      unset CDXGEN_JAVA_IMAGE CDXGEN_IMAGE_PREFIX SBOM_PULL SOURCE_ROOT_HOST
+      for kv in "$@"; do export "${kv?}"; done
+      export EP_DIR="$EPD" PATH="$EPD/bin:$PATH" LIBDIR="$ROOT_DIR/docker/lib"
+      # shellcheck source=../docker/lib/source-detect.sh
+      . "$ROOT_DIR/docker/lib/source-detect.sh"
+      # shellcheck disable=SC1091
+      . "$EPD/fn.sh"
+      self_container_id() { echo self; }
+      generate_sbom_cdxgen "$EPD/src" b.json; echo "rc=$? reason=$CDXGEN_FAIL_REASON" > "$EPD/res"
+    ) > "$EPD/stdout" 2>&1
+}
+ep_runs() { grep -c '^docker run' "$EPD/log" 2>/dev/null; }
+printf '1 1 0:1 / %s rw - fake fake rw\n' "$EPD/out" > "$EPD/mountinfo.shared"
+: > "$EPD/mountinfo.none"
+J21R="ghcr.io/cdxgen/cdxgen-temurin-java21:$CDXGEN_TAG"; J25R="ghcr.io/cdxgen/cdxgen-temurin-java25:$CDXGEN_TAG"
+
+ep_run EP_MOUNTINFO="$EPD/mountinfo.shared"
+{ grep -qx "rc=0 reason=" "$EPD/res" && [ "$(ep_runs)" -eq 2 ] && grep -qx "from=$J25R" "$EPD/out/b.json" \
+    && grep -qF "[INFO] Gradle asked for Java 25; rerunning in $J25R" "$EPD/stdout"; } \
+    && pass "UI: a Java 25 toolchain failure reruns the sibling in the Java 25 image and keeps its SBOM" \
+    || fail "UI: no rerun in the Java 25 image" "$(cat "$EPD/res" "$EPD/stdout")"
+ep_run EP_MOUNTINFO="$EPD/mountinfo.shared" EP_MARKER_IMG=cdxgen-temurin-java
+[ "$(ep_runs)" -eq 2 ] && pass "UI: the rerun with the forced image does not rerun again" \
+    || fail "UI: the rerun recursed" "runs: $(ep_runs)"
+ep_run EP_MOUNTINFO="$EPD/mountinfo.shared" EP_NOWRITE_IF=java25
+{ grep -qx "rc=0 reason=" "$EPD/res" && grep -qx "from=$J21R" "$EPD/out/b.json" \
+    && grep -qF "keeping the result from $J21R" "$EPD/stdout" && ! grep -qF "[WARN] cdxgen" "$EPD/stdout"; } \
+    && pass "UI: a rerun with no SBOM keeps the first one, clears the failure reason and says it once" \
+    || fail "UI: the first SBOM is not kept" "$(cat "$EPD/res" "$EPD/stdout")"
+ep_run EP_MOUNTINFO="$EPD/mountinfo.none" EP_NOWRITE_IF=java25
+{ grep -qx "rc=0 reason=" "$EPD/res" && grep -qx "from=$J21R" "$EPD/out/b.json" && [ ! -e "$EPD/src/b.json" ]; } \
+    && pass "UI: with the SBOM written in the tree, the kept first SBOM still lands in the run folder" \
+    || fail "UI: the kept first SBOM is not in the run folder" "$(cat "$EPD/res"; ls "$EPD/src" "$EPD/out")"
+ep_run EP_MOUNTINFO="$EPD/mountinfo.none"
+{ grep -qx "rc=0 reason=" "$EPD/res" && grep -qx "from=$J25R" "$EPD/out/b.json" && [ ! -e "$EPD/src/b.json" ]; } \
+    && pass "UI: with the SBOM written in the tree, the rerun's SBOM is moved to the run folder" \
+    || fail "UI: the rerun's SBOM is not in the run folder" "$(cat "$EPD/res"; ls "$EPD/src" "$EPD/out")"
+ep_run EP_MOUNTINFO="$EPD/mountinfo.shared" EP_NO_CID=1
+{ grep -qx "rc=0 reason=" "$EPD/res" && [ "$(ep_runs)" -eq 2 ] && ! grep -q Conflict "$EPD/stdout" && grep -qx "from=$J25R" "$EPD/out/b.json"; } \
+    && pass "UI: with no container id read, the first sibling is removed by name before the rerun" \
+    || fail "UI: the rerun hit a container name conflict" "$(cat "$EPD/res" "$EPD/stdout")"
+ep_run EP_MOUNTINFO="$EPD/mountinfo.shared" SBOM_PULL=never EP_ABSENT=cdxgen-temurin-java25
+{ grep -qx "rc=0 reason=" "$EPD/res" && [ "$(ep_runs)" -eq 1 ] && ! grep -q '^docker pull' "$EPD/log" \
+    && grep -qF "[WARN] $J25R is not here (SBOM_PULL=never)" "$EPD/stdout"; } \
+    && pass "UI: SBOM_PULL=never with the image absent keeps the first result, no pull" \
+    || fail "UI: SBOM_PULL=never pulled or reran" "$(cat "$EPD/res" "$EPD/stdout")"
+ep_run EP_MOUNTINFO="$EPD/mountinfo.shared" EP_ABSENT=cdxgen-temurin-java25
+{ [ "$(ep_runs)" -eq 2 ] && grep -q "^docker pull $J25R\$" "$EPD/log" && grep -qF "[INFO] Pulling $J25R" "$EPD/stdout"; } \
+    && pass "UI: an absent rerun image is pulled with progress" || fail "UI: the rerun image is not pulled" "$(cat "$EPD/log")"
+rm -rf "$EPD"
 
 echo "== --model routes a Figshare item to the dataset path =="
 # One option takes both AI inputs a person is handed a link to, so the reference

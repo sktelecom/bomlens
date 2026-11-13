@@ -547,6 +547,10 @@ export class UiContainer {
       "CDXGEN_IMAGE_PREFIX",
       "-e",
       "CDXGEN_JAVA_IMAGE",
+      // How the source scans fetch a cdxgen Java image for a rerun (never,
+      // missing or always), by name only, as the CLI passes it.
+      "-e",
+      "SBOM_PULL",
       this.image,
     ];
     const r = await run(dockerBin, args);

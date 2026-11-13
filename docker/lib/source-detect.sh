@@ -720,9 +720,37 @@ java_toolchain_version() {
     if non_shipped_enabled; then
         for n in $NON_SHIPPED_DIRS; do prune+=(-o -name "$n"); done
     fi
-    (cd "$d" 2>/dev/null && find . -maxdepth 6 \( "${prune[@]:1}" \) -prune -o -type f \( -name '*.gradle' -o -name '*.gradle.kts' \) \
-        -exec awk "$(_java_toolchain_awk)" {} + 2>/dev/null) \
+    # The gradle.properties values come first, from regular files only (find
+    # -type f: never a symlink, a FIFO or a device), as "folder<TAB>key<TAB>value"
+    # lines, at most 64 KB of them. The build files' awk gets them through the
+    # environment and opens no file itself.
+    (cd "$d" 2>/dev/null || exit 0
+     _JAVA_TC_PROPS="$(find . -maxdepth 6 \( "${prune[@]:1}" \) -prune -o -type f -name gradle.properties \
+         -exec awk "$(_java_toolchain_props_awk)" {} + 2>/dev/null | head -c 65536)" \
+         find . -maxdepth 6 \( "${prune[@]:1}" \) -prune -o -type f \( -name '*.gradle' -o -name '*.gradle.kts' \) \
+         -exec awk "$(_java_toolchain_awk)" {} + 2>/dev/null) \
         | grep -E '^[0-9]{1,3}$' | sed 's/^0*\([0-9]\)/\1/' | sort -n | tail -1 || true
+}
+
+# _java_toolchain_props_awk: the awk program that reads gradle.properties
+# files for java_toolchain_version. Prints "folder<TAB>key<TAB>value" for each
+# key Gradle property names can take (letters, digits, _ . -) with a value of
+# at most 16 characters. A line over 4096 characters and a path holding a tab
+# are skipped.
+_java_toolchain_props_awk() {
+    cat <<'AWK'
+FNR == 1 { dir = FILENAME; sub(/\/[^\/]*$/, "", dir); skip = (FILENAME ~ /\t/) }
+skip || length($0) > 4096 { next }
+{
+    line = $0; sub(/^[ \t]+/, "", line)
+    if (line == "" || line ~ /^[#!]/) next
+    if (!match(line, /[=: \t]/)) next
+    key = substr(line, 1, RSTART - 1)
+    if (key !~ /^[A-Za-z0-9_.-]+$/) next
+    val = substr(line, RSTART); sub(/^[ \t]*[=:]?[ \t]*/, "", val); sub(/[ \t\r]+$/, "", val)
+    if (length(val) <= 16) print dir "\t" key "\t" val
+}
+AWK
 }
 
 # _java_toolchain_awk: the awk program java_toolchain_version runs over the
@@ -736,10 +764,14 @@ java_toolchain_version() {
 #   def v = <expression> (also val, var, final, a type, val v: String = ...)
 #                                                       the first one in the file
 #   val v: String by project                            the Gradle property v
+# A definition outside any { } block wins over one inside a block; among
+# equals the first in the file counts (a later reassignment is not followed;
+# the rerun in java_retry_image covers a build where that matters).
 # A definition that reads a Gradle property p (hasProperty("p"), getProperty,
 # findProperty, property, providers.gradleProperty("p"), properties["p"]; not
 # System.getProperty) takes p=N from the gradle.properties nearest the build
-# file, up to the scanned folder. Failing that, the default it gives counts:
+# file, up to the scanned folder, as _java_toolchain_props_awk read it into
+# _JAVA_TC_PROPS (the last value of a key in a file counts, as in Gradle). Failing that, the default it gives counts:
 # the number after its last ?: or the ternary's :, or in getOrElse("N"); or
 # the number it is set to. Only the awk features busybox, mawk and the BSD
 # awk share are used.
@@ -749,25 +781,19 @@ function strip(s) {
     sub(/^[ \t]+/, "", s); sub(/[ \t]+$/, "", s); return s
 }
 function digits(s) { gsub(/[^0-9]/, "", s); return s }
+BEGIN {
+    n = split(ENVIRON["_JAVA_TC_PROPS"], pl, "\n")
+    for (i = 1; i <= n; i++) {
+        if (split(pl[i], pf, "\t") != 3) continue
+        props[pf[1] SUBSEP pf[2]] = pf[3]
+    }
+}
 # The value of Gradle property p in the gradle.properties nearest file f.
-function gprop(f, p,    dir, pf, line, key, val, rc) {
+function gprop(f, p,    dir) {
     dir = f
     while (dir ~ /\//) {
         sub(/\/[^\/]*$/, "", dir)
-        pf = dir "/gradle.properties"
-        while ((rc = (getline line < pf)) > 0) {
-            if (length(line) > 4096) continue
-            line = strip(line)
-            if (line == "" || line ~ /^[#!]/) continue
-            if (!match(line, /[=: \t]/)) continue
-            key = substr(line, 1, RSTART - 1)
-            if (key != p) continue
-            val = substr(line, RSTART)
-            sub(/^[ \t]*[=:]?[ \t]*/, "", val)
-            val = strip(val)
-            if (val ~ /^[0-9]+$/) { close(pf); return val }
-        }
-        if (rc == 0) close(pf)
+        if ((dir SUBSEP p) in props) return (props[dir SUBSEP p] ~ /^[0-9]+$/) ? props[dir SUBSEP p] : ""
     }
     return ""
 }
@@ -796,16 +822,16 @@ function flush(f,    name, e, p, v) {
         v = ""
         if (name in byproj) v = gprop(f, name)
         else if (name in defs) {
-            e = defs[name]
+            e = (name in defs0) ? defs0[name] : defs[name]
             p = propname(e)
             if (p != "") v = gprop(f, p)
             if (v == "") v = fallback(e)
         }
         if (v != "") print v
     }
-    split("", refs); split("", defs); split("", byproj)
+    split("", refs); split("", defs); split("", defs0); split("", byproj)
 }
-FNR == 1 { if (cur != "") flush(cur); cur = FILENAME; blk = 0 }
+FNR == 1 { if (cur != "") flush(cur); cur = FILENAME; blk = 0; depth = 0 }
 length($0) > 4096 { next }
 {
     line = $0; out = ""
@@ -826,6 +852,7 @@ length($0) > 4096 { next }
         sub(/[ \t]*:[ \t]*[A-Za-z?]+[ \t]*$/, "", h); h = strip(h)
         match(h, /[A-Za-z_][A-Za-z0-9_]*$/); h = substr(h, RSTART, RLENGTH)
         if (!(h in defs) && !(h in byproj)) defs[h] = e
+        if (depth == 0 && !(h in defs0)) defs0[h] = e
     }
     rest = out
     while (match(rest, /(JavaLanguageVersion\.of|jvmToolchain)[ \t]*\([ \t]*/)) {
@@ -836,6 +863,9 @@ length($0) > 4096 { next }
             refs[substr(h, 1, RLENGTH)] = 1
         }
     }
+    # The block depth at the start of the next line.
+    t = out; depth += gsub(/\{/, "", t); t = out; depth -= gsub(/\}/, "", t)
+    if (depth < 0) depth = 0
 }
 END { if (cur != "") flush(cur) }
 AWK
@@ -1137,11 +1167,19 @@ java_retry_image() {
 }
 
 # java_retry_image_ready <image>: true when the image is here or a pull of it
-# succeeds now. SBOM_PULL=never only looks, so an offline run does not try.
+# succeeds now, for the web UI (the CLI uses its _optin_image_ready, which
+# does the same). The pull shows docker's own progress. SBOM_PULL=never only
+# looks, so an offline run does not try; SBOM_PULL=always pulls a present
+# image too and uses the local copy when that pull fails.
 java_retry_image_ready() {
-    docker image inspect "$1" >/dev/null 2>&1 && return 0
+    if [ "${SBOM_PULL:-missing}" != always ] && docker image inspect "$1" >/dev/null 2>&1; then
+        return 0
+    fi
     [ "${SBOM_PULL:-missing}" != never ] || return 1
-    docker pull -q "$1" >/dev/null 2>&1
+    echo "[INFO] Pulling $1..."
+    docker pull "$1" && return 0
+    [ "${SBOM_PULL:-missing}" = always ] && docker image inspect "$1" >/dev/null 2>&1 || return 1
+    echo "[WARN] Could not pull $1 (SBOM_PULL=always); using the copy already here."
 }
 
 # java_mixed_note <dir>: a mixed tree runs in the all-in-one image, whatever

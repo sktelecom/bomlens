@@ -456,8 +456,10 @@ drop_unused_guard_state() {
 #   $2 = output bom filename (relative)
 #   $3 = the cdxgen image to use instead of the one img_for_lang picks (the
 #        second run java_retry_image asks for; set only by this function)
+#   $4 = non-empty when the caller keeps an earlier result if this run fails:
+#        the failure is then left for the caller to report
 generate_sbom_cdxgen() {
-    local src="$1" out="$2" forced_img="${3:-}"
+    local src="$1" out="$2" forced_img="${3:-}" quiet="${4:-}"
     local lang img api rc=0 self
     CDXGEN_FAIL_REASON=""
     self=$(self_container_id)
@@ -612,6 +614,9 @@ generate_sbom_cdxgen() {
     drop_unused_guard_state "$sibling_name"
     trap 'exit 130' INT
     trap 'exit 143' TERM
+    # A container that took longer than the loop above to be created (an
+    # image pulled first) has its id in the cidfile by now.
+    [ -n "$cid" ] || cid=$(cat "$cidf" 2>/dev/null)
     rc=$(cat "$rcf" 2>/dev/null || echo 1)
     rm -f "$rcf"
     remove_reach_tools
@@ -623,49 +628,65 @@ generate_sbom_cdxgen() {
     # slot, so the second run's setup_guard_state starts a new one.
     if [ -z "$forced_img" ] && [ "$lang" = java ]; then
         java_retry_image "$src" "$logf" "$img"
-        if [ -n "$JAVA_RETRY_IMAGE" ] && ! java_retry_image_ready "$JAVA_RETRY_IMAGE"; then
-            echo "[WARN] Gradle asked for Java $JAVA_RETRY_JDK, but $JAVA_RETRY_IMAGE is not here (could not be pulled); keeping the result from $img."
-        elif [ -n "$JAVA_RETRY_IMAGE" ]; then
-            echo "[INFO] Gradle asked for Java $JAVA_RETRY_JDK; rerunning in $JAVA_RETRY_IMAGE"
-            [ -n "$cid" ] && docker rm -f "$cid" >/dev/null 2>&1
-            rm -f "$logf" "$cidf" "$prep_file"
-            local first="" first_img="$img"
-            if [ "$rc" -eq 0 ] && [ -s "$bom_path" ]; then
-                first=$(mktemp) && mv -f "$bom_path" "$first" || first=""
+    else
+        JAVA_RETRY_IMAGE=""
+    fi
+    if [ -n "$JAVA_RETRY_IMAGE" ]; then
+        echo "[INFO] Gradle asked for Java $JAVA_RETRY_JDK; rerunning in $JAVA_RETRY_IMAGE"
+        # The exited first container is removed if a cancel comes during the pull.
+        trap 'docker rm -f "$sibling_name" >/dev/null 2>&1; exit 130' INT
+        trap 'docker rm -f "$sibling_name" >/dev/null 2>&1; exit 143' TERM
+        if ! java_retry_image_ready "$JAVA_RETRY_IMAGE"; then
+            echo "[WARN] $JAVA_RETRY_IMAGE is not here ($([ "${SBOM_PULL:-missing}" = never ] && echo "SBOM_PULL=never" || echo "could not be pulled")); keeping the result from $img."
+            JAVA_RETRY_IMAGE=""
+        fi
+        trap 'exit 130' INT
+        trap 'exit 143' TERM
+    fi
+    if [ -n "$JAVA_RETRY_IMAGE" ]; then
+        # By name as well: the id may never have been read.
+        [ -z "$cid" ] || docker rm -f "$cid" >/dev/null 2>&1
+        docker rm -f "$sibling_name" >/dev/null 2>&1
+        rm -f "$logf" "$cidf" "$prep_file"
+        local first="" first_img="$img" retry_img="$JAVA_RETRY_IMAGE"
+        if [ "$rc" -eq 0 ] && [ -s "$bom_path" ]; then
+            first=$(mktemp) || first=""
+            if [ -n "$first" ] && ! mv -f "$bom_path" "$first"; then
+                rm -f "$first"; first=""
             fi
-            rm -f "$bom_path"
-            if generate_sbom_cdxgen "$src" "$out" "$JAVA_RETRY_IMAGE"; then
-                [ -z "$first" ] || rm -f "$first"
-                return 0
-            fi
-            [ -n "$first" ] || return 1
-            echo "[WARN] The rerun in $JAVA_RETRY_IMAGE left no SBOM; keeping the result from $first_img."
-            CDXGEN_FAIL_REASON=""
-            mv -f "$first" "$outdir/$out"
+        fi
+        rm -f "$bom_path"
+        if generate_sbom_cdxgen "$src" "$out" "$retry_img" "${first:+keep}"; then
+            [ -z "$first" ] || rm -f "$first"
             return 0
         fi
+        [ -n "$first" ] || return 1
+        echo "[WARN] The rerun in $retry_img left no SBOM (${CDXGEN_FAIL_REASON:-no output}); keeping the result from $first_img."
+        CDXGEN_FAIL_REASON=""
+        mv -f "$first" "$outdir/$out"
+        return 0
     fi
     if [ "$rc" -ne 0 ]; then
         if [ -n "$cid" ] && [ "$(docker inspect -f '{{.State.OOMKilled}}' "$cid" 2>/dev/null)" = "true" ]; then
             CDXGEN_FAIL_REASON="oom"
-            echo "[WARN] cdxgen was killed for running out of memory (rc=$rc). Give the Docker engine more memory — Docker Desktop: Settings > Resources; Colima: 'colima start --memory N' — and re-scan for full transitive dependencies."
+            [ -n "$quiet" ] || echo "[WARN] cdxgen was killed for running out of memory (rc=$rc). Give the Docker engine more memory — Docker Desktop: Settings > Resources; Colima: 'colima start --memory N' — and re-scan for full transitive dependencies."
         elif grep -qi "no space left on device" "$logf"; then
             CDXGEN_FAIL_REASON="disk-space"
-            echo "[WARN] cdxgen failed: Docker is out of disk space (rc=$rc). Free space (e.g. 'docker system prune') and re-scan for full transitive dependencies."
+            [ -n "$quiet" ] || echo "[WARN] cdxgen failed: Docker is out of disk space (rc=$rc). Free space (e.g. 'docker system prune') and re-scan for full transitive dependencies."
         elif grep -qEi "temporary failure in name resolution|could not resolve host|network is unreachable|connection timed out|connect timed out|no route to host|ENOTFOUND|ETIMEDOUT" "$logf"; then
             # Build tools resolve the real dependency tree by reaching Maven
             # Central / npmjs / PyPI etc. from inside the sibling container;
             # a proxy, firewall or offline host breaks that even though the
             # scan's own network access (cloning the repo) already worked.
             CDXGEN_FAIL_REASON="network"
-            echo "[WARN] cdxgen couldn't reach the network while resolving dependencies (rc=$rc). Check proxy/firewall access to the package registries from the Docker engine and re-scan for full transitive dependencies."
+            [ -n "$quiet" ] || echo "[WARN] cdxgen couldn't reach the network while resolving dependencies (rc=$rc). Check proxy/firewall access to the package registries from the Docker engine and re-scan for full transitive dependencies."
         else
             # Not a resource/network failure this container could see: cdxgen
             # ran and exited non-zero on its own, most often an internal
             # exception or its own schema validator rejecting the document
             # (raw Node stack trace or validation errors, both in $logf only).
             CDXGEN_FAIL_REASON="cdxgen-crash"
-            echo "[WARN] cdxgen failed processing the dependency data (rc=$rc)."
+            [ -n "$quiet" ] || echo "[WARN] cdxgen failed processing the dependency data (rc=$rc)."
         fi
         [ -n "$cid" ] && docker rm -f "$cid" >/dev/null 2>&1
         rm -f "$logf" "$cidf" "$prep_file"
@@ -678,7 +699,8 @@ generate_sbom_cdxgen() {
     fi
     if [ ! -f "$outdir/$out" ]; then
         CDXGEN_FAIL_REASON="cdxgen-unavailable"
-        echo "[WARN] cdxgen produced no SBOM at $bom_path."; return 1
+        [ -n "$quiet" ] || echo "[WARN] cdxgen produced no SBOM at $bom_path."
+        return 1
     fi
     return 0
 }
