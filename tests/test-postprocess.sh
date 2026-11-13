@@ -13706,7 +13706,7 @@ TRIVY
 EH="$ESC/x_1_security.html"
 grep -q '<span class="proj">t <span class="ver">1.0&lt;&quot;x</span></span>' "$EH" && ! grep -q '1.0<"x' "$EH" \
     && pass "the SBOM root version is escaped in the page head" || fail "root version escaping" "$(grep -o '<span class="proj">.*</header>' "$EH")"
-grep -qF '<span class="pkg" title="org.ex&quot;&lt;a:ar&lt;t"><span class="pg">org.ex&quot;&lt;a</span><span class="psep"> / </span><span class="pn">ar&lt;t</span> <span class="pv">1.0</span></span>' "$EH" \
+grep -qF '<span class="pkg" title="org.ex&quot;&lt;a:ar&lt;t"><span class="pg">org.<wbr>ex&quot;&lt;a</span><span class="psep"> / </span><span class="pn">ar&lt;t</span> <span class="pv">1.0</span></span>' "$EH" \
     && pass "a Maven package shows group / artifact, both escaped, the full name in title" || fail "Maven package coordinate"
 grep -qF '<span class="pg">한글그룹</span><span class="psep"> / </span><span class="pn">이름</span>' "$EH" \
     && pass "a non-ASCII Maven name is split by characters, not bytes" || fail "non-ASCII package split"
@@ -13728,6 +13728,11 @@ if sed -n '/@media print{/,/^}/p' "${RTP}_security.html" | grep -q 'th,td{white-
 else
     fail "print rules let a label, id, number or time wrap"
 fi
+# Long names break at their dots first; an evidence item is one line with its
+# full text in title.
+grep -q '<span class="ev" title="' "${RTP}_conformance.html" \
+    && pass "conformance evidence items are one line each, the full text in title" \
+    || fail "conformance evidence items are not one per line"
 # Outbound license conflicts: the count is everything a person has to look at,
 # and each such dependency is a row, even when none is incompatible.
 LCX="$RT/lcx"; mkdir -p "$LCX"

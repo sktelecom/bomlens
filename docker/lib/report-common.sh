@@ -279,6 +279,8 @@ ol,ul{margin:8px 0 0;padding-left:20px;}
 li{margin:4px 0;}
 .mono{list-style:none;padding-left:0;}
 .print-only{display:none;}
+/* One evidence item per line; a long one ends in an ellipsis, its text in title. */
+.ev{display:block;max-width:36ch;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 /* NOTICE */
 .rows .src{display:block;color:var(--text-muted);font-family:var(--font);font-size:var(--font-size-label);margin-top:2px;}
 .src a{word-break:break-all;}
@@ -313,6 +315,7 @@ details.fix .meta{font-size:var(--font-size-label);}
   td.grow{min-width:0;}
   td.fix{max-width:none;}
   .pkg .pg{overflow-wrap:anywhere;}
+  .ev{max-width:none;white-space:normal;overflow:visible;overflow-wrap:anywhere;}
   table .meta{font-size:8pt;}
   pre,pre code{white-space:pre-wrap;overflow-wrap:anywhere;}
   .box-head,th,tr.grp th{background:transparent;}
@@ -511,7 +514,8 @@ report_next_id() { REPORT_BOX_N=$((REPORT_BOX_N + 1)); REPORT_BOX_ID="box-${REPO
 #                  Split by characters, so a non-ASCII name stays whole.
 #   fixlist(none)  "a, b, c", or the muted word for no fixed version
 #   cut(n)         text shortened to n characters with an ellipsis, the full
-#                  text in title
+#                  text in title; it may break after "/", "." and "-"
+#   wbr(chars)     break opportunities after the given characters
 report_jq_defs() {
     cat <<'JQ'
 def num: tostring as $s | if ($s|test("^[0-9]{4,}$")) then ([$s|explode|reverse|_nwise(3)|reverse|implode]|reverse|join(",")) else $s end;
@@ -520,6 +524,10 @@ def sevmark: ({"CRITICAL":"◆","HIGH":"▲","MEDIUM":"●","LOW":"■"}[.] // "
 def sevlbl: ((. // "UNKNOWN") | tostring) as $s
   | "<span class=\"lbl sev-" + ($s|@html) + "\"><span class=\"mk\" aria-hidden=\"true\">" + ($s|sevmark) + "</span>" + ($s|sevword|@html) + "</span>";
 def strv: if type == "string" or type == "number" then tostring else "" end;
+# wbr(chars): a line-break opportunity after each of the given characters, put
+# into text that is already HTML-escaped (the characters are never part of an
+# entity), so a long name breaks there before it breaks anywhere.
+def wbr($re): gsub("(?<c>" + $re + ")"; "\(.c)<wbr>");
 def pkgcoordp($v; $purl): ((. // "") | strv) as $p
   | ((($purl // "") | strv | startswith("pkg:maven/")) and ($p | test(":."))) as $maven
   | (if $maven then ($p | split(":")) else [$p] end) as $parts
@@ -527,13 +535,13 @@ def pkgcoordp($v; $purl): ((. // "") | strv) as $p
      then {g: ($parts[0:-1] | join(":")), n: $parts[-1]} else {g: "", n: $p} end) as $c
   | (($v // "") | strv) as $vv
   | "<span class=\"pkg\" title=\"" + ($p|@html) + "\">"
-    + (if $c.g != "" then "<span class=\"pg\">" + ($c.g|@html) + "</span><span class=\"psep\"> / </span>" else "" end)
+    + (if $c.g != "" then "<span class=\"pg\">" + ($c.g|@html|wbr("[.]")) + "</span><span class=\"psep\"> / </span>" else "" end)
     + "<span class=\"pn\">" + ($c.n|@html) + "</span>"
     + (if $vv != "" then " <span class=\"pv\">" + ($vv|@html) + "</span>" else "" end) + "</span>";
 def fixlist($none): ((. // "") | strv) | if . == "" then "<span class=\"nofix\">" + ($none|@html) + "</span>"
   else (split(", ") | map("<span class=\"v\">" + (.|@html) + "</span>") | join(", ")) end;
 def cut($n): ((. // "") | strv) as $t
-  | if ($t | length) > $n then "<span title=\"" + ($t|@html) + "\">" + ($t[0:$n]|@html) + "…</span>" else ($t|@html) end;
+  | if ($t | length) > $n then "<span title=\"" + ($t|@html) + "\">" + ($t[0:$n]|@html|wbr("[/.-]")) + "…</span>" else ($t|@html|wbr("[/.-]")) end;
 JQ
 }
 

@@ -2468,11 +2468,11 @@ HTMLHEAD
                 "<td>" + ((.detail // "")|@html) + "</td>" +
                 "<td data-evidence=\"" + ($ev | join(", ") | @html) + "\">" +
                 (if ($ev|length) > 3
-                 then ($ev[0:3] | join(", ") | @html)
+                 then ($ev[0:3] | map("<span class=\"ev\" title=\"" + (.|@html) + "\">" + (.|@html) + "</span>") | join(""))
                       + "<details class=\"more\"><summary>" + ($more | sub("%s"; ($ev|length - 3 | tostring)) | @html) + "</summary>"
                       + ($ev[3:] | join(", ") | @html) + "</details>"
                       + "<div class=\"print-only\">" + ($ev[3:] | join(", ") | @html) + "</div>"
-                 else ($ev | join(", ") | @html) end) +
+                 else ($ev | map("<span class=\"ev\" title=\"" + (.|@html) + "\">" + (.|@html) + "</span>") | join("")) end) +
                 (if ((.guidance // null) != null and .status=="warn" and ((.source // "") != "na"))
                  then ("<pre><code>" + (.guidance.snippet|@html) + "</code></pre>" + linkp(.guidance.docUrl)) as $body
                       | "<details class=\"fix\"><summary>" + ($fix|@html) + "</summary>" + $body + "</details>"
