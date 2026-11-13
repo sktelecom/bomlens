@@ -432,6 +432,21 @@ setup_guard_state() {
     GUARD_ID="$key"
 }
 
+# drop_unused_guard_state OWNER: after the cdxgen sibling has exited, remove
+# this run's record when build-prep.sh never took its snapshot there (the
+# sibling did not start, or stopped before build-prep.sh ran). A finished run
+# removes the record itself; one stopped after the snapshot keeps it for the
+# next scan to finish. The same as scripts/scan-sbom.sh.
+drop_unused_guard_state() {
+    [ -n "$GUARD_ID" ] || return 0
+    local d="$GUARD_STATE_DIR/$GUARD_ID"
+    if [ -d "$d" ] && [ ! -f "$d/files.before" ] \
+       && [ "$(cat "$d/owner" 2>/dev/null)" = "$1" ]; then
+        rm -rf -- "$d"
+    fi
+    GUARD_ID=""
+}
+
 # generate_sbom_cdxgen: run a cdxgen language image as a SIBLING container (via the
 # mounted host Docker socket) so a web-UI source scan resolves transitive deps,
 # matching the CLI. The sibling reaches the scanned tree by inheriting THIS container's
@@ -596,6 +611,7 @@ generate_sbom_cdxgen() {
     trap 'stop_sibling; remove_reach_tools; exit 130' INT
     trap 'stop_sibling; remove_reach_tools; exit 143' TERM
     wait "$pipe_pid" || true
+    drop_unused_guard_state "$sibling_name"
     trap 'exit 130' INT
     trap 'exit 143' TERM
     rc=$(cat "$rcf" 2>/dev/null || echo 1)

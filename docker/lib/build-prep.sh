@@ -59,6 +59,10 @@ opted_out() { case "$1" in 1|true) return 0 ;; esac; return 1; }
 # to inspect what a resolution produced).
 # ---------------------------------------------------------------------------
 GUARD_DIR=""
+GUARD_NOEXEC=""
+# The host-persistent guard-state mount. BOMLENS_GUARD_STATE_ROOT names
+# another folder (tests only).
+GUARD_STATE_ROOT="${BOMLENS_GUARD_STATE_ROOT:-/bomlens-state}"
 
 # Resolver-owned paths, relative to $SRC. maxdepth 4 covers multi-module trees
 # (app/build, services/api/go.mod) without walking a whole monorepo; .git and
@@ -108,19 +112,37 @@ guard_snapshot() {
     # run, so a later invocation can finish the restore. Falls back to the
     # normal ephemeral dir when either is absent (unset key, older caller,
     # no /bomlens-state mount) -- unchanged from before this existed.
-    if [ -n "${BOMLENS_GUARD_ID:-}" ] && [ -d /bomlens-state ]; then
-        GUARD_DIR="/bomlens-state/$BOMLENS_GUARD_ID"
+    if [ -n "${BOMLENS_GUARD_ID:-}" ] && [ -d "$GUARD_STATE_ROOT" ]; then
+        GUARD_DIR="$GUARD_STATE_ROOT/$BOMLENS_GUARD_ID"
         mkdir -p "$GUARD_DIR" 2>/dev/null || GUARD_DIR=""
     fi
     [ -n "$GUARD_DIR" ] || GUARD_DIR=$(mktemp -d 2>/dev/null) || { GUARD_DIR=""; return 0; }
+    # Wrappers without the executable bit: cdxgen sets the bit before it runs
+    # them, so the restore clears it again.
+    GUARD_NOEXEC=""
+    for _w in gradlew mvnw; do
+        [ -f "$_w" ] && [ ! -x "$_w" ] && GUARD_NOEXEC="$GUARD_NOEXEC $_w"
+    done
     guard_paths f > "$GUARD_DIR/files.before" 2>/dev/null
     guard_paths d > "$GUARD_DIR/dirs.before" 2>/dev/null
-    echo "$GUARD_NAMES_VERSION" > "$GUARD_DIR/names.version" 2>/dev/null
     while IFS= read -r _f; do
         [ -n "$_f" ] || continue
         mkdir -p "$GUARD_DIR/tree/$(dirname "$_f")" 2>/dev/null
         cp -p "$_f" "$GUARD_DIR/tree/$_f" 2>/dev/null
     done < "$GUARD_DIR/files.before"
+    # Written last: the restore-only mode below finishes a snapshot only when
+    # this file is there, so a run stopped while the lists were being written
+    # leaves nothing it would act on.
+    echo "$GUARD_NAMES_VERSION" > "$GUARD_DIR/names.version" 2>/dev/null
+}
+
+# guard_git_tracked PATH: true when PATH (relative to the current folder) is
+# tracked by git. Used only to keep a path the restore would otherwise remove;
+# without git, or outside a work tree, nothing counts as tracked.
+# safe.directory: the tree is often owned by another uid than this container's.
+guard_git_tracked() {
+    [ "${_g_git:-0}" = 1 ] || return 1
+    git -c safe.directory='*' ls-files --error-unmatch -- "$1" >/dev/null 2>&1
 }
 
 # Idempotent: clears GUARD_DIR first, so the explicit call and the trap that
@@ -129,6 +151,22 @@ guard_restore() {
     [ -n "$GUARD_DIR" ] || return 0
     _g="$GUARD_DIR"; GUARD_DIR=""
     cd "$SRC" 2>/dev/null || { rm -rf "$_g"; return 0; }
+    for _w in ${GUARD_NOEXEC:-}; do
+        [ -x "$_w" ] && chmod a-x "$_w" 2>/dev/null
+    done
+    GUARD_NOEXEC=""
+    # Without both lists there is nothing to compare with: every resolver-owned
+    # path would read as new and be removed. Drop the state instead.
+    if [ ! -f "$_g/files.before" ] || [ ! -f "$_g/dirs.before" ]; then
+        log "source-tree snapshot incomplete; nothing restored or removed"
+        rm -rf "$_g"
+        return 0
+    fi
+    _g_git=0
+    if command -v git >/dev/null 2>&1 \
+       && [ "$(git -c safe.directory='*' rev-parse --is-inside-work-tree 2>/dev/null)" = "true" ]; then
+        _g_git=1
+    fi
     _rst=0; _del=0
     while IFS= read -r _f; do
         [ -n "$_f" ] || continue
@@ -151,6 +189,10 @@ guard_restore() {
         # the tree when the run folder is not on a shared mount.
         [ "$SRC/${_f#./}" = "$OUT" ] && continue
         grep -qxF "$_f" "$_g/files.before" 2>/dev/null && continue
+        if guard_git_tracked "$_f"; then
+            log "WARN: $_f is tracked by git; left in place"
+            continue
+        fi
         rm -f "$_f" 2>/dev/null && _del=$((_del + 1))
     done < "$_g/files.after"
     guard_paths d "$_gnv" > "$_g/dirs.after" 2>/dev/null
@@ -158,6 +200,10 @@ guard_restore() {
         [ -n "$_d" ] || continue
         [ -d "$_d" ] || continue
         grep -qxF "$_d" "$_g/dirs.before" 2>/dev/null && continue
+        if guard_git_tracked "$_d"; then
+            log "WARN: $_d holds files tracked by git; left in place"
+            continue
+        fi
         rm -rf "$_d" 2>/dev/null && _del=$((_del + 1))
         # Drop the parents the run created on the way (gradle's app/build leaves
         # an empty app/ behind when the module dir itself is new). rmdir refuses
@@ -504,10 +550,21 @@ mark_prep_applied() {
 # is gone before asking us to finish what it started; this reuses
 # guard_restore's own diff logic instead of reimplementing it host-side. No
 # resolvers, no cdxgen -- filesystem cleanup only, and fast.
+# Only a snapshot taken in full (both lists and names.version, which
+# guard_snapshot writes last) is finished. A record without one, such as the
+# one a scan whose cdxgen container never started leaves, is removed and
+# nothing in the tree is touched.
 if opted_out "${BOMLENS_GUARD_RESTORE_ONLY:-}"; then
-    if [ -n "${BOMLENS_GUARD_ID:-}" ] && [ -d "/bomlens-state/$BOMLENS_GUARD_ID" ]; then
-        GUARD_DIR="/bomlens-state/$BOMLENS_GUARD_ID"
-        guard_restore
+    if [ -n "${BOMLENS_GUARD_ID:-}" ] && [ -d "$GUARD_STATE_ROOT/$BOMLENS_GUARD_ID" ]; then
+        GUARD_DIR="$GUARD_STATE_ROOT/$BOMLENS_GUARD_ID"
+        if [ -f "$GUARD_DIR/files.before" ] && [ -f "$GUARD_DIR/dirs.before" ] \
+           && [ -f "$GUARD_DIR/names.version" ]; then
+            guard_restore
+        else
+            log "no complete source-tree snapshot for this folder; removing the record without touching the tree"
+            rm -rf "$GUARD_DIR"
+            GUARD_DIR=""
+        fi
     fi
     exit 0
 fi
@@ -857,34 +914,29 @@ fi
 # cache may hold others from earlier scans), it is recorded as a failed step
 # (maven-dependency-jars), otherwise only the count is logged. Skipped when
 # the root also has a Gradle build, which cdxgen reads instead. The wrapper is
-# used only when its .mvn/wrapper files are there; otherwise mvn.
+# used only when its .mvn/wrapper files are there; otherwise mvn. A mvnw
+# without the executable bit runs through sh, as cdxgen runs it too.
 #
 # A POM that declares the same dependency twice: Maven 3.10 and later refuse
 # it ("'dependencies.dependency.(groupId:artifactId:type:classifier)' must be
 # unique", or the same for dependencyManagement), Maven 3.9 and earlier only
 # warn. The cdxgen images ship Maven 3.10, so cdxgen's dependency tree fails
 # and it lists only the dependencies written in pom.xml. The jar fetch reads
-# the same POM, so its output shows the error before cdxgen runs. Then a Maven
-# that accepts the POM is tried, in this order. A retry counts only when it
-# exits 0 and prints no [ERROR] line at all.
-#   1. the project's wrapper, when its distributionUrl names a Maven before
-#      3.10 and it was not the one that just failed (mvnw not executable).
-#      cdxgen picks the wrapper itself, so nothing needs to be set for it.
-#      A wrapper that fails for another reason (it cannot download its
-#      distribution, say) goes on to 2.
-#   2. Apache Maven $MAVEN_FALLBACK_VERSION, fetched through the image's mvn
-#      (its settings apply: mirror, proxy, credentials, offline; the archive
-#      stays in the local repository for the next scan), or from Maven Central
-#      with curl when that fails and Maven is not offline. The archive must
-#      match the SHA-512 checksum pinned below, or it is not used. It is
-#      unpacked under $HOME and passed to cdxgen as MVN_CMD.
-#      cdxgen 13.5.0 still prefers a project's mvnw over MVN_CMD. Only
-#      CDXGEN_JVM_TOOL_PINNED=true makes it take MVN_CMD, and that also makes
-#      it skip every Gradle wrapper. So it is set only when the tree has no
-#      Gradle build outside the non-shipped folders. With a Gradle build, the
-#      Gradle wrappers are left working (losing them would break those builds
-#      with no sign of it), cdxgen may run the mvnw that refuses the POM, a
-#      warning says so, and the step is recorded as failed.
+# the same POM, so its output shows the error before cdxgen runs. Then
+# Apache Maven $MAVEN_FALLBACK_VERSION is tried. The retry counts only when it
+# exits 0 and prints no [ERROR] line at all. It is fetched through the image's
+# mvn (its settings apply: mirror, proxy, credentials, offline; the archive
+# stays in the local repository for the next scan), or from Maven Central
+# with curl when that fails and Maven is not offline. The archive must match
+# the SHA-512 checksum pinned below, or it is not used. It is unpacked under
+# $HOME and passed to cdxgen as MVN_CMD.
+# cdxgen 13.5.0 still prefers a project's mvnw over MVN_CMD. Only
+# CDXGEN_JVM_TOOL_PINNED=true makes it take MVN_CMD, and that also makes it
+# skip every Gradle wrapper. So it is set only when the tree has no Gradle
+# build outside the non-shipped folders. With a Gradle build, the Gradle
+# wrappers are left working (losing them would break those builds with no
+# sign of it), cdxgen may run the mvnw that refuses the POM, a warning says
+# so, and the step is recorded as failed.
 # When no Maven reads the POM, the step is recorded as failed
 # (maven-dependency-tree) in place of maven-dependency-jars, MVN_CMD is not
 # set, and the SBOM shows that its transitive Maven dependencies are missing.
@@ -923,18 +975,6 @@ maven_run_clean() {
 maven_log_retry_failure() {
     log "maven: $1 did not read pom.xml cleanly (rc=$_mvn_rc):"
     { grep '^\[ERROR\]' "$_mvn_err" || tail -3 "$_mvn_err"; } | head -3 | sed 's/^/[build-prep]   /'
-}
-# The Maven version in the wrapper's distributionUrl, empty when not found.
-maven_wrapper_version() {
-    sed -n 's/^[[:space:]]*distributionUrl[[:space:]]*=.*apache-maven-\([0-9][0-9.]*\)-bin\..*/\1/p' \
-        .mvn/wrapper/maven-wrapper.properties 2>/dev/null | head -1
-}
-# True for a Maven 3 before 3.10, which only warns about a repeated dependency.
-maven_accepts_duplicates() {
-    case "$1" in [0-9]*.[0-9]*) ;; *) return 1 ;; esac
-    _mad_major=${1%%.*}; _mad_rest=${1#*.}; _mad_minor=${_mad_rest%%.*}
-    case "$_mad_major$_mad_minor" in *[!0-9]*) return 1 ;; esac
-    [ "$_mad_major" -eq 3 ] && [ "$_mad_minor" -lt 10 ]
 }
 # Maven runs offline: -o in MAVEN_ARGS or MVN_ARGS, or <offline>true</offline>
 # in the settings file it reads.
@@ -1022,8 +1062,10 @@ maven_fetch_fallback() {
     return 1
 }
 if [ -f pom.xml ] && [ ! -f build.gradle ] && [ ! -f build.gradle.kts ]; then
-    _mvn_cmd=""
-    if [ -x ./mvnw ] && [ -d .mvn/wrapper ]; then _mvn_cmd=./mvnw
+    _mvn_cmd=""; _mvn_sh=""
+    if [ -f ./mvnw ] && [ -d .mvn/wrapper ]; then
+        _mvn_cmd=./mvnw
+        [ -x ./mvnw ] || _mvn_sh="sh"
     elif command -v mvn >/dev/null 2>&1; then _mvn_cmd=mvn
     fi
     if [ "$MAVEN_REPO_LOCAL" != "$HOME/.m2/repository" ]; then
@@ -1031,26 +1073,13 @@ if [ -f pom.xml ] && [ ! -f build.gradle ] && [ ! -f build.gradle.kts ]; then
     elif [ -n "$_mvn_cmd" ]; then
         _mvn_err=$(mktemp); _mvn_list=$(mktemp)
         _mvn_tree_failed=""
-        maven_resolve_jars "$_mvn_cmd"
+        maven_resolve_jars ${_mvn_sh:+"$_mvn_sh"} "$_mvn_cmd"
         if maven_model_rejected; then
             log "maven: $_mvn_cmd refused pom.xml:"
             grep "$MAVEN_DUPLICATE_ERROR" "$_mvn_err" | head -1 | sed 's/^/[build-prep]   /'
             log "maven: Maven 3.10 and later refuse a dependency declared twice in one POM; earlier versions only warn"
             _mvn_tree_ok=""
-            _mvn_wrap_v=""
-            [ -f .mvn/wrapper/maven-wrapper.properties ] && _mvn_wrap_v=$(maven_wrapper_version)
-            if [ "$_mvn_cmd" != ./mvnw ] && [ -f ./mvnw ] && [ -n "$_mvn_wrap_v" ] \
-                && maven_accepts_duplicates "$_mvn_wrap_v"; then
-                log "maven: retrying with the project's Maven wrapper (Maven $_mvn_wrap_v)"
-                maven_resolve_jars sh ./mvnw
-                if maven_run_clean; then
-                    _mvn_tree_ok=1
-                    log "maven: the project's Maven wrapper (Maven $_mvn_wrap_v) reads pom.xml; cdxgen runs the wrapper for the dependency tree"
-                else
-                    maven_log_retry_failure "the project's Maven wrapper"
-                fi
-            fi
-            if [ -z "$_mvn_tree_ok" ] && maven_fetch_fallback; then
+            if maven_fetch_fallback; then
                 log "maven: retrying with Maven $MAVEN_FALLBACK_VERSION"
                 maven_resolve_jars "$MAVEN_FALLBACK_CMD"
                 if ! maven_run_clean; then
@@ -1129,7 +1158,16 @@ fi
 # end of this script filters the generated SBOM down to that set.
 ANDROID_RELEASE_SET=""
 if { [ -f build.gradle ] || [ -f build.gradle.kts ]; } && command -v gradle >/dev/null 2>&1; then
-    if [ -x ./gradlew ]; then GRADLEW="./gradlew"; else GRADLEW="gradle"; fi
+    # A gradlew checked out without the executable bit (a 100644 entry, common
+    # from Windows) still runs, through sh: the JDK image was chosen from its
+    # wrapper version, and cdxgen runs it too. GRADLEW_SH is "sh" then.
+    GRADLEW_SH=""
+    if [ -f ./gradlew ]; then
+        GRADLEW="./gradlew"
+        [ -x ./gradlew ] || GRADLEW_SH="sh"
+    else
+        GRADLEW="gradle"
+    fi
     # Gradle keeps its files under ~/.gradle, where ~ is the account's home
     # from the password file (/root), not HOME. With a read-only root it
     # cannot unpack its native library there and every Gradle build fails at
@@ -1146,6 +1184,10 @@ if { [ -f build.gradle ] || [ -f build.gradle.kts ]; } && command -v gradle >/de
     fi
     # The user's Gradle settings, before the first Gradle run.
     gradle_settings_copy
+    # Which Gradle runs: the first "Gradle X.Y" line of --version.
+    _gradle_v=$(run_supervised_timeout "$PREP_TIMEOUT_GRADLE" ${GRADLEW_SH:+"$GRADLEW_SH"} "$GRADLEW" --version 2>/dev/null \
+        | sed -n 's/^\(Gradle [0-9][^ ]*\).*/\1/p' | head -1)
+    log "gradle: ${GRADLEW_SH:+$GRADLEW_SH }$GRADLEW runs ${_gradle_v:-a Gradle whose version could not be read}"
 
     # Android scope fix: cdxgen resolves EVERY Gradle configuration, so an AGP
     # project drags its build/test toolchain (androidTestUtil, Unified Test
@@ -1168,11 +1210,11 @@ if { [ -f build.gradle ] || [ -f build.gradle.kts ]; } && command -v gradle >/de
         # Both Gradle calls below share one label: to a reader they are one
         # logical step (the release classpath resolve), whether it timed out
         # listing subprojects or resolving one module's dependencies.
-        _subs=$(prep_step android-release-classpath "$PREP_TIMEOUT_GRADLE" "$GRADLEW" --no-daemon -q --console=plain projects \
+        _subs=$(prep_step android-release-classpath "$PREP_TIMEOUT_GRADLE" ${GRADLEW_SH:+"$GRADLEW_SH"} "$GRADLEW" --no-daemon -q --console=plain projects \
                 | sed -n "s/.*Project '\(:[A-Za-z0-9:._-]*\)'.*/\1/p")
         # Include the root ("") as a fallback for single-module projects.
         for _s in $_subs ""; do
-            _dep=$(prep_step android-release-classpath "$PREP_TIMEOUT_GRADLE" "$GRADLEW" --no-daemon -q --console=plain "${_s}:dependencies")
+            _dep=$(prep_step android-release-classpath "$PREP_TIMEOUT_GRADLE" ${GRADLEW_SH:+"$GRADLEW_SH"} "$GRADLEW" --no-daemon -q --console=plain "${_s}:dependencies")
             [ -n "$_dep" ] || continue
             # Pick the deployable release runtime config for this module: prefer the
             # plain releaseRuntimeClasspath, else the first flavored release variant
@@ -1219,7 +1261,7 @@ if { [ -f build.gradle ] || [ -f build.gradle.kts ]; } && command -v gradle >/de
     else
         # java-gradle (or opted-out Android): resolve so cdxgen sees the full graph.
         log "gradle dependencies"
-        prep_step gradle-dependencies "$PREP_TIMEOUT_GRADLE" "$GRADLEW" --no-daemon dependencies >/dev/null
+        prep_step gradle-dependencies "$PREP_TIMEOUT_GRADLE" ${GRADLEW_SH:+"$GRADLEW_SH"} "$GRADLEW" --no-daemon dependencies >/dev/null
     fi
 fi
 
@@ -1227,6 +1269,20 @@ fi
 # command; cdxgen may still run ./gradlew) gets the settings copied here.
 if { [ -f build.gradle ] || [ -f build.gradle.kts ] || [ -f settings.gradle ] || [ -f settings.gradle.kts ]; }; then
     gradle_settings_copy
+fi
+
+# cdxgen reads the POMs Gradle downloaded (licenses when its own POM request
+# fails) from $HOME/.gradle unless GRADLE_CACHE_DIR or GRADLE_USER_HOME says
+# otherwise, while Gradle uses the account's home (/root, where the CLI mounts
+# BomLens's Gradle cache) and HOME is /tmp/sbomhome. So it is pointed at
+# Gradle's own cache. A GRADLE_CACHE_DIR the caller set is kept.
+if [ -z "${GRADLE_CACHE_DIR:-}" ]; then
+    _gcd_home="${GRADLE_USER_HOME:-}"
+    if [ -z "$_gcd_home" ]; then
+        _gcd_acct="$( (getent passwd "$(id -u)" 2>/dev/null || true) | cut -d: -f6)"
+        _gcd_home="${_gcd_acct:-/root}/.gradle"
+    fi
+    export GRADLE_CACHE_DIR="$_gcd_home/caches/modules-2/files-2.1"
 fi
 
 # Gradle subproject named like the root project. cdxgen runs
@@ -2251,6 +2307,7 @@ fi
 # pre-resolution duplicate versions cdxgen emits from the other configurations.
 # Match on maven group:artifact:version; keep non-maven components and the app's
 # own modules (root project group). Prune the dependency graph to the kept refs.
+# A kept component of the release set with another scope is set to required.
 if [ "${rc:-1}" -eq 0 ] && [ -n "${ANDROID_RELEASE_SET:-}" ] && [ -s "$ANDROID_RELEASE_SET" ] \
    && [ -f "$OUT" ] && command -v node >/dev/null 2>&1; then
     log "android: filtering SBOM to release runtime scope"
@@ -2278,6 +2335,14 @@ const keep = c => {
 };
 const before = bom.components.length;
 bom.components = bom.components.filter(keep);
+// cdxgen takes a component's scope from the first configuration it appears
+// under, so one on the release runtime classpath that also sits under a test
+// configuration sorted before it comes out optional. On the release set it ships.
+let rescoped = 0;
+for (const c of bom.components) {
+  const g = gav(c.purl);
+  if (g && rel.has(g) && c.scope && c.scope !== 'required') { c.scope = 'required'; rescoped++; }
+}
 const refOf = c => c['bom-ref'] || c.purl;
 const keptRefs = new Set(bom.components.map(refOf));
 if (mc) keptRefs.add(mc['bom-ref'] || mc.purl);
@@ -2289,7 +2354,8 @@ if (Array.isArray(bom.dependencies)) {
       : d);
 }
 fs.writeFileSync(bomPath, JSON.stringify(bom, null, 2));
-process.stderr.write('[build-prep] android: kept ' + bom.components.length + ' of ' + before + ' components\n');
+process.stderr.write('[build-prep] android: kept ' + bom.components.length + ' of ' + before + ' components'
+  + (rescoped ? ', ' + rescoped + ' on the release runtime classpath set to scope required' : '') + '\n');
 FILTER_JS
     node "$_flt" "$OUT" "$ANDROID_RELEASE_SET" || log "android: filter skipped (non-fatal)"
     rm -f "$_flt" "$ANDROID_RELEASE_SET"
