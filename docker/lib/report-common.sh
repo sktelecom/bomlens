@@ -87,7 +87,7 @@ report_tokens_css() {
   --role-success-border:147 224 198;--role-neutral-fg:63 63 70;--role-neutral-muted:238 238 239;
   --role-neutral-emphasis:113 113 122;--role-neutral-border:191 191 195;
   --cat-permissive-fg:63 63 70;--cat-permissive-muted:238 238 239;
-  --cat-permissive-emphasis:113 113 122;--cat-permissive-border:191 191 195;--cat-weak-fg:74 80 20;
+  --cat-permissive-emphasis:136 136 144;--cat-permissive-border:191 191 195;--cat-weak-fg:74 80 20;
   --cat-weak-muted:240 242 226;--cat-weak-emphasis:112 121 28;--cat-weak-border:196 202 146;
   --cat-strong-fg:82 40 103;--cat-strong-muted:241 234 244;--cat-strong-emphasis:137 78 166;
   --cat-strong-border:202 175 215;--cat-network-fg:107 36 74;--cat-network-muted:244 233 239;
@@ -110,7 +110,7 @@ report_tokens_css() {
   --role-success-border:37 108 84;--role-neutral-fg:212 212 216;--role-neutral-muted:46 46 50;
   --role-neutral-emphasis:161 161 170;--role-neutral-border:86 86 91;
   --cat-permissive-fg:212 212 216;--cat-permissive-muted:46 46 50;
-  --cat-permissive-emphasis:161 161 170;--cat-permissive-border:86 86 91;--cat-weak-fg:208 214 140;
+  --cat-permissive-emphasis:118 118 126;--cat-permissive-border:86 86 91;--cat-weak-fg:208 214 140;
   --cat-weak-muted:47 49 33;--cat-weak-emphasis:168 178 72;--cat-weak-border:92 97 50;
   --cat-strong-fg:223 198 235;--cat-strong-muted:52 44 58;--cat-strong-emphasis:183 134 208;
   --cat-strong-border:97 75 110;--cat-network-fg:237 196 218;--cat-network-muted:57 43 52;

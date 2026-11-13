@@ -355,6 +355,7 @@ if [ "$REPORT_LANG" = "ko" ]; then
     P_FW_FAILED=$(tfmt risk.fw_scope_failed "$FW_FAILED")
     P_FW_ENCRYPTED=$(tfmt risk.fw_scope_encrypted "$FW_ENCRYPTED")
     P_FW_TAIL=$(kstr risk.fw_scope_tail)
+    P_FW_TAIL_HTML=$(kstr risk.fw_scope_tail_html)
     P_FW_FORMATS=$(tfmt risk.fw_scope_formats "$FW_FAILED_FORMATS")
     P_FW_MISSING=$(tfmt risk.fw_scope_missing "$FW_MISSING")
     P_H2_LIC=$(kstr risk.h2_lic)
@@ -388,6 +389,7 @@ if [ "$REPORT_LANG" = "ko" ]; then
     P_META_FORMAT=$(kstr risk.meta_format)
     P_TH_SEV=$(kstr risk.th_severity); P_TH_CVE=$(kstr risk.th_cve); P_TH_PKG=$(kstr risk.th_package)
     P_TH_INST=$(kstr risk.th_installed); P_TH_FIXED=$(kstr risk.th_fixed)
+    P_LC_INC=$(kstr risk.lc_incompatible); P_LC_CON=$(kstr risk.lc_conditional); P_LC_UNK=$(kstr risk.lc_unknown)
     P_LC_BOX=$(tfmt risk.lc_box "$(printf '%s' "$OUTBOUND_LIC" | sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g')")
 else
     P_TITLE="Open-source risk report — ${PROJECT}"; P_H1="Open-source risk report"
@@ -414,13 +416,13 @@ else
     P_VULN_NONE_MD="_No known vulnerabilities, or no security artifact was produced._"
     P_VULN_NONE_HTML="No known vulnerabilities, or no security artifact was produced."
     P_PRESENCE_MD="> ${PRESENCE_ONLY} component(s) were proved present but no version could be recovered. With no version there is nothing to ask a vulnerability database about, so the counts above do not cover them. The licence obligations still apply."
-    P_PRESENCE_HTML="<b>$(report_num "$PRESENCE_ONLY") component(s)</b> were proved present but no version could be recovered. With no version there is nothing to ask a vulnerability database about, so the counts above do not cover them. The licence obligations still apply."
+    P_PRESENCE_HTML="<b>$(report_num "$PRESENCE_ONLY") component(s)</b> were proved present but no version could be recovered. With no version there is nothing to ask a vulnerability database about, so the counts below do not cover them. The licence obligations still apply."
     P_UNPINNED_MD="> The source states version ranges and ships no lock file, so the versions in this SBOM are what a fresh install resolves at scan time, not necessarily the versions that were used. The counts above were measured against these versions. To judge a specific environment, scan a manifest that pins exact versions."
-    P_UNPINNED_HTML="The source states version ranges and ships no lock file, so the versions in this SBOM are what a fresh install resolves at scan time, not necessarily the versions that were used. The counts above were measured against these versions. To judge a specific environment, scan a manifest that pins exact versions."
+    P_UNPINNED_HTML="The source states version ranges and ships no lock file, so the versions in this SBOM are what a fresh install resolves at scan time, not necessarily the versions that were used. The counts below were measured against these versions. To judge a specific environment, scan a manifest that pins exact versions."
     P_UNREACHED_MD="> ${UNREACHED_N} finding(s) are not reachable: govulncheck found that the affected Go code is not called or not in the executable (--reachability). They are not in the counts above; the security report lists them."
-    P_UNREACHED_HTML="<b>$(report_num "$UNREACHED_N") finding(s) are not reachable</b>: govulncheck found that the affected Go code is not called or not in the executable (--reachability). They are not in the counts above; the security report lists them."
+    P_UNREACHED_HTML="<b>$(report_num "$UNREACHED_N") finding(s) are not reachable</b>: govulncheck found that the affected Go code is not called or not in the executable (--reachability). They are not in the counts below; the security report lists them."
     P_UNCHECKED_MD="> ${UNCHECKED_N} component(s) could not be checked: they have no version, or no package purl that Trivy can query and no CPE that was matched, so no vulnerability database was asked about them. The counts above do not cover them."
-    P_UNCHECKED_HTML="<b>$(report_num "$UNCHECKED_N") component(s) could not be checked</b>: they have no version, or no package purl that Trivy can query and no CPE that was matched, so no vulnerability database was asked about them. The counts above do not cover them."
+    P_UNCHECKED_HTML="<b>$(report_num "$UNCHECKED_N") component(s) could not be checked</b>: they have no version, or no package purl that Trivy can query and no CPE that was matched, so no vulnerability database was asked about them. The counts below do not cover them."
     P_UNCHECKED_MORE="… and $((UNCHECKED_N - UNCHECKED_LIST_MAX)) more (the security report lists them all)"
     P_REASON_NO_VERSION="no version"
     P_REASON_NO_ID="no package purl and no matched CPE"
@@ -434,6 +436,7 @@ else
     P_FW_FAILED="${FW_FAILED} extraction step(s) did not complete."
     P_FW_ENCRYPTED="${FW_ENCRYPTED} region(s) are encrypted."
     P_FW_TAIL="Components in any part of the image that was not opened are not listed in this SBOM, so the vulnerability counts above describe only what could be opened."
+    P_FW_TAIL_HTML="Components in any part of the image that was not opened are not listed in this SBOM, so the vulnerability counts below describe only what could be opened."
     P_FW_FORMATS="Formats whose extraction did not complete: ${FW_FAILED_FORMATS}."
     P_FW_MISSING="Extraction tools the scanner image does not include: ${FW_MISSING}."
     P_H2_LIC="License summary"
@@ -472,6 +475,7 @@ else
     P_NEXT2_SELF_HTML="Keep and distribute the notice (NOTICE) together with the SBOM."
     P_META_FORMAT="Input format:"
     P_TH_SEV="Severity"; P_TH_CVE="CVE"; P_TH_PKG="Package"; P_TH_INST="Installed"; P_TH_FIXED="Fixed"
+    P_LC_INC="Incompatible"; P_LC_CON="Conditional"; P_LC_UNK="Unknown"
     P_LC_BOX="Conflicts with the outbound license ($(printf '%s' "$OUTBOUND_LIC" | sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g'))"
 fi
 
@@ -483,11 +487,12 @@ if [ "$FW_SCOPE" = "true" ]; then
     [ "${FW_FAILED:-0}" -gt 0 ] && FW_SCOPE_TEXT="${FW_SCOPE_TEXT:+$FW_SCOPE_TEXT }${P_FW_FAILED}"
     [ "${FW_ENCRYPTED:-0}" -gt 0 ] && FW_SCOPE_TEXT="${FW_SCOPE_TEXT:+$FW_SCOPE_TEXT }${P_FW_ENCRYPTED}"
     FW_SCOPE_TEXT="${FW_SCOPE_TEXT:+$FW_SCOPE_TEXT }${P_FW_TAIL}"
-    # The HTML notice groups the byte count's digits.
-    FW_SCOPE_TEXT_HTML="${FW_SCOPE_TEXT}"
-    if [ "${FW_UNKNOWN_BYTES:-0}" -gt 0 ]; then
-        FW_SCOPE_TEXT_HTML="${P_FW_UNKNOWN_HTML}${FW_SCOPE_TEXT#"$P_FW_UNKNOWN"}"
-    fi
+    # The HTML notice groups the byte count's digits and, as it comes before
+    # the counts, says "below".
+    if [ "${FW_UNKNOWN_BYTES:-0}" -gt 0 ]; then FW_SCOPE_TEXT_HTML="${P_FW_UNKNOWN_HTML}"; fi
+    if [ "${FW_FAILED:-0}" -gt 0 ]; then FW_SCOPE_TEXT_HTML="${FW_SCOPE_TEXT_HTML:+$FW_SCOPE_TEXT_HTML }${P_FW_FAILED}"; fi
+    if [ "${FW_ENCRYPTED:-0}" -gt 0 ]; then FW_SCOPE_TEXT_HTML="${FW_SCOPE_TEXT_HTML:+$FW_SCOPE_TEXT_HTML }${P_FW_ENCRYPTED}"; fi
+    FW_SCOPE_TEXT_HTML="${FW_SCOPE_TEXT_HTML:+$FW_SCOPE_TEXT_HTML }${P_FW_TAIL_HTML}"
 fi
 
 # The supplier review is a subtitle, not a second report name: the report is the
@@ -734,9 +739,6 @@ ${UNCHECKED_LI}
         NOTES="${NOTES}<p>${P_UNPINNED_HTML}</p>"
     fi
     if [ -n "$NOTES" ]; then
-        # The shared sentences say "above" because the Markdown report puts them
-        # after the table; here the notice comes first, so the counts are below.
-        NOTES="$(printf '%s' "$NOTES" | sed -e 's/counts above/counts below/g' -e 's/위 집계/아래 집계/g' -e 's/위 취약점 집계/아래 취약점 집계/g')"
         printf '<div class="banner">%s</div>\n' "$NOTES"
     fi
     echo "${P_VULN_NOTE_HTML}"
@@ -779,7 +781,7 @@ ${UNCHECKED_LI}
         report_lbl "lbl-cat-network" "$NC" "Network copyleft"; echo
         report_lbl "lbl-cat-strong" "$SC" "Strong copyleft"; echo
         report_lbl "lbl-cat-weak" "$WK" "Weak copyleft"; echo
-        report_lbl "lbl-cat-permissive" "$PM" "Permissive"; echo
+        report_lbl "lbl-cat-permissive" "$PM" "Permissive" "&#9675;"; echo
         report_lbl "" "$UN" "Uncategorized" "&#8211;"; echo
         echo "</div>"
         if [ "$COPYLEFT_TOTAL" -gt 0 ]; then
@@ -803,15 +805,15 @@ ${UNCHECKED_LI}
         else
             echo "<div class=\"summary\"><span class=\"box-title\">${P_LC_BOX}</span>"
         fi
-        report_lbl "lbl-danger" "$LC_INCOMPAT" "Incompatible"; echo
-        report_lbl "lbl-attention" "$LC_COND" "Conditional"; echo
-        report_lbl "" "$LC_UNKNOWN" "Unknown"; echo
+        report_lbl "lbl-danger" "$LC_INCOMPAT" "$P_LC_INC"; echo
+        report_lbl "lbl-attention" "$LC_COND" "$P_LC_CON"; echo
+        report_lbl "" "$LC_UNKNOWN" "$P_LC_UNK"; echo
         if [ "$LC_TOTAL" -gt 0 ]; then
             echo "</span></div>"
             echo "<ul class=\"rows mono\">"
-            echo "$LC_ALL" | jq -r '.[] | "<li>" + (.label|@html) + " <span class=\"lbl"
+            echo "$LC_ALL" | jq -r --arg inc "$P_LC_INC" --arg con "$P_LC_CON" --arg unk "$P_LC_UNK" '.[] | "<li>" + (.label|@html) + " <span class=\"lbl"
                 + (if .v == "incompatible" then " lbl-danger" elif .v == "conditional" then " lbl-attention" else "" end)
-                + "\">" + ({"incompatible":"Incompatible","conditional":"Conditional","unknown":"Unknown"}[.v] // .v | @html) + "</span></li>"'
+                + "\">" + ({"incompatible":$inc,"conditional":$con,"unknown":$unk}[.v] // .v | @html) + "</span></li>"'
             if [ "$LC_TOTAL" -gt 30 ]; then
                 echo "<li>$(report_str and_more "$(report_num "$((LC_TOTAL - 30))")")</li>"
             fi

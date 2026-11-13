@@ -757,12 +757,12 @@ HTMLHEAD
         # head instead of a line of abbreviations above the table.
         [ "$ENRICHED" = "true" ] && echo "<p class=\"legend\"><span><b>KEV</b> $(sec_s legend_kev 'CISA known-exploited')</span><span><b>EPSS</b> $(sec_s legend_epss 'exploit probability (FIRST.org)')</span><span><b>$(sec_s legend_order_h 'Order')</b> $(sec_s legend_order 'KEV first, then severity, then EPSS')</span></p>"
         echo "<div class=\"table-scroll\"><table aria-labelledby=\"${REPORT_BOX_ID}\"><thead><tr><th>${TH_SEV}</th><th>${TH_KEV}</th><th class=\"num\">${TH_CVSS}</th><th class=\"num\">${TH_EPSS}</th><th>${TH_CVE}</th><th>${TH_PKGI}</th><th>${TH_FIXED}</th><th>${TH_TITLE}</th></tr></thead><tbody>"
-        echo "$FINDINGS" | jq -r --arg nofix "$NO_FIX" "$(report_jq_defs)"'.[] |
+        echo "$FINDINGS" | jq -r --arg nofix "$NO_FIX" --arg cpeu "$(sec_s cpe_unverified_title 'CPE-matched; NVD version range not verified')" "$(report_jq_defs)"'.[] |
             "<tr><td class=\"sev\">" + (.severity|sevlbl) + "</td>" +
             "<td>" + (if .kev then "<span class=\"kevbadge\">KEV</span>" else "" end) + "</td>" +
             "<td class=\"num\">" + ((.cvss // "" )|tostring|@html) + "</td>" +
             "<td class=\"num\">" + (if .epss then ((.epss*1000|floor)/1000|tostring) else "" end) + "</td>" +
-            "<td class=\"id\">" + (.id|strv|@html) + (if .unverified then " <span title=\"CPE-matched; NVD version range not verified\">&dagger;</span>" else "" end) + (if .reach == "exploitable" then " <span title=\"" + (.reach_detail|@html) + "\">&Dagger;</span>" else "" end) + "</td>" +
+            "<td class=\"id\">" + (.id|strv|@html) + (if .unverified then " <span title=\"" + ($cpeu|@html) + "\">&dagger;</span>" else "" end) + (if .reach == "exploitable" then " <span title=\"" + (.reach_detail|@html) + "\">&Dagger;</span>" else "" end) + "</td>" +
             "<td class=\"pkgc\">" + (.version as $v | .purl as $u | .pkg | pkgcoordp($v; $u)) + "</td>" +
             "<td class=\"fix\">" + (.fixed|fixlist($nofix)) + "</td>" +
             "<td class=\"grow\">" + (.title_full // .title | cut(120)) + "</td></tr>"'
@@ -796,11 +796,17 @@ HTMLHEAD
         echo "<div class=\"box\"><div class=\"box-head\"><h2 id=\"${REPORT_BOX_ID}\">$(sec_s h2_unchecked 'Components that could not be checked')</h2><span class=\"counter\">$(report_num "$UNCHECKED_N")</span>"
         echo "<p class=\"meta\">$(sec_s unchecked_intro 'They have no version, or no package purl that Trivy can query and no CPE that was matched, so no vulnerability database was asked about them. A clean result does not cover them.')</p>"
         if [ -n "${BOMLENS_CPE_INDEX_SKIPPED:-}" ] && echo "$UNCHECKED" | jq -e 'any(.[]; .Reason != "no-version")' >/dev/null 2>&1; then
-            if [ "${BOMLENS_CPE_INDEX_SKIPPED:-}" = "analyze-upstream-map-only" ]; then
-                echo "<p class=\"meta\">$(sec_s unchecked_note_upstream "$(esc "$UNCHECKED_NOTE")")</p>"
+            # English is UNCHECKED_NOTE as it is, passed as text and never as a
+            # printf format; Korean comes from the catalog, with the BomLens
+            # version where the English names it.
+            if [ "$REPORT_LANG" != "ko" ]; then
+                NOTE_HTML="$(esc "$UNCHECKED_NOTE")"
+            elif [ "${BOMLENS_CPE_INDEX_SKIPPED:-}" = "analyze-upstream-map-only" ]; then
+                NOTE_HTML="$(sec_s unchecked_note_upstream '%s' "${BOMLENS_VERSION:+ (BomLens $(esc "$BOMLENS_VERSION"))}")"
             else
-                echo "<p class=\"meta\">$(sec_s unchecked_note_analyze "$(esc "$UNCHECKED_NOTE")")</p>"
+                NOTE_HTML="$(sec_s unchecked_note_analyze '%s' "$(esc "$UNCHECKED_NOTE")")"
             fi
+            printf '<p class="meta">%s</p>\n' "$NOTE_HTML"
         fi
         echo "</div>"
         echo "<div class=\"table-scroll\"><table aria-labelledby=\"${REPORT_BOX_ID}\"><thead><tr><th>${TH_COMP}</th><th>${TH_VER}</th><th>${TH_PURL}</th><th>${TH_REASON}</th></tr></thead><tbody>"

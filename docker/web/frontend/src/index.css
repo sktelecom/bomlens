@@ -190,7 +190,8 @@
      *   weak-copyleft olive 65, strong-copyleft violet 280, network-copyleft
      *   magenta 328, review-needed brown 28; permissive and uncategorized take
      *   the neutral grey of role-neutral, as a tier that needs no attention
-     *   draws none. Weak copyleft moved off indigo, which read as the navy
+     *   draws none, and permissive's fill is the quieter grey so the two stay
+     *   apart in a bar (which also leaves a gap between segments). Weak copyleft moved off indigo, which read as the navy
      *   accent (--brand).
      * The three copyleft tiers used to sit 25 to 30 degrees apart (265, 290,
      * 320) and read as one purple; they are now 48 to 50 degrees apart. They
@@ -201,9 +202,9 @@
      * luminance): every fg is at least 4.5:1 and every emphasis fill at least
      * 3:1 on the card, the page and the muted surface in both themes, as
      * npm run token:contrast checks. */
-    --cat-permissive-fg: 63 63 70; /* the role-neutral shades */
+    --cat-permissive-fg: 63 63 70; /* the role-neutral shades, a lighter fill */
     --cat-permissive-muted: 238 238 239;
-    --cat-permissive-emphasis: 113 113 122;
+    --cat-permissive-emphasis: 136 136 144; /* lighter than uncategorized (role-neutral) */
     --cat-permissive-border: 191 191 195;
 
     --cat-weak-fg: 74 80 20; /* olive */
@@ -345,9 +346,9 @@
     --role-neutral-emphasis: 161 161 170; /* 6.9:1 on card */
     --role-neutral-border: 86 86 91;
 
-    --cat-permissive-fg: 212 212 216; /* the role-neutral shades */
+    --cat-permissive-fg: 212 212 216; /* the role-neutral shades, a quieter fill */
     --cat-permissive-muted: 46 46 50;
-    --cat-permissive-emphasis: 161 161 170;
+    --cat-permissive-emphasis: 118 118 126; /* quieter than uncategorized (role-neutral) */
     --cat-permissive-border: 86 86 91;
 
     --cat-weak-fg: 208 214 140; /* olive */

@@ -2466,7 +2466,7 @@ HTMLHEAD
                    else "" end) + "</td>" +
                 (if $kind=="g7" then "" else "<td class=\"req\">" + (if .required then $yes else $no end) + "</td>" end) +
                 "<td>" + ((.detail // "")|@html) + "</td>" +
-                "<td data-evidence=\"" + ($ev | join(", ") | @html) + "\">" +
+                "<td>" +
                 (if ($ev|length) > 3
                  then ($ev[0:3] | map("<span class=\"ev\" title=\"" + (.|@html) + "\">" + (.|@html) + "</span>") | join(""))
                       + "<details class=\"more\"><summary>" + ($more | sub("%s"; ($ev|length - 3 | tostring)) | @html) + "</summary>"

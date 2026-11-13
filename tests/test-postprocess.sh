@@ -13659,14 +13659,17 @@ grep -q '<table aria-labelledby="box-[0-9]*">' "${RTP}_security.html" && grep -q
     && pass "a table is named by the title of its box (aria-labelledby)" || fail "a table has no accessible name"
 # No box with a thick stripe down its left side: no border-left or
 # border-inline-start rule and no inset box-shadow, in the shared CSS, in the
-# documentation site's stylesheets or in any generated report. Notices are a
-# banner with a 1px border all round.
+# documentation site's stylesheets, the web UI's stylesheets (its TSX classes
+# are checked by token-lint) or in any generated report. Notices are a banner
+# with a 1px border all round.
 side_stripe() { grep -EnH 'border-(left|inline-start)(-width|-style|-color)?[[:space:]]*:|box-shadow:[^;}]*inset' "$@"; }
-if STRIPES="$(side_stripe "$LIB/report-common.sh" "$ROOT_DIR"/docs/stylesheets/*.css "${RTP}_risk-report.html" \
-                "${RTP}_security.html" "${RTP}_NOTICE.html" "${RTP}_conformance.html")"; then
-    fail "a left-side stripe rule is in the report CSS, the docs stylesheets or a generated report" "$STRIPES"
+WEB_CSS=()
+while IFS= read -r f; do WEB_CSS+=("$f"); done < <(find "$ROOT_DIR/docker/web/frontend/src" -name '*.css' -not -path '*/node_modules/*')
+if STRIPES="$(side_stripe "$LIB/report-common.sh" "$ROOT_DIR"/docs/stylesheets/*.css "${WEB_CSS[@]}" \
+                "${RTP}_risk-report.html" "${RTP}_security.html" "${RTP}_NOTICE.html" "${RTP}_conformance.html")"; then
+    fail "a left-side stripe rule is in the report CSS, the docs or web UI stylesheets, or a generated report" "$STRIPES"
 else
-    pass "no left-side stripe rule in the report CSS, the docs stylesheets or the four generated reports"
+    pass "no left-side stripe rule in the report CSS, the docs and web UI stylesheets or the four generated reports (${#WEB_CSS[@]} web stylesheets)"
 fi
 # REPORT_LANG=ko: the security report is Korean; the NOTICE stays English.
 ( export RC_TRIVY_FIXTURE="$RC/trivy.json" PATH="$RT/bin:$PATH" SECURITY_ENRICH=false DEEP_CVE=false REPORT_LANG=ko
@@ -13747,6 +13750,20 @@ grep -q 'Conflicts with the outbound license (Apache-2.0)</p><span class="counte
    && grep -q '<li>u1@2 <span class="lbl">Unknown</span></li>' "$LCX/p_1.0_risk-report.html" \
     && pass "the outbound-license box counts and lists conditional and unknown dependencies too" \
     || fail "outbound-license box" "$(grep -o 'Conflicts with[^<]*</p><span class="counter">[^<]*' "$LCX/p_1.0_risk-report.html")"
+( cd "$LCX" && REPORT_LANG=ko bash "$LIB/generate-risk-report.sh" p_1.0 p >/dev/null 2>&1 )
+grep -q '배포 라이선스(Apache-2.0)와 충돌' "$LCX/p_1.0_risk-report.html" \
+   && grep -q '<li>c1@1 <span class="lbl lbl-attention">배포 방식에 따라 달라짐</span></li>' "$LCX/p_1.0_risk-report.html" \
+    && pass "the ko outbound-license box uses the web UI's Korean verdict words" \
+    || fail "ko outbound-license verdict words"
+# A note taken from the environment is text, never a printf format.
+( export RC_TRIVY_FIXTURE="$RC/trivy.json" PATH="$RT/bin:$PATH" SECURITY_ENRICH=false DEEP_CVE=false \
+         BOMLENS_CPE_INDEX_SKIPPED=analyze-upstream-map-only BOMLENS_VERSION='9.9%s%d'
+  bash "$LIB/scan-security.sh" "$RC/sbom.json" "$RT/pf_1.0" pf >/dev/null 2>&1
+  REPORT_LANG=ko bash "$LIB/scan-security.sh" "$RC/sbom.json" "$RT/pk_1.0" pk >/dev/null 2>&1 )
+grep -qF 'with --analyze-cpe-index (BomLens 9.9%s%d).' "$RT/pf_1.0_security.html" \
+   && grep -qF -- '--analyze-cpe-index와 함께 (BomLens 9.9%s%d) 검사한' "$RT/pk_1.0_security.html" \
+    && pass "the received-SBOM note keeps the BomLens version as text, in English and Korean" \
+    || fail "received-SBOM note" "$(grep -o 'analyze-cpe-index[^<]*' "$RT/pf_1.0_security.html" "$RT/pk_1.0_security.html" | head -2)"
 grep -q '<h1>Open-source risk report</h1>' "${RTP}_risk-report.html" \
     && grep -q '<p class="subtitle">Supplier SBOM under review</p>' "${RTP}_risk-report.html" \
     && pass "supplier risk report: GLOSSARY title with the supplier review as subtitle" \
