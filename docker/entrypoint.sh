@@ -354,8 +354,8 @@ GUARD_ID=""
 # always mount into this container and carry to the sibling via
 # --volumes-from, so a file written here is visible to the sibling at the
 # same path -- the same trick --volumes-from already does for the scanned
-# tree. Prints nothing when that mount is missing; callers fall back to the
-# old -c injection (defensive only, both launch paths always provide it).
+# tree. Prints nothing when that mount is missing; the callers then skip the
+# cleanup or stop the scan with an error (both launch paths always mount it).
 write_prep_file() {
     [ -d "$GUARD_STATE_DIR" ] || return 1
     mkdir -p "$GUARD_STATE_DIR/prep" 2>/dev/null || return 1
@@ -412,11 +412,7 @@ setup_guard_state() {
                 "$cleanup_prep_file" "$src" >/dev/null 2>&1 || true
             rm -f "$cleanup_prep_file"
         else
-            docker run --rm -u 0:0 \
-                --volumes-from "$self" \
-                -e BOMLENS_GUARD_RESTORE_ONLY=1 -e "BOMLENS_GUARD_ID=$key" \
-                --entrypoint sh "$cleanup_image" \
-                -c "$prep" _ "$src" >/dev/null 2>&1 || true
+            echo "[WARN] could not write the cleanup script under $GUARD_STATE_DIR; leaving a previous interrupted scan's leftovers in place."
         fi
     fi
     mkdir -p "$GUARD_STATE_DIR/$key" 2>/dev/null || return 0
@@ -530,10 +526,8 @@ generate_sbom_cdxgen() {
     setup_guard_state "$self" "$prep" "$src" "$sibling_name" "$img"
     local guard_env=()
     [ -n "$GUARD_ID" ] && guard_env=(-e "BOMLENS_GUARD_ID=$GUARD_ID")
-    # See write_prep_file above: run build-prep.sh by path when the guard-state
-    # mount is there (the normal case), fall back to the old -c injection
-    # otherwise (works as long as build-prep.sh stays under the kernel's
-    # 128KiB single-argument limit).
+    # See write_prep_file above: build-prep.sh runs by path from the
+    # guard-state mount; without that mount the scan stops with an error.
     local prep_file; prep_file=$(write_prep_file "$prep")
     # --reachability on Go: the sibling has the Go toolchain this image lacks,
     # so govulncheck runs there (build-prep.sh). The binary is copied into a
@@ -581,22 +575,11 @@ generate_sbom_cdxgen() {
             --entrypoint sh "$img" \
             "$prep_file" "$src" "$bom_path" "$CDX_SPEC_VERSION"
       else
-        docker run -u 0:0 \
-            --name "$sibling_name" \
-            --cidfile "$cidf" \
-            --volumes-from "$self" \
-            -e HOME=/tmp/sbomhome \
-            -e "MAVEN_OPTS=-Duser.home=/tmp/sbomhome -Dmaven.repo.local=/tmp/sbomhome/.m2/repository" \
-            -e GOPATH=/tmp/sbomhome/go -e GOMODCACHE=/tmp/sbomhome/go/pkg/mod -e GOCACHE=/tmp/sbomhome/go-build \
-            -e FETCH_LICENSE="$FETCH_LICENSE" \
-            -e PROJECT_NAME="$PROJECT_NAME" \
-            -e PROJECT_VERSION="$PROJECT_VERSION" \
-            -e HOST_GOTOOLCHAIN="${GOTOOLCHAIN:-}" -e GOPROXY -e GOSUMDB \
-            "${prep_env[@]}" \
-            "${guard_env[@]}" \
-            "${reach_env[@]}" \
-            --entrypoint sh "$img" \
-            -c "$prep" _ "$src" "$bom_path" "$CDX_SPEC_VERSION"
+        # build-prep.sh is larger than the kernel's single-argument limit, so
+        # it cannot be handed over as `sh -c`. Without the guard-state mount
+        # there is no shared place to put it.
+        echo "[ERROR] the guard-state folder ($GUARD_STATE_DIR) is not mounted, so build-prep.sh cannot be handed to the cdxgen container. Start the web UI with scan-sbom.sh --ui or the desktop app, or mount a writable folder at $GUARD_STATE_DIR."
+        false
       fi; echo $? > "$rcf" ) 2>&1 | tee "$logf" &
     local pipe_pid=$!
     # The cidfile appears as soon as the container is created, well before it
