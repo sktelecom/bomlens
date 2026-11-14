@@ -185,6 +185,20 @@ assert not any(a.endswith(":/host-output") for a in args), args
 assert ("HOST_OUTPUT_DIR=%s" % run_out) in args, args
 assert args[args.index("-w") + 1] == run_out, args
 
+# The extra CA bundle path is forwarded by name; the file itself reaches the
+# sibling through --volumes-from.
+captured.clear()
+os.environ["BOMLENS_EXTRA_CA_CERTS"] = "/bomlens-ca/extra.pem"
+try:
+    server.run_sibling_scan(
+        "ghcr.io/sktelecom/bomlens-aibom:1.5.0", "AIBOM", run_out,
+        lambda ln: None, model_id="openai/clip",
+    )
+finally:
+    del os.environ["BOMLENS_EXTRA_CA_CERTS"]
+_ca = captured["args"]
+assert any(_ca[i] == "-e" and _ca[i + 1] == "BOMLENS_EXTRA_CA_CERTS" for i in range(len(_ca) - 1)), _ca
+
 # Cancel support: a valid container_name reaches docker run as a `--name`
 # (so a cancelled scan can be stopped); an invalid one is dropped, not smuggled.
 captured.clear()

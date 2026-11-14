@@ -179,6 +179,8 @@ case "${1:-}" in
         done
         exit 1 ;;
     esac
+    # DOCKER_STUB_RUN_OUTPUT: what a container prints (its log), verbatim.
+    [ -z "${DOCKER_STUB_RUN_OUTPUT:-}" ] || printf '%s\n' "$DOCKER_STUB_RUN_OUTPUT"
     # Drop the SBOM where the real container would: the host dir bind-mounted to
     # /host-output (post-process / single-shot) or /out (source stage 1) — i.e.
     # the per-run subfolder scan-sbom.sh now creates. Falls back to cwd so the
@@ -1100,6 +1102,58 @@ DOCKER_STUB_ARGV_DUMP=1 HTTPS_PROXY=http://proxy.example:3128 TRIVY_DB_REPOSITOR
   && in_log "trivy cache:/trivy-cache>" && in_log "<TRIVY_CACHE_DIR=/trivy-cache>" && [ -d "$WORK/trivy cache" ]; } \
   && pass "network settings go by name, a host TRIVY_CACHE_DIR does not, SBOM_TRIVY_CACHE is mounted (space in path)" \
   || { fail "network settings not passed as expected"; show; cat "$LOG"; }
+
+# SBOM_EXTRA_CA_CERTS: a proxy's CA bundle, bind-mounted read-only (--mount,
+# which fails at once when the engine cannot see the file) into stage 1 and
+# stage 2 at a fixed path that BOMLENS_EXTRA_CA_CERTS names (a host value of
+# that variable is not passed on). A file that is missing, holds no PEM
+# certificate or has a comma in its path stops the scan before any container
+# runs.
+printf -- '-----BEGIN CERTIFICATE-----\nMIIB\n-----END CERTIFICATE-----\n' > "$WORK/proxy ca.pem"
+CA_ABS="$(cd "$WORK" && pwd)/proxy ca.pem"
+# On Windows the CLI hands docker the C:/... form of the path (hostpath).
+CA_HOST="$CA_ABS"
+command -v cygpath >/dev/null 2>&1 && CA_HOST="$(cygpath -m "$CA_ABS")"
+CA_MOUNT="type=bind,source=$CA_HOST,target=/bomlens-ca/extra.pem,readonly"
+d="$(new_proj extraca)"; printf '{"name":"a","dependencies":{"x":"1"}}' > "$d/package.json"
+DOCKER_STUB_ARGV_DUMP=1 SBOM_EXTRA_CA_CERTS="$WORK/proxy ca.pem" BOMLENS_EXTRA_CA_CERTS=/host/only/ca.pem \
+  scan_in "$d" --project CA --version 1
+{ [ "$RC" -eq 0 ] && [ "$(grep -cxF "<$CA_MOUNT>" "$LOG")" -ge 2 ] && [ "$(grep -cxF "<--mount>" "$LOG")" -ge 2 ] \
+  && [ "$(grep -cF '<BOMLENS_EXTRA_CA_CERTS=/bomlens-ca/extra.pem>' "$LOG")" -ge 2 ] && ! in_log "/host/only/ca.pem"; } \
+  && pass "SBOM_EXTRA_CA_CERTS is mounted read-only into stage 1 and stage 2 (space in path); a host BOMLENS_EXTRA_CA_CERTS is not passed" \
+  || { fail "SBOM_EXTRA_CA_CERTS not mounted into both stages" "rc=$RC"; show; cat "$LOG"; }
+# A Windows path typed with backslashes in Git Bash (C:\certs\ca.pem) is
+# read as a path: with cygpath on Windows, with the backslashes as slashes here.
+d="$(new_proj extraca_backslash)"; printf '{"name":"a","dependencies":{"x":"1"}}' > "$d/package.json"
+CA_BACKSLASH="${CA_ABS//\//\\}"
+command -v cygpath >/dev/null 2>&1 && CA_BACKSLASH="$(cygpath -w "$CA_ABS")"
+DOCKER_STUB_ARGV_DUMP=1 SBOM_EXTRA_CA_CERTS="$CA_BACKSLASH" scan_in "$d" --project CA --version 1 --generate-only
+{ [ "$RC" -eq 0 ] && in_log "<$CA_MOUNT>"; } \
+  && pass "SBOM_EXTRA_CA_CERTS written with backslashes is mounted as the same file" \
+  || { fail "SBOM_EXTRA_CA_CERTS with backslashes not handled" "rc=$RC"; show; }
+printf 'not a certificate\n' > "$WORK/not-a-ca.txt"
+mkdir -p "$WORK/a,b"; cp "$WORK/proxy ca.pem" "$WORK/a,b/ca.pem"
+for bad in "$WORK/no-such-ca.pem" "$WORK/not-a-ca.txt" "$WORK" "$WORK/a,b/ca.pem"; do
+  d="$(new_proj extraca_bad)"; printf '{"name":"a","dependencies":{"x":"1"}}' > "$d/package.json"
+  SBOM_EXTRA_CA_CERTS="$bad" scan_in "$d" --project CA --version 1
+  { [ "$RC" -ne 0 ] && in_out "[ERROR] SBOM_EXTRA_CA_CERTS=$bad" && ! grep -q "^docker run" "$LOG"; } \
+    && pass "SBOM_EXTRA_CA_CERTS=$(basename "$bad") is refused before any container runs" \
+    || { fail "a bad SBOM_EXTRA_CA_CERTS ($(basename "$bad")) was not refused" "rc=$RC"; show; }
+done
+d="$(new_proj extraca_ui)"
+DOCKER_STUB_ARGV_DUMP=1 SBOM_EXTRA_CA_CERTS="$WORK/proxy ca.pem" scan_in "$d" --ui --output-dir "$d"
+{ in_log "MODE=UI" && in_log "<$CA_MOUNT>" && in_log "<BOMLENS_EXTRA_CA_CERTS=/bomlens-ca/extra.pem>"; } \
+  && pass "--ui mounts SBOM_EXTRA_CA_CERTS into the web UI container" \
+  || { fail "--ui does not mount SBOM_EXTRA_CA_CERTS" "rc=$RC"; show; cat "$LOG"; }
+# A stage 1 log with a certificate the container did not trust gets one line
+# naming SBOM_EXTRA_CA_CERTS.
+d="$(new_proj extraca_hint)"; printf '{"name":"a","dependencies":{"x":"1"}}' > "$d/package.json"
+DOCKER_STUB_RUN_OUTPUT="Could not transfer artifact: PKIX path building failed: unable to find valid certification path" \
+  scan_in "$d" --project CA --version 1
+{ [ "$(grep -c 'a TLS certificate was not trusted' "$OUT")" = 1 ] && in_out "[WARN] cdxgen: a TLS certificate was not trusted" && in_out "Set SBOM_EXTRA_CA_CERTS" \
+  && [ "$(grep -c -- '-e _BOMLENS_TLS_HINT_SHOWN=1' "$LOG")" = 1 ] && grep -- '-e _BOMLENS_TLS_HINT_SHOWN=1' "$LOG" | grep -q 'MODE=POSTPROCESS'; } \
+  && pass "a PKIX failure in the stage 1 log prints one [WARN] naming SBOM_EXTRA_CA_CERTS, and stage 2 is told not to repeat it" \
+  || { fail "no TLS trust hint for a PKIX failure in stage 1" "rc=$RC"; show; }
 
 # A registry mirror for the cdxgen images.
 d="$(new_proj mirror)"; printf '{"name":"a","dependencies":{"x":"1"}}' > "$d/package.json"
@@ -2081,6 +2135,21 @@ if [ -f "$UI_BAT" ]; then
   grep -q "sbom-output" "$UI_BAT"        && pass "sbom-ui.bat isolates output to a dedicated sbom-output folder" || fail "sbom-ui.bat isolates output folder"
   grep -qi "docker image inspect" "$UI_BAT"      && pass "sbom-ui.bat checks for the image before run" || fail "sbom-ui.bat checks for image"
   grep -qi "docker pull" "$UI_BAT"               && pass "sbom-ui.bat pre-pulls the image on first run" || fail "sbom-ui.bat pre-pulls image"
+  # SBOM_EXTRA_CA_CERTS: read from the settings file, made absolute (a bare
+  # name would be a named volume), comma refused, bind-mounted with --mount.
+  { grep -q 'SBOM_IMAGE_TAR SBOM_EXTRA_CA_CERTS) do' "$UI_BAT" \
+    && grep -qF 'for %%F in ("%SBOM_EXTRA_CA_CERTS%") do set "SBOM_EXTRA_CA_CERTS=%%~fF"' "$UI_BAT" \
+    && grep -qF 'if not "%SBOM_EXTRA_CA_CERTS:,=%"=="%SBOM_EXTRA_CA_CERTS%" set "BAD_CHAR=1"' "$UI_BAT" \
+    && grep -qF -- '--mount "type=bind,source=%SBOM_EXTRA_CA_CERTS%,target=/bomlens-ca/extra.pem,readonly"' "$UI_BAT" \
+    && grep -q '^    %CA_V% ^' "$UI_BAT" && ! grep -q ':/bomlens-ca/extra.pem:ro' "$UI_BAT"; } \
+    && pass "sbom-ui.bat bind-mounts SBOM_EXTRA_CA_CERTS by its absolute path, read-only, refusing a comma" \
+    || fail "sbom-ui.bat SBOM_EXTRA_CA_CERTS handling"
+  # The message blocks stay key-for-key identical (both languages).
+  _ui_en=$(tr -d '\r' < "$UI_BAT" | sed -n '/^:load_msgs$/,/^:msgs_ko$/p' | grep -o '^set "M_[A-Z0-9_]*' | sort)
+  _ui_ko=$(tr -d '\r' < "$UI_BAT" | sed -n '/^:msgs_ko$/,$p' | grep -o '^set "M_[A-Z0-9_]*' | sort)
+  { [ -n "$_ui_en" ] && [ "$_ui_en" = "$_ui_ko" ] && printf '%s\n' "$_ui_en" | grep -q M_ERR_CA_NOT_PEM; } \
+    && pass "sbom-ui.bat has the same message keys in English and Korean (CA errors included)" \
+    || fail "sbom-ui.bat message keys differ between English and Korean"
   for n in CDXGEN_IMAGE_PREFIX CDXGEN_JAVA_IMAGE SBOM_PULL; do
     grep -q -- "-e $n ^" "$UI_BAT" && pass "sbom-ui.bat passes $n to the UI container by name" || fail "sbom-ui.bat does not pass $n"
   done

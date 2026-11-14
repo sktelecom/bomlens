@@ -66,6 +66,25 @@ set "MOUNT_V=-v "%SBOM_UI_MOUNT_DIR%":/scan-targets/mounted:ro"
 set "SCAN_ROOTS=/scan-targets/mounted|%SBOM_UI_MOUNT_DIR%"
 :mount_done
 
+REM --- extra CA bundle (a proxy that inspects TLS) -------------------------
+REM Point SBOM_EXTRA_CA_CERTS at the proxy's CA bundle (PEM) and the UI
+REM container trusts it, as do the scan containers it starts (they see the
+REM same file through --volumes-from). Same as scan-sbom.sh --ui.
+REM A relative path is made absolute first: Docker would read a bare name as
+REM a named volume. --mount, not -v: a file the engine cannot see stops
+REM docker run instead of turning into an empty folder in the container.
+set "CA_V="
+if not defined SBOM_EXTRA_CA_CERTS goto :ca_done
+call :check_ca_chars
+if defined BAD_CHAR goto :err_ca_badchar
+for %%F in ("%SBOM_EXTRA_CA_CERTS%") do set "SBOM_EXTRA_CA_CERTS=%%~fF"
+if exist "%SBOM_EXTRA_CA_CERTS%\" goto :err_ca_missing
+if not exist "%SBOM_EXTRA_CA_CERTS%" goto :err_ca_missing
+findstr /C:"-----BEGIN CERTIFICATE-----" "%SBOM_EXTRA_CA_CERTS%" >nul 2>&1
+if errorlevel 1 goto :err_ca_not_pem
+set "CA_V=--mount "type=bind,source=%SBOM_EXTRA_CA_CERTS%,target=/bomlens-ca/extra.pem,readonly" -e BOMLENS_EXTRA_CA_CERTS=/bomlens-ca/extra.pem"
+:ca_done
+
 REM --- Docker checks (the real prerequisite) -------------------------------
 REM `docker version` also talks to the daemon, so it fails when the engine is
 REM merely stopped. Distinguish the two with `where`, otherwise a user whose
@@ -149,6 +168,7 @@ docker run --rm -it ^
     -v "%OUTDIR%":/src ^
     -v "%OUTDIR%":/host-output ^
     %MOUNT_V% ^
+    %CA_V% ^
     -v /var/run/docker.sock:/var/run/docker.sock ^
     -e MODE=UI ^
     -e UI_PORT=8080 ^
@@ -197,6 +217,21 @@ goto :die
 :err_mount_badchar
 call :say M_ERR_MOUNT_BADCHAR
 call :sayval SBOM_UI_MOUNT_DIR
+goto :die
+
+:err_ca_missing
+call :say M_ERR_CA_MISSING
+call :sayval SBOM_EXTRA_CA_CERTS
+goto :die
+
+:err_ca_badchar
+call :say M_ERR_CA_BADCHAR
+call :sayval SBOM_EXTRA_CA_CERTS
+goto :die
+
+:err_ca_not_pem
+call :say M_ERR_CA_NOT_PEM
+call :sayval SBOM_EXTRA_CA_CERTS
 goto :die
 
 :err_no_image
@@ -269,6 +304,19 @@ if not "%SBOM_UI_MOUNT_DIR:>=%"=="%SBOM_UI_MOUNT_DIR%" set "BAD_CHAR=1"
 if not "%SBOM_UI_MOUNT_DIR:^=%"=="%SBOM_UI_MOUNT_DIR%" set "BAD_CHAR=1"
 goto :eof
 
+REM The same check for the CA bundle path, plus the comma, which would split
+REM the --mount value.
+:check_ca_chars
+set "BAD_CHAR="
+if not "%SBOM_EXTRA_CA_CERTS:,=%"=="%SBOM_EXTRA_CA_CERTS%" set "BAD_CHAR=1"
+if not "%SBOM_EXTRA_CA_CERTS:!=%"=="%SBOM_EXTRA_CA_CERTS%" set "BAD_CHAR=1"
+if not "%SBOM_EXTRA_CA_CERTS:&=%"=="%SBOM_EXTRA_CA_CERTS%" set "BAD_CHAR=1"
+if not "%SBOM_EXTRA_CA_CERTS:|=%"=="%SBOM_EXTRA_CA_CERTS%" set "BAD_CHAR=1"
+if not "%SBOM_EXTRA_CA_CERTS:<=%"=="%SBOM_EXTRA_CA_CERTS%" set "BAD_CHAR=1"
+if not "%SBOM_EXTRA_CA_CERTS:>=%"=="%SBOM_EXTRA_CA_CERTS%" set "BAD_CHAR=1"
+if not "%SBOM_EXTRA_CA_CERTS:^=%"=="%SBOM_EXTRA_CA_CERTS%" set "BAD_CHAR=1"
+goto :eof
+
 REM Snapshot the Hyper-V/WSL reserved ranges ONCE. Running netsh per candidate
 REM port cost ~6 seconds on a machine with a handful of ranges, which would be
 REM added to every single launch. A netsh blocked by group policy just leaves the
@@ -319,7 +367,7 @@ set "V=%~2"
 if not defined K goto :eof
 REM Whitelist: never `set` an arbitrary name out of a text file.
 set "OK="
-for %%w in (SBOM_LANG UI_PORT UI_BIND_ADDRESS SBOM_SCANNER_IMAGE SBOM_OUTPUT_DIR SBOM_UI_MOUNT_DIR SBOM_PULL SBOM_IMAGE_TAR) do if /i "%K%"=="%%w" set "OK=1"
+for %%w in (SBOM_LANG UI_PORT UI_BIND_ADDRESS SBOM_SCANNER_IMAGE SBOM_OUTPUT_DIR SBOM_UI_MOUNT_DIR SBOM_PULL SBOM_IMAGE_TAR SBOM_EXTRA_CA_CERTS) do if /i "%K%"=="%%w" set "OK=1"
 if not defined OK goto :eof
 REM A real environment variable always wins over the file.
 if defined %K% goto :eof
@@ -392,6 +440,9 @@ set "M_HINT_CHECK=  For a summary of what is missing, double-click check-setup.b
 set "M_ERR_NO_ENGINE=[error] The Docker engine is not running. Start Rancher Desktop or Docker Desktop, wait for its icon to settle, then try again."
 set "M_ERR_MOUNT_MISSING=[error] SBOM_UI_MOUNT_DIR folder does not exist:"
 set "M_ERR_MOUNT_BADCHAR=[error] SBOM_UI_MOUNT_DIR contains a character that cannot be passed to Docker safely. Please use a path without & ^ | < > percent or exclamation marks:"
+set "M_ERR_CA_MISSING=[error] SBOM_EXTRA_CA_CERTS does not name a file. Point it at your proxy's CA bundle in PEM form, or remove it:"
+set "M_ERR_CA_BADCHAR=[error] SBOM_EXTRA_CA_CERTS contains a character that cannot be passed to Docker safely. Please use a path without & ^ | < > commas, percent or exclamation marks:"
+set "M_ERR_CA_NOT_PEM=[error] SBOM_EXTRA_CA_CERTS holds no PEM certificate (no -----BEGIN CERTIFICATE----- line). Export the proxy's CA as Base-64 (PEM):"
 set "M_ERR_NO_IMAGE=[error] The scanner image is not present and SBOM_PULL is set to never:"
 set "M_ERR_LOAD_FAILED=[error] Could not load the scanner image from the file:"
 set "M_ERR_PULL_1=[error] Downloading the scanner image failed."
@@ -425,6 +476,9 @@ set "M_HINT_CHECK=  무엇이 문제인지 한눈에 보려면 check-setup.bat �
 set "M_ERR_NO_ENGINE=[오류] Docker 엔진이 실행 중이 아닙니다. Rancher Desktop / Docker Desktop을 켜고 아이콘이 안정된 뒤 다시 시도하세요."
 set "M_ERR_MOUNT_MISSING=[오류] SBOM_UI_MOUNT_DIR 폴더가 없습니다:"
 set "M_ERR_MOUNT_BADCHAR=[오류] SBOM_UI_MOUNT_DIR에 Docker로 안전하게 넘길 수 없는 문자가 있습니다. & ^ | < > 퍼센트 느낌표가 없는 경로를 사용해 주세요:"
+set "M_ERR_CA_MISSING=[오류] SBOM_EXTRA_CA_CERTS가 가리키는 파일이 없습니다. 프록시의 CA 번들(PEM)을 지정하거나 이 설정을 지우세요:"
+set "M_ERR_CA_BADCHAR=[오류] SBOM_EXTRA_CA_CERTS에 Docker로 안전하게 넘길 수 없는 문자가 있습니다. & ^ | < > 쉼표 퍼센트 느낌표가 없는 경로를 사용해 주세요:"
+set "M_ERR_CA_NOT_PEM=[오류] SBOM_EXTRA_CA_CERTS 파일에 PEM 인증서(-----BEGIN CERTIFICATE----- 줄)가 없습니다. 프록시의 CA를 Base-64(PEM) 형식으로 내보내세요:"
 set "M_ERR_NO_IMAGE=[오류] 스캐너 이미지가 없고 SBOM_PULL이 never로 설정되어 있습니다:"
 set "M_ERR_LOAD_FAILED=[오류] 파일에서 스캐너 이미지를 불러오지 못했습니다:"
 set "M_ERR_PULL_1=[오류] 스캐너 이미지 다운로드에 실패했습니다."

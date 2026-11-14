@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `SBOM_EXTRA_CA_CERTS=/path/to/bundle.pem` makes the scan containers trust an extra CA bundle, for a proxy that inspects TLS. The CLI (`--ui` included), `sbom-ui.bat` and the desktop app bind-mount it read-only at `/bomlens-ca/extra.pem` (`--mount`, so a file the Docker engine cannot see stops the scan) and set `BOMLENS_EXTRA_CA_CERTS`. Each container adds it to a copy of the bundle it already uses (`SSL_CERT_FILE`, else `REQUESTS_CA_BUNDLE`, else the system bundle) and points `SSL_CERT_FILE`, `REQUESTS_CA_BUNDLE`, `CURL_CA_BUNDLE`, `CARGO_HTTP_CAINFO`, `GIT_SSL_CAINFO` and `PIP_CERT` at it, adds it to `NODE_EXTRA_CA_CERTS`, and imports it into a JKS copy of the Java trust store in use (the one `JAVA_TOOL_OPTIONS` names, else the JDK's), all under `/tmp`. A file that is missing, holds no PEM certificate or has a comma in its path stops the scan with the cause; a Git Bash path with backslashes is accepted.
+- A step that fails on an untrusted certificate (`x509: certificate signed by unknown authority`, `PKIX path building failed`, `CERTIFICATE_VERIFY_FAILED` and the like) prints one `[WARN]` line per run naming `SBOM_EXTRA_CA_CERTS`.
+
 ### Changed
 
 - A Java Gradle source scan keeps what each project's runtime classpath resolves, and leaves out dependencies only on a compile or test classpath (such as `j2objc-annotations` from guava 33.0.0, or JUnit). One Gradle run resolves every project through an init script, with the configuration cache off for that run, in place of the root project's `dependencies` warm-up. The full graph is kept when the build includes other builds (`includeBuild`, `pluginManagement` ones included), when a configuration cannot be resolved, or when the Gradle run fails. A dependency a project ships through another configuration (a custom `agent` or `distribution`, Shadow's `shadow`) is left out; `BOMLENS_GRADLE_FULL_GRAPH=1` keeps the full graph.

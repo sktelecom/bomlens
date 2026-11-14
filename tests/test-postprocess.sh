@@ -10651,9 +10651,11 @@ DETECT="$ROOT_DIR/docker/lib/source-detect.sh"
 # BOMLENS_REACHABILITY, BOMLENS_GOVULNCHECK and BOMLENS_REACHABILITY_NONCE are the
 # same kind: the launcher sets them with a value only when it hands stage 1 a
 # govulncheck binary. BOMLENS_GUARD_STATE_ROOT only points the tests at a
-# folder other than /bomlens-state.
+# folder other than /bomlens-state. BOMLENS_EXTRA_CA_CERTS: the launcher
+# mounts the CA bundle and sets the path itself (EXTRA_CA_ENV_NAMES);
+# BOMLENS_EXTRA_CA_APPLIED is extra_ca_trust's own marker.
 _read=$(grep -oE 'BOMLENS_[A-Z_]+:-' "$PREP" | sed 's/:-$//' | sort -u \
-    | grep -vE '^BOMLENS_(GUARD_ID|GUARD_RESTORE_ONLY|GUARD_STATE_ROOT|REACHABILITY|REACHABILITY_NONCE|GOVULNCHECK)$' | tr '\n' ' ')
+    | grep -vE '^BOMLENS_(GUARD_ID|GUARD_RESTORE_ONLY|GUARD_STATE_ROOT|REACHABILITY|REACHABILITY_NONCE|GOVULNCHECK|EXTRA_CA_CERTS|EXTRA_CA_APPLIED)$' | tr '\n' ' ')
 _listed=$(bash -c '. "$1"; printf "%s\n" $BUILD_PREP_ENV_NAMES' _ "$DETECT" | sort -u | tr '\n' ' ')
 [ -n "$_read" ] && [ "$_read" = "$_listed" ] \
     && pass "BUILD_PREP_ENV_NAMES matches the BOMLENS_* switches build-prep.sh reads" \
@@ -10677,6 +10679,163 @@ _on=""; for v in 1 true 0 false ""; do bash -c "$_opt; opted_out \"\$1\"" _ "$v"
 [ "$_on" = "[1][true]" ] \
     && pass "an opt-out switch counts as set only for 1 or true" \
     || fail "opt-out switch values treated as set: $_on"
+
+echo "== extra CA bundle (BOMLENS_EXTRA_CA_CERTS): a proxy that inspects TLS =="
+ECA="$LIB/extra-ca.sh"
+# extra_ca_trust writes under /tmp; what these cases leave there is removed
+# at the end of the section.
+_eca_tmp_before=" $(echo /tmp/bomlens-ca.*) "
+# build-prep.sh runs alone in the cdxgen container and keeps its own copy.
+_eca_lib=$(sed -n '/^extra_ca_trust() {$/,/^}$/p' "$ECA")
+_eca_prep=$(sed -n '/^extra_ca_trust() {$/,/^}$/p' "$PREP")
+[ -n "$_eca_lib" ] && [ "$_eca_lib" = "$_eca_prep" ] \
+    && pass "build-prep.sh's extra_ca_trust is the same as docker/lib/extra-ca.sh's" \
+    || fail "extra_ca_trust in build-prep.sh and extra-ca.sh differ"
+grep -q '^extra_ca_trust$' "$PREP" && grep -q '^extra_ca_trust$' "$ROOT_DIR/docker/entrypoint.sh" \
+    && pass "build-prep.sh and entrypoint.sh apply the extra CA bundle" \
+    || fail "build-prep.sh or entrypoint.sh no longer calls extra_ca_trust"
+case " $(bash -c '. "$1"; build_prep_env_args' _ "$DETECT") " in
+    *" -e BOMLENS_EXTRA_CA_CERTS "*) pass "the cdxgen container gets BOMLENS_EXTRA_CA_CERTS by name" ;;
+    *) fail "build_prep_env_args does not pass BOMLENS_EXTRA_CA_CERTS" ;;
+esac
+case " $(bash -c '. "$1"; printf "%s " $STAGE2_NETWORK_ENV_NAMES' _ "$DETECT") " in
+    *" BOMLENS_EXTRA_CA_CERTS "*) pass "the post-processing container gets BOMLENS_EXTRA_CA_CERTS by name" ;;
+    *) fail "STAGE2_NETWORK_ENV_NAMES does not name BOMLENS_EXTRA_CA_CERTS" ;;
+esac
+# Unset, a missing file and a file with no certificate change nothing.
+_eca_env=$(env -u BOMLENS_EXTRA_CA_CERTS sh -c '. "$1"; extra_ca_trust; echo "rc=$? ssl=${SSL_CERT_FILE:-}"' _ "$ECA" 2>&1)
+[ "$_eca_env" = "rc=0 ssl=" ] && pass "unset: nothing is changed" || fail "unset BOMLENS_EXTRA_CA_CERTS changed something" "$_eca_env"
+printf 'not a certificate\n' > "$WORK/eca-not-pem.txt"
+for _eca_bad in "$WORK/eca-missing.pem" "$WORK/eca-not-pem.txt"; do
+    _eca_env=$(env -u SSL_CERT_FILE BOMLENS_EXTRA_CA_CERTS="$_eca_bad" sh -c '. "$1"; extra_ca_trust; echo "rc=$? ssl=${SSL_CERT_FILE:-}"' _ "$ECA" 2>&1)
+    case "$_eca_env" in
+        *"[WARN] BOMLENS_EXTRA_CA_CERTS="*"rc=0 ssl=") pass "a bad bundle ($(basename "$_eca_bad")) is warned about and not used" ;;
+        *) fail "a bad bundle ($(basename "$_eca_bad")) was not refused with a warning" "$_eca_env" ;;
+    esac
+done
+# A real bundle: two certificates and a private key, CRLF line ends.
+if command -v openssl >/dev/null 2>&1; then
+    _eca_ok=1
+    for _eca_cn in A B; do
+        openssl req -x509 -newkey rsa:2048 -nodes -keyout "$WORK/eca-$_eca_cn.key" -out "$WORK/eca-$_eca_cn.pem" \
+            -days 2 -subj "/CN=bomlens test CA $_eca_cn" >/dev/null 2>&1 || _eca_ok=""
+    done
+fi
+if [ -n "${_eca_ok:-}" ]; then
+    cat "$WORK/eca-A.pem" "$WORK/eca-A.key" "$WORK/eca-B.pem" | sed 's/$/\r/' > "$WORK/eca-bundle.pem"
+    # A JDK when the host has one (macOS: java_home; elsewhere: JAVA_HOME or
+    # the java on PATH, which extra_ca_trust resolves itself).
+    _eca_jh="${JAVA_HOME:-}"
+    [ -n "$_eca_jh" ] || _eca_jh="$(/usr/libexec/java_home 2>/dev/null || true)"
+    _eca_out=$(env -u SSL_CERT_FILE -u NODE_EXTRA_CA_CERTS -u BOMLENS_EXTRA_CA_APPLIED \
+        JAVA_HOME="$_eca_jh" JAVA_TOOL_OPTIONS="-Dfile.encoding=UTF-8" BOMLENS_EXTRA_CA_CERTS="$WORK/eca-bundle.pem" \
+        sh -c 'set -e; . "$1"; extra_ca_trust; first="$SSL_CERT_FILE"; extra_ca_trust
+               printf "ssl=%s\nreq=%s\ncurl=%s\ncargo=%s\ngit=%s\npip=%s\nnode=%s\njto=%s\nfirst=%s\n" \
+                 "$SSL_CERT_FILE" "$REQUESTS_CA_BUNDLE" "$CURL_CA_BUNDLE" "$CARGO_HTTP_CAINFO" "$GIT_SSL_CAINFO" \
+                 "$PIP_CERT" "$NODE_EXTRA_CA_CERTS" "${JAVA_TOOL_OPTIONS:-}" "$first"' _ "$ECA" 2>&1)
+    _eca_get() { printf '%s\n' "$_eca_out" | sed -n "s/^$1=//p"; }
+    _eca_ssl="$(_eca_get ssl)"; _eca_node="$(_eca_get node)"
+    case "$_eca_ssl" in /tmp/bomlens-ca.*/bundle.pem) pass "the combined bundle is written under /tmp" ;; *) fail "SSL_CERT_FILE is not under /tmp" "$_eca_out" ;; esac
+    { [ "$(_eca_get req)" = "$_eca_ssl" ] && [ "$(_eca_get curl)" = "$_eca_ssl" ] && [ "$(_eca_get cargo)" = "$_eca_ssl" ] \
+      && [ "$(_eca_get git)" = "$_eca_ssl" ] && [ "$(_eca_get pip)" = "$_eca_ssl" ]; } \
+        && pass "REQUESTS_CA_BUNDLE, CURL_CA_BUNDLE, CARGO_HTTP_CAINFO, GIT_SSL_CAINFO and PIP_CERT name the combined bundle" \
+        || fail "a CA variable does not name the combined bundle" "$_eca_out"
+    [ "$(_eca_get first)" = "$_eca_ssl" ] && pass "a second call in the same environment changes nothing" \
+        || fail "extra_ca_trust ran twice" "$_eca_out"
+    if [ -f "$_eca_ssl" ] && [ -f "$_eca_node" ]; then
+        _eca_sys=0
+        for _f in /etc/ssl/certs/ca-certificates.crt /etc/pki/tls/certs/ca-bundle.crt /etc/ssl/ca-bundle.pem \
+                /etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem /etc/ssl/cert.pem; do
+            if [ -s "$_f" ]; then _eca_sys=$(grep -c 'BEGIN CERTIFICATE' "$_f"); break; fi
+        done
+        [ "$(grep -c 'BEGIN CERTIFICATE' "$_eca_ssl")" -eq $((_eca_sys + 2)) ] \
+            && pass "the combined bundle holds the system bundle and both extra certificates" \
+            || fail "the combined bundle holds $(grep -c 'BEGIN CERTIFICATE' "$_eca_ssl") certificates, expected $((_eca_sys + 2))"
+        { [ "$(grep -c 'BEGIN CERTIFICATE' "$_eca_node")" -eq 2 ] && ! grep -q 'PRIVATE KEY' "$_eca_node" "$_eca_ssl" \
+          && ! grep -q "$(printf '\r')" "$_eca_node"; } \
+            && pass "NODE_EXTRA_CA_CERTS holds the two certificates only (no key, no CR)" \
+            || fail "NODE_EXTRA_CA_CERTS content is wrong" "$(cat "$_eca_node")"
+        if openssl verify -CAfile "$_eca_ssl" "$WORK/eca-B.pem" >/dev/null 2>&1; then
+            pass "OpenSSL trusts a certificate from the bundle through SSL_CERT_FILE's file"
+        else
+            fail "openssl verify does not accept the extra CA from the combined bundle"
+        fi
+    else
+        fail "extra_ca_trust wrote no bundle" "$_eca_out"
+    fi
+    _eca_jto="$(_eca_get jto)"
+    if [ -n "$_eca_jh" ] && [ -x "$_eca_jh/bin/keytool" ]; then
+        _eca_ts="${_eca_jto#*-Djavax.net.ssl.trustStore=}"; _eca_ts="${_eca_ts%% *}"
+        case "$_eca_jto" in
+            "-Dfile.encoding=UTF-8 -Djavax.net.ssl.trustStore=/tmp/bomlens-ca."*"/cacerts -Djavax.net.ssl.trustStorePassword=changeit -Djavax.net.ssl.trustStoreType=JKS")
+                pass "JAVA_TOOL_OPTIONS keeps its value and adds the trust store (JKS)" ;;
+            *) fail "JAVA_TOOL_OPTIONS is wrong" "$_eca_jto" ;;
+        esac
+        _eca_list="$("$_eca_jh/bin/keytool" -J-Duser.language=en -list -keystore "$_eca_ts" -storetype JKS -storepass changeit 2>/dev/null)" || _eca_list=""
+        _eca_aliases="$(printf '%s\n' "$_eca_list" | grep -c '^bomlens-extra-ca-[12],')" || _eca_aliases=0
+        { [ "$_eca_aliases" = 2 ] && printf '%s\n' "$_eca_list" | grep -qi '^Keystore type: JKS' \
+          && [ "$(printf '%s\n' "$_eca_list" | grep -c 'trustedCertEntry')" -gt 2 ]; } \
+            && pass "the JKS copy of the JDK trust store holds the JDK's roots and both certificates" \
+            || fail "the Java trust store copy holds $_eca_aliases of the 2 certificates, or is not JKS with the JDK's roots"
+        # A trust store JAVA_TOOL_OPTIONS already names is extended, with its
+        # own password and type; the other options stay.
+        rm -f "$WORK/eca-own.jks"
+        "$_eca_jh/bin/keytool" -importcert -noprompt -alias own-ca -file "$WORK/eca-A.pem" -keystore "$WORK/eca-own.jks" \
+            -storetype PKCS12 -storepass s3cret-pw >/dev/null 2>&1
+        _eca_own=$(env -u SSL_CERT_FILE -u NODE_EXTRA_CA_CERTS -u BOMLENS_EXTRA_CA_APPLIED JAVA_HOME="$_eca_jh" \
+            JAVA_TOOL_OPTIONS="-Xmx1g -Djavax.net.ssl.trustStore=$WORK/eca-own.jks -Djavax.net.ssl.trustStorePassword=s3cret-pw -Djavax.net.ssl.trustStoreType=PKCS12" \
+            BOMLENS_EXTRA_CA_CERTS="$WORK/eca-B.pem" sh -c '. "$1"; extra_ca_trust 2>/dev/null; printf "%s" "$JAVA_TOOL_OPTIONS"' _ "$ECA")
+        _eca_own_ts="${_eca_own#*-Djavax.net.ssl.trustStore=}"; _eca_own_ts="${_eca_own_ts%% *}"
+        _eca_own_list="$("$_eca_jh/bin/keytool" -J-Duser.language=en -list -keystore "$_eca_own_ts" -storetype JKS -storepass changeit 2>/dev/null)" || _eca_own_list=""
+        { case "$_eca_own" in "-Xmx1g -Djavax.net.ssl.trustStore=/tmp/bomlens-ca."*"/cacerts -Djavax.net.ssl.trustStorePassword=changeit -Djavax.net.ssl.trustStoreType=JKS") true ;; *) false ;; esac \
+          && printf '%s\n' "$_eca_own_list" | grep -q '^own-ca,' && printf '%s\n' "$_eca_own_list" | grep -q '^bomlens-extra-ca-1,' \
+          && [ "$(printf '%s\n' "$_eca_own_list" | grep -c 'trustedCertEntry')" = 2 ]; } \
+            && pass "a trust store JAVA_TOOL_OPTIONS already names is extended (its password and type read), not replaced" \
+            || fail "the existing trust store was not extended" "$_eca_own / $_eca_own_list"
+        case "$_eca_own_ts" in /tmp/bomlens-ca.*/cacerts) rm -rf "${_eca_own_ts%/cacerts}" ;; esac
+    else
+        echo "  SKIP: no JDK with keytool here: the Java trust store is not checked"
+    fi
+    # A bundle the container already names (SSL_CERT_FILE) is extended, not
+    # replaced by the system one.
+    _eca_base=$(env -u NODE_EXTRA_CA_CERTS -u BOMLENS_EXTRA_CA_APPLIED -u JAVA_HOME SSL_CERT_FILE="$WORK/eca-A.pem" \
+        BOMLENS_EXTRA_CA_CERTS="$WORK/eca-B.pem" PATH="/usr/bin:/bin" sh -c '. "$1"; extra_ca_trust 2>/dev/null; printf "%s" "$SSL_CERT_FILE"' _ "$ECA")
+    { [ "$(grep -c 'BEGIN CERTIFICATE' "$_eca_base" 2>/dev/null)" = 2 ] \
+      && [ "$(sed -n '2p' "$_eca_base")" = "$(sed -n '2p' "$WORK/eca-A.pem")" ]; } \
+        && pass "an SSL_CERT_FILE already set is the start of the combined bundle" \
+        || fail "SSL_CERT_FILE was replaced instead of extended" "$_eca_base"
+    case "$_eca_base" in /tmp/bomlens-ca.*/bundle.pem) rm -rf "${_eca_base%/bundle.pem}" ;; esac
+    # A JDK trust store but no keytool: a warning, and nothing set for Java.
+    _eca_bin="$WORK/eca-bin"; _eca_fjh="$WORK/eca-fake-jdk"
+    mkdir -p "$_eca_bin" "$_eca_fjh/lib/security"; : > "$_eca_fjh/lib/security/cacerts"
+    for _t in sh mktemp awk tr grep cat cp chmod rm readlink dirname; do
+        _p="$(command -v "$_t" 2>/dev/null)" && ln -sf "$_p" "$_eca_bin/$_t"
+    done
+    _eca_nokt=$(env -u SSL_CERT_FILE -u NODE_EXTRA_CA_CERTS -u BOMLENS_EXTRA_CA_APPLIED -u JAVA_TOOL_OPTIONS PATH="$_eca_bin" \
+        JAVA_HOME="$_eca_fjh" BOMLENS_EXTRA_CA_CERTS="$WORK/eca-B.pem" "$_eca_bin/sh" -c '. "$1"; extra_ca_trust; echo "jto=${JAVA_TOOL_OPTIONS:-}"' _ "$ECA" 2>&1)
+    { printf '%s' "$_eca_nokt" | grep -q '^\[WARN\] there is a Java trust store .* but no keytool' && printf '%s' "$_eca_nokt" | grep -qx 'jto='; } \
+        && pass "a JDK trust store with no keytool is warned about" \
+        || fail "no warning for a trust store without keytool" "$_eca_nokt"
+else
+    echo "  SKIP: no openssl here: the extra CA bundle is not built"
+fi
+# The one-line hint for a TLS trust failure, once per run.
+printf 'Could not GET https://repo.maven.apache.org: PKIX path building failed: unable to find valid certification path\n' > "$WORK/eca-step.log"
+_eca_hint=$(env -u SBOM_EXTRA_CA_CERTS -u BOMLENS_EXTRA_CA_CERTS bash -c '. "$1"; tls_trust_hint cdxgen "$2"; tls_trust_hint cdxgen "$2"; tls_trust_hint grype - <<< "x509: certificate signed by unknown authority"' _ "$DETECT" "$WORK/eca-step.log" 2>&1)
+{ [ "$(printf '%s\n' "$_eca_hint" | grep -c .)" = 1 ] && printf '%s' "$_eca_hint" | grep -q '^\[WARN\] cdxgen: .*Set SBOM_EXTRA_CA_CERTS'; } \
+    && pass "a PKIX failure prints one [WARN] naming SBOM_EXTRA_CA_CERTS, once" \
+    || fail "TLS trust hint wrong" "$_eca_hint"
+_eca_hint=$(BOMLENS_EXTRA_CA_CERTS=/bomlens-ca/extra.pem bash -c '. "$1"; tls_trust_hint grype - <<< "CERTIFICATE_VERIFY_FAILED"' _ "$DETECT" 2>&1)
+printf '%s' "$_eca_hint" | grep -q 'even with the CA bundle in SBOM_EXTRA_CA_CERTS' \
+    && pass "with a bundle set, the hint says the bundle did not cover it" || fail "TLS trust hint with a bundle" "$_eca_hint"
+_eca_hint=$(bash -c '. "$1"; tls_trust_hint cdxgen - <<< "connection refused"' _ "$DETECT" 2>&1)
+[ -z "$_eca_hint" ] && pass "another failure prints no TLS hint" || fail "TLS hint printed for an unrelated failure" "$_eca_hint"
+# Stage 2 of a CLI run whose stage 1 already printed it stays quiet.
+_eca_hint=$(_BOMLENS_TLS_HINT_SHOWN=1 bash -c '. "$1"; tls_trust_hint grype - <<< "x509: certificate signed by unknown authority"' _ "$DETECT" 2>&1)
+[ -z "$_eca_hint" ] && pass "_BOMLENS_TLS_HINT_SHOWN=1 keeps the hint to one per run" || fail "the hint was repeated in stage 2" "$_eca_hint"
+for _d in /tmp/bomlens-ca.*; do
+    case "$_eca_tmp_before" in *" $_d "*) ;; *) [ -d "$_d" ] && rm -rf "$_d" ;; esac
+done
 
 echo "== non-shipped trees: test/example/benchmark manifests and workflows are left out and recorded =="
 PREP="$ROOT_DIR/docker/lib/build-prep.sh"
