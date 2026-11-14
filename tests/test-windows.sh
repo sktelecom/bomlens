@@ -142,8 +142,15 @@ case "${1:-}" in
     # `docker run | tee` pipeline's own status (that would be tee's).
     # DOCKER_STUB_RUN_RC models a container that ran and reported this rc
     # instead of 0; unset/empty means the ordinary successful-run case below.
+    # DOCKER_STUB_WAIT_RC_IF="<text> <rc>": that rc for a container whose run
+    # arguments contained the text.
+    if [ -n "${DOCKER_STUB_WAIT_RC_IF:-}" ] && grep -F -- "${2:-x} " "$log.names" 2>/dev/null | grep -qF -- "${DOCKER_STUB_WAIT_RC_IF% *}"; then
+      echo "${DOCKER_STUB_WAIT_RC_IF##* }"; exit 0
+    fi
     echo "${DOCKER_STUB_RUN_RC:-0}"; exit 0 ;;
   run)
+    # Each named container's arguments, for `docker wait` above.
+    _prev=""; for a in "$@"; do [ "$_prev" != "--name" ] || echo "$a $*" >> "$log.names"; _prev="$a"; done
     # DOCKER_STUB_HANG: a run whose arguments contain this text keeps running
     # (up to 20s) until a `docker stop` or a signal ends it, as a long scan.
     if [ -n "${DOCKER_STUB_HANG:-}" ]; then
@@ -152,6 +159,15 @@ case "${1:-}" in
           : > "$log.running"
           for _i in $(seq 1 100); do [ -f "$log.stopped" ] && exit 143; sleep 0.2; done
           exit 0 ;;
+      esac
+    fi
+    # DOCKER_STUB_TOOLCHAIN_MISSING="<image text> <N>": a stage 1 run in an
+    # image whose name contains that text prints build-prep.sh's marker for a
+    # Gradle toolchain (Java N) the image lacks.
+    if [ -n "${DOCKER_STUB_TOOLCHAIN_MISSING:-}" ]; then
+      case "$*" in
+        *"${DOCKER_STUB_TOOLCHAIN_MISSING% *}"*build-prep*)
+          echo "[build-prep] gradle-dependencies: Gradle asked for a Java ${DOCKER_STUB_TOOLCHAIN_MISSING##* } toolchain, which this image does not have (java-toolchain-missing=${DOCKER_STUB_TOOLCHAIN_MISSING##* })" ;;
       esac
     fi
     # `docker run --rm --entrypoint sh <image> -c 'command -v grype'`: grype
@@ -189,14 +205,22 @@ case "${1:-}" in
     # DOCKER_STUB_NOWRITE=1 models a container that ran and reported success but
     # whose /host-output mount never reached the host (folder outside Docker
     # Desktop file sharing / Colima's home-only mount) — nothing lands on disk.
+    # DOCKER_STUB_NOWRITE_IF: the same, for a run whose arguments contain this text.
+    if [ -n "${DOCKER_STUB_NOWRITE_IF:-}" ]; then
+      case "$*" in *"$DOCKER_STUB_NOWRITE_IF"*) pn="" ;; esac
+    fi
     if [ -n "$pn" ] && [ -n "$pv" ] && [ "${DOCKER_STUB_NOWRITE:-0}" != "1" ]; then
       dest="${hostout:-.}"; mkdir -p "$dest" 2>/dev/null
       # The container names every output with entrypoint.sh's cleaning rule (only
       # [A-Za-z0-9.-], runs of _ folded, edges trimmed); do the same here.
       spn="$(printf '%s' "$pn" | sed 's/[^a-zA-Z0-9.-]/_/g' | sed 's/__*/_/g' | sed 's/^_//; s/_$//')"
       spv="$(printf '%s' "$pv" | sed 's/[^a-zA-Z0-9.-]/_/g' | sed 's/__*/_/g' | sed 's/^_//; s/_$//')"
-      printf '{"bomFormat":"CycloneDX","specVersion":"1.6","version":1,"metadata":{"component":{"type":"application","name":"%s","version":"%s"}},"components":[]}\n' \
-        "$pn" "$pv" > "$dest/${spn}_${spv}_bom.json"
+      from=""; keep=""
+      case "$*" in *cdxgen-temurin-java21*build-prep*) from=java21 ;; *cdxgen-temurin-java25*build-prep*) from=java25 ;; esac
+      # A stage 1 SBOM a test marked stays for post-processing to read.
+      [ -n "$from" ] || ! grep -q 'stage1-from=java' "$dest/${spn}_${spv}_bom.json" 2>/dev/null || keep=1
+      [ -n "$keep" ] || printf '{"bomFormat":"CycloneDX","specVersion":"1.6","version":1,"metadata":{"component":{"type":"application","name":"%s","version":"%s"},"properties":[{"name":"stub","value":"stage1-from=%s"}]},"components":[]}\n' \
+        "$pn" "$pv" "$from" > "$dest/${spn}_${spv}_bom.json"
       # DOCKER_STUB_CONFORMANCE_RESULT models validate-sbom.sh's bare pass/fail
       # sidecar (--fail-on-conformance reads it). Unset means this run produced
       # no conformance report, same as a mode/step that never generates one.
@@ -317,6 +341,58 @@ detect_case rust   Cargo.toml       '[package]\nname="x"\nversion="0.1.0"'      
 detect_case ruby   Gemfile          "source 'https://rubygems.org'\ngem 'rack'"     ruby   cdxgen-debian-ruby34
 detect_case php    composer.json    '{"require":{"monolog/monolog":"^3"}}'          php    cdxgen-debian-php84
 
+# Gradle asked for a toolchain JDK the first image lacks: stage 1 runs once
+# more in the image with that JDK, unless CDXGEN_JAVA_IMAGE chose the image or
+# that image is not here under SBOM_PULL=never.
+stage1_runs() { grep 'docker run .*build-prep' "$LOG" | grep -vc RESTORE_ONLY; }
+J25_IMG="cdxgen-temurin-java25:$(sed -n 's/^CDXGEN_TAG="${CDXGEN_TAG:-\([^}]*\)}".*/\1/p' "$REPO/docker/lib/source-detect.sh")"
+d="$(new_proj gradle-retry)"
+printf 'rootProject.name = "r"\n' > "$d/settings.gradle"
+printf "plugins { id 'java' }\njava { toolchain { languageVersion = JavaLanguageVersion.of(providers.gradleProperty('jdk').get().toInteger()) } }\n" > "$d/build.gradle"
+DOCKER_STUB_TOOLCHAIN_MISSING="cdxgen-temurin-java21 25" scan_in "$d" --project Pretry --version 1.0.0 --generate-only
+{ [ "$RC" -eq 0 ] && in_out "[INFO] Gradle asked for Java 25; rerunning in ghcr.io/cdxgen/$J25_IMG" \
+    && [ "$(grep 'docker run .*build-prep' "$LOG" | grep -vc RESTORE_ONLY)" -eq 2 ] && grep 'docker run .*build-prep' "$LOG" | grep -v RESTORE_ONLY | tail -1 | grep -qF "$J25_IMG"; } \
+  && pass "a Gradle toolchain the Java 21 image lacks reruns stage 1 in the Java 25 image" \
+  || { fail "no rerun in the Java 25 image" "rc=$RC"; show; }
+DOCKER_STUB_TOOLCHAIN_MISSING="cdxgen-temurin-java21 25" CDXGEN_JAVA_IMAGE="ghcr.io/cdxgen/cdxgen-temurin-java21:x" \
+  scan_in "$d" --project Pretry --version 1.0.0 --generate-only
+{ [ "$RC" -eq 0 ] && ! in_out "rerunning in" && [ "$(grep 'docker run .*build-prep' "$LOG" | grep -vc RESTORE_ONLY)" -eq 1 ]; } \
+  && pass "CDXGEN_JAVA_IMAGE: no rerun" || { fail "a rerun despite CDXGEN_JAVA_IMAGE" "rc=$RC"; show; }
+DOCKER_STUB_TOOLCHAIN_MISSING="cdxgen-temurin-java21 25" SBOM_PULL=never DOCKER_STUB_ABSENT_IMAGE="ghcr.io/cdxgen/$J25_IMG" \
+  scan_in "$d" --project Pretry --version 1.0.0 --generate-only
+{ [ "$RC" -eq 0 ] && in_out "[WARN] ghcr.io/cdxgen/$J25_IMG is not here (SBOM_PULL=never); keeping the result from" \
+    && [ "$(stage1_runs)" -eq 1 ] && ! in_log "docker pull ghcr.io/cdxgen/$J25_IMG"; } \
+  && pass "SBOM_PULL=never with the Java 25 image absent: no pull, no rerun" || { fail "SBOM_PULL=never still reruns or pulls" "rc=$RC"; show; }
+DOCKER_STUB_TOOLCHAIN_MISSING="cdxgen-temurin-java21 25" DOCKER_STUB_ABSENT_IMAGE="ghcr.io/cdxgen/$J25_IMG" \
+  scan_in "$d" --project Pretry --version 1.0.0 --generate-only
+{ [ "$RC" -eq 0 ] && in_log "docker pull ghcr.io/cdxgen/$J25_IMG" && [ "$(stage1_runs)" -eq 2 ] \
+    && [ "$(grep -n 'rerunning in' "$OUT" | cut -d: -f1)" -lt "$(grep -n "Pulling ghcr.io/cdxgen/$J25_IMG" "$OUT" | cut -d: -f1)" ]; } \
+  && pass "an absent Java 25 image is pulled with progress, after the INFO line, then the rerun" || { fail "the rerun image is not pulled as expected" "rc=$RC"; show; }
+SBOM_PULL=always DOCKER_STUB_TOOLCHAIN_MISSING="cdxgen-temurin-java21 25" scan_in "$d" --project Pretry --version 1.0.0 --generate-only
+{ [ "$RC" -eq 0 ] && in_log "docker pull ghcr.io/cdxgen/$J25_IMG" && [ "$(stage1_runs)" -eq 2 ]; } \
+  && pass "SBOM_PULL=always pulls the present Java 25 image before the rerun" || { fail "SBOM_PULL=always does not pull the rerun image" "rc=$RC"; show; }
+DOCKER_STUB_TOOLCHAIN_MISSING="cdxgen-temurin-java21 25" DOCKER_STUB_NOWRITE_IF="$J25_IMG" \
+  scan_in "$d" --project Pretry --version 1.0.0 --generate-only
+{ [ "$RC" -eq 0 ] && in_out "[WARN] The rerun in ghcr.io/cdxgen/$J25_IMG left no SBOM" && in_out "keeping the result from ghcr.io/cdxgen/cdxgen-temurin-java21" \
+    && ! in_out "Falling back to a manifest-only scan" && grep -q 'stage1-from=java21' "$d/Pretry_1.0.0/Pretry_1.0.0_bom.json"; } \
+  && pass "a rerun that leaves no SBOM keeps the first result" || { fail "the first result is not kept when the rerun leaves none" "rc=$RC"; show; }
+DOCKER_STUB_TOOLCHAIN_MISSING="cdxgen-temurin-java21 25" scan_in "$d" --project Pretry --version 1.0.0 --generate-only
+{ [ "$RC" -eq 0 ] && grep -q 'stage1-from=java25' "$d/Pretry_1.0.0/Pretry_1.0.0_bom.json"; } \
+  && pass "a successful rerun replaces the first SBOM" || { fail "the rerun's SBOM is not the one kept" "rc=$RC"; show; }
+# The first pass exits 3 but writes an SBOM; the rerun leaves none: its exit
+# code and log are the ones stage 1 reports, and the first SBOM is not used.
+DOCKER_STUB_TOOLCHAIN_MISSING="cdxgen-temurin-java21 25" DOCKER_STUB_NOWRITE_IF="$J25_IMG" DOCKER_STUB_WAIT_RC_IF="cdxgen-temurin-java21 3" \
+  scan_in "$d" --project Pretry --version 1.0.0 --generate-only
+_first_log="$(grep -o '(log: [^)]*)' "$OUT" | head -1 | sed 's/^(log: //; s/)$//')"
+{ in_out "keeping the result from ghcr.io/cdxgen/cdxgen-temurin-java21" && in_out "(rc=3)" && in_out "see $_first_log"; } \
+  && pass "a kept first result brings back its exit code and log" || { fail "the first pass's exit code or log is not restored" "rc=$RC"; show; }
+# The first pass leaves no SBOM at all: the rerun's result is used, and there
+# is nothing to keep when it leaves none either.
+DOCKER_STUB_TOOLCHAIN_MISSING="cdxgen-temurin-java21 25" DOCKER_STUB_NOWRITE_IF="cdxgen-temurin-java" \
+  scan_in "$d" --project Pretry --version 1.0.0 --generate-only
+{ [ "$(stage1_runs)" -eq 2 ] && ! in_out "keeping the result from" && in_out "Falling back to a manifest-only scan"; } \
+  && pass "a first pass with no SBOM: the rerun runs and nothing is kept" || { fail "a first pass with no SBOM is handled wrongly" "rc=$RC"; show; }
+
 # A Java build in an engine with too little memory is announced before it starts;
 # a roomy engine, an unreadable value and other languages print nothing.
 for mem_case in "2000000000:low" "6198534144:roomy" "3900000000:roomy" "bogus:unreadable"; do
@@ -380,10 +456,10 @@ GOTOOLCHAIN='go1.26.0;touch x' scan_in "$d" --project Pgotcbad --version 1.0.0 -
 
 # Source-scan options for build-prep.sh reach the cdxgen container by name only.
 d="$(new_proj prepenv)"; printf '{"name":"a"}' > "$d/package.json"
-BOMLENS_KEEP_BUILD_OUTPUT=1 BOMLENS_MAVEN_FULL_GRAPH=1 BOMLENS_ANDROID_FULL_GRAPH=1 BOMLENS_NODE_FULL_GRAPH=1 BOMLENS_PHP_FULL_GRAPH=1 \
+BOMLENS_KEEP_BUILD_OUTPUT=1 BOMLENS_MAVEN_FULL_GRAPH=1 BOMLENS_ANDROID_FULL_GRAPH=1 BOMLENS_GRADLE_FULL_GRAPH=1 BOMLENS_NODE_FULL_GRAPH=1 BOMLENS_PHP_FULL_GRAPH=1 \
   scan_in "$d" --project Pprepenv --version 1.0.0 --generate-only
 ok=1
-for n in BOMLENS_KEEP_BUILD_OUTPUT BOMLENS_MAVEN_FULL_GRAPH BOMLENS_ANDROID_FULL_GRAPH BOMLENS_NODE_FULL_GRAPH BOMLENS_PHP_FULL_GRAPH; do
+for n in BOMLENS_KEEP_BUILD_OUTPUT BOMLENS_MAVEN_FULL_GRAPH BOMLENS_ANDROID_FULL_GRAPH BOMLENS_GRADLE_FULL_GRAPH BOMLENS_NODE_FULL_GRAPH BOMLENS_PHP_FULL_GRAPH; do
   in_log "-e $n" || ok=0
   in_log "$n=" && ok=0
 done
@@ -411,8 +487,8 @@ scan_in "$d" --ui --reachability --output-dir "$d"
 
 d="$(new_proj ui_mirror)"
 CDXGEN_IMAGE_PREFIX=registry.example/mirror/cdxgen/ CDXGEN_JAVA_IMAGE=registry.example/java25:1 scan_in "$d" --ui --output-dir "$d"
-in_log "-e CDXGEN_IMAGE_PREFIX" && in_log "-e CDXGEN_JAVA_IMAGE" && in_log "-e BOMLENS_OS_LICENSES" \
-  && pass "CDXGEN_IMAGE_PREFIX, CDXGEN_JAVA_IMAGE and BOMLENS_OS_LICENSES passed to the web UI container" \
+in_log "-e CDXGEN_IMAGE_PREFIX" && in_log "-e CDXGEN_JAVA_IMAGE" && in_log "-e SBOM_PULL" && in_log "-e BOMLENS_OS_LICENSES" \
+  && pass "CDXGEN_IMAGE_PREFIX, CDXGEN_JAVA_IMAGE, SBOM_PULL and BOMLENS_OS_LICENSES passed to the web UI container" \
   || { fail "CDXGEN_IMAGE_PREFIX passed to the web UI container" "rc=$RC"; show; }
 
 # The UI's security scans keep Trivy's database in SBOM_TRIVY_CACHE too, and a
@@ -2069,6 +2145,9 @@ if [ -f "$UI_BAT" ]; then
   { [ -n "$_ui_en" ] && [ "$_ui_en" = "$_ui_ko" ] && printf '%s\n' "$_ui_en" | grep -q M_ERR_CA_NOT_PEM; } \
     && pass "sbom-ui.bat has the same message keys in English and Korean (CA errors included)" \
     || fail "sbom-ui.bat message keys differ between English and Korean"
+  for n in CDXGEN_IMAGE_PREFIX CDXGEN_JAVA_IMAGE SBOM_PULL; do
+    grep -q -- "-e $n ^" "$UI_BAT" && pass "sbom-ui.bat passes $n to the UI container by name" || fail "sbom-ui.bat does not pass $n"
+  done
 fi
 if [ -f "$SCAN_BAT" ]; then
   grep -q "scan-sbom.sh" "$SCAN_BAT"     && pass "scan-sbom.bat delegates to scan-sbom.sh" || fail "scan-sbom.bat delegates to scan-sbom.sh"

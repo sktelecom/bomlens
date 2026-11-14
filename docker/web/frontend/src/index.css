@@ -186,29 +186,31 @@
     --role-neutral-border: 191 191 195;
 
     /* Category palette for classifications that are not severities (the licence
-     * tiers). Six tiers, six hues spread around the wheel and kept muted:
-     *   permissive teal 175, weak-copyleft indigo 230, strong-copyleft violet
-     *   280, network-copyleft magenta 328, review-needed brown 28, and the
-     *   neutral grey of role-neutral for uncategorized.
+     * tiers), kept muted:
+     *   weak-copyleft olive 65, strong-copyleft violet 280, network-copyleft
+     *   magenta 328, review-needed brown 28; permissive and uncategorized take
+     *   the neutral grey of role-neutral, as a tier that needs no attention
+     *   draws none, and permissive's fill is the quieter grey so the two stay
+     *   apart in a bar (which also leaves a gap between segments). Weak copyleft moved off indigo, which read as the navy
+     *   accent (--brand).
      * The three copyleft tiers used to sit 25 to 30 degrees apart (265, 290,
      * 320) and read as one purple; they are now 48 to 50 degrees apart. They
      * stay off the alarm hues (red, orange, yellow) and the info blue, so a
      * licence row never reads as a finding, and the tier is also carried by a
      * marker shape and its name, so colour is never the only signal. Same four
      * shades and the same contrast rules as the roles. Ratios (WCAG relative
-     * luminance): the four recoloured tiers have fg at least 8.4:1 on their
-     * muted surface, 10.4:1 on the card and 9.9:1 on the page in both themes;
-     * teal (unchanged) is 6.0, 7.0 and 6.7 light, all above the 4.5:1 floor.
-     * Emphasis fills are at least 4.4:1 on the card in light and 5.4:1 in dark. */
-    --cat-permissive-fg: 12 100 91; /* 6.0:1 on muted, 7.0:1 on card, 6.7:1 on page */
-    --cat-permissive-muted: 227 240 239; /* emphasis at 12% over the card */
-    --cat-permissive-emphasis: 24 134 123; /* 4.4:1 on card (fills, bars) */
-    --cat-permissive-border: 151 201 196;
+     * luminance): every fg is at least 4.5:1 and every emphasis fill at least
+     * 3:1 on the card, the page and the muted surface in both themes, as
+     * npm run token:contrast checks. */
+    --cat-permissive-fg: 63 63 70; /* the role-neutral shades, a lighter fill */
+    --cat-permissive-muted: 238 238 239;
+    --cat-permissive-emphasis: 136 136 144; /* lighter than uncategorized (role-neutral) */
+    --cat-permissive-border: 191 191 195;
 
-    --cat-weak-fg: 31 45 111; /* 10.6:1 on muted, 12.6:1 on card, 12.1:1 on page */
-    --cat-weak-muted: 232 235 247; /* emphasis at 12% over the card */
-    --cat-weak-emphasis: 66 87 189; /* 6.3:1 on card (fills, bars) */
-    --cat-weak-border: 170 179 225;
+    --cat-weak-fg: 74 80 20; /* olive */
+    --cat-weak-muted: 240 242 226; /* emphasis at 12% over the card */
+    --cat-weak-emphasis: 112 121 28; /* fills, bars */
+    --cat-weak-border: 196 202 146;
 
     --cat-strong-fg: 82 40 103; /* 9.6:1 on muted, 11.3:1 on card, 10.8:1 on page */
     --cat-strong-muted: 241 234 244; /* emphasis at 12% over the card */
@@ -344,15 +346,15 @@
     --role-neutral-emphasis: 161 161 170; /* 6.9:1 on card */
     --role-neutral-border: 86 86 91;
 
-    --cat-permissive-fg: 134 234 224; /* 9.6:1 on muted, 12.5:1 on card, 14.0:1 on page */
-    --cat-permissive-muted: 27 50 51; /* emphasis at 16% over the card */
-    --cat-permissive-emphasis: 40 189 174; /* 7.6:1 on card */
-    --cat-permissive-border: 31 98 93;
+    --cat-permissive-fg: 212 212 216; /* the role-neutral shades, a quieter fill */
+    --cat-permissive-muted: 46 46 50;
+    --cat-permissive-emphasis: 118 118 126; /* quieter than uncategorized (role-neutral) */
+    --cat-permissive-border: 86 86 91;
 
-    --cat-weak-fg: 194 201 240; /* 8.4:1 on muted, 10.6:1 on card, 11.9:1 on page */
-    --cat-weak-muted: 43 45 59; /* emphasis at 16% over the card */
-    --cat-weak-emphasis: 124 139 218; /* 5.4:1 on card */
-    --cat-weak-border: 71 77 114;
+    --cat-weak-fg: 208 214 140; /* olive */
+    --cat-weak-muted: 47 49 33; /* emphasis at 16% over the card */
+    --cat-weak-emphasis: 168 178 72;
+    --cat-weak-border: 92 97 50;
 
     --cat-strong-fg: 223 198 235; /* 8.6:1 on muted, 11.0:1 on card, 12.3:1 on page */
     --cat-strong-muted: 52 44 58; /* emphasis at 16% over the card */

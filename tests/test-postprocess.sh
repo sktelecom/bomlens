@@ -1402,7 +1402,7 @@ if [ -f "$FMD" ] && grep -q '^### Firmware analysis scope$' "$FMD" \
 else
     fail "firmware scope section missing from the md report" "$(grep -n -i 'scope' "$FMD" 2>/dev/null)"
 fi
-grep -q '25% of the image (250000 bytes) was not recognized' "$FHTML" 2>/dev/null \
+grep -q '25% of the image (250,000 bytes) was not recognized' "$FHTML" 2>/dev/null \
     && pass "html report carries the firmware scope note" || fail "html report lacks the firmware scope note"
 ( cd "$WORK/riskfw" && REPORT_LANG=ko bash "$LIB/generate-risk-report.sh" proj_1.0 proj FIRMWARE >/dev/null 2>&1 )
 grep -q '^### 펌웨어 분석 범위$' "$FMD" && grep -q '이미지의 25%(250000바이트)를' "$FMD" \
@@ -1435,7 +1435,7 @@ jq '.metadata.component.properties = [
     "$WORK/lc.json" > "$WORK/riskfw3/proj_1.0_bom.json"
 printf 'License: MIT\n' > "$WORK/riskfw3/proj_1.0_NOTICE.txt"
 ( cd "$WORK/riskfw3" && bash "$LIB/generate-risk-report.sh" proj_1.0 proj FIRMWARE >/dev/null 2>&1 )
-grep -q 'display:none' "$WORK/riskfw3/proj_1.0_risk-report.html" \
+grep -qF '.table-wrap{display:none}' "$WORK/riskfw3/proj_1.0_risk-report.html" \
     && fail "markup in a firmware property reached the HTML report" \
     || pass "markup in a firmware property is stripped before it reaches the report"
 # A number that is not plainly a number is dropped, not repaired into a plausible
@@ -3850,12 +3850,12 @@ jq -e '.suggestions | (map(select(.name=="openssl")) | .[0].candidates == ["pkg:
        and (map(select(.name=="lib-x")) | .[0].candidates == [])' "$WORK/sgn_conformance.json" >/dev/null \
     && pass "a missing namespace is suggested from the distro qualifier or the group field, and left empty when neither is there" \
     || fail "purl-namespace suggestions are wrong" "$(jq -c .suggestions "$WORK/sgn_conformance.json")"
-grep -q "^## Suggested fixes" "$WORK/ses_conformance.md" && grep -q "<h2>Suggested fixes</h2>" "$WORK/ses_conformance.html" \
+grep -q "^## Suggested fixes" "$WORK/ses_conformance.md" && grep -qE "<h2 id=\"box-[0-9]+\">Suggested fixes</h2>" "$WORK/ses_conformance.html" \
     && grep -q "was not changed" "$WORK/ses_conformance.md" \
     && pass "the Markdown and HTML reports have a Suggested fixes section that says the file was not changed" \
     || fail "the Suggested fixes section is missing"
 REPORT_LANG=ko CONFORMANCE_PROFILE=skt-submission bash "$LIB/validate-sbom.sh" "$WORK/semantic-cdx.json" "$WORK/sek" "supplier" >/dev/null 2>&1
-grep -q "^## 수정 제안" "$WORK/sek_conformance.md" && grep -q "<h2>수정 제안</h2>" "$WORK/sek_conformance.html" \
+grep -q "^## 수정 제안" "$WORK/sek_conformance.md" && grep -qE "<h2 id=\"box-[0-9]+\">수정 제안</h2>" "$WORK/sek_conformance.html" \
     && pass "the Korean reports title the section 수정 제안" || fail "the Korean Suggested fixes section is missing"
 sem_sum_after=$(shasum "$WORK/semantic-cdx.json" | cut -d' ' -f1)
 [ "$sem_sum_before" = "$sem_sum_after" ] && pass "the submitted SBOM is byte-identical after the check" \
@@ -7050,6 +7050,311 @@ else
     echo "  SKIP: node unavailable"
 fi
 
+echo "== gradle-runtime-scope: a java-gradle SBOM keeps the runtime classpath =="
+# Guards docker/lib/build-prep.sh: cdxgen keeps every Gradle configuration's
+# components, so one only on a compile classpath (j2objc-annotations, which
+# guava 33.0.0's Gradle module metadata gives to compile only) or only on a test
+# classpath was listed as shipped. build-prep reads every project's runtime
+# classpath and filters to it. The real Gradle block (Android branch
+# included) is extracted and run under sh with a stand-in gradlew that writes
+# the per-project files in tests/fixtures/gradle-runtime the init script
+# would write (the init script itself runs under a real Gradle in
+# tests/test-gradle-runtime.sh); then the real filter runs in its gradle mode.
+if command -v node >/dev/null 2>&1; then
+    PREP="$ROOT_DIR/docker/lib/build-prep.sh"
+    GRFIX="$FIX/gradle-runtime"
+    _grs_block=$(sed -n '/^# Gradle (java-gradle \/ Android)/,/^# A root Gradle build that did not reach/p' "$PREP" | sed '$d')
+    _grs_fns=$(sed -n '/^mark_prep_failed() {/,/^}/p; /^unmark_prep_failed() {/,/^}/p; /^prep_step() {/,/^}/p' "$PREP")
+    _grs_js="$WORK/gradle-filter.js"
+    sed -n "/<<'FILTER_JS'/,/^FILTER_JS\$/p" "$PREP" | sed '1d;$d' > "$_grs_js"
+    if [ -n "$_grs_block" ] && [ -n "$_grs_fns" ] && [ -s "$_grs_js" ]; then
+        _grs_bin="$WORK/grs-bin"; mkdir -p "$_grs_bin" "$WORK/grs-home"
+        printf '#!/bin/sh\nexit 0\n' > "$_grs_bin/gradle"
+        cat > "$WORK/grs-gradlew" <<'STUB'
+#!/bin/sh
+case " $* " in *" --version "*) exit 0 ;; esac
+echo "$*" >> "$GRS_CALLS"
+for a in "$@"; do
+    case "$a" in
+        --no-configuration-cache) [ -z "${GRS_OLD:-}" ] || exit 1 ;;
+        -Dbomlens.gradle.out=*) out="${a#-Dbomlens.gradle.out=}" ;;
+        bomlensRuntime)
+            [ -z "${GRS_TOOLCHAIN:-}" ] || { echo "bomlens: could not resolve runtimeClasspath of project :: No matching toolchains found for requested specification: {languageVersion=13, vendor=any, implementation=vendor-specific} for LINUX on aarch64." >&2; exit 1; }
+            [ "${GRS_RC:-0}" = 0 ] || exit "$GRS_RC"; cp "$GRS_REPORT"/* "$out"/; exit 0 ;;
+        projects) [ -z "${GRS_PROJ_RC:-}" ] || exit "$GRS_PROJ_RC"; cat "$GRS_FIX/${GRS_PROJECTS:-android-projects.txt}"; exit 0 ;;
+        *:dependencies)
+            f="$GRS_FIX/${GRS_ANDROID:-android}$(printf '%s' "$a" | tr ':' '-').txt"
+            [ ! -f "$f" ] || cat "$f"; exit 0 ;;
+        dependencies) exit "${GRS_WARM_RC:-0}" ;;
+    esac
+done
+exit 1
+STUB
+        chmod +x "$_grs_bin/gradle" "$WORK/grs-gradlew"
+        _grs_prelude='log() { echo "[build-prep] $*"; }
+opted_out() { case "$1" in 1|true) return 0 ;; esac; return 1; }
+gradle_settings_copy() { :; }
+run_supervised_timeout() { shift; "$@"; }
+PREP_FAILED=""; PREP_APPLIED=""; PREP_TIMEOUT_GRADLE=5'
+        _grs_report='set_of() { [ -n "$1" ] && [ -f "$1" ] && tr "\n" " " < "$1"; }
+echo "SET:$(set_of "$GRADLE_RUNTIME_SET")"
+echo "ASET:$(set_of "$ANDROID_RELEASE_SET")"
+echo "FAILED:$PREP_FAILED"
+echo "APPLIED:$PREP_APPLIED"'
+        _grs_run() {  # env NAME=value ... for the stand-in and the block
+            local p="$WORK/grs-proj"
+            rm -rf "$p"; mkdir -p "$p"; : > "$p/build.gradle"; cp "$WORK/grs-gradlew" "$p/gradlew"
+            [ -z "${GRS_NOEXEC:-}" ] || chmod -x "$p/gradlew"
+            : > "$WORK/grs-calls"
+            ( cd "$p" && env -u GRADLE_USER_HOME -u ANDROID_HOME -u GRADLE_INCLUDED_BUILDS -u BOMLENS_GRADLE_FULL_GRAPH \
+                PATH="$_grs_bin:$PATH" HOME="$WORK/grs-home" GRS_FIX="$GRFIX" GRS_CALLS="$WORK/grs-calls" \
+                GRS_REPORT="$GRFIX/single" "$@" \
+                sh -c "$_grs_prelude
+$_grs_fns
+$_grs_block
+$_grs_report" ) 2>&1
+        }
+        _grs_line() { printf '%s\n' "$1" | sed -n "s/^$2://p"; }
+        _grs_expect() {  # <label> <output> <SET|ASET|FAILED> <expected>
+            local got; got=$(_grs_line "$2" "$3")
+            if [ "$got" = "$4" ]; then pass "$1"; else fail "$1" "$3 got [$got], expected [$4]; $(printf '%s\n' "$2" | grep '^\[build-prep\]' | head -3)"; fi
+        }
+        _grs_single="com.fasterxml.jackson.core:jackson-core:2.16.1 com.google.guava:failureaccess:1.0.2 com.google.guava:guava:33.0.0-jre org.slf4j:jcl-over-slf4j:2.0.9 org.slf4j:slf4j-api:2.0.9 "
+
+        _o=$(_grs_run)
+        _grs_expect "one project, runtimeClasspath at the root: substituted module, rich and conflict-resolved versions read; compile-only, test, (c), (n) left out" \
+            "$_o" SET "$_grs_single"
+        _grs_expect "one Gradle run, recorded as gradle-dependencies and not failed" "$_o" APPLIED "gradle-dependencies"
+        if [ "$(wc -l < "$WORK/grs-calls" | tr -d ' ')" = 1 ] && grep -q -- '--no-configuration-cache --init-script .* bomlensRuntime' "$WORK/grs-calls"; then
+            pass "a single Gradle invocation reads every project, with the configuration cache off"
+        else
+            fail "Gradle invoked other than once with the init script" "$(cat "$WORK/grs-calls")"
+        fi
+
+        _o=$(GRS_NOEXEC=1 _grs_run)
+        _grs_expect "a gradlew without the execute bit is still the wrapper that runs" "$_o" SET "$_grs_single"
+
+        _o=$(_grs_run GRS_REPORT="$GRFIX/multi")
+        _grs_expect "several projects merged; project :core dependency not a component; a root with only jacoco and a Kotlin Multiplatform project (no runtimeClasspath) handled per project; a path with a space read" \
+            "$_o" SET "com.fasterxml.jackson.core:jackson-core:2.16.0 com.fasterxml.jackson.core:jackson-databind:2.16.0 com.google.guava:guava:33.0.0-jre com.squareup.okio:okio-jvm:3.6.0 org.apache.commons:commons-lang3:3.14.0 "
+
+        rm -rf "$WORK/grs-included"; cp -R "$GRFIX/multi" "$WORK/grs-included"
+        printf 'I\tlibbuild\nZ\t5\n' > "$WORK/grs-included/_meta.txt"
+        _o=$(_grs_run GRS_REPORT="$WORK/grs-included")
+        _grs_expect "an included build (includeBuild): no set, full graph" "$_o" SET ""
+        if printf '%s\n' "$_o" | grep -q 'the build includes the build libbuild; using full graph'; then
+            pass "the included build is named in the log"
+        else
+            fail "included build not logged" "$_o"
+        fi
+        _o=$(_grs_run GRADLE_INCLUDED_BUILDS=libbuild)
+        _grs_expect "GRADLE_INCLUDED_BUILDS set: no set, full graph" "$_o" SET ""
+
+        rm -rf "$WORK/grs-missing"; cp -R "$GRFIX/single" "$WORK/grs-missing"
+        printf 'Z\t2\n' > "$WORK/grs-missing/_meta.txt"
+        _o=$(_grs_run GRS_REPORT="$WORK/grs-missing")
+        _grs_expect "a project without its file (the count in the files is short): no set, full graph" "$_o" SET ""
+        rm -rf "$WORK/grs-nometa"; cp -R "$GRFIX/single" "$WORK/grs-nometa"; rm "$WORK/grs-nometa/_meta.txt"
+        _o=$(_grs_run GRS_REPORT="$WORK/grs-nometa")
+        _grs_expect "no end marker (the run stopped early): no set, full graph" "$_o" SET ""
+        rm -rf "$WORK/grs-twice"; cp -R "$GRFIX/single" "$WORK/grs-twice"
+        cp "$GRFIX/single/_meta.txt" "$WORK/grs-twice/_meta.txt"
+        printf 'P\t:\nR\t:\tzzz:zzz:1\n' > "$WORK/grs-twice/%3Adup.txt"
+        _o=$(_grs_run GRS_REPORT="$WORK/grs-twice")
+        _grs_expect "a project listed in two files (a count that does not match): no set, full graph" "$_o" SET ""
+        rm -rf "$WORK/grs-bad"; cp -R "$GRFIX/multi" "$WORK/grs-bad"
+        printf 'P\t:kmp\nX\t:kmp\tjvmRuntimeClasspath\n' > "$WORK/grs-bad/%3Akmp.txt"
+        _o=$(_grs_run GRS_REPORT="$WORK/grs-bad")
+        _grs_expect "a configuration that could not be resolved: no set, full graph" "$_o" SET ""
+        _o=$(_grs_run GRS_OLD=1)
+        _grs_expect "a Gradle without --no-configuration-cache: no set" "$_o" SET ""
+        if grep -qx -- '--no-daemon dependencies' "$WORK/grs-calls"; then
+            pass "a Gradle without --no-configuration-cache: the root warm-up runs instead"
+        else
+            fail "no warm-up after a Gradle that refuses --no-configuration-cache" "$(cat "$WORK/grs-calls")"
+        fi
+
+        _o=$(_grs_run GRS_RC=1)
+        _grs_expect "the run fails: no set" "$_o" SET ""
+        _grs_expect "the run fails: the root warm-up runs instead and the step is not left failed" "$_o" FAILED ""
+        if grep -qx -- '--no-daemon dependencies' "$WORK/grs-calls"; then
+            pass "the run fails: the plain root dependencies warm-up runs"
+        else
+            fail "warm-up not run after a failed read" "$(cat "$WORK/grs-calls")"
+        fi
+        _o=$(_grs_run GRS_RC=1 GRS_WARM_RC=1)
+        _grs_expect "the run and the warm-up both fail: recorded failed" "$_o" FAILED "gradle-dependencies"
+        _o=$(_grs_run GRS_RC=124)
+        _grs_expect "the run times out: no set, recorded failed" "$_o" FAILED "gradle-dependencies"
+        if [ "$(wc -l < "$WORK/grs-calls" | tr -d ' ')" = 1 ]; then
+            pass "the run times out: no second Gradle run"
+        else
+            fail "Gradle run again after a time-out" "$(cat "$WORK/grs-calls")"
+        fi
+
+
+        _o=$(_grs_run GRS_TOOLCHAIN=1)
+        _grs_expect "a runtimeClasspath that fails for want of a toolchain JDK: no set, the step recorded as failed" "$_o" FAILED "gradle-dependencies"
+        if printf '%s\n' "$_o" | grep -q '^\[build-prep\] gradle-dependencies: .*(java-toolchain-missing=13)$' \
+            && printf '%s\n' "$_o" | grep -q 'would fail the same way' && ! grep -qx -- '--no-daemon dependencies' "$WORK/grs-calls"; then
+            pass "the java-toolchain-missing marker is in the log (the CLI reruns stage 1 on it) and the root warm-up is not run"
+        else
+            fail "toolchain failure: marker or warm-up wrong" "$_o $(cat "$WORK/grs-calls")"
+        fi
+        rm -rf "$WORK/grs-x"; cp -R "$GRFIX/multi" "$WORK/grs-x"
+        printf 'P\t:kmp\nX\t:kmp\tjvmRuntimeClasspath\n' > "$WORK/grs-x/%3Akmp.txt"
+        _o=$(_grs_run GRS_REPORT="$WORK/grs-x")
+        _grs_expect "an X line without a failed run (rc 0): full graph, and no marker, so the warm-up is not skipped for it" "$_o" SET ""
+        # The init script also fails the run for a toolchain error in a configuration of a
+        # project with no runtimeClasspath (that Groovy runs in tests/test-gradle-runtime.sh).
+        # Here: the texts it looks for must be ones prep_step turns into java-toolchain-missing=N.
+        if grep -qF 'msg =~ /Cannot find a Java installation|No (compatible|matching) toolchains found/' "$PREP" \
+            && grep -qF 'Cannot find a Java installation on your machine|No (compatible|matching) toolchains found for request' "$PREP"; then
+            pass "the init script's toolchain patterns match the ones prep_step turns into java-toolchain-missing=N"
+        else
+            fail "toolchain patterns of the init script and prep_step drifted"
+        fi
+        _o=$(_grs_run ANDROID_HOME=/opt/android-sdk GRS_PROJ_RC=1)
+        _grs_expect "ANDROID_HOME, the project list fails: android-release-classpath recorded as failed" "$_o" FAILED "android-release-classpath"
+
+        _o=$(_grs_run BOMLENS_GRADLE_FULL_GRAPH=1)
+        _grs_expect "BOMLENS_GRADLE_FULL_GRAPH=1: no set" "$_o" SET ""
+        if grep -qx -- '--no-daemon dependencies' "$WORK/grs-calls"; then
+            pass "BOMLENS_GRADLE_FULL_GRAPH=1: the plain warm-up runs"
+        else
+            fail "opt-out did not run the plain warm-up" "$(cat "$WORK/grs-calls")"
+        fi
+
+        _o=$(_grs_run ANDROID_HOME=/opt/android-sdk)
+        _grs_expect "ANDROID_HOME: the release runtime set, a substituted module read as its target" \
+            "$_o" ASET "com.google.code.gson:gson:2.10.1 com.squareup.okhttp3:okhttp:4.12.0 com.squareup.okio:okio-jvm:3.6.0 "
+        _grs_expect "ANDROID_HOME: no java-gradle set beside the release set" "$_o" SET ""
+        _grs_expect "ANDROID_HOME: android-release-classpath recorded" "$_o" APPLIED "android-release-classpath"
+        _o=$(_grs_run ANDROID_HOME=/opt/android-sdk GRS_ANDROID=androidjava)
+        _grs_expect "ANDROID_HOME, no release configuration (a Java build): the java-gradle set is read instead" "$_o" SET "$_grs_single"
+        _grs_expect "ANDROID_HOME, no release configuration: no release set" "$_o" ASET ""
+        _o=$(_grs_run ANDROID_HOME=/opt/android-sdk GRS_ANDROID=androidjava GRS_PROJ_RC=124)
+        _grs_expect "ANDROID_HOME, the project list times out: no java-gradle set either" "$_o" SET ""
+        if printf '%s\n' "$_o" | grep -q 'timed out; using full graph' && ! grep -q -- 'bomlensRuntime' "$WORK/grs-calls"; then
+            pass "ANDROID_HOME, time-out: logged, and no second Gradle run"
+        else
+            fail "Android time-out still ran the java-gradle step" "$(cat "$WORK/grs-calls")"
+        fi
+        _o=$(_grs_run ANDROID_HOME=/opt/android-sdk GRS_PROJECTS=android-projects-odd.txt)
+        _grs_expect "ANDROID_HOME, a project path the per-module run cannot pass: no release set" "$_o" ASET ""
+        if printf '%s\n' "$_o" | grep -q "cannot pass to Gradle"; then
+            pass "ANDROID_HOME, odd project path: logged"
+        else
+            fail "odd Android project path not logged" "$_o"
+        fi
+        _o=$(_grs_run ANDROID_HOME=/opt/android-sdk GRS_ANDROID=androidjava BOMLENS_GRADLE_FULL_GRAPH=1)
+        _grs_expect "ANDROID_HOME, no release configuration, BOMLENS_GRADLE_FULL_GRAPH=1: no set" "$_o" SET ""
+
+        # The filter in its gradle mode, on a cdxgen-shaped BOM.
+        cat > "$WORK/grs-bom.json" <<'JSON'
+{"bomFormat":"CycloneDX","specVersion":"1.6",
+ "metadata":{"component":{"name":"demo","group":"com.example","purl":"pkg:maven/com.example/demo@1.0.0?type=jar","bom-ref":"pkg:maven/com.example/demo@1.0.0?type=jar"}},
+ "components":[
+   {"name":"guava","group":"com.google.guava","version":"33.0.0-jre","purl":"pkg:maven/com.google.guava/guava@33.0.0-jre?type=jar","bom-ref":"pkg:maven/com.google.guava/guava@33.0.0-jre?type=jar","properties":[{"name":"internal:GradleProfileName","value":"compileClasspath"}]},
+   {"name":"j2objc-annotations","group":"com.google.j2objc","version":"2.8","purl":"pkg:maven/com.google.j2objc/j2objc-annotations@2.8?type=jar","bom-ref":"pkg:maven/com.google.j2objc/j2objc-annotations@2.8?type=jar","properties":[{"name":"internal:GradleProfileName","value":"compileClasspath"}]},
+   {"name":"junit-jupiter","group":"org.junit.jupiter","version":"5.10.1","purl":"pkg:maven/org.junit.jupiter/junit-jupiter@5.10.1?type=jar","bom-ref":"pkg:maven/org.junit.jupiter/junit-jupiter@5.10.1?type=jar","scope":"optional","properties":[{"name":"internal:GradleProfileName","value":"testCompileClasspath"}]},
+   {"name":"rootpath-only","group":"org.other","version":"1.0","purl":"pkg:maven/org.other/rootpath-only@1.0?type=jar","bom-ref":"pkg:maven/org.other/rootpath-only@1.0?type=jar","properties":[{"name":"cdx:gradle:GradleRootPath","value":"/app"}]},
+   {"name":"lombok","group":"org.projectlombok","version":"1.18.30","purl":"pkg:maven/org.projectlombok/lombok@1.18.30?type=jar","bom-ref":"pkg:maven/org.projectlombok/lombok@1.18.30?type=jar","properties":[{"name":"internal:GradleProfileName","value":"annotationProcessor"}]},
+   {"name":"mockito-core","group":"org.mockito","version":"5.11.0","purl":"pkg:maven/org.mockito/mockito-core@5.11.0?type=jar","bom-ref":"pkg:maven/org.mockito/mockito-core@5.11.0?type=jar","scope":"optional","properties":[{"name":"internal:GradleProfileName","value":"testCompileClasspath"}]},
+   {"name":"junit-platform-launcher","group":"org.junit.platform","version":"1.10.2","purl":"pkg:maven/org.junit.platform/junit-platform-launcher@1.10.2?type=jar","bom-ref":"pkg:maven/org.junit.platform/junit-platform-launcher@1.10.2?type=jar","scope":"optional","properties":[{"name":"internal:GradleProfileName","value":"testRuntimeClasspath"}]},
+   {"name":"vendored","group":"org.acme","version":"1.0","purl":"pkg:maven/org.acme/vendored@1.0?type=jar","bom-ref":"pkg:maven/org.acme/vendored@1.0?type=jar"},
+   {"name":"demo","group":"com.example","version":"1.0.0","purl":"pkg:maven/com.example/demo@1.0.0?type=jar&sub=1","bom-ref":"sub-demo"}
+ ],
+ "dependencies":[
+   {"ref":"pkg:maven/com.example/demo@1.0.0?type=jar","dependsOn":["sub-demo"]},
+   {"ref":"sub-demo","dependsOn":["pkg:maven/com.google.guava/guava@33.0.0-jre?type=jar"]},
+   {"ref":"pkg:maven/com.google.guava/guava@33.0.0-jre?type=jar","dependsOn":["pkg:maven/com.google.j2objc/j2objc-annotations@2.8?type=jar"]}
+ ]}
+JSON
+        printf '%s\n' com.google.guava:guava:33.0.0-jre com.google.guava:failureaccess:1.0.2 > "$WORK/grs-set.txt"
+        node "$_grs_js" "$WORK/grs-bom.json" "$WORK/grs-set.txt" gradle 2>/dev/null
+        _grs_got=$(jq -r '[.components[] | "\(.name)=\(.scope // "none")"] | join(",")' "$WORK/grs-bom.json")
+        if [ "$_grs_got" = "guava=none,vendored=none,demo=none" ]; then
+            pass "compile-only, test-only and Gradle-marked (GradleRootPath only) components outside the set dropped; runtime ones required; a jar not from Gradle and first-party modules kept"
+        else
+            fail "unexpected components or scopes after the gradle filter" "$_grs_got"
+        fi
+        if [ "$(jq -r '.dependencies[] | select(.ref | startswith("pkg:maven/com.google.guava/guava")) | .dependsOn | length' "$WORK/grs-bom.json")" = "0" ]; then
+            pass "dependency edges to dropped components pruned"
+        else
+            fail "edge to a dropped component kept" "$(jq -c '.dependencies' "$WORK/grs-bom.json")"
+        fi
+        if [ "$(sed -n "s/^const GRADLE_ORIGIN = new Set(\(.*\));$/\1/p" "$PREP")" = "$(sed -n "s/^const ORIGIN = new Set(\(.*\));$/\1/p" "$PREP")" ]; then
+            pass "the filter's Gradle marks are the gradle-packages check's marks"
+        else
+            fail "GRADLE_ORIGIN and ORIGIN differ in build-prep.sh"
+        fi
+    else
+        fail "could not extract the Gradle block, the prep helpers or the filter from build-prep.sh"
+    fi
+else
+    echo "  SKIP: node unavailable, skipping java-gradle runtime classpath test"
+fi
+
+echo "== gradle-runtime-scope: the whole script, with stub gradle and cdxgen =="
+# The same filter through build-prep.sh itself: the init script's files come
+# from a stand-in gradlew, cdxgen's BOM from a stand-in with the components
+# cdxgen 13.5.0 writes for this build (internal:GradleProfileName on what it
+# read from Gradle, none on a jar found in the tree).
+if command -v node >/dev/null 2>&1; then
+    GW2="$WORK/gradle-whole"; mkdir -p "$GW2/bin" "$GW2/src" "$GW2/out" "$GW2/gh"
+    printf "plugins { id 'java' }\n" > "$GW2/src/build.gradle"
+    printf '#!/bin/sh\nexit 0\n' > "$GW2/bin/gradle"
+    cat > "$GW2/src/gradlew" <<GW2STUB
+#!/bin/sh
+echo "\$*" >> "$GW2/calls"
+case " \$* " in *" --version "*) exit 0 ;; esac
+out=""
+for a in "\$@"; do case "\$a" in -Dbomlens.gradle.out=*) out="\${a#-Dbomlens.gradle.out=}" ;; esac; done
+[ -z "\$out" ] || cp "$FIX/gradle-runtime/single"/* "\$out"/
+exit 0
+GW2STUB
+    chmod +x "$GW2/src/gradlew" "$GW2/bin/gradle"
+    _gw2_c() { printf '{"name":"%s","version":"%s","purl":"pkg:maven/%s/%s@%s?type=jar","bom-ref":"pkg:maven/%s/%s@%s?type=jar","properties":[{"name":"internal:GradleProfileName","value":"%s"}]%s}' "$2" "$3" "$1" "$2" "$3" "$1" "$2" "$3" "$4" "${5:+,\"scope\":\"$5\"}"; }
+    {
+        printf '{"bomFormat":"CycloneDX","specVersion":"1.6","version":1,"metadata":{"component":{"name":"demo","type":"application"}},"components":['
+        _gw2_c com.google.guava guava 33.0.0-jre compileClasspath; printf ','
+        _gw2_c com.google.guava failureaccess 1.0.2 compileClasspath; printf ','
+        _gw2_c com.google.j2objc j2objc-annotations 2.8 compileClasspath; printf ','
+        _gw2_c org.projectlombok lombok 1.18.30 annotationProcessor; printf ','
+        _gw2_c junit junit 4.13.2 testCompileClasspath optional; printf ','
+        printf '{"name":"treejar","version":"1.0","purl":"pkg:maven/org.acme/treejar@1.0?type=jar","bom-ref":"pkg:maven/org.acme/treejar@1.0?type=jar"}'
+        printf ']}'
+    } > "$GW2/bom-template.json"
+    cat > "$GW2/bin/cdxgen" <<GW2CDX
+#!/bin/sh
+out=""; prev=""; for a in "\$@"; do [ "\$prev" = "-o" ] && out="\$a"; prev="\$a"; done
+cp "$GW2/bom-template.json" "\$out"
+GW2CDX
+    chmod +x "$GW2/bin/cdxgen"
+    env -u ANDROID_HOME PATH="$GW2/bin:$PATH" HOME="$GW2/home" GRADLE_USER_HOME="$GW2/gh" \
+        sh "$LIB/build-prep.sh" "$GW2/src" "$GW2/out/bom.json" > "$GW2/log" 2>&1
+    _gw2_purls=$(jq -r '[.components[].purl | sub("^pkg:maven/";"") | sub("\\?type=jar";"")] | sort | join(" ")' "$GW2/out/bom.json" 2>/dev/null)
+    if [ "$_gw2_purls" = "com.google.guava/failureaccess@1.0.2 com.google.guava/guava@33.0.0-jre org.acme/treejar@1.0" ]; then
+        pass "build-prep.sh filters the BOM to the runtime classpath: compile-only, annotation processor and test components dropped, a jar from the tree kept"
+    else
+        fail "whole-script runtime filter kept [$_gw2_purls]" "$(grep gradle "$GW2/log" | head -5)"
+    fi
+    if jq -e '[.metadata.properties[]? | select(.name=="bomlens:prep-step-applied" and (.value|test("gradle-dependencies")))] | length > 0' "$GW2/out/bom.json" >/dev/null 2>&1 \
+       && ! jq -e '[.metadata.properties[]? | select(.name=="bomlens:pipeline-step-failed")] | length > 0' "$GW2/out/bom.json" >/dev/null 2>&1; then
+        pass "the run is recorded as gradle-dependencies, applied and not failed"
+    else
+        fail "gradle-dependencies recording" "$(jq -c '.metadata.properties' "$GW2/out/bom.json" 2>&1 | cut -c1-300)"
+    fi
+    if [ "$(grep -c -- 'bomlensRuntime' "$GW2/calls")" = 1 ] && ! grep -qx -- '--no-daemon dependencies' "$GW2/calls"; then
+        pass "one Gradle run for the whole build, and no separate warm-up run"
+    else
+        fail "unexpected Gradle calls" "$(cat "$GW2/calls")"
+    fi
+else
+    echo "  SKIP: node unavailable, skipping the whole-script java-gradle test"
+fi
+
 echo "== EOL: offline end-of-life flagging (enrich-eol.sh) — PURL whitelist + cycle lookup =="
 cp "$FIX/eol-components.json" "$WORK/eol.json"
 EOL_DATA_FILE="$FIX/eol-data.json" bash "$LIB/enrich-eol.sh" "$WORK/eol.json" >/dev/null 2>&1
@@ -9003,7 +9308,7 @@ printf '#!/bin/sh\necho "wrapper $*" >> "%s/calls"\ncase " $* " in *" --version 
 chmod 644 "$GW_ROOT/src/gradlew"
 env -u ANDROID_HOME PATH="$GW_ROOT/bin:$PATH" HOME="$GW_ROOT/home" GRADLE_USER_HOME="$GW_ROOT/gh" \
     sh "$LIB/build-prep.sh" "$GW_ROOT/src" "$GW_ROOT/out/bom.json" > "$GW_ROOT/log" 2>&1
-{ grep -q '^wrapper --no-daemon dependencies$' "$GW_ROOT/calls" 2>/dev/null && ! grep -q '^image ' "$GW_ROOT/calls"; } \
+{ grep -q '^wrapper --no-daemon -q --console=plain --no-configuration-cache --init-script ' "$GW_ROOT/calls" 2>/dev/null && ! grep -q '^image ' "$GW_ROOT/calls"; } \
     && pass "build-prep runs a non-executable gradlew through sh, not the image's Gradle" \
     || fail "non-executable gradlew: calls [$(tr '\n' ';' < "$GW_ROOT/calls" 2>/dev/null)]" "$(grep gradle "$GW_ROOT/log" | head -5)"
 grep -q '^\[build-prep\] gradle: sh ./gradlew runs Gradle 5.6.4$' "$GW_ROOT/log" \
@@ -13712,7 +14017,7 @@ grep -q '^| 0 | 1 | 0 | 1 | 0 | 2 |$' "$RCH/sec_security.md" && grep -q '^## Not
     && grep -q 'CVE-2026-56852 | golang.org/x/text' "$RCH/sec_security.md" && grep -q 'CVE-2022-32149 ‡' "$RCH/sec_security.md" \
     && pass "markdown: the not-reachable finding is listed apart and out of the totals; the reached one is marked" \
     || fail "markdown report" "$(sed -n '1,40p' "$RCH/sec_security.md")"
-grep -q '<h2>Not reachable</h2>' "$RCH/sec_security.html" && grep -q '1 finding(s) are not reachable' "$RCH/sec_security.html" \
+grep -qE '<h2 id="box-[0-9]+">Not reachable</h2>' "$RCH/sec_security.html" && grep -q '1 finding(s) are not reachable' "$RCH/sec_security.html" \
     && pass "html: the not-reachable section and its note" || fail "html report has no not-reachable section"
 PATH="$FAKEBIN:$PATH" SECURITY_ENRICH=false DEEP_CVE=false bash "$LIB/scan-security.sh" "$RCH/bom.json" "$RCH/secoff" proj >/dev/null 2>&1
 jq -e 'has("Reachability") | not' "$RCH/secoff_security.json" >/dev/null && ! grep -q 'Not reachable' "$RCH/secoff_security.md" \
@@ -13965,6 +14270,129 @@ for kind in risk-report security; do
     grep -q '<td class="id">CVE-' "${RTP}_$kind.html" && grep -q 'td.id{white-space:nowrap' "${RTP}_$kind.html" \
         && pass "$kind report keeps a CVE id on one line" || fail "$kind report CVE column may wrap"
 done
+# Page head: the top bar reads "BomLens / project version" (never the t_1.0
+# prefix), the h1 is the report name, a wide table scrolls inside its box.
+for kv in "risk-report|Open-source risk report" "security|Security report" \
+          "NOTICE|Third-party open source notice" "conformance|Conformance check report"; do
+    kind="${kv%%|*}"; title="${kv#*|}"; H="${RTP}_$kind.html"
+    grep -q '<span class="proj">t <span class="ver">1.0</span></span></header>' "$H" \
+        && pass "$kind report names the project and version in the top bar, not the output prefix" \
+        || fail "$kind report top bar" "$(grep -o '<span class="proj">.*</header>' "$H" | head -1)"
+    grep -q "<h1>${title}</h1>" "$H" \
+        && pass "$kind report is titled ${title}" || fail "$kind report title" "$(grep -m1 -o '<h1>[^<]*</h1>' "$H")"
+    grep -q '\.table-scroll{overflow-x:auto;}' "$H" \
+        && pass "$kind report: a wide table scrolls inside its box" \
+        || fail "$kind report: the table scroll rule is missing"
+done
+grep -q '<table aria-labelledby="box-[0-9]*">' "${RTP}_security.html" && grep -q '<h2 id="box-1">Findings</h2>' "${RTP}_security.html" \
+    && pass "a table is named by the title of its box (aria-labelledby)" || fail "a table has no accessible name"
+# No box with a thick stripe down its left side: no border-left or
+# border-inline-start rule and no inset box-shadow, in the shared CSS, in the
+# documentation site's stylesheets, the web UI's stylesheets (its TSX classes
+# are checked by token-lint) or in any generated report. Notices are a banner
+# with a 1px border all round.
+side_stripe() { grep -EnH 'border-(left|inline-start)(-width|-style|-color)?[[:space:]]*:|box-shadow:[^;}]*inset' "$@"; }
+WEB_CSS=()
+while IFS= read -r f; do WEB_CSS+=("$f"); done < <(find "$ROOT_DIR/docker/web/frontend/src" -name '*.css' -not -path '*/node_modules/*')
+if STRIPES="$(side_stripe "$LIB/report-common.sh" "$ROOT_DIR"/docs/stylesheets/*.css "${WEB_CSS[@]}" \
+                "${RTP}_risk-report.html" "${RTP}_security.html" "${RTP}_NOTICE.html" "${RTP}_conformance.html")"; then
+    fail "a left-side stripe rule is in the report CSS, the docs or web UI stylesheets, or a generated report" "$STRIPES"
+else
+    pass "no left-side stripe rule in the report CSS, the docs and web UI stylesheets or the four generated reports (${#WEB_CSS[@]} web stylesheets)"
+fi
+# REPORT_LANG=ko: the security report is Korean; the NOTICE stays English.
+( export RC_TRIVY_FIXTURE="$RC/trivy.json" PATH="$RT/bin:$PATH" SECURITY_ENRICH=false DEEP_CVE=false REPORT_LANG=ko
+  bash "$LIB/scan-security.sh" "$RC/sbom.json" "$RT/k_1.0" k >/dev/null 2>&1
+  bash "$LIB/generate-notice.sh" "$RC/sbom.json" "$RT/k_1.0" k >/dev/null 2>&1 )
+if grep -q '<html lang="ko">' "$RT/k_1.0_security.html" && grep -q '<h1>보안 보고서</h1>' "$RT/k_1.0_security.html" \
+   && grep -q '<th>패키지(설치 버전)</th>' "$RT/k_1.0_security.html" && grep -q '컴포넌트 [0-9,]*개</span>' "$RT/k_1.0_security.html"; then
+    pass "REPORT_LANG=ko writes the security report in Korean"
+else
+    fail "the ko security report is not Korean" "$(grep -ho '<h1>[^<]*</h1>' "$RT/k_1.0_security.html")"
+fi
+if grep -q '<html lang="en">' "$RT/k_1.0_NOTICE.html" && grep -q '<h1>Third-party open source notice</h1>' "$RT/k_1.0_NOTICE.html" \
+   && grep -q ' components</span>' "$RT/k_1.0_NOTICE.html" && ! grep -qE '컴포넌트|라이선스|오픈소스 고지문|출처:' "$RT/k_1.0_NOTICE.html"; then
+    pass "REPORT_LANG=ko leaves the NOTICE in English"
+else
+    fail "a Korean string reached the NOTICE" "$(grep -o '<p class="desc">.*</p>' "$RT/k_1.0_NOTICE.html")"
+fi
+grep -q '<dl class="deadlines">' "${RTP}_risk-report.html" && grep -q '<dd>within 7 days</dd>' "${RTP}_risk-report.html" \
+    && grep -q '<dd>within 30 days</dd>' "${RTP}_risk-report.html" && ! grep -q 'Critical → within' "${RTP}_risk-report.html" \
+    && pass "risk report lists the remediation deadlines as severity label and deadline" \
+    || fail "risk report deadlines are not a label list"
+grep -q '<td class="sev"><span class="lbl sev-CRITICAL"><span class="mk" aria-hidden="true">' "${RTP}_security.html" \
+    && pass "security report shows severity as a label with a shape marker and the word" \
+    || fail "security report severity cell is not a label"
+# The new cells: package coordinates (Maven only, split by characters), fixed
+# versions, a version from the SBOM root, and escaping of every one of them.
+ESC="$RT/esc"; mkdir -p "$ESC"
+jq '.metadata.component.version = "1.0<\"x"' "$RC/sbom.json" > "$ESC/sbom.json"
+cat > "$ESC/trivy.json" <<'TRIVY'
+{"Results":[{"Target":"t","Vulnerabilities":[
+ {"VulnerabilityID":"CVE-2026-0001","PkgName":"org.ex\"<a:ar<t","InstalledVersion":"1.0","FixedVersion":"1.1, 2.0","Severity":"CRITICAL","PkgIdentifier":{"PURL":"pkg:maven/org.ex/art@1.0"}},
+ {"VulnerabilityID":"CVE-2026-0002","PkgName":"한글그룹:이름","InstalledVersion":"2","Severity":"HIGH","PkgIdentifier":{"PURL":"pkg:maven/x/y@2"}},
+ {"VulnerabilityID":"CVE-2026-0003","PkgName":"libssl3:amd64","InstalledVersion":7,"FixedVersion":"","Severity":"LOW","PkgIdentifier":{"PURL":"pkg:deb/debian/libssl3@3"}}]}]}
+TRIVY
+( export RC_TRIVY_FIXTURE="$ESC/trivy.json" PATH="$RT/bin:$PATH" SECURITY_ENRICH=false DEEP_CVE=false
+  bash "$LIB/scan-security.sh" "$ESC/sbom.json" "$ESC/x_1" t >/dev/null 2>&1 )
+EH="$ESC/x_1_security.html"
+grep -q '<span class="proj">t <span class="ver">1.0&lt;&quot;x</span></span>' "$EH" && ! grep -q '1.0<"x' "$EH" \
+    && pass "the SBOM root version is escaped in the page head" || fail "root version escaping" "$(grep -o '<span class="proj">.*</header>' "$EH")"
+grep -qF '<span class="pkg" title="org.ex&quot;&lt;a:ar&lt;t"><span class="pg">org.<wbr>ex&quot;&lt;a</span><span class="psep"> / </span><span class="pn">ar&lt;t</span> <span class="pv">1.0</span></span>' "$EH" \
+    && pass "a Maven package shows group / artifact, both escaped, the full name in title" || fail "Maven package coordinate"
+grep -qF '<span class="pg">한글그룹</span><span class="psep"> / </span><span class="pn">이름</span>' "$EH" \
+    && pass "a non-ASCII Maven name is split by characters, not bytes" || fail "non-ASCII package split"
+grep -qF '<span class="pn">libssl3:amd64</span> <span class="pv">7</span>' "$EH" \
+    && pass "a non-Maven name with a colon stays whole, and a numeric version is shown" || fail "non-Maven package or numeric version"
+grep -qF '<td class="fix"><span class="v">1.1</span>, <span class="v">2.0</span></td>' "$EH" \
+    && grep -qF '<span class="nofix">No fix yet</span>' "$EH" \
+    && pass "fixed versions are listed one by one, and a missing fix says so" || fail "fixed version cell"
+FACTS="$( ( . "$LIB/report-common.sh"; printf '{"metadata":{"component":{"version":3,"type":"application"}},"components":[{},{}]}' > "$ESC/n.json"
+            report_bom_facts "$ESC/n.json"; printf '%s|%s|%s' "$RB_VERSION" "$RB_ROOTTYPE" "$RB_NCOMP"
+            printf '{"metadata":{"component":{"version":{"x":1}}}}' > "$ESC/o.json"
+            report_bom_facts "$ESC/o.json"; printf '|%s|%s' "$RB_VERSION" "$RB_NCOMP" ) )"
+[ "$FACTS" = "3|application|2||" ] && pass "a numeric root version is read as text, an object one is dropped" \
+    || fail "report_bom_facts" "$FACTS"
+# Print keeps a label, an id, a number and a time on one line; only long values wrap.
+if sed -n '/@media print{/,/^}/p' "${RTP}_security.html" | grep -q 'th,td{white-space:normal;}' \
+   && ! sed -n '/@media print{/,/^}/p' "${RTP}_security.html" | grep -qE '(\.lbl|\.kevbadge|td\.id|td\.num|td\.sev|time)[^{]*\{white-space:normal'; then
+    pass "print lets cells wrap but keeps labels, ids, numbers and times on one line"
+else
+    fail "print rules let a label, id, number or time wrap"
+fi
+# Long names break at their dots first; an evidence item is one line with its
+# full text in title.
+grep -q '<span class="ev" title="' "${RTP}_conformance.html" \
+    && pass "conformance evidence items are one line each, the full text in title" \
+    || fail "conformance evidence items are not one per line"
+# Outbound license conflicts: the count is everything a person has to look at,
+# and each such dependency is a row, even when none is incompatible.
+LCX="$RT/lcx"; mkdir -p "$LCX"
+jq '.metadata.component.licenses = [{"license":{"id":"Apache-2.0"}}]
+    | .components = [{"type":"library","name":"c1","version":"1","properties":[{"name":"bomlens:licenseConflict","value":"conditional"}]},
+                     {"type":"library","name":"u1","version":"2","properties":[{"name":"bomlens:licenseConflict","value":"unknown"}]}]' \
+    "$RC/risk-bom.json" > "$LCX/p_1.0_bom.json"
+printf 'License: MIT\n' > "$LCX/p_1.0_NOTICE.txt"
+( cd "$LCX" && bash "$LIB/generate-risk-report.sh" p_1.0 p >/dev/null 2>&1 )
+grep -q 'Conflicts with the outbound license (Apache-2.0)</p><span class="counter">2</span>' "$LCX/p_1.0_risk-report.html" \
+   && grep -q '<li>c1@1 <span class="lbl lbl-attention">Conditional</span></li>' "$LCX/p_1.0_risk-report.html" \
+   && grep -q '<li>u1@2 <span class="lbl">Unknown</span></li>' "$LCX/p_1.0_risk-report.html" \
+    && pass "the outbound-license box counts and lists conditional and unknown dependencies too" \
+    || fail "outbound-license box" "$(grep -o 'Conflicts with[^<]*</p><span class="counter">[^<]*' "$LCX/p_1.0_risk-report.html")"
+( cd "$LCX" && REPORT_LANG=ko bash "$LIB/generate-risk-report.sh" p_1.0 p >/dev/null 2>&1 )
+grep -q '배포 라이선스(Apache-2.0)와 충돌' "$LCX/p_1.0_risk-report.html" \
+   && grep -q '<li>c1@1 <span class="lbl lbl-attention">배포 방식에 따라 달라짐</span></li>' "$LCX/p_1.0_risk-report.html" \
+    && pass "the ko outbound-license box uses the web UI's Korean verdict words" \
+    || fail "ko outbound-license verdict words"
+# A note taken from the environment is text, never a printf format.
+( export RC_TRIVY_FIXTURE="$RC/trivy.json" PATH="$RT/bin:$PATH" SECURITY_ENRICH=false DEEP_CVE=false \
+         BOMLENS_CPE_INDEX_SKIPPED=analyze-upstream-map-only BOMLENS_VERSION='9.9%s%d'
+  bash "$LIB/scan-security.sh" "$RC/sbom.json" "$RT/pf_1.0" pf >/dev/null 2>&1
+  REPORT_LANG=ko bash "$LIB/scan-security.sh" "$RC/sbom.json" "$RT/pk_1.0" pk >/dev/null 2>&1 )
+grep -qF 'with --analyze-cpe-index (BomLens 9.9%s%d).' "$RT/pf_1.0_security.html" \
+   && grep -qF -- '--analyze-cpe-index와 함께 (BomLens 9.9%s%d) 검사한' "$RT/pk_1.0_security.html" \
+    && pass "the received-SBOM note keeps the BomLens version as text, in English and Korean" \
+    || fail "received-SBOM note" "$(grep -o 'analyze-cpe-index[^<]*' "$RT/pf_1.0_security.html" "$RT/pk_1.0_security.html" | head -2)"
 grep -q '<h1>Open-source risk report</h1>' "${RTP}_risk-report.html" \
     && grep -q '<p class="subtitle">Supplier SBOM under review</p>' "${RTP}_risk-report.html" \
     && pass "supplier risk report: GLOSSARY title with the supplier review as subtitle" \

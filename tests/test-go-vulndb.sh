@@ -277,7 +277,7 @@ jq -e '[.Results[].Vulnerabilities[]] | length == 10' "$S" >/dev/null 2>&1 \
     && pass "_security.json holds Trivy's four findings and the six new ones, CVE-2099-1003 once, and Trivy's own result is kept apart" \
     || fail "merged report: $(jq -c '[.Results[].Vulnerabilities[] | [.PkgName, .VulnerabilityID]]' "$S" 2>&1)" "$(tail -5 "$WORK/sec.log")"
 grep -qF -- "- Engine: Trivy (SBOM scan), Go vulnerability database (snapshot 2026-11-01)" "$WORK/sec/demo_1.0_security.md" \
-    && grep -qF "Engine: Trivy, Go vulnerability database (snapshot 2026-11-01)</p>" "$WORK/sec/demo_1.0_security.html" \
+    && grep -qF "Engine: Trivy, Go vulnerability database (snapshot 2026-11-01)</span></p>" "$WORK/sec/demo_1.0_security.html" \
     && pass "the Markdown and HTML reports name the Go vulnerability database and its date" \
     || fail "report header: $(grep -F 'Engine:' "$WORK/sec/demo_1.0_security.md")"
 

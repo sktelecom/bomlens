@@ -73,12 +73,12 @@ export function useTierHint(): (tier: LicenseRiskTier) => string {
 }
 
 /**
- * Fill for a row in the distribution list: the same hue as the tier's segment
- * in the bar above (BAR), at a low alpha, so the row says which tier it is
- * without the loud fill of the bar. Permissive takes its teal here too: the
- * bar and its legend already call it teal, and a grey row under a teal segment
- * read as a different class. Uncategorized is grey in both places. The tier is
- * also named by the marker shape and its tooltip, so the tint is never the only
+ * Fill for a row in the distribution list: the same colour as the tier's
+ * segment in the bar above (BAR), at a low alpha, so the row says which tier it
+ * is without the loud fill of the bar. Permissive and uncategorized are both
+ * neutral grey (permissive needs no attention); permissive is the lighter
+ * shade, the bar leaves a 1px gap between segments, and the tier is also named
+ * by the marker shape, the legend and the tooltip, so colour is never the only
  * signal.
  */
 export const TIER_FILL: Record<LicenseRiskTier, string> = {
@@ -165,7 +165,7 @@ export function LicenseRiskBar({
         )}
       </div>
       <div
-        className="flex h-2.5 w-full origin-left animate-grow-x overflow-hidden rounded-full bg-muted"
+        className="flex h-2.5 w-full origin-left animate-grow-x gap-px overflow-hidden rounded-full bg-muted"
         role={interactive ? "group" : "img"}
         aria-label={t("result.licenseClassTitle")}
       >

@@ -1433,7 +1433,7 @@ grep -q 'How to fill the gaps' "$WORK/conf_conformance.html" && fail "HTML still
 
 echo "== conformance HTML: table legibility =="
 grep -q '<td class="num">1</td>' "$WORK/conf_conformance.html" && pass "rows are numbered" || fail "rows carry no number column"
-grep -q 'class="s-review"' "$WORK/conf_conformance.html" && pass "review rows have their own status colour" || fail "review rows reuse the warn colour"
+grep -q 'class="st s-review"' "$WORK/conf_conformance.html" && pass "review rows have their own status colour" || fail "review rows reuse the warn colour"
 grep -q 'td.req{white-space:nowrap' "$WORK/conf_conformance.html" && pass "the required cell does not wrap" || fail "the required cell can wrap one glyph per line"
 grep -q 'href="https://huggingface.co/' "$WORK/conf_conformance.html" && pass "the project name links to the model repository" || fail "the project name is not linked"
 
@@ -1464,7 +1464,7 @@ badrv=$(jq -r '.review | to_entries[] | select(((.value.how // "") == "") or ((.
 grep -q "What to establish" "$WORK/conf_conformance.html" && pass "HTML surfaces the review guidance" || fail "HTML hides the review guidance"
 
 echo "== the crosswalk is a roll-up, not a second copy of the requirement tables =="
-xwtb=$(sed -n '/<h2>Regulatory crosswalk<\/h2>/,/<\/table>/p' "$WORK/conf_conformance.html")
+xwtb=$(sed -n '/<h2 id="box-[0-9]*">Regulatory crosswalk<\/h2>/,/<\/table>/p' "$WORK/conf_conformance.html")
 printf '%s' "$xwtb" | grep -q "<th>Framework</th>" && pass "crosswalk is keyed by framework" || fail "crosswalk lacks the framework column"
 printf '%s' "$xwtb" | grep -q "EU AI Act" && pass "crosswalk names the frameworks it covers" || fail "crosswalk lists no framework"
 # Regression guard for the duplication this section used to carry: it reprinted
@@ -1527,10 +1527,10 @@ if [ -f "$PROF" ]; then
     # The rollup is built by a jq expression that silently yields [] on error, so
     # assert the table is actually populated and ordered like the G7 registry.
     rollup=$(sed -n '/G7 minimum elements by cluster/,/SBOM format requirements/p' "$WORK/conf_conformance.html")
-    rows=$(printf '%s' "$rollup" | grep -c '<tr><td>')
+    rows=$(printf '%s' "$rollup" | grep -c '<tr><td class="grow">')
     [ "$rows" -ge 7 ] && pass "the cluster rollup lists every cluster ($rows rows)" || fail "the cluster rollup is empty or short" "$rows"
     want=$(jq -r '[.clusters[].name] | join("|")' "$LIB/g7-registry.json")
-    got=$(printf '%s' "$rollup" | grep -o '<tr><td>[^<]*</td>' | sed 's/<[^>]*>//g' | paste -sd'|' -)
+    got=$(printf '%s' "$rollup" | grep -o '<tr><td class="grow">[^<]*</td>' | sed 's/<[^>]*>//g' | paste -sd'|' -)
     [ "$got" = "$want" ] && pass "the cluster rollup follows the registry order" || fail "the cluster rollup order drifted" "$got"
     # The profile lists the closable gaps and delegates the fragments to the
     # conformance report, so the two artifacts stay complementary, not duplicated.

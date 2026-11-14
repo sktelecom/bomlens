@@ -55,7 +55,7 @@ PROXY_ENV_NAMES="HTTP_PROXY HTTPS_PROXY NO_PROXY http_proxy https_proxy no_proxy
 EXTRA_CA_ENV_NAMES="BOMLENS_EXTRA_CA_CERTS"
 # shellcheck disable=SC2034  # read by scan-sbom.sh
 EXTRA_CA_TARGET="/bomlens-ca/extra.pem"
-BUILD_PREP_ENV_NAMES="BOMLENS_KEEP_BUILD_OUTPUT BOMLENS_MAVEN_FULL_GRAPH BOMLENS_ANDROID_FULL_GRAPH BOMLENS_NODE_FULL_GRAPH BOMLENS_PHP_FULL_GRAPH BOMLENS_INCLUDE_NON_SHIPPED BOMLENS_INCLUDE_DEV_DEPENDENCIES BOMLENS_NO_COPYRIGHT BOMLENS_NO_CARGO_LICENSE BOMLENS_PREP_TIMEOUT"
+BUILD_PREP_ENV_NAMES="BOMLENS_KEEP_BUILD_OUTPUT BOMLENS_MAVEN_FULL_GRAPH BOMLENS_ANDROID_FULL_GRAPH BOMLENS_GRADLE_FULL_GRAPH BOMLENS_NODE_FULL_GRAPH BOMLENS_PHP_FULL_GRAPH BOMLENS_INCLUDE_NON_SHIPPED BOMLENS_INCLUDE_DEV_DEPENDENCIES BOMLENS_NO_COPYRIGHT BOMLENS_NO_CARGO_LICENSE BOMLENS_PREP_TIMEOUT"
 
 # Settings for the network the post-processing container reaches: the proxy,
 # where Trivy gets its vulnerability database (a mirror, or a cache with the
@@ -776,10 +776,13 @@ detect_lang() {
 # is set) and comments:
 #   JavaLanguageVersion.of(25)  (languageVersion.set(...), languageVersion = ...)
 #   jvmToolchain(25)            (Kotlin)
-# A version taken from a property or a version catalog is not read. Maven is
-# not read either: maven.compiler.release and the toolchains plugin take effect
-# when the build compiles, and dependency resolution (dependency:tree) runs
-# without them on the image's JDK.
+# The argument may also be a variable defined in the same file, optionally
+# converted (.toInteger(), .toInt(), .toString(), as int); its value is read
+# from that definition (_java_toolchain_awk). A version from a version
+# catalog, from a variable of another file or from an environment variable
+# alone is not read. Maven is not read either: maven.compiler.release and the
+# toolchains plugin take effect when the build compiles, and dependency
+# resolution (dependency:tree) runs without them on the image's JDK.
 java_toolchain_version() {
     local d="$1" n prune=()
     [ -n "$d" ] && [ -d "$d" ] || return 0
@@ -789,27 +792,155 @@ java_toolchain_version() {
     if non_shipped_enabled; then
         for n in $NON_SHIPPED_DIRS; do prune+=(-o -name "$n"); done
     fi
-    # The awk drops // line comments and /* */ blocks (across lines too, and
-    # never past the end of a file) before the declarations are matched. A
-    # line over 4096 characters holds no declaration worth reading and is
-    # skipped, which keeps the scan of a crafted file linear.
-    (cd "$d" 2>/dev/null && find . -maxdepth 6 \( "${prune[@]:1}" \) -prune -o -type f \( -name '*.gradle' -o -name '*.gradle.kts' \) \
-        -exec awk '
-            FNR == 1 { blk = 0 }
-            length($0) > 4096 { next }
-            {
-                line = $0; out = ""
-                while (line != "") {
-                    if (blk) { i = index(line, "*/"); if (!i) { line = ""; break }; line = substr(line, i + 2); blk = 0; continue }
-                    a = index(line, "/*"); b = index(line, "//")
-                    if (b && (!a || b < a)) { out = out substr(line, 1, b - 1); line = ""; break }
-                    if (a) { out = out substr(line, 1, a - 1); line = substr(line, a + 2); blk = 1; continue }
-                    out = out line; line = ""
-                }
-                print out
-            }' {} + 2>/dev/null) \
-        | grep -oE "(JavaLanguageVersion\.of|jvmToolchain)[[:space:]]*\([[:space:]]*[\"']?[0-9]+" \
-        | grep -oE '[0-9]+$' | grep -E '^[0-9]{1,3}$' | sed 's/^0*\([0-9]\)/\1/' | sort -n | tail -1 || true
+    # The gradle.properties values come first, from regular files only (find
+    # -type f: never a symlink, a FIFO or a device), as "folder<TAB>key<TAB>value"
+    # lines, at most 64 KB of them. The build files' awk gets them through the
+    # environment and opens no file itself.
+    (cd "$d" 2>/dev/null || exit 0
+     _JAVA_TC_PROPS="$(find . -maxdepth 6 \( "${prune[@]:1}" \) -prune -o -type f -name gradle.properties \
+         -exec awk "$(_java_toolchain_props_awk)" {} + 2>/dev/null | head -c 65536)" \
+         find . -maxdepth 6 \( "${prune[@]:1}" \) -prune -o -type f \( -name '*.gradle' -o -name '*.gradle.kts' \) \
+         -exec awk "$(_java_toolchain_awk)" {} + 2>/dev/null) \
+        | grep -E '^[0-9]{1,3}$' | sed 's/^0*\([0-9]\)/\1/' | sort -n | tail -1 || true
+}
+
+# _java_toolchain_props_awk: the awk program that reads gradle.properties
+# files for java_toolchain_version. Prints "folder<TAB>key<TAB>value" for each
+# key Gradle property names can take (letters, digits, _ . -) with a value of
+# at most 16 characters. A line over 4096 characters and a path holding a tab
+# are skipped.
+_java_toolchain_props_awk() {
+    cat <<'AWK'
+FNR == 1 { dir = FILENAME; sub(/\/[^\/]*$/, "", dir); skip = (FILENAME ~ /\t/) }
+skip || length($0) > 4096 { next }
+{
+    line = $0; sub(/^[ \t]+/, "", line)
+    if (line == "" || line ~ /^[#!]/) next
+    if (!match(line, /[=: \t]/)) next
+    key = substr(line, 1, RSTART - 1)
+    if (key !~ /^[A-Za-z0-9_.-]+$/) next
+    val = substr(line, RSTART); sub(/^[ \t]*[=:]?[ \t]*/, "", val); sub(/[ \t\r]+$/, "", val)
+    if (length(val) <= 16) print dir "\t" key "\t" val
+}
+AWK
+}
+
+# _java_toolchain_awk: the awk program java_toolchain_version runs over the
+# build files, printing one candidate version per line. It drops // line
+# comments and /* */ blocks (across lines too, and never past the end of a
+# file) before anything is matched. A line over 4096 characters holds no
+# declaration worth reading and is skipped, in a gradle.properties file too,
+# which keeps the scan of a crafted file linear. Per file it reads:
+#   JavaLanguageVersion.of(25), jvmToolchain("25")     the number itself
+#   JavaLanguageVersion.of(v), jvmToolchain(v.toInt())  v, looked up below
+#   def v = <expression> (also val, var, final, a type, val v: String = ...)
+#                                                       the first one in the file
+#   val v: String by project                            the Gradle property v
+# A definition outside any { } block wins over one inside a block; among
+# equals the first in the file counts (a later reassignment is not followed;
+# the rerun in java_retry_image covers a build where that matters).
+# A definition that reads a Gradle property p (hasProperty("p"), getProperty,
+# findProperty, property, providers.gradleProperty("p"), properties["p"]; not
+# System.getProperty) takes p=N from the gradle.properties nearest the build
+# file, up to the scanned folder, as _java_toolchain_props_awk read it into
+# _JAVA_TC_PROPS (the last value of a key in a file counts, as in Gradle). Failing that, the default it gives counts:
+# the number after its last ?: or the ternary's :, or in getOrElse("N"); or
+# the number it is set to. Only the awk features busybox, mawk and the BSD
+# awk share are used.
+_java_toolchain_awk() {
+    cat <<'AWK'
+function strip(s) {
+    sub(/^[ \t]+/, "", s); sub(/[ \t]+$/, "", s); return s
+}
+function digits(s) { gsub(/[^0-9]/, "", s); return s }
+BEGIN {
+    n = split(ENVIRON["_JAVA_TC_PROPS"], pl, "\n")
+    for (i = 1; i <= n; i++) {
+        if (split(pl[i], pf, "\t") != 3) continue
+        props[pf[1] SUBSEP pf[2]] = pf[3]
+    }
+}
+# The value of Gradle property p in the gradle.properties nearest file f.
+function gprop(f, p,    dir) {
+    dir = f
+    while (dir ~ /\//) {
+        sub(/\/[^\/]*$/, "", dir)
+        if ((dir SUBSEP p) in props) return (props[dir SUBSEP p] ~ /^[0-9]+$/) ? props[dir SUBSEP p] : ""
+    }
+    return ""
+}
+# The Gradle property an expression reads, or "".
+function propname(e,    pre, m) {
+    while (match(e, /([Pp]roperty[ \t]*\([ \t]*|properties[ \t]*\[[ \t]*)["'][A-Za-z0-9_.-]+["']/)) {
+        pre = substr(e, 1, RSTART - 1)
+        m = substr(e, RSTART, RLENGTH)
+        e = substr(e, RSTART + RLENGTH)
+        if (pre ~ /System\.(get)?$/) continue
+        sub(/^[^"']*["']/, "", m); sub(/["']$/, "", m)
+        return m
+    }
+    return ""
+}
+# The number an expression falls back to, or "".
+function fallback(e) {
+    if (match(e, /getOrElse[ \t]*\([ \t]*["']?[0-9]+["']?[ \t]*\)/)) return digits(substr(e, RSTART, RLENGTH))
+    if (e ~ /\?/ && match(e, /:[ \t]*\(?[ \t]*["']?[0-9]+["']?[ \t]*\)?[ \t]*(\.(toInteger|toInt|toString)\(\)|[ \t]+as[ \t]+(int|Integer))?[ \t]*\)?[ \t]*;?[ \t]*$/))
+        return digits(substr(e, RSTART, RLENGTH))
+    if (e ~ /^[ \t]*["']?[0-9]+["']?[ \t]*(\.(toInteger|toInt|toString)\(\)|[ \t]+as[ \t]+(int|Integer))?[ \t]*;?[ \t]*$/) return digits(e)
+    return ""
+}
+function flush(f,    name, e, p, v) {
+    for (name in refs) {
+        v = ""
+        if (name in byproj) v = gprop(f, name)
+        else if (name in defs) {
+            e = (name in defs0) ? defs0[name] : defs[name]
+            p = propname(e)
+            if (p != "") v = gprop(f, p)
+            if (v == "") v = fallback(e)
+        }
+        if (v != "") print v
+    }
+    split("", refs); split("", defs); split("", defs0); split("", byproj)
+}
+FNR == 1 { if (cur != "") flush(cur); cur = FILENAME; blk = 0; depth = 0 }
+length($0) > 4096 { next }
+{
+    line = $0; out = ""
+    while (line != "") {
+        if (blk) { i = index(line, "*/"); if (!i) { line = ""; break }; line = substr(line, i + 2); blk = 0; continue }
+        a = index(line, "/*"); b = index(line, "//")
+        if (b && (!a || b < a)) { out = out substr(line, 1, b - 1); line = ""; break }
+        if (a) { out = out substr(line, 1, a - 1); line = substr(line, a + 2); blk = 1; continue }
+        out = out line; line = ""
+    }
+    if (match(out, /^[ \t]*val[ \t]+[A-Za-z_][A-Za-z0-9_]*([ \t]*:[ \t]*[A-Za-z?]+)?[ \t]+by[ \t]+project([^A-Za-z0-9_.]|$)/)) {
+        h = out; sub(/^[ \t]*val[ \t]+/, "", h); match(h, /^[A-Za-z_][A-Za-z0-9_]*/)
+        h = substr(h, 1, RLENGTH)
+        if (!(h in defs) && !(h in byproj)) byproj[h] = 1
+    } else if (match(out, /^[ \t]*((def|val|var|final|static|private|int|Integer|String)[ \t]+)+[A-Za-z_][A-Za-z0-9_]*([ \t]*:[ \t]*[A-Za-z?]+)?[ \t]*=/) \
+               && substr(out, RSTART + RLENGTH, 1) != "=") {
+        h = substr(out, 1, RLENGTH - 1); e = substr(out, RLENGTH + 1)
+        sub(/[ \t]*:[ \t]*[A-Za-z?]+[ \t]*$/, "", h); h = strip(h)
+        match(h, /[A-Za-z_][A-Za-z0-9_]*$/); h = substr(h, RSTART, RLENGTH)
+        if (!(h in defs) && !(h in byproj)) defs[h] = e
+        if (depth == 0 && !(h in defs0)) defs0[h] = e
+    }
+    rest = out
+    while (match(rest, /(JavaLanguageVersion\.of|jvmToolchain)[ \t]*\([ \t]*/)) {
+        rest = substr(rest, RSTART + RLENGTH)
+        if (match(rest, /^["']?[0-9]+/)) { print digits(substr(rest, 1, RLENGTH)); continue }
+        if (match(rest, /^[A-Za-z_][A-Za-z0-9_]*[ \t]*(\.(toInteger|toInt|toString)\(\)|[ \t]+as[ \t]+(int|Integer))?[ \t]*\)/)) {
+            h = substr(rest, 1, RLENGTH); match(h, /^[A-Za-z_][A-Za-z0-9_]*/)
+            refs[substr(h, 1, RLENGTH)] = 1
+        }
+    }
+    # The block depth at the start of the next line.
+    t = out; depth += gsub(/\{/, "", t); t = out; depth -= gsub(/\}/, "", t)
+    if (depth < 0) depth = 0
+}
+END { if (cur != "") flush(cur) }
+AWK
 }
 
 # The JDKs the published cdxgen Java images carry, and the one used when
@@ -1077,6 +1208,50 @@ EOF
     if [ -n "$w" ] && [ "$j" != "$CDXGEN_JAVA_DEFAULT" ] && [ "$JAVA_PICK_WHY" != toolchain ]; then
         echo "[INFO] The Gradle wrapper (Gradle $w) cannot run on Java $CDXGEN_JAVA_DEFAULT; using the cdxgen Java $j image."
     fi
+}
+
+# java_retry_image <dir> <stage-1 log> <image used>: sets JAVA_RETRY_IMAGE to
+# the cdxgen Java image to run stage 1 again in, or to nothing. Stage 1's build-prep.sh writes
+# "java-toolchain-missing=N" when Gradle failed for want of a Java N
+# toolchain, which covers a version this file cannot read (a version catalog,
+# a convention plugin's own logic). Sets JAVA_RETRY_JDK to N. Nothing when
+# CDXGEN_JAVA_IMAGE names the image, when no published image has Java N, when
+# that image is the one used, or when a Gradle wrapper of <dir> cannot run on
+# Java N (the second run would fail too).
+java_retry_image() {
+    local n img
+    JAVA_RETRY_IMAGE=""; JAVA_RETRY_JDK=""
+    [ -z "$(_java_image_override)" ] || return 0
+    [ -f "${2:-}" ] || return 0
+    n="$(grep -oE '^\[build-prep\] gradle-[a-z-]+: .*\(java-toolchain-missing=[0-9]+\)' "$2" 2>/dev/null \
+        | grep -oE '[0-9]+\)$' | tr -d ')' | grep -E '^[0-9]{1,3}$' | sed 's/^0*\([0-9]\)/\1/' | sort -n | tail -1)" || n=""
+    [ -n "$n" ] && _java_has_image "$n" || return 0
+    gradle_wrappers "${1:-}"
+    # shellcheck disable=SC2086 # one argument per version
+    case " $(_gradle_jdks $GRADLE_WRAPPER_VERSIONS) " in *" $n "*) ;; *) return 0 ;; esac
+    img="${CDXGEN_IMAGE_PREFIX}$(_java_image_name "$n"):$CDXGEN_TAG"
+    [ "$img" != "${3:-}" ] || return 0
+    # shellcheck disable=SC2034  # read by the caller after the call
+    {
+        JAVA_RETRY_IMAGE="$img"
+        JAVA_RETRY_JDK="$n"
+    }
+}
+
+# java_retry_image_ready <image>: true when the image is here or a pull of it
+# succeeds now, for the web UI (the CLI uses its _optin_image_ready, which
+# does the same). The pull shows docker's own progress. SBOM_PULL=never only
+# looks, so an offline run does not try; SBOM_PULL=always pulls a present
+# image too and uses the local copy when that pull fails.
+java_retry_image_ready() {
+    if [ "${SBOM_PULL:-missing}" != always ] && docker image inspect "$1" >/dev/null 2>&1; then
+        return 0
+    fi
+    [ "${SBOM_PULL:-missing}" != never ] || return 1
+    echo "[INFO] Pulling $1..."
+    docker pull "$1" && return 0
+    [ "${SBOM_PULL:-missing}" = always ] && docker image inspect "$1" >/dev/null 2>&1 || return 1
+    echo "[WARN] Could not pull $1 (SBOM_PULL=always); using the copy already here."
 }
 
 # java_mixed_note <dir>: a mixed tree runs in the all-in-one image, whatever

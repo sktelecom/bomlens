@@ -41,7 +41,7 @@ cdxgen이 프로젝트를 읽기 전에 `docker/lib/build-prep.sh`가 프로젝�
 | 생태계 | 실행하는 것 | 실행 조건 |
 |--------|-------------|-----------|
 | Java (Maven) | cdxgen이 Maven을 실행해 그래프를 만듭니다. 컴포넌트 해시를 구하려고 의존성 jar도 내려받습니다 | 매번 |
-| Java (Gradle) | `gradle dependencies`(`./gradlew`가 있으면 그것을 씀) | 매번 |
+| Java (Gradle) | Gradle을 한 번 실행해(`./gradlew`가 있으면 그것을 씀) 모든 프로젝트의 `runtimeClasspath`를 해석하고 아래 범위 필터에 씁니다. 이 실행이 시간 초과가 아닌 이유로 실패하면(6.6 미만 Gradle 등) 루트 프로젝트에서 `gradle dependencies`를 대신 실행합니다 | 매번 |
 | Android | Gradle로 release 런타임 클래스패스를 해석해 아래 범위 필터에 씁니다 | 매번 |
 | Node.js (npm) | cdxgen이 이미지 안의 npm으로 `package.json`을 해석하고, 범위 필터용 프로덕션 의존성 목록을 따로 해석합니다 | 매번 |
 | Python | `pip install -r requirements.txt`. 한꺼번에 설치하다 실패하면 항목마다 다시 시도해, 고정 버전 하나가 실패해도 나머지는 잃지 않습니다 | `requirements.txt`가 있을 때 |
@@ -66,9 +66,14 @@ cdxgen이 프로젝트를 읽기 전에 `docker/lib/build-prep.sh`가 프로젝�
 | 생태계 | 남기는 것 | 빼는 것 | 전부 남기려면 |
 |--------|-----------|---------|---------------|
 | Maven | `compile`, `runtime` 범위 | `test`, `provided`, `system` | `BOMLENS_MAVEN_FULL_GRAPH=1` |
+| Gradle(Java) | 각 프로젝트의 런타임 클래스패스 | 테스트, compileOnly, annotation processor 의존성 | `BOMLENS_GRADLE_FULL_GRAPH=1` |
 | Android | release 런타임 클래스패스, 없으면 알파벳순 첫 flavor의 release 변형 | 테스트, lint, 빌드 도구 | `BOMLENS_ANDROID_FULL_GRAPH=1` |
 | Node.js (npm) | 임시 사본에서 `npm install --omit=dev --package-lock-only`로 해석한 프로덕션 의존성 | `devDependencies`와 그것만 필요로 하는 것 | `BOMLENS_NODE_FULL_GRAPH=1` |
 | PHP | `require` | `require-dev` | `BOMLENS_PHP_FULL_GRAPH=1` |
+
+Gradle(Java)은 BomLens의 init script로 Gradle을 한 번 실행해(그 실행에서만 configuration cache를 끔) 모든 프로젝트의 `runtimeClasspath`를 해석하고, 그 결과를 SBOM에 남깁니다. `runtimeClasspath`가 없는 프로젝트(Kotlin Multiplatform, 커버리지 플러그인만 쓰는 루트 등)는 테스트 구성과 커버리지, lint, 컴파일러, 문서 생성, annotation processor 도구의 구성을 뺀 나머지 구성이 해석한 의존성을 남깁니다. 빌드가 다른 빌드를 포함하거나(`includeBuild`), 해석하지 못한 구성이 있거나, Gradle 실행이 실패하거나 시간을 넘기면 Gradle 전체 그래프를 그대로 둡니다. configuration cache를 끄는 옵션을 모르는 6.6 미만 Gradle은 실행이 실패하는 경우에 해당합니다. Android에서 release 런타임 클래스패스가 없는 빌드(Android SDK 이미지로 스캔한 Java Gradle 빌드)는 Android 단계가 시간을 넘기지 않았다면 Java 방식으로 좁힙니다. 두 경우 모두 Gradle 해석이 아니라 소스 트리에서 찾은 jar는 항상 남습니다.
+
+런타임 클래스패스만 읽는 데는 한계가 두 가지 있습니다. `runtimeClasspath`가 있는 프로젝트가 다른 구성(사용자 정의 `agent`나 `distribution` 구성, Shadow 플러그인의 `shadow` 구성)으로 배포하는 의존성은 SBOM에서 빠집니다. 이런 빌드는 `BOMLENS_GRADLE_FULL_GRAPH=1`로 스캔하세요. 또 다른 빌드를 포함하는 빌드는 전체 그래프를 그대로 둡니다. 컨벤션 플러그인에 쓰는 `pluginManagement { includeBuild("build-logic") }`처럼 플러그인용으로만 포함한 빌드도 같습니다. Gradle이 그런 빌드도 포함된 빌드로 나열하는데, BomLens가 그 빌드를 코드를 쓰려고 포함한 빌드(cdxgen이 그 빌드 자신의 의존성을 SBOM에 넣음)와 구별하지 못하기 때문입니다. 이때 SBOM에는 이 필터가 생기기 전처럼 테스트와 compileOnly 의존성이 남습니다.
 
 `package-lock.json`이 없는 yarn, pnpm, bun 워크스페이스 루트는 프로덕션 의존성 목록에 멤버의 의존성이 잡히지 않으므로 Node.js 전체 그래프를 그대로 둡니다. 환경 변수 목록은 [Docker 이미지](../reference/docker-image.ko.md#환경-변수)에, 그 밖에 생태계마다 다른 제약은 [지원 생태계](../reference/ecosystems.ko.md)에 있습니다.
 

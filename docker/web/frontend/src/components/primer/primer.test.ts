@@ -85,14 +85,17 @@ describe("licence tier mapping", () => {
     }
   });
 
-  it("gives each tier its own colour", () => {
-    const colours = LICENSE_TIER_ORDER.map((t) => TIER_DISPLAY_COLOR[t]);
-    expect(new Set(colours).size).toBe(colours.length);
+  it("gives each tier its own bar fill; permissive and uncategorized share the neutral grey", () => {
+    const fills = LICENSE_TIER_ORDER.map((t) => tierFill(t));
+    expect(new Set(fills).size).toBe(fills.length);
+    expect(TIER_DISPLAY_COLOR.permissive).toBe("gray");
+    expect(TIER_DISPLAY_COLOR.uncategorized).toBe("gray");
   });
 
   it("names Primer display variables", () => {
     expect(tierFg("strong-copyleft")).toBe("var(--display-purple-fgColor)");
-    expect(tierFill("permissive")).toBe("var(--display-teal-bgColor-emphasis)");
+    expect(tierFill("uncategorized")).toBe("var(--display-gray-bgColor-emphasis)");
+    expect(tierFill("permissive")).toBe("var(--borderColor-emphasis)");
   });
 });
 

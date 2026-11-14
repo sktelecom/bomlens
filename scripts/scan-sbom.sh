@@ -1178,8 +1178,9 @@ if [ "$UI_MODE" = "true" ]; then
     # must reach server.py inside the UI container (it reads the env var
     # itself; a host-side default here would never be seen there).
     CANCEL_ENV_FLAGS=(-e BOMLENS_CANCEL_GRACE)
-    # The web UI's source scans pull the cdxgen images from the same mirror.
-    CDXGEN_ENV_FLAGS=(-e CDXGEN_IMAGE_PREFIX -e CDXGEN_JAVA_IMAGE -e BOMLENS_OS_LICENSES)
+    # The web UI's source scans pull the cdxgen images from the same mirror,
+    # and follow SBOM_PULL when a Java rerun needs another image.
+    CDXGEN_ENV_FLAGS=(-e CDXGEN_IMAGE_PREFIX -e CDXGEN_JAVA_IMAGE -e SBOM_PULL -e BOMLENS_OS_LICENSES)
     # /bomlens-state: the same host-persistent guard-state directory
     # the CLI path uses, so a directory scan launched through --ui can also
     # recover a source tree a prior, too-hard-killed scan left dirty. entrypoint.sh
@@ -1396,6 +1397,8 @@ cleanup() {
     # The folder of the govulncheck copy --reachability hands stage 1
     # (removed right after it, too).
     [ -z "${REACH_TOOLS_DIR:-}" ] || rm -rf -- "$REACH_TOOLS_DIR" 2>/dev/null || true
+    # The first stage 1 result, kept aside while a Java rerun runs.
+    [ -z "${STAGE1_FIRST_SBOM:-}" ] || rm -f -- "$STAGE1_FIRST_SBOM" 2>/dev/null || true
 }
 # Ctrl+C or kill ends the run here, after cleanup, rather than going on to the
 # next step. The container is stopped before its mounted temp dirs are
@@ -1407,6 +1410,7 @@ trap 'cleanup; echo "[INFO] Scan cancelled (Ctrl+C); the scan container was stop
 trap 'cleanup; echo "[INFO] Scan stopped (TERM); the scan container was stopped." >&2; exit 143' TERM
 RUNNING_CONTAINER_NAME=""
 REACH_TOOLS_DIR=""
+STAGE1_FIRST_SBOM=""
 
 # Host-persistent guard state: when a scan is interrupted hard
 # enough that build-prep.sh's own trap never runs (SIGKILL, OOM, a host
@@ -3217,6 +3221,15 @@ if [ "$MODE" = "SOURCE" ]; then
     # grace (measured: a 30s grace still ended in a forced SIGKILL every
     # time). Invoking the script file directly makes it PID 1, so its trap is
     # what the SIGTERM actually reaches.
+    #
+    # A Java build whose Gradle asked for a toolchain JDK this image lacks
+    # (java_retry_image) runs once more, in the image with that JDK; the loop
+    # below ends after the second pass. Each pass takes the guard slot anew:
+    # the first pass's build-prep.sh restored the tree and cleared it, or
+    # drop_unused_guard_state did. The loop body is not indented.
+    STAGE1_TRY=1; STAGE1_FIRST_SBOM=""; STAGE1_FIRST_RC=""; STAGE1_FIRST_LOG=""; STAGE1_FIRST_IMG=""
+    while :; do
+    # --- stage 1 pass $STAGE1_TRY (of at most 2) begins
     # $$ alone can collide: two scans (CLI + web UI, or parallel CI jobs) on
     # the same host can land on the same PID space at different times, or a
     # container from an earlier crashed run can still be named this if it was
@@ -3273,6 +3286,47 @@ if [ "$MODE" = "SOURCE" ]; then
     [ -z "$REACH_TOOLS_DIR" ] || rm -rf -- "$REACH_TOOLS_DIR"
     REACH_TOOLS_DIR=""
     STAGE1_RC=$("${DOCKER_ENV[@]}" docker wait "$STAGE1_CONTAINER" 2>/dev/null || echo 1)
+    [ "$STAGE1_TRY" -eq 1 ] && [ "$LANG_DET" = java ] || break
+    java_retry_image "$SCAN_INPUT_DIR" "$STAGE1_LOG" "$CDX_IMG"
+    [ -n "$JAVA_RETRY_IMAGE" ] || break
+    echo "[INFO] Gradle asked for Java $JAVA_RETRY_JDK; rerunning in $JAVA_RETRY_IMAGE"
+    # A pull shows its progress and follows SBOM_PULL like an opt-in image.
+    # The exited first container stays for the failure handling below until
+    # the rerun starts; a Ctrl+C during the pull removes it (cleanup).
+    RUNNING_CONTAINER_NAME="$STAGE1_CONTAINER"
+    if ! _optin_image_ready "$JAVA_RETRY_IMAGE"; then
+        RUNNING_CONTAINER_NAME=""
+        _s1_why="could not be pulled"
+        [ "$SBOM_PULL" != never ] || _s1_why="SBOM_PULL=never"
+        echo "[WARN] $JAVA_RETRY_IMAGE is not here ($_s1_why); keeping the result from $CDX_IMG."
+        break
+    fi
+    RUNNING_CONTAINER_NAME=""
+    "${DOCKER_ENV[@]}" docker rm -f "$STAGE1_CONTAINER" >/dev/null 2>&1 || true
+    # The first result stays aside until the second run has one of its own.
+    if [ -s "$OUTPUT_HOST_DIR/$OUTPUT_FILE" ] && STAGE1_FIRST_SBOM=$(mktemp) \
+       && mv -f "$OUTPUT_HOST_DIR/$OUTPUT_FILE" "$STAGE1_FIRST_SBOM"; then
+        STAGE1_FIRST_RC="$STAGE1_RC"; STAGE1_FIRST_LOG="$STAGE1_LOG"; STAGE1_FIRST_IMG="$CDX_IMG"
+    else
+        [ -z "$STAGE1_FIRST_SBOM" ] || rm -f "$STAGE1_FIRST_SBOM"
+        STAGE1_FIRST_SBOM=""
+        rm -f "$OUTPUT_HOST_DIR/$OUTPUT_FILE" "$STAGE1_LOG"
+    fi
+    CDX_IMG="$JAVA_RETRY_IMAGE"; STAGE1_TRY=2
+    # --- stage 1 pass ends; the second pass follows
+    done
+    # --- stage 1 passes done
+    if [ -n "$STAGE1_FIRST_SBOM" ]; then
+        if [ "$STAGE1_RC" -ne 0 ] || [ ! -s "$OUTPUT_HOST_DIR/$OUTPUT_FILE" ]; then
+            echo "[WARN] The rerun in $CDX_IMG left no SBOM (rc=$STAGE1_RC, log: $STAGE1_LOG); keeping the result from $STAGE1_FIRST_IMG."
+            "${DOCKER_ENV[@]}" docker rm -f "$STAGE1_CONTAINER" >/dev/null 2>&1 || true
+            mv -f "$STAGE1_FIRST_SBOM" "$OUTPUT_HOST_DIR/$OUTPUT_FILE"
+            STAGE1_RC="$STAGE1_FIRST_RC"; STAGE1_LOG="$STAGE1_FIRST_LOG"; CDX_IMG="$STAGE1_FIRST_IMG"
+        else
+            rm -f "$STAGE1_FIRST_SBOM" "$STAGE1_FIRST_LOG"
+        fi
+        STAGE1_FIRST_SBOM=""
+    fi
     # A package registry or download refused for an untrusted certificate (a
     # proxy that inspects TLS) gets one line naming SBOM_EXTRA_CA_CERTS.
     tls_trust_hint "cdxgen" "$STAGE1_LOG" 2>&1

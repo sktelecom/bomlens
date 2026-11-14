@@ -183,6 +183,7 @@ MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL='*' docker run --rm \
 | `BOMLENS_MAVEN_FULL_GRAPH` | — | — | Maven 소스 스캔: `1`로 설정하면 compile/runtime 스코프로 거르지 않고 전체 해석 그래프를 유지 |
 | `BOMLENS_NODE_FULL_GRAPH` | — | — | Node.js 소스 스캔: `1`로 설정하면 production 전용 집합 대신 dev와 production을 합친 전체 그래프를 유지 |
 | `BOMLENS_ANDROID_FULL_GRAPH` | - | - | Android 소스 스캔(Android SDK 이미지): `1`로 설정하면 release 런타임 클래스패스로 거르지 않고 빌드와 테스트 도구까지 포함한 전체 그래프를 유지 |
+| `BOMLENS_GRADLE_FULL_GRAPH` | - | - | Java Gradle 소스 스캔: `1`로 설정하면 각 프로젝트의 런타임 클래스패스로 거르지 않고 테스트와 compileOnly 의존성까지 포함한 전체 그래프를 유지. 필터용 Gradle 실행은 루트만 해석하던 기존 준비 실행과 달리 모든 프로젝트를 해석하므로, 하위 프로젝트가 많은 빌드에서는 이 단계가 더 오래 걸림 |
 | `BOMLENS_PHP_FULL_GRAPH` | - | - | PHP(Composer) 소스 스캔: `1`로 설정하면 required 대상으로 거르지 않고 require와 require-dev를 합친 전체 그래프를 유지 |
 | `BOMLENS_KEEP_BUILD_OUTPUT` | — | — | 소스 스캔: `1`로 설정하면 의존성 해석 결과를 그대로 남김. 기본값에서는 해석 과정이 고쳐 쓴 파일(`go.mod`, `go.sum`, `Cargo.lock`, `Gemfile.lock`, `Package.resolved`)을 되돌리고 새로 생긴 빌드 디렉터리를 지워 스캔한 프로젝트를 원래 상태로 돌려줌 |
 | `BOMLENS_PREP_TIMEOUT` | - | `900`(Gradle/Android 단계는 `1800`) | 의존성 해석 단계(Cargo, Go, Bundler, pip, npm, pnpm, PHP Composer, Swift, Gradle/Android) 하나가 실행될 수 있는 최대 시간(초). 넘으면 그 단계를 멈추고 스캔은 그 단계 없이 계속됨. 값을 주면 모든 단계의 두 기본값을 함께 덮어씀. 실패하거나 시간을 넘긴 단계는 자신의 출력과 함께 로그에 남고 SBOM에 `bomlens:pipeline-step-failed`로 기록되며, 스캔 자체는 끝까지 완료됨 |

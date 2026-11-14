@@ -30,8 +30,8 @@ cd examples/java-gradle
 ## Expected Output
 
 The scan writes its outputs into a `JavaGradle_1.0.0/` folder. The main SBOM, `JavaGradle_1.0.0/JavaGradle_1.0.0_bom.json`, contains:
-- ~18-28 total components (including transitive dependencies)
-<!-- expected-components: 18-28 -->
+- ~11-16 total components (the runtime classpath, transitive dependencies included; test-only dependencies such as JUnit are left out)
+<!-- expected-components: 11-16 -->
 - Guava and its dependencies
 - Jackson core, annotations, databind
 - SLF4J and Logback

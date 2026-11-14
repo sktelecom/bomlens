@@ -342,56 +342,82 @@ done)
 # ---------- HTML (all dynamic fields escaped to prevent XSS from package metadata) ----------
 esc() { printf '%s' "$1" | sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g'; }
 PROJECT_ESC="$(esc "$PROJECT")"
+# The NOTICE is written in English whatever REPORT_LANG says: it is the text a
+# product ships, and its license texts are English. n_s KEY ENGLISH [ARGS] fills
+# an English string with printf.
+REPORT_LANG="en"
+n_s() {
+    local f="$2"
+    shift 2
+    # shellcheck disable=SC2059  # the format is a trusted built-in string
+    printf -- "$f" "$@"
+}
+report_bom_facts "$SBOM"
+N_VERSION="$(report_version "$PROJECT" "$OUT_PREFIX")"
+N_TITLE="$(n_s title 'Third-party open source notice')"
+N_LICS="$(n_s licenses_n '%s licenses' "$(report_num "$TOTAL_LIC")")"; [ "$TOTAL_LIC" = "1" ] && N_LICS="$(n_s licenses_1 '1 license')"
+N_SRC="$(n_s source 'Source:')"; N_COPY="$(n_s copyright 'Copyright:')"
+N_COMPS_FMT="$(n_s components_fmt '%s component(s)' '%s')"
+N_UNVERIFIED="$(n_s unverified 'unverified name — not an SPDX identifier; confirm against the component'"'"'s license file')"
 {
     cat <<HTMLHEAD
 <!DOCTYPE html>
-<html lang="en">
+<html lang="${REPORT_LANG}">
 <head>
 <meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline';">
-<title>Open Source Notice — ${PROJECT_ESC}</title>
+<title>${N_TITLE} — ${PROJECT_ESC}</title>
 HTMLHEAD
     report_style
-    cat <<HTMLHEAD2
-</head>
-<body>
-<header class="report-header">
- <div class="wordmark">BomLens<span class="tag">SBOM</span></div>
- <div class="report-kind">Open Source Notice</div>
-</header>
-<h1>Third-party Open Source Notice</h1>
-<p class="meta">Project: ${PROJECT_ESC} &middot; Generated: $(report_time_html "$GEN_AT") &middot; Components: ${TOTAL_COMP} &middot; Licenses: ${TOTAL_LIC}</p>
-HTMLHEAD2
+    echo "</head>"
+    echo "<body>"
+    report_page_head "$N_TITLE" "$PROJECT_ESC" "$N_VERSION" "" \
+        "$(esc "$(report_type_label "${MODE:-}")")" "$(report_time_html "$GEN_AT")" \
+        "$(report_str components "$(report_num "$TOTAL_COMP")")" "$N_LICS"
 
     # License review banner (AI behavioral-use / non-commercial). Escaped via @html.
     if [ "$REVIEW_N" -gt 0 ]; then
-        echo '<div class="review"><h2>License review needed — AI / restrictive terms</h2>'
-        echo '<p class="meta">behavioral-use = use-based restrictions (RAIL/Llama/Gemma, etc.); non-commercial = restricted commercial use. Human review required.</p><ul>'
+        echo "<div class=\"banner\"><h2 class=\"banner-title\">$(n_s review_title 'License review needed — AI / restrictive terms')</h2>"
+        echo "<p class=\"meta\">$(n_s review_intro 'behavioral-use = use-based restrictions (RAIL/Llama/Gemma, etc.); non-commercial = restricted commercial use. Human review required.')</p><ul>"
         echo "$REVIEW" | jq -r '.[] |
             "<li><b>[" + (.flag|@html) + "]</b> " + (.license|@html) + " — "
             + (.components | map(@html) | join(", ")) + "</li>"'
         echo "</ul></div>"
     fi
 
-    # jq @html escapes license names, component identifiers, source URLs and
-    # copyright. An http(s) source is rendered as a link; a raw purl as plain text.
-    # The Copyright line renders only when component.copyright was captured; when
-    # it wasn't, attrhtml prints nothing rather than a placeholder.
-    echo "$LICENSE_MAP" | jq -r "$SPDX_SHAPE_DEF"'
+    # A list of the licenses first, each a link to its box below.
+    if [ "$TOTAL_LIC" -gt 0 ]; then
+        echo "<div class=\"box\"><div class=\"box-head\"><h2>$(n_s toc 'Licenses')</h2><span class=\"counter\">$(report_num "$TOTAL_LIC")</span></div>"
+        echo "$LICENSE_MAP" | jq -r "$(report_jq_defs)"'"<ul class=\"rows toc\">" + ([ to_entries[]
+            | "<li><a href=\"#lic-" + ((.key + 1)|tostring) + "\">" + (.value.license|@html) + "</a><span class=\"counter\">"
+              + ((.value.count // (.value.components | length)) | num) + "</span></li>" ] | join("")) + "</ul>"'
+        echo "</div>"
+    fi
+
+    # One box per license: the license and its count in the head, one row per
+    # component. jq @html escapes license names, component identifiers, source
+    # URLs and copyright. An http(s) source is rendered as a link; a raw purl as
+    # plain text. The Copyright line renders only when component.copyright was
+    # captured; when it wasn't, attrhtml prints nothing rather than a placeholder.
+    echo "$LICENSE_MAP" | jq -r --arg src "$N_SRC" --arg cpy "$N_COPY" --arg cf "$N_COMPS_FMT" --arg unv "$N_UNVERIFIED" \
+        "$SPDX_SHAPE_DEF$(report_jq_defs)"'
         def srchtml($s):
           if $s == null then ""
           elif ($s | test("^https?://"))
-          then "<span class=\"src\">Source: <a href=\"" + ($s|@html) + "\" target=\"_blank\" rel=\"noopener noreferrer\">" + ($s|@html) + "</a></span>"
-          else "<span class=\"src\">Source: " + ($s|@html) + "</span>" end;
+          then "<span class=\"src\">" + ($src|@html) + " <a href=\"" + ($s|@html) + "\" target=\"_blank\" rel=\"noopener noreferrer\">" + ($s|@html) + "</a></span>"
+          else "<span class=\"src\">" + ($src|@html) + " " + ($s|@html) + "</span>" end;
         def attrhtml($c):
           if $c.copyright
-          then "<span class=\"attr\">Copyright: " + ($c.copyright|@html) + "</span>"
+          then "<span class=\"attr\">" + ($cpy|@html) + " " + ($c.copyright|@html) + "</span>"
           else "" end;
-        .[] |
-        "<div class=\"lic\"><h2>" + (.license | @html) + "</h2>" +
+        to_entries[] | (.key + 1) as $i | .value |
+        ((.count // (.components | length))) as $n |
+        "<div class=\"box lic\" id=\"lic-" + ($i|tostring) + "\"><div class=\"box-head\"><h2>" + (.license | @html) + "</h2>" +
+        "<span class=\"counter\" title=\"" + ($cf | sub("%s"; ($n|tostring)) | @html) + "\">" + ($n|num) + "</span>" +
         (if is_spdx_shaped(.license) then ""
-         else "<p class=\"unverified\">unverified name — not an SPDX identifier; confirm against the component'"'"'s license file</p>" end) +
-        "<p class=\"count\">" + ((.count // (.components | length)) | tostring) + " component(s)</p><ul>" +
+         else "<p class=\"unverified\">" + ($unv|@html) + "</p>" end) +
+        "</div><ul class=\"rows mono\">" +
         (.components | map("<li>" + (.comp | @html)
             + srchtml(.src)
             + attrhtml(.)
@@ -400,10 +426,10 @@ HTMLHEAD2
 
     # Bundled SPDX full texts (HTML-escaped, preformatted).
     if [ -n "$LICENSES_WITH_TEXT" ]; then
-        echo '<div class="texts"><h2>License texts (SPDX standard)</h2>'
+        echo "<div class=\"texts\"><h2>$(n_s texts 'License texts (SPDX standard)')</h2>"
         for lic in $LICENSES_WITH_TEXT; do
             esc=$(sed -e 's/&/\&amp;/g' -e 's/</\&lt;/g' -e 's/>/\&gt;/g' "$LICENSE_DIR/$lic.txt")
-            printf '<h3>%s</h3><pre>%s</pre>\n' "$lic" "$esc"
+            printf '<div class="box"><div class="box-head"><h3>%s</h3></div><pre>%s</pre></div>\n' "$lic" "$esc"
         done
         echo '</div>'
     fi
