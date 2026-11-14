@@ -20,7 +20,18 @@ export default defineConfig({
       title: 'BomLens',
       defaultLocale: 'root',
       locales: { root: { label: 'English', lang: 'en' }, ko: { label: '한국어', lang: 'ko' } },
-      customCss: ['./src/styles/github-like.css'],
+      favicon: '/favicon.svg',
+      customCss: ['./src/styles/bomlens-tokens.css', './src/styles/github-like.css'],
+      components: { PageTitle: './src/components/PageTitle.astro' },
+      expressiveCode: {
+        themes: ['github-light', 'github-dark'],
+        // Shell blocks get no window bar; the copy button stays.
+        defaultProps: { frame: 'code' },
+        styleOverrides: {
+          borderRadius: '0.5rem',
+          frames: { terminalTitlebarDotsForeground: 'transparent', terminalTitlebarDotsOpacity: '0' },
+        },
+      },
       tableOfContents: { minHeadingLevel: 2, maxHeadingLevel: 3 },
       sidebar: [
         { label: 'Get started', translations: { ko: '빠른 시작' }, items: ['concepts/what-is-sbom', 'start/first-scan', 'start/no-cli', 'reference/ui'] },

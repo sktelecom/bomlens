@@ -14,9 +14,14 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const source = path.resolve(here, '../../docs');
 const target = path.resolve(here, '../src/content/docs');
 const demoTarget = path.resolve(here, '../public/demo');
+const repoRoot = path.resolve(here, '../..');
+const homeSource = path.resolve(here, '../home');
 
 const skip = (rel) =>
   rel === 'korean-style-guide.md' ||
+  // The home pages use MkDocs-only syntax; docs-site/home/ holds the Starlight versions.
+  rel === 'index.md' ||
+  rel === 'index.ko.md' ||
   rel === 'requirements.txt' ||
   rel.startsWith('images/src/') ||
   rel.startsWith('internal/') ||
@@ -60,6 +65,22 @@ for (const entry of fs.readdirSync(source, { recursive: true, withFileTypes: tru
     fs.copyFileSync(from, to);
   }
 }
+
+// Home pages written for Starlight (cards need components, so they are MDX).
+for (const name of fs.readdirSync(homeSource)) {
+  fs.copyFileSync(path.join(homeSource, name), path.join(target, name));
+}
+
+// Shared design tokens, the same file the web UI and the reports use. The token
+// file puts dark values under `.dark`; Starlight marks its dark theme with
+// data-theme="dark" on <html>, so the same block is attached to that selector.
+const tokens = fs.readFileSync(path.join(repoRoot, 'docker/shared/bomlens-tokens.css'), 'utf8');
+if (tokens.split('.dark {').length !== 2) throw new Error("expected exactly one '.dark {' block in bomlens-tokens.css");
+fs.writeFileSync(
+  path.resolve(here, '../src/styles/bomlens-tokens.css'),
+  tokens.replace('.dark {', ".dark,\n:root[data-theme='dark'] {"),
+);
+fs.copyFileSync(path.join(source, 'images/logo-mark.svg'), path.resolve(here, '../public/favicon.svg'));
 
 // The demo is a prebuilt single-page app (scripts/build-demo-bundle.sh) with its
 // base path baked in as /bomlens/demo/, so it only works when the site is served at

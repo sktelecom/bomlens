@@ -1,0 +1,103 @@
+---
+title: BomLens
+description: BomLens is a local-first SBOM generator and open-source risk assessor. From source code, containers, binaries, firmware, or an SBOM you received, it produces a CycloneDX SBOM, an open-source notice, and a security and license risk report, from the CLI or a web UI, with no SaaS.
+template: splash
+tableOfContents: false
+---
+
+import { Card, CardGrid, LinkButton } from '@astrojs/starlight/components';
+
+<div class="home-hero">
+
+# Generate SBOMs and assess open-source risk, all locally
+
+From source, containers, binaries, firmware, or an SBOM you received. One run gives you an SBOM, an open-source notice, and a risk report. No SaaS and no account.
+
+BomLens is an [OWASP Incubator project](https://owasp.org/www-project-bomlens/).
+
+<div class="home-actions">
+  <LinkButton href="https://sktelecom.github.io/bomlens/demo/" variant="primary">Try the live demo</LinkButton>
+  <LinkButton href={`${import.meta.env.BASE_URL.replace(/\/$/, '')}/start/first-scan/`} variant="secondary">Get started</LinkButton>
+</div>
+
+[Download for Windows (.exe)](https://github.com/sktelecom/bomlens/releases/latest/download/BomLens-Setup.exe). It needs a Docker engine that is already running.
+
+</div>
+
+![BomLens web UI Overview screen for a finished scan: component, vulnerability, dependency and artifact counts, a needs-attention banner, and the severity and license classification distributions](./images/web-ui-demo.png)
+
+## What it does
+
+A local-first SBOM generator and open-source risk assessor for a single project. From source code, a container image, a binary, firmware, an SBOM you received, or a HuggingFace AI model, it produces an [SBOM](concepts/what-is-sbom.md) (CycloneDX 1.6), an open-source notice, and a security risk report in one run. For an AI model it builds a CycloneDX ML-BOM and checks it against the [G7 minimum elements for AI](guides/ai-model.md), whose clusters overlap with the EU AI Act's Annex IV.
+
+Want to see what a result looks like before installing anything? The [live demo](https://sktelecom.github.io/bomlens/demo/) is the real web UI holding one finished scan of each kind: a Spring Boot project from source, a container image, a device firmware image, an AI model as a CycloneDX ML-BOM, and a supplier SBOM checked against the format requirements. Nothing to install, and nothing is uploaded: it is a frozen copy of results produced by ordinary local runs.
+
+Prefer no command line? Download the installer and double-click it. A Docker engine is required; the free [Rancher Desktop](https://rancherdesktop.io/) works well on Windows. A step-by-step walkthrough is in the [no-CLI quick start](start/no-cli.md).
+
+## Where to start
+
+### If you want to try it
+
+<CardGrid>
+  <Card title="Getting started">
+
+Install through your first SBOM (desktop app, web UI, and CLI).
+
+[Getting started](start/first-scan.md)
+
+  </Card>
+  <Card title="No-CLI quick start">
+
+Make an SBOM and a notice with the desktop app, no command line.
+
+[Quick start](start/no-cli.md)
+
+  </Card>
+  <Card title="Input scenarios">
+
+GitHub URL, ZIP, local source, an existing SBOM, firmware.
+
+[Scenarios guide](guides/by-input.md)
+
+  </Card>
+  <Card title="Supplier SBOM">
+
+Validate an SBOM you received and issue a risk report.
+
+[Supplier SBOM](guides/supplier-sbom.md)
+
+  </Card>
+</CardGrid>
+
+### If you run it in CI or need the reference
+
+<CardGrid>
+  <Card title="CLI reference">
+
+Every option and analysis mode.
+
+[CLI reference](reference/cli.md)
+
+  </Card>
+  <Card title="CI/CD">
+
+Run scans in a pipeline and gate on the result.
+
+[CI/CD](guides/ci-cd.md)
+
+  </Card>
+  <Card title="Notice and security report">
+
+Generate and read the outputs, plus using the web UI.
+
+[Reports](guides/reports.md)
+
+  </Card>
+  <Card title="AI model SBOM">
+
+An ML-BOM for a HuggingFace model, checked against the G7 minimum elements and mapped to the EU AI Act.
+
+[AI model SBOM](guides/ai-model.md)
+
+  </Card>
+</CardGrid>
