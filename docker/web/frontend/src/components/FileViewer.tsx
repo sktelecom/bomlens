@@ -58,7 +58,8 @@ export function FileViewer({ name, scanId, onClose }: Props) {
       open
       onClose={onClose}
       label={name}
-      className="h-[80vh] max-w-4xl"
+      // Wide enough for the HTML reports' tables; the report fills the frame.
+      className="h-[80vh] w-[min(1200px,95vw)] max-w-none"
     >
       <div className="flex items-center justify-between gap-3 border-b px-4 py-3">
         <span className="truncate font-mono text-body-sm">{name}</span>
@@ -79,12 +80,12 @@ export function FileViewer({ name, scanId, onClose }: Props) {
           </Button>
         </div>
       </div>
-      <div className="flex-1 overflow-auto">
+      <div className={isHtml ? "min-h-0 flex-1" : "min-h-0 flex-1 overflow-auto"}>
         {isHtml ? (
           <iframe
             title={name}
             src={fileUrl(scanId, name)}
-            className="h-full w-full bg-white"
+            className="block h-full w-full border-0 bg-white"
           />
         ) : (
           <pre className="whitespace-pre-wrap break-all p-4 font-mono text-label">

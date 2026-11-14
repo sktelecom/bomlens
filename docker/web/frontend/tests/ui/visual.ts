@@ -33,17 +33,16 @@ export async function seedThemeLang(page: Page, theme: Theme, lang: Lang) {
   );
 }
 
-// `main` is the scroll container (overflow-y-auto) AND mounts with
-// `animate-fade-in` (translateY(4px) -> 0) on every section switch. Element
-// screenshots of `main` scroll it into view first, so a non-zero scrollTop or an
-// unsettled transform shifts the whole tall section a few px — a deterministic-
-// looking but flaky ~3% diff. Pin the transform to its end state, reset the
-// scroll to the top, and wait two animation frames so layout has fully settled
-// before the capture.
+// The page scrolls (the top bar and the navigation stick), and `main` mounts
+// with `animate-fade-in` (translateY(4px) -> 0). A non-zero scroll position or
+// an unsettled transform shifts the whole tall section a few px, a
+// deterministic-looking but flaky ~3% diff. Let the animations finish, reset
+// the page scroll to the top, and wait two animation frames so layout has fully
+// settled before the capture.
 export async function waitForMainSettled(page: Page) {
   await page.locator("main").evaluate(async (el) => {
     await Promise.all(el.getAnimations().map((a) => a.finished.catch(() => undefined)));
-    el.scrollTop = 0;
+    window.scrollTo(0, 0);
     await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
   });
 }

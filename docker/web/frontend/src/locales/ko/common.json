@@ -606,7 +606,6 @@
     "label": "언어"
   },
   "nav": {
-    "label": "섹션",
     "collapse": "사이드바 접기",
     "expand": "사이드바 펼치기",
     "recent": "최근 스캔",
@@ -614,7 +613,7 @@
     "recentScans": "스캔 관리",
     "recentEmpty": "최근 스캔이 아직 없습니다",
     "recentDelete": "이 스캔 삭제",
-    "sectionsHint": "스캔을 실행하면 결과 섹션이 여기에 표시됩니다.",
+    "sectionsHint": "스캔을 열면 섹션이 여기에 표시됩니다.",
     "group": {
       "inventory": "구성 정보",
       "ai": "AI",
@@ -642,7 +641,13 @@
     "helpVersionUnknown": "이 빌드에는 버전이 기록되지 않았습니다",
     "conformanceSplitTitle": "측정한 필수 검사 중 통과한 개수",
     "lookupTitle": "외부 취약점 조회",
-    "helpReport": "문제 신고"
+    "helpReport": "문제 신고",
+    "depsSaid": "직접 {{direct}}개, 전이 {{transitive}}개",
+    "confSaid": "필수 검사 {{total}}건 중 {{passed}}건 통과",
+    "opensNewTab": "새 탭에서 열림",
+    "pathLabel": "현재 위치",
+    "mainLabel": "주 메뉴",
+    "recentAll": "모든 스캔 보기"
   },
   "shortcuts": {
     "title": "키보드 단축키",
@@ -650,16 +655,18 @@
     "searchMove": "검색 결과 사이 이동",
     "searchOpen": "선택한 결과 열기",
     "close": "메뉴나 대화상자 닫기",
-    "list": "이 목록 보기",
-    "done": "닫기"
+    "list": "이 목록 보기"
   },
   "shell": {
     "newScan": "새 스캔",
-    "demoGetTool": "BomLens 받기",
     "demoBannerTitle": "읽기 전용 데모",
-    "demoBannerBody": "실제로 스캔한 결과를 그대로 담아 둘러볼 수 있게 한 화면입니다. 여기서는 스캔과 업로드, 삭제가 꺼져 있습니다. 직접 만든 결과를 보려면 각자 환경에서 BomLens를 실행하면 됩니다.",
+    "demoBannerBody": "실제 스캔 결과를 담은 읽기 전용 화면입니다. 스캔과 업로드, 삭제는 꺼져 있습니다.",
     "demoBannerCta": "실행 방법 보기",
-    "skipToMain": "본문으로 건너뛰기"
+    "skipToMain": "본문으로 건너뛰기",
+    "openingScan": "스캔을 여는 중입니다…",
+    "pageTitle": "{{page}} · {{app}}",
+    "scanPageTitle": "{{section}} · {{scan}} · {{app}}",
+    "scanRunning": "스캔 진행 중"
   },
   "search": {
     "placeholder": "컴포넌트, CVE 검색…",
@@ -667,7 +674,10 @@
     "components": "컴포넌트",
     "vulnerabilities": "취약점",
     "lookupGroup": "외부 조회",
-    "lookupExternal": "OSV.dev에서 \"{{term}}\" 조회"
+    "lookupExternal": "OSV.dev에서 \"{{term}}\" 조회",
+    "clear": "검색어 지우기",
+    "showAllComponents": "컴포넌트 모두 보기 ({{count}})",
+    "showAllVulns": "취약점 모두 보기 ({{count}})"
   },
   "lookup": {
     "title": "외부 취약점 조회",
@@ -1469,6 +1479,7 @@
     "sevDown": "이전 스캔보다 나아졌습니다",
     "delete": "삭제",
     "deleted": "스캔을 삭제했습니다",
+    "deleteFailed": "스캔을 삭제하지 못했습니다. 다시 시도하세요.",
     "scanNotFound": "스캔 “{{id}}”을(를) 찾지 못했습니다. 삭제되었을 수 있습니다.",
     "confirmDeleteTitle": "이 스캔을 삭제할까요?",
     "confirmDeleteBody": "{{scan}}의 산출물 파일이 이 컴퓨터에서 지워집니다. 다른 곳에 사본이 없으므로 되돌릴 수 없습니다.",

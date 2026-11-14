@@ -158,11 +158,10 @@ test("Recent menu re-opens a past scan from the top bar", async ({ page }) => {
   );
   await page.goto("/?ui=next");
 
-  // The top bar's Recent menu lists the past scan; opening it and clicking the
-  // entry loads the result. (Recent moved from the rail to the top bar so the
-  // rail stays purely the current scan's sections.)
-  await page.getByRole("banner").getByRole("button", { name: "Scan management" }).click();
-  const recent = page.getByRole("link", { name: /demo · 1.0/ });
+  // The top bar's Recent menu lists the past scan by project and version;
+  // opening it and clicking the entry loads the result.
+  await page.getByRole("banner").getByRole("button", { name: "Recent scans" }).click();
+  const recent = page.getByRole("link", { name: /demo 1\.0/ });
   await expect(recent).toBeVisible();
   await recent.click();
 
@@ -376,7 +375,7 @@ test("the rail spells out the way back to the scan list", async ({ page }) => {
 
   await page.goto("/?ui=next#/scan/demo_1.0");
 
-  const rail = page.getByRole("navigation", { name: "Sections" });
+  const rail = page.getByRole("navigation", { name: "Main" });
   // Real hash links, so both open in a new tab like every other rail row.
   await expect(rail.getByRole("link", { name: "New scan" })).toHaveAttribute("href", "#/new");
   const home = rail.getByRole("link", { name: "Scan management" });
@@ -1578,6 +1577,13 @@ test("AI scan exposes G7 conformance with present/advisory split", async ({ page
   // so it means the same thing on every scan. It used to show G7 coverage here
   // and all-check passes elsewhere, two answers to two different questions.
   await expect(page.getByRole("navigation").getByRole("link", { name: /Conformance check/ })).toContainText("1/1");
+  // A pair is not a plain count: the navigation says which kind of number it is.
+  await expect(page.getByTestId("nav-count-conformance")).toHaveAttribute(
+    "title",
+    "Mandatory checks passed, out of the mandatory checks measured",
+  );
+  // A screen reader hears the pair spelled out.
+  await expect(page.getByRole("link", { name: /1 of 1 mandatory checks passed/ })).toBeVisible();
   await expect(page.locator("main").getByText("1/1").first()).toBeVisible();
   await page.getByRole("navigation").getByRole("link", { name: /Conformance check/ }).click();
 
@@ -1615,7 +1621,7 @@ test("AI scan exposes G7 conformance with present/advisory split", async ({ page
   await expect(page.getByText("Establish that the SBOM lists every component.")).toBeVisible();
   // The verdict line leads the panel, so what blocks the SBOM is not at the end
   // of a page that runs to twelve thousand pixels on an AI scan.
-  await expect(page.getByText(/mandatory check/)).toBeVisible();
+  await expect(page.getByRole("main").getByText(/mandatory check/)).toBeVisible();
   // A met element is one line: title, badge, figure. Its description and the
   // values that satisfied it are still there, folded, because a reader who has
   // already been told the element is met is not reading either again. Forty of
@@ -1713,10 +1719,10 @@ test("the AI summary card omits the G7 and crosswalk tiles without an AI profile
   await expect(card.getByRole("link", { name: "View model details" })).toBeVisible();
 });
 
-// The rail is a fixed width, so a label plus its count badge has a hard budget.
+// The navigation is a fixed width, so a label plus its count has a hard budget.
 // "SBOM conformance" overran it once and rendered as "SBOM conforma…". Nothing
-// else would catch that: it clips silently, and the section screenshots crop to
-// <main>.
+// else would catch that: it clips (or wraps) silently, and the section
+// screenshots crop to <main>.
 //
 // This fixture's badges are narrow (6/8), so every badge is first widened to the
 // widest shape a real scan produces — a two-digit pair like 13/16, seen on the
@@ -1729,17 +1735,34 @@ for (const lang of ["en", "ko"] as const) {
     await stubAiAndRun(page, "light", lang);
     await page.getByRole("navigation").locator('a[href$="/conformance"]').first().waitFor();
 
-    const clipped = await page.evaluate((badge) => {
-      for (const b of document.querySelectorAll("nav a span.tabular-nums")) {
-        b.textContent = badge;
+    // A label that does not fit either clips or wraps onto a second line, or
+    // runs into its count; all three overrun the budget.
+    const { checked, overrun } = await page.evaluate((badge) => {
+      for (const b of document.querySelectorAll('[data-testid^="nav-count-"]')) {
+        const visible = b.querySelector("[aria-hidden]") ?? b;
+        visible.textContent = badge;
       }
       // Read a layout property to flush the mutations before measuring.
       void document.body.offsetHeight;
-      return [...document.querySelectorAll("nav a span.truncate")]
-        .filter((s) => s.scrollWidth > (s as HTMLElement).clientWidth)
-        .map((s) => `${s.textContent} (${(s as HTMLElement).clientWidth}/${s.scrollWidth})`);
+      const labels = [...document.querySelectorAll<HTMLElement>("nav [data-nav-label]")];
+      const bad = labels
+        .filter((s) => {
+          const range = document.createRange();
+          range.selectNodeContents(s);
+          const rects = [...range.getClientRects()];
+          const lines = new Set(rects.map((r) => Math.round(r.top))).size;
+          const right = Math.max(...rects.map((r) => r.right));
+          const link = s.closest("a")!;
+          const count = link.querySelector<HTMLElement>('[data-testid^="nav-count-"]');
+          const limit = count ? count.getBoundingClientRect().left : link.getBoundingClientRect().right;
+          return lines > 1 || right > limit;
+        })
+        .map((s) => s.textContent ?? "");
+      return { checked: labels.length, overrun: bad };
     }, WIDEST_BADGE);
-    expect(clipped).toEqual([]);
+    // The selector found the labels at all: an empty match would pass vacuously.
+    expect(checked).toBeGreaterThanOrEqual(5);
+    expect(overrun).toEqual([]);
   });
 }
 

@@ -7,8 +7,8 @@ import { DONE, FIRMWARE_DONE, SBOM } from "./fixtures";
 import { waitForSettled } from "./settle";
 import { seedThemeLang } from "./visual";
 
-// The result screen's header is one meta line (project, version, scan type, time)
-// over the section title, the summary is a one-line strip, and the Overview names
+// The result screen's header is the section title over one meta line (project,
+// version, scan type, time), the summary is a one-line strip, and the Overview names
 // the items worth looking at first with their source and time. The Recent list
 // keeps its at-risk filter as a chip above the table.
 
@@ -49,23 +49,23 @@ async function openScan(page: Page, done: Record<string, unknown> & { id: string
   await waitForSettled(page.locator("main"));
 }
 
-test("the header is one meta line over the section title, with no status badge on a clean scan", async ({ page }) => {
+test("the header is the section title over one meta line, with no status badge on a clean scan", async ({ page }) => {
   await seedThemeLang(page, "light", "en");
   await openScan(page, { ...DONE, sbom: { ...DONE.sbom, componentType: "application" } });
 
   const meta = page.getByTestId("result-meta");
   // On the Overview the project and version are the title, so the meta line
-  // above it carries only the scan type and time.
+  // under it carries only the scan type and time.
   await expect(page.locator("main h1")).toContainText("demo");
   await expect(page.locator("main h1")).toContainText("1.0");
   await expect(meta).not.toContainText("demo");
   await expect(page.getByTestId("result-kind")).toHaveText("Source");
   await expect(meta.locator("time")).toHaveAttribute("datetime", new Date(GENERATED_AT * 1000).toISOString());
   await expect(meta.locator("time")).toContainText("2023");
-  // The title sits below the meta line, and the badge only shows for a scan
-  // that did not simply complete.
+  // The meta line sits under the title (the page header's description), and
+  // the badge only shows for a scan that did not simply complete.
   const [metaBox, titleBox] = await Promise.all([meta.boundingBox(), page.locator("main h1").boundingBox()]);
-  expect(titleBox!.y).toBeGreaterThan(metaBox!.y);
+  expect(metaBox!.y).toBeGreaterThan(titleBox!.y);
   await expect(page.getByRole("status")).toHaveCount(0);
   await expect(page.getByText("Scan complete")).toHaveCount(0);
   // The whole header stays compact: under the old 90px of title, badge and subtitle.

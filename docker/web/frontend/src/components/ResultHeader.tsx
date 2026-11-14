@@ -1,22 +1,23 @@
 // Copyright 2026 SK Telecom Co., Ltd.
 // SPDX-License-Identifier: Apache-2.0
 
-import { TriangleAlert } from "lucide-react";
-import type { Ref } from "react";
+import { AlertIcon } from "@primer/octicons-react";
+import { Label, PageHeader } from "@primer/react";
 import { useTranslation } from "react-i18next";
 
-import { formatDateTime } from "@/lib/format";
+import { formatDateTime, formatNumber } from "@/lib/format";
 
 export type ResultStatus = "ok" | "failed" | "partial";
 
 /**
- * The top of every result section: one line saying what was scanned (project,
- * version, scan type, when), then the section's own title. The status badge is
- * shown only when the scan did not simply complete, so a normal result carries
- * no "complete" label on every screen.
+ * The top of every result section: the title, then one line saying what was
+ * scanned (project and version, scan type, when). The status label is shown
+ * only when the scan did not simply complete, so a normal result carries no
+ * "complete" label on every screen.
  *
- * The title is the h1 and the focus target when the section changes, so a
- * keyboard or screen-reader user lands on the new content.
+ * The title is the page's h1 (`.bl-result-title`); NextApp moves focus to it
+ * when the section changes, so a keyboard or screen-reader user lands on the
+ * new content.
  */
 export function ResultHeader({
   name,
@@ -25,8 +26,8 @@ export function ResultHeader({
   generatedAt,
   status,
   title,
-  headingRef,
   projectTitle = false,
+  components,
 }: {
   name?: string;
   version?: string;
@@ -36,91 +37,98 @@ export function ResultHeader({
   generatedAt?: number;
   status: ResultStatus;
   title: string;
-  headingRef?: Ref<HTMLHeadingElement>;
   /** Use the project and version as the title (the Overview), so the meta
-   *  line above it does not repeat them. */
+   *  line under it does not repeat them. */
   projectTitle?: boolean;
+  /** Number of components in the SBOM; absent when the scan made none. */
+  components?: number;
 }) {
   const { t, i18n } = useTranslation();
   const when = generatedAt ? formatDateTime(generatedAt, i18n.language) : "";
   const asProject = projectTitle && Boolean(name);
   return (
-    <div>
-      <div
-        className="flex flex-wrap items-center gap-x-2 gap-y-1 text-body-sm text-muted-foreground"
-        data-testid="result-meta"
-      >
-        {!asProject && name && (
-          <span className="max-w-[28rem] truncate font-medium text-foreground" title={name}>
-            {name}
-          </span>
-        )}
-        {!asProject && version && <span className="font-mono text-label">{version}</span>}
-        {!asProject && name && <Dot />}
-        <span data-testid="result-kind" title={t("result.metaScanType")}>
-          {kind}
-        </span>
-        {when && (
-          <>
-            <Dot />
-            <time
-              dateTime={new Date((generatedAt ?? 0) * 1000).toISOString()}
-              className="tabular-nums"
-              title={t("result.metaGenerated")}
+    <PageHeader>
+      <PageHeader.TitleArea>
+        <PageHeader.Title as="h1" className="bl-result-title">
+          {asProject ? (
+            <span style={{ overflowWrap: "anywhere" }}>
+              {name}
+              {version && (
+                <span style={{ fontWeight: 400, color: "var(--fgColor-muted)" }}> {version}</span>
+              )}
+            </span>
+          ) : (
+            title
+          )}
+        </PageHeader.Title>
+      </PageHeader.TitleArea>
+      <PageHeader.Description>
+        <span
+          data-testid="result-meta"
+          style={{
+            display: "flex",
+            flexWrap: "wrap",
+            alignItems: "center",
+            columnGap: "var(--base-size-8)",
+            rowGap: "var(--base-size-4)",
+            fontSize: "var(--text-body-size-small)",
+            color: "var(--fgColor-muted)",
+          }}
+        >
+          {!asProject && name && (
+            <span
+              title={version ? `${name} ${version}` : name}
+              style={{
+                maxWidth: "28rem",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+                fontWeight: 600,
+                color: "var(--fgColor-default)",
+              }}
             >
-              {when}
-            </time>
-          </>
-        )}
-        {status !== "ok" && <StatusBadge status={status} />}
-      </div>
-      <h1
-        ref={headingRef}
-        tabIndex={-1}
-        className="mt-2 text-title font-semibold tracking-tight text-foreground focus:outline-none"
-      >
-        {asProject ? (
-          <>
-            <span className="break-words">{name}</span>
-            {version && (
-              <span className="ml-2 font-mono text-heading font-normal text-muted-foreground">
-                {version}
+              {name}
+              {version && <span style={{ fontWeight: 400 }}> {version}</span>}
+            </span>
+          )}
+          {!asProject && name && <Dot />}
+          <span data-testid="result-kind" title={t("result.metaScanType")}>
+            {kind}
+          </span>
+          {when && (
+            <>
+              <Dot />
+              <time
+                dateTime={new Date((generatedAt ?? 0) * 1000).toISOString()}
+                title={t("result.metaGenerated")}
+                style={{ fontVariantNumeric: "tabular-nums" }}
+              >
+                {when}
+              </time>
+            </>
+          )}
+          {components !== undefined && (
+            <>
+              <Dot />
+              <span data-testid="result-components" style={{ fontVariantNumeric: "tabular-nums" }}>
+                {t("nav.components")} {formatNumber(components, i18n.language)}
               </span>
-            )}
-          </>
-        ) : (
-          title
-        )}
-      </h1>
-    </div>
+            </>
+          )}
+          {status !== "ok" && (
+            <Label variant={status === "failed" ? "danger" : "attention"} role="status">
+              <AlertIcon size={12} />
+              <span style={{ marginLeft: "var(--base-size-4)" }}>
+                {t(status === "failed" ? "result.failed" : "result.partial")}
+              </span>
+            </Label>
+          )}
+        </span>
+      </PageHeader.Description>
+    </PageHeader>
   );
 }
 
 function Dot() {
-  return (
-    <span aria-hidden className="text-muted-foreground/60">
-      ·
-    </span>
-  );
-}
-
-function StatusBadge({ status }: { status: Exclude<ResultStatus, "ok"> }) {
-  const { t } = useTranslation();
-  // text-risk-critical-fg (not text-destructive): --destructive is the same value
-  // in both themes, so it fails WCAG AA on its own tinted background in light
-  // mode. The -fg cut is the AA-passing one. The icon means the state reads
-  // without relying on colour alone.
-  const tone =
-    status === "failed"
-      ? "bg-destructive/10 text-risk-critical-fg"
-      : "border border-warning-border/60 bg-warning-surface text-warning";
-  return (
-    <span
-      role="status"
-      className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-label font-medium ${tone}`}
-    >
-      <TriangleAlert className="h-3 w-3" aria-hidden />
-      {t(status === "failed" ? "result.failed" : "result.partial")}
-    </span>
-  );
+  return <span aria-hidden>·</span>;
 }

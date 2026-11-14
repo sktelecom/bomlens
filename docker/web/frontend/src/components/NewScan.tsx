@@ -39,6 +39,7 @@ import {
   SourceControls,
   UploadOptions,
 } from "./ScanFormFields";
+import { ScreenHeader } from "@/components/primer";
 
 interface Props {
   running: boolean;
@@ -178,12 +179,7 @@ export function NewScan({
 
   return (
     <div className="space-y-6">
-      <div className="space-y-1.5">
-        <h1 className="text-display font-semibold tracking-tight text-foreground">
-          {t("newscan.title")}
-        </h1>
-        <p className="text-body-sm text-muted-foreground">{t("newscan.subtitle")}</p>
-      </div>
+      <ScreenHeader title={t("newscan.title")} description={t("newscan.subtitle")} />
 
       <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
         {/* Left: pick what to scan, then its source-specific input. */}
@@ -202,7 +198,7 @@ export function NewScan({
               return (
                 <div key={group.key} className="space-y-2">
                   <p className={SECTION_LABEL}>{t(`newscan.${group.key}`)}</p>
-                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-4">
+                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 2xl:grid-cols-4">
                     {group.sources.map((s) => {
                       const { labelKey, icon: Icon } = SOURCE_META[s];
                       const active = state.source === s;
@@ -276,7 +272,7 @@ export function NewScan({
         {/* Right: sticky settings panel — identity, outputs, then the folded
             groups scroll inside it while the run action stays pinned below, so
             opening every group never pushes the button off screen. */}
-        <Card className="flex animate-fade-in flex-col lg:sticky lg:top-6 lg:max-h-[calc(100vh-3rem)]">
+        <Card className="flex animate-fade-in flex-col lg:sticky lg:top-20 lg:max-h-[calc(100vh-6.5rem)]">
           <CardContent className="min-h-0 flex-1 space-y-5 overflow-y-auto p-5">
             <div className="space-y-3">
               <p className={SECTION_LABEL}>{t("newscan.settings")}</p>

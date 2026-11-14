@@ -2,94 +2,102 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import {
-  BookOpen,
-  CircleQuestionMark,
-  Keyboard,
-  Clock,
-  ExternalLink,
-  LifeBuoy,
-  Rocket,
-  Sparkles,
-  MonitorPlay,
-  Plus,
-  RotateCw,
-  ScanSearch,
-  X,
-} from "lucide-react";
-import { type ReactNode, useEffect, useId, useRef, useState } from "react";
+  BookIcon,
+  LinkExternalIcon,
+  ListUnorderedIcon,
+  CommandPaletteIcon,
+  GlobeIcon,
+  HistoryIcon,
+  IssueOpenedIcon,
+  MegaphoneIcon,
+  PlayIcon,
+  PlusIcon,
+  QuestionIcon,
+  RocketIcon,
+  SyncIcon,
+  TrashIcon,
+} from "@primer/octicons-react";
+import {
+  ActionList,
+  ActionMenu,
+  AnchoredOverlay,
+  Button,
+  IconButton,
+} from "@primer/react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import { Button, buttonVariants } from "@/components/ui/button";
-import { demoInstallUrl, demoUrl, docsUrl, releaseNotesUrl } from "@/lib/demo";
+import { Marker } from "@/components/ui/marker";
+import { severityShape } from "@/components/primer/display";
+import { demoInstallUrl, demoUrl, docsUrl, IS_STATIC_DEMO, releaseNotesUrl } from "@/lib/demo";
 import { ISSUE_FORM_URL } from "@/lib/diagnostics";
-import { IS_STATIC_DEMO } from "@/lib/demo";
 import { type RecentScanLink } from "@/lib/nav";
 import { scanHash } from "@/lib/route";
-import { cn } from "@/lib/utils";
+import { type ProjectName } from "@/lib/scanTitle";
+import { useMediaQuery } from "@/lib/useMediaQuery";
 
-import { LangToggle } from "./LangToggle";
+import { LANGUAGES, LangToggle, useCurrentLanguage } from "./LangToggle";
 import { ShortcutsDialog } from "./ShortcutsDialog";
 import { ThemeToggle } from "./ThemeToggle";
 
+/** Below this width the top bar packs tighter: a shorter search box, Re-scan
+ *  as an icon, and the language choice inside the help menu. */
+const COMPACT_QUERY = "(max-width: 1199px)";
+/** Below this width the path and the search leave the top bar (the left
+ *  navigation and each screen's own heading still name the scan). */
+const NARROW_QUERY = "(max-width: 767px)";
+
 interface TopBarProps {
-  /**
-   * Active project context. The name truncates (long firmware filenames) with
-   * the full value on hover; the version shows muted beside it. Hidden absent.
-   */
-  project?: { name: string; version?: string };
-  /** Optional global-search control, rendered between the project and controls. */
-  search?: ReactNode;
+  /** The open or running scan: shown as the path after the logo. */
+  project?: ProjectName;
+  /** Where the project in the path links to (the open scan's Overview);
+   *  absent while a scan is still running and has no address yet. */
+  projectHref?: string;
+  /** The global search, rendered only with a scan loaded. Called with the
+   *  width the box should take. */
+  search?: (width: number) => ReactNode;
   /** Re-run this scan with the same target and toggles (prefills the New scan
-   *  form). Shown only when the loaded scan carries a config; absent otherwise. */
+   *  form). Shown only when the loaded scan carries a config. */
   onRescan?: () => void;
-  /** Hash for the home (Recent scans) screen — the logo links here. */
+  /** Hash for the home (Scan management) screen; the logo links here. */
   homeHref: string;
-  /** The running image's version, from `capabilities`. Absent on a local build,
-   *  where the help menu says the build carries no version rather than blank. */
-  version?: string;
-  /** Render the logo as a link home (off on the Recent home screen itself). */
+  /** Render the logo as a link home (off on the home screen itself). */
   showHomeLink?: boolean;
-  /** Hash for the New scan screen — the primary global action. */
-  newHref: string;
+  /** Hash for the New scan screen; absent hides the top-bar button (the home
+   *  screen has its own New scan button). */
+  newHref?: string;
   /** Reset to a blank New scan form, in addition to the `#/new` navigation
-   *  `newHref` already carries — needed when a scan started from `#/new`
-   *  fails, leaving the hash unchanged so the anchor's navigation is a no-op. */
+   *  `newHref` already carries: a scan started from `#/new` that fails leaves
+   *  the hash unchanged, so the link's navigation is a no-op then. */
   onNewScan?: () => void;
   /** Past scans for the Recent menu (newest first). */
   recent?: RecentScanLink[];
-  /** Delete a past scan from the Recent list (removes its artifacts). */
+  /** Delete a past scan from the Recent menu (removes its artifacts). */
   onDeleteRecent?: (id: string) => void;
-  /** Hash for the External lookup screen. Absent hides the entry point,
-   *  meaning `capabilities.externalLookup` is off, or this is the static
-   *  demo, which has no server to ask. Reachable whether or not a scan is
-   *  loaded, so this lives in the chrome rather than the section rail. */
+  /** The running image's version, from `capabilities`. Absent on a local build,
+   *  where the help menu says the build carries no version rather than blank. */
+  version?: string;
+  /** Hash for the External lookup screen. Absent hides the entry point:
+   *  `capabilities.externalLookup` is off, or this is the static demo. */
   lookupHref?: string;
-  /** Leave a running scan (backgrounding it, same as New scan does) and open
-   *  External lookup, in addition to the `#/lookup` navigation `lookupHref`
-   *  already carries — needed because the hash router ignores navigation
-   *  while a scan is running (see `NextApp.goToLookup`). */
+  /** Leave a running scan and open External lookup, in addition to the
+   *  `#/lookup` navigation `lookupHref` carries (the hash router ignores
+   *  navigation while a scan runs; see `NextApp.goToLookup`). */
   onLookup?: () => void;
+  /** External lookup is the current screen (its entry shows as pressed). */
+  lookupCurrent?: boolean;
+  /** The open scan's id, marked in the Recent menu. */
+  currentScanId?: string | null;
 }
 
-const SEVERITY_DOT: Record<NonNullable<RecentScanLink["topSeverity"]>, string> = {
-  CRITICAL: "bg-risk-critical",
-  HIGH: "bg-risk-high",
-  MEDIUM: "bg-risk-medium",
-  LOW: "bg-risk-low",
-  NONE: "bg-risk-info",
-};
-
 /**
- * Application top bar: product mark + active project context on the left,
- * global actions (New scan, Recent) and controls (language, theme) on the
- * right. Sticky, token-driven.
- *
- * New scan and Recent live here — the chrome, not the section rail — so the left
- * rail stays purely the current scan's sections. The logo is a real
- * `<a href="#/">` link so the home screen can be opened in a new tab.
+ * The top bar: logo and the open scan's path on the left; the global search,
+ * Re-scan, New scan, External lookup, Recent scans, Help, language and theme
+ * on the right. Sticky at the top of the page (56px).
  */
 export function TopBar({
   project,
+  projectHref,
   search,
   onRescan,
   homeHref,
@@ -101,397 +109,339 @@ export function TopBar({
   version,
   lookupHref,
   onLookup,
+  lookupCurrent,
+  currentScanId,
 }: TopBarProps) {
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
+  const compact = useMediaQuery(COMPACT_QUERY);
+  const narrow = useMediaQuery(NARROW_QUERY);
   // BASE_URL, not "/": the demo is served from a sub-path, where a rooted src
   // would look outside the deployment. It is "/" in a normal build.
   const logo = (
-    <img
-      src={`${import.meta.env.BASE_URL}logo.svg`}
-      alt={t("appTitle")}
-      className="h-7 w-auto shrink-0"
-    />
+    <img src={`${import.meta.env.BASE_URL}logo.svg`} alt={t("appTitle")} className="bl-topbar-logo" />
   );
   return (
-    <header className="sticky top-0 z-20 flex h-14 shrink-0 items-center gap-2 border-b bg-card/80 px-3 backdrop-blur sm:gap-4 sm:px-4 supports-[backdrop-filter]:bg-card/60">
+    <header className="bl-topbar">
       {showHomeLink ? (
-        <a
-          href={homeHref}
-          title={t("appTitle")}
-          aria-label={t("appTitle")}
-          className="shrink-0 rounded transition-opacity duration-fast ease-out-soft hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-        >
+        <a href={homeHref} className="bl-topbar-home">
           {logo}
         </a>
       ) : (
-        logo
+        <span className="bl-topbar-home">{logo}</span>
       )}
-      {version && (
-        <span
-          className="hidden shrink-0 rounded-full border px-1.5 py-0.5 font-mono text-caption leading-none text-muted-foreground sm:inline-block"
-          title={t("nav.helpVersion", { version })}
-          data-testid="app-version-badge"
-        >
-          {version}
-        </span>
-      )}
-      {project && (
-        <>
-          <span className="hidden h-5 w-px shrink-0 bg-border sm:block" aria-hidden />
-          {/* The scan name needs room the icon buttons cannot spare on a phone. */}
-          <div className="hidden min-w-0 items-baseline gap-2 sm:flex">
-            <span
-              className="truncate text-body-sm font-medium text-foreground"
-              title={project.name}
-            >
-              {project.name}
+      {project && !narrow && (
+        <nav className="bl-path" data-testid="topbar-path" aria-label={t("nav.pathLabel")}>
+          <span className="bl-path-sep" aria-hidden>
+            /
+          </span>
+          {projectHref ? (
+            <a href={projectHref} className="bl-path-name" title={projectTitle(project)}>
+              <PathName project={project} />
+            </a>
+          ) : (
+            <span className="bl-path-name" title={projectTitle(project)}>
+              <PathName project={project} />
             </span>
-            {project.version && (
-              <span className="shrink-0 text-body-sm text-muted-foreground">
-                {project.version}
-              </span>
-            )}
-          </div>
-        </>
+          )}
+        </nav>
       )}
-      <div className="ml-auto flex shrink-0 items-center gap-1 sm:gap-2">
-        {search}
-        {/* Re-scan parks the finished scan's config in the form and reruns it,
-            which the demo cannot do. New scan stays: the form itself is worth
-            seeing, and its run button explains why it is disabled. */}
-        {onRescan && !IS_STATIC_DEMO && (
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={onRescan}
-            className="gap-1.5"
-            title={t("result.rescanHint")}
-          >
-            <RotateCw className="h-4 w-4" aria-hidden />
-            <span>{t("result.rescan")}</span>
-          </Button>
+      <span className="bl-topbar-spacer" />
+      <div className="bl-topbar-actions">
+        {search && !narrow && search(compact ? 200 : 300)}
+        {/* Re-scan parks the finished scan's config in the form, which the demo
+            cannot run. */}
+        {onRescan &&
+          !IS_STATIC_DEMO &&
+          (compact ? (
+            <IconButton
+              icon={SyncIcon}
+              variant="invisible"
+              aria-label={t("result.rescan")}
+              description={t("result.rescanHint")}
+              onClick={onRescan}
+            />
+          ) : (
+            <Button leadingVisual={SyncIcon} onClick={onRescan} title={t("result.rescanHint")}>
+              {t("result.rescan")}
+            </Button>
+          ))}
+        {newHref && (
+          <IconButton
+            as="a"
+            href={newHref}
+            onClick={onNewScan}
+            icon={PlusIcon}
+            variant="invisible"
+            aria-label={t("shell.newScan")}
+          />
         )}
-        <a
-          href={newHref}
-          onClick={onNewScan}
-          aria-label={t("shell.newScan")}
-          className={cn(buttonVariants({ size: "sm" }), "shrink-0")}
-        >
-          <Plus className="h-4 w-4" aria-hidden />
-          <span className="hidden sm:inline">{t("shell.newScan")}</span>
-        </a>
         {lookupHref && (
-          <a
+          <IconButton
+            as="a"
             href={lookupHref}
             onClick={onLookup}
+            icon={GlobeIcon}
+            variant="invisible"
+            aria-current={lookupCurrent ? "page" : undefined}
             aria-label={t("nav.lookupTitle")}
-            title={t("nav.lookupTitle")}
             data-testid="external-lookup-link"
-            className={cn(
-              "inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-muted-foreground",
-              "transition-colors duration-fast ease-out-soft hover:bg-muted hover:text-foreground",
-              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1",
-            )}
-          >
-            <ScanSearch className="h-4 w-4" aria-hidden />
-          </a>
+          />
         )}
         <RecentMenu
           recent={recent}
           homeHref={homeHref}
           onDeleteRecent={onDeleteRecent}
+          currentScanId={currentScanId}
         />
-        <HelpMenu version={version} />
-        <LangToggle />
+        <HelpMenu version={version} withLanguage={compact} />
+        {!compact && <LangToggle />}
         <ThemeToggle />
       </div>
     </header>
   );
 }
 
+function projectTitle(p: ProjectName) {
+  return p.version ? `${p.name} ${p.version}` : p.name;
+}
+
+function PathName({ project }: { project: ProjectName }) {
+  return (
+    <>
+      {project.name}
+      {project.version && <span className="bl-path-version"> {project.version}</span>}
+    </>
+  );
+}
+
+/** Text colour of a severity's shape in the Recent menu. */
+const SEVERITY_FG: Record<NonNullable<RecentScanLink["topSeverity"]>, string> = {
+  CRITICAL: "var(--fgColor-danger)",
+  HIGH: "var(--fgColor-severe)",
+  MEDIUM: "var(--fgColor-attention)",
+  LOW: "var(--fgColor-muted)",
+  NONE: "var(--fgColor-muted)",
+};
+
 /**
- * Recent-scans popover: the Clock button opens a panel listing past scans
- * (severity dot + label, optional delete) with a link to the full Recent home.
- * Closes on outside pointer-down or Escape, mirroring GlobalSearch.
+ * Recent scans: each past scan with the shape and name of its worst severity
+ * and a delete button (not in the demo), then a link to the full list.
  */
-/**
- * Documentation, the demo, and which version is running.
- *
- * Every other way out of the app was inside a scan form, so a reader who
- * wanted the docs had to already be starting a scan. The version matters when
- * someone reports a problem: "the one I downloaded" is not an answer, and a
- * local build that carries no stamp says so rather than showing a blank.
- */
-function HelpMenu({ version }: { version?: string }) {
-  const { t, i18n } = useTranslation();
+function RecentMenu({
+  recent,
+  homeHref,
+  onDeleteRecent,
+  currentScanId,
+}: {
+  recent: RecentScanLink[];
+  homeHref: string;
+  onDeleteRecent?: (id: string) => void;
+  currentScanId?: string | null;
+}) {
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
+  const canDelete = Boolean(onDeleteRecent) && !IS_STATIC_DEMO;
+  return (
+    <AnchoredOverlay
+      open={open}
+      onOpen={() => setOpen(true)}
+      onClose={() => setOpen(false)}
+      renderAnchor={(p) => (
+        <IconButton {...p} icon={HistoryIcon} variant="invisible" aria-label={t("nav.recent")} />
+      )}
+      overlayProps={{ width: "medium", maxHeight: "large" }}
+      focusZoneSettings={{ disabled: false }}
+    >
+      <ActionList aria-label={t("nav.recent")}>
+        {recent.length === 0 && <ActionList.Item disabled>{t("nav.recentEmpty")}</ActionList.Item>}
+        {recent.map((s) => {
+          const sev = s.topSeverity ?? "NONE";
+          // No severity means nothing was found, not an unknown grade.
+          const sevName = t(`severity.${sev}`);
+          const current = s.id === currentScanId;
+          return (
+            <ActionList.LinkItem
+              key={s.id}
+              href={scanHash(s.id)}
+              onClick={() => setOpen(false)}
+              active={current}
+              aria-current={current ? "page" : undefined}
+            >
+              <ActionList.LeadingVisual>
+                <span aria-hidden style={{ display: "inline-flex", color: SEVERITY_FG[sev] }}>
+                  <Marker shape={severityShape(sev === "NONE" ? "UNKNOWN" : sev)} />
+                </span>
+              </ActionList.LeadingVisual>
+              {/* The item is named by its label, so the worst severity goes in
+                  the label too (visually hidden); the shape alone says it
+                  only to sighted readers. */}
+              <span className="bl-recent-name">
+                <span className="bl-recent-project">
+                  {s.name}
+                  {!s.version && <span className="bl-visually-hidden">, {sevName}</span>}
+                </span>
+                {/* The flex gap separates name and version on screen; this
+                    space separates them in the accessible name. */}
+                {s.version && <span className="bl-visually-hidden">{"\u00a0"}</span>}
+                {s.version && (
+                  <span className="bl-recent-version">
+                    {s.version}
+                    <span className="bl-visually-hidden">, {sevName}</span>
+                  </span>
+                )}
+              </span>
+              {canDelete && (
+                <ActionList.TrailingAction
+                  label={t("nav.recentDelete")}
+                  icon={TrashIcon}
+                  onClick={() => {
+                    setOpen(false);
+                    onDeleteRecent?.(s.id);
+                  }}
+                />
+              )}
+            </ActionList.LinkItem>
+          );
+        })}
+        {/* An action, not a scan: it leads to the full list. Named apart from
+            the navigation's "Scan management" so the two are not confused. */}
+        <ActionList.Divider />
+        <ActionList.LinkItem href={homeHref} onClick={() => setOpen(false)}>
+          <ActionList.LeadingVisual>
+            <ListUnorderedIcon />
+          </ActionList.LeadingVisual>
+          {t("nav.recentAll")}
+        </ActionList.LinkItem>
+      </ActionList>
+    </AnchoredOverlay>
+  );
+}
+
+/**
+ * Getting started, documentation, the demo, the keyboard shortcuts, what
+ * changed, reporting a problem, and which version is running. On a compact top
+ * bar it also carries the language choice.
+ */
+function HelpMenu({ version, withLanguage }: { version?: string; withLanguage: boolean }) {
+  const { t, i18n } = useTranslation();
+  const current = useCurrentLanguage();
+  const [menuOpen, setMenuOpen] = useState(false);
   const [shortcuts, setShortcuts] = useState(false);
-  const wrapRef = useRef<HTMLDivElement>(null);
-  const triggerRef = useRef<HTMLButtonElement>(null);
-  const panelId = useId();
+  const anchorRef = useRef<HTMLButtonElement>(null);
+  const ext = { target: "_blank", rel: "noreferrer noopener" } as const;
+  // Every entry but the shortcuts list leaves the app in a new tab: say so.
+  const external = (
+    <ActionList.TrailingVisual>
+      <LinkExternalIcon />
+      <span className="bl-visually-hidden">{t("nav.opensNewTab")}</span>
+    </ActionList.TrailingVisual>
+  );
 
   // "?" lists the keys, the way most web tools do. Not while typing: a question
-  // mark in a field is text, and a modifier means some other shortcut.
+  // mark in a field is text, and a modifier means some other shortcut. With
+  // this menu open, it closes the menu first.
   useEffect(() => {
     const onQuestion = (e: KeyboardEvent) => {
       if (e.key !== "?" || e.metaKey || e.ctrlKey || e.altKey) return;
       const el = e.target as HTMLElement | null;
       if (el?.closest("input, textarea, select, [contenteditable='true']")) return;
       e.preventDefault();
-      setOpen(false);
+      setMenuOpen(false);
       setShortcuts(true);
     };
     window.addEventListener("keydown", onQuestion);
     return () => window.removeEventListener("keydown", onQuestion);
   }, []);
 
-  useEffect(() => {
-    if (!open) return;
-    const onPointer = (e: PointerEvent) => {
-      if (!wrapRef.current?.contains(e.target as Node)) setOpen(false);
-    };
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setOpen(false);
-    };
-    document.addEventListener("pointerdown", onPointer);
-    document.addEventListener("keydown", onKey);
-    return () => {
-      document.removeEventListener("pointerdown", onPointer);
-      document.removeEventListener("keydown", onKey);
-    };
-  }, [open]);
-
-  const item =
-    "flex items-center gap-2 px-3 py-2 text-body-sm hover:bg-muted focus-visible:bg-muted focus-visible:outline-none";
-
   return (
-    <div ref={wrapRef} className="relative shrink-0">
-      <button
-        ref={triggerRef}
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        aria-haspopup="true"
-        aria-expanded={open}
-        aria-controls={open ? panelId : undefined}
-        aria-label={t("nav.help")}
-        title={t("nav.help")}
-        data-testid="help-menu"
-        className={cn(
-          "inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground",
-          "transition-colors duration-fast ease-out-soft hover:bg-muted hover:text-foreground",
-          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1",
-          open && "bg-muted text-foreground",
-        )}
-      >
-        <CircleQuestionMark className="h-4 w-4" aria-hidden />
-      </button>
-      {open && (
-        <div
-          id={panelId}
-          className="absolute right-0 top-full z-30 mt-1 w-64 max-w-[90vw] overflow-hidden rounded-md border bg-popover text-popover-foreground shadow-lg"
-        >
-          <a
-            href={demoInstallUrl(i18n.language)}
-            target="_blank"
-            rel="noreferrer noopener"
-            onClick={() => setOpen(false)}
-            className={item}
-            data-testid="help-start"
-          >
-            <Rocket className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
-            {t("nav.helpStart")}
-            <ExternalLink className="ml-auto h-3 w-3 shrink-0 text-muted-foreground" aria-hidden />
-          </a>
-          <a
-            href={docsUrl(i18n.language)}
-            target="_blank"
-            rel="noreferrer noopener"
-            onClick={() => setOpen(false)}
-            className={item}
-          >
-            <BookOpen className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
-            {t("nav.helpDocs")}
-            <ExternalLink className="ml-auto h-3 w-3 shrink-0 text-muted-foreground" aria-hidden />
-          </a>
-          <a
-            href={demoUrl()}
-            target="_blank"
-            rel="noreferrer noopener"
-            onClick={() => setOpen(false)}
-            className={item}
-          >
-            <MonitorPlay className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
-            {t("nav.helpDemo")}
-            <ExternalLink className="ml-auto h-3 w-3 shrink-0 text-muted-foreground" aria-hidden />
-          </a>
-          <button
-            type="button"
-            onClick={() => {
-              setOpen(false);
-              setShortcuts(true);
-            }}
-            className={cn(item, "w-full text-left")}
-            data-testid="help-shortcuts"
-          >
-            <Keyboard className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
-            {t("nav.helpShortcuts")}
-            <kbd className="ml-auto rounded border bg-muted px-1.5 font-sans text-caption text-muted-foreground" aria-hidden>
-              ?
-            </kbd>
-          </button>
-          <a
-            href={releaseNotesUrl(version)}
-            target="_blank"
-            rel="noreferrer noopener"
-            onClick={() => setOpen(false)}
-            className={item}
-            data-testid="help-whats-new"
-          >
-            <Sparkles className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
-            {t("nav.helpWhatsNew")}
-            <ExternalLink className="ml-auto h-3 w-3 shrink-0 text-muted-foreground" aria-hidden />
-          </a>
-          <a
-            href={ISSUE_FORM_URL}
-            target="_blank"
-            rel="noreferrer noopener"
-            onClick={() => setOpen(false)}
-            className={item}
-            data-testid="help-report"
-          >
-            <LifeBuoy className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
-            {t("nav.helpReport")}
-            <ExternalLink className="ml-auto h-3 w-3 shrink-0 text-muted-foreground" aria-hidden />
-          </a>
-          <p className="border-t px-3 py-2 text-label text-muted-foreground" data-testid="app-version">
-            {version ? t("nav.helpVersion", { version }) : t("nav.helpVersionUnknown")}
-          </p>
-        </div>
-      )}
-      <ShortcutsDialog
-        open={shortcuts}
-        onClose={() => {
-          setShortcuts(false);
-          // The menu item that opened the list is gone by now, so the dialog
-          // cannot hand focus back to it; the menu button stands in.
-          requestAnimationFrame(() => triggerRef.current?.focus());
-        }}
-      />
-    </div>
-  );
-}
-
-function RecentMenu({
-  recent,
-  homeHref,
-  onDeleteRecent,
-}: {
-  recent: RecentScanLink[];
-  homeHref: string;
-  onDeleteRecent?: (id: string) => void;
-}) {
-  const { t } = useTranslation();
-  const [open, setOpen] = useState(false);
-  const wrapRef = useRef<HTMLDivElement>(null);
-  const panelId = useId();
-
-  useEffect(() => {
-    if (!open) return;
-    const onPointer = (e: PointerEvent) => {
-      if (!wrapRef.current?.contains(e.target as Node)) setOpen(false);
-    };
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setOpen(false);
-    };
-    document.addEventListener("pointerdown", onPointer);
-    document.addEventListener("keydown", onKey);
-    return () => {
-      document.removeEventListener("pointerdown", onPointer);
-      document.removeEventListener("keydown", onKey);
-    };
-  }, [open]);
-
-  return (
-    <div ref={wrapRef} className="relative shrink-0">
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        aria-haspopup="true"
-        aria-expanded={open}
-        aria-controls={open ? panelId : undefined}
-        aria-label={t("nav.recentScans")}
-        title={t("nav.recentScans")}
-        className={cn(
-          "inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground",
-          "transition-colors duration-fast ease-out-soft hover:bg-muted hover:text-foreground",
-          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1",
-          open && "bg-muted text-foreground",
-        )}
-      >
-        <Clock className="h-4 w-4" aria-hidden />
-      </button>
-      {open && (
-        <div
-          id={panelId}
-          className="absolute right-0 top-full z-30 mt-1 w-72 max-w-[90vw] overflow-hidden rounded-md border bg-popover text-popover-foreground shadow-lg"
-        >
-          <a
-            href={homeHref}
-            onClick={() => setOpen(false)}
-            className="flex items-center gap-2 border-b px-3 py-2 text-body-sm font-medium hover:bg-muted focus-visible:bg-muted focus-visible:outline-none"
-          >
-            <Clock className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
-            {t("nav.recentScans")}
-          </a>
-          {recent.length === 0 ? (
-            <p className="px-3 py-3 text-body-sm text-muted-foreground">
-              {t("nav.recentEmpty")}
-            </p>
-          ) : (
-            <ul className="max-h-80 overflow-auto py-1">
-              {recent.map((scanItem) => (
-                <li key={scanItem.id} className="group/recent relative">
-                  <a
-                    href={scanHash(scanItem.id)}
-                    onClick={() => setOpen(false)}
-                    className={cn(
-                      "flex w-full items-center gap-2 px-3 py-1.5 text-body-sm text-muted-foreground",
-                      "transition-colors duration-fast ease-out-soft hover:bg-muted hover:text-foreground",
-                      "focus-visible:bg-muted focus-visible:text-foreground focus-visible:outline-none",
-                      onDeleteRecent && "pr-8",
-                    )}
-                  >
-                    <span
-                      className={cn(
-                        "h-2 w-2 shrink-0 rounded-full",
-                        SEVERITY_DOT[scanItem.topSeverity ?? "NONE"],
-                      )}
-                      aria-hidden
-                    />
-                    <span className="truncate">{scanItem.label}</span>
-                  </a>
-                  {onDeleteRecent && (
-                    <button
-                      type="button"
-                      onClick={() => onDeleteRecent(scanItem.id)}
-                      aria-label={t("nav.recentDelete")}
-                      title={t("nav.recentDelete")}
-                      className={cn(
-                        "absolute right-1.5 top-1/2 inline-flex h-5 w-5 -translate-y-1/2 items-center justify-center rounded",
-                        "text-muted-foreground opacity-0 transition-opacity duration-fast",
-                        "hover:bg-muted hover:text-foreground group-hover/recent:opacity-100",
-                        "focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
-                      )}
+    <>
+      <ActionMenu anchorRef={anchorRef} open={menuOpen} onOpenChange={setMenuOpen}>
+        <ActionMenu.Anchor>
+          <IconButton
+            ref={anchorRef}
+            icon={QuestionIcon}
+            variant="invisible"
+            aria-label={t("nav.help")}
+            data-testid="help-menu"
+          />
+        </ActionMenu.Anchor>
+        <ActionMenu.Overlay width="medium">
+          <ActionList>
+            <ActionList.LinkItem href={demoInstallUrl(i18n.language)} {...ext} data-testid="help-start">
+              <ActionList.LeadingVisual>
+                <RocketIcon />
+              </ActionList.LeadingVisual>
+              {t("nav.helpStart")}
+              {external}
+            </ActionList.LinkItem>
+            <ActionList.LinkItem href={docsUrl(i18n.language)} {...ext}>
+              <ActionList.LeadingVisual>
+                <BookIcon />
+              </ActionList.LeadingVisual>
+              {t("nav.helpDocs")}
+              {external}
+            </ActionList.LinkItem>
+            <ActionList.LinkItem href={demoUrl()} {...ext}>
+              <ActionList.LeadingVisual>
+                <PlayIcon />
+              </ActionList.LeadingVisual>
+              {t("nav.helpDemo")}
+              {external}
+            </ActionList.LinkItem>
+            <ActionList.Divider />
+            <ActionList.Item onSelect={() => setShortcuts(true)} data-testid="help-shortcuts">
+              <ActionList.LeadingVisual>
+                <CommandPaletteIcon />
+              </ActionList.LeadingVisual>
+              {t("nav.helpShortcuts")}
+              <ActionList.TrailingVisual>
+                <kbd className="bl-kbd" aria-hidden>
+                  ?
+                </kbd>
+              </ActionList.TrailingVisual>
+            </ActionList.Item>
+            <ActionList.Divider />
+            <ActionList.LinkItem href={releaseNotesUrl(version)} {...ext} data-testid="help-whats-new">
+              <ActionList.LeadingVisual>
+                <MegaphoneIcon />
+              </ActionList.LeadingVisual>
+              {t("nav.helpWhatsNew")}
+              <ActionList.Description variant="block">
+                <span data-testid="app-version">
+                  {version ? t("nav.helpVersion", { version }) : t("nav.helpVersionUnknown")}
+                </span>
+              </ActionList.Description>
+              {external}
+            </ActionList.LinkItem>
+            <ActionList.LinkItem href={ISSUE_FORM_URL} {...ext} data-testid="help-report">
+              <ActionList.LeadingVisual>
+                <IssueOpenedIcon />
+              </ActionList.LeadingVisual>
+              {t("nav.helpReport")}
+              {external}
+            </ActionList.LinkItem>
+            {withLanguage && (
+              <>
+                <ActionList.Divider />
+                <ActionList.Group selectionVariant="single">
+                  <ActionList.GroupHeading>{t("lang.label")}</ActionList.GroupHeading>
+                  {LANGUAGES.map((l) => (
+                    <ActionList.Item
+                      key={l.code}
+                      lang={l.code}
+                      selected={current === l.code}
+                      onSelect={() => void i18n.changeLanguage(l.code)}
                     >
-                      <X className="h-3 w-3" aria-hidden />
-                    </button>
-                  )}
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-      )}
-    </div>
+                      {l.name}
+                    </ActionList.Item>
+                  ))}
+                </ActionList.Group>
+              </>
+            )}
+          </ActionList>
+        </ActionMenu.Overlay>
+      </ActionMenu>
+      {shortcuts && <ShortcutsDialog onClose={() => setShortcuts(false)} returnFocusRef={anchorRef} />}
+    </>
   );
 }

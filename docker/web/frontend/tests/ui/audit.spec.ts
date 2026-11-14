@@ -179,9 +179,10 @@ for (const scene of SCENES) {
         await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
       });
       if (scene.fitHeight) {
-        const full = await page.locator("main").evaluate((el) => {
-          el.scrollTop = 0;
-          return Math.ceil(el.getBoundingClientRect().top + el.scrollHeight);
+        // The page scrolls, so the full height is the document's.
+        const full = await page.evaluate(() => {
+          window.scrollTo(0, 0);
+          return Math.ceil(document.documentElement.scrollHeight);
         });
         await page.setViewportSize({ width: scene.width, height: full });
         await page.locator("main").evaluate(

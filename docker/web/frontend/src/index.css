@@ -21,7 +21,10 @@
 
 @layer base {
   :root {
-    --background: 0 0% 98%; /* #fafafa */
+    /* Page, card, popover and muted follow Primer's light theme
+     * (--bgColor-default #ffffff, --bgColor-muted #f6f8fa), so Tailwind
+     * screens and Primer components sit on the same layers. */
+    --background: 0 0% 100%; /* #ffffff, Primer --bgColor-default */
     --foreground: 240 6% 10%; /* #18181b warm near-black */
 
     --card: 0 0% 100%;
@@ -29,7 +32,7 @@
     --popover: 0 0% 100%;
     --popover-foreground: 240 6% 10%;
 
-    --muted: 240 5% 96%; /* #f4f4f5 */
+    --muted: 210 29% 97%; /* #f6f8fa, Primer --bgColor-muted */
     --muted-foreground: 240 4% 44%; /* #6c6c75 — ≥4.6:1 on both background and muted (was 46%, a 4.49 knife-edge) */
 
     --border: 240 5% 91%; /* #e5e5ea */
@@ -45,9 +48,9 @@
     --selected: 240 6% 10%;
     --selected-foreground: 0 0% 98%;
 
-    --secondary: 240 5% 96%;
+    --secondary: 210 29% 97%; /* #f6f8fa, the muted layer */
     --secondary-foreground: 240 6% 10%;
-    --accent: 240 5% 96%;
+    --accent: 210 29% 97%; /* #f6f8fa: hover fills sit on the muted layer too */
     --accent-foreground: 240 6% 10%;
 
     --destructive: 0 72% 51%; /* ~#dc2626 — aligns with risk-critical */
@@ -263,15 +266,18 @@
 
   /* Dark theme — populated (mirrors the portal's reserved token names). */
   .dark {
-    --background: 240 6% 7%; /* #111113 */
+    /* Primer's dark layers: page and card --bgColor-default #0d1117, muted
+     * and popover --bgColor-muted #151b23 (a popover is never darker than
+     * the box under it; primer.css lifts Primer's overlay the same way). */
+    --background: 216 28% 7%; /* #0d1117, Primer --bgColor-default */
     --foreground: 0 0% 98%; /* #fafafa */
 
-    --card: 240 4% 12%; /* #1d1d20 */
+    --card: 216 28% 7%; /* #0d1117 */
     --card-foreground: 0 0% 98%;
-    --popover: 240 4% 12%;
+    --popover: 214 25% 11%; /* #151b23 */
     --popover-foreground: 0 0% 98%;
 
-    --muted: 240 4% 16%; /* #27272a */
+    --muted: 214 25% 11%; /* #151b23, Primer --bgColor-muted */
     --muted-foreground: 240 5% 65%;
 
     /* Kept clearly above --muted: when the two were equal an outline on a muted
@@ -285,15 +291,17 @@
     --selected: 240 5% 30%; /* #494950, 8.5:1 under the foreground label */
     --selected-foreground: 0 0% 98%;
 
-    --secondary: 240 4% 16%;
+    /* One step above muted and popover (#151b23), in the same blue-grey, so a
+     * hover fill on either still shows. */
+    --secondary: 215 18% 13%; /* #1c2128 */
     --secondary-foreground: 0 0% 98%;
-    --accent: 240 4% 16%;
+    --accent: 215 18% 13%; /* #1c2128 */
     --accent-foreground: 0 0% 98%;
 
     --destructive: 0 72% 51%;
     --destructive-foreground: 0 0% 98%;
 
-    --ring: 213.1 93.9% 67.8%; /* #60a5fa, 7.4:1 on the page, 6.6:1 on the card */
+    --ring: 213.1 93.9% 67.8%; /* #60a5fa, 7.4:1 on the page and the card, 6.8:1 on the muted layer */
 
     /* Brand on the near-black canvas. The fill stays the light-theme navy so
      * the white label on the primary button keeps 6.7:1 (a lighter blue fill
@@ -303,7 +311,7 @@
     --brand-strong: 213.1 93.9% 67.8%; /* #60a5fa */
     --brand-hover: 225.9 70.7% 40.2%;
 
-    --sidebar: 240 5% 10%; /* one step above --background (7%) */
+    --sidebar: 216 28% 7%; /* the page colour: the navigation is not a separate layer */
     --sidebar-foreground: 0 0% 98%;
     --sidebar-border: 240 4% 24%;
 

@@ -72,7 +72,7 @@ async function openScan(page: Page, done: object) {
     r.fulfill({ contentType: "application/json", body: JSON.stringify(SBOM) }),
   );
   await page.goto("/?ui=next#/scan/demo_2.1");
-  await page.getByRole("navigation").first().waitFor();
+  await page.getByTestId("result-meta").waitFor();
 }
 
 test("Re-scan button shows on a scan that carries a config", async ({ page }) => {
@@ -122,11 +122,13 @@ test("a plain New scan after a re-scan starts blank (config consumed once)", asy
   await page.getByRole("button", { name: "Re-scan" }).click();
   await expect(page.locator("#project")).toHaveValue("demo");
 
-  // Go home, then open New scan again from the top bar — the parked config was
-  // consumed, so the form is empty (the re-scan must not leak into a plain one).
+  // Go home, then open New scan again from the navigation: the parked config
+  // was consumed, so the form is empty (the re-scan must not leak into a plain
+  // one). On the home screen New scan is in the navigation and the page itself,
+  // not the top bar.
   await page.getByRole("link", { name: "BomLens" }).click();
   await expect(page.getByRole("heading", { name: "Scan management" })).toBeVisible();
-  await page.getByRole("banner").getByRole("link", { name: "New scan" }).click();
+  await page.getByRole("navigation", { name: "Main" }).getByRole("link", { name: "New scan" }).click();
   await expect(page.locator("#project")).toHaveValue("");
   await expect(page.getByRole("button", { name: "Current folder" })).toHaveAttribute("aria-pressed", "true");
 });
