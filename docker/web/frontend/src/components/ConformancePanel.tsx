@@ -396,8 +396,8 @@ function KindChip({
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1",
         count === 0 ? "cursor-not-allowed opacity-40" : "cursor-pointer hover:opacity-80",
         // Rest-state border so this reads as pressable next to identical-looking
-        // but inert badges elsewhere (see SeverityBar's own for why this is a
-        // real `border`, not a low-contrast `ring`).
+        // but inert badges elsewhere (a real `border`, not a
+        // low-contrast `ring`, which can paint with no visible difference on a pill).
         isSel ? SELECTED_OUTLINE : UNSELECTED_OUTLINE,
       )}
     >

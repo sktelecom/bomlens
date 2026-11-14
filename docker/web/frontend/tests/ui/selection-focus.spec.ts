@@ -256,8 +256,8 @@ async function focusByKeyboard(page: Page, el: Locator) {
 }
 
 const OUTLINE_CHIPS: Array<{ name: string; section: string; chips: string; disabled: boolean }> = [
-  // Legend pills only: the bar segments above them carry an aria-label, the pills do not.
-  { name: "severity chips", section: "vulnerabilities", chips: "main button[aria-pressed]:not([aria-label])", disabled: true },
+  // The Vulnerabilities severity buttons are Primer-based now and are checked in
+  // vulnerabilities-states.spec.ts (selection is a border, nothing is dimmed).
   { name: "licence chips", section: "licenses", chips: "main button[aria-pressed]:not([aria-label])", disabled: false },
   { name: "conformance chips", section: "conformance", chips: "main button[aria-pressed]", disabled: true },
 ];

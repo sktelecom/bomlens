@@ -997,3 +997,137 @@ a.bl-sevcell:focus-visible { outline: 2px solid var(--focus-outlineColor); outli
  * text links (the box head links, the AI summary links). */
 .bl-ov a[class*="prc-Link-Link"] { color: var(--fgColor-accent); }
 .bl-ov a[class*="prc-Link-Link"]:hover { text-decoration: underline; }
+
+/* ---------------------------------------------------------------------------
+ * Vulnerabilities: the filter rows, the table, the package blocks, the folded
+ * boxes and the detail panel.
+ * ------------------------------------------------------------------------- */
+.bl-linkbtn { all: unset; cursor: pointer; color: var(--fgColor-accent); }
+.bl-linkbtn:hover { text-decoration: underline; }
+.bl-linkbtn:focus-visible { outline: 2px solid var(--focus-outlineColor); outline-offset: 2px; border-radius: var(--borderRadius-small); }
+.bl-v [class*="prc-Label-Label"], .bl-vp [class*="prc-Label-Label"] { border-width: var(--borderWidth-thin); }
+.bl-v a[class*="prc-Link-Link"], .bl-vp a[class*="prc-Link-Link"], .bl-vp button[class*="prc-Link-Link"] { color: var(--fgColor-accent); }
+
+/* A package as "group / name" on one line: the group gives way first. */
+.bl-coord { overflow-wrap: anywhere; }
+.bl-coord-group, .bl-coord-sep { color: var(--fgColor-muted); }
+.bl-coord-name { color: var(--fgColor-default); }
+
+/* Fixed versions: one per line; the one the installed version can move to is green. */
+.bl-fixed { display: flex; flex-direction: column; max-width: 100%; overflow-wrap: anywhere; }
+.bl-fixed-mine { color: var(--fgColor-success); font-weight: 600; }
+
+/* Folded boxes: bundles, the kernel note, the coverage lists. */
+.bl-v-bundles > summary { list-style: none; display: flex; align-items: center; gap: var(--base-size-8); padding: var(--base-size-8) var(--base-size-16); cursor: pointer; background: var(--bgColor-muted); border-radius: var(--borderRadius-medium); }
+.bl-v-bundles > summary::-webkit-details-marker { display: none; }
+.bl-v-bundles[open] > summary { border-bottom: var(--borderWidth-thin) solid var(--borderColor-default); border-radius: var(--borderRadius-medium) var(--borderRadius-medium) 0 0; }
+.bl-v-bundles > summary:focus-visible, .bl-v-note > summary:focus-visible, .bl-v-fold > summary:focus-visible, .bl-vp-more > summary:focus-visible { outline: 2px solid var(--focus-outlineColor); outline-offset: -2px; }
+.bl-v-bundles[open] > summary .bl-chev, .bl-v-note[open] > summary .bl-chev, .bl-v-fold[open] > summary .bl-chev, .bl-vp-more[open] > summary .bl-chev { transform: rotate(90deg); }
+.bl-v-h2 { margin: 0; font-size: var(--text-body-size-medium); font-weight: 600; }
+.bl-v-bundles-sub { display: flex; align-items: center; justify-content: space-between; gap: var(--base-size-16); padding: var(--base-size-8) var(--base-size-16); font-size: var(--text-body-size-small); }
+.bl-v-bundles-list { list-style: none; margin: 0; padding: 0; }
+.bl-v-bundles-list > li { display: flex; flex-wrap: wrap; align-items: center; gap: var(--base-size-8); padding: var(--base-size-8) var(--base-size-16); border-top: var(--borderWidth-thin) solid var(--borderColor-muted); }
+.bl-v-bundles-more { margin: 0; padding: var(--base-size-8) var(--base-size-16); border-top: var(--borderWidth-thin) solid var(--borderColor-muted); }
+.bl-v-note > summary { list-style: none; display: flex; align-items: center; gap: var(--base-size-8); padding: var(--base-size-8) var(--base-size-16); cursor: pointer; }
+.bl-v-note > summary::-webkit-details-marker { display: none; }
+.bl-v-note-why { padding: 0 var(--base-size-16) var(--base-size-12) var(--base-size-40); }
+.bl-v-cov { display: flex; flex-direction: column; gap: var(--base-size-8); }
+.bl-v-fold > summary { list-style: none; display: flex; align-items: center; gap: var(--base-size-8); cursor: pointer; }
+.bl-v-fold > summary::-webkit-details-marker { display: none; }
+.bl-v-covscroll { margin-top: var(--base-size-8); max-height: 20rem; overflow: auto; border: var(--borderWidth-thin) solid var(--borderColor-default); border-radius: var(--borderRadius-medium); }
+.bl-v-covscroll:focus-visible { outline: 2px solid var(--focus-outlineColor); outline-offset: 2px; }
+.bl-v-covtbl { min-width: 0; }
+.bl-v-covtbl table { --table-font-size: var(--text-body-size-small); }
+.bl-v-covtbl td, .bl-v-covtbl th { align-items: flex-start; min-width: 0; }
+.bl-v-covtbl thead th { white-space: nowrap; }
+.bl-v-covnote { margin: var(--base-size-8) 0 0; }
+.bl-v-state { padding: var(--base-size-16) 0; }
+
+/* Preset views and the View menu. */
+.bl-v-viewrow { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--base-size-8); }
+/* Five segments are wider than a phone: the row scrolls instead of the page. */
+.bl-v-views { min-width: 0; max-width: 100%; overflow-x: auto; }
+
+/* Search, the severity bar and its buttons. */
+.bl-v-filterbar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--base-size-8) var(--base-size-16); margin: var(--base-size-12) 0 var(--base-size-8); }
+.bl-v-search { flex: 1 1 14rem; min-width: 14rem; }
+.bl-v-sev { display: flex; flex-wrap: wrap; align-items: center; gap: var(--base-size-8); flex: 0 1 auto; min-width: 0; max-width: 100%; }
+.bl-v-bar { display: flex; width: 6rem; height: var(--base-size-8); overflow: hidden; border-radius: var(--borderRadius-full); background: var(--bgColor-neutral-muted); }
+.bl-v-chipgroup { display: flex; flex-wrap: wrap; gap: var(--base-size-4); }
+.bl-v-chip { all: unset; cursor: pointer; display: inline-flex; align-items: center; gap: var(--base-size-4); padding: 2px; border: var(--borderWidth-thin) solid transparent; border-radius: var(--borderRadius-full); }
+.bl-v-chip[aria-pressed="true"] { border-color: var(--borderColor-accent-emphasis); border-width: 2px; padding: 1px; }
+.bl-v-chip:disabled { cursor: not-allowed; opacity: 0.45; }
+.bl-v-chip:not(:disabled):hover { background: var(--bgColor-neutral-muted); }
+.bl-v-chip:focus-visible { outline: 2px solid var(--focus-outlineColor); outline-offset: 2px; }
+.bl-v-check { display: inline-flex; color: var(--fgColor-accent); margin-right: 2px; }
+
+/* The table. It grows with the page; the head sticks under the top bar (56px). */
+.bl-v-table { min-width: 0; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+.bl-v-scroll { grid-area: table; position: relative; isolation: isolate; min-width: 0; overflow-x: clip; overflow-y: visible; border: var(--borderWidth-thin) solid var(--borderColor-default); border-radius: var(--borderRadius-medium); }
+.bl-v-scroll th:first-child, .bl-v-scroll td:first-child, .bl-v-scroll th:last-child, .bl-v-scroll td:last-child { border-inline: 0 !important; }
+.bl-v-scroll thead tr:first-child th { border-top: 0 !important; border-radius: 0 !important; }
+.bl-v-scroll table > :last-child > tr:last-child > * { border-bottom: 0 !important; border-radius: 0 !important; }
+.bl-v-scroll thead { position: sticky; top: 56px; z-index: 3; }
+/* Primer wraps the table in its own scroll region; the page scrolls instead,
+ * so the sticky head works against the window. */
+.bl-v-scroll > [class*="ScrollableRegion"] { overflow: visible; }
+/* Below 1280px the table can be wider than the window: it scrolls sideways inside
+ * its box (the head then stays with the table instead of the window). */
+@media (max-width: 1279px) { .bl-v-scroll { overflow-x: auto; } }
+.bl-v-table table { --table-font-size: var(--text-body-size-medium); }
+.bl-v-table td, .bl-v-table th { align-items: flex-start; min-width: 0; }
+.bl-v-table td[data-cell-align="end"], .bl-v-table th[data-cell-align="end"] { justify-content: flex-end; text-align: end; }
+.bl-v-table thead th { white-space: nowrap; }
+.bl-v-table tbody td, .bl-v-table tbody th { white-space: normal; overflow-wrap: anywhere; }
+.bl-v-table td [class*="prc-Label-Label"] { overflow-wrap: normal; word-break: normal; white-space: nowrap; }
+.bl-v-table td > div { min-width: 0; }
+.bl-v-row { cursor: pointer; }
+.bl-v-table tr[data-open="true"] > td, .bl-v-table tr[data-open="true"] > th { background: var(--bgColor-muted); }
+.bl-v-cell { width: 100%; min-width: 0; }
+.bl-v-line1 { display: flex; align-items: center; gap: var(--base-size-8); min-width: 0; min-height: 25px; }
+.bl-v-labels { display: inline-flex; flex: none; gap: var(--base-size-4); }
+.bl-v-title { all: unset; box-sizing: border-box; cursor: pointer; flex: 0 1 auto; min-width: 0; display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; color: var(--fgColor-default); max-width: 100%; }
+.bl-v-title:hover { color: var(--fgColor-accent); text-decoration: underline; }
+.bl-v-title:focus-visible { outline: 2px solid var(--focus-outlineColor); outline-offset: 1px; border-radius: var(--borderRadius-small); }
+/* The second line is one line high. An item that does not fit wraps to a line
+ * that is cut off, whole, together with its leading dot; nothing is ever
+ * shortened with an ellipsis except the group of the package. */
+/* The second line: the package and installed version (it wraps rather than
+ * being cut), the CVE id (never hidden), then the other ids in a box one line
+ * high. An alias that does not fit wraps to the cut-off line whole, together
+ * with its leading dot; the box takes what is left and may be empty. */
+.bl-v-line2 { display: flex; flex-wrap: wrap; align-items: baseline; column-gap: var(--base-size-12); margin-top: 2px; font-size: var(--text-body-size-small); line-height: 18px; min-height: 18px; }
+.bl-v-line2 > .bl-v-pkg { flex: 0 1 auto; min-width: 0; max-width: 100%; overflow-wrap: anywhere; }
+.bl-v-line2 > .bl-v-id { flex: none; white-space: nowrap; }
+.bl-v-aliases { flex: 1 1 0; min-width: 0; height: 18px; overflow: hidden; display: flex; flex-wrap: wrap; column-gap: var(--base-size-6); }
+/* The empty first item makes every alias that is wider than the box wrap to the
+ * cut-off line instead of staying on the first line and being clipped. */
+.bl-v-aliases::before { content: ""; flex: none; width: 0; height: 18px; }
+.bl-v-aliases > * { flex: none; white-space: nowrap; }
+.bl-v-aliases > *::before { content: "·"; content: "·" / ""; margin-right: var(--base-size-6); }
+.bl-v-pkg > .bl-mono + .bl-mono { margin-left: var(--base-size-6); }
+.bl-v-compact .bl-v-line2 { margin-top: 0; }
+.bl-v-grouprow { grid-column: 1 / -1; display: block; padding: 0 !important; background: var(--bgColor-muted); }
+.bl-v-disclose { all: unset; cursor: pointer; display: flex; align-items: center; flex-wrap: wrap; gap: var(--base-size-8) var(--base-size-12); width: 100%; box-sizing: border-box; padding: var(--base-size-8) var(--base-size-16); }
+.bl-v-disclose:hover .bl-coord-name { color: var(--fgColor-accent); }
+.bl-v-disclose:focus-visible { outline: 2px solid var(--focus-outlineColor); outline-offset: -2px; }
+.bl-v-upgrade { margin-left: auto; }
+
+/* The detail panel. */
+.bl-vp { display: flex; flex-direction: column; gap: var(--base-size-16); padding-top: var(--base-size-16); outline: none; font-size: var(--text-body-size-medium); }
+.bl-vp-ids { display: flex; flex-wrap: wrap; align-items: center; gap: var(--base-size-8); font-size: var(--text-body-size-small); }
+.bl-vp-h { margin: 0; font-size: var(--text-body-size-medium); font-weight: 600; }
+.bl-vp-p { margin: var(--base-size-4) 0 0; }
+.bl-vp-kv { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: var(--base-size-6) var(--base-size-16); margin: 0; }
+.bl-vp-kv dt { color: var(--fgColor-muted); font-weight: 600; }
+.bl-vp-kv dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+.bl-vp-links { display: flex; flex-wrap: wrap; gap: var(--base-size-16); }
+.bl-vp-vexrow { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--base-size-8); margin-top: var(--base-size-8); }
+.bl-vp-note { margin-top: var(--base-size-8); }
+.bl-vp-facts { border-top: var(--borderWidth-thin) solid var(--borderColor-default); padding-top: var(--base-size-12); }
+.bl-vp-desc { margin: var(--base-size-4) 0 0; white-space: pre-line; line-height: 1.6; }
+.bl-vp-refs a { display: inline-flex; align-items: center; gap: var(--base-size-4); }
+.bl-vp-refs a > svg { flex: none; }
+.bl-vp-refs { list-style: none; margin: var(--base-size-4) 0 0; padding: 0; line-height: 1.8; }
+.bl-vp-more > summary { list-style: none; display: flex; align-items: center; gap: var(--base-size-4); cursor: pointer; font-size: var(--text-body-size-small); }
+.bl-vp-more > summary::-webkit-details-marker { display: none; }

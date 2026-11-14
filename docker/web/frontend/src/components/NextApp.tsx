@@ -17,6 +17,7 @@ import { RecentScans } from "./RecentScans";
 import { OverviewHeaderLines } from "./Overview";
 import { ResultHeader } from "./ResultHeader";
 import { ResultSection } from "./ResultSections";
+import { VULN_ACTIONS_SLOT } from "./VulnerabilitiesTable";
 import { ReportProblemDialog } from "./ReportProblemDialog";
 import { ScanRunning } from "./ScanRunning";
 import { ConfirmDialog } from "./ui/dialog";
@@ -865,6 +866,9 @@ export function NextApp() {
                 <Button as="a" href={downloadAllUrl(loadedIdRef.current)} download leadingVisual={DownloadIcon}>
                   {t("result.downloadAll")}
                 </Button>
+              ) : activeSection === "vulnerabilities" && result.security ? (
+                // The Vulnerabilities screen puts its file actions here.
+                <span id={VULN_ACTIONS_SLOT} className="bl-inline bl-wrap" />
               ) : undefined
             }
           />

@@ -129,6 +129,23 @@ test("the demo's scan list is read-only: no actions column, no delete menu, date
   await expect(page.getByText("1 of 6")).toBeVisible();
 });
 
+test("the demo's Vulnerabilities screen is read-only: no VEX import or export, no judgement form, the detail panel still opens", async ({ page }) => {
+  await serveDemoData(page);
+  await page.goto(`${ORIGIN}/#/scan/SpringBootDemo_1.0.0/vulnerabilities`);
+  await page.getByTestId("result-meta").waitFor();
+  await expect(page.locator("main tbody [data-open-id]").first()).toBeVisible();
+  await expect(page.getByRole("button", { name: "Import VEX" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Export VEX" })).toHaveCount(0);
+  await expect(page.locator('input[type="file"]')).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Export CSV" })).toBeEnabled();
+
+  await page.locator("main tbody [data-open-id]").first().click();
+  const panel = page.getByRole("dialog");
+  await expect(panel).toBeVisible();
+  await expect(panel.getByRole("button", { name: "Save" })).toHaveCount(0);
+  await expect(panel.getByLabel("Judgement", { exact: true })).toHaveCount(0);
+});
+
 test("a very long project name in the demo's start strip cannot push the page sideways", async ({ page }) => {
   await serveDemoData(page);
   const long = "Extremely-long-demo-project-name-".repeat(8);
