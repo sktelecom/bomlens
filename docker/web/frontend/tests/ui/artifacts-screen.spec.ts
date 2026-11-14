@@ -152,7 +152,7 @@ test("Copy link puts the file address on the clipboard", async ({ page, context 
   await page.getByTestId("artifact-riskReport").getByRole("button", { name: "Copy link to Open-source risk report" }).click();
   await expect(page.getByText("Link copied")).toBeVisible();
   const clip = await page.evaluate(() => navigator.clipboard.readText());
-  expect(clip).toBe(`http://localhost:4192/file?id=${ID}&name=demo_1.0_risk-report.html`);
+  expect(clip).toBe(`${new URL(page.url()).origin}/file?id=${ID}&name=demo_1.0_risk-report.html`);
 });
 
 test("Export as SPDX converts, downloads, and adds the file to the row", async ({ page }) => {
