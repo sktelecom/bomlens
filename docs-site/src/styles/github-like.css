@@ -117,3 +117,10 @@ starlight-toc h2 { font-size: 0.75rem; text-transform: uppercase; font-weight: 5
 
 /* Option names in the first table column stay on one line */
 .sl-markdown-content td:first-child code { white-space: nowrap; }
+
+/* Header selects keep their full label (the Korean theme names are longer) */
+starlight-theme-select select,
+starlight-lang-select select { text-overflow: clip; }
+@media (min-width: 50rem) {
+  starlight-theme-select label { min-width: 7rem; }
+}

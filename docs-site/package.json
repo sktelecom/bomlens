@@ -11,6 +11,7 @@
     "@astrojs/markdown-remark": "7.3.4",
     "@astrojs/starlight": "0.42.8",
     "astro": "7.4.4",
+    "mermaid": "12.2.0",
     "unist-util-visit": "5.0.0"
   }
 }
