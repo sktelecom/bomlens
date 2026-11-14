@@ -541,8 +541,6 @@
     "expand": "펼치기",
     "collapse": "접기",
     "treeLabel": "의존성 트리",
-    "expandNamed": "{{name}} 펼치기",
-    "collapseNamed": "{{name}} 접기",
     "tooLarge": "노드가 {{count}}개로 {{cap}}개를 넘습니다. 트리 보기를 사용하세요.",
     "graphError": "의존성 그래프를 렌더링하지 못했습니다.",
     "search": "패키지 검색…",
@@ -560,7 +558,10 @@
     "legend": "범례",
     "legendArrow": "화살표: 패키지에서 그 패키지가 쓰는 의존성으로",
     "legendHover": "마우스를 올리면 연결 강조, 누르면 상세",
-    "legendKeyboard": "키보드: 트리 사용"
+    "legendKeyboard": "키보드: 트리 사용",
+    "viewLabel": "의존성 보기 방식",
+    "searchHint": "Enter를 누르면 찾은 항목으로 이동합니다.",
+    "packages": "패키지"
   },
   "sourceTree": {
     "loading": "소스 트리를 불러오는 중…",

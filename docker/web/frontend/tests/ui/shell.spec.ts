@@ -971,7 +971,7 @@ test("dependency graph is labelled and the tree view is keyboard-reachable", asy
   await tree.focus();
   await expect(tree).toBeFocused();
   await page.keyboard.press("Enter");
-  await expect(page.getByText("openssl").first()).toBeVisible();
+  await expect(page.getByRole("treeitem", { name: /^openssl/ })).toBeVisible();
 });
 
 test("section navigation moves focus to the section heading", async ({ page }) => {
@@ -2181,9 +2181,9 @@ test("Dependencies tree marks vulnerable packages and direct deps", async ({ pag
   await page.getByRole("button", { name: "Tree", exact: true }).click();
 
   // openssl is a direct dependency and vulnerable → Critical + Direct badges.
-  const opensslRow = page.locator("li", { hasText: "openssl" }).first();
+  const opensslRow = page.getByRole("treeitem", { name: /^openssl/ });
   await expect(opensslRow.getByText("Critical", { exact: true })).toBeVisible();
-  await expect(opensslRow.getByText("Direct", { exact: true })).toBeVisible();
+  await expect(opensslRow).toHaveAccessibleDescription(/Direct/);
 
   // The tree view has no axe violations. The view switch recolours both of its
   // buttons through a transition; measure them once it has finished, not midway.
@@ -2209,7 +2209,7 @@ test("View zlib in Dependencies jumps to its row, openssl already expanded", asy
   await page.getByRole("button", { name: "View zlib in Dependencies" }).click();
 
   await expect(page).toHaveURL(/#\/scan\/.*\/dependencies\?q=zlib&version=1\.2\.0/);
-  const zlibRow = page.locator('li[role="treeitem"]', { hasText: "zlib" });
+  const zlibRow = page.getByRole("treeitem", { name: "zlib 1.2.0", exact: true });
   await expect(zlibRow).toBeVisible();
   await expect(zlibRow).toBeFocused();
 });
@@ -2221,7 +2221,11 @@ test("Dependencies tree search box jumps to a match and reports a miss", async (
 
   const search = page.getByRole("textbox", { name: /Search packages/i });
   await search.fill("zlib");
-  const zlibRow = page.locator('li[role="treeitem"]', { hasText: "zlib" });
+  const zlibRow = page.getByRole("treeitem", { name: "zlib 1.2.0", exact: true });
+  // Typing keeps the cursor in the box; the match is marked and Enter moves there.
+  await expect(zlibRow).toHaveAttribute("aria-current", "true");
+  await expect(search).toBeFocused();
+  await search.press("Enter");
   await expect(zlibRow).toBeFocused();
 
   await search.fill("no-such-package");
@@ -2233,7 +2237,8 @@ for (const { theme, lang } of COMBOS) {
     await stubAndRun(page, theme, lang);
     await page.getByRole("navigation").locator('a[href$="/dependencies"]').first().click();
     await page.getByTestId("deps-view-tree").click();
-    await expect(page.getByText("openssl").first()).toBeVisible();
+    await expect(page.getByRole("tree")).toBeVisible();
+    await page.mouse.move(0, 0);
     await captureMain(page, "dependencies-tree", theme, lang);
   });
 }
