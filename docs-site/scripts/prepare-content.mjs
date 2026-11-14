@@ -54,7 +54,7 @@ for (const entry of fs.readdirSync(source, { recursive: true, withFileTypes: tru
   if (!entry.isFile()) continue;
   const from = path.join(entry.parentPath, entry.name);
   const rel = path.relative(source, from);
-  if (skip(rel.split(path.sep).join('/'))) continue;
+  if (skip(rel.split(path.sep).join('/')) || rel.split(path.sep).some((part) => part.startsWith('.'))) continue;
   const to = path.join(target, rel);
   fs.mkdirSync(path.dirname(to), { recursive: true });
   if (rel.endsWith('.md')) {
@@ -101,7 +101,12 @@ fs.rmSync(demoTarget, { recursive: true, force: true });
 const demoSource = path.join(source, 'demo');
 let withDemo = false;
 if (process.env.DOCS_INCLUDE_DEMO === '1') {
-  fs.cpSync(demoSource, demoTarget, { recursive: true });
+  // Skip dotfiles: docs/demo/.gitignore would otherwise be published, and git would then
+  // leave the bundle out of the gh-pages commit.
+  fs.cpSync(demoSource, demoTarget, {
+    recursive: true,
+    filter: (src) => !path.basename(src).startsWith('.'),
+  });
   withDemo = true;
 }
 
