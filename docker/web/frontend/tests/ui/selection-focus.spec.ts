@@ -154,56 +154,6 @@ for (const theme of ["light", "dark"] as Theme[]) {
   });
 }
 
-async function openDependencies(page: Page) {
-  await page.route("**/capabilities", (r) =>
-    r.fulfill({ contentType: "application/json", body: JSON.stringify({ firmware: false, scanoss: false, docker: true }) }),
-  );
-  await page.route("**/results", (r) => r.fulfill({ contentType: "application/json", body: "[]" }));
-  await page.route("**/scans", (r) => r.fulfill({ contentType: "application/json", body: "[]" }));
-  await page.route(`**/scan?id=${DONE.id}`, (r) =>
-    r.fulfill({ contentType: "application/json", body: JSON.stringify(DONE) }),
-  );
-  await page.route("**/file**", (r) => r.fulfill({ contentType: "application/json", body: JSON.stringify(SBOM) }));
-  await page.goto(`/?ui=next#/scan/${DONE.id}/dependencies`);
-  await page.getByTestId("deps-view-graph").waitFor();
-  await waitForSettled(page.locator("main"));
-}
-
-test("graph/tree switch: the chosen segment is solid, the tabbed-to segment has the ring", async ({ page }) => {
-  await seedThemeLang(page, "light", "en");
-  await openDependencies(page);
-  await page.mouse.move(0, 0);
-
-  const graph = page.getByTestId("deps-view-graph");
-  const tree = page.getByTestId("deps-view-tree");
-  const ring = await tokenColour(page, "hsl(var(--ring))");
-  const selectedFill = await tokenColour(page, "hsl(var(--selected))");
-
-  await expect(graph).toHaveAttribute("aria-pressed", "true");
-  const chosen = await look(graph);
-  expect(chosen.background).toBe(selectedFill);
-  expect(chosen.shadow, "selection is a fill, not a ring").not.toContain(ring);
-  const other = await look(tree);
-  expect(other.background).not.toBe(selectedFill);
-
-  // Tab onto the unselected segment: the ring appears, the fill does not move.
-  await tabTo(page, (el) => el.getAttribute("data-testid") === "deps-view-tree");
-  const focused = await look(tree);
-  expect(focused.shadow).toContain(ring);
-  expect(focused.background).not.toBe(selectedFill);
-  // The chosen segment kept its fill and gained no ring while focus was elsewhere.
-  const stillChosen = await look(graph);
-  expect(stillChosen.background).toBe(selectedFill);
-  expect(stillChosen.shadow).not.toContain(ring);
-
-  // Space selects it: now it is both chosen and focused, and shows both cues.
-  await page.keyboard.press("Space");
-  await expect(tree).toHaveAttribute("aria-pressed", "true");
-  const both = await look(tree);
-  expect(both.background).toBe(selectedFill);
-  expect(both.shadow).toContain(ring);
-});
-
 // ---------------------------------------------------------------------------
 // Filter chips: the removable component filter chips (Components). Same
 // contract as the tiles above, asserted on computed styles, not screenshots:

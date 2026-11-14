@@ -191,8 +191,10 @@ test.describe("dependency graph default", () => {
     await open(page, "dependencies", sbomWith(8));
     await graph(page).waitFor({ timeout: 15000 });
     const items = page.getByTestId("deps-legend").getByRole("listitem");
-    await expect(items).toHaveCount(7);
+    await expect(items).toHaveCount(8);
     await expect(items.filter({ hasText: "Scanned component" })).toHaveCount(1);
+    // How to read the canvas is one line under it, not more chips.
+    await expect(page.getByTestId("deps-hints")).toContainText("Keyboard: use Tree");
     for (const text of await items.allTextContents()) expect(text.length).toBeLessThan(45);
   });
 

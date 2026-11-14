@@ -541,8 +541,6 @@
     "expand": "Expand",
     "collapse": "Collapse",
     "treeLabel": "Dependency tree",
-    "expandNamed": "Expand {{name}}",
-    "collapseNamed": "Collapse {{name}}",
     "tooLarge": "The graph has {{count}} nodes (over {{cap}}); use the tree view instead.",
     "graphError": "The dependency graph could not be rendered.",
     "search": "Search packages…",
@@ -560,7 +558,10 @@
     "legend": "Legend",
     "legendArrow": "Arrow: package to its dependency",
     "legendHover": "Hover to trace, click for details",
-    "legendKeyboard": "Keyboard: use Tree"
+    "legendKeyboard": "Keyboard: use Tree",
+    "viewLabel": "Dependency view",
+    "searchHint": "Press Enter to move to the match.",
+    "packages": "Packages"
   },
   "sourceTree": {
     "loading": "Loading source tree…",
