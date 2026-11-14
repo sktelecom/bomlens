@@ -1,529 +1,55 @@
 // Copyright 2026 SK Telecom Co., Ltd.
 // SPDX-License-Identifier: Apache-2.0
 
-import { CircleAlert, CircleCheck, CircleMinus, CircleX, Download } from "lucide-react";
-import { useMemo, useState } from "react";
+import { ChecklistIcon, DownloadIcon, SearchIcon } from "@primer/octicons-react";
+import { Button, Label, Link, TextInput } from "@primer/react";
+import { Blankslate } from "@primer/react/experimental";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { SELECTED_OUTLINE, UNSELECTED_OUTLINE } from "@/components/ui/selectable";
-import { Input } from "@/components/ui/input";
-import { EmptyState } from "@/components/ui/state";
-import { PipelineStepsFailedNote } from "@/components/PipelineStepsFailedNote";
-import {
-  fileUrl,
-  type ConformanceCheck,
-  type ConformanceSummary,
-  type ResultFile,
-} from "@/lib/api";
+import { fileUrl, type ConformanceCheck, type ConformanceSummary, type ResultFile } from "@/lib/api";
 import {
   checkKind,
   type CheckKind,
   CISA_CLUSTER_ORDER,
-  crosswalkTotals,
-  dedupeMissing,
-  explainedEntries,
+  conformanceReports,
   groupByCluster,
   groupG7ByCluster,
-  isNotApplicable,
-  isRegistryCheck,
   kindTally,
   matchesQuery,
   registryTally,
   resultQuality,
-  type ResultQuality,
-  missingOverflow,
-  sortByAttention,
   splitChecks,
   verdictTally,
 } from "@/lib/conformance";
-import { Disclosure } from "@/components/ui/disclosure";
-import { cn } from "@/lib/utils";
+import { buildQuery, parseQuery, type RouteQuery } from "@/lib/route";
+import { conformanceFromQuery, conformanceToQuery } from "@/lib/section-query";
+import { useToast } from "@/lib/toast";
+import { NARROW_QUERY, useMediaQuery } from "@/lib/useMediaQuery";
 
-// `color` is applied to an aria-hidden Icon at each usage site, not read
-// directly as body text.
-const STATUS = {
-  // Success role, the same green as the "Met" chip: a met element is a pass,
-  // not an informational note, so it does not take the info blue.
-  pass: { Icon: CircleCheck, color: "text-role-success-emphasis", key: "g7.sPass" }, // token-lint-ignore
-  fail: { Icon: CircleX, color: "text-risk-critical", key: "g7.sFail" }, // token-lint-ignore
-  warn: { Icon: CircleAlert, color: "text-risk-medium", key: "g7.sWarn" }, // token-lint-ignore
-  // Nothing in this document to judge. Muted on purpose: it is neither a gap the
-  // reader can close nor something met, so it must not read as either.
-  na: { Icon: CircleMinus, color: "text-muted-foreground", key: "g7.sNa" },
-} as const;
+import { BaselineBox, Count, FormatBox } from "./conformance/CheckRow";
+import { Crosswalk } from "./conformance/Crosswalk";
+import { EmptyNotices, PipelineNote, QualityNote } from "./conformance/Notices";
+import "./conformance/conformance.css";
 
-function statusOf(check: ConformanceCheck) {
-  if (isNotApplicable(check)) return STATUS.na;
-  return statusOfValue(check.status);
-}
+export { CheckGroup } from "./conformance/CheckRow";
 
-/** For rows that carry a status without the rest of a check (crosswalk elements). */
-function statusOfValue(s: string) {
-  return STATUS[s as keyof typeof STATUS] ?? STATUS.warn;
-}
+/** The result header's slot for the report downloads. */
+export const CONFORMANCE_ACTIONS_SLOT = "bl-conformance-actions";
 
-/** "Regulatory crosswalk" sub-block inside the conformance panel — one row per
- *  framework, present for any SBOM that carries `conformance.regulatoryCrosswalk`.
- *  It answers only "how much of each framework does this SBOM document"; each
- *  mapped requirement carries its own reference down in the check tables, so this
- *  stays a roll-up instead of reprinting those requirement rows. Not a
- *  certification — see the disclaimer. */
-function CrosswalkBlock({
-  crosswalk,
-}: {
-  crosswalk: NonNullable<ConformanceSummary["regulatoryCrosswalk"]>;
-}) {
-  const { t } = useTranslation();
-  const totals = crosswalkTotals(crosswalk.frameworks);
-  return (
-    <Card>
-      <CardContent className="space-y-4 p-4">
-        <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-          <div className="text-body-sm font-semibold text-foreground">{t("crosswalk.title")}</div>
-          <span className="text-label tabular-nums text-muted-foreground">
-            {t("crosswalk.totals", {
-              present: totals.present,
-              gap: totals.gap,
-              failed: totals.failed,
-              review: totals.review,
-              total: totals.total,
-            })}
-          </span>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="min-w-full text-body-sm">
-            <thead>
-              <tr className="border-b text-left text-label text-muted-foreground">
-                <th className="whitespace-nowrap py-1.5 pr-3 font-medium">{t("crosswalk.thFramework")}</th>
-                <th className="whitespace-nowrap py-1.5 px-2 text-right font-medium tabular-nums">{t("crosswalk.present")}</th>
-                <th className="whitespace-nowrap py-1.5 px-2 text-right font-medium tabular-nums">{t("crosswalk.gap")}</th>
-                <th className="whitespace-nowrap py-1.5 px-2 text-right font-medium tabular-nums">{t("crosswalk.failed")}</th>
-                <th className="whitespace-nowrap py-1.5 px-2 text-right font-medium tabular-nums">{t("crosswalk.review")}</th>
-                <th className="whitespace-nowrap py-1.5 pl-2 text-right font-medium tabular-nums">{t("crosswalk.thTotal")}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {crosswalk.frameworks.map((fw) => (
-                <tr key={fw.id} className="border-b last:border-0 align-top">
-                  <td className="py-1.5 pr-3">
-                    {/* The counts said how many requirements were met and left
-                        the reader to work out which. The rows are already in the
-                        payload; folding them under the framework answers the
-                        question the table raises. */}
-                    <Disclosure
-                      summaryClassName="text-foreground"
-                      summary={<span>{fw.title}</span>}
-                    >
-                      <ul className="mt-1 space-y-0.5">
-                        {fw.elements.map((el, i) => {
-                          const { Icon, color } = statusOfValue(el.status);
-                          return (
-                            <li key={`${el.label}-${i}`} className="flex items-start gap-1.5 text-label">
-                              <Icon className={cn("mt-0.5 h-3 w-3 shrink-0", color)} aria-hidden />
-                              <span className="text-muted-foreground">
-                                {el.label}
-                                {el.refs.length > 0 ? (
-                                  <span className="text-muted-foreground"> — {el.refs.join(" · ")}</span>
-                                ) : null}
-                              </span>
-                            </li>
-                          );
-                        })}
-                      </ul>
-                    </Disclosure>
-                    <div className="text-label text-muted-foreground">{fw.source}</div>
-                  </td>
-                  <td className="py-1.5 px-2 text-right tabular-nums text-foreground">{fw.present}</td>
-                  <td className="py-1.5 px-2 text-right tabular-nums text-foreground">{fw.gap}</td>
-                  <td className="py-1.5 px-2 text-right tabular-nums text-foreground">{fw.failed ?? 0}</td>
-                  <td className="py-1.5 px-2 text-right tabular-nums text-foreground">{fw.review}</td>
-                  <td className="py-1.5 pl-2 text-right tabular-nums text-foreground">{fw.total}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-        <p className="text-body-sm text-muted-foreground">{t("crosswalk.disclaimer")}</p>
-      </CardContent>
-    </Card>
-  );
-}
-
-// Provenance badge: where a satisfied value comes from. Reuses existing badge
-// tones (no invented colours); the word carries the meaning, colour only backs
-// it. "na" (no automated source) says "Needs a person" in that chip's tone.
-// A met element whose source is "declared" holds the publisher's declaration
-// (a declared service, for instance), which the tool did not check: it says so
-// rather than reading as something still to declare.
-function SourceBadge({ source, naKind, met }: { source?: string; naKind?: string; met?: boolean }) {
-  const { t } = useTranslation();
-  if (!source) return null;
-  const notApplicable = naKind === "not-applicable";
-  const label = notApplicable
-    ? t("g7.source.notApplicable", { defaultValue: "" })
-    : source === "declared" && met
-      ? t("g7.source.declaredMet")
-      : t(`g7.source.${source}`, { defaultValue: "" });
-  if (notApplicable && label) return <Badge variant="muted">{label}</Badge>;
-  if (!label) return null;
-  switch (source) {
-    case "auto":
-      return <Badge tone="low">{label}</Badge>;
-    case "inferred":
-      return <Badge tone="info">{label}</Badge>;
-    case "na":
-      // No automated source is exactly what puts a check under the "Needs a
-      // person" chip (checkKind), so the badge uses that chip's word and tone.
-      // It used to say "Review needed" in the attention tone, the same word the
-      // model grade badge shows in the severe tone.
-      return <Badge tone={KIND_TONE.review}>{t("conf.kind.review")}</Badge>;
-    case "declared":
-    default:
-      return <Badge variant="muted">{label}</Badge>;
-  }
-}
-
-function CheckRow({ check }: { check: ConformanceCheck }) {
-  const { t, i18n } = useTranslation();
-  const { Icon, color, key } = statusOf(check);
-  // A registry check carries a cluster, a data source, and — where the locale has
-  // one — a plain-language "what this is" line and a "how to satisfy" hint. This
-  // used to be gated on the id starting with "g7-", which meant the 2026 minimum
-  // elements were rendered as three bare lines while the block above them showed
-  // the same kind of element in full. The gate is what the check IS, not what it
-  // is called: the checks the scripts write themselves carry no cluster.
-  const isKo = (i18n.language ?? "").startsWith("ko");
-  const fromRegistry = isRegistryCheck(check);
-  const what = fromRegistry
-    ? t(`g7.help.${check.id}.what`, { defaultValue: "" })
-    : "";
-  // Regulatory references ride with the requirement they belong to: "BSI
-  // TR-03183-2 Section 5.2.2 · CISA 2026 Component Producer". The crosswalk
-  // section stays a per-framework roll-up rather than reprinting these.
-  const regText = (check.regulations ?? [])
-    .map((r) => `${(isKo ? r.short_ko : r.short) || r.framework} ${r.ref}`)
-    .join(" · ");
-  const notMet = check.status !== "pass";
-  const fix =
-    fromRegistry && notMet
-      ? t(`g7.help.${check.id}.fix`, { defaultValue: "" })
-      : "";
-  // Evidence: the real values pulled from the SBOM (purl, license id, hash alg…)
-  // — shown only when the element is present, so it reads as "met with these".
-  const evidence = fromRegistry && !notMet ? (check.evidence ?? []) : [];
-  // What a person has to establish. Shown for an element no scan can settle, and
-  // for one that is checkable in a form this report cannot see — a signature
-  // delivered beside the SBOM reads as "not present" without it.
-  const reviewHow = notMet
-    ? (isKo ? check.reviewGuide?.howKo || check.reviewGuide?.how : check.reviewGuide?.how) ?? ""
-    : "";
-  // The registry's own Korean label, when the reader is reading Korean. The
-  // contract stays English; this is the translation riding alongside it.
-  const label = (isKo && check.labelKo) || check.label;
-  // Same rule for the measurement line. A Korean requirement name followed by
-  // "no packages to measure" was the shape the conformance screen had for every
-  // check this pipeline writes itself.
-  const detail = (isKo && check.detailKo) || check.detail;
-  const missing = dedupeMissing(check.missing ?? []);
-  const overflow = missingOverflow(check);
-  // Components the supplier explained instead of versioning. Shown on a passing
-  // row too: the count passed, but each reason is still the reviewer's call.
-  const explained = explainedEntries(check);
-  // Supplied by the report itself (validate-sbom.sh joins docker/lib/g7-guidance.json),
-  // so the CLI artifacts and this panel show the same fragment. Runs from before
-  // the guidance registry carry none.
-  const guidance = check.guidance;
-  return (
-    <li className="flex items-start gap-2.5 px-3 py-2.5">
-      <Icon className={cn("mt-0.5 h-4 w-4 shrink-0", color)} aria-hidden />
-      <div className="min-w-0 flex-1">
-        <div className="flex flex-wrap items-center gap-2 text-body-sm">
-          <span className="text-foreground">{label}</span>
-          {check.required ? (
-            <Badge variant="muted">{t("g7.required")}</Badge>
-          ) : null}
-          {fromRegistry ? <SourceBadge source={check.source} naKind={check.naKind} met={check.status === "pass"} /> : null}
-          {detail && !notMet ? (
-            <span className="text-label tabular-nums text-muted-foreground">{detail}</span>
-          ) : null}
-          <span className="sr-only">{t(key)}</span>
-        </div>
-        {regText ? (
-          <div className="mt-0.5 text-label text-muted-foreground">
-            <span className="font-medium">{t("crosswalk.refs")}</span> {regText}
-          </div>
-        ) : null}
-        {detail && notMet ? (
-          <div className="mt-0.5 text-label tabular-nums text-muted-foreground">{detail}</div>
-        ) : null}
-        {what && notMet ? (
-          // Only where there is something to do. A met element's description is
-          // read once and then re-read on every visit: forty of them turned a
-          // list a reader scans into a page a reader scrolls.
-          <div className="mt-1 text-label leading-relaxed text-muted-foreground">{what}</div>
-        ) : null}
-        {notMet && (check.missing?.length ?? 0) > 0 ? (
-          // Which items lack the element (e.g. the model components without a
-          // license) — the count in detail says how many, this names them.
-          <div className="mt-1 flex flex-wrap items-center gap-1 text-label text-muted-foreground">
-            <span className="font-medium">{t("g7.missing")}</span>
-            {missing.map(({ name, count }: { name: string; count: number }) => (
-              <code
-                key={name}
-                className="break-all rounded bg-muted px-1.5 py-0.5 font-mono text-mono text-foreground"
-              >
-                {count > 1 ? `${name} ×${count}` : name}
-              </code>
-            ))}
-            {overflow > 0 ? (
-              <span className="tabular-nums">{t("g7.missingMore", { count: overflow })}</span>
-            ) : null}
-          </div>
-        ) : null}
-        {explained.length > 0 ? (
-          <div className="mt-1 flex flex-wrap items-center gap-1 text-label text-muted-foreground">
-            <span className="font-medium">{t("g7.explained")}</span>
-            {explained.map(({ name, reason }, i) => (
-              <code
-                key={`${name}-${i}`}
-                className="break-all rounded bg-muted px-1.5 py-0.5 font-mono text-mono text-foreground"
-              >
-                {name}{" "}
-                <span className="font-sans text-muted-foreground">
-                  ({t(`g7.explainedReason.${reason}`)})
-                </span>
-              </code>
-            ))}
-          </div>
-        ) : null}
-        {evidence.length > 0 ? (
-          // Folded: the values that satisfied an element are worth having, and
-          // worth having on request. Open by default they made every met row as
-          // tall as an unmet one.
-          <Disclosure
-            className="mt-1"
-            summaryClassName="text-label font-medium text-muted-foreground"
-            summary={<span>{t("g7.evidence")}</span>}
-          >
-            <div className="mt-0.5 flex flex-wrap items-center gap-1 text-label text-muted-foreground">
-              {evidence.map((e, i) => (
-                <code
-                  key={`${e}-${i}`}
-                  className="break-all rounded bg-muted px-1.5 py-0.5 font-mono text-mono text-foreground"
-                >
-                  {e}
-                </code>
-              ))}
-            </div>
-          </Disclosure>
-        ) : null}
-        {fix ? (
-          <div className="mt-1 rounded-md bg-muted/50 px-2.5 py-1.5 text-label leading-relaxed text-foreground">
-            <span className="font-medium">{t("g7.howToFix")}</span> {fix}
-          </div>
-        ) : null}
-        {reviewHow ? (
-          <div className="mt-1 rounded-md bg-muted/50 px-2.5 py-1.5 text-label leading-relaxed text-foreground">
-            <span className="font-medium">{t("g7.needsPerson")}</span> {reviewHow}
-          </div>
-        ) : null}
-        {notMet && guidance?.snippet ? (
-          // Folded away: a page that shows every fragment open runs to twelve
-          // thousand pixels, and the fragment is only wanted once a reader has
-          // decided to act on that row.
-          <Disclosure
-            className="mt-1"
-            summaryClassName="text-label font-medium text-muted-foreground"
-            summary={<span>{t("g7.example")}</span>}
-          >
-            <pre className="mt-0.5 overflow-x-auto rounded-md bg-muted px-2.5 py-2 text-mono leading-relaxed text-foreground">
-              <code className="font-mono">{guidance.snippet}</code>
-            </pre>
-          </Disclosure>
-        ) : null}
-        {guidance?.docUrl ? (
-          <a
-            href={guidance.docUrl}
-            target="_blank"
-            rel="noreferrer"
-            className="mt-1 inline-block text-label font-medium text-primary underline underline-offset-2 hover:no-underline"
-          >
-            {t("g7.learnMore")}
-          </a>
-        ) : null}
-      </div>
-    </li>
-  );
-}
-
-const KIND_TONE: Record<CheckKind, "success" | "medium" | "info" | "none"> = {
-  pass: "success",
-  actionable: "medium",
-  review: "info",
-  na: "none",
-};
+const KINDS: CheckKind[] = ["actionable", "review", "na", "pass"];
 
 /**
- * One filter chip. Built like the severity legend so the two screens are read
- * the same way, but with no bar above it: these four are a classification, not a
- * scale, and a bar would give most of its width to "passed", the one band
- * nobody came here to look at.
- */
-function KindChip({
-  kind,
-  count,
-  selected,
-  onSelect,
-}: {
-  kind: CheckKind;
-  count: number;
-  selected: CheckKind | null;
-  onSelect: (k: CheckKind) => void;
-}) {
-  const { t } = useTranslation();
-  const isSel = selected === kind;
-  return (
-    <button
-      type="button"
-      disabled={count === 0}
-      aria-pressed={isSel}
-      onClick={() => onSelect(kind)}
-      className={cn(
-        "rounded-full border border-transparent transition-colors duration-fast ease-out-soft",
-        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1",
-        count === 0 ? "cursor-not-allowed opacity-40" : "cursor-pointer hover:opacity-80",
-        // Rest-state border so this reads as pressable next to identical-looking
-        // but inert badges elsewhere (a real `border`, not a
-        // low-contrast `ring`, which can paint with no visible difference on a pill).
-        isSel ? SELECTED_OUTLINE : UNSELECTED_OUTLINE,
-      )}
-    >
-      <Badge tone={KIND_TONE[kind]} variant={kind === "na" ? "muted" : undefined}>
-        {t(`conf.kind.${kind}`)} {count}
-      </Badge>
-    </button>
-  );
-}
-
-/** A named group of checks, folded away when it holds nothing to act on.
- *  With `foldMet`, the met checks of an open group sit in their own closed
- *  fold below the rest, so opening a group shows what needs filling first. */
-export function CheckGroup({
-  title,
-  checks,
-  defaultOpen,
-  trailing,
-  foldMet = false,
-}: {
-  title: string;
-  checks: ConformanceCheck[];
-  defaultOpen: boolean;
-  trailing?: React.ReactNode;
-  foldMet?: boolean;
-}) {
-  const { t } = useTranslation();
-  if (checks.length === 0) return null;
-  // A group of met checks only is already closed; folding them a second time
-  // inside it would take two clicks to see anything.
-  const pass = checks.filter((c) => checkKind(c) === "pass");
-  const split = foldMet && pass.length > 0 && pass.length < checks.length;
-  const met = split ? pass : [];
-  const rest = split ? checks.filter((c) => checkKind(c) !== "pass") : checks;
-  return (
-    <Disclosure
-      defaultOpen={defaultOpen}
-      summaryClassName="text-label font-semibold text-foreground"
-      summary={
-        <span className="flex flex-wrap items-baseline gap-x-2">
-          <span>{title}</span>
-          <span className="text-label font-normal tabular-nums text-muted-foreground">
-            {checks.length}
-          </span>
-          {trailing}
-        </span>
-      }
-    >
-      {rest.length > 0 && (
-        <ul className="mt-2 divide-y rounded-md border">
-          {sortByAttention(rest).map((c) => (
-            <CheckRow key={c.id} check={c} />
-          ))}
-        </ul>
-      )}
-      {met.length > 0 && (
-        <Disclosure
-          className="mt-2"
-          summaryClassName="text-label font-medium text-muted-foreground"
-          summary={<span>{t("g7.metFold", { count: met.length })}</span>}
-        >
-          <ul className="mt-2 divide-y rounded-md border">
-            {sortByAttention(met).map((c) => (
-              <CheckRow key={c.id} check={c} />
-            ))}
-          </ul>
-        </Disclosure>
-      )}
-    </Disclosure>
-  );
-}
-
-/** Warns about a result the verdict cannot: nothing found, or no license
- *  declared anywhere. Same warning style as the Overview banners, so a green
- *  "pass" never stands alone beside an empty or unlicensed result. When licenses
- *  are declared, the coverage figure is shown as plain text instead. */
-function ResultQualityNote({
-  quality,
-  isSuppliedDocument,
-}: {
-  quality: ResultQuality;
-  isSuppliedDocument: boolean;
-}) {
-  const { t } = useTranslation();
-  const warn = (testId: string, title: string, body: string) => (
-    <div
-      className="rounded-md border border-warning-border/60 bg-warning-surface px-4 py-3 text-warning dark:border-warning-border/20 dark:bg-warning-surface/30"
-      data-testid={testId}
-    >
-      <div className="text-body-sm font-medium">{title}</div>
-      <p className="mt-1 text-body-sm">{body}</p>
-    </div>
-  );
-  if (quality.empty) {
-    return warn(
-      "conformance-empty-result",
-      t("conf.qualityEmptyTitle"),
-      t(isSuppliedDocument ? "conf.qualityEmptyBodySupplied" : "conf.qualityEmptyBody"),
-    );
-  }
-  if (!quality.license) return null;
-  if (quality.noLicenses) {
-    return warn(
-      "conformance-no-licenses",
-      t("conf.qualityLicenseTitle"),
-      t("conf.qualityLicenseBody", quality.license),
-    );
-  }
-  return (
-    <p className="text-body-sm text-muted-foreground" data-testid="conformance-license-coverage">
-      {t("conf.qualityLicenseFigure", quality.license)}
-    </p>
-  );
-}
-
-/**
- * SBOM conformance: the supplier-SBOM verdict, the base CycloneDX format
- * checks, the 2026 SBOM minimum elements and (when the SBOM carries a model) the
- * G7 AI minimum elements.
+ * SBOM conformance: this SBOM's own fields against the CycloneDX format and the
+ * regulatory baselines (the 2026 minimum elements and, when the SBOM carries a
+ * model, the G7 AI minimum elements). It is not a verdict on the scanned software.
  *
- * Ninety-one checks over twelve groups ran to twelve screens with no filter, no
- * search and nothing folded, and drew every unmet check the same way, so the
- * twelve a reader can act on sat among fourteen only a person can settle and
- * seven this document has nothing to measure for. The chips split those four
+ * Ninety-one checks over twelve groups ran to twelve screens with no filter, so
+ * the twelve a reader can act on sat among fourteen only a person can settle and
+ * seven this document has nothing to measure for. The tabs split those four
  * apart and start on the actionable ones; the groups fold; the search covers the
- * requirement names and the regulation references.
+ * requirement names and the regulation references. Tab and search ride in the URL.
  */
 export function ConformancePanel({
   conformance,
@@ -531,58 +57,111 @@ export function ConformancePanel({
   results = [],
   isSuppliedDocument = false,
   isAiDocument = false,
+  query,
+  onQueryChange,
 }: {
   conformance: ConformanceSummary;
   /** Scoping for the report download links; omit to hide them. */
   scanId?: string | null;
   /** This scan's artifacts, to offer the same report as a file. */
   results?: ResultFile[];
-  /** An ANALYZE run against an uploaded SBOM the reader did not generate
-   *  (`Boolean(inputSbomFileName(result))`), so a failed-pipeline-step note
-   *  suggests asking the supplier to regenerate it instead of re-scanning. */
+  /** An ANALYZE run against an uploaded SBOM the reader did not generate, so a
+   *  failed-step note suggests asking the supplier instead of re-scanning. */
   isSuppliedDocument?: boolean;
   /** `isAiScan(result)`: the empty-result and license warnings do not apply. */
   isAiDocument?: boolean;
+  /** The tab and the search, as carried in the URL hash. */
+  query?: RouteQuery;
+  onQueryChange?: (query: RouteQuery) => void;
 }) {
   const { t } = useTranslation();
-  const checks = conformance.checks ?? [];
+  const { toast } = useToast();
+  const checks = useMemo(() => conformance.checks ?? [], [conformance.checks]);
   const tally = useMemo(() => kindTally(checks), [checks]);
   // Open on the checks a reader can do something about. When there are none,
   // opening on an empty list would say "nothing here" about a document that has
   // plenty to show, so the unfiltered list is the honest start.
-  const [kind, setKind] = useState<CheckKind | null>(
-    tally.actionable > 0 ? "actionable" : null,
-  );
-  const [query, setQuery] = useState("");
-  const quality = resultQuality(conformance, isAiDocument);
-  const warnPass = conformance.result === "pass" && (quality.empty || quality.noLicenses);
+  const defaultKind: CheckKind | null = tally.actionable > 0 ? "actionable" : null;
+  const [kind, setKind] = useState<CheckKind | null>(() => conformanceFromQuery(query, defaultKind, tally).kind);
+  const [term, setTerm] = useState(() => conformanceFromQuery(query, defaultKind, tally).term);
 
-  const reports = useMemo(
-    () =>
-      results
-        .filter((r) => r.name.includes("_conformance.") && !r.name.endsWith(".json"))
-        .sort((a, b) => a.name.localeCompare(b.name)),
-    [results],
-  );
+  // The URL is the source; see ComponentsTable for why this compares strings.
+  const urlQuery = buildQuery(query);
+  const appliedRef = useRef(urlQuery);
+  useEffect(() => {
+    if (appliedRef.current === urlQuery) return;
+    appliedRef.current = urlQuery;
+    const next = conformanceFromQuery(parseQuery(urlQuery), defaultKind, tally);
+    setKind(next.kind);
+    setTerm(next.term);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [urlQuery]);
+  useEffect(() => {
+    const next = buildQuery(conformanceToQuery(kind, term, defaultKind));
+    if (next === appliedRef.current) return;
+    appliedRef.current = next;
+    onQueryChange?.(parseQuery(next));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [kind, term]);
+
+  // The report downloads live in the result header when it has a slot for them.
+  const [actionsHost, setActionsHost] = useState<HTMLElement | null>(null);
+  useLayoutEffect(() => {
+    const host = document.getElementById(CONFORMANCE_ACTIONS_SLOT);
+    if (host !== actionsHost) setActionsHost(host);
+  });
+  // On a narrow window the title leaves no room beside the buttons, so they sit
+  // at the top of the screen instead of in the header.
+  const narrow = useMediaQuery(NARROW_QUERY);
+  const reports = useMemo(() => conformanceReports(results), [results]);
+  const reportButtons = scanId
+    ? reports.map((r) => (
+        <Button
+          key={r.name}
+          as="a"
+          href={fileUrl(scanId, r.name)}
+          download={r.name}
+          title={r.name}
+          leadingVisual={DownloadIcon}
+          onClick={() => toast(t("result.downloadStarted"))}
+        >
+          {t("conf.report", { ext: r.name.split(".").pop()?.toUpperCase() })}
+        </Button>
+      ))
+    : null;
+  const actions =
+    reportButtons && reportButtons.length > 0
+      ? actionsHost && !narrow
+        ? createPortal(reportButtons, actionsHost)
+        : <div className="bl-cf-actions">{reportButtons}</div>
+      : null;
+
+  const quality = resultQuality(conformance, isAiDocument);
+  const pass = conformance.result === "pass";
+  const warnPass = pass && (quality.empty || quality.noLicenses);
 
   if (checks.length === 0) {
     return (
-      <div className="space-y-6">
-        <PipelineStepsFailedNote
-          steps={conformance.pipelineStepsFailed ?? []}
-          more={conformance.pipelineStepsFailedMore ?? 0}
-          context="conformance"
-          isSuppliedDocument={isSuppliedDocument}
-          testId="conformance-pipeline-steps-failed"
-        />
-        <ResultQualityNote quality={quality} isSuppliedDocument={isSuppliedDocument} />
-        <EmptyState>{t("g7.empty")}</EmptyState>
+      <div className="bl-cf bl-cf-notes">
+        {actions}
+        <EmptyNotices conformance={conformance} quality={quality} supplied={isSuppliedDocument} />
+        <div className="bl-cf-box">
+          <Blankslate>
+            <Blankslate.Visual>
+              <ChecklistIcon size={24} />
+            </Blankslate.Visual>
+            <Blankslate.Heading as="h2">{t("g7.empty")}</Blankslate.Heading>
+          </Blankslate>
+        </div>
       </div>
     );
   }
 
-  const keep = (c: ConformanceCheck) =>
-    (kind === null || checkKind(c) === kind) && matchesQuery(c, query);
+  const write = (k: CheckKind | null, q: string) => {
+    setKind(k);
+    setTerm(q);
+  };
+  const keep = (c: ConformanceCheck) => (kind === null || checkKind(c) === kind) && matchesQuery(c, term);
   const shown = checks.filter(keep);
   // Coverage of each advisory baseline, always over ALL of its checks: "32/41
   // present" answers how much of G7 this SBOM documents, which a filtered view
@@ -590,201 +169,146 @@ export function ConformancePanel({
   const all = splitChecks(checks);
   const cisaT = registryTally(all.cisa);
   const g7t = registryTally(all.g7);
-  // A search that finds nothing because a chip is narrowing it should say so:
-  // the reader typed a requirement they expect to exist, and "no match" alone
-  // reads as "this SBOM has no such check".
-  const hiddenByChip =
-    kind !== null && query
-      ? checks.filter((c) => matchesQuery(c, query)).length - shown.length
-      : 0;
+  // A search that finds nothing because a tab is narrowing it should say so: the
+  // reader typed a requirement they expect to exist, and "no match" alone reads
+  // as "this SBOM has no such check".
+  const hiddenByKind = kind !== null && term ? checks.filter((c) => matchesQuery(c, term)).length - shown.length : 0;
   const { base, cisa, g7 } = splitChecks(shown);
-  const g7groups = groupG7ByCluster(g7);
-  const cisaGroups = groupByCluster(cisa, CISA_CLUSTER_ORDER);
   const verdict = verdictTally(checks);
-  const pass = conformance.result === "pass";
-  // Re-mount the folds when the filter changes so their default open state is
-  // recomputed; Disclosure captures it once, on purpose.
-  const foldKey = `${kind ?? "all"}:${query}`;
-  const openByDefault = kind !== null || Boolean(query);
+  // A filter opens every group; unfiltered, only the ones holding something to act on.
+  const openAll = kind !== null || Boolean(term);
+  const actionable = (cs: ConformanceCheck[]) => openAll || cs.some((c) => checkKind(c) === "actionable");
+  // Re-mount the folds when the filter changes so their open state is recomputed.
+  const foldKey = `${kind ?? "all"}:${term}`;
+  const crosswalk = conformance.regulatoryCrosswalk;
 
   return (
-    <div className="space-y-6">
-      <PipelineStepsFailedNote
+    <div className="bl-cf bl-stack">
+      {actions}
+      <PipelineNote
         steps={conformance.pipelineStepsFailed ?? []}
         more={conformance.pipelineStepsFailedMore ?? 0}
-        context="conformance"
-        isSuppliedDocument={isSuppliedDocument}
-        testId="conformance-pipeline-steps-failed"
+        supplied={isSuppliedDocument}
       />
-      {conformance.submissionJudgedAs ? (
-        <p className="text-body-sm text-muted-foreground" data-testid="conformance-judged-as">
+      {conformance.submissionJudgedAs && (
+        <p className="bl-muted bl-small bl-flat" data-testid="conformance-judged-as">
           {t("conf.submissionJudgedAs", { mode: conformance.submissionJudgedAs })}
         </p>
-      ) : null}
-      {/* From 2xl up the summary and the filters stay in a narrow column at
-          the right while the checks scroll beside them; below 2xl the order
-          is the one this panel always had (summary, filters, checks). */}
-      <div className="space-y-6 2xl:grid 2xl:grid-cols-[minmax(0,1fr)_22rem] 2xl:items-start 2xl:gap-x-8 2xl:space-y-0">
-        <div className="space-y-6 2xl:sticky 2xl:top-20 2xl:col-start-2 2xl:row-start-1">
-        <div className="space-y-1.5">
-          <div className="flex flex-wrap items-center gap-2 text-body-sm">
-            {conformance.format ? (
-              <span className="font-medium text-foreground">{conformance.format}</span>
-            ) : null}
-            <Badge tone={!pass ? "critical" : warnPass ? "warning" : "success"}>
-              {!pass
-                ? t("result.verdictFail")
-                : warnPass
-                  ? t("conf.qualityPassWarn")
-                  : t("result.verdictPass")}
-            </Badge>
-            <div className="flex-1" />
-            {scanId
-              ? reports.map((r) => (
-                  <Button key={r.name} variant="outline" size="sm" asChild>
-                    <a href={fileUrl(scanId, r.name)} download={r.name}>
-                      <Download className="h-3.5 w-3.5" />
-                      {t("conf.report", { ext: r.name.split(".").pop()?.toUpperCase() })}
-                    </a>
-                  </Button>
-                ))
-              : null}
-          </div>
-          {/* Says what "conformance" here measures — this SBOM's own fields
-              against format and regulatory requirements, not a judgment of the
-              scanned software or (for a self-generated SBOM) a verdict BomLens
-              passes on its own document — so the section title and its "SBOM
-              Validation" name are not read as a compliance verdict on the
-              scanned software. Reachable for every scan except a self-generated
-              AI SBOM, whose G7 rollup lives on Models & datasets instead (see
-              nav.ts) to avoid showing it twice. */}
-          <p className="max-w-3xl text-body-sm text-muted-foreground">{t("g7.panelIntro")}</p>
-          <p className="text-body-sm text-foreground">
-            <span className="font-medium">
-              {t("g7.verdictFailed", { count: verdict.mandatoryFailed })}
-            </span>
-          </p>
+      )}
+      {/* From 1536px the summary stays in a narrow column at the right while the
+          checks run beside it; below that the order is summary, tabs, checks. */}
+      <div className="bl-cf-grid">
+        <div className="bl-cf-side">
+          <section className="bl-cf-box" aria-labelledby="bl-cf-sum">
+            <div className="bl-cf-head">
+              <h2 id="bl-cf-sum">{conformance.format || t("nav.conformance")}</h2>
+              <Label variant={!pass ? "danger" : warnPass ? "attention" : "success"}>
+                {!pass ? t("result.verdictFail") : warnPass ? t("conf.qualityPassWarn") : t("result.verdictPass")}
+              </Label>
+            </div>
+            <div className="bl-cf-body">
+              {/* What "conformance" measures: this SBOM's own fields against the
+                  format and the regulatory requirements, not a judgment of the
+                  scanned software. */}
+              <p className="bl-muted bl-small">{t("g7.panelIntro")}</p>
+              <p className="bl-strong">{t("g7.verdictFailed", { count: verdict.mandatoryFailed })}</p>
+              {(quality.empty || quality.noLicenses) && <QualityNote quality={quality} supplied={isSuppliedDocument} />}
+            </div>
+          </section>
         </div>
-        <ResultQualityNote quality={quality} isSuppliedDocument={isSuppliedDocument} />
-
-        <div className="space-y-3">
-          <div className="flex flex-wrap items-center gap-1.5">
-            {(["actionable", "review", "na", "pass"] as const).map((k) => (
-              <KindChip
-                key={k}
-                kind={k}
-                count={tally[k]}
-                selected={kind}
-                onSelect={(picked) => setKind((cur) => (cur === picked ? null : picked))}
-              />
-            ))}
-            <div className="flex-1" />
-            <Input
+        <div className="bl-cf-main">
+          <div className="bl-cf-bar">
+            <div className="bl-cf-tabs" role="group" aria-label={t("conf.kinds")}>
+              <button type="button" className="bl-cf-tab" aria-pressed={kind === null} onClick={() => write(null, term)}>
+                {t("conf.kind.all")}
+                <Count n={checks.length} />
+              </button>
+              {KINDS.map((k) => (
+                <button
+                  key={k}
+                  type="button"
+                  className="bl-cf-tab"
+                  aria-pressed={kind === k}
+                  disabled={tally[k] === 0}
+                  onClick={() => write(k, term)}
+                >
+                  {t(`conf.kind.${k}`)}
+                  <Count n={tally[k]} />
+                </button>
+              ))}
+            </div>
+            <TextInput
               type="search"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
+              leadingVisual={SearchIcon}
+              value={term}
+              onChange={(e) => write(kind, e.target.value)}
               placeholder={t("conf.searchPlaceholder")}
               aria-label={t("conf.searchPlaceholder")}
-              className="h-8 w-full max-w-xs text-body-sm"
+              className="bl-cf-search"
             />
+            <p className="bl-cf-status" aria-live="polite">
+              {kind === null && !term
+                ? t("conf.showingAll", { count: checks.length })
+                : t("conf.showingFiltered", { count: shown.length, total: checks.length })}
+              {hiddenByKind > 0 && shown.length > 0 ? ` ${t("conf.hiddenByFilter", { count: hiddenByKind })}` : null}
+            </p>
           </div>
-          <p className="text-body-sm text-muted-foreground">
-            {kind === null && !query
-              ? t("conf.showingAll", { count: checks.length })
-              : t("conf.showingFiltered", { count: shown.length, total: checks.length })}
-            {hiddenByChip > 0 && shown.length > 0
-              ? ` ${t("conf.hiddenByFilter", { count: hiddenByChip })}`
-              : null}
-          </p>
-        </div>
-        </div>
-        <div className="min-w-0 2xl:col-start-1 2xl:row-start-1">
-        {shown.length === 0 ? (
-          <EmptyState
-            hint={
-              hiddenByChip > 0
-                ? t("conf.hiddenByFilter", { count: hiddenByChip })
-                : undefined
-            }
-          >
-            {t("conf.noMatch")}
-          </EmptyState>
-        ) : (
-          <div className="space-y-6" key={foldKey}>
-            <CheckGroup
-              title={t("g7.formatTitle")}
-              checks={base}
-              defaultOpen={openByDefault || base.some((c) => checkKind(c) === "actionable")}
-              trailing={
-                <span className="text-label font-normal text-muted-foreground">
-                  {t("g7.baseMandatory", {
-                    passed: verdict.mandatoryPassed,
-                    total: verdict.mandatoryTotal,
-                  })}
-                </span>
-              }
-            />
-
-            {conformance.regulatoryCrosswalk &&
-            conformance.regulatoryCrosswalk.frameworks.length > 0 &&
-            kind === null &&
-            !query ? (
-              <CrosswalkBlock crosswalk={conformance.regulatoryCrosswalk} />
-            ) : null}
-
-            {cisa.length > 0 && (
-              <Card>
-                <CardContent className="space-y-4 p-4">
-                  <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-                    <div className="text-body-sm font-semibold text-foreground">{t("cisa.subtitle")}</div>
-                    <div className="text-heading font-semibold tabular-nums text-foreground">
-                      {t("g7.present", { present: cisaT.present, total: cisaT.autoTotal })}
-                    </div>
-                    <p className="text-body-sm text-muted-foreground">{t("cisa.allAdvisory")}</p>
-                  </div>
-                  <div className="space-y-3">
-                    {cisaGroups.map((group) => (
-                      <CheckGroup
-                        key={group.cluster}
-                        title={t(`cisa.cluster.${group.cluster}`, { defaultValue: group.cluster })}
-                        checks={group.checks}
-                        defaultOpen={
-                          openByDefault || group.checks.some((c) => checkKind(c) === "actionable")
-                        }
-                      />
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-
-            {g7.length > 0 && (
-              <Card>
-                <CardContent className="space-y-4 p-4">
-                  <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-                    <div className="text-body-sm font-semibold text-foreground">{t("g7.subtitle")}</div>
-                    <div className="text-heading font-semibold tabular-nums text-foreground">
-                      {t("g7.present", { present: g7t.present, total: g7t.autoTotal })}
-                    </div>
-                    <p className="text-body-sm text-muted-foreground">{t("g7.allAdvisory")}</p>
-                  </div>
-                  <div className="space-y-3">
-                    {g7groups.map((group) => (
-                      <CheckGroup
-                        key={group.cluster}
-                        title={t(`g7.cluster.${group.cluster}`, { defaultValue: group.cluster })}
-                        checks={group.checks}
-                        defaultOpen={
-                          openByDefault || group.checks.some((c) => checkKind(c) === "actionable")
-                        }
-                      />
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
+          <div className="bl-stack" key={foldKey}>
+            {shown.length === 0 ? (
+              <div className="bl-cf-box bl-cf-nomatch">
+                <Blankslate>
+                  <Blankslate.Visual>
+                    <SearchIcon size={24} />
+                  </Blankslate.Visual>
+                  <Blankslate.Heading as="h2">{t("conf.noMatch")}</Blankslate.Heading>
+                </Blankslate>
+                {hiddenByKind > 0 && (
+                  <p>
+                    {t("conf.hiddenByFilter", { count: hiddenByKind })}{" "}
+                    <Link as="button" onClick={() => write(null, term)}>
+                      {t("conf.searchAllKinds")}
+                    </Link>
+                  </p>
+                )}
+              </div>
+            ) : (
+              <>
+                {base.length > 0 && (
+                  <FormatBox checks={base} open={actionable(base)} />
+                )}
+                {cisa.length > 0 && (
+                  <BaselineBox
+                    title={t("cisa.subtitle")}
+                    present={cisaT.present}
+                    total={cisaT.autoTotal}
+                    note={t("cisa.allAdvisory")}
+                    groups={groupByCluster(cisa, CISA_CLUSTER_ORDER).map((g) => ({
+                      key: g.cluster,
+                      title: t(`cisa.cluster.${g.cluster}`, { defaultValue: g.cluster }),
+                      checks: g.checks,
+                    }))}
+                    open={actionable}
+                  />
+                )}
+                {g7.length > 0 && (
+                  <BaselineBox
+                    title={t("g7.subtitle")}
+                    present={g7t.present}
+                    total={g7t.autoTotal}
+                    note={t("g7.allAdvisory")}
+                    groups={groupG7ByCluster(g7).map((g) => ({
+                      key: g.cluster,
+                      title: t(`g7.cluster.${g.cluster}`, { defaultValue: g.cluster }),
+                      checks: g.checks,
+                    }))}
+                    open={actionable}
+                  />
+                )}
+              </>
             )}
           </div>
-        )}
+          {/* A roll-up of the whole document: shown whatever the tab, so the default view has it. */}
+          {crosswalk && crosswalk.frameworks.length > 0 && <Crosswalk crosswalk={crosswalk} />}
         </div>
       </div>
     </div>

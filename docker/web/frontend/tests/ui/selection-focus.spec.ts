@@ -205,8 +205,7 @@ test("graph/tree switch: the chosen segment is solid, the tabbed-to segment has 
 });
 
 // ---------------------------------------------------------------------------
-// Filter chips: severity (Vulnerabilities), check kind
-// (Conformance) and the removable component filter chips (Components). Same
+// Filter chips: the removable component filter chips (Components). Same
 // contract as the tiles above, asserted on computed styles, not screenshots:
 //   - Tab onto a chip draws the brand ring, and that look is not the selected one
 //   - choosing a chip gives it the selection cue (border or fill), never a ring
@@ -216,16 +215,6 @@ test("graph/tree switch: the chosen segment is solid, the tabbed-to segment has 
 
 const CHIP_DONE = {
   ...DONE,
-  conformance: {
-    result: "warn",
-    format: "CycloneDX",
-    checks: [
-      { id: "timestamp", label: "Timestamp present", required: true, status: "pass", detail: "1 found" },
-      { id: "license", label: "License coverage (recommended)", required: false, status: "warn", detail: "33%" },
-      // No automated source, so it counts as "needs review": a third enabled kind.
-      { id: "coverage", label: "Coverage", required: false, status: "warn", detail: "needs a person", source: "na" },
-    ],
-  },
 };
 
 async function openChipSection(page: Page, section: string) {
@@ -244,9 +233,6 @@ async function openChipSection(page: Page, section: string) {
   await page.mouse.move(0, 0);
 }
 
-const sig = (l: Look) =>
-  `${l.border}|${l.borderStyle}|${l.cursor}|${l.background}|${l.shadow}|${l.opacity}`;
-
 /** Keyboard focus arrives from the previous stop, so :focus-visible applies. */
 async function focusByKeyboard(page: Page, el: Locator) {
   await el.focus();
@@ -255,90 +241,10 @@ async function focusByKeyboard(page: Page, el: Locator) {
   await expect(el).toBeFocused();
 }
 
-const OUTLINE_CHIPS: Array<{ name: string; section: string; chips: string; disabled: boolean }> = [
-  // The Vulnerabilities severity buttons are Primer-based now and are checked in
-  // vulnerabilities-states.spec.ts (selection is a border, nothing is dimmed).
-  // The Licenses class buttons are checked in licenses.spec.ts.
-  { name: "conformance chips", section: "conformance", chips: "main button[aria-pressed]", disabled: true },
-];
+// The Vulnerabilities severity buttons, the Licenses class buttons and the
+// Conformance tabs are Primer-based and are checked in their own screen specs.
 
 for (const theme of ["light", "dark"] as Theme[]) {
-  for (const c of OUTLINE_CHIPS) {
-    test(`${c.name}: selection is a border, focus is the ring, nothing is dimmed (${theme})`, async ({ page }) => {
-      await seedThemeLang(page, theme, "en");
-      await openChipSection(page, c.section);
-
-      const ring = await tokenColour(page, "hsl(var(--ring))");
-      const foreground = await tokenColour(page, "hsl(var(--foreground))");
-      const enabled = page.locator(`${c.chips}:not([disabled])`);
-      // The conformance panel opens with one kind already chosen. Tag the first
-      // two UNselected chips so they can be followed after the selection moves.
-      const unselected = page.locator(`${c.chips}[aria-pressed="false"]:not([disabled])`);
-      expect(await unselected.count(), "needs two unselected chips to compare").toBeGreaterThanOrEqual(2);
-      await unselected.nth(0).evaluate((n) => n.setAttribute("data-probe", "target"));
-      await unselected.nth(1).evaluate((n) => n.setAttribute("data-probe", "other"));
-      const target = page.locator('[data-probe="target"]');
-      const other = page.locator('[data-probe="other"]');
-
-      // Rest: no unselected chip is dimmed, has a ring or the selected border; a
-      // chip that starts selected has the border and no ring.
-      for (let i = 0; i < (await enabled.count()); i++) {
-        const chip = enabled.nth(i);
-        const pressed = (await chip.getAttribute("aria-pressed")) === "true";
-        const l = await look(chip);
-        expect(l.opacity, "no enabled chip is faded").toBe("1");
-        expect(l.shadow).not.toContain(ring);
-        if (pressed) expect(l.border).toBe(foreground);
-        else expect(l.border).not.toBe(foreground);
-      }
-      const rest = await look(target);
-
-      // Keyboard focus: ring appears, border and fill stay those of an unselected chip.
-      await focusByKeyboard(page, target);
-      const focused = await look(target);
-      expect(focused.shadow, "focus draws the ring").toContain(ring);
-      expect(focused.border).toBe(rest.border);
-      expect(focused.background).toBe(rest.background);
-      expect(focused.opacity).toBe("1");
-      expect(sig(focused)).not.toBe(sig(rest));
-
-      // Space selects it: chosen AND focused, so both cues show.
-      await page.keyboard.press("Space");
-      await expect(target).toHaveAttribute("aria-pressed", "true");
-      const both = await look(target);
-      expect(both.shadow).toContain(ring);
-      expect(both.border).toBe(foreground);
-
-      // Focus moves on: the border stays, the ring goes, and the selected look is
-      // neither the rest look nor the focus look.
-      await page.keyboard.press("Tab");
-      await expect(target).not.toBeFocused();
-      await page.mouse.move(0, 0);
-      const selected = await look(target);
-      expect(selected.border, "selection is a dark border").toBe(foreground);
-      expect(selected.shadow, "selection is never a ring").not.toContain(ring);
-      expect(selected.opacity).toBe("1");
-      expect(new Set([sig(rest), sig(focused), sig(selected)]).size).toBe(3);
-
-      // A sibling that is not selected is not dimmed because another chip is.
-      const sibling = await look(other);
-      expect(sibling.opacity, "unselected siblings do not fade when a chip is chosen").toBe("1");
-      expect(sibling.border).not.toBe(foreground);
-      expect(sig(sibling)).not.toBe(sig(selected));
-
-      // A chip with nothing behind it is the one faded, unclickable state.
-      if (c.disabled) {
-        const off = page.locator(`${c.chips}:disabled`).first();
-        await expect(off).toHaveCount(1);
-        const offLook = await look(off);
-        expect(Number(offLook.opacity)).toBeLessThan(1);
-        expect(offLook.cursor).toBe("not-allowed");
-        expect(offLook.shadow).not.toContain(ring);
-        expect(new Set([sig(rest), sig(focused), sig(selected), sig(offLook)]).size).toBe(4);
-      }
-    });
-  }
-
   // The Components filters are Primer buttons under the toolbar, one per active filter, that remove
   // it. They take the focus colour as an outline under the keyboard and are never faded.
   test(`component filter chips: outline only under the keyboard, never faded, Enter removes (${theme})`, async ({ page }) => {

@@ -17,6 +17,7 @@ import { RecentScans } from "./RecentScans";
 import { OverviewHeaderLines } from "./Overview";
 import { ResultHeader } from "./ResultHeader";
 import { ResultSection } from "./ResultSections";
+import { CONFORMANCE_ACTIONS_SLOT } from "./ConformancePanel";
 import { VULN_ACTIONS_SLOT } from "./VulnerabilitiesTable";
 import { ReportProblemDialog } from "./ReportProblemDialog";
 import { ScanRunning } from "./ScanRunning";
@@ -36,6 +37,7 @@ import {
   type ScanParams,
   type Severity,
 } from "@/lib/api";
+import { conformanceReports } from "@/lib/conformance";
 import { IS_STATIC_DEMO } from "@/lib/demo";
 import { type LicenseRiskTier } from "@/lib/licenses";
 import {
@@ -876,6 +878,9 @@ export function NextApp() {
               ) : activeSection === "vulnerabilities" && result.security ? (
                 // The Vulnerabilities screen puts its file actions here.
                 <span id={VULN_ACTIONS_SLOT} className="bl-inline bl-wrap" />
+              ) : activeSection === "conformance" && conformanceReports(result.results).length > 0 ? (
+                // The Conformance screen puts its report downloads here.
+                <span id={CONFORMANCE_ACTIONS_SLOT} className="bl-cf-actions" />
               ) : undefined
             }
           />

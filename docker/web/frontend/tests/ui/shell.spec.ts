@@ -1436,7 +1436,7 @@ test("the conformance panel does not say 'no license' when one component declare
   });
   await expect(page.locator("main h1")).toBeVisible();
   await page.getByRole("navigation").locator('a[href$="/conformance"]').first().click();
-  await expect(page.getByTestId("conformance-license-coverage")).toContainText("0% (1/157 software components");
+  await expect(page.getByTestId("conformance-license-coverage")).toHaveCount(0); // a healthy figure is not repeated in the summary
   await expect(page.getByTestId("conformance-no-licenses")).toHaveCount(0);
 });
 
@@ -1479,7 +1479,7 @@ test("the conformance panel keeps a plain pass and shows only the figure for hea
   });
   await expect(page.locator("main h1")).toBeVisible();
   await page.getByRole("navigation").locator('a[href$="/conformance"]').first().click();
-  await expect(page.getByTestId("conformance-license-coverage")).toContainText("100% (39/39 software components");
+  await expect(page.getByTestId("conformance-license-coverage")).toHaveCount(0);
   await expect(page.getByTestId("conformance-no-licenses")).toHaveCount(0);
   await expect(page.getByTestId("conformance-empty-result")).toHaveCount(0);
   await expect(page.getByText("Pass", { exact: true })).toBeVisible();
@@ -1599,16 +1599,16 @@ test("AI scan exposes G7 conformance with present/advisory split", async ({ page
   // fill, one only a person can settle. These are the filter chips, over the
   // whole document rather than one baseline, and they replace the per-card
   // "advisory / need review" counts that said the same thing three times.
-  await expect(page.getByRole("button", { name: /^Can be fixed \d+$/ })).toBeVisible();
-  await expect(page.getByRole("button", { name: /^Needs a person \d+$/ })).toBeVisible();
+  await expect(page.getByRole("button", { name: /^Can be fixed \(\d+\)$/ })).toBeVisible();
+  await expect(page.getByRole("button", { name: /^Needs a person \(\d+\)$/ })).toBeVisible();
   // The element no scan can settle carries a provenance badge with the chip's
   // own word, and lives under the chip that says so.
-  await page.getByRole("button", { name: /^Needs a person \d+$/ }).click();
+  await page.getByRole("button", { name: /^Needs a person \(\d+\)$/ }).click();
   await expect(page.locator("main li").getByText("Needs a person", { exact: true }).first()).toBeVisible();
-  // Clearing the chip shows every check again, grouped into its clusters. The
+  // The All tab shows every check again, grouped into its clusters. The
   // groups fold, and an unfiltered panel opens only the ones holding something
   // to act on, so open them all for the assertions below.
-  await page.getByRole("button", { name: /^Needs a person \d+$/ }).click();
+  await page.getByRole("button", { name: /^All \(\d+\)$/ }).click();
   await page
     .locator("main details")
     .evaluateAll((els) => els.forEach((e) => ((e as HTMLDetailsElement).open = true)));
@@ -1641,14 +1641,14 @@ test("AI scan exposes G7 conformance with present/advisory split", async ({ page
   // The framework row opens to the requirements it counted. The elements were
   // already in the payload and nothing read them, so the table stated four
   // numbers and left the reader to work out which requirement each one was.
-  const fwRow = page.locator("details", { has: page.getByText("EU AI Act — Annex IV") }).first();
+  const fwRow = page.locator("details", { has: page.getByText("EU AI Act: Annex IV technical documentation") }).first();
   await fwRow.getByRole("group").or(fwRow).first().click();
   await expect(fwRow.getByRole("listitem").first()).toBeVisible();
   // so it matches the block heading and not the panel intro, which also mentions
   // the regulatory crosswalk.
   await expect(page.getByText("Regulatory crosswalk", { exact: true })).toBeVisible();
-  await expect(page.getByText("EU AI Act — Annex IV").first()).toBeVisible();
-  await expect(page.getByText("Korean AI Framework Act").first()).toBeVisible();
+  await expect(page.getByText("EU AI Act: Annex IV technical documentation").first()).toBeVisible();
+  await expect(page.getByText("AI Framework Act (Korea)").first()).toBeVisible();
   await expect(page.getByText("Annex IV(1)").first()).toBeVisible(); // a mapped regulation ref
 
   const results = await new AxeBuilder({ page })
@@ -1810,10 +1810,9 @@ for (const { theme, lang } of COMBOS) {
     await page.getByRole("navigation").locator('a[href$="/conformance"]').first().click();
     // "6/8" and the CycloneDX label are the same in every locale. Scoped to
     // <main> — the rail's conformance badge carries the same 6/8 figure.
-    // Exact: the panel's intro line also contains "CycloneDX" as a substring
-    // (it names the format the checks are against), so a loose match resolves
-    // to both and violates strict mode.
-    await expect(page.getByText("CycloneDX", { exact: true })).toBeVisible();
+    // The summary box is named for the format; wait on that heading by role, as
+    // a text match can also find a tooltip or the intro line.
+    await expect(page.getByRole("heading", { level: 2, name: "CycloneDX" })).toBeVisible();
     await expect(page.locator("main").getByText(/6\s*\/\s*8/)).toBeVisible();
     // <main> mounts with `animate-fade-in` (translateY(4px) -> 0) on every section
     // switch. With `animations: "disabled"`, Playwright freezes the transform to a

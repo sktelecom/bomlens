@@ -382,7 +382,7 @@ function G7Disclosure({ conformance }: { conformance: ConformanceSummary }) {
             </div>
             <p className="text-body-sm text-muted-foreground">{t("g7.allAdvisory")}</p>
           </div>
-          <div className="space-y-3">
+          <div className="bl-cf-groups">
             {g7groups.map((group) => (
               <CheckGroup
                 key={group.cluster}
