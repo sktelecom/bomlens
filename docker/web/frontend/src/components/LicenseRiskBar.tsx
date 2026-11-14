@@ -136,7 +136,7 @@ interface Props {
 }
 
 /**
- * License classification axis, mirroring SeverityBar: a proportional stacked bar
+ * License classification axis, like the severity filter on the Vulnerabilities screen: a proportional stacked bar
  * over per-tier badges, graded by copyleft strength. An unknown license shows as
  * `uncategorized`, never folded into permissive — so the bar never overstates how
  * safe the bill of materials is. With `onSelect`, clicking a tier filters.
@@ -221,8 +221,8 @@ export function LicenseRiskBar({
                 "cursor-pointer hover:opacity-80",
                 "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1",
                 // Rest-state border so this reads as pressable next to identical-
-                // looking but inert badges elsewhere (see SeverityBar's own for
-                // why this is a real `border`, not a low-contrast `ring`).
+                // looking but inert badges elsewhere (a real `border`, not a
+                // low-contrast `ring`, which can paint with no visible difference on a pill).
                 isSel ? SELECTED_OUTLINE : UNSELECTED_OUTLINE,
               )}
             >

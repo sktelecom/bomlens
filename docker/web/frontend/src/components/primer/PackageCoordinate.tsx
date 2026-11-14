@@ -14,9 +14,28 @@ export function PackageCoordinate({
   title,
   strongName,
   className,
-}: PackageCoordinateParts & { title?: string; strongName?: boolean; className?: string }) {
+  shrink,
+}: PackageCoordinateParts & {
+  title?: string;
+  strongName?: boolean;
+  className?: string;
+  /** One line: the group gives way to an ellipsis, the name stays whole. */
+  shrink?: boolean;
+}) {
+  const full = title ?? packageCoordinateText({ group, name });
+  if (shrink) {
+    return (
+      <span className={`bl-coord${className ? ` ${className}` : ""}`} title={full}>
+        {group && <span className="bl-coord-group">{group}</span>}
+        {group && <span className="bl-coord-sep">{PACKAGE_SEPARATOR}</span>}
+        <span className="bl-coord-name" style={{ fontWeight: strongName ? 600 : undefined }}>
+          {name}
+        </span>
+      </span>
+    );
+  }
   return (
-    <span className={className} title={title ?? packageCoordinateText({ group, name })}>
+    <span className={className} title={full}>
       {group && (
         <span style={{ color: "var(--fgColor-muted)" }}>
           {group}

@@ -145,7 +145,7 @@ test("a section with no findings says which of the two it is", async ({ page }) 
   // nothing or never checked. The reason says which, and the link leads to the
   // inventory the check actually covered.
   await open(page, "vulnerabilities");
-  const empty = page.getByTestId("empty-state");
+  const empty = page.getByTestId("no-security-report");
   await expect(empty).toBeVisible();
   // This stub has no security report at all, so the reason is the other one:
   // nothing was checked, which is not the same as nothing being wrong.

@@ -2300,25 +2300,34 @@ async function stubVexAndRun(page: Page) {
   await page.getByTestId("run-scan").click();
 }
 
+// The row of a CVE in the Vulnerabilities table: the row that holds its title button.
+const vulnRow = (page: Page, id: string) =>
+  page.getByRole("row").filter({ has: page.locator(`[data-open-id="${id}"]`) });
+
 test("Vulnerabilities table shows the disposition status and NVD severity, when the report carries them", async ({ page }) => {
   await stubVexAndRun(page);
   await page.getByRole("link", { name: /^Vulnerabilities/ }).first().click();
 
-  // Status badges, scoped to their own row, so a label that repeats elsewhere
+  // Status labels, scoped to their own row, so a label that repeats elsewhere
   // on the page cannot make the lookup ambiguous.
-  const row1 = page.locator("tr", { has: page.getByText("CVE-2024-1111") });
-  const row2 = page.locator("tr", { has: page.getByText("CVE-2024-2222") });
-  await expect(row1.getByText("Fix available", { exact: true })).toBeVisible();
+  const row1 = vulnRow(page, "CVE-2024-1111");
+  const row2 = vulnRow(page, "CVE-2024-2222");
+  // "Fix available" is what the Fixed column already says, so the row leaves it
+  // out; the detail panel lists every status.
+  await expect(row1.getByText("Fix available", { exact: true })).toHaveCount(0);
   await expect(row2.getByText("Will not fix", { exact: true })).toBeVisible();
 
   // NVD severity is its own sortable column, separate from the adopted severity.
   await expect(page.getByRole("button", { name: "NVD severity", exact: true })).toBeVisible();
   await expect(row1.getByText("High", { exact: true })).toBeVisible();
 
-  // Expanding the row with a publish date shows it in the detail area.
-  await page.getByText("CVE-2024-1111").click();
-  await expect(page.getByText("Published", { exact: true })).toBeVisible();
-  await expect(page.getByText("Jan 15, 2024")).toBeVisible();
+  // Opening the row with a publish date shows it, and the status, in the panel.
+  await page.locator('[data-open-id="CVE-2024-1111"]').click();
+  const panel = page.getByRole("dialog");
+  await expect(panel.getByText("Published", { exact: true })).toBeVisible();
+  await expect(panel.getByText("Jan 15, 2024")).toBeVisible();
+  await expect(panel.getByText("Fix available", { exact: true })).toBeVisible();
+  await page.keyboard.press("Escape");
 
   const results = await new AxeBuilder({ page }).include("main").analyze();
   expect(results.violations).toEqual([]);
@@ -2359,9 +2368,9 @@ test("a supplier can record their own judgement, separate from the vendor status
   // No judgement recorded yet, so there is nothing to export.
   await expect(page.getByRole("button", { name: "Export VEX" })).toHaveCount(0);
 
-  const row1 = page.locator("tr", { has: page.getByText("CVE-2024-1111") });
-  await page.getByText("CVE-2024-1111").click();
-  await page.getByLabel("Judgement").selectOption("affected");
+  const row1 = vulnRow(page, "CVE-2024-1111");
+  await page.locator('[data-open-id="CVE-2024-1111"]').click();
+  await page.getByLabel("Judgement", { exact: true }).selectOption("affected");
   await page.getByLabel("Notes (optional)").fill("used behind an internal-only endpoint");
   await page.getByRole("button", { name: "Save" }).click();
 
@@ -2377,12 +2386,13 @@ test("a supplier can record their own judgement, separate from the vendor status
   });
   expect(savedBody).not.toHaveProperty("purl");
 
-  // The new badge sits beside the pre-existing vendor Status badge ("Fix available")
-  // rather than replacing it -- the two are different axes.
-  await expect(row1.getByText("Fix available", { exact: true })).toBeVisible();
+  // The new label sits beside the pre-existing vendor status ("Fix available",
+  // shown in the panel) rather than replacing it: the two are different axes.
+  await expect(page.getByRole("dialog").getByText("Fix available", { exact: true })).toBeVisible();
   await expect(row1.getByText("Judgement: Affected")).toBeVisible();
+  await page.keyboard.press("Escape");
 
-  // Once a judgement exists the table offers to export it as a VEX document.
+  // Once a judgement exists the page offers to export it as a VEX document.
   await page.getByRole("button", { name: "Export VEX" }).click();
   await expect(page.getByText("Download started")).toBeVisible();
   expect(exportRequested).toBe(true);
@@ -2430,7 +2440,7 @@ test("a supplier's VEX can be imported and shows apart from the user's own judge
     });
   });
   await page.getByRole("link", { name: /^Vulnerabilities/ }).first().click();
-  const row1 = page.locator("tr", { has: page.getByText("CVE-2024-1111") });
+  const row1 = vulnRow(page, "CVE-2024-1111");
   await expect(row1.getByText("Supplier VEX: Not affected")).toHaveCount(0);
 
   const file = { name: "vex.json", mimeType: "application/json", buffer: Buffer.from("{}") };
@@ -2443,11 +2453,12 @@ test("a supplier's VEX can be imported and shows apart from the user's own judge
   await expect(page.getByText("Imported 1 statement(s); 2 did not match")).toBeVisible();
   await expect(row1.getByText("Supplier VEX: Not affected")).toBeVisible();
 
-  await page.getByText("CVE-2024-1111").click();
+  await page.locator('[data-open-id="CVE-2024-1111"]').click();
   await expect(page.getByText("Justification: code_not_present")).toBeVisible();
   await expect(page.getByText("the vulnerable code path is not built")).toBeVisible();
   // The user's own judgement input is still there, empty: the statement was not copied into it.
-  await expect(page.getByLabel("Judgement")).toHaveValue("");
+  await expect(page.getByLabel("Judgement", { exact: true })).toHaveValue("");
+  await page.keyboard.press("Escape");
 
   const results = await new AxeBuilder({ page }).include("main").analyze();
   expect(results.violations).toEqual([]);
@@ -2494,16 +2505,20 @@ test("Vulnerabilities table bundles CVEs one upgrade resolves together", async (
   await stubUpgradeAndRun(page);
   await page.getByRole("link", { name: /^Vulnerabilities/ }).first().click();
 
-  const bundle = page.getByRole("button", { name: "Upgrade qs to 6.16.0 to resolve 2 CVEs" });
-  await expect(bundle).toBeVisible();
-  // lodash's single CVE is not a bundle and must not appear in the summary.
-  await expect(page.getByText(/Upgrade lodash/)).toHaveCount(0);
+  // The box is folded; opened, it has one line for qs.
+  const box = page.getByTestId("upgrade-bundles");
+  await expect(box.getByRole("heading", { level: 2 })).toHaveText("Upgrading 1 package resolves 2 CVEs");
+  await box.getByRole("heading", { level: 2 }).click();
+  const line = box.getByRole("listitem").filter({ hasText: "qs" });
+  await expect(line).toContainText("Upgrade to 6.16.0 to resolve 2");
+  // lodash's single CVE is not a bundle and must not appear in the box.
+  await expect(box.getByText("lodash")).toHaveCount(0);
 
-  // Clicking the bundle filters the table down to just its two rows.
-  await bundle.click();
-  await expect(page.getByText("CVE-2024-3001")).toBeVisible();
-  await expect(page.getByText("CVE-2024-3002")).toBeVisible();
-  await expect(page.getByText("CVE-2024-3003")).toHaveCount(0);
+  // Choosing the package filters the table down to just its two rows.
+  await line.getByRole("button", { name: "qs" }).click();
+  await expect(page.locator('[data-open-id="CVE-2024-3001"]')).toBeVisible();
+  await expect(page.locator('[data-open-id="CVE-2024-3002"]')).toBeVisible();
+  await expect(page.locator('[data-open-id="CVE-2024-3003"]')).toHaveCount(0);
 });
 
 for (const { theme, lang } of COMBOS) {

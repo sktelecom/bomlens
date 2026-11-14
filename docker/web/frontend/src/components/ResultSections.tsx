@@ -3,7 +3,8 @@
 
 import { useTranslation } from "react-i18next";
 
-import { EmptyState } from "@/components/ui/state";
+import { ShieldIcon } from "@primer/octicons-react";
+import { Blankslate } from "@primer/react/experimental";
 import type { DoneEvent, RecentScan, ResultFile, Severity } from "@/lib/api";
 import type { LicenseRiskTier } from "@/lib/licenses";
 import type { SectionId } from "@/lib/nav";
@@ -143,9 +144,15 @@ export function ResultSection({
           }
         />
       ) : (
-        <EmptyState hint={t("result.noSecurityHint")}>
-          {t("result.noSecurity")}
-        </EmptyState>
+        <div className="bl-box bl-v-state" data-testid="no-security-report">
+          <Blankslate>
+            <Blankslate.Visual>
+              <ShieldIcon size={24} />
+            </Blankslate.Visual>
+            <Blankslate.Heading as="h2">{t("result.noSecurity")}</Blankslate.Heading>
+            <Blankslate.Description>{t("result.noSecurityHint")}</Blankslate.Description>
+          </Blankslate>
+        </div>
       );
 
     case "licenses":

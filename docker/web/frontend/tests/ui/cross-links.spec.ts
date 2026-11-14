@@ -109,9 +109,9 @@ async function openScan(page: Page, section: string) {
 
 test("a CVE's detail opens Components filtered to its package", async ({ page }) => {
   await openScan(page, "vulnerabilities");
-  await expect(page.getByText("CVE-2024-0001")).toBeVisible();
+  await expect(page.getByText("CVE-2024-0001").first()).toBeVisible();
 
-  await page.getByRole("button", { name: "Show vulnerability details" }).first().click();
+  await page.locator("[data-open-id]").first().click();
   await page.getByRole("button", { name: "View openssl in Components" }).click();
 
   await expect
@@ -140,9 +140,9 @@ test("a component's detail opens Vulnerabilities filtered to it", async ({
     .poll(() => page.evaluate(() => window.location.hash))
     .toBe("#/scan/demo_2.1/vulnerabilities?q=zlib");
   await expect(
-    page.getByRole("textbox", { name: "Search CVE, component, title" }),
+    page.getByRole("searchbox", { name: "Search CVE, component, title" }),
   ).toHaveValue("zlib");
-  await expect(page.getByText("CVE-2024-0002")).toBeVisible();
+  await expect(page.getByText("CVE-2024-0002").first()).toBeVisible();
   await expect(page.getByText("CVE-2024-0001")).toHaveCount(0);
 });
 
@@ -152,9 +152,9 @@ test("the round trip lands back on the component it started from", async ({
   await openScan(page, "components");
   await page.getByRole("button", { name: "Show component details" }).first().click();
   await page.getByRole("link", { name: "View vulnerabilities for openssl" }).click();
-  await expect(page.getByText("CVE-2024-0001")).toBeVisible();
+  await expect(page.getByText("CVE-2024-0001").first()).toBeVisible();
 
-  await page.getByRole("button", { name: "Show vulnerability details" }).first().click();
+  await page.locator("[data-open-id]").first().click();
   await page.getByRole("button", { name: "View openssl in Components" }).click();
   await expect(
     page.getByRole("searchbox", { name: "Search components" }),
@@ -164,7 +164,7 @@ test("the round trip lands back on the component it started from", async ({
 
 test("the cross-links are reachable and accessible", async ({ page }) => {
   await openScan(page, "vulnerabilities");
-  await page.getByRole("button", { name: "Show vulnerability details" }).first().click();
+  await page.locator("[data-open-id]").first().click();
   const link = page.getByRole("button", { name: "View openssl in Components" });
 
   // Keyboard-reachable, with a visible focus ring class applied.
