@@ -853,3 +853,147 @@ input.bl-visually-hidden:focus + .bl-dz { outline: 2px solid var(--focus-outline
 .bl-scanmgmt a[class*="prc-Link-Link"] { color: var(--fgColor-accent); }
 
 .bl-extlink { display: inline-flex; align-items: center; gap: var(--base-size-4); }
+
+/* ---------------------------------------------------------------------------
+ * Overview (components/Overview.tsx, components/overview/*). A main column and
+ * a side column of Boxes, each a bordered list of rows or a bar with its
+ * legend. Colours, spacing and radii are Primer variables.
+ * ------------------------------------------------------------------------- */
+
+.bl-ov { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--base-size-16); align-items: start; }
+.bl-ov-col { display: flex; flex-direction: column; gap: var(--base-size-16); min-width: 0; }
+@media (min-width: 1180px) {
+  .bl-ov { grid-template-columns: minmax(0, 1fr) 21.25rem; }
+}
+.bl-ov-notices { display: flex; flex-direction: column; gap: var(--base-size-8); }
+.bl-ov-notices:not(:empty) { margin-bottom: var(--base-size-16); }
+.bl-ov-notices ul { margin: 0 0 var(--base-size-4); padding-left: var(--base-size-20); }
+.bl-ov-notices p { margin: 0 0 var(--base-size-4); }
+.bl-ov-notices details > summary { cursor: pointer; font-size: var(--text-body-size-medium); }
+.bl-ov-toggle { margin-left: var(--base-size-12); font-size: var(--text-body-size-small); text-decoration: underline; }
+.bl-ov-notices details > summary:focus-visible { outline: 2px solid var(--focus-outlineColor); outline-offset: 2px; }
+.bl-ov-notices dl { margin: var(--base-size-8) 0 0; font-size: var(--text-body-size-small); }
+.bl-ov-notices dt { font-weight: 600; }
+.bl-ov-notices dd { margin: 0 0 var(--base-size-8); }
+.bl-ov-notices .bl-ov-bullets { display: flex; flex-direction: column; gap: var(--base-size-4); margin: 0; }
+
+.bl-ov-prov { display: flex; align-items: center; gap: var(--base-size-8); margin-top: var(--base-size-4); font-size: var(--text-body-size-small); color: var(--fgColor-muted); flex-wrap: wrap; }
+.bl-ov-prov code { padding: 1px var(--base-size-6); border-radius: var(--borderRadius-small); background: var(--bgColor-muted); color: var(--fgColor-default); font-family: var(--fontStack-monospace); overflow-wrap: anywhere; }
+
+.bl-ovlist { list-style: none; margin: 0; padding: 0; }
+.bl-ovrow {
+  display: flex;
+  align-items: center;
+  gap: var(--base-size-12);
+  padding: var(--base-size-8) var(--base-size-16);
+  border-top: var(--borderWidth-thin) solid var(--borderColor-muted);
+  color: var(--fgColor-default);
+  text-decoration: none;
+  font-size: var(--text-body-size-medium);
+}
+.bl-ovlist > li:first-child > .bl-ovrow { border-top: 0; }
+a.bl-ovrow:hover { background: var(--bgColor-muted); }
+a.bl-ovrow:focus-visible { outline: 2px solid var(--focus-outlineColor); outline-offset: -2px; }
+.bl-ovrow-icon { display: inline-flex; flex: none; color: var(--fgColor-muted); }
+.bl-ovrow-text { flex: 1; min-width: 0; }
+.bl-ovrow-text > span { display: block; }
+.bl-ovrow-chev { display: inline-flex; flex: none; color: var(--fgColor-muted); }
+.bl-ovrow-sub { margin-left: var(--base-size-8); font-size: var(--text-body-size-small); }
+.bl-ovrow-value { flex: none; font-weight: 600; font-variant-numeric: tabular-nums; }
+.bl-box-sub {
+  margin: 0;
+  padding: var(--base-size-8) var(--base-size-16);
+  background: var(--bgColor-muted);
+  border-top: var(--borderWidth-thin) solid var(--borderColor-default);
+  border-bottom: var(--borderWidth-thin) solid var(--borderColor-default);
+  font-size: var(--text-body-size-small);
+  font-weight: 600;
+  color: var(--fgColor-muted);
+}
+.bl-box-head-end { margin-left: auto; display: inline-flex; align-items: center; gap: var(--base-size-4); font-size: var(--text-body-size-small); }
+.bl-ovtrend-up { color: var(--fgColor-severe); }
+.bl-ovtrend-down { color: var(--fgColor-success); }
+.bl-ovtrend { display: inline-flex; align-items: center; font-weight: 600; }
+
+/* Comparison: a change list is a full-width disclosure. */
+.bl-ovdiff { border-top: var(--borderWidth-thin) solid var(--borderColor-muted); }
+.bl-ovdiff > summary {
+  display: flex;
+  align-items: center;
+  gap: var(--base-size-12);
+  padding: var(--base-size-8) var(--base-size-16);
+  cursor: pointer;
+  list-style: none;
+  font-size: var(--text-body-size-medium);
+}
+.bl-ovdiff > summary::-webkit-details-marker { display: none; }
+.bl-ovdiff > summary:hover { background: var(--bgColor-muted); }
+.bl-ovdiff > summary:focus-visible { outline: 2px solid var(--focus-outlineColor); outline-offset: -2px; }
+.bl-ovdiff[open] > summary .bl-chev { transform: rotate(90deg); }
+.bl-ovdiff-label { min-width: 9.5rem; font-size: var(--text-body-size-small); color: var(--fgColor-muted); white-space: nowrap; }
+.bl-ovdiff-summary { font-size: var(--text-body-size-medium); font-weight: 600; }
+.bl-ovdiff-row { display: flex; align-items: center; gap: var(--base-size-12); padding: var(--base-size-6) var(--base-size-16); border-top: var(--borderWidth-thin) solid var(--borderColor-muted); color: var(--fgColor-default); text-decoration: none; font-size: var(--text-body-size-small); }
+.bl-ovdiff-row:hover { background: var(--bgColor-muted); }
+.bl-ovdiff-row:focus-visible { outline: 2px solid var(--focus-outlineColor); outline-offset: -2px; }
+.bl-ovdiff-main { flex: 1; min-width: 0; font-family: var(--fontStack-monospace); overflow-wrap: anywhere; }
+.bl-ovdiff-aside { flex: 1; min-width: 0; font-family: var(--fontStack-monospace); color: var(--fgColor-muted); overflow-wrap: anywhere; }
+.bl-ovdiff-foot { padding: var(--base-size-8) var(--base-size-16); border-top: var(--borderWidth-thin) solid var(--borderColor-muted); font-size: var(--text-body-size-small); }
+.bl-ovdiff-more { padding: var(--base-size-6) var(--base-size-16); border-top: var(--borderWidth-thin) solid var(--borderColor-muted); font-size: var(--text-body-size-small); color: var(--fgColor-muted); }
+
+/* Riskiest components */
+.bl-ovrisk-name { flex: 1 1 0; min-width: 0; overflow-wrap: anywhere; font-size: var(--text-body-size-small); }
+.bl-ovrisk-version { flex: 0 1 6.5rem; min-width: 0; text-align: right; font-family: var(--fontStack-monospace); font-size: var(--text-body-size-small); color: var(--fgColor-muted); overflow-wrap: anywhere; }
+.bl-ovrisk-sev { flex: none; width: 7rem; display: flex; }
+
+/* Bars and their legends */
+.bl-ovbar { display: flex; height: var(--base-size-8); gap: 2px; border-radius: var(--borderRadius-full); overflow: hidden; background: var(--bgColor-neutral-muted); }
+.bl-ovbar > * { display: block; height: 100%; min-width: var(--base-size-4); }
+.bl-sevgrid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 2px; margin-top: var(--base-size-12); }
+.bl-sevcell {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--base-size-4) 2px;
+  border-radius: var(--borderRadius-medium);
+  color: var(--fgColor-default);
+  text-decoration: none;
+  font-size: var(--text-body-size-small);
+  white-space: nowrap;
+}
+a.bl-sevcell:hover { background: var(--bgColor-muted); }
+a.bl-sevcell:focus-visible { outline: 2px solid var(--focus-outlineColor); outline-offset: -2px; }
+.bl-sevcell[aria-disabled="true"] { opacity: 0.5; cursor: not-allowed; }
+.bl-sevcell-num { display: inline-flex; align-items: center; gap: var(--base-size-4); }
+.bl-sevcell-num > b { font-size: var(--text-body-size-medium); font-variant-numeric: tabular-nums; font-weight: 600; color: var(--fgColor-default); font-variant-numeric: tabular-nums; }
+.bl-tierlegend { display: flex; flex-wrap: wrap; gap: var(--base-size-6); margin-top: var(--base-size-12); }
+.bl-tierchip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--base-size-6);
+  padding: 1px var(--base-size-8);
+  border: var(--borderWidth-thin) solid var(--borderColor-default);
+  border-radius: var(--borderRadius-full);
+  color: var(--fgColor-default);
+  font-size: var(--text-body-size-small);
+  font-weight: 500;
+  line-height: 18px;
+  text-decoration: none;
+}
+.bl-tierchip:hover { background: var(--bgColor-neutral-muted); }
+.bl-tierchip:focus-visible { outline: 2px solid var(--focus-outlineColor); outline-offset: 1px; }
+/* Inside the bar's clipped edge, so Tab focus on a segment is not cut off. */
+.bl-ovbar > a:focus-visible { outline: 2px solid var(--focus-outlineColor); outline-offset: -2px; }
+/* The license bar's gaps show the page colour, so two grey classes stay apart. */
+.bl-ovbar-lic { gap: 2px; background: var(--bgColor-default); }
+
+/* AI summary */
+.bl-ai-tiles { display: flex; flex-wrap: wrap; gap: var(--base-size-24); }
+.bl-ai-tile { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 10rem; }
+.bl-ai-tile > b { font-size: var(--text-body-size-large); font-weight: 600; }
+.bl-ai-spdx { display: flex; align-items: center; flex-wrap: wrap; gap: var(--base-size-8); padding: var(--base-size-8) var(--base-size-16); border-top: var(--borderWidth-thin) solid var(--borderColor-muted); }
+
+/* Primer's Link sets its colour at zero specificity, and the base reset's
+ * `a { color: inherit }` wins over it. Restore the accent for the Overview's
+ * text links (the box head links, the AI summary links). */
+.bl-ov a[class*="prc-Link-Link"] { color: var(--fgColor-accent); }
+.bl-ov a[class*="prc-Link-Link"]:hover { text-decoration: underline; }

@@ -25,6 +25,8 @@ interface AppShellProps {
   onDeleteRecent?: (id: string) => void;
   /** The running image's version, passed through to the help menu. */
   version?: string;
+  /** Open the report-a-problem dialog from the help menu (a finished scan is open). */
+  onReportProblem?: () => void;
   /** Per-section counts shown in the navigation. */
   counts?: Partial<Record<SectionId, number | string>>;
   /** The open or running scan, shown as the path in the top bar. */
@@ -86,6 +88,7 @@ export function AppShell({
   loadingSections,
   children,
   version,
+  onReportProblem,
 }: AppShellProps) {
   const { t } = useTranslation();
   const mainRef = useRef<HTMLElement>(null);
@@ -122,6 +125,7 @@ export function AppShell({
         recent={recent}
         onDeleteRecent={onDeleteRecent}
         version={version}
+        onReportProblem={onReportProblem}
         lookupHref={lookupHref}
         onLookup={onLookup}
         lookupCurrent={lookupCurrent}

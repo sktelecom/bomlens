@@ -30,7 +30,8 @@ interface Props {
   /**
    * When set, the legend badges become filter controls: the
    * caller owns `selected` and `onSelect` toggles it (re-selecting clears).
-   * Omit for a static read-out (e.g. the Overview).
+   * Omit for a static read-out. The Vulnerabilities table passes both; the
+   * Overview has its own panel (overview/Risk.tsx) whose cells are links.
    */
   selected?: Severity | "";
   onSelect?: (s: Severity) => void;

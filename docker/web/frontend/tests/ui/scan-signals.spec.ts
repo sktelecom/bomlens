@@ -358,6 +358,11 @@ test("warnings the scan emitted survive onto the result screen", async ({ page }
   await page.goto("/#/new");
   await fillAndRun(page);
 
+  // This scan found nothing and warned, so two warning notices apply and they
+  // share one banner; the warning lines sit in its "Details" fold.
+  const merged = page.getByTestId("merged-warning");
+  await expect(merged).toBeVisible();
+  await merged.getByText("Details", { exact: true }).click();
   const box = page.getByTestId("scan-warnings");
   await expect(box).toBeVisible();
   await expect(box).toContainText("No package manifest detected");

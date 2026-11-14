@@ -383,14 +383,12 @@
     "vexUpdatedAt": "마지막 갱신 {{date}}",
     "vulnRowToggle": "취약점 상세 보기",
     "componentRowToggle": "컴포넌트 상세 보기",
-    "eolTile": "지원 종료",
     "eolAtRisk": "취약점 동반 {{count}}건",
     "eolBadge": "지원 종료",
     "eolBadgeHint": "상위 지원이 종료됨. 보안 패치가 제공되지 않습니다",
     "eolSince": "{{date}} 종료",
     "filterEol": "지원 종료",
     "colEol": "지원 상태",
-    "outdatedTile": "최신 아님",
     "outdatedBadge": "최신 아님",
     "outdatedBadgeHint": "같은 릴리스 주기에 더 최신 패치가 있습니다",
     "outdatedLatest": "최신: {{version}}",
@@ -786,9 +784,6 @@
     "vsPrevious": "{{label}} 대비",
     "compDelta": "컴포넌트 {{delta}}",
     "compSame": "컴포넌트 변동 없음",
-    "sevUp": "이전보다 심각도 높음",
-    "sevDown": "이전보다 심각도 낮음",
-    "sevSame": "심각도 변동 없음",
     "sevTrendLabel": "최고 심각도",
     "compChangeLabel": "변경된 컴포넌트",
     "compChangeSummary": "신규 {{added}} · 제거 {{removed}} · 버전 변경 {{changed}}",
@@ -822,7 +817,62 @@
       "sourceConformance": "출처: 이 스캔의 적합성 검사",
       "asOf": "스캔 시각 {{time}} 기준"
     },
-    "summaryLabel": "스캔 요약"
+    "summaryLabel": "스캔 요약",
+    "attnEol_one": "지원이 끝난 컴포넌트 {{count}}개",
+    "attnEol_other": "지원이 끝난 컴포넌트 {{count}}개",
+    "attnOutdated_one": "최신이 아닌 컴포넌트 {{count}}개",
+    "attnOutdated_other": "최신이 아닌 컴포넌트 {{count}}개",
+    "noticeMissingTitle": "이 SBOM에 빠진 정보가 있을 수 있습니다",
+    "noticeNotesTitle": "결과를 읽을 때 참고하세요",
+    "details": "자세히",
+    "prevScanLink": "{{scan}}에서 열림",
+    "notice": {
+      "pipeline": {
+        "title": "일부 보강 정보가 빠졌을 수 있습니다",
+        "short": "지원 종료일 같은 항목을 채우는 단계가 끝나지 않았습니다."
+      },
+      "warnings": {
+        "title": "경고가 난 부분의 결과가 불완전할 수 있습니다",
+        "short": "집계를 쓰기 전에 경고 내용을 확인하세요."
+      },
+      "vendored": {
+        "title": "프로젝트에 복사된 C/C++ 소스가 빠졌을 수 있습니다",
+        "short": "소스에 그대로 복사된 오픈소스는 일반 스캔으로 보이지 않습니다."
+      },
+      "degraded": {
+        "title": "전이 의존성을 확인하지 못했습니다",
+        "short": "SBOM에는 직접 의존성만 담겼습니다."
+      },
+      "graph": {
+        "title": "의존성 관계가 빠졌습니다",
+        "short": "스캔 뒤 처리 과정에서 의존성 관계가 사라졌습니다."
+      },
+      "scanossUnavailable": {
+        "title": "소스에 복사된 오픈소스가 빠졌을 수 있습니다",
+        "short": "복사된 오픈소스 검색이 끝나지 않았습니다."
+      },
+      "scanossNoMatch": {
+        "title": "소스에 복사된 오픈소스는 없었습니다",
+        "short": "복사된 오픈소스를 찾지 못했습니다."
+      },
+      "unpinned": {
+        "title": "설치한 버전과 다를 수 있습니다",
+        "short": "버전은 지금 새로 설치할 때 받게 될 버전입니다."
+      },
+      "firmware": {
+        "title": "이미지 일부가 집계에서 빠졌습니다",
+        "short": "이미지 일부를 열지 못해, 집계는 연 부분만 기준입니다."
+      },
+      "zero": {
+        "title": "컴포넌트를 하나도 찾지 못했습니다",
+        "short": "읽을 수 있는 대상을 찾지 못했습니다."
+      }
+    },
+    "noticeCount_one": "안내 {{count}}건",
+    "noticeCount_other": "안내 {{count}}건",
+    "sevValueUp": "높아짐",
+    "sevValueDown": "낮아짐",
+    "sevValueSame": "변동 없음"
   },
   "pipelineSteps": {
     "enrichAibom": "AI 모델 메타데이터 보강",

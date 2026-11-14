@@ -582,9 +582,9 @@ test.describe("list details", () => {
     const off = await paint();
     await toggle.click();
     await page.mouse.move(0, 0);
-    const on = await paint();
-    expect(on.bg).not.toBe(off.bg);
-    expect(on.border).not.toBe(off.border);
+    // The colour transition takes a moment; poll until it settles.
+    await expect.poll(async () => (await paint()).bg).not.toBe(off.bg);
+    await expect.poll(async () => (await paint()).border).not.toBe(off.border);
   });
 
   test("every row is one line high, the long firmware name included", async ({ page }) => {

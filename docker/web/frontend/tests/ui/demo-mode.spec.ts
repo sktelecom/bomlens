@@ -143,3 +143,15 @@ test("a very long project name in the demo's start strip cannot push the page si
   const excess = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
   expect(excess).toBeLessThanOrEqual(0);
 });
+
+test("the help menu in the demo links straight to the issue form", async ({ page }) => {
+  await serveDemoData(page);
+  await page.goto(`${ORIGIN}/#/scan/SpringBootDemo_1.1.0`);
+  await page.locator("main h1").first().waitFor();
+  await page.getByTestId("help-menu").click();
+  // No server to build a summary: a plain link, not the dialog.
+  const item = page.getByTestId("help-report");
+  await expect(item).toHaveAttribute("href", /issues\/new\?template=bug_report\.yml$/);
+  await expect(item).toHaveAttribute("target", "_blank");
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+});

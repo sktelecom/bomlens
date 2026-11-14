@@ -17,7 +17,6 @@ import {
 } from "@/lib/results";
 import { scanHash, type RouteQuery } from "@/lib/route";
 
-import { AiSummaryCard } from "./AiSummaryCard";
 import { ArtifactsSection, Overview } from "./Overview";
 import { ComponentsTable } from "./ComponentsTable";
 import { ConformancePanel } from "./ConformancePanel";
@@ -46,6 +45,7 @@ export function ResultSection({
   onResultPatch,
   onRescan,
   onRescanWithLicense,
+  onReportProblem,
 }: {
   section: SectionId;
   result: DoneEvent;
@@ -86,22 +86,21 @@ export function ResultSection({
   onRescan?: () => void;
   /** Re-scan from the Licenses section with the outbound-license field in focus. */
   onRescanWithLicense?: () => void;
+  /** Open the report-a-problem dialog (the Overview's failure banner). */
+  onReportProblem?: (trigger: HTMLElement) => void;
 }) {
   const { t } = useTranslation();
 
   switch (section) {
     case "overview":
       return (
-        <div className="space-y-6">
-          {isAiScan(result) && <AiSummaryCard result={result} scanId={scanId} />}
-          <Overview
-            result={result}
-            scanId={scanId}
-            recent={recent}
-            generatedAt={generatedAt}
-            onPick={onPick}
-          />
-        </div>
+        <Overview
+          result={result}
+          scanId={scanId}
+          recent={recent}
+          generatedAt={generatedAt}
+          onReportProblem={onReportProblem}
+        />
       );
 
     case "components":

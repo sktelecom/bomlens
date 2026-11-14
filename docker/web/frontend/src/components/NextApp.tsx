@@ -1,7 +1,8 @@
 // Copyright 2026 SK Telecom Co., Ltd.
 // SPDX-License-Identifier: Apache-2.0
 
-import { Spinner } from "@primer/react";
+import { DownloadIcon } from "@primer/octicons-react";
+import { Button, Spinner } from "@primer/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -13,13 +14,15 @@ import { GlobalSearch } from "./GlobalSearch";
 import { NewScan } from "./NewScan";
 import { ProgressLog } from "./ProgressLog";
 import { RecentScans } from "./RecentScans";
+import { OverviewHeaderLines } from "./Overview";
 import { ResultHeader } from "./ResultHeader";
 import { ResultSection } from "./ResultSections";
-import { ReportProblem } from "./ReportProblem";
+import { ReportProblemDialog } from "./ReportProblemDialog";
 import { ScanRunning } from "./ScanRunning";
 import { ConfirmDialog } from "./ui/dialog";
 import {
   deleteScan,
+  downloadAllUrl,
   fileUrl,
   getCapabilities,
   listScans,
@@ -704,6 +707,25 @@ export function NextApp() {
     document.title = pageTitle;
   }, [pageTitle]);
 
+  // "Report a problem" for the scan on screen, succeeded or failed: the help menu
+  // and the failed-scan banner open one dialog that shows the summary in full.
+  // The read-only demo has no server to build it, so the help menu keeps the
+  // plain link to the issue form there.
+  const [reportOpen, setReportOpen] = useState(false);
+  const reportable = Boolean(result) && !opening && !IS_STATIC_DEMO;
+  const reportScanKey = result?.id ?? loadedIdRef.current ?? "";
+  // The control that opened the dialog, so focus goes back to it on close.
+  const reportReturnRef = useRef<HTMLElement | null>(null);
+  const openReport = (trigger?: HTMLElement | null) => {
+    reportReturnRef.current = trigger ?? document.querySelector<HTMLElement>('[data-testid="help-menu"]');
+    setReportOpen(true);
+  };
+  // The dialog belongs to the scan on screen: leaving it (home, another scan,
+  // a scan starting) closes the dialog rather than carrying it over.
+  useEffect(() => {
+    setReportOpen(false);
+  }, [reportable, reportScanKey]);
+
   return (
     <AppShell
       scan={scan}
@@ -712,6 +734,7 @@ export function NextApp() {
       recent={recentLinks}
       onDeleteRecent={setPendingDelete}
       version={capabilities.version}
+      onReportProblem={reportable ? () => openReport() : undefined}
       counts={opening ? undefined : counts}
       homeHref={homeHash()}
       showHomeLink={!onHomeScreen}
@@ -836,6 +859,14 @@ export function NextApp() {
             title={t(`nav.${activeSection}`)}
             projectTitle={activeSection === "overview"}
             components={result.sbom?.components}
+            extra={activeSection === "overview" ? <OverviewHeaderLines result={result} /> : undefined}
+            actions={
+              activeSection === "overview" && result.results.length > 0 && loadedIdRef.current ? (
+                <Button as="a" href={downloadAllUrl(loadedIdRef.current)} download leadingVisual={DownloadIcon}>
+                  {t("result.downloadAll")}
+                </Button>
+              ) : undefined
+            }
           />
 
           <ResultSection
@@ -864,6 +895,7 @@ export function NextApp() {
                 ? () => handleRescan(result.scanConfig!, "license")
                 : undefined
             }
+            onReportProblem={reportable ? (trigger) => openReport(trigger) : undefined}
           />
 
           {/* The run log is reference material for the run you just watched.
@@ -875,17 +907,18 @@ export function NextApp() {
               <ProgressLog logs={logs} status={status} collapsible />
             )}
 
-          {/* A finished scan, succeeded or failed: the summary to attach to an
-              issue, shown in full before anything is copied. */}
-          {activeSection === "overview" && (
-            <ReportProblem
-              key={result.id ?? loadedIdRef.current ?? "none"}
-              scanId={result.id ?? loadedIdRef.current}
-              errorMessage={scanError}
-              defaultOpen={!result.ok}
-            />
-          )}
         </div>
+      )}
+
+      {reportOpen && reportable && (
+        <ReportProblemDialog
+          // A new scan on screen gets its own summary, not the last one's.
+          key={result?.id ?? loadedIdRef.current ?? "none"}
+          scanId={result?.id ?? loadedIdRef.current}
+          errorMessage={scanError}
+          returnFocusRef={reportReturnRef}
+          onClose={() => setReportOpen(false)}
+        />
       )}
 
       {/* Fixed-position overlay, so it renders the same wherever it sits in the

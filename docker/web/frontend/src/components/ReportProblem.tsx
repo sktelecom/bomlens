@@ -23,6 +23,45 @@ import { cn } from "@/lib/utils";
 const summaryCache = new Map<string, string>();
 
 /**
+ * The diagnostics summary for a finished scan, fetched once `enabled` turns on
+ * (the panel or dialog was opened) and kept per scan. `copyBlocked` is the
+ * "copying was blocked here" state the buttons set.
+ */
+export function useDiagnosticsSummary(
+  scanId: string | null | undefined,
+  errorMessage: string | null | undefined,
+  enabled: boolean,
+) {
+  const [text, setText] = useState<string | null>(null);
+  const [state, setState] = useState<"idle" | "loading" | "ready" | "failed">("idle");
+  const [copyBlocked, setCopyBlocked] = useState(false);
+
+  useEffect(() => {
+    if (!enabled || IS_STATIC_DEMO) return;
+    const cached = scanId ? summaryCache.get(scanId) : undefined;
+    if (cached !== undefined) {
+      setText(cached);
+      setState("ready");
+      return;
+    }
+    let cancelled = false;
+    setState("loading");
+    setCopyBlocked(false);
+    void getDiagnostics(scanId, errorMessage).then((value) => {
+      if (cancelled) return;
+      if (value !== null && scanId) summaryCache.set(scanId, value);
+      setText(value);
+      setState(value === null ? "failed" : "ready");
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [enabled, scanId, errorMessage]);
+
+  return { text, state, copyBlocked, setCopyBlocked };
+}
+
+/**
  * "Report a problem": the diagnostics summary of a finished scan (succeeded or
  * failed), shown in full on screen, with one button that puts exactly that text
  * on the clipboard and a link to the issue form. Nothing is sent anywhere: the
@@ -48,31 +87,7 @@ export function ReportProblem({
   const { t } = useTranslation();
   const { toast } = useToast();
   const [opened, setOpened] = useState(defaultOpen);
-  const [text, setText] = useState<string | null>(null);
-  const [state, setState] = useState<"idle" | "loading" | "ready" | "failed">("idle");
-  const [copyBlocked, setCopyBlocked] = useState(false);
-
-  useEffect(() => {
-    if (!opened || IS_STATIC_DEMO) return;
-    const cached = scanId ? summaryCache.get(scanId) : undefined;
-    if (cached !== undefined) {
-      setText(cached);
-      setState("ready");
-      return;
-    }
-    let cancelled = false;
-    setState("loading");
-    setCopyBlocked(false);
-    void getDiagnostics(scanId, errorMessage).then((value) => {
-      if (cancelled) return;
-      if (value !== null && scanId) summaryCache.set(scanId, value);
-      setText(value);
-      setState(value === null ? "failed" : "ready");
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [opened, scanId, errorMessage]);
+  const { text, state, copyBlocked, setCopyBlocked } = useDiagnosticsSummary(scanId, errorMessage, opened);
 
   // The demo has no server to build a summary; the help menu still links the form.
   if (IS_STATIC_DEMO) return null;

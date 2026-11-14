@@ -798,7 +798,7 @@ test("scan results render in the rail sections, adapted to scan type", async ({ 
   await expect(page.getByRole("link", { name: /^Overview/ })).toBeVisible();
   await expect(page.getByRole("link", { name: /^Components/ })).toBeVisible();
   await expect(page.getByRole("link", { name: /^Vulnerabilities/ })).toBeVisible();
-  await expect(page.getByRole("link", { name: /^Dependencies/ })).toBeVisible();
+  await expect(page.getByRole("link", { name: /^Dependencies/ }).first()).toBeVisible();
   await expect(page.getByRole("link", { name: /^Source tree/ })).toBeVisible();
   await expect(page.getByRole("link", { name: /^Artifacts/ })).toBeVisible();
   await expect(page.getByRole("navigation").getByRole("link", { name: /Models & datasets/ })).toHaveCount(0);
@@ -843,19 +843,21 @@ test("end-of-life surfaces as a KPI tile, a badge and a filter chip", async ({ p
   await page.fill("#version", "1.0");
   await page.getByTestId("run-scan").click();
 
-  // Overview KPI tile links into Components; the at-risk hint is present.
-  const tile = page.getByRole("link", { name: "View End of life" });
+  // The Overview lists it under "Needs attention", with the at-risk hint, and
+  // the row opens Components already filtered to the end-of-life components.
+  const tile = page.getByTestId("needs-attention").getByRole("link", { name: /1 component past end of life/ });
   await expect(tile).toBeVisible();
-  await expect(tile.getByText("1 also vulnerable")).toBeVisible();
+  await expect(tile).toContainText("1 also vulnerable");
+  await expect(tile).toHaveAttribute("href", /#\/scan\/[^/]+\/components\?eol=1$/);
   await tile.click();
   await expect(page.getByRole("link", { name: /^Components/ })).toHaveAttribute("aria-current", "page");
 
   // The EOL component carries the badge; the supported one does not.
   await expect(page.getByText("End of life · since 2023-09-11")).toBeVisible();
 
-  // The filter narrows the table to end-of-life rows only.
+  // The link already applied the filter: only end-of-life rows are listed.
   await page.getByRole("button", { name: /^Filters/ }).click();
-  await page.getByRole("checkbox", { name: "End of life" }).check();
+  await expect(page.getByRole("checkbox", { name: "End of life" })).toBeChecked();
   await page.keyboard.press("Escape");
   await expect(page.getByText("openssl", { exact: true }).first()).toBeVisible();
   await expect(page.getByText("zlib", { exact: true })).toHaveCount(0);
@@ -903,8 +905,8 @@ test("a scan with nothing against any component shows no risk block", async ({ p
   await page.fill("#version", "1.0");
   await page.getByTestId("run-scan").click();
 
-  // The scan landed on the overview (its jump card is there) and the block is not.
-  await expect(page.getByRole("link", { name: "View Components" }).first()).toBeVisible();
+  // The scan landed on the overview (its license axis is there) and the block is not.
+  await expect(page.getByTestId("license-panel")).toBeVisible();
   await expect(page.getByText("Highest risk components")).toHaveCount(0);
 });
 
@@ -922,7 +924,7 @@ test("Overview leads with needs-attention and jumps into sections", async ({ pag
 
   // Back to Overview; a jump card navigates into Components.
   await page.getByRole("link", { name: /^Overview/ }).first().click();
-  await page.getByRole("link", { name: "View Components" }).first().click();
+  await page.getByRole("link", { name: /^Components/ }).first().click();
   await expect(page.getByRole("link", { name: /^Components/ })).toHaveAttribute("aria-current", "page");
   await expect(page.getByText("openssl", { exact: true })).toBeVisible();
 });
@@ -932,7 +934,7 @@ test("Overview severity bar routes into filtered Vulnerabilities", async ({ page
   await expect(page.getByRole("link", { name: /^Overview/ })).toBeVisible();
 
   // Click the High band in the Overview severity axis.
-  await page.getByRole("button", { name: "High 1" }).first().click();
+  await page.getByRole("link", { name: "High 1" }).first().click();
 
   // Lands on Vulnerabilities filtered to HIGH — the HIGH CVE stays, the CRITICAL one is gone.
   await expect(page.getByRole("link", { name: /^Vulnerabilities/ })).toHaveAttribute("aria-current", "page");
@@ -945,7 +947,7 @@ test("Overview license bar routes into filtered Licenses", async ({ page }) => {
   await expect(page.getByRole("link", { name: /^Overview/ })).toBeVisible();
 
   // LIC_DONE is 2 review-needed + 1 permissive (MIT); click the Permissive band.
-  await page.getByRole("button", { name: "Permissive 1" }).first().click();
+  await page.getByRole("link", { name: "Permissive 1" }).first().click();
 
   // Lands on Licenses filtered to permissive — the AI-restrictive review card is
   // gone, and the classification band stays selected so the filter is visible.
@@ -1063,16 +1065,18 @@ test("Overview shows what changed since the previous scan of the same project", 
   // The counts alone don't say which components or CVEs moved; opening each
   // disclosure names them.
   await compSummary.click();
-  await expect(page.getByText("openssl@3.0.0", { exact: true })).toBeVisible();
-  await expect(page.getByText("readline@8.2", { exact: true })).toBeVisible();
-  await expect(page.getByText("curl@7.80.0", { exact: true })).toBeVisible();
-  await expect(page.getByText("zlib moved from 1.1.0 to 1.2.0", { exact: true })).toBeVisible();
+  const details = page.getByTestId("comp-change-details");
+  await expect(details.getByRole("link", { name: /^openssl\s+3\.0\.0$/ })).toBeVisible();
+  await expect(details.getByRole("link", { name: /^readline\s+8\.2$/ })).toBeVisible();
+  await expect(details.getByRole("link", { name: /^curl\s+7\.80\.0$/ })).toBeVisible();
+  await expect(details.getByRole("link", { name: /^zlib\s+moved from 1\.1\.0 to 1\.2\.0$/ })).toBeVisible();
   await expect(page.getByTestId("comp-diff-all-link")).toBeVisible();
 
   await vulnSummary.click();
-  await expect(page.getByText("CVE-2024-0001 (openssl)", { exact: true })).toBeVisible();
-  await expect(page.getByText("CVE-2024-0002 (zlib)", { exact: true })).toBeVisible();
-  await expect(page.getByText("CVE-2024-0003 (curl)", { exact: true })).toBeVisible();
+  const vdetails = page.getByTestId("vuln-change-details");
+  await expect(vdetails.getByRole("link", { name: /^CVE-2024-0001\s+openssl$/ })).toBeVisible();
+  await expect(vdetails.getByRole("link", { name: /^CVE-2024-0002\s+zlib/ })).toBeVisible();
+  await expect(vdetails.getByRole("link", { name: /^CVE-2024-0003\s+curl/ })).toBeVisible();
   await expect(page.getByTestId("vuln-diff-all-link")).toBeVisible();
 });
 
@@ -1081,7 +1085,7 @@ test("Overview comparison card's names jump into the filtered section", async ({
   await expect(page.locator("main h1")).toBeVisible();
   await page.getByTestId("comp-change-summary").click();
 
-  const openssl = page.getByRole("link", { name: "openssl@3.0.0" });
+  const openssl = page.getByTestId("comp-change-details").getByRole("link", { name: /^openssl\s+3\.0\.0$/ });
   await expect(openssl).toHaveAttribute("href", /#\/scan\/.*\/components\?q=openssl$/);
 
   // Keyboard focus lands on the link and stays visible (focus-visible ring,
@@ -1105,7 +1109,7 @@ test("Overview comparison card's names jump into the filtered section", async ({
   await page.goto("/?ui=next#/new");
   await stubAndRunWithPreviousScan(page);
   await page.getByTestId("vuln-change-summary").click();
-  const cve = page.getByRole("link", { name: "CVE-2024-0001 (openssl)" });
+  const cve = page.getByTestId("vuln-change-details").getByRole("link", { name: /^CVE-2024-0001\s+openssl$/ });
   await expect(cve).toHaveAttribute("href", /#\/scan\/.*\/vulnerabilities\?q=CVE-2024-0001$/);
   await cve.click();
   await expect(page.getByRole("link", { name: /^Vulnerabilities/ })).toHaveAttribute("aria-current", "page");
@@ -1114,7 +1118,7 @@ test("Overview comparison card's names jump into the filtered section", async ({
 });
 
 test("Overview comparison card's severity trend text has no axe violations", async ({ page }) => {
-  // Regression guard: this card's "more severe than before" text used the
+  // Regression guard: this card's "Higher" severity text used the
   // graphical text-risk-high token instead of text-risk-high-fg and failed
   // WCAG AA contrast in light mode (3.56:1, needs 4.5:1); severityDir "up" on
   // this fixture is what put that text on the page at all. Full-page, not
@@ -1122,7 +1126,7 @@ test("Overview comparison card's severity trend text has no axe violations", asy
   // contrast/underline fix is tested separately, above).
   await stubAndRunWithPreviousScan(page);
   await expect(page.locator("main h1")).toBeVisible();
-  await expect(page.getByText("more severe than before")).toBeVisible();
+  await expect(page.getByTestId("comparison").getByText("Higher", { exact: true })).toBeVisible();
   const axe = await new AxeBuilder({ page })
     .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
     .analyze();
@@ -1585,7 +1589,7 @@ test("AI scan exposes G7 conformance with present/advisory split", async ({ page
   );
   // A screen reader hears the pair spelled out.
   await expect(page.getByRole("link", { name: /1 of 1 mandatory checks passed/ })).toBeVisible();
-  await expect(page.locator("main").getByText("1/1").first()).toBeVisible();
+  await expect(page.getByTestId("nav-count-conformance")).toContainText("1/1");
   await page.getByRole("navigation").getByRole("link", { name: /Conformance check/ }).click();
 
   // Coverage of the baseline itself: 6 of the 8 auto-covered elements are

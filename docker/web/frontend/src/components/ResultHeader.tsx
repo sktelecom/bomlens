@@ -3,6 +3,7 @@
 
 import { AlertIcon } from "@primer/octicons-react";
 import { Label, PageHeader } from "@primer/react";
+import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
 import { formatDateTime, formatNumber } from "@/lib/format";
@@ -28,6 +29,8 @@ export function ResultHeader({
   title,
   projectTitle = false,
   components,
+  extra,
+  actions,
 }: {
   name?: string;
   version?: string;
@@ -42,6 +45,10 @@ export function ResultHeader({
   projectTitle?: boolean;
   /** Number of components in the SBOM; absent when the scan made none. */
   components?: number;
+  /** More lines under the meta line (the Overview's input source and how it was read). */
+  extra?: ReactNode;
+  /** Buttons at the end of the title row. */
+  actions?: ReactNode;
 }) {
   const { t, i18n } = useTranslation();
   const when = generatedAt ? formatDateTime(generatedAt, i18n.language) : "";
@@ -63,6 +70,7 @@ export function ResultHeader({
         </PageHeader.Title>
       </PageHeader.TitleArea>
       <PageHeader.Description>
+        <div style={{ display: "flex", flexDirection: "column" }}>
         <span
           data-testid="result-meta"
           style={{
@@ -124,7 +132,10 @@ export function ResultHeader({
             </Label>
           )}
         </span>
+        {extra}
+        </div>
       </PageHeader.Description>
+      {actions && <PageHeader.Actions>{actions}</PageHeader.Actions>}
     </PageHeader>
   );
 }
