@@ -196,7 +196,8 @@ fi
 # dependent datasets has no other component at all, and read as 0 licenses.
 # shellcheck disable=SC2016
 LIC_SUBJECTS='((if ((.metadata.component.type // "") | IN("machine-learning-model", "data"))
-                then [.metadata.component] else [] end) + [ .components[]? ])'
+                then [.metadata.component] else [] end)
+               + [ .components[]? | select(any(.properties[]?; .name == "bomlens:ai:usage") | not) ])'
 LIC_CLASS='null'
 if [ -f "$BOM" ] && jq empty "$BOM" >/dev/null 2>&1 \
    && jq -e '(.metadata.component.type // "") | IN("machine-learning-model", "data")' "$BOM" >/dev/null 2>&1; then

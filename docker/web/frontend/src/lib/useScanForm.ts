@@ -162,6 +162,9 @@ export function useScanForm({
   const [identifyVendored, setIdentifyVendored] = useState(
     () => initialConfig?.identifyVendored ?? false,
   );
+  const [resolveModels, setResolveModels] = useState(
+    () => initialConfig?.resolveModels ?? false,
+  );
   // Picked scan-target folder only: resolve transitive dependencies with a real
   // build (cdxgen), like the current folder does, instead of the shallow syft
   // directory scan. Default on — it is the point of scanning a project folder.
@@ -289,6 +292,8 @@ export function useScanForm({
   // Excluded paths need a source tree, like the vendored-code scan.
   const showExclude = isSourceScan || effectiveSource === "scan-target-src";
   const showVendored = Boolean(capabilities.scanoss) && isSourceScan;
+  // The hub lookup reads the models the source references, so source scans only.
+  const showResolveModels = isSourceScan;
   // Deep license (ScanCode) needs a source tree too, so like SCANOSS it only
   // applies to source scans — not Docker images, SBOM uploads, firmware or AI
   // models, where there is nothing to scan and the toggle would be a no-op.
@@ -353,7 +358,7 @@ export function useScanForm({
   const reachabilityOn = showReachability && reachability;
   const securityForced = isAnalyze || deepCveOn || reachabilityOn;
   const showScanOptions =
-    showDeepLicense || showVendored || showByteStable || showDeepCve || showReachability || showAnalyzeCpeIndex ||
+    showDeepLicense || showVendored || showResolveModels || showByteStable || showDeepCve || showReachability || showAnalyzeCpeIndex ||
     showDetection || showReadDeclared;
   const showFormatOptions =
     showOutboundLicense || showSbomAuthor || showSupplier || showSpecVersion || showConformanceProfile;
@@ -583,6 +588,7 @@ export function useScanForm({
       security: isAiModel ? false : securityForced ? true : security,
       deepLicense: showDeepLicense ? deepLicense : false,
       identifyVendored: showVendored ? identifyVendored : false,
+      resolveModels: showResolveModels ? resolveModels : false,
       byteStable: showByteStable ? byteStable : false,
       analyzeCpeIndex: showAnalyzeCpeIndex ? analyzeCpeIndex : false,
       detection: showDetection && !readLockFile ? "build" : "auto",
@@ -639,6 +645,7 @@ export function useScanForm({
     file, setFile,
     deepLicense, setDeepLicense,
     identifyVendored, setIdentifyVendored,
+    resolveModels, setResolveModels, showResolveModels,
     deepCve, setDeepCve,
     reachability, setReachability,
     byteStable, setByteStable,

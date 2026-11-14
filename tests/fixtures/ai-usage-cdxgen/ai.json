@@ -1,0 +1,287 @@
+{
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.6",
+  "version": 1,
+  "metadata": {
+    "timestamp": "2026-11-13T00:00:00Z",
+    "tools": {
+      "components": [
+        {
+          "group": "@cdxgen",
+          "name": "cdxgen",
+          "version": "13.5.0",
+          "purl": "pkg:npm/%40cdxgen/cdxgen@13.5.0",
+          "type": "application",
+          "bom-ref": "pkg:npm/@cdxgen/cdxgen@13.5.0",
+          "publisher": "OWASP Foundation",
+          "authors": [
+            {
+              "name": "OWASP Foundation"
+            }
+          ]
+        }
+      ]
+    },
+    "authors": [
+      {
+        "name": "OWASP Foundation"
+      }
+    ],
+    "lifecycles": [
+      {
+        "phase": "pre-build"
+      }
+    ],
+    "component": {
+      "group": "",
+      "name": "app",
+      "version": "latest",
+      "type": "application",
+      "purl": "pkg:generic/app@latest",
+      "bom-ref": "pkg:generic/app@latest"
+    },
+    "properties": [
+      {
+        "name": "cdx:bom:componentNamespaces",
+        "value": "meta-llama\\nopenai"
+      },
+      {
+        "name": "cdx:bom:componentTypes",
+        "value": "generic\\nhuggingface"
+      },
+      {
+        "name": "cdx:bom:inferredRootDependencies",
+        "value": "1"
+      }
+    ]
+  },
+  "components": [
+    {
+      "group": "openai",
+      "name": "gpt-4o",
+      "purl": "pkg:generic/openai/gpt-4o",
+      "type": "machine-learning-model",
+      "bom-ref": "cdxgen:ai:model:openai:gpt-4o",
+      "tags": [
+        "ai",
+        "machine-learning-model"
+      ],
+      "properties": [
+        {
+          "name": "cdx:ai:confidence",
+          "value": "medium"
+        },
+        {
+          "name": "cdx:ai:kind",
+          "value": "model"
+        },
+        {
+          "name": "cdx:ai:modelFamily",
+          "value": "gpt"
+        },
+        {
+          "name": "cdx:ai:provider",
+          "value": "openai"
+        },
+        {
+          "name": "cdx:ai:runtime",
+          "value": "transformers"
+        },
+        {
+          "name": "cdx:ai:source",
+          "value": "source-code-analysis"
+        }
+      ],
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "src/app.py#L14"
+          }
+        ]
+      }
+    },
+    {
+      "group": "meta-llama",
+      "name": "Llama-3.1-8B-Instruct",
+      "purl": "pkg:huggingface/meta-llama/Llama-3.1-8B-Instruct",
+      "type": "machine-learning-model",
+      "bom-ref": "pkg:huggingface/meta-llama/Llama-3.1-8B-Instruct",
+      "tags": [
+        "ai",
+        "machine-learning-model"
+      ],
+      "properties": [
+        {
+          "name": "cdx:ai:confidence",
+          "value": "medium"
+        },
+        {
+          "name": "cdx:ai:kind",
+          "value": "model"
+        },
+        {
+          "name": "cdx:ai:modelFamily",
+          "value": "llama"
+        },
+        {
+          "name": "cdx:ai:provider",
+          "value": "openai"
+        },
+        {
+          "name": "cdx:ai:runtime",
+          "value": "transformers"
+        },
+        {
+          "name": "cdx:ai:source",
+          "value": "source-code-analysis"
+        }
+      ],
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "src/app.py#L21"
+          }
+        ]
+      }
+    },
+    {
+      "group": "",
+      "name": "AGENTS.md",
+      "type": "file",
+      "bom-ref": "urn:file:ai:AGENTS.md",
+      "tags": [
+        "ai",
+        "prompt-config",
+        "prompt-config-file"
+      ],
+      "properties": [
+        {
+          "name": "cdx:ai:kind",
+          "value": "prompt-config-file"
+        },
+        {
+          "name": "cdx:ai:source",
+          "value": "source-code-analysis"
+        },
+        {
+          "name": "cdx:file:kind",
+          "value": "prompt-config-file"
+        }
+      ],
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "AGENTS.md"
+          }
+        ]
+      }
+    }
+  ],
+  "dependencies": [
+    {
+      "ref": "pkg:generic/app@latest",
+      "dependsOn": [
+        "urn:service:ai:openai:OpenAI-API"
+      ]
+    },
+    {
+      "ref": "urn:service:ai:openai:OpenAI-API",
+      "dependsOn": [
+        "cdxgen:ai:model:openai:gpt-4o",
+        "pkg:huggingface/meta-llama/Llama-3.1-8B-Instruct"
+      ]
+    }
+  ],
+  "services": [
+    {
+      "bom-ref": "urn:service:ai:openai:OpenAI-API",
+      "group": "openai",
+      "name": "OpenAI API",
+      "provider": {
+        "name": "openai"
+      },
+      "version": "observed",
+      "endpoints": [],
+      "properties": [
+        {
+          "name": "cdx:ai:confidence",
+          "value": "high"
+        },
+        {
+          "name": "cdx:ai:deployment",
+          "value": "implicit"
+        },
+        {
+          "name": "cdx:ai:kind",
+          "value": "inference-service"
+        },
+        {
+          "name": "cdx:ai:modelCount",
+          "value": "2"
+        },
+        {
+          "name": "cdx:ai:modelFamily",
+          "value": "gpt"
+        },
+        {
+          "name": "cdx:ai:modelFamily",
+          "value": "llama"
+        },
+        {
+          "name": "cdx:ai:modelId",
+          "value": "Llama-3.1-8B-Instruct"
+        },
+        {
+          "name": "cdx:ai:modelId",
+          "value": "gpt-4o"
+        },
+        {
+          "name": "cdx:ai:modelSelection",
+          "value": "explicit"
+        },
+        {
+          "name": "cdx:ai:runtime",
+          "value": "transformers"
+        },
+        {
+          "name": "cdx:ai:source",
+          "value": "source-code-analysis"
+        },
+        {
+          "name": "cdx:ai:transportSecurity",
+          "value": "unknown"
+        }
+      ],
+      "tags": [
+        "ai",
+        "openai"
+      ]
+    }
+  ],
+  "annotations": [
+    {
+      "bom-ref": "metadata-annotations",
+      "subjects": [
+        "pkg:generic/app@latest"
+      ],
+      "annotator": {
+        "component": {
+          "group": "@cdxgen",
+          "name": "cdxgen",
+          "version": "13.5.0",
+          "purl": "pkg:npm/%40cdxgen/cdxgen@13.5.0",
+          "type": "application",
+          "bom-ref": "pkg:npm/@cdxgen/cdxgen@13.5.0",
+          "publisher": "OWASP Foundation",
+          "authors": [
+            {
+              "name": "OWASP Foundation"
+            }
+          ]
+        }
+      },
+      "timestamp": "2026-11-13T10:52:47Z",
+      "text": "This Software-as-a-Service BOM (SaaSBOM) document was created on Friday, November 13, 2026 with cdxgen. The data was captured during the pre-build lifecycle phase without building the application. The document describes an application named 'app'. It inventories 2 AI model(s), 1 AI service(s), and 0 dataset(s). Usage references span 1 provider or runtime endpoint(s), including openai. There are 3 components. 2 package type(s) and 2 purl namespaces are described in the document under components. 1 are described in this SaaSBOM under services."
+    }
+  ]
+}

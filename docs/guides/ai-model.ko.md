@@ -385,6 +385,53 @@ AI 준수 개요에는 모델별 사용 가능성 판정도 담깁니다. 개발
 
 이 판정은 법적 자문이 아닌 안내이며, 판정을 인쇄하는 모든 보고서에 그 문구가 함께 실립니다. 검토자에게 필요한 것, 곧 조건과 출처와 미확인 사항을 한곳에 모아 주고, 최종 판단은 근거를 갖춘 사람이 내리게 합니다.
 
+## 소스 스캔의 AI 사용 기록
+
+소스 스캔은 스캔한 코드가 쓰는 AI도 기록합니다. `--model`과는 별개의 기능입니다. 모델 카드를 읽지 않고, 코드가 호출하는 대상과 프로젝트가 AI 도구를 쓰도록 설정된 내용을 목록으로 남깁니다. 기본으로 실행됩니다.
+
+| 항목 | 기록 위치 | 예 |
+| --- | --- | --- |
+| 코드가 참조하는 모델 | `components[]`, 유형 `machine-learning-model` | `pkg:generic/openai/gpt-4o`인 `gpt-4o`, `pkg:huggingface/...`인 `meta-llama/Llama-3.1-8B-Instruct` |
+| 코드가 호출하는 AI 서비스 | `services[]`, 호출에 쓰는 모델은 `dependencies[]` | OpenAI API |
+| 설정 파일에 있는 MCP 서버 | `services[]` | `.vscode/mcp.json`이나 `.cursor/mcp.json`의 서버 |
+| MCP 설정 파일 | `components[]`, 유형 `file` | `.vscode/mcp.json` |
+| 에이전트 지침 파일 | `components[]`, 유형 `file`, SHA-256 포함 | `AGENTS.md`, GitHub Copilot `copilot-instructions.md`, `.cursor/rules/*.mdc` |
+
+각 항목에는 `bomlens:ai:usage`(`model`, `ai-service`, `mcp-server`, `mcp-config`, `instruction-file`)와 `bomlens:ai:scope`가 붙습니다. `bomlens:ai:scope`는 코드가 호출하는 것이면 `runtime`, 편집기와 에이전트 설정이면 `development`입니다.
+
+검토해야 할 MCP 서버에는 `bomlens:ai:reviewReason`이 하나 이상 붙습니다.
+
+- `broad-filesystem-access`: 파일 시스템 루트나 홈 폴더를 넘겨받습니다.
+- `unpinned-package`: 버전 없이 `npx`나 `uvx`로 실행되어, 새 릴리스가 검토 없이 실행됩니다.
+- `unencrypted-transport`: 다른 호스트에 평문 `http`로 접속합니다.
+
+MCP 서버에 넘기는 환경 변수 값과 헤더(토큰 등), 프롬프트 문구는 복사하지 않습니다. 접속 주소에서는 사용자 정보, 쿼리, 프래그먼트를 지웁니다.
+
+이 항목들은 목록으로만 보여 주고 측정하지 않습니다. 적합성 검사와 NOTICE에서 빠지고, 모델 위험 판정도 허브에서 조회한 모델(아래)이 아니면 빠지며, 코드가 호출만 하는 모델에는 G7 검사를 적용하지 않습니다. 이 스캔에는 그 모델의 카드가 없기 때문입니다. 모델 자체를 점검하려면 `--model`로 스캔합니다.
+
+탐지는 cdxgen의 `ai`, `mcp` 분석을 쓰며, 이 분석은 텍스트를 맞춰 보는 방식입니다. BomLens는 모델 식별자 형태이고 시험 코드나 문서가 아닌 코드에 나온 모델만 남기고, AI 서비스는 그런 모델이 연결된 경우에만 남깁니다. 그래도 프로젝트가 자료 구조에 나열한 모델은 놓칠 수 있고, 모델 식별자처럼 생긴 문자열이 기록될 수 있습니다. 이 단계를 끄려면 `BOMLENS_NO_AI_USAGE=1`을 설정합니다.
+
+### Hugging Face에서 모델 조회
+
+코드가 참조하는 모델은 이름과 purl만 목록에 올라옵니다. `--resolve-models`(또는 새 스캔 화면의 옵션)를 켜면 스캔이 각 `pkg:huggingface/...` 모델을 Hugging Face 허브에 조회해 그 항목에 요약을 덧붙입니다.
+
+- 모델 카드가 밝힌 라이선스. 적힌 그대로(`llama3.1`)이며 SPDX 식별자로 추측하지 않고, 그 라이선스에 대한 모델 위험 판정도 함께 보여 줍니다. 이 판정은 기반 모델의 라이선스도 읽습니다.
+- 가중치 파일 형식, 그중 pickle 파일의 수(불러올 때 코드를 실행할 수 있음), 허브가 해시를 가진 파일마다의 SHA-256. 이 값들은 기록만 하고 판정에는 읽지 않습니다.
+- 저장소의 접근 제한(gated) 여부(허브는 토큰 없이도 접근 제한 저장소를 설명함), 허브의 현재 리비전과 그 시각(코드가 실제로 불러오는 리비전과 같다고 볼 수는 없음).
+- 카드가 밝힌 기반 모델 계보와 각 기반 모델의 라이선스.
+
+허브가 오류로 답한 모델은 HTTP 상태와 함께 `unreadable`로 표시합니다. 비공개 저장소이거나 없는 저장소이며, 허브는 둘 다 같은 방식(401)으로 답합니다. 읽을 수 있는 비공개 모델이면 `HF_TOKEN`을 설정합니다. 허브가 답하지 않았거나 429나 5xx로 답했거나 시간이 모자란 모델은 `unreachable` 또는 `not-attempted`로 표시하고, 이 단계를 실패로 기록합니다(SBOM은 그대로 기록됩니다). 추측해서 채우는 값은 없습니다. 조회하는 모델은 `MODEL_RESOLVE_MAX`(20)개까지이고, 기반 모델 조회를 포함한 전체 조회 시간은 `MODEL_RESOLVE_BUDGET`(240초)까지입니다. 나머지는 `not-attempted`로 표시합니다. `gpt-4o`처럼 허브 페이지가 없는 호스팅 모델은 그대로 둡니다.
+
+이 요약은 모델 자체의 SBOM이 아닙니다. 모델 카드와 `--model`이 실행하는 검사가 필요하기 때문입니다. 전체 SBOM을 만들어 소스 SBOM에 연결하려면 모델을 스캔한 뒤 그 파일을 넘깁니다.
+
+```bash
+./scripts/scan-sbom.sh --project my-llm --version 1.0 --model "meta-llama/Llama-3.1-8B-Instruct"
+./scripts/scan-sbom.sh --project my-app --version 1.0 --target ./my-app \
+  --model-sbom my-llm_1.0/my-llm_1.0_bom.json
+```
+
+그러면 모델이 CycloneDX BOM-Link(`externalReferences` 유형 `bom`, `urn:cdx:<일련번호>/<버전>#<bom-ref>`)로 그 파일과 연결되어, 소스 SBOM을 읽는 쪽이 전체 SBOM을 찾을 수 있습니다. 링크는 문서를 일련번호로 가리키므로, 소스 SBOM을 전달할 때 모델 SBOM도 함께 전달합니다. 일련번호가 없는 파일이나 코드가 참조하지 않는 모델의 파일은 알리고 제외합니다. 요약의 라이선스와 가중치 파일은 스캔 시점에 허브에서 읽은 값이므로, 완전한 정보는 연결된 SBOM을 기준으로 봅니다.
+
 ## 한계
 
 - 읽을 수 없는 모델은 SBOM을 아예 만들지 않습니다. 조회에 실패하면 생성기가 카드를 일반적인 기본값으로 채우기 때문에, BomLens는 생성기 로그를 확인해 실행을 중단합니다. 통과처럼 읽히는 껍데기 명세를 돌려주지 않기 위해서입니다.

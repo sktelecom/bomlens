@@ -543,6 +543,28 @@ rc = server.run_sibling_scan(
 assert rc == 0, rc
 assert not any(x.startswith("IDENTIFY_VENDORED") for x in captured["args"]), captured["args"]
 assert not any(x.startswith("SCANOSS_API_KEY") for x in captured["args"]), captured["args"]
+# Hub lookup of the referenced models: source scans only, token by NAME ONLY.
+captured.clear()
+os.environ["HF_TOKEN"] = "hf-secret-should-not-appear"
+rc = server.run_sibling_scan(
+    "ghcr.io/sktelecom/bomlens-deep-cve:1.5.0", "SOURCE", run_out,
+    lambda ln: None, source_root=src_root,
+    extra_env={"DEEP_CVE": "true", "MODEL_RESOLVE": "true"},
+)
+assert rc == 0, rc
+_a = captured["args"]
+assert "MODEL_RESOLVE=true" in _a and "HF_TOKEN" in _a, _a
+assert "hf-secret-should-not-appear" not in " ".join(_a), "HF token leaked onto the argv"
+captured.clear()
+rc = server.run_sibling_scan(
+    "ghcr.io/sktelecom/bomlens-deep-cve:1.5.0", "IMAGE", run_out,
+    lambda ln: None, target_image=target_image,
+    extra_env={"DEEP_CVE": "true", "MODEL_RESOLVE": "true"},
+)
+assert rc == 0, rc
+assert not any(x.startswith("MODEL_RESOLVE") for x in captured["args"]), captured["args"]
+assert "HF_TOKEN" not in captured["args"], captured["args"]
+del os.environ["HF_TOKEN"]
 
 # Path-safety regression: SOURCE_ROOT / TARGET_DIR outside every allowed scan
 # root (SRC_DIR, UPLOAD_DIR, ALLOWED_SCAN_ROOTS) is refused before any docker
@@ -1990,6 +2012,111 @@ then
     pass "nothing flagged -> maliciousCount absent (never a reassuring zero)"
 else
     fail "maliciousCount was present with nothing flagged"
+fi
+echo "== AI usage listed apart from components (sbom_summary) =="
+# The fixture is the SBOM build-prep.sh's AI usage pass makes from the recorded
+# cdxgen output for tests/fixtures/ai-usage (see tests/test-ai-usage.sh): two
+# pypi packages plus models, an AI service, MCP servers and configurations,
+# and instruction files, all marked bomlens:ai:usage. Those must not be rows,
+# must not count as components, and must not make the scan an AI model scan.
+mkdir -p "$OUT/aiuse_1.0" "$OUT/aiuseno_1.0"
+cp "$ROOT_DIR/tests/fixtures/ai-usage-summary-bom.json" "$OUT/aiuse_1.0/aiuse_1.0_bom.json"
+echo '{"bomFormat":"CycloneDX","components":[{"name":"a","version":"1","type":"library","purl":"pkg:npm/a@1"}]}' \
+    > "$OUT/aiuseno_1.0/aiuseno_1.0_bom.json"
+if SBOM_OUTPUT_DIR="$OUT" python3 - "$ROOT_DIR" <<'PY'
+import sys, os
+sys.path.insert(0, os.path.join(sys.argv[1], "docker", "web"))
+import server
+s = server.sbom_summary("aiuse_1.0")
+names = sorted(r["name"] for r in s["componentList"])
+assert names == ["openai", "transformers"], names
+assert s["components"] == 2, s["components"]
+assert not any(r["type"] == "machine-learning-model" for r in s["componentList"]), s["componentList"]
+assert "assessCounts" not in s, s
+u = s["aiUsage"]
+assert "aiUsageTruncated" not in s, s
+assert [(e["kind"], e["name"]) for e in u] == [
+    ("model", "Llama-3.1-8B-Instruct"), ("model", "gpt-4o"),
+    ("ai-service", "OpenAI API"),
+    ("mcp-server", "docs"), ("mcp-server", "fs"), ("mcp-server", "github"),
+    ("mcp-config", "mcp.json"), ("mcp-config", "mcp.json"),
+    ("instruction-file", "AGENTS.md"), ("instruction-file", "copilot-instructions.md"),
+    ("instruction-file", "style.mdc"),
+], [(e["kind"], e["name"]) for e in u]
+allowed = {"kind", "name", "purl", "provider", "scope", "path", "reviewReasons", "models", "detectedBy"}
+for e in u:
+    assert set(e) <= allowed, e
+    assert e["scope"] in ("runtime", "development"), e
+    assert isinstance(e["reviewReasons"], list), e
+    assert ("models" in e) == (e["kind"] == "ai-service"), e
+gpt = u[1]
+assert gpt == {"kind": "model", "name": "gpt-4o", "purl": "pkg:generic/openai/gpt-4o",
+               "provider": "openai", "scope": "runtime", "path": "src/app.py#L14",
+               "reviewReasons": []}, gpt
+svc = u[2]
+assert svc == {"kind": "ai-service", "name": "OpenAI API", "provider": "openai",
+               "scope": "runtime", "reviewReasons": [], "models": ["gpt-4o"]}, svc
+mcp = {e["name"]: e for e in u if e["kind"] == "mcp-server"}
+assert mcp["fs"]["reviewReasons"] == ["broad-filesystem-access"], mcp["fs"]
+assert mcp["fs"]["path"] == ".vscode/mcp.json", mcp["fs"]
+assert mcp["github"]["reviewReasons"] == ["unpinned-package"], mcp["github"]
+assert mcp["docs"]["reviewReasons"] == ["unencrypted-transport"], mcp["docs"]
+assert "provider" not in mcp["fs"], mcp["fs"]
+inst = {e["name"]: e for e in u if e["kind"] == "instruction-file"}
+assert inst["style.mdc"]["path"] == ".cursor/rules/style.mdc", inst["style.mdc"]
+assert inst["style.mdc"]["detectedBy"] == "bomlens", inst["style.mdc"]
+assert "detectedBy" not in inst["AGENTS.md"], inst["AGENTS.md"]
+# No other property value reaches the summary (endpoints, commands, env).
+import json
+blob = json.dumps(u)
+assert "docs.example.com" not in blob and "npx" not in blob, blob
+# The Recent list counts and labels the scan the same way.
+row = next(r for r in server.list_scans() if r["id"] == "aiuse_1.0")
+assert row["components"] == 2 and row["isAiScan"] is False, row
+assert "aiUsage" not in server.sbom_summary("aiuseno_1.0")
+PY
+then
+    pass "AI usage kept out of componentList and counts, listed in aiUsage (shape, order, reasons, models)"
+else
+    fail "AI usage summary produced wrong values (see assertion above)"
+fi
+
+echo "== AI usage models carry the hub lookup facts (sbom_summary) =="
+mkdir -p "$OUT/aires_1.0"
+cp "$ROOT_DIR/tests/fixtures/ai-usage-resolved-bom.json" "$OUT/aires_1.0/aires_1.0_bom.json"
+if SBOM_OUTPUT_DIR="$OUT" python3 - "$ROOT_DIR" <<'PY'
+import sys, os
+sys.path.insert(0, os.path.join(sys.argv[1], "docker", "web"))
+import server
+s = server.sbom_summary("aires_1.0")
+models = {e["name"]: e for e in s["aiUsage"] if e["kind"] == "model"}
+llama = models["Llama-3.1-8B-Instruct"]
+assert llama["resolved"] == "huggingface", llama
+assert llama["license"] == "llama3.1", llama
+assert llama["gated"] == "manual", llama
+assert llama["weightFormats"] == ["bin", "safetensors"], llama
+assert llama["pickleFiles"] == 1, llama
+assert llama["lineage"] == "meta-llama/Llama-3.1-8B:llama3.1 > acme/loop-a:apache-2.0", llama
+assert llama["verdict"] == "conditional", llama
+assert llama["hubUrl"] == "https://huggingface.co/meta-llama/Llama-3.1-8B-Instruct", llama
+assert "resolvedStatus" not in llama, llama
+gone = models["gone"]
+assert gone["resolved"] == "unreadable" and gone["resolvedStatus"] == 404, gone
+assert "verdict" not in gone and "license" not in gone, gone
+new = {"resolved", "resolvedStatus", "license", "gated", "weightFormats", "pickleFiles",
+       "lineage", "verdict", "modelSbom", "hubUrl", "modelSbomLink"}
+assert not (set(models["gpt-4o"]) & new), models["gpt-4o"]
+assert not any(set(e) & new for e in s["aiUsage"] if e["kind"] != "model"), s["aiUsage"]
+# Usage models are not packages: not rows, not counted, not in any assessment KPI.
+names = [r["name"] for r in s["componentList"]]
+assert not ({"gpt-4o", "Llama-3.1-8B-Instruct", "gone"} & set(names)), names
+assert s["components"] == 2, s["components"]
+assert "assessCounts" not in s, s
+PY
+then
+    pass "AI usage models carry resolved/license/gated/weights/lineage/verdict/hubUrl, kept out of componentList and KPIs"
+else
+    fail "AI usage hub lookup facts wrong (see assertion above)"
 fi
 echo "== version currency surfaced + counted (sbom_summary) =="
 # enrich-eol.sh writes bomlens:currency:* (offline, behind latest patch in cycle);
@@ -4005,6 +4132,7 @@ echo "[stub] scanning ${PROJECT_NAME} ${PROJECT_VERSION} (mode=$mode)"
   echo "DECLARED_FILE_MODE=$([ -n "${DECLARED_COMPONENTS_FILES:-}" ] && python3 -c 'import os,sys; print(oct(os.stat(sys.argv[1]).st_mode & 0o777))' "$DECLARED_COMPONENTS_FILES" 2>/dev/null)"
   # Counted here, while the scan is running: an extracted upload tree is removed
   # once the scan finishes, so a later check would always find it empty.
+  echo "MODEL_RESOLVE=${MODEL_RESOLVE:-}"
   echo "TARGET_DIR_FILES=$([ -n "${TARGET_DIR:-}" ] && find "$TARGET_DIR" -type f 2>/dev/null | wc -l | tr -d ' ' || echo 0)"; } > "${STUB_ENV_FILE:-/dev/null}"
 write_bom() {
     printf '{"bomFormat":"CycloneDX","specVersion":"1.6","version":1,"components":[{"type":"library","name":"a","version":"1"},{"type":"library","name":"b","version":"2"}]}' \
@@ -5702,6 +5830,35 @@ if [ -z "$(sed -n 's/^AI_USAGE_CONTEXT=//p' "$WORK/stub-env")" ]; then
     pass "no usage param -> AI_USAGE_CONTEXT not set"
 else
     fail "AI_USAGE_CONTEXT leaked without a usage param" "$(cat "$WORK/stub-env")"
+fi
+
+echo "== resolve_models option (MODEL_RESOLVE, recorded as resolveModels) =="
+resolve_check() {  # $1 query, $2 expected MODEL_RESOLVE ("true" or ""), $3 expected resolveModels
+    rm -f "$WORK/stub-env"
+    events=$(sse_events "$1")
+    echo "$events" | RM_WANT="$3" python3 -c "
+import sys, json, os
+evs = json.load(sys.stdin)
+d = [e for e in evs if e['event'] == 'done'][0]['data']
+assert d['ok'] is True, d
+assert d['scanConfig']['resolveModels'] is (os.environ['RM_WANT'] == 'true'), d['scanConfig']
+" && [ "$(sed -n 's/^MODEL_RESOLVE=//p' "$WORK/stub-env")" = "$2" ]
+}
+if resolve_check "project=rm1&version=1.0&source=current-dir&resolve_models=true" true true; then
+    pass "resolve_models=true on a source scan -> MODEL_RESOLVE=true, resolveModels recorded true"
+else
+    fail "resolve_models=true was not applied to a source scan" "$(cat "$WORK/stub-env" 2>/dev/null)"
+fi
+if resolve_check "project=rm2&version=1.0&source=current-dir&resolve_models=false" false false \
+   && resolve_check "project=rm3&version=1.0&source=current-dir" false false; then
+    pass "resolve_models false/absent -> MODEL_RESOLVE=false, resolveModels recorded false"
+else
+    fail "resolve_models default is not off" "$(cat "$WORK/stub-env" 2>/dev/null)"
+fi
+if resolve_check "project=rm4&version=1.0&source=ai-model&target=hf%3Aorg%2Fds&resolve_models=true" false false; then
+    pass "resolve_models is never passed to a non-source mode"
+else
+    fail "resolve_models reached a non-source mode" "$(cat "$WORK/stub-env" 2>/dev/null)"
 fi
 
 # Conversion needs the pipeline helper + syft in this image, or a sibling scanner

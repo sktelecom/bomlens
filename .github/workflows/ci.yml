@@ -310,6 +310,12 @@ jobs:
       - name: Merge-mode unit tests
         run: bash tests/test-merge.sh
 
+      # No Docker: the AI usage merge build-prep.sh runs in the cdxgen
+      # container, against recorded cdxgen output, and the reports that must
+      # leave those items out.
+      - name: AI usage unit tests
+        run: bash tests/test-ai-usage.sh
+
       # No Docker, no network: the Go vulnerability database match against a
       # fixture export, its merge into the security report, and the go-vulndb
       # step in the result manifest.

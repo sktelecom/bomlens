@@ -192,6 +192,8 @@ MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL='*' docker run --rm \
 | `BOMLENS_INCLUDE_DEV_DEPENDENCIES` | - | - | Source scans: set `1` to keep the development-only components that are dropped by default (the ones cdxgen marks, and the gems a root `Gemfile` declares only in its `development` and `test` groups). The dropped components are recorded in `bomlens:excluded-components` |
 | `BOMLENS_NO_COPYRIGHT` | - | - | Source scans: set `1` to skip filling npm, Python, Go and Rust component `copyright` from the installed packages' license files |
 | `BOMLENS_NO_CARGO_LICENSE` | - | - | Source scans: set `1` to skip filling Rust component licenses from `cargo metadata` (`FETCH_LICENSE=false` on the command line skips it too) |
+| `BOMLENS_NO_AI_USAGE` | - | - | Source scans: set `1` to skip recording the AI the code uses (models, AI services, MCP servers, agent instruction files; see [AI usage in a source scan](../guides/ai-model.md#ai-usage-in-a-source-scan)) |
+| `BOMLENS_AI_USAGE_TIMEOUT` | - | `300` | Source scans: seconds each of the two AI usage analyses may run before it is stopped and its findings are left out |
 | `CYCLONEDX_SPEC_VERSION` | — | `1.6` | CycloneDX version of the generated SBOM, `1.6` or `1.7` (the CLI's `--spec-version`). AI model and dataset SBOMs are always 1.7. Any other value stops the run |
 | `CYCLONEDX_SPEC_VERSIONS` | — | `1.3 1.4 1.5 1.6 1.7` | Accepted CycloneDX spec versions for the conformance check (space-separated); overrides the default range |
 | `AI_CYCLONEDX_SPEC_VERSIONS` | — | `1.3 1.4 1.5 1.6 1.7` | Accepted CycloneDX versions for AI SBOMs (ML-BOM); always includes 1.7, the version the AIBOM toolchain emits |
@@ -208,6 +210,9 @@ MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL='*' docker run --rm \
 | `LICENSE_REGISTRY_BUDGET` | — | `240` | Seconds the lookups may take in total. Components it does not reach are left as they were, and the step is recorded as degraded |
 | `LICENSE_REGISTRY_API` | — | `https://api.deps.dev/v3` | Base URL of a server that answers the deps.dev v3 version lookup, for a network that reaches the registries only through its own mirror or proxy. When nothing answers, the components stay as they were and the step is recorded as degraded (`unavailable`) |
 | `PURL_RESOLVE` | — | `false` | `--analyze` only (the script's `--resolve-purl`): look each identifier up in its package repository (deps.dev) and add the answer to the conformance check report as an advisory row. Uses the network |
+| `MODEL_RESOLVE` | - | `false` | Source scans (the script's `--resolve-models`): read each Hugging Face model the code references from the hub. Uses the network; `HF_ENDPOINT` points at a mirror and `HF_TOKEN` reads private models |
+| `MODEL_RESOLVE_MAX` | - | `20` | Models looked up in one scan. The rest are marked `not-attempted` |
+| `MODEL_RESOLVE_BUDGET` | - | `240` | Seconds all the lookups of one scan may take, base models included. The models not reached are marked `not-attempted` |
 | `PURL_RESOLVE_IGNORE` | — | — | Namespace prefixes to leave out of that lookup, space- or comma-separated. Use it for namespaces published only to an internal repository, which cannot be told apart from a wrong identifier |
 | `PURL_RESOLVE_BUDGET` | — | `240` | Seconds the lookup may take in total. Identifiers it does not reach are reported as unchecked, never as missing |
 | `ANALYZE_CPE_INDEX` | — | `false` | `--analyze` only (the script's `--analyze-cpe-index`): match the components carrying `bomlens:purlSource=upstream-map` against the bundled CPE index. |

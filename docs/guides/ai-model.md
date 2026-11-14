@@ -385,6 +385,53 @@ The verdict can be tailored to how you will actually use the model. Pass `--usag
 
 The verdicts are guidance, not legal advice, and every report that prints them says so. They gather what a reviewer needs — the terms, the sources, the unknowns — so the final decision is made by a person with the evidence in one place.
 
+## AI usage in a source scan
+
+A source scan also records the AI the scanned code uses. This is separate from `--model`: it reads no model card, and lists what the code calls and how the project is set up to work with AI tools. It runs by default.
+
+| What | Where it goes | Example |
+| --- | --- | --- |
+| A model the code references | `components[]`, type `machine-learning-model` | `gpt-4o` as `pkg:generic/openai/gpt-4o`, `meta-llama/Llama-3.1-8B-Instruct` as `pkg:huggingface/...` |
+| An AI service the code calls | `services[]`, with the models it is called with in `dependencies[]` | OpenAI API |
+| An MCP server in a configuration file | `services[]` | a server from `.vscode/mcp.json` or `.cursor/mcp.json` |
+| The MCP configuration file | `components[]`, type `file` | `.vscode/mcp.json` |
+| An agent instruction file | `components[]`, type `file`, with its SHA-256 | `AGENTS.md`, GitHub Copilot `copilot-instructions.md`, `.cursor/rules/*.mdc` |
+
+Each item carries `bomlens:ai:usage` (`model`, `ai-service`, `mcp-server`, `mcp-config` or `instruction-file`) and `bomlens:ai:scope`: `runtime` for what the code calls, `development` for editor and agent configuration.
+
+An MCP server that needs a look gets one or more `bomlens:ai:reviewReason` values:
+
+- `broad-filesystem-access`: it is given the filesystem root or the home folder.
+- `unpinned-package`: it runs with `npx` or `uvx` and no version, so a new release runs without review.
+- `unencrypted-transport`: it is reached over plain `http` on another host.
+
+Some things are never copied: the environment values and headers an MCP server is given (tokens, for example) and prompt texts. An endpoint keeps no user info, query or fragment.
+
+These items are listed, not measured. The conformance check and the NOTICE leave them out, and so does the model risk assessment unless the model was looked up on the hub (below), and a model the code only calls gets no G7 checks, because it has no card here to check. To check a model itself, scan it with `--model`.
+
+The findings come from cdxgen's `ai` and `mcp` analyses, which match text. BomLens keeps a model only when its id looks like one and it appears in code that is neither a test nor documentation, and keeps an AI service only when such a model is left under it. A model a project lists in a data structure can still be missed, and a string shaped like a model id can still be reported. Set `BOMLENS_NO_AI_USAGE=1` to turn the step off.
+
+### Looking the models up on Hugging Face
+
+A model the code references is listed by name and purl only. With `--resolve-models` (or the option on the new-scan form), the scan asks the Hugging Face hub about each `pkg:huggingface/...` model and adds a summary to its entry:
+
+- the licence the model card declares, as written (`llama3.1`, not a guess at an SPDX id), and the model risk assessment's verdict on it, which also reads the base models' licences,
+- the weight file formats, how many are pickle files (they can run code when loaded), and each weight file's SHA-256 where the hub holds one. These are recorded, not judged: the verdict does not read them,
+- whether the repository is gated (the hub describes a gated repository without a token), and the hub's current revision and its time (not necessarily what the code loads),
+- the chain of base models the card names, with each one's licence.
+
+A model the hub answers an error for is marked `unreadable` with the HTTP status. That is a private repository or one that does not exist, which the hub answers the same way (401); set `HF_TOKEN` for a private one you can read. A model the hub did not answer for, answered 429 or a 5xx status for, or ran out of time for is marked `unreachable` or `not-attempted`, and the step is recorded as failed (the SBOM is still written). Nothing is filled in by guessing. `MODEL_RESOLVE_MAX` (20) bounds the models looked up and `MODEL_RESOLVE_BUDGET` (240) the seconds all lookups, base models included, may take; the rest are marked `not-attempted`. A hosted model with no hub page, such as `gpt-4o`, is left as it was.
+
+The summary is not the model's own SBOM, which needs the model card and the checks `--model` runs. To get it and tie it to the source SBOM, scan the model and pass the file:
+
+```bash
+./scripts/scan-sbom.sh --project my-llm --version 1.0 --model "meta-llama/Llama-3.1-8B-Instruct"
+./scripts/scan-sbom.sh --project my-app --version 1.0 --target ./my-app \
+  --model-sbom my-llm_1.0/my-llm_1.0_bom.json
+```
+
+The model is then linked to the file with a CycloneDX BOM-Link (`externalReferences` of type `bom`, `urn:cdx:<serial number>/<version>#<bom-ref>`), so a reader of the source SBOM can find the full one. The link points at the document by its serial number, so keep the model SBOM with the source SBOM when you pass them on. A file with no serial number, or one that matches no model the code references, is reported and left out. The summary's licence and weight files are read from the hub at scan time; the linked SBOM is the one to rely on for a complete picture.
+
 ## Limits
 
 - A model the tool cannot read produces no SBOM at all. The generator fills the card with generic defaults when a fetch fails, so BomLens checks its log and refuses the run rather than handing back an inventory of placeholders that would read as a pass.

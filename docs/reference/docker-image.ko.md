@@ -192,6 +192,8 @@ MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL='*' docker run --rm \
 | `BOMLENS_INCLUDE_DEV_DEPENDENCIES` | - | - | 소스 스캔: `1`로 설정하면 기본으로 빼는 개발 전용 컴포넌트(cdxgen이 개발 전용으로 표시한 컴포넌트와 루트 `Gemfile`의 `development`, `test` 그룹에만 선언된 gem)를 그대로 둠. 뺀 컴포넌트는 `bomlens:excluded-components`에 기록됨 |
 | `BOMLENS_NO_COPYRIGHT` | - | - | 소스 스캔: `1`로 설정하면 설치된 패키지의 라이선스 파일에서 npm, Python, Go, Rust 컴포넌트의 `copyright`를 채우는 단계를 건너뜀 |
 | `BOMLENS_NO_CARGO_LICENSE` | - | - | 소스 스캔: `1`로 설정하면 `cargo metadata`로 Rust 컴포넌트의 라이선스를 채우는 단계를 건너뜀(명령줄의 `FETCH_LICENSE=false`도 건너뜀) |
+| `BOMLENS_NO_AI_USAGE` | - | - | 소스 스캔: `1`로 설정하면 코드가 쓰는 AI(모델, AI 서비스, MCP 서버, 에이전트 지침 파일)를 기록하는 단계를 건너뜀([소스 스캔의 AI 사용 기록](../guides/ai-model.ko.md#소스-스캔의-ai-사용-기록) 참고) |
+| `BOMLENS_AI_USAGE_TIMEOUT` | - | `300` | 소스 스캔: AI 사용 분석 두 가지가 각각 실행될 수 있는 시간(초). 넘으면 멈추고 그 결과는 넣지 않음 |
 | `CYCLONEDX_SPEC_VERSION` | — | `1.6` | 생성하는 SBOM의 CycloneDX 버전. `1.6` 또는 `1.7`(CLI의 `--spec-version`). AI 모델과 데이터셋 SBOM은 항상 1.7. 다른 값이면 실행을 멈춤 |
 | `CYCLONEDX_SPEC_VERSIONS` | — | `1.3 1.4 1.5 1.6 1.7` | 적합성 검사가 허용하는 CycloneDX spec 버전(공백 구분). 기본 범위를 덮어씀 |
 | `AI_CYCLONEDX_SPEC_VERSIONS` | — | `1.3 1.4 1.5 1.6 1.7` | AI SBOM(ML-BOM)이 허용하는 CycloneDX 버전. AIBOM 도구가 내보내는 1.7을 항상 포함 |
@@ -208,6 +210,9 @@ MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL='*' docker run --rm \
 | `LICENSE_REGISTRY_BUDGET` | — | `240` | 조회 전체에 허용하는 시간(초). 시간 안에 조회하지 못한 컴포넌트는 그대로 두고 단계를 degraded로 기록한다 |
 | `LICENSE_REGISTRY_API` | — | `https://api.deps.dev/v3` | deps.dev v3 버전 조회에 같은 형식으로 답하는 서버의 기본 URL. 레지스트리에 자체 미러나 프록시로만 닿는 네트워크용. 응답이 없으면 컴포넌트는 그대로 두고 단계를 degraded(`unavailable`)로 기록한다 |
 | `PURL_RESOLVE` | — | `false` | `--analyze` 전용(스크립트의 `--resolve-purl`). 각 식별자를 패키지 저장소(deps.dev)에 조회해 적합성 검사 보고서에 권고 항목으로 덧붙인다. 네트워크를 사용 |
+| `MODEL_RESOLVE` | - | `false` | 소스 스캔 전용(스크립트의 `--resolve-models`). 코드가 참조하는 Hugging Face 모델을 허브에서 읽음. 네트워크를 쓰며, `HF_ENDPOINT`로 미러를 지정하고 `HF_TOKEN`으로 비공개 모델을 읽음 |
+| `MODEL_RESOLVE_MAX` | - | `20` | 스캔 한 번에 조회하는 모델 수. 나머지는 `not-attempted`로 표시 |
+| `MODEL_RESOLVE_BUDGET` | - | `240` | 스캔 한 번의 전체 조회에 허용하는 시간(초). 기반 모델 조회를 포함하며, 닿지 못한 모델은 `not-attempted`로 표시 |
 | `PURL_RESOLVE_IGNORE` | — | — | 조회에서 제외할 네임스페이스 접두사(공백 또는 쉼표 구분). 사내 저장소에만 올리는 네임스페이스에 쓴다. 잘못된 식별자와 구분할 수 없기 때문이다 |
 | `PURL_RESOLVE_BUDGET` | — | `240` | 조회 전체에 허용하는 시간(초). 시간 안에 조회하지 못한 식별자는 없음이 아니라 확인 불가로 보고한다 |
 | `ANALYZE_CPE_INDEX` | — | `false` | `--analyze` 전용(스크립트의 `--analyze-cpe-index`). `bomlens:purlSource=upstream-map` 속성이 붙은 컴포넌트를 번들 CPE 색인에 대조한다. |

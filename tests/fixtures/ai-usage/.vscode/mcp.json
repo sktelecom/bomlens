@@ -1,0 +1,13 @@
+{
+  "servers": {
+    "fs": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-filesystem@2025.8.21", "/"]
+    },
+    "docs": {
+      "type": "http",
+      "url": "http://docs.example.com/mcp"
+    }
+  }
+}
