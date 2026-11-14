@@ -9321,6 +9321,40 @@ grep -q '^wrapper' "$GW_ROOT/calls" && [ -f "$GW_ROOT/src/gradlew" ] && [ ! -x "
     && pass "the gradlew is left without the executable bit after the scan" \
     || fail "gradlew mode after the scan: $(ls -l "$GW_ROOT/src/gradlew" 2>/dev/null)"
 
+echo "== gradle: the shell for a gradlew without the executable bit follows its first line =="
+# Stub bash and sh in PATH record who ran the wrapper, then run the real shell.
+_gs_run() {  # <name> <first line of gradlew or empty>
+    GS_ROOT="$WORK/gradle-shebang-$1"; mkdir -p "$GS_ROOT/bin" "$GS_ROOT/src" "$GS_ROOT/out" "$GS_ROOT/gh"
+    printf "plugins { id 'java' }\n" > "$GS_ROOT/src/build.gradle"
+    printf '#!/bin/sh\nexit 0\n' > "$GS_ROOT/bin/gradle"
+    printf '#!/bin/sh\necho "bash $*" >> "%s/shells"\nexec %s "$@"\n' "$GS_ROOT" "$(command -v bash)" > "$GS_ROOT/bin/bash"
+    printf '#!/bin/sh\necho "sh $*" >> "%s/shells"\nexec /bin/sh "$@"\n' "$GS_ROOT" > "$GS_ROOT/bin/sh"
+    cat > "$GS_ROOT/bin/cdxgen" <<'GSCDX'
+#!/bin/sh
+out=""; prev=""; for a in "$@"; do [ "$prev" = "-o" ] && out="$a"; prev="$a"; done
+printf '%s' '{"bomFormat":"CycloneDX","specVersion":"1.6","version":1,"metadata":{},"components":[]}' > "$out"
+GSCDX
+    chmod +x "$GS_ROOT/bin/gradle" "$GS_ROOT/bin/bash" "$GS_ROOT/bin/sh" "$GS_ROOT/bin/cdxgen"
+    { [ -z "$2" ] || printf '%s\n' "$2"; printf 'exit 0\n'; } > "$GS_ROOT/src/gradlew"
+    chmod 644 "$GS_ROOT/src/gradlew"
+    env -u ANDROID_HOME PATH="$GS_ROOT/bin:$PATH" HOME="$GS_ROOT/home" GRADLE_USER_HOME="$GS_ROOT/gh" \
+        /bin/sh "$LIB/build-prep.sh" "$GS_ROOT/src" "$GS_ROOT/out/bom.json" > "$GS_ROOT/log" 2>&1
+}
+_gs_run bash '#!/usr/bin/env bash'
+{ grep -q '^bash \./gradlew ' "$GS_ROOT/shells" 2>/dev/null && ! grep -q '^sh \./gradlew ' "$GS_ROOT/shells" \
+    && grep -q '^\[build-prep\] gradle: bash \./gradlew runs ' "$GS_ROOT/log"; } \
+    && pass "a gradlew whose first line names bash runs through bash" \
+    || fail "bash shebang: shells [$(tr '\n' ';' < "$GS_ROOT/shells" 2>/dev/null)]" "$(grep 'gradle:' "$GS_ROOT/log" | head -3)"
+_gs_run sh '#!/bin/sh'
+{ grep -q '^sh \./gradlew ' "$GS_ROOT/shells" 2>/dev/null && ! grep -q '^bash \./gradlew ' "$GS_ROOT/shells" \
+    && grep -q '^\[build-prep\] gradle: sh \./gradlew runs ' "$GS_ROOT/log"; } \
+    && pass "a gradlew whose first line names sh runs through sh" \
+    || fail "sh shebang: shells [$(tr '\n' ';' < "$GS_ROOT/shells" 2>/dev/null)]" "$(grep 'gradle:' "$GS_ROOT/log" | head -3)"
+_gs_run none ''
+{ grep -q '^sh \./gradlew ' "$GS_ROOT/shells" 2>/dev/null && ! grep -q '^bash \./gradlew ' "$GS_ROOT/shells"; } \
+    && pass "a gradlew with no shebang runs through sh" \
+    || fail "no shebang: shells [$(tr '\n' ';' < "$GS_ROOT/shells" 2>/dev/null)]" "$(grep 'gradle:' "$GS_ROOT/log" | head -3)"
+
 echo "== gradle: cdxgen reads the POMs Gradle downloaded (GRADLE_CACHE_DIR) =="
 # HOME is not the account home Gradle uses, so cdxgen is told where Gradle's
 # cache is, unless the caller already set GRADLE_CACHE_DIR.

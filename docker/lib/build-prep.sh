@@ -1081,11 +1081,19 @@ maven_fetch_fallback() {
     rm -rf "$MAVEN_FALLBACK_DIR"; MAVEN_FALLBACK_DIR=""
     return 1
 }
+# The shell for a wrapper without the executable bit: bash when its first line
+# (the shebang) names bash and bash is installed, otherwise sh.
+wrapper_shell() {
+    case "$(head -n 1 "$1" 2>/dev/null)" in
+        '#!'*bash*) command -v bash >/dev/null 2>&1 && { echo bash; return 0;} ;;
+    esac
+    echo sh
+}
 if [ -f pom.xml ] && [ ! -f build.gradle ] && [ ! -f build.gradle.kts ]; then
     _mvn_cmd=""; _mvn_sh=""
     if [ -f ./mvnw ] && [ -d .mvn/wrapper ]; then
         _mvn_cmd=./mvnw
-        [ -x ./mvnw ] || _mvn_sh="sh"
+        [ -x ./mvnw ] || _mvn_sh=$(wrapper_shell ./mvnw)
     elif command -v mvn >/dev/null 2>&1; then _mvn_cmd=mvn
     fi
     if [ "$MAVEN_REPO_LOCAL" != "$HOME/.m2/repository" ]; then
@@ -1394,12 +1402,13 @@ GRADLE_INIT
 
 if { [ -f build.gradle ] || [ -f build.gradle.kts ]; } && command -v gradle >/dev/null 2>&1; then
     # A gradlew checked out without the executable bit (a 100644 entry, common
-    # from Windows) still runs, through sh: the JDK image was chosen from its
-    # wrapper version, and cdxgen runs it too. GRADLEW_SH is "sh" then.
+    # from Windows) still runs, through sh (bash when its first line names bash):
+    # the JDK image was chosen from its wrapper version, and cdxgen runs it
+    # too. GRADLEW_SH is that shell then.
     GRADLEW_SH=""
     if [ -f ./gradlew ]; then
         GRADLEW="./gradlew"
-        [ -x ./gradlew ] || GRADLEW_SH="sh"
+        [ -x ./gradlew ] || GRADLEW_SH=$(wrapper_shell ./gradlew)
     else
         GRADLEW="gradle"
     fi
