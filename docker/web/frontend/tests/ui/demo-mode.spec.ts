@@ -80,9 +80,44 @@ test("the banner and the scan list pass axe in the demo", async ({ page }) => {
     banner.getByText(/^Results of a real scan/).boundingBox(),
   ]);
   expect(title!.y).toBeLessThan(body!.y);
-  // The demo cannot scan, so nothing offers New scan.
-  await expect(page.getByRole("link", { name: "New scan" })).toHaveCount(0);
-  await expect(page.getByTestId("recent-new-scan")).toHaveCount(0);
+  // The demo shows the New scan form so the range of inputs is visible; it is offered
+  // from the top bar, the navigation and the scan list. Only running a scan is refused.
+  await expect(page.getByRole("link", { name: "New scan" }).first()).toBeVisible();
+  await expect(page.getByTestId("recent-new-scan")).toHaveCount(1);
+});
+
+test("the demo opens the New scan form, and only the run button is turned off", async ({ page }) => {
+  await serveDemoData(page);
+  const uncaught: string[] = [];
+  page.on("pageerror", (e) => uncaught.push(e.message));
+  await page.goto(`${ORIGIN}/#/`);
+  await page.getByTestId("demo-banner").waitFor();
+  await page.getByTestId("recent-new-scan").click();
+  await page.locator("#project").waitFor();
+  await expect(page.getByTestId("demo-banner")).toBeVisible();
+
+  // The form is usable: the name fields take text and every source can be opened.
+  await page.locator("#project").fill("MyProject");
+  const tiles = page.getByRole("radiogroup", { name: "Source" }).getByRole("radio");
+  const count = await tiles.count();
+  expect(count).toBeGreaterThan(3);
+  for (let i = 0; i < count; i++) {
+    await tiles.nth(i).click();
+    await expect(tiles.nth(i)).toBeChecked();
+  }
+
+  // Running is refused, with the reason and a way to run it for real. The model
+  // questionnaire runs in the browser, so that one source keeps its button.
+  await tiles.first().click();
+  await expect(page.getByTestId("run-scan")).toBeDisabled();
+  await expect(page.getByText("This demo cannot run a scan")).toBeVisible();
+  await expect(page.getByRole("link", { name: "Run it on your own code" })).toBeVisible();
+
+  const results = await new AxeBuilder({ page })
+    .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"])
+    .analyze();
+  expect(results.violations).toEqual([]);
+  expect(uncaught).toEqual([]);
 });
 
 test("the navigation reaches the bottom of the window, at the top and scrolled to the end", async ({ page }) => {

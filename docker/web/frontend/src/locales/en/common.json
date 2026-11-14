@@ -661,7 +661,7 @@
   "shell": {
     "newScan": "New scan",
     "demoBannerTitle": "Read-only demo",
-    "demoBannerBody": "Results of a real scan, read-only: scanning, uploading and deleting are turned off.",
+    "demoBannerBody": "Results of a real scan, read-only. You can open the New scan form to see the inputs, but running a scan, uploading and deleting are turned off.",
     "demoBannerCta": "How to run it",
     "skipToMain": "Skip to main content",
     "openingScan": "Opening the scan…",

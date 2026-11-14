@@ -661,7 +661,7 @@
   "shell": {
     "newScan": "새 스캔",
     "demoBannerTitle": "읽기 전용 데모",
-    "demoBannerBody": "실제 스캔 결과를 담은 읽기 전용 화면입니다. 스캔과 업로드, 삭제는 꺼져 있습니다.",
+    "demoBannerBody": "실제 스캔 결과를 담은 읽기 전용 화면입니다. 새 스캔 화면에서 입력 종류를 둘러볼 수 있지만, 스캔 실행과 업로드, 삭제는 꺼져 있습니다.",
     "demoBannerCta": "실행 방법 보기",
     "skipToMain": "본문으로 건너뛰기",
     "openingScan": "스캔을 여는 중입니다…",
