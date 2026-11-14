@@ -25,6 +25,7 @@ on:
       - docs/**
       - overrides/**
       - hooks/**
+      - docs-site/**
       - docker/shared/bomlens-tokens.css
       - mkdocs.yml
       - .github/workflows/docs.yml
@@ -36,6 +37,7 @@ on:
       - docs/**
       - overrides/**
       - hooks/**
+      - docs-site/**
       - docker/shared/bomlens-tokens.css
       - mkdocs.yml
       - .github/workflows/docs.yml
@@ -97,6 +99,21 @@ jobs:
           pip install --upgrade pip
           pip install -r docs/requirements.txt
           mkdocs build --strict
+      # 새 사이트(Starlight)를 같은 원본에서 빌드해 /next/ 아래에 병행 배포한다.
+      # Astro 7이 Node 22 이상을 요구해 이 단계만 Node 22를 쓴다. 전환이 끝나면
+      # 이 단계가 기본 사이트 빌드가 되고 MkDocs 단계는 사라진다.
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: docs-site/package-lock.json
+      - name: Build the next site (Starlight)
+        working-directory: docs-site
+        run: |
+          npm ci
+          npm run build
+          mkdir -p ../site/next
+          cp -R dist/. ../site/next/
       # 빌드된 사이트의 대표 페이지(홈, 시작, 레퍼런스; 영어와 한국어; 밝은 테마와
       # 어두운 테마)를 axe로 검사한다. 공용 토큰이나 문서 스타일을 바꿨을 때
       # 색 대비가 깨지면 여기서 드러난다.
@@ -133,6 +150,21 @@ jobs:
           pip install --upgrade pip
           pip install -r docs/requirements.txt
           mkdocs build --strict
+      # 새 사이트(Starlight)를 같은 원본에서 빌드해 /next/ 아래에 병행 배포한다.
+      # Astro 7이 Node 22 이상을 요구해 이 단계만 Node 22를 쓴다. 전환이 끝나면
+      # 이 단계가 기본 사이트 빌드가 되고 MkDocs 단계는 사라진다.
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: docs-site/package-lock.json
+      - name: Build the next site (Starlight)
+        working-directory: docs-site
+        run: |
+          npm ci
+          npm run build
+          mkdir -p ../site/next
+          cp -R dist/. ../site/next/
 
       # site/를 고아 커밋 하나로 gh-pages에 강제 push한다. 이 브랜치는 빌드
       # 산출물일 뿐이라 이력을 쌓을 이유가 없고, 매번 새로 써서 브랜치가

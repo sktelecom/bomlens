@@ -1,0 +1,16 @@
+{
+  "name": "bomlens-docs-site",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "prepare-content": "node scripts/prepare-content.mjs",
+    "build": "npm run prepare-content && astro build",
+    "preview": "astro preview"
+  },
+  "dependencies": {
+    "@astrojs/markdown-remark": "7.3.4",
+    "@astrojs/starlight": "0.42.8",
+    "astro": "7.4.4",
+    "unist-util-visit": "5.0.0"
+  }
+}
