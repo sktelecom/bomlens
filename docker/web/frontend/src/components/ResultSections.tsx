@@ -260,6 +260,8 @@ export function ResultSection({
           results={result.results}
           isSuppliedDocument={Boolean(inputSbomFileName(result))}
           isAiDocument={isAiScan(result)}
+          query={query}
+          onQueryChange={onQueryChange}
         />
       ) : null;
 

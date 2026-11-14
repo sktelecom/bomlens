@@ -20,6 +20,7 @@ import {
   type ComponentSortKey,
   type SortDir,
 } from "./components";
+import type { CheckKind } from "./conformance";
 import { LICENSE_TIER_ORDER, type LicenseRiskTier } from "./licenses";
 import type { RouteQuery } from "./route";
 import type { VulnSortKey } from "./vulns";
@@ -127,4 +128,37 @@ export function dependenciesFromQuery(
   const name = query?.q;
   if (!name) return null;
   return query?.version ? { name, version: query.version } : { name };
+}
+
+/** The four kinds a Conformance chip can name. */
+const CONFORMANCE_KINDS: readonly CheckKind[] = ["actionable", "review", "na", "pass"];
+
+/**
+ * The Conformance screen opens on the checks a reader can act on, or on all of
+ * them when there are none. `kind=all` in the URL is the explicit "no chip", so
+ * a link can name a view that differs from the screen's own start.
+ */
+export function conformanceFromQuery(
+  query: RouteQuery | undefined,
+  defaultKind: CheckKind | null,
+  counts?: Record<CheckKind, number>,
+): { kind: CheckKind | null; term: string } {
+  const raw = query?.kind;
+  const named = CONFORMANCE_KINDS.find((k) => k === raw);
+  // A kind this document has no checks of would open on an empty list: use the start.
+  const usable = named && (!counts || counts[named] > 0) ? named : undefined;
+  const kind = raw === "all" ? null : (usable ?? defaultKind);
+  return { kind, term: query?.q ?? "" };
+}
+
+/** The inverse: a chip that is the screen's own start is left out. */
+export function conformanceToQuery(
+  kind: CheckKind | null,
+  term: string,
+  defaultKind: CheckKind | null,
+): RouteQuery {
+  const q: Record<string, string> = {};
+  if (kind !== defaultKind) q.kind = kind ?? "all";
+  if (term) q.q = term;
+  return q;
 }

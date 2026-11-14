@@ -1101,7 +1101,7 @@
   },
   "g7": {
     "empty": "기록된 적합성 검사가 없습니다.",
-    "panelIntro": "이 SBOM이 CycloneDX 형식과 SBOM 관련 규제가 요구하는 필수 항목을 얼마나 채웠는지 점검한 결과입니다. 규제 대응표는 참고용이며, 규정 준수 여부를 판정하지 않습니다.",
+    "panelIntro": "이 SBOM의 항목을 CycloneDX 형식과 SBOM 관련 규제 요건에 견준 결과입니다. 참고용이며 규정 준수를 판정하지 않습니다.",
     "subtitle": "AI G7 최소 요소",
     "present": "{{present}}/{{total}} 충족",
     "advisory": "권고 {{count}}건",
@@ -1122,7 +1122,6 @@
       "not-open-source": "오픈소스 아님",
       "version-unknown": "버전 확인 불가"
     },
-    "example": "예시:",
     "learnMore": "더 알아보기",
     "cluster": {
       "metadata": "메타데이터",
@@ -1458,7 +1457,24 @@
     "gap": "미비",
     "advisory": "권고",
     "review": "검토 필요",
-    "failed": "실패"
+    "failed": "실패",
+    "fw": {
+      "eu-ai-act": {
+        "title": "EU 인공지능법: 부속서 IV 기술문서",
+        "source": "Regulation (EU) 2024/1689, Article 11(1) and Annex IV"
+      },
+      "kr-ai-framework-act": {
+        "title": "AI 기본법 (대한민국)"
+      },
+      "bsi-tr-03183-2": {
+        "title": "BSI TR-03183-2: SBOM 데이터 필드 (EU 사이버복원력법)",
+        "source": "Regulation (EU) 2024/2847 Annex I Part II(1); BSI TR-03183-2 v2.1.0 (2025-08-20)"
+      },
+      "us-sbom-minimum-elements": {
+        "title": "미국 SBOM 최소 요소",
+        "source": "CISA, NSA, FBI가 독일 BSI, 일본 METI, 한국 KISA 등 15개 국제 파트너와 함께 작성한 \"2026 Minimum Elements for a Software Bill of Materials (SBOM)\" v2.1 (2026-07-29)"
+      }
+    }
   },
   "licenses": {
     "empty": "감지된 라이선스가 없습니다.",
@@ -1659,7 +1675,8 @@
       "pass": "충족",
       "actionable": "채울 수 있음",
       "review": "판단 필요",
-      "na": "해당 없음"
+      "na": "해당 없음",
+      "all": "전체"
     },
     "searchPlaceholder": "검사 항목과 참조 규정 검색",
     "showingAll": "검사 {{count}}건을 모두 표시합니다.",
@@ -1673,8 +1690,14 @@
     "qualityEmptyBodySupplied": "여기서 적합은 측정할 필수 항목이 없었다는 뜻이며, 소프트웨어가 기재됐다는 뜻이 아닙니다. 공급사에 소프트웨어 컴포넌트가 기재된 SBOM을 요청해 주십시오.",
     "qualityLicenseTitle": "라이선스를 선언한 컴포넌트가 없습니다",
     "qualityLicenseBody": "라이선스를 선언한 소프트웨어 컴포넌트는 {{total}}개 중 {{declared}}개입니다({{pct}}%). 이 SBOM으로 만든 고지문은 거의 비어 있게 됩니다. 일부 생태계는 의존성 파일에 라이선스를 기록하지 않습니다. 파일 단위 라이선스 검사로 일부를 채울 수 있습니다.",
-    "qualityLicenseFigure": "선언된 라이선스: {{pct}}% (소프트웨어 컴포넌트 {{total}}개 중 {{declared}}개, NOASSERTION과 NONE은 제외)",
-    "hiddenByFilter": "다른 필터에 이 검색과 일치하는 항목이 {{count}}건 더 있습니다."
+    "hiddenByFilter": "다른 필터에 이 검색과 일치하는 항목이 {{count}}건 더 있습니다.",
+    "exampleShow": "예시 보기",
+    "searchAllKinds": "모든 종류에서 검색",
+    "kinds": "검사 종류",
+    "notices_other": "이 결과를 쓰기 전에 확인할 점 {{count}}가지",
+    "notices_one": "이 결과를 쓰기 전에 확인할 점 {{count}}가지",
+    "unit_one": "구성요소",
+    "unit_other": "구성요소"
   },
   "report": {
     "open": "문제 신고",
