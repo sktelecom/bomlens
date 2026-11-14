@@ -84,11 +84,11 @@
   --cat-review-muted: 240 237 234;
   --cat-review-emphasis: 131 106 84;
   --cat-review-border: 199 188 178;
-  --code-keyword: 207 34 46;
-  --code-string: 10 48 105;
+  --code-keyword: 29 78 216;
+  --code-string: 6 95 70;
   --code-comment: 110 119 129;
-  --code-number: 5 80 174;
-  --code-title: 102 57 186;
+  --code-number: 133 77 14;
+  --code-title: 36 41 47;
 }
 
 .dark {
@@ -164,9 +164,9 @@
   --cat-review-muted: 54 50 48;
   --cat-review-emphasis: 196 169 146;
   --cat-review-border: 103 91 82;
-  --code-keyword: 255 123 114;
-  --code-string: 165 214 255;
+  --code-keyword: 96 165 250;
+  --code-string: 110 231 183;
   --code-comment: 145 152 161;
-  --code-number: 121 192 255;
-  --code-title: 210 168 255;
+  --code-number: 232 200 110;
+  --code-title: 230 237 243;
 }

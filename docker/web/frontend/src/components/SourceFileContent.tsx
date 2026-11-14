@@ -1,36 +1,47 @@
 // Copyright 2026 SK Telecom Co., Ltd.
 // SPDX-License-Identifier: Apache-2.0
 
-import { FileCode, FileSymlink, FileWarning } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import {
+  AlertIcon,
+  FileCodeIcon,
+  FileIcon,
+  FileSymlinkFileIcon,
+  WrapIcon,
+} from "@primer/octicons-react";
+import { Button, Label } from "@primer/react";
+import { type ReactNode, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { EmptyState } from "@/components/ui/state";
+import { languageForPath, splitHighlightedLines } from "@/lib/highlight";
+import { highlightSource } from "@/lib/highlight-runtime";
 import {
   lineCount,
   missingReason,
   type SnapshotFile,
   type SourceSnapshot,
 } from "@/lib/sourceSnapshot";
-import { highlightSource } from "@/lib/highlight-runtime";
-import { languageForPath, splitHighlightedLines } from "@/lib/highlight";
 import { formatBytes } from "@/lib/utils";
+
+import "./source-tree.css";
 
 /**
  * How many lines render before the reader asks for the rest. A captured file can
- * be a 256 KB lockfile — thousands of DOM rows would stall the section for a
+ * be a 256 KB lockfile: thousands of DOM rows would stall the section for a
  * view nobody scrolls to the end of. Same "show more" contract the component
  * table uses.
  */
 const VISIBLE_LINES = 1500;
 
-/** The selected file's captured text, or an honest reason there is none. */
+/**
+ * The selected file's captured text, or an honest reason there is none.
+ * Mount it with `key={path}` so "show the rest" and the wrap choice never carry
+ * over to another file.
+ */
 export function SourceFileContent({
   snapshot,
   file,
   linkTarget,
+  noSnapshot = false,
   path,
 }: {
   snapshot: SourceSnapshot | null;
@@ -38,17 +49,21 @@ export function SourceFileContent({
   file: SnapshotFile | null;
   /** Where `path` points, when it is a symlink rather than a file. */
   linkTarget?: string | null;
+  /** The scan stored no file contents at all (no `_source.json`), as opposed to
+   *  one file missing from a snapshot that exists. */
+  noSnapshot?: boolean;
   /** Selected tree path; null before the reader picks a file. */
   path: string | null;
 }) {
   const { t } = useTranslation();
   const [expanded, setExpanded] = useState(false);
+  // Long lines wrap by default, as they always did; the switch lets a reader
+  // turn that off to scroll sideways instead.
+  const [wrap, setWrap] = useState(true);
 
   const lines = useMemo(() => {
     if (!file) return [];
-    const body = file.content.endsWith("\n")
-      ? file.content.slice(0, -1)
-      : file.content;
+    const body = file.content.endsWith("\n") ? file.content.slice(0, -1) : file.content;
     return body.length ? body.split("\n") : [];
   }, [file]);
 
@@ -73,29 +88,41 @@ export function SourceFileContent({
 
   if (!path) {
     return (
-      <EmptyState icon={FileCode}>{t("sourceViewer.selectPrompt")}</EmptyState>
+      <div className="bl-src-empty bl-muted">
+        <FileCodeIcon size={24} />
+        <span>{t("sourceViewer.selectPrompt")}</span>
+      </div>
     );
   }
 
   // A symlink holds a destination, not content. Saying where it points is the
-  // whole answer — and in a container image it is usually busybox, which is why
+  // whole answer; in a container image it is usually busybox, which is why
   // that one command appears under a hundred different names.
   if (linkTarget) {
     return (
-      <div className="flex h-full flex-col">
-        <FileHeader path={path}>
-          <Badge variant="muted">{t("sourceViewer.symlink")}</Badge>
-        </FileHeader>
-        <div className="flex flex-1 items-center justify-center p-6">
-          <p className="flex flex-wrap items-center justify-center gap-2 text-body-sm text-muted-foreground">
-            <FileSymlink className="h-4 w-4 shrink-0" />
-            {t("sourceViewer.symlinkTo")}
-            <code className="break-all rounded bg-muted px-1.5 py-0.5 font-mono text-label text-foreground">
-              {linkTarget}
-            </code>
-          </p>
+      <>
+        <FileHead path={path}>
+          <Label variant="secondary">{t("sourceViewer.symlink")}</Label>
+        </FileHead>
+        <div className="bl-src-empty bl-muted">
+          <FileSymlinkFileIcon size={16} />
+          <span>
+            {t("sourceViewer.symlinkTo")} <code className="bl-mono">{linkTarget}</code>
+          </span>
         </div>
-      </div>
+      </>
+    );
+  }
+
+  if (!file && noSnapshot) {
+    return (
+      <>
+        <FileHead path={path} />
+        <div className="bl-src-empty bl-muted">
+          <FileIcon size={16} />
+          <span>{t("sourceViewer.noSnapshot")}</span>
+        </div>
+      </>
     );
   }
 
@@ -108,15 +135,13 @@ export function SourceFileContent({
           ? "sourceViewer.missingBudget"
           : "sourceViewer.missingUnknown";
     return (
-      <div className="flex h-full flex-col">
-        <FileHeader path={path} />
-        <div className="flex flex-1 items-center justify-center p-6">
-          <p className="flex items-center gap-2 text-body-sm text-muted-foreground">
-            <FileWarning className="h-4 w-4 shrink-0" />
-            {t(key)}
-          </p>
+      <>
+        <FileHead path={path} />
+        <div className="bl-src-empty bl-muted">
+          <AlertIcon size={16} />
+          <span>{t(key)}</span>
         </div>
-      </div>
+      </>
     );
   }
 
@@ -124,76 +149,67 @@ export function SourceFileContent({
   const hidden = lines.length - shown.length;
 
   return (
-    <div className="flex h-full flex-col">
-      <FileHeader path={path}>
-        <span className="shrink-0 text-label text-muted-foreground">
+    <>
+      <FileHead path={path}>
+        <span className="bl-muted bl-small">
           {t("sourceViewer.lines", { count: lineCount(file.content) })}
         </span>
-        <span className="shrink-0 text-label text-muted-foreground">
-          {formatBytes(file.size)}
-        </span>
-        {file.truncated && (
-          <Badge variant="muted">{t("sourceViewer.truncated")}</Badge>
-        )}
-      </FileHeader>
+        <span className="bl-muted bl-small">{formatBytes(file.size)}</span>
+        {file.truncated && <Label variant="attention">{t("sourceViewer.truncated")}</Label>}
+        <Button
+          size="small"
+          variant="invisible"
+          leadingVisual={WrapIcon}
+          aria-pressed={wrap}
+          onClick={() => setWrap((w) => !w)}
+        >
+          {t("sourceViewer.wrap")}
+        </Button>
+      </FileHead>
 
-      <div className="flex-1 overflow-auto">
-        <table className="w-full border-collapse font-mono text-label">
+      <div className="bl-src-code-scroll">
+        <table className={wrap ? "bl-src-code bl-src-wrap" : "bl-src-code"}>
           <tbody>
             {shown.map((line, i) => (
-              <tr key={i} className="align-top">
-                <td
-                  className="w-[1%] select-none whitespace-nowrap border-r px-2 py-0.5 text-right text-muted-foreground"
-                  aria-hidden="true"
-                >
+              <tr key={i}>
+                <td className="bl-src-ln" aria-hidden="true">
                   {i + 1}
                 </td>
                 {highlighted?.[i] !== undefined ? (
                   <td
-                    className="whitespace-pre-wrap break-all px-3 py-0.5"
+                    className="bl-src-lc"
                     // The markup is the highlighter's, whose text it already
                     // escaped; lib/highlight only rebalances the tags around it.
-                    dangerouslySetInnerHTML={{ __html: highlighted[i] || " " }}
+                    dangerouslySetInnerHTML={{ __html: highlighted[i] || " " }}
                   />
                 ) : (
-                  <td className="whitespace-pre-wrap break-all px-3 py-0.5">
-                    {line || " "}
-                  </td>
+                  <td className="bl-src-lc">{line || " "}</td>
                 )}
               </tr>
             ))}
           </tbody>
         </table>
-        {hidden > 0 && (
-          <div className="border-t p-2 text-center">
-            <Button variant="outline" size="sm" onClick={() => setExpanded(true)}>
-              {t("sourceViewer.showAll", { count: hidden })}
-            </Button>
-          </div>
-        )}
-        {file.truncated && expanded && (
-          <p className="border-t p-2 text-center text-label text-muted-foreground">
-            {t("sourceViewer.truncatedFoot")}
-          </p>
-        )}
       </div>
-    </div>
+      {hidden > 0 && (
+        <div className="bl-src-foot">
+          <Button size="small" onClick={() => setExpanded(true)}>
+            {t("sourceViewer.showAll", { count: hidden })}
+          </Button>
+        </div>
+      )}
+      {file.truncated && (expanded || hidden === 0) && (
+        <p className="bl-muted bl-small bl-src-foot">{t("sourceViewer.truncatedFoot")}</p>
+      )}
+    </>
   );
 }
 
-function FileHeader({
-  path,
-  children,
-}: {
-  path: string;
-  children?: React.ReactNode;
-}) {
+function FileHead({ path, children }: { path: string; children?: ReactNode }) {
   return (
-    <div className="flex items-center gap-3 border-b px-3 py-2">
-      <span className="truncate font-mono text-label" title={path}>
-        {path}
-      </span>
-      <span className="ml-auto flex items-center gap-3">{children}</span>
+    <div className="bl-src-head">
+      <FileCodeIcon size={16} />
+      <span className="bl-mono bl-src-path">{path}</span>
+      {children && <span className="bl-src-meta">{children}</span>}
     </div>
   );
 }

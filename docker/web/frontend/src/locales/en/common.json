@@ -564,14 +564,24 @@
     "packages": "Packages"
   },
   "sourceTree": {
+    "filterClear": "Clear the filter",
+    "filter": "Filter by file name",
+    "filterNone": "No file name matches.",
+    "treeLabel": "Source file tree",
     "loading": "Loading source tree…",
     "loadError": "Could not load the source file tree.",
     "empty": "No source files were scanned.",
     "noLicenseHint": "License details appear when you run a ScanCode (deep-license) scan."
   },
   "sourceViewer": {
+    "summary_one": "{{count}} file captured.",
+    "summary_other": "{{count}} files captured.",
+    "linksSummary_one": "{{count}} symlink.",
+    "linksSummary_other": "{{count}} symlinks.",
+    "noSnapshot": "This scan did not store file contents. Only the file structure is shown.",
+    "wrap": "Wrap lines",
+    "paneLabel": "Reading pane",
     "selectPrompt": "Pick a file to read what was scanned.",
-    "summary": "{{count}} file(s) captured from the scanned tree.",
     "summaryOmitted": "{{count}} left out (binary, or past the capture limit).",
     "lines": "{{count}} lines",
     "truncated": "Shown in part",
@@ -581,8 +591,7 @@
     "missingBudget": "No preview. The capture reached its size limit before this file.",
     "missingUnknown": "No content was captured for this file.",
     "symlink": "Symlink",
-    "symlinkTo": "This is a symlink to",
-    "linksSummary": "{{count}} symlinks."
+    "symlinkTo": "This is a symlink to"
   },
   "inputSbom": {
     "loading": "Loading the submitted SBOM…",

@@ -564,14 +564,24 @@
     "packages": "패키지"
   },
   "sourceTree": {
+    "filterClear": "필터 지우기",
+    "filter": "파일 이름으로 거르기",
+    "filterNone": "이름이 맞는 파일이 없습니다.",
+    "treeLabel": "소스 파일 트리",
     "loading": "소스 트리를 불러오는 중…",
     "loadError": "소스 파일 트리를 불러오지 못했습니다.",
     "empty": "스캔된 소스 파일이 없습니다.",
     "noLicenseHint": "라이선스 정보는 ScanCode(딥 라이선스) 스캔을 실행하면 표시됩니다."
   },
   "sourceViewer": {
+    "summary_one": "파일 {{count}}개의 내용을 저장했습니다.",
+    "summary_other": "파일 {{count}}개의 내용을 저장했습니다.",
+    "linksSummary_one": "심볼릭 링크 {{count}}개.",
+    "linksSummary_other": "심볼릭 링크 {{count}}개.",
+    "noSnapshot": "이 스캔은 파일 내용을 저장하지 않습니다. 파일 구조만 볼 수 있습니다.",
+    "wrap": "줄 바꿈",
+    "paneLabel": "파일 내용",
     "selectPrompt": "파일을 고르면 스캔한 내용을 볼 수 있습니다.",
-    "summary": "스캔한 트리에서 파일 {{count}}개를 담았습니다.",
     "summaryOmitted": "{{count}}개는 담지 않았습니다(바이너리이거나 저장 한도를 넘었습니다).",
     "lines": "{{count}}줄",
     "truncated": "일부만 표시",
@@ -581,8 +591,7 @@
     "missingBudget": "미리 볼 수 없습니다. 저장 한도에 먼저 도달해 이 파일은 담지 못했습니다.",
     "missingUnknown": "이 파일은 내용을 담지 않았습니다.",
     "symlink": "심볼릭 링크",
-    "symlinkTo": "이 항목은 다음을 가리키는 심볼릭 링크입니다:",
-    "linksSummary": "심볼릭 링크 {{count}}개."
+    "symlinkTo": "이 항목은 다음을 가리키는 심볼릭 링크입니다:"
   },
   "inputSbom": {
     "loading": "제출된 SBOM을 불러오는 중…",
