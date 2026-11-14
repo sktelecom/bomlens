@@ -1088,6 +1088,21 @@
       "datasetsNamed": "Datasets: {{count}} referenced, worst grade {{verdict}} ({{names}})",
       "viaSources": "{{name}} (via its sources)",
       "trainingUndisclosed": "Training data undisclosed: the terms of the data this model learned from were not declared"
+    },
+    "noVerdict": "No verdict",
+    "dsLicenseNotStated": "Not stated",
+    "refType": {
+      "website": "Website",
+      "distribution": "Download",
+      "vcs": "Source repository",
+      "documentation": "Documentation",
+      "issue-tracker": "Issue tracker",
+      "support": "Support",
+      "license": "License",
+      "advisories": "Advisories",
+      "release-notes": "Release notes",
+      "model-card": "Model card",
+      "other": "Other"
     }
   },
   "aiSummary": {
@@ -2388,7 +2403,18 @@
       }
     },
     "organizationPlaceholder": "Organization name",
-    "autonomyInService": "Whether a person is involved in the AI's decisions was answered in the service step."
+    "autonomyInService": "Whether a person is involved in the AI's decisions was answered in the service step.",
+    "stepNotOpened": "Not opened yet",
+    "draftKept": "Your earlier answers were kept. Pick up where you left off.",
+    "discard": {
+      "title": "Discard your answers?",
+      "body": "The answers you gave in these questions are kept nowhere else. Cancelling discards them.",
+      "confirm": "Discard answers",
+      "keep": "Keep answering"
+    },
+    "notAnswered": "Not answered",
+    "decisionsLeft_one": "{{count}} decision not answered",
+    "decisionsLeft_other": "{{count}} decisions not answered"
   },
   "filters": {
     "active": "Active filters",

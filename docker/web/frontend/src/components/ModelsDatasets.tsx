@@ -1,46 +1,26 @@
 // Copyright 2026 SK Telecom Co., Ltd.
 // SPDX-License-Identifier: Apache-2.0
 
-import {
-  Boxes,
-  CircleCheck,
-  CircleDashed,
-  Database,
-  ExternalLink,
-  Server,
-  TriangleAlert,
-} from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { CpuIcon } from "@primer/octicons-react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent } from "@/components/ui/card";
-import { EmptyState, ErrorState, LoadingState } from "@/components/ui/state";
 import type { ConformanceSummary, DoneEvent, ResultFile, Spdx3Summary } from "@/lib/api";
-import { checkKind, groupG7ByCluster, registryTally, splitChecks } from "@/lib/conformance";
 import {
   type AiModelData,
-  type AssessmentGrade,
-  type DatasetRef,
   type DeclaredService,
-  datasetTreeRows,
-  GRADE_TONE,
-  GradeBadge,
-  type ModelAssessment,
-  type ModelCard,
   parseDeclaredServices,
   parseModelCards,
-  USAGE_LABEL_KEY,
 } from "@/lib/models";
-import { renderLocalized } from "@/lib/localized";
-import { localizeReasons } from "@/lib/modelReasons";
 import { loadSbom } from "@/lib/sbomGraph";
-import { CheckGroup } from "./ConformancePanel";
+
+import { DatasetsBox, Disclaimer, G7Disclosure, ModelCardBox, ServiceBox } from "./models/ModelCards";
+import { ModelsEmpty, ModelsError, ModelsLoading } from "./models/states";
+import "./models/models.css";
 import { Spdx3Panel } from "./Spdx3Panel";
-import { cn } from "@/lib/utils";
 
 /**
- * Models & Datasets — the AI surface. Fetches the raw ML-BOM, parses each
+ * Models & Datasets, the AI surface. Fetches the raw ML-BOM, parses each
  * machine-learning-model's card (identifier, architecture, task, license,
  * integrity, references, limitations), shows the four openness-disclosure axes
  * and the datasets the models reference. Only reachable for AI/ANALYZE scans.
@@ -98,7 +78,7 @@ export function ModelsDatasets({
   // The panel stays at the same place in the tree either way, so it keeps its
   // state (the open flow) when the body around it goes away.
   return (
-    <div className="space-y-6">
+    <div className="bl-md">
       {panel}
       {!filling && <ModelsDatasetsBody scanId={scanId} sbomFile={sbomFile} conformance={conformance} />}
     </div>
@@ -144,577 +124,29 @@ function ModelsDatasetsBody({
     };
   }, [scanId, sbomFile, reloadKey]);
 
-  if (state === "loading") return <LoadingState>{t("models.loading")}</LoadingState>;
+  if (state === "loading") return <ModelsLoading text={t("models.loading")} />;
   if (state === "error" || !data) {
-    return (
-      <ErrorState onRetry={() => setReloadKey((k) => k + 1)} retryLabel={t("retry")}>
-        {t("models.loadError")}
-      </ErrorState>
-    );
+    return <ModelsError text={t("models.loadError")} onRetry={() => setReloadKey((k) => k + 1)} />;
   }
   if (data.models.length === 0 && data.datasets.length === 0) {
-    return (
-      <EmptyState icon={Boxes} hint={t("models.emptyHint")}>
-        {t("models.empty")}
-      </EmptyState>
-    );
+    return <ModelsEmpty icon={CpuIcon} title={t("models.empty")} hint={t("models.emptyHint")} />;
   }
 
   // The assessment surface only exists when the pipeline stamped one (older
   // BOMs and non-assessed runs render exactly as before).
-  const hasDsAssessment = data.datasets.some((d) => d.assessment);
-  const hasAssessment = data.models.some((m) => m.assessment) || hasDsAssessment;
+  const hasAssessment = data.models.some((m) => m.assessment) || data.datasets.some((d) => d.assessment);
 
   return (
-    <div className="space-y-6">
+    <div className="bl-md-body">
       {data.models.map((m, i) => (
-        <ModelCardView key={m.purl || `${m.name}-${i}`} model={m} />
+        <ModelCardBox key={m.purl || `${m.name}-${i}`} model={m} />
       ))}
       {services.map((s, i) => (
-        <DeclaredServiceCard key={s.ref ?? `${s.name}-${i}`} service={s} />
+        <ServiceBox key={s.ref ?? `${s.name}-${i}`} service={s} />
       ))}
-      {data.datasets.length > 0 && (
-        <div className="space-y-2">
-          <div className="flex items-center gap-2 text-body-sm font-semibold text-foreground">
-            <Database className="h-4 w-4 text-muted-foreground" aria-hidden />
-            {t("models.datasets")}
-            <span className="tabular-nums text-muted-foreground">{data.datasets.length}</span>
-          </div>
-          <div className="overflow-x-auto rounded-md border">
-            <table className="w-full text-left text-label">
-              <thead className="border-b bg-muted/40 text-muted-foreground">
-                <tr>
-                  <th scope="col" className="px-3 py-2 font-medium">
-                    {t("models.dsName")}
-                  </th>
-                  {hasDsAssessment && (
-                    <th scope="col" className="px-3 py-2 font-medium">
-                      {t("models.dsAssessment")}
-                    </th>
-                  )}
-                  <th scope="col" className="px-3 py-2 font-medium">
-                    {t("models.dsLicense")}
-                  </th>
-                  <th scope="col" className="px-3 py-2 font-medium">
-                    {t("models.dsIntegrity")}
-                  </th>
-                  <th scope="col" className="px-3 py-2 font-medium">
-                    {t("models.dsSource")}
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {datasetTreeRows(data.datasets).map(({ dataset: d, level, relation, repeat }, i) => (
-                  <tr key={`${d.ref ?? d.name}-${i}`} className="border-b last:border-0">
-                    <td
-                      className="px-3 py-2 align-top"
-                      // A traced source sits under the dataset it came from.
-                      style={level > 0 ? { paddingLeft: `${0.75 + level * 1.25}rem` } : undefined}
-                    >
-                      {level > 0 && (
-                        <span className="mr-1 text-muted-foreground" aria-hidden>
-                          └
-                        </span>
-                      )}
-                      {relation && (
-                        <span className="sr-only">
-                          {t("models.dsSourceOf", { relation: t(`models.dsRelation.${relation}`, relation) })}
-                        </span>
-                      )}
-                      <span className="font-mono">{d.name}</span>
-                      {d.version && (
-                        <span className="text-muted-foreground">@{d.version}</span>
-                      )}
-                      {d.collectedBy && (
-                        <Badge variant="outline" className="ml-1.5 align-middle">
-                          {d.collectedBy}
-                        </Badge>
-                      )}
-                      {relation && (
-                        <Badge variant="muted" className="ml-1.5 align-middle">
-                          {t(`models.dsRelation.${relation}`, relation)}
-                        </Badge>
-                      )}
-                      {repeat && (
-                        <span className="ml-1.5 text-muted-foreground">{t("models.dsListedAbove")}</span>
-                      )}
-                      {d.url && (
-                        <a
-                          href={d.url}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="mt-0.5 flex items-center gap-1 break-all text-primary underline underline-offset-2 hover:no-underline"
-                        >
-                          <ExternalLink className="h-3 w-3 shrink-0" aria-hidden />
-                          {d.url}
-                        </a>
-                      )}
-                    </td>
-                    {hasDsAssessment && (
-                      <td className="px-3 py-2 align-top">
-                        {d.assessment ? (
-                          <GradeBadge grade={d.assessment} />
-                        ) : (
-                          <span className="text-muted-foreground">—</span>
-                        )}
-                      </td>
-                    )}
-                    <td className="px-3 py-2 align-top">
-                      {/* An unreadable repository is said so, rather than shown as
-                          a dataset with no license — the two mean different things. */}
-                      {d.unresolved ? (
-                        <Badge variant="outline">{t("models.dsUnresolved")}</Badge>
-                      ) : d.licenses.length > 0 ? (
-                        <span className="font-mono">{d.licenses.join(", ")}</span>
-                      ) : (
-                        <span className="text-muted-foreground">{t("models.dsNoLicense")}</span>
-                      )}
-                    </td>
-                    <td className="px-3 py-2 align-top">
-                      {d.hasIntegrity ? (
-                        <CircleCheck className="h-4 w-4 text-success" aria-hidden />
-                      ) : (
-                        <CircleDashed className="h-4 w-4 text-muted-foreground" aria-hidden />
-                      )}
-                      <span className="sr-only">
-                        {d.hasIntegrity ? t("models.dsHashed") : t("models.dsNotHashed")}
-                      </span>
-                    </td>
-                    <td className="px-3 py-2 align-top">
-                      {/* A repeat row's sources are on its full row above. */}
-                      {repeat ? (
-                        <span className="text-muted-foreground">—</span>
-                      ) : (
-                        <DatasetSources dataset={d} />
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-      {hasAssessment && (
-        <p className="text-body-sm text-muted-foreground">{t("models.disclaimer")}</p>
-      )}
+      {data.datasets.length > 0 && <DatasetsBox datasets={data.datasets} />}
+      {hasAssessment && <Disclaimer />}
       {conformance ? <G7Disclosure conformance={conformance} /> : null}
     </div>
-  );
-}
-
-/**
- * The "Derived from" cell. When the pipeline traced sources, the traced ones are
- * rows of their own beneath this one, so the cell only counts them and adds what
- * the rows cannot show: a card that calls the data original, sources named in
- * words (kept verbatim, never looked up, so marked for checking), and why the
- * walk stopped here. Without tracing it lists the card's values as before.
- */
-function DatasetSources({ dataset: d }: { dataset: DatasetRef }) {
-  const { t } = useTranslation();
-  const traced = d.depth !== undefined;
-  if (!traced) {
-    return d.sources.length > 0 ? (
-      <span className="break-all">{d.sources.join(", ")}</span>
-    ) : (
-      <span className="text-muted-foreground">—</span>
-    );
-  }
-  const original = d.sources.some((s) => s.trim().toLowerCase() === "original");
-  const parts = d.derivedFrom.length + d.unverifiedSources.length + (original ? 1 : 0);
-  if (parts === 0 && !d.trace) return <span className="text-muted-foreground">—</span>;
-  return (
-    <div className="space-y-1">
-      {d.derivedFrom.length > 0 && (
-        <div>{t("models.dsSourceCount", { count: d.derivedFrom.length })}</div>
-      )}
-      {original && <div>{t("models.dsSourceOriginal")}</div>}
-      {d.unverifiedSources.map((s) => (
-        <div key={s} className="flex flex-wrap items-center gap-1.5">
-          <span className="break-all">{s}</span>
-          {/* The pipeline grades such a source "review"; same tone as that
-              grade's badge, since the Korean label is the same word. */}
-          <Badge tone={GRADE_TONE.review}>{t("models.dsSourceUnverified")}</Badge>
-        </div>
-      ))}
-      {d.trace === "depth-limit" && (
-        <div className="text-muted-foreground">{t("models.dsTraceDepthLimit")}</div>
-      )}
-      {d.trace === "cycle" && (
-        <div className="text-muted-foreground">{t("models.dsTraceCycle")}</div>
-      )}
-    </div>
-  );
-}
-
-/**
- * What this model's own card/listing discloses, measured against the G7
- * minimum elements — for an AI SBOM BomLens generated itself (AIBOM, a model
- * file scan, a dataset scan). Reuses the Conformance screen's own cluster
- * rendering (CheckGroup): the data and its grouping are identical to what an
- * uploaded AI SBOM shows on the Conformance screen, only the destination
- * differs. The headline rollup is AiSummaryCard's job (top of Overview, any
- * AI scan); this is only the detail. Unlike a self-generated software SBOM's
- * format checklist (which is tautological — BomLens always fills its own
- * timestamp/tool fields), a gap here is the model's PUBLISHER not having
- * disclosed something in the card BomLens read to build this SBOM — a real
- * finding about the model, not a self-grade of BomLens's own document, so it
- * keeps its checklist framing rather than being softened into plain
- * description. */
-function G7Disclosure({ conformance }: { conformance: ConformanceSummary }) {
-  const { t } = useTranslation();
-  const { g7 } = splitChecks(conformance.checks ?? []);
-  if (g7.length === 0) return null;
-  const g7t = registryTally(g7);
-  const g7groups = groupG7ByCluster(g7);
-  return (
-    <div className="space-y-3 border-t pt-6">
-      <div className="space-y-1">
-        <div className="text-body-sm font-semibold text-foreground">{t("models.g7SectionTitle")}</div>
-        <p className="max-w-3xl text-body-sm text-muted-foreground">{t("models.g7SectionIntro")}</p>
-      </div>
-      <Card>
-        <CardContent className="space-y-4 p-4">
-          <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-            <div className="text-body-sm font-semibold text-foreground">{t("g7.subtitle")}</div>
-            <div className="text-heading font-semibold tabular-nums text-foreground">
-              {t("g7.present", { present: g7t.present, total: g7t.autoTotal })}
-            </div>
-            <p className="text-body-sm text-muted-foreground">{t("g7.allAdvisory")}</p>
-          </div>
-          <div className="bl-cf-groups">
-            {g7groups.map((group) => (
-              <CheckGroup
-                key={group.cluster}
-                title={t(`g7.cluster.${group.cluster}`, { defaultValue: group.cluster })}
-                checks={group.checks}
-                defaultOpen={group.checks.some((c) => checkKind(c) === "actionable")}
-                // This page has no filter chips to start on the gaps, as the
-                // Conformance screen does; folding the met elements away in
-                // each open group does the same job.
-                foldMet
-              />
-            ))}
-          </div>
-        </CardContent>
-      </Card>
-    </div>
-  );
-}
-
-/**
- * The service (an app or API) the publisher declared the model runs in, read
- * from the CycloneDX SBOM. Every value is the publisher's word: the badge and
- * the note say so, so it is not read as something the scan found.
- */
-function DeclaredServiceCard({ service: s }: { service: DeclaredService }) {
-  const { t } = useTranslation();
-  return (
-    <Card data-testid="declared-service">
-      <CardContent className="space-y-4 p-4">
-        <div className="flex flex-wrap items-center gap-2">
-          <Server className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
-          <span className="text-label text-muted-foreground">{t("models.service.kind")}</span>
-          <span className="text-body-sm font-medium text-foreground">
-            {s.name}
-            {s.version ? <span className="text-muted-foreground"> {s.version}</span> : null}
-          </span>
-          <Badge tone="info">{t("models.service.declared")}</Badge>
-        </div>
-        <p className="max-w-3xl text-body-sm text-muted-foreground">{t("models.service.note")}</p>
-        {s.description && (
-          <p className="max-w-3xl text-body-sm leading-relaxed text-muted-foreground">{s.description}</p>
-        )}
-        <div className="grid max-w-4xl grid-cols-2 gap-4 sm:grid-cols-4">
-          <Field label={t("models.service.provider")}>
-            {s.provider ?? <span className="text-muted-foreground">{t("models.service.notStated")}</span>}
-          </Field>
-          <Field label={t("models.service.runs")}>
-            {s.models.length ? (
-              <span className="break-all font-mono text-label">{s.models.join(", ")}</span>
-            ) : (
-              <span className="text-muted-foreground">{t("models.service.notStated")}</span>
-            )}
-          </Field>
-          <Field label={t("models.service.dataFlows")}>
-            <span className="tabular-nums">{t("models.service.dataFlowCount", { count: s.dataFlows })}</span>
-          </Field>
-          {s.endpoint && (
-            <Field label={t("models.service.endpoint")}>
-              <span className="break-all font-mono text-label">{s.endpoint}</span>
-            </Field>
-          )}
-        </div>
-        <Field label={t("models.service.externalModels")}>
-          {s.externalModels.length ? (
-            <ul className="space-y-0.5" data-testid="declared-external-models">
-              {s.externalModels.map((m, i) => (
-                <li key={`${m.name}-${i}`}>
-                  <span className="font-medium">{m.name}</span>
-                  {(m.provider || m.version) && (
-                    <span className="text-muted-foreground">
-                      {" "}
-                      {[m.provider, m.version].filter(Boolean).join(", ")}
-                    </span>
-                  )}
-                  {m.endpoint && <span className="ml-1 break-all font-mono text-label text-muted-foreground">{m.endpoint}</span>}
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <span className="text-muted-foreground">{t("models.service.noExternal")}</span>
-          )}
-        </Field>
-      </CardContent>
-    </Card>
-  );
-}
-
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div className="space-y-0.5">
-      <div className="text-label text-muted-foreground">{label}</div>
-      <div className="text-body-sm">{children}</div>
-    </div>
-  );
-}
-
-/**
- * The pipeline's stamped verdict: per-axis grades (an unevaluated axis shows
- * "—"), the grounds, the custom-license excerpt and the lineage warning. Pure
- * display — every value comes verbatim from the SBOM properties.
- */
-function AssessmentBlock({
-  assessment: a,
-  customLicenseQuote,
-  lineageConflictWith,
-}: {
-  assessment: ModelAssessment;
-  customLicenseQuote?: string;
-  lineageConflictWith?: string;
-}) {
-  const { t } = useTranslation();
-  const axes: Array<{ key: string; label: string; grade?: AssessmentGrade }> = [
-    { key: "license", label: t("models.assessLicense"), grade: a.license },
-    { key: "security", label: t("models.assessSecurity"), grade: a.security },
-    { key: "datasets", label: t("models.assessDatasets"), grade: a.datasets },
-    { key: "trainingData", label: t("models.assessTrainingData"), grade: a.trainingData },
-  ];
-  const reasons = useMemo(() => localizeReasons(a.reasons), [a.reasons]);
-
-  return (
-    <div className="space-y-3 rounded-md border bg-muted/30 p-3">
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="text-label text-muted-foreground">{t("models.assessment")}</span>
-        {axes.map(({ key, label, grade }) => (
-          <span
-            key={key}
-            className="inline-flex items-center gap-1.5 rounded-md border bg-background px-2 py-1 text-label text-foreground"
-          >
-            {label}
-            {grade ? (
-              <GradeBadge grade={grade} />
-            ) : (
-              <>
-                <span className="text-muted-foreground" aria-hidden>
-                  —
-                </span>
-                <span className="sr-only">{t("models.assessNotEvaluated")}</span>
-              </>
-            )}
-          </span>
-        ))}
-      </div>
-
-      {a.usageContext && (
-        <Field label={t("models.usageContext")}>
-          {t(USAGE_LABEL_KEY[a.usageContext])}
-        </Field>
-      )}
-
-      {a.reasons.length > 0 && (
-        <Field label={t("models.reasons")}>
-          <ul className="list-inside list-disc text-body-sm text-muted-foreground">
-            {/* Stamped in the scan's language; an English sentence the
-                scanner writes is shown in the UI language, with the stamped
-                text kept as the tooltip. Anything else stays verbatim. */}
-            {reasons.map(({ text, key }, i) =>
-              key ? (
-                <li key={i} title={text}>
-                  {renderLocalized(t, key)}
-                </li>
-              ) : (
-                <li key={i}>{text}</li>
-              ),
-            )}
-          </ul>
-        </Field>
-      )}
-
-      {customLicenseQuote && (
-        <Field label={t("models.customLicenseQuote")}>
-          <p className="text-body-sm italic text-muted-foreground">
-            {customLicenseQuote}
-          </p>
-        </Field>
-      )}
-
-      {lineageConflictWith && (
-        <p className="flex items-start gap-1.5 text-body-sm text-foreground">
-          <TriangleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0 text-risk-high" aria-hidden />
-          {t("models.lineageConflict", { name: lineageConflictWith })}
-        </p>
-      )}
-    </div>
-  );
-}
-
-function ModelCardView({ model: m }: { model: ModelCard }) {
-  const { t } = useTranslation();
-  const axes: Array<{ key: keyof ModelCard["disclosure"]; label: string }> = [
-    { key: "weights", label: t("models.axisWeights") },
-    { key: "architecture", label: t("models.axisArchitecture") },
-    { key: "trainingData", label: t("models.axisTrainingData") },
-    { key: "trainingProcess", label: t("models.axisTrainingProcess") },
-  ];
-
-  return (
-    <Card>
-      <CardContent className="space-y-4 p-4">
-        <div className="flex flex-wrap items-center gap-2">
-          <Boxes className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
-          <span className="font-mono text-body-sm font-medium text-foreground">
-            {m.group ? `${m.group} / ` : ""}
-            {m.name}
-            {m.version ? <span className="text-muted-foreground"> {m.version}</span> : null}
-          </span>
-          {m.assessment && <GradeBadge grade={m.assessment.overall} />}
-          {/* Outlined, not filled: a licence id is a fact about the model, and
-              in the same grey fill as the verdict beside it the two read as one
-              kind of thing. */}
-          {m.licenses.map((l) => (
-            <Badge key={l} variant="outline">
-              {l}
-            </Badge>
-          ))}
-        </div>
-
-        {m.assessment && (
-          <AssessmentBlock
-            assessment={m.assessment}
-            customLicenseQuote={m.customLicenseQuote}
-            lineageConflictWith={m.lineageConflictWith}
-          />
-        )}
-
-        {m.description && (
-          <p className="max-w-3xl text-body-sm leading-relaxed text-muted-foreground">
-            {m.description}
-          </p>
-        )}
-
-        <div className="grid max-w-4xl grid-cols-2 gap-4 sm:grid-cols-4">
-          {m.architecture && <Field label={t("models.architecture")}>{m.architecture}</Field>}
-          {m.task && <Field label={t("models.task")}>{m.task}</Field>}
-          {m.supplier && <Field label={t("models.supplier")}>{m.supplier}</Field>}
-          <Field label={t("models.integrity")}>
-            <span className={m.hasIntegrity ? "text-foreground" : "text-muted-foreground"}>
-              {m.hasIntegrity ? t("models.integrityYes") : t("models.integrityNo")}
-            </span>
-          </Field>
-        </div>
-
-        {m.purl && (
-          <Field label={t("models.identifier")}>
-            <span className="break-all font-mono text-label">{m.purl}</span>
-          </Field>
-        )}
-
-        {m.localScan && (
-          <Field label={t("models.localScan")}>
-            <span
-              className={
-                m.localScan === "unsafe"
-                  ? "font-medium text-destructive"
-                  : m.localScan === "suspicious" || m.localScan === "error"
-                    ? "text-foreground"
-                    : "text-muted-foreground"
-              }
-            >
-              {t(`models.localScan_${m.localScan.replace("-", "_")}`)}
-            </span>
-            {m.localScanFindings && (
-              <span className="ml-1 break-all font-mono text-label text-muted-foreground">
-                {m.localScanFindings}
-              </span>
-            )}
-            {m.localScanTool && (
-              <span className="ml-1 text-label text-muted-foreground">({m.localScanTool})</span>
-            )}
-          </Field>
-        )}
-
-        <div className="space-y-1.5">
-          <div className="text-label text-muted-foreground" title={t("models.disclosureHint")}>
-            {t("models.disclosure")}
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {axes.map(({ key, label }) => {
-              const on = m.disclosure[key];
-              const Icon = on ? CircleCheck : CircleDashed;
-              return (
-                <span
-                  key={key}
-                  className={cn(
-                    "inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-label",
-                    on ? "text-foreground" : "text-muted-foreground",
-                  )}
-                  title={on ? t("models.documented") : t("models.notDocumented")}
-                >
-                  <Icon
-                    className={cn("h-3.5 w-3.5", on ? "text-risk-low" : "text-muted-foreground/60")} /* token-lint-ignore: aria-hidden is one line down */
-                    aria-hidden
-                  />
-                  {label}
-                  <span className="sr-only">
-                    : {on ? t("models.documented") : t("models.notDocumented")}
-                  </span>
-                </span>
-              );
-            })}
-          </div>
-        </div>
-
-        {m.limitations.length > 0 && (
-          <Field label={t("models.limitations")}>
-            <ul className="list-inside list-disc text-body-sm text-muted-foreground">
-              {m.limitations.map((l, i) => (
-                <li key={i}>{l}</li>
-              ))}
-            </ul>
-          </Field>
-        )}
-
-        {m.externalRefs.length > 0 && (
-          <Field label={t("models.references")}>
-            <ul className="space-y-0.5">
-              {m.externalRefs.map((r) => (
-                <li key={r.url}>
-                  <a
-                    href={r.url}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="inline-flex items-center gap-1 break-all text-primary underline underline-offset-2 hover:no-underline"
-                  >
-                    <ExternalLink className="h-3 w-3 shrink-0" aria-hidden />
-                    <span className="text-muted-foreground">{r.type}:</span> {r.url}
-                  </a>
-                </li>
-              ))}
-            </ul>
-          </Field>
-        )}
-      </CardContent>
-    </Card>
   );
 }

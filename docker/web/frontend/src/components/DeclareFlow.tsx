@@ -1,12 +1,11 @@
 // Copyright 2026 SK Telecom Co., Ltd.
 // SPDX-License-Identifier: Apache-2.0
 
+import { Link } from "@primer/react";
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { demoInstallUrl, IS_STATIC_DEMO } from "@/lib/demo";
-
-import { ErrorState, LoadingState } from "@/components/ui/state";
 import {
   checkAiDeclaration,
   describeUploadError,
@@ -24,6 +23,8 @@ import {
 } from "@/lib/aiDeclaration";
 
 import { AiDeclarationWizard } from "./AiDeclarationWizard";
+import { ModelsError, ModelsLoading } from "./models/states";
+import "./models/models.css";
 
 /**
  * A model described from its publisher's declaration alone: the questions in
@@ -84,12 +85,18 @@ export function DeclareFlow({
 
   if (failed) {
     return (
-      <ErrorState onRetry={() => setReload((n) => n + 1)} retryLabel={t("retry")}>
-        {t("spdx3.openFailed")}
-      </ErrorState>
+      <div className="bl-md">
+        <ModelsError text={t("spdx3.openFailed")} onRetry={() => setReload((n) => n + 1)} />
+      </div>
     );
   }
-  if (!index || !initial) return <LoadingState>{t("models.loading")}</LoadingState>;
+  if (!index || !initial) {
+    return (
+      <div className="bl-md">
+        <ModelsLoading text={t("models.loading")} />
+      </div>
+    );
+  }
   // A sbom author given on the form is the document's author; the question is
   // then not asked (the converter prefers it the same way).
   const authorFromScan = Boolean(params.sbomAuthor?.trim());
@@ -111,33 +118,30 @@ export function DeclareFlow({
   };
 
   return (
-    <AiDeclarationWizard
-      mode="create"
-      title={`${params.project} ${params.version}`}
-      index={index}
-      initial={initial}
-      initialStep={loaded?.saved ? "preview" : undefined}
-      check={null}
-      authorFromScan={authorFromScan}
-      onCancel={onCancel}
-      onSave={start}
-      // The questions run in the browser; only starting the scan needs a
-      // server, so the demo stops there with a pointer to installing it.
-      startNote={
-        IS_STATIC_DEMO ? (
-          <>
-            {t("form.demoRunDisabled")}{" "}
-            <a
-              href={demoInstallUrl(i18n.language)}
-              target="_blank"
-              rel="noreferrer"
-              className="font-medium text-foreground underline underline-offset-2 hover:no-underline"
-            >
-              {t("form.demoRunDisabledCta")}
-            </a>
-          </>
-        ) : undefined
-      }
-    />
+    <div className="bl-md" data-testid="declare-flow">
+      <AiDeclarationWizard
+        mode="create"
+        title={`${params.project} ${params.version}`}
+        index={index}
+        initial={initial}
+        initialStep={loaded?.saved ? "preview" : undefined}
+        check={null}
+        authorFromScan={authorFromScan}
+        onCancel={onCancel}
+        onSave={start}
+        // The questions run in the browser; only starting the scan needs a
+        // server, so the demo stops there with a pointer to installing it.
+        startNote={
+          IS_STATIC_DEMO ? (
+            <>
+              {t("form.demoRunDisabled")}{" "}
+              <Link href={demoInstallUrl(i18n.language)} target="_blank" rel="noreferrer">
+                {t("form.demoRunDisabledCta")}
+              </Link>
+            </>
+          ) : undefined
+        }
+      />
+    </div>
   );
 }

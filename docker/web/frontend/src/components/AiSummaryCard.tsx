@@ -8,20 +8,12 @@ import { useTranslation } from "react-i18next";
 
 import type { DoneEvent, Spdx3Summary } from "@/lib/api";
 import { computeAiSummary, type AiSummaryRisk } from "@/lib/aiSummary";
-import { type AssessmentGrade, GRADE_LABEL_KEY, GRADE_SEVERITY_ORDER } from "@/lib/models";
+import { GRADE_LABEL_KEY, GRADE_LABEL_VARIANT, GRADE_SEVERITY_ORDER } from "@/lib/models";
 import { inputSbomFileName } from "@/lib/results";
 import { scanHash } from "@/lib/route";
 
 import { PackageCoordinate } from "./primer";
 import { OvBox } from "./overview/parts";
-
-/** Primer Label variant per stamped grade. */
-const GRADE_VARIANT: Record<AssessmentGrade, "success" | "attention" | "severe" | "danger"> = {
-  ok: "success",
-  conditional: "attention",
-  review: "severe",
-  caution: "danger",
-};
 
 /** First tile's sub-line: a single graded model's condition count, or (several
  *  models / no single model to name) a grade distribution, either way with the
@@ -103,7 +95,7 @@ export function AiSummaryCard({ result, scanId }: { result: DoneEvent; scanId: s
                 label={t("aiSummary.riskLabel")}
                 value={
                   grade ? (
-                    <Label variant={GRADE_VARIANT[grade]} size="large">
+                    <Label variant={GRADE_LABEL_VARIANT[grade]} size="large">
                       {t(GRADE_LABEL_KEY[grade])}
                     </Label>
                   ) : (

@@ -1088,6 +1088,21 @@
       "datasetsNamed": "데이터셋: {{count}}개 참조, 최악 등급 {{verdict}} ({{names}})",
       "viaSources": "{{name}}(원천 때문)",
       "trainingUndisclosed": "학습 데이터 미공개: 이 모델이 학습한 데이터의 이용 조건이 선언되지 않음"
+    },
+    "noVerdict": "판정 없음",
+    "dsLicenseNotStated": "표기 없음",
+    "refType": {
+      "website": "웹사이트",
+      "distribution": "내려받기",
+      "vcs": "소스 저장소",
+      "documentation": "문서",
+      "issue-tracker": "이슈 추적",
+      "support": "지원",
+      "license": "라이선스",
+      "advisories": "보안 권고",
+      "release-notes": "릴리스 노트",
+      "model-card": "모델 카드",
+      "other": "기타"
     }
   },
   "aiSummary": {
@@ -2388,7 +2403,18 @@
       }
     },
     "organizationPlaceholder": "조직 이름",
-    "autonomyInService": "AI의 결정에 사람이 관여하는지는 서비스 단계에서 답했습니다."
+    "autonomyInService": "AI의 결정에 사람이 관여하는지는 서비스 단계에서 답했습니다.",
+    "stepNotOpened": "아직 열지 않음",
+    "draftKept": "앞서 입력한 답을 남겨 두었습니다. 이어서 입력하세요.",
+    "discard": {
+      "title": "입력한 답을 버릴까요?",
+      "body": "이 질문에서 입력한 답은 다른 곳에 남지 않습니다. 취소하면 모두 사라집니다.",
+      "confirm": "답 버리기",
+      "keep": "계속 입력"
+    },
+    "notAnswered": "답하지 않음",
+    "decisionsLeft_other": "답하지 않은 결정 {{count}}개",
+    "decisionsLeft_one": "답하지 않은 결정 {{count}}개"
   },
   "filters": {
     "active": "적용 중인 필터",
