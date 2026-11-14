@@ -1540,7 +1540,23 @@
       "unparsedDeclared": "선언된 라이선스를 SPDX 식으로 해석하지 못했습니다.",
       "unparsedLicense": "해석하지 못한 SPDX 식: \"{{license}}\"",
       "exception": "의존성에 바로 이 조합을 허용하려고 둔 예외 조항이 있습니다. 예외가 사용 방식에 해당하는지 확인하세요. ({{inner}})"
-    }
+    },
+    "sortLabel": "정렬 기준",
+    "sortCount": "개수순",
+    "sortName": "이름순",
+    "badTierTitle": "링크에 없는 라이선스 분류가 들어 있습니다",
+    "badTierBody": "\"{{tier}}\"는 여섯 분류에 없습니다. 모든 라이선스를 보여 드리니, 위에서 분류를 골라 걸러 보세요.",
+    "unlicensedInert": "라이선스가 없는 컴포넌트는 컴포넌트 화면에서 라이선스로 걸러 볼 수 없습니다.",
+    "conflictOffNoField": "이 스캔은 다른 곳에서 만든 문서나 AI 모델을 읽었기 때문에, 대조할 우리 배포 라이선스가 없습니다. 충돌 검사는 직접 만든 소스를 스캔할 때 실행됩니다.",
+    "tierFiltered_one": "{{tier}}만 표시합니다. 컴포넌트 {{count}}개.",
+    "tierFiltered_other": "{{tier}}만 표시합니다. 컴포넌트 {{count}}개.",
+    "tierEmpty": "이 스캔에는 {{tier}} 분류의 라이선스가 없습니다.",
+    "whyUntranslated": "이 사유는 번역이 없습니다. 원문은 툴팁에서 볼 수 있습니다.",
+    "conflictShowAll": "전체 {{count}}개 보기",
+    "conflictShowLess": "접기",
+    "distributionCount_one": "라이선스 {{count}}종",
+    "distributionCount_other": "라이선스 {{count}}종",
+    "conflictTableLabel": "{{verdict}}: {{reason}}"
   },
   "recent": {
     "title": "스캔 관리",

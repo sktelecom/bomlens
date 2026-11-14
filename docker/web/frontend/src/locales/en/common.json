@@ -1540,7 +1540,23 @@
       "unparsedDeclared": "The declared license could not be parsed as an SPDX expression.",
       "unparsedLicense": "The license \"{{license}}\" could not be parsed as an SPDX expression.",
       "exception": "The dependency carries an exception clause, which exists to permit exactly this combination. Confirm the exception covers your use. ({{inner}})"
-    }
+    },
+    "sortLabel": "Sort by",
+    "sortCount": "By count",
+    "sortName": "By name",
+    "badTierTitle": "This link names a license class that does not exist",
+    "badTierBody": "The class \"{{tier}}\" is not one of the six. All licenses are shown; pick a class above to filter.",
+    "unlicensedInert": "Components without a license cannot be filtered by license in Components.",
+    "conflictOffNoField": "This scan read a document someone else produced (or an AI model), so there is no outbound license of yours to compare against. The check runs on scans of your own source.",
+    "tierFiltered_one": "Showing {{tier}} only: {{count}} component.",
+    "tierFiltered_other": "Showing {{tier}} only: {{count}} components.",
+    "tierEmpty": "This scan has no licenses in the {{tier}} class.",
+    "whyUntranslated": "No translation of this reason is available. The original text is in the tooltip.",
+    "conflictShowAll": "Show all {{count}}",
+    "conflictShowLess": "Show fewer",
+    "distributionCount_one": "{{count}} license",
+    "distributionCount_other": "{{count}} licenses",
+    "conflictTableLabel": "{{verdict}}: {{reason}}"
   },
   "recent": {
     "title": "Scan management",

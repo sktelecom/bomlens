@@ -47,6 +47,25 @@ describe("conflictWhyKey", () => {
     });
   });
 
+  it("recognises every fixed sentence written in licenses.ts and license-flags.jq", () => {
+    const files = [
+      new URL("./licenses.ts", import.meta.url),
+      new URL("../../../../lib/license-flags.jq", import.meta.url),
+    ];
+    const found: string[] = [];
+    for (const f of files) {
+      const text = readFileSync(f, "utf-8");
+      // Only a plain quoted sentence that ends in a full stop; a template or a
+      // concatenation is covered by the wrapped-sentence cases above.
+      for (const m of text.matchAll(/why: "((?:[^"\\]|\\.)+\.)"/g)) found.push(m[1].replace(/\\"/g, '"'));
+    }
+    expect(found.length).toBeGreaterThan(3);
+    for (const why of found) {
+      if (why.includes("\\(")) continue;
+      expect(conflictWhyKey(why), why).not.toBeNull();
+    }
+  });
+
   it("returns null for a sentence it does not know, so the caller shows it verbatim", () => {
     expect(conflictWhyKey("Something a newer scanner wrote.")).toBeNull();
   });
