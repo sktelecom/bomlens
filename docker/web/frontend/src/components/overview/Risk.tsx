@@ -13,7 +13,7 @@ import { riskyComponentCount, topRiskComponents } from "@/lib/overview";
 import { scanHash } from "@/lib/route";
 
 import { OvBox, OvRow } from "./parts";
-import { useTierHint } from "../LicenseRiskBar";
+import { useTierHint } from "../licenses/tierHint";
 
 /**
  * The handful of components carrying the most risk, as a short list that links

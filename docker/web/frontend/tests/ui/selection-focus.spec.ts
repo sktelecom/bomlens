@@ -205,7 +205,7 @@ test("graph/tree switch: the chosen segment is solid, the tabbed-to segment has 
 });
 
 // ---------------------------------------------------------------------------
-// Filter chips: severity (Vulnerabilities), licence tier (Licenses), check kind
+// Filter chips: severity (Vulnerabilities), check kind
 // (Conformance) and the removable component filter chips (Components). Same
 // contract as the tiles above, asserted on computed styles, not screenshots:
 //   - Tab onto a chip draws the brand ring, and that look is not the selected one
@@ -258,7 +258,7 @@ async function focusByKeyboard(page: Page, el: Locator) {
 const OUTLINE_CHIPS: Array<{ name: string; section: string; chips: string; disabled: boolean }> = [
   // The Vulnerabilities severity buttons are Primer-based now and are checked in
   // vulnerabilities-states.spec.ts (selection is a border, nothing is dimmed).
-  { name: "licence chips", section: "licenses", chips: "main button[aria-pressed]:not([aria-label])", disabled: false },
+  // The Licenses class buttons are checked in licenses.spec.ts.
   { name: "conformance chips", section: "conformance", chips: "main button[aria-pressed]", disabled: true },
 ];
 

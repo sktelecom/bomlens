@@ -1918,7 +1918,7 @@ test("a classification narrows the license distribution, and a license opens its
   await expect(distribution.getByText("GPL-3.0-only", { exact: true })).toBeVisible();
 
   // The row leads to that license's components, with the filter applied.
-  await distribution.getByRole("button").first().click();
+  await distribution.getByRole("link").first().click();
   await expect(page.getByRole("link", { name: /^Components/ })).toHaveAttribute(
     "aria-current",
     "page",

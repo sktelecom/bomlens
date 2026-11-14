@@ -6,7 +6,7 @@ import { useTranslation } from "react-i18next";
 import { ShieldIcon } from "@primer/octicons-react";
 import { Blankslate } from "@primer/react/experimental";
 import type { DoneEvent, RecentScan, ResultFile, Severity } from "@/lib/api";
-import type { LicenseRiskTier } from "@/lib/licenses";
+import { hasOutboundLicenseField, type LicenseRiskTier } from "@/lib/licenses";
 import type { SectionId } from "@/lib/nav";
 import {
   inputSbomFileName,
@@ -162,10 +162,11 @@ export function ResultSection({
           query={query}
           onQueryChange={onQueryChange}
           outboundLicense={result.sbom?.outboundLicense}
-          onPickLicense={
-            onPick ? (license) => onPick("components", { license }) : undefined
+          licenseHref={
+            scanId ? (license) => scanHash(scanId, "components", { license }) : undefined
           }
           onRescanWithLicense={onRescanWithLicense}
+          rescanFieldAvailable={hasOutboundLicenseField(result.scanConfig?.source)}
         />
       );
 

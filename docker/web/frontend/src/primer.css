@@ -1131,3 +1131,116 @@ a.bl-sevcell:focus-visible { outline: 2px solid var(--focus-outlineColor); outli
 .bl-vp-refs { list-style: none; margin: var(--base-size-4) 0 0; padding: 0; line-height: 1.8; }
 .bl-vp-more > summary { list-style: none; display: flex; align-items: center; gap: var(--base-size-4); cursor: pointer; font-size: var(--text-body-size-small); }
 .bl-vp-more > summary::-webkit-details-marker { display: none; }
+
+/* ---------------------------------------------------------------------------
+ * Licenses (components/Licenses.tsx, components/licenses/*). The class box and
+ * the conflicts box span the page; below them the distribution and review boxes
+ * sit in a main column and the obligations box beside it from 1536px up.
+ * ------------------------------------------------------------------------- */
+
+/* Tailwind's reset zeroes border-width over Primer's layered styles, so a Label
+ * lost its outline here as on the other screens. Set it back. */
+.bl-lic [class*="prc-Label-Label"] { border-width: var(--borderWidth-thin); }
+.bl-lic-bar > button {
+  display: block;
+  padding: 0;
+  border: 0;
+  cursor: pointer;
+  transition: opacity 0.1s;
+}
+.bl-lic-bar > button:hover { filter: brightness(1.1); }
+.bl-lic-bar > button:focus-visible { outline: 2px solid var(--focus-outlineColor); outline-offset: -2px; }
+.bl-lic-bar > button[data-dim] { opacity: 0.45; }
+button.bl-tierchip {
+  font-family: inherit;
+  background: transparent;
+  cursor: pointer;
+}
+button.bl-tierchip[aria-pressed="true"] {
+  border-color: var(--borderColor-accent-emphasis);
+  background: var(--bgColor-accent-muted);
+}
+.bl-lic-headtools { margin-left: auto; display: inline-flex; align-items: center; gap: var(--base-size-12); }
+.bl-lic-headtools .bl-small { font-size: var(--text-body-size-small); }
+
+.bl-licrows, .bl-lic-list, .bl-lic-terms { list-style: none; margin: 0; padding: 0; }
+.bl-licrows, .bl-lic-list, .bl-lic-sub, .bl-lic-grouphead { font-size: var(--text-body-size-medium); }
+.bl-licrows > li + li { border-top: var(--borderWidth-thin) solid var(--borderColor-muted); }
+.bl-licrow {
+  display: flex;
+  align-items: center;
+  gap: var(--base-size-12);
+  padding: var(--base-size-8) var(--base-size-16);
+  color: var(--fgColor-default);
+  text-decoration: none;
+}
+a.bl-licrow:hover { background: var(--bgColor-muted); }
+a.bl-licrow:focus-visible { outline: 2px solid var(--focus-outlineColor); outline-offset: -2px; }
+.bl-licrow-mark { display: inline-flex; flex: none; width: 14px; }
+.bl-licrow-name { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
+.bl-licrow-tier { flex: 0 0 8.5rem; white-space: nowrap; }
+.bl-licbar {
+  flex: 0 0 30%;
+  height: var(--base-size-8);
+  border-radius: var(--borderRadius-full);
+  background: var(--bgColor-neutral-muted);
+  overflow: hidden;
+}
+.bl-licbar > span { display: block; height: 100%; }
+.bl-licrow-count { flex: 0 0 3rem; text-align: end; }
+@media (max-width: 1100px) {
+  .bl-licrow-tier { display: none; }
+}
+
+.bl-lic-hint { margin: 0; padding: var(--base-size-12) var(--base-size-16); font-size: var(--text-body-size-medium); }
+.bl-lic-hint-rule { border-bottom: var(--borderWidth-thin) solid var(--borderColor-muted); }
+.bl-lic-sub {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--base-size-8);
+  padding: var(--base-size-8) var(--base-size-16);
+  background: var(--bgColor-muted);
+  border-top: var(--borderWidth-thin) solid var(--borderColor-muted);
+  border-bottom: var(--borderWidth-thin) solid var(--borderColor-muted);
+}
+.bl-lic-table { border: 0; }
+.bl-lic-table table { border: 0 !important; border-radius: 0 !important; }
+.bl-lic-table th, .bl-lic-table td { border-inline: 0 !important; }
+.bl-lic-table tbody tr:last-child > * { border-bottom: 0 !important; }
+.bl-lic-table thead th { border-radius: 0 !important; }
+.bl-lic-group { padding-top: var(--base-size-12); }
+.bl-lic-group:last-child { padding-bottom: var(--base-size-8); }
+.bl-lic-grouphead { display: flex; align-items: center; gap: var(--base-size-8); padding: 0 var(--base-size-16) var(--base-size-4); }
+.bl-lic-item {
+  display: flex;
+  gap: var(--base-size-8);
+  padding: var(--base-size-6) var(--base-size-16);
+}
+.bl-lic-list > .bl-lic-item + .bl-lic-item,
+.bl-lic-list > li.bl-lic-item-col + li.bl-lic-item-col { border-top: var(--borderWidth-thin) solid var(--borderColor-muted); }
+.bl-lic-item-wrap { flex-wrap: wrap; align-items: center; }
+.bl-lic-item-col { flex-direction: column; padding-block: var(--base-size-8); }
+.bl-lic-line { display: flex; flex-wrap: wrap; align-items: center; gap: var(--base-size-6); }
+.bl-lic-expr { display: flex; flex-direction: column; gap: var(--base-size-6); padding-inline-start: var(--base-size-12); }
+.bl-lic-terms { display: flex; flex-direction: column; gap: var(--base-size-4); }
+.bl-lic-terms > li { display: flex; flex-wrap: wrap; align-items: center; gap: var(--base-size-6); }
+.bl-lic-foot { padding: var(--base-size-8) var(--base-size-16); border-top: var(--borderWidth-thin) solid var(--borderColor-muted); }
+.bl-lic-action { margin-top: var(--base-size-8); }
+.bl-lic-cli { margin-top: var(--base-size-12); }
+.bl-lic-cli > summary { cursor: pointer; font-weight: 600; }
+.bl-lic-cli > summary:focus-visible { outline: 2px solid var(--focus-outlineColor); outline-offset: 2px; }
+.bl-lic-cli > p { margin: var(--base-size-4) 0 0; }
+.bl-lic-note:not(:empty) { margin-top: var(--base-size-12); }
+.bl-lic-count { display: inline-block; min-width: 2.5ch; text-align: end; }
+.bl-lic-clear { font-size: var(--text-body-size-small); color: var(--fgColor-accent); }
+
+.bl-licgrid { display: flex; flex-direction: column; gap: var(--base-size-16); }
+.bl-licgrid-col { display: contents; }
+.bl-licgrid-col > div:empty { display: none; }
+.bl-licgrid-1 { order: 1; } .bl-licgrid-2 { order: 2; } .bl-licgrid-4 { order: 4; }
+@media (min-width: 1536px) {
+  .bl-licgrid { display: grid; grid-template-columns: minmax(0, 1fr) 28rem; align-items: start; }
+  .bl-licgrid-col { display: flex; flex-direction: column; gap: var(--base-size-16); min-width: 0; }
+  .bl-licgrid-1, .bl-licgrid-2, .bl-licgrid-4 { order: 0; }
+}

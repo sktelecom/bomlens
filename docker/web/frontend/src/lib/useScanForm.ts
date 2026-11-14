@@ -26,6 +26,7 @@ import {
   type UsageContext,
 } from "@/lib/api";
 import i18n from "@/lib/i18n";
+import { hasOutboundLicenseField } from "@/lib/licenses";
 import { reachabilityOffered } from "@/lib/reachability";
 import { DEFAULT_VERSION, parseSbomIdentity, suggestIdentity } from "@/lib/scanDefaults";
 
@@ -316,7 +317,7 @@ export function useScanForm({
   // A received SBOM carries its supplier's own root license and an AI model has
   // no outbound license of ours, so the field is offered only where we generate
   // the SBOM and therefore own what it ships under.
-  const showOutboundLicense = !isAnalyze && !isAiModel;
+  const showOutboundLicense = hasOutboundLicenseField(source);
   // Unlike outbound license, this applies to AI-model scans too (docmeta stamps
   // BINARY/FIRMWARE/MODELFILE/SOURCE/POSTPROCESS/ROOTFS/IMAGE/AIBOM/DATASET/
   // MERGE alike, see entrypoint.sh). Hidden only for ANALYZE: that mode

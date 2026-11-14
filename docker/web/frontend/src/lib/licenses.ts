@@ -43,6 +43,26 @@ export function licenseGroups(components: ComponentItem[]): {
   return { groups, unlicensed };
 }
 
+export type LicenseSortKey = "count" | "name";
+
+/** The distribution in the order asked for: busiest first, or by license id. */
+export function sortLicenseGroups(groups: LicenseGroup[], key: LicenseSortKey): LicenseGroup[] {
+  return [...groups].sort(
+    key === "name"
+      ? (a, b) => a.name.localeCompare(b.name)
+      : (a, b) => b.count - a.count || a.name.localeCompare(b.name),
+  );
+}
+
+/**
+ * Whether the New scan form has an outbound-license field for a scan of this
+ * kind. A submitted SBOM or an AI model is somebody else's document, so there
+ * is no license of ours to compare it against and re-scanning cannot add one.
+ */
+export function hasOutboundLicenseField(source: string | undefined): boolean {
+  return source !== "sbom-upload" && source !== "ai-model" && source !== "model-upload" && source !== "ai-declare";
+}
+
 /**
  * License risk tier by copyleft strength — the obligation a license imposes, an
  * industry-standard axis. The headline rule: an unrecognised license is never
