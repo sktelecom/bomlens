@@ -27,8 +27,7 @@
   border: var(--borderWidth-thin) solid var(--borderColor-default);
   border-radius: var(--borderRadius-medium);
 }
-.bl-comp-scroll th:first-child, .bl-comp-scroll td:first-child { border-inline-start: 0 !important; }
-.bl-comp-scroll th:last-child, .bl-comp-scroll td:last-child { border-inline-end: 0 !important; }
+.bl-comp-scroll th, .bl-comp-scroll td { border-inline: 0 !important; }
 .bl-comp-scroll thead tr:first-child th { border-top: 0 !important; border-radius: 0 !important; }
 .bl-comp-scroll table > :last-child > tr:last-child > * { border-bottom: 0 !important; border-radius: 0 !important; }
 .bl-comp-scroll thead { position: sticky; top: 56px; z-index: 3; }
