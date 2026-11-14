@@ -4,8 +4,8 @@
 // Copies the Markdown sources under ../docs into src/content/docs so that
 // Starlight can read them, without changing the sources. Two adjustments:
 //   - Starlight requires a front matter `title`, so the first H1 is moved there.
-//   - Files that are not part of the published site are skipped (same list as
-//     exclude_docs in mkdocs.yml), and the demo bundle is exposed under public/.
+//   - Files that are not part of the published site are skipped, and the demo bundle
+//     is exposed under public/.
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -13,15 +13,13 @@ import { fileURLToPath } from 'node:url';
 const here = path.dirname(fileURLToPath(import.meta.url));
 const source = path.resolve(here, '../../docs');
 const target = path.resolve(here, '../src/content/docs');
+const publicDir = path.resolve(here, '../public');
 const demoTarget = path.resolve(here, '../public/demo');
 const repoRoot = path.resolve(here, '../..');
 const homeSource = path.resolve(here, '../home');
 
 const skip = (rel) =>
   rel === 'korean-style-guide.md' ||
-  // The home pages use MkDocs-only syntax; docs-site/home/ holds the Starlight versions.
-  rel === 'index.md' ||
-  rel === 'index.ko.md' ||
   rel === 'requirements.txt' ||
   rel.startsWith('images/src/') ||
   rel.startsWith('internal/') ||
@@ -50,6 +48,7 @@ function withTitle(text) {
 }
 
 fs.rmSync(target, { recursive: true, force: true });
+fs.rmSync(publicDir, { recursive: true, force: true });
 let pages = 0;
 for (const entry of fs.readdirSync(source, { recursive: true, withFileTypes: true })) {
   if (!entry.isFile()) continue;
@@ -61,8 +60,16 @@ for (const entry of fs.readdirSync(source, { recursive: true, withFileTypes: tru
   if (rel.endsWith('.md')) {
     fs.writeFileSync(to, withTitle(fs.readFileSync(from, 'utf8')));
     pages++;
-  } else {
+  } else if (rel.startsWith('images' + path.sep)) {
+    // Images are referenced from the pages, which Starlight processes and publishes.
     fs.copyFileSync(from, to);
+  } else {
+    // Other files (slide decks, sample reports) are published as they are. Pages in each
+    // language link to them relative to their own folder, so a copy goes under /ko/ too.
+    for (const dest of [path.join(publicDir, rel), path.join(publicDir, 'ko', rel)]) {
+      fs.mkdirSync(path.dirname(dest), { recursive: true });
+      fs.copyFileSync(from, dest);
+    }
   }
 }
 

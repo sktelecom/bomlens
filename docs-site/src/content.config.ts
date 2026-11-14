@@ -1,6 +1,6 @@
 // Copyright 2026 SK Telecom Co., Ltd.
 // SPDX-License-Identifier: Apache-2.0
-// foo.ko.md beside foo.md becomes the Korean page ko/foo, as in the MkDocs site.
+// foo.ko.md beside foo.md becomes the Korean page ko/foo, the layout the sources use.
 import { defineCollection } from 'astro:content';
 import { docsLoader } from '@astrojs/starlight/loaders';
 import { docsSchema } from '@astrojs/starlight/schema';

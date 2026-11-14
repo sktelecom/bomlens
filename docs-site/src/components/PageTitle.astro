@@ -35,7 +35,14 @@ if (section) crumbs.push({ label: section[ko ? 1 : 0], href: '' });
     </nav>
   )
 }
-{route.entry.data.template !== 'splash' && <h1 id={PAGE_TITLE_ID}>{route.entry.data.title}</h1>}
+{
+  route.entry.data.template === 'splash' ? (
+    // The home page has its own heading; keep the target of the skip link.
+    <span id={PAGE_TITLE_ID} />
+  ) : (
+    <h1 id={PAGE_TITLE_ID}>{route.entry.data.title}</h1>
+  )
+}
 
 <style>
   @layer starlight.core {

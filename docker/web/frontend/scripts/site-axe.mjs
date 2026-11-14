@@ -10,7 +10,9 @@
  * contrast shows up here.
  *
  * Usage:
- *   node scripts/site-axe.mjs --dir ../../../site        serve a built site
+ *   node scripts/site-axe.mjs --dir ../../../site --prefix /bomlens
+ *                                                        serve a built site, under the
+ *                                                        path it is built for
  *   node scripts/site-axe.mjs --url https://host/base/    check a running site
  *
  * Needs `npm ci` and a Playwright Chromium. Exits 1 on any violation.
@@ -48,10 +50,18 @@ function arg(name) {
   return i >= 0 ? process.argv[i + 1] : undefined;
 }
 
-function serve(dir) {
+function serve(dir, prefix) {
   const root = resolve(dir);
   const server = createServer((req, res) => {
-    const path = decodeURIComponent(new URL(req.url, "http://x").pathname);
+    let path = decodeURIComponent(new URL(req.url, "http://x").pathname);
+    // The site is built for a sub-path; serve it there, as the real host does.
+    if (prefix) {
+      if (path !== prefix && !path.startsWith(`${prefix}/`)) {
+        res.writeHead(404).end("not found");
+        return;
+      }
+      path = path.slice(prefix.length) || "/";
+    }
     let file = normalize(join(root, path));
     // Stay inside the site folder, whatever the request says.
     if (!file.startsWith(root)) {
@@ -67,7 +77,7 @@ function serve(dir) {
     createReadStream(file).pipe(res);
   });
   return new Promise((ok) =>
-    server.listen(0, "127.0.0.1", () => ok({ server, base: `http://127.0.0.1:${server.address().port}/` })),
+    server.listen(0, "127.0.0.1", () => ok({ server, base: `http://127.0.0.1:${server.address().port}${prefix ?? ""}/` })),
   );
 }
 
@@ -81,7 +91,7 @@ if (!dir && !url) {
 let server;
 let base = url;
 if (dir) {
-  ({ server, base } = await serve(dir));
+  ({ server, base } = await serve(dir, arg("--prefix")));
 }
 if (!base.endsWith("/")) base += "/";
 

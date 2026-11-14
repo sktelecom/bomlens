@@ -5,7 +5,8 @@
   "scripts": {
     "prepare-content": "node scripts/prepare-content.mjs",
     "build": "npm run prepare-content && astro build",
-    "preview": "astro preview"
+    "preview": "astro preview",
+    "check-links": "node scripts/check-links.mjs"
   },
   "dependencies": {
     "@astrojs/markdown-remark": "7.3.4",
