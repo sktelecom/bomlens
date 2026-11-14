@@ -383,14 +383,12 @@
     "vexUpdatedAt": "Last updated {{date}}",
     "vulnRowToggle": "Show vulnerability details",
     "componentRowToggle": "Show component details",
-    "eolTile": "End of life",
     "eolAtRisk": "{{count}} also vulnerable",
     "eolBadge": "End of life",
     "eolBadgeHint": "Past upstream end-of-life (no security patches expected)",
     "eolSince": "since {{date}}",
     "filterEol": "End of life",
     "colEol": "Support",
-    "outdatedTile": "Outdated",
     "outdatedBadge": "Outdated",
     "outdatedBadgeHint": "A newer patch is available in its release cycle",
     "outdatedLatest": "latest: {{version}}",
@@ -786,9 +784,6 @@
     "vsPrevious": "vs {{label}}",
     "compDelta": "{{delta}} components",
     "compSame": "no component change",
-    "sevUp": "more severe than before",
-    "sevDown": "less severe than before",
-    "sevSame": "severity unchanged",
     "sevTrendLabel": "Worst severity",
     "compChangeLabel": "Components changed",
     "compChangeSummary": "{{added}} new · {{removed}} removed · {{changed}} updated",
@@ -822,7 +817,62 @@
       "sourceConformance": "Source: this scan's conformance check",
       "asOf": "as of scan time {{time}}"
     },
-    "summaryLabel": "Scan summary"
+    "summaryLabel": "Scan summary",
+    "attnEol_one": "{{count}} component past end of life",
+    "attnEol_other": "{{count}} components past end of life",
+    "attnOutdated_one": "{{count}} outdated component",
+    "attnOutdated_other": "{{count}} outdated components",
+    "noticeMissingTitle": "This SBOM may be missing information",
+    "noticeNotesTitle": "Notes for reading these results",
+    "details": "Details",
+    "prevScanLink": "Opens in {{scan}}",
+    "notice": {
+      "pipeline": {
+        "title": "Some enrichment data may be missing",
+        "short": "Steps that fill fields such as end-of-life dates did not finish."
+      },
+      "warnings": {
+        "title": "Parts the scan warned about may be incomplete",
+        "short": "Check the warnings before you rely on the counts."
+      },
+      "vendored": {
+        "title": "C/C++ source copied into the project may be missing",
+        "short": "Code copied into C/C++ sources is not seen by a normal scan."
+      },
+      "degraded": {
+        "title": "Transitive dependencies were not resolved",
+        "short": "The SBOM holds direct dependencies only."
+      },
+      "graph": {
+        "title": "Dependency relationships are missing",
+        "short": "Dependency relationships were lost after the scan."
+      },
+      "scanossUnavailable": {
+        "title": "Open source copied into the source may be missing",
+        "short": "The search for copied-in open source did not complete."
+      },
+      "scanossNoMatch": {
+        "title": "No open source copied into the source was found",
+        "short": "No copied-in open source was found."
+      },
+      "unpinned": {
+        "title": "Versions may differ from what you installed",
+        "short": "Versions are what a fresh install would get today."
+      },
+      "firmware": {
+        "title": "Part of the image is not in the counts",
+        "short": "Part of the image could not be opened, so counts cover the opened part."
+      },
+      "zero": {
+        "title": "No component was found",
+        "short": "Nothing was found to read."
+      }
+    },
+    "noticeCount_one": "{{count}} notice",
+    "noticeCount_other": "{{count}} notices",
+    "sevValueUp": "Higher",
+    "sevValueDown": "Lower",
+    "sevValueSame": "No change"
   },
   "pipelineSteps": {
     "enrichAibom": "AI model metadata enrichment",

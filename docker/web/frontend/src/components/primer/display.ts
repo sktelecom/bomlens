@@ -49,6 +49,20 @@ export function severityFill(severity: string | null | undefined): string {
   return SEVERITY_FILL[severity ?? ""] ?? SEVERITY_FILL.UNKNOWN;
 }
 
+/** Text and marker colour per grade (the same hues as the Label variants). */
+export const SEVERITY_FG: Readonly<Record<string, string>> = {
+  CRITICAL: "var(--fgColor-danger)",
+  HIGH: "var(--fgColor-severe)",
+  MEDIUM: "var(--fgColor-attention)",
+  LOW: "var(--fgColor-muted)",
+  UNKNOWN: "var(--fgColor-muted)",
+  NONE: "var(--fgColor-muted)",
+};
+
+export function severityFg(severity: string | null | undefined): string {
+  return SEVERITY_FG[severity ?? ""] ?? SEVERITY_FG.UNKNOWN;
+}
+
 /** The i18n key of a grade's word (`severity.CRITICAL` ...). */
 export function severityLabelKey(severity: string | null | undefined): string {
   const s = severity && severity in SEVERITY_LABEL_VARIANT ? severity : "UNKNOWN";
@@ -70,9 +84,13 @@ export const TIER_DISPLAY_COLOR: Readonly<Record<LicenseRiskTier, string>> = {
   permissive: "gray",
 };
 
-/** A lighter grey for permissive in a bar, so it does not merge with uncategorized. */
+/**
+ * Permissive in a bar uses the report's value (--cat-permissive-emphasis in
+ * docker/shared/bomlens-tokens.css: a grey lighter than uncategorized), so the
+ * web and the HTML reports draw the same bar.
+ */
 const TIER_FILL_OVERRIDE: Readonly<Partial<Record<LicenseRiskTier, string>>> = {
-  permissive: "var(--borderColor-emphasis)",
+  permissive: "rgb(var(--cat-permissive-emphasis))",
 };
 
 /** The i18n key of a tier's name. */

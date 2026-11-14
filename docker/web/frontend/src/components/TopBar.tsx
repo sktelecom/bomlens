@@ -88,6 +88,9 @@ interface TopBarProps {
   lookupCurrent?: boolean;
   /** The open scan's id, marked in the Recent menu. */
   currentScanId?: string | null;
+  /** A finished scan is open: "Report a problem" opens the diagnostics dialog
+   *  for it instead of going straight to the issue form. */
+  onReportProblem?: () => void;
 }
 
 /**
@@ -111,6 +114,7 @@ export function TopBar({
   onLookup,
   lookupCurrent,
   currentScanId,
+  onReportProblem,
 }: TopBarProps) {
   const { t } = useTranslation();
   const compact = useMediaQuery(COMPACT_QUERY);
@@ -193,7 +197,7 @@ export function TopBar({
           onDeleteRecent={onDeleteRecent}
           currentScanId={currentScanId}
         />
-        <HelpMenu version={version} withLanguage={compact} />
+        <HelpMenu version={version} withLanguage={compact} onReportProblem={onReportProblem} />
         {!compact && <LangToggle />}
         <ThemeToggle />
       </div>
@@ -322,7 +326,15 @@ function RecentMenu({
  * changed, reporting a problem, and which version is running. On a compact top
  * bar it also carries the language choice.
  */
-function HelpMenu({ version, withLanguage }: { version?: string; withLanguage: boolean }) {
+function HelpMenu({
+  version,
+  withLanguage,
+  onReportProblem,
+}: {
+  version?: string;
+  withLanguage: boolean;
+  onReportProblem?: () => void;
+}) {
   const { t, i18n } = useTranslation();
   const current = useCurrentLanguage();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -413,13 +425,24 @@ function HelpMenu({ version, withLanguage }: { version?: string; withLanguage: b
               </ActionList.Description>
               {external}
             </ActionList.LinkItem>
-            <ActionList.LinkItem href={ISSUE_FORM_URL} {...ext} data-testid="help-report">
-              <ActionList.LeadingVisual>
-                <IssueOpenedIcon />
-              </ActionList.LeadingVisual>
-              {t("nav.helpReport")}
-              {external}
-            </ActionList.LinkItem>
+            {onReportProblem ? (
+              // With a finished scan open, the entry shows what would be copied
+              // (the diagnostics summary) before anything leaves the app.
+              <ActionList.Item onSelect={onReportProblem} data-testid="help-report">
+                <ActionList.LeadingVisual>
+                  <IssueOpenedIcon />
+                </ActionList.LeadingVisual>
+                {t("nav.helpReport")}
+              </ActionList.Item>
+            ) : (
+              <ActionList.LinkItem href={ISSUE_FORM_URL} {...ext} data-testid="help-report">
+                <ActionList.LeadingVisual>
+                  <IssueOpenedIcon />
+                </ActionList.LeadingVisual>
+                {t("nav.helpReport")}
+                {external}
+              </ActionList.LinkItem>
+            )}
             {withLanguage && (
               <>
                 <ActionList.Divider />

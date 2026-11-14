@@ -27,6 +27,7 @@ import {
   tierFg,
   tierFill,
   tierShape,
+  severityFg,
 } from "./display";
 import { LicenseTierLabel } from "./LicenseTierLabel";
 import { PackageCoordinate } from "./PackageCoordinate";
@@ -69,6 +70,13 @@ describe("severity mapping", () => {
     expect(severityLabelKey("bogus")).toBe("severity.UNKNOWN");
   });
 
+  it("gives every grade a Primer foreground variable", () => {
+    for (const s of ["CRITICAL", "HIGH", "MEDIUM", "LOW", "UNKNOWN", "bogus"]) {
+      expect(severityFg(s)).toMatch(/^var\(--fgColor-[\w-]+\)$/);
+    }
+    expect(severityFg("CRITICAL")).toBe("var(--fgColor-danger)");
+  });
+
   it("uses only Primer variables for fills", () => {
     for (const s of ["CRITICAL", "HIGH", "MEDIUM", "LOW", "UNKNOWN"]) {
       expect(severityFill(s)).toMatch(/^var\(--[\w-]+\)$/);
@@ -95,7 +103,26 @@ describe("licence tier mapping", () => {
   it("names Primer display variables", () => {
     expect(tierFg("strong-copyleft")).toBe("var(--display-purple-fgColor)");
     expect(tierFill("uncategorized")).toBe("var(--display-gray-bgColor-emphasis)");
-    expect(tierFill("permissive")).toBe("var(--borderColor-emphasis)");
+    // The report decides the colour: --cat-permissive-emphasis.
+    expect(tierFill("permissive")).toBe("rgb(var(--cat-permissive-emphasis))");
+  });
+});
+
+describe("permissive bar colour", () => {
+  // The HTML reports draw the Permissive tier with --cat-permissive-emphasis
+  // from docker/shared/bomlens-tokens.css; the web bar must use the same value.
+  const value = (css: string, theme: "light" | "dark") => {
+    const at = css.search(/^\s*\.dark\s*\{/m);
+    const block = theme === "light" ? css.slice(0, at) : css.slice(at);
+    return /--cat-permissive-emphasis:\s*([\d ]+)/.exec(block)?.[1]?.trim();
+  };
+  it("is the report's token, in both themes", () => {
+    const shared = readFileSync(join(__dirname, "../../../../../shared/bomlens-tokens.css"), "utf8");
+    const web = readFileSync(join(__dirname, "../../index.css"), "utf8");
+    expect(value(shared, "light")).toBeTruthy();
+    expect(value(web, "light")).toBe(value(shared, "light"));
+    expect(value(web, "dark")).toBe(value(shared, "dark"));
+    expect(tierFill("permissive")).toContain("--cat-permissive-emphasis");
   });
 });
 

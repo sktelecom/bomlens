@@ -9,6 +9,7 @@ import {
   needsAttention,
   overviewAttention,
   riskyComponentCount,
+  staleRows,
   topRiskComponents,
 } from "./overview";
 import { applyVulnView, vulnViewFromQuery } from "./vulnView";
@@ -480,5 +481,40 @@ describe("overviewAttention", () => {
     });
     expect(needsAttention(r).map((i) => i.id)).toContain("conformance");
     expect(overviewAttention(r).map((i) => i.id)).not.toContain("conformance");
+  });
+});
+
+describe("overviewAttention keeps each row's filter", () => {
+  it("carries the preset query the Critical and High row opens", () => {
+    const r = result({
+      security: {
+        ...sev({ CRITICAL: 1, TOTAL: 1 }),
+        vulnerabilities: [{ id: "A", severity: "CRITICAL", pkg: "p", installed: "1", fixed: "", title: "" }],
+      } as unknown as DoneEvent["security"],
+    });
+    expect(overviewAttention(r).find((i) => i.id === "vulns")?.query).toEqual({ view: "critical-high" });
+  });
+});
+
+describe("staleRows", () => {
+  const withCounts = (sbom: Record<string, unknown>) =>
+    result({ sbom: { components: 10, componentList: [], ...sbom } as DoneEvent["sbom"] });
+
+  it("is empty when nothing is past end of life or outdated", () => {
+    expect(staleRows(withCounts({}))).toEqual([]);
+    expect(staleRows(withCounts({ eolCount: 0, outdatedCount: 0 }))).toEqual([]);
+  });
+
+  it("opens Components with the filter that lists exactly what each row counted", () => {
+    const rows = staleRows(withCounts({ eolCount: 25, atRiskCount: 8, outdatedCount: 12 }));
+    expect(rows).toEqual([
+      { id: "eol", count: 25, atRisk: 8, target: "components", query: { eol: "1" } },
+      { id: "outdated", count: 12, target: "components", query: { outdated: "1" } },
+    ]);
+  });
+
+  it("leaves the at-risk figure out when none of the end-of-life ones is vulnerable", () => {
+    const [row] = staleRows(withCounts({ eolCount: 3, atRiskCount: 0 }));
+    expect(row.atRisk).toBeUndefined();
   });
 });

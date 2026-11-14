@@ -128,7 +128,8 @@ interface Props {
   /**
    * When set, the bar segments and legend badges become filter controls: the
    * caller owns `selected` and `onSelect` toggles it (re-selecting clears).
-   * Omit for a static read-out (e.g. the Overview).
+   * Omit for a static read-out. The Licenses section passes both; the Overview
+   * has its own panel (overview/Risk.tsx) whose segments and legend are links.
    */
   selected?: LicenseRiskTier | "";
   onSelect?: (tier: LicenseRiskTier) => void;
