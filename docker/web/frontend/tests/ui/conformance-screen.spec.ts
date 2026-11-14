@@ -207,6 +207,58 @@ test("the format box folds from its heading button and keeps the heading", async
   await expect(page.locator('[data-check="timestamp"]')).toBeHidden();
 });
 
+for (const theme of ["light", "dark"] as const) {
+  test(`the chosen tab is marked by a border, focus is the ring, nothing else fades (${theme})`, async ({ page }) => {
+    await stub(page);
+    await openScreen(page, "en", theme);
+    await page.mouse.move(0, 0);
+    // Resolve a Primer variable to the colour the browser paints.
+    const colour = (v: string) =>
+      page.evaluate((name) => {
+        const probe = document.createElement("span");
+        probe.style.color = `var(${name})`;
+        document.body.appendChild(probe);
+        const c = getComputedStyle(probe).color;
+        probe.remove();
+        return c;
+      }, v);
+    const accent = await colour("--borderColor-accent-emphasis");
+    const ring = await colour("--focus-outlineColor");
+    const look = (loc: ReturnType<typeof tab>) =>
+      loc.evaluate((e) => {
+        const s = getComputedStyle(e);
+        return { opacity: s.opacity, bottom: s.borderBottomColor, outline: s.outlineStyle === "none" ? "none" : s.outlineColor, bg: s.backgroundColor };
+      });
+    const chosen = tab(page, "Can be fixed", 2);
+    const other = tab(page, "Met", 3);
+    const sel = await look(chosen);
+    expect(sel.bottom, "the chosen tab has the accent border").toBe(accent);
+    expect(sel.outline).toBe("none");
+    const rest = await look(other);
+    expect(rest.opacity, "an unchosen tab is not dimmed").toBe("1");
+    expect(rest.bottom).not.toBe(accent);
+    expect(rest.bg).not.toBe(sel.bg);
+    // Keyboard focus: the ring appears and the border does not change.
+    await other.focus();
+    await page.keyboard.press("Shift+Tab");
+    await page.keyboard.press("Tab");
+    await expect(other).toBeFocused();
+    const focused = await look(other);
+    expect(focused.outline, "focus draws the ring").toBe(ring);
+    expect(focused.bottom).toBe(rest.bottom);
+    // Choose it: border, no ring once focus moves on.
+    await page.keyboard.press("Space");
+    await expect(other).toHaveAttribute("aria-pressed", "true");
+    await page.keyboard.press("Tab");
+    await page.mouse.move(0, 0);
+    const now = await look(other);
+    expect(now.bottom).toBe(accent);
+    expect(now.outline).toBe("none");
+    // The other tab is not dimmed by the choice.
+    expect((await look(chosen)).opacity).toBe("1");
+  });
+}
+
 test("a row can be opened and closed from the keyboard", async ({ page }) => {
   await stub(page);
   await openScreen(page);
