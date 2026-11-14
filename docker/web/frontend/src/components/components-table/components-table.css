@@ -1,4 +1,9 @@
 /*
+ * Copyright 2026 SK Telecom Co., Ltd.
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+/*
  * Components screen (components/ComponentsTable.tsx, components-table/*).
  * Primer's Table is a CSS grid: the name column takes what the others leave and
  * wraps instead of being cut, the table grows with the page (no scroll box of
