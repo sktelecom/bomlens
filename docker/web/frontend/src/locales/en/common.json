@@ -80,7 +80,9 @@
     "removeFile": "Remove the chosen file",
     "uploadingPercent": "Uploading… {{percent}}%",
     "aiDeclare": "Enter model information",
-    "aiDeclareHint": "For a model that has no HuggingFace repository or file to read yet. Answer a few questions about it (its base models, the data it was trained on, its release date and the like) and BomLens builds the SBOM and the SPDX 3.0.1 AI document from them. Base models and datasets you name by their HuggingFace id are read from the hub."
+    "aiDeclareHint": "For a model that has no HuggingFace repository or file to read yet. Answer a few questions about it (its base models, the data it was trained on, its release date and the like) and BomLens builds the SBOM and the SPDX 3.0.1 AI document from them. Base models and datasets you name by their HuggingFace id are read from the hub.",
+    "aiDeclareUnavailable": "Describing a model from a declaration needs the SPDX 3.0.1 converter, which this image does not have. Use the full image, or scan the model from HuggingFace or a file.",
+    "dropRefused": "{{name}} is not a file this input takes. Accepted: {{types}}"
   },
   "options": {
     "notice": "Notice",
@@ -126,7 +128,8 @@
     "specVersion": "CycloneDX version",
     "specVersionDefault": "CycloneDX 1.6 (default)",
     "specVersion17": "CycloneDX 1.7",
-    "specVersionHint": "The version the SBOM is written in. Choose 1.7 when the receiving system asks for it. AI model and dataset SBOMs are always 1.7."
+    "specVersionHint": "The version the SBOM is written in. Choose 1.7 when the receiving system asks for it. AI model and dataset SBOMs are always 1.7.",
+    "scanossTokenLabel": "SCANOSS API key (optional)"
   },
   "upload": {
     "target": "Destination",
@@ -734,7 +737,15 @@
     "catArtifact": "Build artifact",
     "catSbom": "SBOM",
     "catAiModel": "AI model",
-    "startQuestions": "Start the questions"
+    "startQuestions": "Start the questions",
+    "more": "More",
+    "less": "Less",
+    "rescanSeeded": "Settings from {{project}} {{version}} are filled in",
+    "rescanSeededBody": "Files, tokens and passwords are not carried over. Add them again if this input needs them.",
+    "aboutOption": "About {{name}}",
+    "lockAnalyze": "Notice and security report are always on when you analyze an SBOM.",
+    "lockDeepCve": "The security report is on because deep CVE matching is on.",
+    "lockReachability": "The security report is on because Go reachability analysis is on."
   },
   "run": {
     "stageGenerate": "Generate SBOM",
@@ -1514,7 +1525,9 @@
     "uploadToken": "Enter the upload API token.",
     "gitRef": "Use a branch, tag or commit id: letters, digits and . _ / @ + - only, without \"..\".",
     "exclude": "Use a relative path with no .. , no wildcard and no backslash, one per line.",
-    "truscaProjectId": "Enter the TRUSCA project id."
+    "truscaProjectId": "Enter the TRUSCA project id.",
+    "requiredList": "Fill in the required fields: {{fields}}",
+    "formatList": "Check the format of: {{fields}}"
   },
   "provenance": {
     "folder": "Scanned folder",

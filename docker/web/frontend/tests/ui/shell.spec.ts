@@ -104,7 +104,7 @@ test("AI model source is gated on the AIBOM image", async ({ page }) => {
   // Without the AIBOM image, the tile is locked (aria-disabled, with a visible
   // reason) rather than plain-disabled, so its reason is still announced.
   await openNewScan(page, "light", "en");
-  await expect(page.getByRole("button", { name: "AI model" })).toHaveAttribute(
+  await expect(page.getByRole("radio", { name: "AI model" })).toHaveAttribute(
     "aria-disabled",
     "true",
   );
@@ -116,7 +116,7 @@ test("AI model source is gated on the AIBOM image", async ({ page }) => {
   );
   await page.reload();
   await page.locator("#project").waitFor();
-  const tile = page.getByRole("button", { name: "AI model" });
+  const tile = page.getByRole("radio", { name: "AI model" });
   await expect(tile).toBeEnabled();
   await tile.click();
   await expect(page.locator("#target")).toBeVisible();
@@ -126,19 +126,19 @@ test("AI model source is gated on the AIBOM image", async ({ page }) => {
 test("New scan groups sources and switches the source-specific input", async ({ page }) => {
   await openNewScan(page, "light", "en");
 
-  // The source picker offers the grouped tiles in one labelled group.
-  const sources = page.getByRole("group", { name: "Source" });
+  // The source picker offers the grouped tiles in one labelled radio group.
+  const sources = page.getByRole("radiogroup", { name: "Source" });
   await expect(sources).toBeVisible();
-  await expect(sources.getByRole("button", { name: "Current folder" })).toBeVisible();
-  await expect(sources.getByRole("button", { name: "Docker image" })).toBeVisible();
+  await expect(sources.getByRole("radio", { name: "Current folder" })).toBeVisible();
+  await expect(sources.getByRole("radio", { name: "Docker image" })).toBeVisible();
 
   // Selecting the GitHub tile reveals the URL target input; Docker keeps it.
-  await page.getByRole("button", { name: "GitHub URL" }).click();
+  await page.getByRole("radio", { name: "GitHub URL" }).click();
   await expect(page.locator("#target")).toBeVisible();
-  await page.getByRole("button", { name: "Docker image" }).click();
+  await page.getByRole("radio", { name: "Docker image" }).click();
   await expect(page.locator("#target")).toBeVisible();
 
-  // The settings pane keeps the project field and the generate button.
+  // The action bar keeps the project field and the generate button.
   await expect(page.locator("#project")).toBeVisible();
   await expect(page.getByRole("button", { name: /Run scan/i })).toBeVisible();
 });

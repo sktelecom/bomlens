@@ -2,44 +2,38 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import {
-  Box,
-  Brain,
-  Cpu,
-  FileArchive,
-  FileBox,
-  FileJson,
-  Folder,
-  FolderTree,
-  Github,
-  Lock,
-  type LucideIcon,
-  Package,
-  PencilLine,
-} from "lucide-react";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+  AiModelIcon,
+  ChevronRightIcon,
+  ContainerIcon,
+  CpuIcon,
+  FileBinaryIcon,
+  FileCodeIcon,
+  FileDirectoryIcon,
+  FileSubmoduleIcon,
+  FileZipIcon,
+  LockIcon,
+  MarkGithubIcon,
+  PackageIcon,
+  PencilIcon,
+  type Icon,
+} from "@primer/octicons-react";
+import { Banner, CounterLabel, FormControl, TextInput, VisuallyHidden } from "@primer/react";
+import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
-import { Card, CardContent } from "@/components/ui/card";
-import { FOCUS_RING, SELECTED_TILE } from "@/components/ui/selectable";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { ScreenHeader } from "@/components/primer";
 import type { Capabilities, ScanConfig, ScanParams, SourceType } from "@/lib/api";
 import { useScanForm } from "@/lib/useScanForm";
-import { Disclosure } from "@/components/ui/disclosure";
-import { cn } from "@/lib/utils";
 
 import {
-  FieldError,
-  FormMessages,
+  ActionNotes,
   FormatOptions,
-  GenerationOptions,
-  RequiredMark,
+  OutputSwitches,
   RunButton,
   ScanOptions,
   SourceControls,
   UploadOptions,
 } from "./ScanFormFields";
-import { ScreenHeader } from "@/components/primer";
 
 interface Props {
   running: boolean;
@@ -49,30 +43,30 @@ interface Props {
    *  once on mount; see `onConfigConsumed`. */
   initialConfig?: ScanConfig | null;
   /** Called once after `initialConfig` is read so the parent can clear the
-   *  pending config — a later plain New scan then starts blank. */
+   *  pending config: a later plain New scan then starts blank. */
   onConfigConsumed?: () => void;
   /** Field to open and focus on arrival, for a prompt that sends the reader
    *  here to fill one in (the Licenses section's outbound-license notice). */
   focusField?: "license" | null;
 }
 
-const SOURCE_META: Record<SourceType, { labelKey: string; icon: LucideIcon }> = {
-  "current-dir": { labelKey: "source.currentDir", icon: Folder },
-  "rootfs-dir": { labelKey: "source.rootfsDir", icon: FolderTree },
-  // Not shown as a tile (absent from SOURCE_GROUPS) — a submit-time variant of
+const SOURCE_META: Record<SourceType, { labelKey: string; icon: Icon }> = {
+  "current-dir": { labelKey: "source.currentDir", icon: FileDirectoryIcon },
+  "rootfs-dir": { labelKey: "source.rootfsDir", icon: FileSubmoduleIcon },
+  // Not shown as a tile (absent from SOURCE_GROUPS): a submit-time variant of
   // rootfs-dir. Present only to satisfy the exhaustive SourceType record.
-  "scan-target-src": { labelKey: "source.rootfsDir", icon: FolderTree },
+  "scan-target-src": { labelKey: "source.rootfsDir", icon: FileSubmoduleIcon },
   // Also not a tile: a folder the scanner recognized as a Yocto build directory.
-  "yocto-build-dir": { labelKey: "source.yoctoBuildDir", icon: FolderTree },
-  "git-url": { labelKey: "source.gitUrl", icon: Github },
-  "zip-upload": { labelKey: "source.zipUpload", icon: FileArchive },
-  "package-upload": { labelKey: "source.packageUpload", icon: Package },
-  "docker-image": { labelKey: "source.dockerImage", icon: Box },
-  "firmware-upload": { labelKey: "source.firmwareUpload", icon: Cpu },
-  "sbom-upload": { labelKey: "source.sbomUpload", icon: FileJson },
-  "ai-model": { labelKey: "source.aiModel", icon: Brain },
-  "model-upload": { labelKey: "source.modelUpload", icon: FileBox },
-  "ai-declare": { labelKey: "source.aiDeclare", icon: PencilLine },
+  "yocto-build-dir": { labelKey: "source.yoctoBuildDir", icon: FileSubmoduleIcon },
+  "git-url": { labelKey: "source.gitUrl", icon: MarkGithubIcon },
+  "zip-upload": { labelKey: "source.zipUpload", icon: FileZipIcon },
+  "package-upload": { labelKey: "source.packageUpload", icon: PackageIcon },
+  "docker-image": { labelKey: "source.dockerImage", icon: ContainerIcon },
+  "firmware-upload": { labelKey: "source.firmwareUpload", icon: CpuIcon },
+  "sbom-upload": { labelKey: "source.sbomUpload", icon: FileCodeIcon },
+  "ai-model": { labelKey: "source.aiModel", icon: AiModelIcon },
+  "model-upload": { labelKey: "source.modelUpload", icon: FileBinaryIcon },
+  "ai-declare": { labelKey: "source.aiDeclare", icon: PencilIcon },
 };
 
 // Grouped tiles: scan source code, scan a built artifact, analyze an SBOM, or
@@ -83,50 +77,59 @@ const SOURCE_GROUPS: Array<{ key: string; sources: SourceType[] }> = [
   { key: "catSbom", sources: ["sbom-upload"] },
   { key: "catAiModel", sources: ["ai-model", "model-upload", "ai-declare"] },
 ];
+const ALL_SOURCES: SourceType[] = SOURCE_GROUPS.flatMap((g) => g.sources);
 
-const SECTION_LABEL =
-  "text-label font-semibold uppercase tracking-wider text-muted-foreground";
-
-/** Collapsed-by-default panel section, on the shared disclosure.
- *  Keeps the settings panel within one viewport: only identity, outputs and
- *  the run action stay always-visible; advanced groups fold away. `badge`
- *  keeps the enabled state readable while the section is closed. */
-function PanelDisclosure({
+/** A folded group of the settings. Open on arrival when something in it differs
+ *  from the default (a re-scan seed); the count of such options stays readable
+ *  while it is closed. Built on `<details>`: open/close state and keyboard
+ *  operation come with it. */
+function SettingsGroup({
   label,
-  badge,
+  testId,
+  count,
   defaultOpen,
   children,
 }: {
   label: string;
-  badge?: string;
+  testId: string;
+  count: number;
   defaultOpen: boolean;
   children: ReactNode;
 }) {
+  const { t } = useTranslation();
+  // Held in state so a later change of `count` never closes a group the reader
+  // is working in.
+  const [open, setOpen] = useState(defaultOpen);
   return (
-    <Disclosure
-      className="border-t pt-5"
-      defaultOpen={defaultOpen}
-      summary={
-        <>
-          <span className={SECTION_LABEL}>{label}</span>
-          {badge && (
-            <span className="ml-auto rounded-full bg-muted px-2 py-0.5 text-label font-medium text-foreground">
-              {badge}
-            </span>
-          )}
-        </>
-      }
+    <details
+      className="bl-box bl-setgroup"
+      data-testid={testId}
+      open={open}
+      onToggle={(e) => setOpen(e.currentTarget.open)}
     >
-      <div className="mt-3 space-y-3">{children}</div>
-    </Disclosure>
+      <summary className="bl-setsum">
+        <span className="bl-chev">
+          <ChevronRightIcon size={16} />
+        </span>
+        <span className="bl-strong">{label}</span>
+        {count > 0 && (
+          <span className="bl-setcount">
+            <CounterLabel aria-hidden>{count}</CounterLabel>
+            <VisuallyHidden>{t("newscan.enabledCount", { n: count })}</VisuallyHidden>
+          </span>
+        )}
+      </summary>
+      <div className="bl-setbody">{children}</div>
+    </details>
   );
 }
 
 /**
- * Two-pane New scan: a question title, a grouped source-tile picker and the
- * selected source's input on the left, and a sticky "Scan settings" panel
- * (identity + outputs + the generate action) on the right. Shares all logic
- * with the classic form via useScanForm — only the layout changes.
+ * New scan: the page header, the source tiles in rows, the selected source's
+ * input, the scan settings in three folded boxes, and a one-line action bar
+ * pinned to the bottom of the window (project, version, the two output
+ * switches and the run button). All logic is useScanForm's; only the drawing is
+ * here.
  */
 export function NewScan({
   running,
@@ -149,9 +152,13 @@ export function NewScan({
       onConfigConsumed?.();
     }
   }, [initialConfig, onConfigConsumed]);
+  // Which output switch has its description open in the line above the action bar.
+  const [openHint, setOpenHint] = useState<string | null>(null);
+  // The notice that a re-scan filled the form outlives the pending config.
+  const [seeded] = useState(() => initialConfig ?? null);
 
-  // How many toggles are on in each folded group (seeded by a re-scan config).
-  // Drives the disclosure's initial open state and its collapsed badge.
+  // How many options differ from the default in each folded group (seeded by a
+  // re-scan config). Drives the group's initial open state and its count.
   const scanOptionsOn = [
     state.identifyVendored,
     state.deepLicense,
@@ -177,207 +184,204 @@ export function NewScan({
     if (focusField === "license") document.getElementById("outbound-license")?.focus();
   }, [focusField]);
 
+  const isLocked = (s: SourceType) =>
+    (s === "firmware-upload" && !capabilities.firmware) ||
+    (s === "ai-model" && !capabilities.aibom) ||
+    (s === "ai-declare" && !capabilities.aiDeclare);
+
+  // Lock reason for a group (firmware / AI need the Docker sibling image or the
+  // converter). Shown as visible text so keyboard and touch users, who cannot
+  // see a hover title, still learn why a tile is unavailable.
+  const lockReason = (sources: SourceType[]) =>
+    sources.includes("firmware-upload") && !capabilities.firmware
+      ? t("source.firmwareUnavailable")
+      : sources.includes("ai-model") && !capabilities.aibom
+        ? t("source.aiModelUnavailable")
+        : sources.includes("ai-declare") && !capabilities.aiDeclare
+          ? t("source.aiDeclareUnavailable")
+          : null;
+
+  // Arrow keys move through every tile in order and select the one they land
+  // on (a radio group); a locked tile takes focus but is not selected.
+  const onTileKey = (e: KeyboardEvent<HTMLButtonElement>, src: SourceType) => {
+    const i = ALL_SOURCES.indexOf(src);
+    const step =
+      e.key === "ArrowRight" || e.key === "ArrowDown"
+        ? 1
+        : e.key === "ArrowLeft" || e.key === "ArrowUp"
+          ? -1
+          : 0;
+    const to =
+      e.key === "Home"
+        ? 0
+        : e.key === "End"
+          ? ALL_SOURCES.length - 1
+          : step
+            ? (i + step + ALL_SOURCES.length) % ALL_SOURCES.length
+            : -1;
+    if (to < 0) return;
+    e.preventDefault();
+    const next = ALL_SOURCES[to];
+    document.querySelector<HTMLButtonElement>(`[data-testid="source-${next}"]`)?.focus();
+    if (!isLocked(next)) state.changeSource(next);
+  };
+
+  // The input box is named for the selected source. Sources that are not tiles
+  // (a submit-time variant, a recognized Yocto folder) keep the generic name.
+  const sourceLabel = t(SOURCE_META[state.source]?.labelKey ?? "newscan.source");
+  // A tab stop for the group: the selected tile, or the first when the selection
+  // is not a tile.
+  const tabStop = ALL_SOURCES.includes(state.source) ? state.source : ALL_SOURCES[0];
+  const nameDescribedBy =
+    [
+      (state.errors.project || state.errors.version) && "scan-alert",
+      state.source === "ai-declare" && "project-hint",
+    ]
+      .filter(Boolean)
+      .join(" ") || undefined;
+
   return (
-    <div className="space-y-6">
+    <>
       <ScreenHeader title={t("newscan.title")} description={t("newscan.subtitle")} />
-
-      <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
-        {/* Left: pick what to scan, then its source-specific input. */}
-        <div className="space-y-4">
-          <div role="group" aria-label={t("newscan.source")} className="space-y-6">
-            {SOURCE_GROUPS.map((group) => {
-              // Lock reason for this group (firmware/AI need the Docker sibling
-              // image). Shown as visible text so keyboard/touch users — who can't
-              // see a hover title — still learn why a tile is unavailable.
-              const lockReason =
-                group.sources.includes("firmware-upload") && !capabilities.firmware
-                  ? t("source.firmwareUnavailable")
-                  : group.sources.includes("ai-model") && !capabilities.aibom
-                    ? t("source.aiModelUnavailable")
-                    : null;
-              return (
-                <div key={group.key} className="space-y-2">
-                  <p className={SECTION_LABEL}>{t(`newscan.${group.key}`)}</p>
-                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 2xl:grid-cols-4">
-                    {group.sources.map((s) => {
-                      const { labelKey, icon: Icon } = SOURCE_META[s];
-                      const active = state.source === s;
-                      const locked =
-                        (s === "firmware-upload" && !capabilities.firmware) ||
-                        (s === "ai-model" && !capabilities.aibom) ||
-                        (s === "ai-declare" && !capabilities.aiDeclare);
-                      return (
-                        <button
-                          key={s}
-                          type="button"
-                          // The source id, not its label: a test that drives
-                          // this picker in both languages needs an anchor that
-                          // does not translate.
-                          data-testid={`source-${s}`}
-                          aria-pressed={active}
-                          aria-disabled={locked || undefined}
-                          disabled={state.busy}
-                          onClick={() => {
-                            if (!locked) state.changeSource(s);
-                          }}
-                          className={cn(
-                            "flex items-center gap-2 rounded-lg border px-3 py-2.5 text-left text-body-sm",
-                            "transition-[color,border-color,background-color,box-shadow] duration-fast ease-out-soft",
-                            FOCUS_RING,
-                            "disabled:pointer-events-none disabled:opacity-50",
-                            locked
-                              ? "cursor-not-allowed border-dashed text-muted-foreground"
-                              : active
-                                ? SELECTED_TILE
-                                : "text-foreground hover:border-foreground/30 hover:bg-muted/50 hover:shadow-md",
-                          )}
-                        >
-                          <Icon
-                            className={cn(
-                              "h-4 w-4 shrink-0",
-                              locked
-                                ? "text-muted-foreground/60"
-                                : active
-                                  ? "text-foreground"
-                                  : "text-muted-foreground",
-                            )}
-                            aria-hidden
-                          />
-                          <span className="truncate">{t(labelKey)}</span>
-                          {locked && (
-                            <Lock
-                              className="ml-auto h-3.5 w-3.5 shrink-0 text-muted-foreground/60"
-                              aria-hidden
-                            />
-                          )}
-                        </button>
-                      );
-                    })}
-                  </div>
-                  {lockReason && (
-                    <p className="text-body-sm text-muted-foreground">{lockReason}</p>
-                  )}
+      {seeded && (
+        <div className="bl-ns-banner">
+          <Banner
+            variant="info"
+            title={t("newscan.rescanSeeded", { project: seeded.project, version: seeded.version })}
+            description={t("newscan.rescanSeededBody")}
+          />
+        </div>
+      )}
+      <div className="bl-ns">
+        <div role="radiogroup" aria-label={t("newscan.source")} className="bl-ns-groups">
+          {SOURCE_GROUPS.map((group) => {
+            const reason = lockReason(group.sources);
+            return (
+              <div
+                key={group.key}
+                role="group"
+                aria-labelledby={`group-${group.key}`}
+                className="bl-ns-row"
+              >
+                <span id={`group-${group.key}`} className="bl-grouplabel">
+                  {t(`newscan.${group.key}`)}
+                </span>
+                <div className="bl-ns-tiles">
+                  {group.sources.map((s) => {
+                    const { labelKey, icon: Icon } = SOURCE_META[s];
+                    const locked = isLocked(s);
+                    return (
+                      <button
+                        key={s}
+                        type="button"
+                        role="radio"
+                        // The source id, not its label: a test that drives
+                        // this picker in both languages needs an anchor that
+                        // does not translate.
+                        data-testid={`source-${s}`}
+                        className={`bl-tile${locked ? " bl-tile-locked" : ""}`}
+                        aria-checked={state.source === s}
+                        aria-disabled={locked || undefined}
+                        aria-describedby={locked && reason ? `lock-${group.key}` : undefined}
+                        tabIndex={tabStop === s ? 0 : -1}
+                        disabled={state.busy}
+                        onClick={() => {
+                          if (!locked) state.changeSource(s);
+                        }}
+                        onKeyDown={(e) => onTileKey(e, s)}
+                      >
+                        <Icon size={16} />
+                        <span className="bl-tile-label">{t(labelKey)}</span>
+                        {locked && <LockIcon size={14} />}
+                      </button>
+                    );
+                  })}
                 </div>
-              );
-            })}
-          </div>
-
-          <Card className="animate-fade-in">
-            <CardContent className="space-y-4 p-4">
-              <SourceControls state={state} />
-            </CardContent>
-          </Card>
+                {reason && (
+                  <p id={`lock-${group.key}`} className="bl-muted bl-small bl-lockreason">
+                    {reason}
+                  </p>
+                )}
+              </div>
+            );
+          })}
         </div>
 
-        {/* Right: sticky settings panel — identity, outputs, then the folded
-            groups scroll inside it while the run action stays pinned below, so
-            opening every group never pushes the button off screen. */}
-        <Card className="flex animate-fade-in flex-col lg:sticky lg:top-20 lg:max-h-[calc(100vh-6.5rem)]">
-          <CardContent className="min-h-0 flex-1 space-y-5 overflow-y-auto p-5">
-            <div className="space-y-3">
-              <p className={SECTION_LABEL}>{t("newscan.settings")}</p>
-              <div className="space-y-2">
-                <Label htmlFor="project">
-                  {t("form.project")}
-                  <RequiredMark />
-                </Label>
-                <Input
-                  id="project"
+        <section className="bl-box" aria-label={sourceLabel}>
+          <div className="bl-box-head">
+            <h2>{sourceLabel}</h2>
+          </div>
+          <div className="bl-box-body">
+            <SourceControls state={state} />
+          </div>
+        </section>
+
+        <section className="bl-stack-8" aria-label={t("newscan.settings")}>
+          <h2 className="bl-grouplabel bl-flat">{t("newscan.settings")}</h2>
+          {state.showScanOptions && (
+            <SettingsGroup
+              label={t("newscan.scanOptions")}
+              testId="settings-quality"
+              count={scanOptionsOn}
+              defaultOpen={scanOptionsOn > 0}
+            >
+              <ScanOptions state={state} />
+            </SettingsGroup>
+          )}
+          {state.showFormatOptions && (
+            <SettingsGroup
+              label={t("newscan.formatOptions")}
+              testId="settings-format"
+              count={formatOptionsOn}
+              defaultOpen={formatOptionsOn > 0 || focusField === "license"}
+            >
+              <FormatOptions state={state} />
+            </SettingsGroup>
+          )}
+          {state.showUpload && (
+            <div className="bl-box bl-setrow" data-testid="settings-transfer">
+              <div className="bl-strong">{t("newscan.upload")}</div>
+              <UploadOptions state={state} />
+            </div>
+          )}
+        </section>
+
+        <div className="bl-actionwrap">
+          <ActionNotes state={state} openHint={openHint} />
+          <div className="bl-actionbar" data-testid="action-bar">
+            <div className="bl-actionrow">
+              <FormControl id="project" required disabled={state.busy} className="bl-af-project">
+                <FormControl.Label className="bl-af-label">{t("form.project")}</FormControl.Label>
+                <TextInput
+                  block
                   value={state.project}
                   onChange={(e) => state.setProject(e.target.value)}
                   placeholder={t("form.projectPlaceholder")}
-                  disabled={state.busy}
-                  autoFocus
-                  aria-required
-                  aria-invalid={state.errors.project ? true : undefined}
-                  aria-describedby={
-                    [state.errors.project && "project-error", state.source === "ai-declare" && "project-hint"]
-                      .filter(Boolean)
-                      .join(" ") || undefined
-                  }
+                  validationStatus={state.errors.project ? "error" : undefined}
+                  aria-describedby={nameDescribedBy}
                 />
-                {/* A declared model has no hub name: the project becomes its name. */}
-                {state.source === "ai-declare" && (
-                  <p id="project-hint" className="text-body-sm text-muted-foreground">
-                    {t("form.projectHintDeclare")}
-                  </p>
-                )}
-                <FieldError id="project-error" msgKey={state.errors.project} />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="version">
-                  {t("form.version")}
-                  <RequiredMark />
-                </Label>
-                <Input
-                  id="version"
+              </FormControl>
+              <FormControl id="version" required disabled={state.busy} className="bl-af-version">
+                <FormControl.Label className="bl-af-label">{t("form.version")}</FormControl.Label>
+                <TextInput
+                  block
                   value={state.version}
                   onChange={(e) => state.setVersion(e.target.value)}
                   placeholder={t("form.versionPlaceholder")}
-                  disabled={state.busy}
-                  aria-required
-                  aria-invalid={state.errors.version ? true : undefined}
-                  aria-describedby={state.errors.version ? "version-error" : undefined}
+                  validationStatus={state.errors.version ? "error" : undefined}
+                  aria-describedby={
+                    state.errors.project || state.errors.version ? "scan-alert" : undefined
+                  }
                 />
-                <FieldError id="version-error" msgKey={state.errors.version} />
+              </FormControl>
+              <OutputSwitches state={state} openHint={openHint} onOpenHint={setOpenHint} />
+              <div className="bl-af-run">
+                <RunButton state={state} running={running} />
               </div>
             </div>
-
-            <div className="space-y-3 border-t pt-5">
-              <p className={SECTION_LABEL}>{t("newscan.outputs")}</p>
-              <GenerationOptions state={state} />
-            </div>
-
-            {/* The result-quality group is how the scan analyzes the source, a
-                different altitude from the output artifacts above — their own
-                sections, folded by default so the panel fits one viewport.
-                A section seeded with non-default values (re-scan) opens
-                itself, and the badge keeps the state readable when closed. */}
-            {state.showScanOptions && (
-              <PanelDisclosure
-                label={t("newscan.scanOptions")}
-                badge={
-                  scanOptionsOn > 0
-                    ? t("newscan.enabledCount", { n: scanOptionsOn })
-                    : undefined
-                }
-                defaultOpen={scanOptionsOn > 0}
-              >
-                <ScanOptions state={state} />
-              </PanelDisclosure>
-            )}
-
-            {state.showFormatOptions && (
-              <PanelDisclosure
-                label={t("newscan.formatOptions")}
-                badge={
-                  formatOptionsOn > 0
-                    ? t("newscan.enabledCount", { n: formatOptionsOn })
-                    : undefined
-                }
-                defaultOpen={formatOptionsOn > 0 || focusField === "license"}
-              >
-                <FormatOptions state={state} />
-              </PanelDisclosure>
-            )}
-
-            {state.showUpload && (
-              <PanelDisclosure
-                label={t("newscan.upload")}
-                badge={state.uploadEnabled ? t("newscan.on") : undefined}
-                defaultOpen={state.uploadEnabled}
-              >
-                <UploadOptions state={state} />
-              </PanelDisclosure>
-            )}
-          </CardContent>
-
-          <div className="space-y-3 border-t bg-card p-5">
-            <FormMessages state={state} />
-            <RunButton state={state} running={running} />
           </div>
-        </Card>
+        </div>
       </div>
-    </div>
+    </>
   );
 }

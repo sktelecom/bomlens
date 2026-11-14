@@ -103,7 +103,7 @@ test("Re-scan prefills the New scan form from the config", async ({ page }) => {
   await expect(page.locator("#version")).toHaveValue("2.1");
 
   // The git-url source is selected and its target is seeded.
-  await expect(page.getByRole("button", { name: "GitHub URL" })).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByRole("radio", { name: "GitHub URL" })).toHaveAttribute("aria-checked", "true");
   await expect(page.locator("#target")).toHaveValue("https://github.com/acme/demo");
 
   // Toggles mirror the config: security off, deep license on.
@@ -115,6 +115,25 @@ test("Re-scan prefills the New scan form from the config", async ({ page }) => {
 
   // A re-runnable input (git URL) is ready to run straight away.
   await expect(page.getByTestId("run-scan")).toBeEnabled();
+});
+
+test("Re-scan opens the group that holds a seeded option, counts it, and says the form was filled", async ({ page }) => {
+  await openScan(page, DONE_WITH_CONFIG);
+  await page.getByRole("button", { name: "Re-scan" }).click();
+  await expect(page.locator("#project")).toHaveValue("demo");
+
+  // The notice names what was filled in and what was not.
+  await expect(page.getByText("Settings from demo 2.1 are filled in")).toBeVisible();
+  await expect(page.getByText(/Files, tokens and passwords are not carried over/)).toBeVisible();
+
+  // Per-file license scan is on in the config, so its group is open and counted.
+  const quality = page.locator("details", { hasText: "Result quality" }).first();
+  await expect(quality).toHaveAttribute("open", "");
+  await expect(quality.locator("summary").getByText("1 on")).toHaveCount(1);
+  // Output format holds nothing but defaults: closed, no count.
+  const format = page.locator("details", { hasText: "Output format" }).first();
+  await expect(format).not.toHaveAttribute("open", "");
+  await expect(format.locator("summary").getByText(/\d+ on/)).toHaveCount(0);
 });
 
 test("a plain New scan after a re-scan starts blank (config consumed once)", async ({ page }) => {
@@ -130,7 +149,7 @@ test("a plain New scan after a re-scan starts blank (config consumed once)", asy
   await expect(page.getByRole("heading", { name: "Scan management" })).toBeVisible();
   await page.getByRole("navigation", { name: "Main" }).getByRole("link", { name: "New scan" }).click();
   await expect(page.locator("#project")).toHaveValue("");
-  await expect(page.getByRole("button", { name: "Current folder" })).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByRole("radio", { name: "Current folder" })).toHaveAttribute("aria-checked", "true");
 });
 
 test("the Licenses notice opens the scan form on the outbound-license field", async ({ page }) => {

@@ -28,7 +28,7 @@ async function openForm(page: Page) {
     r.fulfill({ contentType: "text/event-stream", body: `event: done\ndata: ${JSON.stringify(DONE)}\n\n` }),
   );
   await page.goto("/#/new");
-  await page.getByRole("button", { name: "GitHub URL" }).click();
+  await page.getByRole("radio", { name: "GitHub URL" }).click();
   await page.fill("#target", "https://github.com/acme/demo.git");
   await page.fill("#project", "demo");
   await page.fill("#version", "1.0");
@@ -44,6 +44,6 @@ test("the lines typed in the form go out as one exclude value", async ({ page })
 
 test("the field is not offered for a Docker image", async ({ page }) => {
   await openForm(page);
-  await page.getByRole("button", { name: "Docker image" }).click();
+  await page.getByRole("radio", { name: "Docker image" }).click();
   await expect(page.locator("#exclude")).toHaveCount(0);
 });

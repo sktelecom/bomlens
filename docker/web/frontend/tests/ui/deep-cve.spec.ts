@@ -56,7 +56,7 @@ async function stub(page: Page, caps: Caps) {
 async function selectSbomUpload(page: Page) {
   await page.fill("#project", "demo");
   await page.fill("#version", "1.0");
-  await page.getByRole("button", { name: /SBOM upload/i }).click();
+  await page.getByRole("radio", { name: /SBOM upload/i }).click();
   await page.locator("#file").setInputFiles({
     name: "demo.json",
     mimeType: "application/json",

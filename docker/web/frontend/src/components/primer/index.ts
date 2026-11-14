@@ -19,4 +19,5 @@ export { SeverityLabel } from "./SeverityLabel";
 export { LicenseTierLabel, LicenseTierMark } from "./LicenseTierLabel";
 export { PackageCoordinate } from "./PackageCoordinate";
 export { ScreenHeader } from "./ScreenHeader";
+export { Switch } from "./Switch";
 export * from "./display";

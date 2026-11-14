@@ -44,7 +44,7 @@ test("current folder prefills the project from hostDir and a default version", a
 
 test("git URL prefills the repo name as the project and a default version", async ({ page }) => {
   await openNewScan(page);
-  await page.getByRole("button", { name: "GitHub URL" }).click();
+  await page.getByRole("radio", { name: "GitHub URL" }).click();
   // Switching source drops the folder-based suggestion (empty target = no
   // guess) — and with no target identified, no lone version is shown either.
   await expect(page.locator("#project")).toHaveValue("");
@@ -57,7 +57,7 @@ test("git URL prefills the repo name as the project and a default version", asyn
 
 test("docker image prefills name and tag as project and version", async ({ page }) => {
   await openNewScan(page);
-  await page.getByRole("button", { name: "Docker image" }).click();
+  await page.getByRole("radio", { name: "Docker image" }).click();
   // Registry path and port are not part of the identity; the tag is the version,
   // which beats the default.
   await page.fill("#target", "registry:5000/nginx:1.25");
@@ -68,7 +68,7 @@ test("docker image prefills name and tag as project and version", async ({ page 
 test("a user-typed project is never overwritten by the autofill", async ({ page }) => {
   await openNewScan(page);
   await page.fill("#project", "mine");
-  await page.getByRole("button", { name: "GitHub URL" }).click();
+  await page.getByRole("radio", { name: "GitHub URL" }).click();
   await page.fill("#target", "https://github.com/acme/demo.git");
   // Project is user-owned now; the untouched version follows the source (the
   // git repo names none, so the default fills in once the target is identified).

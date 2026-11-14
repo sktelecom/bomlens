@@ -71,7 +71,7 @@ test("the CycloneDX version is hidden and not sent for an SBOM upload (ANALYZE)"
   await fillIdentity(page);
   await page.getByText("Output format").click();
   await page.getByLabel("CycloneDX version").selectOption("1.7");
-  await page.getByRole("button", { name: /SBOM upload/i }).click();
+  await page.getByRole("radio", { name: /SBOM upload/i }).click();
   await page.locator("#file").setInputFiles({
     name: "demo.json",
     mimeType: "application/json",
