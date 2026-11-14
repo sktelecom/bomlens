@@ -6983,6 +6983,34 @@ fi
 grep -q 'find "$_co_d" \\( ! -user "$HOST_UID"' "$PREP" \
     && pass "build-prep hands the mounted cache folders back to HOST_UID" \
     || fail "build-prep does not chown the cache mounts"
+# The hand-back decision (cache_handback_wanted) is taken out of build-prep.sh
+# and called. rc 0 = walk and chown, 1 = leave the folder alone.
+_co_fn=$(sed -n '/^# --- cache hand-back helpers/,/^# --- end cache hand-back helpers/p' "$PREP")
+_co_t="$WORK/co-fs"; rm -rf "$_co_t"; mkdir -p "$_co_t/cache" "$_co_t/ro" "$_co_t/plain"
+printf '36 35 98:0 / / rw - overlay overlay rw\n900 36 0:37 / %s rw - ext4 /dev/x rw\n901 36 0:38 / %s rw - ext4 /dev/x rw\n' "$_co_t/cache" "$_co_t/ro" > "$_co_t/mountinfo"
+chmod 555 "$_co_t/ro"
+_co_want() { # DIR MOUNTINFO HOST_UID -> prints the rc
+    HOST_UID="$3" HOST_GID="$3" sh -c "$_co_fn"'
+cache_handback_wanted "$1" "$2"; echo $?' _ "$1" "$2"
+}
+[ "$(_co_want "$_co_t/plain" "$_co_t/mountinfo" 4242)" = 1 ] \
+    && pass "a folder that is not a mount point is left alone" || fail "non-mount folder was walked"
+[ "$(_co_want "$_co_t/cache" "$_co_t/none" 4242)" = 1 ] \
+    && pass "an unreadable mountinfo leaves the folder alone" || fail "unreadable mountinfo was walked"
+[ "$(_co_want "$_co_t/cache" "$_co_t/mountinfo" 0)" = 1 ] \
+    && pass "HOST_UID 0 leaves the folder alone (root already owns what the run wrote)" || fail "HOST_UID 0 was walked"
+if [ "$(id -u)" != 0 ]; then
+    [ "$(_co_want "$_co_t/cache" "$_co_t/mountinfo" 4242)" = 1 ] \
+        && pass "a mount where chown to HOST_UID does not stick is left alone" || fail "chown-ineffective mount was walked"
+    [ "$(_co_want "$_co_t/ro" "$_co_t/mountinfo" 4242)" = 0 ] \
+        && pass "a mount where the probe cannot run (not writable) keeps the walk" || fail "unprobeable mount was not walked"
+else
+    [ "$(_co_want "$_co_t/cache" "$_co_t/mountinfo" 4242)" = 0 ] \
+        && pass "a mount where chown to HOST_UID sticks is walked" || fail "effective mount was left alone"
+fi
+[ -z "$(find "$_co_t/cache" -name '.bomlens-chown-probe.*')" ] \
+    && pass "the probe file is removed" || fail "probe file left behind"
+chmod 755 "$_co_t/ro"
 
 echo "== android-scope: release-config selection picks the right variant (flavored projects) =="
 # Guards docker/lib/build-prep.sh's Android config selection. The SCA benchmark
