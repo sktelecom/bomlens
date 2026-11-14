@@ -1,0 +1,680 @@
+<!DOCTYPE html><html lang="en" dir="ltr" data-theme="dark" data-has-toc data-has-sidebar class="astro-g5ptsecz"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/><title>Use the Docker image directly | BomLens</title><link rel="canonical" href="https://sktelecom.github.io/bomlens/reference/docker-image/"/><link rel="alternate" hreflang="en" href="https://sktelecom.github.io/bomlens/reference/docker-image/"/><link rel="alternate" hreflang="ko" href="https://sktelecom.github.io/bomlens/ko/reference/docker-image/"/><link rel="alternate" hreflang="x-default" href="https://sktelecom.github.io/bomlens/reference/docker-image/"/><link rel="sitemap" href="/bomlens/sitemap-index.xml"/><link rel="shortcut icon" href="/bomlens/favicon.svg" type="image/svg+xml"/><meta name="generator" content="Astro v7.4.4"/><meta name="generator" content="Starlight v0.42.8"/><meta property="og:title" content="Use the Docker image directly"/><meta property="og:type" content="article"/><meta property="og:url" content="https://sktelecom.github.io/bomlens/reference/docker-image/"/><meta property="og:locale" content="en_US"/><meta property="og:description" content="Call the BomLens scanner Docker image directly with docker run, for CI runners, Kubernetes jobs, and other environments where the script cannot live."/><meta property="og:site_name" content="BomLens"/><meta name="twitter:card" content="summary_large_image"/><meta name="description" content="Call the BomLens scanner Docker image directly with docker run, for CI runners, Kubernetes jobs, and other environments where the script cannot live."/><meta property="og:image" content="https://sktelecom.github.io/bomlens/images/og-card.png"><meta name="twitter:image" content="https://sktelecom.github.io/bomlens/images/og-card.png"><script>
+	window.StarlightThemeProvider = (() => {
+		const storedTheme =
+			typeof localStorage !== 'undefined' && localStorage.getItem('starlight-theme');
+		const theme =
+			storedTheme ||
+			(window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
+		document.documentElement.dataset.theme = theme === 'light' ? 'light' : 'dark';
+		return {
+			updatePickers(theme = storedTheme || 'auto') {
+				document.querySelectorAll('starlight-theme-select').forEach((picker) => {
+					const select = picker.querySelector('select');
+					if (select) select.value = theme;
+					/** @type {HTMLTemplateElement | null} */
+					const tmpl = document.querySelector(`#theme-icons`);
+					const newIcon = tmpl && tmpl.content.querySelector('.' + theme);
+					if (newIcon) {
+						const oldIcon = picker.querySelector('svg.label-icon');
+						if (oldIcon) {
+							oldIcon.replaceChildren(...newIcon.cloneNode(true).childNodes);
+						}
+					}
+				});
+			},
+		};
+	})();
+</script><template id="theme-icons"><svg aria-hidden="true" class="light astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M5 12a1 1 0 0 0-1-1H3a1 1 0 0 0 0 2h1a1 1 0 0 0 1-1Zm.64 5-.71.71a1 1 0 0 0 0 1.41 1 1 0 0 0 1.41 0l.71-.71A1 1 0 0 0 5.64 17ZM12 5a1 1 0 0 0 1-1V3a1 1 0 0 0-2 0v1a1 1 0 0 0 1 1Zm5.66 2.34a1 1 0 0 0 .7-.29l.71-.71a1 1 0 1 0-1.41-1.41l-.66.71a1 1 0 0 0 0 1.41 1 1 0 0 0 .66.29Zm-12-.29a1 1 0 0 0 1.41 0 1 1 0 0 0 0-1.41l-.71-.71a1.004 1.004 0 1 0-1.43 1.41l.73.71ZM21 11h-1a1 1 0 0 0 0 2h1a1 1 0 0 0 0-2Zm-2.64 6A1 1 0 0 0 17 18.36l.71.71a1 1 0 0 0 1.41 0 1 1 0 0 0 0-1.41l-.76-.66ZM12 6.5a5.5 5.5 0 1 0 5.5 5.5A5.51 5.51 0 0 0 12 6.5Zm0 9a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7Zm0 3.5a1 1 0 0 0-1 1v1a1 1 0 0 0 2 0v-1a1 1 0 0 0-1-1Z"/></svg><svg aria-hidden="true" class="dark astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M21.64 13a1 1 0 0 0-1.05-.14 8.049 8.049 0 0 1-3.37.73 8.15 8.15 0 0 1-8.14-8.1 8.59 8.59 0 0 1 .25-2A1 1 0 0 0 8 2.36a10.14 10.14 0 1 0 14 11.69 1 1 0 0 0-.36-1.05Zm-9.5 6.69A8.14 8.14 0 0 1 7.08 5.22v.27a10.15 10.15 0 0 0 10.14 10.14 9.784 9.784 0 0 0 2.1-.22 8.11 8.11 0 0 1-7.18 4.32v-.04Z"/></svg><svg aria-hidden="true" class="auto astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M21 14h-1V7a3 3 0 0 0-3-3H7a3 3 0 0 0-3 3v7H3a1 1 0 0 0-1 1v2a3 3 0 0 0 3 3h14a3 3 0 0 0 3-3v-2a1 1 0 0 0-1-1ZM6 7a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v7H6V7Zm14 10a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-1h16v1Z"/></svg></template><link rel="stylesheet" href="/bomlens/_astro/print.ehPL0gv-.css" media="print"><link rel="stylesheet" href="/bomlens/_astro/common.DxYPfd-D.css"><style>@layer starlight.components{svg:where(.astro-hkc32dio){color:var(--sl-icon-color);font-size:var(--sl-icon-size,1em);width:1em;height:1em;overflow:visible}.sl-link-button:where(.astro-dcqstdaq){font-size:var(--sl-text-sm);outline-offset:.25rem;border:1px solid #0000;border-radius:999rem;align-items:center;gap:.5em;padding:.4375rem 1.125rem;line-height:1.1875;text-decoration:none;display:inline-flex}.sl-link-button:where(.astro-dcqstdaq).primary{background:var(--sl-color-text-accent);border-color:var(--sl-color-text-accent);color:var(--sl-color-black)}.sl-link-button:where(.astro-dcqstdaq).primary:hover{color:var(--sl-color-black)}.sl-link-button:where(.astro-dcqstdaq).secondary{border-color:inherit;color:var(--sl-color-white)}.sl-link-button:where(.astro-dcqstdaq).minimal{color:var(--sl-color-white);padding-inline:0}.sl-link-button:where(.astro-dcqstdaq) svg{flex-shrink:0}@media (width>=50rem){.sl-link-button:where(.astro-dcqstdaq){font-size:var(--sl-text-base);padding:.9375rem 1.25rem}}.sl-markdown-content .sl-link-button:where(.astro-dcqstdaq){margin-inline-end:1rem}.sl-markdown-content .sl-link-button:where(.astro-dcqstdaq):not(:where(p *)){margin-block:1rem}}
+</style><script type="module" src="/bomlens/_astro/page.cNngjUgL.js"></script></head><body class="astro-g5ptsecz"><a class="sl-skip-link astro-qb7clj6f" href="#_top">Skip to content</a><div class="page sl-flex astro-yntsjkba"><header class="header astro-yntsjkba"><div class="header astro-by6fddyj"><div class="title-wrapper sl-flex astro-by6fddyj"><a href="/bomlens/" class="site-title sl-flex astro-6rvad3va"><span class="astro-6rvad3va" translate="no">BomLens</span></a></div><div class="sl-flex print:hidden astro-by6fddyj"><site-search class="astro-by6fddyj astro-b5kgnn7o" data-translations="{&quot;placeholder&quot;:&quot;Search&quot;}"><button data-open-modal disabled aria-label="Search" aria-keyshortcuts="Control+K" class="astro-b5kgnn7o"><svg aria-hidden="true" class="astro-b5kgnn7o astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M21.71 20.29 18 16.61A9 9 0 1 0 16.61 18l3.68 3.68a.999.999 0 0 0 1.42 0 1 1 0 0 0 0-1.39ZM11 18a7 7 0 1 1 0-14 7 7 0 0 1 0 14Z"/></svg><span class="sl-hidden md:sl-block astro-b5kgnn7o" aria-hidden="true">Search</span><kbd class="sl-hidden md:sl-flex astro-b5kgnn7o" style="display: none;"><kbd class="astro-b5kgnn7o">Ctrl</kbd><kbd class="astro-b5kgnn7o">K</kbd></kbd></button><dialog style="padding:0" aria-label="Search" class="astro-b5kgnn7o"><div class="dialog-frame sl-flex astro-b5kgnn7o"><button data-close-modal class="sl-flex md:sl-hidden astro-b5kgnn7o">Cancel</button><div class="search-container astro-b5kgnn7o"><div id="starlight__search" class="astro-b5kgnn7o"></div></div></div></dialog></site-search><script>
+	(() => {
+		const openBtn = document.querySelector('button[data-open-modal]');
+		const shortcut = openBtn?.querySelector('kbd');
+		if (!openBtn || !(shortcut instanceof HTMLElement)) return;
+		const platformKey = shortcut.querySelector('kbd');
+		if (platformKey && /(Mac|iPhone|iPod|iPad)/i.test(navigator.platform)) {
+			platformKey.textContent = '⌘';
+			openBtn.setAttribute('aria-keyshortcuts', 'Meta+K');
+		}
+		shortcut.style.display = '';
+	})();
+</script><script type="module" src="/bomlens/_astro/Search.astro_astro_type_script_index_0_lang.BSqzOScY.js"></script></div><div class="sl-hidden md:sl-flex print:hidden right-group astro-by6fddyj"><div class="sl-flex social-icons astro-by6fddyj"><a href="https://github.com/sktelecom/bomlens" rel="me" class="sl-flex astro-n2mnl6yq"><span class="sr-only astro-n2mnl6yq">GitHub</span><svg aria-hidden="true" class="astro-n2mnl6yq astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M12 .3a12 12 0 0 0-3.8 23.38c.6.12.83-.26.83-.57L9 21.07c-3.34.72-4.04-1.61-4.04-1.61-.55-1.39-1.34-1.76-1.34-1.76-1.08-.74.09-.73.09-.73 1.2.09 1.83 1.24 1.83 1.24 1.08 1.83 2.81 1.3 3.5 1 .1-.78.42-1.31.76-1.61-2.67-.3-5.47-1.33-5.47-5.93 0-1.31.47-2.38 1.24-3.22-.14-.3-.54-1.52.1-3.18 0 0 1-.32 3.3 1.23a11.5 11.5 0 0 1 6 0c2.28-1.55 3.29-1.23 3.29-1.23.64 1.66.24 2.88.12 3.18a4.65 4.65 0 0 1 1.23 3.22c0 4.61-2.8 5.63-5.48 5.92.42.36.81 1.1.81 2.22l-.01 3.29c0 .31.2.69.82.57A12 12 0 0 0 12 .3Z"/></svg></a></div><starlight-theme-select><label style="--sl-select-width: 6.25em" class="astro-2z5xp7gb"><span class="sr-only astro-2z5xp7gb">Select theme</span><svg aria-hidden="true" class="icon label-icon astro-2z5xp7gb astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M21 14h-1V7a3 3 0 0 0-3-3H7a3 3 0 0 0-3 3v7H3a1 1 0 0 0-1 1v2a3 3 0 0 0 3 3h14a3 3 0 0 0 3-3v-2a1 1 0 0 0-1-1ZM6 7a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v7H6V7Zm14 10a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-1h16v1Z"/></svg><select autocomplete="off" class="astro-2z5xp7gb"><option value="dark" class="astro-2z5xp7gb">Dark</option><option value="light" class="astro-2z5xp7gb">Light</option><option value="auto" selected class="astro-2z5xp7gb">Auto</option></select><svg aria-hidden="true" class="icon caret astro-2z5xp7gb astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M17 9.17a1 1 0 0 0-1.41 0L12 12.71 8.46 9.17a1 1 0 1 0-1.41 1.42l4.24 4.24a1.002 1.002 0 0 0 1.42 0L17 10.59a1.002 1.002 0 0 0 0-1.42Z"/></svg></label></starlight-theme-select><script>
+	StarlightThemeProvider.updatePickers();
+</script><script type="module">var e=`starlight-theme`,t=e=>e===`auto`||e===`dark`||e===`light`?e:`auto`,n=()=>t(typeof localStorage<`u`&&localStorage.getItem(e));function r(t){typeof localStorage<`u`&&localStorage.setItem(e,t===`light`||t===`dark`?t:``)}var i=()=>matchMedia(`(prefers-color-scheme: light)`).matches?`light`:`dark`;function a(e){StarlightThemeProvider.updatePickers(e),document.documentElement.dataset.theme=e===`auto`?i():e,r(e)}matchMedia(`(prefers-color-scheme: light)`).addEventListener(`change`,()=>{n()===`auto`&&a(`auto`)});var o=class extends HTMLElement{constructor(){super(),a(n()),this.querySelector(`select`)?.addEventListener(`change`,e=>{e.currentTarget instanceof HTMLSelectElement&&a(t(e.currentTarget.value))})}};customElements.define(`starlight-theme-select`,o);</script><starlight-lang-select><label style="--sl-select-width: 7em" class="astro-2z5xp7gb"><span class="sr-only astro-2z5xp7gb">Select language</span><svg aria-hidden="true" class="icon label-icon astro-2z5xp7gb astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path fill-rule="evenodd" d="M8.516 3a.94.94 0 0 0-.941.94v1.15H2.94a.94.94 0 1 0 0 1.882h7.362a7.422 7.422 0 0 1-1.787 3.958 7.42 7.42 0 0 1-1.422-2.425.94.94 0 1 0-1.774.627 9.303 9.303 0 0 0 1.785 3.043 7.422 7.422 0 0 1-4.164 1.278.94.94 0 1 0 0 1.881 9.303 9.303 0 0 0 5.575-1.855 9.303 9.303 0 0 0 4.11 1.74l-.763 1.525a.968.968 0 0 0-.016.034l-1.385 2.77a.94.94 0 1 0 1.683.841l1.133-2.267h5.806l1.134 2.267a.94.94 0 0 0 1.683-.841l-1.385-2.769a.95.95 0 0 0-.018-.036l-3.476-6.951a.94.94 0 0 0-1.682 0l-1.82 3.639a7.423 7.423 0 0 1-3.593-1.256 9.303 9.303 0 0 0 2.27-5.203h1.894a.94.94 0 0 0 0-1.881H9.456V3.94A.94.94 0 0 0 8.516 3Zm6.426 11.794a1.068 1.068 0 0 1-.02.039l-.703 1.407h3.924l-1.962-3.924-1.24 2.478Z" clip-rule="evenodd"/></svg><select autocomplete="off" class="astro-2z5xp7gb"><option value="/bomlens/reference/docker-image/" class="astro-2z5xp7gb">English</option><option value="/bomlens/ko/reference/docker-image/" class="astro-2z5xp7gb">한국어</option></select><svg aria-hidden="true" class="icon caret astro-2z5xp7gb astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M17 9.17a1 1 0 0 0-1.41 0L12 12.71 8.46 9.17a1 1 0 1 0-1.41 1.42l4.24 4.24a1.002 1.002 0 0 0 1.42 0L17 10.59a1.002 1.002 0 0 0 0-1.42Z"/></svg></label></starlight-lang-select><script type="module">var e=class extends HTMLElement{constructor(){super();let e=this.querySelector(`select`);e&&(e.addEventListener(`change`,e=>{e.currentTarget instanceof HTMLSelectElement&&(window.location.pathname=e.currentTarget.value)}),window.addEventListener(`pageshow`,t=>{if(!t.persisted)return;let n=e.querySelector(`option[selected]`)?.index;n!==e.selectedIndex&&(e.selectedIndex=n??0)}))}};customElements.define(`starlight-lang-select`,e);</script></div></div></header><nav class="sidebar print:hidden astro-yntsjkba" aria-label="Main"><button popovertarget="starlight__sidebar" class="sl-menu-button sl-flex md:sl-hidden print:hidden astro-r2osgdlg"><svg aria-hidden="true" class="open-menu astro-r2osgdlg astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M3 8h18a1 1 0 1 0 0-2H3a1 1 0 0 0 0 2Zm18 8H3a1 1 0 0 0 0 2h18a1 1 0 0 0 0-2Zm0-5H3a1 1 0 0 0 0 2h18a1 1 0 0 0 0-2Z"/></svg><svg aria-hidden="true" class="close-menu astro-r2osgdlg astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="m13.41 12 6.3-6.29a1.004 1.004 0 1 0-1.42-1.42L12 10.59l-6.29-6.3a1.004 1.004 0 0 0-1.42 1.42l6.3 6.29-6.3 6.29a1 1 0 0 0 0 1.42.998.998 0 0 0 1.42 0l6.29-6.3 6.29 6.3a.999.999 0 0 0 1.42 0 1 1 0 0 0 0-1.42L13.41 12Z"/></svg><span class="sr-only astro-r2osgdlg">Menu</span></button><script type="module">var e=class extends HTMLElement{constructor(){super();let e=matchMedia(`(min-width: 50em)`),t=()=>{this.popover=e.matches?null:`auto`};t(),e.addEventListener(`change`,()=>t()),this.addEventListener(`toggle`,({newState:e})=>this.trapFocus(e===`open`))}trapFocus(e){document.querySelectorAll(`.main-frame, .sl-skip-link`).forEach(t=>{t.toggleAttribute(`inert`,e)})}};customElements.define(`sl-sidebar-pane`,e);</script><sl-sidebar-pane popover id="starlight__sidebar" class="sidebar-pane astro-yntsjkba"><div class="sidebar-content sl-flex astro-yntsjkba"><sl-sidebar-state-persist data-hash="0e9vtkm" class="astro-ipdry5cl"><script aria-hidden="true">
+		(() => {
+			try {
+				if (!matchMedia('(min-width: 50em)').matches) return;
+				/** @type {HTMLElement | null} */
+				const target = document.querySelector('sl-sidebar-state-persist');
+				const state = JSON.parse(sessionStorage.getItem('sl-sidebar-state') || '0');
+				if (!target || !state || target.dataset.hash !== state.hash) return;
+				window._starlightScrollRestore = state.scroll;
+				customElements.define(
+					'sl-sidebar-restore',
+					class SidebarRestore extends HTMLElement {
+						connectedCallback() {
+							try {
+								const idx = parseInt(this.dataset.index || '');
+								const details = this.closest('details');
+								if (details && typeof state.open[idx] === 'boolean') details.open = state.open[idx];
+							} catch {}
+						}
+					}
+				);
+			} catch {}
+		})();
+	</script><ul class="top-level astro-rmhv4bp6"><li class="astro-rmhv4bp6"><details open class="astro-rmhv4bp6"><summary class="astro-rmhv4bp6"><span class="group-label astro-rmhv4bp6"><span class="large astro-rmhv4bp6">Get started</span></span><svg aria-hidden="true" class="caret astro-rmhv4bp6 astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1.25rem;"><path d="m14.83 11.29-4.24-4.24a1 1 0 1 0-1.42 1.41L12.71 12l-3.54 3.54a1 1 0 0 0 0 1.41 1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.24-4.24a1.002 1.002 0 0 0 0-1.42Z"/></svg></summary><sl-sidebar-restore data-index="0"></sl-sidebar-restore><ul class="astro-rmhv4bp6"><li class="astro-rmhv4bp6"><a href="/bomlens/concepts/what-is-sbom/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">What is an SBOM</span></a></li><li class="astro-rmhv4bp6"><a href="/bomlens/start/first-scan/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">Getting started</span></a></li><li class="astro-rmhv4bp6"><a href="/bomlens/start/no-cli/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">No-CLI quick start (no command line)</span></a></li><li class="astro-rmhv4bp6"><a href="/bomlens/reference/ui/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">Web UI &amp; desktop app</span></a></li></ul></details></li><li class="astro-rmhv4bp6"><details open class="astro-rmhv4bp6"><summary class="astro-rmhv4bp6"><span class="group-label astro-rmhv4bp6"><span class="large astro-rmhv4bp6">Guides</span></span><svg aria-hidden="true" class="caret astro-rmhv4bp6 astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1.25rem;"><path d="m14.83 11.29-4.24-4.24a1 1 0 1 0-1.42 1.41L12.71 12l-3.54 3.54a1 1 0 0 0 0 1.41 1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.24-4.24a1.002 1.002 0 0 0 0-1.42Z"/></svg></summary><sl-sidebar-restore data-index="1"></sl-sidebar-restore><ul class="astro-rmhv4bp6"><li class="astro-rmhv4bp6"><a href="/bomlens/guides/ai-model/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">AI model SBOM guide</span></a></li><li class="astro-rmhv4bp6"><a href="/bomlens/guides/by-input/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">Input scenarios guide</span></a></li><li class="astro-rmhv4bp6"><a href="/bomlens/guides/ci-cd/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">Use in CI/CD</span></a></li><li class="astro-rmhv4bp6"><a href="/bomlens/guides/declared-components/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">Declaring your own components</span></a></li><li class="astro-rmhv4bp6"><a href="/bomlens/guides/firmware/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">Firmware analysis guide</span></a></li><li class="astro-rmhv4bp6"><a href="/bomlens/guides/identify-vendored/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">Identify bundled open source (C/C++)</span></a></li><li class="astro-rmhv4bp6"><a href="/bomlens/guides/reports/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">Generate notice, security &amp; risk reports</span></a></li><li class="astro-rmhv4bp6"><a href="/bomlens/guides/server-delivery/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">Server SBOM guide</span></a></li><li class="astro-rmhv4bp6"><a href="/bomlens/guides/supplier-sbom/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">Supplier SBOM validation guide</span></a></li><li class="astro-rmhv4bp6"><a href="/bomlens/guides/upload/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">Upload to Dependency-Track / TRUSCA</span></a></li><li class="astro-rmhv4bp6"><a href="/bomlens/guides/verify-release/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">Verify a release</span></a></li></ul></details></li><li class="astro-rmhv4bp6"><details open class="astro-rmhv4bp6"><summary class="astro-rmhv4bp6"><span class="group-label astro-rmhv4bp6"><span class="large astro-rmhv4bp6">Reference</span></span><svg aria-hidden="true" class="caret astro-rmhv4bp6 astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1.25rem;"><path d="m14.83 11.29-4.24-4.24a1 1 0 1 0-1.42 1.41L12.71 12l-3.54 3.54a1 1 0 0 0 0 1.41 1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.24-4.24a1.002 1.002 0 0 0 0-1.42Z"/></svg></summary><sl-sidebar-restore data-index="2"></sl-sidebar-restore><ul class="astro-rmhv4bp6"><li class="astro-rmhv4bp6"><a href="/bomlens/reference/artifacts/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">Artifacts reference</span></a></li><li class="astro-rmhv4bp6"><a href="/bomlens/reference/cli/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">CLI reference</span></a></li><li class="astro-rmhv4bp6"><a href="/bomlens/reference/docker-image/" aria-current="page" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">Use the Docker image directly</span></a></li><li class="astro-rmhv4bp6"><a href="/bomlens/reference/ecosystems/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">Supported ecosystems</span></a></li><li class="astro-rmhv4bp6"><a href="/bomlens/reference/engine-contract/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">Engine contract</span></a></li><li class="astro-rmhv4bp6"><a href="/bomlens/reference/ui/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">Web UI &amp; desktop app</span></a></li></ul></details></li><li class="astro-rmhv4bp6"><details open class="astro-rmhv4bp6"><summary class="astro-rmhv4bp6"><span class="group-label astro-rmhv4bp6"><span class="large astro-rmhv4bp6">Concepts</span></span><svg aria-hidden="true" class="caret astro-rmhv4bp6 astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1.25rem;"><path d="m14.83 11.29-4.24-4.24a1 1 0 1 0-1.42 1.41L12.71 12l-3.54 3.54a1 1 0 0 0 0 1.41 1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.24-4.24a1.002 1.002 0 0 0 0-1.42Z"/></svg></summary><sl-sidebar-restore data-index="3"></sl-sidebar-restore><ul class="astro-rmhv4bp6"><li class="astro-rmhv4bp6"><a href="/bomlens/concepts/architecture/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">Architecture</span></a></li><li class="astro-rmhv4bp6"><a href="/bomlens/concepts/dependency-resolution/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">How dependencies are resolved</span></a></li><li class="astro-rmhv4bp6"><a href="/bomlens/concepts/limitations/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">What BomLens does not do</span></a></li><li class="astro-rmhv4bp6"><a href="/bomlens/concepts/local-first/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">Local-first by design</span></a></li><li class="astro-rmhv4bp6"><a href="/bomlens/concepts/pipeline-by-input/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">Pipeline by input type</span></a></li><li class="astro-rmhv4bp6"><a href="/bomlens/concepts/reports-explained/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">What the reports mean</span></a></li><li class="astro-rmhv4bp6"><a href="/bomlens/concepts/what-is-sbom/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">What is an SBOM</span></a></li></ul></details></li></ul><script aria-hidden="true">
+		(() => {
+			const scroller = document.getElementById('starlight__sidebar');
+			if (!window._starlightScrollRestore || !scroller) return;
+			scroller.scrollTop = window._starlightScrollRestore;
+			delete window._starlightScrollRestore;
+		})();
+	</script></sl-sidebar-state-persist><div class="md:sl-hidden"><div class="mobile-preferences sl-flex astro-p4azlveh"><div class="social-icons astro-p4azlveh"><a href="https://github.com/sktelecom/bomlens" rel="me" class="sl-flex astro-n2mnl6yq"><span class="sr-only astro-n2mnl6yq">GitHub</span><svg aria-hidden="true" class="astro-n2mnl6yq astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M12 .3a12 12 0 0 0-3.8 23.38c.6.12.83-.26.83-.57L9 21.07c-3.34.72-4.04-1.61-4.04-1.61-.55-1.39-1.34-1.76-1.34-1.76-1.08-.74.09-.73.09-.73 1.2.09 1.83 1.24 1.83 1.24 1.08 1.83 2.81 1.3 3.5 1 .1-.78.42-1.31.76-1.61-2.67-.3-5.47-1.33-5.47-5.93 0-1.31.47-2.38 1.24-3.22-.14-.3-.54-1.52.1-3.18 0 0 1-.32 3.3 1.23a11.5 11.5 0 0 1 6 0c2.28-1.55 3.29-1.23 3.29-1.23.64 1.66.24 2.88.12 3.18a4.65 4.65 0 0 1 1.23 3.22c0 4.61-2.8 5.63-5.48 5.92.42.36.81 1.1.81 2.22l-.01 3.29c0 .31.2.69.82.57A12 12 0 0 0 12 .3Z"/></svg></a></div><starlight-theme-select><label style="--sl-select-width: 6.25em" class="astro-2z5xp7gb"><span class="sr-only astro-2z5xp7gb">Select theme</span><svg aria-hidden="true" class="icon label-icon astro-2z5xp7gb astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M21 14h-1V7a3 3 0 0 0-3-3H7a3 3 0 0 0-3 3v7H3a1 1 0 0 0-1 1v2a3 3 0 0 0 3 3h14a3 3 0 0 0 3-3v-2a1 1 0 0 0-1-1ZM6 7a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v7H6V7Zm14 10a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-1h16v1Z"/></svg><select autocomplete="off" class="astro-2z5xp7gb"><option value="dark" class="astro-2z5xp7gb">Dark</option><option value="light" class="astro-2z5xp7gb">Light</option><option value="auto" selected class="astro-2z5xp7gb">Auto</option></select><svg aria-hidden="true" class="icon caret astro-2z5xp7gb astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M17 9.17a1 1 0 0 0-1.41 0L12 12.71 8.46 9.17a1 1 0 1 0-1.41 1.42l4.24 4.24a1.002 1.002 0 0 0 1.42 0L17 10.59a1.002 1.002 0 0 0 0-1.42Z"/></svg></label></starlight-theme-select><script>
+	StarlightThemeProvider.updatePickers();
+</script><starlight-lang-select><label style="--sl-select-width: 7em" class="astro-2z5xp7gb"><span class="sr-only astro-2z5xp7gb">Select language</span><svg aria-hidden="true" class="icon label-icon astro-2z5xp7gb astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path fill-rule="evenodd" d="M8.516 3a.94.94 0 0 0-.941.94v1.15H2.94a.94.94 0 1 0 0 1.882h7.362a7.422 7.422 0 0 1-1.787 3.958 7.42 7.42 0 0 1-1.422-2.425.94.94 0 1 0-1.774.627 9.303 9.303 0 0 0 1.785 3.043 7.422 7.422 0 0 1-4.164 1.278.94.94 0 1 0 0 1.881 9.303 9.303 0 0 0 5.575-1.855 9.303 9.303 0 0 0 4.11 1.74l-.763 1.525a.968.968 0 0 0-.016.034l-1.385 2.77a.94.94 0 1 0 1.683.841l1.133-2.267h5.806l1.134 2.267a.94.94 0 0 0 1.683-.841l-1.385-2.769a.95.95 0 0 0-.018-.036l-3.476-6.951a.94.94 0 0 0-1.682 0l-1.82 3.639a7.423 7.423 0 0 1-3.593-1.256 9.303 9.303 0 0 0 2.27-5.203h1.894a.94.94 0 0 0 0-1.881H9.456V3.94A.94.94 0 0 0 8.516 3Zm6.426 11.794a1.068 1.068 0 0 1-.02.039l-.703 1.407h3.924l-1.962-3.924-1.24 2.478Z" clip-rule="evenodd"/></svg><select autocomplete="off" class="astro-2z5xp7gb"><option value="/bomlens/reference/docker-image/" class="astro-2z5xp7gb">English</option><option value="/bomlens/ko/reference/docker-image/" class="astro-2z5xp7gb">한국어</option></select><svg aria-hidden="true" class="icon caret astro-2z5xp7gb astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M17 9.17a1 1 0 0 0-1.41 0L12 12.71 8.46 9.17a1 1 0 1 0-1.41 1.42l4.24 4.24a1.002 1.002 0 0 0 1.42 0L17 10.59a1.002 1.002 0 0 0 0-1.42Z"/></svg></label></starlight-lang-select></div></div></div></sl-sidebar-pane></nav><div class="main-frame astro-yntsjkba"><script type="module">var e=document.getElementById(`starlight__sidebar`),t=e?.querySelector(`sl-sidebar-state-persist`),n=`sl-sidebar-state`,r=()=>{let r=[],i=t?.dataset.hash||``;try{let e=sessionStorage.getItem(n),t=JSON.parse(e||`{}`);Array.isArray(t.open)&&t.hash===i&&(r=t.open)}catch{}return{hash:i,open:r,scroll:e?.scrollTop||0}},i=e=>{try{sessionStorage.setItem(n,JSON.stringify(e))}catch{}},a=()=>i(r()),o=(e,t)=>{let n=r();n.open[t]=e,i(n)};t?.addEventListener(`click`,e=>{if(!(e.target instanceof Element))return;let t=e.target.closest(`summary`)?.closest(`details`);if(!t)return;let n=t.querySelector(`sl-sidebar-restore`),r=parseInt(n?.dataset.index||``);isNaN(r)||o(!t.open,r)}),addEventListener(`visibilitychange`,()=>{document.visibilityState===`hidden`&&a()});</script><div class="lg:sl-flex astro-lrzkfocr"><aside class="right-sidebar-container print:hidden astro-lrzkfocr"><div class="right-sidebar astro-lrzkfocr"><div class="lg:sl-hidden astro-qok35upx"><mobile-starlight-toc data-min-h="2" data-max-h="3" class="astro-66cqc7ze"><nav aria-labelledby="starlight__on-this-page--mobile" class="astro-66cqc7ze"><details id="starlight__mobile-toc" class="astro-66cqc7ze"><summary id="starlight__on-this-page--mobile" class="sl-flex astro-66cqc7ze"><span class="toggle sl-flex astro-66cqc7ze">On this page<svg aria-hidden="true" class="caret astro-66cqc7ze astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1rem;"><path d="m14.83 11.29-4.24-4.24a1 1 0 1 0-1.42 1.41L12.71 12l-3.54 3.54a1 1 0 0 0 0 1.41 1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.24-4.24a1.002 1.002 0 0 0 0-1.42Z"/></svg></span><span class="display-current astro-66cqc7ze"></span></summary><div class="dropdown astro-66cqc7ze"><ul class="isMobile astro-jugkfwgx" style="--depth: 0;"><li style="--depth: 0;" class="astro-jugkfwgx"><a href="#_top" style="--depth: 0;" class="astro-jugkfwgx"><span style="--depth: 0;" class="astro-jugkfwgx">Overview</span></a></li><li style="--depth: 0;" class="astro-jugkfwgx"><a href="#images-and-tags" style="--depth: 0;" class="astro-jugkfwgx"><span style="--depth: 0;" class="astro-jugkfwgx">Images and tags</span></a></li><li style="--depth: 0;" class="astro-jugkfwgx"><a href="#what-is-in-the-image" style="--depth: 0;" class="astro-jugkfwgx"><span style="--depth: 0;" class="astro-jugkfwgx">What is in the image</span></a></li><li style="--depth: 0;" class="astro-jugkfwgx"><a href="#running-directly" style="--depth: 0;" class="astro-jugkfwgx"><span style="--depth: 0;" class="astro-jugkfwgx">Running directly</span></a><ul class="isMobile astro-jugkfwgx" style="--depth: 1;"><li style="--depth: 1;" class="astro-jugkfwgx"><a href="#analyze-a-docker-image" style="--depth: 1;" class="astro-jugkfwgx"><span style="--depth: 1;" class="astro-jugkfwgx">Analyze a Docker image</span></a></li><li style="--depth: 1;" class="astro-jugkfwgx"><a href="#analyze-a-binary-file" style="--depth: 1;" class="astro-jugkfwgx"><span style="--depth: 1;" class="astro-jugkfwgx">Analyze a binary file</span></a></li><li style="--depth: 1;" class="astro-jugkfwgx"><a href="#analyze-a-source-directory" style="--depth: 1;" class="astro-jugkfwgx"><span style="--depth: 1;" class="astro-jugkfwgx">Analyze a source directory</span></a></li><li style="--depth: 1;" class="astro-jugkfwgx"><a href="#notice-and-reports-in-one-run" style="--depth: 1;" class="astro-jugkfwgx"><span style="--depth: 1;" class="astro-jugkfwgx">Notice and reports in one run</span></a></li></ul></li><li style="--depth: 0;" class="astro-jugkfwgx"><a href="#environment-variables" style="--depth: 0;" class="astro-jugkfwgx"><span style="--depth: 0;" class="astro-jugkfwgx">Environment variables</span></a></li><li style="--depth: 0;" class="astro-jugkfwgx"><a href="#building-and-publishing-the-image" style="--depth: 0;" class="astro-jugkfwgx"><span style="--depth: 0;" class="astro-jugkfwgx">Building and publishing the image</span></a></li></ul></div></details></nav></mobile-starlight-toc><script type="module" src="/bomlens/_astro/MobileTableOfContents.astro_astro_type_script_index_0_lang.C3fM4Kra.js"></script></div><div class="right-sidebar-panel sl-hidden lg:sl-block astro-qok35upx"><div class="sl-container astro-qok35upx"><starlight-toc data-min-h="2" data-max-h="3"><nav aria-labelledby="starlight__on-this-page"><h2 id="starlight__on-this-page">On this page</h2><ul class="astro-jugkfwgx" style="--depth: 0;"><li style="--depth: 0;" class="astro-jugkfwgx"><a href="#_top" style="--depth: 0;" class="astro-jugkfwgx"><span style="--depth: 0;" class="astro-jugkfwgx">Overview</span></a></li><li style="--depth: 0;" class="astro-jugkfwgx"><a href="#images-and-tags" style="--depth: 0;" class="astro-jugkfwgx"><span style="--depth: 0;" class="astro-jugkfwgx">Images and tags</span></a></li><li style="--depth: 0;" class="astro-jugkfwgx"><a href="#what-is-in-the-image" style="--depth: 0;" class="astro-jugkfwgx"><span style="--depth: 0;" class="astro-jugkfwgx">What is in the image</span></a></li><li style="--depth: 0;" class="astro-jugkfwgx"><a href="#running-directly" style="--depth: 0;" class="astro-jugkfwgx"><span style="--depth: 0;" class="astro-jugkfwgx">Running directly</span></a><ul class="astro-jugkfwgx" style="--depth: 1;"><li style="--depth: 1;" class="astro-jugkfwgx"><a href="#analyze-a-docker-image" style="--depth: 1;" class="astro-jugkfwgx"><span style="--depth: 1;" class="astro-jugkfwgx">Analyze a Docker image</span></a></li><li style="--depth: 1;" class="astro-jugkfwgx"><a href="#analyze-a-binary-file" style="--depth: 1;" class="astro-jugkfwgx"><span style="--depth: 1;" class="astro-jugkfwgx">Analyze a binary file</span></a></li><li style="--depth: 1;" class="astro-jugkfwgx"><a href="#analyze-a-source-directory" style="--depth: 1;" class="astro-jugkfwgx"><span style="--depth: 1;" class="astro-jugkfwgx">Analyze a source directory</span></a></li><li style="--depth: 1;" class="astro-jugkfwgx"><a href="#notice-and-reports-in-one-run" style="--depth: 1;" class="astro-jugkfwgx"><span style="--depth: 1;" class="astro-jugkfwgx">Notice and reports in one run</span></a></li></ul></li><li style="--depth: 0;" class="astro-jugkfwgx"><a href="#environment-variables" style="--depth: 0;" class="astro-jugkfwgx"><span style="--depth: 0;" class="astro-jugkfwgx">Environment variables</span></a></li><li style="--depth: 0;" class="astro-jugkfwgx"><a href="#building-and-publishing-the-image" style="--depth: 0;" class="astro-jugkfwgx"><span style="--depth: 0;" class="astro-jugkfwgx">Building and publishing the image</span></a></li></ul></nav></starlight-toc><script type="module" src="/bomlens/_astro/TableOfContents.astro_astro_type_script_index_0_lang.BpJaGz7G.js"></script></div></div></div></aside><div class="main-pane astro-lrzkfocr"><main data-pagefind-body class="astro-g5ptsecz" lang="en" dir="ltr"><div class="content-panel astro-a7po4psb"><div class="sl-container astro-a7po4psb"><nav class="breadcrumbs astro-u72m6wot" aria-label="Breadcrumb"><ol class="astro-u72m6wot"><li class="astro-u72m6wot"><a href="/bomlens/" class="astro-u72m6wot">Home</a></li><li class="astro-u72m6wot"><span class="astro-u72m6wot">Reference</span></li></ol></nav><h1 id="_top" class="astro-u72m6wot">Use the Docker image directly</h1></div></div><div class="content-panel astro-a7po4psb"><div class="sl-container astro-a7po4psb"><div class="sl-markdown-content"><p>For everyday use we recommend the <a href="/bomlens/reference/cli/"><code dir="auto">scan-sbom.sh</code></a> script, which handles language detection, image selection, and volume mounts for you. This document explains how to call the image directly with <code dir="auto">docker run</code> in environments where the script cannot live (CI runners, Kubernetes jobs, and so on).</p>
+<div class="sl-heading-wrapper level-h2"><h2 id="images-and-tags">Images and tags</h2><a class="sl-anchor-link" href="#images-and-tags"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “Images and tags”</span></a></div>
+<table>
+<thead>
+<tr>
+<th>Image</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code dir="auto">ghcr.io/sktelecom/bomlens</code></td>
+<td>Scanning and post-processing (canonical name)</td>
+</tr>
+<tr>
+<td><code dir="auto">ghcr.io/sktelecom/sbom-generator</code>, <code dir="auto">ghcr.io/sktelecom/sbom-scanner</code></td>
+<td>Aliases of the same image (former names, same digest)</td>
+</tr>
+<tr>
+<td><code dir="auto">ghcr.io/sktelecom/bomlens-firmware</code></td>
+<td>Firmware analysis (includes GPL tools, opt-in) (legacy alias: sbom-scanner-firmware)</td>
+</tr>
+<tr>
+<td><code dir="auto">ghcr.io/sktelecom/bomlens-deep-cve</code></td>
+<td>Bundles grype for deep CVE matching (opt-in). Used by the CLI’s <code dir="auto">--deep-cve</code> and by the web UI’s Deep CVE matching toggle, both of which pull it automatically as a sibling container when it is not already the running image</td>
+</tr>
+<tr>
+<td><code dir="auto">ghcr.io/sktelecom/bomlens-deep-license</code></td>
+<td>Bundles scancode for licence detection in the project’s own files (opt-in). Used by the CLI’s <code dir="auto">--deep-license</code> for a source scan, pulled automatically. Carries LGPL components (7-Zip on linux/amd64, intbitset, chardet); the source for 7-Zip and intbitset is in the image under <code dir="auto">/usr/share/bomlens/sources/</code>, and chardet ships as Python source</td>
+</tr>
+<tr>
+<td><code dir="auto">ghcr.io/sktelecom/bomlens-aibom</code></td>
+<td>Generates an AI-model ML-BOM (opt-in, legacy alias: sbom-scanner-aibom). Used by <code dir="auto">--model</code>/<code dir="auto">--model-file</code> and the web UI’s AI model tile, pulled automatically as a sibling container</td>
+</tr>
+</tbody>
+</table>
+<p><code dir="auto">latest</code> and version tags are available. All published images (<code dir="auto">ghcr.io/sktelecom/bomlens</code>, <code dir="auto">bomlens-firmware</code>, <code dir="auto">bomlens-deep-cve</code>, <code dir="auto">bomlens-deep-license</code>, <code dir="auto">bomlens-aibom</code>, and their aliases) support both <code dir="auto">linux/amd64</code> and <code dir="auto">linux/arm64</code>, so pulling any of them on an <code dir="auto">arm64</code> host (an Apple Silicon Mac, an Arm server) works natively. Images are signed with cosign before publishing.</p>
+<p>On an <code dir="auto">arm64</code> host, do not force <code dir="auto">linux/amd64</code> (<code dir="auto">--platform linux/amd64</code> or <code dir="auto">DOCKER_DEFAULT_PLATFORM=linux/amd64</code>): the image then runs under emulation, where syft in the firmware image can crash. A firmware scan tries a failed syft pass once more (not one that ran out of its time limit or was killed for memory), says in the log that it runs under emulation, and records <code dir="auto">generate</code> as <code dir="auto">degraded</code> in <code dir="auto">bomlens-result.json</code> when the second try also fails.</p>
+<div class="expressive-code"><link rel="stylesheet" href="/bomlens/_astro/ec.klmer.css"><script type="module" src="/bomlens/_astro/ec.0vx5m.js"></script><figure class="frame not-content"><figcaption class="header"></figcaption><pre data-language="bash"><code><div class="ec-line"><div class="code"><span style="--0:#6F42C1;--1:#B392F0">docker</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#032F62;--1:#9ECBFF">pull</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#032F62;--1:#9ECBFF">ghcr.io/sktelecom/bomlens:latest</span></div></div></code></pre><div class="copy"><div aria-live="polite"></div><button title="Copy to clipboard" data-copied="Copied!" data-code="docker pull ghcr.io/sktelecom/bomlens:latest"><div></div></button></div></figure></div>
+<div class="sl-heading-wrapper level-h2"><h2 id="what-is-in-the-image">What is in the image</h2><a class="sl-anchor-link" href="#what-is-in-the-image"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “What is in the image”</span></a></div>
+<p>It is a lightweight image (based on python 3.12 slim) without language toolchains. For source scans, transitive dependency resolution is handled by the script, which pulls per-language cdxgen images separately. See <a href="/bomlens/concepts/architecture/">Architecture</a> for the structure.</p>
+<table>
+<thead>
+<tr>
+<th>Tool</th>
+<th>Version</th>
+<th>Role</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>syft</td>
+<td>v1.54.1</td>
+<td>Scans images, binaries, and directories</td>
+</tr>
+<tr>
+<td>Trivy</td>
+<td>v0.75.0</td>
+<td>Vulnerability report</td>
+</tr>
+<tr>
+<td>cosign</td>
+<td>v3.1.3</td>
+<td>SBOM signing</td>
+</tr>
+<tr>
+<td>jq</td>
+<td>—</td>
+<td>SBOM normalization and notice generation</td>
+</tr>
+<tr>
+<td>ScanCode Toolkit</td>
+<td>32.5.0</td>
+<td>Precise license detection (included only in opt-in builds)</td>
+</tr>
+<tr>
+<td>SCANOSS</td>
+<td>1.54.2</td>
+<td>Identifies open source copied into C/C++ source (<code dir="auto">--identify-vendored</code>)</td>
+</tr>
+<tr>
+<td>docker CLI</td>
+<td>29.9.0</td>
+<td>Starts a sibling cdxgen container when the web UI runs a source scan</td>
+</tr>
+<tr>
+<td>cdxgen</td>
+<td>13.5.0</td>
+<td>Model pedigree enrichment (<code dir="auto">bomlens-aibom</code> image only)</td>
+</tr>
+</tbody>
+</table>
+<p>Tool versions are pinned with <code dir="auto">ARG</code> in <code dir="auto">docker/Dockerfile</code>.</p>
+<p>Every image also carries the NVD CPE index (<code dir="auto">cpe_match.sqlite</code>, about 146 MB), built from the NVD data when the image is built. Firmware, root filesystem and binary scans with <code dir="auto">--security</code> match the CPEs of components that have no package PURL against it, with no network (see <a href="/bomlens/guides/firmware/#how-cves-are-matched">How CVEs are matched</a>). Building it clones the NVD data feeds from GitHub. When you build an image yourself where GitHub is not reachable, the build stops at that step and names <code dir="auto">--build-arg SBOM_CPE_INDEX=false</code>, which leaves the index out; a firmware build does not accept it, so the firmware image always has the index.</p>
+<div class="sl-heading-wrapper level-h2"><h2 id="running-directly">Running directly</h2><a class="sl-anchor-link" href="#running-directly"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “Running directly”</span></a></div>
+<p>Select the analysis mode with the <code dir="auto">MODE</code> environment variable. All examples below leave their outputs in the current directory and do not upload anything (<code dir="auto">UPLOAD_ENABLED=false</code>).</p>
+<div class="sl-heading-wrapper level-h3"><h3 id="analyze-a-docker-image">Analyze a Docker image</h3><a class="sl-anchor-link" href="#analyze-a-docker-image"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “Analyze a Docker image”</span></a></div>
+<p>On Git Bash (Windows), MSYS rewrites both <code dir="auto">/var/run/docker.sock</code> and the
+container-side <code dir="auto">/host-output</code> into Windows paths before Docker ever sees
+them, silently breaking both mounts. <code dir="auto">MSYS_NO_PATHCONV</code> and
+<code dir="auto">MSYS2_ARG_CONV_EXCL</code> below turn that rewriting off, and <code dir="auto">cygpath -m</code>
+converts the host side back by hand instead (<code dir="auto">scripts/scan-sbom.sh</code> uses the
+same pair for the same reason). WSL2, macOS and Linux shells don’t rewrite
+paths and skip straight to the plain <code dir="auto">docker run</code> line.</p>
+<!-- runnable -->
+<div class="expressive-code"><figure class="frame not-content"><figcaption class="header"></figcaption><pre data-language="bash"><code><div class="ec-line"><div class="code"><span style="--0:#24292E;--1:#E1E4E8">HOSTPATH</span><span style="--0:#BF3441;--1:#F97583">=</span><span style="--0:#032F62;--1:#9ECBFF">"$(</span><span style="--0:#6F42C1;--1:#B392F0">cygpath</span><span style="--0:#032F62;--1:#9ECBFF"> </span><span style="--0:#005CC5;--1:#79B8FF">-m</span><span style="--0:#032F62;--1:#9ECBFF"> "$(</span><span style="--0:#005CC5;--1:#79B8FF">pwd</span><span style="--0:#032F62;--1:#9ECBFF">)" </span><span style="--0:#BF3441;--1:#F97583">2></span><span style="--0:#032F62;--1:#9ECBFF">/dev/null </span><span style="--0:#BF3441;--1:#F97583">||</span><span style="--0:#032F62;--1:#9ECBFF"> </span><span style="--0:#005CC5;--1:#79B8FF">pwd</span><span style="--0:#032F62;--1:#9ECBFF">)"</span></div></div><div class="ec-line"><div class="code"><span style="--0:#24292E;--1:#E1E4E8">MSYS_NO_PATHCONV</span><span style="--0:#BF3441;--1:#F97583">=</span><span style="--0:#032F62;--1:#9ECBFF">1</span><span style="--0:#24292E;--1:#E1E4E8"> MSYS2_ARG_CONV_EXCL</span><span style="--0:#BF3441;--1:#F97583">=</span><span style="--0:#032F62;--1:#9ECBFF">'*'</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#6F42C1;--1:#B392F0">docker</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#032F62;--1:#9ECBFF">run</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#005CC5;--1:#79B8FF">--rm</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#005CC5;--1:#79B8FF">\</span></div></div><div class="ec-line"><div class="code"><span class="indent">  </span><span style="--0:#005CC5;--1:#79B8FF">-v</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#032F62;--1:#9ECBFF">"</span><span style="--0:#24292E;--1:#E1E4E8">$HOSTPATH</span><span style="--0:#032F62;--1:#9ECBFF">":/host-output</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#005CC5;--1:#79B8FF">\</span></div></div><div class="ec-line"><div class="code"><span class="indent">  </span><span style="--0:#005CC5;--1:#79B8FF">-v</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#032F62;--1:#9ECBFF">/var/run/docker.sock:/var/run/docker.sock</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#005CC5;--1:#79B8FF">\</span></div></div><div class="ec-line"><div class="code"><span class="indent">  </span><span style="--0:#005CC5;--1:#79B8FF">-e</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#032F62;--1:#9ECBFF">MODE=IMAGE</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#005CC5;--1:#79B8FF">\</span></div></div><div class="ec-line"><div class="code"><span class="indent">  </span><span style="--0:#005CC5;--1:#79B8FF">-e</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#032F62;--1:#9ECBFF">TARGET_IMAGE="nginx:alpine"</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#005CC5;--1:#79B8FF">\</span></div></div><div class="ec-line"><div class="code"><span class="indent">  </span><span style="--0:#005CC5;--1:#79B8FF">-e</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#032F62;--1:#9ECBFF">UPLOAD_ENABLED=</span><span style="--0:#005CC5;--1:#79B8FF">false</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#005CC5;--1:#79B8FF">\</span></div></div><div class="ec-line"><div class="code"><span class="indent">  </span><span style="--0:#005CC5;--1:#79B8FF">-e</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#032F62;--1:#9ECBFF">HOST_OUTPUT_DIR=/host-output</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#005CC5;--1:#79B8FF">\</span></div></div><div class="ec-line"><div class="code"><span class="indent">  </span><span style="--0:#005CC5;--1:#79B8FF">-e</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#032F62;--1:#9ECBFF">PROJECT_NAME="Nginx"</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#005CC5;--1:#79B8FF">\</span></div></div><div class="ec-line"><div class="code"><span class="indent">  </span><span style="--0:#005CC5;--1:#79B8FF">-e</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#032F62;--1:#9ECBFF">PROJECT_VERSION="alpine"</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#005CC5;--1:#79B8FF">\</span></div></div><div class="ec-line"><div class="code"><span class="indent">  </span><span style="--0:#032F62;--1:#9ECBFF">ghcr.io/sktelecom/bomlens:latest</span></div></div></code></pre><div class="copy"><div aria-live="polite"></div><button title="Copy to clipboard" data-copied="Copied!" data-code="HOSTPATH=&#x22;$(cygpath -m &#x22;$(pwd)&#x22; 2>/dev/null || pwd)&#x22;MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL=&#x27;*&#x27; docker run --rm \  -v &#x22;$HOSTPATH&#x22;:/host-output \  -v /var/run/docker.sock:/var/run/docker.sock \  -e MODE=IMAGE \  -e TARGET_IMAGE=&#x22;nginx:alpine&#x22; \  -e UPLOAD_ENABLED=false \  -e HOST_OUTPUT_DIR=/host-output \  -e PROJECT_NAME=&#x22;Nginx&#x22; \  -e PROJECT_VERSION=&#x22;alpine&#x22; \  ghcr.io/sktelecom/bomlens:latest"><div></div></button></div></figure></div>
+<div class="sl-heading-wrapper level-h3"><h3 id="analyze-a-binary-file">Analyze a binary file</h3><a class="sl-anchor-link" href="#analyze-a-binary-file"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “Analyze a binary file”</span></a></div>
+<div class="expressive-code"><figure class="frame not-content"><figcaption class="header"></figcaption><pre data-language="bash"><code><div class="ec-line"><div class="code"><span style="--0:#24292E;--1:#E1E4E8">HOSTPATH</span><span style="--0:#BF3441;--1:#F97583">=</span><span style="--0:#032F62;--1:#9ECBFF">"$(</span><span style="--0:#6F42C1;--1:#B392F0">cygpath</span><span style="--0:#032F62;--1:#9ECBFF"> </span><span style="--0:#005CC5;--1:#79B8FF">-m</span><span style="--0:#032F62;--1:#9ECBFF"> "$(</span><span style="--0:#005CC5;--1:#79B8FF">pwd</span><span style="--0:#032F62;--1:#9ECBFF">)" </span><span style="--0:#BF3441;--1:#F97583">2></span><span style="--0:#032F62;--1:#9ECBFF">/dev/null </span><span style="--0:#BF3441;--1:#F97583">||</span><span style="--0:#032F62;--1:#9ECBFF"> </span><span style="--0:#005CC5;--1:#79B8FF">pwd</span><span style="--0:#032F62;--1:#9ECBFF">)"</span></div></div><div class="ec-line"><div class="code"><span style="--0:#24292E;--1:#E1E4E8">MSYS_NO_PATHCONV</span><span style="--0:#BF3441;--1:#F97583">=</span><span style="--0:#032F62;--1:#9ECBFF">1</span><span style="--0:#24292E;--1:#E1E4E8"> MSYS2_ARG_CONV_EXCL</span><span style="--0:#BF3441;--1:#F97583">=</span><span style="--0:#032F62;--1:#9ECBFF">'*'</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#6F42C1;--1:#B392F0">docker</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#032F62;--1:#9ECBFF">run</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#005CC5;--1:#79B8FF">--rm</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#005CC5;--1:#79B8FF">\</span></div></div><div class="ec-line"><div class="code"><span class="indent">  </span><span style="--0:#005CC5;--1:#79B8FF">-v</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#032F62;--1:#9ECBFF">"</span><span style="--0:#24292E;--1:#E1E4E8">$HOSTPATH</span><span style="--0:#032F62;--1:#9ECBFF">":/target</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#005CC5;--1:#79B8FF">\</span></div></div><div class="ec-line"><div class="code"><span class="indent">  </span><span style="--0:#005CC5;--1:#79B8FF">-v</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#032F62;--1:#9ECBFF">"</span><span style="--0:#24292E;--1:#E1E4E8">$HOSTPATH</span><span style="--0:#032F62;--1:#9ECBFF">":/host-output</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#005CC5;--1:#79B8FF">\</span></div></div><div class="ec-line"><div class="code"><span class="indent">  </span><span style="--0:#005CC5;--1:#79B8FF">-e</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#032F62;--1:#9ECBFF">MODE=BINARY</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#005CC5;--1:#79B8FF">\</span></div></div><div class="ec-line"><div class="code"><span class="indent">  </span><span style="--0:#005CC5;--1:#79B8FF">-e</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#032F62;--1:#9ECBFF">TARGET_FILE=/target/firmware.bin</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#005CC5;--1:#79B8FF">\</span></div></div><div class="ec-line"><div class="code"><span class="indent">  </span><span style="--0:#005CC5;--1:#79B8FF">-e</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#032F62;--1:#9ECBFF">UPLOAD_ENABLED=</span><span style="--0:#005CC5;--1:#79B8FF">false</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#005CC5;--1:#79B8FF">\</span></div></div><div class="ec-line"><div class="code"><span class="indent">  </span><span style="--0:#005CC5;--1:#79B8FF">-e</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#032F62;--1:#9ECBFF">HOST_OUTPUT_DIR=/host-output</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#005CC5;--1:#79B8FF">\</span></div></div><div class="ec-line"><div class="code"><span class="indent">  </span><span style="--0:#005CC5;--1:#79B8FF">-e</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#032F62;--1:#9ECBFF">PROJECT_NAME="Firmware"</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#005CC5;--1:#79B8FF">\</span></div></div><div class="ec-line"><div class="code"><span class="indent">  </span><span style="--0:#005CC5;--1:#79B8FF">-e</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#032F62;--1:#9ECBFF">PROJECT_VERSION="1.0"</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#005CC5;--1:#79B8FF">\</span></div></div><div class="ec-line"><div class="code"><span class="indent">  </span><span style="--0:#032F62;--1:#9ECBFF">ghcr.io/sktelecom/bomlens:latest</span></div></div></code></pre><div class="copy"><div aria-live="polite"></div><button title="Copy to clipboard" data-copied="Copied!" data-code="HOSTPATH=&#x22;$(cygpath -m &#x22;$(pwd)&#x22; 2>/dev/null || pwd)&#x22;MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL=&#x27;*&#x27; docker run --rm \  -v &#x22;$HOSTPATH&#x22;:/target \  -v &#x22;$HOSTPATH&#x22;:/host-output \  -e MODE=BINARY \  -e TARGET_FILE=/target/firmware.bin \  -e UPLOAD_ENABLED=false \  -e HOST_OUTPUT_DIR=/host-output \  -e PROJECT_NAME=&#x22;Firmware&#x22; \  -e PROJECT_VERSION=&#x22;1.0&#x22; \  ghcr.io/sktelecom/bomlens:latest"><div></div></button></div></figure></div>
+<div class="sl-heading-wrapper level-h3"><h3 id="analyze-a-source-directory">Analyze a source directory</h3><a class="sl-anchor-link" href="#analyze-a-source-directory"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “Analyze a source directory”</span></a></div>
+<!-- runnable -->
+<div class="expressive-code"><figure class="frame not-content"><figcaption class="header"></figcaption><pre data-language="bash"><code><div class="ec-line"><div class="code"><span style="--0:#24292E;--1:#E1E4E8">HOSTPATH</span><span style="--0:#BF3441;--1:#F97583">=</span><span style="--0:#032F62;--1:#9ECBFF">"$(</span><span style="--0:#6F42C1;--1:#B392F0">cygpath</span><span style="--0:#032F62;--1:#9ECBFF"> </span><span style="--0:#005CC5;--1:#79B8FF">-m</span><span style="--0:#032F62;--1:#9ECBFF"> "$(</span><span style="--0:#005CC5;--1:#79B8FF">pwd</span><span style="--0:#032F62;--1:#9ECBFF">)" </span><span style="--0:#BF3441;--1:#F97583">2></span><span style="--0:#032F62;--1:#9ECBFF">/dev/null </span><span style="--0:#BF3441;--1:#F97583">||</span><span style="--0:#032F62;--1:#9ECBFF"> </span><span style="--0:#005CC5;--1:#79B8FF">pwd</span><span style="--0:#032F62;--1:#9ECBFF">)"</span></div></div><div class="ec-line"><div class="code"><span style="--0:#24292E;--1:#E1E4E8">MSYS_NO_PATHCONV</span><span style="--0:#BF3441;--1:#F97583">=</span><span style="--0:#032F62;--1:#9ECBFF">1</span><span style="--0:#24292E;--1:#E1E4E8"> MSYS2_ARG_CONV_EXCL</span><span style="--0:#BF3441;--1:#F97583">=</span><span style="--0:#032F62;--1:#9ECBFF">'*'</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#6F42C1;--1:#B392F0">docker</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#032F62;--1:#9ECBFF">run</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#005CC5;--1:#79B8FF">--rm</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#005CC5;--1:#79B8FF">\</span></div></div><div class="ec-line"><div class="code"><span class="indent">  </span><span style="--0:#005CC5;--1:#79B8FF">-v</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#032F62;--1:#9ECBFF">"</span><span style="--0:#24292E;--1:#E1E4E8">$HOSTPATH</span><span style="--0:#032F62;--1:#9ECBFF">":/src</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#005CC5;--1:#79B8FF">\</span></div></div><div class="ec-line"><div class="code"><span class="indent">  </span><span style="--0:#005CC5;--1:#79B8FF">-v</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#032F62;--1:#9ECBFF">"</span><span style="--0:#24292E;--1:#E1E4E8">$HOSTPATH</span><span style="--0:#032F62;--1:#9ECBFF">":/host-output</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#005CC5;--1:#79B8FF">\</span></div></div><div class="ec-line"><div class="code"><span class="indent">  </span><span style="--0:#005CC5;--1:#79B8FF">-e</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#032F62;--1:#9ECBFF">MODE=SOURCE</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#005CC5;--1:#79B8FF">\</span></div></div><div class="ec-line"><div class="code"><span class="indent">  </span><span style="--0:#005CC5;--1:#79B8FF">-e</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#032F62;--1:#9ECBFF">UPLOAD_ENABLED=</span><span style="--0:#005CC5;--1:#79B8FF">false</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#005CC5;--1:#79B8FF">\</span></div></div><div class="ec-line"><div class="code"><span class="indent">  </span><span style="--0:#005CC5;--1:#79B8FF">-e</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#032F62;--1:#9ECBFF">HOST_OUTPUT_DIR=/host-output</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#005CC5;--1:#79B8FF">\</span></div></div><div class="ec-line"><div class="code"><span class="indent">  </span><span style="--0:#005CC5;--1:#79B8FF">-e</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#032F62;--1:#9ECBFF">PROJECT_NAME="MyApp"</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#005CC5;--1:#79B8FF">\</span></div></div><div class="ec-line"><div class="code"><span class="indent">  </span><span style="--0:#005CC5;--1:#79B8FF">-e</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#032F62;--1:#9ECBFF">PROJECT_VERSION="1.0.0"</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#005CC5;--1:#79B8FF">\</span></div></div><div class="ec-line"><div class="code"><span class="indent">  </span><span style="--0:#032F62;--1:#9ECBFF">ghcr.io/sktelecom/bomlens:latest</span></div></div></code></pre><div class="copy"><div aria-live="polite"></div><button title="Copy to clipboard" data-copied="Copied!" data-code="HOSTPATH=&#x22;$(cygpath -m &#x22;$(pwd)&#x22; 2>/dev/null || pwd)&#x22;MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL=&#x27;*&#x27; docker run --rm \  -v &#x22;$HOSTPATH&#x22;:/src \  -v &#x22;$HOSTPATH&#x22;:/host-output \  -e MODE=SOURCE \  -e UPLOAD_ENABLED=false \  -e HOST_OUTPUT_DIR=/host-output \  -e PROJECT_NAME=&#x22;MyApp&#x22; \  -e PROJECT_VERSION=&#x22;1.0.0&#x22; \  ghcr.io/sktelecom/bomlens:latest"><div></div></button></div></figure></div>
+<p>In direct runs, <code dir="auto">SOURCE</code> mode reads a lock file that covers the whole tree (a <code dir="auto">package-lock.json</code>, <code dir="auto">npm-shrinkwrap.json</code>, <code dir="auto">pnpm-lock.yaml</code>, <code dir="auto">bun.lock</code> or <code dir="auto">gradle.lockfile</code>, with no other manifest below the root) as it is, with no build and no Docker socket, and fills the licenses it lacks from the package registry; the SBOM records this as <code dir="auto">bomlens:detection</code>. That is the form to use where there is no Docker to start a sibling container in, such as a CI job that runs this image as its job image. For any other tree, syft reads the package manifests inside the container, so it may only capture direct dependencies; if you need transitive dependencies there, use <code dir="auto">scan-sbom.sh</code>, which routes to the per-language cdxgen images. Syft’s manifest readers need a lockfile (<code dir="auto">package-lock.json</code>, <code dir="auto">npm-shrinkwrap.json</code>, <code dir="auto">yarn.lock</code>, <code dir="auto">pnpm-lock.yaml</code> for Node, and the equivalent for other ecosystems) to resolve any of a project’s declared dependencies; without one, direct-run SOURCE mode has nothing to read and the scan fails with guidance rather than reporting an empty result as complete.</p>
+<div class="sl-heading-wrapper level-h3"><h3 id="notice-and-reports-in-one-run">Notice and reports in one run</h3><a class="sl-anchor-link" href="#notice-and-reports-in-one-run"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “Notice and reports in one run”</span></a></div>
+<p>In direct runs, the notice and security reports are off by default. Turn on the following variables to get the same outputs as the CLI’s <code dir="auto">--all</code>.</p>
+<!-- runnable -->
+<div class="expressive-code"><figure class="frame not-content"><figcaption class="header"></figcaption><pre data-language="bash"><code><div class="ec-line"><div class="code"><span style="--0:#24292E;--1:#E1E4E8">HOSTPATH</span><span style="--0:#BF3441;--1:#F97583">=</span><span style="--0:#032F62;--1:#9ECBFF">"$(</span><span style="--0:#6F42C1;--1:#B392F0">cygpath</span><span style="--0:#032F62;--1:#9ECBFF"> </span><span style="--0:#005CC5;--1:#79B8FF">-m</span><span style="--0:#032F62;--1:#9ECBFF"> "$(</span><span style="--0:#005CC5;--1:#79B8FF">pwd</span><span style="--0:#032F62;--1:#9ECBFF">)" </span><span style="--0:#BF3441;--1:#F97583">2></span><span style="--0:#032F62;--1:#9ECBFF">/dev/null </span><span style="--0:#BF3441;--1:#F97583">||</span><span style="--0:#032F62;--1:#9ECBFF"> </span><span style="--0:#005CC5;--1:#79B8FF">pwd</span><span style="--0:#032F62;--1:#9ECBFF">)"</span></div></div><div class="ec-line"><div class="code"><span style="--0:#24292E;--1:#E1E4E8">MSYS_NO_PATHCONV</span><span style="--0:#BF3441;--1:#F97583">=</span><span style="--0:#032F62;--1:#9ECBFF">1</span><span style="--0:#24292E;--1:#E1E4E8"> MSYS2_ARG_CONV_EXCL</span><span style="--0:#BF3441;--1:#F97583">=</span><span style="--0:#032F62;--1:#9ECBFF">'*'</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#6F42C1;--1:#B392F0">docker</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#032F62;--1:#9ECBFF">run</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#005CC5;--1:#79B8FF">--rm</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#005CC5;--1:#79B8FF">\</span></div></div><div class="ec-line"><div class="code"><span class="indent">  </span><span style="--0:#005CC5;--1:#79B8FF">-v</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#032F62;--1:#9ECBFF">"</span><span style="--0:#24292E;--1:#E1E4E8">$HOSTPATH</span><span style="--0:#032F62;--1:#9ECBFF">":/host-output</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#005CC5;--1:#79B8FF">\</span></div></div><div class="ec-line"><div class="code"><span class="indent">  </span><span style="--0:#005CC5;--1:#79B8FF">-v</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#032F62;--1:#9ECBFF">/var/run/docker.sock:/var/run/docker.sock</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#005CC5;--1:#79B8FF">\</span></div></div><div class="ec-line"><div class="code"><span class="indent">  </span><span style="--0:#005CC5;--1:#79B8FF">-e</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#032F62;--1:#9ECBFF">MODE=IMAGE</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#005CC5;--1:#79B8FF">\</span></div></div><div class="ec-line"><div class="code"><span class="indent">  </span><span style="--0:#005CC5;--1:#79B8FF">-e</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#032F62;--1:#9ECBFF">TARGET_IMAGE="nginx:alpine"</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#005CC5;--1:#79B8FF">\</span></div></div><div class="ec-line"><div class="code"><span class="indent">  </span><span style="--0:#005CC5;--1:#79B8FF">-e</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#032F62;--1:#9ECBFF">GENERATE_NOTICE=</span><span style="--0:#005CC5;--1:#79B8FF">true</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#005CC5;--1:#79B8FF">\</span></div></div><div class="ec-line"><div class="code"><span class="indent">  </span><span style="--0:#005CC5;--1:#79B8FF">-e</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#032F62;--1:#9ECBFF">GENERATE_SECURITY=</span><span style="--0:#005CC5;--1:#79B8FF">true</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#005CC5;--1:#79B8FF">\</span></div></div><div class="ec-line"><div class="code"><span class="indent">  </span><span style="--0:#005CC5;--1:#79B8FF">-e</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#032F62;--1:#9ECBFF">GENERATE_REPORT=</span><span style="--0:#005CC5;--1:#79B8FF">true</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#005CC5;--1:#79B8FF">\</span></div></div><div class="ec-line"><div class="code"><span class="indent">  </span><span style="--0:#005CC5;--1:#79B8FF">-e</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#032F62;--1:#9ECBFF">UPLOAD_ENABLED=</span><span style="--0:#005CC5;--1:#79B8FF">false</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#005CC5;--1:#79B8FF">\</span></div></div><div class="ec-line"><div class="code"><span class="indent">  </span><span style="--0:#005CC5;--1:#79B8FF">-e</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#032F62;--1:#9ECBFF">HOST_OUTPUT_DIR=/host-output</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#005CC5;--1:#79B8FF">\</span></div></div><div class="ec-line"><div class="code"><span class="indent">  </span><span style="--0:#005CC5;--1:#79B8FF">-e</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#032F62;--1:#9ECBFF">PROJECT_NAME="Nginx"</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#005CC5;--1:#79B8FF">\</span></div></div><div class="ec-line"><div class="code"><span class="indent">  </span><span style="--0:#005CC5;--1:#79B8FF">-e</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#032F62;--1:#9ECBFF">PROJECT_VERSION="alpine"</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#005CC5;--1:#79B8FF">\</span></div></div><div class="ec-line"><div class="code"><span class="indent">  </span><span style="--0:#032F62;--1:#9ECBFF">ghcr.io/sktelecom/bomlens:latest</span></div></div></code></pre><div class="copy"><div aria-live="polite"></div><button title="Copy to clipboard" data-copied="Copied!" data-code="HOSTPATH=&#x22;$(cygpath -m &#x22;$(pwd)&#x22; 2>/dev/null || pwd)&#x22;MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL=&#x27;*&#x27; docker run --rm \  -v &#x22;$HOSTPATH&#x22;:/host-output \  -v /var/run/docker.sock:/var/run/docker.sock \  -e MODE=IMAGE \  -e TARGET_IMAGE=&#x22;nginx:alpine&#x22; \  -e GENERATE_NOTICE=true \  -e GENERATE_SECURITY=true \  -e GENERATE_REPORT=true \  -e UPLOAD_ENABLED=false \  -e HOST_OUTPUT_DIR=/host-output \  -e PROJECT_NAME=&#x22;Nginx&#x22; \  -e PROJECT_VERSION=&#x22;alpine&#x22; \  ghcr.io/sktelecom/bomlens:latest"><div></div></button></div></figure></div>
+<div class="sl-heading-wrapper level-h2"><h2 id="environment-variables">Environment variables</h2><a class="sl-anchor-link" href="#environment-variables"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “Environment variables”</span></a></div>
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>Required</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code dir="auto">MODE</code></td>
+<td>No</td>
+<td><code dir="auto">POSTPROCESS</code></td>
+<td>Analysis mode: <code dir="auto">SOURCE</code>, <code dir="auto">IMAGE</code>, <code dir="auto">BINARY</code>, <code dir="auto">ROOTFS</code>, <code dir="auto">FIRMWARE</code>, <code dir="auto">ANALYZE</code>, or <code dir="auto">PLAN</code> (write the execution plan of a source scan, see <a href="/bomlens/reference/engine-contract/#execution-plan">Engine contract</a>). Left unset, the container only post-processes an SBOM already sitting in the output directory — set it explicitly to actually scan something.</td>
+</tr>
+<tr>
+<td><code dir="auto">PROJECT_NAME</code></td>
+<td>Yes</td>
+<td>—</td>
+<td>Project name</td>
+</tr>
+<tr>
+<td><code dir="auto">PROJECT_VERSION</code></td>
+<td>Yes</td>
+<td>—</td>
+<td>Project version</td>
+</tr>
+<tr>
+<td><code dir="auto">TARGET_IMAGE</code></td>
+<td>Per mode</td>
+<td>—</td>
+<td>Image for <code dir="auto">IMAGE</code> mode. With the docker.sock mount it is read from the Docker daemon; without it, from the registry, or from an archive named with its scheme (<code dir="auto">docker-archive:</code>, <code dir="auto">oci-archive:</code>, <code dir="auto">oci-dir:</code>) at a path mounted into the container</td>
+</tr>
+<tr>
+<td><code dir="auto">SYFT_REGISTRY_AUTH_USERNAME</code>, <code dir="auto">SYFT_REGISTRY_AUTH_PASSWORD</code>, <code dir="auto">SYFT_REGISTRY_AUTH_TOKEN</code>, <code dir="auto">SYFT_REGISTRY_AUTH_AUTHORITY</code></td>
+<td>—</td>
+<td>—</td>
+<td><code dir="auto">IMAGE</code> mode: credentials for a private registry. A docker config file mounted and named in <code dir="auto">DOCKER_CONFIG</code> works too. <code dir="auto">SYFT_REGISTRY_INSECURE_SKIP_TLS_VERIFY</code> and <code dir="auto">SYFT_REGISTRY_INSECURE_USE_HTTP</code> reach a registry with a self-signed certificate or plain HTTP. <code dir="auto">SYFT_PLATFORM</code> picks the platform of a multi-platform image</td>
+</tr>
+<tr>
+<td><code dir="auto">TARGET_FILE</code></td>
+<td>Per mode</td>
+<td>—</td>
+<td>File path for <code dir="auto">BINARY</code>/<code dir="auto">FIRMWARE</code> mode (path inside the container)</td>
+</tr>
+<tr>
+<td><code dir="auto">TARGET_DIR</code></td>
+<td>Per mode</td>
+<td>—</td>
+<td>Directory path for <code dir="auto">ROOTFS</code> mode</td>
+</tr>
+<tr>
+<td><code dir="auto">UPLOAD_ENABLED</code></td>
+<td>—</td>
+<td><code dir="auto">true</code></td>
+<td>If <code dir="auto">false</code>, save locally without uploading (same as CLI <code dir="auto">--generate-only</code>)</td>
+</tr>
+<tr>
+<td><code dir="auto">HOST_OUTPUT_DIR</code></td>
+<td>—</td>
+<td>—</td>
+<td>Mounted path to copy the outputs to</td>
+</tr>
+<tr>
+<td><code dir="auto">BOMLENS_STAGE1_EXIT</code>, <code dir="auto">BOMLENS_STAGE1_OOM</code>, <code dir="auto">BOMLENS_STAGE1_LOG</code>, <code dir="auto">BOMLENS_STAGE1_REASON</code></td>
+<td>—</td>
+<td>—</td>
+<td><code dir="auto">POSTPROCESS</code> after a stage 1 you ran yourself: its exit code, <code dir="auto">true</code> if it was killed for memory, and its log’s file name in the output folder; or, instead of the last two, the reason already classified (<code dir="auto">oom</code>, <code dir="auto">disk-space</code>, <code dir="auto">network</code>, <code dir="auto">cdxgen-crash</code>, <code dir="auto">cdxgen-unavailable</code>). Exit code 127 is read as <code dir="auto">cdxgen-unavailable</code>: pass it for an <code dir="auto">unsupported</code> plan, where no stage 1 ran. Stage 2 then falls back to a syft scan when stage 1 left no SBOM (see <a href="/bomlens/reference/engine-contract/#execution-plan">Engine contract</a>)</td>
+</tr>
+<tr>
+<td><code dir="auto">BOMLENS_EVENTS</code></td>
+<td>—</td>
+<td>—</td>
+<td><code dir="auto">file</code> or <code dir="auto">stderr</code>: write progress events, one JSON object per line, to <code dir="auto">bomlens-events.jsonl</code> in the output folder or to stderr (see <a href="/bomlens/reference/engine-contract/#progress-events">Engine contract</a>)</td>
+</tr>
+<tr>
+<td><code dir="auto">BOMLENS_IMAGE_REF</code>, <code dir="auto">BOMLENS_IMAGE_DIGEST</code></td>
+<td>—</td>
+<td>—</td>
+<td>The image reference and digest the caller ran, repeated in <code dir="auto">bomlens-result.json</code> (see <a href="/bomlens/reference/engine-contract/">Engine contract</a>)</td>
+</tr>
+<tr>
+<td><code dir="auto">GENERATE_NOTICE</code></td>
+<td>—</td>
+<td><code dir="auto">false</code></td>
+<td>Generate the open-source notice (CLI <code dir="auto">--notice</code>)</td>
+</tr>
+<tr>
+<td><code dir="auto">GENERATE_SECURITY</code></td>
+<td>—</td>
+<td><code dir="auto">false</code></td>
+<td>Generate the Trivy security report (CLI <code dir="auto">--security</code>)</td>
+</tr>
+<tr>
+<td><code dir="auto">DEEP_LICENSE</code></td>
+<td>—</td>
+<td><code dir="auto">false</code></td>
+<td>Detect licences in the project’s own files with scancode (CLI <code dir="auto">--deep-license</code>; needs scancode in the image)</td>
+</tr>
+<tr>
+<td><code dir="auto">DEEP_LICENSE_MAX_FILES</code></td>
+<td>—</td>
+<td><code dir="auto">20000</code></td>
+<td><code dir="auto">DEEP_LICENSE</code>: a tree with more of the project’s own files than this is not scanned</td>
+</tr>
+<tr>
+<td><code dir="auto">DEEP_LICENSE_TIMEOUT</code></td>
+<td>—</td>
+<td><code dir="auto">600</code></td>
+<td><code dir="auto">DEEP_LICENSE</code>: seconds before scancode is stopped</td>
+</tr>
+<tr>
+<td><code dir="auto">BOMLENS_DEEP_LICENSE_ALL</code></td>
+<td>—</td>
+<td>—</td>
+<td><code dir="auto">DEEP_LICENSE</code>: set <code dir="auto">1</code> to scan dependency, build and tool folders too (left out by default)</td>
+</tr>
+<tr>
+<td><code dir="auto">DETECTION</code></td>
+<td>—</td>
+<td><code dir="auto">auto</code></td>
+<td><code dir="auto">SOURCE</code> mode only. <code dir="auto">auto</code> reads a covering lock file statically and otherwise runs the build or syft path as before; <code dir="auto">static</code> always reads statically; <code dir="auto">build</code> never does (CLI <code dir="auto">--detection</code>). Static detection fills missing licenses from the package registry, so <code dir="auto">auto</code> builds under <code dir="auto">BYTE_STABLE=true</code> or <code dir="auto">FETCH_LICENSE=false</code></td>
+</tr>
+<tr>
+<td><code dir="auto">REACHABILITY</code></td>
+<td>—</td>
+<td><code dir="auto">false</code></td>
+<td>Judge with govulncheck whether each Go advisory’s code is reached (CLI <code dir="auto">--reachability</code>): on the executable in <code dir="auto">BINARY</code> mode; in <code dir="auto">SOURCE</code> and <code dir="auto">POSTPROCESS</code>, from the govulncheck output stage 1 left (the CLI hands stage 1 the image’s govulncheck)</td>
+</tr>
+<tr>
+<td><code dir="auto">GENERATE_REPORT</code></td>
+<td>—</td>
+<td><code dir="auto">false</code></td>
+<td>Generate the open-source risk report (off in direct runs, unlike the CLI default)</td>
+</tr>
+<tr>
+<td><code dir="auto">ENRICH_MAVEN_CPE</code></td>
+<td>—</td>
+<td><code dir="auto">true</code></td>
+<td>Attach an NVD-matchable <code dir="auto">cpe:2.3</code> to maven components (derived from the groupId) so a CPE-aware engine can reach their NVD-only CVEs; unmapped groups get no CPE (skipped for AI SBOMs)</td>
+</tr>
+<tr>
+<td><code dir="auto">ENRICH_GITHUB_CPE</code></td>
+<td>—</td>
+<td><code dir="auto">true</code></td>
+<td>Attach an NVD-matchable <code dir="auto">cpe:2.3</code> to a small, hand-verified set of <code dir="auto">pkg:github/</code> components (source-repository-only coordinates, typical for large C/C++ projects with no package-manager ecosystem) so a CPE-aware engine can reach their NVD-only CVEs; anything not in the curated list gets no CPE (skipped for AI SBOMs)</td>
+</tr>
+<tr>
+<td><code dir="auto">ENRICH_UPSTREAM_PURL</code></td>
+<td>—</td>
+<td><code dir="auto">true</code></td>
+<td>For a firmware, root filesystem or binary scan, or an SBOM read from a Yocto build’s records, set the purl of the upstream source repository (<code dir="auto">pkg:github/&#x3C;owner>/&#x3C;repo>@&#x3C;tag></code>, <code dir="auto">pkg:sourceforge</code>, <code dir="auto">pkg:gnu</code>) on components that have no purl, a <code dir="auto">pkg:generic</code> one or a <code dir="auto">pkg:opkg</code> one, from the closed table in <code dir="auto">docker/lib/upstream-purl-map.json</code>, or from a source download address that states a GitHub or GNU release. Any other component keeps its identifier</td>
+</tr>
+<tr>
+<td><code dir="auto">ENRICH_INTERPRETER_CPE</code></td>
+<td>—</td>
+<td><code dir="auto">true</code></td>
+<td>Attach an NVD-matchable <code dir="auto">cpe:2.3</code> to a small, hand-verified set of interpreter components (e.g. Python packaged as a conda or NuGet artifact) so a CPE-aware engine can reach their NVD-only CVEs; anything not in the curated list gets no CPE (skipped for AI SBOMs)</td>
+</tr>
+<tr>
+<td><code dir="auto">SECURITY_NVD_VERIFY</code></td>
+<td>—</td>
+<td><code dir="auto">false</code></td>
+<td>With <code dir="auto">--deep-cve</code>: verify each grype <code dir="auto">nvd:cpe</code> finding against the live NVD version range and drop out-of-range false positives (needs <code dir="auto">NVD_API_KEY</code> + network; adds minutes). Off by default — findings are kept and flagged version-unverified</td>
+</tr>
+<tr>
+<td><code dir="auto">NVD_API_KEY</code></td>
+<td>For <code dir="auto">SECURITY_NVD_VERIFY</code></td>
+<td>—</td>
+<td>NVD API key used by the deep-cve version filter; passed to the container by name only (never inlined)</td>
+</tr>
+<tr>
+<td><code dir="auto">BOMLENS_OS_LICENSES</code></td>
+<td>—</td>
+<td><code dir="auto">true</code></td>
+<td><code dir="auto">IMAGE</code> and <code dir="auto">ROOTFS</code> modes: read the licenses of Debian packages with Trivy, which reads the license names, common-licenses references and license text in the copyright files syft leaves as a hash. It reads the image a second time; <code dir="auto">false</code> turns it off (the hashes are still removed)</td>
+</tr>
+<tr>
+<td><code dir="auto">BOMLENS_TRIVY_DB_MAX_AGE_DAYS</code></td>
+<td>—</td>
+<td><code dir="auto">7</code></td>
+<td>With a Trivy database mounted at <code dir="auto">/trivy-db</code> (read as it is, offline): the age in days past which the security step is recorded as degraded</td>
+</tr>
+<tr>
+<td><code dir="auto">BOMLENS_GRYPE_DB_MAX_AGE_DAYS</code></td>
+<td>—</td>
+<td><code dir="auto">7</code></td>
+<td>With <code dir="auto">--deep-cve</code>: the age in days past which the grype database is updated with <code dir="auto">grype db update</code> before the match (into a temporary folder when the image’s cache cannot be written; skipped when <code dir="auto">TRIVY_OFFLINE_SCAN</code> or <code dir="auto">TRIVY_SKIP_DB_UPDATE</code> is <code dir="auto">true</code>). A database that is not updated is still read, and the <code dir="auto">deep-cve</code> step is recorded as degraded with its age. The update lives only as long as the container, so while the image’s database is old every scan downloads it again. A Trivy database mounted at <code dir="auto">/trivy-db</code> makes the scan offline, so grype is not updated either</td>
+</tr>
+<tr>
+<td><code dir="auto">GRYPE_DB_UPDATE_URL</code></td>
+<td>—</td>
+<td>grype’s own</td>
+<td>With <code dir="auto">--deep-cve</code>: where <code dir="auto">grype db update</code> gets the grype database, for a mirror</td>
+</tr>
+<tr>
+<td><code dir="auto">BOMLENS_GO_VULNDB</code></td>
+<td>—</td>
+<td><code dir="auto">true</code></td>
+<td>With <code dir="auto">--security</code>: also match Go modules against the Go vulnerability database snapshot in the image. <code dir="auto">false</code> skips it</td>
+</tr>
+<tr>
+<td><code dir="auto">BOMLENS_GO_VULNDB_PATH</code></td>
+<td>—</td>
+<td>the snapshot in the image</td>
+<td>A Go vulnerability database export inside the container (<code dir="auto">vulndb.zip</code> from <a href="https://vuln.go.dev/vulndb.zip">https://vuln.go.dev/vulndb.zip</a>, or that archive unpacked into a folder), read in place of the snapshot. It is never replaced by a download, only recorded as degraded when it is old</td>
+</tr>
+<tr>
+<td><code dir="auto">BOMLENS_GO_VULNDB_MAX_AGE_DAYS</code></td>
+<td>—</td>
+<td><code dir="auto">7</code></td>
+<td>The age in days, counted from the database’s own date (<code dir="auto">index/db.json</code>), past which the Go vulnerability database is old. An old snapshot in the image is replaced for that scan by a download (about 3.6 MB, 60-second limit) into a temporary folder, removed when the scan ends; when the scan is offline (<code dir="auto">TRIVY_OFFLINE_SCAN</code> or <code dir="auto">TRIVY_SKIP_DB_UPDATE</code> is <code dir="auto">true</code>, as with a <code dir="auto">/trivy-db</code> mount) or the download fails, the old snapshot is read and the <code dir="auto">go-vulndb</code> step is recorded as degraded</td>
+</tr>
+<tr>
+<td><code dir="auto">BOMLENS_GO_VULNDB_URL</code></td>
+<td>—</td>
+<td><code dir="auto">https://vuln.go.dev/vulndb.zip</code></td>
+<td>Where that download comes from: a mirror of <code dir="auto">vulndb.zip</code> (<code dir="auto">http</code>, <code dir="auto">https</code> or <code dir="auto">file</code> URL). It is checked as the image build checks it before it is read</td>
+</tr>
+<tr>
+<td><code dir="auto">BOMLENS_EXTRA_CA_CERTS</code></td>
+<td>-</td>
+<td>-</td>
+<td>A CA bundle (PEM) to trust, for a proxy that inspects TLS: a path inside the container. When you run the image yourself, mount the bundle (read-only is enough) and set this to its path. The entrypoint adds it to a copy of the system bundle (<code dir="auto">SSL_CERT_FILE</code>, <code dir="auto">REQUESTS_CA_BUNDLE</code>, <code dir="auto">CURL_CA_BUNDLE</code>, <code dir="auto">CARGO_HTTP_CAINFO</code>, <code dir="auto">GIT_SSL_CAINFO</code>, <code dir="auto">PIP_CERT</code>), to <code dir="auto">NODE_EXTRA_CA_CERTS</code> and to a copy of the JDK trust store named in <code dir="auto">JAVA_TOOL_OPTIONS</code>. These files are written under <code dir="auto">/tmp</code> only, so a read-only root filesystem works with a writable <code dir="auto">/tmp</code>. A path that cannot be read or holds no PEM certificate prints a <code dir="auto">[WARN]</code> and the run goes on without the extra CA. The CLI sets this for you from <code dir="auto">SBOM_EXTRA_CA_CERTS</code></td>
+</tr>
+<tr>
+<td><code dir="auto">ENRICH_EOL</code></td>
+<td>—</td>
+<td><code dir="auto">true</code></td>
+<td>Flag components past their upstream end-of-life from a bundled offline snapshot (skipped for AI SBOMs)</td>
+</tr>
+<tr>
+<td><code dir="auto">ENRICH_MALICIOUS</code></td>
+<td>—</td>
+<td><code dir="auto">true</code></td>
+<td>Flag components that are known-malicious packages (typosquats, hijacked accounts) from a bundled offline OSV snapshot. A separate signal from vulnerabilities: the response is removal and credential rotation, not an upgrade</td>
+</tr>
+<tr>
+<td><code dir="auto">ENRICH_OS_CONTEXT</code></td>
+<td>—</td>
+<td><code dir="auto">true</code></td>
+<td>Synthesize an <code dir="auto">operating-system</code> component from distro package PURLs (rpm, deb, and apk). Trivy selects the distro vulnerability feed from that component, so without it the OS packages in a supplier SBOM or rootfs scan would get no OS CVE matches at all. No-op when the SBOM has no recognizable distro packages — including a distro Trivy carries no feed for, such as OpenWRT (skipped for AI SBOMs)</td>
+</tr>
+<tr>
+<td><code dir="auto">ENRICH_DISTRO_SUPPLIER</code></td>
+<td>—</td>
+<td><code dir="auto">true</code></td>
+<td>Fill <code dir="auto">supplier</code> on an rpm, deb, or apk component with the distro project’s name, read from the <code dir="auto">operating-system</code> component <code dir="auto">ENRICH_OS_CONTEXT</code> synthesizes. Left blank for a distro with no confirmed supplier name, an ambiguous (mixed-distro) SBOM, or a component that already carries a supplier (skipped for AI SBOMs)</td>
+</tr>
+<tr>
+<td><code dir="auto">STALENESS_ENRICH</code></td>
+<td>—</td>
+<td><code dir="auto">false</code></td>
+<td>Add deps.dev version currency (how many releases behind latest); needs network access</td>
+</tr>
+<tr>
+<td><code dir="auto">ENRICH_HF_SECURITY</code></td>
+<td>—</td>
+<td><code dir="auto">true</code></td>
+<td>AIBOM mode: read HuggingFace’s per-file security scan results (ClamAV + picklescan) into the ML-BOM; metadata only, no file download</td>
+</tr>
+<tr>
+<td><code dir="auto">API_KEY</code>, <code dir="auto">API_URL</code></td>
+<td>For uploads</td>
+<td>—</td>
+<td>Upload credential and server URL. DT uses <code dir="auto">X-Api-Key</code>; TRUSCA uses a Bearer token</td>
+</tr>
+<tr>
+<td><code dir="auto">UPLOAD_TARGET</code></td>
+<td>—</td>
+<td><code dir="auto">dependency-track</code></td>
+<td>Upload destination: <code dir="auto">dependency-track</code> (DT-compatible) or <code dir="auto">trusca</code> (native ingest, not DT-compatible)</td>
+</tr>
+<tr>
+<td><code dir="auto">TRUSCA_PROJECT_ID</code></td>
+<td>When <code dir="auto">trusca</code></td>
+<td>—</td>
+<td>Target TRUSCA project id (UUID). Must already exist (no auto-create)</td>
+</tr>
+<tr>
+<td><code dir="auto">TRUSCA_REF</code></td>
+<td>—</td>
+<td><code dir="auto">main</code></td>
+<td>Ingest ref label</td>
+</tr>
+<tr>
+<td><code dir="auto">TRUSCA_RELEASE</code></td>
+<td>—</td>
+<td><code dir="auto">PROJECT_VERSION</code></td>
+<td>Ingest release label</td>
+</tr>
+<tr>
+<td><code dir="auto">BOMLENS_MAVEN_FULL_GRAPH</code></td>
+<td>—</td>
+<td>—</td>
+<td>Maven source scans: set <code dir="auto">1</code> to keep the full resolved graph instead of filtering to compile/runtime scope</td>
+</tr>
+<tr>
+<td><code dir="auto">BOMLENS_NODE_FULL_GRAPH</code></td>
+<td>—</td>
+<td>—</td>
+<td>Node.js source scans: set <code dir="auto">1</code> to keep the full dev-plus-production graph instead of the production-only set</td>
+</tr>
+<tr>
+<td><code dir="auto">BOMLENS_ANDROID_FULL_GRAPH</code></td>
+<td>-</td>
+<td>-</td>
+<td>Android source scans (Android SDK image): set <code dir="auto">1</code> to keep the full graph, build and test tooling included, instead of filtering to the release runtime classpath</td>
+</tr>
+<tr>
+<td><code dir="auto">BOMLENS_GRADLE_FULL_GRAPH</code></td>
+<td>-</td>
+<td>-</td>
+<td>Java Gradle source scans: set <code dir="auto">1</code> to keep the full graph, test and compile-only dependencies included, instead of filtering to each project’s runtime classpath. The filter’s Gradle run resolves every project, not only the root as the plain warm-up does, so on a build with many subprojects that step takes longer</td>
+</tr>
+<tr>
+<td><code dir="auto">BOMLENS_PHP_FULL_GRAPH</code></td>
+<td>-</td>
+<td>-</td>
+<td>PHP (Composer) source scans: set <code dir="auto">1</code> to keep the full require-plus-require-dev graph instead of filtering to the required set</td>
+</tr>
+<tr>
+<td><code dir="auto">BOMLENS_KEEP_BUILD_OUTPUT</code></td>
+<td>—</td>
+<td>—</td>
+<td>Source scans: set <code dir="auto">1</code> to leave the resolved tree in place. By default the scan restores the files its resolvers rewrote (<code dir="auto">go.mod</code>, <code dir="auto">go.sum</code>, <code dir="auto">Cargo.lock</code>, <code dir="auto">Gemfile.lock</code>, <code dir="auto">Package.resolved</code>) and removes the build directories they created, so the scanned project is handed back as it was</td>
+</tr>
+<tr>
+<td><code dir="auto">BOMLENS_PREP_TIMEOUT</code></td>
+<td>-</td>
+<td><code dir="auto">900</code> (<code dir="auto">1800</code> for Gradle/Android steps)</td>
+<td>Seconds a single dependency-resolution step (Cargo, Go, Bundler, pip, npm, pnpm, PHP Composer, Swift, Gradle/Android) is allowed to run before it is stopped and the scan moves on without it. Set to override both defaults for every step. A step that fails or times out is logged with its own output and recorded on the SBOM as <code dir="auto">bomlens:pipeline-step-failed</code>; the scan itself still completes</td>
+</tr>
+<tr>
+<td><code dir="auto">BOMLENS_CANCEL_GRACE</code></td>
+<td>—</td>
+<td><code dir="auto">30</code></td>
+<td>Seconds a cancelled scan (CLI Ctrl+C, or the web UI’s cancel button) gets to stop cleanly before it is force-stopped. Applies to the CLI and <code dir="auto">--ui</code>; the desktop app always uses the default</td>
+</tr>
+<tr>
+<td><code dir="auto">BOMLENS_INCLUDE_NON_SHIPPED</code></td>
+<td>-</td>
+<td>-</td>
+<td>Source scans: set <code dir="auto">1</code> to keep the manifests under test, example, benchmark and demo folders, the GitHub Actions workflows in <code dir="auto">.github/workflows</code> and the Gradle wrapper in <code dir="auto">gradle/wrapper</code>, which are left out by default</td>
+</tr>
+<tr>
+<td><code dir="auto">BOMLENS_INCLUDE_DEV_DEPENDENCIES</code></td>
+<td>-</td>
+<td>-</td>
+<td>Source scans: set <code dir="auto">1</code> to keep the development-only components that are dropped by default (the ones cdxgen marks, and the gems a root <code dir="auto">Gemfile</code> declares only in its <code dir="auto">development</code> and <code dir="auto">test</code> groups). The dropped components are recorded in <code dir="auto">bomlens:excluded-components</code></td>
+</tr>
+<tr>
+<td><code dir="auto">BOMLENS_NO_COPYRIGHT</code></td>
+<td>-</td>
+<td>-</td>
+<td>Source scans: set <code dir="auto">1</code> to skip filling npm, Python, Go and Rust component <code dir="auto">copyright</code> from the installed packages’ license files</td>
+</tr>
+<tr>
+<td><code dir="auto">BOMLENS_NO_CARGO_LICENSE</code></td>
+<td>-</td>
+<td>-</td>
+<td>Source scans: set <code dir="auto">1</code> to skip filling Rust component licenses from <code dir="auto">cargo metadata</code> (<code dir="auto">FETCH_LICENSE=false</code> on the command line skips it too)</td>
+</tr>
+<tr>
+<td><code dir="auto">CYCLONEDX_SPEC_VERSION</code></td>
+<td>—</td>
+<td><code dir="auto">1.6</code></td>
+<td>CycloneDX version of the generated SBOM, <code dir="auto">1.6</code> or <code dir="auto">1.7</code> (the CLI’s <code dir="auto">--spec-version</code>). AI model and dataset SBOMs are always 1.7. Any other value stops the run</td>
+</tr>
+<tr>
+<td><code dir="auto">CYCLONEDX_SPEC_VERSIONS</code></td>
+<td>—</td>
+<td><code dir="auto">1.3 1.4 1.5 1.6 1.7</code></td>
+<td>Accepted CycloneDX spec versions for the conformance check (space-separated); overrides the default range</td>
+</tr>
+<tr>
+<td><code dir="auto">AI_CYCLONEDX_SPEC_VERSIONS</code></td>
+<td>—</td>
+<td><code dir="auto">1.3 1.4 1.5 1.6 1.7</code></td>
+<td>Accepted CycloneDX versions for AI SBOMs (ML-BOM); always includes 1.7, the version the AIBOM toolchain emits</td>
+</tr>
+<tr>
+<td><code dir="auto">SPDX_SPEC_VERSIONS</code></td>
+<td>—</td>
+<td><code dir="auto">SPDX-2.2 SPDX-2.3</code></td>
+<td>Accepted SPDX spec versions for the conformance check</td>
+</tr>
+<tr>
+<td><code dir="auto">PURL_MIN_PCT</code></td>
+<td>—</td>
+<td><code dir="auto">90</code></td>
+<td>Conformance check: minimum percentage of components with a PURL (mandatory check). Applies to a <code dir="auto">--deep-cve</code> scan too, CLI or web UI</td>
+</tr>
+<tr>
+<td><code dir="auto">LICENSE_MIN_PCT</code></td>
+<td>—</td>
+<td><code dir="auto">80</code></td>
+<td>Conformance check: minimum percentage of components with a license (recommended, warn only). Applies to a <code dir="auto">--deep-cve</code> scan too, CLI or web UI</td>
+</tr>
+<tr>
+<td><code dir="auto">HASH_MIN_PCT</code></td>
+<td>—</td>
+<td><code dir="auto">50</code></td>
+<td>Conformance check: minimum percentage of components with a hash (recommended, warn only). Applies to a <code dir="auto">--deep-cve</code> scan too, CLI or web UI</td>
+</tr>
+<tr>
+<td><code dir="auto">FIELD_MIN_PCT</code></td>
+<td>—</td>
+<td><code dir="auto">80</code></td>
+<td>Conformance check: minimum percentage coverage for advisory per-component regulatory fields. Applies to a <code dir="auto">--deep-cve</code> scan too, CLI or web UI</td>
+</tr>
+<tr>
+<td><code dir="auto">PURL_TYPES_FILE</code></td>
+<td>—</td>
+<td><code dir="auto">docker/lib/purl-types.json</code></td>
+<td>Conformance check: the purl-spec type data that says which types exist and which of them require a namespace</td>
+</tr>
+<tr>
+<td><code dir="auto">OS_DISTROS_FILE</code></td>
+<td>—</td>
+<td><code dir="auto">docker/lib/os-distros.json</code></td>
+<td>Conformance check: the distribution ids an rpm, deb or apk namespace may carry</td>
+</tr>
+<tr>
+<td><code dir="auto">NS_ADVISORY_TYPES</code></td>
+<td>—</td>
+<td><code dir="auto">golang huggingface</code></td>
+<td>Conformance check: types whose missing namespace is reported on the advisory row instead of failing the SBOM (space-separated)</td>
+</tr>
+<tr>
+<td><code dir="auto">LICENSE_REGISTRY</code></td>
+<td>—</td>
+<td><code dir="auto">false</code></td>
+<td>The script’s <code dir="auto">--license-registry</code>: look up missing licences, and check a single strong-copyleft or non-commercial licence, in the package registry (deps.dev). Uses the network</td>
+</tr>
+<tr>
+<td><code dir="auto">LICENSE_REGISTRY_VERIFY</code></td>
+<td>—</td>
+<td>GPL, AGPL, SSPL-1.0, BUSL-1.1 and CC-BY-NC ids</td>
+<td>SPDX ids whose single occurrence is checked against the registry, space- or comma-separated</td>
+</tr>
+<tr>
+<td><code dir="auto">LICENSE_REGISTRY_BUDGET</code></td>
+<td>—</td>
+<td><code dir="auto">240</code></td>
+<td>Seconds the lookups may take in total. Components it does not reach are left as they were, and the step is recorded as degraded</td>
+</tr>
+<tr>
+<td><code dir="auto">LICENSE_REGISTRY_API</code></td>
+<td>—</td>
+<td><code dir="auto">https://api.deps.dev/v3</code></td>
+<td>Base URL of a server that answers the deps.dev v3 version lookup, for a network that reaches the registries only through its own mirror or proxy. When nothing answers, the components stay as they were and the step is recorded as degraded (<code dir="auto">unavailable</code>)</td>
+</tr>
+<tr>
+<td><code dir="auto">PURL_RESOLVE</code></td>
+<td>—</td>
+<td><code dir="auto">false</code></td>
+<td><code dir="auto">--analyze</code> only (the script’s <code dir="auto">--resolve-purl</code>): look each identifier up in its package repository (deps.dev) and add the answer to the conformance check report as an advisory row. Uses the network</td>
+</tr>
+<tr>
+<td><code dir="auto">PURL_RESOLVE_IGNORE</code></td>
+<td>—</td>
+<td>—</td>
+<td>Namespace prefixes to leave out of that lookup, space- or comma-separated. Use it for namespaces published only to an internal repository, which cannot be told apart from a wrong identifier</td>
+</tr>
+<tr>
+<td><code dir="auto">PURL_RESOLVE_BUDGET</code></td>
+<td>—</td>
+<td><code dir="auto">240</code></td>
+<td>Seconds the lookup may take in total. Identifiers it does not reach are reported as unchecked, never as missing</td>
+</tr>
+<tr>
+<td><code dir="auto">ANALYZE_CPE_INDEX</code></td>
+<td>—</td>
+<td><code dir="auto">false</code></td>
+<td><code dir="auto">--analyze</code> only (the script’s <code dir="auto">--analyze-cpe-index</code>): match the components carrying <code dir="auto">bomlens:purlSource=upstream-map</code> against the bundled CPE index.</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>TRUSCA’s (formerly TrustedOSS Portal) native ingest endpoint (<code dir="auto">POST /v1/projects/{id}/sbom-ingest</code>, Bearer auth) is not Dependency-Track compatible. To push to a regular Dependency-Track server, keep <code dir="auto">UPLOAD_TARGET=dependency-track</code> (the default).</p>
+</blockquote>
+<p>For the full mapping between CLI flags and environment variables, see the flag mapping in <a href="/bomlens/concepts/architecture/">Architecture</a>.</p>
+<div class="sl-heading-wrapper level-h2"><h2 id="building-and-publishing-the-image">Building and publishing the image</h2><a class="sl-anchor-link" href="#building-and-publishing-the-image"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “Building and publishing the image”</span></a></div>
+<p>The procedure for building the image yourself or publishing it for multiple platforms is in the contributor-facing <a href="https://github.com/sktelecom/bomlens/blob/main/docker/README.md">docker/README</a>.</p>
+<hr>
+<blockquote>
+<p><strong>Related</strong>: <a href="/bomlens/start/first-scan/">Getting started</a> | <a href="/bomlens/reference/cli/">CLI reference</a> | <a href="/bomlens/concepts/architecture/">Architecture</a></p>
+</blockquote></div><footer class="sl-flex astro-ddtxxk7k"><div class="meta sl-flex astro-ddtxxk7k"><a href="https://github.com/sktelecom/bomlens/edit/main/docs/reference/docker-image.md" class="sl-flex print:hidden astro-qlekgd3o"><svg aria-hidden="true" class="astro-qlekgd3o astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1.2em;"><path d="M22 7.24a1 1 0 0 0-.29-.71l-4.24-4.24a1 1 0 0 0-1.1-.22 1 1 0 0 0-.32.22l-2.83 2.83L2.29 16.05a1 1 0 0 0-.29.71V21a1 1 0 0 0 1 1h4.24a1 1 0 0 0 .76-.29l10.87-10.93L21.71 8c.1-.1.17-.2.22-.33a1 1 0 0 0 0-.24v-.14l.07-.05ZM6.83 20H4v-2.83l9.93-9.93 2.83 2.83L6.83 20ZM18.17 8.66l-2.83-2.83 1.42-1.41 2.82 2.82-1.41 1.42Z"/></svg>Edit page</a></div><div class="pagination-links print:hidden astro-b5raizh3" dir="ltr"><a href="/bomlens/reference/cli/" rel="prev" class="astro-b5raizh3"><svg aria-hidden="true" class="astro-b5raizh3 astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1.5rem;"><path d="M17 11H9.41l3.3-3.29a1.004 1.004 0 1 0-1.42-1.42l-5 5a1 1 0 0 0-.21.33 1 1 0 0 0 0 .76 1 1 0 0 0 .21.33l5 5a1.002 1.002 0 0 0 1.639-.325 1 1 0 0 0-.219-1.095L9.41 13H17a1 1 0 0 0 0-2Z"/></svg><span class="astro-b5raizh3">Previous<br class="astro-b5raizh3"><span class="link-title astro-b5raizh3">CLI reference</span></span></a><a href="/bomlens/reference/ecosystems/" rel="next" class="astro-b5raizh3"><svg aria-hidden="true" class="astro-b5raizh3 astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1.5rem;"><path d="M17.92 11.62a1.001 1.001 0 0 0-.21-.33l-5-5a1.003 1.003 0 1 0-1.42 1.42l3.3 3.29H7a1 1 0 0 0 0 2h7.59l-3.3 3.29a1.002 1.002 0 0 0 .325 1.639 1 1 0 0 0 1.095-.219l5-5a1 1 0 0 0 .21-.33 1 1 0 0 0 0-.76Z"/></svg><span class="astro-b5raizh3">Next<br class="astro-b5raizh3"><span class="link-title astro-b5raizh3">Supported ecosystems</span></span></a></div></footer><script type="module" src="/bomlens/_astro/Mermaid.astro_astro_type_script_index_0_lang.DZWWZPOc.js"></script><script type="module">var e=()=>{document.querySelectorAll(`.expressive-code pre`).forEach(e=>{e.scrollWidth>e.clientWidth?e.setAttribute(`tabindex`,`0`):e.removeAttribute(`tabindex`)})};e(),window.addEventListener(`resize`,e);</script><p class="site-copyright astro-jo6i4kqk">Copyright &copy; 2026 SK Telecom Co., Ltd. &middot;<a href="https://github.com/sktelecom/bomlens/blob/main/LICENSE" class="astro-jo6i4kqk">Apache-2.0</a> &middot;<a href="https://github.com/sktelecom/bomlens/blob/main/THIRD_PARTY_LICENSES.md" class="astro-jo6i4kqk">Third-party licenses</a></p></div></div></main></div></div></div></div></body></html>

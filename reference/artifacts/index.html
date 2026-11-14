@@ -1,0 +1,401 @@
+<!DOCTYPE html><html lang="en" dir="ltr" data-theme="dark" data-has-toc data-has-sidebar class="astro-g5ptsecz"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/><title>Artifacts reference | BomLens</title><link rel="canonical" href="https://sktelecom.github.io/bomlens/reference/artifacts/"/><link rel="alternate" hreflang="en" href="https://sktelecom.github.io/bomlens/reference/artifacts/"/><link rel="alternate" hreflang="ko" href="https://sktelecom.github.io/bomlens/ko/reference/artifacts/"/><link rel="alternate" hreflang="x-default" href="https://sktelecom.github.io/bomlens/reference/artifacts/"/><link rel="sitemap" href="/bomlens/sitemap-index.xml"/><link rel="shortcut icon" href="/bomlens/favicon.svg" type="image/svg+xml"/><meta name="generator" content="Astro v7.4.4"/><meta name="generator" content="Starlight v0.42.8"/><meta property="og:title" content="Artifacts reference"/><meta property="og:type" content="article"/><meta property="og:url" content="https://sktelecom.github.io/bomlens/reference/artifacts/"/><meta property="og:locale" content="en_US"/><meta property="og:description" content="The output files BomLens produces — file list, when each is generated, naming rules, and the SBOM structure summary."/><meta property="og:site_name" content="BomLens"/><meta name="twitter:card" content="summary_large_image"/><meta name="description" content="The output files BomLens produces — file list, when each is generated, naming rules, and the SBOM structure summary."/><meta property="og:image" content="https://sktelecom.github.io/bomlens/images/og-card.png"><meta name="twitter:image" content="https://sktelecom.github.io/bomlens/images/og-card.png"><script>
+	window.StarlightThemeProvider = (() => {
+		const storedTheme =
+			typeof localStorage !== 'undefined' && localStorage.getItem('starlight-theme');
+		const theme =
+			storedTheme ||
+			(window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
+		document.documentElement.dataset.theme = theme === 'light' ? 'light' : 'dark';
+		return {
+			updatePickers(theme = storedTheme || 'auto') {
+				document.querySelectorAll('starlight-theme-select').forEach((picker) => {
+					const select = picker.querySelector('select');
+					if (select) select.value = theme;
+					/** @type {HTMLTemplateElement | null} */
+					const tmpl = document.querySelector(`#theme-icons`);
+					const newIcon = tmpl && tmpl.content.querySelector('.' + theme);
+					if (newIcon) {
+						const oldIcon = picker.querySelector('svg.label-icon');
+						if (oldIcon) {
+							oldIcon.replaceChildren(...newIcon.cloneNode(true).childNodes);
+						}
+					}
+				});
+			},
+		};
+	})();
+</script><template id="theme-icons"><svg aria-hidden="true" class="light astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M5 12a1 1 0 0 0-1-1H3a1 1 0 0 0 0 2h1a1 1 0 0 0 1-1Zm.64 5-.71.71a1 1 0 0 0 0 1.41 1 1 0 0 0 1.41 0l.71-.71A1 1 0 0 0 5.64 17ZM12 5a1 1 0 0 0 1-1V3a1 1 0 0 0-2 0v1a1 1 0 0 0 1 1Zm5.66 2.34a1 1 0 0 0 .7-.29l.71-.71a1 1 0 1 0-1.41-1.41l-.66.71a1 1 0 0 0 0 1.41 1 1 0 0 0 .66.29Zm-12-.29a1 1 0 0 0 1.41 0 1 1 0 0 0 0-1.41l-.71-.71a1.004 1.004 0 1 0-1.43 1.41l.73.71ZM21 11h-1a1 1 0 0 0 0 2h1a1 1 0 0 0 0-2Zm-2.64 6A1 1 0 0 0 17 18.36l.71.71a1 1 0 0 0 1.41 0 1 1 0 0 0 0-1.41l-.76-.66ZM12 6.5a5.5 5.5 0 1 0 5.5 5.5A5.51 5.51 0 0 0 12 6.5Zm0 9a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7Zm0 3.5a1 1 0 0 0-1 1v1a1 1 0 0 0 2 0v-1a1 1 0 0 0-1-1Z"/></svg><svg aria-hidden="true" class="dark astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M21.64 13a1 1 0 0 0-1.05-.14 8.049 8.049 0 0 1-3.37.73 8.15 8.15 0 0 1-8.14-8.1 8.59 8.59 0 0 1 .25-2A1 1 0 0 0 8 2.36a10.14 10.14 0 1 0 14 11.69 1 1 0 0 0-.36-1.05Zm-9.5 6.69A8.14 8.14 0 0 1 7.08 5.22v.27a10.15 10.15 0 0 0 10.14 10.14 9.784 9.784 0 0 0 2.1-.22 8.11 8.11 0 0 1-7.18 4.32v-.04Z"/></svg><svg aria-hidden="true" class="auto astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M21 14h-1V7a3 3 0 0 0-3-3H7a3 3 0 0 0-3 3v7H3a1 1 0 0 0-1 1v2a3 3 0 0 0 3 3h14a3 3 0 0 0 3-3v-2a1 1 0 0 0-1-1ZM6 7a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v7H6V7Zm14 10a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-1h16v1Z"/></svg></template><link rel="stylesheet" href="/bomlens/_astro/print.ehPL0gv-.css" media="print"><link rel="stylesheet" href="/bomlens/_astro/common.DxYPfd-D.css"><style>@layer starlight.components{svg:where(.astro-hkc32dio){color:var(--sl-icon-color);font-size:var(--sl-icon-size,1em);width:1em;height:1em;overflow:visible}.sl-link-button:where(.astro-dcqstdaq){font-size:var(--sl-text-sm);outline-offset:.25rem;border:1px solid #0000;border-radius:999rem;align-items:center;gap:.5em;padding:.4375rem 1.125rem;line-height:1.1875;text-decoration:none;display:inline-flex}.sl-link-button:where(.astro-dcqstdaq).primary{background:var(--sl-color-text-accent);border-color:var(--sl-color-text-accent);color:var(--sl-color-black)}.sl-link-button:where(.astro-dcqstdaq).primary:hover{color:var(--sl-color-black)}.sl-link-button:where(.astro-dcqstdaq).secondary{border-color:inherit;color:var(--sl-color-white)}.sl-link-button:where(.astro-dcqstdaq).minimal{color:var(--sl-color-white);padding-inline:0}.sl-link-button:where(.astro-dcqstdaq) svg{flex-shrink:0}@media (width>=50rem){.sl-link-button:where(.astro-dcqstdaq){font-size:var(--sl-text-base);padding:.9375rem 1.25rem}}.sl-markdown-content .sl-link-button:where(.astro-dcqstdaq){margin-inline-end:1rem}.sl-markdown-content .sl-link-button:where(.astro-dcqstdaq):not(:where(p *)){margin-block:1rem}}
+</style><script type="module" src="/bomlens/_astro/page.cNngjUgL.js"></script></head><body class="astro-g5ptsecz"><a class="sl-skip-link astro-qb7clj6f" href="#_top">Skip to content</a><div class="page sl-flex astro-yntsjkba"><header class="header astro-yntsjkba"><div class="header astro-by6fddyj"><div class="title-wrapper sl-flex astro-by6fddyj"><a href="/bomlens/" class="site-title sl-flex astro-6rvad3va"><span class="astro-6rvad3va" translate="no">BomLens</span></a></div><div class="sl-flex print:hidden astro-by6fddyj"><site-search class="astro-by6fddyj astro-b5kgnn7o" data-translations="{&quot;placeholder&quot;:&quot;Search&quot;}"><button data-open-modal disabled aria-label="Search" aria-keyshortcuts="Control+K" class="astro-b5kgnn7o"><svg aria-hidden="true" class="astro-b5kgnn7o astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M21.71 20.29 18 16.61A9 9 0 1 0 16.61 18l3.68 3.68a.999.999 0 0 0 1.42 0 1 1 0 0 0 0-1.39ZM11 18a7 7 0 1 1 0-14 7 7 0 0 1 0 14Z"/></svg><span class="sl-hidden md:sl-block astro-b5kgnn7o" aria-hidden="true">Search</span><kbd class="sl-hidden md:sl-flex astro-b5kgnn7o" style="display: none;"><kbd class="astro-b5kgnn7o">Ctrl</kbd><kbd class="astro-b5kgnn7o">K</kbd></kbd></button><dialog style="padding:0" aria-label="Search" class="astro-b5kgnn7o"><div class="dialog-frame sl-flex astro-b5kgnn7o"><button data-close-modal class="sl-flex md:sl-hidden astro-b5kgnn7o">Cancel</button><div class="search-container astro-b5kgnn7o"><div id="starlight__search" class="astro-b5kgnn7o"></div></div></div></dialog></site-search><script>
+	(() => {
+		const openBtn = document.querySelector('button[data-open-modal]');
+		const shortcut = openBtn?.querySelector('kbd');
+		if (!openBtn || !(shortcut instanceof HTMLElement)) return;
+		const platformKey = shortcut.querySelector('kbd');
+		if (platformKey && /(Mac|iPhone|iPod|iPad)/i.test(navigator.platform)) {
+			platformKey.textContent = '⌘';
+			openBtn.setAttribute('aria-keyshortcuts', 'Meta+K');
+		}
+		shortcut.style.display = '';
+	})();
+</script><script type="module" src="/bomlens/_astro/Search.astro_astro_type_script_index_0_lang.BSqzOScY.js"></script></div><div class="sl-hidden md:sl-flex print:hidden right-group astro-by6fddyj"><div class="sl-flex social-icons astro-by6fddyj"><a href="https://github.com/sktelecom/bomlens" rel="me" class="sl-flex astro-n2mnl6yq"><span class="sr-only astro-n2mnl6yq">GitHub</span><svg aria-hidden="true" class="astro-n2mnl6yq astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M12 .3a12 12 0 0 0-3.8 23.38c.6.12.83-.26.83-.57L9 21.07c-3.34.72-4.04-1.61-4.04-1.61-.55-1.39-1.34-1.76-1.34-1.76-1.08-.74.09-.73.09-.73 1.2.09 1.83 1.24 1.83 1.24 1.08 1.83 2.81 1.3 3.5 1 .1-.78.42-1.31.76-1.61-2.67-.3-5.47-1.33-5.47-5.93 0-1.31.47-2.38 1.24-3.22-.14-.3-.54-1.52.1-3.18 0 0 1-.32 3.3 1.23a11.5 11.5 0 0 1 6 0c2.28-1.55 3.29-1.23 3.29-1.23.64 1.66.24 2.88.12 3.18a4.65 4.65 0 0 1 1.23 3.22c0 4.61-2.8 5.63-5.48 5.92.42.36.81 1.1.81 2.22l-.01 3.29c0 .31.2.69.82.57A12 12 0 0 0 12 .3Z"/></svg></a></div><starlight-theme-select><label style="--sl-select-width: 6.25em" class="astro-2z5xp7gb"><span class="sr-only astro-2z5xp7gb">Select theme</span><svg aria-hidden="true" class="icon label-icon astro-2z5xp7gb astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M21 14h-1V7a3 3 0 0 0-3-3H7a3 3 0 0 0-3 3v7H3a1 1 0 0 0-1 1v2a3 3 0 0 0 3 3h14a3 3 0 0 0 3-3v-2a1 1 0 0 0-1-1ZM6 7a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v7H6V7Zm14 10a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-1h16v1Z"/></svg><select autocomplete="off" class="astro-2z5xp7gb"><option value="dark" class="astro-2z5xp7gb">Dark</option><option value="light" class="astro-2z5xp7gb">Light</option><option value="auto" selected class="astro-2z5xp7gb">Auto</option></select><svg aria-hidden="true" class="icon caret astro-2z5xp7gb astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M17 9.17a1 1 0 0 0-1.41 0L12 12.71 8.46 9.17a1 1 0 1 0-1.41 1.42l4.24 4.24a1.002 1.002 0 0 0 1.42 0L17 10.59a1.002 1.002 0 0 0 0-1.42Z"/></svg></label></starlight-theme-select><script>
+	StarlightThemeProvider.updatePickers();
+</script><script type="module">var e=`starlight-theme`,t=e=>e===`auto`||e===`dark`||e===`light`?e:`auto`,n=()=>t(typeof localStorage<`u`&&localStorage.getItem(e));function r(t){typeof localStorage<`u`&&localStorage.setItem(e,t===`light`||t===`dark`?t:``)}var i=()=>matchMedia(`(prefers-color-scheme: light)`).matches?`light`:`dark`;function a(e){StarlightThemeProvider.updatePickers(e),document.documentElement.dataset.theme=e===`auto`?i():e,r(e)}matchMedia(`(prefers-color-scheme: light)`).addEventListener(`change`,()=>{n()===`auto`&&a(`auto`)});var o=class extends HTMLElement{constructor(){super(),a(n()),this.querySelector(`select`)?.addEventListener(`change`,e=>{e.currentTarget instanceof HTMLSelectElement&&a(t(e.currentTarget.value))})}};customElements.define(`starlight-theme-select`,o);</script><starlight-lang-select><label style="--sl-select-width: 7em" class="astro-2z5xp7gb"><span class="sr-only astro-2z5xp7gb">Select language</span><svg aria-hidden="true" class="icon label-icon astro-2z5xp7gb astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path fill-rule="evenodd" d="M8.516 3a.94.94 0 0 0-.941.94v1.15H2.94a.94.94 0 1 0 0 1.882h7.362a7.422 7.422 0 0 1-1.787 3.958 7.42 7.42 0 0 1-1.422-2.425.94.94 0 1 0-1.774.627 9.303 9.303 0 0 0 1.785 3.043 7.422 7.422 0 0 1-4.164 1.278.94.94 0 1 0 0 1.881 9.303 9.303 0 0 0 5.575-1.855 9.303 9.303 0 0 0 4.11 1.74l-.763 1.525a.968.968 0 0 0-.016.034l-1.385 2.77a.94.94 0 1 0 1.683.841l1.133-2.267h5.806l1.134 2.267a.94.94 0 0 0 1.683-.841l-1.385-2.769a.95.95 0 0 0-.018-.036l-3.476-6.951a.94.94 0 0 0-1.682 0l-1.82 3.639a7.423 7.423 0 0 1-3.593-1.256 9.303 9.303 0 0 0 2.27-5.203h1.894a.94.94 0 0 0 0-1.881H9.456V3.94A.94.94 0 0 0 8.516 3Zm6.426 11.794a1.068 1.068 0 0 1-.02.039l-.703 1.407h3.924l-1.962-3.924-1.24 2.478Z" clip-rule="evenodd"/></svg><select autocomplete="off" class="astro-2z5xp7gb"><option value="/bomlens/reference/artifacts/" class="astro-2z5xp7gb">English</option><option value="/bomlens/ko/reference/artifacts/" class="astro-2z5xp7gb">한국어</option></select><svg aria-hidden="true" class="icon caret astro-2z5xp7gb astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M17 9.17a1 1 0 0 0-1.41 0L12 12.71 8.46 9.17a1 1 0 1 0-1.41 1.42l4.24 4.24a1.002 1.002 0 0 0 1.42 0L17 10.59a1.002 1.002 0 0 0 0-1.42Z"/></svg></label></starlight-lang-select><script type="module">var e=class extends HTMLElement{constructor(){super();let e=this.querySelector(`select`);e&&(e.addEventListener(`change`,e=>{e.currentTarget instanceof HTMLSelectElement&&(window.location.pathname=e.currentTarget.value)}),window.addEventListener(`pageshow`,t=>{if(!t.persisted)return;let n=e.querySelector(`option[selected]`)?.index;n!==e.selectedIndex&&(e.selectedIndex=n??0)}))}};customElements.define(`starlight-lang-select`,e);</script></div></div></header><nav class="sidebar print:hidden astro-yntsjkba" aria-label="Main"><button popovertarget="starlight__sidebar" class="sl-menu-button sl-flex md:sl-hidden print:hidden astro-r2osgdlg"><svg aria-hidden="true" class="open-menu astro-r2osgdlg astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M3 8h18a1 1 0 1 0 0-2H3a1 1 0 0 0 0 2Zm18 8H3a1 1 0 0 0 0 2h18a1 1 0 0 0 0-2Zm0-5H3a1 1 0 0 0 0 2h18a1 1 0 0 0 0-2Z"/></svg><svg aria-hidden="true" class="close-menu astro-r2osgdlg astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="m13.41 12 6.3-6.29a1.004 1.004 0 1 0-1.42-1.42L12 10.59l-6.29-6.3a1.004 1.004 0 0 0-1.42 1.42l6.3 6.29-6.3 6.29a1 1 0 0 0 0 1.42.998.998 0 0 0 1.42 0l6.29-6.3 6.29 6.3a.999.999 0 0 0 1.42 0 1 1 0 0 0 0-1.42L13.41 12Z"/></svg><span class="sr-only astro-r2osgdlg">Menu</span></button><script type="module">var e=class extends HTMLElement{constructor(){super();let e=matchMedia(`(min-width: 50em)`),t=()=>{this.popover=e.matches?null:`auto`};t(),e.addEventListener(`change`,()=>t()),this.addEventListener(`toggle`,({newState:e})=>this.trapFocus(e===`open`))}trapFocus(e){document.querySelectorAll(`.main-frame, .sl-skip-link`).forEach(t=>{t.toggleAttribute(`inert`,e)})}};customElements.define(`sl-sidebar-pane`,e);</script><sl-sidebar-pane popover id="starlight__sidebar" class="sidebar-pane astro-yntsjkba"><div class="sidebar-content sl-flex astro-yntsjkba"><sl-sidebar-state-persist data-hash="0e9vtkm" class="astro-ipdry5cl"><script aria-hidden="true">
+		(() => {
+			try {
+				if (!matchMedia('(min-width: 50em)').matches) return;
+				/** @type {HTMLElement | null} */
+				const target = document.querySelector('sl-sidebar-state-persist');
+				const state = JSON.parse(sessionStorage.getItem('sl-sidebar-state') || '0');
+				if (!target || !state || target.dataset.hash !== state.hash) return;
+				window._starlightScrollRestore = state.scroll;
+				customElements.define(
+					'sl-sidebar-restore',
+					class SidebarRestore extends HTMLElement {
+						connectedCallback() {
+							try {
+								const idx = parseInt(this.dataset.index || '');
+								const details = this.closest('details');
+								if (details && typeof state.open[idx] === 'boolean') details.open = state.open[idx];
+							} catch {}
+						}
+					}
+				);
+			} catch {}
+		})();
+	</script><ul class="top-level astro-rmhv4bp6"><li class="astro-rmhv4bp6"><details open class="astro-rmhv4bp6"><summary class="astro-rmhv4bp6"><span class="group-label astro-rmhv4bp6"><span class="large astro-rmhv4bp6">Get started</span></span><svg aria-hidden="true" class="caret astro-rmhv4bp6 astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1.25rem;"><path d="m14.83 11.29-4.24-4.24a1 1 0 1 0-1.42 1.41L12.71 12l-3.54 3.54a1 1 0 0 0 0 1.41 1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.24-4.24a1.002 1.002 0 0 0 0-1.42Z"/></svg></summary><sl-sidebar-restore data-index="0"></sl-sidebar-restore><ul class="astro-rmhv4bp6"><li class="astro-rmhv4bp6"><a href="/bomlens/concepts/what-is-sbom/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">What is an SBOM</span></a></li><li class="astro-rmhv4bp6"><a href="/bomlens/start/first-scan/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">Getting started</span></a></li><li class="astro-rmhv4bp6"><a href="/bomlens/start/no-cli/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">No-CLI quick start (no command line)</span></a></li><li class="astro-rmhv4bp6"><a href="/bomlens/reference/ui/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">Web UI &amp; desktop app</span></a></li></ul></details></li><li class="astro-rmhv4bp6"><details open class="astro-rmhv4bp6"><summary class="astro-rmhv4bp6"><span class="group-label astro-rmhv4bp6"><span class="large astro-rmhv4bp6">Guides</span></span><svg aria-hidden="true" class="caret astro-rmhv4bp6 astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1.25rem;"><path d="m14.83 11.29-4.24-4.24a1 1 0 1 0-1.42 1.41L12.71 12l-3.54 3.54a1 1 0 0 0 0 1.41 1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.24-4.24a1.002 1.002 0 0 0 0-1.42Z"/></svg></summary><sl-sidebar-restore data-index="1"></sl-sidebar-restore><ul class="astro-rmhv4bp6"><li class="astro-rmhv4bp6"><a href="/bomlens/guides/ai-model/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">AI model SBOM guide</span></a></li><li class="astro-rmhv4bp6"><a href="/bomlens/guides/by-input/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">Input scenarios guide</span></a></li><li class="astro-rmhv4bp6"><a href="/bomlens/guides/ci-cd/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">Use in CI/CD</span></a></li><li class="astro-rmhv4bp6"><a href="/bomlens/guides/declared-components/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">Declaring your own components</span></a></li><li class="astro-rmhv4bp6"><a href="/bomlens/guides/firmware/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">Firmware analysis guide</span></a></li><li class="astro-rmhv4bp6"><a href="/bomlens/guides/identify-vendored/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">Identify bundled open source (C/C++)</span></a></li><li class="astro-rmhv4bp6"><a href="/bomlens/guides/reports/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">Generate notice, security &amp; risk reports</span></a></li><li class="astro-rmhv4bp6"><a href="/bomlens/guides/server-delivery/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">Server SBOM guide</span></a></li><li class="astro-rmhv4bp6"><a href="/bomlens/guides/supplier-sbom/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">Supplier SBOM validation guide</span></a></li><li class="astro-rmhv4bp6"><a href="/bomlens/guides/upload/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">Upload to Dependency-Track / TRUSCA</span></a></li><li class="astro-rmhv4bp6"><a href="/bomlens/guides/verify-release/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">Verify a release</span></a></li></ul></details></li><li class="astro-rmhv4bp6"><details open class="astro-rmhv4bp6"><summary class="astro-rmhv4bp6"><span class="group-label astro-rmhv4bp6"><span class="large astro-rmhv4bp6">Reference</span></span><svg aria-hidden="true" class="caret astro-rmhv4bp6 astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1.25rem;"><path d="m14.83 11.29-4.24-4.24a1 1 0 1 0-1.42 1.41L12.71 12l-3.54 3.54a1 1 0 0 0 0 1.41 1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.24-4.24a1.002 1.002 0 0 0 0-1.42Z"/></svg></summary><sl-sidebar-restore data-index="2"></sl-sidebar-restore><ul class="astro-rmhv4bp6"><li class="astro-rmhv4bp6"><a href="/bomlens/reference/artifacts/" aria-current="page" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">Artifacts reference</span></a></li><li class="astro-rmhv4bp6"><a href="/bomlens/reference/cli/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">CLI reference</span></a></li><li class="astro-rmhv4bp6"><a href="/bomlens/reference/docker-image/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">Use the Docker image directly</span></a></li><li class="astro-rmhv4bp6"><a href="/bomlens/reference/ecosystems/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">Supported ecosystems</span></a></li><li class="astro-rmhv4bp6"><a href="/bomlens/reference/engine-contract/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">Engine contract</span></a></li><li class="astro-rmhv4bp6"><a href="/bomlens/reference/ui/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">Web UI &amp; desktop app</span></a></li></ul></details></li><li class="astro-rmhv4bp6"><details open class="astro-rmhv4bp6"><summary class="astro-rmhv4bp6"><span class="group-label astro-rmhv4bp6"><span class="large astro-rmhv4bp6">Concepts</span></span><svg aria-hidden="true" class="caret astro-rmhv4bp6 astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1.25rem;"><path d="m14.83 11.29-4.24-4.24a1 1 0 1 0-1.42 1.41L12.71 12l-3.54 3.54a1 1 0 0 0 0 1.41 1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.24-4.24a1.002 1.002 0 0 0 0-1.42Z"/></svg></summary><sl-sidebar-restore data-index="3"></sl-sidebar-restore><ul class="astro-rmhv4bp6"><li class="astro-rmhv4bp6"><a href="/bomlens/concepts/architecture/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">Architecture</span></a></li><li class="astro-rmhv4bp6"><a href="/bomlens/concepts/dependency-resolution/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">How dependencies are resolved</span></a></li><li class="astro-rmhv4bp6"><a href="/bomlens/concepts/limitations/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">What BomLens does not do</span></a></li><li class="astro-rmhv4bp6"><a href="/bomlens/concepts/local-first/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">Local-first by design</span></a></li><li class="astro-rmhv4bp6"><a href="/bomlens/concepts/pipeline-by-input/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">Pipeline by input type</span></a></li><li class="astro-rmhv4bp6"><a href="/bomlens/concepts/reports-explained/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">What the reports mean</span></a></li><li class="astro-rmhv4bp6"><a href="/bomlens/concepts/what-is-sbom/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">What is an SBOM</span></a></li></ul></details></li></ul><script aria-hidden="true">
+		(() => {
+			const scroller = document.getElementById('starlight__sidebar');
+			if (!window._starlightScrollRestore || !scroller) return;
+			scroller.scrollTop = window._starlightScrollRestore;
+			delete window._starlightScrollRestore;
+		})();
+	</script></sl-sidebar-state-persist><div class="md:sl-hidden"><div class="mobile-preferences sl-flex astro-p4azlveh"><div class="social-icons astro-p4azlveh"><a href="https://github.com/sktelecom/bomlens" rel="me" class="sl-flex astro-n2mnl6yq"><span class="sr-only astro-n2mnl6yq">GitHub</span><svg aria-hidden="true" class="astro-n2mnl6yq astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M12 .3a12 12 0 0 0-3.8 23.38c.6.12.83-.26.83-.57L9 21.07c-3.34.72-4.04-1.61-4.04-1.61-.55-1.39-1.34-1.76-1.34-1.76-1.08-.74.09-.73.09-.73 1.2.09 1.83 1.24 1.83 1.24 1.08 1.83 2.81 1.3 3.5 1 .1-.78.42-1.31.76-1.61-2.67-.3-5.47-1.33-5.47-5.93 0-1.31.47-2.38 1.24-3.22-.14-.3-.54-1.52.1-3.18 0 0 1-.32 3.3 1.23a11.5 11.5 0 0 1 6 0c2.28-1.55 3.29-1.23 3.29-1.23.64 1.66.24 2.88.12 3.18a4.65 4.65 0 0 1 1.23 3.22c0 4.61-2.8 5.63-5.48 5.92.42.36.81 1.1.81 2.22l-.01 3.29c0 .31.2.69.82.57A12 12 0 0 0 12 .3Z"/></svg></a></div><starlight-theme-select><label style="--sl-select-width: 6.25em" class="astro-2z5xp7gb"><span class="sr-only astro-2z5xp7gb">Select theme</span><svg aria-hidden="true" class="icon label-icon astro-2z5xp7gb astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M21 14h-1V7a3 3 0 0 0-3-3H7a3 3 0 0 0-3 3v7H3a1 1 0 0 0-1 1v2a3 3 0 0 0 3 3h14a3 3 0 0 0 3-3v-2a1 1 0 0 0-1-1ZM6 7a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v7H6V7Zm14 10a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-1h16v1Z"/></svg><select autocomplete="off" class="astro-2z5xp7gb"><option value="dark" class="astro-2z5xp7gb">Dark</option><option value="light" class="astro-2z5xp7gb">Light</option><option value="auto" selected class="astro-2z5xp7gb">Auto</option></select><svg aria-hidden="true" class="icon caret astro-2z5xp7gb astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M17 9.17a1 1 0 0 0-1.41 0L12 12.71 8.46 9.17a1 1 0 1 0-1.41 1.42l4.24 4.24a1.002 1.002 0 0 0 1.42 0L17 10.59a1.002 1.002 0 0 0 0-1.42Z"/></svg></label></starlight-theme-select><script>
+	StarlightThemeProvider.updatePickers();
+</script><starlight-lang-select><label style="--sl-select-width: 7em" class="astro-2z5xp7gb"><span class="sr-only astro-2z5xp7gb">Select language</span><svg aria-hidden="true" class="icon label-icon astro-2z5xp7gb astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path fill-rule="evenodd" d="M8.516 3a.94.94 0 0 0-.941.94v1.15H2.94a.94.94 0 1 0 0 1.882h7.362a7.422 7.422 0 0 1-1.787 3.958 7.42 7.42 0 0 1-1.422-2.425.94.94 0 1 0-1.774.627 9.303 9.303 0 0 0 1.785 3.043 7.422 7.422 0 0 1-4.164 1.278.94.94 0 1 0 0 1.881 9.303 9.303 0 0 0 5.575-1.855 9.303 9.303 0 0 0 4.11 1.74l-.763 1.525a.968.968 0 0 0-.016.034l-1.385 2.77a.94.94 0 1 0 1.683.841l1.133-2.267h5.806l1.134 2.267a.94.94 0 0 0 1.683-.841l-1.385-2.769a.95.95 0 0 0-.018-.036l-3.476-6.951a.94.94 0 0 0-1.682 0l-1.82 3.639a7.423 7.423 0 0 1-3.593-1.256 9.303 9.303 0 0 0 2.27-5.203h1.894a.94.94 0 0 0 0-1.881H9.456V3.94A.94.94 0 0 0 8.516 3Zm6.426 11.794a1.068 1.068 0 0 1-.02.039l-.703 1.407h3.924l-1.962-3.924-1.24 2.478Z" clip-rule="evenodd"/></svg><select autocomplete="off" class="astro-2z5xp7gb"><option value="/bomlens/reference/artifacts/" class="astro-2z5xp7gb">English</option><option value="/bomlens/ko/reference/artifacts/" class="astro-2z5xp7gb">한국어</option></select><svg aria-hidden="true" class="icon caret astro-2z5xp7gb astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M17 9.17a1 1 0 0 0-1.41 0L12 12.71 8.46 9.17a1 1 0 1 0-1.41 1.42l4.24 4.24a1.002 1.002 0 0 0 1.42 0L17 10.59a1.002 1.002 0 0 0 0-1.42Z"/></svg></label></starlight-lang-select></div></div></div></sl-sidebar-pane></nav><div class="main-frame astro-yntsjkba"><script type="module">var e=document.getElementById(`starlight__sidebar`),t=e?.querySelector(`sl-sidebar-state-persist`),n=`sl-sidebar-state`,r=()=>{let r=[],i=t?.dataset.hash||``;try{let e=sessionStorage.getItem(n),t=JSON.parse(e||`{}`);Array.isArray(t.open)&&t.hash===i&&(r=t.open)}catch{}return{hash:i,open:r,scroll:e?.scrollTop||0}},i=e=>{try{sessionStorage.setItem(n,JSON.stringify(e))}catch{}},a=()=>i(r()),o=(e,t)=>{let n=r();n.open[t]=e,i(n)};t?.addEventListener(`click`,e=>{if(!(e.target instanceof Element))return;let t=e.target.closest(`summary`)?.closest(`details`);if(!t)return;let n=t.querySelector(`sl-sidebar-restore`),r=parseInt(n?.dataset.index||``);isNaN(r)||o(!t.open,r)}),addEventListener(`visibilitychange`,()=>{document.visibilityState===`hidden`&&a()});</script><div class="lg:sl-flex astro-lrzkfocr"><aside class="right-sidebar-container print:hidden astro-lrzkfocr"><div class="right-sidebar astro-lrzkfocr"><div class="lg:sl-hidden astro-qok35upx"><mobile-starlight-toc data-min-h="2" data-max-h="3" class="astro-66cqc7ze"><nav aria-labelledby="starlight__on-this-page--mobile" class="astro-66cqc7ze"><details id="starlight__mobile-toc" class="astro-66cqc7ze"><summary id="starlight__on-this-page--mobile" class="sl-flex astro-66cqc7ze"><span class="toggle sl-flex astro-66cqc7ze">On this page<svg aria-hidden="true" class="caret astro-66cqc7ze astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1rem;"><path d="m14.83 11.29-4.24-4.24a1 1 0 1 0-1.42 1.41L12.71 12l-3.54 3.54a1 1 0 0 0 0 1.41 1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.24-4.24a1.002 1.002 0 0 0 0-1.42Z"/></svg></span><span class="display-current astro-66cqc7ze"></span></summary><div class="dropdown astro-66cqc7ze"><ul class="isMobile astro-jugkfwgx" style="--depth: 0;"><li style="--depth: 0;" class="astro-jugkfwgx"><a href="#_top" style="--depth: 0;" class="astro-jugkfwgx"><span style="--depth: 0;" class="astro-jugkfwgx">Overview</span></a></li><li style="--depth: 0;" class="astro-jugkfwgx"><a href="#output-files" style="--depth: 0;" class="astro-jugkfwgx"><span style="--depth: 0;" class="astro-jugkfwgx">Output files</span></a></li><li style="--depth: 0;" class="astro-jugkfwgx"><a href="#the-declared-ai-service" style="--depth: 0;" class="astro-jugkfwgx"><span style="--depth: 0;" class="astro-jugkfwgx">The declared AI service</span></a></li><li style="--depth: 0;" class="astro-jugkfwgx"><a href="#sbom-structure" style="--depth: 0;" class="astro-jugkfwgx"><span style="--depth: 0;" class="astro-jugkfwgx">SBOM structure</span></a></li><li style="--depth: 0;" class="astro-jugkfwgx"><a href="#dependency-graph-completeness" style="--depth: 0;" class="astro-jugkfwgx"><span style="--depth: 0;" class="astro-jugkfwgx">Dependency-graph completeness</span></a></li></ul></div></details></nav></mobile-starlight-toc><script type="module" src="/bomlens/_astro/MobileTableOfContents.astro_astro_type_script_index_0_lang.C3fM4Kra.js"></script></div><div class="right-sidebar-panel sl-hidden lg:sl-block astro-qok35upx"><div class="sl-container astro-qok35upx"><starlight-toc data-min-h="2" data-max-h="3"><nav aria-labelledby="starlight__on-this-page"><h2 id="starlight__on-this-page">On this page</h2><ul class="astro-jugkfwgx" style="--depth: 0;"><li style="--depth: 0;" class="astro-jugkfwgx"><a href="#_top" style="--depth: 0;" class="astro-jugkfwgx"><span style="--depth: 0;" class="astro-jugkfwgx">Overview</span></a></li><li style="--depth: 0;" class="astro-jugkfwgx"><a href="#output-files" style="--depth: 0;" class="astro-jugkfwgx"><span style="--depth: 0;" class="astro-jugkfwgx">Output files</span></a></li><li style="--depth: 0;" class="astro-jugkfwgx"><a href="#the-declared-ai-service" style="--depth: 0;" class="astro-jugkfwgx"><span style="--depth: 0;" class="astro-jugkfwgx">The declared AI service</span></a></li><li style="--depth: 0;" class="astro-jugkfwgx"><a href="#sbom-structure" style="--depth: 0;" class="astro-jugkfwgx"><span style="--depth: 0;" class="astro-jugkfwgx">SBOM structure</span></a></li><li style="--depth: 0;" class="astro-jugkfwgx"><a href="#dependency-graph-completeness" style="--depth: 0;" class="astro-jugkfwgx"><span style="--depth: 0;" class="astro-jugkfwgx">Dependency-graph completeness</span></a></li></ul></nav></starlight-toc><script type="module" src="/bomlens/_astro/TableOfContents.astro_astro_type_script_index_0_lang.BpJaGz7G.js"></script></div></div></div></aside><div class="main-pane astro-lrzkfocr"><main data-pagefind-body class="astro-g5ptsecz" lang="en" dir="ltr"><div class="content-panel astro-a7po4psb"><div class="sl-container astro-a7po4psb"><nav class="breadcrumbs astro-u72m6wot" aria-label="Breadcrumb"><ol class="astro-u72m6wot"><li class="astro-u72m6wot"><a href="/bomlens/" class="astro-u72m6wot">Home</a></li><li class="astro-u72m6wot"><span class="astro-u72m6wot">Reference</span></li></ol></nav><h1 id="_top" class="astro-u72m6wot">Artifacts reference</h1></div></div><div class="content-panel astro-a7po4psb"><div class="sl-container astro-a7po4psb"><div class="sl-markdown-content"><p>The generated SBOM is CycloneDX 1.6 JSON, or 1.7 with <code dir="auto">--spec-version 1.7</code>; AI model and dataset SBOMs are always 1.7. An SPDX 2.3 JSON copy, converted from the final CycloneDX BOM, is produced by <code dir="auto">--spdx</code> during a CLI scan or on demand from the results screen in the UI. AI model and dataset scans also write an SPDX 3.0.1 document with the AI and Dataset profiles (<code dir="auto">_bom.spdx3.json</code>, below). Both paths run the same conversion and give the same file. CycloneDX remains the primary format, and CycloneDX-only data (vulnerabilities, <code dir="auto">bomlens:*</code> properties, and the <code dir="auto">services[]</code> a <a href="#the-declared-ai-service">declared AI service</a> adds) is not carried over.</p>
+<p>The filename is <code dir="auto">{Project}_{Version}_bom.json</code> (e.g. <code dir="auto">MyApp_1.0.0_bom.json</code>).</p>
+<div class="sl-heading-wrapper level-h2"><h2 id="output-files">Output files</h2><a class="sl-anchor-link" href="#output-files"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “Output files”</span></a></div>
+<table>
+<thead>
+<tr>
+<th>File</th>
+<th>When generated</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code dir="auto">{Project}_{Version}_bom.json</code></td>
+<td>always</td>
+<td>SBOM (CycloneDX 1.6, or 1.7 with <code dir="auto">--spec-version 1.7</code>)</td>
+</tr>
+<tr>
+<td><code dir="auto">{Project}_{Version}_bom.refused.json</code></td>
+<td>a source scan or Yocto build directory scan whose declaration file (<code dir="auto">--components</code>, or <code dir="auto">sbom-declared.cdx.json</code> at the scan target root) is refused</td>
+<td>the SBOM written up to the point the scan stopped, without the declared components. It takes the place of <code dir="auto">_bom.json</code>, which is not written, so a step that picks up <code dir="auto">_bom.json</code> cannot take the incomplete SBOM; the scan prints the reasons and exits 1. Not normalized, signed or uploaded, and no report is made from it. The web UI’s failed scan offers it to view or download. The next scan of the same project and version removes it. See <a href="/bomlens/guides/declared-components/#what-is-refused-and-why">What is refused, and why?</a></td>
+</tr>
+<tr>
+<td><code dir="auto">{Project}_{Version}_bom.spdx.json</code></td>
+<td><code dir="auto">--spdx</code> / <code dir="auto">--all</code>, or Export as SPDX 2.3 in the UI</td>
+<td>SBOM (SPDX 2.3, converted from the CycloneDX output)</td>
+</tr>
+<tr>
+<td><code dir="auto">{Project}_{Version}_bom.spdx3.json</code></td>
+<td>AI model and dataset scans (<code dir="auto">--model</code>, <code dir="auto">--model-file</code>, a dataset), unless <code dir="auto">--no-spdx3</code></td>
+<td>the AI SBOM as an SPDX 3.0.1 document with the AI and Dataset profiles (JSON-LD). Fields come from the CycloneDX output, from fixed rules over it, or from the publisher’s declaration (<code dir="auto">--ai-declare</code>); nothing is estimated. Required fields SPDX gives no “unknown” value (who supplied and who made the model and data, release and build dates, the download address, the document’s author) stay empty until declared, and the document says it is a draft until then. Base models are identified by id and licence only. The weights scope is carried as <code dir="auto">bomlens:weights:scope</code> (<code dir="auto">full</code>, <code dir="auto">adapter</code>, <code dir="auto">quantized</code>, <code dir="auto">merged</code>) in a CycloneDX properties extension. Not an input for <code dir="auto">--analyze</code></td>
+</tr>
+<tr>
+<td><code dir="auto">{Project}_{Version}_spdx3-check.json</code> / <code dir="auto">.md</code></td>
+<td>with the SPDX 3.0.1 document</td>
+<td>which field of each element came from the scan, from the declaration, or from nothing, which required fields are open, and what needs a decision by the publisher (personal data, safety risk, autonomy). <code dir="auto">service.state</code> says whether the CycloneDX SBOM carries the declared service and model values: <code dir="auto">none</code> (nothing declared, nothing in the SBOM), <code dir="auto">applied</code> (the SBOM matches the declaration) or <code dir="auto">pendingScan</code> (they differ; a new scan writes them). Guidance, not legal advice</td>
+</tr>
+<tr>
+<td><code dir="auto">{Project}_{Version}_ai-declaration.template.json</code></td>
+<td>with the SPDX 3.0.1 document</td>
+<td>an empty declaration for this scan: the fields a person fills, for the model, its datasets and the base models the scan found. Fill it and pass it back with <code dir="auto">--ai-declare</code></td>
+</tr>
+<tr>
+<td><code dir="auto">{Project}_{Version}_ai-declaration.json</code></td>
+<td><code dir="auto">--ai-declare &#x3C;file></code> (the accepted file), or the declaration saved in the web UI</td>
+<td>what the model’s publisher declared. Like <code dir="auto">_vex.json</code>, it is not removed by re-scanning the same project and version, and a re-scan applies it again. A file that names a dataset or base model the new scan does not have is refused, and the document stays a draft. A dataset entry can list <code dir="auto">sources[]</code>: <code dir="auto">{"ref": "huggingface:&#x3C;id>", "relation": "extended"}</code> for a hub dataset (read from the hub at the next scan and judged with the dataset), or <code dir="auto">{"name": "...", "license": "&#x3C;hub licence tag or SPDX id>", "relation": "other"}</code> for one named in words (written to the SPDX 3.0.1 document only, marked as not verified; a licence that is not an SPDX id is kept in words). Data the hub does not hold takes sources named in words only. <code dir="auto">model.license</code> (a hub licence tag or SPDX id) is the model’s own licence: it fills the SPDX document when the scan read none or only <code dir="auto">other</code> (as an SPDX expression only when it is a hub tag naming one SPDX licence, or a <code dir="auto">LicenseRef-</code>), and a model described from the declaration alone carries it in its SBOM and is judged on it. A declaration can also describe the service the model runs in (<code dir="auto">service</code>) and give the model’s input and output kinds and regulatory values; see <a href="#the-declared-ai-service">The declared AI service</a></td>
+</tr>
+<tr>
+<td><code dir="auto">{Project}_{Version}_component-versions.template.csv</code></td>
+<td>a firmware, root filesystem or binary scan that found components without a version</td>
+<td>the names of those components in the <code dir="auto">--component-versions</code> format (CSV with the header <code dir="auto">name,version,reason</code>) with the versions left empty, and comment lines explaining the three reasons. A component that already carries a reason is not listed. Fill in a version, or a reason when there is none, and pass it back with <code dir="auto">--component-versions</code></td>
+</tr>
+<tr>
+<td><code dir="auto">{Project}_{Version}_NOTICE.txt</code> / <code dir="auto">.html</code></td>
+<td><code dir="auto">--notice</code> / <code dir="auto">--all</code> / risk report default</td>
+<td>open-source notice</td>
+</tr>
+<tr>
+<td><code dir="auto">{Project}_{Version}_NOTICE.pdf</code></td>
+<td>same as above, when a PDF renderer is built into the image (<code dir="auto">--build-arg SBOM_PDF=true</code>)</td>
+<td>the notice rendered to PDF; skipped with a log line otherwise</td>
+</tr>
+<tr>
+<td><code dir="auto">{Project}_{Version}_security.json</code> / <code dir="auto">.md</code> / <code dir="auto">.html</code></td>
+<td><code dir="auto">--security</code> / <code dir="auto">--all</code> / risk report default</td>
+<td>Trivy security report</td>
+</tr>
+<tr>
+<td><code dir="auto">{Project}_{Version}_risk-report.md</code> / <code dir="auto">.html</code></td>
+<td>default (all modes) — omit with <code dir="auto">--no-report</code></td>
+<td>open-source risk report</td>
+</tr>
+<tr>
+<td><code dir="auto">{Project}_{Version}_conformance.json</code> / <code dir="auto">.md</code> / <code dir="auto">.html</code></td>
+<td>every scan that generates an SBOM, also with <code dir="auto">--no-report</code> (which skips only the risk report); <code dir="auto">--analyze</code> produces it too, since that is what it measures</td>
+<td>conformance check report, with a regulatory crosswalk roll-up for every SBOM (EU CRA via BSI TR-03183-2, the US SBOM minimum elements of 2026 — reference only, no compliance determination). For an AI SBOM it also carries the G7 checks and, for each advisory element still missing, the CycloneDX fragment that would satisfy it. Names any best-effort post-process step that failed while the report was generated, so a pass is not read as proof every step ran cleanly; does not affect the pass/fail result or any individual check. See a <a href="/bomlens/samples/aether-7b-5attn_conformance.html">rendered example</a></td>
+</tr>
+<tr>
+<td><code dir="auto">{Project}_{Version}_ai-profile.json</code> / <code dir="auto">.md</code></td>
+<td>AI SBOM (<code dir="auto">--model</code>, or <code dir="auto">--analyze</code> on an SBOM with a model component)</td>
+<td>AI compliance profile: G7 rollup, the closable gaps with their reference links, license-flagged components, regulatory crosswalk, and the model risk assessment (<code dir="auto">riskAssessment</code>: per-model ok/conditional/caution/review verdicts with conditions, reasons and the usage scenario; guidance, not legal advice). The same rollup opens the conformance HTML, so there is no separate HTML profile</td>
+</tr>
+<tr>
+<td><code dir="auto">{Project}_{Version}_scancode.json</code></td>
+<td><code dir="auto">--deep-license</code></td>
+<td>raw scancode result</td>
+</tr>
+<tr>
+<td><code dir="auto">{Project}_{Version}_files.json</code></td>
+<td>a source-having scan (a firmware scan always; other modes when <code dir="auto">--deep-license</code> did not already produce <code dir="auto">_scancode.json</code>)</td>
+<td>ScanCode-shaped file-tree inventory (structure only, no licenses) backing the source-tree view</td>
+</tr>
+<tr>
+<td><code dir="auto">{Project}_{Version}_source.json</code></td>
+<td>a source-having scan</td>
+<td>snapshot of the scanned tree’s file content, backing the file viewer (the scanned tree itself does not outlive the container)</td>
+</tr>
+<tr>
+<td><code dir="auto">{Project}_{Version}_input.json</code></td>
+<td><code dir="auto">--analyze</code></td>
+<td>the supplier SBOM’s own format, spec version, tool and authorship, captured before the CycloneDX conversion rewrites all of it</td>
+</tr>
+<tr>
+<td><code dir="auto">{Project}_{Version}_yocto_vex.json</code></td>
+<td>a Yocto build (a build directory named directly, or <code dir="auto">--analyze</code> on one)</td>
+<td>how many CVEs the build already patched or judged not applicable — numbers not recoverable from the CycloneDX output or the security report, which list only what is still unresolved</td>
+</tr>
+<tr>
+<td><code dir="auto">{Project}_{Version}_vex.json</code></td>
+<td>web UI only, saved when a judgement (affected / not affected / fixed / under investigation, with an optional note) is recorded against a CVE on the Vulnerabilities screen</td>
+<td>the judgements recorded for this scan, keyed by component and CVE. Not produced by the CLI, and absent until the first judgement is saved for a given scan. Unlike every other file here, it is not regenerated by a scan and is not removed by re-scanning the same project and version: a judgement recorded against an earlier scan survives scanning it again</td>
+</tr>
+<tr>
+<td><code dir="auto">{Project}_{Version}_vex.cdx.json</code></td>
+<td>web UI only, built when you press <strong>Export VEX</strong> on the Vulnerabilities screen (needs at least one recorded judgement)</td>
+<td>the judgements from <code dir="auto">_vex.json</code> as a standalone CycloneDX VEX document that another tool can read, at 1.7 when the scan’s SBOM is 1.7 and at 1.6 otherwise. The four states map to CycloneDX <code dir="auto">analysis.state</code> values (affected to <code dir="auto">exploitable</code>, not affected to <code dir="auto">not_affected</code>, fixed to <code dir="auto">resolved</code>, under investigation to <code dir="auto">in_triage</code>), and the note goes into <code dir="auto">analysis.detail</code>. No <code dir="auto">justification</code> is written, because the screen collects free text and CycloneDX allows only a fixed list. Each entry points at a copy of its component (name, version, PURL) held in the document itself, so the file stands alone. A judgement whose component is not in the SBOM is left out, and the screen says how many; firmware findings are the usual case, since their name and version come from the binary. It is rebuilt on every export and removed when the same project and version is scanned again, so export again afterwards</td>
+</tr>
+<tr>
+<td><code dir="auto">{Project}_{Version}_vex_imported.json</code></td>
+<td><code dir="auto">--vex &#x3C;file></code> on the CLI, or <strong>Import VEX</strong> on the Vulnerabilities screen in the web UI, with a CycloneDX VEX document</td>
+<td>the statements from a supplier’s VEX document that apply to a component of this scan’s SBOM, with the product the document describes. Kept apart from your own judgements in <code dir="auto">_vex.json</code>: a received statement never overwrites one, and the screen labels the two separately. The four states are mapped from CycloneDX <code dir="auto">analysis.state</code> (<code dir="auto">exploitable</code> to affected, <code dir="auto">not_affected</code> and <code dir="auto">false_positive</code> to not affected, <code dir="auto">resolved</code> and <code dir="auto">resolved_with_pedigree</code> to fixed, <code dir="auto">in_triage</code> to under investigation); any other state is ignored. A document whose product or version differs from the scanned SBOM’s root is refused and nothing is saved. A successful import replaces this file; a refused or empty one leaves the previous file as it was. A statement that names the product itself is stored once, without a component, and applies to every finding of that CVE that has none of its own. Like <code dir="auto">_vex.json</code>, it is not removed by re-scanning the same project and version</td>
+</tr>
+<tr>
+<td><code dir="auto">{Project}_{Version}_reachability.cdx.json</code></td>
+<td><code dir="auto">--reachability</code> on a Go source or Go executable scan, when govulncheck could read the Go vulnerability database</td>
+<td>govulncheck’s judgement of each Go advisory against a component of the SBOM (same module and version), as a standalone CycloneDX 1.6 VEX document. <code dir="auto">analysis.state</code> is <code dir="auto">not_affected</code> when the affected code is not reached, with <code dir="auto">justification</code> <code dir="auto">code_not_present</code> when the module is required but no affected package is in the build, or <code dir="auto">code_not_reachable</code> when the package is there but no affected function is called (or linked in an executable). It is <code dir="auto">exploitable</code> when the code is reached. <code dir="auto">analysis.detail</code> says which, with the call path or the symbol. <code dir="auto">id</code> is the advisory’s CVE when it has one, with its Go and other ids in <code dir="auto">references</code>. In a source scan, <code dir="auto">metadata.properties</code> record what was covered: <code dir="auto">bomlens:reachability:goos</code>, <code dir="auto">goarch</code>, <code dir="auto">build-tags</code> and <code dir="auto">modules</code>. The security report reads it: each finding it covers carries <code dir="auto">bomlens:reachability</code> (<code dir="auto">state</code>, <code dir="auto">justification</code>, <code dir="auto">detail</code>, <code dir="auto">level</code>, <code dir="auto">mode</code>) in <code dir="auto">_security.json</code>, and the document has a <code dir="auto">Reachability</code> summary</td>
+</tr>
+<tr>
+<td><code dir="auto">{Project}_{Version}_vendored.cdx.json</code></td>
+<td><code dir="auto">--identify-vendored</code> on a source scan, with the opt-in SCANOSS image</td>
+<td>vendored open-source components identified inside the source tree (SCANOSS)</td>
+</tr>
+<tr>
+<td><code dir="auto">{Project}_{Version}_security_trivy.json</code></td>
+<td>with the security report, when another engine (grype, cve-bin-tool, Yocto) added results to it</td>
+<td>Trivy’s own result, kept apart before the merge into <code dir="auto">_security.json</code></td>
+</tr>
+<tr>
+<td><code dir="auto">{Project}_{Version}_cdxgen.log</code></td>
+<td>a CLI source scan where a dependency preparation step failed (the SBOM records it in <code dir="auto">bomlens:pipeline-step-failed</code>)</td>
+<td>the stage 1 log (the preparation steps and cdxgen), kept for finding the cause. A diagnostic file, not meant for distribution: credentials in URLs (<code dir="auto">scheme://user:pass@</code> becomes <code dir="auto">scheme://***@</code>) and Authorization, token, password, secret and API key values are masked, but internal host names stay. Removed before the next scan of the same project and version</td>
+</tr>
+<tr>
+<td><code dir="auto">bomlens-events.jsonl</code></td>
+<td><code dir="auto">BOMLENS_EVENTS=file</code></td>
+<td>progress events, one JSON object per line. See <a href="/bomlens/reference/engine-contract/#progress-events">Engine contract</a></td>
+</tr>
+<tr>
+<td><code dir="auto">bomlens-result.json</code></td>
+<td>always</td>
+<td>the run’s result manifest: how it ended, each step’s outcome, and the role of each output file. See <a href="/bomlens/reference/engine-contract/">Engine contract</a></td>
+</tr>
+<tr>
+<td><code dir="auto">{Project}_{Version}_security_epss.json</code></td>
+<td>whenever the security report is generated</td>
+<td>EPSS score and KEV status per vulnerability (null/false when generated offline), used to prioritize the security report</td>
+</tr>
+<tr>
+<td><code dir="auto">{Project}_{Version}_bom.json.sig</code></td>
+<td><code dir="auto">--sign</code></td>
+<td>cosign signature (with <code dir="auto">--spdx</code>, a <code dir="auto">_bom.spdx.json.sig</code> is produced too, and an AI scan adds <code dir="auto">_bom.spdx3.json.sig</code>; a draft is signed too, since the signature says where the file came from, not that it is complete)</td>
+</tr>
+<tr>
+<td><code dir="auto">{new}_model-diff.json</code></td>
+<td><code dir="auto">--diff &#x3C;old.json> &#x3C;new.json></code></td>
+<td>AI-model drift report comparing two already-generated SBOMs: matched model verdict/license/hash changes, plus any component present in only one of the two files. Named after the newer input (<code dir="auto">&#x3C;new>_bom.json</code> → <code dir="auto">&#x3C;new>_model-diff.json</code>), not <code dir="auto">{Project}_{Version}</code> — <code dir="auto">--diff</code> takes no project or version of its own</td>
+</tr>
+</tbody>
+</table>
+<p><code dir="auto">{P}</code> = project name, <code dir="auto">{V}</code> = version (special characters are normalized to <code dir="auto">_</code>).</p>
+<p>The conditions above are the CLI flags. In the web UI and the desktop app the same choices are the generation options on the New scan screen — Notice and Security report — and every file produced is listed in the Artifacts section of the results, downloadable per format or as one ZIP. SPDX is not a scan option there: the SBOM card in that section has an <strong>Export as SPDX 2.3</strong> button that converts the finished BOM whenever you need it, and the converted file joins the artifact list and the ZIP. The UI has no signing, so an SPDX exported that way is unsigned; use <code dir="auto">--spdx --sign</code> in the CLI when you need a signature. See <a href="/bomlens/reference/ui/">Web UI and desktop app</a>.</p>
+<div class="sl-heading-wrapper level-h2"><h2 id="the-declared-ai-service">The declared AI service</h2><a class="sl-anchor-link" href="#the-declared-ai-service"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “The declared AI service”</span></a></div>
+<p>An AI declaration (<code dir="auto">--ai-declare</code>, or the declaration saved in the web UI) can describe the service the model runs in with a top-level <code dir="auto">service</code> object, and give the model a few values a scan cannot read. A <code dir="auto">service</code> is accepted only when the document describes a model, not a dataset, and one that holds no value at all counts as not declared. The <a href="/bomlens/guides/ai-model/#the-service-a-model-runs-in">AI model guide</a> explains what these are for.</p>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code dir="auto">name</code></td>
+<td>the service’s name. Required</td>
+</tr>
+<tr>
+<td><code dir="auto">packageVersion</code></td>
+<td>its version. Required</td>
+</tr>
+<tr>
+<td><code dir="auto">downloadLocation</code></td>
+<td>the address where the service is offered (a URI). Required</td>
+</tr>
+<tr>
+<td><code dir="auto">suppliedBy</code></td>
+<td>the organization that provides it, <code dir="auto">{"type": "Organization", "name": "..."}</code>. Required</td>
+</tr>
+<tr>
+<td><code dir="auto">releaseTime</code></td>
+<td>when it was released, <code dir="auto">YYYY-MM-DDThh:mm:ssZ</code>. Required</td>
+</tr>
+<tr>
+<td><code dir="auto">informationAboutApplication</code></td>
+<td>what the service is for, in words</td>
+</tr>
+<tr>
+<td><code dir="auto">domain[]</code></td>
+<td>the fields it serves, in words</td>
+</tr>
+<tr>
+<td><code dir="auto">autonomyType</code></td>
+<td>whether a person is involved in its decisions: <code dir="auto">yes</code> (fully automatic, no person involved), <code dir="auto">no</code> (a person is involved) or <code dir="auto">noAssertion</code> (not known)</td>
+</tr>
+<tr>
+<td><code dir="auto">inputModality[]</code>, <code dir="auto">outputModality[]</code></td>
+<td>the kinds of input and output: <code dir="auto">text</code>, <code dir="auto">image</code>, <code dir="auto">audio</code>, <code dir="auto">video</code>, <code dir="auto">timeseries</code>, <code dir="auto">structured</code>, <code dir="auto">code</code>, <code dir="auto">other</code></td>
+</tr>
+<tr>
+<td><code dir="auto">dataFlows[]</code></td>
+<td>the data going in and out, each <code dir="auto">{flow, classification, name, description, source[], destination[]}</code>. <code dir="auto">flow</code> is <code dir="auto">inbound</code>, <code dir="auto">outbound</code>, <code dir="auto">bi-directional</code> or <code dir="auto">unknown</code>. <code dir="auto">classification</code> is required (up to 200 characters) and says what the data is, such as personal data. <code dir="auto">name</code> and <code dir="auto">description</code> are optional words; the description says what the service does with the data. <code dir="auto">source[]</code> and <code dir="auto">destination[]</code> are addresses (URIs)</td>
+</tr>
+<tr>
+<td><code dir="auto">standardCompliance[]</code></td>
+<td>the standards the service follows, by name</td>
+</tr>
+<tr>
+<td><code dir="auto">disclosureUrl</code></td>
+<td>a public page about the service’s use of AI (a URI)</td>
+</tr>
+<tr>
+<td><code dir="auto">externalModels[]</code></td>
+<td>AI models the service calls through an API, each <code dir="auto">{key, name, suppliedBy, packageVersion, endpoint}</code>. <code dir="auto">key</code> (lowercase letters, digits, <code dir="auto">.</code>, <code dir="auto">_</code> and <code dir="auto">-</code>, up to 64, unique in the list) and <code dir="auto">name</code> are required, and <code dir="auto">endpoint</code> is a URI</td>
+</tr>
+</tbody>
+</table>
+<p>The required keys are the ones SPDX requires of the service; the document stays a draft until they are given. The declaration’s <code dir="auto">model</code> takes five more keys:</p>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code dir="auto">inputModality[]</code>, <code dir="auto">outputModality[]</code></td>
+<td>the model’s input and output kinds, with the same values as the service’s</td>
+</tr>
+<tr>
+<td><code dir="auto">trainingComputeFlops</code></td>
+<td>the compute used to train the model in floating-point operations, a positive decimal number written as a string, such as <code dir="auto">"3.2e24"</code> or <code dir="auto">"1500000"</code></td>
+</tr>
+<tr>
+<td><code dir="auto">trainingComputeBasis</code></td>
+<td>how that figure was counted, in words</td>
+</tr>
+<tr>
+<td><code dir="auto">adversarialTesting</code></td>
+<td>whether adversarial testing was done: <code dir="auto">yes</code>, <code dir="auto">no</code> or <code dir="auto">noAssertion</code></td>
+</tr>
+</tbody>
+</table>
+<p>In the SPDX 3.0.1 document the service is an <code dir="auto">ai_AIPackage</code> with <code dir="auto">software_primaryPurpose</code> <code dir="auto">application</code>, linked to the model by a <code dir="auto">dependsOn</code> relationship with the scope <code dir="auto">runtime</code>, and each external model is a <code dir="auto">software_Package</code> with the purpose <code dir="auto">model</code>. The data flows, the input and output kinds and the model’s regulatory values are CycloneDX property extensions: <code dir="auto">bomlens:service:dataFlow</code> (one per flow, holding it as compact serviceData JSON), <code dir="auto">bomlens:service:input</code> and <code dir="auto">:output</code>, <code dir="auto">bomlens:model:input</code> and <code dir="auto">:output</code>, and <code dir="auto">bomlens:regulatory:*</code>.</p>
+<p>A scan also writes them into the CycloneDX SBOM, in a step that runs after the declared dataset sources are read and before the risk assessment and the G7 checks:</p>
+<table>
+<thead>
+<tr>
+<th>Location</th>
+<th>Content</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code dir="auto">services[]</code>, bom-ref <code dir="auto">service:declared/&#x3C;name></code></td>
+<td>the service: <code dir="auto">name</code>, <code dir="auto">version</code>, <code dir="auto">provider.name</code>, <code dir="auto">endpoints[0]</code> (its address), <code dir="auto">description</code> (what it is for), <code dir="auto">data[]</code> (the data flows as serviceData), an <code dir="auto">externalReferences</code> entry of type <code dir="auto">documentation</code> (the disclosure page), and the properties <code dir="auto">bomlens:service:domain</code>, <code dir="auto">:autonomyType</code>, <code dir="auto">:input</code>, <code dir="auto">:output</code> and <code dir="auto">:releaseTime</code></td>
+</tr>
+<tr>
+<td><code dir="auto">services[]</code>, bom-ref <code dir="auto">service:declared-external/&#x3C;key></code></td>
+<td>each external model: <code dir="auto">name</code>, <code dir="auto">version</code>, <code dir="auto">provider.name</code>, <code dir="auto">endpoints</code> and <code dir="auto">bomlens:service:declarationKey</code></td>
+</tr>
+<tr>
+<td><code dir="auto">dependencies[]</code></td>
+<td>the service depends on the model’s bom-ref and on each external model</td>
+</tr>
+<tr>
+<td><code dir="auto">declarations.claims[]</code></td>
+<td>one claim per standard, with the service as target, the standard’s name as predicate, and the reasoning “publisher’s declaration, not verified by BomLens”</td>
+</tr>
+<tr>
+<td>the model component</td>
+<td>the properties <code dir="auto">bomlens:regulatory:trainingComputeFlops</code>, <code dir="auto">:trainingComputeBasis</code> and <code dir="auto">:adversarialTesting</code>, and the input and output kinds as <code dir="auto">modelCard.modelParameters.inputs[]</code> and <code dir="auto">outputs[]</code> (<code dir="auto">{"format": "text"}</code>)</td>
+</tr>
+</tbody>
+</table>
+<p>Every service written this way carries <code dir="auto">bomlens:origin=declared-input</code> and <code dir="auto">bomlens:service:kind</code> (<code dir="auto">application</code> or <code dir="auto">external-model</code>), and the application service carries <code dir="auto">bomlens:service:declarationDigest</code>. On the model component, a <code dir="auto">bomlens:declared</code> property names each location filled from the declaration (a property name, or a <code dir="auto">modelCard</code> path; <code dir="auto">modelCard</code> and <code dir="auto">modelCard.modelParameters</code> themselves when the step created them). Where the scan had already recorded inputs or outputs, those are kept and a <code dir="auto">bomlens:declared:observedKept</code> property names them. <code dir="auto">bomlens:model:declarationDigest</code> records which declaration the model values came from. A <code dir="auto">modelCard.modelParameters</code> created only to hold declared formats does not count as a model card in the G7 checks. The step can run again on the same SBOM: what an earlier run wrote is removed first, so a declaration without a service removes the old one, and a declaration the SPDX converter refuses is not applied at all.</p>
+<p>The G7 system-level elements read the declared service, and an element met by it reports “present (publisher’s declaration, not verified by BomLens)”. The SPDX 2.3 export and <code dir="auto">--diff</code> do not carry services. BomLens v1.13 and earlier refuse a declaration that has a <code dir="auto">service</code> or one of the new model keys, with “unknown key(s)”.</p>
+<div class="sl-heading-wrapper level-h2"><h2 id="sbom-structure">SBOM structure</h2><a class="sl-anchor-link" href="#sbom-structure"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “SBOM structure”</span></a></div>
+<div class="expressive-code"><link rel="stylesheet" href="/bomlens/_astro/ec.klmer.css"><script type="module" src="/bomlens/_astro/ec.0vx5m.js"></script><figure class="frame not-content"><figcaption class="header"></figcaption><pre data-language="plaintext"><code><div class="ec-line"><div class="code"><span style="--0:#24292e;--1:#e1e4e8">bomFormat          "CycloneDX"</span></div></div><div class="ec-line"><div class="code"><span style="--0:#24292e;--1:#e1e4e8">specVersion        "1.6" ("1.7" with --spec-version 1.7)</span></div></div><div class="ec-line"><div class="code"><span style="--0:#24292e;--1:#e1e4e8">metadata</span></div></div><div class="ec-line"><div class="code"><span class="indent"><span style="--0:#24292e;--1:#e1e4e8">  </span></span><span style="--0:#24292e;--1:#e1e4e8">├── timestamp    generation time (ISO 8601)</span></div></div><div class="ec-line"><div class="code"><span class="indent"><span style="--0:#24292e;--1:#e1e4e8">  </span></span><span style="--0:#24292e;--1:#e1e4e8">└── component    project info (name, version, type)</span></div></div><div class="ec-line"><div class="code"><span style="--0:#24292e;--1:#e1e4e8">components[]</span></div></div><div class="ec-line"><div class="code"><span class="indent"><span style="--0:#24292e;--1:#e1e4e8">  </span></span><span style="--0:#24292e;--1:#e1e4e8">├── type         "library" | "framework" | "application"</span></div></div><div class="ec-line"><div class="code"><span class="indent"><span style="--0:#24292e;--1:#e1e4e8">  </span></span><span style="--0:#24292e;--1:#e1e4e8">├── name         component name</span></div></div><div class="ec-line"><div class="code"><span class="indent"><span style="--0:#24292e;--1:#e1e4e8">  </span></span><span style="--0:#24292e;--1:#e1e4e8">├── version      version</span></div></div><div class="ec-line"><div class="code"><span class="indent"><span style="--0:#24292e;--1:#e1e4e8">  </span></span><span style="--0:#24292e;--1:#e1e4e8">├── purl         Package URL (unique identifier)</span></div></div><div class="ec-line"><div class="code"><span class="indent"><span style="--0:#24292e;--1:#e1e4e8">  </span></span><span style="--0:#24292e;--1:#e1e4e8">├── supplier     who supplied the component (when the package metadata names one)</span></div></div><div class="ec-line"><div class="code"><span class="indent"><span style="--0:#24292e;--1:#e1e4e8">  </span></span><span style="--0:#24292e;--1:#e1e4e8">└── licenses[]   license info (SPDX ID)</span></div></div><div class="ec-line"><div class="code"><span style="--0:#24292e;--1:#e1e4e8">compositions[]     dependency-graph completeness (see below)</span></div></div></code></pre><div class="copy"><div aria-live="polite"></div><button title="Copy to clipboard" data-copied="Copied!" data-code="bomFormat          &#x22;CycloneDX&#x22;specVersion        &#x22;1.6&#x22; (&#x22;1.7&#x22; with --spec-version 1.7)metadata  ├── timestamp    generation time (ISO 8601)  └── component    project info (name, version, type)components[]  ├── type         &#x22;library&#x22; | &#x22;framework&#x22; | &#x22;application&#x22;  ├── name         component name  ├── version      version  ├── purl         Package URL (unique identifier)  ├── supplier     who supplied the component (when the package metadata names one)  └── licenses[]   license info (SPDX ID)compositions[]     dependency-graph completeness (see below)"><div></div></button></div></figure></div>
+<p>For the per-language PURL format, see <a href="/bomlens/reference/ecosystems/">Supported ecosystems</a>.</p>
+<p>A component’s <code dir="auto">supplier.name</code> comes from what its package metadata already says, and from nothing else: the <code dir="auto">publisher</code> the generator read (a Maven POM’s <code dir="auto">&#x3C;organization></code>, an npm publisher), the <code dir="auto">authors</code> it read (PyPI, RubyGems, Composer), or the older <code dir="auto">author</code> field, in that order. Anything in angle brackets is dropped, and so is a pair of parentheses or square brackets that holds only an email address or a URL, which removes the email address and URL of an npm-style <code dir="auto">Name &#x3C;email> (url)</code>. Other parentheses stay, so <code dir="auto">Example (Holdings), Inc.</code> is kept as it is. An email address or a URL (<code dir="auto">http://</code>, <code dir="auto">https://</code>, <code dir="auto">ftp://</code>, <code dir="auto">www.</code>) elsewhere in the value is dropped too, along with an unclosed parenthesis in front of it, so <code dir="auto">Alice &#x3C;a@x.org>, Bob &#x3C;b@y.org></code> gives <code dir="auto">Alice, Bob</code>, <code dir="auto">Jane Doe jane@example.org</code> gives <code dir="auto">Jane Doe</code> and <code dir="auto">Bob &#x3C;b@x.org>; Carol &#x3C;c@y.org></code> gives <code dir="auto">Bob; Carol</code>. A value that is only an email address or only a URL is not used, and several authors are joined with commas. The property <code dir="auto">bomlens:supplierSource</code> names the field used (<code dir="auto">publisher</code>, <code dir="auto">authors</code> or <code dir="auto">author</code>). A component with none of these has no supplier, and one that already has a supplier keeps it. Nested components follow the same rule. Distribution and firmware packages (<code dir="auto">pkg:deb</code>, <code dir="auto">pkg:rpm</code>, <code dir="auto">pkg:apk</code>, <code dir="auto">pkg:alpm</code>, <code dir="auto">pkg:opkg</code>, <code dir="auto">pkg:generic</code>) and <code dir="auto">operating-system</code> components are not given a supplier: the publisher a generator reads for them is the package’s maintainer, usually one person, and the distribution’s name is not filled in by guess. A supplier’s own SBOM under <code dir="auto">--analyze</code> is left as it was written, and so is the output of <code dir="auto">--merge</code>.</p>
+<p>A source scan also records on <code dir="auto">metadata.component.properties</code> whether the project pinned its versions: <code dir="auto">bomlens:source:versionPinning</code> is <code dir="auto">pinned</code> when a lock file exists, or every line of <code dir="auto">requirements.txt</code> has an exact version, and <code dir="auto">unpinned</code> when a <code dir="auto">requirements.txt</code>, <code dir="auto">package.json</code>, <code dir="auto">pyproject.toml</code>, <code dir="auto">setup.py</code> or <code dir="auto">setup.cfg</code> has no lock file next to it and does not fix every version. For <code dir="auto">unpinned</code>, the versions in the SBOM are what a fresh install resolved on the day of the scan, not necessarily the ones you ran. The web UI shows a notice, and the risk report states it under the vulnerability counts. The property is absent when the scan could not tell.</p>
+<div class="sl-heading-wrapper level-h2"><h2 id="dependency-graph-completeness">Dependency-graph completeness</h2><a class="sl-anchor-link" href="#dependency-graph-completeness"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “Dependency-graph completeness”</span></a></div>
+<p>A generated SBOM carries a <code dir="auto">compositions[0].aggregate</code> entry stating how complete its dependency graph is:</p>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code dir="auto">complete</code></td>
+<td>The scan found positive evidence the graph was fully resolved: an ecosystem’s lock/resolve step succeeded, or a lockfile was already committed, plus at least one dependency edge.</td>
+</tr>
+<tr>
+<td><code dir="auto">incomplete</code></td>
+<td>A known failure affected the scan: the syft fallback ran instead of cdxgen, a firmware package-cataloging step failed, or a Poetry project with no <code dir="auto">poetry.lock</code> was converted only in part or its dependencies could not be resolved.</td>
+</tr>
+<tr>
+<td><code dir="auto">unknown</code></td>
+<td>Nothing in the SBOM confirms the graph is complete. This is the default whenever there is no positive evidence either way, for example an image/rootfs/firmware/binary scan (syft alone cannot see inter-package dependencies), an AI-model, dataset or merged SBOM, or a Maven source scan (no reliable signal tells a resolved graph apart from a degraded one). <code dir="auto">unknown</code> is not a defect; it means the tool found no basis to judge, not that something went wrong.</td>
+</tr>
+</tbody>
+</table>
+<p>An analyzed supplier SBOM’s own <code dir="auto">compositions</code> declaration, if it has one, is never overwritten.</p>
+<p>The conformance check report’s transitive-dependency check notes the declared value in its detail text (e.g. “12 edge(s), declared complete”), without changing the check’s pass/fail status.</p>
+<p>A preprocessing label that ran, or was satisfied by an already-committed lockfile, is recorded in the <code dir="auto">bomlens:prep-step-applied</code> property regardless of success or failure; <code dir="auto">bomlens:pipeline-step-failed</code> records only the failures. <code dir="auto">aggregate</code> above is decided from both together.</p></div><footer class="sl-flex astro-ddtxxk7k"><div class="meta sl-flex astro-ddtxxk7k"><a href="https://github.com/sktelecom/bomlens/edit/main/docs/reference/artifacts.md" class="sl-flex print:hidden astro-qlekgd3o"><svg aria-hidden="true" class="astro-qlekgd3o astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1.2em;"><path d="M22 7.24a1 1 0 0 0-.29-.71l-4.24-4.24a1 1 0 0 0-1.1-.22 1 1 0 0 0-.32.22l-2.83 2.83L2.29 16.05a1 1 0 0 0-.29.71V21a1 1 0 0 0 1 1h4.24a1 1 0 0 0 .76-.29l10.87-10.93L21.71 8c.1-.1.17-.2.22-.33a1 1 0 0 0 0-.24v-.14l.07-.05ZM6.83 20H4v-2.83l9.93-9.93 2.83 2.83L6.83 20ZM18.17 8.66l-2.83-2.83 1.42-1.41 2.82 2.82-1.41 1.42Z"/></svg>Edit page</a></div><div class="pagination-links print:hidden astro-b5raizh3" dir="ltr"><a href="/bomlens/guides/verify-release/" rel="prev" class="astro-b5raizh3"><svg aria-hidden="true" class="astro-b5raizh3 astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1.5rem;"><path d="M17 11H9.41l3.3-3.29a1.004 1.004 0 1 0-1.42-1.42l-5 5a1 1 0 0 0-.21.33 1 1 0 0 0 0 .76 1 1 0 0 0 .21.33l5 5a1.002 1.002 0 0 0 1.639-.325 1 1 0 0 0-.219-1.095L9.41 13H17a1 1 0 0 0 0-2Z"/></svg><span class="astro-b5raizh3">Previous<br class="astro-b5raizh3"><span class="link-title astro-b5raizh3">Verify a release</span></span></a><a href="/bomlens/reference/cli/" rel="next" class="astro-b5raizh3"><svg aria-hidden="true" class="astro-b5raizh3 astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1.5rem;"><path d="M17.92 11.62a1.001 1.001 0 0 0-.21-.33l-5-5a1.003 1.003 0 1 0-1.42 1.42l3.3 3.29H7a1 1 0 0 0 0 2h7.59l-3.3 3.29a1.002 1.002 0 0 0 .325 1.639 1 1 0 0 0 1.095-.219l5-5a1 1 0 0 0 .21-.33 1 1 0 0 0 0-.76Z"/></svg><span class="astro-b5raizh3">Next<br class="astro-b5raizh3"><span class="link-title astro-b5raizh3">CLI reference</span></span></a></div></footer><script type="module" src="/bomlens/_astro/Mermaid.astro_astro_type_script_index_0_lang.DZWWZPOc.js"></script><script type="module">var e=()=>{document.querySelectorAll(`.expressive-code pre`).forEach(e=>{e.scrollWidth>e.clientWidth?e.setAttribute(`tabindex`,`0`):e.removeAttribute(`tabindex`)})};e(),window.addEventListener(`resize`,e);</script><p class="site-copyright astro-jo6i4kqk">Copyright &copy; 2026 SK Telecom Co., Ltd. &middot;<a href="https://github.com/sktelecom/bomlens/blob/main/LICENSE" class="astro-jo6i4kqk">Apache-2.0</a> &middot;<a href="https://github.com/sktelecom/bomlens/blob/main/THIRD_PARTY_LICENSES.md" class="astro-jo6i4kqk">Third-party licenses</a></p></div></div></main></div></div></div></div></body></html>

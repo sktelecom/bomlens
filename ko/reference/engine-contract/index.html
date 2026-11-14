@@ -1,0 +1,766 @@
+<!DOCTYPE html><html lang="ko" dir="ltr" data-theme="dark" data-has-toc data-has-sidebar class="astro-g5ptsecz"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/><title>엔진 계약 | BomLens</title><link rel="canonical" href="https://sktelecom.github.io/bomlens/ko/reference/engine-contract/"/><link rel="alternate" hreflang="en" href="https://sktelecom.github.io/bomlens/reference/engine-contract/"/><link rel="alternate" hreflang="ko" href="https://sktelecom.github.io/bomlens/ko/reference/engine-contract/"/><link rel="alternate" hreflang="x-default" href="https://sktelecom.github.io/bomlens/reference/engine-contract/"/><link rel="sitemap" href="/bomlens/sitemap-index.xml"/><link rel="shortcut icon" href="/bomlens/favicon.svg" type="image/svg+xml"/><meta name="generator" content="Astro v7.4.4"/><meta name="generator" content="Starlight v0.42.8"/><meta property="og:title" content="엔진 계약"/><meta property="og:type" content="article"/><meta property="og:url" content="https://sktelecom.github.io/bomlens/ko/reference/engine-contract/"/><meta property="og:locale" content="ko_KR"/><meta property="og:description" content="BomLens 이미지를 스캔 엔진으로 쓰는 프로그램을 위해 모든 스캔이 남기는 결과 매니페스트(bomlens-result.json)입니다."/><meta property="og:site_name" content="BomLens"/><meta name="twitter:card" content="summary_large_image"/><meta name="description" content="BomLens 이미지를 스캔 엔진으로 쓰는 프로그램을 위해 모든 스캔이 남기는 결과 매니페스트(bomlens-result.json)입니다."/><meta property="og:image" content="https://sktelecom.github.io/bomlens/images/og-card-ko.png"><meta name="twitter:image" content="https://sktelecom.github.io/bomlens/images/og-card-ko.png"><script>
+	window.StarlightThemeProvider = (() => {
+		const storedTheme =
+			typeof localStorage !== 'undefined' && localStorage.getItem('starlight-theme');
+		const theme =
+			storedTheme ||
+			(window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
+		document.documentElement.dataset.theme = theme === 'light' ? 'light' : 'dark';
+		return {
+			updatePickers(theme = storedTheme || 'auto') {
+				document.querySelectorAll('starlight-theme-select').forEach((picker) => {
+					const select = picker.querySelector('select');
+					if (select) select.value = theme;
+					/** @type {HTMLTemplateElement | null} */
+					const tmpl = document.querySelector(`#theme-icons`);
+					const newIcon = tmpl && tmpl.content.querySelector('.' + theme);
+					if (newIcon) {
+						const oldIcon = picker.querySelector('svg.label-icon');
+						if (oldIcon) {
+							oldIcon.replaceChildren(...newIcon.cloneNode(true).childNodes);
+						}
+					}
+				});
+			},
+		};
+	})();
+</script><template id="theme-icons"><svg aria-hidden="true" class="light astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M5 12a1 1 0 0 0-1-1H3a1 1 0 0 0 0 2h1a1 1 0 0 0 1-1Zm.64 5-.71.71a1 1 0 0 0 0 1.41 1 1 0 0 0 1.41 0l.71-.71A1 1 0 0 0 5.64 17ZM12 5a1 1 0 0 0 1-1V3a1 1 0 0 0-2 0v1a1 1 0 0 0 1 1Zm5.66 2.34a1 1 0 0 0 .7-.29l.71-.71a1 1 0 1 0-1.41-1.41l-.66.71a1 1 0 0 0 0 1.41 1 1 0 0 0 .66.29Zm-12-.29a1 1 0 0 0 1.41 0 1 1 0 0 0 0-1.41l-.71-.71a1.004 1.004 0 1 0-1.43 1.41l.73.71ZM21 11h-1a1 1 0 0 0 0 2h1a1 1 0 0 0 0-2Zm-2.64 6A1 1 0 0 0 17 18.36l.71.71a1 1 0 0 0 1.41 0 1 1 0 0 0 0-1.41l-.76-.66ZM12 6.5a5.5 5.5 0 1 0 5.5 5.5A5.51 5.51 0 0 0 12 6.5Zm0 9a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7Zm0 3.5a1 1 0 0 0-1 1v1a1 1 0 0 0 2 0v-1a1 1 0 0 0-1-1Z"/></svg><svg aria-hidden="true" class="dark astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M21.64 13a1 1 0 0 0-1.05-.14 8.049 8.049 0 0 1-3.37.73 8.15 8.15 0 0 1-8.14-8.1 8.59 8.59 0 0 1 .25-2A1 1 0 0 0 8 2.36a10.14 10.14 0 1 0 14 11.69 1 1 0 0 0-.36-1.05Zm-9.5 6.69A8.14 8.14 0 0 1 7.08 5.22v.27a10.15 10.15 0 0 0 10.14 10.14 9.784 9.784 0 0 0 2.1-.22 8.11 8.11 0 0 1-7.18 4.32v-.04Z"/></svg><svg aria-hidden="true" class="auto astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M21 14h-1V7a3 3 0 0 0-3-3H7a3 3 0 0 0-3 3v7H3a1 1 0 0 0-1 1v2a3 3 0 0 0 3 3h14a3 3 0 0 0 3-3v-2a1 1 0 0 0-1-1ZM6 7a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v7H6V7Zm14 10a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-1h16v1Z"/></svg></template><link rel="stylesheet" href="/bomlens/_astro/print.ehPL0gv-.css" media="print"><link rel="stylesheet" href="/bomlens/_astro/common.DxYPfd-D.css"><style>@layer starlight.components{svg:where(.astro-hkc32dio){color:var(--sl-icon-color);font-size:var(--sl-icon-size,1em);width:1em;height:1em;overflow:visible}.sl-link-button:where(.astro-dcqstdaq){font-size:var(--sl-text-sm);outline-offset:.25rem;border:1px solid #0000;border-radius:999rem;align-items:center;gap:.5em;padding:.4375rem 1.125rem;line-height:1.1875;text-decoration:none;display:inline-flex}.sl-link-button:where(.astro-dcqstdaq).primary{background:var(--sl-color-text-accent);border-color:var(--sl-color-text-accent);color:var(--sl-color-black)}.sl-link-button:where(.astro-dcqstdaq).primary:hover{color:var(--sl-color-black)}.sl-link-button:where(.astro-dcqstdaq).secondary{border-color:inherit;color:var(--sl-color-white)}.sl-link-button:where(.astro-dcqstdaq).minimal{color:var(--sl-color-white);padding-inline:0}.sl-link-button:where(.astro-dcqstdaq) svg{flex-shrink:0}@media (width>=50rem){.sl-link-button:where(.astro-dcqstdaq){font-size:var(--sl-text-base);padding:.9375rem 1.25rem}}.sl-markdown-content .sl-link-button:where(.astro-dcqstdaq){margin-inline-end:1rem}.sl-markdown-content .sl-link-button:where(.astro-dcqstdaq):not(:where(p *)){margin-block:1rem}}
+</style><script type="module" src="/bomlens/_astro/page.cNngjUgL.js"></script></head><body class="astro-g5ptsecz"><a class="sl-skip-link astro-qb7clj6f" href="#_top">콘텐츠로 이동</a><div class="page sl-flex astro-yntsjkba"><header class="header astro-yntsjkba"><div class="header astro-by6fddyj"><div class="title-wrapper sl-flex astro-by6fddyj"><a href="/bomlens/ko/" class="site-title sl-flex astro-6rvad3va"><span class="astro-6rvad3va" translate="no">BomLens</span></a></div><div class="sl-flex print:hidden astro-by6fddyj"><site-search class="astro-by6fddyj astro-b5kgnn7o" data-translations="{&quot;placeholder&quot;:&quot;검색&quot;}"><button data-open-modal disabled aria-label="검색" aria-keyshortcuts="Control+K" class="astro-b5kgnn7o"><svg aria-hidden="true" class="astro-b5kgnn7o astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M21.71 20.29 18 16.61A9 9 0 1 0 16.61 18l3.68 3.68a.999.999 0 0 0 1.42 0 1 1 0 0 0 0-1.39ZM11 18a7 7 0 1 1 0-14 7 7 0 0 1 0 14Z"/></svg><span class="sl-hidden md:sl-block astro-b5kgnn7o" aria-hidden="true">검색</span><kbd class="sl-hidden md:sl-flex astro-b5kgnn7o" style="display: none;"><kbd class="astro-b5kgnn7o">Ctrl</kbd><kbd class="astro-b5kgnn7o">K</kbd></kbd></button><dialog style="padding:0" aria-label="검색" class="astro-b5kgnn7o"><div class="dialog-frame sl-flex astro-b5kgnn7o"><button data-close-modal class="sl-flex md:sl-hidden astro-b5kgnn7o">취소</button><div class="search-container astro-b5kgnn7o"><div id="starlight__search" class="astro-b5kgnn7o"></div></div></div></dialog></site-search><script>
+	(() => {
+		const openBtn = document.querySelector('button[data-open-modal]');
+		const shortcut = openBtn?.querySelector('kbd');
+		if (!openBtn || !(shortcut instanceof HTMLElement)) return;
+		const platformKey = shortcut.querySelector('kbd');
+		if (platformKey && /(Mac|iPhone|iPod|iPad)/i.test(navigator.platform)) {
+			platformKey.textContent = '⌘';
+			openBtn.setAttribute('aria-keyshortcuts', 'Meta+K');
+		}
+		shortcut.style.display = '';
+	})();
+</script><script type="module" src="/bomlens/_astro/Search.astro_astro_type_script_index_0_lang.BSqzOScY.js"></script></div><div class="sl-hidden md:sl-flex print:hidden right-group astro-by6fddyj"><div class="sl-flex social-icons astro-by6fddyj"><a href="https://github.com/sktelecom/bomlens" rel="me" class="sl-flex astro-n2mnl6yq"><span class="sr-only astro-n2mnl6yq">GitHub</span><svg aria-hidden="true" class="astro-n2mnl6yq astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M12 .3a12 12 0 0 0-3.8 23.38c.6.12.83-.26.83-.57L9 21.07c-3.34.72-4.04-1.61-4.04-1.61-.55-1.39-1.34-1.76-1.34-1.76-1.08-.74.09-.73.09-.73 1.2.09 1.83 1.24 1.83 1.24 1.08 1.83 2.81 1.3 3.5 1 .1-.78.42-1.31.76-1.61-2.67-.3-5.47-1.33-5.47-5.93 0-1.31.47-2.38 1.24-3.22-.14-.3-.54-1.52.1-3.18 0 0 1-.32 3.3 1.23a11.5 11.5 0 0 1 6 0c2.28-1.55 3.29-1.23 3.29-1.23.64 1.66.24 2.88.12 3.18a4.65 4.65 0 0 1 1.23 3.22c0 4.61-2.8 5.63-5.48 5.92.42.36.81 1.1.81 2.22l-.01 3.29c0 .31.2.69.82.57A12 12 0 0 0 12 .3Z"/></svg></a></div><starlight-theme-select><label style="--sl-select-width: 6.25em" class="astro-2z5xp7gb"><span class="sr-only astro-2z5xp7gb">테마 선택</span><svg aria-hidden="true" class="icon label-icon astro-2z5xp7gb astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M21 14h-1V7a3 3 0 0 0-3-3H7a3 3 0 0 0-3 3v7H3a1 1 0 0 0-1 1v2a3 3 0 0 0 3 3h14a3 3 0 0 0 3-3v-2a1 1 0 0 0-1-1ZM6 7a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v7H6V7Zm14 10a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-1h16v1Z"/></svg><select autocomplete="off" class="astro-2z5xp7gb"><option value="dark" class="astro-2z5xp7gb">어두운 테마</option><option value="light" class="astro-2z5xp7gb">밝은 테마</option><option value="auto" selected class="astro-2z5xp7gb">자동</option></select><svg aria-hidden="true" class="icon caret astro-2z5xp7gb astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M17 9.17a1 1 0 0 0-1.41 0L12 12.71 8.46 9.17a1 1 0 1 0-1.41 1.42l4.24 4.24a1.002 1.002 0 0 0 1.42 0L17 10.59a1.002 1.002 0 0 0 0-1.42Z"/></svg></label></starlight-theme-select><script>
+	StarlightThemeProvider.updatePickers();
+</script><script type="module">var e=`starlight-theme`,t=e=>e===`auto`||e===`dark`||e===`light`?e:`auto`,n=()=>t(typeof localStorage<`u`&&localStorage.getItem(e));function r(t){typeof localStorage<`u`&&localStorage.setItem(e,t===`light`||t===`dark`?t:``)}var i=()=>matchMedia(`(prefers-color-scheme: light)`).matches?`light`:`dark`;function a(e){StarlightThemeProvider.updatePickers(e),document.documentElement.dataset.theme=e===`auto`?i():e,r(e)}matchMedia(`(prefers-color-scheme: light)`).addEventListener(`change`,()=>{n()===`auto`&&a(`auto`)});var o=class extends HTMLElement{constructor(){super(),a(n()),this.querySelector(`select`)?.addEventListener(`change`,e=>{e.currentTarget instanceof HTMLSelectElement&&a(t(e.currentTarget.value))})}};customElements.define(`starlight-theme-select`,o);</script><starlight-lang-select><label style="--sl-select-width: 7em" class="astro-2z5xp7gb"><span class="sr-only astro-2z5xp7gb">언어 선택</span><svg aria-hidden="true" class="icon label-icon astro-2z5xp7gb astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path fill-rule="evenodd" d="M8.516 3a.94.94 0 0 0-.941.94v1.15H2.94a.94.94 0 1 0 0 1.882h7.362a7.422 7.422 0 0 1-1.787 3.958 7.42 7.42 0 0 1-1.422-2.425.94.94 0 1 0-1.774.627 9.303 9.303 0 0 0 1.785 3.043 7.422 7.422 0 0 1-4.164 1.278.94.94 0 1 0 0 1.881 9.303 9.303 0 0 0 5.575-1.855 9.303 9.303 0 0 0 4.11 1.74l-.763 1.525a.968.968 0 0 0-.016.034l-1.385 2.77a.94.94 0 1 0 1.683.841l1.133-2.267h5.806l1.134 2.267a.94.94 0 0 0 1.683-.841l-1.385-2.769a.95.95 0 0 0-.018-.036l-3.476-6.951a.94.94 0 0 0-1.682 0l-1.82 3.639a7.423 7.423 0 0 1-3.593-1.256 9.303 9.303 0 0 0 2.27-5.203h1.894a.94.94 0 0 0 0-1.881H9.456V3.94A.94.94 0 0 0 8.516 3Zm6.426 11.794a1.068 1.068 0 0 1-.02.039l-.703 1.407h3.924l-1.962-3.924-1.24 2.478Z" clip-rule="evenodd"/></svg><select autocomplete="off" class="astro-2z5xp7gb"><option value="/bomlens/reference/engine-contract/" class="astro-2z5xp7gb">English</option><option value="/bomlens/ko/reference/engine-contract/" selected class="astro-2z5xp7gb">한국어</option></select><svg aria-hidden="true" class="icon caret astro-2z5xp7gb astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M17 9.17a1 1 0 0 0-1.41 0L12 12.71 8.46 9.17a1 1 0 1 0-1.41 1.42l4.24 4.24a1.002 1.002 0 0 0 1.42 0L17 10.59a1.002 1.002 0 0 0 0-1.42Z"/></svg></label></starlight-lang-select><script type="module">var e=class extends HTMLElement{constructor(){super();let e=this.querySelector(`select`);e&&(e.addEventListener(`change`,e=>{e.currentTarget instanceof HTMLSelectElement&&(window.location.pathname=e.currentTarget.value)}),window.addEventListener(`pageshow`,t=>{if(!t.persisted)return;let n=e.querySelector(`option[selected]`)?.index;n!==e.selectedIndex&&(e.selectedIndex=n??0)}))}};customElements.define(`starlight-lang-select`,e);</script></div></div></header><nav class="sidebar print:hidden astro-yntsjkba" aria-label="메인"><button popovertarget="starlight__sidebar" class="sl-menu-button sl-flex md:sl-hidden print:hidden astro-r2osgdlg"><svg aria-hidden="true" class="open-menu astro-r2osgdlg astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M3 8h18a1 1 0 1 0 0-2H3a1 1 0 0 0 0 2Zm18 8H3a1 1 0 0 0 0 2h18a1 1 0 0 0 0-2Zm0-5H3a1 1 0 0 0 0 2h18a1 1 0 0 0 0-2Z"/></svg><svg aria-hidden="true" class="close-menu astro-r2osgdlg astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="m13.41 12 6.3-6.29a1.004 1.004 0 1 0-1.42-1.42L12 10.59l-6.29-6.3a1.004 1.004 0 0 0-1.42 1.42l6.3 6.29-6.3 6.29a1 1 0 0 0 0 1.42.998.998 0 0 0 1.42 0l6.29-6.3 6.29 6.3a.999.999 0 0 0 1.42 0 1 1 0 0 0 0-1.42L13.41 12Z"/></svg><span class="sr-only astro-r2osgdlg">메뉴</span></button><script type="module">var e=class extends HTMLElement{constructor(){super();let e=matchMedia(`(min-width: 50em)`),t=()=>{this.popover=e.matches?null:`auto`};t(),e.addEventListener(`change`,()=>t()),this.addEventListener(`toggle`,({newState:e})=>this.trapFocus(e===`open`))}trapFocus(e){document.querySelectorAll(`.main-frame, .sl-skip-link`).forEach(t=>{t.toggleAttribute(`inert`,e)})}};customElements.define(`sl-sidebar-pane`,e);</script><sl-sidebar-pane popover id="starlight__sidebar" class="sidebar-pane astro-yntsjkba"><div class="sidebar-content sl-flex astro-yntsjkba"><sl-sidebar-state-persist data-hash="1rofo3p" class="astro-ipdry5cl"><script aria-hidden="true">
+		(() => {
+			try {
+				if (!matchMedia('(min-width: 50em)').matches) return;
+				/** @type {HTMLElement | null} */
+				const target = document.querySelector('sl-sidebar-state-persist');
+				const state = JSON.parse(sessionStorage.getItem('sl-sidebar-state') || '0');
+				if (!target || !state || target.dataset.hash !== state.hash) return;
+				window._starlightScrollRestore = state.scroll;
+				customElements.define(
+					'sl-sidebar-restore',
+					class SidebarRestore extends HTMLElement {
+						connectedCallback() {
+							try {
+								const idx = parseInt(this.dataset.index || '');
+								const details = this.closest('details');
+								if (details && typeof state.open[idx] === 'boolean') details.open = state.open[idx];
+							} catch {}
+						}
+					}
+				);
+			} catch {}
+		})();
+	</script><ul class="top-level astro-rmhv4bp6"><li class="astro-rmhv4bp6"><details open class="astro-rmhv4bp6"><summary class="astro-rmhv4bp6"><span class="group-label astro-rmhv4bp6"><span class="large astro-rmhv4bp6">빠른 시작</span></span><svg aria-hidden="true" class="caret astro-rmhv4bp6 astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1.25rem;"><path d="m14.83 11.29-4.24-4.24a1 1 0 1 0-1.42 1.41L12.71 12l-3.54 3.54a1 1 0 0 0 0 1.41 1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.24-4.24a1.002 1.002 0 0 0 0-1.42Z"/></svg></summary><sl-sidebar-restore data-index="0"></sl-sidebar-restore><ul class="astro-rmhv4bp6"><li class="astro-rmhv4bp6"><a href="/bomlens/ko/concepts/what-is-sbom/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">SBOM이란</span></a></li><li class="astro-rmhv4bp6"><a href="/bomlens/ko/start/first-scan/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">시작하기</span></a></li><li class="astro-rmhv4bp6"><a href="/bomlens/ko/start/no-cli/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">비개발자 빠른 시작 (CLI 불필요)</span></a></li><li class="astro-rmhv4bp6"><a href="/bomlens/ko/reference/ui/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">웹 UI와 데스크톱 앱</span></a></li></ul></details></li><li class="astro-rmhv4bp6"><details open class="astro-rmhv4bp6"><summary class="astro-rmhv4bp6"><span class="group-label astro-rmhv4bp6"><span class="large astro-rmhv4bp6">가이드</span></span><svg aria-hidden="true" class="caret astro-rmhv4bp6 astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1.25rem;"><path d="m14.83 11.29-4.24-4.24a1 1 0 1 0-1.42 1.41L12.71 12l-3.54 3.54a1 1 0 0 0 0 1.41 1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.24-4.24a1.002 1.002 0 0 0 0-1.42Z"/></svg></summary><sl-sidebar-restore data-index="1"></sl-sidebar-restore><ul class="astro-rmhv4bp6"><li class="astro-rmhv4bp6"><a href="/bomlens/ko/guides/ai-model/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">AI 모델 SBOM 가이드</span></a></li><li class="astro-rmhv4bp6"><a href="/bomlens/ko/guides/by-input/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">입력 시나리오별 처리 가이드</span></a></li><li class="astro-rmhv4bp6"><a href="/bomlens/ko/guides/ci-cd/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">CI/CD 연동</span></a></li><li class="astro-rmhv4bp6"><a href="/bomlens/ko/guides/declared-components/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">자체 구성요소 선언</span></a></li><li class="astro-rmhv4bp6"><a href="/bomlens/ko/guides/firmware/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">펌웨어 분석 가이드</span></a></li><li class="astro-rmhv4bp6"><a href="/bomlens/ko/guides/identify-vendored/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">내장 오픈소스 식별 (C/C++)</span></a></li><li class="astro-rmhv4bp6"><a href="/bomlens/ko/guides/reports/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">고지문·보안·위험 보고서 생성</span></a></li><li class="astro-rmhv4bp6"><a href="/bomlens/ko/guides/server-delivery/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">서버 SBOM 작성 가이드</span></a></li><li class="astro-rmhv4bp6"><a href="/bomlens/ko/guides/supplier-sbom/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">공급사 SBOM 검증 가이드</span></a></li><li class="astro-rmhv4bp6"><a href="/bomlens/ko/guides/upload/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">Dependency-Track / TRUSCA 업로드</span></a></li><li class="astro-rmhv4bp6"><a href="/bomlens/ko/guides/verify-release/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">릴리스 검증</span></a></li></ul></details></li><li class="astro-rmhv4bp6"><details open class="astro-rmhv4bp6"><summary class="astro-rmhv4bp6"><span class="group-label astro-rmhv4bp6"><span class="large astro-rmhv4bp6">레퍼런스</span></span><svg aria-hidden="true" class="caret astro-rmhv4bp6 astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1.25rem;"><path d="m14.83 11.29-4.24-4.24a1 1 0 1 0-1.42 1.41L12.71 12l-3.54 3.54a1 1 0 0 0 0 1.41 1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.24-4.24a1.002 1.002 0 0 0 0-1.42Z"/></svg></summary><sl-sidebar-restore data-index="2"></sl-sidebar-restore><ul class="astro-rmhv4bp6"><li class="astro-rmhv4bp6"><a href="/bomlens/ko/reference/artifacts/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">산출물 레퍼런스</span></a></li><li class="astro-rmhv4bp6"><a href="/bomlens/ko/reference/cli/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">CLI 레퍼런스</span></a></li><li class="astro-rmhv4bp6"><a href="/bomlens/ko/reference/docker-image/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">Docker 이미지 직접 사용</span></a></li><li class="astro-rmhv4bp6"><a href="/bomlens/ko/reference/ecosystems/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">지원 생태계</span></a></li><li class="astro-rmhv4bp6"><a href="/bomlens/ko/reference/engine-contract/" aria-current="page" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">엔진 계약</span></a></li><li class="astro-rmhv4bp6"><a href="/bomlens/ko/reference/ui/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">웹 UI와 데스크톱 앱</span></a></li></ul></details></li><li class="astro-rmhv4bp6"><details open class="astro-rmhv4bp6"><summary class="astro-rmhv4bp6"><span class="group-label astro-rmhv4bp6"><span class="large astro-rmhv4bp6">개념</span></span><svg aria-hidden="true" class="caret astro-rmhv4bp6 astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1.25rem;"><path d="m14.83 11.29-4.24-4.24a1 1 0 1 0-1.42 1.41L12.71 12l-3.54 3.54a1 1 0 0 0 0 1.41 1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.24-4.24a1.002 1.002 0 0 0 0-1.42Z"/></svg></summary><sl-sidebar-restore data-index="3"></sl-sidebar-restore><ul class="astro-rmhv4bp6"><li class="astro-rmhv4bp6"><a href="/bomlens/ko/concepts/architecture/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">아키텍처</span></a></li><li class="astro-rmhv4bp6"><a href="/bomlens/ko/concepts/dependency-resolution/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">의존성을 해석하는 방식</span></a></li><li class="astro-rmhv4bp6"><a href="/bomlens/ko/concepts/limitations/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">BomLens가 하지 않는 일</span></a></li><li class="astro-rmhv4bp6"><a href="/bomlens/ko/concepts/local-first/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">로컬 우선 설계</span></a></li><li class="astro-rmhv4bp6"><a href="/bomlens/ko/concepts/pipeline-by-input/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">입력 형태별 파이프라인</span></a></li><li class="astro-rmhv4bp6"><a href="/bomlens/ko/concepts/reports-explained/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">보고서 읽는 법</span></a></li><li class="astro-rmhv4bp6"><a href="/bomlens/ko/concepts/what-is-sbom/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">SBOM이란</span></a></li></ul></details></li></ul><script aria-hidden="true">
+		(() => {
+			const scroller = document.getElementById('starlight__sidebar');
+			if (!window._starlightScrollRestore || !scroller) return;
+			scroller.scrollTop = window._starlightScrollRestore;
+			delete window._starlightScrollRestore;
+		})();
+	</script></sl-sidebar-state-persist><div class="md:sl-hidden"><div class="mobile-preferences sl-flex astro-p4azlveh"><div class="social-icons astro-p4azlveh"><a href="https://github.com/sktelecom/bomlens" rel="me" class="sl-flex astro-n2mnl6yq"><span class="sr-only astro-n2mnl6yq">GitHub</span><svg aria-hidden="true" class="astro-n2mnl6yq astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M12 .3a12 12 0 0 0-3.8 23.38c.6.12.83-.26.83-.57L9 21.07c-3.34.72-4.04-1.61-4.04-1.61-.55-1.39-1.34-1.76-1.34-1.76-1.08-.74.09-.73.09-.73 1.2.09 1.83 1.24 1.83 1.24 1.08 1.83 2.81 1.3 3.5 1 .1-.78.42-1.31.76-1.61-2.67-.3-5.47-1.33-5.47-5.93 0-1.31.47-2.38 1.24-3.22-.14-.3-.54-1.52.1-3.18 0 0 1-.32 3.3 1.23a11.5 11.5 0 0 1 6 0c2.28-1.55 3.29-1.23 3.29-1.23.64 1.66.24 2.88.12 3.18a4.65 4.65 0 0 1 1.23 3.22c0 4.61-2.8 5.63-5.48 5.92.42.36.81 1.1.81 2.22l-.01 3.29c0 .31.2.69.82.57A12 12 0 0 0 12 .3Z"/></svg></a></div><starlight-theme-select><label style="--sl-select-width: 6.25em" class="astro-2z5xp7gb"><span class="sr-only astro-2z5xp7gb">테마 선택</span><svg aria-hidden="true" class="icon label-icon astro-2z5xp7gb astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M21 14h-1V7a3 3 0 0 0-3-3H7a3 3 0 0 0-3 3v7H3a1 1 0 0 0-1 1v2a3 3 0 0 0 3 3h14a3 3 0 0 0 3-3v-2a1 1 0 0 0-1-1ZM6 7a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v7H6V7Zm14 10a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-1h16v1Z"/></svg><select autocomplete="off" class="astro-2z5xp7gb"><option value="dark" class="astro-2z5xp7gb">어두운 테마</option><option value="light" class="astro-2z5xp7gb">밝은 테마</option><option value="auto" selected class="astro-2z5xp7gb">자동</option></select><svg aria-hidden="true" class="icon caret astro-2z5xp7gb astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M17 9.17a1 1 0 0 0-1.41 0L12 12.71 8.46 9.17a1 1 0 1 0-1.41 1.42l4.24 4.24a1.002 1.002 0 0 0 1.42 0L17 10.59a1.002 1.002 0 0 0 0-1.42Z"/></svg></label></starlight-theme-select><script>
+	StarlightThemeProvider.updatePickers();
+</script><starlight-lang-select><label style="--sl-select-width: 7em" class="astro-2z5xp7gb"><span class="sr-only astro-2z5xp7gb">언어 선택</span><svg aria-hidden="true" class="icon label-icon astro-2z5xp7gb astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path fill-rule="evenodd" d="M8.516 3a.94.94 0 0 0-.941.94v1.15H2.94a.94.94 0 1 0 0 1.882h7.362a7.422 7.422 0 0 1-1.787 3.958 7.42 7.42 0 0 1-1.422-2.425.94.94 0 1 0-1.774.627 9.303 9.303 0 0 0 1.785 3.043 7.422 7.422 0 0 1-4.164 1.278.94.94 0 1 0 0 1.881 9.303 9.303 0 0 0 5.575-1.855 9.303 9.303 0 0 0 4.11 1.74l-.763 1.525a.968.968 0 0 0-.016.034l-1.385 2.77a.94.94 0 1 0 1.683.841l1.133-2.267h5.806l1.134 2.267a.94.94 0 0 0 1.683-.841l-1.385-2.769a.95.95 0 0 0-.018-.036l-3.476-6.951a.94.94 0 0 0-1.682 0l-1.82 3.639a7.423 7.423 0 0 1-3.593-1.256 9.303 9.303 0 0 0 2.27-5.203h1.894a.94.94 0 0 0 0-1.881H9.456V3.94A.94.94 0 0 0 8.516 3Zm6.426 11.794a1.068 1.068 0 0 1-.02.039l-.703 1.407h3.924l-1.962-3.924-1.24 2.478Z" clip-rule="evenodd"/></svg><select autocomplete="off" class="astro-2z5xp7gb"><option value="/bomlens/reference/engine-contract/" class="astro-2z5xp7gb">English</option><option value="/bomlens/ko/reference/engine-contract/" selected class="astro-2z5xp7gb">한국어</option></select><svg aria-hidden="true" class="icon caret astro-2z5xp7gb astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M17 9.17a1 1 0 0 0-1.41 0L12 12.71 8.46 9.17a1 1 0 1 0-1.41 1.42l4.24 4.24a1.002 1.002 0 0 0 1.42 0L17 10.59a1.002 1.002 0 0 0 0-1.42Z"/></svg></label></starlight-lang-select></div></div></div></sl-sidebar-pane></nav><div class="main-frame astro-yntsjkba"><script type="module">var e=document.getElementById(`starlight__sidebar`),t=e?.querySelector(`sl-sidebar-state-persist`),n=`sl-sidebar-state`,r=()=>{let r=[],i=t?.dataset.hash||``;try{let e=sessionStorage.getItem(n),t=JSON.parse(e||`{}`);Array.isArray(t.open)&&t.hash===i&&(r=t.open)}catch{}return{hash:i,open:r,scroll:e?.scrollTop||0}},i=e=>{try{sessionStorage.setItem(n,JSON.stringify(e))}catch{}},a=()=>i(r()),o=(e,t)=>{let n=r();n.open[t]=e,i(n)};t?.addEventListener(`click`,e=>{if(!(e.target instanceof Element))return;let t=e.target.closest(`summary`)?.closest(`details`);if(!t)return;let n=t.querySelector(`sl-sidebar-restore`),r=parseInt(n?.dataset.index||``);isNaN(r)||o(!t.open,r)}),addEventListener(`visibilitychange`,()=>{document.visibilityState===`hidden`&&a()});</script><div class="lg:sl-flex astro-lrzkfocr"><aside class="right-sidebar-container print:hidden astro-lrzkfocr"><div class="right-sidebar astro-lrzkfocr"><div class="lg:sl-hidden astro-qok35upx"><mobile-starlight-toc data-min-h="2" data-max-h="3" class="astro-66cqc7ze"><nav aria-labelledby="starlight__on-this-page--mobile" class="astro-66cqc7ze"><details id="starlight__mobile-toc" class="astro-66cqc7ze"><summary id="starlight__on-this-page--mobile" class="sl-flex astro-66cqc7ze"><span class="toggle sl-flex astro-66cqc7ze">목차<svg aria-hidden="true" class="caret astro-66cqc7ze astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1rem;"><path d="m14.83 11.29-4.24-4.24a1 1 0 1 0-1.42 1.41L12.71 12l-3.54 3.54a1 1 0 0 0 0 1.41 1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.24-4.24a1.002 1.002 0 0 0 0-1.42Z"/></svg></span><span class="display-current astro-66cqc7ze"></span></summary><div class="dropdown astro-66cqc7ze"><ul class="isMobile astro-jugkfwgx" style="--depth: 0;"><li style="--depth: 0;" class="astro-jugkfwgx"><a href="#_top" style="--depth: 0;" class="astro-jugkfwgx"><span style="--depth: 0;" class="astro-jugkfwgx">개요</span></a></li><li style="--depth: 0;" class="astro-jugkfwgx"><a href="#파일" style="--depth: 0;" class="astro-jugkfwgx"><span style="--depth: 0;" class="astro-jugkfwgx">파일</span></a></li><li style="--depth: 0;" class="astro-jugkfwgx"><a href="#실행-상태" style="--depth: 0;" class="astro-jugkfwgx"><span style="--depth: 0;" class="astro-jugkfwgx">실행 상태</span></a></li><li style="--depth: 0;" class="astro-jugkfwgx"><a href="#단계" style="--depth: 0;" class="astro-jugkfwgx"><span style="--depth: 0;" class="astro-jugkfwgx">단계</span></a></li><li style="--depth: 0;" class="astro-jugkfwgx"><a href="#출력-역할" style="--depth: 0;" class="astro-jugkfwgx"><span style="--depth: 0;" class="astro-jugkfwgx">출력 역할</span></a></li><li style="--depth: 0;" class="astro-jugkfwgx"><a href="#패키지-식별자" style="--depth: 0;" class="astro-jugkfwgx"><span style="--depth: 0;" class="astro-jugkfwgx">패키지 식별자</span></a></li><li style="--depth: 0;" class="astro-jugkfwgx"><a href="#이미지-스캔" style="--depth: 0;" class="astro-jugkfwgx"><span style="--depth: 0;" class="astro-jugkfwgx">이미지 스캔</span></a></li><li style="--depth: 0;" class="astro-jugkfwgx"><a href="#실행-계획" style="--depth: 0;" class="astro-jugkfwgx"><span style="--depth: 0;" class="astro-jugkfwgx">실행 계획</span></a></li><li style="--depth: 0;" class="astro-jugkfwgx"><a href="#입력-지문" style="--depth: 0;" class="astro-jugkfwgx"><span style="--depth: 0;" class="astro-jugkfwgx">입력 지문</span></a></li><li style="--depth: 0;" class="astro-jugkfwgx"><a href="#제한된-네트워크" style="--depth: 0;" class="astro-jugkfwgx"><span style="--depth: 0;" class="astro-jugkfwgx">제한된 네트워크</span></a></li><li style="--depth: 0;" class="astro-jugkfwgx"><a href="#진행-이벤트" style="--depth: 0;" class="astro-jugkfwgx"><span style="--depth: 0;" class="astro-jugkfwgx">진행 이벤트</span></a></li><li style="--depth: 0;" class="astro-jugkfwgx"><a href="#버전-관리" style="--depth: 0;" class="astro-jugkfwgx"><span style="--depth: 0;" class="astro-jugkfwgx">버전 관리</span></a></li></ul></div></details></nav></mobile-starlight-toc><script type="module" src="/bomlens/_astro/MobileTableOfContents.astro_astro_type_script_index_0_lang.C3fM4Kra.js"></script></div><div class="right-sidebar-panel sl-hidden lg:sl-block astro-qok35upx"><div class="sl-container astro-qok35upx"><starlight-toc data-min-h="2" data-max-h="3"><nav aria-labelledby="starlight__on-this-page"><h2 id="starlight__on-this-page">목차</h2><ul class="astro-jugkfwgx" style="--depth: 0;"><li style="--depth: 0;" class="astro-jugkfwgx"><a href="#_top" style="--depth: 0;" class="astro-jugkfwgx"><span style="--depth: 0;" class="astro-jugkfwgx">개요</span></a></li><li style="--depth: 0;" class="astro-jugkfwgx"><a href="#파일" style="--depth: 0;" class="astro-jugkfwgx"><span style="--depth: 0;" class="astro-jugkfwgx">파일</span></a></li><li style="--depth: 0;" class="astro-jugkfwgx"><a href="#실행-상태" style="--depth: 0;" class="astro-jugkfwgx"><span style="--depth: 0;" class="astro-jugkfwgx">실행 상태</span></a></li><li style="--depth: 0;" class="astro-jugkfwgx"><a href="#단계" style="--depth: 0;" class="astro-jugkfwgx"><span style="--depth: 0;" class="astro-jugkfwgx">단계</span></a></li><li style="--depth: 0;" class="astro-jugkfwgx"><a href="#출력-역할" style="--depth: 0;" class="astro-jugkfwgx"><span style="--depth: 0;" class="astro-jugkfwgx">출력 역할</span></a></li><li style="--depth: 0;" class="astro-jugkfwgx"><a href="#패키지-식별자" style="--depth: 0;" class="astro-jugkfwgx"><span style="--depth: 0;" class="astro-jugkfwgx">패키지 식별자</span></a></li><li style="--depth: 0;" class="astro-jugkfwgx"><a href="#이미지-스캔" style="--depth: 0;" class="astro-jugkfwgx"><span style="--depth: 0;" class="astro-jugkfwgx">이미지 스캔</span></a></li><li style="--depth: 0;" class="astro-jugkfwgx"><a href="#실행-계획" style="--depth: 0;" class="astro-jugkfwgx"><span style="--depth: 0;" class="astro-jugkfwgx">실행 계획</span></a></li><li style="--depth: 0;" class="astro-jugkfwgx"><a href="#입력-지문" style="--depth: 0;" class="astro-jugkfwgx"><span style="--depth: 0;" class="astro-jugkfwgx">입력 지문</span></a></li><li style="--depth: 0;" class="astro-jugkfwgx"><a href="#제한된-네트워크" style="--depth: 0;" class="astro-jugkfwgx"><span style="--depth: 0;" class="astro-jugkfwgx">제한된 네트워크</span></a></li><li style="--depth: 0;" class="astro-jugkfwgx"><a href="#진행-이벤트" style="--depth: 0;" class="astro-jugkfwgx"><span style="--depth: 0;" class="astro-jugkfwgx">진행 이벤트</span></a></li><li style="--depth: 0;" class="astro-jugkfwgx"><a href="#버전-관리" style="--depth: 0;" class="astro-jugkfwgx"><span style="--depth: 0;" class="astro-jugkfwgx">버전 관리</span></a></li></ul></nav></starlight-toc><script type="module" src="/bomlens/_astro/TableOfContents.astro_astro_type_script_index_0_lang.BpJaGz7G.js"></script></div></div></div></aside><div class="main-pane astro-lrzkfocr"><main data-pagefind-body class="astro-g5ptsecz" lang="ko" dir="ltr"><div class="content-panel astro-a7po4psb"><div class="sl-container astro-a7po4psb"><nav class="breadcrumbs astro-u72m6wot" aria-label="현재 위치"><ol class="astro-u72m6wot"><li class="astro-u72m6wot"><a href="/bomlens/ko/" class="astro-u72m6wot">홈</a></li><li class="astro-u72m6wot"><span class="astro-u72m6wot">레퍼런스</span></li></ol></nav><h1 id="_top" class="astro-u72m6wot">엔진 계약</h1></div></div><div class="content-panel astro-a7po4psb"><div class="sl-container astro-a7po4psb"><div class="sl-markdown-content"><p>BomLens 이미지를 스캔 엔진으로 쓰는 프로그램은 모든 스캔이 출력 폴더에 남기는 <code dir="auto">bomlens-result.json</code>을 읽습니다. 이 파일에는 실행이 어떻게 끝났는지, 각 단계가 실행됐는지, 설정으로 꺼졌는지, 실행할 수 없었는지, 실패했는지, 그리고 폴더의 어떤 파일이 어떤 역할인지가 들어 있습니다. 그래서 호출하는 프로그램이 로그를 해석하거나 파일 이름을 추측하지 않아도 됩니다.</p>
+<p>형식은 CI의 <code dir="auto">tests/test-engine-contract.sh</code>가 <a href="https://github.com/sktelecom/bomlens/blob/main/schemas/engine-result-1.json"><code dir="auto">schemas/engine-result-1.json</code></a>으로 검사합니다. 이 문서는 계약 버전 <code dir="auto">1.4.0</code>을 설명합니다.</p>
+<div class="sl-heading-wrapper level-h2"><h2 id="파일">파일</h2><a class="sl-anchor-link" href="#파일"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “파일”</span></a></div>
+<p><code dir="auto">bomlens-result.json</code>은 이름이 고정되어 있으므로 스캔마다 출력 폴더를 따로 두세요. 이전 실행이 남긴 매니페스트는 실행을 시작하자마자 다른 확인보다 먼저 지우고, 새 매니페스트는 실행이 끝날 때 씁니다. 오류로 중간에 멈춘 경우에도 씁니다. 실행 뒤에 매니페스트가 없다면 엔진이 매니페스트를 쓰기 전에 강제 종료된 것입니다.</p>
+<p>계약 때문에 스캔의 종료 코드가 바뀌지는 않습니다. SBOM을 만든 실행은 도중에 어떤 단계가 실패해도 0으로 끝나며, 그 실패는 매니페스트로 알립니다. 예외는 두 가지입니다. <code dir="auto">--component-versions</code> 파일을 거부한 경우에는 파일을 모두 쓰지만, 받은 버전을 적용하지 못했으므로 1로 끝납니다. <code dir="auto">--components</code> 파일(또는 <code dir="auto">sbom-declared.cdx.json</code>)을 거부한 경우에는 <code dir="auto">--component-versions</code>와 달리 실행이 그 자리에서 멈춥니다. SBOM을 정규화하거나 서명하거나 업로드하기 전에 1로 끝나는데, 선언한 컴포넌트가 빠진 SBOM은 요청받은 SBOM이 아니기 때문입니다. 그때까지 만든 SBOM은 <code dir="auto">{Project}_{Version}_bom.refused.json</code>으로 이름을 바꿔 두므로, <code dir="auto">_bom.json</code>을 가져가는 CI 단계가 불완전한 SBOM을 쓰는 일은 없습니다.</p>
+<table>
+<thead>
+<tr>
+<th>필드</th>
+<th>뜻</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code dir="auto">contract</code></td>
+<td><code dir="auto">name</code>은 <code dir="auto">bomlens-engine</code>, <code dir="auto">version</code>은 계약 버전입니다(유의적 버전, BomLens 버전과 별개)</td>
+</tr>
+<tr>
+<td><code dir="auto">engine</code></td>
+<td><code dir="auto">version</code>은 이미지에 들어 있는 BomLens 버전입니다. <code dir="auto">image</code>와 <code dir="auto">image_digest</code>는 호출자가 <code dir="auto">BOMLENS_IMAGE_REF</code>와 <code dir="auto">BOMLENS_IMAGE_DIGEST</code>를 넘기면 그 값을 그대로 적습니다. 이미지는 자기 참조를 알 수 없기 때문입니다</td>
+</tr>
+<tr>
+<td><code dir="auto">input</code></td>
+<td><code dir="auto">kind</code>(<code dir="auto">source</code>, <code dir="auto">image</code>, <code dir="auto">sbom</code>, <code dir="auto">binary</code>, <code dir="auto">rootfs</code>, <code dir="auto">firmware</code>, <code dir="auto">ai-model</code>, <code dir="auto">dataset</code>), 실행한 <code dir="auto">MODE</code>, <code dir="auto">target</code>(이미지 스캔의 이미지 참조, 경로는 적지 않음), 이미지 스캔이면 <code dir="auto">image</code>(아래 참조)</td>
+</tr>
+<tr>
+<td><code dir="auto">run</code></td>
+<td><code dir="auto">status</code>, <code dir="auto">reason</code>, <code dir="auto">started_at</code>, <code dir="auto">ended_at</code>(UTC), <code dir="auto">exit_code</code></td>
+</tr>
+<tr>
+<td><code dir="auto">steps[]</code></td>
+<td>단계마다 하나씩, 기록된 순서대로. 단계는 끝날 때 기록됨(아래 표)</td>
+</tr>
+<tr>
+<td><code dir="auto">tools</code></td>
+<td>도구 이름과 버전입니다. SBOM에 적힌 생성 도구, syft, 취약점 스캔이 돌았다면 Trivy가 들어갑니다</td>
+</tr>
+<tr>
+<td><code dir="auto">engines</code></td>
+<td>이번 실행에서 결과를 낸 취약점 엔진(<code dir="auto">trivy</code>, <code dir="auto">grype</code>, <code dir="auto">cve-bin-tool</code>, <code dir="auto">yocto</code>, <code dir="auto">go-vulndb</code>)</td>
+</tr>
+<tr>
+<td><code dir="auto">data_sources.trivy_db</code></td>
+<td>취약점 스캔이 돌았을 때 Trivy 데이터베이스의 스키마 버전, <code dir="auto">updated_at</code>, <code dir="auto">downloaded_at</code></td>
+</tr>
+<tr>
+<td><code dir="auto">data_sources.go_vulndb</code></td>
+<td>Go 취약점 데이터베이스를 읽었을 때 그 데이터베이스의 <code dir="auto">updated_at</code></td>
+</tr>
+<tr>
+<td><code dir="auto">outputs[]</code></td>
+<td>실행이 쓴 파일마다 <code dir="auto">role</code>, <code dir="auto">path</code>(출력 폴더 기준 상대 경로), <code dir="auto">sha256</code>, <code dir="auto">bytes</code></td>
+</tr>
+</tbody>
+</table>
+<div class="sl-heading-wrapper level-h2"><h2 id="실행-상태">실행 상태</h2><a class="sl-anchor-link" href="#실행-상태"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “실행 상태”</span></a></div>
+<table>
+<thead>
+<tr>
+<th><code dir="auto">run.status</code></th>
+<th>조건</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code dir="auto">succeeded</code></td>
+<td>종료 코드 0이고, 기록된 모든 단계가 <code dir="auto">ok</code>, <code dir="auto">disabled</code>, 또는 읽을 것이 없어 건너뛴 <code dir="auto">skipped</code>(<code dir="auto">no_input</code>) 중 하나</td>
+</tr>
+<tr>
+<td><code dir="auto">succeeded_degraded</code></td>
+<td>종료 코드 0이고, <code dir="auto">failed</code>나 <code dir="auto">degraded</code>인 단계, 또는 다른 사유로 <code dir="auto">skipped</code>된 단계(요청했지만 실행할 수 없었던 단계: 도구 미설치, 입력 한도 초과, 이미지 사용 불가)가 하나 이상 있음. SBOM은 유효하며, 실패한 단계가 중요한지는 <code dir="auto">steps[]</code>를 보고 판단합니다</td>
+</tr>
+<tr>
+<td><code dir="auto">failed</code></td>
+<td>0이 아닌 종료 코드로 끝남(<code dir="auto">reason</code>은 <code dir="auto">exit_code</code>)</td>
+</tr>
+<tr>
+<td><code dir="auto">cancelled</code></td>
+<td>시그널로 중단됨(종료 코드 130 또는 143)</td>
+</tr>
+</tbody>
+</table>
+<p>취약점 스캔이 실패하면 <code dir="auto">succeeded</code>가 되지 않습니다. Trivy는 데이터베이스를 읽지 못하면 빈 결과에 <code dir="auto">ScanError</code>를 붙여 씁니다. 매니페스트는 이를 <code dir="auto">scan-security</code>의 <code dir="auto">failed</code>로 적고 Trivy의 메시지를 <code dir="auto">detail</code>에 남기므로, “취약점 0건”과 “스캔이 돌지 않음”이 구분됩니다.</p>
+<div class="sl-heading-wrapper level-h2"><h2 id="단계">단계</h2><a class="sl-anchor-link" href="#단계"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “단계”</span></a></div>
+<p>스캔 모드에 해당하는 단계는 실행되지 않았더라도 모두 기록합니다. 모드에 아예 해당하지 않는 단계(AI 모델의 CPE 보강 등)는 기록하지 않습니다.</p>
+<table>
+<thead>
+<tr>
+<th><code dir="auto">status</code></th>
+<th>뜻</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code dir="auto">ok</code></td>
+<td>실행되어 끝까지 완료됨</td>
+</tr>
+<tr>
+<td><code dir="auto">degraded</code></td>
+<td>실행됐지만 필요한 것이 일부 없었음(예: 오프라인 지원 종료 데이터가 없음)</td>
+</tr>
+<tr>
+<td><code dir="auto">failed</code></td>
+<td>실행됐지만 실패함. SBOM은 그대로 씀. 대부분의 후처리 단계는 SBOM의 <code dir="auto">bomlens:pipeline-step-failed</code> 속성에도 이름을 남기지만, 빠짐없는 기록은 매니페스트임</td>
+</tr>
+<tr>
+<td><code dir="auto">skipped</code></td>
+<td>실행할 수 없었음. 도구가 이미지에 없거나 입력이 없음</td>
+</tr>
+<tr>
+<td><code dir="auto">disabled</code></td>
+<td>설정으로 꺼짐</td>
+</tr>
+</tbody>
+</table>
+<!-- reasons:begin -->
+<table>
+<thead>
+<tr>
+<th><code dir="auto">reason</code></th>
+<th>뜻</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code dir="auto">failed</code></td>
+<td>단계가 오류를 냄</td>
+</tr>
+<tr>
+<td><code dir="auto">timeout</code></td>
+<td>시간 제한을 넘김</td>
+</tr>
+<tr>
+<td><code dir="auto">not_installed</code></td>
+<td>필요한 도구가 이 이미지에 없음</td>
+</tr>
+<tr>
+<td><code dir="auto">too_large</code></td>
+<td>입력이 단계의 크기 제한을 넘음</td>
+</tr>
+<tr>
+<td><code dir="auto">fallback</code></td>
+<td>더 단순한 방법으로 대신함(매니페스트만 읽는 대체 경로로 SBOM을 만들어 직접 의존성만 있음, 또는 <code dir="auto">poetry.lock</code>이 없는 Poetry 프로젝트를 일부만 풀었음: 범위·테이블 의존성이 빠졌거나 고정 버전의 하위 의존성을 풀지 못함), 또는 필요한 이미지 없이 진행함(scancode 이미지를 내려받지 못한 <code dir="auto">--deep-license</code>, grype 이미지를 내려받지 못한 <code dir="auto">--deep-cve</code>)</td>
+</tr>
+<tr>
+<td><code dir="auto">unavailable</code></td>
+<td>단계가 읽는 데이터를 쓸 수 없었음</td>
+</tr>
+<tr>
+<td><code dir="auto">budget_exhausted</code></td>
+<td>작업량 제한에서 멈춤</td>
+</tr>
+<tr>
+<td><code dir="auto">no_input</code></td>
+<td>단계가 읽을 것이 없었음(소스 트리 없음, 서명 키 없음)</td>
+</tr>
+<tr>
+<td><code dir="auto">no_components</code></td>
+<td>소스가 의존성을 선언했는데(매니페스트나 lock 파일에 의존성이 있음) SBOM에 컴포넌트가 없음. <code dir="auto">detail</code>에 해당 매니페스트와, 있으면 실패한 해석 단계를 적음. <code dir="auto">generate</code> 단계에 기록</td>
+</tr>
+</tbody>
+</table>
+<!-- reasons:end -->
+<p><code dir="auto">budget_exhausted</code>는 아직 어느 단계도 내지 않습니다. 이후 릴리스에서 기록할 작업량 제한 사유로 예약해 둔 값입니다.</p>
+<p>각 단계에는 <code dir="auto">stage</code>(이 컨테이너가 시작되기 전에 언어 이미지가 만든 SBOM이면 1, 나머지는 2), <code dir="auto">started_at</code>, <code dir="auto">ended_at</code>, 500자 이하의 선택 항목 <code dir="auto">detail</code>이 있고, 일부 단계에는 <code dir="auto">counts</code>가 있습니다(<code dir="auto">generate</code>는 <code dir="auto">components</code>를 기록하고, 생성기가 보았지만 이름을 알 수 없어 뺀 패키지가 있으면 <code dir="auto">unresolved</code>를 기록하며 <code dir="auto">detail</code>에 그 사실을 적음). <code dir="auto">POSTPROCESS</code> 모드에서는 <code dir="auto">generate</code>에 <code dir="auto">input_fingerprint</code>, <code dir="auto">reused</code>, <code dir="auto">reuse_unsafe</code>가 있고, 실행 계획 뒤에는 <code dir="auto">plan_mismatch</code>도 있습니다(<a href="#%EC%9E%85%EB%A0%A5-%EC%A7%80%EB%AC%B8">입력 지문</a> 참고).</p>
+<!-- steps:begin -->
+<table>
+<thead>
+<tr>
+<th>단계</th>
+<th>하는 일</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code dir="auto">plan</code></td>
+<td>실행 계획 작성(<code dir="auto">MODE=PLAN</code>, 아래 참조)</td>
+</tr>
+<tr>
+<td><code dir="auto">generate</code></td>
+<td>SBOM 생성(소스 스캔은 언어 이미지가 먼저 돌므로 1단계). 생성 중에 실패한 단계(펌웨어 스캔의 syft 실행, 소스 스캔의 해석 단계)가 SBOM의 <code dir="auto">bomlens:pipeline-step-failed</code>에만 남았으면 <code dir="auto">degraded</code>(<code dir="auto">failed</code>)로 기록하고 그 단계 이름을 <code dir="auto">detail</code>에 적음. 그 단계에 펌웨어 syft 실행이 있고 amd64 이미지가 ARM 호스트에서 에뮬레이션으로 돌았으면 그 사실도 <code dir="auto">detail</code>에 적고, arm64 호스트이면 대신 쓸 <code dir="auto">linux/arm64</code> 이미지를 안내함. 후처리 단계(이 표에 따로 있는 단계)의 이름은 이전 실행이 남긴 SBOM에 있더라도 여기에 세지 않음</td>
+</tr>
+<tr>
+<td><code dir="auto">os-licenses</code></td>
+<td>이미지·루트 파일시스템 스캔에서 Debian 패키지의 라이선스를 Trivy로 채움. syft가 해시로 남기는 copyright 파일에서 Trivy가 라이선스 이름, common-licenses 참조, 라이선스 본문을 읽음. <code dir="auto">counts</code>에 <code dir="auto">replaced</code>, <code dir="auto">hashes_dropped</code>를 기록하고, Trivy가 대상을 읽지 못하거나 어떤 Debian 패키지에도 라이선스를 주지 못하면 <code dir="auto">degraded</code>(<code dir="auto">unavailable</code>), Trivy가 없으면 <code dir="auto">skipped</code>(<code dir="auto">not_installed</code>), <code dir="auto">BOMLENS_OS_LICENSES=false</code>이면 <code dir="auto">disabled</code></td>
+</tr>
+<tr>
+<td><code dir="auto">vendored</code></td>
+<td>소스에 복사해 넣은 오픈소스 식별(<code dir="auto">--identify-vendored</code>)</td>
+</tr>
+<tr>
+<td><code dir="auto">suggest-vendored</code></td>
+<td>C/C++ 프로젝트 스캔 결과가 거의 비었을 때 위 식별을 권함</td>
+</tr>
+<tr>
+<td><code dir="auto">cocoapods</code></td>
+<td><code dir="auto">Podfile.lock</code>의 CocoaPods 의존성 추가</td>
+</tr>
+<tr>
+<td><code dir="auto">stamp-metadata</code></td>
+<td>루트 컴포넌트를 프로젝트 이름과 버전으로 지정. Yocto 빌드 디렉터리에서 읽은 SBOM이면 이미지에 bom-ref, 빌드가 적지 않은 버전, <code dir="auto">--license</code>, 설치된 모든 패키지로 가는 의존 관계를 넣음. 실패하면 실행이 멈춤</td>
+</tr>
+<tr>
+<td><code dir="auto">declared-components</code></td>
+<td>소스 스캔에서 <code dir="auto">--components</code> 파일이나 <code dir="auto">sbom-declared.cdx.json</code>에 적은 컴포넌트를 추가. Yocto 빌드에서는 <code dir="auto">--components</code> 파일을 <code dir="auto">bomlens:yocto-recipe</code>에 적은 레시피의 패키지에 적용. 읽을 파일이 있을 때만 기록하며, <code dir="auto">bomlens:declared</code>로 표시된 컴포넌트 수를 <code dir="auto">counts</code>에 적음. 파일을 거부하면 <code dir="auto">failed</code>이고 이유를 <code dir="auto">detail</code>에 적으며, 실행은 1로 끝남</td>
+</tr>
+<tr>
+<td><code dir="auto">docmeta</code></td>
+<td>문서 작성자, 도구, 수명 주기 단계 기록</td>
+</tr>
+<tr>
+<td><code dir="auto">license-registry</code></td>
+<td>패키지 레지스트리에서 빠진 라이선스를 조회하고, 하나뿐인 강한 카피레프트나 비상업 라이선스를 확인(<code dir="auto">--license-registry</code>). <code dir="auto">counts</code>에 <code dir="auto">candidates</code>, <code dir="auto">filled</code>, <code dir="auto">superseded</code>, <code dir="auto">confirmed</code>, <code dir="auto">no_answer</code>, <code dir="auto">not_found</code>, <code dir="auto">non_standard</code>, <code dir="auto">lookup_failed</code>, <code dir="auto">budget_reached</code>를 기록</td>
+</tr>
+<tr>
+<td><code dir="auto">component-versions</code></td>
+<td>펌웨어, 루트 파일시스템, 바이너리 스캔에서 <code dir="auto">--component-versions</code>로 받은 버전을 채우고 사유는 <code dir="auto">bomlens:versionReason</code>으로 기록하며, 버전도 사유도 없는 컴포넌트를 <code dir="auto">_component-versions.template.csv</code>로 씀. 파일을 거부하면 <code dir="auto">failed</code>이고 이유를 <code dir="auto">detail</code>에 적으며, 실행은 1로 끝남</td>
+</tr>
+<tr>
+<td><code dir="auto">normalize</code></td>
+<td>라이선스, PURL, 중복 정규화</td>
+</tr>
+<tr>
+<td><code dir="auto">enrich-cpe</code></td>
+<td>CPE 식별자 추가</td>
+</tr>
+<tr>
+<td><code dir="auto">upstream-purl</code></td>
+<td>펌웨어, 루트 파일시스템, 바이너리 스캔이나 Yocto 빌드의 기록에서 변환표로 upstream 소스 저장소 purl을 붙임. <code dir="auto">ENRICH_UPSTREAM_PURL=false</code>이면 <code dir="auto">disabled</code></td>
+</tr>
+<tr>
+<td><code dir="auto">enrich-os-context</code></td>
+<td>운영체제 패키지의 배포판 기록</td>
+</tr>
+<tr>
+<td><code dir="auto">enrich-distro-supplier</code></td>
+<td>배포판을 운영체제 패키지의 공급자로 기록</td>
+</tr>
+<tr>
+<td><code dir="auto">enrich-maven-cpe</code></td>
+<td>Maven 컴포넌트의 CPE 추가</td>
+</tr>
+<tr>
+<td><code dir="auto">enrich-github-cpe</code></td>
+<td>GitHub 저장소로 식별된 컴포넌트의 CPE 추가</td>
+</tr>
+<tr>
+<td><code dir="auto">enrich-interpreter-cpe</code></td>
+<td>언어 런타임의 CPE 추가</td>
+</tr>
+<tr>
+<td><code dir="auto">enrich-eol</code></td>
+<td>지원이 끝난 버전 표시(오프라인 데이터)</td>
+</tr>
+<tr>
+<td><code dir="auto">enrich-malicious</code></td>
+<td>알려진 악성 패키지 표시(오프라인 데이터)</td>
+</tr>
+<tr>
+<td><code dir="auto">enrich-staleness</code></td>
+<td>버전이 얼마나 뒤처졌는지 측정(선택, 온라인)</td>
+</tr>
+<tr>
+<td><code dir="auto">declared-sources</code></td>
+<td>AI 선언에 적힌 데이터셋 출처 적용</td>
+</tr>
+<tr>
+<td><code dir="auto">declared-service</code></td>
+<td>AI 선언에 적힌 AI 서비스 적용</td>
+</tr>
+<tr>
+<td><code dir="auto">assess-ai-risk</code></td>
+<td>AI 모델 위험 판정</td>
+</tr>
+<tr>
+<td><code dir="auto">resolve-purl</code></td>
+<td>각 PURL을 패키지 저장소에서 조회(<code dir="auto">--resolve-purl</code>)</td>
+</tr>
+<tr>
+<td><code dir="auto">describe-input</code></td>
+<td>공급사 SBOM의 원래 형식과 도구 기록(<code dir="auto">--analyze</code>)</td>
+</tr>
+<tr>
+<td><code dir="auto">conformance</code></td>
+<td>최소 요소 기준으로 SBOM 검사</td>
+</tr>
+<tr>
+<td><code dir="auto">deep-license</code></td>
+<td>scancode로 소스 파일의 라이선스 탐지(<code dir="auto">--deep-license</code>)</td>
+</tr>
+<tr>
+<td><code dir="auto">source-file-tree</code></td>
+<td>스캔한 트리의 파일 목록 기록</td>
+</tr>
+<tr>
+<td><code dir="auto">source-snapshot</code></td>
+<td>파일 보기 화면용으로 스캔한 파일 내용 보관</td>
+</tr>
+<tr>
+<td><code dir="auto">generate-notice</code></td>
+<td>오픈소스 고지문 작성</td>
+</tr>
+<tr>
+<td><code dir="auto">match-cpe</code></td>
+<td><code dir="auto">--security</code>를 켠 펌웨어, 루트 파일 시스템, 바이너리 스캔이나 Yocto SPDX 2.2 아카이브에서 패키지 PURL이 없는 컴포넌트의 CPE를 이미지에 들어 있는 NVD CPE 인덱스와 대조. <code dir="auto">counts</code>에 <code dir="auto">offered</code>, <code dir="auto">components</code>, <code dir="auto">cves</code>를 담고, 인덱스가 없는 이미지에서는 <code dir="auto">skipped</code>(<code dir="auto">not_installed</code>), <code dir="auto">--security</code>가 꺼져 있거나 <code dir="auto">CVE_BIN_TOOL_MODE=components-only</code>이면 <code dir="auto">disabled</code></td>
+</tr>
+<tr>
+<td><code dir="auto">reachability</code></td>
+<td>Go 소스나 Go 실행 파일 스캔에서 각 Go 보안 권고의 코드에 도달하는지 govulncheck로 판정(<code dir="auto">--reachability</code>, <code dir="auto">REACHABILITY=true</code>). <code dir="auto">counts</code>는 <code dir="auto">exploitable</code>, <code dir="auto">not_affected</code>, <code dir="auto">components</code>. Go 취약점 데이터베이스를 읽지 못하면 <code dir="auto">skipped</code>(<code dir="auto">unavailable</code>), SBOM에 Go 컴포넌트가 없거나 1단계가 이 실행의 govulncheck 출력을 남기지 않았으면 <code dir="auto">skipped</code>(<code dir="auto">no_input</code>), 소스 트리의 Go 모듈이 20개를 넘으면 <code dir="auto">skipped</code>(<code dir="auto">too_large</code>), Go 모듈이 GOOS linux, darwin, windows 어디에서도 빌드되지 않아 판정하지 못하면 <code dir="auto">degraded</code>(<code dir="auto">unavailable</code>), govulncheck가 없는 이미지면 <code dir="auto">skipped</code>(<code dir="auto">not_installed</code>), 옵션이 없으면 <code dir="auto">disabled</code></td>
+</tr>
+<tr>
+<td><code dir="auto">scan-security</code></td>
+<td>Trivy로 취약점 매칭</td>
+</tr>
+<tr>
+<td><code dir="auto">deep-cve</code></td>
+<td><code dir="auto">--security</code>를 켰을 때 CPE가 있는 컴포넌트와 <code dir="auto">bomlens:cpeAlternates</code>의 추가 CPE를 grype로 NVD와 대조(<code dir="auto">--deep-cve</code>, deep-cve 이미지). grype가 없는 이미지에서 요청하면 <code dir="auto">skipped</code>(<code dir="auto">not_installed</code>), CLI가 deep-cve 이미지 없이 실행했으면 <code dir="auto">skipped</code>(<code dir="auto">fallback</code>, 이미지를 내려받지 못했거나 스캐너 이미지가 로컬 빌드, 1.13.2보다 낮은 버전, BomLens 이름이 아닌 이미지여서이며 <code dir="auto">detail</code>에 이유를 적음. 그대로 둔 이미지에 grype가 있으면(<code dir="auto">SBOM_DEEP_CVE=true</code>로 빌드) 대조를 실행하고 실제 결과를 기록), 요청하지 않았거나 <code dir="auto">--security</code>가 꺼져 있거나 펌웨어 또는 AI 모델 스캔이면 <code dir="auto">disabled</code>. grype 데이터베이스가 <code dir="auto">BOMLENS_GRYPE_DB_MAX_AGE_DAYS</code>일(7일)보다 오래됐으면 먼저 갱신하고, 갱신하지 못하면 그대로 읽은 뒤 <code dir="auto">degraded</code>(<code dir="auto">unavailable</code>)로 기록하며 <code dir="auto">detail</code>에 경과 일수를 적는다. grype가 실패하면 <code dir="auto">detail</code>에 오류 출력의 마지막 부분을 적는다</td>
+</tr>
+<tr>
+<td><code dir="auto">go-vulndb</code></td>
+<td><code dir="auto">--security</code>를 켰을 때 <code dir="auto">pkg:golang</code> 컴포넌트를 이미지에 든 Go 취약점 데이터베이스 스냅숏(또는 <code dir="auto">BOMLENS_GO_VULNDB_PATH</code>)과 대조하고, 어느 엔진도 보고하지 않은 결과만 더함(CVE, GHSA, GO 식별자로 비교). <code dir="auto">counts</code>에 <code dir="auto">components</code>, <code dir="auto">findings</code>, <code dir="auto">already_reported</code>를 적음. 읽을 수 있는 버전의 Go 모듈이 없거나 보안 스캔이 대조 전에 멈췄으면 <code dir="auto">skipped</code>(<code dir="auto">no_input</code>)이며 <code dir="auto">detail</code>에 이유를 적음(예: 이미지에 Trivy가 없음). 스냅숏이 없으면 <code dir="auto">skipped</code>(<code dir="auto">not_installed</code>), 데이터베이스를 읽을 수 없거나 보안 스캔이 대조 전에 실패했으면 <code dir="auto">failed</code>, 읽은 데이터베이스가 <code dir="auto">BOMLENS_GO_VULNDB_MAX_AGE_DAYS</code>일(7일)보다 오래됐으면 <code dir="auto">degraded</code>(<code dir="auto">unavailable</code>). 이만큼 오래된 이미지 스냅숏은 오프라인 스캔이 아니면 먼저 내려받은 데이터베이스로 바꾸며, <code dir="auto">detail</code>에 경과 일수와 바꾸지 못한 이유를 적음. <code dir="auto">BOMLENS_GO_VULNDB=false</code>이거나 <code dir="auto">--security</code>가 꺼져 있으면 <code dir="auto">disabled</code></td>
+</tr>
+<tr>
+<td><code dir="auto">generate-risk-report</code></td>
+<td>위험 보고서 작성</td>
+</tr>
+<tr>
+<td><code dir="auto">model-security</code></td>
+<td>AI 모델 파일의 위험한 내용 검사</td>
+</tr>
+<tr>
+<td><code dir="auto">verify-weights</code></td>
+<td>공개된 모델 가중치가 해시와 맞는지 확인</td>
+</tr>
+<tr>
+<td><code dir="auto">enrich-aibom</code></td>
+<td>모델 허브 페이지에서 읽은 정보 추가</td>
+</tr>
+<tr>
+<td><code dir="auto">sign</code></td>
+<td>cosign으로 SBOM 서명(<code dir="auto">--sign</code>)</td>
+</tr>
+</tbody>
+</table>
+<!-- steps:end -->
+<div class="sl-heading-wrapper level-h2"><h2 id="출력-역할">출력 역할</h2><a class="sl-anchor-link" href="#출력-역할"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “출력 역할”</span></a></div>
+<table>
+<thead>
+<tr>
+<th><code dir="auto">role</code></th>
+<th>파일</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code dir="auto">sbom.cyclonedx</code></td>
+<td><code dir="auto">_bom.json</code></td>
+</tr>
+<tr>
+<td><code dir="auto">sbom.spdx</code></td>
+<td><code dir="auto">_bom.spdx.json</code></td>
+</tr>
+<tr>
+<td><code dir="auto">sbom.spdx3</code></td>
+<td><code dir="auto">_bom.spdx3.json</code></td>
+</tr>
+<tr>
+<td><code dir="auto">vulnerabilities.trivy</code></td>
+<td>Trivy 자체 결과입니다. 아무것도 고치지 않았으면 <code dir="auto">_security.json</code>이고, 다른 엔진이 결과를 더했거나 항목의 번호를 바꿨거나 <code dir="auto">Advisories</code>로 옮겼으면 따로 남긴 <code dir="auto">_security_trivy.json</code>입니다(<a href="/bomlens/ko/guides/reports/">보안 보고서</a> 참고)</td>
+</tr>
+<tr>
+<td><code dir="auto">vulnerabilities.all</code></td>
+<td><code dir="auto">_security.json</code>. Trivy 결과에 다른 엔진의 결과를 병합하고, 배포판 권고 번호로 보고된 항목을 관련 CVE로 바꾸거나 최상위 <code dir="auto">Advisories</code> 목록으로 옮긴 파일</td>
+</tr>
+<tr>
+<td><code dir="auto">vulnerabilities.other</code></td>
+<td>다른 엔진의 결과(<code dir="auto">_security_grype.json</code>, <code dir="auto">_security_cvebintool.json</code>, <code dir="auto">_security_yocto.json</code>, <code dir="auto">_security_govulndb.json</code>)</td>
+</tr>
+<tr>
+<td><code dir="auto">license-scan.scancode</code></td>
+<td><code dir="auto">_scancode.json</code></td>
+</tr>
+<tr>
+<td><code dir="auto">vendored.cyclonedx</code></td>
+<td><code dir="auto">_vendored.cdx.json</code></td>
+</tr>
+<tr>
+<td><code dir="auto">vex.reachability</code></td>
+<td><code dir="auto">_reachability.cdx.json</code>(<code dir="auto">--reachability</code>)</td>
+</tr>
+<tr>
+<td><code dir="auto">conformance</code></td>
+<td><code dir="auto">_conformance.json</code></td>
+</tr>
+<tr>
+<td><code dir="auto">input-description</code></td>
+<td><code dir="auto">_input.json</code></td>
+</tr>
+<tr>
+<td><code dir="auto">events</code></td>
+<td><code dir="auto">bomlens-events.jsonl</code>(<code dir="auto">BOMLENS_EVENTS=file</code>)</td>
+</tr>
+<tr>
+<td><code dir="auto">other</code></td>
+<td>실행이 쓴 그 밖의 파일(보고서, 보조 파일)</td>
+</tr>
+</tbody>
+</table>
+<div class="sl-heading-wrapper level-h2"><h2 id="패키지-식별자">패키지 식별자</h2><a class="sl-anchor-link" href="#패키지-식별자"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “패키지 식별자”</span></a></div>
+<p><code dir="auto">bom.json</code>의 운영체제 패키지 PURL은 Trivy와 purl-spec이 쓰는 형식을 따르므로, Trivy 스캔이나 공급사 SBOM의 같은 패키지와 연결됩니다.</p>
+<ul>
+<li>deb: epoch는 버전의 일부가 아니라 <code dir="auto">epoch</code> 한정자입니다(<code dir="auto">pkg:deb/debian/bsdutils@2.38.1-5?arch=amd64&#x26;distro=debian-12&#x26;epoch=1</code>).</li>
+<li>apk: <code dir="auto">distro</code>는 릴리스 번호입니다(<code dir="auto">distro=3.20.10</code>).</li>
+<li>deb, rpm, apk: <code dir="auto">upstream</code> 한정자는 없습니다. 소스 패키지는 <code dir="auto">aquasecurity:trivy:SrcName</code> 속성(과 <code dir="auto">SrcVersion</code>, <code dir="auto">SrcRelease</code>, <code dir="auto">SrcEpoch</code>)에 있으며, Trivy는 이 값으로 배포판 권고를 매칭합니다.</li>
+<li>한정자는 이름순으로 정렬합니다.</li>
+</ul>
+<p>이 형식을 바꾸는 것은 메이저 버전 변경입니다(아래 참조).</p>
+<div class="sl-heading-wrapper level-h2"><h2 id="이미지-스캔">이미지 스캔</h2><a class="sl-anchor-link" href="#이미지-스캔"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “이미지 스캔”</span></a></div>
+<p><code dir="auto">IMAGE</code> 모드에서는 syft가 먼저 이미지를 읽고, Debian 패키지의 라이선스를 읽는 Trivy(<code dir="auto">os-licenses</code>)와 파일 보기가 같은 이미지를 한 번 더 읽습니다. 이 두 번째 읽기는 syft가 읽은 다이제스트로 이미지를 지정하므로(<code dir="auto">&#x3C;저장소>@sha256:...</code>), 그사이에 태그가 다른 이미지를 가리키게 되어도 같은 이미지를 읽습니다. <code dir="auto">input.image</code>에 그 내용을 적습니다.</p>
+<div class="expressive-code"><link rel="stylesheet" href="/bomlens/_astro/ec.klmer.css"><script type="module" src="/bomlens/_astro/ec.0vx5m.js"></script><figure class="frame not-content"><figcaption class="header"></figcaption><pre data-language="json"><code><div class="ec-line"><div class="code"><span style="--0:#032F62;--1:#9ECBFF">"image"</span><span style="--0:#24292E;--1:#E1E4E8">: {</span></div></div><div class="ec-line"><div class="code"><span class="indent">  </span><span style="--0:#005CC5;--1:#79B8FF">"reference"</span><span style="--0:#24292E;--1:#E1E4E8">: </span><span style="--0:#032F62;--1:#9ECBFF">"alpine:3.20"</span><span style="--0:#24292E;--1:#E1E4E8">,</span></div></div><div class="ec-line"><div class="code"><span class="indent">  </span><span style="--0:#005CC5;--1:#79B8FF">"source"</span><span style="--0:#24292E;--1:#E1E4E8">: </span><span style="--0:#032F62;--1:#9ECBFF">"registry"</span><span style="--0:#24292E;--1:#E1E4E8">,</span></div></div><div class="ec-line"><div class="code"><span class="indent">  </span><span style="--0:#005CC5;--1:#79B8FF">"digest"</span><span style="--0:#24292E;--1:#E1E4E8">: </span><span style="--0:#032F62;--1:#9ECBFF">"sha256:45e09956dc667c5eff3583c9d94830261fb1ca0be10a0a7db36266edf5de9e1d"</span><span style="--0:#24292E;--1:#E1E4E8">,</span></div></div><div class="ec-line"><div class="code"><span class="indent">  </span><span style="--0:#005CC5;--1:#79B8FF">"platform"</span><span style="--0:#24292E;--1:#E1E4E8">: </span><span style="--0:#032F62;--1:#9ECBFF">"linux/arm64/v8"</span><span style="--0:#24292E;--1:#E1E4E8">,</span></div></div><div class="ec-line"><div class="code"><span class="indent">  </span><span style="--0:#005CC5;--1:#79B8FF">"index_digest"</span><span style="--0:#24292E;--1:#E1E4E8">: </span><span style="--0:#032F62;--1:#9ECBFF">"sha256:d9e853e87e55526f6b2917df91a2115c36dd7c696a35be12163d44e6e2a4b6bc"</span></div></div><div class="ec-line"><div class="code"><span style="--0:#24292E;--1:#E1E4E8">}</span></div></div></code></pre><div class="copy"><div aria-live="polite"></div><button title="Copy to clipboard" data-copied="Copied!" data-code="&#x22;image&#x22;: {  &#x22;reference&#x22;: &#x22;alpine:3.20&#x22;,  &#x22;source&#x22;: &#x22;registry&#x22;,  &#x22;digest&#x22;: &#x22;sha256:45e09956dc667c5eff3583c9d94830261fb1ca0be10a0a7db36266edf5de9e1d&#x22;,  &#x22;platform&#x22;: &#x22;linux/arm64/v8&#x22;,  &#x22;index_digest&#x22;: &#x22;sha256:d9e853e87e55526f6b2917df91a2115c36dd7c696a35be12163d44e6e2a4b6bc&#x22;}"><div></div></button></div></figure></div>
+<table>
+<thead>
+<tr>
+<th>필드</th>
+<th>뜻</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code dir="auto">reference</code></td>
+<td>입력으로 받은 이미지 참조(<code dir="auto">TARGET_IMAGE</code>)</td>
+</tr>
+<tr>
+<td><code dir="auto">source</code></td>
+<td>syft가 이미지를 읽은 곳입니다. <code dir="auto">registry</code>(<code dir="auto">registry:</code> 스킴, 또는 Docker 소켓이 없을 때의 일반 이름), <code dir="auto">daemon</code>(<code dir="auto">docker:</code>와 <code dir="auto">podman:</code>), <code dir="auto">archive</code>(<code dir="auto">docker-archive:</code>, <code dir="auto">oci-archive:</code>, <code dir="auto">oci-dir:</code>), <code dir="auto">other</code>(<code dir="auto">containerd:</code>)이며, syft가 이미지를 읽기 전에 실행이 멈췄다면 <code dir="auto">null</code>입니다. 소켓이 있으면 syft는 일반 이름을 데몬에서 읽고, 데몬에서 이미지를 받지 못하면 레지스트리에서 읽습니다. syft의 기록에는 어느 쪽인지 적혀 있지 않으므로 기록 내용으로 판단합니다. Docker Hub 저장소 다이제스트가 전체 이름(<code dir="auto">index.docker.io/...</code>)으로 적혀 있으면 <code dir="auto">registry</code>, 태그가 있으면 <code dir="auto">daemon</code>, 둘 다 아니면 <code dir="auto">unknown</code>입니다</td>
+</tr>
+<tr>
+<td><code dir="auto">digest</code></td>
+<td><code dir="auto">registry</code>이면 읽은 이미지의 매니페스트 다이제스트(플랫폼 하나), <code dir="auto">daemon</code>과 <code dir="auto">unknown</code>이면 그 저장소에 대해 기록된 저장소 다이제스트입니다. 다중 플랫폼 이미지라면 인덱스의 다이제스트이며, 데몬과 레지스트리에서 같은 내용을 가리킵니다. 아카이브는 파일을 그대로 읽으므로 <code dir="auto">null</code>이고, 다이제스트를 알아낼 수 없을 때도 <code dir="auto">null</code>입니다. 저장소 다이제스트가 없는 경우(로컬에서 빌드하고 푸시하지 않은 이미지), 일반 이미지 이름이 아닌 경우, syft의 소스 기록을 쓰지 못한 경우가 여기에 해당합니다. 이때 두 번째 읽기는 받은 참조를 그대로 쓰고, 로그에 그 사실을 남깁니다</td>
+</tr>
+<tr>
+<td><code dir="auto">platform</code></td>
+<td>읽은 이미지의 <code dir="auto">os/architecture[/variant]</code>, 알 수 없으면 <code dir="auto">null</code>입니다. variant는 syft의 <code dir="auto">architectureVariant</code>를 쓰고, 없으면 이미지 설정의 <code dir="auto">variant</code>를 씁니다(Docker는 arm64 이미지에 <code dir="auto">v8</code>을 적습니다)</td>
+</tr>
+<tr>
+<td><code dir="auto">index_digest</code></td>
+<td><code dir="auto">registry</code>일 때만, 참조가 가리킨 이미지 인덱스(매니페스트 목록)의 다이제스트가 <code dir="auto">digest</code>와 다르면 적습니다</td>
+</tr>
+</tbody>
+</table>
+<div class="sl-heading-wrapper level-h2"><h2 id="실행-계획">실행 계획</h2><a class="sl-anchor-link" href="#실행-계획"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “실행 계획”</span></a></div>
+<p>소스 스캔은 컨테이너 두 개로 돕니다. 1단계는 cdxgen 언어 이미지에서 의존성을 해석하고, 2단계는 이 이미지를 <code dir="auto">POSTPROCESS</code> 모드로 실행합니다. 컨테이너를 직접 실행하는 프로그램(Kubernetes Job, 보안 설정을 한 Docker 실행기 등)은 <code dir="auto">MODE=PLAN</code>으로 무엇을 실행할지 BomLens에 묻습니다. 소스를 <code dir="auto">/src</code>에 읽기 전용으로, 출력 폴더를 <code dir="auto">/host-output</code>에 마운트하면 이미지가 그 폴더에 <code dir="auto">bomlens-plan.json</code>을 쓰고 1단계가 마운트할 파일을 <code dir="auto">bomlens-plan/</code>에 복사합니다. 스캔은 하지 않습니다. 형식은 <a href="https://github.com/sktelecom/bomlens/blob/main/schemas/engine-plan-1.json"><code dir="auto">schemas/engine-plan-1.json</code></a>입니다.</p>
+<div class="expressive-code"><figure class="frame not-content"><figcaption class="header"></figcaption><pre data-language="bash"><code><div class="ec-line"><div class="code"><span style="--0:#6F42C1;--1:#B392F0">docker</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#032F62;--1:#9ECBFF">run</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#005CC5;--1:#79B8FF">--rm</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#005CC5;--1:#79B8FF">-v</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#032F62;--1:#9ECBFF">"</span><span style="--0:#24292E;--1:#E1E4E8">$PWD</span><span style="--0:#032F62;--1:#9ECBFF">/src:/src:ro"</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#005CC5;--1:#79B8FF">-v</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#032F62;--1:#9ECBFF">"</span><span style="--0:#24292E;--1:#E1E4E8">$PWD</span><span style="--0:#032F62;--1:#9ECBFF">/out:/host-output"</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#005CC5;--1:#79B8FF">\</span></div></div><div class="ec-line"><div class="code"><span class="indent">  </span><span style="--0:#005CC5;--1:#79B8FF">-e</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#032F62;--1:#9ECBFF">MODE=PLAN</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#005CC5;--1:#79B8FF">-e</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#032F62;--1:#9ECBFF">PROJECT_NAME=app</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#005CC5;--1:#79B8FF">-e</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#032F62;--1:#9ECBFF">PROJECT_VERSION=</span><span style="--0:#005CC5;--1:#79B8FF">1.0</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#005CC5;--1:#79B8FF">-e</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#032F62;--1:#9ECBFF">HOST_OUTPUT_DIR=/host-output</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#005CC5;--1:#79B8FF">\</span></div></div><div class="ec-line"><div class="code"><span class="indent">  </span><span style="--0:#005CC5;--1:#79B8FF">-e</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#032F62;--1:#9ECBFF">BOMLENS_IMAGE_REF=ghcr.io/sktelecom/bomlens:&#x3C;version></span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#005CC5;--1:#79B8FF">-e</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#032F62;--1:#9ECBFF">BOMLENS_IMAGE_DIGEST=sha256:...</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#005CC5;--1:#79B8FF">\</span></div></div><div class="ec-line"><div class="code"><span class="indent">  </span><span style="--0:#032F62;--1:#9ECBFF">ghcr.io/sktelecom/bomlens:&#x3C;version></span></div></div></code></pre><div class="copy"><div aria-live="polite"></div><button title="Copy to clipboard" data-copied="Copied!" data-code="docker run --rm -v &#x22;$PWD/src:/src:ro&#x22; -v &#x22;$PWD/out:/host-output&#x22; \  -e MODE=PLAN -e PROJECT_NAME=app -e PROJECT_VERSION=1.0 -e HOST_OUTPUT_DIR=/host-output \  -e BOMLENS_IMAGE_REF=ghcr.io/sktelecom/bomlens:<version> -e BOMLENS_IMAGE_DIGEST=sha256:... \  ghcr.io/sktelecom/bomlens:<version>"><div></div></button></div></figure></div>
+<table>
+<thead>
+<tr>
+<th>필드</th>
+<th>뜻</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code dir="auto">status</code></td>
+<td><code dir="auto">ok</code>, 또는 <code dir="auto">reason</code>과 <code dir="auto">detail</code>이 붙은 <code dir="auto">unsupported</code>(<code dir="auto">android-sdk-image</code>: Android SDK 이미지는 사용자가 빌드하며 발행하지 않음). <code dir="auto">unsupported</code>이면 단계가 없음</td>
+</tr>
+<tr>
+<td><code dir="auto">input.detected_ecosystem</code></td>
+<td>1단계 이미지를 고른 언어 감지 결과</td>
+</tr>
+<tr>
+<td><code dir="auto">output_file</code></td>
+<td>1단계가 쓰고 2단계가 읽는 SBOM 파일 이름</td>
+</tr>
+<tr>
+<td><code dir="auto">input_fingerprint</code></td>
+<td>1단계가 읽는 입력을 sha256 값으로 나타낸 것(<a href="#%EC%9E%85%EB%A0%A5-%EC%A7%80%EB%AC%B8">입력 지문</a> 참고). <code dir="auto">generate</code> 단계의 값과 같고, 단계가 없을 때도 여기에 있음</td>
+</tr>
+<tr>
+<td><code dir="auto">stages[]</code></td>
+<td>순서대로 <code dir="auto">generate</code>(1단계)와 <code dir="auto">postprocess</code>(2단계)</td>
+</tr>
+</tbody>
+</table>
+<p>각 단계에는 <code dir="auto">image</code>와 <code dir="auto">image_digest</code>(1단계는 항상 다이제스트로 고정, 2단계는 <code dir="auto">BOMLENS_IMAGE_REF</code>와 <code dir="auto">BOMLENS_IMAGE_DIGEST</code>를 그대로 적음), <code dir="auto">user</code>, <code dir="auto">entrypoint</code>, <code dir="auto">args</code>, <code dir="auto">workdir</code>, <code dir="auto">env</code>(설정할 이름과 값), <code dir="auto">env_passthrough</code>(값이 있으면 호출자의 환경에서 그대로 넘길 이름), <code dir="auto">network</code>(패키지 레지스트리 접속이 필요한지), <code dir="auto">mounts</code>가 있습니다. 마운트에는 <code dir="auto">role</code>(<code dir="auto">source</code>, <code dir="auto">output</code>, 출력 폴더 안 경로를 <code dir="auto">source</code>로 가진 <code dir="auto">plan-file</code>, 선택 항목인 <code dir="auto">guard-state</code>, 캐시(<code dir="auto">cache-maven</code>, <code dir="auto">cache-gradle</code>), 설정 파일(<code dir="auto">maven-settings</code>, <code dir="auto">maven-settings-security</code>, <code dir="auto">gradle-properties</code>, <code dir="auto">gradle-init-script</code>, <code dir="auto">gradle-init-script-kts</code>, <code dir="auto">gradle-init</code>), 선택 항목인 <code dir="auto">trivy-db</code>), <code dir="auto">target</code>, <code dir="auto">mode</code>가 있습니다. 데이터베이스(<code dir="auto">db/trivy.db</code>)가 든 Trivy 캐시 폴더를 <code dir="auto">trivy-db</code>로 읽기 전용 마운트하고 <code dir="auto">GENERATE_SECURITY=true</code>를 주면(2단계 보고서 옵션은 이미지 참조 문서대로 호출자가 정함), 2단계는 그 데이터베이스를 내려받거나 갱신하거나 쓰지 않고 그대로 읽습니다. 그래서 네트워크 없이, 읽기 전용 루트로 실행됩니다. <code dir="auto">trivy-db</code> 마운트에 데이터베이스가 없으면 <code dir="auto">scan-security</code>가 그 사유로 실패하고, 데이터베이스가 <code dir="auto">BOMLENS_TRIVY_DB_MAX_AGE_DAYS</code>일(7일)보다 오래됐으면 <code dir="auto">degraded</code>(<code dir="auto">unavailable</code>)로 기록합니다. 나이는 <code dir="auto">db/metadata.json</code>의 <code dir="auto">UpdatedAt</code>(데이터베이스를 만든 시각)부터 셉니다. 데이터베이스를 갱신하는 주기에 맞는 값을 넘기세요. 소스는 1단계에서만 쓰기 가능합니다. 해석기가 그 안에 lock 파일을 쓰고, 1단계가 끝날 때 트리를 원래대로 되돌립니다. 1단계가 강제 종료되면(메모리 부족, 시간 초과) 되돌리지 못합니다. 호출자의 폴더 하나를 <code dir="auto">guard-state</code>로 마운트하고 스캔마다 고유한 <code dir="auto">BOMLENS_GUARD_ID</code>를 넘겨 두면, 강제 종료 뒤 같은 1단계를 <code dir="auto">BOMLENS_GUARD_RESTORE_ONLY=1</code>로 다시 실행해 소스를 되돌릴 수 있습니다. 두 단계 모두에 <code dir="auto">HOST_UID</code>와 <code dir="auto">HOST_GID</code>를 넘기면 단계가 쓴 파일이 root가 아니라 호출자 사용자 소유가 됩니다. 2단계는 임의 사용자(<code dir="auto">user</code>가 <code dir="auto">null</code>이므로 호출자가 정함)와 읽기 전용 루트 파일시스템으로도 실행됩니다. 이때 쓰기 가능한 <code dir="auto">$TMPDIR</code>(기본 <code dir="auto">/tmp</code>, tmpfs)와 그 사용자가 쓸 수 있는 출력 폴더가 필요하며, 쓸 수 없는 홈 폴더는 그 아래에 마운트된 것이 없으면 <code dir="auto">$TMPDIR</code> 안의 폴더로 바꿔 씁니다. <code dir="auto">trivy-db</code> 마운트가 없으면 Trivy가 그곳에 수백 MB의 데이터베이스를 내려받는데, 메모리 기반 tmpfs에서는 이것이 메모리로 잡히므로 <code dir="auto">trivy-db</code>를 마운트하세요. 1단계는 root로 실행합니다. 해석기가 패키지를 설치하고 소스에 파일을 쓰기 때문입니다. 1단계의 <code dir="auto">env</code>는 Go 캐시도 <code dir="auto">/tmp/sbomhome</code> 아래에 둡니다(<code dir="auto">GOPATH=/tmp/sbomhome/go</code>, <code dir="auto">GOMODCACHE=/tmp/sbomhome/go/pkg/mod</code>, <code dir="auto">GOCACHE=/tmp/sbomhome/go-build</code>). 그래서 읽기 전용 루트 파일시스템에 쓰기 가능한 <code dir="auto">/tmp</code>만 있어도, 이미지 기본값인 <code dir="auto">/go/pkg</code>를 만들지 못해 실패하던 <code dir="auto">go mod tidy</code>가 실행됩니다. <code dir="auto">go.mod</code>가 요구하는 Go 툴체인은 <code dir="auto">GOMODCACHE</code>로 내려받으며, <code dir="auto">/tmp</code>가 메모리 기반이면 그 용량이 메모리로 계산됩니다. Go 캐시용 마운트 역할은 없습니다. 모듈 캐시를 스캔 사이에 유지하려면 직접 만든 폴더를 <code dir="auto">/tmp/sbomhome/go</code>에 마운트하세요. <code dir="auto">cache-maven</code>은 <code dir="auto">.m2</code> 모양 폴더입니다(Maven 저장소는 <code dir="auto">repository/</code>에 두고, <code dir="auto">maven-settings</code>를 마운트하지 않으면 그 안의 <code dir="auto">settings.xml</code>을 읽습니다). <code dir="auto">cache-gradle</code>은 Gradle 사용자 홈입니다. 두 곳에는 사용자의 <code dir="auto">~/.m2</code>나 <code dir="auto">~/.gradle</code>이 아니라 엔진 전용 폴더를 마운트하세요. root 소유 파일이 생기면 그 사용자의 빌드가 깨질 수 있습니다. <code dir="auto">HOST_UID</code>와 <code dir="auto">HOST_GID</code>를 넘기면 1단계는 이 두 마운트에 쓴 파일을 그 사용자 소유로 돌려 놓습니다. 컨테이너 안의 chown이 효과를 내지 않는 마운트(예: macOS의 Colima 공유)는 임시 파일로 먼저 확인해 건너뜁니다. 사용자의 설정 파일은 각자의 역할로 읽기 전용 마운트합니다. 이 역할들의 경로는 캐시 폴더 밖이라 캐시 폴더 안에 마운트 지점이 생기지 않습니다. Maven은 <code dir="auto">maven-settings</code>, <code dir="auto">maven-settings-security</code>를 캐시 안의 설정 대신 읽고, Gradle 설정은 첫 Gradle 실행 전에 Gradle 사용자 홈에 복사했다가 끝나면 지웁니다. 홈에 이미 있는 파일은 바꾸지 않고, 스캔 중에 내용이 바뀐 복사본은 지우지 않습니다. 같은 <code dir="auto">cache-gradle</code>을 쓰는 스캔이 동시에 돌면 복사본을 함께 쓰고, 마지막으로 끝나는 스캔이 지웁니다. 강제 종료된 스캔의 복사본은 하루 동안 남습니다. Gradle 설정 역할은 <code dir="auto">cache-gradle</code>과 함께 쓰세요. CLI는 <code dir="auto">${XDG_CACHE_HOME:-~/.cache}/bomlens/m2</code>와 <code dir="auto">.../bomlens/gradle</code>(Windows는 <code dir="auto">%LOCALAPPDATA%\bomlens\cache</code>)을 캐시로 마운트하고, <code dir="auto">~/.m2/settings.xml</code>, <code dir="auto">~/.m2/settings-security.xml</code>, <code dir="auto">~/.gradle/gradle.properties</code>, <code dir="auto">~/.gradle/init.gradle</code>, <code dir="auto">~/.gradle/init.gradle.kts</code>, <code dir="auto">~/.gradle/init.d</code>가 있으면 읽기 전용으로 마운트합니다. 쓰기 가능한 <code dir="auto">/tmp</code>(<code dir="auto">HOME</code>이 가리키는 곳)가 있으면 읽기 전용 루트 파일시스템으로도 실행됩니다(계정의 <code dir="auto">~/.gradle</code>에 쓸 수 없으면 Gradle 파일은 그곳에 둡니다).</p>
+<p>2단계 이미지는 2단계에 어떤 옵션을 주든 <code dir="auto">BOMLENS_IMAGE_REF</code>에 적은 이미지입니다. <code dir="auto">DEEP_CVE=true</code>에는 grype가, <code dir="auto">DEEP_LICENSE=true</code>에는 scancode가 필요하고 각각 <code dir="auto">bomlens-deep-cve</code>와 <code dir="auto">bomlens-deep-license</code> 이미지에만 들어 있으므로, 2단계를 그 이미지로 실행하고 <code dir="auto">BOMLENS_IMAGE_REF</code>에도 그 이미지를 적습니다. 두 도구를 모두 가진 이미지는 없습니다. 둘 다 쓰려면 먼저 출력 폴더에 남은 이전 <code dir="auto">&#x3C;prefix>_scancode.json</code>을 지우고, deep-license 이미지에서 <code dir="auto">/usr/local/lib/sbom/deep-license.sh /src /host-output/&#x3C;prefix>_scancode.json</code>을 실행합니다(엔트리포인트 <code dir="auto">bash</code>, 마운트는 같음, 파일 소유자를 내 사용자로 하려면 <code dir="auto">HOST_UID</code>와 <code dir="auto">HOST_GID</code>도 넘김). 이어서 2단계를 deep-cve 이미지로 <code dir="auto">DEEP_LICENSE=true</code>와 함께 실행하면서 그 스크립트의 종료 코드를 <code dir="auto">BOMLENS_DEEP_LICENSE_RC</code>로 넘기고, 필요하면 시작과 종료 시각을 <code dir="auto">BOMLENS_DEEP_LICENSE_STARTED</code>와 <code dir="auto">BOMLENS_DEEP_LICENSE_ENDED</code>(<code dir="auto">YYYY-MM-DDTHH:MM:SSZ</code>)로 넘깁니다. 출력 폴더가 소스 트리 안에 있으면 <code dir="auto">DEEP_LICENSE_EXCLUDE</code>에 그 폴더 이름을 적어(공백으로 구분한 폴더 이름, 어느 깊이에서든 제외) 라이선스 스캔이 결과 파일을 읽지 않게 합니다. 스크립트는 끝까지 마치지 못하면(종료 코드 0과 6 외) 출력 파일을 지우고, 2단계는 종료 코드가 0이나 6일 때만 그 파일을 남기고 그 밖에는 지운 뒤 종료 코드로 <code dir="auto">deep-license</code> 단계를 기록합니다. CLI는 두 옵션을 함께 켜면 이렇게 실행합니다. 도구가 없는 이미지로 실행하면 결과 매니페스트가 그 단계(<code dir="auto">deep-cve</code> 또는 <code dir="auto">deep-license</code>)를 <code dir="auto">skipped</code>(<code dir="auto">not_installed</code>)로, 실행을 <code dir="auto">succeeded_degraded</code>로 기록합니다. <code dir="auto">DEEP_CVE=true</code>와 함께 <code dir="auto">SECURITY_NVD_VERIFY=true</code>를 주면 2단계가 <code dir="auto">NVD_API_KEY</code>를 읽으며, 계획은 이 이름을 값 없이 <code dir="auto">env_passthrough</code>에 적습니다.</p>
+<p><code dir="auto">MODE=PLAN</code>에 <code dir="auto">CDXGEN_IMAGE_PREFIX</code>를 주면 1단계 이미지 이름을 레지스트리 미러 경로로 씁니다(예: <code dir="auto">ghcr.io/cdxgen/</code> 대신 <code dir="auto">registry.example/mirror/cdxgen/</code>). 다이제스트는 공개 이미지의 것을 그대로 쓰므로, 미러에는 다이제스트까지 같은 이미지가 있어야 합니다. pull-through 캐시이거나 모든 플랫폼을 복사한 미러(<code dir="auto">skopeo copy --all</code>, <code dir="auto">crane copy</code>)여야 합니다. <code dir="auto">docker pull</code>, <code dir="auto">docker tag</code>, <code dir="auto">docker push</code>로 채운 미러는 한 플랫폼만 다른 다이제스트로 담으므로, 계획의 <code dir="auto">image@image_digest</code>를 받으려 하면 “manifest unknown”으로 실패합니다.</p>
+<p>CycloneDX 1.7 SBOM을 계획하려면 <code dir="auto">MODE=PLAN</code>에 <code dir="auto">CYCLONEDX_SPEC_VERSION</code>(<code dir="auto">1.6</code>이 기본값, 또는 <code dir="auto">1.7</code>. CLI의 <code dir="auto">--spec-version</code>)을 줍니다. 계획은 이 값을 1단계에는 <code dir="auto">build-prep.sh</code>의 마지막 인자로, 2단계에는 <code dir="auto">env</code>의 <code dir="auto">CYCLONEDX_SPEC_VERSION</code>으로 넘깁니다. 그래서 2단계의 대체 스캔(syft)도 같은 버전으로 쓰고, 2단계는 1.4, 1.5, 1.6으로 쓰인 SBOM을 1.7로 올립니다(1.3 이하는 버전을 그대로 둡니다). 이 값은 입력 지문(<code dir="auto">CDX_SPEC_VERSION</code>)에도 들어갑니다. 다른 값을 주면 <code dir="auto">MODE=PLAN</code>이 0이 아닌 코드로 멈춥니다.</p>
+<p><code dir="auto">MODE=PLAN</code>은 계획을 썼으면 <code dir="auto">ok</code>든 <code dir="auto">unsupported</code>든 0으로 끝납니다. <code dir="auto">unsupported</code> 계획은 결과 매니페스트에 <code dir="auto">plan</code> 단계를 <code dir="auto">skipped</code>로 기록하므로 실행은 <code dir="auto">succeeded_degraded</code>입니다. 빈 소스(대개 컨테이너에 닿지 않은 마운트)는 0이 아닌 종료 코드로 거부합니다. 계획을 쓰기 전에 출력 폴더에서 이전 계획과 이전 실행의 1단계 산출물을 지웁니다. 2단계는 새 SBOM과 남은 SBOM을 구분할 수 없기 때문입니다. 1단계 이미지는 이 BomLens 릴리스가 시험한 cdxgen 태그로 고정되어 있어, <code dir="auto">CDXGEN_TAG</code>를 바꾸면 언어 이미지는 <code dir="auto">unsupported</code>(<code dir="auto">no-pinned-digest</code>)가 됩니다. 고정 목록에 없는 이미지를 <code dir="auto">CDXGEN_JAVA_IMAGE</code>로 지정해도 마찬가지입니다. Java 소스는 Gradle 툴체인과 래퍼 버전에 맞는 고정된 Java 이미지(Java 8, 11, 17, 21, 24, 25)를 받습니다(<a href="/bomlens/ko/reference/ecosystems/#java-gradle">Java (Gradle)</a> 참고). 툴체인의 JDK가 없어 Gradle이 실패해도 계획을 실행하는 쪽에서는 다른 Java 이미지로 다시 실행하지 않습니다.</p>
+<p>계획의 1단계는 govulncheck를 실행하지 않으므로 이 경로에서는 Go 소스 도달성을 판정하지 않습니다. <code dir="auto">REACHABILITY=true</code>를 주면 2단계는 <code dir="auto">reachability</code> 단계를 <code dir="auto">skipped</code>(<code dir="auto">no_input</code>)로 기록합니다.</p>
+<p>2단계는 1단계 종료 코드와 관계없이 실행하고, 그 코드를 <code dir="auto">BOMLENS_STAGE1_EXIT</code>로, 1단계 컨테이너가 메모리 부족으로 종료됐으면 <code dir="auto">BOMLENS_STAGE1_OOM</code>에 <code dir="auto">true</code>를, 출력 폴더에 저장한 1단계 로그의 파일 이름을 <code dir="auto">BOMLENS_STAGE1_LOG</code>로 넘깁니다. 1단계가 실패했거나 SBOM을 남기지 않았으면 2단계가 syft로 소스를 대신 스캔하고(직접 의존성만), 사유를 <code dir="auto">bomlens:sbom-tool-degraded</code>(<code dir="auto">oom</code>, <code dir="auto">disk-space</code>, <code dir="auto">network</code>, <code dir="auto">cdxgen-crash</code>, <code dir="auto">cdxgen-unavailable</code>)에 적으며, 결과 매니페스트는 <code dir="auto">generate</code>를 <code dir="auto">degraded</code>(<code dir="auto">fallback</code>)로 기록합니다. CLI와 같은 동작입니다. 1단계를 실행하지 않는 <code dir="auto">unsupported</code> 계획에서는 SBOM 없이 <code dir="auto">BOMLENS_STAGE1_EXIT=127</code>(또는 <code dir="auto">BOMLENS_STAGE1_REASON=cdxgen-unavailable</code>)을 넘기면 사유가 <code dir="auto">cdxgen-unavailable</code>이 됩니다.</p>
+<div class="sl-heading-wrapper level-h2"><h2 id="입력-지문">입력 지문</h2><a class="sl-anchor-link" href="#입력-지문"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “입력 지문”</span></a></div>
+<p>계획의 <code dir="auto">generate</code> 단계에는 <code dir="auto">input_fingerprint</code>가 있습니다. 소스 트리 전체와 1단계를 실행하는 데 쓰이는 파일과 설정에 대한 sha256입니다. 이 값이 1단계가 종료 코드 0으로 끝난 이전 스캔의 <code dir="auto">sha256</code>과 같으면 1단계를 건너뛰고, 그 스캔의 1단계 산출물을 2단계에 대신 줄 수 있습니다. 출력 폴더에 SBOM(<code dir="auto">output_file</code>, 있었다면 <code dir="auto">_conda.cdx.json</code>도)을 두고, 그 종료 코드를 <code dir="auto">BOMLENS_STAGE1_EXIT</code>로, 로그를 <code dir="auto">BOMLENS_STAGE1_LOG</code>로 넘기며, <code dir="auto">BOMLENS_STAGE1_REUSED=1</code>을 함께 넘깁니다. 종료 코드 0으로 끝난 1단계만 다시 쓰고, 실패한 1단계는 다시 실행합니다. 2단계는 항상 실행합니다. 소스 파일의 라이선스 검사, 레지스트리 조회, 버전 노후도, 취약점은 1단계만이 아니라 파일 내용과 실행 시점에 따라 달라지기 때문입니다. 그래서 <code dir="auto">--deep-license</code>를 켠 채로도 다시 쓸 수 있습니다.</p>
+<p>지문은 판단이 어려우면 다시 쓸 수 없다고 봅니다. 1단계가 같은 결과를 낼지 검사로 확인할 수 없으면 <code dir="auto">reusable</code>은 <code dir="auto">false</code>입니다.</p>
+<div class="expressive-code"><figure class="frame not-content"><figcaption class="header"></figcaption><pre data-language="json"><code><div class="ec-line"><div class="code"><span style="--0:#24292E;--1:#E1E4E8">{</span><span style="--0:#005CC5;--1:#79B8FF">"algorithm"</span><span style="--0:#24292E;--1:#E1E4E8">: </span><span style="--0:#032F62;--1:#9ECBFF">"bomlens-input-1"</span><span style="--0:#24292E;--1:#E1E4E8">, </span><span style="--0:#005CC5;--1:#79B8FF">"sha256"</span><span style="--0:#24292E;--1:#E1E4E8">: </span><span style="--0:#032F62;--1:#9ECBFF">"9e61..."</span><span style="--0:#24292E;--1:#E1E4E8">, </span><span style="--0:#005CC5;--1:#79B8FF">"reusable"</span><span style="--0:#24292E;--1:#E1E4E8">: </span><span style="--0:#005CC5;--1:#79B8FF">true</span><span style="--0:#24292E;--1:#E1E4E8">, </span><span style="--0:#005CC5;--1:#79B8FF">"reasons"</span><span style="--0:#24292E;--1:#E1E4E8">: [],</span></div></div><div class="ec-line"><div class="code"><span class="indent"> </span><span style="--0:#005CC5;--1:#79B8FF">"components"</span><span style="--0:#24292E;--1:#E1E4E8">: [{</span><span style="--0:#005CC5;--1:#79B8FF">"kind"</span><span style="--0:#24292E;--1:#E1E4E8">: </span><span style="--0:#032F62;--1:#9ECBFF">"file"</span><span style="--0:#24292E;--1:#E1E4E8">, </span><span style="--0:#005CC5;--1:#79B8FF">"name"</span><span style="--0:#24292E;--1:#E1E4E8">: </span><span style="--0:#032F62;--1:#9ECBFF">"."</span><span style="--0:#24292E;--1:#E1E4E8">, </span><span style="--0:#005CC5;--1:#79B8FF">"sha256"</span><span style="--0:#24292E;--1:#E1E4E8">: </span><span style="--0:#032F62;--1:#9ECBFF">"a729..."</span><span style="--0:#24292E;--1:#E1E4E8">, </span><span style="--0:#005CC5;--1:#79B8FF">"count"</span><span style="--0:#24292E;--1:#E1E4E8">: </span><span style="--0:#005CC5;--1:#79B8FF">1840</span><span style="--0:#24292E;--1:#E1E4E8">}, </span><span style="--0:#B31D28;--0fs:italic;--1:#FDAEB7;--1fs:italic">...</span><span style="--0:#24292E;--1:#E1E4E8">]}</span></div></div></code></pre><div class="copy"><div aria-live="polite"></div><button title="Copy to clipboard" data-copied="Copied!" data-code="{&#x22;algorithm&#x22;: &#x22;bomlens-input-1&#x22;, &#x22;sha256&#x22;: &#x22;9e61...&#x22;, &#x22;reusable&#x22;: true, &#x22;reasons&#x22;: [], &#x22;components&#x22;: [{&#x22;kind&#x22;: &#x22;file&#x22;, &#x22;name&#x22;: &#x22;.&#x22;, &#x22;sha256&#x22;: &#x22;a729...&#x22;, &#x22;count&#x22;: 1840}, ...]}"><div></div></button></div></figure></div>
+<table>
+<thead>
+<tr>
+<th>필드</th>
+<th>뜻</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code dir="auto">algorithm</code></td>
+<td><code dir="auto">bomlens-input-1</code>. <code dir="auto">sha256</code>과 함께 비교함. 알고리즘이 다른 두 값은 같은 값으로 보지 않음</td>
+</tr>
+<tr>
+<td><code dir="auto">sha256</code></td>
+<td>지문. <code dir="auto">reusable</code>이 <code dir="auto">false</code>이면 <code dir="auto">null</code></td>
+</tr>
+<tr>
+<td><code dir="auto">reusable</code></td>
+<td>이 입력에 대한 1단계 결과를 다시 쓸 수 있는지</td>
+</tr>
+<tr>
+<td><code dir="auto">reasons</code></td>
+<td><code dir="auto">reusable</code>이 <code dir="auto">false</code>일 때 그 사유(아래). 사유마다 한 항목</td>
+</tr>
+<tr>
+<td><code dir="auto">components</code></td>
+<td>입력 하나하나를 <code dir="auto">kind</code>(<code dir="auto">file</code>, <code dir="auto">engine</code>, <code dir="auto">image</code>, <code dir="auto">setting</code>), <code dir="auto">name</code>, <code dir="auto">sha256</code>으로 나타냄. 값은 항상 sha256으로만 적음</td>
+</tr>
+</tbody>
+</table>
+<p>구성 요소는 종류와 이름 순서로 정렬합니다.</p>
+<ul>
+<li><code dir="auto">file</code>: 소스 트리 전체를 <code dir="auto">.</code>이라는 이름의 구성 요소 하나로 적습니다. 1단계는 종류를 지정하지 않고 트리 전체에서 cdxgen을 실행하며, cdxgen은 여러 종류의 파일(자체 설정 파일 <code dir="auto">.cdxgenrc</code>, 압축 파일, 설치된 패키지의 메타데이터, 여러 도구의 빌드 파일)을 읽습니다. 그래서 이름이 <code dir="auto">.git</code>인 폴더나 파일(워크트리의 <code dir="auto">.git</code> 파일에는 절대 경로가 들어 있음)을 뺀 모든 파일을 넣습니다. 그 밖에는 건너뛰는 폴더가 없어서 <code dir="auto">node_modules</code>, <code dir="auto">vendor</code>, 가상 환경, 숨김 폴더, 배포하지 않는 폴더도 해시에 들어갑니다. <code dir="auto">sha256</code>은 파일마다 한 줄씩 <code dir="auto">&#x3C;경로>&#x3C;탭>&#x3C;모드>&#x3C;탭>&#x3C;내용의 sha256></code>을 적고, 소스 기준 상대 경로를 바이트 순서(<code dir="auto">LC_ALL=C</code>)로 정렬해 계산합니다. <code dir="auto">&#x3C;모드></code>는 실행할 수 있는 파일이면 <code dir="auto">755</code>, 아니면 <code dir="auto">644</code>이며(모드만 바뀌어도 값이 바뀝니다. build-prep은 <code dir="auto">./gradlew</code>를 실행할 수 없을 때 셸로(첫 줄에 bash가 있으면 <code dir="auto">bash</code>, 아니면 <code dir="auto">sh</code>) 실행하므로 이제 이 모드에 의존하지 않습니다), 링크이면 앞에 <code dir="auto">l</code>이 붙어 링크와 사본이 구분됩니다. <code dir="auto">count</code>는 파일 수입니다. lock 파일뿐 아니라 README나 소스 파일이 바뀌어도 값이 바뀌고, <code dir="auto">.git</code>이 바뀌면 바뀌지 않습니다. 링크는 소스 안의 일반 파일을 가리킬 때만 따라갑니다. 해시를 낼 수 없는 경로(읽을 수 없는 파일이나 폴더, 끊어졌거나 소스 밖을 가리키는 링크, 폴더 링크, FIFO나 소켓이나 장치 파일, 탭이나 줄바꿈이 든 이름)는 <code dir="auto">sha256</code>이 <code dir="auto">null</code>인 <code dir="auto">file</code> 구성 요소로 따로 적고, 그러면 트리의 <code dir="auto">sha256</code>도 <code dir="auto">null</code>이 됩니다. 그래서 설치된 pnpm <code dir="auto">node_modules</code>(폴더 링크로 이루어짐)나 가상 환경(링크가 소스 밖을 가리킴)이 있는 트리는 다시 쓸 수 없습니다. 파일과 폴더를 합쳐 <code dir="auto">BOMLENS_FINGERPRINT_MAX_FILES</code>개(200000) 넘게 보거나 <code dir="auto">BOMLENS_FINGERPRINT_TIMEOUT</code>초(300)가 지나면 순회를 멈추며, 이때 구성 요소에 <code dir="auto">truncated: true</code>가 붙고 <code dir="auto">sha256</code>은 <code dir="auto">null</code>입니다. 아래 검사까지 포함한 계산 전체는 그 한도에서 30초가 더 지나면 멈추며, 이때 지문은 구성 요소 없이 <code dir="auto">unhashable-input</code>인, 다시 쓸 수 없는 값이 됩니다. 검사는 파일을 4 MiB까지만 읽습니다. 그보다 큰 매니페스트, lock 파일, Go 소스는 판단할 수 없으므로 값이 <code dir="auto">unhashable-input</code>이 됩니다(해시는 끝까지 냄). CLI 소스 스캔의 결과 매니페스트에서는 그 실행의 출력 폴더가 소스 안에 있으면(기본값) 그 실행의 결과가 들어 있으므로 순회에서 뺍니다. 다만 이때 값은 다시 쓸 수 없습니다(<code dir="auto">unhashable-input</code>이며, 그 폴더를 <code dir="auto">sha256</code>이 <code dir="auto">null</code>인 구성 요소로 적음). 1단계가 그 폴더를 비우기 전에 실행되어 이전 실행의 파일을 읽었을 수 있기 때문입니다. CLI 경로에서 다시 쓸 수 있는 값을 얻으려면 출력 폴더를 소스 밖에 두세요(<code dir="auto">--output-dir</code>).</li>
+<li><code dir="auto">engine</code>: 1단계가 BomLens에서 가져와 실행하는 파일의 내용을 sha256으로 적습니다. <code dir="auto">build-prep.sh</code>, <code dir="auto">identify-conda.py</code>, 그리고 1단계의 인자와 환경을 정하는 파일로, 계획에서는 <code dir="auto">make-plan.sh</code>입니다. CLI 소스 스캔의 결과 매니페스트에서는 그 파일이 <code dir="auto">scan-sbom.sh</code>이고, <code dir="auto">build-prep.sh</code>와 <code dir="auto">identify-conda.py</code>는 CLI가 마운트한 CLI 쪽 사본입니다. 그래서 CLI의 값은 다른 CLI의 값과만 비교할 수 있습니다.</li>
+<li><code dir="auto">image</code>: 1단계 이미지의 다이제스트인 <code dir="auto">stage1</code>과, <code dir="auto">BOMLENS_IMAGE_DIGEST</code>인 <code dir="auto">bomlens</code>입니다(넘기지 않으면 <code dir="auto">null</code>이며, 이 다이제스트가 대신하던 파일은 이미 <code dir="auto">engine</code> 구성 요소에 있음). CLI 스캔은 1단계 이미지를 받아 온 다이제스트를 기록하며, 로컬에서 빌드한 이미지에는 다이제스트가 없습니다.</li>
+<li><code dir="auto">setting</code>: <code dir="auto">detected_ecosystem</code>, <code dir="auto">PROJECT_NAME</code>, <code dir="auto">PROJECT_VERSION</code>, <code dir="auto">FETCH_LICENSE</code>, <code dir="auto">HOST_GOTOOLCHAIN</code>, <code dir="auto">CDX_SPEC_VERSION</code>(1단계의 <code dir="auto">--spec-version</code>), 그리고 build-prep 옵션 <code dir="auto">BOMLENS_KEEP_BUILD_OUTPUT</code>, <code dir="auto">BOMLENS_MAVEN_FULL_GRAPH</code>, <code dir="auto">BOMLENS_ANDROID_FULL_GRAPH</code>, <code dir="auto">BOMLENS_GRADLE_FULL_GRAPH</code>, <code dir="auto">BOMLENS_NODE_FULL_GRAPH</code>, <code dir="auto">BOMLENS_PHP_FULL_GRAPH</code>, <code dir="auto">BOMLENS_INCLUDE_NON_SHIPPED</code>, <code dir="auto">BOMLENS_INCLUDE_DEV_DEPENDENCIES</code>, <code dir="auto">BOMLENS_NO_COPYRIGHT</code>, <code dir="auto">BOMLENS_NO_CARGO_LICENSE</code>, <code dir="auto">BOMLENS_PREP_TIMEOUT</code>의 값을 sha256으로 적습니다(설정하지 않았으면 빈 값의 sha256). <code dir="auto">FETCH_LICENSE</code>와 <code dir="auto">HOST_GOTOOLCHAIN</code>은 1단계 <code dir="auto">env</code>의 값입니다. build-prep 옵션은 <code dir="auto">MODE=PLAN</code>이 자기 환경에서 읽으므로, 두 단계에 주는 값과 같은 값을 <code dir="auto">MODE=PLAN</code>에도 주세요. 계획의 2단계 <code dir="auto">env_passthrough</code>에도 이 이름들이 있습니다.</li>
+</ul>
+<p>구성 요소에 넣지 않는 것은 절대 경로, 실행 시각, 스캔 ID, 프록시 설정(<code dir="auto">HTTP_PROXY</code>, <code dir="auto">HTTPS_PROXY</code>, <code dir="auto">NO_PROXY</code>와 소문자 이름), <code dir="auto">GOPROXY</code>, <code dir="auto">GOSUMDB</code>, <code dir="auto">TRIVY_*</code>, <code dir="auto">CDXGEN_IMAGE_PREFIX</code>(미러도 같은 다이제스트를 제공함), <code dir="auto">HOST_UID</code>와 <code dir="auto">HOST_GID</code>, 그리고 2단계만 읽는 <code dir="auto">SRC_TREE_EXCLUDE</code>입니다. 1단계의 고정된 인자와 환경은 그것을 정하는 <code dir="auto">engine</code> 파일로 반영됩니다.</p>
+<p>다음 두 가지는 호출자가 책임집니다.</p>
+<ul>
+<li>소스 말고 1단계에 마운트하는 것은 반영되지 않습니다. <code dir="auto">cache-maven</code>, <code dir="auto">cache-gradle</code> 마운트와 그 안의 Maven <code dir="auto">settings.xml</code>, Gradle <code dir="auto">init.d</code> 스크립트나 <code dir="auto">gradle.properties</code>, 그리고 설정 파일 마운트(<code dir="auto">maven-settings</code>, <code dir="auto">maven-settings-security</code>, <code dir="auto">gradle-properties</code>, <code dir="auto">gradle-init-script</code>, <code dir="auto">gradle-init-script-kts</code>, <code dir="auto">gradle-init</code>)가 해당합니다. 이를 바꾸면 같은 지문이 다른 결과를 가리킬 수 있습니다.</li>
+<li><code dir="auto">FETCH_LICENSE=true</code>이면 cdxgen이 라이선스를 온라인으로 조회합니다. 지문은 이 설정을 구성 요소로 넣되, 결과는 다시 쓸 수 있다고 봅니다. 게시된 버전의 라이선스 메타데이터는 거의 바뀌지 않는다는 전제입니다.</li>
+</ul>
+<p>아래 검사는 트리가 같아도 해석기가 레지스트리에 다시 물어 1단계 결과가 달라질 수 있는지 봅니다. Go, Maven, Gradle은 루트에서 트리 전체를 해석하므로 어디에 있든 검사합니다(Go는 go 도구처럼 <code dir="auto">testdata</code>, <code dir="auto">vendor</code>, <code dir="auto">.</code>이나 <code dir="auto">_</code>로 시작하는 이름을 뺌). 다른 언어는 소스 스캔이 건너뛰는 폴더(<code dir="auto">node_modules</code>, <code dir="auto">vendor</code>, <code dir="auto">.venv</code>, <code dir="auto">site-packages</code>, 그리고 <code dir="auto">BOMLENS_INCLUDE_NON_SHIPPED=1</code>이 아니면 배포하지 않는 폴더)를 해시에는 넣되 검사하지 않습니다.</p>
+<p>재사용 여부는 계획만이 아니라 결과 매니페스트로 판단하세요. 결과 매니페스트의 <code dir="auto">input_fingerprint</code>가 <code dir="auto">reusable</code>인 1단계만 재사용할 결과로 보관합니다. 1단계가 종료 코드 0으로 끝났어도 결과가 모자라면 2단계가 그곳에 <code dir="auto">stage1-degraded</code>를 넣습니다.</p>
+<!-- fingerprint-reasons:begin -->
+<table>
+<thead>
+<tr>
+<th><code dir="auto">reasons</code></th>
+<th>뜻</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code dir="auto">no-lockfile</code></td>
+<td>의존성을 선언한 매니페스트의 폴더에 lock 파일이 없음. Node.js <code dir="auto">package-lock.json</code>, <code dir="auto">npm-shrinkwrap.json</code>, <code dir="auto">yarn.lock</code>, <code dir="auto">pnpm-lock.yaml</code>, <code dir="auto">bun.lock</code>, <code dir="auto">bun.lockb</code>, Python <code dir="auto">poetry.lock</code>, <code dir="auto">uv.lock</code>, <code dir="auto">Pipfile.lock</code>, Rust <code dir="auto">Cargo.lock</code>, Go <code dir="auto">go.sum</code>(<code dir="auto">require</code>가 있는 <code dir="auto">go.mod</code>마다 자기 것이 있어야 함), Ruby <code dir="auto">Gemfile.lock</code>, PHP <code dir="auto">composer.lock</code>, Swift <code dir="auto">Package.resolved</code>, <code dir="auto">Podfile.lock</code>. 위 폴더의 lock 파일은 선언된 워크스페이스 구성원만 덮음. npm, yarn, pnpm, bun의 <code dir="auto">workspaces</code>(또는 <code dir="auto">pnpm-workspace.yaml</code>)와 Cargo의 <code dir="auto">[workspace] members</code>가 해당함. Gradle은 빌드 스크립트마다(루트가 <code dir="auto">subprojects {}</code>나 <code dir="auto">allprojects {}</code>로 의존성을 선언하면 <code dir="auto">settings.gradle</code>이 포함하는 프로젝트마다) <code dir="auto">group:artifact:version=</code> 항목이 하나 이상 있는 자기 <code dir="auto">gradle.lockfile</code>이 있어야 함(<code dir="auto">empty=</code> 줄만 있으면 아무것도 고정하지 않음). 그 파일은 의존성 잠금(<code dir="auto">lockAllConfigurations()</code>이나 <code dir="auto">activateDependencyLocking()</code>, 주석 제외)을 켰을 때만 인정하며, 잠금은 프로젝트 자기 빌드 파일에 있거나, 하위 프로젝트라면 루트의 <code dir="auto">subprojects {}</code>나 <code dir="auto">allprojects {}</code> 블록 안에 있어야 함. 루트 빌드 파일 맨 위의 잠금은 루트 프로젝트만 고정함. .NET은 프로젝트마다 자기 <code dir="auto">packages.lock.json</code>이나 <code dir="auto">obj/project.assets.json</code>, 또는 위 폴더의 <code dir="auto">paket.lock</code>이 있어야 하며, .NET 프로젝트가 있는데 이 중 어느 것도 트리에 없으면 <code dir="auto">no-lockfile</code>임. <code dir="auto">requirements*.txt</code>(또는 <code dir="auto">requirements/</code> 아래의 <code dir="auto">.txt</code>)는 pip의 해시 확인 모드일 때만 lock으로 봄. 모든 요구 사항이 <code dir="auto">--hash</code>가 붙은 <code dir="auto">name==version</code>이고, 포함(<code dir="auto">-r</code>, <code dir="auto">-c</code>), 편집 가능 설치, URL, 경로, <code dir="auto">${변수}</code> 요구 사항이 없어야 함. 1단계가 pip로 레지스트리에서 설치하므로 다른 lock 파일은 이를 덮지 않음</td>
+</tr>
+<tr>
+<td><code dir="auto">unpinned-versions</code></td>
+<td>Maven은 아래의 <code dir="auto">registry-resolution</code>에 더해, 트리 안 pom의 요소에 버전 범위, <code dir="auto">-SNAPSHOT</code>, <code dir="auto">LATEST</code>, <code dir="auto">RELEASE</code>가 그대로 적힌 경우임. 속성은 펼치지 않으므로 속성으로 정한 버전은 여기서 판단하지 않으며, 그 트리는 어느 쪽이든 다시 쓸 수 없음. .NET은 프로젝트, <code dir="auto">.props</code>, <code dir="auto">.targets</code> 파일의 유동 버전이나 범위 버전(<code dir="auto">*</code>, <code dir="auto">[1.0,2.0)</code>, MSBuild <code dir="auto">$(속성)</code>)이 해당함. 의존성 자체의 pom에 있는 버전은 보이지 않으며 검사하지 않음</td>
+</tr>
+<tr>
+<td><code dir="auto">registry-resolution</code></td>
+<td>트리가 그대로여도 1단계가 레지스트리에서 다시 해석함. Maven은 <code dir="auto">pom.xml</code>이 하나라도 있는 경우로, 전이 의존성을 고정하는 lock 파일이 없고 의존성 자체의 pom에 있는 범위는 볼 수 없기 때문임. Node.js는 루트 <code dir="auto">package.json</code>에 <code dir="auto">package-lock.json</code>이 없고(yarn, pnpm, bun 프로젝트, 또는 <code dir="auto">npm-shrinkwrap.json</code>만 있는 프로젝트) 워크스페이스 루트도 아닌 경우로, 운영 범위 필터가 npm으로 다시 해석하기 때문임(<code dir="auto">BOMLENS_NODE_FULL_GRAPH=1</code>이면 해당 없음). npm lock 파일이 <code dir="auto">package.json</code>과 맞지 않는 경우(lock 파일에 기록된 그 패키지의 의존성 명세가 다르거나, lockfile 버전 1이면 의존성 이름이 빠짐)도 해당함. Ruby는 <code dir="auto">Gemfile.lock</code>의 <code dir="auto">DEPENDENCIES</code>에 <code dir="auto">Gemfile</code>이 적은 gem이 없는 경우, Swift는 <code dir="auto">Package.resolved</code>가 <code dir="auto">Package.swift</code>가 적은 원격 패키지를 모두 고정하지 않은 경우임. Go는 <code dir="auto">.go</code> 파일이 <code dir="auto">go.mod</code>에 없는 모듈을 import하는 경우로, <code dir="auto">go mod tidy</code>가 그 모듈의 최신 버전을 추가하기 때문임. 요구 모듈 경로가 import 경로의 앞부분이면 덮는 것으로 봄(앞부분 뒤에 <code dir="auto">/vN</code> 주 버전이 오면 덮지 않음). 앞부분이 요구 모듈과 같지만 실제로는 요구하지 않은 별도 모듈에 있는 import는 찾지 못함</td>
+</tr>
+<tr>
+<td><code dir="auto">unsupported-ecosystem</code></td>
+<td>1단계가 재현 가능하게 해석하지 않는 언어. <code dir="auto">unknown</code>, 트리 어딘가의 Conan이나 vcpkg 매니페스트, Modelica 라이브러리(<code dir="auto">package.mo</code>), Xcode 프로젝트만 있는 Swift 프로젝트</td>
+</tr>
+<tr>
+<td><code dir="auto">plan-unsupported</code></td>
+<td>계획의 <code dir="auto">status</code>가 <code dir="auto">unsupported</code>임</td>
+</tr>
+<tr>
+<td><code dir="auto">stage1-degraded</code></td>
+<td>결과 매니페스트에만 나옴. 1단계 SBOM에 실패한 단계(<code dir="auto">bomlens:pipeline-step-failed</code>)나 대체 경로(<code dir="auto">bomlens:sbom-tool-degraded</code>)가 기록됐거나, <code dir="auto">generate</code>가 <code dir="auto">degraded</code>나 <code dir="auto">failed</code>임</td>
+</tr>
+<tr>
+<td><code dir="auto">unhashable-input</code></td>
+<td>해시를 낼 수 없는 입력이 있음. 읽을 수 없는 파일이나 폴더, 끊어졌거나 소스 밖을 가리키는 링크, 폴더 링크(cdxgen이 따라갈 수 있음), FIFO나 소켓이나 장치 파일, 탭이나 줄바꿈이 든 경로, 파일 수나 시간 한도에서 멈춘 순회, 소스 안에 있는 CLI 출력 폴더(또는 소스에 바로 쓰는 평면 출력), requirements 파일이 포함하는데 없거나 소스 밖에 있는 파일</td>
+</tr>
+<tr>
+<td><code dir="auto">unknown-stage1-image</code></td>
+<td>결과 매니페스트가 1단계 이미지의 다이제스트를 모름. CLI의 1단계 이미지에 RepoDigest가 없거나(로컬에서 빌드한 이미지), 계획 없이 실행한 2단계가 다이제스트를 받지 못함</td>
+</tr>
+</tbody>
+</table>
+<!-- fingerprint-reasons:end -->
+<p>계획이 <code dir="auto">unsupported</code>이면 단계가 없으므로, 지문은 계획 최상위의 <code dir="auto">input_fingerprint</code>에만 <code dir="auto">plan-unsupported</code>와 함께 들어갑니다.</p>
+<p><code dir="auto">POSTPROCESS</code> 실행의 결과 매니페스트는 <code dir="auto">generate</code> 단계에 2단계가 자기 코드로 소스에서 다시 계산한 지문을 적습니다. 출력 폴더에 있는 파일의 값을 그대로 가져오지 않습니다.</p>
+<ul>
+<li>실행 계획 뒤(같은 <code dir="auto">output_file</code>로 쓰인 <code dir="auto">bomlens-plan.json</code>이 출력 폴더에 있을 때)에는 1단계 이미지 다이제스트, 설정, <code dir="auto">--spec-version</code>을 계획에서 가져오고(다이제스트는 <code dir="auto">BOMLENS_STAGE1_DIGEST</code>를 넘기면 그 값), <code dir="auto">engine</code> 파일은 <code dir="auto">bomlens-plan/</code>의 사본으로 해시를 냅니다. 그러면 값이 계획의 값과 같고 <code dir="auto">plan_mismatch</code>는 <code dir="auto">false</code>입니다. 값이 다르면(계획 뒤에 소스가 바뀌었거나, 다른 스캔에서 남은 계획이면) 계산한 값과 <code dir="auto">plan_mismatch: true</code>를 적습니다. 2단계가 출력 폴더에 파일을 쓰므로 출력 폴더는 소스 밖에 두세요. 소스 안에 있으면 트리가 바뀝니다.</li>
+<li>CLI 소스 스캔 뒤에는 CLI가 넘긴 1단계 이미지의 RepoDigest, 실행한 파일의 sha256, 뺄 출력 폴더(<code dir="auto">BOMLENS_FINGERPRINT_EXCLUDE</code>, 소스 기준 상대 경로)를 씁니다.</li>
+</ul>
+<p><code dir="auto">reused</code>는 <code dir="auto">BOMLENS_STAGE1_REUSED=1</code>을 넘겼으면 <code dir="auto">true</code>입니다. 지문이 <code dir="auto">reusable</code>이 아니거나, 없거나, 계획의 값과 다른데도 재사용했다면 <code dir="auto">reuse_unsafe</code>가 <code dir="auto">true</code>입니다. 이때 SBOM은 지금 1단계를 실행했을 때의 결과와 다를 수 있습니다.</p>
+<p><code dir="auto">algorithm</code>은 구성 요소의 종류나 목록이 바뀌거나, 같은 입력에 대한 <code dir="auto">sha256</code>이 달라지는 변경일 때 올립니다. 사유를 새로 추가하는 것으로는 올리지 않습니다. 이미지 입력의 지문은 이 버전에 포함되지 않습니다.</p>
+<div class="sl-heading-wrapper level-h2"><h2 id="제한된-네트워크">제한된 네트워크</h2><a class="sl-anchor-link" href="#제한된-네트워크"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “제한된 네트워크”</span></a></div>
+<p>스캔이 네트워크로 접속하는 대상과 각 대상의 설정입니다. 실행 계획은 이 이름들을 <code dir="auto">env_passthrough</code>에 담으므로, 호출자는 자기가 설정한 값을 넘기면 됩니다.</p>
+<table>
+<thead>
+<tr>
+<th>대상</th>
+<th>단계</th>
+<th>설정</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>프록시</td>
+<td>1, 2</td>
+<td><code dir="auto">HTTP_PROXY</code>, <code dir="auto">HTTPS_PROXY</code>, <code dir="auto">NO_PROXY</code>(소문자 이름도)</td>
+</tr>
+<tr>
+<td>TLS를 검사하는 프록시(자체 CA로 HTTPS를 다시 서명함)</td>
+<td>1, 2</td>
+<td><code dir="auto">BOMLENS_EXTRA_CA_CERTS</code>, 프록시 CA 번들(PEM)의 컨테이너 안 경로. 두 단계의 <code dir="auto">env_passthrough</code>에 모두 들어 있지만 계획에는 이 파일의 마운트가 없으므로, 지정한 경로에 호출자가 직접 읽기 전용으로 마운트함(CLI는 <code dir="auto">/bomlens-ca/extra.pem</code>을 씀). 각 단계는 <code dir="auto">/tmp</code> 아래에서 시스템 번들, Node.js, JDK 트러스트 스토어 사본에 이를 추가함</td>
+</tr>
+<tr>
+<td>패키지 레지스트리(pip, npm, Maven 등)</td>
+<td>1</td>
+<td>프록시를 거침. 각 패키지 관리자의 미러 설정도 평소대로 쓸 수 있음</td>
+</tr>
+<tr>
+<td>cdxgen의 라이선스 조회</td>
+<td>1</td>
+<td><code dir="auto">FETCH_LICENSE=false</code>로 끔</td>
+</tr>
+<tr>
+<td>Trivy 취약점 데이터베이스</td>
+<td>2</td>
+<td><code dir="auto">trivy-db</code> 마운트(네트워크가 전혀 필요 없음). 또는 미러를 <code dir="auto">TRIVY_DB_REPOSITORY</code>, <code dir="auto">TRIVY_JAVA_DB_REPOSITORY</code>로 지정. 컨테이너에 설정된 그 밖의 <code dir="auto">TRIVY_*</code> 변수도 Trivy가 읽음(CLI는 가진 것을 모두 넘김)</td>
+</tr>
+<tr>
+<td>EPSS와 CISA KEV</td>
+<td>2</td>
+<td>계획에서는 꺼져 있음(2단계 <code dir="auto">env</code>가 <code dir="auto">SECURITY_ENRICH=false</code>). CLI와 이미지를 단독으로 쓰면 켜져 있음. 미러는 <code dir="auto">EPSS_API</code>, <code dir="auto">KEV_URL</code></td>
+</tr>
+<tr>
+<td>deps.dev(레지스트리 라이선스, 버전 경과 기간)</td>
+<td>2</td>
+<td>요청할 때만 켜짐(<code dir="auto">LICENSE_REGISTRY</code>, <code dir="auto">STALENESS_ENRICH</code>). 미러는 <code dir="auto">LICENSE_REGISTRY_API</code></td>
+</tr>
+<tr>
+<td>PURL 저장소 확인</td>
+<td>2</td>
+<td>요청할 때만 켜짐(<code dir="auto">PURL_RESOLVE</code>)</td>
+</tr>
+<tr>
+<td>SCANOSS(벤더링 코드 식별)</td>
+<td>2</td>
+<td>요청할 때만 켜짐(<code dir="auto">IDENTIFY_VENDORED</code>). 자체 설치 엔드포인트는 <code dir="auto">SCANOSS_API_URL</code></td>
+</tr>
+<tr>
+<td>NVD(심층 CVE 일치 확인)</td>
+<td>2</td>
+<td>요청할 때만 켜짐(<code dir="auto">DEEP_CVE</code>와 함께 <code dir="auto">SECURITY_NVD_VERIFY</code>)</td>
+</tr>
+</tbody>
+</table>
+<p>지원 종료(end-of-life) 데이터와 악성 패키지 데이터는 이미지에 들어 있어 네트워크가 필요 없습니다.</p>
+<div class="sl-heading-wrapper level-h2"><h2 id="진행-이벤트">진행 이벤트</h2><a class="sl-anchor-link" href="#진행-이벤트"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “진행 이벤트”</span></a></div>
+<p><code dir="auto">BOMLENS_EVENTS=file</code>로 두면 실행이 진행되는 동안 출력 폴더의 <code dir="auto">bomlens-events.jsonl</code>에 JSON 객체를 한 줄씩 쓰고, <code dir="auto">BOMLENS_EVENTS=stderr</code>로 두면 표준 오류에 씁니다. 표준 오류에는 경고와 내장 도구의 메시지도 함께 나오므로 <code dir="auto">{"v":1</code>로 시작하는 줄만 읽습니다. 실행 중 진행 상황을 보여 줄 때 씁니다. 최종 기록은 결과 매니페스트이며, 둘이 다르면 매니페스트를 따릅니다. 각 줄은 <a href="https://github.com/sktelecom/bomlens/blob/main/schemas/engine-event-1.json"><code dir="auto">schemas/engine-event-1.json</code></a>을 따릅니다.</p>
+<div class="expressive-code"><figure class="frame not-content"><figcaption class="header"></figcaption><pre data-language="json"><code><div class="ec-line"><div class="code"><span style="--0:#24292E;--1:#E1E4E8">{</span><span style="--0:#005CC5;--1:#79B8FF">"v"</span><span style="--0:#24292E;--1:#E1E4E8">:</span><span style="--0:#005CC5;--1:#79B8FF">1</span><span style="--0:#24292E;--1:#E1E4E8">,</span><span style="--0:#005CC5;--1:#79B8FF">"seq"</span><span style="--0:#24292E;--1:#E1E4E8">:</span><span style="--0:#005CC5;--1:#79B8FF">12</span><span style="--0:#24292E;--1:#E1E4E8">,</span><span style="--0:#005CC5;--1:#79B8FF">"ts"</span><span style="--0:#24292E;--1:#E1E4E8">:</span><span style="--0:#032F62;--1:#9ECBFF">"2026-10-11T03:04:05Z"</span><span style="--0:#24292E;--1:#E1E4E8">,</span><span style="--0:#005CC5;--1:#79B8FF">"type"</span><span style="--0:#24292E;--1:#E1E4E8">:</span><span style="--0:#032F62;--1:#9ECBFF">"step.end"</span><span style="--0:#24292E;--1:#E1E4E8">,</span><span style="--0:#005CC5;--1:#79B8FF">"step"</span><span style="--0:#24292E;--1:#E1E4E8">:</span><span style="--0:#032F62;--1:#9ECBFF">"normalize"</span><span style="--0:#24292E;--1:#E1E4E8">,</span><span style="--0:#005CC5;--1:#79B8FF">"stage"</span><span style="--0:#24292E;--1:#E1E4E8">:</span><span style="--0:#005CC5;--1:#79B8FF">2</span><span style="--0:#24292E;--1:#E1E4E8">,</span><span style="--0:#005CC5;--1:#79B8FF">"status"</span><span style="--0:#24292E;--1:#E1E4E8">:</span><span style="--0:#032F62;--1:#9ECBFF">"ok"</span><span style="--0:#24292E;--1:#E1E4E8">,</span><span style="--0:#005CC5;--1:#79B8FF">"reason"</span><span style="--0:#24292E;--1:#E1E4E8">:</span><span style="--0:#005CC5;--1:#79B8FF">null</span><span style="--0:#24292E;--1:#E1E4E8">}</span></div></div></code></pre><div class="copy"><div aria-live="polite"></div><button title="Copy to clipboard" data-copied="Copied!" data-code="{&#x22;v&#x22;:1,&#x22;seq&#x22;:12,&#x22;ts&#x22;:&#x22;2026-10-11T03:04:05Z&#x22;,&#x22;type&#x22;:&#x22;step.end&#x22;,&#x22;step&#x22;:&#x22;normalize&#x22;,&#x22;stage&#x22;:2,&#x22;status&#x22;:&#x22;ok&#x22;,&#x22;reason&#x22;:null}"><div></div></button></div></figure></div>
+<table>
+<thead>
+<tr>
+<th><code dir="auto">type</code></th>
+<th>시점</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code dir="auto">run.start</code></td>
+<td>실행 시작</td>
+</tr>
+<tr>
+<td><code dir="auto">step.start</code></td>
+<td>단계 시작(<code dir="auto">step</code>, <code dir="auto">stage</code>)</td>
+</tr>
+<tr>
+<td><code dir="auto">step.end</code></td>
+<td>단계 종료. <code dir="auto">status</code>, <code dir="auto">reason</code>, <code dir="auto">detail</code>은 매니페스트와 같음. 설정으로 꺼졌거나 실행할 수 없었던 단계는 시작 없이 종료만 있음</td>
+</tr>
+<tr>
+<td><code dir="auto">run.end</code></td>
+<td>실행 종료. 매니페스트의 <code dir="auto">run.status</code>를 담음. 중단된 실행(<code dir="auto">cancelled</code>)에는 시작만 있고 종료가 없는 단계가 남을 수 있음</td>
+</tr>
+</tbody>
+</table>
+<p><code dir="auto">seq</code>는 이벤트마다 1씩 늘어나므로 빠지거나 순서가 바뀐 줄을 알 수 있습니다. 파일은 매니페스트의 <code dir="auto">outputs</code>에 역할 <code dir="auto">events</code>로 올라가며, 매니페스트는 이벤트가 모두 기록된 뒤에 나타납니다. 이전 실행이 폴더에 남긴 이벤트 파일은 실행을 시작할 때 지웁니다.</p>
+<div class="sl-heading-wrapper level-h2"><h2 id="버전-관리">버전 관리</h2><a class="sl-anchor-link" href="#버전-관리"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “버전 관리”</span></a></div>
+<p>계약 버전은 BomLens 릴리스와 따로 올립니다.</p>
+<ul>
+<li>메이저: 필드, 단계 이름, 출력 역할, 상태 값을 지우거나 이름을 바꾸거나 뜻을 바꿀 때, 같은 입력에서 다른 패키지 PURL(<code dir="auto">pkg:npm</code>, <code dir="auto">pkg:deb</code>처럼 패키지 생태계 타입이 있는 것)이나 라이선스 식별자가 나오게 바뀔 때, 실패를 성공으로 보고하게 바뀔 때.</li>
+<li>마이너: 선택 필드, 단계 이름, 사유, 출력 역할을 새로 추가할 때, 그리고 펌웨어, 루트 파일시스템, 바이너리 스캔처럼 패키지 PURL이 없던 컴포넌트(PURL 없음, <code dir="auto">pkg:generic</code>, <code dir="auto">pkg:opkg</code>)에 PURL을 붙이거나 바꿀 때. 읽는 쪽은 모르는 값을 무시합니다.</li>
+<li>패치: 위 필드에서 읽는 쪽이 알아챌 변화가 없을 때.</li>
+</ul>
+<p>SBOM 안의 <code dir="auto">bomlens:*</code> 속성과 사람이 읽는 보고서는 계약에 포함되지 않으며 어느 릴리스에서든 바뀔 수 있습니다.</p></div><footer class="sl-flex astro-ddtxxk7k"><div class="meta sl-flex astro-ddtxxk7k"><a href="https://github.com/sktelecom/bomlens/edit/main/docs/reference/engine-contract.ko.md" class="sl-flex print:hidden astro-qlekgd3o"><svg aria-hidden="true" class="astro-qlekgd3o astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1.2em;"><path d="M22 7.24a1 1 0 0 0-.29-.71l-4.24-4.24a1 1 0 0 0-1.1-.22 1 1 0 0 0-.32.22l-2.83 2.83L2.29 16.05a1 1 0 0 0-.29.71V21a1 1 0 0 0 1 1h4.24a1 1 0 0 0 .76-.29l10.87-10.93L21.71 8c.1-.1.17-.2.22-.33a1 1 0 0 0 0-.24v-.14l.07-.05ZM6.83 20H4v-2.83l9.93-9.93 2.83 2.83L6.83 20ZM18.17 8.66l-2.83-2.83 1.42-1.41 2.82 2.82-1.41 1.42Z"/></svg>페이지 편집</a></div><div class="pagination-links print:hidden astro-b5raizh3" dir="ltr"><a href="/bomlens/ko/reference/ecosystems/" rel="prev" class="astro-b5raizh3"><svg aria-hidden="true" class="astro-b5raizh3 astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1.5rem;"><path d="M17 11H9.41l3.3-3.29a1.004 1.004 0 1 0-1.42-1.42l-5 5a1 1 0 0 0-.21.33 1 1 0 0 0 0 .76 1 1 0 0 0 .21.33l5 5a1.002 1.002 0 0 0 1.639-.325 1 1 0 0 0-.219-1.095L9.41 13H17a1 1 0 0 0 0-2Z"/></svg><span class="astro-b5raizh3">이전 페이지<br class="astro-b5raizh3"><span class="link-title astro-b5raizh3">지원 생태계</span></span></a><a href="/bomlens/ko/reference/ui/" rel="next" class="astro-b5raizh3"><svg aria-hidden="true" class="astro-b5raizh3 astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1.5rem;"><path d="M17.92 11.62a1.001 1.001 0 0 0-.21-.33l-5-5a1.003 1.003 0 1 0-1.42 1.42l3.3 3.29H7a1 1 0 0 0 0 2h7.59l-3.3 3.29a1.002 1.002 0 0 0 .325 1.639 1 1 0 0 0 1.095-.219l5-5a1 1 0 0 0 .21-.33 1 1 0 0 0 0-.76Z"/></svg><span class="astro-b5raizh3">다음 페이지<br class="astro-b5raizh3"><span class="link-title astro-b5raizh3">웹 UI와 데스크톱 앱</span></span></a></div></footer><script type="module" src="/bomlens/_astro/Mermaid.astro_astro_type_script_index_0_lang.DZWWZPOc.js"></script><script type="module">var e=()=>{document.querySelectorAll(`.expressive-code pre`).forEach(e=>{e.scrollWidth>e.clientWidth?e.setAttribute(`tabindex`,`0`):e.removeAttribute(`tabindex`)})};e(),window.addEventListener(`resize`,e);</script><p class="site-copyright astro-jo6i4kqk">Copyright &copy; 2026 SK Telecom Co., Ltd. &middot;<a href="https://github.com/sktelecom/bomlens/blob/main/LICENSE" class="astro-jo6i4kqk">Apache-2.0</a> &middot;<a href="https://github.com/sktelecom/bomlens/blob/main/THIRD_PARTY_LICENSES.md" class="astro-jo6i4kqk">Third-party licenses</a></p></div></div></main></div></div></div></div></body></html>

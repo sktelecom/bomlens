@@ -1,0 +1,401 @@
+<!DOCTYPE html><html lang="ko" dir="ltr" data-theme="dark" data-has-toc data-has-sidebar class="astro-g5ptsecz"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/><title>산출물 레퍼런스 | BomLens</title><link rel="canonical" href="https://sktelecom.github.io/bomlens/ko/reference/artifacts/"/><link rel="alternate" hreflang="en" href="https://sktelecom.github.io/bomlens/reference/artifacts/"/><link rel="alternate" hreflang="ko" href="https://sktelecom.github.io/bomlens/ko/reference/artifacts/"/><link rel="alternate" hreflang="x-default" href="https://sktelecom.github.io/bomlens/reference/artifacts/"/><link rel="sitemap" href="/bomlens/sitemap-index.xml"/><link rel="shortcut icon" href="/bomlens/favicon.svg" type="image/svg+xml"/><meta name="generator" content="Astro v7.4.4"/><meta name="generator" content="Starlight v0.42.8"/><meta property="og:title" content="산출물 레퍼런스"/><meta property="og:type" content="article"/><meta property="og:url" content="https://sktelecom.github.io/bomlens/ko/reference/artifacts/"/><meta property="og:locale" content="ko_KR"/><meta property="og:description" content="BomLens가 생성하는 산출물 파일 목록과 생성 조건, 파일명 규칙, SBOM 구조 요약입니다."/><meta property="og:site_name" content="BomLens"/><meta name="twitter:card" content="summary_large_image"/><meta name="description" content="BomLens가 생성하는 산출물 파일 목록과 생성 조건, 파일명 규칙, SBOM 구조 요약입니다."/><meta property="og:image" content="https://sktelecom.github.io/bomlens/images/og-card-ko.png"><meta name="twitter:image" content="https://sktelecom.github.io/bomlens/images/og-card-ko.png"><script>
+	window.StarlightThemeProvider = (() => {
+		const storedTheme =
+			typeof localStorage !== 'undefined' && localStorage.getItem('starlight-theme');
+		const theme =
+			storedTheme ||
+			(window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
+		document.documentElement.dataset.theme = theme === 'light' ? 'light' : 'dark';
+		return {
+			updatePickers(theme = storedTheme || 'auto') {
+				document.querySelectorAll('starlight-theme-select').forEach((picker) => {
+					const select = picker.querySelector('select');
+					if (select) select.value = theme;
+					/** @type {HTMLTemplateElement | null} */
+					const tmpl = document.querySelector(`#theme-icons`);
+					const newIcon = tmpl && tmpl.content.querySelector('.' + theme);
+					if (newIcon) {
+						const oldIcon = picker.querySelector('svg.label-icon');
+						if (oldIcon) {
+							oldIcon.replaceChildren(...newIcon.cloneNode(true).childNodes);
+						}
+					}
+				});
+			},
+		};
+	})();
+</script><template id="theme-icons"><svg aria-hidden="true" class="light astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M5 12a1 1 0 0 0-1-1H3a1 1 0 0 0 0 2h1a1 1 0 0 0 1-1Zm.64 5-.71.71a1 1 0 0 0 0 1.41 1 1 0 0 0 1.41 0l.71-.71A1 1 0 0 0 5.64 17ZM12 5a1 1 0 0 0 1-1V3a1 1 0 0 0-2 0v1a1 1 0 0 0 1 1Zm5.66 2.34a1 1 0 0 0 .7-.29l.71-.71a1 1 0 1 0-1.41-1.41l-.66.71a1 1 0 0 0 0 1.41 1 1 0 0 0 .66.29Zm-12-.29a1 1 0 0 0 1.41 0 1 1 0 0 0 0-1.41l-.71-.71a1.004 1.004 0 1 0-1.43 1.41l.73.71ZM21 11h-1a1 1 0 0 0 0 2h1a1 1 0 0 0 0-2Zm-2.64 6A1 1 0 0 0 17 18.36l.71.71a1 1 0 0 0 1.41 0 1 1 0 0 0 0-1.41l-.76-.66ZM12 6.5a5.5 5.5 0 1 0 5.5 5.5A5.51 5.51 0 0 0 12 6.5Zm0 9a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7Zm0 3.5a1 1 0 0 0-1 1v1a1 1 0 0 0 2 0v-1a1 1 0 0 0-1-1Z"/></svg><svg aria-hidden="true" class="dark astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M21.64 13a1 1 0 0 0-1.05-.14 8.049 8.049 0 0 1-3.37.73 8.15 8.15 0 0 1-8.14-8.1 8.59 8.59 0 0 1 .25-2A1 1 0 0 0 8 2.36a10.14 10.14 0 1 0 14 11.69 1 1 0 0 0-.36-1.05Zm-9.5 6.69A8.14 8.14 0 0 1 7.08 5.22v.27a10.15 10.15 0 0 0 10.14 10.14 9.784 9.784 0 0 0 2.1-.22 8.11 8.11 0 0 1-7.18 4.32v-.04Z"/></svg><svg aria-hidden="true" class="auto astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M21 14h-1V7a3 3 0 0 0-3-3H7a3 3 0 0 0-3 3v7H3a1 1 0 0 0-1 1v2a3 3 0 0 0 3 3h14a3 3 0 0 0 3-3v-2a1 1 0 0 0-1-1ZM6 7a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v7H6V7Zm14 10a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-1h16v1Z"/></svg></template><link rel="stylesheet" href="/bomlens/_astro/print.ehPL0gv-.css" media="print"><link rel="stylesheet" href="/bomlens/_astro/common.DxYPfd-D.css"><style>@layer starlight.components{svg:where(.astro-hkc32dio){color:var(--sl-icon-color);font-size:var(--sl-icon-size,1em);width:1em;height:1em;overflow:visible}.sl-link-button:where(.astro-dcqstdaq){font-size:var(--sl-text-sm);outline-offset:.25rem;border:1px solid #0000;border-radius:999rem;align-items:center;gap:.5em;padding:.4375rem 1.125rem;line-height:1.1875;text-decoration:none;display:inline-flex}.sl-link-button:where(.astro-dcqstdaq).primary{background:var(--sl-color-text-accent);border-color:var(--sl-color-text-accent);color:var(--sl-color-black)}.sl-link-button:where(.astro-dcqstdaq).primary:hover{color:var(--sl-color-black)}.sl-link-button:where(.astro-dcqstdaq).secondary{border-color:inherit;color:var(--sl-color-white)}.sl-link-button:where(.astro-dcqstdaq).minimal{color:var(--sl-color-white);padding-inline:0}.sl-link-button:where(.astro-dcqstdaq) svg{flex-shrink:0}@media (width>=50rem){.sl-link-button:where(.astro-dcqstdaq){font-size:var(--sl-text-base);padding:.9375rem 1.25rem}}.sl-markdown-content .sl-link-button:where(.astro-dcqstdaq){margin-inline-end:1rem}.sl-markdown-content .sl-link-button:where(.astro-dcqstdaq):not(:where(p *)){margin-block:1rem}}
+</style><script type="module" src="/bomlens/_astro/page.cNngjUgL.js"></script></head><body class="astro-g5ptsecz"><a class="sl-skip-link astro-qb7clj6f" href="#_top">콘텐츠로 이동</a><div class="page sl-flex astro-yntsjkba"><header class="header astro-yntsjkba"><div class="header astro-by6fddyj"><div class="title-wrapper sl-flex astro-by6fddyj"><a href="/bomlens/ko/" class="site-title sl-flex astro-6rvad3va"><span class="astro-6rvad3va" translate="no">BomLens</span></a></div><div class="sl-flex print:hidden astro-by6fddyj"><site-search class="astro-by6fddyj astro-b5kgnn7o" data-translations="{&quot;placeholder&quot;:&quot;검색&quot;}"><button data-open-modal disabled aria-label="검색" aria-keyshortcuts="Control+K" class="astro-b5kgnn7o"><svg aria-hidden="true" class="astro-b5kgnn7o astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M21.71 20.29 18 16.61A9 9 0 1 0 16.61 18l3.68 3.68a.999.999 0 0 0 1.42 0 1 1 0 0 0 0-1.39ZM11 18a7 7 0 1 1 0-14 7 7 0 0 1 0 14Z"/></svg><span class="sl-hidden md:sl-block astro-b5kgnn7o" aria-hidden="true">검색</span><kbd class="sl-hidden md:sl-flex astro-b5kgnn7o" style="display: none;"><kbd class="astro-b5kgnn7o">Ctrl</kbd><kbd class="astro-b5kgnn7o">K</kbd></kbd></button><dialog style="padding:0" aria-label="검색" class="astro-b5kgnn7o"><div class="dialog-frame sl-flex astro-b5kgnn7o"><button data-close-modal class="sl-flex md:sl-hidden astro-b5kgnn7o">취소</button><div class="search-container astro-b5kgnn7o"><div id="starlight__search" class="astro-b5kgnn7o"></div></div></div></dialog></site-search><script>
+	(() => {
+		const openBtn = document.querySelector('button[data-open-modal]');
+		const shortcut = openBtn?.querySelector('kbd');
+		if (!openBtn || !(shortcut instanceof HTMLElement)) return;
+		const platformKey = shortcut.querySelector('kbd');
+		if (platformKey && /(Mac|iPhone|iPod|iPad)/i.test(navigator.platform)) {
+			platformKey.textContent = '⌘';
+			openBtn.setAttribute('aria-keyshortcuts', 'Meta+K');
+		}
+		shortcut.style.display = '';
+	})();
+</script><script type="module" src="/bomlens/_astro/Search.astro_astro_type_script_index_0_lang.BSqzOScY.js"></script></div><div class="sl-hidden md:sl-flex print:hidden right-group astro-by6fddyj"><div class="sl-flex social-icons astro-by6fddyj"><a href="https://github.com/sktelecom/bomlens" rel="me" class="sl-flex astro-n2mnl6yq"><span class="sr-only astro-n2mnl6yq">GitHub</span><svg aria-hidden="true" class="astro-n2mnl6yq astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M12 .3a12 12 0 0 0-3.8 23.38c.6.12.83-.26.83-.57L9 21.07c-3.34.72-4.04-1.61-4.04-1.61-.55-1.39-1.34-1.76-1.34-1.76-1.08-.74.09-.73.09-.73 1.2.09 1.83 1.24 1.83 1.24 1.08 1.83 2.81 1.3 3.5 1 .1-.78.42-1.31.76-1.61-2.67-.3-5.47-1.33-5.47-5.93 0-1.31.47-2.38 1.24-3.22-.14-.3-.54-1.52.1-3.18 0 0 1-.32 3.3 1.23a11.5 11.5 0 0 1 6 0c2.28-1.55 3.29-1.23 3.29-1.23.64 1.66.24 2.88.12 3.18a4.65 4.65 0 0 1 1.23 3.22c0 4.61-2.8 5.63-5.48 5.92.42.36.81 1.1.81 2.22l-.01 3.29c0 .31.2.69.82.57A12 12 0 0 0 12 .3Z"/></svg></a></div><starlight-theme-select><label style="--sl-select-width: 6.25em" class="astro-2z5xp7gb"><span class="sr-only astro-2z5xp7gb">테마 선택</span><svg aria-hidden="true" class="icon label-icon astro-2z5xp7gb astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M21 14h-1V7a3 3 0 0 0-3-3H7a3 3 0 0 0-3 3v7H3a1 1 0 0 0-1 1v2a3 3 0 0 0 3 3h14a3 3 0 0 0 3-3v-2a1 1 0 0 0-1-1ZM6 7a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v7H6V7Zm14 10a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-1h16v1Z"/></svg><select autocomplete="off" class="astro-2z5xp7gb"><option value="dark" class="astro-2z5xp7gb">어두운 테마</option><option value="light" class="astro-2z5xp7gb">밝은 테마</option><option value="auto" selected class="astro-2z5xp7gb">자동</option></select><svg aria-hidden="true" class="icon caret astro-2z5xp7gb astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M17 9.17a1 1 0 0 0-1.41 0L12 12.71 8.46 9.17a1 1 0 1 0-1.41 1.42l4.24 4.24a1.002 1.002 0 0 0 1.42 0L17 10.59a1.002 1.002 0 0 0 0-1.42Z"/></svg></label></starlight-theme-select><script>
+	StarlightThemeProvider.updatePickers();
+</script><script type="module">var e=`starlight-theme`,t=e=>e===`auto`||e===`dark`||e===`light`?e:`auto`,n=()=>t(typeof localStorage<`u`&&localStorage.getItem(e));function r(t){typeof localStorage<`u`&&localStorage.setItem(e,t===`light`||t===`dark`?t:``)}var i=()=>matchMedia(`(prefers-color-scheme: light)`).matches?`light`:`dark`;function a(e){StarlightThemeProvider.updatePickers(e),document.documentElement.dataset.theme=e===`auto`?i():e,r(e)}matchMedia(`(prefers-color-scheme: light)`).addEventListener(`change`,()=>{n()===`auto`&&a(`auto`)});var o=class extends HTMLElement{constructor(){super(),a(n()),this.querySelector(`select`)?.addEventListener(`change`,e=>{e.currentTarget instanceof HTMLSelectElement&&a(t(e.currentTarget.value))})}};customElements.define(`starlight-theme-select`,o);</script><starlight-lang-select><label style="--sl-select-width: 7em" class="astro-2z5xp7gb"><span class="sr-only astro-2z5xp7gb">언어 선택</span><svg aria-hidden="true" class="icon label-icon astro-2z5xp7gb astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path fill-rule="evenodd" d="M8.516 3a.94.94 0 0 0-.941.94v1.15H2.94a.94.94 0 1 0 0 1.882h7.362a7.422 7.422 0 0 1-1.787 3.958 7.42 7.42 0 0 1-1.422-2.425.94.94 0 1 0-1.774.627 9.303 9.303 0 0 0 1.785 3.043 7.422 7.422 0 0 1-4.164 1.278.94.94 0 1 0 0 1.881 9.303 9.303 0 0 0 5.575-1.855 9.303 9.303 0 0 0 4.11 1.74l-.763 1.525a.968.968 0 0 0-.016.034l-1.385 2.77a.94.94 0 1 0 1.683.841l1.133-2.267h5.806l1.134 2.267a.94.94 0 0 0 1.683-.841l-1.385-2.769a.95.95 0 0 0-.018-.036l-3.476-6.951a.94.94 0 0 0-1.682 0l-1.82 3.639a7.423 7.423 0 0 1-3.593-1.256 9.303 9.303 0 0 0 2.27-5.203h1.894a.94.94 0 0 0 0-1.881H9.456V3.94A.94.94 0 0 0 8.516 3Zm6.426 11.794a1.068 1.068 0 0 1-.02.039l-.703 1.407h3.924l-1.962-3.924-1.24 2.478Z" clip-rule="evenodd"/></svg><select autocomplete="off" class="astro-2z5xp7gb"><option value="/bomlens/reference/artifacts/" class="astro-2z5xp7gb">English</option><option value="/bomlens/ko/reference/artifacts/" selected class="astro-2z5xp7gb">한국어</option></select><svg aria-hidden="true" class="icon caret astro-2z5xp7gb astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M17 9.17a1 1 0 0 0-1.41 0L12 12.71 8.46 9.17a1 1 0 1 0-1.41 1.42l4.24 4.24a1.002 1.002 0 0 0 1.42 0L17 10.59a1.002 1.002 0 0 0 0-1.42Z"/></svg></label></starlight-lang-select><script type="module">var e=class extends HTMLElement{constructor(){super();let e=this.querySelector(`select`);e&&(e.addEventListener(`change`,e=>{e.currentTarget instanceof HTMLSelectElement&&(window.location.pathname=e.currentTarget.value)}),window.addEventListener(`pageshow`,t=>{if(!t.persisted)return;let n=e.querySelector(`option[selected]`)?.index;n!==e.selectedIndex&&(e.selectedIndex=n??0)}))}};customElements.define(`starlight-lang-select`,e);</script></div></div></header><nav class="sidebar print:hidden astro-yntsjkba" aria-label="메인"><button popovertarget="starlight__sidebar" class="sl-menu-button sl-flex md:sl-hidden print:hidden astro-r2osgdlg"><svg aria-hidden="true" class="open-menu astro-r2osgdlg astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M3 8h18a1 1 0 1 0 0-2H3a1 1 0 0 0 0 2Zm18 8H3a1 1 0 0 0 0 2h18a1 1 0 0 0 0-2Zm0-5H3a1 1 0 0 0 0 2h18a1 1 0 0 0 0-2Z"/></svg><svg aria-hidden="true" class="close-menu astro-r2osgdlg astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="m13.41 12 6.3-6.29a1.004 1.004 0 1 0-1.42-1.42L12 10.59l-6.29-6.3a1.004 1.004 0 0 0-1.42 1.42l6.3 6.29-6.3 6.29a1 1 0 0 0 0 1.42.998.998 0 0 0 1.42 0l6.29-6.3 6.29 6.3a.999.999 0 0 0 1.42 0 1 1 0 0 0 0-1.42L13.41 12Z"/></svg><span class="sr-only astro-r2osgdlg">메뉴</span></button><script type="module">var e=class extends HTMLElement{constructor(){super();let e=matchMedia(`(min-width: 50em)`),t=()=>{this.popover=e.matches?null:`auto`};t(),e.addEventListener(`change`,()=>t()),this.addEventListener(`toggle`,({newState:e})=>this.trapFocus(e===`open`))}trapFocus(e){document.querySelectorAll(`.main-frame, .sl-skip-link`).forEach(t=>{t.toggleAttribute(`inert`,e)})}};customElements.define(`sl-sidebar-pane`,e);</script><sl-sidebar-pane popover id="starlight__sidebar" class="sidebar-pane astro-yntsjkba"><div class="sidebar-content sl-flex astro-yntsjkba"><sl-sidebar-state-persist data-hash="1rofo3p" class="astro-ipdry5cl"><script aria-hidden="true">
+		(() => {
+			try {
+				if (!matchMedia('(min-width: 50em)').matches) return;
+				/** @type {HTMLElement | null} */
+				const target = document.querySelector('sl-sidebar-state-persist');
+				const state = JSON.parse(sessionStorage.getItem('sl-sidebar-state') || '0');
+				if (!target || !state || target.dataset.hash !== state.hash) return;
+				window._starlightScrollRestore = state.scroll;
+				customElements.define(
+					'sl-sidebar-restore',
+					class SidebarRestore extends HTMLElement {
+						connectedCallback() {
+							try {
+								const idx = parseInt(this.dataset.index || '');
+								const details = this.closest('details');
+								if (details && typeof state.open[idx] === 'boolean') details.open = state.open[idx];
+							} catch {}
+						}
+					}
+				);
+			} catch {}
+		})();
+	</script><ul class="top-level astro-rmhv4bp6"><li class="astro-rmhv4bp6"><details open class="astro-rmhv4bp6"><summary class="astro-rmhv4bp6"><span class="group-label astro-rmhv4bp6"><span class="large astro-rmhv4bp6">빠른 시작</span></span><svg aria-hidden="true" class="caret astro-rmhv4bp6 astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1.25rem;"><path d="m14.83 11.29-4.24-4.24a1 1 0 1 0-1.42 1.41L12.71 12l-3.54 3.54a1 1 0 0 0 0 1.41 1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.24-4.24a1.002 1.002 0 0 0 0-1.42Z"/></svg></summary><sl-sidebar-restore data-index="0"></sl-sidebar-restore><ul class="astro-rmhv4bp6"><li class="astro-rmhv4bp6"><a href="/bomlens/ko/concepts/what-is-sbom/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">SBOM이란</span></a></li><li class="astro-rmhv4bp6"><a href="/bomlens/ko/start/first-scan/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">시작하기</span></a></li><li class="astro-rmhv4bp6"><a href="/bomlens/ko/start/no-cli/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">비개발자 빠른 시작 (CLI 불필요)</span></a></li><li class="astro-rmhv4bp6"><a href="/bomlens/ko/reference/ui/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">웹 UI와 데스크톱 앱</span></a></li></ul></details></li><li class="astro-rmhv4bp6"><details open class="astro-rmhv4bp6"><summary class="astro-rmhv4bp6"><span class="group-label astro-rmhv4bp6"><span class="large astro-rmhv4bp6">가이드</span></span><svg aria-hidden="true" class="caret astro-rmhv4bp6 astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1.25rem;"><path d="m14.83 11.29-4.24-4.24a1 1 0 1 0-1.42 1.41L12.71 12l-3.54 3.54a1 1 0 0 0 0 1.41 1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.24-4.24a1.002 1.002 0 0 0 0-1.42Z"/></svg></summary><sl-sidebar-restore data-index="1"></sl-sidebar-restore><ul class="astro-rmhv4bp6"><li class="astro-rmhv4bp6"><a href="/bomlens/ko/guides/ai-model/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">AI 모델 SBOM 가이드</span></a></li><li class="astro-rmhv4bp6"><a href="/bomlens/ko/guides/by-input/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">입력 시나리오별 처리 가이드</span></a></li><li class="astro-rmhv4bp6"><a href="/bomlens/ko/guides/ci-cd/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">CI/CD 연동</span></a></li><li class="astro-rmhv4bp6"><a href="/bomlens/ko/guides/declared-components/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">자체 구성요소 선언</span></a></li><li class="astro-rmhv4bp6"><a href="/bomlens/ko/guides/firmware/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">펌웨어 분석 가이드</span></a></li><li class="astro-rmhv4bp6"><a href="/bomlens/ko/guides/identify-vendored/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">내장 오픈소스 식별 (C/C++)</span></a></li><li class="astro-rmhv4bp6"><a href="/bomlens/ko/guides/reports/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">고지문·보안·위험 보고서 생성</span></a></li><li class="astro-rmhv4bp6"><a href="/bomlens/ko/guides/server-delivery/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">서버 SBOM 작성 가이드</span></a></li><li class="astro-rmhv4bp6"><a href="/bomlens/ko/guides/supplier-sbom/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">공급사 SBOM 검증 가이드</span></a></li><li class="astro-rmhv4bp6"><a href="/bomlens/ko/guides/upload/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">Dependency-Track / TRUSCA 업로드</span></a></li><li class="astro-rmhv4bp6"><a href="/bomlens/ko/guides/verify-release/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">릴리스 검증</span></a></li></ul></details></li><li class="astro-rmhv4bp6"><details open class="astro-rmhv4bp6"><summary class="astro-rmhv4bp6"><span class="group-label astro-rmhv4bp6"><span class="large astro-rmhv4bp6">레퍼런스</span></span><svg aria-hidden="true" class="caret astro-rmhv4bp6 astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1.25rem;"><path d="m14.83 11.29-4.24-4.24a1 1 0 1 0-1.42 1.41L12.71 12l-3.54 3.54a1 1 0 0 0 0 1.41 1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.24-4.24a1.002 1.002 0 0 0 0-1.42Z"/></svg></summary><sl-sidebar-restore data-index="2"></sl-sidebar-restore><ul class="astro-rmhv4bp6"><li class="astro-rmhv4bp6"><a href="/bomlens/ko/reference/artifacts/" aria-current="page" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">산출물 레퍼런스</span></a></li><li class="astro-rmhv4bp6"><a href="/bomlens/ko/reference/cli/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">CLI 레퍼런스</span></a></li><li class="astro-rmhv4bp6"><a href="/bomlens/ko/reference/docker-image/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">Docker 이미지 직접 사용</span></a></li><li class="astro-rmhv4bp6"><a href="/bomlens/ko/reference/ecosystems/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">지원 생태계</span></a></li><li class="astro-rmhv4bp6"><a href="/bomlens/ko/reference/engine-contract/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">엔진 계약</span></a></li><li class="astro-rmhv4bp6"><a href="/bomlens/ko/reference/ui/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">웹 UI와 데스크톱 앱</span></a></li></ul></details></li><li class="astro-rmhv4bp6"><details open class="astro-rmhv4bp6"><summary class="astro-rmhv4bp6"><span class="group-label astro-rmhv4bp6"><span class="large astro-rmhv4bp6">개념</span></span><svg aria-hidden="true" class="caret astro-rmhv4bp6 astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1.25rem;"><path d="m14.83 11.29-4.24-4.24a1 1 0 1 0-1.42 1.41L12.71 12l-3.54 3.54a1 1 0 0 0 0 1.41 1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.24-4.24a1.002 1.002 0 0 0 0-1.42Z"/></svg></summary><sl-sidebar-restore data-index="3"></sl-sidebar-restore><ul class="astro-rmhv4bp6"><li class="astro-rmhv4bp6"><a href="/bomlens/ko/concepts/architecture/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">아키텍처</span></a></li><li class="astro-rmhv4bp6"><a href="/bomlens/ko/concepts/dependency-resolution/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">의존성을 해석하는 방식</span></a></li><li class="astro-rmhv4bp6"><a href="/bomlens/ko/concepts/limitations/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">BomLens가 하지 않는 일</span></a></li><li class="astro-rmhv4bp6"><a href="/bomlens/ko/concepts/local-first/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">로컬 우선 설계</span></a></li><li class="astro-rmhv4bp6"><a href="/bomlens/ko/concepts/pipeline-by-input/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">입력 형태별 파이프라인</span></a></li><li class="astro-rmhv4bp6"><a href="/bomlens/ko/concepts/reports-explained/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">보고서 읽는 법</span></a></li><li class="astro-rmhv4bp6"><a href="/bomlens/ko/concepts/what-is-sbom/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">SBOM이란</span></a></li></ul></details></li></ul><script aria-hidden="true">
+		(() => {
+			const scroller = document.getElementById('starlight__sidebar');
+			if (!window._starlightScrollRestore || !scroller) return;
+			scroller.scrollTop = window._starlightScrollRestore;
+			delete window._starlightScrollRestore;
+		})();
+	</script></sl-sidebar-state-persist><div class="md:sl-hidden"><div class="mobile-preferences sl-flex astro-p4azlveh"><div class="social-icons astro-p4azlveh"><a href="https://github.com/sktelecom/bomlens" rel="me" class="sl-flex astro-n2mnl6yq"><span class="sr-only astro-n2mnl6yq">GitHub</span><svg aria-hidden="true" class="astro-n2mnl6yq astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M12 .3a12 12 0 0 0-3.8 23.38c.6.12.83-.26.83-.57L9 21.07c-3.34.72-4.04-1.61-4.04-1.61-.55-1.39-1.34-1.76-1.34-1.76-1.08-.74.09-.73.09-.73 1.2.09 1.83 1.24 1.83 1.24 1.08 1.83 2.81 1.3 3.5 1 .1-.78.42-1.31.76-1.61-2.67-.3-5.47-1.33-5.47-5.93 0-1.31.47-2.38 1.24-3.22-.14-.3-.54-1.52.1-3.18 0 0 1-.32 3.3 1.23a11.5 11.5 0 0 1 6 0c2.28-1.55 3.29-1.23 3.29-1.23.64 1.66.24 2.88.12 3.18a4.65 4.65 0 0 1 1.23 3.22c0 4.61-2.8 5.63-5.48 5.92.42.36.81 1.1.81 2.22l-.01 3.29c0 .31.2.69.82.57A12 12 0 0 0 12 .3Z"/></svg></a></div><starlight-theme-select><label style="--sl-select-width: 6.25em" class="astro-2z5xp7gb"><span class="sr-only astro-2z5xp7gb">테마 선택</span><svg aria-hidden="true" class="icon label-icon astro-2z5xp7gb astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M21 14h-1V7a3 3 0 0 0-3-3H7a3 3 0 0 0-3 3v7H3a1 1 0 0 0-1 1v2a3 3 0 0 0 3 3h14a3 3 0 0 0 3-3v-2a1 1 0 0 0-1-1ZM6 7a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v7H6V7Zm14 10a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-1h16v1Z"/></svg><select autocomplete="off" class="astro-2z5xp7gb"><option value="dark" class="astro-2z5xp7gb">어두운 테마</option><option value="light" class="astro-2z5xp7gb">밝은 테마</option><option value="auto" selected class="astro-2z5xp7gb">자동</option></select><svg aria-hidden="true" class="icon caret astro-2z5xp7gb astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M17 9.17a1 1 0 0 0-1.41 0L12 12.71 8.46 9.17a1 1 0 1 0-1.41 1.42l4.24 4.24a1.002 1.002 0 0 0 1.42 0L17 10.59a1.002 1.002 0 0 0 0-1.42Z"/></svg></label></starlight-theme-select><script>
+	StarlightThemeProvider.updatePickers();
+</script><starlight-lang-select><label style="--sl-select-width: 7em" class="astro-2z5xp7gb"><span class="sr-only astro-2z5xp7gb">언어 선택</span><svg aria-hidden="true" class="icon label-icon astro-2z5xp7gb astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path fill-rule="evenodd" d="M8.516 3a.94.94 0 0 0-.941.94v1.15H2.94a.94.94 0 1 0 0 1.882h7.362a7.422 7.422 0 0 1-1.787 3.958 7.42 7.42 0 0 1-1.422-2.425.94.94 0 1 0-1.774.627 9.303 9.303 0 0 0 1.785 3.043 7.422 7.422 0 0 1-4.164 1.278.94.94 0 1 0 0 1.881 9.303 9.303 0 0 0 5.575-1.855 9.303 9.303 0 0 0 4.11 1.74l-.763 1.525a.968.968 0 0 0-.016.034l-1.385 2.77a.94.94 0 1 0 1.683.841l1.133-2.267h5.806l1.134 2.267a.94.94 0 0 0 1.683-.841l-1.385-2.769a.95.95 0 0 0-.018-.036l-3.476-6.951a.94.94 0 0 0-1.682 0l-1.82 3.639a7.423 7.423 0 0 1-3.593-1.256 9.303 9.303 0 0 0 2.27-5.203h1.894a.94.94 0 0 0 0-1.881H9.456V3.94A.94.94 0 0 0 8.516 3Zm6.426 11.794a1.068 1.068 0 0 1-.02.039l-.703 1.407h3.924l-1.962-3.924-1.24 2.478Z" clip-rule="evenodd"/></svg><select autocomplete="off" class="astro-2z5xp7gb"><option value="/bomlens/reference/artifacts/" class="astro-2z5xp7gb">English</option><option value="/bomlens/ko/reference/artifacts/" selected class="astro-2z5xp7gb">한국어</option></select><svg aria-hidden="true" class="icon caret astro-2z5xp7gb astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M17 9.17a1 1 0 0 0-1.41 0L12 12.71 8.46 9.17a1 1 0 1 0-1.41 1.42l4.24 4.24a1.002 1.002 0 0 0 1.42 0L17 10.59a1.002 1.002 0 0 0 0-1.42Z"/></svg></label></starlight-lang-select></div></div></div></sl-sidebar-pane></nav><div class="main-frame astro-yntsjkba"><script type="module">var e=document.getElementById(`starlight__sidebar`),t=e?.querySelector(`sl-sidebar-state-persist`),n=`sl-sidebar-state`,r=()=>{let r=[],i=t?.dataset.hash||``;try{let e=sessionStorage.getItem(n),t=JSON.parse(e||`{}`);Array.isArray(t.open)&&t.hash===i&&(r=t.open)}catch{}return{hash:i,open:r,scroll:e?.scrollTop||0}},i=e=>{try{sessionStorage.setItem(n,JSON.stringify(e))}catch{}},a=()=>i(r()),o=(e,t)=>{let n=r();n.open[t]=e,i(n)};t?.addEventListener(`click`,e=>{if(!(e.target instanceof Element))return;let t=e.target.closest(`summary`)?.closest(`details`);if(!t)return;let n=t.querySelector(`sl-sidebar-restore`),r=parseInt(n?.dataset.index||``);isNaN(r)||o(!t.open,r)}),addEventListener(`visibilitychange`,()=>{document.visibilityState===`hidden`&&a()});</script><div class="lg:sl-flex astro-lrzkfocr"><aside class="right-sidebar-container print:hidden astro-lrzkfocr"><div class="right-sidebar astro-lrzkfocr"><div class="lg:sl-hidden astro-qok35upx"><mobile-starlight-toc data-min-h="2" data-max-h="3" class="astro-66cqc7ze"><nav aria-labelledby="starlight__on-this-page--mobile" class="astro-66cqc7ze"><details id="starlight__mobile-toc" class="astro-66cqc7ze"><summary id="starlight__on-this-page--mobile" class="sl-flex astro-66cqc7ze"><span class="toggle sl-flex astro-66cqc7ze">목차<svg aria-hidden="true" class="caret astro-66cqc7ze astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1rem;"><path d="m14.83 11.29-4.24-4.24a1 1 0 1 0-1.42 1.41L12.71 12l-3.54 3.54a1 1 0 0 0 0 1.41 1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.24-4.24a1.002 1.002 0 0 0 0-1.42Z"/></svg></span><span class="display-current astro-66cqc7ze"></span></summary><div class="dropdown astro-66cqc7ze"><ul class="isMobile astro-jugkfwgx" style="--depth: 0;"><li style="--depth: 0;" class="astro-jugkfwgx"><a href="#_top" style="--depth: 0;" class="astro-jugkfwgx"><span style="--depth: 0;" class="astro-jugkfwgx">개요</span></a></li><li style="--depth: 0;" class="astro-jugkfwgx"><a href="#산출물-파일" style="--depth: 0;" class="astro-jugkfwgx"><span style="--depth: 0;" class="astro-jugkfwgx">산출물 파일</span></a></li><li style="--depth: 0;" class="astro-jugkfwgx"><a href="#선언한-ai-서비스" style="--depth: 0;" class="astro-jugkfwgx"><span style="--depth: 0;" class="astro-jugkfwgx">선언한 AI 서비스</span></a></li><li style="--depth: 0;" class="astro-jugkfwgx"><a href="#sbom-구조" style="--depth: 0;" class="astro-jugkfwgx"><span style="--depth: 0;" class="astro-jugkfwgx">SBOM 구조</span></a></li><li style="--depth: 0;" class="astro-jugkfwgx"><a href="#의존성-그래프-완전성" style="--depth: 0;" class="astro-jugkfwgx"><span style="--depth: 0;" class="astro-jugkfwgx">의존성 그래프 완전성</span></a></li></ul></div></details></nav></mobile-starlight-toc><script type="module" src="/bomlens/_astro/MobileTableOfContents.astro_astro_type_script_index_0_lang.C3fM4Kra.js"></script></div><div class="right-sidebar-panel sl-hidden lg:sl-block astro-qok35upx"><div class="sl-container astro-qok35upx"><starlight-toc data-min-h="2" data-max-h="3"><nav aria-labelledby="starlight__on-this-page"><h2 id="starlight__on-this-page">목차</h2><ul class="astro-jugkfwgx" style="--depth: 0;"><li style="--depth: 0;" class="astro-jugkfwgx"><a href="#_top" style="--depth: 0;" class="astro-jugkfwgx"><span style="--depth: 0;" class="astro-jugkfwgx">개요</span></a></li><li style="--depth: 0;" class="astro-jugkfwgx"><a href="#산출물-파일" style="--depth: 0;" class="astro-jugkfwgx"><span style="--depth: 0;" class="astro-jugkfwgx">산출물 파일</span></a></li><li style="--depth: 0;" class="astro-jugkfwgx"><a href="#선언한-ai-서비스" style="--depth: 0;" class="astro-jugkfwgx"><span style="--depth: 0;" class="astro-jugkfwgx">선언한 AI 서비스</span></a></li><li style="--depth: 0;" class="astro-jugkfwgx"><a href="#sbom-구조" style="--depth: 0;" class="astro-jugkfwgx"><span style="--depth: 0;" class="astro-jugkfwgx">SBOM 구조</span></a></li><li style="--depth: 0;" class="astro-jugkfwgx"><a href="#의존성-그래프-완전성" style="--depth: 0;" class="astro-jugkfwgx"><span style="--depth: 0;" class="astro-jugkfwgx">의존성 그래프 완전성</span></a></li></ul></nav></starlight-toc><script type="module" src="/bomlens/_astro/TableOfContents.astro_astro_type_script_index_0_lang.BpJaGz7G.js"></script></div></div></div></aside><div class="main-pane astro-lrzkfocr"><main data-pagefind-body class="astro-g5ptsecz" lang="ko" dir="ltr"><div class="content-panel astro-a7po4psb"><div class="sl-container astro-a7po4psb"><nav class="breadcrumbs astro-u72m6wot" aria-label="현재 위치"><ol class="astro-u72m6wot"><li class="astro-u72m6wot"><a href="/bomlens/ko/" class="astro-u72m6wot">홈</a></li><li class="astro-u72m6wot"><span class="astro-u72m6wot">레퍼런스</span></li></ol></nav><h1 id="_top" class="astro-u72m6wot">산출물 레퍼런스</h1></div></div><div class="content-panel astro-a7po4psb"><div class="sl-container astro-a7po4psb"><div class="sl-markdown-content"><p>생성된 SBOM은 CycloneDX 1.6 JSON 형식이고, <code dir="auto">--spec-version 1.7</code>을 주면 1.7입니다. AI 모델과 데이터셋 SBOM은 항상 1.7입니다. 최종 CycloneDX SBOM을 변환한 SPDX 2.3 JSON 파일은 CLI 스캔에서 <code dir="auto">--spdx</code>로 만들거나, UI에서는 스캔이 끝난 뒤 결과 화면에서 내보냅니다. 두 경로 모두 같은 변환을 거치므로 결과 파일은 동일합니다. 이때도 정본은 CycloneDX이며, CycloneDX에만 있는 데이터(취약점, <code dir="auto">bomlens:*</code> 속성, <a href="#%EC%84%A0%EC%96%B8%ED%95%9C-ai-%EC%84%9C%EB%B9%84%EC%8A%A4">선언한 AI 서비스</a>가 더하는 <code dir="auto">services[]</code>)는 SPDX 파일로 옮겨지지 않습니다. AI 모델과 데이터셋 스캔은 AI와 Dataset 프로파일을 쓴 SPDX 3.0.1 문서(<code dir="auto">_bom.spdx3.json</code>, 아래 표)도 만듭니다.</p>
+<p>파일명은 <code dir="auto">{Project}_{Version}_bom.json</code>입니다(예: <code dir="auto">MyApp_1.0.0_bom.json</code>).</p>
+<div class="sl-heading-wrapper level-h2"><h2 id="산출물-파일">산출물 파일</h2><a class="sl-anchor-link" href="#산출물-파일"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “산출물 파일”</span></a></div>
+<table>
+<thead>
+<tr>
+<th>파일</th>
+<th>생성 조건</th>
+<th>설명</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code dir="auto">{Project}_{Version}_bom.json</code></td>
+<td>항상</td>
+<td>SBOM (CycloneDX 1.6, <code dir="auto">--spec-version 1.7</code>이면 1.7)</td>
+</tr>
+<tr>
+<td><code dir="auto">{Project}_{Version}_bom.refused.json</code></td>
+<td>선언 파일(<code dir="auto">--components</code>, 또는 스캔 대상 루트의 <code dir="auto">sbom-declared.cdx.json</code>)이 거부된 소스 스캔 또는 Yocto 빌드 디렉터리 스캔</td>
+<td>스캔이 멈춘 시점까지 만든 SBOM으로, 선언 구성요소가 빠져 있다. <code dir="auto">_bom.json</code>을 쓰지 않고 이 파일이 그 자리를 대신하므로, <code dir="auto">_bom.json</code>을 가져가는 단계가 불완전한 SBOM을 쓰지 않는다. 스캔은 사유를 출력하고 1로 종료한다. 정규화, 서명, 업로드를 하지 않고 보고서도 만들지 않는다. 웹 UI는 실패한 스캔 화면에서 이 파일을 보거나 내려받게 한다. 같은 프로젝트와 버전을 다음에 스캔하면 지워진다. <a href="/bomlens/ko/guides/declared-components/#%EB%AC%B4%EC%97%87%EC%9D%84-%EA%B1%B0%EB%B6%80%ED%95%98%EA%B3%A0-%EC%99%9C-%EA%B1%B0%EB%B6%80%ED%95%98%EB%82%98">무엇을 거부하고, 왜 거부하나?</a> 참고</td>
+</tr>
+<tr>
+<td><code dir="auto">{Project}_{Version}_bom.spdx.json</code></td>
+<td><code dir="auto">--spdx</code> / <code dir="auto">--all</code>, 또는 UI의 SPDX 2.3으로 내보내기</td>
+<td>SBOM (SPDX 2.3, CycloneDX 결과를 변환)</td>
+</tr>
+<tr>
+<td><code dir="auto">{Project}_{Version}_bom.spdx3.json</code></td>
+<td>AI 모델과 데이터셋 스캔(<code dir="auto">--model</code>, <code dir="auto">--model-file</code>, 데이터셋), <code dir="auto">--no-spdx3</code>를 주지 않은 경우</td>
+<td>AI SBOM을 AI와 Dataset 프로파일을 쓴 SPDX 3.0.1 문서(JSON-LD)로 담은 파일. 값은 CycloneDX 결과, 그 결과에 대한 고정 규칙, 모델 공개자의 선언(<code dir="auto">--ai-declare</code>)에서만 가져오며 추정하지 않는다. SPDX에 “알 수 없음” 값이 없는 필수 필드(모델과 데이터의 공급 주체와 제작 주체, 출시일과 생성일, 내려받기 주소, 문서 작성자)는 선언하기 전까지 비어 있고, 그동안 문서에 초안이라고 표시한다. 기반 모델은 id와 라이선스로만 식별한다. 배포 가중치 범위는 CycloneDX 속성 확장의 <code dir="auto">bomlens:weights:scope</code>(<code dir="auto">full</code>, <code dir="auto">adapter</code>, <code dir="auto">quantized</code>, <code dir="auto">merged</code>)로 담는다. <code dir="auto">--analyze</code> 입력으로는 쓸 수 없다</td>
+</tr>
+<tr>
+<td><code dir="auto">{Project}_{Version}_spdx3-check.json</code> / <code dir="auto">.md</code></td>
+<td>SPDX 3.0.1 문서와 함께</td>
+<td>요소마다 각 필드가 스캔에서 왔는지, 선언에서 왔는지, 비어 있는지와, 채워지지 않은 필수 필드, 모델 공개자가 판단해야 할 항목(개인정보, 안전 위험, 자율성)을 정리한 검사 결과. <code dir="auto">service.state</code>는 선언한 서비스와 모델 값이 CycloneDX SBOM에 들어 있는지를 알린다. <code dir="auto">none</code>(선언도 없고 SBOM에도 없음), <code dir="auto">applied</code>(SBOM이 선언과 같음), <code dir="auto">pendingScan</code>(둘이 다르며 다시 스캔하면 반영됨) 중 하나다. 법적 자문이 아닌 안내</td>
+</tr>
+<tr>
+<td><code dir="auto">{Project}_{Version}_ai-declaration.template.json</code></td>
+<td>SPDX 3.0.1 문서와 함께</td>
+<td>이 스캔의 빈 선언 양식. 모델과 데이터셋, 스캔이 찾은 기반 모델마다 사람이 채울 필드가 들어 있다. 채워서 <code dir="auto">--ai-declare</code>로 다시 넘긴다</td>
+</tr>
+<tr>
+<td><code dir="auto">{Project}_{Version}_ai-declaration.json</code></td>
+<td><code dir="auto">--ai-declare &#x3C;file></code>(받아들인 파일), 또는 웹 UI에서 저장한 선언</td>
+<td>모델 공개자가 선언한 내용. <code dir="auto">_vex.json</code>처럼 같은 프로젝트와 버전을 다시 스캔해도 지워지지 않고, 다시 스캔하면 다시 적용된다. 새 스캔에 없는 데이터셋이나 기반 모델을 적은 파일은 거부하며, 그 경우 문서는 초안으로 남는다. 데이터셋 항목에는 <code dir="auto">sources[]</code>를 적을 수 있다. 허브 데이터셋은 <code dir="auto">{"ref": "huggingface:&#x3C;id>", "relation": "extended"}</code>로 적으며 다음 스캔에서 허브에서 읽어 그 데이터셋과 함께 판정한다. 문장으로만 아는 원천은 <code dir="auto">{"name": "...", "license": "&#x3C;허브 라이선스 태그나 SPDX ID>", "relation": "other"}</code>로 적으며 SPDX 3.0.1 문서에만 기록되고 확인되지 않은 것으로 표시된다. SPDX ID가 아닌 라이선스는 문장으로만 남는다. 허브에 없는 데이터에는 문장으로 적는 원천만 넣을 수 있다. <code dir="auto">model.license</code>(허브 라이선스 태그나 SPDX ID)는 모델 자체의 라이선스다. 스캔이 라이선스를 읽지 못했거나 <code dir="auto">other</code>만 읽었을 때 SPDX 문서에 들어가고(SPDX 라이선스 하나에 대응하는 허브 태그나 <code dir="auto">LicenseRef-</code>일 때만 SPDX 식으로 기록), 선언만으로 만든 모델은 SBOM에도 이 라이선스가 들어가 이것으로 판정한다. 선언에는 모델을 실행하는 서비스(<code dir="auto">service</code>)와 모델의 입력과 출력 종류, 규제 제출용 값도 적을 수 있다. <a href="#%EC%84%A0%EC%96%B8%ED%95%9C-ai-%EC%84%9C%EB%B9%84%EC%8A%A4">선언한 AI 서비스</a>를 참고한다</td>
+</tr>
+<tr>
+<td><code dir="auto">{Project}_{Version}_component-versions.template.csv</code></td>
+<td>버전 없는 컴포넌트를 찾은 펌웨어, 루트 파일시스템, 바이너리 스캔</td>
+<td>그 컴포넌트의 이름을 <code dir="auto">--component-versions</code> 형식(<code dir="auto">name,version,reason</code> 머리글의 CSV)으로 적고 버전은 비워 둔 파일. 세 가지 사유를 설명하는 주석 줄이 함께 들어 있고, 이미 사유가 붙은 컴포넌트는 넣지 않는다. 버전을, 버전이 없으면 사유를 채워 <code dir="auto">--component-versions</code>로 다시 넘긴다</td>
+</tr>
+<tr>
+<td><code dir="auto">{Project}_{Version}_NOTICE.txt</code> / <code dir="auto">.html</code></td>
+<td><code dir="auto">--notice</code> / <code dir="auto">--all</code> / 오픈소스 위험 보고서 기본</td>
+<td>오픈소스 고지문</td>
+</tr>
+<tr>
+<td><code dir="auto">{Project}_{Version}_NOTICE.pdf</code></td>
+<td>위와 동일한 조건, 이미지에 PDF 렌더러가 포함된 경우(<code dir="auto">--build-arg SBOM_PDF=true</code>)</td>
+<td>고지문을 PDF로 렌더링한 파일. 렌더러가 없으면 로그만 남기고 건너뜀</td>
+</tr>
+<tr>
+<td><code dir="auto">{Project}_{Version}_security.json</code> / <code dir="auto">.md</code> / <code dir="auto">.html</code></td>
+<td><code dir="auto">--security</code> / <code dir="auto">--all</code> / 오픈소스 위험 보고서 기본</td>
+<td>Trivy 보안보고서</td>
+</tr>
+<tr>
+<td><code dir="auto">{Project}_{Version}_risk-report.md</code> / <code dir="auto">.html</code></td>
+<td>기본(전 모드) — <code dir="auto">--no-report</code>로 생략</td>
+<td>오픈소스 위험 보고서</td>
+</tr>
+<tr>
+<td><code dir="auto">{Project}_{Version}_conformance.json</code> / <code dir="auto">.md</code> / <code dir="auto">.html</code></td>
+<td>SBOM을 생성하는 모든 스캔에서 만들어지며 <code dir="auto">--no-report</code>를 줘도 생략되지 않는다(<code dir="auto">--no-report</code>는 오픈소스 위험 보고서만 건너뛴다). <code dir="auto">--analyze</code>도 만든다(그것이 검증 대상이므로)</td>
+<td>적합성 검사 보고서. 모든 SBOM에 규제 크로스워크 집계가 함께 담긴다(EU 사이버복원력법은 BSI TR-03183-2로, 2026년판 미국 SBOM 최소 요소 — 참고용이며 준수 판정 아님). AI SBOM이면 G7 검사와 함께, 아직 비어 있는 권고 요소마다 이를 충족하는 CycloneDX 조각을 담는다. 보고서를 만드는 중 best-effort 후처리 단계가 실패하면 그 단계 이름을 기록하므로, 통과 판정이 모든 단계가 문제없이 돌았다는 증명은 아니다. 통과/실패 판정이나 개별 검사 항목의 상태에는 영향을 주지 않는다. 예시는 <a href="/bomlens/samples/aether-7b-5attn_conformance.ko.html">적합성 검사 보고서</a>를 참고한다</td>
+</tr>
+<tr>
+<td><code dir="auto">{Project}_{Version}_ai-profile.json</code> / <code dir="auto">.md</code></td>
+<td>AI SBOM (<code dir="auto">--model</code>, 또는 모델 컴포넌트가 있는 SBOM에 <code dir="auto">--analyze</code>)</td>
+<td>AI 준수 개요: G7 요약, 메울 수 있는 공백과 참고 링크, 라이선스 표시 컴포넌트, 규제 크로스워크, 모델 위험 판정(<code dir="auto">riskAssessment</code>: 모델별 ok/conditional/caution/review 판정과 조건, 근거, 사용 형태. 법적 자문이 아닌 안내). 같은 요약이 적합성 검사 보고서 HTML 맨 위에 나오므로 별도 HTML은 만들지 않는다</td>
+</tr>
+<tr>
+<td><code dir="auto">{Project}_{Version}_scancode.json</code></td>
+<td><code dir="auto">--deep-license</code></td>
+<td>scancode 원본 결과</td>
+</tr>
+<tr>
+<td><code dir="auto">{Project}_{Version}_files.json</code></td>
+<td>소스를 갖는 스캔(펌웨어 스캔은 항상, 다른 모드는 <code dir="auto">--deep-license</code>가 아직 <code dir="auto">_scancode.json</code>을 만들지 않은 경우)</td>
+<td>소스 트리 뷰를 뒷받침하는 ScanCode 형식 파일 트리 인벤토리(구조만, 라이선스 없음)</td>
+</tr>
+<tr>
+<td><code dir="auto">{Project}_{Version}_source.json</code></td>
+<td>소스를 갖는 스캔</td>
+<td>스캔한 트리의 파일 내용 스냅샷, 파일 뷰어를 뒷받침(스캔한 트리 자체는 컨테이너 종료와 함께 사라짐)</td>
+</tr>
+<tr>
+<td><code dir="auto">{Project}_{Version}_input.json</code></td>
+<td><code dir="auto">--analyze</code></td>
+<td>CycloneDX 변환이 덮어쓰기 전, 공급사 SBOM 원본의 포맷·스펙 버전·도구·작성 정보를 보존</td>
+</tr>
+<tr>
+<td><code dir="auto">{Project}_{Version}_yocto_vex.json</code></td>
+<td>Yocto 빌드(빌드 디렉터리를 직접 지정하거나 그 위에 <code dir="auto">--analyze</code>)</td>
+<td>빌드가 이미 패치했거나 무관하다고 판정한 CVE 건수 — CycloneDX 결과나 보안보고서에는 미해결 항목만 남아 있어 이 수치를 알 수 없다</td>
+</tr>
+<tr>
+<td><code dir="auto">{Project}_{Version}_vex.json</code></td>
+<td>웹 UI 전용, 취약점 화면에서 CVE에 판단(영향 있음/영향 없음/이미 고침/조사 중, 근거 메모는 선택)을 저장할 때 생긴다</td>
+<td>이 스캔에 저장된 판단을 컴포넌트와 CVE 기준으로 담는다. CLI는 만들지 않으며, 해당 스캔에 첫 판단을 저장하기 전에는 없다. 다른 파일과 달리 스캔이 다시 만들지 않고, 같은 프로젝트와 버전을 재스캔해도 지워지지 않는다. 이전 스캔에 남긴 판단은 재스캔 뒤에도 그대로 남는다</td>
+</tr>
+<tr>
+<td><code dir="auto">{Project}_{Version}_vex.cdx.json</code></td>
+<td>웹 UI 전용, 취약점 화면에서 <strong>VEX 내보내기</strong>를 누를 때 만들어진다(저장된 판단이 하나 이상 필요)</td>
+<td><code dir="auto">_vex.json</code>의 판단을 다른 도구가 읽을 수 있는 독립된 CycloneDX VEX 문서로 담는다. 스캔의 SBOM이 1.7이면 1.7, 그 밖에는 1.6으로 쓴다. 네 가지 상태는 CycloneDX <code dir="auto">analysis.state</code> 값으로 바뀌어 기록되고(영향 있음은 <code dir="auto">exploitable</code>, 영향 없음은 <code dir="auto">not_affected</code>, 이미 고침은 <code dir="auto">resolved</code>, 조사 중은 <code dir="auto">in_triage</code>), 메모는 <code dir="auto">analysis.detail</code>에 들어간다. 화면이 자유 서술을 받는 반면 CycloneDX는 정해진 목록만 허용하므로 <code dir="auto">justification</code>은 쓰지 않는다. 각 항목은 문서 안에 들어 있는 해당 컴포넌트의 사본(이름, 버전, PURL)을 가리키므로 파일 하나로 완결된다. 컴포넌트가 SBOM에 없는 판단은 제외하고 화면이 그 건수를 알려 주며, 펌웨어 발견 항목은 이름과 버전이 바이너리에서 오므로 대표적인 경우다. 내보낼 때마다 새로 만들고, 같은 프로젝트와 버전을 재스캔하면 지워지므로 그 뒤에는 다시 내보낸다</td>
+</tr>
+<tr>
+<td><code dir="auto">{Project}_{Version}_vex_imported.json</code></td>
+<td>CLI의 <code dir="auto">--vex &#x3C;file></code>, 또는 웹 UI 취약점 화면의 <strong>VEX 가져오기</strong>에 CycloneDX VEX 문서를 줄 때 생긴다</td>
+<td>공급사가 보낸 VEX 문서 중 이 스캔 SBOM의 컴포넌트에 해당하는 진술과, 그 문서가 설명하는 제품이다. 직접 남긴 판단(<code dir="auto">_vex.json</code>)과는 따로 보관한다. 받은 진술이 내 판단을 덮어쓰지 않으며 화면도 둘을 다른 이름으로 표시한다. CycloneDX <code dir="auto">analysis.state</code>는 네 가지 상태로 옮긴다(<code dir="auto">exploitable</code>은 영향 있음, <code dir="auto">not_affected</code>와 <code dir="auto">false_positive</code>는 영향 없음, <code dir="auto">resolved</code>와 <code dir="auto">resolved_with_pedigree</code>는 이미 고침, <code dir="auto">in_triage</code>는 조사 중). 그 밖의 상태는 무시한다. 문서의 제품이나 버전이 스캔한 SBOM의 루트와 다르면 거부하고 아무것도 저장하지 않는다. 가져오기에 성공하면 이 파일을 교체하고, 거부되거나 적용할 진술이 없는 가져오기는 이전 파일을 그대로 둔다. 제품 자체를 가리키는 진술은 컴포넌트 없이 한 번만 저장하며, 그 CVE의 발견 항목 중 자기 진술이 없는 것 모두에 적용한다. <code dir="auto">_vex.json</code>처럼 같은 프로젝트와 버전을 재스캔해도 지워지지 않는다</td>
+</tr>
+<tr>
+<td><code dir="auto">{Project}_{Version}_reachability.cdx.json</code></td>
+<td>Go 소스나 Go 실행 파일 스캔에 <code dir="auto">--reachability</code>를 주고, govulncheck가 Go 취약점 데이터베이스를 읽었을 때 생긴다</td>
+<td>SBOM의 컴포넌트(같은 모듈과 버전)에 해당하는 Go 보안 권고마다 govulncheck가 내린 판정을 담은 독립 CycloneDX 1.6 VEX 문서다. 영향받는 코드에 도달하지 않으면 <code dir="auto">analysis.state</code>는 <code dir="auto">not_affected</code>이다. 모듈은 필요하지만 영향받는 패키지가 빌드에 없으면 <code dir="auto">justification</code>은 <code dir="auto">code_not_present</code>, 패키지는 있지만 영향받는 함수를 호출하지 않거나 실행 파일에 링크되지 않았으면 <code dir="auto">code_not_reachable</code>이다. 도달하면 <code dir="auto">exploitable</code>이다. <code dir="auto">analysis.detail</code>에 어느 경우인지와 호출 경로나 심볼을 적는다. <code dir="auto">id</code>는 권고에 CVE가 있으면 그 CVE이고, Go 식별자와 다른 식별자는 <code dir="auto">references</code>에 있다. 소스 스캔에서는 <code dir="auto">metadata.properties</code>에 판정 범위(<code dir="auto">bomlens:reachability:goos</code>, <code dir="auto">goarch</code>, <code dir="auto">build-tags</code>, <code dir="auto">modules</code>)를 남긴다. 보안 보고서가 이 문서를 읽어, 해당 발견 항목마다 <code dir="auto">_security.json</code>에 <code dir="auto">bomlens:reachability</code>(<code dir="auto">state</code>, <code dir="auto">justification</code>, <code dir="auto">detail</code>, <code dir="auto">level</code>, <code dir="auto">mode</code>)를 붙이고 문서에 <code dir="auto">Reachability</code> 요약을 둔다</td>
+</tr>
+<tr>
+<td><code dir="auto">{Project}_{Version}_vendored.cdx.json</code></td>
+<td>소스 스캔에서 <code dir="auto">--identify-vendored</code>, opt-in SCANOSS 이미지 필요</td>
+<td>소스 트리 안에서 식별한 번들 오픈소스 컴포넌트(SCANOSS)</td>
+</tr>
+<tr>
+<td><code dir="auto">{Project}_{Version}_security_trivy.json</code></td>
+<td>보안보고서를 생성할 때, 다른 엔진(grype, cve-bin-tool, Yocto)이 결과를 더한 경우</td>
+<td><code dir="auto">_security.json</code>으로 병합하기 전에 따로 남긴 Trivy 자체 결과</td>
+</tr>
+<tr>
+<td><code dir="auto">{Project}_{Version}_cdxgen.log</code></td>
+<td>CLI 소스 스캔에서 의존성 준비 단계가 실패한 경우(SBOM의 <code dir="auto">bomlens:pipeline-step-failed</code>에 기록됨)</td>
+<td>원인을 찾을 수 있도록 남긴 1단계 로그(준비 단계와 cdxgen 출력). 진단용 파일이므로 배포하지 않습니다. URL에 든 자격 증명(<code dir="auto">scheme://user:pass@</code>는 <code dir="auto">scheme://***@</code>로 바뀜)과 Authorization, 토큰, 비밀번호, 시크릿, API 키 값은 가리지만 내부 호스트 이름은 그대로 남습니다. 같은 프로젝트와 버전을 다시 스캔하기 전에 지웁니다</td>
+</tr>
+<tr>
+<td><code dir="auto">bomlens-events.jsonl</code></td>
+<td><code dir="auto">BOMLENS_EVENTS=file</code></td>
+<td>진행 이벤트, 한 줄에 JSON 객체 하나. <a href="/bomlens/ko/reference/engine-contract/#%EC%A7%84%ED%96%89-%EC%9D%B4%EB%B2%A4%ED%8A%B8">엔진 계약</a> 참고</td>
+</tr>
+<tr>
+<td><code dir="auto">bomlens-result.json</code></td>
+<td>항상</td>
+<td>실행 결과 매니페스트. 실행이 어떻게 끝났는지, 단계별 결과, 출력 파일별 역할을 담습니다. <a href="/bomlens/ko/reference/engine-contract/">엔진 계약</a> 참고</td>
+</tr>
+<tr>
+<td><code dir="auto">{Project}_{Version}_security_epss.json</code></td>
+<td>보안보고서를 생성할 때마다</td>
+<td>취약점별 EPSS 점수와 KEV 여부(오프라인 생성 시 null/false), 보안보고서 우선순위 산정에 사용</td>
+</tr>
+<tr>
+<td><code dir="auto">{Project}_{Version}_bom.json.sig</code></td>
+<td><code dir="auto">--sign</code></td>
+<td>cosign 서명 (<code dir="auto">--spdx</code>와 함께 쓰면 <code dir="auto">_bom.spdx.json.sig</code>도 생성). AI 스캔에는 <code dir="auto">_bom.spdx3.json.sig</code>도 추가되며, 초안도 서명한다. 서명은 파일의 출처를 보증할 뿐 완성 여부를 뜻하지 않는다</td>
+</tr>
+<tr>
+<td><code dir="auto">{new}_model-diff.json</code></td>
+<td><code dir="auto">--diff &#x3C;old.json> &#x3C;new.json></code></td>
+<td>이미 생성한 SBOM 두 개를 비교한 AI 모델 변동 보고서. 매칭된 모델의 판정·라이선스·해시 변화와, 한쪽 파일에만 있는 컴포넌트를 담는다. 새 쪽 입력 파일 이름을 따르며(<code dir="auto">&#x3C;new>_bom.json</code> → <code dir="auto">&#x3C;new>_model-diff.json</code>), <code dir="auto">{Project}_{Version}</code>이 아니다 — <code dir="auto">--diff</code>는 프로젝트나 버전을 따로 받지 않는다</td>
+</tr>
+</tbody>
+</table>
+<p><code dir="auto">{P}</code>=프로젝트 이름, <code dir="auto">{V}</code>=버전 (특수문자는 <code dir="auto">_</code>로 정규화).</p>
+<p>위 표의 생성 조건은 CLI 옵션 기준입니다. 웹 UI와 데스크톱 앱에서는 새 스캔 화면의 생성 옵션(고지문, 보안 보고서)이 같은 역할을 하고, 만들어진 파일은 결과 화면의 산출물 섹션에 모두 표시되어 형식별로 또는 ZIP 하나로 내려받을 수 있습니다. SPDX는 스캔 옵션이 아닙니다. 산출물 섹션의 SBOM 카드에 있는 <strong>SPDX 2.3으로 내보내기</strong> 버튼으로 필요할 때 완성된 SBOM을 변환하며, 변환된 파일은 산출물 목록과 ZIP 묶음에 함께 들어갑니다. UI에는 서명 기능이 없어 이렇게 내보낸 SPDX는 서명되지 않으므로, 서명이 필요하면 CLI에서 <code dir="auto">--spdx --sign</code>을 쓰세요. <a href="/bomlens/ko/reference/ui/">웹 UI와 데스크톱 앱</a>을 참고하세요.</p>
+<div class="sl-heading-wrapper level-h2"><h2 id="선언한-ai-서비스">선언한 AI 서비스</h2><a class="sl-anchor-link" href="#선언한-ai-서비스"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “선언한 AI 서비스”</span></a></div>
+<p>AI 선언(<code dir="auto">--ai-declare</code>, 또는 웹 UI에서 저장한 선언)에는 최상위 <code dir="auto">service</code> 객체로 모델을 실행하는 서비스를 적을 수 있고, 스캔으로 읽을 수 없는 모델 값 몇 가지도 적을 수 있습니다. <code dir="auto">service</code>는 문서가 데이터셋이 아니라 모델을 기술할 때만 받으며, 값이 하나도 없는 <code dir="auto">service</code>는 선언하지 않은 것으로 봅니다. 이 값들이 무엇을 위한 것인지는 <a href="/bomlens/ko/guides/ai-model/#%EB%AA%A8%EB%8D%B8%EC%9D%84-%EC%8B%A4%ED%96%89%ED%95%98%EB%8A%94-%EC%84%9C%EB%B9%84%EC%8A%A4">AI 모델 가이드</a>에서 설명합니다.</p>
+<table>
+<thead>
+<tr>
+<th>키</th>
+<th>값</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code dir="auto">name</code></td>
+<td>서비스 이름. 필수</td>
+</tr>
+<tr>
+<td><code dir="auto">packageVersion</code></td>
+<td>서비스 버전. 필수</td>
+</tr>
+<tr>
+<td><code dir="auto">downloadLocation</code></td>
+<td>서비스를 제공하는 주소(URI). 필수</td>
+</tr>
+<tr>
+<td><code dir="auto">suppliedBy</code></td>
+<td>서비스를 제공하는 조직, <code dir="auto">{"type": "Organization", "name": "..."}</code>. 필수</td>
+</tr>
+<tr>
+<td><code dir="auto">releaseTime</code></td>
+<td>출시일, <code dir="auto">YYYY-MM-DDThh:mm:ssZ</code>. 필수</td>
+</tr>
+<tr>
+<td><code dir="auto">informationAboutApplication</code></td>
+<td>서비스의 용도를 적은 글</td>
+</tr>
+<tr>
+<td><code dir="auto">domain[]</code></td>
+<td>서비스가 쓰이는 분야를 적은 글</td>
+</tr>
+<tr>
+<td><code dir="auto">autonomyType</code></td>
+<td>AI의 결정에 사람이 관여하는지. <code dir="auto">yes</code>(사람이 관여하지 않는 완전 자동), <code dir="auto">no</code>(사람이 관여함), <code dir="auto">noAssertion</code>(모름)</td>
+</tr>
+<tr>
+<td><code dir="auto">inputModality[]</code>, <code dir="auto">outputModality[]</code></td>
+<td>입력과 출력의 종류. <code dir="auto">text</code>, <code dir="auto">image</code>, <code dir="auto">audio</code>, <code dir="auto">video</code>, <code dir="auto">timeseries</code>, <code dir="auto">structured</code>, <code dir="auto">code</code>, <code dir="auto">other</code></td>
+</tr>
+<tr>
+<td><code dir="auto">dataFlows[]</code></td>
+<td>들어오고 나가는 데이터. 항목마다 <code dir="auto">{flow, classification, name, description, source[], destination[]}</code>이다. <code dir="auto">flow</code>는 <code dir="auto">inbound</code>, <code dir="auto">outbound</code>, <code dir="auto">bi-directional</code>, <code dir="auto">unknown</code> 중 하나다. <code dir="auto">classification</code>은 필수(200자 이내)이며 개인정보처럼 어떤 데이터인지 적는다. <code dir="auto">name</code>과 <code dir="auto">description</code>은 선택이며, 설명에는 서비스가 그 데이터를 어떻게 쓰는지 적는다. <code dir="auto">source[]</code>와 <code dir="auto">destination[]</code>은 주소(URI)다</td>
+</tr>
+<tr>
+<td><code dir="auto">standardCompliance[]</code></td>
+<td>서비스가 따르는 표준의 이름</td>
+</tr>
+<tr>
+<td><code dir="auto">disclosureUrl</code></td>
+<td>서비스의 AI 사용을 설명하는 공개 페이지(URI)</td>
+</tr>
+<tr>
+<td><code dir="auto">externalModels[]</code></td>
+<td>서비스가 API로 호출하는 AI 모델. 항목마다 <code dir="auto">{key, name, suppliedBy, packageVersion, endpoint}</code>이다. <code dir="auto">key</code>(영문 소문자, 숫자, <code dir="auto">.</code>, <code dir="auto">_</code>, <code dir="auto">-</code>로 64자 이내, 목록 안에서 중복 불가)와 <code dir="auto">name</code>은 필수이고, <code dir="auto">endpoint</code>는 URI다</td>
+</tr>
+</tbody>
+</table>
+<p>필수 키는 SPDX가 서비스에 요구하는 항목이며, 모두 적을 때까지 문서는 초안으로 남습니다. 선언의 <code dir="auto">model</code>에는 다음 다섯 키를 더 적을 수 있습니다.</p>
+<table>
+<thead>
+<tr>
+<th>키</th>
+<th>값</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code dir="auto">inputModality[]</code>, <code dir="auto">outputModality[]</code></td>
+<td>모델의 입력과 출력 종류. 값은 서비스와 같다</td>
+</tr>
+<tr>
+<td><code dir="auto">trainingComputeFlops</code></td>
+<td>모델 학습에 쓴 연산량(부동소수점 연산 횟수). <code dir="auto">"3.2e24"</code>나 <code dir="auto">"1500000"</code>처럼 문자열로 적은 양의 10진수</td>
+</tr>
+<tr>
+<td><code dir="auto">trainingComputeBasis</code></td>
+<td>그 수치를 산정한 방법을 적은 글</td>
+</tr>
+<tr>
+<td><code dir="auto">adversarialTesting</code></td>
+<td>적대적 시험을 했는지. <code dir="auto">yes</code>, <code dir="auto">no</code>, <code dir="auto">noAssertion</code></td>
+</tr>
+</tbody>
+</table>
+<p>SPDX 3.0.1 문서에서 서비스는 <code dir="auto">software_primaryPurpose</code>가 <code dir="auto">application</code>인 <code dir="auto">ai_AIPackage</code>이며, 범위(scope)가 <code dir="auto">runtime</code>인 <code dir="auto">dependsOn</code> 관계로 모델과 이어집니다. 외부 모델은 각각 용도가 <code dir="auto">model</code>인 <code dir="auto">software_Package</code>입니다. 데이터 흐름, 입력과 출력 종류, 모델의 규제 값은 CycloneDX 속성 확장으로 들어갑니다. <code dir="auto">bomlens:service:dataFlow</code>(흐름마다 하나, serviceData를 압축한 JSON 문자열), <code dir="auto">bomlens:service:input</code>과 <code dir="auto">:output</code>, <code dir="auto">bomlens:model:input</code>과 <code dir="auto">:output</code>, <code dir="auto">bomlens:regulatory:*</code>입니다.</p>
+<p>스캔은 같은 내용을 CycloneDX SBOM에도 기록합니다. 선언한 데이터셋 원천을 읽은 다음, 위험 판정과 G7 검사보다 먼저 도는 단계입니다.</p>
+<table>
+<thead>
+<tr>
+<th>위치</th>
+<th>내용</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code dir="auto">services[]</code>, bom-ref <code dir="auto">service:declared/&#x3C;이름></code></td>
+<td>서비스. <code dir="auto">name</code>, <code dir="auto">version</code>, <code dir="auto">provider.name</code>, <code dir="auto">endpoints[0]</code>(서비스 주소), <code dir="auto">description</code>(용도), <code dir="auto">data[]</code>(serviceData 형식의 데이터 흐름), 유형이 <code dir="auto">documentation</code>인 <code dir="auto">externalReferences</code> 항목(공개 페이지), 그리고 <code dir="auto">bomlens:service:domain</code>, <code dir="auto">:autonomyType</code>, <code dir="auto">:input</code>, <code dir="auto">:output</code>, <code dir="auto">:releaseTime</code> 속성</td>
+</tr>
+<tr>
+<td><code dir="auto">services[]</code>, bom-ref <code dir="auto">service:declared-external/&#x3C;key></code></td>
+<td>외부 모델마다 하나. <code dir="auto">name</code>, <code dir="auto">version</code>, <code dir="auto">provider.name</code>, <code dir="auto">endpoints</code>, <code dir="auto">bomlens:service:declarationKey</code></td>
+</tr>
+<tr>
+<td><code dir="auto">dependencies[]</code></td>
+<td>서비스가 모델의 bom-ref와 각 외부 모델에 의존</td>
+</tr>
+<tr>
+<td><code dir="auto">declarations.claims[]</code></td>
+<td>표준마다 하나. 대상(target)은 서비스, 서술(predicate)은 표준 이름, 근거(reasoning)는 “publisher’s declaration, not verified by BomLens”</td>
+</tr>
+<tr>
+<td>모델 컴포넌트</td>
+<td><code dir="auto">bomlens:regulatory:trainingComputeFlops</code>, <code dir="auto">:trainingComputeBasis</code>, <code dir="auto">:adversarialTesting</code> 속성과, <code dir="auto">modelCard.modelParameters.inputs[]</code>와 <code dir="auto">outputs[]</code>에 적은 입력과 출력 종류(<code dir="auto">{"format": "text"}</code>)</td>
+</tr>
+</tbody>
+</table>
+<p>이렇게 기록한 서비스에는 모두 <code dir="auto">bomlens:origin=declared-input</code>과 <code dir="auto">bomlens:service:kind</code>(<code dir="auto">application</code> 또는 <code dir="auto">external-model</code>)가 붙고, 서비스 본체에는 <code dir="auto">bomlens:service:declarationDigest</code>도 붙습니다. 모델 컴포넌트에는 선언에서 채운 위치마다 <code dir="auto">bomlens:declared</code> 속성이 붙습니다. 값은 속성 이름이나 <code dir="auto">modelCard</code> 경로이며, 이 단계가 <code dir="auto">modelCard</code>나 <code dir="auto">modelCard.modelParameters</code>를 새로 만들었다면 그 경로도 적습니다. 스캔이 이미 입력이나 출력을 기록했다면 그 값을 그대로 두고 <code dir="auto">bomlens:declared:observedKept</code> 속성에 그 위치를 적습니다. <code dir="auto">bomlens:model:declarationDigest</code>는 모델 값이 어느 선언에서 왔는지 기록합니다. 선언한 형식을 담으려고 새로 만든 <code dir="auto">modelCard.modelParameters</code>는 G7 검사에서 모델 카드로 세지 않습니다. 이 단계는 같은 SBOM에 여러 번 돌려도 됩니다. 이전 실행이 쓴 내용을 먼저 지우므로, 서비스가 없는 선언을 적용하면 예전 서비스가 지워집니다. SPDX 변환기가 거부한 선언은 아예 적용하지 않습니다.</p>
+<p>G7 시스템 속성 요소는 선언한 서비스를 읽고, 이렇게 충족된 요소는 “있음 (발행자 선언, BomLens가 확인하지 않음)“으로 나옵니다. SPDX 2.3 내보내기와 <code dir="auto">--diff</code>는 서비스를 다루지 않습니다. BomLens v1.13 이하는 <code dir="auto">service</code>나 새 모델 키가 있는 선언을 “unknown key(s)” 오류로 거부합니다.</p>
+<div class="sl-heading-wrapper level-h2"><h2 id="sbom-구조">SBOM 구조</h2><a class="sl-anchor-link" href="#sbom-구조"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “SBOM 구조”</span></a></div>
+<div class="expressive-code"><link rel="stylesheet" href="/bomlens/_astro/ec.klmer.css"><script type="module" src="/bomlens/_astro/ec.0vx5m.js"></script><figure class="frame not-content"><figcaption class="header"></figcaption><pre data-language="plaintext"><code><div class="ec-line"><div class="code"><span style="--0:#24292e;--1:#e1e4e8">bomFormat          "CycloneDX"</span></div></div><div class="ec-line"><div class="code"><span style="--0:#24292e;--1:#e1e4e8">specVersion        "1.6" (--spec-version 1.7이면 "1.7")</span></div></div><div class="ec-line"><div class="code"><span style="--0:#24292e;--1:#e1e4e8">metadata</span></div></div><div class="ec-line"><div class="code"><span class="indent"><span style="--0:#24292e;--1:#e1e4e8">  </span></span><span style="--0:#24292e;--1:#e1e4e8">├── timestamp    생성 시각 (ISO 8601)</span></div></div><div class="ec-line"><div class="code"><span class="indent"><span style="--0:#24292e;--1:#e1e4e8">  </span></span><span style="--0:#24292e;--1:#e1e4e8">└── component    프로젝트 정보 (name, version, type)</span></div></div><div class="ec-line"><div class="code"><span style="--0:#24292e;--1:#e1e4e8">components[]</span></div></div><div class="ec-line"><div class="code"><span class="indent"><span style="--0:#24292e;--1:#e1e4e8">  </span></span><span style="--0:#24292e;--1:#e1e4e8">├── type         "library" | "framework" | "application"</span></div></div><div class="ec-line"><div class="code"><span class="indent"><span style="--0:#24292e;--1:#e1e4e8">  </span></span><span style="--0:#24292e;--1:#e1e4e8">├── name         컴포넌트 이름</span></div></div><div class="ec-line"><div class="code"><span class="indent"><span style="--0:#24292e;--1:#e1e4e8">  </span></span><span style="--0:#24292e;--1:#e1e4e8">├── version      버전</span></div></div><div class="ec-line"><div class="code"><span class="indent"><span style="--0:#24292e;--1:#e1e4e8">  </span></span><span style="--0:#24292e;--1:#e1e4e8">├── purl         Package URL (고유 식별자)</span></div></div><div class="ec-line"><div class="code"><span class="indent"><span style="--0:#24292e;--1:#e1e4e8">  </span></span><span style="--0:#24292e;--1:#e1e4e8">├── supplier     컴포넌트 공급자 (패키지 메타데이터에 있을 때)</span></div></div><div class="ec-line"><div class="code"><span class="indent"><span style="--0:#24292e;--1:#e1e4e8">  </span></span><span style="--0:#24292e;--1:#e1e4e8">└── licenses[]   라이선스 정보 (SPDX ID)</span></div></div><div class="ec-line"><div class="code"><span style="--0:#24292e;--1:#e1e4e8">compositions[]     의존성 그래프 완전성 (아래 참고)</span></div></div></code></pre><div class="copy"><div aria-live="polite"></div><button title="Copy to clipboard" data-copied="Copied!" data-code="bomFormat          &#x22;CycloneDX&#x22;specVersion        &#x22;1.6&#x22; (--spec-version 1.7이면 &#x22;1.7&#x22;)metadata  ├── timestamp    생성 시각 (ISO 8601)  └── component    프로젝트 정보 (name, version, type)components[]  ├── type         &#x22;library&#x22; | &#x22;framework&#x22; | &#x22;application&#x22;  ├── name         컴포넌트 이름  ├── version      버전  ├── purl         Package URL (고유 식별자)  ├── supplier     컴포넌트 공급자 (패키지 메타데이터에 있을 때)  └── licenses[]   라이선스 정보 (SPDX ID)compositions[]     의존성 그래프 완전성 (아래 참고)"><div></div></button></div></figure></div>
+<p>언어별 PURL 형식은 <a href="/bomlens/ko/reference/ecosystems/">지원 생태계</a>를 참고하세요.</p>
+<p>컴포넌트의 <code dir="auto">supplier.name</code>은 패키지 메타데이터에 이미 적힌 값으로만 채웁니다. 생성 도구가 읽은 <code dir="auto">publisher</code>(Maven POM의 <code dir="auto">&#x3C;organization></code>, npm 게시자), <code dir="auto">authors</code>(PyPI, RubyGems, Composer), 예전 형식의 <code dir="auto">author</code> 필드 순서로 처음 있는 값을 씁니다. 값 안의 꺾쇠괄호 부분은 지우고, 괄호나 대괄호는 안에 이메일 주소나 URL만 있을 때 지웁니다. 그래서 npm 형식 <code dir="auto">Name &#x3C;email> (url)</code>의 이메일 주소와 URL이 빠지고, <code dir="auto">Example (Holdings), Inc.</code>처럼 다른 내용이 든 괄호는 그대로 남습니다. 괄호 밖에 있는 이메일 주소와 URL(<code dir="auto">http://</code>, <code dir="auto">https://</code>, <code dir="auto">ftp://</code>, <code dir="auto">www.</code>)도 지우며, 그 앞에 닫히지 않은 괄호가 있으면 함께 지웁니다. 그래서 <code dir="auto">Alice &#x3C;a@x.org>, Bob &#x3C;b@y.org></code>는 <code dir="auto">Alice, Bob</code>, <code dir="auto">Jane Doe jane@example.org</code>는 <code dir="auto">Jane Doe</code>, <code dir="auto">Bob &#x3C;b@x.org>; Carol &#x3C;c@y.org></code>는 <code dir="auto">Bob; Carol</code>이 됩니다. 이메일 주소나 URL만 있는 값은 쓰지 않으며, 작성자가 여럿이면 쉼표로 잇습니다. 어느 필드에서 왔는지는 <code dir="auto">bomlens:supplierSource</code> 속성(<code dir="auto">publisher</code>, <code dir="auto">authors</code>, <code dir="auto">author</code>)에 남습니다. 세 필드가 모두 없는 컴포넌트에는 공급자를 넣지 않고, 이미 공급자가 있는 컴포넌트는 그대로 둡니다. 하위 컴포넌트(<code dir="auto">components[].components</code>)에도 같은 규칙을 적용합니다. 배포판과 펌웨어 패키지(<code dir="auto">pkg:deb</code>, <code dir="auto">pkg:rpm</code>, <code dir="auto">pkg:apk</code>, <code dir="auto">pkg:alpm</code>, <code dir="auto">pkg:opkg</code>, <code dir="auto">pkg:generic</code>)와 <code dir="auto">operating-system</code> 컴포넌트에는 공급자를 넣지 않습니다. 생성 도구가 이 패키지에서 읽는 게시자는 패키지 관리자이고 대개 개인 한 명이며, 배포판 이름을 추정해 대신 넣지도 않습니다. <code dir="auto">--analyze</code>로 받은 공급사 SBOM과 <code dir="auto">--merge</code> 결과는 작성된 그대로 둡니다.</p>
+<p>소스 스캔은 프로젝트가 버전을 고정했는지도 <code dir="auto">metadata.component.properties</code>에 기록합니다. <code dir="auto">bomlens:source:versionPinning</code> 값이 <code dir="auto">pinned</code>이면 lock 파일이 있거나 <code dir="auto">requirements.txt</code>의 모든 줄에 정확한 버전이 있는 것이고, <code dir="auto">unpinned</code>이면 <code dir="auto">requirements.txt</code>, <code dir="auto">package.json</code>, <code dir="auto">pyproject.toml</code>, <code dir="auto">setup.py</code>, <code dir="auto">setup.cfg</code> 옆에 lock 파일이 없고 모든 버전이 고정되어 있지 않은 것입니다. <code dir="auto">unpinned</code>일 때 SBOM의 버전은 스캔한 날 새로 설치하면 받게 될 버전이어서, 실제로 실행한 버전과 다를 수 있습니다. 웹 UI가 안내를 보이고, 위험 보고서는 취약점 집계 아래에 같은 내용을 적습니다. 스캔이 판단하지 못했으면 이 속성은 없습니다.</p>
+<div class="sl-heading-wrapper level-h2"><h2 id="의존성-그래프-완전성">의존성 그래프 완전성</h2><a class="sl-anchor-link" href="#의존성-그래프-완전성"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “의존성 그래프 완전성”</span></a></div>
+<p>생성된 SBOM은 의존성 그래프가 얼마나 완전한지 나타내는 <code dir="auto">compositions[0].aggregate</code> 항목을 담습니다.</p>
+<table>
+<thead>
+<tr>
+<th>값</th>
+<th>의미</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code dir="auto">complete</code></td>
+<td>그래프가 완전히 해석됐다는 적극적인 근거를 찾았습니다. 생태계의 lock/resolve 단계가 성공했거나 lock 파일이 이미 커밋돼 있었고, 의존 엣지가 하나 이상 있는 경우입니다.</td>
+</tr>
+<tr>
+<td><code dir="auto">incomplete</code></td>
+<td>스캔에 알려진 실패가 있었습니다. cdxgen 대신 syft 폴백이 돌았거나, 펌웨어 패키지 목록화 단계가 실패했거나, <code dir="auto">poetry.lock</code>이 없는 Poetry 프로젝트를 일부만 변환했거나 그 의존성을 풀지 못한 경우입니다.</td>
+</tr>
+<tr>
+<td><code dir="auto">unknown</code></td>
+<td>그래프가 완전하다고 확인해 주는 근거가 SBOM에 없습니다. 어느 쪽으로도 적극적인 근거가 없을 때의 기본값이며, 예를 들면 image/rootfs/firmware/binary 스캔(syft 혼자서는 패키지 사이 의존 관계를 못 봄), AI 모델·데이터셋·병합 SBOM, Maven 소스 스캔(해석이 됐는지 저하됐는지 가릴 신뢰할 수 있는 신호가 없음)이 여기 해당합니다. <code dir="auto">unknown</code>은 결함이 아닙니다. 도구가 판단할 근거를 찾지 못했다는 뜻일 뿐, 뭔가 잘못됐다는 뜻이 아닙니다.</td>
+</tr>
+</tbody>
+</table>
+<p>분석 대상 공급사 SBOM이 자체 <code dir="auto">compositions</code> 선언을 이미 가지고 있다면 절대 덮어쓰지 않습니다.</p>
+<p>적합성 검사 보고서의 전이 의존성 검사는 이 값을 detail 문구에 덧붙입니다(예: “12 edge(s), declared complete”). 통과/실패 판정에는 영향을 주지 않습니다.</p>
+<p>전처리 단계가 돌았거나 이미 커밋된 lock 파일로 충족된 경우, 성공·실패와 무관하게 <code dir="auto">bomlens:prep-step-applied</code> 속성에 기록됩니다. <code dir="auto">bomlens:pipeline-step-failed</code>는 실패만 기록합니다. 위 <code dir="auto">aggregate</code> 값은 둘을 함께 봐서 정해집니다.</p></div><footer class="sl-flex astro-ddtxxk7k"><div class="meta sl-flex astro-ddtxxk7k"><a href="https://github.com/sktelecom/bomlens/edit/main/docs/reference/artifacts.ko.md" class="sl-flex print:hidden astro-qlekgd3o"><svg aria-hidden="true" class="astro-qlekgd3o astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1.2em;"><path d="M22 7.24a1 1 0 0 0-.29-.71l-4.24-4.24a1 1 0 0 0-1.1-.22 1 1 0 0 0-.32.22l-2.83 2.83L2.29 16.05a1 1 0 0 0-.29.71V21a1 1 0 0 0 1 1h4.24a1 1 0 0 0 .76-.29l10.87-10.93L21.71 8c.1-.1.17-.2.22-.33a1 1 0 0 0 0-.24v-.14l.07-.05ZM6.83 20H4v-2.83l9.93-9.93 2.83 2.83L6.83 20ZM18.17 8.66l-2.83-2.83 1.42-1.41 2.82 2.82-1.41 1.42Z"/></svg>페이지 편집</a></div><div class="pagination-links print:hidden astro-b5raizh3" dir="ltr"><a href="/bomlens/ko/guides/verify-release/" rel="prev" class="astro-b5raizh3"><svg aria-hidden="true" class="astro-b5raizh3 astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1.5rem;"><path d="M17 11H9.41l3.3-3.29a1.004 1.004 0 1 0-1.42-1.42l-5 5a1 1 0 0 0-.21.33 1 1 0 0 0 0 .76 1 1 0 0 0 .21.33l5 5a1.002 1.002 0 0 0 1.639-.325 1 1 0 0 0-.219-1.095L9.41 13H17a1 1 0 0 0 0-2Z"/></svg><span class="astro-b5raizh3">이전 페이지<br class="astro-b5raizh3"><span class="link-title astro-b5raizh3">릴리스 검증</span></span></a><a href="/bomlens/ko/reference/cli/" rel="next" class="astro-b5raizh3"><svg aria-hidden="true" class="astro-b5raizh3 astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1.5rem;"><path d="M17.92 11.62a1.001 1.001 0 0 0-.21-.33l-5-5a1.003 1.003 0 1 0-1.42 1.42l3.3 3.29H7a1 1 0 0 0 0 2h7.59l-3.3 3.29a1.002 1.002 0 0 0 .325 1.639 1 1 0 0 0 1.095-.219l5-5a1 1 0 0 0 .21-.33 1 1 0 0 0 0-.76Z"/></svg><span class="astro-b5raizh3">다음 페이지<br class="astro-b5raizh3"><span class="link-title astro-b5raizh3">CLI 레퍼런스</span></span></a></div></footer><script type="module" src="/bomlens/_astro/Mermaid.astro_astro_type_script_index_0_lang.DZWWZPOc.js"></script><script type="module">var e=()=>{document.querySelectorAll(`.expressive-code pre`).forEach(e=>{e.scrollWidth>e.clientWidth?e.setAttribute(`tabindex`,`0`):e.removeAttribute(`tabindex`)})};e(),window.addEventListener(`resize`,e);</script><p class="site-copyright astro-jo6i4kqk">Copyright &copy; 2026 SK Telecom Co., Ltd. &middot;<a href="https://github.com/sktelecom/bomlens/blob/main/LICENSE" class="astro-jo6i4kqk">Apache-2.0</a> &middot;<a href="https://github.com/sktelecom/bomlens/blob/main/THIRD_PARTY_LICENSES.md" class="astro-jo6i4kqk">Third-party licenses</a></p></div></div></main></div></div></div></div></body></html>

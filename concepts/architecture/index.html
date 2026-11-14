@@ -1,0 +1,629 @@
+<!DOCTYPE html><html lang="en" dir="ltr" data-theme="dark" data-has-toc data-has-sidebar class="astro-g5ptsecz"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/><title>Architecture | BomLens</title><link rel="canonical" href="https://sktelecom.github.io/bomlens/concepts/architecture/"/><link rel="alternate" hreflang="en" href="https://sktelecom.github.io/bomlens/concepts/architecture/"/><link rel="alternate" hreflang="ko" href="https://sktelecom.github.io/bomlens/ko/concepts/architecture/"/><link rel="alternate" hreflang="x-default" href="https://sktelecom.github.io/bomlens/concepts/architecture/"/><link rel="sitemap" href="/bomlens/sitemap-index.xml"/><link rel="shortcut icon" href="/bomlens/favicon.svg" type="image/svg+xml"/><meta name="generator" content="Astro v7.4.4"/><meta name="generator" content="Starlight v0.42.8"/><meta property="og:title" content="Architecture"/><meta property="og:type" content="article"/><meta property="og:url" content="https://sktelecom.github.io/bomlens/concepts/architecture/"/><meta property="og:locale" content="en_US"/><meta property="og:description" content="How BomLens is structured and which tool runs at each step of the scan pipeline, and in what order."/><meta property="og:site_name" content="BomLens"/><meta name="twitter:card" content="summary_large_image"/><meta name="description" content="How BomLens is structured and which tool runs at each step of the scan pipeline, and in what order."/><meta property="og:image" content="https://sktelecom.github.io/bomlens/images/og-card.png"><meta name="twitter:image" content="https://sktelecom.github.io/bomlens/images/og-card.png"><script>
+	window.StarlightThemeProvider = (() => {
+		const storedTheme =
+			typeof localStorage !== 'undefined' && localStorage.getItem('starlight-theme');
+		const theme =
+			storedTheme ||
+			(window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
+		document.documentElement.dataset.theme = theme === 'light' ? 'light' : 'dark';
+		return {
+			updatePickers(theme = storedTheme || 'auto') {
+				document.querySelectorAll('starlight-theme-select').forEach((picker) => {
+					const select = picker.querySelector('select');
+					if (select) select.value = theme;
+					/** @type {HTMLTemplateElement | null} */
+					const tmpl = document.querySelector(`#theme-icons`);
+					const newIcon = tmpl && tmpl.content.querySelector('.' + theme);
+					if (newIcon) {
+						const oldIcon = picker.querySelector('svg.label-icon');
+						if (oldIcon) {
+							oldIcon.replaceChildren(...newIcon.cloneNode(true).childNodes);
+						}
+					}
+				});
+			},
+		};
+	})();
+</script><template id="theme-icons"><svg aria-hidden="true" class="light astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M5 12a1 1 0 0 0-1-1H3a1 1 0 0 0 0 2h1a1 1 0 0 0 1-1Zm.64 5-.71.71a1 1 0 0 0 0 1.41 1 1 0 0 0 1.41 0l.71-.71A1 1 0 0 0 5.64 17ZM12 5a1 1 0 0 0 1-1V3a1 1 0 0 0-2 0v1a1 1 0 0 0 1 1Zm5.66 2.34a1 1 0 0 0 .7-.29l.71-.71a1 1 0 1 0-1.41-1.41l-.66.71a1 1 0 0 0 0 1.41 1 1 0 0 0 .66.29Zm-12-.29a1 1 0 0 0 1.41 0 1 1 0 0 0 0-1.41l-.71-.71a1.004 1.004 0 1 0-1.43 1.41l.73.71ZM21 11h-1a1 1 0 0 0 0 2h1a1 1 0 0 0 0-2Zm-2.64 6A1 1 0 0 0 17 18.36l.71.71a1 1 0 0 0 1.41 0 1 1 0 0 0 0-1.41l-.76-.66ZM12 6.5a5.5 5.5 0 1 0 5.5 5.5A5.51 5.51 0 0 0 12 6.5Zm0 9a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7Zm0 3.5a1 1 0 0 0-1 1v1a1 1 0 0 0 2 0v-1a1 1 0 0 0-1-1Z"/></svg><svg aria-hidden="true" class="dark astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M21.64 13a1 1 0 0 0-1.05-.14 8.049 8.049 0 0 1-3.37.73 8.15 8.15 0 0 1-8.14-8.1 8.59 8.59 0 0 1 .25-2A1 1 0 0 0 8 2.36a10.14 10.14 0 1 0 14 11.69 1 1 0 0 0-.36-1.05Zm-9.5 6.69A8.14 8.14 0 0 1 7.08 5.22v.27a10.15 10.15 0 0 0 10.14 10.14 9.784 9.784 0 0 0 2.1-.22 8.11 8.11 0 0 1-7.18 4.32v-.04Z"/></svg><svg aria-hidden="true" class="auto astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M21 14h-1V7a3 3 0 0 0-3-3H7a3 3 0 0 0-3 3v7H3a1 1 0 0 0-1 1v2a3 3 0 0 0 3 3h14a3 3 0 0 0 3-3v-2a1 1 0 0 0-1-1ZM6 7a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v7H6V7Zm14 10a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-1h16v1Z"/></svg></template><link rel="stylesheet" href="/bomlens/_astro/print.ehPL0gv-.css" media="print"><link rel="stylesheet" href="/bomlens/_astro/common.DxYPfd-D.css"><style>@layer starlight.components{svg:where(.astro-hkc32dio){color:var(--sl-icon-color);font-size:var(--sl-icon-size,1em);width:1em;height:1em;overflow:visible}.sl-link-button:where(.astro-dcqstdaq){font-size:var(--sl-text-sm);outline-offset:.25rem;border:1px solid #0000;border-radius:999rem;align-items:center;gap:.5em;padding:.4375rem 1.125rem;line-height:1.1875;text-decoration:none;display:inline-flex}.sl-link-button:where(.astro-dcqstdaq).primary{background:var(--sl-color-text-accent);border-color:var(--sl-color-text-accent);color:var(--sl-color-black)}.sl-link-button:where(.astro-dcqstdaq).primary:hover{color:var(--sl-color-black)}.sl-link-button:where(.astro-dcqstdaq).secondary{border-color:inherit;color:var(--sl-color-white)}.sl-link-button:where(.astro-dcqstdaq).minimal{color:var(--sl-color-white);padding-inline:0}.sl-link-button:where(.astro-dcqstdaq) svg{flex-shrink:0}@media (width>=50rem){.sl-link-button:where(.astro-dcqstdaq){font-size:var(--sl-text-base);padding:.9375rem 1.25rem}}.sl-markdown-content .sl-link-button:where(.astro-dcqstdaq){margin-inline-end:1rem}.sl-markdown-content .sl-link-button:where(.astro-dcqstdaq):not(:where(p *)){margin-block:1rem}}
+</style><script type="module" src="/bomlens/_astro/page.cNngjUgL.js"></script></head><body class="astro-g5ptsecz"><a class="sl-skip-link astro-qb7clj6f" href="#_top">Skip to content</a><div class="page sl-flex astro-yntsjkba"><header class="header astro-yntsjkba"><div class="header astro-by6fddyj"><div class="title-wrapper sl-flex astro-by6fddyj"><a href="/bomlens/" class="site-title sl-flex astro-6rvad3va"><span class="astro-6rvad3va" translate="no">BomLens</span></a></div><div class="sl-flex print:hidden astro-by6fddyj"><site-search class="astro-by6fddyj astro-b5kgnn7o" data-translations="{&quot;placeholder&quot;:&quot;Search&quot;}"><button data-open-modal disabled aria-label="Search" aria-keyshortcuts="Control+K" class="astro-b5kgnn7o"><svg aria-hidden="true" class="astro-b5kgnn7o astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M21.71 20.29 18 16.61A9 9 0 1 0 16.61 18l3.68 3.68a.999.999 0 0 0 1.42 0 1 1 0 0 0 0-1.39ZM11 18a7 7 0 1 1 0-14 7 7 0 0 1 0 14Z"/></svg><span class="sl-hidden md:sl-block astro-b5kgnn7o" aria-hidden="true">Search</span><kbd class="sl-hidden md:sl-flex astro-b5kgnn7o" style="display: none;"><kbd class="astro-b5kgnn7o">Ctrl</kbd><kbd class="astro-b5kgnn7o">K</kbd></kbd></button><dialog style="padding:0" aria-label="Search" class="astro-b5kgnn7o"><div class="dialog-frame sl-flex astro-b5kgnn7o"><button data-close-modal class="sl-flex md:sl-hidden astro-b5kgnn7o">Cancel</button><div class="search-container astro-b5kgnn7o"><div id="starlight__search" class="astro-b5kgnn7o"></div></div></div></dialog></site-search><script>
+	(() => {
+		const openBtn = document.querySelector('button[data-open-modal]');
+		const shortcut = openBtn?.querySelector('kbd');
+		if (!openBtn || !(shortcut instanceof HTMLElement)) return;
+		const platformKey = shortcut.querySelector('kbd');
+		if (platformKey && /(Mac|iPhone|iPod|iPad)/i.test(navigator.platform)) {
+			platformKey.textContent = '⌘';
+			openBtn.setAttribute('aria-keyshortcuts', 'Meta+K');
+		}
+		shortcut.style.display = '';
+	})();
+</script><script type="module" src="/bomlens/_astro/Search.astro_astro_type_script_index_0_lang.BSqzOScY.js"></script></div><div class="sl-hidden md:sl-flex print:hidden right-group astro-by6fddyj"><div class="sl-flex social-icons astro-by6fddyj"><a href="https://github.com/sktelecom/bomlens" rel="me" class="sl-flex astro-n2mnl6yq"><span class="sr-only astro-n2mnl6yq">GitHub</span><svg aria-hidden="true" class="astro-n2mnl6yq astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M12 .3a12 12 0 0 0-3.8 23.38c.6.12.83-.26.83-.57L9 21.07c-3.34.72-4.04-1.61-4.04-1.61-.55-1.39-1.34-1.76-1.34-1.76-1.08-.74.09-.73.09-.73 1.2.09 1.83 1.24 1.83 1.24 1.08 1.83 2.81 1.3 3.5 1 .1-.78.42-1.31.76-1.61-2.67-.3-5.47-1.33-5.47-5.93 0-1.31.47-2.38 1.24-3.22-.14-.3-.54-1.52.1-3.18 0 0 1-.32 3.3 1.23a11.5 11.5 0 0 1 6 0c2.28-1.55 3.29-1.23 3.29-1.23.64 1.66.24 2.88.12 3.18a4.65 4.65 0 0 1 1.23 3.22c0 4.61-2.8 5.63-5.48 5.92.42.36.81 1.1.81 2.22l-.01 3.29c0 .31.2.69.82.57A12 12 0 0 0 12 .3Z"/></svg></a></div><starlight-theme-select><label style="--sl-select-width: 6.25em" class="astro-2z5xp7gb"><span class="sr-only astro-2z5xp7gb">Select theme</span><svg aria-hidden="true" class="icon label-icon astro-2z5xp7gb astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M21 14h-1V7a3 3 0 0 0-3-3H7a3 3 0 0 0-3 3v7H3a1 1 0 0 0-1 1v2a3 3 0 0 0 3 3h14a3 3 0 0 0 3-3v-2a1 1 0 0 0-1-1ZM6 7a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v7H6V7Zm14 10a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-1h16v1Z"/></svg><select autocomplete="off" class="astro-2z5xp7gb"><option value="dark" class="astro-2z5xp7gb">Dark</option><option value="light" class="astro-2z5xp7gb">Light</option><option value="auto" selected class="astro-2z5xp7gb">Auto</option></select><svg aria-hidden="true" class="icon caret astro-2z5xp7gb astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M17 9.17a1 1 0 0 0-1.41 0L12 12.71 8.46 9.17a1 1 0 1 0-1.41 1.42l4.24 4.24a1.002 1.002 0 0 0 1.42 0L17 10.59a1.002 1.002 0 0 0 0-1.42Z"/></svg></label></starlight-theme-select><script>
+	StarlightThemeProvider.updatePickers();
+</script><script type="module">var e=`starlight-theme`,t=e=>e===`auto`||e===`dark`||e===`light`?e:`auto`,n=()=>t(typeof localStorage<`u`&&localStorage.getItem(e));function r(t){typeof localStorage<`u`&&localStorage.setItem(e,t===`light`||t===`dark`?t:``)}var i=()=>matchMedia(`(prefers-color-scheme: light)`).matches?`light`:`dark`;function a(e){StarlightThemeProvider.updatePickers(e),document.documentElement.dataset.theme=e===`auto`?i():e,r(e)}matchMedia(`(prefers-color-scheme: light)`).addEventListener(`change`,()=>{n()===`auto`&&a(`auto`)});var o=class extends HTMLElement{constructor(){super(),a(n()),this.querySelector(`select`)?.addEventListener(`change`,e=>{e.currentTarget instanceof HTMLSelectElement&&a(t(e.currentTarget.value))})}};customElements.define(`starlight-theme-select`,o);</script><starlight-lang-select><label style="--sl-select-width: 7em" class="astro-2z5xp7gb"><span class="sr-only astro-2z5xp7gb">Select language</span><svg aria-hidden="true" class="icon label-icon astro-2z5xp7gb astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path fill-rule="evenodd" d="M8.516 3a.94.94 0 0 0-.941.94v1.15H2.94a.94.94 0 1 0 0 1.882h7.362a7.422 7.422 0 0 1-1.787 3.958 7.42 7.42 0 0 1-1.422-2.425.94.94 0 1 0-1.774.627 9.303 9.303 0 0 0 1.785 3.043 7.422 7.422 0 0 1-4.164 1.278.94.94 0 1 0 0 1.881 9.303 9.303 0 0 0 5.575-1.855 9.303 9.303 0 0 0 4.11 1.74l-.763 1.525a.968.968 0 0 0-.016.034l-1.385 2.77a.94.94 0 1 0 1.683.841l1.133-2.267h5.806l1.134 2.267a.94.94 0 0 0 1.683-.841l-1.385-2.769a.95.95 0 0 0-.018-.036l-3.476-6.951a.94.94 0 0 0-1.682 0l-1.82 3.639a7.423 7.423 0 0 1-3.593-1.256 9.303 9.303 0 0 0 2.27-5.203h1.894a.94.94 0 0 0 0-1.881H9.456V3.94A.94.94 0 0 0 8.516 3Zm6.426 11.794a1.068 1.068 0 0 1-.02.039l-.703 1.407h3.924l-1.962-3.924-1.24 2.478Z" clip-rule="evenodd"/></svg><select autocomplete="off" class="astro-2z5xp7gb"><option value="/bomlens/concepts/architecture/" class="astro-2z5xp7gb">English</option><option value="/bomlens/ko/concepts/architecture/" class="astro-2z5xp7gb">한국어</option></select><svg aria-hidden="true" class="icon caret astro-2z5xp7gb astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M17 9.17a1 1 0 0 0-1.41 0L12 12.71 8.46 9.17a1 1 0 1 0-1.41 1.42l4.24 4.24a1.002 1.002 0 0 0 1.42 0L17 10.59a1.002 1.002 0 0 0 0-1.42Z"/></svg></label></starlight-lang-select><script type="module">var e=class extends HTMLElement{constructor(){super();let e=this.querySelector(`select`);e&&(e.addEventListener(`change`,e=>{e.currentTarget instanceof HTMLSelectElement&&(window.location.pathname=e.currentTarget.value)}),window.addEventListener(`pageshow`,t=>{if(!t.persisted)return;let n=e.querySelector(`option[selected]`)?.index;n!==e.selectedIndex&&(e.selectedIndex=n??0)}))}};customElements.define(`starlight-lang-select`,e);</script></div></div></header><nav class="sidebar print:hidden astro-yntsjkba" aria-label="Main"><button popovertarget="starlight__sidebar" class="sl-menu-button sl-flex md:sl-hidden print:hidden astro-r2osgdlg"><svg aria-hidden="true" class="open-menu astro-r2osgdlg astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M3 8h18a1 1 0 1 0 0-2H3a1 1 0 0 0 0 2Zm18 8H3a1 1 0 0 0 0 2h18a1 1 0 0 0 0-2Zm0-5H3a1 1 0 0 0 0 2h18a1 1 0 0 0 0-2Z"/></svg><svg aria-hidden="true" class="close-menu astro-r2osgdlg astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="m13.41 12 6.3-6.29a1.004 1.004 0 1 0-1.42-1.42L12 10.59l-6.29-6.3a1.004 1.004 0 0 0-1.42 1.42l6.3 6.29-6.3 6.29a1 1 0 0 0 0 1.42.998.998 0 0 0 1.42 0l6.29-6.3 6.29 6.3a.999.999 0 0 0 1.42 0 1 1 0 0 0 0-1.42L13.41 12Z"/></svg><span class="sr-only astro-r2osgdlg">Menu</span></button><script type="module">var e=class extends HTMLElement{constructor(){super();let e=matchMedia(`(min-width: 50em)`),t=()=>{this.popover=e.matches?null:`auto`};t(),e.addEventListener(`change`,()=>t()),this.addEventListener(`toggle`,({newState:e})=>this.trapFocus(e===`open`))}trapFocus(e){document.querySelectorAll(`.main-frame, .sl-skip-link`).forEach(t=>{t.toggleAttribute(`inert`,e)})}};customElements.define(`sl-sidebar-pane`,e);</script><sl-sidebar-pane popover id="starlight__sidebar" class="sidebar-pane astro-yntsjkba"><div class="sidebar-content sl-flex astro-yntsjkba"><sl-sidebar-state-persist data-hash="0e9vtkm" class="astro-ipdry5cl"><script aria-hidden="true">
+		(() => {
+			try {
+				if (!matchMedia('(min-width: 50em)').matches) return;
+				/** @type {HTMLElement | null} */
+				const target = document.querySelector('sl-sidebar-state-persist');
+				const state = JSON.parse(sessionStorage.getItem('sl-sidebar-state') || '0');
+				if (!target || !state || target.dataset.hash !== state.hash) return;
+				window._starlightScrollRestore = state.scroll;
+				customElements.define(
+					'sl-sidebar-restore',
+					class SidebarRestore extends HTMLElement {
+						connectedCallback() {
+							try {
+								const idx = parseInt(this.dataset.index || '');
+								const details = this.closest('details');
+								if (details && typeof state.open[idx] === 'boolean') details.open = state.open[idx];
+							} catch {}
+						}
+					}
+				);
+			} catch {}
+		})();
+	</script><ul class="top-level astro-rmhv4bp6"><li class="astro-rmhv4bp6"><details open class="astro-rmhv4bp6"><summary class="astro-rmhv4bp6"><span class="group-label astro-rmhv4bp6"><span class="large astro-rmhv4bp6">Get started</span></span><svg aria-hidden="true" class="caret astro-rmhv4bp6 astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1.25rem;"><path d="m14.83 11.29-4.24-4.24a1 1 0 1 0-1.42 1.41L12.71 12l-3.54 3.54a1 1 0 0 0 0 1.41 1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.24-4.24a1.002 1.002 0 0 0 0-1.42Z"/></svg></summary><sl-sidebar-restore data-index="0"></sl-sidebar-restore><ul class="astro-rmhv4bp6"><li class="astro-rmhv4bp6"><a href="/bomlens/concepts/what-is-sbom/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">What is an SBOM</span></a></li><li class="astro-rmhv4bp6"><a href="/bomlens/start/first-scan/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">Getting started</span></a></li><li class="astro-rmhv4bp6"><a href="/bomlens/start/no-cli/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">No-CLI quick start (no command line)</span></a></li><li class="astro-rmhv4bp6"><a href="/bomlens/reference/ui/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">Web UI &amp; desktop app</span></a></li></ul></details></li><li class="astro-rmhv4bp6"><details open class="astro-rmhv4bp6"><summary class="astro-rmhv4bp6"><span class="group-label astro-rmhv4bp6"><span class="large astro-rmhv4bp6">Guides</span></span><svg aria-hidden="true" class="caret astro-rmhv4bp6 astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1.25rem;"><path d="m14.83 11.29-4.24-4.24a1 1 0 1 0-1.42 1.41L12.71 12l-3.54 3.54a1 1 0 0 0 0 1.41 1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.24-4.24a1.002 1.002 0 0 0 0-1.42Z"/></svg></summary><sl-sidebar-restore data-index="1"></sl-sidebar-restore><ul class="astro-rmhv4bp6"><li class="astro-rmhv4bp6"><a href="/bomlens/guides/ai-model/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">AI model SBOM guide</span></a></li><li class="astro-rmhv4bp6"><a href="/bomlens/guides/by-input/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">Input scenarios guide</span></a></li><li class="astro-rmhv4bp6"><a href="/bomlens/guides/ci-cd/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">Use in CI/CD</span></a></li><li class="astro-rmhv4bp6"><a href="/bomlens/guides/declared-components/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">Declaring your own components</span></a></li><li class="astro-rmhv4bp6"><a href="/bomlens/guides/firmware/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">Firmware analysis guide</span></a></li><li class="astro-rmhv4bp6"><a href="/bomlens/guides/identify-vendored/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">Identify bundled open source (C/C++)</span></a></li><li class="astro-rmhv4bp6"><a href="/bomlens/guides/reports/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">Generate notice, security &amp; risk reports</span></a></li><li class="astro-rmhv4bp6"><a href="/bomlens/guides/server-delivery/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">Server SBOM guide</span></a></li><li class="astro-rmhv4bp6"><a href="/bomlens/guides/supplier-sbom/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">Supplier SBOM validation guide</span></a></li><li class="astro-rmhv4bp6"><a href="/bomlens/guides/upload/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">Upload to Dependency-Track / TRUSCA</span></a></li><li class="astro-rmhv4bp6"><a href="/bomlens/guides/verify-release/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">Verify a release</span></a></li></ul></details></li><li class="astro-rmhv4bp6"><details open class="astro-rmhv4bp6"><summary class="astro-rmhv4bp6"><span class="group-label astro-rmhv4bp6"><span class="large astro-rmhv4bp6">Reference</span></span><svg aria-hidden="true" class="caret astro-rmhv4bp6 astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1.25rem;"><path d="m14.83 11.29-4.24-4.24a1 1 0 1 0-1.42 1.41L12.71 12l-3.54 3.54a1 1 0 0 0 0 1.41 1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.24-4.24a1.002 1.002 0 0 0 0-1.42Z"/></svg></summary><sl-sidebar-restore data-index="2"></sl-sidebar-restore><ul class="astro-rmhv4bp6"><li class="astro-rmhv4bp6"><a href="/bomlens/reference/artifacts/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">Artifacts reference</span></a></li><li class="astro-rmhv4bp6"><a href="/bomlens/reference/cli/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">CLI reference</span></a></li><li class="astro-rmhv4bp6"><a href="/bomlens/reference/docker-image/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">Use the Docker image directly</span></a></li><li class="astro-rmhv4bp6"><a href="/bomlens/reference/ecosystems/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">Supported ecosystems</span></a></li><li class="astro-rmhv4bp6"><a href="/bomlens/reference/engine-contract/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">Engine contract</span></a></li><li class="astro-rmhv4bp6"><a href="/bomlens/reference/ui/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">Web UI &amp; desktop app</span></a></li></ul></details></li><li class="astro-rmhv4bp6"><details open class="astro-rmhv4bp6"><summary class="astro-rmhv4bp6"><span class="group-label astro-rmhv4bp6"><span class="large astro-rmhv4bp6">Concepts</span></span><svg aria-hidden="true" class="caret astro-rmhv4bp6 astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1.25rem;"><path d="m14.83 11.29-4.24-4.24a1 1 0 1 0-1.42 1.41L12.71 12l-3.54 3.54a1 1 0 0 0 0 1.41 1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.24-4.24a1.002 1.002 0 0 0 0-1.42Z"/></svg></summary><sl-sidebar-restore data-index="3"></sl-sidebar-restore><ul class="astro-rmhv4bp6"><li class="astro-rmhv4bp6"><a href="/bomlens/concepts/architecture/" aria-current="page" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">Architecture</span></a></li><li class="astro-rmhv4bp6"><a href="/bomlens/concepts/dependency-resolution/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">How dependencies are resolved</span></a></li><li class="astro-rmhv4bp6"><a href="/bomlens/concepts/limitations/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">What BomLens does not do</span></a></li><li class="astro-rmhv4bp6"><a href="/bomlens/concepts/local-first/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">Local-first by design</span></a></li><li class="astro-rmhv4bp6"><a href="/bomlens/concepts/pipeline-by-input/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">Pipeline by input type</span></a></li><li class="astro-rmhv4bp6"><a href="/bomlens/concepts/reports-explained/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">What the reports mean</span></a></li><li class="astro-rmhv4bp6"><a href="/bomlens/concepts/what-is-sbom/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">What is an SBOM</span></a></li></ul></details></li></ul><script aria-hidden="true">
+		(() => {
+			const scroller = document.getElementById('starlight__sidebar');
+			if (!window._starlightScrollRestore || !scroller) return;
+			scroller.scrollTop = window._starlightScrollRestore;
+			delete window._starlightScrollRestore;
+		})();
+	</script></sl-sidebar-state-persist><div class="md:sl-hidden"><div class="mobile-preferences sl-flex astro-p4azlveh"><div class="social-icons astro-p4azlveh"><a href="https://github.com/sktelecom/bomlens" rel="me" class="sl-flex astro-n2mnl6yq"><span class="sr-only astro-n2mnl6yq">GitHub</span><svg aria-hidden="true" class="astro-n2mnl6yq astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M12 .3a12 12 0 0 0-3.8 23.38c.6.12.83-.26.83-.57L9 21.07c-3.34.72-4.04-1.61-4.04-1.61-.55-1.39-1.34-1.76-1.34-1.76-1.08-.74.09-.73.09-.73 1.2.09 1.83 1.24 1.83 1.24 1.08 1.83 2.81 1.3 3.5 1 .1-.78.42-1.31.76-1.61-2.67-.3-5.47-1.33-5.47-5.93 0-1.31.47-2.38 1.24-3.22-.14-.3-.54-1.52.1-3.18 0 0 1-.32 3.3 1.23a11.5 11.5 0 0 1 6 0c2.28-1.55 3.29-1.23 3.29-1.23.64 1.66.24 2.88.12 3.18a4.65 4.65 0 0 1 1.23 3.22c0 4.61-2.8 5.63-5.48 5.92.42.36.81 1.1.81 2.22l-.01 3.29c0 .31.2.69.82.57A12 12 0 0 0 12 .3Z"/></svg></a></div><starlight-theme-select><label style="--sl-select-width: 6.25em" class="astro-2z5xp7gb"><span class="sr-only astro-2z5xp7gb">Select theme</span><svg aria-hidden="true" class="icon label-icon astro-2z5xp7gb astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M21 14h-1V7a3 3 0 0 0-3-3H7a3 3 0 0 0-3 3v7H3a1 1 0 0 0-1 1v2a3 3 0 0 0 3 3h14a3 3 0 0 0 3-3v-2a1 1 0 0 0-1-1ZM6 7a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v7H6V7Zm14 10a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-1h16v1Z"/></svg><select autocomplete="off" class="astro-2z5xp7gb"><option value="dark" class="astro-2z5xp7gb">Dark</option><option value="light" class="astro-2z5xp7gb">Light</option><option value="auto" selected class="astro-2z5xp7gb">Auto</option></select><svg aria-hidden="true" class="icon caret astro-2z5xp7gb astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M17 9.17a1 1 0 0 0-1.41 0L12 12.71 8.46 9.17a1 1 0 1 0-1.41 1.42l4.24 4.24a1.002 1.002 0 0 0 1.42 0L17 10.59a1.002 1.002 0 0 0 0-1.42Z"/></svg></label></starlight-theme-select><script>
+	StarlightThemeProvider.updatePickers();
+</script><starlight-lang-select><label style="--sl-select-width: 7em" class="astro-2z5xp7gb"><span class="sr-only astro-2z5xp7gb">Select language</span><svg aria-hidden="true" class="icon label-icon astro-2z5xp7gb astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path fill-rule="evenodd" d="M8.516 3a.94.94 0 0 0-.941.94v1.15H2.94a.94.94 0 1 0 0 1.882h7.362a7.422 7.422 0 0 1-1.787 3.958 7.42 7.42 0 0 1-1.422-2.425.94.94 0 1 0-1.774.627 9.303 9.303 0 0 0 1.785 3.043 7.422 7.422 0 0 1-4.164 1.278.94.94 0 1 0 0 1.881 9.303 9.303 0 0 0 5.575-1.855 9.303 9.303 0 0 0 4.11 1.74l-.763 1.525a.968.968 0 0 0-.016.034l-1.385 2.77a.94.94 0 1 0 1.683.841l1.133-2.267h5.806l1.134 2.267a.94.94 0 0 0 1.683-.841l-1.385-2.769a.95.95 0 0 0-.018-.036l-3.476-6.951a.94.94 0 0 0-1.682 0l-1.82 3.639a7.423 7.423 0 0 1-3.593-1.256 9.303 9.303 0 0 0 2.27-5.203h1.894a.94.94 0 0 0 0-1.881H9.456V3.94A.94.94 0 0 0 8.516 3Zm6.426 11.794a1.068 1.068 0 0 1-.02.039l-.703 1.407h3.924l-1.962-3.924-1.24 2.478Z" clip-rule="evenodd"/></svg><select autocomplete="off" class="astro-2z5xp7gb"><option value="/bomlens/concepts/architecture/" class="astro-2z5xp7gb">English</option><option value="/bomlens/ko/concepts/architecture/" class="astro-2z5xp7gb">한국어</option></select><svg aria-hidden="true" class="icon caret astro-2z5xp7gb astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M17 9.17a1 1 0 0 0-1.41 0L12 12.71 8.46 9.17a1 1 0 1 0-1.41 1.42l4.24 4.24a1.002 1.002 0 0 0 1.42 0L17 10.59a1.002 1.002 0 0 0 0-1.42Z"/></svg></label></starlight-lang-select></div></div></div></sl-sidebar-pane></nav><div class="main-frame astro-yntsjkba"><script type="module">var e=document.getElementById(`starlight__sidebar`),t=e?.querySelector(`sl-sidebar-state-persist`),n=`sl-sidebar-state`,r=()=>{let r=[],i=t?.dataset.hash||``;try{let e=sessionStorage.getItem(n),t=JSON.parse(e||`{}`);Array.isArray(t.open)&&t.hash===i&&(r=t.open)}catch{}return{hash:i,open:r,scroll:e?.scrollTop||0}},i=e=>{try{sessionStorage.setItem(n,JSON.stringify(e))}catch{}},a=()=>i(r()),o=(e,t)=>{let n=r();n.open[t]=e,i(n)};t?.addEventListener(`click`,e=>{if(!(e.target instanceof Element))return;let t=e.target.closest(`summary`)?.closest(`details`);if(!t)return;let n=t.querySelector(`sl-sidebar-restore`),r=parseInt(n?.dataset.index||``);isNaN(r)||o(!t.open,r)}),addEventListener(`visibilitychange`,()=>{document.visibilityState===`hidden`&&a()});</script><div class="lg:sl-flex astro-lrzkfocr"><aside class="right-sidebar-container print:hidden astro-lrzkfocr"><div class="right-sidebar astro-lrzkfocr"><div class="lg:sl-hidden astro-qok35upx"><mobile-starlight-toc data-min-h="2" data-max-h="3" class="astro-66cqc7ze"><nav aria-labelledby="starlight__on-this-page--mobile" class="astro-66cqc7ze"><details id="starlight__mobile-toc" class="astro-66cqc7ze"><summary id="starlight__on-this-page--mobile" class="sl-flex astro-66cqc7ze"><span class="toggle sl-flex astro-66cqc7ze">On this page<svg aria-hidden="true" class="caret astro-66cqc7ze astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1rem;"><path d="m14.83 11.29-4.24-4.24a1 1 0 1 0-1.42 1.41L12.71 12l-3.54 3.54a1 1 0 0 0 0 1.41 1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.24-4.24a1.002 1.002 0 0 0 0-1.42Z"/></svg></span><span class="display-current astro-66cqc7ze"></span></summary><div class="dropdown astro-66cqc7ze"><ul class="isMobile astro-jugkfwgx" style="--depth: 0;"><li style="--depth: 0;" class="astro-jugkfwgx"><a href="#_top" style="--depth: 0;" class="astro-jugkfwgx"><span style="--depth: 0;" class="astro-jugkfwgx">Overview</span></a></li><li style="--depth: 0;" class="astro-jugkfwgx"><a href="#at-a-glance" style="--depth: 0;" class="astro-jugkfwgx"><span style="--depth: 0;" class="astro-jugkfwgx">At a glance</span></a></li><li style="--depth: 0;" class="astro-jugkfwgx"><a href="#why-two-stages" style="--depth: 0;" class="astro-jugkfwgx"><span style="--depth: 0;" class="astro-jugkfwgx">Why two stages</span></a></li><li style="--depth: 0;" class="astro-jugkfwgx"><a href="#tool-inventory" style="--depth: 0;" class="astro-jugkfwgx"><span style="--depth: 0;" class="astro-jugkfwgx">Tool inventory</span></a></li><li style="--depth: 0;" class="astro-jugkfwgx"><a href="#full-pipeline-flow" style="--depth: 0;" class="astro-jugkfwgx"><span style="--depth: 0;" class="astro-jugkfwgx">Full pipeline flow</span></a></li><li style="--depth: 0;" class="astro-jugkfwgx"><a href="#stage-1-sbom-generation" style="--depth: 0;" class="astro-jugkfwgx"><span style="--depth: 0;" class="astro-jugkfwgx">Stage 1: SBOM generation</span></a><ul class="isMobile astro-jugkfwgx" style="--depth: 1;"><li style="--depth: 1;" class="astro-jugkfwgx"><a href="#source-code-modesource-cdxgen-language-image" style="--depth: 1;" class="astro-jugkfwgx"><span style="--depth: 1;" class="astro-jugkfwgx">Source code (MODE=SOURCE): cdxgen language image</span></a></li><li style="--depth: 1;" class="astro-jugkfwgx"><a href="#image--binary--directory-syft" style="--depth: 1;" class="astro-jugkfwgx"><span style="--depth: 1;" class="astro-jugkfwgx">Image / binary / directory: syft</span></a></li></ul></li><li style="--depth: 0;" class="astro-jugkfwgx"><a href="#stage-2-post-processing-pipeline" style="--depth: 0;" class="astro-jugkfwgx"><span style="--depth: 0;" class="astro-jugkfwgx">Stage 2: post-processing pipeline</span></a></li><li style="--depth: 0;" class="astro-jugkfwgx"><a href="#branching-by-input-type" style="--depth: 0;" class="astro-jugkfwgx"><span style="--depth: 0;" class="astro-jugkfwgx">Branching by input type</span></a></li><li style="--depth: 0;" class="astro-jugkfwgx"><a href="#flag-to-step-mapping" style="--depth: 0;" class="astro-jugkfwgx"><span style="--depth: 0;" class="astro-jugkfwgx">Flag-to-step mapping</span></a></li><li style="--depth: 0;" class="astro-jugkfwgx"><a href="#artifacts" style="--depth: 0;" class="astro-jugkfwgx"><span style="--depth: 0;" class="astro-jugkfwgx">Artifacts</span></a></li><li style="--depth: 0;" class="astro-jugkfwgx"><a href="#extension-points" style="--depth: 0;" class="astro-jugkfwgx"><span style="--depth: 0;" class="astro-jugkfwgx">Extension points</span></a><ul class="isMobile astro-jugkfwgx" style="--depth: 1;"><li style="--depth: 1;" class="astro-jugkfwgx"><a href="#adding-support-for-a-new-language" style="--depth: 1;" class="astro-jugkfwgx"><span style="--depth: 1;" class="astro-jugkfwgx">Adding support for a new language</span></a></li><li style="--depth: 1;" class="astro-jugkfwgx"><a href="#adding-a-new-post-processing-step" style="--depth: 1;" class="astro-jugkfwgx"><span style="--depth: 1;" class="astro-jugkfwgx">Adding a new post-processing step</span></a></li></ul></li><li style="--depth: 0;" class="astro-jugkfwgx"><a href="#design-principles" style="--depth: 0;" class="astro-jugkfwgx"><span style="--depth: 0;" class="astro-jugkfwgx">Design principles</span></a></li><li style="--depth: 0;" class="astro-jugkfwgx"><a href="#division-of-roles-trusca" style="--depth: 0;" class="astro-jugkfwgx"><span style="--depth: 0;" class="astro-jugkfwgx">Division of roles (TRUSCA)</span></a></li></ul></div></details></nav></mobile-starlight-toc><script type="module" src="/bomlens/_astro/MobileTableOfContents.astro_astro_type_script_index_0_lang.C3fM4Kra.js"></script></div><div class="right-sidebar-panel sl-hidden lg:sl-block astro-qok35upx"><div class="sl-container astro-qok35upx"><starlight-toc data-min-h="2" data-max-h="3"><nav aria-labelledby="starlight__on-this-page"><h2 id="starlight__on-this-page">On this page</h2><ul class="astro-jugkfwgx" style="--depth: 0;"><li style="--depth: 0;" class="astro-jugkfwgx"><a href="#_top" style="--depth: 0;" class="astro-jugkfwgx"><span style="--depth: 0;" class="astro-jugkfwgx">Overview</span></a></li><li style="--depth: 0;" class="astro-jugkfwgx"><a href="#at-a-glance" style="--depth: 0;" class="astro-jugkfwgx"><span style="--depth: 0;" class="astro-jugkfwgx">At a glance</span></a></li><li style="--depth: 0;" class="astro-jugkfwgx"><a href="#why-two-stages" style="--depth: 0;" class="astro-jugkfwgx"><span style="--depth: 0;" class="astro-jugkfwgx">Why two stages</span></a></li><li style="--depth: 0;" class="astro-jugkfwgx"><a href="#tool-inventory" style="--depth: 0;" class="astro-jugkfwgx"><span style="--depth: 0;" class="astro-jugkfwgx">Tool inventory</span></a></li><li style="--depth: 0;" class="astro-jugkfwgx"><a href="#full-pipeline-flow" style="--depth: 0;" class="astro-jugkfwgx"><span style="--depth: 0;" class="astro-jugkfwgx">Full pipeline flow</span></a></li><li style="--depth: 0;" class="astro-jugkfwgx"><a href="#stage-1-sbom-generation" style="--depth: 0;" class="astro-jugkfwgx"><span style="--depth: 0;" class="astro-jugkfwgx">Stage 1: SBOM generation</span></a><ul class="astro-jugkfwgx" style="--depth: 1;"><li style="--depth: 1;" class="astro-jugkfwgx"><a href="#source-code-modesource-cdxgen-language-image" style="--depth: 1;" class="astro-jugkfwgx"><span style="--depth: 1;" class="astro-jugkfwgx">Source code (MODE=SOURCE): cdxgen language image</span></a></li><li style="--depth: 1;" class="astro-jugkfwgx"><a href="#image--binary--directory-syft" style="--depth: 1;" class="astro-jugkfwgx"><span style="--depth: 1;" class="astro-jugkfwgx">Image / binary / directory: syft</span></a></li></ul></li><li style="--depth: 0;" class="astro-jugkfwgx"><a href="#stage-2-post-processing-pipeline" style="--depth: 0;" class="astro-jugkfwgx"><span style="--depth: 0;" class="astro-jugkfwgx">Stage 2: post-processing pipeline</span></a></li><li style="--depth: 0;" class="astro-jugkfwgx"><a href="#branching-by-input-type" style="--depth: 0;" class="astro-jugkfwgx"><span style="--depth: 0;" class="astro-jugkfwgx">Branching by input type</span></a></li><li style="--depth: 0;" class="astro-jugkfwgx"><a href="#flag-to-step-mapping" style="--depth: 0;" class="astro-jugkfwgx"><span style="--depth: 0;" class="astro-jugkfwgx">Flag-to-step mapping</span></a></li><li style="--depth: 0;" class="astro-jugkfwgx"><a href="#artifacts" style="--depth: 0;" class="astro-jugkfwgx"><span style="--depth: 0;" class="astro-jugkfwgx">Artifacts</span></a></li><li style="--depth: 0;" class="astro-jugkfwgx"><a href="#extension-points" style="--depth: 0;" class="astro-jugkfwgx"><span style="--depth: 0;" class="astro-jugkfwgx">Extension points</span></a><ul class="astro-jugkfwgx" style="--depth: 1;"><li style="--depth: 1;" class="astro-jugkfwgx"><a href="#adding-support-for-a-new-language" style="--depth: 1;" class="astro-jugkfwgx"><span style="--depth: 1;" class="astro-jugkfwgx">Adding support for a new language</span></a></li><li style="--depth: 1;" class="astro-jugkfwgx"><a href="#adding-a-new-post-processing-step" style="--depth: 1;" class="astro-jugkfwgx"><span style="--depth: 1;" class="astro-jugkfwgx">Adding a new post-processing step</span></a></li></ul></li><li style="--depth: 0;" class="astro-jugkfwgx"><a href="#design-principles" style="--depth: 0;" class="astro-jugkfwgx"><span style="--depth: 0;" class="astro-jugkfwgx">Design principles</span></a></li><li style="--depth: 0;" class="astro-jugkfwgx"><a href="#division-of-roles-trusca" style="--depth: 0;" class="astro-jugkfwgx"><span style="--depth: 0;" class="astro-jugkfwgx">Division of roles (TRUSCA)</span></a></li></ul></nav></starlight-toc><script type="module" src="/bomlens/_astro/TableOfContents.astro_astro_type_script_index_0_lang.BpJaGz7G.js"></script></div></div></div></aside><div class="main-pane astro-lrzkfocr"><main data-pagefind-body class="astro-g5ptsecz" lang="en" dir="ltr"><div class="content-panel astro-a7po4psb"><div class="sl-container astro-a7po4psb"><nav class="breadcrumbs astro-u72m6wot" aria-label="Breadcrumb"><ol class="astro-u72m6wot"><li class="astro-u72m6wot"><a href="/bomlens/" class="astro-u72m6wot">Home</a></li><li class="astro-u72m6wot"><span class="astro-u72m6wot">Concepts</span></li></ol></nav><h1 id="_top" class="astro-u72m6wot">Architecture</h1></div></div><div class="content-panel astro-a7po4psb"><div class="sl-container astro-a7po4psb"><div class="sl-markdown-content"><p>This document describes the overall system structure of BomLens and explains which tool runs at which step of the scan pipeline, and in what order.</p>
+<p>For the per-input tool flow (source code with the ScanCode and SCANOSS options, firmware, a received SBOM, and an AI model), see <a href="/bomlens/concepts/pipeline-by-input/">Pipeline by input type</a>.</p>
+<blockquote>
+<p>This document reflects the 2-stage architecture as currently implemented. The Stage 1 routing in the source code (detect the language, then run the official cdxgen language image) is implemented and working in <code dir="auto">scripts/scan-sbom.sh</code>.</p>
+</blockquote>
+<div class="sl-heading-wrapper level-h2"><h2 id="at-a-glance">At a glance</h2><a class="sl-anchor-link" href="#at-a-glance"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “At a glance”</span></a></div>
+<p>BomLens is a 2-stage pipeline in which two kinds of Docker images work together.</p>
+<ul>
+<li>Stage 1, generation: for source code, the official per-language cdxgen images generate the SBOM (CycloneDX 1.6 by default, or 1.7 with <code dir="auto">--spec-version 1.7</code>); for container images, binaries, and directories, syft does.</li>
+<li>Stage 2, post-processing: the lightweight <code dir="auto">bomlens</code> image takes the SBOM and runs normalization, optional deep license detection, notice generation, the security report, signing, and upload in order.</li>
+</ul>
+<p><img alt="BomLens two-stage pipeline: per-language cdxgen images or syft build bom.json, and the bomlens image post-processes it" loading="lazy" decoding="async" width="1920" height="940" src="/bomlens/_astro/architecture-overview.CZsQgShw_Z2lYgua.webp"></p>
+<p>The single entry point for orchestration is <code dir="auto">scripts/scan-sbom.sh</code> (<code dir="auto">scan-sbom.bat</code> on Windows); this is the only script users invoke.</p>
+<div class="sl-heading-wrapper level-h2"><h2 id="why-two-stages">Why two stages</h2><a class="sl-anchor-link" href="#why-two-stages"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “Why two stages”</span></a></div>
+<p>Previously, every language runtime plus every analysis tool lived in a single huge image. The redesigned pipeline splits the responsibilities in two.</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>Stage 1 image</th>
+<th>Stage 2 image (<code dir="auto">bomlens</code>)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Role</td>
+<td>Generates the SBOM from source</td>
+<td>SBOM post-processing (normalization, notice, security, signing, upload) plus syft scans</td>
+</tr>
+<tr>
+<td>Contents</td>
+<td>Official per-language cdxgen images (java, python, node, …)</td>
+<td>No language toolchain, lightweight <code dir="auto">python:3.12-slim</code></td>
+</tr>
+<tr>
+<td>Acquisition</td>
+<td>Pulled on demand after detecting the project language</td>
+<td>Pulled once and reused</td>
+</tr>
+<tr>
+<td>Benefit</td>
+<td>cdxgen maintains up-to-date per-language toolchains</td>
+<td>Small image; pinned tool versions ensure reproducibility</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p><code dir="auto">build-prep.sh</code> runs the ecosystem’s build tool before cdxgen (Cargo, Bundler, Composer and Swift only when no lock file is committed), so that cdxgen sees the full dependency graph instead of only the manifest’s direct dependencies. What runs for each ecosystem is in <a href="/bomlens/concepts/dependency-resolution/">How dependencies are resolved</a>. To compare this against running cdxgen alone, see <a href="https://github.com/sktelecom/bomlens/blob/main/tests/compare-cdxgen-vs-docker.sh"><code dir="auto">tests/compare-cdxgen-vs-docker.sh</code></a>.</p>
+</blockquote>
+<div class="sl-heading-wrapper level-h2"><h2 id="tool-inventory">Tool inventory</h2><a class="sl-anchor-link" href="#tool-inventory"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “Tool inventory”</span></a></div>
+<p>The tools the pipeline invokes.</p>
+<table>
+<thead>
+<tr>
+<th>Tool</th>
+<th>Stage</th>
+<th>Role</th>
+<th>Enabled when</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>cdxgen</td>
+<td>Stage 1</td>
+<td>Generates the SBOM from source code (<code dir="auto">--spec-version 1.6</code>, or <code dir="auto">1.7</code> when the scan asks for it)</td>
+<td><code dir="auto">MODE=SOURCE</code></td>
+</tr>
+<tr>
+<td>build-prep.sh</td>
+<td>Stage 1</td>
+<td>Runs the ecosystem’s build tool before cdxgen (some steps only when no lock file is committed) and narrows the SBOM to what ships</td>
+<td><code dir="auto">MODE=SOURCE</code></td>
+</tr>
+<tr>
+<td>syft</td>
+<td>Stage 1</td>
+<td>Scans images, binaries, and root filesystems</td>
+<td><code dir="auto">MODE=IMAGE/BINARY/ROOTFS</code></td>
+</tr>
+<tr>
+<td>jq (<code dir="auto">normalize-sbom.sh</code>)</td>
+<td>Stage 2</td>
+<td>Normalizes and sorts the SBOM</td>
+<td>Always</td>
+</tr>
+<tr>
+<td>ScanCode Toolkit</td>
+<td>Stage 2</td>
+<td>Precise license detection on first-party source</td>
+<td><code dir="auto">--deep-license</code> (opt-in build)</td>
+</tr>
+<tr>
+<td>SCANOSS</td>
+<td>Stage 2</td>
+<td>Identify vendored open source in C/C++ source with no package manager</td>
+<td><code dir="auto">--identify-vendored</code></td>
+</tr>
+<tr>
+<td>jq (<code dir="auto">generate-notice.sh</code>)</td>
+<td>Stage 2</td>
+<td>Generates the open source notice (NOTICE)</td>
+<td><code dir="auto">--notice</code> / <code dir="auto">--all</code></td>
+</tr>
+<tr>
+<td>Trivy</td>
+<td>Stage 2</td>
+<td>Vulnerability (CVE) security report</td>
+<td><code dir="auto">--security</code> / <code dir="auto">--all</code></td>
+</tr>
+<tr>
+<td>Cosign</td>
+<td>Stage 2</td>
+<td>Detached SBOM signature</td>
+<td><code dir="auto">--sign</code></td>
+</tr>
+<tr>
+<td>curl</td>
+<td>Stage 2</td>
+<td>Upload to Dependency-Track</td>
+<td>Default (unless <code dir="auto">--generate-only</code>)</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>Versions are pinned as <code dir="auto">ARG</code>s in <code dir="auto">docker/Dockerfile</code> and listed in <a href="/bomlens/reference/docker-image/">Docker image</a>. To keep the image lean, ScanCode is an opt-in build arg (<code dir="auto">--build-arg SBOM_DEEP_LICENSE=true</code>). The SCANOSS client is included by default; build with <code dir="auto">--build-arg SBOM_SCANOSS=false</code> to drop it. Firmware unpacking/identification (unblob, cve-bin-tool) ships in the separate opt-in <code dir="auto">bomlens-firmware</code> image, and AI-model SBOM generation (OWASP AIBOM Generator) in <code dir="auto">bomlens-aibom</code>. For the per-input tool flow, see <a href="/bomlens/concepts/pipeline-by-input/">Pipeline by input type</a>.</p>
+</blockquote>
+<div class="sl-heading-wrapper level-h2"><h2 id="full-pipeline-flow">Full pipeline flow</h2><a class="sl-anchor-link" href="#full-pipeline-flow"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “Full pipeline flow”</span></a></div>
+<p>The order in which tools are invoked, in one diagram. Dashed boxes are optional steps enabled by flags.</p>
+<p><img alt="Full tool order: build-prep and cdxgen, or syft, produce bom.json, then the numbered post-processing steps run through upload" loading="lazy" decoding="async" width="1920" height="2680" src="/bomlens/_astro/architecture-full-pipeline.pZSiUljY_Z1un4WY.webp"></p>
+<p>The sequence from the user’s invocation through post-processing:</p>
+<div class="expressive-code"><link rel="stylesheet" href="/bomlens/_astro/ec.klmer.css"><script type="module" src="/bomlens/_astro/ec.0vx5m.js"></script><figure class="frame not-content"><figcaption class="header"></figcaption><pre data-language="mermaid"><code><div class="ec-line"><div class="code"><span style="--0:#BF3441;--1:#F97583">sequenceDiagram</span></div></div><div class="ec-line"><div class="code"><span class="indent">    </span><span style="--0:#BF3441;--1:#F97583">autonumber</span></div></div><div class="ec-line"><div class="code"><span class="indent">    </span><span style="--0:#BF3441;--1:#F97583">actor</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#AE4B07;--1:#FFAB70">U</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#BF3441;--1:#F97583">as</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#032F62;--1:#9ECBFF">User</span></div></div><div class="ec-line"><div class="code"><span class="indent">    </span><span style="--0:#BF3441;--1:#F97583">participant</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#AE4B07;--1:#FFAB70">S</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#BF3441;--1:#F97583">as</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#032F62;--1:#9ECBFF">scan</span><span style="--0:#24292E;--1:#E1E4E8">-sbom.sh</span></div></div><div class="ec-line"><div class="code"><span class="indent">    </span><span style="--0:#BF3441;--1:#F97583">participant</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#AE4B07;--1:#FFAB70">D</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#BF3441;--1:#F97583">as</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#032F62;--1:#9ECBFF">Docker</span></div></div><div class="ec-line"><div class="code"><span class="indent">    </span><span style="--0:#BF3441;--1:#F97583">participant</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#AE4B07;--1:#FFAB70">L</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#BF3441;--1:#F97583">as</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#032F62;--1:#9ECBFF">Stage 1 language image</span></div></div><div class="ec-line"><div class="code"><span class="indent">    </span><span style="--0:#BF3441;--1:#F97583">participant</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#AE4B07;--1:#FFAB70">P</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#BF3441;--1:#F97583">as</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#032F62;--1:#9ECBFF">bomlens (run</span><span style="--0:#24292E;--1:#E1E4E8">-scan)</span></div></div><div class="ec-line"><div class="code">
+</div></div><div class="ec-line"><div class="code"><span class="indent">    </span><span style="--0:#AE4B07;--1:#FFAB70">U</span><span style="--0:#BF3441;--1:#F97583">->></span><span style="--0:#AE4B07;--1:#FFAB70">S</span><span style="--0:#BF3441;--1:#F97583">:</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#032F62;--1:#9ECBFF">scan-sbom.sh --project App --version 1.0 --all</span></div></div><div class="ec-line"><div class="code"><span class="indent">    </span><span style="--0:#AE4B07;--1:#FFAB70">S</span><span style="--0:#BF3441;--1:#F97583">->></span><span style="--0:#AE4B07;--1:#FFAB70">S</span><span style="--0:#BF3441;--1:#F97583">:</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#032F62;--1:#9ECBFF">Parse arguments, detect target type</span></div></div><div class="ec-line"><div class="code"><span class="indent">    </span><span style="--0:#BF3441;--1:#F97583">rect</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#032F62;--1:#9ECBFF">rgb(227,242,253)</span></div></div><div class="ec-line"><div class="code"><span class="indent">    </span><span style="--0:#BF3441;--1:#F97583">note</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#6F42C1;--1:#B392F0">over</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#AE4B07;--1:#FFAB70">S</span><span style="--0:#BF3441;--1:#F97583">,</span><span style="--0:#AE4B07;--1:#FFAB70">L</span><span style="--0:#BF3441;--1:#F97583">:</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#032F62;--1:#9ECBFF">Stage 1: Generation</span></div></div><div class="ec-line"><div class="code"><span class="indent">    </span><span style="--0:#AE4B07;--1:#FFAB70">S</span><span style="--0:#BF3441;--1:#F97583">->></span><span style="--0:#AE4B07;--1:#FFAB70">D</span><span style="--0:#BF3441;--1:#F97583">:</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#032F62;--1:#9ECBFF">(source) docker run the language image</span></div></div><div class="ec-line"><div class="code"><span class="indent">    </span><span style="--0:#AE4B07;--1:#FFAB70">D</span><span style="--0:#BF3441;--1:#F97583">->></span><span style="--0:#AE4B07;--1:#FFAB70">L</span><span style="--0:#BF3441;--1:#F97583">:</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#032F62;--1:#9ECBFF">build-prep.sh → cdxgen</span></div></div><div class="ec-line"><div class="code"><span class="indent">    </span><span style="--0:#AE4B07;--1:#FFAB70">L</span><span style="--0:#BF3441;--1:#F97583">-->></span><span style="--0:#AE4B07;--1:#FFAB70">S</span><span style="--0:#BF3441;--1:#F97583">:</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#032F62;--1:#9ECBFF">bom.json</span></div></div><div class="ec-line"><div class="code"><span class="indent">    </span><span style="--0:#BF3441;--1:#F97583">end</span></div></div><div class="ec-line"><div class="code"><span class="indent">    </span><span style="--0:#BF3441;--1:#F97583">rect</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#032F62;--1:#9ECBFF">rgb(241,248,233)</span></div></div><div class="ec-line"><div class="code"><span class="indent">    </span><span style="--0:#BF3441;--1:#F97583">note</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#6F42C1;--1:#B392F0">over</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#AE4B07;--1:#FFAB70">S</span><span style="--0:#BF3441;--1:#F97583">,</span><span style="--0:#AE4B07;--1:#FFAB70">P</span><span style="--0:#BF3441;--1:#F97583">:</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#032F62;--1:#9ECBFF">Stage 2: Post-processing</span></div></div><div class="ec-line"><div class="code"><span class="indent">    </span><span style="--0:#AE4B07;--1:#FFAB70">S</span><span style="--0:#BF3441;--1:#F97583">->></span><span style="--0:#AE4B07;--1:#FFAB70">D</span><span style="--0:#BF3441;--1:#F97583">:</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#032F62;--1:#9ECBFF">bomlens docker run (MODE=POSTPROCESS)</span></div></div><div class="ec-line"><div class="code"><span class="indent">    </span><span style="--0:#AE4B07;--1:#FFAB70">D</span><span style="--0:#BF3441;--1:#F97583">->></span><span style="--0:#AE4B07;--1:#FFAB70">P</span><span style="--0:#BF3441;--1:#F97583">:</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#032F62;--1:#9ECBFF">run-scan (entrypoint)</span></div></div><div class="ec-line"><div class="code"><span class="indent">    </span><span style="--0:#AE4B07;--1:#FFAB70">P</span><span style="--0:#BF3441;--1:#F97583">->></span><span style="--0:#AE4B07;--1:#FFAB70">P</span><span style="--0:#BF3441;--1:#F97583">:</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#032F62;--1:#9ECBFF">normalize → scancode → notice → Trivy → cosign</span></div></div><div class="ec-line"><div class="code"><span class="indent">    </span><span style="--0:#AE4B07;--1:#FFAB70">P</span><span style="--0:#BF3441;--1:#F97583">->></span><span style="--0:#AE4B07;--1:#FFAB70">P</span><span style="--0:#BF3441;--1:#F97583">:</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#032F62;--1:#9ECBFF">Copy artifacts to host</span></div></div><div class="ec-line"><div class="code"><span class="indent">    </span><span style="--0:#AE4B07;--1:#FFAB70">P</span><span style="--0:#BF3441;--1:#F97583">-->></span><span style="--0:#AE4B07;--1:#FFAB70">U</span><span style="--0:#BF3441;--1:#F97583">:</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#032F62;--1:#9ECBFF">(optional) upload to Dependency-Track</span></div></div><div class="ec-line"><div class="code"><span class="indent">    </span><span style="--0:#BF3441;--1:#F97583">end</span></div></div></code></pre><div class="copy"><div aria-live="polite"></div><button title="Copy to clipboard" data-copied="Copied!" data-code="sequenceDiagram    autonumber    actor U as User    participant S as scan-sbom.sh    participant D as Docker    participant L as Stage 1 language image    participant P as bomlens (run-scan)    U->>S: scan-sbom.sh --project App --version 1.0 --all    S->>S: Parse arguments, detect target type    rect rgb(227,242,253)    note over S,L: Stage 1: Generation    S->>D: (source) docker run the language image    D->>L: build-prep.sh → cdxgen    L-->>S: bom.json    end    rect rgb(241,248,233)    note over S,P: Stage 2: Post-processing    S->>D: bomlens docker run (MODE=POSTPROCESS)    D->>P: run-scan (entrypoint)    P->>P: normalize → scancode → notice → Trivy → cosign    P->>P: Copy artifacts to host    P-->>U: (optional) upload to Dependency-Track    end"><div></div></button></div></figure></div>
+<div class="sl-heading-wrapper level-h2"><h2 id="stage-1-sbom-generation">Stage 1: SBOM generation</h2><a class="sl-anchor-link" href="#stage-1-sbom-generation"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “Stage 1: SBOM generation”</span></a></div>
+<p>The generation tool depends on the target type.</p>
+<div class="sl-heading-wrapper level-h3"><h3 id="source-code-modesource-cdxgen-language-image">Source code (<code dir="auto">MODE=SOURCE</code>): cdxgen language image</h3><a class="sl-anchor-link" href="#source-code-modesource-cdxgen-language-image"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “Source code (MODE=SOURCE): cdxgen language image”</span></a></div>
+<p><code dir="auto">scan-sbom.sh</code> detects the project language with <code dir="auto">detect_lang()</code>, picks the matching official cdxgen language image with <code dir="auto">img_for_lang()</code>, pulls it, and runs <code dir="auto">build-prep.sh</code> inside that image (<code dir="auto">scripts/scan-sbom.sh</code>, with the detection in <code dir="auto">docker/lib/source-detect.sh</code>). The lightweight post-processing image has no language toolchain, so generation is handled entirely by the language image.</p>
+<p>The per-language cdxgen image mapping is as follows (<code dir="auto">img_for_lang()</code> in <code dir="auto">docker/lib/source-detect.sh</code>; the tag is pinned via <code dir="auto">CDXGEN_TAG</code>). The images are published by the cdxgen project on <code dir="auto">ghcr.io/cdxgen</code> and pulled on the first scan of each language; see <a href="/bomlens/concepts/dependency-resolution/#where-the-build-tools-come-from">How dependencies are resolved</a>.</p>
+<table>
+<thead>
+<tr>
+<th>Detected language</th>
+<th>Image</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>rust</td>
+<td><code dir="auto">cdxgen-debian-rust</code></td>
+</tr>
+<tr>
+<td>go</td>
+<td><code dir="auto">cdxgen-debian-golang124</code></td>
+</tr>
+<tr>
+<td>ruby</td>
+<td><code dir="auto">cdxgen-debian-ruby34</code></td>
+</tr>
+<tr>
+<td>java</td>
+<td><code dir="auto">cdxgen-temurin-java21</code>, or <code dir="auto">cdxgen-temurin-java8</code>, <code dir="auto">cdxgen-java11</code>, <code dir="auto">cdxgen-java17</code>, <code dir="auto">cdxgen-temurin-java24</code> or <code dir="auto">cdxgen-temurin-java25</code> when the Gradle toolchain or wrapper version calls for that JDK (<a href="/bomlens/reference/ecosystems/#java-gradle">Java (Gradle)</a>; <code dir="auto">CDXGEN_JAVA_IMAGE</code> overrides the choice)</td>
+</tr>
+<tr>
+<td>python</td>
+<td><code dir="auto">cdxgen-python312</code></td>
+</tr>
+<tr>
+<td>node</td>
+<td><code dir="auto">cdxgen-alpine-node24</code></td>
+</tr>
+<tr>
+<td>php</td>
+<td><code dir="auto">cdxgen-debian-php84</code></td>
+</tr>
+<tr>
+<td>dotnet</td>
+<td><code dir="auto">cdxgen-debian-dotnet9</code></td>
+</tr>
+<tr>
+<td>swift</td>
+<td><code dir="auto">cdxgen-debian-swift</code></td>
+</tr>
+<tr>
+<td>android</td>
+<td><code dir="auto">bomlens-android-sdk&#x3C;API></code>, built on the scanning machine because the Android SDK cannot be redistributed (compileSdk extracted automatically)</td>
+</tr>
+<tr>
+<td>mixed / unknown</td>
+<td>cdxgen all-in-one (<code dir="auto">CDXGEN_ALLINONE</code>)</td>
+</tr>
+</tbody>
+</table>
+<p>Two steps run inside the image:</p>
+<ol>
+<li>
+<p><code dir="auto">build-prep.sh</code> (<code dir="auto">docker/lib/build-prep.sh</code>) prepares the project right before cdxgen: it runs the ecosystem’s build tool (some steps only when no lock file is committed), and after cdxgen it narrows the SBOM to what ships. A failure in it never stops the scan. What runs for each ecosystem is in <a href="/bomlens/concepts/dependency-resolution/">How dependencies are resolved</a>.</p>
+</li>
+<li>
+<p>Run cdxgen: <code dir="auto">build-prep.sh</code> auto-detects the cdxgen binary path, which differs per image, and runs <code dir="auto">cdxgen -r --spec-version 1.6 -o bom.json</code> (<code dir="auto">1.7</code> instead with <code dir="auto">--spec-version 1.7</code>). The generated SBOM is then handed to the Stage 2 (<code dir="auto">MODE=POSTPROCESS</code>) post-processing image.</p>
+</li>
+</ol>
+<div class="sl-heading-wrapper level-h3"><h3 id="image--binary--directory-syft">Image / binary / directory: syft</h3><a class="sl-anchor-link" href="#image--binary--directory-syft"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “Image / binary / directory: syft”</span></a></div>
+<p>syft, included in the <code dir="auto">bomlens</code> image, generates the SBOM directly. (<code dir="auto">docker/entrypoint.sh</code>)</p>
+<table>
+<thead>
+<tr>
+<th>MODE</th>
+<th>Input</th>
+<th>syft invocation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code dir="auto">IMAGE</code></td>
+<td>Docker image</td>
+<td><code dir="auto">syft &#x3C;image> -o cyclonedx-json</code> (from the Docker daemon with the docker.sock mount, otherwise from the registry or an archive)</td>
+</tr>
+<tr>
+<td><code dir="auto">BINARY</code></td>
+<td>Single file</td>
+<td><code dir="auto">syft file:&#x3C;path> -o cyclonedx-json</code> (falls back to a minimal SBOM on failure)</td>
+</tr>
+<tr>
+<td><code dir="auto">ROOTFS</code></td>
+<td>Directory</td>
+<td><code dir="auto">syft dir:&#x3C;path> -o cyclonedx-json</code></td>
+</tr>
+</tbody>
+</table>
+<div class="sl-heading-wrapper level-h2"><h2 id="stage-2-post-processing-pipeline">Stage 2: post-processing pipeline</h2><a class="sl-anchor-link" href="#stage-2-post-processing-pipeline"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “Stage 2: post-processing pipeline”</span></a></div>
+<p>The <code dir="auto">bomlens</code> image’s entry point <code dir="auto">run-scan</code> (<code dir="auto">docker/entrypoint.sh</code>) takes the SBOM and runs the steps in a fixed order. Each step is enabled by an environment variable (equivalent to a CLI flag), and outputs accumulate in the <code dir="auto">ARTIFACTS</code> list.</p>
+<p><img alt="Stage 2 post-processing: eight fixed steps from normalize to upload, each gated by its environment variable" loading="lazy" decoding="async" width="1520" height="1840" src="/bomlens/_astro/architecture-stage2-steps.DACu6WrG_ZaT3I7.webp"></p>
+<p>Step details:</p>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Step</th>
+<th>Script / tool</th>
+<th>Condition</th>
+<th>Output</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>①</td>
+<td>Normalize</td>
+<td><code dir="auto">normalize-sbom.sh</code> (jq)</td>
+<td>Always (deterministic mode with <code dir="auto">--byte-stable</code>)</td>
+<td>Updates <code dir="auto">bom.json</code></td>
+</tr>
+<tr>
+<td>②</td>
+<td>Deep license</td>
+<td><code dir="auto">scancode</code></td>
+<td><code dir="auto">--deep-license</code> and <code dir="auto">/src</code> exists</td>
+<td><code dir="auto">_scancode.json</code></td>
+</tr>
+<tr>
+<td>③</td>
+<td>Notice</td>
+<td><code dir="auto">generate-notice.sh</code> (jq)</td>
+<td><code dir="auto">--notice</code> / <code dir="auto">--all</code></td>
+<td><code dir="auto">_NOTICE.txt</code>, <code dir="auto">_NOTICE.html</code></td>
+</tr>
+<tr>
+<td>④</td>
+<td>Security report</td>
+<td><code dir="auto">scan-security.sh</code> (Trivy)</td>
+<td><code dir="auto">--security</code> / <code dir="auto">--all</code></td>
+<td><code dir="auto">_security.{json,md,html}</code></td>
+</tr>
+<tr>
+<td>⑤</td>
+<td>Signing</td>
+<td><code dir="auto">cosign sign-blob</code></td>
+<td><code dir="auto">--sign</code> and <code dir="auto">COSIGN_KEY</code></td>
+<td><code dir="auto">bom.json.sig</code></td>
+</tr>
+<tr>
+<td>⑥</td>
+<td>Risk report</td>
+<td><code dir="auto">generate-risk-report.sh</code></td>
+<td>Default (skip with <code dir="auto">--no-report</code>)</td>
+<td><code dir="auto">_risk-report.{md,html}</code> (plus <code dir="auto">_conformance.*</code> in ANALYZE mode)</td>
+</tr>
+<tr>
+<td>⑦</td>
+<td>Copy to host</td>
+<td><code dir="auto">cp</code></td>
+<td>Always</td>
+<td>Copied to <code dir="auto">HOST_OUTPUT_DIR</code></td>
+</tr>
+<tr>
+<td>⑧</td>
+<td>Upload</td>
+<td><code dir="auto">curl</code></td>
+<td>Default (skipped with <code dir="auto">--generate-only</code>)</td>
+<td>Upload to a Dependency-Track server or TRUSCA’s native ingest (select with <code dir="auto">UPLOAD_TARGET</code>)</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>Why the order is fixed: normalization stabilizes the input for every later step, so it runs first; signing must target the final <code dir="auto">bom.json</code>, so it runs last. Each step is best-effort: failures are handled with <code dir="auto">|| true</code> or a warning and do not abort the whole scan (signing and upload excepted).</p>
+</blockquote>
+<div class="sl-heading-wrapper level-h2"><h2 id="branching-by-input-type">Branching by input type</h2><a class="sl-anchor-link" href="#branching-by-input-type"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “Branching by input type”</span></a></div>
+<p><code dir="auto">scan-sbom.sh</code> determines the mode automatically from <code dir="auto">--git</code>/<code dir="auto">--analyze</code>/<code dir="auto">--firmware</code> and the <code dir="auto">--target</code> value.</p>
+<p>The checks run top to bottom; the first matching branch wins.</p>
+<div class="expressive-code"><figure class="frame not-content"><figcaption class="header"></figcaption><pre data-language="mermaid"><code><div class="ec-line"><div class="code"><span style="--0:#BF3441;--1:#F97583">flowchart</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#6F42C1;--1:#B392F0">TD</span></div></div><div class="ec-line"><div class="code"><span class="indent">    </span><span style="--0:#AE4B07;--1:#FFAB70">D1</span><span style="--0:#BF3441;--1:#F97583">{</span><span style="--0:#032F62;--1:#9ECBFF">"--git URL&#x3C;br/>or URL-like target?"</span><span style="--0:#BF3441;--1:#F97583">}</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#BF3441;--1:#F97583">-->|</span><span style="--0:#032F62;--1:#9ECBFF">yes</span><span style="--0:#BF3441;--1:#F97583">|</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#AE4B07;--1:#FFAB70">R1</span><span style="--0:#BF3441;--1:#F97583">[</span><span style="--0:#032F62;--1:#9ECBFF">"clone → MODE=SOURCE"</span><span style="--0:#BF3441;--1:#F97583">]</span></div></div><div class="ec-line"><div class="code"><span class="indent">    </span><span style="--0:#AE4B07;--1:#FFAB70">D1 </span><span style="--0:#BF3441;--1:#F97583">-->|</span><span style="--0:#032F62;--1:#9ECBFF">no</span><span style="--0:#BF3441;--1:#F97583">|</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#AE4B07;--1:#FFAB70">D2</span><span style="--0:#BF3441;--1:#F97583">{</span><span style="--0:#032F62;--1:#9ECBFF">"--target&#x3C;br/>*.zip / *.tar.gz?"</span><span style="--0:#BF3441;--1:#F97583">}</span></div></div><div class="ec-line"><div class="code"><span class="indent">    </span><span style="--0:#AE4B07;--1:#FFAB70">D2 </span><span style="--0:#BF3441;--1:#F97583">-->|</span><span style="--0:#032F62;--1:#9ECBFF">yes</span><span style="--0:#BF3441;--1:#F97583">|</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#AE4B07;--1:#FFAB70">R2</span><span style="--0:#BF3441;--1:#F97583">[</span><span style="--0:#032F62;--1:#9ECBFF">"extract → MODE=SOURCE"</span><span style="--0:#BF3441;--1:#F97583">]</span></div></div><div class="ec-line"><div class="code"><span class="indent">    </span><span style="--0:#AE4B07;--1:#FFAB70">D2 </span><span style="--0:#BF3441;--1:#F97583">-->|</span><span style="--0:#032F62;--1:#9ECBFF">no</span><span style="--0:#BF3441;--1:#F97583">|</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#AE4B07;--1:#FFAB70">D3</span><span style="--0:#BF3441;--1:#F97583">{</span><span style="--0:#032F62;--1:#9ECBFF">"--analyze sbom?"</span><span style="--0:#BF3441;--1:#F97583">}</span></div></div><div class="ec-line"><div class="code"><span class="indent">    </span><span style="--0:#AE4B07;--1:#FFAB70">D3 </span><span style="--0:#BF3441;--1:#F97583">-->|</span><span style="--0:#032F62;--1:#9ECBFF">yes</span><span style="--0:#BF3441;--1:#F97583">|</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#AE4B07;--1:#FFAB70">R3</span><span style="--0:#BF3441;--1:#F97583">[</span><span style="--0:#032F62;--1:#9ECBFF">"MODE=ANALYZE&#x3C;br/>validate + convert to CDX"</span><span style="--0:#BF3441;--1:#F97583">]</span></div></div><div class="ec-line"><div class="code"><span class="indent">    </span><span style="--0:#AE4B07;--1:#FFAB70">D3 </span><span style="--0:#BF3441;--1:#F97583">-->|</span><span style="--0:#032F62;--1:#9ECBFF">no</span><span style="--0:#BF3441;--1:#F97583">|</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#AE4B07;--1:#FFAB70">D4</span><span style="--0:#BF3441;--1:#F97583">{</span><span style="--0:#032F62;--1:#9ECBFF">"target omitted?"</span><span style="--0:#BF3441;--1:#F97583">}</span></div></div><div class="ec-line"><div class="code"><span class="indent">    </span><span style="--0:#AE4B07;--1:#FFAB70">D4 </span><span style="--0:#BF3441;--1:#F97583">-->|</span><span style="--0:#032F62;--1:#9ECBFF">yes</span><span style="--0:#BF3441;--1:#F97583">|</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#AE4B07;--1:#FFAB70">R4</span><span style="--0:#BF3441;--1:#F97583">[</span><span style="--0:#032F62;--1:#9ECBFF">"MODE=SOURCE&#x3C;br/>current directory → cdxgen"</span><span style="--0:#BF3441;--1:#F97583">]</span></div></div><div class="ec-line"><div class="code"><span class="indent">    </span><span style="--0:#AE4B07;--1:#FFAB70">D4 </span><span style="--0:#BF3441;--1:#F97583">-->|</span><span style="--0:#032F62;--1:#9ECBFF">no</span><span style="--0:#BF3441;--1:#F97583">|</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#AE4B07;--1:#FFAB70">D5</span><span style="--0:#BF3441;--1:#F97583">{</span><span style="--0:#032F62;--1:#9ECBFF">"existing file?"</span><span style="--0:#BF3441;--1:#F97583">}</span></div></div><div class="ec-line"><div class="code"><span class="indent">    </span><span style="--0:#AE4B07;--1:#FFAB70">D5 </span><span style="--0:#BF3441;--1:#F97583">-->|</span><span style="--0:#032F62;--1:#9ECBFF">"yes · --firmware/extension"</span><span style="--0:#BF3441;--1:#F97583">|</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#AE4B07;--1:#FFAB70">R5</span><span style="--0:#BF3441;--1:#F97583">[</span><span style="--0:#032F62;--1:#9ECBFF">"MODE=FIRMWARE&#x3C;br/>opt-in firmware image"</span><span style="--0:#BF3441;--1:#F97583">]</span></div></div><div class="ec-line"><div class="code"><span class="indent">    </span><span style="--0:#AE4B07;--1:#FFAB70">D5 </span><span style="--0:#BF3441;--1:#F97583">-->|</span><span style="--0:#032F62;--1:#9ECBFF">"yes · otherwise"</span><span style="--0:#BF3441;--1:#F97583">|</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#AE4B07;--1:#FFAB70">R6</span><span style="--0:#BF3441;--1:#F97583">[</span><span style="--0:#032F62;--1:#9ECBFF">"MODE=BINARY → syft"</span><span style="--0:#BF3441;--1:#F97583">]</span></div></div><div class="ec-line"><div class="code"><span class="indent">    </span><span style="--0:#AE4B07;--1:#FFAB70">D5 </span><span style="--0:#BF3441;--1:#F97583">-->|</span><span style="--0:#032F62;--1:#9ECBFF">no</span><span style="--0:#BF3441;--1:#F97583">|</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#AE4B07;--1:#FFAB70">D6</span><span style="--0:#BF3441;--1:#F97583">{</span><span style="--0:#032F62;--1:#9ECBFF">"existing directory?"</span><span style="--0:#BF3441;--1:#F97583">}</span></div></div><div class="ec-line"><div class="code"><span class="indent">    </span><span style="--0:#AE4B07;--1:#FFAB70">D6 </span><span style="--0:#BF3441;--1:#F97583">-->|</span><span style="--0:#032F62;--1:#9ECBFF">yes</span><span style="--0:#BF3441;--1:#F97583">|</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#AE4B07;--1:#FFAB70">R7</span><span style="--0:#BF3441;--1:#F97583">[</span><span style="--0:#032F62;--1:#9ECBFF">"MODE=ROOTFS → syft"</span><span style="--0:#BF3441;--1:#F97583">]</span></div></div><div class="ec-line"><div class="code"><span class="indent">    </span><span style="--0:#AE4B07;--1:#FFAB70">D6 </span><span style="--0:#BF3441;--1:#F97583">-->|</span><span style="--0:#032F62;--1:#9ECBFF">no</span><span style="--0:#BF3441;--1:#F97583">|</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#AE4B07;--1:#FFAB70">R8</span><span style="--0:#BF3441;--1:#F97583">[</span><span style="--0:#032F62;--1:#9ECBFF">"MODE=IMAGE → syft"</span><span style="--0:#BF3441;--1:#F97583">]</span></div></div></code></pre><div class="copy"><div aria-live="polite"></div><button title="Copy to clipboard" data-copied="Copied!" data-code="flowchart TD    D1{&#x22;--git URL<br/>or URL-like target?&#x22;} -->|yes| R1[&#x22;clone → MODE=SOURCE&#x22;]    D1 -->|no| D2{&#x22;--target<br/>*.zip / *.tar.gz?&#x22;}    D2 -->|yes| R2[&#x22;extract → MODE=SOURCE&#x22;]    D2 -->|no| D3{&#x22;--analyze sbom?&#x22;}    D3 -->|yes| R3[&#x22;MODE=ANALYZE<br/>validate + convert to CDX&#x22;]    D3 -->|no| D4{&#x22;target omitted?&#x22;}    D4 -->|yes| R4[&#x22;MODE=SOURCE<br/>current directory → cdxgen&#x22;]    D4 -->|no| D5{&#x22;existing file?&#x22;}    D5 -->|&#x22;yes · --firmware/extension&#x22;| R5[&#x22;MODE=FIRMWARE<br/>opt-in firmware image&#x22;]    D5 -->|&#x22;yes · otherwise&#x22;| R6[&#x22;MODE=BINARY → syft&#x22;]    D5 -->|no| D6{&#x22;existing directory?&#x22;}    D6 -->|yes| R7[&#x22;MODE=ROOTFS → syft&#x22;]    D6 -->|no| R8[&#x22;MODE=IMAGE → syft&#x22;]"><div></div></button></div></figure></div>
+<blockquote>
+<p>Independently of the branching above, <code dir="auto">--ui</code> starts <code dir="auto">MODE=UI</code> (the web server <code dir="auto">server.py</code>) and runs subsequent scans through the form or file upload.</p>
+</blockquote>
+<table>
+<thead>
+<tr>
+<th>Mode</th>
+<th>Trigger</th>
+<th>Generation tool</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code dir="auto">SOURCE</code></td>
+<td>No target, <code dir="auto">--git &#x3C;url></code>, or <code dir="auto">--target *.zip/*.tar.gz</code></td>
+<td>cdxgen</td>
+<td>Language detection selects the per-language image. Git targets are cloned; archives are extracted and treated as source. (The web UI’s SOURCE uses <code dir="auto">syft dir:</code> inside the container)</td>
+</tr>
+<tr>
+<td><code dir="auto">ANALYZE</code></td>
+<td><code dir="auto">--analyze &#x3C;sbom></code> (alias <code dir="auto">--sbom</code>)</td>
+<td>—</td>
+<td>Validates a supplier SBOM (CycloneDX/SPDX), converts it to CDX, and re-aggregates. Produces <code dir="auto">_conformance.*</code></td>
+</tr>
+<tr>
+<td><code dir="auto">FIRMWARE</code></td>
+<td><code dir="auto">--target &#x3C;file> --firmware</code>, or a firmware file extension</td>
+<td>unblob + syft + cve-bin-tool</td>
+<td>Opt-in image <code dir="auto">bomlens-firmware</code>. Details in the <a href="/bomlens/guides/firmware/">firmware analysis guide</a></td>
+</tr>
+<tr>
+<td><code dir="auto">BINARY</code></td>
+<td><code dir="auto">--target &#x3C;file></code></td>
+<td>syft</td>
+<td><code dir="auto">file:</code> scheme</td>
+</tr>
+<tr>
+<td><code dir="auto">ROOTFS</code></td>
+<td><code dir="auto">--target &#x3C;directory></code></td>
+<td>syft</td>
+<td><code dir="auto">dir:</code> scheme</td>
+</tr>
+<tr>
+<td><code dir="auto">IMAGE</code></td>
+<td><code dir="auto">--target &#x3C;image name></code></td>
+<td>syft</td>
+<td>Docker daemon (docker.sock mount), or the registry</td>
+</tr>
+<tr>
+<td><code dir="auto">AIBOM</code></td>
+<td><code dir="auto">--model &#x3C;owner/name></code></td>
+<td>OWASP AIBOM Generator</td>
+<td>Opt-in image <code dir="auto">bomlens-aibom</code>. CycloneDX 1.7 ML-BOM from a HuggingFace model card; adds a G7 conformance check</td>
+</tr>
+<tr>
+<td><code dir="auto">MODELFILE</code></td>
+<td><code dir="auto">--model-file &#x3C;path></code></td>
+<td><code dir="auto">identify-model-file.py</code> (stdlib)</td>
+<td>Base image, offline. CycloneDX 1.7 ML-BOM read from a model file’s own header (GGUF, safetensors, PyTorch, pickle, npz, npy, ONNX); adds the same G7 check</td>
+</tr>
+<tr>
+<td><code dir="auto">DATASET</code></td>
+<td><code dir="auto">--model &#x3C;Figshare item></code> or <code dir="auto">--model datasets/&#x3C;owner>/&#x3C;name></code></td>
+<td><code dir="auto">scan-figshare.py</code>, <code dir="auto">scan-hf-dataset.py</code> (stdlib)</td>
+<td>Base image. A published research dataset read from the public Figshare item endpoint (no account): licence, DOI, authors and a per-file MD5 digest become a CycloneDX 1.7 <code dir="auto">data</code> component. A HuggingFace dataset (<code dir="auto">datasets/&#x3C;owner>/&#x3C;name></code>, <code dir="auto">https://huggingface.co/datasets/&#x3C;owner>/&#x3C;name></code> or <code dir="auto">hf:&#x3C;owner>/&#x3C;name></code>) becomes the same <code dir="auto">data</code> component with its licence, hub revision and per-file SHA-256 digests, and the datasets its card lists under <code dir="auto">source_datasets</code> are read with it</td>
+</tr>
+<tr>
+<td><code dir="auto">AIDECLARE</code></td>
+<td><code dir="auto">--ai-declare &#x3C;file></code> alone (no <code dir="auto">--model</code>, <code dir="auto">--model-file</code> or <code dir="auto">--target</code>)</td>
+<td><code dir="auto">declare-ai-model.py</code> (stdlib)</td>
+<td>Base image. A model that has no hub repository or file yet, described from its publisher’s declaration: the model is <code dir="auto">metadata.component</code>, named by the project and version and marked <code dir="auto">bomlens:origin=declared-input</code>; the base models and HuggingFace datasets the declaration names are read from the hub by id, as in a model scan. Most declared values go only into the SPDX 3.0.1 AI document; a declared service and the model’s input and output kinds, training compute and adversarial testing also reach the CycloneDX SBOM, marked as the publisher’s declaration</td>
+</tr>
+<tr>
+<td><code dir="auto">UI</code></td>
+<td><code dir="auto">--ui</code></td>
+<td>—</td>
+<td>Browser UI; runs every scan target type through the form or file upload</td>
+</tr>
+</tbody>
+</table>
+<div class="sl-heading-wrapper level-h2"><h2 id="flag-to-step-mapping">Flag-to-step mapping</h2><a class="sl-anchor-link" href="#flag-to-step-mapping"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “Flag-to-step mapping”</span></a></div>
+<p>How CLI flags translate into environment variables and which steps they enable (<code dir="auto">scan-sbom.sh</code> converts them and passes them to <code dir="auto">entrypoint.sh</code>).</p>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Environment variable</th>
+<th>Steps enabled</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>(default)</td>
+<td><code dir="auto">GENERATE_REPORT=true</code> (plus notice and security)</td>
+<td>normalize + risk report + upload</td>
+</tr>
+<tr>
+<td><code dir="auto">--no-report</code></td>
+<td><code dir="auto">GENERATE_REPORT=false</code></td>
+<td>Does not force-enable the risk report, notice, or security steps</td>
+</tr>
+<tr>
+<td><code dir="auto">--notice</code></td>
+<td><code dir="auto">GENERATE_NOTICE=true</code></td>
+<td>③ notice</td>
+</tr>
+<tr>
+<td><code dir="auto">--security</code></td>
+<td><code dir="auto">GENERATE_SECURITY=true</code></td>
+<td>④ security report</td>
+</tr>
+<tr>
+<td><code dir="auto">--all</code></td>
+<td>Both of the above</td>
+<td>③ + ④</td>
+</tr>
+<tr>
+<td><code dir="auto">--git &#x3C;url></code> / <code dir="auto">--branch</code></td>
+<td>(cloned on the host)</td>
+<td>SOURCE input collection</td>
+</tr>
+<tr>
+<td><code dir="auto">--analyze &#x3C;sbom></code></td>
+<td><code dir="auto">MODE=ANALYZE</code></td>
+<td>Supplier SBOM validation, conversion, and report</td>
+</tr>
+<tr>
+<td><code dir="auto">--firmware</code></td>
+<td><code dir="auto">MODE=FIRMWARE</code> (firmware image)</td>
+<td>Unpack, then syft + cve-bin-tool</td>
+</tr>
+<tr>
+<td><code dir="auto">--model &#x3C;owner/name></code></td>
+<td><code dir="auto">MODE=AIBOM</code> (aibom image)</td>
+<td>Generate an ML-BOM from a HuggingFace model, plus a G7 check</td>
+</tr>
+<tr>
+<td><code dir="auto">--model-file &#x3C;path></code></td>
+<td><code dir="auto">MODE=MODELFILE</code></td>
+<td>Read one model file’s header into an ML-BOM, offline, plus a G7 check</td>
+</tr>
+<tr>
+<td><code dir="auto">--model &#x3C;Figshare item></code>, <code dir="auto">--model datasets/&#x3C;owner>/&#x3C;name></code></td>
+<td><code dir="auto">MODE=DATASET</code></td>
+<td>Describe a published dataset from its Figshare item or its HuggingFace dataset page, no account needed for a public one</td>
+</tr>
+<tr>
+<td><code dir="auto">--ai-declare &#x3C;file></code> alone</td>
+<td><code dir="auto">MODE=AIDECLARE</code></td>
+<td>Describe a model not yet published from its declaration, plus a G7 check and the SPDX 3.0.1 AI document</td>
+</tr>
+<tr>
+<td><code dir="auto">--deep-license</code></td>
+<td><code dir="auto">DEEP_LICENSE=true</code></td>
+<td>② scancode</td>
+</tr>
+<tr>
+<td><code dir="auto">--byte-stable</code></td>
+<td><code dir="auto">BYTE_STABLE=true</code></td>
+<td>① deterministic normalization (also the UI’s Reproducible output toggle)</td>
+</tr>
+<tr>
+<td><code dir="auto">--sign</code></td>
+<td><code dir="auto">SIGN_SBOM=true</code> (plus <code dir="auto">COSIGN_KEY</code>/<code dir="auto">COSIGN_PASSWORD</code>)</td>
+<td>⑤ signing</td>
+</tr>
+<tr>
+<td><code dir="auto">--generate-only</code></td>
+<td><code dir="auto">UPLOAD_ENABLED=false</code></td>
+<td>⑦ skips the upload</td>
+</tr>
+<tr>
+<td><code dir="auto">--ui</code></td>
+<td><code dir="auto">MODE=UI</code></td>
+<td>Web UI</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>The risk report (<code dir="auto">_risk-report.{md,html}</code>) is generated by default in every mode (it aggregates licenses and vulnerabilities). To support it, the notice and security scans are turned on automatically alongside it; disable with <code dir="auto">--no-report</code>.</p>
+</blockquote>
+<p>For how to use each feature, see the <a href="/bomlens/guides/reports/">notice and security report guide</a>.</p>
+<div class="sl-heading-wrapper level-h2"><h2 id="artifacts">Artifacts</h2><a class="sl-anchor-link" href="#artifacts"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “Artifacts”</span></a></div>
+<p><code dir="auto">{P}</code> is the project name, <code dir="auto">{V}</code> the version (special characters are normalized to <code dir="auto">_</code>).</p>
+<table>
+<thead>
+<tr>
+<th>File</th>
+<th>Generated when</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code dir="auto">{Project}_{Version}_bom.json</code></td>
+<td>Always (CycloneDX 1.6, or 1.7 with <code dir="auto">--spec-version 1.7</code>; a 1.7 ML-BOM for AI models)</td>
+</tr>
+<tr>
+<td><code dir="auto">{Project}_{Version}_NOTICE.txt</code> / <code dir="auto">.html</code> / <code dir="auto">.pdf</code></td>
+<td><code dir="auto">--notice</code> / <code dir="auto">--all</code> / default risk report generation (PDF only in an <code dir="auto">SBOM_PDF</code> build)</td>
+</tr>
+<tr>
+<td><code dir="auto">{Project}_{Version}_security.json</code> / <code dir="auto">.md</code> / <code dir="auto">.html</code></td>
+<td><code dir="auto">--security</code> / <code dir="auto">--all</code> / default risk report generation</td>
+</tr>
+<tr>
+<td><code dir="auto">{Project}_{Version}_risk-report.md</code> / <code dir="auto">.html</code></td>
+<td>Default (all modes); skip with <code dir="auto">--no-report</code></td>
+</tr>
+<tr>
+<td><code dir="auto">{Project}_{Version}_conformance.json</code> / <code dir="auto">.md</code> / <code dir="auto">.html</code></td>
+<td><code dir="auto">--analyze</code> (supplier SBOM validation)</td>
+</tr>
+<tr>
+<td><code dir="auto">{Project}_{Version}_scancode.json</code></td>
+<td><code dir="auto">--deep-license</code></td>
+</tr>
+<tr>
+<td><code dir="auto">{Project}_{Version}_bom.json.sig</code></td>
+<td><code dir="auto">--sign</code></td>
+</tr>
+</tbody>
+</table>
+<div class="sl-heading-wrapper level-h2"><h2 id="extension-points">Extension points</h2><a class="sl-anchor-link" href="#extension-points"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “Extension points”</span></a></div>
+<div class="sl-heading-wrapper level-h3"><h3 id="adding-support-for-a-new-language">Adding support for a new language</h3><a class="sl-anchor-link" href="#adding-support-for-a-new-language"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “Adding support for a new language”</span></a></div>
+<ol>
+<li>Check whether an official cdxgen image exists for the language; if so, add it to the routing table.</li>
+<li>If cdxgen cannot resolve transitive dependencies automatically, add preparation logic to <code dir="auto">docker/lib/build-prep.sh</code>.</li>
+<li>Add an example project under <code dir="auto">examples/{language}/</code> and a test case in <code dir="auto">tests/cases/test-{language}.sh</code>.</li>
+</ol>
+<p>For the full procedure, see the <a href="/bomlens/contribute/package-managers/">package manager guide</a>.</p>
+<div class="sl-heading-wrapper level-h3"><h3 id="adding-a-new-post-processing-step">Adding a new post-processing step</h3><a class="sl-anchor-link" href="#adding-a-new-post-processing-step"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “Adding a new post-processing step”</span></a></div>
+<p>Add a helper script under <code dir="auto">docker/lib/</code>, call it from the shared pipeline section of <code dir="auto">entrypoint.sh</code> (after normalization) behind an environment variable guard, and append its outputs to <code dir="auto">ARTIFACTS</code>. Place it before the signing step so its outputs are covered by the signature.</p>
+<div class="sl-heading-wrapper level-h2"><h2 id="design-principles">Design principles</h2><a class="sl-anchor-link" href="#design-principles"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “Design principles”</span></a></div>
+<ul>
+<li>Isolation: all analysis runs in Docker containers; the host environment stays untouched.</li>
+<li>Separation of concerns: generation (Stage 1) and post-processing (Stage 2) are split, keeping the post-processing image small.</li>
+<li>Reproducibility: tool versions are pinned via <code dir="auto">ARG</code>; <code dir="auto">--byte-stable</code> produces byte-identical output.</li>
+<li>Standards compliance: conforms to the CycloneDX specification, 1.6 by default and 1.7 with <code dir="auto">--spec-version 1.7</code>.</li>
+<li>Robustness: post-processing steps are best-effort and do not abort the whole scan.</li>
+<li>Single interface: every language and mode is invoked through the one <code dir="auto">scan-sbom.sh</code>.</li>
+</ul>
+<div class="sl-heading-wrapper level-h2"><h2 id="division-of-roles-trusca">Division of roles (TRUSCA)</h2><a class="sl-anchor-link" href="#division-of-roles-trusca"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “Division of roles (TRUSCA)”</span></a></div>
+<p>BomLens specializes in generation. Governance (company-wide project management, vulnerability triage, and license policy gates) is delegated to the sister project <a href="https://github.com/trustedoss/trusca">TRUSCA</a> (formerly TrustedOSS Portal). Both tools share cdxgen and Trivy, so the artifacts (CycloneDX) are directly compatible.</p>
+<div class="expressive-code"><figure class="frame not-content"><figcaption class="header"></figcaption><pre data-language="mermaid"><code><div class="ec-line"><div class="code"><span style="--0:#BF3441;--1:#F97583">flowchart</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#6F42C1;--1:#B392F0">TB</span></div></div><div class="ec-line"><div class="code"><span class="indent">    </span><span style="--0:#BF3441;--1:#F97583">subgraph</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#6F42C1;--1:#B392F0">dev</span><span style="--0:#24292E;--1:#E1E4E8">["</span><span style="--0:#AE4B07;--1:#FFAB70">Developer </span><span style="--0:#24292E;--1:#E1E4E8">· </span><span style="--0:#AE4B07;--1:#FFAB70">single project</span><span style="--0:#24292E;--1:#E1E4E8">"]</span></div></div><div class="ec-line"><div class="code"><span class="indent">        </span><span style="--0:#BF3441;--1:#F97583">direction</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#6F42C1;--1:#B392F0">LR</span></div></div><div class="ec-line"><div class="code"><span class="indent">        </span><span style="--0:#AE4B07;--1:#FFAB70">A</span><span style="--0:#BF3441;--1:#F97583">[</span><span style="--0:#032F62;--1:#9ECBFF">"Source / image / binary"</span><span style="--0:#BF3441;--1:#F97583">]</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#BF3441;--1:#F97583">--></span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#AE4B07;--1:#FFAB70">B</span><span style="--0:#BF3441;--1:#F97583">[</span><span style="--0:#032F62;--1:#9ECBFF">"BomLens"</span><span style="--0:#BF3441;--1:#F97583">]</span></div></div><div class="ec-line"><div class="code"><span class="indent">        </span><span style="--0:#AE4B07;--1:#FFAB70">B </span><span style="--0:#BF3441;--1:#F97583">--></span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#AE4B07;--1:#FFAB70">C</span><span style="--0:#BF3441;--1:#F97583">[</span><span style="--0:#032F62;--1:#9ECBFF">"SBOM"</span><span style="--0:#BF3441;--1:#F97583">]</span></div></div><div class="ec-line"><div class="code"><span class="indent">        </span><span style="--0:#AE4B07;--1:#FFAB70">B </span><span style="--0:#BF3441;--1:#F97583">--></span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#AE4B07;--1:#FFAB70">D</span><span style="--0:#BF3441;--1:#F97583">[</span><span style="--0:#032F62;--1:#9ECBFF">"Notice"</span><span style="--0:#BF3441;--1:#F97583">]</span></div></div><div class="ec-line"><div class="code"><span class="indent">        </span><span style="--0:#AE4B07;--1:#FFAB70">B </span><span style="--0:#BF3441;--1:#F97583">--></span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#AE4B07;--1:#FFAB70">E</span><span style="--0:#BF3441;--1:#F97583">[</span><span style="--0:#032F62;--1:#9ECBFF">"Security report"</span><span style="--0:#BF3441;--1:#F97583">]</span></div></div><div class="ec-line"><div class="code"><span class="indent">    </span><span style="--0:#BF3441;--1:#F97583">end</span></div></div><div class="ec-line"><div class="code"><span class="indent">    </span><span style="--0:#BF3441;--1:#F97583">subgraph</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#6F42C1;--1:#B392F0">org</span><span style="--0:#24292E;--1:#E1E4E8">["</span><span style="--0:#AE4B07;--1:#FFAB70">Organization </span><span style="--0:#24292E;--1:#E1E4E8">· </span><span style="--0:#AE4B07;--1:#FFAB70">central management</span><span style="--0:#24292E;--1:#E1E4E8">"]</span></div></div><div class="ec-line"><div class="code"><span class="indent">        </span><span style="--0:#BF3441;--1:#F97583">direction</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#6F42C1;--1:#B392F0">LR</span></div></div><div class="ec-line"><div class="code"><span class="indent">        </span><span style="--0:#AE4B07;--1:#FFAB70">F</span><span style="--0:#BF3441;--1:#F97583">[</span><span style="--0:#032F62;--1:#9ECBFF">"TRUSCA"</span><span style="--0:#BF3441;--1:#F97583">]</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#BF3441;--1:#F97583">--></span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#AE4B07;--1:#FFAB70">G</span><span style="--0:#BF3441;--1:#F97583">[</span><span style="--0:#032F62;--1:#9ECBFF">"Vulnerability triage"</span><span style="--0:#BF3441;--1:#F97583">]</span></div></div><div class="ec-line"><div class="code"><span class="indent">        </span><span style="--0:#AE4B07;--1:#FFAB70">F </span><span style="--0:#BF3441;--1:#F97583">--></span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#AE4B07;--1:#FFAB70">H</span><span style="--0:#BF3441;--1:#F97583">[</span><span style="--0:#032F62;--1:#9ECBFF">"License policy gate"</span><span style="--0:#BF3441;--1:#F97583">]</span></div></div><div class="ec-line"><div class="code"><span class="indent">        </span><span style="--0:#AE4B07;--1:#FFAB70">F </span><span style="--0:#BF3441;--1:#F97583">--></span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#AE4B07;--1:#FFAB70">I</span><span style="--0:#BF3441;--1:#F97583">[</span><span style="--0:#032F62;--1:#9ECBFF">"Project dashboard"</span><span style="--0:#BF3441;--1:#F97583">]</span></div></div><div class="ec-line"><div class="code"><span class="indent">    </span><span style="--0:#BF3441;--1:#F97583">end</span></div></div><div class="ec-line"><div class="code"><span class="indent">    </span><span style="--0:#AE4B07;--1:#FFAB70">C </span><span style="--0:#BF3441;--1:#F97583">-.</span><span style="--0:#032F62;--1:#9ECBFF"> upload </span><span style="--0:#BF3441;--1:#F97583">.-></span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#AE4B07;--1:#FFAB70">F</span></div></div></code></pre><div class="copy"><div aria-live="polite"></div><button title="Copy to clipboard" data-copied="Copied!" data-code="flowchart TB    subgraph dev[&#x22;Developer · single project&#x22;]        direction LR        A[&#x22;Source / image / binary&#x22;] --> B[&#x22;BomLens&#x22;]        B --> C[&#x22;SBOM&#x22;]        B --> D[&#x22;Notice&#x22;]        B --> E[&#x22;Security report&#x22;]    end    subgraph org[&#x22;Organization · central management&#x22;]        direction LR        F[&#x22;TRUSCA&#x22;] --> G[&#x22;Vulnerability triage&#x22;]        F --> H[&#x22;License policy gate&#x22;]        F --> I[&#x22;Project dashboard&#x22;]    end    C -. upload .-> F"><div></div></button></div></figure></div>
+<blockquote>
+<p>Related: <a href="/bomlens/concepts/pipeline-by-input/">Pipeline by input type</a> | <a href="/bomlens/start/first-scan/">Getting started</a> | <a href="/bomlens/reference/cli/">CLI reference</a> | <a href="/bomlens/reference/docker-image/">Use the Docker image directly</a></p>
+</blockquote></div><footer class="sl-flex astro-ddtxxk7k"><div class="meta sl-flex astro-ddtxxk7k"><a href="https://github.com/sktelecom/bomlens/edit/main/docs/concepts/architecture.md" class="sl-flex print:hidden astro-qlekgd3o"><svg aria-hidden="true" class="astro-qlekgd3o astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1.2em;"><path d="M22 7.24a1 1 0 0 0-.29-.71l-4.24-4.24a1 1 0 0 0-1.1-.22 1 1 0 0 0-.32.22l-2.83 2.83L2.29 16.05a1 1 0 0 0-.29.71V21a1 1 0 0 0 1 1h4.24a1 1 0 0 0 .76-.29l10.87-10.93L21.71 8c.1-.1.17-.2.22-.33a1 1 0 0 0 0-.24v-.14l.07-.05ZM6.83 20H4v-2.83l9.93-9.93 2.83 2.83L6.83 20ZM18.17 8.66l-2.83-2.83 1.42-1.41 2.82 2.82-1.41 1.42Z"/></svg>Edit page</a></div><div class="pagination-links print:hidden astro-b5raizh3" dir="ltr"><a href="/bomlens/reference/ui/" rel="prev" class="astro-b5raizh3"><svg aria-hidden="true" class="astro-b5raizh3 astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1.5rem;"><path d="M17 11H9.41l3.3-3.29a1.004 1.004 0 1 0-1.42-1.42l-5 5a1 1 0 0 0-.21.33 1 1 0 0 0 0 .76 1 1 0 0 0 .21.33l5 5a1.002 1.002 0 0 0 1.639-.325 1 1 0 0 0-.219-1.095L9.41 13H17a1 1 0 0 0 0-2Z"/></svg><span class="astro-b5raizh3">Previous<br class="astro-b5raizh3"><span class="link-title astro-b5raizh3">Web UI &amp; desktop app</span></span></a><a href="/bomlens/concepts/dependency-resolution/" rel="next" class="astro-b5raizh3"><svg aria-hidden="true" class="astro-b5raizh3 astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1.5rem;"><path d="M17.92 11.62a1.001 1.001 0 0 0-.21-.33l-5-5a1.003 1.003 0 1 0-1.42 1.42l3.3 3.29H7a1 1 0 0 0 0 2h7.59l-3.3 3.29a1.002 1.002 0 0 0 .325 1.639 1 1 0 0 0 1.095-.219l5-5a1 1 0 0 0 .21-.33 1 1 0 0 0 0-.76Z"/></svg><span class="astro-b5raizh3">Next<br class="astro-b5raizh3"><span class="link-title astro-b5raizh3">How dependencies are resolved</span></span></a></div></footer><script type="module" src="/bomlens/_astro/Mermaid.astro_astro_type_script_index_0_lang.DZWWZPOc.js"></script><script type="module">var e=()=>{document.querySelectorAll(`.expressive-code pre`).forEach(e=>{e.scrollWidth>e.clientWidth?e.setAttribute(`tabindex`,`0`):e.removeAttribute(`tabindex`)})};e(),window.addEventListener(`resize`,e);</script><p class="site-copyright astro-jo6i4kqk">Copyright &copy; 2026 SK Telecom Co., Ltd. &middot;<a href="https://github.com/sktelecom/bomlens/blob/main/LICENSE" class="astro-jo6i4kqk">Apache-2.0</a> &middot;<a href="https://github.com/sktelecom/bomlens/blob/main/THIRD_PARTY_LICENSES.md" class="astro-jo6i4kqk">Third-party licenses</a></p></div></div></main></div></div></div></div></body></html>

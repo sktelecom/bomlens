@@ -1,0 +1,680 @@
+<!DOCTYPE html><html lang="ko" dir="ltr" data-theme="dark" data-has-toc data-has-sidebar class="astro-g5ptsecz"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/><title>Docker 이미지 직접 사용 | BomLens</title><link rel="canonical" href="https://sktelecom.github.io/bomlens/ko/reference/docker-image/"/><link rel="alternate" hreflang="en" href="https://sktelecom.github.io/bomlens/reference/docker-image/"/><link rel="alternate" hreflang="ko" href="https://sktelecom.github.io/bomlens/ko/reference/docker-image/"/><link rel="alternate" hreflang="x-default" href="https://sktelecom.github.io/bomlens/reference/docker-image/"/><link rel="sitemap" href="/bomlens/sitemap-index.xml"/><link rel="shortcut icon" href="/bomlens/favicon.svg" type="image/svg+xml"/><meta name="generator" content="Astro v7.4.4"/><meta name="generator" content="Starlight v0.42.8"/><meta property="og:title" content="Docker 이미지 직접 사용"/><meta property="og:type" content="article"/><meta property="og:url" content="https://sktelecom.github.io/bomlens/ko/reference/docker-image/"/><meta property="og:locale" content="ko_KR"/><meta property="og:description" content="BomLens 스캐너 Docker 이미지를 docker run으로 직접 호출하는 방법. 스크립트를 둘 수 없는 CI 러너, Kubernetes 잡 등의 환경을 위한 안내입니다."/><meta property="og:site_name" content="BomLens"/><meta name="twitter:card" content="summary_large_image"/><meta name="description" content="BomLens 스캐너 Docker 이미지를 docker run으로 직접 호출하는 방법. 스크립트를 둘 수 없는 CI 러너, Kubernetes 잡 등의 환경을 위한 안내입니다."/><meta property="og:image" content="https://sktelecom.github.io/bomlens/images/og-card-ko.png"><meta name="twitter:image" content="https://sktelecom.github.io/bomlens/images/og-card-ko.png"><script>
+	window.StarlightThemeProvider = (() => {
+		const storedTheme =
+			typeof localStorage !== 'undefined' && localStorage.getItem('starlight-theme');
+		const theme =
+			storedTheme ||
+			(window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
+		document.documentElement.dataset.theme = theme === 'light' ? 'light' : 'dark';
+		return {
+			updatePickers(theme = storedTheme || 'auto') {
+				document.querySelectorAll('starlight-theme-select').forEach((picker) => {
+					const select = picker.querySelector('select');
+					if (select) select.value = theme;
+					/** @type {HTMLTemplateElement | null} */
+					const tmpl = document.querySelector(`#theme-icons`);
+					const newIcon = tmpl && tmpl.content.querySelector('.' + theme);
+					if (newIcon) {
+						const oldIcon = picker.querySelector('svg.label-icon');
+						if (oldIcon) {
+							oldIcon.replaceChildren(...newIcon.cloneNode(true).childNodes);
+						}
+					}
+				});
+			},
+		};
+	})();
+</script><template id="theme-icons"><svg aria-hidden="true" class="light astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M5 12a1 1 0 0 0-1-1H3a1 1 0 0 0 0 2h1a1 1 0 0 0 1-1Zm.64 5-.71.71a1 1 0 0 0 0 1.41 1 1 0 0 0 1.41 0l.71-.71A1 1 0 0 0 5.64 17ZM12 5a1 1 0 0 0 1-1V3a1 1 0 0 0-2 0v1a1 1 0 0 0 1 1Zm5.66 2.34a1 1 0 0 0 .7-.29l.71-.71a1 1 0 1 0-1.41-1.41l-.66.71a1 1 0 0 0 0 1.41 1 1 0 0 0 .66.29Zm-12-.29a1 1 0 0 0 1.41 0 1 1 0 0 0 0-1.41l-.71-.71a1.004 1.004 0 1 0-1.43 1.41l.73.71ZM21 11h-1a1 1 0 0 0 0 2h1a1 1 0 0 0 0-2Zm-2.64 6A1 1 0 0 0 17 18.36l.71.71a1 1 0 0 0 1.41 0 1 1 0 0 0 0-1.41l-.76-.66ZM12 6.5a5.5 5.5 0 1 0 5.5 5.5A5.51 5.51 0 0 0 12 6.5Zm0 9a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7Zm0 3.5a1 1 0 0 0-1 1v1a1 1 0 0 0 2 0v-1a1 1 0 0 0-1-1Z"/></svg><svg aria-hidden="true" class="dark astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M21.64 13a1 1 0 0 0-1.05-.14 8.049 8.049 0 0 1-3.37.73 8.15 8.15 0 0 1-8.14-8.1 8.59 8.59 0 0 1 .25-2A1 1 0 0 0 8 2.36a10.14 10.14 0 1 0 14 11.69 1 1 0 0 0-.36-1.05Zm-9.5 6.69A8.14 8.14 0 0 1 7.08 5.22v.27a10.15 10.15 0 0 0 10.14 10.14 9.784 9.784 0 0 0 2.1-.22 8.11 8.11 0 0 1-7.18 4.32v-.04Z"/></svg><svg aria-hidden="true" class="auto astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M21 14h-1V7a3 3 0 0 0-3-3H7a3 3 0 0 0-3 3v7H3a1 1 0 0 0-1 1v2a3 3 0 0 0 3 3h14a3 3 0 0 0 3-3v-2a1 1 0 0 0-1-1ZM6 7a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v7H6V7Zm14 10a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-1h16v1Z"/></svg></template><link rel="stylesheet" href="/bomlens/_astro/print.ehPL0gv-.css" media="print"><link rel="stylesheet" href="/bomlens/_astro/common.DxYPfd-D.css"><style>@layer starlight.components{svg:where(.astro-hkc32dio){color:var(--sl-icon-color);font-size:var(--sl-icon-size,1em);width:1em;height:1em;overflow:visible}.sl-link-button:where(.astro-dcqstdaq){font-size:var(--sl-text-sm);outline-offset:.25rem;border:1px solid #0000;border-radius:999rem;align-items:center;gap:.5em;padding:.4375rem 1.125rem;line-height:1.1875;text-decoration:none;display:inline-flex}.sl-link-button:where(.astro-dcqstdaq).primary{background:var(--sl-color-text-accent);border-color:var(--sl-color-text-accent);color:var(--sl-color-black)}.sl-link-button:where(.astro-dcqstdaq).primary:hover{color:var(--sl-color-black)}.sl-link-button:where(.astro-dcqstdaq).secondary{border-color:inherit;color:var(--sl-color-white)}.sl-link-button:where(.astro-dcqstdaq).minimal{color:var(--sl-color-white);padding-inline:0}.sl-link-button:where(.astro-dcqstdaq) svg{flex-shrink:0}@media (width>=50rem){.sl-link-button:where(.astro-dcqstdaq){font-size:var(--sl-text-base);padding:.9375rem 1.25rem}}.sl-markdown-content .sl-link-button:where(.astro-dcqstdaq){margin-inline-end:1rem}.sl-markdown-content .sl-link-button:where(.astro-dcqstdaq):not(:where(p *)){margin-block:1rem}}
+</style><script type="module" src="/bomlens/_astro/page.cNngjUgL.js"></script></head><body class="astro-g5ptsecz"><a class="sl-skip-link astro-qb7clj6f" href="#_top">콘텐츠로 이동</a><div class="page sl-flex astro-yntsjkba"><header class="header astro-yntsjkba"><div class="header astro-by6fddyj"><div class="title-wrapper sl-flex astro-by6fddyj"><a href="/bomlens/ko/" class="site-title sl-flex astro-6rvad3va"><span class="astro-6rvad3va" translate="no">BomLens</span></a></div><div class="sl-flex print:hidden astro-by6fddyj"><site-search class="astro-by6fddyj astro-b5kgnn7o" data-translations="{&quot;placeholder&quot;:&quot;검색&quot;}"><button data-open-modal disabled aria-label="검색" aria-keyshortcuts="Control+K" class="astro-b5kgnn7o"><svg aria-hidden="true" class="astro-b5kgnn7o astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M21.71 20.29 18 16.61A9 9 0 1 0 16.61 18l3.68 3.68a.999.999 0 0 0 1.42 0 1 1 0 0 0 0-1.39ZM11 18a7 7 0 1 1 0-14 7 7 0 0 1 0 14Z"/></svg><span class="sl-hidden md:sl-block astro-b5kgnn7o" aria-hidden="true">검색</span><kbd class="sl-hidden md:sl-flex astro-b5kgnn7o" style="display: none;"><kbd class="astro-b5kgnn7o">Ctrl</kbd><kbd class="astro-b5kgnn7o">K</kbd></kbd></button><dialog style="padding:0" aria-label="검색" class="astro-b5kgnn7o"><div class="dialog-frame sl-flex astro-b5kgnn7o"><button data-close-modal class="sl-flex md:sl-hidden astro-b5kgnn7o">취소</button><div class="search-container astro-b5kgnn7o"><div id="starlight__search" class="astro-b5kgnn7o"></div></div></div></dialog></site-search><script>
+	(() => {
+		const openBtn = document.querySelector('button[data-open-modal]');
+		const shortcut = openBtn?.querySelector('kbd');
+		if (!openBtn || !(shortcut instanceof HTMLElement)) return;
+		const platformKey = shortcut.querySelector('kbd');
+		if (platformKey && /(Mac|iPhone|iPod|iPad)/i.test(navigator.platform)) {
+			platformKey.textContent = '⌘';
+			openBtn.setAttribute('aria-keyshortcuts', 'Meta+K');
+		}
+		shortcut.style.display = '';
+	})();
+</script><script type="module" src="/bomlens/_astro/Search.astro_astro_type_script_index_0_lang.BSqzOScY.js"></script></div><div class="sl-hidden md:sl-flex print:hidden right-group astro-by6fddyj"><div class="sl-flex social-icons astro-by6fddyj"><a href="https://github.com/sktelecom/bomlens" rel="me" class="sl-flex astro-n2mnl6yq"><span class="sr-only astro-n2mnl6yq">GitHub</span><svg aria-hidden="true" class="astro-n2mnl6yq astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M12 .3a12 12 0 0 0-3.8 23.38c.6.12.83-.26.83-.57L9 21.07c-3.34.72-4.04-1.61-4.04-1.61-.55-1.39-1.34-1.76-1.34-1.76-1.08-.74.09-.73.09-.73 1.2.09 1.83 1.24 1.83 1.24 1.08 1.83 2.81 1.3 3.5 1 .1-.78.42-1.31.76-1.61-2.67-.3-5.47-1.33-5.47-5.93 0-1.31.47-2.38 1.24-3.22-.14-.3-.54-1.52.1-3.18 0 0 1-.32 3.3 1.23a11.5 11.5 0 0 1 6 0c2.28-1.55 3.29-1.23 3.29-1.23.64 1.66.24 2.88.12 3.18a4.65 4.65 0 0 1 1.23 3.22c0 4.61-2.8 5.63-5.48 5.92.42.36.81 1.1.81 2.22l-.01 3.29c0 .31.2.69.82.57A12 12 0 0 0 12 .3Z"/></svg></a></div><starlight-theme-select><label style="--sl-select-width: 6.25em" class="astro-2z5xp7gb"><span class="sr-only astro-2z5xp7gb">테마 선택</span><svg aria-hidden="true" class="icon label-icon astro-2z5xp7gb astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M21 14h-1V7a3 3 0 0 0-3-3H7a3 3 0 0 0-3 3v7H3a1 1 0 0 0-1 1v2a3 3 0 0 0 3 3h14a3 3 0 0 0 3-3v-2a1 1 0 0 0-1-1ZM6 7a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v7H6V7Zm14 10a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-1h16v1Z"/></svg><select autocomplete="off" class="astro-2z5xp7gb"><option value="dark" class="astro-2z5xp7gb">어두운 테마</option><option value="light" class="astro-2z5xp7gb">밝은 테마</option><option value="auto" selected class="astro-2z5xp7gb">자동</option></select><svg aria-hidden="true" class="icon caret astro-2z5xp7gb astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M17 9.17a1 1 0 0 0-1.41 0L12 12.71 8.46 9.17a1 1 0 1 0-1.41 1.42l4.24 4.24a1.002 1.002 0 0 0 1.42 0L17 10.59a1.002 1.002 0 0 0 0-1.42Z"/></svg></label></starlight-theme-select><script>
+	StarlightThemeProvider.updatePickers();
+</script><script type="module">var e=`starlight-theme`,t=e=>e===`auto`||e===`dark`||e===`light`?e:`auto`,n=()=>t(typeof localStorage<`u`&&localStorage.getItem(e));function r(t){typeof localStorage<`u`&&localStorage.setItem(e,t===`light`||t===`dark`?t:``)}var i=()=>matchMedia(`(prefers-color-scheme: light)`).matches?`light`:`dark`;function a(e){StarlightThemeProvider.updatePickers(e),document.documentElement.dataset.theme=e===`auto`?i():e,r(e)}matchMedia(`(prefers-color-scheme: light)`).addEventListener(`change`,()=>{n()===`auto`&&a(`auto`)});var o=class extends HTMLElement{constructor(){super(),a(n()),this.querySelector(`select`)?.addEventListener(`change`,e=>{e.currentTarget instanceof HTMLSelectElement&&a(t(e.currentTarget.value))})}};customElements.define(`starlight-theme-select`,o);</script><starlight-lang-select><label style="--sl-select-width: 7em" class="astro-2z5xp7gb"><span class="sr-only astro-2z5xp7gb">언어 선택</span><svg aria-hidden="true" class="icon label-icon astro-2z5xp7gb astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path fill-rule="evenodd" d="M8.516 3a.94.94 0 0 0-.941.94v1.15H2.94a.94.94 0 1 0 0 1.882h7.362a7.422 7.422 0 0 1-1.787 3.958 7.42 7.42 0 0 1-1.422-2.425.94.94 0 1 0-1.774.627 9.303 9.303 0 0 0 1.785 3.043 7.422 7.422 0 0 1-4.164 1.278.94.94 0 1 0 0 1.881 9.303 9.303 0 0 0 5.575-1.855 9.303 9.303 0 0 0 4.11 1.74l-.763 1.525a.968.968 0 0 0-.016.034l-1.385 2.77a.94.94 0 1 0 1.683.841l1.133-2.267h5.806l1.134 2.267a.94.94 0 0 0 1.683-.841l-1.385-2.769a.95.95 0 0 0-.018-.036l-3.476-6.951a.94.94 0 0 0-1.682 0l-1.82 3.639a7.423 7.423 0 0 1-3.593-1.256 9.303 9.303 0 0 0 2.27-5.203h1.894a.94.94 0 0 0 0-1.881H9.456V3.94A.94.94 0 0 0 8.516 3Zm6.426 11.794a1.068 1.068 0 0 1-.02.039l-.703 1.407h3.924l-1.962-3.924-1.24 2.478Z" clip-rule="evenodd"/></svg><select autocomplete="off" class="astro-2z5xp7gb"><option value="/bomlens/reference/docker-image/" class="astro-2z5xp7gb">English</option><option value="/bomlens/ko/reference/docker-image/" selected class="astro-2z5xp7gb">한국어</option></select><svg aria-hidden="true" class="icon caret astro-2z5xp7gb astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M17 9.17a1 1 0 0 0-1.41 0L12 12.71 8.46 9.17a1 1 0 1 0-1.41 1.42l4.24 4.24a1.002 1.002 0 0 0 1.42 0L17 10.59a1.002 1.002 0 0 0 0-1.42Z"/></svg></label></starlight-lang-select><script type="module">var e=class extends HTMLElement{constructor(){super();let e=this.querySelector(`select`);e&&(e.addEventListener(`change`,e=>{e.currentTarget instanceof HTMLSelectElement&&(window.location.pathname=e.currentTarget.value)}),window.addEventListener(`pageshow`,t=>{if(!t.persisted)return;let n=e.querySelector(`option[selected]`)?.index;n!==e.selectedIndex&&(e.selectedIndex=n??0)}))}};customElements.define(`starlight-lang-select`,e);</script></div></div></header><nav class="sidebar print:hidden astro-yntsjkba" aria-label="메인"><button popovertarget="starlight__sidebar" class="sl-menu-button sl-flex md:sl-hidden print:hidden astro-r2osgdlg"><svg aria-hidden="true" class="open-menu astro-r2osgdlg astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M3 8h18a1 1 0 1 0 0-2H3a1 1 0 0 0 0 2Zm18 8H3a1 1 0 0 0 0 2h18a1 1 0 0 0 0-2Zm0-5H3a1 1 0 0 0 0 2h18a1 1 0 0 0 0-2Z"/></svg><svg aria-hidden="true" class="close-menu astro-r2osgdlg astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="m13.41 12 6.3-6.29a1.004 1.004 0 1 0-1.42-1.42L12 10.59l-6.29-6.3a1.004 1.004 0 0 0-1.42 1.42l6.3 6.29-6.3 6.29a1 1 0 0 0 0 1.42.998.998 0 0 0 1.42 0l6.29-6.3 6.29 6.3a.999.999 0 0 0 1.42 0 1 1 0 0 0 0-1.42L13.41 12Z"/></svg><span class="sr-only astro-r2osgdlg">메뉴</span></button><script type="module">var e=class extends HTMLElement{constructor(){super();let e=matchMedia(`(min-width: 50em)`),t=()=>{this.popover=e.matches?null:`auto`};t(),e.addEventListener(`change`,()=>t()),this.addEventListener(`toggle`,({newState:e})=>this.trapFocus(e===`open`))}trapFocus(e){document.querySelectorAll(`.main-frame, .sl-skip-link`).forEach(t=>{t.toggleAttribute(`inert`,e)})}};customElements.define(`sl-sidebar-pane`,e);</script><sl-sidebar-pane popover id="starlight__sidebar" class="sidebar-pane astro-yntsjkba"><div class="sidebar-content sl-flex astro-yntsjkba"><sl-sidebar-state-persist data-hash="1rofo3p" class="astro-ipdry5cl"><script aria-hidden="true">
+		(() => {
+			try {
+				if (!matchMedia('(min-width: 50em)').matches) return;
+				/** @type {HTMLElement | null} */
+				const target = document.querySelector('sl-sidebar-state-persist');
+				const state = JSON.parse(sessionStorage.getItem('sl-sidebar-state') || '0');
+				if (!target || !state || target.dataset.hash !== state.hash) return;
+				window._starlightScrollRestore = state.scroll;
+				customElements.define(
+					'sl-sidebar-restore',
+					class SidebarRestore extends HTMLElement {
+						connectedCallback() {
+							try {
+								const idx = parseInt(this.dataset.index || '');
+								const details = this.closest('details');
+								if (details && typeof state.open[idx] === 'boolean') details.open = state.open[idx];
+							} catch {}
+						}
+					}
+				);
+			} catch {}
+		})();
+	</script><ul class="top-level astro-rmhv4bp6"><li class="astro-rmhv4bp6"><details open class="astro-rmhv4bp6"><summary class="astro-rmhv4bp6"><span class="group-label astro-rmhv4bp6"><span class="large astro-rmhv4bp6">빠른 시작</span></span><svg aria-hidden="true" class="caret astro-rmhv4bp6 astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1.25rem;"><path d="m14.83 11.29-4.24-4.24a1 1 0 1 0-1.42 1.41L12.71 12l-3.54 3.54a1 1 0 0 0 0 1.41 1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.24-4.24a1.002 1.002 0 0 0 0-1.42Z"/></svg></summary><sl-sidebar-restore data-index="0"></sl-sidebar-restore><ul class="astro-rmhv4bp6"><li class="astro-rmhv4bp6"><a href="/bomlens/ko/concepts/what-is-sbom/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">SBOM이란</span></a></li><li class="astro-rmhv4bp6"><a href="/bomlens/ko/start/first-scan/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">시작하기</span></a></li><li class="astro-rmhv4bp6"><a href="/bomlens/ko/start/no-cli/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">비개발자 빠른 시작 (CLI 불필요)</span></a></li><li class="astro-rmhv4bp6"><a href="/bomlens/ko/reference/ui/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">웹 UI와 데스크톱 앱</span></a></li></ul></details></li><li class="astro-rmhv4bp6"><details open class="astro-rmhv4bp6"><summary class="astro-rmhv4bp6"><span class="group-label astro-rmhv4bp6"><span class="large astro-rmhv4bp6">가이드</span></span><svg aria-hidden="true" class="caret astro-rmhv4bp6 astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1.25rem;"><path d="m14.83 11.29-4.24-4.24a1 1 0 1 0-1.42 1.41L12.71 12l-3.54 3.54a1 1 0 0 0 0 1.41 1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.24-4.24a1.002 1.002 0 0 0 0-1.42Z"/></svg></summary><sl-sidebar-restore data-index="1"></sl-sidebar-restore><ul class="astro-rmhv4bp6"><li class="astro-rmhv4bp6"><a href="/bomlens/ko/guides/ai-model/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">AI 모델 SBOM 가이드</span></a></li><li class="astro-rmhv4bp6"><a href="/bomlens/ko/guides/by-input/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">입력 시나리오별 처리 가이드</span></a></li><li class="astro-rmhv4bp6"><a href="/bomlens/ko/guides/ci-cd/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">CI/CD 연동</span></a></li><li class="astro-rmhv4bp6"><a href="/bomlens/ko/guides/declared-components/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">자체 구성요소 선언</span></a></li><li class="astro-rmhv4bp6"><a href="/bomlens/ko/guides/firmware/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">펌웨어 분석 가이드</span></a></li><li class="astro-rmhv4bp6"><a href="/bomlens/ko/guides/identify-vendored/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">내장 오픈소스 식별 (C/C++)</span></a></li><li class="astro-rmhv4bp6"><a href="/bomlens/ko/guides/reports/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">고지문·보안·위험 보고서 생성</span></a></li><li class="astro-rmhv4bp6"><a href="/bomlens/ko/guides/server-delivery/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">서버 SBOM 작성 가이드</span></a></li><li class="astro-rmhv4bp6"><a href="/bomlens/ko/guides/supplier-sbom/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">공급사 SBOM 검증 가이드</span></a></li><li class="astro-rmhv4bp6"><a href="/bomlens/ko/guides/upload/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">Dependency-Track / TRUSCA 업로드</span></a></li><li class="astro-rmhv4bp6"><a href="/bomlens/ko/guides/verify-release/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">릴리스 검증</span></a></li></ul></details></li><li class="astro-rmhv4bp6"><details open class="astro-rmhv4bp6"><summary class="astro-rmhv4bp6"><span class="group-label astro-rmhv4bp6"><span class="large astro-rmhv4bp6">레퍼런스</span></span><svg aria-hidden="true" class="caret astro-rmhv4bp6 astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1.25rem;"><path d="m14.83 11.29-4.24-4.24a1 1 0 1 0-1.42 1.41L12.71 12l-3.54 3.54a1 1 0 0 0 0 1.41 1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.24-4.24a1.002 1.002 0 0 0 0-1.42Z"/></svg></summary><sl-sidebar-restore data-index="2"></sl-sidebar-restore><ul class="astro-rmhv4bp6"><li class="astro-rmhv4bp6"><a href="/bomlens/ko/reference/artifacts/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">산출물 레퍼런스</span></a></li><li class="astro-rmhv4bp6"><a href="/bomlens/ko/reference/cli/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">CLI 레퍼런스</span></a></li><li class="astro-rmhv4bp6"><a href="/bomlens/ko/reference/docker-image/" aria-current="page" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">Docker 이미지 직접 사용</span></a></li><li class="astro-rmhv4bp6"><a href="/bomlens/ko/reference/ecosystems/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">지원 생태계</span></a></li><li class="astro-rmhv4bp6"><a href="/bomlens/ko/reference/engine-contract/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">엔진 계약</span></a></li><li class="astro-rmhv4bp6"><a href="/bomlens/ko/reference/ui/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">웹 UI와 데스크톱 앱</span></a></li></ul></details></li><li class="astro-rmhv4bp6"><details open class="astro-rmhv4bp6"><summary class="astro-rmhv4bp6"><span class="group-label astro-rmhv4bp6"><span class="large astro-rmhv4bp6">개념</span></span><svg aria-hidden="true" class="caret astro-rmhv4bp6 astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1.25rem;"><path d="m14.83 11.29-4.24-4.24a1 1 0 1 0-1.42 1.41L12.71 12l-3.54 3.54a1 1 0 0 0 0 1.41 1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.24-4.24a1.002 1.002 0 0 0 0-1.42Z"/></svg></summary><sl-sidebar-restore data-index="3"></sl-sidebar-restore><ul class="astro-rmhv4bp6"><li class="astro-rmhv4bp6"><a href="/bomlens/ko/concepts/architecture/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">아키텍처</span></a></li><li class="astro-rmhv4bp6"><a href="/bomlens/ko/concepts/dependency-resolution/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">의존성을 해석하는 방식</span></a></li><li class="astro-rmhv4bp6"><a href="/bomlens/ko/concepts/limitations/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">BomLens가 하지 않는 일</span></a></li><li class="astro-rmhv4bp6"><a href="/bomlens/ko/concepts/local-first/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">로컬 우선 설계</span></a></li><li class="astro-rmhv4bp6"><a href="/bomlens/ko/concepts/pipeline-by-input/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">입력 형태별 파이프라인</span></a></li><li class="astro-rmhv4bp6"><a href="/bomlens/ko/concepts/reports-explained/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">보고서 읽는 법</span></a></li><li class="astro-rmhv4bp6"><a href="/bomlens/ko/concepts/what-is-sbom/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">SBOM이란</span></a></li></ul></details></li></ul><script aria-hidden="true">
+		(() => {
+			const scroller = document.getElementById('starlight__sidebar');
+			if (!window._starlightScrollRestore || !scroller) return;
+			scroller.scrollTop = window._starlightScrollRestore;
+			delete window._starlightScrollRestore;
+		})();
+	</script></sl-sidebar-state-persist><div class="md:sl-hidden"><div class="mobile-preferences sl-flex astro-p4azlveh"><div class="social-icons astro-p4azlveh"><a href="https://github.com/sktelecom/bomlens" rel="me" class="sl-flex astro-n2mnl6yq"><span class="sr-only astro-n2mnl6yq">GitHub</span><svg aria-hidden="true" class="astro-n2mnl6yq astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M12 .3a12 12 0 0 0-3.8 23.38c.6.12.83-.26.83-.57L9 21.07c-3.34.72-4.04-1.61-4.04-1.61-.55-1.39-1.34-1.76-1.34-1.76-1.08-.74.09-.73.09-.73 1.2.09 1.83 1.24 1.83 1.24 1.08 1.83 2.81 1.3 3.5 1 .1-.78.42-1.31.76-1.61-2.67-.3-5.47-1.33-5.47-5.93 0-1.31.47-2.38 1.24-3.22-.14-.3-.54-1.52.1-3.18 0 0 1-.32 3.3 1.23a11.5 11.5 0 0 1 6 0c2.28-1.55 3.29-1.23 3.29-1.23.64 1.66.24 2.88.12 3.18a4.65 4.65 0 0 1 1.23 3.22c0 4.61-2.8 5.63-5.48 5.92.42.36.81 1.1.81 2.22l-.01 3.29c0 .31.2.69.82.57A12 12 0 0 0 12 .3Z"/></svg></a></div><starlight-theme-select><label style="--sl-select-width: 6.25em" class="astro-2z5xp7gb"><span class="sr-only astro-2z5xp7gb">테마 선택</span><svg aria-hidden="true" class="icon label-icon astro-2z5xp7gb astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M21 14h-1V7a3 3 0 0 0-3-3H7a3 3 0 0 0-3 3v7H3a1 1 0 0 0-1 1v2a3 3 0 0 0 3 3h14a3 3 0 0 0 3-3v-2a1 1 0 0 0-1-1ZM6 7a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v7H6V7Zm14 10a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-1h16v1Z"/></svg><select autocomplete="off" class="astro-2z5xp7gb"><option value="dark" class="astro-2z5xp7gb">어두운 테마</option><option value="light" class="astro-2z5xp7gb">밝은 테마</option><option value="auto" selected class="astro-2z5xp7gb">자동</option></select><svg aria-hidden="true" class="icon caret astro-2z5xp7gb astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M17 9.17a1 1 0 0 0-1.41 0L12 12.71 8.46 9.17a1 1 0 1 0-1.41 1.42l4.24 4.24a1.002 1.002 0 0 0 1.42 0L17 10.59a1.002 1.002 0 0 0 0-1.42Z"/></svg></label></starlight-theme-select><script>
+	StarlightThemeProvider.updatePickers();
+</script><starlight-lang-select><label style="--sl-select-width: 7em" class="astro-2z5xp7gb"><span class="sr-only astro-2z5xp7gb">언어 선택</span><svg aria-hidden="true" class="icon label-icon astro-2z5xp7gb astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path fill-rule="evenodd" d="M8.516 3a.94.94 0 0 0-.941.94v1.15H2.94a.94.94 0 1 0 0 1.882h7.362a7.422 7.422 0 0 1-1.787 3.958 7.42 7.42 0 0 1-1.422-2.425.94.94 0 1 0-1.774.627 9.303 9.303 0 0 0 1.785 3.043 7.422 7.422 0 0 1-4.164 1.278.94.94 0 1 0 0 1.881 9.303 9.303 0 0 0 5.575-1.855 9.303 9.303 0 0 0 4.11 1.74l-.763 1.525a.968.968 0 0 0-.016.034l-1.385 2.77a.94.94 0 1 0 1.683.841l1.133-2.267h5.806l1.134 2.267a.94.94 0 0 0 1.683-.841l-1.385-2.769a.95.95 0 0 0-.018-.036l-3.476-6.951a.94.94 0 0 0-1.682 0l-1.82 3.639a7.423 7.423 0 0 1-3.593-1.256 9.303 9.303 0 0 0 2.27-5.203h1.894a.94.94 0 0 0 0-1.881H9.456V3.94A.94.94 0 0 0 8.516 3Zm6.426 11.794a1.068 1.068 0 0 1-.02.039l-.703 1.407h3.924l-1.962-3.924-1.24 2.478Z" clip-rule="evenodd"/></svg><select autocomplete="off" class="astro-2z5xp7gb"><option value="/bomlens/reference/docker-image/" class="astro-2z5xp7gb">English</option><option value="/bomlens/ko/reference/docker-image/" selected class="astro-2z5xp7gb">한국어</option></select><svg aria-hidden="true" class="icon caret astro-2z5xp7gb astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M17 9.17a1 1 0 0 0-1.41 0L12 12.71 8.46 9.17a1 1 0 1 0-1.41 1.42l4.24 4.24a1.002 1.002 0 0 0 1.42 0L17 10.59a1.002 1.002 0 0 0 0-1.42Z"/></svg></label></starlight-lang-select></div></div></div></sl-sidebar-pane></nav><div class="main-frame astro-yntsjkba"><script type="module">var e=document.getElementById(`starlight__sidebar`),t=e?.querySelector(`sl-sidebar-state-persist`),n=`sl-sidebar-state`,r=()=>{let r=[],i=t?.dataset.hash||``;try{let e=sessionStorage.getItem(n),t=JSON.parse(e||`{}`);Array.isArray(t.open)&&t.hash===i&&(r=t.open)}catch{}return{hash:i,open:r,scroll:e?.scrollTop||0}},i=e=>{try{sessionStorage.setItem(n,JSON.stringify(e))}catch{}},a=()=>i(r()),o=(e,t)=>{let n=r();n.open[t]=e,i(n)};t?.addEventListener(`click`,e=>{if(!(e.target instanceof Element))return;let t=e.target.closest(`summary`)?.closest(`details`);if(!t)return;let n=t.querySelector(`sl-sidebar-restore`),r=parseInt(n?.dataset.index||``);isNaN(r)||o(!t.open,r)}),addEventListener(`visibilitychange`,()=>{document.visibilityState===`hidden`&&a()});</script><div class="lg:sl-flex astro-lrzkfocr"><aside class="right-sidebar-container print:hidden astro-lrzkfocr"><div class="right-sidebar astro-lrzkfocr"><div class="lg:sl-hidden astro-qok35upx"><mobile-starlight-toc data-min-h="2" data-max-h="3" class="astro-66cqc7ze"><nav aria-labelledby="starlight__on-this-page--mobile" class="astro-66cqc7ze"><details id="starlight__mobile-toc" class="astro-66cqc7ze"><summary id="starlight__on-this-page--mobile" class="sl-flex astro-66cqc7ze"><span class="toggle sl-flex astro-66cqc7ze">목차<svg aria-hidden="true" class="caret astro-66cqc7ze astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1rem;"><path d="m14.83 11.29-4.24-4.24a1 1 0 1 0-1.42 1.41L12.71 12l-3.54 3.54a1 1 0 0 0 0 1.41 1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.24-4.24a1.002 1.002 0 0 0 0-1.42Z"/></svg></span><span class="display-current astro-66cqc7ze"></span></summary><div class="dropdown astro-66cqc7ze"><ul class="isMobile astro-jugkfwgx" style="--depth: 0;"><li style="--depth: 0;" class="astro-jugkfwgx"><a href="#_top" style="--depth: 0;" class="astro-jugkfwgx"><span style="--depth: 0;" class="astro-jugkfwgx">개요</span></a></li><li style="--depth: 0;" class="astro-jugkfwgx"><a href="#이미지와-태그" style="--depth: 0;" class="astro-jugkfwgx"><span style="--depth: 0;" class="astro-jugkfwgx">이미지와 태그</span></a></li><li style="--depth: 0;" class="astro-jugkfwgx"><a href="#이미지에-들어-있는-것" style="--depth: 0;" class="astro-jugkfwgx"><span style="--depth: 0;" class="astro-jugkfwgx">이미지에 들어 있는 것</span></a></li><li style="--depth: 0;" class="astro-jugkfwgx"><a href="#직접-실행" style="--depth: 0;" class="astro-jugkfwgx"><span style="--depth: 0;" class="astro-jugkfwgx">직접 실행</span></a><ul class="isMobile astro-jugkfwgx" style="--depth: 1;"><li style="--depth: 1;" class="astro-jugkfwgx"><a href="#docker-이미지-분석" style="--depth: 1;" class="astro-jugkfwgx"><span style="--depth: 1;" class="astro-jugkfwgx">Docker 이미지 분석</span></a></li><li style="--depth: 1;" class="astro-jugkfwgx"><a href="#바이너리-파일-분석" style="--depth: 1;" class="astro-jugkfwgx"><span style="--depth: 1;" class="astro-jugkfwgx">바이너리 파일 분석</span></a></li><li style="--depth: 1;" class="astro-jugkfwgx"><a href="#소스-디렉터리-분석" style="--depth: 1;" class="astro-jugkfwgx"><span style="--depth: 1;" class="astro-jugkfwgx">소스 디렉터리 분석</span></a></li><li style="--depth: 1;" class="astro-jugkfwgx"><a href="#고지문과-보고서까지-한-번에" style="--depth: 1;" class="astro-jugkfwgx"><span style="--depth: 1;" class="astro-jugkfwgx">고지문과 보고서까지 한 번에</span></a></li></ul></li><li style="--depth: 0;" class="astro-jugkfwgx"><a href="#환경-변수" style="--depth: 0;" class="astro-jugkfwgx"><span style="--depth: 0;" class="astro-jugkfwgx">환경 변수</span></a></li><li style="--depth: 0;" class="astro-jugkfwgx"><a href="#이미지-빌드와-배포" style="--depth: 0;" class="astro-jugkfwgx"><span style="--depth: 0;" class="astro-jugkfwgx">이미지 빌드와 배포</span></a></li></ul></div></details></nav></mobile-starlight-toc><script type="module" src="/bomlens/_astro/MobileTableOfContents.astro_astro_type_script_index_0_lang.C3fM4Kra.js"></script></div><div class="right-sidebar-panel sl-hidden lg:sl-block astro-qok35upx"><div class="sl-container astro-qok35upx"><starlight-toc data-min-h="2" data-max-h="3"><nav aria-labelledby="starlight__on-this-page"><h2 id="starlight__on-this-page">목차</h2><ul class="astro-jugkfwgx" style="--depth: 0;"><li style="--depth: 0;" class="astro-jugkfwgx"><a href="#_top" style="--depth: 0;" class="astro-jugkfwgx"><span style="--depth: 0;" class="astro-jugkfwgx">개요</span></a></li><li style="--depth: 0;" class="astro-jugkfwgx"><a href="#이미지와-태그" style="--depth: 0;" class="astro-jugkfwgx"><span style="--depth: 0;" class="astro-jugkfwgx">이미지와 태그</span></a></li><li style="--depth: 0;" class="astro-jugkfwgx"><a href="#이미지에-들어-있는-것" style="--depth: 0;" class="astro-jugkfwgx"><span style="--depth: 0;" class="astro-jugkfwgx">이미지에 들어 있는 것</span></a></li><li style="--depth: 0;" class="astro-jugkfwgx"><a href="#직접-실행" style="--depth: 0;" class="astro-jugkfwgx"><span style="--depth: 0;" class="astro-jugkfwgx">직접 실행</span></a><ul class="astro-jugkfwgx" style="--depth: 1;"><li style="--depth: 1;" class="astro-jugkfwgx"><a href="#docker-이미지-분석" style="--depth: 1;" class="astro-jugkfwgx"><span style="--depth: 1;" class="astro-jugkfwgx">Docker 이미지 분석</span></a></li><li style="--depth: 1;" class="astro-jugkfwgx"><a href="#바이너리-파일-분석" style="--depth: 1;" class="astro-jugkfwgx"><span style="--depth: 1;" class="astro-jugkfwgx">바이너리 파일 분석</span></a></li><li style="--depth: 1;" class="astro-jugkfwgx"><a href="#소스-디렉터리-분석" style="--depth: 1;" class="astro-jugkfwgx"><span style="--depth: 1;" class="astro-jugkfwgx">소스 디렉터리 분석</span></a></li><li style="--depth: 1;" class="astro-jugkfwgx"><a href="#고지문과-보고서까지-한-번에" style="--depth: 1;" class="astro-jugkfwgx"><span style="--depth: 1;" class="astro-jugkfwgx">고지문과 보고서까지 한 번에</span></a></li></ul></li><li style="--depth: 0;" class="astro-jugkfwgx"><a href="#환경-변수" style="--depth: 0;" class="astro-jugkfwgx"><span style="--depth: 0;" class="astro-jugkfwgx">환경 변수</span></a></li><li style="--depth: 0;" class="astro-jugkfwgx"><a href="#이미지-빌드와-배포" style="--depth: 0;" class="astro-jugkfwgx"><span style="--depth: 0;" class="astro-jugkfwgx">이미지 빌드와 배포</span></a></li></ul></nav></starlight-toc><script type="module" src="/bomlens/_astro/TableOfContents.astro_astro_type_script_index_0_lang.BpJaGz7G.js"></script></div></div></div></aside><div class="main-pane astro-lrzkfocr"><main data-pagefind-body class="astro-g5ptsecz" lang="ko" dir="ltr"><div class="content-panel astro-a7po4psb"><div class="sl-container astro-a7po4psb"><nav class="breadcrumbs astro-u72m6wot" aria-label="현재 위치"><ol class="astro-u72m6wot"><li class="astro-u72m6wot"><a href="/bomlens/ko/" class="astro-u72m6wot">홈</a></li><li class="astro-u72m6wot"><span class="astro-u72m6wot">레퍼런스</span></li></ol></nav><h1 id="_top" class="astro-u72m6wot">Docker 이미지 직접 사용</h1></div></div><div class="content-panel astro-a7po4psb"><div class="sl-container astro-a7po4psb"><div class="sl-markdown-content"><p>평소에는 <a href="/bomlens/ko/reference/cli/"><code dir="auto">scan-sbom.sh</code></a> 스크립트 사용을 권장합니다. 스크립트가 언어 감지와 이미지 선택, 볼륨 마운트를 대신 처리하기 때문입니다. 이 문서는 스크립트를 둘 수 없는 환경(CI 러너, 쿠버네티스 잡 등)에서 이미지를 <code dir="auto">docker run</code>으로 직접 호출하는 방법을 설명합니다.</p>
+<div class="sl-heading-wrapper level-h2"><h2 id="이미지와-태그">이미지와 태그</h2><a class="sl-anchor-link" href="#이미지와-태그"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “이미지와 태그”</span></a></div>
+<table>
+<thead>
+<tr>
+<th>이미지</th>
+<th>용도</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code dir="auto">ghcr.io/sktelecom/bomlens</code></td>
+<td>스캔과 후처리 (대표 이름)</td>
+</tr>
+<tr>
+<td><code dir="auto">ghcr.io/sktelecom/sbom-generator</code>, <code dir="auto">ghcr.io/sktelecom/sbom-scanner</code></td>
+<td>같은 이미지의 별칭 (이전 이름, 같은 다이제스트)</td>
+</tr>
+<tr>
+<td><code dir="auto">ghcr.io/sktelecom/bomlens-firmware</code></td>
+<td>펌웨어 분석용 (GPL 도구 포함, opt-in) (legacy alias: sbom-scanner-firmware)</td>
+</tr>
+<tr>
+<td><code dir="auto">ghcr.io/sktelecom/bomlens-deep-cve</code></td>
+<td>심층 CVE 매칭용 grype 포함 (opt-in). CLI의 <code dir="auto">--deep-cve</code>와 웹 UI의 심층 CVE 매칭 토글이 쓰며, 둘 다 지금 실행 중인 이미지가 이 이미지가 아니면 곁들임 컨테이너로 자동으로 내려받습니다</td>
+</tr>
+<tr>
+<td><code dir="auto">ghcr.io/sktelecom/bomlens-deep-license</code></td>
+<td>프로젝트 자체 파일의 라이선스 탐지용 scancode 포함 (opt-in). 소스 스캔에서 CLI의 <code dir="auto">--deep-license</code>가 쓰며, 자동으로 내려받습니다. LGPL 구성요소(linux/amd64의 7-Zip, intbitset, chardet)가 들어 있습니다. 7-Zip과 intbitset의 소스는 이미지 안 <code dir="auto">/usr/share/bomlens/sources/</code>에 있고, chardet은 파이썬 소스 형태로 들어 있습니다</td>
+</tr>
+<tr>
+<td><code dir="auto">ghcr.io/sktelecom/bomlens-aibom</code></td>
+<td>AI 모델 ML-BOM 생성용 (opt-in, legacy alias: sbom-scanner-aibom). <code dir="auto">--model</code>/<code dir="auto">--model-file</code>과 웹 UI의 AI 모델 타일이 쓰며, 곁들임 컨테이너로 자동으로 내려받습니다</td>
+</tr>
+</tbody>
+</table>
+<p><code dir="auto">latest</code>와 버전 태그를 제공합니다. 발행되는 모든 이미지(<code dir="auto">ghcr.io/sktelecom/bomlens</code>, <code dir="auto">bomlens-firmware</code>, <code dir="auto">bomlens-deep-cve</code>, <code dir="auto">bomlens-deep-license</code>, <code dir="auto">bomlens-aibom</code> 및 별칭)가 <code dir="auto">linux/amd64</code>와 <code dir="auto">linux/arm64</code>를 모두 지원하므로, <code dir="auto">arm64</code> 호스트(Apple Silicon 맥, Arm 서버)에서도 그대로 pull해 쓸 수 있습니다. 이미지는 cosign으로 서명되어 발행됩니다.</p>
+<p><code dir="auto">arm64</code> 호스트에서는 <code dir="auto">linux/amd64</code>를 강제하지 마세요(<code dir="auto">--platform linux/amd64</code>나 <code dir="auto">DOCKER_DEFAULT_PLATFORM=linux/amd64</code>). 그러면 이미지가 에뮬레이션으로 돌고, 펌웨어 이미지 안의 syft가 비정상 종료할 수 있습니다. 펌웨어 스캔은 실패한 syft 실행을 한 번 더 시도하고(시간 제한을 넘겼거나 메모리 부족으로 강제 종료된 실행은 다시 시도하지 않음), 에뮬레이션으로 돌고 있다는 사실을 로그에 남깁니다. 두 번째 시도도 실패하면 <code dir="auto">bomlens-result.json</code>에 <code dir="auto">generate</code>를 <code dir="auto">degraded</code>로 기록합니다.</p>
+<div class="expressive-code"><link rel="stylesheet" href="/bomlens/_astro/ec.klmer.css"><script type="module" src="/bomlens/_astro/ec.0vx5m.js"></script><figure class="frame not-content"><figcaption class="header"></figcaption><pre data-language="bash"><code><div class="ec-line"><div class="code"><span style="--0:#6F42C1;--1:#B392F0">docker</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#032F62;--1:#9ECBFF">pull</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#032F62;--1:#9ECBFF">ghcr.io/sktelecom/bomlens:latest</span></div></div></code></pre><div class="copy"><div aria-live="polite"></div><button title="Copy to clipboard" data-copied="Copied!" data-code="docker pull ghcr.io/sktelecom/bomlens:latest"><div></div></button></div></figure></div>
+<div class="sl-heading-wrapper level-h2"><h2 id="이미지에-들어-있는-것">이미지에 들어 있는 것</h2><a class="sl-anchor-link" href="#이미지에-들어-있는-것"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “이미지에 들어 있는 것”</span></a></div>
+<p>언어 toolchain이 없는 경량 이미지(python 3.12 slim 기반)입니다. 소스 스캔의 전이 의존성 해석은 스크립트가 cdxgen 언어별 이미지를 따로 받아 처리합니다. 구조는 <a href="/bomlens/ko/concepts/architecture/">아키텍처</a>를 참고하세요.</p>
+<table>
+<thead>
+<tr>
+<th>도구</th>
+<th>버전</th>
+<th>역할</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>syft</td>
+<td>v1.54.1</td>
+<td>이미지, 바이너리, 디렉터리 스캔</td>
+</tr>
+<tr>
+<td>Trivy</td>
+<td>v0.75.0</td>
+<td>취약점 보고서</td>
+</tr>
+<tr>
+<td>cosign</td>
+<td>v3.1.3</td>
+<td>SBOM 서명</td>
+</tr>
+<tr>
+<td>jq</td>
+<td>—</td>
+<td>SBOM 정규화와 고지문 생성</td>
+</tr>
+<tr>
+<td>ScanCode Toolkit</td>
+<td>32.5.0</td>
+<td>정밀 라이선스 탐지 (opt-in 빌드에만 포함)</td>
+</tr>
+<tr>
+<td>SCANOSS</td>
+<td>1.54.2</td>
+<td>C/C++ 소스에 복사해 넣은 오픈소스 식별(<code dir="auto">--identify-vendored</code>)</td>
+</tr>
+<tr>
+<td>docker CLI</td>
+<td>29.9.0</td>
+<td>웹 UI가 소스 스캔에서 cdxgen 컨테이너를 sibling으로 띄울 때 사용</td>
+</tr>
+<tr>
+<td>cdxgen</td>
+<td>13.5.0</td>
+<td>모델 계보 정보 보강(<code dir="auto">bomlens-aibom</code> 이미지 전용)</td>
+</tr>
+</tbody>
+</table>
+<p>도구 버전은 <code dir="auto">docker/Dockerfile</code>의 <code dir="auto">ARG</code>로 고정됩니다.</p>
+<p>모든 이미지에는 NVD CPE 인덱스(<code dir="auto">cpe_match.sqlite</code>, 약 146 MB)도 들어 있으며, 이미지를 빌드할 때 NVD 데이터로 만듭니다. 펌웨어, 루트 파일시스템, 바이너리 스캔에서 <code dir="auto">--security</code>를 켜면 패키지 PURL이 없는 컴포넌트의 CPE를 네트워크 없이 이 인덱스와 대조합니다(<a href="/bomlens/ko/guides/firmware/#cve-%EB%8C%80%EC%A1%B0-%EB%B0%A9%EC%8B%9D">CVE 대조 방식</a> 참고). 인덱스를 만들 때 GitHub에서 NVD 데이터 피드를 복제합니다. GitHub에 접속할 수 없는 환경에서 이미지를 직접 빌드하면 빌드가 이 단계에서 멈추고 <code dir="auto">--build-arg SBOM_CPE_INDEX=false</code>를 안내하며, 이 옵션으로 인덱스를 뺄 수 있습니다. 펌웨어 빌드는 이 옵션을 받지 않으므로 펌웨어 이미지에는 항상 인덱스가 들어갑니다.</p>
+<div class="sl-heading-wrapper level-h2"><h2 id="직접-실행">직접 실행</h2><a class="sl-anchor-link" href="#직접-실행"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “직접 실행”</span></a></div>
+<p>분석 모드는 환경 변수 <code dir="auto">MODE</code>로 지정합니다. 모든 예시는 산출물을 현재 디렉터리에 남기고 업로드는 하지 않습니다(<code dir="auto">UPLOAD_ENABLED=false</code>).</p>
+<div class="sl-heading-wrapper level-h3"><h3 id="docker-이미지-분석">Docker 이미지 분석</h3><a class="sl-anchor-link" href="#docker-이미지-분석"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “Docker 이미지 분석”</span></a></div>
+<p>Windows Git Bash에서는 MSYS가 <code dir="auto">/var/run/docker.sock</code>과 컨테이너 쪽 경로인
+<code dir="auto">/host-output</code>을 둘 다 Docker에 넘기기 전에 자기 마음대로 Windows 경로로
+바꿔버려서 두 마운트가 조용히 깨집니다. 아래 <code dir="auto">MSYS_NO_PATHCONV</code>와
+<code dir="auto">MSYS2_ARG_CONV_EXCL</code>은 그 변환을 끄고, <code dir="auto">cygpath -m</code>으로 호스트 쪽 경로만
+직접 변환합니다(<code dir="auto">scripts/scan-sbom.sh</code>도 같은 이유로 같은 조합을 씁니다).
+WSL2·macOS·Linux 셸은 경로를 바꾸지 않으므로 그냥 평범한 <code dir="auto">docker run</code> 줄로
+바로 넘어갑니다.</p>
+<!-- runnable -->
+<div class="expressive-code"><figure class="frame not-content"><figcaption class="header"></figcaption><pre data-language="bash"><code><div class="ec-line"><div class="code"><span style="--0:#24292E;--1:#E1E4E8">HOSTPATH</span><span style="--0:#BF3441;--1:#F97583">=</span><span style="--0:#032F62;--1:#9ECBFF">"$(</span><span style="--0:#6F42C1;--1:#B392F0">cygpath</span><span style="--0:#032F62;--1:#9ECBFF"> </span><span style="--0:#005CC5;--1:#79B8FF">-m</span><span style="--0:#032F62;--1:#9ECBFF"> "$(</span><span style="--0:#005CC5;--1:#79B8FF">pwd</span><span style="--0:#032F62;--1:#9ECBFF">)" </span><span style="--0:#BF3441;--1:#F97583">2></span><span style="--0:#032F62;--1:#9ECBFF">/dev/null </span><span style="--0:#BF3441;--1:#F97583">||</span><span style="--0:#032F62;--1:#9ECBFF"> </span><span style="--0:#005CC5;--1:#79B8FF">pwd</span><span style="--0:#032F62;--1:#9ECBFF">)"</span></div></div><div class="ec-line"><div class="code"><span style="--0:#24292E;--1:#E1E4E8">MSYS_NO_PATHCONV</span><span style="--0:#BF3441;--1:#F97583">=</span><span style="--0:#032F62;--1:#9ECBFF">1</span><span style="--0:#24292E;--1:#E1E4E8"> MSYS2_ARG_CONV_EXCL</span><span style="--0:#BF3441;--1:#F97583">=</span><span style="--0:#032F62;--1:#9ECBFF">'*'</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#6F42C1;--1:#B392F0">docker</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#032F62;--1:#9ECBFF">run</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#005CC5;--1:#79B8FF">--rm</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#005CC5;--1:#79B8FF">\</span></div></div><div class="ec-line"><div class="code"><span class="indent">  </span><span style="--0:#005CC5;--1:#79B8FF">-v</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#032F62;--1:#9ECBFF">"</span><span style="--0:#24292E;--1:#E1E4E8">$HOSTPATH</span><span style="--0:#032F62;--1:#9ECBFF">":/host-output</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#005CC5;--1:#79B8FF">\</span></div></div><div class="ec-line"><div class="code"><span class="indent">  </span><span style="--0:#005CC5;--1:#79B8FF">-v</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#032F62;--1:#9ECBFF">/var/run/docker.sock:/var/run/docker.sock</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#005CC5;--1:#79B8FF">\</span></div></div><div class="ec-line"><div class="code"><span class="indent">  </span><span style="--0:#005CC5;--1:#79B8FF">-e</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#032F62;--1:#9ECBFF">MODE=IMAGE</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#005CC5;--1:#79B8FF">\</span></div></div><div class="ec-line"><div class="code"><span class="indent">  </span><span style="--0:#005CC5;--1:#79B8FF">-e</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#032F62;--1:#9ECBFF">TARGET_IMAGE="nginx:alpine"</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#005CC5;--1:#79B8FF">\</span></div></div><div class="ec-line"><div class="code"><span class="indent">  </span><span style="--0:#005CC5;--1:#79B8FF">-e</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#032F62;--1:#9ECBFF">UPLOAD_ENABLED=</span><span style="--0:#005CC5;--1:#79B8FF">false</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#005CC5;--1:#79B8FF">\</span></div></div><div class="ec-line"><div class="code"><span class="indent">  </span><span style="--0:#005CC5;--1:#79B8FF">-e</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#032F62;--1:#9ECBFF">HOST_OUTPUT_DIR=/host-output</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#005CC5;--1:#79B8FF">\</span></div></div><div class="ec-line"><div class="code"><span class="indent">  </span><span style="--0:#005CC5;--1:#79B8FF">-e</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#032F62;--1:#9ECBFF">PROJECT_NAME="Nginx"</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#005CC5;--1:#79B8FF">\</span></div></div><div class="ec-line"><div class="code"><span class="indent">  </span><span style="--0:#005CC5;--1:#79B8FF">-e</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#032F62;--1:#9ECBFF">PROJECT_VERSION="alpine"</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#005CC5;--1:#79B8FF">\</span></div></div><div class="ec-line"><div class="code"><span class="indent">  </span><span style="--0:#032F62;--1:#9ECBFF">ghcr.io/sktelecom/bomlens:latest</span></div></div></code></pre><div class="copy"><div aria-live="polite"></div><button title="Copy to clipboard" data-copied="Copied!" data-code="HOSTPATH=&#x22;$(cygpath -m &#x22;$(pwd)&#x22; 2>/dev/null || pwd)&#x22;MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL=&#x27;*&#x27; docker run --rm \  -v &#x22;$HOSTPATH&#x22;:/host-output \  -v /var/run/docker.sock:/var/run/docker.sock \  -e MODE=IMAGE \  -e TARGET_IMAGE=&#x22;nginx:alpine&#x22; \  -e UPLOAD_ENABLED=false \  -e HOST_OUTPUT_DIR=/host-output \  -e PROJECT_NAME=&#x22;Nginx&#x22; \  -e PROJECT_VERSION=&#x22;alpine&#x22; \  ghcr.io/sktelecom/bomlens:latest"><div></div></button></div></figure></div>
+<div class="sl-heading-wrapper level-h3"><h3 id="바이너리-파일-분석">바이너리 파일 분석</h3><a class="sl-anchor-link" href="#바이너리-파일-분석"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “바이너리 파일 분석”</span></a></div>
+<div class="expressive-code"><figure class="frame not-content"><figcaption class="header"></figcaption><pre data-language="bash"><code><div class="ec-line"><div class="code"><span style="--0:#24292E;--1:#E1E4E8">HOSTPATH</span><span style="--0:#BF3441;--1:#F97583">=</span><span style="--0:#032F62;--1:#9ECBFF">"$(</span><span style="--0:#6F42C1;--1:#B392F0">cygpath</span><span style="--0:#032F62;--1:#9ECBFF"> </span><span style="--0:#005CC5;--1:#79B8FF">-m</span><span style="--0:#032F62;--1:#9ECBFF"> "$(</span><span style="--0:#005CC5;--1:#79B8FF">pwd</span><span style="--0:#032F62;--1:#9ECBFF">)" </span><span style="--0:#BF3441;--1:#F97583">2></span><span style="--0:#032F62;--1:#9ECBFF">/dev/null </span><span style="--0:#BF3441;--1:#F97583">||</span><span style="--0:#032F62;--1:#9ECBFF"> </span><span style="--0:#005CC5;--1:#79B8FF">pwd</span><span style="--0:#032F62;--1:#9ECBFF">)"</span></div></div><div class="ec-line"><div class="code"><span style="--0:#24292E;--1:#E1E4E8">MSYS_NO_PATHCONV</span><span style="--0:#BF3441;--1:#F97583">=</span><span style="--0:#032F62;--1:#9ECBFF">1</span><span style="--0:#24292E;--1:#E1E4E8"> MSYS2_ARG_CONV_EXCL</span><span style="--0:#BF3441;--1:#F97583">=</span><span style="--0:#032F62;--1:#9ECBFF">'*'</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#6F42C1;--1:#B392F0">docker</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#032F62;--1:#9ECBFF">run</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#005CC5;--1:#79B8FF">--rm</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#005CC5;--1:#79B8FF">\</span></div></div><div class="ec-line"><div class="code"><span class="indent">  </span><span style="--0:#005CC5;--1:#79B8FF">-v</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#032F62;--1:#9ECBFF">"</span><span style="--0:#24292E;--1:#E1E4E8">$HOSTPATH</span><span style="--0:#032F62;--1:#9ECBFF">":/target</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#005CC5;--1:#79B8FF">\</span></div></div><div class="ec-line"><div class="code"><span class="indent">  </span><span style="--0:#005CC5;--1:#79B8FF">-v</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#032F62;--1:#9ECBFF">"</span><span style="--0:#24292E;--1:#E1E4E8">$HOSTPATH</span><span style="--0:#032F62;--1:#9ECBFF">":/host-output</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#005CC5;--1:#79B8FF">\</span></div></div><div class="ec-line"><div class="code"><span class="indent">  </span><span style="--0:#005CC5;--1:#79B8FF">-e</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#032F62;--1:#9ECBFF">MODE=BINARY</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#005CC5;--1:#79B8FF">\</span></div></div><div class="ec-line"><div class="code"><span class="indent">  </span><span style="--0:#005CC5;--1:#79B8FF">-e</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#032F62;--1:#9ECBFF">TARGET_FILE=/target/firmware.bin</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#005CC5;--1:#79B8FF">\</span></div></div><div class="ec-line"><div class="code"><span class="indent">  </span><span style="--0:#005CC5;--1:#79B8FF">-e</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#032F62;--1:#9ECBFF">UPLOAD_ENABLED=</span><span style="--0:#005CC5;--1:#79B8FF">false</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#005CC5;--1:#79B8FF">\</span></div></div><div class="ec-line"><div class="code"><span class="indent">  </span><span style="--0:#005CC5;--1:#79B8FF">-e</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#032F62;--1:#9ECBFF">HOST_OUTPUT_DIR=/host-output</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#005CC5;--1:#79B8FF">\</span></div></div><div class="ec-line"><div class="code"><span class="indent">  </span><span style="--0:#005CC5;--1:#79B8FF">-e</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#032F62;--1:#9ECBFF">PROJECT_NAME="Firmware"</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#005CC5;--1:#79B8FF">\</span></div></div><div class="ec-line"><div class="code"><span class="indent">  </span><span style="--0:#005CC5;--1:#79B8FF">-e</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#032F62;--1:#9ECBFF">PROJECT_VERSION="1.0"</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#005CC5;--1:#79B8FF">\</span></div></div><div class="ec-line"><div class="code"><span class="indent">  </span><span style="--0:#032F62;--1:#9ECBFF">ghcr.io/sktelecom/bomlens:latest</span></div></div></code></pre><div class="copy"><div aria-live="polite"></div><button title="Copy to clipboard" data-copied="Copied!" data-code="HOSTPATH=&#x22;$(cygpath -m &#x22;$(pwd)&#x22; 2>/dev/null || pwd)&#x22;MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL=&#x27;*&#x27; docker run --rm \  -v &#x22;$HOSTPATH&#x22;:/target \  -v &#x22;$HOSTPATH&#x22;:/host-output \  -e MODE=BINARY \  -e TARGET_FILE=/target/firmware.bin \  -e UPLOAD_ENABLED=false \  -e HOST_OUTPUT_DIR=/host-output \  -e PROJECT_NAME=&#x22;Firmware&#x22; \  -e PROJECT_VERSION=&#x22;1.0&#x22; \  ghcr.io/sktelecom/bomlens:latest"><div></div></button></div></figure></div>
+<div class="sl-heading-wrapper level-h3"><h3 id="소스-디렉터리-분석">소스 디렉터리 분석</h3><a class="sl-anchor-link" href="#소스-디렉터리-분석"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “소스 디렉터리 분석”</span></a></div>
+<!-- runnable -->
+<div class="expressive-code"><figure class="frame not-content"><figcaption class="header"></figcaption><pre data-language="bash"><code><div class="ec-line"><div class="code"><span style="--0:#24292E;--1:#E1E4E8">HOSTPATH</span><span style="--0:#BF3441;--1:#F97583">=</span><span style="--0:#032F62;--1:#9ECBFF">"$(</span><span style="--0:#6F42C1;--1:#B392F0">cygpath</span><span style="--0:#032F62;--1:#9ECBFF"> </span><span style="--0:#005CC5;--1:#79B8FF">-m</span><span style="--0:#032F62;--1:#9ECBFF"> "$(</span><span style="--0:#005CC5;--1:#79B8FF">pwd</span><span style="--0:#032F62;--1:#9ECBFF">)" </span><span style="--0:#BF3441;--1:#F97583">2></span><span style="--0:#032F62;--1:#9ECBFF">/dev/null </span><span style="--0:#BF3441;--1:#F97583">||</span><span style="--0:#032F62;--1:#9ECBFF"> </span><span style="--0:#005CC5;--1:#79B8FF">pwd</span><span style="--0:#032F62;--1:#9ECBFF">)"</span></div></div><div class="ec-line"><div class="code"><span style="--0:#24292E;--1:#E1E4E8">MSYS_NO_PATHCONV</span><span style="--0:#BF3441;--1:#F97583">=</span><span style="--0:#032F62;--1:#9ECBFF">1</span><span style="--0:#24292E;--1:#E1E4E8"> MSYS2_ARG_CONV_EXCL</span><span style="--0:#BF3441;--1:#F97583">=</span><span style="--0:#032F62;--1:#9ECBFF">'*'</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#6F42C1;--1:#B392F0">docker</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#032F62;--1:#9ECBFF">run</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#005CC5;--1:#79B8FF">--rm</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#005CC5;--1:#79B8FF">\</span></div></div><div class="ec-line"><div class="code"><span class="indent">  </span><span style="--0:#005CC5;--1:#79B8FF">-v</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#032F62;--1:#9ECBFF">"</span><span style="--0:#24292E;--1:#E1E4E8">$HOSTPATH</span><span style="--0:#032F62;--1:#9ECBFF">":/src</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#005CC5;--1:#79B8FF">\</span></div></div><div class="ec-line"><div class="code"><span class="indent">  </span><span style="--0:#005CC5;--1:#79B8FF">-v</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#032F62;--1:#9ECBFF">"</span><span style="--0:#24292E;--1:#E1E4E8">$HOSTPATH</span><span style="--0:#032F62;--1:#9ECBFF">":/host-output</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#005CC5;--1:#79B8FF">\</span></div></div><div class="ec-line"><div class="code"><span class="indent">  </span><span style="--0:#005CC5;--1:#79B8FF">-e</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#032F62;--1:#9ECBFF">MODE=SOURCE</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#005CC5;--1:#79B8FF">\</span></div></div><div class="ec-line"><div class="code"><span class="indent">  </span><span style="--0:#005CC5;--1:#79B8FF">-e</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#032F62;--1:#9ECBFF">UPLOAD_ENABLED=</span><span style="--0:#005CC5;--1:#79B8FF">false</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#005CC5;--1:#79B8FF">\</span></div></div><div class="ec-line"><div class="code"><span class="indent">  </span><span style="--0:#005CC5;--1:#79B8FF">-e</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#032F62;--1:#9ECBFF">HOST_OUTPUT_DIR=/host-output</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#005CC5;--1:#79B8FF">\</span></div></div><div class="ec-line"><div class="code"><span class="indent">  </span><span style="--0:#005CC5;--1:#79B8FF">-e</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#032F62;--1:#9ECBFF">PROJECT_NAME="MyApp"</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#005CC5;--1:#79B8FF">\</span></div></div><div class="ec-line"><div class="code"><span class="indent">  </span><span style="--0:#005CC5;--1:#79B8FF">-e</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#032F62;--1:#9ECBFF">PROJECT_VERSION="1.0.0"</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#005CC5;--1:#79B8FF">\</span></div></div><div class="ec-line"><div class="code"><span class="indent">  </span><span style="--0:#032F62;--1:#9ECBFF">ghcr.io/sktelecom/bomlens:latest</span></div></div></code></pre><div class="copy"><div aria-live="polite"></div><button title="Copy to clipboard" data-copied="Copied!" data-code="HOSTPATH=&#x22;$(cygpath -m &#x22;$(pwd)&#x22; 2>/dev/null || pwd)&#x22;MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL=&#x27;*&#x27; docker run --rm \  -v &#x22;$HOSTPATH&#x22;:/src \  -v &#x22;$HOSTPATH&#x22;:/host-output \  -e MODE=SOURCE \  -e UPLOAD_ENABLED=false \  -e HOST_OUTPUT_DIR=/host-output \  -e PROJECT_NAME=&#x22;MyApp&#x22; \  -e PROJECT_VERSION=&#x22;1.0.0&#x22; \  ghcr.io/sktelecom/bomlens:latest"><div></div></button></div></figure></div>
+<p>직접 실행의 <code dir="auto">SOURCE</code> 모드는 트리 전체를 덮는 lock 파일(<code dir="auto">package-lock.json</code>, <code dir="auto">npm-shrinkwrap.json</code>, <code dir="auto">pnpm-lock.yaml</code>, <code dir="auto">bun.lock</code>, <code dir="auto">gradle.lockfile</code> 중 하나이고 루트 아래 다른 매니페스트가 없을 때)을 빌드도 Docker 소켓도 없이 그대로 읽고, 빠진 라이선스는 패키지 레지스트리에서 채웁니다. SBOM에는 이 방식이 <code dir="auto">bomlens:detection</code>으로 남습니다. 사이드 컨테이너를 띄울 Docker가 없는 환경, 예를 들어 이 이미지를 작업 이미지로 쓰는 CI 작업에서 쓰는 형태입니다. 그 밖의 트리는 컨테이너 안에서 syft가 패키지 매니페스트를 읽는 방식이라 직접 의존성만 잡힐 수 있습니다. 전이 의존성까지 필요하면 cdxgen 언어 이미지를 라우팅하는 <code dir="auto">scan-sbom.sh</code>를 쓰세요. syft의 매니페스트 판독기는 의존성을 하나라도 풀어내려면 락파일(Node는 <code dir="auto">package-lock.json</code>, <code dir="auto">npm-shrinkwrap.json</code>, <code dir="auto">yarn.lock</code>, <code dir="auto">pnpm-lock.yaml</code>, 다른 생태계도 마찬가지)이 있어야 합니다. 락파일이 없으면 직접 실행의 <code dir="auto">SOURCE</code> 모드는 읽을 것이 없어, 빈 결과를 완료로 보고하는 대신 안내와 함께 실패합니다.</p>
+<div class="sl-heading-wrapper level-h3"><h3 id="고지문과-보고서까지-한-번에">고지문과 보고서까지 한 번에</h3><a class="sl-anchor-link" href="#고지문과-보고서까지-한-번에"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “고지문과 보고서까지 한 번에”</span></a></div>
+<p>직접 실행에서는 고지문과 보안 보고서가 기본으로 꺼져 있습니다. 다음 변수를 켜면 CLI의 <code dir="auto">--all</code>과 같은 산출물이 나옵니다.</p>
+<!-- runnable -->
+<div class="expressive-code"><figure class="frame not-content"><figcaption class="header"></figcaption><pre data-language="bash"><code><div class="ec-line"><div class="code"><span style="--0:#24292E;--1:#E1E4E8">HOSTPATH</span><span style="--0:#BF3441;--1:#F97583">=</span><span style="--0:#032F62;--1:#9ECBFF">"$(</span><span style="--0:#6F42C1;--1:#B392F0">cygpath</span><span style="--0:#032F62;--1:#9ECBFF"> </span><span style="--0:#005CC5;--1:#79B8FF">-m</span><span style="--0:#032F62;--1:#9ECBFF"> "$(</span><span style="--0:#005CC5;--1:#79B8FF">pwd</span><span style="--0:#032F62;--1:#9ECBFF">)" </span><span style="--0:#BF3441;--1:#F97583">2></span><span style="--0:#032F62;--1:#9ECBFF">/dev/null </span><span style="--0:#BF3441;--1:#F97583">||</span><span style="--0:#032F62;--1:#9ECBFF"> </span><span style="--0:#005CC5;--1:#79B8FF">pwd</span><span style="--0:#032F62;--1:#9ECBFF">)"</span></div></div><div class="ec-line"><div class="code"><span style="--0:#24292E;--1:#E1E4E8">MSYS_NO_PATHCONV</span><span style="--0:#BF3441;--1:#F97583">=</span><span style="--0:#032F62;--1:#9ECBFF">1</span><span style="--0:#24292E;--1:#E1E4E8"> MSYS2_ARG_CONV_EXCL</span><span style="--0:#BF3441;--1:#F97583">=</span><span style="--0:#032F62;--1:#9ECBFF">'*'</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#6F42C1;--1:#B392F0">docker</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#032F62;--1:#9ECBFF">run</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#005CC5;--1:#79B8FF">--rm</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#005CC5;--1:#79B8FF">\</span></div></div><div class="ec-line"><div class="code"><span class="indent">  </span><span style="--0:#005CC5;--1:#79B8FF">-v</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#032F62;--1:#9ECBFF">"</span><span style="--0:#24292E;--1:#E1E4E8">$HOSTPATH</span><span style="--0:#032F62;--1:#9ECBFF">":/host-output</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#005CC5;--1:#79B8FF">\</span></div></div><div class="ec-line"><div class="code"><span class="indent">  </span><span style="--0:#005CC5;--1:#79B8FF">-v</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#032F62;--1:#9ECBFF">/var/run/docker.sock:/var/run/docker.sock</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#005CC5;--1:#79B8FF">\</span></div></div><div class="ec-line"><div class="code"><span class="indent">  </span><span style="--0:#005CC5;--1:#79B8FF">-e</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#032F62;--1:#9ECBFF">MODE=IMAGE</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#005CC5;--1:#79B8FF">\</span></div></div><div class="ec-line"><div class="code"><span class="indent">  </span><span style="--0:#005CC5;--1:#79B8FF">-e</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#032F62;--1:#9ECBFF">TARGET_IMAGE="nginx:alpine"</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#005CC5;--1:#79B8FF">\</span></div></div><div class="ec-line"><div class="code"><span class="indent">  </span><span style="--0:#005CC5;--1:#79B8FF">-e</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#032F62;--1:#9ECBFF">GENERATE_NOTICE=</span><span style="--0:#005CC5;--1:#79B8FF">true</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#005CC5;--1:#79B8FF">\</span></div></div><div class="ec-line"><div class="code"><span class="indent">  </span><span style="--0:#005CC5;--1:#79B8FF">-e</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#032F62;--1:#9ECBFF">GENERATE_SECURITY=</span><span style="--0:#005CC5;--1:#79B8FF">true</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#005CC5;--1:#79B8FF">\</span></div></div><div class="ec-line"><div class="code"><span class="indent">  </span><span style="--0:#005CC5;--1:#79B8FF">-e</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#032F62;--1:#9ECBFF">GENERATE_REPORT=</span><span style="--0:#005CC5;--1:#79B8FF">true</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#005CC5;--1:#79B8FF">\</span></div></div><div class="ec-line"><div class="code"><span class="indent">  </span><span style="--0:#005CC5;--1:#79B8FF">-e</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#032F62;--1:#9ECBFF">UPLOAD_ENABLED=</span><span style="--0:#005CC5;--1:#79B8FF">false</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#005CC5;--1:#79B8FF">\</span></div></div><div class="ec-line"><div class="code"><span class="indent">  </span><span style="--0:#005CC5;--1:#79B8FF">-e</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#032F62;--1:#9ECBFF">HOST_OUTPUT_DIR=/host-output</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#005CC5;--1:#79B8FF">\</span></div></div><div class="ec-line"><div class="code"><span class="indent">  </span><span style="--0:#005CC5;--1:#79B8FF">-e</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#032F62;--1:#9ECBFF">PROJECT_NAME="Nginx"</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#005CC5;--1:#79B8FF">\</span></div></div><div class="ec-line"><div class="code"><span class="indent">  </span><span style="--0:#005CC5;--1:#79B8FF">-e</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#032F62;--1:#9ECBFF">PROJECT_VERSION="alpine"</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#005CC5;--1:#79B8FF">\</span></div></div><div class="ec-line"><div class="code"><span class="indent">  </span><span style="--0:#032F62;--1:#9ECBFF">ghcr.io/sktelecom/bomlens:latest</span></div></div></code></pre><div class="copy"><div aria-live="polite"></div><button title="Copy to clipboard" data-copied="Copied!" data-code="HOSTPATH=&#x22;$(cygpath -m &#x22;$(pwd)&#x22; 2>/dev/null || pwd)&#x22;MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL=&#x27;*&#x27; docker run --rm \  -v &#x22;$HOSTPATH&#x22;:/host-output \  -v /var/run/docker.sock:/var/run/docker.sock \  -e MODE=IMAGE \  -e TARGET_IMAGE=&#x22;nginx:alpine&#x22; \  -e GENERATE_NOTICE=true \  -e GENERATE_SECURITY=true \  -e GENERATE_REPORT=true \  -e UPLOAD_ENABLED=false \  -e HOST_OUTPUT_DIR=/host-output \  -e PROJECT_NAME=&#x22;Nginx&#x22; \  -e PROJECT_VERSION=&#x22;alpine&#x22; \  ghcr.io/sktelecom/bomlens:latest"><div></div></button></div></figure></div>
+<div class="sl-heading-wrapper level-h2"><h2 id="환경-변수">환경 변수</h2><a class="sl-anchor-link" href="#환경-변수"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “환경 변수”</span></a></div>
+<table>
+<thead>
+<tr>
+<th>환경 변수</th>
+<th>필수</th>
+<th>기본값</th>
+<th>설명</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code dir="auto">MODE</code></td>
+<td>X</td>
+<td><code dir="auto">POSTPROCESS</code></td>
+<td>분석 모드: <code dir="auto">SOURCE</code>, <code dir="auto">IMAGE</code>, <code dir="auto">BINARY</code>, <code dir="auto">ROOTFS</code>, <code dir="auto">FIRMWARE</code>, <code dir="auto">ANALYZE</code>, 또는 <code dir="auto">PLAN</code>(소스 스캔의 실행 계획 작성, <a href="/bomlens/ko/reference/engine-contract/#%EC%8B%A4%ED%96%89-%EA%B3%84%ED%9A%8D">엔진 계약</a> 참조). 지정하지 않으면 출력 디렉터리에 이미 있는 SBOM을 후처리만 한다 — 실제로 무언가를 스캔하려면 명시적으로 지정해야 한다.</td>
+</tr>
+<tr>
+<td><code dir="auto">PROJECT_NAME</code></td>
+<td>O</td>
+<td>—</td>
+<td>프로젝트 이름</td>
+</tr>
+<tr>
+<td><code dir="auto">PROJECT_VERSION</code></td>
+<td>O</td>
+<td>—</td>
+<td>프로젝트 버전</td>
+</tr>
+<tr>
+<td><code dir="auto">TARGET_IMAGE</code></td>
+<td>모드별</td>
+<td>—</td>
+<td><code dir="auto">IMAGE</code> 모드의 이미지. docker.sock을 마운트하면 Docker 데몬에서 읽고, 마운트하지 않으면 레지스트리에서 읽거나 형식 접두사가 붙은 아카이브(<code dir="auto">docker-archive:</code>, <code dir="auto">oci-archive:</code>, <code dir="auto">oci-dir:</code>, 컨테이너에 마운트한 경로)에서 읽음</td>
+</tr>
+<tr>
+<td><code dir="auto">SYFT_REGISTRY_AUTH_USERNAME</code>, <code dir="auto">SYFT_REGISTRY_AUTH_PASSWORD</code>, <code dir="auto">SYFT_REGISTRY_AUTH_TOKEN</code>, <code dir="auto">SYFT_REGISTRY_AUTH_AUTHORITY</code></td>
+<td>—</td>
+<td>—</td>
+<td><code dir="auto">IMAGE</code> 모드: 비공개 레지스트리의 자격 증명. docker 설정 파일을 마운트하고 <code dir="auto">DOCKER_CONFIG</code>로 지정해도 됨. <code dir="auto">SYFT_REGISTRY_INSECURE_SKIP_TLS_VERIFY</code>와 <code dir="auto">SYFT_REGISTRY_INSECURE_USE_HTTP</code>는 자체 서명 인증서나 HTTP 레지스트리에 접속할 때 씀. <code dir="auto">SYFT_PLATFORM</code>은 여러 플랫폼 이미지에서 플랫폼을 고름</td>
+</tr>
+<tr>
+<td><code dir="auto">TARGET_FILE</code></td>
+<td>모드별</td>
+<td>—</td>
+<td><code dir="auto">BINARY</code>/<code dir="auto">FIRMWARE</code> 모드의 파일 경로 (컨테이너 내부 경로)</td>
+</tr>
+<tr>
+<td><code dir="auto">TARGET_DIR</code></td>
+<td>모드별</td>
+<td>—</td>
+<td><code dir="auto">ROOTFS</code> 모드의 디렉터리 경로</td>
+</tr>
+<tr>
+<td><code dir="auto">UPLOAD_ENABLED</code></td>
+<td>—</td>
+<td><code dir="auto">true</code></td>
+<td><code dir="auto">false</code>면 업로드 없이 로컬 저장만 (CLI <code dir="auto">--generate-only</code>와 동일)</td>
+</tr>
+<tr>
+<td><code dir="auto">HOST_OUTPUT_DIR</code></td>
+<td>—</td>
+<td>—</td>
+<td>산출물을 복사할 마운트 경로</td>
+</tr>
+<tr>
+<td><code dir="auto">BOMLENS_STAGE1_EXIT</code>, <code dir="auto">BOMLENS_STAGE1_OOM</code>, <code dir="auto">BOMLENS_STAGE1_LOG</code>, <code dir="auto">BOMLENS_STAGE1_REASON</code></td>
+<td>—</td>
+<td>—</td>
+<td>1단계를 직접 실행한 뒤의 <code dir="auto">POSTPROCESS</code>: 그 종료 코드, 메모리 부족으로 종료됐으면 <code dir="auto">true</code>, 출력 폴더에 둔 로그 파일 이름. 뒤의 두 값 대신 이미 분류한 사유(<code dir="auto">oom</code>, <code dir="auto">disk-space</code>, <code dir="auto">network</code>, <code dir="auto">cdxgen-crash</code>, <code dir="auto">cdxgen-unavailable</code>)를 넘겨도 됨. 종료 코드 127은 <code dir="auto">cdxgen-unavailable</code>로 읽으므로, 1단계를 실행하지 않는 <code dir="auto">unsupported</code> 계획에서는 이 값을 넘김. 1단계가 SBOM을 남기지 않았으면 2단계가 syft 스캔으로 대신함(<a href="/bomlens/ko/reference/engine-contract/#%EC%8B%A4%ED%96%89-%EA%B3%84%ED%9A%8D">엔진 계약</a> 참조)</td>
+</tr>
+<tr>
+<td><code dir="auto">BOMLENS_EVENTS</code></td>
+<td>—</td>
+<td>—</td>
+<td><code dir="auto">file</code> 또는 <code dir="auto">stderr</code>: 진행 이벤트를 한 줄에 JSON 객체 하나씩 출력 폴더의 <code dir="auto">bomlens-events.jsonl</code> 또는 표준 오류에 씀(<a href="/bomlens/ko/reference/engine-contract/#%EC%A7%84%ED%96%89-%EC%9D%B4%EB%B2%A4%ED%8A%B8">엔진 계약</a> 참조)</td>
+</tr>
+<tr>
+<td><code dir="auto">BOMLENS_IMAGE_REF</code>, <code dir="auto">BOMLENS_IMAGE_DIGEST</code></td>
+<td>—</td>
+<td>—</td>
+<td>호출자가 실행한 이미지 참조와 다이제스트. <code dir="auto">bomlens-result.json</code>에 그대로 적습니다(<a href="/bomlens/ko/reference/engine-contract/">엔진 계약</a> 참고)</td>
+</tr>
+<tr>
+<td><code dir="auto">GENERATE_NOTICE</code></td>
+<td>—</td>
+<td><code dir="auto">false</code></td>
+<td>오픈소스 고지문 생성 (CLI <code dir="auto">--notice</code>)</td>
+</tr>
+<tr>
+<td><code dir="auto">GENERATE_SECURITY</code></td>
+<td>—</td>
+<td><code dir="auto">false</code></td>
+<td>Trivy 보안 보고서 생성 (CLI <code dir="auto">--security</code>)</td>
+</tr>
+<tr>
+<td><code dir="auto">DEEP_LICENSE</code></td>
+<td>—</td>
+<td><code dir="auto">false</code></td>
+<td>scancode로 프로젝트 자체 파일의 라이선스 탐지 (CLI <code dir="auto">--deep-license</code>, 이미지에 scancode 필요)</td>
+</tr>
+<tr>
+<td><code dir="auto">DEEP_LICENSE_MAX_FILES</code></td>
+<td>—</td>
+<td><code dir="auto">20000</code></td>
+<td><code dir="auto">DEEP_LICENSE</code>: 프로젝트 자체 파일이 이보다 많은 트리는 검사하지 않음</td>
+</tr>
+<tr>
+<td><code dir="auto">DEEP_LICENSE_TIMEOUT</code></td>
+<td>—</td>
+<td><code dir="auto">600</code></td>
+<td><code dir="auto">DEEP_LICENSE</code>: scancode를 멈출 때까지의 초</td>
+</tr>
+<tr>
+<td><code dir="auto">BOMLENS_DEEP_LICENSE_ALL</code></td>
+<td>—</td>
+<td>—</td>
+<td><code dir="auto">DEEP_LICENSE</code>: <code dir="auto">1</code>이면 의존성, 빌드, 도구 폴더까지 검사 (기본은 제외)</td>
+</tr>
+<tr>
+<td><code dir="auto">DETECTION</code></td>
+<td>—</td>
+<td><code dir="auto">auto</code></td>
+<td><code dir="auto">SOURCE</code> 모드 전용. <code dir="auto">auto</code>는 트리를 덮는 lock 파일이 있으면 정적으로 읽고 그 외에는 예전처럼 빌드나 syft 경로를 쓴다. <code dir="auto">static</code>은 항상 정적으로 읽고, <code dir="auto">build</code>는 정적으로 읽지 않는다(CLI <code dir="auto">--detection</code>). 정적 검출은 빠진 라이선스를 패키지 레지스트리에서 채우므로 <code dir="auto">BYTE_STABLE=true</code>나 <code dir="auto">FETCH_LICENSE=false</code>에서는 <code dir="auto">auto</code>가 빌드한다</td>
+</tr>
+<tr>
+<td><code dir="auto">REACHABILITY</code></td>
+<td>—</td>
+<td><code dir="auto">false</code></td>
+<td>각 Go 보안 권고의 코드에 도달하는지 govulncheck로 판정 (CLI <code dir="auto">--reachability</code>). <code dir="auto">BINARY</code> 모드는 실행 파일을 읽고, <code dir="auto">SOURCE</code>와 <code dir="auto">POSTPROCESS</code>는 1단계가 남긴 govulncheck 출력을 읽는다(CLI가 이미지의 govulncheck를 1단계에 넘긴다)</td>
+</tr>
+<tr>
+<td><code dir="auto">GENERATE_REPORT</code></td>
+<td>—</td>
+<td><code dir="auto">false</code></td>
+<td>오픈소스 위험 보고서 생성 (CLI 기본값과 달리 직접 실행은 꺼짐)</td>
+</tr>
+<tr>
+<td><code dir="auto">ENRICH_MAVEN_CPE</code></td>
+<td>—</td>
+<td><code dir="auto">true</code></td>
+<td>maven 컴포넌트에 groupId로 유도한 NVD 매칭용 <code dir="auto">cpe:2.3</code>을 부여해 CPE 기반 엔진이 NVD 전용 CVE를 찾게 함. 매핑 불가한 group은 CPE를 붙이지 않음 (AI SBOM은 건너뜀)</td>
+</tr>
+<tr>
+<td><code dir="auto">ENRICH_GITHUB_CPE</code></td>
+<td>—</td>
+<td><code dir="auto">true</code></td>
+<td>소수의 손검증된 <code dir="auto">pkg:github/</code> 컴포넌트(패키지 매니저 생태계가 없는 대형 C/C++ 프로젝트에 흔한, 소스 저장소 좌표로만 식별되는 컴포넌트)에 NVD 매칭용 <code dir="auto">cpe:2.3</code>을 부여해 CPE 기반 엔진이 NVD 전용 CVE를 찾게 함. 큐레이션 목록에 없으면 CPE를 붙이지 않음 (AI SBOM은 건너뜀)</td>
+</tr>
+<tr>
+<td><code dir="auto">ENRICH_UPSTREAM_PURL</code></td>
+<td>—</td>
+<td><code dir="auto">true</code></td>
+<td>펌웨어, 루트 파일시스템, 바이너리 스캔과 Yocto 빌드의 기록에서 읽은 SBOM에서 purl이 없거나 <code dir="auto">pkg:generic</code>, <code dir="auto">pkg:opkg</code> purl인 컴포넌트에 upstream 소스 저장소 purl(<code dir="auto">pkg:github/&#x3C;owner>/&#x3C;repo>@&#x3C;tag></code>, <code dir="auto">pkg:sourceforge</code>, <code dir="auto">pkg:gnu</code>)을 붙임. <code dir="auto">docker/lib/upstream-purl-map.json</code>의 변환표에 있는 프로젝트와, 소스 내려받기 주소가 GitHub이나 GNU 릴리스를 밝히는 컴포넌트만 바꾸고, 나머지는 원래 식별자를 둠</td>
+</tr>
+<tr>
+<td><code dir="auto">ENRICH_INTERPRETER_CPE</code></td>
+<td>—</td>
+<td><code dir="auto">true</code></td>
+<td>소수의 손검증된 인터프리터 컴포넌트(예: conda나 NuGet 패키지로 배포된 Python)에 NVD 매칭용 <code dir="auto">cpe:2.3</code>을 부여해 CPE 기반 엔진이 NVD 전용 CVE를 찾게 함. 큐레이션 목록에 없으면 CPE를 붙이지 않음 (AI SBOM은 건너뜀)</td>
+</tr>
+<tr>
+<td><code dir="auto">SECURITY_NVD_VERIFY</code></td>
+<td>—</td>
+<td><code dir="auto">false</code></td>
+<td><code dir="auto">--deep-cve</code> 사용 시: grype <code dir="auto">nvd:cpe</code> 결과를 실시간 NVD 버전 범위로 검증해 범위 밖 오탐을 제거 (<code dir="auto">NVD_API_KEY</code>·네트워크 필요, 수 분 추가). 기본 off — 결과는 유지하되 버전 미검증으로 표시</td>
+</tr>
+<tr>
+<td><code dir="auto">NVD_API_KEY</code></td>
+<td><code dir="auto">SECURITY_NVD_VERIFY</code>에 필요</td>
+<td>—</td>
+<td>deep-cve 버전 필터가 쓰는 NVD API 키. 컨테이너에 이름으로만 전달(값은 인라인하지 않음)</td>
+</tr>
+<tr>
+<td><code dir="auto">BOMLENS_OS_LICENSES</code></td>
+<td>—</td>
+<td><code dir="auto">true</code></td>
+<td><code dir="auto">IMAGE</code>와 <code dir="auto">ROOTFS</code> 모드: Debian 패키지의 라이선스를 Trivy로 읽음. syft가 해시로 남기는 copyright 파일에서 Trivy가 라이선스 이름, common-licenses 참조, 라이선스 본문을 읽음. 이미지를 한 번 더 읽으며, <code dir="auto">false</code>로 끔(해시는 그대로 지움)</td>
+</tr>
+<tr>
+<td><code dir="auto">BOMLENS_TRIVY_DB_MAX_AGE_DAYS</code></td>
+<td>—</td>
+<td><code dir="auto">7</code></td>
+<td><code dir="auto">/trivy-db</code>에 Trivy 데이터베이스를 마운트했을 때(갱신 없이 오프라인으로 읽음), 보안 단계를 열화로 기록하는 경과 일수</td>
+</tr>
+<tr>
+<td><code dir="auto">BOMLENS_GRYPE_DB_MAX_AGE_DAYS</code></td>
+<td>—</td>
+<td><code dir="auto">7</code></td>
+<td><code dir="auto">--deep-cve</code> 사용 시 grype 데이터베이스를 대조 전에 <code dir="auto">grype db update</code>로 갱신하는 기준 경과 일수. 이미지의 캐시에 쓸 수 없으면 임시 폴더에 받고, <code dir="auto">TRIVY_OFFLINE_SCAN</code>이나 <code dir="auto">TRIVY_SKIP_DB_UPDATE</code>가 <code dir="auto">true</code>이면 갱신하지 않는다. 갱신하지 못한 데이터베이스도 그대로 읽고, <code dir="auto">deep-cve</code> 단계를 경과 일수와 함께 <code dir="auto">degraded</code>로 기록한다. 갱신한 데이터베이스는 컨테이너가 끝나면 사라지므로, 이미지의 데이터베이스가 오래된 동안에는 스캔할 때마다 다시 내려받는다. <code dir="auto">/trivy-db</code>에 Trivy 데이터베이스를 마운트하면 오프라인 스캔이 되어 grype도 갱신하지 않는다</td>
+</tr>
+<tr>
+<td><code dir="auto">GRYPE_DB_UPDATE_URL</code></td>
+<td>—</td>
+<td>grype 기본값</td>
+<td><code dir="auto">--deep-cve</code> 사용 시 <code dir="auto">grype db update</code>가 grype 데이터베이스를 받는 주소. 미러를 쓸 때 지정한다</td>
+</tr>
+<tr>
+<td><code dir="auto">BOMLENS_GO_VULNDB</code></td>
+<td>—</td>
+<td><code dir="auto">true</code></td>
+<td><code dir="auto">--security</code>를 켰을 때 Go 모듈을 이미지에 든 Go 취약점 데이터베이스 스냅숏과도 대조. <code dir="auto">false</code>면 건너뜀</td>
+</tr>
+<tr>
+<td><code dir="auto">BOMLENS_GO_VULNDB_PATH</code></td>
+<td>—</td>
+<td>이미지에 든 스냅숏</td>
+<td>스냅숏 대신 읽을 컨테이너 안의 Go 취약점 데이터베이스 내보내기 파일(<a href="https://vuln.go.dev/vulndb.zip">https://vuln.go.dev/vulndb.zip</a> 의 <code dir="auto">vulndb.zip</code> 또는 그 압축을 푼 폴더). 내려받은 데이터베이스로 바꾸지 않으며, 오래됐으면 열화로만 기록</td>
+</tr>
+<tr>
+<td><code dir="auto">BOMLENS_GO_VULNDB_MAX_AGE_DAYS</code></td>
+<td>—</td>
+<td><code dir="auto">7</code></td>
+<td>Go 취약점 데이터베이스를 오래된 것으로 보는 경과 일수. 데이터베이스 자체의 날짜(<code dir="auto">index/db.json</code>)부터 셈. 이미지에 든 스냅숏이 오래됐으면 그 스캔에서는 임시 폴더에 내려받은 데이터베이스(약 3.6 MB, 제한 60초)를 대신 읽고, 스캔이 끝나면 지움. 오프라인 스캔이거나(<code dir="auto">TRIVY_OFFLINE_SCAN</code> 또는 <code dir="auto">TRIVY_SKIP_DB_UPDATE</code>가 <code dir="auto">true</code>, <code dir="auto">/trivy-db</code> 마운트일 때처럼) 내려받기에 실패하면 오래된 스냅숏을 읽고 <code dir="auto">go-vulndb</code> 단계를 열화로 기록</td>
+</tr>
+<tr>
+<td><code dir="auto">BOMLENS_GO_VULNDB_URL</code></td>
+<td>—</td>
+<td><code dir="auto">https://vuln.go.dev/vulndb.zip</code></td>
+<td>그 내려받기의 주소. <code dir="auto">vulndb.zip</code>의 미러를 지정(<code dir="auto">http</code>, <code dir="auto">https</code>, <code dir="auto">file</code> URL). 읽기 전에 이미지 빌드 때와 같은 방법으로 검사</td>
+</tr>
+<tr>
+<td><code dir="auto">BOMLENS_EXTRA_CA_CERTS</code></td>
+<td>-</td>
+<td>-</td>
+<td>TLS를 검사하는 프록시를 쓸 때 신뢰할 CA 번들(PEM)의 컨테이너 안 경로. 이미지를 직접 실행할 때는 번들을 마운트하고(읽기 전용이면 충분) 이 변수에 그 경로를 지정. 엔트리포인트가 시스템 번들의 사본(<code dir="auto">SSL_CERT_FILE</code>, <code dir="auto">REQUESTS_CA_BUNDLE</code>, <code dir="auto">CURL_CA_BUNDLE</code>, <code dir="auto">CARGO_HTTP_CAINFO</code>, <code dir="auto">GIT_SSL_CAINFO</code>, <code dir="auto">PIP_CERT</code>), <code dir="auto">NODE_EXTRA_CA_CERTS</code>, <code dir="auto">JAVA_TOOL_OPTIONS</code>로 지정한 JDK 트러스트 스토어 사본에 추가한다. 이 파일들은 <code dir="auto">/tmp</code> 아래에만 쓰므로 <code dir="auto">/tmp</code>만 쓸 수 있으면 루트 파일 시스템이 읽기 전용이어도 된다. 읽을 수 없거나 PEM 인증서가 없는 경로면 <code dir="auto">[WARN]</code>을 출력하고 추가 CA 없이 계속 진행. CLI는 <code dir="auto">SBOM_EXTRA_CA_CERTS</code>로 이 값을 대신 설정</td>
+</tr>
+<tr>
+<td><code dir="auto">ENRICH_EOL</code></td>
+<td>—</td>
+<td><code dir="auto">true</code></td>
+<td>번들된 오프라인 스냅샷으로 upstream end-of-life가 지난 컴포넌트를 표시 (AI SBOM은 건너뜀)</td>
+</tr>
+<tr>
+<td><code dir="auto">ENRICH_MALICIOUS</code></td>
+<td>—</td>
+<td><code dir="auto">true</code></td>
+<td>번들된 오프라인 OSV 스냅샷으로 악성 패키지(오타 도용, 계정 탈취 배포본)를 표시. 취약점과 별개 신호이며, 대응도 업그레이드가 아니라 제거와 자격 증명 교체다</td>
+</tr>
+<tr>
+<td><code dir="auto">ENRICH_OS_CONTEXT</code></td>
+<td>—</td>
+<td><code dir="auto">true</code></td>
+<td>배포판 패키지 PURL(rpm·deb·apk)에서 <code dir="auto">operating-system</code> 컴포넌트를 합성. Trivy가 이 컴포넌트를 보고 배포판 취약점 피드를 고르므로, 없으면 공급사 SBOM이나 rootfs 스캔의 OS 패키지는 OS CVE 매칭이 전혀 안 됨. 인식 가능한 배포판 패키지가 없으면 아무 동작도 하지 않음. Trivy가 피드를 제공하지 않는 배포판(예: OpenWRT)도 대상에서 제외 (AI SBOM은 건너뜀)</td>
+</tr>
+<tr>
+<td><code dir="auto">ENRICH_DISTRO_SUPPLIER</code></td>
+<td>—</td>
+<td><code dir="auto">true</code></td>
+<td>rpm·deb·apk 컴포넌트의 <code dir="auto">supplier</code>를 배포판 프로젝트 이름으로 채움. <code dir="auto">ENRICH_OS_CONTEXT</code>가 합성한 <code dir="auto">operating-system</code> 컴포넌트에서 배포판을 읽는다. 확인된 공급자 이름이 없는 배포판, 배포판이 섞인 SBOM, 이미 supplier가 있는 컴포넌트는 그대로 둠 (AI SBOM은 건너뜀)</td>
+</tr>
+<tr>
+<td><code dir="auto">STALENESS_ENRICH</code></td>
+<td>—</td>
+<td><code dir="auto">false</code></td>
+<td>deps.dev 버전 최신성(최신 대비 몇 릴리스 뒤처졌는지) 추가. 네트워크 접근 필요</td>
+</tr>
+<tr>
+<td><code dir="auto">ENRICH_HF_SECURITY</code></td>
+<td>—</td>
+<td><code dir="auto">true</code></td>
+<td>AIBOM 모드에서 HuggingFace의 파일별 보안 스캔 결과(ClamAV·picklescan)를 ML-BOM에 기록. 메타데이터만 읽고 파일은 내려받지 않음</td>
+</tr>
+<tr>
+<td><code dir="auto">API_KEY</code>, <code dir="auto">API_URL</code></td>
+<td>업로드 시</td>
+<td>—</td>
+<td>업로드 자격과 서버 주소. DT는 <code dir="auto">X-Api-Key</code>, TRUSCA는 Bearer 토큰으로 쓰입니다</td>
+</tr>
+<tr>
+<td><code dir="auto">UPLOAD_TARGET</code></td>
+<td>—</td>
+<td><code dir="auto">dependency-track</code></td>
+<td>업로드 대상. <code dir="auto">dependency-track</code>(DT 호환) 또는 <code dir="auto">trusca</code>(네이티브 ingest, DT 비호환)</td>
+</tr>
+<tr>
+<td><code dir="auto">TRUSCA_PROJECT_ID</code></td>
+<td><code dir="auto">trusca</code>일 때</td>
+<td>—</td>
+<td>업로드할 TRUSCA 프로젝트 id(UUID). 사전에 존재해야 합니다(자동 생성 없음)</td>
+</tr>
+<tr>
+<td><code dir="auto">TRUSCA_REF</code></td>
+<td>—</td>
+<td><code dir="auto">main</code></td>
+<td>ingest ref 라벨</td>
+</tr>
+<tr>
+<td><code dir="auto">TRUSCA_RELEASE</code></td>
+<td>—</td>
+<td><code dir="auto">PROJECT_VERSION</code></td>
+<td>ingest release 라벨</td>
+</tr>
+<tr>
+<td><code dir="auto">BOMLENS_MAVEN_FULL_GRAPH</code></td>
+<td>—</td>
+<td>—</td>
+<td>Maven 소스 스캔: <code dir="auto">1</code>로 설정하면 compile/runtime 스코프로 거르지 않고 전체 해석 그래프를 유지</td>
+</tr>
+<tr>
+<td><code dir="auto">BOMLENS_NODE_FULL_GRAPH</code></td>
+<td>—</td>
+<td>—</td>
+<td>Node.js 소스 스캔: <code dir="auto">1</code>로 설정하면 production 전용 집합 대신 dev와 production을 합친 전체 그래프를 유지</td>
+</tr>
+<tr>
+<td><code dir="auto">BOMLENS_ANDROID_FULL_GRAPH</code></td>
+<td>-</td>
+<td>-</td>
+<td>Android 소스 스캔(Android SDK 이미지): <code dir="auto">1</code>로 설정하면 release 런타임 클래스패스로 거르지 않고 빌드와 테스트 도구까지 포함한 전체 그래프를 유지</td>
+</tr>
+<tr>
+<td><code dir="auto">BOMLENS_GRADLE_FULL_GRAPH</code></td>
+<td>-</td>
+<td>-</td>
+<td>Java Gradle 소스 스캔: <code dir="auto">1</code>로 설정하면 각 프로젝트의 런타임 클래스패스로 거르지 않고 테스트와 compileOnly 의존성까지 포함한 전체 그래프를 유지. 필터용 Gradle 실행은 루트만 해석하던 기존 준비 실행과 달리 모든 프로젝트를 해석하므로, 하위 프로젝트가 많은 빌드에서는 이 단계가 더 오래 걸림</td>
+</tr>
+<tr>
+<td><code dir="auto">BOMLENS_PHP_FULL_GRAPH</code></td>
+<td>-</td>
+<td>-</td>
+<td>PHP(Composer) 소스 스캔: <code dir="auto">1</code>로 설정하면 required 대상으로 거르지 않고 require와 require-dev를 합친 전체 그래프를 유지</td>
+</tr>
+<tr>
+<td><code dir="auto">BOMLENS_KEEP_BUILD_OUTPUT</code></td>
+<td>—</td>
+<td>—</td>
+<td>소스 스캔: <code dir="auto">1</code>로 설정하면 의존성 해석 결과를 그대로 남김. 기본값에서는 해석 과정이 고쳐 쓴 파일(<code dir="auto">go.mod</code>, <code dir="auto">go.sum</code>, <code dir="auto">Cargo.lock</code>, <code dir="auto">Gemfile.lock</code>, <code dir="auto">Package.resolved</code>)을 되돌리고 새로 생긴 빌드 디렉터리를 지워 스캔한 프로젝트를 원래 상태로 돌려줌</td>
+</tr>
+<tr>
+<td><code dir="auto">BOMLENS_PREP_TIMEOUT</code></td>
+<td>-</td>
+<td><code dir="auto">900</code>(Gradle/Android 단계는 <code dir="auto">1800</code>)</td>
+<td>의존성 해석 단계(Cargo, Go, Bundler, pip, npm, pnpm, PHP Composer, Swift, Gradle/Android) 하나가 실행될 수 있는 최대 시간(초). 넘으면 그 단계를 멈추고 스캔은 그 단계 없이 계속됨. 값을 주면 모든 단계의 두 기본값을 함께 덮어씀. 실패하거나 시간을 넘긴 단계는 자신의 출력과 함께 로그에 남고 SBOM에 <code dir="auto">bomlens:pipeline-step-failed</code>로 기록되며, 스캔 자체는 끝까지 완료됨</td>
+</tr>
+<tr>
+<td><code dir="auto">BOMLENS_CANCEL_GRACE</code></td>
+<td>—</td>
+<td><code dir="auto">30</code></td>
+<td>스캔을 취소했을 때(CLI Ctrl+C 또는 웹 UI의 취소 버튼) 깔끔하게 멈출 수 있도록 주는 유예 시간(초). 이 시간이 지나도 안 멈추면 강제로 정지시킴. CLI와 <code dir="auto">--ui</code>에 적용되고, 데스크톱 앱은 항상 기본값을 쓴다</td>
+</tr>
+<tr>
+<td><code dir="auto">BOMLENS_INCLUDE_NON_SHIPPED</code></td>
+<td>-</td>
+<td>-</td>
+<td>소스 스캔: <code dir="auto">1</code>로 설정하면 기본으로 제외하는 테스트, 예제, 벤치마크, 데모 폴더의 매니페스트, <code dir="auto">.github/workflows</code>의 GitHub Actions 워크플로, <code dir="auto">gradle/wrapper</code>의 Gradle 래퍼를 포함</td>
+</tr>
+<tr>
+<td><code dir="auto">BOMLENS_INCLUDE_DEV_DEPENDENCIES</code></td>
+<td>-</td>
+<td>-</td>
+<td>소스 스캔: <code dir="auto">1</code>로 설정하면 기본으로 빼는 개발 전용 컴포넌트(cdxgen이 개발 전용으로 표시한 컴포넌트와 루트 <code dir="auto">Gemfile</code>의 <code dir="auto">development</code>, <code dir="auto">test</code> 그룹에만 선언된 gem)를 그대로 둠. 뺀 컴포넌트는 <code dir="auto">bomlens:excluded-components</code>에 기록됨</td>
+</tr>
+<tr>
+<td><code dir="auto">BOMLENS_NO_COPYRIGHT</code></td>
+<td>-</td>
+<td>-</td>
+<td>소스 스캔: <code dir="auto">1</code>로 설정하면 설치된 패키지의 라이선스 파일에서 npm, Python, Go, Rust 컴포넌트의 <code dir="auto">copyright</code>를 채우는 단계를 건너뜀</td>
+</tr>
+<tr>
+<td><code dir="auto">BOMLENS_NO_CARGO_LICENSE</code></td>
+<td>-</td>
+<td>-</td>
+<td>소스 스캔: <code dir="auto">1</code>로 설정하면 <code dir="auto">cargo metadata</code>로 Rust 컴포넌트의 라이선스를 채우는 단계를 건너뜀(명령줄의 <code dir="auto">FETCH_LICENSE=false</code>도 건너뜀)</td>
+</tr>
+<tr>
+<td><code dir="auto">CYCLONEDX_SPEC_VERSION</code></td>
+<td>—</td>
+<td><code dir="auto">1.6</code></td>
+<td>생성하는 SBOM의 CycloneDX 버전. <code dir="auto">1.6</code> 또는 <code dir="auto">1.7</code>(CLI의 <code dir="auto">--spec-version</code>). AI 모델과 데이터셋 SBOM은 항상 1.7. 다른 값이면 실행을 멈춤</td>
+</tr>
+<tr>
+<td><code dir="auto">CYCLONEDX_SPEC_VERSIONS</code></td>
+<td>—</td>
+<td><code dir="auto">1.3 1.4 1.5 1.6 1.7</code></td>
+<td>적합성 검사가 허용하는 CycloneDX spec 버전(공백 구분). 기본 범위를 덮어씀</td>
+</tr>
+<tr>
+<td><code dir="auto">AI_CYCLONEDX_SPEC_VERSIONS</code></td>
+<td>—</td>
+<td><code dir="auto">1.3 1.4 1.5 1.6 1.7</code></td>
+<td>AI SBOM(ML-BOM)이 허용하는 CycloneDX 버전. AIBOM 도구가 내보내는 1.7을 항상 포함</td>
+</tr>
+<tr>
+<td><code dir="auto">SPDX_SPEC_VERSIONS</code></td>
+<td>—</td>
+<td><code dir="auto">SPDX-2.2 SPDX-2.3</code></td>
+<td>적합성 검사가 허용하는 SPDX spec 버전</td>
+</tr>
+<tr>
+<td><code dir="auto">PURL_MIN_PCT</code></td>
+<td>—</td>
+<td><code dir="auto">90</code></td>
+<td>적합성 검사: PURL을 가진 컴포넌트 비율의 최소 기준(필수 검사). CLI든 웹 UI든 <code dir="auto">--deep-cve</code> 스캔에도 적용됨</td>
+</tr>
+<tr>
+<td><code dir="auto">LICENSE_MIN_PCT</code></td>
+<td>—</td>
+<td><code dir="auto">80</code></td>
+<td>적합성 검사: 라이선스를 가진 컴포넌트 비율의 최소 기준(권장, 경고만 표시). CLI든 웹 UI든 <code dir="auto">--deep-cve</code> 스캔에도 적용됨</td>
+</tr>
+<tr>
+<td><code dir="auto">HASH_MIN_PCT</code></td>
+<td>—</td>
+<td><code dir="auto">50</code></td>
+<td>적합성 검사: 해시를 가진 컴포넌트 비율의 최소 기준(권장, 경고만 표시). CLI든 웹 UI든 <code dir="auto">--deep-cve</code> 스캔에도 적용됨</td>
+</tr>
+<tr>
+<td><code dir="auto">FIELD_MIN_PCT</code></td>
+<td>—</td>
+<td><code dir="auto">80</code></td>
+<td>적합성 검사: 규제 대응용 컴포넌트별 필드의 참고 기준 커버리지. CLI든 웹 UI든 <code dir="auto">--deep-cve</code> 스캔에도 적용됨</td>
+</tr>
+<tr>
+<td><code dir="auto">PURL_TYPES_FILE</code></td>
+<td>—</td>
+<td><code dir="auto">docker/lib/purl-types.json</code></td>
+<td>적합성 검사: 어떤 purl 타입이 있고 그중 어떤 타입이 네임스페이스를 요구하는지 담은 purl-spec 데이터</td>
+</tr>
+<tr>
+<td><code dir="auto">OS_DISTROS_FILE</code></td>
+<td>—</td>
+<td><code dir="auto">docker/lib/os-distros.json</code></td>
+<td>적합성 검사: rpm, deb, apk 네임스페이스에 올 수 있는 배포판 식별자 목록</td>
+</tr>
+<tr>
+<td><code dir="auto">NS_ADVISORY_TYPES</code></td>
+<td>—</td>
+<td><code dir="auto">golang huggingface</code></td>
+<td>적합성 검사: 네임스페이스가 없어도 실패로 보지 않고 권고 항목으로만 보고할 타입(공백 구분)</td>
+</tr>
+<tr>
+<td><code dir="auto">LICENSE_REGISTRY</code></td>
+<td>—</td>
+<td><code dir="auto">false</code></td>
+<td>스크립트의 <code dir="auto">--license-registry</code>. 빠진 라이선스를 조회하고, 하나뿐인 강한 카피레프트나 비상업 라이선스를 패키지 레지스트리(deps.dev)와 대조한다. 네트워크를 사용</td>
+</tr>
+<tr>
+<td><code dir="auto">LICENSE_REGISTRY_VERIFY</code></td>
+<td>—</td>
+<td>GPL, AGPL, SSPL-1.0, BUSL-1.1, CC-BY-NC 식별자</td>
+<td>하나뿐일 때 레지스트리와 대조할 SPDX 식별자(공백 또는 쉼표 구분)</td>
+</tr>
+<tr>
+<td><code dir="auto">LICENSE_REGISTRY_BUDGET</code></td>
+<td>—</td>
+<td><code dir="auto">240</code></td>
+<td>조회 전체에 허용하는 시간(초). 시간 안에 조회하지 못한 컴포넌트는 그대로 두고 단계를 degraded로 기록한다</td>
+</tr>
+<tr>
+<td><code dir="auto">LICENSE_REGISTRY_API</code></td>
+<td>—</td>
+<td><code dir="auto">https://api.deps.dev/v3</code></td>
+<td>deps.dev v3 버전 조회에 같은 형식으로 답하는 서버의 기본 URL. 레지스트리에 자체 미러나 프록시로만 닿는 네트워크용. 응답이 없으면 컴포넌트는 그대로 두고 단계를 degraded(<code dir="auto">unavailable</code>)로 기록한다</td>
+</tr>
+<tr>
+<td><code dir="auto">PURL_RESOLVE</code></td>
+<td>—</td>
+<td><code dir="auto">false</code></td>
+<td><code dir="auto">--analyze</code> 전용(스크립트의 <code dir="auto">--resolve-purl</code>). 각 식별자를 패키지 저장소(deps.dev)에 조회해 적합성 검사 보고서에 권고 항목으로 덧붙인다. 네트워크를 사용</td>
+</tr>
+<tr>
+<td><code dir="auto">PURL_RESOLVE_IGNORE</code></td>
+<td>—</td>
+<td>—</td>
+<td>조회에서 제외할 네임스페이스 접두사(공백 또는 쉼표 구분). 사내 저장소에만 올리는 네임스페이스에 쓴다. 잘못된 식별자와 구분할 수 없기 때문이다</td>
+</tr>
+<tr>
+<td><code dir="auto">PURL_RESOLVE_BUDGET</code></td>
+<td>—</td>
+<td><code dir="auto">240</code></td>
+<td>조회 전체에 허용하는 시간(초). 시간 안에 조회하지 못한 식별자는 없음이 아니라 확인 불가로 보고한다</td>
+</tr>
+<tr>
+<td><code dir="auto">ANALYZE_CPE_INDEX</code></td>
+<td>—</td>
+<td><code dir="auto">false</code></td>
+<td><code dir="auto">--analyze</code> 전용(스크립트의 <code dir="auto">--analyze-cpe-index</code>). <code dir="auto">bomlens:purlSource=upstream-map</code> 속성이 붙은 컴포넌트를 번들 CPE 색인에 대조한다.</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>TRUSCA(구 TrustedOSS Portal)의 네이티브 ingest 엔드포인트(<code dir="auto">POST /v1/projects/{id}/sbom-ingest</code>, Bearer 인증)는 Dependency-Track와 호환되지 않습니다. 일반 Dependency-Track 서버로 올릴 때는 <code dir="auto">UPLOAD_TARGET=dependency-track</code>(기본값)을 그대로 두세요.</p>
+</blockquote>
+<p>CLI 플래그와 환경 변수의 전체 대응은 <a href="/bomlens/ko/concepts/architecture/#%ED%94%8C%EB%9E%98%EA%B7%B8--%EB%8B%A8%EA%B3%84-%EB%A7%A4%ED%95%91">아키텍처의 플래그 매핑</a>을 참고하세요.</p>
+<div class="sl-heading-wrapper level-h2"><h2 id="이미지-빌드와-배포">이미지 빌드와 배포</h2><a class="sl-anchor-link" href="#이미지-빌드와-배포"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “이미지 빌드와 배포”</span></a></div>
+<p>이미지를 직접 빌드하거나 멀티 플랫폼으로 발행하는 절차는 기여자용 <a href="https://github.com/sktelecom/bomlens/blob/main/docker/README.md">docker/README</a>에 있습니다.</p>
+<hr>
+<blockquote>
+<p><strong>관련 문서</strong>: <a href="/bomlens/ko/start/first-scan/">시작하기</a> | <a href="/bomlens/ko/reference/cli/">CLI 레퍼런스</a> | <a href="/bomlens/ko/concepts/architecture/">아키텍처</a></p>
+</blockquote></div><footer class="sl-flex astro-ddtxxk7k"><div class="meta sl-flex astro-ddtxxk7k"><a href="https://github.com/sktelecom/bomlens/edit/main/docs/reference/docker-image.ko.md" class="sl-flex print:hidden astro-qlekgd3o"><svg aria-hidden="true" class="astro-qlekgd3o astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1.2em;"><path d="M22 7.24a1 1 0 0 0-.29-.71l-4.24-4.24a1 1 0 0 0-1.1-.22 1 1 0 0 0-.32.22l-2.83 2.83L2.29 16.05a1 1 0 0 0-.29.71V21a1 1 0 0 0 1 1h4.24a1 1 0 0 0 .76-.29l10.87-10.93L21.71 8c.1-.1.17-.2.22-.33a1 1 0 0 0 0-.24v-.14l.07-.05ZM6.83 20H4v-2.83l9.93-9.93 2.83 2.83L6.83 20ZM18.17 8.66l-2.83-2.83 1.42-1.41 2.82 2.82-1.41 1.42Z"/></svg>페이지 편집</a></div><div class="pagination-links print:hidden astro-b5raizh3" dir="ltr"><a href="/bomlens/ko/reference/cli/" rel="prev" class="astro-b5raizh3"><svg aria-hidden="true" class="astro-b5raizh3 astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1.5rem;"><path d="M17 11H9.41l3.3-3.29a1.004 1.004 0 1 0-1.42-1.42l-5 5a1 1 0 0 0-.21.33 1 1 0 0 0 0 .76 1 1 0 0 0 .21.33l5 5a1.002 1.002 0 0 0 1.639-.325 1 1 0 0 0-.219-1.095L9.41 13H17a1 1 0 0 0 0-2Z"/></svg><span class="astro-b5raizh3">이전 페이지<br class="astro-b5raizh3"><span class="link-title astro-b5raizh3">CLI 레퍼런스</span></span></a><a href="/bomlens/ko/reference/ecosystems/" rel="next" class="astro-b5raizh3"><svg aria-hidden="true" class="astro-b5raizh3 astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1.5rem;"><path d="M17.92 11.62a1.001 1.001 0 0 0-.21-.33l-5-5a1.003 1.003 0 1 0-1.42 1.42l3.3 3.29H7a1 1 0 0 0 0 2h7.59l-3.3 3.29a1.002 1.002 0 0 0 .325 1.639 1 1 0 0 0 1.095-.219l5-5a1 1 0 0 0 .21-.33 1 1 0 0 0 0-.76Z"/></svg><span class="astro-b5raizh3">다음 페이지<br class="astro-b5raizh3"><span class="link-title astro-b5raizh3">지원 생태계</span></span></a></div></footer><script type="module" src="/bomlens/_astro/Mermaid.astro_astro_type_script_index_0_lang.DZWWZPOc.js"></script><script type="module">var e=()=>{document.querySelectorAll(`.expressive-code pre`).forEach(e=>{e.scrollWidth>e.clientWidth?e.setAttribute(`tabindex`,`0`):e.removeAttribute(`tabindex`)})};e(),window.addEventListener(`resize`,e);</script><p class="site-copyright astro-jo6i4kqk">Copyright &copy; 2026 SK Telecom Co., Ltd. &middot;<a href="https://github.com/sktelecom/bomlens/blob/main/LICENSE" class="astro-jo6i4kqk">Apache-2.0</a> &middot;<a href="https://github.com/sktelecom/bomlens/blob/main/THIRD_PARTY_LICENSES.md" class="astro-jo6i4kqk">Third-party licenses</a></p></div></div></main></div></div></div></div></body></html>

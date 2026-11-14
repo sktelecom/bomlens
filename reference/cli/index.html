@@ -1,0 +1,746 @@
+<!DOCTYPE html><html lang="en" dir="ltr" data-theme="dark" data-has-toc data-has-sidebar class="astro-g5ptsecz"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/><title>CLI reference | BomLens</title><link rel="canonical" href="https://sktelecom.github.io/bomlens/reference/cli/"/><link rel="alternate" hreflang="en" href="https://sktelecom.github.io/bomlens/reference/cli/"/><link rel="alternate" hreflang="ko" href="https://sktelecom.github.io/bomlens/ko/reference/cli/"/><link rel="alternate" hreflang="x-default" href="https://sktelecom.github.io/bomlens/reference/cli/"/><link rel="sitemap" href="/bomlens/sitemap-index.xml"/><link rel="shortcut icon" href="/bomlens/favicon.svg" type="image/svg+xml"/><meta name="generator" content="Astro v7.4.4"/><meta name="generator" content="Starlight v0.42.8"/><meta property="og:title" content="CLI reference"/><meta property="og:type" content="article"/><meta property="og:url" content="https://sktelecom.github.io/bomlens/reference/cli/"/><meta property="og:locale" content="en_US"/><meta property="og:description" content="Every CLI option and environment variable for BomLens, with output locations, image pinning, and troubleshooting."/><meta property="og:site_name" content="BomLens"/><meta name="twitter:card" content="summary_large_image"/><meta name="description" content="Every CLI option and environment variable for BomLens, with output locations, image pinning, and troubleshooting."/><meta property="og:image" content="https://sktelecom.github.io/bomlens/images/og-card.png"><meta name="twitter:image" content="https://sktelecom.github.io/bomlens/images/og-card.png"><script>
+	window.StarlightThemeProvider = (() => {
+		const storedTheme =
+			typeof localStorage !== 'undefined' && localStorage.getItem('starlight-theme');
+		const theme =
+			storedTheme ||
+			(window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
+		document.documentElement.dataset.theme = theme === 'light' ? 'light' : 'dark';
+		return {
+			updatePickers(theme = storedTheme || 'auto') {
+				document.querySelectorAll('starlight-theme-select').forEach((picker) => {
+					const select = picker.querySelector('select');
+					if (select) select.value = theme;
+					/** @type {HTMLTemplateElement | null} */
+					const tmpl = document.querySelector(`#theme-icons`);
+					const newIcon = tmpl && tmpl.content.querySelector('.' + theme);
+					if (newIcon) {
+						const oldIcon = picker.querySelector('svg.label-icon');
+						if (oldIcon) {
+							oldIcon.replaceChildren(...newIcon.cloneNode(true).childNodes);
+						}
+					}
+				});
+			},
+		};
+	})();
+</script><template id="theme-icons"><svg aria-hidden="true" class="light astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M5 12a1 1 0 0 0-1-1H3a1 1 0 0 0 0 2h1a1 1 0 0 0 1-1Zm.64 5-.71.71a1 1 0 0 0 0 1.41 1 1 0 0 0 1.41 0l.71-.71A1 1 0 0 0 5.64 17ZM12 5a1 1 0 0 0 1-1V3a1 1 0 0 0-2 0v1a1 1 0 0 0 1 1Zm5.66 2.34a1 1 0 0 0 .7-.29l.71-.71a1 1 0 1 0-1.41-1.41l-.66.71a1 1 0 0 0 0 1.41 1 1 0 0 0 .66.29Zm-12-.29a1 1 0 0 0 1.41 0 1 1 0 0 0 0-1.41l-.71-.71a1.004 1.004 0 1 0-1.43 1.41l.73.71ZM21 11h-1a1 1 0 0 0 0 2h1a1 1 0 0 0 0-2Zm-2.64 6A1 1 0 0 0 17 18.36l.71.71a1 1 0 0 0 1.41 0 1 1 0 0 0 0-1.41l-.76-.66ZM12 6.5a5.5 5.5 0 1 0 5.5 5.5A5.51 5.51 0 0 0 12 6.5Zm0 9a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7Zm0 3.5a1 1 0 0 0-1 1v1a1 1 0 0 0 2 0v-1a1 1 0 0 0-1-1Z"/></svg><svg aria-hidden="true" class="dark astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M21.64 13a1 1 0 0 0-1.05-.14 8.049 8.049 0 0 1-3.37.73 8.15 8.15 0 0 1-8.14-8.1 8.59 8.59 0 0 1 .25-2A1 1 0 0 0 8 2.36a10.14 10.14 0 1 0 14 11.69 1 1 0 0 0-.36-1.05Zm-9.5 6.69A8.14 8.14 0 0 1 7.08 5.22v.27a10.15 10.15 0 0 0 10.14 10.14 9.784 9.784 0 0 0 2.1-.22 8.11 8.11 0 0 1-7.18 4.32v-.04Z"/></svg><svg aria-hidden="true" class="auto astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M21 14h-1V7a3 3 0 0 0-3-3H7a3 3 0 0 0-3 3v7H3a1 1 0 0 0-1 1v2a3 3 0 0 0 3 3h14a3 3 0 0 0 3-3v-2a1 1 0 0 0-1-1ZM6 7a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v7H6V7Zm14 10a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-1h16v1Z"/></svg></template><link rel="stylesheet" href="/bomlens/_astro/print.ehPL0gv-.css" media="print"><link rel="stylesheet" href="/bomlens/_astro/common.DxYPfd-D.css"><style>@layer starlight.components{svg:where(.astro-hkc32dio){color:var(--sl-icon-color);font-size:var(--sl-icon-size,1em);width:1em;height:1em;overflow:visible}.sl-link-button:where(.astro-dcqstdaq){font-size:var(--sl-text-sm);outline-offset:.25rem;border:1px solid #0000;border-radius:999rem;align-items:center;gap:.5em;padding:.4375rem 1.125rem;line-height:1.1875;text-decoration:none;display:inline-flex}.sl-link-button:where(.astro-dcqstdaq).primary{background:var(--sl-color-text-accent);border-color:var(--sl-color-text-accent);color:var(--sl-color-black)}.sl-link-button:where(.astro-dcqstdaq).primary:hover{color:var(--sl-color-black)}.sl-link-button:where(.astro-dcqstdaq).secondary{border-color:inherit;color:var(--sl-color-white)}.sl-link-button:where(.astro-dcqstdaq).minimal{color:var(--sl-color-white);padding-inline:0}.sl-link-button:where(.astro-dcqstdaq) svg{flex-shrink:0}@media (width>=50rem){.sl-link-button:where(.astro-dcqstdaq){font-size:var(--sl-text-base);padding:.9375rem 1.25rem}}.sl-markdown-content .sl-link-button:where(.astro-dcqstdaq){margin-inline-end:1rem}.sl-markdown-content .sl-link-button:where(.astro-dcqstdaq):not(:where(p *)){margin-block:1rem}}
+</style><script type="module" src="/bomlens/_astro/page.cNngjUgL.js"></script></head><body class="astro-g5ptsecz"><a class="sl-skip-link astro-qb7clj6f" href="#_top">Skip to content</a><div class="page sl-flex astro-yntsjkba"><header class="header astro-yntsjkba"><div class="header astro-by6fddyj"><div class="title-wrapper sl-flex astro-by6fddyj"><a href="/bomlens/" class="site-title sl-flex astro-6rvad3va"><span class="astro-6rvad3va" translate="no">BomLens</span></a></div><div class="sl-flex print:hidden astro-by6fddyj"><site-search class="astro-by6fddyj astro-b5kgnn7o" data-translations="{&quot;placeholder&quot;:&quot;Search&quot;}"><button data-open-modal disabled aria-label="Search" aria-keyshortcuts="Control+K" class="astro-b5kgnn7o"><svg aria-hidden="true" class="astro-b5kgnn7o astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M21.71 20.29 18 16.61A9 9 0 1 0 16.61 18l3.68 3.68a.999.999 0 0 0 1.42 0 1 1 0 0 0 0-1.39ZM11 18a7 7 0 1 1 0-14 7 7 0 0 1 0 14Z"/></svg><span class="sl-hidden md:sl-block astro-b5kgnn7o" aria-hidden="true">Search</span><kbd class="sl-hidden md:sl-flex astro-b5kgnn7o" style="display: none;"><kbd class="astro-b5kgnn7o">Ctrl</kbd><kbd class="astro-b5kgnn7o">K</kbd></kbd></button><dialog style="padding:0" aria-label="Search" class="astro-b5kgnn7o"><div class="dialog-frame sl-flex astro-b5kgnn7o"><button data-close-modal class="sl-flex md:sl-hidden astro-b5kgnn7o">Cancel</button><div class="search-container astro-b5kgnn7o"><div id="starlight__search" class="astro-b5kgnn7o"></div></div></div></dialog></site-search><script>
+	(() => {
+		const openBtn = document.querySelector('button[data-open-modal]');
+		const shortcut = openBtn?.querySelector('kbd');
+		if (!openBtn || !(shortcut instanceof HTMLElement)) return;
+		const platformKey = shortcut.querySelector('kbd');
+		if (platformKey && /(Mac|iPhone|iPod|iPad)/i.test(navigator.platform)) {
+			platformKey.textContent = '⌘';
+			openBtn.setAttribute('aria-keyshortcuts', 'Meta+K');
+		}
+		shortcut.style.display = '';
+	})();
+</script><script type="module" src="/bomlens/_astro/Search.astro_astro_type_script_index_0_lang.BSqzOScY.js"></script></div><div class="sl-hidden md:sl-flex print:hidden right-group astro-by6fddyj"><div class="sl-flex social-icons astro-by6fddyj"><a href="https://github.com/sktelecom/bomlens" rel="me" class="sl-flex astro-n2mnl6yq"><span class="sr-only astro-n2mnl6yq">GitHub</span><svg aria-hidden="true" class="astro-n2mnl6yq astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M12 .3a12 12 0 0 0-3.8 23.38c.6.12.83-.26.83-.57L9 21.07c-3.34.72-4.04-1.61-4.04-1.61-.55-1.39-1.34-1.76-1.34-1.76-1.08-.74.09-.73.09-.73 1.2.09 1.83 1.24 1.83 1.24 1.08 1.83 2.81 1.3 3.5 1 .1-.78.42-1.31.76-1.61-2.67-.3-5.47-1.33-5.47-5.93 0-1.31.47-2.38 1.24-3.22-.14-.3-.54-1.52.1-3.18 0 0 1-.32 3.3 1.23a11.5 11.5 0 0 1 6 0c2.28-1.55 3.29-1.23 3.29-1.23.64 1.66.24 2.88.12 3.18a4.65 4.65 0 0 1 1.23 3.22c0 4.61-2.8 5.63-5.48 5.92.42.36.81 1.1.81 2.22l-.01 3.29c0 .31.2.69.82.57A12 12 0 0 0 12 .3Z"/></svg></a></div><starlight-theme-select><label style="--sl-select-width: 6.25em" class="astro-2z5xp7gb"><span class="sr-only astro-2z5xp7gb">Select theme</span><svg aria-hidden="true" class="icon label-icon astro-2z5xp7gb astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M21 14h-1V7a3 3 0 0 0-3-3H7a3 3 0 0 0-3 3v7H3a1 1 0 0 0-1 1v2a3 3 0 0 0 3 3h14a3 3 0 0 0 3-3v-2a1 1 0 0 0-1-1ZM6 7a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v7H6V7Zm14 10a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-1h16v1Z"/></svg><select autocomplete="off" class="astro-2z5xp7gb"><option value="dark" class="astro-2z5xp7gb">Dark</option><option value="light" class="astro-2z5xp7gb">Light</option><option value="auto" selected class="astro-2z5xp7gb">Auto</option></select><svg aria-hidden="true" class="icon caret astro-2z5xp7gb astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M17 9.17a1 1 0 0 0-1.41 0L12 12.71 8.46 9.17a1 1 0 1 0-1.41 1.42l4.24 4.24a1.002 1.002 0 0 0 1.42 0L17 10.59a1.002 1.002 0 0 0 0-1.42Z"/></svg></label></starlight-theme-select><script>
+	StarlightThemeProvider.updatePickers();
+</script><script type="module">var e=`starlight-theme`,t=e=>e===`auto`||e===`dark`||e===`light`?e:`auto`,n=()=>t(typeof localStorage<`u`&&localStorage.getItem(e));function r(t){typeof localStorage<`u`&&localStorage.setItem(e,t===`light`||t===`dark`?t:``)}var i=()=>matchMedia(`(prefers-color-scheme: light)`).matches?`light`:`dark`;function a(e){StarlightThemeProvider.updatePickers(e),document.documentElement.dataset.theme=e===`auto`?i():e,r(e)}matchMedia(`(prefers-color-scheme: light)`).addEventListener(`change`,()=>{n()===`auto`&&a(`auto`)});var o=class extends HTMLElement{constructor(){super(),a(n()),this.querySelector(`select`)?.addEventListener(`change`,e=>{e.currentTarget instanceof HTMLSelectElement&&a(t(e.currentTarget.value))})}};customElements.define(`starlight-theme-select`,o);</script><starlight-lang-select><label style="--sl-select-width: 7em" class="astro-2z5xp7gb"><span class="sr-only astro-2z5xp7gb">Select language</span><svg aria-hidden="true" class="icon label-icon astro-2z5xp7gb astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path fill-rule="evenodd" d="M8.516 3a.94.94 0 0 0-.941.94v1.15H2.94a.94.94 0 1 0 0 1.882h7.362a7.422 7.422 0 0 1-1.787 3.958 7.42 7.42 0 0 1-1.422-2.425.94.94 0 1 0-1.774.627 9.303 9.303 0 0 0 1.785 3.043 7.422 7.422 0 0 1-4.164 1.278.94.94 0 1 0 0 1.881 9.303 9.303 0 0 0 5.575-1.855 9.303 9.303 0 0 0 4.11 1.74l-.763 1.525a.968.968 0 0 0-.016.034l-1.385 2.77a.94.94 0 1 0 1.683.841l1.133-2.267h5.806l1.134 2.267a.94.94 0 0 0 1.683-.841l-1.385-2.769a.95.95 0 0 0-.018-.036l-3.476-6.951a.94.94 0 0 0-1.682 0l-1.82 3.639a7.423 7.423 0 0 1-3.593-1.256 9.303 9.303 0 0 0 2.27-5.203h1.894a.94.94 0 0 0 0-1.881H9.456V3.94A.94.94 0 0 0 8.516 3Zm6.426 11.794a1.068 1.068 0 0 1-.02.039l-.703 1.407h3.924l-1.962-3.924-1.24 2.478Z" clip-rule="evenodd"/></svg><select autocomplete="off" class="astro-2z5xp7gb"><option value="/bomlens/reference/cli/" class="astro-2z5xp7gb">English</option><option value="/bomlens/ko/reference/cli/" class="astro-2z5xp7gb">한국어</option></select><svg aria-hidden="true" class="icon caret astro-2z5xp7gb astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M17 9.17a1 1 0 0 0-1.41 0L12 12.71 8.46 9.17a1 1 0 1 0-1.41 1.42l4.24 4.24a1.002 1.002 0 0 0 1.42 0L17 10.59a1.002 1.002 0 0 0 0-1.42Z"/></svg></label></starlight-lang-select><script type="module">var e=class extends HTMLElement{constructor(){super();let e=this.querySelector(`select`);e&&(e.addEventListener(`change`,e=>{e.currentTarget instanceof HTMLSelectElement&&(window.location.pathname=e.currentTarget.value)}),window.addEventListener(`pageshow`,t=>{if(!t.persisted)return;let n=e.querySelector(`option[selected]`)?.index;n!==e.selectedIndex&&(e.selectedIndex=n??0)}))}};customElements.define(`starlight-lang-select`,e);</script></div></div></header><nav class="sidebar print:hidden astro-yntsjkba" aria-label="Main"><button popovertarget="starlight__sidebar" class="sl-menu-button sl-flex md:sl-hidden print:hidden astro-r2osgdlg"><svg aria-hidden="true" class="open-menu astro-r2osgdlg astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M3 8h18a1 1 0 1 0 0-2H3a1 1 0 0 0 0 2Zm18 8H3a1 1 0 0 0 0 2h18a1 1 0 0 0 0-2Zm0-5H3a1 1 0 0 0 0 2h18a1 1 0 0 0 0-2Z"/></svg><svg aria-hidden="true" class="close-menu astro-r2osgdlg astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="m13.41 12 6.3-6.29a1.004 1.004 0 1 0-1.42-1.42L12 10.59l-6.29-6.3a1.004 1.004 0 0 0-1.42 1.42l6.3 6.29-6.3 6.29a1 1 0 0 0 0 1.42.998.998 0 0 0 1.42 0l6.29-6.3 6.29 6.3a.999.999 0 0 0 1.42 0 1 1 0 0 0 0-1.42L13.41 12Z"/></svg><span class="sr-only astro-r2osgdlg">Menu</span></button><script type="module">var e=class extends HTMLElement{constructor(){super();let e=matchMedia(`(min-width: 50em)`),t=()=>{this.popover=e.matches?null:`auto`};t(),e.addEventListener(`change`,()=>t()),this.addEventListener(`toggle`,({newState:e})=>this.trapFocus(e===`open`))}trapFocus(e){document.querySelectorAll(`.main-frame, .sl-skip-link`).forEach(t=>{t.toggleAttribute(`inert`,e)})}};customElements.define(`sl-sidebar-pane`,e);</script><sl-sidebar-pane popover id="starlight__sidebar" class="sidebar-pane astro-yntsjkba"><div class="sidebar-content sl-flex astro-yntsjkba"><sl-sidebar-state-persist data-hash="0e9vtkm" class="astro-ipdry5cl"><script aria-hidden="true">
+		(() => {
+			try {
+				if (!matchMedia('(min-width: 50em)').matches) return;
+				/** @type {HTMLElement | null} */
+				const target = document.querySelector('sl-sidebar-state-persist');
+				const state = JSON.parse(sessionStorage.getItem('sl-sidebar-state') || '0');
+				if (!target || !state || target.dataset.hash !== state.hash) return;
+				window._starlightScrollRestore = state.scroll;
+				customElements.define(
+					'sl-sidebar-restore',
+					class SidebarRestore extends HTMLElement {
+						connectedCallback() {
+							try {
+								const idx = parseInt(this.dataset.index || '');
+								const details = this.closest('details');
+								if (details && typeof state.open[idx] === 'boolean') details.open = state.open[idx];
+							} catch {}
+						}
+					}
+				);
+			} catch {}
+		})();
+	</script><ul class="top-level astro-rmhv4bp6"><li class="astro-rmhv4bp6"><details open class="astro-rmhv4bp6"><summary class="astro-rmhv4bp6"><span class="group-label astro-rmhv4bp6"><span class="large astro-rmhv4bp6">Get started</span></span><svg aria-hidden="true" class="caret astro-rmhv4bp6 astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1.25rem;"><path d="m14.83 11.29-4.24-4.24a1 1 0 1 0-1.42 1.41L12.71 12l-3.54 3.54a1 1 0 0 0 0 1.41 1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.24-4.24a1.002 1.002 0 0 0 0-1.42Z"/></svg></summary><sl-sidebar-restore data-index="0"></sl-sidebar-restore><ul class="astro-rmhv4bp6"><li class="astro-rmhv4bp6"><a href="/bomlens/concepts/what-is-sbom/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">What is an SBOM</span></a></li><li class="astro-rmhv4bp6"><a href="/bomlens/start/first-scan/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">Getting started</span></a></li><li class="astro-rmhv4bp6"><a href="/bomlens/start/no-cli/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">No-CLI quick start (no command line)</span></a></li><li class="astro-rmhv4bp6"><a href="/bomlens/reference/ui/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">Web UI &amp; desktop app</span></a></li></ul></details></li><li class="astro-rmhv4bp6"><details open class="astro-rmhv4bp6"><summary class="astro-rmhv4bp6"><span class="group-label astro-rmhv4bp6"><span class="large astro-rmhv4bp6">Guides</span></span><svg aria-hidden="true" class="caret astro-rmhv4bp6 astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1.25rem;"><path d="m14.83 11.29-4.24-4.24a1 1 0 1 0-1.42 1.41L12.71 12l-3.54 3.54a1 1 0 0 0 0 1.41 1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.24-4.24a1.002 1.002 0 0 0 0-1.42Z"/></svg></summary><sl-sidebar-restore data-index="1"></sl-sidebar-restore><ul class="astro-rmhv4bp6"><li class="astro-rmhv4bp6"><a href="/bomlens/guides/ai-model/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">AI model SBOM guide</span></a></li><li class="astro-rmhv4bp6"><a href="/bomlens/guides/by-input/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">Input scenarios guide</span></a></li><li class="astro-rmhv4bp6"><a href="/bomlens/guides/ci-cd/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">Use in CI/CD</span></a></li><li class="astro-rmhv4bp6"><a href="/bomlens/guides/declared-components/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">Declaring your own components</span></a></li><li class="astro-rmhv4bp6"><a href="/bomlens/guides/firmware/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">Firmware analysis guide</span></a></li><li class="astro-rmhv4bp6"><a href="/bomlens/guides/identify-vendored/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">Identify bundled open source (C/C++)</span></a></li><li class="astro-rmhv4bp6"><a href="/bomlens/guides/reports/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">Generate notice, security &amp; risk reports</span></a></li><li class="astro-rmhv4bp6"><a href="/bomlens/guides/server-delivery/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">Server SBOM guide</span></a></li><li class="astro-rmhv4bp6"><a href="/bomlens/guides/supplier-sbom/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">Supplier SBOM validation guide</span></a></li><li class="astro-rmhv4bp6"><a href="/bomlens/guides/upload/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">Upload to Dependency-Track / TRUSCA</span></a></li><li class="astro-rmhv4bp6"><a href="/bomlens/guides/verify-release/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">Verify a release</span></a></li></ul></details></li><li class="astro-rmhv4bp6"><details open class="astro-rmhv4bp6"><summary class="astro-rmhv4bp6"><span class="group-label astro-rmhv4bp6"><span class="large astro-rmhv4bp6">Reference</span></span><svg aria-hidden="true" class="caret astro-rmhv4bp6 astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1.25rem;"><path d="m14.83 11.29-4.24-4.24a1 1 0 1 0-1.42 1.41L12.71 12l-3.54 3.54a1 1 0 0 0 0 1.41 1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.24-4.24a1.002 1.002 0 0 0 0-1.42Z"/></svg></summary><sl-sidebar-restore data-index="2"></sl-sidebar-restore><ul class="astro-rmhv4bp6"><li class="astro-rmhv4bp6"><a href="/bomlens/reference/artifacts/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">Artifacts reference</span></a></li><li class="astro-rmhv4bp6"><a href="/bomlens/reference/cli/" aria-current="page" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">CLI reference</span></a></li><li class="astro-rmhv4bp6"><a href="/bomlens/reference/docker-image/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">Use the Docker image directly</span></a></li><li class="astro-rmhv4bp6"><a href="/bomlens/reference/ecosystems/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">Supported ecosystems</span></a></li><li class="astro-rmhv4bp6"><a href="/bomlens/reference/engine-contract/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">Engine contract</span></a></li><li class="astro-rmhv4bp6"><a href="/bomlens/reference/ui/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">Web UI &amp; desktop app</span></a></li></ul></details></li><li class="astro-rmhv4bp6"><details open class="astro-rmhv4bp6"><summary class="astro-rmhv4bp6"><span class="group-label astro-rmhv4bp6"><span class="large astro-rmhv4bp6">Concepts</span></span><svg aria-hidden="true" class="caret astro-rmhv4bp6 astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1.25rem;"><path d="m14.83 11.29-4.24-4.24a1 1 0 1 0-1.42 1.41L12.71 12l-3.54 3.54a1 1 0 0 0 0 1.41 1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.24-4.24a1.002 1.002 0 0 0 0-1.42Z"/></svg></summary><sl-sidebar-restore data-index="3"></sl-sidebar-restore><ul class="astro-rmhv4bp6"><li class="astro-rmhv4bp6"><a href="/bomlens/concepts/architecture/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">Architecture</span></a></li><li class="astro-rmhv4bp6"><a href="/bomlens/concepts/dependency-resolution/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">How dependencies are resolved</span></a></li><li class="astro-rmhv4bp6"><a href="/bomlens/concepts/limitations/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">What BomLens does not do</span></a></li><li class="astro-rmhv4bp6"><a href="/bomlens/concepts/local-first/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">Local-first by design</span></a></li><li class="astro-rmhv4bp6"><a href="/bomlens/concepts/pipeline-by-input/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">Pipeline by input type</span></a></li><li class="astro-rmhv4bp6"><a href="/bomlens/concepts/reports-explained/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">What the reports mean</span></a></li><li class="astro-rmhv4bp6"><a href="/bomlens/concepts/what-is-sbom/" class="astro-rmhv4bp6"><span class="astro-rmhv4bp6">What is an SBOM</span></a></li></ul></details></li></ul><script aria-hidden="true">
+		(() => {
+			const scroller = document.getElementById('starlight__sidebar');
+			if (!window._starlightScrollRestore || !scroller) return;
+			scroller.scrollTop = window._starlightScrollRestore;
+			delete window._starlightScrollRestore;
+		})();
+	</script></sl-sidebar-state-persist><div class="md:sl-hidden"><div class="mobile-preferences sl-flex astro-p4azlveh"><div class="social-icons astro-p4azlveh"><a href="https://github.com/sktelecom/bomlens" rel="me" class="sl-flex astro-n2mnl6yq"><span class="sr-only astro-n2mnl6yq">GitHub</span><svg aria-hidden="true" class="astro-n2mnl6yq astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M12 .3a12 12 0 0 0-3.8 23.38c.6.12.83-.26.83-.57L9 21.07c-3.34.72-4.04-1.61-4.04-1.61-.55-1.39-1.34-1.76-1.34-1.76-1.08-.74.09-.73.09-.73 1.2.09 1.83 1.24 1.83 1.24 1.08 1.83 2.81 1.3 3.5 1 .1-.78.42-1.31.76-1.61-2.67-.3-5.47-1.33-5.47-5.93 0-1.31.47-2.38 1.24-3.22-.14-.3-.54-1.52.1-3.18 0 0 1-.32 3.3 1.23a11.5 11.5 0 0 1 6 0c2.28-1.55 3.29-1.23 3.29-1.23.64 1.66.24 2.88.12 3.18a4.65 4.65 0 0 1 1.23 3.22c0 4.61-2.8 5.63-5.48 5.92.42.36.81 1.1.81 2.22l-.01 3.29c0 .31.2.69.82.57A12 12 0 0 0 12 .3Z"/></svg></a></div><starlight-theme-select><label style="--sl-select-width: 6.25em" class="astro-2z5xp7gb"><span class="sr-only astro-2z5xp7gb">Select theme</span><svg aria-hidden="true" class="icon label-icon astro-2z5xp7gb astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M21 14h-1V7a3 3 0 0 0-3-3H7a3 3 0 0 0-3 3v7H3a1 1 0 0 0-1 1v2a3 3 0 0 0 3 3h14a3 3 0 0 0 3-3v-2a1 1 0 0 0-1-1ZM6 7a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v7H6V7Zm14 10a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-1h16v1Z"/></svg><select autocomplete="off" class="astro-2z5xp7gb"><option value="dark" class="astro-2z5xp7gb">Dark</option><option value="light" class="astro-2z5xp7gb">Light</option><option value="auto" selected class="astro-2z5xp7gb">Auto</option></select><svg aria-hidden="true" class="icon caret astro-2z5xp7gb astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M17 9.17a1 1 0 0 0-1.41 0L12 12.71 8.46 9.17a1 1 0 1 0-1.41 1.42l4.24 4.24a1.002 1.002 0 0 0 1.42 0L17 10.59a1.002 1.002 0 0 0 0-1.42Z"/></svg></label></starlight-theme-select><script>
+	StarlightThemeProvider.updatePickers();
+</script><starlight-lang-select><label style="--sl-select-width: 7em" class="astro-2z5xp7gb"><span class="sr-only astro-2z5xp7gb">Select language</span><svg aria-hidden="true" class="icon label-icon astro-2z5xp7gb astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path fill-rule="evenodd" d="M8.516 3a.94.94 0 0 0-.941.94v1.15H2.94a.94.94 0 1 0 0 1.882h7.362a7.422 7.422 0 0 1-1.787 3.958 7.42 7.42 0 0 1-1.422-2.425.94.94 0 1 0-1.774.627 9.303 9.303 0 0 0 1.785 3.043 7.422 7.422 0 0 1-4.164 1.278.94.94 0 1 0 0 1.881 9.303 9.303 0 0 0 5.575-1.855 9.303 9.303 0 0 0 4.11 1.74l-.763 1.525a.968.968 0 0 0-.016.034l-1.385 2.77a.94.94 0 1 0 1.683.841l1.133-2.267h5.806l1.134 2.267a.94.94 0 0 0 1.683-.841l-1.385-2.769a.95.95 0 0 0-.018-.036l-3.476-6.951a.94.94 0 0 0-1.682 0l-1.82 3.639a7.423 7.423 0 0 1-3.593-1.256 9.303 9.303 0 0 0 2.27-5.203h1.894a.94.94 0 0 0 0-1.881H9.456V3.94A.94.94 0 0 0 8.516 3Zm6.426 11.794a1.068 1.068 0 0 1-.02.039l-.703 1.407h3.924l-1.962-3.924-1.24 2.478Z" clip-rule="evenodd"/></svg><select autocomplete="off" class="astro-2z5xp7gb"><option value="/bomlens/reference/cli/" class="astro-2z5xp7gb">English</option><option value="/bomlens/ko/reference/cli/" class="astro-2z5xp7gb">한국어</option></select><svg aria-hidden="true" class="icon caret astro-2z5xp7gb astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M17 9.17a1 1 0 0 0-1.41 0L12 12.71 8.46 9.17a1 1 0 1 0-1.41 1.42l4.24 4.24a1.002 1.002 0 0 0 1.42 0L17 10.59a1.002 1.002 0 0 0 0-1.42Z"/></svg></label></starlight-lang-select></div></div></div></sl-sidebar-pane></nav><div class="main-frame astro-yntsjkba"><script type="module">var e=document.getElementById(`starlight__sidebar`),t=e?.querySelector(`sl-sidebar-state-persist`),n=`sl-sidebar-state`,r=()=>{let r=[],i=t?.dataset.hash||``;try{let e=sessionStorage.getItem(n),t=JSON.parse(e||`{}`);Array.isArray(t.open)&&t.hash===i&&(r=t.open)}catch{}return{hash:i,open:r,scroll:e?.scrollTop||0}},i=e=>{try{sessionStorage.setItem(n,JSON.stringify(e))}catch{}},a=()=>i(r()),o=(e,t)=>{let n=r();n.open[t]=e,i(n)};t?.addEventListener(`click`,e=>{if(!(e.target instanceof Element))return;let t=e.target.closest(`summary`)?.closest(`details`);if(!t)return;let n=t.querySelector(`sl-sidebar-restore`),r=parseInt(n?.dataset.index||``);isNaN(r)||o(!t.open,r)}),addEventListener(`visibilitychange`,()=>{document.visibilityState===`hidden`&&a()});</script><div class="lg:sl-flex astro-lrzkfocr"><aside class="right-sidebar-container print:hidden astro-lrzkfocr"><div class="right-sidebar astro-lrzkfocr"><div class="lg:sl-hidden astro-qok35upx"><mobile-starlight-toc data-min-h="2" data-max-h="3" class="astro-66cqc7ze"><nav aria-labelledby="starlight__on-this-page--mobile" class="astro-66cqc7ze"><details id="starlight__mobile-toc" class="astro-66cqc7ze"><summary id="starlight__on-this-page--mobile" class="sl-flex astro-66cqc7ze"><span class="toggle sl-flex astro-66cqc7ze">On this page<svg aria-hidden="true" class="caret astro-66cqc7ze astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1rem;"><path d="m14.83 11.29-4.24-4.24a1 1 0 1 0-1.42 1.41L12.71 12l-3.54 3.54a1 1 0 0 0 0 1.41 1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.24-4.24a1.002 1.002 0 0 0 0-1.42Z"/></svg></span><span class="display-current astro-66cqc7ze"></span></summary><div class="dropdown astro-66cqc7ze"><ul class="isMobile astro-jugkfwgx" style="--depth: 0;"><li style="--depth: 0;" class="astro-jugkfwgx"><a href="#_top" style="--depth: 0;" class="astro-jugkfwgx"><span style="--depth: 0;" class="astro-jugkfwgx">Overview</span></a></li><li style="--depth: 0;" class="astro-jugkfwgx"><a href="#options-reference" style="--depth: 0;" class="astro-jugkfwgx"><span style="--depth: 0;" class="astro-jugkfwgx">Options reference</span></a></li><li style="--depth: 0;" class="astro-jugkfwgx"><a href="#the-ai-declaration-file" style="--depth: 0;" class="astro-jugkfwgx"><span style="--depth: 0;" class="astro-jugkfwgx">The AI declaration file</span></a></li><li style="--depth: 0;" class="astro-jugkfwgx"><a href="#where-outputs-go" style="--depth: 0;" class="astro-jugkfwgx"><span style="--depth: 0;" class="astro-jugkfwgx">Where outputs go</span></a></li><li style="--depth: 0;" class="astro-jugkfwgx"><a href="#what-the-scan-prints-at-the-end" style="--depth: 0;" class="astro-jugkfwgx"><span style="--depth: 0;" class="astro-jugkfwgx">What the scan prints at the end</span></a></li><li style="--depth: 0;" class="astro-jugkfwgx"><a href="#exit-codes" style="--depth: 0;" class="astro-jugkfwgx"><span style="--depth: 0;" class="astro-jugkfwgx">Exit codes</span></a></li><li style="--depth: 0;" class="astro-jugkfwgx"><a href="#pin-the-scanner-image-version" style="--depth: 0;" class="astro-jugkfwgx"><span style="--depth: 0;" class="astro-jugkfwgx">Pin the scanner image version</span></a></li><li style="--depth: 0;" class="astro-jugkfwgx"><a href="#troubleshooting" style="--depth: 0;" class="astro-jugkfwgx"><span style="--depth: 0;" class="astro-jugkfwgx">Troubleshooting</span></a><ul class="isMobile astro-jugkfwgx" style="--depth: 1;"><li style="--depth: 1;" class="astro-jugkfwgx"><a href="#windows-no-outputs-appear" style="--depth: 1;" class="astro-jugkfwgx"><span style="--depth: 1;" class="astro-jugkfwgx">Windows: no outputs appear</span></a></li><li style="--depth: 1;" class="astro-jugkfwgx"><a href="#docker-permission-error-linuxwsl2" style="--depth: 1;" class="astro-jugkfwgx"><span style="--depth: 1;" class="astro-jugkfwgx">Docker permission error (Linux/WSL2)</span></a></li><li style="--depth: 1;" class="astro-jugkfwgx"><a href="#out-of-disk-space" style="--depth: 1;" class="astro-jugkfwgx"><span style="--depth: 1;" class="astro-jugkfwgx">Out of disk space</span></a></li><li style="--depth: 1;" class="astro-jugkfwgx"><a href="#interrupted-build-artifacts-in-the-source-tree" style="--depth: 1;" class="astro-jugkfwgx"><span style="--depth: 1;" class="astro-jugkfwgx">Interrupted build artifacts in the source tree</span></a></li><li style="--depth: 1;" class="astro-jugkfwgx"><a href="#leftover-output-folder-artifacts-on-re-scan" style="--depth: 1;" class="astro-jugkfwgx"><span style="--depth: 1;" class="astro-jugkfwgx">Leftover output-folder artifacts on re-scan</span></a></li><li style="--depth: 1;" class="astro-jugkfwgx"><a href="#anything-else" style="--depth: 1;" class="astro-jugkfwgx"><span style="--depth: 1;" class="astro-jugkfwgx">Anything else</span></a></li></ul></li></ul></div></details></nav></mobile-starlight-toc><script type="module" src="/bomlens/_astro/MobileTableOfContents.astro_astro_type_script_index_0_lang.C3fM4Kra.js"></script></div><div class="right-sidebar-panel sl-hidden lg:sl-block astro-qok35upx"><div class="sl-container astro-qok35upx"><starlight-toc data-min-h="2" data-max-h="3"><nav aria-labelledby="starlight__on-this-page"><h2 id="starlight__on-this-page">On this page</h2><ul class="astro-jugkfwgx" style="--depth: 0;"><li style="--depth: 0;" class="astro-jugkfwgx"><a href="#_top" style="--depth: 0;" class="astro-jugkfwgx"><span style="--depth: 0;" class="astro-jugkfwgx">Overview</span></a></li><li style="--depth: 0;" class="astro-jugkfwgx"><a href="#options-reference" style="--depth: 0;" class="astro-jugkfwgx"><span style="--depth: 0;" class="astro-jugkfwgx">Options reference</span></a></li><li style="--depth: 0;" class="astro-jugkfwgx"><a href="#the-ai-declaration-file" style="--depth: 0;" class="astro-jugkfwgx"><span style="--depth: 0;" class="astro-jugkfwgx">The AI declaration file</span></a></li><li style="--depth: 0;" class="astro-jugkfwgx"><a href="#where-outputs-go" style="--depth: 0;" class="astro-jugkfwgx"><span style="--depth: 0;" class="astro-jugkfwgx">Where outputs go</span></a></li><li style="--depth: 0;" class="astro-jugkfwgx"><a href="#what-the-scan-prints-at-the-end" style="--depth: 0;" class="astro-jugkfwgx"><span style="--depth: 0;" class="astro-jugkfwgx">What the scan prints at the end</span></a></li><li style="--depth: 0;" class="astro-jugkfwgx"><a href="#exit-codes" style="--depth: 0;" class="astro-jugkfwgx"><span style="--depth: 0;" class="astro-jugkfwgx">Exit codes</span></a></li><li style="--depth: 0;" class="astro-jugkfwgx"><a href="#pin-the-scanner-image-version" style="--depth: 0;" class="astro-jugkfwgx"><span style="--depth: 0;" class="astro-jugkfwgx">Pin the scanner image version</span></a></li><li style="--depth: 0;" class="astro-jugkfwgx"><a href="#troubleshooting" style="--depth: 0;" class="astro-jugkfwgx"><span style="--depth: 0;" class="astro-jugkfwgx">Troubleshooting</span></a><ul class="astro-jugkfwgx" style="--depth: 1;"><li style="--depth: 1;" class="astro-jugkfwgx"><a href="#windows-no-outputs-appear" style="--depth: 1;" class="astro-jugkfwgx"><span style="--depth: 1;" class="astro-jugkfwgx">Windows: no outputs appear</span></a></li><li style="--depth: 1;" class="astro-jugkfwgx"><a href="#docker-permission-error-linuxwsl2" style="--depth: 1;" class="astro-jugkfwgx"><span style="--depth: 1;" class="astro-jugkfwgx">Docker permission error (Linux/WSL2)</span></a></li><li style="--depth: 1;" class="astro-jugkfwgx"><a href="#out-of-disk-space" style="--depth: 1;" class="astro-jugkfwgx"><span style="--depth: 1;" class="astro-jugkfwgx">Out of disk space</span></a></li><li style="--depth: 1;" class="astro-jugkfwgx"><a href="#interrupted-build-artifacts-in-the-source-tree" style="--depth: 1;" class="astro-jugkfwgx"><span style="--depth: 1;" class="astro-jugkfwgx">Interrupted build artifacts in the source tree</span></a></li><li style="--depth: 1;" class="astro-jugkfwgx"><a href="#leftover-output-folder-artifacts-on-re-scan" style="--depth: 1;" class="astro-jugkfwgx"><span style="--depth: 1;" class="astro-jugkfwgx">Leftover output-folder artifacts on re-scan</span></a></li><li style="--depth: 1;" class="astro-jugkfwgx"><a href="#anything-else" style="--depth: 1;" class="astro-jugkfwgx"><span style="--depth: 1;" class="astro-jugkfwgx">Anything else</span></a></li></ul></li></ul></nav></starlight-toc><script type="module" src="/bomlens/_astro/TableOfContents.astro_astro_type_script_index_0_lang.BpJaGz7G.js"></script></div></div></div></aside><div class="main-pane astro-lrzkfocr"><main data-pagefind-body class="astro-g5ptsecz" lang="en" dir="ltr"><div class="content-panel astro-a7po4psb"><div class="sl-container astro-a7po4psb"><nav class="breadcrumbs astro-u72m6wot" aria-label="Breadcrumb"><ol class="astro-u72m6wot"><li class="astro-u72m6wot"><a href="/bomlens/" class="astro-u72m6wot">Home</a></li><li class="astro-u72m6wot"><span class="astro-u72m6wot">Reference</span></li></ol></nav><h1 id="_top" class="astro-u72m6wot">CLI reference</h1></div></div><div class="content-panel astro-a7po4psb"><div class="sl-container astro-a7po4psb"><div class="sl-markdown-content"><p>Full options, analysis modes, CI/CD integration, and troubleshooting for BomLens.</p>
+<div class="sl-heading-wrapper level-h2"><h2 id="options-reference">Options reference</h2><a class="sl-anchor-link" href="#options-reference"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “Options reference”</span></a></div>
+<div class="expressive-code"><link rel="stylesheet" href="/bomlens/_astro/ec.klmer.css"><script type="module" src="/bomlens/_astro/ec.0vx5m.js"></script><figure class="frame not-content"><figcaption class="header"></figcaption><pre data-language="bash"><code><div class="ec-line"><div class="code"><span style="--0:#6F42C1;--1:#B392F0">./scripts/scan-sbom.sh</span><span style="--0:#24292E;--1:#E1E4E8"> [options]</span></div></div></code></pre><div class="copy"><div aria-live="polite"></div><button title="Copy to clipboard" data-copied="Copied!" data-code="./scripts/scan-sbom.sh [options]"><div></div></button></div></figure></div>
+<blockquote>
+<p><strong>Windows</strong>: the commands here are for macOS/Linux. Pick one of the following. See <a href="/bomlens/start/first-scan/">Getting started</a> for installation.</p>
+<ul>
+<li>Replace <code dir="auto">./scripts/scan-sbom.sh</code> with <code dir="auto">scripts\scan-sbom.bat</code> (needs Git Bash).</li>
+<li>Under WSL2, run the commands as-is.</li>
+<li>To work without a command line, double-click <code dir="auto">scripts\sbom-ui.bat</code>, or download the desktop app.</li>
+</ul>
+</blockquote>
+<table>
+<thead>
+<tr>
+<th>Option</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code dir="auto">--project &#x3C;name></code></td>
+<td>—</td>
+<td><strong>(required)</strong> Project name</td>
+</tr>
+<tr>
+<td><code dir="auto">--version &#x3C;version></code></td>
+<td>—</td>
+<td><strong>(required)</strong> Project version</td>
+</tr>
+<tr>
+<td><code dir="auto">--supplier &#x3C;supplier></code></td>
+<td>—</td>
+<td>The supplier of the product this SBOM describes, written as <code dir="auto">"Name &#x3C;https://...>"</code> (recorded as its <code dir="auto">url</code>) or <code dir="auto">"Name &#x3C;email>"</code> (recorded as a contact <code dir="auto">email</code>), in <code dir="auto">metadata.component.supplier</code>; <code dir="auto">"&#x3C;https://...>"</code> without a name records only the URL. A value that is empty after trimming writes nothing. <code dir="auto">metadata.supplier</code> is left alone, since it would read as the SBOM’s author. A bare name is recorded with a warning, since the <code dir="auto">bsi-tr-03183-2</code> profile needs a URL or email for it. Not written under <code dir="auto">--analyze</code>, which keeps the supplier’s own SBOM as it is; a Yocto build directory given as <code dir="auto">--target</code> is scanned through the same path but its SBOM is this scan’s, so it is written there</td>
+</tr>
+<tr>
+<td><code dir="auto">--target &#x3C;target></code></td>
+<td>current directory</td>
+<td>What to analyze: a directory (source tree, or an OS rootfs / staging build output), a Docker image, a binary file, or a <code dir="auto">.zip</code>/<code dir="auto">.tar.gz</code> archive. A Yocto build directory is recognized as such, and the image SBOM it published under <code dir="auto">tmp/deploy/images/</code> is analyzed instead of the build tree being walked (see the <a href="/bomlens/guides/supplier-sbom/#yocto-images">supplier SBOM guide</a>). A folder that is not a source tree (no manifest, lockfile or build file at its top level) and directly holds one root filesystem or one firmware image (by signature or a firmware extension such as <code dir="auto">.bix</code> or <code dir="auto">.trx</code>; <code dir="auto">.bin</code> and <code dir="auto">.img</code> by signature only), such as a release <code dir="auto">images/</code> folder, is scanned as that root filesystem or image, and the scan says so. A folder with executables, shared libraries, <code dir="auto">node_modules</code> or model files at its top level, or more than 20 top-level files, stays a source scan. When it holds several, the scan stops and lists the <code dir="auto">--target</code> to use for each</td>
+</tr>
+<tr>
+<td><code dir="auto">--git &#x3C;url></code></td>
+<td>—</td>
+<td>Shallow-clone a git/GitHub URL and analyze it as source (private repos: <code dir="auto">GIT_TOKEN</code> env var)</td>
+</tr>
+<tr>
+<td><code dir="auto">--branch &#x3C;ref></code></td>
+<td>default branch</td>
+<td>Branch, tag, or commit of the <code dir="auto">--git</code> target (alias <code dir="auto">--ref</code>)</td>
+</tr>
+<tr>
+<td><code dir="auto">--exclude &#x3C;path></code></td>
+<td>—</td>
+<td>Leave a path out of a source scan. Repeatable. The path is relative to the scanned folder (for example <code dir="auto">--exclude vendor/legacy</code>); globs, absolute paths and <code dir="auto">..</code> are rejected. The scan runs on a copy of the tree without the excluded paths, so the build, the license scan and the file tree all skip them. A path that does not exist is reported and ignored</td>
+</tr>
+<tr>
+<td><code dir="auto">--firmware</code></td>
+<td>false</td>
+<td>Force firmware mode on the <code dir="auto">--target</code> file, or on a <code dir="auto">--target</code> folder holding an unpacked image such as a root filesystem from the build (opt-in firmware image). A root filesystem folder with no package database switches to it on its own when the firmware image is present</td>
+</tr>
+<tr>
+<td><code dir="auto">--as-source</code></td>
+<td>false</td>
+<td>Scan a directory <code dir="auto">--target</code> as a source tree, as it is: no switch to a root filesystem or firmware image the folder holds, and no Yocto build directory or root filesystem recognition. Cannot be combined with <code dir="auto">--firmware</code></td>
+</tr>
+<tr>
+<td><code dir="auto">--analyze &#x3C;sbom></code></td>
+<td>—</td>
+<td>Validate and analyze a supplier SBOM (alias <code dir="auto">--sbom</code>). CycloneDX/SPDX. Mutually exclusive with <code dir="auto">--target</code></td>
+</tr>
+<tr>
+<td><code dir="auto">--model &#x3C;ref></code></td>
+<td>—</td>
+<td>Generate an AI SBOM (CycloneDX 1.7 ML-BOM). A HuggingFace model id (<code dir="auto">owner/name</code>) goes through the OWASP AIBOM Generator (opt-in <code dir="auto">bomlens-aibom</code> image; fetches model-card metadata over the network). A Figshare item — its page URL, its DOI, or the item number — is described as a dataset from the public item endpoint, with no account and no opt-in image; an institutional DOI that does not carry “figshare” cannot be told apart from any other DOI, so give the item URL for those. A HuggingFace dataset, given as <code dir="auto">datasets/&#x3C;owner>/&#x3C;name></code>, as <code dir="auto">https://huggingface.co/datasets/&#x3C;owner>/&#x3C;name></code> (anything after the name, such as <code dir="auto">/tree/main</code>, is ignored) or as <code dir="auto">hf:&#x3C;owner>/&#x3C;name></code>, is described as a dataset in the base image, and the datasets its card lists under <code dir="auto">source_datasets</code> are read too (<code dir="auto">AIBOM_DATASET_DEPTH</code>, <code dir="auto">AIBOM_DATASET_MAX_LOOKUPS</code>). A bare <code dir="auto">owner/name</code> is always a model id, because the hub uses the same form for both. A gated or private dataset needs <code dir="auto">HF_TOKEN</code>. Mutually exclusive with <code dir="auto">--target</code>/<code dir="auto">--analyze</code>/<code dir="auto">--git</code>/<code dir="auto">--merge</code></td>
+</tr>
+<tr>
+<td><code dir="auto">--model-file &#x3C;path></code></td>
+<td>—</td>
+<td>Read one AI model file and describe it from its own header: GGUF, safetensors, PyTorch (<code dir="auto">.pt</code>/<code dir="auto">.pth</code>/<code dir="auto">.ckpt</code>), pickle, npz, npy or ONNX. Offline, no HuggingFace account, and it works on a model that was never published. What can be filled depends on the format — GGUF carries a name, a license and an architecture, while safetensors usually carries only tensor shapes, and a field the file does not declare is left empty rather than guessed. A <code dir="auto">.gguf</code>/<code dir="auto">.safetensors</code>/<code dir="auto">.pt</code>/… path passed to <code dir="auto">--target</code> is read this way too. Mutually exclusive with <code dir="auto">--target</code>/<code dir="auto">--analyze</code>/<code dir="auto">--git</code></td>
+</tr>
+<tr>
+<td><code dir="auto">--license &#x3C;spdx-id></code></td>
+<td>—</td>
+<td>The outbound license the project is distributed under (e.g. <code dir="auto">Apache-2.0</code>). Recorded on the SBOM’s root component, with <code dir="auto">acknowledgement</code> <code dir="auto">concluded</code> (the distribution licence), and used to flag dependencies whose terms clash with it. It replaces a root license the generator read. A source scan cannot infer this — cdxgen leaves the root license empty for maven and gradle — so without it no conflict verdict is produced; a license read from the project manifest instead only fills an empty root license, as <code dir="auto">declared</code>. A supplier SBOM’s own root license under <code dir="auto">--analyze</code> is never replaced; for a Yocto build directory given as <code dir="auto">--target</code> it is recorded on the image. An SPDX License List id (in any letter case) is written as <code dir="auto">license.id</code>, a <code dir="auto">LicenseRef-</code> or <code dir="auto">DocumentRef-...:LicenseRef-</code> name (prefixes in any letter case) as <code dir="auto">license.name</code>, and an expression as <code dir="auto">expression</code>: SPDX ids and <code dir="auto">LicenseRef-</code> names joined by <code dir="auto">AND</code> or <code dir="auto">OR</code>, <code dir="auto">WITH</code> followed by an SPDX exception id, and balanced parentheses, with operators in any letter case and ids written in the SPDX list’s spelling. Anything else, free text such as <code dir="auto">Proprietary</code> or an expression such as <code dir="auto">Proprietary or commercial</code> or <code dir="auto">MIT AND</code>, is refused with the reason and, for free text, the <code dir="auto">LicenseRef-</code> name to use. In the scans that record it (a source scan, a root filesystem, a Yocto build directory) it is refused when the scan starts, before anything is generated, whoever started it (CLI, web UI or a CI job); the CLI refuses it before starting a container. A licence read from the project manifest that does not fit is left out with a warning</td>
+</tr>
+<tr>
+<td><code dir="auto">--sbom-author &#x3C;name></code></td>
+<td>—</td>
+<td>The entity that generated the SBOM — the organisation or person running the scan, not the tool and not whoever wrote the software. Recorded in <code dir="auto">metadata.authors</code>, using the full name without acronyms. Nothing in a scan can discover it, so the field is left out of the SBOM when it is not given rather than filled with a placeholder. Written as <code dir="auto">Name &#x3C;email></code> (for example <code dir="auto">"Example Corp &#x3C;sbom@example.com>"</code>), the email is recorded too, as the <code dir="auto">bsi-tr-03183-2</code> profile asks of the SBOM creator. Not written under <code dir="auto">--analyze</code>, except for a Yocto build directory given as <code dir="auto">--target</code>, whose SBOM this scan generates</td>
+</tr>
+<tr>
+<td><code dir="auto">--ai-declare &#x3C;file></code></td>
+<td>—</td>
+<td>For an AI model or dataset scan: the publisher’s declaration (JSON) of what a scan cannot read, such as release dates, who made the model and the data, which datasets trained or tested it, the base model revision and the distributed weights scope. Most declared values are written only to the SPDX 3.0.1 AI document. The exceptions are the service the model runs in (<code dir="auto">service</code>) and the model’s input and output kinds, training compute and adversarial testing, which also go into the CycloneDX SBOM, marked as the publisher’s declaration (see <a href="#the-ai-declaration-file">the example below</a>). Every AI scan writes an empty one to start from, <code dir="auto">{Project}_{Version}_ai-declaration.template.json</code>. A file that names a field, value, dataset or base model the scan does not have is refused with the reasons, and the document is written without it, as a draft. The accepted file is kept as <code dir="auto">{Project}_{Version}_ai-declaration.json</code> and applied again on the next scan of the same version. Given alone, without <code dir="auto">--model</code>, <code dir="auto">--model-file</code> or <code dir="auto">--target</code>, it describes a model that has no hub repository or file yet (<code dir="auto">MODE=AIDECLARE</code>, base image): the base models in <code dir="auto">model.baseModels[].ref</code> and the datasets in <code dir="auto">datasets[].ref</code> (<code dir="auto">huggingface:&#x3C;owner>/&#x3C;name></code>) are read from the hub by id, <code dir="auto">datasets[].local</code> lists data the hub does not hold, and the model is named by <code dir="auto">--project</code> and <code dir="auto">--version</code>. Without a declared download address and supplier, the SPDX document stays a draft. Not offered with <code dir="auto">--ui</code> (use the Models &#x26; datasets screen) or <code dir="auto">--diff</code></td>
+</tr>
+<tr>
+<td><code dir="auto">--no-spdx3</code></td>
+<td>false</td>
+<td>For an AI model or dataset scan: do not write the SPDX 3.0.1 AI document, its check or the declaration template</td>
+</tr>
+<tr>
+<td><code dir="auto">--vex &#x3C;file></code></td>
+<td>—</td>
+<td>A CycloneDX VEX document (JSON) a supplier sent for this product. The statements that apply to a component of the scanned SBOM are kept in <code dir="auto">{Project}_{Version}_vex_imported.json</code>; the SBOM and the security report are not changed. Turns the security report on too (as <code dir="auto">--deep-cve</code> does), because the statements are shown on its findings: open the scan folder in the web UI to see them on the vulnerability rows. A document for a different product or version, or one that is not CycloneDX VEX, is reported and skipped, and the scan still completes; a document with no applicable statement leaves an earlier <code dir="auto">_vex_imported.json</code> as it was. Not offered with <code dir="auto">--ui</code> (use Import VEX on the Vulnerabilities screen) or <code dir="auto">--diff</code></td>
+</tr>
+<tr>
+<td><code dir="auto">--component-versions &#x3C;file></code></td>
+<td>—</td>
+<td>For a firmware, root filesystem or binary scan: a CSV file, <code dir="auto">name,version,reason</code>, giving the version of components the scan found but could not read a version for. The third column is optional (a two-column <code dir="auto">name,version</code> file is read as before); with the version left empty it says why there is none: <code dir="auto">own-code</code>, <code dir="auto">not-open-source</code> or <code dir="auto">version-unknown</code>, recorded on the component as <code dir="auto">bomlens:versionReason</code>. A reason on a row that also has a version, on a component the scan read a version for, or on a name the scan did not find is ignored with a warning. A version the scan read from the delivered files is kept and a warning shows both; a name the scan did not find is added as a component marked <code dir="auto">bomlens:identifiedBy = supplier-declared</code>. Every such scan writes the components still missing a version to <code dir="auto">{Project}_{Version}_component-versions.template.csv</code> in this format. A file over 256 KiB, with a malformed row or with any other reason value is refused: the scan still writes its files, without those versions, and exits 1 with the reason. A row with neither a version nor a reason is skipped. See the <a href="/bomlens/guides/firmware/#supplying-the-versions-the-scan-could-not-read">firmware guide</a></td>
+</tr>
+<tr>
+<td><code dir="auto">--binary-kb &#x3C;path></code></td>
+<td>—</td>
+<td>For a firmware, root filesystem or binary scan: a binary knowledge base (the <code dir="auto">kb.sqlite3</code> file, or the folder that holds it) built from the release sources of the components to look for. It finds what left no version string and no package record behind, such as a library linked into a program. A component gets a version only when exactly one release in the base fits; with several, it is reported without a version and <code dir="auto">bomlens:versionCandidates</code> lists them. A result whose one fitting release is the newest the base has is reported without a version, with <code dir="auto">bomlens:versionMayBeNewer</code>. The base is opened read-only and never replaces a version another pass already read. A path that holds no base is refused. Not offered with <code dir="auto">--ui</code> or <code dir="auto">--diff</code>. See the <a href="/bomlens/guides/firmware/#identifying-components-with-a-binary-knowledge-base">firmware guide</a></td>
+</tr>
+<tr>
+<td><code dir="auto">--kb-decisions &#x3C;file></code></td>
+<td>—</td>
+<td>With <code dir="auto">--binary-kb</code>: a JSON list of what a person decided about the base’s results, each entry <code dir="auto">{"component", "decision", "version", "reason", "reviewer", "evidence_sha256"}</code> with <code dir="auto">decision</code> one of <code dir="auto">exclude</code>, <code dir="auto">confirm</code> or <code dir="auto">version</code>. An entry without a reason is ignored with a warning. With <code dir="auto">evidence_sha256</code> it applies only while the file the result was found in still has that hash. A file over 1 MiB is refused</td>
+</tr>
+<tr>
+<td><code dir="auto">--components &#x3C;file></code></td>
+<td><code dir="auto">sbom-declared.cdx.json</code> at the scan target root, when it exists</td>
+<td>For a source scan or a Yocto build: a CycloneDX file (JSON) listing the components the scan cannot find, such as your own build outputs and third-party parts added by hand. Repeat the option for several files; with it, <code dir="auto">sbom-declared.cdx.json</code> is not read. Each component needs the property <code dir="auto">bomlens:origin</code> (<code dir="auto">first-party</code> or <code dir="auto">third-party</code>), and a <code dir="auto">third-party</code> one needs a version; a <code dir="auto">first-party</code> one without a version takes <code dir="auto">--version</code>. A build output named in <code dir="auto">bomlens:artifact</code> (a path relative to the scan target root) gets its SHA-512 and SHA-256 hashes and the <code dir="auto">bsi:component:filename</code>, <code dir="auto">bsi:component:executable</code>, <code dir="auto">bsi:component:archive</code> and <code dir="auto">bsi:component:structured</code> properties (structured or unstructured as BSI TR-03183-2 defines it), read from the file; a value the declaration gives for <code dir="auto">executable</code>, <code dir="auto">archive</code> or <code dir="auto">structured</code> is kept instead. Each build output is also named on an <code dir="auto">externalReferences</code> entry of type <code dir="auto">distribution</code> carrying its SHA-512, as BSI TR-03183-2 section 8 does: its <code dir="auto">url</code> is the component’s <code dir="auto">bomlens:distribution-url</code> property when given (an http or https URL, or a relative path without <code dir="auto">..</code>, in which a <code dir="auto">%</code> must start a <code dir="auto">%XX</code> escape), otherwise the build output’s path; a component with several build outputs gets one per file and cannot give <code dir="auto">bomlens:distribution-url</code>. A licence given without an <code dir="auto">acknowledgement</code> is written as <code dir="auto">concluded</code>, the distribution licence; an <code dir="auto">acknowledgement</code> the declaration gives is kept. A component may use only these CycloneDX fields: <code dir="auto">name</code>, <code dir="auto">version</code>, <code dir="auto">bom-ref</code>, <code dir="auto">group</code>, <code dir="auto">description</code>, <code dir="auto">copyright</code>, <code dir="auto">cpe</code>, <code dir="auto">purl</code>, <code dir="auto">publisher</code>, <code dir="auto">author</code>, <code dir="auto">mime-type</code>, <code dir="auto">type</code>, <code dir="auto">scope</code>, <code dir="auto">tags</code>, <code dir="auto">supplier</code>, <code dir="auto">manufacturer</code>, <code dir="auto">authors</code>, <code dir="auto">hashes</code>, <code dir="auto">licenses</code>, <code dir="auto">externalReferences</code> and <code dir="auto">properties</code>; any other field, nested <code dir="auto">components</code> included, is refused by name. A license <code dir="auto">id</code> must be an id on the SPDX License List, so an unknown id is refused; give a license that is not on the list as <code dir="auto">name</code>. A file that breaks these rules is refused, for example one over 4 MiB, a component without a valid <code dir="auto">bomlens:origin</code>, a named file that is missing or outside the scan target, or the same name and version declared twice: the scan stops before the SBOM is finished, keeps the SBOM written so far as <code dir="auto">{Project}_{Version}_bom.refused.json</code> (not <code dir="auto">_bom.json</code>) and exits 1, naming the file and component. For a Yocto build directory given as <code dir="auto">--target</code>, a component names its recipe (PN) in <code dir="auto">bomlens:yocto-recipe</code> instead of a build output, and no default file is read: the declaration goes on every package installed in the image whose recipe the build recorded as that PN (a package whose recipe the build did not record is not matched by its name; a multilib or SDK variant such as <code dir="auto">lib32-&#x3C;PN></code> or <code dir="auto">nativesdk-&#x3C;PN></code> is a recipe of its own, declared separately, and a warning names any the image installs), which keep their name, version, purl and CPE and get the declared type, supplier, licence (concluded) and <code dir="auto">bomlens:origin</code>. The files and hashes the SPDX document records for each package (SHA-256, and SHA-512 from Yocto 6.1) are nested under it as <code dir="auto">file</code> components with their <code dir="auto">bsi:component:filename</code>; no package hash is made up. A recipe that installed no package, a version other than the build’s, <code dir="auto">bomlens:artifact</code> beside <code dir="auto">bomlens:yocto-recipe</code>, <code dir="auto">hashes</code>, <code dir="auto">purl</code>, <code dir="auto">cpe</code>, <code dir="auto">bom-ref</code>, <code dir="auto">group</code> or <code dir="auto">mime-type</code> on a recipe declaration, or a component added by name that has the name of an installed package (declare that one by its recipe), is refused the same way. In any scan a declaration may not carry the properties the scan itself writes (<code dir="auto">bomlens:identifiedBy</code>, <code dir="auto">bomlens:yocto:recipe</code>, <code dir="auto">bomlens:layer</code>, <code dir="auto">bomlens:yocto:arch</code>). Refused with <code dir="auto">--analyze</code>: an SBOM passed there is received, and is not changed. Not offered with <code dir="auto">--ui</code> or <code dir="auto">--diff</code>; the web UI reads <code dir="auto">sbom-declared.cdx.json</code> at the root of the folder it scans, a source tree or a Yocto build directory. See the <a href="/bomlens/guides/declared-components/">declared components guide</a></td>
+</tr>
+<tr>
+<td><code dir="auto">--no-components</code></td>
+<td>false</td>
+<td>For a source scan: do not read <code dir="auto">sbom-declared.cdx.json</code> at the scan target root, for example in a scan made before the build outputs it names exist. When that file is refused because a build output is missing, the message points to this option. Cannot be combined with <code dir="auto">--components</code>; not offered with <code dir="auto">--ui</code> (the web UI’s Read sbom-declared.cdx.json switch does the same) or <code dir="auto">--diff</code></td>
+</tr>
+<tr>
+<td><code dir="auto">--usage &#x3C;scenario></code></td>
+<td>—</td>
+<td>Tailor the AI model risk assessment (<code dir="auto">--model</code> and <code dir="auto">--model-file</code>) to how the model will be used: <code dir="auto">internal</code>, <code dir="auto">product</code>, <code dir="auto">redistribute</code> or <code dir="auto">outputs-only</code>. Only the license conditions that bind that scenario decide the verdict, and the report states which scenario it was judged for. Unset judges against every condition</td>
+</tr>
+<tr>
+<td><code dir="auto">--merge &#x3C;a.json> &#x3C;b.json> …</code></td>
+<td>—</td>
+<td>Merge two or more CycloneDX SBOMs into one, dedupe by purl, and stamp the root component with <code dir="auto">--project</code>/<code dir="auto">--version</code>. Optional — for a server SBOM when an external system needs a single product BOM; otherwise keep the layers separate (see the <a href="/bomlens/guides/server-delivery/">server SBOM guide</a>). Mutually exclusive with <code dir="auto">--target</code>/<code dir="auto">--analyze</code>/<code dir="auto">--git</code></td>
+</tr>
+<tr>
+<td><code dir="auto">--merge-root &#x3C;file></code></td>
+<td>—</td>
+<td>With <code dir="auto">--merge</code>: keep this input’s <code dir="auto">specVersion</code> and root component (for example an ML-BOM’s CycloneDX 1.7 root with its model card) instead of writing a fresh root at the <code dir="auto">--spec-version</code> version. Must be one of the <code dir="auto">--merge</code> files; the preserved root is renamed to <code dir="auto">--project</code>/<code dir="auto">--version</code></td>
+</tr>
+<tr>
+<td><code dir="auto">--diff &#x3C;old.json> &#x3C;new.json></code></td>
+<td>—</td>
+<td>Compare two already-generated AI-model SBOMs (<code dir="auto">--model</code> or <code dir="auto">--model-file</code> output) for drift: a <code dir="auto">bomlens:assessment:*</code> verdict that got worse, a changed declared license, or a SHA-256 weight-file hash that no longer matches under the same model name/purl/HuggingFace id — the last one means the artifact behind a stable name silently changed. Needs neither <code dir="auto">--project</code>/<code dir="auto">--version</code> nor a scan target: it only reads the two files and writes <code dir="auto">&#x3C;new>_model-diff.json</code> next to the newer one (or under <code dir="auto">--output-dir</code>)</td>
+</tr>
+<tr>
+<td><code dir="auto">--generate-only</code></td>
+<td>false</td>
+<td>Save locally only, without uploading</td>
+</tr>
+<tr>
+<td><code dir="auto">--upload-target &#x3C;target></code></td>
+<td><code dir="auto">dependency-track</code></td>
+<td>Upload destination: <code dir="auto">dependency-track</code> (DT-compatible) or <code dir="auto">trusca</code> (native ingest)</td>
+</tr>
+<tr>
+<td><code dir="auto">--trusca &#x3C;project_id></code></td>
+<td>—</td>
+<td>Upload to TRUSCA (= <code dir="auto">--upload-target trusca</code> + project id). Needs <code dir="auto">API_URL</code> and a Bearer <code dir="auto">API_KEY</code></td>
+</tr>
+<tr>
+<td><code dir="auto">--notice</code></td>
+<td>forced on by the risk-report default</td>
+<td>Generate the open-source notice (NOTICE, txt+html). The flag itself defaults to off; it is the risk report (on by default) that turns it on, so <code dir="auto">--no-report</code>, not simply omitting <code dir="auto">--notice</code>, is what skips it</td>
+</tr>
+<tr>
+<td><code dir="auto">--security</code></td>
+<td>forced on by the risk-report default</td>
+<td>Generate the Trivy security report (json+md+html), including CVSS, EPSS, and CISA KEV priority signals. Same mechanism as <code dir="auto">--notice</code>: <code dir="auto">--no-report</code> skips it, omitting the flag alone does not</td>
+</tr>
+<tr>
+<td><code dir="auto">--spdx</code></td>
+<td>false</td>
+<td>Also export the SBOM as SPDX 2.3 JSON (<code dir="auto">_bom.spdx.json</code>), converted from the final CycloneDX output</td>
+</tr>
+<tr>
+<td><code dir="auto">--spec-version &#x3C;1.6|1.7></code></td>
+<td><code dir="auto">1.6</code></td>
+<td>CycloneDX version of the SBOM. <code dir="auto">1.7</code> has cdxgen and syft write 1.7, and an SBOM put together at 1.4, 1.5 or 1.6 is labelled 1.7, <code dir="auto">$schema</code> included, before it is delivered. Those versions only gained fields up to 1.7, except that from 1.6 on a property must have a name, so a 1.4 or 1.5 property without one is removed as the SBOM is raised. An SBOM at 1.3 or older keeps its version, and so does a 1.4 SBOM at the default <code dir="auto">1.6</code>, which then gets no <code dir="auto">metadata.lifecycles</code> (a 1.5 field). NOTICE, the security report, the conformance check and the web UI read either version. AI model and dataset SBOMs are 1.7 whatever this says. Dependency-Track reads 1.7 from 4.14.4 and 5.1.0 on; an older server, or one whose version is not known, that refuses it gets a 1.6 copy (see <a href="/bomlens/guides/upload/#troubleshooting">Upload</a>). Any other value stops the scan</td>
+</tr>
+<tr>
+<td><code dir="auto">--all</code></td>
+<td>—</td>
+<td><code dir="auto">--notice --security --spdx</code></td>
+</tr>
+<tr>
+<td><code dir="auto">--no-report</code></td>
+<td>false</td>
+<td>Skip the open-source risk report (see below)</td>
+</tr>
+<tr>
+<td><code dir="auto">--lang &#x3C;en|ko></code></td>
+<td><code dir="auto">en</code></td>
+<td>Language for the human-facing conformance and AI-profile reports (<code dir="auto">.md</code>/<code dir="auto">.html</code>). The SBOM and the JSON reports stay English regardless</td>
+</tr>
+<tr>
+<td><code dir="auto">--conformance-profile &#x3C;default|skt-submission|bsi-tr-03183-2></code></td>
+<td><code dir="auto">default</code></td>
+<td>Conformance check strictness. <code dir="auto">skt-submission</code> requires 100% PURL coverage and fails on any <code dir="auto">pkg:generic</code> identifier, matching the SKT supplier submission review. It also adds a required “Version needed” row, which fails only on components with neither a version nor a reason (fill them with <code dir="auto">--component-versions</code>) and lists the ones with a reason as explained by the supplier, and an advisory “No upstream purl” row for versioned components without an upstream purl, which SK Telecom checks separately. For a firmware, root filesystem, binary or Yocto build directory scan, and under <code dir="auto">--analyze</code> for an SBOM marked <code dir="auto">bomlens:scanMode</code> by one, the name+version, PURL coverage, <code dir="auto">pkg:generic</code> and transitive-dependency rows warn instead of failing on what those two rows already cover, since such a scan records packages found rather than a dependency graph. The profile accepts <code dir="auto">pkg:sourceforge</code> and <code dir="auto">pkg:gnu</code>, and says in the summary that <code dir="auto">{Project}_{Version}_bom.json</code> is the one file to submit. The web UI’s submission-review screen defaults to <code dir="auto">skt-submission</code>; the CLI does not, so pair it with <code dir="auto">--analyze</code> explicitly. In every profile, a component the <code dir="auto">--components</code> file added in this scan with <code dir="auto">bomlens:origin</code> <code dir="auto">first-party</code>, a supplier and a SHA-512 needs no purl: it is left out of PURL coverage, the <code dir="auto">pkg:generic</code> row and the upstream-purl row, and listed on an advisory row by name. A <code dir="auto">third-party</code> one is not, and nothing is exempted under <code dir="auto">--analyze</code>. <code dir="auto">bsi-tr-03183-2</code> measures the SBOM against BSI TR-03183-2 v2.1.0: CycloneDX 1.6 or later (SPDX 3.0 or later), a timestamp, an SBOM creator with an email or URL (<code dir="auto">metadata.manufacturer</code>, or <code dir="auto">metadata.authors</code> with an email, which <code dir="auto">--sbom-author "Name &#x3C;email>"</code> writes), and a dependency graph that reaches every component from the product are required; the graph row warns when the SBOM does not state its completeness (<code dir="auto">compositions</code>), and a component without its own <code dir="auto">dependencies</code> entry is listed on an advisory row. The product (<code dir="auto">metadata.component</code>) needs a creator with a URL or email, a name, a version and a concluded licence (<code dir="auto">--license</code> writes the licence and <code dir="auto">--supplier</code> the creator), and its filename, SHA-512 and file properties when it names a file. For each component the <code dir="auto">--components</code> file added, the creator (supplier or manufacturer with a URL or email), name and version, and the distribution licence as an SPDX identifier, expression or <code dir="auto">LicenseRef-</code> name with <code dir="auto">acknowledgement</code> <code dir="auto">concluded</code> are required; for one that names a build output, so are its file name, SHA-512 (on the component, its files or a <code dir="auto">distribution</code> reference) and executable, archive and structured properties. A declared library or framework with no file of its own is listed on an advisory row; a declared component of any other type without one fails the file rows. The components the scan found are measured on one advisory row, with counts and each component’s gaps, and do not move the result; in the SBOM a scan generated from a Yocto build directory, a SHA-512 missing from a package the build recorded is reported there as not in the source SBOM. For such a package declared by recipe (<code dir="auto">bomlens:yocto-recipe</code>), a SHA-512, file name or file properties the build did not record are reported the same way on the declared rows, as a warning rather than a failure. A received SBOM (<code dir="auto">--analyze</code>) gets no such allowance, whatever properties its components carry. PURL coverage is advisory in this profile</td>
+</tr>
+<tr>
+<td><code dir="auto">--license-registry</code></td>
+<td>off</td>
+<td>Ask the package registry (deps.dev) for the licence of a component that has none, and check a component’s single strong-copyleft or non-commercial licence (GPL, AGPL, SSPL, BUSL, CC-BY-NC) against it. When the registry says otherwise its answer replaces the recorded one, and the old value is kept in <code dir="auto">bomlens:license:superseded</code>; licences written this way carry <code dir="auto">bomlens:licenseSource</code> = <code dir="auto">registry (deps.dev)</code>. A licence with its text, a url or a concluded acknowledgement is never checked, and with <code dir="auto">--analyze</code> only missing licences are filled. Uses the network</td>
+</tr>
+<tr>
+<td><code dir="auto">--resolve-purl</code></td>
+<td>off</td>
+<td><code dir="auto">--analyze</code> only: ask each package repository whether the identifiers in the submitted SBOM name packages that exist, and add the answer to the conformance check report as an advisory row. The only part of the check that uses the network. An identifier that resolves to nothing is reported, never failed, because a package published only to an internal repository answers the same way; <code dir="auto">PURL_RESOLVE_IGNORE</code> skips namespaces you know are internal</td>
+</tr>
+<tr>
+<td><code dir="auto">--analyze-cpe-index</code></td>
+<td>off</td>
+<td><code dir="auto">--analyze</code> only: match the components of a BomLens-generated SBOM that carry <code dir="auto">bomlens:purlSource=upstream-map</code> against the bundled CPE index, as a generating scan does. Other components are not matched. The property is plain text in the file, so an edited SBOM can lose it, and a component whose CPE was removed is not found.</td>
+</tr>
+<tr>
+<td><code dir="auto">--deep-license</code></td>
+<td>false</td>
+<td>Precise license detection with scancode in the project’s own files (opt-in <code dir="auto">bomlens-deep-license</code> image, pulled automatically; when it cannot be pulled, the scan runs on the base image without the licence scan). With <code dir="auto">--deep-cve</code> as well, the licence scan runs first in this image and post-processing then runs on the deep-cve image, so both <code dir="auto">_scancode.json</code> and <code dir="auto">_security_grype.json</code> are written</td>
+</tr>
+<tr>
+<td><code dir="auto">--deep-cve</code></td>
+<td>false</td>
+<td>Add a second CVE-matching pass via grype’s NVD CPE matcher (opt-in <code dir="auto">bomlens-deep-cve</code> image, pulled automatically; a source scan runs its post-processing step on it, and when it cannot be pulled, the source scan goes on without the grype match; with a <code dir="auto">SBOM_SCANNER_IMAGE</code> that is a local build, a version before 1.13.2 or another name and no <code dir="auto">SBOM_DEEP_CVE_IMAGE</code>, post-processing stays on that image, which runs the match only if it has grype, also with <code dir="auto">--deep-license</code>). Recovers NVD-only CVEs that Trivy misses, mostly for older Maven libraries, since BomLens attaches an NVD-matchable CPE to Maven components specifically; implies <code dir="auto">--security</code>. Findings not verified against the live NVD version range are flagged version-unverified in the report. See the <a href="/bomlens/guides/reports/">deep CVE matching guide</a></td>
+</tr>
+<tr>
+<td><code dir="auto">--reachability</code></td>
+<td>false</td>
+<td>Go source, or a Go executable given with <code dir="auto">--target</code>: judge with govulncheck whether the code each Go advisory names is reached, from the source’s call graph or from the executable’s symbols. An advisory whose code is not reached is recorded as <code dir="auto">not_affected</code> (with <code dir="auto">code_not_present</code> when the affected package is not in the build, <code dir="auto">code_not_reachable</code> when it is but no affected function is reached) in <code dir="auto">{Project}_{Version}_reachability.cdx.json</code> (CycloneDX VEX), marked on its finding in <code dir="auto">_security.json</code>, listed in its own “Not reachable” section of the security report, and left out of that report’s totals, the risk report’s and <code dir="auto">--fail-on vulnerability=</code>. One whose code is reached is <code dir="auto">exploitable</code>, with the call path. Implies <code dir="auto">--security</code>. govulncheck reads the Go vulnerability database (vuln.go.dev) over the network; when it cannot, the step is skipped and the report is as without the option. A source scan runs govulncheck in the Go image of stage 1, for each Go module in the tree (up to 20) and for GOOS linux, darwin and windows (GOARCH amd64) with the default build tags; code built only under a custom build tag is not covered. With <code dir="auto">--ui</code> it is chosen per scan in the web UI’s advanced scan options instead. See <a href="/bomlens/guides/reports/#go-reachability---reachability">Go reachability</a></td>
+</tr>
+<tr>
+<td><code dir="auto">--identify-vendored</code></td>
+<td>false</td>
+<td>Identify open source copied (vendored) into C/C++ source that has no package manager. Matches file fingerprints against the OSSKB service (included in the published image; sends hashes, not source). See the <a href="/bomlens/guides/identify-vendored/">identify bundled OSS guide</a></td>
+</tr>
+<tr>
+<td><code dir="auto">--verify-weights</code></td>
+<td>false</td>
+<td>With <code dir="auto">--model</code>: download the repo’s pickle-format weight files (<code dir="auto">.bin</code>/<code dir="auto">.pt</code>/<code dir="auto">.pth</code>/<code dir="auto">.ckpt</code> — the ones that execute code on load) and run the same local picklescan verification <code dir="auto">--model-file</code> runs, instead of only trusting HuggingFace’s own scan (<code dir="auto">bomlens:hf:scan:*</code>). safetensors/GGUF/ONNX weights are never downloaded — they cannot execute code on load, so there is nothing for picklescan to check. Real network and disk cost (bounded by <code dir="auto">AIBOM_VERIFY_MAX_FILES</code>/<code dir="auto">AIBOM_VERIFY_MAX_BYTES</code>, default 5 files / 2 GiB each), unlike the metadata-only <code dir="auto">ENRICH_HF_SECURITY</code> lookup, which is why this is opt-in. AI-model scans only</td>
+</tr>
+<tr>
+<td><code dir="auto">--byte-stable</code></td>
+<td>false</td>
+<td>Deterministic (reproducible) SBOM output</td>
+</tr>
+<tr>
+<td><code dir="auto">--detection &#x3C;how></code></td>
+<td>auto</td>
+<td>How a source scan finds its dependencies: <code dir="auto">build</code> resolves them in a cdxgen language image, <code dir="auto">static</code> reads the lock file and does not build (no language image to pull, about 5 to 10 seconds shorter; a project with no complete lock file comes out short, a workspace takes its members’ dependencies in, and the copyright notices a build reads from downloaded packages, for example 73 of 98 crates in a Rust project, are not filled), <code dir="auto">auto</code> reads statically only when a <code dir="auto">package-lock.json</code>, <code dir="auto">npm-shrinkwrap.json</code>, <code dir="auto">pnpm-lock.yaml</code>, <code dir="auto">bun.lock</code> or <code dir="auto">gradle.lockfile</code> covers the whole tree and builds otherwise. A static scan fills the licenses a lock file does not carry from the package registry (the same lookup as <code dir="auto">--license-registry</code>), so <code dir="auto">auto</code> builds under <code dir="auto">--byte-stable</code> or <code dir="auto">FETCH_LICENSE=false</code>. <code dir="auto">DETECTION=&#x3C;how></code> in the environment does the same. The SBOM records which way it was made (<code dir="auto">bomlens:detection</code>)</td>
+</tr>
+<tr>
+<td><code dir="auto">--fail-on-conformance</code></td>
+<td>false</td>
+<td>Exit 2 if this scan’s own conformance check report says “fail” (exit 3 if no conformance check report was produced for this scan). Not offered with <code dir="auto">--ui</code>. See <a href="#exit-codes">Exit codes</a></td>
+</tr>
+<tr>
+<td><code dir="auto">--fail-on &#x3C;condition></code></td>
+<td>—</td>
+<td>Exit 4 when this scan meets the condition, or 5 when it cannot be judged from what the scan produced. Repeat the option for several conditions. The conditions are a closed list: <code dir="auto">vulnerability=&#x3C;critical|high|medium|low></code> (a finding at that severity or worse; turns the security report on), <code dir="auto">malicious-package</code> (a component flagged as a known malicious package), <code dir="auto">license-conflict</code> (a component incompatible with the license the product is distributed under; the SBOM’s root component has to record it, which <code dir="auto">--license</code> does for source and rootfs scans and a supplier SBOM carries itself, otherwise it cannot be judged), <code dir="auto">empty-result</code> (the scan identified no software: no component is left once operating-system and file entries are set aside, so a rootfs or image scan that names no package counts as empty), <code dir="auto">license-coverage=&#x3C;0-100></code> (fewer than that percent of those same components declare a license; a license of NOASSERTION or NONE is not a declaration, and the percentage is rounded down; the value is required, has no default and takes no leading zero). Both read the scan’s own conformance check report, so a scan that wrote none cannot be judged, nor can one whose SBOM format the report did not measure (an SPDX 3.0 document that could not be converted). <code dir="auto">license-coverage=</code> cannot be judged on a scan with no such component either (use <code dir="auto">empty-result</code> for that). They leave the conformance verdict itself unchanged. Findings are counted as the security report counts them: once per package and id, with the kernel’s advisories left out. <code dir="auto">--vex</code> statements are not applied, so a finding the supplier declared not affected still counts; a finding <code dir="auto">--reachability</code> judged not reachable does not. <code dir="auto">vulnerability=</code> is not available for AI model and dataset inputs, which have no dependencies to scan, and neither is <code dir="auto">empty-result</code>. Not offered with <code dir="auto">--ui</code> or <code dir="auto">--diff</code>. See <a href="#exit-codes">Exit codes</a></td>
+</tr>
+<tr>
+<td><code dir="auto">--sign</code></td>
+<td>false</td>
+<td>cosign signature (<code dir="auto">COSIGN_KEY</code> required)</td>
+</tr>
+<tr>
+<td><code dir="auto">--output-dir &#x3C;dir></code></td>
+<td>current directory</td>
+<td>Base directory for outputs (alias <code dir="auto">-o</code>). Each scan lands in a <code dir="auto">{Project}_{Version}/</code> subfolder under it, keeping the bundle together and out of the source tree</td>
+</tr>
+<tr>
+<td><code dir="auto">--timestamp</code></td>
+<td>false</td>
+<td>Append <code dir="auto">_YYYYMMDD-HHMMSS</code> to the run subfolder so repeat scans of the same project and version are kept side by side instead of overwritten. Folder name only; SBOM bytes are unchanged</td>
+</tr>
+<tr>
+<td><code dir="auto">--ui</code></td>
+<td>—</td>
+<td>Launch the local web UI</td>
+</tr>
+<tr>
+<td><code dir="auto">--mount &#x3C;dir></code></td>
+<td>—</td>
+<td>With <code dir="auto">--ui</code>: expose an extra host directory to the web UI as a read-only target for the <strong>Directory path</strong> input (repeatable). Lets the UI scan an OS tree outside the launch folder — including the running host OS with <code dir="auto">--mount /</code>. Results still save under the launch folder</td>
+</tr>
+<tr>
+<td><code dir="auto">--help</code></td>
+<td>—</td>
+<td>Print help</td>
+</tr>
+</tbody>
+</table>
+<p><strong>ANALYZE mode (<code dir="auto">--analyze</code>) is an exception to six of these.</strong> <code dir="auto">--project</code>/<code dir="auto">--version</code>/<code dir="auto">--license</code>/<code dir="auto">--sbom-author</code>/<code dir="auto">--supplier</code> never overwrite what a supplier’s own SBOM already declares: its existing name, version, root license, authorship and supplier are a fact about the document, not something this run has the authority to replace. <code dir="auto">--no-report</code> has no effect because the risk report is always generated for a supplier SBOM under review. When the submitted SBOM is missing one of these fields outright (no root license, no <code dir="auto">metadata.authors</code>, no product supplier), the flag still cannot fill it in; the field stays empty and the conformance check judges accordingly.</p>
+<p>Environment variables adjust the behavior.</p>
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code dir="auto">SBOM_SCANNER_IMAGE</code></td>
+<td><code dir="auto">ghcr.io/sktelecom/bomlens:latest</code></td>
+<td>Override the scanner image</td>
+</tr>
+<tr>
+<td><code dir="auto">SBOM_FIRMWARE_IMAGE</code></td>
+<td>Follows <code dir="auto">SBOM_SCANNER_IMAGE</code> when it is a BomLens image name with a registry path and a tag of 1.13.2 or later, or a tag that is not a version (same registry path and tag: <code dir="auto">.../bomlens:1.13.2</code> gives <code dir="auto">.../bomlens-firmware:1.13.2</code>), else <code dir="auto">ghcr.io/sktelecom/bomlens-firmware:latest</code></td>
+<td>Image used for firmware analysis</td>
+</tr>
+<tr>
+<td><code dir="auto">SBOM_AIBOM_IMAGE</code></td>
+<td>Follows <code dir="auto">SBOM_SCANNER_IMAGE</code> when it is a BomLens image name with a registry path and a tag of 1.13.2 or later, or a tag that is not a version (same registry path and tag: <code dir="auto">.../bomlens:1.13.2</code> gives <code dir="auto">.../bomlens-aibom:1.13.2</code>), else <code dir="auto">ghcr.io/sktelecom/bomlens-aibom:latest</code></td>
+<td>Image used for AI model (ML-BOM) generation</td>
+</tr>
+<tr>
+<td><code dir="auto">SBOM_DEEP_CVE_IMAGE</code></td>
+<td>Follows <code dir="auto">SBOM_SCANNER_IMAGE</code> when it is a BomLens image name with a registry path and a tag of 1.13.2 or later, or a tag that is not a version (same registry path and tag: <code dir="auto">.../bomlens:1.13.2</code> gives <code dir="auto">.../bomlens-deep-cve:1.13.2</code>), else <code dir="auto">ghcr.io/sktelecom/bomlens-deep-cve:latest</code></td>
+<td>Image used for <code dir="auto">--deep-cve</code> (grype CPE matching), and by the same toggle in the web UI</td>
+</tr>
+<tr>
+<td><code dir="auto">SBOM_GO_VULNDB</code></td>
+<td>—</td>
+<td>A Go vulnerability database export on this host (<code dir="auto">vulndb.zip</code> from <a href="https://vuln.go.dev/vulndb.zip">https://vuln.go.dev/vulndb.zip</a>, or that archive unpacked into a folder), mounted read-only and read in place of the image’s snapshot. It is never replaced by a download; one older than <code dir="auto">BOMLENS_GO_VULNDB_MAX_AGE_DAYS</code> is recorded as degraded</td>
+</tr>
+<tr>
+<td><code dir="auto">SBOM_DEEP_LICENSE_IMAGE</code></td>
+<td>Follows <code dir="auto">SBOM_SCANNER_IMAGE</code> under the same condition; otherwise <code dir="auto">SBOM_SCANNER_IMAGE</code> itself; when neither is set, <code dir="auto">ghcr.io/sktelecom/bomlens-deep-license:latest</code></td>
+<td>Image a source scan’s post-process step runs on with <code dir="auto">--deep-license</code> (scancode)</td>
+</tr>
+<tr>
+<td><code dir="auto">SBOM_OUTPUT_FLAT</code></td>
+<td>—</td>
+<td>Set to <code dir="auto">1</code> to write artifacts flat in the output base, with no per-run subfolder (the pre-isolation layout, for CI that expects the old paths)</td>
+</tr>
+<tr>
+<td><code dir="auto">SBOM_OUTPUT_DIR</code></td>
+<td><code dir="auto">~/sbom-output</code></td>
+<td>Output base for the desktop app and web UI (the CLI uses <code dir="auto">--output-dir</code> instead). Each scan still lands in a <code dir="auto">{Project}_{Version}/</code> subfolder under it</td>
+</tr>
+<tr>
+<td><code dir="auto">SBOM_UI_MOUNT_DIR</code></td>
+<td>—</td>
+<td>For the Windows launcher <code dir="auto">sbom-ui.bat</code>, which takes no CLI arguments: one extra folder to expose to the web UI as a read-only Directory path target (the double-click counterpart of <code dir="auto">--ui --mount</code>). Use a path without `&#x26; ^</td>
+</tr>
+<tr>
+<td><code dir="auto">SBOM_LANG</code></td>
+<td>system locale</td>
+<td><code dir="auto">en</code> or <code dir="auto">ko</code>, for the Windows launchers and the desktop app. Anything that is not Korean gets English</td>
+</tr>
+<tr>
+<td><code dir="auto">SBOM_BASH</code></td>
+<td>auto-detected</td>
+<td>For <code dir="auto">scan-sbom.bat</code>: explicit path to Git Bash’s <code dir="auto">bash.exe</code> (e.g. <code dir="auto">C:\Program Files\Git\bin\bash.exe</code>), when the launcher’s own detection (deriving it from <code dir="auto">git</code> on PATH) fails to find one that is not WSL’s or a WindowsApps alias</td>
+</tr>
+<tr>
+<td><code dir="auto">CDXGEN_IMAGE_PREFIX</code></td>
+<td><code dir="auto">ghcr.io/cdxgen/</code></td>
+<td>Where the cdxgen images of a source scan are pulled from (the language images and the all-in-one image): everything before the image name. On a network with no route to ghcr.io, set it to a registry mirror that holds the same images, for example <code dir="auto">registry.example/mirror/cdxgen/</code>; the names and tags stay the same. Passed on to the web UI’s source scans (<code dir="auto">--ui</code>, <code dir="auto">sbom-ui.bat</code>, the desktop app), and taken by the Android SDK image’s build as <code dir="auto">--build-arg</code> (that build pins its base image by digest, so the mirror must be a pull-through cache or a copy of every platform)</td>
+</tr>
+<tr>
+<td><code dir="auto">CDXGEN_JAVA_IMAGE</code></td>
+<td>-</td>
+<td>The cdxgen image for a Java source scan, a full image reference (for example <code dir="auto">registry.example/jdk22/cdxgen-java22:1</code>). A <code dir="auto">ghcr.io/cdxgen/</code> name is pulled through <code dir="auto">CDXGEN_IMAGE_PREFIX</code>, like the other cdxgen images. Unset, the image follows the Java toolchain the Gradle build declares and the Gradle version of its wrapper: one of <code dir="auto">cdxgen-temurin-java8</code>, <code dir="auto">cdxgen-java11</code>, <code dir="auto">cdxgen-java17</code>, <code dir="auto">cdxgen-temurin-java21</code>, <code dir="auto">cdxgen-temurin-java24</code> and <code dir="auto">cdxgen-temurin-java25</code>, with <code dir="auto">cdxgen-temurin-java21</code> when the build declares neither, and a warning when no image fits both (<a href="/bomlens/reference/ecosystems/#java-gradle">Java (Gradle)</a>). Setting it also turns off the rerun in the image whose JDK a failed Gradle toolchain asked for. Passed on to the web UI like <code dir="auto">CDXGEN_IMAGE_PREFIX</code></td>
+</tr>
+<tr>
+<td><code dir="auto">SBOM_PULL</code></td>
+<td><code dir="auto">missing</code></td>
+<td>Scanner image download policy, honored by both <code dir="auto">scan-sbom.sh</code> and the Windows launcher. It is also passed to the web UI container (from <code dir="auto">--ui</code>, the Windows launcher and the desktop app), where it decides whether the Java rerun image is pulled. <code dir="auto">missing</code> (default) pulls only when the image is absent, and otherwise quietly refreshes an already-present <code dir="auto">:latest</code> in the background (bounded and best-effort: a stalled or offline check gives up and the run proceeds with the local image either way). <code dir="auto">always</code> blocks and re-pulls every run, failing the run if the pull fails. <code dir="auto">never</code> never touches the network, failing the run if the image is absent. An opt-in image that <code dir="auto">--deep-cve</code> or <code dir="auto">--deep-license</code> needs is pulled once when absent (once per run with <code dir="auto">always</code>), with docker’s progress shown and no time limit. With <code dir="auto">always</code>, a pull that fails uses the copy already here; a scan that cannot get it at all, offline or with <code dir="auto">never</code>, goes on without it and says so</td>
+</tr>
+<tr>
+<td><code dir="auto">SBOM_IMAGE_TAR</code></td>
+<td>—</td>
+<td>Path to an image tar from <code dir="auto">docker save</code>. The Windows launcher loads it instead of pulling; a file named <code dir="auto">bomlens-image.tar</code> next to the scripts is picked up automatically. Combined with <code dir="auto">SBOM_PULL=never</code> this gives a fully offline install</td>
+</tr>
+<tr>
+<td><code dir="auto">CVE_BIN_TOOL_MODE</code></td>
+<td><code dir="auto">auto</code></td>
+<td>Firmware, root filesystem and binary scans: <code dir="auto">components-only</code> turns off the match of CPEs against the NVD CPE index in the image, while firmware binaries are still identified; any other value leaves it on. Read by the scanner container (<code dir="auto">docker run -e</code>); the CLI does not pass it on</td>
+</tr>
+<tr>
+<td><code dir="auto">CVE_BIN_TOOL_HOME</code></td>
+<td><code dir="auto">/opt/cve-bin-tool-home</code></td>
+<td>Where the image keeps the NVD CPE index (<code dir="auto">cpe_match.sqlite</code>) and its data notice. The firmware image also keeps there the placeholder <code dir="auto">cve.db</code> cve-bin-tool needs in order to start; it holds no CVE data</td>
+</tr>
+<tr>
+<td><code dir="auto">CVE_BIN_TOOL_DISABLE_SOURCES</code></td>
+<td><code dir="auto">GAD,OSV</code></td>
+<td>cve-bin-tool data sources to disable during a firmware scan. GAD (GitLab Advisory) and OSV are disabled by default so identification does not reach out over the network</td>
+</tr>
+<tr>
+<td><code dir="auto">SCANOSS_API_URL</code></td>
+<td>OSSKB free API</td>
+<td>Endpoint for <code dir="auto">--identify-vendored</code>. Point at a SCANOSS commercial or self-hosted endpoint for air-gapped or high-volume use</td>
+</tr>
+<tr>
+<td><code dir="auto">SCANOSS_API_KEY</code></td>
+<td>—</td>
+<td>Credential for <code dir="auto">SCANOSS_API_URL</code>, if the endpoint requires one</td>
+</tr>
+<tr>
+<td><code dir="auto">SCANOSS_MIN_FILES</code></td>
+<td><code dir="auto">2</code></td>
+<td>Minimum number of files that must match a library before it is reported, to drop one-off downstream-fork noise. Set <code dir="auto">1</code> to keep every single-file match</td>
+</tr>
+<tr>
+<td><code dir="auto">GIT_TOKEN</code></td>
+<td>—</td>
+<td>Token for cloning private git repositories</td>
+</tr>
+<tr>
+<td><code dir="auto">HF_TOKEN</code></td>
+<td>—</td>
+<td>HuggingFace read token for <code dir="auto">--model</code> and for the dataset metadata lookups during AI SBOM analysis. Required for a private or gated repository, which is how you review a model before publishing it. <code dir="auto">HUGGING_FACE_HUB_TOKEN</code> is accepted as an alias</td>
+</tr>
+<tr>
+<td><code dir="auto">ENRICH_HF_SECURITY</code></td>
+<td><code dir="auto">true</code></td>
+<td>Read HuggingFace’s own file-security scan results (ClamAV and picklescan, per file) for <code dir="auto">--model</code> scans and record them in the ML-BOM. Metadata only, no file download. Set <code dir="auto">false</code> to skip the lookup</td>
+</tr>
+<tr>
+<td><code dir="auto">AIBOM_VERIFY_MAX_FILES</code></td>
+<td><code dir="auto">5</code></td>
+<td>With <code dir="auto">--verify-weights</code>: maximum number of pickle-format weight files downloaded and scanned per model. Extra files beyond the cap are left unchecked, not queued</td>
+</tr>
+<tr>
+<td><code dir="auto">AIBOM_VERIFY_MAX_BYTES</code></td>
+<td><code dir="auto">2147483648</code> (2 GiB)</td>
+<td>With <code dir="auto">--verify-weights</code>: a weight file larger than this (by the repo’s declared size, or by its actual downloaded size if that differs) is skipped rather than downloaded/scanned</td>
+</tr>
+<tr>
+<td><code dir="auto">AIBOM_DATASET_DEPTH</code></td>
+<td><code dir="auto">3</code></td>
+<td>With <code dir="auto">--model</code>: how many levels of a dataset’s own sources (<code dir="auto">source_datasets</code> on its card) to read and judge with it. <code dir="auto">0</code> reads only the datasets the model card names, as before</td>
+</tr>
+<tr>
+<td><code dir="auto">AIBOM_DATASET_MAX_LOOKUPS</code></td>
+<td><code dir="auto">40</code></td>
+<td>With <code dir="auto">--model</code>: the most datasets one scan reads, sources included. Datasets past the limit are recorded by name as not read</td>
+</tr>
+<tr>
+<td><code dir="auto">COSIGN_KEY</code></td>
+<td>—</td>
+<td>Path to the signing key used by <code dir="auto">--sign</code></td>
+</tr>
+<tr>
+<td><code dir="auto">CYCLONEDX_SPEC_VERSION</code></td>
+<td><code dir="auto">1.6</code></td>
+<td>Same as <code dir="auto">--spec-version</code>. Also read by the scanner image itself, for a <code dir="auto">docker run</code> without the CLI</td>
+</tr>
+<tr>
+<td><code dir="auto">FETCH_LICENSE</code></td>
+<td><code dir="auto">true</code></td>
+<td>Resolve dependency licenses during source scans. Set <code dir="auto">false</code> to skip the lookup and run faster</td>
+</tr>
+<tr>
+<td><code dir="auto">GOTOOLCHAIN</code></td>
+<td><code dir="auto">auto</code></td>
+<td>Go source scans: which Go toolchain resolves the modules. By default, when <code dir="auto">go.mod</code> asks for a newer Go than the scanner image carries, that version is downloaded. Set <code dir="auto">local</code> to use only the image’s own Go; dependency resolution then fails for such a project</td>
+</tr>
+<tr>
+<td><code dir="auto">GOPROXY</code></td>
+<td><code dir="auto">https://proxy.golang.org,direct</code></td>
+<td>Go source scans: proxy for module and toolchain downloads, for a network that cannot reach <code dir="auto">proxy.golang.org</code>. <code dir="auto">GOSUMDB</code> is passed on the same way</td>
+</tr>
+<tr>
+<td><code dir="auto">PROJECT_LICENSE</code></td>
+<td>—</td>
+<td>Same as <code dir="auto">--license</code>. The outbound license the project is distributed under, as an SPDX id. Drives the <code dir="auto">bomlens:licenseConflict</code> verdicts and the risk report’s conflict section</td>
+</tr>
+<tr>
+<td><code dir="auto">SBOM_AUTHOR</code></td>
+<td>—</td>
+<td>Same as <code dir="auto">--sbom-author</code>. The entity that generated the SBOM, recorded in <code dir="auto">metadata.authors</code></td>
+</tr>
+<tr>
+<td><code dir="auto">PRODUCT_SUPPLIER</code></td>
+<td>—</td>
+<td>Same as <code dir="auto">--supplier</code>. The supplier of the product, recorded in <code dir="auto">metadata.component.supplier</code></td>
+</tr>
+<tr>
+<td><code dir="auto">SECURITY_ENRICH</code></td>
+<td><code dir="auto">true</code></td>
+<td>Enrich the security report with EPSS and CISA KEV signals. Set <code dir="auto">false</code> on air-gapped networks to skip the external lookups</td>
+</tr>
+<tr>
+<td><code dir="auto">HTTP_PROXY</code>, <code dir="auto">HTTPS_PROXY</code>, <code dir="auto">NO_PROXY</code></td>
+<td>—</td>
+<td>Passed on by name to the scan containers (the lower-case forms too). A proxy at this machine’s loopback address (<code dir="auto">127.0.0.1</code>, <code dir="auto">localhost</code>) is not passed, since in a container that address is the container itself; Docker’s own proxy settings apply then</td>
+</tr>
+<tr>
+<td><code dir="auto">TRIVY_*</code></td>
+<td>—</td>
+<td>Any Trivy setting, passed on by name, for example <code dir="auto">TRIVY_DB_REPOSITORY</code> for a database mirror or <code dir="auto">TRIVY_SKIP_DB_UPDATE=true</code> offline. <code dir="auto">TRIVY_CACHE_DIR</code> is not passed (a host path); use <code dir="auto">SBOM_TRIVY_CACHE</code></td>
+</tr>
+<tr>
+<td><code dir="auto">SBOM_TRIVY_CACHE</code></td>
+<td><code dir="auto">~/.cache/bomlens/trivy</code> (<code dir="auto">%LOCALAPPDATA%\bomlens\cache\trivy</code> on Windows)</td>
+<td>A host folder kept as Trivy’s cache, so its vulnerability database (about 1.5 GB) is downloaded once instead of on every scan, which saves 15 to 25 seconds per scan (the web UI’s scans too). Set it to an empty value to download on every scan, as before. Scans can run side by side: only the database is shared. For an offline host, put the database there and set <code dir="auto">TRIVY_SKIP_DB_UPDATE=true</code>. On Linux the files in it belong to root</td>
+</tr>
+<tr>
+<td><code dir="auto">SBOM_EXTRA_CA_CERTS</code></td>
+<td>-</td>
+<td>A CA bundle (PEM) to trust, for a proxy that inspects TLS (it re-signs HTTPS with its own CA). Mounted read-only at <code dir="auto">/bomlens-ca/extra.pem</code> in the cdxgen, post-processing and web UI containers, where it is added to a copy of the system bundle (<code dir="auto">SSL_CERT_FILE</code>, <code dir="auto">REQUESTS_CA_BUNDLE</code>, <code dir="auto">CURL_CA_BUNDLE</code>, <code dir="auto">CARGO_HTTP_CAINFO</code>, <code dir="auto">GIT_SSL_CAINFO</code>, <code dir="auto">PIP_CERT</code>), to <code dir="auto">NODE_EXTRA_CA_CERTS</code> and to a copy of the JDK trust store named in <code dir="auto">JAVA_TOOL_OPTIONS</code>. A file that is missing or holds no PEM certificate stops the scan before any container starts. When a step fails on an untrusted certificate (<code dir="auto">x509: certificate signed by unknown authority</code>, <code dir="auto">PKIX path building failed</code>, <code dir="auto">CERTIFICATE_VERIFY_FAILED</code> and the like), the scan prints one <code dir="auto">[WARN]</code> line naming this option</td>
+</tr>
+<tr>
+<td><code dir="auto">EPSS_API</code>, <code dir="auto">KEV_URL</code></td>
+<td>public endpoints</td>
+<td>Mirrors for the EPSS and CISA KEV lookups</td>
+</tr>
+<tr>
+<td><code dir="auto">SECURITY_NVD_VERIFY</code></td>
+<td><code dir="auto">false</code></td>
+<td>With <code dir="auto">--deep-cve</code>: verify each grype <code dir="auto">nvd:cpe</code> finding against the live NVD version range and drop out-of-range false positives (needs <code dir="auto">NVD_API_KEY</code> and network access; adds minutes). Off by default — findings are kept and flagged version-unverified</td>
+</tr>
+<tr>
+<td><code dir="auto">NVD_API_KEY</code></td>
+<td>—</td>
+<td>NVD API key for <code dir="auto">SECURITY_NVD_VERIFY</code>. Passed to the container by name only, never inlined into the command</td>
+</tr>
+<tr>
+<td><code dir="auto">SYFT_REGISTRY_AUTH_USERNAME</code>, <code dir="auto">SYFT_REGISTRY_AUTH_PASSWORD</code>, <code dir="auto">SYFT_REGISTRY_AUTH_TOKEN</code>, <code dir="auto">SYFT_REGISTRY_AUTH_AUTHORITY</code></td>
+<td>—</td>
+<td>An image scan of an image the local Docker daemon does not have: credentials for its private registry (an image you can <code dir="auto">docker pull</code> needs none). <code dir="auto">SYFT_REGISTRY_INSECURE_SKIP_TLS_VERIFY</code>, <code dir="auto">SYFT_REGISTRY_INSECURE_USE_HTTP</code> and <code dir="auto">SYFT_PLATFORM</code> are passed on too. Passed by name only</td>
+</tr>
+<tr>
+<td><code dir="auto">API_URL</code></td>
+<td>—</td>
+<td>Upload server URL (a DT server, or the TRUSCA base)</td>
+</tr>
+<tr>
+<td><code dir="auto">API_KEY</code></td>
+<td>—</td>
+<td>Upload credential. Used as <code dir="auto">X-Api-Key</code> for DT, as a Bearer token for TRUSCA</td>
+</tr>
+<tr>
+<td><code dir="auto">UPLOAD_TARGET</code></td>
+<td><code dir="auto">dependency-track</code></td>
+<td>Upload destination: <code dir="auto">dependency-track</code> or <code dir="auto">trusca</code></td>
+</tr>
+<tr>
+<td><code dir="auto">TRUSCA_PROJECT_ID</code></td>
+<td>—</td>
+<td>TRUSCA project id (UUID). Required when <code dir="auto">trusca</code></td>
+</tr>
+<tr>
+<td><code dir="auto">TRUSCA_REF</code></td>
+<td><code dir="auto">main</code></td>
+<td>Ingest ref label</td>
+</tr>
+<tr>
+<td><code dir="auto">TRUSCA_RELEASE</code></td>
+<td><code dir="auto">--version</code> value</td>
+<td>Ingest release label</td>
+</tr>
+<tr>
+<td><code dir="auto">EXTERNAL_LOOKUP</code></td>
+<td><code dir="auto">true</code></td>
+<td>With <code dir="auto">--ui</code>: enable the web UI’s CVE/package lookup, which queries OSV.dev on demand. Set <code dir="auto">false</code> for air-gapped runs</td>
+</tr>
+<tr>
+<td><code dir="auto">SBOM_UPLOAD_TTL_HOURS</code></td>
+<td><code dir="auto">24</code></td>
+<td>With <code dir="auto">--ui</code>: how long an uploaded file is kept if no scan is ever started with it (a picked-then-abandoned upload). Clamped to at least 1</td>
+</tr>
+</tbody>
+</table>
+<p>A short local name with no registry path, such as <code dir="auto">sbom-scanner:local</code>, and a version tag before 1.13.2 keep the earlier defaults: <code dir="auto">ghcr.io/sktelecom/bomlens-&#x3C;name>:latest</code> for the opt-in images, and <code dir="auto">SBOM_SCANNER_IMAGE</code> itself for <code dir="auto">--deep-license</code>.</p>
+<p>When <code dir="auto">SBOM_SCANNER_IMAGE</code> is pinned by digest only, the opt-in images use <code dir="auto">:latest</code> in the CLI and the web UI and the app’s own version in the desktop app; to pin them as well, set each <code dir="auto">SBOM_*_IMAGE</code>.</p>
+<p>Source-scan resolver options such as <code dir="auto">BOMLENS_MAVEN_FULL_GRAPH</code> are listed under <a href="/bomlens/reference/docker-image/#environment-variables">Docker image environment variables</a>. Set them in the shell that runs <code dir="auto">scan-sbom.sh</code> and they reach dependency resolution the same way.</p>
+<p>On Windows, environment variables set in a command prompt do not survive a
+double-click. The launchers therefore also read <code dir="auto">UI_PORT</code>, <code dir="auto">SBOM_LANG</code>,
+<code dir="auto">SBOM_PULL</code>, <code dir="auto">SBOM_IMAGE_TAR</code>, <code dir="auto">SBOM_SCANNER_IMAGE</code>, <code dir="auto">SBOM_OUTPUT_DIR</code> and
+<code dir="auto">SBOM_UI_MOUNT_DIR</code> from a plain text file: copy <code dir="auto">scripts/bomlens.settings.example.txt</code>
+to <code dir="auto">bomlens.settings.txt</code> beside the scripts (or to <code dir="auto">%USERPROFILE%\.bomlens\settings.txt</code>).
+A real environment variable always wins over the file.</p>
+<p>Output flags are detailed in the <a href="/bomlens/guides/reports/">reports guide</a>; validating a received supplier SBOM is covered in the <a href="/bomlens/guides/supplier-sbom/">supplier SBOM validation</a>.</p>
+<div class="sl-heading-wrapper level-h2"><h2 id="the-ai-declaration-file">The AI declaration file</h2><a class="sl-anchor-link" href="#the-ai-declaration-file"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “The AI declaration file”</span></a></div>
+<p><code dir="auto">--ai-declare</code> takes a JSON file. Start from the <code dir="auto">{Project}_{Version}_ai-declaration.template.json</code> an AI scan writes, and fill what applies. This one describes a model that runs in a support chat service and calls an external translation model:</p>
+<div class="expressive-code"><figure class="frame not-content"><figcaption class="header"></figcaption><pre data-language="json"><code><div class="ec-line"><div class="code"><span style="--0:#24292E;--1:#E1E4E8">{</span></div></div><div class="ec-line"><div class="code"><span class="indent">  </span><span style="--0:#005CC5;--1:#79B8FF">"schema"</span><span style="--0:#24292E;--1:#E1E4E8">: </span><span style="--0:#032F62;--1:#9ECBFF">"bomlens-ai-declaration/1"</span><span style="--0:#24292E;--1:#E1E4E8">,</span></div></div><div class="ec-line"><div class="code"><span class="indent">  </span><span style="--0:#005CC5;--1:#79B8FF">"document"</span><span style="--0:#24292E;--1:#E1E4E8">: {</span><span style="--0:#005CC5;--1:#79B8FF">"createdBy"</span><span style="--0:#24292E;--1:#E1E4E8">: [{</span><span style="--0:#005CC5;--1:#79B8FF">"type"</span><span style="--0:#24292E;--1:#E1E4E8">: </span><span style="--0:#032F62;--1:#9ECBFF">"Organization"</span><span style="--0:#24292E;--1:#E1E4E8">, </span><span style="--0:#005CC5;--1:#79B8FF">"name"</span><span style="--0:#24292E;--1:#E1E4E8">: </span><span style="--0:#032F62;--1:#9ECBFF">"Acme AI Lab"</span><span style="--0:#24292E;--1:#E1E4E8">}]},</span></div></div><div class="ec-line"><div class="code"><span class="indent">  </span><span style="--0:#005CC5;--1:#79B8FF">"model"</span><span style="--0:#24292E;--1:#E1E4E8">: {</span></div></div><div class="ec-line"><div class="code"><span class="indent">    </span><span style="--0:#005CC5;--1:#79B8FF">"releaseTime"</span><span style="--0:#24292E;--1:#E1E4E8">: </span><span style="--0:#032F62;--1:#9ECBFF">"2025-04-15T00:00:00Z"</span><span style="--0:#24292E;--1:#E1E4E8">,</span></div></div><div class="ec-line"><div class="code"><span class="indent">    </span><span style="--0:#005CC5;--1:#79B8FF">"originatedBy"</span><span style="--0:#24292E;--1:#E1E4E8">: [{</span><span style="--0:#005CC5;--1:#79B8FF">"type"</span><span style="--0:#24292E;--1:#E1E4E8">: </span><span style="--0:#032F62;--1:#9ECBFF">"Organization"</span><span style="--0:#24292E;--1:#E1E4E8">, </span><span style="--0:#005CC5;--1:#79B8FF">"name"</span><span style="--0:#24292E;--1:#E1E4E8">: </span><span style="--0:#032F62;--1:#9ECBFF">"Acme AI Lab"</span><span style="--0:#24292E;--1:#E1E4E8">}],</span></div></div><div class="ec-line"><div class="code"><span class="indent">    </span><span style="--0:#005CC5;--1:#79B8FF">"inputModality"</span><span style="--0:#24292E;--1:#E1E4E8">: [</span><span style="--0:#032F62;--1:#9ECBFF">"text"</span><span style="--0:#24292E;--1:#E1E4E8">],</span></div></div><div class="ec-line"><div class="code"><span class="indent">    </span><span style="--0:#005CC5;--1:#79B8FF">"outputModality"</span><span style="--0:#24292E;--1:#E1E4E8">: [</span><span style="--0:#032F62;--1:#9ECBFF">"text"</span><span style="--0:#24292E;--1:#E1E4E8">],</span></div></div><div class="ec-line"><div class="code"><span class="indent">    </span><span style="--0:#005CC5;--1:#79B8FF">"trainingComputeFlops"</span><span style="--0:#24292E;--1:#E1E4E8">: </span><span style="--0:#032F62;--1:#9ECBFF">"3.2e21"</span><span style="--0:#24292E;--1:#E1E4E8">,</span></div></div><div class="ec-line"><div class="code"><span class="indent">    </span><span style="--0:#005CC5;--1:#79B8FF">"trainingComputeBasis"</span><span style="--0:#24292E;--1:#E1E4E8">: </span><span style="--0:#032F62;--1:#9ECBFF">"6 x parameters x training tokens, from the training logs"</span><span style="--0:#24292E;--1:#E1E4E8">,</span></div></div><div class="ec-line"><div class="code"><span class="indent">    </span><span style="--0:#005CC5;--1:#79B8FF">"adversarialTesting"</span><span style="--0:#24292E;--1:#E1E4E8">: </span><span style="--0:#032F62;--1:#9ECBFF">"yes"</span></div></div><div class="ec-line"><div class="code"><span class="indent"><span style="--0:#24292E;--1:#E1E4E8">  </span></span><span style="--0:#24292E;--1:#E1E4E8">},</span></div></div><div class="ec-line"><div class="code"><span class="indent">  </span><span style="--0:#005CC5;--1:#79B8FF">"service"</span><span style="--0:#24292E;--1:#E1E4E8">: {</span></div></div><div class="ec-line"><div class="code"><span class="indent">    </span><span style="--0:#005CC5;--1:#79B8FF">"name"</span><span style="--0:#24292E;--1:#E1E4E8">: </span><span style="--0:#032F62;--1:#9ECBFF">"Acme Support Assistant"</span><span style="--0:#24292E;--1:#E1E4E8">,</span></div></div><div class="ec-line"><div class="code"><span class="indent">    </span><span style="--0:#005CC5;--1:#79B8FF">"packageVersion"</span><span style="--0:#24292E;--1:#E1E4E8">: </span><span style="--0:#032F62;--1:#9ECBFF">"2.3.0"</span><span style="--0:#24292E;--1:#E1E4E8">,</span></div></div><div class="ec-line"><div class="code"><span class="indent">    </span><span style="--0:#005CC5;--1:#79B8FF">"downloadLocation"</span><span style="--0:#24292E;--1:#E1E4E8">: </span><span style="--0:#032F62;--1:#9ECBFF">"https://support.acme.example/assistant"</span><span style="--0:#24292E;--1:#E1E4E8">,</span></div></div><div class="ec-line"><div class="code"><span class="indent">    </span><span style="--0:#005CC5;--1:#79B8FF">"suppliedBy"</span><span style="--0:#24292E;--1:#E1E4E8">: {</span><span style="--0:#005CC5;--1:#79B8FF">"type"</span><span style="--0:#24292E;--1:#E1E4E8">: </span><span style="--0:#032F62;--1:#9ECBFF">"Organization"</span><span style="--0:#24292E;--1:#E1E4E8">, </span><span style="--0:#005CC5;--1:#79B8FF">"name"</span><span style="--0:#24292E;--1:#E1E4E8">: </span><span style="--0:#032F62;--1:#9ECBFF">"Acme Corp"</span><span style="--0:#24292E;--1:#E1E4E8">},</span></div></div><div class="ec-line"><div class="code"><span class="indent">    </span><span style="--0:#005CC5;--1:#79B8FF">"releaseTime"</span><span style="--0:#24292E;--1:#E1E4E8">: </span><span style="--0:#032F62;--1:#9ECBFF">"2025-06-01T00:00:00Z"</span><span style="--0:#24292E;--1:#E1E4E8">,</span></div></div><div class="ec-line"><div class="code"><span class="indent">    </span><span style="--0:#005CC5;--1:#79B8FF">"autonomyType"</span><span style="--0:#24292E;--1:#E1E4E8">: </span><span style="--0:#032F62;--1:#9ECBFF">"no"</span><span style="--0:#24292E;--1:#E1E4E8">,</span></div></div><div class="ec-line"><div class="code"><span class="indent">    </span><span style="--0:#005CC5;--1:#79B8FF">"dataFlows"</span><span style="--0:#24292E;--1:#E1E4E8">: [</span></div></div><div class="ec-line"><div class="code"><span class="indent"><span style="--0:#24292E;--1:#E1E4E8">      </span></span><span style="--0:#24292E;--1:#E1E4E8">{</span><span style="--0:#005CC5;--1:#79B8FF">"flow"</span><span style="--0:#24292E;--1:#E1E4E8">: </span><span style="--0:#032F62;--1:#9ECBFF">"outbound"</span><span style="--0:#24292E;--1:#E1E4E8">, </span><span style="--0:#005CC5;--1:#79B8FF">"classification"</span><span style="--0:#24292E;--1:#E1E4E8">: </span><span style="--0:#032F62;--1:#9ECBFF">"personal data"</span><span style="--0:#24292E;--1:#E1E4E8">,</span></div></div><div class="ec-line"><div class="code"><span class="indent">       </span><span style="--0:#005CC5;--1:#79B8FF">"description"</span><span style="--0:#24292E;--1:#E1E4E8">: </span><span style="--0:#032F62;--1:#9ECBFF">"Questions forwarded to the external translation model."</span><span style="--0:#24292E;--1:#E1E4E8">,</span></div></div><div class="ec-line"><div class="code"><span class="indent">       </span><span style="--0:#005CC5;--1:#79B8FF">"destination"</span><span style="--0:#24292E;--1:#E1E4E8">: [</span><span style="--0:#032F62;--1:#9ECBFF">"https://api.translate.example/v1"</span><span style="--0:#24292E;--1:#E1E4E8">]}</span></div></div><div class="ec-line"><div class="code"><span class="indent"><span style="--0:#24292E;--1:#E1E4E8">    </span></span><span style="--0:#24292E;--1:#E1E4E8">],</span></div></div><div class="ec-line"><div class="code"><span class="indent">    </span><span style="--0:#005CC5;--1:#79B8FF">"externalModels"</span><span style="--0:#24292E;--1:#E1E4E8">: [</span></div></div><div class="ec-line"><div class="code"><span class="indent"><span style="--0:#24292E;--1:#E1E4E8">      </span></span><span style="--0:#24292E;--1:#E1E4E8">{</span><span style="--0:#005CC5;--1:#79B8FF">"key"</span><span style="--0:#24292E;--1:#E1E4E8">: </span><span style="--0:#032F62;--1:#9ECBFF">"translate"</span><span style="--0:#24292E;--1:#E1E4E8">, </span><span style="--0:#005CC5;--1:#79B8FF">"name"</span><span style="--0:#24292E;--1:#E1E4E8">: </span><span style="--0:#032F62;--1:#9ECBFF">"Example Translate"</span><span style="--0:#24292E;--1:#E1E4E8">,</span></div></div><div class="ec-line"><div class="code"><span class="indent">       </span><span style="--0:#005CC5;--1:#79B8FF">"suppliedBy"</span><span style="--0:#24292E;--1:#E1E4E8">: {</span><span style="--0:#005CC5;--1:#79B8FF">"type"</span><span style="--0:#24292E;--1:#E1E4E8">: </span><span style="--0:#032F62;--1:#9ECBFF">"Organization"</span><span style="--0:#24292E;--1:#E1E4E8">, </span><span style="--0:#005CC5;--1:#79B8FF">"name"</span><span style="--0:#24292E;--1:#E1E4E8">: </span><span style="--0:#032F62;--1:#9ECBFF">"Example Inc"</span><span style="--0:#24292E;--1:#E1E4E8">},</span></div></div><div class="ec-line"><div class="code"><span class="indent">       </span><span style="--0:#005CC5;--1:#79B8FF">"endpoint"</span><span style="--0:#24292E;--1:#E1E4E8">: </span><span style="--0:#032F62;--1:#9ECBFF">"https://api.translate.example/v1"</span><span style="--0:#24292E;--1:#E1E4E8">}</span></div></div><div class="ec-line"><div class="code"><span class="indent"><span style="--0:#24292E;--1:#E1E4E8">    </span></span><span style="--0:#24292E;--1:#E1E4E8">]</span></div></div><div class="ec-line"><div class="code"><span class="indent"><span style="--0:#24292E;--1:#E1E4E8">  </span></span><span style="--0:#24292E;--1:#E1E4E8">}</span></div></div><div class="ec-line"><div class="code"><span style="--0:#24292E;--1:#E1E4E8">}</span></div></div></code></pre><div class="copy"><div aria-live="polite"></div><button title="Copy to clipboard" data-copied="Copied!" data-code="{  &#x22;schema&#x22;: &#x22;bomlens-ai-declaration/1&#x22;,  &#x22;document&#x22;: {&#x22;createdBy&#x22;: [{&#x22;type&#x22;: &#x22;Organization&#x22;, &#x22;name&#x22;: &#x22;Acme AI Lab&#x22;}]},  &#x22;model&#x22;: {    &#x22;releaseTime&#x22;: &#x22;2025-04-15T00:00:00Z&#x22;,    &#x22;originatedBy&#x22;: [{&#x22;type&#x22;: &#x22;Organization&#x22;, &#x22;name&#x22;: &#x22;Acme AI Lab&#x22;}],    &#x22;inputModality&#x22;: [&#x22;text&#x22;],    &#x22;outputModality&#x22;: [&#x22;text&#x22;],    &#x22;trainingComputeFlops&#x22;: &#x22;3.2e21&#x22;,    &#x22;trainingComputeBasis&#x22;: &#x22;6 x parameters x training tokens, from the training logs&#x22;,    &#x22;adversarialTesting&#x22;: &#x22;yes&#x22;  },  &#x22;service&#x22;: {    &#x22;name&#x22;: &#x22;Acme Support Assistant&#x22;,    &#x22;packageVersion&#x22;: &#x22;2.3.0&#x22;,    &#x22;downloadLocation&#x22;: &#x22;https://support.acme.example/assistant&#x22;,    &#x22;suppliedBy&#x22;: {&#x22;type&#x22;: &#x22;Organization&#x22;, &#x22;name&#x22;: &#x22;Acme Corp&#x22;},    &#x22;releaseTime&#x22;: &#x22;2025-06-01T00:00:00Z&#x22;,    &#x22;autonomyType&#x22;: &#x22;no&#x22;,    &#x22;dataFlows&#x22;: [      {&#x22;flow&#x22;: &#x22;outbound&#x22;, &#x22;classification&#x22;: &#x22;personal data&#x22;,       &#x22;description&#x22;: &#x22;Questions forwarded to the external translation model.&#x22;,       &#x22;destination&#x22;: [&#x22;https://api.translate.example/v1&#x22;]}    ],    &#x22;externalModels&#x22;: [      {&#x22;key&#x22;: &#x22;translate&#x22;, &#x22;name&#x22;: &#x22;Example Translate&#x22;,       &#x22;suppliedBy&#x22;: {&#x22;type&#x22;: &#x22;Organization&#x22;, &#x22;name&#x22;: &#x22;Example Inc&#x22;},       &#x22;endpoint&#x22;: &#x22;https://api.translate.example/v1&#x22;}    ]  }}"><div></div></button></div></figure></div>
+<div class="expressive-code"><figure class="frame not-content"><figcaption class="header"></figcaption><pre data-language="bash"><code><div class="ec-line"><div class="code"><span style="--0:#6F42C1;--1:#B392F0">./scripts/scan-sbom.sh</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#005CC5;--1:#79B8FF">--project</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#032F62;--1:#9ECBFF">support-adapter</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#005CC5;--1:#79B8FF">--version</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#005CC5;--1:#79B8FF">1.0</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#005CC5;--1:#79B8FF">\</span></div></div><div class="ec-line"><div class="code"><span class="indent">  </span><span style="--0:#005CC5;--1:#79B8FF">--model</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#032F62;--1:#9ECBFF">"acme/support-adapter"</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#005CC5;--1:#79B8FF">--ai-declare</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#032F62;--1:#9ECBFF">declaration.json</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#005CC5;--1:#79B8FF">--generate-only</span></div></div></code></pre><div class="copy"><div aria-live="polite"></div><button title="Copy to clipboard" data-copied="Copied!" data-code="./scripts/scan-sbom.sh --project support-adapter --version 1.0 \  --model &#x22;acme/support-adapter&#x22; --ai-declare declaration.json --generate-only"><div></div></button></div></figure></div>
+<p>The <code dir="auto">service</code> and the model’s input and output kinds, training compute and adversarial testing reach the CycloneDX SBOM in the same run; everything else goes only to the SPDX 3.0.1 document. Every key and allowed value is listed under <a href="/bomlens/reference/artifacts/#the-declared-ai-service">The declared AI service</a>. BomLens v1.13 and earlier refuse a file with <code dir="auto">service</code> or these model keys (“unknown key(s)”). <code dir="auto">--no-spdx3</code> cannot be combined with <code dir="auto">--ai-declare</code> given as the only input, since most declared values have nowhere else to go.</p>
+<div class="sl-heading-wrapper level-h2"><h2 id="where-outputs-go">Where outputs go</h2><a class="sl-anchor-link" href="#where-outputs-go"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “Where outputs go”</span></a></div>
+<p>Each scan is isolated in its own <code dir="auto">{Project}_{Version}/</code> subfolder, so the files from one run stay together and the CLI never litters the source tree it scans. That subfolder is created under a base directory:</p>
+<ul>
+<li><strong>CLI</strong> (<code dir="auto">scan-sbom.sh</code>): the base is the directory you ran the command in. Override it with <code dir="auto">--output-dir &#x3C;dir></code> (alias <code dir="auto">-o</code>).</li>
+<li><strong>Desktop app and web UI</strong>: the base is <code dir="auto">~/sbom-output</code> (<code dir="auto">C:\Users\&#x3C;you>\sbom-output</code> on Windows). Override it with the <code dir="auto">SBOM_OUTPUT_DIR</code> environment variable.</li>
+</ul>
+<p>For <code dir="auto">--git</code> or archive ingestion the clone or extract happens in a temp directory that is cleaned up on exit, and only the output subfolder remains.</p>
+<p>A re-scan of the same project and version overwrites its subfolder by default, keeping just the latest result. Add <code dir="auto">--timestamp</code> to keep each run instead: it appends <code dir="auto">_YYYYMMDD-HHMMSS</code> to the folder name, for example <code dir="auto">MyApp_1.0.0_20260626-143000/</code>. The flag changes the folder name only, not the SBOM file names or bytes, so it works together with <code dir="auto">--byte-stable</code>.</p>
+<p>To restore the previous flat layout, where every file is written directly in the base with no per-run subfolder, set <code dir="auto">SBOM_OUTPUT_FLAT=1</code>. This is meant for CI that expects the old paths.</p>
+<p><code dir="auto">--diff</code> has no project or version of its own, so it writes its report directly into the base directory (current directory, or <code dir="auto">--output-dir</code>) rather than a per-run subfolder.</p>
+<div class="sl-heading-wrapper level-h2"><h2 id="what-the-scan-prints-at-the-end">What the scan prints at the end</h2><a class="sl-anchor-link" href="#what-the-scan-prints-at-the-end"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “What the scan prints at the end”</span></a></div>
+<p>With <code dir="auto">--generate-only</code>, the CLI lists the files it produced after <code dir="auto">Analysis Complete!</code>. If a requested file was not produced, the heading reads <code dir="auto">Analysis finished with errors</code> instead and a warning names the missing files; the exit code stays 0, so use <code dir="auto">--fail-on</code> to stop a pipeline on a scan that could not be judged. For every scan that measured software (not an AI model or dataset scan) it then states what the result holds:</p>
+<div class="expressive-code"><figure class="frame not-content"><figcaption class="header"></figcaption><pre data-language="plaintext"><code><div class="ec-line"><div class="code"><span class="indent"><span style="--0:#24292e;--1:#e1e4e8">  </span></span><span style="--0:#24292e;--1:#e1e4e8">Components:  176 identified (purl on 100%, license declared on 96% (169 of 176))</span></div></div></code></pre><div class="copy"><div aria-live="polite"></div><button title="Copy to clipboard" data-copied="Copied!" data-code="  Components:  176 identified (purl on 100%, license declared on 96% (169 of 176))"><div></div></button></div></figure></div>
+<p>The numbers come from the scan’s own conformance measurement, so they match the <code dir="auto">licenseCoverage</code> and <code dir="auto">softwareComponentCount</code> fields of the conformance check report, and the purl share counts the same packages as its purl check. The purl share is shown for CycloneDX results only. A warning line follows when something is off:</p>
+<ul>
+<li><code dir="auto">No software was identified</code>: the result has no components. Check that the scanned folder holds a manifest or lock file for a supported ecosystem.</li>
+<li><code dir="auto">No component declares a license</code>: no component declares one, so license checks have nothing to work with.</li>
+<li><code dir="auto">Reduced analysis</code>: a shallow fallback ran instead of the full analysis and only direct dependencies were identified. The line names the cause: out of disk space, out of memory, a failed download, or the dependency analyzer failing or not running.</li>
+<li><code dir="auto">Steps that failed</code>: post-processing steps that did not complete, by name. Details are in the log above.</li>
+</ul>
+<p>The last two are not shown for <code dir="auto">--analyze</code>, because they would describe the submitted document rather than this run. The summary does not change the exit code. To fail a run on these conditions, use <code dir="auto">--fail-on empty-result</code> or <code dir="auto">--fail-on license-coverage=&#x3C;0-100></code>. A scanner image that predates the summary prints only the file list.</p>
+<div class="sl-heading-wrapper level-h2"><h2 id="exit-codes">Exit codes</h2><a class="sl-anchor-link" href="#exit-codes"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “Exit codes”</span></a></div>
+<table>
+<thead>
+<tr>
+<th>Code</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>0</td>
+<td>Scan succeeded</td>
+</tr>
+<tr>
+<td>1</td>
+<td>Scan failed (bad arguments, Docker unavailable, a required input missing, and similar)</td>
+</tr>
+<tr>
+<td>2</td>
+<td><code dir="auto">--fail-on-conformance</code>: the scan succeeded, but its own conformance check report says “fail”</td>
+</tr>
+<tr>
+<td>3</td>
+<td><code dir="auto">--fail-on-conformance</code>: the scan succeeded, but produced no conformance check report to judge</td>
+</tr>
+<tr>
+<td>4</td>
+<td><code dir="auto">--fail-on</code>: the scan succeeded, but at least one condition is met</td>
+</tr>
+<tr>
+<td>5</td>
+<td><code dir="auto">--fail-on</code>: the scan succeeded, but a condition could not be judged (for example the vulnerability database could not be downloaded, <code dir="auto">license-conflict</code> without <code dir="auto">--license</code>, or <code dir="auto">empty-result</code> and <code dir="auto">license-coverage=</code> when the scan wrote no conformance check report or the report did not measure the SBOM’s format), or the scan produced no result to judge</td>
+</tr>
+</tbody>
+</table>
+<p>2 to 5 are used only when the matching option is given; every scan that uses neither exits 0 or 1. Every <code dir="auto">--fail-on</code> condition is printed with its verdict. When more than one code applies, the lowest wins: 2 and 3 (conformance) before 4, and 4 (a condition is met) before 5 (a condition could not be judged). “Could not be judged” is a failure on purpose: a scan that could not look is not a scan that found nothing, so an air-gapped run with no vulnerability database never passes a <code dir="auto">vulnerability=</code> gate by accident.</p>
+<div class="sl-heading-wrapper level-h2"><h2 id="pin-the-scanner-image-version">Pin the scanner image version</h2><a class="sl-anchor-link" href="#pin-the-scanner-image-version"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “Pin the scanner image version”</span></a></div>
+<p>Override the scanner image with <code dir="auto">SBOM_SCANNER_IMAGE</code>.</p>
+<div class="expressive-code"><figure class="frame not-content"><figcaption class="header"></figcaption><pre data-language="bash"><code><div class="ec-line"><div class="code"><span style="--0:#24292E;--1:#E1E4E8">SBOM_SCANNER_IMAGE</span><span style="--0:#BF3441;--1:#F97583">=</span><span style="--0:#032F62;--1:#9ECBFF">"ghcr.io/sktelecom/bomlens:&#x3C;version>"</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#6F42C1;--1:#B392F0">\</span></div></div><div class="ec-line"><div class="code"><span class="indent">  </span><span style="--0:#032F62;--1:#9ECBFF">./scripts/scan-sbom.sh</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#005CC5;--1:#79B8FF">--project</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#032F62;--1:#9ECBFF">"MyApp"</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#005CC5;--1:#79B8FF">--version</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#032F62;--1:#9ECBFF">"1.0.0"</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#005CC5;--1:#79B8FF">--generate-only</span></div></div></code></pre><div class="copy"><div aria-live="polite"></div><button title="Copy to clipboard" data-copied="Copied!" data-code="SBOM_SCANNER_IMAGE=&#x22;ghcr.io/sktelecom/bomlens:<version>&#x22; \  ./scripts/scan-sbom.sh --project &#x22;MyApp&#x22; --version &#x22;1.0.0&#x22; --generate-only"><div></div></button></div></figure></div>
+<div class="sl-heading-wrapper level-h2"><h2 id="troubleshooting">Troubleshooting</h2><a class="sl-anchor-link" href="#troubleshooting"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “Troubleshooting”</span></a></div>
+<div class="sl-heading-wrapper level-h3"><h3 id="windows-no-outputs-appear">Windows: no outputs appear</h3><a class="sl-anchor-link" href="#windows-no-outputs-appear"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “Windows: no outputs appear”</span></a></div>
+<p>If the scan finishes but no output files show up, check that the folder you ran from is inside a Docker file-sharing path. Anything under your home directory (<code dir="auto">C:\Users\...</code>) is shared by default in both Rancher Desktop and Docker Desktop. From an unshared location the container cannot write results to the host.</p>
+<div class="sl-heading-wrapper level-h3"><h3 id="docker-permission-error-linuxwsl2">Docker permission error (Linux/WSL2)</h3><a class="sl-anchor-link" href="#docker-permission-error-linuxwsl2"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “Docker permission error (Linux/WSL2)”</span></a></div>
+<div class="expressive-code"><figure class="frame not-content"><figcaption class="header"></figcaption><pre data-language="plaintext"><code><div class="ec-line"><div class="code"><span style="--0:#24292e;--1:#e1e4e8">Got permission denied while trying to connect to the Docker daemon</span></div></div></code></pre><div class="copy"><div aria-live="polite"></div><button title="Copy to clipboard" data-copied="Copied!" data-code="Got permission denied while trying to connect to the Docker daemon"><div></div></button></div></figure></div>
+<p>Does not apply on Windows/macOS with Rancher Desktop or Docker Desktop. Add your user to the <code dir="auto">docker</code> group.</p>
+<div class="expressive-code"><figure class="frame not-content"><figcaption class="header"></figcaption><pre data-language="bash"><code><div class="ec-line"><div class="code"><span style="--0:#6F42C1;--1:#B392F0">sudo</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#032F62;--1:#9ECBFF">usermod</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#005CC5;--1:#79B8FF">-aG</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#032F62;--1:#9ECBFF">docker</span><span style="--0:#24292E;--1:#E1E4E8"> $USER</span></div></div><div class="ec-line"><div class="code"><span style="--0:#6F42C1;--1:#B392F0">newgrp</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#032F62;--1:#9ECBFF">docker</span></div></div></code></pre><div class="copy"><div aria-live="polite"></div><button title="Copy to clipboard" data-copied="Copied!" data-code="sudo usermod -aG docker $USERnewgrp docker"><div></div></button></div></figure></div>
+<div class="sl-heading-wrapper level-h3"><h3 id="out-of-disk-space">Out of disk space</h3><a class="sl-anchor-link" href="#out-of-disk-space"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “Out of disk space”</span></a></div>
+<div class="expressive-code"><figure class="frame not-content"><figcaption class="header"></figcaption><pre data-language="plaintext"><code><div class="ec-line"><div class="code"><span style="--0:#24292e;--1:#e1e4e8">no space left on device</span></div></div></code></pre><div class="copy"><div aria-live="polite"></div><button title="Copy to clipboard" data-copied="Copied!" data-code="no space left on device"><div></div></button></div></figure></div>
+<p>Prune the Docker cache. From a terminal:</p>
+<div class="expressive-code"><figure class="frame not-content"><figcaption class="header"></figcaption><pre data-language="bash"><code><div class="ec-line"><div class="code"><span style="--0:#6F42C1;--1:#B392F0">docker</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#032F62;--1:#9ECBFF">system</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#032F62;--1:#9ECBFF">prune</span><span style="--0:#24292E;--1:#E1E4E8"> </span><span style="--0:#005CC5;--1:#79B8FF">-f</span></div></div></code></pre><div class="copy"><div aria-live="polite"></div><button title="Copy to clipboard" data-copied="Copied!" data-code="docker system prune -f"><div></div></button></div></figure></div>
+<p>With Rancher Desktop or Docker Desktop, the same cleanup is also available from the app’s own Preferences screen.</p>
+<div class="sl-heading-wrapper level-h3"><h3 id="interrupted-build-artifacts-in-the-source-tree">Interrupted build artifacts in the source tree</h3><a class="sl-anchor-link" href="#interrupted-build-artifacts-in-the-source-tree"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “Interrupted build artifacts in the source tree”</span></a></div>
+<p>A source scan (<code dir="auto">--target &#x3C;dir></code>, the web UI’s folder scan, or the desktop app) runs build steps (<code dir="auto">cargo generate-lockfile</code>, <code dir="auto">go mod tidy</code>, <code dir="auto">npm install</code>, and the like) against the scanned tree, then restores it: every file a build step changed or added is put back or removed. If that scan ends by SIGKILL, an out-of-memory kill, or a host crash, the restore never runs and the changes stay. The next scan of that same source tree restores them first, before doing anything else, once it has confirmed the earlier scan’s container is no longer running.</p>
+<div class="sl-heading-wrapper level-h3"><h3 id="leftover-output-folder-artifacts-on-re-scan">Leftover output-folder artifacts on re-scan</h3><a class="sl-anchor-link" href="#leftover-output-folder-artifacts-on-re-scan"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “Leftover output-folder artifacts on re-scan”</span></a></div>
+<p>Re-scanning the same <code dir="auto">--project</code>/<code dir="auto">--version</code> reuses its output folder, however the earlier scan there ended. Before writing its own artifacts, the new scan removes any of BomLens’s own files under that project/version that today’s mode or options will not produce, so nothing from an earlier run with different options survives to be mistaken for this run’s output. A file you placed in the folder yourself, or a different version’s artifacts, is left alone.</p>
+<div class="sl-heading-wrapper level-h3"><h3 id="anything-else">Anything else</h3><a class="sl-anchor-link" href="#anything-else"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “Anything else”</span></a></div>
+<ol>
+<li>Run the same command again and read the terminal output. The <code dir="auto">[WARN]</code> and <code dir="auto">[ERROR]</code> lines say what was skipped or what failed.</li>
+<li>Update the Docker image: <code dir="auto">docker pull ghcr.io/sktelecom/bomlens:latest</code>.</li>
+<li>If it still fails, open a <a href="https://github.com/sktelecom/bomlens/issues/new?template=bug_report.yml">GitHub Issue</a> with the command you ran and its terminal output. The issue form lists what it needs.</li>
+</ol>
+<p>For how to use each mode, see the <a href="/bomlens/guides/by-input/">input scenarios guide</a>; for the kinds of outputs, see the <a href="/bomlens/reference/artifacts/">artifacts reference</a>; for language detection, see <a href="/bomlens/reference/ecosystems/">supported ecosystems</a>; to run scans in a pipeline, see <a href="/bomlens/guides/ci-cd/">CI/CD integration</a>.</p></div><footer class="sl-flex astro-ddtxxk7k"><div class="meta sl-flex astro-ddtxxk7k"><a href="https://github.com/sktelecom/bomlens/edit/main/docs/reference/cli.md" class="sl-flex print:hidden astro-qlekgd3o"><svg aria-hidden="true" class="astro-qlekgd3o astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1.2em;"><path d="M22 7.24a1 1 0 0 0-.29-.71l-4.24-4.24a1 1 0 0 0-1.1-.22 1 1 0 0 0-.32.22l-2.83 2.83L2.29 16.05a1 1 0 0 0-.29.71V21a1 1 0 0 0 1 1h4.24a1 1 0 0 0 .76-.29l10.87-10.93L21.71 8c.1-.1.17-.2.22-.33a1 1 0 0 0 0-.24v-.14l.07-.05ZM6.83 20H4v-2.83l9.93-9.93 2.83 2.83L6.83 20ZM18.17 8.66l-2.83-2.83 1.42-1.41 2.82 2.82-1.41 1.42Z"/></svg>Edit page</a></div><div class="pagination-links print:hidden astro-b5raizh3" dir="ltr"><a href="/bomlens/reference/artifacts/" rel="prev" class="astro-b5raizh3"><svg aria-hidden="true" class="astro-b5raizh3 astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1.5rem;"><path d="M17 11H9.41l3.3-3.29a1.004 1.004 0 1 0-1.42-1.42l-5 5a1 1 0 0 0-.21.33 1 1 0 0 0 0 .76 1 1 0 0 0 .21.33l5 5a1.002 1.002 0 0 0 1.639-.325 1 1 0 0 0-.219-1.095L9.41 13H17a1 1 0 0 0 0-2Z"/></svg><span class="astro-b5raizh3">Previous<br class="astro-b5raizh3"><span class="link-title astro-b5raizh3">Artifacts reference</span></span></a><a href="/bomlens/reference/docker-image/" rel="next" class="astro-b5raizh3"><svg aria-hidden="true" class="astro-b5raizh3 astro-hkc32dio" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1.5rem;"><path d="M17.92 11.62a1.001 1.001 0 0 0-.21-.33l-5-5a1.003 1.003 0 1 0-1.42 1.42l3.3 3.29H7a1 1 0 0 0 0 2h7.59l-3.3 3.29a1.002 1.002 0 0 0 .325 1.639 1 1 0 0 0 1.095-.219l5-5a1 1 0 0 0 .21-.33 1 1 0 0 0 0-.76Z"/></svg><span class="astro-b5raizh3">Next<br class="astro-b5raizh3"><span class="link-title astro-b5raizh3">Use the Docker image directly</span></span></a></div></footer><script type="module" src="/bomlens/_astro/Mermaid.astro_astro_type_script_index_0_lang.DZWWZPOc.js"></script><script type="module">var e=()=>{document.querySelectorAll(`.expressive-code pre`).forEach(e=>{e.scrollWidth>e.clientWidth?e.setAttribute(`tabindex`,`0`):e.removeAttribute(`tabindex`)})};e(),window.addEventListener(`resize`,e);</script><p class="site-copyright astro-jo6i4kqk">Copyright &copy; 2026 SK Telecom Co., Ltd. &middot;<a href="https://github.com/sktelecom/bomlens/blob/main/LICENSE" class="astro-jo6i4kqk">Apache-2.0</a> &middot;<a href="https://github.com/sktelecom/bomlens/blob/main/THIRD_PARTY_LICENSES.md" class="astro-jo6i4kqk">Third-party licenses</a></p></div></div></main></div></div></div></div></body></html>

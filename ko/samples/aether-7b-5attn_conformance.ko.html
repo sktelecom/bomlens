@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html lang="ko"><head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline';">
+<title>SBOM 적합성 검사 — Aether-7B-5Attn</title>
+<style>
+:root {
+  --background: 0 0% 98%;
+  --foreground: 240 6% 10%;
+  --card: 0 0% 100%;
+  --card-foreground: 240 6% 10%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 240 6% 10%;
+  --muted: 240 5% 96%;
+  --muted-foreground: 240 4% 44%;
+  --border: 240 5% 91%;
+  --input: 240 5% 91%;
+  --primary: 240 6% 10%;
+  --primary-foreground: 0 0% 98%;
+  --selected: 240 6% 10%;
+  --selected-foreground: 0 0% 98%;
+  --secondary: 240 5% 96%;
+  --secondary-foreground: 240 6% 10%;
+  --accent: 240 5% 96%;
+  --accent-foreground: 240 6% 10%;
+  --destructive: 0 72% 51%;
+  --destructive-foreground: 0 0% 98%;
+  --ring: 349 100% 46%;
+  --brand: 349 100% 46%;
+  --brand-foreground: 0 0% 100%;
+  --brand-strong: 349 100% 38%;
+  --brand-accent: 24 90% 55%;
+  --sidebar: 0 0% 100%;
+  --sidebar-foreground: 240 6% 10%;
+  --sidebar-border: 240 5% 91%;
+  --font-size-display: 1.875rem;
+  --font-size-title: 1.25rem;
+  --font-size-heading: 1.125rem;
+  --font-size-body: 1rem;
+  --font-size-body-sm: 0.875rem;
+  --font-size-label: 0.75rem;
+  --font-size-caption: 0.6875rem;
+  --font-size-mono: 0.75rem;
+  --role-danger-fg: 185 28 28;
+  --role-danger-muted: 251 229 229;
+  --role-danger-emphasis: 220 38 38;
+  --role-danger-border: 239 157 157;
+  --role-severe-fg: 154 52 18;
+  --role-severe-muted: 252 235 226;
+  --role-severe-emphasis: 234 88 12;
+  --role-severe-border: 246 180 146;
+  --role-attention-fg: 133 77 14;
+  --role-attention-muted: 247 240 225;
+  --role-attention-emphasis: 190 129 3;
+  --role-attention-border: 231 202 142;
+  --role-info-fg: 29 78 216;
+  --role-info-muted: 229 236 253;
+  --role-info-emphasis: 37 99 235;
+  --role-info-border: 157 185 246;
+  --role-success-fg: 6 95 70;
+  --role-success-muted: 226 243 238;
+  --role-success-emphasis: 10 155 110;
+  --role-success-border: 147 224 198;
+  --role-neutral-fg: 63 63 70;
+  --role-neutral-muted: 238 238 239;
+  --role-neutral-emphasis: 113 113 122;
+  --role-neutral-border: 191 191 195;
+  --cat-permissive-fg: 12 100 91;
+  --cat-permissive-muted: 227 240 239;
+  --cat-permissive-emphasis: 24 134 123;
+  --cat-permissive-border: 151 201 196;
+  --cat-weak-fg: 31 45 111;
+  --cat-weak-muted: 232 235 247;
+  --cat-weak-emphasis: 66 87 189;
+  --cat-weak-border: 170 179 225;
+  --cat-strong-fg: 82 40 103;
+  --cat-strong-muted: 241 234 244;
+  --cat-strong-emphasis: 137 78 166;
+  --cat-strong-border: 202 175 215;
+  --cat-network-fg: 107 36 74;
+  --cat-network-muted: 244 233 239;
+  --cat-network-emphasis: 167 68 121;
+  --cat-network-border: 215 171 195;
+  --cat-review-fg: 80 60 43;
+  --cat-review-muted: 240 237 234;
+  --cat-review-emphasis: 131 106 84;
+  --cat-review-border: 199 188 178;
+  --code-keyword: 207 34 46;
+  --code-string: 10 48 105;
+  --code-comment: 110 119 129;
+  --code-number: 5 80 174;
+  --code-title: 102 57 186;
+}
+@media screen and (prefers-color-scheme: dark) {
+:root {
+  --background: 240 6% 7%;
+  --foreground: 0 0% 98%;
+  --card: 240 4% 12%;
+  --card-foreground: 0 0% 98%;
+  --popover: 240 4% 12%;
+  --popover-foreground: 0 0% 98%;
+  --muted: 240 4% 16%;
+  --muted-foreground: 240 5% 65%;
+  --border: 240 4% 24%;
+  --input: 240 4% 24%;
+  --primary: 0 0% 98%;
+  --primary-foreground: 240 6% 10%;
+  --selected: 240 5% 30%;
+  --selected-foreground: 0 0% 98%;
+  --secondary: 240 4% 16%;
+  --secondary-foreground: 0 0% 98%;
+  --accent: 240 4% 16%;
+  --accent-foreground: 0 0% 98%;
+  --destructive: 0 72% 51%;
+  --destructive-foreground: 0 0% 98%;
+  --ring: 349 100% 62%;
+  --brand: 349 100% 46%;
+  --brand-foreground: 0 0% 100%;
+  --brand-strong: 349 100% 68%;
+  --brand-accent: 24 90% 60%;
+  --sidebar: 240 5% 10%;
+  --sidebar-foreground: 0 0% 98%;
+  --sidebar-border: 240 4% 24%;
+  --role-danger-fg: 252 165 165;
+  --role-danger-muted: 60 38 41;
+  --role-danger-emphasis: 248 113 113;
+  --role-danger-border: 125 64 66;
+  --role-severe-fg: 253 186 116;
+  --role-severe-muted: 60 44 32;
+  --role-severe-emphasis: 251 146 60;
+  --role-severe-border: 126 79 42;
+  --role-attention-fg: 232 200 110;
+  --role-attention-muted: 53 47 34;
+  --role-attention-emphasis: 205 170 70;
+  --role-attention-border: 105 90 46;
+  --role-info-fg: 147 197 253;
+  --role-info-muted: 36 47 63;
+  --role-info-emphasis: 96 165 250;
+  --role-info-border: 56 87 127;
+  --role-success-fg: 110 231 183;
+  --role-success-muted: 28 54 47;
+  --role-success-emphasis: 52 211 153;
+  --role-success-border: 37 108 84;
+  --role-neutral-fg: 212 212 216;
+  --role-neutral-muted: 46 46 50;
+  --role-neutral-emphasis: 161 161 170;
+  --role-neutral-border: 86 86 91;
+  --cat-permissive-fg: 134 234 224;
+  --cat-permissive-muted: 27 50 51;
+  --cat-permissive-emphasis: 40 189 174;
+  --cat-permissive-border: 31 98 93;
+  --cat-weak-fg: 194 201 240;
+  --cat-weak-muted: 43 45 59;
+  --cat-weak-emphasis: 124 139 218;
+  --cat-weak-border: 71 77 114;
+  --cat-strong-fg: 223 198 235;
+  --cat-strong-muted: 52 44 58;
+  --cat-strong-emphasis: 183 134 208;
+  --cat-strong-border: 97 75 110;
+  --cat-network-fg: 237 196 218;
+  --cat-network-muted: 57 43 52;
+  --cat-network-emphasis: 213 129 174;
+  --cat-network-border: 111 73 94;
+  --cat-review-fg: 230 216 204;
+  --cat-review-muted: 54 50 48;
+  --cat-review-emphasis: 196 169 146;
+  --cat-review-border: 103 91 82;
+  --code-keyword: 255 123 114;
+  --code-string: 165 214 255;
+  --code-comment: 145 152 161;
+  --code-number: 121 192 255;
+  --code-title: 210 168 255;
+}
+}
+:root{
+  color-scheme:light dark;
+  --bg:hsl(var(--background));--surface:hsl(var(--card));--text:hsl(var(--foreground));
+  --text-muted:hsl(var(--muted-foreground));--line:hsl(var(--border));--th-bg:hsl(var(--muted));
+  --link:hsl(var(--brand-strong));
+  --radius:.375rem;--radius-card:.5rem;
+  --shadow:0 1px 2px rgb(0 0 0/.04),0 2px 8px -2px rgb(0 0 0/.08);
+  --font:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;
+  --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+}
+@media screen and (prefers-color-scheme:dark){:root{
+  --shadow:0 1px 2px rgb(0 0 0/.3),0 2px 8px -2px rgb(0 0 0/.5);
+}}
+*{box-sizing:border-box;}
+body{font-family:var(--font);font-size:var(--font-size-body);background:var(--bg);color:var(--text);
+  max-width:1040px;margin:0 auto;padding:2.5rem 1.5rem 4rem;line-height:1.55;
+  -webkit-font-smoothing:antialiased;}
+a{color:var(--link);}
+.report-header{display:flex;align-items:flex-end;justify-content:space-between;
+  gap:1rem;flex-wrap:wrap;padding-bottom:.85rem;border-bottom:1px solid var(--line);
+  margin-bottom:1.5rem;}
+.wordmark{display:flex;align-items:center;gap:.5rem;font-size:var(--font-size-title);font-weight:800;
+  letter-spacing:-.02em;color:hsl(var(--brand));}
+.wordmark .tag{font-size:var(--font-size-caption);font-weight:700;letter-spacing:.1em;color:var(--text-muted);
+  border:1px solid var(--line);border-radius:999px;padding:.15rem .5rem;background:var(--surface);}
+.report-kind{font-size:var(--font-size-label);font-weight:600;color:var(--text-muted);
+  text-transform:uppercase;letter-spacing:.07em;}
+h1{font-size:var(--font-size-display);font-weight:700;letter-spacing:-.01em;line-height:1.25;margin:.2rem 0 .35rem;}
+h2{font-size:var(--font-size-title);font-weight:600;letter-spacing:-.01em;margin:2.1rem 0 .8rem;}
+h3{font-size:var(--font-size-heading);font-weight:600;margin:1.3rem 0 .4rem;}
+.subtitle{font-size:var(--font-size-body);color:var(--text-muted);margin:0 0 .35rem;}
+.meta{color:var(--text-muted);font-size:var(--font-size-body-sm);margin:.15rem 0 0;}
+time{white-space:nowrap;}
+.cards{display:flex;gap:.5rem;flex-wrap:wrap;margin:1.1rem 0 1.3rem;}
+.pill{display:inline-flex;align-items:center;gap:.4rem;padding:.3rem .7rem;
+  border:1px solid rgb(var(--role-neutral-border));border-radius:999px;
+  background:rgb(var(--role-neutral-muted));color:rgb(var(--role-neutral-fg));
+  font-size:var(--font-size-body-sm);font-weight:600;line-height:1.1;white-space:nowrap;}
+.pill .count{font-variant-numeric:tabular-nums;}
+.pill-crit,.pill-fail,.pill-kev{background:rgb(var(--role-danger-muted));color:rgb(var(--role-danger-fg));border-color:rgb(var(--role-danger-border));}
+.pill-high{background:rgb(var(--role-severe-muted));color:rgb(var(--role-severe-fg));border-color:rgb(var(--role-severe-border));}
+.pill-med,.pill-warn{background:rgb(var(--role-attention-muted));color:rgb(var(--role-attention-fg));border-color:rgb(var(--role-attention-border));}
+.pill-low{background:rgb(var(--role-info-muted));color:rgb(var(--role-info-fg));border-color:rgb(var(--role-info-border));}
+.pill-pass{background:rgb(var(--role-success-muted));color:rgb(var(--role-success-fg));border-color:rgb(var(--role-success-border));}
+.pill-info{background:rgb(var(--role-neutral-muted));color:rgb(var(--role-neutral-fg));border-color:rgb(var(--role-neutral-border));}
+.pill-cat-network{background:rgb(var(--cat-network-muted));color:rgb(var(--cat-network-fg));border-color:rgb(var(--cat-network-border));}
+.pill-cat-strong{background:rgb(var(--cat-strong-muted));color:rgb(var(--cat-strong-fg));border-color:rgb(var(--cat-strong-border));}
+.pill-cat-weak{background:rgb(var(--cat-weak-muted));color:rgb(var(--cat-weak-fg));border-color:rgb(var(--cat-weak-border));}
+.pill-cat-permissive{background:rgb(var(--cat-permissive-muted));color:rgb(var(--cat-permissive-fg));border-color:rgb(var(--cat-permissive-border));}
+.pill-cat-review{background:rgb(var(--cat-review-muted));color:rgb(var(--cat-review-fg));border-color:rgb(var(--cat-review-border));}
+.note{background:rgb(var(--role-attention-muted));border-left:3px solid rgb(var(--role-attention-emphasis));
+  border-radius:var(--radius);padding:.75rem 1rem;margin:1rem 0 1.3rem;font-size:var(--font-size-body-sm);}
+.note b{color:var(--text);}
+.table-wrap{border:1px solid var(--line);border-radius:var(--radius-card);
+  overflow-x:auto;box-shadow:var(--shadow);background:var(--surface);margin:1rem 0 1.5rem;}
+table{border-collapse:collapse;width:100%;font-size:var(--font-size-body-sm);}
+th{background:var(--th-bg);text-align:left;font-size:var(--font-size-label);font-weight:600;
+  text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted);
+  padding:.6rem .8rem;border-bottom:1px solid var(--line);white-space:nowrap;}
+td{padding:.6rem .8rem;border-bottom:1px solid var(--line);vertical-align:top;}
+tr:last-child td{border-bottom:none;}
+tr:hover td{background:var(--th-bg);}
+td.num{text-align:right;font-variant-numeric:tabular-nums;}
+td.id{white-space:nowrap;font-variant-numeric:tabular-nums;}
+td[class^="sev-"]{white-space:nowrap;}
+.sev-CRITICAL{color:rgb(var(--role-danger-fg));font-weight:700;}
+.sev-HIGH{color:rgb(var(--role-severe-fg));font-weight:700;}
+.sev-MEDIUM{color:rgb(var(--role-attention-fg));font-weight:600;}
+.sev-LOW{color:rgb(var(--role-info-fg));font-weight:600;}
+.sev-UNKNOWN{color:rgb(var(--role-neutral-fg));}
+.kevbadge{display:inline-block;background:rgb(var(--role-danger-muted));color:rgb(var(--role-danger-fg));
+  border:1px solid rgb(var(--role-danger-border));
+  border-radius:999px;padding:.12rem .5rem;font-size:var(--font-size-label);font-weight:700;}
+.mono li{font-family:var(--mono);font-size:var(--font-size-mono);}
+ol,ul{margin:.5rem 0 0;padding-left:1.3rem;}
+li{margin:.3rem 0;}
+code{font-family:var(--mono);font-size:var(--font-size-mono);}
+/* NOTICE */
+.review{background:rgb(var(--role-attention-muted));border-left:3px solid rgb(var(--role-attention-emphasis));
+  border-radius:var(--radius);padding:.9rem 1.1rem;margin:1.2rem 0;}
+.review h2{color:rgb(var(--role-attention-fg));margin:.1rem 0 .3rem;font-size:var(--font-size-heading);font-weight:600;}
+.review .meta{margin:.2rem 0 .4rem;color:var(--text);}
+.review ul{list-style:none;padding:0;margin:.5rem 0 0;}
+.review li{font-family:var(--mono);font-size:var(--font-size-mono);margin:.3rem 0;}
+.lic{background:var(--surface);border:1px solid var(--line);
+  border-radius:var(--radius-card);box-shadow:var(--shadow);
+  padding:1rem 1.15rem;margin:1rem 0;}
+.lic h2{margin:0;font-size:var(--font-size-heading);font-weight:700;}
+.lic .count{display:block;color:var(--text-muted);font-size:var(--font-size-body-sm);margin:.15rem 0 .5rem;}
+.lic ul{list-style:none;padding:0;margin:0;}
+.lic li{font-family:var(--mono);font-size:var(--font-size-mono);padding:.45rem 0;
+  border-top:1px solid var(--line);margin:0;}
+.lic li:first-child{border-top:none;}
+.src{display:block;color:var(--text-muted);font-size:var(--font-size-label);margin-top:.25rem;}
+.src a{color:var(--link);text-decoration:none;word-break:break-all;}
+.attr{display:block;color:var(--text-muted);font-size:var(--font-size-label);margin-top:.1rem;}
+.lic .unverified{color:rgb(var(--role-attention-fg));font-size:var(--font-size-label);margin:.1rem 0 0;}
+.texts{margin-top:2.5rem;border-top:1px solid var(--line);padding-top:1.25rem;}
+.texts pre{background:var(--th-bg);border:1px solid var(--line);
+  border-radius:var(--radius);padding:1rem;overflow:auto;font-size:var(--font-size-mono);
+  line-height:1.45;white-space:pre-wrap;}
+/* Conformance */
+.s-pass{color:rgb(var(--role-success-fg));font-weight:700;}
+.s-fail{color:rgb(var(--role-danger-fg));font-weight:700;}
+.s-warn{color:rgb(var(--role-attention-fg));font-weight:700;}
+.s-review{color:rgb(var(--role-info-fg));font-weight:700;}
+.s-na{color:var(--text-muted);font-weight:700;}
+td.num:first-child{color:var(--text-muted);}
+th.num{text-align:right;}
+td.req{white-space:nowrap;}
+td.s-pass,td.s-fail,td.s-warn,td.s-review,td.s-na{white-space:nowrap;}
+details.fix{margin:.4rem 0 0;}
+details.fix summary{cursor:pointer;color:var(--link);font-size:var(--font-size-body-sm);font-weight:600;}
+details.fix pre{margin:.4rem 0 .2rem;}
+details.fix .meta{font-size:var(--font-size-body-sm);}
+.mono{list-style:none;padding-left:0;}
+pre{background:var(--th-bg);border:1px solid var(--line);border-radius:var(--radius);
+  padding:.6rem .75rem;overflow-x:auto;margin:.5rem 0;}
+pre code{font-family:var(--mono);font-size:var(--font-size-mono);white-space:pre;}
+/* Print: always light (the dark tokens apply to screens only), no page
+   background or shadows, table headers repeat on every page, rows and cards do
+   not split, and an external link shows its address because paper cannot be
+   clicked. */
+@page{margin:16mm 14mm;}
+@media print{
+  body{max-width:none;margin:0;padding:0;background:#fff;font-size:10.5pt;line-height:1.45;}
+  .table-wrap,.lic,.texts pre,pre{box-shadow:none;background:transparent;overflow:visible;}
+  .table-wrap{border:0;border-top:1px solid var(--line);border-radius:0;margin:.6rem 0 1rem;}
+  table{font-size:9pt;}
+  th,td{padding:.3rem .4rem;}
+  th{white-space:normal;}
+  table .meta{font-size:8.5pt;}
+  pre,pre code{white-space:pre-wrap;overflow-wrap:anywhere;}
+  th,.wordmark .tag{background:transparent;}
+  thead{display:table-header-group;}
+  tfoot{display:table-footer-group;}
+  tr,.lic,.note,.review,li{break-inside:avoid;page-break-inside:avoid;}
+  h1,h2,h3{break-after:avoid;page-break-after:avoid;}
+  tr:hover td{background:transparent;}
+  a[href^="http"]::after{content:" (" attr(href) ")";font-size:var(--font-size-label);word-break:break-all;}
+  .src a::after{content:none;}
+  details.fix summary{color:var(--text);}
+}
+</style>
+</head><body>
+<header class="report-header">
+ <div class="wordmark">BomLens<span class="tag">SBOM</span></div>
+ <div class="report-kind">적합성 검사</div>
+</header>
+<h1>적합성 검사 보고서</h1>
+<p class="meta">프로젝트: <a href="https://huggingface.co/FINAL-Bench/Aether-7B-5Attn" target="_blank" rel="noopener noreferrer">Aether-7B-5Attn</a> &middot; 생성 시각: <time datetime="2026-10-23T10:14:35Z">2026-10-23 10:14 UTC</time> &middot; 형식: CycloneDX &middot; 검사 기준: default</p>
+<div class="cards">
+ <span class="pill pill-pass">결과: PASS</span>
+ <span class="pill pill-fail">필수 실패: <span class="count">0</span></span>
+ <span class="pill pill-warn">경고: <span class="count">16</span></span>
+ <span class="pill">검토 필요: <span class="count">14</span></span>
+ <span class="pill">해당 없음: <span class="count">10</span></span>
+
+</div>
+
+
+<h2>클러스터별 G7 최소 요소</h2>
+<div class="table-wrap"><table><thead><tr><th>클러스터</th><th>충족</th><th>미충족</th><th>검토</th><th>합계</th></tr></thead><tbody>
+<tr><td>메타데이터</td><td>7</td><td>3</td><td>0</td><td>10</td></tr>
+<tr><td>시스템 수준 속성</td><td>3</td><td>2</td><td>4</td><td>9</td></tr>
+<tr><td>모델</td><td>12</td><td>2</td><td>0</td><td>14</td></tr>
+<tr><td>데이터셋 속성</td><td>8</td><td>0</td><td>2</td><td>10</td></tr>
+<tr><td>인프라</td><td>0</td><td>2</td><td>0</td><td>2</td></tr>
+<tr><td>보안 속성</td><td>0</td><td>1</td><td>3</td><td>4</td></tr>
+<tr><td>핵심 성과 지표</td><td>0</td><td>1</td><td>1</td><td>2</td></tr>
+<tr><td><b>합계</b></td><td><b>30</b></td><td><b>11</b></td><td><b>10</b></td><td><b>51</b></td></tr>
+</tbody></table></div>
+<h2>검토 대상 라이선스</h2>
+<p class="meta">AI 행위 사용 제한 또는 비상업 라이선스 표시가 붙은 구성요소가 없습니다.</p>
+<h2>규제 대응표</h2>
+<div class="table-wrap"><table><thead><tr><th>프레임워크</th><th>충족</th><th>미충족</th><th>실패</th><th>검토</th><th>합계</th></tr></thead><tbody>
+<tr><td>EU 인공지능법 — 부속서 IV 기술문서<br><span class="meta">Regulation (EU) 2024/1689, Article 11(1) and Annex IV</span></td><td>8</td><td>6</td><td>0</td><td>9</td><td>23</td></tr>
+<tr><td>AI 기본법 (대한민국)<br><span class="meta">인공지능 발전과 신뢰 기반 조성 등에 관한 기본법 (effective 2026-01-22)</span></td><td>1</td><td>2</td><td>0</td><td>7</td><td>10</td></tr>
+<tr><td>BSI TR-03183-2 — SBOM 데이터 필드 (EU 사이버복원력법)<br><span class="meta">Regulation (EU) 2024/2847 Annex I Part II(1); BSI TR-03183-2 v2.1.0 (2025-08-20)</span></td><td>6</td><td>2</td><td>0</td><td>6</td><td>14</td></tr>
+<tr><td>미국 SBOM 최소 요소<br><span class="meta">&quot;2026 Minimum Elements for a Software Bill of Materials (SBOM)&quot; v2.1 (2026-07-29), authored by CISA, NSA and FBI with fifteen international partners including Germany&apos;s BSI, Japan&apos;s METI and Korea&apos;s KISA</span></td><td>16</td><td>3</td><td>0</td><td>4</td><td>23</td></tr>
+</tbody></table></div>
+<p class="meta">BomLens는 EU 인공지능법, AI 기본법, EU 사이버복원력법을 비롯한 어떤 규제에 대해서도 준수 여부를 인증하거나 판정하지 않습니다. 이 대응표는 SBOM이 담을 수 있는 문서화 항목만 다룹니다. 공정성·편향 평가, 위험관리, 인간 감독처럼 SBOM으로 표현할 수 없는 의무는 이 대응표 범위 밖이며, 별도 문서로 이행해야 합니다. 이 표는 문서로 남기지 못한 부분을 눈에 보이게 해 준비를 돕기 위한 것이며, 특정 제품의 법적 의무에 비추어 해석하는 일은 사람이 해야 합니다.</p>
+<h2>SBOM 형식 요건</h2>
+<p class="meta">SBOM 자체가 갖춰야 할 형식 요건입니다. 어떤 방식으로 만든 SBOM이든 같은 기준으로 확인하며, 필수 항목이 하나라도 실패하면 전체 판정이 실패가 됩니다.</p>
+<div class="table-wrap"><table><thead><tr><th class="num">#</th><th>상태</th><th>요구사항</th><th>필수</th><th>세부 내용</th><th>근거 · 방법</th></tr></thead><tbody>
+<tr><td class="num">1</td><td class="s-pass">PASS</td><td>사양 버전 (CycloneDX 1.3/1.4/1.5/1.6/1.7)<br><span class="meta">BSI TR-03183-2 Section 4</span></td><td class="req">예</td><td>CycloneDX 1.7</td><td></td></tr>
+<tr><td class="num">2</td><td class="s-pass">PASS</td><td>타임스탬프 (metadata.timestamp)<br><span class="meta">BSI TR-03183-2 Section 5.2.1</span></td><td class="req">예</td><td>2026-10-23T10:14:33+00:00</td><td></td></tr>
+<tr><td class="num">3</td><td class="s-pass">PASS</td><td>도구 정보 (metadata.tools)<br><span class="meta">BSI TR-03183-2 Section 5.2.1</span></td><td class="req">예</td><td>도구 2개</td><td></td></tr>
+<tr><td class="num">4</td><td class="s-pass">PASS</td><td>최상위 구성요소 이름+버전<br><span class="meta">BSI TR-03183-2 Section 5.1</span></td><td class="req">예</td><td>Aether-7B-5Attn@da711bdb</td><td></td></tr>
+<tr><td class="num">5</td><td class="s-na">N/A</td><td>구성요소 이름+버전 포함률 (100%)<br><span class="meta">BSI TR-03183-2 Section 5.2.2</span></td><td class="req">예</td><td>측정할 패키지 없음</td><td></td></tr>
+<tr><td class="num">6</td><td class="s-na">N/A</td><td>PURL 포함률 (90% 이상)<br><span class="meta">BSI TR-03183-2 Section 5.2.4</span></td><td class="req">예</td><td>측정할 패키지 없음</td><td></td></tr>
+<tr><td class="num">7</td><td class="s-na">N/A</td><td>파일 구성요소 식별자 포함률 (해시, 80% 이상, 권장)</td><td class="req">아니오</td><td>파일 구성요소 없음</td><td></td></tr>
+<tr><td class="num">8</td><td class="s-pass">PASS</td><td>추적 가능한 PURL (pkg:generic 없음, 권고)</td><td class="req">아니오</td><td>추적 불가 0개</td><td></td></tr>
+<tr><td class="num">9</td><td class="s-pass">PASS</td><td>PURL 형식 (pkg:type/[namespace/]name)</td><td class="req">예</td><td>형식 오류 0개</td><td></td></tr>
+<tr><td class="num">10</td><td class="s-na">N/A</td><td>타입이 요구하는 PURL 네임스페이스 (pkg:maven/&lt;groupId&gt;/이름)</td><td class="req">예</td><td>네임스페이스가 필요한 타입의 식별자 없음</td><td></td></tr>
+<tr><td class="num">11</td><td class="s-na">N/A</td><td>golang/huggingface의 PURL 네임스페이스 (권고)</td><td class="req">아니오</td><td>네임스페이스가 필요한 타입의 식별자 없음</td><td></td></tr>
+<tr><td class="num">12</td><td class="s-pass">PASS</td><td>purl-spec에 정의된 PURL 타입 (권고)</td><td class="req">아니오</td><td>규격에 없는 타입 0개</td><td></td></tr>
+<tr><td class="num">13</td><td class="s-pass">PASS</td><td>전이 의존성 (의존 그래프)<br><span class="meta">BSI TR-03183-2 Section 5.1; 5.2.2</span></td><td class="req">예</td><td>7 edge(s), graph completeness unknown (no positive evidence found, not a defect)</td><td></td></tr>
+<tr><td class="num">14</td><td class="s-warn">WARN</td><td>라이선스 포함률 (80% 이상, 권장)<br><span class="meta">BSI TR-03183-2 Section 5.2.2</span></td><td class="req">아니오</td><td>57% (4/7)</td><td></td></tr>
+<tr><td class="num">15</td><td class="s-pass">PASS</td><td>해시 포함률 (50% 이상, 권장)<br><span class="meta">BSI TR-03183-2 Section 5.2.2</span></td><td class="req">아니오</td><td>100% (7/7)</td><td></td></tr>
+<tr><td class="num">16</td><td class="s-warn">WARN</td><td>SHA-512 체크섬 포함률 (80% 이상, 권장)<br><span class="meta">BSI TR-03183-2 Section 5.2.2</span></td><td class="req">아니오</td><td>0% (0/7)</td><td></td></tr>
+<tr><td class="num">17</td><td class="s-na">N/A</td><td>구성요소 작성자 포함률 (80% 이상, 권장)<br><span class="meta">BSI TR-03183-2 Section 5.2.2</span></td><td class="req">아니오</td><td>측정할 패키지 없음</td><td></td></tr>
+<tr><td class="num">18</td><td class="s-na">N/A</td><td>구성요소 파일명 포함률 (80% 이상, 권장)<br><span class="meta">BSI TR-03183-2 Section 5.2.2</span></td><td class="req">아니오</td><td>측정할 패키지 없음</td><td></td></tr>
+<tr><td class="num">19</td><td class="s-na">N/A</td><td>소스 또는 배포 URI 포함률 (80% 이상, 권장)<br><span class="meta">BSI TR-03183-2 Section 5.2.4</span></td><td class="req">아니오</td><td>측정할 패키지 없음</td><td></td></tr>
+<tr><td class="num">20</td><td class="s-na">N/A</td><td>배포 파일 속성 (실행 파일/압축 파일/구조화 파일)<br><span class="meta">BSI TR-03183-2 Section 5.2.2</span></td><td class="req">아니오</td><td>측정할 패키지 없음</td><td></td></tr>
+<tr><td class="num">21</td><td class="s-warn">WARN</td><td>SBOM 작성자<br><span class="meta">CISA 2026 SBOM Author</span></td><td class="req">아니오</td><td>SBOM에 없음</td><td><details class="fix"><summary>채우는 방법 보기</summary><pre><code>&quot;metadata&quot;: {
+  &quot;authors&quot;: [ { &quot;name&quot;: &quot;Example Manufacturing Co., Ltd.&quot; } ]
+}</code></pre><p class="meta">참고: <a href="https://cyclonedx.org/docs/1.6/json/#metadata_authors" target="_blank" rel="noopener noreferrer">cyclonedx.org</a></p></details></td></tr>
+<tr><td class="num">22</td><td class="s-warn">WARN</td><td>SBOM 작성자 서명<br><span class="meta">CISA 2026 SBOM Author Signature</span></td><td class="req">아니오</td><td>SBOM에 없음</td><td><details class="fix"><summary>확인할 내용 보기</summary><p>문서 안에 담긴 서명이나, cosign(예: --sign)이 SBOM 옆에 &lt;SBOM 파일명&gt;.sig로 남기는 분리 서명은 자동으로 인식되며 그 경우 이 행에 표시됩니다. 다른 이름이나 위치의 분리 서명은 이 보고서가 그 한 가지 관례만 찾기 때문에 나타나지 않습니다. 보낸 쪽의 키로 검증한 뒤 내용을 그쪽의 것으로 취급하고, 검증했다는 사실을 기록해 둡니다.</p><p class="meta">참고: <a href="https://www.cisa.gov/resources-tools/resources/2026-minimum-elements-software-bill-materials-sbom" target="_blank" rel="noopener noreferrer">www.cisa.gov</a></p></details></td></tr>
+<tr><td class="num">23</td><td class="s-pass">PASS</td><td>SBOM 데이터 형식 이름<br><span class="meta">CISA 2026 SBOM Data Format Name</span></td><td class="req">아니오</td><td>있음</td><td></td></tr>
+<tr><td class="num">24</td><td class="s-pass">PASS</td><td>SBOM 데이터 형식 버전<br><span class="meta">CISA 2026 SBOM Data Format Version</span></td><td class="req">아니오</td><td>있음</td><td></td></tr>
+<tr><td class="num">25</td><td class="s-pass">PASS</td><td>SBOM 생성 시점<br><span class="meta">CISA 2026 SBOM Generation Context</span></td><td class="req">아니오</td><td>있음</td><td></td></tr>
+<tr><td class="num">26</td><td class="s-pass">PASS</td><td>SBOM 생성 시각<br><span class="meta">CISA 2026 SBOM Timestamp</span></td><td class="req">아니오</td><td>있음</td><td></td></tr>
+<tr><td class="num">27</td><td class="s-pass">PASS</td><td>SBOM 생성 도구 이름<br><span class="meta">CISA 2026 SBOM Tool Name</span></td><td class="req">아니오</td><td>있음</td><td></td></tr>
+<tr><td class="num">28</td><td class="s-pass">PASS</td><td>SBOM 생성 도구 버전<br><span class="meta">CISA 2026 SBOM Tool Version</span></td><td class="req">아니오</td><td>있음</td><td></td></tr>
+<tr><td class="num">29</td><td class="s-pass">PASS</td><td>SBOM 문서 버전<br><span class="meta">CISA 2026 SBOM Version</span></td><td class="req">아니오</td><td>있음</td><td></td></tr>
+<tr><td class="num">30</td><td class="s-pass">PASS</td><td>구성요소 이름<br><span class="meta">CISA 2026 Component Name</span></td><td class="req">아니오</td><td>구성요소 8/8</td><td></td></tr>
+<tr><td class="num">31</td><td class="s-pass">PASS</td><td>구성요소 버전<br><span class="meta">CISA 2026 Component Version</span></td><td class="req">아니오</td><td>구성요소 8/8</td><td></td></tr>
+<tr><td class="num">32</td><td class="s-pass">PASS</td><td>구성요소 생산자<br><span class="meta">CISA 2026 Component Producer</span></td><td class="req">아니오</td><td>구성요소 8/8</td><td></td></tr>
+<tr><td class="num">33</td><td class="s-pass">PASS</td><td>구성요소 식별자<br><span class="meta">CISA 2026 Component Identifiers</span></td><td class="req">아니오</td><td>구성요소 8/8</td><td>pkg:huggingface/FINAL-Bench/Aether-7B-5Attn@da711bdb</td></tr>
+<tr><td class="num">34</td><td class="s-warn">WARN</td><td>구성요소 라이선스<br><span class="meta">CISA 2026 Component License</span></td><td class="req">아니오</td><td>구성요소 5/8</td><td></td></tr>
+<tr><td class="num">35</td><td class="s-pass">PASS</td><td>구성요소 해시 값<br><span class="meta">CISA 2026 Component Hash Value</span></td><td class="req">아니오</td><td>구성요소 8/8</td><td></td></tr>
+<tr><td class="num">36</td><td class="s-pass">PASS</td><td>구성요소 해시 알고리즘<br><span class="meta">CISA 2026 Component Hash Algorithm</span></td><td class="req">아니오</td><td>구성요소 8/8</td><td></td></tr>
+<tr><td class="num">37</td><td class="s-pass">PASS</td><td>구성요소 의존 관계<br><span class="meta">CISA 2026 Component Dependency Relationship</span></td><td class="req">아니오</td><td>있음</td><td></td></tr>
+<tr><td class="num">38</td><td class="s-pass">PASS</td><td>기계 판독 가능 데이터<br><span class="meta">CISA 2026 Machine-Processable Data</span></td><td class="req">아니오</td><td>있음</td><td></td></tr>
+<tr><td class="num">39</td><td class="s-review">REVIEW</td><td>포함 범위<br><span class="meta">CISA 2026 Coverage</span></td><td class="req">아니오</td><td>사람 검토 필요 (자동 확인 불가)</td><td><details class="fix"><summary>확인할 내용 보기</summary><p>SBOM이 소프트웨어를 이루는 구성요소를 이행 의존성까지 빠짐없이 담았는지 확인합니다. 문서만 보고는 어떤 도구도 판정할 수 없습니다. 문서는 자기가 빠뜨린 것을 보여 주지 못하기 때문입니다. 빌드가 실제로 해석한 의존성이나 빌드에 쓰인 매니페스트와 대조합니다.</p><p class="meta">참고: <a href="https://www.cisa.gov/resources-tools/resources/2026-minimum-elements-software-bill-materials-sbom" target="_blank" rel="noopener noreferrer">www.cisa.gov</a></p></details></td></tr>
+<tr><td class="num">40</td><td class="s-review">REVIEW</td><td>SBOM 데이터 갱신 수용<br><span class="meta">CISA 2026 Accommodation of Updates to SBOM Data</span></td><td class="req">아니오</td><td>사람 검토 필요 (자동 확인 불가)</td><td><details class="fix"><summary>확인할 내용 보기</summary><p>발행한 SBOM 데이터를 나중에 정정할 방법이 있고 정정본이 지체 없이 나가는지 확인합니다. 문서 안의 필드가 아니라 SBOM을 발행하는 조직의 관행에 대한 항목입니다.</p><p class="meta">참고: <a href="https://www.cisa.gov/resources-tools/resources/2026-minimum-elements-software-bill-materials-sbom" target="_blank" rel="noopener noreferrer">www.cisa.gov</a></p></details></td></tr>
+<tr><td class="num">41</td><td class="s-review">REVIEW</td><td>배포와 전달<br><span class="meta">CISA 2026 Distribution and Delivery</span></td><td class="req">아니오</td><td>사람 검토 필요 (자동 확인 불가)</td><td><details class="fix"><summary>확인할 내용 보기</summary><p>SBOM이 필요한 쪽이 지체 없이 받을 수 있는지, 접근 통제가 권한 없는 쪽을 막되 권한 있는 쪽의 수신이나 보안 도구로의 반입까지 막지는 않는지 확인합니다.</p><p class="meta">참고: <a href="https://www.cisa.gov/resources-tools/resources/2026-minimum-elements-software-bill-materials-sbom" target="_blank" rel="noopener noreferrer">www.cisa.gov</a></p></details></td></tr>
+<tr><td class="num">42</td><td class="s-pass">PASS</td><td>미상 정보의 명시<br><span class="meta">CISA 2026 Explicitly Identifying Unknown Information</span></td><td class="req">아니오</td><td>있음</td><td></td></tr>
+<tr><td class="num">43</td><td class="s-review">REVIEW</td><td>갱신 주기<br><span class="meta">CISA 2026 Frequency</span></td><td class="req">아니오</td><td>사람 검토 필요 (자동 확인 불가)</td><td><details class="fix"><summary>확인할 내용 보기</summary><p>소프트웨어 버전이나 업데이트마다 자기 SBOM이 있는지, 구성요소 데이터가 바뀌거나 오류를 발견했을 때 정정본을 다시 내는지 확인합니다.</p><p class="meta">참고: <a href="https://www.cisa.gov/resources-tools/resources/2026-minimum-elements-software-bill-materials-sbom" target="_blank" rel="noopener noreferrer">www.cisa.gov</a></p></details></td></tr>
+<tr><td class="num">44</td><td class="s-na">N/A</td><td>저장소에서 조회되는 PURL (권고)</td><td class="req">아니오</td><td>저장소 조회를 실행하지 않음</td><td></td></tr>
+</tbody></table></div>
+<h2>G7 최소 요구사항</h2>
+<p class="meta">G7 「Software Bill of Materials for AI — Minimum Elements」의 권고 항목입니다. 모두 권고라 판정을 좌우하지 않으며, 자동으로 확인할 수 없는 항목은 검토 필요로 표시됩니다.</p>
+<div class="table-wrap"><table><thead><tr><th class="num">#</th><th>상태</th><th>요구사항</th><th>세부 내용</th><th>근거 · 방법</th></tr></thead><tbody>
+<tr><td class="num">1</td><td class="s-warn">WARN</td><td>SBOM 작성자</td><td>SBOM에 없음</td><td></td></tr>
+<tr><td class="num">2</td><td class="s-pass">PASS</td><td>SBOM 버전</td><td>있음</td><td></td></tr>
+<tr><td class="num">3</td><td class="s-pass">PASS</td><td>SBOM 데이터 형식 이름</td><td>있음</td><td></td></tr>
+<tr><td class="num">4</td><td class="s-pass">PASS</td><td>SBOM 데이터 형식 버전</td><td>있음</td><td></td></tr>
+<tr><td class="num">5</td><td class="s-warn">WARN</td><td>SBOM 작성자 서명</td><td>SBOM에 없음</td><td><details class="fix"><summary>채우는 방법 보기</summary><pre><code>&quot;signature&quot;: {
+  &quot;algorithm&quot;: &quot;ES256&quot;,
+  &quot;value&quot;: &quot;MEUCIQD…&quot;
+}</code></pre><p class="meta">참고: <a href="https://cyclonedx.org/docs/1.7/json/#signature" target="_blank" rel="noopener noreferrer">cyclonedx.org</a></p></details></td></tr>
+<tr><td class="num">6</td><td class="s-pass">PASS</td><td>SBOM 생성 도구 이름</td><td>있음</td><td></td></tr>
+<tr><td class="num">7</td><td class="s-pass">PASS</td><td>SBOM 생성 도구 버전</td><td>있음</td><td></td></tr>
+<tr><td class="num">8</td><td class="s-warn">WARN</td><td>SBOM 생성 맥락</td><td>SBOM에 없음</td><td></td></tr>
+<tr><td class="num">9</td><td class="s-pass">PASS</td><td>SBOM 타임스탬프</td><td>있음</td><td></td></tr>
+<tr><td class="num">10</td><td class="s-pass">PASS</td><td>SBOM 의존성 관계</td><td>있음</td><td></td></tr>
+<tr><td class="num">11</td><td class="s-warn">WARN</td><td>시스템 이름<br><span class="meta">EU 인공지능법 Annex IV(1) · AI 기본법 제31조</span></td><td>SBOM에 없음</td><td></td></tr>
+<tr><td class="num">12</td><td class="s-pass">PASS</td><td>시스템 구성요소</td><td>있음</td><td></td></tr>
+<tr><td class="num">13</td><td class="s-warn">WARN</td><td>시스템 제작자</td><td>SBOM에 없음</td><td></td></tr>
+<tr><td class="num">14</td><td class="s-pass">PASS</td><td>시스템 버전</td><td>있음</td><td></td></tr>
+<tr><td class="num">15</td><td class="s-pass">PASS</td><td>시스템 타임스탬프</td><td>있음</td><td></td></tr>
+<tr><td class="num">16</td><td class="s-review">REVIEW</td><td>시스템 데이터 흐름<br><span class="meta">EU 인공지능법 Annex IV(1) · AI 기본법 제35조</span></td><td>사람 검토 필요 (자동 확인 불가)</td><td><details class="fix"><summary>확인할 내용 보기</summary><p>데이터가 시스템 안에서 어떻게 흐르는지 적습니다. 입력이 어디서 오고, 모델이 무엇을 받고, 출력이 어디로 가는지입니다. BomLens에서는 AI 선언의 서비스 항목(service.dataFlows: 방향, 분류, 보내는 곳과 받는 곳의 주소)에 적으면 다음 스캔에서 SBOM의 CycloneDX services[].data에 발행자 선언으로 표시되어 들어갑니다. 다른 도구가 만든 SBOM도 서비스에 serviceData가 있으면 충족으로 봅니다. 적어 둔 내용이 실제 배포 구성과 맞는지 확인합니다.</p><p class="meta">참고: <a href="https://www.bsi.bund.de/SharedDocs/Downloads/EN/BSI/KI/SBOM-for-AI_minimum-elements.pdf?__blob=publicationFile&amp;v=4" target="_blank" rel="noopener noreferrer">www.bsi.bund.de</a></p></details></td></tr>
+<tr><td class="num">17</td><td class="s-review">REVIEW</td><td>시스템 데이터 사용<br><span class="meta">EU 인공지능법 Annex IV(2)(d) · AI 기본법 제35조</span></td><td>사람 검토 필요 (자동 확인 불가)</td><td><details class="fix"><summary>확인할 내용 보기</summary><p>시스템이 받은 데이터를 어떻게 쓰는지 밝힙니다. 저장하는지, 다른 구성요소로 넘기는지, 추가 학습에 쓰는지입니다. BomLens에서는 선언한 서비스의 데이터 흐름마다 설명(service.dataFlows[].description)으로 적으면 다음 스캔에서 SBOM에 발행자 선언으로 표시되어 들어갑니다. 공개하는 개인정보 처리방침과 어긋나지 않는지 확인합니다.</p><p class="meta">참고: <a href="https://www.bsi.bund.de/SharedDocs/Downloads/EN/BSI/KI/SBOM-for-AI_minimum-elements.pdf?__blob=publicationFile&amp;v=4" target="_blank" rel="noopener noreferrer">www.bsi.bund.de</a></p></details></td></tr>
+<tr><td class="num">18</td><td class="s-review">REVIEW</td><td>시스템 입출력 속성<br><span class="meta">EU 인공지능법 Annex IV(1)</span></td><td>사람 검토 필요 (자동 확인 불가)</td><td><details class="fix"><summary>확인할 내용 보기</summary><p>시스템이 받는 입력과 내놓는 출력을 적습니다. 형식과 크기 제한, 받지 않는 입력까지 포함합니다. BomLens에서는 서비스의 입력과 출력 종류(service.inputModality, service.outputModality)를 선언하면 다음 스캔에서 서비스에 발행자 선언으로 기록됩니다. 모델 카드에는 처리 방식만 적히고 시스템의 실제 인터페이스는 드러나지 않으므로 나머지는 사람이 확인합니다.</p><p class="meta">참고: <a href="https://www.bsi.bund.de/SharedDocs/Downloads/EN/BSI/KI/SBOM-for-AI_minimum-elements.pdf?__blob=publicationFile&amp;v=4" target="_blank" rel="noopener noreferrer">www.bsi.bund.de</a></p></details></td></tr>
+<tr><td class="num">19</td><td class="s-review">REVIEW</td><td>적용 대상 분야<br><span class="meta">EU 인공지능법 Annex IV(1) · AI 기본법 제33조</span></td><td>사람 검토 필요 (자동 확인 불가)</td><td><details class="fix"><summary>확인할 내용 보기</summary><p>시스템을 어느 분야에 쓰려고 만들었는지, 쓰지 말아야 할 용도는 무엇인지 밝힙니다. 도구가 읽어낼 수 있는 사실이 아니라 판단이며, 규제에서 직접 요구하는 항목입니다. BomLens에서는 서비스의 적용 분야와 용도(service.domain, service.informationAboutApplication)를 선언하면 다음 스캔에서 서비스에 발행자 선언으로 기록됩니다.</p><p class="meta">참고: <a href="https://www.bsi.bund.de/SharedDocs/Downloads/EN/BSI/KI/SBOM-for-AI_minimum-elements.pdf?__blob=publicationFile&amp;v=4" target="_blank" rel="noopener noreferrer">www.bsi.bund.de</a></p></details></td></tr>
+<tr><td class="num">20</td><td class="s-pass">PASS</td><td>모델 이름</td><td>모델 구성요소 1/1개</td><td></td></tr>
+<tr><td class="num">21</td><td class="s-pass">PASS</td><td>모델 식별자</td><td>모델 구성요소 1/1개</td><td>pkg:huggingface/FINAL-Bench/Aether-7B-5Attn@da711bdb</td></tr>
+<tr><td class="num">22</td><td class="s-pass">PASS</td><td>모델 버전</td><td>모델 구성요소 1/1개</td><td></td></tr>
+<tr><td class="num">23</td><td class="s-warn">WARN</td><td>모델 타임스탬프</td><td>모델 구성요소 0/1개</td><td></td></tr>
+<tr><td class="num">24</td><td class="s-pass">PASS</td><td>모델 제작자</td><td>모델 구성요소 1/1개</td><td></td></tr>
+<tr><td class="num">25</td><td class="s-warn">WARN</td><td>모델 설명<br><span class="meta">EU 인공지능법 Annex IV(1)</span></td><td>모델 구성요소 0/1개</td><td><details class="fix"><summary>채우는 방법 보기</summary><pre><code>{
+  &quot;type&quot;: &quot;machine-learning-model&quot;,
+  &quot;description&quot;: &quot;0.5B-parameter causal language model.&quot;
+}</code></pre><p class="meta">참고: <a href="https://huggingface.co/docs/hub/model-cards" target="_blank" rel="noopener noreferrer">huggingface.co</a></p></details></td></tr>
+<tr><td class="num">26</td><td class="s-pass">PASS</td><td>모델 해시 값</td><td>모델 구성요소 1/1개</td><td></td></tr>
+<tr><td class="num">27</td><td class="s-pass">PASS</td><td>모델 해시 알고리즘</td><td>모델 구성요소 1/1개</td><td>SHA-256</td></tr>
+<tr><td class="num">28</td><td class="s-pass">PASS</td><td>모델 속성 (모델 카드)<br><span class="meta">EU 인공지능법 Annex IV(2)(b)-(c)</span></td><td>모델 구성요소 1/1개</td><td>aether_v2_7way</td></tr>
+<tr><td class="num">29</td><td class="s-pass">PASS</td><td>모델 입출력 속성<br><span class="meta">EU 인공지능법 Annex IV(3)</span></td><td>모델 구성요소 1/1개</td><td></td></tr>
+<tr><td class="num">30</td><td class="s-pass">PASS</td><td>모델 학습 속성<br><span class="meta">EU 인공지능법 Annex IV(2)(d) · AI 기본법 제32조</span></td><td>모델 구성요소 1/1개</td><td></td></tr>
+<tr><td class="num">31</td><td class="s-pass">PASS</td><td>모델 라이선스</td><td>모델 구성요소 1/1개</td><td>Apache-2.0</td></tr>
+<tr><td class="num">32</td><td class="s-pass">PASS</td><td>모델 라이선스 — 공개성 (가중치/구조/데이터/학습)</td><td>있음</td><td>open-architecture, open-data, open-data-permissive, open-training, open-weight, openness:architecture=open-architecture, openness:training-data=open-data, openness:training=open-training, openness:weights=open-weight</td></tr>
+<tr><td class="num">33</td><td class="s-pass">PASS</td><td>모델 외부 참조</td><td>모델 구성요소 1/1개</td><td></td></tr>
+<tr><td class="num">34</td><td class="s-pass">PASS</td><td>데이터셋 이름<br><span class="meta">EU 인공지능법 Annex IV(2)(d)</span></td><td>있음</td><td>HAERAE-HUB/KOREAN-SyntheticText-1.5B, HAERAE-HUB/KOREAN-WEBTEXT, HuggingFaceFW/fineweb-edu, HuggingFaceTB/finemath, HuggingFaceTB/smollm-corpus, OpenCoder-LLM/opc-fineweb-code-corpus, open-web-math/open-web-math</td></tr>
+<tr><td class="num">35</td><td class="s-pass">PASS</td><td>데이터셋 설명<br><span class="meta">EU 인공지능법 Annex IV(2)(d)</span></td><td>있음</td><td></td></tr>
+<tr><td class="num">36</td><td class="s-pass">PASS</td><td>데이터셋 내용<br><span class="meta">EU 인공지능법 Annex IV(2)(d)</span></td><td>있음</td><td></td></tr>
+<tr><td class="num">37</td><td class="s-pass">PASS</td><td>데이터셋 식별자</td><td>있음</td><td></td></tr>
+<tr><td class="num">38</td><td class="s-pass">PASS</td><td>데이터셋 해시</td><td>있음</td><td></td></tr>
+<tr><td class="num">39</td><td class="s-pass">PASS</td><td>데이터셋 출처<br><span class="meta">EU 인공지능법 Annex IV(2)(d)</span></td><td>있음</td><td></td></tr>
+<tr><td class="num">40</td><td class="s-review">REVIEW</td><td>데이터셋 통계 속성<br><span class="meta">EU 인공지능법 Annex IV(2)(d)</span></td><td>사람 검토 필요 (자동 확인 불가)</td><td><details class="fix"><summary>확인할 내용 보기</summary><p>학습 데이터의 규모와 구성을 적습니다. 건수, 분류별 비율, 알고 있는 치우침입니다. 이 수치가 모델의 한계를 설명하므로 불리한 내용이라도 밝힙니다.</p><p class="meta">참고: <a href="https://huggingface.co/docs/hub/datasets-cards" target="_blank" rel="noopener noreferrer">huggingface.co</a></p></details></td></tr>
+<tr><td class="num">41</td><td class="s-review">REVIEW</td><td>데이터셋 민감도 (개인정보/저작권)<br><span class="meta">EU 인공지능법 Annex IV(2)(d) · AI 기본법 제35조</span></td><td>사람 검토 필요 (자동 확인 불가)</td><td><details class="fix"><summary>확인할 내용 보기</summary><p>학습 데이터에 개인정보나 타인의 저작물이 섞였는지 판단하고, 무엇을 어떻게 걸러냈는지 기록합니다. 판단이 서지 않으면 공개 전에 개인정보 담당 부서와 법무에 확인합니다.</p><p class="meta">참고: <a href="https://www.bsi.bund.de/SharedDocs/Downloads/EN/BSI/KI/SBOM-for-AI_minimum-elements.pdf?__blob=publicationFile&amp;v=4" target="_blank" rel="noopener noreferrer">www.bsi.bund.de</a></p></details></td></tr>
+<tr><td class="num">42</td><td class="s-pass">PASS</td><td>데이터셋 의존성 관계</td><td>있음</td><td></td></tr>
+<tr><td class="num">43</td><td class="s-pass">PASS</td><td>데이터셋 라이선스<br><span class="meta">EU 인공지능법 Annex IV(2)(d)</span></td><td>있음</td><td></td></tr>
+<tr><td class="num">44</td><td class="s-warn">WARN</td><td>인프라 소프트웨어 (의존성)<br><span class="meta">EU 인공지능법 Annex IV(2)(c)</span></td><td>SBOM에 없음</td><td></td></tr>
+<tr><td class="num">45</td><td class="s-warn">WARN</td><td>인프라 하드웨어 (HBOM 연결)<br><span class="meta">EU 인공지능법 Annex IV(1)</span></td><td>SBOM에 없음</td><td><details class="fix"><summary>채우는 방법 보기</summary><pre><code>&quot;externalReferences&quot;: [
+  { &quot;type&quot;: &quot;bom&quot;, &quot;url&quot;: &quot;https://example.com/hbom.json&quot; }
+]</code></pre><p class="meta">참고: <a href="https://cyclonedx.org/capabilities/hbom/" target="_blank" rel="noopener noreferrer">cyclonedx.org</a></p></details></td></tr>
+<tr><td class="num">46</td><td class="s-review">REVIEW</td><td>보안 통제<br><span class="meta">EU 인공지능법 Annex IV(2)(h) · AI 기본법 제32조</span></td><td>사람 검토 필요 (자동 확인 불가)</td><td><details class="fix"><summary>확인할 내용 보기</summary><p>모델과 데이터를 보호하는 통제 수단을 적습니다. 가중치에 누가 접근할 수 있는지, 학습 환경을 어떻게 분리하는지, 산출물에 어떻게 서명하는지입니다. SBOM이 아니라 운영 쪽에 있는 정보입니다.</p><p class="meta">참고: <a href="https://www.bsi.bund.de/SharedDocs/Downloads/EN/BSI/KI/SBOM-for-AI_minimum-elements.pdf?__blob=publicationFile&amp;v=4" target="_blank" rel="noopener noreferrer">www.bsi.bund.de</a></p></details></td></tr>
+<tr><td class="num">47</td><td class="s-review">REVIEW</td><td>보안 준수</td><td>사람 검토 필요 (자동 확인 불가)</td><td><details class="fix"><summary>확인할 내용 보기</summary><p>이 모델이 어떤 보안 표준이나 사내 정책을 따라 만들어졌는지, 누가 승인했는지 밝힙니다. 내용을 옮겨 적기보다 점검 기록을 가리키는 편이 낫습니다.</p><p class="meta">참고: <a href="https://www.bsi.bund.de/SharedDocs/Downloads/EN/BSI/KI/SBOM-for-AI_minimum-elements.pdf?__blob=publicationFile&amp;v=4" target="_blank" rel="noopener noreferrer">www.bsi.bund.de</a></p></details></td></tr>
+<tr><td class="num">48</td><td class="s-review">REVIEW</td><td>사이버보안 정책 정보<br><span class="meta">EU 인공지능법 Annex IV(5) · AI 기본법 제32조</span></td><td>사람 검토 필요 (자동 확인 불가)</td><td><details class="fix"><summary>확인할 내용 보기</summary><p>이 모델의 취약점을 어디로 신고하고 누가 답하는지 적습니다. 공개한 모델에는 학습한 사람이 자리를 옮겨도 유지되는 연락처가 필요합니다.</p><p class="meta">참고: <a href="https://www.bsi.bund.de/SharedDocs/Downloads/EN/BSI/KI/SBOM-for-AI_minimum-elements.pdf?__blob=publicationFile&amp;v=4" target="_blank" rel="noopener noreferrer">www.bsi.bund.de</a></p></details></td></tr>
+<tr><td class="num">49</td><td class="s-warn">WARN</td><td>취약점 참조<br><span class="meta">EU 인공지능법 Annex IV(2)(h) · AI 기본법 제32조</span></td><td>SBOM에 없음</td><td></td></tr>
+<tr><td class="num">50</td><td class="s-review">REVIEW</td><td>보안 지표<br><span class="meta">EU 인공지능법 Annex IV(2)(h) · AI 기본법 제32조</span></td><td>사람 검토 필요 (자동 확인 불가)</td><td><details class="fix"><summary>확인할 내용 보기</summary><p>보안 쪽에서 무엇을 측정했는지 기록합니다. 적대적 입력이나 우회 시도 시험, 거부율, 모의 공격 결과를 방법·시점과 함께 적습니다. 측정하지 않았다면 하지 않았다고 그대로 밝힙니다.</p><p class="meta">참고: <a href="https://www.bsi.bund.de/SharedDocs/Downloads/EN/BSI/KI/SBOM-for-AI_minimum-elements.pdf?__blob=publicationFile&amp;v=4" target="_blank" rel="noopener noreferrer">www.bsi.bund.de</a></p></details></td></tr>
+<tr><td class="num">51</td><td class="s-warn">WARN</td><td>운영 성능 지표(KPI)<br><span class="meta">EU 인공지능법 Annex IV(2)(g)</span></td><td>SBOM에 없음</td><td></td></tr>
+</tbody></table></div>
+<h2>누락 / 미준수 항목</h2>
+<h3>모델 타임스탬프</h3><ul class="mono"><li>Aether-7B-5Attn</li></ul>
+<h3>모델 설명</h3><ul class="mono"><li>Aether-7B-5Attn</li></ul>
+<h3>구성요소 라이선스</h3><ul class="mono"><li>HAERAE-HUB/KOREAN-SyntheticText-1.5B</li><li>HAERAE-HUB/KOREAN-WEBTEXT</li><li>open-web-math/open-web-math</li></ul>
+</body></html>

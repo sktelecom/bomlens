@@ -1,0 +1,388 @@
+{
+  "contract": {
+    "name": "bomlens-engine",
+    "version": "1.4.0"
+  },
+  "engine": {
+    "version": "1.14.5",
+    "image": null,
+    "image_digest": null
+  },
+  "input": {
+    "kind": "firmware",
+    "mode": "FIRMWARE",
+    "target": null
+  },
+  "run": {
+    "status": "succeeded",
+    "reason": null,
+    "started_at": "2026-11-12T09:11:38Z",
+    "ended_at": "2026-11-12T09:25:53Z",
+    "exit_code": 0
+  },
+  "steps": [
+    {
+      "id": "generate",
+      "status": "ok",
+      "reason": null,
+      "detail": null,
+      "started_at": "2026-11-12T09:11:38Z",
+      "ended_at": "2026-11-12T09:23:42Z",
+      "counts": {
+        "components": 60126
+      },
+      "stage": 2
+    },
+    {
+      "id": "docmeta",
+      "status": "ok",
+      "reason": null,
+      "detail": null,
+      "started_at": "2026-11-12T09:23:43Z",
+      "ended_at": "2026-11-12T09:23:44Z",
+      "stage": 2
+    },
+    {
+      "id": "component-versions",
+      "status": "ok",
+      "reason": null,
+      "detail": null,
+      "started_at": "2026-11-12T09:23:45Z",
+      "ended_at": "2026-11-12T09:23:45Z",
+      "stage": 2
+    },
+    {
+      "id": "normalize",
+      "status": "ok",
+      "reason": null,
+      "detail": null,
+      "started_at": "2026-11-12T09:23:45Z",
+      "ended_at": "2026-11-12T09:24:50Z",
+      "stage": 2
+    },
+    {
+      "id": "license-registry",
+      "status": "disabled",
+      "reason": null,
+      "detail": null,
+      "started_at": "2026-11-12T09:24:50Z",
+      "ended_at": "2026-11-12T09:24:50Z",
+      "stage": 2
+    },
+    {
+      "id": "enrich-cpe",
+      "status": "ok",
+      "reason": null,
+      "detail": null,
+      "started_at": "2026-11-12T09:24:52Z",
+      "ended_at": "2026-11-12T09:24:58Z",
+      "stage": 2
+    },
+    {
+      "id": "upstream-purl",
+      "status": "ok",
+      "reason": null,
+      "detail": null,
+      "started_at": "2026-11-12T09:24:58Z",
+      "ended_at": "2026-11-12T09:24:59Z",
+      "stage": 2
+    },
+    {
+      "id": "enrich-os-context",
+      "status": "ok",
+      "reason": null,
+      "detail": null,
+      "started_at": "2026-11-12T09:24:59Z",
+      "ended_at": "2026-11-12T09:24:59Z",
+      "stage": 2
+    },
+    {
+      "id": "enrich-distro-supplier",
+      "status": "ok",
+      "reason": null,
+      "detail": null,
+      "started_at": "2026-11-12T09:24:59Z",
+      "ended_at": "2026-11-12T09:25:00Z",
+      "stage": 2
+    },
+    {
+      "id": "enrich-maven-cpe",
+      "status": "ok",
+      "reason": null,
+      "detail": null,
+      "started_at": "2026-11-12T09:25:00Z",
+      "ended_at": "2026-11-12T09:25:01Z",
+      "stage": 2
+    },
+    {
+      "id": "enrich-github-cpe",
+      "status": "ok",
+      "reason": null,
+      "detail": null,
+      "started_at": "2026-11-12T09:25:01Z",
+      "ended_at": "2026-11-12T09:25:01Z",
+      "stage": 2
+    },
+    {
+      "id": "enrich-interpreter-cpe",
+      "status": "ok",
+      "reason": null,
+      "detail": null,
+      "started_at": "2026-11-12T09:25:01Z",
+      "ended_at": "2026-11-12T09:25:01Z",
+      "stage": 2
+    },
+    {
+      "id": "enrich-eol",
+      "status": "ok",
+      "reason": null,
+      "detail": null,
+      "started_at": "2026-11-12T09:25:01Z",
+      "ended_at": "2026-11-12T09:25:05Z",
+      "stage": 2
+    },
+    {
+      "id": "enrich-malicious",
+      "status": "ok",
+      "reason": null,
+      "detail": null,
+      "started_at": "2026-11-12T09:25:05Z",
+      "ended_at": "2026-11-12T09:25:08Z",
+      "stage": 2
+    },
+    {
+      "id": "enrich-staleness",
+      "status": "disabled",
+      "reason": null,
+      "detail": null,
+      "started_at": "2026-11-12T09:25:08Z",
+      "ended_at": "2026-11-12T09:25:08Z",
+      "stage": 2
+    },
+    {
+      "id": "conformance",
+      "status": "ok",
+      "reason": null,
+      "detail": null,
+      "started_at": "2026-11-12T09:25:08Z",
+      "ended_at": "2026-11-12T09:25:18Z",
+      "stage": 2
+    },
+    {
+      "id": "generate-notice",
+      "status": "ok",
+      "reason": null,
+      "detail": null,
+      "started_at": "2026-11-12T09:25:19Z",
+      "ended_at": "2026-11-12T09:25:21Z",
+      "stage": 2
+    },
+    {
+      "id": "match-cpe",
+      "status": "ok",
+      "reason": null,
+      "detail": null,
+      "started_at": "2026-11-12T09:25:21Z",
+      "ended_at": "2026-11-12T09:25:26Z",
+      "counts": {
+        "offered": 59193,
+        "components": 1,
+        "cves": 851
+      },
+      "stage": 2
+    },
+    {
+      "id": "scan-security",
+      "status": "ok",
+      "reason": null,
+      "detail": null,
+      "started_at": "2026-11-12T09:25:26Z",
+      "ended_at": "2026-11-12T09:25:39Z",
+      "stage": 2
+    },
+    {
+      "id": "deep-cve",
+      "status": "disabled",
+      "reason": null,
+      "detail": null,
+      "started_at": "2026-11-12T09:25:39Z",
+      "ended_at": "2026-11-12T09:25:39Z",
+      "stage": 2
+    },
+    {
+      "id": "go-vulndb",
+      "status": "ok",
+      "reason": null,
+      "detail": null,
+      "started_at": "2026-11-12T09:25:40Z",
+      "ended_at": "2026-11-12T09:25:40Z",
+      "counts": {
+        "components": 53,
+        "findings": 0,
+        "already_reported": 37
+      },
+      "stage": 2
+    },
+    {
+      "id": "generate-risk-report",
+      "status": "ok",
+      "reason": null,
+      "detail": null,
+      "started_at": "2026-11-12T09:25:40Z",
+      "ended_at": "2026-11-12T09:25:50Z",
+      "stage": 2
+    },
+    {
+      "id": "sign",
+      "status": "disabled",
+      "reason": null,
+      "detail": null,
+      "started_at": "2026-11-12T09:25:50Z",
+      "ended_at": "2026-11-12T09:25:50Z",
+      "stage": 2
+    }
+  ],
+  "tools": {
+    "unblob": "26.3.30",
+    "syft": "1.54.1",
+    "cve-bin-tool": "3.4",
+    "trivy": "0.75.0"
+  },
+  "engines": [
+    "trivy",
+    "cve-bin-tool",
+    "go-vulndb"
+  ],
+  "data_sources": {
+    "trivy_db": {
+      "schema_version": 2,
+      "updated_at": "2026-11-12T07:01:33.828310435Z",
+      "downloaded_at": "2026-11-12T09:09:35.206565975Z"
+    },
+    "go_vulndb": {
+      "updated_at": "2026-11-11T02:51:11Z"
+    }
+  },
+  "outputs": [
+    {
+      "role": "sbom.cyclonedx",
+      "path": "RaspberryPiOsLite_2026-06-18_bom.json",
+      "sha256": "7959bc279a459390e4da86aa8dfdb835e210c488af98193b0a91a82987ba23b7",
+      "bytes": 41940056
+    },
+    {
+      "role": "other",
+      "path": "RaspberryPiOsLite_2026-06-18_component-versions.template.csv",
+      "sha256": "6d1c227025879386a715bf1c4102abaa956edf15e685532483896281110b6b8d",
+      "bytes": 23918
+    },
+    {
+      "role": "other",
+      "path": "RaspberryPiOsLite_2026-06-18_files.json",
+      "sha256": "04cbebc3178f937e130aa71d3e73543a38ea3ed651fe756082b32421e7c246df",
+      "bytes": 2315660
+    },
+    {
+      "role": "other",
+      "path": "RaspberryPiOsLite_2026-06-18_source.json",
+      "sha256": "9d39fedb9c64149aa4dc98c858126b62987bd79f2eed2dd723d23214292f4aaa",
+      "bytes": 8998390
+    },
+    {
+      "role": "other",
+      "path": "RaspberryPiOsLite_2026-06-18_NOTICE.txt",
+      "sha256": "846d80ad25008d68ebe1942a1e726b7c35dd11aed93f50b359a2ee9e935d0b8e",
+      "bytes": 709756
+    },
+    {
+      "role": "other",
+      "path": "RaspberryPiOsLite_2026-06-18_NOTICE.html",
+      "sha256": "00c50586eab00ea54b8b3d1013c3f60dcdbb08e190e484b684a384b45e1fa961",
+      "bytes": 875142
+    },
+    {
+      "role": "vulnerabilities.all",
+      "path": "RaspberryPiOsLite_2026-06-18_security.json",
+      "sha256": "90c793036c5f4190c96977688fffa044b587eb0481f23d66e72bf0246a3ae946",
+      "bytes": 30345917
+    },
+    {
+      "role": "vulnerabilities.trivy",
+      "path": "RaspberryPiOsLite_2026-06-18_security_trivy.json",
+      "sha256": "afba6a3486f66661f8a51e2ee185897da3ae263497bb62077becf29213beb623",
+      "bytes": 29976668
+    },
+    {
+      "role": "other",
+      "path": "RaspberryPiOsLite_2026-06-18_security.md",
+      "sha256": "5a4a8d07a6b1d395e4c3835985341d3ce98bfb9afd9bff4115ac1d75b0565744",
+      "bytes": 711832
+    },
+    {
+      "role": "other",
+      "path": "RaspberryPiOsLite_2026-06-18_security.html",
+      "sha256": "03ef80f9a7d2b93f7f568cd15e81514f392500fe570f1fa2f9d00573479fcb90",
+      "bytes": 2266960
+    },
+    {
+      "role": "conformance",
+      "path": "RaspberryPiOsLite_2026-06-18_conformance.json",
+      "sha256": "1cdc6c9c5b1257115850371e7f63fdbb3446a24de064cb03db427d3b7bec03bf",
+      "bytes": 61905
+    },
+    {
+      "role": "other",
+      "path": "RaspberryPiOsLite_2026-06-18_conformance.md",
+      "sha256": "4089dd52b22b0fac049bf284c2df484cec9663fc4cc41980685e34172e97d61e",
+      "bytes": 20457
+    },
+    {
+      "role": "other",
+      "path": "RaspberryPiOsLite_2026-06-18_conformance.html",
+      "sha256": "a9a136d02eea48c810a0f563253a04f0c5e0b28d30248966dd8ef73999f4255d",
+      "bytes": 45024
+    },
+    {
+      "role": "other",
+      "path": "RaspberryPiOsLite_2026-06-18_conformance.result",
+      "sha256": "51280dabfbc880cdc5f92cc2f4f22c8032de5aba401c3268250a11eeb2df1f73",
+      "bytes": 4
+    },
+    {
+      "role": "other",
+      "path": "RaspberryPiOsLite_2026-06-18_summary.result",
+      "sha256": "4a158f073dc7f93701e2737f74633768c6e95d1e3026947e8d047970d0d088cc",
+      "bytes": 63
+    },
+    {
+      "role": "other",
+      "path": "RaspberryPiOsLite_2026-06-18_risk-report.md",
+      "sha256": "d8b142e0052c63360e4626cba47a40ac4ccc93ab43c80fbdc30c75756b1f9b51",
+      "bytes": 720594
+    },
+    {
+      "role": "other",
+      "path": "RaspberryPiOsLite_2026-06-18_risk-report.html",
+      "sha256": "db4186111e905384ad1af50e56b0be32bd7cff8254e74a0938aba4c0f3dc6f58",
+      "bytes": 1358605
+    },
+    {
+      "role": "other",
+      "path": "RaspberryPiOsLite_2026-06-18_security_epss.json",
+      "sha256": "aeb1840537614460b2addc3a7c3abf2e7781a039c678d2a4d504942ac88f9da0",
+      "bytes": 75193
+    },
+    {
+      "role": "vulnerabilities.other",
+      "path": "RaspberryPiOsLite_2026-06-18_security_cvebintool.json",
+      "sha256": "ebfb0d6e85c09d45ef7d5f73ddb6a86ff4a3fd39055eb17c6a025716dacedfe6",
+      "bytes": 334624
+    },
+    {
+      "role": "vulnerabilities.other",
+      "path": "RaspberryPiOsLite_2026-06-18_security_govulndb.json",
+      "sha256": "0efc758a869e884a53ab07801bb2a913a49eb9deb23543257ba04915950bab4f",
+      "bytes": 282
+    }
+  ]
+}
