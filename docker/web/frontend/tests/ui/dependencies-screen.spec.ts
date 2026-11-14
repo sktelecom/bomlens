@@ -363,14 +363,15 @@ test("a slow SBOM load shows the loading state first", async ({ page }) => {
   await canvas(page).waitFor({ timeout: 15000 });
 });
 
-test("a graph canvas that fails to load shows the error, and Retry draws it once the chunk loads", async ({ page }) => {
+test("a graph canvas that fails to load shows the error, and Retry reloads the page and draws it once the chunk loads", async ({ page }) => {
   const chunk = /cytoscape[^/]*\.js/;
   await page.route(chunk, (r) => r.abort());
   await openScreen(page);
   const error = page.getByTestId("deps-error");
   await expect(error).toContainText("The dependency graph could not be rendered.");
   await page.unroute(chunk);
-  await error.getByRole("button", { name: "Retry" }).click();
+  // A browser remembers a failed dynamic import, so Retry loads the page again.
+  await Promise.all([page.waitForEvent("load"), error.getByRole("button", { name: "Retry" }).click()]);
   await canvas(page).waitFor({ timeout: 15000 });
   await expect(error).toHaveCount(0);
   // The view switch stays through the error, so the reader can also leave for the tree.

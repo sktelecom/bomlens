@@ -97,6 +97,8 @@ export function DependencyGraph({
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const cyRef = useRef<any>(null);
   const [error, setError] = useState(false);
+  // The canvas library itself failed to load (as opposed to failing to draw).
+  const [chunkFailed, setChunkFailed] = useState(false);
   const [attempt, setAttempt] = useState(0);
   // Bumped when a canvas is created, so a search typed while it loaded is applied.
   const [drawn, setDrawn] = useState(0);
@@ -128,7 +130,16 @@ export function DependencyGraph({
 
     void (async () => {
       try {
-        const [{ default: cytoscape }, { default: dagre }] = await Promise.all([import("cytoscape"), import("cytoscape-dagre")]);
+        let modules;
+        try {
+          modules = await Promise.all([import("cytoscape"), import("cytoscape-dagre")]);
+        } catch (e) {
+          // A browser remembers a failed dynamic import for the page's lifetime,
+          // so loading the same chunk again in place cannot succeed.
+          if (!destroyed) setChunkFailed(true);
+          throw e;
+        }
+        const [{ default: cytoscape }, { default: dagre }] = modules;
         if (!dagreRegistered) {
           cytoscape.use(dagre);
           dagreRegistered = true;
@@ -321,6 +332,12 @@ export function DependencyGraph({
         <DepError text={t("deps.graphError")} onRetry={() => {
             // Clear the error in the same update, so the canvas container is
             // mounted before the effect runs again.
+            if (chunkFailed) {
+              // The failed import is remembered by the page, so only a fresh
+              // page load fetches the chunk again; the route (hash) is kept.
+              location.reload();
+              return;
+            }
             setError(false);
             setAttempt((n) => n + 1);
           }} />
