@@ -7198,6 +7198,32 @@ $_grs_report" ) 2>&1
         _o=$(_grs_run GRADLE_INCLUDED_BUILDS=libbuild)
         _grs_expect "GRADLE_INCLUDED_BUILDS set: no set, full graph" "$_o" SET ""
 
+        # A build included only through pluginManagement (J line) keeps the filter on;
+        # one next to it included for its code (I line), or a project that depends on
+        # a project of another build (F line), keeps the full graph.
+        rm -rf "$WORK/grs-pm"; cp -R "$GRFIX/multi" "$WORK/grs-pm"
+        printf 'J\tbuild-logic\nZ\t5\n' > "$WORK/grs-pm/_meta.txt"
+        _o=$(_grs_run GRS_REPORT="$WORK/grs-pm")
+        _grs_expect "a build included only through pluginManagement: the runtime classpath set is kept" "$_o" SET \
+            "com.fasterxml.jackson.core:jackson-core:2.16.0 com.fasterxml.jackson.core:jackson-databind:2.16.0 com.google.guava:guava:33.0.0-jre com.squareup.okio:okio-jvm:3.6.0 org.apache.commons:commons-lang3:3.14.0 "
+        if printf '%s\n' "$_o" | grep -q 'included for plugins only, so not part of the graph: build-logic'; then
+            pass "the plugin build is named in the log"
+        else
+            fail "plugin build not logged" "$_o"
+        fi
+        printf 'J\tbuild-logic\nI\tlibbuild\nZ\t5\n' > "$WORK/grs-pm/_meta.txt"
+        _o=$(_grs_run GRS_REPORT="$WORK/grs-pm")
+        _grs_expect "a plugin build next to a build included for its code: no set, full graph" "$_o" SET ""
+        printf 'J\tbuild-logic\nZ\t5\n' > "$WORK/grs-pm/_meta.txt"
+        printf 'P\t:app\nH\t:app\nF\t:app\tproject :build-logic\nR\t:app\tzzz:zzz:1\n' > "$WORK/grs-pm/%3Aapp.txt"
+        _o=$(_grs_run GRS_REPORT="$WORK/grs-pm")
+        _grs_expect "a project that depends on a project of another build: no set, full graph" "$_o" SET ""
+        if printf '%s\n' "$_o" | grep -q 'project :app depends on project :build-logic, a project of another build; using full graph'; then
+            pass "the dependency on a project of another build is named in the log"
+        else
+            fail "dependency on another build's project not logged" "$_o"
+        fi
+
         rm -rf "$WORK/grs-missing"; cp -R "$GRFIX/single" "$WORK/grs-missing"
         printf 'Z\t2\n' > "$WORK/grs-missing/_meta.txt"
         _o=$(_grs_run GRS_REPORT="$WORK/grs-missing")

@@ -1247,7 +1247,14 @@ function gradle_gav(line,    i, left, right, nl, l, nr, r, g, a, v) {
 # The full graph is kept when the build includes other builds (includeBuild,
 # or GRADLE_INCLUDED_BUILDS: cdxgen reads their reports too, and they are not
 # in this run), when a configuration could not be resolved, when the files are
-# incomplete, or when nothing was read. A run that fails for another reason
+# incomplete, or when nothing was read. A build included only through
+# pluginManagement { includeBuild(...) } is a plugin build: it cannot replace a
+# dependency and nothing it needs at build time ships, so it does not keep the
+# full graph. That holds when the settings tell it from a build included for
+# its code (a directory with more inclusions than pluginManagement ones is
+# both), and when no project's graph holds a project of another build. Settings
+# that cannot be read leave every included build counting as one included for
+# its code. A run that fails for another reason
 # than the time limit is followed by the root project's dependencies task, as
 # the warm-up was before.
 gradle_runtime_classpath() {
@@ -1269,6 +1276,38 @@ if (gradle.parent == null) {
         // Deprecated configurations Gradle 6 and 7 warn about when they are resolved.
         n == 'archives' || n == 'default'
     }
+    // Gradle lists a build included through pluginManagement { includeBuild(...) }
+    // in gradle.includedBuilds like one included for its code, and does not say
+    // which it is. The settings keep one spec per inclusion: settings.includedBuilds
+    // has all of them, settings.pluginManagement.includedBuilds those made through
+    // pluginManagement. A directory that has no more inclusions than pluginManagement
+    // ones is a plugin build only. These classes are Gradle's internal ones, so
+    // anything that cannot be read leaves every included build counting as one
+    // included for its code.
+    def pluginOnlyDirs = null
+    gradle.settingsEvaluated { s ->
+        try {
+            def count = { specs ->
+                def m = [:]
+                specs.each { sp -> def k = sp.rootDir.canonicalPath; m[k] = (m[k] ?: 0) + 1 }
+                m
+            }
+            def all = count(s.includedBuilds)
+            def only = new HashSet()
+            count(s.pluginManagement.includedBuilds).each { k, n -> if (all[k] == n) { only << k } }
+            pluginOnlyDirs = only
+        } catch (Throwable e) {
+            pluginOnlyDirs = null
+        }
+    }
+    // Whether a project component belongs to another build of the composite.
+    // buildTreePath (Gradle 8.2 on) is the project path for a project of the
+    // root build; before that the build identifier says. Unreadable: not another build.
+    def inOtherBuild = { id ->
+        try { return id.buildTreePath != id.projectPath } catch (Throwable e) { }
+        try { return !id.build.currentBuild } catch (Throwable e) { }
+        false
+    }
     gradle.allprojects { p ->
         def path = p.path
         p.tasks.register('bomlensResolve') { t ->
@@ -1289,6 +1328,8 @@ if (gradle.parent == null) {
                         def id = c.id
                         if (id instanceof org.gradle.api.artifacts.component.ModuleComponentIdentifier) {
                             found << (id.group + ':' + id.module + ':' + id.version)
+                        } else if (id instanceof org.gradle.api.artifacts.component.ProjectComponentIdentifier && inOtherBuild(id)) {
+                            lines << ("F\t" + path + "\t" + id.displayName)
                         }
                     }
                     // A dependency that did not resolve is still named by what asked for it.
@@ -1343,7 +1384,12 @@ if (gradle.parent == null) {
             t.dependsOn { root.allprojects.collect { it.tasks.named('bomlensResolve') } }
             t.doLast {
                 def lines = []
-                gradle.includedBuilds.each { lines << ("I\t" + it.name) }
+                // I: an included build that keeps the full graph, J: a plugin build only.
+                gradle.includedBuilds.each { ib ->
+                    def pluginOnly = false
+                    try { pluginOnly = pluginOnlyDirs != null && pluginOnlyDirs.contains(ib.projectDir.canonicalPath) } catch (Throwable e) { }
+                    lines << ((pluginOnly ? "J\t" : "I\t") + ib.name)
+                }
                 lines << ("Z\t" + root.allprojects.size())
                 new File(outDir, '_meta.txt').text = lines.join('\n') + '\n'
             }
@@ -1360,12 +1406,15 @@ GRADLE_INIT
     _gr_rc=$?
     cat "$_gr_err" >&2
     if [ "$_gr_rc" -eq 0 ]; then
-        # Lines: I <included build>, Z <number of projects>, P <project>,
-        # H <project has a runtimeClasspath>, R <project> <coordinate> (its
-        # runtimeClasspath), O <project> <coordinate> (another configuration
-        # of a project with none), X <project> <configuration> (not resolved).
+        # Lines: I <included build>, J <build included for plugins only>,
+        # Z <number of projects>, P <project>, F <project> <project of another
+        # build in its graph>, H <project has a runtimeClasspath>, R <project>
+        # <coordinate> (its runtimeClasspath), O <project> <coordinate>
+        # (another configuration of a project with none), X <project>
+        # <configuration> (not resolved).
         cat "$_gr_out"/*.txt 2>/dev/null | awk -F '\t' '
             $1 == "I" { print "!the build includes the build " $2 }
+            $1 == "F" { print "!project " $2 " depends on " $3 ", a project of another build" }
             $1 == "Z" { want = $2; nz++ }
             $1 == "P" { proj[$2] = 1; np++ }
             $1 == "H" { hasrt[$2] = 1 }
@@ -1386,6 +1435,8 @@ GRADLE_INIT
         elif [ -s "$_gr_set" ]; then
             GRADLE_RUNTIME_SET=$(mktemp)
             sort -u "$_gr_set" > "$GRADLE_RUNTIME_SET"
+            _gr_plugin=$(cat "$_gr_out"/*.txt 2>/dev/null | awk -F '\t' '$1 == "J" { printf "%s%s", sep, $2; sep = ", " }')
+            [ -z "$_gr_plugin" ] || log "gradle: included for plugins only, so not part of the graph: $_gr_plugin"
             log "gradle: runtime classpath set = $(wc -l < "$GRADLE_RUNTIME_SET") components"
         else
             log "gradle: no runtime classpath dependency found; using full graph"
