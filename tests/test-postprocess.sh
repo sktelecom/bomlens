@@ -6576,6 +6576,26 @@ STUB
     [ "$(cat "$WORK/mh-calls" 2>/dev/null)" = "mvnw $_mh_goal" ] \
         && pass "mvnw without the executable bit runs through sh, not the image's mvn" \
         || fail "mvnw without the executable bit: [$(cat "$WORK/mh-calls" 2>/dev/null)]"
+    # The shell follows the wrapper's first line. Stub bash and sh in PATH
+    # record who ran ./mvnw, then run the real shell.
+    mkdir -p "$WORK/mh-shbin"
+    printf '#!/bin/sh\necho "bash $1" >> "%s/mh-shells"\nexec %s "$@"\n' "$WORK" "$(command -v bash)" > "$WORK/mh-shbin/bash"
+    printf '#!/bin/sh\necho "sh $1" >> "%s/mh-shells"\nexec /bin/sh "$@"\n' "$WORK" > "$WORK/mh-shbin/sh"
+    chmod +x "$WORK/mh-shbin/bash" "$WORK/mh-shbin/sh"
+    for _mh_sb in "bash:#!/usr/bin/env bash" "sh:#!/bin/sh" "none:"; do
+        _mh_want=${_mh_sb%%:*}; _mh_first=${_mh_sb#*:}
+        [ "$_mh_want" = none ] && _mh_want="sh"
+        _mh_d="$WORK/mh-shebang-${_mh_sb%%:*}"; mkdir -p "$_mh_d/.mvn/wrapper"; touch "$_mh_d/pom.xml"
+        { [ -z "$_mh_first" ] || printf '%s\n' "$_mh_first"; sed 1d "$_mh_bin/mvn"; } > "$_mh_d/mvnw"; chmod -x "$_mh_d/mvnw"
+        rm -f "$WORK/mh-shells"
+        ( PATH="$WORK/mh-shbin:$PATH" _mh_run "$_mh_d" "" >/dev/null )
+        _mh_other=bash; [ "$_mh_want" = bash ] && _mh_other="sh"
+        { grep -qx "$_mh_want ./mvnw" "$WORK/mh-shells" 2>/dev/null \
+            && ! grep -qx "$_mh_other ./mvnw" "$WORK/mh-shells" \
+            && [ "$(cat "$WORK/mh-calls" 2>/dev/null)" = "mvnw $_mh_goal" ]; } \
+            && pass "a mvnw with first line [${_mh_first:-none}] and no executable bit runs through $_mh_want" \
+            || fail "mvnw first line [${_mh_first:-none}]: shells [$(tr '\n' ';' < "$WORK/mh-shells" 2>/dev/null)] calls [$(cat "$WORK/mh-calls" 2>/dev/null)]"
+    done
     for _mh_f in exit error; do
         if _mh_out=$(_mh_run "$WORK/mh-proj" "" "$_mh_f"); then
             printf '%s' "$_mh_out" | grep -q "some components will have no hashes (non-fatal)" \
@@ -7092,7 +7112,7 @@ if command -v node >/dev/null 2>&1; then
     PREP="$ROOT_DIR/docker/lib/build-prep.sh"
     GRFIX="$FIX/gradle-runtime"
     _grs_block=$(sed -n '/^# Gradle (java-gradle \/ Android)/,/^# A root Gradle build that did not reach/p' "$PREP" | sed '$d')
-    _grs_fns=$(sed -n '/^mark_prep_failed() {/,/^}/p; /^unmark_prep_failed() {/,/^}/p; /^prep_step() {/,/^}/p' "$PREP")
+    _grs_fns=$(sed -n '/^mark_prep_failed() {/,/^}/p; /^unmark_prep_failed() {/,/^}/p; /^prep_step() {/,/^}/p; /^wrapper_shell() {/,/^}/p' "$PREP")
     _grs_js="$WORK/gradle-filter.js"
     sed -n "/<<'FILTER_JS'/,/^FILTER_JS\$/p" "$PREP" | sed '1d;$d' > "$_grs_js"
     if [ -n "$_grs_block" ] && [ -n "$_grs_fns" ] && [ -s "$_grs_js" ]; then
@@ -9348,6 +9368,56 @@ grep -q '^\[build-prep\] gradle: sh ./gradlew runs Gradle 5.6.4$' "$GW_ROOT/log"
 grep -q '^wrapper' "$GW_ROOT/calls" && [ -f "$GW_ROOT/src/gradlew" ] && [ ! -x "$GW_ROOT/src/gradlew" ] \
     && pass "the gradlew is left without the executable bit after the scan" \
     || fail "gradlew mode after the scan: $(ls -l "$GW_ROOT/src/gradlew" 2>/dev/null)"
+
+echo "== gradle: the shell for a gradlew without the executable bit follows its first line =="
+# Stub bash and sh in PATH record who ran the wrapper, then run the real shell.
+_gs_run() {  # <name> <first line of gradlew or empty>
+    GS_ROOT="$WORK/gradle-shebang-$1"; mkdir -p "$GS_ROOT/bin" "$GS_ROOT/src" "$GS_ROOT/out" "$GS_ROOT/gh"
+    printf "plugins { id 'java' }\n" > "$GS_ROOT/src/build.gradle"
+    printf '#!/bin/sh\nexit 0\n' > "$GS_ROOT/bin/gradle"
+    printf '#!/bin/sh\necho "bash $*" >> "%s/shells"\nexec %s "$@"\n' "$GS_ROOT" "$(command -v bash)" > "$GS_ROOT/bin/bash"
+    printf '#!/bin/sh\necho "sh $*" >> "%s/shells"\nexec /bin/sh "$@"\n' "$GS_ROOT" > "$GS_ROOT/bin/sh"
+    cat > "$GS_ROOT/bin/cdxgen" <<'GSCDX'
+#!/bin/sh
+out=""; prev=""; for a in "$@"; do [ "$prev" = "-o" ] && out="$a"; prev="$a"; done
+printf '%s' '{"bomFormat":"CycloneDX","specVersion":"1.6","version":1,"metadata":{},"components":[]}' > "$out"
+GSCDX
+    chmod +x "$GS_ROOT/bin/gradle" "$GS_ROOT/bin/bash" "$GS_ROOT/bin/sh" "$GS_ROOT/bin/cdxgen"
+    { [ -z "$2" ] || printf '%s\n' "$2"; printf 'exit 0\n'; } > "$GS_ROOT/src/gradlew"
+    chmod 644 "$GS_ROOT/src/gradlew"
+    env -u ANDROID_HOME PATH="$GS_ROOT/bin:$PATH" HOME="$GS_ROOT/home" GRADLE_USER_HOME="$GS_ROOT/gh" \
+        /bin/sh "$LIB/build-prep.sh" "$GS_ROOT/src" "$GS_ROOT/out/bom.json" > "$GS_ROOT/log" 2>&1
+}
+_gs_run bash '#!/usr/bin/env bash'
+{ grep -q '^bash \./gradlew ' "$GS_ROOT/shells" 2>/dev/null && ! grep -q '^sh \./gradlew ' "$GS_ROOT/shells" \
+    && grep -q '^\[build-prep\] gradle: bash \./gradlew runs ' "$GS_ROOT/log"; } \
+    && pass "a gradlew whose first line names bash runs through bash" \
+    || fail "bash shebang: shells [$(tr '\n' ';' < "$GS_ROOT/shells" 2>/dev/null)]" "$(grep 'gradle:' "$GS_ROOT/log" | head -3)"
+_gs_run sh '#!/bin/sh'
+{ grep -q '^sh \./gradlew ' "$GS_ROOT/shells" 2>/dev/null && ! grep -q '^bash \./gradlew ' "$GS_ROOT/shells" \
+    && grep -q '^\[build-prep\] gradle: sh \./gradlew runs ' "$GS_ROOT/log"; } \
+    && pass "a gradlew whose first line names sh runs through sh" \
+    || fail "sh shebang: shells [$(tr '\n' ';' < "$GS_ROOT/shells" 2>/dev/null)]" "$(grep 'gradle:' "$GS_ROOT/log" | head -3)"
+_gs_run none ''
+{ grep -q '^sh \./gradlew ' "$GS_ROOT/shells" 2>/dev/null && ! grep -q '^bash \./gradlew ' "$GS_ROOT/shells" \
+    && grep -q '^\[build-prep\] gradle: sh \./gradlew runs ' "$GS_ROOT/log"; } \
+    && pass "a gradlew with no shebang runs through sh" \
+    || fail "no shebang: shells [$(tr '\n' ';' < "$GS_ROOT/shells" 2>/dev/null)]" "$(grep 'gradle:' "$GS_ROOT/log" | head -3)"
+# The helper alone, with a PATH that has head but no bash (or has both): a bash
+# shebang falls back to sh when bash is not installed. An empty PATH would
+# also give sh, by head being missing, so head stays.
+_ws_fn="$(awk '/^wrapper_shell\(\) \{/ {p=1} p {print} p && /^}$/ {exit}' "$LIB/build-prep.sh")"
+_ws_dir="$WORK/wrapper-shell-path"; mkdir -p "$_ws_dir"
+ln -sf "$(command -v head)" "$_ws_dir/head"
+printf '#!/usr/bin/env bash\nexit 0\n' > "$WORK/wrapper-shell-bash"
+_ws_nobash="$(PATH="$_ws_dir" /bin/sh -c "$_ws_fn"'
+wrapper_shell "$1"' _ "$WORK/wrapper-shell-bash")"
+ln -sf "$(command -v bash)" "$_ws_dir/bash"
+_ws_withbash="$(PATH="$_ws_dir" /bin/sh -c "$_ws_fn"'
+wrapper_shell "$1"' _ "$WORK/wrapper-shell-bash")"
+[ "$_ws_nobash" = sh ] && [ "$_ws_withbash" = bash ] \
+    && pass "a bash shebang runs through sh when bash is not installed, and through bash when it is" \
+    || fail "wrapper_shell without bash [$_ws_nobash], with bash [$_ws_withbash]"
 
 echo "== gradle: cdxgen reads the POMs Gradle downloaded (GRADLE_CACHE_DIR) =="
 # HOME is not the account home Gradle uses, so cdxgen is told where Gradle's
