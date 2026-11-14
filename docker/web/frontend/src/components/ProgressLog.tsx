@@ -1,23 +1,15 @@
 // Copyright 2026 SK Telecom Co., Ltd.
 // SPDX-License-Identifier: Apache-2.0
 
-import { Copy, TriangleAlert } from "lucide-react";
+import { AlertIcon, ChevronRightIcon, CopyIcon } from "@primer/octicons-react";
+import { Button, Label } from "@primer/react";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Progress } from "@/components/ui/progress";
 import { copyToClipboard } from "@/lib/diagnostics";
-import { stageProgress } from "@/lib/scanProgress";
-import { Disclosure } from "@/components/ui/disclosure";
 import { useToast } from "@/lib/toast";
-import { cn } from "@/lib/utils";
+
+import "./progress/scan-progress.css";
 
 export type RunStatus = "running" | "done" | "error";
 
@@ -25,36 +17,41 @@ interface Props {
   logs: string[];
   status: RunStatus;
   /**
-   * Render as a collapsed-by-default disclosure. Used on the result screen,
-   * where the log is reference material under every section rather than the
-   * focus — the live run (ScanRunning) keeps it expanded.
+   * Start folded. Used on the result screen, where the log is reference
+   * material under every section rather than the focus; the live run keeps it
+   * open. `open` wins when both are given.
    */
   collapsible?: boolean;
+  /** Open or closed, set by the caller (a failed run opens it only when the cause is unknown). */
+  open?: boolean;
+  /** The scanner's own message, shown as received above the log. */
+  serverMessage?: string | null;
 }
 
-export function ProgressLog({
-  logs,
-  status,
-  collapsible = false,
-}: Props) {
+/** How close to the end still counts as "at the end" (px). */
+const END_SLACK = 8;
+
+/**
+ * The run log: lines as the stream delivers them in a focusable `role=log` box
+ * (resizable, wrapping), the copy button with its caution, and a note when the
+ * browser blocks the clipboard. The box follows new lines only while the reader
+ * is at its end; scrolling up to read stops it, and returning to the end
+ * resumes. The box scrolls itself, never the page (no scrollIntoView).
+ */
+export function ProgressLog({ logs, status, collapsible = false, open, serverMessage }: Props) {
   const { t } = useTranslation();
   const { toast } = useToast();
-  const logBoxRef = useRef<HTMLDivElement>(null);
+  const box = useRef<HTMLDivElement>(null);
+  const atEnd = useRef(true);
   const [copyBlocked, setCopyBlocked] = useState(false);
 
   useEffect(() => {
-    // Auto-scroll the log box itself — never scrollIntoView, which would also
-    // scroll the page canvas to the bottom on mount.
-    const box = logBoxRef.current;
-    if (box) box.scrollTop = box.scrollHeight;
+    const b = box.current;
+    if (b && atEnd.current) b.scrollTop = b.scrollHeight;
   }, [logs]);
 
-  // There is no real percentage from the backend, so approximate from log
-  // volume while running, then snap to 100% on completion.
-  const value = status === "running" ? stageProgress(logs) : 100;
-
-  // Copies the lines exactly as they are shown in the box, so what lands on the
-  // clipboard is what the user just read.
+  // Copies the lines exactly as they are shown, so what lands on the clipboard
+  // is what the reader just saw.
   const copyLog = async () => {
     if (await copyToClipboard(logs.join("\n"))) {
       setCopyBlocked(false);
@@ -66,77 +63,68 @@ export function ProgressLog({
     }
   };
 
-  const body = (
-    <>
-      <Progress
-        value={value}
-        aria-label={t("progress.title")}
-        indicatorClassName={cn(
-          status === "error" && "bg-destructive",
-          status === "done" && "bg-success-solid",
-        )}
-      />
-      <div
-        ref={logBoxRef}
-        role="log"
-        aria-label={t("progress.title")}
-        tabIndex={0}
-        className="h-72 min-h-40 max-h-[80vh] resize-y overflow-auto rounded-md border bg-muted/40 p-3 font-mono text-label leading-relaxed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-      >
-        {logs.length === 0 ? (
-          // foreground/70 (not muted-foreground) clears AA on the muted log panel.
-          <p className="text-foreground/70">{t("progress.waiting")}</p>
-        ) : (
-          logs.map((line, i) => (
-            <div
-              key={i}
-              className="whitespace-pre-wrap break-all text-foreground/90"
-            >
-              {line}
+  return (
+    <details className="bl-box bl-fold" open={open ?? !collapsible} data-testid="run-log">
+      <summary>
+        <span className="bl-fold-chev" aria-hidden>
+          <ChevronRightIcon size={16} />
+        </span>
+        <h2>{t("progress.title")}</h2>
+        {/* How the run ended, in words: the old progress bar's finished and failed colours. */}
+        <Label variant={status === "error" ? "danger" : status === "done" ? "success" : "accent"} data-testid="run-log-status">
+          {t(status === "error" ? "run.logFailed" : status === "done" ? "run.logDone" : "run.logRunning")}
+        </Label>
+        <span className="bl-fold-count">{t("run.logLines", { count: logs.length })}</span>
+      </summary>
+      <div className="bl-fold-body">
+        {serverMessage && (
+          <div>
+            <div className="bl-muted bl-strong" style={{ fontSize: "var(--text-body-size-small)" }}>
+              {t("run.serverMessage")}
             </div>
-          ))
+            <pre className="bl-log-message" data-testid="run-server-message">
+              {serverMessage}
+            </pre>
+          </div>
         )}
-      </div>
-      {logs.length > 0 && (
-        <div className="space-y-2">
-          <Button type="button" variant="outline" size="sm" onClick={copyLog}>
-            <Copy className="h-4 w-4" aria-hidden />
-            {t("report.copyLog")}
-          </Button>
-          <p className="flex items-start gap-2 text-body-sm text-foreground/80">
-            <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0 text-risk-medium" aria-hidden />
-            {t("report.logHint")}
-          </p>
-          {copyBlocked && (
-            <p role="status" className="text-body-sm text-foreground/70">
-              {t("report.logCopyFailed")}
-            </p>
+        <div
+          ref={box}
+          role="log"
+          aria-label={t("progress.title")}
+          tabIndex={0}
+          className="bl-log"
+          data-live={status === "running"}
+          onScroll={(e) => {
+            const b = e.currentTarget;
+            atEnd.current = b.scrollHeight - b.scrollTop - b.clientHeight < END_SLACK;
+          }}
+        >
+          {logs.length === 0 ? (
+            <p className="bl-log-empty">{t("progress.waiting")}</p>
+          ) : (
+            logs.map((line, i) => <div key={i}>{line}</div>)
           )}
         </div>
-      )}
-    </>
-  );
-
-  if (collapsible) {
-    return (
-      <Card className="animate-fade-in">
-        <Disclosure
-          size="md"
-          summaryClassName="p-6 text-body font-semibold tracking-tight"
-          summary={t("progress.title")}
-        >
-          <div className="space-y-3 px-6 pb-6">{body}</div>
-        </Disclosure>
-      </Card>
-    );
-  }
-
-  return (
-    <Card className="animate-fade-in">
-      <CardHeader className="pb-3">
-        <CardTitle className="text-body">{t("progress.title")}</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-3">{body}</CardContent>
-    </Card>
+        {logs.length > 0 && (
+          <>
+            <div className="bl-log-tools">
+              <Button size="small" leadingVisual={CopyIcon} onClick={copyLog}>
+                {t("report.copyLog")}
+              </Button>
+              <span className="bl-log-hint">
+                <AlertIcon size={14} />
+                {t("report.logHint")}
+              </span>
+            </div>
+            {copyBlocked && (
+              <p role="status" className="bl-log-note">
+                {t("report.logCopyFailed")}
+              </p>
+            )}
+          </>
+        )}
+        {status === "running" && <p className="bl-log-note">{t("run.logFollow")}</p>}
+      </div>
+    </details>
   );
 }

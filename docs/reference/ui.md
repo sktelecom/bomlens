@@ -82,7 +82,11 @@ To declare components by recipe (`bomlens:yocto-recipe`), put `sbom-declared.cdx
 
 ## Scan running
 
-During a run the screen shows the pipeline stages — generate, normalize, notices, security, report — advancing as the live log streams, so you can see where the scan is and read any error (clone failure, no Docker socket, an unsupported file) as it happens.
+During a run the screen shows the project and version, a Cancel button and a Steps box: generate, normalize, notices, security, report, plus Deep CVE matching when the run asked for it. Each step is marked done, in progress or waiting as its marker appears in the live log, and the percentage beside the bar counts only the steps this run has. The run log below stays open. It follows new lines while you are at its end; scroll up to read and it stops following until you scroll back down. Copy log puts the log as shown on the clipboard, with a reminder to read it first.
+
+Cancel asks first, because it stops the scan and keeps nothing it found so far. **Keep scanning** leaves the scan running; **Cancel scan** stops it, returns to New scan and says so in a short notice.
+
+When a run fails, the title becomes "Scan failed" and a banner leads with what went wrong and what to do, in your language: a repository that was not found or is private, a repository host that could not be reached, a scan tool that could not start (exit code 126, with the tool and runtime named), or an internal error. The Steps box stays and marks the step the run stopped on. **Retry** runs the same scan again; it is offered only when nothing in the scan is single-use, so a scan with an access token or an uploaded file shows a line saying why instead. New scan is always there. The scanner's own message is kept as received in the run log, which stays folded when the banner already explains the cause and opens by itself when it does not. Report a problem opens below with the diagnostics summary, as described in [Reporting a problem](#reporting-a-problem).
 
 ## Result sections
 
