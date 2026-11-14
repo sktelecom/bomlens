@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- A Java Gradle source scan keeps what each project's runtime classpath resolves, and leaves out dependencies only on a compile or test classpath (such as `j2objc-annotations` from guava 33.0.0, or JUnit). One Gradle run resolves every project through an init script, with the configuration cache off for that run, in place of the root project's `dependencies` warm-up. The full graph is kept when the build includes other builds (`includeBuild`, `pluginManagement` ones included), when a configuration cannot be resolved, or when the Gradle run fails. A dependency a project ships through another configuration (a custom `agent` or `distribution`, Shadow's `shadow`) is left out; `BOMLENS_GRADLE_FULL_GRAPH=1` keeps the full graph.
+- On the Android SDK image, a Java Gradle build with no release configuration is narrowed the Java way.
+
 ### Fixed
 
 - A source scan no longer deletes go.mod, lock files, vendor/ or other build folders from the scanned folder after an earlier scan of it whose cdxgen container never started. The cleanup of an interrupted scan runs only when that scan recorded a complete snapshot of the folder, and the CLI and the web UI remove the record a scan leaves when its cdxgen container did not get that far. The cleanup also leaves in place any file or folder that git tracks.

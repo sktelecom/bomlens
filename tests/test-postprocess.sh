@@ -7050,6 +7050,311 @@ else
     echo "  SKIP: node unavailable"
 fi
 
+echo "== gradle-runtime-scope: a java-gradle SBOM keeps the runtime classpath =="
+# Guards docker/lib/build-prep.sh: cdxgen keeps every Gradle configuration's
+# components, so one only on a compile classpath (j2objc-annotations, which
+# guava 33.0.0's Gradle module metadata gives to compile only) or only on a test
+# classpath was listed as shipped. build-prep reads every project's runtime
+# classpath and filters to it. The real Gradle block (Android branch
+# included) is extracted and run under sh with a stand-in gradlew that writes
+# the per-project files in tests/fixtures/gradle-runtime the init script
+# would write (the init script itself runs under a real Gradle in
+# tests/test-gradle-runtime.sh); then the real filter runs in its gradle mode.
+if command -v node >/dev/null 2>&1; then
+    PREP="$ROOT_DIR/docker/lib/build-prep.sh"
+    GRFIX="$FIX/gradle-runtime"
+    _grs_block=$(sed -n '/^# Gradle (java-gradle \/ Android)/,/^# A root Gradle build that did not reach/p' "$PREP" | sed '$d')
+    _grs_fns=$(sed -n '/^mark_prep_failed() {/,/^}/p; /^unmark_prep_failed() {/,/^}/p; /^prep_step() {/,/^}/p' "$PREP")
+    _grs_js="$WORK/gradle-filter.js"
+    sed -n "/<<'FILTER_JS'/,/^FILTER_JS\$/p" "$PREP" | sed '1d;$d' > "$_grs_js"
+    if [ -n "$_grs_block" ] && [ -n "$_grs_fns" ] && [ -s "$_grs_js" ]; then
+        _grs_bin="$WORK/grs-bin"; mkdir -p "$_grs_bin" "$WORK/grs-home"
+        printf '#!/bin/sh\nexit 0\n' > "$_grs_bin/gradle"
+        cat > "$WORK/grs-gradlew" <<'STUB'
+#!/bin/sh
+case " $* " in *" --version "*) exit 0 ;; esac
+echo "$*" >> "$GRS_CALLS"
+for a in "$@"; do
+    case "$a" in
+        --no-configuration-cache) [ -z "${GRS_OLD:-}" ] || exit 1 ;;
+        -Dbomlens.gradle.out=*) out="${a#-Dbomlens.gradle.out=}" ;;
+        bomlensRuntime)
+            [ -z "${GRS_TOOLCHAIN:-}" ] || { echo "bomlens: could not resolve runtimeClasspath of project :: No matching toolchains found for requested specification: {languageVersion=13, vendor=any, implementation=vendor-specific} for LINUX on aarch64." >&2; exit 1; }
+            [ "${GRS_RC:-0}" = 0 ] || exit "$GRS_RC"; cp "$GRS_REPORT"/* "$out"/; exit 0 ;;
+        projects) [ -z "${GRS_PROJ_RC:-}" ] || exit "$GRS_PROJ_RC"; cat "$GRS_FIX/${GRS_PROJECTS:-android-projects.txt}"; exit 0 ;;
+        *:dependencies)
+            f="$GRS_FIX/${GRS_ANDROID:-android}$(printf '%s' "$a" | tr ':' '-').txt"
+            [ ! -f "$f" ] || cat "$f"; exit 0 ;;
+        dependencies) exit "${GRS_WARM_RC:-0}" ;;
+    esac
+done
+exit 1
+STUB
+        chmod +x "$_grs_bin/gradle" "$WORK/grs-gradlew"
+        _grs_prelude='log() { echo "[build-prep] $*"; }
+opted_out() { case "$1" in 1|true) return 0 ;; esac; return 1; }
+gradle_settings_copy() { :; }
+run_supervised_timeout() { shift; "$@"; }
+PREP_FAILED=""; PREP_APPLIED=""; PREP_TIMEOUT_GRADLE=5'
+        _grs_report='set_of() { [ -n "$1" ] && [ -f "$1" ] && tr "\n" " " < "$1"; }
+echo "SET:$(set_of "$GRADLE_RUNTIME_SET")"
+echo "ASET:$(set_of "$ANDROID_RELEASE_SET")"
+echo "FAILED:$PREP_FAILED"
+echo "APPLIED:$PREP_APPLIED"'
+        _grs_run() {  # env NAME=value ... for the stand-in and the block
+            local p="$WORK/grs-proj"
+            rm -rf "$p"; mkdir -p "$p"; : > "$p/build.gradle"; cp "$WORK/grs-gradlew" "$p/gradlew"
+            [ -z "${GRS_NOEXEC:-}" ] || chmod -x "$p/gradlew"
+            : > "$WORK/grs-calls"
+            ( cd "$p" && env -u GRADLE_USER_HOME -u ANDROID_HOME -u GRADLE_INCLUDED_BUILDS -u BOMLENS_GRADLE_FULL_GRAPH \
+                PATH="$_grs_bin:$PATH" HOME="$WORK/grs-home" GRS_FIX="$GRFIX" GRS_CALLS="$WORK/grs-calls" \
+                GRS_REPORT="$GRFIX/single" "$@" \
+                sh -c "$_grs_prelude
+$_grs_fns
+$_grs_block
+$_grs_report" ) 2>&1
+        }
+        _grs_line() { printf '%s\n' "$1" | sed -n "s/^$2://p"; }
+        _grs_expect() {  # <label> <output> <SET|ASET|FAILED> <expected>
+            local got; got=$(_grs_line "$2" "$3")
+            if [ "$got" = "$4" ]; then pass "$1"; else fail "$1" "$3 got [$got], expected [$4]; $(printf '%s\n' "$2" | grep '^\[build-prep\]' | head -3)"; fi
+        }
+        _grs_single="com.fasterxml.jackson.core:jackson-core:2.16.1 com.google.guava:failureaccess:1.0.2 com.google.guava:guava:33.0.0-jre org.slf4j:jcl-over-slf4j:2.0.9 org.slf4j:slf4j-api:2.0.9 "
+
+        _o=$(_grs_run)
+        _grs_expect "one project, runtimeClasspath at the root: substituted module, rich and conflict-resolved versions read; compile-only, test, (c), (n) left out" \
+            "$_o" SET "$_grs_single"
+        _grs_expect "one Gradle run, recorded as gradle-dependencies and not failed" "$_o" APPLIED "gradle-dependencies"
+        if [ "$(wc -l < "$WORK/grs-calls" | tr -d ' ')" = 1 ] && grep -q -- '--no-configuration-cache --init-script .* bomlensRuntime' "$WORK/grs-calls"; then
+            pass "a single Gradle invocation reads every project, with the configuration cache off"
+        else
+            fail "Gradle invoked other than once with the init script" "$(cat "$WORK/grs-calls")"
+        fi
+
+        _o=$(GRS_NOEXEC=1 _grs_run)
+        _grs_expect "a gradlew without the execute bit is still the wrapper that runs" "$_o" SET "$_grs_single"
+
+        _o=$(_grs_run GRS_REPORT="$GRFIX/multi")
+        _grs_expect "several projects merged; project :core dependency not a component; a root with only jacoco and a Kotlin Multiplatform project (no runtimeClasspath) handled per project; a path with a space read" \
+            "$_o" SET "com.fasterxml.jackson.core:jackson-core:2.16.0 com.fasterxml.jackson.core:jackson-databind:2.16.0 com.google.guava:guava:33.0.0-jre com.squareup.okio:okio-jvm:3.6.0 org.apache.commons:commons-lang3:3.14.0 "
+
+        rm -rf "$WORK/grs-included"; cp -R "$GRFIX/multi" "$WORK/grs-included"
+        printf 'I\tlibbuild\nZ\t5\n' > "$WORK/grs-included/_meta.txt"
+        _o=$(_grs_run GRS_REPORT="$WORK/grs-included")
+        _grs_expect "an included build (includeBuild): no set, full graph" "$_o" SET ""
+        if printf '%s\n' "$_o" | grep -q 'the build includes the build libbuild; using full graph'; then
+            pass "the included build is named in the log"
+        else
+            fail "included build not logged" "$_o"
+        fi
+        _o=$(_grs_run GRADLE_INCLUDED_BUILDS=libbuild)
+        _grs_expect "GRADLE_INCLUDED_BUILDS set: no set, full graph" "$_o" SET ""
+
+        rm -rf "$WORK/grs-missing"; cp -R "$GRFIX/single" "$WORK/grs-missing"
+        printf 'Z\t2\n' > "$WORK/grs-missing/_meta.txt"
+        _o=$(_grs_run GRS_REPORT="$WORK/grs-missing")
+        _grs_expect "a project without its file (the count in the files is short): no set, full graph" "$_o" SET ""
+        rm -rf "$WORK/grs-nometa"; cp -R "$GRFIX/single" "$WORK/grs-nometa"; rm "$WORK/grs-nometa/_meta.txt"
+        _o=$(_grs_run GRS_REPORT="$WORK/grs-nometa")
+        _grs_expect "no end marker (the run stopped early): no set, full graph" "$_o" SET ""
+        rm -rf "$WORK/grs-twice"; cp -R "$GRFIX/single" "$WORK/grs-twice"
+        cp "$GRFIX/single/_meta.txt" "$WORK/grs-twice/_meta.txt"
+        printf 'P\t:\nR\t:\tzzz:zzz:1\n' > "$WORK/grs-twice/%3Adup.txt"
+        _o=$(_grs_run GRS_REPORT="$WORK/grs-twice")
+        _grs_expect "a project listed in two files (a count that does not match): no set, full graph" "$_o" SET ""
+        rm -rf "$WORK/grs-bad"; cp -R "$GRFIX/multi" "$WORK/grs-bad"
+        printf 'P\t:kmp\nX\t:kmp\tjvmRuntimeClasspath\n' > "$WORK/grs-bad/%3Akmp.txt"
+        _o=$(_grs_run GRS_REPORT="$WORK/grs-bad")
+        _grs_expect "a configuration that could not be resolved: no set, full graph" "$_o" SET ""
+        _o=$(_grs_run GRS_OLD=1)
+        _grs_expect "a Gradle without --no-configuration-cache: no set" "$_o" SET ""
+        if grep -qx -- '--no-daemon dependencies' "$WORK/grs-calls"; then
+            pass "a Gradle without --no-configuration-cache: the root warm-up runs instead"
+        else
+            fail "no warm-up after a Gradle that refuses --no-configuration-cache" "$(cat "$WORK/grs-calls")"
+        fi
+
+        _o=$(_grs_run GRS_RC=1)
+        _grs_expect "the run fails: no set" "$_o" SET ""
+        _grs_expect "the run fails: the root warm-up runs instead and the step is not left failed" "$_o" FAILED ""
+        if grep -qx -- '--no-daemon dependencies' "$WORK/grs-calls"; then
+            pass "the run fails: the plain root dependencies warm-up runs"
+        else
+            fail "warm-up not run after a failed read" "$(cat "$WORK/grs-calls")"
+        fi
+        _o=$(_grs_run GRS_RC=1 GRS_WARM_RC=1)
+        _grs_expect "the run and the warm-up both fail: recorded failed" "$_o" FAILED "gradle-dependencies"
+        _o=$(_grs_run GRS_RC=124)
+        _grs_expect "the run times out: no set, recorded failed" "$_o" FAILED "gradle-dependencies"
+        if [ "$(wc -l < "$WORK/grs-calls" | tr -d ' ')" = 1 ]; then
+            pass "the run times out: no second Gradle run"
+        else
+            fail "Gradle run again after a time-out" "$(cat "$WORK/grs-calls")"
+        fi
+
+
+        _o=$(_grs_run GRS_TOOLCHAIN=1)
+        _grs_expect "a runtimeClasspath that fails for want of a toolchain JDK: no set, the step recorded as failed" "$_o" FAILED "gradle-dependencies"
+        if printf '%s\n' "$_o" | grep -q '^\[build-prep\] gradle-dependencies: .*(java-toolchain-missing=13)$' \
+            && printf '%s\n' "$_o" | grep -q 'would fail the same way' && ! grep -qx -- '--no-daemon dependencies' "$WORK/grs-calls"; then
+            pass "the java-toolchain-missing marker is in the log (the CLI reruns stage 1 on it) and the root warm-up is not run"
+        else
+            fail "toolchain failure: marker or warm-up wrong" "$_o $(cat "$WORK/grs-calls")"
+        fi
+        rm -rf "$WORK/grs-x"; cp -R "$GRFIX/multi" "$WORK/grs-x"
+        printf 'P\t:kmp\nX\t:kmp\tjvmRuntimeClasspath\n' > "$WORK/grs-x/%3Akmp.txt"
+        _o=$(_grs_run GRS_REPORT="$WORK/grs-x")
+        _grs_expect "an X line without a failed run (rc 0): full graph, and no marker, so the warm-up is not skipped for it" "$_o" SET ""
+        # The init script also fails the run for a toolchain error in a configuration of a
+        # project with no runtimeClasspath (that Groovy runs in tests/test-gradle-runtime.sh).
+        # Here: the texts it looks for must be ones prep_step turns into java-toolchain-missing=N.
+        if grep -qF 'msg =~ /Cannot find a Java installation|No (compatible|matching) toolchains found/' "$PREP" \
+            && grep -qF 'Cannot find a Java installation on your machine|No (compatible|matching) toolchains found for request' "$PREP"; then
+            pass "the init script's toolchain patterns match the ones prep_step turns into java-toolchain-missing=N"
+        else
+            fail "toolchain patterns of the init script and prep_step drifted"
+        fi
+        _o=$(_grs_run ANDROID_HOME=/opt/android-sdk GRS_PROJ_RC=1)
+        _grs_expect "ANDROID_HOME, the project list fails: android-release-classpath recorded as failed" "$_o" FAILED "android-release-classpath"
+
+        _o=$(_grs_run BOMLENS_GRADLE_FULL_GRAPH=1)
+        _grs_expect "BOMLENS_GRADLE_FULL_GRAPH=1: no set" "$_o" SET ""
+        if grep -qx -- '--no-daemon dependencies' "$WORK/grs-calls"; then
+            pass "BOMLENS_GRADLE_FULL_GRAPH=1: the plain warm-up runs"
+        else
+            fail "opt-out did not run the plain warm-up" "$(cat "$WORK/grs-calls")"
+        fi
+
+        _o=$(_grs_run ANDROID_HOME=/opt/android-sdk)
+        _grs_expect "ANDROID_HOME: the release runtime set, a substituted module read as its target" \
+            "$_o" ASET "com.google.code.gson:gson:2.10.1 com.squareup.okhttp3:okhttp:4.12.0 com.squareup.okio:okio-jvm:3.6.0 "
+        _grs_expect "ANDROID_HOME: no java-gradle set beside the release set" "$_o" SET ""
+        _grs_expect "ANDROID_HOME: android-release-classpath recorded" "$_o" APPLIED "android-release-classpath"
+        _o=$(_grs_run ANDROID_HOME=/opt/android-sdk GRS_ANDROID=androidjava)
+        _grs_expect "ANDROID_HOME, no release configuration (a Java build): the java-gradle set is read instead" "$_o" SET "$_grs_single"
+        _grs_expect "ANDROID_HOME, no release configuration: no release set" "$_o" ASET ""
+        _o=$(_grs_run ANDROID_HOME=/opt/android-sdk GRS_ANDROID=androidjava GRS_PROJ_RC=124)
+        _grs_expect "ANDROID_HOME, the project list times out: no java-gradle set either" "$_o" SET ""
+        if printf '%s\n' "$_o" | grep -q 'timed out; using full graph' && ! grep -q -- 'bomlensRuntime' "$WORK/grs-calls"; then
+            pass "ANDROID_HOME, time-out: logged, and no second Gradle run"
+        else
+            fail "Android time-out still ran the java-gradle step" "$(cat "$WORK/grs-calls")"
+        fi
+        _o=$(_grs_run ANDROID_HOME=/opt/android-sdk GRS_PROJECTS=android-projects-odd.txt)
+        _grs_expect "ANDROID_HOME, a project path the per-module run cannot pass: no release set" "$_o" ASET ""
+        if printf '%s\n' "$_o" | grep -q "cannot pass to Gradle"; then
+            pass "ANDROID_HOME, odd project path: logged"
+        else
+            fail "odd Android project path not logged" "$_o"
+        fi
+        _o=$(_grs_run ANDROID_HOME=/opt/android-sdk GRS_ANDROID=androidjava BOMLENS_GRADLE_FULL_GRAPH=1)
+        _grs_expect "ANDROID_HOME, no release configuration, BOMLENS_GRADLE_FULL_GRAPH=1: no set" "$_o" SET ""
+
+        # The filter in its gradle mode, on a cdxgen-shaped BOM.
+        cat > "$WORK/grs-bom.json" <<'JSON'
+{"bomFormat":"CycloneDX","specVersion":"1.6",
+ "metadata":{"component":{"name":"demo","group":"com.example","purl":"pkg:maven/com.example/demo@1.0.0?type=jar","bom-ref":"pkg:maven/com.example/demo@1.0.0?type=jar"}},
+ "components":[
+   {"name":"guava","group":"com.google.guava","version":"33.0.0-jre","purl":"pkg:maven/com.google.guava/guava@33.0.0-jre?type=jar","bom-ref":"pkg:maven/com.google.guava/guava@33.0.0-jre?type=jar","properties":[{"name":"internal:GradleProfileName","value":"compileClasspath"}]},
+   {"name":"j2objc-annotations","group":"com.google.j2objc","version":"2.8","purl":"pkg:maven/com.google.j2objc/j2objc-annotations@2.8?type=jar","bom-ref":"pkg:maven/com.google.j2objc/j2objc-annotations@2.8?type=jar","properties":[{"name":"internal:GradleProfileName","value":"compileClasspath"}]},
+   {"name":"junit-jupiter","group":"org.junit.jupiter","version":"5.10.1","purl":"pkg:maven/org.junit.jupiter/junit-jupiter@5.10.1?type=jar","bom-ref":"pkg:maven/org.junit.jupiter/junit-jupiter@5.10.1?type=jar","scope":"optional","properties":[{"name":"internal:GradleProfileName","value":"testCompileClasspath"}]},
+   {"name":"rootpath-only","group":"org.other","version":"1.0","purl":"pkg:maven/org.other/rootpath-only@1.0?type=jar","bom-ref":"pkg:maven/org.other/rootpath-only@1.0?type=jar","properties":[{"name":"cdx:gradle:GradleRootPath","value":"/app"}]},
+   {"name":"lombok","group":"org.projectlombok","version":"1.18.30","purl":"pkg:maven/org.projectlombok/lombok@1.18.30?type=jar","bom-ref":"pkg:maven/org.projectlombok/lombok@1.18.30?type=jar","properties":[{"name":"internal:GradleProfileName","value":"annotationProcessor"}]},
+   {"name":"mockito-core","group":"org.mockito","version":"5.11.0","purl":"pkg:maven/org.mockito/mockito-core@5.11.0?type=jar","bom-ref":"pkg:maven/org.mockito/mockito-core@5.11.0?type=jar","scope":"optional","properties":[{"name":"internal:GradleProfileName","value":"testCompileClasspath"}]},
+   {"name":"junit-platform-launcher","group":"org.junit.platform","version":"1.10.2","purl":"pkg:maven/org.junit.platform/junit-platform-launcher@1.10.2?type=jar","bom-ref":"pkg:maven/org.junit.platform/junit-platform-launcher@1.10.2?type=jar","scope":"optional","properties":[{"name":"internal:GradleProfileName","value":"testRuntimeClasspath"}]},
+   {"name":"vendored","group":"org.acme","version":"1.0","purl":"pkg:maven/org.acme/vendored@1.0?type=jar","bom-ref":"pkg:maven/org.acme/vendored@1.0?type=jar"},
+   {"name":"demo","group":"com.example","version":"1.0.0","purl":"pkg:maven/com.example/demo@1.0.0?type=jar&sub=1","bom-ref":"sub-demo"}
+ ],
+ "dependencies":[
+   {"ref":"pkg:maven/com.example/demo@1.0.0?type=jar","dependsOn":["sub-demo"]},
+   {"ref":"sub-demo","dependsOn":["pkg:maven/com.google.guava/guava@33.0.0-jre?type=jar"]},
+   {"ref":"pkg:maven/com.google.guava/guava@33.0.0-jre?type=jar","dependsOn":["pkg:maven/com.google.j2objc/j2objc-annotations@2.8?type=jar"]}
+ ]}
+JSON
+        printf '%s\n' com.google.guava:guava:33.0.0-jre com.google.guava:failureaccess:1.0.2 > "$WORK/grs-set.txt"
+        node "$_grs_js" "$WORK/grs-bom.json" "$WORK/grs-set.txt" gradle 2>/dev/null
+        _grs_got=$(jq -r '[.components[] | "\(.name)=\(.scope // "none")"] | join(",")' "$WORK/grs-bom.json")
+        if [ "$_grs_got" = "guava=none,vendored=none,demo=none" ]; then
+            pass "compile-only, test-only and Gradle-marked (GradleRootPath only) components outside the set dropped; runtime ones required; a jar not from Gradle and first-party modules kept"
+        else
+            fail "unexpected components or scopes after the gradle filter" "$_grs_got"
+        fi
+        if [ "$(jq -r '.dependencies[] | select(.ref | startswith("pkg:maven/com.google.guava/guava")) | .dependsOn | length' "$WORK/grs-bom.json")" = "0" ]; then
+            pass "dependency edges to dropped components pruned"
+        else
+            fail "edge to a dropped component kept" "$(jq -c '.dependencies' "$WORK/grs-bom.json")"
+        fi
+        if [ "$(sed -n "s/^const GRADLE_ORIGIN = new Set(\(.*\));$/\1/p" "$PREP")" = "$(sed -n "s/^const ORIGIN = new Set(\(.*\));$/\1/p" "$PREP")" ]; then
+            pass "the filter's Gradle marks are the gradle-packages check's marks"
+        else
+            fail "GRADLE_ORIGIN and ORIGIN differ in build-prep.sh"
+        fi
+    else
+        fail "could not extract the Gradle block, the prep helpers or the filter from build-prep.sh"
+    fi
+else
+    echo "  SKIP: node unavailable, skipping java-gradle runtime classpath test"
+fi
+
+echo "== gradle-runtime-scope: the whole script, with stub gradle and cdxgen =="
+# The same filter through build-prep.sh itself: the init script's files come
+# from a stand-in gradlew, cdxgen's BOM from a stand-in with the components
+# cdxgen 13.5.0 writes for this build (internal:GradleProfileName on what it
+# read from Gradle, none on a jar found in the tree).
+if command -v node >/dev/null 2>&1; then
+    GW2="$WORK/gradle-whole"; mkdir -p "$GW2/bin" "$GW2/src" "$GW2/out" "$GW2/gh"
+    printf "plugins { id 'java' }\n" > "$GW2/src/build.gradle"
+    printf '#!/bin/sh\nexit 0\n' > "$GW2/bin/gradle"
+    cat > "$GW2/src/gradlew" <<GW2STUB
+#!/bin/sh
+echo "\$*" >> "$GW2/calls"
+case " \$* " in *" --version "*) exit 0 ;; esac
+out=""
+for a in "\$@"; do case "\$a" in -Dbomlens.gradle.out=*) out="\${a#-Dbomlens.gradle.out=}" ;; esac; done
+[ -z "\$out" ] || cp "$FIX/gradle-runtime/single"/* "\$out"/
+exit 0
+GW2STUB
+    chmod +x "$GW2/src/gradlew" "$GW2/bin/gradle"
+    _gw2_c() { printf '{"name":"%s","version":"%s","purl":"pkg:maven/%s/%s@%s?type=jar","bom-ref":"pkg:maven/%s/%s@%s?type=jar","properties":[{"name":"internal:GradleProfileName","value":"%s"}]%s}' "$2" "$3" "$1" "$2" "$3" "$1" "$2" "$3" "$4" "${5:+,\"scope\":\"$5\"}"; }
+    {
+        printf '{"bomFormat":"CycloneDX","specVersion":"1.6","version":1,"metadata":{"component":{"name":"demo","type":"application"}},"components":['
+        _gw2_c com.google.guava guava 33.0.0-jre compileClasspath; printf ','
+        _gw2_c com.google.guava failureaccess 1.0.2 compileClasspath; printf ','
+        _gw2_c com.google.j2objc j2objc-annotations 2.8 compileClasspath; printf ','
+        _gw2_c org.projectlombok lombok 1.18.30 annotationProcessor; printf ','
+        _gw2_c junit junit 4.13.2 testCompileClasspath optional; printf ','
+        printf '{"name":"treejar","version":"1.0","purl":"pkg:maven/org.acme/treejar@1.0?type=jar","bom-ref":"pkg:maven/org.acme/treejar@1.0?type=jar"}'
+        printf ']}'
+    } > "$GW2/bom-template.json"
+    cat > "$GW2/bin/cdxgen" <<GW2CDX
+#!/bin/sh
+out=""; prev=""; for a in "\$@"; do [ "\$prev" = "-o" ] && out="\$a"; prev="\$a"; done
+cp "$GW2/bom-template.json" "\$out"
+GW2CDX
+    chmod +x "$GW2/bin/cdxgen"
+    env -u ANDROID_HOME PATH="$GW2/bin:$PATH" HOME="$GW2/home" GRADLE_USER_HOME="$GW2/gh" \
+        sh "$LIB/build-prep.sh" "$GW2/src" "$GW2/out/bom.json" > "$GW2/log" 2>&1
+    _gw2_purls=$(jq -r '[.components[].purl | sub("^pkg:maven/";"") | sub("\\?type=jar";"")] | sort | join(" ")' "$GW2/out/bom.json" 2>/dev/null)
+    if [ "$_gw2_purls" = "com.google.guava/failureaccess@1.0.2 com.google.guava/guava@33.0.0-jre org.acme/treejar@1.0" ]; then
+        pass "build-prep.sh filters the BOM to the runtime classpath: compile-only, annotation processor and test components dropped, a jar from the tree kept"
+    else
+        fail "whole-script runtime filter kept [$_gw2_purls]" "$(grep gradle "$GW2/log" | head -5)"
+    fi
+    if jq -e '[.metadata.properties[]? | select(.name=="bomlens:prep-step-applied" and (.value|test("gradle-dependencies")))] | length > 0' "$GW2/out/bom.json" >/dev/null 2>&1 \
+       && ! jq -e '[.metadata.properties[]? | select(.name=="bomlens:pipeline-step-failed")] | length > 0' "$GW2/out/bom.json" >/dev/null 2>&1; then
+        pass "the run is recorded as gradle-dependencies, applied and not failed"
+    else
+        fail "gradle-dependencies recording" "$(jq -c '.metadata.properties' "$GW2/out/bom.json" 2>&1 | cut -c1-300)"
+    fi
+    if [ "$(grep -c -- 'bomlensRuntime' "$GW2/calls")" = 1 ] && ! grep -qx -- '--no-daemon dependencies' "$GW2/calls"; then
+        pass "one Gradle run for the whole build, and no separate warm-up run"
+    else
+        fail "unexpected Gradle calls" "$(cat "$GW2/calls")"
+    fi
+else
+    echo "  SKIP: node unavailable, skipping the whole-script java-gradle test"
+fi
+
 echo "== EOL: offline end-of-life flagging (enrich-eol.sh) — PURL whitelist + cycle lookup =="
 cp "$FIX/eol-components.json" "$WORK/eol.json"
 EOL_DATA_FILE="$FIX/eol-data.json" bash "$LIB/enrich-eol.sh" "$WORK/eol.json" >/dev/null 2>&1
@@ -9003,7 +9308,7 @@ printf '#!/bin/sh\necho "wrapper $*" >> "%s/calls"\ncase " $* " in *" --version 
 chmod 644 "$GW_ROOT/src/gradlew"
 env -u ANDROID_HOME PATH="$GW_ROOT/bin:$PATH" HOME="$GW_ROOT/home" GRADLE_USER_HOME="$GW_ROOT/gh" \
     sh "$LIB/build-prep.sh" "$GW_ROOT/src" "$GW_ROOT/out/bom.json" > "$GW_ROOT/log" 2>&1
-{ grep -q '^wrapper --no-daemon dependencies$' "$GW_ROOT/calls" 2>/dev/null && ! grep -q '^image ' "$GW_ROOT/calls"; } \
+{ grep -q '^wrapper --no-daemon -q --console=plain --no-configuration-cache --init-script ' "$GW_ROOT/calls" 2>/dev/null && ! grep -q '^image ' "$GW_ROOT/calls"; } \
     && pass "build-prep runs a non-executable gradlew through sh, not the image's Gradle" \
     || fail "non-executable gradlew: calls [$(tr '\n' ';' < "$GW_ROOT/calls" 2>/dev/null)]" "$(grep gradle "$GW_ROOT/log" | head -5)"
 grep -q '^\[build-prep\] gradle: sh ./gradlew runs Gradle 5.6.4$' "$GW_ROOT/log" \

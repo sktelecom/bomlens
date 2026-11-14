@@ -90,6 +90,10 @@ npm, Python(pip), Go, Rust(Cargo) 패키지는 소스 스캔이 설치된 패키
 
 > 주의: Maven과 마찬가지로 해석하려면 컨테이너가 Maven Central(또는 사내 미러)에 접속할 수 있어야 합니다. 접속하지 못하면 직접 의존성만 담기고 라이선스가 빌 수 있습니다. 컴포넌트 수가 예상보다 훨씬 적으면 네트워크 접속부터 확인하세요.
 
+> 주의: SBOM에는 각 프로젝트의 `runtimeClasspath`가 해석한 의존성이 담깁니다. 그래서 컴파일 클래스패스에만 있는 의존성(`compileOnly`, `annotationProcessor`, 라이브러리가 컴파일 전용으로 선언한 Guava의 `j2objc-annotations` 같은 어노테이션)과 테스트 클래스패스에만 있는 의존성(JUnit, Mockito)은 빠집니다. 빌드가 다른 빌드를 포함하거나, 런타임 클래스패스를 해석하지 못했거나, Gradle 실행이 실패하면 전체 그래프를 그대로 두며, `BOMLENS_GRADLE_FULL_GRAPH=1`로 전체 그래프를 유지할 수 있습니다([Docker 이미지 환경 변수](docker-image.ko.md#환경-변수)). 한계는 [배포되는 구성만 남기기](../concepts/dependency-resolution.ko.md#배포되는-구성만-남기기)에 있습니다.
+
+> 주의: cdxgen에는 스캔의 Gradle 캐시(`GRADLE_CACHE_DIR`, CLI는 스캔 사이에 이 캐시를 유지함)를 알려 줍니다. jar가 이미 그 캐시에 있는 구성요소는 MD5, SHA-1, SHA-256, SHA-512 해시가 붙고, Maven Central에 닿지 않을 때도 그 캐시의 POM에서 라이선스를 읽습니다. 파일이 캐시에 없는 구성요소는 둘 다 없으므로 해시와 라이선스는 Maven처럼 캐시 내용에 따라 달라집니다. 해시 계산은 부하가 있는 컴퓨터에서 jar 하나에 약 0.16초였습니다(jar 369개, 354MB에 60초).
+
 cdxgen Java 이미지에는 JDK가 하나씩만 있고, Gradle 빌드에서는 두 가지가 필요한 JDK를 정합니다. 툴체인은 지정한 버전의 JDK를 정확히 요구합니다. Gradle 래퍼(`gradlew`와 `gradle/wrapper/gradle-wrapper.properties`)는 그 Gradle 버전이 지원하는 JDK에서만 실행됩니다. 예를 들어 6.9.4 래퍼는 Java 21에서 "Unsupported class file major version 65"로 실패합니다. 스캔은 두 가지를 모두 읽습니다.
 
 - 툴체인은 `JavaLanguageVersion.of(N)`(`languageVersion = ...` 또는 `languageVersion.set(...)` 형태)과 Kotlin `jvmToolchain(N)`에서 읽습니다. 스캔한 폴더와 그 아래 다섯 단계까지의 `*.gradle`과 `*.gradle.kts` 파일(`buildSrc`와 컨벤션 플러그인 포함)에서 찾고, 가장 높은 버전을 씁니다. 인자는 같은 파일에 정의한 변수여도 되고, `.toInteger()`, `.toInt()`, `.toString()`, `as int`로 변환한 형태도 읽습니다. 변수의 값은 그 정의가 읽는 Gradle 속성(`hasProperty`, `getProperty`, `findProperty`, `property`, `providers.gradleProperty("p")`, `properties["p"]`, Kotlin `val p: String by project`)을 가장 가까운 `gradle.properties`에서 찾은 값입니다. 그 값이 없으면 정의가 주는 기본값(`?:`나 삼항 연산자의 `:` 뒤, 또는 `getOrElse("N")` 안의 숫자)을 쓰고, 그것도 없으면 변수에 대입한 숫자를 씁니다. 일반 파일인 `gradle.properties`만 읽으며, 블록 밖의 정의를 블록 안의 정의보다 먼저 봅니다.
