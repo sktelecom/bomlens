@@ -282,7 +282,6 @@
       }
     },
     "download": "다운로드",
-    "view": "보기",
     "conformance": "적합성 검사",
     "verdictPass": "적합",
     "verdictFail": "부적합",
@@ -451,6 +450,12 @@
     "csvKev": "악용 확인",
     "csvTitle": "제목",
     "artifactFiles": "(파일 {{count}}개)",
+    "artifactNotListed_one": "ZIP에만 들어 있는 파일 {{count}}개",
+    "artifactNotListed_other": "ZIP에만 들어 있는 파일 {{count}}개",
+    "tooBig": "미리 보기에는 너무 큰 파일입니다 ({{size}}). 받아서 확인하세요.",
+    "viewFormat": "{{format}} 보기",
+    "formatTemplate": "템플릿",
+    "copyLinkOf": "{{name}} 링크 복사",
     "emptyForm": "빈 양식",
     "declarationUpload": "선언 파일 올리기",
     "declarationNotJson": "JSON 파일이 아닙니다.",
@@ -608,7 +613,9 @@
   },
   "viewer": {
     "open": "산출물 보기",
-    "close": "닫기"
+    "close": "닫기",
+    "loading": "파일을 여는 중…",
+    "error": "파일을 열지 못했습니다"
   },
   "dialog": {
     "cancel": "취소"

@@ -46,7 +46,7 @@ The filename is `{Project}_{Version}_bom.json` (e.g. `MyApp_1.0.0_bom.json`).
 
 `{P}` = project name, `{V}` = version (special characters are normalized to `_`).
 
-The conditions above are the CLI flags. In the web UI and the desktop app the same choices are the generation options on the New scan screen — Notice and Security report — and every file produced is listed in the Artifacts section of the results, downloadable per format or as one ZIP. SPDX is not a scan option there: the SBOM card in that section has an **Export as SPDX 2.3** button that converts the finished BOM whenever you need it, and the converted file joins the artifact list and the ZIP. The UI has no signing, so an SPDX exported that way is unsigned; use `--spdx --sign` in the CLI when you need a signature. See [Web UI and desktop app](ui.md).
+The conditions above are the CLI flags. In the web UI and the desktop app the same choices are the generation options on the New scan screen — Notice and Security report — and every file produced is listed in the Artifacts section of the results, downloadable per format or as one ZIP. SPDX is not a scan option there: the SBOM row in that section has an **Export as SPDX 2.3** button that converts the finished BOM whenever you need it, and the converted file joins the artifact list and the ZIP. The UI has no signing, so an SPDX exported that way is unsigned; use `--spdx --sign` in the CLI when you need a signature. See [Web UI and desktop app](ui.md).
 
 ## The declared AI service
 

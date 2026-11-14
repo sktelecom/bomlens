@@ -632,6 +632,7 @@ test.describe("list details", () => {
 
   test("every type label carries an icon", async ({ page }) => {
     const labels = page.locator("tbody tr td:nth-child(2) [class*=Label]");
+    await expect(labels.first()).toBeVisible();
     const n = await labels.count();
     expect(n).toBeGreaterThan(4);
     for (let i = 0; i < n; i++) await expect(labels.nth(i).locator("svg")).toHaveCount(1);

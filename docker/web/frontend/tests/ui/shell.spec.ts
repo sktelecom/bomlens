@@ -2625,7 +2625,7 @@ for (const { theme, lang } of COMBOS) {
   test(`artifacts section matches baseline — ${theme}/${lang} @visual`, async ({ page }) => {
     await stubAndRun(page, theme, lang);
     await page.getByRole("navigation").locator('a[href$="/artifacts"]').first().click();
-    await expect(page.getByText("SBOM (CycloneDX)")).toBeVisible();
+    await expect(page.getByRole("heading", { name: "SBOM (CycloneDX)" })).toBeVisible();
     await captureMain(page, "artifacts", theme, lang);
   });
 }
