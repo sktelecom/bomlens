@@ -4,13 +4,13 @@
 /* Do not edit: run `npm run tokens:build` in docker/web/frontend. */
 
 :root {
-  --background: 0 0% 98%;
+  --background: 0 0% 100%;
   --foreground: 240 6% 10%;
   --card: 0 0% 100%;
   --card-foreground: 240 6% 10%;
   --popover: 0 0% 100%;
   --popover-foreground: 240 6% 10%;
-  --muted: 240 5% 96%;
+  --muted: 210 29% 97%;
   --muted-foreground: 240 4% 44%;
   --border: 240 5% 91%;
   --input: 240 5% 91%;
@@ -18,9 +18,9 @@
   --primary-foreground: 0 0% 98%;
   --selected: 240 6% 10%;
   --selected-foreground: 0 0% 98%;
-  --secondary: 240 5% 96%;
+  --secondary: 210 29% 97%;
   --secondary-foreground: 240 6% 10%;
-  --accent: 240 5% 96%;
+  --accent: 210 29% 97%;
   --accent-foreground: 240 6% 10%;
   --destructive: 0 72% 51%;
   --destructive-foreground: 0 0% 98%;
@@ -92,13 +92,13 @@
 }
 
 .dark {
-  --background: 240 6% 7%;
+  --background: 216 28% 7%;
   --foreground: 0 0% 98%;
-  --card: 240 4% 12%;
+  --card: 216 28% 7%;
   --card-foreground: 0 0% 98%;
-  --popover: 240 4% 12%;
+  --popover: 214 25% 11%;
   --popover-foreground: 0 0% 98%;
-  --muted: 240 4% 16%;
+  --muted: 214 25% 11%;
   --muted-foreground: 240 5% 65%;
   --border: 240 4% 24%;
   --input: 240 4% 24%;
@@ -106,9 +106,9 @@
   --primary-foreground: 240 6% 10%;
   --selected: 240 5% 30%;
   --selected-foreground: 0 0% 98%;
-  --secondary: 240 4% 16%;
+  --secondary: 215 18% 13%;
   --secondary-foreground: 0 0% 98%;
-  --accent: 240 4% 16%;
+  --accent: 215 18% 13%;
   --accent-foreground: 0 0% 98%;
   --destructive: 0 72% 51%;
   --destructive-foreground: 0 0% 98%;
@@ -117,7 +117,7 @@
   --brand-foreground: 0 0% 100%;
   --brand-strong: 213.1 93.9% 67.8%;
   --brand-hover: 225.9 70.7% 40.2%;
-  --sidebar: 240 5% 10%;
+  --sidebar: 216 28% 7%;
   --sidebar-foreground: 0 0% 98%;
   --sidebar-border: 240 4% 24%;
   --role-danger-fg: 252 165 165;

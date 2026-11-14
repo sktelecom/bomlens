@@ -75,7 +75,7 @@ report_tokens_css() {
     cat <<'FALLBACK'
 /* bomlens-report: built-in fallback palette (tokens file not found) */
 :root{
-  --background:0 0% 98%;--foreground:240 6% 10%;--card:0 0% 100%;--muted:240 5% 96%;
+  --background:0 0% 100%;--foreground:240 6% 10%;--card:0 0% 100%;--muted:210 29% 97%;
   --muted-foreground:240 4% 44%;--border:240 5% 91%;--brand:224.3 76.3% 48%;
   --brand-strong:224.3 76.3% 48%;--role-danger-fg:185 28 28;--role-danger-muted:251 229 229;
   --role-danger-emphasis:220 38 38;--role-danger-border:239 157 157;--role-severe-fg:154 52 18;
@@ -98,7 +98,7 @@ report_tokens_css() {
   --font-size-caption:0.6875rem;--font-size-mono:0.75rem;
 }
 @media screen and (prefers-color-scheme: dark){:root{
-  --background:240 6% 7%;--foreground:0 0% 98%;--card:240 4% 12%;--muted:240 4% 16%;
+  --background:216 28% 7%;--foreground:0 0% 98%;--card:216 28% 7%;--muted:214 25% 11%;
   --muted-foreground:240 5% 65%;--border:240 4% 24%;--brand:224.3 76.3% 48%;
   --brand-strong:213.1 93.9% 67.8%;--role-danger-fg:252 165 165;--role-danger-muted:60 38 41;
   --role-danger-emphasis:248 113 113;--role-danger-border:125 64 66;--role-severe-fg:253 186 116;

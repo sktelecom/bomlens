@@ -104,7 +104,7 @@ async function openScan(page: Page, section: string) {
     r.fulfill({ contentType: "application/json", body: JSON.stringify(SBOM) }),
   );
   await page.goto(`/?ui=next#/scan/demo_2.1/${section}`);
-  await page.getByRole("navigation").first().waitFor();
+  await page.getByTestId("result-meta").waitFor();
 }
 
 test("a CVE's detail opens Components filtered to its package", async ({ page }) => {

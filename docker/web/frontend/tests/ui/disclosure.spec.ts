@@ -77,7 +77,7 @@ async function open(page: Page, section: string) {
     r.fulfill({ contentType: "application/json", body: JSON.stringify(fixture) }),
   );
   await page.goto(`/?ui=next#/scan/demo_4.0/${section}`);
-  await page.getByRole("navigation").first().waitFor();
+  await page.getByTestId("result-meta").waitFor();
   if (section === "conformance") {
     // The panel opens on the checks a reader can act on. Evidence belongs to a
     // met check, so show those.

@@ -23,7 +23,7 @@ const RESULT = {
 
 describe("searchScan", () => {
   it("returns nothing for a blank query", () => {
-    expect(searchScan(RESULT, "  ")).toEqual({ components: [], vulns: [] });
+    expect(searchScan(RESULT, "  ")).toEqual({ components: [], vulns: [], componentTotal: 0, vulnTotal: 0 });
   });
 
   it("matches components by name/purl and vulns by package", () => {
@@ -44,5 +44,18 @@ describe("searchScan", () => {
       security: { vulnerabilities: [] },
     } as unknown as DoneEvent;
     expect(searchScan(many, "libx", 6).components).toHaveLength(6);
+  });
+
+  it("counts every match, beyond the cap, for a show-all entry", () => {
+    const many = {
+      ...RESULT,
+      sbom: {
+        components: 9,
+        componentList: Array.from({ length: 9 }, (_, i) => ({ name: `lib${i}`, version: "1", group: "", purl: "", type: "library", licenses: [] })),
+      },
+    } as unknown as DoneEvent;
+    const r = searchScan(many, "lib");
+    expect(r.components).toHaveLength(6);
+    expect(r.componentTotal).toBe(9);
   });
 });

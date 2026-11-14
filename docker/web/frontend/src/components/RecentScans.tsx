@@ -18,6 +18,9 @@ import {
   TrendingDown,
   TrendingUp,
 } from "lucide-react";
+import { PlusIcon } from "@primer/octicons-react";
+import { Button } from "@primer/react";
+import { ScreenHeader } from "@/components/primer";
 import { type ReactNode, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -315,14 +318,19 @@ export function RecentScans({ scans, newHref, onDelete }: Props) {
 
   return (
     <div className="space-y-6">
-      <div className="space-y-1.5">
-        <h1 className="text-display font-semibold tracking-tight text-foreground">
-          {t("recent.title")}
-        </h1>
-        <p className="text-body-sm text-muted-foreground">
-          {t(IS_STATIC_DEMO ? "recent.demoSubtitle" : "recent.subtitle")}
-        </p>
-      </div>
+      <ScreenHeader
+        title={t("recent.title")}
+        description={t(IS_STATIC_DEMO ? "recent.demoSubtitle" : "recent.subtitle")}
+        actions={
+          // The empty list carries its own New scan call to action; the
+          // read-only demo cannot scan.
+          scans.length > 0 && !IS_STATIC_DEMO ? (
+            <Button as="a" href={newHref} variant="primary" leadingVisual={PlusIcon} data-testid="recent-new-scan">
+              {t("shell.newScan")}
+            </Button>
+          ) : undefined
+        }
+      />
 
       {scans.length === 0 ? (
         // First-run hero: this empty Recent list is what a new user sees first,

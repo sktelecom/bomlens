@@ -87,7 +87,7 @@ async function openAt(page: Page, hash: string) {
     r.fulfill({ contentType: "application/json", body: JSON.stringify(DONE) }),
   );
   await page.goto(`/?ui=next#${hash}`);
-  await page.getByRole("navigation").first().waitFor();
+  await page.getByTestId("result-meta").waitFor();
 }
 
 const hashOf = (page: Page) => page.evaluate(() => window.location.hash);
@@ -108,7 +108,7 @@ test("a filtered view survives a reload", async ({ page }) => {
   await expect.poll(() => hashOf(page)).toContain("q=openssl");
 
   await page.reload();
-  await page.getByRole("navigation").first().waitFor();
+  await page.getByTestId("result-meta").waitFor();
 
   await expect(page.getByRole("textbox", { name: "Search name, license, type…" })).toHaveValue(
     "openssl",
@@ -141,7 +141,7 @@ test("sorting is carried too", async ({ page }) => {
   await expect.poll(() => hashOf(page)).toBe("#/scan/demo_3.0/components?dir=asc&sort=name");
 
   await page.reload();
-  await page.getByRole("navigation").first().waitFor();
+  await page.getByTestId("result-meta").waitFor();
   await expect(page.locator("th").filter({ hasText: "Name" })).toHaveAttribute(
     "aria-sort",
     "ascending",

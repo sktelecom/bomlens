@@ -1,206 +1,244 @@
 // Copyright 2026 SK Telecom Co., Ltd.
 // SPDX-License-Identifier: Apache-2.0
 
-import { Clock, PanelLeftClose, PanelLeftOpen, Plus } from "lucide-react";
+import {
+  ChecklistIcon,
+  CpuIcon,
+  FileDirectoryIcon,
+  FileIcon,
+  FileZipIcon,
+  GitBranchIcon,
+  GraphIcon,
+  ListUnorderedIcon,
+  type Icon,
+  LawIcon,
+  PackageIcon,
+  PlusIcon,
+  ShieldIcon,
+  SidebarCollapseIcon,
+  SidebarExpandIcon,
+} from "@primer/octicons-react";
+import { IconButton, NavList } from "@primer/react";
+import { SkeletonText } from "@primer/react/experimental";
+import { Fragment } from "react";
 import { useTranslation } from "react-i18next";
 
-import {
-  EMPTY_SCAN,
-  type ScanContext,
-  type SectionId,
-  visibleGroups,
-} from "@/lib/nav";
-import { scanHash } from "@/lib/route";
-import { cn } from "@/lib/utils";
 import { useFormatNumber } from "@/lib/format";
+import { EMPTY_SCAN, type ScanContext, type SectionId, visibleGroups } from "@/lib/nav";
+import { scanHash } from "@/lib/route";
+
+/** Where the reader is: one of the two global screens, a scan section, or
+ *  neither (External lookup, a running scan). */
+export type NavPlace = "recent" | "new" | SectionId | null;
 
 interface SidebarProps {
   scan?: ScanContext;
-  activeSection: SectionId;
-  /** The current scan's id, so section links resolve to `#/scan/<id>/<section>`. */
+  current: NavPlace;
+  /** The open scan's id, so section links resolve to `#/scan/<id>/<section>`;
+   *  absent when no scan is open, which hides the sections. */
   activeScanId?: string | null;
-  /**
-   * Per-section counts shown as a trailing badge (e.g. components, vulns).
-   * Mostly numbers; dependencies is a `direct/transitive` string.
-   */
+  /** Per-section counts shown after the label (dependencies is a
+   *  `direct/transitive` string, conformance `passed/measured`). */
   counts?: Partial<Record<SectionId, number | string>>;
-  /** Icon-only rail when collapsed (narrow widths / user toggle). */
-  collapsed?: boolean;
-  onToggleCollapsed?: () => void;
-  /** Hash for the Scan management screen — the way back out of this scan. */
+  /** Icon-only rail (narrow widths, or the reader's toggle). */
+  collapsed: boolean;
+  onToggleCollapsed: () => void;
   homeHref: string;
-  /** Hash for the New scan screen. */
   newHref: string;
-  /** Reset to a blank New scan form, in addition to the `#/new` navigation
-   *  `newHref` already carries — needed when a scan started from `#/new`
-   *  fails, leaving the hash unchanged so the link's navigation is a no-op. */
+  /** Reset to a blank New scan form, in addition to the `#/new` navigation the
+   *  link carries: a scan started from `#/new` that fails leaves the hash
+   *  unchanged, so the link's own navigation is a no-op then. */
   onNewScan?: () => void;
+  /** Hide New scan (the read-only demo cannot scan). */
+  hideNewScan?: boolean;
+  /** A scan is running or opening: its sections are on the way. */
+  loading?: boolean;
 }
 
-/** Shared row shape for every rail link — global block and sections alike. */
-// The gap and horizontal padding are tighter than a comfortable default on
-// purpose. The rail is a fixed 15rem, and `main` is sized from what is left
-// (1040px at the 1280px capture viewport), so widening the rail would resize
-// every section screenshot. The longest label once needed 133px against a
-// 128px budget, so the row reclaims 8px from its own spacing instead: 2px at
-// each of the two gaps, 2px at each side padding. Re-check this budget before
-// lengthening any label — nav.ts carries a note on the one that hit it.
-const RAIL_ROW =
-  "group relative flex w-full items-center gap-2 rounded-md px-1 py-2 text-body-sm " +
-  "transition-colors duration-fast ease-out-soft " +
-  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-sidebar";
-
-/** The resting (non-active) row colours. */
-const RAIL_ROW_IDLE =
-  "font-medium text-muted-foreground hover:bg-muted hover:text-foreground";
+const SECTION_ICON: Record<SectionId, Icon> = {
+  overview: GraphIcon,
+  components: PackageIcon,
+  dependencies: GitBranchIcon,
+  sourceTree: FileDirectoryIcon,
+  inputSbom: FileIcon,
+  vulnerabilities: ShieldIcon,
+  licenses: LawIcon,
+  conformance: ChecklistIcon,
+  models: CpuIcon,
+  artifacts: FileZipIcon,
+};
 
 /**
- * Left rail: a small block of global links (Scan management, New scan) over the
- * current scan's grouped sections, which adapt to the scan type (AI surfaces
- * appear only for AI/ANALYZE scans). The global block repeats what the TopBar
- * offers, spelled out in words: from a result screen the only labelled way back
- * to the scan list was the logo, which reads as decoration. Tokens only; the
- * neutral fill and a thin bar mark the active section. Collapses to an icon rail on narrow
- * widths or via the header toggle.
+ * The left navigation, on every screen: Scan management and New scan, then the
+ * open scan's sections grouped as lib/nav.ts describes, each with its count.
+ * Collapses to an icon strip on narrow widths or by the toggle at its top.
  */
 export function Sidebar({
   scan = EMPTY_SCAN,
-  activeSection,
+  current,
   activeScanId,
   counts = {},
-  collapsed = false,
+  collapsed,
   onToggleCollapsed,
   homeHref,
   newHref,
   onNewScan,
+  hideNewScan,
+  loading,
 }: SidebarProps) {
   const { t } = useTranslation();
   const fmt = useFormatNumber();
-  const groups = visibleGroups(scan);
+  const groups = activeScanId ? visibleGroups(scan) : [];
+  const globals: Array<{ key: "recent" | "new"; href: string; label: string; icon: Icon; onClick?: () => void }> = [
+    { key: "recent", href: homeHref, label: t("nav.recentScans"), icon: ListUnorderedIcon },
+    { key: "new", href: newHref, label: t("shell.newScan"), icon: PlusIcon, onClick: onNewScan },
+  ];
+  if (hideNewScan) globals.pop();
+  const sectionHref = (id: SectionId) => (activeScanId ? scanHash(activeScanId, id) : homeHref);
+  // Two of the counts are pairs ("6/65"). The pointer gets the meaning as a
+  // tooltip; a screen reader hears the pair spelled out instead of "6 slash 65".
+  const countNote = (id: SectionId) =>
+    id === "dependencies"
+      ? t("nav.depSplitTitle")
+      : id === "conformance"
+        ? t("nav.conformanceSplitTitle")
+        : undefined;
+  const said = (id: SectionId, count: string): string | undefined => {
+    const [a, b] = count.split("/");
+    if (b === undefined) return undefined;
+    if (id === "dependencies") return t("nav.depsSaid", { direct: a, transitive: b });
+    if (id === "conformance") return t("nav.confSaid", { passed: a, total: b });
+    return undefined;
+  };
+
+  const toggle = (
+    <div className="bl-pane-toggle">
+      <IconButton
+        icon={collapsed ? SidebarCollapseIcon : SidebarExpandIcon}
+        variant="invisible"
+        size="small"
+        aria-label={collapsed ? t("nav.expand") : t("nav.collapse")}
+        onClick={onToggleCollapsed}
+        tooltipDirection="e"
+      />
+    </div>
+  );
+
+  if (collapsed) {
+    return (
+      <div className="bl-pane" data-collapsed="true">
+        {toggle}
+        <nav aria-label={t("nav.mainLabel")}>
+          <ul className="bl-pane-icons">
+            {globals.map((g) => (
+              <li key={g.key}>
+                <IconButton
+                  as="a"
+                  href={g.href}
+                  onClick={g.onClick}
+                  icon={g.icon}
+                  variant="invisible"
+                  aria-label={g.label}
+                  aria-current={current === g.key ? "page" : undefined}
+                  tooltipDirection="e"
+                />
+              </li>
+            ))}
+            {/* A rule between the global links and the first group, and one
+                at every group boundary, as the expanded list draws them. */}
+            {groups.map((group) => (
+              <Fragment key={group.id}>
+                <li aria-hidden className="bl-pane-icons-rule" />
+                {group.sections.map((s) => (
+                  <li key={s.id}>
+                    <IconButton
+                      as="a"
+                      href={sectionHref(s.id)}
+                      icon={SECTION_ICON[s.id]}
+                      variant="invisible"
+                      aria-label={t(s.labelKey)}
+                      aria-current={current === s.id ? "page" : undefined}
+                      tooltipDirection="e"
+                    />
+                  </li>
+                ))}
+              </Fragment>
+            ))}
+          </ul>
+        </nav>
+      </div>
+    );
+  }
 
   return (
-    <nav
-      aria-label={t("nav.label")}
-      data-collapsed={collapsed}
-      className={cn(
-        "flex shrink-0 flex-col gap-1 border-r border-sidebar-border bg-sidebar",
-        "overflow-y-auto py-3 transition-[width] duration-base ease-out-soft",
-        collapsed ? "w-[3.75rem] px-2" : "w-60 px-3",
-      )}
-    >
-      <div className={cn("mb-1 flex items-center", collapsed ? "justify-center" : "justify-end")}>
-        <button
-          type="button"
-          onClick={onToggleCollapsed}
-          aria-label={collapsed ? t("nav.expand") : t("nav.collapse")}
-          title={collapsed ? t("nav.expand") : t("nav.collapse")}
-          className={cn(
-            "inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground",
-            "transition-colors duration-fast ease-out-soft hover:bg-muted hover:text-foreground",
-            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-sidebar",
-          )}
-        >
-          {collapsed ? (
-            <PanelLeftOpen className="h-4 w-4" />
-          ) : (
-            <PanelLeftClose className="h-4 w-4" />
-          )}
-        </button>
-      </div>
-
-      {/* Global links, kept above the sections and separated by a rule so the
-          rail reads as "leave this scan" over "move within this scan". */}
-      <ul className="mb-2 flex flex-col gap-0.5 border-b border-sidebar-border pb-2">
-        {[
-          { href: homeHref, icon: Clock, label: t("nav.recentScans") },
-          { href: newHref, icon: Plus, label: t("shell.newScan"), onClick: onNewScan },
-        ].map(({ href, icon: Icon, label, onClick }) => (
-          <li key={href}>
-            <a
-              href={href}
-              onClick={onClick}
-              title={label}
-              className={cn(RAIL_ROW, RAIL_ROW_IDLE, collapsed && "justify-center")}
+    <div className="bl-pane" data-collapsed="false">
+      {toggle}
+      <NavList aria-label={t("nav.mainLabel")}>
+        {globals.map((g) => {
+          const GlobalIcon = g.icon;
+          return (
+            <NavList.Item
+              key={g.key}
+              href={g.href}
+              onClick={g.onClick}
+              aria-current={current === g.key ? "page" : undefined}
             >
-              <Icon className="h-4 w-4 shrink-0" aria-hidden />
-              {!collapsed && <span className="truncate">{label}</span>}
-            </a>
-          </li>
-        ))}
-      </ul>
-
-      {groups.map((group) => (
-        <div key={group.id} className="mb-2">
-          {!collapsed && (
-            <p className="px-2 pb-1 pt-2 text-caption font-semibold uppercase tracking-wider text-muted-foreground">
-              {t(group.labelKey)}
-            </p>
-          )}
-          <ul className="flex flex-col gap-0.5">
-            {group.sections.map((section) => {
-              const Icon = section.icon;
-              const active = section.id === activeSection;
-              const label = t(section.labelKey);
-              const count = counts[section.id];
+              <NavList.LeadingVisual>
+                <GlobalIcon />
+              </NavList.LeadingVisual>
+              {g.label}
+            </NavList.Item>
+          );
+        })}
+        {/* Each group draws its own rule above it; without groups, one rule
+            separates the hint from the global links. */}
+        {groups.length === 0 && <NavList.Divider />}
+        {groups.length === 0 &&
+          (loading ? (
+            <li className="bl-pane-hint" aria-hidden data-testid="nav-loading">
+              <SkeletonText lines={3} />
+            </li>
+          ) : (
+            <li className="bl-pane-hint">{t("nav.sectionsHint")}</li>
+          ))}
+        {groups.map((group) => (
+          <NavList.Group key={group.id} title={t(group.labelKey)}>
+            {group.sections.map((s) => {
+              const SectionIcon = SECTION_ICON[s.id];
+              const count = counts[s.id];
+              const note = countNote(s.id);
               return (
-                <li key={section.id}>
-                  <a
-                    href={activeScanId ? scanHash(activeScanId, section.id) : undefined}
-                    aria-current={active ? "page" : undefined}
-                    title={label}
-                    className={cn(
-                      RAIL_ROW,
-                      collapsed && "justify-center",
-                      // The active row is a neutral fill only. The brand colour is not
-                      // used here: it would draw the eye to the one row that
-                      // is simply "where you are". The label stays at foreground
-                      // contrast (AA).
-                      active
-                        ? "bg-muted font-semibold text-foreground"
-                        : RAIL_ROW_IDLE,
-                    )}
-                  >
-                    <Icon
-                      className={cn("h-4 w-4 shrink-0", active && "text-foreground")}
-                      aria-hidden
-                    />
-                    {!collapsed && <span className="truncate">{label}</span>}
-                    {!collapsed && count !== undefined && (
-                      <span
-                        className={cn(
-                          "ml-auto shrink-0 tabular-nums text-label",
-                          // Keep the count at foreground contrast on the active row,
-                          // like the label.
-                          active ? "text-foreground" : "text-muted-foreground",
+                <NavList.Item
+                  key={s.id}
+                  href={sectionHref(s.id)}
+                  aria-current={current === s.id ? "page" : undefined}
+                >
+                  <NavList.LeadingVisual>
+                    <SectionIcon />
+                  </NavList.LeadingVisual>
+                  <span data-nav-label={s.id}>{t(s.labelKey)}</span>
+                  {count !== undefined && (
+                    <NavList.TrailingVisual>
+                      <span className="bl-count" title={note} data-testid={`nav-count-${s.id}`}>
+                        {typeof count === "number" ? (
+                          fmt(count)
+                        ) : said(s.id, count) ? (
+                          <>
+                            <span aria-hidden>{count}</span>
+                            <span className="bl-visually-hidden">{said(s.id, count)}</span>
+                          </>
+                        ) : (
+                          count
                         )}
-                        // Every badge sits in the same place in the same type,
-                        // but they are not the same kind of number: components
-                        // is a count, conformance is passed-over-mandatory, and
-                        // dependencies is a direct/transitive split. Say which,
-                        // for the two that are not plain counts.
-                        title={
-                          section.id === "dependencies"
-                            ? t("nav.depSplitTitle")
-                            : section.id === "conformance"
-                              ? t("nav.conformanceSplitTitle")
-                              : undefined
-                        }
-                        aria-label={
-                          section.id === "conformance"
-                            ? t("nav.conformanceSplitTitle")
-                            : undefined
-                        }
-                      >
-                        {typeof count === "number" ? fmt(count) : count}
                       </span>
-                    )}
-                  </a>
-                </li>
+                    </NavList.TrailingVisual>
+                  )}
+                </NavList.Item>
               );
             })}
-          </ul>
-        </div>
-      ))}
-    </nav>
+          </NavList.Group>
+        ))}
+      </NavList>
+    </div>
   );
 }

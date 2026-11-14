@@ -66,6 +66,9 @@
 }
 
 [data-color-mode="dark"][data-light-theme][data-dark-theme] {
+  /* Primer's dark overlay colour is darker than the page and its boxes,
+   * so a menu read as a hole. Overlays take the muted layer instead. */
+  --overlay-bgColor: var(--bgColor-muted);
   --selection-bgColor: hsl(var(--brand) / 0.7);
   /* Primer's dark outline button rests on a near-white fill, so its label is
    * the dark navy at rest and the lighter blue on the dark hover fill. */
@@ -91,4 +94,355 @@
 :root [class*="FilteredActionList-ActionListItem"][data-input-focused][data-first-child]::after,
 :root [class*="TreeView-TreeViewItem"][aria-current="true"] > [class*="TreeView-TreeViewItemContainer"]::after {
   display: none;
+}
+
+/* ---------------------------------------------------------------------------
+ * App frame (components/AppShell.tsx, TopBar.tsx, Sidebar.tsx). The page
+ * itself scrolls: the top bar sticks at the top (56px, so content that sticks
+ * below it uses top: 56px) and the left navigation sticks under it.
+ * ------------------------------------------------------------------------- */
+
+.bl-shell {
+  min-height: 100vh;
+  background: var(--bgColor-default);
+  color: var(--fgColor-default);
+  font-family: var(--fontStack-sansSerif);
+}
+
+.bl-skip {
+  position: absolute;
+  left: -9999px;
+  top: var(--base-size-8);
+  z-index: 50;
+}
+.bl-skip:focus {
+  left: var(--base-size-8);
+  padding: var(--base-size-8) var(--base-size-12);
+  background: var(--bgColor-default);
+  color: var(--fgColor-default);
+  border: var(--borderWidth-thin) solid var(--borderColor-default);
+  border-radius: var(--borderRadius-medium);
+  outline: 2px solid var(--focus-outlineColor);
+  outline-offset: 2px;
+}
+
+.bl-topbar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: var(--base-size-8);
+  height: 56px;
+  padding: 0 var(--base-size-16);
+  background: var(--bgColor-default);
+  border-bottom: var(--borderWidth-thin) solid var(--borderColor-default);
+  font-size: var(--text-body-size-medium);
+}
+.bl-topbar-home {
+  display: inline-flex;
+  flex: none;
+  border-radius: var(--borderRadius-medium);
+}
+.bl-topbar-home:focus-visible {
+  outline: 2px solid var(--focus-outlineColor);
+  outline-offset: 2px;
+}
+/* public/logo.svg is a 232x48 viewBox. Its text is drawn by the browser from
+ * whatever font the system has, so the tagline ends at x=177 with Arial or
+ * Helvetica and at x=186 with a wide face such as Verdana. Cut the box at
+ * x=192: the widest measured case fits whole, and the empty edge costs about
+ * 9px at 28px height. */
+.bl-topbar-logo {
+  --bl-logo-height: 28px;
+  display: block;
+  flex: none;
+  height: var(--bl-logo-height);
+  width: calc(var(--bl-logo-height) * 192 / 48);
+  max-width: none;
+  object-fit: cover;
+  object-position: left center;
+}
+.bl-path {
+  display: flex;
+  align-items: baseline;
+  gap: var(--base-size-8);
+  min-width: 0;
+  flex: 0 1 auto;
+}
+.bl-path-sep {
+  flex: none;
+  color: var(--fgColor-muted);
+}
+.bl-path-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+  color: var(--fgColor-default);
+}
+:root a.bl-path-name {
+  color: var(--fgColor-default);
+  text-decoration: none;
+}
+:root a.bl-path-name:hover {
+  text-decoration: underline;
+}
+.bl-path-version {
+  font-weight: 400;
+  color: var(--fgColor-muted);
+}
+.bl-topbar-spacer {
+  flex: 1 1 0;
+  min-width: 0;
+}
+/* The current screen's icon button (External lookup in the top bar, the open
+ * page in the collapsed navigation) is marked with the selected fill; every
+ * icon button rests invisible. */
+:root .bl-pane-icons [aria-current="page"],
+:root .bl-topbar-actions [aria-current="page"] {
+  background-color: var(--control-transparent-bgColor-selected);
+}
+.bl-topbar-actions {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--base-size-8);
+}
+
+.bl-kbd {
+  font-family: var(--fontStack-monospace);
+  font-size: var(--text-caption-size);
+  line-height: var(--text-caption-lineHeight);
+  padding: 0 5px;
+  color: var(--fgColor-muted);
+  background: var(--bgColor-muted);
+  border: var(--borderWidth-thin) solid var(--borderColor-default);
+  border-bottom-width: 2px;
+  border-radius: var(--borderRadius-small);
+}
+
+/* Global search: the combobox in the top bar and its result list. */
+.bl-search {
+  position: relative;
+  flex: none;
+}
+.bl-searchpop {
+  position: absolute;
+  top: calc(100% + var(--base-size-4));
+  right: 0;
+  z-index: 30;
+  width: min(560px, 100vw - 32px);
+  max-height: 560px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding: var(--base-size-8) 0;
+  background: var(--overlay-bgColor);
+  border: var(--borderWidth-thin) solid var(--borderColor-default);
+  border-radius: var(--borderRadius-large);
+  box-shadow: var(--shadow-floating-small);
+}
+.bl-searchpop-group {
+  padding: var(--base-size-4) var(--base-size-16) 2px;
+  font-size: var(--text-body-size-small);
+  font-weight: 600;
+  color: var(--fgColor-muted);
+}
+.bl-searchpop-empty {
+  padding: var(--base-size-8) var(--base-size-16);
+  color: var(--fgColor-muted);
+}
+.bl-searchpop [role="option"] {
+  display: flex;
+  align-items: center;
+  gap: var(--base-size-8);
+  padding: 6px var(--base-size-16);
+  cursor: pointer;
+  color: var(--fgColor-default);
+}
+.bl-searchpop [role="option"] > svg {
+  flex: none;
+  color: var(--fgColor-muted);
+}
+.bl-searchpop [role="option"][aria-selected="true"],
+.bl-searchpop [role="option"]:hover {
+  background: var(--bgColor-neutral-muted);
+}
+.bl-searchpop-text {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* "group / name": the name is one cell that may shrink to an ellipsis, the
+ * group gives way first (it keeps its start), the separator never shrinks.
+ * The full value is the option's text, so assistive technology reads it whole,
+ * and the tooltip. */
+.bl-searchpop-coord {
+  display: inline-flex;
+  min-width: 0;
+  flex: 0 1 auto;
+}
+.bl-searchpop-coord-group {
+  flex: 0 10 auto;
+  min-width: 3ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--fgColor-muted);
+}
+.bl-searchpop-coord-sep {
+  flex: none;
+  white-space: pre;
+  color: var(--fgColor-muted);
+}
+.bl-searchpop-coord-name {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* The coordinate on a vulnerability row takes what the id leaves. */
+.bl-searchpop-aside.bl-searchpop-coordwrap {
+  display: inline-flex;
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: none;
+  overflow: hidden;
+}
+/* Identifiers that are never shortened: the severity label and the CVE id. */
+.bl-searchpop-id {
+  flex: none;
+  white-space: nowrap;
+}
+.bl-searchpop [role="option"].bl-searchpop-all {
+  color: var(--fgColor-accent);
+}
+.bl-searchpop-mono {
+  font-family: var(--fontStack-monospace);
+  font-size: var(--text-body-size-small);
+}
+.bl-searchpop-aside {
+  flex: none;
+  margin-left: auto;
+  white-space: nowrap;
+  font-size: var(--text-body-size-small);
+  color: var(--fgColor-muted);
+}
+
+/* The demo notice at the top of main: room on both sides of its button and
+ * space before the screen heading. */
+:root .bl-demo-banner {
+  padding: var(--base-size-8) var(--base-size-16);
+  margin-bottom: var(--base-size-16);
+}
+
+.bl-body {
+  display: flex;
+  align-items: flex-start;
+}
+
+/* Left navigation, under the top bar on every screen. */
+.bl-pane {
+  position: sticky;
+  top: 56px;
+  flex: none;
+  width: 256px;
+  height: calc(100vh - 56px);
+  overflow-y: auto;
+  padding: var(--base-size-8) var(--base-size-8) var(--base-size-24);
+  border-right: var(--borderWidth-thin) solid var(--borderColor-default);
+}
+.bl-pane[data-collapsed="true"] {
+  width: 56px;
+  padding-inline: var(--base-size-8);
+}
+.bl-pane-toggle {
+  display: flex;
+  justify-content: flex-end;
+  padding: 0 var(--base-size-8) var(--base-size-4);
+}
+.bl-pane[data-collapsed="true"] .bl-pane-toggle {
+  justify-content: center;
+  padding-inline: 0;
+}
+.bl-pane-icons {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--base-size-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.bl-pane-icons-rule {
+  width: 24px;
+  height: 0;
+  margin: var(--base-size-4) 0;
+  border-top: var(--borderWidth-thin) solid var(--borderColor-muted);
+}
+.bl-pane-hint {
+  padding: var(--base-size-8) var(--base-size-16);
+  font-size: var(--text-body-size-small);
+  color: var(--fgColor-muted);
+}
+.bl-count {
+  font-variant-numeric: tabular-nums;
+  font-size: var(--text-body-size-small);
+  color: var(--fgColor-muted);
+}
+
+.bl-main {
+  position: relative;
+  flex: 1 1 0;
+  min-width: 0;
+  padding: var(--base-size-24) var(--base-size-24) var(--base-size-48);
+}
+.bl-main:focus,
+.bl-main h1:focus {
+  outline: none;
+}
+/* A section title focused after a section change clears the sticky top bar. */
+.bl-result-title {
+  scroll-margin-top: 72px;
+}
+
+.bl-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+/* Recent menu entry: the project name shortens, the version stays whole. */
+.bl-recent-name {
+  display: flex;
+  align-items: baseline;
+  gap: var(--base-size-4);
+  min-width: 0;
+}
+.bl-recent-project {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.bl-recent-version {
+  flex: none;
+  white-space: nowrap;
+  color: var(--fgColor-muted);
+}
+
+/* Primer's overlays (menus, dialogs, tooltips) render in a portal at the end
+ * of <body> with an inline z-index of 1, under the sticky top bar (20) and
+ * the sticky table heads (10). Lift the portal above both. */
+#__primerPortalRoot__,
+body > [data-component="Portal"] {
+  z-index: 40 !important;
 }

@@ -606,7 +606,6 @@
     "label": "Language"
   },
   "nav": {
-    "label": "Sections",
     "collapse": "Collapse sidebar",
     "expand": "Expand sidebar",
     "recent": "Recent scans",
@@ -614,7 +613,7 @@
     "recentScans": "Scan management",
     "recentEmpty": "No recent scans yet",
     "recentDelete": "Delete this scan",
-    "sectionsHint": "Run a scan to see result sections here.",
+    "sectionsHint": "Open a scan to see its sections here.",
     "group": {
       "inventory": "Inventory",
       "ai": "AI",
@@ -642,7 +641,13 @@
     "helpVersionUnknown": "Version not stamped in this build",
     "conformanceSplitTitle": "Mandatory checks passed, out of the mandatory checks measured",
     "lookupTitle": "External vulnerability lookup",
-    "helpReport": "Report a problem"
+    "helpReport": "Report a problem",
+    "depsSaid": "{{direct}} direct, {{transitive}} transitive",
+    "confSaid": "{{passed}} of {{total}} mandatory checks passed",
+    "opensNewTab": "opens in a new tab",
+    "pathLabel": "Location",
+    "mainLabel": "Main",
+    "recentAll": "View all scans"
   },
   "shortcuts": {
     "title": "Keyboard shortcuts",
@@ -650,16 +655,18 @@
     "searchMove": "Move through search results",
     "searchOpen": "Open the highlighted result",
     "close": "Close a menu or dialog",
-    "list": "Show this list",
-    "done": "Done"
+    "list": "Show this list"
   },
   "shell": {
     "newScan": "New scan",
-    "demoGetTool": "Get BomLens",
     "demoBannerTitle": "Read-only demo",
-    "demoBannerBody": "These are real results from a real scan, frozen so you can look around. Scanning, uploading and deleting are turned off here. Run BomLens on your own code to produce your own.",
+    "demoBannerBody": "Results of a real scan, read-only: scanning, uploading and deleting are turned off.",
     "demoBannerCta": "How to run it",
-    "skipToMain": "Skip to main content"
+    "skipToMain": "Skip to main content",
+    "openingScan": "Opening the scan…",
+    "pageTitle": "{{page}} · {{app}}",
+    "scanPageTitle": "{{section}} · {{scan}} · {{app}}",
+    "scanRunning": "Scan in progress"
   },
   "search": {
     "placeholder": "Search components, CVEs…",
@@ -667,7 +674,10 @@
     "components": "Components",
     "vulnerabilities": "Vulnerabilities",
     "lookupGroup": "External lookup",
-    "lookupExternal": "Look up \"{{term}}\" on OSV.dev"
+    "lookupExternal": "Look up \"{{term}}\" on OSV.dev",
+    "clear": "Clear search",
+    "showAllComponents": "View all components ({{count}})",
+    "showAllVulns": "View all vulnerabilities ({{count}})"
   },
   "lookup": {
     "title": "External vulnerability lookup",
@@ -1469,6 +1479,7 @@
     "sevDown": "Better than the previous scan",
     "delete": "Delete",
     "deleted": "Scan deleted",
+    "deleteFailed": "The scan could not be deleted. Try again.",
     "scanNotFound": "Scan “{{id}}” was not found. It may have been deleted.",
     "confirmDeleteTitle": "Delete this scan?",
     "confirmDeleteBody": "The output files for {{scan}} are removed from this machine. Nothing is kept elsewhere, so this cannot be undone.",

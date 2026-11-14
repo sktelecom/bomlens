@@ -68,4 +68,32 @@ test("the banner and the scan list pass axe in the demo", async ({ page }) => {
     .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"])
     .analyze();
   expect(results.violations).toEqual([]);
+  // The banner's title is not a heading: the page's first heading is its h1.
+  expect(await page.locator("h1, h2, h3, h4, h5, h6").first().evaluate((h) => h.tagName)).toBe("H1");
+  // The notice opens the page content: its title line, then its text.
+  const banner = page.getByTestId("demo-banner");
+  await expect(page.locator("main").getByTestId("demo-banner")).toHaveCount(1);
+  const [title, body] = await Promise.all([
+    banner.getByText("Read-only demo").boundingBox(),
+    banner.getByText(/^Results of a real scan/).boundingBox(),
+  ]);
+  expect(title!.y).toBeLessThan(body!.y);
+  // The demo cannot scan, so nothing offers New scan.
+  await expect(page.getByRole("link", { name: "New scan" })).toHaveCount(0);
+  await expect(page.getByTestId("recent-new-scan")).toHaveCount(0);
+});
+
+test("the navigation reaches the bottom of the window, at the top and scrolled to the end", async ({ page }) => {
+  await serveDemoData(page);
+  await page.setViewportSize({ width: 1280, height: 600 });
+  await page.goto(`${ORIGIN}/#/scan/SpringBootDemo_1.0.0/vulnerabilities`);
+  await page.getByTestId("result-meta").waitFor();
+  const bottom = async () => {
+    const box = await page.locator(".bl-pane").boundingBox();
+    return Math.round(box!.y + box!.height);
+  };
+  expect(await bottom()).toBe(600);
+  await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+  await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(0);
+  expect(await bottom()).toBe(600);
 });

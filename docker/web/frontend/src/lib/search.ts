@@ -12,6 +12,9 @@ import type { ComponentItem, DoneEvent, VulnItem } from "./api";
 export interface ScanSearchResults {
   components: ComponentItem[];
   vulns: VulnItem[];
+  /** How many matched before the cap, so the UI can offer "show all". */
+  componentTotal: number;
+  vulnTotal: number;
 }
 
 /** Case-insensitive substring search, each kind capped (default 6). */
@@ -21,24 +24,23 @@ export function searchScan(
   cap = 6,
 ): ScanSearchResults {
   const q = query.trim().toLowerCase();
-  if (!q) return { components: [], vulns: [] };
+  if (!q) return { components: [], vulns: [], componentTotal: 0, vulnTotal: 0 };
 
-  const components = (result.sbom?.componentList ?? [])
-    .filter(
-      (c) =>
-        c.name.toLowerCase().includes(q) ||
-        (c.purl ?? "").toLowerCase().includes(q),
-    )
-    .slice(0, cap);
+  const allComponents = (result.sbom?.componentList ?? []).filter(
+    (c) => c.name.toLowerCase().includes(q) || (c.purl ?? "").toLowerCase().includes(q),
+  );
 
-  const vulns = (result.security?.vulnerabilities ?? [])
-    .filter(
-      (v) =>
-        v.id.toLowerCase().includes(q) ||
-        v.pkg.toLowerCase().includes(q) ||
-        (v.title ?? "").toLowerCase().includes(q),
-    )
-    .slice(0, cap);
+  const allVulns = (result.security?.vulnerabilities ?? []).filter(
+    (v) =>
+      v.id.toLowerCase().includes(q) ||
+      v.pkg.toLowerCase().includes(q) ||
+      (v.title ?? "").toLowerCase().includes(q),
+  );
 
-  return { components, vulns };
+  return {
+    components: allComponents.slice(0, cap),
+    vulns: allVulns.slice(0, cap),
+    componentTotal: allComponents.length,
+    vulnTotal: allVulns.length,
+  };
 }

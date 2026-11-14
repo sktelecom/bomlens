@@ -625,7 +625,7 @@ export function ConformancePanel({
           the right while the checks scroll beside them; below 2xl the order
           is the one this panel always had (summary, filters, checks). */}
       <div className="space-y-6 2xl:grid 2xl:grid-cols-[minmax(0,1fr)_22rem] 2xl:items-start 2xl:gap-x-8 2xl:space-y-0">
-        <div className="space-y-6 2xl:sticky 2xl:top-6 2xl:col-start-2 2xl:row-start-1">
+        <div className="space-y-6 2xl:sticky 2xl:top-20 2xl:col-start-2 2xl:row-start-1">
         <div className="space-y-1.5">
           <div className="flex flex-wrap items-center gap-2 text-body-sm">
             {conformance.format ? (

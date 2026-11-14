@@ -324,7 +324,7 @@ test.describe("GlobalSearch routing", () => {
       r.fulfill({ contentType: "application/json", body: JSON.stringify(SCANS) }),
     );
     await page.goto("/?ui=next#/scan/demo_2.1");
-    await page.getByRole("navigation").first().waitFor();
+    await page.getByTestId("result-meta").waitFor();
   }
 
   test("typing a CVE-shaped term offers an external-lookup row that never fires a request", async ({

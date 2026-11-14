@@ -28,6 +28,7 @@ import {
 } from "@/lib/lookup";
 import { homeHash } from "@/lib/route";
 import { severityTone } from "@/lib/severity";
+import { ScreenHeader } from "@/components/primer";
 
 /** Display name for each ecosystem slug: OSV's own spelling, since that's
  *  the least ambiguous choice and matches what the server sends it as. */
@@ -291,12 +292,7 @@ export function ExternalLookup({ initialQuery, onQueryChange }: Props) {
 
   return (
     <div className="space-y-6">
-      <div className="space-y-1.5">
-        <h1 className="text-display font-semibold tracking-tight text-foreground">
-          {t("lookup.title")}
-        </h1>
-        <p className="max-w-2xl text-body-sm text-muted-foreground">{t("lookup.subtitle")}</p>
-      </div>
+      <ScreenHeader title={t("lookup.title")} description={t("lookup.subtitle")} />
 
       <Card>
         <CardContent className="p-5">

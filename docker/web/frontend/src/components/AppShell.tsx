@@ -1,164 +1,150 @@
 // Copyright 2026 SK Telecom Co., Ltd.
 // SPDX-License-Identifier: Apache-2.0
 
-import { type ReactNode, useEffect, useRef, useState } from "react";
+import { type ReactNode, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { DemoBanner } from "./DemoBanner";
-import { Sidebar } from "./Sidebar";
+import { type NavPlace, Sidebar } from "./Sidebar";
 import { TopBar } from "./TopBar";
 import { IS_STATIC_DEMO } from "@/lib/demo";
-import {
-  EMPTY_SCAN,
-  type RecentScanLink,
-  type ScanContext,
-  type SectionId,
-} from "@/lib/nav";
+import { EMPTY_SCAN, type RecentScanLink, type ScanContext, type SectionId } from "@/lib/nav";
 import { newHash } from "@/lib/route";
+import { type ProjectName } from "@/lib/scanTitle";
+import { useMediaQuery } from "@/lib/useMediaQuery";
 
 interface AppShellProps {
   scan?: ScanContext;
-  activeSection: SectionId;
-  /** The current scan's id, so the rail can build `#/scan/<id>/<section>` links. */
+  /** Which navigation entry is the current page. */
+  current: NavPlace;
+  /** The open scan's id, so the navigation can build `#/scan/<id>/<section>`
+   *  links; absent when no scan is open. */
   activeScanId?: string | null;
   recent?: RecentScanLink[];
-  /** Delete a past scan from the Recent list. */
+  /** Delete a past scan from the Recent menu. */
   onDeleteRecent?: (id: string) => void;
   /** The running image's version, passed through to the help menu. */
   version?: string;
-  /** Per-section counts shown as trailing rail badges (dependencies is a split string). */
+  /** Per-section counts shown in the navigation. */
   counts?: Partial<Record<SectionId, number | string>>;
-  /** Show the section rail (a scan is loaded); hidden on the idle home screens. */
-  showSections?: boolean;
-  /** Project context shown in the top bar (name + optional version). */
-  project?: { name: string; version?: string };
-  /** Optional top-bar content (the global search), shown when a scan is loaded. */
-  search?: ReactNode;
-  /** Re-run the loaded scan (prefills the New scan form); shown in the top bar
-   *  only when the scan carries a config. */
+  /** The open or running scan, shown as the path in the top bar. */
+  project?: ProjectName;
+  /** Where that path links to (the open scan's Overview). */
+  projectHref?: string;
+  /** The global search, shown when a scan is loaded. */
+  search?: (width: number) => ReactNode;
+  /** Re-run the loaded scan (prefills the New scan form). */
   onRescan?: () => void;
-  /** Hash for the home (Recent scans) screen — the logo links here. */
+  /** Hash for the home (Scan management) screen; the logo links here. */
   homeHref: string;
-  /** Show the logo as a link home (hidden on the Recent home screen itself). */
+  /** Show the logo as a link home (off on the home screen itself). */
   showHomeLink?: boolean;
-  /** Hash for the External lookup screen; absent hides the top-bar entry
-   *  point (`capabilities.externalLookup` off, or the static demo). */
+  /** Hide the top bar's New scan button (on Scan management, which has its
+   *  own, and on New scan itself). */
+  hideTopBarNewScan?: boolean;
+  /** Hash for the External lookup screen; absent hides the entry point. */
   lookupHref?: string;
-  /** Leave a running scan and open External lookup, in addition to the
-   *  `#/lookup` navigation `lookupHref` already carries (see
-   *  `NextApp.goToLookup`). */
+  /** Leave a running scan and open External lookup (see `NextApp.goToLookup`). */
   onLookup?: () => void;
-  /** Reset to a blank New scan form, in addition to the `#/new` navigation the
-   *  TopBar/Sidebar links already carry — needed when a scan started from
-   *  `#/new` fails, leaving the hash unchanged (see `NextApp.goToNewScan`). */
+  /** External lookup is the current screen. */
+  lookupCurrent?: boolean;
+  /** Reset to a blank New scan form (see `NextApp.goToNewScan`). */
   onNewScan?: () => void;
-  /** The active section's content fills the canvas. */
+  /** A scan is running or opening; the navigation shows placeholders for
+   *  its sections. */
+  loadingSections?: boolean;
   children: ReactNode;
 }
 
-/** Below this width the rail auto-collapses to an icon strip. */
+/** Below this width the navigation starts as an icon strip. */
 const COLLAPSE_QUERY = "(max-width: 1024px)";
 
 /**
- * The application frame: a sticky top bar over a left rail + scrolling canvas.
- * The top bar carries the global actions (New scan, Recent); the left rail
- * appears once a scan is loaded and repeats those two as labelled links above
- * the scan's own sections. The rail adapts to the scan type and collapses
- * automatically on narrow viewports (and via the in-rail toggle).
+ * The application frame: a sticky top bar, the left navigation and the screen
+ * content. The page itself scrolls. Every screen has the navigation, so Scan
+ * management and New scan are one click away from anywhere; the open scan's
+ * sections appear under them.
  */
 export function AppShell({
   scan = EMPTY_SCAN,
-  activeSection,
+  current,
   activeScanId,
   recent,
   onDeleteRecent,
   counts,
-  showSections,
   project,
+  projectHref,
   search,
   onRescan,
   homeHref,
   showHomeLink,
+  hideTopBarNewScan,
   lookupHref,
   onLookup,
+  lookupCurrent,
   onNewScan,
+  loadingSections,
   children,
   version,
 }: AppShellProps) {
-  // `null` until the user toggles manually; until then we follow the viewport.
   const { t } = useTranslation();
   const mainRef = useRef<HTMLElement>(null);
+  const narrow = useMediaQuery(COLLAPSE_QUERY);
+  // `null` until the reader toggles; until then the viewport decides.
   const [manualCollapsed, setManualCollapsed] = useState<boolean | null>(null);
-  const [narrow, setNarrow] = useState(false);
-
-  useEffect(() => {
-    const mq = window.matchMedia(COLLAPSE_QUERY);
-    const sync = () => setNarrow(mq.matches);
-    sync();
-    mq.addEventListener("change", sync);
-    return () => mq.removeEventListener("change", sync);
-  }, []);
-
   const collapsed = manualCollapsed ?? narrow;
 
   return (
-    <div className="flex h-screen flex-col bg-background">
-      {/* The first Tab stop: jumps past the top bar and the rail (WCAG 2.4.1).
-          Visible only while focused, in the ring colour rather than the brand
-          colour. The route lives in the URL hash, so a real in-page anchor would
-          rewrite it: the click moves focus to the content area instead. */}
+    <div className="bl-shell">
+      {/* The first Tab stop: jumps past the top bar and the navigation (WCAG
+          2.4.1). Visible only while focused. The route lives in the URL hash,
+          so a real in-page anchor would rewrite it: the click moves focus to
+          the content instead. */}
       <a
         href="#main-content"
+        className="bl-skip"
         onClick={(e) => {
           e.preventDefault();
           mainRef.current?.focus();
         }}
-        className="sr-only rounded-md border bg-background px-3 py-2 text-body-sm font-medium text-foreground shadow-md focus:not-sr-only focus:fixed focus:left-3 focus:top-3 focus:z-50 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-background"
       >
         {t("shell.skipToMain")}
       </a>
       <TopBar
         project={project}
+        projectHref={projectHref}
         search={search}
         onRescan={onRescan}
         homeHref={homeHref}
         showHomeLink={showHomeLink}
-        newHref={newHash()}
+        newHref={hideTopBarNewScan || IS_STATIC_DEMO ? undefined : newHash()}
         onNewScan={onNewScan}
         recent={recent}
         onDeleteRecent={onDeleteRecent}
         version={version}
         lookupHref={lookupHref}
         onLookup={onLookup}
+        lookupCurrent={lookupCurrent}
+        currentScanId={activeScanId}
       />
-      {IS_STATIC_DEMO && <DemoBanner />}
-      <div className="flex min-h-0 flex-1">
-        {showSections && (
-          <Sidebar
-            scan={scan}
-            activeSection={activeSection}
-            activeScanId={activeScanId}
-            counts={counts}
-            collapsed={collapsed}
-            onToggleCollapsed={() => setManualCollapsed(!collapsed)}
-            homeHref={homeHref}
-            newHref={newHash()}
-            onNewScan={onNewScan}
-          />
-        )}
-        {/* tabIndex makes the scrollable region keyboard-accessible (axe
-            scrollable-region-focusable / WCAG 2.1.1): a mouse-free user can
-            focus it and scroll with the arrow keys. */}
-        {/* `relative` makes main the containing block of absolutely positioned
-            descendants (the sr-only text). Without it they sit outside main's
-            clipping and stretch the page to the depth of the content, so the
-            document scrolls on into blank space under the shell. */}
-        <main
-          id="main-content"
-          ref={mainRef}
-          tabIndex={0}
-          className="relative min-w-0 flex-1 overflow-y-auto animate-fade-in"
-        >
+      <div className="bl-body">
+        <Sidebar
+          scan={scan}
+          current={current}
+          activeScanId={activeScanId}
+          counts={counts}
+          collapsed={collapsed}
+          onToggleCollapsed={() => setManualCollapsed(!collapsed)}
+          homeHref={homeHref}
+          newHref={newHash()}
+          onNewScan={onNewScan}
+          hideNewScan={IS_STATIC_DEMO}
+          loading={loadingSections}
+        />
+        <main id="main-content" ref={mainRef} tabIndex={-1} className="bl-main animate-fade-in">
+          {/* The demo notice opens every screen, inside the page so the top
+              bar and the navigation keep their fixed geometry. */}
+          {IS_STATIC_DEMO && <DemoBanner />}
           {children}
         </main>
       </div>

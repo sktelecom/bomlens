@@ -64,7 +64,7 @@ async function open(page: Page, section: string) {
     r.fulfill({ contentType: "application/json", body: JSON.stringify(SBOM) }),
   );
   await page.goto(`/?ui=next#/scan/demo_5.0/${section}`);
-  await page.getByRole("navigation").first().waitFor();
+  await page.getByTestId("result-meta").waitFor();
 }
 
 async function downloadText(page: Page, action: () => Promise<void>): Promise<string> {

@@ -66,7 +66,7 @@ async function openDependencies(page: Page) {
     r.fulfill({ contentType: "application/json", body: JSON.stringify(SBOM) }),
   );
   await page.goto("/?ui=next#/scan/demo_1.0/dependencies");
-  await page.getByRole("navigation").first().waitFor();
+  await page.getByTestId("result-meta").waitFor();
 }
 
 test("risk tokens stay in the channel form the graph converts", async ({ page }) => {
@@ -170,7 +170,7 @@ for (const section of ["artifacts", "licenses"] as const) {
         r.fulfill({ contentType: "application/json", body: JSON.stringify(ARTIFACT_DONE) }),
       );
       await page.goto(`/?ui=next#/scan/demo_1.0/${section}`);
-      await page.getByRole("navigation").first().waitFor();
+      await page.getByTestId("result-meta").waitFor();
       await waitForSettled(page.locator("main"));
 
       const axe = await new AxeBuilder({ page })
@@ -212,6 +212,10 @@ test("the dependency tree carries tree semantics and moves under the arrow keys"
   await expect(items.first()).toHaveAttribute("aria-expanded", "false");
   expect(await page.getByRole("treeitem").count()).toBeLessThan(before);
 
+  // Park the pointer and let the Graph button finish fading out of its
+  // pressed fill: axe would otherwise read a colour mid-transition.
+  await page.mouse.move(0, 0);
+  await waitForSettled(page.getByTestId("deps-view-graph"));
   const axe = await new AxeBuilder({ page })
     .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
     .analyze();
@@ -308,7 +312,7 @@ async function openSection(page: Page, kind: Kind, section: string) {
     }),
   );
   await page.goto(`/?ui=next#/scan/${done.id}/${section}`);
-  await page.getByRole("navigation").first().waitFor();
+  await page.getByTestId("result-meta").waitFor();
   await page.locator("main h1").first().waitFor();
   await waitForSettled(page.locator("main"));
 }
@@ -338,20 +342,42 @@ for (const { kind, section } of SECTIONS) {
   }
 }
 
-// The content area (`main`) is the only scroll container. Visually hidden text
-// (`sr-only`) is absolutely positioned, and without a positioned ancestor its
-// containing block is the page, so it escapes main's clipping and stretches the
-// document to the depth of main's content: the page then scrolls on into blank
-// space under the shell. A short viewport forces every section to overflow.
+// The page is the one scroll container. `main` must not become a scroll box of
+// its own (a second scrollbar, and the sticky top bar and table heads would
+// stick to the wrong thing). The document must not run on past the content:
+// visually hidden text (`sr-only`) is absolutely positioned, and without a
+// positioned ancestor it can stretch the page into blank space under the
+// shell. And the navigation must stay under the top bar while the page
+// scrolls. A short viewport forces every section to overflow.
 for (const { kind, section } of SECTIONS) {
-  test(`the page itself never scrolls: ${kind}/${section}`, async ({ page }) => {
+  test(`one page scroll, ending at the content, navigation kept: ${kind}/${section}`, async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 360 });
     await openSection(page, kind, section);
-    const metrics = await page.evaluate(() => {
-      const el = document.scrollingElement as HTMLElement;
-      return { scroll: el.scrollHeight, client: el.clientHeight };
+    const before = await page.evaluate(() => {
+      const main = document.querySelector("main")!;
+      const cs = getComputedStyle(main);
+      const doc = document.scrollingElement as HTMLElement;
+      const mainBottom = main.getBoundingClientRect().bottom + window.scrollY;
+      return {
+        overflowY: cs.overflowY,
+        mainOverflow: main.scrollHeight - main.clientHeight,
+        docHeight: doc.scrollHeight,
+        mainBottom: Math.ceil(mainBottom),
+        viewport: window.innerHeight,
+      };
     });
-    expect(metrics.scroll, "document scroll height equals the viewport").toBe(metrics.client);
+    expect(before.overflowY, "main is not a scroll box").toBe("visible");
+    expect(before.mainOverflow, "nothing overflows main").toBeLessThanOrEqual(1);
+    // The document ends where main ends (or at the window, for a short page).
+    expect(before.docHeight - Math.max(before.mainBottom, before.viewport)).toBeLessThanOrEqual(1);
+    // The page scrolls (the section is taller than 360px) and the navigation
+    // stays right under the 56px top bar.
+    expect(before.docHeight).toBeGreaterThan(before.viewport);
+    await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+    await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(0);
+    const pane = await page.locator(".bl-pane").boundingBox();
+    // Within a pixel: scrolling to the very end can land on a half pixel.
+    expect(Math.abs(pane!.y - 56)).toBeLessThanOrEqual(1);
   });
 }
 

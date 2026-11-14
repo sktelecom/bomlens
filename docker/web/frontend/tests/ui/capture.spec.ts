@@ -25,9 +25,10 @@ test.skip(process.env.CAPTURE !== "1", "opt-in via CAPTURE=1 (npm run capture:ui
 // Two capture shapes, matching the existing files:
 //  - Full-window page screenshots at a 1040x664 viewport (top bar + rail +
 //    content), for the New scan and Overview guide images.
-//  - `main`-element screenshots at the default 1280x720 viewport, where the
-//    rail (15rem) + top bar (3.5rem) make `main` exactly 1040x664 — the
-//    content-only section images (Components, Vulnerabilities, …).
+//  - Content-only section images (Components, Vulnerabilities, …) at the
+//    default 1280x720 viewport: the part of `main` on screen, right of the
+//    navigation and under the top bar (the page itself scrolls, so a plain
+//    element screenshot would take the whole section).
 const IMAGES = "../../../docs/images";
 
 type Lang = "en" | "ko";
@@ -122,15 +123,27 @@ async function runScan(page: Page, project: string, version: string) {
   await page.getByTestId("run-scan").click();
 }
 
-// Reset `main` (the scroll container) to the top and let its fade-in settle, so
-// the section title sits right under the top bar — not a mid-panel slice.
+// Scroll the page to the top and let main's fade-in settle, so the section
+// title sits right under the top bar, not a mid-panel slice.
 async function settleMain(page: Page) {
   await page.locator("main").evaluate(async (el) => {
     await Promise.all(el.getAnimations().map((a) => a.finished.catch(() => undefined)));
-    el.scrollTop = 0;
+    window.scrollTo(0, 0);
     await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
   });
   await page.mouse.move(0, 0); // neutral pointer — avoid hover-state leak
+}
+
+// The part of `main` on screen: right of the navigation, under the sticky top
+// bar, down to the bottom of the window.
+async function shootMain(page: Page, path: string) {
+  const clip = await page.locator("main").evaluate((el) => {
+    const r = el.getBoundingClientRect();
+    const top = Math.max(r.top, document.querySelector("header")?.getBoundingClientRect().bottom ?? 0);
+    const bottom = Math.min(r.bottom, window.innerHeight);
+    return { x: r.left, y: top, width: Math.min(r.right, window.innerWidth) - r.left, height: bottom - top };
+  });
+  await page.screenshot({ path, clip });
 }
 
 // ---------------------------------------------------------------------------
@@ -338,7 +351,7 @@ for (const lang of ["en", "ko"] as Lang[]) {
 }
 
 // ===========================================================================
-// Section images: content-only `main` screenshots (1040x664 at default vp).
+// Section images: the on-screen part of `main` at the default viewport.
 // ===========================================================================
 
 for (const lang of ["en", "ko"] as Lang[]) {
@@ -352,7 +365,7 @@ for (const lang of ["en", "ko"] as Lang[]) {
     await page.getByText(new RegExp(s.vulnCount)).first().waitFor();
     await killAnim(page);
     await settleMain(page);
-    await page.locator("main").screenshot({ path: `${IMAGES}/${withLang("app-results.png", lang)}` });
+    await shootMain(page, `${IMAGES}/${withLang("app-results.png", lang)}`);
   });
 
   test(`@capture components section (content) - ${lang}`, async ({ page }) => {
@@ -363,7 +376,7 @@ for (const lang of ["en", "ko"] as Lang[]) {
     await page.getByText("openssl", { exact: true }).first().waitFor();
     await killAnim(page);
     await settleMain(page);
-    await page.locator("main").screenshot({ path: `${IMAGES}/${withLang("web-ui-components.png", lang)}` });
+    await shootMain(page, `${IMAGES}/${withLang("web-ui-components.png", lang)}`);
   });
 
   test(`@capture vulnerabilities section (content) - ${lang}`, async ({ page }) => {
@@ -374,7 +387,7 @@ for (const lang of ["en", "ko"] as Lang[]) {
     await page.getByText("9.8", { exact: true }).waitFor();
     await killAnim(page);
     await settleMain(page);
-    await page.locator("main").screenshot({ path: `${IMAGES}/${withLang("web-ui-vulns.png", lang)}` });
+    await shootMain(page, `${IMAGES}/${withLang("web-ui-vulns.png", lang)}`);
   });
 
   test(`@capture dependencies section (content) - ${lang}`, async ({ page }) => {
@@ -388,7 +401,7 @@ for (const lang of ["en", "ko"] as Lang[]) {
     await page.getByText("openssl").first().waitFor();
     await killAnim(page);
     await settleMain(page);
-    await page.locator("main").screenshot({ path: `${IMAGES}/${withLang("web-ui-dependencies.png", lang)}` });
+    await shootMain(page, `${IMAGES}/${withLang("web-ui-dependencies.png", lang)}`);
   });
 
   test(`@capture licenses section (content) - ${lang}`, async ({ page }) => {
@@ -399,7 +412,7 @@ for (const lang of ["en", "ko"] as Lang[]) {
     await page.getByText("some-llama-model").waitFor();
     await killAnim(page);
     await settleMain(page);
-    await page.locator("main").screenshot({ path: `${IMAGES}/${withLang("web-ui-licenses.png", lang)}` });
+    await shootMain(page, `${IMAGES}/${withLang("web-ui-licenses.png", lang)}`);
   });
 
   test(`@capture artifacts section (content) - ${lang}`, async ({ page }) => {
@@ -412,7 +425,7 @@ for (const lang of ["en", "ko"] as Lang[]) {
     await page.getByRole("button", { name: new RegExp(s.spdxExport) }).waitFor();
     await killAnim(page);
     await settleMain(page);
-    await page.locator("main").screenshot({ path: `${IMAGES}/${withLang("web-ui-artifacts.png", lang)}` });
+    await shootMain(page, `${IMAGES}/${withLang("web-ui-artifacts.png", lang)}`);
   });
 
   test(`@capture models section (content) - ${lang}`, async ({ page }) => {
@@ -427,11 +440,9 @@ for (const lang of ["en", "ko"] as Lang[]) {
     await header.waitFor();
     await killAnim(page);
     await settleMain(page);
-    await header.evaluate((el) => {
-      const main = el.closest("main")!;
-      main.scrollTop += el.getBoundingClientRect().top - main.getBoundingClientRect().top - 40;
-    });
-    await page.locator("main").screenshot({ path: `${IMAGES}/${withLang("web-ui-models.png", lang)}` });
+    // 56px top bar plus 40px of air above the card header.
+    await header.evaluate((el) => window.scrollBy(0, el.getBoundingClientRect().top - 96));
+    await shootMain(page, `${IMAGES}/${withLang("web-ui-models.png", lang)}`);
   });
 }
 
@@ -654,7 +665,7 @@ for (const lang of ["en", "ko"] as Lang[]) {
     await page.locator('tr[data-field="releaseTime"]').first().waitFor();
     await killAnim(page);
     await settleMain(page);
-    await page.locator("main").screenshot({ path: `${IMAGES}/${withLang("web-ui-spdx3.png", lang)}` });
+    await shootMain(page, `${IMAGES}/${withLang("web-ui-spdx3.png", lang)}`);
   });
 
   test(`@capture AI declaration questions - ${lang}`, async ({ page }) => {
@@ -667,7 +678,7 @@ for (const lang of ["en", "ko"] as Lang[]) {
     await page.locator('[data-question="model.releaseTime"]').waitFor();
     await killAnim(page);
     await settleMain(page);
-    await page.locator("main").screenshot({ path: `${IMAGES}/${withLang("web-ui-ai-declaration.png", lang)}` });
+    await shootMain(page, `${IMAGES}/${withLang("web-ui-ai-declaration.png", lang)}`);
   });
 
   test(`@capture AI declaration service step - ${lang}`, async ({ page }) => {
@@ -691,6 +702,6 @@ for (const lang of ["en", "ko"] as Lang[]) {
     await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
     await killAnim(page);
     await settleMain(page);
-    await page.locator("main").screenshot({ path: `${IMAGES}/${withLang("web-ui-ai-service.png", lang)}` });
+    await shootMain(page, `${IMAGES}/${withLang("web-ui-ai-service.png", lang)}`);
   });
 }

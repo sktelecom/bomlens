@@ -98,7 +98,7 @@ async function open(page: Page, hash: string, sbom: unknown = sbomWith(8)) {
     r.fulfill({ contentType: "application/json", body: JSON.stringify(sbom) }),
   );
   await page.goto(`/?ui=next#/scan/${ID}/${hash}`);
-  await page.getByRole("navigation").first().waitFor();
+  await page.getByTestId("result-meta").waitFor();
 }
 
 const hashOf = (page: Page) => page.evaluate(() => window.location.hash);
@@ -153,7 +153,7 @@ test.describe("preset views", () => {
     await expect(page.getByText("CVE-2024-4001")).toBeVisible();
 
     await page.reload();
-    await page.getByRole("navigation").first().waitFor();
+    await page.getByTestId("result-meta").waitFor();
     await expect(page.getByRole("button", { name: /^Critical and High/ })).toHaveAttribute("aria-pressed", "true");
     await expect(page.getByText("CVE-2024-4003")).toHaveCount(0);
 
@@ -248,7 +248,7 @@ test.describe("row density", () => {
     expect(await firstRowHeight(page, /urllib3/)).toBeLessThan(34);
 
     await page.reload();
-    await page.getByRole("navigation").first().waitFor();
+    await page.getByTestId("result-meta").waitFor();
     await expect(page.getByTestId("density-toggle").getByRole("button", { name: "Compact" })).toHaveAttribute(
       "aria-pressed",
       "true",
