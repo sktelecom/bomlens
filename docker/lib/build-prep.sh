@@ -1249,8 +1249,9 @@ function gradle_gav(line,    i, left, right, nl, l, nr, r, g, a, v) {
 # in this run), when a configuration could not be resolved, when the files are
 # incomplete, or when nothing was read. A build included only through
 # pluginManagement { includeBuild(...) } is a plugin build: it cannot replace a
-# dependency and nothing it needs at build time ships, so it does not keep the
-# full graph. That holds when the settings tell it from a build included for
+# dependency and, as a rule, nothing it needs at build time ships, so it does
+# not keep the full graph (a plugin that copies a library of its own into the
+# output is the exception; BOMLENS_GRADLE_FULL_GRAPH=1 keeps it). That holds when the settings tell it from a build included for
 # its code (a directory with more inclusions than pluginManagement ones is
 # both), and when no project's graph holds a project of another build. Settings
 # that cannot be read leave every included build counting as one included for
