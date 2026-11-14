@@ -59,7 +59,7 @@ test("Overview lists the outdated components and opens Components filtered to th
   await expect(row).toHaveAttribute("href", /#\/scan\/[^/]+\/components\?outdated=1$/);
   await row.click();
   await page.getByRole("button", { name: /^Filters/ }).click();
-  await expect(page.getByRole("checkbox", { name: "Outdated" })).toBeChecked();
+  await expect(page.getByRole("menuitemcheckbox", { name: "Outdated" })).toHaveAttribute("aria-checked", "true");
   await page.keyboard.press("Escape");
   await expect(page.getByText("express", { exact: true })).toHaveCount(0);
 });
@@ -76,7 +76,7 @@ test("outdated badge + latest version render; filter narrows the table", async (
 
   // The Outdated filter keeps only the two outdated rows (express drops out).
   await page.getByRole("button", { name: /^Filters/ }).click();
-  await page.getByRole("checkbox", { name: "Outdated" }).check();
+  await page.getByRole("menuitemcheckbox", { name: "Outdated" }).click();
   await page.keyboard.press("Escape");
   await expect(page.getByText("lodash", { exact: true }).first()).toBeVisible();
   await expect(page.getByText("jinja2", { exact: true }).first()).toBeVisible();

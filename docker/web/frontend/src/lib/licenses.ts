@@ -286,6 +286,20 @@ function worstTier(licenses: string[]): LicenseRiskTier {
   return tier;
 }
 
+/** The license of a list that carries the most concerning tier (the first one on a tie). */
+export function worstLicense(licenses: string[]): string {
+  let best = licenses[0] ?? "";
+  let rank = -1;
+  for (const l of licenses) {
+    const r = TIER_RANK[licenseRiskTier(l)];
+    if (r > rank) {
+      rank = r;
+      best = l;
+    }
+  }
+  return best;
+}
+
 /**
  * Whether a component's licence has to be resolved by a person: nothing declared
  * at all, or a name that is not an identifier we can place (`BSD License`,

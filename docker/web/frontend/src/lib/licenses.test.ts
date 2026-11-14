@@ -13,6 +13,7 @@ import {
   licenseGroups,
   licenseRiskSummary,
   licenseRiskTier,
+  worstLicense,
   parseLicenseExpression,
   reviewCount,
   reviewGroups,
@@ -477,5 +478,13 @@ describe("conflictReasonGroups", () => {
       ["R2", ["b"]],
       ["", ["d"]],
     ]);
+  });
+});
+
+describe("worstLicense", () => {
+  it("picks the license of the most concerning tier, the first on a tie", () => {
+    expect(worstLicense(["MIT", "GPL-3.0-only", "Apache-2.0"])).toBe("GPL-3.0-only");
+    expect(worstLicense(["MIT", "Apache-2.0"])).toBe("MIT");
+    expect(worstLicense([])).toBe("");
   });
 });

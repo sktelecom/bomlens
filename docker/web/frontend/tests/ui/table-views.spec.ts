@@ -233,32 +233,45 @@ test.describe("row density", () => {
       .filter({ hasText: label })
       .first()
       .evaluate((el) => el.getBoundingClientRect().height);
+  // The Components rows are plain rows with an expand button inside.
+  const componentRowHeight = (page: Page, name: string) =>
+    page
+      .locator("main table tbody tr")
+      .filter({ has: page.getByRole("button", { name: `Show component details: ${name}`, exact: true }) })
+      .first()
+      .evaluate((el) => el.getBoundingClientRect().height);
+  const viewMenu = (page: Page) => page.getByRole("button", { name: "View", exact: true });
 
-  test("components rows are 32px compact and 40px comfortable, and the choice is remembered", async ({ page }) => {
+  test("components rows are shorter compact than comfortable, and the choice is remembered", async ({ page }) => {
     await open(page, "components");
-    await expect(page.getByRole("cell", { name: "urllib3", exact: true })).toBeVisible();
-    const toggle = page.getByTestId("density-toggle");
-    await expect(toggle.getByRole("button", { name: "Comfortable" })).toHaveAttribute("aria-pressed", "true");
-    expect(await firstRowHeight(page, /urllib3/)).toBeGreaterThanOrEqual(39.5); // sub-pixel layout can give 39.99998
-    expect(await firstRowHeight(page, /urllib3/)).toBeLessThan(42);
+    await expect(page.getByRole("button", { name: "Show component details: urllib3", exact: true })).toBeVisible();
+    await viewMenu(page).click();
+    await expect(page.getByRole("menuitemradio", { name: "Comfortable" })).toHaveAttribute("aria-checked", "true");
+    await page.keyboard.press("Escape");
+    const comfortable = await componentRowHeight(page, "urllib3");
+    expect(comfortable).toBeGreaterThanOrEqual(36);
+    expect(comfortable).toBeLessThan(46);
 
-    await toggle.getByRole("button", { name: "Compact" }).click();
-    await expect(toggle.getByRole("button", { name: "Compact" })).toHaveAttribute("aria-pressed", "true");
-    expect(await firstRowHeight(page, /urllib3/)).toBeGreaterThanOrEqual(31.5);
-    expect(await firstRowHeight(page, /urllib3/)).toBeLessThan(34);
+    await viewMenu(page).click();
+    await page.getByRole("menuitemradio", { name: "Compact" }).click();
+    await page.keyboard.press("Escape");
+    const compact = await componentRowHeight(page, "urllib3");
+    expect(compact).toBeGreaterThanOrEqual(28);
+    expect(compact).toBeLessThan(comfortable);
 
     await page.reload();
     await page.getByTestId("result-meta").waitFor();
-    await expect(page.getByTestId("density-toggle").getByRole("button", { name: "Compact" })).toHaveAttribute(
-      "aria-pressed",
-      "true",
-    );
-    expect(await firstRowHeight(page, /urllib3/)).toBeLessThan(34);
+    await viewMenu(page).click();
+    await expect(page.getByRole("menuitemradio", { name: "Compact" })).toHaveAttribute("aria-checked", "true");
+    await page.keyboard.press("Escape");
+    expect(await componentRowHeight(page, "urllib3")).toBe(compact);
   });
 
   test("the vulnerabilities table has the same two steps and shares the choice", async ({ page }) => {
     await open(page, "components");
-    await page.getByTestId("density-toggle").getByRole("button", { name: "Compact" }).click();
+    await viewMenu(page).click();
+    await page.getByRole("menuitemradio", { name: "Compact" }).click();
+    await page.keyboard.press("Escape");
     await page.getByRole("link", { name: /^Vulnerabilities/ }).first().click();
 
     const toggle = page.getByTestId("density-toggle");
@@ -276,9 +289,8 @@ test.describe("row density", () => {
   test("a corrupt stored value reads as the default", async ({ page }) => {
     await page.addInitScript(() => localStorage.setItem("sbom.table.density", "spacious"));
     await open(page, "components");
-    await expect(
-      page.getByTestId("density-toggle").getByRole("button", { name: "Comfortable" }),
-    ).toHaveAttribute("aria-pressed", "true");
+    await viewMenu(page).click();
+    await expect(page.getByRole("menuitemradio", { name: "Comfortable" })).toHaveAttribute("aria-checked", "true");
   });
 });
 
@@ -374,7 +386,7 @@ for (const theme of ["light", "dark"] as const) {
       expect(axe.violations).toEqual([]);
     });
 
-    test(`graph legend chips and density switch pass axe — ${theme}/${lang}`, async ({ page }) => {
+    test(`graph legend chips and the components toolbar pass axe: ${theme}/${lang}`, async ({ page }) => {
       await seedThemeLang(page, theme, lang);
       await open(page, "dependencies", sbomWith(8));
       await page.locator("[data-label-px]").waitFor({ timeout: 15000 });
@@ -386,7 +398,7 @@ for (const theme of ["light", "dark"] as const) {
       expect(axe.violations).toEqual([]);
 
       await page.getByRole("link", { name: /^(Components|컴포넌트)/ }).first().click();
-      await expect(page.getByTestId("density-toggle")).toBeVisible();
+      await expect(page.getByRole("button", { name: /^(View|보기)$/ })).toBeVisible();
       await waitForSettled(page.locator("main"));
       axe = await new AxeBuilder({ page })
         .include("main")

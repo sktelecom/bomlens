@@ -339,43 +339,35 @@ for (const theme of ["light", "dark"] as Theme[]) {
     });
   }
 
-  test(`component filter chips: solid fill when on, ring only under the keyboard, never faded (${theme})`, async ({ page }) => {
+  // The Components filters are Primer buttons under the toolbar, one per active filter, that remove
+  // it. They take the focus colour as an outline under the keyboard and are never faded.
+  test(`component filter chips: outline only under the keyboard, never faded, Enter removes (${theme})`, async ({ page }) => {
     await seedThemeLang(page, theme, "en");
     await openChipSection(page, "components?vulns=1&direct=1");
 
-    const ring = await tokenColour(page, "hsl(var(--ring))");
-    const selectedFill = await tokenColour(page, "hsl(var(--selected))");
-    // The density switch beside them is pressable too, but it is not a filter chip.
-    const chips = page.locator('main :not([data-testid="density-toggle"]) > button[aria-pressed]');
+    const focusColour = await tokenColour(page, "var(--focus-outlineColor)");
+    const chips = page.getByRole("button", { name: /^Remove filter:/ });
     await expect(chips).toHaveCount(2);
+    const outline = (el: Locator) =>
+      el.evaluate((node) => {
+        const cs = getComputedStyle(node);
+        return { style: cs.outlineStyle, width: cs.outlineWidth, colour: cs.outlineColor, opacity: cs.opacity };
+      });
     const first = chips.nth(0);
-    const second = chips.nth(1);
-
-    for (const chip of [first, second]) {
-      await expect(chip).toHaveAttribute("aria-pressed", "true");
-      const l = await look(chip);
-      expect(l.background, "an active filter chip is a solid fill").toBe(selectedFill);
-      expect(l.opacity).toBe("1");
-      expect(l.shadow, "selection is not a ring").not.toContain(ring);
-    }
-    const rest = await look(first);
+    await page.mouse.move(0, 0);
+    const rest = await outline(first);
+    expect(rest.opacity).toBe("1");
+    expect(rest.style === "none" || rest.width === "0px", "a chip at rest has no outline").toBe(true);
 
     await focusByKeyboard(page, first);
-    const focused = await look(first);
-    expect(focused.shadow, "focus draws the ring").toContain(ring);
-    expect(focused.background, "focus does not move the fill").toBe(selectedFill);
-    expect(sig(focused)).not.toBe(sig(rest));
-    // The neighbour was not focused, so it carries the fill but no ring.
-    const neighbour = await look(second);
-    expect(neighbour.shadow).not.toContain(ring);
-    expect(neighbour.background).toBe(selectedFill);
+    const focused = await outline(first);
+    expect(focused.style).toBe("solid");
+    expect(focused.width).not.toBe("0px");
+    expect(focused.colour, "focus draws the outline in the focus colour").toBe(focusColour);
+    expect((await outline(chips.nth(1))).style === "none" || (await outline(chips.nth(1))).width === "0px").toBe(true);
 
-    await page.keyboard.press("Tab");
-    await expect(first).not.toBeFocused();
-    const after = await look(first);
-    expect(after.shadow).not.toContain(ring);
-    expect(after.background).toBe(selectedFill);
-    expect(after.opacity).toBe("1");
+    await page.keyboard.press("Enter");
+    await expect(chips).toHaveCount(1);
   });
 }
 

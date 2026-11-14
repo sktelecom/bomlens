@@ -1,0 +1,99 @@
+/*
+ * Components screen (components/ComponentsTable.tsx, components-table/*).
+ * Primer's Table is a CSS grid: the name column takes what the others leave and
+ * wraps instead of being cut, the table grows with the page (no scroll box of
+ * its own) and its head sticks under the 56px top bar. Every colour, space and
+ * radius is a Primer variable.
+ */
+
+.bl-comp-gap { margin-top: var(--base-size-16); }
+
+/* The search takes what the buttons leave, never less than a readable width. */
+.bl-comp-search { flex: 1 1 14rem; min-width: 14rem; max-width: 32rem; }
+
+/* Tailwind's preflight loads after Primer and resets border width and link
+ * colour with the same specificity as Primer's :where() rules; set both back. */
+.bl-comp [class*="prc-Label-Label"] { border-width: var(--borderWidth-thin); }
+.bl-comp a[class*="prc-Link-Link"] { color: var(--fgColor-accent); }
+
+.bl-comp-table { min-width: 0; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+.bl-comp-scroll {
+  grid-area: table;
+  position: relative;
+  isolation: isolate;
+  min-width: 0;
+  overflow-x: clip;
+  overflow-y: visible;
+  border: var(--borderWidth-thin) solid var(--borderColor-default);
+  border-radius: var(--borderRadius-medium);
+}
+.bl-comp-scroll th:first-child, .bl-comp-scroll td:first-child { border-inline-start: 0 !important; }
+.bl-comp-scroll th:last-child, .bl-comp-scroll td:last-child { border-inline-end: 0 !important; }
+.bl-comp-scroll thead tr:first-child th { border-top: 0 !important; border-radius: 0 !important; }
+.bl-comp-scroll table > :last-child > tr:last-child > * { border-bottom: 0 !important; border-radius: 0 !important; }
+.bl-comp-scroll thead { position: sticky; top: 56px; z-index: 3; }
+/* Primer wraps the table in its own scroll region; the page scrolls instead, so
+ * the sticky head works against the window. */
+.bl-comp-scroll > [class*="ScrollableRegion"] { overflow: visible; }
+
+.bl-comp-table table { --table-font-size: var(--text-body-size-medium); }
+.bl-comp-table td, .bl-comp-table th { align-items: flex-start; min-width: 0; }
+.bl-comp-table thead th { white-space: nowrap; }
+/* Only the name may wrap (after a hyphen or dot when there is one); every other cell keeps its words whole.
+ * A version is the one exception: a long build string wraps anywhere rather than overlapping its neighbour. */
+.bl-comp-table tbody td { white-space: nowrap; }
+.bl-comp-table tbody th { white-space: normal; overflow-wrap: break-word; word-break: normal; }
+.bl-comp-table tbody td:nth-child(2) .bl-comp-ver { white-space: normal; overflow-wrap: anywhere; }
+.bl-comp-table td [class*="prc-Label-Label"] { overflow-wrap: normal; word-break: normal; white-space: nowrap; }
+.bl-comp-table td > div { min-width: 0; }
+.bl-comp-row { cursor: pointer; }
+.bl-comp-table tr[data-open="true"] > * { background: var(--bgColor-muted); }
+
+/* The name column stays in view if the table is ever wider than the page. Its
+ * background is opaque: it slides over the other cells. */
+.bl-comp-table tbody tr > th:first-child,
+.bl-comp-table thead tr > th:first-child { position: sticky; left: 0; z-index: 2; background: var(--bgColor-default); }
+.bl-comp-table thead tr > th:first-child { z-index: 4; background: var(--bgColor-muted); }
+.bl-comp-table tbody tr:hover > th:first-child { background: linear-gradient(var(--control-transparent-bgColor-hover), var(--control-transparent-bgColor-hover)), var(--bgColor-default); }
+.bl-comp-table tbody tr[data-open="true"] > th:first-child { background: var(--bgColor-muted); }
+.bl-comp-table tbody th { font-weight: 400; }
+
+/* Chunks: one tbody each, laid on the table's own columns. A recycled chunk is
+ * one spacer row of the chunk's measured height. */
+.bl-comp-chunk, .bl-comp-spacer { display: grid; grid-column: 1 / -1; grid-template-columns: subgrid; }
+.bl-comp-spacer > td { grid-column: 1 / -1; }
+
+/* The name cell: the disclosure button with the package, then its labels. */
+.bl-comp-namecell { width: 100%; min-width: 0; }
+.bl-comp-line1 { display: flex; flex-wrap: wrap; align-items: center; gap: var(--base-size-4) var(--base-size-8); min-width: 0; }
+.bl-comp-disclose {
+  all: unset;
+  box-sizing: border-box;
+  display: flex;
+  align-items: flex-start;
+  gap: var(--base-size-4);
+  min-width: 0;
+  max-width: 100%;
+  cursor: pointer;
+}
+.bl-comp-disclose:hover .bl-comp-name { color: var(--fgColor-accent); }
+.bl-comp-disclose:focus-visible { outline: 2px solid var(--focus-outlineColor); outline-offset: 1px; border-radius: var(--borderRadius-small); }
+.bl-comp-chev { display: inline-flex; flex: none; align-items: center; height: 1.5em; }
+.bl-comp-name { min-width: 0; overflow-wrap: break-word; word-break: normal; font-size: var(--text-body-size-medium); line-height: 1.5; }
+.bl-comp-labels { display: inline-flex; flex-wrap: wrap; gap: var(--base-size-4); }
+.bl-comp-labels:empty { display: none; }
+.bl-comp-meta { margin-top: 2px; padding-left: var(--base-size-20); overflow-wrap: anywhere; }
+.bl-comp-sans { font-family: var(--fontStack-system); }
+
+/* The license cell: tier mark, the first license, and "+N". */
+.bl-comp-lic { display: flex; align-items: center; gap: var(--base-size-4); flex-wrap: nowrap; min-width: 0; }
+.bl-comp-tier { display: inline-flex; flex: none; }
+.bl-comp-liclabel { max-width: 9.5rem; overflow: hidden; text-overflow: ellipsis; display: inline-block; }
+
+/* The detail row spans every column. */
+.bl-comp-table .bl-comp-detail { grid-column: 1 / -1; display: block; background: var(--bgColor-muted); }
+.bl-comp-detailbody { padding: var(--base-size-4) var(--base-size-16) var(--base-size-8) var(--base-size-40); }
+.bl-comp-kv { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: var(--base-size-6) var(--base-size-16); margin: 0; font-size: var(--text-body-size-medium); }
+.bl-comp-kv dt { color: var(--fgColor-muted); font-weight: 600; }
+.bl-comp-kv dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+.bl-comp-licdd, .bl-comp-vulndd { display: flex; flex-wrap: wrap; align-items: center; gap: var(--base-size-4) var(--base-size-12); }
