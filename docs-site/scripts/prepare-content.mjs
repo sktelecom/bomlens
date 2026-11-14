@@ -46,9 +46,11 @@ function withTitle(text) {
 
 fs.rmSync(target, { recursive: true, force: true });
 let pages = 0;
-for (const rel of fs.readdirSync(source, { recursive: true })) {
-  const from = path.join(source, rel);
-  if (!fs.statSync(from).isFile() || skip(rel.split(path.sep).join('/'))) continue;
+for (const entry of fs.readdirSync(source, { recursive: true, withFileTypes: true })) {
+  if (!entry.isFile()) continue;
+  const from = path.join(entry.parentPath, entry.name);
+  const rel = path.relative(source, from);
+  if (skip(rel.split(path.sep).join('/'))) continue;
   const to = path.join(target, rel);
   fs.mkdirSync(path.dirname(to), { recursive: true });
   if (rel.endsWith('.md')) {
@@ -65,7 +67,10 @@ for (const rel of fs.readdirSync(source, { recursive: true })) {
 // switch-over), and goes to public/ because it is served as-is.
 fs.rmSync(demoTarget, { recursive: true, force: true });
 const demoSource = path.join(source, 'demo');
-const withDemo = process.env.DOCS_INCLUDE_DEMO === '1' && fs.existsSync(demoSource);
-if (withDemo) fs.cpSync(demoSource, demoTarget, { recursive: true });
+let withDemo = false;
+if (process.env.DOCS_INCLUDE_DEMO === '1') {
+  fs.cpSync(demoSource, demoTarget, { recursive: true });
+  withDemo = true;
+}
 
 console.log(`prepare-content: ${pages} pages${withDemo ? ' + demo' : ''}`);
