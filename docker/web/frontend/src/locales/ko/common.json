@@ -754,7 +754,16 @@
       "rubygems": "RubyGems",
       "packagist": "Packagist",
       "nuget": "NuGet"
-    }
+    },
+    "formats": "받는 형식: CVE, GHSA, GO, PYSEC, RUSTSEC, OSV, GSD, MAL ID, purl(npm, PyPI, Maven, Go, crates.io, RubyGems, Packagist, NuGet), 이름@버전, 또는 이름에 생태계와 버전을 골라 붙인 형식.",
+    "results": "조회 결과",
+    "disabledTitle": "이 서버에서는 외부 조회를 꺼 두었습니다",
+    "disabledBody": "관리자가 이 컴퓨터 밖으로 나가는 조회를 껐습니다. 스캔은 여전히 로컬 데이터베이스로 취약점을 확인합니다.",
+    "goHome": "스캔 관리로 돌아가기",
+    "captionEmpty": "식별자, purl, 패키지 이름 중 하나를 입력하면 조회할 수 있습니다.",
+    "captionPackage": "생태계를 고르고 버전을 입력하면 조회할 수 있습니다.",
+    "emptyTitle": "권고나 패키지를 조회해 보세요",
+    "emptyHint": "예시를 선택하면 입력칸에 채워집니다. 채운 뒤 조회를 누르세요."
   },
   "newscan": {
     "title": "무엇을 스캔할까요?",

@@ -46,6 +46,7 @@ import {
   visibleSectionIds,
 } from "@/lib/nav";
 import {
+  buildHash,
   homeHash,
   lookupHash,
   newHash,
@@ -599,8 +600,8 @@ export function NextApp() {
   // The Lookup screen ran a query, so reflect it in the URL (replaced, not
   // pushed, same reasoning as handleQueryChange below) so the result is a
   // shareable link without the screen touching the hash itself.
-  const handleLookupQueryChange = useCallback((term: string) => {
-    const next = lookupHash(term || undefined);
+  const handleLookupQueryChange = useCallback((query: RouteQuery) => {
+    const next = buildHash({ kind: "lookup", query });
     if (next === window.location.hash) return;
     window.history.replaceState(null, "", next);
   }, []);
@@ -788,10 +789,7 @@ export function NextApp() {
               onDelete={setPendingDelete}
             />
           ) : homeView === "lookup" ? (
-            <ExternalLookup
-              initialQuery={sectionQuery.q}
-              onQueryChange={handleLookupQueryChange}
-            />
+            <ExternalLookup query={sectionQuery} onQueryChange={handleLookupQueryChange} />
           ) : declaring ? (
             <DeclareFlow
               params={declaring.params}
