@@ -726,9 +726,9 @@ guard_snapshot
 # gradle_settings_remove: the user's Gradle settings copied for this scan.
 # MAVEN_FALLBACK_DIR: the Maven unpacked for a refused pom.xml (Maven section).
 MAVEN_FALLBACK_DIR=""
-trap 'stop_supervised; guard_restore; gradle_settings_remove; [ -z "${_pg_dir:-}" ] || rm -rf "$_pg_dir"; [ -z "${MAVEN_FALLBACK_DIR:-}" ] || rm -rf "$MAVEN_FALLBACK_DIR"' EXIT
-trap 'stop_supervised; guard_restore; gradle_settings_remove; [ -z "${_pg_dir:-}" ] || rm -rf "$_pg_dir"; [ -z "${MAVEN_FALLBACK_DIR:-}" ] || rm -rf "$MAVEN_FALLBACK_DIR"; exit 130' INT
-trap 'stop_supervised; guard_restore; gradle_settings_remove; [ -z "${_pg_dir:-}" ] || rm -rf "$_pg_dir"; [ -z "${MAVEN_FALLBACK_DIR:-}" ] || rm -rf "$MAVEN_FALLBACK_DIR"; exit 143' TERM
+trap 'stop_supervised; guard_restore; gradle_settings_remove; [ -z "${_pg_dir:-}" ] || rm -rf "$_pg_dir"; [ -z "${MAVEN_FALLBACK_DIR:-}" ] || rm -rf "$MAVEN_FALLBACK_DIR"; [ -z "${_cp_f:-}" ] || rm -f "$_cp_f"' EXIT
+trap 'stop_supervised; guard_restore; gradle_settings_remove; [ -z "${_pg_dir:-}" ] || rm -rf "$_pg_dir"; [ -z "${MAVEN_FALLBACK_DIR:-}" ] || rm -rf "$MAVEN_FALLBACK_DIR"; [ -z "${_cp_f:-}" ] || rm -f "$_cp_f"; exit 130' INT
+trap 'stop_supervised; guard_restore; gradle_settings_remove; [ -z "${_pg_dir:-}" ] || rm -rf "$_pg_dir"; [ -z "${MAVEN_FALLBACK_DIR:-}" ] || rm -rf "$MAVEN_FALLBACK_DIR"; [ -z "${_cp_f:-}" ] || rm -f "$_cp_f"; exit 143' TERM
 
 # Non-shipped trees: manifests under test, fixture, example, benchmark and demo
 # folders, the GitHub Actions workflows and the Gradle wrapper jar are left out
@@ -5777,6 +5777,32 @@ EOF
     rm -f "$_rch_runs" "$_rch_err1"
 fi
 
+# --- cache hand-back helpers ------------------------------------------------
+# cache_chown_has_effect DIR: probe whether a chown to HOST_UID:HOST_GID in DIR
+# sticks. Makes a scratch file in DIR, chowns it, reads the owner back, removes
+# it. Returns 0 when the owner changed, 1 when it did not (a mount that keeps
+# its own owner mapping, a non-root user), and 0 as well when the probe cannot
+# be run (no scratch file, no stat), so an unclear case keeps the hand-back.
+cache_chown_has_effect() {
+    _cp_f=$(mktemp "$1/.bomlens-chown-probe.XXXXXX" 2>/dev/null) || return 0
+    chown "${HOST_UID}:${HOST_GID}" "$_cp_f" 2>/dev/null
+    _cp_o=$(stat -c '%u:%g' "$_cp_f" 2>/dev/null || stat -f '%u:%g' "$_cp_f" 2>/dev/null)
+    rm -f "$_cp_f"; _cp_f=""
+    [ -n "$_cp_o" ] || return 0
+    [ "$_cp_o" = "${HOST_UID}:${HOST_GID}" ]
+}
+# cache_handback_wanted DIR MOUNTINFO: should DIR be walked and chowned? No when
+# it is not a mount point listed in MOUNTINFO (the cache was not mounted),
+# when HOST_UID and HOST_GID are both 0 (root is already the owner the host wants), or when the
+# probe shows chown has no effect there. Yes otherwise.
+cache_handback_wanted() {
+    [ -d "$1" ] && [ -r "$2" ] || return 1
+    awk -v p="$1" '$5 == p { f = 1 } END { exit !f }' "$2" 2>/dev/null || return 1
+    [ "${HOST_UID:-0}" != 0 ] || [ "${HOST_GID:-0}" != 0 ] || return 1
+    cache_chown_has_effect "$1"
+}
+# --- end cache hand-back helpers --------------------------------------------
+
 # Hand the build tree back to the host user. This image runs as root (-u 0:0),
 # so the build steps above (npm install, cargo/go fetch, the bom write) leave
 # root-owned files in the mounted source dir. On Linux the host user then cannot
@@ -5787,11 +5813,12 @@ if [ -n "${HOST_UID:-}" ] && [ -n "${HOST_GID:-}" ]; then
     chown -R "${HOST_UID}:${HOST_GID}" "$SRC" 2>/dev/null || true
     # The Maven and Gradle caches are host folders too (cache-maven,
     # cache-gradle): hand back what this run wrote there. Only a mounted one,
-    # and only the files not already the host user's.
+    # and only the files not already the host user's. A mount where a chown
+    # from in here does not change the owner the host sees is left alone
+    # (cache_handback_wanted).
     _co_acct="$( (getent passwd "$(id -u)" 2>/dev/null || true) | cut -d: -f6)"
     for _co_d in "$HOME/.m2" "${_co_acct:-/root}/.gradle"; do
-        [ -d "$_co_d" ] && [ -r /proc/self/mountinfo ] || continue
-        awk -v p="$_co_d" '$5 == p { f = 1 } END { exit !f }' /proc/self/mountinfo 2>/dev/null || continue
+        cache_handback_wanted "$_co_d" /proc/self/mountinfo || continue
         find "$_co_d" \( ! -user "$HOST_UID" -o ! -group "$HOST_GID" \) \
             -exec chown -h "${HOST_UID}:${HOST_GID}" {} + 2>/dev/null || true
     done
