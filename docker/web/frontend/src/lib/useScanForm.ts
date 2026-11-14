@@ -43,7 +43,7 @@ export const ACCEPT: Record<UploadKind, string> = {
   sbom: ".json,.xml,.spdx,.cdx.json,.spdx.json,.spdx.tar.zst",
   firmware:
     ".bin,.img,.squashfs,.sqsh,.ubi,.ubifs,.trx,.chk,.fw,.rom,.dlf,.bix," +
-    ".gz,.tgz,.tar,.xz,.bz2,.lzma,.zst,.img.gz,.tar.gz",
+    ".gz,.tgz,.tar,.xz,.bz2,.lzma,.zst,.zip,.img.gz,.tar.gz",
   model: ".gguf,.safetensors,.pt,.pth,.ckpt,.pkl,.pickle,.onnx,.npz,.npy",
   declaration: ".json",
 };
@@ -491,7 +491,10 @@ export function useScanForm({
       // Land keyboard/screen-reader users on the first field that needs fixing
       // (field keys double as the input ids). The Run button itself stays
       // enabled — disabling it would hide *why* the scan can't start.
-      document.getElementById(firstInvalid)?.focus();
+      // After the errors are drawn: the line that names them sits above the
+      // action bar and makes it taller, so the field is scrolled into view
+      // against the bar's final height.
+      setTimeout(() => document.getElementById(firstInvalid)?.focus(), 0);
       return;
     }
 

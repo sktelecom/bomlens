@@ -37,7 +37,7 @@ async function stub(page: Page, opts: { uploadOk: boolean }) {
 async function selectZipAndAttach(page: Page) {
   await page.fill("#project", "demo");
   await page.fill("#version", "1.0");
-  await page.getByRole("button", { name: /ZIP upload/i }).click();
+  await page.getByRole("radio", { name: /ZIP upload/i }).click();
   await page.locator("#file").setInputFiles({
     name: "demo.zip",
     mimeType: "application/zip",
@@ -104,7 +104,7 @@ test("a dropped file is attached and can be scanned", async ({ page }) => {
   await page.goto("/#/new");
   await page.fill("#project", "demo");
   await page.fill("#version", "1.0");
-  await page.getByRole("button", { name: /ZIP upload/i }).click();
+  await page.getByRole("radio", { name: /ZIP upload/i }).click();
 
   await dropFile(page, "dropped.zip", "PK dropped bytes");
 
@@ -120,7 +120,7 @@ test("a dropped file is attached and can be scanned", async ({ page }) => {
 test("the chosen file can be taken back off", async ({ page }) => {
   await stub(page, { uploadOk: true });
   await page.goto("/#/new");
-  await page.getByRole("button", { name: /ZIP upload/i }).click();
+  await page.getByRole("radio", { name: /ZIP upload/i }).click();
   await dropFile(page, "wrong.zip", "PK wrong");
   await expect(page.getByTestId("dropzone-name")).toHaveText("wrong.zip");
 
@@ -157,7 +157,7 @@ test("upload progress is reported while the file goes out", async ({ page }) => 
   await page.goto("/#/new");
   await page.fill("#project", "demo");
   await page.fill("#version", "1.0");
-  await page.getByRole("button", { name: /ZIP upload/i }).click();
+  await page.getByRole("radio", { name: /ZIP upload/i }).click();
   await dropFile(page, "demo.zip", "PK demo");
   await page.getByTestId("run-scan").click();
 
@@ -171,7 +171,7 @@ test("upload progress is reported while the file goes out", async ({ page }) => 
 test("the dropzone has no axe violations, before and after a file", async ({ page }) => {
   await stub(page, { uploadOk: true });
   await page.goto("/#/new");
-  await page.getByRole("button", { name: /ZIP upload/i }).click();
+  await page.getByRole("radio", { name: /ZIP upload/i }).click();
   await expect(page.getByTestId("dropzone")).toBeVisible();
 
   const empty = await new AxeBuilder({ page })

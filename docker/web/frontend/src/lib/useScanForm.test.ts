@@ -1,6 +1,8 @@
 // Copyright 2026 SK Telecom Co., Ltd.
 // SPDX-License-Identifier: Apache-2.0
 
+import { readFileSync } from "node:fs";
+
 import { describe, expect, it } from "vitest";
 
 import type { SourceType } from "./api";
@@ -123,4 +125,38 @@ describe("TEXT_INPUT", () => {
       expect(UPLOAD_KIND[s]).toBeUndefined();
     }
   });
+});
+
+describe("ACCEPT against the server's upload list", () => {
+  // The drop zone refuses a dropped file whose name does not end in an accepted
+  // extension, so its list has to be the server's (UPLOAD_EXTS in server.py)
+  // exactly: a shorter one would turn away a file the upload form used to take
+  // (a firmware .zip), a longer one would let the server answer 415.
+  const source = readFileSync(new URL("../../../server.py", import.meta.url), "utf8");
+  const block = source.slice(source.indexOf("UPLOAD_EXTS = {"), source.indexOf("\n}\n", source.indexOf("UPLOAD_EXTS = {")));
+  const uncommented = block
+    .split("\n")
+    .map((l) => l.replace(/#.*$/, ""))
+    .join("\n");
+  const server: Record<string, string[]> = {};
+  for (const m of uncommented.matchAll(/"(\w+)":\s*\(([^)]*)\)/g)) {
+    server[m[1]] = [...m[2].matchAll(/"(\.[^"]+)"/g)].map((x) => x[1]);
+  }
+
+  it("reads every kind from server.py", () => {
+    expect(Object.keys(server).sort()).toEqual(Object.keys(ACCEPT).sort());
+  });
+
+  for (const kind of Object.keys(ACCEPT) as Array<keyof typeof ACCEPT>) {
+    it(`matches the server for ${kind}`, () => {
+      const ours = ACCEPT[kind].split(",").map((x) => x.trim());
+      // The picker also lists compound names the server covers by their last
+      // part (.img.gz, .tar.gz): those are redundant with .gz, so compare on
+      // the extensions the server names.
+      for (const ext of server[kind]) expect(ours).toContain(ext);
+      for (const ext of ours) {
+        expect(server[kind].some((s) => ext.endsWith(s))).toBe(true);
+      }
+    });
+  }
 });

@@ -11,10 +11,10 @@ import { seedThemeLang, type Theme } from "./visual";
  * Selected and keyboard-focused are different looks.
  *
  * Both used to be the same dark ring with an offset, so a tile you had tabbed to
- * looked chosen and the chosen tile looked focused. Now a selection is a fill
- * plus a dark border (never a ring) and focus is the brand ring from --ring
- * (focus-visible only). These tests read computed styles, so they do not depend
- * on a screenshot baseline.
+ * looked chosen and the chosen tile looked focused. Now a selection is a tinted
+ * fill plus an accent border (never a ring) and focus is the outline from
+ * --focus-outlineColor (focus-visible only). These tests read computed styles,
+ * so they do not depend on a screenshot baseline.
  */
 
 const CAPS = { firmware: false, scanoss: false, docker: true, hostDir: "/work/acme" };
@@ -25,6 +25,7 @@ interface Look {
   cursor: string;
   background: string;
   shadow: string;
+  outline: string;
   opacity: string;
 }
 
@@ -41,6 +42,7 @@ async function look(el: Locator): Promise<Look> {
       cursor: cs.cursor,
       background: cs.backgroundColor,
       shadow: cs.boxShadow,
+      outline: cs.outlineStyle === "none" || cs.outlineWidth === "0px" ? "none" : `${cs.outlineWidth} ${cs.outlineStyle} ${cs.outlineColor}`,
       opacity: cs.opacity,
     };
   });
@@ -86,26 +88,27 @@ for (const theme of ["light", "dark"] as Theme[]) {
     await page.locator("#project").waitFor();
     await page.mouse.move(0, 0);
 
-    const selected = page.locator('[data-testid^="source-"][aria-pressed="true"]');
+    // The tiles are one radio group: exactly one is checked.
+    const selected = page.locator('[data-testid^="source-"][aria-checked="true"]');
     await expect(selected).toHaveCount(1);
-    const idle = page.locator('[data-testid^="source-"][aria-pressed="false"]:not([aria-disabled="true"])').first();
+    const idle = page.locator('[data-testid^="source-"][aria-checked="false"]:not([aria-disabled="true"])').first();
     // Firmware needs a capability the stub withholds, so its tile is the locked one.
     const locked = page.getByTestId("source-firmware-upload");
     await expect(locked).toHaveAttribute("aria-disabled", "true");
 
-    const ring = await tokenColour(page, "hsl(var(--ring))");
-    const foreground = await tokenColour(page, "hsl(var(--foreground))");
+    const accent = await tokenColour(page, "var(--borderColor-accent-emphasis)");
+    const ring = await tokenColour(page, "var(--focus-outlineColor)");
 
-    // Rest states: no ring anywhere. Selected is a dark border on a filled tile.
+    // Rest states: no outline anywhere. Selected is an accent border on a tinted tile.
     const idleLook = await look(idle);
     const selectedLook = await look(selected);
     const lockedLook = await look(locked);
-    expect(idleLook.shadow).not.toContain(ring);
-    expect(selectedLook.shadow, "a selected tile is not drawn with a ring").not.toContain(ring);
-    expect(selectedLook.border).toBe(foreground);
+    expect(idleLook.outline).toBe("none");
+    expect(selectedLook.outline, "a selected tile is not drawn with a ring").toBe("none");
+    expect(selectedLook.border).toBe(accent);
     expect(selectedLook.background).not.toBe(idleLook.background);
-    expect(idleLook.border).not.toBe(foreground);
-    expect(lockedLook.shadow).not.toContain(ring);
+    expect(idleLook.border).not.toBe(accent);
+    expect(lockedLook.outline).toBe("none");
     // The locked tile keeps its dashed border and is not clickable.
     await expect(locked).toHaveCSS("border-top-style", "dashed");
     await expect(locked).toHaveCSS("cursor", "not-allowed");
@@ -113,44 +116,33 @@ for (const theme of ["light", "dark"] as Theme[]) {
     // Hover: a hint of fill, still no ring, still not the selected look.
     await idle.hover();
     const hoverLook = await look(idle);
-    expect(hoverLook.shadow).not.toContain(ring);
-    expect(hoverLook.border).not.toBe(foreground);
+    expect(hoverLook.outline).toBe("none");
+    expect(hoverLook.border).not.toBe(accent);
     await page.mouse.move(0, 0);
 
-    // Keyboard focus lands on the tiles in order. Tab to the first one, note
-    // whether it is the selected one, then step to a second.
+    // The group is one tab stop, the selected tile: Tab lands on it, and the
+    // next Tab leaves the tiles.
     await tabTo(page, (el) => (el.getAttribute("data-testid") ?? "").startsWith("source-"));
     const firstId = await page.evaluate(() => document.activeElement?.getAttribute("data-testid"));
     const first = page.getByTestId(firstId!);
-    const firstPressed = (await first.getAttribute("aria-pressed")) === "true";
-    const firstFocused = await look(first);
-    expect(firstFocused.shadow, "focus draws the ring").toContain(ring);
+    await expect(first).toHaveAttribute("aria-checked", "true");
+    const focusedSelected = await look(first);
+    expect(focusedSelected.outline, "focus draws the ring").toContain(ring);
+    // Focused + selected keeps BOTH cues: the ring and the accent border/fill.
+    expect(focusedSelected.border).toBe(accent);
+    expect(focusedSelected.background).toBe(selectedLook.background);
 
-    await page.keyboard.press("Tab");
-    const secondId = await page.evaluate(() => document.activeElement?.getAttribute("data-testid"));
-    expect(secondId).toMatch(/^source-/);
-    const second = page.getByTestId(secondId!);
-    const secondPressed = (await second.getAttribute("aria-pressed")) === "true";
-    const secondFocused = await look(second);
-    expect(secondFocused.shadow).toContain(ring);
-
-    // One of the two is the selected tile, so we have it focused, and the other
-    // is a plain tile that is only focused.
-    const [focusedSelected, focusedPlain] =
-      firstPressed || !secondPressed ? [firstFocused, secondFocused] : [secondFocused, firstFocused];
-    if (firstPressed || secondPressed) {
-      // Focused + selected keeps BOTH cues: the ring and the dark border/fill.
-      expect(focusedSelected.shadow).toContain(ring);
-      expect(focusedSelected.border).toBe(foreground);
-      expect(focusedSelected.background).toBe(selectedLook.background);
-    }
-    // Focused but not selected: ring, and neither the dark border nor the fill.
-    expect(focusedPlain.border).not.toBe(foreground);
+    // Keyboard focus on a tile that is not selected (the keyboard was the last
+    // input, so :focus-visible applies): ring, and neither the accent border nor the fill.
+    await idle.focus();
+    const focusedPlain = await look(idle);
+    expect(focusedPlain.outline).toContain(ring);
+    expect(focusedPlain.border).not.toBe(accent);
     expect(focusedPlain.background).toBe(idleLook.background);
 
     // The five states are pairwise distinguishable by what is painted.
     const sig = (l: Look) =>
-      `${l.border}|${l.borderStyle}|${l.cursor}|${l.background}|${l.shadow}|${l.opacity}`;
+      `${l.border}|${l.borderStyle}|${l.cursor}|${l.background}|${l.outline}|${l.opacity}`;
     const states = {
       default: sig(idleLook),
       hover: sig(hoverLook),
@@ -387,11 +379,18 @@ for (const theme of ["light", "dark"] as Theme[]) {
   });
 }
 
-// Text fields take focus on their own (autoFocus, a click), so their focus is a
-// darker outline in the foreground colour, not the brand ring that marks
-// buttons and links: next to the red required marks the ring read as an error.
+// Text fields take focus on their own (autoFocus, a click), so their focus is
+// Primer's own field focus: the field's outline in the focus colour
+// (--focus-outlineColor, the navy accent), drawn on the field and not on the
+// buttons' ring. A field at rest has no outline.
+//
+// This used to assert a foreground-coloured outline and "not the brand ring":
+// the brand colour was red, and a red ring beside the red required marks read as
+// an error. The accent is now navy (Primer's own focus colour for fields), so
+// that premise is gone and the field takes the same focus colour as every other
+// control.
 for (const theme of ["light", "dark"] as Theme[]) {
-  test(`a Tab-focused text field gets a foreground outline, not the brand ring (${theme})`, async ({ page }) => {
+  test(`a Tab-focused text field gets the navy focus outline, the same as other controls (${theme})`, async ({ page }) => {
     await seedThemeLang(page, theme, "en");
     await stubNewScan(page);
     await page.goto("/#/new");
@@ -399,15 +398,20 @@ for (const theme of ["light", "dark"] as Theme[]) {
     await field.waitFor();
     await page.mouse.move(0, 0);
 
-    const ring = await tokenColour(page, "hsl(var(--ring))");
-    const foreground = await tokenColour(page, "hsl(var(--foreground))");
-    const rest = await look(field);
-    expect(rest.border, "a field at rest has the quiet input border").not.toBe(foreground);
+    const focusColour = await tokenColour(page, "var(--focus-outlineColor)");
+    const wrapper = field.locator("xpath=ancestor::span[contains(@class,'TextInputBaseWrapper')][1]");
+    const outline = (): Promise<{ style: string; width: string; colour: string }> =>
+      wrapper.evaluate((node) => {
+        const cs = getComputedStyle(node);
+        return { style: cs.outlineStyle, width: cs.outlineWidth, colour: cs.outlineColor };
+      });
+    const rest = await outline();
+    expect(rest.style === "none" || rest.width === "0px", "a field at rest has no outline").toBe(true);
 
     await focusByKeyboard(page, field);
-    const focused = await look(field);
-    expect(focused.border, "focus darkens the field's own outline").toBe(foreground);
-    expect(focused.shadow).toContain(foreground);
-    expect(focused.shadow, "no brand ring on a text field").not.toContain(ring);
+    const focused = await outline();
+    expect(focused.style).toBe("solid");
+    expect(focused.width).not.toBe("0px");
+    expect(focused.colour, "focus draws the outline in the focus colour").toBe(focusColour);
   });
 }

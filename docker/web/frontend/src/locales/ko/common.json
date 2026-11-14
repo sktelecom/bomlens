@@ -80,7 +80,9 @@
     "removeFile": "선택한 파일 제거",
     "uploadingPercent": "업로드 중… {{percent}}%",
     "aiDeclare": "모델 정보 직접 입력",
-    "aiDeclareHint": "아직 HuggingFace 저장소나 읽을 파일이 없는 모델을 위한 입력입니다. 기반 모델, 학습 데이터, 출시일 같은 질문에 답하면 BomLens가 그 답으로 SBOM과 SPDX 3.0.1 AI 문서를 만듭니다. HuggingFace ID로 적은 기반 모델과 데이터셋은 허브에서 읽어 옵니다."
+    "aiDeclareHint": "아직 HuggingFace 저장소나 읽을 파일이 없는 모델을 위한 입력입니다. 기반 모델, 학습 데이터, 출시일 같은 질문에 답하면 BomLens가 그 답으로 SBOM과 SPDX 3.0.1 AI 문서를 만듭니다. HuggingFace ID로 적은 기반 모델과 데이터셋은 허브에서 읽어 옵니다.",
+    "aiDeclareUnavailable": "모델 정보 직접 입력에는 SPDX 3.0.1 변환기가 필요한데 이 이미지에는 없습니다. 전체 이미지를 쓰거나, HuggingFace나 모델 파일로 스캔하세요.",
+    "dropRefused": "{{name}}은 이 입력에서 받을 수 없는 파일입니다. 받는 형식: {{types}}"
   },
   "options": {
     "notice": "고지문",
@@ -126,7 +128,8 @@
     "specVersion": "CycloneDX 버전",
     "specVersionDefault": "CycloneDX 1.6 (기본값)",
     "specVersion17": "CycloneDX 1.7",
-    "specVersionHint": "SBOM을 기록할 CycloneDX 버전입니다. 받는 쪽 시스템이 1.7을 요구할 때 1.7을 고릅니다. AI 모델과 데이터셋 SBOM은 항상 1.7입니다."
+    "specVersionHint": "SBOM을 기록할 CycloneDX 버전입니다. 받는 쪽 시스템이 1.7을 요구할 때 1.7을 고릅니다. AI 모델과 데이터셋 SBOM은 항상 1.7입니다.",
+    "scanossTokenLabel": "SCANOSS API 키(선택)"
   },
   "upload": {
     "target": "대상",
@@ -734,7 +737,15 @@
     "catArtifact": "빌드 산출물",
     "catSbom": "SBOM",
     "catAiModel": "AI 모델",
-    "startQuestions": "질문 시작"
+    "startQuestions": "질문 시작",
+    "more": "자세히",
+    "less": "접기",
+    "rescanSeeded": "{{project}} {{version}}의 설정을 채웠습니다",
+    "rescanSeededBody": "파일, 토큰, 비밀번호는 옮기지 않습니다. 이 입력에 필요하면 다시 넣으세요.",
+    "aboutOption": "{{name}} 설명",
+    "lockAnalyze": "SBOM을 분석할 때는 고지문과 보안 보고서가 항상 켜집니다.",
+    "lockDeepCve": "심층 CVE 매칭을 켜서 보안 보고서도 함께 켜집니다.",
+    "lockReachability": "Go 도달성 분석을 켜서 보안 보고서도 함께 켜집니다."
   },
   "run": {
     "stageGenerate": "SBOM 생성",
@@ -1514,7 +1525,9 @@
     "uploadToken": "업로드 API 토큰을 입력하세요.",
     "gitRef": "브랜치, 태그 또는 커밋 ID로 입력하세요. 영문, 숫자, . _ / @ + - 만 쓸 수 있고 \"..\"은 쓸 수 없습니다.",
     "exclude": "한 줄에 상대 경로 하나를 입력하세요. .., 와일드카드, 역슬래시는 쓸 수 없습니다.",
-    "truscaProjectId": "TRUSCA 프로젝트 id를 입력하세요."
+    "truscaProjectId": "TRUSCA 프로젝트 id를 입력하세요.",
+    "requiredList": "필수 항목을 입력하세요: {{fields}}",
+    "formatList": "형식을 확인하세요: {{fields}}"
   },
   "provenance": {
     "folder": "스캔한 폴더",

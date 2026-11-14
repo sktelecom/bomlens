@@ -59,7 +59,7 @@ test("turning it off sends build", async ({ page }) => {
 
 test("it is not offered for an SBOM upload", async ({ page }) => {
   await openForm(page);
-  await page.getByRole("button", { name: /SBOM upload/i }).click();
+  await page.getByRole("radio", { name: /SBOM upload/i }).click();
   // Open the group when there is one, so a closed group cannot hide the switch.
   const group = page.getByText("Result quality");
   if ((await group.count()) > 0) await group.click();
