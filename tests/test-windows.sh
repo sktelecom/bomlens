@@ -1111,7 +1111,10 @@ DOCKER_STUB_ARGV_DUMP=1 HTTPS_PROXY=http://proxy.example:3128 TRIVY_DB_REPOSITOR
 # runs.
 printf -- '-----BEGIN CERTIFICATE-----\nMIIB\n-----END CERTIFICATE-----\n' > "$WORK/proxy ca.pem"
 CA_ABS="$(cd "$WORK" && pwd)/proxy ca.pem"
-CA_MOUNT="type=bind,source=$CA_ABS,target=/bomlens-ca/extra.pem,readonly"
+# On Windows the CLI hands docker the C:/... form of the path (hostpath).
+CA_HOST="$CA_ABS"
+command -v cygpath >/dev/null 2>&1 && CA_HOST="$(cygpath -m "$CA_ABS")"
+CA_MOUNT="type=bind,source=$CA_HOST,target=/bomlens-ca/extra.pem,readonly"
 d="$(new_proj extraca)"; printf '{"name":"a","dependencies":{"x":"1"}}' > "$d/package.json"
 DOCKER_STUB_ARGV_DUMP=1 SBOM_EXTRA_CA_CERTS="$WORK/proxy ca.pem" BOMLENS_EXTRA_CA_CERTS=/host/only/ca.pem \
   scan_in "$d" --project CA --version 1
@@ -1122,7 +1125,9 @@ DOCKER_STUB_ARGV_DUMP=1 SBOM_EXTRA_CA_CERTS="$WORK/proxy ca.pem" BOMLENS_EXTRA_C
 # A Windows path typed with backslashes in Git Bash (C:\certs\ca.pem) is
 # read as a path: with cygpath on Windows, with the backslashes as slashes here.
 d="$(new_proj extraca_backslash)"; printf '{"name":"a","dependencies":{"x":"1"}}' > "$d/package.json"
-DOCKER_STUB_ARGV_DUMP=1 SBOM_EXTRA_CA_CERTS="${CA_ABS//\//\\}" scan_in "$d" --project CA --version 1 --generate-only
+CA_BACKSLASH="${CA_ABS//\//\\}"
+command -v cygpath >/dev/null 2>&1 && CA_BACKSLASH="$(cygpath -w "$CA_ABS")"
+DOCKER_STUB_ARGV_DUMP=1 SBOM_EXTRA_CA_CERTS="$CA_BACKSLASH" scan_in "$d" --project CA --version 1 --generate-only
 { [ "$RC" -eq 0 ] && in_log "<$CA_MOUNT>"; } \
   && pass "SBOM_EXTRA_CA_CERTS written with backslashes is mounted as the same file" \
   || { fail "SBOM_EXTRA_CA_CERTS with backslashes not handled" "rc=$RC"; show; }

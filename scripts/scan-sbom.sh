@@ -1059,6 +1059,7 @@ SBOM_PULL="${SBOM_PULL:-missing}"
 # scan container at EXTRA_CA_TARGET (extra_ca_run). BOMLENS_EXTRA_CA_CERTS is that
 # path inside the container: a value in this shell is not passed on.
 unset BOMLENS_EXTRA_CA_CERTS
+# extra_ca_mount prints the [ERROR] with its fix (>&2) before it fails.
 EXTRA_CA_HOST="$(extra_ca_mount)" || exit 1
 # The --mount value: --mount, not -v, because when the Docker engine's VM does
 # not share the file's folder (Colima, Rancher Desktop) docker run stops with
