@@ -7084,7 +7084,7 @@ if command -v node >/dev/null 2>&1; then
     PREP="$ROOT_DIR/docker/lib/build-prep.sh"
     GRFIX="$FIX/gradle-runtime"
     _grs_block=$(sed -n '/^# Gradle (java-gradle \/ Android)/,/^# A root Gradle build that did not reach/p' "$PREP" | sed '$d')
-    _grs_fns=$(sed -n '/^mark_prep_failed() {/,/^}/p; /^unmark_prep_failed() {/,/^}/p; /^prep_step() {/,/^}/p' "$PREP")
+    _grs_fns=$(sed -n '/^mark_prep_failed() {/,/^}/p; /^unmark_prep_failed() {/,/^}/p; /^prep_step() {/,/^}/p; /^wrapper_shell() {/,/^}/p' "$PREP")
     _grs_js="$WORK/gradle-filter.js"
     sed -n "/<<'FILTER_JS'/,/^FILTER_JS\$/p" "$PREP" | sed '1d;$d' > "$_grs_js"
     if [ -n "$_grs_block" ] && [ -n "$_grs_fns" ] && [ -s "$_grs_js" ]; then
