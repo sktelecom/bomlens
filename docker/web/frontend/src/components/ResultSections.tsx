@@ -206,6 +206,7 @@ export function ResultSection({
           scanId={scanId}
           inputFile={inputFile}
           componentsHref={scanId ? scanHash(scanId, "components") : undefined}
+          componentsTotal={result.sbom?.components}
         />
       );
     }
