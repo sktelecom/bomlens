@@ -3,7 +3,7 @@
 
 import { Spinner } from "@primer/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Trans, useTranslation } from "react-i18next";
+import { useTranslation } from "react-i18next";
 
 import { AppShell } from "./AppShell";
 import type { NavPlace } from "./Sidebar";
@@ -454,6 +454,15 @@ export function NextApp() {
   const pendingLabel = pendingScan
     ? [pendingScan.project, pendingScan.version].filter(Boolean).join(" ")
     : (pendingDelete ?? "");
+  // Bold the scan name without react-i18next's Trans, which would bundle an
+  // extra HTML parser. The marker splits the translated sentence around the name.
+  const nameMark = "\u0000";
+  const deleteBody = t("recent.confirmDeleteBody", { scan: nameMark })
+    .replace(/<\/?b>/g, "")
+    .split(nameMark)
+    .flatMap((part, i) =>
+      i === 0 ? [part] : [<strong key={i} className="font-semibold text-foreground">{pendingLabel}</strong>, part],
+    );
 
   const confirmDelete = () => {
     const id = pendingDelete;
@@ -884,7 +893,7 @@ export function NextApp() {
       <ConfirmDialog
         open={pendingDelete !== null}
         title={t("recent.confirmDeleteTitle")}
-        description={<Trans i18nKey="recent.confirmDeleteBody" values={{ scan: pendingLabel }} components={{ b: <strong className="font-semibold text-foreground" /> }} />}
+        description={deleteBody}
         confirmLabel={t("recent.delete")}
         destructive
         onConfirm={confirmDelete}
