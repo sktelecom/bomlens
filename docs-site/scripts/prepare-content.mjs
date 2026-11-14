@@ -80,7 +80,10 @@ fs.writeFileSync(
   path.resolve(here, '../src/styles/bomlens-tokens.css'),
   tokens.replace('.dark {', ".dark,\n:root[data-theme='dark'] {"),
 );
-fs.mkdirSync(path.resolve(here, '../public'), { recursive: true });
+fs.mkdirSync(path.resolve(here, '../public/images'), { recursive: true });
+for (const card of ['og-card.png', 'og-card-ko.png']) {
+  fs.copyFileSync(path.join(source, 'images', card), path.resolve(here, '../public/images', card));
+}
 fs.copyFileSync(path.join(source, 'images/logo-mark.svg'), path.resolve(here, '../public/favicon.svg'));
 
 // The demo is a prebuilt single-page app (scripts/build-demo-bundle.sh) with its
