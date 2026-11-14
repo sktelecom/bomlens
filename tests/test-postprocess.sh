@@ -14418,7 +14418,7 @@ grep -q '<table aria-labelledby="box-[0-9]*">' "${RTP}_security.html" && grep -q
 side_stripe() { grep -EnH 'border-(left|inline-start)(-width|-style|-color)?[[:space:]]*:|box-shadow:[^;}]*inset' "$@"; }
 WEB_CSS=()
 while IFS= read -r f; do WEB_CSS+=("$f"); done < <(find "$ROOT_DIR/docker/web/frontend/src" -name '*.css' -not -path '*/node_modules/*')
-if STRIPES="$(side_stripe "$LIB/report-common.sh" "$ROOT_DIR"/docs/stylesheets/*.css "${WEB_CSS[@]}" \
+if STRIPES="$(side_stripe "$LIB/report-common.sh" "$ROOT_DIR"/docs-site/src/styles/*.css "${WEB_CSS[@]}" \
                 "${RTP}_risk-report.html" "${RTP}_security.html" "${RTP}_NOTICE.html" "${RTP}_conformance.html")"; then
     fail "a left-side stripe rule is in the report CSS, the docs or web UI stylesheets, or a generated report" "$STRIPES"
 else

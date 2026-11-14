@@ -6,7 +6,7 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 
 // Renders docs/images/src/og-card.html into docs/images/og-card.png, the Open
-// Graph card the docs site serves (overrides/main.html) and the image uploaded
+// Graph card the docs site serves (docs-site/src/components/Head.astro) and the image uploaded
 // as the repository's social preview. Run on demand with `npm run capture:og`;
 // the @capture tag keeps it out of the normal `test:ui` run, like the guide
 // screenshots in capture.spec.ts.

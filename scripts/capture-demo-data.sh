@@ -177,11 +177,10 @@ PY
     # Artifacts are copied rather than re-fetched: /file streams the same bytes
     # and copying keeps the run folder's names exactly as results[] reports them.
     #
-    # Markdown reports are the exception. This folder ends up inside the MkDocs
-    # docs tree, where any *.md is taken as a page to render — it would be turned
-    # into HTML (so the download would 404) and would fail `--strict` for not
-    # being in the nav. Every one of them ships an .html twin carrying the same
-    # report, so dropping them costs the demo nothing.
+    # Markdown reports are the exception. This folder is published inside the docs
+    # site, and a .md there is not a download a browser shows. Every one of them
+    # ships an .html twin carrying the same report, so dropping them costs the demo
+    # nothing.
     # Dot-files are internal (.scanmeta.json records how the scan was launched);
     # the server keeps them out of /results, so they must stay out of the copied
     # folder and its zip too, or the demo would publish more than the app does.

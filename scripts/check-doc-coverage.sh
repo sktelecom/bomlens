@@ -37,8 +37,8 @@ doc_path() {
 }
 
 # Korean mirror of doc_path(). README has none (no README.ko.md); every other
-# key's .md has a same-named .ko.md sibling (mkdocs_static_i18n's suffix
-# convention), so the ko path is derived rather than duplicated here.
+# key's .md has a same-named .ko.md sibling (the suffix
+# convention the docs site reads), so the ko path is derived rather than duplicated here.
 doc_path_ko() {
   [ "$1" = "readme" ] && { echo ""; return; }
   en="$(doc_path "$1")"

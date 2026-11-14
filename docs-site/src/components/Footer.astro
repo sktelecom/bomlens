@@ -2,15 +2,16 @@
 // Copyright 2026 SK Telecom Co., Ltd.
 // SPDX-License-Identifier: Apache-2.0
 //
-// Starlight's footer (edit link, previous and next page) plus the copyright line the
-// MkDocs site shows. The holder is spelled as in NOTICE and README, and the license
+// Starlight's footer (edit link, previous and next page) plus the copyright line. The holder is spelled as in NOTICE and README, and the license
 // is linked because the site is where most readers meet the project.
 import Default from '@astrojs/starlight/components/Footer.astro';
 import Mermaid from './Mermaid.astro';
+import CodeFocus from './CodeFocus.astro';
 ---
 
 <Default {...Astro.props}><slot /></Default>
 <Mermaid />
+<CodeFocus />
 <p class="site-copyright">
   Copyright &copy; 2026 SK Telecom Co., Ltd. &middot;
   <a href="https://github.com/sktelecom/bomlens/blob/main/LICENSE">Apache-2.0</a> &middot;

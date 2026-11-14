@@ -120,7 +120,7 @@ const REPO = join(fileURLToPath(new URL(".", import.meta.url)), "..", "..", ".."
 const TEXT_SOURCES = (process.env.TOKEN_CONTRAST_TEXT_SOURCES ?? [
   "docker/lib/report-common.sh",
   "docker/web/frontend/src/primer.css",
-  "docs/stylesheets/extra.css",
+  "docs-site/src/styles/github-like.css",
   "electron/assets/status.html",
   "electron/assets/docker-missing.html",
 ].join(",")).split(",");

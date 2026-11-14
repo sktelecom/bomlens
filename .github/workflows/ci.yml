@@ -527,7 +527,7 @@ jobs:
 
           emit web      '^(docker/web/|docker/Dockerfile|docker/entrypoint\.sh|scripts/scan-sbom\.sh|tests/test-web-e2e\.sh|\.github/workflows/heavy-e2e\.yml)'
           emit frontend '^(docker/web/frontend/|docker/shared/|docker/entrypoint\.sh$|docker/lib/(build-prep|scan-firmware)\.sh$)'
-          emit docs     '(\.md$|^docs/|^mkdocs\.yml$|^\.github/markdown-link-check-config\.json$)'
+          emit docs     '(\.md$|^docs/|^docs-site/|^\.github/markdown-link-check-config\.json$)'
           emit examples '^examples/'
           emit desktop  '^(electron/|docker/web/server\.py$)'
           emit reports  '^(docker/lib/(generate-risk-report|generate-notice|scan-security|validate-sbom|report-common)\.sh$|docker/lib/i18n/|docker/shared/|tests/(test-report-contrast\.sh|report-contrast/|fixtures/report-contrast/)|docker/web/frontend/package-lock\.json$)'
@@ -544,7 +544,7 @@ jobs:
           # content against the code, which is exactly what a docs-only
           # change must not skip, and a secrets scan should never depend on
           # which files changed.
-          if echo "$changed" | grep -qvE '(\.md$|^docs/|^mkdocs\.yml$|^\.github/markdown-link-check-config\.json$)'; then
+          if echo "$changed" | grep -qvE '(\.md$|^docs/|^docs-site/|^\.github/markdown-link-check-config\.json$)'; then
             echo "code=true" >> "$GITHUB_OUTPUT"
           else
             echo "code=false" >> "$GITHUB_OUTPUT"
@@ -656,7 +656,8 @@ jobs:
       # Advisory by design: this step checks EXTERNAL links, which fail for
       # reasons outside the repo (rate limits, transient outages), so it must
       # not block merges. Internal links are hard-gated separately by
-      # scripts/check-doc-links.sh (doc-coverage job) and `mkdocs build --strict`.
+      # scripts/check-doc-links.sh (doc-coverage job) and the built-site link check
+      # in docs.yml.
       - name: Check Markdown links
         uses: gaurav-nelson/github-action-markdown-link-check@5c5dfc0ac2e225883c0e5f03a85311ec2830d368 # v1
         with:

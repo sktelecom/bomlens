@@ -10,7 +10,7 @@
 # limitations under the License.
 #
 # build-demo-bundle.sh — build the web UI as the read-only demo and place it
-# where MkDocs will pick it up (docs/demo/).
+# where the docs site build picks it up (docs/demo/).
 #
 # The demo is the same SPA as the app, built with two settings: a base path,
 # because the site lives under /bomlens/, and a data base, which switches the
@@ -18,8 +18,8 @@
 # The captured JSON itself is committed under docs/demo/data/ and produced by
 # scripts/capture-demo-data.sh — this script never touches it.
 #
-# The bundle is deliberately NOT committed: CI runs this before `mkdocs build`,
-# and mkdocs copies docs/demo/ into the site as-is.
+# The bundle is deliberately NOT committed: CI runs this before the docs site build,
+# and docs-site/scripts/prepare-content.mjs copies docs/demo/ into the site as-is.
 #
 # Usage: scripts/build-demo-bundle.sh
 #   DEMO_BASE_PATH   URL path the site is served from (default /bomlens/demo/)

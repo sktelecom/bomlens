@@ -5,9 +5,9 @@ import starlight from '@astrojs/starlight';
 import { unified } from '@astrojs/markdown-remark';
 import remarkMdLinks from './src/plugins/remark-md-links.mjs';
 
-// The site is served under a sub-path. During the migration the new site is built
-// next to the MkDocs site under /bomlens/next/; DOCS_BASE switches it to /bomlens/.
-const base = process.env.DOCS_BASE || '/bomlens/next';
+// The site is served under a sub-path of github.io. DOCS_BASE overrides it, for a
+// preview at another path or a different host.
+const base = process.env.DOCS_BASE || '/bomlens';
 const slashBase = base.endsWith('/') ? base : `${base}/`;
 
 // Pages that moved before this site existed. The root-level names are the old
