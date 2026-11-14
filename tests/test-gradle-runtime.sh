@@ -97,8 +97,76 @@ grep -q '^gradle_runtime_classpath() {' "$FUNCS" || { fail "could not extract gr
 # build tool ones (left out) and two a project may ship (kept).
 # From Gradle 7 on, guava 33.0.0 is added, whose Gradle module metadata gives
 # j2objc-annotations to the compile classpath only (Gradle 6 cannot read it).
-make_build() {  # <dir> <composite: yes|no|tc|kmptc|kmpsoft> <guava: yes|no>
+# A build whose convention plugins come from a build included through
+# pluginManagement (Gradle 7 on), the way most current builds are set up. The
+# plugin build ("build-logic", group com.example) has its own dependency
+# (commons-io), the app has commons-text, JUnit (test) and Lombok (compile only).
+#   pm      only pluginManagement { includeBuild("build-logic") }, Groovy settings
+#   pmkts   the same with Kotlin DSL settings and build files
+#   pmlib   pm, and a second build ("libbuild") included for its code
+#   pmsame  the build is included through pluginManagement and also as a library
+#           build
+#   pmdep   pmsame, and the app depends on com.example:build-logic: the module
+#           replaces the dependency, so commons-io ships
+make_plugin_build() {  # <dir> <pm|pmkts|pmlib|pmsame|pmdep>
+    local d="$1" comp="$2"
+    mkdir -p "$d/app" "$d/build-logic/src/main/groovy"
+    printf "rootProject.name = 'build-logic'\n" > "$d/build-logic/settings.gradle"
+    cat > "$d/build-logic/build.gradle" <<'EOF'
+plugins { id 'groovy-gradle-plugin' }
+group = 'com.example'
+repositories { mavenCentral() }
+dependencies { implementation 'commons-io:commons-io:2.15.1' }
+EOF
+    printf "plugins { id 'java' }\n" > "$d/build-logic/src/main/groovy/demo.conv.gradle"
+    if [ "$comp" = pmkts ]; then
+        printf 'pluginManagement { includeBuild("build-logic") }\nrootProject.name = "demo"\ninclude("app")\n' > "$d/settings.gradle.kts"
+        : > "$d/build.gradle.kts"
+        cat > "$d/app/build.gradle.kts" <<'EOF'
+plugins { id("demo.conv") }
+repositories { mavenCentral() }
+dependencies {
+    implementation("org.apache.commons:commons-text:1.11.0")
+    testImplementation("junit:junit:4.13.2")
+    compileOnly("org.projectlombok:lombok:1.18.30")
+}
+EOF
+        return 0
+    fi
+    printf "pluginManagement { includeBuild('build-logic') }\nrootProject.name = 'demo'\ninclude 'app'\n" > "$d/settings.gradle"
+    : > "$d/build.gradle"
+    local deps=""
+    case "$comp" in
+        pmlib)
+            mkdir -p "$d/libbuild"
+            printf "includeBuild 'libbuild'\n" >> "$d/settings.gradle"
+            printf "rootProject.name = 'libbuild'\n" > "$d/libbuild/settings.gradle"
+            cat > "$d/libbuild/build.gradle" <<'EOF'
+plugins { id 'java-library' }
+group = 'com.example'
+repositories { mavenCentral() }
+dependencies { implementation 'commons-collections:commons-collections:3.2.2' }
+EOF
+            ;;
+        pmsame|pmdep)
+            printf "includeBuild 'build-logic'\n" >> "$d/settings.gradle"
+            [ "$comp" != pmdep ] || deps="    implementation 'com.example:build-logic'" ;;
+    esac
+    cat > "$d/app/build.gradle" <<EOF
+plugins { id 'demo.conv' }
+repositories { mavenCentral() }
+dependencies {
+    implementation 'org.apache.commons:commons-text:1.11.0'
+    testImplementation 'junit:junit:4.13.2'
+    compileOnly 'org.projectlombok:lombok:1.18.30'
+$deps
+}
+EOF
+}
+
+make_build() {  # <dir> <composite: yes|no|tc|kmptc|kmpsoft|pm|pmkts|pmlib|pmsame|pmdep> <guava: yes|no>
     local d="$1" comp="$2" guava="$3"
+    case "$comp" in pm|pmkts|pmlib|pmsame|pmdep) make_plugin_build "$d" "$comp"; return 0 ;; esac
     case "$comp" in kmptc|kmpsoft)
         # One project with no runtimeClasspath, only a configuration of its own that
         # cannot be resolved: for a toolchain no JDK matches, or for another reason.
@@ -240,6 +308,75 @@ if grep -q 'the build includes the build other; using full graph' "$log" && [ -z
 else
     fail "Gradle $v: included build" "$(tail -5 "$log" | tr '\n' ' ')"
 fi
+
+# A build included only through pluginManagement is a plugin build: it cannot
+# replace a dependency, and what it needs to build does not ship, so it does not
+# keep the full graph. Gradle 6 does not give the settings' list of pluginManagement
+# inclusions, so there such a build keeps the full graph, as every included build did.
+# The same build also included as a library build, or another build included for
+# its code, still does: cdxgen reads their dependencies too, and a library build's
+# module can replace a dependency.
+PM_SET="org.apache.commons:commons-lang3:3.13.0
+org.apache.commons:commons-text:1.11.0"
+pm_versions=""
+for c in $CASES; do [ "${c%%.*}" -lt 7 ] 2>/dev/null || pm_versions="$pm_versions $c"; done
+pm_first="${pm_versions# }"; pm_first="${pm_first%% *}"
+pm_last="${pm_versions##* }"
+for c in $CASES; do
+    v="${c%%:*}"; jdk="${c##*:}"
+    old_gradle "$v" || [ "${v%%.*}" -ge 7 ] || {
+        log="$(run_step "$v" "$jdk" off pm)"
+        if [ -z "$(set_of "$log")" ] && grep -q 'the build includes the build build-logic; using full graph' "$log"; then
+            pass "Gradle $v: a build included through pluginManagement keeps the full graph (the settings' list of them is not there before Gradle 7)"
+        else
+            fail "Gradle $v: pluginManagement included build before Gradle 7" "$(grep -E 'build-prep\]' "$log" | head -4 | tr '\n' ' ')"
+            [ "$VERBOSE" = true ] && sed -n '1,40p' "$log"
+        fi
+    }
+done
+for c in $pm_versions; do
+    v="${c%%:*}"; jdk="${c##*:}"
+    log="$(run_step "$v" "$jdk" off pm)"
+    if [ "$(set_of "$log")" = "$PM_SET" ] && grep -q 'included for plugins only, so not part of the graph: build-logic' "$log"; then
+        pass "Gradle $v: a build included only through pluginManagement keeps the filter on"
+    else
+        fail "Gradle $v: pluginManagement-only included build" "$(set_of "$log" | tr '\n' ' ') / $(grep -E 'build-prep\]' "$log" | head -4 | tr '\n' ' ')"
+        [ "$VERBOSE" = true ] && sed -n '1,40p' "$log"
+    fi
+    log="$(run_step "$v" "$jdk" off pmsame)"
+    if [ -z "$(set_of "$log")" ] && grep -q 'the build includes the build build-logic; using full graph' "$log"; then
+        pass "Gradle $v: a build included through pluginManagement and as a library build keeps the full graph"
+    else
+        fail "Gradle $v: build included both ways" "$(grep -E 'build-prep\]' "$log" | head -4 | tr '\n' ' ')"
+        [ "$VERBOSE" = true ] && sed -n '1,40p' "$log"
+    fi
+    # Then the app depends on a module of that build, which replaces the dependency.
+    log="$(run_step "$v" "$jdk" off pmdep)"
+    if [ -z "$(set_of "$log")" ] && grep -Eq "project :app depends on project '?:build-logic'?, a project of another build; using full graph" "$log"; then
+        pass "Gradle $v: a project that depends on a module of an included build keeps the full graph"
+    else
+        fail "Gradle $v: dependency on a module of an included build" "$(grep -E 'build-prep\]' "$log" | head -4 | tr '\n' ' ')"
+        [ "$VERBOSE" = true ] && sed -n '1,40p' "$log"
+    fi
+done
+# The Kotlin DSL settings and a second build included for its code, on the oldest and the newest.
+for c in $pm_first $pm_last; do
+    v="${c%%:*}"; jdk="${c##*:}"
+    log="$(run_step "$v" "$jdk" off pmkts)"
+    if [ "$(set_of "$log")" = "$PM_SET" ] && grep -q 'included for plugins only, so not part of the graph: build-logic' "$log"; then
+        pass "Gradle $v: the same with Kotlin DSL settings"
+    else
+        fail "Gradle $v: pluginManagement-only included build, Kotlin DSL" "$(set_of "$log" | tr '\n' ' ') / $(grep -E 'build-prep\]' "$log" | head -4 | tr '\n' ' ')"
+        [ "$VERBOSE" = true ] && sed -n '1,40p' "$log"
+    fi
+    log="$(run_step "$v" "$jdk" off pmlib)"
+    if [ -z "$(set_of "$log")" ] && grep -q 'the build includes the build libbuild; using full graph' "$log"; then
+        pass "Gradle $v: a build included for its code next to a pluginManagement one keeps the full graph"
+    else
+        fail "Gradle $v: library build next to a plugin build" "$(grep -E 'build-prep\]' "$log" | head -4 | tr '\n' ' ')"
+        [ "$VERBOSE" = true ] && sed -n '1,40p' "$log"
+    fi
+done
 
 # A toolchain no JDK matches: the run fails, so the step is recorded as failed, the
 # message names the JDK (the marker the CLI reads to rerun stage 1 in an image

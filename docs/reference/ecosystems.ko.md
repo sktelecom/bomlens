@@ -90,7 +90,7 @@ npm, Python(pip), Go, Rust(Cargo) 패키지는 소스 스캔이 설치된 패키
 
 > 주의: Maven과 마찬가지로 해석하려면 컨테이너가 Maven Central(또는 사내 미러)에 접속할 수 있어야 합니다. 접속하지 못하면 직접 의존성만 담기고 라이선스가 빌 수 있습니다. 컴포넌트 수가 예상보다 훨씬 적으면 네트워크 접속부터 확인하세요.
 
-> 주의: SBOM에는 각 프로젝트의 `runtimeClasspath`가 해석한 의존성이 담깁니다. 그래서 컴파일 클래스패스에만 있는 의존성(`compileOnly`, `annotationProcessor`, 라이브러리가 컴파일 전용으로 선언한 Guava의 `j2objc-annotations` 같은 어노테이션)과 테스트 클래스패스에만 있는 의존성(JUnit, Mockito)은 빠집니다. 빌드가 다른 빌드를 포함하거나, 런타임 클래스패스를 해석하지 못했거나, Gradle 실행이 실패하면 전체 그래프를 그대로 두며, `BOMLENS_GRADLE_FULL_GRAPH=1`로 전체 그래프를 유지할 수 있습니다([Docker 이미지 환경 변수](docker-image.ko.md#환경-변수)). 한계는 [배포되는 구성만 남기기](../concepts/dependency-resolution.ko.md#배포되는-구성만-남기기)에 있습니다.
+> 주의: SBOM에는 각 프로젝트의 `runtimeClasspath`가 해석한 의존성이 담깁니다. 그래서 컴파일 클래스패스에만 있는 의존성(`compileOnly`, `annotationProcessor`, 라이브러리가 컴파일 전용으로 선언한 Guava의 `j2objc-annotations` 같은 어노테이션)과 테스트 클래스패스에만 있는 의존성(JUnit, Mockito)은 빠집니다. 빌드가 코드를 쓰려고 다른 빌드를 포함하거나(`includeBuild`, `pluginManagement`로만 포함한 빌드는 해당하지 않음), 런타임 클래스패스를 해석하지 못했거나, Gradle 실행이 실패하면 전체 그래프를 그대로 두며, `BOMLENS_GRADLE_FULL_GRAPH=1`로 전체 그래프를 유지할 수 있습니다([Docker 이미지 환경 변수](docker-image.ko.md#환경-변수)). 한계는 [배포되는 구성만 남기기](../concepts/dependency-resolution.ko.md#배포되는-구성만-남기기)에 있습니다.
 
 > 주의: cdxgen에는 스캔의 Gradle 캐시(`GRADLE_CACHE_DIR`, CLI는 스캔 사이에 이 캐시를 유지함)를 알려 줍니다. jar가 이미 그 캐시에 있는 구성요소는 MD5, SHA-1, SHA-256, SHA-512 해시가 붙고, Maven Central에 닿지 않을 때도 그 캐시의 POM에서 라이선스를 읽습니다. 파일이 캐시에 없는 구성요소는 둘 다 없으므로 해시와 라이선스는 Maven처럼 캐시 내용에 따라 달라집니다. 해시 계산은 부하가 있는 컴퓨터에서 jar 하나에 약 0.16초였습니다(jar 369개, 354MB에 60초).
 
