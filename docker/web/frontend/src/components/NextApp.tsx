@@ -862,8 +862,15 @@ export function NextApp() {
             components={result.sbom?.components}
             extra={activeSection === "overview" ? <OverviewHeaderLines result={result} /> : undefined}
             actions={
-              activeSection === "overview" && result.results.length > 0 && loadedIdRef.current ? (
-                <Button as="a" href={downloadAllUrl(loadedIdRef.current)} download leadingVisual={DownloadIcon}>
+              (activeSection === "overview" || activeSection === "artifacts") &&
+              result.results.length > 0 ? (
+                <Button
+                  as="a"
+                  href={downloadAllUrl(loadedIdRef.current)} // null falls back to the latest run
+                  download
+                  leadingVisual={DownloadIcon}
+                  onClick={() => toast(t("result.downloadStarted"))}
+                >
                   {t("result.downloadAll")}
                 </Button>
               ) : activeSection === "vulnerabilities" && result.security ? (

@@ -4,6 +4,7 @@
 import { expect, test, type Page } from "@playwright/test";
 
 import { DONE, SBOM } from "./fixtures";
+import { waitForSettled } from "./settle";
 import { seedThemeLang, type Lang } from "./visual";
 
 /**
@@ -420,6 +421,8 @@ test("the artifact viewer is wide enough for a report", async ({ page }) => {
   await page.goto(`/?ui=next#/scan/${ID}/artifacts`);
   await page.getByTestId("result-meta").waitFor();
   await page.getByRole("main").getByRole("button", { name: "View" }).first().click();
+  // The dialog scales in; measure it once it has settled.
+  await waitForSettled(page.getByRole("dialog"));
   const box = await page.getByRole("dialog").boundingBox();
   // min(1200px, 95vw) wide, 80vh tall.
   expect(Math.round(box!.width)).toBe(1200);

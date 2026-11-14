@@ -282,7 +282,6 @@
       }
     },
     "download": "Download",
-    "view": "View",
     "conformance": "Conformance check",
     "verdictPass": "Pass",
     "verdictFail": "Fail",
@@ -451,6 +450,12 @@
     "csvKev": "Known exploited",
     "csvTitle": "Title",
     "artifactFiles": "({{count}} files)",
+    "artifactNotListed_one": "{{count}} file only in the ZIP",
+    "artifactNotListed_other": "{{count}} files only in the ZIP",
+    "tooBig": "This file is too large to preview ({{size}}). Download it instead.",
+    "viewFormat": "View {{format}}",
+    "formatTemplate": "template",
+    "copyLinkOf": "Copy link to {{name}}",
     "emptyForm": "Empty form",
     "declarationUpload": "Upload declaration",
     "declarationNotJson": "That file is not JSON.",
@@ -608,7 +613,9 @@
   },
   "viewer": {
     "open": "View artifact",
-    "close": "Close"
+    "close": "Close",
+    "loading": "Opening the file…",
+    "error": "The file could not be opened"
   },
   "dialog": {
     "cancel": "Cancel"
