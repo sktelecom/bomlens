@@ -333,7 +333,7 @@ test.describe("rows", () => {
   test("a long name is cut in the middle, with the full name in the tooltip and for screen readers", async ({ page }) => {
     await stub(page, SCANS);
     await open(page);
-    const link = page.getByRole("link", { name: new RegExp(`^${LONG.replace(/\./g, "\\.")} @2026-06-18$`) });
+    const link = page.getByRole("link", { name: `${LONG} @2026-06-18`, exact: true });
     await expect(link).toHaveAttribute("title", `${LONG} @2026-06-18`);
     const shown = await link.locator("span[aria-hidden]").textContent();
     expect(shown).toContain("…");
@@ -590,7 +590,7 @@ test.describe("list details", () => {
   test("every row is one line high, the long firmware name included", async ({ page }) => {
     const heights = await page.locator("tbody tr").evaluateAll((rows) => rows.map((r) => Math.round(r.getBoundingClientRect().height)));
     expect(new Set(heights).size).toBe(1);
-    const link = page.getByRole("link", { name: new RegExp(`^${LONG.replace(/\./g, "\\.")} @2026-06-18$`) });
+    const link = page.getByRole("link", { name: `${LONG} @2026-06-18`, exact: true });
     const box = await link.boundingBox();
     expect(box!.height).toBeLessThan(30);
     // Version sits on the same line, in the muted colour.
