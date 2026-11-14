@@ -571,7 +571,7 @@ jobs:
   # The three heavy suites live in the reusable heavy-e2e.yml (shared with the
   # nightly full run, so the step definitions cannot drift). Gating:
   #   - web-e2e: heavy dispatch AND pull requests that touch the web stack
-  #     (docker/web/**, image entry, its own harness) — the layer where a PR
+  #     (docker/web/**, image entry, its own harness), the layer where a PR
   #     regression is most user-visible and the always-on contract suite
   #     cannot see container wiring. It is cheap (~1 minute).
   #   - full-e2e / docs-walkthrough: dispatch only, plus PRs that opt in with
