@@ -1,0 +1,71 @@
+---
+// Copyright 2026 SK Telecom Co., Ltd.
+// SPDX-License-Identifier: Apache-2.0
+//
+// Page title with a breadcrumb line above it, as on docs.github.com.
+// Starlight looks the page title up by this id (its PAGE_TITLE_ID constant).
+const PAGE_TITLE_ID = '_top';
+const route = Astro.locals.starlightRoute;
+const ko = route.locale === 'ko';
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+const root = ko ? `${base}/ko/` : `${base}/`;
+
+const sections: Record<string, [string, string]> = {
+  start: ['Get started', '빠른 시작'],
+  guides: ['Guides', '가이드'],
+  reference: ['Reference', '레퍼런스'],
+  concepts: ['Concepts', '개념'],
+  contribute: ['Contribute', '기여'],
+  talks: ['Talks', '발표'],
+};
+const first = route.id.replace(/^ko\//, '').split('/')[0];
+const section = route.entry.data.template === 'splash' ? undefined : sections[first];
+const crumbs = [{ label: ko ? '홈' : 'Home', href: root }];
+if (section) crumbs.push({ label: section[ko ? 1 : 0], href: '' });
+---
+
+{
+  section && (
+    <nav class="breadcrumbs" aria-label={ko ? '현재 위치' : 'Breadcrumb'}>
+      <ol>
+        {crumbs.map((c) => (
+          <li>{c.href ? <a href={c.href}>{c.label}</a> : <span>{c.label}</span>}</li>
+        ))}
+      </ol>
+    </nav>
+  )
+}
+{route.entry.data.template !== 'splash' && <h1 id={PAGE_TITLE_ID}>{route.entry.data.title}</h1>}
+
+<style>
+  @layer starlight.core {
+    h1 {
+      margin-top: 0.5rem;
+      font-size: var(--sl-text-h1);
+      line-height: var(--sl-line-height-headings);
+      font-weight: 600;
+      color: var(--sl-color-white);
+    }
+    .breadcrumbs ol {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      font-size: var(--sl-text-sm);
+      color: var(--sl-color-gray-3);
+    }
+    .breadcrumbs li + li::before {
+      content: '/';
+      margin-inline-end: 0.5rem;
+    }
+    .breadcrumbs a {
+      color: var(--sl-color-gray-3);
+      text-decoration: none;
+    }
+    .breadcrumbs a:hover {
+      text-decoration: underline;
+    }
+  }
+</style>

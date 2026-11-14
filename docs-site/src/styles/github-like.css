@@ -3,19 +3,117 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-/* Layout and density modelled on docs.github.com, without its marks. */
+/*
+ * Layout and density modelled on docs.github.com, without its marks. Colors come
+ * from the tokens shared with the web UI (bomlens-tokens.css, copied at build time).
+ * Rules shared with the app: no thick accent bar on one side of a box, and red is
+ * reserved for danger.
+ * Token values are HSL or RGB triples, so they are wrapped in hsl() or rgb().
+ */
+
 :root {
-  --sl-font: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", "Apple SD Gothic Neo", "Noto Sans KR", Helvetica, Arial, sans-serif;
+  --sl-font: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', 'Apple SD Gothic Neo', 'Noto Sans KR', Helvetica, Arial, sans-serif;
   --sl-font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  --sl-text-base: 1rem; --sl-line-height: 1.6;
-  --sl-content-width: 49rem;          /* about 785px body text, as measured */
-  --sl-sidebar-width: 20.3rem;        /* about 325px left tree, as measured */
-  --sl-nav-height: 4rem;              /* 64px header */
+  --sl-text-base: 1rem;
+  --sl-line-height: 1.6;
+  --sl-content-width: 49rem;
+  --sl-sidebar-width: 20.3rem;
+  --sl-nav-height: 4rem;
+  --sl-color-accent: hsl(var(--brand));
+  --sl-color-accent-high: hsl(var(--brand-strong));
 }
-:root[data-theme='light'] { --sl-color-bg: #ffffff; --sl-color-bg-nav: #ffffff; --sl-color-bg-sidebar: #ffffff; --sl-color-hairline: #d1d9e0; --sl-color-text-accent: #0969da; }
-:root[data-theme='dark'] { --sl-color-bg: #0d1117; --sl-color-bg-nav: #0d1117; --sl-color-bg-sidebar: #0d1117; --sl-color-hairline: #3d444d; --sl-color-text-accent: #4493f8; }
-.sl-markdown-content a { color: var(--sl-color-text-accent); text-decoration: underline; }
-.sl-markdown-content h2 { font-size: 1.5rem; font-weight: 600; }
+
+:root[data-theme='light'] {
+  --sl-color-bg: hsl(var(--background));
+  --sl-color-bg-nav: hsl(var(--background));
+  --sl-color-bg-sidebar: hsl(var(--background));
+  --sl-color-hairline: hsl(var(--border));
+  --sl-color-hairline-light: hsl(var(--border));
+  --sl-color-text-accent: hsl(var(--brand));
+  --sl-color-accent-low: hsl(var(--muted));
+  --sl-color-bg-inline-code: hsl(var(--muted));
+}
+
+:root[data-theme='dark'] {
+  --sl-color-bg: hsl(var(--background));
+  --sl-color-bg-nav: hsl(var(--background));
+  --sl-color-bg-sidebar: hsl(var(--sidebar));
+  --sl-color-hairline: hsl(var(--border));
+  --sl-color-hairline-light: hsl(var(--border));
+  --sl-color-text-accent: hsl(var(--brand-strong));
+  --sl-color-accent-low: hsl(var(--muted));
+  --sl-color-bg-inline-code: hsl(var(--muted));
+}
+
+/* Body text */
+.sl-markdown-content a:not(.sl-link-button):not(.card a) {
+  color: var(--sl-color-text-accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.sl-markdown-content h2 {
+  font-size: 1.5rem;
+  font-weight: 600;
+}
+.sl-markdown-content h3 { font-size: 1.25rem; font-weight: 600; }
+
+/* Tables: no vertical rules, 14px text, one hairline per row */
 .sl-markdown-content table { font-size: 0.875rem; }
-.sl-markdown-content th, .sl-markdown-content td { border: 0; border-bottom: 1px solid var(--sl-color-hairline); padding: 0.75rem 0.5rem 0.75rem 0; }
-starlight-toc h2 { font-size: 0.75rem; text-transform: uppercase; font-weight: 500; }
+.sl-markdown-content th,
+.sl-markdown-content td {
+  border: 0;
+  border-bottom: 1px solid var(--sl-color-hairline);
+  padding: 0.75rem 0.5rem 0.75rem 0;
+}
+.sl-markdown-content th { font-weight: 600; }
+
+/* Table of contents heading, as "IN THIS ARTICLE" on docs.github.com */
+starlight-toc h2 { font-size: 0.75rem; text-transform: uppercase; font-weight: 500; letter-spacing: 0.02em; }
+
+/* Quotes and notes: a full 1px border and a tinted background instead of a side bar */
+.sl-markdown-content blockquote,
+.sl-markdown-content .starlight-aside {
+  border: 1px solid var(--sl-color-hairline);
+  border-radius: 0.5rem;
+  background: hsl(var(--muted));
+  padding: 0.75rem 1rem;
+  margin-inline: 0;
+}
+.sl-markdown-content blockquote > :first-child { margin-top: 0; }
+.sl-markdown-content blockquote > :last-child { margin-bottom: 0; }
+.sl-markdown-content .starlight-aside--note { background: rgb(var(--role-info-muted)); border-color: rgb(var(--role-info-border)); }
+.sl-markdown-content .starlight-aside--tip { background: rgb(var(--role-success-muted)); border-color: rgb(var(--role-success-border)); }
+.sl-markdown-content .starlight-aside--caution { background: rgb(var(--role-attention-muted)); border-color: rgb(var(--role-attention-border)); }
+.sl-markdown-content .starlight-aside--danger { background: rgb(var(--role-danger-muted)); border-color: rgb(var(--role-danger-border)); }
+
+/* Cards on the home page: quiet boxes with a hairline border */
+.card {
+  border: 1px solid var(--sl-color-hairline);
+  border-radius: 0.5rem;
+  background: var(--sl-color-bg);
+  box-shadow: none;
+}
+.card .title { font-size: 1rem; font-weight: 600; }
+
+/* Home hero */
+.home-hero { max-width: 49rem; margin-inline: auto; padding-top: 2rem; }
+.home-hero h1 { font-size: 2.5rem; line-height: 1.2; font-weight: 600; margin-top: 0; }
+.home-actions { display: flex; flex-wrap: wrap; gap: 0.75rem; margin: 1.5rem 0 1rem; }
+
+/* Images in the body */
+.sl-markdown-content img { border: 1px solid var(--sl-color-hairline); border-radius: 0.5rem; }
+
+/* Buttons: 6px corners, not pills */
+.sl-link-button { border-radius: 0.375rem; font-size: 0.875rem; padding: 0.5rem 1rem; }
+
+/* Current page in the sidebar: a light tint with bold text, not a solid fill */
+.sidebar-content a[aria-current='page'],
+.sidebar-content a[aria-current='page']:hover {
+  background: hsl(var(--muted));
+  color: var(--sl-color-white);
+  font-weight: 600;
+  border-radius: 0.375rem;
+}
+
+/* Option names in the first table column stay on one line */
+.sl-markdown-content td:first-child code { white-space: nowrap; }
