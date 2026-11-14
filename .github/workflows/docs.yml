@@ -153,8 +153,10 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           touch .nojekyll
-          git add -A
+          git add -A -f
           git commit -q -m "docs: publish ${GITHUB_SHA}"
+          # The demo bundle must be in the commit; a missing one would only show as a 404.
+          git ls-files --error-unmatch demo/index.html > /dev/null
           git push --force "https://x-access-token:${PUSH_TOKEN}@github.com/${PUBLISH_REPO}.git" HEAD:gh-pages
         env:
           PUSH_TOKEN: ${{ secrets.PUBLISH_TOKEN || github.token }}
