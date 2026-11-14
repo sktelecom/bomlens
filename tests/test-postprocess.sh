@@ -6576,6 +6576,26 @@ STUB
     [ "$(cat "$WORK/mh-calls" 2>/dev/null)" = "mvnw $_mh_goal" ] \
         && pass "mvnw without the executable bit runs through sh, not the image's mvn" \
         || fail "mvnw without the executable bit: [$(cat "$WORK/mh-calls" 2>/dev/null)]"
+    # The shell follows the wrapper's first line. Stub bash and sh in PATH
+    # record who ran ./mvnw, then run the real shell.
+    mkdir -p "$WORK/mh-shbin"
+    printf '#!/bin/sh\necho "bash $1" >> "%s/mh-shells"\nexec %s "$@"\n' "$WORK" "$(command -v bash)" > "$WORK/mh-shbin/bash"
+    printf '#!/bin/sh\necho "sh $1" >> "%s/mh-shells"\nexec /bin/sh "$@"\n' "$WORK" > "$WORK/mh-shbin/sh"
+    chmod +x "$WORK/mh-shbin/bash" "$WORK/mh-shbin/sh"
+    for _mh_sb in "bash:#!/usr/bin/env bash" "sh:#!/bin/sh" "none:"; do
+        _mh_want=${_mh_sb%%:*}; _mh_first=${_mh_sb#*:}
+        [ "$_mh_want" = none ] && _mh_want="sh"
+        _mh_d="$WORK/mh-shebang-${_mh_sb%%:*}"; mkdir -p "$_mh_d/.mvn/wrapper"; touch "$_mh_d/pom.xml"
+        { [ -z "$_mh_first" ] || printf '%s\n' "$_mh_first"; sed 1d "$_mh_bin/mvn"; } > "$_mh_d/mvnw"; chmod -x "$_mh_d/mvnw"
+        rm -f "$WORK/mh-shells"
+        ( PATH="$WORK/mh-shbin:$PATH" _mh_run "$_mh_d" "" >/dev/null )
+        _mh_other=bash; [ "$_mh_want" = bash ] && _mh_other="sh"
+        { grep -qx "$_mh_want ./mvnw" "$WORK/mh-shells" 2>/dev/null \
+            && ! grep -qx "$_mh_other ./mvnw" "$WORK/mh-shells" \
+            && [ "$(cat "$WORK/mh-calls" 2>/dev/null)" = "mvnw $_mh_goal" ]; } \
+            && pass "a mvnw with first line [${_mh_first:-none}] and no executable bit runs through $_mh_want" \
+            || fail "mvnw first line [${_mh_first:-none}]: shells [$(tr '\n' ';' < "$WORK/mh-shells" 2>/dev/null)] calls [$(cat "$WORK/mh-calls" 2>/dev/null)]"
+    done
     for _mh_f in exit error; do
         if _mh_out=$(_mh_run "$WORK/mh-proj" "" "$_mh_f"); then
             printf '%s' "$_mh_out" | grep -q "some components will have no hashes (non-fatal)" \
