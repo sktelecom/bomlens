@@ -237,6 +237,11 @@ CONFORMANCE_PROFILE="${CONFORMANCE_PROFILE:-default}"
 # Repository resolution for a submitted SBOM (--resolve-purl). Off unless asked:
 # it is the only part of the conformance check that uses the network.
 PURL_RESOLVE="${PURL_RESOLVE:-false}"
+# Hub lookup for the Hugging Face models a source scan's code references
+# (--resolve-models), and the model SBOM files to link them to (--model-sbom,
+# repeatable; each one implies the lookup). Off unless asked: it uses the network.
+MODEL_RESOLVE="${MODEL_RESOLVE:-false}"
+MODEL_SBOM_FILES=()
 # CPE index match for a submitted SBOM (--analyze-cpe-index). Off unless asked;
 # it covers only the components BomLens's upstream table identified.
 ANALYZE_CPE_INDEX="${ANALYZE_CPE_INDEX:-false}"
@@ -442,6 +447,10 @@ while [[ "$#" -gt 0 ]]; do
         --lang) REPORT_LANG="$2"; shift ;;
         --conformance-profile) CONFORMANCE_PROFILE="$2"; shift ;;
         --resolve-purl) PURL_RESOLVE="true" ;;
+        --resolve-models) MODEL_RESOLVE="true" ;;
+        --model-sbom)
+            [ "$#" -ge 2 ] || { echo "[ERROR] --model-sbom requires a file, e.g. --model-sbom my-model_1.0_bom.json"; exit 1; }
+            MODEL_SBOM_FILES+=("$2"); MODEL_RESOLVE="true"; shift ;;
         --analyze-cpe-index) ANALYZE_CPE_INDEX="true" ;;
         --license-registry) LICENSE_REGISTRY="true" ;;
         --firmware) FORCE_FIRMWARE="true" ;;
@@ -759,6 +768,23 @@ Options:
                          replacing it when the registry says otherwise (the old
                          value is kept in bomlens:license:superseded). Off by
                          default; uses the network.
+  --resolve-models       For a source scan: ask the Hugging Face hub about each
+                         model the code references (the ones listed under "AI
+                         used by the code") and add its licence, weight file
+                         formats and digests, gated state and base models to
+                         that entry. A model the hub answers an error for (a
+                         private repository, or one that does not exist; set
+                         HF_TOKEN to read a private one) is marked unreadable,
+                         never guessed. Off by default; it uses the
+                         network. The summary is not the model's own SBOM: make
+                         that with --model <owner/name>.
+  --model-sbom <file>    With --resolve-models: a CycloneDX file that a
+                         --model scan wrote. The model it describes is linked to
+                         the file with a CycloneDX BOM-Link, so a reader of the
+                         source SBOM can find the full one. Repeat the option for
+                         several files; each implies --resolve-models. A file
+                         with no serial number or matching no referenced model is
+                         reported and left out.
   --resolve-purl         --analyze only: ask each package repository whether the
                          identifiers in the submitted SBOM name packages that
                          exist, and add the answer to the conformance check report as
@@ -1085,6 +1111,7 @@ if [ "$UI_MODE" = "true" ]; then
     [ -z "$BINARY_KB_PATH" ] || { echo "[ERROR] --binary-kb is not offered with --ui (it applies to one firmware, root filesystem or binary scan)."; exit 1; }
     [ -z "$COMPONENT_VERSIONS_FILE" ] || { echo "[ERROR] --component-versions is not offered with --ui (it applies to one firmware, root filesystem or binary scan)."; exit 1; }
     [ "${#COMPONENTS_FILES[@]}" -eq 0 ] || { echo "[ERROR] --components is not offered with --ui (put sbom-declared.cdx.json at the root of the folder to scan instead)."; exit 1; }
+    [ "${#MODEL_SBOM_FILES[@]}" -eq 0 ] || { echo "[ERROR] --model-sbom is not offered with --ui (it links one source scan to model SBOM files on this machine)."; exit 1; }
     [ "$NO_COMPONENTS" = "false" ] || { echo "[ERROR] --no-components is not offered with --ui (it applies to one source scan)."; exit 1; }
     [ "${#FAIL_ON[@]}" -eq 0 ] || { echo "[ERROR] --fail-on is not offered with --ui (it exits on one scan's result; the UI runs many)."; exit 1; }
     [ "$FAIL_ON_CONFORMANCE" = "true" ] && { echo "[ERROR] --fail-on-conformance is not offered with --ui (it exits on one scan's result; the UI runs many)."; exit 1; }
@@ -1222,6 +1249,7 @@ if [ -n "$DIFF_OLD" ]; then
     [ -z "$BINARY_KB_PATH" ] || { echo "[ERROR] --binary-kb cannot be combined with --diff (a diff writes no SBOM to read a base into)."; exit 1; }
     [ -z "$COMPONENT_VERSIONS_FILE" ] || { echo "[ERROR] --component-versions cannot be combined with --diff (a diff writes no SBOM to add versions to)."; exit 1; }
     [ "${#COMPONENTS_FILES[@]}" -eq 0 ] || { echo "[ERROR] --components cannot be combined with --diff (a diff writes no SBOM to add components to)."; exit 1; }
+    [ "${#MODEL_SBOM_FILES[@]}" -eq 0 ] || { echo "[ERROR] --model-sbom cannot be combined with --diff (a diff writes no SBOM to link models in)."; exit 1; }
     [ "$NO_COMPONENTS" = "false" ] || { echo "[ERROR] --no-components cannot be combined with --diff (a diff reads no source tree)."; exit 1; }
     docker_check
     [ -f "$DIFF_OLD" ] || { echo "[ERROR] --diff: old SBOM not found: $DIFF_OLD"; exit 1; }
@@ -1566,6 +1594,13 @@ pp_env() {
         "${PURL_MIN_PCT:-}" "${LICENSE_MIN_PCT:-}" "${HASH_MIN_PCT:-}" "${FIELD_MIN_PCT:-}" "$CONFORMANCE_PROFILE" "${PURL_RESOLVE:-false}" "${LICENSE_REGISTRY:-false}" "$REACHABILITY" "$REACHABILITY_NONCE"
     printf ' -e CYCLONEDX_SPEC_VERSION=%s' "$CDX_SPEC_VERSION"
     printf ' -e ANALYZE_CPE_INDEX=%s' "${ANALYZE_CPE_INDEX:-false}"
+    printf ' -e MODEL_RESOLVE=%s -e MODEL_RESOLVE_MAX -e MODEL_RESOLVE_BUDGET' "${MODEL_RESOLVE:-false}"
+    # The hub lookup reads private and gated models with the token, and a mirror
+    # when HF_ENDPOINT is set. Names only, so the token never lands on argv.
+    if [ "${MODEL_RESOLVE:-false}" = "true" ]; then
+        [ -z "$HF_TOKEN" ] || printf ' -e HF_TOKEN'
+        [ -z "${HF_ENDPOINT:-}" ] || printf ' -e HF_ENDPOINT'
+    fi
     # Proxy, Trivy database and EPSS/KEV settings, by name.
     printf ' %s' "$(stage2_network_env_args)"
     # Debian package licenses from Trivy (image/rootfs scans), on unless set false.
@@ -1688,6 +1723,21 @@ components_run() {
         i=$((i + 1))
     done
     printf ' -e DECLARED_COMPONENTS_FILES=%q -e DECLARED_COMPONENTS_LABELS' "$list"
+}
+
+# --model-sbom: each file is mounted read-only under an index name (a name with
+# a space or a quote never reaches the eval'd command line), and the container
+# is told the paths and, by name, the labels (set where the files are checked).
+model_sbom_run() {
+    [ "${#MODEL_SBOM_FILES[@]}" -gt 0 ] || return 0
+    local d f i=0 list=""
+    for f in "${MODEL_SBOM_FILES[@]}"; do
+        d="$(cd "$(dirname "$f")" && pwd)"
+        printf ' -v %q:/model-sbom-in/%d.cdx.json:ro' "$(hostpath "$d/$(basename "$f")")" "$i"
+        list="${list:+$list }/model-sbom-in/$i.cdx.json"
+        i=$((i + 1))
+    done
+    printf ' -e MODEL_SBOM_FILES=%q -e MODEL_SBOM_LABELS' "$list"
 }
 
 # --exclude: the excluded paths, for the declared-components step's messages.
@@ -2872,6 +2922,32 @@ if [ "$PURL_RESOLVE" = "true" ] && [ "$MODE" != "ANALYZE" ]; then
     PURL_RESOLVE="false"
 fi
 
+# --resolve-models and --model-sbom read the models a SOURCE scan found the code
+# using. Another mode has none of them; a warning rather than an error, so a
+# shared command line that carries the flag still runs.
+if [ "$MODEL_RESOLVE" = "true" ] && [ "$MODE" != "SOURCE" ]; then
+    echo "[WARN] --resolve-models and --model-sbom apply to a source scan; ignoring them for this $MODE scan."
+    MODEL_RESOLVE="false"
+    MODEL_SBOM_FILES=()
+fi
+if [ "${#MODEL_SBOM_FILES[@]}" -gt 0 ]; then
+    MODEL_SBOM_LABELS=""
+    for _mf in "${MODEL_SBOM_FILES[@]}"; do
+        if [ -z "$_mf" ] || [ ! -f "$_mf" ]; then
+            echo "[ERROR] --model-sbom file not found: $_mf"
+            echo "[ERROR] Pass the CycloneDX file (JSON) a --model scan wrote, e.g. my-model_1.0/my-model_1.0_bom.json."; exit 1
+        fi
+        if [ "$(wc -c < "$_mf" | tr -d ' ')" -gt 16777216 ]; then
+            echo "[ERROR] --model-sbom: $_mf is larger than 16 MiB."; exit 1
+        fi
+        # One name per line, in the order of the files (see model_sbom_run).
+        MODEL_SBOM_LABELS="${MODEL_SBOM_LABELS:+$MODEL_SBOM_LABELS
+}$(basename "$_mf" | tr '\n\r' '  ')"
+    done
+    export MODEL_SBOM_LABELS
+    unset _mf
+fi
+
 if [ "$ANALYZE_CPE_INDEX" = "true" ] && [ "$MODE" != "ANALYZE" ]; then
     echo "[WARN] --analyze-cpe-index applies to --analyze only; ignoring it for this scan."
     ANALYZE_CPE_INDEX="false"
@@ -3561,7 +3637,7 @@ EOF
         -v "\"$(hostpath "$SCAN_INPUT_DIR")\"":/src -v "\"$(hostpath "$OUTPUT_HOST_DIR")\"":/host-output \
         -w /host-output \
         --add-host=host.docker.internal:host-gateway \
-        -e MODE=POSTPROCESS -e BOMLENS_RUN_INPUT="$OUTPUT_FILE" -e NESTED_ROOTFS_HINT="\"$NESTED_ROOTFS_HINT\"" -e BOMLENS_DEEP_LICENSE_FALLBACK="\"${DEEP_LICENSE_FALLBACK_FROM:-}\"" -e BOMLENS_DEEP_CVE_FALLBACK="\"${DEEP_CVE_FALLBACK_FROM:-}\"" -e BOMLENS_INCLUDE_NON_SHIPPED${STAGE1_FALLBACK_ENV}${STAGE1_FINGERPRINT_ENV}${PP_ENV} $(pp_env)$(cosign_run)$(vex_run)$(declare_run)$(components_run)$(exclude_run)$(gate_run) \
+        -e MODE=POSTPROCESS -e BOMLENS_RUN_INPUT="$OUTPUT_FILE" -e NESTED_ROOTFS_HINT="\"$NESTED_ROOTFS_HINT\"" -e BOMLENS_DEEP_LICENSE_FALLBACK="\"${DEEP_LICENSE_FALLBACK_FROM:-}\"" -e BOMLENS_DEEP_CVE_FALLBACK="\"${DEEP_CVE_FALLBACK_FROM:-}\"" -e BOMLENS_INCLUDE_NON_SHIPPED${STAGE1_FALLBACK_ENV}${STAGE1_FINGERPRINT_ENV}${PP_ENV} $(pp_env)$(cosign_run)$(vex_run)$(declare_run)$(components_run)$(model_sbom_run)$(exclude_run)$(gate_run) \
         "\"$PP_IMAGE\"" || {
         _pp_rc=$?
         # Refused declared components rename the SBOM to _bom.refused.json and

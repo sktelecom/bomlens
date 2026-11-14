@@ -82,14 +82,15 @@ def fetch_dataset(ds_id):
     return _fetch("datasets", ds_id)
 
 
-def fetch_model(model_id):
+def fetch_model(model_id, blobs=False):
     """Read one model's metadata (the endpoint `HfApi.model_info` calls), with
     the same return shape, limits and credentials as fetch_dataset. A file://
-    base serves <dir>/models/<id>.json."""
-    return _fetch("models", model_id)
+    base serves <dir>/models/<id>.json. blobs=True asks for the file listing
+    with each file's size and LFS digest (`files_metadata=True`)."""
+    return _fetch("models", model_id, blobs=blobs)
 
 
-def _fetch(kind, ds_id):
+def _fetch(kind, ds_id, blobs=False):
     if not _valid_id(ds_id):
         return 400, None
     base = (os.environ.get("BOMLENS_HF_API_BASE") or os.environ.get("HF_ENDPOINT") or DEFAULT_BASE).rstrip("/")
@@ -112,7 +113,7 @@ def _fetch(kind, ds_id):
         if status:
             return int(status), None
         return (200, doc) if isinstance(doc, dict) else (None, None)
-    url = f"{base}/api/{kind}/{urllib.parse.quote(ds_id, safe='/')}" + ("?blobs=true" if kind == "datasets" else "")
+    url = f"{base}/api/{kind}/{urllib.parse.quote(ds_id, safe='/')}" + ("?blobs=true" if kind == "datasets" or blobs else "")
     request = urllib.request.Request(url, headers={"User-Agent": USER_AGENT, "Accept": "application/json"})
     token = os.environ.get("HF_TOKEN")
     if token and base.startswith("https://"):

@@ -1,0 +1,1001 @@
+{
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.6",
+  "version": 1,
+  "metadata": {
+    "timestamp": "2026-11-13T00:00:00Z",
+    "tools": {
+      "components": [
+        {
+          "group": "@cdxgen",
+          "name": "cdxgen",
+          "version": "13.5.0",
+          "purl": "pkg:npm/%40cdxgen/cdxgen@13.5.0",
+          "type": "application",
+          "bom-ref": "pkg:npm/@cdxgen/cdxgen@13.5.0",
+          "publisher": "OWASP Foundation",
+          "authors": [
+            {
+              "name": "OWASP Foundation"
+            }
+          ]
+        }
+      ]
+    },
+    "authors": [
+      {
+        "name": "OWASP Foundation"
+      }
+    ],
+    "lifecycles": [
+      {
+        "phase": "pre-build"
+      }
+    ],
+    "component": {
+      "group": "",
+      "name": "app",
+      "version": "latest",
+      "type": "application",
+      "purl": "pkg:pypi/app@latest",
+      "bom-ref": "pkg:pypi/app@latest"
+    },
+    "properties": [
+      {
+        "name": "cdx:bom:componentSrcFiles",
+        "value": "requirements.txt"
+      },
+      {
+        "name": "cdx:bom:componentTypes",
+        "value": "pypi"
+      }
+    ]
+  },
+  "components": [
+    {
+      "group": "",
+      "name": "openai",
+      "version": "1.40.0",
+      "purl": "pkg:pypi/openai@1.40.0",
+      "type": "library",
+      "bom-ref": "pkg:pypi/openai@1.40.0",
+      "properties": [
+        {
+          "name": "internal:SrcFile",
+          "value": "requirements.txt"
+        }
+      ],
+      "evidence": {
+        "identity": [
+          {
+            "field": "purl",
+            "confidence": 0.5,
+            "methods": [
+              {
+                "technique": "manifest-analysis",
+                "confidence": 0.5,
+                "value": "requirements.txt"
+              }
+            ],
+            "concludedValue": "requirements.txt"
+          }
+        ]
+      },
+      "tags": [
+        "ml"
+      ]
+    },
+    {
+      "group": "",
+      "name": "transformers",
+      "version": "4.44.0",
+      "purl": "pkg:pypi/transformers@4.44.0",
+      "type": "library",
+      "bom-ref": "pkg:pypi/transformers@4.44.0",
+      "properties": [
+        {
+          "name": "internal:SrcFile",
+          "value": "requirements.txt"
+        }
+      ],
+      "evidence": {
+        "identity": [
+          {
+            "field": "purl",
+            "confidence": 0.5,
+            "methods": [
+              {
+                "technique": "manifest-analysis",
+                "confidence": 0.5,
+                "value": "requirements.txt"
+              }
+            ],
+            "concludedValue": "requirements.txt"
+          }
+        ]
+      },
+      "tags": [
+        "transform"
+      ]
+    },
+    {
+      "group": "openai",
+      "name": "gpt-4o",
+      "purl": "pkg:generic/openai/gpt-4o",
+      "type": "machine-learning-model",
+      "bom-ref": "cdxgen:ai:model:openai:gpt-4o",
+      "tags": [
+        "ai",
+        "machine-learning-model"
+      ],
+      "properties": [
+        {
+          "name": "cdx:ai:confidence",
+          "value": "medium"
+        },
+        {
+          "name": "cdx:ai:kind",
+          "value": "model"
+        },
+        {
+          "name": "cdx:ai:modelFamily",
+          "value": "gpt"
+        },
+        {
+          "name": "cdx:ai:runtime",
+          "value": "transformers"
+        },
+        {
+          "name": "cdx:ai:source",
+          "value": "source-code-analysis"
+        },
+        {
+          "name": "internal:SrcFile",
+          "value": "src/app.py#L14"
+        },
+        {
+          "name": "cdx:ai:provider",
+          "value": "openai"
+        },
+        {
+          "name": "bomlens:ai:usage",
+          "value": "model"
+        },
+        {
+          "name": "bomlens:ai:scope",
+          "value": "runtime"
+        }
+      ],
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "src/app.py#L14"
+          }
+        ]
+      }
+    },
+    {
+      "group": "meta-llama",
+      "name": "Llama-3.1-8B-Instruct",
+      "purl": "pkg:huggingface/meta-llama/Llama-3.1-8B-Instruct",
+      "type": "machine-learning-model",
+      "bom-ref": "pkg:huggingface/meta-llama/Llama-3.1-8B-Instruct",
+      "tags": [
+        "ai",
+        "machine-learning-model"
+      ],
+      "properties": [
+        {
+          "name": "cdx:ai:confidence",
+          "value": "medium"
+        },
+        {
+          "name": "cdx:ai:kind",
+          "value": "model"
+        },
+        {
+          "name": "cdx:ai:modelFamily",
+          "value": "llama"
+        },
+        {
+          "name": "cdx:ai:runtime",
+          "value": "transformers"
+        },
+        {
+          "name": "cdx:ai:source",
+          "value": "source-code-analysis"
+        },
+        {
+          "name": "internal:SrcFile",
+          "value": "src/app.py#L21"
+        },
+        {
+          "name": "cdx:ai:provider",
+          "value": "huggingface"
+        },
+        {
+          "name": "bomlens:ai:usage",
+          "value": "model"
+        },
+        {
+          "name": "bomlens:ai:scope",
+          "value": "runtime"
+        },
+        {
+          "name": "bomlens:weights:formats",
+          "value": "bin,safetensors"
+        },
+        {
+          "name": "bomlens:weights:pickleFiles",
+          "value": "1"
+        },
+        {
+          "name": "bomlens:weights:file",
+          "value": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa  pytorch_model.bin"
+        },
+        {
+          "name": "bomlens:hf:gated",
+          "value": "manual"
+        },
+        {
+          "name": "bomlens:hf:revision",
+          "value": "0e9e39f249a16976918f6564b8830bc894c89659"
+        },
+        {
+          "name": "bomlens:hf:revisionTime",
+          "value": "2025-09-25T12:00:00.000Z"
+        },
+        {
+          "name": "bomlens:lineage:chain",
+          "value": "meta-llama/Llama-3.1-8B:llama3.1 > acme/loop-a:apache-2.0"
+        },
+        {
+          "name": "bomlens:lineage:rootLicense",
+          "value": "apache-2.0"
+        },
+        {
+          "name": "bomlens:ai:resolved",
+          "value": "huggingface"
+        },
+        {
+          "name": "bomlens:assessment:axes",
+          "value": "license"
+        },
+        {
+          "name": "bomlens:assessment:license",
+          "value": "conditional"
+        },
+        {
+          "name": "bomlens:assessment:license:keys",
+          "value": "llama-community"
+        },
+        {
+          "name": "bomlens:assessment:overall",
+          "value": "conditional"
+        },
+        {
+          "name": "bomlens:assessment:reasons",
+          "value": "license llama3.1: Llama Community License (conditional)"
+        }
+      ],
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "src/app.py#L21"
+          }
+        ]
+      },
+      "licenses": [
+        {
+          "license": {
+            "name": "llama3.1"
+          }
+        }
+      ],
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://huggingface.co/meta-llama/Llama-3.1-8B-Instruct",
+          "comment": "model page on the Hugging Face hub"
+        }
+      ]
+    },
+    {
+      "group": "",
+      "name": "AGENTS.md",
+      "type": "file",
+      "bom-ref": "urn:file:ai:AGENTS.md",
+      "tags": [
+        "ai",
+        "prompt-config",
+        "prompt-config-file"
+      ],
+      "properties": [
+        {
+          "name": "cdx:ai:kind",
+          "value": "prompt-config-file"
+        },
+        {
+          "name": "cdx:ai:source",
+          "value": "source-code-analysis"
+        },
+        {
+          "name": "cdx:file:kind",
+          "value": "prompt-config-file"
+        },
+        {
+          "name": "internal:SrcFile",
+          "value": "AGENTS.md"
+        },
+        {
+          "name": "bomlens:ai:usage",
+          "value": "instruction-file"
+        },
+        {
+          "name": "bomlens:ai:scope",
+          "value": "development"
+        },
+        {
+          "name": "bomlens:ai:path",
+          "value": "AGENTS.md"
+        }
+      ],
+      "evidence": {
+        "occurrences": [
+          {
+            "location": "AGENTS.md"
+          }
+        ]
+      }
+    },
+    {
+      "group": "",
+      "name": "mcp.json",
+      "type": "file",
+      "bom-ref": "file:.vscode/mcp.json",
+      "properties": [
+        {
+          "name": "cdx:file:kind",
+          "value": "mcp-config"
+        },
+        {
+          "name": "cdx:mcp:catalogSource",
+          "value": "heuristic"
+        },
+        {
+          "name": "cdx:mcp:configFormat",
+          "value": "vscode"
+        },
+        {
+          "name": "cdx:mcp:configuredEndpoints",
+          "value": "http://docs.example.com/mcp"
+        },
+        {
+          "name": "cdx:mcp:configuredServiceCount",
+          "value": "2"
+        },
+        {
+          "name": "cdx:mcp:configuredServiceNames",
+          "value": "docs,fs"
+        },
+        {
+          "name": "cdx:mcp:inventorySource",
+          "value": "config-file"
+        },
+        {
+          "name": "cdx:mcp:official",
+          "value": "false"
+        },
+        {
+          "name": "cdx:mcp:package",
+          "value": "true"
+        },
+        {
+          "name": "cdx:mcp:packageName",
+          "value": "mcp.json"
+        },
+        {
+          "name": "cdx:mcp:role",
+          "value": "sdk"
+        },
+        {
+          "name": "internal:SrcFile",
+          "value": ".vscode/mcp.json"
+        },
+        {
+          "name": "bomlens:ai:usage",
+          "value": "mcp-config"
+        },
+        {
+          "name": "bomlens:ai:scope",
+          "value": "development"
+        },
+        {
+          "name": "bomlens:ai:path",
+          "value": ".vscode/mcp.json"
+        }
+      ],
+      "tags": [
+        "mcp",
+        "mcp-sdk"
+      ]
+    },
+    {
+      "group": "",
+      "name": "mcp.json",
+      "type": "file",
+      "bom-ref": "file:.cursor/mcp.json",
+      "properties": [
+        {
+          "name": "cdx:file:kind",
+          "value": "mcp-config"
+        },
+        {
+          "name": "cdx:mcp:catalogSource",
+          "value": "heuristic"
+        },
+        {
+          "name": "cdx:mcp:configFormat",
+          "value": "cursor"
+        },
+        {
+          "name": "cdx:mcp:configuredServiceCount",
+          "value": "1"
+        },
+        {
+          "name": "cdx:mcp:configuredServiceNames",
+          "value": "github"
+        },
+        {
+          "name": "cdx:mcp:credentialExposedServiceCount",
+          "value": "1"
+        },
+        {
+          "name": "cdx:mcp:credentialExposure",
+          "value": "true"
+        },
+        {
+          "name": "cdx:mcp:inventorySource",
+          "value": "config-file"
+        },
+        {
+          "name": "cdx:mcp:official",
+          "value": "false"
+        },
+        {
+          "name": "cdx:mcp:package",
+          "value": "true"
+        },
+        {
+          "name": "cdx:mcp:packageName",
+          "value": "mcp.json"
+        },
+        {
+          "name": "cdx:mcp:role",
+          "value": "sdk"
+        },
+        {
+          "name": "internal:SrcFile",
+          "value": ".cursor/mcp.json"
+        },
+        {
+          "name": "bomlens:ai:usage",
+          "value": "mcp-config"
+        },
+        {
+          "name": "bomlens:ai:scope",
+          "value": "development"
+        },
+        {
+          "name": "bomlens:ai:path",
+          "value": ".cursor/mcp.json"
+        }
+      ],
+      "tags": [
+        "mcp",
+        "mcp-sdk"
+      ]
+    },
+    {
+      "type": "file",
+      "bom-ref": "file:.github/copilot-instructions.md",
+      "name": "copilot-instructions.md",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "39256be4e9da6d5c2312f44d9670ef3498aaffd49ff80556a9bed6b5bac56077"
+        }
+      ],
+      "properties": [
+        {
+          "name": "bomlens:ai:usage",
+          "value": "instruction-file"
+        },
+        {
+          "name": "bomlens:ai:scope",
+          "value": "development"
+        },
+        {
+          "name": "bomlens:ai:path",
+          "value": ".github/copilot-instructions.md"
+        },
+        {
+          "name": "bomlens:ai:detectedBy",
+          "value": "bomlens"
+        }
+      ]
+    },
+    {
+      "type": "file",
+      "bom-ref": "file:.cursor/rules/style.mdc",
+      "name": "style.mdc",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "26d188bfb53efb62bfa36dc93f2bd216f309cb11eb18411b79490edbc4894446"
+        }
+      ],
+      "properties": [
+        {
+          "name": "bomlens:ai:usage",
+          "value": "instruction-file"
+        },
+        {
+          "name": "bomlens:ai:scope",
+          "value": "development"
+        },
+        {
+          "name": "bomlens:ai:path",
+          "value": ".cursor/rules/style.mdc"
+        },
+        {
+          "name": "bomlens:ai:detectedBy",
+          "value": "bomlens"
+        }
+      ]
+    },
+    {
+      "type": "machine-learning-model",
+      "bom-ref": "pkg:huggingface/acme/gone",
+      "name": "gone",
+      "purl": "pkg:huggingface/acme/gone",
+      "properties": [
+        {
+          "name": "bomlens:ai:usage",
+          "value": "model"
+        },
+        {
+          "name": "bomlens:ai:resolved",
+          "value": "unreadable"
+        },
+        {
+          "name": "bomlens:ai:resolvedStatus",
+          "value": "404"
+        }
+      ]
+    }
+  ],
+  "dependencies": [
+    {
+      "ref": "pkg:pypi/app@latest",
+      "dependsOn": [
+        "pkg:pypi/openai@1.40.0",
+        "pkg:pypi/transformers@4.44.0",
+        "urn:service:ai:openai:OpenAI-API",
+        "pkg:huggingface/meta-llama/Llama-3.1-8B-Instruct",
+        "urn:file:ai:AGENTS.md",
+        "file:.vscode/mcp.json",
+        "file:.cursor/mcp.json",
+        "file:.github/copilot-instructions.md",
+        "file:.cursor/rules/style.mdc",
+        "urn:service:mcp:fs:latest",
+        "urn:service:mcp:docs:latest",
+        "urn:service:mcp:github:latest"
+      ]
+    },
+    {
+      "ref": "pkg:pypi/openai@1.40.0",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:pypi/transformers@4.44.0",
+      "dependsOn": []
+    },
+    {
+      "ref": "urn:service:ai:openai:OpenAI-API",
+      "dependsOn": [
+        "cdxgen:ai:model:openai:gpt-4o"
+      ]
+    },
+    {
+      "ref": "cdxgen:ai:model:openai:gpt-4o",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:huggingface/meta-llama/Llama-3.1-8B-Instruct",
+      "dependsOn": []
+    },
+    {
+      "ref": "urn:file:ai:AGENTS.md",
+      "dependsOn": []
+    },
+    {
+      "ref": "file:.vscode/mcp.json",
+      "dependsOn": []
+    },
+    {
+      "ref": "file:.cursor/mcp.json",
+      "dependsOn": []
+    },
+    {
+      "ref": "file:.github/copilot-instructions.md",
+      "dependsOn": []
+    },
+    {
+      "ref": "file:.cursor/rules/style.mdc",
+      "dependsOn": []
+    },
+    {
+      "ref": "urn:service:mcp:fs:latest",
+      "dependsOn": []
+    },
+    {
+      "ref": "urn:service:mcp:docs:latest",
+      "dependsOn": []
+    },
+    {
+      "ref": "urn:service:mcp:github:latest",
+      "dependsOn": []
+    }
+  ],
+  "annotations": [
+    {
+      "bom-ref": "metadata-annotations",
+      "subjects": [
+        "pkg:pypi/app@latest"
+      ],
+      "annotator": {
+        "component": {
+          "group": "@cdxgen",
+          "name": "cdxgen",
+          "version": "13.5.0",
+          "purl": "pkg:npm/%40cdxgen/cdxgen@13.5.0",
+          "type": "application",
+          "bom-ref": "pkg:npm/@cdxgen/cdxgen@13.5.0",
+          "publisher": "OWASP Foundation",
+          "authors": [
+            {
+              "name": "OWASP Foundation"
+            }
+          ]
+        }
+      },
+      "timestamp": "2026-11-13T10:52:48Z",
+      "text": "This Software Bill-of-Materials (SBOM) document was created on Friday, November 13, 2026 with cdxgen. The data was captured during the pre-build lifecycle phase without building the application. The document describes an application named 'app'."
+    }
+  ],
+  "services": [
+    {
+      "bom-ref": "urn:service:ai:openai:OpenAI-API",
+      "group": "openai",
+      "name": "OpenAI API",
+      "provider": {
+        "name": "openai"
+      },
+      "version": "observed",
+      "endpoints": [],
+      "properties": [
+        {
+          "name": "cdx:ai:confidence",
+          "value": "high"
+        },
+        {
+          "name": "cdx:ai:deployment",
+          "value": "implicit"
+        },
+        {
+          "name": "cdx:ai:kind",
+          "value": "inference-service"
+        },
+        {
+          "name": "cdx:ai:modelSelection",
+          "value": "explicit"
+        },
+        {
+          "name": "cdx:ai:runtime",
+          "value": "transformers"
+        },
+        {
+          "name": "cdx:ai:source",
+          "value": "source-code-analysis"
+        },
+        {
+          "name": "cdx:ai:transportSecurity",
+          "value": "unknown"
+        },
+        {
+          "name": "bomlens:ai:usage",
+          "value": "ai-service"
+        },
+        {
+          "name": "bomlens:ai:scope",
+          "value": "runtime"
+        },
+        {
+          "name": "cdx:ai:modelId",
+          "value": "gpt-4o"
+        },
+        {
+          "name": "cdx:ai:modelFamily",
+          "value": "gpt"
+        },
+        {
+          "name": "cdx:ai:modelCount",
+          "value": "1"
+        }
+      ],
+      "tags": [
+        "ai",
+        "openai"
+      ]
+    },
+    {
+      "bom-ref": "urn:service:mcp:fs:latest",
+      "endpoints": [],
+      "group": "mcp",
+      "name": "fs",
+      "properties": [
+        {
+          "name": "cdx:mcp:command",
+          "value": "npx"
+        },
+        {
+          "name": "cdx:mcp:configFormat",
+          "value": "vscode"
+        },
+        {
+          "name": "cdx:mcp:configKey",
+          "value": "servers.fs"
+        },
+        {
+          "name": "cdx:mcp:exposureType",
+          "value": "stdio-configured"
+        },
+        {
+          "name": "cdx:mcp:inventorySource",
+          "value": "config-file"
+        },
+        {
+          "name": "cdx:mcp:officialSdk",
+          "value": "true"
+        },
+        {
+          "name": "cdx:mcp:packageRefs",
+          "value": "@modelcontextprotocol/server-filesystem@2025.8.21"
+        },
+        {
+          "name": "cdx:mcp:reviewNeeded",
+          "value": "true"
+        },
+        {
+          "name": "cdx:mcp:security:confusedDeputyRisk",
+          "value": "none"
+        },
+        {
+          "name": "cdx:mcp:security:tokenPassthroughRisk",
+          "value": "none"
+        },
+        {
+          "name": "cdx:mcp:serviceType",
+          "value": "configured-server"
+        },
+        {
+          "name": "cdx:mcp:transport",
+          "value": "stdio"
+        },
+        {
+          "name": "cdx:mcp:trustProfile",
+          "value": "official-sdk+unknown"
+        },
+        {
+          "name": "cdx:mcp:usageConfidence",
+          "value": "high"
+        },
+        {
+          "name": "internal:SrcFile",
+          "value": ".vscode/mcp.json"
+        },
+        {
+          "name": "bomlens:ai:usage",
+          "value": "mcp-server"
+        },
+        {
+          "name": "bomlens:ai:scope",
+          "value": "development"
+        },
+        {
+          "name": "bomlens:ai:reviewReason",
+          "value": "broad-filesystem-access"
+        }
+      ],
+      "version": "latest"
+    },
+    {
+      "bom-ref": "urn:service:mcp:docs:latest",
+      "authenticated": false,
+      "endpoints": [
+        "http://docs.example.com/mcp"
+      ],
+      "group": "mcp",
+      "name": "docs",
+      "properties": [
+        {
+          "name": "cdx:mcp:authMode",
+          "value": "none"
+        },
+        {
+          "name": "cdx:mcp:authPosture",
+          "value": "none"
+        },
+        {
+          "name": "cdx:mcp:command",
+          "value": "configured"
+        },
+        {
+          "name": "cdx:mcp:configFormat",
+          "value": "vscode"
+        },
+        {
+          "name": "cdx:mcp:configKey",
+          "value": "servers.docs"
+        },
+        {
+          "name": "cdx:mcp:exposureType",
+          "value": "networked-public"
+        },
+        {
+          "name": "cdx:mcp:inventorySource",
+          "value": "config-file"
+        },
+        {
+          "name": "cdx:mcp:reviewNeeded",
+          "value": "true"
+        },
+        {
+          "name": "cdx:mcp:security:confusedDeputyRisk",
+          "value": "none"
+        },
+        {
+          "name": "cdx:mcp:security:tokenPassthroughRisk",
+          "value": "none"
+        },
+        {
+          "name": "cdx:mcp:serviceType",
+          "value": "configured-server"
+        },
+        {
+          "name": "cdx:mcp:transport",
+          "value": "streamable-http"
+        },
+        {
+          "name": "cdx:mcp:trustProfile",
+          "value": "non-official-sdk+unauthenticated-networked"
+        },
+        {
+          "name": "cdx:mcp:usageConfidence",
+          "value": "high"
+        },
+        {
+          "name": "internal:SrcFile",
+          "value": ".vscode/mcp.json"
+        },
+        {
+          "name": "bomlens:ai:usage",
+          "value": "mcp-server"
+        },
+        {
+          "name": "bomlens:ai:scope",
+          "value": "development"
+        },
+        {
+          "name": "bomlens:ai:reviewReason",
+          "value": "unencrypted-transport"
+        }
+      ],
+      "version": "latest"
+    },
+    {
+      "bom-ref": "urn:service:mcp:github:latest",
+      "endpoints": [],
+      "group": "mcp",
+      "name": "github",
+      "properties": [
+        {
+          "name": "cdx:mcp:command",
+          "value": "npx"
+        },
+        {
+          "name": "cdx:mcp:configFormat",
+          "value": "cursor"
+        },
+        {
+          "name": "cdx:mcp:configKey",
+          "value": "mcpServers.github"
+        },
+        {
+          "name": "cdx:mcp:credentialExposure",
+          "value": "true"
+        },
+        {
+          "name": "cdx:mcp:credentialExposureFieldCount",
+          "value": "1"
+        },
+        {
+          "name": "cdx:mcp:credentialIndicatorCount",
+          "value": "1"
+        },
+        {
+          "name": "cdx:mcp:exposureType",
+          "value": "stdio-configured"
+        },
+        {
+          "name": "cdx:mcp:inventorySource",
+          "value": "config-file"
+        },
+        {
+          "name": "cdx:mcp:officialSdk",
+          "value": "true"
+        },
+        {
+          "name": "cdx:mcp:packageRefs",
+          "value": "@modelcontextprotocol/server-github"
+        },
+        {
+          "name": "cdx:mcp:reviewNeeded",
+          "value": "true"
+        },
+        {
+          "name": "cdx:mcp:security:confusedDeputyRisk",
+          "value": "none"
+        },
+        {
+          "name": "cdx:mcp:security:tokenPassthroughRisk",
+          "value": "none"
+        },
+        {
+          "name": "cdx:mcp:serviceType",
+          "value": "configured-server"
+        },
+        {
+          "name": "cdx:mcp:transport",
+          "value": "stdio"
+        },
+        {
+          "name": "cdx:mcp:trustProfile",
+          "value": "official-sdk+unknown"
+        },
+        {
+          "name": "cdx:mcp:usageConfidence",
+          "value": "high"
+        },
+        {
+          "name": "internal:SrcFile",
+          "value": ".cursor/mcp.json"
+        },
+        {
+          "name": "bomlens:ai:usage",
+          "value": "mcp-server"
+        },
+        {
+          "name": "bomlens:ai:scope",
+          "value": "development"
+        },
+        {
+          "name": "bomlens:ai:reviewReason",
+          "value": "unpinned-package"
+        }
+      ],
+      "version": "latest"
+    }
+  ]
+}

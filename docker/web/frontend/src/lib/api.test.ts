@@ -520,6 +520,12 @@ describe("startScan", () => {
     expect(qs.get("git_ref")).toBe("v1.2.0");
   });
 
+  it("sends the Hugging Face model lookup option", () => {
+    startScan({ ...PARAMS, resolveModels: true }, handlers());
+    const qs = new URLSearchParams(FakeEventSource.last!.url.split("?")[1]);
+    expect(qs.get("resolve_models")).toBe("true");
+  });
+
   it("sends the excluded paths one per line", () => {
     startScan({ ...PARAMS, exclude: ["vendor/legacy", "test/fixtures"] }, handlers());
     const qs = new URLSearchParams(FakeEventSource.last!.url.split("?")[1]);
@@ -539,6 +545,7 @@ describe("startScan", () => {
     expect(qs.get("security")).toBe("true");
     expect(qs.get("deep_license")).toBe("false");
     expect(qs.get("identify_vendored")).toBe("false");
+    expect(qs.get("resolve_models")).toBe("false");
     expect(qs.has("includeOsv")).toBe(false);
     expect(qs.get("byte_stable")).toBe("false");
     expect(qs.get("deep_cve")).toBe("false");

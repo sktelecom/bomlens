@@ -73,3 +73,40 @@ test("no card when the scan recorded no AI usage", async ({ page }) => {
   await expect(page.getByRole("link", { name: /^Components/ }).first()).toBeVisible();
   await expect(page.getByTestId("ai-usage")).toHaveCount(0);
 });
+
+test("a model looked up on Hugging Face shows its licence, weights, verdict and the model SBOM command", async ({ page }) => {
+  await seedThemeLang(page, "light", "en");
+  const aiUsage = [
+    {
+      kind: "model", name: "acme/chat-7b", purl: "pkg:huggingface/acme/chat-7b", provider: "Hugging Face", scope: "runtime",
+      path: "app/load.py#L3", reviewReasons: [], detectedBy: "bomlens",
+      resolved: "huggingface", license: "apache-2.0", gated: "manual", weightFormats: ["safetensors", "bin"], pickleFiles: 1,
+      lineage: "meta-llama/Llama-3.1-8B:llama3.1 > acme/chat-7b:apache-2.0", verdict: "caution", hubUrl: "https://huggingface.co/acme/chat-7b",
+    },
+    {
+      kind: "model", name: "acme/private-1b", purl: "pkg:huggingface/acme/private-1b", provider: "Hugging Face", scope: "runtime",
+      path: "app/load.py#L9", reviewReasons: [], detectedBy: "bomlens", resolved: "unreadable", resolvedStatus: 404,
+    },
+  ];
+  await openResult(page, { ...DONE, sbom: { ...DONE.sbom, aiUsage } });
+  const card = page.getByTestId("ai-usage");
+  await expect(card).toBeVisible();
+  await expect(card.getByText("Licence: apache-2.0")).toBeVisible();
+  await expect(card.getByText("Gated (manual approval)")).toBeVisible();
+  await expect(card.getByText("Weights: safetensors, bin")).toBeVisible();
+  await expect(card.getByText("Pickle weights: 1")).toBeVisible();
+  await expect(card.getByText(/can run code when they are loaded/)).toBeVisible();
+  await expect(card.getByText(/Base models: meta-llama\/Llama-3.1-8B/)).toBeVisible();
+  await expect(card.getByText("./scripts/scan-sbom.sh --model acme/chat-7b")).toBeVisible();
+  const link = card.getByRole("link", { name: "View on Hugging Face" });
+  await expect(link).toHaveAttribute("href", "https://huggingface.co/acme/chat-7b");
+  await expect(link).toHaveAttribute("rel", "noopener noreferrer");
+  await expect(card.getByText("Hub could not be read (HTTP 404): private, gated or renamed")).toBeVisible();
+
+  await waitForSettled(page.locator("main"));
+  const axe = await new AxeBuilder({ page })
+    .include('[data-testid="ai-usage"]')
+    .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
+    .analyze();
+  expect(axe.violations).toEqual([]);
+});

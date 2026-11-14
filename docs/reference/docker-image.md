@@ -210,6 +210,9 @@ MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL='*' docker run --rm \
 | `LICENSE_REGISTRY_BUDGET` | — | `240` | Seconds the lookups may take in total. Components it does not reach are left as they were, and the step is recorded as degraded |
 | `LICENSE_REGISTRY_API` | — | `https://api.deps.dev/v3` | Base URL of a server that answers the deps.dev v3 version lookup, for a network that reaches the registries only through its own mirror or proxy. When nothing answers, the components stay as they were and the step is recorded as degraded (`unavailable`) |
 | `PURL_RESOLVE` | — | `false` | `--analyze` only (the script's `--resolve-purl`): look each identifier up in its package repository (deps.dev) and add the answer to the conformance check report as an advisory row. Uses the network |
+| `MODEL_RESOLVE` | - | `false` | Source scans (the script's `--resolve-models`): read each Hugging Face model the code references from the hub. Uses the network; `HF_ENDPOINT` points at a mirror and `HF_TOKEN` reads private models |
+| `MODEL_RESOLVE_MAX` | - | `20` | Models looked up in one scan. The rest are marked `not-attempted` |
+| `MODEL_RESOLVE_BUDGET` | - | `240` | Seconds all the lookups of one scan may take, base models included. The models not reached are marked `not-attempted` |
 | `PURL_RESOLVE_IGNORE` | — | — | Namespace prefixes to leave out of that lookup, space- or comma-separated. Use it for namespaces published only to an internal repository, which cannot be told apart from a wrong identifier |
 | `PURL_RESOLVE_BUDGET` | — | `240` | Seconds the lookup may take in total. Identifiers it does not reach are reported as unchecked, never as missing |
 | `ANALYZE_CPE_INDEX` | — | `false` | `--analyze` only (the script's `--analyze-cpe-index`): match the components carrying `bomlens:purlSource=upstream-map` against the bundled CPE index. |

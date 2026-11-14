@@ -1,0 +1,15 @@
+{
+  "id": "meta-llama/Llama-3.1-8B-Instruct",
+  "sha": "0e9e39f249a16976918f6564b8830bc894c89659",
+  "lastModified": "2025-09-25T12:00:00.000Z",
+  "private": false,
+  "gated": "manual",
+  "tags": ["transformers", "license:llama3.1"],
+  "cardData": { "license": "llama3.1", "base_model": "meta-llama/Llama-3.1-8B" },
+  "siblings": [
+    { "rfilename": "config.json", "size": 855 },
+    { "rfilename": "model-00001-of-00002.safetensors", "size": 4976698672, "lfs": { "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "size": 4976698672 } },
+    { "rfilename": "model-00002-of-00002.safetensors", "size": 3615690440, "lfs": { "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "size": 3615690440 } },
+    { "rfilename": "pytorch_model.bin", "size": 100, "lfs": { "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "size": 100 } }
+  ]
+}
