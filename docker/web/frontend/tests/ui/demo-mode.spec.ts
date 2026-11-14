@@ -3,9 +3,11 @@
 
 import AxeBuilder from "@axe-core/playwright";
 import type { ChildProcess } from "node:child_process";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { expect, test } from "@playwright/test";
 
-import { serveDemoData, startDemoBundle } from "./demo-bundle";
+import { DATA_BASE, DEMO_DATA, serveDemoData, startDemoBundle } from "./demo-bundle";
 
 // The read-only demo is a different build of the app (a banner, no scanning),
 // so it is checked as its own target: built once, served from the committed
@@ -96,4 +98,48 @@ test("the navigation reaches the bottom of the window, at the top and scrolled t
   await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
   await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(0);
   expect(await bottom()).toBe(600);
+});
+
+test("the demo's scan list is read-only: no actions column, no delete menu, dates, and a start strip", async ({ page }) => {
+  await serveDemoData(page);
+  await page.goto(`${ORIGIN}/#/`);
+  await page.getByTestId("demo-banner").waitFor();
+  await expect(page.getByRole("table")).toBeVisible();
+
+  // Nothing can be deleted or scanned: no row menu, no extra column, no output-folder note.
+  await expect(page.getByRole("button", { name: /^More actions for/ })).toHaveCount(0);
+  await expect(page.getByRole("columnheader")).toHaveCount(5);
+  await expect(page.getByRole("columnheader", { name: "Actions" })).toHaveCount(0);
+  await expect(page.getByText("~/sbom-output")).toHaveCount(0);
+
+  // The scans were captured once, so they show the date they were made.
+  await expect(page.locator("table time").first()).toHaveText(/\d{4}/);
+
+  // Three scans to start with, and the project scanned twice to compare.
+  const strip = page.getByTestId("demo-start-here");
+  await expect(strip).toBeVisible();
+  await expect(strip.getByRole("link")).toHaveCount(4);
+  await expect(page.getByTestId("demo-compare-link")).toHaveAttribute("href", /#\/scan\//);
+
+  // Reading still works: sorting, search and the at-risk toggle.
+  await page.getByRole("columnheader", { name: "Components" }).getByRole("button").click();
+  await expect(page.getByRole("columnheader", { name: "Components" })).toHaveAttribute("aria-sort", "descending");
+  await page.getByRole("searchbox").fill("nginx");
+  await expect(page.getByRole("table").getByRole("link")).toHaveCount(1);
+  await expect(page.getByText("1 of 6")).toBeVisible();
+});
+
+test("a very long project name in the demo's start strip cannot push the page sideways", async ({ page }) => {
+  await serveDemoData(page);
+  const long = "Extremely-long-demo-project-name-".repeat(8);
+  await page.route(`**${DATA_BASE}/scans.json`, async (route) => {
+    const list = JSON.parse(readFileSync(join(DEMO_DATA, "scans.json"), "utf8")) as { project: string }[];
+    list.forEach((s) => (s.project = long));
+    await route.fulfill({ json: list });
+  });
+  await page.setViewportSize({ width: 1024, height: 800 });
+  await page.goto(`${ORIGIN}/#/`);
+  await page.getByTestId("demo-start-here").waitFor();
+  const excess = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+  expect(excess).toBeLessThanOrEqual(0);
 });

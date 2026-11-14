@@ -300,9 +300,10 @@ test("Recent home deletes a scan from its row", async ({ page }) => {
 
   const row = page.getByRole("link", { name: /demo @1.0/ });
   await expect(row).toBeVisible();
-  // The row's trash button asks first (dialog.spec covers the prompt itself);
+  // The row menu's Delete asks first (dialog.spec covers the prompt itself);
   // confirming deletes the scan and the list refreshes to empty.
-  await page.getByRole("button", { name: "Delete", exact: true }).click();
+  await page.getByRole("button", { name: "More actions for demo 1.0" }).click();
+  await page.getByRole("menuitem", { name: "Delete" }).click();
   await page.getByRole("dialog").getByRole("button", { name: "Delete" }).click();
   await expect(row).toHaveCount(0);
   await expect(page.getByText("Generate your first SBOM")).toBeVisible();

@@ -761,3 +761,95 @@ input.bl-visually-hidden:focus + .bl-dz { outline: 2px solid var(--focus-outline
 @media (prefers-reduced-motion: reduce) {
   .bl-switch, .bl-switch-line, .bl-switch-circle, .bl-switch-knob { transition: none; }
 }
+
+/* ---------------------------------------------------------------------------
+ * Scan management: filter bar, active filters, table, narrow rows.
+ * ------------------------------------------------------------------------- */
+.bl-filterbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--base-size-8);
+  margin: var(--base-size-16) 0 var(--base-size-8);
+}
+.bl-filterbar-search { width: 16.25rem; max-width: 100%; }
+.bl-grow { flex: 1 1 auto; }
+.bl-totals { display: inline-flex; align-items: center; flex-wrap: wrap; gap: var(--base-size-4) var(--base-size-8); font-size: var(--text-body-size-medium); }
+.bl-totals strong { color: var(--fgColor-default); font-weight: 600; }
+.bl-chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--base-size-8);
+  min-height: var(--base-size-24);
+  margin: 0 0 var(--base-size-8);
+  font-size: var(--text-body-size-small);
+}
+.bl-chips-count { margin-left: auto; }
+/* Nothing to show: the row takes no space (its live region stays for later). */
+.bl-chips[data-empty] { min-height: 0; margin: 0; }
+.bl-scanmgmt button.bl-toggle-on { background: var(--bgColor-accent-muted); border-color: var(--borderColor-accent-emphasis); }
+.bl-scanmgmt button.bl-toggle-on:hover { background: var(--bgColor-accent-muted); }
+.bl-lbl { display: inline-flex; align-items: center; gap: var(--base-size-4); white-space: nowrap; }
+.bl-lbl-wrap { display: inline-flex; align-items: center; flex-wrap: wrap; gap: var(--base-size-4) var(--base-size-8); }
+.bl-nowrap { white-space: nowrap; }
+.bl-trend { display: inline-flex; }
+.bl-trend-up { color: var(--fgColor-severe); }
+.bl-trend-down { color: var(--fgColor-success); }
+.bl-compcell { display: inline-flex; align-items: baseline; }
+.bl-delta { display: inline-block; width: 6ch; margin-left: var(--base-size-8); text-align: start; white-space: nowrap; }
+
+/* The table: Primer's Table is a CSS grid. Cells wrap, headers do not, and the
+ * scan column takes what the other columns leave. */
+.bl-scantbl { min-width: 0; }
+.bl-scantbl table { --table-font-size: var(--text-body-size-medium); }
+.bl-scantbl td, .bl-scantbl th { align-items: center; min-width: 0; }
+.bl-scantbl thead th { white-space: nowrap; }
+.bl-scantbl td[data-cell-align="end"], .bl-scantbl th[data-cell-align="end"] { justify-content: flex-end; text-align: end; }
+.bl-scantbl td > div { min-width: 0; }
+.bl-scanname { position: relative; display: block; max-width: 100%; min-width: 0; overflow: hidden; text-overflow: ellipsis; font-weight: 600; white-space: nowrap; }
+.bl-scanname-version { font-weight: 400; color: var(--fgColor-muted); }
+.bl-sortbtn {
+  all: unset;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--base-size-4);
+  font-weight: 600;
+  cursor: pointer;
+}
+.bl-sortbtn:focus-visible { outline: 2px solid var(--focus-outlineColor); outline-offset: 2px; border-radius: var(--borderRadius-small); }
+.bl-sortbtn-hint { display: inline-flex; color: var(--fgColor-muted); opacity: 0.6; }
+.bl-sortbtn:hover .bl-sortbtn-hint, .bl-sortbtn:focus-visible .bl-sortbtn-hint { opacity: 1; }
+
+/* Narrow screens: one stacked row per scan. */
+.bl-rows { list-style: none; margin: 0; padding: 0; }
+.bl-row {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--base-size-12);
+  padding: var(--base-size-12) var(--base-size-16);
+  border-top: var(--borderWidth-thin) solid var(--borderColor-muted);
+}
+.bl-rows > .bl-row:first-child { border-top: 0; }
+.bl-row-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: var(--base-size-8); }
+.bl-row-tags { display: flex; flex-wrap: wrap; align-items: center; gap: var(--base-size-8); }
+
+/* Demo: where to start. */
+.bl-demostart { display: flex; flex-wrap: wrap; align-items: center; gap: var(--base-size-16); }
+.bl-demostart p { margin: 0; max-width: 22.5rem; }
+.bl-demostart ul { display: flex; flex: 1; flex-wrap: wrap; gap: var(--base-size-8); list-style: none; margin: 0; padding: 0; }
+.bl-demostart li { min-width: 0; max-width: 100%; }
+.bl-demoname { display: inline-block; max-width: 16rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: bottom; }
+
+/* Empty state. */
+.bl-emptyouts { display: flex; flex-wrap: wrap; justify-content: center; gap: var(--base-size-8); list-style: none; margin: var(--base-size-16) 0 0; padding: 0; }
+.bl-sourcenote { display: flex; align-items: center; flex-wrap: wrap; gap: var(--base-size-8); margin-top: var(--base-size-12); }
+.bl-code { font-family: var(--fontStack-monospace); font-size: var(--text-body-size-small); background: var(--bgColor-muted); padding: 1px var(--base-size-8); border-radius: var(--borderRadius-small); }
+
+/* Tailwind's preflight (index.css) loads after Primer and resets border width and
+ * link colour with the same specificity as Primer's :where() rules, so on this
+ * screen a Label lost its outline and a Link its accent colour. Set both back. */
+.bl-scanmgmt [class*="prc-Label-Label"] { border-width: var(--borderWidth-thin); }
+.bl-scanmgmt a[class*="prc-Link-Link"] { color: var(--fgColor-accent); }
+
+.bl-extlink { display: inline-flex; align-items: center; gap: var(--base-size-4); }

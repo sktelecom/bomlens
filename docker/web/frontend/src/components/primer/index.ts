@@ -21,3 +21,5 @@ export { PackageCoordinate } from "./PackageCoordinate";
 export { ScreenHeader } from "./ScreenHeader";
 export { Switch } from "./Switch";
 export * from "./display";
+export { SortHeader, type SortDirection } from "./SortHeader";
+export { ActiveFilters, FilterMenu, type FilterOption } from "./FilterControls";

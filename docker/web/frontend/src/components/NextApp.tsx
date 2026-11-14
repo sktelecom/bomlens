@@ -454,13 +454,32 @@ export function NextApp() {
   const pendingLabel = pendingScan
     ? [pendingScan.project, pendingScan.version].filter(Boolean).join(" ")
     : (pendingDelete ?? "");
+  // Bold the scan name without react-i18next's Trans, which would bundle an
+  // extra HTML parser. The marker splits the translated sentence around the name.
+  const nameMark = "\u0000";
+  const deleteBody = t("recent.confirmDeleteBody", { scan: nameMark })
+    .replace(/<\/?b>/g, "")
+    .split(nameMark)
+    .flatMap((part, i) =>
+      i === 0 ? [part] : [<strong key={i} className="font-semibold text-foreground">{pendingLabel}</strong>, part],
+    );
 
   const confirmDelete = () => {
     const id = pendingDelete;
     setPendingDelete(null);
     if (!id) return;
-    void deleteScan(id).then((ok) => {
-      void refreshRecent();
+    void deleteScan(id).then(async (ok) => {
+      const stayedOnList = homeViewRef.current === "recent" && loadedIdRef.current === null;
+      await refreshRecent().catch(() => undefined);
+      if (ok && stayedOnList) {
+        // The row that held focus is gone; put it on the list's heading rather
+        // than letting it fall to the start of the document.
+        const heading = document.querySelector<HTMLElement>("main h1");
+        if (heading) {
+          heading.tabIndex = -1;
+          heading.focus();
+        }
+      }
       if (!ok) {
         toast(t("recent.deleteFailed"));
         return;
@@ -874,7 +893,7 @@ export function NextApp() {
       <ConfirmDialog
         open={pendingDelete !== null}
         title={t("recent.confirmDeleteTitle")}
-        description={t("recent.confirmDeleteBody", { scan: pendingLabel })}
+        description={deleteBody}
         confirmLabel={t("recent.delete")}
         destructive
         onConfirm={confirmDelete}

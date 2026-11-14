@@ -1493,7 +1493,7 @@
     "deleteFailed": "The scan could not be deleted. Try again.",
     "scanNotFound": "Scan “{{id}}” was not found. It may have been deleted.",
     "confirmDeleteTitle": "Delete this scan?",
-    "confirmDeleteBody": "The output files for {{scan}} are removed from this machine. Nothing is kept elsewhere, so this cannot be undone.",
+    "confirmDeleteBody": "The output files for <b>{{scan}}</b> are removed from this machine. Nothing is kept elsewhere, so this cannot be undone.",
     "typeAi": "AI model",
     "typeSbom": "SBOM",
     "typeSource": "Source",
@@ -1513,7 +1513,11 @@
     "rowMeta_one": "{{count}} component, {{date}}",
     "rowMeta_other": "{{count}} components, {{date}}",
     "refused": "Declaration refused",
-    "refusedHint": "The scan stopped because its declaration file was refused, so it has no SBOM. Open it for the reasons and the refused SBOM."
+    "refusedHint": "The scan stopped because its declaration file was refused, so it has no SBOM. Open it for the reasons and the refused SBOM.",
+    "moreActions": "More actions for {{name}}",
+    "colActions": "Actions",
+    "searchChip": "“{{query}}”",
+    "noMatchHint": "Try a different search or type."
   },
   "validation": {
     "required": "Fill in the required fields marked above.",
@@ -2259,5 +2263,9 @@
     },
     "organizationPlaceholder": "Organization name",
     "autonomyInService": "Whether a person is involved in the AI's decisions was answered in the service step."
+  },
+  "filters": {
+    "active": "Active filters",
+    "remove": "Remove filter: {{label}}"
   }
 }
