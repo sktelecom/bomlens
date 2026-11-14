@@ -96,6 +96,7 @@ BomLens 이미지를 스캔 엔진으로 쓰는 프로그램은 모든 스캔이
 | `declared-sources` | AI 선언에 적힌 데이터셋 출처 적용 |
 | `declared-service` | AI 선언에 적힌 AI 서비스 적용 |
 | `assess-ai-risk` | AI 모델 위험 판정 |
+| `resolve-models` | 코드가 참조하는 Hugging Face 모델을 허브에서 읽고 모델 SBOM을 연결(`--resolve-models`) |
 | `resolve-purl` | 각 PURL을 패키지 저장소에서 조회(`--resolve-purl`) |
 | `describe-input` | 공급사 SBOM의 원래 형식과 도구 기록(`--analyze`) |
 | `conformance` | 최소 요소 기준으로 SBOM 검사 |
@@ -274,6 +275,7 @@ CycloneDX 1.7 SBOM을 계획하려면 `MODE=PLAN`에 `CYCLONEDX_SPEC_VERSION`(`1
 | EPSS와 CISA KEV | 2 | 계획에서는 꺼져 있음(2단계 `env`가 `SECURITY_ENRICH=false`). CLI와 이미지를 단독으로 쓰면 켜져 있음. 미러는 `EPSS_API`, `KEV_URL` |
 | deps.dev(레지스트리 라이선스, 버전 경과 기간) | 2 | 요청할 때만 켜짐(`LICENSE_REGISTRY`, `STALENESS_ENRICH`). 미러는 `LICENSE_REGISTRY_API` |
 | PURL 저장소 확인 | 2 | 요청할 때만 켜짐(`PURL_RESOLVE`) |
+| Hugging Face 허브(코드가 참조하는 모델) | 2 | 요청할 때만 켜짐(`MODEL_RESOLVE`). `HF_ENDPOINT`로 미러를 지정하고, `HF_TOKEN`으로 비공개 모델을 읽음 |
 | SCANOSS(벤더링 코드 식별) | 2 | 요청할 때만 켜짐(`IDENTIFY_VENDORED`). 자체 설치 엔드포인트는 `SCANOSS_API_URL` |
 | NVD(심층 CVE 일치 확인) | 2 | 요청할 때만 켜짐(`DEEP_CVE`와 함께 `SECURITY_NVD_VERIFY`) |
 

@@ -2241,7 +2241,21 @@ fi
 # to review, never to a guess, and the reports that print the verdict carry the
 # registry's not-legal-advice disclaimer. Self-gates on the presence of a
 # machine-learning-model component, so ANALYZE of a plain SBOM is a no-op.
-if [ "$AI_MODEL_SCAN" = "true" ] || [ "$SCAN_MODE" = "ANALYZE" ]; then
+# The Hugging Face models a source scan found the code using are read from the
+# hub (opt-in, MODEL_RESOLVE=true): licence, weight files, gated state, base
+# models. --model-sbom files are linked to the model they describe. It runs
+# before the assessment so a model the hub answered for can be judged on what
+# it said. The step marks each model with bomlens:ai:resolved.
+RESOLVED_MODELS=false
+if [ "${MODEL_RESOLVE:-false}" = "true" ] && { [ "$SCAN_MODE" = "SOURCE" ] || [ "$SCAN_MODE" = "POSTPROCESS" ]; }; then
+    _rm_files=()
+    [ -z "${MODEL_SBOM_FILES:-}" ] || read -r -a _rm_files <<< "$MODEL_SBOM_FILES"
+    run_optional_step resolve-models python3 "$LIBDIR/resolve-models.py" "$OUTPUT_FILE" ${_rm_files[@]+"${_rm_files[@]}"}
+    if jq -e 'any(.components[]?; any(.properties[]?; .name == "bomlens:ai:resolved" and .value == "huggingface"))' "$OUTPUT_FILE" >/dev/null 2>&1; then
+        RESOLVED_MODELS=true
+    fi
+fi
+if [ "$AI_MODEL_SCAN" = "true" ] || [ "$SCAN_MODE" = "ANALYZE" ] || [ "$RESOLVED_MODELS" = "true" ]; then
     # Sources the publisher named by hub id are read from the hub first, so the
     # assessment judges them with the dataset (the SPDX 3.0.1 block below
     # records them as declared). The same declaration that block applies.

@@ -2079,6 +2079,68 @@ def _is_ai_usage(c):
     )
 
 
+_AI_WEIGHT_FORMAT_RE = re.compile(r"^[a-z0-9]{1,12}$")
+_AI_RESOLVED = ("huggingface", "unreadable", "unreachable", "not-attempted")
+_AI_VERDICTS = ("ok", "conditional", "caution", "review")
+
+
+def _ai_usage_model_facts(c, values, row):
+    """Add the optional hub-lookup facts of a usage model to ROW, copied from the
+    named properties only (resolve-models.py writes them). Absent stays absent."""
+    first = lambda name: next(iter(values(name)), None)  # noqa: E731
+    resolved = first("bomlens:ai:resolved")
+    if resolved in _AI_RESOLVED:
+        row["resolved"] = resolved
+        if resolved == "unreadable":
+            try:
+                status = int(str(first("bomlens:ai:resolvedStatus")).strip())
+            except ValueError:
+                status = 0
+            if 100 <= status <= 599:
+                row["resolvedStatus"] = status
+    for lic in _dicts(c.get("licenses")):
+        l = _as_dict(lic.get("license"))
+        text = l.get("id") or l.get("name") or lic.get("expression")
+        if isinstance(text, str) and text:
+            row["license"] = text[:100]
+        break
+    gated = first("bomlens:hf:gated")
+    if gated in ("auto", "manual"):
+        row["gated"] = gated
+    fmts = first("bomlens:weights:formats")
+    if fmts:
+        names = [f.strip() for f in fmts.split(",")]
+        names = [f for f in names if _AI_WEIGHT_FORMAT_RE.match(f)]
+        if names:
+            row["weightFormats"] = names[:12]
+    pickles = first("bomlens:weights:pickleFiles")
+    if pickles is not None:
+        try:
+            n = int(pickles.strip())
+        except ValueError:
+            n = -1
+        if n >= 0:
+            row["pickleFiles"] = n
+    lineage = first("bomlens:lineage:chain")
+    if lineage:
+        row["lineage"] = lineage[:500]
+    verdict = first("bomlens:assessment:overall")
+    if verdict in _AI_VERDICTS:
+        row["verdict"] = verdict
+    sbom_name = first("bomlens:ai:modelSbom")
+    if sbom_name:
+        row["modelSbom"] = sbom_name[:120]
+    for ref in _dicts(c.get("externalReferences")):
+        url = ref.get("url")
+        if not isinstance(url, str):
+            continue
+        if (ref.get("type") == "website" and url.startswith("https://huggingface.co/")
+                and "hubUrl" not in row):
+            row["hubUrl"] = url
+        elif ref.get("type") == "bom" and url.startswith("urn:cdx:") and "modelSbomLink" not in row:
+            row["modelSbomLink"] = url[:300]
+
+
 def _ai_usage_list(data):
     """The AI usage items of one SBOM, normalized for the UI.
 
@@ -2155,6 +2217,8 @@ def _ai_usage_list(data):
             row["models"] = names
         if "bomlens" in values("bomlens:ai:detectedBy"):
             row["detectedBy"] = "bomlens"
+        if kind == "model":
+            _ai_usage_model_facts(c, values, row)
         rows.append(row)
     rows.sort(key=lambda r: (AI_USAGE_KINDS.index(r["kind"]), r["name"]))
     return rows[:MAX_AI_USAGE_ROWS], len(rows) > MAX_AI_USAGE_ROWS
@@ -3359,7 +3423,7 @@ def scan_detail(run_id):
 # user to read the text before pasting it.
 # --------------------------------------------------------------------------
 _DIAG_OPTION_KEYS = (
-    "notice", "security", "deepLicense", "identifyVendored",
+    "notice", "security", "deepLicense", "identifyVendored", "resolveModels",
     "byteStable", "deepCve", "reachability", "analyzeCpeIndex",
 )
 # Input kinds the server itself dispatches on. Anything else in a recorded scan
@@ -4634,6 +4698,16 @@ def run_sibling_scan(image, mode, out_dir, on_log, *, upload_file=None, model_id
             args += ["-e", "IDENTIFY_VENDORED=true"]
         if env.get("SCANOSS_API_KEY"):
             args += ["-e", "SCANOSS_API_KEY"]
+        # Hub lookup of the referenced models (opt-in). The token, when the
+        # server has one, goes by NAME ONLY, as for the AI model scan below.
+        if env.get("MODEL_RESOLVE") == "true":
+            args += ["-e", "MODEL_RESOLVE=true"]
+            if os.environ.get("HF_TOKEN"):
+                args += ["-e", "HF_TOKEN"]
+            # A hub mirror and the lookup limits the server was started with, by name.
+            for _k in ("HF_ENDPOINT", "MODEL_RESOLVE_MAX", "MODEL_RESOLVE_BUDGET"):
+                if os.environ.get(_k):
+                    args += ["-e", _k]
     if model_id is not None:
         # model_id passed _MODEL_RE above.
         args += ["-e", "MODEL_ID=%s" % model_id]
@@ -6790,6 +6864,9 @@ class Handler(BaseHTTPRequestHandler):
                 "security": g("security", "true") == "true",
                 "deepLicense": g("deep_license") == "true",
                 "identifyVendored": g("identify_vendored") == "true",
+                # Ask the Hugging Face hub about the models the code references
+                # (source scans only; cleared below for any other mode).
+                "resolveModels": g("resolve_models") == "true",
                 "byteStable": g("byte_stable") == "true",
                 "deepCve": g("deep_cve") == "true",
                 "reachability": g("reachability") == "true",
@@ -6931,6 +7008,9 @@ class Handler(BaseHTTPRequestHandler):
             # Vendored-OSS identification (SCANOSS). SCANOSS_API_URL/KEY, if set in
             # the server's environment, pass through via env.copy() above.
             "IDENTIFY_VENDORED": "true" if g("identify_vendored") == "true" else "false",
+            # Hub lookup of the models a source scan references (resolve-models.py).
+            # Dropped again for every mode but SOURCE once the mode is known.
+            "MODEL_RESOLVE": "true" if g("resolve_models") == "true" else "false",
             "BYTE_STABLE": "true" if g("byte_stable") == "true" else "false",
             # CPE index match for a submitted SBOM, opt-in. entrypoint.sh reads it
             # on the ANALYZE path only.
@@ -7518,6 +7598,12 @@ class Handler(BaseHTTPRequestHandler):
                 host_root = host_path_of(env["SOURCE_ROOT"])
                 if host_root:
                     env["SOURCE_ROOT_HOST"] = host_root
+
+            # The model lookup belongs to the source scan only: any other mode
+            # neither passes the flag nor records the setting as on.
+            if env.get("MODE") != "SOURCE":
+                env["MODEL_RESOLVE"] = "false"
+                scan_config["resolveModels"] = False
 
             # Opt-in deep CVE matching on the base-image scan modes (SOURCE, IMAGE,
             # ROOTFS, BINARY). FIRMWARE and AIBOM already routed (or refused) their

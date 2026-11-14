@@ -96,6 +96,7 @@ Each step also has `stage` (1 for the SBOM a language image generated before thi
 | `declared-sources` | apply the dataset sources an AI declaration names |
 | `declared-service` | apply the AI service an AI declaration describes |
 | `assess-ai-risk` | assess the AI model's risk |
+| `resolve-models` | read each Hugging Face model the code references from the hub and link its model SBOM (`--resolve-models`) |
 | `resolve-purl` | look each PURL up in its package repository (`--resolve-purl`) |
 | `describe-input` | record the supplier SBOM's own format and tool (`--analyze`) |
 | `conformance` | check the SBOM against the minimum elements |
@@ -274,6 +275,7 @@ What a scan reaches over the network, and the setting for each. The execution pl
 | EPSS and CISA KEV | 2 | off in the plan (its stage 2 `env` sets `SECURITY_ENRICH=false`); the CLI and the image alone have them on. `EPSS_API` and `KEV_URL` point at a mirror |
 | deps.dev (licence registry, version age) | 2 | off unless asked for (`LICENSE_REGISTRY`, `STALENESS_ENRICH`); `LICENSE_REGISTRY_API` points at a mirror |
 | PURL repository check | 2 | off unless asked for (`PURL_RESOLVE`) |
+| Hugging Face hub (models the code references) | 2 | off unless asked for (`MODEL_RESOLVE`); `HF_ENDPOINT` points at a mirror, `HF_TOKEN` reads private models |
 | SCANOSS (vendored code identification) | 2 | off unless asked for (`IDENTIFY_VENDORED`); `SCANOSS_API_URL` points at a self-hosted endpoint |
 | NVD (checking deep CVE matches) | 2 | off unless asked for (`SECURITY_NVD_VERIFY` with `DEEP_CVE`) |
 

@@ -7,15 +7,17 @@ import { Fragment } from "react";
 import { useTranslation } from "react-i18next";
 
 import { Card, CardContent } from "@/components/ui/card";
-import type { SbomSummary } from "@/lib/api";
+import type { AiUsageItem, SbomSummary } from "@/lib/api";
 import {
   AI_USAGE_KIND_KEY,
   AI_USAGE_REASON_HELP_KEY,
   AI_USAGE_REASON_KEY,
+  aiUsageModelDetail,
   aiUsageScopeKey,
   aiUsageView,
 } from "@/lib/aiUsage";
 import { useFormatNumber } from "@/lib/format";
+import { GradeBadge } from "@/lib/models";
 
 /**
  * The AI the scanned code uses: models and AI services it calls, MCP servers
@@ -93,7 +95,8 @@ export function AiUsageCard({ sbom }: { sbom: SbomSummary | null | undefined }) 
                         {it.path && (
                           <div className="break-all font-mono text-foreground/70">{it.path}</div>
                         )}
-                        {!it.provider && !it.path && <span className="text-foreground/70">-</span>}
+                        {!it.provider && !it.path && !modelDetail(it) && <span className="text-foreground/70">-</span>}
+                        <ModelDetail item={it} />
                       </td>
                       <td className="whitespace-nowrap px-3 py-1.5">
                         <Label variant="secondary">{t(aiUsageScopeKey(it.scope))}</Label>
@@ -133,5 +136,57 @@ export function AiUsageCard({ sbom }: { sbom: SbomSummary | null | undefined }) 
         )}
       </CardContent>
     </Card>
+  );
+}
+
+const modelDetail = (it: AiUsageItem) => aiUsageModelDetail(it)?.hasDetail ?? false;
+
+/** What the Hugging Face lookup found for a model row: licence, access, weight
+ *  files, base models, the verdict and the way to the full model SBOM. */
+function ModelDetail({ item }: { item: AiUsageItem }) {
+  const { t } = useTranslation();
+  const d = aiUsageModelDetail(item);
+  if (!d || !d.hasDetail) return null;
+  return (
+    <div className="mt-1 space-y-1 text-foreground/70" data-testid="ai-usage-model-detail">
+      {(d.verdict || d.gated || d.pickleFiles > 0) && (
+        <div className="flex flex-wrap items-center gap-1">
+          {d.verdict && (
+            <span title={t("aiUsage.verdictTitle")}>
+              <GradeBadge grade={d.verdict} />
+            </span>
+          )}
+          {d.gated && <Label variant="attention">{t(`aiUsage.gated.${d.gated}`)}</Label>}
+          {d.pickleFiles > 0 && (
+            <Label variant="attention" title={t("aiUsage.pickleHelp")}>
+              {t("aiUsage.pickle", { count: d.pickleFiles })}
+            </Label>
+          )}
+        </div>
+      )}
+      {d.license && <div>{t("aiUsage.licence", { license: d.license })}</div>}
+      {d.weightFormats.length > 0 && <div>{t("aiUsage.weights", { formats: d.weightFormats.join(", ") })}</div>}
+      {d.pickleFiles > 0 && <div>{t("aiUsage.pickleHelp")}</div>}
+      {d.lineage && <div className="break-words">{t("aiUsage.lineage", { lineage: d.lineage })}</div>}
+      {d.resolution && <div>{t(d.resolution.key, { status: d.resolution.status })}</div>}
+      {d.hubUrl && (
+        <div>
+          <a
+            href={d.hubUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-foreground underline underline-offset-2"
+          >
+            {t("aiUsage.hubLink")}
+          </a>
+        </div>
+      )}
+      {d.modelSbom && <div>{t("aiUsage.linkedSbom", { name: d.modelSbom })}</div>}
+      {d.scanCommand && (
+        <div>
+          {t("aiUsage.fullSbomHint")} <code className="break-all font-mono text-foreground">{d.scanCommand}</code>
+        </div>
+      )}
+    </div>
   );
 }

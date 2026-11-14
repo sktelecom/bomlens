@@ -13,8 +13,11 @@ import {
   AI_USAGE_REASON_HELP_KEY,
   AI_USAGE_REASON_KEY,
   AI_USAGE_REASONS,
+  aiUsageModelDetail,
   aiUsageScopeKey,
   aiUsageView,
+  hubModelId,
+  safeHubUrl,
 } from "./aiUsage";
 
 const item = (over: Partial<AiUsageItem>): AiUsageItem => ({
@@ -103,5 +106,87 @@ describe("aiUsage labels", () => {
       const messages = load(lng);
       for (const key of keys) expect(typeof lookup(messages, key), `${lng}:${key}`).toBe("string");
     }
+  });
+});
+
+describe("hubModelId and safeHubUrl", () => {
+  it("reads owner/name from a hub purl and refuses anything unsafe", () => {
+    expect(hubModelId("pkg:huggingface/meta-llama/Llama-3.1-8B")).toBe("meta-llama/Llama-3.1-8B");
+    expect(hubModelId("pkg:huggingface/acme/x@abc123")).toBe("acme/x");
+    expect(hubModelId("pkg:generic/openai/gpt-4o")).toBeNull();
+    expect(hubModelId("pkg:huggingface/acme/x%3Brm")).toBeNull();
+    expect(hubModelId(undefined)).toBeNull();
+  });
+
+  it("accepts only huggingface.co links", () => {
+    expect(safeHubUrl("https://huggingface.co/acme/x")).toBe("https://huggingface.co/acme/x");
+    expect(safeHubUrl("http://huggingface.co/acme/x")).toBeUndefined();
+    expect(safeHubUrl("https://huggingface.co.evil.test/x")).toBeUndefined();
+    expect(safeHubUrl("javascript:alert(1)")).toBeUndefined();
+    expect(safeHubUrl(undefined)).toBeUndefined();
+  });
+});
+
+describe("aiUsageModelDetail", () => {
+  const hub = (over: Partial<AiUsageItem>) =>
+    item({ name: "acme/x", purl: "pkg:huggingface/acme/x", ...over });
+
+  it("is null for other kinds and empty for a model that was not looked up", () => {
+    expect(aiUsageModelDetail(item({ kind: "ai-service" }))).toBeNull();
+    expect(aiUsageModelDetail(hub({}))?.hasDetail).toBe(false);
+  });
+
+  it("carries the resolved hub data and the command for the full model SBOM", () => {
+    const d = aiUsageModelDetail(
+      hub({
+        resolved: "huggingface",
+        license: "apache-2.0",
+        gated: "manual",
+        weightFormats: ["safetensors", "bin"],
+        pickleFiles: 2,
+        lineage: "meta-llama/Llama-3.1-8B:llama3.1 > acme/x:apache-2.0",
+        verdict: "caution",
+        hubUrl: "https://huggingface.co/acme/x",
+      }),
+    )!;
+    expect(d.license).toBe("apache-2.0");
+    expect(d.gated).toBe("manual");
+    expect(d.pickleFiles).toBe(2);
+    expect(d.verdict).toBe("caution");
+    expect(d.hubUrl).toBe("https://huggingface.co/acme/x");
+    expect(d.scanCommand).toBe("./scripts/scan-sbom.sh --model acme/x");
+  });
+
+  it("shows the link to a model SBOM instead of the command", () => {
+    const d = aiUsageModelDetail(hub({ resolved: "huggingface", modelSbom: "x_bom.json" }))!;
+    expect(d.modelSbom).toBe("x_bom.json");
+    expect(d.scanCommand).toBeUndefined();
+  });
+
+  it("explains a failed lookup and drops hub data and unsafe links", () => {
+    expect(aiUsageModelDetail(hub({ resolved: "unreadable", resolvedStatus: 404 }))!.resolution).toEqual({
+      key: "aiUsage.resolution.unreadable",
+      status: 404,
+    });
+    expect(aiUsageModelDetail(hub({ resolved: "unreadable" }))!.resolution?.key).toBe(
+      "aiUsage.resolution.unreadableNoStatus",
+    );
+    expect(aiUsageModelDetail(hub({ resolved: "unreachable" }))!.resolution?.key).toBe(
+      "aiUsage.resolution.unreachable",
+    );
+    const d = aiUsageModelDetail(
+      hub({ resolved: "not-attempted", license: "mit", hubUrl: "https://evil.test/x" }),
+    )!;
+    expect(d.resolution?.key).toBe("aiUsage.resolution.notAttempted");
+    expect(d.license).toBeUndefined();
+    expect(d.hubUrl).toBeUndefined();
+    expect(d.scanCommand).toBeUndefined();
+  });
+
+  it("survives aiUsageView and ignores a bad verdict", () => {
+    const v = aiUsageView(sbom([hub({ resolved: "huggingface", verdict: "bogus" as never, license: "mit" })]))!;
+    const d = aiUsageModelDetail(v.groups[0].items[0])!;
+    expect(d.license).toBe("mit");
+    expect(d.verdict).toBeUndefined();
   });
 });
