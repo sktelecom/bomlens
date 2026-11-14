@@ -191,9 +191,9 @@ function RecentHeader({ newHref, withAction }: { newHref: string; withAction: bo
       title={t("recent.title")}
       description={t(IS_STATIC_DEMO ? "recent.demoSubtitle" : "recent.subtitle")}
       actions={
-        // The empty list carries its own New scan call to action; the
-        // read-only demo cannot scan.
-        withAction && !IS_STATIC_DEMO ? (
+        // The empty list carries its own New scan call to action. The demo shows
+        // the form too; only its last step, running the scan, is refused.
+        withAction ? (
           <Button as="a" href={newHref} variant="primary" leadingVisual={PlusIcon} data-testid="recent-new-scan">
             {t("shell.newScan")}
           </Button>
