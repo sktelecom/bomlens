@@ -852,12 +852,12 @@ test("end-of-life surfaces as a KPI tile, a badge and a filter chip", async ({ p
   await tile.click();
   await expect(page.getByRole("link", { name: /^Components/ })).toHaveAttribute("aria-current", "page");
 
-  // The EOL component carries the badge; the supported one does not.
-  await expect(page.getByText("End of life · since 2023-09-11")).toBeVisible();
+  // The EOL component says since when; the filter is already on, so the line leaves out the words it repeats.
+  await expect(page.getByText("since 2023-09-11", { exact: true })).toBeVisible();
 
   // The link already applied the filter: only end-of-life rows are listed.
   await page.getByRole("button", { name: /^Filters/ }).click();
-  await expect(page.getByRole("checkbox", { name: "End of life" })).toBeChecked();
+  await expect(page.getByRole("menuitemcheckbox", { name: "End of life" })).toHaveAttribute("aria-checked", "true");
   await page.keyboard.press("Escape");
   await expect(page.getByText("openssl", { exact: true }).first()).toBeVisible();
   await expect(page.getByText("zlib", { exact: true })).toHaveCount(0);
@@ -2529,7 +2529,7 @@ test("Components table shows Scope/Risk and filters on the full set", async ({ p
   // The toggles live in the Filters menu; the active ones also appear as
   // removable chips under the toolbar.
   await page.getByRole("button", { name: /^Filters/ }).click();
-  await page.getByRole("checkbox", { name: "Has vulnerabilities" }).check();
+  await page.getByRole("menuitemcheckbox", { name: "Has vulnerabilities" }).click();
   await page.keyboard.press("Escape");
   await expect(page.getByText("openssl", { exact: true })).toBeVisible();
   await expect(page.getByText("zlib", { exact: true })).toHaveCount(0);
@@ -2539,8 +2539,8 @@ test("Components table shows Scope/Risk and filters on the full set", async ({ p
 
   // Clearing it brings zlib back; "Direct only" then also excludes the transitive zlib.
   await page.getByRole("button", { name: /^Filters/ }).click();
-  await page.getByRole("checkbox", { name: "Has vulnerabilities" }).uncheck();
-  await page.getByRole("checkbox", { name: "Direct only" }).check();
+  await page.getByRole("menuitemcheckbox", { name: "Has vulnerabilities" }).click();
+  await page.getByRole("menuitemcheckbox", { name: "Direct only" }).click();
   await page.keyboard.press("Escape");
   await expect(page.getByText("zlib", { exact: true })).toHaveCount(0);
   await expect(page.getByText("openssl", { exact: true })).toBeVisible();
@@ -2555,8 +2555,8 @@ test("columns can be hidden, and the choice is kept for next time", async ({ pag
   await page.getByRole("link", { name: /^Components/ }).first().click();
   await expect(page.getByRole("button", { name: "Version", exact: true })).toBeVisible();
 
-  await page.getByRole("button", { name: /^Columns/ }).click();
-  await page.getByRole("checkbox", { name: "Version" }).uncheck();
+  await page.getByRole("button", { name: "View", exact: true }).click();
+  await page.getByRole("menuitemcheckbox", { name: "Version" }).click();
   await page.keyboard.press("Escape");
 
   // The column is gone from the header and the rows keep their shape.
@@ -2569,8 +2569,8 @@ test("columns can be hidden, and the choice is kept for next time", async ({ pag
   ).toContain("version");
 
   // And it comes back.
-  await page.getByRole("button", { name: /^Columns/ }).click();
-  await page.getByRole("checkbox", { name: "Version" }).check();
+  await page.getByRole("button", { name: "View", exact: true }).click();
+  await page.getByRole("menuitemcheckbox", { name: "Version" }).click();
   await page.keyboard.press("Escape");
   await expect(page.getByRole("button", { name: "Version", exact: true })).toBeVisible();
 });
@@ -2585,8 +2585,12 @@ test("the toolbar menus have no axe violations, open or closed", async ({ page }
     .analyze();
   expect(closed.violations).toEqual([]);
 
-  await page.getByRole("button", { name: /^Columns/ }).click();
-  await expect(page.getByRole("checkbox", { name: "Version" })).toBeVisible();
+  await page.getByRole("button", { name: "View", exact: true }).click();
+  await expect(page.getByRole("menuitemcheckbox", { name: "Version" })).toBeVisible();
+  await page.locator('[data-component="ActionMenu.Overlay"]').evaluate(async (el) => {
+    await Promise.all(el.getAnimations({ subtree: true }).map((a) => a.finished.catch(() => undefined)));
+    await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+  });
   const open = await new AxeBuilder({ page })
     .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
     .analyze();
