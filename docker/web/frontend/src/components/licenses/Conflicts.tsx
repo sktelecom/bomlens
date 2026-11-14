@@ -52,7 +52,7 @@ function ConflictRows({
   return (
     <>
       <Table.Container className="bl-lic-table">
-        <Table id={id} gridTemplateColumns="minmax(0, 1fr) fit-content(14rem) minmax(0, 20rem)" cellPadding="condensed" aria-label={label}>
+        <Table id={id} gridTemplateColumns="minmax(10rem, 1fr) fit-content(14rem) minmax(8rem, 20rem)" cellPadding="condensed" aria-label={label}>
           <Table.Head>
             <Table.Row>
               <Table.Header>{t("result.colName")}</Table.Header>

@@ -225,7 +225,7 @@ const WIDE = doneWith([
 ]);
 
 for (const lang of ["en", "ko"] as const) {
-  for (const width of [1024, 1280, 1440, 1536]) {
+  for (const width of [390, 1024, 1280, 1440, 1536]) {
     test(`layout at ${width}px (${lang}): nothing clipped, no ellipsis, no sideways scroll`, async ({ page }) => {
       await page.setViewportSize({ width, height: 900 });
       await open(page, WIDE, "/licenses", "light", lang);
@@ -237,10 +237,11 @@ for (const lang of ["en", "ko"] as const) {
           if (cs.textOverflow === "ellipsis") out.push(`ellipsis: ${el.tagName}.${el.className} ${el.outerHTML.slice(0, 120)}`);
           if (el.closest("svg") || el.closest(".bl-visually-hidden, [class*='VisuallyHidden']")) continue;
           const text = Array.from(el.childNodes).some((n) => n.nodeType === 3 && (n.textContent ?? "").trim());
-          if (text && el.scrollWidth > el.clientWidth + 1 && cs.display !== "inline") out.push(`clipped: ${el.tagName}.${el.className}`);
+          if (text && el.scrollWidth > el.clientWidth + 1 && cs.display !== "inline") out.push(`clipped: ${el.tagName}.${el.className} "${(el.textContent ?? "").slice(0, 30)}" ${el.scrollWidth}>${el.clientWidth}`);
         }
         const doc = document.documentElement;
         if (doc.scrollWidth > doc.clientWidth) out.push("page scrolls sideways");
+        if (root.scrollWidth > root.clientWidth) out.push("main scrolls sideways");
         return out;
       });
       expect(bad).toEqual([]);

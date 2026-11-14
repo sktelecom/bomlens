@@ -1141,6 +1141,20 @@ a.bl-sevcell:focus-visible { outline: 2px solid var(--focus-outlineColor); outli
 /* Tailwind's reset zeroes border-width over Primer's layered styles, so a Label
  * lost its outline here as on the other screens. Set it back. */
 .bl-lic [class*="prc-Label-Label"] { border-width: var(--borderWidth-thin); }
+.bl-lic { min-width: 0; }
+/* Nothing on this screen may widen the page. Long text wraps and tables scroll
+ * in their own box; this is the backstop, and the positioned context keeps
+ * visually hidden text from reaching outside it. */
+.bl-lic { position: relative; overflow-x: clip; }
+/* A box head holds a title, a count and a hint or a switch. Below about 480px
+ * they would squeeze the title to a few pixels and push the hint out of the
+ * box, so let the head wrap. */
+.bl-lic .bl-box-head { flex-wrap: wrap; row-gap: var(--base-size-4); }
+.bl-lic .bl-box-head h2 { overflow-wrap: anywhere; }
+.bl-lic .bl-box-head-end, .bl-lic-headtools { flex-wrap: wrap; min-width: 0; }
+.bl-lic [class*="prc-Label-Label"] { max-width: 100%; white-space: normal; overflow-wrap: anywhere; }
+/* A table that cannot fit a narrow window scrolls inside its box. */
+.bl-lic-table { overflow-x: auto; }
 .bl-lic-bar > button {
   display: block;
   padding: 0;
