@@ -2,45 +2,44 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import {
-  ArrowDown,
-  ArrowUp,
-  ArrowUpDown,
-  Cpu,
-  ExternalLink,
-  FileJson,
-  FolderOpen,
-  Plus,
-  ScanLine,
-  ScrollText,
-  Search,
-  ShieldCheck,
-  Trash2,
-  TrendingDown,
-  TrendingUp,
-} from "lucide-react";
-import { PlusIcon } from "@primer/octicons-react";
-import { Button } from "@primer/react";
-import { ScreenHeader } from "@/components/primer";
-import { type ReactNode, useMemo, useState } from "react";
+  AiModelIcon,
+  AlertIcon,
+  ArrowDownIcon,
+  ArrowUpIcon,
+  ContainerIcon,
+  CpuIcon,
+  FileCodeIcon,
+  FileDirectoryIcon,
+  FileIcon,
+  FileSubmoduleIcon,
+  type Icon,
+  KebabHorizontalIcon,
+  LawIcon,
+  LinkExternalIcon,
+  PlusIcon,
+  SearchIcon,
+  ShieldIcon,
+  TrashIcon,
+} from "@primer/octicons-react";
+import { ActionList, ActionMenu, Button, IconButton, Label, Link, TextInput, VisuallyHidden } from "@primer/react";
+import { Blankslate, Table } from "@primer/react/experimental";
+import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import { Badge } from "@/components/ui/badge";
-import { FOCUS_RING, SELECTED_SOLID } from "@/components/ui/selectable";
-import { buttonVariants } from "@/components/ui/button";
-import { demoUrl, IS_STATIC_DEMO } from "@/lib/demo";
-import { Card, CardContent } from "@/components/ui/card";
+import { ActiveFilters, FilterMenu, ScreenHeader, SeverityLabel, SortHeader } from "@/components/primer";
 import { DemoStartHere } from "@/components/DemoStartHere";
-import { Input } from "@/components/ui/input";
-import type { RecentScan, Severity } from "@/lib/api";
+import type { RecentScan } from "@/lib/api";
+import { demoUrl, IS_STATIC_DEMO } from "@/lib/demo";
+import { useFormatNumber } from "@/lib/format";
 import {
   filterRecent,
   formatRelativeTime,
   middleEllipsis,
   presentTypes,
-  scanComparison,
   type RecentSortDir,
   type RecentSortKey,
   type ScanType,
+  scanComparison,
   scanType,
   scanTypeLabelKey,
   scanTypeLabelKeyFor,
@@ -49,200 +48,204 @@ import {
 } from "@/lib/recent";
 import { scanHash } from "@/lib/route";
 import { NARROW_QUERY, useMediaQuery } from "@/lib/useMediaQuery";
-import { cn } from "@/lib/utils";
-import { useFormatNumber } from "@/lib/format";
 
 interface Props {
   scans: RecentScan[];
   /** Hash for the New scan screen (empty-state CTA). */
   newHref: string;
-  /** Delete a past scan (removes its artifacts from the output folder). */
+  /** Ask to delete a past scan (the confirm dialog in NextApp does the work). */
   onDelete: (id: string) => void;
 }
 
-const SEV_TONE: Record<
-  Severity,
-  "critical" | "high" | "medium" | "low" | "info"
-> = {
-  CRITICAL: "critical",
-  HIGH: "high",
-  MEDIUM: "medium",
-  LOW: "low",
-  UNKNOWN: "info",
+/** One icon per scan type, the same ones the New scan tiles use for that input. */
+const TYPE_ICON: Record<ScanType, Icon> = {
+  source: FileDirectoryIcon,
+  container: ContainerIcon,
+  rootfs: FileSubmoduleIcon,
+  firmware: CpuIcon,
+  ai: AiModelIcon,
+  sbom: FileCodeIcon,
 };
-
-const TH = "whitespace-nowrap px-4 py-3 text-left font-medium";
-
-/** Which way the worst severity moved since the previous run of this project.
- *  The arrow carries the meaning for sighted readers and the label carries it
- *  for everyone else, so it is not decorative. */
-function TrendArrow({ up, label }: { up: boolean; label: string }) {
-  const Icon = up ? TrendingUp : TrendingDown;
-  // Colours the aria-hidden Icon below via currentColor; the only visible
-  // text in this span is the sr-only label, read aloud, never seen.
-  const toneClass = up ? "text-risk-high" : "text-risk-low"; // token-lint-ignore
-  return (
-    <span title={label} className={toneClass}>
-      <Icon className="h-3.5 w-3.5" aria-hidden />
-      <span className="sr-only">{label}</span>
-    </span>
-  );
-}
-
-/** A pill toggle for the Scan management filters (AI only / at-risk only). */
-function FilterChip({
-  active,
-  onClick,
-  children,
-}: {
-  active: boolean;
-  onClick: () => void;
-  children: ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      aria-pressed={active}
-      onClick={onClick}
-      className={cn(
-        "inline-flex h-9 items-center rounded-md border px-3.5 text-body-sm",
-        "transition-[color,border-color,background-color,box-shadow] duration-fast ease-out-soft",
-        FOCUS_RING,
-        active
-          ? SELECTED_SOLID
-          : "border-input text-muted-foreground hover:bg-muted hover:text-foreground",
-      )}
-    >
-      {children}
-    </button>
-  );
-}
 
 /** Longest name shown in full before the middle is replaced with an ellipsis. */
 const NAME_MAX = 40;
 
 /**
- * A scan's name and version as one link label. A long name (a firmware image's
- * file name, say) is shortened in the middle so the start and the end both stay
- * readable and the version is never pushed out; the full text stays in the
- * tooltip and is what assistive technology reads.
+ * A scan's name and version as one link. A long name (a firmware image's file
+ * name, say) is shortened in the middle so the start and the end both stay
+ * readable and the version is never pushed out; the full text is the tooltip
+ * and is what assistive technology reads.
  */
-function ScanLabel({ scan }: { scan: RecentScan }) {
+function ScanName({ scan }: { scan: RecentScan }) {
   const shown = middleEllipsis(scan.project, NAME_MAX);
+  const cut = shown !== scan.project;
   const full = scan.version ? `${scan.project} @${scan.version}` : scan.project;
+  // One line: when the column is narrow the end of the line (the version first)
+  // gives way to an ellipsis, and the tooltip always holds both in full.
   return (
-    <span title={shown === scan.project ? undefined : full}>
-      <span aria-hidden={shown === scan.project ? undefined : true} className="font-medium text-foreground">
-        {shown}
-      </span>
-      {shown !== scan.project && <span className="sr-only">{scan.project}</span>}
+    <Link href={scanHash(scan.id)} title={full} className="bl-scanname">
+      <span aria-hidden={cut || undefined}>{shown}</span>
+      {cut && <VisuallyHidden>{scan.project}</VisuallyHidden>}
       {scan.version && (
-        <span className="text-muted-foreground">
+        <span className="bl-scanname-version">
           {" @"}
           {scan.version}
         </span>
       )}
+    </Link>
+  );
+}
+
+/** The type label, shared by the table and the stacked rows. */
+function TypeLabel({ scan }: { scan: RecentScan }) {
+  const { t } = useTranslation();
+  const TypeIcon = TYPE_ICON[scanType(scan)];
+  return (
+    <Label variant="secondary" className="bl-lbl">
+      <TypeIcon size={12} />
+      {t(scanTypeLabelKey(scan))}
+    </Label>
+  );
+}
+
+/** Which way the worst severity moved since the previous run of this project.
+ *  The arrow is paired with a label read aloud and shown as a tooltip. */
+function Trend({ up }: { up: boolean }) {
+  const { t } = useTranslation();
+  const label = t(up ? "recent.sevUp" : "recent.sevDown");
+  return (
+    <span title={label} className={`bl-trend ${up ? "bl-trend-up" : "bl-trend-down"}`}>
+      {up ? <ArrowUpIcon size={16} /> : <ArrowDownIcon size={16} />}
+      <VisuallyHidden>{label}</VisuallyHidden>
     </span>
   );
 }
 
-/** The type chip, shared by the table and the stacked rows. Every type is the
- *  same muted chip; an AI scan adds the icon its Models section uses in the
- *  rail, so it stands out without a heavier outline. */
-function TypeBadge({ scan }: { scan: RecentScan }) {
+function SeverityCell({ scan, all }: { scan: RecentScan; all: RecentScan[] }) {
+  const { t } = useTranslation();
+  const cmp = scanComparison(all, scan.id);
+  return (
+    <span className="bl-lbl-wrap">
+      {scan.refused && (
+        <Label variant="attention" title={t("recent.refusedHint")}>
+          {t("recent.refused")}
+        </Label>
+      )}
+      {scan.maxSeverity ? <SeverityLabel severity={scan.maxSeverity} /> : <span className="bl-muted">—</span>}
+      {cmp && cmp.severityDir !== "same" && <Trend up={cmp.severityDir === "up"} />}
+    </span>
+  );
+}
+
+/** Component count and, against the previous run of the same project, the
+ *  change. A project scanned once has nothing to compare against and shows no
+ *  change at all, rather than a "0" that would read as "unchanged". */
+function ComponentsCell({ scan, all }: { scan: RecentScan; all: RecentScan[] }) {
+  const { t } = useTranslation();
+  const fmt = useFormatNumber();
+  const cmp = scanComparison(all, scan.id);
+  return (
+    <span className="bl-num bl-compcell">
+      {fmt(scan.components)}
+      {/* A fixed slot, filled or not, so the counts share one right edge. */}
+      <span className="bl-muted bl-small bl-delta" title={cmp && cmp.componentsDelta !== 0 ? t("recent.vsPrevious") : undefined}>
+        {cmp && cmp.componentsDelta !== 0 && (
+          <>
+            {cmp.componentsDelta > 0 ? "+" : ""}
+            {fmt(cmp.componentsDelta)}
+            <VisuallyHidden> ({t("recent.vsPrevious")})</VisuallyHidden>
+          </>
+        )}
+      </span>
+    </span>
+  );
+}
+
+/** The row's actions. Delete is the only one today; it asks first. */
+function RowMenu({ scan, onDelete }: { scan: RecentScan; onDelete: (id: string) => void }) {
+  const { t } = useTranslation();
+  const name = [scan.project, scan.version].filter(Boolean).join(" ");
+  return (
+    <ActionMenu>
+      <ActionMenu.Anchor>
+        <IconButton icon={KebabHorizontalIcon} variant="invisible" size="small" aria-label={t("recent.moreActions", { name })} />
+      </ActionMenu.Anchor>
+      <ActionMenu.Overlay width="small">
+        <ActionList>
+          <ActionList.Item variant="danger" onSelect={() => onDelete(scan.id)}>
+            <ActionList.LeadingVisual>
+              <TrashIcon />
+            </ActionList.LeadingVisual>
+            {t("recent.delete")}
+          </ActionList.Item>
+        </ActionList>
+      </ActionMenu.Overlay>
+    </ActionMenu>
+  );
+}
+
+function RecentHeader({ newHref, withAction }: { newHref: string; withAction: boolean }) {
   const { t } = useTranslation();
   return (
-    <Badge variant="muted">
-      {scanType(scan) === "ai" && <Cpu className="h-3 w-3" aria-hidden />}
-      {t(scanTypeLabelKey(scan))}
-    </Badge>
+    <ScreenHeader
+      title={t("recent.title")}
+      description={t(IS_STATIC_DEMO ? "recent.demoSubtitle" : "recent.subtitle")}
+      actions={
+        // The empty list carries its own New scan call to action; the
+        // read-only demo cannot scan.
+        withAction && !IS_STATIC_DEMO ? (
+          <Button as="a" href={newHref} variant="primary" leadingVisual={PlusIcon} data-testid="recent-new-scan">
+            {t("shell.newScan")}
+          </Button>
+        ) : undefined
+      }
+    />
   );
 }
 
 /**
- * The narrow-screen form of the scan list: one stacked row per scan instead of
- * a five-column table that would run off the edge. Name and version on top,
- * the type and severity chips under it, then component count and date as
- * secondary text. Sorting is the default (newest first) on this layout.
+ * First-run screen: the empty list is what a new user sees first, so orient
+ * them: what BomLens does, how to start, and what it produces.
  */
-function ScanRows({
-  scans,
-  all,
-  now,
-  onDelete,
-}: {
-  scans: RecentScan[];
-  all: RecentScan[];
-  now: number;
-  onDelete: (id: string) => void;
-}) {
-  const { t, i18n } = useTranslation();
-  if (scans.length === 0) {
-    return (
-      <p className="px-4 py-8 text-center text-body-sm text-muted-foreground">
-        {t("recent.noMatch")}
-      </p>
-    );
-  }
+function RecentEmpty({ newHref }: { newHref: string }) {
+  const { t } = useTranslation();
   return (
-    <ul>
-      {scans.map((s) => {
-        const cmp = scanComparison(all, s.id);
-        return (
-          <li
-            key={s.id}
-            className="flex items-start gap-2 border-b px-4 py-3 last:border-0"
-          >
-            <div className="min-w-0 flex-1 space-y-1.5">
-              <a
-                href={scanHash(s.id)}
-                className="block break-words rounded text-body-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-              >
-                <ScanLabel scan={s} />
-              </a>
-              <div className="flex flex-wrap items-center gap-1.5">
-                <TypeBadge scan={s} />
-                {s.refused && (
-                  <Badge tone="critical" title={t("recent.refusedHint")}>
-                    {t("recent.refused")}
-                  </Badge>
-                )}
-                {s.maxSeverity ? (
-                  <Badge tone={SEV_TONE[s.maxSeverity]} mark>
-                    {t(`severity.${s.maxSeverity}`)}
-                  </Badge>
-                ) : null}
-                {cmp && cmp.severityDir !== "same" && (
-                  <TrendArrow
-                    up={cmp.severityDir === "up"}
-                    label={t(
-                      cmp.severityDir === "up" ? "recent.sevUp" : "recent.sevDown",
-                    )}
-                  />
-                )}
-              </div>
-              <p className="text-label tabular-nums text-muted-foreground">
-                {t("recent.rowMeta", {
-                  count: s.components,
-                  date: formatRelativeTime(s.generatedAt, now, i18n.language),
-                })}
-              </p>
+    <div className="bl-scanmgmt">
+      <RecentHeader newHref={newHref} withAction={false} />
+      <div className="bl-box" style={{ marginTop: "var(--base-size-16)" }}>
+        <Blankslate spacious>
+          <Blankslate.Visual>
+            <ShieldIcon size={32} />
+          </Blankslate.Visual>
+          <Blankslate.Heading as="h2">{t("recent.emptyTitle")}</Blankslate.Heading>
+          <Blankslate.Description>{t("recent.emptyBody")}</Blankslate.Description>
+          <Blankslate.PrimaryAction href={newHref}>{t("shell.newScan")}</Blankslate.PrimaryAction>
+          {/* A second way in for someone who wants to see a result before
+              scanning anything of their own. */}
+          {!IS_STATIC_DEMO && (
+            <div style={{ marginTop: "var(--base-size-16)" }}>
+              <Link href={demoUrl()} target="_blank" rel="noreferrer noopener" data-testid="empty-demo-link" className="bl-extlink">
+                {t("recent.emptyDemo")} <LinkExternalIcon size={12} />
+              </Link>
             </div>
-            {!IS_STATIC_DEMO && (
-              <button
-                type="button"
-                onClick={() => onDelete(s.id)}
-                aria-label={t("recent.delete")}
-                title={t("recent.delete")}
-                className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors duration-fast ease-out-soft hover:bg-destructive/10 hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-              >
-                <Trash2 className="h-4 w-4" aria-hidden />
-              </button>
-            )}
-          </li>
-        );
-      })}
-    </ul>
+          )}
+          <ul className="bl-emptyouts">
+            {[
+              { Icon: FileIcon, label: t("recent.emptyOutSbom") },
+              { Icon: LawIcon, label: t("recent.emptyOutNotice") },
+              { Icon: ShieldIcon, label: t("recent.emptyOutSecurity") },
+            ].map(({ Icon, label }) => (
+              <li key={label}>
+                <Label variant="secondary" className="bl-lbl">
+                  <Icon size={12} />
+                  {label}
+                </Label>
+              </li>
+            ))}
+          </ul>
+        </Blankslate>
+      </div>
+    </div>
   );
 }
 
@@ -251,325 +254,202 @@ interface RecentSort {
   dir: RecentSortDir;
 }
 
-function SortHeader({
-  label,
-  sortKey,
-  sort,
-  onSort,
-  className,
-}: {
-  label: string;
-  sortKey: RecentSortKey;
-  sort: RecentSort;
-  onSort: (key: RecentSortKey) => void;
-  className?: string;
-}) {
-  const active = sort.key === sortKey;
-  const Icon = !active ? ArrowUpDown : sort.dir === "asc" ? ArrowUp : ArrowDown;
-  return (
-    <th
-      // Left by default, like the plain headers (TH) and the cells under them;
-      // a numeric column passes text-right.
-      className={cn("whitespace-nowrap px-4 py-3 text-left font-medium", className)}
-      aria-sort={active ? (sort.dir === "asc" ? "ascending" : "descending") : "none"}
-    >
-      <button
-        type="button"
-        onClick={() => onSort(sortKey)}
-        className="inline-flex items-center gap-1 rounded hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-      >
-        {label}
-        <Icon
-          className={cn("h-3 w-3", active ? "text-foreground" : "text-muted-foreground/60")}
-          aria-hidden
-        />
-      </button>
-    </th>
-  );
-}
-
 /**
- * Recent scans — the home screen (logo / `#/` target). A light summary strip
- * over a table of past local scans. Every figure is computed from real
- * `/scans` data; Type is AI-vs-SBOM only (no invented Source/Firmware split),
- * and there is no Review column — the data isn't there to fill it honestly.
+ * Scan management, the home screen (logo / `#/` target): the past local scans
+ * with search, an at-risk toggle, a type filter and sortable columns. Every
+ * figure is computed from the real `/scans` list; Type is derived only from
+ * signals the data carries (see lib/recent.ts).
  */
 export function RecentScans({ scans, newHref, onDelete }: Props) {
   const { t, i18n } = useTranslation();
   const fmt = useFormatNumber();
-  const summary = summarizeRecent(scans);
   const narrow = useMediaQuery(NARROW_QUERY);
   const now = Date.now();
   const [sort, setSort] = useState<RecentSort>({ key: "generated", dir: "desc" });
   const [query, setQuery] = useState("");
   const [type, setType] = useState<ScanType | "all">("all");
   const [atRisk, setAtRisk] = useState(false);
+  const summary = useMemo(() => summarizeRecent(scans), [scans]);
   const types = useMemo(() => presentTypes(scans), [scans]);
   const filtering = query.trim() !== "" || type !== "all" || atRisk;
-  const sorted = useMemo(
-    () =>
-      sortRecent(filterRecent(scans, { query, type, atRisk }), sort.key, sort.dir),
+  const rows = useMemo(
+    () => sortRecent(filterRecent(scans, { query, type, atRisk }), sort.key, sort.dir),
     [scans, query, type, atRisk, sort],
   );
   const onSort = (key: RecentSortKey) =>
-    setSort((s) =>
-      s.key === key ? { key, dir: s.dir === "asc" ? "desc" : "asc" } : { key, dir: "desc" },
-    );
+    setSort((s) => (s.key === key ? { key, dir: s.dir === "asc" ? "desc" : "asc" } : { key, dir: "desc" }));
+  const sortHeader = (key: RecentSortKey, label: string, align?: "end") => (
+    <SortHeader label={label} active={sort.key === key} dir={sort.dir} onSort={() => onSort(key)} align={align} />
+  );
+
+  if (scans.length === 0) return <RecentEmpty newHref={newHref} />;
+
+  const chips = [
+    ...(query.trim() ? [{ key: "q", label: t("recent.searchChip", { query: query.trim() }), onRemove: () => setQuery("") }] : []),
+    ...(atRisk ? [{ key: "risk", label: t("recent.atRisk"), onRemove: () => setAtRisk(false) }] : []),
+    ...(type !== "all" ? [{ key: "type", label: t(scanTypeLabelKeyFor(type)), onRemove: () => setType("all") }] : []),
+  ];
+  const clearAll = () => {
+    setQuery("");
+    setAtRisk(false);
+    setType("all");
+  };
 
   return (
-    <div className="space-y-6">
-      <ScreenHeader
-        title={t("recent.title")}
-        description={t(IS_STATIC_DEMO ? "recent.demoSubtitle" : "recent.subtitle")}
-        actions={
-          // The empty list carries its own New scan call to action; the
-          // read-only demo cannot scan.
-          scans.length > 0 && !IS_STATIC_DEMO ? (
-            <Button as="a" href={newHref} variant="primary" leadingVisual={PlusIcon} data-testid="recent-new-scan">
-              {t("shell.newScan")}
-            </Button>
-          ) : undefined
-        }
+    <div className="bl-scanmgmt">
+      <RecentHeader newHref={newHref} withAction />
+      {IS_STATIC_DEMO && <DemoStartHere scans={scans} />}
+      <div className="bl-filterbar">
+        <TextInput
+          type="search"
+          leadingVisual={SearchIcon}
+          placeholder={t("recent.searchPlaceholder")}
+          aria-label={t("recent.searchPlaceholder")}
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          className="bl-filterbar-search"
+        />
+        {/* The at-risk filter is a toggle with its count on it. It stays while
+            active so it can be turned off. */}
+        {(summary.atRisk > 0 || atRisk) && (
+          <Button
+            aria-pressed={atRisk}
+            onClick={() => setAtRisk((v) => !v)}
+            leadingVisual={AlertIcon}
+            count={fmt(summary.atRisk)}
+            className={atRisk ? "bl-toggle-on" : undefined}
+          >
+            {t("recent.atRisk")}
+          </Button>
+        )}
+        {/* The type filter only when there is more than one type to choose between. */}
+        {types.length > 1 && (
+          <FilterMenu
+            name={t("recent.colType")}
+            allLabel={t("result.allTypes")}
+            value={type === "all" ? "" : type}
+            onChange={(v) => setType((v || "all") as ScanType | "all")}
+            options={types.map((ty) => ({
+              value: ty,
+              text: t(scanTypeLabelKeyFor(ty)),
+              count: scans.filter((s) => scanType(s) === ty).length,
+            }))}
+          />
+        )}
+        <span className="bl-grow" />
+        {/* Totals: plain text, not controls. */}
+        <span className="bl-totals bl-muted bl-num">
+          <span>
+            {t("recent.total")} <strong>{fmt(summary.total)}</strong>
+          </span>
+          <span aria-hidden>·</span>
+          <span>
+            {t("recent.projects")} <strong>{fmt(summary.projects)}</strong>
+          </span>
+        </span>
+      </div>
+      <ActiveFilters
+        chips={chips}
+        onClear={clearAll}
+        summary={filtering && rows.length > 0 ? t("recent.shown", { shown: rows.length, total: scans.length }) : undefined}
       />
 
-      {scans.length === 0 ? (
-        // First-run hero: this empty Recent list is what a new user sees first,
-        // so orient them — what BomLens does, how to start, and what it produces.
-        <Card>
-          <CardContent className="flex flex-col items-center gap-5 px-6 py-12 text-center">
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-muted text-foreground">
-              <ScanLine className="h-6 w-6" aria-hidden />
-            </div>
-            <div className="space-y-1.5">
-              <h2 className="text-title font-semibold tracking-tight text-foreground">
-                {t("recent.emptyTitle")}
-              </h2>
-              <p className="mx-auto max-w-md text-body-sm text-muted-foreground">
-                {t("recent.emptyBody")}
-              </p>
-            </div>
-            <a href={newHref} className={cn(buttonVariants())}>
-              <Plus className="h-4 w-4" aria-hidden />
-              {t("shell.newScan")}
-            </a>
-            {/* A second way in for someone who wants to see a result before
-                scanning anything of their own. */}
-            {!IS_STATIC_DEMO && (
-              <a
-                href={demoUrl()}
-                target="_blank"
-                rel="noreferrer noopener"
-                data-testid="empty-demo-link"
-                className="inline-flex items-center gap-1.5 text-body-sm font-medium text-foreground underline underline-offset-2 hover:no-underline"
-              >
-                {t("recent.emptyDemo")}
-                <ExternalLink className="h-3.5 w-3.5" aria-hidden />
-              </a>
-            )}
-            <ul className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1.5 text-label text-muted-foreground">
-              {[
-                { icon: FileJson, label: t("recent.emptyOutSbom") },
-                { icon: ScrollText, label: t("recent.emptyOutNotice") },
-                { icon: ShieldCheck, label: t("recent.emptyOutSecurity") },
-              ].map(({ icon: Icon, label }) => (
-                <li key={label} className="inline-flex items-center gap-1.5">
-                  <Icon className="h-3.5 w-3.5 opacity-70" aria-hidden />
-                  {label}
-                </li>
-              ))}
-            </ul>
-          </CardContent>
-        </Card>
+      {rows.length === 0 ? (
+        <div className="bl-box">
+          <Blankslate>
+            <Blankslate.Visual>
+              <SearchIcon size={24} />
+            </Blankslate.Visual>
+            <Blankslate.Heading as="h2">{t("recent.noMatch")}</Blankslate.Heading>
+            <Blankslate.Description>{t("recent.noMatchHint")}</Blankslate.Description>
+            <Button onClick={clearAll}>{t("result.clearFilters")}</Button>
+          </Blankslate>
+        </div>
+      ) : narrow ? (
+        <ul className="bl-box bl-rows">
+          {rows.map((s) => (
+            <li key={s.id} className="bl-row">
+              <div className="bl-row-main">
+                <ScanName scan={s} />
+                <span className="bl-row-tags">
+                  <TypeLabel scan={s} />
+                  <SeverityCell scan={s} all={scans} />
+                </span>
+                <span className="bl-muted bl-small bl-num">
+                  {t("recent.rowMeta", { count: s.components, date: formatRelativeTime(s.generatedAt, now, i18n.language) })}
+                </span>
+              </div>
+              {/* The demo's data is fixed, so nothing there can be deleted. */}
+              {!IS_STATIC_DEMO && <RowMenu scan={s} onDelete={onDelete} />}
+            </li>
+          ))}
+        </ul>
       ) : (
-        <>
-          {IS_STATIC_DEMO && <DemoStartHere scans={scans} />}
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="relative">
-              <Search
-                className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
-                aria-hidden
-              />
-              <Input
-                type="search"
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder={t("recent.searchPlaceholder")}
-                aria-label={t("recent.searchPlaceholder")}
-                className="h-9 w-56 rounded-md pl-8"
-              />
-            </div>
-            {/* The at-risk filter is a chip like the type chips, with its count on
-                it. It stays while active so it can be turned off. */}
-            {(summary.atRisk > 0 || atRisk) && (
-              <FilterChip active={atRisk} onClick={() => setAtRisk((v) => !v)}>
-                {t("recent.atRisk")}
-                <span className="ml-1.5 tabular-nums">{fmt(summary.atRisk)}</span>
-              </FilterChip>
-            )}
-            {/* Type chips only when there's more than one type to choose between. */}
-            {types.length > 1 &&
-              types.map((ty) => (
-                <FilterChip
-                  key={ty}
-                  active={type === ty}
-                  onClick={() => setType((cur) => (cur === ty ? "all" : ty))}
-                >
-                  {t(scanTypeLabelKeyFor(ty))}
-                </FilterChip>
-              ))}
-            {filtering && (
-              <span className="text-label tabular-nums text-muted-foreground">
-                {t("recent.shown", { shown: sorted.length, total: scans.length })}
-              </span>
-            )}
-            {/* Totals: plain text, not controls. */}
-            <span className="ml-auto flex gap-4 text-label tabular-nums text-muted-foreground">
-              <span>
-                {t("recent.total")} {fmt(summary.total)}
-              </span>
-              <span>
-                {t("recent.projects")} {fmt(summary.projects)}
-              </span>
-            </span>
-          </div>
-
-          <Card>
-            <CardContent className="p-0">
-              {narrow ? (
-                <ScanRows scans={sorted} all={scans} now={now} onDelete={onDelete} />
-              ) : (
-              <table className="w-full text-body-sm">
-                <thead>
-                  <tr className="border-b text-label text-muted-foreground">
-                    <SortHeader label={t("recent.colScan")} sortKey="scan" sort={sort} onSort={onSort} />
-                    <th className={TH}>{t("recent.colType")}</th>
-                    <SortHeader label={t("recent.colGenerated")} sortKey="generated" sort={sort} onSort={onSort} />
-                    <SortHeader
-                      label={t("recent.colComponents")}
-                      sortKey="components"
-                      sort={sort}
-                      onSort={onSort}
-                      className="text-right"
-                    />
-                    <SortHeader label={t("recent.colSeverity")} sortKey="severity" sort={sort} onSort={onSort} />
-                    {!IS_STATIC_DEMO && (
-                      <th className={cn(TH, "text-right")}>
-                        <span className="sr-only">{t("recent.delete")}</span>
-                      </th>
-                    )}
-                  </tr>
-                </thead>
-                <tbody>
-                  {sorted.length === 0 ? (
-                    <tr>
-                      <td
-                        colSpan={6}
-                        className="px-4 py-8 text-center text-body-sm text-muted-foreground"
-                      >
-                        {t("recent.noMatch")}
-                      </td>
-                    </tr>
-                  ) : (
-                    sorted.map((s) => {
-                      const cmp = scanComparison(scans, s.id);
-                      return (
-                    <tr
-                      key={s.id}
-                      className="border-b transition-colors duration-fast ease-out-soft last:border-0 hover:bg-muted/40"
+        <Table.Container className="bl-scantbl">
+          <Table
+            aria-label={t("recent.title")}
+            gridTemplateColumns={`minmax(15rem, 1fr) auto auto auto auto${IS_STATIC_DEMO ? "" : " 3.5rem"}`}
+          >
+            <Table.Head>
+              <Table.Row>
+                {sortHeader("scan", t("recent.colScan"))}
+                <Table.Header>{t("recent.colType")}</Table.Header>
+                {sortHeader("generated", t("recent.colGenerated"))}
+                {sortHeader("components", t("recent.colComponents"), "end")}
+                {sortHeader("severity", t("recent.colSeverity"))}
+                {/* The demo's data is fixed, so the whole column goes, header
+                    included, or the row would gain a blank cell. */}
+                {!IS_STATIC_DEMO && (
+                  <Table.Header>
+                    <VisuallyHidden>{t("recent.colActions")}</VisuallyHidden>
+                  </Table.Header>
+                )}
+              </Table.Row>
+            </Table.Head>
+            <Table.Body>
+              {rows.map((s) => (
+                <Table.Row key={s.id}>
+                  <Table.Cell>
+                    <ScanName scan={s} />
+                  </Table.Cell>
+                  <Table.Cell>
+                    <TypeLabel scan={s} />
+                  </Table.Cell>
+                  <Table.Cell>
+                    <time
+                      dateTime={new Date(s.generatedAt * 1000).toISOString()}
+                      title={new Date(s.generatedAt * 1000).toLocaleString(i18n.language)}
+                      className="bl-muted bl-nowrap"
                     >
-                      <td className="px-4 py-3">
-                        <a
-                          href={scanHash(s.id)}
-                          className="rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                        >
-                          <ScanLabel scan={s} />
-                        </a>
-                      </td>
-                      <td className="px-4 py-3">
-                        <TypeBadge scan={s} />
-                      </td>
-                      <td className="px-4 py-3 text-muted-foreground">
-                        {formatRelativeTime(s.generatedAt, now, i18n.language)}
-                      </td>
-                      {/* Against the previous run of the same project, from
-                          this list alone — no SBOM is re-read. A project scanned
-                          once has nothing to compare against and shows nothing,
-                          rather than a "0" that would read as "unchanged". */}
-                      <td className="px-4 py-3 text-right tabular-nums">
-                        {fmt(s.components)}
-                        {cmp && cmp.componentsDelta !== 0 && (
-                          <span
-                            className="ml-1.5 text-label text-muted-foreground"
-                            title={t("recent.vsPrevious")}
-                          >
-                            {cmp.componentsDelta > 0 ? "+" : ""}
-                            {fmt(cmp.componentsDelta)}
-                          </span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className="inline-flex items-center gap-1.5">
-                          {s.refused && (
-                            <Badge tone="critical" title={t("recent.refusedHint")}>
-                              {t("recent.refused")}
-                            </Badge>
-                          )}
-                          {s.maxSeverity ? (
-                            <Badge tone={SEV_TONE[s.maxSeverity]} mark>
-                              {t(`severity.${s.maxSeverity}`)}
-                            </Badge>
-                          ) : (
-                            <span className="text-muted-foreground">—</span>
-                          )}
-                          {cmp && cmp.severityDir !== "same" && (
-                            <TrendArrow
-                              up={cmp.severityDir === "up"}
-                              label={t(
-                                cmp.severityDir === "up"
-                                  ? "recent.sevUp"
-                                  : "recent.sevDown",
-                              )}
-                            />
-                          )}
-                        </span>
-                      </td>
-                      {/* The demo dataset is fixed, so the whole column goes —
-                          header included, or the row would gain a blank cell. */}
-                      {!IS_STATIC_DEMO && (
-                        <td className="px-4 py-3 text-right">
-                          <button
-                            type="button"
-                            onClick={() => onDelete(s.id)}
-                            aria-label={t("recent.delete")}
-                            title={t("recent.delete")}
-                            className="inline-flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground transition-colors duration-fast ease-out-soft hover:bg-destructive/10 hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                          >
-                            <Trash2 className="h-4 w-4" aria-hidden />
-                          </button>
-                        </td>
-                      )}
-                    </tr>
-                    );
-                    })
+                      {formatRelativeTime(s.generatedAt, now, i18n.language)}
+                    </time>
+                  </Table.Cell>
+                  <Table.Cell align="end">
+                    <ComponentsCell scan={s} all={scans} />
+                  </Table.Cell>
+                  <Table.Cell>
+                    <SeverityCell scan={s} all={scans} />
+                  </Table.Cell>
+                  {!IS_STATIC_DEMO && (
+                    <Table.Cell align="end">
+                      <RowMenu scan={s} onDelete={onDelete} />
+                    </Table.Cell>
                   )}
-                </tbody>
-              </table>
-              )}
-            </CardContent>
-          </Card>
+                </Table.Row>
+              ))}
+            </Table.Body>
+          </Table>
+        </Table.Container>
+      )}
 
-          {/* Where the list comes from — true of a local run, false of the
-              demo, whose list is a fixed capture and not a folder on disk. */}
-          {!IS_STATIC_DEMO && (
-            <p className="flex items-center gap-1.5 text-body-sm text-muted-foreground">
-              <FolderOpen className="h-3.5 w-3.5" aria-hidden />
-              <code className="rounded bg-muted px-1.5 py-0.5 font-mono">
-                ~/sbom-output
-              </code>
-              <span>{t("recent.source")}</span>
-            </p>
-          )}
-        </>
+      {/* Where the list comes from: true of a local run, false of the demo,
+          whose list is a fixed capture and not a folder on disk. */}
+      {!IS_STATIC_DEMO && (
+        <p className="bl-muted bl-small bl-sourcenote">
+          <FileDirectoryIcon size={14} />
+          <code className="bl-code">~/sbom-output</code>
+          <span>{t("recent.source")}</span>
+        </p>
       )}
     </div>
   );

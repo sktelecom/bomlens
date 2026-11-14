@@ -88,12 +88,18 @@ async function stub(page: Page) {
   return deletes;
 }
 
+/** The row's delete lives in its menu: open the menu, choose Delete. */
+async function deleteFromRow(page: Page) {
+  await page.getByRole("button", { name: /^More actions for/ }).first().click();
+  await page.getByRole("menuitem", { name: "Delete" }).click();
+}
+
 test("deleting a scan asks first, and cancelling sends nothing", async ({ page }) => {
   const deletes = await stub(page);
   await page.goto("/?ui=next#/");
   await expect(page.getByRole("heading", { name: "Scan management" })).toBeVisible();
 
-  await page.getByRole("button", { name: "Delete" }).first().click();
+  await deleteFromRow(page);
 
   // The prompt names the scan and warns that the files go.
   const dialog = page.getByRole("dialog");
@@ -113,7 +119,7 @@ test("deleting a scan asks first, and cancelling sends nothing", async ({ page }
 test("confirming the prompt deletes the scan and says so", async ({ page }) => {
   const deletes = await stub(page);
   await page.goto("/?ui=next#/");
-  await page.getByRole("button", { name: "Delete" }).first().click();
+  await deleteFromRow(page);
 
   // The confirm button carries the destructive verb, not a bare "OK".
   await page.getByRole("dialog").getByRole("button", { name: "Delete" }).click();
@@ -126,7 +132,7 @@ test("confirming the prompt deletes the scan and says so", async ({ page }) => {
 test("Escape dismisses the prompt without deleting", async ({ page }) => {
   const deletes = await stub(page);
   await page.goto("/?ui=next#/");
-  await page.getByRole("button", { name: "Delete" }).first().click();
+  await deleteFromRow(page);
   await expect(page.getByRole("dialog")).toBeVisible();
 
   await page.keyboard.press("Escape");
@@ -137,7 +143,7 @@ test("Escape dismisses the prompt without deleting", async ({ page }) => {
 test("the prompt is accessible", async ({ page }) => {
   await stub(page);
   await page.goto("/?ui=next#/");
-  await page.getByRole("button", { name: "Delete" }).first().click();
+  await deleteFromRow(page);
   await expect(page.getByRole("dialog")).toBeVisible();
   // The panel fades in; a contrast check taken mid-fade reads blended colours.
   await waitForSettled(page.getByRole("dialog"));

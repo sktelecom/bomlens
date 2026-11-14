@@ -3,7 +3,7 @@
 
 import { Spinner } from "@primer/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useTranslation } from "react-i18next";
+import { Trans, useTranslation } from "react-i18next";
 
 import { AppShell } from "./AppShell";
 import type { NavPlace } from "./Sidebar";
@@ -459,8 +459,18 @@ export function NextApp() {
     const id = pendingDelete;
     setPendingDelete(null);
     if (!id) return;
-    void deleteScan(id).then((ok) => {
-      void refreshRecent();
+    void deleteScan(id).then(async (ok) => {
+      const stayedOnList = homeViewRef.current === "recent" && loadedIdRef.current === null;
+      await refreshRecent().catch(() => undefined);
+      if (ok && stayedOnList) {
+        // The row that held focus is gone; put it on the list's heading rather
+        // than letting it fall to the start of the document.
+        const heading = document.querySelector<HTMLElement>("main h1");
+        if (heading) {
+          heading.tabIndex = -1;
+          heading.focus();
+        }
+      }
       if (!ok) {
         toast(t("recent.deleteFailed"));
         return;
@@ -874,7 +884,7 @@ export function NextApp() {
       <ConfirmDialog
         open={pendingDelete !== null}
         title={t("recent.confirmDeleteTitle")}
-        description={t("recent.confirmDeleteBody", { scan: pendingLabel })}
+        description={<Trans i18nKey="recent.confirmDeleteBody" values={{ scan: pendingLabel }} components={{ b: <strong className="font-semibold text-foreground" /> }} />}
         confirmLabel={t("recent.delete")}
         destructive
         onConfirm={confirmDelete}
