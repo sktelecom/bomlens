@@ -666,7 +666,7 @@ export function ScanOptions({ state }: { state: ScanFormState }) {
         </>
       )}
       {showResolveModels && (
-        <ToggleRow
+        <Toggle
           labelKey="resolveModels"
           checked={resolveModels}
           onChange={setResolveModels}
