@@ -9371,9 +9371,25 @@ _gs_run sh '#!/bin/sh'
     && pass "a gradlew whose first line names sh runs through sh" \
     || fail "sh shebang: shells [$(tr '\n' ';' < "$GS_ROOT/shells" 2>/dev/null)]" "$(grep 'gradle:' "$GS_ROOT/log" | head -3)"
 _gs_run none ''
-{ grep -q '^sh \./gradlew ' "$GS_ROOT/shells" 2>/dev/null && ! grep -q '^bash \./gradlew ' "$GS_ROOT/shells"; } \
+{ grep -q '^sh \./gradlew ' "$GS_ROOT/shells" 2>/dev/null && ! grep -q '^bash \./gradlew ' "$GS_ROOT/shells" \
+    && grep -q '^\[build-prep\] gradle: sh \./gradlew runs ' "$GS_ROOT/log"; } \
     && pass "a gradlew with no shebang runs through sh" \
     || fail "no shebang: shells [$(tr '\n' ';' < "$GS_ROOT/shells" 2>/dev/null)]" "$(grep 'gradle:' "$GS_ROOT/log" | head -3)"
+# The helper alone, with a PATH that has head but no bash (or has both): a bash
+# shebang falls back to sh when bash is not installed. An empty PATH would
+# also give sh, by head being missing, so head stays.
+_ws_fn="$(awk '/^wrapper_shell\(\) \{/ {p=1} p {print} p && /^}$/ {exit}' "$LIB/build-prep.sh")"
+_ws_dir="$WORK/wrapper-shell-path"; mkdir -p "$_ws_dir"
+ln -sf "$(command -v head)" "$_ws_dir/head"
+printf '#!/usr/bin/env bash\nexit 0\n' > "$WORK/wrapper-shell-bash"
+_ws_nobash="$(PATH="$_ws_dir" /bin/sh -c "$_ws_fn"'
+wrapper_shell "$1"' _ "$WORK/wrapper-shell-bash")"
+ln -sf "$(command -v bash)" "$_ws_dir/bash"
+_ws_withbash="$(PATH="$_ws_dir" /bin/sh -c "$_ws_fn"'
+wrapper_shell "$1"' _ "$WORK/wrapper-shell-bash")"
+[ "$_ws_nobash" = sh ] && [ "$_ws_withbash" = bash ] \
+    && pass "a bash shebang runs through sh when bash is not installed, and through bash when it is" \
+    || fail "wrapper_shell without bash [$_ws_nobash], with bash [$_ws_withbash]"
 
 echo "== gradle: cdxgen reads the POMs Gradle downloaded (GRADLE_CACHE_DIR) =="
 # HOME is not the account home Gradle uses, so cdxgen is told where Gradle's
