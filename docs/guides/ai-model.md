@@ -432,6 +432,23 @@ The summary is not the model's own SBOM, which needs the model card and the chec
 
 The model is then linked to the file with a CycloneDX BOM-Link (`externalReferences` of type `bom`, `urn:cdx:<serial number>/<version>#<bom-ref>`), so a reader of the source SBOM can find the full one. The link points at the document by its serial number, so keep the model SBOM with the source SBOM when you pass them on. A file with no serial number, or one that matches no model the code references, is reported and left out. The summary's licence and weight files are read from the hub at scan time; the linked SBOM is the one to rely on for a complete picture.
 
+## AI BOMs from other tools
+
+`--analyze` reads an AI BOM that another tool wrote and runs the same G7 check and risk assessment on it. Samples of four tools were checked: the k8s-aibom CycloneDX output, AIsbom, Cisco AI BOM and AIBoMGen CLI. None of them fills most of the G7 elements, so the report shows many of them as missing. That is the content of the file, not a fault of the reading.
+
+A few values sit where the G7 check did not look before, and are read now. The detail line of such an element says `also read from` and names the source, and the result carries it in `via`.
+
+| Element | Read from | Tool |
+|---|---|---|
+| Model identifier | `aisbom:hf:repo_id` | AIsbom |
+| Model licence | `aisbom:hf:license` | AIsbom |
+| Model version | `aisbom:hf:revision`, `k8s-aibom:model:revision` | AIsbom, k8s-aibom |
+| SBOM generation context | `metadata.lifecycles` (a CycloneDX field) | k8s-aibom, AIBoMGen CLI |
+
+AIsbom leaves the hub's licence out of `licenses[]` on purpose, so that a licence verdict does not change on its own. BomLens counts it as present and passes it to the risk assessment only while `licenses[]` is empty; `licenses[]` wins when both exist. The value is what the hub page declares, and BomLens does not check it.
+
+The rest of what these tools write has no G7 element to land on: Cisco AI BOM lists agents and MCP servers as `application` components, and k8s-aibom records the workload that runs the model. They stay in the file and in the component list.
+
 ## Limits
 
 - A model the tool cannot read produces no SBOM at all. The generator fills the card with generic defaults when a fetch fails, so BomLens checks its log and refuses the run rather than handing back an inventory of placeholders that would read as a pass.

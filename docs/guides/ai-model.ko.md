@@ -432,6 +432,23 @@ MCP 서버에 넘기는 환경 변수 값과 헤더(토큰 등), 프롬프트 �
 
 그러면 모델이 CycloneDX BOM-Link(`externalReferences` 유형 `bom`, `urn:cdx:<일련번호>/<버전>#<bom-ref>`)로 그 파일과 연결되어, 소스 SBOM을 읽는 쪽이 전체 SBOM을 찾을 수 있습니다. 링크는 문서를 일련번호로 가리키므로, 소스 SBOM을 전달할 때 모델 SBOM도 함께 전달합니다. 일련번호가 없는 파일이나 코드가 참조하지 않는 모델의 파일은 알리고 제외합니다. 요약의 라이선스와 가중치 파일은 스캔 시점에 허브에서 읽은 값이므로, 완전한 정보는 연결된 SBOM을 기준으로 봅니다.
 
+## 다른 도구가 만든 AI BOM
+
+`--analyze`는 다른 도구가 만든 AI BOM도 읽어 같은 G7 점검과 위험 판정을 돌립니다. k8s-aibom의 CycloneDX 출력, AIsbom, Cisco AI BOM, AIBoMGen CLI 네 가지 도구의 시료로 확인했습니다. 어느 도구도 G7 항목 대부분을 채우지 않으므로 보고서에는 없음으로 나오는 항목이 많습니다. 이는 파일에 든 내용이 그렇다는 뜻이며 읽기가 잘못된 것이 아닙니다.
+
+일부 값은 G7 점검이 예전에 보지 않던 자리에 들어 있어서, 이제 그 자리에서도 읽습니다. 이렇게 채워진 항목의 상세 줄에는 `also read from`과 출처가 붙고, 결과의 `via`에도 담깁니다.
+
+| 항목 | 읽는 곳 | 도구 |
+|---|---|---|
+| 모델 식별자 | `aisbom:hf:repo_id` | AIsbom |
+| 모델 라이선스 | `aisbom:hf:license` | AIsbom |
+| 모델 버전 | `aisbom:hf:revision`, `k8s-aibom:model:revision` | AIsbom, k8s-aibom |
+| SBOM 생성 맥락 | `metadata.lifecycles`(CycloneDX 표준 필드) | k8s-aibom, AIBoMGen CLI |
+
+AIsbom은 라이선스 판정이 저절로 바뀌지 않게 하려고 허브의 라이선스를 `licenses[]`에 넣지 않습니다. BomLens는 이 값을 있는 것으로 세고, `licenses[]`가 비어 있을 때만 위험 판정에 넘깁니다. 둘 다 있으면 `licenses[]`를 씁니다. 이 값은 허브 페이지가 밝힌 내용이며 BomLens가 검증하지는 않습니다.
+
+그 밖에 이 도구들이 적은 내용은 대응하는 G7 항목이 없습니다. Cisco AI BOM은 에이전트와 MCP 서버를 `application` 구성요소로, k8s-aibom은 모델을 실행하는 워크로드를 기록합니다. 이 내용은 파일과 구성요소 목록에 그대로 남습니다.
+
 ## 한계
 
 - 읽을 수 없는 모델은 SBOM을 아예 만들지 않습니다. 조회에 실패하면 생성기가 카드를 일반적인 기본값으로 채우기 때문에, BomLens는 생성기 로그를 확인해 실행을 중단합니다. 통과처럼 읽히는 껍데기 명세를 돌려주지 않기 위해서입니다.

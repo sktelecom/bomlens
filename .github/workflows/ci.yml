@@ -334,6 +334,11 @@ jobs:
       - name: AI usage unit tests
         run: bash tests/test-ai-usage.sh
 
+      # No Docker, no network: AI BOMs written by other tools (k8s-aibom,
+      # AIsbom, Cisco AI BOM, AIBoMGen CLI) through the G7 check.
+      - name: External AI BOM tests
+        run: bash tests/test-external-aibom.sh
+
       # No Docker, no network: the Go vulnerability database match against a
       # fixture export, its merge into the security report, and the go-vulndb
       # step in the result manifest.

@@ -607,6 +607,10 @@ cdx_checks() {
 #                 area, which only a declared or supplied service fills), and
 #                 declaredPath, a jq boolean, marks a pass as the publisher's
 #                 declaration in the detail.
+#   viaPath     — optional jq array of the tool property names that supplied the
+#                 value when a standard field did not (aisbom:hf:license,
+#                 k8s-aibom:model:revision and the like). The result carries them in
+#                 "via" and the detail says "also read from ...".
 #   missingPath — per-model coverage: a jq expression (may use $models) returning
 #                 the names of model components MISSING the element. Keeps the
 #                 old cov() semantics: pass only when EVERY model has it, warn with
@@ -666,6 +670,8 @@ registry_checks() {
             + ",_slabel:" + ($slabel|@json)
             + ",_sempty:" + ($sempty|@json)
             + ",_ev:(" + (if (.evidencePath==null) then "[]" else "(try (" + .evidencePath + ") catch [])" end) + ")"
+            # Which tool property supplied the value, when it was not the standard field.
+            + ",_via:(" + (if (.viaPath==null) then "[]" else "(try (" + .viaPath + ") catch [])" end) + ")"
             + "}"
         ] | join(",")) + "]"
     ' "$reg") || { echo "[]"; return; }
@@ -697,10 +703,14 @@ registry_checks() {
                 then {status:$unmet, detail:"signature requested but failed", missing:[]}
                 else {status:$unmet, detail:"not present in the SBOM", missing:[]} end)
              else {status:"warn", detail:"requires human review (no automated source)", missing:[]} end) as $s
-            | {id, label, label_ko, required, status:$s.status, detail:$s.detail,
-               missing:$s.missing,
-               evidence: ((._ev // []) | unique | .[0:$cap]),
-               cluster, source:$src, role}
+            | (((._via // []) | unique) as $via
+               | {id, label, label_ko, required, status:$s.status,
+                  detail:(if ($via|length) > 0
+                          then $s.detail + ", also read from " + ($via | join(", ")) else $s.detail end),
+                  missing:$s.missing,
+                  evidence: ((._ev // []) | unique | .[0:$cap]),
+                  cluster, source:$src, role}
+                 + (if ($via|length) > 0 then {via:$via} else {} end))
         )'
     local out
     if ! out=$(jq -c --argjson cap "$MISSING_CAP" --argjson hasSigFile "$HAS_SIG_FILE" \

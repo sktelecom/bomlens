@@ -112,9 +112,15 @@ jq --arg ctx "$CTX" --arg lang "$LANG_TAG" --slurpfile kb "$KB" '
                                    | ($m != "") and (($n | test($m)) // false)))
         // null );
 
+  # An AIsbom scan keeps the licence its hub page declares in
+  # modelCard.properties (aisbom:hf:license) and leaves licenses[] empty. That
+  # value stands in only while licenses[] holds nothing.
   def lic_strings:
-    [ (.licenses // [])[] | (.license.id // .license.name // .expression // "")
-      | select(. != "") ];
+    ([ (.licenses // [])[] | (.license.id // .license.name // .expression // "")
+       | select(. != "") ]) as $own
+    | if ($own | length) > 0 then $own
+      else [ (.modelCard.properties // [])[]?
+             | select(.name == "aisbom:hf:license") | (.value // "") | select(. != "") ] end;
 
   # License axis for one component: worst verdict across its licenses, the
   # matched registry keys, and one human-readable reason per license.
