@@ -39,7 +39,7 @@ export const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 
 <div class="home-actions">
   <a class="btn btn-primary" href={`${base}/start/first-scan/`}>Run your first scan</a>
-  <a class="btn" href={`${base}/demo/`}>Open the live demo</a>
+  <a class="btn" href={`${base}/demo/`} target="_blank" rel="noopener">Open the live demo<span class="sr-only"> (opens in a new tab)</span></a>
 </div>
 
 <button type="button" class="home-search" data-open-search aria-keyshortcuts="Control+K Meta+K">
@@ -119,7 +119,7 @@ BomLens is a local-first SBOM generator and open-source risk assessor for a sing
 
 ![BomLens web UI Overview screen for a finished scan: component, vulnerability, dependency and artifact counts, a needs-attention banner, and the severity and license classification distributions](./images/web-ui-demo.png)
 
-Want to see what a result looks like before installing anything? The <a href={`${base}/demo/`}>live demo</a> is the real web UI holding one finished scan of each kind: a Spring Boot project from source, a container image, a device firmware image, an AI model as a CycloneDX ML-BOM, and a supplier SBOM checked against the format requirements. Nothing to install, and nothing is uploaded: it is a frozen copy of results produced by ordinary local runs.
+Want to see what a result looks like before installing anything? The <a href={`${base}/demo/`} target="_blank" rel="noopener">live demo<span class="sr-only"> (opens in a new tab)</span></a> is the real web UI holding one finished scan of each kind: a Spring Boot project from source, a container image, a device firmware image, an AI model as a CycloneDX ML-BOM, and a supplier SBOM checked against the format requirements. Nothing to install, and nothing is uploaded: it is a frozen copy of results produced by ordinary local runs.
 
 Prefer no command line? Download the installer and double-click it. A Docker engine is required; the free [Rancher Desktop](https://rancherdesktop.io/) works well on Windows. A step-by-step walkthrough is in the [no-CLI quick start](start/no-cli.md). [Download for Windows (.exe)](https://github.com/sktelecom/bomlens/releases/latest/download/BomLens-Setup.exe).
 
