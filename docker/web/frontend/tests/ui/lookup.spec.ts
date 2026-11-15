@@ -679,7 +679,7 @@ test.describe("the rebuilt screen", () => {
     await expect(page.getByText("CVE-2021-23337")).toBeVisible();
     await expect(rows.first().getByText("npm: lodash")).toBeVisible();
     await expect(rows.first().getByText(">= 0, < 4.17.21").first()).toBeVisible();
-    await expect(rows.first().getByRole("link", { name: /example\.com/ })).toHaveAttribute("rel", "noreferrer");
+    await expect(rows.first().getByRole("link", { name: "example.com" })).toHaveAttribute("rel", "noreferrer");
     // The second row is still closed.
     await expect(rows.nth(1).locator("details")).not.toHaveAttribute("open");
   });
