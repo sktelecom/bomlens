@@ -44,7 +44,12 @@ export function AiUsageCard({ sbom }: { sbom: SbomSummary | null | undefined }) 
           </span>
         </div>
         <p className="text-label text-muted-foreground">{t("aiUsage.note")}</p>
-        <div className="max-h-96 overflow-auto rounded-md border bg-card">
+        <div
+          className="max-h-96 overflow-auto rounded-md border bg-card"
+          role="region"
+          aria-label={t("aiUsage.title")}
+          tabIndex={0}
+        >
           <table className="w-full text-left text-label">
             <thead className="border-b bg-muted/40 text-muted-foreground">
               <tr>
