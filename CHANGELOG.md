@@ -7,6 +7,76 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `SBOM_EXTRA_CA_CERTS=/path/to/bundle.pem` makes the scan containers trust an extra CA bundle, for a proxy that inspects TLS. The CLI (`--ui` included), `sbom-ui.bat` and the desktop app bind-mount it read-only at `/bomlens-ca/extra.pem` (`--mount`, so a file the Docker engine cannot see stops the scan) and set `BOMLENS_EXTRA_CA_CERTS`. Each container adds it to a copy of the bundle it already uses (`SSL_CERT_FILE`, else `REQUESTS_CA_BUNDLE`, else the system bundle) and points `SSL_CERT_FILE`, `REQUESTS_CA_BUNDLE`, `CURL_CA_BUNDLE`, `CARGO_HTTP_CAINFO`, `GIT_SSL_CAINFO` and `PIP_CERT` at it, adds it to `NODE_EXTRA_CA_CERTS`, and imports it into a JKS copy of the Java trust store in use (the one `JAVA_TOOL_OPTIONS` names, else the JDK's), all under `/tmp`. A file that is missing, holds no PEM certificate or has a comma in its path stops the scan with the cause; a Git Bash path with backslashes is accepted.
+- A step that fails on an untrusted certificate (`x509: certificate signed by unknown authority`, `PKIX path building failed`, `CERTIFICATE_VERIFY_FAILED` and the like) prints one `[WARN]` line per run naming `SBOM_EXTRA_CA_CERTS`.
+
+### Changed
+
+- A Java Gradle source scan keeps what each project's runtime classpath resolves, and leaves out dependencies only on a compile or test classpath (such as `j2objc-annotations` from guava 33.0.0, or JUnit). One Gradle run resolves every project through an init script, with the configuration cache off for that run, in place of the root project's `dependencies` warm-up. The full graph is kept when the build includes other builds for their code (`includeBuild`), when a configuration cannot be resolved, or when the Gradle run fails. A build included only through `pluginManagement { includeBuild(...) }`, such as a convention plugin build, does not turn the filter off, as long as no project depends on a module of it and the settings can be read (Gradle 7 or later); its own dependencies (a Kotlin DSL plugin build brings the Kotlin compiler) then no longer reach the SBOM. A dependency a project ships through another configuration (a custom `agent` or `distribution`, Shadow's `shadow`) is left out; `BOMLENS_GRADLE_FULL_GRAPH=1` keeps the full graph.
+- On the Android SDK image, a Java Gradle build with no release configuration is narrowed the Java way.
+
+### Fixed
+
+- A source scan no longer deletes go.mod, lock files, vendor/ or other build folders from the scanned folder after an earlier scan of it whose cdxgen container never started. The cleanup of an interrupted scan runs only when that scan recorded a complete snapshot of the folder, and the CLI and the web UI remove the record a scan leaves when its cdxgen container did not get that far. The cleanup also leaves in place any file or folder that git tracks.
+- A `gradlew` or `mvnw` without the executable bit runs through `sh` for the dependency step (`bash` when its first line names bash), instead of the image's Gradle or Maven. The Gradle version that runs is logged.
+- A Gradle source scan reads licenses from the POMs Gradle downloaded: cdxgen gets `GRADLE_CACHE_DIR` pointing at Gradle's own cache, unless it is already set.
+- An Android source scan marks the components on the release runtime classpath `scope: required`; cdxgen had marked some `optional` from a test configuration.
+- A Gradle toolchain declared through a variable picks the cdxgen Java image too: `JavaLanguageVersion.of(v)` and `jvmToolchain(v)` read `v` from its definition in the same file, taking the Gradle property it reads from `gradle.properties` or else its default (`def v = hasProperty('p') ? getProperty('p') : '25'`, `val v = findProperty("p")?.toString() ?: "25"`, `providers.gradleProperty("p").getOrElse("25")`, `val p: String by project`). Only regular `gradle.properties` files are read.
+- When Gradle fails in a Java source scan because no JDK matches its toolchain and another cdxgen Java image has that JDK, the dependency step runs once more in that image (`[INFO] Gradle asked for Java N; rerunning in <image>`), in the CLI and in the web UI. Not when `CDXGEN_JAVA_IMAGE` names the image, when the Gradle wrapper cannot run on that JDK, or when the image is not here and `SBOM_PULL=never`. An absent image is pulled with its progress shown, and `SBOM_PULL=always` pulls it first. If the second run leaves no SBOM, the first result is kept. `scan-sbom.sh --ui`, the Windows launcher and the desktop app pass `SBOM_PULL` on to the web UI container for this.
+
+## [v1.14.5] - 2026-11-12
+
+### Added
+
+- With `--security`, Go modules (`pkg:golang`) are also matched against the Go vulnerability database (vuln.go.dev), by module path and by the package paths an advisory names. Findings another engine already reports under the same CVE, GHSA or GO id are not added again. The image carries a snapshot; when it is older than `BOMLENS_GO_VULNDB_MAX_AGE_DAYS` (7) days and the scan is online, a fresh copy is downloaded for that scan, otherwise the new `go-vulndb` step is recorded as degraded. `BOMLENS_GO_VULNDB=false` turns it off, `BOMLENS_GO_VULNDB_PATH` and `SBOM_GO_VULNDB` name another export, `BOMLENS_GO_VULNDB_URL` a mirror. The engine contract is 1.4.0 (`go-vulndb` engine, `data_sources.go_vulndb`).
+- A Java source scan picks the cdxgen Java image from the declared Gradle toolchain and the Gradle wrapper version: `cdxgen-temurin-java8`, `cdxgen-java11`, `cdxgen-java17`, `cdxgen-temurin-java21`, `cdxgen-temurin-java24` or `cdxgen-temurin-java25`. A wrapper older than 8.5 no longer runs on Java 21, and a Java 25 toolchain resolves. `CDXGEN_JAVA_IMAGE` names the image directly.
+- `--deep-cve` adds package-style Maven CPE candidates (`<groupId>:<artifactId>`, `target_sw=maven`) and hands every CPE candidate to grype in one run.
+
+### Changed
+
+- `--deep-cve` updates a grype database older than `BOMLENS_GRYPE_DB_MAX_AGE_DAYS` (7) days before the match. When it cannot (offline, or the update fails), it reads the old one and records the `deep-cve` step as degraded with its age. `GRYPE_DB_UPDATE_URL` names a mirror.
+- A Maven CPE derived from the groupId takes its product from the artifactId when the last groupId segment does not name the artifact (`apache:httpclient5` instead of `apache:client5`).
+- The Maven pom.xml fallback leaves out test, provided, system and optional dependencies, as the resolved tree does (`BOMLENS_MAVEN_FULL_GRAPH=1` keeps them).
+- A CLI source scan keeps the stage 1 log as `{Project}_{Version}_cdxgen.log`, with credentials masked, when a dependency preparation step failed.
+
+### Fixed
+
+- `--deep-cve` no longer stops matching five days after the deep-cve image was built.
+- Go modules marked `// indirect` that are part of the build are `required`, not `optional`.
+- A Gradle build that declares dependencies but whose packages cdxgen did not resolve records the `generate` step as degraded (`gradle-packages`), and a subproject named like the root project has its dependencies resolved.
+- A pom.xml that Maven 3.10 refuses for a duplicate dependency declaration is resolved with the project's Maven wrapper or Maven 3.9; when no Maven reads it, the `maven-dependency-tree` step is recorded as failed.
+
+## [v1.14.4] - 2026-11-12
+
+### Added
+
+- The conformance check now reports an rpm, deb or apk identifier whose namespace is not a distribution id (`pkg:rpm/examplevendor/glibc@…`) and a component version that is clearly malformed (whitespace, `key: value` shape, control characters, over 128 characters). Both warn under the default profile and fail under `skt-submission`. The accepted ids are in `docker/lib/os-distros.json`; a namespace equal to the SBOM's operating-system component or to the identifier's own `distro=` id is accepted too, and firmware, root filesystem, binary and Yocto build scans warn instead of failing.
+- The conformance report has a "Suggested fixes" section (`suggestions` in the JSON) with rule-based candidates, each with its basis and confidence, and none when the answer is ambiguous. A candidate must fit the package type, and a Maven `group` candidate is medium confidence. The submitted SBOM is not changed.
+- `--analyze-cpe-index` (env `ANALYZE_CPE_INDEX=true`, off by default) matches the components of a received SBOM whose `bomlens:purlSource` is `upstream-map` against the bundled CPE index. Results are labeled "CPE index (NVD, upstream table)". The web UI has a matching toggle in the SBOM analysis options.
+- Experimental: `--binary-kb <path>` and `--kb-decisions <file>` add an opt-in pass to the firmware, root filesystem and binary scans that identifies components from a knowledge base built from release sources. A version is written only when exactly one release fits; otherwise the candidates are listed in `bomlens:versionCandidates`, and a result that is the newest release in the base carries `bomlens:versionMayBeNewer`. A component found inside a file that is not its own library or program carries `bomlens:linkage` and `bomlens:embeddedIn`. Nothing runs without the option and no base ships in the images. Results for small or statically linked components can be incomplete.
+
+### Changed
+
+- The unchecked-components list names a repository purl (`pkg:github` and similar) as `repository-purl`, apart from a component with no purl. A received SBOM (`--analyze`) gets a note that the CPE index step does not run in that mode. Counts are unchanged.
+
+### Fixed
+
+- The binary knowledge base pass checks the version per release series, bounds its ELF section reads, matches a component's own files by name, reports one component per release found, sorts its file walk, reports a damaged base and records the base hash.
+
+## [v1.14.3] - 2026-10-26
+
+### Security
+
+- Source scans run cdxgen 13.5.0, whose language images ship Node.js 24.22.1, for CVE-2026-111497 in the Brotli decoder. The Android image and the AIBOM image move to cdxgen 13.5.0 too.
+
+## [v1.14.2] - 2026-10-26
+
+### Security
+
+- The AIBOM image installs Node.js 24.22.1 and the firmware image brotli 1.2.1, for CVE-2026-111497 in the Brotli decoder.
+
 ## [v1.14.1] - 2026-10-24
 
 ### Added

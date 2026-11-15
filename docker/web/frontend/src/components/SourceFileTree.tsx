@@ -1,122 +1,47 @@
 // Copyright 2026 SK Telecom Co., Ltd.
 // SPDX-License-Identifier: Apache-2.0
 
-import {
-  ChevronDown,
-  ChevronRight,
-  File,
-  FileSymlink,
-  Folder,
-} from "lucide-react";
-import { useState } from "react";
+import { FileIcon, FileSymlinkFileIcon, FilterIcon, XIcon } from "@primer/octicons-react";
+import { Label, TextInput, TreeView } from "@primer/react";
+import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import { Badge } from "@/components/ui/badge";
 import type { FileNode } from "@/lib/scancode";
-import { cn } from "@/lib/utils";
+import { ancestorDirs, dirsWithMatchBelow, filterNodes } from "@/lib/sourceTreeFilter";
 
-/**
- * Source file tree rendered from the scan's file inventory — ScanCode output
- * (`_scancode.json`, which also carries per-file licenses) or the
- * structure-only `_files.json`. Directories collapse/expand; files are
- * selectable, and SourceTreePanel shows the selected one's captured text.
- */
-function FileRow({
-  node,
-  depth,
-  selected,
-  onSelect,
-}: {
-  node: FileNode;
-  depth: number;
-  selected: string | null;
-  onSelect: (path: string) => void;
-}) {
-  const { t } = useTranslation();
-  const [open, setOpen] = useState(depth === 0);
+import "./source-tree.css";
 
-  const indent = { paddingLeft: `${depth * 16 + 6}px` };
-  const isSelected = !node.isDir && selected === node.path;
+/** Top-level folders open at the start only when there are few of them. */
+const TOP_OPEN_MAX = 8;
 
-  const label = (
-    <>
-      {node.isDir ? (
-        <Folder className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-      ) : node.isLink ? (
-        <FileSymlink className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-      ) : (
-        <File className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-      )}
-      <span className="truncate font-mono text-label">{node.name}</span>
+/** How long typing waits before the tree is filtered: a big tree rebuilds per change. */
+const FILTER_DELAY_MS = 150;
 
-      {node.licenses.slice(0, 2).map((l) => (
-        <Badge key={l} variant="muted">
-          {l}
-        </Badge>
-      ))}
-      {node.licenses.length > 2 && (
-        <Badge variant="muted">+{node.licenses.length - 2}</Badge>
-      )}
-    </>
-  );
-
+function Licenses({ licenses }: { licenses: string[] }) {
+  if (licenses.length === 0) return null;
   return (
-    <li>
-      {node.isDir ? (
-        <div
-          className="flex items-center gap-2 rounded-sm px-1.5 py-1 hover:bg-accent/50"
-          style={indent}
-        >
-          <button
-            type="button"
-            onClick={() => setOpen((v) => !v)}
-            className="flex h-4 w-4 shrink-0 items-center justify-center text-muted-foreground hover:text-foreground"
-            aria-expanded={open}
-            aria-label={open ? t("deps.collapse") : t("deps.expand")}
-          >
-            {open ? (
-              <ChevronDown className="h-3.5 w-3.5" />
-            ) : (
-              <ChevronRight className="h-3.5 w-3.5" />
-            )}
-          </button>
-          {label}
-        </div>
-      ) : (
-        // Files are buttons: the whole row selects, so a keyboard reader tabs
-        // through the files themselves instead of hunting for a hit area.
-        <button
-          type="button"
-          onClick={() => onSelect(node.path)}
-          aria-current={isSelected ? "true" : undefined}
-          className={cn(
-            "flex w-full items-center gap-2 rounded-sm px-1.5 py-1 text-left hover:bg-accent/50",
-            isSelected && "bg-accent text-accent-foreground",
-          )}
-          style={indent}
-        >
-          <span className="inline-block h-4 w-4 shrink-0" />
-          {label}
-        </button>
+    <span className="bl-src-licenses">
+      {licenses.slice(0, 2).map((l) => (
+        <Label key={l} variant="secondary" title={l}>
+          {l}
+        </Label>
+      ))}
+      {licenses.length > 2 && (
+        <Label variant="secondary" title={licenses.slice(2).join(", ")}>
+          +{licenses.length - 2}
+        </Label>
       )}
-
-      {node.isDir && open && node.children.length > 0 && (
-        <ul>
-          {node.children.map((c) => (
-            <FileRow
-              key={c.path}
-              node={c}
-              depth={depth + 1}
-              selected={selected}
-              onSelect={onSelect}
-            />
-          ))}
-        </ul>
-      )}
-    </li>
+    </span>
   );
 }
 
+/**
+ * Source file tree rendered from the scan's file inventory: ScanCode output
+ * (`_scancode.json`, which also carries per-file licenses) or the
+ * structure-only `_files.json`. A Primer TreeView, so the arrow keys, Home,
+ * End and type-ahead work; folders open and close, files are selectable, and
+ * SourceTreePanel shows the selected one's captured text.
+ */
 export function SourceFileTree({
   nodes,
   selected = null,
@@ -128,26 +53,108 @@ export function SourceFileTree({
   onSelect?: (path: string) => void;
 }) {
   const { t } = useTranslation();
+  const [filter, setFilter] = useState("");
+  const [q, setQ] = useState("");
+  const scroller = useRef<HTMLDivElement>(null);
+  // Folders the reader opened or closed with no filter active, kept across a
+  // filter so clearing it brings the tree back as it was left.
+  const userOpen = useRef(new Map<string, boolean>());
+
+  useEffect(() => {
+    const id = setTimeout(() => setQ(filter.trim().toLowerCase()), FILTER_DELAY_MS);
+    return () => clearTimeout(id);
+  }, [filter]);
+
+  const shown = useMemo(() => filterNodes(nodes, q), [nodes, q]);
+  const matchOpen = useMemo(() => dirsWithMatchBelow(nodes, q), [nodes, q]);
+  const selectedDirs = useMemo(() => ancestorDirs(selected), [selected]);
+  const openTop = nodes.filter((n) => n.isDir).length <= TOP_OPEN_MAX;
+
+  // After a filter changes the rows, bring the open file back into view.
+  useEffect(() => {
+    scroller.current
+      ?.querySelector('[aria-current="true"]')
+      ?.scrollIntoView({ block: "nearest" });
+  }, [q]);
+
+  const expandedAtStart = (n: FileNode, depth: number): boolean => {
+    if (q) return matchOpen.has(n.path);
+    if (selectedDirs.has(n.path)) return true;
+    return userOpen.current.get(n.path) ?? (depth === 0 && openTop);
+  };
+
+  const render = (list: FileNode[], depth: number): ReactNode =>
+    list.map((n) => (
+      <TreeView.Item
+        key={n.path}
+        id={`src-${encodeURIComponent(n.path)}`}
+        aria-label={n.licenses.length ? `${n.name}, ${n.licenses.join(", ")}` : n.name}
+        defaultExpanded={n.isDir ? expandedAtStart(n, depth) : undefined}
+        onExpandedChange={
+          n.isDir
+            ? (open) => {
+                if (!q) userOpen.current.set(n.path, open);
+              }
+            : undefined
+        }
+        current={!n.isDir && selected === n.path}
+        onSelect={n.isDir ? undefined : () => onSelect?.(n.path)}
+      >
+        <TreeView.LeadingVisual>
+          {n.isDir ? (
+            <TreeView.DirectoryIcon />
+          ) : n.isLink ? (
+            <FileSymlinkFileIcon />
+          ) : (
+            <FileIcon />
+          )}
+        </TreeView.LeadingVisual>
+        <span className="bl-mono">{n.name}</span>
+        <Licenses licenses={n.licenses} />
+        {n.isDir && n.children.length > 0 && (
+          <TreeView.SubTree>{render(n.children, depth + 1)}</TreeView.SubTree>
+        )}
+      </TreeView.Item>
+    ));
 
   if (nodes.length === 0) {
-    return (
-      <p className="text-body-sm text-muted-foreground">{t("sourceTree.empty")}</p>
-    );
+    return <p className="bl-muted bl-src-none">{t("sourceTree.empty")}</p>;
   }
 
   return (
-    <div className="max-h-[max(44rem,calc(100vh-21rem))] self-start overflow-auto rounded-md border p-1">
-      <ul>
-        {nodes.map((n) => (
-          <FileRow
-            key={n.path}
-            node={n}
-            depth={0}
-            selected={selected}
-            onSelect={onSelect ?? (() => {})}
-          />
-        ))}
-      </ul>
-    </div>
+    <>
+      <div className="bl-src-filter">
+        <TextInput
+          block
+          size="small"
+          leadingVisual={FilterIcon}
+          trailingAction={
+            filter ? (
+              <TextInput.Action
+                icon={XIcon}
+                aria-label={t("sourceTree.filterClear")}
+                onClick={() => setFilter("")}
+              />
+            ) : undefined
+          }
+          aria-label={t("sourceTree.filter")}
+          placeholder={t("sourceTree.filter")}
+          value={filter}
+          onChange={(e) => setFilter(e.target.value)}
+        />
+      </div>
+      <div className="bl-src-scroll" ref={scroller}>
+        {shown.length === 0 ? (
+          <p className="bl-muted bl-small bl-src-none" role="status">
+            {t("sourceTree.filterNone")}
+          </p>
+        ) : (
+          // Keyed by the filter so each search starts with its matches open.
+          <TreeView key={q} aria-label={t("sourceTree.treeLabel")} truncate={false}>
+            {render(shown, 0)}
+          </TreeView>
+        )}
+      </div>
+    </>
   );
 }

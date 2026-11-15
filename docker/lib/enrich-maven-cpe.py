@@ -22,10 +22,15 @@
 #      derived mechanically — each entry verified against NVD. Spring is
 #      vmware:spring_framework, Jackson's product is the artifact not the group
 #      tail, org.json is stleary:json-java. Guessing these would inject wrong CVEs.
-#   2. A conservative rule for org.apache.* only, where the pattern holds
-#      (org.apache.pdfbox -> apache:pdfbox, org.apache.poi -> apache:poi).
-# Anything else gets NO CPE — a wrong vendor:product is worse than none, so we
-# never guess outside the map and the apache rule.
+#   2. A reverse-domain rule for 2+ segment groups (vendor = 2nd segment,
+#      product = last segment when it names the artifact's project, else the
+#      artifactId): org.apache.pdfbox -> apache:pdfbox, com.google.guava ->
+#      google:guava, org.apache.httpcomponents.client5/httpclient5 ->
+#      apache:httpclient5. A single-segment group is map-only.
+# Every maven component that ends up with a cpe also gets package-style
+# candidates (vendor = groupId, product = artifactId, target_sw = maven), the
+# shape recent NVD records use for maven packages. They go into
+# bomlens:cpeAlternates next to the curated alternates; see package_cpes().
 #
 # A pre-existing cpe is left alone UNLESS it is a mechanical copy of the maven
 # groupId/artifactId into vendor:product (some generators do this as a fallback
@@ -65,9 +70,10 @@ import sys
 # current at each CVE's disclosure date rather than backfilling old ones to
 # the new name. A CycloneDX component carries exactly one cpe field, so the
 # primary entry above still drives that field; the alternates are attached
-# separately (bomlens:cpeAlternates) and looked up as their own grype CPE
-# queries by scan-nvd-cpe.py, since a single cpe:2.3 string cannot express
-# more than one vendor:product.
+# separately (bomlens:cpeAlternates), and scan-nvd-cpe.py passes them to grype
+# as extra CPEs of the same component (syft:cpe23 properties in a temporary
+# copy of the SBOM), since a single cpe:2.3 string cannot express more than
+# one vendor:product.
 MAVEN_CPE_MAP = {
     "com.fasterxml.jackson.core": ("fasterxml", "@artifact"),
     "com.fasterxml.jackson.dataformat": ("fasterxml", "@artifact"),
@@ -91,12 +97,17 @@ MAVEN_CPE_MAP = {
     "commons-fileupload": ("apache", "commons_fileupload"),
     "commons-collections": ("apache", "commons_collections"),
     "org.json": ("stleary", "json-java"),
-    # The generic org.apache.* rule (vendor=2nd segment, product=last segment)
-    # only holds when NVD's own CPE reuses the groupId's tail. These groups
+    # Jackson 3 moved to the tools.jackson.* groupIds; the project and its NVD
+    # vendor (FasterXML) are unchanged, and the product is still the artifact.
+    "tools.jackson": ("fasterxml", "@artifact"),
+    # The generic rule (vendor = 2nd segment, product = last segment when the
+    # artifactId starts with it, else the artifactId) only holds when NVD's own
+    # CPE reuses those names. These groups
     # need an explicit override because NVD's product (or vendor) differs from
     # what the rule would derive — each verified against NVD's own cpeMatch
     # data, not guessed.
     "log4j": ("apache", "log4j"),  # single-segment group: the generic rule needs 2+ segments, so this old-style Log4j 1.x groupId gets no CPE without an override
+    "org.apache.pdfbox": ("apache", "pdfbox"),  # fontbox, xmpbox, preflight are PDFBox subprojects that NVD files under apache:pdfbox (e.g. CVE-2018-8036 in fontbox's AFMParser); the rule would derive apache:fontbox
     "org.apache.sshd": ("apache", "mina_sshd"),  # rule would derive apache:sshd; NVD files it under mina_sshd
     "org.apache.xmlgraphics": ("apache", "batik"),  # rule would derive apache:xmlgraphics; this groupId is Batik's, and NVD's product is batik
     "com.h2database": ("h2database", "h2"),  # rule would derive h2database:h2database; NVD's product is h2 (the artifactId, not the groupId tail)
@@ -106,6 +117,7 @@ MAVEN_CPE_MAP = {
     "org.postgresql": ("postgresql", "postgresql_jdbc_driver"),  # rule would derive postgresql:postgresql
     "org.quartz-scheduler": ("softwareag", "quartz"),  # rule would derive quartz-scheduler:quartz-scheduler
     "org.codehaus.woodstox": ("fasterxml", "woodstox"),  # the pre-rename groupId; NVD files Woodstox CVEs under the current fasterxml vendor regardless of which groupId a given release used
+    "org.xerial.snappy": ("xerial", "snappy-java"),  # rule would derive xerial:snappy; NVD's product is the artifactId snappy-java
     "com.mchange": ("mchange", "c3p0"),  # rule would derive mchange:mchange; NVD's product is the artifactId c3p0
     "io.opentelemetry.instrumentation": ("linuxfoundation", "opentelemetry_instrumentation_for_java"),  # rule would derive opentelemetry:instrumentation
     "io.undertow": ("redhat", "undertow"),  # rule would derive undertow:undertow; NVD files it under redhat
@@ -127,10 +139,20 @@ MAVEN_CPE_MAP = {
     # the Classic side; this entry exists only to route the artemis-*
     # artifacts to apache:artemis instead. See the artifact_prefix branch in
     # derive_cpe() -- "" is the fallback for every artifactId that matches no
-    # more specific prefix.
+    # more specific prefix. A value of None means "no curated entry for these
+    # artifacts": they fall back to the generic rule.
     "org.apache.activemq": {
         "artemis-": ("apache", "artemis"),
         "": ("apache", "activemq"),
+    },
+    # tomcat-embed-core carries the embedded Tomcat server (connectors,
+    # Catalina) that NVD files under apache:tomcat. The other embed artifacts
+    # (tomcat-embed-el, -websocket, -jasper) are separate libraries, so they
+    # get no curated entry (None) and fall back to the generic rule; most
+    # Tomcat server CVEs do not apply to them.
+    "org.apache.tomcat.embed": {
+        "tomcat-embed-core": ("apache", "tomcat"),
+        "": None,
     },
 }
 
@@ -217,15 +239,75 @@ def _parse_maven(purl):
     return group, artifact, version
 
 
-def _cpe_string(vendor, product, version):
-    return f"cpe:2.3:a:{vendor}:{product}:{version}:*:*:*:*:*:*:*"
+def _cpe_string(vendor, product, version, target_sw="*"):
+    return f"cpe:2.3:a:{vendor}:{product}:{version}:*:*:*:*:{target_sw}:*:*"
+
+
+# A groupId or artifactId used verbatim as a cpe:2.3 vendor/product. In the
+# formatted-string binding '.', '-' and '_' stand unescaped next to letters and
+# digits; anything else would need a backslash escape, so such a coordinate is
+# left out of the package-style candidates rather than emitted half-escaped.
+_CPE_SAFE_COORD = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
+
+# groupId parents that are shared hosting namespaces, not a project: a parent
+# candidate there (com.github, org.webjars, net.sourceforge) would be a vendor
+# shared by unrelated projects, so it is not emitted.
+_HOSTING_SEGMENTS = {"github", "gitlab", "bitbucket", "sourceforge", "webjars",
+                     "googlecode", "codeberg", "sf", "jitpack"}
+
+
+def _is_hosting_namespace(parent_parts):
+    """True for a two-segment groupId parent whose second segment is a
+    code-hosting or repackaging namespace (com.github, io.github, org.gitlab,
+    net.sourceforge, org.webjars, com.googlecode)."""
+    return len(parent_parts) == 2 and parent_parts[1] in _HOSTING_SEGMENTS
+
+
+# At most this many package-style candidates per component: each one is an
+# extra CPE grype searches, so the list stays short.
+_MAX_PACKAGE_CPES = 2
+
+
+def package_cpes(group, artifact, version):
+    """Package-style cpe:2.3 candidates for a maven coordinate, the shape recent
+    NVD records use for maven packages: vendor = the groupId, product = the
+    artifactId, target_sw = maven, e.g.
+    cpe:2.3:a:com.fasterxml.jackson.core:jackson-databind:<v>:*:*:*:*:maven:*:*.
+    A second candidate uses the groupId's parent (org.xerial for
+    org.xerial.snappy) when the groupId has 3+ segments and the parent is not
+    a shared hosting namespace (com.github, org.webjars), since NVD sometimes
+    files a package under a shorter groupId than the one it ships with.
+    Lowercased like NVD's own CPEs. [] when the version or a coordinate cannot
+    be written into a cpe:2.3 string unescaped."""
+    if not _CPE_SAFE_VERSION.match(version):
+        return []
+    if not _CPE_SAFE_COORD.match(group) or not _CPE_SAFE_COORD.match(artifact):
+        return []
+    g, a = group.lower(), artifact.lower()
+    vendors = [g]
+    parts = g.split(".")
+    if len(parts) >= 3 and not _is_hosting_namespace(parts[:-1]):
+        vendors.append(".".join(parts[:-1]))
+    return [_cpe_string(v, a, version, "maven") for v in vendors][:_MAX_PACKAGE_CPES]
+
+
+def _segment_names_artifact(segment, artifact):
+    """True when the groupId's last segment names the artifact's project: the
+    artifactId starts with that segment (pdfbox / pdfbox-app, netty /
+    netty-common, guava / guava, struts / struts2-core, derby / derbyclient).
+    Then the segment is the project name NVD uses as product. Otherwise the
+    segment is a packaging detail (client5 for httpclient5, core for
+    jackson-databind, inject for guice) and the artifactId is the better
+    product."""
+    return artifact.lower().startswith(segment.lower())
 
 
 def derive_cpe(purl):
     """Return (cpe, alt_cpes): an NVD-matchable cpe:2.3 string (or None if we
     cannot map it safely) and a list of additional cpe:2.3 strings for a
     project NVD splits across more than one CPE vendor (see MAVEN_CPE_MAP's
-    alternates). alt_cpes is always [] when derive_cpe returns None."""
+    alternates), followed by the package-style candidates of package_cpes().
+    alt_cpes is always [] when derive_cpe returns None."""
     parsed = _parse_maven(purl)
     if not parsed:
         return None, []
@@ -238,6 +320,7 @@ def derive_cpe(purl):
     # 1. Curated map (longest groupId prefix wins, so *.security beats *). These
     # override the generic rule where it is known wrong (spring -> vmware, Jackson
     # product = artifact, org.json -> stleary:json-java).
+    curated = False
     for prefix in sorted(MAVEN_CPE_MAP, key=len, reverse=True):
         if group == prefix or group.startswith(prefix + "."):
             entry = MAVEN_CPE_MAP[prefix]
@@ -246,30 +329,39 @@ def derive_cpe(purl):
                 # artifactId prefix (e.g. org.apache.activemq's artemis-*
                 # artifacts vs everything else). Longest prefix wins; ""
                 # is the catch-all for whatever matches no specific prefix.
-                for art_prefix in sorted(entry, key=len, reverse=True):
-                    if artifact.startswith(art_prefix):
-                        entry = entry[art_prefix]
-                        break
-                else:
-                    break  # no prefix matched (should not happen with a "" catch-all)
-            vendor, src = entry[0], entry[1]
-            product = artifact if src == "@artifact" else src
-            alt_specs = entry[2] if len(entry) > 2 else ()
+                # None (or no matching prefix) falls back to the generic rule.
+                entry = next((entry[art_prefix]
+                              for art_prefix in sorted(entry, key=len, reverse=True)
+                              if artifact.startswith(art_prefix)), None)
+            if entry is not None:
+                vendor, src = entry[0], entry[1]
+                product = artifact if src == "@artifact" else src
+                alt_specs = entry[2] if len(entry) > 2 else ()
+                curated = True
             break
-    else:
+    if not curated:
         # 2. Generic reverse-domain rule for 2+ segment groups (parts[1]:parts[-1]):
         # org.apache.pdfbox -> apache:pdfbox, com.google.guava -> google:guava,
-        # io.netty -> netty:netty (2-segment, where parts[1] == parts[-1]). A wrong
-        # guess is self-correcting: grype produces an nvd:cpe finding only when the
-        # vendor:product actually exists in NVD, so a mis-derived product (e.g.
-        # org.springframework -> springframework:springframework) simply matches
-        # nothing — and the curated map above already overrides the ones we know
-        # (spring -> vmware). The residual risk (right product, loose version range)
-        # is handled by the NVD version filter in scan-nvd-cpe.py. A single-segment
-        # group (commons-fileupload) has no domain to split, so it is map-only.
+        # io.netty -> netty:netty (2-segment, where parts[1] == parts[-1]). A
+        # vendor:product that does not exist in NVD (e.g. org.springframework ->
+        # springframework:springframework) matches nothing, so that kind of wrong
+        # guess costs only the missed CVEs; the curated map above overrides the
+        # ones we know (spring -> vmware). A guess that hits a real but wrong
+        # NVD product is not caught: the NVD version filter in scan-nvd-cpe.py
+        # (opt-in, SECURITY_NVD_VERIFY) only drops matches whose version falls
+        # outside the NVD range, so it cannot tell that the CVE belongs to a
+        # different artifact of the same project. A single-segment group
+        # (commons-fileupload) has no domain to split, so it is map-only.
+        # The last segment is the product only when the artifactId starts with it
+        # (_segment_names_artifact); otherwise it is a packaging detail
+        # (org.apache.httpcomponents.client5 / httpclient5 would give
+        # apache:client5) and the artifactId is used instead (apache:httpclient5).
         parts = group.split(".")
         if len(parts) >= 2:
             vendor, product = parts[1], parts[-1]
+            if (artifact and _CPE_SAFE_COORD.match(artifact)
+                    and not _segment_names_artifact(parts[-1], artifact)):
+                product = artifact.lower()
 
     if not vendor or not product:
         return None, []
@@ -277,7 +369,11 @@ def derive_cpe(purl):
         _cpe_string(alt_vendor, artifact if alt_src == "@artifact" else alt_src, version)
         for alt_vendor, alt_src in alt_specs
     ]
-    return _cpe_string(vendor, product, version), alt_cpes
+    cpe = _cpe_string(vendor, product, version)
+    for pkg_cpe in package_cpes(group, artifact, version):
+        if pkg_cpe != cpe and pkg_cpe not in alt_cpes:
+            alt_cpes.append(pkg_cpe)
+    return cpe, alt_cpes
 
 
 def enrich(path):
@@ -298,33 +394,51 @@ def enrich(path):
         purl = c.get("purl", "")
         if not purl.startswith("pkg:maven/"):
             continue  # not maven
-        existing = c.get("cpe")
-        if existing:
-            parsed = _parse_maven(purl)
-            if not parsed or not (
-                _is_mechanical_maven_cpe(existing, parsed[0], parsed[1])
-                or _is_submodule_mechanical_cpe(existing, parsed[0], parsed[1])
-            ):
-                continue  # a real cpe is already present; never overwrite it
-        cpe, alt_cpes = derive_cpe(purl)
-        if not cpe or cpe == existing:
+        parsed = _parse_maven(purl)
+        if not parsed:
             continue
+        existing = c.get("cpe")
+        cpe, alt_cpes = derive_cpe(purl)
+        derived = False
+        if not existing or (
+            _is_mechanical_maven_cpe(existing, parsed[0], parsed[1])
+            or _is_submodule_mechanical_cpe(existing, parsed[0], parsed[1])
+        ):
+            if not cpe:
+                continue
+            derived = True
+        elif cpe != existing:
+            # A real cpe is already present; never overwrite it. Only the
+            # package-style candidates are added next to it, so the
+            # package-style NVD records are still searched.
+            cpe, alt_cpes = existing, package_cpes(*parsed)
+        else:
+            derived = True  # set by an earlier run of this script
+
+        before = json.dumps(c, sort_keys=True)
         c["cpe"] = cpe
         props = [p for p in (c.get("properties") or [])
                  if p.get("name") not in ("bomlens:cpeSource", "bomlens:cpeAlternates")]
-        props.append({"name": "bomlens:cpeSource", "value": "maven-groupid"})
+        if derived:
+            props.append({"name": "bomlens:cpeSource", "value": "maven-groupid"})
+        else:
+            props.extend(p for p in (c.get("properties") or [])
+                         if p.get("name") == "bomlens:cpeSource")
         if alt_cpes:
-            # A second cpe:2.3 the component itself cannot carry (CycloneDX
-            # allows exactly one), read back by scan-nvd-cpe.py as extra
-            # individual grype CPE lookups. See MAVEN_CPE_MAP's alternates.
+            # Extra cpe:2.3 strings the component itself cannot carry
+            # (CycloneDX allows exactly one cpe), read back by scan-nvd-cpe.py
+            # and searched by grype next to the primary cpe. See
+            # MAVEN_CPE_MAP's alternates and package_cpes().
             props.append({"name": "bomlens:cpeAlternates", "value": json.dumps(alt_cpes)})
-        c["properties"] = props
-        n += 1
+        if props:
+            c["properties"] = props
+        if json.dumps(c, sort_keys=True) != before:
+            n += 1
 
     if n:
         with open(path, "w") as f:
             json.dump(doc, f, ensure_ascii=False)
-        print(f"[maven-cpe] attached an NVD-matchable cpe:2.3 to {n} maven component(s) "
+        print(f"[maven-cpe] attached NVD-matchable cpe:2.3 candidates to {n} maven component(s) "
               f"for CPE-based CVE matching.")
 
 

@@ -26,6 +26,7 @@ export const REQUIRED = [
   "assets/docker-missing.html",
   "assets/steps.cjs",
   "assets/logo.svg",
+  "assets/logo-dark.svg",
   "assets/bomlens-tokens.css",
   "main.mjs",
   "preload.mjs",

@@ -158,9 +158,9 @@ for (const lang of ["en", "ko"] as const) {
     // Overview: counts, needs-attention, severity/license axes, highest-risk table.
     await page.locator("main h1").waitFor();
     await beat(page, 1200);
-    // The main content area scrolls independently of the document (window.scrollTo
-    // has no effect on it), and it starts already scrolled past the page heading
-    // and the count cards' numbers. Scroll the heading itself into view instead.
+    // The page scrolls under a sticky top bar, and a finished scan can leave it
+    // scrolled past the page heading and the count cards' numbers. Scroll the
+    // heading itself into view (its scroll margin clears the top bar).
     await page.locator("main h1").scrollIntoViewIfNeeded();
     await beat(page, 300);
 

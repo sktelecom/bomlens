@@ -41,11 +41,11 @@ docker build --build-arg SBOM_SCANOSS=true -t bomlens ./docker
   --identify-vendored --all --generate-only
 ```
 
-In the web UI or desktop app, open **Advanced** and turn on **File-level identification (SCANOSS)** — the on-screen label differs from this guide's title, but it is the same feature. The option appears only for a source scan (current directory, git URL, or ZIP upload) when the image supports it.
+In the web UI or desktop app, open **Result quality** and turn on **Detect copied-in open source**. The on-screen label differs from this guide's title, but it is the same feature (it runs SCANOSS). The option appears only for a source scan (current directory, git URL, or ZIP upload) when the image supports it.
 
 If you are on Windows and new to the command line, follow the desktop-app steps in [Quick start without the CLI](../start/no-cli.md) first.
 
-![The Advanced section with the File-level identification (SCANOSS) toggle](../images/web-ui-identify-vendored-en.png)
+![The Result quality group with the Detect copied-in open source toggle](../images/web-ui-identify-vendored-en.png)
 
 ## What you get
 

@@ -1,0 +1,99 @@
+/*
+ * Copyright 2026 SK Telecom Co., Ltd.
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+/*
+ * Scan progress and failure (ScanRunning.tsx, ProgressLog.tsx, ReportProblem.tsx).
+ * The steps box, the folded run log and the report panel are Boxes like the
+ * Overview's. Log lines and the server's message wrap, never truncate.
+ * Colours, spaces and radii are Primer variables.
+ */
+
+.bl-run {
+  max-width: 64rem;
+  margin-inline: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--base-size-16);
+}
+.bl-run-name { display: inline-flex; flex-wrap: wrap; gap: var(--base-size-8); align-items: baseline; overflow-wrap: anywhere; }
+
+/* ---- Steps ---- */
+.bl-run-steps-body { padding: var(--base-size-12) var(--base-size-16) var(--base-size-8); }
+.bl-run-pct { margin-left: auto; color: var(--fgColor-muted); font-size: var(--text-body-size-small); font-variant-numeric: tabular-nums; }
+.bl-run-bar { padding: var(--base-size-12) var(--base-size-16) 0; }
+.bl-run-step { display: inline-flex; flex-wrap: wrap; column-gap: var(--base-size-4); align-items: baseline; }
+.bl-run-step-state { color: var(--fgColor-muted); font-size: var(--text-body-size-small); }
+.bl-run-icon { display: inline-flex; }
+.bl-run-icon[data-state="active"],
+.bl-run-icon[data-state="active"] svg { color: var(--fgColor-accent); }
+.bl-run-step-state[data-state="active"] { color: var(--fgColor-accent); }
+.bl-run-icon[data-state="done"] { color: var(--fgColor-success); }
+.bl-run-icon[data-state="pending"] { color: var(--fgColor-muted); }
+.bl-run-icon[data-state="failed"] { color: var(--fgColor-danger); }
+
+/* ---- Folded boxes (run log, report a problem) ---- */
+.bl-fold > summary {
+  display: flex;
+  align-items: center;
+  gap: var(--base-size-8);
+  padding: var(--base-size-12) var(--base-size-16);
+  background: var(--bgColor-muted);
+  border-radius: var(--borderRadius-medium);
+  cursor: pointer;
+  list-style: none;
+}
+.bl-fold > summary::-webkit-details-marker { display: none; }
+.bl-fold[open] > summary {
+  border-bottom: var(--borderWidth-thin) solid var(--borderColor-default);
+  border-radius: var(--borderRadius-medium) var(--borderRadius-medium) 0 0;
+}
+.bl-fold > summary:focus-visible { outline: 2px solid var(--focus-outlineColor); outline-offset: -2px; }
+.bl-fold > summary h2 { margin: 0; font-size: var(--text-body-size-medium); font-weight: 600; }
+.bl-fold-chev { display: inline-flex; color: var(--fgColor-muted); transition: transform 0.12s; }
+.bl-fold[open] > summary .bl-fold-chev { transform: rotate(90deg); }
+.bl-fold-count { margin-left: auto; color: var(--fgColor-muted); font-size: var(--text-body-size-small); font-variant-numeric: tabular-nums; }
+.bl-fold-body { display: flex; flex-direction: column; gap: var(--base-size-8); padding: var(--base-size-16); font-size: var(--text-body-size-medium); }
+
+/* ---- Log ---- */
+.bl-log {
+  height: 18rem;
+  min-height: 10rem;
+  max-height: 80vh;
+  resize: vertical;
+  overflow: auto;
+  padding: var(--base-size-12);
+  background: var(--bgColor-inset);
+  border: var(--borderWidth-thin) solid var(--borderColor-default);
+  border-radius: var(--borderRadius-medium);
+  font-family: var(--fontStack-monospace);
+  font-size: var(--text-body-size-small);
+  line-height: 1.6;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.bl-log:focus-visible { outline: 2px solid var(--focus-outlineColor); outline-offset: 1px; }
+.bl-log-empty { margin: 0; color: var(--fgColor-muted); font-family: inherit; }
+.bl-log-message {
+  margin: 0;
+  padding: var(--base-size-8) var(--base-size-12);
+  background: var(--bgColor-inset);
+  border-radius: var(--borderRadius-medium);
+  font-family: var(--fontStack-monospace);
+  font-size: var(--text-body-size-small);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.bl-log-tools { display: flex; flex-wrap: wrap; align-items: center; gap: var(--base-size-8); }
+.bl-log-hint { display: inline-flex; gap: var(--base-size-6); color: var(--fgColor-muted); font-size: var(--text-body-size-small); }
+.bl-log-hint svg { flex: none; margin-top: 2px; color: var(--fgColor-attention); }
+.bl-log-note { margin: 0; color: var(--fgColor-muted); font-size: var(--text-body-size-small); }
+
+/* ---- Failure ---- */
+.bl-run-fail-text { margin: 0; overflow-wrap: anywhere; }
+.bl-run-fail-text + .bl-run-fail-text { margin-top: var(--base-size-4); }
+
+/* A log that is no longer growing is as tall as its lines (4rem to 18rem); only a
+   running one keeps the fixed 18rem so it does not jump as lines arrive. */
+.bl-log[data-live="false"] { height: auto; min-height: 4rem; max-height: 18rem; }

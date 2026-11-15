@@ -268,3 +268,36 @@ export function overviewAttention(result: DoneEvent): AttentionItem[] {
     return true;
   });
 }
+
+/**
+ * End-of-life and outdated components as rows of the "Needs attention" list.
+ * They used to be jump cards that opened Components without a filter, so the
+ * count on the card and the rows it led to disagreed. Each row now carries the
+ * filter that lists exactly the components it counted (`eol=1`, `outdated=1`).
+ * `atRisk` is how many of the end-of-life ones also carry a vulnerability.
+ */
+export interface StaleRow {
+  id: "eol" | "outdated";
+  count: number;
+  atRisk?: number;
+  target: SectionId;
+  query: Record<string, string>;
+}
+
+export function staleRows(result: DoneEvent): StaleRow[] {
+  const sb = result.sbom;
+  const rows: StaleRow[] = [];
+  if ((sb?.eolCount ?? 0) > 0) {
+    rows.push({
+      id: "eol",
+      count: sb!.eolCount!,
+      atRisk: (sb?.atRiskCount ?? 0) > 0 ? sb!.atRiskCount : undefined,
+      target: "components",
+      query: { eol: "1" },
+    });
+  }
+  if ((sb?.outdatedCount ?? 0) > 0) {
+    rows.push({ id: "outdated", count: sb!.outdatedCount!, target: "components", query: { outdated: "1" } });
+  }
+  return rows;
+}

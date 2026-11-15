@@ -111,7 +111,7 @@ export function Modal({
 interface ConfirmDialogProps {
   open: boolean;
   title: string;
-  description?: string;
+  description?: ReactNode;
   confirmLabel: string;
   cancelLabel?: string;
   /** Paints the confirm button as destructive. */

@@ -1,23 +1,30 @@
 // Copyright 2026 SK Telecom Co., Ltd.
 // SPDX-License-Identifier: Apache-2.0
 
+import { DownloadIcon } from "@primer/octicons-react";
+import { Button, Spinner } from "@primer/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { AppShell } from "./AppShell";
+import type { NavPlace } from "./Sidebar";
 import { DeclareFlow } from "./DeclareFlow";
 import { ExternalLookup } from "./ExternalLookup";
 import { GlobalSearch } from "./GlobalSearch";
 import { NewScan } from "./NewScan";
 import { ProgressLog } from "./ProgressLog";
 import { RecentScans } from "./RecentScans";
+import { OverviewHeaderLines } from "./Overview";
 import { ResultHeader } from "./ResultHeader";
 import { ResultSection } from "./ResultSections";
-import { ReportProblem } from "./ReportProblem";
+import { CONFORMANCE_ACTIONS_SLOT } from "./ConformancePanel";
+import { VULN_ACTIONS_SLOT } from "./VulnerabilitiesTable";
+import { ReportProblemDialog } from "./ReportProblemDialog";
 import { ScanRunning } from "./ScanRunning";
 import { ConfirmDialog } from "./ui/dialog";
 import {
   deleteScan,
+  downloadAllUrl,
   fileUrl,
   getCapabilities,
   listScans,
@@ -30,6 +37,7 @@ import {
   type ScanParams,
   type Severity,
 } from "@/lib/api";
+import { conformanceReports } from "@/lib/conformance";
 import { IS_STATIC_DEMO } from "@/lib/demo";
 import { type LicenseRiskTier } from "@/lib/licenses";
 import {
@@ -38,6 +46,7 @@ import {
   visibleSectionIds,
 } from "@/lib/nav";
 import {
+  buildHash,
   homeHash,
   lookupHash,
   newHash,
@@ -47,9 +56,13 @@ import {
 } from "@/lib/route";
 import { formatNumber } from "@/lib/format";
 import { deriveScanContext, sectionCounts } from "@/lib/results";
+import { type ProjectName, projectText, scanProjectName } from "@/lib/scanTitle";
 import { useToast } from "@/lib/toast";
 
 type Status = "idle" | "running" | "done" | "error";
+
+/** How long opening a scan waits for the scan list before drawing. */
+const LIST_WAIT_MS = 3000;
 
 /** Scan-kind label key for the result-header subtitle, keyed by the CycloneDX
  *  root component type (available on re-open, unlike the scan MODE). AI wins,
@@ -105,7 +118,9 @@ function toRecentLink(s: RecentScan): RecentScanLink {
   const sev = s.maxSeverity;
   return {
     id: s.id,
-    label: s.version ? `${s.project} · ${s.version}` : s.project,
+    label: projectText({ name: s.project, version: s.version || undefined }),
+    name: s.project,
+    version: s.version || undefined,
     topSeverity:
       sev === "CRITICAL" || sev === "HIGH" || sev === "MEDIUM" || sev === "LOW"
         ? sev
@@ -139,10 +154,12 @@ export function NextApp() {
   // key for a friendlier headline, with scanError kept as the raw detail.
   const [scanErrorKey, setScanErrorKey] = useState<string | null>(null);
   const [result, setResult] = useState<DoneEvent | null>(null);
-  const [projectInfo, setProjectInfo] = useState<{
-    name: string;
-    version?: string;
-  }>();
+  // The project a live scan was started for: it has no id (and so no entry in
+  // the scan list) until it finishes.
+  const [liveProject, setLiveProject] = useState<ProjectName>();
+  // The id of a past scan being fetched, so a deep link shows a loading state
+  // rather than the home screen until the scan arrives.
+  const [opening, setOpening] = useState<string | null>(null);
   const [activeSection, setActiveSection] = useState<SectionId>("overview");
   // Mirrored into a ref so the URL writer can read the current section without
   // taking it as a dependency and being rebuilt on every section change.
@@ -151,6 +168,8 @@ export function NextApp() {
   // Which idle screen is shown: Recent scans (home/logo), New scan (#/new) or
   // External lookup (#/lookup).
   const [homeView, setHomeView] = useState<"recent" | "new" | "lookup">("recent");
+  const homeViewRef = useRef(homeView);
+  homeViewRef.current = homeView;
   const [capabilities, setCapabilities] = useState<Capabilities>({
     firmware: false,
     docker: true,
@@ -191,11 +210,10 @@ export function NextApp() {
   // only when they carry no single-use upload token or stashed credential.
   const lastParamsRef = useRef<ScanParams | null>(null);
 
-  // The result-section heading. On a section change we move focus here so
-  // keyboard and screen-reader users land on (and hear) the new section instead
-  // of being left on the rail link. Skip the first run so we don't grab focus
-  // on initial load.
-  const headingRef = useRef<HTMLHeadingElement>(null);
+  // On a section change focus moves to the section heading, so keyboard and
+  // screen-reader users land on (and hear) the new section instead of being
+  // left on the navigation link. Skipped on the first run so the initial load
+  // does not grab focus.
   const didMountRef = useRef(false);
 
   // The live scan's SSE stream. Held so leaving the running view (new scan,
@@ -207,7 +225,27 @@ export function NextApp() {
     streamRef.current = null;
   };
 
-  const refreshRecent = () => listScans().then(setRecent);
+  // The scan list request in flight (or done). Opening a scan waits for it, so
+  // the scan is named from the list ("project version") on its first render
+  // rather than by its run id.
+  const recentLoadRef = useRef<Promise<void> | null>(null);
+  // The latest list, for showScan to tell whether it already names a scan.
+  const recentRef = useRef<RecentScan[]>([]);
+  // True while a list request is on its way, so a second caller joins it.
+  const recentPendingRef = useRef(false);
+  const refreshRecent = () => {
+    recentPendingRef.current = true;
+    const load = listScans()
+      .then((list) => {
+        recentRef.current = list;
+        setRecent(list);
+      })
+      .finally(() => {
+        if (recentLoadRef.current === load) recentPendingRef.current = false;
+      });
+    recentLoadRef.current = load;
+    return load;
+  };
 
   useEffect(() => {
     getCapabilities().then((caps) => {
@@ -235,7 +273,8 @@ export function NextApp() {
     setStatus("idle");
     setLogs([]);
     setResult(null);
-    setProjectInfo(undefined);
+    setLiveProject(undefined);
+    setOpening(null);
     setActiveSection("overview");
   }, []);
 
@@ -245,13 +284,35 @@ export function NextApp() {
     (id: string, section: SectionId) => {
       // Same scan already loaded → just switch the section (no reload, no flash).
       if (loadedIdRef.current === id) {
+        // Back to the open scan while another was loading: that load is moot.
+        setOpening(null);
         setActiveSection(section);
         return;
       }
       closeStream();
       runningIdRef.current = null;
-      void loadScan(id).then((done) => {
-        if (parseHash(window.location.hash).kind !== "scan") return; // navigated away
+      setOpening(id);
+      // Wait for the scan list so the first render names the scan from it, but
+      // not for long: past LIST_WAIT_MS the scan draws with the name from its
+      // settings, and the list renames it when it lands.
+      // A list that does not have this scan yet (one finished since) is asked
+      // again; one that has it is reused.
+      // One on its way is joined rather than repeated.
+      const known = recentRef.current.some((s) => s.id === id) || recentPendingRef.current;
+      const listed = ((known && recentLoadRef.current) || refreshRecent()).catch(() => undefined);
+      let timer = 0;
+      const listedOrLate = Promise.race([
+        listed,
+        new Promise<void>((r) => {
+          timer = window.setTimeout(r, LIST_WAIT_MS);
+        }),
+      ]).finally(() => window.clearTimeout(timer));
+      void Promise.all([loadScan(id), listedOrLate]).then(([done]) => {
+        setOpening((o) => (o === id ? null : o));
+        // Navigated away meanwhile, to another screen or to another scan: a
+        // late answer for this one must not cover what is now on screen.
+        const now = parseHash(window.location.hash);
+        if (now.kind !== "scan" || now.id !== id) return;
         if (!done) {
           // Artifacts missing (e.g. a live-only scan that was never stored, or a
           // deleted one). Falling back to the scan list is right, but doing it
@@ -263,24 +324,15 @@ export function NextApp() {
         }
         loadedIdRef.current = id;
         setLogs([]);
+        setLiveProject(undefined);
         setResult(done);
         setStatus(done.ok ? "done" : "error");
         setActiveSection(section);
-        const meta = recent.find((s) => s.id === id);
-        // Not in the loaded list yet (a direct link or reload): the settings
-        // the scan ran with name the project too, also for a run with no SBOM
-        // such as one stopped by a refused declaration.
-        const config = done.scanConfig;
-        setProjectInfo(
-          meta
-            ? { name: meta.project, version: meta.version || undefined }
-            : config?.project
-              ? { name: config.project, version: config.version || undefined }
-              : { name: id },
-        );
       });
     },
-    [recent],
+    // refreshRecent only reads refs and the state setter.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [t, toast],
   );
 
   // Switch to one of the idle home views (Recent or New scan), resetting any
@@ -290,7 +342,15 @@ export function NextApp() {
   // `hashchange` (see goToNewScan).
   const enterHome = useCallback(
     (kind: "recent" | "new") => {
+      // Scan management shows the current list whenever it is entered from
+      // another screen. Already on it (the first render, or the router running
+      // again once capabilities arrive), the list on hand is current: the mount
+      // effect has requested it, and a second request would only repeat it.
+      const alreadyThere =
+        homeViewRef.current === "recent" && loadedIdRef.current === null && status === "idle";
+      if (kind === "recent" && !alreadyThere) void refreshRecent();
       setHomeView(kind);
+      setOpening(null);
       // Open questions belong to the form they were started from; any other
       // way into the home screens starts over.
       setDeclaring(null);
@@ -319,6 +379,7 @@ export function NextApp() {
         return;
       }
       setHomeView("lookup");
+      setOpening(null);
       setSectionQuery(parsed.query ?? {});
       if (loadedIdRef.current !== null || status !== "idle") resetToHome();
       return;
@@ -376,7 +437,15 @@ export function NextApp() {
       didMountRef.current = true;
       return;
     }
-    headingRef.current?.focus();
+    // Only a result section's own title: leaving a scan for the New scan form
+    // (Re-scan) also resets the section, and that form focuses its own field.
+    const heading = document.querySelector<HTMLElement>(".bl-result-title");
+    if (!heading) return;
+    // A new section starts at its top, whatever the last one was scrolled to;
+    // the title's scroll-margin keeps it clear of the sticky top bar.
+    window.scrollTo(0, 0);
+    heading.tabIndex = -1;
+    heading.focus();
   }, [activeSection]);
 
   // Close the live scan stream if the app unmounts.
@@ -392,15 +461,38 @@ export function NextApp() {
   const pendingLabel = pendingScan
     ? [pendingScan.project, pendingScan.version].filter(Boolean).join(" ")
     : (pendingDelete ?? "");
+  // Bold the scan name without react-i18next's Trans, which would bundle an
+  // extra HTML parser. The marker splits the translated sentence around the name.
+  const nameMark = "\u0000";
+  const deleteBody = t("recent.confirmDeleteBody", { scan: nameMark })
+    .replace(/<\/?b>/g, "")
+    .split(nameMark)
+    .flatMap((part, i) =>
+      i === 0 ? [part] : [<strong key={i} className="font-semibold text-foreground">{pendingLabel}</strong>, part],
+    );
 
   const confirmDelete = () => {
     const id = pendingDelete;
     setPendingDelete(null);
     if (!id) return;
-    void deleteScan(id).then(() => {
-      void refreshRecent();
+    void deleteScan(id).then(async (ok) => {
+      const stayedOnList = homeViewRef.current === "recent" && loadedIdRef.current === null;
+      await refreshRecent().catch(() => undefined);
+      if (ok && stayedOnList) {
+        // The row that held focus is gone; put it on the list's heading rather
+        // than letting it fall to the start of the document.
+        const heading = document.querySelector<HTMLElement>("main h1");
+        if (heading) {
+          heading.tabIndex = -1;
+          heading.focus();
+        }
+      }
+      if (!ok) {
+        toast(t("recent.deleteFailed"));
+        return;
+      }
       toast(t("recent.deleted"));
-      // If we're viewing the scan we just deleted, drop back to New scan.
+      // If we're viewing the scan we just deleted, drop back to Scan management.
       if (loadedIdRef.current === id) window.location.hash = homeHash();
     });
   };
@@ -434,13 +526,14 @@ export function NextApp() {
     loadedIdRef.current = null;
     runningIdRef.current = null;
     lastParamsRef.current = params;
+    setOpening(null);
     setStatus("running");
     setLogs([]);
     setScanError(null);
     setScanErrorKey(null);
     setResult(null);
     setActiveSection("overview");
-    setProjectInfo({
+    setLiveProject({
       name: params.project,
       version: params.version || undefined,
     });
@@ -507,8 +600,8 @@ export function NextApp() {
   // The Lookup screen ran a query, so reflect it in the URL (replaced, not
   // pushed, same reasoning as handleQueryChange below) so the result is a
   // shareable link without the screen touching the hash itself.
-  const handleLookupQueryChange = useCallback((term: string) => {
-    const next = lookupHash(term || undefined);
+  const handleLookupQueryChange = useCallback((query: RouteQuery) => {
+    const next = buildHash({ kind: "lookup", query });
     if (next === window.location.hash) return;
     window.history.replaceState(null, "", next);
   }, []);
@@ -572,39 +665,123 @@ export function NextApp() {
       !retryParams.scanossCred,
   );
 
+  // The scan on screen, by project and version (never its run id when the scan
+  // list or its settings can name it). A live scan uses the form's values.
+  const loadedId = loadedIdRef.current;
+  const projectInfo: ProjectName | undefined = opening
+    ? undefined
+    : loadedId
+      ? scanProjectName(
+          loadedId,
+          recent,
+          result?.scanConfig ??
+            (liveProject ? { project: liveProject.name, version: liveProject.version } : null),
+        )
+      : liveProject;
+  // Which navigation entry is the current page.
+  const navCurrent: NavPlace =
+    opening || result
+      ? activeSection
+      : !isHome
+        ? null
+        : homeView === "lookup"
+          ? null
+          : homeView;
+  const onHomeScreen = isHome && !opening && homeView === "recent";
+
+  // The browser tab names the screen, then the scan, then the app.
+  const scanLabel = projectText(projectInfo);
+  const pageTitle = opening
+    ? t("appTitle")
+    : result && scanLabel
+      ? t("shell.scanPageTitle", { section: t(`nav.${activeSection}`), scan: scanLabel, app: t("appTitle") })
+      : !isHome
+        ? // A scan is running: its name, or "in progress" when it has none yet.
+          t("shell.pageTitle", { page: scanLabel || t("shell.scanRunning"), app: t("appTitle") })
+        : t("shell.pageTitle", {
+            page:
+              homeView === "new"
+                ? t("shell.newScan")
+                : homeView === "lookup"
+                  ? t("nav.lookupTitle")
+                  : t("recent.title"),
+            app: t("appTitle"),
+          });
+  useEffect(() => {
+    document.title = pageTitle;
+  }, [pageTitle]);
+
+  // "Report a problem" for the scan on screen, succeeded or failed: the help menu
+  // and the failed-scan banner open one dialog that shows the summary in full.
+  // The read-only demo has no server to build it, so the help menu keeps the
+  // plain link to the issue form there.
+  const [reportOpen, setReportOpen] = useState(false);
+  const reportable = Boolean(result) && !opening && !IS_STATIC_DEMO;
+  const reportScanKey = result?.id ?? loadedIdRef.current ?? "";
+  // The control that opened the dialog, so focus goes back to it on close.
+  const reportReturnRef = useRef<HTMLElement | null>(null);
+  const openReport = (trigger?: HTMLElement | null) => {
+    reportReturnRef.current = trigger ?? document.querySelector<HTMLElement>('[data-testid="help-menu"]');
+    setReportOpen(true);
+  };
+  // The dialog belongs to the scan on screen: leaving it (home, another scan,
+  // a scan starting) closes the dialog rather than carrying it over.
+  useEffect(() => {
+    setReportOpen(false);
+  }, [reportable, reportScanKey]);
+
   return (
     <AppShell
       scan={scan}
-      activeSection={activeSection}
-      activeScanId={loadedIdRef.current}
+      current={navCurrent}
+      activeScanId={opening ? null : loadedId}
       recent={recentLinks}
       onDeleteRecent={setPendingDelete}
       version={capabilities.version}
-      counts={counts}
-      showSections={Boolean(result)}
+      onReportProblem={reportable ? () => openReport() : undefined}
+      counts={opening ? undefined : counts}
       homeHref={homeHash()}
-      showHomeLink={!(isHome && homeView === "recent")}
+      showHomeLink={!onHomeScreen}
+      hideTopBarNewScan={onHomeScreen || (isHome && !opening && homeView === "new")}
+      lookupCurrent={isHome && !opening && homeView === "lookup"}
       lookupHref={lookupEnabled ? lookupHash() : undefined}
       onLookup={lookupEnabled ? goToLookup : undefined}
       onNewScan={goToNewScan}
-      project={isHome ? undefined : projectInfo}
+      loadingSections={Boolean(opening) || status === "running"}
+      project={isHome && !result ? undefined : projectInfo}
+      projectHref={loadedId && !opening ? scanHash(loadedId) : undefined}
       search={
-        result ? (
-          <GlobalSearch
-            result={result}
-            onPick={handleSearchPick}
-            onLookup={lookupEnabled ? handleLookupPick : undefined}
-          />
-        ) : undefined
+        result && !opening
+          ? (width: number) => (
+              <GlobalSearch
+                result={result}
+                width={width}
+                onPick={handleSearchPick}
+                onLookup={lookupEnabled ? handleLookupPick : undefined}
+              />
+            )
+          : undefined
       }
       onRescan={
-        result?.scanConfig ? () => handleRescan(result.scanConfig!) : undefined
+        result?.scanConfig && !opening ? () => handleRescan(result.scanConfig!) : undefined
       }
     >
-      {isHome ? (
+      {opening ? (
         <div
-          className={`px-6 py-8 ${homeView === "recent" ? "" : "mx-auto max-w-6xl"}`}
+          role="status"
+          data-testid="scan-opening"
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "var(--base-size-8)",
+            color: "var(--fgColor-muted)",
+          }}
         >
+          <Spinner size="small" srText={null} />
+          {t("shell.openingScan")}
+        </div>
+      ) : isHome ? (
+        <div className={homeView === "recent" ? "" : "mx-auto max-w-6xl"}>
           {homeView === "recent" ? (
             <RecentScans
               scans={recent}
@@ -612,10 +789,7 @@ export function NextApp() {
               onDelete={setPendingDelete}
             />
           ) : homeView === "lookup" ? (
-            <ExternalLookup
-              initialQuery={sectionQuery.q}
-              onQueryChange={handleLookupQueryChange}
-            />
+            <ExternalLookup query={sectionQuery} onQueryChange={handleLookupQueryChange} />
           ) : declaring ? (
             <DeclareFlow
               params={declaring.params}
@@ -641,34 +815,27 @@ export function NextApp() {
           )}
         </div>
       ) : !result ? (
-        <div className="mx-auto max-w-5xl px-6 py-8">
-          <ScanRunning
-            logs={logs}
-            status={status === "error" ? "error" : "running"}
-            projectLabel={
-              projectInfo &&
-              (projectInfo.version
-                ? `${projectInfo.name} · ${projectInfo.version}`
-                : projectInfo.name)
-            }
-            errorMessage={scanError}
-            errorKey={scanErrorKey}
-            newScanHref={newHash()}
-            onNewScan={goToNewScan}
-            deepCveEnabled={retryParams?.deepCve}
-            onRetry={
-              canRetry && retryParams ? () => run(retryParams) : undefined
-            }
-            onCancel={() => {
-              closeStream(); // backend ends the process when the stream drops
-              resetToHome();
-              setHomeView("new");
-            }}
-          />
-        </div>
+        <ScanRunning
+          logs={logs}
+          status={status === "error" ? "error" : "running"}
+          projectLabel={projectText(projectInfo) || undefined}
+          errorMessage={scanError}
+          errorKey={scanErrorKey}
+          newScanHref={newHash()}
+          onNewScan={goToNewScan}
+          deepCveEnabled={retryParams?.deepCve}
+          onRetry={
+            canRetry && retryParams ? () => run(retryParams) : undefined
+          }
+          onCancel={() => {
+            closeStream(); // backend ends the process when the stream drops
+            resetToHome();
+            setHomeView("new");
+          }}
+        />
       ) : (
         <div
-          className={`space-y-6 px-6 py-8 ${
+          className={`space-y-6 ${
             TWO_COLUMN_SECTIONS.has(activeSection)
               ? "[&>*:not(:first-child)]:max-w-6xl 2xl:[&>*:not(:first-child)]:max-w-none"
               : WIDE_SECTIONS.has(activeSection)
@@ -690,7 +857,28 @@ export function NextApp() {
             }
             title={t(`nav.${activeSection}`)}
             projectTitle={activeSection === "overview"}
-            headingRef={headingRef}
+            components={result.sbom?.components}
+            extra={activeSection === "overview" ? <OverviewHeaderLines result={result} /> : undefined}
+            actions={
+              (activeSection === "overview" || activeSection === "artifacts") &&
+              result.results.length > 0 ? (
+                <Button
+                  as="a"
+                  href={downloadAllUrl(loadedIdRef.current)} // null falls back to the latest run
+                  download
+                  leadingVisual={DownloadIcon}
+                  onClick={() => toast(t("result.downloadStarted"))}
+                >
+                  {t("result.downloadAll")}
+                </Button>
+              ) : activeSection === "vulnerabilities" && result.security ? (
+                // The Vulnerabilities screen puts its file actions here.
+                <span id={VULN_ACTIONS_SLOT} className="bl-inline bl-wrap" />
+              ) : activeSection === "conformance" && conformanceReports(result.results).length > 0 ? (
+                // The Conformance screen puts its report downloads here.
+                <span id={CONFORMANCE_ACTIONS_SLOT} className="bl-cf-actions" />
+              ) : undefined
+            }
           />
 
           <ResultSection
@@ -719,6 +907,7 @@ export function NextApp() {
                 ? () => handleRescan(result.scanConfig!, "license")
                 : undefined
             }
+            onReportProblem={reportable ? (trigger) => openReport(trigger) : undefined}
           />
 
           {/* The run log is reference material for the run you just watched.
@@ -730,17 +919,18 @@ export function NextApp() {
               <ProgressLog logs={logs} status={status} collapsible />
             )}
 
-          {/* A finished scan, succeeded or failed: the summary to attach to an
-              issue, shown in full before anything is copied. */}
-          {activeSection === "overview" && (
-            <ReportProblem
-              key={result.id ?? loadedIdRef.current ?? "none"}
-              scanId={result.id ?? loadedIdRef.current}
-              errorMessage={scanError}
-              defaultOpen={!result.ok}
-            />
-          )}
         </div>
+      )}
+
+      {reportOpen && reportable && (
+        <ReportProblemDialog
+          // A new scan on screen gets its own summary, not the last one's.
+          key={result?.id ?? loadedIdRef.current ?? "none"}
+          scanId={result?.id ?? loadedIdRef.current}
+          errorMessage={scanError}
+          returnFocusRef={reportReturnRef}
+          onClose={() => setReportOpen(false)}
+        />
       )}
 
       {/* Fixed-position overlay, so it renders the same wherever it sits in the
@@ -748,7 +938,7 @@ export function NextApp() {
       <ConfirmDialog
         open={pendingDelete !== null}
         title={t("recent.confirmDeleteTitle")}
-        description={t("recent.confirmDeleteBody", { scan: pendingLabel })}
+        description={deleteBody}
         confirmLabel={t("recent.delete")}
         destructive
         onConfirm={confirmDelete}

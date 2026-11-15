@@ -1,0 +1,84 @@
+/*
+ * Copyright 2026 SK Telecom Co., Ltd.
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+/*
+ * Artifacts screen (components/ResultsList.tsx) and the file viewer dialog
+ * (components/FileViewer.tsx). One bordered list, one row per artifact: icon,
+ * name and description with a button per format, then view and copy link.
+ * Names wrap, never truncate. Colours, spaces and radii are Primer variables.
+ */
+
+.bl-art-summary {
+  margin: 0;
+  font-size: var(--text-body-size-medium);
+  color: var(--fgColor-muted);
+}
+.bl-art-unlisted { color: var(--fgColor-muted); }
+.bl-art-unlisted summary { cursor: pointer; width: fit-content; }
+.bl-art-unlisted ul { margin: var(--base-size-4) 0 0; padding-inline-start: var(--base-size-20); }
+
+.bl-art-list { list-style: none; margin: 0; padding: 0; }
+.bl-art-row {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--base-size-12);
+  padding: var(--base-size-12) var(--base-size-16);
+  border-top: var(--borderWidth-thin) solid var(--borderColor-muted);
+}
+.bl-art-row:first-child { border-top: 0; }
+.bl-art-icon { display: flex; flex: none; padding-top: var(--base-size-2); }
+.bl-art-main { flex: 1 1 0; min-width: 0; }
+.bl-art-title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--base-size-4) var(--base-size-8);
+}
+.bl-art-title h2 { margin: 0; font-size: var(--text-body-size-medium); font-weight: 600; }
+.bl-art-desc {
+  margin: var(--base-size-2) 0 0;
+  font-size: var(--text-body-size-small);
+  color: var(--fgColor-muted);
+}
+.bl-art-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--base-size-6);
+  margin-top: var(--base-size-8);
+}
+.bl-art-actions { display: flex; flex: none; align-items: center; min-width: 11rem; justify-content: flex-end; flex-wrap: wrap; gap: var(--base-size-4); }
+.bl-chip-size { font-weight: var(--base-text-weight-normal); }
+.bl-label-text { margin-inline-start: var(--base-size-4); }
+
+@media (max-width: 900px) {
+  .bl-art-row { flex-wrap: wrap; }
+  .bl-art-main { flex-basis: calc(100% - 2rem); }
+  .bl-art-actions { flex-basis: 100%; justify-content: flex-start; padding-inline-start: calc(16px + var(--base-size-12)); }
+}
+
+/* The viewer dialog: its size is set on the dialog itself (FileViewer.tsx). */
+.bl-viewer-body { padding: var(--base-size-16); }
+/* The report fills the whole body: the frame is laid over it, so it has the body's height. */
+.bl-viewer-body.bl-viewer-body-frame { position: relative; height: 100%; min-height: 0; padding: 0; overflow: hidden; }
+.bl-viewer-iframe {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: var(--borderWidth-thin) solid var(--borderColor-default);
+  /* A report is a document with its own colours and is written for a white page, in either theme. */
+  background: white;
+}
+.bl-viewer-pre {
+  margin: 0;
+  font-family: var(--fontStack-monospace);
+  font-size: var(--text-body-size-small);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.bl-viewer-retry { margin-top: var(--base-size-16); }
+
+/* The loading line sits in the middle of the body. */
+.bl-viewer-center { justify-content: center; width: 100%; padding: var(--base-size-32) 0; }

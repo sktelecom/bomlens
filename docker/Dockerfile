@@ -139,7 +139,7 @@ LABEL org.opencontainers.image.licenses="Apache-2.0"
 # The engine contract this image follows (docs/reference/engine-contract.md),
 # the same value as ENGINE_CONTRACT_VERSION in docker/lib/engine-result.sh.
 # The CLI reads it to tell an image too old for the stage 1 hand-off.
-LABEL com.sktelecom.sbom.engine-contract="1.3.0"
+LABEL com.sktelecom.sbom.engine-contract="1.4.0"
 
 ENV DEBIAN_FRONTEND=noninteractive
 
@@ -241,14 +241,14 @@ ARG AIBOM_GENERATOR_REF=c5a3f2f647b801ab4ab7569aade4a6cdaf1f9591
 # harvest model pedigree / performance metrics that the OWASP tool omits. Opt-in
 # with the aibom image only; enrich-aibom.sh degrades gracefully when it is absent.
 # renovate: datasource=npm depName=@cdxgen/cdxgen
-ARG CDXGEN_VERSION=13.3.0
+ARG CDXGEN_VERSION=13.5.0
 # cdxgen 13 requires Node.js >= 24; Debian's own nodejs package (bundled in the
 # python:3.12-slim base) is still on the 20.x line, so Node is installed from
 # the official upstream release tarball instead of apt. Pinned like syft/trivy/
 # cosign/docker above (this file's established pattern for external tools),
 # arch-mapped via uname -m.
 # renovate: datasource=github-releases depName=nodejs/node
-ARG NODE_VERSION=v24.21.0
+ARG NODE_VERSION=v24.22.1
 # npm as bundled with that Node release carries its own vulnerable copies of
 # tar, ip-address and brace-expansion, and npm stays in the image (it installs
 # cdxgen), so it is replaced by a pinned release with those fixed.
@@ -456,7 +456,9 @@ RUN if [ "$SBOM_FIRMWARE" = "true" ]; then \
 # `grype db update` caches the DB under GRYPE_DB_CACHE_DIR at build time so the
 # image needs no network at scan time; auto-update is disabled at runtime. The
 # build FAILS if the DB is not valid, so a broken cache cannot ship a silent 0-CVE
-# deep-cve image.
+# deep-cve image. grype refuses a DB built more than 5 days ago: scan-nvd-cpe.py
+# updates one older than BOMLENS_GRYPE_DB_MAX_AGE_DAYS (7) days before the match,
+# or reads it as it is (offline) and reports the step as degraded.
 ENV GRYPE_DB_CACHE_DIR=/opt/grype-db \
     GRYPE_DB_AUTO_UPDATE=false
 RUN if [ "$SBOM_DEEP_CVE" = "true" ]; then \
@@ -615,6 +617,17 @@ RUN timeout 1200 python3 /tmp/build-malicious-index.py \
         /usr/local/lib/sbom/malicious-index.json \
     || echo "[build] OSV malicious snapshot skipped; the check will be inactive at scan time" \
     ; rm -f /tmp/build-malicious-index.py
+
+# Bundle a snapshot of the Go vulnerability database (vuln.go.dev/vulndb.zip,
+# about 3.6 MB, kept as published) beside scan-go-vulndb.py, so the security
+# step matches Go modules against it OFFLINE. A newer export can be mounted
+# at scan time and named with BOMLENS_GO_VULNDB_PATH; a scan that is not
+# offline downloads a newer one when this snapshot is older than
+# BOMLENS_GO_VULNDB_MAX_AGE_DAYS (7) days, with the same checks as here.
+# Best-effort in the same way: if the fetch fails no file is written and the
+# go-vulndb step is skipped at scan time. See scan-go-vulndb.py --fetch.
+RUN timeout 300 python3 /usr/local/lib/sbom/scan-go-vulndb.py --fetch /usr/local/lib/sbom/go-vulndb.zip \
+    || echo "[build] Go vulnerability database snapshot skipped; the go-vulndb step will be skipped at scan time"
 
 WORKDIR /src
 

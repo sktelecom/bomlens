@@ -1,0 +1,46 @@
+/*
+ * Copyright 2026 SK Telecom Co., Ltd.
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+/*
+ * Submitted SBOM screen (components/InputSbomPanel.tsx). One box (.bl-box) holding
+ * the document header and its facts, then a line pointing at the Components
+ * screen. Names and identifiers wrap, never truncate. Colours and spaces are
+ * Primer variables.
+ */
+
+.bl-is { margin-top: var(--base-size-16); display: flex; flex-direction: column; gap: var(--base-size-12); }
+.bl-is > p { margin: 0; max-width: 60rem; font-size: var(--text-body-size-medium); color: var(--fgColor-muted); }
+.bl-is-box { max-width: 64rem; }
+
+.bl-is-head { flex-wrap: wrap; gap: var(--base-size-4) var(--base-size-8); }
+.bl-is-head svg { flex: none; color: var(--fgColor-muted); }
+.bl-is-head h2 { min-width: 0; font-family: var(--fontStack-monospace); overflow-wrap: anywhere; }
+.bl-is-size { color: var(--fgColor-muted); font-size: var(--text-body-size-small); }
+.bl-is-count { margin-inline-start: auto; }
+
+.bl-is-facts { margin: 0; }
+.bl-is-fact {
+  display: grid;
+  grid-template-columns: minmax(0, 10rem) minmax(0, 1fr);
+  gap: var(--base-size-12);
+  padding: var(--base-size-8) var(--base-size-16);
+  border-top: var(--borderWidth-thin) solid var(--borderColor-muted);
+  font-size: var(--text-body-size-medium);
+}
+.bl-is-fact:first-child { border-top: 0; }
+.bl-is-fact dt { color: var(--fgColor-muted); overflow-wrap: anywhere; }
+.bl-is-fact dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+.bl-is-mono { font-family: var(--fontStack-monospace); }
+.bl-is-copy { vertical-align: middle; margin-inline-start: var(--base-size-4); }
+
+.bl-is-state {
+  min-height: 6rem;
+  padding: var(--base-size-24);
+  display: flex;
+  align-items: center;
+  gap: var(--base-size-12);
+  color: var(--fgColor-muted);
+  font-size: var(--text-body-size-medium);
+}

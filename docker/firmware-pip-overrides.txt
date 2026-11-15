@@ -15,3 +15,6 @@
 # Delete a line once gsutil's own pin reaches or passes it.
 httplib2==0.32.0  # replaces httplib2==0.20.4 (CVE-2026-59939)
 pyOpenSSL==26.4.0  # replaces pyOpenSSL==22.0.0 (CVE-2026-27459, CVE-2026-27448)
+# brotli is a transitive dependency of the firmware tools. 1.2.1 is newer than
+# 14 days; it is the first release with the decoder fix for CVE-2026-111497.
+brotli==1.2.1  # replaces brotli==1.2.0 (CVE-2026-111497)

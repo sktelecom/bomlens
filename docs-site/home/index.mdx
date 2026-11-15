@@ -1,0 +1,152 @@
+---
+title: Local SBOM generator and open-source risk assessor
+description: Make a CycloneDX SBOM, a notice and a risk report from source, containers or firmware. No SaaS.
+template: splash
+tableOfContents: false
+---
+
+import { Card, CardGrid } from '@astrojs/starlight/components';
+import HomeSearch from '../../components/HomeSearch.astro';
+
+export const sampleBom = `{
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.6",
+  "components": [
+    { "name": "log4j-core",
+      "version": "2.14.1",
+      "type": "library" }
+  ]
+}`;
+export const sampleNotice = `log4j-core 2.14.1
+License: Apache-2.0
+https://logging.apache.org/log4j/2.x/
+
+Licensed under the Apache License,
+Version 2.0 (the "License"); ...`;
+export const sampleSecurity = `log4j-core 2.14.1
+CVE-2021-44228  CRITICAL
+Fixed in: 2.15.0
+CISA KEV: yes`;
+export const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+
+<div class="home" data-glow="on">
+
+<section class="home-hero">
+
+# Generate SBOMs and assess <span class="nowrap">open-source</span> risk, all locally
+
+<p class="home-lead">Give it source code, a container, firmware or an SBOM you received. One run produces an SBOM, an <span class="nowrap">open-source</span> notice and a risk report. No SaaS and no account.</p>
+
+<div class="home-actions">
+  <a class="btn btn-primary" href={`${base}/start/first-scan/`}>Run your first scan</a>
+  <a class="btn" href={`${base}/demo/`}>Open the live demo</a>
+</div>
+
+<button type="button" class="home-search" data-open-search aria-keyshortcuts="Control+K Meta+K">
+  <svg aria-hidden="true" viewBox="0 0 16 16" width="16" height="16"><path fill="currentColor" d="M10.68 11.74a6 6 0 0 1-7.922-8.982 6 6 0 0 1 8.982 7.922l3.04 3.04a.749.749 0 0 1-.326 1.275.749.749 0 0 1-.734-.215ZM11.5 7a4.499 4.499 0 1 0-8.997 0A4.499 4.499 0 0 0 11.5 7Z"/></svg>
+  <span>Search guides, options and reports</span>
+  <kbd aria-hidden="true">⌘ K</kbd>
+</button>
+
+</section>
+
+<section class="home-start" aria-labelledby="home-start-title">
+  <h2 id="home-start-title" class="home-eyebrow">Common tasks</h2>
+  <div class="start-grid">
+    <a class="start-card" href={`${base}/guides/supplier-sbom/`}>
+      <strong>Check a supplier SBOM</strong>
+      <span>Validate an SBOM you received and issue a risk report.</span>
+    </a>
+    <a class="start-card" href={`${base}/guides/ci-cd/`}>
+      <strong>Use it in CI</strong>
+      <span>Run scans in a pipeline and gate on the result.</span>
+    </a>
+    <a class="start-card" href={`${base}/guides/reports/`}>
+      <strong>Read the outputs</strong>
+      <span>Generate the notice and security report and learn to read them.</span>
+    </a>
+    <a class="start-card" href={`${base}/reference/cli/`}>
+      <strong>CLI options</strong>
+      <span>Every option and analysis mode in one place.</span>
+    </a>
+  </div>
+</section>
+
+<section class="home-meta">
+  <div class="chips" aria-label="Works on">
+    <span class="home-eyebrow">Works on</span>
+    <a class="chip" href={`${base}/guides/by-input/`}>Source code</a>
+    <a class="chip" href={`${base}/guides/by-input/`}>Containers</a>
+    <a class="chip" href={`${base}/guides/firmware/`}>Firmware</a>
+    <a class="chip" href={`${base}/guides/supplier-sbom/`}>A received SBOM</a>
+    <a class="chip" href={`${base}/guides/ai-model/`}>AI models</a>
+  </div>
+  <ul class="trust">
+    <li>CycloneDX 1.6</li>
+    <li>Runs on your machine</li>
+    <li>OWASP Incubator project</li>
+    <li>Apache-2.0</li>
+  </ul>
+</section>
+
+<HomeSearch />
+
+<section class="home-samples" aria-labelledby="home-samples-title">
+  <h2 id="home-samples-title">What one run produces</h2>
+  <p class="home-sub">File names match the real outputs. Contents are shortened excerpts.</p>
+  <div class="sample-grid">
+    <figure class="sample">
+      <figcaption><span class="dots" aria-hidden="true"></span>MyApp_1.0.0_bom.json</figcaption>
+      <pre tabindex="0"><code>{sampleBom}</code></pre>
+      <p>The SBOM. Components, licenses and dependencies in CycloneDX 1.6.</p>
+    </figure>
+    <figure class="sample">
+      <figcaption><span class="dots" aria-hidden="true"></span>MyApp_1.0.0_NOTICE.txt</figcaption>
+      <pre tabindex="0"><code>{sampleNotice}</code></pre>
+      <p>The open-source notice. Standard text you can ship with the distribution.</p>
+    </figure>
+    <figure class="sample">
+      <figcaption><span class="dots" aria-hidden="true"></span>MyApp_1.0.0_security.md</figcaption>
+      <pre tabindex="0"><code>{sampleSecurity}</code></pre>
+      <p>The security report. Vulnerabilities, fixed versions and the signals to check first.</p>
+    </figure>
+  </div>
+</section>
+
+## What it does
+
+BomLens is a local-first SBOM generator and open-source risk assessor for a single project. From source code, a container image, a binary, firmware, an SBOM you received, or a HuggingFace AI model, it produces an [SBOM](concepts/what-is-sbom.md) (CycloneDX 1.6), an open-source notice, and a security risk report in one run. For an AI model it builds a CycloneDX ML-BOM and checks it against the [G7 minimum elements for AI](guides/ai-model.md), whose clusters overlap with the EU AI Act's Annex IV.
+
+![BomLens web UI Overview screen for a finished scan: component, vulnerability, dependency and artifact counts, a needs-attention banner, and the severity and license classification distributions](./images/web-ui-demo.png)
+
+Want to see what a result looks like before installing anything? The <a href={`${base}/demo/`}>live demo</a> is the real web UI holding one finished scan of each kind: a Spring Boot project from source, a container image, a device firmware image, an AI model as a CycloneDX ML-BOM, and a supplier SBOM checked against the format requirements. Nothing to install, and nothing is uploaded: it is a frozen copy of results produced by ordinary local runs.
+
+Prefer no command line? Download the installer and double-click it. A Docker engine is required; the free [Rancher Desktop](https://rancherdesktop.io/) works well on Windows. A step-by-step walkthrough is in the [no-CLI quick start](start/no-cli.md). [Download for Windows (.exe)](https://github.com/sktelecom/bomlens/releases/latest/download/BomLens-Setup.exe).
+
+## More guides
+
+<CardGrid>
+  <Card title="CLI reference">
+
+Every option and analysis mode.
+
+[CLI reference](reference/cli.md)
+
+  </Card>
+  <Card title="Notice and security report">
+
+Generate and read the outputs, plus using the web UI.
+
+[Notice and security report](guides/reports.md)
+
+  </Card>
+  <Card title="AI model SBOM">
+
+An ML-BOM for a HuggingFace model, checked against the G7 minimum elements and mapped to the EU AI Act.
+
+[AI model SBOM](guides/ai-model.md)
+
+  </Card>
+</CardGrid>
+
+</div>

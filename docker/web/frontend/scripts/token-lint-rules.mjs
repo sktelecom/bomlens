@@ -56,13 +56,16 @@ export const RULES = [
         line,
       ) && !/aria-hidden/.test(line),
   },
-  // The brand red marks the primary action, the logo and keyboard focus. It is
-  // not a data colour and not decoration: on a switch, a drop target, a callout
-  // or a link it reads as "problem" or "look here" next to the severity colours.
-  // So the rule is an allow list, not a deny list: a brand token is accepted
-  // only in BRAND_ALLOWED_FILES (the primary button variant). The logo is an
-  // image and the focus ring is the `ring` colour (`--ring`), neither of which
-  // is a brand utility class. Anything else uses a neutral, a role or a category.
+  // The brand navy marks the primary action, links, the logo and keyboard
+  // focus. It is not a data colour and not decoration: on a badge, a chart, a
+  // drop target or a callout it competes with the primary action and reads as
+  // "click here". So the rule is an allow list, not a deny list: a brand utility
+  // is accepted only in BRAND_ALLOWED_FILES (the primary button variant). The
+  // logo is an image and the focus ring is the `ring` colour (`--ring`), neither
+  // of which is a brand utility class. Primer controls (checkbox, radio, toggle
+  // switch) take the accent through Primer's own variables (src/primer.css),
+  // which is allowed; this rule covers the Tailwind brand classes. Anything else
+  // uses a neutral, a role or a category.
   {
     name: "brand token outside the allow list (primary button, logo, focus ring only)",
     test: (line, file = "") => BRAND_TOKEN.test(line) && !BRAND_ALLOWED_FILES.test(file.replace(/\\/g, "/")),
@@ -73,6 +76,24 @@ export const RULES = [
     name: "arbitrary font size (use a role size: text-caption, text-label, text-body-sm ...)",
     re: /\btext-\[\s*[\d.]+(?:px|rem|em|pt)\s*\]/,
   },
+  // Shape rules. A thick bar on the left edge of a card, row or menu item is
+  // not part of the design language (Primer's own active-item bar is hidden in
+  // src/primer.css), and corners and shadows come from the token scale
+  // (rounded-sm/md/lg/full, shadow-sm/md/lg, or a Primer variable), not from a
+  // value typed at the call site. A 1px left border (border-l) is a divider and
+  // stays allowed.
+  {
+    name: "thick left accent border (border-l-2 and up, or a left border of 2px or more)",
+    test: (line) => hasLeftBarClass(line) || hasLeftBarStyle(line),
+  },
+  {
+    name: "arbitrary shadow (use shadow-sm/md/lg or a Primer shadow variable)",
+    test: (line) => ARBITRARY_SHADOW_CLASS.test(line) || LITERAL_SHADOW_STYLE.test(line),
+  },
+  {
+    name: "arbitrary corner radius (use rounded-sm/md/lg/full or a Primer radius variable)",
+    test: (line) => ARBITRARY_RADIUS_CLASS.test(line) || LITERAL_RADIUS_STYLE.test(line),
+  },
   // Tailwind's own size names were removed from the theme (tailwind.config.ts),
   // so a leftover one would silently render at the inherited size.
   {
@@ -81,9 +102,9 @@ export const RULES = [
   },
 ];
 
-/** A brand utility class (bg-brand/10, text-brand-strong, hover:border-brand) or the CSS variable. */
+/** A brand utility class (bg-brand/10, text-brand-strong, hover:bg-brand-hover) or the CSS variable. */
 export const BRAND_TOKEN =
-  /--brand\b|(?:^|[^\w-])(?:[\w-]+:)*(?:bg|text|border|ring|ring-offset|outline|decoration|divide|placeholder|caret|accent|fill|stroke|shadow|from|via|to)-brand(?:-(?:foreground|accent|strong))?(?:\/\d+)?(?![\w-])/;
+  /--brand\b|(?:^|[^\w-])(?:[\w-]+:)*(?:bg|text|border|ring|ring-offset|outline|decoration|divide|placeholder|caret|accent|fill|stroke|shadow|from|via|to)-brand(?:-(?:foreground|strong|hover))?(?:\/\d+)?(?![\w-])/;
 
 /** The only files that may use a brand utility: the Button variants (the primary
  *  action). Add a file here only for a primary action, never for data or decoration. */
@@ -94,3 +115,54 @@ export function lintLine(line, file = "") {
   if (/token-lint-ignore/.test(line)) return [];
   return RULES.filter((r) => (r.re ? r.re.test(line) : r.test(line, file))).map((r) => r.name);
 }
+
+/** A CSS length in px (rem and em at 16px), or null when the text is not a
+ *  plain length (a keyword, a var(), a colour). */
+export function lengthPx(text) {
+  const m = /^\s*(\d*\.?\d+)\s*(px|rem|em)?\s*$/.exec(text);
+  if (!m) return null;
+  const n = Number(m[1]);
+  return m[2] === "rem" || m[2] === "em" ? n * 16 : n;
+}
+
+/** border-l-2, border-s-4, md:border-l-[3px], border-l-[0.25rem]: a left or
+ *  inline-start border of 2px or more. border-l, border-l-0, border-l-[1px],
+ *  border-l-[0px] and colour classes (border-l-border) pass. */
+export function hasLeftBarClass(line) {
+  for (const m of line.matchAll(/(?:^|[^\w-])(?:[\w-]+:)*border-[ls]-(\d+|\[[^\]]*\])/g)) {
+    const v = m[1];
+    const px = v.startsWith("[") ? lengthPx(v.slice(1, -1)) : Number(v);
+    if (px !== null && px >= 2) return true;
+  }
+  return false;
+}
+
+/** borderLeft: "3px solid ...", borderLeft: "0.25rem solid", borderLeftWidth: 2,
+ *  border-left: 4px ..., border-inline-start-width: 2px. The first word of the
+ *  value is read as a length; under 2px passes. */
+export function hasLeftBarStyle(line) {
+  const re = /\bborder(?:Left|InlineStart|-left|-inline-start)(?:Width|-width)?\s*:\s*["'`]?\s*([\d.]+(?:px|rem|em)?)(?![\w.])/g;
+  for (const m of line.matchAll(re)) {
+    const px = lengthPx(m[1]);
+    if (px !== null && px >= 2) return true;
+  }
+  return false;
+}
+
+/** shadow-[0_1px_2px_...], hover:shadow-[...]. shadow-[var(--...)] (a Primer
+ *  shadow variable) passes. */
+export const ARBITRARY_SHADOW_CLASS = /(?:^|[^\w-])(?:[\w-]+:)*shadow-\[(?!\s*var\()/;
+/** boxShadow: "0 1px 2px ...", box-shadow: inset ... A quoted value other than
+ *  none, a var() or a template, or an unquoted number or `inset`, is a literal.
+ *  An unquoted identifier (boxShadow: theShadow) is a variable and passes. */
+export const LITERAL_SHADOW_STYLE =
+  /\b(?:boxShadow|box-shadow)\s*:\s*(?:["'`]\s*(?!none\b|var\(|inherit\b|initial\b|unset\b|["'`]|\$\{)\S|(?:\d|\.\d|inset\b))/;
+/** rounded-[10px], rounded-tl-[4px], md:rounded-[1.5rem]. rounded-[var(--...)]
+ *  (a Primer radius variable) passes. */
+export const ARBITRARY_RADIUS_CLASS =
+  /(?:^|[^\w-])(?:[\w-]+:)*rounded(?:-(?:[trblse]|tl|tr|bl|br|ss|se|es|ee))?-\[(?!\s*var\()/;
+/** borderRadius: 8, borderRadius: 0.5, borderTopLeftRadius: "4px", "0.375rem",
+ *  "0px 4px", border-radius: 6px. Only a single zero (0, "0px", "0rem") or a
+ *  var() / identifier passes. */
+export const LITERAL_RADIUS_STYLE =
+  /\b(?:border(?:[A-Z][a-z]+)*Radius|border(?:-[a-z]+)*-radius)\s*:\s*["'`]?\s*(?!0(?:px|rem|em|%)?\s*(?:["'`;,})]|$))(?:\d|\.\d)/;

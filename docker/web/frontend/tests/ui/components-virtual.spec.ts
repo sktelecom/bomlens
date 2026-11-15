@@ -7,7 +7,7 @@ import { expect, test, type Page } from "@playwright/test";
  * Large-SBOM component table: rows render in per-chunk <tbody> elements and
  * chunks far from the viewport are recycled into measured spacers, so the
  * whole filtered set is scrollable without the "show more" clicks the table
- * used to need — and without holding thousands of rows in the DOM.
+ * used to need, and without holding thousands of rows in the DOM.
  */
 
 const N = 600;
@@ -55,15 +55,15 @@ test("the full set is scrollable with a recycled DOM and no show-more clicks", a
   await expect(page.getByRole("button", { name: /show .* more/i })).toHaveCount(0);
 
   // Far fewer real rows than components: offscreen chunks are spacers.
-  const rows = () => page.locator("tbody tr[role='button']").count();
+  const rows = () => page.locator("tbody[data-live='true'] button[aria-expanded]").count();
   expect(await rows()).toBeLessThan(N);
 
-  // Scroll the table container to the bottom; the LAST component materializes.
-  const container = page.locator("table").locator("xpath=ancestor::div[1]");
-  await container.evaluate((el) => el.scrollTo({ top: el.scrollHeight }));
+  // Scroll the page to the bottom (the table has no scroll box of its own); the
+  // LAST component materializes.
+  await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
   await expect(page.getByText(`pkg-${String(N - 1).padStart(4, "0")}`)).toBeVisible();
 
-  // The top chunk got recycled meanwhile — the DOM still holds a window,
+  // The top chunk got recycled meanwhile: the DOM still holds a window,
   // not the whole list.
   expect(await rows()).toBeLessThan(N);
 });
