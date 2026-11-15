@@ -59,6 +59,7 @@ export default defineConfig({
       defaultLocale: 'root',
       locales: { root: { label: 'English', lang: 'en' }, ko: { label: '한국어', lang: 'ko' } },
       favicon: '/favicon.svg',
+      logo: { src: './src/assets/logo-mark.svg', alt: 'BomLens' },
       customCss: ['./src/styles/bomlens-tokens.css', './src/styles/github-like.css'],
       social: [{ icon: 'github', label: 'GitHub', href: 'https://github.com/sktelecom/bomlens' }],
       // The edit link target is set per page in src/routeData.ts. The base URL here only

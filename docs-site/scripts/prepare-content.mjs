@@ -92,6 +92,8 @@ for (const card of ['og-card.png', 'og-card-ko.png']) {
   fs.copyFileSync(path.join(source, 'images', card), path.resolve(here, '../public/images', card));
 }
 fs.copyFileSync(path.join(source, 'images/logo-mark.svg'), path.resolve(here, '../public/favicon.svg'));
+fs.mkdirSync(path.resolve(here, '../src/assets'), { recursive: true });
+fs.copyFileSync(path.join(source, 'images/logo-mark.svg'), path.resolve(here, '../src/assets/logo-mark.svg'));
 
 // The demo is a prebuilt single-page app (scripts/build-demo-bundle.sh) with its
 // base path baked in as /bomlens/demo/, so it only works when the site is served at
