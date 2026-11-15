@@ -45,6 +45,16 @@
   --sl-color-bg-inline-code: hsl(var(--muted));
 }
 
+/* Header title: body text colour, close to the mark */
+.header a.site-title {
+  color: var(--sl-color-white);
+  gap: 0.5rem;
+  font-weight: 600;
+  font-size: 1.0625rem;
+}
+.header a.site-title img,
+.header a.site-title svg { height: 28px; width: 28px; }
+
 /* Body text */
 .sl-markdown-content a:not(.sl-link-button):not(.card a) {
   color: var(--sl-color-text-accent);
