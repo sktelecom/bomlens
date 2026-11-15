@@ -441,9 +441,9 @@ report_type_label() {
 }
 
 # The logo mark, drawn inline (a report is one file under a CSP that blocks
-# images). Same drawing and colours as docker/web/frontend/public/logo.svg.
+# images). Same mark and colours as docker/web/frontend/public/logo.svg (blue tile, white aperture).
 report_logo_svg() {
-    printf '%s' '<svg viewBox="0 0 48 48" aria-hidden="true" focusable="false"><defs><linearGradient id="bl-mark" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#EA002C"/><stop offset="1" stop-color="#F47725"/></linearGradient></defs><rect width="48" height="48" rx="11" fill="url(#bl-mark)"/><g transform="translate(12 12)" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="14.31" y1="8" x2="20.05" y2="17.94"/><line x1="9.69" y1="8" x2="21.17" y2="8"/><line x1="7.38" y1="12" x2="13.12" y2="2.06"/><line x1="9.69" y1="16" x2="3.95" y2="6.06"/><line x1="14.31" y1="16" x2="2.83" y2="16"/><line x1="16.62" y1="12" x2="10.88" y2="21.94"/></g></svg>'
+    printf '%s' '<svg viewBox="0 0 48 48" aria-hidden="true" focusable="false"><rect width="48" height="48" rx="11" fill="#1d4ed8"/><g fill="none" stroke="#ffffff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="24" cy="24" r="12"/><line x1="27.23" y1="19.28" x2="33.19" y2="31.71"/><line x1="29.7" y1="24.44" x2="21.92" y2="35.82"/><line x1="26.47" y1="29.16" x2="12.72" y2="28.1"/><line x1="20.77" y1="28.72" x2="14.81" y2="16.29"/><line x1="18.3" y1="23.56" x2="26.08" y2="12.18"/><line x1="21.53" y1="18.84" x2="35.28" y2="19.9"/></g></svg>'
 }
 
 # report_project_html NAME_HTML VERSION: "Project version", the version muted.

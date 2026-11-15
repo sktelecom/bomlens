@@ -309,7 +309,7 @@
         cursor: pointer;
         text-decoration: none;
       }
-      /* Brand red is reserved for the one primary action, the logo and the focus ring. */
+      /* The brand blue is reserved for the one primary action, the logo and the focus ring. */
       .btn.primary {
         color: var(--s-brand-fg);
         background: var(--s-brand);
@@ -395,7 +395,10 @@
       <button type="button" data-lang="ko">KO</button>|<button type="button" data-lang="en">EN</button>
     </nav>
     <main>
-      <img class="logo" src="logo.svg" alt="BomLens: SBOM Generator" />
+      <picture>
+        <source media="(prefers-color-scheme: dark)" srcset="logo-dark.svg" />
+        <img class="logo" src="logo.svg" alt="BomLens" />
+      </picture>
       <h1 id="title"></h1>
       <p id="subtitle"></p>
       <ol id="steps"></ol>

@@ -15,8 +15,8 @@
 <text x="440.0" y="148.0" text-anchor="middle" font-family="'Apple SD Gothic Neo','Noto Sans CJK KR','Malgun Gothic',sans-serif" font-size="17" font-weight="600" fill="#1c2228">OWASP AIBOM Generator</text>
 <text x="440.0" y="173.0" text-anchor="middle" font-family="'Apple SD Gothic Neo','Noto Sans CJK KR','Malgun Gothic',sans-serif" font-size="14" fill="#5c6773">모델 카드 메타데이터 조회</text>
 <path d="M440,84 L440,128" fill="none" stroke="#9aa4af" stroke-width="1.5" marker-end="url(#arr)"/>
-<rect x="345" y="232" width="190" height="56" rx="8" fill="#ffffff" stroke="#EA002C" stroke-width="1.6" filter="url(#sh)"/>
-<text x="440.0" y="250.0" text-anchor="middle" font-family="'Apple SD Gothic Neo','Noto Sans CJK KR','Malgun Gothic',sans-serif" font-size="17" font-weight="600" fill="#EA002C">ML-BOM</text>
+<rect x="345" y="232" width="190" height="56" rx="8" fill="#ffffff" stroke="#1d4ed8" stroke-width="1.6" filter="url(#sh)"/>
+<text x="440.0" y="250.0" text-anchor="middle" font-family="'Apple SD Gothic Neo','Noto Sans CJK KR','Malgun Gothic',sans-serif" font-size="17" font-weight="600" fill="#1d4ed8">ML-BOM</text>
 <text x="440.0" y="275.0" text-anchor="middle" font-family="'Apple SD Gothic Neo','Noto Sans CJK KR','Malgun Gothic',sans-serif" font-size="14" fill="#5c6773">CycloneDX 1.7</text>
 <path d="M440,188 L440,232" fill="none" stroke="#9aa4af" stroke-width="1.5" marker-end="url(#arr)"/>
 <rect x="250" y="332" width="380" height="60" rx="8" fill="#ffffff" stroke="#d6dbe1" stroke-width="1" filter="url(#sh)"/>

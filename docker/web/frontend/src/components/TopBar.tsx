@@ -121,8 +121,22 @@ export function TopBar({
   const narrow = useMediaQuery(NARROW_QUERY);
   // BASE_URL, not "/": the demo is served from a sub-path, where a rooted src
   // would look outside the deployment. It is "/" in a normal build.
+  // Two files, one shown per theme (the `.dark` class on the root element, rules in primer.css): the wordmark text is
+  // outlined, so the logo cannot follow the theme by itself. Both carry the name;
+  // the hidden one is display:none and so is not read.
   const logo = (
-    <img src={`${import.meta.env.BASE_URL}logo.svg`} alt={t("appTitle")} className="bl-topbar-logo" />
+    <>
+      <img
+        src={`${import.meta.env.BASE_URL}logo.svg`}
+        alt={t("appTitle")}
+        className="bl-topbar-logo bl-logo-light"
+      />
+      <img
+        src={`${import.meta.env.BASE_URL}logo-dark.svg`}
+        alt={t("appTitle")}
+        className="bl-topbar-logo bl-logo-dark"
+      />
+    </>
   );
   return (
     <header className="bl-topbar">

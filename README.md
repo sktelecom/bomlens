@@ -1,5 +1,8 @@
 <p align="center">
-  <img src="docs/images/logo.svg" alt="BomLens — an SBOM generator" width="300" />
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/images/logo-dark.svg" />
+    <img src="docs/images/logo.svg" alt="BomLens" width="220" />
+  </picture>
 </p>
 
 <h1 align="center">BomLens</h1>
