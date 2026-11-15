@@ -7,11 +7,17 @@
 import Default from '@astrojs/starlight/components/Footer.astro';
 import Mermaid from './Mermaid.astro';
 import CodeFocus from './CodeFocus.astro';
+const ko = Astro.url.pathname.includes('/ko/');
+const owasp = 'https://owasp.org/www-project-bomlens/';
 ---
 
 <Default {...Astro.props}><slot /></Default>
 <Mermaid />
 <CodeFocus />
+<p class="site-copyright">
+  <a href={owasp}>OWASP BomLens</a>{ko ? ', OWASP Incubator 프로젝트' : ', an OWASP Incubator Project'} &middot;
+  <a href="https://github.com/sktelecom/bomlens/blob/main/CONTRIBUTING.md">{ko ? '기여 방법' : 'Contributing'}</a>
+</p>
 <p class="site-copyright">
   Copyright &copy; 2026 SK Telecom Co., Ltd. &middot;
   <a href="https://github.com/sktelecom/bomlens/blob/main/LICENSE">Apache-2.0</a> &middot;
