@@ -261,6 +261,22 @@ test("the logo links home, except on the home screen itself", async ({ page }) =
   await expect(banner.getByRole("link", { name: "New scan" })).toHaveAttribute("href", "#/new");
 });
 
+for (const [theme, shown, hidden] of [
+  ["light", "logo.svg", "logo-dark.svg"],
+  ["dark", "logo-dark.svg", "logo.svg"],
+] as const) {
+  test(`the top bar shows only ${shown} in the ${theme} theme`, async ({ page }) => {
+    await seedThemeLang(page, theme, "en");
+    await stub(page);
+    await page.goto("/?ui=next#/new");
+    await page.locator("#project").waitFor();
+    const banner = page.getByRole("banner");
+    await expect(banner.locator(`img[src$="/${shown}"]`)).toBeVisible();
+    await expect(banner.locator(`img[src$="/${hidden}"]`)).toBeHidden();
+    await expect(banner.getByRole("img", { name: "BomLens" })).toHaveCount(1);
+  });
+}
+
 test("the Recent menu says when there are no scans yet", async ({ page }) => {
   await seedThemeLang(page, "light", "en");
   await stub(page, { scans: [] });

@@ -11,21 +11,18 @@ import { pathToFileURL } from "node:url";
 // the @capture tag keeps it out of the normal `test:ui` run, like the guide
 // screenshots in capture.spec.ts.
 //
-// 1200x630 is the Open Graph size; deviceScaleFactor 2 writes it at 2400x1260
-// so the card stays sharp where platforms render it larger.
+// 1200x630 is the Open Graph size, and both cards are written at it.
 const IMAGES = "../../../docs/images";
 
-test.use({ viewport: { width: 1200, height: 630 }, deviceScaleFactor: 2 });
+test.use({ viewport: { width: 1200, height: 630 } });
 
 test("@capture og card", async ({ page }) => {
   const source = path.resolve(process.cwd(), `${IMAGES}/src/og-card.html`);
   await page.goto(pathToFileURL(source).href);
   await page.evaluate(() => document.fonts.ready);
-  await page.screenshot({ path: `${IMAGES}/og-card.png` });
+  await page.screenshot({ path: `${IMAGES}/og-card.png`, scale: "css" });
 });
 
-// The Korean card (docs/images/og-card-ko.png) is written at CSS size, a plain
-// 1200x630, because that is the size the sharing platforms ask for.
 test("@capture og card ko", async ({ page }) => {
   const source = path.resolve(process.cwd(), `${IMAGES}/src/og-card-ko.html`);
   await page.goto(pathToFileURL(source).href);

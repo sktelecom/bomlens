@@ -29,8 +29,8 @@
 <text x="688.0" y="178" text-anchor="start" font-family="'Helvetica Neue',Helvetica,Arial,sans-serif" font-size="13" font-weight="400" fill="#8a94a0">image / file / RootFS</text>
 <path d="M210.0,254 L210.0,286" fill="none" stroke="#9aa4af" stroke-width="1.5" marker-end="url(#arr)"/>
 <path d="M210.0,346 L210.0,378" fill="none" stroke="#9aa4af" stroke-width="1.5" marker-end="url(#arr)"/>
-<rect x="375" y="470" width="190" height="56" rx="8" fill="#ffffff" stroke="#EA002C" stroke-width="1.6" filter="url(#sh)"/>
-<text x="470.0" y="498.0" text-anchor="middle" font-family="'Helvetica Neue',Helvetica,Arial,sans-serif" font-size="17" font-weight="600" fill="#EA002C">bom.json</text>
+<rect x="375" y="470" width="190" height="56" rx="8" fill="#ffffff" stroke="#1d4ed8" stroke-width="1.6" filter="url(#sh)"/>
+<text x="470.0" y="498.0" text-anchor="middle" font-family="'Helvetica Neue',Helvetica,Arial,sans-serif" font-size="17" font-weight="600" fill="#1d4ed8">bom.json</text>
 <path d="M210.0,424 L210.0,446 L440.0,446 L440.0,470" fill="none" stroke="#9aa4af" stroke-width="1.5" marker-end="url(#arr)"/>
 <path d="M680.0,346 L680.0,446 L500.0,446 L500.0,470" fill="none" stroke="#9aa4af" stroke-width="1.5" marker-end="url(#arr)"/>
 <rect x="320" y="560" width="300" height="56" rx="8" fill="#ffffff" stroke="#d6dbe1" stroke-width="1" filter="url(#sh)"/>

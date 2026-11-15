@@ -148,20 +148,25 @@
   outline: 2px solid var(--focus-outlineColor);
   outline-offset: 2px;
 }
-/* public/logo.svg is a 232x48 viewBox. Its text is drawn by the browser from
- * whatever font the system has, so the tagline ends at x=177 with Arial or
- * Helvetica and at x=186 with a wide face such as Verdana. Cut the box at
- * x=192: the widest measured case fits whole, and the empty edge costs about
- * 9px at 28px height. */
+/* public/logo.svg (light) and logo-dark.svg are 169x48 viewBoxes with the
+ * wordmark outlined, so the box needs no crop. The dark file is shown under
+ * `.dark`, the light one otherwise. */
 .bl-topbar-logo {
   --bl-logo-height: 28px;
   display: block;
   flex: none;
   height: var(--bl-logo-height);
-  width: calc(var(--bl-logo-height) * 192 / 48);
+  width: calc(var(--bl-logo-height) * 169 / 48);
   max-width: none;
-  object-fit: cover;
-  object-position: left center;
+}
+.bl-topbar-logo.bl-logo-dark {
+  display: none;
+}
+.dark .bl-topbar-logo.bl-logo-light {
+  display: none;
+}
+.dark .bl-topbar-logo.bl-logo-dark {
+  display: block;
 }
 .bl-path {
   display: flex;
