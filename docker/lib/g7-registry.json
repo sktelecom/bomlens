@@ -74,7 +74,8 @@
           "label_ko": "SBOM 생성 맥락",
           "role": "sbom-author",
           "source": "inferred",
-          "cdxPath": "[ (.metadata.properties // [])[]? | select((.name // \"\") == \"bomlens:generationContext\") ] | length > 0"
+          "cdxPath": "([ (.metadata.properties // [])[]? | select((.name // \"\") == \"bomlens:generationContext\") ] | length > 0) or (((.metadata.lifecycles // []) | length) > 0)",
+          "viaPath": "[ if (([ (.metadata.properties // [])[]? | select((.name // \"\") == \"bomlens:generationContext\") ] | length > 0) | not) and (((.metadata.lifecycles // []) | length) > 0) then \"metadata.lifecycles\" else empty end ]"
         },
         {
           "id": "g7-meta-timestamp",
@@ -211,8 +212,9 @@
           "label_ko": "모델 식별자",
           "role": "sbom-author",
           "source": "auto",
-          "missingPath": "[ $subjects[] | select(((.purl // \"\") == \"\") and ((.cpe // \"\") == \"\")) | (.name // \"(unnamed)\") ]",
-          "evidencePath": "[ $subjects[] | (.purl // .cpe) | select(. != null and . != \"\") ] | unique"
+          "missingPath": "[ $subjects[] | select(((.purl // \"\") == \"\") and ((.cpe // \"\") == \"\") and ([ ((.properties // []) + (.modelCard.properties // []))[]? | select((.name == \"aisbom:hf:repo_id\") and ((.value // \"\") != \"\")) ] | length == 0)) | (.name // \"(unnamed)\") ]",
+          "evidencePath": "([ $subjects[] | (.purl // .cpe) ] + [ $subjects[] | (((.properties // []) + (.modelCard.properties // []))[]? | select((.name == \"aisbom:hf:repo_id\") and ((.value // \"\") != \"\"))) | .value ]) | map(select(. != null and . != \"\")) | unique",
+          "viaPath": "[ $subjects[] | select(((.purl // \"\") == \"\") and ((.cpe // \"\") == \"\")) | (((.properties // []) + (.modelCard.properties // []))[]? | select((.name == \"aisbom:hf:repo_id\") and ((.value // \"\") != \"\"))) | .name ] | unique"
         },
         {
           "id": "g7-model-version",
@@ -220,7 +222,8 @@
           "label_ko": "모델 버전",
           "role": "model-producer",
           "source": "auto",
-          "missingPath": "[ $subjects[] | select((.version // \"\") == \"\") | (.name // \"(unnamed)\") ]"
+          "missingPath": "[ $subjects[] | select(((.version // \"\") == \"\") and ([ ((.properties // []) + (.modelCard.properties // []))[]? | select((.name == \"k8s-aibom:model:revision\" or .name == \"aisbom:hf:revision\") and ((.value // \"\") != \"\")) ] | length == 0)) | (.name // \"(unnamed)\") ]",
+          "viaPath": "[ $subjects[] | select((.version // \"\") == \"\") | (((.properties // []) + (.modelCard.properties // []))[]? | select((.name == \"k8s-aibom:model:revision\" or .name == \"aisbom:hf:revision\") and ((.value // \"\") != \"\"))) | .name ] | unique"
         },
         {
           "id": "g7-model-timestamp",
@@ -294,8 +297,9 @@
           "label_ko": "모델 라이선스",
           "role": "model-producer",
           "source": "auto",
-          "missingPath": "[ $subjects[] | select(((.licenses // []) | length) == 0) | (.name // \"(unnamed)\") ]",
-          "evidencePath": "[ $subjects[] | .licenses[]? | (.license.id // .license.name // .expression) | select(. != null and . != \"\") ] | unique"
+          "missingPath": "[ $subjects[] | select((((.licenses // []) | length) == 0) and ([ ((.properties // []) + (.modelCard.properties // []))[]? | select((.name == \"aisbom:hf:license\") and ((.value // \"\") != \"\")) ] | length == 0)) | (.name // \"(unnamed)\") ]",
+          "evidencePath": "([ $subjects[] | .licenses[]? | (.license.id // .license.name // .expression) ] + [ $subjects[] | select(((.licenses // []) | length) == 0) | (((.properties // []) + (.modelCard.properties // []))[]? | select((.name == \"aisbom:hf:license\") and ((.value // \"\") != \"\"))) | .value ]) | map(select(. != null and . != \"\")) | unique",
+          "viaPath": "[ $subjects[] | select(((.licenses // []) | length) == 0) | (((.properties // []) + (.modelCard.properties // []))[]? | select((.name == \"aisbom:hf:license\") and ((.value // \"\") != \"\"))) | .name ] | unique"
         },
         {
           "id": "g7-model-openness",

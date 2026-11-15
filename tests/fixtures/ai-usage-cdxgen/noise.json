@@ -1,0 +1,47 @@
+{
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.6",
+  "metadata": { "component": { "bom-ref": "pkg:generic/app@latest", "type": "application", "name": "app" } },
+  "components": [
+    { "type": "machine-learning-model", "bom-ref": "cdxgen:ai:model:huggingface:the", "name": "the",
+      "purl": "pkg:generic/huggingface/the",
+      "properties": [ { "name": "cdx:ai:kind", "value": "model" }, { "name": "cdx:ai:provider", "value": "huggingface" } ],
+      "evidence": { "occurrences": [ { "location": "src/convert.py#L1368" } ] } },
+    { "type": "machine-learning-model", "bom-ref": "cdxgen:ai:model:ai:sys.stderr.write", "name": "sys.stderr.write",
+      "purl": "pkg:generic/ai/sys.stderr.write",
+      "properties": [ { "name": "cdx:ai:kind", "value": "model" } ],
+      "evidence": { "occurrences": [ { "location": "src/verify.py#L155" } ] } },
+    { "type": "machine-learning-model", "bom-ref": "pkg:huggingface/%3Cowner%3E/%3Crepo%3E", "name": "<repo>",
+      "purl": "pkg:huggingface/%3Cowner%3E/%3Crepo%3E",
+      "properties": [ { "name": "cdx:ai:kind", "value": "model" } ],
+      "evidence": { "occurrences": [ { "location": "src/cli.py#L40" } ] } },
+    { "type": "machine-learning-model", "bom-ref": "pkg:huggingface/openai/whisper-large-v3", "name": "whisper-large-v3",
+      "purl": "pkg:huggingface/openai/whisper-large-v3",
+      "properties": [ { "name": "cdx:ai:kind", "value": "model" } ],
+      "evidence": { "occurrences": [ { "location": "src/summary.test.ts#L65" } ] } },
+    { "type": "machine-learning-model", "bom-ref": "pkg:huggingface/anthropic/claude-2", "name": "claude-2",
+      "purl": "pkg:huggingface/anthropic/claude-2",
+      "properties": [ { "name": "cdx:ai:kind", "value": "model" } ],
+      "evidence": { "occurrences": [ { "location": "docs/other-models.md#L249" } ] } },
+    { "type": "machine-learning-model", "bom-ref": "cdxgen:ai:model:ai:my-model-id", "name": "my-model-id",
+      "purl": "pkg:generic/ai/my-model-id",
+      "properties": [ { "name": "cdx:ai:kind", "value": "model" } ],
+      "evidence": { "occurrences": [ { "location": "src/plugin.py#L68" } ] } },
+    { "type": "file", "bom-ref": "urn:file:ai:build.sh", "name": "build.sh",
+      "properties": [ { "name": "cdx:ai:kind", "value": "prompt-config-file" } ],
+      "evidence": { "occurrences": [ { "location": "scripts/build.sh" } ] } }
+  ],
+  "services": [
+    { "bom-ref": "urn:service:ai:google:Google-Generative-AI-API", "name": "Google Generative AI API", "group": "google",
+      "provider": { "name": "google" },
+      "properties": [ { "name": "cdx:ai:kind", "value": "inference-service" } ],
+      "endpoints": [ "https://osv-vulnerabilities.storage.googleapis.com/%7B%7D/all.zip" ] },
+    { "bom-ref": "urn:service:ai:huggingface:huggingface-service", "name": "Hugging Face Inference API", "group": "huggingface",
+      "provider": { "name": "huggingface" },
+      "properties": [ { "name": "cdx:ai:kind", "value": "inference-service" }, { "name": "cdx:ai:modelId", "value": "the" } ] }
+  ],
+  "dependencies": [
+    { "ref": "pkg:generic/app@latest", "dependsOn": [ "urn:service:ai:google:Google-Generative-AI-API", "urn:service:ai:huggingface:huggingface-service" ] },
+    { "ref": "urn:service:ai:huggingface:huggingface-service", "dependsOn": [ "cdxgen:ai:model:huggingface:the", "<repo>" ] }
+  ]
+}

@@ -1284,6 +1284,12 @@ MAX_ASSESS_URLS = 8  # license source links per assessed model
 MAX_PIPELINE_STEP_LEN = 100  # chars per step id
 MAX_PIPELINE_STEPS = 20  # step ids listed; the rest are counted, not shown
 MAX_FIRMWARE_SCOPE_NAMES = 10  # handler or tool names listed in the firmware scope note
+MAX_AI_USAGE_ROWS = 500  # AI usage items (models, services, MCP, instruction files) listed
+# The values build-prep.sh writes to bomlens:ai:usage, in display order. A
+# supplier SBOM can carry any string there, so only these are listed.
+AI_USAGE_KINDS = ("model", "ai-service", "mcp-server", "mcp-config", "instruction-file")
+AI_USAGE_SCOPES = ("runtime", "development")
+AI_USAGE_REVIEW_REASONS = ("broad-filesystem-access", "unpinned-package", "unencrypted-transport")
 
 # Severity ranking for picking a component's worst vulnerability.
 _SEV_RANK = {"CRITICAL": 5, "HIGH": 4, "MEDIUM": 3, "LOW": 2, "UNKNOWN": 1}
@@ -2062,6 +2068,162 @@ def _firmware_scope(meta):
     return scope
 
 
+def _is_ai_usage(c):
+    """Whether a component or service is an AI usage item from a source scan
+    (bomlens:ai:usage, written by build-prep.sh). These record what the code
+    calls or configures (a hosted model, an AI service, an MCP server, an
+    instruction file), not packages, so they stay out of every package count
+    and out of the AI-model-scan detection."""
+    return isinstance(c, dict) and any(
+        p.get("name") == "bomlens:ai:usage" for p in _dicts(c.get("properties"))
+    )
+
+
+_AI_WEIGHT_FORMAT_RE = re.compile(r"^[a-z0-9]{1,12}$")
+_AI_RESOLVED = ("huggingface", "unreadable", "unreachable", "not-attempted")
+_AI_VERDICTS = ("ok", "conditional", "caution", "review")
+
+
+def _ai_usage_model_facts(c, values, row):
+    """Add the optional hub-lookup facts of a usage model to ROW, copied from the
+    named properties only (resolve-models.py writes them). Absent stays absent."""
+    first = lambda name: next(iter(values(name)), None)  # noqa: E731
+    resolved = first("bomlens:ai:resolved")
+    if resolved in _AI_RESOLVED:
+        row["resolved"] = resolved
+        if resolved == "unreadable":
+            try:
+                status = int(str(first("bomlens:ai:resolvedStatus")).strip())
+            except ValueError:
+                status = 0
+            if 100 <= status <= 599:
+                row["resolvedStatus"] = status
+    for lic in _dicts(c.get("licenses")):
+        l = _as_dict(lic.get("license"))
+        text = l.get("id") or l.get("name") or lic.get("expression")
+        if isinstance(text, str) and text:
+            row["license"] = text[:100]
+        break
+    gated = first("bomlens:hf:gated")
+    if gated in ("auto", "manual"):
+        row["gated"] = gated
+    fmts = first("bomlens:weights:formats")
+    if fmts:
+        names = [f.strip() for f in fmts.split(",")]
+        names = [f for f in names if _AI_WEIGHT_FORMAT_RE.match(f)]
+        if names:
+            row["weightFormats"] = names[:12]
+    pickles = first("bomlens:weights:pickleFiles")
+    if pickles is not None:
+        try:
+            n = int(pickles.strip())
+        except ValueError:
+            n = -1
+        if n >= 0:
+            row["pickleFiles"] = n
+    lineage = first("bomlens:lineage:chain")
+    if lineage:
+        row["lineage"] = lineage[:500]
+    verdict = first("bomlens:assessment:overall")
+    if verdict in _AI_VERDICTS:
+        row["verdict"] = verdict
+    sbom_name = first("bomlens:ai:modelSbom")
+    if sbom_name:
+        row["modelSbom"] = sbom_name[:120]
+    for ref in _dicts(c.get("externalReferences")):
+        url = ref.get("url")
+        if not isinstance(url, str):
+            continue
+        if (ref.get("type") == "website" and url.startswith("https://huggingface.co/")
+                and "hubUrl" not in row):
+            row["hubUrl"] = url
+        elif ref.get("type") == "bom" and url.startswith("urn:cdx:") and "modelSbomLink" not in row:
+            row["modelSbomLink"] = url[:300]
+
+
+def _ai_usage_list(data):
+    """The AI usage items of one SBOM, normalized for the UI.
+
+    Returns (rows, truncated). Only the fields listed here are read: endpoints,
+    commands, environment variables and every other property stay in the SBOM.
+    """
+    comps = _dicts(data.get("components"))
+    services = _dicts(data.get("services"))
+    model_names = {
+        c.get("bom-ref"): c.get("name")
+        for c in comps
+        if c.get("type") == "machine-learning-model"
+        and isinstance(c.get("bom-ref"), str)
+        and isinstance(c.get("name"), str)
+        and c.get("name")
+    }
+    depends = {}
+    for d in _dicts(data.get("dependencies")):
+        if isinstance(d.get("ref"), str):
+            depends[d["ref"]] = [r for r in _as_list(d.get("dependsOn")) if isinstance(r, str)]
+    rows = []
+    for c in comps + services:
+        props = _dicts(c.get("properties"))
+
+        def values(name, props=props):
+            return [
+                p.get("value")
+                for p in props
+                if p.get("name") == name and isinstance(p.get("value"), str) and p.get("value")
+            ]
+
+        kind = next(iter(values("bomlens:ai:usage")), None)
+        if kind not in AI_USAGE_KINDS:
+            continue
+        row = {"kind": kind, "name": c.get("name") if isinstance(c.get("name"), str) else ""}
+        if isinstance(c.get("purl"), str) and c.get("purl"):
+            row["purl"] = c["purl"]
+        provider = None
+        if kind == "model":
+            provider = next(iter(values("cdx:ai:provider")), None)
+        elif kind == "ai-service":
+            provider = _as_dict(c.get("provider")).get("name") or c.get("group")
+        if isinstance(provider, str) and provider:
+            row["provider"] = provider
+        scope = next(iter(values("bomlens:ai:scope")), None)
+        if scope in AI_USAGE_SCOPES:
+            row["scope"] = scope
+        # The file the item was found in: the path build-prep.sh recorded, else
+        # cdxgen's source file (which may end in #L<line>, kept as is).
+        path = next(iter(values("bomlens:ai:path")), None) or next(
+            iter(values("internal:SrcFile")), None
+        )
+        if path:
+            row["path"] = path
+        row["reviewReasons"] = sorted(
+            {r for r in values("bomlens:ai:reviewReason") if r in AI_USAGE_REVIEW_REASONS}
+        )
+        # The models a service is called with, from its dependencies[] entry.
+        # An SBOM with no dependency graph gets none from the scan (adding one
+        # would change what the rest of the summary reads as direct), so the
+        # service's own cdx:ai:modelId values stand in, limited to the model
+        # components the SBOM holds.
+        if kind == "ai-service":
+            names = []
+            for ref in depends.get(c.get("bom-ref"), []):
+                n = model_names.get(ref)
+                if n and n not in names:
+                    names.append(n)
+            if not names and not depends:
+                known = set(model_names.values())
+                for n in values("cdx:ai:modelId"):
+                    if isinstance(n, str) and n in known and n not in names:
+                        names.append(n)
+            row["models"] = names
+        if "bomlens" in values("bomlens:ai:detectedBy"):
+            row["detectedBy"] = "bomlens"
+        if kind == "model":
+            _ai_usage_model_facts(c, values, row)
+        rows.append(row)
+    rows.sort(key=lambda r: (AI_USAGE_KINDS.index(r["kind"]), r["name"]))
+    return rows[:MAX_AI_USAGE_ROWS], len(rows) > MAX_AI_USAGE_ROWS
+
+
 def sbom_summary(run_id):
     p = run_file(run_id, "_bom.json")
     if not p or not os.path.isfile(p):
@@ -2092,6 +2254,10 @@ def sbom_summary(run_id):
         _root.get("type") == "data" and _root_collected
     ):
         comps = [_root] + comps
+    # AI usage items (bomlens:ai:usage) are listed apart in aiUsage below, not
+    # as components: every count, KPI and row here is about packages, and a
+    # source scan that calls a hosted model must not read as an AI model scan.
+    comps = [c for c in comps if not _is_ai_usage(c)]
     risk_by_purl, risk_by_nv = _component_risk_index(run_id)
     scope_by_ref, has_deps = _scope_index(data)
     rows = []
@@ -2578,6 +2744,14 @@ def sbom_summary(run_id):
         summary["maliciousCount"] = malicious_count
     if assessed_models:
         summary["assessCounts"] = assess_counts
+    # What the scanned code calls or configures in the way of AI (models,
+    # AI services, MCP servers and configurations, instruction files). Omitted
+    # when there is none, so a scan without it carries no empty section.
+    ai_usage, ai_usage_truncated = _ai_usage_list(data)
+    if ai_usage:
+        summary["aiUsage"] = ai_usage
+        if ai_usage_truncated:
+            summary["aiUsageTruncated"] = True
     return summary
 
 
@@ -3058,6 +3232,10 @@ def list_scans():
         # reflects the full array length, to match sbom_summary's `components`.
         comp_count = len(_as_list(data.get("components")))
         comps = _dicts(data.get("components"))
+        # AI usage items are not packages and do not make this an AI model
+        # scan; leave them out exactly as sbom_summary does.
+        comp_count -= sum(1 for c in comps if _is_ai_usage(c))
+        comps = [c for c in comps if not _is_ai_usage(c)]
         meta = _as_dict(_as_dict(data.get("metadata")).get("component"))
         # A spec-shaped AI SBOM names the model as the document's own component
         # and lists only its datasets under components[]. Reading that array
@@ -3066,7 +3244,7 @@ def list_scans():
         # on the scan's own page. Fold a machine-learning-model root in, by the
         # same rule as sbom_summary: every other root is the scanned project
         # itself, which is not one of its own components and stays out.
-        if meta.get("type") == "machine-learning-model":
+        if meta.get("type") == "machine-learning-model" and not _is_ai_usage(meta):
             comps = [meta] + comps
             comp_count += 1
         # The OWASP AIBOM generator names the root metadata.component after its
@@ -3245,7 +3423,7 @@ def scan_detail(run_id):
 # user to read the text before pasting it.
 # --------------------------------------------------------------------------
 _DIAG_OPTION_KEYS = (
-    "notice", "security", "deepLicense", "identifyVendored",
+    "notice", "security", "deepLicense", "identifyVendored", "resolveModels",
     "byteStable", "deepCve", "reachability", "analyzeCpeIndex",
 )
 # Input kinds the server itself dispatches on. Anything else in a recorded scan
@@ -3350,8 +3528,11 @@ def _diag_sbom_facts(run_id):
     except (OSError, json.JSONDecodeError):
         return None
     count = len(_as_list(data.get("components")))
+    # Same package count as sbom_summary: AI usage items are not components.
+    count -= sum(1 for c in _dicts(data.get("components")) if _is_ai_usage(c))
     meta = _as_dict(data.get("metadata"))
-    if _as_dict(meta.get("component")).get("type") == "machine-learning-model":
+    if _as_dict(meta.get("component")).get("type") == "machine-learning-model" \
+            and not _is_ai_usage(meta.get("component")):
         count += 1
     steps = []
     for prop in _dicts(meta.get("properties")):
@@ -4517,6 +4698,16 @@ def run_sibling_scan(image, mode, out_dir, on_log, *, upload_file=None, model_id
             args += ["-e", "IDENTIFY_VENDORED=true"]
         if env.get("SCANOSS_API_KEY"):
             args += ["-e", "SCANOSS_API_KEY"]
+        # Hub lookup of the referenced models (opt-in). The token, when the
+        # server has one, goes by NAME ONLY, as for the AI model scan below.
+        if env.get("MODEL_RESOLVE") == "true":
+            args += ["-e", "MODEL_RESOLVE=true"]
+            if os.environ.get("HF_TOKEN"):
+                args += ["-e", "HF_TOKEN"]
+            # A hub mirror and the lookup limits the server was started with, by name.
+            for _k in ("HF_ENDPOINT", "MODEL_RESOLVE_MAX", "MODEL_RESOLVE_BUDGET"):
+                if os.environ.get(_k):
+                    args += ["-e", _k]
     if model_id is not None:
         # model_id passed _MODEL_RE above.
         args += ["-e", "MODEL_ID=%s" % model_id]
@@ -6673,6 +6864,9 @@ class Handler(BaseHTTPRequestHandler):
                 "security": g("security", "true") == "true",
                 "deepLicense": g("deep_license") == "true",
                 "identifyVendored": g("identify_vendored") == "true",
+                # Ask the Hugging Face hub about the models the code references
+                # (source scans only; cleared below for any other mode).
+                "resolveModels": g("resolve_models") == "true",
                 "byteStable": g("byte_stable") == "true",
                 "deepCve": g("deep_cve") == "true",
                 "reachability": g("reachability") == "true",
@@ -6814,6 +7008,9 @@ class Handler(BaseHTTPRequestHandler):
             # Vendored-OSS identification (SCANOSS). SCANOSS_API_URL/KEY, if set in
             # the server's environment, pass through via env.copy() above.
             "IDENTIFY_VENDORED": "true" if g("identify_vendored") == "true" else "false",
+            # Hub lookup of the models a source scan references (resolve-models.py).
+            # Dropped again for every mode but SOURCE once the mode is known.
+            "MODEL_RESOLVE": "true" if g("resolve_models") == "true" else "false",
             "BYTE_STABLE": "true" if g("byte_stable") == "true" else "false",
             # CPE index match for a submitted SBOM, opt-in. entrypoint.sh reads it
             # on the ANALYZE path only.
@@ -7401,6 +7598,12 @@ class Handler(BaseHTTPRequestHandler):
                 host_root = host_path_of(env["SOURCE_ROOT"])
                 if host_root:
                     env["SOURCE_ROOT_HOST"] = host_root
+
+            # The model lookup belongs to the source scan only: any other mode
+            # neither passes the flag nor records the setting as on.
+            if env.get("MODE") != "SOURCE":
+                env["MODEL_RESOLVE"] = "false"
+                scan_config["resolveModels"] = False
 
             # Opt-in deep CVE matching on the base-image scan modes (SOURCE, IMAGE,
             # ROOTFS, BINARY). FIRMWARE and AIBOM already routed (or refused) their

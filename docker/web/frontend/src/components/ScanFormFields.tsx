@@ -600,6 +600,9 @@ export function ScanOptions({ state }: { state: ScanFormState }) {
     setDeepLicense,
     identifyVendored,
     setIdentifyVendored,
+    resolveModels,
+    setResolveModels,
+    showResolveModels,
     deepCve,
     setDeepCve,
     reachability,
@@ -661,6 +664,15 @@ export function ScanOptions({ state }: { state: ScanFormState }) {
             </FormControl>
           )}
         </>
+      )}
+      {showResolveModels && (
+        <Toggle
+          labelKey="resolveModels"
+          checked={resolveModels}
+          onChange={setResolveModels}
+          disabled={busy}
+          external
+        />
       )}
       {showDeepLicense && (
         <Toggle labelKey="deepLicense" checked={deepLicense} onChange={setDeepLicense} disabled={busy} />

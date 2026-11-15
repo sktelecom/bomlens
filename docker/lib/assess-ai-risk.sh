@@ -48,7 +48,9 @@ fi
 # a general CycloneDX type, and judging one this pipeline never fetched would be
 # a verdict on a component nobody here resolved.
 if ! jq -e '([.metadata.component // empty] + [.components[]?])
-            | map(select(.type == "machine-learning-model"
+            | map(select((.type == "machine-learning-model"
+                          and ((any(.properties[]?; .name == "bomlens:ai:usage") | not)
+                               or any(.properties[]?; .name == "bomlens:ai:resolved" and .value == "huggingface")))
                          or (.type == "data"
                              and ((.properties // [])
                                   | any(.name == "bomlens:dataset:collectedBy")))))
@@ -110,9 +112,15 @@ jq --arg ctx "$CTX" --arg lang "$LANG_TAG" --slurpfile kb "$KB" '
                                    | ($m != "") and (($n | test($m)) // false)))
         // null );
 
+  # An AIsbom scan keeps the licence its hub page declares in
+  # modelCard.properties (aisbom:hf:license) and leaves licenses[] empty. That
+  # value stands in only while licenses[] holds nothing.
   def lic_strings:
-    [ (.licenses // [])[] | (.license.id // .license.name // .expression // "")
-      | select(. != "") ];
+    ([ (.licenses // [])[] | (.license.id // .license.name // .expression // "")
+       | select(. != "") ]) as $own
+    | if ($own | length) > 0 then $own
+      else [ (.modelCard.properties // [])[]?
+             | select(.name == "aisbom:hf:license") | (.value // "") | select(. != "") ] end;
 
   # License axis for one component: worst verdict across its licenses, the
   # matched registry keys, and one human-readable reason per license.
@@ -397,8 +405,14 @@ jq --arg ctx "$CTX" --arg lang "$LANG_TAG" --slurpfile kb "$KB" '
   # components[], while a spec-shaped AI SBOM (hand-written, or from a supplier)
   # puts the model in metadata.component. The verdict must not depend on which
   # tool wrote the document.
+  # A model a source scan only saw the code use (bomlens:ai:usage) is listed,
+  # not judged: a hosted model has no licence or card here to judge it on. One
+  # the hub answered for (bomlens:ai:resolved=huggingface) has a licence and
+  # weight files to read, and is judged on those.
   def assess_component:
-      if .type == "machine-learning-model" then
+      if .type == "machine-learning-model"
+         and ((any(.properties[]?; .name == "bomlens:ai:usage") | not)
+              or any(.properties[]?; .name == "bomlens:ai:resolved" and .value == "huggingface")) then
         (.properties // []) as $p0
         | (assess_license) as $a0
         | (assess_license_extras($p0)) as $ex

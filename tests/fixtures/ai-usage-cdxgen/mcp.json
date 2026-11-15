@@ -1,0 +1,422 @@
+{
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.6",
+  "version": 1,
+  "metadata": {
+    "timestamp": "2026-11-13T00:00:00Z",
+    "tools": {
+      "components": [
+        {
+          "group": "@cdxgen",
+          "name": "cdxgen",
+          "version": "13.5.0",
+          "purl": "pkg:npm/%40cdxgen/cdxgen@13.5.0",
+          "type": "application",
+          "bom-ref": "pkg:npm/@cdxgen/cdxgen@13.5.0",
+          "publisher": "OWASP Foundation",
+          "authors": [
+            {
+              "name": "OWASP Foundation"
+            }
+          ]
+        }
+      ]
+    },
+    "authors": [
+      {
+        "name": "OWASP Foundation"
+      }
+    ],
+    "lifecycles": [
+      {
+        "phase": "pre-build"
+      }
+    ],
+    "component": {
+      "group": "",
+      "name": "app",
+      "version": "latest",
+      "type": "application",
+      "purl": "pkg:generic/app@latest",
+      "bom-ref": "pkg:generic/app@latest"
+    },
+    "properties": []
+  },
+  "components": [
+    {
+      "group": "",
+      "name": "mcp.json",
+      "type": "file",
+      "bom-ref": "file:/app/.vscode/mcp.json",
+      "properties": [
+        {
+          "name": "cdx:file:kind",
+          "value": "mcp-config"
+        },
+        {
+          "name": "cdx:mcp:catalogSource",
+          "value": "heuristic"
+        },
+        {
+          "name": "cdx:mcp:configFormat",
+          "value": "vscode"
+        },
+        {
+          "name": "cdx:mcp:configuredEndpoints",
+          "value": "http://docs.example.com/mcp"
+        },
+        {
+          "name": "cdx:mcp:configuredServiceCount",
+          "value": "2"
+        },
+        {
+          "name": "cdx:mcp:configuredServiceNames",
+          "value": "docs,fs"
+        },
+        {
+          "name": "cdx:mcp:inventorySource",
+          "value": "config-file"
+        },
+        {
+          "name": "cdx:mcp:official",
+          "value": "false"
+        },
+        {
+          "name": "cdx:mcp:package",
+          "value": "true"
+        },
+        {
+          "name": "cdx:mcp:packageName",
+          "value": "mcp.json"
+        },
+        {
+          "name": "cdx:mcp:role",
+          "value": "sdk"
+        },
+        {
+          "name": "internal:SrcFile",
+          "value": ".vscode/mcp.json"
+        }
+      ],
+      "tags": [
+        "mcp",
+        "mcp-sdk"
+      ]
+    },
+    {
+      "group": "",
+      "name": "mcp.json",
+      "type": "file",
+      "bom-ref": "file:/app/.cursor/mcp.json",
+      "properties": [
+        {
+          "name": "cdx:file:kind",
+          "value": "mcp-config"
+        },
+        {
+          "name": "cdx:mcp:catalogSource",
+          "value": "heuristic"
+        },
+        {
+          "name": "cdx:mcp:configFormat",
+          "value": "cursor"
+        },
+        {
+          "name": "cdx:mcp:configuredServiceCount",
+          "value": "1"
+        },
+        {
+          "name": "cdx:mcp:configuredServiceNames",
+          "value": "github"
+        },
+        {
+          "name": "cdx:mcp:credentialExposedServiceCount",
+          "value": "1"
+        },
+        {
+          "name": "cdx:mcp:credentialExposure",
+          "value": "true"
+        },
+        {
+          "name": "cdx:mcp:inventorySource",
+          "value": "config-file"
+        },
+        {
+          "name": "cdx:mcp:official",
+          "value": "false"
+        },
+        {
+          "name": "cdx:mcp:package",
+          "value": "true"
+        },
+        {
+          "name": "cdx:mcp:packageName",
+          "value": "mcp.json"
+        },
+        {
+          "name": "cdx:mcp:role",
+          "value": "sdk"
+        },
+        {
+          "name": "internal:SrcFile",
+          "value": ".cursor/mcp.json"
+        }
+      ],
+      "tags": [
+        "mcp",
+        "mcp-sdk"
+      ]
+    }
+  ],
+  "dependencies": [],
+  "services": [
+    {
+      "bom-ref": "urn:service:mcp:fs:latest",
+      "endpoints": [],
+      "group": "mcp",
+      "name": "fs",
+      "properties": [
+        {
+          "name": "cdx:mcp:command",
+          "value": "npx"
+        },
+        {
+          "name": "cdx:mcp:configFormat",
+          "value": "vscode"
+        },
+        {
+          "name": "cdx:mcp:configKey",
+          "value": "servers.fs"
+        },
+        {
+          "name": "cdx:mcp:exposureType",
+          "value": "stdio-configured"
+        },
+        {
+          "name": "cdx:mcp:inventorySource",
+          "value": "config-file"
+        },
+        {
+          "name": "cdx:mcp:officialSdk",
+          "value": "true"
+        },
+        {
+          "name": "cdx:mcp:packageRefs",
+          "value": "@modelcontextprotocol/server-filesystem@2025.8.21"
+        },
+        {
+          "name": "cdx:mcp:reviewNeeded",
+          "value": "true"
+        },
+        {
+          "name": "cdx:mcp:security:confusedDeputyRisk",
+          "value": "none"
+        },
+        {
+          "name": "cdx:mcp:security:tokenPassthroughRisk",
+          "value": "none"
+        },
+        {
+          "name": "cdx:mcp:serviceType",
+          "value": "configured-server"
+        },
+        {
+          "name": "cdx:mcp:transport",
+          "value": "stdio"
+        },
+        {
+          "name": "cdx:mcp:trustProfile",
+          "value": "official-sdk+unknown"
+        },
+        {
+          "name": "cdx:mcp:usageConfidence",
+          "value": "high"
+        },
+        {
+          "name": "internal:SrcFile",
+          "value": "/app/.vscode/mcp.json"
+        }
+      ],
+      "version": "latest"
+    },
+    {
+      "bom-ref": "urn:service:mcp:docs:latest",
+      "authenticated": false,
+      "endpoints": [
+        "http://docs.example.com/mcp"
+      ],
+      "group": "mcp",
+      "name": "docs",
+      "properties": [
+        {
+          "name": "cdx:mcp:authMode",
+          "value": "none"
+        },
+        {
+          "name": "cdx:mcp:authPosture",
+          "value": "none"
+        },
+        {
+          "name": "cdx:mcp:command",
+          "value": "configured"
+        },
+        {
+          "name": "cdx:mcp:configFormat",
+          "value": "vscode"
+        },
+        {
+          "name": "cdx:mcp:configKey",
+          "value": "servers.docs"
+        },
+        {
+          "name": "cdx:mcp:exposureType",
+          "value": "networked-public"
+        },
+        {
+          "name": "cdx:mcp:inventorySource",
+          "value": "config-file"
+        },
+        {
+          "name": "cdx:mcp:reviewNeeded",
+          "value": "true"
+        },
+        {
+          "name": "cdx:mcp:security:confusedDeputyRisk",
+          "value": "none"
+        },
+        {
+          "name": "cdx:mcp:security:tokenPassthroughRisk",
+          "value": "none"
+        },
+        {
+          "name": "cdx:mcp:serviceType",
+          "value": "configured-server"
+        },
+        {
+          "name": "cdx:mcp:transport",
+          "value": "streamable-http"
+        },
+        {
+          "name": "cdx:mcp:trustProfile",
+          "value": "non-official-sdk+unauthenticated-networked"
+        },
+        {
+          "name": "cdx:mcp:usageConfidence",
+          "value": "high"
+        },
+        {
+          "name": "internal:SrcFile",
+          "value": "/app/.vscode/mcp.json"
+        }
+      ],
+      "version": "latest"
+    },
+    {
+      "bom-ref": "urn:service:mcp:github:latest",
+      "endpoints": [],
+      "group": "mcp",
+      "name": "github",
+      "properties": [
+        {
+          "name": "cdx:mcp:command",
+          "value": "npx"
+        },
+        {
+          "name": "cdx:mcp:configFormat",
+          "value": "cursor"
+        },
+        {
+          "name": "cdx:mcp:configKey",
+          "value": "mcpServers.github"
+        },
+        {
+          "name": "cdx:mcp:credentialExposure",
+          "value": "true"
+        },
+        {
+          "name": "cdx:mcp:credentialExposureFieldCount",
+          "value": "1"
+        },
+        {
+          "name": "cdx:mcp:credentialIndicatorCount",
+          "value": "1"
+        },
+        {
+          "name": "cdx:mcp:exposureType",
+          "value": "stdio-configured"
+        },
+        {
+          "name": "cdx:mcp:inventorySource",
+          "value": "config-file"
+        },
+        {
+          "name": "cdx:mcp:officialSdk",
+          "value": "true"
+        },
+        {
+          "name": "cdx:mcp:packageRefs",
+          "value": "@modelcontextprotocol/server-github"
+        },
+        {
+          "name": "cdx:mcp:reviewNeeded",
+          "value": "true"
+        },
+        {
+          "name": "cdx:mcp:security:confusedDeputyRisk",
+          "value": "none"
+        },
+        {
+          "name": "cdx:mcp:security:tokenPassthroughRisk",
+          "value": "none"
+        },
+        {
+          "name": "cdx:mcp:serviceType",
+          "value": "configured-server"
+        },
+        {
+          "name": "cdx:mcp:transport",
+          "value": "stdio"
+        },
+        {
+          "name": "cdx:mcp:trustProfile",
+          "value": "official-sdk+unknown"
+        },
+        {
+          "name": "cdx:mcp:usageConfidence",
+          "value": "high"
+        },
+        {
+          "name": "internal:SrcFile",
+          "value": "/app/.cursor/mcp.json"
+        }
+      ],
+      "version": "latest"
+    }
+  ],
+  "annotations": [
+    {
+      "bom-ref": "metadata-annotations",
+      "subjects": [
+        "pkg:generic/app@latest"
+      ],
+      "annotator": {
+        "component": {
+          "group": "@cdxgen",
+          "name": "cdxgen",
+          "version": "13.5.0",
+          "purl": "pkg:npm/%40cdxgen/cdxgen@13.5.0",
+          "type": "application",
+          "bom-ref": "pkg:npm/@cdxgen/cdxgen@13.5.0",
+          "publisher": "OWASP Foundation",
+          "authors": [
+            {
+              "name": "OWASP Foundation"
+            }
+          ]
+        }
+      },
+      "timestamp": "2026-11-13T10:52:47Z",
+      "text": "This Software-as-a-Service BOM (SaaSBOM) document was created on Friday, November 13, 2026 with cdxgen. The data was captured during the pre-build lifecycle phase without building the application. The document describes an application named 'app'. There are 2 components. 3 are described in this SaaSBOM under services."
+    }
+  ]
+}

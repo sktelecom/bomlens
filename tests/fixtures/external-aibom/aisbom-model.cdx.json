@@ -1,0 +1,65 @@
+{
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.7",
+  "version": 1,
+  "metadata": {
+    "timestamp": "2026-11-01T00:00:00Z",
+    "tools": {
+      "components": [
+        {
+          "type": "application",
+          "name": "aisbom-cli",
+          "version": "0.7.0"
+        }
+      ]
+    }
+  },
+  "components": [
+    {
+      "type": "machine-learning-model",
+      "bom-ref": "aisbom:0:model.safetensors",
+      "name": "model.safetensors",
+      "description": "Risk: LOW | Framework: SafeTensors | Legal: UNKNOWN | License: Unknown",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"
+        }
+      ],
+      "properties": [
+        {
+          "name": "aisbom:risk",
+          "value": "LOW"
+        },
+        {
+          "name": "aisbom:format",
+          "value": "SafeTensors"
+        }
+      ],
+      "modelCard": {
+        "modelParameters": {
+          "task": "text-generation",
+          "architectureFamily": "transformer"
+        },
+        "properties": [
+          {
+            "name": "aisbom:hf:repo_id",
+            "value": "example-org/example-model"
+          },
+          {
+            "name": "aisbom:hf:license",
+            "value": "apache-2.0"
+          },
+          {
+            "name": "aisbom:hf:revision",
+            "value": "0123456789abcdef0123456789abcdef01234567"
+          },
+          {
+            "name": "aisbom:hf:gated",
+            "value": "False"
+          }
+        ]
+      }
+    }
+  ]
+}

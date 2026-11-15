@@ -1,0 +1,91 @@
+{
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.7",
+  "version": 1,
+  "metadata": {
+    "timestamp": "2026-11-01T00:00:00Z",
+    "lifecycles": [
+      {
+        "phase": "post-build"
+      }
+    ],
+    "tools": {
+      "components": [
+        {
+          "type": "application",
+          "name": "aibomgen-cli",
+          "version": "0.2.0"
+        }
+      ]
+    },
+    "component": {
+      "type": "machine-learning-model",
+      "bom-ref": "pkg:huggingface/example-org/example-model@0123456789abcdef0123456789abcdef01234567",
+      "name": "example-org/example-model",
+      "version": "0123456789abcdef0123456789abcdef01234567",
+      "purl": "pkg:huggingface/example-org/example-model@0123456789abcdef0123456789abcdef01234567",
+      "description": "Example model",
+      "supplier": {
+        "name": "example-org",
+        "url": [
+          "https://huggingface.co/example-org"
+        ]
+      },
+      "authors": [
+        {
+          "name": "Example Org"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0"
+          }
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-1",
+          "content": "0123456789abcdef0123456789abcdef01234567"
+        }
+      ],
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://huggingface.co/example-org/example-model"
+        }
+      ],
+      "properties": [
+        {
+          "name": "huggingface:libraryName",
+          "value": "transformers"
+        },
+        {
+          "name": "huggingface:baseModel",
+          "value": "example-org/base-model"
+        }
+      ],
+      "modelCard": {
+        "modelParameters": {
+          "task": "text-generation",
+          "architectureFamily": "transformer",
+          "datasets": [
+            {
+              "type": "dataset",
+              "name": "example-org/example-data"
+            }
+          ]
+        },
+        "considerations": {
+          "useCases": [
+            "chat"
+          ],
+          "technicalLimitations": [
+            "short context"
+          ]
+        }
+      }
+    }
+  },
+  "components": []
+}

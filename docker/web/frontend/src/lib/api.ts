@@ -126,12 +126,61 @@ export interface ComponentItem {
   lastReleased?: string;
 }
 
+export type AiUsageKind = "model" | "ai-service" | "mcp-server" | "mcp-config" | "instruction-file";
+export type AiUsageReviewReason =
+  | "broad-filesystem-access"
+  | "unpinned-package"
+  | "unencrypted-transport";
+
+/** One AI item a source scan found in the code or its editor and agent setup
+ *  (server.py's SBOM summary, `aiUsage[]`). */
+export interface AiUsageItem {
+  kind: AiUsageKind;
+  name: string;
+  purl?: string;
+  /** Models and AI services. */
+  provider?: string;
+  /** runtime: the code calls it; development: editor and agent configuration. */
+  scope: "runtime" | "development";
+  /** Relative file path, may end in "#L<n>". */
+  path?: string;
+  /** Sorted; empty when nothing needs a look. */
+  reviewReasons: AiUsageReviewReason[];
+  /** AI service only: the model names it is called with. */
+  models?: string[];
+  detectedBy?: "bomlens";
+  /** Model rows only: the Hugging Face hub lookup (--resolve-models). Absent
+   *  when the lookup was not requested. */
+  resolved?: "huggingface" | "unreadable" | "unreachable" | "not-attempted";
+  /** HTTP status when `resolved` is "unreadable" (for example 404). */
+  resolvedStatus?: number;
+  license?: string;
+  gated?: "auto" | "manual";
+  weightFormats?: string[];
+  /** Weight files in pickle formats, which can run code when loaded. */
+  pickleFiles?: number;
+  /** Base-model chain, for example "meta-llama/Llama-3.1-8B:llama3.1 > acme/x:apache-2.0". */
+  lineage?: string;
+  /** Model risk assessment of the hub's licence and its base models' licences. */
+  verdict?: "ok" | "conditional" | "caution" | "review";
+  /** File name of a linked model SBOM. */
+  modelSbom?: string;
+  hubUrl?: string;
+  modelSbomLink?: string;
+}
+
 export interface SbomSummary {
   components: number;
   /** Per-component detail rows (capped server-side; see `truncated`). */
   componentList?: ComponentItem[];
   /** True when the SBOM has more components than the server returned. */
   truncated?: boolean;
+  /** The AI the scanned source uses (a source scan's ai-usage step). Absent
+   *  when none was found. Not part of componentList, so it does not count
+   *  toward an AI scan or the Models & datasets section. */
+  aiUsage?: AiUsageItem[];
+  /** Set when the server capped aiUsage (500 items). */
+  aiUsageTruncated?: true;
   /** Set when the scan looks like C/C++ embedded source with no package manager,
    *  hinting the user to re-run with --identify-vendored. Drives a result banner. */
   suggestIdentifyVendored?: boolean;
@@ -666,6 +715,9 @@ export interface ScanConfig {
   spdx?: boolean;
   deepLicense: boolean;
   identifyVendored: boolean;
+  /** Look up the Hugging Face models the code references (--resolve-models).
+   *  Absent on scans that did not record it. */
+  resolveModels?: boolean;
   byteStable: boolean;
   /** Components of a submitted SBOM were also matched against the CPE index
    *  (--analyze-cpe-index). Absent on scans that did not record it. */
@@ -861,6 +913,9 @@ export interface ScanParams {
   security: boolean;
   deepLicense: boolean;
   identifyVendored: boolean;
+  /** Look up the Hugging Face models the code references (--resolve-models).
+   *  Absent on scans that did not record it. */
+  resolveModels?: boolean;
   byteStable: boolean;
   /** Also match the components of a submitted SBOM against the CPE index
    *  (server ANALYZE_CPE_INDEX). Analyze scans only; omitted means off. */
@@ -1706,6 +1761,7 @@ export function startScan(params: ScanParams, handlers: ScanHandlers): EventSour
     security: String(params.security),
     deep_license: String(params.deepLicense),
     identify_vendored: String(params.identifyVendored),
+    resolve_models: String(params.resolveModels ?? false),
     byte_stable: String(params.byteStable),
     analyze_cpe_index: String(params.analyzeCpeIndex ?? false),
     detection: params.detection ?? "auto",

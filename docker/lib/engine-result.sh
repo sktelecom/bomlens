@@ -32,7 +32,7 @@ declared-components declared-service declared-sources deep-cve deep-license desc
 enrich-aibom enrich-cpe enrich-distro-supplier enrich-eol enrich-github-cpe
 enrich-interpreter-cpe enrich-malicious enrich-maven-cpe enrich-os-context
 enrich-staleness generate-notice generate-risk-report go-vulndb license-registry
-match-cpe model-security normalize os-licenses reachability resolve-purl scan-security sign
+match-cpe model-security normalize os-licenses reachability resolve-models resolve-purl scan-security sign
 source-file-tree source-snapshot stamp-metadata suggest-vendored upstream-purl
 vendored verify-weights"
 

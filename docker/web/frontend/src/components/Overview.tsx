@@ -16,6 +16,7 @@ import { type ProvenanceKind, provenanceOf } from "@/lib/provenance";
 import { isAiScan, sbomFileName } from "@/lib/results";
 
 import { AiSummaryCard } from "./AiSummaryCard";
+import { AiUsageCard } from "./AiUsageCard";
 import { AttentionBox } from "./overview/Attention";
 import { ComparisonBox } from "./overview/Comparison";
 import { FailureBanner, OverviewNotices } from "./overview/Notices";
@@ -112,6 +113,9 @@ export function Overview({
           {result.yoctoVex && <YoctoVexNote vex={result.yoctoVex} />}
           <ComparisonBox result={result} scanId={scanId} recent={recent} />
           <RiskyBox result={result} scanId={scanId} />
+          {/* The AI the scanned code uses: an inventory to read after the worst
+              components, not a finding that outranks them. */}
+          <AiUsageCard sbom={result.sbom} />
         </div>
         <div className="bl-ov-col">
           {result.security && <SeverityPanel security={result.security} scanId={scanId} />}

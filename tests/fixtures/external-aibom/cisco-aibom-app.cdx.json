@@ -1,0 +1,82 @@
+{
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.6",
+  "version": 1,
+  "metadata": {
+    "timestamp": "2026-11-01T00:00:00Z",
+    "tools": {
+      "components": [
+        {
+          "type": "application",
+          "author": "Cisco",
+          "name": "cisco-aibom",
+          "version": "0.1.0"
+        }
+      ]
+    }
+  },
+  "components": [
+    {
+      "type": "machine-learning-model",
+      "bom-ref": "model-1",
+      "name": "gpt-4o",
+      "description": "Model detected in source",
+      "properties": [
+        {
+          "name": "cisco-aibom:framework",
+          "value": "openai"
+        },
+        {
+          "name": "cisco-aibom:file",
+          "value": "app/main.py"
+        },
+        {
+          "name": "cisco-aibom:line",
+          "value": "12"
+        }
+      ]
+    },
+    {
+      "type": "application",
+      "bom-ref": "mcp-1",
+      "name": "filesystem",
+      "description": "MCP server",
+      "properties": [
+        {
+          "name": "cisco-aibom:type",
+          "value": "mcp_server"
+        },
+        {
+          "name": "cisco-aibom:transport",
+          "value": "stdio"
+        }
+      ]
+    },
+    {
+      "type": "application",
+      "bom-ref": "agent-1",
+      "name": "support-agent",
+      "properties": [
+        {
+          "name": "cisco-aibom:type",
+          "value": "agent"
+        },
+        {
+          "name": "cisco-aibom:framework",
+          "value": "langgraph"
+        }
+      ]
+    },
+    {
+      "type": "data",
+      "bom-ref": "ds-1",
+      "name": "faq.csv",
+      "properties": [
+        {
+          "name": "cisco-aibom:dataset_source",
+          "value": "local"
+        }
+      ]
+    }
+  ]
+}

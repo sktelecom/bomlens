@@ -187,7 +187,9 @@ test("options that send data out carry the same mark", async ({ page }) => {
   await open(page);
   await page.getByText("Result quality").click();
   const marks = page.getByTestId("external-mark");
-  await expect(marks).toHaveCount(2);
+  await expect(marks).toHaveCount(3);
+  const models = page.getByTestId("option-resolveModels");
+  await expect(models.getByTestId("external-mark")).toBeVisible();
   const lookup = page.getByTestId("option-identifyVendored");
   await expect(lookup.getByTestId("external-mark")).toBeVisible();
   const upload = page.getByTestId("option-upload");

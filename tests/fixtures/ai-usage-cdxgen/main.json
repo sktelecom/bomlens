@@ -1,0 +1,165 @@
+{
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.6",
+  "version": 1,
+  "metadata": {
+    "timestamp": "2026-11-13T00:00:00Z",
+    "tools": {
+      "components": [
+        {
+          "group": "@cdxgen",
+          "name": "cdxgen",
+          "version": "13.5.0",
+          "purl": "pkg:npm/%40cdxgen/cdxgen@13.5.0",
+          "type": "application",
+          "bom-ref": "pkg:npm/@cdxgen/cdxgen@13.5.0",
+          "publisher": "OWASP Foundation",
+          "authors": [
+            {
+              "name": "OWASP Foundation"
+            }
+          ]
+        }
+      ]
+    },
+    "authors": [
+      {
+        "name": "OWASP Foundation"
+      }
+    ],
+    "lifecycles": [
+      {
+        "phase": "pre-build"
+      }
+    ],
+    "component": {
+      "group": "",
+      "name": "app",
+      "version": "latest",
+      "type": "application",
+      "purl": "pkg:pypi/app@latest",
+      "bom-ref": "pkg:pypi/app@latest"
+    },
+    "properties": [
+      {
+        "name": "cdx:bom:componentSrcFiles",
+        "value": "requirements.txt"
+      },
+      {
+        "name": "cdx:bom:componentTypes",
+        "value": "pypi"
+      }
+    ]
+  },
+  "components": [
+    {
+      "group": "",
+      "name": "openai",
+      "version": "1.40.0",
+      "purl": "pkg:pypi/openai@1.40.0",
+      "type": "library",
+      "bom-ref": "pkg:pypi/openai@1.40.0",
+      "properties": [
+        {
+          "name": "internal:SrcFile",
+          "value": "requirements.txt"
+        }
+      ],
+      "evidence": {
+        "identity": [
+          {
+            "field": "purl",
+            "confidence": 0.5,
+            "methods": [
+              {
+                "technique": "manifest-analysis",
+                "confidence": 0.5,
+                "value": "requirements.txt"
+              }
+            ],
+            "concludedValue": "requirements.txt"
+          }
+        ]
+      },
+      "tags": [
+        "ml"
+      ]
+    },
+    {
+      "group": "",
+      "name": "transformers",
+      "version": "4.44.0",
+      "purl": "pkg:pypi/transformers@4.44.0",
+      "type": "library",
+      "bom-ref": "pkg:pypi/transformers@4.44.0",
+      "properties": [
+        {
+          "name": "internal:SrcFile",
+          "value": "requirements.txt"
+        }
+      ],
+      "evidence": {
+        "identity": [
+          {
+            "field": "purl",
+            "confidence": 0.5,
+            "methods": [
+              {
+                "technique": "manifest-analysis",
+                "confidence": 0.5,
+                "value": "requirements.txt"
+              }
+            ],
+            "concludedValue": "requirements.txt"
+          }
+        ]
+      },
+      "tags": [
+        "transform"
+      ]
+    }
+  ],
+  "dependencies": [
+    {
+      "ref": "pkg:pypi/app@latest",
+      "dependsOn": [
+        "pkg:pypi/openai@1.40.0",
+        "pkg:pypi/transformers@4.44.0"
+      ]
+    },
+    {
+      "ref": "pkg:pypi/openai@1.40.0",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:pypi/transformers@4.44.0",
+      "dependsOn": []
+    }
+  ],
+  "annotations": [
+    {
+      "bom-ref": "metadata-annotations",
+      "subjects": [
+        "pkg:pypi/app@latest"
+      ],
+      "annotator": {
+        "component": {
+          "group": "@cdxgen",
+          "name": "cdxgen",
+          "version": "13.5.0",
+          "purl": "pkg:npm/%40cdxgen/cdxgen@13.5.0",
+          "type": "application",
+          "bom-ref": "pkg:npm/@cdxgen/cdxgen@13.5.0",
+          "publisher": "OWASP Foundation",
+          "authors": [
+            {
+              "name": "OWASP Foundation"
+            }
+          ]
+        }
+      },
+      "timestamp": "2026-11-13T10:52:48Z",
+      "text": "This Software Bill-of-Materials (SBOM) document was created on Friday, November 13, 2026 with cdxgen. The data was captured during the pre-build lifecycle phase without building the application. The document describes an application named 'app'."
+    }
+  ]
+}

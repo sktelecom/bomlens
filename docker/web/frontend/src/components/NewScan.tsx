@@ -161,6 +161,7 @@ export function NewScan({
   // re-scan config). Drives the group's initial open state and its count.
   const scanOptionsOn = [
     state.identifyVendored,
+    state.resolveModels && state.showResolveModels,
     state.deepLicense,
     state.deepCve,
     state.reachability,
