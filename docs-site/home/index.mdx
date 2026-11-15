@@ -8,6 +8,25 @@ tableOfContents: false
 import { Card, CardGrid } from '@astrojs/starlight/components';
 import HomeSearch from '../../components/HomeSearch.astro';
 
+export const sampleBom = `{
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.6",
+  "components": [
+    { "name": "log4j-core",
+      "version": "2.14.1",
+      "type": "library" }
+  ]
+}`;
+export const sampleNotice = `log4j-core 2.14.1
+License: Apache-2.0
+https://logging.apache.org/log4j/2.x/
+
+Licensed under the Apache License,
+Version 2.0 (the "License"); ...`;
+export const sampleSecurity = `log4j-core 2.14.1
+CVE-2021-44228  CRITICAL
+Fixed in: 2.15.0
+CISA KEV: yes`;
 export const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 
 <div class="home" data-glow="on">
@@ -18,6 +37,11 @@ export const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 
 <p class="home-lead">Give it source code, a container, firmware or an SBOM you received. One run produces an SBOM, an <span class="nowrap">open-source</span> notice and a risk report. No SaaS and no account.</p>
 
+<div class="home-actions">
+  <a class="btn btn-primary" href={`${base}/start/first-scan/`}>Run your first scan</a>
+  <a class="btn" href={`${base}/demo/`}>Open the live demo</a>
+</div>
+
 <button type="button" class="home-search" data-open-search aria-keyshortcuts="Control+K Meta+K">
   <svg aria-hidden="true" viewBox="0 0 16 16" width="16" height="16"><path fill="currentColor" d="M10.68 11.74a6 6 0 0 1-7.922-8.982 6 6 0 0 1 8.982 7.922l3.04 3.04a.749.749 0 0 1-.326 1.275.749.749 0 0 1-.734-.215ZM11.5 7a4.499 4.499 0 1 0-8.997 0A4.499 4.499 0 0 0 11.5 7Z"/></svg>
   <span>Search guides, options and reports</span>
@@ -27,16 +51,8 @@ export const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 </section>
 
 <section class="home-start" aria-labelledby="home-start-title">
-  <h2 id="home-start-title" class="home-eyebrow">Start here</h2>
+  <h2 id="home-start-title" class="home-eyebrow">Common tasks</h2>
   <div class="start-grid">
-    <a class="start-card" href={`${base}/demo/`}>
-      <strong>Open the live demo</strong>
-      <span>See a finished scan of each kind in the real web UI. Nothing to install.</span>
-    </a>
-    <a class="start-card" href={`${base}/start/first-scan/`}>
-      <strong>Run your first scan</strong>
-      <span>Install the app or the CLI and make an SBOM from your own project.</span>
-    </a>
     <a class="start-card" href={`${base}/guides/supplier-sbom/`}>
       <strong>Check a supplier SBOM</strong>
       <span>Validate an SBOM you received and issue a risk report.</span>
@@ -44,6 +60,14 @@ export const base = import.meta.env.BASE_URL.replace(/\/$/, '');
     <a class="start-card" href={`${base}/guides/ci-cd/`}>
       <strong>Use it in CI</strong>
       <span>Run scans in a pipeline and gate on the result.</span>
+    </a>
+    <a class="start-card" href={`${base}/guides/reports/`}>
+      <strong>Read the outputs</strong>
+      <span>Generate the notice and security report and learn to read them.</span>
+    </a>
+    <a class="start-card" href={`${base}/reference/cli/`}>
+      <strong>CLI options</strong>
+      <span>Every option and analysis mode in one place.</span>
     </a>
   </div>
 </section>
@@ -66,6 +90,28 @@ export const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 </section>
 
 <HomeSearch />
+
+<section class="home-samples" aria-labelledby="home-samples-title">
+  <h2 id="home-samples-title">What one run produces</h2>
+  <p class="home-sub">File names match the real outputs. Contents are shortened excerpts.</p>
+  <div class="sample-grid">
+    <figure class="sample">
+      <figcaption><span class="dots" aria-hidden="true"></span>MyApp_1.0.0_bom.json</figcaption>
+      <pre tabindex="0"><code>{sampleBom}</code></pre>
+      <p>The SBOM. Components, licenses and dependencies in CycloneDX 1.6.</p>
+    </figure>
+    <figure class="sample">
+      <figcaption><span class="dots" aria-hidden="true"></span>MyApp_1.0.0_NOTICE.txt</figcaption>
+      <pre tabindex="0"><code>{sampleNotice}</code></pre>
+      <p>The open-source notice. Standard text you can ship with the distribution.</p>
+    </figure>
+    <figure class="sample">
+      <figcaption><span class="dots" aria-hidden="true"></span>MyApp_1.0.0_security.md</figcaption>
+      <pre tabindex="0"><code>{sampleSecurity}</code></pre>
+      <p>The security report. Vulnerabilities, fixed versions and the signals to check first.</p>
+    </figure>
+  </div>
+</section>
 
 ## What it does
 
