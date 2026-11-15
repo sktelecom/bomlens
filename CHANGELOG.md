@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v1.15.0] - 2026-11-15
+
 ### Added
 
 - `SBOM_EXTRA_CA_CERTS=/path/to/bundle.pem` makes the scan containers trust an extra CA bundle, for a proxy that inspects TLS. The CLI (`--ui` included), `sbom-ui.bat` and the desktop app bind-mount it read-only at `/bomlens-ca/extra.pem` (`--mount`, so a file the Docker engine cannot see stops the scan) and set `BOMLENS_EXTRA_CA_CERTS`. Each container adds it to a copy of the bundle it already uses (`SSL_CERT_FILE`, else `REQUESTS_CA_BUNDLE`, else the system bundle) and points `SSL_CERT_FILE`, `REQUESTS_CA_BUNDLE`, `CURL_CA_BUNDLE`, `CARGO_HTTP_CAINFO`, `GIT_SSL_CAINFO` and `PIP_CERT` at it, adds it to `NODE_EXTRA_CA_CERTS`, and imports it into a JKS copy of the Java trust store in use (the one `JAVA_TOOL_OPTIONS` names, else the JDK's), all under `/tmp`. A file that is missing, holds no PEM certificate or has a comma in its path stops the scan with the cause; a Git Bash path with backslashes is accepted.
@@ -17,6 +19,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- The web UI is rebuilt on Primer: the app shell, New scan, Scan management, Overview, Components, Vulnerabilities, Artifacts, Licenses, Conformance, Dependencies, Source tree, Input SBOM, External lookup, Models and datasets, and the scan progress and failure screens. Sorting, filters, search, exports, links, URL keys and state are unchanged. The accent is navy (light `#1d4ed8`, dark `#60a5fa`), and red marks risk only. The new logo is used in the web UI, the desktop start screen and the docs.
+- The HTML reports use the same look as the web UI. The NOTICE stays in English.
+- The read-only demo shows the New scan form.
+- The docs site is built with Astro Starlight in place of MkDocs, with a new landing page.
+- Dependency updates: the frontend and desktop app packages, SCANOSS 1.54.3, aiohttp 3.14.5, anyio 4.15.1, the Docker CLI 29.9.2 and GitHub Actions. `@axe-core/playwright` stays at 4.13.0.
 - A Java Gradle source scan keeps what each project's runtime classpath resolves, and leaves out dependencies only on a compile or test classpath (such as `j2objc-annotations` from guava 33.0.0, or JUnit). One Gradle run resolves every project through an init script, with the configuration cache off for that run, in place of the root project's `dependencies` warm-up. The full graph is kept when the build includes other builds for their code (`includeBuild`), when a configuration cannot be resolved, or when the Gradle run fails. A build included only through `pluginManagement { includeBuild(...) }`, such as a convention plugin build, does not turn the filter off, as long as no project depends on a module of it and the settings can be read (Gradle 7 or later); its own dependencies (a Kotlin DSL plugin build brings the Kotlin compiler) then no longer reach the SBOM. A dependency a project ships through another configuration (a custom `agent` or `distribution`, Shadow's `shadow`) is left out; `BOMLENS_GRADLE_FULL_GRAPH=1` keeps the full graph.
 - On the Android SDK image, a Java Gradle build with no release configuration is narrowed the Java way.
 
