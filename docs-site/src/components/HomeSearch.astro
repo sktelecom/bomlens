@@ -1,0 +1,19 @@
+---
+// Copyright 2026 SK Telecom Co., Ltd.
+// SPDX-License-Identifier: Apache-2.0
+//
+// The large search field on the home page opens the same search dialog as the header,
+// so there is a single search and a single shortcut. The shortcut label follows the
+// platform.
+---
+
+<script>
+  const mac = /Mac|iPhone|iPad/.test(navigator.platform);
+  document.querySelectorAll<HTMLElement>('[data-open-search]').forEach((button) => {
+    const key = button.querySelector('kbd');
+    if (key) key.textContent = mac ? '⌘ K' : 'Ctrl K';
+    button.addEventListener('click', () => {
+      document.querySelector<HTMLButtonElement>('site-search button[data-open-modal]')?.click();
+    });
+  });
+</script>
