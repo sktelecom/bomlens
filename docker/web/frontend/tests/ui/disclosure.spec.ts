@@ -77,23 +77,18 @@ async function open(page: Page, section: string) {
     r.fulfill({ contentType: "application/json", body: JSON.stringify(fixture) }),
   );
   await page.goto(`/?ui=next#/scan/demo_4.0/${section}`);
-  await page.getByRole("navigation").first().waitFor();
+  await page.getByTestId("result-meta").waitFor();
   if (section === "conformance") {
     // The panel opens on the checks a reader can act on. Evidence belongs to a
     // met check, so show those.
-    await page.getByRole("button", { name: /^Met \d+$/ }).click();
+    await page.getByRole("button", { name: /^Met \(\d+\)$/ }).click();
   }
 }
 
-/** The evidence fold itself, not the check group that contains it: both are
- *  `<details>` and both contain the text. */
+/** The row that holds the evidence: the check row is the fold, since the row's
+ *  detail (what satisfied it, the example, the references) opens inside it. */
 function evidenceFold(page: Page) {
-  // The group also contains that summary, so it matches too; the innermost one
-  // is the evidence fold.
-  return page
-    .locator("details")
-    .filter({ has: page.locator("summary", { hasText: "Met with:" }) })
-    .last();
+  return page.locator("li.bl-cf-row details").filter({ hasText: "Met with:" }).first();
 }
 
 test("a collapsible section shows that it can be opened, and opens", async ({ page }) => {
@@ -102,7 +97,7 @@ test("a collapsible section shows that it can be opened, and opens", async ({ pa
   const evidence = evidenceFold(page);
   await expect(evidence).toBeVisible();
   // The chevron is the affordance: without it the row reads as plain text.
-  await expect(evidence.locator("> summary svg")).toBeVisible();
+  await expect(evidence.locator("> summary svg").last()).toBeVisible();
   await expect(evidence).not.toHaveAttribute("open", /.*/);
 
   await evidence.locator("> summary").click();
@@ -114,11 +109,11 @@ test("a collapsible section shows that it can be opened, and opens", async ({ pa
 });
 
 test("a closed fold inside an open one keeps its chevron unturned", async ({ page }) => {
-  // The chevron used to follow any open ancestor, so the evidence fold of a
-  // check inside an open group showed "open" while closed.
+  // The chevron used to follow any open ancestor, so a row inside an open group
+  // showed "open" while closed.
   await open(page, "conformance");
   const evidence = evidenceFold(page);
-  const chevron = evidence.locator("> summary > svg");
+  const chevron = evidence.locator("> summary .bl-cf-chev");
   const transform = () => chevron.evaluate((el) => getComputedStyle(el).transform);
   await expect(evidence).not.toHaveAttribute("open", /.*/);
   expect(await transform()).toBe("none");
@@ -145,7 +140,7 @@ test("a section with no findings says which of the two it is", async ({ page }) 
   // nothing or never checked. The reason says which, and the link leads to the
   // inventory the check actually covered.
   await open(page, "vulnerabilities");
-  const empty = page.getByTestId("empty-state");
+  const empty = page.getByTestId("no-security-report");
   await expect(empty).toBeVisible();
   // This stub has no security report at all, so the reason is the other one:
   // nothing was checked, which is not the same as nothing being wrong.

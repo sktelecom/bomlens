@@ -1,0 +1,7 @@
+
+------------------------------------------------------------
+Project ':app'
+------------------------------------------------------------
+
+runtimeClasspath - Runtime classpath of source set 'main'.
+\--- com.google.guava:guava:33.0.0-jre

@@ -115,11 +115,6 @@ describe("groupArtifacts", () => {
     expect(vex.formats.some((f) => f.name.includes("_yocto_vex"))).toBe(false);
   });
 
-  it("flags the risk report as the single primary deliverable", () => {
-    const groups = groupArtifacts(RESULTS);
-    expect(groups.filter((g) => g.primary).map((g) => g.key)).toEqual(["riskReport"]);
-  });
-
   it("collects every format of a report under one card, richest first", () => {
     const groups = groupArtifacts(RESULTS);
     const risk = groups.find((g) => g.key === "riskReport")!;

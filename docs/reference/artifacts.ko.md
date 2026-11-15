@@ -37,6 +37,7 @@ description: BomLens가 생성하는 산출물 파일 목록과 생성 조건, �
 | `{Project}_{Version}_reachability.cdx.json` | Go 소스나 Go 실행 파일 스캔에 `--reachability`를 주고, govulncheck가 Go 취약점 데이터베이스를 읽었을 때 생긴다 | SBOM의 컴포넌트(같은 모듈과 버전)에 해당하는 Go 보안 권고마다 govulncheck가 내린 판정을 담은 독립 CycloneDX 1.6 VEX 문서다. 영향받는 코드에 도달하지 않으면 `analysis.state`는 `not_affected`이다. 모듈은 필요하지만 영향받는 패키지가 빌드에 없으면 `justification`은 `code_not_present`, 패키지는 있지만 영향받는 함수를 호출하지 않거나 실행 파일에 링크되지 않았으면 `code_not_reachable`이다. 도달하면 `exploitable`이다. `analysis.detail`에 어느 경우인지와 호출 경로나 심볼을 적는다. `id`는 권고에 CVE가 있으면 그 CVE이고, Go 식별자와 다른 식별자는 `references`에 있다. 소스 스캔에서는 `metadata.properties`에 판정 범위(`bomlens:reachability:goos`, `goarch`, `build-tags`, `modules`)를 남긴다. 보안 보고서가 이 문서를 읽어, 해당 발견 항목마다 `_security.json`에 `bomlens:reachability`(`state`, `justification`, `detail`, `level`, `mode`)를 붙이고 문서에 `Reachability` 요약을 둔다 |
 | `{Project}_{Version}_vendored.cdx.json` | 소스 스캔에서 `--identify-vendored`, opt-in SCANOSS 이미지 필요 | 소스 트리 안에서 식별한 번들 오픈소스 컴포넌트(SCANOSS) |
 | `{Project}_{Version}_security_trivy.json` | 보안보고서를 생성할 때, 다른 엔진(grype, cve-bin-tool, Yocto)이 결과를 더한 경우 | `_security.json`으로 병합하기 전에 따로 남긴 Trivy 자체 결과 |
+| `{Project}_{Version}_cdxgen.log` | CLI 소스 스캔에서 의존성 준비 단계가 실패한 경우(SBOM의 `bomlens:pipeline-step-failed`에 기록됨) | 원인을 찾을 수 있도록 남긴 1단계 로그(준비 단계와 cdxgen 출력). 진단용 파일이므로 배포하지 않습니다. URL에 든 자격 증명(`scheme://user:pass@`는 `scheme://***@`로 바뀜)과 Authorization, 토큰, 비밀번호, 시크릿, API 키 값은 가리지만 내부 호스트 이름은 그대로 남습니다. 같은 프로젝트와 버전을 다시 스캔하기 전에 지웁니다 |
 | `bomlens-events.jsonl` | `BOMLENS_EVENTS=file` | 진행 이벤트, 한 줄에 JSON 객체 하나. [엔진 계약](engine-contract.ko.md#진행-이벤트) 참고 |
 | `bomlens-result.json` | 항상 | 실행 결과 매니페스트. 실행이 어떻게 끝났는지, 단계별 결과, 출력 파일별 역할을 담습니다. [엔진 계약](engine-contract.ko.md) 참고 |
 | `{Project}_{Version}_security_epss.json` | 보안보고서를 생성할 때마다 | 취약점별 EPSS 점수와 KEV 여부(오프라인 생성 시 null/false), 보안보고서 우선순위 산정에 사용 |
@@ -45,7 +46,7 @@ description: BomLens가 생성하는 산출물 파일 목록과 생성 조건, �
 
 `{P}`=프로젝트 이름, `{V}`=버전 (특수문자는 `_`로 정규화).
 
-위 표의 생성 조건은 CLI 옵션 기준입니다. 웹 UI와 데스크톱 앱에서는 새 스캔 화면의 생성 옵션(고지문, 보안 보고서)이 같은 역할을 하고, 만들어진 파일은 결과 화면의 산출물 섹션에 모두 표시되어 형식별로 또는 ZIP 하나로 내려받을 수 있습니다. SPDX는 스캔 옵션이 아닙니다. 산출물 섹션의 SBOM 카드에 있는 **SPDX 2.3으로 내보내기** 버튼으로 필요할 때 완성된 SBOM을 변환하며, 변환된 파일은 산출물 목록과 ZIP 묶음에 함께 들어갑니다. UI에는 서명 기능이 없어 이렇게 내보낸 SPDX는 서명되지 않으므로, 서명이 필요하면 CLI에서 `--spdx --sign`을 쓰세요. [웹 UI와 데스크톱 앱](ui.ko.md)을 참고하세요.
+위 표의 생성 조건은 CLI 옵션 기준입니다. 웹 UI와 데스크톱 앱에서는 새 스캔 화면의 생성 옵션(고지문, 보안 보고서)이 같은 역할을 하고, 만들어진 파일은 결과 화면의 산출물 섹션에 모두 표시되어 형식별로 또는 ZIP 하나로 내려받을 수 있습니다. SPDX는 스캔 옵션이 아닙니다. 산출물 섹션의 SBOM 행에 있는 **SPDX 2.3으로 내보내기** 버튼으로 필요할 때 완성된 SBOM을 변환하며, 변환된 파일은 산출물 목록과 ZIP 묶음에 함께 들어갑니다. UI에는 서명 기능이 없어 이렇게 내보낸 SPDX는 서명되지 않으므로, 서명이 필요하면 CLI에서 `--spdx --sign`을 쓰세요. [웹 UI와 데스크톱 앱](ui.ko.md)을 참고하세요.
 
 ## 선언한 AI 서비스
 

@@ -31,16 +31,6 @@ export function scanStageIndex(logs: string[]): number {
   return 0;
 }
 
-/**
- * A monotonic, honest percent (0–100) from the furthest pipeline stage reached.
- * The active stage counts as half done, so the bar advances with real progress
- * and never claims completion before the scan's done event. Replaces the old
- * log-volume guess; the caller snaps to 100 once the scan finishes.
- */
-export function stageProgress(logs: string[]): number {
-  return Math.round(((scanStageIndex(logs) + 0.5) / SCAN_STAGES.length) * 100);
-}
-
 export type StageStatus = "done" | "active" | "pending";
 
 /** Per-stage status for the given logs and run state. */
@@ -50,4 +40,37 @@ export function stageStatuses(logs: string[], finished: boolean): StageStatus[] 
   return SCAN_STAGES.map((_, i) =>
     i < current ? "done" : i === current ? "active" : "pending",
   );
+}
+
+/** Whether any step's marker has appeared in the log yet. */
+export function anyStageMarker(logs: string[]): boolean {
+  return SCAN_STAGES.some((stage) => logs.some((line) => stage.match.test(line)));
+}
+
+export interface VisibleStage {
+  stage: ScanStage;
+  status: StageStatus;
+}
+
+/**
+ * The steps this run has. Deep CVE matching is left out when the run did not
+ * ask for it, since its marker never appears. `finished` marks every step done
+ * (a scan that ended); a failed run passes false so the step it stopped on
+ * stays the active one.
+ */
+export function visibleStages(logs: string[], finished: boolean, deepCve: boolean): VisibleStage[] {
+  const statuses = stageStatuses(logs, finished);
+  return SCAN_STAGES.map((stage, i) => ({ stage, status: statuses[i] })).filter(
+    ({ stage }) => stage.id !== "deepCve" || deepCve,
+  );
+}
+
+/**
+ * Percent over the steps this run has, so a step it skips is not counted. The
+ * active step counts as half done; no active step (finished) is 100.
+ */
+export function visiblePercent(visible: VisibleStage[]): number {
+  const cur = visible.findIndex((v) => v.status === "active");
+  if (cur < 0) return 100;
+  return Math.round(((cur + 0.5) / visible.length) * 100);
 }

@@ -1,0 +1,4 @@
+P	:core
+H	:core
+R	:core	com.fasterxml.jackson.core:jackson-core:2.16.0
+R	:core	com.fasterxml.jackson.core:jackson-databind:2.16.0

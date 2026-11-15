@@ -1,14 +1,12 @@
 // Copyright 2026 SK Telecom Co., Ltd.
 // SPDX-License-Identifier: Apache-2.0
 
-import { FileCheck2, Info, Loader2, PencilLine, RotateCw, TriangleAlert } from "lucide-react";
-import { useEffect, useRef } from "react";
+import { ChevronRightIcon, FileBadgeIcon, PencilIcon } from "@primer/octicons-react";
+import { Banner, Button, Label } from "@primer/react";
+import { Table } from "@primer/react/experimental";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { Disclosure } from "@/components/ui/disclosure";
 import type { Spdx3Summary } from "@/lib/api";
 import {
   bandSegments,
@@ -21,14 +19,9 @@ import {
   type FieldStatus,
   type Spdx3Check,
 } from "@/lib/aiDeclaration";
-import { cn } from "@/lib/utils";
+import { formatNumber } from "@/lib/format";
 
-const SEGMENT_COLOR: Record<string, string> = {
-  filled: "bg-risk-low",
-  optional: "bg-muted-foreground/40",
-  judgment: "bg-risk-medium",
-  missingRequired: "bg-risk-critical",
-};
+import "./models/models.css";
 
 /**
  * The SPDX 3.0.1 AI document's state on the Models & datasets screen: draft or
@@ -66,7 +59,7 @@ export function Spdx3StatusBand({
    *  when a declared service is not in the CycloneDX SBOM yet. */
   onRescan?: () => void;
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const fillRef = useRef<HTMLButtonElement>(null);
   useEffect(() => {
     if (focusFill) fillRef.current?.focus();
@@ -74,22 +67,22 @@ export function Spdx3StatusBand({
 
   if (!summary) {
     return (
-      <Card data-testid="spdx3-band">
-        <CardContent className="flex flex-wrap items-center justify-between gap-3 p-4">
-          <div className="min-w-0">
-            <div className="text-body-sm font-semibold">{t("spdx3.band.title")}</div>
-            <p className="mt-0.5 text-body-sm text-muted-foreground">
-              {available ? t("spdx3.band.none") : t("spdx3.band.unavailable")}
-            </p>
-          </div>
+      <section className="bl-box" data-testid="spdx3-band" aria-labelledby="bl-md-spdx-title">
+        <div className="bl-box-head">
+          <span className="bl-md-icon" aria-hidden>
+            <FileBadgeIcon size={16} />
+          </span>
+          <h2 id="bl-md-spdx-title">{t("spdx3.band.title")}</h2>
           {available && (
-            <Button variant="outline" size="sm" onClick={onWrite} disabled={busy}>
-              {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileCheck2 className="h-4 w-4" />}
-              {t("spdx3.band.write")}
-            </Button>
+            <span className="bl-box-head-end">
+              <Button size="small" leadingVisual={FileBadgeIcon} onClick={onWrite} loading={busy}>
+                {t("spdx3.band.write")}
+              </Button>
+            </span>
           )}
-        </CardContent>
-      </Card>
+        </div>
+        <div className="bl-box-body bl-muted">{available ? t("spdx3.band.none") : t("spdx3.band.unavailable")}</div>
+      </section>
     );
   }
 
@@ -107,50 +100,40 @@ export function Spdx3StatusBand({
   const where = check && missing > 0 ? missingByElement(check) : [];
 
   return (
-    <Card data-testid="spdx3-band">
-      <CardContent className="space-y-3 p-4">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
-            <span className="text-body-sm font-semibold">{t("spdx3.band.title")}</span>
-            {summary.draft ? (
-              <Badge tone="warning">{t("spdx3.draft")}</Badge>
-            ) : (
-              <Badge tone="success">{t("spdx3.complete")}</Badge>
-            )}
-          </div>
-          {available && (
-            <Button ref={fillRef} size="sm" onClick={onFill} disabled={busy}>
-              {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <PencilLine className="h-4 w-4" />}
+    <section className="bl-box" data-testid="spdx3-band" aria-labelledby="bl-md-spdx-title">
+      <div className="bl-box-head">
+        <span className="bl-md-icon" aria-hidden>
+          <FileBadgeIcon size={16} />
+        </span>
+        <h2 id="bl-md-spdx-title">{t("spdx3.band.title")}</h2>
+        <Label variant={summary.draft ? "attention" : "success"}>{summary.draft ? t("spdx3.draft") : t("spdx3.complete")}</Label>
+        {available && (
+          <span className="bl-box-head-end">
+            <Button ref={fillRef} variant="primary" size="small" leadingVisual={PencilIcon} onClick={onFill} loading={busy}>
               {t("spdx3.band.fill")}
             </Button>
-          )}
+          </span>
+        )}
+      </div>
+      <div className="bl-box-body bl-md-stack">
+        <div className="bl-md-bar" aria-hidden>
+          {segments.map((s) => (s.count > 0 ? <span key={s.key} data-seg={s.key} style={{ flex: s.count / total }} /> : null))}
         </div>
-        <div className="flex h-2 w-full overflow-hidden rounded-full bg-muted" aria-hidden>
-          {segments.map((s) =>
-            s.count > 0 ? (
-              <div
-                key={s.key}
-                className={SEGMENT_COLOR[s.key]}
-                style={{ width: `${(s.count / total) * 100}%` }}
-              />
-            ) : null,
-          )}
-        </div>
-        <ul className="flex flex-wrap gap-x-4 gap-y-1 text-label">
+        <ul className="bl-md-legend">
           {segments.map((s) => (
-            <li key={s.key} className="flex items-center gap-1.5" data-segment={s.key}>
-              <span className={cn("h-2 w-2 rounded-full", SEGMENT_COLOR[s.key])} aria-hidden />
+            <li key={s.key} data-segment={s.key}>
+              <span className="bl-md-dot" data-seg={s.key} aria-hidden />
               {t(`spdx3.segment.${s.key}`)}
-              <span className="tabular-nums font-medium">{s.count}</span>
+              <span className="bl-strong bl-num">{formatNumber(s.count, i18n.language)}</span>
             </li>
           ))}
         </ul>
-        <p className="text-body-sm text-muted-foreground">
+        <p className="bl-md-p bl-muted">
           {summary.draft ? t("spdx3.band.draftNote", { count: missing }) : t("spdx3.band.completeNote")}
           {summary.draft && !publisher && <> {t("spdx3.band.consumerNote")}</>}
         </p>
         {where.length > 0 && (
-          <p className="text-body-sm text-foreground" data-testid="spdx3-missing-where">
+          <p className="bl-md-p" data-testid="spdx3-missing-where">
             {t("spdx3.band.missingAt", {
               list: where
                 .map((e) =>
@@ -169,63 +152,51 @@ export function Spdx3StatusBand({
           </p>
         )}
         {servicePending && (
-          <div
+          <Banner
+            variant="info"
             role="status"
             data-testid="spdx3-service-pending"
-            className="flex flex-wrap items-center justify-between gap-2 rounded-md border bg-muted/40 p-3 text-label text-foreground"
-          >
-            <span className="flex items-start gap-1.5">
-              <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden />
-              {t(hasService ? "spdx3.band.servicePending" : "spdx3.band.declarationPending")}
-            </span>
-            {onRescan && (
-              <Button variant="outline" size="sm" onClick={onRescan} title={t("result.rescanHint")}>
-                <RotateCw className="h-4 w-4" aria-hidden />
-                {t("result.rescan")}
-              </Button>
-            )}
-          </div>
+            title={t(hasService ? "spdx3.band.servicePending" : "spdx3.band.declarationPending")}
+            primaryAction={
+              onRescan ? (
+                <Banner.PrimaryAction onClick={onRescan} title={t("result.rescanHint")}>
+                  {t("result.rescan")}
+                </Banner.PrimaryAction>
+              ) : undefined
+            }
+          />
         )}
         {refused && (
-          <div
-            role="status"
-            className="space-y-1 rounded-md border border-warning/40 bg-warning-surface p-3 text-label text-warning dark:bg-warning-surface/15"
-          >
-            <div className="flex items-center gap-1.5 font-medium">
-              <TriangleAlert className="h-3.5 w-3.5" aria-hidden />
-              {t("spdx3.band.refused")}
-            </div>
-            <ul className="list-disc space-y-0.5 pl-5 font-mono">
-              {(summary.declaration?.reasons ?? []).slice(0, 5).map((r, i) => (
-                <li key={i}>{r}</li>
-              ))}
-            </ul>
-          </div>
+          <Banner variant="warning" role="status">
+            <Banner.Title as="h3">{t("spdx3.band.refused")}</Banner.Title>
+            <Banner.Description>
+              <ul className="bl-md-reasons">
+                {(summary.declaration?.reasons ?? []).slice(0, 5).map((r, i) => (
+                  <li key={i}>{r}</li>
+                ))}
+              </ul>
+            </Banner.Description>
+          </Banner>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </section>
   );
 }
 
-const STATUS_BADGE: Record<FieldStatus, { tone?: "low" | "info" | "critical" | "medium"; key: string }> = {
-  auto: { tone: "low", key: "auto" },
-  declared: { tone: "info", key: "declared" },
-  noAssertion: { key: "noAssertion" },
-  missingRequired: { tone: "critical", key: "missingRequired" },
-  judgment: { tone: "medium", key: "judgment" },
-  optional: { key: "optional" },
-  omitted: { key: "omitted" },
-  review: { key: "review" },
+const STATUS_VARIANT: Record<FieldStatus, "success" | "secondary" | "primary" | "accent" | "attention"> = {
+  auto: "success",
+  declared: "primary",
+  noAssertion: "secondary",
+  missingRequired: "attention",
+  judgment: "accent",
+  optional: "secondary",
+  omitted: "secondary",
+  review: "secondary",
 };
 
 export function Spdx3StatusBadge({ status }: { status: FieldStatus }) {
   const { t } = useTranslation();
-  const b = STATUS_BADGE[status];
-  return b.tone ? (
-    <Badge tone={b.tone}>{t(`spdx3.status.${b.key}`)}</Badge>
-  ) : (
-    <Badge variant="muted">{t(`spdx3.status.${b.key}`)}</Badge>
-  );
+  return <Label variant={STATUS_VARIANT[status]}>{t(`spdx3.status.${status}`)}</Label>;
 }
 
 /** The translation namespace for an element type's field names. The check
@@ -247,13 +218,13 @@ export function fieldNamespace(type: string): "document" | "model" | "dataset" |
 
 const SHOWN: FieldStatus[] = ["auto", "declared", "noAssertion", "missingRequired", "judgment"];
 
+type ExtraRow = { key: string; label: string; value: string | null; status: FieldStatus; statusLabel?: string };
+
 /**
  * One element's fields in the SPDX 3.0.1 document: the value and where it came
  * from. Optional fields nobody filled are counted under the table instead of
  * listed, so the rows that need attention are not lost among them.
  */
-type ExtraRow = { key: string; label: string; value: string | null; status: FieldStatus; statusLabel?: string };
-
 export function Spdx3FieldTable({
   element,
   extraRows = [],
@@ -270,42 +241,48 @@ export function Spdx3FieldTable({
   const rows = element.fields.filter((f) => SHOWN.includes(f.status) || (f.status === "optional" && f.display));
   const hidden = element.fields.filter((f) => f.status === "optional" && !f.display).length;
   return (
-    <div className="space-y-1">
-      <div className="overflow-x-auto rounded-md border">
-        <table className="w-full text-left text-label">
-          <thead className="border-b bg-muted/40 text-muted-foreground">
-            <tr>
-              <th scope="col" className="px-3 py-2 font-medium">{t("spdx3.table.field")}</th>
-              <th scope="col" className="px-3 py-2 font-medium">{t("spdx3.table.value")}</th>
-              <th scope="col" className="px-3 py-2 font-medium">{t("spdx3.table.status")}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {extraRows.map((r) => <ExtraTableRow key={r.key} row={r} />)}
-            {rows.map((f) => (
-              <tr key={f.id} className="border-b last:border-0" data-field={f.id}>
-                <td className="px-3 py-2 align-top">{t(`aiDecl.${ns}.${f.id}.label`, { defaultValue: f.id })}</td>
-                <td className="px-3 py-2 align-top break-all">
-                  {f.display !== undefined ? (
-                    <DisplayText ns={ns} fieldId={f.id} display={f.display} />
-                  ) : (
-                    <span className="text-muted-foreground">{t("spdx3.table.notFilled")}</span>
-                  )}
-                  {f.meaning === "huggingface-publisher" && (
-                    <span className="ml-1 text-muted-foreground">{t("spdx3.table.hubPublisher")}</span>
-                  )}
-                </td>
-                <td className="px-3 py-2 align-top">
-                  <Spdx3StatusBadge status={f.status} />
-                </td>
-              </tr>
+    <>
+      <Table.Container className="bl-md-fieldtable">
+        <Table gridTemplateColumns="minmax(10rem, 0.8fr) minmax(0, 2fr) fit-content(12rem)" cellPadding="condensed" aria-label={element.label}>
+          <Table.Head>
+            <Table.Row>
+              <Table.Header>{t("spdx3.table.field")}</Table.Header>
+              <Table.Header>{t("spdx3.table.value")}</Table.Header>
+              <Table.Header>{t("spdx3.table.status")}</Table.Header>
+            </Table.Row>
+          </Table.Head>
+          <Table.Body>
+            {extraRows.map((r) => (
+              <ExtraTableRow key={r.key} row={r} />
             ))}
-            {trailingRows.map((r) => <ExtraTableRow key={r.key} row={r} />)}
-          </tbody>
-        </table>
-      </div>
-      {hidden > 0 && <p className="text-body-sm text-muted-foreground">{t("spdx3.table.optionalHidden", { count: hidden })}</p>}
-    </div>
+            {rows.map((f) => (
+              <Table.Row key={f.id} data-field={f.id}>
+                <Table.Cell>{t(`aiDecl.${ns}.${f.id}.label`, { defaultValue: f.id })}</Table.Cell>
+                <Table.Cell>
+                  <span className="bl-breakall">
+                    {f.display !== undefined ? (
+                      <DisplayText ns={ns} fieldId={f.id} display={f.display} />
+                    ) : (
+                      <span className="bl-muted">{t("spdx3.table.notFilled")}</span>
+                    )}
+                    {f.meaning === "huggingface-publisher" && (
+                      <span className="bl-muted"> {t("spdx3.table.hubPublisher")}</span>
+                    )}
+                  </span>
+                </Table.Cell>
+                <Table.Cell>
+                  <Spdx3StatusBadge status={f.status} />
+                </Table.Cell>
+              </Table.Row>
+            ))}
+            {trailingRows.map((r) => (
+              <ExtraTableRow key={r.key} row={r} />
+            ))}
+          </Table.Body>
+        </Table>
+      </Table.Container>
+      {hidden > 0 && <p className="bl-md-fieldnote">{t("spdx3.table.optionalHidden", { count: hidden })}</p>}
+    </>
   );
 }
 
@@ -340,15 +317,27 @@ function DisplayText({ ns, fieldId, display }: { ns: string; fieldId: string; di
 function ExtraTableRow({ row }: { row: ExtraRow }) {
   const { t } = useTranslation();
   return (
-    <tr className="border-b last:border-0">
-      <td className="px-3 py-2 align-top">{row.label}</td>
-      <td className="px-3 py-2 align-top break-all">
-        {row.value ?? <span className="text-muted-foreground">{t("spdx3.table.notFilled")}</span>}
-      </td>
-      <td className="px-3 py-2 align-top">
-        {row.statusLabel ? <Badge variant="muted">{row.statusLabel}</Badge> : <Spdx3StatusBadge status={row.status} />}
-      </td>
-    </tr>
+    <Table.Row>
+      <Table.Cell>{row.label}</Table.Cell>
+      <Table.Cell>
+        <span className="bl-breakall">{row.value ?? <span className="bl-muted">{t("spdx3.table.notFilled")}</span>}</span>
+      </Table.Cell>
+      <Table.Cell>
+        {row.statusLabel ? <Label variant="secondary">{row.statusLabel}</Label> : <Spdx3StatusBadge status={row.status} />}
+      </Table.Cell>
+    </Table.Row>
+  );
+}
+
+function Sub({ title, caption, children }: { title: ReactNode; caption?: string | null; children: ReactNode }) {
+  return (
+    <div className="bl-md-sub">
+      <div className="bl-md-subhead">
+        <span className="bl-strong">{title}</span>
+        {caption && <span className="bl-muted bl-small">{caption}</span>}
+      </div>
+      {children}
+    </div>
   );
 }
 
@@ -386,82 +375,70 @@ export function Spdx3Fields({ check, defaultOpen = false }: { check: Spdx3Check;
     (n, d) => n + d.fields.filter((f) => f.status === "missingRequired").length,
     0,
   );
+  // Captured once so React never fights the person's own open and close.
+  const [initialOpen] = useState(defaultOpen);
+  const [foldOpen] = useState(foldedMissing > 0);
   return (
-    <Disclosure
-      defaultOpen={defaultOpen}
-      summary={<span className="text-body-sm font-medium">{t("spdx3.table.toggle")}</span>}
-      className="rounded-lg border bg-card p-3"
-    >
-      <div className="mt-3 space-y-3" data-testid="spdx3-fields">
+    <details className="bl-box" open={initialOpen || undefined}>
+      <summary className="bl-box-head bl-md-sum">
+        <span className="bl-md-chev" aria-hidden>
+          <ChevronRightIcon size={16} />
+        </span>
+        <span className="bl-strong">{t("spdx3.table.toggle")}</span>
+      </summary>
+      <div data-testid="spdx3-fields">
         {model && (
-          <Card>
-            <CardContent className="space-y-2 p-4">
-              <div className="flex flex-wrap items-baseline justify-between gap-2">
-                <span className="text-body-sm font-semibold">{model.label}</span>
-                <span className="text-label text-muted-foreground">{t("spdx3.table.caption")}</span>
-              </div>
-              <Spdx3FieldTable element={model} extraRows={extra} trailingRows={roleRows} />
-            </CardContent>
-          </Card>
+          <Sub title={model.label} caption={t("spdx3.table.caption")}>
+            <Spdx3FieldTable element={model} extraRows={extra} trailingRows={roleRows} />
+          </Sub>
         )}
         {service && (
-          <Card data-testid="spdx3-service-fields">
-            <CardContent className="space-y-2 p-4">
-              <div className="flex flex-wrap items-baseline justify-between gap-2">
-                <span className="flex items-center gap-2 text-body-sm font-semibold">
-                  {service.label}
-                  <Badge tone="info">{t("spdx3.table.publisherDeclared")}</Badge>
-                </span>
-                <span className="text-label text-muted-foreground">{t("spdx3.table.serviceCaption")}</span>
-              </div>
+          <div data-testid="spdx3-service-fields">
+            <Sub
+              title={
+                <>
+                  {service.label} <Label variant="secondary">{t("spdx3.table.publisherDeclared")}</Label>
+                </>
+              }
+              caption={t("spdx3.table.serviceCaption")}
+            >
               <Spdx3FieldTable element={service} />
               {externals.map((e) => (
-                <div key={e.declarationKey ?? e.label} className="space-y-1 pt-2" data-testid="spdx3-external-model">
-                  <div className="text-label font-semibold">
-                    {t("spdx3.table.externalModel", { name: e.label })}
-                  </div>
+                <div key={e.declarationKey ?? e.label} className="bl-md-ext" data-testid="spdx3-external-model">
+                  <div className="bl-md-extname">{t("spdx3.table.externalModel", { name: e.label })}</div>
                   <Spdx3FieldTable element={e} />
                 </div>
               ))}
-            </CardContent>
-          </Card>
+            </Sub>
+          </div>
         )}
         {!model && doc && datasets[0] && (
-          <Card>
-            <CardContent className="space-y-2 p-4">
-              <span className="text-body-sm font-semibold">{datasets[0].label}</span>
-              <Spdx3FieldTable element={datasets[0]} extraRows={extra} />
-            </CardContent>
-          </Card>
+          <Sub title={datasets[0].label}>
+            <Spdx3FieldTable element={datasets[0]} extraRows={extra} />
+          </Sub>
         )}
         {folded.length > 0 && (
           // Opens by itself when it holds required fields still empty, so they
           // are not hidden behind a fold.
-          <Disclosure
-            defaultOpen={foldedMissing > 0}
-            summary={
-              <span className="text-body-sm font-medium" data-testid="spdx3-dataset-fields">
-                {t("spdx3.table.datasetFields", { count: folded.length })}
-                {foldedMissing > 0 && (
-                  <span className="ml-2 font-normal text-risk-critical-fg">
-                    {t("spdx3.table.datasetMissing", { count: foldedMissing })}
-                  </span>
-                )}
+          <details className="bl-md-folded" open={foldOpen || undefined}>
+            <summary className="bl-md-sum" data-testid="spdx3-dataset-fields">
+              <span className="bl-md-chev" aria-hidden>
+                <ChevronRightIcon size={16} />
               </span>
-            }
-          >
-            <div className="mt-2 space-y-3">
-              {folded.map((d) => (
-                <div key={d.declarationKey ?? d.label} className="space-y-1">
-                  <div className="text-label font-semibold">{d.label}</div>
-                  <Spdx3FieldTable element={d} />
-                </div>
-              ))}
-            </div>
-          </Disclosure>
+              <span className="bl-strong">{t("spdx3.table.datasetFields", { count: folded.length })}</span>
+              {foldedMissing > 0 && (
+                <span className="bl-md-danger">{t("spdx3.table.datasetMissing", { count: foldedMissing })}</span>
+              )}
+            </summary>
+            {folded.map((d) => (
+              <Sub key={d.declarationKey ?? d.label} title={d.label}>
+                <Spdx3FieldTable element={d} />
+              </Sub>
+            ))}
+          </details>
         )}
-        <p className="text-body-sm text-muted-foreground">{t("spdx3.table.notLegalAdvice")}</p>
+        <p className="bl-md-legal">{t("spdx3.table.notLegalAdvice")}</p>
       </div>
-    </Disclosure>
+    </details>
   );
 }

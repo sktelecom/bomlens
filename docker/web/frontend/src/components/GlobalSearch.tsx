@@ -1,32 +1,33 @@
 // Copyright 2026 SK Telecom Co., Ltd.
 // SPDX-License-Identifier: Apache-2.0
 
-import { Boxes, ScanSearch, Search, ShieldAlert } from "lucide-react";
+import { GlobeIcon, ListUnorderedIcon, PackageIcon, SearchIcon, XCircleFillIcon } from "@primer/octicons-react";
+import { TextInput } from "@primer/react";
 import { type KeyboardEvent, useEffect, useId, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import { Input } from "@/components/ui/input";
 import type { DoneEvent } from "@/lib/api";
 import { parseLookupInput } from "@/lib/lookup";
-import { isAppleKeyboard } from "@/lib/platform";
 import type { SectionId } from "@/lib/nav";
+import { isAppleKeyboard } from "@/lib/platform";
+import { PACKAGE_SEPARATOR, SeverityLabel, splitPackage } from "@/components/primer";
 import { searchScan } from "@/lib/search";
 
 /**
  * Cross-section quick search in the top bar (shown only with a scan loaded).
  * Type to find a component or CVE from anywhere; picking a result routes to its
- * section with the term pre-applied. Lives in the chrome (outside `main`), so it
- * doesn't touch the result-section visual snapshots.
+ * section with the term pre-applied.
  *
  * Keyboard follows the APG combobox-with-listbox pattern: focus stays in the
  * input and the active option is named by `aria-activedescendant` rather than
- * moved to. Options are therefore not tab stops and carry no tabIndex — a
+ * moved to. Options are therefore not tab stops and carry no tabIndex; a
  * screen reader announces the active one because the input points at it.
  */
 export function GlobalSearch({
   result,
   onPick,
   onLookup,
+  width,
 }: {
   result: DoneEvent;
   /** Navigate to a section with the chosen term applied to its search. */
@@ -40,6 +41,8 @@ export function GlobalSearch({
    * the actual request.
    */
   onLookup?: (term: string) => void;
+  /** Box width in px (narrower when the top bar is short of room). */
+  width: number;
 }) {
   const { t } = useTranslation();
   const [query, setQuery] = useState("");
@@ -49,7 +52,7 @@ export function GlobalSearch({
   const inputRef = useRef<HTMLInputElement>(null);
   const baseId = useId();
 
-  const { components, vulns } = searchScan(result, query);
+  const { components, vulns, componentTotal, vulnTotal } = searchScan(result, query, GROUP_CAP);
   const hasResults = components.length > 0 || vulns.length > 0;
   const show = open && query.trim().length > 0;
   // Offered when the term looks like an advisory id (CVE/GHSA/…), since this
@@ -65,11 +68,20 @@ export function GlobalSearch({
   type Option =
     | { kind: "pick"; section: SectionId; term: string }
     | { kind: "lookup"; term: string };
+  // A group cut at its cap ends with a row that opens the section filtered
+  // to the typed term, where every match is listed.
+  const moreComponents = componentTotal > components.length;
+  const moreVulns = vulnTotal > vulns.length;
   const options: Option[] = [
     ...components.map((c) => ({ kind: "pick" as const, section: "components" as SectionId, term: c.name })),
+    ...(moreComponents ? [{ kind: "pick" as const, section: "components" as SectionId, term: trimmedQuery }] : []),
     ...vulns.map((v) => ({ kind: "pick" as const, section: "vulnerabilities" as SectionId, term: v.id })),
+    ...(moreVulns ? [{ kind: "pick" as const, section: "vulnerabilities" as SectionId, term: trimmedQuery }] : []),
     ...(showLookup ? [{ kind: "lookup" as const, term: trimmedQuery }] : []),
   ];
+  const moreComponentsIdx = moreComponents ? components.length : -1;
+  const vulnBase = components.length + (moreComponents ? 1 : 0);
+  const moreVulnsIdx = moreVulns ? vulnBase + vulns.length : -1;
   const lookupIdx = showLookup ? options.length - 1 : -1;
   // A shrinking result set can strand the index past the end.
   const activeIdx = active >= 0 && active < options.length ? active : -1;
@@ -145,28 +157,42 @@ export function GlobalSearch({
     }
   };
 
-  const optionClass = (i: number) =>
-    [
-      "flex w-full cursor-pointer items-center gap-2 px-3 py-1.5 text-left",
-      i === activeIdx ? "bg-muted" : "hover:bg-muted",
-    ].join(" ");
-
   return (
-    <div className="relative hidden min-w-0 md:block">
-      <Search
-        className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
-        aria-hidden
-      />
-      <Input
+    <div className="bl-search">
+      <TextInput
         ref={inputRef}
-        type="search"
+        type="text"
         role="combobox"
         aria-expanded={show}
         aria-controls={show ? listboxId : undefined}
         aria-activedescendant={activeIdx >= 0 ? optionId(activeIdx) : undefined}
         aria-autocomplete="list"
         aria-keyshortcuts="Meta+K Control+K"
+        aria-label={t("search.placeholder")}
         data-testid="global-search"
+        leadingVisual={SearchIcon}
+        // The shortcut hint while empty; a clear button once there is a term.
+        trailingVisual={
+          query ? undefined : (
+            <kbd className="bl-kbd" aria-hidden>
+              {isAppleKeyboard() ? "⌘K" : "Ctrl K"}
+            </kbd>
+          )
+        }
+        trailingAction={
+          query ? (
+            <TextInput.Action
+              icon={XCircleFillIcon}
+              aria-label={t("search.clear")}
+              onClick={() => {
+                setQuery("");
+                setActive(-1);
+                inputRef.current?.focus();
+              }}
+            />
+          ) : undefined
+        }
+        placeholder={t("search.placeholder")}
         value={query}
         onChange={(e) => {
           setQuery(e.target.value);
@@ -178,111 +204,138 @@ export function GlobalSearch({
           blurTimer.current = window.setTimeout(() => setOpen(false), 120);
         }}
         onKeyDown={onKeyDown}
-        placeholder={t("search.placeholder")}
-        aria-label={t("search.placeholder")}
-        className="h-8 w-56 pl-8 pr-3 lg:w-72 lg:pr-14"
+        width={width}
       />
-      <kbd
-        className="pointer-events-none absolute right-2 top-1/2 hidden -translate-y-1/2 select-none rounded border bg-muted px-1.5 py-0.5 font-sans text-caption font-medium text-muted-foreground lg:block"
-        aria-hidden
-      >
-        {isAppleKeyboard() ? "⌘K" : "Ctrl K"}
-      </kbd>
       {show && (
         <div
           id={listboxId}
           role="listbox"
           aria-label={t("search.placeholder")}
-          className="absolute left-0 top-full z-30 mt-1 w-80 max-w-[90vw] overflow-hidden rounded-md border bg-popover text-popover-foreground shadow-lg"
+          className="bl-searchpop"
           // Keep the input focused through the click so onClick fires before blur.
           onMouseDown={(e) => {
             e.preventDefault();
             window.clearTimeout(blurTimer.current);
           }}
         >
-          {!hasResults && !showLookup ? (
-            <p className="px-3 py-3 text-body-sm text-muted-foreground">{t("search.none")}</p>
-          ) : (
-            <div className="max-h-80 overflow-auto py-1 text-body-sm">
-              {components.length > 0 && (
-                <div role="group" aria-labelledby={componentsHeadingId}>
-                  <div
-                    id={componentsHeadingId}
-                    className="px-3 pb-1 pt-2 text-label font-semibold uppercase tracking-wider text-muted-foreground"
-                  >
-                    {t("search.components")}
-                  </div>
-                  {components.map((c, i) => (
-                    <div
-                      key={`c-${c.purl || c.name}-${i}`}
-                      id={optionId(i)}
-                      role="option"
-                      aria-selected={i === activeIdx}
-                      onClick={() => activate({ kind: "pick", section: "components", term: c.name })}
-                      className={optionClass(i)}
-                    >
-                      <Boxes className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden />
-                      <span className="truncate">{c.name}</span>
-                      {c.version && (
-                        <span className="shrink-0 text-label text-muted-foreground">{c.version}</span>
-                      )}
-                    </div>
-                  ))}
+          {/* Said before the lookup row too, so the row reads as the next step. */}
+          {!hasResults && <p className="bl-searchpop-empty">{t("search.none")}</p>}
+          {components.length > 0 && (
+            <div role="group" aria-labelledby={componentsHeadingId}>
+              <div id={componentsHeadingId} className="bl-searchpop-group">
+                {t("search.components")}
+              </div>
+              {components.map((c, i) => (
+                <div
+                  key={`c-${c.purl || c.name}-${i}`}
+                  id={optionId(i)}
+                  role="option"
+                  aria-selected={i === activeIdx}
+                  onClick={() => activate({ kind: "pick", section: "components", term: c.name })}
+                >
+                  <PackageIcon size={16} />
+                  <Coordinate group={c.group} name={c.name} />
+                  {c.version && <span className="bl-searchpop-aside">{c.version}</span>}
                 </div>
+              ))}
+              {moreComponents && (
+                <ShowAll
+                  id={optionId(moreComponentsIdx)}
+                  selected={moreComponentsIdx === activeIdx}
+                  label={t("search.showAllComponents", { count: componentTotal })}
+                  onClick={() => activate({ kind: "pick", section: "components", term: trimmedQuery })}
+                />
               )}
-              {vulns.length > 0 && (
-                <div role="group" aria-labelledby={vulnsHeadingId}>
-                  <div
-                    id={vulnsHeadingId}
-                    className="px-3 pb-1 pt-2 text-label font-semibold uppercase tracking-wider text-muted-foreground"
-                  >
-                    {t("search.vulnerabilities")}
-                  </div>
-                  {vulns.map((v, i) => (
-                    <div
-                      key={`v-${v.id}-${i}`}
-                      id={optionId(components.length + i)}
-                      role="option"
-                      aria-selected={components.length + i === activeIdx}
-                      onClick={() => activate({ kind: "pick", section: "vulnerabilities", term: v.id })}
-                      className={optionClass(components.length + i)}
-                    >
-                      <ShieldAlert
-                        className="h-3.5 w-3.5 shrink-0 text-muted-foreground"
-                        aria-hidden
-                      />
-                      <span className="truncate font-mono text-label">{v.id}</span>
-                      <span className="shrink-0 text-label text-muted-foreground">{v.pkg}</span>
-                    </div>
-                  ))}
+            </div>
+          )}
+          {vulns.length > 0 && (
+            <div role="group" aria-labelledby={vulnsHeadingId}>
+              <div id={vulnsHeadingId} className="bl-searchpop-group">
+                {t("search.vulnerabilities")}
+              </div>
+              {vulns.map((v, i) => (
+                <div
+                  key={`v-${v.id}-${i}`}
+                  id={optionId(vulnBase + i)}
+                  role="option"
+                  aria-selected={vulnBase + i === activeIdx}
+                  onClick={() => activate({ kind: "pick", section: "vulnerabilities", term: v.id })}
+                >
+                  <span className="bl-searchpop-id">
+                    <SeverityLabel severity={v.severity} size="small" />
+                  </span>
+                  <span className="bl-searchpop-id bl-searchpop-mono">{v.id}</span>
+                  <span className="bl-searchpop-aside bl-searchpop-coordwrap">
+                    <Coordinate {...splitPackage(v.pkg)} />
+                  </span>
                 </div>
+              ))}
+              {moreVulns && (
+                <ShowAll
+                  id={optionId(moreVulnsIdx)}
+                  selected={moreVulnsIdx === activeIdx}
+                  label={t("search.showAllVulns", { count: vulnTotal })}
+                  onClick={() => activate({ kind: "pick", section: "vulnerabilities", term: trimmedQuery })}
+                />
               )}
-              {showLookup && (
-                <div role="group" aria-labelledby={lookupHeadingId}>
-                  <div
-                    id={lookupHeadingId}
-                    className="px-3 pb-1 pt-2 text-label font-semibold uppercase tracking-wider text-muted-foreground"
-                  >
-                    {t("search.lookupGroup")}
-                  </div>
-                  <div
-                    id={optionId(lookupIdx)}
-                    role="option"
-                    aria-selected={lookupIdx === activeIdx}
-                    onClick={() => activate({ kind: "lookup", term: trimmedQuery })}
-                    className={optionClass(lookupIdx)}
-                  >
-                    <ScanSearch className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden />
-                    <span className="truncate">
-                      {t("search.lookupExternal", { term: trimmedQuery })}
-                    </span>
-                  </div>
-                </div>
-              )}
+            </div>
+          )}
+          {showLookup && (
+            <div role="group" aria-labelledby={lookupHeadingId}>
+              <div id={lookupHeadingId} className="bl-searchpop-group">
+                {t("search.lookupGroup")}
+              </div>
+              <div
+                id={optionId(lookupIdx)}
+                role="option"
+                aria-selected={lookupIdx === activeIdx}
+                onClick={() => activate({ kind: "lookup", term: trimmedQuery })}
+              >
+                <GlobeIcon size={16} />
+                <span className="bl-searchpop-text">
+                  {t("search.lookupExternal", { term: trimmedQuery })}
+                </span>
+              </div>
             </div>
           )}
         </div>
       )}
+    </div>
+  );
+}
+
+/** Matches listed per group before its "View all" row. Five, so both groups'
+ *  rows and the lookup row fit the popup without scrolling. */
+const GROUP_CAP = 5;
+
+/** "group / name" in one line: the group gives way first (ellipsis), the name
+ *  stays whole, the full coordinate is the tooltip. */
+function Coordinate({ group, name }: { group?: string; name: string }) {
+  return (
+    <span className="bl-searchpop-coord" title={group ? `${group}${PACKAGE_SEPARATOR}${name}` : name}>
+      {group && <span className="bl-searchpop-coord-group">{group}</span>}
+      {group && <span className="bl-searchpop-coord-sep">{PACKAGE_SEPARATOR}</span>}
+      <span className="bl-searchpop-coord-name">{name}</span>
+    </span>
+  );
+}
+
+/** The last row of a group cut at its cap. */
+function ShowAll({
+  id,
+  selected,
+  label,
+  onClick,
+}: {
+  id: string;
+  selected: boolean;
+  label: string;
+  onClick: () => void;
+}) {
+  return (
+    <div id={id} role="option" aria-selected={selected} onClick={onClick} className="bl-searchpop-all">
+      <ListUnorderedIcon size={16} />
+      <span className="bl-searchpop-text">{label}</span>
     </div>
   );
 }

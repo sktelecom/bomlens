@@ -65,7 +65,7 @@ test("English messages contain no Hangul", () => {
 test("containerError translates each code without leaking the raw code", () => {
   const en = mainMessages("en");
   const ko = mainMessages("ko");
-  for (const code of ["run-failed", "exited-early", "not-ready"]) {
+  for (const code of ["run-failed", "exited-early", "not-ready", "extra-ca-invalid"]) {
     assert.notEqual(en.containerError(code, "90000"), code);
     assert.notEqual(ko.containerError(code, "90000"), code);
   }

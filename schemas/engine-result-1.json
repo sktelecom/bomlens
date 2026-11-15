@@ -109,7 +109,7 @@
     },
     "engines": {
       "type": "array",
-      "items": { "enum": ["trivy", "grype", "cve-bin-tool", "yocto"] }
+      "items": { "enum": ["trivy", "grype", "cve-bin-tool", "yocto", "go-vulndb"] }
     },
     "data_sources": {
       "type": "object",
@@ -120,6 +120,12 @@
             "schema_version": { "type": ["integer", "null"] },
             "updated_at": { "type": ["string", "null"] },
             "downloaded_at": { "type": ["string", "null"] }
+          }
+        },
+        "go_vulndb": {
+          "type": ["object", "null"],
+          "properties": {
+            "updated_at": { "type": ["string", "null"] }
           }
         }
       }

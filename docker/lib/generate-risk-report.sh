@@ -67,7 +67,8 @@ if [ -f "$SEC" ] && jq empty "$SEC" >/dev/null 2>&1; then
           pkg: .PkgName,
           version: .InstalledVersion,
           severity: (.Severity // "UNKNOWN"),
-          fixed: (.FixedVersion // "")
+          fixed: (.FixedVersion // ""),
+          purl: ((.PkgIdentifier // {}).PURL // "")
         } ]
       | sort_by({CRITICAL:0,HIGH:1,MEDIUM:2,LOW:3,UNKNOWN:4}[.severity] // 5)
     ' "$SEC" 2>/dev/null || echo '[]')
@@ -219,7 +220,7 @@ fi
 # declares an outbound license (see --license / PROJECT_LICENSE). With no
 # declaration no property exists and this whole block stays absent from the
 # report — an omitted section means "not assessed", never "no conflicts".
-OUTBOUND_LIC=""; LC_INCOMPAT=0; LC_COND=0; LC_UNKNOWN=0; LC_TOP='[]'
+OUTBOUND_LIC=""; LC_INCOMPAT=0; LC_COND=0; LC_UNKNOWN=0; LC_TOP='[]'; LC_ROWS='[]'
 if [ -f "$BOM" ] && jq empty "$BOM" >/dev/null 2>&1; then
     OUTBOUND_LIC=$(jq -r '[ (.metadata.component.licenses // [])[]
         | (.license.id // .license.name // .expression // "") | select(. != "") ] | first // ""' "$BOM" 2>/dev/null || echo "")
@@ -230,11 +231,14 @@ if [ -f "$BOM" ] && jq empty "$BOM" >/dev/null 2>&1; then
           | { i: ([$rows[] | select(.v=="incompatible")] | length),
               c: ([$rows[] | select(.v=="conditional")]  | length),
               u: ([$rows[] | select(.v=="unknown")]      | length),
-              top: ([$rows[] | select(.v=="incompatible") | .label] | .[0:10]) }' "$BOM" 2>/dev/null || echo '{}')
+              top: ([$rows[] | select(.v=="incompatible") | .label] | .[0:10]),
+              all: ([$rows[] | select(.v=="incompatible")] + [$rows[] | select(.v=="conditional")]
+                    + [$rows[] | select(.v=="unknown")] | .[0:30]) }' "$BOM" 2>/dev/null || echo '{}')
         LC_INCOMPAT=$(echo "$LC_COUNTS" | jq '.i // 0')
         LC_COND=$(echo "$LC_COUNTS" | jq '.c // 0')
         LC_UNKNOWN=$(echo "$LC_COUNTS" | jq '.u // 0')
         LC_TOP=$(echo "$LC_COUNTS" | jq -c '.top // []')
+        LC_ROWS=$(echo "$LC_COUNTS" | jq -c '.all // []')
     fi
 fi
 
@@ -333,12 +337,12 @@ if [ "$REPORT_LANG" = "ko" ]; then
     P_TH_DEADLINE=$(kstr risk.th_deadline)
     P_VULN_NONE_MD=$(kstr risk.vuln_none_md); P_VULN_NONE_HTML=$(kstr risk.vuln_none_html)
     P_PRESENCE_MD=$(tfmt risk.presence_only_md "$PRESENCE_ONLY" "$PRESENCE_ONLY")
-    P_PRESENCE_HTML=$(tfmt risk.presence_only_html "$PRESENCE_ONLY" "$PRESENCE_ONLY")
+    P_PRESENCE_HTML=$(tfmt risk.presence_only_html "$(report_num "$PRESENCE_ONLY")" "$(report_num "$PRESENCE_ONLY")")
     P_UNPINNED_MD=$(kstr risk.unpinned_md); P_UNPINNED_HTML=$(kstr risk.unpinned_html)
     P_UNCHECKED_MD=$(tfmt risk.unchecked_md "$UNCHECKED_N")
     P_UNREACHED_MD=$(tfmt risk.unreached_md "$UNREACHED_N")
-    P_UNREACHED_HTML=$(tfmt risk.unreached_html "$UNREACHED_N")
-    P_UNCHECKED_HTML=$(tfmt risk.unchecked_html "$UNCHECKED_N")
+    P_UNREACHED_HTML=$(tfmt risk.unreached_html "$(report_num "$UNREACHED_N")")
+    P_UNCHECKED_HTML=$(tfmt risk.unchecked_html "$(report_num "$UNCHECKED_N")")
     P_UNCHECKED_MORE=$(tfmt risk.unchecked_more "$((UNCHECKED_N - UNCHECKED_LIST_MAX))")
     P_REASON_NO_VERSION=$(kstr risk.unchecked_no_version)
     P_REASON_NO_ID=$(kstr risk.unchecked_no_identifier)
@@ -347,9 +351,11 @@ if [ "$REPORT_LANG" = "ko" ]; then
     P_FW_SCOPE_H=$(kstr risk.fw_scope_h)
     P_FW_LABEL=$(kstr risk.fw_scope_label)
     P_FW_UNKNOWN=$(tfmt risk.fw_scope_unknown "$FW_UNKNOWN_PCT" "$FW_UNKNOWN_BYTES")
+    P_FW_UNKNOWN_HTML=$(tfmt risk.fw_scope_unknown "$FW_UNKNOWN_PCT" "$(report_num "$FW_UNKNOWN_BYTES")")
     P_FW_FAILED=$(tfmt risk.fw_scope_failed "$FW_FAILED")
     P_FW_ENCRYPTED=$(tfmt risk.fw_scope_encrypted "$FW_ENCRYPTED")
     P_FW_TAIL=$(kstr risk.fw_scope_tail)
+    P_FW_TAIL_HTML=$(kstr risk.fw_scope_tail_html)
     P_FW_FORMATS=$(tfmt risk.fw_scope_formats "$FW_FAILED_FORMATS")
     P_FW_MISSING=$(tfmt risk.fw_scope_missing "$FW_MISSING")
     P_H2_LIC=$(kstr risk.h2_lic)
@@ -380,8 +386,11 @@ if [ "$REPORT_LANG" = "ko" ]; then
     P_NEXT2_CONF=$(kstr risk.next2_conf)
     P_NEXT2_SELF_MD=$(tfmt risk.next2_self_md "$OUT_PREFIX" "$OUT_PREFIX")
     P_NEXT2_SELF_HTML=$(kstr risk.next2_self_html)
-    P_KIND=$(kstr risk.kind)
-    P_META_PROJECT=$(kstr risk.meta_project); P_META_GENERATED=$(kstr risk.meta_generated); P_META_FORMAT=$(kstr risk.meta_format)
+    P_META_FORMAT=$(kstr risk.meta_format)
+    P_TH_SEV=$(kstr risk.th_severity); P_TH_CVE=$(kstr risk.th_cve); P_TH_PKG=$(kstr risk.th_package)
+    P_TH_INST=$(kstr risk.th_installed); P_TH_FIXED=$(kstr risk.th_fixed)
+    P_LC_INC=$(kstr risk.lc_incompatible); P_LC_CON=$(kstr risk.lc_conditional); P_LC_UNK=$(kstr risk.lc_unknown)
+    P_LC_BOX=$(tfmt risk.lc_box "$(printf '%s' "$OUTBOUND_LIC" | sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g')")
 else
     P_TITLE="Open-source risk report — ${PROJECT}"; P_H1="Open-source risk report"
     P_SUBTITLE=""
@@ -407,13 +416,13 @@ else
     P_VULN_NONE_MD="_No known vulnerabilities, or no security artifact was produced._"
     P_VULN_NONE_HTML="No known vulnerabilities, or no security artifact was produced."
     P_PRESENCE_MD="> ${PRESENCE_ONLY} component(s) were proved present but no version could be recovered. With no version there is nothing to ask a vulnerability database about, so the counts above do not cover them. The licence obligations still apply."
-    P_PRESENCE_HTML="<b>${PRESENCE_ONLY} component(s)</b> were proved present but no version could be recovered. With no version there is nothing to ask a vulnerability database about, so the counts above do not cover them. The licence obligations still apply."
+    P_PRESENCE_HTML="<b>$(report_num "$PRESENCE_ONLY") component(s)</b> were proved present but no version could be recovered. With no version there is nothing to ask a vulnerability database about, so the counts below do not cover them. The licence obligations still apply."
     P_UNPINNED_MD="> The source states version ranges and ships no lock file, so the versions in this SBOM are what a fresh install resolves at scan time, not necessarily the versions that were used. The counts above were measured against these versions. To judge a specific environment, scan a manifest that pins exact versions."
-    P_UNPINNED_HTML="The source states version ranges and ships no lock file, so the versions in this SBOM are what a fresh install resolves at scan time, not necessarily the versions that were used. The counts above were measured against these versions. To judge a specific environment, scan a manifest that pins exact versions."
+    P_UNPINNED_HTML="The source states version ranges and ships no lock file, so the versions in this SBOM are what a fresh install resolves at scan time, not necessarily the versions that were used. The counts below were measured against these versions. To judge a specific environment, scan a manifest that pins exact versions."
     P_UNREACHED_MD="> ${UNREACHED_N} finding(s) are not reachable: govulncheck found that the affected Go code is not called or not in the executable (--reachability). They are not in the counts above; the security report lists them."
-    P_UNREACHED_HTML="<b>${UNREACHED_N} finding(s) are not reachable</b>: govulncheck found that the affected Go code is not called or not in the executable (--reachability). They are not in the counts above; the security report lists them."
+    P_UNREACHED_HTML="<b>$(report_num "$UNREACHED_N") finding(s) are not reachable</b>: govulncheck found that the affected Go code is not called or not in the executable (--reachability). They are not in the counts below; the security report lists them."
     P_UNCHECKED_MD="> ${UNCHECKED_N} component(s) could not be checked: they have no version, or no package purl that Trivy can query and no CPE that was matched, so no vulnerability database was asked about them. The counts above do not cover them."
-    P_UNCHECKED_HTML="<b>${UNCHECKED_N} component(s) could not be checked</b>: they have no version, or no package purl that Trivy can query and no CPE that was matched, so no vulnerability database was asked about them. The counts above do not cover them."
+    P_UNCHECKED_HTML="<b>$(report_num "$UNCHECKED_N") component(s) could not be checked</b>: they have no version, or no package purl that Trivy can query and no CPE that was matched, so no vulnerability database was asked about them. The counts below do not cover them."
     P_UNCHECKED_MORE="… and $((UNCHECKED_N - UNCHECKED_LIST_MAX)) more (the security report lists them all)"
     P_REASON_NO_VERSION="no version"
     P_REASON_NO_ID="no package purl and no matched CPE"
@@ -423,9 +432,11 @@ else
     P_FW_SCOPE_H="Firmware analysis scope"
     P_FW_LABEL="Analysis scope:"
     P_FW_UNKNOWN="${FW_UNKNOWN_PCT}% of the image (${FW_UNKNOWN_BYTES} bytes) was not recognized as a known format."
+    P_FW_UNKNOWN_HTML="${FW_UNKNOWN_PCT}% of the image ($(report_num "$FW_UNKNOWN_BYTES") bytes) was not recognized as a known format."
     P_FW_FAILED="${FW_FAILED} extraction step(s) did not complete."
     P_FW_ENCRYPTED="${FW_ENCRYPTED} region(s) are encrypted."
     P_FW_TAIL="Components in any part of the image that was not opened are not listed in this SBOM, so the vulnerability counts above describe only what could be opened."
+    P_FW_TAIL_HTML="Components in any part of the image that was not opened are not listed in this SBOM, so the vulnerability counts below describe only what could be opened."
     P_FW_FORMATS="Formats whose extraction did not complete: ${FW_FAILED_FORMATS}."
     P_FW_MISSING="Extraction tools the scanner image does not include: ${FW_MISSING}."
     P_H2_LIC="License summary"
@@ -462,18 +473,26 @@ else
     P_NEXT2_CONF="If the conformance check failed, fill the missing items and regenerate the SBOM."
     P_NEXT2_SELF_MD="Keep and distribute the notice (\`${OUT_PREFIX}_NOTICE.{txt,html}\`) together with the SBOM (\`${OUT_PREFIX}_bom.json\`)."
     P_NEXT2_SELF_HTML="Keep and distribute the notice (NOTICE) together with the SBOM."
-    P_KIND="Open-source risk report"
-    P_META_PROJECT="Project:"; P_META_GENERATED="Generated:"; P_META_FORMAT="Input format:"
+    P_META_FORMAT="Input format:"
+    P_TH_SEV="Severity"; P_TH_CVE="CVE"; P_TH_PKG="Package"; P_TH_INST="Installed"; P_TH_FIXED="Fixed"
+    P_LC_INC="Incompatible"; P_LC_CON="Conditional"; P_LC_UNK="Unknown"
+    P_LC_BOX="Conflicts with the outbound license ($(printf '%s' "$OUTBOUND_LIC" | sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g'))"
 fi
 
 # Only the parts that apply are said, so a scan that lost nothing but one tool
 # does not read "0% ... 0 steps ... 0 regions".
-FW_SCOPE_TEXT=""
+FW_SCOPE_TEXT=""; FW_SCOPE_TEXT_HTML=""
 if [ "$FW_SCOPE" = "true" ]; then
     [ "${FW_UNKNOWN_BYTES:-0}" -gt 0 ] && FW_SCOPE_TEXT="${FW_SCOPE_TEXT:+$FW_SCOPE_TEXT }${P_FW_UNKNOWN}"
     [ "${FW_FAILED:-0}" -gt 0 ] && FW_SCOPE_TEXT="${FW_SCOPE_TEXT:+$FW_SCOPE_TEXT }${P_FW_FAILED}"
     [ "${FW_ENCRYPTED:-0}" -gt 0 ] && FW_SCOPE_TEXT="${FW_SCOPE_TEXT:+$FW_SCOPE_TEXT }${P_FW_ENCRYPTED}"
     FW_SCOPE_TEXT="${FW_SCOPE_TEXT:+$FW_SCOPE_TEXT }${P_FW_TAIL}"
+    # The HTML notice groups the byte count's digits and, as it comes before
+    # the counts, says "below".
+    if [ "${FW_UNKNOWN_BYTES:-0}" -gt 0 ]; then FW_SCOPE_TEXT_HTML="${P_FW_UNKNOWN_HTML}"; fi
+    if [ "${FW_FAILED:-0}" -gt 0 ]; then FW_SCOPE_TEXT_HTML="${FW_SCOPE_TEXT_HTML:+$FW_SCOPE_TEXT_HTML }${P_FW_FAILED}"; fi
+    if [ "${FW_ENCRYPTED:-0}" -gt 0 ]; then FW_SCOPE_TEXT_HTML="${FW_SCOPE_TEXT_HTML:+$FW_SCOPE_TEXT_HTML }${P_FW_ENCRYPTED}"; fi
+    FW_SCOPE_TEXT_HTML="${FW_SCOPE_TEXT_HTML:+$FW_SCOPE_TEXT_HTML }${P_FW_TAIL_HTML}"
 fi
 
 # The supplier review is a subtitle, not a second report name: the report is the
@@ -488,7 +507,16 @@ fi
 # Shared composites (built from the localized pieces above; identical structure
 # in both languages, so the deadline note stays one place).
 P_VULN_NOTE_MD="> ${P_DL_LEAD}**${P_DL_BOLD_CRIT}, ${P_DL_BOLD_HIGH}**${P_DL_TAIL}"
-P_VULN_NOTE_HTML="<div class=\"note\">${P_DL_LEAD}<b>${P_DL_BOLD_CRIT}</b>, <b>${P_DL_BOLD_HIGH}</b>${P_DL_TAIL}</div>"
+# HTML: the deadlines as a definition list (severity label, then its deadline)
+# under a titled box, and the recommendation as the box's closing line.
+P_DL_TITLE="${P_DL_LEAD%: }"; P_DL_TITLE="${P_DL_TITLE%:}"
+P_DL_ADVICE="${P_DL_TAIL#. }"; P_DL_ADVICE="${P_DL_ADVICE# }"
+P_VULN_NOTE_HTML="<div class=\"box\"><div class=\"box-head\"><p class=\"box-title\">${P_DL_TITLE}</p></div>
+<dl class=\"deadlines\">
+ <div><dt><span class=\"lbl sev-CRITICAL\"><span class=\"mk\" aria-hidden=\"true\">&#9670;</span>Critical</span></dt><dd>${P_DL_CRIT}</dd></div>
+ <div><dt><span class=\"lbl sev-HIGH\"><span class=\"mk\" aria-hidden=\"true\">&#9650;</span>High</span></dt><dd>${P_DL_HIGH}</dd></div>
+</dl>
+<p class=\"legend\">${P_DL_ADVICE}</p></div>"
 
 # --------------------------------------------------------
 # Markdown
@@ -642,162 +670,179 @@ P_VULN_NOTE_HTML="<div class=\"note\">${P_DL_LEAD}<b>${P_DL_BOLD_CRIT}</b>, <b>$
 } > "$MD"
 
 # --------------------------------------------------------
-# HTML (cards/table/CSP/escape pattern from scan-security.sh)
+# HTML (page head, labels, boxes and tables from report-common.sh)
 # --------------------------------------------------------
 esc() { printf '%s' "$1" | sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g'; }
-conf_class="warn"; [ "$CONF_RESULT" = "pass" ] && conf_class="pass"; [ "$CONF_RESULT" = "fail" ] && conf_class="fail"
-# Meta suffix only states the input format for supplier (ANALYZE) reports (section
-# numbers S_CONF/S_VULN/S_LIC/S_NEXT were assigned once near the top).
-META_FORMAT=""; [ "$HAS_CONF" = "true" ] && META_FORMAT=" &middot; ${P_META_FORMAT} $(esc "$CONF_FORMAT")"
+conf_class="lbl-attention"; [ "$CONF_RESULT" = "pass" ] && conf_class="lbl-success"; [ "$CONF_RESULT" = "fail" ] && conf_class="lbl-danger"
+# Page head: the report name, then one line with the project and version, what
+# was scanned, when, how many components and, for a supplier review, the input
+# format.
+report_bom_facts "$BOM"
+RR_VERSION="$(report_version "$PROJECT" "$OUT_PREFIX")"
+RR_COMP=""; [ -n "$RB_NCOMP" ] && RR_COMP="$(report_str components "$(report_num "$RB_NCOMP")")"
+META_FORMAT=""; [ "$HAS_CONF" = "true" ] && META_FORMAT="${P_META_FORMAT} $(esc "$CONF_FORMAT")"
+P_FINDINGS="$(report_str findings)"
+P_NO_FIX="$(report_str no_fix)"
 {
     cat <<HTMLHEAD
 <!DOCTYPE html>
 <html lang="${REPORT_LANG}"><head>
 <meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline';">
 <title>${P_H1} — $(esc "$PROJECT")</title>
 HTMLHEAD
     report_style
-    cat <<HTMLHEAD2
-</head><body>
-<header class="report-header">
- <div class="wordmark">BomLens<span class="tag">SBOM</span></div>
- <div class="report-kind">${P_KIND}</div>
-</header>
-<h1>${P_H1}</h1>
-${SUBTITLE_HTML}<p class="meta">${P_META_PROJECT} $(esc "$PROJECT") &middot; ${P_META_GENERATED} $(report_time_html "$GEN_AT")${META_FORMAT}</p>
-HTMLHEAD2
+    echo "</head><body>"
+    report_page_head "${P_H1}" "$(esc "$PROJECT")" "$RR_VERSION" "${SUBTITLE_HTML%
+}" \
+        "$(esc "$(report_type_label "$SCAN_MODE")")" "$(report_time_html "$GEN_AT")" "$RR_COMP" "$META_FORMAT"
 
     if [ "$HAS_CONF" = "true" ]; then
         echo "<h2>${S_CONF}. ${P_H2_CONF}</h2>"
-        echo "<div class=\"cards\"><span class=\"pill pill-${conf_class}\">${P_CONF_RESULT_LBL} ${CONF_UP}</span></div>"
+        echo "<div class=\"summary\"><span class=\"lbl ${conf_class}\">${P_CONF_RESULT_LBL} ${CONF_UP}</span></div>"
         if [ "$CONF_RESULT" = "fail" ]; then
-            echo "<div class=\"note\"><b>${P_CONF_FAIL_B}</b>${P_CONF_FAIL_TXT}"
+            echo "<div class=\"banner banner-danger\"><p><b>${P_CONF_FAIL_B}</b>${P_CONF_FAIL_TXT}</p>"
             echo "<ul>"
             echo "$CONF_FAILS" | jq -r '.[] | "<li>" + (.|@html) + "</li>"'
             echo "</ul></div>"
         fi
     fi
 
-    cat <<HTMLSEC
-<h2>${S_VULN}. ${P_H2_VULN}</h2>
-${P_VULN_NOTE_HTML}
-<div class="cards">
- <span class="pill pill-crit">Critical <span class="count">${C}</span></span>
- <span class="pill pill-high">High <span class="count">${H}</span></span>
- <span class="pill pill-med">Medium <span class="count">${M}</span></span>
- <span class="pill pill-low">Low <span class="count">${L}</span></span>
- <span class="pill pill-info">Unknown <span class="count">${U}</span></span>
-</div>
-HTMLSEC
-
+    echo "<h2>${S_VULN}. ${P_H2_VULN}</h2>"
+    # What the counts below do not cover, in one notice above them. The limit
+    # of a firmware analysis comes first: it bounds everything else.
+    NOTES=""
+    if [ "$FW_SCOPE" = "true" ]; then
+        NOTES="${NOTES}<p><b>${P_FW_LABEL}</b> ${FW_SCOPE_TEXT_HTML}"
+        if [ -n "$FW_FAILED_FORMATS" ]; then NOTES="${NOTES}<br>${P_FW_FORMATS}"; fi
+        if [ -n "$FW_MISSING" ]; then NOTES="${NOTES}<br>${P_FW_MISSING}"; fi
+        NOTES="${NOTES}</p>"
+    fi
     if [ "${UNREACHED_N:-0}" -gt 0 ]; then
-        echo "<div class=\"note\">${P_UNREACHED_HTML}</div>"
+        NOTES="${NOTES}<p>${P_UNREACHED_HTML}</p>"
     fi
     if [ "${UNCHECKED_N:-0}" -gt 0 ]; then
-        echo "<div class=\"note\">${P_UNCHECKED_HTML}<ul>"
         # shellcheck disable=SC2016
-        echo "$UNCHECKED_TOP" | jq -r --arg nv "$P_REASON_NO_VERSION" --arg ni "$P_REASON_NO_ID" --arg rp "$P_REASON_REPO_PURL" '.[] |
+        UNCHECKED_LI=$(echo "$UNCHECKED_TOP" | jq -r --arg nv "$P_REASON_NO_VERSION" --arg ni "$P_REASON_NO_ID" --arg rp "$P_REASON_REPO_PURL" '.[] |
             "<li><code>" + (.name | @html) + "</code>" + (if .version != "" then " " + (.version | @html) else "" end)
-            + " (" + ((if .reason == "no-version" then $nv elif .reason == "no-identifier" then $ni elif .reason == "repository-purl" then $rp else .reason end) | @html) + ")</li>"'
-        if [ "$UNCHECKED_N" -gt "$UNCHECKED_LIST_MAX" ]; then echo "<li>$(esc "$P_UNCHECKED_MORE")</li>"; fi
-        echo "</ul></div>"
+            + " (" + ((if .reason == "no-version" then $nv elif .reason == "no-identifier" then $ni elif .reason == "repository-purl" then $rp else .reason end) | @html) + ")</li>"')
+        if [ "$UNCHECKED_N" -gt "$UNCHECKED_LIST_MAX" ]; then UNCHECKED_LI="${UNCHECKED_LI}
+<li>$(esc "$P_UNCHECKED_MORE")</li>"; fi
+        NOTES="${NOTES}<p>${P_UNCHECKED_HTML}</p><ul>
+${UNCHECKED_LI}
+</ul>"
     elif [ "${PRESENCE_ONLY:-0}" -gt 0 ]; then
-        echo "<div class=\"note\">${P_PRESENCE_HTML}</div>"
+        NOTES="${NOTES}<p>${P_PRESENCE_HTML}</p>"
     fi
     if [ "${UNPINNED:-0}" -eq 1 ]; then
-        echo "<div class=\"note\">${P_UNPINNED_HTML}</div>"
+        NOTES="${NOTES}<p>${P_UNPINNED_HTML}</p>"
     fi
-    if [ "$FW_SCOPE" = "true" ]; then
-        echo "<div class=\"note\"><b>${P_FW_LABEL}</b> ${FW_SCOPE_TEXT}"
-        if [ -n "$FW_FAILED_FORMATS" ]; then echo "<br>${P_FW_FORMATS}"; fi
-        if [ -n "$FW_MISSING" ]; then echo "<br>${P_FW_MISSING}"; fi
-        echo "</div>"
+    if [ -n "$NOTES" ]; then
+        printf '<div class="banner">%s</div>\n' "$NOTES"
     fi
+    echo "${P_VULN_NOTE_HTML}"
 
     if [ "$TOTAL" -gt 0 ]; then
-        echo "<div class=\"table-wrap\"><table><thead><tr><th>Severity</th><th>CVE</th><th>Package</th><th>Installed</th><th>Fixed</th><th>${P_TH_DEADLINE}</th></tr></thead><tbody>"
+        # The severity labels sit in the head of the table they count.
+        report_next_id
+        echo "<div class=\"box\"><div class=\"box-head\"><span class=\"box-title\" id=\"${REPORT_BOX_ID}\">${P_FINDINGS}</span><span class=\"counter\">$(report_num "$TOTAL")</span><span class=\"end\">"
+        report_sev_labels "$C" "$H" "$M" "$L" "$U"
+        echo "</span></div>"
+        echo "<div class=\"table-scroll\"><table aria-labelledby=\"${REPORT_BOX_ID}\"><thead><tr><th>${P_TH_SEV}</th><th>${P_TH_CVE}</th><th>${P_TH_PKG}</th><th>${P_TH_INST}</th><th>${P_TH_FIXED}</th><th>${P_TH_DEADLINE}</th></tr></thead><tbody>"
         # shellcheck disable=SC2016
-        echo "$FINDINGS" | jq -r --arg cd "$P_DL_CRIT" --arg hd "$P_DL_HIGH" --arg pol "$P_DL_POLICY" '.[] |
-            "<tr><td class=\"sev-\(.severity)\">" + (.severity|@html) + "</td>" +
-            "<td class=\"id\">" + (.id|@html) + "</td><td>" + (.pkg|@html) + "</td>" +
-            "<td>" + (.version|@html) + "</td><td>" + (.fixed|@html) + "</td>" +
-            "<td>" + ((if .severity=="CRITICAL" then $cd elif .severity=="HIGH" then $hd else $pol end)|@html) + "</td></tr>"'
-        echo "</tbody></table></div>"
-    elif [ "${UNCHECKED_N:-0}" -gt 0 ]; then
-        echo "<p>${P_VULN_NONE_CHECKED_HTML}</p>"
+        echo "$FINDINGS" | jq -r --arg cd "$P_DL_CRIT" --arg hd "$P_DL_HIGH" --arg pol "$P_DL_POLICY" --arg nofix "$P_NO_FIX" "$(report_jq_defs)"'.[] |
+            "<tr><td class=\"sev\">" + (.severity|sevlbl) + "</td>" +
+            "<td class=\"id\">" + (.id|strv|@html) + "</td><td class=\"grow pkgc\">" + (.purl as $u | .pkg | pkgcoordp(""; $u)) + "</td>" +
+            "<td class=\"ver\">" + (.version|strv|@html) + "</td><td class=\"fix\">" + (.fixed|fixlist($nofix)) + "</td>" +
+            "<td class=\"dl\">" + ((if .severity=="CRITICAL" then $cd elif .severity=="HIGH" then $hd else $pol end)|@html) + "</td></tr>"'
+        echo "</tbody></table></div></div>"
     else
-        echo "<p>${P_VULN_NONE_HTML}</p>"
+        echo "<div class=\"summary\">"
+        report_sev_labels "$C" "$H" "$M" "$L" "$U"
+        echo "</div>"
+        if [ "${UNCHECKED_N:-0}" -gt 0 ]; then
+            echo "<p>${P_VULN_NONE_CHECKED_HTML}</p>"
+        else
+            echo "<p>${P_VULN_NONE_HTML}</p>"
+        fi
     fi
 
     echo "<h2>${S_LIC}. ${P_H2_LIC}</h2>"
     if [ "$LIC_COUNT" = "N/A" ]; then
         echo "<p><em>${P_LIC_NO_NOTICE_HTML}</em></p>"
     else
-        echo "<p>${P_LIC_HTML_PRE} <b>${LIC_COUNT}</b>${P_LIC_HTML_POST}</p>"
+        echo "<p>${P_LIC_HTML_PRE} <b>$(report_num "$LIC_COUNT")</b>${P_LIC_HTML_POST}</p>"
     fi
     if [ "$HAS_LIC_CLASS" = "true" ]; then
         echo "<h3>${P_H3_LICCLASS}</h3>"
         echo "<p>${P_LICCLASS_INTRO_A}<code>bomlens:licenseClass</code>${P_LICCLASS_INTRO_B}</p>"
-        cat <<HTMLLIC
-<div class="cards">
- <span class="pill pill-cat-network">Network copyleft <span class="count">${NC}</span></span>
- <span class="pill pill-cat-strong">Strong copyleft <span class="count">${SC}</span></span>
- <span class="pill pill-cat-weak">Weak copyleft <span class="count">${WK}</span></span>
- <span class="pill pill-cat-permissive">Permissive <span class="count">${PM}</span></span>
- <span class="pill pill-cat-review">Uncategorized <span class="count">${UN}</span></span>
-</div>
-HTMLLIC
+        echo "<div class=\"summary\">"
+        report_lbl "lbl-cat-network" "$NC" "Network copyleft"; echo
+        report_lbl "lbl-cat-strong" "$SC" "Strong copyleft"; echo
+        report_lbl "lbl-cat-weak" "$WK" "Weak copyleft"; echo
+        report_lbl "lbl-cat-permissive" "$PM" "Permissive" "&#9675;"; echo
+        report_lbl "" "$UN" "Uncategorized" "&#8211;"; echo
+        echo "</div>"
         if [ "$COPYLEFT_TOTAL" -gt 0 ]; then
-            echo "<p>${P_COPYLEFT_DRIVERS}</p>"
-            echo "<ul class=\"mono\">"
+            echo "<div class=\"box\"><div class=\"box-head\"><p class=\"box-title\">${P_COPYLEFT_DRIVERS%:}</p><span class=\"counter\">$(report_num "$COPYLEFT_TOTAL")</span></div>"
+            echo "<ul class=\"rows mono\">"
             echo "$COPYLEFT_TOP" | jq -r '.[] | "<li>" + (.label|@html) + " (" + .class + ")</li>"'
             if [ "$COPYLEFT_TOTAL" -gt 10 ]; then
                 echo "<li>${P_CL_MORE_PRE}$((COPYLEFT_TOTAL - 10))${P_CL_MORE_MID}<code>bomlens:licenseClass</code>${P_CL_MORE_END}</li>"
             fi
-            echo "</ul>"
+            echo "</ul></div>"
         fi
     fi
     if [ -n "$OUTBOUND_LIC" ]; then
+        # The box counts every dependency a person has to look at (incompatible,
+        # conditional and unknown) and lists them, incompatible first.
+        LC_TOTAL=$((LC_INCOMPAT + LC_COND + LC_UNKNOWN))
         echo "<h3>${P_H3_LICCONFLICT}</h3>"
         echo "<p>${P_LICCONFLICT_INTRO}</p>"
-        echo "<p><code>$(printf '%s' "$OUTBOUND_LIC" | sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g')</code></p>"
-        cat <<HTMLLC
-<div class="cards">
- <span class="pill pill-crit">Incompatible <span class="count">${LC_INCOMPAT}</span></span>
- <span class="pill pill-med">Conditional <span class="count">${LC_COND}</span></span>
- <span class="pill pill-info">Unknown <span class="count">${LC_UNKNOWN}</span></span>
-</div>
-HTMLLC
-        if [ "$LC_INCOMPAT" -gt 0 ]; then
-            echo "<p>${P_LICCONFLICT_DRIVERS}</p>"
-            echo "<ul class=\"mono\">"
-            echo "$LC_TOP" | jq -r '.[] | "<li>" + (.|@html) + "</li>"'
-            echo "</ul>"
+        if [ "$LC_TOTAL" -gt 0 ]; then
+            echo "<div class=\"box lc\"><div class=\"box-head\"><p class=\"box-title\">${P_LC_BOX}</p><span class=\"counter\">$(report_num "$LC_TOTAL")</span><span class=\"end\">"
+        else
+            echo "<div class=\"summary\"><span class=\"box-title\">${P_LC_BOX}</span>"
+        fi
+        report_lbl "lbl-danger" "$LC_INCOMPAT" "$P_LC_INC"; echo
+        report_lbl "lbl-attention" "$LC_COND" "$P_LC_CON"; echo
+        report_lbl "" "$LC_UNKNOWN" "$P_LC_UNK"; echo
+        if [ "$LC_TOTAL" -gt 0 ]; then
+            echo "</span></div>"
+            echo "<ul class=\"rows mono\">"
+            echo "$LC_ROWS" | jq -r --arg inc "$P_LC_INC" --arg con "$P_LC_CON" --arg unk "$P_LC_UNK" '.[] | "<li>" + (.label|@html) + " <span class=\"lbl"
+                + (if .v == "incompatible" then " lbl-danger" elif .v == "conditional" then " lbl-attention" else "" end)
+                + "\">" + ({"incompatible":$inc,"conditional":$con,"unknown":$unk}[.v] // .v | @html) + "</span></li>"'
+            if [ "$LC_TOTAL" -gt 30 ]; then
+                echo "<li>$(report_str and_more "$(report_num "$((LC_TOTAL - 30))")")</li>"
+            fi
+            echo "</ul></div>"
+        else
+            echo "</div>"
         fi
     fi
 
     if [ "$MAL_COUNT" -gt 0 ]; then
         echo "<h3>${P_H3_MALICIOUS}</h3>"
         echo "<p>${P_MALICIOUS_INTRO}</p>"
-        echo "<div class=\"cards\"><span class=\"pill pill-crit\">${P_H3_MALICIOUS} <span class=\"count\">${MAL_COUNT}</span></span></div>"
-        echo "<p>${P_MALICIOUS_LIST}</p>"
-        echo "<ul class=\"mono\">"
+        echo "<div class=\"box\"><div class=\"box-head\"><p class=\"box-title\">${P_MALICIOUS_LIST%:}</p><span class=\"counter\">$(report_num "$MAL_COUNT")</span><span class=\"end\">"
+        report_lbl "lbl-danger" "$MAL_COUNT" "${P_H3_MALICIOUS}"; echo
+        echo "</span></div>"
+        echo "<ul class=\"rows mono\">"
         echo "$MAL_TOP" | jq -r '.[] | "<li>" + (.label|@html) + " (" + (.id|@html) + ")</li>"'
         echo "</ul>"
-        echo "<p class=\"meta\">$(printf '%s' "$MAL_SNAP" | sed 's/&/\&amp;/g; s/</\&lt;/g')</p>"
+        echo "<p class=\"legend\">$(printf '%s' "$MAL_SNAP" | sed 's/&/\&amp;/g; s/</\&lt;/g')</p></div>"
     fi
     if [ "$AS_MODELS" -gt 0 ]; then
         echo "<h3>${P_H3_AI}</h3>"
         echo "<p>${P_AI_SEE_HTML} ${P_AI_DISC}</p>"
-        cat <<HTMLASSESS
-<div class="cards">
- <span class="pill pill-pass">${L_OK} <span class="count">${AS_OK}</span></span>
- <span class="pill pill-med">${L_COND} <span class="count">${AS_COND}</span></span>
- <span class="pill pill-high">${L_CAU} <span class="count">${AS_CAU}</span></span>
- <span class="pill pill-info">${L_REV} <span class="count">${AS_REV}</span></span>
-</div>
-HTMLASSESS
+        echo "<div class=\"summary\">"
+        report_lbl "lbl-success" "$AS_OK" "${L_OK}"; echo
+        report_lbl "lbl-attention" "$AS_COND" "${L_COND}"; echo
+        report_lbl "lbl-severe" "$AS_CAU" "${L_CAU}"; echo
+        report_lbl "" "$AS_REV" "${L_REV}"; echo
+        echo "</div>"
     fi
 
     echo "<h2>${S_NEXT}. ${P_H2_NEXT}</h2>"

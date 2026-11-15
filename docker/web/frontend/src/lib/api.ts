@@ -667,6 +667,9 @@ export interface ScanConfig {
   deepLicense: boolean;
   identifyVendored: boolean;
   byteStable: boolean;
+  /** Components of a submitted SBOM were also matched against the CPE index
+   *  (--analyze-cpe-index). Absent on scans that did not record it. */
+  analyzeCpeIndex?: boolean;
   /** "build" when the scan was told not to read a lock file statically; absent
    *  or "auto" otherwise. */
   detection?: string;
@@ -859,6 +862,9 @@ export interface ScanParams {
   deepLicense: boolean;
   identifyVendored: boolean;
   byteStable: boolean;
+  /** Also match the components of a submitted SBOM against the CPE index
+   *  (server ANALYZE_CPE_INDEX). Analyze scans only; omitted means off. */
+  analyzeCpeIndex?: boolean;
   /** "build" turns off reading a covering lock file instead of building (server
    *  DETECTION); "auto" or omitted leaves it on. Source scans only. */
   detection?: "auto" | "build";
@@ -1701,6 +1707,7 @@ export function startScan(params: ScanParams, handlers: ScanHandlers): EventSour
     deep_license: String(params.deepLicense),
     identify_vendored: String(params.identifyVendored),
     byte_stable: String(params.byteStable),
+    analyze_cpe_index: String(params.analyzeCpeIndex ?? false),
     detection: params.detection ?? "auto",
     no_components: params.noComponents ? "true" : "",
     conformance_profile: params.conformanceProfile ?? "",

@@ -1,0 +1,7 @@
+P	:
+H	:
+R	:	com.fasterxml.jackson.core:jackson-core:2.16.1
+R	:	com.google.guava:failureaccess:1.0.2
+R	:	com.google.guava:guava:33.0.0-jre
+R	:	org.slf4j:jcl-over-slf4j:2.0.9
+R	:	org.slf4j:slf4j-api:2.0.9

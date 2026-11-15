@@ -80,14 +80,14 @@ test("turning it off sends no_components=true", async ({ page }) => {
 
 test("it is offered for a directory, which may be a Yocto build directory", async ({ page }) => {
   await openForm(page);
-  await page.getByRole("button", { name: /Directory \/ rootfs/i }).click();
+  await page.getByRole("radio", { name: /Directory \/ rootfs/i }).click();
   await page.getByText("Result quality").click();
   await expect(page.getByRole("switch", { name: SWITCH })).toBeVisible();
 });
 
 test("it is not offered for an SBOM upload", async ({ page }) => {
   await openForm(page);
-  await page.getByRole("button", { name: /SBOM upload/i }).click();
+  await page.getByRole("radio", { name: /SBOM upload/i }).click();
   const group = page.getByText("Result quality");
   if ((await group.count()) > 0) await group.click();
   await expect(page.getByRole("switch", { name: SWITCH })).toHaveCount(0);
