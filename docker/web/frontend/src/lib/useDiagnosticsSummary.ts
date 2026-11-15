@@ -1,5 +1,6 @@
 // Copyright 2026 SK Telecom Co., Ltd.
 // SPDX-License-Identifier: Apache-2.0
+// @no-unit-test: a React hook over a cached fetch, which the DOM-less vitest here cannot mount; the summary and its cache are checked in report-problem.spec.ts and scan-progress.spec.ts.
 
 import { useEffect, useState } from "react";
 
