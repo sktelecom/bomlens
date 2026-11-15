@@ -754,7 +754,16 @@
       "rubygems": "RubyGems",
       "packagist": "Packagist",
       "nuget": "NuGet"
-    }
+    },
+    "formats": "Accepted: CVE, GHSA, GO, PYSEC, RUSTSEC, OSV, GSD and MAL ids, a purl (npm, PyPI, Maven, Go, crates.io, RubyGems, Packagist, NuGet), name@version, or a name with the ecosystem and version picked.",
+    "results": "Results",
+    "disabledTitle": "External lookup is turned off on this server",
+    "disabledBody": "The administrator turned off lookups that leave this machine. Scans still check vulnerabilities against the local database.",
+    "goHome": "Back to scan management",
+    "captionEmpty": "Enter an id, a purl or a package name to turn on Look up.",
+    "captionPackage": "Pick an ecosystem and enter a version to turn on Look up.",
+    "emptyTitle": "Look up an advisory or a package",
+    "emptyHint": "Select an example to fill the field, then look it up."
   },
   "newscan": {
     "title": "What do you want to scan?",

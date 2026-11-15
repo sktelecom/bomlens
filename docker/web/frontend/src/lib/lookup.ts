@@ -139,3 +139,31 @@ function parsePurl(input: string): ParsedLookup {
       : `${namespace}/${name}`;
   return { kind: "package", ecosystem, name: fullName, version };
 }
+
+/** Human-readable date; falls back to the raw string if it doesn't parse. */
+export function formatLookupDate(iso: string, locale: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  return d.toLocaleDateString(locale, { dateStyle: "medium" });
+}
+
+/** Best-effort summary of one OSV range object. Ranges are typed `unknown` on
+ *  the wire (server.py passes them through unshaped), so this reads
+ *  defensively rather than assuming every event carries every field. */
+export function formatRange(range: unknown): string {
+  if (!range || typeof range !== "object") return "";
+  const events = (range as { events?: unknown }).events;
+  if (!Array.isArray(events)) return "";
+  return events
+    .map((e) => {
+      if (!e || typeof e !== "object") return "";
+      const ev = e as Record<string, string>;
+      if (ev.introduced !== undefined) return `>= ${ev.introduced || "0"}`;
+      if (ev.fixed !== undefined) return `< ${ev.fixed}`;
+      if (ev.last_affected !== undefined) return `<= ${ev.last_affected}`;
+      if (ev.limit !== undefined) return `< ${ev.limit}`;
+      return "";
+    })
+    .filter(Boolean)
+    .join(", ");
+}
