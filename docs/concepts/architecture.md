@@ -103,7 +103,7 @@ The per-language cdxgen image mapping is as follows (`img_for_lang()` in `docker
 | rust | `cdxgen-debian-rust` |
 | go | `cdxgen-debian-golang124` |
 | ruby | `cdxgen-debian-ruby34` |
-| java | `cdxgen-temurin-java21` |
+| java | `cdxgen-temurin-java21`, or `cdxgen-temurin-java8`, `cdxgen-java11`, `cdxgen-java17`, `cdxgen-temurin-java24` or `cdxgen-temurin-java25` when the Gradle toolchain or wrapper version calls for that JDK ([Java (Gradle)](../reference/ecosystems.md#java-gradle); `CDXGEN_JAVA_IMAGE` overrides the choice) |
 | python | `cdxgen-python312` |
 | node | `cdxgen-alpine-node24` |
 | php | `cdxgen-debian-php84` |

@@ -13,10 +13,6 @@
  * classification logic lives in exactly one place (the pipeline).
  */
 
-import { useTranslation } from "react-i18next";
-
-import { Badge } from "@/components/ui/badge";
-
 import { USAGE_CONTEXTS, type UsageContext } from "./api";
 
 /** A pipeline-stamped risk grade, read verbatim from the SBOM. */
@@ -536,25 +532,25 @@ export function parseDeclaredServices(sbom: unknown): DeclaredService[] {
   });
 }
 
-// ── Grade badge ──────────────────────────────────────────────────────────────
+// ── Grade label ──────────────────────────────────────────────────────────────
 //
 // Shared between the Models & datasets view and the AI summary card, so a
 // grade never reads as a different color depending on which screen shows it.
 
-/** Badge tone per pipeline grade — the grade word itself is always shown, so
- *  the color is a reinforcement, never the only signal.
+/** Primer Label variant per pipeline grade. The grade word itself is always
+ *  shown, so the color is a reinforcement, never the only signal.
  *
- *  The tone ordering has to track the pipeline's own severity ranking
- *  (assess-ai-risk.sh: caution > review > conditional > ok — a known blocker
+ *  The ordering has to track the pipeline's own severity ranking
+ *  (assess-ai-risk.sh: caution > review > conditional > ok; a known blocker
  *  outranks an unknown, which outranks a condition, which outranks a clear
  *  signal). Get that ordering wrong here and the two readings disagree: a
  *  reader sees "review" rendered milder than "conditional" and reasonably
  *  concludes it's the safer of the two, when the pipeline ranks it worse. */
-export const GRADE_TONE: Record<AssessmentGrade, "positive" | "medium" | "high" | "critical"> = {
-  ok: "positive",
-  conditional: "medium",
-  review: "high",
-  caution: "critical",
+export const GRADE_LABEL_VARIANT: Record<AssessmentGrade, "success" | "attention" | "severe" | "danger"> = {
+  ok: "success",
+  conditional: "attention",
+  review: "severe",
+  caution: "danger",
 };
 
 /** Worst-first severity order (assess-ai-risk.sh), for picking one overall
@@ -565,9 +561,3 @@ export const GRADE_SEVERITY_ORDER: readonly AssessmentGrade[] = [
   "conditional",
   "ok",
 ];
-
-/** A stamped grade as word + tone (verbatim from the SBOM property). */
-export function GradeBadge({ grade }: { grade: AssessmentGrade }) {
-  const { t } = useTranslation();
-  return <Badge tone={GRADE_TONE[grade]}>{t(GRADE_LABEL_KEY[grade])}</Badge>;
-}

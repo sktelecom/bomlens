@@ -32,16 +32,19 @@ BomLens(Apache-2.0)는 자체 코드를 셸 스크립트로 두고, SBOM 생성�
 
 ### 동봉된 데이터 스냅샷
 
-두 가지 데이터를 이미지 빌드 시점에 한 번 받아 기본 이미지 안에 함께 넣습니다. 이 데이터를 읽는 검사가 스캔 시점에 네트워크 없이 동작해야 하기 때문입니다. 데이터를 받아 오는 빌드 스크립트는 빌드가 끝나면 이미지에서 지워지므로, 출처는 이 문서에 남깁니다.
+세 가지 데이터를 이미지 빌드 시점에 한 번 받아 기본 이미지 안에 함께 넣습니다. 이 데이터를 읽는 검사가 스캔 시점에 네트워크 없이 동작해야 하기 때문입니다. 데이터를 받아 오는 빌드 스크립트는 빌드가 끝나면 이미지에서 지워지므로, 출처는 이 문서에 남깁니다.
 
 | 데이터 | 이미지 내 경로 | 출처 | 라이선스 |
 |--------|---------------|------|----------|
 | 지원 종료 날짜 | `/usr/local/lib/sbom/eol-data.json`, `eol-purl-map.json` | [endoflife.date](https://endoflife.date)의 공개 API | MIT |
 | 악성 패키지 권고문 | `/usr/local/lib/sbom/malicious-index.json` | OSV 벌크 아카이브(`osv-vulnerabilities.storage.googleapis.com`). 그 안의 `MAL-` 레코드는 OpenSSF Package Analysis 프로젝트가 [ossf/malicious-packages](https://github.com/ossf/malicious-packages)에 발행합니다 | Apache-2.0 (원 권고문 저장소) |
+| Go 취약점 보고서 | `/usr/local/lib/sbom/go-vulndb.zip` | Go 보안 팀(Google)이 관리하는 Go 취약점 데이터베이스 [vuln.go.dev](https://vuln.go.dev)의 오프라인 내보내기 파일(`vulndb.zip`) | [CC-BY-4.0](https://creativecommons.org/licenses/by/4.0/) ([이용 조건](https://go.dev/security/vuln/database#license)) |
 
-두 데이터 모두 원본을 그대로 복제하지 않습니다. 검사가 실제로 읽는 부분만 남깁니다. 제품별 지원 종료 날짜, 또는 PURL과 그에 대응하는 권고문 식별자입니다. 스냅샷 날짜는 동봉 파일과 검사가 표시한 각 컴포넌트에 함께 기록됩니다(`bomlens:eol:source`, `bomlens:malicious:source`). 두 프로젝트 모두 BomLens를 보증하거나 인증하지 않으며, 동봉 데이터는 있는 그대로 제공됩니다.
+Go 취약점 데이터베이스 내보내기 파일은 발행된 그대로 고치지 않고 넣으며, 데이터베이스의 수정 날짜는 `index/db.json`에 들어 있습니다. 보안 보고서는 이 데이터베이스를 읽었을 때 그 이름과 날짜를 적습니다. 이 스냅샷이 `BOMLENS_GO_VULNDB_MAX_AGE_DAYS`일보다 오래됐고 오프라인 스캔이 아니면, 스캔이 최신 내보내기 파일을 임시 폴더에 내려받아 대신 읽습니다.
 
-CPE 대응 인덱스(`/opt/cve-bin-tool-home/cpe_match.sqlite`, 기본 이미지와 그 이미지에서 만든 이미지에 들어 있음)는 이 둘이 아니라 NVD에서 온 것으로, 출처 표시와 고지는 그 옆에 `CVE-DATA-NOTICE.txt`로 함께 들어갑니다.
+나머지 두 데이터는 원본을 그대로 복제하지 않습니다. 검사가 실제로 읽는 부분만 남깁니다. 제품별 지원 종료 날짜, 또는 PURL과 그에 대응하는 권고문 식별자입니다. 스냅샷 날짜는 동봉 파일과 검사가 표시한 각 컴포넌트에 함께 기록됩니다(`bomlens:eol:source`, `bomlens:malicious:source`). 세 프로젝트 모두 BomLens를 보증하거나 인증하지 않으며, 동봉 데이터는 있는 그대로 제공됩니다.
+
+CPE 대응 인덱스(`/opt/cve-bin-tool-home/cpe_match.sqlite`, 기본 이미지와 그 이미지에서 만든 이미지에 들어 있음)는 이 셋이 아니라 NVD에서 온 것으로, 출처 표시와 고지는 그 옆에 `CVE-DATA-NOTICE.txt`로 함께 들어갑니다.
 
 ### 웹 UI npm 패키지
 
@@ -49,18 +52,22 @@ CPE 대응 인덱스(`/opt/cve-bin-tool-home/cpe_match.sqlite`, 기본 이미지
 
 정본은 빌드 시 생성되는 `third-party-licenses.txt`입니다. 번들에 실제로 들어간 패키지만 골라 각 패키지의 라이선스 전문을 그대로 담으며, 웹 UI에서 `/third-party-licenses.txt`로 열 수 있고 이미지 안에서는 `/usr/local/lib/sbom-web/dist/third-party-licenses.txt`에 있습니다. `package.json`의 선언 목록이 아니라 번들 그래프에서 뽑는 이유는 두 목록이 다르기 때문입니다. 선언된 의존성 중 tailwindcss나 typescript처럼 빌드에만 쓰이는 것은 배포물에 들어가지 않고, 반대로 선언되어 설치까지 되었지만 아무 곳에서도 가져다 쓰지 않아 번들에서 빠지는 것도 있습니다.
 
-아래는 현재 번들에 들어가는 23개 패키지입니다. 모두 permissive이며 copyleft는 없습니다.
+아래는 현재 번들에 들어가는 27개 패키지입니다. 모두 permissive이며 copyleft는 없습니다.
 
 | 패키지 | 용도 | 라이선스 (SPDX) |
 |--------|------|------------------|
 | react, react-dom, scheduler | UI 렌더링 | MIT |
+| @primer/react, @primer/primitives | Primer 컴포넌트와 디자인 토큰(테마, 크기, 글자) | MIT |
 | @radix-ui/react-label, react-progress, react-slot, react-primitive, react-context, react-compose-refs | 접근성 있는 기본 컴포넌트 | MIT |
 | cytoscape, cytoscape-dagre, dagre, graphlib, lodash | 의존성 그래프 시각화와 배치 | MIT |
 | i18next, react-i18next, i18next-browser-languagedetector | 한국어·영어 전환 | MIT |
 | class-variance-authority | 컴포넌트 변형 정의 | Apache-2.0 |
 | clsx, tailwind-merge | 클래스 이름 결합 | MIT |
 | lucide-react | 아이콘 | ISC |
-| @fontsource/inter, @fontsource/jetbrains-mono | 글꼴(아래 절 참고) | OFL-1.1 |
+| highlight.js | 소스 보기 화면의 구문 강조(문법 정의는 필요할 때 불러옴) | BSD-3-Clause |
+| @fontsource/inter, @fontsource/jetbrains-mono, pretendard | 글꼴(아래 절 참고) | OFL-1.1 |
+
+`@primer/octicons-react`(아이콘, MIT)도 함께 선언했습니다. `@primer/react`를 설치하면 다음 패키지가 따라 들어옵니다. MIT 라이선스인 @primer/behaviors, @primer/live-region-element, @github/relative-time-element, @github/mini-throttle, @tanstack/react-virtual, @tanstack/virtual-core, color2k, deepmerge, history, hsluv, lodash.isempty, lodash.isobject, react-intersection-observer, react-is가 있고, BSD-3-Clause인 @lit-labs/react, @lit-labs/ssr-dom-shim, @oddbird/popover-polyfill, W3C 라이선스인 focus-visible이 있습니다. 이 패키지들은 화면에서 해당 컴포넌트를 쓰기 시작할 때 생성 파일에 나타납니다. @primer/react, @primer/live-region-element, @lit-labs/ssr-dom-shim은 패키지 안에 라이선스 파일이 없어서, Pretendard처럼 전문을 이 저장소의 `docker/web/frontend/licenses/`에 두었습니다.
 
 목록이 낡지 않도록 `npm run notices:check`가 생성 파일을 검사합니다. 라이선스를 선언하지 않은 패키지, 전문을 찾지 못한 패키지, copyleft 라이선스가 하나라도 있으면 CI가 실패합니다.
 
@@ -157,7 +164,7 @@ Windows 배포물이 담겨 오는 컨테이너 형식용 7z, 그다음 binwalk�
 |------|------|------|------------------|----------|--------|
 | grype | v0.120.1 (`GRYPE_VERSION`) | CPE 기반 NVD CVE 매칭 | Apache-2.0 | permissive | https://github.com/anchore/grype |
 
-> 데이터: 빌드 시 이미지에 굽는 grype 취약점 DB는 Anchore가 공개 취약점 출처를 모아 만든 것입니다 — NVD(public domain), GitHub Security Advisories(CC-BY-4.0), 배포판 보안 DB(각 배포판 조건). DB는 `GRYPE_DB_AUTO_UPDATE=false`로 고정되어 스캔 중 네트워크를 쓰지 않습니다.
+> 데이터: 빌드 시 이미지에 굽는 grype 취약점 DB는 Anchore가 공개 취약점 출처를 모아 만든 것입니다 — NVD(public domain), GitHub Security Advisories(CC-BY-4.0), 배포판 보안 DB(각 배포판 조건). 자동 갱신은 꺼져 있습니다(`GRYPE_DB_AUTO_UPDATE=false`). 이미지에 든 DB가 `BOMLENS_GRYPE_DB_MAX_AGE_DAYS`일보다 오래됐고 오프라인 스캔이 아닐 때만 스캔 중에 새 DB를 내려받습니다.
 
 ## deep-license 이미지: `ghcr.io/sktelecom/bomlens-deep-license` (LGPL 포함, opt-in)
 

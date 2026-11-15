@@ -13,22 +13,6 @@
  * Titles/descriptions are i18n keys (resolved in the component); this module
  * only decides grouping, ordering and which formats exist.
  */
-import {
-  BadgeCheck,
-  BrainCircuit,
-  ClipboardCheck,
-  Cpu,
-  FileJson,
-  FileSignature,
-  FileText,
-  PencilLine,
-  ScrollText,
-  ShieldAlert,
-  ShieldCheck,
-  Tags,
-  type LucideIcon,
-} from "lucide-react";
-
 import type { ResultFile } from "./api";
 
 export interface ArtifactFormat {
@@ -47,9 +31,6 @@ export interface LogicalArtifact {
   key: string;
   titleKey: string;
   descKey: string;
-  Icon: LucideIcon;
-  /** Headline deliverable rendered as the hero card. */
-  primary: boolean;
   rank: number;
   formats: ArtifactFormat[];
   /** Detached SBOM signature, attached to the SBOM card when present. */
@@ -62,8 +43,6 @@ export interface LogicalArtifact {
 
 interface GroupSpec {
   key: string;
-  Icon: LucideIcon;
-  primary: boolean;
   rank: number;
   match: (name: string) => boolean;
 }
@@ -72,15 +51,11 @@ interface GroupSpec {
 const GROUPS: GroupSpec[] = [
   {
     key: "riskReport",
-    Icon: ShieldAlert,
-    primary: true,
     rank: 0,
     match: (n) => n.includes("_risk-report"),
   },
   {
     key: "sbom",
-    Icon: FileJson,
-    primary: false,
     rank: 1,
     // The SPDX export rides on the SBOM card as an extra format chip, whether the
     // CLI's --spdx wrote it during the scan or the user exported it from here.
@@ -90,38 +65,28 @@ const GROUPS: GroupSpec[] = [
     // The SBOM written before a declaration file was refused, kept under its
     // own name so it is never taken for the result (entrypoint.sh).
     key: "refusedSbom",
-    Icon: FileJson,
-    primary: false,
     rank: 1.1,
     match: (n) => n.endsWith("_bom.refused.json"),
   },
   {
     // The SPDX 3.0.1 AI document (AI scans) with the check of what it holds.
     key: "spdx3",
-    Icon: BrainCircuit,
-    primary: false,
     rank: 1.5,
     match: (n) => n.endsWith("_bom.spdx3.json") || n.endsWith("_spdx3-check.json") || n.endsWith("_spdx3-check.md"),
   },
   {
     // What the publisher declared for that document, and the empty form.
     key: "aiDeclaration",
-    Icon: PencilLine,
-    primary: false,
     rank: 1.6,
     match: (n) => n.endsWith("_ai-declaration.json") || n.endsWith("_ai-declaration.template.json"),
   },
   {
     key: "notice",
-    Icon: ScrollText,
-    primary: false,
     rank: 2,
     match: (n) => n.includes("_NOTICE"),
   },
   {
     key: "conformance",
-    Icon: BadgeCheck,
-    primary: false,
     rank: 3,
     match: (n) => n.includes("_conformance"),
   },
@@ -131,15 +96,11 @@ const GROUPS: GroupSpec[] = [
     // header counted ten files while the cards offered eight: the profile was
     // reachable only inside the download-all ZIP.
     key: "aiProfile",
-    Icon: Cpu,
-    primary: false,
     rank: 4,
     match: (n) => n.includes("_ai-profile"),
   },
   {
     key: "security",
-    Icon: ShieldCheck,
-    primary: false,
     rank: 5,
     // _security_epss.json is the raw EPSS feed the pipeline enriches with —
     // an internal intermediate, not a report format; listing it produced two
@@ -151,15 +112,11 @@ const GROUPS: GroupSpec[] = [
     // a name,version CSV with the versions empty: filled in and passed back
     // with --component-versions.
     key: "componentVersions",
-    Icon: Tags,
-    primary: false,
     rank: 5.5,
     match: (n) => n.endsWith("_component-versions.template.csv"),
   },
   {
     key: "license",
-    Icon: FileText,
-    primary: false,
     rank: 6,
     match: (n) => n.includes("_scancode"),
   },
@@ -170,8 +127,6 @@ const GROUPS: GroupSpec[] = [
     // the header counted them while no card offered them. The Yocto build's own
     // `_yocto_vex.json` is a different file and stays out.
     key: "vex",
-    Icon: ClipboardCheck,
-    primary: false,
     rank: 8,
     match: (n) =>
       (n.endsWith("_vex.json") ||
@@ -229,8 +184,6 @@ export function groupArtifacts(results: ResultFile[]): LogicalArtifact[] {
       key: spec.key,
       titleKey: `result.kind.${spec.key}.title`,
       descKey: `result.kind.${spec.key}.desc`,
-      Icon: spec.Icon,
-      primary: spec.primary,
       rank: spec.rank,
       formats: members.map(toFormat).sort(byFormatPref),
       signature: spec.key === "sbom" ? sig : spec.key === "spdx3" ? sig3 : undefined,
@@ -245,8 +198,6 @@ export function groupArtifacts(results: ResultFile[]): LogicalArtifact[] {
       key: "signature",
       titleKey: "result.kind.signature.title",
       descKey: "result.kind.signature.desc",
-      Icon: FileSignature,
-      primary: false,
       rank: 7,
       formats: [toFormat(sig)],
     });

@@ -33,16 +33,17 @@ Data: NVD, the vulnerability source, is public domain and requires attribution t
 
 ### Bundled data snapshots
 
-Two datasets are fetched once at image-build time and shipped inside the base image so the offline checks that read them need no network access at scan time. The build scripts that fetch them are deleted from the image afterwards, so the attribution is recorded here instead.
+Three datasets are fetched once at image-build time and shipped inside the base image so the offline checks that read them need no network access at scan time. The build scripts that fetch them are deleted from the image afterwards, so the attribution is recorded here instead.
 
 | Data | Bundled at | Source | License |
 |------|-----------|--------|---------|
 | End-of-life dates | `/usr/local/lib/sbom/eol-data.json`, `eol-purl-map.json` | [endoflife.date](https://endoflife.date), read from its public API | MIT |
 | Malicious package advisories | `/usr/local/lib/sbom/malicious-index.json` | OSV bulk archives (`osv-vulnerabilities.storage.googleapis.com`). The `MAL-` records they carry are published by the OpenSSF Package Analysis project, [ossf/malicious-packages](https://github.com/ossf/malicious-packages) | Apache-2.0 (upstream advisory repository) |
+| Go vulnerability reports | `/usr/local/lib/sbom/go-vulndb.zip` | The Go vulnerability database, [vuln.go.dev](https://vuln.go.dev) (`vulndb.zip`, its offline export), maintained by the Go security team at Google | [CC-BY-4.0](https://creativecommons.org/licenses/by/4.0/) ([terms](https://go.dev/security/vuln/database#license)) |
 
-Neither dataset is reproduced whole. Each is reduced to what the check actually reads — a product's end-of-life dates, or a PURL keyed to its advisory id — and the snapshot date travels with it, both in the bundled file and on every component the check flags (`bomlens:eol:source`, `bomlens:malicious:source`). Neither project endorses or certifies BomLens, and the bundled data is provided as is.
+The Go vulnerability database export is bundled unmodified, as published, with its own modified date in `index/db.json`; the security report names it and that date when it was read. When that snapshot is older than `BOMLENS_GO_VULNDB_MAX_AGE_DAYS` days and the scan is not offline, a scan downloads the current export into a temporary folder and reads that instead. The other two datasets are not reproduced whole. Each is reduced to what the check actually reads (a product's end-of-life dates, or a PURL keyed to its advisory id), and the snapshot date travels with it, both in the bundled file and on every component the check flags (`bomlens:eol:source`, `bomlens:malicious:source`). None of these projects endorses or certifies BomLens, and the bundled data is provided as is.
 
-The CPE applicability index (`/opt/cve-bin-tool-home/cpe_match.sqlite`, in the base image and the images built from it) comes from NVD rather than either of these, and its attribution and notices ship beside it as `CVE-DATA-NOTICE.txt`.
+The CPE applicability index (`/opt/cve-bin-tool-home/cpe_match.sqlite`, in the base image and the images built from it) comes from NVD rather than any of these, and its attribution and notices ship beside it as `CVE-DATA-NOTICE.txt`.
 
 ### Web UI npm packages
 
@@ -50,11 +51,12 @@ The web UI (`--ui`) is a React single-page application. npm package code is comp
 
 The authoritative record is `third-party-licenses.txt`, generated at build time. It lists only the packages that actually reach the bundle and reproduces each one's license text in full. Open it at `/third-party-licenses.txt` in the web UI; inside the image it is at `/usr/local/lib/sbom-web/dist/third-party-licenses.txt`. It comes from the bundled module graph rather than the `package.json` declaration because the two differ: declared dependencies used only at build time (tailwindcss, typescript) never reach the distribution, and a package can be declared and installed yet dropped from the bundle because nothing imports it.
 
-The 23 packages currently in the bundle are below. All are permissive; none is copyleft.
+The 27 packages currently in the bundle are below. All are permissive; none is copyleft.
 
 | Package | Purpose | License (SPDX) |
 |---------|---------|----------------|
 | react, react-dom, scheduler | UI rendering | MIT |
+| @primer/react, @primer/primitives | Primer components and design tokens (theme, sizes, type) | MIT |
 | @radix-ui/react-label, react-progress, react-slot, react-primitive, react-context, react-compose-refs | Accessible primitives | MIT |
 | cytoscape, cytoscape-dagre, dagre, graphlib, lodash | Dependency graph rendering and layout | MIT |
 | i18next, react-i18next, i18next-browser-languagedetector | English and Korean switching | MIT |
@@ -63,6 +65,8 @@ The 23 packages currently in the bundle are below. All are permissive; none is c
 | lucide-react | Icons | ISC |
 | highlight.js | Syntax highlighting in the source viewer (grammars loaded on demand) | BSD-3-Clause |
 | @fontsource/inter, @fontsource/jetbrains-mono, pretendard | Fonts (see the section below) | OFL-1.1 |
+
+`@primer/octicons-react` (icons, MIT) is declared as well, and `@primer/react` brings these packages with it: @primer/behaviors, @primer/live-region-element, @github/relative-time-element, @github/mini-throttle, @tanstack/react-virtual, @tanstack/virtual-core, color2k, deepmerge, history, hsluv, lodash.isempty, lodash.isobject, react-intersection-observer and react-is (MIT); @lit-labs/react, @lit-labs/ssr-dom-shim and @oddbird/popover-polyfill (BSD-3-Clause); focus-visible (W3C). They reach the generated file when a screen starts using the component that needs them. @primer/react, @primer/live-region-element and @lit-labs/ssr-dom-shim ship no license file of their own, so their texts are carried in this repository under `docker/web/frontend/licenses/`, as for Pretendard.
 
 `npm run notices:check` keeps the list from going stale by checking the generated file. CI fails when a bundled package declares no license, when no license text was found to reproduce, or when any copyleft license appears.
 
@@ -163,7 +167,7 @@ The version below matches the build ARG default in `docker/Dockerfile` (pinned; 
 |------|----------------------|---------|----------------|----------|--------|
 | grype | v0.120.1 (`GRYPE_VERSION`) | CPE-based NVD CVE matching | Apache-2.0 | permissive | https://github.com/anchore/grype |
 
-Data: the grype vulnerability database baked into the image at build time is assembled by Anchore from public vulnerability sources — NVD (public domain), GitHub Security Advisories (CC-BY-4.0), and distribution security databases (each under its own terms). The database is pinned with `GRYPE_DB_AUTO_UPDATE=false`, so no network access happens during a scan.
+Data: the grype vulnerability database baked into the image at build time is assembled by Anchore from public vulnerability sources — NVD (public domain), GitHub Security Advisories (CC-BY-4.0), and distribution security databases (each under its own terms). Automatic updates are off (`GRYPE_DB_AUTO_UPDATE=false`). A scan downloads a newer database only when the bundled one is older than `BOMLENS_GRYPE_DB_MAX_AGE_DAYS` days and the scan is not offline.
 
 ## deep-license image: `ghcr.io/sktelecom/bomlens-deep-license` (contains LGPL, opt-in)
 

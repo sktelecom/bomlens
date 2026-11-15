@@ -4,6 +4,8 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
 
+import { waitForSettled } from "./settle";
+
 /**
  * The way out of the app: documentation, the demo, and which version is
  * running. Every other external link lived inside a scan form, so a reader who
@@ -36,8 +38,9 @@ test("the help menu opens with documentation and demo links", async ({ page }) =
   await open(page, "1.10.5");
   await page.getByTestId("help-menu").click();
 
-  const docs = page.getByRole("link", { name: /Documentation/ });
-  const demo = page.getByRole("link", { name: /Live demo/ });
+  // A menu's entries are menu items, links underneath.
+  const docs = page.getByRole("menuitem", { name: /Documentation/ });
+  const demo = page.getByRole("menuitem", { name: /Live demo/ });
   await expect(docs).toBeVisible();
   await expect(demo).toBeVisible();
   // Opened away from the app: a scan in progress is not navigated out from.
@@ -80,6 +83,8 @@ test("the open menu has no axe violations", async ({ page }) => {
   await open(page, "1.10.5");
   await page.getByTestId("help-menu").click();
   await expect(page.getByTestId("app-version")).toBeVisible();
+  // The menu fades in; axe would read the text mid-fade.
+  await waitForSettled(page.locator('[data-component="ActionMenu.Overlay"]'));
   const results = await new AxeBuilder({ page })
     .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
     .analyze();
@@ -113,6 +118,8 @@ test("the shortcut list opens from the menu and closes with Escape", async ({ pa
   const dialog = page.getByRole("dialog", { name: "Keyboard shortcuts" });
   await expect(dialog).toBeVisible();
   await expect(page.getByTestId("shortcut-list").getByRole("listitem")).not.toHaveCount(0);
+  // The dialog fades in; axe would read the text mid-fade.
+  await waitForSettled(dialog);
   const results = await new AxeBuilder({ page })
     .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
     .analyze();
@@ -121,6 +128,36 @@ test("the shortcut list opens from the menu and closes with Escape", async ({ pa
   await expect(dialog).toHaveCount(0);
   // Focus returns to the control that opened it.
   await expect(page.getByTestId("help-menu")).toBeFocused();
+});
+
+test("? with the help menu open closes the menu and opens the list", async ({ page }) => {
+  await open(page, "1.10.5");
+  await page.getByTestId("help-menu").click();
+  await expect(page.getByTestId("app-version")).toBeVisible();
+  await page.keyboard.press("?");
+  await expect(page.getByRole("dialog", { name: "Keyboard shortcuts" })).toBeVisible();
+  await expect(page.getByTestId("app-version")).toHaveCount(0);
+});
+
+test("the version is part of a menu item, so the keyboard reaches it", async ({ page }) => {
+  await open(page, "1.10.5");
+  const trigger = page.getByTestId("help-menu");
+  await trigger.focus();
+  await page.keyboard.press("Enter");
+  const item = page.getByRole("menuitem", { name: /What's new/ });
+  await expect(item).toBeVisible();
+  // Opened from the keyboard, the menu puts focus on its first item.
+  await expect(page.getByRole("menuitem").first()).toBeFocused();
+  // Walk down with the arrow keys until the item that carries the version
+  // has focus; it has to be reachable this way, not only by pointer.
+  for (let i = 0; i < 8; i++) {
+    if (await item.evaluate((el) => el === document.activeElement)) break;
+    await page.keyboard.press("ArrowDown");
+  }
+  await expect(item).toBeFocused();
+  await expect(item.getByTestId("app-version")).toHaveText("Version 1.10.5");
+  // Links out say they open a new tab.
+  await expect(page.getByRole("menuitem", { name: /Documentation/ })).toContainText("opens in a new tab");
 });
 
 test("? opens the shortcut list, but not while typing in a field", async ({ page }) => {

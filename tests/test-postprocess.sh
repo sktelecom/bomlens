@@ -1402,7 +1402,7 @@ if [ -f "$FMD" ] && grep -q '^### Firmware analysis scope$' "$FMD" \
 else
     fail "firmware scope section missing from the md report" "$(grep -n -i 'scope' "$FMD" 2>/dev/null)"
 fi
-grep -q '25% of the image (250000 bytes) was not recognized' "$FHTML" 2>/dev/null \
+grep -q '25% of the image (250,000 bytes) was not recognized' "$FHTML" 2>/dev/null \
     && pass "html report carries the firmware scope note" || fail "html report lacks the firmware scope note"
 ( cd "$WORK/riskfw" && REPORT_LANG=ko bash "$LIB/generate-risk-report.sh" proj_1.0 proj FIRMWARE >/dev/null 2>&1 )
 grep -q '^### 펌웨어 분석 범위$' "$FMD" && grep -q '이미지의 25%(250000바이트)를' "$FMD" \
@@ -1435,7 +1435,7 @@ jq '.metadata.component.properties = [
     "$WORK/lc.json" > "$WORK/riskfw3/proj_1.0_bom.json"
 printf 'License: MIT\n' > "$WORK/riskfw3/proj_1.0_NOTICE.txt"
 ( cd "$WORK/riskfw3" && bash "$LIB/generate-risk-report.sh" proj_1.0 proj FIRMWARE >/dev/null 2>&1 )
-grep -q 'display:none' "$WORK/riskfw3/proj_1.0_risk-report.html" \
+grep -qF '.table-wrap{display:none}' "$WORK/riskfw3/proj_1.0_risk-report.html" \
     && fail "markup in a firmware property reached the HTML report" \
     || pass "markup in a firmware property is stripped before it reaches the report"
 # A number that is not plainly a number is dropped, not repaired into a plausible
@@ -2140,11 +2140,13 @@ mech_cpe_of() { jq -r --arg n "$1" '[.components[]|select(.name==$n)]|.[0].cpe /
 # (a) vendor=<group> (dotted, verbatim), product=<artifact> -> replaced (same
 # result as deriving from no cpe at all: org.apache.pdfbox -> apache:pdfbox).
 [ "$(mech_cpe_of pdfbox-app)" = "cpe:2.3:a:apache:pdfbox:1.8.7:*:*:*:*:*:*:*" ] && pass "mechanical group-copy cpe replaced (apache:pdfbox)" || fail "pdfbox-app cpe='$(mech_cpe_of pdfbox-app)'"
-# (b) vendor=<artifact> (verbatim), product=<artifact> -> replaced (2-segment
-# group, parts[1]==parts[-1] shape: jakarta.annotation -> annotation:annotation).
-[ "$(mech_cpe_of jakarta.annotation-api)" = "cpe:2.3:a:annotation:annotation:2.1.1:*:*:*:*:*:*:*" ] && pass "mechanical artifact-copy cpe replaced (annotation:annotation)" || fail "jakarta.annotation-api cpe='$(mech_cpe_of jakarta.annotation-api)'"
-# (c) vendor=<group>.<artifact> concatenated, product=<artifact> -> replaced.
-[ "$(mech_cpe_of HikariCP)" = "cpe:2.3:a:zaxxer:zaxxer:4.0.3:*:*:*:*:*:*:*" ] && pass "mechanical group.artifact-copy cpe replaced (zaxxer:zaxxer)" || fail "HikariCP cpe='$(mech_cpe_of HikariCP)'"
+# (b) vendor=<artifact> (verbatim), product=<artifact> -> replaced. The group's
+# last segment ("annotation") does not name the artifact, so the product is the
+# artifactId: jakarta.annotation -> annotation:jakarta.annotation-api.
+[ "$(mech_cpe_of jakarta.annotation-api)" = "cpe:2.3:a:annotation:jakarta.annotation-api:2.1.1:*:*:*:*:*:*:*" ] && pass "mechanical artifact-copy cpe replaced (annotation:jakarta.annotation-api)" || fail "jakarta.annotation-api cpe='$(mech_cpe_of jakarta.annotation-api)'"
+# (c) vendor=<group>.<artifact> concatenated, product=<artifact> -> replaced
+# (product = the lowercased artifactId, since "zaxxer" does not name HikariCP).
+[ "$(mech_cpe_of HikariCP)" = "cpe:2.3:a:zaxxer:hikaricp:4.0.3:*:*:*:*:*:*:*" ] && pass "mechanical group.artifact-copy cpe replaced (zaxxer:hikaricp)" || fail "HikariCP cpe='$(mech_cpe_of HikariCP)'"
 # (d) boundary: single-segment groupId equal to the artifactId, but the
 # pre-existing vendor ("apache-software-foundation") is not the group or
 # artifact string in any form -- it looks like a real (if possibly wrong)
@@ -2444,18 +2446,18 @@ cat > "$WORK/mvn-alt.json" <<'JSON'
 JSON
 python3 "$MVNCPE" "$WORK/mvn-alt.json" >/dev/null 2>&1
 alt_props_of() { jq -r --arg n "$1" '[.components[]|select(.name==$n)]|.[0]|[(.properties//[])[]|select(.name=="bomlens:cpeAlternates")|.value][0] // "NONE"' "$WORK/mvn-alt.json"; }
-[ "$(alt_props_of spring-context)" = '["cpe:2.3:a:pivotal_software:spring_framework:2.5.6:*:*:*:*:*:*:*", "cpe:2.3:a:springsource:spring_framework:2.5.6:*:*:*:*:*:*:*"]' ] \
+[ "$(alt_props_of spring-context)" = '["cpe:2.3:a:pivotal_software:spring_framework:2.5.6:*:*:*:*:*:*:*", "cpe:2.3:a:springsource:spring_framework:2.5.6:*:*:*:*:*:*:*", "cpe:2.3:a:org.springframework:spring-context:2.5.6:*:*:*:*:maven:*:*"]' ] \
     && pass "org.springframework carries both pivotal_software and springsource alternates" \
     || fail "spring-context alternates='$(alt_props_of spring-context)'"
-[ "$(alt_props_of spring-security-core)" = '["cpe:2.3:a:pivotal_software:spring_security:3.0.0:*:*:*:*:*:*:*"]' ] \
+[ "$(alt_props_of spring-security-core)" = '["cpe:2.3:a:pivotal_software:spring_security:3.0.0:*:*:*:*:*:*:*", "cpe:2.3:a:org.springframework.security:spring-security-core:3.0.0:*:*:*:*:maven:*:*", "cpe:2.3:a:org.springframework:spring-security-core:3.0.0:*:*:*:*:maven:*:*"]' ] \
     && pass "org.springframework.security carries the pivotal_software alternate" \
     || fail "spring-security-core alternates='$(alt_props_of spring-security-core)'"
-[ "$(alt_props_of jetty)" = '["cpe:2.3:a:eclipse:jetty:6.1.21:*:*:*:*:*:*:*"]' ] \
+[ "$(alt_props_of jetty)" = '["cpe:2.3:a:eclipse:jetty:6.1.21:*:*:*:*:*:*:*", "cpe:2.3:a:org.mortbay.jetty:jetty:6.1.21:*:*:*:*:maven:*:*", "cpe:2.3:a:org.mortbay:jetty:6.1.21:*:*:*:*:maven:*:*"]' ] \
     && pass "org.mortbay.jetty carries the eclipse:jetty alternate" \
     || fail "jetty alternates='$(alt_props_of jetty)'"
-[ "$(alt_props_of spring-boot)" = "NONE" ] \
-    && pass "org.springframework.boot (single vendor, verified no split) gets no alternates property" \
-    || fail "spring-boot wrongly got alternates='$(alt_props_of spring-boot)'"
+[ "$(alt_props_of spring-boot)" = '["cpe:2.3:a:org.springframework.boot:spring-boot:1.5.6.RELEASE:*:*:*:*:maven:*:*", "cpe:2.3:a:org.springframework:spring-boot:1.5.6.RELEASE:*:*:*:*:maven:*:*"]' ] \
+    && pass "org.springframework.boot (single vendor, verified no split) gets only the package-style candidates" \
+    || fail "spring-boot alternates='$(alt_props_of spring-boot)'"
 cp "$WORK/mvn-alt.json" "$WORK/mvn-alt2.json"; python3 "$MVNCPE" "$WORK/mvn-alt2.json" >/dev/null 2>&1
 diff -q "$WORK/mvn-alt.json" "$WORK/mvn-alt2.json" >/dev/null 2>&1 && pass "F-1c7 enrichment is idempotent" || fail "second run changed the SBOM"
 # regression: scan-nvd-cpe.py actually looks the alternates up and recovers
@@ -2509,6 +2511,131 @@ if command -v grype >/dev/null 2>&1; then
 else
     echo "  SKIP: grype not installed; skipping CVE-recovery regression (F-1c8)"
 fi
+
+echo "== F-1c9: maven CPE enrichment, package-style CPE candidates (groupId:artifactId, target_sw=maven) =="
+# Recent NVD records describe maven packages as vendor=<groupId>,
+# product=<artifactId>, target_sw=maven. Every maven component with a cpe gets
+# up to two such candidates in bomlens:cpeAlternates (the full groupId, and its
+# parent for a 3+ segment groupId). The first four purls below also had a
+# product taken from a groupId segment (client5, embed, core, snappy).
+cat > "$WORK/mvn-pkg.json" <<'JSON'
+{"bomFormat":"CycloneDX","specVersion":"1.6","components":[
+ {"type":"library","name":"httpclient5","version":"5.6.3","purl":"pkg:maven/org.apache.httpcomponents.client5/httpclient5@5.6.3"},
+ {"type":"library","name":"tomcat-embed-el","version":"11.0.25","purl":"pkg:maven/org.apache.tomcat.embed/tomcat-embed-el@11.0.25"},
+ {"type":"library","name":"jackson-databind","version":"3.1.7","purl":"pkg:maven/tools.jackson.core/jackson-databind@3.1.7"},
+ {"type":"library","name":"snappy-java","version":"1.1.10.7","purl":"pkg:maven/org.xerial.snappy/snappy-java@1.1.10.7"},
+ {"type":"library","name":"jackson-databind-2","version":"2.21.7","purl":"pkg:maven/com.fasterxml.jackson.core/jackson-databind@2.21.7"},
+ {"type":"library","name":"preset-cpe","version":"1.0","purl":"pkg:maven/com.example/preset-cpe@1.0","cpe":"cpe:2.3:a:examplevendor:preset:1.0:*:*:*:*:*:*:*"},
+ {"type":"library","name":"odd-coord","version":"1.0","purl":"pkg:maven/com.example/odd%20coord@1.0"},
+ {"type":"library","name":"struts2-core","version":"2.3.31","purl":"pkg:maven/org.apache.struts/struts2-core@2.3.31"},
+ {"type":"library","name":"derbyclient","version":"10.14.2.0","purl":"pkg:maven/org.apache.derby/derbyclient@10.14.2.0"},
+ {"type":"library","name":"fontbox","version":"2.0.0","purl":"pkg:maven/org.apache.pdfbox/fontbox@2.0.0"},
+ {"type":"library","name":"tomcat-embed-core","version":"9.0.1","purl":"pkg:maven/org.apache.tomcat.embed/tomcat-embed-core@9.0.1"},
+ {"type":"library","name":"okhttp","version":"4.9.0","purl":"pkg:maven/com.squareup.okhttp3/okhttp@4.9.0"},
+ {"type":"library","name":"guice","version":"4.0","purl":"pkg:maven/com.google.inject/guice@4.0"},
+ {"type":"library","name":"gh-lib","version":"1.0","purl":"pkg:maven/com.github.someone/gh-lib@1.0"},
+ {"type":"library","name":"jquery","version":"3.0.0","purl":"pkg:maven/org.webjars.npm/jquery@3.0.0"}]}
+JSON
+python3 "$MVNCPE" "$WORK/mvn-pkg.json" >/dev/null 2>&1
+pkg_cpe_of() { jq -r --arg n "$1" '[.components[]|select(.name==$n)]|.[0].cpe // "NONE"' "$WORK/mvn-pkg.json"; }
+pkg_alt_of() { jq -r --arg n "$1" '[.components[]|select(.name==$n)]|.[0]|[(.properties//[])[]|select(.name=="bomlens:cpeAlternates")|.value][0] // "NONE"' "$WORK/mvn-pkg.json"; }
+check_pkg() {  # name, expected primary cpe, expected alternates JSON
+    if [ "$(pkg_cpe_of "$1")" = "$2" ]; then pass "$1 primary cpe $2"; else fail "$1 cpe='$(pkg_cpe_of "$1")', expected $2"; fi
+    if [ "$(pkg_alt_of "$1")" = "$3" ]; then pass "$1 package-style alternates"; else fail "$1 alternates='$(pkg_alt_of "$1")', expected $3"; fi
+}
+check_pkg httpclient5 "cpe:2.3:a:apache:httpclient5:5.6.3:*:*:*:*:*:*:*" \
+    '["cpe:2.3:a:org.apache.httpcomponents.client5:httpclient5:5.6.3:*:*:*:*:maven:*:*", "cpe:2.3:a:org.apache.httpcomponents:httpclient5:5.6.3:*:*:*:*:maven:*:*"]'
+# Only tomcat-embed-core is the Tomcat server (apache:tomcat); the other embed
+# artifacts fall back to the generic rule (product = artifactId).
+check_pkg tomcat-embed-el "cpe:2.3:a:apache:tomcat-embed-el:11.0.25:*:*:*:*:*:*:*" \
+    '["cpe:2.3:a:org.apache.tomcat.embed:tomcat-embed-el:11.0.25:*:*:*:*:maven:*:*", "cpe:2.3:a:org.apache.tomcat:tomcat-embed-el:11.0.25:*:*:*:*:maven:*:*"]'
+check_pkg jackson-databind "cpe:2.3:a:fasterxml:jackson-databind:3.1.7:*:*:*:*:*:*:*" \
+    '["cpe:2.3:a:tools.jackson.core:jackson-databind:3.1.7:*:*:*:*:maven:*:*", "cpe:2.3:a:tools.jackson:jackson-databind:3.1.7:*:*:*:*:maven:*:*"]'
+check_pkg snappy-java "cpe:2.3:a:xerial:snappy-java:1.1.10.7:*:*:*:*:*:*:*" \
+    '["cpe:2.3:a:org.xerial.snappy:snappy-java:1.1.10.7:*:*:*:*:maven:*:*", "cpe:2.3:a:org.xerial:snappy-java:1.1.10.7:*:*:*:*:maven:*:*"]'
+check_pkg jackson-databind-2 "cpe:2.3:a:fasterxml:jackson-databind:2.21.7:*:*:*:*:*:*:*" \
+    '["cpe:2.3:a:com.fasterxml.jackson.core:jackson-databind:2.21.7:*:*:*:*:maven:*:*", "cpe:2.3:a:com.fasterxml.jackson:jackson-databind:2.21.7:*:*:*:*:maven:*:*"]'
+check_pkg tomcat-embed-core "cpe:2.3:a:apache:tomcat:9.0.1:*:*:*:*:*:*:*" \
+    '["cpe:2.3:a:org.apache.tomcat.embed:tomcat-embed-core:9.0.1:*:*:*:*:maven:*:*", "cpe:2.3:a:org.apache.tomcat:tomcat-embed-core:9.0.1:*:*:*:*:maven:*:*"]'
+# An artifactId that starts with the last groupId segment keeps the segment as
+# the product, with or without a separator (struts / struts2-core, derby /
+# derbyclient): NVD files these under apache:struts and apache:derby.
+check_pkg struts2-core "cpe:2.3:a:apache:struts:2.3.31:*:*:*:*:*:*:*" \
+    '["cpe:2.3:a:org.apache.struts:struts2-core:2.3.31:*:*:*:*:maven:*:*", "cpe:2.3:a:org.apache:struts2-core:2.3.31:*:*:*:*:maven:*:*"]'
+check_pkg derbyclient "cpe:2.3:a:apache:derby:10.14.2.0:*:*:*:*:*:*:*" \
+    '["cpe:2.3:a:org.apache.derby:derbyclient:10.14.2.0:*:*:*:*:maven:*:*", "cpe:2.3:a:org.apache:derbyclient:10.14.2.0:*:*:*:*:maven:*:*"]'
+# PDFBox subprojects stay on apache:pdfbox (curated).
+[ "$(pkg_cpe_of fontbox)" = "cpe:2.3:a:apache:pdfbox:2.0.0:*:*:*:*:*:*:*" ] && pass "fontbox -> apache:pdfbox (curated)" || fail "fontbox cpe='$(pkg_cpe_of fontbox)'"
+# The segment is a packaging detail when the artifactId does not start with it.
+[ "$(pkg_cpe_of okhttp)" = "cpe:2.3:a:squareup:okhttp:4.9.0:*:*:*:*:*:*:*" ] && pass "com.squareup.okhttp3/okhttp -> squareup:okhttp" || fail "okhttp cpe='$(pkg_cpe_of okhttp)'"
+[ "$(pkg_cpe_of guice)" = "cpe:2.3:a:google:guice:4.0:*:*:*:*:*:*:*" ] && pass "com.google.inject/guice -> google:guice" || fail "guice cpe='$(pkg_cpe_of guice)'"
+# A shared hosting namespace (com.github, org.webjars) is not used as a parent-groupId vendor.
+[ "$(pkg_alt_of gh-lib)" = '["cpe:2.3:a:com.github.someone:gh-lib:1.0:*:*:*:*:maven:*:*"]' ] \
+    && pass "no com.github parent-groupId candidate" || fail "gh-lib alternates='$(pkg_alt_of gh-lib)'"
+[ "$(pkg_alt_of jquery)" = '["cpe:2.3:a:org.webjars.npm:jquery:3.0.0:*:*:*:*:maven:*:*"]' ] \
+    && pass "no org.webjars parent-groupId candidate" || fail "jquery alternates='$(pkg_alt_of jquery)'"
+# A real pre-existing cpe is kept and gains only the package-style candidate
+# (2-segment groupId, so no parent candidate). It is not marked as derived.
+check_pkg preset-cpe "cpe:2.3:a:examplevendor:preset:1.0:*:*:*:*:*:*:*" \
+    '["cpe:2.3:a:com.example:preset-cpe:1.0:*:*:*:*:maven:*:*"]'
+preset_src=$(jq -r '[.components[]|select(.name=="preset-cpe")]|.[0]|[(.properties//[])[]|select(.name=="bomlens:cpeSource")|.value][0] // "NONE"' "$WORK/mvn-pkg.json")
+[ "$preset_src" = "NONE" ] && pass "pre-existing cpe is not marked bomlens:cpeSource" || fail "preset-cpe cpeSource='$preset_src'"
+# A coordinate that cannot be written unescaped into a cpe gets no package-style candidate.
+[ "$(pkg_alt_of odd-coord)" = "NONE" ] && pass "unsafe coordinate gets no package-style candidate" || fail "odd-coord alternates='$(pkg_alt_of odd-coord)'"
+cp "$WORK/mvn-pkg.json" "$WORK/mvn-pkg2.json"; python3 "$MVNCPE" "$WORK/mvn-pkg2.json" >/dev/null 2>&1
+diff -q "$WORK/mvn-pkg.json" "$WORK/mvn-pkg2.json" >/dev/null 2>&1 && pass "F-1c9 enrichment is idempotent" || fail "second run changed the SBOM"
+
+echo "== F-1c10: scan-nvd-cpe.py hands the alternates to grype and version-filters their matches =="
+# The alternates go to grype as syft:cpe23 properties of a temporary SBOM copy
+# (one grype run, purl kept). A match found through a package-style NVD record
+# goes through the same NVD version filter as a primary-cpe match, keyed on the
+# product of the record grype matched.
+GRYPE_SEEN="$WORK/grype-pkg-seen.json"
+cat > "$WORK/grype-pkg-stub" <<'SH'
+#!/usr/bin/env bash
+if [ "$1" = "db" ]; then echo '{}'; exit 1; fi
+cp "${1#sbom:}" "$GRYPE_SEEN"
+cat <<'JSON'
+{"matches":[
+ {"vulnerability":{"id":"CVE-2026-110879","namespace":"nvd:cpe","severity":"high"},
+  "artifact":{"name":"jackson-databind-2","version":"2.21.7","purl":"pkg:maven/com.fasterxml.jackson.core/jackson-databind@2.21.7","cpes":["cpe:2.3:a:fasterxml:jackson-databind:2.21.7:*:*:*:*:*:*:*"]},
+  "matchDetails":[{"type":"cpe-match","found":{"vulnerabilityID":"CVE-2026-110879","cpes":["cpe:2.3:a:com.fasterxml.jackson.core:jackson-databind:*:*:*:*:*:maven:*:*"]}}]},
+ {"vulnerability":{"id":"CVE-2026-000001","namespace":"nvd:cpe","severity":"high"},
+  "artifact":{"name":"jackson-databind-2","version":"2.21.7","purl":"pkg:maven/com.fasterxml.jackson.core/jackson-databind@2.21.7","cpes":["cpe:2.3:a:fasterxml:jackson-databind:2.21.7:*:*:*:*:*:*:*"]},
+  "matchDetails":[{"type":"cpe-match","found":{"vulnerabilityID":"CVE-2026-000001","cpes":["cpe:2.3:a:com.fasterxml.jackson.core:jackson-databind:*:*:*:*:*:maven:*:*"]}}]}
+]}
+JSON
+SH
+chmod +x "$WORK/grype-pkg-stub"
+cp "$WORK/mvn-pkg.json" "$WORK/mvn-pkg-scan.json"
+GRYPE_SEEN="$GRYPE_SEEN" GRYPE_BIN="$WORK/grype-pkg-stub" SECURITY_NVD_VERIFY=true \
+    python3 - "$LIB/scan-nvd-cpe.py" "$WORK/mvn-pkg-scan.json" "$WORK/mvn-pkg-out" >/dev/null 2>&1 <<'PY'
+import importlib.util, sys
+spec = importlib.util.spec_from_file_location("snc", sys.argv[1])
+m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
+crit = "cpe:2.3:a:com.fasterxml.jackson.core:jackson-databind:*:*:*:*:*:maven:*:*"
+ranges = {
+    "CVE-2026-110879": [{"criteria": crit, "vulnerable": True, "versionStartIncluding": "2.19.0", "versionEndExcluding": "2.21.8"}],
+    "CVE-2026-000001": [{"criteria": crit, "vulnerable": True, "versionEndExcluding": "2.10.0"}],
+}
+m._nvd_matches = lambda cve, key, cache: ranges.get(cve, [])
+m.build_sidecar(sys.argv[2], sys.argv[3])
+PY
+seen_cpes=$(jq -r '[.components[]|select(.name=="snappy-java")|(.properties//[])[]|select(.name=="syft:cpe23")|.value]|join(",")' "$GRYPE_SEEN" 2>/dev/null)
+[ "$seen_cpes" = "cpe:2.3:a:org.xerial.snappy:snappy-java:1.1.10.7:*:*:*:*:maven:*:*,cpe:2.3:a:org.xerial:snappy-java:1.1.10.7:*:*:*:*:maven:*:*" ] \
+    && pass "grype input carries the alternates as syft:cpe23 properties" \
+    || fail "syft:cpe23 in grype input='$seen_cpes'"
+seen_purl=$(jq -r '[.components[]|select(.name=="snappy-java")]|.[0].purl' "$GRYPE_SEEN" 2>/dev/null)
+[ "$seen_purl" = "pkg:maven/org.xerial.snappy/snappy-java@1.1.10.7" ] && pass "grype input keeps the component purl" || fail "grype input purl='$seen_purl'"
+if jq -e '[.components[]|(.properties//[])[]|select(.name=="syft:cpe23")]|length==0' "$WORK/mvn-pkg-scan.json" >/dev/null 2>&1; then
+    pass "the SBOM itself gets no syft:cpe23 properties"
+else
+    fail "scan-nvd-cpe.py wrote syft:cpe23 into the SBOM"
+fi
+pkg_kept=$(jq -r '[.Results[0].Vulnerabilities[].VulnerabilityID]|join(",")' "$WORK/mvn-pkg-out_security_grype.json" 2>/dev/null)
+[ "$pkg_kept" = "CVE-2026-110879" ] \
+    && pass "package-style match in the NVD range kept, out-of-range one dropped by the version filter" \
+    || fail "kept CVEs='$pkg_kept', expected CVE-2026-110879"
 
 echo "== F-1d: NVD version filter (scan-nvd-cpe) — drops loose-range false positives =="
 # The filter is what removes grype's over-broad nvd:cpe matches (a fixed-in-9.0.104
@@ -3619,6 +3746,200 @@ bash "$LIB/validate-sbom.sh" "$WORK/known-type-cdx.json" "$WORK/ktd" "supplier" 
 ktd=$(jq -r '.checks[] | select(.id=="purl-type") | "\(.status)|\(.detail)"' "$WORK/ktd_conformance.json")
 [ "$ktd" = "pass|0 undefined type(s)" ] && pass "defined purl types pass the type check" \
     || fail "purl-type on defined types = '$ktd', expected 'pass|0 undefined type(s)'"
+
+echo "== conformance: an rpm/deb/apk namespace must be a distribution id, a version must look like one =="
+# A vendor name in the namespace slot (pkg:rpm/<company>/glibc) is well formed and
+# carries a namespace, so purl-namespace passes it; a version such as
+# "Specification-Vendor: ..." is a manifest line read as a version. Both fail the
+# submission profile and warn elsewhere.
+jq '.components += [
+  {"type":"library","name":"glibc","version":"2.28-251.ex1","purl":"pkg:rpm/examplevendor/glibc@2.28-251.ex1?distro=rhel-8"},
+  {"type":"library","name":"zlib","version":"1.2.11","purl":"pkg:rpm/examplevendor/zlib@1.2.11"},
+  {"type":"library","name":"commons-dbcp","version":"Specification-Vendor: The Apache Software Foundation","purl":"pkg:maven/commons-dbcp/commons-dbcp@1.4","group":"commons-dbcp"},
+  {"type":"library","name":"padded","version":" 2.0 ","purl":"pkg:npm/padded@2.0"}
+]' "$FIX/good-cyclonedx.json" > "$WORK/semantic-cdx.json"
+sem_sum_before=$(shasum "$WORK/semantic-cdx.json" | cut -d' ' -f1)
+bash "$LIB/validate-sbom.sh" "$WORK/semantic-cdx.json" "$WORK/sed" "supplier" >/dev/null 2>&1
+sem_def=$(jq -r '"\(.result)|\(.checks[]|select(.id=="purl-namespace-os")|"\(.required)|\(.status)")|\(.checks[]|select(.id=="version-sanity")|"\(.required)|\(.status)")"' "$WORK/sed_conformance.json")
+[ "$sem_def" = "pass|false|warn|false|warn" ] \
+    && pass "default profile: a vendor namespace and a malformed version warn and do not fail the SBOM" \
+    || fail "default profile rows = '$sem_def', expected 'pass|false|warn|false|warn'"
+CONFORMANCE_PROFILE=skt-submission bash "$LIB/validate-sbom.sh" "$WORK/semantic-cdx.json" "$WORK/ses" "supplier" >/dev/null 2>&1
+sem_skt=$(jq -r '"\(.result)|\(.checks[]|select(.id=="purl-namespace-os")|"\(.required)|\(.status)")|\(.checks[]|select(.id=="version-sanity")|"\(.required)|\(.status)")"' "$WORK/ses_conformance.json")
+[ "$sem_skt" = "fail|true|fail|true|fail" ] \
+    && pass "skt-submission: a vendor namespace and a malformed version are required failures" \
+    || fail "skt-submission rows = '$sem_skt', expected 'fail|true|fail|true|fail'"
+jq -e '.checks[] | select(.id=="purl-namespace-os") | select(.detail | test("examplevendor \\(2\\)"))' \
+    "$WORK/ses_conformance.json" >/dev/null \
+    && pass "the namespace row names the offending value and its count" \
+    || fail "the namespace row does not name examplevendor (2)"
+jq -e '.checks[] | select(.id=="version-sanity") | .missing | (index("commons-dbcp@Specification-Vendor: The Apache Software Foundation") != null) and (index("padded@ 2.0 ") != null)' \
+    "$WORK/ses_conformance.json" >/dev/null \
+    && pass "the version row lists name@version for each malformed value" \
+    || fail "the version row lacks the malformed name@version entries"
+jq -e '.checks[] | select(.id=="purl-namespace-os") | select(.label_ko != null and .detail_ko != null)' \
+    "$WORK/ses_conformance.json" >/dev/null \
+    && pass "the namespace row carries Korean label and detail" || fail "the namespace row has no Korean wording"
+grep -q "PURL namespace of rpm/deb/apk" "$WORK/ses_conformance.md" \
+    && grep -q "PURL namespace of rpm/deb/apk" "$WORK/ses_conformance.html" \
+    && pass "both rows appear in the Markdown and HTML reports" || fail "the new rows are missing from the md/html reports"
+sem_cr=$(cat "$WORK/ses_conformance.result")
+[ "$sem_cr" = "fail" ] && pass "the .result sidecar follows the required failures (--fail-on-conformance)" \
+    || fail "the .result sidecar = '$sem_cr', expected fail"
+
+# A distribution id passes, in any case; a missing namespace is purl-namespace's
+# business and is not counted again.
+jq '.components += [
+  {"type":"library","name":"bash","version":"5.1","purl":"pkg:rpm/rhel/bash@5.1?distro=rhel-9"},
+  {"type":"library","name":"curl","version":"8.0","purl":"pkg:deb/Debian/curl@8.0"},
+  {"type":"library","name":"musl","version":"1.2","purl":"pkg:apk/alpine/musl@1.2"},
+  {"type":"library","name":"openssl","version":"3.0.7","purl":"pkg:rpm/openssl@3.0.7?distro=rhel-9"}
+]' "$FIX/good-cyclonedx.json" > "$WORK/semantic-ok.json"
+CONFORMANCE_PROFILE=skt-submission bash "$LIB/validate-sbom.sh" "$WORK/semantic-ok.json" "$WORK/seo" "supplier" >/dev/null 2>&1
+sem_ok=$(jq -r '"\(.checks[]|select(.id=="purl-namespace-os")|"\(.status)|\(.detail)")|\(.checks[]|select(.id=="version-sanity")|.status)"' "$WORK/seo_conformance.json")
+[ "$sem_ok" = "pass|all namespaces are distribution ids|pass" ] \
+    && pass "pkg:rpm/rhel, pkg:deb/Debian and pkg:apk/alpine pass; a missing namespace is not counted twice" \
+    || fail "valid distribution namespaces = '$sem_ok'"
+
+# SPDX JSON and Tag-Value run the same rows.
+jq '.packages += [{
+  "name":"glibc","SPDXID":"SPDXRef-Package-glibc","versionInfo":"2.28 ex1","downloadLocation":"NOASSERTION",
+  "externalRefs":[{"referenceCategory":"PACKAGE-MANAGER","referenceType":"purl",
+                   "referenceLocator":"pkg:rpm/examplevendor/glibc@2.28"}]}]' "$FIX/good-spdx.json" > "$WORK/semantic-spdx.json"
+CONFORMANCE_PROFILE=skt-submission bash "$LIB/validate-sbom.sh" "$WORK/semantic-spdx.json" "$WORK/ses2" "supplier" >/dev/null 2>&1
+sem_spdx=$(jq -r '"\(.checks[]|select(.id=="purl-namespace-os")|.status)|\(.checks[]|select(.id=="version-sanity")|.status)"' "$WORK/ses2_conformance.json")
+[ "$sem_spdx" = "fail|fail" ] && pass "SPDX JSON: the namespace and version rows fail" \
+    || fail "SPDX JSON rows = '$sem_spdx', expected 'fail|fail'"
+{
+    cat "$FIX/supplier-clean-tagvalue.spdx"
+    printf '\nPackageName: glibc\nSPDXID: SPDXRef-Package-glibc\nPackageVersion: 2.28 ex1\nPackageDownloadLocation: NOASSERTION\nExternalRef: PACKAGE-MANAGER purl pkg:rpm/examplevendor/glibc@2.28\n'
+} > "$WORK/semantic-tv.spdx"
+CONFORMANCE_PROFILE=skt-submission bash "$LIB/validate-sbom.sh" "$WORK/semantic-tv.spdx" "$WORK/ses3" "supplier" >/dev/null 2>&1
+sem_tv=$(jq -r '"\(.format)|\(.checks[]|select(.id=="purl-namespace-os")|.status)|\(.checks[]|select(.id=="version-sanity")|.status)"' "$WORK/ses3_conformance.json")
+[ "$sem_tv" = "SPDX-TagValue|fail|fail" ] && pass "SPDX Tag-Value: the namespace and version rows fail" \
+    || fail "SPDX Tag-Value rows = '$sem_tv', expected 'SPDX-TagValue|fail|fail'"
+
+echo "== conformance: suggested fixes are rule-based, offline and leave the input alone =="
+sem_sug=$(jq -c '.suggestions' "$WORK/ses_conformance.json")
+jq -e '.suggestions | map(select(.check=="purl-namespace-os" and .name=="glibc")) | .[0]
+       | (.candidates == ["pkg:rpm/rhel/glibc@2.28-251.ex1?distro=rhel-8"])
+         and .basis == "distro qualifier in the purl" and .confidence == "high"' \
+    "$WORK/ses_conformance.json" >/dev/null \
+    && pass "a vendor namespace with a distro qualifier gets a candidate, with its basis and high confidence" \
+    || fail "no candidate for the glibc namespace" "$sem_sug"
+jq -e '.suggestions | map(select(.check=="purl-namespace-os" and .name=="zlib")) | .[0]
+       | (.candidates == []) and .confidence == "none" and (.note | test("base distribution"))' \
+    "$WORK/ses_conformance.json" >/dev/null \
+    && pass "with no distro qualifier or OS component there is no candidate, and the report says the base distribution is needed" \
+    || fail "an ambiguous namespace got a candidate" "$sem_sug"
+jq -e '.suggestions | map(select(.check=="version-sanity" and .name=="padded")) | .[0]
+       | (.candidates == ["2.0"]) and .basis == "leading or trailing whitespace removed"' \
+    "$WORK/ses_conformance.json" >/dev/null \
+    && pass "a version padded with whitespace gets the trimmed token" \
+    || fail "no trimmed candidate for the padded version" "$sem_sug"
+jq -e '.suggestions | map(select(.check=="version-sanity" and .name=="commons-dbcp")) | .[0].candidates == []' \
+    "$WORK/ses_conformance.json" >/dev/null \
+    && pass "a garbage version gets no candidate" || fail "a garbage version got a candidate" "$sem_sug"
+jq '.components += [{"type":"library","name":"openssl","version":"3.0.7","purl":"pkg:rpm/openssl@3.0.7?distro=rhel-9"},
+                    {"type":"library","name":"guava","version":"33.0","group":"com.google.guava","purl":"pkg:maven/guava@33.0"},
+                    {"type":"library","name":"lib-x","version":"1.0","purl":"pkg:maven/lib-x@1.0"}]' \
+    "$FIX/good-cyclonedx.json" > "$WORK/suggest-ns.json"
+bash "$LIB/validate-sbom.sh" "$WORK/suggest-ns.json" "$WORK/sgn" "supplier" >/dev/null 2>&1
+jq -e '.suggestions | (map(select(.name=="openssl")) | .[0].candidates == ["pkg:rpm/rhel/openssl@3.0.7?distro=rhel-9"])
+       and (map(select(.name=="guava")) | .[0].candidates == ["pkg:maven/com.google.guava/guava@33.0"])
+       and (map(select(.name=="lib-x")) | .[0].candidates == [])' "$WORK/sgn_conformance.json" >/dev/null \
+    && pass "a missing namespace is suggested from the distro qualifier or the group field, and left empty when neither is there" \
+    || fail "purl-namespace suggestions are wrong" "$(jq -c .suggestions "$WORK/sgn_conformance.json")"
+grep -q "^## Suggested fixes" "$WORK/ses_conformance.md" && grep -qE "<h2 id=\"box-[0-9]+\">Suggested fixes</h2>" "$WORK/ses_conformance.html" \
+    && grep -q "was not changed" "$WORK/ses_conformance.md" \
+    && pass "the Markdown and HTML reports have a Suggested fixes section that says the file was not changed" \
+    || fail "the Suggested fixes section is missing"
+REPORT_LANG=ko CONFORMANCE_PROFILE=skt-submission bash "$LIB/validate-sbom.sh" "$WORK/semantic-cdx.json" "$WORK/sek" "supplier" >/dev/null 2>&1
+grep -q "^## 수정 제안" "$WORK/sek_conformance.md" && grep -qE "<h2 id=\"box-[0-9]+\">수정 제안</h2>" "$WORK/sek_conformance.html" \
+    && pass "the Korean reports title the section 수정 제안" || fail "the Korean Suggested fixes section is missing"
+sem_sum_after=$(shasum "$WORK/semantic-cdx.json" | cut -d' ' -f1)
+[ "$sem_sum_before" = "$sem_sum_after" ] && pass "the submitted SBOM is byte-identical after the check" \
+    || fail "the input SBOM changed during the conformance check"
+jq -e '.suggestions | map(select(.name=="bash" or .name=="curl" or .name=="musl")) | length == 0' "$WORK/seo_conformance.json" >/dev/null \
+    && pass "components that pass are not in the suggestions" || fail "a passing component appears in the suggestions"
+
+echo "== conformance: operating-system hint, type match, declared distribution, new ids =="
+semrun() {   # $1 jq filter adding components, $2 out prefix; skt-submission, extra env via SEMENV
+    jq "$1" "$FIX/good-cyclonedx.json" > "$WORK/$2.json"
+    env CONFORMANCE_PROFILE=skt-submission ${SEMENV:-} bash "$LIB/validate-sbom.sh" "$WORK/$2.json" "$WORK/$2" "supplier" >/dev/null 2>&1
+}
+semrun '.components += [
+  {"type":"operating-system","name":"alpine","version":"3.20"},
+  {"type":"library","name":"musl","version":"1.2","purl":"pkg:apk/acme/musl@1.2"},
+  {"type":"library","name":"g","version":"1","purl":"pkg:rpm/acme/g@1"},
+  {"type":"library","name":"i","version":"1","purl":"pkg:deb/acme/i@1"}]' osa
+jq -e '.suggestions | (map(select(.name=="musl")) | .[0] | (.candidates == ["pkg:apk/alpine/musl@1.2"]) and .confidence == "medium")
+       and (map(select(.name=="g" or .name=="i")) | all(.candidates == []))' "$WORK/osa_conformance.json" >/dev/null \
+    && pass "an alpine operating-system component suggests alpine for apk (medium) and nothing for rpm or deb" \
+    || fail "operating-system hint ignores the package type" "$(jq -c .suggestions "$WORK/osa_conformance.json")"
+semrun '.components += [
+  {"type":"operating-system","name":"rhel","version":"9"},
+  {"type":"library","name":"g","version":"1","purl":"pkg:rpm/acme/g@1"},
+  {"type":"library","name":"h","version":"1","purl":"pkg:rpm/acme/h@1?distro=acmeos-9"}]' osb
+jq -e '.suggestions | (map(select(.name=="g")) | .[0] | (.candidates == ["pkg:rpm/rhel/g@1"]) and .confidence == "medium")
+       and (map(select(.name=="h")) | .[0].candidates == [])' "$WORK/osb_conformance.json" >/dev/null \
+    && pass "a matching operating-system component gives a medium candidate; an unrecognized distro qualifier gives none and no fallback" \
+    || fail "operating-system fallback is wrong" "$(jq -c .suggestions "$WORK/osb_conformance.json")"
+# A distribution the document or the purl itself declares is accepted.
+semrun '.components += [
+  {"type":"operating-system","name":"acmeos","version":"1"},
+  {"type":"library","name":"a","version":"1","purl":"pkg:rpm/acmeos/a@1"},
+  {"type":"library","name":"b","version":"1","purl":"pkg:rpm/otheros/b@1?distro=otheros-2"}]' osc
+jq -e '.checks[] | select(.id=="purl-namespace-os") | .status == "pass"' "$WORK/osc_conformance.json" >/dev/null \
+    && pass "a namespace equal to the operating-system component or to the purl's own distro id is accepted" \
+    || fail "a declared distribution was rejected"
+semrun '.components += [
+  {"type":"library","name":"a","version":"1","purl":"pkg:rpm/sle-micro/a@1"},
+  {"type":"library","name":"b","version":"1","purl":"pkg:rpm/opensuse.leap/b@1"},
+  {"type":"library","name":"c","version":"1","purl":"pkg:rpm/rhcos/c@1"},
+  {"type":"library","name":"d","version":"1","purl":"pkg:rpm/poky/d@1"},
+  {"type":"library","name":"e","version":"1","purl":"pkg:rpm/opencloudos/e@1"},
+  {"type":"library","name":"f","version":"1","purl":"pkg:rpm/amzn/f@1"},
+  {"type":"library","name":"g","version":"1","purl":"pkg:rpm/ol/g@1"}]' osd
+jq -e '.checks[] | select(.id=="purl-namespace-os") | .status == "pass"' "$WORK/osd_conformance.json" >/dev/null \
+    && pass "sle-micro, opensuse.leap, rhcos, poky, opencloudos, amzn and ol are accepted ids" \
+    || fail "a listed distribution id was rejected" "$(jq -c '.checks[]|select(.id=="purl-namespace-os")|.detail' "$WORK/osd_conformance.json")"
+
+echo "== conformance: the maven group field is a medium hint and never contradicts the purl name =="
+semrun '.components += [
+  {"type":"library","name":"foo","version":"1","group":"org.foo","purl":"pkg:maven/org.foo:foo@1"},
+  {"type":"library","name":"org.bar-core","version":"1","group":"org.bar","purl":"pkg:maven/org.bar-core@1"},
+  {"type":"library","name":"guava","version":"33.0","group":"com.google.guava","purl":"pkg:maven/guava@33.0"}]' mvg
+jq -e '.suggestions | (map(select(.name=="foo" or .name=="org.bar-core")) | all(.candidates == []))
+       and (map(select(.name=="guava")) | .[0] | (.candidates == ["pkg:maven/com.google.guava/guava@33.0"]) and .confidence == "medium")' \
+    "$WORK/mvg_conformance.json" >/dev/null \
+    && pass "no candidate when the purl name has a colon or starts with the group; otherwise the group gives a medium candidate" \
+    || fail "maven group rule is wrong" "$(jq -c .suggestions "$WORK/mvg_conformance.json")"
+
+echo "== conformance: firmware, rootfs and Yocto scans defer the two value rows to warnings =="
+SEMENV="MODE=FIRMWARE" semrun '.components += [
+  {"type":"library","name":"g","version":"1","purl":"pkg:rpm/examplevendor/g@1"},
+  {"type":"library","name":"v","version":"a: b","purl":"pkg:npm/v@1"}]' fwd
+fwd=$(jq -r '"\(.result)|\(.checks[]|select(.id=="purl-namespace-os")|.status)|\(.checks[]|select(.id=="version-sanity")|.status)"' "$WORK/fwd_conformance.json")
+[ "$fwd" = "pass|warn|warn" ] && pass "MODE=FIRMWARE under skt-submission: both rows warn instead of failing" \
+    || fail "firmware deferral = '$fwd', expected 'pass|warn|warn'"
+semrun '.components += [{"type":"library","name":"g","version":"1","purl":"pkg:rpm/examplevendor/g@1"}]' fwn
+[ "$(jq -r '.checks[]|select(.id=="purl-namespace-os")|.status' "$WORK/fwn_conformance.json")" = "fail" ] \
+    && pass "a source scan keeps the row as a required failure" || fail "the row was deferred outside firmware modes"
+
+echo "== conformance: CRLF Tag-Value and control characters =="
+sed 's/$/\r/' "$WORK/semantic-tv.spdx" > "$WORK/semantic-crlf.spdx"
+CONFORMANCE_PROFILE=skt-submission bash "$LIB/validate-sbom.sh" "$WORK/semantic-crlf.spdx" "$WORK/crlf" "supplier" >/dev/null 2>&1
+crlf=$(jq -r '"\(.checks[]|select(.id=="version-sanity")|.detail|startswith("1 malformed"))|\(.suggestions|map(select(.name=="glibc"))|length)|\(.suggestions|map(.name)|any(test("\\s$")))"' "$WORK/crlf_conformance.json")
+[ "$crlf" = "true|2|false" ] && pass "a CRLF Tag-Value file reports only the real malformed version and leaves no trailing space in names" \
+    || fail "CRLF Tag-Value = '$crlf', expected 'true|2|false'"
+semrun '.components += [{"type":"library","name":"bad\u0001na|me\nx","version":"a: b","purl":"pkg:npm/x@1"}]' ctl
+jq -e '.suggestions | all(.name | test("[\\x00-\\x1f]") | not)' "$WORK/ctl_conformance.json" >/dev/null \
+    && ! grep -q "$(printf '\001')" "$WORK/ctl_conformance.md" \
+    && pass "control characters in a component name are cleaned in the JSON suggestions and the Markdown report" \
+    || fail "a control character reached the suggestions or the Markdown report"
+grep -A8 "^## Suggested fixes" "$WORK/ctl_conformance.md" | grep -q '^| bad na me x' \
+    && pass "a pipe or newline in a name cannot break the Markdown table" || fail "the Markdown table cell was not escaped"
 
 echo "== conformance: CycloneDX 1.7 is an accepted submission version =="
 # 1.7 has been released since October 2025 and generators emit it. What this
@@ -4849,10 +5170,10 @@ JSON
     else
         pass "scan-firmware.sh leaves CVE matching to the pipeline step (no second pass)"
     fi
-    grep -q 'case "$_cpe_mode" in FIRMWARE|ROOTFS|BINARY|YOCTO)' "$_ep" \
+    grep -q 'case "$_cpe_mode" in FIRMWARE|ROOTFS|BINARY|YOCTO|ANALYZE_UPSTREAM)' "$_ep" \
         && grep -q 'case "$_upstream_mode" in' "$_ep" \
         && grep -q '\[ "\$YOCTO_ARCHIVE" = "true" \] && YOCTO_CPE_MATCH=true' "$_ep" \
-        && pass "the CPE step runs for firmware, rootfs and binary scans and a Yocto SPDX 2.2 archive only; the upstream purl step for any Yocto records" \
+        && pass "the CPE step runs for firmware, rootfs and binary scans a Yocto SPDX 2.2 archive and, when asked, the upstream-table components of a received SBOM; the upstream purl step for any Yocto records" \
         || fail "the CPE index or upstream purl step is not scoped as expected"
 
     # rootfs / binary: syft's pkg:generic binary and a purl-less OS component are
@@ -4925,6 +5246,65 @@ SH
         && grep -q "3 component(s) could not be checked" "$WORK/unm_security.html" \
         && pass "the markdown and HTML reports say how many and list them" \
         || fail "the report does not name the unchecked components"
+
+    # A repository purl is worded apart from "no purl", and a received SBOM
+    # (--analyze) says the CPE index did not run. The counts do not change.
+    cat > "$WORK/repo.json" <<'JSON'
+{"bomFormat":"CycloneDX","specVersion":"1.6","metadata":{"component":{"type":"application","name":"sup","version":"1"}},
+ "components":[
+  {"type":"library","name":"curl","version":"8.5.0","purl":"pkg:github/curl/curl@curl-8_5_0"},
+  {"type":"library","name":"zlib-x","version":"1.2","purl":"pkg:generic/zlib-x@1.2"}]}
+JSON
+    BOMLENS_CPE_INDEX_SKIPPED=analyze-mode PATH="$FAKEBIN:$PATH" SECURITY_ENRICH=false DEEP_CVE=false \
+        bash "$LIB/scan-security.sh" "$WORK/repo.json" "$WORK/repo" proj >/dev/null 2>&1
+    [ "$(jq -r '[.UncheckedComponents.Components[] | "\(.Name):\(.Reason)"] | join(" ")' "$WORK/repo_security.json")" = "curl:repository-purl zlib-x:no-identifier" ] \
+        && [ "$(jq '.UncheckedComponents.Count' "$WORK/repo_security.json")" = 2 ] \
+        && grep -q "repository purl (pkg:github, ...), which Trivy does not query" "$WORK/repo_security.md" \
+        && grep -q "received SBOM (--analyze)" "$WORK/repo_security.md" \
+        && grep -q "received SBOM (--analyze)" "$WORK/repo_security.html" \
+        && pass "a repository purl has its own reason and a received SBOM gets the note" \
+        || fail "repository-purl reason or the --analyze note is wrong"
+    PATH="$FAKEBIN:$PATH" SECURITY_ENRICH=false DEEP_CVE=false \
+        bash "$LIB/scan-security.sh" "$WORK/repo.json" "$WORK/repo2" proj >/dev/null 2>&1
+    grep -q "received SBOM (--analyze)" "$WORK/repo2_security.md" \
+        && fail "the --analyze note appears outside --analyze" \
+        || pass "the --analyze note is absent when the index step was not skipped for the mode"
+
+    # --analyze-cpe-index: a received SBOM offers the index only the components
+    # whose bomlens:purlSource is upstream-map (not another value, not absent).
+    cat > "$WORK/an.json" <<'JSON'
+{"bomFormat":"CycloneDX","specVersion":"1.6","metadata":{"component":{"type":"application","name":"sup","version":"1"}},
+ "components":[
+  {"type":"library","name":"openssl","version":"1.0.2h","purl":"pkg:github/openssl/openssl@OpenSSL_1_0_2h","cpe":"cpe:2.3:a:openssl:openssl:1.0.2h:*:*:*:*:*:*:*",
+   "properties":[{"name":"bomlens:purlSource","value":"upstream-map"}]},
+  {"type":"library","name":"openssl-other","version":"1.0.2h","purl":"pkg:github/openssl/openssl@OpenSSL_1_0_2h","cpe":"cpe:2.3:a:openssl:openssl:1.0.2h:*:*:*:*:*:*:*"},
+  {"type":"library","name":"openssl-distro","version":"1.0.2h","purl":"pkg:deb/ubuntu/openssl@1.0.2h","cpe":"cpe:2.3:a:openssl:openssl:1.0.2h:*:*:*:*:*:*:*",
+   "properties":[{"name":"bomlens:purlSource","value":"container-store-distro"}]}]}
+JSON
+    jq '.components |= .[1:]' "$WORK/an.json" > "$WORK/an-none.json"
+    an_off="$(CPE_INDEX_SCOPE=upstream-map FW_CPE_INDEX="$CPEIDX" bash "$LIB/match-cpe-index.sh" "$WORK/an.json" "$WORK/an" 2>/dev/null | jq -c .offered)"
+    an_none="$(CPE_INDEX_SCOPE=upstream-map FW_CPE_INDEX="$CPEIDX" bash "$LIB/match-cpe-index.sh" "$WORK/an-none.json" "$WORK/an-none" 2>/dev/null | jq -c .offered)"
+    an_all="$(FW_CPE_INDEX="$CPEIDX" bash "$LIB/match-cpe-index.sh" "$WORK/an.json" "$WORK/an-all" 2>/dev/null | jq -c .offered)"
+    [ "$an_off" = 1 ] && [ "$an_none" = 0 ] && [ "$an_all" = 3 ] \
+        && pass "the scoped index match offers only upstream-map components (1 of 3; none of an SBOM without the property)" \
+        || fail "scoped offered=$an_off, without the property=$an_none, unscoped=$an_all (expected 1, 0, 3)"
+    grep -q "upstream table" "$WORK/an_security_cvebintool.json" 2>/dev/null \
+        && pass "a scoped match names its basis in the result" \
+        || fail "the scoped result does not name the upstream table"
+    PATH="$FAKEBIN:$PATH" SECURITY_ENRICH=false DEEP_CVE=false BOMLENS_CPE_INDEX_MATCHED=true BOMLENS_CPE_INDEX_SCOPE=upstream-map \
+        BOMLENS_CPE_INDEX_SKIPPED=analyze-upstream-map-only BOMLENS_VERSION=9.9.9 \
+        bash "$LIB/scan-security.sh" "$WORK/an.json" "$WORK/an" proj >/dev/null 2>&1
+    [ "$(jq -r '[.UncheckedComponents.Components[] | "\(.Name):\(.Reason)"] | join(" ")' "$WORK/an_security.json")" = "openssl-other:repository-purl" ] \
+        && grep -q "BomLens 9.9.9" "$WORK/an_security.md" \
+        && grep -q "upstream-map" "$WORK/an_security.md" \
+        && pass "with the opt-in only the upstream-map component is checked, and the note says so" \
+        || fail "scoped unchecked list is wrong"
+    PATH="$FAKEBIN:$PATH" SECURITY_ENRICH=false DEEP_CVE=false BOMLENS_CPE_INDEX_SKIPPED=analyze-mode \
+        bash "$LIB/scan-security.sh" "$WORK/an.json" "$WORK/an-off" proj >/dev/null 2>&1
+    [ "$(jq '.UncheckedComponents.Count' "$WORK/an-off_security.json")" = 2 ] \
+        && grep -q "unless --analyze-cpe-index is given" "$WORK/an-off_security.md" \
+        && pass "without the opt-in both repository-purl components stay unchecked and the note names the flag" \
+        || fail "opt-in off: unchecked list or note is wrong"
 
     # With the match done, only what it could not reach is left, and the CVE
     # Trivy and the index would both report is counted once.
@@ -5762,9 +6142,9 @@ JSON
 
         # require-dev only (no required component at all): the same guard that
         # protects a scope-less BOM cannot tell this apart from "scopes were
-        # never populated", so it also leaves this one untouched. Inherited
-        # from the Maven filter (a maven-only reactor has the identical gap);
-        # documented here as known behavior, not fixed by this change.
+        # never populated", so it also leaves this one untouched. Documented
+        # here as known behavior (the Maven filter passes the "any" guard and
+        # does not have this gap).
         cat > "$WORK/php-devonly-bom.json" <<'JSON'
 {"bomFormat":"CycloneDX","specVersion":"1.6",
  "metadata":{"component":{"name":"app","version":"1.0.0","bom-ref":"root"}},
@@ -5778,7 +6158,7 @@ JSON
         node "$SFLT" "$WORK/php-devonly-bom.json" "pkg:composer/" 2>/dev/null
         names=$(jq -r '[.components[].name]|sort|join(",")' "$WORK/php-devonly-bom.json")
         [ "$names" = "phpunit" ] \
-            && pass "require-dev-only project (no required component): filter leaves the BOM untouched (known gap, shared with maven)" \
+            && pass "require-dev-only project (no required component): filter leaves the BOM untouched (known gap)" \
             || fail "filter unexpectedly changed a require-dev-only BOM" "$names"
     else
         fail "could not extract SFILTER_JS from build-prep.sh"
@@ -5815,6 +6195,314 @@ else
     [ -z "$_t_nocomposer" ] \
         && pass "no composer.json: filter never turns on" \
         || fail "filter turned on with no composer.json present" "got [$_t_nocomposer]"
+fi
+
+echo "== go-scope: indirect Go modules in the build graph become required =="
+# Guards docker/lib/build-prep.sh's Go scope correction: cdxgen marks every
+# `// indirect` module scope optional, so the ones `go list -deps ./...` lists
+# are set to required, cdx:go:indirect is kept, and a module outside the list
+# keeps optional. Extract the real JS and shell block (no logic duplication)
+# and drive the block with a stand-in go.
+if command -v node >/dev/null 2>&1; then
+    PREP="$ROOT_DIR/docker/lib/build-prep.sh"
+    GSJS="$WORK/go-scope.js"
+    sed -n "/<<'GOSCOPE_JS'/,/^GOSCOPE_JS\$/p" "$PREP" | sed '1d;$d' > "$GSJS"
+    _gs_block=$(sed -n '/^# Go scope: cdxgen sets/,/^fi$/p' "$PREP")
+    if [ -s "$GSJS" ] && [ -n "$_gs_block" ]; then
+        cat > "$WORK/go-scope-bom.json" <<'JSON'
+{"bomFormat":"CycloneDX","specVersion":"1.6",
+ "metadata":{"component":{"name":"example.com/demo","bom-ref":"root"}},
+ "components":[
+   {"name":"cobra","version":"v1.8.0","purl":"pkg:golang/github.com/spf13/cobra@v1.8.0","scope":"required","properties":[{"name":"cdx:go:indirect","value":"false"}]},
+   {"name":"pflag","version":"v1.0.5","purl":"pkg:golang/github.com/spf13/pflag@v1.0.5","scope":"optional","properties":[{"name":"cdx:go:indirect","value":"true"}]},
+   {"name":"mousetrap","version":"v1.1.0","purl":"pkg:golang/github.com/inconshreveable/mousetrap@v1.1.0","scope":"optional","properties":[{"name":"cdx:go:indirect","value":"true"}]},
+   {"name":"Azure","version":"v0.5.0","purl":"pkg:golang/github.com/Azure/go-ntlmssp@v0.5.0?type=module","scope":"optional"},
+   {"name":"fork","version":"v2.0.0","purl":"pkg:golang/example.com/fork@v2.0.0","scope":"optional","properties":[{"name":"cdx:go:replaces","value":"example.com/orig@v1.0.0"}]},
+   {"name":"local","purl":"pkg:golang/example.com/local","scope":"optional"},
+   {"name":"pyopt","version":"1.0","purl":"pkg:pypi/pyopt@1.0","scope":"optional"}
+ ]}
+JSON
+        cat > "$WORK/go-scope-list.txt" <<'LIST'
+github.com/spf13/cobra@v1.8.0
+github.com/spf13/cobra@
+github.com/spf13/pflag@v1.0.5
+github.com/spf13/pflag@
+github.com/azure/go-ntlmssp@v0.5.0
+
+example.com/orig@v1.0.0
+example.com/orig@
+example.com/fork@v2.0.0
+example.com/local@
+LIST
+        node "$GSJS" "$WORK/go-scope-bom.json" "$WORK/go-scope-list.txt" 2>/dev/null
+        _gs_scopes=$(jq -r '[.components[] | "\(.name)=\(.scope)"] | join(",")' "$WORK/go-scope-bom.json")
+        if [ "$_gs_scopes" = "cobra=required,pflag=required,mousetrap=optional,Azure=required,fork=required,local=required,pyopt=optional" ]; then
+            pass "listed indirect modules (replaced and local included) required; unlisted Go and non-Go optional kept"
+        else
+            fail "unexpected scopes after the Go scope correction" "$_gs_scopes"
+        fi
+        if [ "$(jq -r '.components[] | select(.name=="pflag") | .properties[] | select(.name=="cdx:go:indirect") | .value' "$WORK/go-scope-bom.json")" = "true" ]; then
+            pass "cdx:go:indirect kept on a promoted module"
+        else
+            fail "cdx:go:indirect lost on pflag"
+        fi
+
+        # The shell block: a stand-in go prints the list, or fails.
+        _gs_bin="$WORK/gs-bin"; mkdir -p "$_gs_bin"
+        cat > "$_gs_bin/go" <<'STUB'
+#!/bin/sh
+[ "$GS_FAIL" = 1 ] && { echo "go: updates to go.mod needed" >&2; exit 1; }
+cat "$GS_LIST"
+STUB
+        chmod +x "$_gs_bin/go"
+        _gs_prelude='log() { echo "[build-prep] $*"; }; run_supervised_timeout() { shift; "$@"; }; PREP_TIMEOUT_DEFAULT=5; rc=0; EXCLUDE_NON_SHIPPED=1; NON_SHIPPED_DIRS="test testdata"; NON_SHIPPED_PATHS=".github/workflows"'
+        _gs_run() {  # <fail>
+            rm -rf "$WORK/gs-proj"; mkdir -p "$WORK/gs-proj"
+            printf 'module example.com/demo\n' > "$WORK/gs-proj/go.mod"
+            cp "$WORK/go-scope-bom.orig.json" "$WORK/gs-proj/bom.json"
+            ( cd "$WORK/gs-proj" && PATH="$_gs_bin:$PATH" GS_FAIL="$1" GS_LIST="$WORK/go-scope-list.txt" \
+                OUT="$WORK/gs-proj/bom.json" bash -c "$_gs_prelude; $_gs_block" ) 2>&1
+        }
+        jq '(.components[] | select(.purl | startswith("pkg:golang/")) | select(.name != "cobra")) .scope = "optional"' \
+            "$WORK/go-scope-bom.json" > "$WORK/go-scope-bom.orig.json"
+        _gs_run 0 >/dev/null
+        if [ "$(jq -r '.components[] | select(.name=="pflag") | .scope' "$WORK/gs-proj/bom.json")" = "required" ]; then
+            pass "build-prep block: go list succeeds, pflag promoted"
+        else
+            fail "build-prep block did not promote pflag"
+        fi
+        _gs_log=$(_gs_run 1)
+        if cmp -s "$WORK/go-scope-bom.orig.json" "$WORK/gs-proj/bom.json"; then
+            pass "build-prep block: go list fails, SBOM left untouched"
+        else
+            fail "build-prep block changed the SBOM although go list failed"
+        fi
+        case "$_gs_log" in
+            *"could not list the build graph"*) pass "build-prep block: go list failure is logged" ;;
+            *) fail "go list failure not logged" "$_gs_log" ;;
+        esac
+        _gs_log=$(PREP_FAILED="go-mod-tidy" _gs_run 0)
+        if cmp -s "$WORK/go-scope-bom.orig.json" "$WORK/gs-proj/bom.json"; then
+            pass "build-prep block: go-mod-tidy failed, SBOM left untouched"
+        else
+            fail "build-prep block changed the SBOM although go-mod-tidy failed"
+        fi
+        case "$_gs_log" in
+            *"go-mod-tidy failed"*) pass "build-prep block: the skipped correction is logged" ;;
+            *) fail "skipped Go scope correction not logged" "$_gs_log" ;;
+        esac
+    else
+        fail "could not extract the Go scope correction from build-prep.sh"
+    fi
+else
+    echo "  SKIP: node unavailable, skipping Go scope test"
+fi
+
+echo "== gradle-same-name: a subproject named like the root gets its dependencies task =="
+# Guards docker/lib/build-prep.sh: cdxgen skips `<sub>:dependencies` for a
+# subproject whose purl equals the root's, so the task is handed to cdxgen in
+# GRADLE_ARGS_DEPENDENCIES. Extract the real block and drive it on settings
+# files (no logic duplication).
+if command -v node >/dev/null 2>&1; then
+    PREP="$ROOT_DIR/docker/lib/build-prep.sh"
+    _gsn_block=$(sed -n '/^# Gradle subproject named like the root project/,/^fi$/p' "$PREP")
+    if [ -n "$_gsn_block" ]; then
+        _gsn_run() {  # <settings file name> <content> [GRADLE_ARGS_DEPENDENCIES] [folder name]
+            local dir="$WORK/gsn/${4:-proj}"
+            rm -rf "$WORK/gsn"; mkdir -p "$dir"; : > "$WORK/gsn.log"
+            printf '%s\n' "$2" > "$dir/$1"
+            ( cd "$dir" && GRADLE_ARGS_DEPENDENCIES="${3:-}" GSN_LOG="$WORK/gsn.log" \
+                bash -c 'log() { echo "$*" >> "$GSN_LOG"; }; '"$_gsn_block"'; printf "%s" "${GRADLE_ARGS_DEPENDENCIES:-}"' )
+        }
+        _gsn_out=$(_gsn_run settings.gradle.kts 'rootProject.name = "demo"
+include("demo")')
+        if [ "$_gsn_out" = ":demo:dependencies" ]; then
+            pass "include(\"demo\") under rootProject demo: :demo:dependencies handed to cdxgen"
+        else
+            fail "same-name subproject task not set" "got [$_gsn_out]"
+        fi
+        _gsn_out=$(_gsn_run settings.gradle "rootProject.name = 'demo'
+// include 'old:demo'
+include 'core',
+        'apps:demo'")
+        if [ "$_gsn_out" = ":apps:demo:dependencies" ]; then
+            pass "Groovy include across lines, nested path, commented include ignored"
+        else
+            fail "Groovy settings not read as expected" "got [$_gsn_out]"
+        fi
+        _gsn_out=$(_gsn_run settings.gradle.kts 'rootProject.name = "demo-root"
+include("demo")')
+        if [ -z "$_gsn_out" ]; then
+            pass "subproject named differently from the root: nothing added"
+        else
+            fail "task added although the names differ" "got [$_gsn_out]"
+        fi
+        _gsn_out=$(_gsn_run settings.gradle.kts 'rootProject.name = "demo"
+include("demo")' "--configuration runtimeClasspath")
+        if [ "$_gsn_out" = "--configuration runtimeClasspath :demo:dependencies --configuration runtimeClasspath" ]; then
+            pass "a GRADLE_ARGS_DEPENDENCIES the caller set is kept for the root task and the added one"
+        else
+            fail "caller GRADLE_ARGS_DEPENDENCIES not kept" "got [$_gsn_out]"
+        fi
+        # No rootProject.name: Gradle names the root after its folder, which
+        # is app under the CLI's /app mount, so `include ':app'` is the same name.
+        _gsn_out=$(_gsn_run settings.gradle "include ':app'" "" app)
+        if [ "$_gsn_out" = ":app:dependencies" ]; then
+            pass "no rootProject.name, folder app, include ':app': :app:dependencies handed to cdxgen"
+        else
+            fail "folder-name default not used for the root name" "got [$_gsn_out]"
+        fi
+        _gsn_out=$(_gsn_run settings.gradle.kts 'rootProject.name = "demo"
+if (System.getenv("WITH_DEMO") != null) {
+    include("demo")
+}')
+        if [ -z "$_gsn_out" ] && grep -q "may be conditional" "$WORK/gsn.log"; then
+            pass "a same-name include inside an if block: nothing added, and logged"
+        else
+            fail "conditional include not skipped" "got [$_gsn_out], log: $(cat "$WORK/gsn.log")"
+        fi
+        _gsn_out=$(_gsn_run settings.gradle.kts 'rootProject.name = "demo"
+when (mode) { "full" -> include("demo") }')
+        if [ -z "$_gsn_out" ]; then
+            pass "a same-name include on a when line: nothing added"
+        else
+            fail "include on a when line not skipped" "got [$_gsn_out]"
+        fi
+    else
+        fail "could not extract the Gradle same-name block from build-prep.sh"
+    fi
+else
+    echo "  SKIP: node unavailable, skipping Gradle same-name test"
+fi
+
+echo "== gradle-packages: a Gradle build with no Gradle-resolved package is recorded =="
+# Guards docker/lib/build-prep.sh: a build file that declares external
+# dependencies with no pkg:maven component from Gradle's resolution (a jar in
+# the tree does not count) marks the gradle-packages step failed, so generate
+# reads degraded, but only for a build cdxgen could run Gradle on. Extract the
+# real block and drive it on small trees. PATH holds only the tools the block
+# uses, so whether java or gradle is there is set per case (as functions).
+if command -v node >/dev/null 2>&1; then
+    PREP="$ROOT_DIR/docker/lib/build-prep.sh"
+    _gpk_block=$(sed -n '/^# Gradle build with no Gradle-resolved package/,/^fi$/p' "$PREP")
+    _gpk_bin="$WORK/gpk-bin"; mkdir -p "$_gpk_bin"
+    for _t in node find sed grep sort head tr cat mktemp rm; do
+        _p=$(command -v "$_t") && ln -sf "$_p" "$_gpk_bin/$_t"
+    done
+    _gpk_bash=$(command -v bash)
+    if [ -n "$_gpk_block" ]; then
+        _gpk_jar='{"components":[{"name":"junit","version":"4.13.2","purl":"pkg:maven/junit/junit@4.13.2?type=jar","evidence":{"identity":[{"field":"purl","methods":[{"technique":"filename","value":"libs/junit-4.13.2.jar"}]}]}}]}'
+        _gpk_gradle='{"components":[{"name":"guava","version":"33.0.0-jre","purl":"pkg:maven/com.google.guava/guava@33.0.0-jre?type=jar","properties":[{"name":"internal:GradleProfileName","value":"compileClasspath"},{"name":"cdx:gradle:GradleRootPath","value":"/app"}]}]}'
+        _gpk_deps='plugins { java }
+dependencies {
+    implementation("com.google.guava:guava:33.0.0-jre") // the library
+}'
+        # _gpk_run <bom json> <tools: java, gradle, java+gradle or none> [path content]...
+        # Each path is written with the content after it; a path ending in / is a folder.
+        _gpk_run() {
+            local bom="$1" tools="$2" fns=""; shift 2
+            rm -rf "$WORK/gpk"; mkdir -p "$WORK/gpk"
+            printf '%s\n' "$bom" > "$WORK/gpk/bom.json"
+            while [ $# -ge 2 ]; do
+                mkdir -p "$WORK/gpk/$(dirname "$1")"
+                printf '%s\n' "$2" > "$WORK/gpk/$1"
+                shift 2
+            done
+            case "$tools" in *java*) fns="$fns java() { :; };" ;; esac
+            case "$tools" in *gradle*) fns="$fns gradle() { :; };" ;; esac
+            ( cd "$WORK/gpk" && PATH="$_gpk_bin" OUT="$WORK/gpk/bom.json" PREP_FAILED="${GPK_PREP_FAILED:-}" "$_gpk_bash" -c 'log() { :; }; mark_prep_failed() { echo "MARK-FAILED $1"; };'"$fns"' rc=0; EXCLUDE_NON_SHIPPED=1; NON_SHIPPED_DIRS="examples test"; NON_SHIPPED_PATHS="gradle/wrapper"; '"$_gpk_block" 2>&1 )
+        }
+        _gpk_expect() {  # <marked|clean> <label> <run output>
+            local got=clean
+            case "$3" in *"MARK-FAILED gradle-packages"*) got=marked ;; esac
+            if [ "$got" = "$1" ]; then pass "$2"; else fail "$2" "$3"; fi
+        }
+        _gpk_expect marked "root build with gradlew and java, only a jar-file component: gradle-packages failed" \
+            "$(_gpk_run "$_gpk_jar" java settings.gradle.kts 'include("demo")' gradlew '#!/bin/sh' demo/build.gradle.kts "$_gpk_deps")"
+        _gpk_expect clean "a component with the Gradle origin properties: nothing recorded" \
+            "$(_gpk_run "$_gpk_gradle" java settings.gradle.kts 'include("demo")' gradlew '#!/bin/sh' demo/build.gradle.kts "$_gpk_deps")"
+        _gpk_expect marked "root build, no gradlew, gradle on PATH: checked" \
+            "$(_gpk_run "$_gpk_jar" gradle build.gradle.kts "$_gpk_deps")"
+        _gpk_expect clean "root build, no gradlew and no gradle: nothing recorded" \
+            "$(_gpk_run "$_gpk_jar" java build.gradle.kts "$_gpk_deps")"
+        _gpk_expect clean "gradle-dependencies already failed: gradle-packages not added" \
+            "$(GPK_PREP_FAILED=gradle-dependencies _gpk_run "$_gpk_jar" java gradlew '#!/bin/sh' build.gradle.kts "$_gpk_deps")"
+        _gpk_expect clean "Flutter-style android/ folder with no gradlew: nothing recorded" \
+            "$(_gpk_run "$_gpk_jar" java+gradle pubspec.yaml 'name: app' android/app/build.gradle "$_gpk_deps")"
+        _gpk_expect marked "nested build with its own gradlew, java present: checked" \
+            "$(_gpk_run "$_gpk_jar" java android/gradlew '#!/bin/sh' android/settings.gradle "include ':app'" android/app/build.gradle "$_gpk_deps")"
+        _gpk_expect clean "nested build with its own gradlew but no java: nothing recorded" \
+            "$(_gpk_run "$_gpk_jar" none android/gradlew '#!/bin/sh' android/settings.gradle "include ':app'" android/app/build.gradle "$_gpk_deps")"
+        _gpk_expect clean "build file under a non-shipped folder: nothing recorded" \
+            "$(_gpk_run "$_gpk_jar" java gradlew '#!/bin/sh' settings.gradle '' examples/app/build.gradle "dependencies {
+    implementation 'com.google.guava:guava:33.0.0-jre'
+}")"
+        _gpk_expect marked "version catalog alias counts as a declared dependency" \
+            "$(_gpk_run "$_gpk_jar" java gradlew '#!/bin/sh' build.gradle "dependencies {
+    implementation libs.guava
+}")"
+        for _gpk_line in "implementation project(':core')" 'implementation(project(":core"))' \
+                         "runtimeOnly files('libs/a.jar')" "implementation fileTree(dir: 'libs')" \
+                         'implementation(projects.core)' 'api projects.shared.model' \
+                         'implementation gradleApi()' 'implementation(localGroovy())' 'implementation(gradleTestKit())' \
+                         'implementation(platform(project(":bom")))' "api enforcedPlatform(project(':bom'))"; do
+            _gpk_expect clean "not external: $_gpk_line" \
+                "$(_gpk_run "$_gpk_jar" java gradlew '#!/bin/sh' build.gradle "dependencies {
+    $_gpk_line
+}")"
+        done
+        _gpk_expect marked "platform() of an external BOM counts as declared" \
+            "$(_gpk_run "$_gpk_jar" java gradlew '#!/bin/sh' build.gradle 'dependencies {
+    implementation(platform("org.springframework.boot:spring-boot-dependencies:3.3.0"))
+}')"
+        for _gpk_dir in buildSrc build-logic; do
+            _gpk_expect clean "a build file under $_gpk_dir is not searched" \
+                "$(_gpk_run "$_gpk_jar" java gradlew '#!/bin/sh' settings.gradle.kts 'rootProject.name = "demo"' "$_gpk_dir/build.gradle.kts" "$_gpk_deps")"
+        done
+        _gpk_expect clean "a build named in includeBuild(...) is not searched" \
+            "$(_gpk_run "$_gpk_jar" java gradlew '#!/bin/sh' settings.gradle.kts 'pluginManagement { includeBuild("tools/conventions") }' tools/conventions/build.gradle.kts "$_gpk_deps")"
+        _gpk_expect marked "a build next to an included build is still searched" \
+            "$(_gpk_run "$_gpk_jar" java gradlew '#!/bin/sh' settings.gradle.kts 'includeBuild("tools/conventions")
+include("demo")' tools/conventions/build.gradle.kts 'dependencies { }' demo/build.gradle.kts "$_gpk_deps")"
+    else
+        fail "could not extract the Gradle packages block from build-prep.sh"
+    fi
+else
+    echo "  SKIP: node unavailable, skipping Gradle packages test"
+fi
+
+echo "== cdxgen-log mask: the kept stage 1 log has credentials masked =="
+# Guards scripts/scan-sbom.sh's mask_log_secrets, used on the cdxgen log kept
+# as <prefix>_cdxgen.log. Extract the real function (no logic duplication).
+_mls_fn=$(sed -n '/^mask_log_secrets() {/,/^}/p' "$ROOT_DIR/scripts/scan-sbom.sh")
+if [ -z "$_mls_fn" ]; then
+    fail "could not extract mask_log_secrets from scan-sbom.sh"
+else
+    cat > "$WORK/mls-in.log" <<'LOG'
+Could not GET https://alice:s3cr3t@repo.internal.example/maven2/x.pom
+Authorization: Bearer abcdefghijklmnop
+header "Authorization": "Basic dXNlcjpwYXNz"
+REPO_TOKEN=abc123def npm_config_password: hunter2 apiKey="k-123456"
+Download https://repo1.maven.org/maven2/com/google/guava/guava/33.0.0-jre/guava-33.0.0-jre.pom
+Resolved 12 tokens: done
+LOG
+    bash -c "$_mls_fn; mask_log_secrets '$WORK/mls-in.log' '$WORK/mls-out.log'"
+    _mls_out=$(cat "$WORK/mls-out.log" 2>/dev/null)
+    for _mls_secret in alice s3cr3t abcdefghijklmnop dXNlcjpwYXNz abc123def hunter2 k-123456; do
+        case "$_mls_out" in
+            *"$_mls_secret"*) fail "mask_log_secrets left '$_mls_secret' in the log" "$_mls_out" ;;
+            *) pass "mask_log_secrets masks '$_mls_secret'" ;;
+        esac
+    done
+    case "$_mls_out" in
+        *"https://***@repo.internal.example/maven2/x.pom"*) pass "a URL keeps its host and path, only the user part is masked" ;;
+        *) fail "URL credentials not masked as scheme://***@" "$_mls_out" ;;
+    esac
+    case "$_mls_out" in
+        *"https://repo1.maven.org/maven2/com/google/guava/guava/33.0.0-jre/guava-33.0.0-jre.pom"*"Resolved 12 tokens: done"*)
+            pass "lines with nothing to mask are kept as they were" ;;
+        *) fail "a line with nothing to mask was changed" "$_mls_out" ;;
+    esac
 fi
 
 echo "== maven-hashes: build-prep fetches dependency jars where cdxgen reads them for hashes =="
@@ -5882,6 +6570,32 @@ STUB
     [ "$(cat "$WORK/mh-calls" 2>/dev/null)" = "mvn $_mh_goal" ] \
         && pass "mvnw without .mvn/wrapper falls back to mvn" \
         || fail "mvnw without .mvn/wrapper: [$(cat "$WORK/mh-calls" 2>/dev/null)]"
+    mkdir -p "$WORK/mh-wrapnx/.mvn/wrapper"; touch "$WORK/mh-wrapnx/pom.xml"
+    cp "$_mh_bin/mvn" "$WORK/mh-wrapnx/mvnw"; chmod -x "$WORK/mh-wrapnx/mvnw"
+    _mh_run "$WORK/mh-wrapnx" "" >/dev/null
+    [ "$(cat "$WORK/mh-calls" 2>/dev/null)" = "mvnw $_mh_goal" ] \
+        && pass "mvnw without the executable bit runs through sh, not the image's mvn" \
+        || fail "mvnw without the executable bit: [$(cat "$WORK/mh-calls" 2>/dev/null)]"
+    # The shell follows the wrapper's first line. Stub bash and sh in PATH
+    # record who ran ./mvnw, then run the real shell.
+    mkdir -p "$WORK/mh-shbin"
+    printf '#!/bin/sh\necho "bash $1" >> "%s/mh-shells"\nexec %s "$@"\n' "$WORK" "$(command -v bash)" > "$WORK/mh-shbin/bash"
+    printf '#!/bin/sh\necho "sh $1" >> "%s/mh-shells"\nexec /bin/sh "$@"\n' "$WORK" > "$WORK/mh-shbin/sh"
+    chmod +x "$WORK/mh-shbin/bash" "$WORK/mh-shbin/sh"
+    for _mh_sb in "bash:#!/usr/bin/env bash" "sh:#!/bin/sh" "none:"; do
+        _mh_want=${_mh_sb%%:*}; _mh_first=${_mh_sb#*:}
+        [ "$_mh_want" = none ] && _mh_want="sh"
+        _mh_d="$WORK/mh-shebang-${_mh_sb%%:*}"; mkdir -p "$_mh_d/.mvn/wrapper"; touch "$_mh_d/pom.xml"
+        { [ -z "$_mh_first" ] || printf '%s\n' "$_mh_first"; sed 1d "$_mh_bin/mvn"; } > "$_mh_d/mvnw"; chmod -x "$_mh_d/mvnw"
+        rm -f "$WORK/mh-shells"
+        ( PATH="$WORK/mh-shbin:$PATH" _mh_run "$_mh_d" "" >/dev/null )
+        _mh_other=bash; [ "$_mh_want" = bash ] && _mh_other="sh"
+        { grep -qx "$_mh_want ./mvnw" "$WORK/mh-shells" 2>/dev/null \
+            && ! grep -qx "$_mh_other ./mvnw" "$WORK/mh-shells" \
+            && [ "$(cat "$WORK/mh-calls" 2>/dev/null)" = "mvnw $_mh_goal" ]; } \
+            && pass "a mvnw with first line [${_mh_first:-none}] and no executable bit runs through $_mh_want" \
+            || fail "mvnw first line [${_mh_first:-none}]: shells [$(tr '\n' ';' < "$WORK/mh-shells" 2>/dev/null)] calls [$(cat "$WORK/mh-calls" 2>/dev/null)]"
+    done
     for _mh_f in exit error; do
         if _mh_out=$(_mh_run "$WORK/mh-proj" "" "$_mh_f"); then
             printf '%s' "$_mh_out" | grep -q "some components will have no hashes (non-fatal)" \
@@ -5913,6 +6627,272 @@ STUB
         && pass "a partly failed jar fetch is only logged, with the count" \
         || fail "a partly failed jar fetch: [$_mh_out]"
     rm -rf "$WORK/mh-home/.m2/repository/g" "$WORK/mh-home/.m2/repository/org"
+fi
+echo "== maven-duplicates: a pom.xml Maven 3.10 refuses gets a Maven that reads it, or is recorded =="
+# Maven 3.10 and later refuse a dependency declared twice in one POM; 3.9 only
+# warns. Drive the real Maven block of build-prep.sh with a stand-in mvn that
+# prints that error, a stand-in curl, and a stand-in Maven 3.9 archive whose
+# checksum replaces the pinned one (the block itself is not otherwise changed).
+# build-prep.sh is POSIX sh, so the cases run under bash and, when it is
+# installed, dash.
+PREP="$ROOT_DIR/docker/lib/build-prep.sh"
+_md_block=$(sed -n '/^# Maven component hashes/,/^fi$/p' "$PREP")
+_md_ver=$(printf '%s\n' "$_md_block" | sed -n 's/^MAVEN_FALLBACK_VERSION="\(.*\)"$/\1/p')
+if [ -z "$_md_block" ] || [ -z "$_md_ver" ]; then
+    fail "could not extract the Maven block (or MAVEN_FALLBACK_VERSION) from build-prep.sh"
+else
+    _md_bin="$WORK/md-bin"; mkdir -p "$_md_bin" "$WORK/md-home"
+    # mvn and mvnw: record the call; the copy goal puts MD_COPY in the output
+    # folder. A wrapper run with MD_WRAP_OK=1 reads the POM (a wrapper that pins
+    # an older Maven). Otherwise the duplicate-dependency error is printed.
+    cat > "$_md_bin/mvn" <<'STUB'
+#!/bin/sh
+echo "${0##*/} $*" >> "$MD_CALLS"
+case " $* " in
+    *":copy "*)
+        [ -n "$MD_COPY" ] || exit 1
+        for a in "$@"; do
+            case "$a" in -DoutputDirectory=*) cp "$MD_COPY" "${a#-DoutputDirectory=}/apache-maven-$MD_VER-bin.tar.gz" ;; esac
+        done
+        exit 0 ;;
+esac
+if [ "${0##*/}" = mvnw ] && [ "$MD_WRAP_OK" = 1 ]; then exit 0; fi
+echo "[ERROR] [ERROR] Some problems were encountered while processing the POMs:"
+echo "[ERROR] 'dependencies.dependency.(groupId:artifactId:type:classifier)' must be unique: junit:junit:jar -> version 4.12 vs 4.13.2 @ line 9, column 17"
+exit 0
+STUB
+    cat > "$_md_bin/curl" <<'STUB'
+#!/bin/sh
+echo "curl $*" >> "$MD_CALLS"
+[ -n "$MD_CURL" ] || exit 22
+out=""; prev=""
+for a in "$@"; do [ "$prev" = "-o" ] && out="$a"; prev="$a"; done
+cp "$MD_CURL" "$out"
+STUB
+    chmod +x "$_md_bin/mvn" "$_md_bin/curl"
+    # The stand-in Maven 3.9: accepts the POM and records its call; with
+    # MD_39_FAIL=1 it refuses the POM for another model error.
+    mkdir -p "$WORK/md-dist/apache-maven-$_md_ver/bin"
+    cat > "$WORK/md-dist/apache-maven-$_md_ver/bin/mvn" <<'STUB'
+#!/bin/sh
+echo "mvn39 $*" >> "$MD_CALLS"
+if [ "$MD_39_FAIL" = 1 ]; then
+    echo "[ERROR] 'dependencies.dependency.version' for org.x:y:jar is missing. @ line 12, column 17"
+    echo "[ERROR] The build could not read 1 project -> [Help 1]"
+fi
+exit 0
+STUB
+    chmod +x "$WORK/md-dist/apache-maven-$_md_ver/bin/mvn"
+    ( cd "$WORK/md-dist" && tar czf "$WORK/md-good.tar.gz" "apache-maven-$_md_ver" )
+    printf 'not maven\n' > "$WORK/md-dist/apache-maven-$_md_ver/README.txt"
+    ( cd "$WORK/md-dist" && tar czf "$WORK/md-bad.tar.gz" "apache-maven-$_md_ver" )
+    if command -v sha512sum >/dev/null 2>&1; then _md_sum=$(sha512sum "$WORK/md-good.tar.gz" | cut -d' ' -f1)
+    else _md_sum=$(shasum -a 512 "$WORK/md-good.tar.gz" | cut -d' ' -f1); fi
+    _md_block=$(printf '%s\n' "$_md_block" | sed "s/^MAVEN_FALLBACK_SHA512=.*/MAVEN_FALLBACK_SHA512=\"$_md_sum\"/")
+    _md_prelude='log() { echo "[build-prep] $*"; }; mark_prep_failed() { echo "MARK-FAILED $1"; }; run_supervised_timeout() { shift; "$@"; }; PREP_TIMEOUT_DEFAULT=5'
+    # A PATH with the tools the block needs, less the ones named in $1 (to
+    # stand for an image without them).
+    _md_minpath() {
+        _mp="$WORK/md-min-$(printf '%s' "$1" | tr ' ' '-')"
+        rm -rf "$_mp"; mkdir -p "$_mp"
+        for _t in sh cat grep sed head tail mktemp cp rm find cut tar gzip awk sort chmod ls tr \
+                  sha512sum shasum openssl perl; do
+            case " $1 " in *" $_t "*) continue ;; esac
+            _tp=$(command -v "$_t" 2>/dev/null) && ln -s "$_tp" "$_mp/$_t"
+        done
+        printf '%s' "$_mp"
+    }
+    _md_run() {  # <dir>; MD_SHELL, MD_COPY, MD_CURL, MD_WRAP_OK, MD_39_FAIL, MD_MAVEN_ARGS, MD_PATH from the caller
+        # build-prep's exit trap removes the unpacked Maven; this extract has none.
+        rm -rf "$WORK/md-calls" "$WORK/md-home"/bomlens-maven.*; : > "$WORK/md-calls"
+        ( cd "$1" && PATH="$_md_bin:${MD_PATH:-$PATH}" HOME="$WORK/md-home" MD_CALLS="$WORK/md-calls" MD_VER="$_md_ver" \
+            MD_COPY="${MD_COPY:-}" MD_CURL="${MD_CURL:-}" MD_WRAP_OK="${MD_WRAP_OK:-}" \
+            MD_39_FAIL="${MD_39_FAIL:-}" EXCLUDE_NON_SHIPPED=1 NON_SHIPPED_DIRS="test examples" \
+            MAVEN_ARGS="${MD_MAVEN_ARGS:-}" MVN_ARGS="" MAVEN_OPTS="" MAVEN_SETTINGS_ARGS="" SETTINGS_ROOT="$WORK/md-nosettings" \
+            "$MD_SHELL" -c "$_md_prelude; $_md_block"'
+                echo "RESULT MVN_CMD=${MVN_CMD:-} PINNED=${CDXGEN_JVM_TOOL_PINNED:-} DIR=${MAVEN_FALLBACK_DIR:-}"' 2>&1 )
+    }
+    mkdir -p "$WORK/md-proj" "$WORK/md-wrap/.mvn/wrapper" "$WORK/md-wrap310/.mvn/wrapper" \
+        "$WORK/md-gradle/.mvn/wrapper" "$WORK/md-gradle/android" "$WORK/md-gradle-ex/.mvn/wrapper" "$WORK/md-gradle-ex/examples/demo"
+    touch "$WORK/md-proj/pom.xml" "$WORK/md-wrap/pom.xml" "$WORK/md-wrap310/pom.xml" \
+        "$WORK/md-gradle/pom.xml" "$WORK/md-gradle/android/build.gradle" \
+        "$WORK/md-gradle-ex/pom.xml" "$WORK/md-gradle-ex/examples/demo/build.gradle.kts"
+    cp "$_md_bin/mvn" "$WORK/md-wrap/mvnw"; chmod -x "$WORK/md-wrap/mvnw"
+    for _d in md-wrap310 md-gradle md-gradle-ex; do cp "$_md_bin/mvn" "$WORK/$_d/mvnw"; done
+    echo 'distributionUrl=https://repo.maven.apache.org/maven2/org/apache/maven/apache-maven/3.9.6/apache-maven-3.9.6-bin.zip' \
+        > "$WORK/md-wrap/.mvn/wrapper/maven-wrapper.properties"
+    for _d in md-wrap310 md-gradle md-gradle-ex; do
+        echo 'distributionUrl=https://repo.maven.apache.org/maven2/org/apache/maven/apache-maven/3.10.0/apache-maven-3.10.0-bin.zip' \
+            > "$WORK/$_d/.mvn/wrapper/maven-wrapper.properties"
+    done
+
+    _md_shells=$(command -v bash)
+    if command -v dash >/dev/null 2>&1; then _md_shells="$_md_shells $(command -v dash)"
+    else echo "  NOTE: dash not installed, the maven-duplicates cases run under bash only"; fi
+    for MD_SHELL in $_md_shells; do
+    _s="[${MD_SHELL##*/}]"
+
+    # Through the image's mvn (copy goal, run outside the project).
+    _md_out=$(MD_COPY="$WORK/md-good.tar.gz" _md_run "$WORK/md-proj")
+    { printf '%s' "$_md_out" | grep -q "RESULT MVN_CMD=$WORK/md-home/bomlens-maven\.[^ ]*/apache-maven-$_md_ver/bin/mvn PINNED= " \
+        && ! printf '%s' "$_md_out" | grep -q "MARK-FAILED" \
+        && grep -q "^mvn -q -B org.apache.maven.plugins:maven-dependency-plugin:3.11.0:copy -Dartifact=org.apache.maven:apache-maven:$_md_ver:tar.gz:bin " "$WORK/md-calls" \
+        && grep -q "^mvn39 -q -B --fail-never org.apache.maven.plugins:maven-dependency-plugin:3.11.0:resolve " "$WORK/md-calls" \
+        && ! grep -q "^curl" "$WORK/md-calls"; } \
+        && pass "$_s refused pom.xml: Maven $_md_ver from the Maven repository becomes cdxgen's MVN_CMD, nothing recorded as failed" \
+        || fail "$_s refused pom.xml, Maven fetched through mvn: [$_md_out] calls: [$(cat "$WORK/md-calls")]"
+
+    # The copy goal gives nothing: curl from Maven Central.
+    _md_out=$(MD_CURL="$WORK/md-good.tar.gz" _md_run "$WORK/md-proj")
+    { printf '%s' "$_md_out" | grep -q "RESULT MVN_CMD=.*/apache-maven-$_md_ver/bin/mvn " \
+        && grep -q "^curl .*https://repo.maven.apache.org/maven2/org/apache/maven/apache-maven/$_md_ver/apache-maven-$_md_ver-bin.tar.gz" "$WORK/md-calls"; } \
+        && pass "$_s the copy goal fails: Maven $_md_ver is downloaded from Maven Central with curl" \
+        || fail "$_s curl download: [$_md_out] calls: [$(cat "$WORK/md-calls")]"
+
+    # Checksum mismatch, from both sources: refused, and recorded.
+    _md_out=$(MD_COPY="$WORK/md-bad.tar.gz" MD_CURL="$WORK/md-bad.tar.gz" _md_run "$WORK/md-proj")
+    { printf '%s' "$_md_out" | grep -q "does not match its pinned SHA-512 checksum; not used" \
+        && printf '%s' "$_md_out" | grep -q "RESULT MVN_CMD= PINNED= DIR=$" \
+        && printf '%s' "$_md_out" | grep -q "MARK-FAILED maven-dependency-tree" \
+        && ! printf '%s' "$_md_out" | grep -q "MARK-FAILED maven-dependency-jars" \
+        && ! grep -q "^mvn39" "$WORK/md-calls" \
+        && [ -z "$(find "$WORK/md-home" -maxdepth 1 -name 'bomlens-maven.*')" ]; } \
+        && pass "$_s an archive that does not match the pinned checksum is not used or kept; maven-dependency-tree is recorded in place of maven-dependency-jars" \
+        || fail "$_s checksum refusal: [$_md_out]"
+
+    # No SHA-512 tool, or no tar: said so, nothing downloaded.
+    _md_out=$(MD_PATH="$(_md_minpath "sha512sum shasum openssl")" MD_COPY="$WORK/md-good.tar.gz" _md_run "$WORK/md-proj")
+    { printf '%s' "$_md_out" | grep -q "no SHA-512 tool in this image" \
+        && ! printf '%s' "$_md_out" | grep -q "does not match" \
+        && printf '%s' "$_md_out" | grep -q "MARK-FAILED maven-dependency-tree" \
+        && ! grep -q ":copy " "$WORK/md-calls"; } \
+        && pass "$_s no SHA-512 tool: logged as such, no download, the step is recorded as failed" \
+        || fail "$_s no SHA-512 tool: [$_md_out] calls: [$(cat "$WORK/md-calls")]"
+    _md_out=$(MD_PATH="$(_md_minpath "tar")" MD_COPY="$WORK/md-good.tar.gz" _md_run "$WORK/md-proj")
+    { printf '%s' "$_md_out" | grep -q "tar or gzip is not in this image" \
+        && ! grep -q ":copy " "$WORK/md-calls"; } \
+        && pass "$_s no tar: logged as such, no download" \
+        || fail "$_s no tar: [$_md_out] calls: [$(cat "$WORK/md-calls")]"
+
+    # Offline: the copy goal runs with -o (a cached archive would do), curl is not tried.
+    _md_out=$(MD_MAVEN_ARGS="-o" MD_CURL="$WORK/md-good.tar.gz" _md_run "$WORK/md-proj")
+    { printf '%s' "$_md_out" | grep -q "Maven runs offline and Maven $_md_ver is not in the local repository" \
+        && printf '%s' "$_md_out" | grep -q "MARK-FAILED maven-dependency-tree" \
+        && grep -q "^mvn -q -B -o .*:copy " "$WORK/md-calls" \
+        && ! grep -q "^curl" "$WORK/md-calls"; } \
+        && pass "$_s offline: no download from Maven Central, the step is recorded as failed" \
+        || fail "$_s offline: [$_md_out] calls: [$(cat "$WORK/md-calls")]"
+
+    # Maven 3.9 refuses it too, for another model error: no MVN_CMD, recorded.
+    _md_out=$(MD_39_FAIL=1 MD_COPY="$WORK/md-good.tar.gz" _md_run "$WORK/md-wrap310")
+    { printf '%s' "$_md_out" | grep -q "Maven $_md_ver did not read pom.xml cleanly" \
+        && printf '%s' "$_md_out" | grep -q "RESULT MVN_CMD= PINNED= DIR=$" \
+        && printf '%s' "$_md_out" | grep -q "MARK-FAILED maven-dependency-tree" \
+        && grep -q "^mvn39 " "$WORK/md-calls"; } \
+        && pass "$_s a Maven $_md_ver retry that fails for another model error sets no MVN_CMD and records maven-dependency-tree" \
+        || fail "$_s Maven 3.9 retry failing: [$_md_out]"
+
+    # A wrapper that pins Maven 3.9 but is not executable runs through sh and
+    # reads the POM; the image's mvn is not run and nothing is downloaded.
+    _md_out=$(MD_WRAP_OK=1 MD_COPY="$WORK/md-good.tar.gz" _md_run "$WORK/md-wrap")
+    { printf '%s' "$_md_out" | grep -q "RESULT MVN_CMD= PINNED= " \
+        && ! printf '%s' "$_md_out" | grep -q "MARK-FAILED" \
+        && grep -q "^mvnw -q -B --fail-never .*:resolve " "$WORK/md-calls" \
+        && ! grep -q "^mvn " "$WORK/md-calls"; } \
+        && pass "$_s a wrapper pinning Maven 3.9 without the executable bit runs through sh; no other Maven is run" \
+        || fail "$_s wrapper 3.9: [$_md_out] calls: [$(cat "$WORK/md-calls")]"
+
+    # The same wrapper refuses the POM: Maven $_md_ver is tried and pinned.
+    _md_out=$(MD_COPY="$WORK/md-good.tar.gz" _md_run "$WORK/md-wrap")
+    { printf '%s' "$_md_out" | grep -q "maven: ./mvnw refused pom.xml" \
+        && printf '%s' "$_md_out" | grep -q "RESULT MVN_CMD=.*/apache-maven-$_md_ver/bin/mvn PINNED=true " \
+        && ! printf '%s' "$_md_out" | grep -q "MARK-FAILED" \
+        && grep -q "^mvnw -q -B --fail-never .*:resolve " "$WORK/md-calls" \
+        && grep -q "^mvn39 " "$WORK/md-calls"; } \
+        && pass "$_s a wrapper without the executable bit that refuses the POM: Maven $_md_ver is tried and pinned" \
+        || fail "$_s non-executable wrapper refusing the POM: [$_md_out] calls: [$(cat "$WORK/md-calls")]"
+
+    # A wrapper on Maven 3.10 refuses it too: the downloaded Maven goes to
+    # cdxgen with CDXGEN_JVM_TOOL_PINNED, so cdxgen does not take the wrapper.
+    # A Gradle build under a non-shipped folder does not count.
+    for _d in md-wrap310 md-gradle-ex; do
+        _md_out=$(MD_COPY="$WORK/md-good.tar.gz" _md_run "$WORK/$_d")
+        { printf '%s' "$_md_out" | grep -q "RESULT MVN_CMD=.*/apache-maven-$_md_ver/bin/mvn PINNED=true " \
+            && grep -q "^mvnw -q -B --fail-never .*:resolve " "$WORK/md-calls" \
+            && ! printf '%s' "$_md_out" | grep -q "MARK-FAILED"; } \
+            && pass "$_s $_d: a wrapper on Maven 3.10, the downloaded Maven is pinned over the wrapper" \
+            || fail "$_s $_d wrapper 3.10: [$_md_out] calls: [$(cat "$WORK/md-calls")]"
+    done
+
+    # With a Gradle build in the tree, pinning would also turn off the Gradle
+    # wrappers: not pinned, a warning, and the step recorded as failed.
+    _md_out=$(MD_COPY="$WORK/md-good.tar.gz" _md_run "$WORK/md-gradle")
+    { printf '%s' "$_md_out" | grep -q "RESULT MVN_CMD=.*/apache-maven-$_md_ver/bin/mvn PINNED= " \
+        && printf '%s' "$_md_out" | grep -q "WARN: maven: .*Gradle wrappers" \
+        && printf '%s' "$_md_out" | grep -q "MARK-FAILED maven-dependency-tree"; } \
+        && pass "$_s a Gradle build in the tree: CDXGEN_JVM_TOOL_PINNED is not set, the Gradle wrapper consequence is warned, the step is recorded" \
+        || fail "$_s Gradle build in the tree: [$_md_out]"
+    done
+
+    # Which errors count as a repeated dependency.
+    _md_re=$(printf '%s\n' "$_md_block" | sed -n "s/^MAVEN_DUPLICATE_ERROR='\(.*\)'\$/\1/p")
+    _md_hits=""
+    for _md_l in "[ERROR] 'dependencies.dependency.(groupId:artifactId:type:classifier)' must be unique: a:b:jar" \
+                 "[ERROR] 'dependencyManagement.dependencies.dependency.(groupId:artifactId:type:classifier)' must be unique: a:b:jar" \
+                 "[ERROR] 'build.plugins.plugin.(groupId:artifactId)' must be unique but found duplicate declaration" \
+                 "[WARNING] 'dependencies.dependency.(groupId:artifactId:type:classifier)' must be unique: a:b:jar"; do
+        if printf '%s\n' "$_md_l" | grep -q "$_md_re"; then _md_hits="${_md_hits}1"; else _md_hits="${_md_hits}0"; fi
+    done
+    [ -n "$_md_re" ] && [ "$_md_hits" = "1100" ] \
+        && pass "only dependencies and dependencyManagement uniqueness errors count" \
+        || fail "MAVEN_DUPLICATE_ERROR matched [$_md_hits] (want 1100)"
+    rm -rf "$WORK/md-home"/bomlens-maven.*
+fi
+
+echo "== maven-scope: the pom.xml fallback's test and provided dependencies are dropped too =="
+# When cdxgen's dependency tree fails, it lists the dependencies written in
+# pom.xml: a test one is "optional", a provided one "excluded", and one with no
+# <scope> has none, so no component is "required". The Maven filter runs with
+# the "any" guard for that; a BOM with no scope at all is still left alone.
+if command -v node >/dev/null 2>&1; then
+    SFLT="$WORK/scope-filter-maven.js"
+    sed -n "/<<'SFILTER_JS'/,/^SFILTER_JS\$/p" "$ROOT_DIR/docker/lib/build-prep.sh" | sed '1d;$d' > "$SFLT"
+    grep -q '^    run_scope_filter "pkg:maven/" "maven" any$' "$ROOT_DIR/docker/lib/build-prep.sh" \
+        && pass "the Maven scope filter runs with the any guard" \
+        || fail "the Maven scope filter does not pass the any guard"
+    cat > "$WORK/maven-pomonly-bom.json" <<'JSON'
+{"bomFormat":"CycloneDX","specVersion":"1.6",
+ "metadata":{"component":{"name":"dup-demo","version":"1.0","bom-ref":"pkg:maven/demo/dup-demo@1.0?type=jar","purl":"pkg:maven/demo/dup-demo@1.0?type=jar"}},
+ "components":[
+   {"group":"junit","name":"junit","version":"4.12","purl":"pkg:maven/junit/junit@4.12?type=jar","bom-ref":"pkg:maven/junit/junit@4.12?type=jar","scope":"optional"},
+   {"group":"com.google.guava","name":"guava","version":"33.4.8-jre","purl":"pkg:maven/com.google.guava/guava@33.4.8-jre?type=jar","bom-ref":"pkg:maven/com.google.guava/guava@33.4.8-jre?type=jar"},
+   {"group":"junit","name":"junit","version":"4.13.2","purl":"pkg:maven/junit/junit@4.13.2?type=jar","bom-ref":"pkg:maven/junit/junit@4.13.2?type=jar","scope":"optional"},
+   {"group":"javax.servlet","name":"servlet-api","version":"2.5","purl":"pkg:maven/javax.servlet/servlet-api@2.5?type=jar","bom-ref":"pkg:maven/javax.servlet/servlet-api@2.5?type=jar","scope":"excluded"}
+ ],
+ "dependencies":[
+   {"ref":"pkg:maven/demo/dup-demo@1.0?type=jar","dependsOn":["pkg:maven/junit/junit@4.12?type=jar","pkg:maven/com.google.guava/guava@33.4.8-jre?type=jar","pkg:maven/junit/junit@4.13.2?type=jar","pkg:maven/javax.servlet/servlet-api@2.5?type=jar"]}
+ ]}
+JSON
+    cp "$WORK/maven-pomonly-bom.json" "$WORK/maven-pomonly-bom-default.json"
+    node "$SFLT" "$WORK/maven-pomonly-bom.json" "pkg:maven/" any 2>/dev/null
+    names=$(jq -r '[.components[].name]|sort|join(",")' "$WORK/maven-pomonly-bom.json")
+    rootdeps=$(jq -r '.dependencies[0].dependsOn|join(",")' "$WORK/maven-pomonly-bom.json")
+    { [ "$names" = "guava" ] && [ "$rootdeps" = "pkg:maven/com.google.guava/guava@33.4.8-jre?type=jar" ]; } \
+        && pass "pom.xml fallback: test and provided dependencies dropped, the unscoped compile one kept" \
+        || fail "pom.xml fallback scope filter" "components [$names] root dependsOn [$rootdeps]"
+    node "$SFLT" "$WORK/maven-pomonly-bom-default.json" "pkg:maven/" 2>/dev/null
+    names=$(jq -r '[.components[].name]|sort|join(",")' "$WORK/maven-pomonly-bom-default.json")
+    [ "$names" = "guava,junit,junit,servlet-api" ] \
+        && pass "without the any guard (the PHP filter) a BOM with no required component is left alone" \
+        || fail "the default guard changed a BOM with no required component" "$names"
+    jq 'del(.components[].scope)' "$WORK/maven-pomonly-bom-default.json" > "$WORK/maven-noscope-bom.json"
+    node "$SFLT" "$WORK/maven-noscope-bom.json" "pkg:maven/" any 2>/dev/null
+    names=$(jq -r '[.components[].name]|sort|join(",")' "$WORK/maven-noscope-bom.json")
+    [ "$names" = "guava,junit,junit,servlet-api" ] \
+        && pass "any guard: a BOM with no scope at all (syft fallback) is still left alone" \
+        || fail "the any guard changed a BOM with no scope" "$names"
+else
+    echo "  SKIP: node unavailable, skipping the maven pom.xml fallback scope test"
 fi
 # Every caller pins the repository to the standard layout under HOME=/tmp/sbomhome,
 # the one place cdxgen looks for the jars, and mounts the Maven cache there.
@@ -6023,6 +7003,34 @@ fi
 grep -q 'find "$_co_d" \\( ! -user "$HOST_UID"' "$PREP" \
     && pass "build-prep hands the mounted cache folders back to HOST_UID" \
     || fail "build-prep does not chown the cache mounts"
+# The hand-back decision (cache_handback_wanted) is taken out of build-prep.sh
+# and called. rc 0 = walk and chown, 1 = leave the folder alone.
+_co_fn=$(sed -n '/^# --- cache hand-back helpers/,/^# --- end cache hand-back helpers/p' "$PREP")
+_co_t="$WORK/co-fs"; rm -rf "$_co_t"; mkdir -p "$_co_t/cache" "$_co_t/ro" "$_co_t/plain"
+printf '36 35 98:0 / / rw - overlay overlay rw\n900 36 0:37 / %s rw - ext4 /dev/x rw\n901 36 0:38 / %s rw - ext4 /dev/x rw\n' "$_co_t/cache" "$_co_t/ro" > "$_co_t/mountinfo"
+chmod 555 "$_co_t/ro"
+_co_want() { # DIR MOUNTINFO HOST_UID -> prints the rc
+    HOST_UID="$3" HOST_GID="$3" sh -c "$_co_fn"'
+cache_handback_wanted "$1" "$2"; echo $?' _ "$1" "$2"
+}
+[ "$(_co_want "$_co_t/plain" "$_co_t/mountinfo" 4242)" = 1 ] \
+    && pass "a folder that is not a mount point is left alone" || fail "non-mount folder was walked"
+[ "$(_co_want "$_co_t/cache" "$_co_t/none" 4242)" = 1 ] \
+    && pass "an unreadable mountinfo leaves the folder alone" || fail "unreadable mountinfo was walked"
+[ "$(_co_want "$_co_t/cache" "$_co_t/mountinfo" 0)" = 1 ] \
+    && pass "HOST_UID 0 leaves the folder alone (root already owns what the run wrote)" || fail "HOST_UID 0 was walked"
+if [ "$(id -u)" != 0 ]; then
+    [ "$(_co_want "$_co_t/cache" "$_co_t/mountinfo" 4242)" = 1 ] \
+        && pass "a mount where chown to HOST_UID does not stick is left alone" || fail "chown-ineffective mount was walked"
+    [ "$(_co_want "$_co_t/ro" "$_co_t/mountinfo" 4242)" = 0 ] \
+        && pass "a mount where the probe cannot run (not writable) keeps the walk" || fail "unprobeable mount was not walked"
+else
+    [ "$(_co_want "$_co_t/cache" "$_co_t/mountinfo" 4242)" = 0 ] \
+        && pass "a mount where chown to HOST_UID sticks is walked" || fail "effective mount was left alone"
+fi
+[ -z "$(find "$_co_t/cache" -name '.bomlens-chown-probe.*')" ] \
+    && pass "the probe file is removed" || fail "probe file left behind"
+chmod 755 "$_co_t/ro"
 
 echo "== android-scope: release-config selection picks the right variant (flavored projects) =="
 # Guards docker/lib/build-prep.sh's Android config selection. The SCA benchmark
@@ -6056,6 +7064,369 @@ if grep -q 'grep -x releaseRuntimeClasspath || cat' "$PREP"; then
     fail "the stdin-draining '{ grep -x ... || cat; }' idiom is back in build-prep.sh"
 else
     pass "build-prep.sh no longer uses the stdin-draining grep||cat idiom"
+fi
+
+echo "== android-scope: the release filter marks release runtime components required =="
+# cdxgen takes the scope from the first configuration a component appears
+# under, so a release runtime component also under a test configuration comes
+# out optional. Extract the real filter JS from build-prep.sh.
+if command -v node >/dev/null 2>&1; then
+    AFLT="$WORK/android-release-filter.js"
+    sed -n "/<<'FILTER_JS'/,/^FILTER_JS\$/p" "$ROOT_DIR/docker/lib/build-prep.sh" | sed '1d;$d' > "$AFLT"
+    if [ -s "$AFLT" ]; then
+        cat > "$WORK/android-bom.json" <<'JSON'
+{"bomFormat":"CycloneDX","specVersion":"1.6",
+ "metadata":{"component":{"name":"app","purl":"pkg:maven/com.example/app@1.0","bom-ref":"pkg:maven/com.example/app@1.0"}},
+ "components":[
+   {"group":"com.squareup.okhttp3","name":"okhttp","version":"4.12.0","scope":"optional","purl":"pkg:maven/com.squareup.okhttp3/okhttp@4.12.0?type=jar","bom-ref":"okhttp"},
+   {"group":"com.google.code.gson","name":"gson","version":"2.10.1","purl":"pkg:maven/com.google.code.gson/gson@2.10.1?type=jar","bom-ref":"gson"},
+   {"group":"com.example","name":"lib","version":"1.0","scope":"optional","purl":"pkg:maven/com.example/lib@1.0","bom-ref":"lib"},
+   {"group":"com.android.tools.utp","name":"utp-core","version":"31.0.0","scope":"optional","purl":"pkg:maven/com.android.tools.utp/utp-core@31.0.0","bom-ref":"utp"},
+   {"name":"left-pad","version":"1.3.0","scope":"optional","purl":"pkg:npm/left-pad@1.3.0","bom-ref":"lp"}
+ ]}
+JSON
+        printf 'com.squareup.okhttp3:okhttp:4.12.0\ncom.google.code.gson:gson:2.10.1\n' > "$WORK/android-rel.set"
+        node "$AFLT" "$WORK/android-bom.json" "$WORK/android-rel.set" 2>/dev/null
+        scopes=$(jq -r '[.components[] | .name + "=" + (.scope // "none")] | join(",")' "$WORK/android-bom.json")
+        [ "$scopes" = "okhttp=required,gson=none,lib=optional,left-pad=optional" ] \
+            && pass "an optional release runtime component is required; one with no scope, first-party and non-maven ones are not touched (got: $scopes)" \
+            || fail "android release filter scopes" "$scopes"
+    else
+        fail "could not extract FILTER_JS from build-prep.sh"
+    fi
+else
+    echo "  SKIP: node unavailable"
+fi
+
+echo "== gradle-runtime-scope: a java-gradle SBOM keeps the runtime classpath =="
+# Guards docker/lib/build-prep.sh: cdxgen keeps every Gradle configuration's
+# components, so one only on a compile classpath (j2objc-annotations, which
+# guava 33.0.0's Gradle module metadata gives to compile only) or only on a test
+# classpath was listed as shipped. build-prep reads every project's runtime
+# classpath and filters to it. The real Gradle block (Android branch
+# included) is extracted and run under sh with a stand-in gradlew that writes
+# the per-project files in tests/fixtures/gradle-runtime the init script
+# would write (the init script itself runs under a real Gradle in
+# tests/test-gradle-runtime.sh); then the real filter runs in its gradle mode.
+if command -v node >/dev/null 2>&1; then
+    PREP="$ROOT_DIR/docker/lib/build-prep.sh"
+    GRFIX="$FIX/gradle-runtime"
+    _grs_block=$(sed -n '/^# Gradle (java-gradle \/ Android)/,/^# A root Gradle build that did not reach/p' "$PREP" | sed '$d')
+    _grs_fns=$(sed -n '/^mark_prep_failed() {/,/^}/p; /^unmark_prep_failed() {/,/^}/p; /^prep_step() {/,/^}/p; /^wrapper_shell() {/,/^}/p' "$PREP")
+    _grs_js="$WORK/gradle-filter.js"
+    sed -n "/<<'FILTER_JS'/,/^FILTER_JS\$/p" "$PREP" | sed '1d;$d' > "$_grs_js"
+    if [ -n "$_grs_block" ] && [ -n "$_grs_fns" ] && [ -s "$_grs_js" ]; then
+        _grs_bin="$WORK/grs-bin"; mkdir -p "$_grs_bin" "$WORK/grs-home"
+        printf '#!/bin/sh\nexit 0\n' > "$_grs_bin/gradle"
+        cat > "$WORK/grs-gradlew" <<'STUB'
+#!/bin/sh
+case " $* " in *" --version "*) exit 0 ;; esac
+echo "$*" >> "$GRS_CALLS"
+for a in "$@"; do
+    case "$a" in
+        --no-configuration-cache) [ -z "${GRS_OLD:-}" ] || exit 1 ;;
+        -Dbomlens.gradle.out=*) out="${a#-Dbomlens.gradle.out=}" ;;
+        bomlensRuntime)
+            [ -z "${GRS_TOOLCHAIN:-}" ] || { echo "bomlens: could not resolve runtimeClasspath of project :: No matching toolchains found for requested specification: {languageVersion=13, vendor=any, implementation=vendor-specific} for LINUX on aarch64." >&2; exit 1; }
+            [ "${GRS_RC:-0}" = 0 ] || exit "$GRS_RC"; cp "$GRS_REPORT"/* "$out"/; exit 0 ;;
+        projects) [ -z "${GRS_PROJ_RC:-}" ] || exit "$GRS_PROJ_RC"; cat "$GRS_FIX/${GRS_PROJECTS:-android-projects.txt}"; exit 0 ;;
+        *:dependencies)
+            f="$GRS_FIX/${GRS_ANDROID:-android}$(printf '%s' "$a" | tr ':' '-').txt"
+            [ ! -f "$f" ] || cat "$f"; exit 0 ;;
+        dependencies) exit "${GRS_WARM_RC:-0}" ;;
+    esac
+done
+exit 1
+STUB
+        chmod +x "$_grs_bin/gradle" "$WORK/grs-gradlew"
+        _grs_prelude='log() { echo "[build-prep] $*"; }
+opted_out() { case "$1" in 1|true) return 0 ;; esac; return 1; }
+gradle_settings_copy() { :; }
+run_supervised_timeout() { shift; "$@"; }
+PREP_FAILED=""; PREP_APPLIED=""; PREP_TIMEOUT_GRADLE=5'
+        _grs_report='set_of() { [ -n "$1" ] && [ -f "$1" ] && tr "\n" " " < "$1"; }
+echo "SET:$(set_of "$GRADLE_RUNTIME_SET")"
+echo "ASET:$(set_of "$ANDROID_RELEASE_SET")"
+echo "FAILED:$PREP_FAILED"
+echo "APPLIED:$PREP_APPLIED"'
+        _grs_run() {  # env NAME=value ... for the stand-in and the block
+            local p="$WORK/grs-proj"
+            rm -rf "$p"; mkdir -p "$p"; : > "$p/build.gradle"; cp "$WORK/grs-gradlew" "$p/gradlew"
+            [ -z "${GRS_NOEXEC:-}" ] || chmod -x "$p/gradlew"
+            : > "$WORK/grs-calls"
+            ( cd "$p" && env -u GRADLE_USER_HOME -u ANDROID_HOME -u GRADLE_INCLUDED_BUILDS -u BOMLENS_GRADLE_FULL_GRAPH \
+                PATH="$_grs_bin:$PATH" HOME="$WORK/grs-home" GRS_FIX="$GRFIX" GRS_CALLS="$WORK/grs-calls" \
+                GRS_REPORT="$GRFIX/single" "$@" \
+                sh -c "$_grs_prelude
+$_grs_fns
+$_grs_block
+$_grs_report" ) 2>&1
+        }
+        _grs_line() { printf '%s\n' "$1" | sed -n "s/^$2://p"; }
+        _grs_expect() {  # <label> <output> <SET|ASET|FAILED> <expected>
+            local got; got=$(_grs_line "$2" "$3")
+            if [ "$got" = "$4" ]; then pass "$1"; else fail "$1" "$3 got [$got], expected [$4]; $(printf '%s\n' "$2" | grep '^\[build-prep\]' | head -3)"; fi
+        }
+        _grs_single="com.fasterxml.jackson.core:jackson-core:2.16.1 com.google.guava:failureaccess:1.0.2 com.google.guava:guava:33.0.0-jre org.slf4j:jcl-over-slf4j:2.0.9 org.slf4j:slf4j-api:2.0.9 "
+
+        _o=$(_grs_run)
+        _grs_expect "one project, runtimeClasspath at the root: substituted module, rich and conflict-resolved versions read; compile-only, test, (c), (n) left out" \
+            "$_o" SET "$_grs_single"
+        _grs_expect "one Gradle run, recorded as gradle-dependencies and not failed" "$_o" APPLIED "gradle-dependencies"
+        if [ "$(wc -l < "$WORK/grs-calls" | tr -d ' ')" = 1 ] && grep -q -- '--no-configuration-cache --init-script .* bomlensRuntime' "$WORK/grs-calls"; then
+            pass "a single Gradle invocation reads every project, with the configuration cache off"
+        else
+            fail "Gradle invoked other than once with the init script" "$(cat "$WORK/grs-calls")"
+        fi
+
+        _o=$(GRS_NOEXEC=1 _grs_run)
+        _grs_expect "a gradlew without the execute bit is still the wrapper that runs" "$_o" SET "$_grs_single"
+
+        _o=$(_grs_run GRS_REPORT="$GRFIX/multi")
+        _grs_expect "several projects merged; project :core dependency not a component; a root with only jacoco and a Kotlin Multiplatform project (no runtimeClasspath) handled per project; a path with a space read" \
+            "$_o" SET "com.fasterxml.jackson.core:jackson-core:2.16.0 com.fasterxml.jackson.core:jackson-databind:2.16.0 com.google.guava:guava:33.0.0-jre com.squareup.okio:okio-jvm:3.6.0 org.apache.commons:commons-lang3:3.14.0 "
+
+        rm -rf "$WORK/grs-included"; cp -R "$GRFIX/multi" "$WORK/grs-included"
+        printf 'I\tlibbuild\nZ\t5\n' > "$WORK/grs-included/_meta.txt"
+        _o=$(_grs_run GRS_REPORT="$WORK/grs-included")
+        _grs_expect "an included build (includeBuild): no set, full graph" "$_o" SET ""
+        if printf '%s\n' "$_o" | grep -q 'the build includes the build libbuild; using full graph'; then
+            pass "the included build is named in the log"
+        else
+            fail "included build not logged" "$_o"
+        fi
+        _o=$(_grs_run GRADLE_INCLUDED_BUILDS=libbuild)
+        _grs_expect "GRADLE_INCLUDED_BUILDS set: no set, full graph" "$_o" SET ""
+
+        # A build included only through pluginManagement (J line) keeps the filter on;
+        # one next to it included for its code (I line), or a project that depends on
+        # a project of another build (F line), keeps the full graph.
+        rm -rf "$WORK/grs-pm"; cp -R "$GRFIX/multi" "$WORK/grs-pm"
+        printf 'J\tbuild-logic\nZ\t5\n' > "$WORK/grs-pm/_meta.txt"
+        _o=$(_grs_run GRS_REPORT="$WORK/grs-pm")
+        _grs_expect "a build included only through pluginManagement: the runtime classpath set is kept" "$_o" SET \
+            "com.fasterxml.jackson.core:jackson-core:2.16.0 com.fasterxml.jackson.core:jackson-databind:2.16.0 com.google.guava:guava:33.0.0-jre com.squareup.okio:okio-jvm:3.6.0 org.apache.commons:commons-lang3:3.14.0 "
+        if printf '%s\n' "$_o" | grep -q 'included for plugins only, so not part of the graph: build-logic'; then
+            pass "the plugin build is named in the log"
+        else
+            fail "plugin build not logged" "$_o"
+        fi
+        printf 'J\tbuild-logic\nI\tlibbuild\nZ\t5\n' > "$WORK/grs-pm/_meta.txt"
+        _o=$(_grs_run GRS_REPORT="$WORK/grs-pm")
+        _grs_expect "a plugin build next to a build included for its code: no set, full graph" "$_o" SET ""
+        printf 'J\tbuild-logic\nZ\t5\n' > "$WORK/grs-pm/_meta.txt"
+        printf 'P\t:app\nH\t:app\nF\t:app\tproject :build-logic\nR\t:app\tzzz:zzz:1\n' > "$WORK/grs-pm/%3Aapp.txt"
+        _o=$(_grs_run GRS_REPORT="$WORK/grs-pm")
+        _grs_expect "a project that depends on a project of another build: no set, full graph" "$_o" SET ""
+        if printf '%s\n' "$_o" | grep -q 'project :app depends on project :build-logic, a project of another build; using full graph'; then
+            pass "the dependency on a project of another build is named in the log"
+        else
+            fail "dependency on another build's project not logged" "$_o"
+        fi
+
+        rm -rf "$WORK/grs-missing"; cp -R "$GRFIX/single" "$WORK/grs-missing"
+        printf 'Z\t2\n' > "$WORK/grs-missing/_meta.txt"
+        _o=$(_grs_run GRS_REPORT="$WORK/grs-missing")
+        _grs_expect "a project without its file (the count in the files is short): no set, full graph" "$_o" SET ""
+        rm -rf "$WORK/grs-nometa"; cp -R "$GRFIX/single" "$WORK/grs-nometa"; rm "$WORK/grs-nometa/_meta.txt"
+        _o=$(_grs_run GRS_REPORT="$WORK/grs-nometa")
+        _grs_expect "no end marker (the run stopped early): no set, full graph" "$_o" SET ""
+        rm -rf "$WORK/grs-twice"; cp -R "$GRFIX/single" "$WORK/grs-twice"
+        cp "$GRFIX/single/_meta.txt" "$WORK/grs-twice/_meta.txt"
+        printf 'P\t:\nR\t:\tzzz:zzz:1\n' > "$WORK/grs-twice/%3Adup.txt"
+        _o=$(_grs_run GRS_REPORT="$WORK/grs-twice")
+        _grs_expect "a project listed in two files (a count that does not match): no set, full graph" "$_o" SET ""
+        rm -rf "$WORK/grs-bad"; cp -R "$GRFIX/multi" "$WORK/grs-bad"
+        printf 'P\t:kmp\nX\t:kmp\tjvmRuntimeClasspath\n' > "$WORK/grs-bad/%3Akmp.txt"
+        _o=$(_grs_run GRS_REPORT="$WORK/grs-bad")
+        _grs_expect "a configuration that could not be resolved: no set, full graph" "$_o" SET ""
+        _o=$(_grs_run GRS_OLD=1)
+        _grs_expect "a Gradle without --no-configuration-cache: no set" "$_o" SET ""
+        if grep -qx -- '--no-daemon dependencies' "$WORK/grs-calls"; then
+            pass "a Gradle without --no-configuration-cache: the root warm-up runs instead"
+        else
+            fail "no warm-up after a Gradle that refuses --no-configuration-cache" "$(cat "$WORK/grs-calls")"
+        fi
+
+        _o=$(_grs_run GRS_RC=1)
+        _grs_expect "the run fails: no set" "$_o" SET ""
+        _grs_expect "the run fails: the root warm-up runs instead and the step is not left failed" "$_o" FAILED ""
+        if grep -qx -- '--no-daemon dependencies' "$WORK/grs-calls"; then
+            pass "the run fails: the plain root dependencies warm-up runs"
+        else
+            fail "warm-up not run after a failed read" "$(cat "$WORK/grs-calls")"
+        fi
+        _o=$(_grs_run GRS_RC=1 GRS_WARM_RC=1)
+        _grs_expect "the run and the warm-up both fail: recorded failed" "$_o" FAILED "gradle-dependencies"
+        _o=$(_grs_run GRS_RC=124)
+        _grs_expect "the run times out: no set, recorded failed" "$_o" FAILED "gradle-dependencies"
+        if [ "$(wc -l < "$WORK/grs-calls" | tr -d ' ')" = 1 ]; then
+            pass "the run times out: no second Gradle run"
+        else
+            fail "Gradle run again after a time-out" "$(cat "$WORK/grs-calls")"
+        fi
+
+
+        _o=$(_grs_run GRS_TOOLCHAIN=1)
+        _grs_expect "a runtimeClasspath that fails for want of a toolchain JDK: no set, the step recorded as failed" "$_o" FAILED "gradle-dependencies"
+        if printf '%s\n' "$_o" | grep -q '^\[build-prep\] gradle-dependencies: .*(java-toolchain-missing=13)$' \
+            && printf '%s\n' "$_o" | grep -q 'would fail the same way' && ! grep -qx -- '--no-daemon dependencies' "$WORK/grs-calls"; then
+            pass "the java-toolchain-missing marker is in the log (the CLI reruns stage 1 on it) and the root warm-up is not run"
+        else
+            fail "toolchain failure: marker or warm-up wrong" "$_o $(cat "$WORK/grs-calls")"
+        fi
+        rm -rf "$WORK/grs-x"; cp -R "$GRFIX/multi" "$WORK/grs-x"
+        printf 'P\t:kmp\nX\t:kmp\tjvmRuntimeClasspath\n' > "$WORK/grs-x/%3Akmp.txt"
+        _o=$(_grs_run GRS_REPORT="$WORK/grs-x")
+        _grs_expect "an X line without a failed run (rc 0): full graph, and no marker, so the warm-up is not skipped for it" "$_o" SET ""
+        # The init script also fails the run for a toolchain error in a configuration of a
+        # project with no runtimeClasspath (that Groovy runs in tests/test-gradle-runtime.sh).
+        # Here: the texts it looks for must be ones prep_step turns into java-toolchain-missing=N.
+        if grep -qF 'msg =~ /Cannot find a Java installation|No (compatible|matching) toolchains found/' "$PREP" \
+            && grep -qF 'Cannot find a Java installation on your machine|No (compatible|matching) toolchains found for request' "$PREP"; then
+            pass "the init script's toolchain patterns match the ones prep_step turns into java-toolchain-missing=N"
+        else
+            fail "toolchain patterns of the init script and prep_step drifted"
+        fi
+        _o=$(_grs_run ANDROID_HOME=/opt/android-sdk GRS_PROJ_RC=1)
+        _grs_expect "ANDROID_HOME, the project list fails: android-release-classpath recorded as failed" "$_o" FAILED "android-release-classpath"
+
+        _o=$(_grs_run BOMLENS_GRADLE_FULL_GRAPH=1)
+        _grs_expect "BOMLENS_GRADLE_FULL_GRAPH=1: no set" "$_o" SET ""
+        if grep -qx -- '--no-daemon dependencies' "$WORK/grs-calls"; then
+            pass "BOMLENS_GRADLE_FULL_GRAPH=1: the plain warm-up runs"
+        else
+            fail "opt-out did not run the plain warm-up" "$(cat "$WORK/grs-calls")"
+        fi
+
+        _o=$(_grs_run ANDROID_HOME=/opt/android-sdk)
+        _grs_expect "ANDROID_HOME: the release runtime set, a substituted module read as its target" \
+            "$_o" ASET "com.google.code.gson:gson:2.10.1 com.squareup.okhttp3:okhttp:4.12.0 com.squareup.okio:okio-jvm:3.6.0 "
+        _grs_expect "ANDROID_HOME: no java-gradle set beside the release set" "$_o" SET ""
+        _grs_expect "ANDROID_HOME: android-release-classpath recorded" "$_o" APPLIED "android-release-classpath"
+        _o=$(_grs_run ANDROID_HOME=/opt/android-sdk GRS_ANDROID=androidjava)
+        _grs_expect "ANDROID_HOME, no release configuration (a Java build): the java-gradle set is read instead" "$_o" SET "$_grs_single"
+        _grs_expect "ANDROID_HOME, no release configuration: no release set" "$_o" ASET ""
+        _o=$(_grs_run ANDROID_HOME=/opt/android-sdk GRS_ANDROID=androidjava GRS_PROJ_RC=124)
+        _grs_expect "ANDROID_HOME, the project list times out: no java-gradle set either" "$_o" SET ""
+        if printf '%s\n' "$_o" | grep -q 'timed out; using full graph' && ! grep -q -- 'bomlensRuntime' "$WORK/grs-calls"; then
+            pass "ANDROID_HOME, time-out: logged, and no second Gradle run"
+        else
+            fail "Android time-out still ran the java-gradle step" "$(cat "$WORK/grs-calls")"
+        fi
+        _o=$(_grs_run ANDROID_HOME=/opt/android-sdk GRS_PROJECTS=android-projects-odd.txt)
+        _grs_expect "ANDROID_HOME, a project path the per-module run cannot pass: no release set" "$_o" ASET ""
+        if printf '%s\n' "$_o" | grep -q "cannot pass to Gradle"; then
+            pass "ANDROID_HOME, odd project path: logged"
+        else
+            fail "odd Android project path not logged" "$_o"
+        fi
+        _o=$(_grs_run ANDROID_HOME=/opt/android-sdk GRS_ANDROID=androidjava BOMLENS_GRADLE_FULL_GRAPH=1)
+        _grs_expect "ANDROID_HOME, no release configuration, BOMLENS_GRADLE_FULL_GRAPH=1: no set" "$_o" SET ""
+
+        # The filter in its gradle mode, on a cdxgen-shaped BOM.
+        cat > "$WORK/grs-bom.json" <<'JSON'
+{"bomFormat":"CycloneDX","specVersion":"1.6",
+ "metadata":{"component":{"name":"demo","group":"com.example","purl":"pkg:maven/com.example/demo@1.0.0?type=jar","bom-ref":"pkg:maven/com.example/demo@1.0.0?type=jar"}},
+ "components":[
+   {"name":"guava","group":"com.google.guava","version":"33.0.0-jre","purl":"pkg:maven/com.google.guava/guava@33.0.0-jre?type=jar","bom-ref":"pkg:maven/com.google.guava/guava@33.0.0-jre?type=jar","properties":[{"name":"internal:GradleProfileName","value":"compileClasspath"}]},
+   {"name":"j2objc-annotations","group":"com.google.j2objc","version":"2.8","purl":"pkg:maven/com.google.j2objc/j2objc-annotations@2.8?type=jar","bom-ref":"pkg:maven/com.google.j2objc/j2objc-annotations@2.8?type=jar","properties":[{"name":"internal:GradleProfileName","value":"compileClasspath"}]},
+   {"name":"junit-jupiter","group":"org.junit.jupiter","version":"5.10.1","purl":"pkg:maven/org.junit.jupiter/junit-jupiter@5.10.1?type=jar","bom-ref":"pkg:maven/org.junit.jupiter/junit-jupiter@5.10.1?type=jar","scope":"optional","properties":[{"name":"internal:GradleProfileName","value":"testCompileClasspath"}]},
+   {"name":"rootpath-only","group":"org.other","version":"1.0","purl":"pkg:maven/org.other/rootpath-only@1.0?type=jar","bom-ref":"pkg:maven/org.other/rootpath-only@1.0?type=jar","properties":[{"name":"cdx:gradle:GradleRootPath","value":"/app"}]},
+   {"name":"lombok","group":"org.projectlombok","version":"1.18.30","purl":"pkg:maven/org.projectlombok/lombok@1.18.30?type=jar","bom-ref":"pkg:maven/org.projectlombok/lombok@1.18.30?type=jar","properties":[{"name":"internal:GradleProfileName","value":"annotationProcessor"}]},
+   {"name":"mockito-core","group":"org.mockito","version":"5.11.0","purl":"pkg:maven/org.mockito/mockito-core@5.11.0?type=jar","bom-ref":"pkg:maven/org.mockito/mockito-core@5.11.0?type=jar","scope":"optional","properties":[{"name":"internal:GradleProfileName","value":"testCompileClasspath"}]},
+   {"name":"junit-platform-launcher","group":"org.junit.platform","version":"1.10.2","purl":"pkg:maven/org.junit.platform/junit-platform-launcher@1.10.2?type=jar","bom-ref":"pkg:maven/org.junit.platform/junit-platform-launcher@1.10.2?type=jar","scope":"optional","properties":[{"name":"internal:GradleProfileName","value":"testRuntimeClasspath"}]},
+   {"name":"vendored","group":"org.acme","version":"1.0","purl":"pkg:maven/org.acme/vendored@1.0?type=jar","bom-ref":"pkg:maven/org.acme/vendored@1.0?type=jar"},
+   {"name":"demo","group":"com.example","version":"1.0.0","purl":"pkg:maven/com.example/demo@1.0.0?type=jar&sub=1","bom-ref":"sub-demo"}
+ ],
+ "dependencies":[
+   {"ref":"pkg:maven/com.example/demo@1.0.0?type=jar","dependsOn":["sub-demo"]},
+   {"ref":"sub-demo","dependsOn":["pkg:maven/com.google.guava/guava@33.0.0-jre?type=jar"]},
+   {"ref":"pkg:maven/com.google.guava/guava@33.0.0-jre?type=jar","dependsOn":["pkg:maven/com.google.j2objc/j2objc-annotations@2.8?type=jar"]}
+ ]}
+JSON
+        printf '%s\n' com.google.guava:guava:33.0.0-jre com.google.guava:failureaccess:1.0.2 > "$WORK/grs-set.txt"
+        node "$_grs_js" "$WORK/grs-bom.json" "$WORK/grs-set.txt" gradle 2>/dev/null
+        _grs_got=$(jq -r '[.components[] | "\(.name)=\(.scope // "none")"] | join(",")' "$WORK/grs-bom.json")
+        if [ "$_grs_got" = "guava=none,vendored=none,demo=none" ]; then
+            pass "compile-only, test-only and Gradle-marked (GradleRootPath only) components outside the set dropped; runtime ones required; a jar not from Gradle and first-party modules kept"
+        else
+            fail "unexpected components or scopes after the gradle filter" "$_grs_got"
+        fi
+        if [ "$(jq -r '.dependencies[] | select(.ref | startswith("pkg:maven/com.google.guava/guava")) | .dependsOn | length' "$WORK/grs-bom.json")" = "0" ]; then
+            pass "dependency edges to dropped components pruned"
+        else
+            fail "edge to a dropped component kept" "$(jq -c '.dependencies' "$WORK/grs-bom.json")"
+        fi
+        if [ "$(sed -n "s/^const GRADLE_ORIGIN = new Set(\(.*\));$/\1/p" "$PREP")" = "$(sed -n "s/^const ORIGIN = new Set(\(.*\));$/\1/p" "$PREP")" ]; then
+            pass "the filter's Gradle marks are the gradle-packages check's marks"
+        else
+            fail "GRADLE_ORIGIN and ORIGIN differ in build-prep.sh"
+        fi
+    else
+        fail "could not extract the Gradle block, the prep helpers or the filter from build-prep.sh"
+    fi
+else
+    echo "  SKIP: node unavailable, skipping java-gradle runtime classpath test"
+fi
+
+echo "== gradle-runtime-scope: the whole script, with stub gradle and cdxgen =="
+# The same filter through build-prep.sh itself: the init script's files come
+# from a stand-in gradlew, cdxgen's BOM from a stand-in with the components
+# cdxgen 13.5.0 writes for this build (internal:GradleProfileName on what it
+# read from Gradle, none on a jar found in the tree).
+if command -v node >/dev/null 2>&1; then
+    GW2="$WORK/gradle-whole"; mkdir -p "$GW2/bin" "$GW2/src" "$GW2/out" "$GW2/gh"
+    printf "plugins { id 'java' }\n" > "$GW2/src/build.gradle"
+    printf '#!/bin/sh\nexit 0\n' > "$GW2/bin/gradle"
+    cat > "$GW2/src/gradlew" <<GW2STUB
+#!/bin/sh
+echo "\$*" >> "$GW2/calls"
+case " \$* " in *" --version "*) exit 0 ;; esac
+out=""
+for a in "\$@"; do case "\$a" in -Dbomlens.gradle.out=*) out="\${a#-Dbomlens.gradle.out=}" ;; esac; done
+[ -z "\$out" ] || cp "$FIX/gradle-runtime/single"/* "\$out"/
+exit 0
+GW2STUB
+    chmod +x "$GW2/src/gradlew" "$GW2/bin/gradle"
+    _gw2_c() { printf '{"name":"%s","version":"%s","purl":"pkg:maven/%s/%s@%s?type=jar","bom-ref":"pkg:maven/%s/%s@%s?type=jar","properties":[{"name":"internal:GradleProfileName","value":"%s"}]%s}' "$2" "$3" "$1" "$2" "$3" "$1" "$2" "$3" "$4" "${5:+,\"scope\":\"$5\"}"; }
+    {
+        printf '{"bomFormat":"CycloneDX","specVersion":"1.6","version":1,"metadata":{"component":{"name":"demo","type":"application"}},"components":['
+        _gw2_c com.google.guava guava 33.0.0-jre compileClasspath; printf ','
+        _gw2_c com.google.guava failureaccess 1.0.2 compileClasspath; printf ','
+        _gw2_c com.google.j2objc j2objc-annotations 2.8 compileClasspath; printf ','
+        _gw2_c org.projectlombok lombok 1.18.30 annotationProcessor; printf ','
+        _gw2_c junit junit 4.13.2 testCompileClasspath optional; printf ','
+        printf '{"name":"treejar","version":"1.0","purl":"pkg:maven/org.acme/treejar@1.0?type=jar","bom-ref":"pkg:maven/org.acme/treejar@1.0?type=jar"}'
+        printf ']}'
+    } > "$GW2/bom-template.json"
+    cat > "$GW2/bin/cdxgen" <<GW2CDX
+#!/bin/sh
+out=""; prev=""; for a in "\$@"; do [ "\$prev" = "-o" ] && out="\$a"; prev="\$a"; done
+cp "$GW2/bom-template.json" "\$out"
+GW2CDX
+    chmod +x "$GW2/bin/cdxgen"
+    env -u ANDROID_HOME PATH="$GW2/bin:$PATH" HOME="$GW2/home" GRADLE_USER_HOME="$GW2/gh" \
+        sh "$LIB/build-prep.sh" "$GW2/src" "$GW2/out/bom.json" > "$GW2/log" 2>&1
+    _gw2_purls=$(jq -r '[.components[].purl | sub("^pkg:maven/";"") | sub("\\?type=jar";"")] | sort | join(" ")' "$GW2/out/bom.json" 2>/dev/null)
+    if [ "$_gw2_purls" = "com.google.guava/failureaccess@1.0.2 com.google.guava/guava@33.0.0-jre org.acme/treejar@1.0" ]; then
+        pass "build-prep.sh filters the BOM to the runtime classpath: compile-only, annotation processor and test components dropped, a jar from the tree kept"
+    else
+        fail "whole-script runtime filter kept [$_gw2_purls]" "$(grep gradle "$GW2/log" | head -5)"
+    fi
+    if jq -e '[.metadata.properties[]? | select(.name=="bomlens:prep-step-applied" and (.value|test("gradle-dependencies")))] | length > 0' "$GW2/out/bom.json" >/dev/null 2>&1 \
+       && ! jq -e '[.metadata.properties[]? | select(.name=="bomlens:pipeline-step-failed")] | length > 0' "$GW2/out/bom.json" >/dev/null 2>&1; then
+        pass "the run is recorded as gradle-dependencies, applied and not failed"
+    else
+        fail "gradle-dependencies recording" "$(jq -c '.metadata.properties' "$GW2/out/bom.json" 2>&1 | cut -c1-300)"
+    fi
+    if [ "$(grep -c -- 'bomlensRuntime' "$GW2/calls")" = 1 ] && ! grep -qx -- '--no-daemon dependencies' "$GW2/calls"; then
+        pass "one Gradle run for the whole build, and no separate warm-up run"
+    else
+        fail "unexpected Gradle calls" "$(cat "$GW2/calls")"
+    fi
+else
+    echo "  SKIP: node unavailable, skipping the whole-script java-gradle test"
 fi
 
 echo "== EOL: offline end-of-life flagging (enrich-eol.sh) — PURL whitelist + cycle lookup =="
@@ -7185,6 +8556,94 @@ BOMLENS_KEEP_BUILD_OUTPUT=1 PATH="$GUARD_ROOT/bin:$PATH" \
     && pass "BOMLENS_KEEP_BUILD_OUTPUT=1 keeps the resolved tree" \
     || fail "the opt-out did not keep the resolved tree"
 
+echo "== source-tree guard: a record without a snapshot never deletes the tree (#988) =="
+# A scan whose cdxgen container never started leaves owner/path/image in the
+# guard-state folder and no files.before. The next scan's restore-only run
+# must not read that as "every resolver-owned path is new".
+STALE="$WORK/guard-stale"
+stale_tree() {
+    rm -rf "$STALE/src"; mkdir -p "$STALE/src/vendor/github.com/google/uuid" "$STALE/state"
+    printf 'module example.com/guardrepro\n\ngo 1.22\n' > "$STALE/src/go.mod"
+    printf 'github.com/google/uuid v1.6.0 h1:x=\n' > "$STALE/src/go.sum"
+    printf 'package uuid\n' > "$STALE/src/vendor/github.com/google/uuid/uuid.go"
+    printf 'package main\n' > "$STALE/src/main.go"
+}
+stale_restore_only() {
+    BOMLENS_GUARD_RESTORE_ONLY=1 BOMLENS_GUARD_ID=k1 BOMLENS_GUARD_STATE_ROOT="$STALE/state" \
+        sh "$LIB/build-prep.sh" "$STALE/src" >/dev/null 2>&1
+}
+stale_tree
+mkdir -p "$STALE/state/k1"
+printf 'bomlens-scan-1\n' > "$STALE/state/k1/owner"; printf '%s\n' "$STALE/src" > "$STALE/state/k1/path"
+printf 'nosuch/cdxgen\n' > "$STALE/state/k1/image"
+stale_restore_only
+[ -f "$STALE/src/go.mod" ] && [ -f "$STALE/src/go.sum" ] && [ -f "$STALE/src/vendor/github.com/google/uuid/uuid.go" ] \
+    && pass "restore-only with no files.before keeps go.mod, go.sum and vendor/" \
+    || fail "restore-only with no files.before deleted the user's files" "$(cd "$STALE/src" && find . | sort | tr '\n' ' ')"
+[ ! -e "$STALE/state/k1" ] \
+    && pass "the record without a snapshot is removed" \
+    || fail "the record without a snapshot was left in place"
+# Lists written but names.version missing (stopped while the snapshot was taken).
+stale_tree
+mkdir -p "$STALE/state/k1"; : > "$STALE/state/k1/files.before"; : > "$STALE/state/k1/dirs.before"
+stale_restore_only
+[ -f "$STALE/src/go.mod" ] && [ -f "$STALE/src/go.sum" ] && [ -d "$STALE/src/vendor" ] && [ ! -e "$STALE/state/k1" ] \
+    && pass "restore-only with a snapshot lacking names.version touches nothing and drops the record" \
+    || fail "an incomplete snapshot led to deletions or was kept"
+# A complete snapshot is still finished: go.sum and build/ that it did not list go.
+stale_tree; rm -f "$STALE/src/go.sum"; rm -rf "$STALE/src/vendor"
+mkdir -p "$STALE/state/k1/tree"
+printf './go.mod\n' > "$STALE/state/k1/files.before"; : > "$STALE/state/k1/dirs.before"
+cp "$STALE/src/go.mod" "$STALE/state/k1/tree/go.mod"; cp "$STALE/src/go.mod" "$STALE/go.mod.orig"
+echo 5 > "$STALE/state/k1/names.version"
+printf 'require x v1\n' >> "$STALE/src/go.mod"; printf 'x\n' > "$STALE/src/go.sum"; mkdir -p "$STALE/src/build"
+stale_restore_only
+[ ! -e "$STALE/src/go.sum" ] && [ ! -e "$STALE/src/build" ] && cmp -s "$STALE/go.mod.orig" "$STALE/src/go.mod" \
+    && [ ! -e "$STALE/state/k1" ] \
+    && pass "restore-only still finishes a complete snapshot" \
+    || fail "a complete snapshot was not finished" "$(cd "$STALE/src" && find . | sort | tr '\n' ' ')"
+# guard_restore itself refuses a folder without the lists.
+stale_tree; mkdir -p "$STALE/state/k2"
+( cd "$STALE/src" && SRC="$STALE/src" OUT="$STALE/none.json" \
+    sh -c 'log() { :; }; . "$1"; GUARD_DIR="$2"; guard_restore' _ "$LEG/guard-funcs.sh" "$STALE/state/k2" >/dev/null 2>&1 )
+[ -f "$STALE/src/go.mod" ] && [ -f "$STALE/src/go.sum" ] && [ -d "$STALE/src/vendor" ] && [ ! -e "$STALE/state/k2" ] \
+    && pass "guard_restore with no files.before deletes nothing" \
+    || fail "guard_restore with no files.before deleted the user's files"
+# A path git tracks is kept even when the snapshot does not list it.
+if command -v git >/dev/null 2>&1; then
+    stale_tree
+    ( cd "$STALE/src" && git init -q . && git add go.mod go.sum vendor \
+        && git -c user.name=t -c user.email=t@example.invalid commit -qm init ) >/dev/null 2>&1
+    printf 'x\n' > "$STALE/src/Cargo.lock"
+    mkdir -p "$STALE/state/k3"; : > "$STALE/state/k3/files.before"; : > "$STALE/state/k3/dirs.before"
+    echo 5 > "$STALE/state/k3/names.version"
+    ( cd "$STALE/src" && SRC="$STALE/src" OUT="$STALE/none.json" \
+        sh -c 'log() { :; }; . "$1"; GUARD_DIR="$2"; guard_restore' _ "$LEG/guard-funcs.sh" "$STALE/state/k3" >/dev/null 2>&1 )
+    [ -f "$STALE/src/go.mod" ] && [ -f "$STALE/src/go.sum" ] && [ -f "$STALE/src/vendor/github.com/google/uuid/uuid.go" ] \
+        && pass "guard_restore keeps files and folders git tracks" \
+        || fail "guard_restore deleted files git tracks" "$(cd "$STALE/src" && find . -path ./.git -prune -o -print | sort | tr '\n' ' ')"
+    [ ! -e "$STALE/src/Cargo.lock" ] \
+        && pass "guard_restore still removes an untracked file the run created" \
+        || fail "an untracked new Cargo.lock was kept"
+else
+    echo "  (skip: no git here for the tracked-file check)"
+fi
+# The CLI and the web UI drop their record when the cdxgen container never
+# took a snapshot, and keep one that has it (an interrupted run).
+for _gs_script in "$ROOT_DIR/scripts/scan-sbom.sh" "$ROOT_DIR/docker/entrypoint.sh"; do
+    sed -n '/^drop_unused_guard_state() {/,/^}/p' "$_gs_script" > "$STALE/drop.sh"
+    rm -rf "$STALE/hs"; mkdir -p "$STALE/hs/a" "$STALE/hs/b" "$STALE/hs/c"
+    printf 'me\n' > "$STALE/hs/a/owner"
+    printf 'me\n' > "$STALE/hs/b/owner"; : > "$STALE/hs/b/files.before"
+    printf 'other\n' > "$STALE/hs/c/owner"
+    for _gs_id in a b c; do
+        GUARD_STATE_DIR="$STALE/hs" GUARD_ID="$_gs_id" bash -c '. "$1"; drop_unused_guard_state me' _ "$STALE/drop.sh"
+    done
+    [ -s "$STALE/drop.sh" ] && [ ! -e "$STALE/hs/a" ] && [ -d "$STALE/hs/b" ] && [ -d "$STALE/hs/c" ] \
+        && pass "$(basename "$_gs_script"): a record with no snapshot is dropped, a snapshot or another owner's record is kept" \
+        || fail "$(basename "$_gs_script"): drop_unused_guard_state removed the wrong records" "$(ls "$STALE/hs" | tr '\n' ' ')"
+done
+
 echo "== source-tree guard: an interrupt stops the resolver instead of waiting it out =="
 # Regression: a plain foreground `cdxgen "$@"` deferred INT/TERM
 # handling until cdxgen finished on its own (measured: a 5-minute `docker stop`
@@ -7906,6 +9365,111 @@ else
         && pass "a writable ~/.gradle (the CLI's mounted cache) is left in use" \
         || fail "writable account home: gradle saw $(sort -u "$GU_ROOT/seen" 2>&1 | tr '\n' ' ')"
 fi
+
+echo "== gradle: a gradlew without the executable bit runs through sh =="
+GW_ROOT="$WORK/gradle-wrapper-noexec"; mkdir -p "$GW_ROOT/bin" "$GW_ROOT/src" "$GW_ROOT/out" "$GW_ROOT/gh"
+printf "plugins { id 'java' }\n" > "$GW_ROOT/src/build.gradle"
+printf '#!/bin/sh\necho "image $*" >> "%s/calls"\n' "$GW_ROOT" > "$GW_ROOT/bin/gradle"
+# The cdxgen stub sets the executable bit, as cdxgen does before it runs gradlew.
+cat > "$GW_ROOT/bin/cdxgen" <<GWCDX
+#!/bin/sh
+chmod +x "$GW_ROOT/src/gradlew"
+out=""; prev=""; for a in "\$@"; do [ "\$prev" = "-o" ] && out="\$a"; prev="\$a"; done
+printf '%s' '{"bomFormat":"CycloneDX","specVersion":"1.6","version":1,"metadata":{},"components":[]}' > "\$out"
+GWCDX
+chmod +x "$GW_ROOT/bin/gradle" "$GW_ROOT/bin/cdxgen"
+printf '#!/bin/sh\necho "wrapper $*" >> "%s/calls"\ncase " $* " in *" --version "*) printf "\\n------------------------------------------------------------\\nGradle 5.6.4\\n------------------------------------------------------------\\n" ;; esac\n' "$GW_ROOT" > "$GW_ROOT/src/gradlew"
+chmod 644 "$GW_ROOT/src/gradlew"
+env -u ANDROID_HOME PATH="$GW_ROOT/bin:$PATH" HOME="$GW_ROOT/home" GRADLE_USER_HOME="$GW_ROOT/gh" \
+    sh "$LIB/build-prep.sh" "$GW_ROOT/src" "$GW_ROOT/out/bom.json" > "$GW_ROOT/log" 2>&1
+{ grep -q '^wrapper --no-daemon -q --console=plain --no-configuration-cache --init-script ' "$GW_ROOT/calls" 2>/dev/null && ! grep -q '^image ' "$GW_ROOT/calls"; } \
+    && pass "build-prep runs a non-executable gradlew through sh, not the image's Gradle" \
+    || fail "non-executable gradlew: calls [$(tr '\n' ';' < "$GW_ROOT/calls" 2>/dev/null)]" "$(grep gradle "$GW_ROOT/log" | head -5)"
+grep -q '^\[build-prep\] gradle: sh ./gradlew runs Gradle 5.6.4$' "$GW_ROOT/log" \
+    && pass "the Gradle that runs is logged once, from --version" \
+    || fail "Gradle version log line missing" "$(grep 'gradle:' "$GW_ROOT/log" | head -5)"
+[ "$(grep -c 'runs Gradle' "$GW_ROOT/log")" = 1 ] \
+    && pass "the Gradle version line appears once" \
+    || fail "Gradle version line count: $(grep -c 'runs Gradle' "$GW_ROOT/log")"
+grep -q '^wrapper' "$GW_ROOT/calls" && [ -f "$GW_ROOT/src/gradlew" ] && [ ! -x "$GW_ROOT/src/gradlew" ] \
+    && pass "the gradlew is left without the executable bit after the scan" \
+    || fail "gradlew mode after the scan: $(ls -l "$GW_ROOT/src/gradlew" 2>/dev/null)"
+
+echo "== gradle: the shell for a gradlew without the executable bit follows its first line =="
+# Stub bash and sh in PATH record who ran the wrapper, then run the real shell.
+_gs_run() {  # <name> <first line of gradlew or empty>
+    GS_ROOT="$WORK/gradle-shebang-$1"; mkdir -p "$GS_ROOT/bin" "$GS_ROOT/src" "$GS_ROOT/out" "$GS_ROOT/gh"
+    printf "plugins { id 'java' }\n" > "$GS_ROOT/src/build.gradle"
+    printf '#!/bin/sh\nexit 0\n' > "$GS_ROOT/bin/gradle"
+    printf '#!/bin/sh\necho "bash $*" >> "%s/shells"\nexec %s "$@"\n' "$GS_ROOT" "$(command -v bash)" > "$GS_ROOT/bin/bash"
+    printf '#!/bin/sh\necho "sh $*" >> "%s/shells"\nexec /bin/sh "$@"\n' "$GS_ROOT" > "$GS_ROOT/bin/sh"
+    cat > "$GS_ROOT/bin/cdxgen" <<'GSCDX'
+#!/bin/sh
+out=""; prev=""; for a in "$@"; do [ "$prev" = "-o" ] && out="$a"; prev="$a"; done
+printf '%s' '{"bomFormat":"CycloneDX","specVersion":"1.6","version":1,"metadata":{},"components":[]}' > "$out"
+GSCDX
+    chmod +x "$GS_ROOT/bin/gradle" "$GS_ROOT/bin/bash" "$GS_ROOT/bin/sh" "$GS_ROOT/bin/cdxgen"
+    { [ -z "$2" ] || printf '%s\n' "$2"; printf 'exit 0\n'; } > "$GS_ROOT/src/gradlew"
+    chmod 644 "$GS_ROOT/src/gradlew"
+    env -u ANDROID_HOME PATH="$GS_ROOT/bin:$PATH" HOME="$GS_ROOT/home" GRADLE_USER_HOME="$GS_ROOT/gh" \
+        /bin/sh "$LIB/build-prep.sh" "$GS_ROOT/src" "$GS_ROOT/out/bom.json" > "$GS_ROOT/log" 2>&1
+}
+_gs_run bash '#!/usr/bin/env bash'
+{ grep -q '^bash \./gradlew ' "$GS_ROOT/shells" 2>/dev/null && ! grep -q '^sh \./gradlew ' "$GS_ROOT/shells" \
+    && grep -q '^\[build-prep\] gradle: bash \./gradlew runs ' "$GS_ROOT/log"; } \
+    && pass "a gradlew whose first line names bash runs through bash" \
+    || fail "bash shebang: shells [$(tr '\n' ';' < "$GS_ROOT/shells" 2>/dev/null)]" "$(grep 'gradle:' "$GS_ROOT/log" | head -3)"
+_gs_run sh '#!/bin/sh'
+{ grep -q '^sh \./gradlew ' "$GS_ROOT/shells" 2>/dev/null && ! grep -q '^bash \./gradlew ' "$GS_ROOT/shells" \
+    && grep -q '^\[build-prep\] gradle: sh \./gradlew runs ' "$GS_ROOT/log"; } \
+    && pass "a gradlew whose first line names sh runs through sh" \
+    || fail "sh shebang: shells [$(tr '\n' ';' < "$GS_ROOT/shells" 2>/dev/null)]" "$(grep 'gradle:' "$GS_ROOT/log" | head -3)"
+_gs_run none ''
+{ grep -q '^sh \./gradlew ' "$GS_ROOT/shells" 2>/dev/null && ! grep -q '^bash \./gradlew ' "$GS_ROOT/shells" \
+    && grep -q '^\[build-prep\] gradle: sh \./gradlew runs ' "$GS_ROOT/log"; } \
+    && pass "a gradlew with no shebang runs through sh" \
+    || fail "no shebang: shells [$(tr '\n' ';' < "$GS_ROOT/shells" 2>/dev/null)]" "$(grep 'gradle:' "$GS_ROOT/log" | head -3)"
+# The helper alone, with a PATH that has head but no bash (or has both): a bash
+# shebang falls back to sh when bash is not installed. An empty PATH would
+# also give sh, by head being missing, so head stays.
+_ws_fn="$(awk '/^wrapper_shell\(\) \{/ {p=1} p {print} p && /^}$/ {exit}' "$LIB/build-prep.sh")"
+_ws_dir="$WORK/wrapper-shell-path"; mkdir -p "$_ws_dir"
+ln -sf "$(command -v head)" "$_ws_dir/head"
+printf '#!/usr/bin/env bash\nexit 0\n' > "$WORK/wrapper-shell-bash"
+_ws_nobash="$(PATH="$_ws_dir" /bin/sh -c "$_ws_fn"'
+wrapper_shell "$1"' _ "$WORK/wrapper-shell-bash")"
+ln -sf "$(command -v bash)" "$_ws_dir/bash"
+_ws_withbash="$(PATH="$_ws_dir" /bin/sh -c "$_ws_fn"'
+wrapper_shell "$1"' _ "$WORK/wrapper-shell-bash")"
+[ "$_ws_nobash" = sh ] && [ "$_ws_withbash" = bash ] \
+    && pass "a bash shebang runs through sh when bash is not installed, and through bash when it is" \
+    || fail "wrapper_shell without bash [$_ws_nobash], with bash [$_ws_withbash]"
+
+echo "== gradle: cdxgen reads the POMs Gradle downloaded (GRADLE_CACHE_DIR) =="
+# HOME is not the account home Gradle uses, so cdxgen is told where Gradle's
+# cache is, unless the caller already set GRADLE_CACHE_DIR.
+GC_ROOT="$WORK/gradle-cache-dir"; mkdir -p "$GC_ROOT/bin" "$GC_ROOT/src" "$GC_ROOT/out" "$GC_ROOT/acct" "$GC_ROOT/home"
+printf "plugins { id 'java' }\n" > "$GC_ROOT/src/build.gradle"
+printf '#!/bin/sh\necho "root:x:0:0:root:%s:/bin/sh"\n' "$GC_ROOT/acct" > "$GC_ROOT/bin/getent"
+printf '#!/bin/sh\nexit 0\n' > "$GC_ROOT/bin/gradle"
+printf '#!/bin/sh\nout=""; prev=""; for a in "$@"; do [ "$prev" = "-o" ] && out="$a"; prev="$a"; done\necho "${GRADLE_CACHE_DIR:-unset}" > "%s/seen"\nprintf %s > "$out"\n' "$GC_ROOT" "'{\"bomFormat\":\"CycloneDX\",\"specVersion\":\"1.6\",\"version\":1,\"metadata\":{},\"components\":[]}'" > "$GC_ROOT/bin/cdxgen"
+chmod +x "$GC_ROOT/bin/getent" "$GC_ROOT/bin/gradle" "$GC_ROOT/bin/cdxgen"
+_gc_run() { rm -f "$GC_ROOT/seen"
+    env -u ANDROID_HOME "$@" PATH="$GC_ROOT/bin:$PATH" HOME="$GC_ROOT/home" \
+        sh "$LIB/build-prep.sh" "$GC_ROOT/src" "$GC_ROOT/out/bom.json" > "$GC_ROOT/log" 2>&1
+    cat "$GC_ROOT/seen" 2>/dev/null; }
+_gc_seen=$(_gc_run -u GRADLE_USER_HOME -u GRADLE_CACHE_DIR)
+[ "$_gc_seen" = "$GC_ROOT/acct/.gradle/caches/modules-2/files-2.1" ] \
+    && pass "cdxgen looks for Gradle's downloads under the account home's .gradle, not HOME" \
+    || fail "GRADLE_CACHE_DIR with the account home: [$_gc_seen]" "$(grep gradle "$GC_ROOT/log" | head -5)"
+_gc_seen=$(_gc_run -u GRADLE_CACHE_DIR GRADLE_USER_HOME="$GC_ROOT/guh")
+[ "$_gc_seen" = "$GC_ROOT/guh/caches/modules-2/files-2.1" ] \
+    && pass "a GRADLE_USER_HOME is the cache cdxgen reads" \
+    || fail "GRADLE_CACHE_DIR with GRADLE_USER_HOME: [$_gc_seen]"
+_gc_seen=$(_gc_run -u GRADLE_USER_HOME GRADLE_CACHE_DIR=/elsewhere/files-2.1)
+[ "$_gc_seen" = "/elsewhere/files-2.1" ] \
+    && pass "a GRADLE_CACHE_DIR the caller set is kept" \
+    || fail "preset GRADLE_CACHE_DIR: [$_gc_seen]"
 
 echo "== prep_step: every resolution step runs through it (no bare invocation left) =="
 # The pre-prep_step patterns (silently discarded stderr, no time limit) must
@@ -9210,9 +10774,12 @@ DETECT="$ROOT_DIR/docker/lib/source-detect.sh"
 # clobbering nothing today but wiring a second, wrong path for the same name.
 # BOMLENS_REACHABILITY, BOMLENS_GOVULNCHECK and BOMLENS_REACHABILITY_NONCE are the
 # same kind: the launcher sets them with a value only when it hands stage 1 a
-# govulncheck binary.
+# govulncheck binary. BOMLENS_GUARD_STATE_ROOT only points the tests at a
+# folder other than /bomlens-state. BOMLENS_EXTRA_CA_CERTS: the launcher
+# mounts the CA bundle and sets the path itself (EXTRA_CA_ENV_NAMES);
+# BOMLENS_EXTRA_CA_APPLIED is extra_ca_trust's own marker.
 _read=$(grep -oE 'BOMLENS_[A-Z_]+:-' "$PREP" | sed 's/:-$//' | sort -u \
-    | grep -vE '^BOMLENS_(GUARD_ID|GUARD_RESTORE_ONLY|REACHABILITY|REACHABILITY_NONCE|GOVULNCHECK)$' | tr '\n' ' ')
+    | grep -vE '^BOMLENS_(GUARD_ID|GUARD_RESTORE_ONLY|GUARD_STATE_ROOT|REACHABILITY|REACHABILITY_NONCE|GOVULNCHECK|EXTRA_CA_CERTS|EXTRA_CA_APPLIED)$' | tr '\n' ' ')
 _listed=$(bash -c '. "$1"; printf "%s\n" $BUILD_PREP_ENV_NAMES' _ "$DETECT" | sort -u | tr '\n' ' ')
 [ -n "$_read" ] && [ "$_read" = "$_listed" ] \
     && pass "BUILD_PREP_ENV_NAMES matches the BOMLENS_* switches build-prep.sh reads" \
@@ -9236,6 +10803,163 @@ _on=""; for v in 1 true 0 false ""; do bash -c "$_opt; opted_out \"\$1\"" _ "$v"
 [ "$_on" = "[1][true]" ] \
     && pass "an opt-out switch counts as set only for 1 or true" \
     || fail "opt-out switch values treated as set: $_on"
+
+echo "== extra CA bundle (BOMLENS_EXTRA_CA_CERTS): a proxy that inspects TLS =="
+ECA="$LIB/extra-ca.sh"
+# extra_ca_trust writes under /tmp; what these cases leave there is removed
+# at the end of the section.
+_eca_tmp_before=" $(echo /tmp/bomlens-ca.*) "
+# build-prep.sh runs alone in the cdxgen container and keeps its own copy.
+_eca_lib=$(sed -n '/^extra_ca_trust() {$/,/^}$/p' "$ECA")
+_eca_prep=$(sed -n '/^extra_ca_trust() {$/,/^}$/p' "$PREP")
+[ -n "$_eca_lib" ] && [ "$_eca_lib" = "$_eca_prep" ] \
+    && pass "build-prep.sh's extra_ca_trust is the same as docker/lib/extra-ca.sh's" \
+    || fail "extra_ca_trust in build-prep.sh and extra-ca.sh differ"
+grep -q '^extra_ca_trust$' "$PREP" && grep -q '^extra_ca_trust$' "$ROOT_DIR/docker/entrypoint.sh" \
+    && pass "build-prep.sh and entrypoint.sh apply the extra CA bundle" \
+    || fail "build-prep.sh or entrypoint.sh no longer calls extra_ca_trust"
+case " $(bash -c '. "$1"; build_prep_env_args' _ "$DETECT") " in
+    *" -e BOMLENS_EXTRA_CA_CERTS "*) pass "the cdxgen container gets BOMLENS_EXTRA_CA_CERTS by name" ;;
+    *) fail "build_prep_env_args does not pass BOMLENS_EXTRA_CA_CERTS" ;;
+esac
+case " $(bash -c '. "$1"; printf "%s " $STAGE2_NETWORK_ENV_NAMES' _ "$DETECT") " in
+    *" BOMLENS_EXTRA_CA_CERTS "*) pass "the post-processing container gets BOMLENS_EXTRA_CA_CERTS by name" ;;
+    *) fail "STAGE2_NETWORK_ENV_NAMES does not name BOMLENS_EXTRA_CA_CERTS" ;;
+esac
+# Unset, a missing file and a file with no certificate change nothing.
+_eca_env=$(env -u BOMLENS_EXTRA_CA_CERTS sh -c '. "$1"; extra_ca_trust; echo "rc=$? ssl=${SSL_CERT_FILE:-}"' _ "$ECA" 2>&1)
+[ "$_eca_env" = "rc=0 ssl=" ] && pass "unset: nothing is changed" || fail "unset BOMLENS_EXTRA_CA_CERTS changed something" "$_eca_env"
+printf 'not a certificate\n' > "$WORK/eca-not-pem.txt"
+for _eca_bad in "$WORK/eca-missing.pem" "$WORK/eca-not-pem.txt"; do
+    _eca_env=$(env -u SSL_CERT_FILE BOMLENS_EXTRA_CA_CERTS="$_eca_bad" sh -c '. "$1"; extra_ca_trust; echo "rc=$? ssl=${SSL_CERT_FILE:-}"' _ "$ECA" 2>&1)
+    case "$_eca_env" in
+        *"[WARN] BOMLENS_EXTRA_CA_CERTS="*"rc=0 ssl=") pass "a bad bundle ($(basename "$_eca_bad")) is warned about and not used" ;;
+        *) fail "a bad bundle ($(basename "$_eca_bad")) was not refused with a warning" "$_eca_env" ;;
+    esac
+done
+# A real bundle: two certificates and a private key, CRLF line ends.
+if command -v openssl >/dev/null 2>&1; then
+    _eca_ok=1
+    for _eca_cn in A B; do
+        openssl req -x509 -newkey rsa:2048 -nodes -keyout "$WORK/eca-$_eca_cn.key" -out "$WORK/eca-$_eca_cn.pem" \
+            -days 2 -subj "/CN=bomlens test CA $_eca_cn" >/dev/null 2>&1 || _eca_ok=""
+    done
+fi
+if [ -n "${_eca_ok:-}" ]; then
+    cat "$WORK/eca-A.pem" "$WORK/eca-A.key" "$WORK/eca-B.pem" | sed 's/$/\r/' > "$WORK/eca-bundle.pem"
+    # A JDK when the host has one (macOS: java_home; elsewhere: JAVA_HOME or
+    # the java on PATH, which extra_ca_trust resolves itself).
+    _eca_jh="${JAVA_HOME:-}"
+    [ -n "$_eca_jh" ] || _eca_jh="$(/usr/libexec/java_home 2>/dev/null || true)"
+    _eca_out=$(env -u SSL_CERT_FILE -u NODE_EXTRA_CA_CERTS -u BOMLENS_EXTRA_CA_APPLIED \
+        JAVA_HOME="$_eca_jh" JAVA_TOOL_OPTIONS="-Dfile.encoding=UTF-8" BOMLENS_EXTRA_CA_CERTS="$WORK/eca-bundle.pem" \
+        sh -c 'set -e; . "$1"; extra_ca_trust; first="$SSL_CERT_FILE"; extra_ca_trust
+               printf "ssl=%s\nreq=%s\ncurl=%s\ncargo=%s\ngit=%s\npip=%s\nnode=%s\njto=%s\nfirst=%s\n" \
+                 "$SSL_CERT_FILE" "$REQUESTS_CA_BUNDLE" "$CURL_CA_BUNDLE" "$CARGO_HTTP_CAINFO" "$GIT_SSL_CAINFO" \
+                 "$PIP_CERT" "$NODE_EXTRA_CA_CERTS" "${JAVA_TOOL_OPTIONS:-}" "$first"' _ "$ECA" 2>&1)
+    _eca_get() { printf '%s\n' "$_eca_out" | sed -n "s/^$1=//p"; }
+    _eca_ssl="$(_eca_get ssl)"; _eca_node="$(_eca_get node)"
+    case "$_eca_ssl" in /tmp/bomlens-ca.*/bundle.pem) pass "the combined bundle is written under /tmp" ;; *) fail "SSL_CERT_FILE is not under /tmp" "$_eca_out" ;; esac
+    { [ "$(_eca_get req)" = "$_eca_ssl" ] && [ "$(_eca_get curl)" = "$_eca_ssl" ] && [ "$(_eca_get cargo)" = "$_eca_ssl" ] \
+      && [ "$(_eca_get git)" = "$_eca_ssl" ] && [ "$(_eca_get pip)" = "$_eca_ssl" ]; } \
+        && pass "REQUESTS_CA_BUNDLE, CURL_CA_BUNDLE, CARGO_HTTP_CAINFO, GIT_SSL_CAINFO and PIP_CERT name the combined bundle" \
+        || fail "a CA variable does not name the combined bundle" "$_eca_out"
+    [ "$(_eca_get first)" = "$_eca_ssl" ] && pass "a second call in the same environment changes nothing" \
+        || fail "extra_ca_trust ran twice" "$_eca_out"
+    if [ -f "$_eca_ssl" ] && [ -f "$_eca_node" ]; then
+        _eca_sys=0
+        for _f in /etc/ssl/certs/ca-certificates.crt /etc/pki/tls/certs/ca-bundle.crt /etc/ssl/ca-bundle.pem \
+                /etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem /etc/ssl/cert.pem; do
+            if [ -s "$_f" ]; then _eca_sys=$(grep -c 'BEGIN CERTIFICATE' "$_f"); break; fi
+        done
+        [ "$(grep -c 'BEGIN CERTIFICATE' "$_eca_ssl")" -eq $((_eca_sys + 2)) ] \
+            && pass "the combined bundle holds the system bundle and both extra certificates" \
+            || fail "the combined bundle holds $(grep -c 'BEGIN CERTIFICATE' "$_eca_ssl") certificates, expected $((_eca_sys + 2))"
+        { [ "$(grep -c 'BEGIN CERTIFICATE' "$_eca_node")" -eq 2 ] && ! grep -q 'PRIVATE KEY' "$_eca_node" "$_eca_ssl" \
+          && ! grep -q "$(printf '\r')" "$_eca_node"; } \
+            && pass "NODE_EXTRA_CA_CERTS holds the two certificates only (no key, no CR)" \
+            || fail "NODE_EXTRA_CA_CERTS content is wrong" "$(cat "$_eca_node")"
+        if openssl verify -CAfile "$_eca_ssl" "$WORK/eca-B.pem" >/dev/null 2>&1; then
+            pass "OpenSSL trusts a certificate from the bundle through SSL_CERT_FILE's file"
+        else
+            fail "openssl verify does not accept the extra CA from the combined bundle"
+        fi
+    else
+        fail "extra_ca_trust wrote no bundle" "$_eca_out"
+    fi
+    _eca_jto="$(_eca_get jto)"
+    if [ -n "$_eca_jh" ] && [ -x "$_eca_jh/bin/keytool" ]; then
+        _eca_ts="${_eca_jto#*-Djavax.net.ssl.trustStore=}"; _eca_ts="${_eca_ts%% *}"
+        case "$_eca_jto" in
+            "-Dfile.encoding=UTF-8 -Djavax.net.ssl.trustStore=/tmp/bomlens-ca."*"/cacerts -Djavax.net.ssl.trustStorePassword=changeit -Djavax.net.ssl.trustStoreType=JKS")
+                pass "JAVA_TOOL_OPTIONS keeps its value and adds the trust store (JKS)" ;;
+            *) fail "JAVA_TOOL_OPTIONS is wrong" "$_eca_jto" ;;
+        esac
+        _eca_list="$("$_eca_jh/bin/keytool" -J-Duser.language=en -list -keystore "$_eca_ts" -storetype JKS -storepass changeit 2>/dev/null)" || _eca_list=""
+        _eca_aliases="$(printf '%s\n' "$_eca_list" | grep -c '^bomlens-extra-ca-[12],')" || _eca_aliases=0
+        { [ "$_eca_aliases" = 2 ] && printf '%s\n' "$_eca_list" | grep -qi '^Keystore type: JKS' \
+          && [ "$(printf '%s\n' "$_eca_list" | grep -c 'trustedCertEntry')" -gt 2 ]; } \
+            && pass "the JKS copy of the JDK trust store holds the JDK's roots and both certificates" \
+            || fail "the Java trust store copy holds $_eca_aliases of the 2 certificates, or is not JKS with the JDK's roots"
+        # A trust store JAVA_TOOL_OPTIONS already names is extended, with its
+        # own password and type; the other options stay.
+        rm -f "$WORK/eca-own.jks"
+        "$_eca_jh/bin/keytool" -importcert -noprompt -alias own-ca -file "$WORK/eca-A.pem" -keystore "$WORK/eca-own.jks" \
+            -storetype PKCS12 -storepass s3cret-pw >/dev/null 2>&1
+        _eca_own=$(env -u SSL_CERT_FILE -u NODE_EXTRA_CA_CERTS -u BOMLENS_EXTRA_CA_APPLIED JAVA_HOME="$_eca_jh" \
+            JAVA_TOOL_OPTIONS="-Xmx1g -Djavax.net.ssl.trustStore=$WORK/eca-own.jks -Djavax.net.ssl.trustStorePassword=s3cret-pw -Djavax.net.ssl.trustStoreType=PKCS12" \
+            BOMLENS_EXTRA_CA_CERTS="$WORK/eca-B.pem" sh -c '. "$1"; extra_ca_trust 2>/dev/null; printf "%s" "$JAVA_TOOL_OPTIONS"' _ "$ECA")
+        _eca_own_ts="${_eca_own#*-Djavax.net.ssl.trustStore=}"; _eca_own_ts="${_eca_own_ts%% *}"
+        _eca_own_list="$("$_eca_jh/bin/keytool" -J-Duser.language=en -list -keystore "$_eca_own_ts" -storetype JKS -storepass changeit 2>/dev/null)" || _eca_own_list=""
+        { case "$_eca_own" in "-Xmx1g -Djavax.net.ssl.trustStore=/tmp/bomlens-ca."*"/cacerts -Djavax.net.ssl.trustStorePassword=changeit -Djavax.net.ssl.trustStoreType=JKS") true ;; *) false ;; esac \
+          && printf '%s\n' "$_eca_own_list" | grep -q '^own-ca,' && printf '%s\n' "$_eca_own_list" | grep -q '^bomlens-extra-ca-1,' \
+          && [ "$(printf '%s\n' "$_eca_own_list" | grep -c 'trustedCertEntry')" = 2 ]; } \
+            && pass "a trust store JAVA_TOOL_OPTIONS already names is extended (its password and type read), not replaced" \
+            || fail "the existing trust store was not extended" "$_eca_own / $_eca_own_list"
+        case "$_eca_own_ts" in /tmp/bomlens-ca.*/cacerts) rm -rf "${_eca_own_ts%/cacerts}" ;; esac
+    else
+        echo "  SKIP: no JDK with keytool here: the Java trust store is not checked"
+    fi
+    # A bundle the container already names (SSL_CERT_FILE) is extended, not
+    # replaced by the system one.
+    _eca_base=$(env -u NODE_EXTRA_CA_CERTS -u BOMLENS_EXTRA_CA_APPLIED -u JAVA_HOME SSL_CERT_FILE="$WORK/eca-A.pem" \
+        BOMLENS_EXTRA_CA_CERTS="$WORK/eca-B.pem" PATH="/usr/bin:/bin" sh -c '. "$1"; extra_ca_trust 2>/dev/null; printf "%s" "$SSL_CERT_FILE"' _ "$ECA")
+    { [ "$(grep -c 'BEGIN CERTIFICATE' "$_eca_base" 2>/dev/null)" = 2 ] \
+      && [ "$(sed -n '2p' "$_eca_base")" = "$(sed -n '2p' "$WORK/eca-A.pem")" ]; } \
+        && pass "an SSL_CERT_FILE already set is the start of the combined bundle" \
+        || fail "SSL_CERT_FILE was replaced instead of extended" "$_eca_base"
+    case "$_eca_base" in /tmp/bomlens-ca.*/bundle.pem) rm -rf "${_eca_base%/bundle.pem}" ;; esac
+    # A JDK trust store but no keytool: a warning, and nothing set for Java.
+    _eca_bin="$WORK/eca-bin"; _eca_fjh="$WORK/eca-fake-jdk"
+    mkdir -p "$_eca_bin" "$_eca_fjh/lib/security"; : > "$_eca_fjh/lib/security/cacerts"
+    for _t in sh mktemp awk tr grep cat cp chmod rm readlink dirname; do
+        _p="$(command -v "$_t" 2>/dev/null)" && ln -sf "$_p" "$_eca_bin/$_t"
+    done
+    _eca_nokt=$(env -u SSL_CERT_FILE -u NODE_EXTRA_CA_CERTS -u BOMLENS_EXTRA_CA_APPLIED -u JAVA_TOOL_OPTIONS PATH="$_eca_bin" \
+        JAVA_HOME="$_eca_fjh" BOMLENS_EXTRA_CA_CERTS="$WORK/eca-B.pem" "$_eca_bin/sh" -c '. "$1"; extra_ca_trust; echo "jto=${JAVA_TOOL_OPTIONS:-}"' _ "$ECA" 2>&1)
+    { printf '%s' "$_eca_nokt" | grep -q '^\[WARN\] there is a Java trust store .* but no keytool' && printf '%s' "$_eca_nokt" | grep -qx 'jto='; } \
+        && pass "a JDK trust store with no keytool is warned about" \
+        || fail "no warning for a trust store without keytool" "$_eca_nokt"
+else
+    echo "  SKIP: no openssl here: the extra CA bundle is not built"
+fi
+# The one-line hint for a TLS trust failure, once per run.
+printf 'Could not GET https://repo.maven.apache.org: PKIX path building failed: unable to find valid certification path\n' > "$WORK/eca-step.log"
+_eca_hint=$(env -u SBOM_EXTRA_CA_CERTS -u BOMLENS_EXTRA_CA_CERTS bash -c '. "$1"; tls_trust_hint cdxgen "$2"; tls_trust_hint cdxgen "$2"; tls_trust_hint grype - <<< "x509: certificate signed by unknown authority"' _ "$DETECT" "$WORK/eca-step.log" 2>&1)
+{ [ "$(printf '%s\n' "$_eca_hint" | grep -c .)" = 1 ] && printf '%s' "$_eca_hint" | grep -q '^\[WARN\] cdxgen: .*Set SBOM_EXTRA_CA_CERTS'; } \
+    && pass "a PKIX failure prints one [WARN] naming SBOM_EXTRA_CA_CERTS, once" \
+    || fail "TLS trust hint wrong" "$_eca_hint"
+_eca_hint=$(BOMLENS_EXTRA_CA_CERTS=/bomlens-ca/extra.pem bash -c '. "$1"; tls_trust_hint grype - <<< "CERTIFICATE_VERIFY_FAILED"' _ "$DETECT" 2>&1)
+printf '%s' "$_eca_hint" | grep -q 'even with the CA bundle in SBOM_EXTRA_CA_CERTS' \
+    && pass "with a bundle set, the hint says the bundle did not cover it" || fail "TLS trust hint with a bundle" "$_eca_hint"
+_eca_hint=$(bash -c '. "$1"; tls_trust_hint cdxgen - <<< "connection refused"' _ "$DETECT" 2>&1)
+[ -z "$_eca_hint" ] && pass "another failure prints no TLS hint" || fail "TLS hint printed for an unrelated failure" "$_eca_hint"
+# Stage 2 of a CLI run whose stage 1 already printed it stays quiet.
+_eca_hint=$(_BOMLENS_TLS_HINT_SHOWN=1 bash -c '. "$1"; tls_trust_hint grype - <<< "x509: certificate signed by unknown authority"' _ "$DETECT" 2>&1)
+[ -z "$_eca_hint" ] && pass "_BOMLENS_TLS_HINT_SHOWN=1 keeps the hint to one per run" || fail "the hint was repeated in stage 2" "$_eca_hint"
+for _d in /tmp/bomlens-ca.*; do
+    case "$_eca_tmp_before" in *" $_d "*) ;; *) [ -d "$_d" ] && rm -rf "$_d" ;; esac
+done
 
 echo "== non-shipped trees: test/example/benchmark manifests and workflows are left out and recorded =="
 PREP="$ROOT_DIR/docker/lib/build-prep.sh"
@@ -12417,7 +14141,7 @@ grep -q '^| 0 | 1 | 0 | 1 | 0 | 2 |$' "$RCH/sec_security.md" && grep -q '^## Not
     && grep -q 'CVE-2026-56852 | golang.org/x/text' "$RCH/sec_security.md" && grep -q 'CVE-2022-32149 ‡' "$RCH/sec_security.md" \
     && pass "markdown: the not-reachable finding is listed apart and out of the totals; the reached one is marked" \
     || fail "markdown report" "$(sed -n '1,40p' "$RCH/sec_security.md")"
-grep -q '<h2>Not reachable</h2>' "$RCH/sec_security.html" && grep -q '1 finding(s) are not reachable' "$RCH/sec_security.html" \
+grep -qE '<h2 id="box-[0-9]+">Not reachable</h2>' "$RCH/sec_security.html" && grep -q '1 finding(s) are not reachable' "$RCH/sec_security.html" \
     && pass "html: the not-reachable section and its note" || fail "html report has no not-reachable section"
 PATH="$FAKEBIN:$PATH" SECURITY_ENRICH=false DEEP_CVE=false bash "$LIB/scan-security.sh" "$RCH/bom.json" "$RCH/secoff" proj >/dev/null 2>&1
 jq -e 'has("Reachability") | not' "$RCH/secoff_security.json" >/dev/null && ! grep -q 'Not reachable' "$RCH/secoff_security.md" \
@@ -12670,6 +14394,129 @@ for kind in risk-report security; do
     grep -q '<td class="id">CVE-' "${RTP}_$kind.html" && grep -q 'td.id{white-space:nowrap' "${RTP}_$kind.html" \
         && pass "$kind report keeps a CVE id on one line" || fail "$kind report CVE column may wrap"
 done
+# Page head: the top bar reads "BomLens / project version" (never the t_1.0
+# prefix), the h1 is the report name, a wide table scrolls inside its box.
+for kv in "risk-report|Open-source risk report" "security|Security report" \
+          "NOTICE|Third-party open source notice" "conformance|Conformance check report"; do
+    kind="${kv%%|*}"; title="${kv#*|}"; H="${RTP}_$kind.html"
+    grep -q '<span class="proj">t <span class="ver">1.0</span></span></header>' "$H" \
+        && pass "$kind report names the project and version in the top bar, not the output prefix" \
+        || fail "$kind report top bar" "$(grep -o '<span class="proj">.*</header>' "$H" | head -1)"
+    grep -q "<h1>${title}</h1>" "$H" \
+        && pass "$kind report is titled ${title}" || fail "$kind report title" "$(grep -m1 -o '<h1>[^<]*</h1>' "$H")"
+    grep -q '\.table-scroll{overflow-x:auto;}' "$H" \
+        && pass "$kind report: a wide table scrolls inside its box" \
+        || fail "$kind report: the table scroll rule is missing"
+done
+grep -q '<table aria-labelledby="box-[0-9]*">' "${RTP}_security.html" && grep -q '<h2 id="box-1">Findings</h2>' "${RTP}_security.html" \
+    && pass "a table is named by the title of its box (aria-labelledby)" || fail "a table has no accessible name"
+# No box with a thick stripe down its left side: no border-left or
+# border-inline-start rule and no inset box-shadow, in the shared CSS, in the
+# documentation site's stylesheets, the web UI's stylesheets (its TSX classes
+# are checked by token-lint) or in any generated report. Notices are a banner
+# with a 1px border all round.
+side_stripe() { grep -EnH 'border-(left|inline-start)(-width|-style|-color)?[[:space:]]*:|box-shadow:[^;}]*inset' "$@"; }
+WEB_CSS=()
+while IFS= read -r f; do WEB_CSS+=("$f"); done < <(find "$ROOT_DIR/docker/web/frontend/src" -name '*.css' -not -path '*/node_modules/*')
+if STRIPES="$(side_stripe "$LIB/report-common.sh" "$ROOT_DIR"/docs-site/src/styles/*.css "${WEB_CSS[@]}" \
+                "${RTP}_risk-report.html" "${RTP}_security.html" "${RTP}_NOTICE.html" "${RTP}_conformance.html")"; then
+    fail "a left-side stripe rule is in the report CSS, the docs or web UI stylesheets, or a generated report" "$STRIPES"
+else
+    pass "no left-side stripe rule in the report CSS, the docs and web UI stylesheets or the four generated reports (${#WEB_CSS[@]} web stylesheets)"
+fi
+# REPORT_LANG=ko: the security report is Korean; the NOTICE stays English.
+( export RC_TRIVY_FIXTURE="$RC/trivy.json" PATH="$RT/bin:$PATH" SECURITY_ENRICH=false DEEP_CVE=false REPORT_LANG=ko
+  bash "$LIB/scan-security.sh" "$RC/sbom.json" "$RT/k_1.0" k >/dev/null 2>&1
+  bash "$LIB/generate-notice.sh" "$RC/sbom.json" "$RT/k_1.0" k >/dev/null 2>&1 )
+if grep -q '<html lang="ko">' "$RT/k_1.0_security.html" && grep -q '<h1>보안 보고서</h1>' "$RT/k_1.0_security.html" \
+   && grep -q '<th>패키지(설치 버전)</th>' "$RT/k_1.0_security.html" && grep -q '컴포넌트 [0-9,]*개</span>' "$RT/k_1.0_security.html"; then
+    pass "REPORT_LANG=ko writes the security report in Korean"
+else
+    fail "the ko security report is not Korean" "$(grep -ho '<h1>[^<]*</h1>' "$RT/k_1.0_security.html")"
+fi
+if grep -q '<html lang="en">' "$RT/k_1.0_NOTICE.html" && grep -q '<h1>Third-party open source notice</h1>' "$RT/k_1.0_NOTICE.html" \
+   && grep -q ' components</span>' "$RT/k_1.0_NOTICE.html" && ! grep -qE '컴포넌트|라이선스|오픈소스 고지문|출처:' "$RT/k_1.0_NOTICE.html"; then
+    pass "REPORT_LANG=ko leaves the NOTICE in English"
+else
+    fail "a Korean string reached the NOTICE" "$(grep -o '<p class="desc">.*</p>' "$RT/k_1.0_NOTICE.html")"
+fi
+grep -q '<dl class="deadlines">' "${RTP}_risk-report.html" && grep -q '<dd>within 7 days</dd>' "${RTP}_risk-report.html" \
+    && grep -q '<dd>within 30 days</dd>' "${RTP}_risk-report.html" && ! grep -q 'Critical → within' "${RTP}_risk-report.html" \
+    && pass "risk report lists the remediation deadlines as severity label and deadline" \
+    || fail "risk report deadlines are not a label list"
+grep -q '<td class="sev"><span class="lbl sev-CRITICAL"><span class="mk" aria-hidden="true">' "${RTP}_security.html" \
+    && pass "security report shows severity as a label with a shape marker and the word" \
+    || fail "security report severity cell is not a label"
+# The new cells: package coordinates (Maven only, split by characters), fixed
+# versions, a version from the SBOM root, and escaping of every one of them.
+ESC="$RT/esc"; mkdir -p "$ESC"
+jq '.metadata.component.version = "1.0<\"x"' "$RC/sbom.json" > "$ESC/sbom.json"
+cat > "$ESC/trivy.json" <<'TRIVY'
+{"Results":[{"Target":"t","Vulnerabilities":[
+ {"VulnerabilityID":"CVE-2026-0001","PkgName":"org.ex\"<a:ar<t","InstalledVersion":"1.0","FixedVersion":"1.1, 2.0","Severity":"CRITICAL","PkgIdentifier":{"PURL":"pkg:maven/org.ex/art@1.0"}},
+ {"VulnerabilityID":"CVE-2026-0002","PkgName":"한글그룹:이름","InstalledVersion":"2","Severity":"HIGH","PkgIdentifier":{"PURL":"pkg:maven/x/y@2"}},
+ {"VulnerabilityID":"CVE-2026-0003","PkgName":"libssl3:amd64","InstalledVersion":7,"FixedVersion":"","Severity":"LOW","PkgIdentifier":{"PURL":"pkg:deb/debian/libssl3@3"}}]}]}
+TRIVY
+( export RC_TRIVY_FIXTURE="$ESC/trivy.json" PATH="$RT/bin:$PATH" SECURITY_ENRICH=false DEEP_CVE=false
+  bash "$LIB/scan-security.sh" "$ESC/sbom.json" "$ESC/x_1" t >/dev/null 2>&1 )
+EH="$ESC/x_1_security.html"
+grep -q '<span class="proj">t <span class="ver">1.0&lt;&quot;x</span></span>' "$EH" && ! grep -q '1.0<"x' "$EH" \
+    && pass "the SBOM root version is escaped in the page head" || fail "root version escaping" "$(grep -o '<span class="proj">.*</header>' "$EH")"
+grep -qF '<span class="pkg" title="org.ex&quot;&lt;a:ar&lt;t"><span class="pg">org.<wbr>ex&quot;&lt;a</span><span class="psep"> / </span><span class="pn">ar&lt;t</span> <span class="pv">1.0</span></span>' "$EH" \
+    && pass "a Maven package shows group / artifact, both escaped, the full name in title" || fail "Maven package coordinate"
+grep -qF '<span class="pg">한글그룹</span><span class="psep"> / </span><span class="pn">이름</span>' "$EH" \
+    && pass "a non-ASCII Maven name is split by characters, not bytes" || fail "non-ASCII package split"
+grep -qF '<span class="pn">libssl3:amd64</span> <span class="pv">7</span>' "$EH" \
+    && pass "a non-Maven name with a colon stays whole, and a numeric version is shown" || fail "non-Maven package or numeric version"
+grep -qF '<td class="fix"><span class="v">1.1</span>, <span class="v">2.0</span></td>' "$EH" \
+    && grep -qF '<span class="nofix">No fix yet</span>' "$EH" \
+    && pass "fixed versions are listed one by one, and a missing fix says so" || fail "fixed version cell"
+FACTS="$( ( . "$LIB/report-common.sh"; printf '{"metadata":{"component":{"version":3,"type":"application"}},"components":[{},{}]}' > "$ESC/n.json"
+            report_bom_facts "$ESC/n.json"; printf '%s|%s|%s' "$RB_VERSION" "$RB_ROOTTYPE" "$RB_NCOMP"
+            printf '{"metadata":{"component":{"version":{"x":1}}}}' > "$ESC/o.json"
+            report_bom_facts "$ESC/o.json"; printf '|%s|%s' "$RB_VERSION" "$RB_NCOMP" ) )"
+[ "$FACTS" = "3|application|2||" ] && pass "a numeric root version is read as text, an object one is dropped" \
+    || fail "report_bom_facts" "$FACTS"
+# Print keeps a label, an id, a number and a time on one line; only long values wrap.
+if sed -n '/@media print{/,/^}/p' "${RTP}_security.html" | grep -q 'th,td{white-space:normal;}' \
+   && ! sed -n '/@media print{/,/^}/p' "${RTP}_security.html" | grep -qE '(\.lbl|\.kevbadge|td\.id|td\.num|td\.sev|time)[^{]*\{white-space:normal'; then
+    pass "print lets cells wrap but keeps labels, ids, numbers and times on one line"
+else
+    fail "print rules let a label, id, number or time wrap"
+fi
+# Long names break at their dots first; an evidence item is one line with its
+# full text in title.
+grep -q '<span class="ev" title="' "${RTP}_conformance.html" \
+    && pass "conformance evidence items are one line each, the full text in title" \
+    || fail "conformance evidence items are not one per line"
+# Outbound license conflicts: the count is everything a person has to look at,
+# and each such dependency is a row, even when none is incompatible.
+LCX="$RT/lcx"; mkdir -p "$LCX"
+jq '.metadata.component.licenses = [{"license":{"id":"Apache-2.0"}}]
+    | .components = [{"type":"library","name":"c1","version":"1","properties":[{"name":"bomlens:licenseConflict","value":"conditional"}]},
+                     {"type":"library","name":"u1","version":"2","properties":[{"name":"bomlens:licenseConflict","value":"unknown"}]}]' \
+    "$RC/risk-bom.json" > "$LCX/p_1.0_bom.json"
+printf 'License: MIT\n' > "$LCX/p_1.0_NOTICE.txt"
+( cd "$LCX" && bash "$LIB/generate-risk-report.sh" p_1.0 p >/dev/null 2>&1 )
+grep -q 'Conflicts with the outbound license (Apache-2.0)</p><span class="counter">2</span>' "$LCX/p_1.0_risk-report.html" \
+   && grep -q '<li>c1@1 <span class="lbl lbl-attention">Conditional</span></li>' "$LCX/p_1.0_risk-report.html" \
+   && grep -q '<li>u1@2 <span class="lbl">Unknown</span></li>' "$LCX/p_1.0_risk-report.html" \
+    && pass "the outbound-license box counts and lists conditional and unknown dependencies too" \
+    || fail "outbound-license box" "$(grep -o 'Conflicts with[^<]*</p><span class="counter">[^<]*' "$LCX/p_1.0_risk-report.html")"
+( cd "$LCX" && REPORT_LANG=ko bash "$LIB/generate-risk-report.sh" p_1.0 p >/dev/null 2>&1 )
+grep -q '배포 라이선스(Apache-2.0)와 충돌' "$LCX/p_1.0_risk-report.html" \
+   && grep -q '<li>c1@1 <span class="lbl lbl-attention">배포 방식에 따라 달라짐</span></li>' "$LCX/p_1.0_risk-report.html" \
+    && pass "the ko outbound-license box uses the web UI's Korean verdict words" \
+    || fail "ko outbound-license verdict words"
+# A note taken from the environment is text, never a printf format.
+( export RC_TRIVY_FIXTURE="$RC/trivy.json" PATH="$RT/bin:$PATH" SECURITY_ENRICH=false DEEP_CVE=false \
+         BOMLENS_CPE_INDEX_SKIPPED=analyze-upstream-map-only BOMLENS_VERSION='9.9%s%d'
+  bash "$LIB/scan-security.sh" "$RC/sbom.json" "$RT/pf_1.0" pf >/dev/null 2>&1
+  REPORT_LANG=ko bash "$LIB/scan-security.sh" "$RC/sbom.json" "$RT/pk_1.0" pk >/dev/null 2>&1 )
+grep -qF 'with --analyze-cpe-index (BomLens 9.9%s%d).' "$RT/pf_1.0_security.html" \
+   && grep -qF -- '--analyze-cpe-index와 함께 (BomLens 9.9%s%d) 검사한' "$RT/pk_1.0_security.html" \
+    && pass "the received-SBOM note keeps the BomLens version as text, in English and Korean" \
+    || fail "received-SBOM note" "$(grep -o 'analyze-cpe-index[^<]*' "$RT/pf_1.0_security.html" "$RT/pk_1.0_security.html" | head -2)"
 grep -q '<h1>Open-source risk report</h1>' "${RTP}_risk-report.html" \
     && grep -q '<p class="subtitle">Supplier SBOM under review</p>' "${RTP}_risk-report.html" \
     && pass "supplier risk report: GLOSSARY title with the supplier review as subtitle" \

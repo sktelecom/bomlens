@@ -47,13 +47,22 @@ FETCH_LICENSE="${FETCH_LICENSE:-true}"
 # The proxy variables reach the package managers cdxgen runs; passed on with
 # the options above.
 PROXY_ENV_NAMES="HTTP_PROXY HTTPS_PROXY NO_PROXY http_proxy https_proxy no_proxy"
-BUILD_PREP_ENV_NAMES="BOMLENS_KEEP_BUILD_OUTPUT BOMLENS_MAVEN_FULL_GRAPH BOMLENS_ANDROID_FULL_GRAPH BOMLENS_NODE_FULL_GRAPH BOMLENS_PHP_FULL_GRAPH BOMLENS_INCLUDE_NON_SHIPPED BOMLENS_INCLUDE_DEV_DEPENDENCIES BOMLENS_NO_COPYRIGHT BOMLENS_NO_CARGO_LICENSE BOMLENS_PREP_TIMEOUT"
+# The CA bundle of a proxy that inspects TLS, a path inside the container
+# (extra-ca.sh). The CLI never passes the host's own value on: it mounts
+# SBOM_EXTRA_CA_CERTS at EXTRA_CA_TARGET and sets the variable itself
+# (extra_ca_mount). The web UI container passes on the value it was given,
+# and its sibling containers see the file through --volumes-from.
+EXTRA_CA_ENV_NAMES="BOMLENS_EXTRA_CA_CERTS"
+# shellcheck disable=SC2034  # read by scan-sbom.sh
+EXTRA_CA_TARGET="/bomlens-ca/extra.pem"
+BUILD_PREP_ENV_NAMES="BOMLENS_KEEP_BUILD_OUTPUT BOMLENS_MAVEN_FULL_GRAPH BOMLENS_ANDROID_FULL_GRAPH BOMLENS_GRADLE_FULL_GRAPH BOMLENS_NODE_FULL_GRAPH BOMLENS_PHP_FULL_GRAPH BOMLENS_INCLUDE_NON_SHIPPED BOMLENS_INCLUDE_DEV_DEPENDENCIES BOMLENS_NO_COPYRIGHT BOMLENS_NO_CARGO_LICENSE BOMLENS_PREP_TIMEOUT"
 
 # Settings for the network the post-processing container reaches: the proxy,
 # where Trivy gets its vulnerability database (a mirror, or a cache with the
-# update skipped) and the EPSS and KEV lookups (off, or a mirror). Passed on
+# update skipped) and the EPSS and KEV lookups (off, or a mirror), and which
+# Go vulnerability database export it reads (BOMLENS_GO_VULNDB*). Passed on
 # by name, so a value is never on a command line.
-STAGE2_NETWORK_ENV_NAMES="$PROXY_ENV_NAMES TRIVY_DB_REPOSITORY TRIVY_JAVA_DB_REPOSITORY TRIVY_SKIP_DB_UPDATE TRIVY_SKIP_JAVA_DB_UPDATE TRIVY_OFFLINE_SCAN TRIVY_USERNAME TRIVY_PASSWORD TRIVY_REGISTRY_TOKEN TRIVY_INSECURE BOMLENS_TRIVY_DB_MAX_AGE_DAYS KEV_URL EPSS_API"
+STAGE2_NETWORK_ENV_NAMES="$PROXY_ENV_NAMES $EXTRA_CA_ENV_NAMES TRIVY_DB_REPOSITORY TRIVY_JAVA_DB_REPOSITORY TRIVY_SKIP_DB_UPDATE TRIVY_SKIP_JAVA_DB_UPDATE TRIVY_OFFLINE_SCAN TRIVY_USERNAME TRIVY_PASSWORD TRIVY_REGISTRY_TOKEN TRIVY_INSECURE BOMLENS_TRIVY_DB_MAX_AGE_DAYS BOMLENS_GRYPE_DB_MAX_AGE_DAYS GRYPE_DB_UPDATE_URL BOMLENS_GO_VULNDB BOMLENS_GO_VULNDB_PATH BOMLENS_GO_VULNDB_MAX_AGE_DAYS BOMLENS_GO_VULNDB_URL KEV_URL EPSS_API"
 
 # Prints "-e NAME" for the names above and for any other TRIVY_* variable set
 # here, except TRIVY_CACHE_DIR: a path on this host means nothing in the
@@ -89,7 +98,7 @@ _passable_names() {
 # is safe to splice into the eval'd docker command in scan-sbom.sh.
 build_prep_env_args() {
     local n out=""
-    for n in $BUILD_PREP_ENV_NAMES $(_passable_names $PROXY_ENV_NAMES); do out="$out -e $n"; done
+    for n in $BUILD_PREP_ENV_NAMES $(_passable_names $PROXY_ENV_NAMES) $EXTRA_CA_ENV_NAMES; do out="$out -e $n"; done
     printf '%s' "${out# }"
 }
 
@@ -102,6 +111,86 @@ trivy_cache_args() {
         return 0
     fi
     printf '%s\n' -v "$(cd "$SBOM_TRIVY_CACHE" && pwd):/trivy-cache" -e TRIVY_CACHE_DIR=/trivy-cache
+}
+
+# SBOM_GO_VULNDB: a Go vulnerability database export on this host (vulndb.zip
+# from https://vuln.go.dev/vulndb.zip, or that archive unpacked into a folder),
+# read in place of the snapshot the image carries. Prints the host path and the
+# path inside the container, one per line; the caller mounts the first at the
+# second, read-only, and sets BOMLENS_GO_VULNDB_PATH to the second.
+go_vulndb_mount() {
+    [ -n "${SBOM_GO_VULNDB:-}" ] || return 0
+    if [ -f "$SBOM_GO_VULNDB" ]; then
+        printf '%s\n' "$(cd "$(dirname "$SBOM_GO_VULNDB")" && pwd)/$(basename "$SBOM_GO_VULNDB")" /go-vulndb.zip
+    elif [ -d "$SBOM_GO_VULNDB" ]; then
+        printf '%s\n' "$(cd "$SBOM_GO_VULNDB" && pwd)" /go-vulndb
+    else
+        echo "[WARN] SBOM_GO_VULNDB=$SBOM_GO_VULNDB is neither a file nor a folder; the Go vulnerability database snapshot in the image is used. Download https://vuln.go.dev/vulndb.zip and point SBOM_GO_VULNDB at it." >&2
+    fi
+}
+
+# SBOM_EXTRA_CA_CERTS: the CA bundle (PEM) of a proxy that inspects TLS, on
+# this host. Prints its absolute path, for the caller to bind-mount read-only
+# at EXTRA_CA_TARGET (docker run --mount, which fails at once when the Docker
+# engine cannot see the file, where -v would mount an empty folder) with
+# BOMLENS_EXTRA_CA_CERTS set to that target; nothing when it is unset. A
+# Windows path typed with backslashes (C:\certs\ca.pem in Git Bash) is read
+# with cygpath when there is one, otherwise with the backslashes as slashes.
+# A path that is not a readable file holding a PEM certificate, or that holds
+# a comma or a double quote (they would split the --mount value), is an error
+# (exit status 1) with the cause and the fix on stderr: the scan would
+# otherwise fail later, in every HTTPS call, with less to go on.
+extra_ca_mount() {
+    local f="${SBOM_EXTRA_CA_CERTS:-}"
+    [ -n "$f" ] || return 0
+    case "$f" in
+        *\\*)
+            if command -v cygpath >/dev/null 2>&1; then
+                f="$(cygpath -u -- "$f" 2>/dev/null)" || f="${SBOM_EXTRA_CA_CERTS//\\//}"
+            else
+                f="${f//\\//}"
+            fi ;;
+    esac
+    case "$f" in
+        *,*|*\"*)
+            echo "[ERROR] SBOM_EXTRA_CA_CERTS=$SBOM_EXTRA_CA_CERTS has a comma or a double quote in its path, which Docker's --mount option cannot take. Copy the bundle to a path without them." >&2
+            return 1 ;;
+    esac
+    if [ -d "$f" ] || [ ! -f "$f" ] || [ ! -r "$f" ]; then
+        echo "[ERROR] SBOM_EXTRA_CA_CERTS=$SBOM_EXTRA_CA_CERTS is not a readable file. Point it at the proxy's CA bundle in PEM form (a .pem or .crt file with -----BEGIN CERTIFICATE----- lines), or unset it." >&2
+        return 1
+    fi
+    if ! grep -q -- '-----BEGIN CERTIFICATE-----' "$f" 2>/dev/null; then
+        echo "[ERROR] SBOM_EXTRA_CA_CERTS=$SBOM_EXTRA_CA_CERTS holds no PEM certificate (no -----BEGIN CERTIFICATE----- line). A DER (binary) certificate converts with: openssl x509 -inform der -in ca.cer -out ca.pem" >&2
+        return 1
+    fi
+    printf '%s\n' "$(cd "$(dirname "$f")" && pwd)/$(basename "$f")"
+}
+
+# What a TLS client prints when it does not trust the certificate it was
+# shown: Go (x509), Java (PKIX), Python (CERTIFICATE_VERIFY_FAILED), Node.js
+# and OpenSSL (UNABLE_TO_GET_ISSUER_CERT_LOCALLY, UNABLE_TO_VERIFY_LEAF_SIGNATURE,
+# unable to get local issuer certificate, SELF_SIGNED_CERT_IN_CHAIN).
+TLS_TRUST_ERROR_RE='x509: certificate signed by unknown authority|PKIX path building failed|CERTIFICATE_VERIFY_FAILED|UNABLE_TO_GET_ISSUER_CERT_LOCALLY|UNABLE_TO_VERIFY_LEAF_SIGNATURE|unable to get local issuer certificate|SELF_SIGNED_CERT_IN_CHAIN|self[- ]signed certificate in certificate chain'
+
+# tls_trust_hint <step> <file|->...: when a file (or stdin, given as -) holds
+# one of those errors, prints a one-line [WARN] naming SBOM_EXTRA_CA_CERTS,
+# once per run. A step that fails this way most often sits behind a proxy
+# that inspects TLS. The CLI prints it for stage 1 itself and then passes
+# _BOMLENS_TLS_HINT_SHOWN=1 to stage 2, so stage 2 does not print it again.
+TLS_TRUST_HINT_SHOWN="${_BOMLENS_TLS_HINT_SHOWN:-}"
+tls_trust_hint() {
+    local step="$1"; shift
+    [ -z "$TLS_TRUST_HINT_SHOWN" ] || return 0
+    [ "$#" -gt 0 ] || return 0
+    grep -qE -- "$TLS_TRUST_ERROR_RE" "$@" 2>/dev/null || return 0
+    TLS_TRUST_HINT_SHOWN=1
+    if [ -n "${SBOM_EXTRA_CA_CERTS:-}${BOMLENS_EXTRA_CA_CERTS:-}" ]; then
+        echo "[WARN] $step: a TLS certificate was not trusted even with the CA bundle in SBOM_EXTRA_CA_CERTS; check that the bundle holds the root CA your proxy signs with." >&2
+    else
+        echo "[WARN] $step: a TLS certificate was not trusted, most likely by a proxy that inspects HTTPS. Set SBOM_EXTRA_CA_CERTS to the proxy's CA bundle (PEM) and scan again." >&2
+    fi
+    return 0
 }
 
 # Folders whose manifests a source scan leaves out by default: test suites and
@@ -677,13 +766,518 @@ detect_lang() {
     if [ "$#" -eq 1 ]; then echo "$1"; elif [ "$#" -eq 0 ]; then echo "unknown"; else echo "mixed"; fi
 }
 
+# The highest Java toolchain version the Gradle builds under $1 declare, or
+# nothing. A Gradle toolchain asks for that exact JDK, and without a toolchain
+# download repository (auto-provisioning) the build fails to resolve its
+# dependencies when the image has another one. Read from *.gradle and
+# *.gradle.kts files in $1 and up to five folders below it (buildSrc and
+# build-logic convention plugins sit that deep), skipping the folders
+# _detect_first skips (the non-shipped ones unless BOMLENS_INCLUDE_NON_SHIPPED
+# is set) and comments:
+#   JavaLanguageVersion.of(25)  (languageVersion.set(...), languageVersion = ...)
+#   jvmToolchain(25)            (Kotlin)
+# The argument may also be a variable defined in the same file, optionally
+# converted (.toInteger(), .toInt(), .toString(), as int); its value is read
+# from that definition (_java_toolchain_awk). A version from a version
+# catalog, from a variable of another file or from an environment variable
+# alone is not read. Maven is not read either: maven.compiler.release and the
+# toolchains plugin take effect when the build compiles, and dependency
+# resolution (dependency:tree) runs without them on the image's JDK.
+java_toolchain_version() {
+    local d="$1" n prune=()
+    [ -n "$d" ] && [ -d "$d" ] || return 0
+    for n in .git .gradle node_modules vendor build target bin obj .build Pods .venv; do
+        prune+=(-o -name "$n")
+    done
+    if non_shipped_enabled; then
+        for n in $NON_SHIPPED_DIRS; do prune+=(-o -name "$n"); done
+    fi
+    # The gradle.properties values come first, from regular files only (find
+    # -type f: never a symlink, a FIFO or a device), as "folder<TAB>key<TAB>value"
+    # lines, at most 64 KB of them. The build files' awk gets them through the
+    # environment and opens no file itself.
+    (cd "$d" 2>/dev/null || exit 0
+     _JAVA_TC_PROPS="$(find . -maxdepth 6 \( "${prune[@]:1}" \) -prune -o -type f -name gradle.properties \
+         -exec awk "$(_java_toolchain_props_awk)" {} + 2>/dev/null | head -c 65536)" \
+         find . -maxdepth 6 \( "${prune[@]:1}" \) -prune -o -type f \( -name '*.gradle' -o -name '*.gradle.kts' \) \
+         -exec awk "$(_java_toolchain_awk)" {} + 2>/dev/null) \
+        | grep -E '^[0-9]{1,3}$' | sed 's/^0*\([0-9]\)/\1/' | sort -n | tail -1 || true
+}
+
+# _java_toolchain_props_awk: the awk program that reads gradle.properties
+# files for java_toolchain_version. Prints "folder<TAB>key<TAB>value" for each
+# key Gradle property names can take (letters, digits, _ . -) with a value of
+# at most 16 characters. A line over 4096 characters and a path holding a tab
+# are skipped.
+_java_toolchain_props_awk() {
+    cat <<'AWK'
+FNR == 1 { dir = FILENAME; sub(/\/[^\/]*$/, "", dir); skip = (FILENAME ~ /\t/) }
+skip || length($0) > 4096 { next }
+{
+    line = $0; sub(/^[ \t]+/, "", line)
+    if (line == "" || line ~ /^[#!]/) next
+    if (!match(line, /[=: \t]/)) next
+    key = substr(line, 1, RSTART - 1)
+    if (key !~ /^[A-Za-z0-9_.-]+$/) next
+    val = substr(line, RSTART); sub(/^[ \t]*[=:]?[ \t]*/, "", val); sub(/[ \t\r]+$/, "", val)
+    if (length(val) <= 16) print dir "\t" key "\t" val
+}
+AWK
+}
+
+# _java_toolchain_awk: the awk program java_toolchain_version runs over the
+# build files, printing one candidate version per line. It drops // line
+# comments and /* */ blocks (across lines too, and never past the end of a
+# file) before anything is matched. A line over 4096 characters holds no
+# declaration worth reading and is skipped, in a gradle.properties file too,
+# which keeps the scan of a crafted file linear. Per file it reads:
+#   JavaLanguageVersion.of(25), jvmToolchain("25")     the number itself
+#   JavaLanguageVersion.of(v), jvmToolchain(v.toInt())  v, looked up below
+#   def v = <expression> (also val, var, final, a type, val v: String = ...)
+#                                                       the first one in the file
+#   val v: String by project                            the Gradle property v
+# A definition outside any { } block wins over one inside a block; among
+# equals the first in the file counts (a later reassignment is not followed;
+# the rerun in java_retry_image covers a build where that matters).
+# A definition that reads a Gradle property p (hasProperty("p"), getProperty,
+# findProperty, property, providers.gradleProperty("p"), properties["p"]; not
+# System.getProperty) takes p=N from the gradle.properties nearest the build
+# file, up to the scanned folder, as _java_toolchain_props_awk read it into
+# _JAVA_TC_PROPS (the last value of a key in a file counts, as in Gradle). Failing that, the default it gives counts:
+# the number after its last ?: or the ternary's :, or in getOrElse("N"); or
+# the number it is set to. Only the awk features busybox, mawk and the BSD
+# awk share are used.
+_java_toolchain_awk() {
+    cat <<'AWK'
+function strip(s) {
+    sub(/^[ \t]+/, "", s); sub(/[ \t]+$/, "", s); return s
+}
+function digits(s) { gsub(/[^0-9]/, "", s); return s }
+BEGIN {
+    n = split(ENVIRON["_JAVA_TC_PROPS"], pl, "\n")
+    for (i = 1; i <= n; i++) {
+        if (split(pl[i], pf, "\t") != 3) continue
+        props[pf[1] SUBSEP pf[2]] = pf[3]
+    }
+}
+# The value of Gradle property p in the gradle.properties nearest file f.
+function gprop(f, p,    dir) {
+    dir = f
+    while (dir ~ /\//) {
+        sub(/\/[^\/]*$/, "", dir)
+        if ((dir SUBSEP p) in props) return (props[dir SUBSEP p] ~ /^[0-9]+$/) ? props[dir SUBSEP p] : ""
+    }
+    return ""
+}
+# The Gradle property an expression reads, or "".
+function propname(e,    pre, m) {
+    while (match(e, /([Pp]roperty[ \t]*\([ \t]*|properties[ \t]*\[[ \t]*)["'][A-Za-z0-9_.-]+["']/)) {
+        pre = substr(e, 1, RSTART - 1)
+        m = substr(e, RSTART, RLENGTH)
+        e = substr(e, RSTART + RLENGTH)
+        if (pre ~ /System\.(get)?$/) continue
+        sub(/^[^"']*["']/, "", m); sub(/["']$/, "", m)
+        return m
+    }
+    return ""
+}
+# The number an expression falls back to, or "".
+function fallback(e) {
+    if (match(e, /getOrElse[ \t]*\([ \t]*["']?[0-9]+["']?[ \t]*\)/)) return digits(substr(e, RSTART, RLENGTH))
+    if (e ~ /\?/ && match(e, /:[ \t]*\(?[ \t]*["']?[0-9]+["']?[ \t]*\)?[ \t]*(\.(toInteger|toInt|toString)\(\)|[ \t]+as[ \t]+(int|Integer))?[ \t]*\)?[ \t]*;?[ \t]*$/))
+        return digits(substr(e, RSTART, RLENGTH))
+    if (e ~ /^[ \t]*["']?[0-9]+["']?[ \t]*(\.(toInteger|toInt|toString)\(\)|[ \t]+as[ \t]+(int|Integer))?[ \t]*;?[ \t]*$/) return digits(e)
+    return ""
+}
+function flush(f,    name, e, p, v) {
+    for (name in refs) {
+        v = ""
+        if (name in byproj) v = gprop(f, name)
+        else if (name in defs) {
+            e = (name in defs0) ? defs0[name] : defs[name]
+            p = propname(e)
+            if (p != "") v = gprop(f, p)
+            if (v == "") v = fallback(e)
+        }
+        if (v != "") print v
+    }
+    split("", refs); split("", defs); split("", defs0); split("", byproj)
+}
+FNR == 1 { if (cur != "") flush(cur); cur = FILENAME; blk = 0; depth = 0 }
+length($0) > 4096 { next }
+{
+    line = $0; out = ""
+    while (line != "") {
+        if (blk) { i = index(line, "*/"); if (!i) { line = ""; break }; line = substr(line, i + 2); blk = 0; continue }
+        a = index(line, "/*"); b = index(line, "//")
+        if (b && (!a || b < a)) { out = out substr(line, 1, b - 1); line = ""; break }
+        if (a) { out = out substr(line, 1, a - 1); line = substr(line, a + 2); blk = 1; continue }
+        out = out line; line = ""
+    }
+    if (match(out, /^[ \t]*val[ \t]+[A-Za-z_][A-Za-z0-9_]*([ \t]*:[ \t]*[A-Za-z?]+)?[ \t]+by[ \t]+project([^A-Za-z0-9_.]|$)/)) {
+        h = out; sub(/^[ \t]*val[ \t]+/, "", h); match(h, /^[A-Za-z_][A-Za-z0-9_]*/)
+        h = substr(h, 1, RLENGTH)
+        if (!(h in defs) && !(h in byproj)) byproj[h] = 1
+    } else if (match(out, /^[ \t]*((def|val|var|final|static|private|int|Integer|String)[ \t]+)+[A-Za-z_][A-Za-z0-9_]*([ \t]*:[ \t]*[A-Za-z?]+)?[ \t]*=/) \
+               && substr(out, RSTART + RLENGTH, 1) != "=") {
+        h = substr(out, 1, RLENGTH - 1); e = substr(out, RLENGTH + 1)
+        sub(/[ \t]*:[ \t]*[A-Za-z?]+[ \t]*$/, "", h); h = strip(h)
+        match(h, /[A-Za-z_][A-Za-z0-9_]*$/); h = substr(h, RSTART, RLENGTH)
+        if (!(h in defs) && !(h in byproj)) defs[h] = e
+        if (depth == 0 && !(h in defs0)) defs0[h] = e
+    }
+    rest = out
+    while (match(rest, /(JavaLanguageVersion\.of|jvmToolchain)[ \t]*\([ \t]*/)) {
+        rest = substr(rest, RSTART + RLENGTH)
+        if (match(rest, /^["']?[0-9]+/)) { print digits(substr(rest, 1, RLENGTH)); continue }
+        if (match(rest, /^[A-Za-z_][A-Za-z0-9_]*[ \t]*(\.(toInteger|toInt|toString)\(\)|[ \t]+as[ \t]+(int|Integer))?[ \t]*\)/)) {
+            h = substr(rest, 1, RLENGTH); match(h, /^[A-Za-z_][A-Za-z0-9_]*/)
+            refs[substr(h, 1, RLENGTH)] = 1
+        }
+    }
+    # The block depth at the start of the next line.
+    t = out; depth += gsub(/\{/, "", t); t = out; depth -= gsub(/\}/, "", t)
+    if (depth < 0) depth = 0
+}
+END { if (cur != "") flush(cur) }
+AWK
+}
+
+# The JDKs the published cdxgen Java images carry, and the one used when
+# nothing in the build asks for another. Every image also has its own Gradle
+# (8.14.5), used when the build has no wrapper.
+CDXGEN_JAVA_JDKS="8 11 17 21 24 25"
+CDXGEN_JAVA_DEFAULT=21
+
+# _java_image_name <jdk>: the cdxgen image name for a JDK in CDXGEN_JAVA_JDKS.
+# The Java 11 and 17 images are not named temurin.
+_java_image_name() {
+    case "$1" in
+        11|17) echo "cdxgen-java$1" ;;
+        *)     echo "cdxgen-temurin-java$1" ;;
+    esac
+}
+
+# _java_has_image <jdk>: true when a published image has that JDK.
+_java_has_image() {
+    case " $CDXGEN_JAVA_JDKS " in *" ${1:-x} "*) return 0 ;; esac
+    return 1
+}
+
+# _gradle_wrapper_props_version <gradle-wrapper.properties>: the Gradle
+# version of the distribution its distributionUrl names, as X.Y.Z, or
+# nothing. Only the file name at the end of the URL is read, in Gradle's own
+# form: gradle-X.Y[.Z][-rc-N|-milestone-N|-<snapshot>]-(bin|all).zip. A
+# milestone, release candidate or snapshot counts as its release. The key and
+# the value may be separated by =, : or white space, as in any .properties file.
+_gradle_wrapper_props_version() {
+    local url v
+    url="$(grep -E '^[[:space:]]*distributionUrl([[:space:]]|[=:])' "$1" 2>/dev/null | head -1 \
+        | sed -E 's/^[[:space:]]*distributionUrl[[:space:]]*[=:]?[[:space:]]*//; s/[[:space:]]+$//')" || true
+    url="${url##*/}"
+    v="$(printf '%s\n' "$url" | grep -E '^gradle-[0-9]{1,3}\.[0-9]{1,3}(\.[0-9]{1,3})?(-[A-Za-z0-9.+-]+)?-(bin|all)\.zip$' \
+        | grep -oE '^gradle-[0-9]{1,3}\.[0-9]{1,3}(\.[0-9]{1,3})?')" || true
+    v="${v#gradle-}"
+    case "$v" in
+        '') return 0 ;;
+        *.*.*) echo "$v" ;;
+        *) echo "$v.0" ;;
+    esac
+}
+
+# _gradle_version_number <X.Y.Z>: the version as one comparable number.
+_gradle_version_number() {
+    local a b c
+    IFS=. read -r a b c <<EOF
+$1
+EOF
+    echo $(( 10#${a:-0} * 1000000 + 10#${b:-0} * 1000 + 10#${c:-0} ))
+}
+
+# _gradle_has_build <dir>: true when <dir> holds a Gradle settings or build file.
+_gradle_has_build() {
+    [ -f "$1/settings.gradle" ] || [ -f "$1/settings.gradle.kts" ] \
+        || [ -f "$1/build.gradle" ] || [ -f "$1/build.gradle.kts" ]
+}
+
+# _gradle_included_builds <dir>: the builds its settings file names in
+# includeBuild("..."), one relative path per line, inside <dir> only.
+_gradle_included_builds() {
+    local x
+    for x in $(cat "$1/settings.gradle" "$1/settings.gradle.kts" 2>/dev/null \
+               | sed 's#//.*##' \
+               | grep -oE 'includeBuild[[:space:]]*\(?[[:space:]]*["'"'"'][A-Za-z0-9_./-]+["'"'"']' \
+               | sed -E 's/^includeBuild[[:space:]]*\(?[[:space:]]*["'"'"']//; s/["'"'"']$//; s#^\./##; s#/$##'); do
+        case "$x" in ''|/*|..|../*|*/../*|*/..) continue ;; esac
+        printf '%s\n' "$x"
+    done
+}
+
+# gradle_wrappers <dir>: the Gradle wrappers a source scan of <dir> runs.
+# Sets GRADLE_WRAPPER_VERSIONS (their versions, space separated, or empty)
+# and GRADLE_WRAPPER_UNREADABLE (the properties files of the wrappers whose
+# version could not be read, one path per line, relative to <dir>). A wrapper counts only
+# with its gradlew script beside it; without one the image's own Gradle runs.
+#   - <dir> has gradlew: its wrapper alone runs, readable or not.
+#   - <dir> has a Gradle settings or build file and no gradlew: the image's
+#     Gradle runs once there, and no nested wrapper runs.
+#   - otherwise: every build below it with gradlew beside a settings or build
+#     file, found as build-prep.sh finds them: up to five folders below <dir>,
+#     skipping build, .gradle, node_modules, buildSrc, build-logic, dot
+#     folders, the non-shipped folders (unless BOMLENS_INCLUDE_NON_SHIPPED is
+#     set) and the builds another one's settings names in includeBuild(...).
+gradle_wrappers() {
+    local d="$1" n f b v incl prune=() roots=()
+    GRADLE_WRAPPER_VERSIONS=""; GRADLE_WRAPPER_UNREADABLE=""
+    [ -n "$d" ] && [ -d "$d" ] || return 0
+    if [ -f "$d/gradlew" ]; then
+        f="gradle/wrapper/gradle-wrapper.properties"
+        v="$(_gradle_wrapper_props_version "$d/$f")"
+        if [ -n "$v" ]; then GRADLE_WRAPPER_VERSIONS="$v"; else GRADLE_WRAPPER_UNREADABLE="$f"; fi
+        return 0
+    fi
+    _gradle_has_build "$d" && return 0
+    for n in build .gradle node_modules buildSrc build-logic '.?*'; do
+        prune+=(-o -name "$n")
+    done
+    if non_shipped_enabled; then
+        for n in $NON_SHIPPED_DIRS; do prune+=(-o -name "$n"); done
+    fi
+    while IFS= read -r f; do
+        b="${f%/gradlew}"; b="${b#./}"
+        case "$b" in ''|.|gradlew) continue ;; esac
+        if _gradle_has_build "$d/$b"; then roots+=("$b"); fi
+    done <<EOF
+$(cd "$d" 2>/dev/null && find . -maxdepth 6 -type d \( "${prune[@]:1}" \) ! -path . -prune -o -type f -name gradlew -print 2>/dev/null | LC_ALL=C sort)
+EOF
+    [ "${#roots[@]}" -gt 0 ] || return 0
+    for b in "${roots[@]}"; do
+        # An included build runs inside the build that names it.
+        for n in "${roots[@]}"; do
+            [ "$n" != "$b" ] || continue
+            while IFS= read -r incl; do
+                if [ -n "$incl" ] && [ "$n/$incl" = "$b" ]; then continue 3; fi
+            done <<EOF
+$(_gradle_included_builds "$d/$n")
+EOF
+        done
+        f="$b/gradle/wrapper/gradle-wrapper.properties"
+        v="$(_gradle_wrapper_props_version "$d/$f")"
+        if [ -n "$v" ]; then
+            GRADLE_WRAPPER_VERSIONS="${GRADLE_WRAPPER_VERSIONS:+$GRADLE_WRAPPER_VERSIONS }$v"
+        else
+            GRADLE_WRAPPER_UNREADABLE="${GRADLE_WRAPPER_UNREADABLE:+$GRADLE_WRAPPER_UNREADABLE
+}$f"
+        fi
+    done
+    return 0
+}
+
+# _gradle_runs_on <X.Y.Z> <jdk>: true when that Gradle version runs on that
+# JDK, from Gradle's compatibility matrix
+# (https://docs.gradle.org/current/userguide/compatibility.html): Java 8 runs
+# Gradle up to 8.14.x, 11 from 5.0 to 8.14.x, 17 from 7.3, 21 from 8.5, 24
+# from 8.14 and 25 from 9.1.0.
+_gradle_runs_on() {
+    local n min
+    n="$(_gradle_version_number "$1")"
+    case "$2" in
+        8)  min=0 ;;
+        11) min=5000000 ;;
+        17) min=7003000 ;;
+        21) min=8005000 ;;
+        24) min=8014000 ;;
+        25) min=9001000 ;;
+        *)  return 1 ;;
+    esac
+    [ "$n" -ge "$min" ] || return 1
+    case "$2" in 8|11) [ "$n" -lt 9000000 ] || return 1 ;; esac
+    return 0
+}
+
+# _gradle_jdks <version>...: the image JDKs every one of these Gradle
+# versions runs on, space separated (all of them for no version).
+_gradle_jdks() {
+    local j v out=""
+    for j in $CDXGEN_JAVA_JDKS; do
+        for v in "$@"; do _gradle_runs_on "$v" "$j" || continue 2; done
+        out="$out $j"
+    done
+    echo "${out# }"
+}
+
+# _java_choose <dir>: decide the Java image for <dir>. Sets JAVA_PICK_JDK (the
+# image's JDK), JAVA_PICK_TOOLCHAIN (the declared toolchain, or empty),
+# JAVA_PICK_WRAPPER (the wrapper versions, comma separated, or empty),
+# JAVA_PICK_WRAPPER_CONFLICT (true when no image JDK runs every wrapper),
+# JAVA_PICK_UNREADABLE (gradle_wrappers' GRADLE_WRAPPER_UNREADABLE) and
+# JAVA_PICK_WHY:
+#   toolchain   the declared toolchain's own image
+#   conflict    an image has the toolchain's JDK, but a wrapper cannot run on it
+#   no-image    no image has the toolchain's JDK
+#   (empty)     nothing asked for another image than the wrappers allow
+# The JDKs the wrappers run on are those every wrapper runs on; when there is
+# none, those the lowest wrapper runs on. From them the toolchain's JDK is
+# taken when it is one, else Java 21 when it is one, else the newest.
+_java_choose() {
+    local v low="" lown=0 vn runs
+    JAVA_PICK_TOOLCHAIN="$(java_toolchain_version "${1:-}")"
+    gradle_wrappers "${1:-}"
+    JAVA_PICK_UNREADABLE="$GRADLE_WRAPPER_UNREADABLE"
+    JAVA_PICK_WRAPPER=""; JAVA_PICK_WRAPPER_CONFLICT=""; JAVA_PICK_WHY=""
+    for v in $GRADLE_WRAPPER_VERSIONS; do
+        JAVA_PICK_WRAPPER="${JAVA_PICK_WRAPPER:+$JAVA_PICK_WRAPPER, }$v"
+        vn="$(_gradle_version_number "$v")"
+        if [ -z "$low" ] || [ "$vn" -lt "$lown" ]; then low="$v"; lown="$vn"; fi
+    done
+    # shellcheck disable=SC2086 # one argument per version
+    runs="$(_gradle_jdks $GRADLE_WRAPPER_VERSIONS)"
+    if [ -z "$runs" ]; then
+        JAVA_PICK_WRAPPER_CONFLICT="true"
+        runs="$(_gradle_jdks "$low")"
+    fi
+    case " $runs " in
+        *" $JAVA_PICK_TOOLCHAIN "*)
+            JAVA_PICK_JDK="$JAVA_PICK_TOOLCHAIN"
+            [ "$JAVA_PICK_JDK" = "$CDXGEN_JAVA_DEFAULT" ] || JAVA_PICK_WHY="toolchain"
+            return 0 ;;
+        *" $CDXGEN_JAVA_DEFAULT "*) JAVA_PICK_JDK="$CDXGEN_JAVA_DEFAULT" ;;
+        *) JAVA_PICK_JDK="${runs##* }" ;;
+    esac
+    if [ -n "$JAVA_PICK_TOOLCHAIN" ]; then
+        if _java_has_image "$JAVA_PICK_TOOLCHAIN"; then JAVA_PICK_WHY="conflict"; else JAVA_PICK_WHY="no-image"; fi
+    fi
+    return 0
+}
+
+# CDXGEN_JAVA_IMAGE when it is set and reads as an image reference, else
+# nothing. The value reaches a docker command line. A ghcr.io/cdxgen/ name
+# comes from CDXGEN_IMAGE_PREFIX, like CDXGEN_ALLINONE.
+_java_image_override() {
+    case "${CDXGEN_JAVA_IMAGE:-}" in
+        [A-Za-z0-9]*) case "$CDXGEN_JAVA_IMAGE" in *[!A-Za-z0-9._/:@-]*) return 0 ;; esac
+            case "$CDXGEN_JAVA_IMAGE" in
+                ghcr.io/cdxgen/*) echo "${CDXGEN_IMAGE_PREFIX}${CDXGEN_JAVA_IMAGE#ghcr.io/cdxgen/}" ;;
+                *) echo "$CDXGEN_JAVA_IMAGE" ;;
+            esac ;;
+    esac
+}
+
+# _java_toolchain_warn <version> <what the image has> <what to do>
+_java_toolchain_warn() {
+    echo "[WARN] The Gradle build declares a Java $1 toolchain, and $2."
+    echo "[WARN]   Gradle needs a Java $1 JDK, so dependency resolution can fail unless the build configures toolchain auto-provisioning."
+    echo "[WARN]   $3"
+}
+
+# java_image_note <dir>: the lines that say why img_for_lang picked the Java
+# image it did for <dir>; nothing for the default image when nothing in the
+# build asked for another.
+java_image_note() {
+    local f
+    if [ -n "${CDXGEN_JAVA_IMAGE:-}" ]; then
+        if [ -n "$(_java_image_override)" ]; then
+            echo "[INFO] Java image from CDXGEN_JAVA_IMAGE: $(_java_image_override)"
+            return 0
+        fi
+        echo "[WARN] CDXGEN_JAVA_IMAGE is not an image reference and is ignored: $CDXGEN_JAVA_IMAGE"
+    fi
+    _java_choose "${1:-}"
+    local tc="$JAVA_PICK_TOOLCHAIN" w="$JAVA_PICK_WRAPPER" j="$JAVA_PICK_JDK"
+    while IFS= read -r f; do
+        [ -n "$f" ] || continue
+        echo "[INFO] The Gradle wrapper version could not be read from $f (distributionUrl); the Java image is chosen without it."
+    done <<EOF
+$JAVA_PICK_UNREADABLE
+EOF
+    if [ -n "$JAVA_PICK_WRAPPER_CONFLICT" ]; then
+        echo "[WARN] No cdxgen Java image runs every Gradle wrapper in this tree (Gradle $w); using the cdxgen Java $j image, chosen for the lowest one."
+        echo "[WARN]   The other builds can fail to resolve their dependencies. Scan them on their own, or set CDXGEN_JAVA_IMAGE to an image with a JDK they all run on."
+    fi
+    case "$JAVA_PICK_WHY" in
+        toolchain)
+            echo "[INFO] The Gradle build declares a Java $tc toolchain; using the cdxgen Java $j image." ;;
+        conflict)
+            echo "[WARN] The Gradle build declares a Java $tc toolchain, but its wrapper (Gradle $w) cannot run on Java $tc; using the cdxgen Java $j image, which it runs on."
+            echo "[WARN]   Gradle needs a Java $tc JDK too, so dependency resolution can fail unless the build configures toolchain auto-provisioning."
+            echo "[WARN]   Set CDXGEN_JAVA_IMAGE to an image with a JDK Gradle $w runs on and a Java $tc JDK." ;;
+        no-image)
+            _java_toolchain_warn "$tc" "the cdxgen Java image has Java $j" \
+                "Set CDXGEN_JAVA_IMAGE to an image that has a Java $tc JDK." ;;
+    esac
+    if [ -n "$w" ] && [ "$j" != "$CDXGEN_JAVA_DEFAULT" ] && [ "$JAVA_PICK_WHY" != toolchain ]; then
+        echo "[INFO] The Gradle wrapper (Gradle $w) cannot run on Java $CDXGEN_JAVA_DEFAULT; using the cdxgen Java $j image."
+    fi
+}
+
+# java_retry_image <dir> <stage-1 log> <image used>: sets JAVA_RETRY_IMAGE to
+# the cdxgen Java image to run stage 1 again in, or to nothing. Stage 1's build-prep.sh writes
+# "java-toolchain-missing=N" when Gradle failed for want of a Java N
+# toolchain, which covers a version this file cannot read (a version catalog,
+# a convention plugin's own logic). Sets JAVA_RETRY_JDK to N. Nothing when
+# CDXGEN_JAVA_IMAGE names the image, when no published image has Java N, when
+# that image is the one used, or when a Gradle wrapper of <dir> cannot run on
+# Java N (the second run would fail too).
+java_retry_image() {
+    local n img
+    JAVA_RETRY_IMAGE=""; JAVA_RETRY_JDK=""
+    [ -z "$(_java_image_override)" ] || return 0
+    [ -f "${2:-}" ] || return 0
+    n="$(grep -oE '^\[build-prep\] gradle-[a-z-]+: .*\(java-toolchain-missing=[0-9]+\)' "$2" 2>/dev/null \
+        | grep -oE '[0-9]+\)$' | tr -d ')' | grep -E '^[0-9]{1,3}$' | sed 's/^0*\([0-9]\)/\1/' | sort -n | tail -1)" || n=""
+    [ -n "$n" ] && _java_has_image "$n" || return 0
+    gradle_wrappers "${1:-}"
+    # shellcheck disable=SC2086 # one argument per version
+    case " $(_gradle_jdks $GRADLE_WRAPPER_VERSIONS) " in *" $n "*) ;; *) return 0 ;; esac
+    img="${CDXGEN_IMAGE_PREFIX}$(_java_image_name "$n"):$CDXGEN_TAG"
+    [ "$img" != "${3:-}" ] || return 0
+    # shellcheck disable=SC2034  # read by the caller after the call
+    {
+        JAVA_RETRY_IMAGE="$img"
+        JAVA_RETRY_JDK="$n"
+    }
+}
+
+# java_retry_image_ready <image>: true when the image is here or a pull of it
+# succeeds now, for the web UI (the CLI uses its _optin_image_ready, which
+# does the same). The pull shows docker's own progress. SBOM_PULL=never only
+# looks, so an offline run does not try; SBOM_PULL=always pulls a present
+# image too and uses the local copy when that pull fails.
+java_retry_image_ready() {
+    if [ "${SBOM_PULL:-missing}" != always ] && docker image inspect "$1" >/dev/null 2>&1; then
+        return 0
+    fi
+    [ "${SBOM_PULL:-missing}" != never ] || return 1
+    echo "[INFO] Pulling $1..."
+    docker pull "$1" && return 0
+    [ "${SBOM_PULL:-missing}" = always ] && docker image inspect "$1" >/dev/null 2>&1 || return 1
+    echo "[WARN] Could not pull $1 (SBOM_PULL=always); using the copy already here."
+}
+
+# java_mixed_note <dir>: a mixed tree runs in the all-in-one image, whatever
+# the toolchain. Warn when a Gradle build in it declares one other than the
+# default Java image's.
+java_mixed_note() {
+    local v
+    v="$(java_toolchain_version "${1:-}")"
+    [ -n "$v" ] && [ "$v" != "$CDXGEN_JAVA_DEFAULT" ] || return 0
+    _java_toolchain_warn "$v" "this mixed-language tree is scanned in the cdxgen all-in-one image, which may not have that JDK" \
+        "Scan the Java project's folder on its own, with CDXGEN_JAVA_IMAGE naming an image that has a Java $v JDK if no published one does."
+}
+
+# img_for_lang <lang> [dir]: the cdxgen image for a detected language. For
+# java, <dir> is the scanned tree, and the image follows its Gradle toolchain
+# and wrapper (_java_choose). CDXGEN_JAVA_IMAGE, a full image reference, wins.
 img_for_lang() {
-    local p="$CDXGEN_IMAGE_PREFIX"
+    local p="$CDXGEN_IMAGE_PREFIX" v=""
     case "$1" in
         rust)   echo "${p}cdxgen-debian-rust:$CDXGEN_TAG" ;;
         go)     echo "${p}cdxgen-debian-golang124:$CDXGEN_TAG" ;;
         ruby)   echo "${p}cdxgen-debian-ruby34:$CDXGEN_TAG" ;;
-        java)   echo "${p}cdxgen-temurin-java21:$CDXGEN_TAG" ;;
+        java)   v="$(_java_image_override)"
+                if [ -n "$v" ]; then echo "$v"; return 0; fi
+                _java_choose "${2:-}"
+                echo "${p}$(_java_image_name "$JAVA_PICK_JDK"):$CDXGEN_TAG" ;;
         python) echo "${p}cdxgen-python312:$CDXGEN_TAG" ;;
         node)   echo "${p}cdxgen-alpine-node24:$CDXGEN_TAG" ;;
         php)    echo "${p}cdxgen-debian-php84:$CDXGEN_TAG" ;;

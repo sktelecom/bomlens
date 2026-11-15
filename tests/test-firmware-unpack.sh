@@ -291,7 +291,7 @@ fi
 merged="$(jq -n --slurpfile a "$FIX/merge-pkg-comps.json" \
                 --slurpfile b "$FIX/merge-bin-comps.json" \
                 --slurpfile c <(echo '[]') --slurpfile d <(echo '[]') \
-                --slurpfile e <(echo '[]') --slurpfile f <(echo '[]') "$merge_filter")"
+                --slurpfile e <(echo '[]') --slurpfile f <(echo '[]') --slurpfile g <(echo '[]') "$merge_filter")"
 
 n=$(printf '%s' "$merged" | jq '[.[] | select(.name == "openssl" and .version == "1.0.2h")] | length')
 if [ "$n" = "1" ]; then
@@ -368,7 +368,7 @@ fi
 store_merge="$(jq -n \
     --slurpfile a "$FIX/merge-pkg-comps.json" \
     --slurpfile b <(echo '[]') --slurpfile c <(echo '[]') --slurpfile d <(echo '[]') \
-    --slurpfile e '/dev/stdin' --slurpfile f <(echo '[]') "$merge_filter" <<'EOF'
+    --slurpfile e '/dev/stdin' --slurpfile f <(echo '[]') --slurpfile g <(echo '[]') "$merge_filter" <<'EOF'
 [{"type":"library","name":"openssl","version":"1.0.2h",
   "purl":"pkg:deb/debian/openssl@1.0.2h?distro=debian-13",
   "properties":[{"name":"bomlens:purlSource","value":"container-store-distro"},
@@ -434,7 +434,7 @@ with_presence="$(jq -n --slurpfile a "$FIX/merge-pkg-comps.json" \
                        --slurpfile b "$FIX/merge-bin-comps.json" \
                        --slurpfile c "$FIX/elf-presence-comps.json" \
                        --slurpfile d <(echo '[]') \
-                       --slurpfile e <(echo '[]') --slurpfile f <(echo '[]') "$merge_filter")"
+                       --slurpfile e <(echo '[]') --slurpfile f <(echo '[]') --slurpfile g <(echo '[]') "$merge_filter")"
 
 if printf '%s' "$with_presence" | jq -e 'any(.[]; .name == "net-snmp")' >/dev/null; then
     pass "a component only the ELF structure proves is carried into the SBOM"
@@ -683,7 +683,7 @@ with_verstr="$(jq -n --slurpfile a "$FIX/merge-pkg-comps.json" \
                      --slurpfile b "$FIX/merge-bin-comps.json" \
                      --slurpfile c "$FIX/elf-presence-comps.json" \
                      --slurpfile d "$FIX/version-string-comps.json" \
-                     --slurpfile e <(echo '[]') --slurpfile f <(echo '[]') "$merge_filter")"
+                     --slurpfile e <(echo '[]') --slurpfile f <(echo '[]') --slurpfile g <(echo '[]') "$merge_filter")"
 
 if printf '%s' "$with_verstr" | jq -e '
       any(.[]; .name == "net-tools" and .version == "1.60")' >/dev/null; then
@@ -746,7 +746,7 @@ forms_versioned="$(jq -n '[
 forms_out="$(jq -n --slurpfile a <(echo "$forms_versioned") \
                    --slurpfile b <(echo "$forms_in") \
                    --slurpfile c <(echo '[]') --slurpfile d <(echo '[]') \
-                   --slurpfile e <(echo '[]') --slurpfile f <(echo '[]') "$merge_filter")"
+                   --slurpfile e <(echo '[]') --slurpfile f <(echo '[]') --slurpfile g <(echo '[]') "$merge_filter")"
 
 for pair in expat:libexpat zstd:zstandard; do
     bare="${pair%%:*}"; full="${pair#*:}"

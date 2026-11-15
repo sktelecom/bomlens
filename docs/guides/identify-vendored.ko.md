@@ -41,11 +41,11 @@ docker build --build-arg SBOM_SCANOSS=true -t bomlens ./docker
   --identify-vendored --all --generate-only
 ```
 
-웹 UI·데스크톱 앱에서는 **고급**을 펼쳐 **파일 단위 식별 (SCANOSS)** 토글을 켭니다. 화면 라벨은 "파일 단위 식별 (SCANOSS)"이지만 이 문서에서 말하는 내장 오픈소스 식별과 같은 기능입니다. 이 옵션은 소스 스캔(현재 디렉터리, git URL, ZIP 업로드)이면서 이미지가 지원할 때만 보입니다.
+웹 UI·데스크톱 앱에서는 **결과 품질**을 펼쳐 **복사해 넣은 오픈소스 탐지** 토글을 켭니다. 화면 라벨은 "복사해 넣은 오픈소스 탐지"이지만 이 문서에서 말하는 내장 오픈소스 식별과 같은 기능입니다. 이 옵션은 소스 스캔(현재 디렉터리, git URL, ZIP 업로드)이면서 이미지가 지원할 때만 보입니다.
 
 명령어가 낯선 Windows 사용자는 [비개발자 빠른 시작](../start/no-cli.ko.md)의 데스크톱 앱 안내를 먼저 따라 하세요.
 
-![고급 섹션의 파일 단위 식별 (SCANOSS) 토글](../images/web-ui-identify-vendored-ko.png)
+![결과 품질 그룹의 복사해 넣은 오픈소스 탐지 토글](../images/web-ui-identify-vendored-ko.png)
 
 ## 결과
 

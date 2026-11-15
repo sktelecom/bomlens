@@ -49,12 +49,19 @@ async function fillAndRun(page: Page) {
   await page.getByRole("button", { name: /Run scan/i }).click();
 }
 
-test("Overview shows the outdated jump tile", async ({ page }) => {
+test("Overview lists the outdated components and opens Components filtered to them", async ({ page }) => {
   await stub(page, { firmware: false, scanoss: false, docker: true }, OUTDATED_DONE);
   await page.goto("/#/new");
   await fillAndRun(page);
-  // The tile carries the outdated count and its label word (color is not the only signal).
-  await expect(page.getByText("Outdated", { exact: true }).first()).toBeVisible();
+  // The row carries the count and says what it counts in words (color is not the only signal).
+  const row = page.getByTestId("needs-attention").getByRole("link", { name: "2 outdated components" });
+  await expect(row).toBeVisible();
+  await expect(row).toHaveAttribute("href", /#\/scan\/[^/]+\/components\?outdated=1$/);
+  await row.click();
+  await page.getByRole("button", { name: /^Filters/ }).click();
+  await expect(page.getByRole("menuitemcheckbox", { name: "Outdated" })).toHaveAttribute("aria-checked", "true");
+  await page.keyboard.press("Escape");
+  await expect(page.getByText("express", { exact: true })).toHaveCount(0);
 });
 
 test("outdated badge + latest version render; filter narrows the table", async ({ page }) => {
@@ -69,7 +76,7 @@ test("outdated badge + latest version render; filter narrows the table", async (
 
   // The Outdated filter keeps only the two outdated rows (express drops out).
   await page.getByRole("button", { name: /^Filters/ }).click();
-  await page.getByRole("checkbox", { name: "Outdated" }).check();
+  await page.getByRole("menuitemcheckbox", { name: "Outdated" }).click();
   await page.keyboard.press("Escape");
   await expect(page.getByText("lodash", { exact: true }).first()).toBeVisible();
   await expect(page.getByText("jinja2", { exact: true }).first()).toBeVisible();

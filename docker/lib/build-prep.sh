@@ -59,6 +59,10 @@ opted_out() { case "$1" in 1|true) return 0 ;; esac; return 1; }
 # to inspect what a resolution produced).
 # ---------------------------------------------------------------------------
 GUARD_DIR=""
+GUARD_NOEXEC=""
+# The host-persistent guard-state mount. BOMLENS_GUARD_STATE_ROOT names
+# another folder (tests only).
+GUARD_STATE_ROOT="${BOMLENS_GUARD_STATE_ROOT:-/bomlens-state}"
 
 # Resolver-owned paths, relative to $SRC. maxdepth 4 covers multi-module trees
 # (app/build, services/api/go.mod) without walking a whole monorepo; .git and
@@ -108,19 +112,37 @@ guard_snapshot() {
     # run, so a later invocation can finish the restore. Falls back to the
     # normal ephemeral dir when either is absent (unset key, older caller,
     # no /bomlens-state mount) -- unchanged from before this existed.
-    if [ -n "${BOMLENS_GUARD_ID:-}" ] && [ -d /bomlens-state ]; then
-        GUARD_DIR="/bomlens-state/$BOMLENS_GUARD_ID"
+    if [ -n "${BOMLENS_GUARD_ID:-}" ] && [ -d "$GUARD_STATE_ROOT" ]; then
+        GUARD_DIR="$GUARD_STATE_ROOT/$BOMLENS_GUARD_ID"
         mkdir -p "$GUARD_DIR" 2>/dev/null || GUARD_DIR=""
     fi
     [ -n "$GUARD_DIR" ] || GUARD_DIR=$(mktemp -d 2>/dev/null) || { GUARD_DIR=""; return 0; }
+    # Wrappers without the executable bit: cdxgen sets the bit before it runs
+    # them, so the restore clears it again.
+    GUARD_NOEXEC=""
+    for _w in gradlew mvnw; do
+        [ -f "$_w" ] && [ ! -x "$_w" ] && GUARD_NOEXEC="$GUARD_NOEXEC $_w"
+    done
     guard_paths f > "$GUARD_DIR/files.before" 2>/dev/null
     guard_paths d > "$GUARD_DIR/dirs.before" 2>/dev/null
-    echo "$GUARD_NAMES_VERSION" > "$GUARD_DIR/names.version" 2>/dev/null
     while IFS= read -r _f; do
         [ -n "$_f" ] || continue
         mkdir -p "$GUARD_DIR/tree/$(dirname "$_f")" 2>/dev/null
         cp -p "$_f" "$GUARD_DIR/tree/$_f" 2>/dev/null
     done < "$GUARD_DIR/files.before"
+    # Written last: the restore-only mode below finishes a snapshot only when
+    # this file is there, so a run stopped while the lists were being written
+    # leaves nothing it would act on.
+    echo "$GUARD_NAMES_VERSION" > "$GUARD_DIR/names.version" 2>/dev/null
+}
+
+# guard_git_tracked PATH: true when PATH (relative to the current folder) is
+# tracked by git. Used only to keep a path the restore would otherwise remove;
+# without git, or outside a work tree, nothing counts as tracked.
+# safe.directory: the tree is often owned by another uid than this container's.
+guard_git_tracked() {
+    [ "${_g_git:-0}" = 1 ] || return 1
+    git -c safe.directory='*' ls-files --error-unmatch -- "$1" >/dev/null 2>&1
 }
 
 # Idempotent: clears GUARD_DIR first, so the explicit call and the trap that
@@ -129,6 +151,22 @@ guard_restore() {
     [ -n "$GUARD_DIR" ] || return 0
     _g="$GUARD_DIR"; GUARD_DIR=""
     cd "$SRC" 2>/dev/null || { rm -rf "$_g"; return 0; }
+    for _w in ${GUARD_NOEXEC:-}; do
+        [ -x "$_w" ] && chmod a-x "$_w" 2>/dev/null
+    done
+    GUARD_NOEXEC=""
+    # Without both lists there is nothing to compare with: every resolver-owned
+    # path would read as new and be removed. Drop the state instead.
+    if [ ! -f "$_g/files.before" ] || [ ! -f "$_g/dirs.before" ]; then
+        log "source-tree snapshot incomplete; nothing restored or removed"
+        rm -rf "$_g"
+        return 0
+    fi
+    _g_git=0
+    if command -v git >/dev/null 2>&1 \
+       && [ "$(git -c safe.directory='*' rev-parse --is-inside-work-tree 2>/dev/null)" = "true" ]; then
+        _g_git=1
+    fi
     _rst=0; _del=0
     while IFS= read -r _f; do
         [ -n "$_f" ] || continue
@@ -151,6 +189,10 @@ guard_restore() {
         # the tree when the run folder is not on a shared mount.
         [ "$SRC/${_f#./}" = "$OUT" ] && continue
         grep -qxF "$_f" "$_g/files.before" 2>/dev/null && continue
+        if guard_git_tracked "$_f"; then
+            log "WARN: $_f is tracked by git; left in place"
+            continue
+        fi
         rm -f "$_f" 2>/dev/null && _del=$((_del + 1))
     done < "$_g/files.after"
     guard_paths d "$_gnv" > "$_g/dirs.after" 2>/dev/null
@@ -158,6 +200,10 @@ guard_restore() {
         [ -n "$_d" ] || continue
         [ -d "$_d" ] || continue
         grep -qxF "$_d" "$_g/dirs.before" 2>/dev/null && continue
+        if guard_git_tracked "$_d"; then
+            log "WARN: $_d holds files tracked by git; left in place"
+            continue
+        fi
         rm -rf "$_d" 2>/dev/null && _del=$((_del + 1))
         # Drop the parents the run created on the way (gradle's app/build leaves
         # an empty app/ behind when the module dir itself is new). rmdir refuses
@@ -188,10 +234,12 @@ guard_restore() {
 # setsid gives the command its own process group (pgid == its own pid), so
 # stopping it reaches the whole subtree it spawns (language tool -> package
 # manager -> git clone, etc.) with one signal instead of depending on each
-# level to forward it to the next. Confirmed present in every cdxgen image
-# build-prep.sh runs in (debian-rust/golang124/ruby34/php84/dotnet9/swift,
-# temurin-java21, python312, node20, the all-in-one image). Where it is
-# missing, falls back to a /proc-based tree walk.
+# level to forward it to the next. Confirmed present in these cdxgen images
+# (debian-rust/golang124/ruby34/php84/dotnet9/swift, temurin-java21,
+# python312, node20, the all-in-one image), and not checked in the other Java
+# images source-detect.sh can pick (temurin-java8, java11, java17,
+# temurin-java24, temurin-java25). Where it is missing, falls back to a
+# /proc-based tree walk.
 #
 # _cg_pid / _cg_pgid track whatever is currently supervised, so stop_supervised
 # and a trap can act on it without either needing to be passed the details.
@@ -337,6 +385,16 @@ prep_step() {
             echo "[build-prep] $_ps_label said (last 20 lines):" >&2
             tail -20 "$_ps_err" | sed 's/^/[build-prep]   /' >&2
         fi
+        # A Gradle toolchain this image has no JDK for. The marker line is
+        # what the caller reads (java_retry_image in source-detect.sh) to run
+        # this step again in the cdxgen image with that JDK.
+        case "$_ps_label" in gradle-*)
+            _ps_jdk=$(grep -oE '(Cannot find a Java installation on your machine|No (compatible|matching) toolchains found for request(ed)? (specification|filter))[^{]*\{languageVersion=[0-9]+' "$_ps_err" 2>/dev/null \
+                | grep -oE '[0-9]+$' | grep -E '^[0-9]{1,3}$' | sort -n | tail -1)
+            if [ -n "$_ps_jdk" ]; then
+                echo "[build-prep] $_ps_label: Gradle asked for a Java $_ps_jdk toolchain, which this image does not have (java-toolchain-missing=$_ps_jdk)" >&2
+            fi ;;
+        esac
         case " $PREP_FAILED " in
             *" $_ps_label "*) ;;
             *) PREP_FAILED="${PREP_FAILED:+$PREP_FAILED }$_ps_label" ;;
@@ -358,6 +416,16 @@ mark_prep_failed() {
         *" $1 "*) ;;
         *) PREP_FAILED="${PREP_FAILED:+$PREP_FAILED }$1" ;;
     esac
+}
+
+# Take LABEL off PREP_FAILED: a step that failed once and then succeeded
+# another way (the java-gradle runtime classpath read, then the plain warm-up).
+unmark_prep_failed() {
+    _upf=""
+    for _upf_l in $PREP_FAILED; do
+        [ "$_upf_l" = "$1" ] || _upf="${_upf:+$_upf }$_upf_l"
+    done
+    PREP_FAILED="$_upf"
 }
 
 # The user's Gradle settings (mounted under $SETTINGS_ROOT/gradle) go into
@@ -502,20 +570,165 @@ mark_prep_applied() {
 # is gone before asking us to finish what it started; this reuses
 # guard_restore's own diff logic instead of reimplementing it host-side. No
 # resolvers, no cdxgen -- filesystem cleanup only, and fast.
+# Only a snapshot taken in full (both lists and names.version, which
+# guard_snapshot writes last) is finished. A record without one, such as the
+# one a scan whose cdxgen container never started leaves, is removed and
+# nothing in the tree is touched.
 if opted_out "${BOMLENS_GUARD_RESTORE_ONLY:-}"; then
-    if [ -n "${BOMLENS_GUARD_ID:-}" ] && [ -d "/bomlens-state/$BOMLENS_GUARD_ID" ]; then
-        GUARD_DIR="/bomlens-state/$BOMLENS_GUARD_ID"
-        guard_restore
+    if [ -n "${BOMLENS_GUARD_ID:-}" ] && [ -d "$GUARD_STATE_ROOT/$BOMLENS_GUARD_ID" ]; then
+        GUARD_DIR="$GUARD_STATE_ROOT/$BOMLENS_GUARD_ID"
+        if [ -f "$GUARD_DIR/files.before" ] && [ -f "$GUARD_DIR/dirs.before" ] \
+           && [ -f "$GUARD_DIR/names.version" ]; then
+            guard_restore
+        else
+            log "no complete source-tree snapshot for this folder; removing the record without touching the tree"
+            rm -rf "$GUARD_DIR"
+            GUARD_DIR=""
+        fi
     fi
     exit 0
 fi
 
+# An extra CA bundle (BOMLENS_EXTRA_CA_CERTS, a proxy that inspects TLS):
+# trusted by every package manager and JVM started below. A copy of
+# extra_ca_trust in docker/lib/extra-ca.sh (this file runs alone in the
+# cdxgen container); tests/test-postprocess.sh checks the copies stay equal.
+extra_ca_trust() {
+    _ec_src="${BOMLENS_EXTRA_CA_CERTS:-}"
+    [ -n "$_ec_src" ] || return 0
+    # Applied once per container: a scan started inside this one inherits it.
+    [ "${BOMLENS_EXTRA_CA_APPLIED:-}" != "$_ec_src" ] || return 0
+    if [ ! -f "$_ec_src" ] || [ ! -r "$_ec_src" ]; then
+        echo "[WARN] BOMLENS_EXTRA_CA_CERTS=$_ec_src is not a readable file in this container, so no extra CA is trusted. Mount the PEM bundle and point the variable at its path inside the container." >&2
+        return 0
+    fi
+    if ! grep -q -- '-----BEGIN CERTIFICATE-----' "$_ec_src" 2>/dev/null; then
+        echo "[WARN] BOMLENS_EXTRA_CA_CERTS=$_ec_src holds no PEM certificate (no -----BEGIN CERTIFICATE----- line), so no extra CA is trusted." >&2
+        return 0
+    fi
+    if ! _ec_dir="$(mktemp -d /tmp/bomlens-ca.XXXXXX 2>/dev/null)"; then
+        echo "[WARN] /tmp cannot be written, so the CA bundle in BOMLENS_EXTRA_CA_CERTS is not trusted. Mount a writable /tmp." >&2
+        return 0
+    fi
+    # The certificates only: a private key in the same file is left behind.
+    if ! awk '/-----BEGIN CERTIFICATE-----/ { p = 1 } p { print } /-----END CERTIFICATE-----/ { p = 0 }' "$_ec_src" \
+            | tr -d '\r' > "$_ec_dir/extra.pem"; then
+        echo "[WARN] could not read the certificates in BOMLENS_EXTRA_CA_CERTS=$_ec_src, so no extra CA is trusted." >&2
+        return 0
+    fi
+    _ec_n="$(grep -c -- '-----BEGIN CERTIFICATE-----' "$_ec_dir/extra.pem" 2>/dev/null)" || _ec_n=0
+    # Extended, not replaced: a bundle the image or the caller already names
+    # comes first, the system bundle only when there is none.
+    _ec_base=""
+    for _ec_f in "${SSL_CERT_FILE:-}" "${REQUESTS_CA_BUNDLE:-}" /etc/ssl/certs/ca-certificates.crt \
+            /etc/pki/tls/certs/ca-bundle.crt /etc/ssl/ca-bundle.pem \
+            /etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem /etc/ssl/cert.pem; do
+        if [ -n "$_ec_f" ] && [ -f "$_ec_f" ] && [ -r "$_ec_f" ] && [ -s "$_ec_f" ]; then _ec_base="$_ec_f"; break; fi
+    done
+    {
+        if [ -n "$_ec_base" ]; then cat "$_ec_base"; echo; fi
+        cat "$_ec_dir/extra.pem"
+    } > "$_ec_dir/bundle.pem" 2>/dev/null || true
+    if [ -z "$_ec_base" ]; then
+        echo "[WARN] no CA bundle found in this image: only the certificates in BOMLENS_EXTRA_CA_CERTS are trusted for TLS outside Java and Node.js." >&2
+    fi
+    SSL_CERT_FILE="$_ec_dir/bundle.pem"
+    REQUESTS_CA_BUNDLE="$_ec_dir/bundle.pem"
+    CURL_CA_BUNDLE="$_ec_dir/bundle.pem"
+    CARGO_HTTP_CAINFO="$_ec_dir/bundle.pem"
+    GIT_SSL_CAINFO="$_ec_dir/bundle.pem"
+    PIP_CERT="$_ec_dir/bundle.pem"
+    export SSL_CERT_FILE REQUESTS_CA_BUNDLE CURL_CA_BUNDLE CARGO_HTTP_CAINFO GIT_SSL_CAINFO PIP_CERT
+    # Node.js adds these to its own roots. One the image already names is kept.
+    if [ -n "${NODE_EXTRA_CA_CERTS:-}" ] && [ -r "$NODE_EXTRA_CA_CERTS" ]; then
+        { cat "$NODE_EXTRA_CA_CERTS"; echo; cat "$_ec_dir/extra.pem"; } > "$_ec_dir/node-extra.pem" 2>/dev/null || true
+        NODE_EXTRA_CA_CERTS="$_ec_dir/node-extra.pem"
+    else
+        NODE_EXTRA_CA_CERTS="$_ec_dir/extra.pem"
+    fi
+    export NODE_EXTRA_CA_CERTS
+    # Java. The trust store JAVA_TOOL_OPTIONS already names (with its password
+    # and type, when given) is the one extended; the other options are kept.
+    _ec_java=""
+    _ec_ts_old=""; _ec_ts_pw=""; _ec_ts_type=""; _ec_jto_rest=""
+    case "$-" in *f*) _ec_glob_off=1 ;; *) _ec_glob_off="" ;; esac
+    set -f
+    for _ec_w in ${JAVA_TOOL_OPTIONS:-}; do
+        case "$_ec_w" in
+            -Djavax.net.ssl.trustStore=*) _ec_ts_old="${_ec_w#*=}" ;;
+            -Djavax.net.ssl.trustStorePassword=*) _ec_ts_pw="${_ec_w#*=}" ;;
+            -Djavax.net.ssl.trustStoreType=*) _ec_ts_type="${_ec_w#*=}" ;;
+            *) _ec_jto_rest="${_ec_jto_rest:+$_ec_jto_rest }$_ec_w" ;;
+        esac
+    done
+    [ -n "$_ec_glob_off" ] || set +f
+    _ec_jh="${JAVA_HOME:-}"
+    if [ -z "$_ec_jh" ] && command -v java >/dev/null 2>&1; then
+        _ec_jbin="$(readlink -f "$(command -v java)" 2>/dev/null)" || _ec_jbin=""
+        [ -z "$_ec_jbin" ] || _ec_jh="$(dirname "$(dirname "$_ec_jbin")")"
+    fi
+    _ec_store=""; _ec_store_pw="changeit"; _ec_store_type=""
+    if [ -n "$_ec_ts_old" ] && [ -f "$_ec_ts_old" ] && [ -r "$_ec_ts_old" ]; then
+        _ec_store="$_ec_ts_old"; _ec_store_pw="${_ec_ts_pw:-changeit}"; _ec_store_type="$_ec_ts_type"
+    elif [ -n "$_ec_jh" ]; then
+        for _ec_f in "$_ec_jh/lib/security/cacerts" "$_ec_jh/jre/lib/security/cacerts"; do
+            if [ -f "$_ec_f" ]; then _ec_store="$_ec_f"; break; fi
+        done
+    fi
+    _ec_keytool=""
+    if [ -n "$_ec_jh" ] && [ -x "$_ec_jh/bin/keytool" ]; then
+        _ec_keytool="$_ec_jh/bin/keytool"
+    elif command -v keytool >/dev/null 2>&1; then
+        _ec_keytool="$(command -v keytool)"
+    fi
+    if [ -n "$_ec_store" ] && [ -z "$_ec_keytool" ]; then
+        echo "[WARN] there is a Java trust store ($_ec_store) but no keytool in this image, so Java builds do not trust the certificates in BOMLENS_EXTRA_CA_CERTS." >&2
+    elif [ -n "$_ec_store" ]; then
+        _ec_java="no"
+        # The JVM each keytool starts must not read a trust store set by an
+        # earlier call, so JAVA_TOOL_OPTIONS is cleared for it.
+        if JAVA_TOOL_OPTIONS="" "$_ec_keytool" -importkeystore -noprompt \
+                -srckeystore "$_ec_store" -srcstorepass "$_ec_store_pw" ${_ec_store_type:+-srcstoretype "$_ec_store_type"} \
+                -destkeystore "$_ec_dir/cacerts" -deststoretype JKS -deststorepass changeit >/dev/null 2>&1; then
+            chmod 600 "$_ec_dir/cacerts" 2>/dev/null || true
+            awk -v d="$_ec_dir" '/-----BEGIN CERTIFICATE-----/ { n++; f = sprintf("%s/cert-%d.pem", d, n) }
+                f != "" { print > f } /-----END CERTIFICATE-----/ { if (f != "") close(f); f = "" }' "$_ec_dir/extra.pem" 2>/dev/null || true
+            _ec_i=0; _ec_ok=0
+            for _ec_f in "$_ec_dir"/cert-*.pem; do
+                [ -f "$_ec_f" ] || continue
+                _ec_i=$((_ec_i + 1))
+                if JAVA_TOOL_OPTIONS="" "$_ec_keytool" -importcert -noprompt -trustcacerts \
+                        -alias "bomlens-extra-ca-$_ec_i" -file "$_ec_f" \
+                        -keystore "$_ec_dir/cacerts" -storetype JKS -storepass changeit >/dev/null 2>&1; then
+                    _ec_ok=$((_ec_ok + 1))
+                fi
+                rm -f "$_ec_f"
+            done
+            if [ "$_ec_ok" -gt 0 ]; then
+                JAVA_TOOL_OPTIONS="${_ec_jto_rest:+$_ec_jto_rest }-Djavax.net.ssl.trustStore=$_ec_dir/cacerts -Djavax.net.ssl.trustStorePassword=changeit -Djavax.net.ssl.trustStoreType=JKS"
+                export JAVA_TOOL_OPTIONS
+                _ec_java="yes"
+            fi
+        fi
+        if [ "$_ec_java" != "yes" ]; then
+            echo "[WARN] could not import the certificates in BOMLENS_EXTRA_CA_CERTS into a copy of $_ec_store (keytool failed, or the store password is wrong); Java builds do not trust them." >&2
+        fi
+    fi
+    BOMLENS_EXTRA_CA_APPLIED="$_ec_src"
+    export BOMLENS_EXTRA_CA_APPLIED
+    echo "[INFO] Trusting $_ec_n extra CA certificate(s) from $_ec_src${_ec_java:+ (Java trust store: $_ec_java)}." >&2
+    return 0
+}
+extra_ca_trust
+
 guard_snapshot
 # _pg_dir: the Poetry dependency-graph run's scratch folder, while it exists.
 # gradle_settings_remove: the user's Gradle settings copied for this scan.
-trap 'stop_supervised; guard_restore; gradle_settings_remove; [ -z "${_pg_dir:-}" ] || rm -rf "$_pg_dir"' EXIT
-trap 'stop_supervised; guard_restore; gradle_settings_remove; [ -z "${_pg_dir:-}" ] || rm -rf "$_pg_dir"; exit 130' INT
-trap 'stop_supervised; guard_restore; gradle_settings_remove; [ -z "${_pg_dir:-}" ] || rm -rf "$_pg_dir"; exit 143' TERM
+# MAVEN_FALLBACK_DIR: the Maven unpacked for a refused pom.xml (Maven section).
+MAVEN_FALLBACK_DIR=""
+trap 'stop_supervised; guard_restore; gradle_settings_remove; [ -z "${_pg_dir:-}" ] || rm -rf "$_pg_dir"; [ -z "${MAVEN_FALLBACK_DIR:-}" ] || rm -rf "$MAVEN_FALLBACK_DIR"; [ -z "${_cp_f:-}" ] || rm -f "$_cp_f"' EXIT
+trap 'stop_supervised; guard_restore; gradle_settings_remove; [ -z "${_pg_dir:-}" ] || rm -rf "$_pg_dir"; [ -z "${MAVEN_FALLBACK_DIR:-}" ] || rm -rf "$MAVEN_FALLBACK_DIR"; [ -z "${_cp_f:-}" ] || rm -f "$_cp_f"; exit 130' INT
+trap 'stop_supervised; guard_restore; gradle_settings_remove; [ -z "${_pg_dir:-}" ] || rm -rf "$_pg_dir"; [ -z "${MAVEN_FALLBACK_DIR:-}" ] || rm -rf "$MAVEN_FALLBACK_DIR"; [ -z "${_cp_f:-}" ] || rm -f "$_cp_f"; exit 143' TERM
 
 # Non-shipped trees: manifests under test, fixture, example, benchmark and demo
 # folders, the GitHub Actions workflows and the Gradle wrapper jar are left out
@@ -721,27 +934,210 @@ fi
 # cache may hold others from earlier scans), it is recorded as a failed step
 # (maven-dependency-jars), otherwise only the count is logged. Skipped when
 # the root also has a Gradle build, which cdxgen reads instead. The wrapper is
-# used only when its .mvn/wrapper files are there; otherwise mvn.
+# used only when its .mvn/wrapper files are there; otherwise mvn. A mvnw
+# without the executable bit runs through sh, as cdxgen runs it too.
+#
+# A POM that declares the same dependency twice: Maven 3.10 and later refuse
+# it ("'dependencies.dependency.(groupId:artifactId:type:classifier)' must be
+# unique", or the same for dependencyManagement), Maven 3.9 and earlier only
+# warn. The cdxgen images ship Maven 3.10, so cdxgen's dependency tree fails
+# and it lists only the dependencies written in pom.xml. The jar fetch reads
+# the same POM, so its output shows the error before cdxgen runs. Then
+# Apache Maven $MAVEN_FALLBACK_VERSION is tried. The retry counts only when it
+# exits 0 and prints no [ERROR] line at all. It is fetched through the image's
+# mvn (its settings apply: mirror, proxy, credentials, offline; the archive
+# stays in the local repository for the next scan), or from Maven Central
+# with curl when that fails and Maven is not offline. The archive must match
+# the SHA-512 checksum pinned below, or it is not used. It is unpacked under
+# $HOME and passed to cdxgen as MVN_CMD.
+# cdxgen 13.5.0 still prefers a project's mvnw over MVN_CMD. Only
+# CDXGEN_JVM_TOOL_PINNED=true makes it take MVN_CMD, and that also makes it
+# skip every Gradle wrapper. So it is set only when the tree has no Gradle
+# build outside the non-shipped folders. With a Gradle build, the Gradle
+# wrappers are left working (losing them would break those builds with no
+# sign of it), cdxgen may run the mvnw that refuses the POM, a warning says
+# so, and the step is recorded as failed.
+# When no Maven reads the POM, the step is recorded as failed
+# (maven-dependency-tree) in place of maven-dependency-jars, MVN_CMD is not
+# set, and the SBOM shows that its transitive Maven dependencies are missing.
 MAVEN_DEPENDENCY_PLUGIN="org.apache.maven.plugins:maven-dependency-plugin:3.11.0"
 MAVEN_REPO_LOCAL="$HOME/.m2/repository"
 case " ${MAVEN_OPTS:-} " in
     *" -Dmaven.repo.local="*)
         MAVEN_REPO_LOCAL=$(printf '%s\n' " $MAVEN_OPTS " | sed 's/.* -Dmaven\.repo\.local=\([^ ]*\) .*/\1/') ;;
 esac
+MAVEN_FALLBACK_VERSION="3.9.16"
+MAVEN_FALLBACK_SHA512="831a8591fe20c8243b1dbe7d71e3244f31d1665b0804b2e825e38cbbe5ce0cafb8338851f90780735568773e0a6cd07bbec107cda0b896b008b861075358b6f6"
+MAVEN_FALLBACK_URL="https://repo.maven.apache.org/maven2/org/apache/maven/apache-maven/$MAVEN_FALLBACK_VERSION/apache-maven-$MAVEN_FALLBACK_VERSION-bin.tar.gz"
+MAVEN_FALLBACK_DIR=""
+MAVEN_FALLBACK_CMD=""
+# The error lines of a POM refused for a repeated dependency.
+MAVEN_DUPLICATE_ERROR='^\[ERROR\].*dependenc[^ ]*\.dependency.*must be unique'
+# Run the jar fetch with the Maven command given: output in $_mvn_err, the
+# resolved list in $_mvn_list, the exit code in $_mvn_rc.
+maven_resolve_jars() {
+    : > "$_mvn_list"
+    _mvn_rc=0
+    # shellcheck disable=SC2086 # MAVEN_SETTINGS_ARGS is a list of options
+    run_supervised_timeout "$PREP_TIMEOUT_DEFAULT" "$@" -q -B --fail-never $MAVEN_SETTINGS_ARGS \
+        "$MAVEN_DEPENDENCY_PLUGIN:resolve" -DoutputFile="$_mvn_list" -DappendOutput=true \
+        >"$_mvn_err" 2>&1 || _mvn_rc=$?
+}
+# The last run refused pom.xml for a dependency declared twice.
+maven_model_rejected() {
+    grep -q "$MAVEN_DUPLICATE_ERROR" "$_mvn_err"
+}
+# The last run went through: exit 0 and no [ERROR] line.
+maven_run_clean() {
+    [ "$_mvn_rc" -eq 0 ] && ! grep -q '^\[ERROR\]' "$_mvn_err"
+}
+# Log why the last retry did not count (its first error lines).
+maven_log_retry_failure() {
+    log "maven: $1 did not read pom.xml cleanly (rc=$_mvn_rc):"
+    { grep '^\[ERROR\]' "$_mvn_err" || tail -3 "$_mvn_err"; } | head -3 | sed 's/^/[build-prep]   /'
+}
+# Maven runs offline: -o in MAVEN_ARGS or MVN_ARGS, or <offline>true</offline>
+# in the settings file it reads.
+maven_offline() {
+    case " ${MAVEN_ARGS:-} ${MVN_ARGS:-} " in *" -o "*|*" --offline "*) return 0 ;; esac
+    for _mo_s in "${SETTINGS_ROOT:-/bomlens-settings}/m2/settings.xml" "$HOME/.m2/settings.xml"; do
+        [ -f "$_mo_s" ] && grep -q '<offline>[[:space:]]*true[[:space:]]*</offline>' "$_mo_s" && return 0
+    done
+    return 1
+}
+# A Gradle build in the tree, outside .git, node_modules and (unless that is
+# turned off) the non-shipped folders.
+maven_tree_has_gradle() {
+    _mtg_prune="-name .git -o -name node_modules"
+    if [ -n "${EXCLUDE_NON_SHIPPED:-}" ]; then
+        for _mtg_d in ${NON_SHIPPED_DIRS:-}; do _mtg_prune="$_mtg_prune -o -name $_mtg_d"; done
+    fi
+    # shellcheck disable=SC2086 # _mtg_prune is a list of find operands
+    [ -n "$(find . -maxdepth 8 -type d \( $_mtg_prune \) -prune -o -type f \
+        \( -name build.gradle -o -name build.gradle.kts -o -name settings.gradle -o -name settings.gradle.kts \) \
+        -print 2>/dev/null | head -1)" ]
+}
+sha512_tool() {
+    for _st in sha512sum shasum openssl; do
+        if command -v "$_st" >/dev/null 2>&1; then echo "$_st"; return 0; fi
+    done
+    return 1
+}
+file_sha512() {
+    case "$(sha512_tool)" in
+        sha512sum) sha512sum "$1" | cut -d' ' -f1 ;;
+        shasum) shasum -a 512 "$1" | cut -d' ' -f1 ;;
+        openssl) openssl dgst -sha512 -r "$1" | cut -d' ' -f1 ;;
+    esac
+}
+# Fetch, check and unpack Apache Maven $MAVEN_FALLBACK_VERSION; on success
+# MAVEN_FALLBACK_CMD is its mvn. The folder is removed on exit.
+maven_fetch_fallback() {
+    MAVEN_FALLBACK_CMD=""
+    _mf_name="apache-maven-$MAVEN_FALLBACK_VERSION"
+    if ! command -v tar >/dev/null 2>&1 || ! command -v gzip >/dev/null 2>&1; then
+        log "maven: tar or gzip is not in this image, so Maven $MAVEN_FALLBACK_VERSION cannot be unpacked; not downloaded"
+        return 1
+    fi
+    if ! sha512_tool >/dev/null; then
+        log "maven: no SHA-512 tool in this image (sha512sum, shasum or openssl), so Maven $MAVEN_FALLBACK_VERSION cannot be checked; not downloaded"
+        return 1
+    fi
+    MAVEN_FALLBACK_DIR=$(mktemp -d "$HOME/bomlens-maven.XXXXXX" 2>/dev/null) || { MAVEN_FALLBACK_DIR=""; return 1; }
+    _mf_tgz="$MAVEN_FALLBACK_DIR/$_mf_name-bin.tar.gz"
+    _mf_offline=""
+    maven_offline && _mf_offline=1
+    if command -v mvn >/dev/null 2>&1; then
+        # Run outside the project, so Maven does not read the refused pom.xml.
+        _mf_pwd=$(pwd)
+        if cd "$MAVEN_FALLBACK_DIR"; then
+            # shellcheck disable=SC2086 # MAVEN_SETTINGS_ARGS is a list of options
+            run_supervised_timeout "$PREP_TIMEOUT_DEFAULT" mvn -q -B ${_mf_offline:+-o} $MAVEN_SETTINGS_ARGS \
+                "$MAVEN_DEPENDENCY_PLUGIN:copy" \
+                -Dartifact="org.apache.maven:apache-maven:$MAVEN_FALLBACK_VERSION:tar.gz:bin" \
+                -DoutputDirectory="$MAVEN_FALLBACK_DIR" >/dev/null 2>&1
+            cd "$_mf_pwd" || return 1
+        fi
+    fi
+    if [ ! -s "$_mf_tgz" ] && [ -z "$_mf_offline" ] && command -v curl >/dev/null 2>&1; then
+        run_supervised_timeout "$PREP_TIMEOUT_DEFAULT" curl -fsSL --connect-timeout 20 \
+            -o "$_mf_tgz" "$MAVEN_FALLBACK_URL" >/dev/null 2>&1
+    fi
+    if [ ! -s "$_mf_tgz" ]; then
+        if [ -n "$_mf_offline" ]; then
+            log "maven: Maven runs offline and Maven $MAVEN_FALLBACK_VERSION is not in the local repository, so it cannot be used"
+        else
+            log "maven: could not download Maven $MAVEN_FALLBACK_VERSION from the configured Maven repository or $MAVEN_FALLBACK_URL"
+        fi
+    elif [ "$(file_sha512 "$_mf_tgz")" != "$MAVEN_FALLBACK_SHA512" ]; then
+        log "maven: the downloaded $_mf_name-bin.tar.gz does not match its pinned SHA-512 checksum; not used"
+    elif tar xzf "$_mf_tgz" -C "$MAVEN_FALLBACK_DIR" 2>/dev/null && [ -x "$MAVEN_FALLBACK_DIR/$_mf_name/bin/mvn" ]; then
+        rm -f "$_mf_tgz"
+        MAVEN_FALLBACK_CMD="$MAVEN_FALLBACK_DIR/$_mf_name/bin/mvn"
+        return 0
+    else
+        log "maven: could not unpack $_mf_name-bin.tar.gz"
+    fi
+    rm -rf "$MAVEN_FALLBACK_DIR"; MAVEN_FALLBACK_DIR=""
+    return 1
+}
+# The shell for a wrapper without the executable bit: bash when its first line
+# (the shebang) names bash and bash is installed, otherwise sh.
+wrapper_shell() {
+    case "$(head -n 1 "$1" 2>/dev/null)" in
+        '#!'*bash*) command -v bash >/dev/null 2>&1 && { echo bash; return 0;} ;;
+    esac
+    echo sh
+}
 if [ -f pom.xml ] && [ ! -f build.gradle ] && [ ! -f build.gradle.kts ]; then
-    _mvn_cmd=""
-    if [ -x ./mvnw ] && [ -d .mvn/wrapper ]; then _mvn_cmd=./mvnw
+    _mvn_cmd=""; _mvn_sh=""
+    if [ -f ./mvnw ] && [ -d .mvn/wrapper ]; then
+        _mvn_cmd=./mvnw
+        [ -x ./mvnw ] || _mvn_sh=$(wrapper_shell ./mvnw)
     elif command -v mvn >/dev/null 2>&1; then _mvn_cmd=mvn
     fi
     if [ "$MAVEN_REPO_LOCAL" != "$HOME/.m2/repository" ]; then
         log "maven: local repository $MAVEN_REPO_LOCAL is not $HOME/.m2/repository; cdxgen will not find jars for hashes"
     elif [ -n "$_mvn_cmd" ]; then
         _mvn_err=$(mktemp); _mvn_list=$(mktemp)
-        _mvn_rc=0
-        # shellcheck disable=SC2086 # MAVEN_SETTINGS_ARGS is a list of options
-        run_supervised_timeout "$PREP_TIMEOUT_DEFAULT" "$_mvn_cmd" -q -B --fail-never $MAVEN_SETTINGS_ARGS \
-            "$MAVEN_DEPENDENCY_PLUGIN:resolve" -DoutputFile="$_mvn_list" -DappendOutput=true \
-            >"$_mvn_err" 2>&1 || _mvn_rc=$?
+        _mvn_tree_failed=""
+        maven_resolve_jars ${_mvn_sh:+"$_mvn_sh"} "$_mvn_cmd"
+        if maven_model_rejected; then
+            log "maven: $_mvn_cmd refused pom.xml:"
+            grep "$MAVEN_DUPLICATE_ERROR" "$_mvn_err" | head -1 | sed 's/^/[build-prep]   /'
+            log "maven: Maven 3.10 and later refuse a dependency declared twice in one POM; earlier versions only warn"
+            _mvn_tree_ok=""
+            if maven_fetch_fallback; then
+                log "maven: retrying with Maven $MAVEN_FALLBACK_VERSION"
+                maven_resolve_jars "$MAVEN_FALLBACK_CMD"
+                if ! maven_run_clean; then
+                    maven_log_retry_failure "Maven $MAVEN_FALLBACK_VERSION"
+                    rm -rf "$MAVEN_FALLBACK_DIR"; MAVEN_FALLBACK_DIR=""
+                elif [ -f ./mvnw ] && maven_tree_has_gradle; then
+                    # MVN_CMD still serves cdxgen if the wrapper does not start.
+                    MVN_CMD="$MAVEN_FALLBACK_CMD"
+                    export MVN_CMD
+                    echo "[build-prep] WARN: maven: Maven $MAVEN_FALLBACK_VERSION reads pom.xml, but cdxgen prefers the project's mvnw, which runs a Maven that refuses it. cdxgen is not told to skip mvnw (CDXGEN_JVM_TOOL_PINNED), because cdxgen 13.5.0 would then also skip the Gradle wrappers of the Gradle builds in this tree. The Maven dependency tree may be missing; remove the repeated <dependency> entries from pom.xml, or point .mvn/wrapper/maven-wrapper.properties at Maven 3.9, and re-scan." >&2
+                    _mvn_tree_failed=1
+                    mark_prep_failed maven-dependency-tree
+                    _mvn_tree_ok=warned
+                else
+                    _mvn_tree_ok=1
+                    MVN_CMD="$MAVEN_FALLBACK_CMD"
+                    export MVN_CMD
+                    if [ -f ./mvnw ]; then
+                        CDXGEN_JVM_TOOL_PINNED=true
+                        export CDXGEN_JVM_TOOL_PINNED
+                    fi
+                    log "maven: cdxgen runs Maven $MAVEN_FALLBACK_VERSION ($MAVEN_FALLBACK_CMD) for the dependency tree"
+                fi
+            fi
+            if [ -z "$_mvn_tree_ok" ]; then
+                log "maven: the dependency tree cannot be built, so the SBOM lists only the dependencies written in pom.xml (no transitive dependencies). Remove the repeated <dependency> entries from pom.xml and re-scan."
+                _mvn_tree_failed=1
+                mark_prep_failed maven-dependency-tree
+            fi
+        fi
         # Each resolved jar, as its path in the local repository:
         # group:artifact:jar[:classifier]:version:scope.
         _mvn_counts=$(awk -v repo="$MAVEN_REPO_LOCAL" '
@@ -764,7 +1160,8 @@ if [ -f pom.xml ] && [ ! -f build.gradle ] && [ ! -f build.gradle.kts ]; then
             grep '^\[ERROR\]' "$_mvn_err" | head -5 | sed 's/^/[build-prep]   /'
             # None of this run's jars there: recorded like a failed resolver
             # step, so the result manifest shows it. Some there: the log is enough.
-            [ "${_mvn_have:-0}" -gt 0 ] || mark_prep_failed maven-dependency-jars
+            # A refused pom.xml is already recorded as maven-dependency-tree.
+            [ -n "$_mvn_tree_failed" ] || [ "${_mvn_have:-0}" -gt 0 ] || mark_prep_failed maven-dependency-jars
         fi
         rm -f "$_mvn_err" "$_mvn_list"
     fi
@@ -787,9 +1184,286 @@ fi
 # ANDROID_RELEASE_SET, when set below, points at a file of "group:artifact:version"
 # lines (the deployable release runtime classpath). The post-cdxgen step near the
 # end of this script filters the generated SBOM down to that set.
+# GRADLE_RUNTIME_SET is the same for a java-gradle build: the runtime classpath
+# of every project.
 ANDROID_RELEASE_SET=""
+GRADLE_RUNTIME_SET=""
+
+# awk function shared by the two readers below: one dependency line of a
+# Gradle `dependencies` report to group:artifact:version, or "" for a line that
+# names no resolved external module ((c) constraint, (n) unresolved
+# declaration, a project of the build). After "->" Gradle prints what was
+# selected: a version only (a conflict or a dynamic version resolved), or a
+# whole group:artifact:version when a module was substituted
+# (commons-logging:commons-logging:1.2 -> org.slf4j:jcl-over-slf4j:2.0.9), or
+# a project. A rich version ({strictly 2.0.9}, {require 1.0; reject 1.1})
+# without "->" gives its first version.
+GRADLE_DEP_AWK='
+function gradle_gav(line,    i, left, right, nl, l, nr, r, g, a, v) {
+    sub(/^.*[+\\]--- /, "", line)
+    if (line ~ /\(c\)|\(n\)/ || line ~ /^project /) return ""
+    sub(/ \(\*\)$/, "", line)
+    sub(/ FAILED$/, "", line)
+    right = ""
+    i = index(line, " -> ")
+    if (i > 0) { left = substr(line, 1, i - 1); right = substr(line, i + 4) } else left = line
+    nl = split(left, l, ":")
+    g = l[1]; a = l[2]; v = (nl >= 3) ? l[3] : ""
+    if (v ~ /^\{/) {
+        gsub(/[{}]/, "", v); sub(/^(strictly|require|prefer) /, "", v); sub(/;.*$/, "", v)
+    }
+    sub(/ .*$/, "", v)
+    if (right != "") {
+        if (right ~ /^project /) return ""
+        sub(/ .*$/, "", right)
+        nr = split(right, r, ":")
+        if (nr >= 3) { g = r[1]; a = r[2]; v = r[3] }
+        else if (nr == 1) v = r[1]
+    }
+    if (g == "" || a == "" || v == "" || v ~ /[][{}(),]/) return ""
+    return g ":" a ":" v
+}'
+
+# java-gradle runtime classpath. cdxgen keeps every configuration's
+# components, so one only on a compile classpath (a compileOnly dependency, or
+# one a library's Gradle module metadata gives to compile only, as guava 33.0.0
+# does j2objc-annotations) or only on a test classpath is listed as if the
+# build shipped it. One Gradle run, the same count as the cache warm-up it
+# replaces. An init script adds a task to every project that resolves the
+# project's own configurations and writes the coordinates to a file (one file
+# per project), so nothing is read from Gradle's console output: with the
+# configuration cache on, Gradle runs the projects' tasks in parallel and
+# their console output mixes. The run is made with --no-configuration-cache
+# because a task action cannot resolve configurations under it (a stored
+# configuration would also skip the init script's own listing); Gradle older
+# than 6.6 does not know the option, the run fails, and the root warm-up below
+# runs instead. The files give GRADLE_RUNTIME_SET, which the filter near the
+# end applies to cdxgen's BOM:
+# - a project with a runtimeClasspath gives that configuration;
+# - a project with none (Kotlin Multiplatform, a root with only jacoco or
+#   kover) gives what its other configurations resolve, except test ones and
+#   build tool ones (coverage, lint, compilers, documentation, annotation
+#   processors), so nothing it ships is lost.
+# The full graph is kept when the build includes other builds (includeBuild,
+# or GRADLE_INCLUDED_BUILDS: cdxgen reads their reports too, and they are not
+# in this run), when a configuration could not be resolved, when the files are
+# incomplete, or when nothing was read. A build included only through
+# pluginManagement { includeBuild(...) } is a plugin build: it cannot replace a
+# dependency and, as a rule, nothing it needs at build time ships, so it does
+# not keep the full graph (a plugin that copies a library of its own into the
+# output is the exception; BOMLENS_GRADLE_FULL_GRAPH=1 keeps it). That holds when the settings tell it from a build included for
+# its code (a directory with more inclusions than pluginManagement ones is
+# both), and when no project's graph holds a project of another build. Settings
+# that cannot be read leave every included build counting as one included for
+# its code. A run that fails for another reason
+# than the time limit is followed by the root project's dependencies task, as
+# the warm-up was before.
+gradle_runtime_classpath() {
+    _gr_dir=$(mktemp -d); _gr_init="$_gr_dir/bomlens-init.gradle"
+    _gr_out="$_gr_dir/out"; _gr_set="$_gr_dir/set.txt"
+    mkdir -p "$_gr_out"
+    cat > "$_gr_init" <<'GRADLE_INIT'
+// bomlens: write what every project of the build resolves, one file per project.
+if (gradle.parent == null) {
+    def outDir = System.getProperty('bomlens.gradle.out')
+    // Test configurations, and the configurations of build tools (coverage,
+    // lint, compilers, documentation), are not what a project ships.
+    def skipCfg = { String n ->
+        n ==~ /^(test|androidTest)([A-Z].*)?$/ ||
+        n ==~ /^.*[A-Za-z0-9_]Test(Fixtures)?(Compile|Runtime|Implementation|Api|Only|AnnotationProcessor|Classpath).*$/ ||
+        n.contains('-test-') ||
+        n ==~ /^(jacoco|kover|checkstyle|pmd|spotbugs|codenarc|detekt|ktlint|errorprone|annotationProcessor|kapt|ksp|dokka|lint|_internal|kotlinCompiler|kotlinNativeCompiler|kotlinKlib|kotlinBuildToolsApi|kotlinScripting).*$/ ||
+        n ==~ /^.*AnnotationProcessor(Classpath)?$/ ||
+        // Deprecated configurations Gradle 6 and 7 warn about when they are resolved.
+        n == 'archives' || n == 'default'
+    }
+    // Gradle lists a build included through pluginManagement { includeBuild(...) }
+    // in gradle.includedBuilds like one included for its code, and does not say
+    // which it is. The settings keep one spec per inclusion: settings.includedBuilds
+    // has all of them, settings.pluginManagement.includedBuilds those made through
+    // pluginManagement. A directory that has no more inclusions than pluginManagement
+    // ones is a plugin build only. These classes are Gradle's internal ones, so
+    // anything that cannot be read leaves every included build counting as one
+    // included for its code.
+    def pluginOnlyDirs = null
+    gradle.settingsEvaluated { s ->
+        try {
+            def count = { specs ->
+                def m = [:]
+                specs.each { sp -> def k = sp.rootDir.canonicalPath; m[k] = (m[k] ?: 0) + 1 }
+                m
+            }
+            def all = count(s.includedBuilds)
+            def only = new HashSet()
+            count(s.pluginManagement.includedBuilds).each { k, n -> if (all[k] == n) { only << k } }
+            pluginOnlyDirs = only
+        } catch (Throwable e) {
+            pluginOnlyDirs = null
+        }
+    }
+    // Whether a project component belongs to another build of the composite.
+    // buildTreePath (Gradle 8.2 on) is the project path for a project of the
+    // root build; before that the build identifier says. Unreadable: not another build.
+    def inOtherBuild = { id ->
+        try { return id.buildTreePath != id.projectPath } catch (Throwable e) { }
+        try { return !id.build.currentBuild } catch (Throwable e) { }
+        false
+    }
+    gradle.allprojects { p ->
+        def path = p.path
+        p.tasks.register('bomlensResolve') { t ->
+            t.doLast {
+                def lines = ["P\t" + path]
+                def failure = null
+                // What went wrong, with its causes: a toolchain Gradle cannot find is
+                // named in a cause, and build-prep reads it from the build's stderr.
+                def why = { Throwable err ->
+                    def parts = []
+                    while (err != null && parts.size() < 6) { if (err.message) { parts << err.message }; err = err.cause }
+                    parts.join(' | ')
+                }
+                def gavs = { cfg ->
+                    def found = new TreeSet()
+                    def res = cfg.incoming.resolutionResult
+                    res.allComponents.each { c ->
+                        def id = c.id
+                        if (id instanceof org.gradle.api.artifacts.component.ModuleComponentIdentifier) {
+                            found << (id.group + ':' + id.module + ':' + id.version)
+                        } else if (id instanceof org.gradle.api.artifacts.component.ProjectComponentIdentifier && inOtherBuild(id)) {
+                            lines << ("F\t" + path + "\t" + id.displayName)
+                        }
+                    }
+                    // A dependency that did not resolve is still named by what asked for it.
+                    res.allDependencies.each { d ->
+                        if (d instanceof org.gradle.api.artifacts.result.UnresolvedDependencyResult) {
+                            def s = d.requested
+                            if (s instanceof org.gradle.api.artifacts.component.ModuleComponentSelector && s.version) {
+                                found << (s.group + ':' + s.module + ':' + s.version)
+                            }
+                        }
+                    }
+                    found
+                }
+                def rt = p.configurations.findByName('runtimeClasspath')
+                if (rt != null && rt.canBeResolved) {
+                    lines << ("H\t" + path)
+                    try {
+                        gavs(rt).each { lines << ("R\t" + path + "\t" + it) }
+                    } catch (Throwable e) {
+                        lines << ("X\t" + path + "\truntimeClasspath")
+                        failure = "bomlens: could not resolve runtimeClasspath of project " + path + ": " + why(e)
+                    }
+                } else {
+                    p.configurations.toList().each { cfg ->
+                        if (cfg.canBeResolved && !skipCfg(cfg.name)) {
+                            try {
+                                gavs(cfg).each { lines << ("O\t" + path + "\t" + it) }
+                            } catch (Throwable e) {
+                                lines << ("X\t" + path + "\t" + cfg.name)
+                                def msg = why(e)
+                                System.err.println("bomlens: could not resolve " + cfg.name + " of project " + path + ": " + msg)
+                                // A toolchain no JDK matches fails the run here too (a project with
+                                // no runtimeClasspath, a Kotlin Multiplatform root), so the stage 1
+                                // rerun in the right JDK image can follow; any other reason does not.
+                                if (failure == null && msg =~ /Cannot find a Java installation|No (compatible|matching) toolchains found/) {
+                                    failure = "bomlens: could not resolve " + cfg.name + " of project " + path + ": " + msg
+                                }
+                            }
+                        }
+                    }
+                }
+                new File(outDir, java.net.URLEncoder.encode(path, 'UTF-8') + '.txt').text = lines.join('\n') + '\n'
+                // A runtimeClasspath that cannot be resolved fails the run, so the step is
+                // recorded as failed and its message reaches the log (a missing toolchain
+                // is recognised there); the shell would otherwise only see an X line.
+                if (failure != null) { throw new org.gradle.api.GradleException(failure) }
+            }
+        }
+    }
+    gradle.rootProject { root ->
+        root.tasks.register('bomlensRuntime') { t ->
+            t.dependsOn { root.allprojects.collect { it.tasks.named('bomlensResolve') } }
+            t.doLast {
+                def lines = []
+                // I: an included build that keeps the full graph, J: a plugin build only.
+                gradle.includedBuilds.each { ib ->
+                    def pluginOnly = false
+                    try { pluginOnly = pluginOnlyDirs != null && pluginOnlyDirs.contains(ib.projectDir.canonicalPath) } catch (Throwable e) { }
+                    lines << ((pluginOnly ? "J\t" : "I\t") + ib.name)
+                }
+                lines << ("Z\t" + root.allprojects.size())
+                new File(outDir, '_meta.txt').text = lines.join('\n') + '\n'
+            }
+        }
+    }
+}
+GRADLE_INIT
+    log "gradle dependencies (runtime classpath of each project)"
+    # prep_step's own stderr (the failure text and the java-toolchain-missing
+    # marker) is kept to see whether the same failure would repeat, then shown.
+    _gr_err="$_gr_dir/err.txt"
+    prep_step gradle-dependencies "$PREP_TIMEOUT_GRADLE" ${GRADLEW_SH:+"$GRADLEW_SH"} "$GRADLEW" --no-daemon -q --console=plain \
+        --no-configuration-cache --init-script "$_gr_init" "-Dbomlens.gradle.out=$_gr_out" bomlensRuntime >/dev/null 2>"$_gr_err"
+    _gr_rc=$?
+    cat "$_gr_err" >&2
+    if [ "$_gr_rc" -eq 0 ]; then
+        # Lines: I <included build>, J <build included for plugins only>,
+        # Z <number of projects>, P <project>, F <project> <project of another
+        # build in its graph>, H <project has a runtimeClasspath>, R <project>
+        # <coordinate> (its runtimeClasspath), O <project> <coordinate>
+        # (another configuration of a project with none), X <project>
+        # <configuration> (not resolved).
+        cat "$_gr_out"/*.txt 2>/dev/null | awk -F '\t' '
+            $1 == "I" { print "!the build includes the build " $2 }
+            $1 == "F" { print "!project " $2 " depends on " $3 ", a project of another build" }
+            $1 == "Z" { want = $2; nz++ }
+            $1 == "P" { proj[$2] = 1; np++ }
+            $1 == "H" { hasrt[$2] = 1 }
+            $1 == "R" { print $3 }
+            $1 == "O" { other[$2] = other[$2] "\n" $3 }
+            $1 == "X" { bad[$2] = $3 }
+            END {
+                n = 0; for (p in proj) n++
+                if (nz != 1 || n != want || np != want) print "!the project files are incomplete (" np " of " want ")"
+                for (p in bad) print "!could not resolve " bad[p] " of project " p
+                for (p in proj) if (!(p in hasrt) && other[p] != "") print substr(other[p], 2)
+            }
+        ' > "$_gr_set"
+        if [ -n "${GRADLE_INCLUDED_BUILDS:-}" ]; then
+            log "gradle: GRADLE_INCLUDED_BUILDS is set; using full graph"
+        elif grep -q '^!' "$_gr_set"; then
+            log "gradle: $(sed -n 's/^!//p' "$_gr_set" | head -1); using full graph"
+        elif [ -s "$_gr_set" ]; then
+            GRADLE_RUNTIME_SET=$(mktemp)
+            sort -u "$_gr_set" > "$GRADLE_RUNTIME_SET"
+            _gr_plugin=$(cat "$_gr_out"/*.txt 2>/dev/null | awk -F '\t' '$1 == "J" { printf "%s%s", sep, $2; sep = ", " }')
+            [ -z "$_gr_plugin" ] || log "gradle: included for plugins only, so not part of the graph: $_gr_plugin"
+            log "gradle: runtime classpath set = $(wc -l < "$GRADLE_RUNTIME_SET") components"
+        else
+            log "gradle: no runtime classpath dependency found; using full graph"
+        fi
+    elif grep -q 'java-toolchain-missing=' "$_gr_err" 2>/dev/null; then
+        log "gradle: no JDK matches the build's toolchain; the root project's dependencies would fail the same way (full graph)"
+    elif [ "$_gr_rc" -ne 124 ]; then
+        log "gradle: could not read every project's dependencies; resolving the root project only (full graph)"
+        prep_step gradle-dependencies "$PREP_TIMEOUT_GRADLE" ${GRADLEW_SH:+"$GRADLEW_SH"} "$GRADLEW" --no-daemon dependencies >/dev/null \
+            && unmark_prep_failed gradle-dependencies
+    fi
+    rm -rf "$_gr_dir"
+}
+
 if { [ -f build.gradle ] || [ -f build.gradle.kts ]; } && command -v gradle >/dev/null 2>&1; then
-    if [ -x ./gradlew ]; then GRADLEW="./gradlew"; else GRADLEW="gradle"; fi
+    # A gradlew checked out without the executable bit (a 100644 entry, common
+    # from Windows) still runs, through sh (bash when its first line names bash):
+    # the JDK image was chosen from its wrapper version, and cdxgen runs it
+    # too. GRADLEW_SH is that shell then.
+    GRADLEW_SH=""
+    if [ -f ./gradlew ]; then
+        GRADLEW="./gradlew"
+        [ -x ./gradlew ] || GRADLEW_SH=$(wrapper_shell ./gradlew)
+    else
+        GRADLEW="gradle"
+    fi
     # Gradle keeps its files under ~/.gradle, where ~ is the account's home
     # from the password file (/root), not HOME. With a read-only root it
     # cannot unpack its native library there and every Gradle build fails at
@@ -806,6 +1480,10 @@ if { [ -f build.gradle ] || [ -f build.gradle.kts ]; } && command -v gradle >/de
     fi
     # The user's Gradle settings, before the first Gradle run.
     gradle_settings_copy
+    # Which Gradle runs: the first "Gradle X.Y" line of --version.
+    _gradle_v=$(run_supervised_timeout "$PREP_TIMEOUT_GRADLE" ${GRADLEW_SH:+"$GRADLEW_SH"} "$GRADLEW" --version 2>/dev/null \
+        | sed -n 's/^\(Gradle [0-9][^ ]*\).*/\1/p' | head -1)
+    log "gradle: ${GRADLEW_SH:+$GRADLEW_SH }$GRADLEW runs ${_gradle_v:-a Gradle whose version could not be read}"
 
     # Android scope fix: cdxgen resolves EVERY Gradle configuration, so an AGP
     # project drags its build/test toolchain (androidTestUtil, Unified Test
@@ -828,11 +1506,22 @@ if { [ -f build.gradle ] || [ -f build.gradle.kts ]; } && command -v gradle >/de
         # Both Gradle calls below share one label: to a reader they are one
         # logical step (the release classpath resolve), whether it timed out
         # listing subprojects or resolving one module's dependencies.
-        _subs=$(prep_step android-release-classpath "$PREP_TIMEOUT_GRADLE" "$GRADLEW" --no-daemon -q --console=plain projects \
-                | sed -n "s/.*Project '\(:[A-Za-z0-9:._-]*\)'.*/\1/p")
+        # Their output goes to a file, not $(...): prep_step records the label
+        # in this shell, which a command substitution's subshell would lose.
+        _aout=$(mktemp); _atimeout=""
+        prep_step android-release-classpath "$PREP_TIMEOUT_GRADLE" ${GRADLEW_SH:+"$GRADLEW_SH"} "$GRADLEW" --no-daemon -q --console=plain projects > "$_aout"
+        [ "$?" -ne 124 ] || _atimeout=1
+        _subs=$(sed -n "s/.*Project '\(:[A-Za-z0-9:._-]*\)'.*/\1/p" "$_aout")
+        # A project path outside those characters cannot be passed on here;
+        # its module would be missing from the set, so none is made.
+        _aodd=$(grep "Project '" "$_aout" | grep -v "Project '\(:[A-Za-z0-9:._-]*\)'" | head -1)
+        [ -z "$_aodd" ] || { log "android: a project path this step cannot pass to Gradle ($_aodd); no release set"; _subs=""; }
         # Include the root ("") as a fallback for single-module projects.
         for _s in $_subs ""; do
-            _dep=$(prep_step android-release-classpath "$PREP_TIMEOUT_GRADLE" "$GRADLEW" --no-daemon -q --console=plain "${_s}:dependencies")
+            [ -z "$_aodd" ] || break
+            prep_step android-release-classpath "$PREP_TIMEOUT_GRADLE" ${GRADLEW_SH:+"$GRADLEW_SH"} "$GRADLEW" --no-daemon -q --console=plain "${_s}:dependencies" > "$_aout"
+            [ "$?" -ne 124 ] || _atimeout=1
+            _dep=$(cat "$_aout")
             [ -n "$_dep" ] || continue
             # Pick the deployable release runtime config for this module: prefer the
             # plain releaseRuntimeClasspath, else the first flavored release variant
@@ -849,37 +1538,40 @@ if { [ -f build.gradle ] || [ -f build.gradle.kts ]; } && command -v gradle >/de
                    || printf '%s\n' "$_cands" | head -1)
             [ -n "$_cfg" ] || continue
             log "android: ${_s:-:} -> --configuration $_cfg"
-            # Extract that config's subtree as resolved group:artifact:version.
-            # Take the version after "->" when Gradle upgraded/downgraded it; skip
-            # (c) constraints and (n) not-resolved markers.
-            printf '%s\n' "$_dep" | awk -v cfg="$_cfg" '
+            # Extract that config's subtree as resolved group:artifact:version
+            # (gradle_gav above).
+            printf '%s\n' "$_dep" | awk -v cfg="$_cfg" "$GRADLE_DEP_AWK"'
                 $0 ~ ("^" cfg " ") { insec=1; next }
                 insec && /^[[:space:]]*$/ { insec=0 }
-                insec {
-                    line=$0
-                    if (!match(line, /[+\\]--- /)) next
-                    sub(/^.*[+\\]--- /, "", line)
-                    if (line ~ /\(c\)|\(n\)/) next
-                    resolved=""
-                    if (match(line, /-> [^ ]+/)) resolved=substr(line, RSTART+3, RLENGTH-3)
-                    split(line, a, " "); split(a[1], ga, ":")
-                    g=ga[1]; art=ga[2]; ver=ga[3]; if (resolved!="") ver=resolved
-                    gsub(/[()*]/, "", ver)
-                    if (g!="" && art!="" && ver!="") print g":"art":"ver
-                }' >> "$_relset"
+                insec && /[+\\]--- / { gav = gradle_gav($0); if (gav != "") print gav }' >> "$_relset"
         done
+        rm -f "$_aout"
         if [ -s "$_relset" ]; then
             sort -u "$_relset" -o "$_relset"
             ANDROID_RELEASE_SET="$_relset"
             log "android: release runtime set = $(wc -l < "$_relset") components"
         else
-            log "android: no release runtime configuration found; using full graph"
             rm -f "$_relset"
+            # No release configuration: not an Android app (a Java Gradle
+            # build scanned in the Android SDK image), so the java-gradle
+            # runtime classpath applies.
+            if opted_out "${BOMLENS_GRADLE_FULL_GRAPH:-}"; then
+                log "android: no release runtime configuration found; using full graph"
+            elif [ -n "$_atimeout" ]; then
+                log "android: the release classpath step timed out; using full graph"
+            else
+                log "android: no release runtime configuration found; reading the java-gradle runtime classpath"
+                gradle_runtime_classpath
+            fi
         fi
+    elif [ -z "${ANDROID_HOME:-}" ] && ! opted_out "${BOMLENS_GRADLE_FULL_GRAPH:-}"; then
+        # java-gradle: see gradle_runtime_classpath above.
+        # BOMLENS_GRADLE_FULL_GRAPH=1 opts out (keep the full graph).
+        gradle_runtime_classpath
     else
-        # java-gradle (or opted-out Android): resolve so cdxgen sees the full graph.
+        # Opted-out java-gradle or Android: resolve so cdxgen sees the full graph.
         log "gradle dependencies"
-        prep_step gradle-dependencies "$PREP_TIMEOUT_GRADLE" "$GRADLEW" --no-daemon dependencies >/dev/null
+        prep_step gradle-dependencies "$PREP_TIMEOUT_GRADLE" ${GRADLEW_SH:+"$GRADLEW_SH"} "$GRADLEW" --no-daemon dependencies >/dev/null
     fi
 fi
 
@@ -887,6 +1579,87 @@ fi
 # command; cdxgen may still run ./gradlew) gets the settings copied here.
 if { [ -f build.gradle ] || [ -f build.gradle.kts ] || [ -f settings.gradle ] || [ -f settings.gradle.kts ]; }; then
     gradle_settings_copy
+fi
+
+# cdxgen reads the POMs Gradle downloaded (licenses when its own POM request
+# fails) from $HOME/.gradle unless GRADLE_CACHE_DIR or GRADLE_USER_HOME says
+# otherwise, while Gradle uses the account's home (/root, where the CLI mounts
+# BomLens's Gradle cache) and HOME is /tmp/sbomhome. So it is pointed at
+# Gradle's own cache. A GRADLE_CACHE_DIR the caller set is kept.
+if [ -z "${GRADLE_CACHE_DIR:-}" ]; then
+    _gcd_home="${GRADLE_USER_HOME:-}"
+    if [ -z "$_gcd_home" ]; then
+        _gcd_acct="$( (getent passwd "$(id -u)" 2>/dev/null || true) | cut -d: -f6)"
+        _gcd_home="${_gcd_acct:-/root}/.gradle"
+    fi
+    export GRADLE_CACHE_DIR="$_gcd_home/caches/modules-2/files-2.1"
+fi
+
+# Gradle subproject named like the root project. cdxgen runs
+# `<subproject>:dependencies` only for a subproject whose purl differs from the
+# root's, so a subproject with the root's name (and, through allprojects, its
+# group and version) is never resolved and none of its dependencies reach the
+# SBOM. cdxgen appends GRADLE_ARGS_DEPENDENCIES after every dependencies task it
+# runs, so the task of each such subproject is put there: Gradle runs a task
+# named twice once, and cdxgen reads that output under the subproject's path,
+# as it does for any other subproject. A GRADLE_ARGS_DEPENDENCIES the caller
+# set is kept, after the root's task and after each task added here. The root
+# name is rootProject.name in settings.gradle(.kts), or else the folder name,
+# which is Gradle's own default: under the CLI's /app mount that is `app`, so an
+# Android project with `include ':app'` and no rootProject.name also gets
+# `:app:dependencies` (its root and app purls are the same, so cdxgen skips it
+# too). An include that may sit in a conditional (an `if (` or `when` on a line
+# before it or on its own line) is not read reliably here, so then nothing is
+# added and that is logged.
+if { [ -f settings.gradle ] || [ -f settings.gradle.kts ]; } && command -v node >/dev/null 2>&1; then
+    _gsame_js=$(mktemp)
+    cat > "$_gsame_js" <<'GRADLE_SAME_NAME_JS'
+const fs = require('fs');
+const path = require('path');
+const [dir] = process.argv.slice(2);
+let text = '';
+for (const f of ['settings.gradle.kts', 'settings.gradle']) {
+  try { text = fs.readFileSync(path.join(dir, f), 'utf8'); break; } catch (e) { /* next */ }
+}
+// Comments out, so a commented include is not read.
+text = text.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:"'])\/\/.*$/gm, '$1');
+const nameMatch = /rootProject\.name\s*=\s*["']([^"']+)["']/.exec(text);
+const rootName = nameMatch ? nameMatch[1] : path.basename(path.resolve(dir));
+const out = new Set();
+let conditional = false;
+// include("a", ":b:c") / include 'a', 'b' / include(listOf("a")), across lines.
+const inc = /\binclude\s*\(?\s*(?:listOf\s*\()?((?:\s*["'][^"'\n]+["']\s*,?)+)/g;
+let m;
+while ((m = inc.exec(text)) !== null) {
+  // The text up to the end of the include's first line.
+  const eol = text.indexOf('\n', m.index);
+  const upTo = text.slice(0, eol < 0 ? text.length : eol);
+  for (const s of m[1].match(/["'][^"'\n]+["']/g) || []) {
+    let p = s.slice(1, -1).trim();
+    if (!/^:?[A-Za-z0-9_.\-]+(:[A-Za-z0-9_.\-]+)*$/.test(p)) continue;
+    if (!p.startsWith(':')) p = ':' + p;
+    if (p.split(':').pop() !== rootName) continue;
+    if (/\bif\s*\(|\bwhen\b/.test(upTo)) conditional = true;
+    out.add(p);
+  }
+}
+if (conditional) process.stdout.write('conditional');
+else process.stdout.write([...out].sort().map(p => p + ':dependencies').join(' '));
+GRADLE_SAME_NAME_JS
+    _gsame_tasks=$(node "$_gsame_js" . 2>/dev/null)
+    rm -f "$_gsame_js"
+    if [ "$_gsame_tasks" = conditional ]; then
+        log "gradle: a subproject has the root project's name, but its include may be conditional; its dependencies task is left to cdxgen"
+    elif [ -n "$_gsame_tasks" ]; then
+        log "gradle: a subproject has the root project's name; asking cdxgen for $_gsame_tasks"
+        if [ -n "${GRADLE_ARGS_DEPENDENCIES:-}" ]; then
+            _gsame_args="$GRADLE_ARGS_DEPENDENCIES"
+            for _gsame_t in $_gsame_tasks; do _gsame_args="$_gsame_args $_gsame_t $GRADLE_ARGS_DEPENDENCIES"; done
+        else
+            _gsame_args="$_gsame_tasks"
+        fi
+        export GRADLE_ARGS_DEPENDENCIES="$_gsame_args"
+    fi
 fi
 # Python — install the requirements so transitive deps are visible
 # (requirements.txt without a lockfile) and so the license-evidence pass near the
@@ -1601,6 +2374,115 @@ CARGO_LIC
     rm -f "$_clmeta"
 fi
 
+# Gradle build with no Gradle-resolved package. A build file that declares
+# external dependencies (an implementation, api, compileOnly, runtimeOnly,
+# compile, runtime, annotationProcessor, kapt or ksp line that is not a
+# dependency on a project of the build, on local files or on Gradle itself)
+# should give at least one
+# pkg:maven component from Gradle's resolution. cdxgen marks every component it
+# reads from a dependencies task with cdx:gradle:GradleRootPath and, under the
+# configuration it came from, internal:GradleProfileName (GradleProfileName in
+# older releases); a jar found in the tree carries neither. When the SBOM has
+# no such component, cdxgen resolved nothing for the build (a task it skipped,
+# a build that did not configure), whatever other files added: recorded as the
+# gradle-packages step failing, so the generate step reads degraded and the
+# SBOM is not taken as complete. The build files are searched like the
+# non-shipped exclusion cdxgen is given, and not under build/ or .gradle/.
+# Only for a build cdxgen was in a position to resolve: a Gradle build at the
+# scan root, with ./gradlew and java or with gradle on PATH, or a folder below
+# it that has its own gradlew next to its settings or build file, with java.
+# A build file beside the scanned language (the android/ folder of a Flutter
+# or JavaScript app with no gradlew, read in an image without Gradle) is left
+# alone. buildSrc, build-logic and the builds settings.gradle(.kts) names in
+# includeBuild(...) hold build logic, not the product, and are not searched.
+# Dependencies on other projects of the build (project(...), projects.<name>,
+# a platform of one) and on Gradle itself (gradleApi(), localGroovy(),
+# gradleTestKit()) are not external. When gradle-dependencies already failed,
+# that label explains the gap and this one is not added.
+_gpk_skip=""
+case " $PREP_FAILED " in *" gradle-dependencies "*) _gpk_skip=1 ;; esac
+if [ "${rc:-1}" -eq 0 ] && [ -f "$OUT" ] && [ -z "$_gpk_skip" ] && command -v node >/dev/null 2>&1; then
+    _gpk_has_java=""; command -v java >/dev/null 2>&1 && _gpk_has_java=1
+    _gpk_has_gradle=""; command -v gradle >/dev/null 2>&1 && _gpk_has_gradle=1
+    # The folders to leave out of a search from $1: the fixed names, the
+    # non-shipped ones, and the included builds its settings file names.
+    gpk_prune_args() {
+        set -- "$1" -name build -o -name .gradle -o -name node_modules -o -name buildSrc -o -name build-logic -o -name '.?*'
+        _gpk_r="$1"; shift
+        if [ -n "$EXCLUDE_NON_SHIPPED" ]; then
+            for _gpk_x in $NON_SHIPPED_DIRS; do set -- "$@" -o -name "$_gpk_x"; done
+            for _gpk_x in $NON_SHIPPED_PATHS; do set -- "$@" -o -path "$_gpk_r/$_gpk_x"; done
+        fi
+        for _gpk_x in $(cat "$_gpk_r/settings.gradle" "$_gpk_r/settings.gradle.kts" 2>/dev/null \
+                        | sed 's#//.*##' \
+                        | grep -oE 'includeBuild[[:space:]]*\(?[[:space:]]*["'"'"'][A-Za-z0-9_./-]+["'"'"']' \
+                        | sed -E 's/^includeBuild[[:space:]]*\(?[[:space:]]*["'"'"']//; s/["'"'"']$//; s#^\./##; s#/$##'); do
+            case "$_gpk_x" in ''|/*|..|../*|*/../*|*/..) continue ;; esac
+            set -- "$@" -o -path "$_gpk_r/$_gpk_x"
+        done
+        for _gpk_x in "$@"; do printf '%s\n' "$_gpk_x"; done
+    }
+    # The Gradle builds to check, one folder per line.
+    _gpk_roots=""
+    if [ -f build.gradle ] || [ -f build.gradle.kts ] || [ -f settings.gradle ] || [ -f settings.gradle.kts ]; then
+        if { [ -f ./gradlew ] && [ -n "$_gpk_has_java" ]; } || [ -n "$_gpk_has_gradle" ]; then
+            _gpk_roots="."
+        fi
+    elif [ -n "$_gpk_has_java" ]; then
+        _gpk_args=$(gpk_prune_args .)
+        _gpk_old_ifs="$IFS"; IFS='
+'
+        # shellcheck disable=SC2086 # one find argument per line, globbing off
+        set -f; set -- $_gpk_args; set +f
+        IFS="$_gpk_old_ifs"
+        _gpk_roots=$(find . -type d \( "$@" \) ! -path . -prune -o -type f -name gradlew -print 2>/dev/null \
+            | sed 's#/gradlew$##' | while IFS= read -r _gpk_d; do
+                if [ -f "$_gpk_d/settings.gradle" ] || [ -f "$_gpk_d/settings.gradle.kts" ] \
+                   || [ -f "$_gpk_d/build.gradle" ] || [ -f "$_gpk_d/build.gradle.kts" ]; then
+                    printf '%s\n' "$_gpk_d"
+                fi
+            done | LC_ALL=C sort)
+        set --
+    fi
+    _gpk_decl=$(printf '%s\n' "$_gpk_roots" | while IFS= read -r _gpk_root; do
+        [ -n "$_gpk_root" ] || continue
+        _gpk_args=$(gpk_prune_args "$_gpk_root")
+        _gpk_old_ifs="$IFS"; IFS='
+'
+        # shellcheck disable=SC2086 # one find argument per line, globbing off
+        set -f; set -- $_gpk_args; set +f
+        IFS="$_gpk_old_ifs"
+        find "$_gpk_root" -type d \( "$@" \) ! -path "$_gpk_root" -prune -o -type f \( -name build.gradle -o -name build.gradle.kts \) -print 2>/dev/null
+    done | while IFS= read -r _gpk_f; do
+            if sed 's#//.*##' "$_gpk_f" 2>/dev/null \
+                | grep -E '^[[:space:]]*(implementation|api|compileOnly|runtimeOnly|compile|runtime|annotationProcessor|kapt|ksp)([[:space:]]*[("'"'"']|[[:space:]]+[a-zA-Z])' \
+                | grep -vqE '^[[:space:]]*[a-zA-Z]+[[:space:]]*\(?[[:space:]]*((enforcedPlatform|platform)[[:space:]]*\(?[[:space:]]*)?(project[[:space:]]*\(|projects\.|files[[:space:]]*\(|fileTree[[:space:]]*\(|gradleApi[[:space:]]*\(|localGroovy[[:space:]]*\(|gradleTestKit[[:space:]]*\()'; then
+                printf '%s\n' "${_gpk_f#./}"
+            fi
+        done | LC_ALL=C sort -u | head -n 5)
+    if [ -n "$_gpk_decl" ]; then
+        _gpk_js=$(mktemp)
+        cat > "$_gpk_js" <<'GRADLE_PACKAGES_JS'
+const fs = require('fs');
+let bom;
+try { bom = JSON.parse(fs.readFileSync(process.argv[2], 'utf8')); } catch (e) { process.exit(0); }
+const ORIGIN = new Set(['cdx:gradle:GradleRootPath', 'internal:GradleProfileName', 'GradleProfileName']);
+const fromGradle = c => String(c.purl || '').startsWith('pkg:maven/')
+  && (c.properties || []).some(p => p && ORIGIN.has(p.name));
+const any = list => (list || []).some(c => c && (fromGradle(c) || any(c.components)));
+process.stdout.write(any(bom.components) ? 'yes' : 'no');
+GRADLE_PACKAGES_JS
+        _gpk_found=$(node "$_gpk_js" "$OUT" 2>/dev/null)
+        rm -f "$_gpk_js"
+        if [ "$_gpk_found" = "no" ]; then
+            _gpk_list=$(printf '%s\n' "$_gpk_decl" | tr '\n' ',' | sed 's/,$//; s/,/, /g')
+            echo "[build-prep] gradle: [WARN] the build declares dependencies ($_gpk_list) but cdxgen resolved no Gradle package; the SBOM lacks them." >&2
+            echo "[build-prep] gradle: run './gradlew dependencies' for each subproject to see what Gradle reports, or re-scan with CDXGEN_DEBUG_MODE=debug." >&2
+            mark_prep_failed gradle-packages
+        fi
+    fi
+fi
+
 # Record each prep_step that failed or timed out (PREP_FAILED, space-separated
 # labels) on the SBOM, one bomlens:pipeline-step-failed property per label,
 # the same shape docker/lib/pipeline-step.sh's mark_pipeline_warning writes.
@@ -1735,13 +2617,31 @@ fi
 # pre-resolution duplicate versions cdxgen emits from the other configurations.
 # Match on maven group:artifact:version; keep non-maven components and the app's
 # own modules (root project group). Prune the dependency graph to the kept refs.
-if [ "${rc:-1}" -eq 0 ] && [ -n "${ANDROID_RELEASE_SET:-}" ] && [ -s "$ANDROID_RELEASE_SET" ] \
+# A java-gradle build's runtime classpath set (GRADLE_RUNTIME_SET) goes through
+# the same filter, which then also keeps a Maven component cdxgen did not read
+# from a Gradle dependencies task (none of the marks the gradle-packages check
+# above reads: cdx:gradle:GradleRootPath, internal:GradleProfileName,
+# GradleProfileName): a jar found in the tree is on no resolved classpath, so
+# the set says nothing about it.
+_flt_set=""; _flt_label=""
+if [ -n "${ANDROID_RELEASE_SET:-}" ]; then
+    _flt_set="$ANDROID_RELEASE_SET"; _flt_label=android
+elif [ -n "${GRADLE_RUNTIME_SET:-}" ]; then
+    _flt_set="$GRADLE_RUNTIME_SET"; _flt_label=gradle
+fi
+if [ "${rc:-1}" -eq 0 ] && [ -n "$_flt_set" ] && [ -s "$_flt_set" ] \
    && [ -f "$OUT" ] && command -v node >/dev/null 2>&1; then
-    log "android: filtering SBOM to release runtime scope"
+    if [ "$_flt_label" = android ]; then
+        log "android: filtering SBOM to release runtime scope"
+    else
+        log "gradle: filtering SBOM to the runtime classpath"
+    fi
     _flt=$(mktemp).js
     cat > "$_flt" <<'FILTER_JS'
 const fs = require('fs');
-const [bomPath, relPath] = process.argv.slice(2);
+const [bomPath, relPath, label] = process.argv.slice(2);
+const GRADLE_ORIGIN = new Set(['cdx:gradle:GradleRootPath', 'internal:GradleProfileName', 'GradleProfileName']);
+const fromGradle = c => (c.properties || []).some(p => GRADLE_ORIGIN.has(p.name));
 let bom;
 try { bom = JSON.parse(fs.readFileSync(bomPath, 'utf8')); } catch (e) { process.exit(0); }
 const rel = new Set(fs.readFileSync(relPath, 'utf8').split('\n').filter(Boolean));
@@ -1758,10 +2658,20 @@ const keep = c => {
   const g = gav(p);
   if (!g) return true;                            // app root (single segment)
   if (rootGroup && g.split(':')[0] === rootGroup) return true; // first-party modules
+  if (label === 'gradle' && !fromGradle(c)) return true;     // not from a Gradle resolve
   return rel.has(g);
 };
 const before = bom.components.length;
 bom.components = bom.components.filter(keep);
+// cdxgen takes a component's scope from the first configuration it appears
+// under, so one on the runtime classpath set that also sits under a test
+// configuration sorted before it comes out optional. On the set it ships.
+// A component with no scope stays without one.
+let rescoped = 0;
+for (const c of bom.components) {
+  const g = gav(c.purl);
+  if (g && rel.has(g) && c.scope && c.scope !== 'required') { c.scope = 'required'; rescoped++; }
+}
 const refOf = c => c['bom-ref'] || c.purl;
 const keptRefs = new Set(bom.components.map(refOf));
 if (mc) keptRefs.add(mc['bom-ref'] || mc.purl);
@@ -1773,11 +2683,13 @@ if (Array.isArray(bom.dependencies)) {
       : d);
 }
 fs.writeFileSync(bomPath, JSON.stringify(bom, null, 2));
-process.stderr.write('[build-prep] android: kept ' + bom.components.length + ' of ' + before + ' components\n');
+process.stderr.write('[build-prep] ' + (label || 'android') + ': kept ' + bom.components.length + ' of ' + before + ' components'
+  + (rescoped ? ', ' + rescoped + ' on the runtime classpath set to scope required' : '') + '\n');
 FILTER_JS
-    node "$_flt" "$OUT" "$ANDROID_RELEASE_SET" || log "android: filter skipped (non-fatal)"
-    rm -f "$_flt" "$ANDROID_RELEASE_SET"
+    node "$_flt" "$OUT" "$_flt_set" "$_flt_label" || log "$_flt_label: filter skipped (non-fatal)"
+    rm -f "$_flt"
 fi
+rm -f ${ANDROID_RELEASE_SET:+"$ANDROID_RELEASE_SET"} ${GRADLE_RUNTIME_SET:+"$GRADLE_RUNTIME_SET"}
 
 # Node production-scope filter: keep only npm components in the resolved production
 # set; drop the devDependencies tree cdxgen pulls in from package.json. Keep non-npm
@@ -2075,6 +2987,106 @@ NWMF_JS
     rm -f "$_nwmf"
 fi
 
+# Go scope: cdxgen sets scope "optional" on every module go.mod marks
+# `// indirect` (it reads the flag as direct vs indirect, and keeps it in the
+# cdx:go:indirect property too). An indirect module is often compiled into the
+# program, and readers that leave out optional components (the NOTICE, a
+# vulnerability gate) then drop real dependencies. So the modules the build
+# uses are listed here with `go list -e -deps ./...`: the same ./... package
+# pattern cdxgen runs, so the list covers what cdxgen read and no more (default
+# flags, so the same readonly or vendor mode, and the same go.work), once per
+# go.mod as cdxgen's own search finds them, and a pkg:golang/ component with
+# scope optional that is in that list becomes required. -e keeps the modules
+# of the packages that did load when one package has an error. cdx:go:indirect
+# is left as it is. A module outside every list keeps optional. A module whose
+# `go list` fails or takes longer than _gscope_timeout seconds adds nothing to
+# the list; when none succeeds the SBOM is left untouched. When go-mod-tidy
+# failed (no route to the module proxy, most often), go.sum is incomplete and
+# what go list reads cannot be trusted, so nothing is changed. A replaced
+# module is listed under the module that replaces it, the name cdxgen gives the
+# component (a local replacement keeps the original path and has no version).
+# Up to _gscope_max modules are listed.
+_gscope_max=20
+_gscope_timeout=120
+_gscope_tidy_failed=""
+case " $PREP_FAILED " in *" go-mod-tidy "*) _gscope_tidy_failed=1 ;; esac
+if [ -n "$_gscope_tidy_failed" ] && grep -q '"pkg:golang/' "$OUT" 2>/dev/null; then
+    log "go: go-mod-tidy failed, so indirect modules keep the scope cdxgen gave them"
+elif [ "${rc:-1}" -eq 0 ] && [ -f "$OUT" ] && command -v go >/dev/null 2>&1 \
+   && command -v node >/dev/null 2>&1 && grep -q '"pkg:golang/' "$OUT" 2>/dev/null; then
+    set -- -name vendor -o -name node_modules -o -name build -o -name test-fixtures -o -name '.?*'
+    if [ -n "$EXCLUDE_NON_SHIPPED" ]; then
+        for _gscope_x in $NON_SHIPPED_DIRS; do set -- "$@" -o -name "$_gscope_x"; done
+        for _gscope_x in $NON_SHIPPED_PATHS; do set -- "$@" -o -path "./$_gscope_x"; done
+    fi
+    _gscope_mods=$(find . -type d \( "$@" \) ! -path . -prune -o -type f -name go.mod -print 2>/dev/null \
+        | sed 's|/go\.mod$||' | LC_ALL=C sort | head -n "$_gscope_max")
+    set --
+    _gscope_list=$(mktemp)
+    _gscope_one=$(mktemp)
+    _gscope_ok=0
+    _gscope_tmpl='{{with .Module}}{{if not .Main}}{{.Path}}@{{.Version}}{{"\n"}}{{.Path}}@{{with .Replace}}{{if .Version}}{{"\n"}}{{.Path}}@{{.Version}}{{end}}{{end}}{{end}}{{end}}'
+    while IFS= read -r _gscope_d; do
+        [ -n "$_gscope_d" ] || continue
+        run_supervised_timeout "$_gscope_timeout" sh -c 'cd "$1" && go list -e -deps -f "$2" ./... > "$3" 2>/dev/null' \
+            _ "$_gscope_d" "$_gscope_tmpl" "$_gscope_one"
+        _gscope_rc=$?
+        if [ "$_gscope_rc" -eq 0 ]; then
+            cat "$_gscope_one" >> "$_gscope_list"
+            _gscope_ok=$((_gscope_ok + 1))
+        else
+            log "go: could not list the build graph of $_gscope_d (go list -e -deps rc=$_gscope_rc); its indirect modules keep the scope cdxgen gave them"
+        fi
+    done <<EOF
+$_gscope_mods
+EOF
+    if [ "$_gscope_ok" -gt 0 ]; then
+        _gscope_js=$(mktemp)
+        cat > "$_gscope_js" <<'GOSCOPE_JS'
+const fs = require('fs');
+const [bomPath, listPath] = process.argv.slice(2);
+let bom;
+try { bom = JSON.parse(fs.readFileSync(bomPath, 'utf8')); } catch (e) { process.exit(0); }
+if (!Array.isArray(bom.components)) process.exit(0);
+// path@version, one per line, from `go list -deps`; a module path with no
+// version (a local replacement) ends in a bare @.
+const built = new Set(fs.readFileSync(listPath, 'utf8').split('\n')
+  .map(l => l.trim().toLowerCase()).filter(l => l.includes('@')));
+if (built.size === 0) process.exit(0);
+// pkg:golang/<path>@<version>[?qualifiers][#subpath], percent-encoded.
+function keyOf(purl) {
+  const m = /^pkg:golang\/([^?#]+)/.exec(purl || '');
+  if (!m) return null;
+  const body = m[1];
+  const at = body.lastIndexOf('@');
+  let name = at >= 0 ? body.slice(0, at) : body;
+  let version = at >= 0 ? body.slice(at + 1) : '';
+  try { name = decodeURIComponent(name); version = decodeURIComponent(version); } catch (e) { return null; }
+  return (name + '@' + version).toLowerCase();
+}
+let changed = 0;
+const visit = list => {
+  for (const c of list || []) {
+    if (c && c.scope === 'optional') {
+      const k = keyOf(c.purl);
+      if (k && built.has(k)) { c.scope = 'required'; changed++; }
+    }
+    if (c && Array.isArray(c.components)) visit(c.components);
+  }
+};
+visit(bom.components);
+if (changed === 0) process.exit(0);
+fs.writeFileSync(bomPath, JSON.stringify(bom, null, 2));
+process.stderr.write('[build-prep] go: ' + changed + ' indirect module(s) in the build graph marked required (cdx:go:indirect kept)\n');
+GOSCOPE_JS
+        node "$_gscope_js" "$OUT" "$_gscope_list" || log "go: scope correction skipped (non-fatal)"
+        rm -f "$_gscope_js"
+    elif [ -n "$_gscope_mods" ]; then
+        log "go: no build graph could be listed; indirect modules keep scope optional"
+    fi
+    rm -f "$_gscope_list" "$_gscope_one"
+fi
+
 # Scope filter (Maven, PHP/Composer): cdxgen tags each component's resolved
 # scope itself (Maven: compile/runtime -> required, test -> optional,
 # provided/system -> excluded; Composer: require -> required, require-dev ->
@@ -2084,10 +3096,16 @@ fi
 # the dependency graph to what remains. Guard: only act when cdxgen actually
 # populated scopes (at least one node of that purl prefix marked "required")
 # -- the syft fallback path emits no scope, and dropping there would gut the
-# BOM, so we leave it untouched and recall never regresses.
+# BOM, so we leave it untouched and recall never regresses. A third argument,
+# "any", lets any of the three scope values count: Maven passes it, because when
+# cdxgen's dependency tree fails it lists the dependencies written in pom.xml,
+# and those carry a scope only when the POM names one (a test or provided one
+# then, while a compile dependency usually has none), so "required" is often
+# missing although the scopes are there.
 run_scope_filter() {
     _sf_purl_prefix="$1"
     _sf_label="$2"
+    _sf_guard="${3:-required}"
     [ "${rc:-1}" -eq 0 ] || return 0
     [ -f "$OUT" ] || return 0
     command -v node >/dev/null 2>&1 || return 0
@@ -2095,12 +3113,13 @@ run_scope_filter() {
     _sflt=$(mktemp).js
     cat > "$_sflt" <<'SFILTER_JS'
 const fs = require('fs');
-const [bomPath, purlPrefix] = process.argv.slice(2);
+const [bomPath, purlPrefix, guard] = process.argv.slice(2);
 let bom;
 try { bom = JSON.parse(fs.readFileSync(bomPath, 'utf8')); } catch (e) { process.exit(0); }
 if (!Array.isArray(bom.components)) process.exit(0);
 const isTarget = c => (c.purl || '').startsWith(purlPrefix);
-const hasScopes = bom.components.some(c => isTarget(c) && c.scope === 'required');
+const guardScopes = guard === 'any' ? ['required', 'optional', 'excluded'] : ['required'];
+const hasScopes = bom.components.some(c => isTarget(c) && guardScopes.includes(c.scope));
 if (!hasScopes) process.exit(0);   // scopes not populated (e.g. syft fallback): leave as-is
 const keep = c => !isTarget(c) || (c.scope !== 'optional' && c.scope !== 'excluded');
 const before = bom.components.length;
@@ -2119,11 +3138,11 @@ if (Array.isArray(bom.dependencies)) {
 fs.writeFileSync(bomPath, JSON.stringify(bom, null, 2));
 process.stderr.write('[build-prep] ' + purlPrefix + ': kept ' + bom.components.length + ' of ' + before + ' components\n');
 SFILTER_JS
-    node "$_sflt" "$OUT" "$_sf_purl_prefix" || log "$_sf_label: filter skipped (non-fatal)"
+    node "$_sflt" "$OUT" "$_sf_purl_prefix" "$_sf_guard" || log "$_sf_label: filter skipped (non-fatal)"
     rm -f "$_sflt"
 }
 if [ -n "${MAVEN_SCOPE_FILTER:-}" ]; then
-    run_scope_filter "pkg:maven/" "maven"
+    run_scope_filter "pkg:maven/" "maven" any
 fi
 if [ -n "${PHP_SCOPE_FILTER:-}" ]; then
     run_scope_filter "pkg:composer/" "php"
@@ -4819,6 +5838,32 @@ EOF
     rm -f "$_rch_runs" "$_rch_err1"
 fi
 
+# --- cache hand-back helpers ------------------------------------------------
+# cache_chown_has_effect DIR: probe whether a chown to HOST_UID:HOST_GID in DIR
+# sticks. Makes a scratch file in DIR, chowns it, reads the owner back, removes
+# it. Returns 0 when the owner changed, 1 when it did not (a mount that keeps
+# its own owner mapping, a non-root user), and 0 as well when the probe cannot
+# be run (no scratch file, no stat), so an unclear case keeps the hand-back.
+cache_chown_has_effect() {
+    _cp_f=$(mktemp "$1/.bomlens-chown-probe.XXXXXX" 2>/dev/null) || return 0
+    chown "${HOST_UID}:${HOST_GID}" "$_cp_f" 2>/dev/null
+    _cp_o=$(stat -c '%u:%g' "$_cp_f" 2>/dev/null || stat -f '%u:%g' "$_cp_f" 2>/dev/null)
+    rm -f "$_cp_f"; _cp_f=""
+    [ -n "$_cp_o" ] || return 0
+    [ "$_cp_o" = "${HOST_UID}:${HOST_GID}" ]
+}
+# cache_handback_wanted DIR MOUNTINFO: should DIR be walked and chowned? No when
+# it is not a mount point listed in MOUNTINFO (the cache was not mounted),
+# when HOST_UID and HOST_GID are both 0 (root is already the owner the host wants), or when the
+# probe shows chown has no effect there. Yes otherwise.
+cache_handback_wanted() {
+    [ -d "$1" ] && [ -r "$2" ] || return 1
+    awk -v p="$1" '$5 == p { f = 1 } END { exit !f }' "$2" 2>/dev/null || return 1
+    [ "${HOST_UID:-0}" != 0 ] || [ "${HOST_GID:-0}" != 0 ] || return 1
+    cache_chown_has_effect "$1"
+}
+# --- end cache hand-back helpers --------------------------------------------
+
 # Hand the build tree back to the host user. This image runs as root (-u 0:0),
 # so the build steps above (npm install, cargo/go fetch, the bom write) leave
 # root-owned files in the mounted source dir. On Linux the host user then cannot
@@ -4829,11 +5874,12 @@ if [ -n "${HOST_UID:-}" ] && [ -n "${HOST_GID:-}" ]; then
     chown -R "${HOST_UID}:${HOST_GID}" "$SRC" 2>/dev/null || true
     # The Maven and Gradle caches are host folders too (cache-maven,
     # cache-gradle): hand back what this run wrote there. Only a mounted one,
-    # and only the files not already the host user's.
+    # and only the files not already the host user's. A mount where a chown
+    # from in here does not change the owner the host sees is left alone
+    # (cache_handback_wanted).
     _co_acct="$( (getent passwd "$(id -u)" 2>/dev/null || true) | cut -d: -f6)"
     for _co_d in "$HOME/.m2" "${_co_acct:-/root}/.gradle"; do
-        [ -d "$_co_d" ] && [ -r /proc/self/mountinfo ] || continue
-        awk -v p="$_co_d" '$5 == p { f = 1 } END { exit !f }' /proc/self/mountinfo 2>/dev/null || continue
+        cache_handback_wanted "$_co_d" /proc/self/mountinfo || continue
         find "$_co_d" \( ! -user "$HOST_UID" -o ! -group "$HOST_GID" \) \
             -exec chown -h "${HOST_UID}:${HOST_GID}" {} + 2>/dev/null || true
     done

@@ -1,84 +1,80 @@
 // Copyright 2026 SK Telecom Co., Ltd.
 // SPDX-License-Identifier: Apache-2.0
 
+import { ChevronRightIcon, PackageIcon } from "@primer/octicons-react";
+import { Label } from "@primer/react";
 import { useTranslation } from "react-i18next";
-import { PackageCheck } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
-import { CALLOUT } from "@/components/ui/coverage-notice";
-import { severityTone } from "@/lib/severity";
+
+import { PackageCoordinate, SeverityLabel, splitPackage } from "@/components/primer";
 import { bundleSteps, type PackageGroup } from "@/lib/vulnGroups";
-import { cn } from "@/lib/utils";
 
 /** Bundles shown before the rest are summarised as a count. */
 const SHOWN = 5;
 
 /**
- * "One upgrade resolves more than one CVE". The same callout surface as the
- * coverage notices above the table, with an info-role icon (the brand colour is not a data colour), one line per package,
- * worst severity first. Clicking a line searches the table for that package.
+ * "One upgrade resolves more than one CVE": a collapsed box that says how many
+ * packages and CVEs it covers; opened, one line per package, worst severity
+ * first. Choosing a package searches the table for it.
  */
 export function UpgradeBundles({
   bundles,
   onPick,
+  onByPackage,
 }: {
   bundles: PackageGroup[];
   onPick: (pkg: string) => void;
+  onByPackage: () => void;
 }) {
   const { t } = useTranslation();
   if (bundles.length === 0) return null;
+  const cves = bundles.reduce((n, g) => n + g.steps[g.steps.length - 1].count, 0);
   return (
-    <section
-      data-testid="upgrade-bundles"
-      aria-labelledby="upgrade-bundles-title"
-      className={cn("space-y-2", CALLOUT)}
-    >
-      <h3
-        id="upgrade-bundles-title"
-        className="flex items-center gap-1.5 text-label font-medium text-foreground"
-      >
-        <PackageCheck className="h-4 w-4 shrink-0 text-role-info-fg" aria-hidden />
+    <details className="bl-box bl-v-bundles" data-testid="upgrade-bundles">
+      <summary className="bl-v-bundles-sum">
+        <span className="bl-chev">
+          <ChevronRightIcon size={16} />
+        </span>
+        <span className="bl-ovrow-icon">
+          <PackageIcon size={16} />
+        </span>
+        <h2 className="bl-v-h2">{t("result.vulnBundleSummary", { count: bundles.length, cves })}</h2>
+      </summary>
+      <div className="bl-v-bundles-sub bl-muted">
         {t("result.upgradeBundlesTitle")}
-      </h3>
-      <ul className="space-y-1">
+        <button type="button" className="bl-linkbtn bl-small" onClick={onByPackage}>
+          {t("result.vulnViewByPackage")}
+        </button>
+      </div>
+      <ul className="bl-v-bundles-list">
         {bundles.slice(0, SHOWN).map((g) => {
           const { top, lower } = bundleSteps(g);
-          const line =
+          const rest =
             lower.length === 0
-              ? t("result.upgradeBundleLine", { pkg: g.pkg, fixed: top.fixed, count: top.count })
-              : t("result.upgradeBundleLineSteps", {
-                  pkg: g.pkg,
+              ? t("result.pkgGroupUpgrade", { fixed: top.fixed, count: top.count })
+              : t("result.pkgGroupUpgradeSteps", {
                   fixed: top.fixed,
                   count: top.count,
-                  steps: lower
-                    .map((s) => t("result.upgradeBundleStep", { fixed: s.fixed, count: s.count }))
-                    .join(", "),
+                  steps: lower.map((s) => t("result.upgradeBundleStep", { fixed: s.fixed, count: s.count })).join(", "),
                 });
           return (
-            <li key={g.key} className="flex flex-wrap items-center gap-2">
-              <Badge tone={severityTone(g.maxSeverity)} mark>
-                {t(`severity.${g.maxSeverity}`)}
-              </Badge>
-              <button
-                type="button"
-                onClick={() => onPick(g.pkg)}
-                className="rounded text-left text-label text-primary underline underline-offset-2 hover:no-underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              >
-                {line}
+            <li key={g.key}>
+              <SeverityLabel severity={g.maxSeverity} quiet />
+              <button type="button" className="bl-linkbtn" onClick={() => onPick(g.pkg)} title={t("result.vulnSearchPlaceholder")}>
+                <PackageCoordinate {...splitPackage(g.pkg)} title={g.pkg} strongName className="bl-mono bl-breakall" />
               </button>
+              <span>{rest}</span>
               {g.kev && (
-                <Badge tone="critical" title={t("result.kevHint")}>
+                <Label variant="danger" title={t("result.kevHint")}>
                   {t("result.kevBadge")}
-                </Badge>
+                </Label>
               )}
             </li>
           );
         })}
       </ul>
       {bundles.length > SHOWN && (
-        <p className="text-body-sm text-muted-foreground">
-          {t("result.upgradeBundlesMore", { count: bundles.length - SHOWN })}
-        </p>
+        <p className="bl-muted bl-small bl-v-bundles-more">{t("result.upgradeBundlesMore", { count: bundles.length - SHOWN })}</p>
       )}
-    </section>
+    </details>
   );
 }

@@ -3,7 +3,7 @@
 
 import { describe, expect, it } from "vitest";
 
-import { parseLookupInput } from "./lookup";
+import { formatLookupDate, formatRange, parseLookupInput } from "./lookup";
 
 describe("parseLookupInput: advisory ids", () => {
   it("recognizes every advisory-id prefix the server accepts", () => {
@@ -214,5 +214,24 @@ describe("parseLookupInput: empty", () => {
   it("treats blank / whitespace-only input as empty", () => {
     expect(parseLookupInput("")).toEqual({ kind: "empty" });
     expect(parseLookupInput("   ")).toEqual({ kind: "empty" });
+  });
+});
+
+describe("formatRange", () => {
+  it("reads introduced, fixed, last_affected and limit events", () => {
+    expect(
+      formatRange({ events: [{ introduced: "" }, { fixed: "2.0.1" }, { last_affected: "3" }, { limit: "4" }] }),
+    ).toBe(">= 0, < 2.0.1, <= 3, < 4");
+  });
+  it("returns an empty string for anything that is not a range", () => {
+    expect(formatRange(null)).toBe("");
+    expect(formatRange({ events: "x" })).toBe("");
+    expect(formatRange({ events: [null, {}] })).toBe("");
+  });
+});
+
+describe("formatLookupDate", () => {
+  it("keeps an unparseable date as it came", () => {
+    expect(formatLookupDate("soon", "en")).toBe("soon");
   });
 });

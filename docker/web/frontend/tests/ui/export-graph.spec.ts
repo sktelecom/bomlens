@@ -64,7 +64,7 @@ async function open(page: Page, section: string) {
     r.fulfill({ contentType: "application/json", body: JSON.stringify(SBOM) }),
   );
   await page.goto(`/?ui=next#/scan/demo_5.0/${section}`);
-  await page.getByRole("navigation").first().waitFor();
+  await page.getByTestId("result-meta").waitFor();
 }
 
 async function downloadText(page: Page, action: () => Promise<void>): Promise<string> {
@@ -77,7 +77,7 @@ async function downloadText(page: Page, action: () => Promise<void>): Promise<st
 
 test("the components export carries the header and every visible row", async ({ page }) => {
   await open(page, "components");
-  await expect(page.getByRole("cell", { name: "openssl", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Show component details: openssl", exact: true })).toBeVisible();
 
   const csv = await downloadText(page, () =>
     page.getByRole("button", { name: "Export CSV" }).click(),
@@ -93,8 +93,8 @@ test("the components export carries the header and every visible row", async ({ 
 
 test("the export carries the filter, not the whole table", async ({ page }) => {
   await open(page, "components");
-  await page.getByRole("textbox", { name: "Search name, license, type…" }).fill("openssl");
-  await expect(page.getByRole("cell", { name: "zlib", exact: true })).toHaveCount(0);
+  await page.getByRole("searchbox", { name: "Search components" }).fill("openssl");
+  await expect(page.getByRole("button", { name: "Show component details: zlib", exact: true })).toHaveCount(0);
 
   const csv = await downloadText(page, () =>
     page.getByRole("button", { name: "Export CSV" }).click(),

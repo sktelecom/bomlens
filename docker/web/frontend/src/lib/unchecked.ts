@@ -9,7 +9,7 @@
  */
 import type { SecuritySummary, UncheckedComponent, UncheckedReason } from "./api";
 
-export const UNCHECKED_REASONS: UncheckedReason[] = ["no-version", "no-identifier", "unknown"];
+export const UNCHECKED_REASONS: UncheckedReason[] = ["no-version", "no-identifier", "repository-purl", "unknown"];
 
 export interface UncheckedSummary {
   /** Components not checked; may exceed `rows.length` (the server caps rows). */
@@ -22,7 +22,7 @@ export interface UncheckedSummary {
 }
 
 function normReason(r: unknown): UncheckedReason {
-  return r === "no-version" || r === "no-identifier" ? r : "unknown";
+  return r === "no-version" || r === "no-identifier" || r === "repository-purl" ? r : "unknown";
 }
 
 /** The unchecked components of a security summary, or null when there are none. */
@@ -47,5 +47,7 @@ export function uncheckedReasonKey(reason: UncheckedReason): string {
     ? "result.uncheckedReason.noVersion"
     : reason === "no-identifier"
       ? "result.uncheckedReason.noIdentifier"
-      : "result.uncheckedReason.unknown";
+      : reason === "repository-purl"
+        ? "result.uncheckedReason.repositoryPurl"
+        : "result.uncheckedReason.unknown";
 }

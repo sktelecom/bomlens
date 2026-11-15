@@ -8,8 +8,8 @@
   </filter>
 </defs>
 <rect width="800" height="970" fill="#ffffff"/>
-<rect x="100" y="24" width="380" height="56" rx="8" fill="#ffffff" stroke="#EA002C" stroke-width="1.6" filter="url(#sh)"/>
-<text x="290.0" y="52.0" text-anchor="middle" font-family="'Helvetica Neue',Helvetica,Arial,sans-serif" font-size="17" font-weight="600" fill="#EA002C">SBOM from any input</text>
+<rect x="100" y="24" width="380" height="56" rx="8" fill="#ffffff" stroke="#1d4ed8" stroke-width="1.6" filter="url(#sh)"/>
+<text x="290.0" y="52.0" text-anchor="middle" font-family="'Helvetica Neue',Helvetica,Arial,sans-serif" font-size="17" font-weight="600" fill="#1d4ed8">SBOM from any input</text>
 <rect x="100" y="104" width="380" height="56" rx="8" fill="#ffffff" stroke="#d6dbe1" stroke-width="1" filter="url(#sh)"/>
 <text x="290.0" y="132.0" text-anchor="middle" font-family="'Helvetica Neue',Helvetica,Arial,sans-serif" font-size="17" font-weight="600" fill="#1c2228">normalize (jq)</text>
 <rect x="504" y="121.0" width="66" height="22" rx="11" fill="#f1f3f5" stroke="#e3e7ec"/>

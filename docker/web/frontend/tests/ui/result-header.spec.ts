@@ -7,8 +7,8 @@ import { DONE, FIRMWARE_DONE, SBOM } from "./fixtures";
 import { waitForSettled } from "./settle";
 import { seedThemeLang } from "./visual";
 
-// The result screen's header is one meta line (project, version, scan type, time)
-// over the section title, the summary is a one-line strip, and the Overview names
+// The result screen's header is the section title over one meta line (project,
+// version, scan type, time), the summary is a one-line strip, and the Overview names
 // the items worth looking at first with their source and time. The Recent list
 // keeps its at-risk filter as a chip above the table.
 
@@ -49,23 +49,23 @@ async function openScan(page: Page, done: Record<string, unknown> & { id: string
   await waitForSettled(page.locator("main"));
 }
 
-test("the header is one meta line over the section title, with no status badge on a clean scan", async ({ page }) => {
+test("the header is the section title over one meta line, with no status badge on a clean scan", async ({ page }) => {
   await seedThemeLang(page, "light", "en");
   await openScan(page, { ...DONE, sbom: { ...DONE.sbom, componentType: "application" } });
 
   const meta = page.getByTestId("result-meta");
   // On the Overview the project and version are the title, so the meta line
-  // above it carries only the scan type and time.
+  // under it carries only the scan type and time.
   await expect(page.locator("main h1")).toContainText("demo");
   await expect(page.locator("main h1")).toContainText("1.0");
   await expect(meta).not.toContainText("demo");
   await expect(page.getByTestId("result-kind")).toHaveText("Source");
   await expect(meta.locator("time")).toHaveAttribute("datetime", new Date(GENERATED_AT * 1000).toISOString());
   await expect(meta.locator("time")).toContainText("2023");
-  // The title sits below the meta line, and the badge only shows for a scan
-  // that did not simply complete.
+  // The meta line sits under the title (the page header's description), and
+  // the badge only shows for a scan that did not simply complete.
   const [metaBox, titleBox] = await Promise.all([meta.boundingBox(), page.locator("main h1").boundingBox()]);
-  expect(titleBox!.y).toBeGreaterThan(metaBox!.y);
+  expect(metaBox!.y).toBeGreaterThan(titleBox!.y);
   await expect(page.getByRole("status")).toHaveCount(0);
   await expect(page.getByText("Scan complete")).toHaveCount(0);
   // The whole header stays compact: under the old 90px of title, badge and subtitle.
@@ -82,24 +82,13 @@ test("a scan that finished with failed steps carries a text badge", async ({ pag
   await expect(page.getByRole("status")).toHaveText("Some steps failed");
 });
 
-test("the summary strip stays on compact lines at 1024px", async ({ page }) => {
+test("the Overview fits a 1024px window and the rail still opens a section", async ({ page }) => {
   await page.setViewportSize({ width: 1024, height: 768 });
   await seedThemeLang(page, "light", "en");
   await openScan(page, FIRMWARE_DONE);
-  const strip = page.getByRole("list", { name: "Scan summary" });
-  const items = strip.getByRole("listitem");
-  const count = await items.count();
-  expect(count).toBeGreaterThanOrEqual(3);
-  // Each entry is a single line: no entry wraps its own words.
-  for (let i = 0; i < count; i += 1) {
-    const box = await items.nth(i).boundingBox();
-    expect(box!.height, `summary entry ${i} stays one line`).toBeLessThan(48);
-  }
-  // And the strip is far shorter than the five tall cards it replaced (~130px each row).
-  const stripBox = await strip.boundingBox();
-  expect(stripBox!.height).toBeLessThan(110);
-  // An entry still opens its section.
-  await strip.getByRole("link", { name: /Vulnerabilities/ }).click();
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+  expect(overflow).toBeLessThanOrEqual(0);
+  await page.getByRole("link", { name: /^Vulnerabilities/ }).first().click();
   await expect(page.locator("main h1")).toHaveText("Vulnerabilities");
 });
 
@@ -114,7 +103,8 @@ test("the Overview names up to three items to check first, with source and scan 
   await expect(block).toContainText("reference order");
   await expect(block).toContainText("not a ranking of importance or a verdict");
 
-  const rows = block.getByRole("listitem");
+  // The box also carries the "Needs attention" rows; the first list is the three.
+  const rows = block.getByRole("list").first().getByRole("listitem");
   await expect(rows).toHaveCount(3);
   await expect(rows.nth(0)).toContainText("Known exploited vulnerabilities (CISA KEV)");
   await expect(rows.nth(0)).toContainText("Source: vulnerability results");
@@ -141,10 +131,10 @@ test("the Overview leaves the first-checks block out when nothing applies", asyn
   await expect(page.getByTestId("first-checks")).toHaveCount(0);
 });
 
-test("the needs-attention card is the same neutral card for a source and an AI scan", async ({ page }) => {
+test("the items to check first and needs-attention rows share one neutral box", async ({ page }) => {
   await seedThemeLang(page, "light", "en");
   // One High finding without a fix, so the Critical-and-High count differs from
-  // the fixable one in first checks and the card has a row of its own.
+  // the fixable one in first checks and "Needs attention" has a row of its own.
   await openScan(page, {
     ...DONE,
     security: {
@@ -154,15 +144,23 @@ test("the needs-attention card is the same neutral card for a source and an AI s
       ),
     },
   });
-  const card = page.getByTestId("needs-attention");
-  await expect(card).toBeVisible();
+  const box = page.getByTestId("first-checks");
+  await expect(box).toBeVisible();
+  const attention = box.getByTestId("needs-attention");
+  await expect(attention).toBeVisible();
+  await expect(box.getByText("Needs attention", { exact: true })).toBeVisible();
   // No accent bar on one edge: the border is the same width on every side.
-  const style = await card.evaluate((el) => {
+  const style = await box.evaluate((el) => {
     const cs = getComputedStyle(el);
     return { left: cs.borderLeftWidth, top: cs.borderTopWidth, bg: cs.backgroundColor };
   });
   expect(style.left).toBe(style.top);
   expect(style.bg).not.toBe("rgba(0, 0, 0, 0)");
+  // The Critical-and-High row opens the preset that lists exactly what it counted.
+  await expect(attention.getByRole("link", { name: /critical or high vulnerabilities/ })).toHaveAttribute(
+    "href",
+    /vulnerabilities\?view=critical-high$/,
+  );
 });
 
 test("the Recent list keeps the at-risk filter as a chip above the table", async ({ page }) => {

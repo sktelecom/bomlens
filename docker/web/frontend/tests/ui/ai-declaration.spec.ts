@@ -493,20 +493,50 @@ test("a saved declaration is laid over the open fields when the questions reopen
   await expect(flow.getByRole("radio", { name: "Evaluation" })).toHaveAttribute("aria-checked", "true");
 });
 
-test("answers survive leaving the section; cancelling drops them and returns focus", async ({ page }) => {
+test("answers survive leaving the section; cancelling asks first, then drops them and returns focus", async ({ page }) => {
   await stub(page);
   await openModels(page);
   let flow = await openFlow(page);
   await flow.locator('[data-question="model.releaseTime"] input').fill("2025-04-15");
+  await next(flow);
   await page.locator('a[href$="/components"]').first().click();
   await expect(page.getByTestId("ai-declaration")).toHaveCount(0);
   await page.locator('a[href$="/models"]').first().click();
   flow = page.getByTestId("ai-declaration");
+  await expect(page.getByTestId("spdx3-draft-kept")).toBeVisible();
+  await expect(flow.locator('[data-question="model.releaseTime"] input')).toHaveCount(0);
+  // The step opened and left before the visit is still marked, not "not opened".
+  await expect(stepButton(flow, "Model").locator("svg")).toHaveCount(1);
+  await stepButton(flow, "Model").click();
+  await expect(flow.locator('[data-question="model.releaseTime"] input')).toHaveValue("2025-04-15");
+  // Cancel asks, because the answers differ from the template, even after coming back.
+  await flow.getByRole("button", { name: "Cancel" }).click();
+  const dialog = page.getByRole("alertdialog");
+  await expect(dialog).toBeVisible();
+  await dialog.getByRole("button", { name: "Keep answering" }).click();
+  await expect(flow).toBeVisible();
   await expect(flow.locator('[data-question="model.releaseTime"] input')).toHaveValue("2025-04-15");
   await flow.getByRole("button", { name: "Cancel" }).click();
+  await page.getByRole("alertdialog").getByRole("button", { name: "Discard answers" }).click();
   await expect(page.getByRole("button", { name: "Fill in empty fields" })).toBeFocused();
   flow = await openFlow(page);
   await expect(flow.locator('[data-question="model.releaseTime"] input')).toHaveValue("");
+  // Untouched answers cancel at once.
+  await flow.getByRole("button", { name: "Cancel" }).click();
+  await expect(page.getByRole("alertdialog")).toHaveCount(0);
+  await expect(page.getByTestId("ai-declaration")).toHaveCount(0);
+});
+
+test("the review marks a step with open items that was never opened, and leaves optional steps unanswered", async ({ page }) => {
+  await stub(page);
+  await openModels(page);
+  const flow = await openFlow(page);
+  await stepButton(flow, "Review").click();
+  const data = flow.locator('[data-summary="data"]');
+  await expect(data).toContainText("Not opened yet");
+  await expect(flow.locator('[data-summary="legal"]')).toContainText("Not answered");
+  await expect(flow.locator('[data-summary="legal"]')).not.toContainText("Not opened yet");
+  await expect(flow.getByTestId("decisions-left")).toBeVisible();
 });
 
 test("single choices work from the keyboard as a radio group", async ({ page }) => {

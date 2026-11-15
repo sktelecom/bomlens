@@ -43,6 +43,10 @@ export default defineConfig({
   test: {
     environment: "node",
     include: ["src/**/*.test.ts", "scripts/**/*.test.ts"],
+    // @primer/react imports its CSS modules from JavaScript, which Node cannot
+    // load, so Vitest runs it through Vite (CSS becomes empty modules). This is
+    // what lets the src/components/primer tests render a Primer Label.
+    server: { deps: { inline: [/@primer\/react/] } },
     // Coverage is scoped to src/lib — the pure data/display modules Vitest
     // actually exercises. Components live behind the DOM and are covered by
     // Playwright, so including them here would just depress the number.

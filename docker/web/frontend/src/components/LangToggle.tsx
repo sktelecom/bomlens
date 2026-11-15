@@ -1,46 +1,42 @@
 // Copyright 2026 SK Telecom Co., Ltd.
 // SPDX-License-Identifier: Apache-2.0
 
+import { SegmentedControl } from "@primer/react";
 import { useTranslation } from "react-i18next";
 
-import { cn } from "@/lib/utils";
-import { FOCUS_RING, SELECTED_SOLID } from "@/components/ui/selectable";
-
-const LANGS: Array<[string, string]> = [
-  ["ko", "KO"],
-  ["en", "EN"],
+/** The two UI languages: the short code shown, the language's own name read out. */
+export const LANGUAGES: ReadonlyArray<{ code: "ko" | "en"; short: string; name: string }> = [
+  { code: "ko", short: "KO", name: "한국어" },
+  { code: "en", short: "EN", name: "English" },
 ];
 
+/** The current UI language, as one of LANGUAGES' codes. */
+export function useCurrentLanguage(): string {
+  const { i18n } = useTranslation();
+  return i18n.resolvedLanguage ?? i18n.language;
+}
+
+/** KO / EN switch in the top bar (the help menu carries it on narrow widths). */
 export function LangToggle() {
   const { i18n, t } = useTranslation();
-  const current = i18n.resolvedLanguage ?? i18n.language;
-
+  const current = useCurrentLanguage();
   return (
-    <div
-      className="inline-flex items-center rounded-md border border-input bg-background p-0.5"
-      role="group"
+    <SegmentedControl
       aria-label={t("lang.label")}
+      size="small"
+      onChange={(i) => void i18n.changeLanguage(LANGUAGES[i].code)}
     >
-      {LANGS.map(([code, label]) => {
-        const active = current === code;
-        return (
-          <button
-            key={code}
-            type="button"
-            onClick={() => void i18n.changeLanguage(code)}
-            aria-pressed={active}
-            className={cn(
-              "rounded-sm border border-transparent px-2 py-1 text-label font-medium transition-colors duration-fast ease-out-soft",
-              FOCUS_RING,
-              active
-                ? SELECTED_SOLID
-                : "text-muted-foreground hover:text-foreground",
-            )}
-          >
-            {label}
-          </button>
-        );
-      })}
-    </div>
+      {LANGUAGES.map((l) => (
+        <SegmentedControl.Button
+          key={l.code}
+          selected={current === l.code}
+          lang={l.code}
+          // The visible code leads the name, so voice control by "KO" works.
+          aria-label={`${l.short}, ${l.name}`}
+        >
+          {l.short}
+        </SegmentedControl.Button>
+      ))}
+    </SegmentedControl>
   );
 }
