@@ -120,7 +120,7 @@ export function AppShell({
         onRescan={onRescan}
         homeHref={homeHref}
         showHomeLink={showHomeLink}
-        newHref={hideTopBarNewScan || IS_STATIC_DEMO ? undefined : newHash()}
+        newHref={hideTopBarNewScan ? undefined : newHash()}
         onNewScan={onNewScan}
         recent={recent}
         onDeleteRecent={onDeleteRecent}
@@ -142,7 +142,6 @@ export function AppShell({
           homeHref={homeHref}
           newHref={newHash()}
           onNewScan={onNewScan}
-          hideNewScan={IS_STATIC_DEMO}
           loading={loadingSections}
         />
         <main id="main-content" ref={mainRef} tabIndex={-1} className="bl-main animate-fade-in">

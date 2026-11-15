@@ -50,7 +50,6 @@ interface SidebarProps {
    *  unchanged, so the link's own navigation is a no-op then. */
   onNewScan?: () => void;
   /** Hide New scan (the read-only demo cannot scan). */
-  hideNewScan?: boolean;
   /** A scan is running or opening: its sections are on the way. */
   loading?: boolean;
 }
@@ -83,7 +82,6 @@ export function Sidebar({
   homeHref,
   newHref,
   onNewScan,
-  hideNewScan,
   loading,
 }: SidebarProps) {
   const { t } = useTranslation();
@@ -93,7 +91,6 @@ export function Sidebar({
     { key: "recent", href: homeHref, label: t("nav.recentScans"), icon: ListUnorderedIcon },
     { key: "new", href: newHref, label: t("shell.newScan"), icon: PlusIcon, onClick: onNewScan },
   ];
-  if (hideNewScan) globals.pop();
   const sectionHref = (id: SectionId) => (activeScanId ? scanHash(activeScanId, id) : homeHref);
   // Two of the counts are pairs ("6/65"). The pointer gets the meaning as a
   // tooltip; a screen reader hears the pair spelled out instead of "6 slash 65".
