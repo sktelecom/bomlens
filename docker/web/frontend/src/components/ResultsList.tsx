@@ -1,16 +1,30 @@
 // Copyright 2026 SK Telecom Co., Ltd.
 // SPDX-License-Identifier: Apache-2.0
 
-import { Download, Eye, FileSignature, FileText, Link2, Loader2, Package, Upload } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import {
+  ChecklistIcon,
+  CpuIcon,
+  DownloadIcon,
+  EyeIcon,
+  FileCodeIcon,
+  FileIcon,
+  GraphIcon,
+  LawIcon,
+  LinkIcon,
+  PencilIcon,
+  ArrowSwitchIcon,
+  ShieldIcon,
+  SyncIcon,
+  UploadIcon,
+  VerifiedIcon,
+} from "@primer/octicons-react";
+import { Blankslate } from "@primer/react/experimental";
+import { Button, IconButton, Label } from "@primer/react";
+import { useEffect, useRef, useState, type ElementType } from "react";
 import { useTranslation } from "react-i18next";
 
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { EmptyState } from "@/components/ui/state";
 import {
   absoluteFileUrl,
-  downloadAllUrl,
   exportSpdx,
   exportSpdx3,
   fileUrl,
@@ -32,6 +46,24 @@ import { useToast } from "@/lib/toast";
 import { formatBytes } from "@/lib/utils";
 
 import { FileViewer } from "./FileViewer";
+import "./results-list.css";
+
+/** One icon per kind of artifact; an unknown kind gets the plain file icon. */
+const ICON: Record<string, ElementType> = {
+  riskReport: GraphIcon,
+  sbom: FileCodeIcon,
+  refusedSbom: FileCodeIcon,
+  spdx3: CpuIcon,
+  aiDeclaration: PencilIcon,
+  notice: LawIcon,
+  conformance: ChecklistIcon,
+  aiProfile: CpuIcon,
+  security: ShieldIcon,
+  componentVersions: FileIcon,
+  license: LawIcon,
+  vex: ShieldIcon,
+  signature: VerifiedIcon,
+};
 
 /** Filename shared by an artifact's formats, with the format extension dropped. */
 function baseName(formats: ArtifactFormat[]): string {
@@ -41,9 +73,8 @@ function baseName(formats: ArtifactFormat[]): string {
 }
 
 /** Richest viewable format for the inline viewer (HTML first). */
-function preferredView(formats: ArtifactFormat[]): string | null {
-  const html = formats.find((f) => f.ext === "html" && f.viewable);
-  return (html ?? formats.find((f) => f.viewable))?.name ?? null;
+function preferredView(formats: ArtifactFormat[]): ArtifactFormat | null {
+  return formats.find((f) => f.ext === "html" && f.viewable) ?? formats.find((f) => f.viewable) ?? null;
 }
 
 function DownloadChip({
@@ -57,20 +88,30 @@ function DownloadChip({
 }) {
   const { t } = useTranslation();
   return (
-    <Button variant="outline" size="sm" asChild>
-      <a href={fileUrl(scanId, fmt.name)} download={fmt.name} onClick={onDownload}>
-        <Download className="h-3.5 w-3.5" />
-        {fmt.ext === "template"
-          ? t("result.emptyForm")
-          : isSpdx3Check(fmt.name)
-            ? t("result.checkFormat", { format: formatLabel(fmt.ext) })
-            : formatLabel(fmt.ext)}
-        <span className="font-normal text-muted-foreground">
-          {formatBytes(fmt.size)}
-        </span>
-      </a>
+    <Button
+      as="a"
+      size="small"
+      href={fileUrl(scanId, fmt.name)}
+      download={fmt.name}
+      title={fmt.name}
+      leadingVisual={DownloadIcon}
+      onClick={onDownload}
+    >
+      {fmt.ext === "template"
+        ? t("result.emptyForm")
+        : isSpdx3Check(fmt.name)
+          ? t("result.checkFormat", { format: formatLabel(fmt.ext) })
+          : formatLabel(fmt.ext)}{" "}
+      <span className="bl-muted bl-chip-size">{formatBytes(fmt.size)}</span>
     </Button>
   );
+}
+
+function triggerDownload(scanId: string, name: string) {
+  const a = document.createElement("a");
+  a.href = fileUrl(scanId, name);
+  a.download = name;
+  a.click();
 }
 
 /**
@@ -78,8 +119,8 @@ function DownloadChip({
  *
  * SPDX is not a scan option: the BOM already exists, so the format choice
  * belongs here rather than in a toggle the user had to predict before scanning.
- * One click covers the whole intent — convert, then hand over the file — and the
- * new artifact also joins the card as an ordinary download chip.
+ * One click covers the whole intent (convert, then hand over the file) and the
+ * new artifact also joins the row as an ordinary download chip.
  */
 function SpdxExportButton({
   scanId,
@@ -104,30 +145,21 @@ function SpdxExportButton({
     onExported?.(res.results);
     // Hand the file over straight away: the click meant "I want the SPDX file",
     // not "prepare it and wait for me to ask again".
-    const a = document.createElement("a");
-    a.href = fileUrl(scanId, res.name);
-    a.download = res.name;
-    a.click();
+    triggerDownload(scanId, res.name);
     toast(t("result.downloadStarted"));
   };
 
   return (
-    <Button variant="outline" size="sm" onClick={run} disabled={pending}>
-      {pending ? (
-        <Loader2 className="h-3.5 w-3.5 animate-spin" />
-      ) : (
-        <Download className="h-3.5 w-3.5" />
-      )}
+    <Button
+      size="small"
+      onClick={run}
+      disabled={pending}
+      loading={pending}
+      leadingVisual={pending ? undefined : ArrowSwitchIcon}
+    >
       {pending ? t("result.spdxExporting") : t("result.spdxExport")}
     </Button>
   );
-}
-
-function triggerDownload(scanId: string, name: string) {
-  const a = document.createElement("a");
-  a.href = fileUrl(scanId, name);
-  a.download = name;
-  a.click();
 }
 
 /**
@@ -140,10 +172,12 @@ function Spdx3ExportButton({
   scanId,
   onPatch,
   label,
+  icon,
 }: {
   scanId: string | null;
   onPatch?: (patch: Partial<DoneEvent>) => void;
   label: string;
+  icon: ElementType;
 }) {
   const { t } = useTranslation();
   const { toast } = useToast();
@@ -162,8 +196,13 @@ function Spdx3ExportButton({
     toast(t("result.downloadStarted"));
   };
   return (
-    <Button variant="outline" size="sm" onClick={run} disabled={pending}>
-      {pending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
+    <Button
+      size="small"
+      onClick={run}
+      disabled={pending}
+      loading={pending}
+      leadingVisual={pending ? undefined : icon}
+    >
       {label}
     </Button>
   );
@@ -214,7 +253,7 @@ function DeclarationUploadButton({
         ref={input}
         type="file"
         accept=".json,application/json"
-        className="sr-only"
+        className="bl-visually-hidden"
         tabIndex={-1}
         aria-hidden
         onChange={(e) => {
@@ -223,15 +262,21 @@ function DeclarationUploadButton({
           if (f) void send(f);
         }}
       />
-      <Button variant="outline" size="sm" onClick={() => input.current?.click()} disabled={pending}>
-        {pending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
+      <Button
+        size="small"
+        onClick={() => input.current?.click()}
+        disabled={pending}
+        loading={pending}
+        leadingVisual={pending ? undefined : UploadIcon}
+      >
         {t("result.declarationUpload")}
       </Button>
     </>
   );
 }
 
-function ArtifactCard({
+/** One artifact as a row (name, description, one download per format, view, copy link), like the asset list of a release. */
+function ArtifactRow({
   artifact,
   scanId,
   onView,
@@ -259,129 +304,96 @@ function ArtifactCard({
 }) {
   const { t } = useTranslation();
   const { toast } = useToast();
-  const { Icon, primary, formats, signature } = artifact;
+  const { formats, signature } = artifact;
+  const Icon = ICON[artifact.key] ?? FileIcon;
+  const title = t(artifact.titleKey);
   // Rebuilding changes the document only when it is behind the saved
   // declaration or this BomLens; otherwise the button would do nothing new.
   const behind = artifact.key === "spdx3" && spdx3?.upToDate === false;
   const view = preferredView(formats);
+  const onDownload = () => toast(t("result.downloadStarted"));
 
   const copyLink = async () => {
     try {
       await navigator.clipboard.writeText(absoluteFileUrl(scanId, formats[0].name));
       toast(t("result.copied"));
     } catch {
-      /* clipboard blocked (insecure context) — silently ignore */
+      /* clipboard blocked (insecure context): nothing to say */
     }
   };
 
   return (
-    <div
-      className={
-        "rounded-lg border bg-card p-4 transition-all duration-fast ease-out-soft hover:bg-accent/40 hover:shadow-md" +
-        // The featured card stands out by its place (first, full width), its
-        // larger icon and title, and a resting elevation (a light wash in dark,
-        // where a shadow does not show). A dark border read as a selected or
-        // focused card.
-        (primary ? " shadow-sm lg:col-span-2 dark:bg-muted/50" : "")
-      }
-    >
-      <div className="flex items-start gap-3">
-        <div
-          className={
-            "flex shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground" +
-            (primary ? " h-11 w-11" : " h-9 w-9")
-          }
-        >
-          <Icon className={primary ? "h-5 w-5" : "h-4 w-4"} />
+    <li className="bl-art-row" data-testid={`artifact-${artifact.key}`}>
+      <span className="bl-art-icon bl-muted">
+        <Icon size={16} />
+      </span>
+      <div className="bl-art-main">
+        <div className="bl-art-title">
+          <h2>{title}</h2>
+          <span className="bl-mono bl-muted bl-breakall">{baseName(formats)}</span>
+          {signature && (
+            <Label variant="success">
+              <VerifiedIcon size={12} />
+              <span className="bl-label-text">{t("result.signed")}</span>
+            </Label>
+          )}
+          {artifact.key === "spdx3" && spdx3 && (
+            <Label variant={spdx3.draft ? "attention" : "success"}>
+              {spdx3.draft ? t("spdx3.draft") : t("spdx3.complete")}
+            </Label>
+          )}
         </div>
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className={primary ? "font-semibold" : "text-body-sm font-medium"}>
-              {t(artifact.titleKey)}
-            </span>
-            {signature && (
-              <Badge tone="success" className="gap-1">
-                <FileSignature className="h-3 w-3" />
-                {t("result.signed")}
-              </Badge>
-            )}
-            {artifact.key === "spdx3" && spdx3 && (
-              <Badge tone={spdx3.draft ? "warning" : "success"}>
-                {spdx3.draft ? t("spdx3.draft") : t("spdx3.complete")}
-              </Badge>
-            )}
-          </div>
-          <p className="mt-0.5 text-body-sm text-muted-foreground">
-            {t(artifact.descKey)}
-            {artifact.key === "spdx3" && spdx3?.draft && (
-              <> {t("result.kind.spdx3.draftNote", { count: spdx3.counts.missingRequired ?? 0 })}</>
-            )}
-            {artifact.key === "spdx3" && uploadedSbom && <> {t("result.kind.spdx3.uploadNote")}</>}
-            {behind && <> {t("result.kind.spdx3.behindNote")}</>}
-          </p>
-          <span className="mt-1 block truncate font-mono text-label text-muted-foreground">
-            {baseName(formats)}
-          </span>
+        <p className="bl-art-desc">
+          {t(artifact.descKey)}
+          {artifact.key === "spdx3" && spdx3?.draft && (
+            <> {t("result.kind.spdx3.draftNote", { count: spdx3.counts.missingRequired ?? 0 })}</>
+          )}
+          {artifact.key === "spdx3" && uploadedSbom && <> {t("result.kind.spdx3.uploadNote")}</>}
+          {behind && <> {t("result.kind.spdx3.behindNote")}</>}
+        </p>
+        <div className="bl-art-chips">
+          {formats.map((fmt) => (
+            <DownloadChip key={fmt.name} fmt={fmt} scanId={scanId} onDownload={onDownload} />
+          ))}
+          {signature && (
+            <DownloadChip
+              fmt={{ ext: "sig", name: signature.name, size: signature.size, viewable: false }}
+              scanId={scanId}
+              onDownload={onDownload}
+            />
+          )}
+          {artifact.spdxExportable && spdxAvailable && (
+            <SpdxExportButton scanId={scanId} onExported={onExported} />
+          )}
+          {spdx3Available && behind && (
+            <Spdx3ExportButton scanId={scanId} onPatch={onPatch} label={t("result.spdx3Rebuild")} icon={SyncIcon} />
+          )}
+          {/* An AI scan from before the document existed: write it from here. */}
+          {spdx3Available && artifact.key === "sbom" && aiScan && !spdx3 && (
+            <Spdx3ExportButton scanId={scanId} onPatch={onPatch} label={t("spdx3.band.write")} icon={PencilIcon} />
+          )}
+          {spdx3Available && artifact.key === "aiDeclaration" && (
+            <DeclarationUploadButton scanId={scanId} onPatch={onPatch} />
+          )}
         </div>
       </div>
-
-      {/* Downloads on one row, the two per-card actions on their own. In a
-          two-column grid the spacer between them pushed View and Copy link onto
-          a ragged second line whenever a card carried three format chips. */}
-      <div className="mt-3 flex flex-wrap items-center gap-2">
-        {formats.map((fmt) => (
-          <DownloadChip
-            key={fmt.name}
-            fmt={fmt}
-            scanId={scanId}
-            onDownload={() => toast(t("result.downloadStarted"))}
-          />
-        ))}
-        {signature && (
-          <DownloadChip
-            fmt={{
-              ext: "sig",
-              name: signature.name,
-              size: signature.size,
-              viewable: false,
-            }}
-            scanId={scanId}
-            onDownload={() => toast(t("result.downloadStarted"))}
-          />
-        )}
-        {artifact.spdxExportable && spdxAvailable && (
-          <SpdxExportButton scanId={scanId} onExported={onExported} />
-        )}
-        {spdx3Available && behind && (
-          <Spdx3ExportButton scanId={scanId} onPatch={onPatch} label={t("result.spdx3Rebuild")} />
-        )}
-        {/* An AI scan from before the document existed: write it from here. */}
-        {spdx3Available && artifact.key === "sbom" && aiScan && !spdx3 && (
-          <Spdx3ExportButton scanId={scanId} onPatch={onPatch} label={t("spdx3.band.write")} />
-        )}
-        {spdx3Available && artifact.key === "aiDeclaration" && (
-          <DeclarationUploadButton scanId={scanId} onPatch={onPatch} />
-        )}
-      </div>
-
-      <div className="mt-2 flex items-center justify-end gap-1 border-t pt-2">
+      <div className="bl-art-actions">
         {view && (
-          <Button variant="ghost" size="sm" onClick={() => onView(view)}>
-            <Eye className="h-4 w-4" />
-            <span className="hidden sm:inline">{t("result.view")}</span>
+          <Button size="small" variant="invisible" leadingVisual={EyeIcon} onClick={() => onView(view.name)}>
+            {t("result.viewFormat", {
+              format: view.ext === "template" ? t("result.formatTemplate") : formatLabel(view.ext),
+            })}
           </Button>
         )}
-        <Button
-          variant="ghost"
-          size="sm"
+        <IconButton
+          size="small"
+          variant="invisible"
+          icon={LinkIcon}
+          aria-label={t("result.copyLinkOf", { name: title })}
           onClick={copyLink}
-          aria-label={t("result.copyLink")}
-        >
-          <Link2 className="h-4 w-4" />
-          <span className="hidden sm:inline">{t("result.copyLink")}</span>
-        </Button>
+        />
       </div>
-    </div>
+    </li>
   );
 }
 
@@ -410,7 +422,6 @@ export function ResultsList({
   onResultPatch?: (patch: Partial<DoneEvent>) => void;
 }) {
   const { t } = useTranslation();
-  const { toast } = useToast();
   const [view, setView] = useState<string | null>(null);
   const [spdxAvailable, setSpdxAvailable] = useState(false);
   const [spdx3Available, setSpdx3Available] = useState(false);
@@ -427,47 +438,52 @@ export function ResultsList({
   }, []);
 
   if (results.length === 0) {
-    return <EmptyState icon={FileText}>{t("result.artifactsEmpty")}</EmptyState>;
+    return (
+      <div className="bl-box" data-testid="empty-state">
+        <Blankslate spacious>
+          <Blankslate.Visual>
+            <FileIcon size={24} />
+          </Blankslate.Visual>
+          <Blankslate.Heading as="h2">{t("result.artifactsEmpty")}</Blankslate.Heading>
+        </Blankslate>
+      </div>
+    );
   }
 
   const artifacts = groupArtifacts(results);
   const totalBytes = results.reduce((sum, r) => sum + r.size, 0);
+  // Files that no row offers (the raw EPSS feed, the second signature): they
+  // are only in the ZIP, and the header would otherwise count them unseen.
+  const listed = new Set(
+    artifacts.flatMap((a) => [...a.formats.map((f) => f.name), ...(a.signature ? [a.signature.name] : [])]),
+  );
+  const unlisted = results.filter((r) => !listed.has(r.name)).map((r) => r.name);
 
   return (
-    <div className="space-y-3">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-2 text-body-sm text-muted-foreground">
-          <Package className="h-4 w-4" />
-          {/* Count what is on screen. The header said "10 artifacts" over four
-              cards, because it counted files while the cards group a report's
-              formats together; the file count follows, where it explains the
-              chips rather than contradicting the cards. */}
-          {t("result.artifactCount", {
-            count: artifacts.length,
-            size: formatBytes(totalBytes),
-          })}
-          <span className="text-label">
-            {t("result.artifactFiles", { count: results.length })}
-          </span>
-        </div>
-        <Button
-          asChild
-          variant="outline"
-          onClick={() => toast(t("result.downloadStarted"))}
-        >
-          <a href={downloadAllUrl(scanId)} download>
-            <Download className="h-4 w-4" />
-            {t("result.downloadAll")}
-          </a>
-        </Button>
-      </div>
-
-      {/* Two columns: the cards are short and were stacked one per row, so four
-          of them filled a screen and left the lower half empty. The headline
-          deliverable keeps the full width. */}
-      <div className="grid grid-cols-1 gap-3 lg:grid-cols-2 2xl:grid-cols-3">
+    <div className="bl-stack-8">
+      {/* Count what is on screen. The header said "10 artifacts" over four
+          rows, because it counted files while the rows group a report's
+          formats together; the file count follows, where it explains the
+          chips rather than contradicting the rows. */}
+      <p className="bl-art-summary" data-testid="artifact-summary">
+        {t("result.artifactCount", { count: artifacts.length, size: formatBytes(totalBytes) })}{" "}
+        <span className="bl-small">{t("result.artifactFiles", { count: results.length })}</span>
+      </p>
+      {unlisted.length > 0 && (
+        <details className="bl-art-unlisted bl-small" data-testid="artifact-unlisted">
+          <summary>{t("result.artifactNotListed", { count: unlisted.length })}</summary>
+          <ul>
+            {unlisted.map((n) => (
+              <li key={n} className="bl-mono bl-breakall">
+                {n}
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
+      <ul className="bl-box bl-art-list">
         {artifacts.map((a) => (
-          <ArtifactCard
+          <ArtifactRow
             key={a.key}
             artifact={a}
             scanId={scanId}
@@ -481,9 +497,12 @@ export function ResultsList({
             onPatch={onResultPatch ?? ((p) => p.results && onResultsChange?.(p.results))}
           />
         ))}
-      </div>
-
-      <FileViewer name={view} scanId={scanId} onClose={() => setView(null)} />
+      </ul>
+      <FileViewer
+        key={view ?? "closed"}
+        name={view}
+        scanId={scanId}
+        size={results.find((r) => r.name === view)?.size} onClose={() => setView(null)} />
     </div>
   );
 }

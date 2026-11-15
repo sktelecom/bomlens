@@ -39,7 +39,7 @@ git clone --depth 1 https://github.com/sktelecom/bomlens.git && cd bomlens
 3. 스캔 실행을 누르면 진행 로그가 실시간으로 표시됩니다.
 4. 완료되면 SBOM, 고지문, 오픈소스 위험 보고서, 보안 보고서를 열거나 내려받습니다.
 
-![결과 화면 — 종류별 산출물 카드와 전체 ZIP 다운로드](../images/app-results-ko.png)
+![결과 개요 화면. 먼저 확인할 항목, 심각도 분포, 전체 ZIP 다운로드](../images/app-results-ko.png)
 
 > 펌웨어 업로드 타일은 Docker 엔진이 켜져 있으면 자동으로 나타납니다. 자세한 동작은 [펌웨어 분석 가이드](../guides/firmware.ko.md)를 참고하세요.
 

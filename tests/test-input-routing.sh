@@ -514,6 +514,442 @@ got="$(detect_lang "$LANGDIR/proj")"
 [ "$got" = "dotnet" ] && pass "a root .slnx detects as dotnet" \
     || fail "a root .slnx detects as '$got'"
 
+echo "== a declared Java toolchain picks the cdxgen Java image =="
+# A Gradle toolchain asks for that exact JDK, and each cdxgen Java image has one.
+# The Java 21 image cannot resolve the dependencies of a build that declares
+# Java 25, so the SBOM had none.
+unset CDXGEN_JAVA_IMAGE CDXGEN_IMAGE_PREFIX BOMLENS_INCLUDE_NON_SHIPPED
+# shellcheck source=../docker/lib/source-detect.sh
+. "$ROOT_DIR/docker/lib/source-detect.sh"
+J21="ghcr.io/cdxgen/cdxgen-temurin-java21:$CDXGEN_TAG"
+J24="ghcr.io/cdxgen/cdxgen-temurin-java24:$CDXGEN_TAG"
+J25="ghcr.io/cdxgen/cdxgen-temurin-java25:$CDXGEN_TAG"
+java_case() {  # java_case <want> <description> [CDXGEN_JAVA_IMAGE]
+    local got
+    got="$(CDXGEN_JAVA_IMAGE="${3:-}" img_for_lang java "$LANGDIR/proj")"
+    [ "$got" = "$1" ] && pass "$2" || fail "$2" "got '$got', want '$1'"
+}
+note_case() {  # note_case <description> <note function> <text>...: every text is in the note
+    local desc="$1" fn="$2" got t
+    shift 2
+    got="$("$fn" "$LANGDIR/proj")"
+    for t in "$@"; do
+        case "$got" in *"$t"*) ;; *) fail "$desc" "no '$t' in: $got"; return 0 ;; esac
+    done
+    pass "$desc"
+}
+gradle_tree() {  # gradle_tree <path under proj> <content>
+    rm -rf "${LANGDIR:?}/proj" && mkdir -p "$LANGDIR/proj/$(dirname "$1")"
+    printf 'rootProject.name = "demo"\n' > "$LANGDIR/proj/settings.gradle.kts"
+    printf '%b' "$2" > "$LANGDIR/proj/$1"
+}
+gradle_tree build.gradle.kts 'plugins { java }\njava {\n    toolchain {\n        languageVersion = JavaLanguageVersion.of(25)\n    }\n}\n'
+[ "$(detect_lang "$LANGDIR/proj")" = java ] && pass "the toolchain 25 fixture detects as java" || fail "toolchain fixture is not java"
+java_case "$J25" "Kotlin DSL languageVersion = JavaLanguageVersion.of(25) picks the Java 25 image"
+note_case "the INFO line names the Java 25 toolchain" java_image_note "[INFO] " "Java 25 toolchain"
+[ "$(img_for_lang java)" = "$J21" ] && pass "without a scanned folder, java stays on the Java 21 image" \
+    || fail "img_for_lang java with no folder: $(img_for_lang java)"
+java_case "registry.example/java25:1" "CDXGEN_JAVA_IMAGE wins over the declared toolchain" "registry.example/java25:1"
+java_case "$J25" "a CDXGEN_JAVA_IMAGE that is not an image reference is ignored" 'bad;rm -rf /'
+case "$(CDXGEN_JAVA_IMAGE='bad;x' java_image_note "$LANGDIR/proj")" in
+    *"[WARN] CDXGEN_JAVA_IMAGE is not an image reference"*) pass "an unusable CDXGEN_JAVA_IMAGE is reported" ;;
+    *) fail "an unusable CDXGEN_JAVA_IMAGE is not reported" ;; esac
+[ "$(CDXGEN_IMAGE_PREFIX=registry.example/mirror/cdxgen/ img_for_lang java "$LANGDIR/proj")" = "registry.example/mirror/cdxgen/cdxgen-temurin-java25:$CDXGEN_TAG" ] \
+    && pass "the Java 25 image comes from CDXGEN_IMAGE_PREFIX too" || fail "the Java 25 image ignores CDXGEN_IMAGE_PREFIX"
+[ "$(CDXGEN_IMAGE_PREFIX=registry.example/mirror/cdxgen/ CDXGEN_JAVA_IMAGE="$J24" img_for_lang java "$LANGDIR/proj")" = "registry.example/mirror/cdxgen/cdxgen-temurin-java24:$CDXGEN_TAG" ] \
+    && pass "a ghcr.io/cdxgen/ CDXGEN_JAVA_IMAGE comes from CDXGEN_IMAGE_PREFIX" \
+    || fail "CDXGEN_JAVA_IMAGE ignores CDXGEN_IMAGE_PREFIX: $(CDXGEN_IMAGE_PREFIX=registry.example/mirror/cdxgen/ CDXGEN_JAVA_IMAGE="$J24" img_for_lang java "$LANGDIR/proj")"
+
+gradle_tree build.gradle.kts 'plugins { java }\njava { toolchain { languageVersion = JavaLanguageVersion.of(21) } }\n'
+java_case "$J21" "a Java 21 toolchain stays on the Java 21 image"
+[ -z "$(java_image_note "$LANGDIR/proj")" ] && pass "a Java 21 toolchain prints no note" || fail "a Java 21 toolchain prints a note"
+gradle_tree build.gradle.kts 'plugins { java }\ndependencies { implementation("a:b:1") }\n'
+java_case "$J21" "a build with no toolchain stays on the Java 21 image"
+[ -z "$(java_image_note "$LANGDIR/proj")" ] && pass "no toolchain prints no note" || fail "no toolchain prints a note"
+gradle_tree build.gradle.kts 'java { toolchain { languageVersion = JavaLanguageVersion.of(24) } }\n'
+java_case "$J24" "a Java 24 toolchain picks the Java 24 image"
+gradle_tree build.gradle 'java {\n  toolchain {\n    languageVersion.set(JavaLanguageVersion.of("25"))\n  }\n}\n'
+java_case "$J25" "Groovy DSL languageVersion.set(JavaLanguageVersion.of(\"25\")) picks the Java 25 image"
+gradle_tree build.gradle.kts 'kotlin {\n    jvmToolchain(25)\n}\n'
+java_case "$J25" "Kotlin jvmToolchain(25) picks the Java 25 image"
+gradle_tree buildSrc/src/main/kotlin/java-conventions.gradle.kts 'java { toolchain { languageVersion.set(JavaLanguageVersion.of(25)) } }\n'
+java_case "$J25" "a buildSrc convention plugin's toolchain picks the Java 25 image"
+gradle_tree build.gradle.kts 'java {\n    // languageVersion = JavaLanguageVersion.of(25)\n    toolchain { languageVersion = JavaLanguageVersion.of(21) }\n}\n'
+java_case "$J21" "a commented-out toolchain line is not read"
+gradle_tree build.gradle.kts 'java { toolchain { languageVersion = JavaLanguageVersion.of(21) } } // JavaLanguageVersion.of(25)\n'
+java_case "$J21" "a comment at the end of a line is not read"
+gradle_tree build.gradle.kts 'java {\n    /* old:\n       languageVersion = JavaLanguageVersion.of(25)\n    */ toolchain { languageVersion = JavaLanguageVersion.of(21) }\n    /* jvmToolchain(24) */\n}\n'
+java_case "$J21" "a /* */ block comment, one line or several, is not read"
+gradle_tree build.gradle.kts '/* not closed in this file\n'
+printf 'kotlin { jvmToolchain(25) }\n' > "$LANGDIR/proj/settings.gradle.kts"
+java_case "$J25" "an unclosed block comment does not hide the next file"
+python3 -c "import sys; open(sys.argv[1], 'w').write('/*' * 200000)" "$LANGDIR/proj/build.gradle.kts"
+t0=$(date +%s); java_case "$J25" "a 400 KB line of comment openers is skipped, not read as a block"
+[ $(( $(date +%s) - t0 )) -lt 5 ] && pass "that line is read in under 5 seconds" || fail "a 400 KB comment line took $(( $(date +%s) - t0 ))s"
+gradle_tree examples/demo/build.gradle.kts 'kotlin { jvmToolchain(25) }\n'
+java_case "$J21" "a toolchain under examples/ (not shipped) is not read"
+[ "$(BOMLENS_INCLUDE_NON_SHIPPED=1 img_for_lang java "$LANGDIR/proj")" = "$J25" ] \
+    && pass "BOMLENS_INCLUDE_NON_SHIPPED=1 reads the toolchain under examples/ too" \
+    || fail "BOMLENS_INCLUDE_NON_SHIPPED=1 does not read examples/"
+gradle_tree app/build.gradle.kts 'kotlin { jvmToolchain(21) }\n'
+printf 'kotlin { jvmToolchain(25) }\n' > "$LANGDIR/proj/build.gradle.kts"
+java_case "$J25" "the highest toolchain across modules decides"
+
+# The older JDKs have images too; the Java 11 and 17 ones are not named temurin.
+for v in 8:cdxgen-temurin-java8 11:cdxgen-java11 17:cdxgen-java17; do
+    gradle_tree build.gradle.kts "kotlin { jvmToolchain(${v%%:*}) }\n"
+    java_case "ghcr.io/cdxgen/${v#*:}:$CDXGEN_TAG" "a Java ${v%%:*} toolchain picks ${v#*:}"
+done
+[ "$(CDXGEN_IMAGE_PREFIX=registry.example/mirror/cdxgen/ img_for_lang java "$LANGDIR/proj")" = "registry.example/mirror/cdxgen/cdxgen-java17:$CDXGEN_TAG" ] \
+    && pass "cdxgen-java17 comes from CDXGEN_IMAGE_PREFIX too" || fail "cdxgen-java17 ignores CDXGEN_IMAGE_PREFIX"
+[ "$(CDXGEN_IMAGE_PREFIX=registry.example/mirror/cdxgen/ CDXGEN_JAVA_IMAGE="ghcr.io/cdxgen/cdxgen-java11:$CDXGEN_TAG" img_for_lang java "$LANGDIR/proj")" = "registry.example/mirror/cdxgen/cdxgen-java11:$CDXGEN_TAG" ] \
+    && pass "a ghcr.io/cdxgen/cdxgen-java11 CDXGEN_JAVA_IMAGE comes from CDXGEN_IMAGE_PREFIX" \
+    || fail "CDXGEN_JAVA_IMAGE=cdxgen-java11 ignores CDXGEN_IMAGE_PREFIX"
+
+# No image has these JDKs: the Java 21 image, with a warning.
+for v in 22 23 26; do
+    gradle_tree build.gradle.kts "kotlin { jvmToolchain($v) }\n"
+    java_case "$J21" "a Java $v toolchain (no image has it) stays on the Java 21 image"
+    note_case "a Java $v toolchain warns and points at CDXGEN_JAVA_IMAGE" java_image_note \
+        "[WARN] The Gradle build declares a Java $v toolchain, and the cdxgen Java image has Java 21" \
+        "auto-provisioning" "CDXGEN_JAVA_IMAGE"
+done
+gradle_tree build.gradle.kts 'kotlin { jvmToolchain(99999999999999999999) }\n'
+java_case "$J21" "an overlong version number is ignored"
+gradle_tree build.gradle.kts 'kotlin { jvmToolchain(025) }\n'
+java_case "$J25" "a leading zero still reads as the version"
+
+echo "== a Java toolchain taken from a variable is read from its definition =="
+# Builds that let CI override the Java version pass a variable with a default;
+# the Java 21 image was used for them and Gradle failed without a Java 25 JDK.
+J17="ghcr.io/cdxgen/cdxgen-java17:$CDXGEN_TAG"
+gradle_tree build.gradle "plugins { id 'java' }\ndef javaVersionProp = project.hasProperty('javaVer') ? project.getProperty('javaVer') : '25'\njava {\n    toolchain {\n        languageVersion = JavaLanguageVersion.of(javaVersionProp.toInteger())\n    }\n}\n"
+java_case "$J25" "Groovy: the ternary's default '25' picks the Java 25 image"
+printf 'org.gradle.jvmargs=-Xmx2g\njavaVer=17\n' > "$LANGDIR/proj/gradle.properties"
+java_case "$J17" "Groovy: javaVer=17 in gradle.properties wins over the default"
+gradle_tree build.gradle "def jv = findProperty('jv') ?: '24'\njava.toolchain.languageVersion = JavaLanguageVersion.of(jv)\n"
+java_case "$J24" "Groovy: findProperty('jv') ?: '24' picks the Java 24 image"
+gradle_tree build.gradle "def jv = project.findProperty('jv') ?: 25\njava.toolchain.languageVersion = JavaLanguageVersion.of(jv as int)\n"
+java_case "$J25" "Groovy: project.findProperty(...) ?: 25 with as int"
+gradle_tree build.gradle.kts 'val javaVersion = findProperty("javaVersion")?.toString() ?: "25"\njava { toolchain { languageVersion.set(JavaLanguageVersion.of(javaVersion.toInt())) } }\n'
+java_case "$J25" "Kotlin: findProperty(...)?.toString() ?: \"25\" picks the Java 25 image"
+printf 'javaVersion = 17\n' > "$LANGDIR/proj/gradle.properties"
+java_case "$J17" "Kotlin: javaVersion = 17 in gradle.properties wins over the default"
+gradle_tree build.gradle.kts 'val jdk = providers.gradleProperty("jdk").get()\nkotlin { jvmToolchain(jdk.toInt()) }\n'
+printf 'jdk=25\n' > "$LANGDIR/proj/gradle.properties"
+java_case "$J25" "Kotlin: providers.gradleProperty(\"jdk\") reads jdk=25 from gradle.properties"
+gradle_tree build.gradle.kts 'val jdk = providers.gradleProperty("jdk").getOrElse("24")\nkotlin { jvmToolchain(jdk.toInt()) }\n'
+java_case "$J24" "Kotlin: getOrElse(\"24\") is the default"
+gradle_tree build.gradle.kts 'val jdk: String by project\nkotlin { jvmToolchain(jdk.toInt()) }\n'
+printf 'jdk=25\n' > "$LANGDIR/proj/gradle.properties"
+java_case "$J25" "Kotlin: val jdk: String by project reads jdk=25 from gradle.properties"
+gradle_tree app/build.gradle "def v = findProperty('v') ?: '11'\njava.toolchain.languageVersion = JavaLanguageVersion.of(v)\n"
+printf 'v=25\n' > "$LANGDIR/proj/gradle.properties"
+java_case "$J25" "a module's property is read from the root gradle.properties"
+gradle_tree build.gradle.kts 'val jdk = 25\nkotlin { jvmToolchain(jdk) }\n'
+java_case "$J25" "a variable set to a number is read"
+gradle_tree build.gradle.kts 'val jdk = System.getenv("JDK") ?: "25"\nkotlin { jvmToolchain(jdk.toInt()) }\n'
+java_case "$J25" "an environment variable's default is read"
+gradle_tree build.gradle.kts 'val jdk = System.getenv("JDK")\nkotlin { jvmToolchain(jdk.toInt()) }\n'
+java_case "$J21" "an environment variable with no default is not read"
+gradle_tree build.gradle.kts 'val jdk = System.getProperty("jdk") ?: "x"\nkotlin { jvmToolchain(jdk.toInt()) }\n'
+printf 'jdk=25\n' > "$LANGDIR/proj/gradle.properties"
+java_case "$J21" "System.getProperty is not a Gradle property"
+gradle_tree build.gradle.kts '// val jdk = 25\nkotlin { jvmToolchain(jdk) }\n'
+java_case "$J21" "a commented-out definition is not read"
+gradle_tree build.gradle.kts 'val jdk = 99999\nkotlin { jvmToolchain(jdk) }\n'
+java_case "$J21" "an overlong default is ignored"
+gradle_tree build.gradle.kts 'val jdk = libs.versions.java.get()\nkotlin { jvmToolchain(jdk.toInt()) }\n'
+java_case "$J21" "a version catalog value is not read"
+gradle_tree build.gradle.kts 'kotlin { jvmToolchain(jdk.toInt()) }\n'
+printf 'val jdk = 25\n' > "$LANGDIR/proj/other.gradle.kts"
+java_case "$J21" "a variable of another file is not read"
+gradle_tree build.gradle.kts 'val jdk = providers.gradleProperty("jdk").get()\nkotlin { jvmToolchain(jdk.toInt()) }\n'
+python3 -c "import sys; open(sys.argv[1], 'w').write('jdk=' + '2' * 5000 + '\njdk=25\n')" "$LANGDIR/proj/gradle.properties"
+java_case "$J25" "a gradle.properties line over 4096 characters is skipped"
+printf 'jdk=17\njdk=25\n' > "$LANGDIR/proj/gradle.properties"
+java_case "$J25" "the last value of a key in gradle.properties counts, as in Gradle"
+# Only regular files are read: a committed symlink to /dev/zero or a FIFO
+# named gradle.properties would otherwise hang the scan.
+gradle_tree app/build.gradle "def v = findProperty('v') ?: '24'\njava.toolchain.languageVersion = JavaLanguageVersion.of(v)\n"
+ln -s /dev/zero "$LANGDIR/proj/gradle.properties"
+mkfifo "$LANGDIR/proj/app/gradle.properties" 2>/dev/null || true
+t0=$(date +%s); java_case "$J24" "a gradle.properties that is a symlink to /dev/zero or a FIFO is not read"
+[ $(( $(date +%s) - t0 )) -lt 5 ] && pass "that tree is read in under 5 seconds" || fail "a /dev/zero or FIFO gradle.properties took $(( $(date +%s) - t0 ))s"
+gradle_tree build.gradle "java { def w = '11' }\ndef w = '24'\nkotlin { jvmToolchain(w) }\n"
+java_case "$J24" "a definition outside any block wins over an earlier one inside a block"
+
+echo "== the Gradle wrapper's version limits the cdxgen Java image =="
+# A wrapper runs only on the JDKs its Gradle supports: a 6.9.4 wrapper fails
+# on Java 21 ("Unsupported class file major version 65") and the SBOM had none.
+J8="ghcr.io/cdxgen/cdxgen-temurin-java8:$CDXGEN_TAG"
+J11="ghcr.io/cdxgen/cdxgen-java11:$CDXGEN_TAG"
+J17="ghcr.io/cdxgen/cdxgen-java17:$CDXGEN_TAG"
+wrapper_at() {  # wrapper_at <folder under proj, or .> <distribution file> [no-gradlew]
+    mkdir -p "$LANGDIR/proj/$1/gradle/wrapper"
+    printf 'distributionBase=GRADLE_USER_HOME\ndistributionUrl=https\\://services.gradle.org/distributions/%s\n' "$2" \
+        > "$LANGDIR/proj/$1/gradle/wrapper/gradle-wrapper.properties"
+    [ -n "${3:-}" ] || printf '#!/bin/sh\n' > "$LANGDIR/proj/$1/gradlew"
+}
+wrapper_case() {  # wrapper_case <distribution file> <want> <description>
+    gradle_tree build.gradle "plugins { id 'java' }\n"
+    wrapper_at . "$1"
+    java_case "$2" "$3"
+}
+wrapper_case gradle-4.10.3-bin.zip "$J8" "a Gradle 4.10.3 wrapper picks the Java 8 image"
+wrapper_case gradle-5.6.4-all.zip "$J11" "a Gradle 5.6.4 wrapper picks the Java 11 image"
+wrapper_case gradle-6.9.4-bin.zip "$J11" "a Gradle 6.9.4 wrapper picks the Java 11 image"
+note_case "a Gradle 6.9.4 wrapper says why" java_image_note "[INFO] The Gradle wrapper (Gradle 6.9.4) cannot run on Java 21; using the cdxgen Java 11 image."
+wrapper_case gradle-7.2-bin.zip "$J11" "a Gradle 7.2 wrapper picks the Java 11 image"
+wrapper_case gradle-7.3-bin.zip "$J17" "a Gradle 7.3 wrapper picks the Java 17 image"
+wrapper_case gradle-7.5.1-bin.zip "$J17" "a Gradle 7.5.1 wrapper picks the Java 17 image"
+wrapper_case gradle-8.4-bin.zip "$J17" "a Gradle 8.4 wrapper picks the Java 17 image"
+wrapper_case gradle-8.5-bin.zip "$J21" "a Gradle 8.5 wrapper stays on the Java 21 image"
+[ -z "$(java_image_note "$LANGDIR/proj")" ] && pass "a Gradle 8.5 wrapper prints no note" || fail "a Gradle 8.5 wrapper prints a note"
+wrapper_case gradle-9.6.0-bin.zip "$J21" "a Gradle 9.6.0 wrapper stays on the Java 21 image"
+wrapper_case gradle-8.0-milestone-1-bin.zip "$J17" "a milestone wrapper counts as its release"
+wrapper_case gradle-9.0-rc-1-all.zip "$J21" "a release candidate wrapper counts as its release"
+gradle_tree build.gradle "plugins { id 'java' }\n"
+wrapper_at . gradle-6.9.4-bin.zip no-gradlew
+java_case "$J21" "a wrapper with no gradlew beside it is not used (the image's Gradle runs)"
+
+# Toolchain and wrapper together.
+gradle_tree build.gradle.kts 'kotlin { jvmToolchain(17) }\n'
+wrapper_at . gradle-7.6.4-bin.zip
+java_case "$J17" "a Java 17 toolchain with a Gradle 7.6.4 wrapper picks the Java 17 image"
+gradle_tree build.gradle.kts 'kotlin { jvmToolchain(25) }\n'
+wrapper_at . gradle-9.1.0-bin.zip
+java_case "$J25" "a Java 25 toolchain with a Gradle 9.1.0 wrapper picks the Java 25 image"
+gradle_tree build.gradle.kts 'kotlin { jvmToolchain(25) }\n'
+wrapper_at . gradle-8.14.3-bin.zip
+java_case "$J21" "a Java 25 toolchain with a Gradle 8.14.3 wrapper (no Java 25) stays on the Java 21 image"
+note_case "that conflict warns with both versions and CDXGEN_JAVA_IMAGE" java_image_note \
+    "[WARN] The Gradle build declares a Java 25 toolchain, but its wrapper (Gradle 8.14.3) cannot run on Java 25" \
+    "auto-provisioning" "CDXGEN_JAVA_IMAGE"
+gradle_tree build.gradle.kts 'kotlin { jvmToolchain(21) }\n'
+wrapper_at . gradle-6.9.4-bin.zip
+java_case "$J11" "a Java 21 toolchain with a Gradle 6.9.4 wrapper picks the Java 11 image the wrapper runs on"
+note_case "that conflict warns and says why the image is not Java 21" java_image_note \
+    "[WARN] The Gradle build declares a Java 21 toolchain, but its wrapper (Gradle 6.9.4) cannot run on Java 21" \
+    "[INFO] The Gradle wrapper (Gradle 6.9.4)"
+gradle_tree build.gradle.kts 'kotlin { jvmToolchain(8) }\n'
+wrapper_at . gradle-9.6.0-bin.zip
+java_case "$J21" "a Java 8 toolchain with a Gradle 9 wrapper (needs Java 17 or later) stays on the Java 21 image"
+
+# How the wrapper version is read: the file name at the end of distributionUrl.
+gradle_tree build.gradle "plugins { id 'java' }\n"
+wrapper_at . gradle-6.9.4-bin.zip
+printf 'distributionUrl=https\\://repo.example/gradle-8.5/dist/gradle-6.9.4-bin.zip\n' > "$LANGDIR/proj/gradle/wrapper/gradle-wrapper.properties"
+java_case "$J11" "a gradle-8.5 folder in the URL does not hide the gradle-6.9.4-bin.zip file name"
+printf 'distributionUrl https\\://services.gradle.org/distributions/gradle-6.9.4-bin.zip\n' > "$LANGDIR/proj/gradle/wrapper/gradle-wrapper.properties"
+java_case "$J11" "a space between the key and the value is read like ="
+printf 'distributionUrl=https\\://services.gradle.org/distributions-snapshots/gradle-8.6-20231215224233+0000-bin.zip\n' > "$LANGDIR/proj/gradle/wrapper/gradle-wrapper.properties"
+java_case "$J21" "a snapshot distribution counts as its release"
+printf 'distributionUrl=https\\://repo.example/tools/our-gradle-6.9.4.zip\n' > "$LANGDIR/proj/gradle/wrapper/gradle-wrapper.properties"
+java_case "$J21" "a custom distribution file name is not read as a version"
+note_case "an unreadable wrapper version is reported" java_image_note \
+    "[INFO] The Gradle wrapper version could not be read from gradle/wrapper/gradle-wrapper.properties"
+
+# Which wrappers run. With gradlew at the root only its wrapper runs, even when
+# its version cannot be read; with a Gradle file at the root and no gradlew
+# the image's Gradle runs there and no nested wrapper does.
+gradle_tree build.gradle "plugins { id 'java' }\n"
+wrapper_at . our-gradle.zip
+gradle_tree_add() { mkdir -p "$LANGDIR/proj/$1"; printf "plugins { id 'java' }\n" > "$LANGDIR/proj/$1/build.gradle"; }
+gradle_tree_add legacy; wrapper_at legacy gradle-4.10.3-bin.zip
+java_case "$J21" "a root gradlew with an unreadable version does not fall through to a nested old wrapper"
+note_case "and the unreadable root version is reported" java_image_note "[INFO] The Gradle wrapper version could not be read"
+gradle_tree build.gradle "plugins { id 'java' }\n"
+gradle_tree_add legacy; wrapper_at legacy gradle-4.10.3-bin.zip
+java_case "$J21" "a root build file with no gradlew ignores a nested old wrapper"
+
+# A root with no Gradle file: the builds below it, each with its own wrapper.
+nested_root() { rm -rf "${LANGDIR:?}/proj" && mkdir -p "$LANGDIR/proj"; }
+nested_root
+gradle_tree_add a; wrapper_at a gradle-8.4-bin.zip
+gradle_tree_add b; wrapper_at b gradle-6.9.4-bin.zip
+java_case "$J11" "nested wrappers 8.4 and 6.9.4 share Java 11 and 8, and get Java 11"
+nested_root
+gradle_tree_add a; wrapper_at a gradle-9.6.0-bin.zip
+gradle_tree_add b; wrapper_at b gradle-6.9.4-bin.zip
+java_case "$J11" "nested wrappers with no common JDK are chosen for the lowest one"
+note_case "and warn with both versions and CDXGEN_JAVA_IMAGE" java_image_note \
+    "[WARN] No cdxgen Java image runs every Gradle wrapper in this tree (Gradle 9.6.0, 6.9.4)" "CDXGEN_JAVA_IMAGE"
+nested_root
+gradle_tree_add a; wrapper_at a gradle-8.14.3-bin.zip
+mkdir -p "$LANGDIR/proj/b/gradle/wrapper"; wrapper_at b gradle-4.10.3-bin.zip
+java_case "$J21" "a nested gradlew with no settings or build file beside it is not a build"
+nested_root
+for skip in buildSrc build-logic .hidden examples/demo; do
+    gradle_tree_add "$skip"; wrapper_at "$skip" gradle-4.10.3-bin.zip
+done
+gradle_tree_add app; wrapper_at app gradle-8.14.3-bin.zip
+java_case "$J21" "wrappers under buildSrc, build-logic, dot folders and examples/ are not read"
+nested_root
+gradle_tree_add app; wrapper_at app gradle-8.14.3-bin.zip
+printf 'includeBuild("tools")\n' > "$LANGDIR/proj/app/settings.gradle"
+gradle_tree_add app/tools; wrapper_at app/tools gradle-4.10.3-bin.zip
+java_case "$J21" "a build named in another's includeBuild(...) is not read on its own"
+nested_root
+gradle_tree_add a/b/c/d/e; wrapper_at a/b/c/d/e gradle-6.9.4-bin.zip
+java_case "$J11" "a build five folders down is read"
+nested_root
+gradle_tree_add a/b/c/d/e/f; wrapper_at a/b/c/d/e/f gradle-6.9.4-bin.zip
+java_case "$J21" "a build six folders down is not read"
+
+echo "== a Gradle toolchain failure in stage 1 picks the image to run again in =="
+# build-prep.sh writes java-toolchain-missing=N when Gradle could not find a
+# Java N toolchain; java_retry_image turns that into the image to rerun in.
+RLOG="$LANGDIR/stage1.log"
+retry_case() {  # retry_case <want image or ""> <description> <image used> [CDXGEN_JAVA_IMAGE]
+    JAVA_RETRY_IMAGE="unset"
+    CDXGEN_JAVA_IMAGE="${4:-}" java_retry_image "$LANGDIR/proj" "$RLOG" "$3"
+    [ "$JAVA_RETRY_IMAGE" = "$1" ] && pass "$2" || fail "$2" "got '$JAVA_RETRY_IMAGE', want '$1'"
+}
+gradle_tree build.gradle "plugins { id 'java' }\n"
+printf '[build-prep] gradle-dependencies: failed (rc=1)\n[build-prep]   > Cannot find a Java installation on your machine (Linux 6.10 aarch64) matching: {languageVersion=25, vendor=any vendor}.\n[build-prep] gradle-dependencies: Gradle asked for a Java 25 toolchain, which this image does not have (java-toolchain-missing=25)\n' > "$RLOG"
+retry_case "$J25" "Java 25 asked for in the Java 21 image: rerun in the Java 25 image" "$J21"
+[ "$JAVA_RETRY_JDK" = 25 ] && pass "JAVA_RETRY_JDK names the JDK" || fail "JAVA_RETRY_JDK is '$JAVA_RETRY_JDK'"
+retry_case "" "no rerun in the image that already has that JDK" "$J25"
+retry_case "" "no rerun when CDXGEN_JAVA_IMAGE names the image" "registry.example/j:1" "registry.example/j:1"
+[ "$(CDXGEN_IMAGE_PREFIX=registry.example/mirror/cdxgen/ bash -c '. "$1"; java_retry_image "$2" "$3" x; echo "$JAVA_RETRY_IMAGE"' _ "$ROOT_DIR/docker/lib/source-detect.sh" "$LANGDIR/proj" "$RLOG")" \
+    = "registry.example/mirror/cdxgen/cdxgen-temurin-java25:$CDXGEN_TAG" ] \
+    && pass "the rerun image comes from CDXGEN_IMAGE_PREFIX" || fail "the rerun image ignores CDXGEN_IMAGE_PREFIX"
+wrapper_at . gradle-8.14.3-bin.zip
+retry_case "" "no rerun when the Gradle wrapper cannot run on that JDK" "$J21"
+rm -rf "${LANGDIR:?}/proj/gradlew" "${LANGDIR:?}/proj/gradle"
+printf '[build-prep] gradle-dependencies: Gradle asked for a Java 23 toolchain, which this image does not have (java-toolchain-missing=23)\n' > "$RLOG"
+retry_case "" "no rerun for a JDK no image has" "$J21"
+printf 'some task printed (java-toolchain-missing=25)\n' > "$RLOG"
+retry_case "" "the marker counts only on a build-prep line" "$J21"
+: > "$RLOG"
+retry_case "" "no marker, no rerun" "$J21"
+retry_case "" "no log, no rerun" "$J21"
+rm -f "$RLOG"
+# The marker itself: build-prep.sh reads Gradle's own messages, old and new.
+gradle_marker() {  # gradle_marker <stderr text>: what prep_step prints for it
+    local d; d=$(mktemp -d)
+    printf '%b' "$1" > "$d/err"
+    sed -n '/^prep_step() {$/,/^}$/p' "$ROOT_DIR/docker/lib/build-prep.sh" > "$d/fn.sh"
+    sh -c '. "$1/fn.sh"; PREP_APPLIED=""; PREP_FAILED=""; run_supervised_timeout() { shift; cat "$2" >&2; return 1; }; prep_step gradle-dependencies 9 x "$1/err"' _ "$d" 2>&1 \
+        | grep -o 'java-toolchain-missing=[0-9]*'
+    rm -rf "$d"
+}
+[ "$(gradle_marker '* What went wrong:\nCannot find a Java installation on your machine (Linux 6.10 aarch64) matching: {languageVersion=25, vendor=any vendor, implementation=vendor-specific}.\n')" = java-toolchain-missing=25 ] \
+    && pass "build-prep.sh marks Gradle 8/9's missing toolchain" || fail "no marker for Gradle 8/9's message"
+[ "$(gradle_marker 'No matching toolchains found for requested specification: {languageVersion=17, vendor=any, implementation=vendor-specific}.\n')" = java-toolchain-missing=17 ] \
+    && pass "build-prep.sh marks Gradle 7's missing toolchain" || fail "no marker for Gradle 7's message"
+[ -z "$(gradle_marker 'Could not resolve com.example:a:1.\n')" ] \
+    && pass "another Gradle failure gets no marker" || fail "another Gradle failure got a marker"
+
+# A mixed tree runs in the all-in-one image; only a warning for the toolchain.
+gradle_tree build.gradle.kts 'kotlin { jvmToolchain(25) }\n'
+: > "$LANGDIR/proj/requirements.txt"
+[ "$(detect_lang "$LANGDIR/proj")" = mixed ] && pass "the Gradle and Python fixture detects as mixed" || fail "mixed fixture is not mixed"
+note_case "a mixed tree with a Java 25 toolchain warns and points at CDXGEN_JAVA_IMAGE" java_mixed_note \
+    "[WARN] The Gradle build declares a Java 25 toolchain" "all-in-one" "CDXGEN_JAVA_IMAGE"
+gradle_tree build.gradle.kts 'kotlin { jvmToolchain(21) }\n'
+[ -z "$(java_mixed_note "$LANGDIR/proj")" ] && pass "a mixed tree with a Java 21 toolchain prints no warning" \
+    || fail "a mixed tree with a Java 21 toolchain warns"
+
+echo "== the web UI's cdxgen sibling reruns once in the Java image Gradle asks for =="
+# generate_sbom_cdxgen (entrypoint.sh) against a stub docker: the stage 1
+# sibling, its name and cidfile, the SBOM it writes and the marker it prints.
+EPD="$(mktemp -d)"; mkdir -p "$EPD/bin" "$EPD/out" "$EPD/src"
+awk '/^self_container_id\(\) \{$/ { on = 1 } on { print } on && /^generate_sbom_cdxgen\(\) \{$/ { g = 1 } g && /^}$/ { exit }' \
+    "$ROOT_DIR/docker/entrypoint.sh" | sed 's#/proc/self/mountinfo#"$EP_MOUNTINFO"#' > "$EPD/fn.sh"
+cat > "$EPD/bin/docker" <<'STUB'
+#!/bin/bash
+d="$EP_DIR"; echo "docker $*" >> "$d/log"
+case "$1" in
+  run)
+    name=""; cidf=""; img=""; prev=""
+    for a in "$@"; do
+      case "$prev" in --name) name="$a" ;; --cidfile) cidf="$a" ;; --entrypoint) img="next" ;; *) [ "$img" = next ] && img="$a" ;; esac
+      prev="$a"
+    done
+    if grep -qxF "$name" "$d/names" 2>/dev/null; then echo "Conflict. The container name \"/$name\" is already in use" >&2; exit 125; fi
+    echo "$name" >> "$d/names"
+    if [ -z "${EP_NO_CID:-}" ]; then cid="cid$RANDOM"; echo "$cid" > "$cidf"; echo "$cid $name" >> "$d/cids"; fi
+    bom="${*: -2:1}"
+    case "$img" in *"${EP_MARKER_IMG:-cdxgen-temurin-java21}"*)
+      echo "[build-prep] gradle-dependencies: Gradle asked for a Java 25 toolchain, which this image does not have (java-toolchain-missing=25)" ;; esac
+    case "$img" in *"${EP_NOWRITE_IF:-x-none-x}"*) ;; *) echo "from=$img" > "$bom" ;; esac
+    exit 0 ;;
+  rm)
+    for a in "$@"; do
+      n="$(awk -v c="$a" '$1 == c { print $2 }' "$d/cids" 2>/dev/null)"
+      grep -vxF "${n:-$a}" "$d/names" > "$d/names.t" 2>/dev/null; mv -f "$d/names.t" "$d/names"
+    done
+    exit 0 ;;
+  inspect) echo false; exit 0 ;;
+  image) [ -n "${EP_ABSENT:-}" ] && case "$*" in *"$EP_ABSENT"*) exit 1 ;; esac; exit 0 ;;
+  *) exit 0 ;;
+esac
+STUB
+chmod +x "$EPD/bin/docker"
+printf "plugins { id 'java' }\n" > "$EPD/src/build.gradle"
+ep_run() {  # ep_run [VAR=value...]: run generate_sbom_cdxgen once, results in $EPD
+    rm -f "$EPD/log" "$EPD/names" "$EPD/cids" "$EPD/out/b.json" "$EPD/src/b.json" "$EPD/res"
+    ( cd "$EPD/out" || exit 1
+      set +u  # entrypoint.sh does not run under set -u
+      export PROJECT_NAME=p PROJECT_VERSION=1 CDX_SPEC_VERSION=1.6 FETCH_LICENSE=false
+      unset CDXGEN_JAVA_IMAGE CDXGEN_IMAGE_PREFIX SBOM_PULL SOURCE_ROOT_HOST
+      for kv in "$@"; do export "${kv?}"; done
+      export EP_DIR="$EPD" PATH="$EPD/bin:$PATH" LIBDIR="$ROOT_DIR/docker/lib"
+      # shellcheck source=../docker/lib/source-detect.sh
+      . "$ROOT_DIR/docker/lib/source-detect.sh"
+      # shellcheck disable=SC1091
+      . "$EPD/fn.sh"
+      self_container_id() { echo self; }
+      # The guard-state mount both launchers provide: build-prep.sh is handed
+      # over as a file there. Without it the -c fallback passes the whole
+      # script as one argument, over Linux's 128 KB limit for one.
+      GUARD_STATE_DIR="$EPD/state"; mkdir -p "$GUARD_STATE_DIR"
+      generate_sbom_cdxgen "$EPD/src" b.json; echo "rc=$? reason=$CDXGEN_FAIL_REASON" > "$EPD/res"
+    ) > "$EPD/stdout" 2>&1
+}
+ep_runs() { grep -c '^docker run' "$EPD/log" 2>/dev/null; }
+printf '1 1 0:1 / %s rw - fake fake rw\n' "$EPD/out" > "$EPD/mountinfo.shared"
+: > "$EPD/mountinfo.none"
+J21R="ghcr.io/cdxgen/cdxgen-temurin-java21:$CDXGEN_TAG"; J25R="ghcr.io/cdxgen/cdxgen-temurin-java25:$CDXGEN_TAG"
+
+ep_run EP_MOUNTINFO="$EPD/mountinfo.shared"
+{ grep -qx "rc=0 reason=" "$EPD/res" && [ "$(ep_runs)" -eq 2 ] && grep -qx "from=$J25R" "$EPD/out/b.json" \
+    && grep -qF "[INFO] Gradle asked for Java 25; rerunning in $J25R" "$EPD/stdout" \
+    && ! grep -q '^docker run.* -c ' "$EPD/log"; } \
+    && pass "UI: a Java 25 toolchain failure reruns the sibling in the Java 25 image and keeps its SBOM" \
+    || fail "UI: no rerun in the Java 25 image" "$(cat "$EPD/res" "$EPD/stdout")"
+ep_run EP_MOUNTINFO="$EPD/mountinfo.shared" EP_MARKER_IMG=cdxgen-temurin-java
+[ "$(ep_runs)" -eq 2 ] && pass "UI: the rerun with the forced image does not rerun again" \
+    || fail "UI: the rerun recursed" "runs: $(ep_runs)"
+ep_run EP_MOUNTINFO="$EPD/mountinfo.shared" EP_NOWRITE_IF=java25
+{ grep -qx "rc=0 reason=" "$EPD/res" && grep -qx "from=$J21R" "$EPD/out/b.json" \
+    && grep -qF "keeping the result from $J21R" "$EPD/stdout" && ! grep -qF "[WARN] cdxgen" "$EPD/stdout"; } \
+    && pass "UI: a rerun with no SBOM keeps the first one, clears the failure reason and says it once" \
+    || fail "UI: the first SBOM is not kept" "$(cat "$EPD/res" "$EPD/stdout")"
+ep_run EP_MOUNTINFO="$EPD/mountinfo.none" EP_NOWRITE_IF=java25
+{ grep -qx "rc=0 reason=" "$EPD/res" && grep -qx "from=$J21R" "$EPD/out/b.json" && [ ! -e "$EPD/src/b.json" ]; } \
+    && pass "UI: with the SBOM written in the tree, the kept first SBOM still lands in the run folder" \
+    || fail "UI: the kept first SBOM is not in the run folder" "$(cat "$EPD/res"; ls "$EPD/src" "$EPD/out")"
+ep_run EP_MOUNTINFO="$EPD/mountinfo.none"
+{ grep -qx "rc=0 reason=" "$EPD/res" && grep -qx "from=$J25R" "$EPD/out/b.json" && [ ! -e "$EPD/src/b.json" ]; } \
+    && pass "UI: with the SBOM written in the tree, the rerun's SBOM is moved to the run folder" \
+    || fail "UI: the rerun's SBOM is not in the run folder" "$(cat "$EPD/res"; ls "$EPD/src" "$EPD/out")"
+ep_run EP_MOUNTINFO="$EPD/mountinfo.shared" EP_NO_CID=1
+{ grep -qx "rc=0 reason=" "$EPD/res" && [ "$(ep_runs)" -eq 2 ] && ! grep -q Conflict "$EPD/stdout" && grep -qx "from=$J25R" "$EPD/out/b.json"; } \
+    && pass "UI: with no container id read, the first sibling is removed by name before the rerun" \
+    || fail "UI: the rerun hit a container name conflict" "$(cat "$EPD/res" "$EPD/stdout")"
+ep_run EP_MOUNTINFO="$EPD/mountinfo.shared" SBOM_PULL=never EP_ABSENT=cdxgen-temurin-java25
+{ grep -qx "rc=0 reason=" "$EPD/res" && [ "$(ep_runs)" -eq 1 ] && ! grep -q '^docker pull' "$EPD/log" \
+    && grep -qF "[WARN] $J25R is not here (SBOM_PULL=never)" "$EPD/stdout"; } \
+    && pass "UI: SBOM_PULL=never with the image absent keeps the first result, no pull" \
+    || fail "UI: SBOM_PULL=never pulled or reran" "$(cat "$EPD/res" "$EPD/stdout")"
+ep_run EP_MOUNTINFO="$EPD/mountinfo.shared" EP_ABSENT=cdxgen-temurin-java25
+{ [ "$(ep_runs)" -eq 2 ] && grep -q "^docker pull $J25R\$" "$EPD/log" && grep -qF "[INFO] Pulling $J25R" "$EPD/stdout"; } \
+    && pass "UI: an absent rerun image is pulled with progress" || fail "UI: the rerun image is not pulled" "$(cat "$EPD/log")"
+rm -rf "$EPD"
+
 echo "== --model routes a Figshare item to the dataset path =="
 # One option takes both AI inputs a person is handed a link to, so the reference
 # itself decides which path runs. The server applies the same rule on the string

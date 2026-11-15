@@ -1,0 +1,152 @@
+---
+title: 로컬 SBOM 생성과 오픈소스 위험 평가
+description: SaaS 없이 소스, 컨테이너, 펌웨어에서 SBOM과 고지문, 위험 보고서를 한 번에 만듭니다.
+template: splash
+tableOfContents: false
+---
+
+import { Card, CardGrid } from '@astrojs/starlight/components';
+import HomeSearch from '../../components/HomeSearch.astro';
+
+export const sampleBom = `{
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.6",
+  "components": [
+    { "name": "log4j-core",
+      "version": "2.14.1",
+      "type": "library" }
+  ]
+}`;
+export const sampleNotice = `log4j-core 2.14.1
+License: Apache-2.0
+https://logging.apache.org/log4j/2.x/
+
+Licensed under the Apache License,
+Version 2.0 (the "License"); ...`;
+export const sampleSecurity = `log4j-core 2.14.1
+CVE-2021-44228  CRITICAL
+Fixed in: 2.15.0
+CISA KEV: yes`;
+export const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+
+<div class="home" data-glow="on">
+
+<section class="home-hero">
+
+# 로컬에서 SBOM 생성과 오픈소스 위험 평가를 한 번에
+
+<p class="home-lead">소스 코드, 컨테이너, 펌웨어, 받은 SBOM을 넣으면 한 번의 실행으로 SBOM과 오픈소스 고지문, 위험 보고서가 나옵니다. SaaS도 계정도 필요 없습니다.</p>
+
+<div class="home-actions">
+  <a class="btn btn-primary" href={`${base}/ko/start/first-scan/`}>첫 스캔 시작</a>
+  <a class="btn" href={`${base}/demo/`}>데모 열어 보기</a>
+</div>
+
+<button type="button" class="home-search" data-open-search aria-keyshortcuts="Control+K Meta+K">
+  <svg aria-hidden="true" viewBox="0 0 16 16" width="16" height="16"><path fill="currentColor" d="M10.68 11.74a6 6 0 0 1-7.922-8.982 6 6 0 0 1 8.982 7.922l3.04 3.04a.749.749 0 0 1-.326 1.275.749.749 0 0 1-.734-.215ZM11.5 7a4.499 4.499 0 1 0-8.997 0A4.499 4.499 0 0 0 11.5 7Z"/></svg>
+  <span>가이드, 옵션, 보고서 검색</span>
+  <kbd aria-hidden="true">⌘ K</kbd>
+</button>
+
+</section>
+
+<section class="home-start" aria-labelledby="home-start-title">
+  <h2 id="home-start-title" class="home-eyebrow">자주 하는 일</h2>
+  <div class="start-grid">
+    <a class="start-card" href={`${base}/ko/guides/supplier-sbom/`}>
+      <strong>공급사 SBOM 검증</strong>
+      <span>받은 SBOM의 요구사항 충족을 검증하고 위험 보고서를 발행합니다.</span>
+    </a>
+    <a class="start-card" href={`${base}/ko/guides/ci-cd/`}>
+      <strong>CI에서 사용</strong>
+      <span>파이프라인에서 스캔을 실행하고 결과로 통과 여부를 가릅니다.</span>
+    </a>
+    <a class="start-card" href={`${base}/ko/guides/reports/`}>
+      <strong>결과물 읽기</strong>
+      <span>고지문과 보안 보고서를 만들고 읽는 방법을 봅니다.</span>
+    </a>
+    <a class="start-card" href={`${base}/ko/reference/cli/`}>
+      <strong>CLI 옵션</strong>
+      <span>모든 옵션과 분석 모드를 한곳에서 찾습니다.</span>
+    </a>
+  </div>
+</section>
+
+<section class="home-meta">
+  <div class="chips" aria-label="지원 입력">
+    <span class="home-eyebrow">지원 입력</span>
+    <a class="chip" href={`${base}/ko/guides/by-input/`}>소스 코드</a>
+    <a class="chip" href={`${base}/ko/guides/by-input/`}>컨테이너</a>
+    <a class="chip" href={`${base}/ko/guides/firmware/`}>펌웨어</a>
+    <a class="chip" href={`${base}/ko/guides/supplier-sbom/`}>받은 SBOM</a>
+    <a class="chip" href={`${base}/ko/guides/ai-model/`}>AI 모델</a>
+  </div>
+  <ul class="trust">
+    <li>CycloneDX 1.6</li>
+    <li>내 컴퓨터에서 실행</li>
+    <li>OWASP Incubator 프로젝트</li>
+    <li>Apache-2.0</li>
+  </ul>
+</section>
+
+<HomeSearch />
+
+<section class="home-samples" aria-labelledby="home-samples-title">
+  <h2 id="home-samples-title">한 번의 실행으로 나오는 결과물</h2>
+  <p class="home-sub">파일 이름은 실제 결과물과 같고, 내용은 일부만 줄여 보였습니다.</p>
+  <div class="sample-grid">
+    <figure class="sample">
+      <figcaption><span class="dots" aria-hidden="true"></span>MyApp_1.0.0_bom.json</figcaption>
+      <pre tabindex="0"><code>{sampleBom}</code></pre>
+      <p>SBOM. 구성요소, 라이선스, 의존 관계를 CycloneDX 1.6으로 담습니다.</p>
+    </figure>
+    <figure class="sample">
+      <figcaption><span class="dots" aria-hidden="true"></span>MyApp_1.0.0_NOTICE.txt</figcaption>
+      <pre tabindex="0"><code>{sampleNotice}</code></pre>
+      <p>오픈소스 고지문. 배포물에 그대로 동봉할 수 있는 표준 텍스트입니다.</p>
+    </figure>
+    <figure class="sample">
+      <figcaption><span class="dots" aria-hidden="true"></span>MyApp_1.0.0_security.md</figcaption>
+      <pre tabindex="0"><code>{sampleSecurity}</code></pre>
+      <p>보안 보고서. 취약점과 수정 버전, 우선 확인할 신호를 보여 줍니다.</p>
+    </figure>
+  </div>
+</section>
+
+## 무엇을 하는 도구인가
+
+SaaS 없이 로컬에서 단일 프로젝트의 [SBOM](concepts/what-is-sbom.ko.md)(CycloneDX 1.6)을 생성하고 오픈소스 위험을 평가하는 도구입니다. 소스 코드, 컨테이너 이미지, 바이너리, 펌웨어, 받은 SBOM, HuggingFace AI 모델에서 SBOM과 오픈소스 고지문, 보안 위험 보고서를 한 번에 만듭니다. AI 모델은 CycloneDX ML-BOM을 만들고 [AI를 위한 G7 최소 요소](guides/ai-model.ko.md)로 검사합니다. 이 요소들은 EU 인공지능법(AI Act) Annex IV와 상당 부분 겹칩니다.
+
+![완료된 스캔의 BomLens 웹 UI 개요 화면: 컴포넌트, 취약점, 의존성, 산출물 개수, 확인 필요 배너, 심각도와 라이선스 분류 분포](./images/web-ui-demo-ko.png)
+
+설치하기 전에 결과가 어떤 모습인지 보고 싶다면 <a href={`${base}/demo/`}>데모</a>를 둘러보세요. 입력 종류별로 완료된 스캔을 하나씩 담은 실제 웹 UI입니다. 소스로 스캔한 Spring Boot 프로젝트, 컨테이너 이미지, 언패킹한 기기 펌웨어 이미지, CycloneDX ML-BOM으로 만든 AI 모델, 그리고 형식 요건을 검사한 공급사 SBOM입니다. 설치할 것이 없고 아무것도 업로드되지 않습니다. 평범한 로컬 실행으로 나온 결과를 그대로 담아 둔 화면입니다.
+
+CLI가 부담스럽다면 설치 파일을 받아 더블클릭하세요. 단계별 안내는 [비개발자 빠른 시작](start/no-cli.ko.md)에 있습니다. Docker 엔진이 필요하며, Windows에서는 무료 [Rancher Desktop](https://rancherdesktop.io/)이 잘 맞습니다. [Windows용 내려받기 (.exe)](https://github.com/sktelecom/bomlens/releases/latest/download/BomLens-Setup.exe).
+
+## 더 읽을 가이드
+
+<CardGrid>
+  <Card title="CLI 레퍼런스">
+
+전체 옵션과 분석 모드.
+
+[CLI 레퍼런스](reference/cli.ko.md)
+
+  </Card>
+  <Card title="고지문과 보안 보고서">
+
+산출물 생성과 해석, 웹 UI 사용법.
+
+[고지문과 보안 보고서](guides/reports.ko.md)
+
+  </Card>
+  <Card title="AI 모델 SBOM">
+
+HuggingFace 모델의 ML-BOM을 만들고 G7 최소 요소로 검사, EU 인공지능법과 대응.
+
+[AI 모델 SBOM](guides/ai-model.ko.md)
+
+  </Card>
+</CardGrid>
+
+</div>

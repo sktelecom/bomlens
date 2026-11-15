@@ -3246,7 +3246,7 @@ def scan_detail(run_id):
 # --------------------------------------------------------------------------
 _DIAG_OPTION_KEYS = (
     "notice", "security", "deepLicense", "identifyVendored",
-    "byteStable", "deepCve", "reachability",
+    "byteStable", "deepCve", "reachability", "analyzeCpeIndex",
 )
 # Input kinds the server itself dispatches on. Anything else in a recorded scan
 # (the value comes from the request) is shown as "other".
@@ -4390,12 +4390,16 @@ def run_sibling_scan(image, mode, out_dir, on_log, *, upload_file=None, model_id
         if _dle:
             args += ["-e", "BOMLENS_DEEP_LICENSE_ENDED=%s" % _dle.group(0)]
     # Where the cdxgen images come from (a registry mirror) and the network
-    # settings: proxy, Trivy's database, EPSS/KEV endpoints. By name, when set.
-    for _k in ("CDXGEN_IMAGE_PREFIX", "CDXGEN_TAG", "CDXGEN_ALLINONE", "BOMLENS_OS_LICENSES",
+    # settings: proxy, Trivy's database, EPSS/KEV endpoints, the extra CA bundle
+    # (the file itself reaches the sibling through --volumes-from). By name, when set.
+    for _k in ("CDXGEN_IMAGE_PREFIX", "CDXGEN_TAG", "CDXGEN_ALLINONE", "CDXGEN_JAVA_IMAGE", "BOMLENS_OS_LICENSES",
                "HTTP_PROXY", "HTTPS_PROXY", "NO_PROXY", "http_proxy", "https_proxy", "no_proxy",
                "TRIVY_DB_REPOSITORY", "TRIVY_JAVA_DB_REPOSITORY", "TRIVY_SKIP_DB_UPDATE",
                "TRIVY_SKIP_JAVA_DB_UPDATE", "TRIVY_OFFLINE_SCAN", "TRIVY_USERNAME", "TRIVY_PASSWORD",
-               "TRIVY_REGISTRY_TOKEN", "TRIVY_INSECURE", "KEV_URL", "EPSS_API"):
+               "TRIVY_REGISTRY_TOKEN", "TRIVY_INSECURE", "BOMLENS_TRIVY_DB_MAX_AGE_DAYS",
+               "BOMLENS_GRYPE_DB_MAX_AGE_DAYS", "GRYPE_DB_UPDATE_URL", "BOMLENS_GO_VULNDB",
+               "BOMLENS_GO_VULNDB_MAX_AGE_DAYS", "BOMLENS_GO_VULNDB_URL", "KEV_URL", "EPSS_API",
+               "BOMLENS_EXTRA_CA_CERTS"):
         if env.get(_k):
             args += ["-e", _k]
     # The profile the caller resolved (see the main handler's per-mode default),
@@ -6672,6 +6676,7 @@ class Handler(BaseHTTPRequestHandler):
                 "byteStable": g("byte_stable") == "true",
                 "deepCve": g("deep_cve") == "true",
                 "reachability": g("reachability") == "true",
+                "analyzeCpeIndex": g("analyze_cpe_index") == "true",
                 # How a source scan finds its dependencies: "build" never reads a
                 # lock file statically, anything else is "auto" (the default).
                 "detection": "build" if g("detection") == "build" else "auto",
@@ -6810,6 +6815,9 @@ class Handler(BaseHTTPRequestHandler):
             # the server's environment, pass through via env.copy() above.
             "IDENTIFY_VENDORED": "true" if g("identify_vendored") == "true" else "false",
             "BYTE_STABLE": "true" if g("byte_stable") == "true" else "false",
+            # CPE index match for a submitted SBOM, opt-in. entrypoint.sh reads it
+            # on the ANALYZE path only.
+            "ANALYZE_CPE_INDEX": "true" if g("analyze_cpe_index") == "true" else "false",
             # Source scans read a lock file that covers the tree instead of building
             # (entrypoint.sh, DETECTION). "build" is the form's way to turn that off;
             # only these two literals are ever passed on.

@@ -121,8 +121,8 @@ test("a traced source sits under its dataset with its own grade and licence", as
   // The words source is marked for checking; the traced source is not.
   await expect(rows.nth(0).getByText("needs checking")).toHaveCount(1);
   await expect(rows.nth(1).getByText("needs checking")).toHaveCount(0);
-  const indent = await rows.nth(1).locator("td").first().evaluate((el) => getComputedStyle(el).paddingLeft);
-  const rootIndent = await rows.nth(0).locator("td").first().evaluate((el) => getComputedStyle(el).paddingLeft);
+  const indent = await rows.nth(1).locator("th, td").first().evaluate((el) => getComputedStyle(el).paddingLeft);
+  const rootIndent = await rows.nth(0).locator("th, td").first().evaluate((el) => getComputedStyle(el).paddingLeft);
   expect(parseFloat(indent)).toBeGreaterThan(parseFloat(rootIndent));
 });
 

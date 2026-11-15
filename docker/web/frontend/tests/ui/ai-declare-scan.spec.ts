@@ -185,7 +185,7 @@ test("re-scanning a declared model reopens the questions at the review, with its
   });
   await page.goto("/#/scan/acme_1.0");
   await page.getByRole("button", { name: "Re-scan" }).first().click();
-  await expect(page.getByTestId("source-ai-declare")).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByTestId("source-ai-declare")).toHaveAttribute("aria-checked", "true");
   await page.getByTestId("run-scan").click();
   const flow = page.getByTestId("ai-declaration");
   await expect(flow.getByRole("heading", { name: "Review and save" })).toBeVisible();

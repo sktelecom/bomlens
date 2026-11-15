@@ -83,7 +83,7 @@ async function openScan(
     r.fulfill({ contentType: "application/json", body: JSON.stringify(SBOM) }),
   );
   await page.goto("/?ui=next#/scan/demo_2.1");
-  await page.getByRole("navigation").first().waitFor();
+  await page.getByTestId("result-meta").waitFor();
 }
 
 test("a scan with a .spdx.json artifact shows the SPDX chip in Artifacts", async ({ page }) => {

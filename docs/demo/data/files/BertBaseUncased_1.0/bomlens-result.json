@@ -1,10 +1,10 @@
 {
   "contract": {
     "name": "bomlens-engine",
-    "version": "1.3.0"
+    "version": "1.4.0"
   },
   "engine": {
-    "version": "1.14.3",
+    "version": "1.14.5",
     "image": null,
     "image_digest": null
   },
@@ -16,8 +16,8 @@
   "run": {
     "status": "succeeded",
     "reason": null,
-    "started_at": "2026-10-26T16:56:49Z",
-    "ended_at": "2026-10-26T16:56:54Z",
+    "started_at": "2026-11-12T09:11:10Z",
+    "ended_at": "2026-11-12T09:11:16Z",
     "exit_code": 0
   },
   "steps": [
@@ -26,8 +26,8 @@
       "status": "ok",
       "reason": null,
       "detail": null,
-      "started_at": "2026-10-26T16:56:51Z",
-      "ended_at": "2026-10-26T16:56:53Z",
+      "started_at": "2026-11-12T09:11:12Z",
+      "ended_at": "2026-11-12T09:11:14Z",
       "stage": 2
     },
     {
@@ -35,8 +35,8 @@
       "status": "ok",
       "reason": null,
       "detail": null,
-      "started_at": "2026-10-26T16:56:49Z",
-      "ended_at": "2026-10-26T16:56:53Z",
+      "started_at": "2026-11-12T09:11:10Z",
+      "ended_at": "2026-11-12T09:11:14Z",
       "counts": {
         "components": 2
       },
@@ -47,8 +47,8 @@
       "status": "ok",
       "reason": null,
       "detail": null,
-      "started_at": "2026-10-26T16:56:53Z",
-      "ended_at": "2026-10-26T16:56:53Z",
+      "started_at": "2026-11-12T09:11:14Z",
+      "ended_at": "2026-11-12T09:11:14Z",
       "stage": 2
     },
     {
@@ -56,8 +56,8 @@
       "status": "ok",
       "reason": null,
       "detail": null,
-      "started_at": "2026-10-26T16:56:53Z",
-      "ended_at": "2026-10-26T16:56:53Z",
+      "started_at": "2026-11-12T09:11:14Z",
+      "ended_at": "2026-11-12T09:11:14Z",
       "stage": 2
     },
     {
@@ -65,8 +65,8 @@
       "status": "ok",
       "reason": null,
       "detail": null,
-      "started_at": "2026-10-26T16:56:53Z",
-      "ended_at": "2026-10-26T16:56:53Z",
+      "started_at": "2026-11-12T09:11:14Z",
+      "ended_at": "2026-11-12T09:11:15Z",
       "stage": 2
     },
     {
@@ -74,8 +74,8 @@
       "status": "ok",
       "reason": null,
       "detail": null,
-      "started_at": "2026-10-26T16:56:53Z",
-      "ended_at": "2026-10-26T16:56:53Z",
+      "started_at": "2026-11-12T09:11:15Z",
+      "ended_at": "2026-11-12T09:11:15Z",
       "stage": 2
     },
     {
@@ -83,8 +83,8 @@
       "status": "ok",
       "reason": null,
       "detail": null,
-      "started_at": "2026-10-26T16:56:53Z",
-      "ended_at": "2026-10-26T16:56:54Z",
+      "started_at": "2026-11-12T09:11:15Z",
+      "ended_at": "2026-11-12T09:11:15Z",
       "stage": 2
     },
     {
@@ -92,8 +92,8 @@
       "status": "ok",
       "reason": null,
       "detail": null,
-      "started_at": "2026-10-26T16:56:54Z",
-      "ended_at": "2026-10-26T16:56:54Z",
+      "started_at": "2026-11-12T09:11:15Z",
+      "ended_at": "2026-11-12T09:11:15Z",
       "stage": 2
     },
     {
@@ -101,8 +101,8 @@
       "status": "disabled",
       "reason": null,
       "detail": null,
-      "started_at": "2026-10-26T16:56:54Z",
-      "ended_at": "2026-10-26T16:56:54Z",
+      "started_at": "2026-11-12T09:11:15Z",
+      "ended_at": "2026-11-12T09:11:15Z",
       "stage": 2
     },
     {
@@ -110,8 +110,17 @@
       "status": "disabled",
       "reason": null,
       "detail": null,
-      "started_at": "2026-10-26T16:56:54Z",
-      "ended_at": "2026-10-26T16:56:54Z",
+      "started_at": "2026-11-12T09:11:15Z",
+      "ended_at": "2026-11-12T09:11:15Z",
+      "stage": 2
+    },
+    {
+      "id": "go-vulndb",
+      "status": "disabled",
+      "reason": null,
+      "detail": null,
+      "started_at": "2026-11-12T09:11:15Z",
+      "ended_at": "2026-11-12T09:11:15Z",
       "stage": 2
     },
     {
@@ -119,8 +128,8 @@
       "status": "ok",
       "reason": null,
       "detail": null,
-      "started_at": "2026-10-26T16:56:54Z",
-      "ended_at": "2026-10-26T16:56:54Z",
+      "started_at": "2026-11-12T09:11:15Z",
+      "ended_at": "2026-11-12T09:11:15Z",
       "stage": 2
     },
     {
@@ -128,8 +137,8 @@
       "status": "disabled",
       "reason": null,
       "detail": null,
-      "started_at": "2026-10-26T16:56:54Z",
-      "ended_at": "2026-10-26T16:56:54Z",
+      "started_at": "2026-11-12T09:11:15Z",
+      "ended_at": "2026-11-12T09:11:15Z",
       "stage": 2
     }
   ],
@@ -139,44 +148,45 @@
   },
   "engines": [],
   "data_sources": {
-    "trivy_db": null
+    "trivy_db": null,
+    "go_vulndb": null
   },
   "outputs": [
     {
       "role": "sbom.cyclonedx",
       "path": "BertBaseUncased_1.0_bom.json",
-      "sha256": "01c6f5668e57552289f8abaa067f6f23dbea5e86c348e65af09ca8b2a9ea8a79",
+      "sha256": "f5aa7f878dd1fd68918d8331d0bf7f89a802b8bf579f592497222663917cb597",
       "bytes": 28375
     },
     {
       "role": "other",
       "path": "BertBaseUncased_1.0_NOTICE.txt",
-      "sha256": "cb796ef08a1d2a10a89050ae9766fde31100c56227ac934e7c5518dec5d925bc",
+      "sha256": "8534334657ed1f7085f96c2bff4965afbd821684ab392b14873d23d29c667689",
       "bytes": 682
     },
     {
       "role": "other",
       "path": "BertBaseUncased_1.0_NOTICE.html",
-      "sha256": "762a363e95df6fff7a46272a14d75e84127c0792f50e73585b27cc42988cfb1f",
+      "sha256": "07dd6c98a39b6732c118117d89f2b2c675be89ee02289767881fb4c678bbc7e7",
       "bytes": 16298
     },
     {
       "role": "conformance",
       "path": "BertBaseUncased_1.0_conformance.json",
-      "sha256": "c2c5852454689a0cf8fc12e358835e3b51eb896c68b7b95c15dbfcf62ab7f5d1",
-      "bytes": 99700
+      "sha256": "61a8e969de487c8e8a024901429d7c7a30bed0fd6e15eb15da792d5bc499f90c",
+      "bytes": 100801
     },
     {
       "role": "other",
       "path": "BertBaseUncased_1.0_conformance.md",
-      "sha256": "e0c62e0d71ec43bd2abbc49ae167b15b9b8a3614372ed7ee66fced659cb2922d",
-      "bytes": 19085
+      "sha256": "ee23aa40032f3fd237c6cb110199b80fef7b8d6461c7717b6c8178df08f49c80",
+      "bytes": 19388
     },
     {
       "role": "other",
       "path": "BertBaseUncased_1.0_conformance.html",
-      "sha256": "909b9eb5afa7a1dfe35a28e23e22dd73fc609ea018d0952e888e93403ee98df4",
-      "bytes": 48648
+      "sha256": "bba19a5e1741c4499763aae47a21f0b4fb28f05b0fe4cee9b66c9e91010ebf56",
+      "bytes": 49136
     },
     {
       "role": "other",
@@ -187,25 +197,25 @@
     {
       "role": "other",
       "path": "BertBaseUncased_1.0_risk-report.md",
-      "sha256": "791feea6a09259de784680d851e6e0bc42ba525f3323ffae7abe6f92830aa881",
+      "sha256": "5502190aa8a56e867bd4ebc6bc987a87b577e84a428bbd18703ee92f0fd48e42",
       "bytes": 1876
     },
     {
       "role": "other",
       "path": "BertBaseUncased_1.0_risk-report.html",
-      "sha256": "f3acb64987c1ba99f148a0abc903b7a39316bd083740a95b8571cb1f5e79ef1f",
+      "sha256": "2b1df9c6c8a14237a25021ee9fd5b4c58df97d5ce6b69560d735947f4d04f80a",
       "bytes": 18405
     },
     {
       "role": "sbom.spdx3",
       "path": "BertBaseUncased_1.0_bom.spdx3.json",
-      "sha256": "d2f0d7bfd4b0981eaffb2538628b9fe73db2a3048d65f3329d0de7d18fea8e09",
+      "sha256": "40811bee97f2261ca681b4d7af445e5e8b0ef73f323ff487f334e890637cc032",
       "bytes": 18878
     },
     {
       "role": "other",
       "path": "BertBaseUncased_1.0_spdx3-check.json",
-      "sha256": "0d03560bf3ce4f0210566f5af69e7ea73d174c12b63ac43458f5545828a91124",
+      "sha256": "2a13f9f85ffe14ab5910356ff5c854960d05084b67b095a4e9dd5124b63fc75e",
       "bytes": 13097
     },
     {
@@ -223,13 +233,13 @@
     {
       "role": "other",
       "path": "BertBaseUncased_1.0_ai-profile.json",
-      "sha256": "3aeff90031ec25c57335d92fd325f56732a41dbb0ff1d4005fd1ea9f55d1d1d3",
+      "sha256": "717f2a8776e42da8bc5cc2b56996d3417f0c7aef3ae934160b6f47865aba455c",
       "bytes": 28947
     },
     {
       "role": "other",
       "path": "BertBaseUncased_1.0_ai-profile.md",
-      "sha256": "6be7bda1ded5d67e9a6455c1d8bce073d27d9cbead53bfbdcb9b58742aff2082",
+      "sha256": "fe08189dbc3643eda1e173711f685f2e1f05139bdd2511dd2a9a1fb2293c5265",
       "bytes": 4010
     }
   ]

@@ -18,7 +18,7 @@
 # disabled (a setting turned it off). A step that does not apply to the mode at
 # all (CPE enrichment of an AI model) is not recorded.
 
-ENGINE_CONTRACT_VERSION="1.3.0"
+ENGINE_CONTRACT_VERSION="1.4.0"
 ENGINE_RESULT_NAME="bomlens-result.json"
 
 # Every step entrypoint.sh records after generation (run_optional_step,
@@ -31,7 +31,7 @@ ER_POSTPROCESS_STEPS="assess-ai-risk cocoapods component-versions conformance
 declared-components declared-service declared-sources deep-cve deep-license describe-input docmeta
 enrich-aibom enrich-cpe enrich-distro-supplier enrich-eol enrich-github-cpe
 enrich-interpreter-cpe enrich-malicious enrich-maven-cpe enrich-os-context
-enrich-staleness generate-notice generate-risk-report license-registry
+enrich-staleness generate-notice generate-risk-report go-vulndb license-registry
 match-cpe model-security normalize os-licenses reachability resolve-purl scan-security sign
 source-file-tree source-snapshot stamp-metadata suggest-vendored upstream-purl
 vendored verify-weights"
@@ -129,7 +129,7 @@ _er_role() {
         *_bom.spdx3.json) echo "sbom.spdx3" ;;
         *_security_trivy.json) echo "vulnerabilities.trivy" ;;
         *_security.json) echo "vulnerabilities.all" ;;
-        *_security_grype.json|*_security_cvebintool.json|*_security_yocto.json) echo "vulnerabilities.other" ;;
+        *_security_grype.json|*_security_cvebintool.json|*_security_yocto.json|*_security_govulndb.json) echo "vulnerabilities.other" ;;
         *_scancode.json) echo "license-scan.scancode" ;;
         *_vendored.cdx.json) echo "vendored.cyclonedx" ;;
         *_reachability.cdx.json) echo "vex.reachability" ;;
@@ -249,8 +249,9 @@ er_finish() {
         outputs="$(jq -c '. + [.[] | select(.role == "vulnerabilities.all") | .role = "vulnerabilities.trivy"]' <<<"$outputs")"
     fi
 
-    # Vulnerability engines that actually produced results for this run.
-    local engines="[]" e
+    # Vulnerability engines that actually produced results for this run, and
+    # the date of the Go vulnerability database when it was read.
+    local engines="[]" e go_vulndb="null" gvf=""
     if [ "$sec_present" = true ]; then
         engines='["trivy"]'
         for e in grype cvebintool yocto; do
@@ -259,6 +260,16 @@ er_finish() {
                 engines="$(jq -c --arg e "$e" '. + [$e]' <<<"$engines")"
             fi
         done
+        # The Go vulnerability database counts only when it matched a
+        # component: its sidecar is also written for an SBOM whose Go modules
+        # had no version it could read, and the step is skipped then.
+        if [ -f "$outdir/${OUT_PREFIX}_security_govulndb.json" ]; then gvf="$outdir/${OUT_PREFIX}_security_govulndb.json"
+        elif [ -f "${OUT_PREFIX}_security_govulndb.json" ]; then gvf="${OUT_PREFIX}_security_govulndb.json"; fi
+        if [ -n "$gvf" ] && jq -e '(.GoVulnDB.Components // 0) > 0' "$gvf" >/dev/null 2>&1; then
+            engines="$(jq -c '. + ["go-vulndb"]' <<<"$engines")"
+            go_vulndb="$(jq -c '{updated_at: ((.GoVulnDB.Modified // "") | if . == "" then null else . end)}' "$gvf" 2>/dev/null || echo null)"
+            [ -n "$go_vulndb" ] || go_vulndb="null"
+        fi
     fi
 
     # Tool versions: the generator recorded in the SBOM, then the bundled tools.
@@ -327,7 +338,7 @@ er_finish() {
         --arg target "$target" --arg started "${ER_STARTED:-$ended}" --arg ended "$ended" \
         --argjson rc "$rc" --argjson props "$props" --arg scanerr "$scan_error" \
         --argjson secpresent "$sec_present" --argjson outputs "$outputs" \
-        --argjson engines "$engines" --argjson tools "$tools" --argjson tdb "$trivy_db" \
+        --argjson engines "$engines" --argjson tools "$tools" --argjson tdb "$trivy_db" --argjson gvdb "$go_vulndb" \
         --argjson fp "$fp" --argjson mismatch "$mismatch" --argjson reused "$reused" --argjson s1deg "$s1deg" \
         --argjson image "$image" --argjson genfailed "$gen_failed" --arg gentool "$gen_tool" \
         --arg emulated "$emulated" '
@@ -416,7 +427,7 @@ er_finish() {
             steps: $steps,
             tools: $tools,
             engines: $engines,
-            data_sources: {trivy_db: $tdb},
+            data_sources: {trivy_db: $tdb, go_vulndb: $gvdb},
             outputs: $outputs
           }' "$ER_STEPS" > "$tmp" 2>/dev/null || { rm -f "$tmp"; rm -f "$ER_STEPS"; return 0; }
     # Everything the manifest says is settled before it appears: run.end goes

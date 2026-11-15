@@ -87,33 +87,33 @@ async function openAt(page: Page, hash: string) {
     r.fulfill({ contentType: "application/json", body: JSON.stringify(DONE) }),
   );
   await page.goto(`/?ui=next#${hash}`);
-  await page.getByRole("navigation").first().waitFor();
+  await page.getByTestId("result-meta").waitFor();
 }
 
 const hashOf = (page: Page) => page.evaluate(() => window.location.hash);
 
 test("filtering the components table puts the filter in the URL", async ({ page }) => {
   await openAt(page, "/scan/demo_3.0/components");
-  await expect(page.getByRole("cell", { name: "zlib", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Show component details: zlib", exact: true })).toBeVisible();
 
-  await page.getByRole("textbox", { name: "Search name, license, type…" }).fill("openssl");
+  await page.getByRole("searchbox", { name: "Search components" }).fill("openssl");
 
   await expect.poll(() => hashOf(page)).toBe("#/scan/demo_3.0/components?q=openssl");
-  await expect(page.getByRole("cell", { name: "zlib", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Show component details: zlib", exact: true })).toHaveCount(0);
 });
 
 test("a filtered view survives a reload", async ({ page }) => {
   await openAt(page, "/scan/demo_3.0/components");
-  await page.getByRole("textbox", { name: "Search name, license, type…" }).fill("openssl");
+  await page.getByRole("searchbox", { name: "Search components" }).fill("openssl");
   await expect.poll(() => hashOf(page)).toContain("q=openssl");
 
   await page.reload();
-  await page.getByRole("navigation").first().waitFor();
+  await page.getByTestId("result-meta").waitFor();
 
-  await expect(page.getByRole("textbox", { name: "Search name, license, type…" })).toHaveValue(
+  await expect(page.getByRole("searchbox", { name: "Search components" })).toHaveValue(
     "openssl",
   );
-  await expect(page.getByRole("cell", { name: "zlib", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Show component details: zlib", exact: true })).toHaveCount(0);
 });
 
 test("a link into a filtered view opens it filtered", async ({ page }) => {
@@ -126,12 +126,12 @@ test("a link into a filtered view opens it filtered", async ({ page }) => {
 
 test("clearing a filter takes it back out of the URL", async ({ page }) => {
   await openAt(page, "/scan/demo_3.0/components?q=openssl");
-  await expect(page.getByRole("cell", { name: "zlib", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Show component details: zlib", exact: true })).toHaveCount(0);
 
-  await page.getByRole("textbox", { name: "Search name, license, type…" }).fill("");
+  await page.getByRole("searchbox", { name: "Search components" }).fill("");
 
   await expect.poll(() => hashOf(page)).toBe("#/scan/demo_3.0/components");
-  await expect(page.getByRole("cell", { name: "zlib", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Show component details: zlib", exact: true })).toBeVisible();
 });
 
 test("sorting is carried too", async ({ page }) => {
@@ -141,7 +141,7 @@ test("sorting is carried too", async ({ page }) => {
   await expect.poll(() => hashOf(page)).toBe("#/scan/demo_3.0/components?dir=asc&sort=name");
 
   await page.reload();
-  await page.getByRole("navigation").first().waitFor();
+  await page.getByTestId("result-meta").waitFor();
   await expect(page.locator("th").filter({ hasText: "Name" })).toHaveAttribute(
     "aria-sort",
     "ascending",
@@ -152,6 +152,6 @@ test("a hand-edited query does not break the section", async ({ page }) => {
   // Someone truncates or mangles the link; the section still opens, unfiltered.
   await openAt(page, "/scan/demo_3.0/components?sort=nonsense&dir=sideways&q=");
 
-  await expect(page.getByRole("cell", { name: "openssl", exact: true })).toBeVisible();
-  await expect(page.getByRole("cell", { name: "zlib", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Show component details: openssl", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Show component details: zlib", exact: true })).toBeVisible();
 });

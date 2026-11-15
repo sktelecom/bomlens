@@ -54,6 +54,16 @@
 # missing(기본) = 없을 때만 받음 / always = 매번 최신 확인 / never = 네트워크 사용 안 함
 #SBOM_PULL=missing
 
+# --- Proxy CA certificate / 프록시 CA 인증서 --------------------------------
+# A network proxy that inspects HTTPS re-signs it with its own CA, and the scans
+# then fail with "certificate signed by unknown authority" or "PKIX path
+# building failed". Point this at that CA bundle in PEM form (ask your IT team
+# for it). Use a path without & ^ | < > characters.
+# HTTPS를 검사하는 사내 프록시는 자체 CA로 다시 서명하므로, 그 CA를 신뢰하지 않으면 스캔이
+# "certificate signed by unknown authority"나 "PKIX path building failed"로 실패합니다.
+# IT 담당 부서에서 받은 CA 번들(PEM 형식) 파일 경로를 지정하세요.
+#SBOM_EXTRA_CA_CERTS=C:\Users\me\proxy-ca.pem
+
 # --- Offline install / 오프라인 설치 ----------------------------------------
 # Path to an image tar produced by:  docker save -o bomlens-image.tar <image>
 # If a file named bomlens-image.tar sits next to these scripts it is used

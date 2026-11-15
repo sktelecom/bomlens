@@ -1,10 +1,10 @@
 {
   "contract": {
     "name": "bomlens-engine",
-    "version": "1.3.0"
+    "version": "1.4.0"
   },
   "engine": {
-    "version": "1.14.3",
+    "version": "1.14.5",
     "image": null,
     "image_digest": null
   },
@@ -16,8 +16,8 @@
   "run": {
     "status": "succeeded",
     "reason": null,
-    "started_at": "2026-10-26T16:57:12Z",
-    "ended_at": "2026-10-26T17:10:04Z",
+    "started_at": "2026-11-12T09:11:38Z",
+    "ended_at": "2026-11-12T09:25:53Z",
     "exit_code": 0
   },
   "steps": [
@@ -26,10 +26,10 @@
       "status": "ok",
       "reason": null,
       "detail": null,
-      "started_at": "2026-10-26T16:57:12Z",
-      "ended_at": "2026-10-26T17:06:57Z",
+      "started_at": "2026-11-12T09:11:38Z",
+      "ended_at": "2026-11-12T09:23:42Z",
       "counts": {
-        "components": 60131
+        "components": 60126
       },
       "stage": 2
     },
@@ -38,8 +38,8 @@
       "status": "ok",
       "reason": null,
       "detail": null,
-      "started_at": "2026-10-26T17:06:58Z",
-      "ended_at": "2026-10-26T17:06:59Z",
+      "started_at": "2026-11-12T09:23:43Z",
+      "ended_at": "2026-11-12T09:23:44Z",
       "stage": 2
     },
     {
@@ -47,8 +47,8 @@
       "status": "ok",
       "reason": null,
       "detail": null,
-      "started_at": "2026-10-26T17:07:00Z",
-      "ended_at": "2026-10-26T17:07:01Z",
+      "started_at": "2026-11-12T09:23:45Z",
+      "ended_at": "2026-11-12T09:23:45Z",
       "stage": 2
     },
     {
@@ -56,8 +56,8 @@
       "status": "ok",
       "reason": null,
       "detail": null,
-      "started_at": "2026-10-26T17:07:01Z",
-      "ended_at": "2026-10-26T17:08:33Z",
+      "started_at": "2026-11-12T09:23:45Z",
+      "ended_at": "2026-11-12T09:24:50Z",
       "stage": 2
     },
     {
@@ -65,8 +65,8 @@
       "status": "disabled",
       "reason": null,
       "detail": null,
-      "started_at": "2026-10-26T17:08:33Z",
-      "ended_at": "2026-10-26T17:08:33Z",
+      "started_at": "2026-11-12T09:24:50Z",
+      "ended_at": "2026-11-12T09:24:50Z",
       "stage": 2
     },
     {
@@ -74,8 +74,8 @@
       "status": "ok",
       "reason": null,
       "detail": null,
-      "started_at": "2026-10-26T17:08:35Z",
-      "ended_at": "2026-10-26T17:08:43Z",
+      "started_at": "2026-11-12T09:24:52Z",
+      "ended_at": "2026-11-12T09:24:58Z",
       "stage": 2
     },
     {
@@ -83,8 +83,8 @@
       "status": "ok",
       "reason": null,
       "detail": null,
-      "started_at": "2026-10-26T17:08:43Z",
-      "ended_at": "2026-10-26T17:08:45Z",
+      "started_at": "2026-11-12T09:24:58Z",
+      "ended_at": "2026-11-12T09:24:59Z",
       "stage": 2
     },
     {
@@ -92,8 +92,8 @@
       "status": "ok",
       "reason": null,
       "detail": null,
-      "started_at": "2026-10-26T17:08:45Z",
-      "ended_at": "2026-10-26T17:08:45Z",
+      "started_at": "2026-11-12T09:24:59Z",
+      "ended_at": "2026-11-12T09:24:59Z",
       "stage": 2
     },
     {
@@ -101,8 +101,8 @@
       "status": "ok",
       "reason": null,
       "detail": null,
-      "started_at": "2026-10-26T17:08:45Z",
-      "ended_at": "2026-10-26T17:08:46Z",
+      "started_at": "2026-11-12T09:24:59Z",
+      "ended_at": "2026-11-12T09:25:00Z",
       "stage": 2
     },
     {
@@ -110,8 +110,8 @@
       "status": "ok",
       "reason": null,
       "detail": null,
-      "started_at": "2026-10-26T17:08:46Z",
-      "ended_at": "2026-10-26T17:08:47Z",
+      "started_at": "2026-11-12T09:25:00Z",
+      "ended_at": "2026-11-12T09:25:01Z",
       "stage": 2
     },
     {
@@ -119,8 +119,8 @@
       "status": "ok",
       "reason": null,
       "detail": null,
-      "started_at": "2026-10-26T17:08:47Z",
-      "ended_at": "2026-10-26T17:08:47Z",
+      "started_at": "2026-11-12T09:25:01Z",
+      "ended_at": "2026-11-12T09:25:01Z",
       "stage": 2
     },
     {
@@ -128,8 +128,8 @@
       "status": "ok",
       "reason": null,
       "detail": null,
-      "started_at": "2026-10-26T17:08:47Z",
-      "ended_at": "2026-10-26T17:08:48Z",
+      "started_at": "2026-11-12T09:25:01Z",
+      "ended_at": "2026-11-12T09:25:01Z",
       "stage": 2
     },
     {
@@ -137,8 +137,8 @@
       "status": "ok",
       "reason": null,
       "detail": null,
-      "started_at": "2026-10-26T17:08:48Z",
-      "ended_at": "2026-10-26T17:08:52Z",
+      "started_at": "2026-11-12T09:25:01Z",
+      "ended_at": "2026-11-12T09:25:05Z",
       "stage": 2
     },
     {
@@ -146,8 +146,8 @@
       "status": "ok",
       "reason": null,
       "detail": null,
-      "started_at": "2026-10-26T17:08:52Z",
-      "ended_at": "2026-10-26T17:08:56Z",
+      "started_at": "2026-11-12T09:25:05Z",
+      "ended_at": "2026-11-12T09:25:08Z",
       "stage": 2
     },
     {
@@ -155,8 +155,8 @@
       "status": "disabled",
       "reason": null,
       "detail": null,
-      "started_at": "2026-10-26T17:08:56Z",
-      "ended_at": "2026-10-26T17:08:56Z",
+      "started_at": "2026-11-12T09:25:08Z",
+      "ended_at": "2026-11-12T09:25:08Z",
       "stage": 2
     },
     {
@@ -164,8 +164,8 @@
       "status": "ok",
       "reason": null,
       "detail": null,
-      "started_at": "2026-10-26T17:08:56Z",
-      "ended_at": "2026-10-26T17:09:09Z",
+      "started_at": "2026-11-12T09:25:08Z",
+      "ended_at": "2026-11-12T09:25:18Z",
       "stage": 2
     },
     {
@@ -173,8 +173,8 @@
       "status": "ok",
       "reason": null,
       "detail": null,
-      "started_at": "2026-10-26T17:09:09Z",
-      "ended_at": "2026-10-26T17:09:13Z",
+      "started_at": "2026-11-12T09:25:19Z",
+      "ended_at": "2026-11-12T09:25:21Z",
       "stage": 2
     },
     {
@@ -182,12 +182,12 @@
       "status": "ok",
       "reason": null,
       "detail": null,
-      "started_at": "2026-10-26T17:09:13Z",
-      "ended_at": "2026-10-26T17:09:19Z",
+      "started_at": "2026-11-12T09:25:21Z",
+      "ended_at": "2026-11-12T09:25:26Z",
       "counts": {
-        "offered": 59198,
+        "offered": 59193,
         "components": 1,
-        "cves": 746
+        "cves": 851
       },
       "stage": 2
     },
@@ -196,8 +196,8 @@
       "status": "ok",
       "reason": null,
       "detail": null,
-      "started_at": "2026-10-26T17:09:19Z",
-      "ended_at": "2026-10-26T17:09:44Z",
+      "started_at": "2026-11-12T09:25:26Z",
+      "ended_at": "2026-11-12T09:25:39Z",
       "stage": 2
     },
     {
@@ -205,8 +205,22 @@
       "status": "disabled",
       "reason": null,
       "detail": null,
-      "started_at": "2026-10-26T17:09:44Z",
-      "ended_at": "2026-10-26T17:09:44Z",
+      "started_at": "2026-11-12T09:25:39Z",
+      "ended_at": "2026-11-12T09:25:39Z",
+      "stage": 2
+    },
+    {
+      "id": "go-vulndb",
+      "status": "ok",
+      "reason": null,
+      "detail": null,
+      "started_at": "2026-11-12T09:25:40Z",
+      "ended_at": "2026-11-12T09:25:40Z",
+      "counts": {
+        "components": 53,
+        "findings": 0,
+        "already_reported": 37
+      },
       "stage": 2
     },
     {
@@ -214,8 +228,8 @@
       "status": "ok",
       "reason": null,
       "detail": null,
-      "started_at": "2026-10-26T17:09:44Z",
-      "ended_at": "2026-10-26T17:09:59Z",
+      "started_at": "2026-11-12T09:25:40Z",
+      "ended_at": "2026-11-12T09:25:50Z",
       "stage": 2
     },
     {
@@ -223,8 +237,8 @@
       "status": "disabled",
       "reason": null,
       "detail": null,
-      "started_at": "2026-10-26T17:09:59Z",
-      "ended_at": "2026-10-26T17:09:59Z",
+      "started_at": "2026-11-12T09:25:50Z",
+      "ended_at": "2026-11-12T09:25:50Z",
       "stage": 2
     }
   ],
@@ -236,93 +250,97 @@
   },
   "engines": [
     "trivy",
-    "cve-bin-tool"
+    "cve-bin-tool",
+    "go-vulndb"
   ],
   "data_sources": {
     "trivy_db": {
       "schema_version": 2,
-      "updated_at": "2026-10-26T14:38:04.845305817Z",
-      "downloaded_at": "2026-10-26T16:55:04.097142667Z"
+      "updated_at": "2026-11-12T07:01:33.828310435Z",
+      "downloaded_at": "2026-11-12T09:09:35.206565975Z"
+    },
+    "go_vulndb": {
+      "updated_at": "2026-11-11T02:51:11Z"
     }
   },
   "outputs": [
     {
       "role": "sbom.cyclonedx",
       "path": "RaspberryPiOsLite_2026-06-18_bom.json",
-      "sha256": "5100d2d249933b46813c18384d7ef919598e0c2aad8cffbe3b6f278f5add6bcb",
-      "bytes": 41944324
+      "sha256": "7959bc279a459390e4da86aa8dfdb835e210c488af98193b0a91a82987ba23b7",
+      "bytes": 41940056
     },
     {
       "role": "other",
       "path": "RaspberryPiOsLite_2026-06-18_component-versions.template.csv",
-      "sha256": "751dea7445675a9200e40392c56a0245938cd9c93987c3a09fdfa4dc200b2b53",
+      "sha256": "6d1c227025879386a715bf1c4102abaa956edf15e685532483896281110b6b8d",
       "bytes": 23918
     },
     {
       "role": "other",
       "path": "RaspberryPiOsLite_2026-06-18_files.json",
-      "sha256": "e52f192cb9a63ae373ae348445b8ffe5f0149b13e95d1b8195ec5589f427f203",
-      "bytes": 2281366
+      "sha256": "04cbebc3178f937e130aa71d3e73543a38ea3ed651fe756082b32421e7c246df",
+      "bytes": 2315660
     },
     {
       "role": "other",
       "path": "RaspberryPiOsLite_2026-06-18_source.json",
-      "sha256": "79de8eca4b14d5597f22102218bed100c90051c66088e2c518c19d7f936d3b08",
-      "bytes": 6274507
+      "sha256": "9d39fedb9c64149aa4dc98c858126b62987bd79f2eed2dd723d23214292f4aaa",
+      "bytes": 8998390
     },
     {
       "role": "other",
       "path": "RaspberryPiOsLite_2026-06-18_NOTICE.txt",
-      "sha256": "6ed64b9c61fd67b8a294cc1a6a13135a22b6a0ace51e1efda47f8c06d5984e76",
-      "bytes": 710081
+      "sha256": "846d80ad25008d68ebe1942a1e726b7c35dd11aed93f50b359a2ee9e935d0b8e",
+      "bytes": 709756
     },
     {
       "role": "other",
       "path": "RaspberryPiOsLite_2026-06-18_NOTICE.html",
-      "sha256": "fcc6708e4cc6286c0d6ca0ab99702dc6311b733e32f976d6dad4a32438a92174",
-      "bytes": 875577
+      "sha256": "00c50586eab00ea54b8b3d1013c3f60dcdbb08e190e484b684a384b45e1fa961",
+      "bytes": 875142
     },
     {
       "role": "vulnerabilities.all",
       "path": "RaspberryPiOsLite_2026-06-18_security.json",
-      "sha256": "1fe4683eded07933be01c562adff9fc8452e8db4416056c9dc645c34e90d6c23",
-      "bytes": 57840324
+      "sha256": "90c793036c5f4190c96977688fffa044b587eb0481f23d66e72bf0246a3ae946",
+      "bytes": 30345917
     },
     {
       "role": "vulnerabilities.trivy",
       "path": "RaspberryPiOsLite_2026-06-18_security_trivy.json",
-      "sha256": "4d966838a3fdf581a1bed0142cfece7c5e40fdf310f171ced28ed1a9941e6051",
-      "bytes": 57787847
+      "sha256": "afba6a3486f66661f8a51e2ee185897da3ae263497bb62077becf29213beb623",
+      "bytes": 29976668
     },
     {
       "role": "other",
       "path": "RaspberryPiOsLite_2026-06-18_security.md",
-      "sha256": "80e4568228cabba50d9c98479962d310fb5b449bc73861fef9aee0aae1bc7040",
-      "bytes": 1372170
+      "sha256": "5a4a8d07a6b1d395e4c3835985341d3ce98bfb9afd9bff4115ac1d75b0565744",
+      "bytes": 711832
     },
     {
       "role": "other",
       "path": "RaspberryPiOsLite_2026-06-18_security.html",
-      "sha256": "3d5375879eafa168ac33151246ba511d6776f438ae76e4ed67a7b62eee8b3ee9",
-      "bytes": 4313158
+      "sha256": "03ef80f9a7d2b93f7f568cd15e81514f392500fe570f1fa2f9d00573479fcb90",
+      "bytes": 2266960
     },
     {
       "role": "conformance",
       "path": "RaspberryPiOsLite_2026-06-18_conformance.json",
-      "sha256": "66453e443abdd73b2a9c2c647b67521ace15b4c2602075cfa0ab22a17c1ce249",
-      "bytes": 60823
+      "sha256": "1cdc6c9c5b1257115850371e7f63fdbb3446a24de064cb03db427d3b7bec03bf",
+      "bytes": 61905
     },
     {
       "role": "other",
       "path": "RaspberryPiOsLite_2026-06-18_conformance.md",
-      "sha256": "7f2478ef15c9b93eafc5ac404c1411f18f84ccf1e2112646c30974a0aa2bb97e",
-      "bytes": 20153
+      "sha256": "4089dd52b22b0fac049bf284c2df484cec9663fc4cc41980685e34172e97d61e",
+      "bytes": 20457
     },
     {
       "role": "other",
       "path": "RaspberryPiOsLite_2026-06-18_conformance.html",
-      "sha256": "3722d7617ac160cf9e3cc37616e25d887429235a1580d8cc8d536b75d2d659d8",
-      "bytes": 44532
+      "sha256": "a9a136d02eea48c810a0f563253a04f0c5e0b28d30248966dd8ef73999f4255d",
+      "bytes": 45024
     },
     {
       "role": "other",
@@ -333,32 +351,38 @@
     {
       "role": "other",
       "path": "RaspberryPiOsLite_2026-06-18_summary.result",
-      "sha256": "968b434eb9de5447159c23d3ec1743b22d52e83c4b6a9894597ec09fb47b4dc7",
+      "sha256": "4a158f073dc7f93701e2737f74633768c6e95d1e3026947e8d047970d0d088cc",
       "bytes": 63
     },
     {
       "role": "other",
       "path": "RaspberryPiOsLite_2026-06-18_risk-report.md",
-      "sha256": "429bbd265c2aacb2b78e62ac88c136a9f0ff0b617cd96d01eb1c3ecca9c4d863",
-      "bytes": 1395735
+      "sha256": "d8b142e0052c63360e4626cba47a40ac4ccc93ab43c80fbdc30c75756b1f9b51",
+      "bytes": 720594
     },
     {
       "role": "other",
       "path": "RaspberryPiOsLite_2026-06-18_risk-report.html",
-      "sha256": "9ccd8df4e244c0c072764cc8e1bef0cee9059eb264bdf97496e62dc9d7d1d26c",
-      "bytes": 2575998
+      "sha256": "db4186111e905384ad1af50e56b0be32bd7cff8254e74a0938aba4c0f3dc6f58",
+      "bytes": 1358605
     },
     {
       "role": "other",
       "path": "RaspberryPiOsLite_2026-06-18_security_epss.json",
-      "sha256": "2efb4948dd25baae0c214ec78f9a920a7a7de0aaa3214b886200cb35a67859e8",
-      "bytes": 103050
+      "sha256": "aeb1840537614460b2addc3a7c3abf2e7781a039c678d2a4d504942ac88f9da0",
+      "bytes": 75193
     },
     {
       "role": "vulnerabilities.other",
       "path": "RaspberryPiOsLite_2026-06-18_security_cvebintool.json",
-      "sha256": "8bda2dcb264fd1275a8068ea74101b878d8f03282b64438a56c2d1db39f3f92a",
-      "bytes": 293366
+      "sha256": "ebfb0d6e85c09d45ef7d5f73ddb6a86ff4a3fd39055eb17c6a025716dacedfe6",
+      "bytes": 334624
+    },
+    {
+      "role": "vulnerabilities.other",
+      "path": "RaspberryPiOsLite_2026-06-18_security_govulndb.json",
+      "sha256": "0efc758a869e884a53ab07801bb2a913a49eb9deb23543257ba04915950bab4f",
+      "bytes": 282
     }
   ]
 }

@@ -13,11 +13,11 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
-        // Primary call to action — SK Red, matching the design language.
+        // Primary call to action in the brand navy.
         default:
-          // The hover state darkens: a lighter tint of the brand fill leaves the white
-          // label at 4.44:1, just under AA.
-          "bg-brand text-brand-foreground shadow-sm hover:bg-brand-strong",
+          // The hover state darkens (--brand-hover), so the white label gains
+          // contrast instead of losing it.
+          "bg-brand text-brand-foreground shadow-sm hover:bg-brand-hover",
         destructive:
           "bg-destructive text-destructive-foreground shadow-sm hover:bg-destructive/90",
         outline:

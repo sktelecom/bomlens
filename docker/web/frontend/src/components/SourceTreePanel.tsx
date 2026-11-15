@@ -1,10 +1,12 @@
 // Copyright 2026 SK Telecom Co., Ltd.
 // SPDX-License-Identifier: Apache-2.0
 
+import { AlertIcon, SyncIcon } from "@primer/octicons-react";
+import { Button, Spinner } from "@primer/react";
+import { Blankslate } from "@primer/react/experimental";
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import { ErrorState, LoadingState } from "@/components/ui/state";
 import { loadScanCode, parseScanCode, type FileNode } from "@/lib/scancode";
 import {
   indexLinks,
@@ -15,6 +17,7 @@ import {
 
 import { SourceFileContent } from "./SourceFileContent";
 import { SourceFileTree } from "./SourceFileTree";
+import "./source-tree.css";
 
 /**
  * What the scan actually looked at: the file tree on the left, the selected
@@ -91,16 +94,38 @@ export function SourceTreePanel({
   const linkTargets = useMemo(() => indexLinks(snapshot), [snapshot]);
 
   if (state === "loading") {
-    return <LoadingState>{t("sourceTree.loading")}</LoadingState>;
+    // The same two-column frame the loaded screen has, so nothing jumps when it arrives.
+    return (
+      <div className="bl-src">
+        <div className="bl-src-grid">
+          <div className="bl-box bl-src-pane" role="status" data-testid="loading-state">
+            <div className="bl-src-wait bl-muted">
+              <Spinner size="small" srText={null} />
+              <span>{t("sourceTree.loading")}</span>
+            </div>
+          </div>
+          <div className="bl-box bl-src-pane" aria-hidden="true" />
+        </div>
+      </div>
+    );
   }
   if (state === "error" || !nodes) {
     return (
-      <ErrorState
-        onRetry={() => setReloadKey((k) => k + 1)}
-        retryLabel={t("retry")}
-      >
-        {t("sourceTree.loadError")}
-      </ErrorState>
+      <div className="bl-box" role="alert" data-testid="error-state">
+        <Blankslate>
+          <Blankslate.Visual>
+            <span className="bl-danger bl-inline">
+              <AlertIcon size={24} />
+            </span>
+          </Blankslate.Visual>
+          <Blankslate.Heading as="h2">{t("sourceTree.loadError")}</Blankslate.Heading>
+          <div className="bl-src-retry">
+            <Button leadingVisual={SyncIcon} onClick={() => setReloadKey((k) => k + 1)}>
+              {t("retry")}
+            </Button>
+          </div>
+        </Blankslate>
+      </div>
     );
   }
 
@@ -108,33 +133,43 @@ export function SourceTreePanel({
   const omitted = totals
     ? totals.skippedBinary + totals.skippedBudget + totals.skippedUnreadable
     : 0;
+  // One line above the tree: what was captured, or that nothing was, then the
+  // licence hint last.
+  const note = [
+    snapshotFile
+      ? totals
+        ? t("sourceViewer.summary", { count: totals.files })
+        : ""
+      : t("sourceViewer.noSnapshot"),
+    totals && totals.links > 0 ? t("sourceViewer.linksSummary", { count: totals.links }) : "",
+    omitted > 0 ? t("sourceViewer.summaryOmitted", { count: omitted }) : "",
+    hasLicenses ? "" : t("sourceTree.noLicenseHint"),
+  ].filter(Boolean);
 
   return (
-    <div className="space-y-2">
-      {!hasLicenses && (
-        <p className="text-body-sm text-muted-foreground">{t("sourceTree.noLicenseHint")}</p>
-      )}
-      {totals && (
-        <p className="text-body-sm text-muted-foreground">
-          {t("sourceViewer.summary", { count: totals.files })}
-          {totals.links > 0 && ` ${t("sourceViewer.linksSummary", { count: totals.links })}`}
-          {omitted > 0 && ` ${t("sourceViewer.summaryOmitted", { count: omitted })}`}
+    <div className="bl-src">
+      {note.length > 0 && (
+        <p className="bl-muted bl-small bl-src-note" data-testid="source-note">
+          {note.join(" ")}
         </p>
       )}
-      <div className="grid gap-3 lg:grid-cols-[minmax(0,24rem)_minmax(0,1fr)]">
-        <SourceFileTree
-          nodes={nodes}
-          selected={selected}
-          onSelect={setSelected}
-        />
-        <div className="max-h-[44rem] min-h-[16rem] overflow-hidden rounded-md border">
+      <div className="bl-src-grid">
+        <div className="bl-box bl-src-pane">
+          <SourceFileTree nodes={nodes} selected={selected} onSelect={setSelected} />
+        </div>
+        <section
+          className="bl-box bl-src-pane"
+          aria-label={selected ?? t("sourceViewer.paneLabel")}
+        >
           <SourceFileContent
+            key={selected ?? ""}
             snapshot={snapshot}
             file={selected ? (byPath.get(selected) ?? null) : null}
             linkTarget={selected ? (linkTargets.get(selected) ?? null) : null}
+            noSnapshot={!snapshotFile}
             path={selected}
           />
-        </div>
+        </section>
       </div>
     </div>
   );

@@ -19,8 +19,7 @@
 # break. External (http/https/mailto) and pure #anchor links are skipped.
 #
 # Separately, a .ko.md page that links to the English `foo.md` instead of its
-# own `foo.ko.md` sibling is not a broken link — mkdocs build --strict does not
-# catch it either, since the English target genuinely exists — but it sends a
+# own `foo.ko.md` sibling is not a broken link, since the English target genuinely exists, but it sends a
 # Korean reader clicking a Korean link straight to an English page. That check
 # runs over every .ko.md under docs/, not just the onboarding list above.
 
@@ -30,10 +29,11 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 fail=0
 
-# Onboarding journey: the pages a newcomer actually follows. Extend as needed.
+# Onboarding journey: the pages a newcomer actually follows. Extend as needed. The home
+# pages (docs-site/home/*.mdx) are not listed: their links are relative to the docs root
+# and are checked on the built site by docs-site/scripts/check-links.mjs.
 DOCS=(
   README.md
-  docs/index.md docs/index.ko.md
   docs/concepts/what-is-sbom.md docs/concepts/what-is-sbom.ko.md
   docs/start/first-scan.md docs/start/first-scan.ko.md
   docs/start/no-cli.md docs/start/no-cli.ko.md

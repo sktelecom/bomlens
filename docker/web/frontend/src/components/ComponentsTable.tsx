@@ -1,43 +1,39 @@
 // Copyright 2026 SK Telecom Co., Ltd.
 // SPDX-License-Identifier: Apache-2.0
 
-import { Fragment, useEffect, useMemo, useRef, useState } from "react";
+import { DownloadIcon, PackageIcon, SearchIcon } from "@primer/octicons-react";
+import { Button, TextInput } from "@primer/react";
+import { Blankslate, Table } from "@primer/react/experimental";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { ArrowDown, ArrowUp, ArrowUpDown, Download, Package, Search, X } from "lucide-react";
-import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
-import { DensityToggle, useDensity } from "@/components/ui/density-toggle";
-import { FilterChip } from "@/components/ui/filter-chip";
-import { Button } from "@/components/ui/button";
-import { CheckMenu, type CheckMenuItem } from "@/components/ui/check-menu";
-import { ToolbarSelect } from "@/components/ui/select";
-import { TOOLBAR_CONTROL } from "@/components/ui/toolbar";
-import { EmptyState } from "@/components/ui/state";
-import type { ComponentItem, Severity } from "@/lib/api";
+
+import { ActiveFilters, FilterMenu, SortHeader } from "@/components/primer";
+import { useDensity } from "@/components/ui/density-toggle";
+import type { ComponentItem } from "@/lib/api";
 import {
   type ComponentFilters,
   type ComponentSortKey,
-  EMPTY_FILTERS,
-  licenseBadges,
   selectComponents,
   type SortDir,
 } from "@/lib/components";
 import { componentCsvRows, csvFilename, downloadCsv, toCsv } from "@/lib/csv";
 import { licenseNeedsDecision } from "@/lib/licenses";
+import { buildQuery, parseQuery, type RouteQuery } from "@/lib/route";
+import { componentsFromQuery, componentsToQuery } from "@/lib/section-query";
+import type { Density } from "@/lib/tableDensity";
 import {
   COMPONENT_COLUMNS,
   COMPONENT_VIEW_KEY,
+  defaultStore,
   readHidden,
   toggleHidden,
   writeHidden,
 } from "@/lib/tableView";
-import { buildQuery, parseQuery, type RouteQuery } from "@/lib/route";
-import { componentsFromQuery, componentsToQuery } from "@/lib/section-query";
-import { cn } from "@/lib/utils";
-import { useFormatNumber } from "@/lib/format";
-import { densityClass, ROW_HEIGHT_PX } from "@/lib/tableDensity";
-import { ComponentRow } from "./components-table/ComponentRow";
-import { SortHeader, type Sort } from "./components-table/SortHeader";
+
+import { ChunkedBody } from "./components-table/ChunkedBody";
+import { ComponentRow, type ShownColumns } from "./components-table/ComponentRow";
+import { type CheckItem, CheckMenu, ViewMenu } from "./components-table/menus";
+import "./components-table/components-table.css";
 
 interface Props {
   items: ComponentItem[];
@@ -45,12 +41,12 @@ interface Props {
   truncated?: boolean;
   /** The scan's id, so an export says which scan it came from. */
   scanId?: string | null;
-  /** Filter and sort state from the URL — what a shared link or a reload
+  /** Filter and sort state from the URL: what a shared link or a reload
    *  restores, and what a global-search term or a picked license arrives as. */
   query?: RouteQuery;
   /** Report state back so the URL can carry it; the shell replaces the hash. */
   onQueryChange?: (query: RouteQuery) => void;
-  /** Open the Vulnerabilities section filtered to this component — the other
+  /** Open the Vulnerabilities section filtered to this component: the other
    *  half of the investigation loop (which CVEs does this row stand for?). */
   onPickVulns?: (name: string) => void;
   /** Jump into the Dependencies tree, expanded to this component's version:
@@ -58,14 +54,7 @@ interface Props {
   onPickDependency?: (name: string, version?: string) => void;
 }
 
-/** Rows are rendered in chunks of this size, one <tbody> per chunk. Chunks far
- *  from the viewport are recycled into a single spacer row of their measured
- *  height, so a large SBOM scrolls the full list while the DOM stays small.
- *  Row heights may vary (wrapping license badges, the expanded detail row), so
- *  spacers use per-chunk measurements, not a global fixed row height. */
-const CHUNK = 100;
-/** Chunks live from the start, before the observer has seen anything. */
-const INITIAL_LIVE: ReadonlySet<number> = new Set([0, 1, 2]);
+type Sort = { key: ComponentSortKey; dir: SortDir };
 
 /** Distinct, sorted, non-empty values. */
 function distinct(values: string[]): string[] {
@@ -74,14 +63,44 @@ function distinct(values: string[]): string[] {
   );
 }
 
+/** Measured on the Primer rows (1280px, lists of firmware files and image packages: 41.3 to 41.8 and
+ *  32.3 to 32.9 px per row, borders included). Only the estimate for a chunk not yet seen; a seen chunk
+ *  keeps its measured height. */
+const ESTIMATED_ROW_PX: Record<Density, number> = { compact: 33, comfortable: 42 };
+
+/** Set once the reader shows the Type column of a single-type scan. */
+const TYPE_SHOWN_KEY = "sbom.components.typeShown";
+function readTypeShown(): boolean {
+  try {
+    return defaultStore()?.getItem(TYPE_SHOWN_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+function writeTypeShown(on: boolean): void {
+  try {
+    defaultStore()?.setItem(TYPE_SHOWN_KEY, on ? "1" : "0");
+  } catch {
+    // Blocked storage: the choice lasts for the session.
+  }
+}
+
+const COLUMN_IDS = COMPONENT_COLUMNS.map((c) => c.id);
+
 /** Searchable, sortable, filterable table of detected SBOM components, with
  *  decision-first Scope and Risk columns (shown when the scan carries that data). */
-export function ComponentsTable({ items, total, truncated, scanId, query, onQueryChange, onPickVulns, onPickDependency }: Props) {
+export function ComponentsTable({
+  items,
+  total,
+  truncated,
+  scanId,
+  query,
+  onQueryChange,
+  onPickVulns,
+  onPickDependency,
+}: Props) {
   const { t } = useTranslation();
-  const fmt = useFormatNumber();
-  const [filters, setFilters] = useState<ComponentFilters>(
-    () => componentsFromQuery(query).filters,
-  );
+  const [filters, setFilters] = useState<ComponentFilters>(() => componentsFromQuery(query).filters);
   const [sort, setSort] = useState<Sort | null>(() => componentsFromQuery(query).sort);
 
   // The URL is the source: a link opened elsewhere, a reload, or a term routed
@@ -108,36 +127,64 @@ export function ComponentsTable({ items, total, truncated, scanId, query, onQuer
     // would fire on every parent render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filters, sort]);
+
   const [openKey, setOpenKey] = useState<string | null>(null);
   const [density, setDensity] = useDensity();
-  // Which columns the reader has hidden, read once from browser-local storage
-  // (the same place the theme and language live — no account, nothing sent).
-  const [hiddenCols, setHiddenCols] = useState<string[]>(() =>
-    readHidden(COMPONENT_VIEW_KEY, COMPONENT_COLUMNS.map((c) => c.id)),
+  // Only what the reader chose is stored. A column with one value says nothing per row, so Type
+  // is also hidden at render time when every component has the same type, until the reader
+  // shows it (remembered by a flag of its own, not by the hidden list).
+  const [hiddenCols, setHiddenCols] = useState<string[]>(() => readHidden(COMPONENT_VIEW_KEY, COLUMN_IDS));
+  const [typeShown, setTypeShown] = useState<boolean>(readTypeShown);
+  const singleType = useMemo(() => new Set(items.map((c) => c.type)).size === 1, [items]);
+  const effectiveHidden = useMemo(
+    () => (singleType && !typeShown && !hiddenCols.includes("type") ? [...hiddenCols, "type"] : hiddenCols),
+    [singleType, typeShown, hiddenCols],
   );
-  // Chunk recycling state: which chunks render real rows, and the measured
-  // pixel height of chunks currently recycled into spacers.
-  const [liveChunks, setLiveChunks] = useState<ReadonlySet<number>>(INITIAL_LIVE);
-  const chunkHeights = useRef(new Map<number, number>());
   const scrollRef = useRef<HTMLDivElement | null>(null);
 
   const types = useMemo(() => distinct(items.map((c) => c.type)), [items]);
   const licenses = useMemo(() => distinct(items.flatMap((c) => c.licenses)), [items]);
+  const typeCounts = useMemo(() => countBy(items, (c) => [c.type]), [items]);
+  const licenseCounts = useMemo(() => countBy(items, (c) => c.licenses), [items]);
 
-  // Adaptive columns/filters: only offer what the scan actually produced.
-  const anyScope = useMemo(() => items.some((c) => c.scope), [items]);
-  const anyVulns = useMemo(() => items.some((c) => c.vulnCount), [items]);
-  const anyVendored = useMemo(() => items.some((c) => c.vendored), [items]);
-  const anyEol = useMemo(() => items.some((c) => c.eol === "true"), [items]);
-  const anyOutdated = useMemo(() => items.some((c) => c.outdated === "true"), [items]);
-  const anyLicenseUnclear = useMemo(
-    () => items.some((c) => licenseNeedsDecision(c.licenses)),
+  // Adaptive columns and filters: only offer what the scan actually produced.
+  const avail = useMemo(
+    () => ({
+      scope: items.some((c) => c.scope),
+      vulns: items.some((c) => c.vulnCount),
+      vendored: items.some((c) => c.vendored),
+      eol: items.some((c) => c.eol === "true"),
+      outdated: items.some((c) => c.outdated === "true"),
+      licenseUnclear: items.some((c) => licenseNeedsDecision(c.licenses)),
+    }),
     [items],
   );
 
-  const filtered = useMemo(
-    () => selectComponents(items, filters, sort),
-    [items, filters, sort],
+  // Which optional columns this scan can offer at all, and which of those the
+  // reader has hidden. A column the scan has no data for is not offered, so the
+  // menu never lists a column that would come up empty.
+  const available: Record<string, boolean> = useMemo(
+    () => ({ version: true, type: true, scope: avail.scope, risk: avail.vulns, license: true }),
+    [avail],
+  );
+  const shown: ShownColumns = useMemo(() => {
+    const shows = (id: string) => available[id] && !effectiveHidden.includes(id);
+    return {
+      version: shows("version"),
+      type: shows("type"),
+      scope: shows("scope"),
+      risk: shows("risk"),
+      license: shows("license"),
+    };
+  }, [available, effectiveHidden]);
+
+  const rows = useMemo(() => selectComponents(items, filters, sort), [items, filters, sort]);
+
+  const onToggle = useCallback((key: string) => setOpenKey((k) => (k === key ? null : key)), []);
+  const rowKey = (c: ComponentItem, i: number) => c.purl || `${c.name}-${i}`;
+  const openIndex = useMemo(
+    () => (openKey === null ? -1 : rows.findIndex((c, i) => (c.purl || `${c.name}-${i}`) === openKey)),
+    [rows, openKey],
   );
 
   // Exports what the table is showing: this filter, this sort, this order.
@@ -154,345 +201,218 @@ export function ComponentsTable({ items, total, truncated, scanId, query, onQuer
     ];
     downloadCsv(
       csvFilename(scanId ?? "scan", "components", new Date().toISOString().slice(0, 10)),
-      toCsv(componentCsvRows(filtered, headers)),
+      toCsv(componentCsvRows(rows, headers)),
     );
   };
-
-  // A new visible set invalidates every measurement and starts from the top.
-  useEffect(() => {
-    setLiveChunks(INITIAL_LIVE);
-    chunkHeights.current.clear();
-  }, [filters, sort, items]);
-
-  // One observer over the per-chunk <tbody> elements (stable nodes — React
-  // keeps them keyed by chunk index across live/spacer swaps). A chunk near
-  // the viewport goes live; one leaving it is measured, then recycled.
-  const chunkCount = Math.ceil(filtered.length / CHUNK);
-  useEffect(() => {
-    const root = scrollRef.current;
-    if (!root) return;
-    const io = new IntersectionObserver(
-      (entries) => {
-        setLiveChunks((prev) => {
-          const next = new Set(prev);
-          for (const e of entries) {
-            const idx = Number((e.target as HTMLElement).dataset.chunk);
-            if (Number.isNaN(idx)) continue;
-            if (e.isIntersecting) {
-              next.add(idx);
-            } else {
-              if (prev.has(idx)) {
-                chunkHeights.current.set(idx, e.boundingClientRect.height);
-              }
-              next.delete(idx);
-            }
-          }
-          return next;
-        });
-      },
-      { root, rootMargin: "600px 0px" },
-    );
-    for (const el of root.querySelectorAll("tbody[data-chunk]")) io.observe(el);
-    return () => io.disconnect();
-  }, [chunkCount]);
 
   if (total === 0) {
     return (
-      <EmptyState icon={Package} hint={t("result.componentsEmptyHint")}>
-        {t("result.componentsEmpty")}
-      </EmptyState>
+      <div className="bl-box bl-comp-gap" data-testid="components-empty">
+        <Blankslate spacious>
+          <Blankslate.Visual>
+            <PackageIcon size={24} />
+          </Blankslate.Visual>
+          <Blankslate.Heading as="h2">{t("result.componentsEmpty")}</Blankslate.Heading>
+          <Blankslate.Description>{t("result.componentsEmptyHint")}</Blankslate.Description>
+        </Blankslate>
+      </div>
     );
   }
 
-  const onSort = (key: ComponentSortKey) =>
-    setSort((s) =>
-      s?.key === key ? { key, dir: s.dir === "asc" ? "desc" : "asc" } : { key, dir: "asc" },
-    );
   const patch = (p: Partial<ComponentFilters>) => setFilters((f) => ({ ...f, ...p }));
+  const onSort = (key: ComponentSortKey) =>
+    setSort((s) => (s?.key === key ? { key, dir: s.dir === "asc" ? "desc" : "asc" } : { key, dir: "asc" }));
 
-  // Which optional columns this scan can offer at all, and which of those the
-  // reader has hidden. A column the scan has no data for is not offered, so the
-  // menu never lists a column that would come up empty.
-  const columnAvailable: Record<string, boolean> = {
-    version: true,
-    type: true,
-    scope: anyScope,
-    risk: anyVulns,
-    license: true,
-  };
-  const shows = (id: string) => columnAvailable[id] && !hiddenCols.includes(id);
-  const showVersion = shows("version");
-  const showType = shows("type");
-  const showScope = shows("scope");
-  const showRisk = shows("risk");
-  const showLicense = shows("license");
-  const colCount =
-    1 + [showVersion, showType, showScope, showRisk, showLicense].filter(Boolean).length;
+  // The name keeps at least 20rem and takes whatever the others leave.
+  const cols = [
+    "minmax(min(20rem, 100%), 1fr)",
+    // A long version wraps; every other column is as wide as its content, so a word is never split.
+    ...(shown.version ? ["fit-content(14rem)"] : []),
+    ...(shown.type ? ["max-content"] : []),
+    ...(shown.scope ? ["max-content"] : []),
+    ...(shown.risk ? ["max-content"] : []),
+    ...(shown.license ? ["max-content"] : []),
+  ].join(" ");
 
-  const toggleColumn = (id: string) => {
-    setHiddenCols((prev) => {
-      const next = toggleHidden(prev, id);
-      writeHidden(COMPONENT_VIEW_KEY, next);
-      return next;
-    });
-  };
-
-  // The toggles that used to sit in a row of chips, as one menu. Only the ones
-  // this scan has data for appear.
-  const filterItems: CheckMenuItem[] = [
-    anyVulns && {
-      id: "hasVulns",
-      label: t("result.filterHasVulns"),
-      checked: filters.hasVulns,
-      onToggle: () => patch({ hasVulns: !filters.hasVulns }),
-    },
-    anyScope && {
-      id: "directOnly",
-      label: t("result.filterDirectOnly"),
-      checked: filters.directOnly,
-      onToggle: () => patch({ directOnly: !filters.directOnly }),
-    },
-    anyVendored && {
-      id: "needsReview",
-      label: t("result.filterNeedsReview"),
-      checked: filters.needsReview,
-      onToggle: () => patch({ needsReview: !filters.needsReview }),
-    },
-    anyEol && {
-      id: "eolOnly",
-      label: t("result.filterEol"),
-      checked: filters.eolOnly,
-      onToggle: () => patch({ eolOnly: !filters.eolOnly }),
-    },
-    anyOutdated && {
-      id: "outdatedOnly",
-      label: t("result.filterOutdated"),
-      checked: filters.outdatedOnly,
-      onToggle: () => patch({ outdatedOnly: !filters.outdatedOnly }),
-    },
+  const flag = (id: keyof ComponentFilters, label: string, on: boolean): CheckItem | false =>
+    on && {
+      id,
+      label,
+      checked: Boolean(filters[id]),
+      onToggle: () => patch({ [id]: !filters[id] } as Partial<ComponentFilters>),
+    };
+  // The toggles, as one menu. Only the ones this scan has data for appear.
+  const filterItems = [
+    flag("hasVulns", t("result.filterHasVulns"), avail.vulns),
+    flag("directOnly", t("result.filterDirectOnly"), avail.scope),
+    flag("needsReview", t("result.filterNeedsReview"), avail.vendored),
+    flag("eolOnly", t("result.filterEol"), avail.eol),
+    flag("outdatedOnly", t("result.filterOutdated"), avail.outdated),
     // Offered only when there is something to narrow to: on a tree whose licences
     // all resolved, the filter would return the whole table and say nothing.
-    anyLicenseUnclear && {
-      id: "licenseUnclear",
-      label: t("result.filterLicenseUnclear"),
-      checked: filters.licenseUnclear,
-      onToggle: () => patch({ licenseUnclear: !filters.licenseUnclear }),
-    },
-  ].filter(Boolean) as CheckMenuItem[];
+    flag("licenseUnclear", t("result.filterLicenseUnclear"), avail.licenseUnclear),
+  ].filter(Boolean) as CheckItem[];
 
-  const columnItems: CheckMenuItem[] = COMPONENT_COLUMNS.filter(
-    (c) => columnAvailable[c.id],
-  ).map((c) => ({
+  const columnItems: CheckItem[] = COMPONENT_COLUMNS.filter((c) => available[c.id]).map((c) => ({
     id: c.id,
     label: t(c.labelKey),
-    checked: !hiddenCols.includes(c.id),
-    onToggle: () => toggleColumn(c.id),
+    checked: !effectiveHidden.includes(c.id),
+    onToggle: () => {
+      const showing = effectiveHidden.includes(c.id);
+      const next = showing ? hiddenCols.filter((h) => h !== c.id) : toggleHidden(hiddenCols, c.id);
+      setHiddenCols(next);
+      writeHidden(COMPONENT_VIEW_KEY, next);
+      if (c.id === "type") {
+        setTypeShown(showing);
+        writeTypeShown(showing);
+      }
+    },
   }));
 
-  // The active toggles, as removable chips. They appear only once something is
-  // on, so an unfiltered table carries no row of controls it is not using.
-  const activeChips = filterItems.filter((i) => i.checked);
+  // The active filters as removable chips; they appear only once something is on.
+  const chips = [
+    ...(filters.query ? [{ key: "q", label: `"${filters.query}"`, onRemove: () => patch({ query: "" }) }] : []),
+    ...(filters.type
+      ? [{ key: "type", label: `${t("result.colType")}: ${filters.type}`, onRemove: () => patch({ type: "" }) }]
+      : []),
+    ...(filters.license
+      ? [{ key: "license", label: `${t("result.colLicense")}: ${filters.license}`, onRemove: () => patch({ license: "" }) }]
+      : []),
+    ...filterItems.filter((i) => i.checked).map((i) => ({ key: i.id, label: i.label, onRemove: i.onToggle })),
+  ];
 
-  // Row keys are purl-or-name based (stable across chunk boundaries); the
-  // chunk holding the expanded row is pinned live so it can never be recycled
-  // out from under the open detail panel.
-  const rowKey = (c: ComponentItem, gi: number) => c.purl || `${c.name}-${gi}`;
-  const openChunk =
-    openKey === null
-      ? -1
-      : Math.floor(filtered.findIndex((c, gi) => rowKey(c, gi) === openKey) / CHUNK);
-  const chunks: ComponentItem[][] = [];
-  for (let i = 0; i < filtered.length; i += CHUNK) chunks.push(filtered.slice(i, i + CHUNK));
+  const sortHeader = (key: ComponentSortKey, label: string) => (
+    <SortHeader label={label} active={sort?.key === key} dir={sort?.dir ?? "asc"} onSort={() => onSort(key)} />
+  );
 
   return (
-    <div className="space-y-3">
-      <div className="flex flex-wrap items-center gap-2">
-        <div className="relative min-w-[10rem] flex-1">
-          <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            value={filters.query}
-            onChange={(e) => patch({ query: e.target.value })}
-            placeholder={t("result.componentsSearch")}
-            className={cn(TOOLBAR_CONTROL, "pl-8")}
-          />
-        </div>
+    <div className="bl-comp bl-comp-gap">
+      <div className="bl-filterbar">
+        <TextInput
+          block
+          type="search"
+          leadingVisual={SearchIcon}
+          value={filters.query}
+          onChange={(e) => patch({ query: e.target.value })}
+          placeholder={t("result.componentsSearch")}
+          aria-label={t("result.componentsSearch")}
+          className="bl-comp-search"
+        />
         {types.length > 1 && (
-          <ToolbarSelect
+          <FilterMenu
+            name={t("result.colType")}
+            allLabel={t("result.allTypes")}
             value={filters.type}
-            onChange={(e) => patch({ type: e.target.value })}
-            aria-label={t("result.allTypes")}
-            // Capped so a long option value cannot push the toolbar onto a
-            // second line; the native select still shows the full text open.
-            className="max-w-40"
-          >
-            <option value="">{t("result.allTypes")}</option>
-            {types.map((ty) => (
-              <option key={ty} value={ty}>
-                {ty}
-              </option>
-            ))}
-          </ToolbarSelect>
+            onChange={(v) => patch({ type: v })}
+            options={types.map((ty) => ({ value: ty, text: ty, count: typeCounts.get(ty) ?? 0 }))}
+          />
         )}
-        {/* Also shown for a single license when one is selected — a filter
-            routed in from the Licenses section must stay clearable. */}
+        {/* Also shown for a single license when one is selected: a filter routed
+            in from the Licenses section must stay clearable. */}
         {(licenses.length > 1 || filters.license) && (
-          <ToolbarSelect
+          <FilterMenu
+            name={t("result.colLicense")}
+            allLabel={t("result.allLicenses")}
             value={filters.license}
-            onChange={(e) => patch({ license: e.target.value })}
-            aria-label={t("result.allLicenses")}
-            className="max-w-44"
-          >
-            <option value="">{t("result.allLicenses")}</option>
-            {licenses.map((l) => (
-              <option key={l} value={l}>
-                {l}
-              </option>
-            ))}
-          </ToolbarSelect>
+            onChange={(v) => patch({ license: v })}
+            options={licenses.map((l) => ({ value: l, text: l, count: licenseCounts.get(l) ?? 0 }))}
+          />
         )}
-        {filterItems.length > 0 && (
-          <CheckMenu label={t("result.filters")} items={filterItems} />
-        )}
-        <CheckMenu label={t("result.columns")} items={columnItems} />
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          className={cn(TOOLBAR_CONTROL, "shrink-0")}
-          disabled={filtered.length === 0}
-          onClick={exportCsv}
-        >
-          <Download className="mr-1.5 h-3.5 w-3.5" aria-hidden />
+        {filterItems.length > 0 && <CheckMenu name={t("result.filters")} items={filterItems} />}
+        <ViewMenu density={density} onDensity={setDensity} columns={columnItems} />
+        <span className="bl-grow" />
+        <Button leadingVisual={DownloadIcon} disabled={rows.length === 0} onClick={exportCsv}>
           {t("result.exportCsv")}
         </Button>
-        <DensityToggle density={density} onChange={setDensity} />
-        {/* The count closes the toolbar rather than starting a line of its own,
-            which is what made the controls read as four stacked rows. */}
-        <div className="ml-auto text-label text-muted-foreground">
-          {t("result.componentsCount", { shown: filtered.length, total })}
-          {/* "list truncated" left the reader guessing how much they were
-              looking at. items.length is what the server sent for this scan. */}
-          {truncated ? ` · ${t("result.truncated", { count: items.length })}` : ""}
-        </div>
       </div>
-
-      {activeChips.length > 0 && (
-        <div className="flex flex-wrap items-center gap-2">
-          {activeChips.map((chip) => (
-            <FilterChip key={chip.id} active onClick={chip.onToggle}>
-              {chip.label}
-              <X className="ml-1 h-3 w-3" aria-hidden />
-            </FilterChip>
-          ))}
-          <button
-            type="button"
-            onClick={() =>
-              patch({
-                hasVulns: false,
-                directOnly: false,
-                needsReview: false,
-                eolOnly: false,
-                outdatedOnly: false,
-                licenseUnclear: false,
-              })
-            }
-            className="rounded text-label text-muted-foreground underline underline-offset-2 hover:text-foreground hover:no-underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-          >
-            {t("result.clearFilters")}
-          </button>
+      <ActiveFilters
+        chips={chips}
+        onClear={() =>
+          patch({
+            query: "",
+            type: "",
+            license: "",
+            hasVulns: false,
+            directOnly: false,
+            needsReview: false,
+            eolOnly: false,
+            outdatedOnly: false,
+            licenseUnclear: false,
+          })
+        }
+        summary={
+          chips.length > 0 || truncated ? (
+            <>
+              {t("result.componentsCount", { shown: rows.length, total })}
+              {truncated ? ` · ${t("result.truncated", { count: items.length })}` : ""}
+            </>
+          ) : undefined
+        }
+      />
+      {rows.length === 0 ? (
+        <div className="bl-box">
+          <Blankslate>
+            <Blankslate.Visual>
+              <SearchIcon size={24} />
+            </Blankslate.Visual>
+            <Blankslate.Heading as="h2">{t("result.noMatch")}</Blankslate.Heading>
+          </Blankslate>
         </div>
-      )}
-
-      <div ref={scrollRef} className="max-h-[max(44rem,calc(100vh-21rem))] overflow-auto rounded-md border">
-        <table className={cn("w-full text-left text-label", densityClass(density))}>
-          <thead className="sticky top-0 z-10 bg-muted/95 backdrop-blur">
-            <tr className="border-b">
-              {/* The name column is pinned: reading the columns on the right of a
-                  wide table used to lose track of which component the row was.
-                  Its background must be opaque — the pinned cell slides over the
-                  others, and the header's translucent tint would show them
-                  through. z-30 keeps it above both the sticky header (z-10) and
-                  the pinned body cells (z-10). */}
-              <SortHeader
-                label={t("result.colName")}
-                sortKey="name"
-                sort={sort}
-                onSort={onSort}
-                className="sticky left-0 z-30 bg-muted"
+      ) : (
+        <Table.Container className="bl-comp-table">
+          <div className="bl-comp-scroll" ref={scrollRef} data-density={density}>
+            <Table
+              aria-label={t("nav.components")}
+              gridTemplateColumns={cols}
+              cellPadding={density === "compact" ? "condensed" : "normal"}
+            >
+              <Table.Head>
+                <Table.Row>
+                  {sortHeader("name", t("result.colName"))}
+                  {shown.version && sortHeader("version", t("result.colVersion"))}
+                  {shown.type && sortHeader("type", t("result.colType"))}
+                  {shown.scope && sortHeader("scope", t("result.colScope"))}
+                  {shown.risk && sortHeader("risk", t("result.colRisk"))}
+                  {shown.license && <Table.Header>{t("result.colLicense")}</Table.Header>}
+                </Table.Row>
+              </Table.Head>
+              <ChunkedBody
+                rows={rows}
+                observeRoot={scrollRef}
+                openIndex={openIndex}
+                rowHeight={ESTIMATED_ROW_PX[density]}
+                resetKey={rows}
+                render={(c, i) => {
+                  const key = rowKey(c, i);
+                  return (
+                    <ComponentRow
+                      key={key}
+                      item={c}
+                      rowKey={key}
+                      index={i}
+                      isOpen={openKey === key}
+                      onToggle={onToggle}
+                      shown={shown}
+                      scanId={scanId}
+                      eolFilter={filters.eolOnly}
+                      outdatedFilter={filters.outdatedOnly}
+                      onPickVulns={onPickVulns}
+                      onPickDependency={onPickDependency}
+                    />
+                  );
+                }}
               />
-              {showVersion && (
-                <SortHeader label={t("result.colVersion")} sortKey="version" sort={sort} onSort={onSort} className="min-w-24" />
-              )}
-              {showType && (
-                <SortHeader label={t("result.colType")} sortKey="type" sort={sort} onSort={onSort} className="min-w-24" />
-              )}
-              {showScope && (
-                <SortHeader label={t("result.colScope")} sortKey="scope" sort={sort} onSort={onSort} className="min-w-20" />
-              )}
-              {showRisk && (
-                <SortHeader label={t("result.colRisk")} sortKey="risk" sort={sort} onSort={onSort} className="min-w-24" />
-              )}
-              {showLicense && (
-                <th className="whitespace-nowrap px-3 py-2 font-medium">{t("result.colLicense")}</th>
-              )}
-            </tr>
-          </thead>
-          {chunks.map((chunkItems, ci) =>
-            liveChunks.has(ci) || ci === openChunk ? (
-              <tbody key={ci} data-chunk={ci}>
-            {chunkItems.map((c, i) => {
-              const key = rowKey(c, ci * CHUNK + i);
-              const isOpen = openKey === key;
-              return (
-                <ComponentRow
-                  key={key}
-                  item={c}
-                  isOpen={isOpen}
-                  onToggle={() => setOpenKey(isOpen ? null : key)}
-                  shown={{
-                    version: showVersion,
-                    type: showType,
-                    scope: showScope,
-                    risk: showRisk,
-                    license: showLicense,
-                  }}
-                  colCount={colCount}
-                  onPickVulns={onPickVulns}
-                  onPickDependency={onPickDependency}
-                />
-              );
-            })}
-              </tbody>
-            ) : (
-              // Recycled chunk: one spacer row holding the chunk's measured
-              // height (or an estimate before its first paint), so the
-              // scrollbar geometry stays correct without the row DOM.
-              <tbody key={ci} data-chunk={ci} aria-hidden>
-                <tr>
-                  <td
-                    colSpan={colCount}
-                    style={{
-                      height:
-                        chunkHeights.current.get(ci) ??
-                        chunkItems.length * (ROW_HEIGHT_PX[density] + 1),
-                      padding: 0,
-                    }}
-                  />
-                </tr>
-              </tbody>
-            ),
-          )}
-          {filtered.length === 0 && (
-            <tbody>
-              <tr>
-                <td colSpan={colCount} className="px-3 py-6 text-center text-muted-foreground">
-                  {t("result.noMatch")}
-                </td>
-              </tr>
-            </tbody>
-          )}
-        </table>
-      </div>
+            </Table>
+          </div>
+        </Table.Container>
+      )}
     </div>
   );
+}
+
+/** How many items carry each value (an item with several values counts once for each). */
+function countBy(items: ComponentItem[], valuesOf: (c: ComponentItem) => string[]): Map<string, number> {
+  const out = new Map<string, number>();
+  for (const c of items) for (const v of new Set(valuesOf(c))) out.set(v, (out.get(v) ?? 0) + 1);
+  return out;
 }

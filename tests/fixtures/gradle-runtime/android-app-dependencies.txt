@@ -1,0 +1,12 @@
+
+------------------------------------------------------------
+Project ':app'
+------------------------------------------------------------
+
+debugRuntimeClasspath - Resolved configuration for runtime for variant: debug
+\--- junit:junit:4.13.2
+
+freeReleaseRuntimeClasspath - Resolved configuration for runtime for variant: freeRelease
++--- com.squareup.okhttp3:okhttp:4.12.0
+|    \--- com.squareup.okio:okio:3.6.0 -> com.squareup.okio:okio-jvm:3.6.0
+\--- com.google.code.gson:gson:2.10.1

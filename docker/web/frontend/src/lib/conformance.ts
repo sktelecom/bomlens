@@ -449,3 +449,27 @@ export function resultQuality(conformance: ConformanceSummary, isAi = false): Re
     license,
   };
 }
+
+/** The report files the Conformance screen offers: the HTML, Markdown and other
+ *  renderings of the checks, by name. The machine-readable JSON is not one. */
+export function conformanceReports<T extends { name: string }>(results: readonly T[]): T[] {
+  return results
+    .filter((r) => r.name.includes("_conformance.") && !r.name.endsWith(".json"))
+    .sort((a, b) => a.name.localeCompare(b.name));
+}
+
+/**
+ * A measurement line for display: the "n/m" counts get digit grouping and the
+ * English "component(s)" the pipeline writes becomes a counted, localized unit
+ * (`unit(m)` returns e.g. "components"). Anything else is left as written.
+ */
+export function formatMeasure(
+  detail: string,
+  fmt: (n: number) => string,
+  unit: (count: number) => string,
+): string {
+  return detail.replace(/(\d+)\/(\d+)( component\(s\))?/g, (_m, a: string, b: string, u?: string) => {
+    const head = `${fmt(Number(a))}/${fmt(Number(b))}`;
+    return u ? `${head} ${unit(Number(b))}` : head;
+  });
+}
