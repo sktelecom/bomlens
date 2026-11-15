@@ -2,7 +2,7 @@
   "project": "BertBaseUncased",
   "format": "CycloneDX",
   "result": "pass",
-  "generatedAt": "2026-11-12T09:11:15Z",
+  "generatedAt": "2026-11-15T13:43:31Z",
   "profile": "default",
   "untraceableComponents": 0,
   "checks": [
@@ -30,7 +30,7 @@
       "label": "Timestamp (metadata.timestamp)",
       "required": true,
       "status": "pass",
-      "detail": "2026-11-12T09:11:12+00:00",
+      "detail": "2026-11-15T13:43:28+00:00",
       "missing": [],
       "regulations": [
         {
@@ -42,7 +42,7 @@
         }
       ],
       "label_ko": "타임스탬프 (metadata.timestamp)",
-      "detail_ko": "2026-11-12T09:11:12+00:00"
+      "detail_ko": "2026-11-15T13:43:28+00:00"
     },
     {
       "id": "tools",
@@ -479,15 +479,18 @@
       "label": "SBOM generation context",
       "label_ko": "SBOM 생성 맥락",
       "required": false,
-      "status": "warn",
-      "detail": "not present in the SBOM",
+      "status": "pass",
+      "detail": "present, also read from metadata.lifecycles",
       "missing": [],
       "evidence": [],
       "cluster": "metadata",
       "source": "inferred",
       "role": "sbom-author",
+      "via": [
+        "metadata.lifecycles"
+      ],
       "regulations": [],
-      "detail_ko": "SBOM에 없음"
+      "detail_ko": "present, also read from metadata.lifecycles"
     },
     {
       "id": "g7-meta-timestamp",
@@ -2561,7 +2564,7 @@
             "label": "Timestamp (metadata.timestamp)",
             "status": "pass",
             "source": null,
-            "detail": "2026-11-12T09:11:12+00:00",
+            "detail": "2026-11-15T13:43:28+00:00",
             "refs": [
               "Section 5.2.1"
             ]

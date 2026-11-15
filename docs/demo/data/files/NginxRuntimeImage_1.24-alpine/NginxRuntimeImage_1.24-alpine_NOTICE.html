@@ -2,17 +2,18 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline';">
-<title>Open Source Notice — NginxRuntimeImage</title>
+<title>Third-party open source notice — NginxRuntimeImage</title>
 <style>
 :root {
-  --background: 0 0% 98%;
+  --background: 0 0% 100%;
   --foreground: 240 6% 10%;
   --card: 0 0% 100%;
   --card-foreground: 240 6% 10%;
   --popover: 0 0% 100%;
   --popover-foreground: 240 6% 10%;
-  --muted: 240 5% 96%;
+  --muted: 210 29% 97%;
   --muted-foreground: 240 4% 44%;
   --border: 240 5% 91%;
   --input: 240 5% 91%;
@@ -20,17 +21,17 @@
   --primary-foreground: 0 0% 98%;
   --selected: 240 6% 10%;
   --selected-foreground: 0 0% 98%;
-  --secondary: 240 5% 96%;
+  --secondary: 210 29% 97%;
   --secondary-foreground: 240 6% 10%;
-  --accent: 240 5% 96%;
+  --accent: 210 29% 97%;
   --accent-foreground: 240 6% 10%;
   --destructive: 0 72% 51%;
   --destructive-foreground: 0 0% 98%;
-  --ring: 349 100% 46%;
-  --brand: 349 100% 46%;
+  --ring: 224.3 76.3% 48%;
+  --brand: 224.3 76.3% 48%;
   --brand-foreground: 0 0% 100%;
-  --brand-strong: 349 100% 38%;
-  --brand-accent: 24 90% 55%;
+  --brand-strong: 224.3 76.3% 48%;
+  --brand-hover: 225.9 70.7% 40.2%;
   --sidebar: 0 0% 100%;
   --sidebar-foreground: 240 6% 10%;
   --sidebar-border: 240 5% 91%;
@@ -66,14 +67,14 @@
   --role-neutral-muted: 238 238 239;
   --role-neutral-emphasis: 113 113 122;
   --role-neutral-border: 191 191 195;
-  --cat-permissive-fg: 12 100 91;
-  --cat-permissive-muted: 227 240 239;
-  --cat-permissive-emphasis: 24 134 123;
-  --cat-permissive-border: 151 201 196;
-  --cat-weak-fg: 31 45 111;
-  --cat-weak-muted: 232 235 247;
-  --cat-weak-emphasis: 66 87 189;
-  --cat-weak-border: 170 179 225;
+  --cat-permissive-fg: 63 63 70;
+  --cat-permissive-muted: 238 238 239;
+  --cat-permissive-emphasis: 136 136 144;
+  --cat-permissive-border: 191 191 195;
+  --cat-weak-fg: 74 80 20;
+  --cat-weak-muted: 240 242 226;
+  --cat-weak-emphasis: 112 121 28;
+  --cat-weak-border: 196 202 146;
   --cat-strong-fg: 82 40 103;
   --cat-strong-muted: 241 234 244;
   --cat-strong-emphasis: 137 78 166;
@@ -86,21 +87,21 @@
   --cat-review-muted: 240 237 234;
   --cat-review-emphasis: 131 106 84;
   --cat-review-border: 199 188 178;
-  --code-keyword: 207 34 46;
-  --code-string: 10 48 105;
+  --code-keyword: 29 78 216;
+  --code-string: 6 95 70;
   --code-comment: 110 119 129;
-  --code-number: 5 80 174;
-  --code-title: 102 57 186;
+  --code-number: 133 77 14;
+  --code-title: 36 41 47;
 }
 @media screen and (prefers-color-scheme: dark) {
 :root {
-  --background: 240 6% 7%;
+  --background: 216 28% 7%;
   --foreground: 0 0% 98%;
-  --card: 240 4% 12%;
+  --card: 216 28% 7%;
   --card-foreground: 0 0% 98%;
-  --popover: 240 4% 12%;
+  --popover: 214 25% 11%;
   --popover-foreground: 0 0% 98%;
-  --muted: 240 4% 16%;
+  --muted: 214 25% 11%;
   --muted-foreground: 240 5% 65%;
   --border: 240 4% 24%;
   --input: 240 4% 24%;
@@ -108,18 +109,18 @@
   --primary-foreground: 240 6% 10%;
   --selected: 240 5% 30%;
   --selected-foreground: 0 0% 98%;
-  --secondary: 240 4% 16%;
+  --secondary: 215 18% 13%;
   --secondary-foreground: 0 0% 98%;
-  --accent: 240 4% 16%;
+  --accent: 215 18% 13%;
   --accent-foreground: 0 0% 98%;
   --destructive: 0 72% 51%;
   --destructive-foreground: 0 0% 98%;
-  --ring: 349 100% 62%;
-  --brand: 349 100% 46%;
+  --ring: 213.1 93.9% 67.8%;
+  --brand: 224.3 76.3% 48%;
   --brand-foreground: 0 0% 100%;
-  --brand-strong: 349 100% 68%;
-  --brand-accent: 24 90% 60%;
-  --sidebar: 240 5% 10%;
+  --brand-strong: 213.1 93.9% 67.8%;
+  --brand-hover: 225.9 70.7% 40.2%;
+  --sidebar: 216 28% 7%;
   --sidebar-foreground: 0 0% 98%;
   --sidebar-border: 240 4% 24%;
   --role-danger-fg: 252 165 165;
@@ -146,14 +147,14 @@
   --role-neutral-muted: 46 46 50;
   --role-neutral-emphasis: 161 161 170;
   --role-neutral-border: 86 86 91;
-  --cat-permissive-fg: 134 234 224;
-  --cat-permissive-muted: 27 50 51;
-  --cat-permissive-emphasis: 40 189 174;
-  --cat-permissive-border: 31 98 93;
-  --cat-weak-fg: 194 201 240;
-  --cat-weak-muted: 43 45 59;
-  --cat-weak-emphasis: 124 139 218;
-  --cat-weak-border: 71 77 114;
+  --cat-permissive-fg: 212 212 216;
+  --cat-permissive-muted: 46 46 50;
+  --cat-permissive-emphasis: 118 118 126;
+  --cat-permissive-border: 86 86 91;
+  --cat-weak-fg: 208 214 140;
+  --cat-weak-muted: 47 49 33;
+  --cat-weak-emphasis: 168 178 72;
+  --cat-weak-border: 92 97 50;
   --cat-strong-fg: 223 198 235;
   --cat-strong-muted: 52 44 58;
   --cat-strong-emphasis: 183 134 208;
@@ -166,197 +167,248 @@
   --cat-review-muted: 54 50 48;
   --cat-review-emphasis: 196 169 146;
   --cat-review-border: 103 91 82;
-  --code-keyword: 255 123 114;
-  --code-string: 165 214 255;
+  --code-keyword: 96 165 250;
+  --code-string: 110 231 183;
   --code-comment: 145 152 161;
-  --code-number: 121 192 255;
-  --code-title: 210 168 255;
+  --code-number: 232 200 110;
+  --code-title: 230 237 243;
 }
 }
 :root{
   color-scheme:light dark;
-  --bg:hsl(var(--background));--surface:hsl(var(--card));--text:hsl(var(--foreground));
+  --bg:hsl(var(--card));--surface:hsl(var(--card));--text:hsl(var(--foreground));
   --text-muted:hsl(var(--muted-foreground));--line:hsl(var(--border));--th-bg:hsl(var(--muted));
   --link:hsl(var(--brand-strong));
-  --radius:.375rem;--radius-card:.5rem;
-  --shadow:0 1px 2px rgb(0 0 0/.04),0 2px 8px -2px rgb(0 0 0/.08);
+  --radius:6px;
   --font:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;
   --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
 }
-@media screen and (prefers-color-scheme:dark){:root{
-  --shadow:0 1px 2px rgb(0 0 0/.3),0 2px 8px -2px rgb(0 0 0/.5);
-}}
 *{box-sizing:border-box;}
-body{font-family:var(--font);font-size:var(--font-size-body);background:var(--bg);color:var(--text);
-  max-width:1040px;margin:0 auto;padding:2.5rem 1.5rem 4rem;line-height:1.55;
-  -webkit-font-smoothing:antialiased;}
-a{color:var(--link);}
-.report-header{display:flex;align-items:flex-end;justify-content:space-between;
-  gap:1rem;flex-wrap:wrap;padding-bottom:.85rem;border-bottom:1px solid var(--line);
-  margin-bottom:1.5rem;}
-.wordmark{display:flex;align-items:center;gap:.5rem;font-size:var(--font-size-title);font-weight:800;
-  letter-spacing:-.02em;color:hsl(var(--brand));}
-.wordmark .tag{font-size:var(--font-size-caption);font-weight:700;letter-spacing:.1em;color:var(--text-muted);
-  border:1px solid var(--line);border-radius:999px;padding:.15rem .5rem;background:var(--surface);}
-.report-kind{font-size:var(--font-size-label);font-weight:600;color:var(--text-muted);
-  text-transform:uppercase;letter-spacing:.07em;}
-h1{font-size:var(--font-size-display);font-weight:700;letter-spacing:-.01em;line-height:1.25;margin:.2rem 0 .35rem;}
-h2{font-size:var(--font-size-title);font-weight:600;letter-spacing:-.01em;margin:2.1rem 0 .8rem;}
-h3{font-size:var(--font-size-heading);font-weight:600;margin:1.3rem 0 .4rem;}
-.subtitle{font-size:var(--font-size-body);color:var(--text-muted);margin:0 0 .35rem;}
-.meta{color:var(--text-muted);font-size:var(--font-size-body-sm);margin:.15rem 0 0;}
+html{-webkit-text-size-adjust:100%;}
+body{font-family:var(--font);font-size:var(--font-size-body-sm);background:var(--bg);color:var(--text);
+  max-width:1280px;margin:0 auto;padding:0 32px 48px;line-height:1.5;
+  -webkit-font-smoothing:antialiased;overflow-wrap:break-word;}
+a{color:var(--link);text-decoration:underline;text-underline-offset:.2em;}
+/* Top bar and page head */
+.topbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:12px 0;
+  border-bottom:1px solid var(--line);margin-bottom:24px;}
+.topbar .brand{display:inline-flex;align-items:center;gap:8px;font-weight:600;color:var(--text);}
+.topbar .brand svg{width:20px;height:20px;flex:none;display:block;}
+.topbar .sep{color:var(--text-muted);}
+.topbar .proj{font-weight:600;}
+.topbar .proj a{color:inherit;text-decoration-thickness:1px;}
+.topbar .ver,.desc .ver{font-weight:400;color:var(--text-muted);}
+.page-head{margin:0 0 24px;}
+h1{font-size:var(--font-size-title);font-weight:600;line-height:1.3;margin:0 0 4px;}
+.subtitle{color:var(--text);margin:0 0 4px;}
+.desc{color:var(--text-muted);font-size:var(--font-size-label);margin:2px 0 0;}
+.desc>span+span::before{content:"\00B7";padding:0 6px;color:var(--text-muted);}
+.meta{color:var(--text-muted);font-size:var(--font-size-label);margin:4px 0 0;}
 time{white-space:nowrap;}
-.cards{display:flex;gap:.5rem;flex-wrap:wrap;margin:1.1rem 0 1.3rem;}
-.pill{display:inline-flex;align-items:center;gap:.4rem;padding:.3rem .7rem;
-  border:1px solid rgb(var(--role-neutral-border));border-radius:999px;
-  background:rgb(var(--role-neutral-muted));color:rgb(var(--role-neutral-fg));
-  font-size:var(--font-size-body-sm);font-weight:600;line-height:1.1;white-space:nowrap;}
-.pill .count{font-variant-numeric:tabular-nums;}
-.pill-crit,.pill-fail,.pill-kev{background:rgb(var(--role-danger-muted));color:rgb(var(--role-danger-fg));border-color:rgb(var(--role-danger-border));}
-.pill-high{background:rgb(var(--role-severe-muted));color:rgb(var(--role-severe-fg));border-color:rgb(var(--role-severe-border));}
-.pill-med,.pill-warn{background:rgb(var(--role-attention-muted));color:rgb(var(--role-attention-fg));border-color:rgb(var(--role-attention-border));}
-.pill-low{background:rgb(var(--role-info-muted));color:rgb(var(--role-info-fg));border-color:rgb(var(--role-info-border));}
-.pill-pass{background:rgb(var(--role-success-muted));color:rgb(var(--role-success-fg));border-color:rgb(var(--role-success-border));}
-.pill-info{background:rgb(var(--role-neutral-muted));color:rgb(var(--role-neutral-fg));border-color:rgb(var(--role-neutral-border));}
-.pill-cat-network{background:rgb(var(--cat-network-muted));color:rgb(var(--cat-network-fg));border-color:rgb(var(--cat-network-border));}
-.pill-cat-strong{background:rgb(var(--cat-strong-muted));color:rgb(var(--cat-strong-fg));border-color:rgb(var(--cat-strong-border));}
-.pill-cat-weak{background:rgb(var(--cat-weak-muted));color:rgb(var(--cat-weak-fg));border-color:rgb(var(--cat-weak-border));}
-.pill-cat-permissive{background:rgb(var(--cat-permissive-muted));color:rgb(var(--cat-permissive-fg));border-color:rgb(var(--cat-permissive-border));}
-.pill-cat-review{background:rgb(var(--cat-review-muted));color:rgb(var(--cat-review-fg));border-color:rgb(var(--cat-review-border));}
-.note{background:rgb(var(--role-attention-muted));border-left:3px solid rgb(var(--role-attention-emphasis));
-  border-radius:var(--radius);padding:.75rem 1rem;margin:1rem 0 1.3rem;font-size:var(--font-size-body-sm);}
-.note b{color:var(--text);}
-.table-wrap{border:1px solid var(--line);border-radius:var(--radius-card);
-  overflow-x:auto;box-shadow:var(--shadow);background:var(--surface);margin:1rem 0 1.5rem;}
+/* Sections */
+h2{font-size:1rem;font-weight:600;line-height:1.4;margin:32px 0 8px;padding-bottom:8px;
+  border-bottom:1px solid var(--line);}
+h3{font-size:var(--font-size-body-sm);font-weight:600;margin:16px 0 8px;}
+p{margin:8px 0;}
+/* Box: one border, a head row (title + count) and rows. No box inside a box. */
+.box{border:1px solid var(--line);border-radius:var(--radius);background:var(--surface);
+  margin:12px 0 24px;overflow:hidden;}
+.box-head{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:8px 16px;
+  background:var(--th-bg);border-bottom:1px solid var(--line);}
+.box-head h2,.box-head h3,.box-head .box-title{font-size:var(--font-size-body-sm);font-weight:600;
+  margin:0;padding:0;border:0;}
+.box-head .meta{margin:0;flex-basis:100%;}
+.box-head .end{margin-left:auto;display:flex;gap:6px;flex-wrap:wrap;}
+.box-body{padding:12px 16px;}
+.box-body>:first-child{margin-top:0;}.box-body>:last-child{margin-bottom:0;}
+.rows{list-style:none;margin:0;padding:0;}
+.rows>li{padding:8px 16px;border-top:1px solid var(--line);margin:0;}
+.rows>li:first-child{border-top:0;}
+.rows.mono>li,.mono li{font-family:var(--mono);font-size:var(--font-size-mono);overflow-wrap:anywhere;}
+.rows.toc>li{display:flex;gap:8px;align-items:center;padding:4px 16px;}
+.rows.toc .counter{margin-left:auto;}
+/* Counter and labels */
+.counter{display:inline-block;min-width:20px;padding:0 6px;border-radius:2em;text-align:center;
+  background:rgb(var(--role-neutral-muted));color:var(--text);font-size:var(--font-size-label);
+  font-weight:500;line-height:18px;font-variant-numeric:tabular-nums;}
+.summary{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:8px 0 12px;}
+.lbl{display:inline-flex;align-items:center;gap:4px;padding:0 7px;border:1px solid rgb(var(--role-neutral-border));
+  border-radius:2em;color:rgb(var(--role-neutral-fg));background:transparent;font-size:var(--font-size-label);
+  font-weight:500;line-height:18px;white-space:nowrap;}
+.lbl .count{font-weight:600;font-variant-numeric:tabular-nums;color:var(--text);}
+.lbl .mk{font-size:.75em;line-height:1;}
+.summary .lbl{font-size:var(--font-size-body-sm);line-height:22px;padding:0 10px;}
+.lbl-danger,.lbl.sev-CRITICAL,.s-fail .lbl{color:rgb(var(--role-danger-fg));border-color:rgb(var(--role-danger-emphasis));}
+.lbl-severe,.lbl.sev-HIGH{color:rgb(var(--role-severe-fg));border-color:rgb(var(--role-severe-emphasis));}
+.lbl-attention,.lbl.sev-MEDIUM,.s-warn .lbl{color:rgb(var(--role-attention-fg));border-color:rgb(var(--role-attention-emphasis));}
+.lbl-success,.s-pass .lbl{color:rgb(var(--role-success-fg));border-color:rgb(var(--role-success-emphasis));}
+.lbl.sev-LOW,.lbl.sev-UNKNOWN,.s-na .lbl,.s-review .lbl{color:rgb(var(--role-neutral-fg));border-color:rgb(var(--role-neutral-border));}
+.lbl-cat-network{color:rgb(var(--cat-network-fg));border-color:rgb(var(--cat-network-emphasis));}
+.lbl-cat-strong{color:rgb(var(--cat-strong-fg));border-color:rgb(var(--cat-strong-emphasis));}
+.lbl-cat-weak{color:rgb(var(--cat-weak-fg));border-color:rgb(var(--cat-weak-emphasis));}
+.lbl-cat-permissive{color:rgb(var(--cat-permissive-fg));border-color:rgb(var(--cat-permissive-emphasis));}
+.lbl-cat-review{color:rgb(var(--cat-review-fg));border-color:rgb(var(--cat-review-emphasis));}
+.lbl.zero{color:rgb(var(--role-neutral-fg));border-color:rgb(var(--role-neutral-border));}
+.kevbadge{display:inline-block;padding:0 7px;border:1px solid rgb(var(--role-danger-emphasis));border-radius:2em;
+  color:rgb(var(--role-danger-fg));font-size:var(--font-size-label);font-weight:600;line-height:18px;white-space:nowrap;}
+/* Banner: one notice block. Tinted fill and a full 1px border. */
+.banner{border:1px solid rgb(var(--role-attention-border));background:rgb(var(--role-attention-muted));
+  border-radius:var(--radius);padding:12px 16px;margin:12px 0 16px;}
+.banner>:first-child{margin-top:0;}.banner>:last-child{margin-bottom:0;}
+.banner p{margin:6px 0;}
+.banner ul{margin:6px 0 0;padding-left:20px;}
+.banner li{margin:2px 0;}
+.banner b{color:var(--text);}
+.banner-title,.banner h2.banner-title{font-size:var(--font-size-body-sm);font-weight:600;margin:0 0 4px;padding:0;border:0;}
+.banner-danger{border-color:rgb(var(--role-danger-border));background:rgb(var(--role-danger-muted));}
+.banner code{overflow-wrap:anywhere;}
+/* Definition rows: a label, then what it means (the risk report's deadlines). */
+.deadlines{margin:0;}
+.deadlines>div{display:flex;align-items:center;gap:12px;padding:8px 16px;border-top:1px solid var(--line);}
+.deadlines>div:first-child{border-top:0;}
+.deadlines dt{min-width:7em;margin:0;}
+.deadlines dd{margin:0;}
+/* Legend under a table head, or a closing line of a box. */
+.legend{margin:0;padding:8px 16px;border-bottom:1px solid var(--line);color:var(--text-muted);
+  font-size:var(--font-size-label);display:flex;flex-wrap:wrap;gap:4px 20px;}
+.legend span b{color:var(--text);font-weight:600;}
+.box>.legend:last-child{border-bottom:0;border-top:1px solid var(--line);}
+/* Tables */
+.table-scroll{overflow-x:auto;}
+.table-scroll::-webkit-scrollbar{height:10px;}
+.table-scroll::-webkit-scrollbar-thumb{background:rgb(var(--role-neutral-border));border-radius:6px;border:2px solid var(--surface);}
+.table-scroll::-webkit-scrollbar-track{background:var(--th-bg);}
 table{border-collapse:collapse;width:100%;font-size:var(--font-size-body-sm);}
 th{background:var(--th-bg);text-align:left;font-size:var(--font-size-label);font-weight:600;
-  text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted);
-  padding:.6rem .8rem;border-bottom:1px solid var(--line);white-space:nowrap;}
-td{padding:.6rem .8rem;border-bottom:1px solid var(--line);vertical-align:top;}
-tr:last-child td{border-bottom:none;}
-tr:hover td{background:var(--th-bg);}
-td.num{text-align:right;font-variant-numeric:tabular-nums;}
-td.id{white-space:nowrap;font-variant-numeric:tabular-nums;}
-td[class^="sev-"]{white-space:nowrap;}
-.sev-CRITICAL{color:rgb(var(--role-danger-fg));font-weight:700;}
-.sev-HIGH{color:rgb(var(--role-severe-fg));font-weight:700;}
-.sev-MEDIUM{color:rgb(var(--role-attention-fg));font-weight:600;}
-.sev-LOW{color:rgb(var(--role-info-fg));font-weight:600;}
-.sev-UNKNOWN{color:rgb(var(--role-neutral-fg));}
-.kevbadge{display:inline-block;background:rgb(var(--role-danger-muted));color:rgb(var(--role-danger-fg));
-  border:1px solid rgb(var(--role-danger-border));
-  border-radius:999px;padding:.12rem .5rem;font-size:var(--font-size-label);font-weight:700;}
-.mono li{font-family:var(--mono);font-size:var(--font-size-mono);}
-ol,ul{margin:.5rem 0 0;padding-left:1.3rem;}
-li{margin:.3rem 0;}
-code{font-family:var(--mono);font-size:var(--font-size-mono);}
-/* NOTICE */
-.review{background:rgb(var(--role-attention-muted));border-left:3px solid rgb(var(--role-attention-emphasis));
-  border-radius:var(--radius);padding:.9rem 1.1rem;margin:1.2rem 0;}
-.review h2{color:rgb(var(--role-attention-fg));margin:.1rem 0 .3rem;font-size:var(--font-size-heading);font-weight:600;}
-.review .meta{margin:.2rem 0 .4rem;color:var(--text);}
-.review ul{list-style:none;padding:0;margin:.5rem 0 0;}
-.review li{font-family:var(--mono);font-size:var(--font-size-mono);margin:.3rem 0;}
-.lic{background:var(--surface);border:1px solid var(--line);
-  border-radius:var(--radius-card);box-shadow:var(--shadow);
-  padding:1rem 1.15rem;margin:1rem 0;}
-.lic h2{margin:0;font-size:var(--font-size-heading);font-weight:700;}
-.lic .count{display:block;color:var(--text-muted);font-size:var(--font-size-body-sm);margin:.15rem 0 .5rem;}
-.lic ul{list-style:none;padding:0;margin:0;}
-.lic li{font-family:var(--mono);font-size:var(--font-size-mono);padding:.45rem 0;
-  border-top:1px solid var(--line);margin:0;}
-.lic li:first-child{border-top:none;}
-.src{display:block;color:var(--text-muted);font-size:var(--font-size-label);margin-top:.25rem;}
-.src a{color:var(--link);text-decoration:none;word-break:break-all;}
-.attr{display:block;color:var(--text-muted);font-size:var(--font-size-label);margin-top:.1rem;}
-.lic .unverified{color:rgb(var(--role-attention-fg));font-size:var(--font-size-label);margin:.1rem 0 0;}
-.texts{margin-top:2.5rem;border-top:1px solid var(--line);padding-top:1.25rem;}
-.texts pre{background:var(--th-bg);border:1px solid var(--line);
-  border-radius:var(--radius);padding:1rem;overflow:auto;font-size:var(--font-size-mono);
-  line-height:1.45;white-space:pre-wrap;}
-/* Conformance */
-.s-pass{color:rgb(var(--role-success-fg));font-weight:700;}
-.s-fail{color:rgb(var(--role-danger-fg));font-weight:700;}
-.s-warn{color:rgb(var(--role-attention-fg));font-weight:700;}
-.s-review{color:rgb(var(--role-info-fg));font-weight:700;}
-.s-na{color:var(--text-muted);font-weight:700;}
+  color:var(--text-muted);padding:6px 10px;border-bottom:1px solid var(--line);white-space:nowrap;vertical-align:bottom;}
+td{padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:top;overflow-wrap:anywhere;}
+tbody:last-child tr:last-child td{border-bottom:none;}
+tbody tr:hover td{background:var(--th-bg);}
+th.num,td.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;}
 td.num:first-child{color:var(--text-muted);}
-th.num{text-align:right;}
+/* Short columns take their content width; the column marked grow takes the rest. */
+th.num,td.num,td.sev,td.id,td.req,td.dl,td.st{width:1%;}
+td.id{white-space:nowrap;font-variant-numeric:tabular-nums;overflow-wrap:normal;}
+td.sev,td.st,td.dl{white-space:nowrap;}
 td.req{white-space:nowrap;}
-td.s-pass,td.s-fail,td.s-warn,td.s-review,td.s-na{white-space:nowrap;}
-details.fix{margin:.4rem 0 0;}
-details.fix summary{cursor:pointer;color:var(--link);font-size:var(--font-size-body-sm);font-weight:600;}
-details.fix pre{margin:.4rem 0 .2rem;}
-details.fix .meta{font-size:var(--font-size-body-sm);}
-.mono{list-style:none;padding-left:0;}
+td.ver{font-variant-numeric:tabular-nums;}
+td.fix{max-width:16ch;min-width:9ch;}
+td.grow{width:auto;}
+@media screen{td.pkgc{min-width:20ch;}}
+td.purl{font-family:var(--mono);font-size:var(--font-size-mono);}
+td.total{font-weight:600;}
+.nofix{color:var(--text-muted);}
+/* Each part of a package stays whole while it fits the cell, and wraps
+   anywhere only when one part alone is wider than the cell. */
+.pkg .pg,.pkg .pn,.pkg .pv{display:inline-block;max-width:100%;}
+.pkg .pn{font-weight:600;}
+.pkg .pg,.pkg .psep{color:var(--text-muted);}
+.pkg .pv{font-variant-numeric:tabular-nums;}
+tr.grp th{background:var(--surface);color:var(--text);font-size:var(--font-size-body-sm);
+  padding:10px 10px 6px;border-top:1px solid var(--line);}
+tr.grp th .counter{margin-left:6px;}
+tbody.met td{padding-top:3px;padding-bottom:3px;}
+code{font-family:var(--mono);font-size:var(--font-size-mono);}
 pre{background:var(--th-bg);border:1px solid var(--line);border-radius:var(--radius);
-  padding:.6rem .75rem;overflow-x:auto;margin:.5rem 0;}
-pre code{font-family:var(--mono);font-size:var(--font-size-mono);white-space:pre;}
-/* Print: always light (the dark tokens apply to screens only), no page
-   background or shadows, table headers repeat on every page, rows and cards do
-   not split, and an external link shows its address because paper cannot be
-   clicked. */
-@page{margin:16mm 14mm;}
+  padding:8px 12px;overflow-x:auto;margin:8px 0;}
+pre code{white-space:pre;}
+ol,ul{margin:8px 0 0;padding-left:20px;}
+li{margin:4px 0;}
+.mono{list-style:none;padding-left:0;}
+.print-only{display:none;}
+/* One evidence item per line; a long one ends in an ellipsis, its text in title. */
+.ev{display:block;max-width:36ch;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+/* NOTICE */
+.rows .src{display:block;color:var(--text-muted);font-family:var(--font);font-size:var(--font-size-label);margin-top:2px;}
+.src a{word-break:break-all;}
+.rows .attr{display:block;color:var(--text-muted);font-family:var(--font);font-size:var(--font-size-label);margin-top:2px;}
+.unverified{color:rgb(var(--role-attention-fg));font-size:var(--font-size-label);margin:0;flex-basis:100%;}
+.texts .box pre{border:0;border-radius:0;margin:0;background:transparent;padding:12px 16px;
+  font-size:var(--font-size-mono);line-height:1.45;white-space:pre-wrap;overflow-wrap:anywhere;}
+/* Conformance */
+details.fix,details.more{margin:6px 0 0;}
+details.fix summary,details.more summary{cursor:pointer;color:var(--link);font-size:var(--font-size-label);font-weight:600;}
+details.fix pre{margin:6px 0 2px;}
+details.fix pre code{white-space:pre-wrap;overflow-wrap:anywhere;}
+details.fix .meta{font-size:var(--font-size-label);}
+@media screen and (max-width:767px){body{padding:0 16px 32px;}}
+/* Print: always light (the dark tokens apply to screens only), A4, no page
+   background, table headers repeat on every page, rows do not split, a table
+   box draws only its row lines (a box border would break at the page edge),
+   every cell may wrap, the text of a collapsed details is printed, and an
+   external link shows its address because paper cannot be clicked. */
+@page{size:A4;margin:16mm 14mm;}
 @media print{
-  body{max-width:none;margin:0;padding:0;background:#fff;font-size:10.5pt;line-height:1.45;}
-  .table-wrap,.lic,.texts pre,pre{box-shadow:none;background:transparent;overflow:visible;}
-  .table-wrap{border:0;border-top:1px solid var(--line);border-radius:0;margin:.6rem 0 1rem;}
-  table{font-size:9pt;}
-  th,td{padding:.3rem .4rem;}
-  th{white-space:normal;}
-  table .meta{font-size:8.5pt;}
+  body{max-width:none;margin:0;padding:0;background:#fff;font-size:10pt;line-height:1.45;}
+  .topbar{padding-top:0;}
+  .table-scroll{overflow:visible;}
+  .box{overflow:visible;break-inside:auto;border:0;border-radius:0;}
+  .box-head{padding:6px 0;border-bottom:1px solid var(--line);}
+  .rows>li,.legend,.deadlines>div{padding-left:0;padding-right:0;}
+  table{font-size:8.5pt;}
+  th,td{padding:3px 4px;}
+  /* Long values wrap; a label, an id, a number and a time stay on one line. */
+  th,td{white-space:normal;}
+  td.grow{min-width:0;}
+  td.fix{max-width:none;}
+  .pkg .pg{overflow-wrap:anywhere;}
+  .ev{max-width:none;white-space:normal;overflow:visible;overflow-wrap:anywhere;}
+  table .meta{font-size:8pt;}
   pre,pre code{white-space:pre-wrap;overflow-wrap:anywhere;}
-  th,.wordmark .tag{background:transparent;}
+  .box-head,th,tr.grp th{background:transparent;}
   thead{display:table-header-group;}
   tfoot{display:table-footer-group;}
-  tr,.lic,.note,.review,li{break-inside:avoid;page-break-inside:avoid;}
-  h1,h2,h3{break-after:avoid;page-break-after:avoid;}
-  tr:hover td{background:transparent;}
+  tr,.banner,li,.box-head{break-inside:avoid;page-break-inside:avoid;}
+  h1,h2,h3,.box-head{break-after:avoid;page-break-after:avoid;}
+  tbody tr:hover td{background:transparent;}
   a[href^="http"]::after{content:" (" attr(href) ")";font-size:var(--font-size-label);word-break:break-all;}
-  .src a::after{content:none;}
-  details.fix summary{color:var(--text);}
+  .src a::after,.topbar a::after,.rows.toc a::after{content:none;}
+  details.fix,details.more{display:none;}
+  .print-only{display:block;}
 }
 </style>
 </head>
 <body>
-<header class="report-header">
- <div class="wordmark">BomLens<span class="tag">SBOM</span></div>
- <div class="report-kind">Open Source Notice</div>
-</header>
-<h1>Third-party Open Source Notice</h1>
-<p class="meta">Project: NginxRuntimeImage &middot; Generated: <time datetime="2026-11-12T09:11:07Z">2026-11-12 09:11 UTC</time> &middot; Components: 1885 &middot; Licenses: 30</p>
-<div class="lic"><h2>2-clause</h2><p class="count">5 component(s)</p><ul><li>nginx-module-geoip@1.24.0-r1<span class="src">Source: <a href="https://nginx.org/" target="_blank" rel="noopener noreferrer">https://nginx.org/</a></span></li><li>nginx-module-image-filter@1.24.0-r1<span class="src">Source: <a href="https://nginx.org/" target="_blank" rel="noopener noreferrer">https://nginx.org/</a></span></li><li>nginx-module-njs@1.24.0.0.7.12-r1<span class="src">Source: <a href="https://nginx.org/" target="_blank" rel="noopener noreferrer">https://nginx.org/</a></span></li><li>nginx-module-xslt@1.24.0-r1<span class="src">Source: <a href="https://nginx.org/" target="_blank" rel="noopener noreferrer">https://nginx.org/</a></span></li><li>nginx@1.24.0-r1<span class="src">Source: <a href="https://nginx.org/" target="_blank" rel="noopener noreferrer">https://nginx.org/</a></span></li></ul></div>
-<div class="lic"><h2>AND</h2><p class="count">2 component(s)</p><ul><li>aom-libs@3.5.0-r0<span class="src">Source: <a href="https://aomedia.org/" target="_blank" rel="noopener noreferrer">https://aomedia.org/</a></span></li><li>xz-libs@5.2.9-r0<span class="src">Source: <a href="https://tukaani.org/xz" target="_blank" rel="noopener noreferrer">https://tukaani.org/xz</a></span></li></ul></div>
-<div class="lic"><h2>Apache-2.0</h2><p class="count">2 component(s)</p><ul><li>libcrypto3@3.0.12-r4<span class="src">Source: <a href="https://www.openssl.org/" target="_blank" rel="noopener noreferrer">https://www.openssl.org/</a></span></li><li>libssl3@3.0.12-r4<span class="src">Source: <a href="https://www.openssl.org/" target="_blank" rel="noopener noreferrer">https://www.openssl.org/</a></span></li></ul></div>
-<div class="lic"><h2>BSD-2-Clause</h2><p class="count">3 component(s)</p><ul><li>aom-libs@3.5.0-r0<span class="src">Source: <a href="https://aomedia.org/" target="_blank" rel="noopener noreferrer">https://aomedia.org/</a></span></li><li>libavif@0.11.1-r0<span class="src">Source: <a href="https://aomediacodec.github.io/av1-avif/" target="_blank" rel="noopener noreferrer">https://aomediacodec.github.io/av1-avif/</a></span></li><li>libdav1d@1.0.0-r2<span class="src">Source: <a href="https://code.videolan.org/videolan/dav1d" target="_blank" rel="noopener noreferrer">https://code.videolan.org/videolan/dav1d</a></span></li></ul></div>
-<div class="lic"><h2>BSD-2-Clause AND BSD-3-Clause</h2><p class="count">1 component(s)</p><ul><li>libc-utils@0.7.2-r3<span class="src">Source: <a href="https://alpinelinux.org" target="_blank" rel="noopener noreferrer">https://alpinelinux.org</a></span></li></ul></div>
-<div class="lic"><h2>BSD-3-Clause</h2><p class="count">6 component(s)</p><ul><li>libbsd@0.11.7-r0<span class="src">Source: <a href="https://libbsd.freedesktop.org/" target="_blank" rel="noopener noreferrer">https://libbsd.freedesktop.org/</a></span></li><li>libedit@20221030.3.1-r0<span class="src">Source: <a href="https://www.thrysoee.dk/editline" target="_blank" rel="noopener noreferrer">https://www.thrysoee.dk/editline</a></span></li><li>libuuid@2.38.1-r1<span class="src">Source: <a href="https://git.kernel.org/cgit/utils/util-linux/util-linux.git" target="_blank" rel="noopener noreferrer">https://git.kernel.org/cgit/utils/util-linux/util-linux.git</a></span></li><li>libwebp@1.2.4-r3<span class="src">Source: <a href="https://developers.google.com/speed/webp" target="_blank" rel="noopener noreferrer">https://developers.google.com/speed/webp</a></span></li><li>pcre2@10.42-r0<span class="src">Source: <a href="https://pcre.org/" target="_blank" rel="noopener noreferrer">https://pcre.org/</a></span></li><li>zstd-libs@1.5.5-r0<span class="src">Source: <a href="https://www.zstd.net/" target="_blank" rel="noopener noreferrer">https://www.zstd.net/</a></span></li></ul></div>
-<div class="lic"><h2>BSD-3-Clause AND IJG AND Zlib</h2><p class="count">1 component(s)</p><ul><li>libjpeg-turbo@2.1.4-r0<span class="src">Source: <a href="https://libjpeg-turbo.org/" target="_blank" rel="noopener noreferrer">https://libjpeg-turbo.org/</a></span></li></ul></div>
-<div class="lic"><h2>BSD-like</h2><p class="count">5 component(s)</p><ul><li>nginx-module-geoip@1.24.0-r1<span class="src">Source: <a href="https://nginx.org/" target="_blank" rel="noopener noreferrer">https://nginx.org/</a></span></li><li>nginx-module-image-filter@1.24.0-r1<span class="src">Source: <a href="https://nginx.org/" target="_blank" rel="noopener noreferrer">https://nginx.org/</a></span></li><li>nginx-module-njs@1.24.0.0.7.12-r1<span class="src">Source: <a href="https://nginx.org/" target="_blank" rel="noopener noreferrer">https://nginx.org/</a></span></li><li>nginx-module-xslt@1.24.0-r1<span class="src">Source: <a href="https://nginx.org/" target="_blank" rel="noopener noreferrer">https://nginx.org/</a></span></li><li>nginx@1.24.0-r1<span class="src">Source: <a href="https://nginx.org/" target="_blank" rel="noopener noreferrer">https://nginx.org/</a></span></li></ul></div>
-<div class="lic"><h2>Domain</h2><p class="count">1 component(s)</p><ul><li>libmd@1.0.4-r0<span class="src">Source: <a href="https://www.hadrons.org/software/libmd/" target="_blank" rel="noopener noreferrer">https://www.hadrons.org/software/libmd/</a></span></li></ul></div>
-<div class="lic"><h2>FTL</h2><p class="count">1 component(s)</p><ul><li>freetype@2.12.1-r0<span class="src">Source: <a href="https://www.freetype.org/" target="_blank" rel="noopener noreferrer">https://www.freetype.org/</a></span></li></ul></div>
-<div class="lic"><h2>GPL</h2><p class="count">1 component(s)</p><ul><li>geoip@1.6.12-r3<span class="src">Source: <a href="http://www.maxmind.com/app/ip-location" target="_blank" rel="noopener noreferrer">http://www.maxmind.com/app/ip-location</a></span></li></ul></div>
-<div class="lic"><h2>GPL-2.0-only</h2><p class="count">7 component(s)</p><ul><li>alpine-baselayout-data@3.4.0-r0<span class="src">Source: <a href="https://git.alpinelinux.org/cgit/aports/tree/main/alpine-baselayout" target="_blank" rel="noopener noreferrer">https://git.alpinelinux.org/cgit/aports/tree/main/alpine-baselayout</a></span></li><li>alpine-baselayout@3.4.0-r0<span class="src">Source: <a href="https://git.alpinelinux.org/cgit/aports/tree/main/alpine-baselayout" target="_blank" rel="noopener noreferrer">https://git.alpinelinux.org/cgit/aports/tree/main/alpine-baselayout</a></span></li><li>apk-tools@2.12.10-r1<span class="src">Source: <a href="https://gitlab.alpinelinux.org/alpine/apk-tools" target="_blank" rel="noopener noreferrer">https://gitlab.alpinelinux.org/alpine/apk-tools</a></span></li><li>busybox-binsh@1.35.0-r29<span class="src">Source: <a href="https://busybox.net/" target="_blank" rel="noopener noreferrer">https://busybox.net/</a></span></li><li>busybox@1.35.0-r29<span class="src">Source: <a href="https://busybox.net/" target="_blank" rel="noopener noreferrer">https://busybox.net/</a></span></li><li>scanelf@1.3.5-r1<span class="src">Source: <a href="https://wiki.gentoo.org/wiki/Hardened/PaX_Utilities" target="_blank" rel="noopener noreferrer">https://wiki.gentoo.org/wiki/Hardened/PaX_Utilities</a></span></li><li>ssl_client@1.35.0-r29<span class="src">Source: <a href="https://busybox.net/" target="_blank" rel="noopener noreferrer">https://busybox.net/</a></span></li></ul></div>
-<div class="lic"><h2>GPL-2.0-or-later</h2><p class="count">4 component(s)</p><ul><li>freetype@2.12.1-r0<span class="src">Source: <a href="https://www.freetype.org/" target="_blank" rel="noopener noreferrer">https://www.freetype.org/</a></span></li><li>libgpg-error@1.46-r1<span class="src">Source: <a href="https://www.gnupg.org/" target="_blank" rel="noopener noreferrer">https://www.gnupg.org/</a></span></li><li>xz-libs@5.2.9-r0<span class="src">Source: <a href="https://tukaani.org/xz" target="_blank" rel="noopener noreferrer">https://tukaani.org/xz</a></span></li><li>zstd-libs@1.5.5-r0<span class="src">Source: <a href="https://www.zstd.net/" target="_blank" rel="noopener noreferrer">https://www.zstd.net/</a></span></li></ul></div>
-<div class="lic"><h2>LGPL-2.1-or-later</h2><p class="count">4 component(s)</p><ul><li>libgcrypt@1.10.1-r0<span class="src">Source: <a href="https://www.gnupg.org/" target="_blank" rel="noopener noreferrer">https://www.gnupg.org/</a></span></li><li>libgpg-error@1.46-r1<span class="src">Source: <a href="https://www.gnupg.org/" target="_blank" rel="noopener noreferrer">https://www.gnupg.org/</a></span></li><li>libintl@0.21.1-r1<span class="src">Source: <a href="https://www.gnu.org/software/gettext/gettext.html" target="_blank" rel="noopener noreferrer">https://www.gnu.org/software/gettext/gettext.html</a></span></li><li>xz-libs@5.2.9-r0<span class="src">Source: <a href="https://tukaani.org/xz" target="_blank" rel="noopener noreferrer">https://tukaani.org/xz</a></span></li></ul></div>
-<div class="lic"><h2>Libpng</h2><p class="count">1 component(s)</p><ul><li>libpng@1.6.39-r0<span class="src">Source: <a href="http://www.libpng.org" target="_blank" rel="noopener noreferrer">http://www.libpng.org</a></span></li></ul></div>
-<div class="lic"><h2>MIT</h2><p class="count">14 component(s)</p><ul><li>alpine-keys@2.4-r1<span class="src">Source: <a href="https://alpinelinux.org" target="_blank" rel="noopener noreferrer">https://alpinelinux.org</a></span></li><li>brotli-libs@1.0.9-r9<span class="src">Source: <a href="https://github.com/google/brotli" target="_blank" rel="noopener noreferrer">https://github.com/google/brotli</a></span></li><li>fontconfig@2.14.1-r0<span class="src">Source: <a href="https://www.freedesktop.org/wiki/Software/fontconfig" target="_blank" rel="noopener noreferrer">https://www.freedesktop.org/wiki/Software/fontconfig</a></span></li><li>libexpat@2.6.2-r0<span class="src">Source: <a href="https://libexpat.github.io/" target="_blank" rel="noopener noreferrer">https://libexpat.github.io/</a></span></li><li>libsm@1.2.3-r1<span class="src">Source: <a href="https://xorg.freedesktop.org/" target="_blank" rel="noopener noreferrer">https://xorg.freedesktop.org/</a></span></li><li>libxau@1.0.10-r0<span class="src">Source: <a href="http://xorg.freedesktop.org/" target="_blank" rel="noopener noreferrer">http://xorg.freedesktop.org/</a></span></li><li>libxcb@1.15-r0<span class="src">Source: <a href="https://xcb.freedesktop.org" target="_blank" rel="noopener noreferrer">https://xcb.freedesktop.org</a></span></li><li>libxdmcp@1.1.4-r0<span class="src">Source: <a href="http://xorg.freedesktop.org/" target="_blank" rel="noopener noreferrer">http://xorg.freedesktop.org/</a></span></li><li>libxext@1.3.5-r0<span class="src">Source: <a href="http://xorg.freedesktop.org/" target="_blank" rel="noopener noreferrer">http://xorg.freedesktop.org/</a></span></li><li>libxml2@2.10.4-r0<span class="src">Source: <a href="http://www.xmlsoft.org/" target="_blank" rel="noopener noreferrer">http://www.xmlsoft.org/</a></span></li><li>musl@1.2.3-r5<span class="src">Source: <a href="https://musl.libc.org/" target="_blank" rel="noopener noreferrer">https://musl.libc.org/</a></span></li><li>ncurses-libs@6.3_p20221119-r1<span class="src">Source: <a href="https://invisible-island.net/ncurses/" target="_blank" rel="noopener noreferrer">https://invisible-island.net/ncurses/</a></span></li><li>ncurses-terminfo-base@6.3_p20221119-r1<span class="src">Source: <a href="https://invisible-island.net/ncurses/" target="_blank" rel="noopener noreferrer">https://invisible-island.net/ncurses/</a></span></li><li>nghttp2-libs@1.51.0-r2<span class="src">Source: <a href="https://nghttp2.org" target="_blank" rel="noopener noreferrer">https://nghttp2.org</a></span></li></ul></div>
-<div class="lic"><h2>MIT AND BSD-2-Clause AND GPL-2.0-or-later</h2><p class="count">1 component(s)</p><ul><li>musl-utils@1.2.3-r5<span class="src">Source: <a href="https://musl.libc.org/" target="_blank" rel="noopener noreferrer">https://musl.libc.org/</a></span></li></ul></div>
-<div class="lic"><h2>MPL-2.0 AND MIT</h2><p class="count">2 component(s)</p><ul><li>ca-certificates-bundle@20230506-r0<span class="src">Source: <a href="https://www.mozilla.org/en-US/about/governance/policies/security-group/certs/" target="_blank" rel="noopener noreferrer">https://www.mozilla.org/en-US/about/governance/policies/security-group/certs/</a></span></li><li>ca-certificates@20230506-r0<span class="src">Source: <a href="https://www.mozilla.org/en-US/about/governance/policies/security-group/certs/" target="_blank" rel="noopener noreferrer">https://www.mozilla.org/en-US/about/governance/policies/security-group/certs/</a></span></li></ul></div>
-<div class="lic"><h2>NOASSERTION</h2><p class="count">1823 component(s)</p><ul><li>Catalogued files (1822) — paths recorded by the scan, listed in the SBOM, not components</li><li>alpine@3.17.7<span class="src">Source: <a href="https://alpinelinux.org/" target="_blank" rel="noopener noreferrer">https://alpinelinux.org/</a></span></li></ul></div>
-<div class="lic"><h2>Public</h2><p class="count">1 component(s)</p><ul><li>libmd@1.0.4-r0<span class="src">Source: <a href="https://www.hadrons.org/software/libmd/" target="_blank" rel="noopener noreferrer">https://www.hadrons.org/software/libmd/</a></span></li></ul></div>
-<div class="lic"><h2>Public-Domain</h2><p class="count">2 component(s)</p><ul><li>tzdata@2024a-r0<span class="src">Source: <a href="https://www.iana.org/time-zones" target="_blank" rel="noopener noreferrer">https://www.iana.org/time-zones</a></span></li><li>xz-libs@5.2.9-r0<span class="src">Source: <a href="https://tukaani.org/xz" target="_blank" rel="noopener noreferrer">https://tukaani.org/xz</a></span></li></ul></div>
-<div class="lic"><h2>X11</h2><p class="count">1 component(s)</p><ul><li>libice@1.0.10-r1<span class="src">Source: <a href="http://xorg.freedesktop.org/" target="_blank" rel="noopener noreferrer">http://xorg.freedesktop.org/</a></span></li></ul></div>
-<div class="lic"><h2>Zlib</h2><p class="count">1 component(s)</p><ul><li>zlib@1.2.13-r0<span class="src">Source: <a href="https://zlib.net/" target="_blank" rel="noopener noreferrer">https://zlib.net/</a></span></li></ul></div>
-<div class="lic"><h2>bzip2-1.0.6</h2><p class="count">1 component(s)</p><ul><li>libbz2@1.0.8-r4<span class="src">Source: <a href="https://sourceware.org/bzip2/" target="_blank" rel="noopener noreferrer">https://sourceware.org/bzip2/</a></span></li></ul></div>
-<div class="lic"><h2>curl</h2><p class="count">2 component(s)</p><ul><li>curl@8.5.0-r0<span class="src">Source: <a href="https://curl.se/" target="_blank" rel="noopener noreferrer">https://curl.se/</a></span></li><li>libcurl@8.5.0-r0<span class="src">Source: <a href="https://curl.se/" target="_blank" rel="noopener noreferrer">https://curl.se/</a></span></li></ul></div>
-<div class="lic"><h2>custom</h2><p class="count">4 component(s)</p><ul><li>aom-libs@3.5.0-r0<span class="src">Source: <a href="https://aomedia.org/" target="_blank" rel="noopener noreferrer">https://aomedia.org/</a></span></li><li>libgd@2.3.3-r3<span class="src">Source: <a href="https://libgd.github.io/" target="_blank" rel="noopener noreferrer">https://libgd.github.io/</a></span></li><li>libxslt@1.1.37-r1<span class="src">Source: <a href="http://xmlsoft.org/XSLT/" target="_blank" rel="noopener noreferrer">http://xmlsoft.org/XSLT/</a></span></li><li>libxt@1.2.1-r0<span class="src">Source: <a href="http://xorg.freedesktop.org/" target="_blank" rel="noopener noreferrer">http://xorg.freedesktop.org/</a></span></li></ul></div>
-<div class="lic"><h2>custom:BELL</h2><p class="unverified">unverified name — not an SPDX identifier; confirm against the component's license file</p><p class="count">1 component(s)</p><ul><li>libxpm@3.5.15-r0<span class="src">Source: <a href="http://xorg.freedesktop.org/" target="_blank" rel="noopener noreferrer">http://xorg.freedesktop.org/</a></span></li></ul></div>
-<div class="lic"><h2>custom:XFREE86</h2><p class="unverified">unverified name — not an SPDX identifier; confirm against the component's license file</p><p class="count">1 component(s)</p><ul><li>libx11@1.8.7-r0<span class="src">Source: <a href="http://xorg.freedesktop.org/" target="_blank" rel="noopener noreferrer">http://xorg.freedesktop.org/</a></span></li></ul></div>
-<div class="lic"><h2>libtiff</h2><p class="count">1 component(s)</p><ul><li>tiff@4.4.0-r4<span class="src">Source: <a href="https://gitlab.com/libtiff/libtiff" target="_blank" rel="noopener noreferrer">https://gitlab.com/libtiff/libtiff</a></span></li></ul></div>
-<div class="lic"><h2>license</h2><p class="count">5 component(s)</p><ul><li>nginx-module-geoip@1.24.0-r1<span class="src">Source: <a href="https://nginx.org/" target="_blank" rel="noopener noreferrer">https://nginx.org/</a></span></li><li>nginx-module-image-filter@1.24.0-r1<span class="src">Source: <a href="https://nginx.org/" target="_blank" rel="noopener noreferrer">https://nginx.org/</a></span></li><li>nginx-module-njs@1.24.0.0.7.12-r1<span class="src">Source: <a href="https://nginx.org/" target="_blank" rel="noopener noreferrer">https://nginx.org/</a></span></li><li>nginx-module-xslt@1.24.0-r1<span class="src">Source: <a href="https://nginx.org/" target="_blank" rel="noopener noreferrer">https://nginx.org/</a></span></li><li>nginx@1.24.0-r1<span class="src">Source: <a href="https://nginx.org/" target="_blank" rel="noopener noreferrer">https://nginx.org/</a></span></li></ul></div>
+<header class="topbar"><span class="brand"><svg viewBox="0 0 48 48" aria-hidden="true" focusable="false"><rect width="48" height="48" rx="11" fill="#1d4ed8"/><g fill="none" stroke="#ffffff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="24" cy="24" r="12"/><line x1="27.23" y1="19.28" x2="33.19" y2="31.71"/><line x1="29.7" y1="24.44" x2="21.92" y2="35.82"/><line x1="26.47" y1="29.16" x2="12.72" y2="28.1"/><line x1="20.77" y1="28.72" x2="14.81" y2="16.29"/><line x1="18.3" y1="23.56" x2="26.08" y2="12.18"/><line x1="21.53" y1="18.84" x2="35.28" y2="19.9"/></g></svg>BomLens</span><span class="sep" aria-hidden="true">/</span><span class="proj">NginxRuntimeImage <span class="ver">1.24-alpine</span></span></header>
+<div class="page-head">
+<h1>Third-party open source notice</h1>
+<p class="desc"><span>NginxRuntimeImage <span class="ver">1.24-alpine</span></span><span>Container image</span><span><time datetime="2026-11-15T13:43:22Z">2026-11-15 13:43 UTC</time></span><span>1,885 components</span><span>30 licenses</span></p>
+</div>
+<div class="box"><div class="box-head"><h2>Licenses</h2><span class="counter">30</span></div>
+<ul class="rows toc"><li><a href="#lic-1">2-clause</a><span class="counter">5</span></li><li><a href="#lic-2">AND</a><span class="counter">2</span></li><li><a href="#lic-3">Apache-2.0</a><span class="counter">2</span></li><li><a href="#lic-4">BSD-2-Clause</a><span class="counter">3</span></li><li><a href="#lic-5">BSD-2-Clause AND BSD-3-Clause</a><span class="counter">1</span></li><li><a href="#lic-6">BSD-3-Clause</a><span class="counter">6</span></li><li><a href="#lic-7">BSD-3-Clause AND IJG AND Zlib</a><span class="counter">1</span></li><li><a href="#lic-8">BSD-like</a><span class="counter">5</span></li><li><a href="#lic-9">Domain</a><span class="counter">1</span></li><li><a href="#lic-10">FTL</a><span class="counter">1</span></li><li><a href="#lic-11">GPL</a><span class="counter">1</span></li><li><a href="#lic-12">GPL-2.0-only</a><span class="counter">7</span></li><li><a href="#lic-13">GPL-2.0-or-later</a><span class="counter">4</span></li><li><a href="#lic-14">LGPL-2.1-or-later</a><span class="counter">4</span></li><li><a href="#lic-15">Libpng</a><span class="counter">1</span></li><li><a href="#lic-16">MIT</a><span class="counter">14</span></li><li><a href="#lic-17">MIT AND BSD-2-Clause AND GPL-2.0-or-later</a><span class="counter">1</span></li><li><a href="#lic-18">MPL-2.0 AND MIT</a><span class="counter">2</span></li><li><a href="#lic-19">NOASSERTION</a><span class="counter">1,823</span></li><li><a href="#lic-20">Public</a><span class="counter">1</span></li><li><a href="#lic-21">Public-Domain</a><span class="counter">2</span></li><li><a href="#lic-22">X11</a><span class="counter">1</span></li><li><a href="#lic-23">Zlib</a><span class="counter">1</span></li><li><a href="#lic-24">bzip2-1.0.6</a><span class="counter">1</span></li><li><a href="#lic-25">curl</a><span class="counter">2</span></li><li><a href="#lic-26">custom</a><span class="counter">4</span></li><li><a href="#lic-27">custom:BELL</a><span class="counter">1</span></li><li><a href="#lic-28">custom:XFREE86</a><span class="counter">1</span></li><li><a href="#lic-29">libtiff</a><span class="counter">1</span></li><li><a href="#lic-30">license</a><span class="counter">5</span></li></ul>
+</div>
+<div class="box lic" id="lic-1"><div class="box-head"><h2>2-clause</h2><span class="counter" title="5 component(s)">5</span></div><ul class="rows mono"><li>nginx-module-geoip@1.24.0-r1<span class="src">Source: <a href="https://nginx.org/" target="_blank" rel="noopener noreferrer">https://nginx.org/</a></span></li><li>nginx-module-image-filter@1.24.0-r1<span class="src">Source: <a href="https://nginx.org/" target="_blank" rel="noopener noreferrer">https://nginx.org/</a></span></li><li>nginx-module-njs@1.24.0.0.7.12-r1<span class="src">Source: <a href="https://nginx.org/" target="_blank" rel="noopener noreferrer">https://nginx.org/</a></span></li><li>nginx-module-xslt@1.24.0-r1<span class="src">Source: <a href="https://nginx.org/" target="_blank" rel="noopener noreferrer">https://nginx.org/</a></span></li><li>nginx@1.24.0-r1<span class="src">Source: <a href="https://nginx.org/" target="_blank" rel="noopener noreferrer">https://nginx.org/</a></span></li></ul></div>
+<div class="box lic" id="lic-2"><div class="box-head"><h2>AND</h2><span class="counter" title="2 component(s)">2</span></div><ul class="rows mono"><li>aom-libs@3.5.0-r0<span class="src">Source: <a href="https://aomedia.org/" target="_blank" rel="noopener noreferrer">https://aomedia.org/</a></span></li><li>xz-libs@5.2.9-r0<span class="src">Source: <a href="https://tukaani.org/xz" target="_blank" rel="noopener noreferrer">https://tukaani.org/xz</a></span></li></ul></div>
+<div class="box lic" id="lic-3"><div class="box-head"><h2>Apache-2.0</h2><span class="counter" title="2 component(s)">2</span></div><ul class="rows mono"><li>libcrypto3@3.0.12-r4<span class="src">Source: <a href="https://www.openssl.org/" target="_blank" rel="noopener noreferrer">https://www.openssl.org/</a></span></li><li>libssl3@3.0.12-r4<span class="src">Source: <a href="https://www.openssl.org/" target="_blank" rel="noopener noreferrer">https://www.openssl.org/</a></span></li></ul></div>
+<div class="box lic" id="lic-4"><div class="box-head"><h2>BSD-2-Clause</h2><span class="counter" title="3 component(s)">3</span></div><ul class="rows mono"><li>aom-libs@3.5.0-r0<span class="src">Source: <a href="https://aomedia.org/" target="_blank" rel="noopener noreferrer">https://aomedia.org/</a></span></li><li>libavif@0.11.1-r0<span class="src">Source: <a href="https://aomediacodec.github.io/av1-avif/" target="_blank" rel="noopener noreferrer">https://aomediacodec.github.io/av1-avif/</a></span></li><li>libdav1d@1.0.0-r2<span class="src">Source: <a href="https://code.videolan.org/videolan/dav1d" target="_blank" rel="noopener noreferrer">https://code.videolan.org/videolan/dav1d</a></span></li></ul></div>
+<div class="box lic" id="lic-5"><div class="box-head"><h2>BSD-2-Clause AND BSD-3-Clause</h2><span class="counter" title="1 component(s)">1</span></div><ul class="rows mono"><li>libc-utils@0.7.2-r3<span class="src">Source: <a href="https://alpinelinux.org" target="_blank" rel="noopener noreferrer">https://alpinelinux.org</a></span></li></ul></div>
+<div class="box lic" id="lic-6"><div class="box-head"><h2>BSD-3-Clause</h2><span class="counter" title="6 component(s)">6</span></div><ul class="rows mono"><li>libbsd@0.11.7-r0<span class="src">Source: <a href="https://libbsd.freedesktop.org/" target="_blank" rel="noopener noreferrer">https://libbsd.freedesktop.org/</a></span></li><li>libedit@20221030.3.1-r0<span class="src">Source: <a href="https://www.thrysoee.dk/editline" target="_blank" rel="noopener noreferrer">https://www.thrysoee.dk/editline</a></span></li><li>libuuid@2.38.1-r1<span class="src">Source: <a href="https://git.kernel.org/cgit/utils/util-linux/util-linux.git" target="_blank" rel="noopener noreferrer">https://git.kernel.org/cgit/utils/util-linux/util-linux.git</a></span></li><li>libwebp@1.2.4-r3<span class="src">Source: <a href="https://developers.google.com/speed/webp" target="_blank" rel="noopener noreferrer">https://developers.google.com/speed/webp</a></span></li><li>pcre2@10.42-r0<span class="src">Source: <a href="https://pcre.org/" target="_blank" rel="noopener noreferrer">https://pcre.org/</a></span></li><li>zstd-libs@1.5.5-r0<span class="src">Source: <a href="https://www.zstd.net/" target="_blank" rel="noopener noreferrer">https://www.zstd.net/</a></span></li></ul></div>
+<div class="box lic" id="lic-7"><div class="box-head"><h2>BSD-3-Clause AND IJG AND Zlib</h2><span class="counter" title="1 component(s)">1</span></div><ul class="rows mono"><li>libjpeg-turbo@2.1.4-r0<span class="src">Source: <a href="https://libjpeg-turbo.org/" target="_blank" rel="noopener noreferrer">https://libjpeg-turbo.org/</a></span></li></ul></div>
+<div class="box lic" id="lic-8"><div class="box-head"><h2>BSD-like</h2><span class="counter" title="5 component(s)">5</span></div><ul class="rows mono"><li>nginx-module-geoip@1.24.0-r1<span class="src">Source: <a href="https://nginx.org/" target="_blank" rel="noopener noreferrer">https://nginx.org/</a></span></li><li>nginx-module-image-filter@1.24.0-r1<span class="src">Source: <a href="https://nginx.org/" target="_blank" rel="noopener noreferrer">https://nginx.org/</a></span></li><li>nginx-module-njs@1.24.0.0.7.12-r1<span class="src">Source: <a href="https://nginx.org/" target="_blank" rel="noopener noreferrer">https://nginx.org/</a></span></li><li>nginx-module-xslt@1.24.0-r1<span class="src">Source: <a href="https://nginx.org/" target="_blank" rel="noopener noreferrer">https://nginx.org/</a></span></li><li>nginx@1.24.0-r1<span class="src">Source: <a href="https://nginx.org/" target="_blank" rel="noopener noreferrer">https://nginx.org/</a></span></li></ul></div>
+<div class="box lic" id="lic-9"><div class="box-head"><h2>Domain</h2><span class="counter" title="1 component(s)">1</span></div><ul class="rows mono"><li>libmd@1.0.4-r0<span class="src">Source: <a href="https://www.hadrons.org/software/libmd/" target="_blank" rel="noopener noreferrer">https://www.hadrons.org/software/libmd/</a></span></li></ul></div>
+<div class="box lic" id="lic-10"><div class="box-head"><h2>FTL</h2><span class="counter" title="1 component(s)">1</span></div><ul class="rows mono"><li>freetype@2.12.1-r0<span class="src">Source: <a href="https://www.freetype.org/" target="_blank" rel="noopener noreferrer">https://www.freetype.org/</a></span></li></ul></div>
+<div class="box lic" id="lic-11"><div class="box-head"><h2>GPL</h2><span class="counter" title="1 component(s)">1</span></div><ul class="rows mono"><li>geoip@1.6.12-r3<span class="src">Source: <a href="http://www.maxmind.com/app/ip-location" target="_blank" rel="noopener noreferrer">http://www.maxmind.com/app/ip-location</a></span></li></ul></div>
+<div class="box lic" id="lic-12"><div class="box-head"><h2>GPL-2.0-only</h2><span class="counter" title="7 component(s)">7</span></div><ul class="rows mono"><li>alpine-baselayout-data@3.4.0-r0<span class="src">Source: <a href="https://git.alpinelinux.org/cgit/aports/tree/main/alpine-baselayout" target="_blank" rel="noopener noreferrer">https://git.alpinelinux.org/cgit/aports/tree/main/alpine-baselayout</a></span></li><li>alpine-baselayout@3.4.0-r0<span class="src">Source: <a href="https://git.alpinelinux.org/cgit/aports/tree/main/alpine-baselayout" target="_blank" rel="noopener noreferrer">https://git.alpinelinux.org/cgit/aports/tree/main/alpine-baselayout</a></span></li><li>apk-tools@2.12.10-r1<span class="src">Source: <a href="https://gitlab.alpinelinux.org/alpine/apk-tools" target="_blank" rel="noopener noreferrer">https://gitlab.alpinelinux.org/alpine/apk-tools</a></span></li><li>busybox-binsh@1.35.0-r29<span class="src">Source: <a href="https://busybox.net/" target="_blank" rel="noopener noreferrer">https://busybox.net/</a></span></li><li>busybox@1.35.0-r29<span class="src">Source: <a href="https://busybox.net/" target="_blank" rel="noopener noreferrer">https://busybox.net/</a></span></li><li>scanelf@1.3.5-r1<span class="src">Source: <a href="https://wiki.gentoo.org/wiki/Hardened/PaX_Utilities" target="_blank" rel="noopener noreferrer">https://wiki.gentoo.org/wiki/Hardened/PaX_Utilities</a></span></li><li>ssl_client@1.35.0-r29<span class="src">Source: <a href="https://busybox.net/" target="_blank" rel="noopener noreferrer">https://busybox.net/</a></span></li></ul></div>
+<div class="box lic" id="lic-13"><div class="box-head"><h2>GPL-2.0-or-later</h2><span class="counter" title="4 component(s)">4</span></div><ul class="rows mono"><li>freetype@2.12.1-r0<span class="src">Source: <a href="https://www.freetype.org/" target="_blank" rel="noopener noreferrer">https://www.freetype.org/</a></span></li><li>libgpg-error@1.46-r1<span class="src">Source: <a href="https://www.gnupg.org/" target="_blank" rel="noopener noreferrer">https://www.gnupg.org/</a></span></li><li>xz-libs@5.2.9-r0<span class="src">Source: <a href="https://tukaani.org/xz" target="_blank" rel="noopener noreferrer">https://tukaani.org/xz</a></span></li><li>zstd-libs@1.5.5-r0<span class="src">Source: <a href="https://www.zstd.net/" target="_blank" rel="noopener noreferrer">https://www.zstd.net/</a></span></li></ul></div>
+<div class="box lic" id="lic-14"><div class="box-head"><h2>LGPL-2.1-or-later</h2><span class="counter" title="4 component(s)">4</span></div><ul class="rows mono"><li>libgcrypt@1.10.1-r0<span class="src">Source: <a href="https://www.gnupg.org/" target="_blank" rel="noopener noreferrer">https://www.gnupg.org/</a></span></li><li>libgpg-error@1.46-r1<span class="src">Source: <a href="https://www.gnupg.org/" target="_blank" rel="noopener noreferrer">https://www.gnupg.org/</a></span></li><li>libintl@0.21.1-r1<span class="src">Source: <a href="https://www.gnu.org/software/gettext/gettext.html" target="_blank" rel="noopener noreferrer">https://www.gnu.org/software/gettext/gettext.html</a></span></li><li>xz-libs@5.2.9-r0<span class="src">Source: <a href="https://tukaani.org/xz" target="_blank" rel="noopener noreferrer">https://tukaani.org/xz</a></span></li></ul></div>
+<div class="box lic" id="lic-15"><div class="box-head"><h2>Libpng</h2><span class="counter" title="1 component(s)">1</span></div><ul class="rows mono"><li>libpng@1.6.39-r0<span class="src">Source: <a href="http://www.libpng.org" target="_blank" rel="noopener noreferrer">http://www.libpng.org</a></span></li></ul></div>
+<div class="box lic" id="lic-16"><div class="box-head"><h2>MIT</h2><span class="counter" title="14 component(s)">14</span></div><ul class="rows mono"><li>alpine-keys@2.4-r1<span class="src">Source: <a href="https://alpinelinux.org" target="_blank" rel="noopener noreferrer">https://alpinelinux.org</a></span></li><li>brotli-libs@1.0.9-r9<span class="src">Source: <a href="https://github.com/google/brotli" target="_blank" rel="noopener noreferrer">https://github.com/google/brotli</a></span></li><li>fontconfig@2.14.1-r0<span class="src">Source: <a href="https://www.freedesktop.org/wiki/Software/fontconfig" target="_blank" rel="noopener noreferrer">https://www.freedesktop.org/wiki/Software/fontconfig</a></span></li><li>libexpat@2.6.2-r0<span class="src">Source: <a href="https://libexpat.github.io/" target="_blank" rel="noopener noreferrer">https://libexpat.github.io/</a></span></li><li>libsm@1.2.3-r1<span class="src">Source: <a href="https://xorg.freedesktop.org/" target="_blank" rel="noopener noreferrer">https://xorg.freedesktop.org/</a></span></li><li>libxau@1.0.10-r0<span class="src">Source: <a href="http://xorg.freedesktop.org/" target="_blank" rel="noopener noreferrer">http://xorg.freedesktop.org/</a></span></li><li>libxcb@1.15-r0<span class="src">Source: <a href="https://xcb.freedesktop.org" target="_blank" rel="noopener noreferrer">https://xcb.freedesktop.org</a></span></li><li>libxdmcp@1.1.4-r0<span class="src">Source: <a href="http://xorg.freedesktop.org/" target="_blank" rel="noopener noreferrer">http://xorg.freedesktop.org/</a></span></li><li>libxext@1.3.5-r0<span class="src">Source: <a href="http://xorg.freedesktop.org/" target="_blank" rel="noopener noreferrer">http://xorg.freedesktop.org/</a></span></li><li>libxml2@2.10.4-r0<span class="src">Source: <a href="http://www.xmlsoft.org/" target="_blank" rel="noopener noreferrer">http://www.xmlsoft.org/</a></span></li><li>musl@1.2.3-r5<span class="src">Source: <a href="https://musl.libc.org/" target="_blank" rel="noopener noreferrer">https://musl.libc.org/</a></span></li><li>ncurses-libs@6.3_p20221119-r1<span class="src">Source: <a href="https://invisible-island.net/ncurses/" target="_blank" rel="noopener noreferrer">https://invisible-island.net/ncurses/</a></span></li><li>ncurses-terminfo-base@6.3_p20221119-r1<span class="src">Source: <a href="https://invisible-island.net/ncurses/" target="_blank" rel="noopener noreferrer">https://invisible-island.net/ncurses/</a></span></li><li>nghttp2-libs@1.51.0-r2<span class="src">Source: <a href="https://nghttp2.org" target="_blank" rel="noopener noreferrer">https://nghttp2.org</a></span></li></ul></div>
+<div class="box lic" id="lic-17"><div class="box-head"><h2>MIT AND BSD-2-Clause AND GPL-2.0-or-later</h2><span class="counter" title="1 component(s)">1</span></div><ul class="rows mono"><li>musl-utils@1.2.3-r5<span class="src">Source: <a href="https://musl.libc.org/" target="_blank" rel="noopener noreferrer">https://musl.libc.org/</a></span></li></ul></div>
+<div class="box lic" id="lic-18"><div class="box-head"><h2>MPL-2.0 AND MIT</h2><span class="counter" title="2 component(s)">2</span></div><ul class="rows mono"><li>ca-certificates-bundle@20230506-r0<span class="src">Source: <a href="https://www.mozilla.org/en-US/about/governance/policies/security-group/certs/" target="_blank" rel="noopener noreferrer">https://www.mozilla.org/en-US/about/governance/policies/security-group/certs/</a></span></li><li>ca-certificates@20230506-r0<span class="src">Source: <a href="https://www.mozilla.org/en-US/about/governance/policies/security-group/certs/" target="_blank" rel="noopener noreferrer">https://www.mozilla.org/en-US/about/governance/policies/security-group/certs/</a></span></li></ul></div>
+<div class="box lic" id="lic-19"><div class="box-head"><h2>NOASSERTION</h2><span class="counter" title="1823 component(s)">1,823</span></div><ul class="rows mono"><li>Catalogued files (1822) — paths recorded by the scan, listed in the SBOM, not components</li><li>alpine@3.17.7<span class="src">Source: <a href="https://alpinelinux.org/" target="_blank" rel="noopener noreferrer">https://alpinelinux.org/</a></span></li></ul></div>
+<div class="box lic" id="lic-20"><div class="box-head"><h2>Public</h2><span class="counter" title="1 component(s)">1</span></div><ul class="rows mono"><li>libmd@1.0.4-r0<span class="src">Source: <a href="https://www.hadrons.org/software/libmd/" target="_blank" rel="noopener noreferrer">https://www.hadrons.org/software/libmd/</a></span></li></ul></div>
+<div class="box lic" id="lic-21"><div class="box-head"><h2>Public-Domain</h2><span class="counter" title="2 component(s)">2</span></div><ul class="rows mono"><li>tzdata@2024a-r0<span class="src">Source: <a href="https://www.iana.org/time-zones" target="_blank" rel="noopener noreferrer">https://www.iana.org/time-zones</a></span></li><li>xz-libs@5.2.9-r0<span class="src">Source: <a href="https://tukaani.org/xz" target="_blank" rel="noopener noreferrer">https://tukaani.org/xz</a></span></li></ul></div>
+<div class="box lic" id="lic-22"><div class="box-head"><h2>X11</h2><span class="counter" title="1 component(s)">1</span></div><ul class="rows mono"><li>libice@1.0.10-r1<span class="src">Source: <a href="http://xorg.freedesktop.org/" target="_blank" rel="noopener noreferrer">http://xorg.freedesktop.org/</a></span></li></ul></div>
+<div class="box lic" id="lic-23"><div class="box-head"><h2>Zlib</h2><span class="counter" title="1 component(s)">1</span></div><ul class="rows mono"><li>zlib@1.2.13-r0<span class="src">Source: <a href="https://zlib.net/" target="_blank" rel="noopener noreferrer">https://zlib.net/</a></span></li></ul></div>
+<div class="box lic" id="lic-24"><div class="box-head"><h2>bzip2-1.0.6</h2><span class="counter" title="1 component(s)">1</span></div><ul class="rows mono"><li>libbz2@1.0.8-r4<span class="src">Source: <a href="https://sourceware.org/bzip2/" target="_blank" rel="noopener noreferrer">https://sourceware.org/bzip2/</a></span></li></ul></div>
+<div class="box lic" id="lic-25"><div class="box-head"><h2>curl</h2><span class="counter" title="2 component(s)">2</span></div><ul class="rows mono"><li>curl@8.5.0-r0<span class="src">Source: <a href="https://curl.se/" target="_blank" rel="noopener noreferrer">https://curl.se/</a></span></li><li>libcurl@8.5.0-r0<span class="src">Source: <a href="https://curl.se/" target="_blank" rel="noopener noreferrer">https://curl.se/</a></span></li></ul></div>
+<div class="box lic" id="lic-26"><div class="box-head"><h2>custom</h2><span class="counter" title="4 component(s)">4</span></div><ul class="rows mono"><li>aom-libs@3.5.0-r0<span class="src">Source: <a href="https://aomedia.org/" target="_blank" rel="noopener noreferrer">https://aomedia.org/</a></span></li><li>libgd@2.3.3-r3<span class="src">Source: <a href="https://libgd.github.io/" target="_blank" rel="noopener noreferrer">https://libgd.github.io/</a></span></li><li>libxslt@1.1.37-r1<span class="src">Source: <a href="http://xmlsoft.org/XSLT/" target="_blank" rel="noopener noreferrer">http://xmlsoft.org/XSLT/</a></span></li><li>libxt@1.2.1-r0<span class="src">Source: <a href="http://xorg.freedesktop.org/" target="_blank" rel="noopener noreferrer">http://xorg.freedesktop.org/</a></span></li></ul></div>
+<div class="box lic" id="lic-27"><div class="box-head"><h2>custom:BELL</h2><span class="counter" title="1 component(s)">1</span><p class="unverified">unverified name — not an SPDX identifier; confirm against the component&apos;s license file</p></div><ul class="rows mono"><li>libxpm@3.5.15-r0<span class="src">Source: <a href="http://xorg.freedesktop.org/" target="_blank" rel="noopener noreferrer">http://xorg.freedesktop.org/</a></span></li></ul></div>
+<div class="box lic" id="lic-28"><div class="box-head"><h2>custom:XFREE86</h2><span class="counter" title="1 component(s)">1</span><p class="unverified">unverified name — not an SPDX identifier; confirm against the component&apos;s license file</p></div><ul class="rows mono"><li>libx11@1.8.7-r0<span class="src">Source: <a href="http://xorg.freedesktop.org/" target="_blank" rel="noopener noreferrer">http://xorg.freedesktop.org/</a></span></li></ul></div>
+<div class="box lic" id="lic-29"><div class="box-head"><h2>libtiff</h2><span class="counter" title="1 component(s)">1</span></div><ul class="rows mono"><li>tiff@4.4.0-r4<span class="src">Source: <a href="https://gitlab.com/libtiff/libtiff" target="_blank" rel="noopener noreferrer">https://gitlab.com/libtiff/libtiff</a></span></li></ul></div>
+<div class="box lic" id="lic-30"><div class="box-head"><h2>license</h2><span class="counter" title="5 component(s)">5</span></div><ul class="rows mono"><li>nginx-module-geoip@1.24.0-r1<span class="src">Source: <a href="https://nginx.org/" target="_blank" rel="noopener noreferrer">https://nginx.org/</a></span></li><li>nginx-module-image-filter@1.24.0-r1<span class="src">Source: <a href="https://nginx.org/" target="_blank" rel="noopener noreferrer">https://nginx.org/</a></span></li><li>nginx-module-njs@1.24.0.0.7.12-r1<span class="src">Source: <a href="https://nginx.org/" target="_blank" rel="noopener noreferrer">https://nginx.org/</a></span></li><li>nginx-module-xslt@1.24.0-r1<span class="src">Source: <a href="https://nginx.org/" target="_blank" rel="noopener noreferrer">https://nginx.org/</a></span></li><li>nginx@1.24.0-r1<span class="src">Source: <a href="https://nginx.org/" target="_blank" rel="noopener noreferrer">https://nginx.org/</a></span></li></ul></div>
 <div class="texts"><h2>License texts (SPDX standard)</h2>
-<h3>Apache-2.0</h3><pre>Apache License
+<div class="box"><div class="box-head"><h3>Apache-2.0</h3></div><pre>Apache License
 Version 2.0, January 2004
 http://www.apache.org/licenses/
 
@@ -428,8 +480,8 @@ Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
-limitations under the License.</pre>
-<h3>BSD-2-Clause</h3><pre>Copyright (c) &lt;year&gt; &lt;owner&gt; 
+limitations under the License.</pre></div>
+<div class="box"><div class="box-head"><h3>BSD-2-Clause</h3></div><pre>Copyright (c) &lt;year&gt; &lt;owner&gt; 
 
 Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met:
 
@@ -437,8 +489,8 @@ Redistribution and use in source and binary forms, with or without modification,
 
 2. Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the following disclaimer in the documentation and/or other materials provided with the distribution.
 
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.</pre>
-<h3>BSD-3-Clause</h3><pre>Copyright (c) &lt;year&gt; &lt;owner&gt;. 
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.</pre></div>
+<div class="box"><div class="box-head"><h3>BSD-3-Clause</h3></div><pre>Copyright (c) &lt;year&gt; &lt;owner&gt;. 
 
 Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met:
 
@@ -448,8 +500,8 @@ Redistribution and use in source and binary forms, with or without modification,
 
 3. Neither the name of the copyright holder nor the names of its contributors may be used to endorse or promote products derived from this software without specific prior written permission.
 
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.</pre>
-<h3>GPL-2.0-only</h3><pre>GNU GENERAL PUBLIC LICENSE
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.</pre></div>
+<div class="box"><div class="box-head"><h3>GPL-2.0-only</h3></div><pre>GNU GENERAL PUBLIC LICENSE
 Version 2, June 1991
 
 Copyright (C) 1989, 1991 Free Software Foundation, Inc.
@@ -565,8 +617,8 @@ You should also get your employer (if you work as a programmer) or your school, 
 
      Yoyodyne, Inc., hereby disclaims all copyright interest in the program `Gnomovision' (which makes passes at compilers) written by James Hacker.
 
-signature of Ty Coon, 1 April 1989 Ty Coon, President of Vice</pre>
-<h3>LGPL-2.1-or-later</h3><pre>GNU LESSER GENERAL PUBLIC LICENSE
+signature of Ty Coon, 1 April 1989 Ty Coon, President of Vice</pre></div>
+<div class="box"><div class="box-head"><h3>LGPL-2.1-or-later</h3></div><pre>GNU LESSER GENERAL PUBLIC LICENSE
 
 Version 2.1, February 1999
 
@@ -741,8 +793,8 @@ by James Random Hacker.
 
 signature of Ty Coon, 1 April 1990
 Ty Coon, President of Vice
-That's all there is to it!</pre>
-<h3>MIT</h3><pre>MIT License
+That's all there is to it!</pre></div>
+<div class="box"><div class="box-head"><h3>MIT</h3></div><pre>MIT License
 
 Copyright (c) &lt;year&gt; &lt;copyright holders&gt;
 
@@ -759,8 +811,8 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO
 EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
 IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE
-USE OR OTHER DEALINGS IN THE SOFTWARE.</pre>
-<h3>Zlib</h3><pre>zlib License
+USE OR OTHER DEALINGS IN THE SOFTWARE.</pre></div>
+<div class="box"><div class="box-head"><h3>Zlib</h3></div><pre>zlib License
 
 This software is provided 'as-is', without any express or implied warranty.  In no event will the authors be held liable for any damages arising from the use of this software.
 
@@ -770,6 +822,6 @@ Permission is granted to anyone to use this software for any purpose, including 
 
      2. Altered source versions must be plainly marked as such, and must not be misrepresented as being the original software.
 
-     3. This notice may not be removed or altered from any source distribution.</pre>
+     3. This notice may not be removed or altered from any source distribution.</pre></div>
 </div>
 </body></html>
