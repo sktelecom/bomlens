@@ -1,6 +1,7 @@
 // Copyright 2026 SK Telecom Co., Ltd.
 // SPDX-License-Identifier: Apache-2.0
 
+import { Banner } from "@primer/react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -32,6 +33,7 @@ import { IS_STATIC_DEMO } from "@/lib/demo";
 import { useToast } from "@/lib/toast";
 
 import { AiDeclarationWizard } from "./AiDeclarationWizard";
+import "./models/models.css";
 import { Spdx3Fields, Spdx3StatusBand } from "./Spdx3StatusBand";
 
 /** Answers in progress, by scan. Leaving the section (or the scan) and coming
@@ -42,10 +44,18 @@ type Draft = {
   initial: Declaration;
   current: Declaration;
   step: StepId;
+  /** Steps opened and left so far, so their marks survive a visit elsewhere. */
+  left?: StepId[];
   /** The declaration saved before, as read. */
   original: unknown;
 };
 const drafts = new Map<string, Draft>();
+
+/** Answers were typed and kept for this scan, not yet saved. */
+function hasKeptAnswers(scanId: string | null): boolean {
+  const d = scanId ? drafts.get(scanId) : undefined;
+  return Boolean(d && d.current !== d.initial);
+}
 
 async function readJson(scanId: string | null, name: string): Promise<unknown | null> {
   try {
@@ -100,10 +110,14 @@ export function Spdx3Panel({
   const [busy, setBusy] = useState(false);
   const [fill, setFill] = useState<Draft | null>(() => (scanId ? drafts.get(scanId) ?? null : null));
   const [closed, setClosed] = useState(false);
+  // The questions opened from answers kept earlier (the section was left and
+  // came back to), not from the saved declaration.
+  const [resumed, setResumed] = useState(() => hasKeptAnswers(scanId));
 
   // Another scan: its own draft, or none.
   useEffect(() => {
     setFill(scanId ? drafts.get(scanId) ?? null : null);
+    setResumed(hasKeptAnswers(scanId));
   }, [scanId]);
 
   useEffect(() => {
@@ -175,6 +189,7 @@ export function Spdx3Panel({
     }
     if (tpl) onPatch?.({ results: tpl.results });
     setClosed(false);
+    setResumed(false);
     // Open where something is still open, not at a step with nothing to ask.
     const authorFromScan =
       current?.elements.find((e) => e.type === "CreationInfo")?.fields.find((f) => f.id === "createdBy")?.status === "auto";
@@ -195,14 +210,15 @@ export function Spdx3Panel({
 
   const close = () => {
     if (scanId) drafts.delete(scanId);
+    setResumed(false);
     setFill(null);
     setClosed(true);
   };
 
   const keepDraft = useCallback(
-    (current: Declaration, step: StepId) => {
+    (current: Declaration, step: StepId, left: StepId[]) => {
       if (!scanId || !fill) return;
-      drafts.set(scanId, { ...fill, current, step });
+      drafts.set(scanId, { ...fill, current, step, left });
     },
     [scanId, fill],
   );
@@ -219,22 +235,32 @@ export function Spdx3Panel({
 
   if (fill) {
     return (
-      <AiDeclarationWizard
-        key={scanId ?? ""}
-        title={title}
-        index={fill.index}
-        initial={fill.current}
-        initialStep={fill.step}
-        check={check}
-        onCancel={close}
-        onSave={save}
-        onDraft={keepDraft}
-        declaredScan={declaredScan}
-      />
+      <div>
+        {/* Answers kept from an earlier visit to this screen: say so. */}
+        {resumed && (
+          <div className="bl-md-draftkept">
+            <Banner variant="info" title={t("aiDecl.draftKept")} data-testid="spdx3-draft-kept" />
+          </div>
+        )}
+        <AiDeclarationWizard
+          key={scanId ?? ""}
+          title={title}
+          index={fill.index}
+          initial={fill.current}
+          initialStep={fill.step}
+          baseline={fill.initial}
+          initialLeft={fill.left}
+          check={check}
+          onCancel={close}
+          onSave={save}
+          onDraft={keepDraft}
+          declaredScan={declaredScan}
+        />
+      </div>
     );
   }
   return (
-    <div className="space-y-3">
+    <div className="bl-md-stack">
       <Spdx3StatusBand
         summary={summary}
         available={available}

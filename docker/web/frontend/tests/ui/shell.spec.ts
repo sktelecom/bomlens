@@ -2136,15 +2136,18 @@ test("Models & datasets folds the met G7 checks of an open group", async ({ page
   await page.getByTestId("run-scan").click();
   await page.getByRole("navigation").getByRole("link", { name: /Models & datasets/ }).click();
 
-  // The models cluster has gaps, so it opens; its three met checks sit in a
-  // closed fold below them.
+  // Groups start folded. The models cluster has gaps; once opened, its three
+  // met checks sit in a closed fold below them.
+  const models = page.locator("main details").filter({ has: page.locator("> summary", { hasText: /^Models/ }) }).first();
+  await expect(models).not.toHaveAttribute("open", /.*/);
+  await models.locator("> summary").click();
   const metFold = page.locator("main details").filter({ has: page.locator("> summary", { hasText: /^Met 3$/ }) });
   await expect(metFold).toHaveCount(1);
   await expect(metFold).not.toHaveAttribute("open", /.*/);
-  await expect(page.getByText("Model hash value")).toBeVisible();
-  await expect(page.getByText("Model identifier")).toBeHidden();
+  await expect(models.getByText("Model hash value")).toBeVisible();
+  await expect(models.getByText("Model identifier")).toBeHidden();
   await metFold.locator("> summary").click();
-  await expect(page.getByText("Model identifier")).toBeVisible();
+  await expect(models.getByText("Model identifier")).toBeVisible();
 
   // A group of met checks only is closed already, and opening it shows the
   // checks straight away rather than a second fold.

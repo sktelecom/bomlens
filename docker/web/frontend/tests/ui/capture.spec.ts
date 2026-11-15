@@ -436,7 +436,7 @@ for (const lang of ["en", "ko"] as Lang[]) {
     await stubSpdx3(page);
     await runScan(page, "model", "1.0");
     await NAV(page, "models").click();
-    const header = page.locator("main span.font-mono", { hasText: "google-bert / " }).first();
+    const header = page.locator("main h2.bl-mono", { hasText: "google-bert / " }).first();
     await header.waitFor();
     await killAnim(page);
     await settleMain(page);
