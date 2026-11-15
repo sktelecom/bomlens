@@ -184,7 +184,7 @@ ARG SBOM_DEEP_LICENSE=false
 # so shipping the client just makes the web-UI toggle available out of the box.
 ARG SBOM_SCANOSS=true
 # renovate: datasource=pypi depName=scanoss
-ARG SCANOSS_VERSION=1.54.2
+ARG SCANOSS_VERSION=1.54.3
 # renovate: datasource=pypi depName=picklescan
 ARG PICKLESCAN_VERSION=1.0.5
 ARG TARGETARCH=amd64
