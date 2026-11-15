@@ -184,7 +184,7 @@ ARG SBOM_DEEP_LICENSE=false
 # so shipping the client just makes the web-UI toggle available out of the box.
 ARG SBOM_SCANOSS=true
 # renovate: datasource=pypi depName=scanoss
-ARG SCANOSS_VERSION=1.54.2
+ARG SCANOSS_VERSION=1.54.3
 # renovate: datasource=pypi depName=picklescan
 ARG PICKLESCAN_VERSION=1.0.5
 ARG TARGETARCH=amd64
@@ -208,7 +208,7 @@ ARG UNBLOB_VERSION=26.3.30
 # renovate: datasource=pypi depName=cve-bin-tool
 ARG CVE_BIN_TOOL_VERSION=3.4
 # renovate: datasource=pypi depName=ubi_reader
-ARG UBI_READER_VERSION=0.8.15
+ARG UBI_READER_VERSION=0.8.16
 # The firmware SBOM names the tools that produced it, and a tool name without a
 # version tells a reader nothing about which build ran. Carry the pins forward as
 # ENV so scan-firmware.sh states them exactly instead of parsing --version output.
