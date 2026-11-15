@@ -26,4 +26,5 @@ soupsieve==2.9  # replaces soupsieve==2.8.3 (CVE-2026-49476, CVE-2026-49477, CVE
 starlette==1.3.1  # replaces starlette==1.0.0 (CVE-2026-48818, CVE-2026-54283, CVE-2026-54282, CVE-2026-48710, CVE-2026-48817)
 torch==2.13.0  # replaces torch==2.11.0 (CVE-2025-3000; also lifts the setuptools<82 cap)
 transformers==5.10.4  # replaces transformers==5.5.4 (CVE-2026-9856; 5.10.0 itself was yanked)
+typing-extensions==4.16.0  # replaces typing-extensions==4.15.0 (anyio 4.15.1 needs typing_extensions>=4.16.0)
 urllib3==2.8.0  # replaces urllib3==2.6.3 (CVE-2026-44431, CVE-2026-44432, CVE-2026-97687, CVE-2026-97688, CVE-2026-97689)
