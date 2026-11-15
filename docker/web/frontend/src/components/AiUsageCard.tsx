@@ -17,7 +17,7 @@ import {
   aiUsageView,
 } from "@/lib/aiUsage";
 import { useFormatNumber } from "@/lib/format";
-import { GradeBadge } from "@/lib/models";
+import { GradeLabel } from "./models/ModelCards";
 
 /**
  * The AI the scanned code uses: models and AI services it calls, MCP servers
@@ -153,7 +153,7 @@ function ModelDetail({ item }: { item: AiUsageItem }) {
         <div className="flex flex-wrap items-center gap-1">
           {d.verdict && (
             <span title={t("aiUsage.verdictTitle")}>
-              <GradeBadge grade={d.verdict} />
+              <GradeLabel grade={d.verdict} />
             </span>
           )}
           {d.gated && <Label variant="attention">{t(`aiUsage.gated.${d.gated}`)}</Label>}
