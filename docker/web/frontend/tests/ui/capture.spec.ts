@@ -25,9 +25,10 @@ test.skip(process.env.CAPTURE !== "1", "opt-in via CAPTURE=1 (npm run capture:ui
 // Two capture shapes, matching the existing files:
 //  - Full-window page screenshots at a 1040x664 viewport (top bar + rail +
 //    content), for the New scan and Overview guide images.
-//  - `main`-element screenshots at the default 1280x720 viewport, where the
-//    rail (15rem) + top bar (3.5rem) make `main` exactly 1040x664 — the
-//    content-only section images (Components, Vulnerabilities, …).
+//  - Content-only section images (Components, Vulnerabilities, …) at the
+//    default 1280x720 viewport: the part of `main` on screen, right of the
+//    navigation and under the top bar (the page itself scrolls, so a plain
+//    element screenshot would take the whole section).
 const IMAGES = "../../../docs/images";
 
 type Lang = "en" | "ko";
@@ -42,24 +43,15 @@ type Caps = {
 // count or version number changing inside the sentence.
 const STR: Record<Lang, {
   scanOptions: string; // scanOptions
-  identifyVendored: string; // identifyVendored
-  vendoredHint: string; // substring of vendoredHintTitle
   spdxExport: string; // substring of spdxExport
-  vulnCount: string; // substring of attnVulns
 }> = {
   en: {
     scanOptions: "Result quality",
-    identifyVendored: "Detect copied-in open source",
-    vendoredHint: "C/C++ embedded source",
     spdxExport: "Export as SPDX",
-    vulnCount: "critical or high vulnerabilities",
   },
   ko: {
     scanOptions: "결과 품질",
-    identifyVendored: "복사해 넣은 오픈소스 탐지",
-    vendoredHint: "C/C++ 임베디드 소스",
     spdxExport: "SPDX",
-    vulnCount: "취약점",
   },
 };
 
@@ -122,15 +114,27 @@ async function runScan(page: Page, project: string, version: string) {
   await page.getByTestId("run-scan").click();
 }
 
-// Reset `main` (the scroll container) to the top and let its fade-in settle, so
-// the section title sits right under the top bar — not a mid-panel slice.
+// Scroll the page to the top and let main's fade-in settle, so the section
+// title sits right under the top bar, not a mid-panel slice.
 async function settleMain(page: Page) {
   await page.locator("main").evaluate(async (el) => {
     await Promise.all(el.getAnimations().map((a) => a.finished.catch(() => undefined)));
-    el.scrollTop = 0;
+    window.scrollTo(0, 0);
     await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
   });
   await page.mouse.move(0, 0); // neutral pointer — avoid hover-state leak
+}
+
+// The part of `main` on screen: right of the navigation, under the sticky top
+// bar, down to the bottom of the window.
+async function shootMain(page: Page, path: string) {
+  const clip = await page.locator("main").evaluate((el) => {
+    const r = el.getBoundingClientRect();
+    const top = Math.max(r.top, document.querySelector("header")?.getBoundingClientRect().bottom ?? 0);
+    const bottom = Math.min(r.bottom, window.innerHeight);
+    return { x: r.left, y: top, width: Math.min(r.right, window.innerWidth) - r.left, height: bottom - top };
+  });
+  await page.screenshot({ path, clip });
 }
 
 // ---------------------------------------------------------------------------
@@ -338,7 +342,7 @@ for (const lang of ["en", "ko"] as Lang[]) {
 }
 
 // ===========================================================================
-// Section images: content-only `main` screenshots (1040x664 at default vp).
+// Section images: the on-screen part of `main` at the default viewport.
 // ===========================================================================
 
 for (const lang of ["en", "ko"] as Lang[]) {
@@ -349,10 +353,11 @@ for (const lang of ["en", "ko"] as Lang[]) {
     await stub(page, { firmware: false, scanoss: false, docker: true }, { done: DONE, sbom: SBOM });
     await runScan(page, "demo", "1.0");
     await page.locator("main h1").waitFor();
-    await page.getByText(new RegExp(s.vulnCount)).first().waitFor();
+    // The first-checks list is what the redesigned Overview opens with.
+    await page.getByTestId("first-checks").waitFor();
     await killAnim(page);
     await settleMain(page);
-    await page.locator("main").screenshot({ path: `${IMAGES}/${withLang("app-results.png", lang)}` });
+    await shootMain(page, `${IMAGES}/${withLang("app-results.png", lang)}`);
   });
 
   test(`@capture components section (content) - ${lang}`, async ({ page }) => {
@@ -363,7 +368,7 @@ for (const lang of ["en", "ko"] as Lang[]) {
     await page.getByText("openssl", { exact: true }).first().waitFor();
     await killAnim(page);
     await settleMain(page);
-    await page.locator("main").screenshot({ path: `${IMAGES}/${withLang("web-ui-components.png", lang)}` });
+    await shootMain(page, `${IMAGES}/${withLang("web-ui-components.png", lang)}`);
   });
 
   test(`@capture vulnerabilities section (content) - ${lang}`, async ({ page }) => {
@@ -374,7 +379,7 @@ for (const lang of ["en", "ko"] as Lang[]) {
     await page.getByText("9.8", { exact: true }).waitFor();
     await killAnim(page);
     await settleMain(page);
-    await page.locator("main").screenshot({ path: `${IMAGES}/${withLang("web-ui-vulns.png", lang)}` });
+    await shootMain(page, `${IMAGES}/${withLang("web-ui-vulns.png", lang)}`);
   });
 
   test(`@capture dependencies section (content) - ${lang}`, async ({ page }) => {
@@ -388,7 +393,7 @@ for (const lang of ["en", "ko"] as Lang[]) {
     await page.getByText("openssl").first().waitFor();
     await killAnim(page);
     await settleMain(page);
-    await page.locator("main").screenshot({ path: `${IMAGES}/${withLang("web-ui-dependencies.png", lang)}` });
+    await shootMain(page, `${IMAGES}/${withLang("web-ui-dependencies.png", lang)}`);
   });
 
   test(`@capture licenses section (content) - ${lang}`, async ({ page }) => {
@@ -399,7 +404,7 @@ for (const lang of ["en", "ko"] as Lang[]) {
     await page.getByText("some-llama-model").waitFor();
     await killAnim(page);
     await settleMain(page);
-    await page.locator("main").screenshot({ path: `${IMAGES}/${withLang("web-ui-licenses.png", lang)}` });
+    await shootMain(page, `${IMAGES}/${withLang("web-ui-licenses.png", lang)}`);
   });
 
   test(`@capture artifacts section (content) - ${lang}`, async ({ page }) => {
@@ -412,7 +417,7 @@ for (const lang of ["en", "ko"] as Lang[]) {
     await page.getByRole("button", { name: new RegExp(s.spdxExport) }).waitFor();
     await killAnim(page);
     await settleMain(page);
-    await page.locator("main").screenshot({ path: `${IMAGES}/${withLang("web-ui-artifacts.png", lang)}` });
+    await shootMain(page, `${IMAGES}/${withLang("web-ui-artifacts.png", lang)}`);
   });
 
   test(`@capture models section (content) - ${lang}`, async ({ page }) => {
@@ -423,15 +428,13 @@ for (const lang of ["en", "ko"] as Lang[]) {
     await stubSpdx3(page);
     await runScan(page, "model", "1.0");
     await NAV(page, "models").click();
-    const header = page.locator("main span.font-mono", { hasText: "google-bert / " }).first();
+    const header = page.locator("main h2.bl-mono", { hasText: "google-bert / " }).first();
     await header.waitFor();
     await killAnim(page);
     await settleMain(page);
-    await header.evaluate((el) => {
-      const main = el.closest("main")!;
-      main.scrollTop += el.getBoundingClientRect().top - main.getBoundingClientRect().top - 40;
-    });
-    await page.locator("main").screenshot({ path: `${IMAGES}/${withLang("web-ui-models.png", lang)}` });
+    // 56px top bar plus 40px of air above the card header.
+    await header.evaluate((el) => window.scrollBy(0, el.getBoundingClientRect().top - 96));
+    await shootMain(page, `${IMAGES}/${withLang("web-ui-models.png", lang)}`);
   });
 }
 
@@ -458,10 +461,9 @@ for (const lang of ["en", "ko"] as Lang[]) {
     // The vendored-ID toggle lives inside the collapsed "Result quality"
     // disclosure, expand it and capture the whole open section (summary +
     // toggle) so the guide shows users where to find it, not just the switch.
-    await page.getByText(s.scanOptions).click();
-    const toggle = page.getByText(s.identifyVendored);
-    await toggle.waitFor({ state: "visible" });
-    const section = toggle.locator("xpath=ancestor::details[1]");
+    const section = page.getByTestId("settings-quality");
+    await section.getByText(s.scanOptions, { exact: true }).click();
+    await section.getByTestId("option-identifyVendored").waitFor({ state: "visible" });
     await section.screenshot({
       path: `${IMAGES}/${withLang("web-ui-identify-vendored-en.png", lang)}`,
     });
@@ -471,11 +473,8 @@ for (const lang of ["en", "ko"] as Lang[]) {
     await seedLang(page, lang);
     await stub(page, { firmware: false, scanoss: true, docker: true }, { done: VENDORED_DONE });
     await runScan(page, "trelay", "26.4.0");
-    // The banner is the amber rounded-md box that holds the suggestion text.
-    const banner = page
-      .locator("div.rounded-md")
-      .filter({ hasText: s.vendoredHint })
-      .first();
+    // The suggestion is a warning banner with its own test id.
+    const banner = page.getByTestId("vendored-hint");
     await banner.waitFor({ state: "visible" });
     await killAnim(page);
     await settleMain(page);
@@ -545,27 +544,24 @@ const CONFORMANCE_DONE = {
 // down to what still needs fixing. The panel itself opens filtered to
 // "actionable" whenever any check qualifies (ConformancePanel.tsx), so the
 // capture has to reset that filter to match what the doc describes.
+const KINDS_GROUP: Record<Lang, string> = { en: "Check kind", ko: "검사 종류" };
 const G7_WAIT: Record<Lang, string> = { en: "SBOM author", ko: "SBOM 작성자" };
 
 for (const lang of ["en", "ko"] as Lang[]) {
   test(`@capture conformance section - ${lang}`, async ({ page }) => {
-    await page.setViewportSize({ width: 1040, height: 664 });
+    // Taller than the other full-window shots: the redesigned screen stacks the
+    // verdict, the tabs and the format box above the G7 clusters this image shows.
+    await page.setViewportSize({ width: 1040, height: 1100 });
     await seedLang(page, lang);
     await stub(page, { firmware: false, scanoss: false, docker: true }, { done: CONFORMANCE_DONE });
     await runScan(page, "model", "1.0");
     await NAV(page, "conformance").click();
-    // Reset the default "actionable" filter to "all" (the chip toggles off
-    // when clicked a second time). Scoped to main: the top bar's EN/KO
-    // toggle is also a pressed button. The chip only exists once the
-    // conformance data has rendered, so wait for it before deciding whether
-    // to click it (count() alone does not wait).
-    const activeKindChip = page.locator("main").getByRole("button", { pressed: true }).first();
-    try {
-      await activeKindChip.waitFor({ state: "visible", timeout: 5000 });
-      await activeKindChip.click();
-    } catch {
-      // No kind filter defaulted on (no actionable check in this stub); nothing to toggle.
-    }
+    // The screen opens on "Can be fixed" when any check qualifies; the doc
+    // describes the whole report, so switch to the "All" tab, the first one in
+    // the kind group. The tabs exist once the conformance data has rendered.
+    const kinds = page.getByRole("group", { name: KINDS_GROUP[lang], exact: true });
+    await kinds.waitFor({ state: "visible" });
+    await kinds.getByRole("button").first().click();
     // A cluster with no actionable check of its own (metadata, holding "SBOM
     // author") stays collapsed even under the "all" filter, since each
     // CheckGroup only auto-opens when the filter is non-null or it contains
@@ -654,7 +650,7 @@ for (const lang of ["en", "ko"] as Lang[]) {
     await page.locator('tr[data-field="releaseTime"]').first().waitFor();
     await killAnim(page);
     await settleMain(page);
-    await page.locator("main").screenshot({ path: `${IMAGES}/${withLang("web-ui-spdx3.png", lang)}` });
+    await shootMain(page, `${IMAGES}/${withLang("web-ui-spdx3.png", lang)}`);
   });
 
   test(`@capture AI declaration questions - ${lang}`, async ({ page }) => {
@@ -667,7 +663,7 @@ for (const lang of ["en", "ko"] as Lang[]) {
     await page.locator('[data-question="model.releaseTime"]').waitFor();
     await killAnim(page);
     await settleMain(page);
-    await page.locator("main").screenshot({ path: `${IMAGES}/${withLang("web-ui-ai-declaration.png", lang)}` });
+    await shootMain(page, `${IMAGES}/${withLang("web-ui-ai-declaration.png", lang)}`);
   });
 
   test(`@capture AI declaration service step - ${lang}`, async ({ page }) => {
@@ -691,6 +687,6 @@ for (const lang of ["en", "ko"] as Lang[]) {
     await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
     await killAnim(page);
     await settleMain(page);
-    await page.locator("main").screenshot({ path: `${IMAGES}/${withLang("web-ui-ai-service.png", lang)}` });
+    await shootMain(page, `${IMAGES}/${withLang("web-ui-ai-service.png", lang)}`);
   });
 }

@@ -28,7 +28,7 @@ async function openGitForm(page: Page) {
     r.fulfill({ contentType: "text/event-stream", body: `event: done\ndata: ${JSON.stringify(DONE)}\n\n` }),
   );
   await page.goto("/#/new");
-  await page.getByRole("button", { name: "GitHub URL" }).click();
+  await page.getByRole("radio", { name: "GitHub URL" }).click();
   await page.fill("#target", "https://github.com/acme/demo.git");
   await page.fill("#project", "demo");
   await page.fill("#version", "1.0");
@@ -53,6 +53,6 @@ test("an empty field sends an empty git_ref", async ({ page }) => {
 
 test("the field is not offered for the current folder", async ({ page }) => {
   await openGitForm(page);
-  await page.getByRole("button", { name: /Current folder/i }).click();
+  await page.getByRole("radio", { name: /Current folder/i }).click();
   await expect(page.locator("#gitRef")).toHaveCount(0);
 });

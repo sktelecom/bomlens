@@ -1,0 +1,5 @@
+P	:app
+H	:app
+R	:app	com.fasterxml.jackson.core:jackson-core:2.16.0
+R	:app	com.fasterxml.jackson.core:jackson-databind:2.16.0
+R	:app	com.google.guava:guava:33.0.0-jre

@@ -307,7 +307,7 @@ test("the licence-decision filter narrows to the rows a person has to resolve", 
   await page.getByRole("link", { name: /^Components/ }).first().click();
 
   await page.getByRole("button", { name: /^Filters/ }).click();
-  await page.getByRole("checkbox", { name: "Licence to decide" }).check();
+  await page.getByRole("menuitemcheckbox", { name: "License to decide" }).click();
   await page.keyboard.press("Escape");
 
   await expect(page.getByText("python-dateutil", { exact: true }).first()).toBeVisible();
@@ -337,7 +337,7 @@ test("the filter is not offered when every licence was placed", async ({ page })
   await page.getByRole("link", { name: /^Components/ }).first().click();
 
   await page.getByRole("button", { name: /^Filters/ }).click();
-  await expect(page.getByRole("checkbox", { name: "Licence to decide" })).toHaveCount(0);
+  await expect(page.getByRole("menuitemcheckbox", { name: "License to decide" })).toHaveCount(0);
 });
 
 // 20-d: the scan log is streamed and never stored, so a result opened later had
@@ -358,6 +358,11 @@ test("warnings the scan emitted survive onto the result screen", async ({ page }
   await page.goto("/#/new");
   await fillAndRun(page);
 
+  // This scan found nothing and warned, so two warning notices apply and they
+  // share one banner; the warning lines sit in its "Details" fold.
+  const merged = page.getByTestId("merged-warning");
+  await expect(merged).toBeVisible();
+  await merged.getByText("Details", { exact: true }).click();
   const box = page.getByTestId("scan-warnings");
   await expect(box).toBeVisible();
   await expect(box).toContainText("No package manifest detected");

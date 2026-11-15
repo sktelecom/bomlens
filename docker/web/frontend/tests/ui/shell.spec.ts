@@ -104,7 +104,7 @@ test("AI model source is gated on the AIBOM image", async ({ page }) => {
   // Without the AIBOM image, the tile is locked (aria-disabled, with a visible
   // reason) rather than plain-disabled, so its reason is still announced.
   await openNewScan(page, "light", "en");
-  await expect(page.getByRole("button", { name: "AI model" })).toHaveAttribute(
+  await expect(page.getByRole("radio", { name: "AI model" })).toHaveAttribute(
     "aria-disabled",
     "true",
   );
@@ -116,7 +116,7 @@ test("AI model source is gated on the AIBOM image", async ({ page }) => {
   );
   await page.reload();
   await page.locator("#project").waitFor();
-  const tile = page.getByRole("button", { name: "AI model" });
+  const tile = page.getByRole("radio", { name: "AI model" });
   await expect(tile).toBeEnabled();
   await tile.click();
   await expect(page.locator("#target")).toBeVisible();
@@ -126,19 +126,19 @@ test("AI model source is gated on the AIBOM image", async ({ page }) => {
 test("New scan groups sources and switches the source-specific input", async ({ page }) => {
   await openNewScan(page, "light", "en");
 
-  // The source picker offers the grouped tiles in one labelled group.
-  const sources = page.getByRole("group", { name: "Source" });
+  // The source picker offers the grouped tiles in one labelled radio group.
+  const sources = page.getByRole("radiogroup", { name: "Source" });
   await expect(sources).toBeVisible();
-  await expect(sources.getByRole("button", { name: "Current folder" })).toBeVisible();
-  await expect(sources.getByRole("button", { name: "Docker image" })).toBeVisible();
+  await expect(sources.getByRole("radio", { name: "Current folder" })).toBeVisible();
+  await expect(sources.getByRole("radio", { name: "Docker image" })).toBeVisible();
 
   // Selecting the GitHub tile reveals the URL target input; Docker keeps it.
-  await page.getByRole("button", { name: "GitHub URL" }).click();
+  await page.getByRole("radio", { name: "GitHub URL" }).click();
   await expect(page.locator("#target")).toBeVisible();
-  await page.getByRole("button", { name: "Docker image" }).click();
+  await page.getByRole("radio", { name: "Docker image" }).click();
   await expect(page.locator("#target")).toBeVisible();
 
-  // The settings pane keeps the project field and the generate button.
+  // The action bar keeps the project field and the generate button.
   await expect(page.locator("#project")).toBeVisible();
   await expect(page.getByRole("button", { name: /Run scan/i })).toBeVisible();
 });
@@ -158,11 +158,10 @@ test("Recent menu re-opens a past scan from the top bar", async ({ page }) => {
   );
   await page.goto("/?ui=next");
 
-  // The top bar's Recent menu lists the past scan; opening it and clicking the
-  // entry loads the result. (Recent moved from the rail to the top bar so the
-  // rail stays purely the current scan's sections.)
-  await page.getByRole("banner").getByRole("button", { name: "Scan management" }).click();
-  const recent = page.getByRole("link", { name: /demo · 1.0/ });
+  // The top bar's Recent menu lists the past scan by project and version;
+  // opening it and clicking the entry loads the result.
+  await page.getByRole("banner").getByRole("button", { name: "Recent scans" }).click();
+  const recent = page.getByRole("link", { name: /demo 1\.0/ });
   await expect(recent).toBeVisible();
   await recent.click();
 
@@ -301,9 +300,10 @@ test("Recent home deletes a scan from its row", async ({ page }) => {
 
   const row = page.getByRole("link", { name: /demo @1.0/ });
   await expect(row).toBeVisible();
-  // The row's trash button asks first (dialog.spec covers the prompt itself);
+  // The row menu's Delete asks first (dialog.spec covers the prompt itself);
   // confirming deletes the scan and the list refreshes to empty.
-  await page.getByRole("button", { name: "Delete", exact: true }).click();
+  await page.getByRole("button", { name: "More actions for demo 1.0" }).click();
+  await page.getByRole("menuitem", { name: "Delete" }).click();
   await page.getByRole("dialog").getByRole("button", { name: "Delete" }).click();
   await expect(row).toHaveCount(0);
   await expect(page.getByText("Generate your first SBOM")).toBeVisible();
@@ -376,7 +376,7 @@ test("the rail spells out the way back to the scan list", async ({ page }) => {
 
   await page.goto("/?ui=next#/scan/demo_1.0");
 
-  const rail = page.getByRole("navigation", { name: "Sections" });
+  const rail = page.getByRole("navigation", { name: "Main" });
   // Real hash links, so both open in a new tab like every other rail row.
   await expect(rail.getByRole("link", { name: "New scan" })).toHaveAttribute("href", "#/new");
   const home = rail.getByRole("link", { name: "Scan management" });
@@ -767,6 +767,8 @@ test("cancelling a running scan returns to New scan", async ({ page }) => {
 
   await expect(page.getByText("Scanning…")).toBeVisible();
   await page.getByRole("button", { name: "Cancel" }).click();
+  // Cancelling drops what the scan found, so it asks first.
+  await page.getByRole("alertdialog").getByRole("button", { name: "Cancel scan" }).click();
   // Cancel drops back to the New scan screen.
   await expect(
     page.getByRole("heading", { name: "What do you want to scan?" }),
@@ -798,7 +800,7 @@ test("scan results render in the rail sections, adapted to scan type", async ({ 
   await expect(page.getByRole("link", { name: /^Overview/ })).toBeVisible();
   await expect(page.getByRole("link", { name: /^Components/ })).toBeVisible();
   await expect(page.getByRole("link", { name: /^Vulnerabilities/ })).toBeVisible();
-  await expect(page.getByRole("link", { name: /^Dependencies/ })).toBeVisible();
+  await expect(page.getByRole("link", { name: /^Dependencies/ }).first()).toBeVisible();
   await expect(page.getByRole("link", { name: /^Source tree/ })).toBeVisible();
   await expect(page.getByRole("link", { name: /^Artifacts/ })).toBeVisible();
   await expect(page.getByRole("navigation").getByRole("link", { name: /Models & datasets/ })).toHaveCount(0);
@@ -843,19 +845,21 @@ test("end-of-life surfaces as a KPI tile, a badge and a filter chip", async ({ p
   await page.fill("#version", "1.0");
   await page.getByTestId("run-scan").click();
 
-  // Overview KPI tile links into Components; the at-risk hint is present.
-  const tile = page.getByRole("link", { name: "View End of life" });
+  // The Overview lists it under "Needs attention", with the at-risk hint, and
+  // the row opens Components already filtered to the end-of-life components.
+  const tile = page.getByTestId("needs-attention").getByRole("link", { name: /1 component past end of life/ });
   await expect(tile).toBeVisible();
-  await expect(tile.getByText("1 also vulnerable")).toBeVisible();
+  await expect(tile).toContainText("1 also vulnerable");
+  await expect(tile).toHaveAttribute("href", /#\/scan\/[^/]+\/components\?eol=1$/);
   await tile.click();
   await expect(page.getByRole("link", { name: /^Components/ })).toHaveAttribute("aria-current", "page");
 
-  // The EOL component carries the badge; the supported one does not.
-  await expect(page.getByText("End of life · since 2023-09-11")).toBeVisible();
+  // The EOL component says since when; the filter is already on, so the line leaves out the words it repeats.
+  await expect(page.getByText("since 2023-09-11", { exact: true })).toBeVisible();
 
-  // The filter narrows the table to end-of-life rows only.
+  // The link already applied the filter: only end-of-life rows are listed.
   await page.getByRole("button", { name: /^Filters/ }).click();
-  await page.getByRole("checkbox", { name: "End of life" }).check();
+  await expect(page.getByRole("menuitemcheckbox", { name: "End of life" })).toHaveAttribute("aria-checked", "true");
   await page.keyboard.press("Escape");
   await expect(page.getByText("openssl", { exact: true }).first()).toBeVisible();
   await expect(page.getByText("zlib", { exact: true })).toHaveCount(0);
@@ -903,8 +907,8 @@ test("a scan with nothing against any component shows no risk block", async ({ p
   await page.fill("#version", "1.0");
   await page.getByTestId("run-scan").click();
 
-  // The scan landed on the overview (its jump card is there) and the block is not.
-  await expect(page.getByRole("link", { name: "View Components" }).first()).toBeVisible();
+  // The scan landed on the overview (its license axis is there) and the block is not.
+  await expect(page.getByTestId("license-panel")).toBeVisible();
   await expect(page.getByText("Highest risk components")).toHaveCount(0);
 });
 
@@ -922,7 +926,7 @@ test("Overview leads with needs-attention and jumps into sections", async ({ pag
 
   // Back to Overview; a jump card navigates into Components.
   await page.getByRole("link", { name: /^Overview/ }).first().click();
-  await page.getByRole("link", { name: "View Components" }).first().click();
+  await page.getByRole("link", { name: /^Components/ }).first().click();
   await expect(page.getByRole("link", { name: /^Components/ })).toHaveAttribute("aria-current", "page");
   await expect(page.getByText("openssl", { exact: true })).toBeVisible();
 });
@@ -932,7 +936,7 @@ test("Overview severity bar routes into filtered Vulnerabilities", async ({ page
   await expect(page.getByRole("link", { name: /^Overview/ })).toBeVisible();
 
   // Click the High band in the Overview severity axis.
-  await page.getByRole("button", { name: "High 1" }).first().click();
+  await page.getByRole("link", { name: "High 1" }).first().click();
 
   // Lands on Vulnerabilities filtered to HIGH — the HIGH CVE stays, the CRITICAL one is gone.
   await expect(page.getByRole("link", { name: /^Vulnerabilities/ })).toHaveAttribute("aria-current", "page");
@@ -945,7 +949,7 @@ test("Overview license bar routes into filtered Licenses", async ({ page }) => {
   await expect(page.getByRole("link", { name: /^Overview/ })).toBeVisible();
 
   // LIC_DONE is 2 review-needed + 1 permissive (MIT); click the Permissive band.
-  await page.getByRole("button", { name: "Permissive 1" }).first().click();
+  await page.getByRole("link", { name: "Permissive 1" }).first().click();
 
   // Lands on Licenses filtered to permissive — the AI-restrictive review card is
   // gone, and the classification band stays selected so the filter is visible.
@@ -969,7 +973,7 @@ test("dependency graph is labelled and the tree view is keyboard-reachable", asy
   await tree.focus();
   await expect(tree).toBeFocused();
   await page.keyboard.press("Enter");
-  await expect(page.getByText("openssl").first()).toBeVisible();
+  await expect(page.getByRole("treeitem", { name: /^openssl/ })).toBeVisible();
 });
 
 test("section navigation moves focus to the section heading", async ({ page }) => {
@@ -1063,16 +1067,18 @@ test("Overview shows what changed since the previous scan of the same project", 
   // The counts alone don't say which components or CVEs moved; opening each
   // disclosure names them.
   await compSummary.click();
-  await expect(page.getByText("openssl@3.0.0", { exact: true })).toBeVisible();
-  await expect(page.getByText("readline@8.2", { exact: true })).toBeVisible();
-  await expect(page.getByText("curl@7.80.0", { exact: true })).toBeVisible();
-  await expect(page.getByText("zlib moved from 1.1.0 to 1.2.0", { exact: true })).toBeVisible();
+  const details = page.getByTestId("comp-change-details");
+  await expect(details.getByRole("link", { name: /^openssl\s+3\.0\.0$/ })).toBeVisible();
+  await expect(details.getByRole("link", { name: /^readline\s+8\.2$/ })).toBeVisible();
+  await expect(details.getByRole("link", { name: /^curl\s+7\.80\.0$/ })).toBeVisible();
+  await expect(details.getByRole("link", { name: /^zlib\s+moved from 1\.1\.0 to 1\.2\.0$/ })).toBeVisible();
   await expect(page.getByTestId("comp-diff-all-link")).toBeVisible();
 
   await vulnSummary.click();
-  await expect(page.getByText("CVE-2024-0001 (openssl)", { exact: true })).toBeVisible();
-  await expect(page.getByText("CVE-2024-0002 (zlib)", { exact: true })).toBeVisible();
-  await expect(page.getByText("CVE-2024-0003 (curl)", { exact: true })).toBeVisible();
+  const vdetails = page.getByTestId("vuln-change-details");
+  await expect(vdetails.getByRole("link", { name: /^CVE-2024-0001\s+openssl$/ })).toBeVisible();
+  await expect(vdetails.getByRole("link", { name: /^CVE-2024-0002\s+zlib/ })).toBeVisible();
+  await expect(vdetails.getByRole("link", { name: /^CVE-2024-0003\s+curl/ })).toBeVisible();
   await expect(page.getByTestId("vuln-diff-all-link")).toBeVisible();
 });
 
@@ -1081,7 +1087,7 @@ test("Overview comparison card's names jump into the filtered section", async ({
   await expect(page.locator("main h1")).toBeVisible();
   await page.getByTestId("comp-change-summary").click();
 
-  const openssl = page.getByRole("link", { name: "openssl@3.0.0" });
+  const openssl = page.getByTestId("comp-change-details").getByRole("link", { name: /^openssl\s+3\.0\.0$/ });
   await expect(openssl).toHaveAttribute("href", /#\/scan\/.*\/components\?q=openssl$/);
 
   // Keyboard focus lands on the link and stays visible (focus-visible ring,
@@ -1105,7 +1111,7 @@ test("Overview comparison card's names jump into the filtered section", async ({
   await page.goto("/?ui=next#/new");
   await stubAndRunWithPreviousScan(page);
   await page.getByTestId("vuln-change-summary").click();
-  const cve = page.getByRole("link", { name: "CVE-2024-0001 (openssl)" });
+  const cve = page.getByTestId("vuln-change-details").getByRole("link", { name: /^CVE-2024-0001\s+openssl$/ });
   await expect(cve).toHaveAttribute("href", /#\/scan\/.*\/vulnerabilities\?q=CVE-2024-0001$/);
   await cve.click();
   await expect(page.getByRole("link", { name: /^Vulnerabilities/ })).toHaveAttribute("aria-current", "page");
@@ -1114,7 +1120,7 @@ test("Overview comparison card's names jump into the filtered section", async ({
 });
 
 test("Overview comparison card's severity trend text has no axe violations", async ({ page }) => {
-  // Regression guard: this card's "more severe than before" text used the
+  // Regression guard: this card's "Higher" severity text used the
   // graphical text-risk-high token instead of text-risk-high-fg and failed
   // WCAG AA contrast in light mode (3.56:1, needs 4.5:1); severityDir "up" on
   // this fixture is what put that text on the page at all. Full-page, not
@@ -1122,7 +1128,7 @@ test("Overview comparison card's severity trend text has no axe violations", asy
   // contrast/underline fix is tested separately, above).
   await stubAndRunWithPreviousScan(page);
   await expect(page.locator("main h1")).toBeVisible();
-  await expect(page.getByText("more severe than before")).toBeVisible();
+  await expect(page.getByTestId("comparison").getByText("Higher", { exact: true })).toBeVisible();
   const axe = await new AxeBuilder({ page })
     .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
     .analyze();
@@ -1432,7 +1438,7 @@ test("the conformance panel does not say 'no license' when one component declare
   });
   await expect(page.locator("main h1")).toBeVisible();
   await page.getByRole("navigation").locator('a[href$="/conformance"]').first().click();
-  await expect(page.getByTestId("conformance-license-coverage")).toContainText("0% (1/157 software components");
+  await expect(page.getByTestId("conformance-license-coverage")).toHaveCount(0); // a healthy figure is not repeated in the summary
   await expect(page.getByTestId("conformance-no-licenses")).toHaveCount(0);
 });
 
@@ -1475,7 +1481,7 @@ test("the conformance panel keeps a plain pass and shows only the figure for hea
   });
   await expect(page.locator("main h1")).toBeVisible();
   await page.getByRole("navigation").locator('a[href$="/conformance"]').first().click();
-  await expect(page.getByTestId("conformance-license-coverage")).toContainText("100% (39/39 software components");
+  await expect(page.getByTestId("conformance-license-coverage")).toHaveCount(0);
   await expect(page.getByTestId("conformance-no-licenses")).toHaveCount(0);
   await expect(page.getByTestId("conformance-empty-result")).toHaveCount(0);
   await expect(page.getByText("Pass", { exact: true })).toBeVisible();
@@ -1578,7 +1584,14 @@ test("AI scan exposes G7 conformance with present/advisory split", async ({ page
   // so it means the same thing on every scan. It used to show G7 coverage here
   // and all-check passes elsewhere, two answers to two different questions.
   await expect(page.getByRole("navigation").getByRole("link", { name: /Conformance check/ })).toContainText("1/1");
-  await expect(page.locator("main").getByText("1/1").first()).toBeVisible();
+  // A pair is not a plain count: the navigation says which kind of number it is.
+  await expect(page.getByTestId("nav-count-conformance")).toHaveAttribute(
+    "title",
+    "Mandatory checks passed, out of the mandatory checks measured",
+  );
+  // A screen reader hears the pair spelled out.
+  await expect(page.getByRole("link", { name: /1 of 1 mandatory checks passed/ })).toBeVisible();
+  await expect(page.getByTestId("nav-count-conformance")).toContainText("1/1");
   await page.getByRole("navigation").getByRole("link", { name: /Conformance check/ }).click();
 
   // Coverage of the baseline itself: 6 of the 8 auto-covered elements are
@@ -1588,16 +1601,16 @@ test("AI scan exposes G7 conformance with present/advisory split", async ({ page
   // fill, one only a person can settle. These are the filter chips, over the
   // whole document rather than one baseline, and they replace the per-card
   // "advisory / need review" counts that said the same thing three times.
-  await expect(page.getByRole("button", { name: /^Can be fixed \d+$/ })).toBeVisible();
-  await expect(page.getByRole("button", { name: /^Needs a person \d+$/ })).toBeVisible();
+  await expect(page.getByRole("button", { name: /^Can be fixed \(\d+\)$/ })).toBeVisible();
+  await expect(page.getByRole("button", { name: /^Needs a person \(\d+\)$/ })).toBeVisible();
   // The element no scan can settle carries a provenance badge with the chip's
   // own word, and lives under the chip that says so.
-  await page.getByRole("button", { name: /^Needs a person \d+$/ }).click();
+  await page.getByRole("button", { name: /^Needs a person \(\d+\)$/ }).click();
   await expect(page.locator("main li").getByText("Needs a person", { exact: true }).first()).toBeVisible();
-  // Clearing the chip shows every check again, grouped into its clusters. The
+  // The All tab shows every check again, grouped into its clusters. The
   // groups fold, and an unfiltered panel opens only the ones holding something
   // to act on, so open them all for the assertions below.
-  await page.getByRole("button", { name: /^Needs a person \d+$/ }).click();
+  await page.getByRole("button", { name: /^All \(\d+\)$/ }).click();
   await page
     .locator("main details")
     .evaluateAll((els) => els.forEach((e) => ((e as HTMLDetailsElement).open = true)));
@@ -1615,7 +1628,7 @@ test("AI scan exposes G7 conformance with present/advisory split", async ({ page
   await expect(page.getByText("Establish that the SBOM lists every component.")).toBeVisible();
   // The verdict line leads the panel, so what blocks the SBOM is not at the end
   // of a page that runs to twelve thousand pixels on an AI scan.
-  await expect(page.getByText(/mandatory check/)).toBeVisible();
+  await expect(page.getByRole("main").getByText(/mandatory check/)).toBeVisible();
   // A met element is one line: title, badge, figure. Its description and the
   // values that satisfied it are still there, folded, because a reader who has
   // already been told the element is met is not reading either again. Forty of
@@ -1630,14 +1643,14 @@ test("AI scan exposes G7 conformance with present/advisory split", async ({ page
   // The framework row opens to the requirements it counted. The elements were
   // already in the payload and nothing read them, so the table stated four
   // numbers and left the reader to work out which requirement each one was.
-  const fwRow = page.locator("details", { has: page.getByText("EU AI Act — Annex IV") }).first();
+  const fwRow = page.locator("details", { has: page.getByText("EU AI Act: Annex IV technical documentation") }).first();
   await fwRow.getByRole("group").or(fwRow).first().click();
   await expect(fwRow.getByRole("listitem").first()).toBeVisible();
   // so it matches the block heading and not the panel intro, which also mentions
   // the regulatory crosswalk.
   await expect(page.getByText("Regulatory crosswalk", { exact: true })).toBeVisible();
-  await expect(page.getByText("EU AI Act — Annex IV").first()).toBeVisible();
-  await expect(page.getByText("Korean AI Framework Act").first()).toBeVisible();
+  await expect(page.getByText("EU AI Act: Annex IV technical documentation").first()).toBeVisible();
+  await expect(page.getByText("AI Framework Act (Korea)").first()).toBeVisible();
   await expect(page.getByText("Annex IV(1)").first()).toBeVisible(); // a mapped regulation ref
 
   const results = await new AxeBuilder({ page })
@@ -1713,10 +1726,10 @@ test("the AI summary card omits the G7 and crosswalk tiles without an AI profile
   await expect(card.getByRole("link", { name: "View model details" })).toBeVisible();
 });
 
-// The rail is a fixed width, so a label plus its count badge has a hard budget.
+// The navigation is a fixed width, so a label plus its count has a hard budget.
 // "SBOM conformance" overran it once and rendered as "SBOM conforma…". Nothing
-// else would catch that: it clips silently, and the section screenshots crop to
-// <main>.
+// else would catch that: it clips (or wraps) silently, and the section
+// screenshots crop to <main>.
 //
 // This fixture's badges are narrow (6/8), so every badge is first widened to the
 // widest shape a real scan produces — a two-digit pair like 13/16, seen on the
@@ -1729,17 +1742,34 @@ for (const lang of ["en", "ko"] as const) {
     await stubAiAndRun(page, "light", lang);
     await page.getByRole("navigation").locator('a[href$="/conformance"]').first().waitFor();
 
-    const clipped = await page.evaluate((badge) => {
-      for (const b of document.querySelectorAll("nav a span.tabular-nums")) {
-        b.textContent = badge;
+    // A label that does not fit either clips or wraps onto a second line, or
+    // runs into its count; all three overrun the budget.
+    const { checked, overrun } = await page.evaluate((badge) => {
+      for (const b of document.querySelectorAll('[data-testid^="nav-count-"]')) {
+        const visible = b.querySelector("[aria-hidden]") ?? b;
+        visible.textContent = badge;
       }
       // Read a layout property to flush the mutations before measuring.
       void document.body.offsetHeight;
-      return [...document.querySelectorAll("nav a span.truncate")]
-        .filter((s) => s.scrollWidth > (s as HTMLElement).clientWidth)
-        .map((s) => `${s.textContent} (${(s as HTMLElement).clientWidth}/${s.scrollWidth})`);
+      const labels = [...document.querySelectorAll<HTMLElement>("nav [data-nav-label]")];
+      const bad = labels
+        .filter((s) => {
+          const range = document.createRange();
+          range.selectNodeContents(s);
+          const rects = [...range.getClientRects()];
+          const lines = new Set(rects.map((r) => Math.round(r.top))).size;
+          const right = Math.max(...rects.map((r) => r.right));
+          const link = s.closest("a")!;
+          const count = link.querySelector<HTMLElement>('[data-testid^="nav-count-"]');
+          const limit = count ? count.getBoundingClientRect().left : link.getBoundingClientRect().right;
+          return lines > 1 || right > limit;
+        })
+        .map((s) => s.textContent ?? "");
+      return { checked: labels.length, overrun: bad };
     }, WIDEST_BADGE);
-    expect(clipped).toEqual([]);
+    // The selector found the labels at all: an empty match would pass vacuously.
+    expect(checked).toBeGreaterThanOrEqual(5);
+    expect(overrun).toEqual([]);
   });
 }
 
@@ -1782,10 +1812,9 @@ for (const { theme, lang } of COMBOS) {
     await page.getByRole("navigation").locator('a[href$="/conformance"]').first().click();
     // "6/8" and the CycloneDX label are the same in every locale. Scoped to
     // <main> — the rail's conformance badge carries the same 6/8 figure.
-    // Exact: the panel's intro line also contains "CycloneDX" as a substring
-    // (it names the format the checks are against), so a loose match resolves
-    // to both and violates strict mode.
-    await expect(page.getByText("CycloneDX", { exact: true })).toBeVisible();
+    // The summary box is named for the format; wait on that heading by role, as
+    // a text match can also find a tooltip or the intro line.
+    await expect(page.getByRole("heading", { level: 2, name: "CycloneDX" })).toBeVisible();
     await expect(page.locator("main").getByText(/6\s*\/\s*8/)).toBeVisible();
     // <main> mounts with `animate-fade-in` (translateY(4px) -> 0) on every section
     // switch. With `animations: "disabled"`, Playwright freezes the transform to a
@@ -1890,7 +1919,7 @@ test("a classification narrows the license distribution, and a license opens its
   await expect(distribution.getByText("GPL-3.0-only", { exact: true })).toBeVisible();
 
   // The row leads to that license's components, with the filter applied.
-  await distribution.getByRole("button").first().click();
+  await distribution.getByRole("link").first().click();
   await expect(page.getByRole("link", { name: /^Components/ })).toHaveAttribute(
     "aria-current",
     "page",
@@ -2107,15 +2136,18 @@ test("Models & datasets folds the met G7 checks of an open group", async ({ page
   await page.getByTestId("run-scan").click();
   await page.getByRole("navigation").getByRole("link", { name: /Models & datasets/ }).click();
 
-  // The models cluster has gaps, so it opens; its three met checks sit in a
-  // closed fold below them.
+  // Groups start folded. The models cluster has gaps; once opened, its three
+  // met checks sit in a closed fold below them.
+  const models = page.locator("main details").filter({ has: page.locator("> summary", { hasText: /^Models/ }) }).first();
+  await expect(models).not.toHaveAttribute("open", /.*/);
+  await models.locator("> summary").click();
   const metFold = page.locator("main details").filter({ has: page.locator("> summary", { hasText: /^Met 3$/ }) });
   await expect(metFold).toHaveCount(1);
   await expect(metFold).not.toHaveAttribute("open", /.*/);
-  await expect(page.getByText("Model hash value")).toBeVisible();
-  await expect(page.getByText("Model identifier")).toBeHidden();
+  await expect(models.getByText("Model hash value")).toBeVisible();
+  await expect(models.getByText("Model identifier")).toBeHidden();
   await metFold.locator("> summary").click();
-  await expect(page.getByText("Model identifier")).toBeVisible();
+  await expect(models.getByText("Model identifier")).toBeVisible();
 
   // A group of met checks only is closed already, and opening it shows the
   // checks straight away rather than a second fold.
@@ -2154,9 +2186,9 @@ test("Dependencies tree marks vulnerable packages and direct deps", async ({ pag
   await page.getByRole("button", { name: "Tree", exact: true }).click();
 
   // openssl is a direct dependency and vulnerable → Critical + Direct badges.
-  const opensslRow = page.locator("li", { hasText: "openssl" }).first();
+  const opensslRow = page.getByRole("treeitem", { name: /^openssl/ });
   await expect(opensslRow.getByText("Critical", { exact: true })).toBeVisible();
-  await expect(opensslRow.getByText("Direct", { exact: true })).toBeVisible();
+  await expect(opensslRow).toHaveAccessibleDescription(/Direct/);
 
   // The tree view has no axe violations. The view switch recolours both of its
   // buttons through a transition; measure them once it has finished, not midway.
@@ -2182,7 +2214,7 @@ test("View zlib in Dependencies jumps to its row, openssl already expanded", asy
   await page.getByRole("button", { name: "View zlib in Dependencies" }).click();
 
   await expect(page).toHaveURL(/#\/scan\/.*\/dependencies\?q=zlib&version=1\.2\.0/);
-  const zlibRow = page.locator('li[role="treeitem"]', { hasText: "zlib" });
+  const zlibRow = page.getByRole("treeitem", { name: "zlib 1.2.0", exact: true });
   await expect(zlibRow).toBeVisible();
   await expect(zlibRow).toBeFocused();
 });
@@ -2194,7 +2226,11 @@ test("Dependencies tree search box jumps to a match and reports a miss", async (
 
   const search = page.getByRole("textbox", { name: /Search packages/i });
   await search.fill("zlib");
-  const zlibRow = page.locator('li[role="treeitem"]', { hasText: "zlib" });
+  const zlibRow = page.getByRole("treeitem", { name: "zlib 1.2.0", exact: true });
+  // Typing keeps the cursor in the box; the match is marked and Enter moves there.
+  await expect(zlibRow).toHaveAttribute("aria-current", "true");
+  await expect(search).toBeFocused();
+  await search.press("Enter");
   await expect(zlibRow).toBeFocused();
 
   await search.fill("no-such-package");
@@ -2206,7 +2242,8 @@ for (const { theme, lang } of COMBOS) {
     await stubAndRun(page, theme, lang);
     await page.getByRole("navigation").locator('a[href$="/dependencies"]').first().click();
     await page.getByTestId("deps-view-tree").click();
-    await expect(page.getByText("openssl").first()).toBeVisible();
+    await expect(page.getByRole("tree")).toBeVisible();
+    await page.mouse.move(0, 0);
     await captureMain(page, "dependencies-tree", theme, lang);
   });
 }
@@ -2272,25 +2309,34 @@ async function stubVexAndRun(page: Page) {
   await page.getByTestId("run-scan").click();
 }
 
+// The row of a CVE in the Vulnerabilities table: the row that holds its title button.
+const vulnRow = (page: Page, id: string) =>
+  page.getByRole("row").filter({ has: page.locator(`[data-open-id="${id}"]`) });
+
 test("Vulnerabilities table shows the disposition status and NVD severity, when the report carries them", async ({ page }) => {
   await stubVexAndRun(page);
   await page.getByRole("link", { name: /^Vulnerabilities/ }).first().click();
 
-  // Status badges, scoped to their own row, so a label that repeats elsewhere
+  // Status labels, scoped to their own row, so a label that repeats elsewhere
   // on the page cannot make the lookup ambiguous.
-  const row1 = page.locator("tr", { has: page.getByText("CVE-2024-1111") });
-  const row2 = page.locator("tr", { has: page.getByText("CVE-2024-2222") });
-  await expect(row1.getByText("Fix available", { exact: true })).toBeVisible();
+  const row1 = vulnRow(page, "CVE-2024-1111");
+  const row2 = vulnRow(page, "CVE-2024-2222");
+  // "Fix available" is what the Fixed column already says, so the row leaves it
+  // out; the detail panel lists every status.
+  await expect(row1.getByText("Fix available", { exact: true })).toHaveCount(0);
   await expect(row2.getByText("Will not fix", { exact: true })).toBeVisible();
 
   // NVD severity is its own sortable column, separate from the adopted severity.
   await expect(page.getByRole("button", { name: "NVD severity", exact: true })).toBeVisible();
   await expect(row1.getByText("High", { exact: true })).toBeVisible();
 
-  // Expanding the row with a publish date shows it in the detail area.
-  await page.getByText("CVE-2024-1111").click();
-  await expect(page.getByText("Published", { exact: true })).toBeVisible();
-  await expect(page.getByText("Jan 15, 2024")).toBeVisible();
+  // Opening the row with a publish date shows it, and the status, in the panel.
+  await page.locator('[data-open-id="CVE-2024-1111"]').click();
+  const panel = page.getByRole("dialog");
+  await expect(panel.getByText("Published", { exact: true })).toBeVisible();
+  await expect(panel.getByText("Jan 15, 2024")).toBeVisible();
+  await expect(panel.getByText("Fix available", { exact: true })).toBeVisible();
+  await page.keyboard.press("Escape");
 
   const results = await new AxeBuilder({ page }).include("main").analyze();
   expect(results.violations).toEqual([]);
@@ -2331,9 +2377,9 @@ test("a supplier can record their own judgement, separate from the vendor status
   // No judgement recorded yet, so there is nothing to export.
   await expect(page.getByRole("button", { name: "Export VEX" })).toHaveCount(0);
 
-  const row1 = page.locator("tr", { has: page.getByText("CVE-2024-1111") });
-  await page.getByText("CVE-2024-1111").click();
-  await page.getByLabel("Judgement").selectOption("affected");
+  const row1 = vulnRow(page, "CVE-2024-1111");
+  await page.locator('[data-open-id="CVE-2024-1111"]').click();
+  await page.getByLabel("Judgement", { exact: true }).selectOption("affected");
   await page.getByLabel("Notes (optional)").fill("used behind an internal-only endpoint");
   await page.getByRole("button", { name: "Save" }).click();
 
@@ -2349,12 +2395,13 @@ test("a supplier can record their own judgement, separate from the vendor status
   });
   expect(savedBody).not.toHaveProperty("purl");
 
-  // The new badge sits beside the pre-existing vendor Status badge ("Fix available")
-  // rather than replacing it -- the two are different axes.
-  await expect(row1.getByText("Fix available", { exact: true })).toBeVisible();
+  // The new label sits beside the pre-existing vendor status ("Fix available",
+  // shown in the panel) rather than replacing it: the two are different axes.
+  await expect(page.getByRole("dialog").getByText("Fix available", { exact: true })).toBeVisible();
   await expect(row1.getByText("Judgement: Affected")).toBeVisible();
+  await page.keyboard.press("Escape");
 
-  // Once a judgement exists the table offers to export it as a VEX document.
+  // Once a judgement exists the page offers to export it as a VEX document.
   await page.getByRole("button", { name: "Export VEX" }).click();
   await expect(page.getByText("Download started")).toBeVisible();
   expect(exportRequested).toBe(true);
@@ -2402,7 +2449,7 @@ test("a supplier's VEX can be imported and shows apart from the user's own judge
     });
   });
   await page.getByRole("link", { name: /^Vulnerabilities/ }).first().click();
-  const row1 = page.locator("tr", { has: page.getByText("CVE-2024-1111") });
+  const row1 = vulnRow(page, "CVE-2024-1111");
   await expect(row1.getByText("Supplier VEX: Not affected")).toHaveCount(0);
 
   const file = { name: "vex.json", mimeType: "application/json", buffer: Buffer.from("{}") };
@@ -2415,11 +2462,12 @@ test("a supplier's VEX can be imported and shows apart from the user's own judge
   await expect(page.getByText("Imported 1 statement(s); 2 did not match")).toBeVisible();
   await expect(row1.getByText("Supplier VEX: Not affected")).toBeVisible();
 
-  await page.getByText("CVE-2024-1111").click();
+  await page.locator('[data-open-id="CVE-2024-1111"]').click();
   await expect(page.getByText("Justification: code_not_present")).toBeVisible();
   await expect(page.getByText("the vulnerable code path is not built")).toBeVisible();
   // The user's own judgement input is still there, empty: the statement was not copied into it.
-  await expect(page.getByLabel("Judgement")).toHaveValue("");
+  await expect(page.getByLabel("Judgement", { exact: true })).toHaveValue("");
+  await page.keyboard.press("Escape");
 
   const results = await new AxeBuilder({ page }).include("main").analyze();
   expect(results.violations).toEqual([]);
@@ -2466,16 +2514,20 @@ test("Vulnerabilities table bundles CVEs one upgrade resolves together", async (
   await stubUpgradeAndRun(page);
   await page.getByRole("link", { name: /^Vulnerabilities/ }).first().click();
 
-  const bundle = page.getByRole("button", { name: "Upgrade qs to 6.16.0 to resolve 2 CVEs" });
-  await expect(bundle).toBeVisible();
-  // lodash's single CVE is not a bundle and must not appear in the summary.
-  await expect(page.getByText(/Upgrade lodash/)).toHaveCount(0);
+  // The box is folded; opened, it has one line for qs.
+  const box = page.getByTestId("upgrade-bundles");
+  await expect(box.getByRole("heading", { level: 2 })).toHaveText("Upgrading 1 package resolves 2 CVEs");
+  await box.getByRole("heading", { level: 2 }).click();
+  const line = box.getByRole("listitem").filter({ hasText: "qs" });
+  await expect(line).toContainText("Upgrade to 6.16.0 to resolve 2");
+  // lodash's single CVE is not a bundle and must not appear in the box.
+  await expect(box.getByText("lodash")).toHaveCount(0);
 
-  // Clicking the bundle filters the table down to just its two rows.
-  await bundle.click();
-  await expect(page.getByText("CVE-2024-3001")).toBeVisible();
-  await expect(page.getByText("CVE-2024-3002")).toBeVisible();
-  await expect(page.getByText("CVE-2024-3003")).toHaveCount(0);
+  // Choosing the package filters the table down to just its two rows.
+  await line.getByRole("button", { name: "qs" }).click();
+  await expect(page.locator('[data-open-id="CVE-2024-3001"]')).toBeVisible();
+  await expect(page.locator('[data-open-id="CVE-2024-3002"]')).toBeVisible();
+  await expect(page.locator('[data-open-id="CVE-2024-3003"]')).toHaveCount(0);
 });
 
 for (const { theme, lang } of COMBOS) {
@@ -2501,7 +2553,7 @@ test("Components table shows Scope/Risk and filters on the full set", async ({ p
   // The toggles live in the Filters menu; the active ones also appear as
   // removable chips under the toolbar.
   await page.getByRole("button", { name: /^Filters/ }).click();
-  await page.getByRole("checkbox", { name: "Has vulnerabilities" }).check();
+  await page.getByRole("menuitemcheckbox", { name: "Has vulnerabilities" }).click();
   await page.keyboard.press("Escape");
   await expect(page.getByText("openssl", { exact: true })).toBeVisible();
   await expect(page.getByText("zlib", { exact: true })).toHaveCount(0);
@@ -2511,8 +2563,8 @@ test("Components table shows Scope/Risk and filters on the full set", async ({ p
 
   // Clearing it brings zlib back; "Direct only" then also excludes the transitive zlib.
   await page.getByRole("button", { name: /^Filters/ }).click();
-  await page.getByRole("checkbox", { name: "Has vulnerabilities" }).uncheck();
-  await page.getByRole("checkbox", { name: "Direct only" }).check();
+  await page.getByRole("menuitemcheckbox", { name: "Has vulnerabilities" }).click();
+  await page.getByRole("menuitemcheckbox", { name: "Direct only" }).click();
   await page.keyboard.press("Escape");
   await expect(page.getByText("zlib", { exact: true })).toHaveCount(0);
   await expect(page.getByText("openssl", { exact: true })).toBeVisible();
@@ -2527,8 +2579,8 @@ test("columns can be hidden, and the choice is kept for next time", async ({ pag
   await page.getByRole("link", { name: /^Components/ }).first().click();
   await expect(page.getByRole("button", { name: "Version", exact: true })).toBeVisible();
 
-  await page.getByRole("button", { name: /^Columns/ }).click();
-  await page.getByRole("checkbox", { name: "Version" }).uncheck();
+  await page.getByRole("button", { name: "View", exact: true }).click();
+  await page.getByRole("menuitemcheckbox", { name: "Version" }).click();
   await page.keyboard.press("Escape");
 
   // The column is gone from the header and the rows keep their shape.
@@ -2541,8 +2593,8 @@ test("columns can be hidden, and the choice is kept for next time", async ({ pag
   ).toContain("version");
 
   // And it comes back.
-  await page.getByRole("button", { name: /^Columns/ }).click();
-  await page.getByRole("checkbox", { name: "Version" }).check();
+  await page.getByRole("button", { name: "View", exact: true }).click();
+  await page.getByRole("menuitemcheckbox", { name: "Version" }).click();
   await page.keyboard.press("Escape");
   await expect(page.getByRole("button", { name: "Version", exact: true })).toBeVisible();
 });
@@ -2557,8 +2609,12 @@ test("the toolbar menus have no axe violations, open or closed", async ({ page }
     .analyze();
   expect(closed.violations).toEqual([]);
 
-  await page.getByRole("button", { name: /^Columns/ }).click();
-  await expect(page.getByRole("checkbox", { name: "Version" })).toBeVisible();
+  await page.getByRole("button", { name: "View", exact: true }).click();
+  await expect(page.getByRole("menuitemcheckbox", { name: "Version" })).toBeVisible();
+  await page.locator('[data-component="ActionMenu.Overlay"]').evaluate(async (el) => {
+    await Promise.all(el.getAnimations({ subtree: true }).map((a) => a.finished.catch(() => undefined)));
+    await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+  });
   const open = await new AxeBuilder({ page })
     .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
     .analyze();
@@ -2578,7 +2634,7 @@ for (const { theme, lang } of COMBOS) {
   test(`artifacts section matches baseline — ${theme}/${lang} @visual`, async ({ page }) => {
     await stubAndRun(page, theme, lang);
     await page.getByRole("navigation").locator('a[href$="/artifacts"]').first().click();
-    await expect(page.getByText("SBOM (CycloneDX)")).toBeVisible();
+    await expect(page.getByRole("heading", { name: "SBOM (CycloneDX)" })).toBeVisible();
     await captureMain(page, "artifacts", theme, lang);
   });
 }

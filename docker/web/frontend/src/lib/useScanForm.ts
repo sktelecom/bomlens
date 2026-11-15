@@ -26,6 +26,7 @@ import {
   type UsageContext,
 } from "@/lib/api";
 import i18n from "@/lib/i18n";
+import { hasOutboundLicenseField } from "@/lib/licenses";
 import { reachabilityOffered } from "@/lib/reachability";
 import { DEFAULT_VERSION, parseSbomIdentity, suggestIdentity } from "@/lib/scanDefaults";
 
@@ -43,7 +44,7 @@ export const ACCEPT: Record<UploadKind, string> = {
   sbom: ".json,.xml,.spdx,.cdx.json,.spdx.json,.spdx.tar.zst",
   firmware:
     ".bin,.img,.squashfs,.sqsh,.ubi,.ubifs,.trx,.chk,.fw,.rom,.dlf,.bix," +
-    ".gz,.tgz,.tar,.xz,.bz2,.lzma,.zst,.img.gz,.tar.gz",
+    ".gz,.tgz,.tar,.xz,.bz2,.lzma,.zst,.zip,.img.gz,.tar.gz",
   model: ".gguf,.safetensors,.pt,.pth,.ckpt,.pkl,.pickle,.onnx,.npz,.npy",
   declaration: ".json",
 };
@@ -176,6 +177,9 @@ export function useScanForm({
   const [byteStable, setByteStable] = useState(
     () => initialConfig?.byteStable ?? false,
   );
+  const [analyzeCpeIndex, setAnalyzeCpeIndex] = useState(
+    () => initialConfig?.analyzeCpeIndex ?? false,
+  );
   // Read sbom-declared.cdx.json at the root of the scanned folder (on by
   // default; off is the CLI's --no-components). Seeded from a re-scan.
   const [readDeclared, setReadDeclared] = useState(
@@ -297,6 +301,8 @@ export function useScanForm({
   // Reproducible output applies to any generated SBOM. It is a near no-op for a
   // supplier SBOM we only analyze, and for an AI model, so hide it there.
   const showByteStable = !isAnalyze && !isAiModel;
+  // The CPE index match is for a submitted SBOM only (--analyze-cpe-index).
+  const showAnalyzeCpeIndex = isAnalyze;
   // Only a source tree has a lock file to read in place of a build.
   const showDetection = isSourceScan;
   // A declaration file sits at the root of a source tree, or of a Yocto build
@@ -311,7 +317,7 @@ export function useScanForm({
   // A received SBOM carries its supplier's own root license and an AI model has
   // no outbound license of ours, so the field is offered only where we generate
   // the SBOM and therefore own what it ships under.
-  const showOutboundLicense = !isAnalyze && !isAiModel;
+  const showOutboundLicense = hasOutboundLicenseField(source);
   // Unlike outbound license, this applies to AI-model scans too (docmeta stamps
   // BINARY/FIRMWARE/MODELFILE/SOURCE/POSTPROCESS/ROOTFS/IMAGE/AIBOM/DATASET/
   // MERGE alike, see entrypoint.sh). Hidden only for ANALYZE: that mode
@@ -348,7 +354,7 @@ export function useScanForm({
   const reachabilityOn = showReachability && reachability;
   const securityForced = isAnalyze || deepCveOn || reachabilityOn;
   const showScanOptions =
-    showDeepLicense || showVendored || showByteStable || showDeepCve || showReachability ||
+    showDeepLicense || showVendored || showByteStable || showDeepCve || showReachability || showAnalyzeCpeIndex ||
     showDetection || showReadDeclared;
   const showFormatOptions =
     showOutboundLicense || showSbomAuthor || showSupplier || showSpecVersion || showConformanceProfile;
@@ -486,7 +492,10 @@ export function useScanForm({
       // Land keyboard/screen-reader users on the first field that needs fixing
       // (field keys double as the input ids). The Run button itself stays
       // enabled — disabling it would hide *why* the scan can't start.
-      document.getElementById(firstInvalid)?.focus();
+      // After the errors are drawn: the line that names them sits above the
+      // action bar and makes it taller, so the field is scrolled into view
+      // against the bar's final height.
+      setTimeout(() => document.getElementById(firstInvalid)?.focus(), 0);
       return;
     }
 
@@ -576,6 +585,7 @@ export function useScanForm({
       deepLicense: showDeepLicense ? deepLicense : false,
       identifyVendored: showVendored ? identifyVendored : false,
       byteStable: showByteStable ? byteStable : false,
+      analyzeCpeIndex: showAnalyzeCpeIndex ? analyzeCpeIndex : false,
       detection: showDetection && !readLockFile ? "build" : "auto",
       noComponents: showReadDeclared && !readDeclared,
       conformanceProfile: showConformanceProfile ? conformanceProfile : undefined,
@@ -633,6 +643,7 @@ export function useScanForm({
     deepCve, setDeepCve,
     reachability, setReachability,
     byteStable, setByteStable,
+    analyzeCpeIndex, setAnalyzeCpeIndex,
     readLockFile, setReadLockFile, showDetection,
     readDeclared, setReadDeclared, showReadDeclared, readDeclaredChanged,
     conformanceProfile, setConformanceProfile,
@@ -648,7 +659,7 @@ export function useScanForm({
     truscaProjectId, setTruscaProjectId,
     errors, uploadError, uploading, uploadPercent,
     busy, uploadKind, textInput, isText, isAnalyze, isAiModel, showVendored,
-    showDeepLicense, showDeepCve, showReachability, showByteStable, showOutboundLicense,
+    showDeepLicense, showDeepCve, showReachability, showByteStable, showAnalyzeCpeIndex, showOutboundLicense,
     showSbomAuthor,
     showSupplier,
     showSpecVersion,

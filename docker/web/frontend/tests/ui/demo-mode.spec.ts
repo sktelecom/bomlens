@@ -3,9 +3,11 @@
 
 import AxeBuilder from "@axe-core/playwright";
 import type { ChildProcess } from "node:child_process";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { expect, test } from "@playwright/test";
 
-import { serveDemoData, startDemoBundle } from "./demo-bundle";
+import { DATA_BASE, DEMO_DATA, serveDemoData, startDemoBundle } from "./demo-bundle";
 
 // The read-only demo is a different build of the app (a banner, no scanning),
 // so it is checked as its own target: built once, served from the committed
@@ -68,4 +70,140 @@ test("the banner and the scan list pass axe in the demo", async ({ page }) => {
     .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"])
     .analyze();
   expect(results.violations).toEqual([]);
+  // The banner's title is not a heading: the page's first heading is its h1.
+  expect(await page.locator("h1, h2, h3, h4, h5, h6").first().evaluate((h) => h.tagName)).toBe("H1");
+  // The notice opens the page content: its title line, then its text.
+  const banner = page.getByTestId("demo-banner");
+  await expect(page.locator("main").getByTestId("demo-banner")).toHaveCount(1);
+  const [title, body] = await Promise.all([
+    banner.getByText("Read-only demo").boundingBox(),
+    banner.getByText(/^Results of a real scan/).boundingBox(),
+  ]);
+  expect(title!.y).toBeLessThan(body!.y);
+  // The demo shows the New scan form so the range of inputs is visible; it is offered
+  // from the top bar, the navigation and the scan list. Only running a scan is refused.
+  await expect(page.getByRole("link", { name: "New scan" }).first()).toBeVisible();
+  await expect(page.getByTestId("recent-new-scan")).toHaveCount(1);
+});
+
+test("the demo opens the New scan form, and only the run button is turned off", async ({ page }) => {
+  await serveDemoData(page);
+  const uncaught: string[] = [];
+  page.on("pageerror", (e) => uncaught.push(e.message));
+  await page.goto(`${ORIGIN}/#/`);
+  await page.getByTestId("demo-banner").waitFor();
+  await page.getByTestId("recent-new-scan").click();
+  await page.locator("#project").waitFor();
+  await expect(page.getByTestId("demo-banner")).toBeVisible();
+
+  // The form is usable: the name fields take text and every source can be opened.
+  await page.locator("#project").fill("MyProject");
+  const tiles = page.getByRole("radiogroup", { name: "Source" }).getByRole("radio");
+  const count = await tiles.count();
+  expect(count).toBeGreaterThan(3);
+  for (let i = 0; i < count; i++) {
+    await tiles.nth(i).click();
+    await expect(tiles.nth(i)).toBeChecked();
+  }
+
+  // Running is refused, with the reason and a way to run it for real. The model
+  // questionnaire runs in the browser, so that one source keeps its button.
+  await tiles.first().click();
+  await expect(page.getByTestId("run-scan")).toBeDisabled();
+  await expect(page.getByText("This demo cannot run a scan")).toBeVisible();
+  await expect(page.getByRole("link", { name: "Run it on your own code" })).toBeVisible();
+
+  const results = await new AxeBuilder({ page })
+    .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"])
+    .analyze();
+  expect(results.violations).toEqual([]);
+  expect(uncaught).toEqual([]);
+});
+
+test("the navigation reaches the bottom of the window, at the top and scrolled to the end", async ({ page }) => {
+  await serveDemoData(page);
+  await page.setViewportSize({ width: 1280, height: 600 });
+  await page.goto(`${ORIGIN}/#/scan/SpringBootDemo_1.0.0/vulnerabilities`);
+  await page.getByTestId("result-meta").waitFor();
+  const bottom = async () => {
+    const box = await page.locator(".bl-pane").boundingBox();
+    return Math.round(box!.y + box!.height);
+  };
+  expect(await bottom()).toBe(600);
+  await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+  await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(0);
+  expect(await bottom()).toBe(600);
+});
+
+test("the demo's scan list is read-only: no actions column, no delete menu, dates, and a start strip", async ({ page }) => {
+  await serveDemoData(page);
+  await page.goto(`${ORIGIN}/#/`);
+  await page.getByTestId("demo-banner").waitFor();
+  await expect(page.getByRole("table")).toBeVisible();
+
+  // Nothing can be deleted or scanned: no row menu, no extra column, no output-folder note.
+  await expect(page.getByRole("button", { name: /^More actions for/ })).toHaveCount(0);
+  await expect(page.getByRole("columnheader")).toHaveCount(5);
+  await expect(page.getByRole("columnheader", { name: "Actions" })).toHaveCount(0);
+  await expect(page.getByText("~/sbom-output")).toHaveCount(0);
+
+  // The scans were captured once, so they show the date they were made.
+  await expect(page.locator("table time").first()).toHaveText(/\d{4}/);
+
+  // Three scans to start with, and the project scanned twice to compare.
+  const strip = page.getByTestId("demo-start-here");
+  await expect(strip).toBeVisible();
+  await expect(strip.getByRole("link")).toHaveCount(4);
+  await expect(page.getByTestId("demo-compare-link")).toHaveAttribute("href", /#\/scan\//);
+
+  // Reading still works: sorting, search and the at-risk toggle.
+  await page.getByRole("columnheader", { name: "Components" }).getByRole("button").click();
+  await expect(page.getByRole("columnheader", { name: "Components" })).toHaveAttribute("aria-sort", "descending");
+  await page.getByRole("searchbox").fill("nginx");
+  await expect(page.getByRole("table").getByRole("link")).toHaveCount(1);
+  await expect(page.getByText("1 of 6")).toBeVisible();
+});
+
+test("the demo's Vulnerabilities screen is read-only: no VEX import or export, no judgement form, the detail panel still opens", async ({ page }) => {
+  await serveDemoData(page);
+  await page.goto(`${ORIGIN}/#/scan/SpringBootDemo_1.0.0/vulnerabilities`);
+  await page.getByTestId("result-meta").waitFor();
+  await expect(page.locator("main tbody [data-open-id]").first()).toBeVisible();
+  await expect(page.getByRole("button", { name: "Import VEX" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Export VEX" })).toHaveCount(0);
+  await expect(page.locator('input[type="file"]')).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Export CSV" })).toBeEnabled();
+
+  await page.locator("main tbody [data-open-id]").first().click();
+  const panel = page.getByRole("dialog");
+  await expect(panel).toBeVisible();
+  await expect(panel.getByRole("button", { name: "Save" })).toHaveCount(0);
+  await expect(panel.getByLabel("Judgement", { exact: true })).toHaveCount(0);
+});
+
+test("a very long project name in the demo's start strip cannot push the page sideways", async ({ page }) => {
+  await serveDemoData(page);
+  const long = "Extremely-long-demo-project-name-".repeat(8);
+  await page.route(`**${DATA_BASE}/scans.json`, async (route) => {
+    const list = JSON.parse(readFileSync(join(DEMO_DATA, "scans.json"), "utf8")) as { project: string }[];
+    list.forEach((s) => (s.project = long));
+    await route.fulfill({ json: list });
+  });
+  await page.setViewportSize({ width: 1024, height: 800 });
+  await page.goto(`${ORIGIN}/#/`);
+  await page.getByTestId("demo-start-here").waitFor();
+  const excess = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+  expect(excess).toBeLessThanOrEqual(0);
+});
+
+test("the help menu in the demo links straight to the issue form", async ({ page }) => {
+  await serveDemoData(page);
+  await page.goto(`${ORIGIN}/#/scan/SpringBootDemo_1.1.0`);
+  await page.locator("main h1").first().waitFor();
+  await page.getByTestId("help-menu").click();
+  // No server to build a summary: a plain link, not the dialog.
+  const item = page.getByTestId("help-report");
+  await expect(item).toHaveAttribute("href", /issues\/new\?template=bug_report\.yml$/);
+  await expect(item).toHaveAttribute("target", "_blank");
+  await expect(page.getByRole("dialog")).toHaveCount(0);
 });

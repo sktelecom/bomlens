@@ -237,6 +237,9 @@ CONFORMANCE_PROFILE="${CONFORMANCE_PROFILE:-default}"
 # Repository resolution for a submitted SBOM (--resolve-purl). Off unless asked:
 # it is the only part of the conformance check that uses the network.
 PURL_RESOLVE="${PURL_RESOLVE:-false}"
+# CPE index match for a submitted SBOM (--analyze-cpe-index). Off unless asked;
+# it covers only the components BomLens's upstream table identified.
+ANALYZE_CPE_INDEX="${ANALYZE_CPE_INDEX:-false}"
 # Registry licences (--license-registry). Off unless asked: it uses the network.
 _LICENSE_REGISTRY_USER="${LICENSE_REGISTRY-}"
 LICENSE_REGISTRY="${LICENSE_REGISTRY:-false}"
@@ -251,6 +254,7 @@ fail_on_bad_coverage() {
 FORCE_FIRMWARE="false"; FORCE_SOURCE="false"; RELEASE_FOLDER_DIR=""; ANALYZE_SBOM=""; MODEL=""; MODEL_FILE=""; VEX_FILE=""
 AI_DECLARE_FILE=""; GENERATE_SPDX3="true"
 COMPONENT_VERSIONS_FILE=""
+BINARY_KB_PATH=""; BINARY_KB_DECISIONS=""
 # --components <file>, repeatable: CycloneDX files listing components a source
 # scan cannot find. With none, the container reads sbom-declared.cdx.json at
 # the scan target root when it exists.
@@ -367,6 +371,8 @@ while [[ "$#" -gt 0 ]]; do
         --vex) VEX_FILE="$2"; GENERATE_SECURITY="true"; shift ;;
         --ai-declare) AI_DECLARE_FILE="$2"; shift ;;
         --component-versions) COMPONENT_VERSIONS_FILE="$2"; shift ;;
+        --binary-kb) BINARY_KB_PATH="$2"; shift ;;
+        --kb-decisions) BINARY_KB_DECISIONS="$2"; shift ;;
         --components)
             [ "$#" -ge 2 ] || { echo "[ERROR] --components requires a file, e.g. --components sbom-declared.cdx.json"; exit 1; }
             COMPONENTS_FILES+=("$2"); shift ;;
@@ -436,6 +442,7 @@ while [[ "$#" -gt 0 ]]; do
         --lang) REPORT_LANG="$2"; shift ;;
         --conformance-profile) CONFORMANCE_PROFILE="$2"; shift ;;
         --resolve-purl) PURL_RESOLVE="true" ;;
+        --analyze-cpe-index) ANALYZE_CPE_INDEX="true" ;;
         --license-registry) LICENSE_REGISTRY="true" ;;
         --firmware) FORCE_FIRMWARE="true" ;;
         --as-source) FORCE_SOURCE="true" ;;
@@ -512,6 +519,20 @@ Options:
                          version to
                          <Project>_<Version>_component-versions.template.csv,
                          in this format, to fill in and pass back.
+  --binary-kb <path>     For a firmware, root filesystem or binary scan: a binary
+                         knowledge base (a kb.sqlite3 file, or the folder that
+                         holds it) built from the release sources of the
+                         components to look for. It finds what left no version
+                         string and no package record, such as a library linked
+                         into a program. A version is written only when one
+                         release fits; otherwise the candidates are listed in
+                         bomlens:versionCandidates. The base is read-only and
+                         never replaces a version another pass already read.
+  --kb-decisions <file>  With --binary-kb: a JSON list recording what a person
+                         decided about a result, each entry
+                         {"component", "decision": "exclude"|"confirm"|"version",
+                         "version", "reason", "reviewer", "evidence_sha256"}.
+                         An entry without a reason is ignored.
   --components <file>    For a source scan: a CycloneDX file (JSON) listing the
                          components the scan cannot find, such as your own
                          build outputs and third-party parts added by hand.
@@ -747,6 +768,10 @@ Options:
                          package published only to an internal repository
                          answers the same way. PURL_RESOLVE_IGNORE skips
                          namespaces you know are internal.
+  --analyze-cpe-index    --analyze only: also match the components of a BomLens-
+                         generated SBOM that carry bomlens:purlSource=upstream-
+                         map against the bundled CPE index, as a generating scan
+                         does. Other components are not matched. Off by default.
   --sign                 cosign sign (requires COSIGN_KEY)
   --output-dir <dir>     Base directory for outputs (alias: -o; default: current
                          dir). Each scan lands in a <project>_<version>/ subfolder
@@ -773,6 +798,21 @@ Environment:
                          about 1.5 GB; set it empty to download on every scan);
                          HTTP(S)_PROXY, NO_PROXY, TRIVY_*, EPSS_API and
                          KEV_URL are passed on to the containers by name
+  SBOM_EXTRA_CA_CERTS    A CA bundle (PEM) to trust in the scan containers, for
+                         a proxy that inspects TLS (re-signs HTTPS with its own
+                         CA); mounted read-only and added to the system bundle,
+                         Node.js and the Java trust store
+  BOMLENS_GO_VULNDB      With --security, also match Go modules against the Go
+                         vulnerability database snapshot in the image (default:
+                         true; set false to skip). A snapshot older than
+                         BOMLENS_GO_VULNDB_MAX_AGE_DAYS (default 7) days is
+                         replaced for the scan by a download (3.6 MB) from
+                         BOMLENS_GO_VULNDB_URL (default vuln.go.dev), unless
+                         TRIVY_OFFLINE_SCAN or TRIVY_SKIP_DB_UPDATE is true
+  SBOM_GO_VULNDB         A vulndb.zip from https://vuln.go.dev/vulndb.zip (or
+                         that archive unpacked into a folder) on this host, read
+                         in place of the image's snapshot and never replaced;
+                         one older than the limit is flagged as out of date
   ENRICH_EOL             Flag components past their end-of-life from a bundled
                          endoflife.date snapshot (default: true; runs OFFLINE,
                          so it is air-gap safe; set false to skip)
@@ -811,6 +851,11 @@ Environment:
   CDXGEN_IMAGE_PREFIX    Where the cdxgen images come from (language and
                          all-in-one), everything before the image name (default
                          ghcr.io/cdxgen/); set it to a registry mirror's path
+  CDXGEN_JAVA_IMAGE      The cdxgen image for a Java source scan, a full image
+                         reference (a ghcr.io/cdxgen/ one follows
+                         CDXGEN_IMAGE_PREFIX). Unset, the Gradle toolchain and
+                         wrapper version pick the Java 8, 11, 17, 21, 24 or 25
+                         image; with neither, cdxgen-temurin-java21
   SBOM_FIRMWARE_IMAGE    Override the firmware image
   SBOM_AIBOM_IMAGE       Override the AI SBOM (OWASP AIBOM Generator) image
   SBOM_DEEP_CVE_IMAGE    Override the deep-cve (grype) image
@@ -1009,12 +1054,35 @@ _pull_optin() {
 # unset SBOM_PULL is never read as empty by that call.
 SBOM_PULL="${SBOM_PULL:-missing}"
 
+# SBOM_EXTRA_CA_CERTS: the CA bundle of a proxy that inspects TLS. Checked
+# here, before any container starts, and bind-mounted read-only into each
+# scan container at EXTRA_CA_TARGET (extra_ca_run). BOMLENS_EXTRA_CA_CERTS is that
+# path inside the container: a value in this shell is not passed on.
+unset BOMLENS_EXTRA_CA_CERTS
+# extra_ca_mount prints the [ERROR] with its fix (>&2) before it fails.
+EXTRA_CA_HOST="$(extra_ca_mount)" || exit 1
+# The --mount value: --mount, not -v, because when the Docker engine's VM does
+# not share the file's folder (Colima, Rancher Desktop) docker run stops with
+# "bind source path does not exist" instead of mounting an empty folder.
+extra_ca_mount_arg() {
+    printf 'type=bind,source=%s,target=%s,readonly' "$(hostpath "$EXTRA_CA_HOST")" "$EXTRA_CA_TARGET"
+}
+# The mount and BOMLENS_EXTRA_CA_CERTS, quoted for the eval'd docker commands
+# of stage 1 and stage 2. A stage 1 that already printed the TLS hint tells
+# stage 2 (_BOMLENS_TLS_HINT_SHOWN), so a run prints it once.
+extra_ca_run() {
+    [ -z "$TLS_TRUST_HINT_SHOWN" ] || printf ' -e _BOMLENS_TLS_HINT_SHOWN=1'
+    [ -n "$EXTRA_CA_HOST" ] || return 0
+    printf ' --mount %q -e BOMLENS_EXTRA_CA_CERTS=%s' "$(extra_ca_mount_arg)" "$EXTRA_CA_TARGET"
+}
+
 # ========================================================
 # Web UI mode
 # ========================================================
 if [ "$UI_MODE" = "true" ]; then
     [ -z "$VEX_FILE" ] || { echo "[ERROR] --vex is not offered with --ui (import a VEX from the Vulnerabilities screen instead)."; exit 1; }
     [ -z "$AI_DECLARE_FILE" ] || { echo "[ERROR] --ai-declare is not offered with --ui (fill the declaration on the Models & datasets screen instead)."; exit 1; }
+    [ -z "$BINARY_KB_PATH" ] || { echo "[ERROR] --binary-kb is not offered with --ui (it applies to one firmware, root filesystem or binary scan)."; exit 1; }
     [ -z "$COMPONENT_VERSIONS_FILE" ] || { echo "[ERROR] --component-versions is not offered with --ui (it applies to one firmware, root filesystem or binary scan)."; exit 1; }
     [ "${#COMPONENTS_FILES[@]}" -eq 0 ] || { echo "[ERROR] --components is not offered with --ui (put sbom-declared.cdx.json at the root of the folder to scan instead)."; exit 1; }
     [ "$NO_COMPONENTS" = "false" ] || { echo "[ERROR] --no-components is not offered with --ui (it applies to one source scan)."; exit 1; }
@@ -1111,8 +1179,9 @@ if [ "$UI_MODE" = "true" ]; then
     # must reach server.py inside the UI container (it reads the env var
     # itself; a host-side default here would never be seen there).
     CANCEL_ENV_FLAGS=(-e BOMLENS_CANCEL_GRACE)
-    # The web UI's source scans pull the cdxgen images from the same mirror.
-    CDXGEN_ENV_FLAGS=(-e CDXGEN_IMAGE_PREFIX -e BOMLENS_OS_LICENSES)
+    # The web UI's source scans pull the cdxgen images from the same mirror,
+    # and follow SBOM_PULL when a Java rerun needs another image.
+    CDXGEN_ENV_FLAGS=(-e CDXGEN_IMAGE_PREFIX -e CDXGEN_JAVA_IMAGE -e SBOM_PULL -e BOMLENS_OS_LICENSES)
     # /bomlens-state: the same host-persistent guard-state directory
     # the CLI path uses, so a directory scan launched through --ui can also
     # recover a source tree a prior, too-hard-killed scan left dirty. entrypoint.sh
@@ -1124,11 +1193,15 @@ if [ "$UI_MODE" = "true" ]; then
     # same way as for a CLI scan, so they follow SBOM_SCANNER_IMAGE there too.
     UI_IMAGE_FLAGS=(-e SBOM_SCANNER_IMAGE="$POSTPROCESS_IMAGE" -e SBOM_FIRMWARE_IMAGE="$FIRMWARE_IMAGE"
                     -e SBOM_AIBOM_IMAGE="$AIBOM_IMAGE" -e SBOM_DEEP_CVE_IMAGE="$DEEP_CVE_IMAGE")
+    # SBOM_EXTRA_CA_CERTS: the UI container trusts it, and the containers it
+    # starts see the same file through --volumes-from.
+    UI_CA_FLAGS=()
+    [ -z "$EXTRA_CA_HOST" ] || UI_CA_FLAGS=(--mount "$(extra_ca_mount_arg)" -e "BOMLENS_EXTRA_CA_CERTS=$EXTRA_CA_TARGET")
     ensure_image_fresh "$POSTPROCESS_IMAGE"
     exec "${DOCKER_ENV[@]}" docker run --rm "${TTY_FLAGS[@]}" -p "${UI_BIND_ADDRESS}:${UI_PORT}:8080" \
         -v "$(hostpath "$UI_BASE")":/src -v "$(hostpath "$UI_BASE")":/host-output \
         "${MOUNT_FLAGS[@]}" "${HF_FLAGS[@]}" "${GO_ENV_FLAGS[@]}" "${PREP_ENV_FLAGS[@]}" "${CANCEL_ENV_FLAGS[@]}" "${TRIVY_CACHE_FLAGS[@]}" "${UI_CACHE_FLAGS[@]}" "${CDXGEN_ENV_FLAGS[@]}" \
-        "${UI_GUARD_FLAGS[@]}" "${UI_IMAGE_FLAGS[@]}" \
+        "${UI_GUARD_FLAGS[@]}" "${UI_IMAGE_FLAGS[@]}" "${UI_CA_FLAGS[@]}" \
         -v /var/run/docker.sock:/var/run/docker.sock \
         -e MODE=UI -e UI_PORT=8080 -e SBOM_UI_HOST_DIR="$(hostpath "$UI_BASE")" \
         -e SBOM_UI_SCAN_ROOTS="$SCAN_ROOTS" -e EXTERNAL_LOOKUP="$EXTERNAL_LOOKUP" \
@@ -1146,6 +1219,7 @@ if [ -n "$DIFF_OLD" ]; then
     [ "${#FAIL_ON[@]}" -eq 0 ] || { echo "[ERROR] --fail-on cannot be combined with --diff (a diff judges no scan)."; exit 1; }
     [ -z "$VEX_FILE" ] || { echo "[ERROR] --vex cannot be combined with --diff (a diff writes no SBOM to attach statements to)."; exit 1; }
     [ -z "$AI_DECLARE_FILE" ] || { echo "[ERROR] --ai-declare cannot be combined with --diff (a diff writes no AI document to declare into)."; exit 1; }
+    [ -z "$BINARY_KB_PATH" ] || { echo "[ERROR] --binary-kb cannot be combined with --diff (a diff writes no SBOM to read a base into)."; exit 1; }
     [ -z "$COMPONENT_VERSIONS_FILE" ] || { echo "[ERROR] --component-versions cannot be combined with --diff (a diff writes no SBOM to add versions to)."; exit 1; }
     [ "${#COMPONENTS_FILES[@]}" -eq 0 ] || { echo "[ERROR] --components cannot be combined with --diff (a diff writes no SBOM to add components to)."; exit 1; }
     [ "$NO_COMPONENTS" = "false" ] || { echo "[ERROR] --no-components cannot be combined with --diff (a diff reads no source tree)."; exit 1; }
@@ -1218,6 +1292,24 @@ fi
 # Use the same rule here, or a name such as "@acme/lib" is looked for under a name
 # the container never wrote ("SBOM not found on host", and no result file found).
 container_safe() { printf '%s' "$1" | sed 's/[^a-zA-Z0-9.-]/_/g' | sed 's/__*/_/g' | sed 's/^_//; s/_$//'; }
+
+# mask_log_secrets <in> <out>: copy a tool log with what can identify a
+# credential masked, for a copy kept beside the outputs: the user and password
+# of a URL (scheme://user:pass@ becomes scheme://***@), the value of an
+# Authorization header, a Bearer or Basic credential, and a value given to a
+# token, password, secret or API key name. Returns non-zero (and writes
+# nothing) when sed fails.
+mask_log_secrets() {
+    local q="[\"']"
+    sed -E \
+        -e "s#([A-Za-z][A-Za-z0-9+.-]*://)[^/@[:space:]\"']+@#\\1***@#g" \
+        -e "s#([Aa][Uu][Tt][Hh][Oo][Rr][Ii][Zz][Aa][Tt][Ii][Oo][Nn]${q}?[[:space:]]*[:=][[:space:]]*${q}?)([A-Za-z]+[[:space:]]+)?[^[:space:]\"',;]+#\\1\\2***#g" \
+        -e "s#([Bb][Ee][Aa][Rr][Ee][Rr]|[Bb][Aa][Ss][Ii][Cc])[[:space:]]+[A-Za-z0-9._~+/=-]{8,}#\\1 ***#g" \
+        -e "s#(([Tt][Oo][Kk][Ee][Nn]|[Pp][Aa][Ss][Ss][Ww][Oo][Rr][Dd]|[Pp][Aa][Ss][Ss][Ww][Dd]|[Ss][Ee][Cc][Rr][Ee][Tt]|[Aa][Pp][Ii][_-]?[Kk][Ee][Yy])${q}?[[:space:]]*[:=][[:space:]]*${q}?)[^[:space:]\"',;&]+#\\1***#g" \
+        "$1" > "$2.tmp" 2>/dev/null && mv "$2.tmp" "$2" && return 0
+    rm -f "$2.tmp"
+    return 1
+}
 SAFE_PROJECT=$(container_safe "$PROJECT_NAME")
 SAFE_VERSION=$(container_safe "$PROJECT_VERSION")
 OUTPUT_FILE="${SAFE_PROJECT}_${SAFE_VERSION}_bom.json"
@@ -1253,6 +1345,9 @@ GATE_RESULT_FILE="${OUTPUT_HOST_DIR}/${SAFE_PROJECT}_${SAFE_VERSION}_gate.result
 # The closing summary's facts (docker/lib/validate-sbom.sh) belong to this run only.
 SUMMARY_RESULT_FILE="${OUTPUT_HOST_DIR}/${SAFE_PROJECT}_${SAFE_VERSION}_summary.result"
 rm -f "$SUMMARY_RESULT_FILE"
+# A cdxgen log an earlier source scan kept (see stage 1 below) is not this
+# run's, whatever mode this run is.
+rm -f "${OUTPUT_HOST_DIR}/${SAFE_PROJECT}_${SAFE_VERSION}_cdxgen.log"
 
 # A SOURCE scan writes $OUTPUT_FILE in two containers: stage 1 (cdxgen) here on
 # the host first, stage 2 (POSTPROCESS, entrypoint.sh) after. entrypoint.sh's
@@ -1303,6 +1398,8 @@ cleanup() {
     # The folder of the govulncheck copy --reachability hands stage 1
     # (removed right after it, too).
     [ -z "${REACH_TOOLS_DIR:-}" ] || rm -rf -- "$REACH_TOOLS_DIR" 2>/dev/null || true
+    # The first stage 1 result, kept aside while a Java rerun runs.
+    [ -z "${STAGE1_FIRST_SBOM:-}" ] || rm -f -- "$STAGE1_FIRST_SBOM" 2>/dev/null || true
 }
 # Ctrl+C or kill ends the run here, after cleanup, rather than going on to the
 # next step. The container is stopped before its mounted temp dirs are
@@ -1314,6 +1411,7 @@ trap 'cleanup; echo "[INFO] Scan cancelled (Ctrl+C); the scan container was stop
 trap 'cleanup; echo "[INFO] Scan stopped (TERM); the scan container was stopped." >&2; exit 143' TERM
 RUNNING_CONTAINER_NAME=""
 REACH_TOOLS_DIR=""
+STAGE1_FIRST_SBOM=""
 
 # Host-persistent guard state: when a scan is interrupted hard
 # enough that build-prep.sh's own trap never runs (SIGKILL, OOM, a host
@@ -1402,6 +1500,21 @@ setup_guard_state() {
     GUARD_ID="$key"
 }
 
+# drop_unused_guard_state OWNER: after the stage 1 container has exited, remove
+# this run's record when build-prep.sh never took its snapshot there (the
+# container did not start, or stopped before build-prep.sh ran). A finished
+# run removes the record itself; one stopped after the snapshot keeps it for
+# the next scan to finish.
+drop_unused_guard_state() {
+    [ -n "$GUARD_ID" ] || return 0
+    local d="$GUARD_STATE_DIR/$GUARD_ID"
+    if [ -d "$d" ] && [ ! -f "$d/files.before" ] \
+       && [ "$(cat "$d/owner" 2>/dev/null)" = "$1" ]; then
+        rm -rf -- "$d"
+    fi
+    GUARD_ID=""
+}
+
 # A reproducible (--byte-stable) build must not resolve dependency licenses over
 # the network: registry availability (e.g. pkg.go.dev) varies between runs, so a
 # license fetched in one scan but not the next would make two otherwise-identical
@@ -1452,6 +1565,7 @@ pp_env() {
         "${FW_EXTRA_ROOTS:-}" "${FW_MAX_EXTRA_ROOTS:-}" "${FW_CONTAINER_MEMBERSHIP:-}" \
         "${PURL_MIN_PCT:-}" "${LICENSE_MIN_PCT:-}" "${HASH_MIN_PCT:-}" "${FIELD_MIN_PCT:-}" "$CONFORMANCE_PROFILE" "${PURL_RESOLVE:-false}" "${LICENSE_REGISTRY:-false}" "$REACHABILITY" "$REACHABILITY_NONCE"
     printf ' -e CYCLONEDX_SPEC_VERSION=%s' "$CDX_SPEC_VERSION"
+    printf ' -e ANALYZE_CPE_INDEX=%s' "${ANALYZE_CPE_INDEX:-false}"
     # Proxy, Trivy database and EPSS/KEV settings, by name.
     printf ' %s' "$(stage2_network_env_args)"
     # Debian package licenses from Trivy (image/rootfs scans), on unless set false.
@@ -1462,6 +1576,14 @@ pp_env() {
     local _tc=() _l
     while IFS= read -r _l; do _tc+=("$_l"); done < <(trivy_cache_args)
     [ "${#_tc[@]}" -eq 4 ] && printf ' -v %q -e TRIVY_CACHE_DIR=/trivy-cache' "$(hostpath "${_tc[1]%:/trivy-cache}"):/trivy-cache"
+    # SBOM_GO_VULNDB: a Go vulnerability database export on this host, read
+    # in place of the snapshot in the image (mounted read-only).
+    local _gv=()
+    while IFS= read -r _l; do _gv+=("$_l"); done < <(go_vulndb_mount)
+    if [ "${#_gv[@]}" -eq 2 ]; then
+        printf ' -v %q -e BOMLENS_GO_VULNDB_PATH=%s' "$(hostpath "${_gv[0]}"):${_gv[1]}:ro" "${_gv[1]}"
+    fi
+    extra_ca_run
 }
 
 # The docker CLI forwards a name-only `-e VAR` from its own environment, so the
@@ -1526,6 +1648,25 @@ component_versions_run() {
     local d f
     d="$(cd "$(dirname "$COMPONENT_VERSIONS_FILE")" && pwd)"; f="$(basename "$COMPONENT_VERSIONS_FILE")"
     printf ' -v %q:/component-versions-in/versions.csv:ro -e COMPONENT_VERSIONS_FILE=/component-versions-in/versions.csv' "$(hostpath "$d/$f")"
+}
+
+# --binary-kb and --kb-decisions: the base (a file or the folder holding it) and
+# the review file are mounted read-only at fixed container paths; the container
+# opens the base read-only and checks every review entry.
+binary_kb_run() {
+    local d f
+    if [ -n "$BINARY_KB_PATH" ]; then
+        if [ -d "$BINARY_KB_PATH" ]; then
+            printf ' -v %q:/binary-kb-in:ro -e FW_BINARY_KB=/binary-kb-in' "$(hostpath "$(cd "$BINARY_KB_PATH" && pwd)")"
+        else
+            d="$(cd "$(dirname "$BINARY_KB_PATH")" && pwd)"; f="$(basename "$BINARY_KB_PATH")"
+            printf ' -v %q:/binary-kb-in:ro -e FW_BINARY_KB=/binary-kb-in/%q' "$(hostpath "$d")" "$f"
+        fi
+    fi
+    if [ -n "$BINARY_KB_DECISIONS" ]; then
+        d="$(cd "$(dirname "$BINARY_KB_DECISIONS")" && pwd)"; f="$(basename "$BINARY_KB_DECISIONS")"
+        printf ' -v %q:/kb-decisions-in/decisions.json:ro -e FW_BINARY_KB_DECISIONS=/kb-decisions-in/decisions.json' "$(hostpath "$d/$f")"
+    fi
 }
 
 # --components: each file is mounted on its own, read-only, at a fixed container
@@ -2284,6 +2425,22 @@ if [ -n "$COMPONENT_VERSIONS_FILE" ]; then
     fi
 fi
 
+if [ -n "$BINARY_KB_PATH" ]; then
+    if [ ! -f "$BINARY_KB_PATH" ] && [ ! -f "$BINARY_KB_PATH/kb.sqlite3" ]; then
+        echo "[ERROR] --binary-kb: no knowledge base at $BINARY_KB_PATH (pass the kb.sqlite3 file, or the folder that holds it)."; exit 1
+    fi
+fi
+if [ -n "$BINARY_KB_DECISIONS" ]; then
+    if [ -z "$BINARY_KB_PATH" ]; then
+        echo "[ERROR] --kb-decisions needs --binary-kb: the review file records decisions about its results."; exit 1
+    fi
+    if [ ! -f "$BINARY_KB_DECISIONS" ]; then
+        echo "[ERROR] --kb-decisions file not found: $BINARY_KB_DECISIONS"; exit 1
+    fi
+    if [ "$(wc -c < "$BINARY_KB_DECISIONS" | tr -d ' ')" -gt 1048576 ]; then
+        echo "[ERROR] --kb-decisions: the file is larger than 1 MiB."; exit 1
+    fi
+fi
 if [ "$NO_COMPONENTS" = "true" ] && [ "${#COMPONENTS_FILES[@]}" -gt 0 ]; then
     echo "[ERROR] --no-components cannot be combined with --components: the first reads no declaration file, the second names one."; exit 1
 fi
@@ -2646,6 +2803,9 @@ fi
 if [ -n "${USAGE_CONTEXT:-}" ] && [ "$MODE" != "AIBOM" ] && [ "$MODE" != "MODELFILE" ] && [ "$MODE" != "DATASET" ] && [ "$MODE" != "AIDECLARE" ]; then
     echo "[ERROR] --usage applies to AI model and dataset scans only (use it with --model or --model-file)."; exit 1
 fi
+if [ -n "$BINARY_KB_PATH" ] && [ "$MODE" != "FIRMWARE" ] && [ "$MODE" != "ROOTFS" ] && [ "$MODE" != "BINARY" ]; then
+    echo "[ERROR] --binary-kb applies to firmware, root filesystem and binary scans only (this target is scanned as $MODE)."; exit 1
+fi
 if [ -n "$COMPONENT_VERSIONS_FILE" ] && [ "$MODE" != "FIRMWARE" ] && [ "$MODE" != "ROOTFS" ] && [ "$MODE" != "BINARY" ]; then
     echo "[ERROR] --component-versions applies to firmware, root filesystem and binary scans only (this target is scanned as $MODE)."; exit 1
 fi
@@ -2710,6 +2870,11 @@ fi
 if [ "$PURL_RESOLVE" = "true" ] && [ "$MODE" != "ANALYZE" ]; then
     echo "[WARN] --resolve-purl applies to --analyze only; ignoring it for this scan."
     PURL_RESOLVE="false"
+fi
+
+if [ "$ANALYZE_CPE_INDEX" = "true" ] && [ "$MODE" != "ANALYZE" ]; then
+    echo "[WARN] --analyze-cpe-index applies to --analyze only; ignoring it for this scan."
+    ANALYZE_CPE_INDEX="false"
 fi
 
 if [ "$FORCE_FIRMWARE" = "true" ] && [ "$MODE" != "FIRMWARE" ]; then
@@ -2929,8 +3094,10 @@ if [ "$MODE" = "SOURCE" ]; then
             exit 1
         fi
     else
-        CDX_IMG=$(img_for_lang "$LANG_DET")
+        CDX_IMG=$(img_for_lang "$LANG_DET" "$SCAN_INPUT_DIR")
         echo "[INFO] Language: $LANG_DET -> $CDX_IMG"
+        if [ "$LANG_DET" = "java" ]; then java_image_note "$SCAN_INPUT_DIR"; fi
+        if [ "$LANG_DET" = "mixed" ]; then java_mixed_note "$SCAN_INPUT_DIR"; fi
         if [ "$LANG_DET" = "swift" ]; then
             echo "[INFO] iOS/Swift: SPM (Package.resolved) and CocoaPods (Podfile.lock) are read from the committed lockfiles; commit them for a complete result."
             echo "[WARN]   UIKit platform and Xcode-driven dependencies require macOS and are NOT resolved in this Linux container."
@@ -3055,6 +3222,15 @@ if [ "$MODE" = "SOURCE" ]; then
     # grace (measured: a 30s grace still ended in a forced SIGKILL every
     # time). Invoking the script file directly makes it PID 1, so its trap is
     # what the SIGTERM actually reaches.
+    #
+    # A Java build whose Gradle asked for a toolchain JDK this image lacks
+    # (java_retry_image) runs once more, in the image with that JDK; the loop
+    # below ends after the second pass. Each pass takes the guard slot anew:
+    # the first pass's build-prep.sh restored the tree and cleared it, or
+    # drop_unused_guard_state did. The loop body is not indented.
+    STAGE1_TRY=1; STAGE1_FIRST_SBOM=""; STAGE1_FIRST_RC=""; STAGE1_FIRST_LOG=""; STAGE1_FIRST_IMG=""
+    while :; do
+    # --- stage 1 pass $STAGE1_TRY (of at most 2) begins
     # $$ alone can collide: two scans (CLI + web UI, or parallel CI jobs) on
     # the same host can land on the same PID space at different times, or a
     # container from an earlier crashed run can still be named this if it was
@@ -3096,6 +3272,7 @@ if [ "$MODE" = "SOURCE" ]; then
         -e HOST_GOTOOLCHAIN="\"$HOST_GOTOOLCHAIN\"" -e GOPROXY -e GOSUMDB \
         $PREP_ENV_ARGS \
         $REACH_ARGS \
+        "$(extra_ca_run)" \
         --entrypoint sh "\"$CDX_IMG\"" \
         /tmp/build-prep.sh /app "\"/out/$OUTPUT_FILE\"" "$CDX_SPEC_VERSION" > "$STAGE1_LOG" 2>&1 &
     STAGE1_PID=$!
@@ -3105,10 +3282,55 @@ if [ "$MODE" = "SOURCE" ]; then
     # here, aborting the script before any of the failure handling below
     # runs. The real exit code comes from `docker wait` next regardless.
     wait "$STAGE1_PID" || true
+    drop_unused_guard_state "$STAGE1_CONTAINER"
     RUNNING_CONTAINER_NAME=""
     [ -z "$REACH_TOOLS_DIR" ] || rm -rf -- "$REACH_TOOLS_DIR"
     REACH_TOOLS_DIR=""
     STAGE1_RC=$("${DOCKER_ENV[@]}" docker wait "$STAGE1_CONTAINER" 2>/dev/null || echo 1)
+    [ "$STAGE1_TRY" -eq 1 ] && [ "$LANG_DET" = java ] || break
+    java_retry_image "$SCAN_INPUT_DIR" "$STAGE1_LOG" "$CDX_IMG"
+    [ -n "$JAVA_RETRY_IMAGE" ] || break
+    echo "[INFO] Gradle asked for Java $JAVA_RETRY_JDK; rerunning in $JAVA_RETRY_IMAGE"
+    # A pull shows its progress and follows SBOM_PULL like an opt-in image.
+    # The exited first container stays for the failure handling below until
+    # the rerun starts; a Ctrl+C during the pull removes it (cleanup).
+    RUNNING_CONTAINER_NAME="$STAGE1_CONTAINER"
+    if ! _optin_image_ready "$JAVA_RETRY_IMAGE"; then
+        RUNNING_CONTAINER_NAME=""
+        _s1_why="could not be pulled"
+        [ "$SBOM_PULL" != never ] || _s1_why="SBOM_PULL=never"
+        echo "[WARN] $JAVA_RETRY_IMAGE is not here ($_s1_why); keeping the result from $CDX_IMG."
+        break
+    fi
+    RUNNING_CONTAINER_NAME=""
+    "${DOCKER_ENV[@]}" docker rm -f "$STAGE1_CONTAINER" >/dev/null 2>&1 || true
+    # The first result stays aside until the second run has one of its own.
+    if [ -s "$OUTPUT_HOST_DIR/$OUTPUT_FILE" ] && STAGE1_FIRST_SBOM=$(mktemp) \
+       && mv -f "$OUTPUT_HOST_DIR/$OUTPUT_FILE" "$STAGE1_FIRST_SBOM"; then
+        STAGE1_FIRST_RC="$STAGE1_RC"; STAGE1_FIRST_LOG="$STAGE1_LOG"; STAGE1_FIRST_IMG="$CDX_IMG"
+    else
+        [ -z "$STAGE1_FIRST_SBOM" ] || rm -f "$STAGE1_FIRST_SBOM"
+        STAGE1_FIRST_SBOM=""
+        rm -f "$OUTPUT_HOST_DIR/$OUTPUT_FILE" "$STAGE1_LOG"
+    fi
+    CDX_IMG="$JAVA_RETRY_IMAGE"; STAGE1_TRY=2
+    # --- stage 1 pass ends; the second pass follows
+    done
+    # --- stage 1 passes done
+    if [ -n "$STAGE1_FIRST_SBOM" ]; then
+        if [ "$STAGE1_RC" -ne 0 ] || [ ! -s "$OUTPUT_HOST_DIR/$OUTPUT_FILE" ]; then
+            echo "[WARN] The rerun in $CDX_IMG left no SBOM (rc=$STAGE1_RC, log: $STAGE1_LOG); keeping the result from $STAGE1_FIRST_IMG."
+            "${DOCKER_ENV[@]}" docker rm -f "$STAGE1_CONTAINER" >/dev/null 2>&1 || true
+            mv -f "$STAGE1_FIRST_SBOM" "$OUTPUT_HOST_DIR/$OUTPUT_FILE"
+            STAGE1_RC="$STAGE1_FIRST_RC"; STAGE1_LOG="$STAGE1_FIRST_LOG"; CDX_IMG="$STAGE1_FIRST_IMG"
+        else
+            rm -f "$STAGE1_FIRST_SBOM" "$STAGE1_FIRST_LOG"
+        fi
+        STAGE1_FIRST_SBOM=""
+    fi
+    # A package registry or download refused for an untrusted certificate (a
+    # proxy that inspects TLS) gets one line naming SBOM_EXTRA_CA_CERTS.
+    tls_trust_hint "cdxgen" "$STAGE1_LOG" 2>&1
     # When stage 1 left no SBOM, stage 2 takes its place with the manifest-only
     # syft scan: the same fallback a caller running the execution plan gets
     # (entrypoint.sh, POSTPROCESS), so the CLI and that path cannot drift
@@ -3139,7 +3361,41 @@ if [ "$MODE" = "SOURCE" ]; then
         STAGE1_FALLBACK_ENV="$STAGE1_FALLBACK_ENV -e BOMLENS_STAGE1_REASON=$STAGE1_FAIL_REASON"
     else
         "${DOCKER_ENV[@]}" docker rm -f "$STAGE1_CONTAINER" >/dev/null 2>&1
-        rm -f "$STAGE1_LOG"
+        # A preprocessing step that failed (build-prep.sh records it on the
+        # SBOM as bomlens:pipeline-step-failed, a Gradle build with no
+        # resolved package included) leaves an SBOM that is short of what the
+        # project declares; the log is what says why, so it is kept beside the
+        # outputs instead of being removed.
+        # The kept copy has credentials in URLs and token-like values masked
+        # (mask_log_secrets); when masking fails the log is removed instead.
+        # A gradle-packages failure is announced by stage 2 itself, so it is
+        # not repeated here; the log path is still printed.
+        if grep -q '"bomlens:pipeline-step-failed"' "$OUTPUT_HOST_DIR/$OUTPUT_FILE" 2>/dev/null; then
+            _s1_kept="$OUTPUT_HOST_DIR/${SAFE_PROJECT}_${SAFE_VERSION}_cdxgen.log"
+            _s1_steps=""
+            if command -v jq >/dev/null 2>&1; then
+                # A truncated SBOM makes jq fail; the run goes on to stage 2,
+                # which reports an unreadable SBOM the usual way.
+                _s1_steps="$(jq -r '[.metadata.properties[]? | select(.name == "bomlens:pipeline-step-failed") | .value | strings] | unique | join(", ")' "$OUTPUT_HOST_DIR/$OUTPUT_FILE" 2>/dev/null)" || _s1_steps=""
+            fi
+            _s1_other="$(printf '%s\n' "$_s1_steps" | tr ',' '\n' | sed 's/^ *//; s/ *$//' | grep -vx 'gradle-packages' | grep . | tr '\n' ',' | sed 's/,$//; s/,/, /g')" || _s1_other=""
+            if mask_log_secrets "$STAGE1_LOG" "$_s1_kept"; then
+                rm -f "$STAGE1_LOG"
+                STAGE1_LOG="$_s1_kept"
+                _s1_where="cdxgen log (a diagnostic file with credentials in URLs masked, not meant for distribution): $STAGE1_LOG"
+            else
+                rm -f "$STAGE1_LOG" "$_s1_kept"
+                STAGE1_LOG=""
+                _s1_where="the cdxgen log could not be masked, so it was not kept."
+            fi
+            if [ -n "$_s1_other" ] || [ -z "$_s1_steps" ]; then
+                echo "[WARN] cdxgen finished, but a preprocessing step failed${_s1_other:+ ($_s1_other)}; the SBOM may lack dependencies. ${_s1_where}"
+            else
+                echo "[INFO] ${_s1_where}"
+            fi
+        else
+            rm -f "$STAGE1_LOG"
+        fi
     fi
     fi
 
@@ -3455,7 +3711,7 @@ else
     # shellcheck disable=SC2046
     eval "$DOCKER_MSYS"docker run --rm $VOL \
         --add-host=host.docker.internal:host-gateway \
-        -e MODE="$MODE" -e BOMLENS_ARTIFACT_CLEANUP=1 $ENVV $(pp_env)$(cosign_run)$(vex_run)$(declare_run)$(component_versions_run)$(components_run)$(gate_run) \
+        -e MODE="$MODE" -e BOMLENS_ARTIFACT_CLEANUP=1 $ENVV $(pp_env)$(cosign_run)$(vex_run)$(declare_run)$(component_versions_run)$(binary_kb_run)$(components_run)$(gate_run) \
         "\"$RUN_IMAGE\""
 fi
 

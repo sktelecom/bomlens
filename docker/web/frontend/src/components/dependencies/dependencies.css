@@ -1,0 +1,89 @@
+/*
+ * Copyright 2026 SK Telecom Co., Ltd.
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+/*
+ * Dependencies screen (components/DependenciesPanel.tsx, DependencyTree.tsx,
+ * DependencyGraph.tsx). A bar with the view switch and the search, then the
+ * tree as a Primer TreeView in a bordered box, or the graph canvas in one.
+ * Names wrap, never truncate. Colours, spaces and radii are Primer variables.
+ */
+
+.bl-dep-loading {
+  display: flex;
+  align-items: center;
+  gap: var(--base-size-12);
+  padding: var(--base-size-24);
+}
+.bl-dep-retry { margin-top: var(--base-size-16); }
+
+.bl-dep-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--base-size-8);
+}
+.bl-dep-search { flex: 1 1 14rem; min-width: 14rem; max-width: 32rem; }
+.bl-dep-btns { display: flex; flex-wrap: wrap; gap: var(--base-size-8); }
+
+/* ---- Tree ---- */
+.bl-dep-tree { padding: var(--base-size-4); overflow-x: auto; }
+/* The row the search or a jump is on: a tinted fill, no border. */
+.bl-dep-tree li[aria-current="true"] > div { background: var(--bgColor-accent-muted); }
+.bl-dep-status { display: block; min-height: 1.25rem; }
+.bl-dep-name { min-width: 0; overflow-wrap: anywhere; }
+/* Severity and licences sit together at the right edge of the row. */
+.bl-dep-trail {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--base-size-4) var(--base-size-8);
+}
+.bl-dep-trail:empty { display: none; }
+.bl-dep-labels { display: inline-flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--base-size-4); max-width: 100%; }
+/* A Label keeps its border where a reset would drop it, and stays on one line. */
+.bl-dep-label, .bl-dep-screen [data-severity] { border-width: var(--borderWidth-thin); }
+.bl-dep-label { white-space: nowrap; }
+.bl-dep-cycle { margin-inline-start: var(--base-size-8); }
+
+/* ---- Graph ---- */
+.bl-dep-legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--base-size-4) var(--base-size-16);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--text-body-size-small);
+}
+.bl-dep-legend-lead { color: var(--fgColor-muted); }
+.bl-dep-legend li { display: inline-flex; align-items: center; gap: var(--base-size-6); }
+.bl-dep-dot { display: inline-block; flex: none; width: 10px; height: 10px; border-radius: 50%; }
+.bl-dep-dot-root { border: 2px solid var(--fgColor-default); background: var(--bgColor-default); }
+.bl-dep-dot-direct { width: 12px; height: 12px; background: var(--fgColor-default); }
+.bl-dep-dot-transitive { width: 8px; height: 8px; background: var(--fgColor-muted); }
+.bl-dep-hints {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--base-size-4) var(--base-size-16);
+  margin: 0;
+  font-size: var(--text-body-size-small);
+  color: var(--fgColor-muted);
+}
+.bl-dep-hints span { display: inline-flex; align-items: center; gap: var(--base-size-4); }
+.bl-dep-canvas { width: 100%; height: max(24rem, calc(100vh - 22rem)); }
+.bl-dep-detail-title { overflow-wrap: anywhere; }
+.bl-dep-kv {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: var(--base-size-8) var(--base-size-16);
+  margin: 0;
+}
+.bl-dep-kv dt { color: var(--fgColor-muted); }
+.bl-dep-kv dd { margin: 0; min-width: 0; }
+
+.bl-dep-screen { margin-top: var(--base-size-16); }
+

@@ -1,0 +1,19 @@
+---
+// Copyright 2026 SK Telecom Co., Ltd.
+// SPDX-License-Identifier: Apache-2.0
+//
+// A code block wider than its column scrolls sideways, and a keyboard user must be able
+// to focus it to read the rest. Only blocks that actually scroll get a tab stop, so
+// short blocks do not add noise to the tab order.
+---
+
+<script>
+  const mark = () => {
+    document.querySelectorAll<HTMLElement>('.expressive-code pre').forEach((pre) => {
+      if (pre.scrollWidth > pre.clientWidth) pre.setAttribute('tabindex', '0');
+      else pre.removeAttribute('tabindex');
+    });
+  };
+  mark();
+  window.addEventListener('resize', mark);
+</script>

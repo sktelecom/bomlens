@@ -3,9 +3,10 @@
 
 import { useTranslation } from "react-i18next";
 
-import { EmptyState } from "@/components/ui/state";
+import { ShieldIcon } from "@primer/octicons-react";
+import { Blankslate } from "@primer/react/experimental";
 import type { DoneEvent, RecentScan, ResultFile, Severity } from "@/lib/api";
-import type { LicenseRiskTier } from "@/lib/licenses";
+import { hasOutboundLicenseField, type LicenseRiskTier } from "@/lib/licenses";
 import type { SectionId } from "@/lib/nav";
 import {
   inputSbomFileName,
@@ -17,7 +18,6 @@ import {
 } from "@/lib/results";
 import { scanHash, type RouteQuery } from "@/lib/route";
 
-import { AiSummaryCard } from "./AiSummaryCard";
 import { ArtifactsSection, Overview } from "./Overview";
 import { ComponentsTable } from "./ComponentsTable";
 import { ConformancePanel } from "./ConformancePanel";
@@ -46,6 +46,7 @@ export function ResultSection({
   onResultPatch,
   onRescan,
   onRescanWithLicense,
+  onReportProblem,
 }: {
   section: SectionId;
   result: DoneEvent;
@@ -86,22 +87,21 @@ export function ResultSection({
   onRescan?: () => void;
   /** Re-scan from the Licenses section with the outbound-license field in focus. */
   onRescanWithLicense?: () => void;
+  /** Open the report-a-problem dialog (the Overview's failure banner). */
+  onReportProblem?: (trigger: HTMLElement) => void;
 }) {
   const { t } = useTranslation();
 
   switch (section) {
     case "overview":
       return (
-        <div className="space-y-6">
-          {isAiScan(result) && <AiSummaryCard result={result} scanId={scanId} />}
-          <Overview
-            result={result}
-            scanId={scanId}
-            recent={recent}
-            generatedAt={generatedAt}
-            onPick={onPick}
-          />
-        </div>
+        <Overview
+          result={result}
+          scanId={scanId}
+          recent={recent}
+          generatedAt={generatedAt}
+          onReportProblem={onReportProblem}
+        />
       );
 
     case "components":
@@ -144,9 +144,15 @@ export function ResultSection({
           }
         />
       ) : (
-        <EmptyState hint={t("result.noSecurityHint")}>
-          {t("result.noSecurity")}
-        </EmptyState>
+        <div className="bl-box bl-v-state" data-testid="no-security-report">
+          <Blankslate>
+            <Blankslate.Visual>
+              <ShieldIcon size={24} />
+            </Blankslate.Visual>
+            <Blankslate.Heading as="h2">{t("result.noSecurity")}</Blankslate.Heading>
+            <Blankslate.Description>{t("result.noSecurityHint")}</Blankslate.Description>
+          </Blankslate>
+        </div>
       );
 
     case "licenses":
@@ -156,10 +162,11 @@ export function ResultSection({
           query={query}
           onQueryChange={onQueryChange}
           outboundLicense={result.sbom?.outboundLicense}
-          onPickLicense={
-            onPick ? (license) => onPick("components", { license }) : undefined
+          licenseHref={
+            scanId ? (license) => scanHash(scanId, "components", { license }) : undefined
           }
           onRescanWithLicense={onRescanWithLicense}
+          rescanFieldAvailable={hasOutboundLicenseField(result.scanConfig?.source)}
         />
       );
 
@@ -199,6 +206,7 @@ export function ResultSection({
           scanId={scanId}
           inputFile={inputFile}
           componentsHref={scanId ? scanHash(scanId, "components") : undefined}
+          componentsTotal={result.sbom?.components}
         />
       );
     }
@@ -253,6 +261,8 @@ export function ResultSection({
           results={result.results}
           isSuppliedDocument={Boolean(inputSbomFileName(result))}
           isAiDocument={isAiScan(result)}
+          query={query}
+          onQueryChange={onQueryChange}
         />
       ) : null;
 

@@ -16,7 +16,8 @@
  *
  * Also enforced: brand tokens appear only in the primary button variants (an
  * allow list), only the `-fg` shade of a role is a text colour, and font sizes
- * come from the role scale (no text-[Npx]).
+ * come from the role scale (no text-[Npx]). Shapes: no thick left accent border,
+ * and no arbitrary shadow or corner radius (class or inline style).
  *
  * Scope: src/**\/*.{ts,tsx}. The token source itself (src/index.css) is not a
  * component and is never scanned. The rules live in token-lint-rules.mjs.

@@ -1,14 +1,14 @@
 // Copyright 2026 SK Telecom Co., Ltd.
 // SPDX-License-Identifier: Apache-2.0
 
-import { ShieldQuestion } from "lucide-react";
+import { ShieldIcon } from "@primer/octicons-react";
 import { useTranslation } from "react-i18next";
 
-import { Disclosure } from "@/components/ui/disclosure";
 import type { SecuritySummary } from "@/lib/api";
-import { uncheckedReasonKey, uncheckedSummary } from "@/lib/unchecked";
 import { useFormatNumber } from "@/lib/format";
-import { CoverageNotice } from "@/components/ui/coverage-notice";
+import { uncheckedReasonKey, uncheckedSummary } from "@/lib/unchecked";
+
+import { CoverageBox } from "./vulns/CoverageBox";
 
 /**
  * Components the vulnerability check could not reach, with why and which.
@@ -16,67 +16,37 @@ import { CoverageNotice } from "@/components/ui/coverage-notice";
  * and in place of "No vulnerabilities found", which would otherwise read as a
  * clean result when it only covers part of the inventory.
  */
-export function UncheckedComponents({
-  security,
-  className,
-}: {
-  security: SecuritySummary;
-  className?: string;
-}) {
+export function UncheckedComponents({ security }: { security: SecuritySummary }) {
   const { t } = useTranslation();
   const fmt = useFormatNumber();
   const u = uncheckedSummary(security);
   if (!u) return null;
   return (
-    <CoverageNotice
+    <CoverageBox
       testId="unchecked-components"
-      icon={ShieldQuestion}
+      icon={ShieldIcon}
       title={t("result.uncheckedTitle", { count: u.count })}
-      className={className}
-    >
-      <p className="text-muted-foreground">
-        {t("result.uncheckedHint")}{" "}
-        {u.byReason.map((b) => `${t(uncheckedReasonKey(b.reason))} ${fmt(b.count)}`).join(", ")}
-      </p>
-      {u.rows.length > 0 && (
-        <Disclosure
-          summary={<span className="text-label font-medium text-foreground">{t("result.uncheckedList")}</span>}
-        >
-          <div className="mt-2 max-h-80 overflow-auto rounded-md border bg-card">
-            <table className="w-full text-left text-label">
-              <thead className="border-b bg-muted/40 text-muted-foreground">
-                <tr>
-                  <th scope="col" className="px-3 py-2 font-medium">
-                    {t("result.uncheckedName")}
-                  </th>
-                  <th scope="col" className="px-3 py-2 font-medium">
-                    {t("result.uncheckedVersion")}
-                  </th>
-                  <th scope="col" className="px-3 py-2 font-medium">
-                    {t("result.uncheckedReasonCol")}
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {u.rows.map((r, i) => (
-                  <tr key={`${r.name}-${r.version}-${i}`} className="border-b last:border-0">
-                    <td className="break-all px-3 py-1.5 font-mono text-foreground" title={r.purl}>
-                      {r.name}
-                    </td>
-                    <td className="px-3 py-1.5 font-mono text-foreground">{r.version || "-"}</td>
-                    <td className="px-3 py-1.5 text-foreground">{t(uncheckedReasonKey(r.reason))}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          {u.truncated && (
-            <p className="mt-1 text-muted-foreground">
-              {t("result.uncheckedTruncated", { shown: u.rows.length, count: u.count })}
-            </p>
-          )}
-        </Disclosure>
-      )}
-    </CoverageNotice>
+      hint={
+        <>
+          {t("result.uncheckedHint")} {u.byReason.map((b) => `${t(uncheckedReasonKey(b.reason))} ${fmt(b.count)}`).join(", ")}
+        </>
+      }
+      listLabel={t("result.uncheckedList")}
+      columns={[{ label: t("result.uncheckedName") }, { label: t("result.uncheckedVersion") }, { label: t("result.uncheckedReasonCol") }]}
+      grid="minmax(200px, 1fr) minmax(80px, auto) minmax(160px, auto)"
+      rows={u.rows.map((r, i) => ({
+        key: `${r.name}-${r.version}-${i}`,
+        cells: [
+          <span key="n" className="bl-mono bl-breakall" title={r.purl}>
+            {r.name}
+          </span>,
+          <span key="v" className="bl-mono">
+            {r.version || "-"}
+          </span>,
+          t(uncheckedReasonKey(r.reason)),
+        ],
+      }))}
+      note={u.truncated ? t("result.uncheckedTruncated", { shown: u.rows.length, count: u.count }) : undefined}
+    />
   );
 }

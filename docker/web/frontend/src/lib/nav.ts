@@ -6,22 +6,9 @@
  * left rail's sections, their grouping and which ones are AI-only.
  *
  * Kept free of React/JSX so the adaptation logic (`visibleGroups`) is unit
- * testable in isolation. The Sidebar component renders these descriptors; the
- * icons are plain lucide components referenced here by value.
+ * testable in isolation. The Sidebar component renders these descriptors and
+ * picks each section's icon by its id.
  */
-import {
-  Boxes,
-  Cpu,
-  FileCheck2,
-  FileInput,
-  FileText,
-  GitBranch,
-  type LucideIcon,
-  LayoutDashboard,
-  Package,
-  ScrollText,
-  ShieldAlert,
-} from "lucide-react";
 
 /** Stable identifiers for each result section (used for routing/active state). */
 export type SectionId =
@@ -40,7 +27,6 @@ export interface NavSection {
   id: SectionId;
   /** i18n key under `nav.*` for the visible label. */
   labelKey: string;
-  icon: LucideIcon;
   /**
    * Only shown for AI/ANALYZE scans (model components or AI-SBOM analysis).
    * Non-AI scans never see these so the rail stays honest per scan type.
@@ -102,18 +88,16 @@ export const NAV_GROUPS: NavGroup[] = [
     id: "inventory",
     labelKey: "nav.group.inventory",
     sections: [
-      { id: "overview", labelKey: "nav.overview", icon: LayoutDashboard },
-      { id: "components", labelKey: "nav.components", icon: Boxes },
+      { id: "overview", labelKey: "nav.overview" },
+      { id: "components", labelKey: "nav.components" },
       {
         id: "dependencies",
         labelKey: "nav.dependencies",
-        icon: GitBranch,
         requires: (c) => c.hasDependencies,
       },
       {
         id: "sourceTree",
         labelKey: "nav.sourceTree",
-        icon: FileText,
         requires: (c) => c.hasSourceTree,
       },
       // The scanned input, when that input was itself an SBOM: what the
@@ -123,7 +107,6 @@ export const NAV_GROUPS: NavGroup[] = [
       {
         id: "inputSbom",
         labelKey: "nav.inputSbom",
-        icon: FileInput,
         requires: (c) => c.hasInputSbom,
       },
     ],
@@ -136,14 +119,14 @@ export const NAV_GROUPS: NavGroup[] = [
     id: "security",
     labelKey: "nav.group.security",
     sections: [
-      { id: "vulnerabilities", labelKey: "nav.vulnerabilities", icon: ShieldAlert },
+      { id: "vulnerabilities", labelKey: "nav.vulnerabilities" },
     ],
   },
   {
     id: "compliance",
     labelKey: "nav.group.compliance",
     sections: [
-      { id: "licenses", labelKey: "nav.licenses", icon: ScrollText },
+      { id: "licenses", labelKey: "nav.licenses" },
       // A conformance report exists for every mode (a mandatory checklist run
       // against whatever SBOM the scan ends with) and the section shows it
       // for every one of them — a self-generated SBOM's own checklist is a
@@ -161,13 +144,9 @@ export const NAV_GROUPS: NavGroup[] = [
       // here would duplicate what Models & datasets already carries
       // (AiSummaryCard + this section's own CheckGroup rendering, reused
       // there) — so hasInputSbom still gates it for that one case.
-      // nav.conformance ("Conformance check" in English) is close to the rail's
-      // per-row width budget — see the RAIL_ROW comment in Sidebar.tsx —
-      // check the rendered rail before lengthening it further.
       {
         id: "conformance",
         labelKey: "nav.conformance",
-        icon: FileCheck2,
         requires: (c) => c.hasConformance && (c.hasInputSbom || !c.isAiScan),
       },
     ],
@@ -176,14 +155,14 @@ export const NAV_GROUPS: NavGroup[] = [
     id: "ai",
     labelKey: "nav.group.ai",
     sections: [
-      { id: "models", labelKey: "nav.models", icon: Cpu, aiOnly: true },
+      { id: "models", labelKey: "nav.models", aiOnly: true },
     ],
   },
   {
     id: "outputs",
     labelKey: "nav.group.outputs",
     sections: [
-      { id: "artifacts", labelKey: "nav.artifacts", icon: Package },
+      { id: "artifacts", labelKey: "nav.artifacts" },
     ],
   },
 ];
@@ -210,7 +189,10 @@ export function visibleSectionIds(ctx: ScanContext): SectionId[] {
 /** A past scan as shown in the top bar's Recent menu (lightweight link shape). */
 export interface RecentScanLink {
   id: string;
+  /** "project version", the accessible name of the entry. */
   label: string;
+  name: string;
+  version?: string;
   topSeverity?: "CRITICAL" | "HIGH" | "MEDIUM" | "LOW" | "NONE";
 }
 

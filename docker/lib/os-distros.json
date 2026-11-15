@@ -1,0 +1,16 @@
+{
+  "note": "Identifiers a rpm, deb or apk purl may carry in its namespace slot: the distribution id the package repository uses (os-release ID, or the name purl-spec, syft and Trivy use). A company name is not such an identifier. Lowercase; compared case-insensitively. 'ids' is every accepted id; 'apk' and 'deb' list the ids that belong to those package types, and an id in neither list is an rpm-family id. Suggestions only propose an id that matches the package type. Verified with syft in the BomLens image: amzn (Amazon Linux 2023), ol (Oracle Linux), debian. Where the spelling a tool writes was not verified, both the dotted and the hyphenated form are listed.",
+  "ids": [
+    "alma", "almalinux", "alpine", "alinux", "amazon", "amzn", "anolis", "arch", "archlinux",
+    "azurelinux", "bottlerocket", "centos", "centos-stream", "centos_stream", "cbl-mariner",
+    "chainguard", "clear-linux-os", "debian", "deepin", "devuan", "elementary", "eurolinux",
+    "fedora", "flatcar", "gentoo", "kali", "kylin", "linuxmint", "mageia", "mariner", "minimos",
+    "nixos", "ol", "openeuler", "opencloudos", "opensuse", "opensuse-leap", "opensuse.leap",
+    "opensuse-microos", "opensuse.microos", "opensuse-tumbleweed", "opensuse.tumbleweed",
+    "openwrt", "oracle", "photon", "poky", "pop", "postmarketos", "raspbian", "redhat", "rhcos",
+    "rhel", "rocky", "scientific", "scientificlinux", "sl-micro", "sl_micro", "sle-micro",
+    "sle_micro", "sled", "sles", "slem", "suse", "tencentos", "ubuntu", "uos", "void", "wolfi"
+  ],
+  "apk": ["alpine", "chainguard", "postmarketos", "wolfi"],
+  "deb": ["debian", "deepin", "devuan", "elementary", "kali", "linuxmint", "pop", "raspbian", "ubuntu"]
+}

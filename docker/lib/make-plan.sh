@@ -73,7 +73,7 @@ case "$lang" in
         detail="Android needs a locally built SDK image (${ANDROID_IMAGE_PREFIX}$(android_api "$SRC")); it is not published"
         ;;
     *)
-        image="$(img_for_lang "$lang")"
+        image="$(img_for_lang "$lang" "$SRC")"
         digest="$(cdxgen_pinned_digest "$image" "$LIBDIR")"
         if [ -z "$digest" ]; then
             status="unsupported"; reason="no-pinned-digest"
@@ -100,7 +100,7 @@ jq -n \
     --arg outfile "$OUTFILE" --arg spec "$CDX_SPEC_VERSION" \
     --arg fetch "$fetch" --arg gotc "$gotoolchain" \
     --arg pname "${PROJECT_NAME:-}" --arg pver "${PROJECT_VERSION:-}" \
-    --arg prepenv "$BUILD_PREP_ENV_NAMES $PROXY_ENV_NAMES" --arg netenv "$STAGE2_NETWORK_ENV_NAMES" \
+    --arg prepenv "$BUILD_PREP_ENV_NAMES $PROXY_ENV_NAMES $EXTRA_CA_ENV_NAMES" --arg netenv "$STAGE2_NETWORK_ENV_NAMES" \
     --arg prep2 "$BUILD_PREP_ENV_NAMES" \
     --argjson fp "$fingerprint" '
     def nn: if . == "" then null else . end;

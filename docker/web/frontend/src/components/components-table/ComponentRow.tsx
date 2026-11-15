@@ -1,20 +1,18 @@
 // Copyright 2026 SK Telecom Co., Ltd.
 // SPDX-License-Identifier: Apache-2.0
 
-import { Package } from "lucide-react";
+import { ChevronDownIcon, ChevronRightIcon } from "@primer/octicons-react";
+import { Label, Link } from "@primer/react";
+import { Table } from "@primer/react/experimental";
+import { Fragment, memo, type MouseEvent } from "react";
 import { useTranslation } from "react-i18next";
-import { Badge } from "@/components/ui/badge";
-import type { ComponentItem, Severity } from "@/lib/api";
-import { licenseBadges } from "@/lib/components";
-import { useFormatNumber } from "@/lib/format";
 
-const SEV_TONE: Record<Severity, "critical" | "high" | "medium" | "low" | "info"> = {
-  CRITICAL: "critical",
-  HIGH: "high",
-  MEDIUM: "medium",
-  LOW: "low",
-  UNKNOWN: "info",
-};
+import { LicenseTierLabel, LicenseTierMark, PackageCoordinate, SeverityLabel } from "@/components/primer";
+import { TIER_LABEL_KEY } from "@/components/primer/display";
+import type { ComponentItem } from "@/lib/api";
+import { useFormatNumber } from "@/lib/format";
+import { componentRiskTier, worstLicense } from "@/lib/licenses";
+import { scanHash } from "@/lib/route";
 
 /** Which optional columns the table is showing right now. */
 export interface ShownColumns {
@@ -25,315 +23,356 @@ export interface ShownColumns {
   license: boolean;
 }
 
-interface Props {
+export interface RowProps {
   item: ComponentItem;
+  /** Stable key of the row (purl, or name and position). */
+  rowKey: string;
+  /** Position in the filtered list; names the detail row for aria-controls. */
+  index: number;
   isOpen: boolean;
-  onToggle: () => void;
+  onToggle: (rowKey: string) => void;
   shown: ShownColumns;
-  /** Total number of columns, for the expanded detail row to span. */
-  colCount: number;
+  scanId?: string | null;
+  /** When the End of life or Outdated filter is on, the second line leaves out the word the filter already says. */
+  eolFilter: boolean;
+  outdatedFilter: boolean;
   onPickVulns?: (name: string) => void;
   onPickDependency?: (name: string, version?: string) => void;
 }
 
-/** One component row and, when open, the detail row it expands into. */
-export function ComponentRow({
-  item: c,
-  isOpen,
-  onToggle,
-  shown,
-  colCount,
-  onPickVulns,
-  onPickDependency,
-}: Props) {
+/** EOL and outdated, as a muted second line under the name. */
+function NameMeta({ c, eolFilter, outdatedFilter }: { c: ComponentItem; eolFilter: boolean; outdatedFilter: boolean }) {
   const { t } = useTranslation();
-  const fmt = useFormatNumber();
-  const { version: showVersion, type: showType, scope: showScope, risk: showRisk, license: showLicense } = shown;
-  const lic = licenseBadges(c.licenses);
+  const parts: { key: string; text: string; title: string }[] = [];
+  if (c.eol === "true") {
+    const text = eolFilter
+      ? c.eolDate
+        ? t("result.eolSince", { date: c.eolDate })
+        : ""
+      : c.eolDate
+        ? t("result.eolWithDate", { date: c.eolDate })
+        : t("result.eolBadge");
+    parts.push({ key: "eol", title: t("result.eolBadgeHint"), text });
+  }
+  if (c.outdated === "true") {
+    const latest = c.latestVersion ? t("result.outdatedLatest", { version: c.latestVersion }) : "";
+    const text = outdatedFilter ? latest : latest ? `${t("result.outdatedBadge")} · ${latest}` : t("result.outdatedBadge");
+    parts.push({ key: "out", title: t("result.outdatedBadgeHint"), text });
+  }
+  const shown = parts.filter((p) => p.text);
+  if (!shown.length) return null;
+  return (
+    <div className="bl-comp-meta bl-muted bl-small">
+      {shown.map((p, i) => (
+        <span key={p.key} title={p.title}>
+          {i > 0 && " · "}
+          {p.text}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+/** Where a component came from or what is wrong with it, as Labels after the name. */
+function NameLabels({ c }: { c: ComponentItem }) {
+  const { t } = useTranslation();
   return (
     <>
-    {/* role="button" makes aria-expanded valid here (it is not allowed
-        on a plain table row) and, with tabIndex + the key handler,
-        keeps the expandable row reachable by keyboard. */}
-    <tr
-      className="group cursor-pointer border-b last:border-0 hover:bg-accent/50"
-      role="button"
-      tabIndex={0}
-      aria-expanded={isOpen}
-      aria-label={t("result.componentRowToggle")}
-      onClick={onToggle}
-      onKeyDown={(e: React.KeyboardEvent) => {
-        if (e.key === "Enter" || e.key === " ") {
-          e.preventDefault();
-          onToggle();
-        }
-      }}
-    >
-      {/* Pinned like its header. The row tint is painted per-cell here
-          (group-hover) because a pinned cell needs its own opaque
-          background and would otherwise stay unhighlighted. */}
-      <td className="sticky left-0 z-10 max-w-80 bg-background px-3 py-2 group-hover:bg-accent/50">
-        <div className="flex items-center gap-2">
-          <Package className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-          <span
-            className="truncate font-mono"
-            title={`${c.group ? `${c.group} / ` : ""}${c.name}`}
-          >
-            {c.group ? `${c.group} / ` : ""}
-            {c.name}
-          </span>
-          {c.vendored && (
-            <Badge
-              variant="muted"
-              title={
-                c.matchConfidence
-                  ? `${t("result.vendoredBadgeHint")} (${t("result.vendoredMatch", { pct: c.matchConfidence })})`
-                  : t("result.vendoredBadgeHint")
-              }
-            >
-              {t("result.vendoredBadge")}
-            </Badge>
-          )}
-          {/* Added from a declaration file, not found by the scan. Neutral
-              tones: where a component came from is not a risk signal. */}
-          {c.declaredOrigin && (
-            <Badge
-              variant={c.declaredOrigin === "first-party" ? "outline" : "muted"}
-              title={t(
-                c.declaredOrigin === "first-party"
-                  ? "result.declaredFirstPartyHint"
-                  : "result.declaredThirdPartyHint",
-              )}
-              data-testid="declared-origin"
-            >
-              {t(
-                c.declaredOrigin === "first-party"
-                  ? "result.declaredFirstParty"
-                  : "result.declaredThirdParty",
-              )}
-            </Badge>
-          )}
-          {/* Leads the badges: a package to remove outranks anything
-              that is merely out of date or vulnerable. */}
-          {c.malicious && (
-            <Badge
-              tone="critical"
-              title={
-                c.maliciousId
-                  ? `${t("result.maliciousBadgeHint")} (${c.maliciousId}${c.maliciousSource ? `, ${c.maliciousSource}` : ""})`
-                  : t("result.maliciousBadgeHint")
-              }
-            >
-              {t("result.maliciousBadge")}
-            </Badge>
-          )}
-          {c.eol === "true" && (
-            <Badge tone="high" title={t("result.eolBadgeHint")}>
-              {t("result.eolBadge")}
-              {c.eolDate ? ` · ${t("result.eolSince", { date: c.eolDate })}` : ""}
-            </Badge>
-          )}
-          {/* Weaker emphasis than EOL: a supported component that simply
-              has a newer patch available. Muted, not warning-toned. */}
-          {c.outdated === "true" && (
-            <Badge variant="muted" title={t("result.outdatedBadgeHint")}>
-              {t("result.outdatedBadge")}
-              {c.latestVersion
-                ? ` · ${t("result.outdatedLatest", { version: c.latestVersion })}`
-                : ""}
-            </Badge>
-          )}
-        </div>
-      </td>
-      {/* A presence-only row has no version by construction, so an
-          em dash here would read as a gap in the data rather than as
-          the finding it is: the component is there, the version is
-          not recoverable, and no advisory lookup applies to it. */}
-      {showVersion && (
-      <td className="whitespace-nowrap px-3 py-2 font-mono tabular-nums text-muted-foreground">
-        {c.version || (c.presenceOnly ? (
-          <span
-            className="font-sans text-label"
-            title={t("result.presenceOnlyHint")}
-          >
-            {t("result.presenceOnlyVersion")}
-          </span>
-        ) : "—")}
-      </td>
+      {/* Leads the labels: a package to remove outranks anything else. */}
+      {c.malicious && (
+        <Label
+          variant="danger"
+          title={
+            c.maliciousId
+              ? `${t("result.maliciousBadgeHint")} (${c.maliciousId}${c.maliciousSource ? `, ${c.maliciousSource}` : ""})`
+              : t("result.maliciousBadgeHint")
+          }
+        >
+          {t("result.maliciousBadge")}
+        </Label>
       )}
-      {showType && (
-      <td className="whitespace-nowrap px-3 py-2 text-muted-foreground">{c.type || "—"}</td>
+      {c.vendored && (
+        <Label
+          variant="secondary"
+          title={
+            c.matchConfidence
+              ? `${t("result.vendoredBadgeHint")} (${t("result.vendoredMatch", { pct: c.matchConfidence })})`
+              : t("result.vendoredBadgeHint")
+          }
+        >
+          {t("result.vendoredBadge")}
+        </Label>
       )}
-      {showScope && (
-        <td className="whitespace-nowrap px-3 py-2">
-          {c.scope ? (
-            <span
-              className={
-                c.scope === "direct"
-                  ? "font-medium text-foreground"
-                  : "text-muted-foreground"
-              }
-            >
-              {t(c.scope === "direct" ? "result.scopeDirect" : "result.scopeTransitive")}
-            </span>
-          ) : (
-            <span className="text-muted-foreground">—</span>
-          )}
-        </td>
+      {/* Added from a declaration file, not found by the scan. Neutral tones:
+          where a component came from is not a risk signal. */}
+      {c.declaredOrigin && (
+        <Label
+          variant={c.declaredOrigin === "first-party" ? "default" : "secondary"}
+          data-testid="declared-origin"
+          title={t(c.declaredOrigin === "first-party" ? "result.declaredFirstPartyHint" : "result.declaredThirdPartyHint")}
+        >
+          {t(c.declaredOrigin === "first-party" ? "result.declaredFirstParty" : "result.declaredThirdParty")}
+        </Label>
       )}
-      {showRisk && (
-        <td className="whitespace-nowrap px-3 py-2">
-          {c.maxSeverity ? (
-            <Badge tone={SEV_TONE[c.maxSeverity]} mark>
-              {t(`severity.${c.maxSeverity}`)}
-              {c.vulnCount ? ` · ${fmt(c.vulnCount)}` : ""}
-            </Badge>
-          ) : (
-            <span className="text-muted-foreground">—</span>
-          )}
-        </td>
-      )}
-      {/* Badges past the limit fold into a count so a component with a
-          dozen licenses does not stand three rows tall. The expanded
-          row below lists them all. */}
-      {showLicense && (
-      <td className="whitespace-nowrap px-3 py-2">
-        {c.licenses.length ? (
-          <div className="flex items-center gap-1">
-            {lic.shown.map((l, j) => (
-              <Badge key={j} variant="muted">
-                {l}
-              </Badge>
-            ))}
-            {lic.hidden > 0 && (
-              <span
-                className="text-muted-foreground"
-                title={c.licenses.join(", ")}
-              >
-                {t("result.licenseMore", { count: lic.hidden })}
-              </span>
-            )}
-          </div>
-        ) : (
-          <span className="text-muted-foreground">{t("result.licenseNone")}</span>
-        )}
-      </td>
-      )}
-    </tr>
-    {isOpen && (
-      <tr className="border-b last:border-0">
-        <td colSpan={colCount} className="bg-muted/30 px-3 py-3">
-          <dl className="grid grid-cols-[max-content,1fr] gap-x-4 gap-y-1.5 text-label">
-            {c.purl ? (
-              <>
-                <dt className="font-medium text-muted-foreground">purl</dt>
-                <dd className="break-all font-mono">{c.purl}</dd>
-              </>
-            ) : null}
-            {c.source ? (
-              <>
-                <dt className="font-medium text-muted-foreground">{t("result.colSource")}</dt>
-                <dd>
-                  <a
-                    href={c.source}
-                    target="_blank"
-                    rel="noreferrer"
-                    onClick={(e) => e.stopPropagation()}
-                    className="break-all text-primary underline underline-offset-2 hover:no-underline"
-                  >
-                    {c.source}
-                  </a>
-                </dd>
-              </>
-            ) : null}
-            {c.copyright ? (
-              <>
-                <dt className="font-medium text-muted-foreground">{t("result.colCopyright")}</dt>
-                <dd className="break-words">{c.copyright}</dd>
-              </>
-            ) : null}
-            {c.licenses.length > 0 ? (
-              <>
-                <dt className="font-medium text-muted-foreground">{t("result.colLicense")}</dt>
-                <dd>{c.licenses.join(", ")}</dd>
-              </>
-            ) : null}
-            {c.eol === "true" ? (
-              <>
-                <dt className="font-medium text-muted-foreground">{t("result.colEol")}</dt>
-                <dd>
-                  {t("result.eolBadge")}
-                  {c.eolDate ? ` (${c.eolDate})` : ""}
-                </dd>
-              </>
-            ) : null}
-            {c.outdated === "true" ? (
-              <>
-                <dt className="font-medium text-muted-foreground">{t("result.colCurrency")}</dt>
-                <dd>
-                  {c.latestVersion
-                    ? t("result.outdatedLatest", { version: c.latestVersion })
-                    : t("result.outdatedBadge")}
-                  {typeof c.releasesBehind === "number"
-                    ? ` · ${t("result.outdatedReleasesBehind", { count: c.releasesBehind })}`
-                    : ""}
-                  {c.lastReleased
-                    ? ` · ${t("result.outdatedLastReleased", { date: c.lastReleased })}`
-                    : ""}
-                </dd>
-              </>
-            ) : null}
-            {c.vulnCount ? (
-              <>
-                <dt className="font-medium text-muted-foreground">{t("nav.vulnerabilities")}</dt>
-                <dd className="flex flex-wrap items-baseline gap-2">
-                  <span>
-                    {c.maxSeverity ? `${t(`severity.${c.maxSeverity}`)} · ` : ""}
-                    {fmt(c.vulnCount)}
-                  </span>
-                  {/* Into the CVEs behind this row. It sits in the
-                      expanded detail rather than on the risk badge
-                      because the row itself is the toggle control,
-                      and a control inside a control is not announced
-                      reliably. */}
-                  {onPickVulns && (
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onPickVulns(c.name);
-                      }}
-                      className="rounded text-primary underline underline-offset-2 hover:no-underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                    >
-                      {t("result.viewInVulns", { name: c.name })}
-                    </button>
-                  )}
-                </dd>
-              </>
-            ) : null}
-            {onPickDependency && (
-              <>
-                <dt className="font-medium text-muted-foreground">{t("nav.dependencies")}</dt>
-                <dd>
-                  {/* Same reason as View in Vulnerabilities above: the
-                      row itself is the toggle control. */}
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onPickDependency(c.name, c.version);
-                    }}
-                    className="rounded text-primary underline underline-offset-2 hover:no-underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  >
-                    {t("result.viewInDependencies", { name: c.name })}
-                  </button>
-                </dd>
-              </>
-            )}
-          </dl>
-        </td>
-      </tr>
-    )}
     </>
   );
 }
+
+/** A link into another section of this scan. A plain click goes through the shell's own navigation (it keeps
+ *  the term and version it needs); a modified click and "open in a new tab" use the href. */
+function SectionLink({
+  href,
+  onPick,
+  children,
+}: {
+  href?: string;
+  onPick: () => void;
+  children: string;
+}) {
+  const onClick = (e: MouseEvent<HTMLElement>) => {
+    if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return;
+    e.preventDefault();
+    onPick();
+  };
+  return (
+    <Link as={href ? "a" : "button"} href={href} onClick={onClick}>
+      {children}
+    </Link>
+  );
+}
+
+function Detail({
+  c,
+  scanId,
+  onPickVulns,
+  onPickDependency,
+}: {
+  c: ComponentItem;
+  scanId?: string | null;
+  onPickVulns?: (name: string) => void;
+  onPickDependency?: (name: string, version?: string) => void;
+}) {
+  const { t } = useTranslation();
+  const fmt = useFormatNumber();
+  return (
+    <div className="bl-comp-detailbody">
+      <dl className="bl-comp-kv">
+        {c.purl ? (
+          <>
+            <dt>purl</dt>
+            <dd className="bl-mono">{c.purl}</dd>
+          </>
+        ) : null}
+        {c.source ? (
+          <>
+            <dt>{t("result.colSource")}</dt>
+            <dd>
+              <Link href={c.source} target="_blank" rel="noreferrer">
+                {c.source}
+              </Link>
+            </dd>
+          </>
+        ) : null}
+        {c.copyright ? (
+          <>
+            <dt>{t("result.colCopyright")}</dt>
+            <dd>{c.copyright}</dd>
+          </>
+        ) : null}
+        {c.licenses.length > 0 ? (
+          <>
+            <dt>{t("result.colLicense")}</dt>
+            <dd className="bl-comp-licdd">
+              <span>{c.licenses.join(", ")}</span>
+              <LicenseTierLabel tier={componentRiskTier(c)} size="small" />
+            </dd>
+          </>
+        ) : null}
+        {c.eol === "true" ? (
+          <>
+            <dt>{t("result.colEol")}</dt>
+            <dd>
+              {t("result.eolBadge")}
+              {c.eolDate ? ` (${c.eolDate})` : ""}
+            </dd>
+          </>
+        ) : null}
+        {c.outdated === "true" ? (
+          <>
+            <dt>{t("result.colCurrency")}</dt>
+            <dd>
+              {c.latestVersion ? t("result.outdatedLatest", { version: c.latestVersion }) : t("result.outdatedBadge")}
+              {typeof c.releasesBehind === "number" ? ` · ${t("result.outdatedReleasesBehind", { count: c.releasesBehind })}` : ""}
+              {c.lastReleased ? ` · ${t("result.outdatedLastReleased", { date: c.lastReleased })}` : ""}
+            </dd>
+          </>
+        ) : null}
+        {c.vulnCount ? (
+          <>
+            <dt>{t("nav.vulnerabilities")}</dt>
+            <dd className="bl-comp-vulndd">
+              {c.maxSeverity ? <SeverityLabel severity={c.maxSeverity} count={c.vulnCount} size="small" /> : <span>{fmt(c.vulnCount)}</span>}
+              {onPickVulns && (
+                <SectionLink
+                  href={scanId ? scanHash(scanId, "vulnerabilities", { q: c.name }) : undefined}
+                  onPick={() => onPickVulns(c.name)}
+                >
+                  {t("result.viewInVulns", { name: c.name })}
+                </SectionLink>
+              )}
+            </dd>
+          </>
+        ) : null}
+        {onPickDependency && (
+          <>
+            <dt>{t("nav.dependencies")}</dt>
+            <dd>
+              <SectionLink
+                href={scanId ? scanHash(scanId, "dependencies", { q: c.name, ...(c.version ? { version: c.version } : {}) }) : undefined}
+                onPick={() => onPickDependency(c.name, c.version)}
+              >
+                {t("result.viewInDependencies", { name: c.name })}
+              </SectionLink>
+            </dd>
+          </>
+        )}
+      </dl>
+    </div>
+  );
+}
+
+/** One component row and, when open, the detail row it expands into. */
+function ComponentRowImpl({
+  item: c,
+  rowKey,
+  index,
+  isOpen,
+  onToggle,
+  shown,
+  scanId,
+  eolFilter,
+  outdatedFilter,
+  onPickVulns,
+  onPickDependency,
+}: RowProps) {
+  const { t } = useTranslation();
+  const detailId = `cd-${index}`;
+  // The one license shown is the most concerning one; the rest fold into "+N" that names them all.
+  const shownLicense = worstLicense(c.licenses);
+  const otherLicenses = c.licenses.length - 1;
+  const tier = componentRiskTier(c);
+  const tierName = t(TIER_LABEL_KEY[tier]);
+  const toggle = () => onToggle(rowKey);
+  const coord = c.group ? `${c.group}/${c.name}` : c.name;
+  return (
+    <Fragment>
+      <Table.Row data-open={isOpen} onClick={toggle} className="bl-comp-row">
+        <Table.Cell scope="row">
+          <div className="bl-comp-namecell">
+            <div className="bl-comp-line1">
+              {/* The disclosure is a real button, so Tab, Enter and Space work and a
+                  screen reader hears the state; a click anywhere on the row does the same for a pointer. */}
+              <button
+                type="button"
+                className="bl-comp-disclose"
+                aria-expanded={isOpen}
+                aria-controls={isOpen ? detailId : undefined}
+                aria-label={`${t("result.componentRowToggle")}: ${coord}`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  toggle();
+                }}
+              >
+                <span className="bl-muted bl-comp-chev" aria-hidden>
+                  {isOpen ? <ChevronDownIcon size={16} /> : <ChevronRightIcon size={16} />}
+                </span>
+                <PackageCoordinate group={c.group || undefined} name={c.name} strongName className="bl-comp-name" />
+              </button>
+              <span className="bl-comp-labels">
+                <NameLabels c={c} />
+              </span>
+            </div>
+            <NameMeta c={c} eolFilter={eolFilter} outdatedFilter={outdatedFilter} />
+          </div>
+        </Table.Cell>
+        {shown.version && (
+          <Table.Cell>
+            {/* A presence-only row has no version by construction: a dash here would read as a gap in the
+                data rather than as the finding it is. */}
+            <span className="bl-mono bl-muted bl-comp-ver">
+              {c.version ||
+                (c.presenceOnly ? (
+                  <span className="bl-comp-sans" title={t("result.presenceOnlyHint")}>
+                    {t("result.presenceOnlyVersion")}
+                  </span>
+                ) : (
+                  "-"
+                ))}
+            </span>
+          </Table.Cell>
+        )}
+        {shown.type && (
+          <Table.Cell>
+            <span className="bl-muted">{c.type || "-"}</span>
+          </Table.Cell>
+        )}
+        {shown.scope && (
+          <Table.Cell>
+            {c.scope ? (
+              <span className={c.scope === "direct" ? "bl-strong" : "bl-muted"}>
+                {t(c.scope === "direct" ? "result.scopeDirect" : "result.scopeTransitive")}
+              </span>
+            ) : (
+              <span className="bl-muted">-</span>
+            )}
+          </Table.Cell>
+        )}
+        {shown.risk && (
+          <Table.Cell>
+            {c.maxSeverity ? <SeverityLabel severity={c.maxSeverity} count={c.vulnCount || undefined} /> : <span className="bl-muted">-</span>}
+          </Table.Cell>
+        )}
+        {shown.license && (
+          <Table.Cell>
+            {c.licenses.length ? (
+              <div className="bl-comp-lic">
+                <span
+                  role="img"
+                  aria-label={t("result.componentsTierOf", { tier: tierName })}
+                  title={t("result.componentsTierOf", { tier: tierName })}
+                  className="bl-comp-tier"
+                >
+                  <LicenseTierMark tier={tier} />
+                </span>
+                <Label variant="secondary" className="bl-comp-liclabel" title={shownLicense}>
+                  {shownLicense}
+                </Label>
+                {otherLicenses > 0 && (
+                  <span
+                    role="img"
+                    className="bl-muted bl-small bl-nowrap"
+                    title={c.licenses.join(", ")}
+                    aria-label={c.licenses.join(", ")}
+                  >
+                    {t("result.licenseMore", { count: otherLicenses })}
+                  </span>
+                )}
+              </div>
+            ) : (
+              <span className="bl-muted">{t("result.licenseNone")}</span>
+            )}
+          </Table.Cell>
+        )}
+      </Table.Row>
+      {isOpen && (
+        <Table.Row id={detailId}>
+          <Table.Cell className="bl-comp-detail">
+            <Detail c={c} scanId={scanId} onPickVulns={onPickVulns} onPickDependency={onPickDependency} />
+          </Table.Cell>
+        </Table.Row>
+      )}
+    </Fragment>
+  );
+}
+
+export const ComponentRow = memo(ComponentRowImpl);

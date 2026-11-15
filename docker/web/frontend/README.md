@@ -29,8 +29,17 @@ the default and the classic path is removed.
 
 All colours, spacing, radius, elevation and motion live as CSS custom
 properties in `src/index.css` (light + `.dark`) and are mapped to utilities in
-`tailwind.config.ts`. The brand accent is SKT (SK Red `--brand`, SK Orange
-`--brand-accent`); the neutral `--primary` is intentionally separate.
+`tailwind.config.ts`. The brand accent is navy (`--brand` #1d4ed8, with
+`--brand-strong` for link text and `--brand-hover` for the hovered and pressed button);
+the neutral `--primary` is intentionally separate. Red belongs to the danger
+role only (Critical, errors, failures).
+
+Primer (`@primer/react`, `@primer/primitives`) is loaded in `src/main.tsx`.
+`src/lib/theme.ts` keeps Primer's `data-color-mode` attributes on `<html>` in
+step with the `dark` class, and `src/primer.css` points Primer's accent and
+primary-button variables at the tokens above. BomLens-only displays built on
+Primer (severity and licence tier labels, the package coordinate) live in
+`src/components/primer/`.
 
 Components never hardcode a colour — `npm run token:lint` enforces this.
 

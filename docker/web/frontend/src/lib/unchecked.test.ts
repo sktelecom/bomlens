@@ -23,6 +23,7 @@ describe("uncheckedSummary", () => {
         { name: "busybox", version: "", reason: "no-version" },
         { name: "libfoo", version: "1.2", reason: "no-identifier", purl: "pkg:generic/libfoo@1.2" },
         { name: "bar", version: "", reason: "no-version" },
+        { name: "curl", version: "8.5.0", reason: "repository-purl", purl: "pkg:github/curl/curl@curl-8_5_0" },
       ],
     })!;
     expect(u.count).toBe(640);
@@ -30,6 +31,7 @@ describe("uncheckedSummary", () => {
     expect(u.byReason).toEqual([
       { reason: "no-version", count: 2 },
       { reason: "no-identifier", count: 1 },
+      { reason: "repository-purl", count: 1 },
     ]);
   });
 
@@ -48,6 +50,7 @@ describe("uncheckedReasonKey", () => {
   it("maps each reason code to a label key", () => {
     expect(uncheckedReasonKey("no-version")).toBe("result.uncheckedReason.noVersion");
     expect(uncheckedReasonKey("no-identifier")).toBe("result.uncheckedReason.noIdentifier");
+    expect(uncheckedReasonKey("repository-purl")).toBe("result.uncheckedReason.repositoryPurl");
     expect(uncheckedReasonKey("unknown")).toBe("result.uncheckedReason.unknown");
   });
 });
