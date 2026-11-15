@@ -767,6 +767,8 @@ test("cancelling a running scan returns to New scan", async ({ page }) => {
 
   await expect(page.getByText("Scanning…")).toBeVisible();
   await page.getByRole("button", { name: "Cancel" }).click();
+  // Cancelling drops what the scan found, so it asks first.
+  await page.getByRole("alertdialog").getByRole("button", { name: "Cancel scan" }).click();
   // Cancel drops back to the New scan screen.
   await expect(
     page.getByRole("heading", { name: "What do you want to scan?" }),

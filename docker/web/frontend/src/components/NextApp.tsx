@@ -815,26 +815,24 @@ export function NextApp() {
           )}
         </div>
       ) : !result ? (
-        <div className="mx-auto max-w-5xl">
-          <ScanRunning
-            logs={logs}
-            status={status === "error" ? "error" : "running"}
-            projectLabel={projectText(projectInfo) || undefined}
-            errorMessage={scanError}
-            errorKey={scanErrorKey}
-            newScanHref={newHash()}
-            onNewScan={goToNewScan}
-            deepCveEnabled={retryParams?.deepCve}
-            onRetry={
-              canRetry && retryParams ? () => run(retryParams) : undefined
-            }
-            onCancel={() => {
-              closeStream(); // backend ends the process when the stream drops
-              resetToHome();
-              setHomeView("new");
-            }}
-          />
-        </div>
+        <ScanRunning
+          logs={logs}
+          status={status === "error" ? "error" : "running"}
+          projectLabel={projectText(projectInfo) || undefined}
+          errorMessage={scanError}
+          errorKey={scanErrorKey}
+          newScanHref={newHash()}
+          onNewScan={goToNewScan}
+          deepCveEnabled={retryParams?.deepCve}
+          onRetry={
+            canRetry && retryParams ? () => run(retryParams) : undefined
+          }
+          onCancel={() => {
+            closeStream(); // backend ends the process when the stream drops
+            resetToHome();
+            setHomeView("new");
+          }}
+        />
       ) : (
         <div
           className={`space-y-6 ${

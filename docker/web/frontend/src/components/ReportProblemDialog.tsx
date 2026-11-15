@@ -7,9 +7,9 @@ import type { RefObject } from "react";
 import { useTranslation } from "react-i18next";
 
 import { copyToClipboard, ISSUE_FORM_URL } from "@/lib/diagnostics";
+import { useDiagnosticsSummary } from "@/lib/useDiagnosticsSummary";
 import { useToast } from "@/lib/toast";
 
-import { useDiagnosticsSummary } from "./ReportProblem";
 import { DialogHeader } from "./ShortcutsDialog";
 
 /**

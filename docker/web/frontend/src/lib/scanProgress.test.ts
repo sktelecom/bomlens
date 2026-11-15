@@ -6,8 +6,10 @@ import { describe, expect, it } from "vitest";
 import {
   SCAN_STAGES,
   scanStageIndex,
-  stageProgress,
+  anyStageMarker,
   stageStatuses,
+  visiblePercent,
+  visibleStages,
 } from "./scanProgress";
 
 describe("scanStageIndex", () => {
@@ -50,13 +52,27 @@ describe("stageStatuses", () => {
   });
 });
 
-describe("stageProgress", () => {
-  it("advances monotonically with the furthest stage, never reaching 100", () => {
-    const start = stageProgress([]); // generate active, no marker yet
-    const mid = stageProgress(["[1/2] cdxgen", "[notice] generated"]);
-    const late = stageProgress(["[risk] generated"]);
-    expect(start).toBeLessThan(mid);
-    expect(mid).toBeLessThan(late);
-    expect(late).toBeLessThan(100); // the done event snaps to 100, not this
+
+describe("visible steps", () => {
+  const logs = ["[1/2] generate", "[normalize] x", "[notice] x"];
+  it("leaves deep CVE matching out when the run did not ask for it", () => {
+    expect(visibleStages(logs, false, false).map((v) => v.stage.id)).not.toContain("deepCve");
+    expect(visibleStages(logs, false, true).map((v) => v.stage.id)).toContain("deepCve");
+  });
+  it("counts the percent over the visible steps only", () => {
+    // notice is the third of five visible steps: (2 + 0.5) / 5
+    expect(visiblePercent(visibleStages(logs, false, false))).toBe(50);
+    // and the third of six when deep CVE matching is on
+    expect(visiblePercent(visibleStages(logs, false, true))).toBe(42);
+  });
+  it("is 100 once finished", () => {
+    expect(visiblePercent(visibleStages(logs, true, false))).toBe(100);
+  });
+});
+
+describe("anyStageMarker", () => {
+  it("is false until a step's marker appears", () => {
+    expect(anyStageMarker(["git clone failed"])).toBe(false);
+    expect(anyStageMarker(["[normalize] x"])).toBe(true);
   });
 });
