@@ -49,6 +49,20 @@ export function severityFill(severity: string | null | undefined): string {
   return SEVERITY_FILL[severity ?? ""] ?? SEVERITY_FILL.UNKNOWN;
 }
 
+/** Text and marker colour per grade (the same hues as the Label variants). */
+export const SEVERITY_FG: Readonly<Record<string, string>> = {
+  CRITICAL: "var(--fgColor-danger)",
+  HIGH: "var(--fgColor-severe)",
+  MEDIUM: "var(--fgColor-attention)",
+  LOW: "var(--fgColor-muted)",
+  UNKNOWN: "var(--fgColor-muted)",
+  NONE: "var(--fgColor-muted)",
+};
+
+export function severityFg(severity: string | null | undefined): string {
+  return SEVERITY_FG[severity ?? ""] ?? SEVERITY_FG.UNKNOWN;
+}
+
 /** The i18n key of a grade's word (`severity.CRITICAL` ...). */
 export function severityLabelKey(severity: string | null | undefined): string {
   const s = severity && severity in SEVERITY_LABEL_VARIANT ? severity : "UNKNOWN";
@@ -57,7 +71,9 @@ export function severityLabelKey(severity: string | null | undefined): string {
 
 /**
  * Licence tier colours from Primer's display palette. None of them is the
- * accent or a severity hue, so a licence never reads as a finding.
+ * accent or a severity hue, so a licence never reads as a finding. Permissive
+ * needs no attention and is neutral grey like uncategorized; the two differ by
+ * shade in a bar (TIER_FILL_OVERRIDE), by marker shape and by name.
  */
 export const TIER_DISPLAY_COLOR: Readonly<Record<LicenseRiskTier, string>> = {
   "network-copyleft": "pink",
@@ -65,7 +81,16 @@ export const TIER_DISPLAY_COLOR: Readonly<Record<LicenseRiskTier, string>> = {
   "weak-copyleft": "olive",
   "review-needed": "brown",
   uncategorized: "gray",
-  permissive: "teal",
+  permissive: "gray",
+};
+
+/**
+ * Permissive in a bar uses the report's value (--cat-permissive-emphasis in
+ * docker/shared/bomlens-tokens.css: a grey lighter than uncategorized), so the
+ * web and the HTML reports draw the same bar.
+ */
+const TIER_FILL_OVERRIDE: Readonly<Partial<Record<LicenseRiskTier, string>>> = {
+  permissive: "rgb(var(--cat-permissive-emphasis))",
 };
 
 /** The i18n key of a tier's name. */
@@ -82,7 +107,7 @@ export const TIER_LABEL_KEY: Readonly<Record<LicenseRiskTier, string>> = {
 export const tierFg = (tier: LicenseRiskTier) => `var(--display-${TIER_DISPLAY_COLOR[tier]}-fgColor)`;
 /** Bar fill of a tier. */
 export const tierFill = (tier: LicenseRiskTier) =>
-  `var(--display-${TIER_DISPLAY_COLOR[tier]}-bgColor-emphasis)`;
+  TIER_FILL_OVERRIDE[tier] ?? `var(--display-${TIER_DISPLAY_COLOR[tier]}-bgColor-emphasis)`;
 /** Outline of a tier Label. */
 export const tierBorder = (tier: LicenseRiskTier) =>
   `var(--display-${TIER_DISPLAY_COLOR[tier]}-borderColor-emphasis)`;

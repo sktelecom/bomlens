@@ -1,0 +1,17 @@
+---
+// Copyright 2026 SK Telecom Co., Ltd.
+// SPDX-License-Identifier: Apache-2.0
+//
+// Starlight's head plus the share-card image. The card differs by language, and the
+// image is addressed from the site root so it also works when a link preview is
+// built from the page URL.
+import Default from '@astrojs/starlight/components/Head.astro';
+
+const ko = Astro.locals.starlightRoute.locale === 'ko';
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+const image = new URL(`${base}/images/${ko ? 'og-card-ko.png' : 'og-card.png'}`, Astro.site).href;
+---
+
+<Default {...Astro.props}><slot /></Default>
+<meta property="og:image" content={image} />
+<meta name="twitter:image" content={image} />

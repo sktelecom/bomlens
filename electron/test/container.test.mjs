@@ -24,6 +24,8 @@ import {
   defaultOutputDir,
   detectWsl2Docker,
   dockerStatus,
+  EXTRA_CA_TARGET,
+  extraCaArgs,
   findFreePort,
   imageEnvArgs,
   imageRef,
@@ -471,4 +473,43 @@ test("detectWsl2Docker reflects whether `wsl.exe -- docker info` succeeds", asyn
 
   const fail = async () => ({ code: 1, out: "", err: "" });
   assert.equal(await detectWsl2Docker({ runImpl: fail, platform: "win32" }), false);
+});
+
+test("extraCaArgs mounts SBOM_EXTRA_CA_CERTS read-only and names it in the container", () => {
+  assert.deepEqual(extraCaArgs({ env: {} }), []);
+  const pem = "-----BEGIN CERTIFICATE-----\nMIIB\n-----END CERTIFICATE-----\n";
+  const args = extraCaArgs({ env: { SBOM_EXTRA_CA_CERTS: "/etc/proxy-ca.pem" }, readFile: () => pem });
+  assert.deepEqual(args, [
+    "--mount",
+    `type=bind,source=${path.resolve("/etc/proxy-ca.pem")},target=${EXTRA_CA_TARGET},readonly`,
+    "-e",
+    "BOMLENS_EXTRA_CA_CERTS=/bomlens-ca/extra.pem",
+  ]);
+});
+
+test("extraCaArgs refuses a missing file or one with no PEM certificate", () => {
+  const missing = () => {
+    throw new Error("ENOENT");
+  };
+  for (const readFile of [missing, () => "not a certificate"]) {
+    assert.throws(
+      () => extraCaArgs({ env: { SBOM_EXTRA_CA_CERTS: "/nope/ca.pem" }, readFile }),
+      (err) => err instanceof ContainerError && err.code === CONTAINER_ERR.EXTRA_CA_INVALID && err.detail === "/nope/ca.pem",
+    );
+  }
+  // A comma would split the --mount value into another option.
+  const pem = () => "-----BEGIN CERTIFICATE-----\n";
+  assert.throws(
+    () => extraCaArgs({ env: { SBOM_EXTRA_CA_CERTS: "/certs/a,readonly=false/ca.pem" }, readFile: pem }),
+    (err) => err instanceof ContainerError && err.code === CONTAINER_ERR.EXTRA_CA_INVALID,
+  );
+});
+
+test("start passes the source-scan image settings to the UI container by name", () => {
+  // scan-sbom.sh --ui와 같은 계약: 값 없이 이름만 넘겨 docker가 이 프로세스의
+  // 환경에서 읽게 한다. SBOM_PULL은 Java 재실행 이미지를 받을지 정한다.
+  const src = fs.readFileSync(new URL("../lib/container.mjs", import.meta.url), "utf8");
+  for (const name of ["CDXGEN_IMAGE_PREFIX", "CDXGEN_JAVA_IMAGE", "SBOM_PULL"]) {
+    assert.match(src, new RegExp(`"-e",\\s*"${name}",`), name);
+  }
 });

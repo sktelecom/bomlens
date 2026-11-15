@@ -1,0 +1,242 @@
+/*
+ * Copyright 2026 SK Telecom Co., Ltd.
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+/*
+ * Layout and density modelled on docs.github.com, without its marks. Colors come
+ * from the tokens shared with the web UI (bomlens-tokens.css, copied at build time).
+ * Rules shared with the app: no thick accent bar on one side of a box, and red is
+ * reserved for danger.
+ * Token values are HSL or RGB triples, so they are wrapped in hsl() or rgb().
+ */
+
+:root {
+  --sl-font: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', 'Apple SD Gothic Neo', 'Noto Sans KR', Helvetica, Arial, sans-serif;
+  --sl-font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --sl-text-base: 1rem;
+  --sl-line-height: 1.6;
+  --sl-content-width: 49rem;
+  --sl-sidebar-width: 20.3rem;
+  --sl-nav-height: 4rem;
+  --sl-color-accent: hsl(var(--brand));
+  --sl-color-accent-high: hsl(var(--brand-strong));
+}
+
+:root[data-theme='light'] {
+  --sl-color-bg: hsl(var(--background));
+  --sl-color-bg-nav: hsl(var(--background));
+  --sl-color-bg-sidebar: hsl(var(--background));
+  --sl-color-hairline: hsl(var(--border));
+  --sl-color-hairline-light: hsl(var(--border));
+  --sl-color-text-accent: hsl(var(--brand));
+  --sl-color-accent-low: hsl(var(--muted));
+  --sl-color-bg-inline-code: hsl(var(--muted));
+}
+
+:root[data-theme='dark'] {
+  --sl-color-bg: hsl(var(--background));
+  --sl-color-bg-nav: hsl(var(--background));
+  --sl-color-bg-sidebar: hsl(var(--sidebar));
+  --sl-color-hairline: hsl(var(--border));
+  --sl-color-hairline-light: hsl(var(--border));
+  --sl-color-text-accent: hsl(var(--brand-strong));
+  --sl-color-accent-low: hsl(var(--muted));
+  --sl-color-bg-inline-code: hsl(var(--muted));
+}
+
+/* Body text */
+.sl-markdown-content a:not(.sl-link-button):not(.card a) {
+  color: var(--sl-color-text-accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.sl-markdown-content h2 {
+  font-size: 1.5rem;
+  font-weight: 600;
+}
+.sl-markdown-content h3 { font-size: 1.25rem; font-weight: 600; }
+
+/* Tables: no vertical rules, 14px text, one hairline per row */
+.sl-markdown-content table { font-size: 0.875rem; }
+.sl-markdown-content th,
+.sl-markdown-content td {
+  border: 0;
+  border-bottom: 1px solid var(--sl-color-hairline);
+  padding: 0.75rem 0.5rem 0.75rem 0;
+}
+.sl-markdown-content th { font-weight: 600; }
+
+/* Table of contents heading, as "IN THIS ARTICLE" on docs.github.com */
+starlight-toc h2 { font-size: 0.75rem; text-transform: uppercase; font-weight: 500; letter-spacing: 0.02em; }
+
+/* Quotes and notes: a full 1px border and a tinted background instead of a side bar */
+.sl-markdown-content blockquote,
+.sl-markdown-content .starlight-aside {
+  border: 1px solid var(--sl-color-hairline);
+  border-radius: 0.5rem;
+  background: hsl(var(--muted));
+  padding: 0.75rem 1rem;
+  margin-inline: 0;
+}
+.sl-markdown-content blockquote > :first-child { margin-top: 0; }
+.sl-markdown-content blockquote > :last-child { margin-bottom: 0; }
+.sl-markdown-content .starlight-aside--note { background: rgb(var(--role-info-muted)); border-color: rgb(var(--role-info-border)); }
+.sl-markdown-content .starlight-aside--tip { background: rgb(var(--role-success-muted)); border-color: rgb(var(--role-success-border)); }
+.sl-markdown-content .starlight-aside--caution { background: rgb(var(--role-attention-muted)); border-color: rgb(var(--role-attention-border)); }
+.sl-markdown-content .starlight-aside--danger { background: rgb(var(--role-danger-muted)); border-color: rgb(var(--role-danger-border)); }
+
+/* Cards on the home page: quiet boxes with a hairline border */
+.card {
+  border: 1px solid var(--sl-color-hairline);
+  border-radius: 0.5rem;
+  background: var(--sl-color-bg);
+  box-shadow: none;
+}
+.card .title { font-size: 1rem; font-weight: 600; }
+
+/* Home page: centered hero, a row of start cards, then the usual article body */
+.home { max-width: 62rem; margin-inline: auto; }
+.home-hero { text-align: center; padding: 3rem 0 1.5rem; }
+.sl-markdown-content .home-hero h1 { font-size: 2.75rem; line-height: 1.15; font-weight: 600; margin: 0 auto; max-width: 40rem; text-wrap: balance; }
+.home-hero { position: relative; isolation: isolate; }
+/* A single-hue glow behind the heading and search field. It drifts slowly and stops when
+ * the reader asks for less motion. Strength is capped so text contrast does not depend on it. */
+.home:not([data-glow='off']) .home-hero::before {
+  content: ''; position: absolute; inset: -3rem 0 auto 0; height: 26rem; z-index: -1; pointer-events: none;
+  background: radial-gradient(ellipse 45% 60% at 50% 35%, hsl(var(--brand) / 0.13), transparent 72%);
+  animation: home-glow 26s ease-in-out infinite alternate;
+}
+:root[data-theme='dark'] .home:not([data-glow='off']) .home-hero::before {
+  background: radial-gradient(ellipse 45% 60% at 50% 35%, hsl(var(--brand-strong) / 0.16), transparent 72%);
+}
+@keyframes home-glow {
+  from { transform: translate3d(-4%, 0, 0) scale(1); }
+  to { transform: translate3d(4%, 3%, 0) scale(1.1); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .home:not([data-glow='off']) .home-hero::before { animation: none; }
+}
+.home-hero .sl-heading-wrapper { max-width: 44rem; margin-inline: auto; }
+.home-lead { max-width: 40rem; margin: 1.25rem auto 0; font-size: 1.125rem; color: var(--sl-color-gray-2); text-wrap: balance; }
+.home-search {
+  display: flex; align-items: center; gap: 0.75rem;
+  width: min(100%, 36rem); margin: 1.75rem auto 0; padding: 0.75rem 1rem;
+  border: 1px solid var(--sl-color-hairline); border-radius: 0.5rem;
+  background: var(--sl-color-bg); color: var(--sl-color-gray-3);
+  font: inherit; font-size: 1rem; text-align: start; cursor: pointer;
+}
+.home-search:hover { border-color: var(--sl-color-gray-4); background: var(--sl-color-bg-nav); }
+.home-search:focus-visible { outline: 2px solid var(--sl-color-accent); outline-offset: 2px; }
+.home-search span { flex: 1; }
+.home-search kbd {
+  padding: 0.1rem 0.4rem; border: 1px solid var(--sl-color-hairline); border-radius: 0.25rem;
+  font: inherit; font-size: 0.75rem; color: var(--sl-color-gray-3);
+}
+.sl-markdown-content h2.home-eyebrow, .home-eyebrow {
+  margin: 0 0 0.75rem; font-size: 0.75rem; font-weight: 600; letter-spacing: 0.04em;
+  text-transform: uppercase; color: var(--sl-color-gray-3);
+}
+.home-start { margin-top: 1rem; }
+.start-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); gap: 1rem; }
+.sl-markdown-content a.start-card {
+  display: flex; flex-direction: column; gap: 0.4rem; padding: 1rem 1.25rem;
+  border: 1px solid var(--sl-color-hairline); border-radius: 0.5rem;
+  background: var(--sl-color-bg); color: var(--sl-color-gray-2); text-decoration: none !important;
+}
+.sl-markdown-content a.start-card:hover { border-color: var(--sl-color-accent); background: var(--sl-color-bg-nav); }
+.sl-markdown-content a.start-card:focus-visible { outline: 2px solid var(--sl-color-accent); outline-offset: 2px; }
+.sl-markdown-content h2#home-start-title { font-size: 1.25rem; letter-spacing: 0; text-transform: none; color: var(--sl-color-white); margin-bottom: 1rem; }
+:lang(ko) .home-eyebrow { letter-spacing: 0; }
+.start-card strong { font-size: 1rem; color: var(--sl-color-white); }
+.start-card span { font-size: 0.875rem; line-height: 1.5; color: var(--sl-color-gray-3); }
+.home-meta { display: flex; flex-direction: column; align-items: center; gap: 1rem; margin: 2rem 0 1rem; }
+.chips { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 0.5rem; }
+.chips .home-eyebrow { margin: 0 0.5rem 0 0; }
+.sl-markdown-content a.chip {
+  padding: 0.2rem 0.75rem; border: 1px solid var(--sl-color-hairline); border-radius: 999px;
+  font-size: 0.875rem; color: var(--sl-color-gray-2); text-decoration: none !important;
+}
+.sl-markdown-content a.chip:hover { border-color: var(--sl-color-accent); color: var(--sl-color-text-accent); }
+.trust { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.25rem 1.5rem; margin: 0; padding: 0; list-style: none; font-size: 0.875rem; color: var(--sl-color-gray-3); }
+.sl-markdown-content .trust li { margin: 0; }
+.sl-markdown-content .home h2:not(.home-eyebrow) { margin-top: 3rem; }
+/* The home page has no title row, so its empty frame takes no space */
+.content-panel:has(#_top) { padding: 0; border: 0; }
+
+/* Images in the body */
+.sl-markdown-content img { border: 1px solid var(--sl-color-hairline); border-radius: 0.5rem; }
+
+/* Buttons: 6px corners, not pills */
+.sl-link-button { border-radius: 0.375rem; font-size: 0.875rem; padding: 0.5rem 1rem; }
+
+/* Current page in the sidebar: a light tint with bold text, not a solid fill */
+.sidebar-content a[aria-current='page'],
+.sidebar-content a[aria-current='page']:hover {
+  background: hsl(var(--muted));
+  color: var(--sl-color-white);
+  font-weight: 600;
+  border-radius: 0.375rem;
+}
+
+/* Option names in the first table column stay on one line */
+.sl-markdown-content td:first-child code { white-space: nowrap; }
+
+/* Header selects keep their full label (the Korean theme names are longer) */
+starlight-theme-select select,
+starlight-lang-select select { text-overflow: clip; }
+@media (min-width: 50rem) {
+  starlight-theme-select label { min-width: 7rem; }
+}
+
+.home .nowrap { white-space: nowrap; }
+body:has(.home) site-search > button { visibility: hidden; }
+.home-hero .sl-anchor-link { display: none; }
+.home-hero .sl-heading-wrapper { display: block; }
+.sl-markdown-content .home-hero h1 { padding-inline: 0; display: block; }
+.home-hero h1, .home-lead, .start-card { word-break: keep-all; overflow-wrap: break-word; }
+
+/* Home: primary actions */
+.home-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.75rem; margin-top: 1.75rem; }
+.sl-markdown-content .home-actions .btn {
+  position: relative; display: inline-flex; align-items: center; padding: 0.6rem 1.25rem;
+  border: 1px solid var(--sl-color-hairline); border-radius: 0.5rem; background: var(--sl-color-bg);
+  color: var(--sl-color-white) !important; font-size: 1rem; font-weight: 600; text-decoration: none !important;
+}
+.sl-markdown-content .home-actions .btn:hover { background: var(--sl-color-bg-nav); border-color: var(--sl-color-gray-4); }
+.sl-markdown-content .home-actions .btn:focus-visible { outline: 2px solid var(--sl-color-accent); outline-offset: 2px; }
+.sl-markdown-content .home-actions .btn-primary { background: var(--sl-color-accent); border-color: var(--sl-color-accent); color: #fff !important; }
+.sl-markdown-content .home-actions .btn-primary:hover { background: var(--sl-color-accent-high, var(--sl-color-accent)); border-color: transparent; }
+.home-actions + .home-search { margin-top: 1.25rem; }
+
+/* Home: rotating glow behind the primary action (one element only) */
+@property --glow-angle { syntax: '<angle>'; initial-value: 0deg; inherits: false; }
+@keyframes home-glow-spin { to { --glow-angle: 360deg; } }
+.home:not([data-glow='off']) .btn-primary::before {
+  content: ''; position: absolute; inset: -3px; z-index: -1; border-radius: 0.7rem; filter: blur(10px); opacity: 0.55;
+  background: conic-gradient(from var(--glow-angle), hsl(var(--brand)), hsl(calc(var(--brand-hue, 224) + 40) 80% 62%), hsl(calc(var(--brand-hue, 224) - 30) 85% 60%), hsl(var(--brand)));
+  animation: home-glow-spin 8s linear infinite;
+}
+.home .btn-primary { isolation: isolate; }
+@media (prefers-reduced-motion: reduce) { .home:not([data-glow='off']) .btn-primary::before { animation: none; } }
+
+/* Home: sample outputs */
+.home-samples h2 { margin-bottom: 0.25rem; }
+.home-sub { margin: 0 0 1.25rem; color: var(--sl-color-gray-2); font-size: 0.9375rem; }
+.sample-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr)); gap: 1rem; }
+.sample { margin: 0; display: flex; flex-direction: column; gap: 0.5rem; }
+.sample figcaption {
+  display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem 0.75rem;
+  border: 1px solid var(--sl-color-hairline); border-bottom: 0; border-radius: 0.5rem 0.5rem 0 0;
+  background: var(--sl-color-bg-nav); font-family: var(--sl-font-mono); font-size: 0.75rem; color: var(--sl-color-gray-2);
+}
+.sample .dots { width: 2.1rem; height: 0.5rem; background: radial-gradient(circle, var(--sl-color-gray-5) 3px, transparent 3.5px) 0 0 / 0.7rem 0.5rem; }
+.sample pre {
+  flex: 1; margin: -0.5rem 0 0; padding: 0.75rem; overflow-x: auto;
+  border: 1px solid var(--sl-color-hairline); border-radius: 0 0 0.5rem 0.5rem; background: var(--sl-color-bg);
+  font-size: 0.75rem; line-height: 1.55;
+}
+.sample p { margin: 0; font-size: 0.875rem; color: var(--sl-color-gray-2); }
+.sample pre:focus-visible { outline: 2px solid var(--sl-color-accent); outline-offset: 2px; }
+.sample pre { white-space: pre; }
+.sample pre code { white-space: pre; }

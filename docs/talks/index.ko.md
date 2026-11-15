@@ -6,6 +6,8 @@ description: BomLens를 발표한 자리와 외부에 소개된 기사를 모읍
 
 BomLens를 발표한 자리와 외부에 소개된 기사를 모읍니다. 행사에 BomLens 발표를 원하시면 [GitHub 이슈](https://github.com/sktelecom/bomlens/issues)로 알려 주세요.
 
+2026-10-19에 BomLens가 [OWASP Incubator 프로젝트](https://owasp.org/www-project-bomlens/)로 승인됐습니다.
+
 ## 발표
 
 <div class="news-list" markdown>

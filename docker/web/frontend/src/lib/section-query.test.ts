@@ -8,6 +8,8 @@ import { buildHash, parseHash, type RouteQuery } from "./route";
 import {
   componentsFromQuery,
   componentsToQuery,
+  conformanceFromQuery,
+  conformanceToQuery,
   DEFAULT_VULN_SORT,
   dependenciesFromQuery,
   vulnsFromQuery,
@@ -142,5 +144,33 @@ describe("through the hash", () => {
     expect(buildHash({ kind: "scan", id: "x", section: "components", query: {} })).toBe(
       "#/scan/x/components",
     );
+  });
+});
+
+describe("conformance query", () => {
+  it("leaves the screen's own start out of the URL", () => {
+    expect(conformanceToQuery("actionable", "", "actionable")).toEqual({});
+    expect(conformanceToQuery(null, "", null)).toEqual({});
+  });
+
+  it("names a chip, no chip, and a search", () => {
+    expect(conformanceToQuery("pass", "", "actionable")).toEqual({ kind: "pass" });
+    expect(conformanceToQuery(null, "hash", "actionable")).toEqual({ kind: "all", q: "hash" });
+    expect(conformanceToQuery("actionable", "hash", null)).toEqual({ kind: "actionable", q: "hash" });
+  });
+
+  it("round-trips and falls back to the start on a bad kind", () => {
+    for (const kind of ["actionable", "review", "na", "pass", null] as const) {
+      const q = conformanceToQuery(kind, "x", "actionable");
+      expect(conformanceFromQuery(q, "actionable")).toEqual({ kind, term: "x" });
+    }
+    expect(conformanceFromQuery({ kind: "bogus" }, "review")).toEqual({ kind: "review", term: "" });
+    expect(conformanceFromQuery(undefined, null)).toEqual({ kind: null, term: "" });
+  });
+
+  it("falls back to the start when the named kind has no checks", () => {
+    const counts = { actionable: 2, review: 0, na: 0, pass: 3 };
+    expect(conformanceFromQuery({ kind: "review" }, "actionable", counts)).toEqual({ kind: "actionable", term: "" });
+    expect(conformanceFromQuery({ kind: "pass" }, "actionable", counts)).toEqual({ kind: "pass", term: "" });
   });
 });

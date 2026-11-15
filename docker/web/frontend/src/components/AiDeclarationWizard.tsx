@@ -1,7 +1,6 @@
 // Copyright 2026 SK Telecom Co., Ltd.
 // SPDX-License-Identifier: Apache-2.0
 
-import { Check, Loader2, Plus, Trash2, TriangleAlert, X } from "lucide-react";
 import {
   createContext,
   useContext,
@@ -15,12 +14,6 @@ import {
 } from "react";
 import { useTranslation } from "react-i18next";
 
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { Disclosure } from "@/components/ui/disclosure";
-import { Input } from "@/components/ui/input";
-import { Select } from "@/components/ui/select";
 import type { Spdx3Failure } from "@/lib/api";
 import {
   adapterWithoutBase,
@@ -81,7 +74,12 @@ import {
   type PendingId,
   type Target,
 } from "@/lib/useAiDeclaration";
-import { cn } from "@/lib/utils";
+import { AlertIcon as OAlert, CheckIcon as OCheck, CircleIcon as OCircle } from "@primer/octicons-react";
+import { Banner, ConfirmationDialog, Label, Link as PLink, ProgressBar } from "@primer/react";
+import { InlineMessage } from "@primer/react/experimental";
+
+import { Badge, Button, Card, CardContent, Check, cn, Disclosure, Input, Loader2, Plus, Select, Trash2, TriangleAlert, X } from "./declaration/primerShim";
+import "./declaration/declaration.css";
 
 /** The translation namespace of a question: `aiDecl.<ns>.<field>`. */
 type Ns = "document" | "model" | "dataset" | "service" | "externalModel" | "dataFlow";
@@ -94,16 +92,8 @@ const SERVICE_ANSWERS: ServiceAnswer[] = ["yes", "no", "later"];
 /** What kind of data flows, offered while it is typed; any words can be typed. */
 const CLASSIFICATION_KEYS = ["personal", "public", "internal"];
 
-const textAreaClass =
-  "flex min-h-[4.5rem] w-full rounded-lg border border-input bg-background px-3 py-2 text-body-sm ring-offset-background " +
-  "placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2";
-
-const chipClass = (on: boolean) =>
-  cn(
-    "rounded-full border px-3 py-1 text-body-sm transition-colors duration-fast ease-out-soft",
-    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-    on ? "border-foreground bg-foreground text-background" : "border-input hover:bg-muted",
-  );
+const textAreaClass = "bl-decl-textarea";
+const chipClass = (on: boolean) => cn("bl-decl-choice", on && "on");
 
 /**
  * A row of choices. As a single choice it follows the radio-group pattern: one
@@ -536,13 +526,9 @@ function Suggestions({ id, values }: { id: string; values: string[] }) {
 
 function WarningNote({ children }: { children: ReactNode }) {
   return (
-    <p
-      role="note"
-      className="flex items-start gap-1.5 rounded-md border border-warning-border/60 bg-warning-surface px-3 py-2 text-label text-warning dark:border-warning-border/20 dark:bg-warning-surface/30"
-    >
-      <TriangleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
-      <span>{children}</span>
-    </p>
+    <InlineMessage variant="warning" role="note">
+      {children}
+    </InlineMessage>
   );
 }
 
@@ -591,7 +577,7 @@ function SourcesEditor({
       role="group"
       aria-labelledby={`${id}-label`}
       aria-describedby={shown.length ? errId : undefined}
-      className="space-y-2 rounded-md border border-dashed p-3"
+      className="space-y-2 bl-decl-subrow"
       data-sources={name}
       onBlur={(e) => {
         if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setTouched(true);
@@ -836,7 +822,7 @@ function DataFlowsEditor({
         const where = `service.dataFlows[${i}]`;
         const label = t("aiDecl.dataFlow.n", { n: i + 1 });
         return (
-          <div key={i} data-where={where} data-flow-row={i} className="space-y-4 rounded-md border p-3">
+          <div key={i} data-where={where} data-flow-row={i} className="space-y-4 bl-decl-subrow">
             <div className="flex items-center justify-between gap-2">
               <span className="text-body-sm font-semibold">
                 {label}
@@ -917,7 +903,7 @@ function ExternalModelsEditor({
         const where = `service.externalModels[${i}]`;
         const label = m.name.trim() || t("aiDecl.externalModel.n", { n: i + 1 });
         return (
-          <div key={i} data-where={where} data-external-model={i} className="space-y-4 rounded-md border p-3">
+          <div key={i} data-where={where} data-external-model={i} className="space-y-4 bl-decl-subrow">
             <div className="flex items-center justify-between gap-2">
               <span className="text-body-sm font-semibold">{label}</span>
               <Button
@@ -961,6 +947,15 @@ function ExternalModelsEditor({
   );
 }
 
+/** The answers as one string that does not depend on key order, to compare. */
+function canonical(v: unknown): string {
+  return JSON.stringify(v, (_k, x: unknown) =>
+    x && typeof x === "object" && !Array.isArray(x)
+      ? Object.fromEntries(Object.entries(x as Record<string, unknown>).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)))
+      : x,
+  );
+}
+
 /** "Did this model start from another one?" in create mode. */
 type Origin = "scratch" | "base";
 const ORIGINS: Origin[] = ["scratch", "base"];
@@ -974,6 +969,8 @@ export function AiDeclarationWizard({
   onCancel,
   onSave,
   onDraft,
+  baseline,
+  initialLeft,
   mode = "fill",
   authorFromScan: authorGiven,
   declaredScan = false,
@@ -990,7 +987,12 @@ export function AiDeclarationWizard({
   onSave: (file: Declaration) => Promise<Spdx3Failure | null>;
   /** Called with the answers as they change, so leaving the section and coming
    *  back does not lose them. */
-  onDraft?: (decl: Declaration, step: StepId) => void;
+  onDraft?: (decl: Declaration, step: StepId, left: StepId[]) => void;
+  /** The declaration the flow started from before anything was kept (the
+   *  template): Cancel asks only when the answers differ from it. */
+  baseline?: Declaration;
+  /** Steps already opened and left in an earlier visit that was kept. */
+  initialLeft?: StepId[];
   /** "fill": the open fields of a finished scan. "create": a model described
    *  from the declaration alone, before any scan (base models and datasets
    *  are added here, and saving starts the scan). */
@@ -1040,9 +1042,12 @@ export function AiDeclarationWizard({
     heading.current?.focus();
   }, [step]);
 
+  // Steps the person has left: their empty required fields now show as errors,
+  // and they count as opened in the step list and the review.
+  const [left, setLeft] = useState<StepId[]>(initialLeft ?? []);
   useEffect(() => {
-    onDraft?.(decl, step);
-  }, [decl, step, onDraft]);
+    onDraft?.(decl, step, left);
+  }, [decl, step, left, onDraft]);
 
   const authorFromScan =
     authorGiven ??
@@ -1058,8 +1063,6 @@ export function AiDeclarationWizard({
   const set = (target: Target, field: string, value: Value) => dispatch({ type: "set", target, field, value });
   // Back from the review step, show every problem at once.
   const [reviewed, setReviewed] = useState(false);
-  // Steps the person has left: their empty required fields now show as errors.
-  const [left, setLeft] = useState<StepId[]>([]);
   const loud = reviewed || left.includes(step);
 
   /** Add what the add-by-id boxes still hold; false (and the box says why)
@@ -1119,6 +1122,21 @@ export function AiDeclarationWizard({
   };
 
   const stepName = (s: StepId) => t(`aiDecl.step.${s}`);
+  // Cancel throws the answers away: ask first when there are any.
+  const [confirmCancel, setConfirmCancel] = useState(false);
+  const cancel = () => {
+    // Answers changed from where the flow started, or an id typed and not yet
+    // added, would be lost: ask first.
+    const typed = [...pending.boxes.values()].some((get) => get().value.trim() !== "");
+    if (typed || canonical(decl) !== canonical(baseline ?? initial)) setConfirmCancel(true);
+    else onCancel();
+  };
+  // Opened straight on the review: no step was skipped, so none is "not opened".
+  const startedAtPreview = useRef(initialStep === "preview").current;
+  const decisionsLeft = judgmentFields(index, decl).filter((k) => isEmpty(decl.model?.[k])).length;
+  /** An optional step whose question was never answered: neutral, not "done". */
+  const unanswered = (s: StepId) =>
+    s === "legal" ? decisionsLeft > 0 : s === "service" ? !serviceDeclared(decl) && (decl.serviceAnswer ?? "later") === "later" : false;
 
   let body: ReactNode;
   let why: string;
@@ -1561,50 +1579,50 @@ export function AiDeclarationWizard({
     const valueText = (r: SummaryRow) => formatValue(r, t, i18n.language);
     body = (
       <div className="space-y-3">
-        <Card>
-          <CardContent className="space-y-1 p-4 text-body-sm">
-            {all.length === 0 ? (
-              <p className="flex items-center gap-2 text-success">
-                <Check className="h-4 w-4" />
-                {t("aiDecl.preview.complete")}
-              </p>
-            ) : (
-              <>
-                <p>{t("aiDecl.preview.open", { count: all.length })}</p>
-                <p className="text-body-sm text-muted-foreground">
-                  {blockers.length ? t("aiDecl.preview.blocked") : t("aiDecl.preview.draftOk")}
-                </p>
-              </>
-            )}
-            {/* The model's own values that also go into the CycloneDX SBOM; a
-                declared service says so in its own group below. */}
-            {!serviceDeclared(decl) && modelCdxValues(decl) && (
-              <p className="text-body-sm text-muted-foreground" data-testid="cdx-note">
-                {t(create ? "aiDecl.preview.modelCreate" : "aiDecl.preview.modelFill")}
-              </p>
-            )}
-          </CardContent>
-        </Card>
+        <Banner variant={all.length === 0 ? "success" : "warning"}>
+          <Banner.Title as="h3">
+            {all.length === 0 ? t("aiDecl.preview.complete") : t("aiDecl.preview.open", { count: all.length })}
+          </Banner.Title>
+          <Banner.Description>
+            <>
+              {all.length > 0 && <span className="bl-decl-block">{blockers.length ? t("aiDecl.preview.blocked") : t("aiDecl.preview.draftOk")}</span>}
+              {!serviceDeclared(decl) && modelCdxValues(decl) && (
+                <span className="bl-decl-block" data-testid="cdx-note">
+                  {t(create ? "aiDecl.preview.modelCreate" : "aiDecl.preview.modelFill")}
+                </span>
+              )}
+            </>
+          </Banner.Description>
+        </Banner>
+        <div className="bl-box">
         {steps
           .filter((s) => s !== "preview")
           .map((s) => {
             const open = openIn[s] ?? 0;
             const mine = groups.filter((g) => g.step === s);
             return (
-              <Card key={s} data-summary={s}>
-                <CardContent className="space-y-2 p-4 text-body-sm">
+              <div key={s} data-summary={s} className="bl-decl-previewrow space-y-2">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <h3 className="font-semibold">{stepName(s)}</h3>
                     {open > 0 ? (
-                      <button
-                        type="button"
+                      <PLink
+                        as="button"
                         aria-label={`${stepName(s)}: ${t("aiDecl.preview.openInStep", { count: open })}`}
-                        className="inline-flex items-center gap-1 rounded text-label font-medium text-foreground underline underline-offset-2 hover:no-underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                         onClick={() => go(s, firstOpenIn(s, all))}
+                        className="bl-decl-openlink"
                       >
-                        <TriangleAlert className="h-3.5 w-3.5" aria-hidden />
+                        <span className="bl-decl-warnicon"><OAlert size={14} /></span>
                         {t("aiDecl.preview.openInStep", { count: open })}
-                      </button>
+                      </PLink>
+                    ) : null}
+                    {open > 0 && !left.includes(s) && !startedAtPreview && (
+                      <span className="inline-flex items-center gap-1 text-label text-muted-foreground">
+                        <OCircle size={14} />
+                        {t("aiDecl.stepNotOpened")}
+                      </span>
+                    )}
+                    {open > 0 ? null : unanswered(s) ? (
+                      <Label variant="secondary">{t("aiDecl.notAnswered")}</Label>
                     ) : (
                       <span className="inline-flex items-center gap-1 text-label text-muted-foreground">
                         <Check className="h-3.5 w-3.5" aria-hidden />
@@ -1686,35 +1704,30 @@ export function AiDeclarationWizard({
                   {s !== "base" && s !== "service" && mine.length === 0 && (
                     <p className="text-body-sm text-muted-foreground">{t("aiDecl.preview.nothing")}</p>
                   )}
-                </CardContent>
-              </Card>
+              </div>
             );
           })}
+        </div>
         <Disclosure summary={<span className="text-body-sm font-medium">{t("aiDecl.preview.file")}</span>}>
-          <pre className="mt-2 max-h-80 overflow-auto rounded-md border bg-muted/40 p-3 text-body-sm">
+          <pre className="bl-decl-logpre mt-2">
             {JSON.stringify(toFile(decl, create), null, 2)}
           </pre>
         </Disclosure>
         {failure && (
-          <div
-            role="alert"
-            className="space-y-1 rounded-md border border-risk-critical/40 bg-risk-critical/10 p-3 text-label text-risk-critical-fg"
-          >
-            <div className="font-medium">
-              {failure.status === 422
-                ? t("aiDecl.saveRefused")
-                : failure.status === 409
-                  ? t("aiDecl.saveBusy")
-                  : t("aiDecl.saveFailed")}
-            </div>
+          <Banner variant="critical" role="alert">
+            <Banner.Title as="h3">
+              {failure.status === 422 ? t("aiDecl.saveRefused") : failure.status === 409 ? t("aiDecl.saveBusy") : t("aiDecl.saveFailed")}
+            </Banner.Title>
             {failure.reasons && (
-              <ul className="list-disc space-y-0.5 pl-5 font-mono">
-                {failure.reasons.slice(0, 10).map((r, i) => (
-                  <li key={i}>{r}</li>
-                ))}
-              </ul>
+              <Banner.Description>
+                <ul className="bl-decl-reasons">
+                  {failure.reasons.slice(0, 10).map((r, i) => (
+                    <li key={i}>{r}</li>
+                  ))}
+                </ul>
+              </Banner.Description>
             )}
-          </div>
+          </Banner>
         )}
       </div>
     );
@@ -1722,14 +1735,29 @@ export function AiDeclarationWizard({
 
   return (
     <PendingIds.Provider value={pending}>
-      <div className="grid gap-6 lg:grid-cols-[12rem_minmax(0,1fr)_16rem]" data-testid="ai-declaration">
+      {confirmCancel && (
+        <ConfirmationDialog
+          title={t("aiDecl.discard.title")}
+          confirmButtonContent={t("aiDecl.discard.confirm")}
+          cancelButtonContent={t("aiDecl.discard.keep")}
+          confirmButtonType="danger"
+          onClose={(gesture) => {
+            setConfirmCancel(false);
+            if (gesture === "confirm") onCancel();
+          }}
+        >
+          {t("aiDecl.discard.body")}
+        </ConfirmationDialog>
+      )}
+      <div className="bl-decl grid" data-testid="ai-declaration">
         <nav aria-label={t("aiDecl.stepsLabel")} className="space-y-4">
-          <div className="truncate text-label text-muted-foreground">{title}</div>
-          <ol className="space-y-2">
+          <div className="break-all text-label text-muted-foreground">{title}</div>
+          <ol className="bl-decl-steplist">
             {steps.map((s, i) => {
-              const visited = i < stepIndex || left.includes(s);
+              // Only a step the person actually opened and left is done.
+              const visited = left.includes(s) || startedAtPreview;
               const open = s === "preview" ? 0 : openIn[s] ?? 0;
-              const done = visited && open === 0 && s !== step;
+              const done = visited && open === 0 && s !== step && !unanswered(s);
               const warn = visited && open > 0 && s !== step;
               return (
                 <li key={s}>
@@ -1741,29 +1769,13 @@ export function AiDeclarationWizard({
                     aria-label={stepName(s)}
                     aria-describedby={open > 0 ? `${headingId}-open-${s}` : undefined}
                     data-step={s}
-                    className={cn(
-                      "flex w-full items-center gap-2 rounded-md px-1 py-1 text-left text-body-sm",
-                      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                      s === step ? "font-semibold" : "text-muted-foreground hover:text-foreground",
-                    )}
                   >
-                    <span
-                      className={cn(
-                        "flex h-5 w-5 shrink-0 items-center justify-center rounded-full border text-caption",
-                        done && "border-foreground bg-foreground text-background",
-                        warn && "border-warning-border bg-warning-surface text-warning",
-                      )}
-                      aria-hidden
-                    >
-                      {done ? <Check className="h-3 w-3" /> : warn ? <TriangleAlert className="h-3 w-3" /> : i + 1}
+                    <span className={cn("bl-decl-stepnum", done && "done", warn && "warn")} aria-hidden>
+                      {done ? <OCheck size={12} /> : warn ? <OAlert size={12} /> : i + 1}
                     </span>
                     <span className="min-w-0 flex-1">{stepName(s)}</span>
                     {open > 0 && (
-                      <span
-                        id={`${headingId}-open-${s}`}
-                        className="shrink-0 text-label font-normal text-muted-foreground"
-                        data-open={open}
-                      >
+                      <span id={`${headingId}-open-${s}`} data-open={open} className="bl-muted bl-small">
                         {t("aiDecl.preview.openInStep", { count: open })}
                       </span>
                     )}
@@ -1775,13 +1787,9 @@ export function AiDeclarationWizard({
           <div className="space-y-1.5">
             <div className="text-label text-muted-foreground" aria-live="polite">
               {t("aiDecl.remaining", { count: remaining })}
+              {decisionsLeft > 0 && <div data-testid="decisions-left">{t("aiDecl.decisionsLeft", { count: decisionsLeft })}</div>}
             </div>
-            <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted" aria-hidden>
-              <div
-                className="h-full bg-foreground"
-                style={{ width: `${totalRequired ? ((totalRequired - remaining) / totalRequired) * 100 : 100}%` }}
-              />
-            </div>
+            <ProgressBar progress={totalRequired ? ((totalRequired - remaining) / totalRequired) * 100 : 100} aria-hidden barSize="small" />
           </div>
         </nav>
 
@@ -1796,7 +1804,7 @@ export function AiDeclarationWizard({
           </div>
           {body}
           <div className="flex flex-wrap items-center justify-between gap-2 pt-2">
-            <Button variant="ghost" onClick={onCancel}>
+            <Button variant="ghost" onClick={cancel}>
               {t("aiDecl.cancel")}
             </Button>
             <div className="flex gap-2">

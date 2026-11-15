@@ -1,10 +1,10 @@
 // Copyright 2026 SK Telecom Co., Ltd.
 // SPDX-License-Identifier: Apache-2.0
 
-import { ArrowRight } from "lucide-react";
+import { ArrowRightIcon } from "@primer/octicons-react";
+import { Button, Link } from "@primer/react";
 import { useTranslation } from "react-i18next";
 
-import { Card, CardContent } from "@/components/ui/card";
 import type { RecentScan } from "@/lib/api";
 import { pickComparedScan, pickStartScans, scanTypeLabelKey } from "@/lib/recent";
 import { scanHash } from "@/lib/route";
@@ -22,42 +22,24 @@ export function DemoStartHere({ scans }: { scans: RecentScan[] }) {
   const compared = pickComparedScan(scans);
   if (picks.length === 0) return null;
   return (
-    <Card data-testid="demo-start-here">
-      <CardContent className="flex flex-col gap-3 p-4 md:flex-row md:items-center md:gap-5">
-        <p className="text-body-sm text-foreground md:max-w-sm">
-          {t("recent.demoStart")}
-        </p>
-        <ul className="flex min-w-0 flex-1 flex-col gap-2 md:flex-row md:flex-wrap">
+    <section className="bl-box" data-testid="demo-start-here" style={{ marginTop: "var(--base-size-16)" }}>
+      <div className="bl-box-body bl-demostart">
+        <p>{t("recent.demoStart")}</p>
+        <ul>
           {picks.map((s) => (
-            <li key={s.id} className="min-w-0">
-              <a
-                href={scanHash(s.id)}
-                className="group inline-flex max-w-full items-center gap-2 rounded-md border bg-background px-3 py-2 text-body-sm text-foreground transition-colors duration-fast ease-out-soft hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-              >
-                <span className="shrink-0 text-label text-muted-foreground">
-                  {t(scanTypeLabelKey(s))}
-                </span>
-                <span className="min-w-0 truncate font-medium" title={s.project}>{s.project}</span>
-                <ArrowRight
-                  className="h-3.5 w-3.5 shrink-0 text-muted-foreground"
-                  aria-hidden
-                />
-              </a>
+            <li key={s.id}>
+              <Button as="a" href={scanHash(s.id)} trailingVisual={ArrowRightIcon}>
+                <span className="bl-muted">{t(scanTypeLabelKey(s))}</span> <span className="bl-demoname" title={s.project}>{s.project}</span>
+              </Button>
             </li>
           ))}
         </ul>
         {compared && (
-          <p className="text-body-sm text-muted-foreground md:max-w-xs">
-            <a
-              href={scanHash(compared.id)}
-              className="rounded font-medium text-foreground underline underline-offset-2 hover:no-underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-              data-testid="demo-compare-link"
-            >
-              {t("recent.demoCompare", { project: compared.project, version: compared.version })}
-            </a>
-          </p>
+          <Link href={scanHash(compared.id)} data-testid="demo-compare-link">
+            {t("recent.demoCompare", { project: compared.project, version: compared.version })}
+          </Link>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </section>
   );
 }

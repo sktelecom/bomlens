@@ -1,0 +1,67 @@
+---
+// Copyright 2026 SK Telecom Co., Ltd.
+// SPDX-License-Identifier: Apache-2.0
+//
+// Draws ```mermaid blocks as diagrams. The code blocks are rendered by Starlight first,
+// so this reads their text back and swaps each block for the drawn diagram. The library
+// is bundled with the site and loaded only on pages that contain such a block, so no
+// request leaves the site.
+---
+
+<script>
+  const blocks = Array.from(document.querySelectorAll<HTMLElement>('.expressive-code')).filter(
+    (el) => el.querySelector('pre[data-language="mermaid"]'),
+  );
+
+  if (blocks.length > 0) {
+    const sources = blocks.map((el) =>
+      Array.from(el.querySelectorAll('.ec-line')).map((line) => line.textContent ?? '').join('\n'),
+    );
+    const targets = blocks.map((el) => {
+      const div = document.createElement('div');
+      div.className = 'mermaid-diagram';
+      el.replaceWith(div);
+      return div;
+    });
+
+    const render = async () => {
+      const { default: mermaid } = await import('mermaid');
+      // Always the light theme: some diagrams set their own light fills, which are
+      // unreadable under the dark theme. The panel below keeps a white background.
+      mermaid.initialize({ startOnLoad: false, theme: 'default', securityLevel: 'strict' });
+      for (let i = 0; i < targets.length; i++) {
+        try {
+          const { svg } = await mermaid.render(`mermaid-${i}-${Date.now()}`, sources[i]);
+          targets[i].innerHTML = svg;
+        } catch {
+          // Keep the source readable if a diagram does not parse.
+          targets[i].textContent = sources[i];
+          targets[i].classList.add('mermaid-failed');
+        }
+      }
+    };
+
+    render();
+  }
+</script>
+
+<style is:global>
+  @layer starlight.core {
+    .mermaid-diagram {
+      margin: 1rem 0;
+      padding: 1rem;
+      overflow-x: auto;
+      text-align: center;
+      background: #fff;
+      border: 1px solid var(--sl-color-hairline);
+      border-radius: 0.5rem;
+    }
+    .mermaid-failed {
+      white-space: pre;
+      text-align: left;
+      font-family: var(--sl-font-mono);
+      font-size: var(--sl-text-sm);
+      color: #1f2328;
+    }
+  }
+</style>

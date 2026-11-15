@@ -80,7 +80,9 @@
     "removeFile": "Remove the chosen file",
     "uploadingPercent": "Uploading… {{percent}}%",
     "aiDeclare": "Enter model information",
-    "aiDeclareHint": "For a model that has no HuggingFace repository or file to read yet. Answer a few questions about it (its base models, the data it was trained on, its release date and the like) and BomLens builds the SBOM and the SPDX 3.0.1 AI document from them. Base models and datasets you name by their HuggingFace id are read from the hub."
+    "aiDeclareHint": "For a model that has no HuggingFace repository or file to read yet. Answer a few questions about it (its base models, the data it was trained on, its release date and the like) and BomLens builds the SBOM and the SPDX 3.0.1 AI document from them. Base models and datasets you name by their HuggingFace id are read from the hub.",
+    "aiDeclareUnavailable": "Describing a model from a declaration needs the SPDX 3.0.1 converter, which this image does not have. Use the full image, or scan the model from HuggingFace or a file.",
+    "dropRefused": "{{name}} is not a file this input takes. Accepted: {{types}}"
   },
   "options": {
     "notice": "Notice",
@@ -126,7 +128,8 @@
     "specVersion": "CycloneDX version",
     "specVersionDefault": "CycloneDX 1.6 (default)",
     "specVersion17": "CycloneDX 1.7",
-    "specVersionHint": "The version the SBOM is written in. Choose 1.7 when the receiving system asks for it. AI model and dataset SBOMs are always 1.7."
+    "specVersionHint": "The version the SBOM is written in. Choose 1.7 when the receiving system asks for it. AI model and dataset SBOMs are always 1.7.",
+    "scanossTokenLabel": "SCANOSS API key (optional)"
   },
   "upload": {
     "target": "Destination",
@@ -279,7 +282,6 @@
       }
     },
     "download": "Download",
-    "view": "View",
     "conformance": "Conformance check",
     "verdictPass": "Pass",
     "verdictFail": "Fail",
@@ -291,7 +293,10 @@
     "tabSourceTree": "Source tree",
     "componentsEmpty": "No components were detected.",
     "componentsEmptyHint": "The scan finished without identifying a single component. A target with no recognised manifest, lock file or package database usually reads this way.",
-    "componentsSearch": "Search name, license, type…",
+    "componentsSearch": "Search components",
+    "componentsView": "View",
+    "componentsTierOf": "License class: {{tier}}",
+    "eolWithDate": "End of life since {{date}}",
     "allTypes": "All types",
     "allLicenses": "All licenses",
     "allSeverities": "All severities",
@@ -378,23 +383,20 @@
     "vexReceivedFrom": "From a VEX document for {{product}}, separate from your own judgement.",
     "vexReceivedJustification": "Justification: {{value}}",
     "vexUpdatedAt": "Last updated {{date}}",
-    "vulnRowToggle": "Show vulnerability details",
     "componentRowToggle": "Show component details",
-    "eolTile": "End of life",
     "eolAtRisk": "{{count}} also vulnerable",
     "eolBadge": "End of life",
     "eolBadgeHint": "Past upstream end-of-life (no security patches expected)",
     "eolSince": "since {{date}}",
     "filterEol": "End of life",
     "colEol": "Support",
-    "outdatedTile": "Outdated",
     "outdatedBadge": "Outdated",
     "outdatedBadgeHint": "A newer patch is available in its release cycle",
     "outdatedLatest": "latest: {{version}}",
     "outdatedReleasesBehind": "{{count}} releases behind",
     "outdatedLastReleased": "released {{date}}",
     "filterOutdated": "Outdated",
-    "filterLicenseUnclear": "Licence to decide",
+    "filterLicenseUnclear": "License to decide",
     "columns": "Columns",
     "filters": "Filters",
     "clearFilters": "Clear filters",
@@ -404,9 +406,7 @@
     "kernelAdvisories": "{{count}} kernel advisories are in the security report and not counted above",
     "kernelAdvisoriesWhy": "Most advisories against a kernel are for subsystems a device never compiled in, and the SBOM cannot tell which.",
     "upgradeBundlesTitle": "One upgrade resolves more than one CVE",
-    "upgradeBundleLine": "Upgrade {{pkg}} to {{fixed}} to resolve {{count}} CVEs",
     "upgradeBundlesMore": "and {{count}} more bundle(s) below",
-    "upgradeBundleLineSteps": "Upgrade {{pkg}} to {{fixed}} to resolve {{count}} CVEs ({{steps}})",
     "upgradeBundleStep": "{{fixed}} alone: {{count}}",
     "vulnViews": "Preset views",
     "vulnViewAll": "All",
@@ -450,6 +450,12 @@
     "csvKev": "Known exploited",
     "csvTitle": "Title",
     "artifactFiles": "({{count}} files)",
+    "artifactNotListed_one": "{{count}} file only in the ZIP",
+    "artifactNotListed_other": "{{count}} files only in the ZIP",
+    "tooBig": "This file is too large to preview ({{size}}). Download it instead.",
+    "viewFormat": "View {{format}}",
+    "formatTemplate": "template",
+    "copyLinkOf": "Copy link to {{name}}",
     "emptyForm": "Empty form",
     "declarationUpload": "Upload declaration",
     "declarationNotJson": "That file is not JSON.",
@@ -506,7 +512,21 @@
     "metaScanType": "Scan type",
     "metaGenerated": "Scan time",
     "licenseShowAll": "Show all {{count}} licenses",
-    "licenseShowLess": "Show fewer"
+    "licenseShowLess": "Show fewer",
+    "colVulnerability": "Vulnerability",
+    "vulnBundleSummary_one": "Upgrading {{count}} package resolves {{cves}} CVEs",
+    "vulnBundleSummary_other": "Upgrading {{count}} packages resolves {{cves}} CVEs",
+    "vulnViewByPackage": "View by package",
+    "vulnFilterBySeverity": "Filter by severity",
+    "vulnPackageUrl": "Package URL",
+    "vulnFixedForBranch": "fixed version for the installed branch",
+    "vulnTruncatedTitle": "Not every finding is listed",
+    "vulnTruncated": "This list holds {{listed}} of the {{total}} findings in the security report. The counts above use all {{total}}. Open the security report for the rest.",
+    "vulnViewMenu": "View",
+    "vulnColumnsGroup": "Columns",
+    "vulnColumnRows": "{{shown}} of {{total}} rows have a value",
+    "vulnRefsMore": "{{count}} more",
+    "vulnSeverityChipHint": "Pick a severity to show only those rows. Pick it again to show all."
   },
   "deps": {
     "loading": "Loading dependencies…",
@@ -521,8 +541,6 @@
     "expand": "Expand",
     "collapse": "Collapse",
     "treeLabel": "Dependency tree",
-    "expandNamed": "Expand {{name}}",
-    "collapseNamed": "Collapse {{name}}",
     "tooLarge": "The graph has {{count}} nodes (over {{cap}}); use the tree view instead.",
     "graphError": "The dependency graph could not be rendered.",
     "search": "Search packages…",
@@ -540,17 +558,30 @@
     "legend": "Legend",
     "legendArrow": "Arrow: package to its dependency",
     "legendHover": "Hover to trace, click for details",
-    "legendKeyboard": "Keyboard: use Tree"
+    "legendKeyboard": "Keyboard: use Tree",
+    "viewLabel": "Dependency view",
+    "searchHint": "Press Enter to move to the match.",
+    "packages": "Packages"
   },
   "sourceTree": {
+    "filterClear": "Clear the filter",
+    "filter": "Filter by file name",
+    "filterNone": "No file name matches.",
+    "treeLabel": "Source file tree",
     "loading": "Loading source tree…",
     "loadError": "Could not load the source file tree.",
     "empty": "No source files were scanned.",
     "noLicenseHint": "License details appear when you run a ScanCode (deep-license) scan."
   },
   "sourceViewer": {
+    "summary_one": "{{count}} file captured.",
+    "summary_other": "{{count}} files captured.",
+    "linksSummary_one": "{{count}} symlink.",
+    "linksSummary_other": "{{count}} symlinks.",
+    "noSnapshot": "This scan did not store file contents. Only the file structure is shown.",
+    "wrap": "Wrap lines",
+    "paneLabel": "Reading pane",
     "selectPrompt": "Pick a file to read what was scanned.",
-    "summary": "{{count}} file(s) captured from the scanned tree.",
     "summaryOmitted": "{{count}} left out (binary, or past the capture limit).",
     "lines": "{{count}} lines",
     "truncated": "Shown in part",
@@ -560,16 +591,21 @@
     "missingBudget": "No preview. The capture reached its size limit before this file.",
     "missingUnknown": "No content was captured for this file.",
     "symlink": "Symlink",
-    "symlinkTo": "This is a symlink to",
-    "linksSummary": "{{count}} symlinks."
+    "symlinkTo": "This is a symlink to"
   },
   "inputSbom": {
     "loading": "Loading the submitted SBOM…",
     "loadError": "Could not load the details of the submitted SBOM.",
     "intro": "This scan read an SBOM someone else produced. Below is that document as it arrived, before it was converted to CycloneDX for the analysis on the other screens.",
     "unnamed": "Submitted SBOM",
-    "entries": "{{count}} entries",
-    "componentsHint": "The entries themselves are listed, with filters and risk, under",
+    "entries_one": "{{count}} entry",
+    "entries_other": "{{count}} entries",
+    "componentsBefore": "The entries themselves are listed, with filters and risk, under ",
+    "componentsAfter": ".",
+    "converted_one": "{{count}} component after conversion",
+    "converted_other": "{{count}} components after conversion",
+    "copyValue": "Copy {{name}}",
+    "copied": "Copied",
     "field": {
       "format": "Format",
       "documentName": "Document name",
@@ -593,7 +629,9 @@
   },
   "viewer": {
     "open": "View artifact",
-    "close": "Close"
+    "close": "Close",
+    "loading": "Opening the file…",
+    "error": "The file could not be opened"
   },
   "dialog": {
     "cancel": "Cancel"
@@ -606,7 +644,6 @@
     "label": "Language"
   },
   "nav": {
-    "label": "Sections",
     "collapse": "Collapse sidebar",
     "expand": "Expand sidebar",
     "recent": "Recent scans",
@@ -614,7 +651,7 @@
     "recentScans": "Scan management",
     "recentEmpty": "No recent scans yet",
     "recentDelete": "Delete this scan",
-    "sectionsHint": "Run a scan to see result sections here.",
+    "sectionsHint": "Open a scan to see its sections here.",
     "group": {
       "inventory": "Inventory",
       "ai": "AI",
@@ -642,7 +679,13 @@
     "helpVersionUnknown": "Version not stamped in this build",
     "conformanceSplitTitle": "Mandatory checks passed, out of the mandatory checks measured",
     "lookupTitle": "External vulnerability lookup",
-    "helpReport": "Report a problem"
+    "helpReport": "Report a problem",
+    "depsSaid": "{{direct}} direct, {{transitive}} transitive",
+    "confSaid": "{{passed}} of {{total}} mandatory checks passed",
+    "opensNewTab": "opens in a new tab",
+    "pathLabel": "Location",
+    "mainLabel": "Main",
+    "recentAll": "View all scans"
   },
   "shortcuts": {
     "title": "Keyboard shortcuts",
@@ -650,16 +693,18 @@
     "searchMove": "Move through search results",
     "searchOpen": "Open the highlighted result",
     "close": "Close a menu or dialog",
-    "list": "Show this list",
-    "done": "Done"
+    "list": "Show this list"
   },
   "shell": {
     "newScan": "New scan",
-    "demoGetTool": "Get BomLens",
     "demoBannerTitle": "Read-only demo",
-    "demoBannerBody": "These are real results from a real scan, frozen so you can look around. Scanning, uploading and deleting are turned off here. Run BomLens on your own code to produce your own.",
+    "demoBannerBody": "Results of a real scan, read-only. You can open the New scan form to see the inputs, but running a scan, uploading and deleting are turned off.",
     "demoBannerCta": "How to run it",
-    "skipToMain": "Skip to main content"
+    "skipToMain": "Skip to main content",
+    "openingScan": "Opening the scan…",
+    "pageTitle": "{{page}} · {{app}}",
+    "scanPageTitle": "{{section}} · {{scan}} · {{app}}",
+    "scanRunning": "Scan in progress"
   },
   "search": {
     "placeholder": "Search components, CVEs…",
@@ -667,7 +712,10 @@
     "components": "Components",
     "vulnerabilities": "Vulnerabilities",
     "lookupGroup": "External lookup",
-    "lookupExternal": "Look up \"{{term}}\" on OSV.dev"
+    "lookupExternal": "Look up \"{{term}}\" on OSV.dev",
+    "clear": "Clear search",
+    "showAllComponents": "View all components ({{count}})",
+    "showAllVulns": "View all vulnerabilities ({{count}})"
   },
   "lookup": {
     "title": "External vulnerability lookup",
@@ -706,7 +754,16 @@
       "rubygems": "RubyGems",
       "packagist": "Packagist",
       "nuget": "NuGet"
-    }
+    },
+    "formats": "Accepted: CVE, GHSA, GO, PYSEC, RUSTSEC, OSV, GSD and MAL ids, a purl (npm, PyPI, Maven, Go, crates.io, RubyGems, Packagist, NuGet), name@version, or a name with the ecosystem and version picked.",
+    "results": "Results",
+    "disabledTitle": "External lookup is turned off on this server",
+    "disabledBody": "The administrator turned off lookups that leave this machine. Scans still check vulnerabilities against the local database.",
+    "goHome": "Back to scan management",
+    "captionEmpty": "Enter an id, a purl or a package name to turn on Look up.",
+    "captionPackage": "Pick an ecosystem and enter a version to turn on Look up.",
+    "emptyTitle": "Look up an advisory or a package",
+    "emptyHint": "Select an example to fill the field, then look it up."
   },
   "newscan": {
     "title": "What do you want to scan?",
@@ -724,7 +781,15 @@
     "catArtifact": "Build artifact",
     "catSbom": "SBOM",
     "catAiModel": "AI model",
-    "startQuestions": "Start the questions"
+    "startQuestions": "Start the questions",
+    "more": "More",
+    "less": "Less",
+    "rescanSeeded": "Settings from {{project}} {{version}} are filled in",
+    "rescanSeededBody": "Files, tokens and passwords are not carried over. Add them again if this input needs them.",
+    "aboutOption": "About {{name}}",
+    "lockAnalyze": "Notice and security report are always on when you analyze an SBOM.",
+    "lockDeepCve": "The security report is on because deep CVE matching is on.",
+    "lockReachability": "The security report is on because Go reachability analysis is on."
   },
   "run": {
     "stageGenerate": "Generate SBOM",
@@ -740,11 +805,40 @@
     "declarationRefusedFix": "Fix the declaration file and scan again. To scan without it, turn off \"Read sbom-declared.cdx.json\" under Result quality.",
     "declarationRefusedView": "View the refused SBOM",
     "declarationRefusedDownload": "Download",
-    "errorGitNotFoundOrPrivate": "The repository could not be found, or it's private. Check the URL, or add a token if it's private.",
-    "errorGitNetwork": "The repository host could not be reached. Check the network connection and try again.",
-    "showDetail": "Show detail",
     "retry": "Retry",
-    "cancel": "Cancel"
+    "cancel": "Cancel",
+    "runSteps": "Steps",
+    "stepDone": "done",
+    "stepActive": "in progress",
+    "stepPending": "waiting",
+    "stepsLabel": "Scan steps",
+    "logLines_one": "{{count}} line",
+    "logLines_other": "{{count}} lines",
+    "logFollow": "The log follows new lines while you are at its end. Scroll up to read; it stops following.",
+    "serverMessage": "Message from the scanner (as received)",
+    "noRetryOneShot": "Retry is not offered: an uploaded file or a token can be used for one scan only. Start a new scan and add it again.",
+    "cancelTitle": "Cancel this scan?",
+    "cancelBody": "{{name}} is still running. Cancelling stops it, and nothing it found so far is kept.",
+    "cancelConfirm": "Cancel scan",
+    "cancelKeep": "Keep scanning",
+    "cancelled": "The scan was cancelled",
+    "failGitPrivateCause": "The repository was not found, or it is private.",
+    "failGitPrivateFix": "Check the URL. If the repository is private, enter a token in the \"Token (private repo, optional)\" field and scan again.",
+    "failGitNetworkCause": "The repository host could not be reached.",
+    "failGitNetworkFix": "Check the network connection or proxy settings of this machine, then retry.",
+    "fail126Cause": "The scan tool ({{tool}}) could not be started (exit code 126).",
+    "fail126Fix": "The scanner image cannot run {{runtime}} on this machine, often because the image was built for another processor. Pull the image again for this machine, or scan with Docker Desktop, then retry.",
+    "failInternalCause": "The scan stopped on an internal error while processing the SBOM.",
+    "failInternalFix": "Retry once. If it fails again, open Report a problem below and send the summary.",
+    "failGenericCause": "The scan stopped before it finished.",
+    "failGenericFix": "Open the run log for the cause, then retry or start a new scan.",
+    "failToolUnknown": "the scanner",
+    "failRuntimeUnknown": "its runtime",
+    "stepFailed": "failed",
+    "cancelBodyNoName": "This scan is still running. Cancelling stops it, and nothing it found so far is kept.",
+    "logRunning": "Running",
+    "logDone": "Finished",
+    "logFailed": "Failed"
   },
   "overview": {
     "needsAttention": "Needs attention",
@@ -765,9 +859,6 @@
     "vsPrevious": "vs {{label}}",
     "compDelta": "{{delta}} components",
     "compSame": "no component change",
-    "sevUp": "more severe than before",
-    "sevDown": "less severe than before",
-    "sevSame": "severity unchanged",
     "sevTrendLabel": "Worst severity",
     "compChangeLabel": "Components changed",
     "compChangeSummary": "{{added}} new · {{removed}} removed · {{changed}} updated",
@@ -801,7 +892,62 @@
       "sourceConformance": "Source: this scan's conformance check",
       "asOf": "as of scan time {{time}}"
     },
-    "summaryLabel": "Scan summary"
+    "summaryLabel": "Scan summary",
+    "attnEol_one": "{{count}} component past end of life",
+    "attnEol_other": "{{count}} components past end of life",
+    "attnOutdated_one": "{{count}} outdated component",
+    "attnOutdated_other": "{{count}} outdated components",
+    "noticeMissingTitle": "This SBOM may be missing information",
+    "noticeNotesTitle": "Notes for reading these results",
+    "details": "Details",
+    "prevScanLink": "Opens in {{scan}}",
+    "notice": {
+      "pipeline": {
+        "title": "Some enrichment data may be missing",
+        "short": "Steps that fill fields such as end-of-life dates did not finish."
+      },
+      "warnings": {
+        "title": "Parts the scan warned about may be incomplete",
+        "short": "Check the warnings before you rely on the counts."
+      },
+      "vendored": {
+        "title": "C/C++ source copied into the project may be missing",
+        "short": "Code copied into C/C++ sources is not seen by a normal scan."
+      },
+      "degraded": {
+        "title": "Transitive dependencies were not resolved",
+        "short": "The SBOM holds direct dependencies only."
+      },
+      "graph": {
+        "title": "Dependency relationships are missing",
+        "short": "Dependency relationships were lost after the scan."
+      },
+      "scanossUnavailable": {
+        "title": "Open source copied into the source may be missing",
+        "short": "The search for copied-in open source did not complete."
+      },
+      "scanossNoMatch": {
+        "title": "No open source copied into the source was found",
+        "short": "No copied-in open source was found."
+      },
+      "unpinned": {
+        "title": "Versions may differ from what you installed",
+        "short": "Versions are what a fresh install would get today."
+      },
+      "firmware": {
+        "title": "Part of the image is not in the counts",
+        "short": "Part of the image could not be opened, so counts cover the opened part."
+      },
+      "zero": {
+        "title": "No component was found",
+        "short": "Nothing was found to read."
+      }
+    },
+    "noticeCount_one": "{{count}} notice",
+    "noticeCount_other": "{{count}} notices",
+    "sevValueUp": "Higher",
+    "sevValueDown": "Lower",
+    "sevValueSame": "No change"
   },
   "pipelineSteps": {
     "enrichAibom": "AI model metadata enrichment",
@@ -980,6 +1126,21 @@
       "datasetsNamed": "Datasets: {{count}} referenced, worst grade {{verdict}} ({{names}})",
       "viaSources": "{{name}} (via its sources)",
       "trainingUndisclosed": "Training data undisclosed: the terms of the data this model learned from were not declared"
+    },
+    "noVerdict": "No verdict",
+    "dsLicenseNotStated": "Not stated",
+    "refType": {
+      "website": "Website",
+      "distribution": "Download",
+      "vcs": "Source repository",
+      "documentation": "Documentation",
+      "issue-tracker": "Issue tracker",
+      "support": "Support",
+      "license": "License",
+      "advisories": "Advisories",
+      "release-notes": "Release notes",
+      "model-card": "Model card",
+      "other": "Other"
     }
   },
   "aiSummary": {
@@ -1009,7 +1170,7 @@
   },
   "g7": {
     "empty": "No conformance checks were recorded.",
-    "panelIntro": "Checks how well this SBOM's fields meet the CycloneDX format and SBOM-related regulatory requirements. The regulatory crosswalk is for reference and makes no compliance determination.",
+    "panelIntro": "Checks this SBOM's fields against the CycloneDX format and SBOM regulatory requirements. For reference; it makes no compliance determination.",
     "subtitle": "G7 minimum elements for AI",
     "present": "{{present}}/{{total}} present",
     "advisory": "{{count}} advisory",
@@ -1030,7 +1191,6 @@
       "not-open-source": "not open source",
       "version-unknown": "version unknown"
     },
-    "example": "Example:",
     "learnMore": "Learn more",
     "cluster": {
       "metadata": "Metadata",
@@ -1366,7 +1526,24 @@
     "gap": "Gap",
     "advisory": "Advisory",
     "review": "Review needed",
-    "failed": "Failed"
+    "failed": "Failed",
+    "fw": {
+      "eu-ai-act": {
+        "title": "EU AI Act: Annex IV technical documentation",
+        "source": "Regulation (EU) 2024/1689, Article 11(1) and Annex IV"
+      },
+      "kr-ai-framework-act": {
+        "title": "AI Framework Act (Korea)"
+      },
+      "bsi-tr-03183-2": {
+        "title": "BSI TR-03183-2: SBOM data fields (EU CRA)",
+        "source": "Regulation (EU) 2024/2847 Annex I Part II(1); BSI TR-03183-2 v2.1.0 (2025-08-20)"
+      },
+      "us-sbom-minimum-elements": {
+        "title": "US SBOM minimum elements",
+        "source": "\"2026 Minimum Elements for a Software Bill of Materials (SBOM)\" v2.1 (2026-07-29), authored by CISA, NSA and FBI with fifteen international partners including Germany's BSI, Japan's METI and Korea's KISA"
+      }
+    }
   },
   "licenses": {
     "empty": "No licenses were detected.",
@@ -1448,7 +1625,23 @@
       "unparsedDeclared": "The declared license could not be parsed as an SPDX expression.",
       "unparsedLicense": "The license \"{{license}}\" could not be parsed as an SPDX expression.",
       "exception": "The dependency carries an exception clause, which exists to permit exactly this combination. Confirm the exception covers your use. ({{inner}})"
-    }
+    },
+    "sortLabel": "Sort by",
+    "sortCount": "By count",
+    "sortName": "By name",
+    "badTierTitle": "This link names a license class that does not exist",
+    "badTierBody": "The class \"{{tier}}\" is not one of the six. All licenses are shown; pick a class above to filter.",
+    "unlicensedInert": "Components without a license cannot be filtered by license in Components.",
+    "conflictOffNoField": "This scan read a document someone else produced (or an AI model), so there is no outbound license of yours to compare against. The check runs on scans of your own source.",
+    "tierFiltered_one": "Showing {{tier}} only: {{count}} component.",
+    "tierFiltered_other": "Showing {{tier}} only: {{count}} components.",
+    "tierEmpty": "This scan has no licenses in the {{tier}} class.",
+    "whyUntranslated": "No translation of this reason is available. The original text is in the tooltip.",
+    "conflictShowAll": "Show all {{count}}",
+    "conflictShowLess": "Show fewer",
+    "distributionCount_one": "{{count}} license",
+    "distributionCount_other": "{{count}} licenses",
+    "conflictTableLabel": "{{verdict}}: {{reason}}"
   },
   "recent": {
     "title": "Scan management",
@@ -1469,9 +1662,10 @@
     "sevDown": "Better than the previous scan",
     "delete": "Delete",
     "deleted": "Scan deleted",
+    "deleteFailed": "The scan could not be deleted. Try again.",
     "scanNotFound": "Scan “{{id}}” was not found. It may have been deleted.",
     "confirmDeleteTitle": "Delete this scan?",
-    "confirmDeleteBody": "The output files for {{scan}} are removed from this machine. Nothing is kept elsewhere, so this cannot be undone.",
+    "confirmDeleteBody": "The output files for <b>{{scan}}</b> are removed from this machine. Nothing is kept elsewhere, so this cannot be undone.",
     "typeAi": "AI model",
     "typeSbom": "SBOM",
     "typeSource": "Source",
@@ -1491,7 +1685,11 @@
     "rowMeta_one": "{{count}} component, {{date}}",
     "rowMeta_other": "{{count}} components, {{date}}",
     "refused": "Declaration refused",
-    "refusedHint": "The scan stopped because its declaration file was refused, so it has no SBOM. Open it for the reasons and the refused SBOM."
+    "refusedHint": "The scan stopped because its declaration file was refused, so it has no SBOM. Open it for the reasons and the refused SBOM.",
+    "moreActions": "More actions for {{name}}",
+    "colActions": "Actions",
+    "searchChip": "“{{query}}”",
+    "noMatchHint": "Try a different search or type."
   },
   "validation": {
     "required": "Fill in the required fields marked above.",
@@ -1503,7 +1701,9 @@
     "uploadToken": "Enter the upload API token.",
     "gitRef": "Use a branch, tag or commit id: letters, digits and . _ / @ + - only, without \"..\".",
     "exclude": "Use a relative path with no .. , no wildcard and no backslash, one per line.",
-    "truscaProjectId": "Enter the TRUSCA project id."
+    "truscaProjectId": "Enter the TRUSCA project id.",
+    "requiredList": "Fill in the required fields: {{fields}}",
+    "formatList": "Check the format of: {{fields}}"
   },
   "provenance": {
     "folder": "Scanned folder",
@@ -1544,7 +1744,8 @@
       "pass": "Met",
       "actionable": "Can be fixed",
       "review": "Needs a person",
-      "na": "Not applicable"
+      "na": "Not applicable",
+      "all": "All"
     },
     "searchPlaceholder": "Search requirements and references",
     "showingAll": "Showing all {{count}} checks.",
@@ -1558,8 +1759,14 @@
     "qualityEmptyBodySupplied": "A pass here only means no required item could be measured. It does not mean the software is listed. Ask the supplier for an SBOM that lists the software components.",
     "qualityLicenseTitle": "No component declares a license",
     "qualityLicenseBody": "Software components with a declared license: {{declared}}/{{total}} ({{pct}}%). Attribution notices built from this SBOM will be nearly empty. Some ecosystems do not record licenses in their dependency files. A per-file license scan can fill part of the gap.",
-    "qualityLicenseFigure": "Declared licenses: {{pct}}% ({{declared}}/{{total}} software components; NOASSERTION and NONE are not counted)",
-    "hiddenByFilter": "{{count}} more match this search under another filter."
+    "hiddenByFilter": "{{count}} more match this search under another filter.",
+    "exampleShow": "Show example",
+    "searchAllKinds": "Search all kinds",
+    "kinds": "Check kind",
+    "notices_one": "{{count}} thing to check before you rely on this result",
+    "notices_other": "{{count}} things to check before you rely on this result",
+    "unit_one": "component",
+    "unit_other": "components"
   },
   "report": {
     "open": "Report a problem",
@@ -2234,6 +2441,21 @@
       }
     },
     "organizationPlaceholder": "Organization name",
-    "autonomyInService": "Whether a person is involved in the AI's decisions was answered in the service step."
+    "autonomyInService": "Whether a person is involved in the AI's decisions was answered in the service step.",
+    "stepNotOpened": "Not opened yet",
+    "draftKept": "Your earlier answers were kept. Pick up where you left off.",
+    "discard": {
+      "title": "Discard your answers?",
+      "body": "The answers you gave in these questions are kept nowhere else. Cancelling discards them.",
+      "confirm": "Discard answers",
+      "keep": "Keep answering"
+    },
+    "notAnswered": "Not answered",
+    "decisionsLeft_one": "{{count}} decision not answered",
+    "decisionsLeft_other": "{{count}} decisions not answered"
+  },
+  "filters": {
+    "active": "Active filters",
+    "remove": "Remove filter: {{label}}"
   }
 }

@@ -38,10 +38,3 @@ export const SELECTED_TILE = "border-foreground bg-muted font-medium text-foregr
  *  foreground border every selected control carries. */
 export const SELECTED_SOLID =
   "border-foreground bg-selected text-selected-foreground hover:bg-selected/90 hover:text-selected-foreground";
-
-/** Selected pill that wraps a coloured badge: the border darkens, nothing else
- *  moves, so the badge keeps its own colours and contrast. */
-export const SELECTED_OUTLINE = "border-foreground";
-
-/** Resting border for a pill that is pressable but not selected. */
-export const UNSELECTED_OUTLINE = "border-border";

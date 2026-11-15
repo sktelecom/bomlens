@@ -66,6 +66,9 @@
 }
 
 [data-color-mode="dark"][data-light-theme][data-dark-theme] {
+  /* Primer's dark overlay colour is darker than the page and its boxes,
+   * so a menu read as a hole. Overlays take the muted layer instead. */
+  --overlay-bgColor: var(--bgColor-muted);
   --selection-bgColor: hsl(var(--brand) / 0.7);
   /* Primer's dark outline button rests on a near-white fill, so its label is
    * the dark navy at rest and the lighter blue on the dark hover fill. */
@@ -91,4 +94,1172 @@
 :root [class*="FilteredActionList-ActionListItem"][data-input-focused][data-first-child]::after,
 :root [class*="TreeView-TreeViewItem"][aria-current="true"] > [class*="TreeView-TreeViewItemContainer"]::after {
   display: none;
+}
+
+/* ---------------------------------------------------------------------------
+ * App frame (components/AppShell.tsx, TopBar.tsx, Sidebar.tsx). The page
+ * itself scrolls: the top bar sticks at the top (56px, so content that sticks
+ * below it uses top: 56px) and the left navigation sticks under it.
+ * ------------------------------------------------------------------------- */
+
+.bl-shell {
+  min-height: 100vh;
+  background: var(--bgColor-default);
+  color: var(--fgColor-default);
+  font-family: var(--fontStack-sansSerif);
+}
+
+.bl-skip {
+  position: absolute;
+  left: -9999px;
+  top: var(--base-size-8);
+  z-index: 50;
+}
+.bl-skip:focus {
+  left: var(--base-size-8);
+  padding: var(--base-size-8) var(--base-size-12);
+  background: var(--bgColor-default);
+  color: var(--fgColor-default);
+  border: var(--borderWidth-thin) solid var(--borderColor-default);
+  border-radius: var(--borderRadius-medium);
+  outline: 2px solid var(--focus-outlineColor);
+  outline-offset: 2px;
+}
+
+.bl-topbar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: var(--base-size-8);
+  height: 56px;
+  padding: 0 var(--base-size-16);
+  background: var(--bgColor-default);
+  border-bottom: var(--borderWidth-thin) solid var(--borderColor-default);
+  font-size: var(--text-body-size-medium);
+}
+.bl-topbar-home {
+  display: inline-flex;
+  flex: none;
+  border-radius: var(--borderRadius-medium);
+}
+.bl-topbar-home:focus-visible {
+  outline: 2px solid var(--focus-outlineColor);
+  outline-offset: 2px;
+}
+/* public/logo.svg (light) and logo-dark.svg are 169x48 viewBoxes with the
+ * wordmark outlined, so the box needs no crop. The dark file is shown under
+ * `.dark`, the light one otherwise. */
+.bl-topbar-logo {
+  --bl-logo-height: 28px;
+  display: block;
+  flex: none;
+  height: var(--bl-logo-height);
+  width: calc(var(--bl-logo-height) * 169 / 48);
+  max-width: none;
+}
+.bl-topbar-logo.bl-logo-dark {
+  display: none;
+}
+.dark .bl-topbar-logo.bl-logo-light {
+  display: none;
+}
+.dark .bl-topbar-logo.bl-logo-dark {
+  display: block;
+}
+.bl-path {
+  display: flex;
+  align-items: baseline;
+  gap: var(--base-size-8);
+  min-width: 0;
+  flex: 0 1 auto;
+}
+.bl-path-sep {
+  flex: none;
+  color: var(--fgColor-muted);
+}
+.bl-path-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+  color: var(--fgColor-default);
+}
+:root a.bl-path-name {
+  color: var(--fgColor-default);
+  text-decoration: none;
+}
+:root a.bl-path-name:hover {
+  text-decoration: underline;
+}
+.bl-path-version {
+  font-weight: 400;
+  color: var(--fgColor-muted);
+}
+.bl-topbar-spacer {
+  flex: 1 1 0;
+  min-width: 0;
+}
+/* The current screen's icon button (External lookup in the top bar, the open
+ * page in the collapsed navigation) is marked with the selected fill; every
+ * icon button rests invisible. */
+:root .bl-pane-icons [aria-current="page"],
+:root .bl-topbar-actions [aria-current="page"] {
+  background-color: var(--control-transparent-bgColor-selected);
+}
+.bl-topbar-actions {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--base-size-8);
+}
+
+.bl-kbd {
+  font-family: var(--fontStack-monospace);
+  font-size: var(--text-caption-size);
+  line-height: var(--text-caption-lineHeight);
+  padding: 0 5px;
+  color: var(--fgColor-muted);
+  background: var(--bgColor-muted);
+  border: var(--borderWidth-thin) solid var(--borderColor-default);
+  border-bottom-width: 2px;
+  border-radius: var(--borderRadius-small);
+}
+
+/* Global search: the combobox in the top bar and its result list. */
+.bl-search {
+  position: relative;
+  flex: none;
+}
+.bl-searchpop {
+  position: absolute;
+  top: calc(100% + var(--base-size-4));
+  right: 0;
+  z-index: 30;
+  width: min(560px, 100vw - 32px);
+  max-height: 560px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding: var(--base-size-8) 0;
+  background: var(--overlay-bgColor);
+  border: var(--borderWidth-thin) solid var(--borderColor-default);
+  border-radius: var(--borderRadius-large);
+  box-shadow: var(--shadow-floating-small);
+}
+.bl-searchpop-group {
+  padding: var(--base-size-4) var(--base-size-16) 2px;
+  font-size: var(--text-body-size-small);
+  font-weight: 600;
+  color: var(--fgColor-muted);
+}
+.bl-searchpop-empty {
+  padding: var(--base-size-8) var(--base-size-16);
+  color: var(--fgColor-muted);
+}
+.bl-searchpop [role="option"] {
+  display: flex;
+  align-items: center;
+  gap: var(--base-size-8);
+  padding: 6px var(--base-size-16);
+  cursor: pointer;
+  color: var(--fgColor-default);
+}
+.bl-searchpop [role="option"] > svg {
+  flex: none;
+  color: var(--fgColor-muted);
+}
+.bl-searchpop [role="option"][aria-selected="true"],
+.bl-searchpop [role="option"]:hover {
+  background: var(--bgColor-neutral-muted);
+}
+.bl-searchpop-text {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* "group / name": the name is one cell that may shrink to an ellipsis, the
+ * group gives way first (it keeps its start), the separator never shrinks.
+ * The full value is the option's text, so assistive technology reads it whole,
+ * and the tooltip. */
+.bl-searchpop-coord {
+  display: inline-flex;
+  min-width: 0;
+  flex: 0 1 auto;
+}
+.bl-searchpop-coord-group {
+  flex: 0 10 auto;
+  min-width: 3ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--fgColor-muted);
+}
+.bl-searchpop-coord-sep {
+  flex: none;
+  white-space: pre;
+  color: var(--fgColor-muted);
+}
+.bl-searchpop-coord-name {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* The coordinate on a vulnerability row takes what the id leaves. */
+.bl-searchpop-aside.bl-searchpop-coordwrap {
+  display: inline-flex;
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: none;
+  overflow: hidden;
+}
+/* Identifiers that are never shortened: the severity label and the CVE id. */
+.bl-searchpop-id {
+  flex: none;
+  white-space: nowrap;
+}
+.bl-searchpop [role="option"].bl-searchpop-all {
+  color: var(--fgColor-accent);
+}
+.bl-searchpop-mono {
+  font-family: var(--fontStack-monospace);
+  font-size: var(--text-body-size-small);
+}
+.bl-searchpop-aside {
+  flex: none;
+  margin-left: auto;
+  white-space: nowrap;
+  font-size: var(--text-body-size-small);
+  color: var(--fgColor-muted);
+}
+
+/* The demo notice at the top of main: room on both sides of its button and
+ * space before the screen heading. */
+:root .bl-demo-banner {
+  padding: var(--base-size-8) var(--base-size-16);
+  margin-bottom: var(--base-size-16);
+}
+
+.bl-body {
+  display: flex;
+  align-items: flex-start;
+}
+
+/* Left navigation, under the top bar on every screen. */
+.bl-pane {
+  position: sticky;
+  top: 56px;
+  flex: none;
+  width: 256px;
+  height: calc(100vh - 56px);
+  overflow-y: auto;
+  padding: var(--base-size-8) var(--base-size-8) var(--base-size-24);
+  border-right: var(--borderWidth-thin) solid var(--borderColor-default);
+}
+.bl-pane[data-collapsed="true"] {
+  width: 56px;
+  padding-inline: var(--base-size-8);
+}
+.bl-pane-toggle {
+  display: flex;
+  justify-content: flex-end;
+  padding: 0 var(--base-size-8) var(--base-size-4);
+}
+.bl-pane[data-collapsed="true"] .bl-pane-toggle {
+  justify-content: center;
+  padding-inline: 0;
+}
+.bl-pane-icons {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--base-size-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.bl-pane-icons-rule {
+  width: 24px;
+  height: 0;
+  margin: var(--base-size-4) 0;
+  border-top: var(--borderWidth-thin) solid var(--borderColor-muted);
+}
+.bl-pane-hint {
+  padding: var(--base-size-8) var(--base-size-16);
+  font-size: var(--text-body-size-small);
+  color: var(--fgColor-muted);
+}
+.bl-count {
+  font-variant-numeric: tabular-nums;
+  font-size: var(--text-body-size-small);
+  color: var(--fgColor-muted);
+}
+
+.bl-main {
+  position: relative;
+  flex: 1 1 0;
+  min-width: 0;
+  padding: var(--base-size-24) var(--base-size-24) var(--base-size-48);
+}
+.bl-main:focus,
+.bl-main h1:focus {
+  outline: none;
+}
+/* A section title focused after a section change clears the sticky top bar. */
+.bl-result-title {
+  scroll-margin-top: 72px;
+}
+
+.bl-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+/* Recent menu entry: the project name shortens, the version stays whole. */
+.bl-recent-name {
+  display: flex;
+  align-items: baseline;
+  gap: var(--base-size-4);
+  min-width: 0;
+}
+.bl-recent-project {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.bl-recent-version {
+  flex: none;
+  white-space: nowrap;
+  color: var(--fgColor-muted);
+}
+
+/* Primer's overlays (menus, dialogs, tooltips) render in a portal at the end
+ * of <body> with an inline z-index of 1, under the sticky top bar (20) and
+ * the sticky table heads (10). Lift the portal above both. */
+#__primerPortalRoot__,
+body > [data-component="Portal"] {
+  z-index: 40 !important;
+}
+
+/* ---------------------------------------------------------------------------
+ * New scan (components/NewScan.tsx, ScanFormFields.tsx, FileDropzone.tsx,
+ * SiblingImagePanel.tsx). Rows of source tiles, the input box, three settings
+ * boxes and a one-line action bar that sticks to the bottom of the window.
+ * Colours, spacing and radii are Primer variables; nothing is typed in here.
+ * ------------------------------------------------------------------------- */
+
+.bl-muted { color: var(--fgColor-muted); }
+.bl-danger { color: var(--fgColor-danger); }
+.bl-success { display: inline-flex; color: var(--fgColor-success); }
+.bl-strong { font-weight: 600; }
+.bl-small { font-size: var(--text-body-size-small); }
+.bl-num { font-variant-numeric: tabular-nums; }
+.bl-mono { font-family: var(--fontStack-monospace); font-size: var(--text-body-size-small); }
+.bl-breakall { overflow-wrap: anywhere; }
+.bl-flat { margin: 0; }
+.bl-inline { display: inline-flex; align-items: center; gap: var(--base-size-8); }
+.bl-wrap { flex-wrap: wrap; }
+.bl-stack { display: flex; flex-direction: column; gap: var(--base-size-16); }
+.bl-stack-8 { display: flex; flex-direction: column; gap: var(--base-size-8); }
+
+.bl-box {
+  border: var(--borderWidth-thin) solid var(--borderColor-default);
+  border-radius: var(--borderRadius-medium);
+  background: var(--bgColor-default);
+}
+.bl-box-head {
+  display: flex;
+  align-items: center;
+  gap: var(--base-size-8);
+  padding: var(--base-size-12) var(--base-size-16);
+  background: var(--bgColor-muted);
+  border-bottom: var(--borderWidth-thin) solid var(--borderColor-default);
+  border-radius: var(--borderRadius-medium) var(--borderRadius-medium) 0 0;
+  font-size: var(--text-body-size-medium);
+}
+.bl-box-head h2 { margin: 0; font-size: var(--text-body-size-medium); font-weight: 600; }
+.bl-box-body { padding: var(--base-size-16); font-size: var(--text-body-size-medium); }
+.bl-inset {
+  padding: var(--base-size-8) var(--base-size-12);
+  background: var(--bgColor-muted);
+  border: var(--borderWidth-thin) solid var(--borderColor-muted);
+  border-radius: var(--borderRadius-medium);
+}
+.bl-sibling-ready { display: flex; align-items: center; gap: var(--base-size-8); }
+.bl-currentdir-path { margin-bottom: var(--base-size-4); }
+.bl-fieldlabel {
+  display: block;
+  margin-bottom: var(--base-size-8);
+  font-size: var(--text-body-size-medium);
+  font-weight: 600;
+}
+.bl-fielderror { margin: var(--base-size-4) 0 0; }
+.bl-filehint { margin: var(--base-size-8) 0 0; }
+
+.bl-ns {
+  display: flex;
+  flex-direction: column;
+  gap: var(--base-size-16);
+  margin-top: var(--base-size-16);
+  padding-bottom: var(--base-size-16);
+}
+.bl-ns-banner { margin-top: var(--base-size-16); }
+/* A field that gets focus (a failed submit, the licence prompt) must not end up
+ * behind the action bar. */
+html:has(.bl-actionbar) { scroll-padding-bottom: calc(var(--base-size-128) + var(--base-size-16)); }
+
+/* Tiles: a label on the left, the tiles on the right, four columns. Where the
+ * container is under 640px the label goes above and the tiles take two columns.
+ * A tile name wraps to a second line rather than being cut. */
+.bl-ns-groups { container-type: inline-size; display: flex; flex-direction: column; gap: var(--base-size-8); }
+.bl-ns-row {
+  display: grid;
+  grid-template-columns: 8.5rem minmax(0, 1fr);
+  align-items: center;
+  gap: 0 var(--base-size-12);
+}
+.bl-grouplabel {
+  margin: 0 0 var(--base-size-8);
+  font-size: var(--text-body-size-small);
+  font-weight: 600;
+  color: var(--fgColor-muted);
+}
+.bl-ns-row > .bl-grouplabel { margin: 0; grid-column: 1; }
+.bl-ns-tiles {
+  grid-column: 2;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--base-size-8);
+}
+.bl-ns-row > .bl-lockreason { grid-column: 2; margin: var(--base-size-4) 0 0; }
+.bl-tile {
+  all: unset;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: var(--base-size-8);
+  min-height: 40px;
+  padding: var(--base-size-6) var(--base-size-12);
+  border: var(--borderWidth-thin) solid var(--borderColor-default);
+  border-radius: var(--borderRadius-medium);
+  background: var(--bgColor-default);
+  color: var(--fgColor-default);
+  font-size: var(--text-body-size-medium);
+  cursor: pointer;
+}
+.bl-tile:hover { background: var(--bgColor-muted); }
+.bl-tile[aria-checked="true"] {
+  border-color: var(--borderColor-accent-emphasis);
+  background: var(--bgColor-accent-muted);
+  font-weight: 600;
+}
+.bl-tile[aria-checked="true"] svg { color: var(--fgColor-accent); }
+.bl-tile-locked { border-style: dashed; color: var(--fgColor-muted); cursor: not-allowed; }
+.bl-tile:disabled { opacity: 0.5; cursor: not-allowed; }
+.bl-tile:focus-visible { outline: 2px solid var(--focus-outlineColor); outline-offset: 1px; }
+.bl-tile-label { flex: 1; min-width: 0; overflow-wrap: anywhere; line-height: 1.25; }
+@container (max-width: 640px) {
+  .bl-ns-row { grid-template-columns: minmax(0, 1fr); gap: var(--base-size-4) 0; }
+  .bl-ns-row > .bl-grouplabel,
+  .bl-ns-row > .bl-ns-tiles,
+  .bl-ns-row > .bl-lockreason { grid-column: 1; }
+  .bl-ns-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+/* The settings: three boxes, the first two fold. */
+.bl-setgroup > summary.bl-setsum {
+  display: flex;
+  align-items: center;
+  gap: var(--base-size-8);
+  padding: var(--base-size-12) var(--base-size-16);
+  list-style: none;
+  cursor: pointer;
+  font-size: var(--text-body-size-medium);
+}
+.bl-setsum::-webkit-details-marker { display: none; }
+.bl-setsum:hover { background: var(--bgColor-muted); }
+.bl-setsum:focus-visible { outline: 2px solid var(--focus-outlineColor); outline-offset: -2px; }
+.bl-setgroup[open] > summary.bl-setsum { border-bottom: var(--borderWidth-thin) solid var(--borderColor-default); }
+.bl-chev { display: inline-flex; flex-shrink: 0; color: var(--fgColor-muted); transition: transform 0.1s; }
+.bl-setgroup[open] > summary .bl-chev { transform: rotate(90deg); }
+.bl-setcount { margin-left: auto; }
+.bl-setbody { padding: var(--base-size-16); font-size: var(--text-body-size-medium); }
+.bl-setrow {
+  display: flex;
+  flex-direction: column;
+  gap: var(--base-size-12);
+  padding: var(--base-size-12) var(--base-size-16);
+  font-size: var(--text-body-size-medium);
+}
+.bl-optgrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--base-size-16) var(--base-size-32);
+  align-items: start;
+}
+.bl-optgrid > .bl-span2, .bl-span2 { grid-column: 1 / -1; }
+@media (max-width: 900px) { .bl-optgrid { grid-template-columns: minmax(0, 1fr); } }
+
+.bl-toggle {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--base-size-12);
+  font-size: var(--text-body-size-medium);
+}
+.bl-toggle-text { display: block; min-width: 0; }
+.bl-toggle-label { display: flex; flex-wrap: wrap; align-items: center; gap: var(--base-size-4) var(--base-size-8); }
+.bl-external { gap: var(--base-size-4); }
+
+/* A hint: two lines, with "More" at the end of the second line when there is
+ * more. The full text is always in the page. */
+.bl-hint { position: relative; display: block; font-size: var(--text-body-size-small); color: var(--fgColor-muted); }
+.bl-hint-text { display: block; }
+.bl-hint-text[data-clamped] {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.bl-hint-button { padding: 0; font-size: var(--text-body-size-small); color: var(--fgColor-accent); }
+.bl-hint[data-open] .bl-hint-button { margin-inline-start: var(--base-size-4); }
+.bl-hint:not([data-open]) .bl-hint-button {
+  position: absolute;
+  inset-inline-end: 0;
+  bottom: 0;
+  padding-inline-start: var(--base-size-16);
+  background: linear-gradient(to right, transparent, var(--bgColor-default) var(--base-size-12));
+}
+.bl-toggle-text { cursor: pointer; }
+.bl-required { color: inherit; }
+.bl-outlabel { cursor: pointer; }
+.bl-infobtn { padding: 0 var(--base-size-4); min-height: 0; height: var(--base-size-24); color: var(--fgColor-muted); }
+
+/* The action bar: sticks to the bottom of the window, one line. */
+.bl-actionwrap { position: sticky; bottom: 0; z-index: 2; display: flex; flex-direction: column; }
+.bl-actionnotes {
+  display: flex;
+  flex-direction: column;
+  gap: var(--base-size-4);
+  padding: var(--base-size-8) var(--base-size-16);
+  background: var(--bgColor-default);
+  border: var(--borderWidth-thin) solid var(--borderColor-default);
+  border-bottom: 0;
+  border-radius: var(--borderRadius-medium) var(--borderRadius-medium) 0 0;
+}
+.bl-actionbar {
+  background: var(--bgColor-default);
+  border: var(--borderWidth-thin) solid var(--borderColor-default);
+  border-radius: var(--borderRadius-medium);
+  padding: var(--base-size-6) var(--base-size-16);
+}
+.bl-actionnotes[hidden], .bl-actionnotes > [hidden] { display: none; }
+.bl-actionnotes + .bl-actionbar { border-radius: 0 0 var(--borderRadius-medium) var(--borderRadius-medium); }
+.bl-actionrow { display: flex; align-items: flex-end; gap: var(--base-size-16); }
+.bl-af-project { flex: 2 1 0; min-width: 0; }
+.bl-af-version { flex: 1 1 0; min-width: 0; }
+.bl-af-label { font-size: var(--text-body-size-small) !important; line-height: 16px; margin-bottom: var(--base-size-4); }
+.bl-af-outputs { display: flex; gap: var(--base-size-16); align-items: center; flex: none; min-height: 32px; }
+.bl-outswitch { display: flex; align-items: center; gap: var(--base-size-8); white-space: nowrap; }
+.bl-af-run { flex: none; display: flex; align-items: center; min-height: 32px; }
+.bl-af-run button { min-width: 8rem; }
+
+/* File chooser and drop target. */
+.bl-dz {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--base-size-8);
+  padding: var(--base-size-20) var(--base-size-16);
+  border: var(--borderWidth-thin) dashed var(--borderColor-default);
+  border-radius: var(--borderRadius-medium);
+  background: var(--bgColor-muted);
+  color: var(--fgColor-muted);
+  text-align: center;
+}
+.bl-dz-filled {
+  align-items: stretch;
+  padding: var(--base-size-8) var(--base-size-12);
+  border-style: solid;
+  background: var(--bgColor-default);
+  color: var(--fgColor-default);
+  text-align: start;
+}
+.bl-dz[data-over] { border-color: var(--borderColor-accent-emphasis); background: var(--bgColor-accent-muted); }
+/* The hidden file input is the dropzone's previous sibling. Plain :focus, not
+ * :focus-visible: a failed submit focuses it from script after a pointer press,
+ * where :focus-visible would stay off. */
+input.bl-visually-hidden:focus + .bl-dz { outline: 2px solid var(--focus-outlineColor); outline-offset: 1px; }
+.bl-dz-file { display: flex; align-items: center; gap: var(--base-size-8); width: 100%; }
+.bl-dz-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bl-dz-progress { width: 100%; margin-top: var(--base-size-8); }
+.bl-dz-progress p { margin: var(--base-size-4) 0 0; }
+.bl-dz-refused { margin: var(--base-size-4) 0 0; }
+
+/* Switch (components/primer/Switch.tsx): Primer's ToggleSwitch geometry and
+ * control variables, with the switch role. */
+.bl-switch {
+  appearance: none;
+  box-sizing: border-box;
+  position: relative;
+  display: block;
+  flex: none;
+  width: 48px;
+  height: 24px;
+  padding: 0;
+  overflow: hidden;
+  border: var(--borderWidth-thin) solid var(--controlTrack-borderColor-rest);
+  border-radius: var(--borderRadius-default);
+  background: var(--controlTrack-bgColor-rest);
+  cursor: pointer;
+  user-select: none;
+  transition: background-color 80ms, border-color 80ms;
+}
+.bl-switch:hover { background: var(--controlTrack-bgColor-hover); }
+.bl-switch:active { background: var(--controlTrack-bgColor-active); }
+.bl-switch[aria-checked="true"] {
+  background: var(--control-checked-bgColor-rest);
+  border-color: var(--control-checked-borderColor-rest);
+}
+.bl-switch[aria-checked="true"]:hover { background: var(--control-checked-bgColor-hover); }
+.bl-switch[aria-checked="true"]:active { background: var(--control-checked-bgColor-active); }
+.bl-switch:focus-visible { outline: 2px solid var(--focus-outlineColor); outline-offset: 3px; }
+.bl-switch:disabled { cursor: not-allowed; opacity: 0.5; }
+.bl-switch[aria-disabled="true"] { cursor: not-allowed; }
+.bl-switch-icons { display: flex; align-items: center; width: 100%; height: 100%; overflow: hidden; }
+.bl-switch-line, .bl-switch-circle {
+  flex: 1 0 50%;
+  line-height: 0;
+  transition: transform 80ms;
+}
+.bl-switch-line { color: var(--control-checked-fgColor-rest); transform: translateX(-100%); }
+.bl-switch-circle { color: var(--controlTrack-fgColor-rest); transform: translateX(0); }
+.bl-switch[aria-checked="true"] .bl-switch-line { transform: translateX(0); }
+.bl-switch[aria-checked="true"] .bl-switch-circle { transform: translateX(100%); }
+.bl-switch-knob {
+  position: absolute;
+  top: 1px;
+  bottom: 1px;
+  left: 1px;
+  z-index: 1;
+  width: 50%;
+  background: var(--controlKnob-bgColor-rest);
+  border: var(--borderWidth-thin) solid var(--controlKnob-borderColor-rest);
+  border-radius: calc(var(--borderRadius-default) - var(--borderWidth-thick));
+  transition: transform 80ms;
+}
+.bl-switch[aria-checked="true"] .bl-switch-knob {
+  border-color: var(--controlKnob-borderColor-checked);
+  transform: translateX(calc(100% - 2px));
+}
+@media (prefers-reduced-motion: reduce) {
+  .bl-switch, .bl-switch-line, .bl-switch-circle, .bl-switch-knob { transition: none; }
+}
+
+/* ---------------------------------------------------------------------------
+ * Scan management: filter bar, active filters, table, narrow rows.
+ * ------------------------------------------------------------------------- */
+.bl-filterbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--base-size-8);
+  margin: var(--base-size-16) 0 var(--base-size-8);
+}
+.bl-filterbar-search { width: 16.25rem; max-width: 100%; }
+.bl-grow { flex: 1 1 auto; }
+.bl-totals { display: inline-flex; align-items: center; flex-wrap: wrap; gap: var(--base-size-4) var(--base-size-8); font-size: var(--text-body-size-medium); }
+.bl-totals strong { color: var(--fgColor-default); font-weight: 600; }
+.bl-chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--base-size-8);
+  min-height: var(--base-size-24);
+  margin: 0 0 var(--base-size-8);
+  font-size: var(--text-body-size-small);
+}
+.bl-chips-count { margin-left: auto; }
+/* Nothing to show: the row takes no space (its live region stays for later). */
+.bl-chips[data-empty] { min-height: 0; margin: 0; }
+.bl-scanmgmt button.bl-toggle-on { background: var(--bgColor-accent-muted); border-color: var(--borderColor-accent-emphasis); }
+.bl-scanmgmt button.bl-toggle-on:hover { background: var(--bgColor-accent-muted); }
+.bl-lbl { display: inline-flex; align-items: center; gap: var(--base-size-4); white-space: nowrap; }
+.bl-lbl-wrap { display: inline-flex; align-items: center; flex-wrap: wrap; gap: var(--base-size-4) var(--base-size-8); }
+.bl-nowrap { white-space: nowrap; }
+.bl-trend { display: inline-flex; }
+.bl-trend-up { color: var(--fgColor-severe); }
+.bl-trend-down { color: var(--fgColor-success); }
+.bl-compcell { display: inline-flex; align-items: baseline; }
+.bl-delta { display: inline-block; width: 6ch; margin-left: var(--base-size-8); text-align: start; white-space: nowrap; }
+
+/* The table: Primer's Table is a CSS grid. Cells wrap, headers do not, and the
+ * scan column takes what the other columns leave. */
+.bl-scantbl { min-width: 0; }
+.bl-scantbl table { --table-font-size: var(--text-body-size-medium); }
+.bl-scantbl td, .bl-scantbl th { align-items: center; min-width: 0; }
+.bl-scantbl thead th { white-space: nowrap; }
+.bl-scantbl td[data-cell-align="end"], .bl-scantbl th[data-cell-align="end"] { justify-content: flex-end; text-align: end; }
+.bl-scantbl td > div { min-width: 0; }
+.bl-scanname { position: relative; display: block; max-width: 100%; min-width: 0; overflow: hidden; text-overflow: ellipsis; font-weight: 600; white-space: nowrap; }
+.bl-scanname-version { font-weight: 400; color: var(--fgColor-muted); }
+.bl-sortbtn {
+  all: unset;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--base-size-4);
+  font-weight: 600;
+  cursor: pointer;
+}
+.bl-sortbtn:focus-visible { outline: 2px solid var(--focus-outlineColor); outline-offset: 2px; border-radius: var(--borderRadius-small); }
+.bl-sortbtn-hint { display: inline-flex; color: var(--fgColor-muted); opacity: 0.6; }
+.bl-sortbtn:hover .bl-sortbtn-hint, .bl-sortbtn:focus-visible .bl-sortbtn-hint { opacity: 1; }
+
+/* Narrow screens: one stacked row per scan. */
+.bl-rows { list-style: none; margin: 0; padding: 0; }
+.bl-row {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--base-size-12);
+  padding: var(--base-size-12) var(--base-size-16);
+  border-top: var(--borderWidth-thin) solid var(--borderColor-muted);
+}
+.bl-rows > .bl-row:first-child { border-top: 0; }
+.bl-row-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: var(--base-size-8); }
+.bl-row-tags { display: flex; flex-wrap: wrap; align-items: center; gap: var(--base-size-8); }
+
+/* Demo: where to start. */
+.bl-demostart { display: flex; flex-wrap: wrap; align-items: center; gap: var(--base-size-16); }
+.bl-demostart p { margin: 0; max-width: 22.5rem; }
+.bl-demostart ul { display: flex; flex: 1; flex-wrap: wrap; gap: var(--base-size-8); list-style: none; margin: 0; padding: 0; }
+.bl-demostart li { min-width: 0; max-width: 100%; }
+.bl-demoname { display: inline-block; max-width: 16rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: bottom; }
+
+/* Empty state. */
+.bl-emptyouts { display: flex; flex-wrap: wrap; justify-content: center; gap: var(--base-size-8); list-style: none; margin: var(--base-size-16) 0 0; padding: 0; }
+.bl-sourcenote { display: flex; align-items: center; flex-wrap: wrap; gap: var(--base-size-8); margin-top: var(--base-size-12); }
+.bl-code { font-family: var(--fontStack-monospace); font-size: var(--text-body-size-small); background: var(--bgColor-muted); padding: 1px var(--base-size-8); border-radius: var(--borderRadius-small); }
+
+/* Tailwind's preflight (index.css) loads after Primer and resets border width and
+ * link colour with the same specificity as Primer's :where() rules, so on this
+ * screen a Label lost its outline and a Link its accent colour. Set both back. */
+.bl-scanmgmt [class*="prc-Label-Label"] { border-width: var(--borderWidth-thin); }
+.bl-scanmgmt a[class*="prc-Link-Link"] { color: var(--fgColor-accent); }
+
+.bl-extlink { display: inline-flex; align-items: center; gap: var(--base-size-4); }
+
+/* ---------------------------------------------------------------------------
+ * Overview (components/Overview.tsx, components/overview/*). A main column and
+ * a side column of Boxes, each a bordered list of rows or a bar with its
+ * legend. Colours, spacing and radii are Primer variables.
+ * ------------------------------------------------------------------------- */
+
+.bl-ov { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--base-size-16); align-items: start; }
+.bl-ov-col { display: flex; flex-direction: column; gap: var(--base-size-16); min-width: 0; }
+@media (min-width: 1180px) {
+  .bl-ov { grid-template-columns: minmax(0, 1fr) 21.25rem; }
+}
+.bl-ov-notices { display: flex; flex-direction: column; gap: var(--base-size-8); }
+.bl-ov-notices:not(:empty) { margin-bottom: var(--base-size-16); }
+.bl-ov-notices ul { margin: 0 0 var(--base-size-4); padding-left: var(--base-size-20); }
+.bl-ov-notices p { margin: 0 0 var(--base-size-4); }
+.bl-ov-notices details > summary { cursor: pointer; font-size: var(--text-body-size-medium); }
+.bl-ov-toggle { margin-left: var(--base-size-12); font-size: var(--text-body-size-small); text-decoration: underline; }
+.bl-ov-notices details > summary:focus-visible { outline: 2px solid var(--focus-outlineColor); outline-offset: 2px; }
+.bl-ov-notices dl { margin: var(--base-size-8) 0 0; font-size: var(--text-body-size-small); }
+.bl-ov-notices dt { font-weight: 600; }
+.bl-ov-notices dd { margin: 0 0 var(--base-size-8); }
+.bl-ov-notices .bl-ov-bullets { display: flex; flex-direction: column; gap: var(--base-size-4); margin: 0; }
+
+.bl-ov-prov { display: flex; align-items: center; gap: var(--base-size-8); margin-top: var(--base-size-4); font-size: var(--text-body-size-small); color: var(--fgColor-muted); flex-wrap: wrap; }
+.bl-ov-prov code { padding: 1px var(--base-size-6); border-radius: var(--borderRadius-small); background: var(--bgColor-muted); color: var(--fgColor-default); font-family: var(--fontStack-monospace); overflow-wrap: anywhere; }
+
+.bl-ovlist { list-style: none; margin: 0; padding: 0; }
+.bl-ovrow {
+  display: flex;
+  align-items: center;
+  gap: var(--base-size-12);
+  padding: var(--base-size-8) var(--base-size-16);
+  border-top: var(--borderWidth-thin) solid var(--borderColor-muted);
+  color: var(--fgColor-default);
+  text-decoration: none;
+  font-size: var(--text-body-size-medium);
+}
+.bl-ovlist > li:first-child > .bl-ovrow { border-top: 0; }
+a.bl-ovrow:hover { background: var(--bgColor-muted); }
+a.bl-ovrow:focus-visible { outline: 2px solid var(--focus-outlineColor); outline-offset: -2px; }
+.bl-ovrow-icon { display: inline-flex; flex: none; color: var(--fgColor-muted); }
+.bl-ovrow-text { flex: 1; min-width: 0; }
+.bl-ovrow-text > span { display: block; }
+.bl-ovrow-chev { display: inline-flex; flex: none; color: var(--fgColor-muted); }
+.bl-ovrow-sub { margin-left: var(--base-size-8); font-size: var(--text-body-size-small); }
+.bl-ovrow-value { flex: none; font-weight: 600; font-variant-numeric: tabular-nums; }
+.bl-box-sub {
+  margin: 0;
+  padding: var(--base-size-8) var(--base-size-16);
+  background: var(--bgColor-muted);
+  border-top: var(--borderWidth-thin) solid var(--borderColor-default);
+  border-bottom: var(--borderWidth-thin) solid var(--borderColor-default);
+  font-size: var(--text-body-size-small);
+  font-weight: 600;
+  color: var(--fgColor-muted);
+}
+.bl-box-head-end { margin-left: auto; display: inline-flex; align-items: center; gap: var(--base-size-4); font-size: var(--text-body-size-small); }
+.bl-ovtrend-up { color: var(--fgColor-severe); }
+.bl-ovtrend-down { color: var(--fgColor-success); }
+.bl-ovtrend { display: inline-flex; align-items: center; font-weight: 600; }
+
+/* Comparison: a change list is a full-width disclosure. */
+.bl-ovdiff { border-top: var(--borderWidth-thin) solid var(--borderColor-muted); }
+.bl-ovdiff > summary {
+  display: flex;
+  align-items: center;
+  gap: var(--base-size-12);
+  padding: var(--base-size-8) var(--base-size-16);
+  cursor: pointer;
+  list-style: none;
+  font-size: var(--text-body-size-medium);
+}
+.bl-ovdiff > summary::-webkit-details-marker { display: none; }
+.bl-ovdiff > summary:hover { background: var(--bgColor-muted); }
+.bl-ovdiff > summary:focus-visible { outline: 2px solid var(--focus-outlineColor); outline-offset: -2px; }
+.bl-ovdiff[open] > summary .bl-chev { transform: rotate(90deg); }
+.bl-ovdiff-label { min-width: 9.5rem; font-size: var(--text-body-size-small); color: var(--fgColor-muted); white-space: nowrap; }
+.bl-ovdiff-summary { font-size: var(--text-body-size-medium); font-weight: 600; }
+.bl-ovdiff-row { display: flex; align-items: center; gap: var(--base-size-12); padding: var(--base-size-6) var(--base-size-16); border-top: var(--borderWidth-thin) solid var(--borderColor-muted); color: var(--fgColor-default); text-decoration: none; font-size: var(--text-body-size-small); }
+.bl-ovdiff-row:hover { background: var(--bgColor-muted); }
+.bl-ovdiff-row:focus-visible { outline: 2px solid var(--focus-outlineColor); outline-offset: -2px; }
+.bl-ovdiff-main { flex: 1; min-width: 0; font-family: var(--fontStack-monospace); overflow-wrap: anywhere; }
+.bl-ovdiff-aside { flex: 1; min-width: 0; font-family: var(--fontStack-monospace); color: var(--fgColor-muted); overflow-wrap: anywhere; }
+.bl-ovdiff-foot { padding: var(--base-size-8) var(--base-size-16); border-top: var(--borderWidth-thin) solid var(--borderColor-muted); font-size: var(--text-body-size-small); }
+.bl-ovdiff-more { padding: var(--base-size-6) var(--base-size-16); border-top: var(--borderWidth-thin) solid var(--borderColor-muted); font-size: var(--text-body-size-small); color: var(--fgColor-muted); }
+
+/* Riskiest components */
+.bl-ovrisk-name { flex: 1 1 0; min-width: 0; overflow-wrap: anywhere; font-size: var(--text-body-size-small); }
+.bl-ovrisk-version { flex: 0 1 6.5rem; min-width: 0; text-align: right; font-family: var(--fontStack-monospace); font-size: var(--text-body-size-small); color: var(--fgColor-muted); overflow-wrap: anywhere; }
+.bl-ovrisk-sev { flex: none; width: 7rem; display: flex; }
+
+/* Bars and their legends */
+.bl-ovbar { display: flex; height: var(--base-size-8); gap: 2px; border-radius: var(--borderRadius-full); overflow: hidden; background: var(--bgColor-neutral-muted); }
+.bl-ovbar > * { display: block; height: 100%; min-width: var(--base-size-4); }
+.bl-sevgrid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 2px; margin-top: var(--base-size-12); }
+.bl-sevcell {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--base-size-4) 2px;
+  border-radius: var(--borderRadius-medium);
+  color: var(--fgColor-default);
+  text-decoration: none;
+  font-size: var(--text-body-size-small);
+  white-space: nowrap;
+}
+a.bl-sevcell:hover { background: var(--bgColor-muted); }
+a.bl-sevcell:focus-visible { outline: 2px solid var(--focus-outlineColor); outline-offset: -2px; }
+.bl-sevcell[aria-disabled="true"] { opacity: 0.5; cursor: not-allowed; }
+.bl-sevcell-num { display: inline-flex; align-items: center; gap: var(--base-size-4); }
+.bl-sevcell-num > b { font-size: var(--text-body-size-medium); font-variant-numeric: tabular-nums; font-weight: 600; color: var(--fgColor-default); font-variant-numeric: tabular-nums; }
+.bl-tierlegend { display: flex; flex-wrap: wrap; gap: var(--base-size-6); margin-top: var(--base-size-12); }
+.bl-tierchip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--base-size-6);
+  padding: 1px var(--base-size-8);
+  border: var(--borderWidth-thin) solid var(--borderColor-default);
+  border-radius: var(--borderRadius-full);
+  color: var(--fgColor-default);
+  font-size: var(--text-body-size-small);
+  font-weight: 500;
+  line-height: 18px;
+  text-decoration: none;
+}
+.bl-tierchip:hover { background: var(--bgColor-neutral-muted); }
+.bl-tierchip:focus-visible { outline: 2px solid var(--focus-outlineColor); outline-offset: 1px; }
+/* Inside the bar's clipped edge, so Tab focus on a segment is not cut off. */
+.bl-ovbar > a:focus-visible { outline: 2px solid var(--focus-outlineColor); outline-offset: -2px; }
+/* The license bar's gaps show the page colour, so two grey classes stay apart. */
+.bl-ovbar-lic { gap: 2px; background: var(--bgColor-default); }
+
+/* AI summary */
+.bl-ai-tiles { display: flex; flex-wrap: wrap; gap: var(--base-size-24); }
+.bl-ai-tile { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 10rem; }
+.bl-ai-tile > b { font-size: var(--text-body-size-large); font-weight: 600; }
+.bl-ai-spdx { display: flex; align-items: center; flex-wrap: wrap; gap: var(--base-size-8); padding: var(--base-size-8) var(--base-size-16); border-top: var(--borderWidth-thin) solid var(--borderColor-muted); }
+
+/* Primer's Link sets its colour at zero specificity, and the base reset's
+ * `a { color: inherit }` wins over it. Restore the accent for the Overview's
+ * text links (the box head links, the AI summary links). */
+.bl-ov a[class*="prc-Link-Link"] { color: var(--fgColor-accent); }
+.bl-ov a[class*="prc-Link-Link"]:hover { text-decoration: underline; }
+
+/* ---------------------------------------------------------------------------
+ * Vulnerabilities: the filter rows, the table, the package blocks, the folded
+ * boxes and the detail panel.
+ * ------------------------------------------------------------------------- */
+.bl-linkbtn { all: unset; cursor: pointer; color: var(--fgColor-accent); }
+.bl-linkbtn:hover { text-decoration: underline; }
+.bl-linkbtn:focus-visible { outline: 2px solid var(--focus-outlineColor); outline-offset: 2px; border-radius: var(--borderRadius-small); }
+.bl-v [class*="prc-Label-Label"], .bl-vp [class*="prc-Label-Label"] { border-width: var(--borderWidth-thin); }
+.bl-v a[class*="prc-Link-Link"], .bl-vp a[class*="prc-Link-Link"], .bl-vp button[class*="prc-Link-Link"] { color: var(--fgColor-accent); }
+
+/* A package as "group / name" on one line: the group gives way first. */
+.bl-coord { overflow-wrap: anywhere; }
+.bl-coord-group, .bl-coord-sep { color: var(--fgColor-muted); }
+.bl-coord-name { color: var(--fgColor-default); }
+
+/* Fixed versions: one per line; the one the installed version can move to is green. */
+.bl-fixed { display: flex; flex-direction: column; max-width: 100%; overflow-wrap: anywhere; }
+.bl-fixed-mine { color: var(--fgColor-success); font-weight: 600; }
+
+/* Folded boxes: bundles, the kernel note, the coverage lists. */
+.bl-v-bundles > summary { list-style: none; display: flex; align-items: center; gap: var(--base-size-8); padding: var(--base-size-8) var(--base-size-16); cursor: pointer; background: var(--bgColor-muted); border-radius: var(--borderRadius-medium); }
+.bl-v-bundles > summary::-webkit-details-marker { display: none; }
+.bl-v-bundles[open] > summary { border-bottom: var(--borderWidth-thin) solid var(--borderColor-default); border-radius: var(--borderRadius-medium) var(--borderRadius-medium) 0 0; }
+.bl-v-bundles > summary:focus-visible, .bl-v-note > summary:focus-visible, .bl-v-fold > summary:focus-visible, .bl-vp-more > summary:focus-visible { outline: 2px solid var(--focus-outlineColor); outline-offset: -2px; }
+.bl-v-bundles[open] > summary .bl-chev, .bl-v-note[open] > summary .bl-chev, .bl-v-fold[open] > summary .bl-chev, .bl-vp-more[open] > summary .bl-chev { transform: rotate(90deg); }
+.bl-v-h2 { margin: 0; font-size: var(--text-body-size-medium); font-weight: 600; }
+.bl-v-bundles-sub { display: flex; align-items: center; justify-content: space-between; gap: var(--base-size-16); padding: var(--base-size-8) var(--base-size-16); font-size: var(--text-body-size-small); }
+.bl-v-bundles-list { list-style: none; margin: 0; padding: 0; }
+.bl-v-bundles-list > li { display: flex; flex-wrap: wrap; align-items: center; gap: var(--base-size-8); padding: var(--base-size-8) var(--base-size-16); border-top: var(--borderWidth-thin) solid var(--borderColor-muted); }
+.bl-v-bundles-more { margin: 0; padding: var(--base-size-8) var(--base-size-16); border-top: var(--borderWidth-thin) solid var(--borderColor-muted); }
+.bl-v-note > summary { list-style: none; display: flex; align-items: center; gap: var(--base-size-8); padding: var(--base-size-8) var(--base-size-16); cursor: pointer; }
+.bl-v-note > summary::-webkit-details-marker { display: none; }
+.bl-v-note-why { padding: 0 var(--base-size-16) var(--base-size-12) var(--base-size-40); }
+.bl-v-cov { display: flex; flex-direction: column; gap: var(--base-size-8); }
+.bl-v-fold > summary { list-style: none; display: flex; align-items: center; gap: var(--base-size-8); cursor: pointer; }
+.bl-v-fold > summary::-webkit-details-marker { display: none; }
+.bl-v-covscroll { margin-top: var(--base-size-8); max-height: 20rem; overflow: auto; border: var(--borderWidth-thin) solid var(--borderColor-default); border-radius: var(--borderRadius-medium); }
+.bl-v-covscroll:focus-visible { outline: 2px solid var(--focus-outlineColor); outline-offset: 2px; }
+.bl-v-covtbl { min-width: 0; }
+.bl-v-covtbl table { --table-font-size: var(--text-body-size-small); }
+.bl-v-covtbl td, .bl-v-covtbl th { align-items: flex-start; min-width: 0; }
+.bl-v-covtbl thead th { white-space: nowrap; }
+.bl-v-covnote { margin: var(--base-size-8) 0 0; }
+.bl-v-state { padding: var(--base-size-16) 0; }
+
+/* Preset views and the View menu. */
+.bl-v-viewrow { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--base-size-8); }
+/* Five segments are wider than a phone: the row scrolls instead of the page. */
+.bl-v-views { min-width: 0; max-width: 100%; overflow-x: auto; }
+
+/* Search, the severity bar and its buttons. */
+.bl-v-filterbar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--base-size-8) var(--base-size-16); margin: var(--base-size-12) 0 var(--base-size-8); }
+.bl-v-search { flex: 1 1 14rem; min-width: 14rem; }
+.bl-v-sev { display: flex; flex-wrap: wrap; align-items: center; gap: var(--base-size-8); flex: 0 1 auto; min-width: 0; max-width: 100%; }
+.bl-v-bar { display: flex; width: 6rem; height: var(--base-size-8); overflow: hidden; border-radius: var(--borderRadius-full); background: var(--bgColor-neutral-muted); }
+.bl-v-chipgroup { display: flex; flex-wrap: wrap; gap: var(--base-size-4); }
+.bl-v-chip { all: unset; cursor: pointer; display: inline-flex; align-items: center; gap: var(--base-size-4); padding: 2px; border: var(--borderWidth-thin) solid transparent; border-radius: var(--borderRadius-full); }
+.bl-v-chip[aria-pressed="true"] { border-color: var(--borderColor-accent-emphasis); border-width: 2px; padding: 1px; }
+.bl-v-chip:disabled { cursor: not-allowed; opacity: 0.45; }
+.bl-v-chip:not(:disabled):hover { background: var(--bgColor-neutral-muted); }
+.bl-v-chip:focus-visible { outline: 2px solid var(--focus-outlineColor); outline-offset: 2px; }
+.bl-v-check { display: inline-flex; color: var(--fgColor-accent); margin-right: 2px; }
+
+/* The table. It grows with the page; the head sticks under the top bar (56px). */
+.bl-v-table { min-width: 0; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+.bl-v-scroll { grid-area: table; position: relative; isolation: isolate; min-width: 0; overflow-x: clip; overflow-y: visible; border: var(--borderWidth-thin) solid var(--borderColor-default); border-radius: var(--borderRadius-medium); }
+.bl-v-scroll th:first-child, .bl-v-scroll td:first-child, .bl-v-scroll th:last-child, .bl-v-scroll td:last-child { border-inline: 0 !important; }
+.bl-v-scroll thead tr:first-child th { border-top: 0 !important; border-radius: 0 !important; }
+.bl-v-scroll table > :last-child > tr:last-child > * { border-bottom: 0 !important; border-radius: 0 !important; }
+.bl-v-scroll thead { position: sticky; top: 56px; z-index: 3; }
+/* Primer wraps the table in its own scroll region; the page scrolls instead,
+ * so the sticky head works against the window. */
+.bl-v-scroll > [class*="ScrollableRegion"] { overflow: visible; }
+/* Below 1280px the table can be wider than the window: it scrolls sideways inside
+ * its box (the head then stays with the table instead of the window). */
+@media (max-width: 1279px) { .bl-v-scroll { overflow-x: auto; } }
+.bl-v-table table { --table-font-size: var(--text-body-size-medium); }
+.bl-v-table td, .bl-v-table th { align-items: flex-start; min-width: 0; }
+.bl-v-table td[data-cell-align="end"], .bl-v-table th[data-cell-align="end"] { justify-content: flex-end; text-align: end; }
+.bl-v-table thead th { white-space: nowrap; }
+.bl-v-table tbody td, .bl-v-table tbody th { white-space: normal; overflow-wrap: anywhere; }
+.bl-v-table td [class*="prc-Label-Label"] { overflow-wrap: normal; word-break: normal; white-space: nowrap; }
+.bl-v-table td > div { min-width: 0; }
+.bl-v-row { cursor: pointer; }
+.bl-v-table tr[data-open="true"] > td, .bl-v-table tr[data-open="true"] > th { background: var(--bgColor-muted); }
+.bl-v-cell { width: 100%; min-width: 0; }
+.bl-v-line1 { display: flex; align-items: center; gap: var(--base-size-8); min-width: 0; min-height: 25px; }
+.bl-v-labels { display: inline-flex; flex: none; gap: var(--base-size-4); }
+.bl-v-title { all: unset; box-sizing: border-box; cursor: pointer; flex: 0 1 auto; min-width: 0; display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; color: var(--fgColor-default); max-width: 100%; }
+.bl-v-title:hover { color: var(--fgColor-accent); text-decoration: underline; }
+.bl-v-title:focus-visible { outline: 2px solid var(--focus-outlineColor); outline-offset: 1px; border-radius: var(--borderRadius-small); }
+/* The second line is one line high. An item that does not fit wraps to a line
+ * that is cut off, whole, together with its leading dot; nothing is ever
+ * shortened with an ellipsis except the group of the package. */
+/* The second line: the package and installed version (it wraps rather than
+ * being cut), the CVE id (never hidden), then the other ids in a box one line
+ * high. An alias that does not fit wraps to the cut-off line whole, together
+ * with its leading dot; the box takes what is left and may be empty. */
+.bl-v-line2 { display: flex; flex-wrap: wrap; align-items: baseline; column-gap: var(--base-size-12); margin-top: 2px; font-size: var(--text-body-size-small); line-height: 18px; min-height: 18px; }
+.bl-v-line2 > .bl-v-pkg { flex: 0 1 auto; min-width: 0; max-width: 100%; overflow-wrap: anywhere; }
+.bl-v-line2 > .bl-v-id { flex: none; white-space: nowrap; }
+.bl-v-aliases { flex: 1 1 0; min-width: 0; height: 18px; overflow: hidden; display: flex; flex-wrap: wrap; column-gap: var(--base-size-6); }
+/* The empty first item makes every alias that is wider than the box wrap to the
+ * cut-off line instead of staying on the first line and being clipped. */
+.bl-v-aliases::before { content: ""; flex: none; width: 0; height: 18px; }
+.bl-v-aliases > * { flex: none; white-space: nowrap; }
+.bl-v-aliases > *::before { content: "·"; content: "·" / ""; margin-right: var(--base-size-6); }
+.bl-v-pkg > .bl-mono + .bl-mono { margin-left: var(--base-size-6); }
+.bl-v-compact .bl-v-line2 { margin-top: 0; }
+.bl-v-grouprow { grid-column: 1 / -1; display: block; padding: 0 !important; background: var(--bgColor-muted); }
+.bl-v-disclose { all: unset; cursor: pointer; display: flex; align-items: center; flex-wrap: wrap; gap: var(--base-size-8) var(--base-size-12); width: 100%; box-sizing: border-box; padding: var(--base-size-8) var(--base-size-16); }
+.bl-v-disclose:hover .bl-coord-name { color: var(--fgColor-accent); }
+.bl-v-disclose:focus-visible { outline: 2px solid var(--focus-outlineColor); outline-offset: -2px; }
+.bl-v-upgrade { margin-left: auto; }
+
+/* The detail panel. */
+.bl-vp { display: flex; flex-direction: column; gap: var(--base-size-16); padding-top: var(--base-size-16); outline: none; font-size: var(--text-body-size-medium); }
+.bl-vp-ids { display: flex; flex-wrap: wrap; align-items: center; gap: var(--base-size-8); font-size: var(--text-body-size-small); }
+.bl-vp-h { margin: 0; font-size: var(--text-body-size-medium); font-weight: 600; }
+.bl-vp-p { margin: var(--base-size-4) 0 0; }
+.bl-vp-kv { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: var(--base-size-6) var(--base-size-16); margin: 0; }
+.bl-vp-kv dt { color: var(--fgColor-muted); font-weight: 600; }
+.bl-vp-kv dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+.bl-vp-links { display: flex; flex-wrap: wrap; gap: var(--base-size-16); }
+.bl-vp-vexrow { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--base-size-8); margin-top: var(--base-size-8); }
+.bl-vp-note { margin-top: var(--base-size-8); }
+.bl-vp-facts { border-top: var(--borderWidth-thin) solid var(--borderColor-default); padding-top: var(--base-size-12); }
+.bl-vp-desc { margin: var(--base-size-4) 0 0; white-space: pre-line; line-height: 1.6; }
+.bl-vp-refs a { display: inline-flex; align-items: center; gap: var(--base-size-4); }
+.bl-vp-refs a > svg { flex: none; }
+.bl-vp-refs { list-style: none; margin: var(--base-size-4) 0 0; padding: 0; line-height: 1.8; }
+.bl-vp-more > summary { list-style: none; display: flex; align-items: center; gap: var(--base-size-4); cursor: pointer; font-size: var(--text-body-size-small); }
+.bl-vp-more > summary::-webkit-details-marker { display: none; }
+
+/* ---------------------------------------------------------------------------
+ * Licenses (components/Licenses.tsx, components/licenses/*). The class box and
+ * the conflicts box span the page; below them the distribution and review boxes
+ * sit in a main column and the obligations box beside it from 1536px up.
+ * ------------------------------------------------------------------------- */
+
+/* Tailwind's reset zeroes border-width over Primer's layered styles, so a Label
+ * lost its outline here as on the other screens. Set it back. */
+.bl-lic [class*="prc-Label-Label"] { border-width: var(--borderWidth-thin); }
+.bl-lic { min-width: 0; }
+/* Nothing on this screen may widen the page. Long text wraps and tables scroll
+ * in their own box; this is the backstop, and the positioned context keeps
+ * visually hidden text from reaching outside it. */
+.bl-lic { position: relative; overflow-x: clip; }
+/* A box head holds a title, a count and a hint or a switch. Below about 480px
+ * they would squeeze the title to a few pixels and push the hint out of the
+ * box, so let the head wrap. */
+.bl-lic .bl-box-head { flex-wrap: wrap; row-gap: var(--base-size-4); }
+.bl-lic .bl-box-head h2 { overflow-wrap: anywhere; }
+.bl-lic .bl-box-head-end, .bl-lic-headtools { flex-wrap: wrap; min-width: 0; }
+.bl-lic [class*="prc-Label-Label"] { max-width: 100%; white-space: normal; overflow-wrap: anywhere; }
+/* A table that cannot fit a narrow window scrolls inside its box. */
+.bl-lic-table { overflow-x: auto; }
+.bl-lic-bar > button {
+  display: block;
+  padding: 0;
+  border: 0;
+  cursor: pointer;
+  transition: opacity 0.1s;
+}
+.bl-lic-bar > button:hover { filter: brightness(1.1); }
+.bl-lic-bar > button:focus-visible { outline: 2px solid var(--focus-outlineColor); outline-offset: -2px; }
+.bl-lic-bar > button[data-dim] { opacity: 0.45; }
+button.bl-tierchip {
+  font-family: inherit;
+  background: transparent;
+  cursor: pointer;
+}
+button.bl-tierchip[aria-pressed="true"] {
+  border-color: var(--borderColor-accent-emphasis);
+  background: var(--bgColor-accent-muted);
+}
+.bl-lic-headtools { margin-left: auto; display: inline-flex; align-items: center; gap: var(--base-size-12); }
+.bl-lic-headtools .bl-small { font-size: var(--text-body-size-small); }
+
+.bl-licrows, .bl-lic-list, .bl-lic-terms { list-style: none; margin: 0; padding: 0; }
+.bl-licrows, .bl-lic-list, .bl-lic-sub, .bl-lic-grouphead { font-size: var(--text-body-size-medium); }
+.bl-licrows > li + li { border-top: var(--borderWidth-thin) solid var(--borderColor-muted); }
+.bl-licrow {
+  display: flex;
+  align-items: center;
+  gap: var(--base-size-12);
+  padding: var(--base-size-8) var(--base-size-16);
+  color: var(--fgColor-default);
+  text-decoration: none;
+}
+a.bl-licrow:hover { background: var(--bgColor-muted); }
+a.bl-licrow:focus-visible { outline: 2px solid var(--focus-outlineColor); outline-offset: -2px; }
+.bl-licrow-mark { display: inline-flex; flex: none; width: 14px; }
+.bl-licrow-name { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
+.bl-licrow-tier { flex: 0 0 8.5rem; white-space: nowrap; }
+.bl-licbar {
+  flex: 0 0 30%;
+  height: var(--base-size-8);
+  border-radius: var(--borderRadius-full);
+  background: var(--bgColor-neutral-muted);
+  overflow: hidden;
+}
+.bl-licbar > span { display: block; height: 100%; }
+.bl-licrow-count { flex: 0 0 3rem; text-align: end; }
+@media (max-width: 1100px) {
+  .bl-licrow-tier { display: none; }
+}
+
+.bl-lic-hint { margin: 0; padding: var(--base-size-12) var(--base-size-16); font-size: var(--text-body-size-medium); }
+.bl-lic-hint-rule { border-bottom: var(--borderWidth-thin) solid var(--borderColor-muted); }
+.bl-lic-sub {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--base-size-8);
+  padding: var(--base-size-8) var(--base-size-16);
+  background: var(--bgColor-muted);
+  border-top: var(--borderWidth-thin) solid var(--borderColor-muted);
+  border-bottom: var(--borderWidth-thin) solid var(--borderColor-muted);
+}
+.bl-lic-table { border: 0; }
+.bl-lic-table table { border: 0 !important; border-radius: 0 !important; }
+.bl-lic-table th, .bl-lic-table td { border-inline: 0 !important; }
+.bl-lic-table tbody tr:last-child > * { border-bottom: 0 !important; }
+.bl-lic-table thead th { border-radius: 0 !important; }
+.bl-lic-group { padding-top: var(--base-size-12); }
+.bl-lic-group:last-child { padding-bottom: var(--base-size-8); }
+.bl-lic-grouphead { display: flex; align-items: center; gap: var(--base-size-8); padding: 0 var(--base-size-16) var(--base-size-4); }
+.bl-lic-item {
+  display: flex;
+  gap: var(--base-size-8);
+  padding: var(--base-size-6) var(--base-size-16);
+}
+.bl-lic-list > .bl-lic-item + .bl-lic-item,
+.bl-lic-list > li.bl-lic-item-col + li.bl-lic-item-col { border-top: var(--borderWidth-thin) solid var(--borderColor-muted); }
+.bl-lic-item-wrap { flex-wrap: wrap; align-items: center; }
+.bl-lic-item-col { flex-direction: column; padding-block: var(--base-size-8); }
+.bl-lic-line { display: flex; flex-wrap: wrap; align-items: center; gap: var(--base-size-6); }
+.bl-lic-expr { display: flex; flex-direction: column; gap: var(--base-size-6); padding-inline-start: var(--base-size-12); }
+.bl-lic-terms { display: flex; flex-direction: column; gap: var(--base-size-4); }
+.bl-lic-terms > li { display: flex; flex-wrap: wrap; align-items: center; gap: var(--base-size-6); }
+.bl-lic-foot { padding: var(--base-size-8) var(--base-size-16); border-top: var(--borderWidth-thin) solid var(--borderColor-muted); }
+.bl-lic-action { margin-top: var(--base-size-8); }
+.bl-lic-cli { margin-top: var(--base-size-12); }
+.bl-lic-cli > summary { cursor: pointer; font-weight: 600; }
+.bl-lic-cli > summary:focus-visible { outline: 2px solid var(--focus-outlineColor); outline-offset: 2px; }
+.bl-lic-cli > p { margin: var(--base-size-4) 0 0; }
+.bl-lic-note:not(:empty) { margin-top: var(--base-size-12); }
+.bl-lic-count { display: inline-block; min-width: 2.5ch; text-align: end; }
+.bl-lic-clear { font-size: var(--text-body-size-small); color: var(--fgColor-accent); }
+
+.bl-licgrid { display: flex; flex-direction: column; gap: var(--base-size-16); }
+.bl-licgrid-col { display: contents; }
+.bl-licgrid-col > div:empty { display: none; }
+.bl-licgrid-1 { order: 1; } .bl-licgrid-2 { order: 2; } .bl-licgrid-4 { order: 4; }
+@media (min-width: 1536px) {
+  .bl-licgrid { display: grid; grid-template-columns: minmax(0, 1fr) 28rem; align-items: start; }
+  .bl-licgrid-col { display: flex; flex-direction: column; gap: var(--base-size-16); min-width: 0; }
+  .bl-licgrid-1, .bl-licgrid-2, .bl-licgrid-4 { order: 0; }
 }

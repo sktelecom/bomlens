@@ -1,0 +1,3 @@
+P	:my app
+H	:my app
+R	:my app	org.apache.commons:commons-lang3:3.14.0

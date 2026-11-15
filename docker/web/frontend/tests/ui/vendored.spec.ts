@@ -57,7 +57,7 @@ test("Vendored toggle is offered under scan options when scanoss is available", 
   // vendored-ID toggle, off by default. Discovery for users who never open
   // it is handled by the post-scan suggestion banner (covered below).
   await page.getByText("Result quality").click();
-  const toggle = page.getByText("Detect copied-in open source");
+  const toggle = page.getByRole("switch", { name: "Detect copied-in open source" });
   await expect(toggle).toBeVisible();
   await expect(page.locator("#scanossToken")).toHaveCount(0);
 });

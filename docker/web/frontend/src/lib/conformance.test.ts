@@ -7,6 +7,8 @@ import type { AiProfile, ConformanceCheck } from "./api";
 import {
   baseTally,
   checkKind,
+  conformanceReports,
+  formatMeasure,
   clusterOf,
   crosswalkTotals,
   dedupeMissing,
@@ -509,5 +511,31 @@ describe("explainedEntries", () => {
   it("is empty when the row carries no list", () => {
     expect(explainedEntries(row(undefined))).toEqual([]);
     expect(explainedEntries(row("not-a-list"))).toEqual([]);
+  });
+});
+
+describe("conformanceReports", () => {
+  it("keeps the readable reports by name and drops the JSON", () => {
+    const files = [
+      { name: "a_1.0_conformance.json" },
+      { name: "a_1.0_conformance.md" },
+      { name: "a_1.0_bom.json" },
+      { name: "a_1.0_conformance.html" },
+    ];
+    expect(conformanceReports(files).map((f) => f.name)).toEqual([
+      "a_1.0_conformance.html",
+      "a_1.0_conformance.md",
+    ]);
+  });
+});
+
+describe("formatMeasure", () => {
+  const fmt = (n: number) => n.toLocaleString("en-US");
+  const unit = (n: number) => (n === 1 ? "component" : "components");
+  it("groups digits and localizes the component unit", () => {
+    expect(formatMeasure("4% (2772/60118)", fmt, unit)).toBe("4% (2,772/60,118)");
+    expect(formatMeasure("32/40 component(s)", fmt, unit)).toBe("32/40 components");
+    expect(formatMeasure("0/1 component(s)", fmt, unit)).toBe("0/1 component");
+    expect(formatMeasure("not present in the SBOM", fmt, unit)).toBe("not present in the SBOM");
   });
 });

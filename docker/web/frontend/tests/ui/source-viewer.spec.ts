@@ -119,7 +119,7 @@ test("a scanned file's content opens from the tree", async ({ page }) => {
   // Nothing selected yet: the pane invites a choice rather than sitting blank.
   await expect(page.getByText("Pick a file to read what was scanned.")).toBeVisible();
 
-  await page.getByRole("button", { name: /main\.go/ }).click();
+  await page.getByRole("treeitem", { name: /main\.go/ }).click();
 
   // The real file body is on screen, line by line.
   await expect(page.getByText("package main")).toBeVisible();
@@ -130,11 +130,11 @@ test("a scanned file's content opens from the tree", async ({ page }) => {
 test("selection is announced and moves between files", async ({ page }) => {
   await runScan(page);
 
-  const goFile = page.getByRole("button", { name: /main\.go/ });
+  const goFile = page.getByRole("treeitem", { name: /main\.go/ });
   await goFile.click();
   await expect(goFile).toHaveAttribute("aria-current", "true");
 
-  const license = page.getByRole("button", { name: /LICENSE/ });
+  const license = page.getByRole("treeitem", { name: /LICENSE/ });
   await license.click();
   await expect(license).toHaveAttribute("aria-current", "true");
   await expect(goFile).not.toHaveAttribute("aria-current", "true");
@@ -143,7 +143,7 @@ test("selection is announced and moves between files", async ({ page }) => {
 
 test("a file is reachable by keyboard alone", async ({ page }) => {
   await runScan(page);
-  const license = page.getByRole("button", { name: /LICENSE/ });
+  const license = page.getByRole("treeitem", { name: /LICENSE/ });
   await license.focus();
   await expect(license).toBeFocused();
   await page.keyboard.press("Enter");
@@ -154,7 +154,7 @@ test("a binary file says why it has no preview instead of showing nothing", asyn
   page,
 }) => {
   await runScan(page);
-  await page.getByRole("button", { name: /app\.bin/ }).click();
+  await page.getByRole("treeitem", { name: /app\.bin/ }).click();
   await expect(
     page.getByText(
       "No preview. This file is binary, so only its path was recorded.",
@@ -165,7 +165,7 @@ test("a binary file says why it has no preview instead of showing nothing", asyn
 test("the capture summary reports what was left out", async ({ page }) => {
   await runScan(page);
   await expect(
-    page.getByText("2 file(s) captured from the scanned tree."),
+    page.getByText("2 files captured."),
   ).toBeVisible();
   await expect(
     page.getByText("1 left out (binary, or past the capture limit)."),
@@ -180,7 +180,7 @@ test("a truncated file is flagged, not passed off as complete", async ({ page })
       { path: "LICENSE", size: 900000, content: "MIT License\n", truncated: true },
     ],
   });
-  await page.getByRole("button", { name: /LICENSE/ }).click();
+  await page.getByRole("treeitem", { name: /LICENSE/ }).click();
   await expect(page.getByText("Shown in part")).toBeVisible();
 });
 
@@ -188,8 +188,8 @@ test("the tree still renders when the scan captured no content", async ({ page }
   // A scan from before the snapshot existed: the structure must survive, and
   // the pane must explain the gap rather than the section failing.
   await runScan(page, null);
-  await expect(page.getByRole("button", { name: /main\.go/ })).toBeVisible();
-  await page.getByRole("button", { name: /main\.go/ }).click();
+  await expect(page.getByRole("treeitem", { name: /main\.go/ })).toBeVisible();
+  await page.getByRole("treeitem", { name: /main\.go/ }).click();
   await expect(page.getByText("No content was captured for this file.")).toBeVisible();
 });
 
@@ -197,14 +197,14 @@ test("a symlink shows where it points instead of a blank pane", async ({ page })
   // In a container image most of /bin is links into busybox; the destination is
   // the whole answer, and an empty content box would read as a broken view.
   await runScan(page);
-  await page.getByRole("button", { name: /cat/ }).click();
+  await page.getByRole("treeitem", { name: /cat/ }).click();
   await expect(page.getByText("This is a symlink to")).toBeVisible();
   await expect(page.getByText("/bin/busybox")).toBeVisible();
 });
 
 test("links are counted in the capture summary", async ({ page }) => {
   await runScan(page);
-  await expect(page.getByText("1 symlinks.")).toBeVisible();
+  await expect(page.getByText("1 symlink.")).toBeVisible();
 });
 
 for (const { theme, lang } of COMBOS) {
@@ -212,7 +212,7 @@ for (const { theme, lang } of COMBOS) {
     await runScan(page, SNAPSHOT, theme, lang);
     // Captured with nothing selected: the tree plus the empty reading pane is
     // the state every source scan opens in.
-    await expect(page.getByRole("button", { name: /main\.go/ })).toBeVisible();
+    await expect(page.getByRole("treeitem", { name: /main\.go/ })).toBeVisible();
     await captureMain(page, "source-tree", theme, lang);
   });
 }
@@ -225,7 +225,7 @@ for (const { theme, lang } of COMBOS) {
  */
 test("a file with a known grammar is highlighted", async ({ page }) => {
   await runScan(page);
-  await page.getByRole("button", { name: /main\.go/ }).click();
+  await page.getByRole("treeitem", { name: /main\.go/ }).click();
 
   // The grammar loads on demand, so the markup arrives a beat after the text.
   await expect(page.locator(".hljs-keyword").first()).toBeVisible();
@@ -239,7 +239,7 @@ test("a file with a known grammar is highlighted", async ({ page }) => {
 test("a file with no grammar is shown as plain text", async ({ page }) => {
   await runScan(page);
   // LICENSE carries no extension and no grammar worth guessing at.
-  await page.getByRole("button", { name: /LICENSE/ }).click();
+  await page.getByRole("treeitem", { name: /LICENSE/ }).click();
 
   await expect(page.getByText("MIT License")).toBeVisible();
   await expect(page.locator(".hljs-keyword")).toHaveCount(0);

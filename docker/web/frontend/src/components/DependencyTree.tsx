@@ -1,380 +1,219 @@
 // Copyright 2026 SK Telecom Co., Ltd.
 // SPDX-License-Identifier: Apache-2.0
 
-import { ChevronDown, ChevronRight, Package, Search } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { GitBranchIcon, PackageIcon, SearchIcon } from "@primer/octicons-react";
+import { CounterLabel, Label, TextInput, TreeView } from "@primer/react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
-import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
-import { TOOLBAR_CONTROL } from "@/components/ui/toolbar";
-import type { Severity } from "@/lib/api";
+import { SeverityLabel, severityLabelKey } from "@/components/primer";
+import { formatNumber } from "@/lib/format";
+import { licenseOperands } from "@/lib/licenseOperands";
 import { findFirstMatch, findPathToRef, type TreeNode } from "@/lib/sbomGraph";
-import { cn } from "@/lib/utils";
 
-const VULN_TONE: Record<Severity, "critical" | "high" | "medium" | "low" | "info"> = {
-  CRITICAL: "critical",
-  HIGH: "high",
-  MEDIUM: "medium",
-  LOW: "low",
-  UNKNOWN: "info",
-};
+import { LicenseLabels } from "./dependencies/LicenseLabels";
+import { DepEmpty } from "./dependencies/states";
+import "./dependencies/dependencies.css";
 
-/** One visible row of the tree, with the structure a screen reader needs. */
-interface Row {
-  node: TreeNode;
-  /** 1-based, for aria-level. */
-  level: number;
-  /** Position among its siblings, 1-based (aria-posinset). */
-  pos: number;
-  /** How many siblings it has (aria-setsize). */
-  size: number;
-  /** Index path, unique even when the same package appears under two parents. */
-  path: string;
-  hasChildren: boolean;
-  expanded: boolean;
-}
-
-/**
- * Flatten the visible part of the tree.
- *
- * A flat list with aria-level / aria-posinset / aria-setsize is one of the two
- * shapes ARIA allows for a tree, and it is the one that makes roving focus
- * tractable: "the next row" is the next array entry, whatever its depth.
- */
-function flatten(
-  nodes: TreeNode[],
-  open: Set<string>,
-  level = 1,
-  prefix = "",
-): Row[] {
-  const rows: Row[] = [];
-  nodes.forEach((node, i) => {
-    const path = prefix ? `${prefix}.${i}` : String(i);
-    const hasChildren = node.children.length > 0;
-    const expanded = hasChildren && open.has(path);
-    rows.push({
-      node,
-      level,
-      pos: i + 1,
-      size: nodes.length,
-      path,
-      hasChildren,
-      expanded,
-    });
-    if (expanded) rows.push(...flatten(node.children, open, level + 1, path));
-  });
-  return rows;
-}
+/** The DOM id of a tree row, from its index path ("0.2.1" becomes "dep-0-2-1"). */
+const rowId = (path: string) => `dep-${path.replace(/\./g, "-")}`;
 
 /**
  * Collapsible package hierarchy built from CycloneDX `dependencies[]`. Direct
- * dependencies (depth 0) sit at the top; expanding a row reveals its transitive
- * dependencies. When the SBOM has no dependency graph the caller passes a flat
- * list (every node at depth 0, no children) and we render it as a plain list.
+ * dependencies sit at the top and start open; expanding a row reveals its
+ * transitive dependencies. When the SBOM has no dependency graph the caller
+ * passes a flat list (every node at depth 0, no children).
  *
- * The graph view tells keyboard users to come here, so this has to be navigable:
- * one tab stop for the whole tree, arrow keys to move within it, and each row
- * carrying its own name, depth and expanded state. Before that it offered a row
- * of identical "Expand" buttons and no structure at all, which made the advice
- * on the graph view false.
+ * The rows are a Primer TreeView, which carries the tree semantics the graph
+ * view sends keyboard users here for: one tab stop, arrow keys, Home and End,
+ * Enter and Space, and a name, level and expanded state on every row.
  */
 export function DependencyTree({
   tree,
   hasDependencies,
   focusTarget,
+  viewSwitch,
+  count,
+  direct,
+  transitive,
+  note,
 }: {
   tree: TreeNode[];
   hasDependencies: boolean;
-  /** Jump here on mount / whenever it changes: every ancestor branch opens and
-   *  the matched row gets keyboard focus, scrolled into view. Set from a
-   *  Vulnerabilities/Components row's "View in Dependencies" link, carried in
-   *  the URL so the jump survives a reload or a shared link. */
+  /** Jump here on mount and whenever it changes: every ancestor branch opens
+   *  and the matched row gets keyboard focus, scrolled into view. Set from a
+   *  "View in Dependencies" link, carried in the URL so the jump survives a
+   *  reload or a shared link. */
   focusTarget?: { name: string; version?: string } | null;
+  viewSwitch?: ReactNode;
+  /** Packages in the SBOM (the same number as Components in the page meta). */
+  count?: number;
+  /** Direct and transitive packages, when the SBOM records relationships. */
+  direct?: number;
+  transitive?: number;
+  note?: ReactNode;
 }) {
-  const { t } = useTranslation();
-  // Direct dependencies start expanded, as they did when each row owned its own
-  // state. Paths, not ids: the same package can sit under two parents.
-  const [open, setOpen] = useState<Set<string>>(
-    () => new Set(tree.map((_, i) => String(i))),
-  );
-  const [focused, setFocused] = useState(0);
-  // Set while a key handler (or a search/focusTarget jump) moves focus, so the
-  // effect below only pulls focus when this component asked for it, never
-  // stealing it on an unrelated render.
-  const moving = useRef(false);
-  const rowRefs = useRef<(HTMLLIElement | null)[]>([]);
-  const [query, setQuery] = useState("");
-  // Set by a search/focusTarget jump; consumed (and cleared) once `rows`
-  // actually contains that path. Expanding a branch is a state update, so
-  // the target row does not exist on the same render that requested it.
-  const [pendingPath, setPendingPath] = useState<string | null>(null);
+  const { t, i18n } = useTranslation();
+  // Paths, not ids: the same package can sit under two parents.
+  const [open, setOpen] = useState<Set<string>>(() => new Set(tree.map((_, i) => String(i))));
+  const [term, setTerm] = useState("");
+  const [hit, setHit] = useState<string | null>(null);
   const [noMatch, setNoMatch] = useState(false);
 
-  const rows = useMemo(() => flatten(tree, open), [tree, open]);
-
-  // Rows come and go as branches open and close; keep the focused index inside
-  // the list rather than leaving the tree with no tab stop at all.
-  const active = Math.min(focused, Math.max(rows.length - 1, 0));
-
-  useEffect(() => {
-    if (!moving.current) return;
-    moving.current = false;
-    rowRefs.current[active]?.focus();
-    rowRefs.current[active]?.scrollIntoView({ block: "nearest" });
-  }, [active, rows.length]);
-
-  const toggle = useCallback((path: string, want?: boolean) => {
-    setOpen((prev) => {
-      const next = new Set(prev);
-      const isOpen = next.has(path);
-      const target = want ?? !isOpen;
-      if (target) next.add(path);
-      else next.delete(path);
-      return next;
-    });
+  // Expand to a match and bring it into view. `focus` moves the keyboard there
+  // too: a jump from another section does, typing in the search box does not
+  // (the cursor stays in the box; Enter moves it).
+  const jump = useCallback((found: ReturnType<typeof findFirstMatch>, focus: boolean) => {
+    if (!found) {
+      setHit(null);
+      setNoMatch(true);
+      return;
+    }
+    setNoMatch(false);
+    setOpen((prev) => new Set([...prev, ...found.ancestors]));
+    setHit(found.target);
+    requestAnimationFrame(() =>
+      requestAnimationFrame(() => {
+        const el = document.getElementById(rowId(found.target));
+        if (!el) return;
+        el.scrollIntoView({ block: "center" });
+        if (focus) el.focus({ preventScroll: true });
+      }),
+    );
   }, []);
 
-  const move = useCallback((to: number) => {
-    moving.current = true;
-    setFocused(to);
-  }, []);
-
-  // Expand every ancestor of a match and queue its row for focus once it
-  // exists. Shared by the search box and `focusTarget`, same mechanism, only
-  // the match function differs (exact name+version vs. a name substring).
-  const jumpTo = useCallback(
-    (found: ReturnType<typeof findFirstMatch>) => {
-      if (!found) {
-        setNoMatch(true);
-        return;
-      }
-      setNoMatch(false);
-      setOpen((prev) => {
-        const next = new Set(prev);
-        for (const a of found.ancestors) next.add(a);
-        return next;
-      });
-      setPendingPath(found.target);
-    },
-    [],
-  );
-
   useEffect(() => {
-    if (pendingPath === null) return;
-    const i = rows.findIndex((r) => r.path === pendingPath);
-    if (i === -1) return; // branch not expanded into `rows` yet on this render
-    setPendingPath(null);
-    move(i);
-  }, [pendingPath, rows, move]);
-
-  // focusTarget arrives from another section's "View in Dependencies" link.
-  // Jump as soon as the tree has it (mount, or the target changes on the same
-  // scan, e.g. clicking a different vulnerable package without leaving here).
-  useEffect(() => {
-    if (!focusTarget) return;
-    jumpTo(findPathToRef(tree, focusTarget));
-    // Only re-run when the target itself changes, not on every `tree`
-    // identity change (the SBOM doesn't change under a mounted panel).
+    if (focusTarget) jump(findPathToRef(tree, focusTarget), true);
+    // Only re-run when the target itself changes, not on every `tree` identity.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [focusTarget?.name, focusTarget?.version]);
 
-  const onSearchChange = (v: string) => {
-    setQuery(v);
-    if (!v.trim()) {
+  const onSearch = (v: string) => {
+    setTerm(v);
+    const needle = v.trim().toLowerCase();
+    if (!needle) {
       setNoMatch(false);
+      setHit(null);
       return;
     }
-    const needle = v.trim().toLowerCase();
-    jumpTo(findFirstMatch(tree, (n) => n.name.toLowerCase().includes(needle)));
-  };
-
-  const onKeyDown = (e: React.KeyboardEvent, i: number) => {
-    const row = rows[i];
-    if (!row) return;
-    switch (e.key) {
-      case "ArrowDown":
-        e.preventDefault();
-        if (i < rows.length - 1) move(i + 1);
-        break;
-      case "ArrowUp":
-        e.preventDefault();
-        if (i > 0) move(i - 1);
-        break;
-      case "ArrowRight":
-        e.preventDefault();
-        // Closed: open it. Already open: step into the first child, which is
-        // the next row by construction.
-        if (row.hasChildren && !row.expanded) toggle(row.path, true);
-        else if (row.expanded && i < rows.length - 1) move(i + 1);
-        break;
-      case "ArrowLeft":
-        e.preventDefault();
-        if (row.expanded) {
-          toggle(row.path, false);
-        } else {
-          // Walk back to the nearest row one level up — the parent.
-          for (let j = i - 1; j >= 0; j -= 1) {
-            if (rows[j].level < row.level) {
-              move(j);
-              break;
-            }
-          }
-        }
-        break;
-      case "Home":
-        e.preventDefault();
-        move(0);
-        break;
-      case "End":
-        e.preventDefault();
-        move(rows.length - 1);
-        break;
-      case "Enter":
-      case " ":
-        if (row.hasChildren) {
-          e.preventDefault();
-          toggle(row.path);
-        }
-        break;
-      default:
-        break;
-    }
+    jump(findFirstMatch(tree, (n) => n.name.toLowerCase().includes(needle)), false);
   };
 
   if (tree.length === 0) {
-    return <p className="text-body-sm text-muted-foreground">{t("deps.empty")}</p>;
+    return (
+      <div className="bl-stack">
+        {viewSwitch && <div className="bl-dep-bar">{viewSwitch}</div>}
+        <DepEmpty icon={GitBranchIcon} title={t("deps.empty")} testId="deps-empty" />
+      </div>
+    );
   }
 
+  const describe = (node: TreeNode, level: number) =>
+    [level === 1 ? t("deps.direct") : null, node.vuln ? t(severityLabelKey(node.vuln)) : null, ...licenseOperands(node.licenses)]
+      .filter(Boolean)
+      .join(", ");
+
+  const render = (nodes: TreeNode[], prefix: string, level: number): ReactNode =>
+    nodes.map((node, i) => {
+      const path = prefix ? `${prefix}.${i}` : String(i);
+      const hasChildren = node.children.length > 0 && !node.cycle;
+      const expanded = open.has(path);
+      const label = node.version ? `${node.name} ${node.version}` : node.name;
+      return (
+        <TreeView.Item
+          key={path}
+          id={rowId(path)}
+          aria-label={label}
+          expanded={hasChildren ? expanded : null}
+          current={hit === path}
+          onExpandedChange={(e) =>
+            setOpen((prev) => {
+              const next = new Set(prev);
+              if (e) next.add(path);
+              else next.delete(path);
+              return next;
+            })
+          }
+        >
+          <TreeView.LeadingVisual>
+            <PackageIcon />
+          </TreeView.LeadingVisual>
+          <span className="bl-dep-name bl-mono">
+            {node.name}
+            {node.version && <span className="bl-muted"> {node.version}</span>}
+            {node.cycle && (
+              <Label variant="secondary" className="bl-dep-label bl-dep-cycle">
+                {t("deps.cycle")}
+              </Label>
+            )}
+          </span>
+          {/* The visible trailing part is aria-hidden in Primer, so what it shows
+              is also given as the row's description (its `label`): a direct
+              dependency has no visible label (it sits at the top level), so the
+              word is there for assistive technology, with severity and licences. */}
+          <TreeView.TrailingVisual label={describe(node, level)}>
+            <span className="bl-dep-trail">
+              {node.vuln && (
+                <span title={t("deps.hasVuln")}>
+                  <SeverityLabel severity={node.vuln} />
+                </span>
+              )}
+              <LicenseLabels licenses={node.licenses} />
+            </span>
+          </TreeView.TrailingVisual>
+          {/* A collapsed branch still gets a (cheap, truthy) child: with none, Primer
+              reads the item as a leaf and drops its expanded state, so it could
+              not be opened again. */}
+          {hasChildren && <TreeView.SubTree>{expanded ? render(node.children, path, level + 1) : <></>}</TreeView.SubTree>}
+        </TreeView.Item>
+      );
+    });
+
   return (
-    <div className="space-y-2">
-      {!hasDependencies && (
-        <p className="text-body-sm text-muted-foreground">{t("deps.flatFallback")}</p>
-      )}
-      <div className="relative">
-        <Search
-          className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
-          aria-hidden
-        />
-        <Input
-          type="text"
-          value={query}
-          onChange={(e) => onSearchChange(e.target.value)}
-          placeholder={t("deps.search")}
-          className={cn(TOOLBAR_CONTROL, "pl-8")}
+    <div className="bl-stack-8">
+      <div className="bl-dep-bar">
+        {viewSwitch}
+        <TextInput
+          className="bl-dep-search"
+          leadingVisual={SearchIcon}
           aria-label={t("deps.search")}
+          placeholder={t("deps.search")}
+          value={term}
+          onChange={(e) => onSearch(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && hit) {
+              e.preventDefault();
+              document.getElementById(rowId(hit))?.focus();
+            }
+          }}
         />
       </div>
-      {noMatch && (
-        <p className="text-body-sm text-muted-foreground">{t("deps.searchNoMatch")}</p>
+      {/* Always mounted, so a screen reader announces the text when it changes. */}
+      <span className="bl-muted bl-small bl-dep-status" role="status" data-testid="deps-search-status">
+        {noMatch ? t("deps.searchNoMatch") : hit && term ? t("deps.searchHint") : ""}
+      </span>
+      {note}
+      {!hasDependencies && (
+        <p className="bl-muted bl-flat" data-testid="deps-flat-note">
+          {t("deps.flatFallback")}
+        </p>
       )}
-      <div className="max-h-[max(44rem,calc(100vh-21rem))] overflow-auto rounded-md border p-1">
-        <ul role="tree" aria-label={t("deps.treeLabel")}>
-          {rows.map((row, i) => {
-            const { node } = row;
-            const label = node.version ? `${node.name} ${node.version}` : node.name;
-            return (
-              <li
-                key={row.path}
-                role="treeitem"
-                aria-level={row.level}
-                aria-posinset={row.pos}
-                aria-setsize={row.size}
-                aria-expanded={row.hasChildren ? row.expanded : undefined}
-                // One tab stop for the tree; the arrow keys move within it.
-                tabIndex={i === active ? 0 : -1}
-                ref={(el) => {
-                  rowRefs.current[i] = el;
-                }}
-                onFocus={() => setFocused(i)}
-                onKeyDown={(e) => onKeyDown(e, i)}
-                className="rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              >
-                <div
-                  className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-sm px-1.5 py-1 hover:bg-accent/50 xl:flex-nowrap"
-                  style={{ paddingLeft: `${(row.level - 1) * 16 + 6}px` }}
-                >
-                  {row.hasChildren ? (
-                    <button
-                      type="button"
-                      onClick={() => toggle(row.path)}
-                      className="flex h-4 w-4 shrink-0 items-center justify-center text-muted-foreground hover:text-foreground"
-                      // The row owns the expanded state for assistive tech; this
-                      // is the pointer affordance, kept out of the tab order so
-                      // the tree stays one stop. Its name carries the package,
-                      // because a dozen buttons all called "Expand" name nothing.
-                      tabIndex={-1}
-                      aria-hidden
-                      title={t(row.expanded ? "deps.collapseNamed" : "deps.expandNamed", {
-                        name: label,
-                      })}
-                    >
-                      {row.expanded ? (
-                        <ChevronDown className="h-3.5 w-3.5" />
-                      ) : (
-                        <ChevronRight className="h-3.5 w-3.5" />
-                      )}
-                    </button>
-                  ) : (
-                    <span className="inline-block h-4 w-4 shrink-0" />
-                  )}
-
-                  <Package className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden />
-                  {/* The name wraps instead of being cut short, so all of it is on
-                      screen for every reader, keyboard focus included. */}
-                  <span className="min-w-[6rem] flex-1 font-mono text-label [overflow-wrap:anywhere] xl:min-w-0">
-                    {node.name}
-                    {node.version ? (
-                      <span className="text-muted-foreground"> {node.version}</span>
-                    ) : null}
-                  </span>
-                  {/* Where the node sits in the tree stays beside its name. */}
-                  {row.level === 1 && (
-                    <Badge tone="info" className="shrink-0">
-                      {t("deps.direct")}
-                    </Badge>
-                  )}
-                  {node.cycle && (
-                    <Badge variant="muted" className="shrink-0">
-                      {t("deps.cycle")}
-                    </Badge>
-                  )}
-
-                  {/* From xl up, severity and licences sit in fixed columns on the
-                      right, so they line up from row to row whatever the name's
-                      length. Narrower, they follow the name and wrap under it
-                      rather than squeezing it. A long licence value (a hash, a
-                      full licence text) is cut short, with the whole value in
-                      the tooltip. */}
-                  <span className="ml-auto flex shrink-0 justify-end xl:w-24">
-                    {node.vuln && (
-                      <Badge tone={VULN_TONE[node.vuln]} mark title={t("deps.hasVuln")}>
-                        {t(`severity.${node.vuln}`)}
-                      </Badge>
-                    )}
-                  </span>
-                  <span className="flex min-w-0 flex-wrap justify-end gap-1 xl:w-72 xl:shrink-0 xl:flex-nowrap">
-                    {node.licenses.slice(0, 2).map((l) => (
-                      <Badge key={l} variant="muted" className="min-w-0 max-w-[7.5rem]" title={l}>
-                        <span className="truncate">{l}</span>
-                      </Badge>
-                    ))}
-                    {node.licenses.length > 2 && (
-                      <Badge
-                        variant="muted"
-                        className="shrink-0"
-                        title={node.licenses.slice(2).join(", ")}
-                      >
-                        +{node.licenses.length - 2}
-                      </Badge>
-                    )}
-                  </span>
-                </div>
-              </li>
-            );
-          })}
-        </ul>
-      </div>
+      <section className="bl-box" aria-labelledby="dep-tree-title">
+        <div className="bl-box-head">
+          <h2 id="dep-tree-title">{t("deps.packages")}</h2>
+          {count !== undefined && <CounterLabel>{formatNumber(count, i18n.language)}</CounterLabel>}
+          {direct !== undefined && transitive !== undefined && (
+            <span className="bl-muted bl-small" data-testid="deps-split">
+              {t("nav.depsSaid", { direct: formatNumber(direct, i18n.language), transitive: formatNumber(transitive, i18n.language) })}
+            </span>
+          )}
+        </div>
+        <div className="bl-dep-tree">
+          <TreeView aria-label={t("deps.treeLabel")} truncate={false}>
+            {render(tree, "", 1)}
+          </TreeView>
+        </div>
+      </section>
     </div>
   );
 }

@@ -21,7 +21,10 @@
 
 @layer base {
   :root {
-    --background: 0 0% 98%; /* #fafafa */
+    /* Page, card, popover and muted follow Primer's light theme
+     * (--bgColor-default #ffffff, --bgColor-muted #f6f8fa), so Tailwind
+     * screens and Primer components sit on the same layers. */
+    --background: 0 0% 100%; /* #ffffff, Primer --bgColor-default */
     --foreground: 240 6% 10%; /* #18181b warm near-black */
 
     --card: 0 0% 100%;
@@ -29,7 +32,7 @@
     --popover: 0 0% 100%;
     --popover-foreground: 240 6% 10%;
 
-    --muted: 240 5% 96%; /* #f4f4f5 */
+    --muted: 210 29% 97%; /* #f6f8fa, Primer --bgColor-muted */
     --muted-foreground: 240 4% 44%; /* #6c6c75 — ≥4.6:1 on both background and muted (was 46%, a 4.49 knife-edge) */
 
     --border: 240 5% 91%; /* #e5e5ea */
@@ -45,9 +48,9 @@
     --selected: 240 6% 10%;
     --selected-foreground: 0 0% 98%;
 
-    --secondary: 240 5% 96%;
+    --secondary: 210 29% 97%; /* #f6f8fa, the muted layer */
     --secondary-foreground: 240 6% 10%;
-    --accent: 240 5% 96%;
+    --accent: 210 29% 97%; /* #f6f8fa: hover fills sit on the muted layer too */
     --accent-foreground: 240 6% 10%;
 
     --destructive: 0 72% 51%; /* ~#dc2626 — aligns with risk-critical */
@@ -186,29 +189,31 @@
     --role-neutral-border: 191 191 195;
 
     /* Category palette for classifications that are not severities (the licence
-     * tiers). Six tiers, six hues spread around the wheel and kept muted:
-     *   permissive teal 175, weak-copyleft indigo 230, strong-copyleft violet
-     *   280, network-copyleft magenta 328, review-needed brown 28, and the
-     *   neutral grey of role-neutral for uncategorized.
+     * tiers), kept muted:
+     *   weak-copyleft olive 65, strong-copyleft violet 280, network-copyleft
+     *   magenta 328, review-needed brown 28; permissive and uncategorized take
+     *   the neutral grey of role-neutral, as a tier that needs no attention
+     *   draws none, and permissive's fill is the quieter grey so the two stay
+     *   apart in a bar (which also leaves a gap between segments). Weak copyleft moved off indigo, which read as the navy
+     *   accent (--brand).
      * The three copyleft tiers used to sit 25 to 30 degrees apart (265, 290,
      * 320) and read as one purple; they are now 48 to 50 degrees apart. They
      * stay off the alarm hues (red, orange, yellow) and the info blue, so a
      * licence row never reads as a finding, and the tier is also carried by a
      * marker shape and its name, so colour is never the only signal. Same four
      * shades and the same contrast rules as the roles. Ratios (WCAG relative
-     * luminance): the four recoloured tiers have fg at least 8.4:1 on their
-     * muted surface, 10.4:1 on the card and 9.9:1 on the page in both themes;
-     * teal (unchanged) is 6.0, 7.0 and 6.7 light, all above the 4.5:1 floor.
-     * Emphasis fills are at least 4.4:1 on the card in light and 5.4:1 in dark. */
-    --cat-permissive-fg: 12 100 91; /* 6.0:1 on muted, 7.0:1 on card, 6.7:1 on page */
-    --cat-permissive-muted: 227 240 239; /* emphasis at 12% over the card */
-    --cat-permissive-emphasis: 24 134 123; /* 4.4:1 on card (fills, bars) */
-    --cat-permissive-border: 151 201 196;
+     * luminance): every fg is at least 4.5:1 and every emphasis fill at least
+     * 3:1 on the card, the page and the muted surface in both themes, as
+     * npm run token:contrast checks. */
+    --cat-permissive-fg: 63 63 70; /* the role-neutral shades, a lighter fill */
+    --cat-permissive-muted: 238 238 239;
+    --cat-permissive-emphasis: 136 136 144; /* lighter than uncategorized (role-neutral) */
+    --cat-permissive-border: 191 191 195;
 
-    --cat-weak-fg: 31 45 111; /* 10.6:1 on muted, 12.6:1 on card, 12.1:1 on page */
-    --cat-weak-muted: 232 235 247; /* emphasis at 12% over the card */
-    --cat-weak-emphasis: 66 87 189; /* 6.3:1 on card (fills, bars) */
-    --cat-weak-border: 170 179 225;
+    --cat-weak-fg: 74 80 20; /* olive */
+    --cat-weak-muted: 240 242 226; /* emphasis at 12% over the card */
+    --cat-weak-emphasis: 112 121 28; /* fills, bars */
+    --cat-weak-border: 196 202 146;
 
     --cat-strong-fg: 82 40 103; /* 9.6:1 on muted, 11.3:1 on card, 10.8:1 on page */
     --cat-strong-muted: 241 234 244; /* emphasis at 12% over the card */
@@ -249,27 +254,30 @@
     --warning-surface: var(--role-attention-muted);
 
     /* Syntax colours for the source viewer. Its own small palette rather than
-     * borrowed severity hues: a keyword is not a warning, and reusing the risk
-     * colours here would make a Python file look like a findings list. Each is
+     * borrowed severity hues: a keyword is not a warning. Red is kept for danger, so
+     * keywords take the accent navy and no code colour is red. Each is
      * checked against the surface it is read on (ratios in the comments). */
-    --code-keyword: 207 34 46; /* 5.36:1 on white */
-    --code-string: 10 48 105; /* 12.81:1 */
+    --code-keyword: 29 78 216; /* #1d4ed8, the accent navy; 6.4:1 on white */
+    --code-string: 6 95 70; /* the success foreground; 7.4:1 */
     --code-comment: 110 119 129; /* 4.55:1 */
-    --code-number: 5 80 174; /* 7.59:1 */
-    --code-title: 102 57 186; /* 7.34:1 */
+    --code-number: 133 77 14; /* the attention foreground; 6.6:1 */
+    --code-title: 36 41 47; /* near-black, the neutral foreground; 14:1 */
   }
 
   /* Dark theme — populated (mirrors the portal's reserved token names). */
   .dark {
-    --background: 240 6% 7%; /* #111113 */
+    /* Primer's dark layers: page and card --bgColor-default #0d1117, muted
+     * and popover --bgColor-muted #151b23 (a popover is never darker than
+     * the box under it; primer.css lifts Primer's overlay the same way). */
+    --background: 216 28% 7%; /* #0d1117, Primer --bgColor-default */
     --foreground: 0 0% 98%; /* #fafafa */
 
-    --card: 240 4% 12%; /* #1d1d20 */
+    --card: 216 28% 7%; /* #0d1117 */
     --card-foreground: 0 0% 98%;
-    --popover: 240 4% 12%;
+    --popover: 214 25% 11%; /* #151b23 */
     --popover-foreground: 0 0% 98%;
 
-    --muted: 240 4% 16%; /* #27272a */
+    --muted: 214 25% 11%; /* #151b23, Primer --bgColor-muted */
     --muted-foreground: 240 5% 65%;
 
     /* Kept clearly above --muted: when the two were equal an outline on a muted
@@ -283,15 +291,17 @@
     --selected: 240 5% 30%; /* #494950, 8.5:1 under the foreground label */
     --selected-foreground: 0 0% 98%;
 
-    --secondary: 240 4% 16%;
+    /* One step above muted and popover (#151b23), in the same blue-grey, so a
+     * hover fill on either still shows. */
+    --secondary: 215 18% 13%; /* #1c2128 */
     --secondary-foreground: 0 0% 98%;
-    --accent: 240 4% 16%;
+    --accent: 215 18% 13%; /* #1c2128 */
     --accent-foreground: 0 0% 98%;
 
     --destructive: 0 72% 51%;
     --destructive-foreground: 0 0% 98%;
 
-    --ring: 213.1 93.9% 67.8%; /* #60a5fa, 7.4:1 on the page, 6.6:1 on the card */
+    --ring: 213.1 93.9% 67.8%; /* #60a5fa, 7.4:1 on the page and the card, 6.8:1 on the muted layer */
 
     /* Brand on the near-black canvas. The fill stays the light-theme navy so
      * the white label on the primary button keeps 6.7:1 (a lighter blue fill
@@ -301,7 +311,7 @@
     --brand-strong: 213.1 93.9% 67.8%; /* #60a5fa */
     --brand-hover: 225.9 70.7% 40.2%;
 
-    --sidebar: 240 5% 10%; /* one step above --background (7%) */
+    --sidebar: 216 28% 7%; /* the page colour: the navigation is not a separate layer */
     --sidebar-foreground: 0 0% 98%;
     --sidebar-border: 240 4% 24%;
 
@@ -344,15 +354,15 @@
     --role-neutral-emphasis: 161 161 170; /* 6.9:1 on card */
     --role-neutral-border: 86 86 91;
 
-    --cat-permissive-fg: 134 234 224; /* 9.6:1 on muted, 12.5:1 on card, 14.0:1 on page */
-    --cat-permissive-muted: 27 50 51; /* emphasis at 16% over the card */
-    --cat-permissive-emphasis: 40 189 174; /* 7.6:1 on card */
-    --cat-permissive-border: 31 98 93;
+    --cat-permissive-fg: 212 212 216; /* the role-neutral shades, a quieter fill */
+    --cat-permissive-muted: 46 46 50;
+    --cat-permissive-emphasis: 118 118 126; /* quieter than uncategorized (role-neutral) */
+    --cat-permissive-border: 86 86 91;
 
-    --cat-weak-fg: 194 201 240; /* 8.4:1 on muted, 10.6:1 on card, 11.9:1 on page */
-    --cat-weak-muted: 43 45 59; /* emphasis at 16% over the card */
-    --cat-weak-emphasis: 124 139 218; /* 5.4:1 on card */
-    --cat-weak-border: 71 77 114;
+    --cat-weak-fg: 208 214 140; /* olive */
+    --cat-weak-muted: 47 49 33; /* emphasis at 16% over the card */
+    --cat-weak-emphasis: 168 178 72;
+    --cat-weak-border: 92 97 50;
 
     --cat-strong-fg: 223 198 235; /* 8.6:1 on muted, 11.0:1 on card, 12.3:1 on page */
     --cat-strong-muted: 52 44 58; /* emphasis at 16% over the card */
@@ -370,11 +380,11 @@
     --cat-review-border: 103 91 82;
 
     /* Syntax colours lift for the dark card (#18181b); ratios against it. */
-    --code-keyword: 255 123 114; /* 7.03:1 */
-    --code-string: 165 214 255; /* 11.53:1 */
+    --code-keyword: 96 165 250; /* #60a5fa, the accent navy lifted; 7.2:1 */
+    --code-string: 110 231 183; /* the success foreground; 11.6:1 */
     --code-comment: 145 152 161; /* 6.08:1 */
-    --code-number: 121 192 255; /* 9.11:1 */
-    --code-title: 210 168 255; /* 9.10:1 */
+    --code-number: 232 200 110; /* the attention foreground; 10.9:1 */
+    --code-title: 230 237 243; /* the neutral foreground; 14:1 */
   }
 
   * {

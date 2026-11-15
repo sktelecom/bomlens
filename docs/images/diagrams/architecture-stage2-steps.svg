@@ -8,8 +8,8 @@
   </filter>
 </defs>
 <rect width="760" height="920" fill="#ffffff"/>
-<rect x="110" y="24" width="370" height="76" rx="8" fill="#ffffff" stroke="#EA002C" stroke-width="1.6" filter="url(#sh)"/>
-<text x="295.0" y="52.0" text-anchor="middle" font-family="'Helvetica Neue',Helvetica,Arial,sans-serif" font-size="17" font-weight="600" fill="#EA002C">Obtain SBOM</text>
+<rect x="110" y="24" width="370" height="76" rx="8" fill="#ffffff" stroke="#1d4ed8" stroke-width="1.6" filter="url(#sh)"/>
+<text x="295.0" y="52.0" text-anchor="middle" font-family="'Helvetica Neue',Helvetica,Arial,sans-serif" font-size="17" font-weight="600" fill="#1d4ed8">Obtain SBOM</text>
 <text x="295.0" y="77.0" text-anchor="middle" font-family="'Helvetica Neue',Helvetica,Arial,sans-serif" font-size="14" fill="#5c6773">POSTPROCESS: Stage 1 output — otherwise: syft</text>
 <rect x="110" y="124" width="370" height="76" rx="8" fill="#ffffff" stroke="#d6dbe1" stroke-width="1" filter="url(#sh)"/>
 <text x="295.0" y="152.0" text-anchor="middle" font-family="'Helvetica Neue',Helvetica,Arial,sans-serif" font-size="17" font-weight="600" fill="#1c2228">1  normalize-sbom.sh (jq)</text>

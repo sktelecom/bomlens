@@ -1,0 +1,92 @@
+/*
+ * Copyright 2026 SK Telecom Co., Ltd.
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+/*
+ * External lookup screen (components/ExternalLookup.tsx, lookup/*). A form box,
+ * then one bordered list with a row per advisory: id, grade, title with the
+ * affected range, date. The rest of the advisory opens inside the row. Titles
+ * and ids wrap, never truncate. Colours, spaces and radii are Primer variables.
+ */
+
+.bl-lk-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--base-size-12);
+  padding: var(--base-size-16);
+}
+.bl-lk-input { flex: 1 1 20rem; min-width: 0; }
+.bl-lk-eco { flex: 0 1 13rem; min-width: 10rem; }
+.bl-lk-ver { flex: 0 1 10rem; min-width: 8rem; }
+.bl-lk-note {
+  margin: 0;
+  padding: var(--base-size-8) var(--base-size-16);
+  border-top: var(--borderWidth-thin) solid var(--borderColor-muted);
+  font-size: var(--text-body-size-small);
+  color: var(--fgColor-muted);
+}
+.bl-lk-unsupported { margin: 0; padding: 0 var(--base-size-16) var(--base-size-12); font-size: var(--text-body-size-small); color: var(--fgColor-muted); }
+
+.bl-lk-state { display: flex; align-items: center; gap: var(--base-size-12); padding: var(--base-size-24); }
+
+/* ---- Advisory rows ---- */
+.bl-lk-row { border-top: var(--borderWidth-thin) solid var(--borderColor-muted); }
+.bl-lk-row:first-child { border-top: 0; }
+.bl-lk-sum {
+  display: grid;
+  grid-template-columns: var(--base-size-16) minmax(8rem, 14rem) 6.5rem minmax(0, 1fr) 7.5rem;
+  gap: var(--base-size-12);
+  align-items: start;
+  padding: var(--base-size-8) var(--base-size-16);
+  cursor: pointer;
+  list-style: none;
+  font-size: var(--text-body-size-medium);
+}
+.bl-lk-sum::-webkit-details-marker { display: none; }
+.bl-lk-sum:hover { background: var(--bgColor-muted); }
+.bl-lk-sum:focus-visible { outline: 2px solid var(--focus-outlineColor); outline-offset: -2px; }
+.bl-lk-chev { display: inline-flex; padding-top: var(--base-size-4); color: var(--fgColor-muted); transition: transform 0.12s; }
+details[open] > .bl-lk-sum .bl-lk-chev { transform: rotate(90deg); }
+@media (prefers-reduced-motion: reduce) { .bl-lk-chev { transition: none; } }
+.bl-lk-id { min-width: 0; overflow-wrap: anywhere; font-weight: 600; }
+.bl-lk-titlecell { min-width: 0; }
+.bl-lk-title { overflow-wrap: anywhere; }
+.bl-lk-struck { color: var(--fgColor-muted); text-decoration: line-through; }
+.bl-lk-aff { display: block; margin-top: var(--base-size-2); overflow-wrap: anywhere; color: var(--fgColor-muted); font-size: var(--text-body-size-small); }
+.bl-lk-date { text-align: end; white-space: nowrap; color: var(--fgColor-muted); font-size: var(--text-body-size-small); padding-top: var(--base-size-2); }
+.bl-lk-withdrawn { margin-inline-end: var(--base-size-6); }
+
+.bl-lk-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--base-size-12);
+  padding: var(--base-size-12) var(--base-size-16) var(--base-size-16) var(--base-size-44);
+  border-top: var(--borderWidth-thin) solid var(--borderColor-muted);
+  font-size: var(--text-body-size-medium);
+}
+.bl-lk-kv {
+  display: grid;
+  grid-template-columns: 10rem minmax(0, 1fr);
+  gap: var(--base-size-4) var(--base-size-12);
+  margin: 0;
+}
+.bl-lk-kv dt { color: var(--fgColor-muted); }
+.bl-lk-kv dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+.bl-lk-aliases { display: flex; flex-wrap: wrap; gap: var(--base-size-4) var(--base-size-12); }
+.bl-lk-list { list-style: none; margin: 0; padding: 0; }
+.bl-lk-desc { margin: 0; max-width: 52rem; color: var(--fgColor-muted); overflow-wrap: anywhere; }
+.bl-lk-reflist { list-style: none; margin: var(--base-size-4) 0 0; padding: 0; font-size: var(--text-body-size-small); }
+.bl-lk-reflist a { overflow-wrap: anywhere; }
+.bl-lk-ext { margin-inline-end: var(--base-size-4); vertical-align: -1px; }
+.bl-lk-examples { display: flex; flex-wrap: wrap; justify-content: center; gap: var(--base-size-8) var(--base-size-16); margin-top: var(--base-size-8); }
+.bl-lk-sub { color: var(--fgColor-muted); font-size: var(--text-body-size-small); font-weight: 600; }
+/* A Label keeps its border where a reset would drop it, and stays on one line. */
+.bl-lk-sum [data-severity], .bl-lk-sum .bl-lk-lbl { border-width: var(--borderWidth-thin); white-space: nowrap; }
+
+/* Below a laptop width the date drops under the title instead of squeezing it. */
+@media (max-width: 900px) {
+  .bl-lk-sum { grid-template-columns: var(--base-size-16) minmax(8rem, 14rem) 6.5rem minmax(0, 1fr); }
+  .bl-lk-date { grid-column: 4; text-align: start; }
+}

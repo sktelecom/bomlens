@@ -10,9 +10,12 @@ import {
   conflictReasonGroups,
   isCopyleft,
   licenseNeedsDecision,
+  hasOutboundLicenseField,
   licenseGroups,
+  sortLicenseGroups,
   licenseRiskSummary,
   licenseRiskTier,
+  worstLicense,
   parseLicenseExpression,
   reviewCount,
   reviewGroups,
@@ -477,5 +480,35 @@ describe("conflictReasonGroups", () => {
       ["R2", ["b"]],
       ["", ["d"]],
     ]);
+  });
+});
+
+describe("worstLicense", () => {
+  it("picks the license of the most concerning tier, the first on a tie", () => {
+    expect(worstLicense(["MIT", "GPL-3.0-only", "Apache-2.0"])).toBe("GPL-3.0-only");
+    expect(worstLicense(["MIT", "Apache-2.0"])).toBe("MIT");
+    expect(worstLicense([])).toBe("");
+  });
+});
+
+describe("sortLicenseGroups", () => {
+  const groups = [
+    { name: "MIT", count: 5 },
+    { name: "Apache-2.0", count: 5 },
+    { name: "GPL-3.0-only", count: 9 },
+  ];
+  it("puts the busiest first and breaks a tie by name", () => {
+    expect(sortLicenseGroups(groups, "count").map((g) => g.name)).toEqual(["GPL-3.0-only", "Apache-2.0", "MIT"]);
+  });
+  it("orders by name when asked and leaves the input alone", () => {
+    expect(sortLicenseGroups(groups, "name").map((g) => g.name)).toEqual(["Apache-2.0", "GPL-3.0-only", "MIT"]);
+    expect(groups[0].name).toBe("MIT");
+  });
+});
+
+describe("hasOutboundLicenseField", () => {
+  it("is false for a submitted SBOM or an AI model, true otherwise", () => {
+    for (const s of ["sbom-upload", "ai-model", "model-upload", "ai-declare"]) expect(hasOutboundLicenseField(s)).toBe(false);
+    for (const s of ["current-dir", "git", "image", undefined]) expect(hasOutboundLicenseField(s)).toBe(true);
   });
 });
