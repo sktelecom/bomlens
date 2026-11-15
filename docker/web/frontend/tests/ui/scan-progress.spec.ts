@@ -100,7 +100,7 @@ test("the log follows new lines at its end, stops when scrolled up, and resumes 
   await expect(log).toContainText("line 79");
   const metrics = () => log.evaluate((el) => ({ top: el.scrollTop, end: el.scrollHeight - el.clientHeight }));
   await expect.poll(async () => (await metrics()).top).toBeGreaterThan(0);
-  expect((await metrics()).end - (await metrics()).top).toBeLessThan(2);
+  await expect.poll(async () => (await metrics()).end - (await metrics()).top).toBeLessThan(2);
   // Read upward: new lines no longer move the box.
   await log.evaluate((el) => (el.scrollTop = 40));
   await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => r(null))));
