@@ -43,24 +43,15 @@ type Caps = {
 // count or version number changing inside the sentence.
 const STR: Record<Lang, {
   scanOptions: string; // scanOptions
-  identifyVendored: string; // identifyVendored
-  vendoredHint: string; // substring of vendoredHintTitle
   spdxExport: string; // substring of spdxExport
-  vulnCount: string; // substring of attnVulns
 }> = {
   en: {
     scanOptions: "Result quality",
-    identifyVendored: "Detect copied-in open source",
-    vendoredHint: "C/C++ embedded source",
     spdxExport: "Export as SPDX",
-    vulnCount: "critical or high vulnerabilities",
   },
   ko: {
     scanOptions: "결과 품질",
-    identifyVendored: "복사해 넣은 오픈소스 탐지",
-    vendoredHint: "C/C++ 임베디드 소스",
     spdxExport: "SPDX",
-    vulnCount: "취약점",
   },
 };
 
@@ -362,7 +353,8 @@ for (const lang of ["en", "ko"] as Lang[]) {
     await stub(page, { firmware: false, scanoss: false, docker: true }, { done: DONE, sbom: SBOM });
     await runScan(page, "demo", "1.0");
     await page.locator("main h1").waitFor();
-    await page.getByText(new RegExp(s.vulnCount)).first().waitFor();
+    // The first-checks list is what the redesigned Overview opens with.
+    await page.getByTestId("first-checks").waitFor();
     await killAnim(page);
     await settleMain(page);
     await shootMain(page, `${IMAGES}/${withLang("app-results.png", lang)}`);
@@ -469,10 +461,9 @@ for (const lang of ["en", "ko"] as Lang[]) {
     // The vendored-ID toggle lives inside the collapsed "Result quality"
     // disclosure, expand it and capture the whole open section (summary +
     // toggle) so the guide shows users where to find it, not just the switch.
-    await page.getByText(s.scanOptions).click();
-    const toggle = page.getByText(s.identifyVendored);
-    await toggle.waitFor({ state: "visible" });
-    const section = toggle.locator("xpath=ancestor::details[1]");
+    const section = page.getByTestId("settings-quality");
+    await section.getByText(s.scanOptions, { exact: true }).click();
+    await section.getByTestId("option-identifyVendored").waitFor({ state: "visible" });
     await section.screenshot({
       path: `${IMAGES}/${withLang("web-ui-identify-vendored-en.png", lang)}`,
     });
@@ -482,11 +473,8 @@ for (const lang of ["en", "ko"] as Lang[]) {
     await seedLang(page, lang);
     await stub(page, { firmware: false, scanoss: true, docker: true }, { done: VENDORED_DONE });
     await runScan(page, "trelay", "26.4.0");
-    // The banner is the amber rounded-md box that holds the suggestion text.
-    const banner = page
-      .locator("div.rounded-md")
-      .filter({ hasText: s.vendoredHint })
-      .first();
+    // The suggestion is a warning banner with its own test id.
+    const banner = page.getByTestId("vendored-hint");
     await banner.waitFor({ state: "visible" });
     await killAnim(page);
     await settleMain(page);
@@ -556,27 +544,24 @@ const CONFORMANCE_DONE = {
 // down to what still needs fixing. The panel itself opens filtered to
 // "actionable" whenever any check qualifies (ConformancePanel.tsx), so the
 // capture has to reset that filter to match what the doc describes.
+const KINDS_GROUP: Record<Lang, string> = { en: "Check kind", ko: "검사 종류" };
 const G7_WAIT: Record<Lang, string> = { en: "SBOM author", ko: "SBOM 작성자" };
 
 for (const lang of ["en", "ko"] as Lang[]) {
   test(`@capture conformance section - ${lang}`, async ({ page }) => {
-    await page.setViewportSize({ width: 1040, height: 664 });
+    // Taller than the other full-window shots: the redesigned screen stacks the
+    // verdict, the tabs and the format box above the G7 clusters this image shows.
+    await page.setViewportSize({ width: 1040, height: 1100 });
     await seedLang(page, lang);
     await stub(page, { firmware: false, scanoss: false, docker: true }, { done: CONFORMANCE_DONE });
     await runScan(page, "model", "1.0");
     await NAV(page, "conformance").click();
-    // Reset the default "actionable" filter to "all" (the chip toggles off
-    // when clicked a second time). Scoped to main: the top bar's EN/KO
-    // toggle is also a pressed button. The chip only exists once the
-    // conformance data has rendered, so wait for it before deciding whether
-    // to click it (count() alone does not wait).
-    const activeKindChip = page.locator("main").getByRole("button", { pressed: true }).first();
-    try {
-      await activeKindChip.waitFor({ state: "visible", timeout: 5000 });
-      await activeKindChip.click();
-    } catch {
-      // No kind filter defaulted on (no actionable check in this stub); nothing to toggle.
-    }
+    // The screen opens on "Can be fixed" when any check qualifies; the doc
+    // describes the whole report, so switch to the "All" tab, the first one in
+    // the kind group. The tabs exist once the conformance data has rendered.
+    const kinds = page.getByRole("group", { name: KINDS_GROUP[lang], exact: true });
+    await kinds.waitFor({ state: "visible" });
+    await kinds.getByRole("button").first().click();
     // A cluster with no actionable check of its own (metadata, holding "SBOM
     // author") stays collapsed even under the "all" filter, since each
     // CheckGroup only auto-opens when the filter is non-null or it contains
