@@ -43,12 +43,26 @@ export function ProgressLog({ logs, status, collapsible = false, open, serverMes
   const { toast } = useToast();
   const box = useRef<HTMLDivElement>(null);
   const atEnd = useRef(true);
+  // Set by the reader's own input (wheel, touch, keys, a press on the scrollbar).
+  // A scroll event with no such input came from the box growing or from our own
+  // jump to its end, and says nothing about where the reader wants to be.
+  const userInput = useRef(false);
+  const pressed = useRef(false);
   const [copyBlocked, setCopyBlocked] = useState(false);
 
   useEffect(() => {
     const b = box.current;
     if (b && atEnd.current) b.scrollTop = b.scrollHeight;
+    if (!pressed.current) userInput.current = false;
   }, [logs]);
+
+  useEffect(() => {
+    const up = () => {
+      pressed.current = false;
+    };
+    window.addEventListener("pointerup", up);
+    return () => window.removeEventListener("pointerup", up);
+  }, []);
 
   // Copies the lines exactly as they are shown, so what lands on the clipboard
   // is what the reader just saw.
@@ -94,7 +108,15 @@ export function ProgressLog({ logs, status, collapsible = false, open, serverMes
           tabIndex={0}
           className="bl-log"
           data-live={status === "running"}
+          onWheel={() => (userInput.current = true)}
+          onTouchMove={() => (userInput.current = true)}
+          onKeyDown={() => (userInput.current = true)}
+          onPointerDown={() => {
+            userInput.current = true;
+            pressed.current = true;
+          }}
           onScroll={(e) => {
+            if (!userInput.current) return;
             const b = e.currentTarget;
             atEnd.current = b.scrollHeight - b.scrollTop - b.clientHeight < END_SLACK;
           }}

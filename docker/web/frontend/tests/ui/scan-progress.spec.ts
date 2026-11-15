@@ -101,14 +101,17 @@ test("the log follows new lines at its end, stops when scrolled up, and resumes 
   const metrics = () => log.evaluate((el) => ({ top: el.scrollTop, end: el.scrollHeight - el.clientHeight }));
   await expect.poll(async () => (await metrics()).top).toBeGreaterThan(0);
   await expect.poll(async () => (await metrics()).end - (await metrics()).top).toBeLessThan(2);
-  // Read upward: new lines no longer move the box.
-  await log.evaluate((el) => (el.scrollTop = 40));
+  // Read upward with a real wheel: new lines no longer move the box.
+  await log.hover();
+  await page.mouse.wheel(0, -100000);
+  await expect.poll(async () => (await metrics()).top).toBe(0);
   await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => r(null))));
   await emit(page, "log", "late line");
   await expect(log).toContainText("late line");
-  expect((await metrics()).top).toBe(40);
-  // Back to the end: following resumes.
-  await log.evaluate((el) => (el.scrollTop = el.scrollHeight));
+  expect((await metrics()).top).toBe(0);
+  // Back to the end with the wheel: following resumes.
+  await page.mouse.wheel(0, 100000);
+  await expect.poll(async () => (await metrics()).end - (await metrics()).top).toBeLessThan(2);
   await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => r(null))));
   await emit(page, "log", "another line");
   await expect(log).toContainText("another line");
