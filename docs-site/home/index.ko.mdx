@@ -8,6 +8,25 @@ tableOfContents: false
 import { Card, CardGrid } from '@astrojs/starlight/components';
 import HomeSearch from '../../components/HomeSearch.astro';
 
+export const sampleBom = `{
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.6",
+  "components": [
+    { "name": "log4j-core",
+      "version": "2.14.1",
+      "type": "library" }
+  ]
+}`;
+export const sampleNotice = `log4j-core 2.14.1
+License: Apache-2.0
+https://logging.apache.org/log4j/2.x/
+
+Licensed under the Apache License,
+Version 2.0 (the "License"); ...`;
+export const sampleSecurity = `log4j-core 2.14.1
+CVE-2021-44228  CRITICAL
+Fixed in: 2.15.0
+CISA KEV: yes`;
 export const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 
 <div class="home" data-glow="on">
@@ -18,6 +37,11 @@ export const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 
 <p class="home-lead">소스 코드, 컨테이너, 펌웨어, 받은 SBOM을 넣으면 한 번의 실행으로 SBOM과 오픈소스 고지문, 위험 보고서가 나옵니다. SaaS도 계정도 필요 없습니다.</p>
 
+<div class="home-actions">
+  <a class="btn btn-primary" href={`${base}/ko/start/first-scan/`}>첫 스캔 시작</a>
+  <a class="btn" href={`${base}/demo/`}>데모 열어 보기</a>
+</div>
+
 <button type="button" class="home-search" data-open-search aria-keyshortcuts="Control+K Meta+K">
   <svg aria-hidden="true" viewBox="0 0 16 16" width="16" height="16"><path fill="currentColor" d="M10.68 11.74a6 6 0 0 1-7.922-8.982 6 6 0 0 1 8.982 7.922l3.04 3.04a.749.749 0 0 1-.326 1.275.749.749 0 0 1-.734-.215ZM11.5 7a4.499 4.499 0 1 0-8.997 0A4.499 4.499 0 0 0 11.5 7Z"/></svg>
   <span>가이드, 옵션, 보고서 검색</span>
@@ -27,16 +51,8 @@ export const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 </section>
 
 <section class="home-start" aria-labelledby="home-start-title">
-  <h2 id="home-start-title" class="home-eyebrow">여기서 시작하세요</h2>
+  <h2 id="home-start-title" class="home-eyebrow">자주 하는 일</h2>
   <div class="start-grid">
-    <a class="start-card" href={`${base}/demo/`}>
-      <strong>데모 열어 보기</strong>
-      <span>입력 종류별로 완료된 스캔을 실제 웹 UI에서 봅니다. 설치할 것이 없습니다.</span>
-    </a>
-    <a class="start-card" href={`${base}/ko/start/first-scan/`}>
-      <strong>첫 스캔 실행</strong>
-      <span>앱이나 CLI를 설치하고 내 프로젝트의 SBOM을 만듭니다.</span>
-    </a>
     <a class="start-card" href={`${base}/ko/guides/supplier-sbom/`}>
       <strong>공급사 SBOM 검증</strong>
       <span>받은 SBOM의 요구사항 충족을 검증하고 위험 보고서를 발행합니다.</span>
@@ -44,6 +60,14 @@ export const base = import.meta.env.BASE_URL.replace(/\/$/, '');
     <a class="start-card" href={`${base}/ko/guides/ci-cd/`}>
       <strong>CI에서 사용</strong>
       <span>파이프라인에서 스캔을 실행하고 결과로 통과 여부를 가릅니다.</span>
+    </a>
+    <a class="start-card" href={`${base}/ko/guides/reports/`}>
+      <strong>결과물 읽기</strong>
+      <span>고지문과 보안 보고서를 만들고 읽는 방법을 봅니다.</span>
+    </a>
+    <a class="start-card" href={`${base}/ko/reference/cli/`}>
+      <strong>CLI 옵션</strong>
+      <span>모든 옵션과 분석 모드를 한곳에서 찾습니다.</span>
     </a>
   </div>
 </section>
@@ -66,6 +90,28 @@ export const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 </section>
 
 <HomeSearch />
+
+<section class="home-samples" aria-labelledby="home-samples-title">
+  <h2 id="home-samples-title">한 번의 실행으로 나오는 결과물</h2>
+  <p class="home-sub">파일 이름은 실제 결과물과 같고, 내용은 일부만 줄여 보였습니다.</p>
+  <div class="sample-grid">
+    <figure class="sample">
+      <figcaption><span class="dots" aria-hidden="true"></span>MyApp_1.0.0_bom.json</figcaption>
+      <pre tabindex="0"><code>{sampleBom}</code></pre>
+      <p>SBOM. 구성요소, 라이선스, 의존 관계를 CycloneDX 1.6으로 담습니다.</p>
+    </figure>
+    <figure class="sample">
+      <figcaption><span class="dots" aria-hidden="true"></span>MyApp_1.0.0_NOTICE.txt</figcaption>
+      <pre tabindex="0"><code>{sampleNotice}</code></pre>
+      <p>오픈소스 고지문. 배포물에 그대로 동봉할 수 있는 표준 텍스트입니다.</p>
+    </figure>
+    <figure class="sample">
+      <figcaption><span class="dots" aria-hidden="true"></span>MyApp_1.0.0_security.md</figcaption>
+      <pre tabindex="0"><code>{sampleSecurity}</code></pre>
+      <p>보안 보고서. 취약점과 수정 버전, 우선 확인할 신호를 보여 줍니다.</p>
+    </figure>
+  </div>
+</section>
 
 ## 무엇을 하는 도구인가
 
