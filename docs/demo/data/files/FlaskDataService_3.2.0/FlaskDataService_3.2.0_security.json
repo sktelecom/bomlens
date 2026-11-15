@@ -3,8 +3,8 @@
   "Trivy": {
     "Version": "0.75.0"
   },
-  "ReportID": "01a1cf05-0588-7288-b8ee-2d6f008ceba9",
-  "CreatedAt": "2026-11-12T09:09:35.240168188Z",
+  "ReportID": "01a1df71-1baa-7ce5-ac08-c7232be29b13",
+  "CreatedAt": "2026-11-15T13:41:34.25084813Z",
   "ArtifactName": "FlaskDataService_3.2.0_bom.json",
   "ArtifactType": "cyclonedx",
   "Results": [
@@ -1178,7 +1178,7 @@
             "https://www.cve.org/CVERecord?id=CVE-2026-114134"
           ],
           "PublishedDate": "2026-11-05T21:18:36.887Z",
-          "LastModifiedDate": "2026-11-09T18:17:20.997Z"
+          "LastModifiedDate": "2026-11-12T22:18:35.61Z"
         },
         {
           "VulnerabilityID": "CVE-2024-21503",
@@ -1653,7 +1653,7 @@
           ],
           "VendorSeverity": {
             "alma": 3,
-            "amazon": 3,
+            "amazon": 2,
             "azure": 3,
             "cbl-mariner": 3,
             "ghsa": 3,
@@ -1740,7 +1740,7 @@
           ],
           "VendorSeverity": {
             "alma": 3,
-            "amazon": 3,
+            "amazon": 2,
             "azure": 3,
             "cbl-mariner": 3,
             "ghsa": 3,

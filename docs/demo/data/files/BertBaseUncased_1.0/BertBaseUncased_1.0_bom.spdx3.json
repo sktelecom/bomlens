@@ -5,10 +5,10 @@
       "type": "CreationInfo",
       "@id": "_:creationinfo",
       "specVersion": "3.0.1",
-      "created": "2026-11-12T09:11:12Z",
+      "created": "2026-11-15T13:43:28Z",
       "createdUsing": [
         "https://github.com/sktelecom/bomlens/spdxdocs/BertBaseUncased_1.0/spdx3/tool/owasp-aibom-generator%201.0.2",
-        "https://github.com/sktelecom/bomlens/spdxdocs/BertBaseUncased_1.0/spdx3/tool/BomLens%201.14.5"
+        "https://github.com/sktelecom/bomlens/spdxdocs/BertBaseUncased_1.0/spdx3/tool/BomLens%201.15.0"
       ]
     },
     {
@@ -21,7 +21,7 @@
       ],
       "element": [
         "https://github.com/sktelecom/bomlens/spdxdocs/BertBaseUncased_1.0/spdx3/tool/owasp-aibom-generator%201.0.2",
-        "https://github.com/sktelecom/bomlens/spdxdocs/BertBaseUncased_1.0/spdx3/tool/BomLens%201.14.5",
+        "https://github.com/sktelecom/bomlens/spdxdocs/BertBaseUncased_1.0/spdx3/tool/BomLens%201.15.0",
         "https://github.com/sktelecom/bomlens/spdxdocs/BertBaseUncased_1.0/spdx3/model/pkg%3Ahuggingface%2Fgoogle-bert%2Fbert-base-uncased%4086b5e093",
         "https://github.com/sktelecom/bomlens/spdxdocs/BertBaseUncased_1.0/spdx3/agent/Agent%3Agoogle-bert",
         "https://github.com/sktelecom/bomlens/spdxdocs/BertBaseUncased_1.0/spdx3/annotation/1",
@@ -68,9 +68,9 @@
     },
     {
       "type": "Tool",
-      "spdxId": "https://github.com/sktelecom/bomlens/spdxdocs/BertBaseUncased_1.0/spdx3/tool/BomLens%201.14.5",
+      "spdxId": "https://github.com/sktelecom/bomlens/spdxdocs/BertBaseUncased_1.0/spdx3/tool/BomLens%201.15.0",
       "creationInfo": "_:creationinfo",
-      "name": "BomLens 1.14.5"
+      "name": "BomLens 1.15.0"
     },
     {
       "type": "ai_AIPackage",

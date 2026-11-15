@@ -1,12 +1,12 @@
 {
   "project": "BertBaseUncased",
-  "generatedAt": "2026-11-12T09:11:15Z",
+  "generatedAt": "2026-11-15T13:43:32Z",
   "conformanceResult": "pass",
   "g7": {
     "total": 51,
     "auto": 41,
-    "present": 30,
-    "gap": 11,
+    "present": 31,
+    "gap": 10,
     "review": 10,
     "notApplicable": 0,
     "clusters": [
@@ -37,8 +37,8 @@
       {
         "cluster": "metadata",
         "total": 10,
-        "present": 7,
-        "gap": 3,
+        "present": 8,
+        "gap": 2,
         "review": 0,
         "notApplicable": 0
       },
@@ -131,12 +131,6 @@
         "label": "SBOM author signature",
         "cluster": "metadata",
         "docUrl": "https://cyclonedx.org/docs/1.7/json/#signature"
-      },
-      {
-        "id": "g7-meta-gen-context",
-        "label": "SBOM generation context",
-        "cluster": "metadata",
-        "docUrl": ""
       },
       {
         "id": "g7-slp-name",
@@ -570,7 +564,7 @@
             "label": "Timestamp (metadata.timestamp)",
             "status": "pass",
             "source": null,
-            "detail": "2026-11-12T09:11:12+00:00",
+            "detail": "2026-11-15T13:43:28+00:00",
             "refs": [
               "Section 5.2.1"
             ]
