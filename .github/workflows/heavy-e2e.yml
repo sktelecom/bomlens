@@ -1,7 +1,7 @@
 name: Heavy E2E (reusable)
 
 # The heavy end-to-end suites (web UI E2E, comprehensive CLI E2E, docs
-# walkthrough) in one reusable workflow. Both ci.yml (main pushes, dispatch,
+# walkthrough) in one reusable workflow. Both ci.yml (dispatch and
 # path-filtered PRs) and nightly.yml (daily full run) call this, so the step
 # definitions exist exactly once and the two schedules can never drift apart.
 #
@@ -101,7 +101,7 @@ jobs:
       # the PUBLISHED firmware image and tag it as the name test-e2e.sh's
       # firmware group auto-enables on. This validates the published image plus
       # HEAD's harness within 24h; HEAD's firmware Dockerfile itself is still
-      # validated by docker-publish.yml on main pushes and by dispatching with
+      # validated by docker-publish.yml when it runs and by dispatching with
       # firmware=true.
       - name: Pull published firmware image (opt-in, fast)
         if: inputs.firmware_pull && !inputs.firmware
@@ -127,7 +127,7 @@ jobs:
       - name: Run comprehensive CLI e2e (test-e2e.sh)
         run: bash tests/test-e2e.sh
 
-      # examples_only bounds runtime for callers on a budget (main pushes scan a
+      # examples_only bounds runtime for callers on a budget (pull requests scan a
       # representative npm/pip/gomod subset); empty scans every bundled example.
       - name: Run real-example scan e2e (test-examples-e2e.sh)
         env:
