@@ -110,7 +110,7 @@ def write_new_file(path: Path, data: bytes) -> None:
             shutil.rmtree(path)
         else:
             path.unlink()
-    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL | _NOFOLLOW, 0o644)
+    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL | _NOFOLLOW, 0o640)
     with os.fdopen(fd, "wb") as fh:
         fh.write(data)
 

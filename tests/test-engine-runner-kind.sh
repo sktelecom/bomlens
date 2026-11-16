@@ -28,10 +28,14 @@ CLUSTER="${KIND_CLUSTER:-bomlens-runner}"
 REG_NAME="${KIND_REGISTRY:-bomlens-runner-registry}"
 REG_PORT="${KIND_REGISTRY_PORT:-5001}"
 REG_IMAGE="registry:2@sha256:a3d8aaa63ed8681a604f1dea0aa03f100d5895b6a58ace528858a7b332415373"
+# kind's default CNI does not enforce NetworkPolicy; Calico does.
+CALICO_URL="https://raw.githubusercontent.com/projectcalico/calico/v3.29.3/manifests/calico.yaml"
+CALICO_SHA256="9a575859428b822a224dedafc4238555b6b0f910f2abf12983f20f871860914e"
 NS=bomlens-scan
 PASS=0
 FAIL=0
 
+sha() { if command -v sha256sum >/dev/null 2>&1; then sha256sum; else shasum -a 256; fi; }
 pass() { echo "  PASS: $1"; PASS=$((PASS + 1)); }
 fail() { echo "  FAIL: $1"; [ -n "${2:-}" ] && echo "        $2"; FAIL=$((FAIL + 1)); return 0; }
 
@@ -66,6 +70,9 @@ fi
 cat > "$WORK/kind.yaml" <<EOF
 kind: Cluster
 apiVersion: kind.x-k8s.io/v1alpha4
+networking:
+  disableDefaultCNI: true
+  podSubnet: 192.168.0.0/16
 containerdConfigPatches:
   - |-
     [plugins."io.containerd.grpc.v1.cri".registry]
@@ -77,7 +84,12 @@ nodes:
         containerPath: /ws
 EOF
 kind delete cluster --name "$CLUSTER" >/dev/null 2>&1 || true
-kind create cluster --name "$CLUSTER" --config "$WORK/kind.yaml" --wait 120s
+kind create cluster --name "$CLUSTER" --config "$WORK/kind.yaml"
+curl -sSfL -o "$WORK/calico.yaml" "$CALICO_URL"
+[ "$(sha < "$WORK/calico.yaml" | cut -d' ' -f1)" = "$CALICO_SHA256" ] || { echo "[ERROR] the Calico manifest checksum differs"; exit 1; }
+kubectl apply -f "$WORK/calico.yaml" >/dev/null
+kubectl wait --for=condition=Ready nodes --all --timeout=300s >/dev/null
+kubectl -n kube-system rollout status daemonset/calico-node --timeout=300s >/dev/null
 node="${CLUSTER}-control-plane"
 docker exec "$node" mkdir -p "/etc/containerd/certs.d/localhost:${REG_PORT}"
 printf '[host."http://%s:5000"]\n' "$REG_NAME" | docker exec -i "$node" cp /dev/stdin "/etc/containerd/certs.d/localhost:${REG_PORT}/hosts.toml"
@@ -179,7 +191,6 @@ policy() {  # policy <file>
 EOF
 }
 runner() { PYTHONPATH="$ROOT_DIR/runner/src" python3 -m bomlens_runner "$@" --api http://127.0.0.1:8001; }
-sha() { if command -v sha256sum >/dev/null 2>&1; then sha256sum; else shasum -a 256; fi; }
 tree_hash() { (cd "$1" && find . -type f -print0 | LC_ALL=C sort -z | xargs -0 cat | sha | cut -d' ' -f1); }
 
 echo "== source scan =="
@@ -215,8 +226,11 @@ echo "== cancel =="
 mkdir -p "$WS/scan3"
 cp -R "$ROOT_DIR/examples/nodejs" "$WS/scan3/src"
 before3="$(tree_hash "$WS/scan3/src")"
-runner source --policy "$WORK/policy.json" --scan-id kind3 --scan-dir "$WS/scan3" --source "$WS/scan3/src" \
-    --project demo --version 1.0 > "$WORK/cancel.json" 2> "$WORK/cancel.log" &
+# Started as its own process (not through the shell function), so the
+# signal reaches the runner and not a subshell.
+PYTHONPATH="$ROOT_DIR/runner/src" python3 -m bomlens_runner source --policy "$WORK/policy.json" --scan-id kind3 \
+    --scan-dir "$WS/scan3" --source "$WS/scan3/src" --project demo --version 1.0 --api http://127.0.0.1:8001 \
+    > "$WORK/cancel.json" 2> "$WORK/cancel.log" &
 rpid=$!
 for _ in $(seq 1 120); do
     kubectl get pods -n "$NS" -l app.kubernetes.io/component=engine-stage1 -o name 2>/dev/null | grep -q . && break
