@@ -52,7 +52,7 @@ cleanup() {
         docker rm -f "$REG_NAME" >/dev/null 2>&1 || true
         # The node wrote these as the scan's users; the host user may not
         # own them all.
-        docker run --rm -v "$WORK:/w" "$IMAGE" sh -c 'rm -rf /w/*' >/dev/null 2>&1 || true
+        docker run --rm --entrypoint sh -v "$WORK:/w" "$IMAGE" -c 'rm -rf /w/*' >/dev/null 2>&1 || true
         rm -rf "$WORK" 2>/dev/null || true
     else
         echo "Kept: cluster $CLUSTER, registry $REG_NAME, work folder $WORK"

@@ -2,8 +2,9 @@
 # the scan engine on Kubernetes.
 #
 #   unit: its own tests on the oldest and a current Python, no cluster.
-#   kind: the image built from this commit, on a kind cluster, scanned
-#         through the runner (tests/test-engine-runner-kind.sh).
+#   kind: the image built from this commit, scanned through the runner on
+#         the runner's Docker daemon (tests/test-engine-runner-docker.sh)
+#         and on a kind cluster (tests/test-engine-runner-kind.sh).
 #
 # Runs on a pull request that touches the runner, or the parts of the image
 # it reads (the plan, the result manifest, the entrypoint), and on dispatch.
@@ -19,6 +20,7 @@ on:
       - "docker/entrypoint.sh"
       - "schemas/engine-*.json"
       - "tests/test-engine-runner-kind.sh"
+      - "tests/test-engine-runner-docker.sh"
       - ".github/workflows/engine-runner.yml"
   workflow_dispatch:
 
@@ -52,7 +54,7 @@ jobs:
         run: python -m unittest -v
 
   kind:
-    name: Runner on a kind cluster
+    name: Runner on Docker and a kind cluster
     runs-on: ubuntu-latest
     timeout-minutes: 45
     needs: [unit]
@@ -89,6 +91,21 @@ jobs:
           tags: bomlens:runner-test
           cache-from: type=gha,scope=engine-runner
           cache-to: type=gha,mode=max,scope=engine-runner
+
+      # The runner runs images by digest; a local registry gives the built
+      # image one.
+      - name: Run the runner on Docker
+        env:
+          KIND_WORK_BASE: ${{ runner.temp }}
+        run: |
+          docker run -d --name runner-test-registry -p 127.0.0.1:5002:5000 \
+            registry:2@sha256:a3d8aaa63ed8681a604f1dea0aa03f100d5895b6a58ace528858a7b332415373
+          docker tag bomlens:runner-test localhost:5002/bomlens:runner-test
+          pushed=""
+          for _ in $(seq 1 20); do docker push -q localhost:5002/bomlens:runner-test >/dev/null && { pushed=1; break; }; sleep 1; done
+          [ -n "$pushed" ] || { echo "::error::the image could not be pushed to the local registry"; exit 1; }
+          BOMLENS_TEST_IMAGE=localhost:5002/bomlens:runner-test bash tests/test-engine-runner-docker.sh
+          docker rm -f runner-test-registry >/dev/null
 
       - name: Run the runner on kind
         env:
