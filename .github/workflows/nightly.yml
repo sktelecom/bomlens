@@ -15,8 +15,8 @@ permissions:
 jobs:
   # Full heavy-suite run (web UI E2E, comprehensive CLI E2E over ALL bundled
   # examples, docs walkthrough) via the same reusable workflow ci.yml uses on
-  # main pushes. On quiet days (no push to main) this bounds drift in the
-  # user-facing scan paths to 24 hours instead of "until the next merge".
+  # pull requests. The nightly run bounds drift in the user-facing scan
+  # paths to 24 hours instead of "until the next pull request".
   heavy-e2e:
     name: Heavy E2E (full)
     uses: ./.github/workflows/heavy-e2e.yml
