@@ -1,5 +1,5 @@
 ---
-description: 다른 프로그램이 BomLens 스캔 엔진을 쿠버네티스에서 엔진 계약대로 실행하게 해 주는 Python 패키지입니다.
+description: 다른 프로그램이 BomLens 스캔 엔진을 쿠버네티스나 Docker에서 엔진 계약대로 실행하게 해 주는 Python 패키지입니다.
 ---
 
 # 엔진 실행기
@@ -7,7 +7,7 @@ description: 다른 프로그램이 BomLens 스캔 엔진을 쿠버네티스에�
 BomLens를 스캔 엔진으로 쓰는 프로그램은 [엔진 계약](engine-contract.ko.md)대로 엔진 컨테이너를 직접 실행할 수도 있고, 엔진 실행기를 호출할 수도 있습니다. 실행기는 Python 패키지(`bomlens-runner`, 표준 라이브러리만 사용, Python 3.10 이상)이며, 그런 프로그램마다 작성해야 했던 다음 일을 맡습니다.
 
 - `MODE=PLAN`을 실행하고, 실행 계획을 읽어 허용 범위에 맞는지 검사합니다.
-- 1단계와 2단계를 쿠버네티스 Job으로 실행하고, 1단계의 종료 코드, 메모리 부족 여부, 로그를 2단계에 넘기며, 1단계가 강제 종료되면 소스 복구 실행을 합니다.
+- 1단계와 2단계를 쿠버네티스 Job이나 Docker 컨테이너로 실행하고, 1단계의 종료 코드, 메모리 부족 여부, 로그를 2단계에 넘기며, 1단계가 강제 종료되면 소스 복구 실행을 합니다.
 - 결과 매니페스트와 거기 적힌 출력 파일을 검사합니다.
 - 반환하기 전에 모든 Job과 Pod를 지웁니다.
 
@@ -116,6 +116,47 @@ print(result.manifest.run_status, result.output_dir)
 `bomlens.engine/network: none`에는 모든 통신을 막는 정책을, `egress`에는 DNS와 클러스터 사설 대역을 뺀 인터넷만 허용하는 정책을 걸면 CLI와 같은 네트워크 조건이 됩니다. NetworkPolicy를 실제로 적용하는 CNI가 필요합니다. 모든 Pod는 seccomp 프로필 `RuntimeDefault`, 서비스 계정 토큰 없음, 서비스 링크 없음, 읽기 전용 루트 파일시스템, `/tmp`의 `emptyDir`로 실행됩니다. 쿠버네티스에는 Pod 단위 프로세스 수 제한이 없으므로 `limits.pids`는 노드에 `podPidsLimit`이 설정된 경우에만 적용됩니다.
 
 CI는 커밋에서 빌드한 이미지로 [kind](https://kind.sigs.k8s.io/) 클러스터에서 실행기를 돌립니다(`tests/test-engine-runner-kind.sh`). 소스 스캔, 취소한 스캔, 이미지 스캔, 그리고 위 두 정책 아래에서 네트워크 라벨이 동작하는지를 확인합니다.
+
+## Docker 준비
+
+`DockerBackend`는 같은 컨테이너를 `docker` CLI로, `DOCKER_HOST`가 가리키는 데몬에서 실행합니다. 컨테이너와 이미지 엔드포인트만 허용하는 소켓 프록시로 충분합니다. 실행기가 쓰는 명령은 `version`, `image inspect`, `pull`, `create`, `inspect`, `start`, `logs`, `kill`, `rm`, `ps`입니다.
+
+```python
+from bomlens_runner.docker import DockerBackend, DockerOptions
+
+backend = DockerBackend(DockerOptions(
+    workspace="scan-workspace",         # subpath로 마운트하는 named volume
+    trivy_db="scan-trivy",
+    egress_network="scan-egress",       # 1단계와 이미지 스캔이 붙는 네트워크
+    refuse_networks=("app-internal",),  # 옵션과 관계없이 붙지 않는 네트워크
+    instance_labels={"example.com/instance": "prod"},
+    secrets=lambda ref: read_secret(ref.name, ref.key),
+))
+```
+
+| 옵션 | 뜻 |
+|---|---|
+| `volume_strategy` | `named`(기본값): 작업 공간과 Trivy 볼륨이 subpath로 마운트하는 Docker 볼륨이며, Docker API 1.45 이상이 필요합니다. `bind`: 호스트 폴더입니다(API 1.41 이상) |
+| `workspace`, `trivy_db` | 볼륨 이름, `bind`이면 절대 경로의 호스트 폴더. 정책의 `workspace.local_root`는 실행기가 같은 파일을 보는 위치입니다 |
+| `egress_network` | `egress` 라벨이 붙은 컨테이너가 붙는 네트워크의 이름(id는 거부). `host`, `none`, `bridge`, `refuse_networks`, 워커 자신의 컨테이너가 붙은 네트워크는 거부합니다 |
+| `worker_container` | 네트워크를 확인할 워커 자신의 컨테이너. 지정하지 않으면 컨테이너 안에서 돌 때 `HOSTNAME`으로 찾습니다 |
+| `instance_labels` | 모든 컨테이너에 붙이고, 이전 시도가 남긴 컨테이너를 지울 범위를 이 설치로 좁히는 라벨 |
+| `secrets` | 컨테이너를 만들 때 `SecretRef`를 값으로 바꾸는 함수 |
+
+컨테이너에 넘길 값은 명령줄에도, docker CLI의 환경에도 들어가지 않습니다. 소유자만 읽을 수 있는 env 파일에 적고, 컨테이너를 만든 직후 지웁니다. 컨테이너를 만든 뒤에는 데몬이 기록한 마운트와 설정을 요청한 것과 대조하고, 다르면 시작하지 않고 지웁니다. 모든 컨테이너에는 다음이 적용됩니다.
+
+- `--security-opt no-new-privileges`
+- `--cap-drop ALL`(root 컨테이너는 root용 capability만 추가)
+- 추가 스왑 없는 메모리 제한, CPU 제한, 프로세스 수 제한
+- 읽기 전용 루트(1단계는 `stage1_read_only_root`를 끄지 않은 경우)
+- `egress` 라벨이 없으면 `--network none`
+- 지워도 되는 시각을 담은 `bomlens.engine/deadline` 라벨
+
+named volume은 `volume-nocopy`로 마운트하고, `/tmp`는 새로 만든 작업 공간 폴더입니다. `run`이 반환하면 컨테이너는 지워진 상태이고, 지우지 못하면 `ContainerStillRunning`을 던집니다.
+
+`bomlens-runner` 명령은 정책 파일에 `docker` 객체가 있으면 Docker를 씁니다. 객체에는 위 옵션(`secrets` 제외)을 적습니다. `SecretRef` `{"secret": {"name": "proxy", "key": "url"}}`는 실행기 환경변수 `BOMLENS_SECRET_PROXY_URL`에서 읽습니다(이름과 키를 대문자로, 그 밖의 문자는 `_`로 바꿈). 이 변수들은 `docker` 명령에 넘기지 않습니다.
+
+CI는 러너의 데몬에서 Docker 백엔드를 돌립니다(`tests/test-engine-runner-docker.sh`). 호스트 폴더와 named volume 각각으로 한 소스 스캔, 취소한 스캔, 이미지 스캔을 확인합니다.
 
 ## 버전
 

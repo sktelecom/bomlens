@@ -8,9 +8,14 @@
     bomlens-runner image --policy policy.json --scan-id s2 --scan-dir /ws/s2 \
         --target alpine:3.20 --project alpine --version 3.20
 
-The policy file is the RunnerPolicy and the Kubernetes options as JSON (see
-docs/reference/engine-runner.md). The API is the in-cluster one unless
---api names another (for example a kubectl proxy at http://127.0.0.1:8001).
+The policy file is the RunnerPolicy and the backend options as JSON (see
+docs/reference/engine-runner.md). With a "docker" object the scan runs on
+the Docker daemon DOCKER_HOST names; otherwise on Kubernetes, through the
+in-cluster API unless --api names another (for example a kubectl proxy at
+http://127.0.0.1:8001). On Docker, a SecretRef {"name": n, "key": k} is
+read from the runner's environment variable BOMLENS_SECRET_<N>_<K> (upper
+case, other characters as "_"); those variables never reach a docker child
+process.
 The output folder and run status are printed as JSON; the exit code is 0 for
 a run that succeeded or succeeded degraded, 1 otherwise.
 """
@@ -19,6 +24,8 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
+import re
 import signal
 import sys
 import threading
@@ -26,6 +33,7 @@ from pathlib import Path
 
 from . import _release
 from .errors import BomLensError, PolicyError
+from .docker import SECRET_ENV_PREFIX, DockerBackend, DockerOptions
 from .kubernetes import KubeApi, KubernetesBackend, KubernetesOptions
 from .orchestrator import run_image_scan, run_source_scan
 from .policy import Images, Limits, RunnerPolicy, SecretRef, Timeouts, Volume
@@ -38,7 +46,20 @@ def _env(raw: dict | None) -> dict:
     return out
 
 
-def load_policy(path: Path) -> tuple[RunnerPolicy, KubernetesOptions]:
+def secret_env_name(ref: SecretRef) -> str:
+    def part(text: str) -> str:
+        return re.sub(r"[^A-Z0-9]", "_", text.upper())
+    return f"{SECRET_ENV_PREFIX}{part(ref.name)}_{part(ref.key)}"
+
+
+def _env_secret(ref: SecretRef) -> str:
+    value = os.environ.get(secret_env_name(ref))
+    if value is None:
+        raise PolicyError(f"no environment value for the secret {ref.name}/{ref.key}")
+    return value
+
+
+def load_policy(path: Path) -> tuple[RunnerPolicy, "KubernetesOptions | DockerOptions"]:
     try:
         doc = json.loads(Path(path).read_text(encoding="utf-8"))
     except (OSError, ValueError):
@@ -71,6 +92,14 @@ def load_policy(path: Path) -> tuple[RunnerPolicy, KubernetesOptions]:
         caller_mounts={k: Path(v) for k, v in (doc.get("caller_mounts") or {}).items()},
         deep_license=doc.get("deep_license", False), deep_cve=doc.get("deep_cve", False),
     )
+    if "docker" in doc:
+        d = dict(doc["docker"] or {})
+        d.pop("secrets", None)
+        d["refuse_networks"] = tuple(d.get("refuse_networks", ()))
+        try:
+            return policy, DockerOptions(secrets=_env_secret, **d)
+        except TypeError:
+            raise PolicyError("the policy's docker object has an option the runner does not know") from None
     k8s.setdefault("workspace_claim", ws.get("name", ""))
     if trivy:
         k8s.setdefault("trivy_db_claim", trivy["name"])
@@ -81,7 +110,10 @@ def load_policy(path: Path) -> tuple[RunnerPolicy, KubernetesOptions]:
             raise PolicyError("the policy names no Kubernetes namespace") from None
     k8s["tolerations"] = tuple(k8s.get("tolerations", ()))
     k8s["image_pull_secrets"] = tuple(k8s.get("image_pull_secrets", ()))
-    return policy, KubernetesOptions(**k8s)
+    try:
+        return policy, KubernetesOptions(**k8s)
+    except TypeError:
+        raise PolicyError("the policy's kubernetes object has an option the runner does not know") from None
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -110,12 +142,16 @@ def main(argv: list[str] | None = None) -> int:
     signal.signal(signal.SIGINT, lambda *_: cancelled.set())
     try:
         policy, options = load_policy(args.policy)
-        if args.api:
+        if isinstance(options, DockerOptions):
+            if args.api or args.token_file or args.ca_file:
+                raise PolicyError("--api, --token-file and --ca-file are for Kubernetes; the policy names Docker")
+            backend = DockerBackend(options)
+        elif args.api:
             token = args.token_file.read_text(encoding="utf-8").strip() if args.token_file else None
             api = KubeApi(args.api, token=token, ca_file=args.ca_file, insecure_http=args.api.startswith("http://"))
+            backend = KubernetesBackend(api, options)
         else:
-            api = KubeApi.in_cluster()
-        backend = KubernetesBackend(api, options)
+            backend = KubernetesBackend(KubeApi.in_cluster(), options)
         log = lambda stage, line: print(f"[{stage}] {line}", file=sys.stderr, flush=True)  # noqa: E731
         common = dict(scan_id=args.scan_id, project=args.project, version=args.project_version,
                       scan_dir=args.scan_dir, on_log=log, cancel=cancelled.is_set)

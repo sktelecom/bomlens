@@ -1,5 +1,5 @@
 ---
-description: The Python package that runs the BomLens scan engine on Kubernetes for another program, following the engine contract.
+description: The Python package that runs the BomLens scan engine on Kubernetes or Docker for another program, following the engine contract.
 ---
 
 # Engine runner
@@ -7,7 +7,7 @@ description: The Python package that runs the BomLens scan engine on Kubernetes 
 A program that uses BomLens as its scan engine can run the engine's containers itself, following the [engine contract](engine-contract.md), or call the engine runner. The runner is a Python package (`bomlens-runner`, standard library only, Python 3.10 or later) that does the part every such program would otherwise write:
 
 - it runs `MODE=PLAN`, reads the execution plan and checks it against what it allows;
-- it runs stage 1 and stage 2 as Kubernetes Jobs, passes stage 1's exit code, out-of-memory state and log to stage 2, and runs the source restore after a killed stage 1;
+- it runs stage 1 and stage 2 as Kubernetes Jobs or Docker containers, passes stage 1's exit code, out-of-memory state and log to stage 2, and runs the source restore after a killed stage 1;
 - it checks the result manifest and the output files it lists;
 - it removes every Job and Pod before it returns.
 
@@ -99,6 +99,38 @@ The runner creates Jobs only. What the cluster provides:
 A policy that denies all traffic to `bomlens.engine/network: none`, and one that allows DNS and the internet, without the cluster's private ranges, to `egress`, give the containers the same network the CLI does. A CNI that enforces NetworkPolicy is needed. Every Pod has a seccomp profile of `RuntimeDefault`, no service account token, no service links, a read-only root file system and an `emptyDir` at `/tmp`. Kubernetes has no per-Pod process limit, so `limits.pids` applies only where the node's `podPidsLimit` is set.
 
 CI runs the runner against a [kind](https://kind.sigs.k8s.io/) cluster with the image built from the commit (`tests/test-engine-runner-kind.sh`): a source scan, a cancelled scan, an image scan, and the network labels under the two policies above.
+
+## Docker setup
+
+`DockerBackend` runs the same containers through the `docker` CLI, on the daemon `DOCKER_HOST` names. A socket proxy that allows only the container and image endpoints is enough: the runner uses `version`, `image inspect`, `pull`, `create`, `inspect`, `start`, `logs`, `kill`, `rm` and `ps`.
+
+```python
+from bomlens_runner.docker import DockerBackend, DockerOptions
+
+backend = DockerBackend(DockerOptions(
+    workspace="scan-workspace",         # a named volume, mounted by subpath
+    trivy_db="scan-trivy",
+    egress_network="scan-egress",       # the network stage 1 and image scans join
+    refuse_networks=("app-internal",),  # never joined, whatever the options say
+    instance_labels={"example.com/instance": "prod"},
+    secrets=lambda ref: read_secret(ref.name, ref.key),
+))
+```
+
+| Option | Meaning |
+|---|---|
+| `volume_strategy` | `named` (default): the workspace and Trivy volumes are Docker volumes mounted by subpath, which needs Docker API 1.45 or later. `bind`: they are host folders (API 1.41 or later) |
+| `workspace`, `trivy_db` | the volume names, or the absolute host folders with `bind`. The policy's `workspace.local_root` is where the runner sees the same files |
+| `egress_network` | the network a container with the `egress` label joins, by name (an id is refused). `host`, `none`, `bridge`, `refuse_networks` and the networks of the worker's own container are refused |
+| `worker_container` | the worker's container, to read its networks. By default the runner inspects its `HOSTNAME` when it runs in a container |
+| `instance_labels` | labels every container gets, and that scope the removal of an earlier attempt's containers to this installation |
+| `secrets` | turns a `SecretRef` into its value when a container is created |
+
+A container's values never reach a command line or the docker CLI's environment: they are written to an env file readable by its owner only, which is removed once the container is created. After a container is created, the mounts and settings the daemon recorded are compared with the ones asked for, and a container that differs is removed without being started. Every container has `--security-opt no-new-privileges`, `--cap-drop ALL` (and the root capabilities for the root containers), memory with no extra swap, a CPU and process limit, a read-only root (stage 1 unless `stage1_read_only_root` is off), `--network none` unless it has the `egress` label, and a `bomlens.engine/deadline` label with the time after which it may be removed. Named volumes are mounted with `volume-nocopy`. `/tmp` is a fresh workspace folder. When `run` returns, the container has been removed, or `ContainerStillRunning` is raised.
+
+The `bomlens-runner` command uses Docker when the policy file has a `docker` object with these options (`secrets` aside). It reads a `SecretRef` `{"secret": {"name": "proxy", "key": "url"}}` from the runner's environment variable `BOMLENS_SECRET_PROXY_URL` (the name and key in upper case, other characters as `_`); those variables are not passed to the `docker` commands.
+
+CI runs the Docker backend on the runner's daemon (`tests/test-engine-runner-docker.sh`): a source scan with a host folder and with a named volume, a cancelled scan and an image scan.
 
 ## Versions
 
