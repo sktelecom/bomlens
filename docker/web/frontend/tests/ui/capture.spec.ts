@@ -181,6 +181,10 @@ const DONE = {
   conformance: null,
   sbom: {
     components: 2,
+    // The relationships in SBOM below: one direct, one transitive. Without the
+    // counts the Overview says no relationship was recorded.
+    directCount: 1,
+    transitiveCount: 1,
     componentList: [
       { name: "openssl", version: "3.0.0", group: "", purl: "pkg:github/openssl/openssl", type: "library", licenses: ["Apache-2.0"], scope: "direct", maxSeverity: "CRITICAL", vulnCount: 1 },
       { name: "zlib", version: "1.2.0", group: "", purl: "pkg:github/madler/zlib", type: "library", licenses: ["Zlib"], scope: "transitive" },
