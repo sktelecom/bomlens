@@ -67,7 +67,7 @@ print(result.manifest.run_status, result.output_dir)
 | `workspace`, `trivy_db` | 클레임 이름과 이 프로세스에서 보이는 위치. 실행기가 마운트하는 경로는 모두 `workspace.local_root` 아래에 있어야 하고 심볼릭 링크를 거치면 안 됩니다 |
 | `stage1_repositories`, `stage1_image_prefix` | 1단계 이미지를 받을 수 있는 곳(기본값 `ghcr.io/cdxgen/`). 미러 접두어를 주면 기본값 대신 그 접두어만 허용하고, `MODE=PLAN`에 `CDXGEN_IMAGE_PREFIX`로 넘깁니다 |
 | `limits`, `timeouts` | 컨테이너별 메모리, CPU, `/tmp` 크기와, 컨테이너별 시간 제한 및 이미지 pull 시간 제한 |
-| `uid`, `gid` | 실행 계획, 2단계, 이미지 스캔 컨테이너를 실행할 사용자이자, 1단계가 쓴 파일의 소유자(`HOST_UID`/`HOST_GID`) |
+| `uid`, `gid` | 실행 계획, 2단계, 이미지 스캔 컨테이너를 실행할 사용자이자, 1단계가 쓴 파일의 소유자(`HOST_UID`/`HOST_GID`). 실행기 자신의 사용자를 주세요. 실행기가 컨테이너용으로 쓰는 파일은 소유자만 읽을 수 있습니다 |
 | `stage1_env`, `stage2_env`, `image_env` | 컨테이너별로 넘길 값. 실행기가 직접 정하는 이름이나 그 컨테이너가 받지 않는 이름은 거부합니다. 값으로 쿠버네티스 Secret 키를 가리키는 `SecretRef`를 주면 값이 Job에 적히지 않습니다. `NVD_API_KEY`, `TRIVY_USERNAME`, `TRIVY_PASSWORD`, `TRIVY_REGISTRY_TOKEN`, 사용자 이름이나 비밀번호가 들어간 프록시 주소는 이 방법으로만 받습니다 |
 | `caller_mounts` | 실행 계획의 호출자 역할(`cache-maven`, `cache-gradle`, `maven-settings`와 그 밖의 설정 역할)에 마운트할 폴더나 파일 |
 | `labels` | 모든 Job과 Pod에 붙일 라벨 |

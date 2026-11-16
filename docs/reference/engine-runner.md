@@ -67,7 +67,7 @@ The runner never reads its own environment for a container. Each value a contain
 | `workspace`, `trivy_db` | the claim name and where this process sees it. Every path the runner mounts must be under `workspace.local_root` with no symbolic link in it |
 | `stage1_repositories`, `stage1_image_prefix` | where the stage 1 image may come from (`ghcr.io/cdxgen/` by default). A mirror prefix replaces the default and is passed to `MODE=PLAN` as `CDXGEN_IMAGE_PREFIX` |
 | `limits`, `timeouts` | memory, CPU and `/tmp` size per container; the time limit of each container and of an image pull |
-| `uid`, `gid` | the user the plan, stage 2 and image containers run as, and `HOST_UID`/`HOST_GID` for the files stage 1 writes |
+| `uid`, `gid` | the user the plan, stage 2 and image containers run as, and `HOST_UID`/`HOST_GID` for the files stage 1 writes. Give the runner's own user: the files it writes for the containers are readable by their owner only |
 | `stage1_env`, `stage2_env`, `image_env` | values for each container, by name. A name the runner sets itself, or one the container does not take, is refused. A value can be a `SecretRef` to a Kubernetes Secret key, so it is never written into a Job; `NVD_API_KEY`, `TRIVY_USERNAME`, `TRIVY_PASSWORD`, `TRIVY_REGISTRY_TOKEN` and a proxy address with a user name or password are taken only that way |
 | `caller_mounts` | folders or files for the plan's caller roles (`cache-maven`, `cache-gradle`, `maven-settings` and the other settings roles) |
 | `labels` | added to every Job and Pod |

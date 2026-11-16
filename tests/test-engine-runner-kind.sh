@@ -219,8 +219,15 @@ jq -e '[.components[] | select(.name == "express")] | length > 0' "$bom" >/dev/n
     && pass "express is in the SBOM" || fail "express is missing from the SBOM"
 grep -q '^\[cdxgen\] ' "$WORK/source.log" && pass "stage 1 output reached on_log" || fail "no stage 1 lines were logged"
 [ "$(tree_hash "$WS/scan1/src")" = "$before" ] && pass "the source tree is unchanged" || fail "the scan changed the source tree"
-left="$(kubectl get jobs,pods -n "$NS" -l app.kubernetes.io/part-of=bomlens-engine -o name 2>/dev/null | wc -l | tr -d ' ')"
-[ "$left" = 0 ] && pass "no Job or Pod is left" || fail "$left engine objects left" "$(kubectl get jobs,pods -n "$NS")"
+# A Pod whose container has ended may stay listed for a moment while it is
+# removed; what must not be left is a Job, or a container that still runs.
+live_pods() {  # live_pods <selector>
+    kubectl get pods -n "$NS" -l "$1" --field-selector=status.phase!=Succeeded,status.phase!=Failed -o name \
+        2>/dev/null | wc -l | tr -d ' '
+}
+left="$(kubectl get jobs -n "$NS" -l app.kubernetes.io/part-of=bomlens-engine -o name 2>/dev/null | wc -l | tr -d ' ')"
+left=$((left + $(live_pods app.kubernetes.io/part-of=bomlens-engine)))
+[ "$left" = 0 ] && pass "no Job or running Pod is left" || fail "$left engine objects left" "$(kubectl get jobs,pods -n "$NS")"
 
 echo "== cancel =="
 mkdir -p "$WS/scan3"
@@ -243,8 +250,8 @@ t1=$(date +%s)
 [ "$(jq -r .error "$WORK/cancel.json" 2>/dev/null)" = "ScanCancelled" ] && pass "SIGTERM cancels the scan" \
     || fail "cancel result: $(cat "$WORK/cancel.json")"
 [ $((t1 - t0)) -le 60 ] && pass "cancel finished in $((t1 - t0))s" || fail "cancel took $((t1 - t0))s"
-left="$(kubectl get pods -n "$NS" -l bomlens.engine/scan=kind3 -o name 2>/dev/null | wc -l | tr -d ' ')"
-[ "$left" = 0 ] && pass "a cancelled scan leaves no Pod" || fail "$left Pods left after cancel"
+left="$(live_pods bomlens.engine/scan=kind3)"
+[ "$left" = 0 ] && pass "a cancelled scan leaves no running Pod" || fail "$left Pods left after cancel" "$(kubectl get pods -n "$NS")"
 [ "$(tree_hash "$WS/scan3/src")" = "$before3" ] && pass "a scan cancelled in stage 1 leaves the source unchanged" \
     || fail "the cancelled scan changed the source tree" "$(grep -c '' "$WORK/cancel.log") log lines"
 
