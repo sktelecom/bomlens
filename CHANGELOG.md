@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- The engine runner (`runner/`, the Python package `bomlens-runner`) runs the scan engine on Kubernetes for another program: it runs `MODE=PLAN`, checks the execution plan, runs stage 1 and stage 2 as Jobs (passing stage 1's exit code, out-of-memory state and log to stage 2, and restoring the source after a killed stage 1), checks the result manifest and its outputs, and removes every Job and Pod before it returns. Image scans run as one Job. Every Pod carries `app.kubernetes.io/part-of=bomlens-engine`, `app.kubernetes.io/component` and `bomlens.engine/network` (`none` or `egress`) labels for the cluster's NetworkPolicies, and secret values are referenced from Kubernetes Secrets. See [Engine runner](docs/reference/engine-runner.md). CI runs it on a kind cluster with the image built from the commit.
+
 ## [v1.15.0] - 2026-11-15
 
 ### Added

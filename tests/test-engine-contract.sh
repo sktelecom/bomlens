@@ -836,6 +836,18 @@ err="$(plan_schema_errors "$P/bomlens-plan.json")"
     && pass "stage 1 is pinned by digest" || fail "stage 1 digest is $(jq -r '.stages[0].image_digest' "$P/bomlens-plan.json")"
 [ "$(jq -r '.stages[0].args | join(" ")' "$P/bomlens-plan.json")" = "/tmp/build-prep.sh /app /out/demo_1.0_bom.json 1.6" ] \
     && pass "stage 1 runs build-prep.sh with the CLI's arguments" || fail "stage 1 args: $(jq -c '.stages[0].args' "$P/bomlens-plan.json")"
+# The engine runner (runner/) reads this plan with its own allowlists; a name
+# make-plan.sh adds must be added there too, or the runner drops it.
+runner_drift="$(PYTHONPATH="$ROOT_DIR/runner/src" python3 - "$P" <<'PY' 2>&1
+import sys
+from pathlib import Path
+from bomlens_runner.plan import load_plan
+plan = load_plan(Path(sys.argv[1]))
+print(" ".join(plan.dropped_env) if plan.dropped_env else "ok")
+PY
+)"
+[ "$runner_drift" = ok ] && pass "the engine runner reads the plan and drops no env name" \
+    || fail "the engine runner: $runner_drift" "add the names to runner/src/bomlens_runner/plan.py"
 cmp -s "$P/bomlens-plan/build-prep.sh" "$ROOT_DIR/docker/lib/build-prep.sh" && [ -f "$P/bomlens-plan/identify-conda.py" ] \
     && pass "the files stage 1 mounts are copied next to the plan" || fail "bomlens-plan/ holds: $(ls "$P/bomlens-plan" 2>&1)"
 [ "$(jq -r '.stages[1] | .image + " " + .env.MODE + " " + .env.BOMLENS_RUN_INPUT' "$P/bomlens-plan.json")" = "ghcr.io/example/bomlens:1 POSTPROCESS demo_1.0_bom.json" ] \
