@@ -581,9 +581,11 @@ Options:
   --sbom-author <name>   Entity that generated this SBOM — the organisation or
                          person running the scan, not the tool and not whoever
                          wrote the software. Use the full name, no acronyms.
-                         Nothing here can discover it, so the field is left out
-                         of the SBOM when it is not given. "Name <email>"
-                         records the email as well.
+                         Nothing here can discover it, so BomLens is recorded as
+                         the author, marked as the tool, when it is not given.
+                         "Name <email>" records the email as well. A default can
+                         be saved as sbom_author=<name> in
+                         ~/.config/bomlens/config (or $BOMLENS_CONFIG).
   --supplier <supplier>  Supplier of the product this SBOM describes, as
                          "Name <https://...>" or "Name <email>" (recorded in
                          metadata.component.supplier).
@@ -922,6 +924,25 @@ EOF
     esac
     shift
 done
+
+# A saved default for the SBOM author, so it need not be typed on every scan.
+# Read as data (one `sbom_author=<name>` line), never sourced. --sbom-author and
+# the SBOM_AUTHOR variable win over it.
+if [ -z "${SBOM_AUTHOR:-}" ]; then
+    _bl_cfg="${BOMLENS_CONFIG:-${XDG_CONFIG_HOME:-$HOME/.config}/bomlens/config}"
+    if [ -f "$_bl_cfg" ]; then
+        _bl_val="$(sed -n 's/^[[:space:]]*sbom_author[[:space:]]*=[[:space:]]*//p' "$_bl_cfg" | head -n 1 | sed 's/[[:space:]]*$//')"
+        case "$_bl_val" in
+            \"*\") _bl_val="${_bl_val#\"}"; _bl_val="${_bl_val%\"}" ;;
+            \'*\') _bl_val="${_bl_val#\'}"; _bl_val="${_bl_val%\'}" ;;
+        esac
+        if [ -n "$_bl_val" ]; then
+            SBOM_AUTHOR="$_bl_val"
+            echo "[INFO] SBOM author taken from $_bl_cfg (--sbom-author overrides it)"
+        fi
+    fi
+    unset _bl_cfg _bl_val
+fi
 
 # ========================================================
 # Docker checks

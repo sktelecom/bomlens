@@ -548,6 +548,15 @@ python3 -I "$CONV" convert --bom "$WORK/scan-author-bom.json" --out-dir "$OUT" -
     --declaration "$FIX/declaration-complete.json" --stable 2>/dev/null
 [ "$(status_of document createdBy)" = "auto" ] && grep -q -- "--sbom-author" "$DOC" \
     && pass "an author the scan was given is still the scan's" || fail "scan author status=$(status_of document createdBy)"
+# BomLens recorded as the author because none was named (marker tool) is not a creator.
+jq '.metadata.authors = [{"name": "BomLens 1.0"}]
+    | .metadata.properties = ((.metadata.properties // []) + [{"name": "bomlens:sbom-author-source", "value": "tool"}])' \
+   "$WORK/declared-bom.json" > "$WORK/tool-author-bom.json"
+rm -f "$OUT"/*
+python3 -I "$CONV" convert --bom "$WORK/tool-author-bom.json" --out-dir "$OUT" --prefix "$P" --stable 2>/dev/null
+[ "$(status_of document createdBy)" = "missingRequired" ] && ! grep -q "BomLens 1.0" "$DOC" \
+    && pass "a tool recorded as the author is not credited as the document creator" \
+    || fail "tool author status=$(status_of document createdBy)"
 
 echo "== the service the model runs in =="
 # A declared service is an ai_AIPackage with primaryPurpose application that
