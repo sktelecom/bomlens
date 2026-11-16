@@ -14,7 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - The web UI names the running version at the foot of the left navigation, so the static demo shows which release it is a copy of. The demo's help menu no longer offers a link to itself.
-- `@axe-core/playwright` moves to 4.14.0. The navigation's numeric counts are now announced as hidden text next to the visible number, which the new `label-content-name-mismatch` check requires.
+- `@axe-core/playwright` moves to 4.14.0. The navigation's labels now end with a space before their count, so the visible text matches the item's name under the new `label-content-name-mismatch` check.
 
 ## [v1.15.0] - 2026-11-15
 

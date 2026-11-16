@@ -217,15 +217,15 @@ export function Sidebar({
                   <NavList.LeadingVisual>
                     <SectionIcon />
                   </NavList.LeadingVisual>
-                  <span data-nav-label={s.id}>{t(s.labelKey)}</span>
+                  <span data-nav-label={s.id}>
+                    {t(s.labelKey)}
+                    {count !== undefined && " "}
+                  </span>
                   {count !== undefined && (
                     <NavList.TrailingVisual>
                       <span className="bl-count" title={note} data-testid={`nav-count-${s.id}`}>
                         {typeof count === "number" ? (
-                          <>
-                            <span aria-hidden>{fmt(count)}</span>
-                            <span className="bl-visually-hidden">{fmt(count)}</span>
-                          </>
+                          fmt(count)
                         ) : said(s.id, count) ? (
                           <>
                             <span aria-hidden>{count}</span>

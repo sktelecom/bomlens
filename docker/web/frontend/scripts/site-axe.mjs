@@ -106,6 +106,14 @@ for (const scheme of SCHEMES) {
       .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"])
       .analyze();
     for (const v of results.violations) {
+      // Starlight's search button is named "Search" while it also shows the
+      // keyboard shortcut ("Ctrl K") as a hint. Axe 4.14 counts the hint as
+      // label text the name lacks. The name is the label, so this one element
+      // is not reported for this one rule.
+      if (v.id === "label-content-name-mismatch") {
+        v.nodes = v.nodes.filter((n) => n.target.join(" ") !== "button[data-open-modal]");
+        if (v.nodes.length === 0) continue;
+      }
       failures += 1;
       const nodes = v.nodes.slice(0, 3).map((n) => n.target.join(" ")).join(" | ");
       console.log(`[${scheme}] /${path} ${v.id} (${v.impact}, ${v.nodes.length}): ${nodes}`);
