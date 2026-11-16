@@ -261,9 +261,9 @@ da=$(jq -rc '"\(.metadata.lifecycles[0].phase)|\(.metadata.authors[0].name)"' "$
 # option and the variable win over it.
 sed -n '/^# A saved default for the SBOM author/,/^# Docker checks/p' "$ROOT_DIR/scripts/scan-sbom.sh" | sed '$d' | sed '$d' > "$WORK/cfgblock.sh"
 printf 'other=1\nsbom_author = "Example Corp <sbom@example.com>"\n' > "$WORK/bomlens.cfg"
-ca=$(unset SBOM_AUTHOR; BOMLENS_CONFIG="$WORK/bomlens.cfg"; . "$WORK/cfgblock.sh" >/dev/null; printf '%s' "$SBOM_AUTHOR")
-cb=$(SBOM_AUTHOR="From Env"; BOMLENS_CONFIG="$WORK/bomlens.cfg"; . "$WORK/cfgblock.sh" >/dev/null; printf '%s' "$SBOM_AUTHOR")
-cc=$(unset SBOM_AUTHOR; BOMLENS_CONFIG="$WORK/none.cfg"; . "$WORK/cfgblock.sh" >/dev/null; printf '%s' "${SBOM_AUTHOR:-}")
+ca=$(unset SBOM_AUTHOR; export BOMLENS_CONFIG="$WORK/bomlens.cfg"; . "$WORK/cfgblock.sh" >/dev/null; printf '%s' "$SBOM_AUTHOR")
+cb=$(SBOM_AUTHOR="From Env"; export BOMLENS_CONFIG="$WORK/bomlens.cfg"; . "$WORK/cfgblock.sh" >/dev/null; printf '%s' "$SBOM_AUTHOR")
+cc=$(unset SBOM_AUTHOR; export BOMLENS_CONFIG="$WORK/none.cfg"; . "$WORK/cfgblock.sh" >/dev/null; printf '%s' "${SBOM_AUTHOR:-}")
 [ "$ca" = "Example Corp <sbom@example.com>" ] && [ "$cb" = "From Env" ] && [ -z "$cc" ] \
     && pass "the saved author default is read from the config file and yields to the variable" \
     || fail "config default: [$ca] [$cb] [$cc]"
