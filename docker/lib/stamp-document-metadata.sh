@@ -82,13 +82,13 @@ case "$MODE" in
 esac
 
 # SBOM Author: the entity operating the tool, which is not something this
-# container can discover — only the person or organisation running the scan knows
-# it. Written when SBOM_AUTHOR says so and left absent otherwise.
+# container can discover: only the person or organisation running the scan knows
+# it. Written when SBOM_AUTHOR says so. When nobody says, BomLens itself is
+# recorded as the author and marked as such (see below).
 #
-# An absent author is not the same as an unknown one, and neither is a wrong one:
-# cdxgen fills metadata.authors with its own publisher, which by definition is not
-# whoever ran the scan, so that default is dropped rather than passed off as an
-# answer.
+# A tool recorded as the author is not the same as a named one. cdxgen fills
+# metadata.authors with its own publisher, which by definition is not whoever ran
+# the scan, so that default is replaced and not passed off as an answer.
 SBOM_AUTHOR="${SBOM_AUTHOR:-}"
 
 # AIDECLARE is the one mode where the person running it has already said who
@@ -116,6 +116,16 @@ elif [ "$MODE" = "AIDECLARE" ] && [ -n "${AI_DECLARATION_FILE:-}" ] && [ -f "$AI
         AUTHORS_JSON="$_declared"
         AUTHOR_SOURCE="declaration"
     fi
+fi
+
+# Nobody named an author. The tool that generated the document is then recorded
+# as its author, so the field is not left empty, and bomlens:sbom-author-source=tool
+# says it is the tool and not whoever ran the scan. This replaces the generator's
+# own default (cdxgen writes its publisher there) and is not read as a contact:
+# it carries no email, so the BSI TR-03183-2 creator check still asks for one.
+# A tool entry is not written for a mode that stamps a received document.
+if [ "$AUTHORS_JSON" = "[]" ] && [ -z "$AUTHOR_SOURCE" ]; then
+    AUTHOR_SOURCE="tool"
 fi
 
 # The product's supplier (--supplier, PRODUCT_SUPPLIER): the organisation that
@@ -251,8 +261,9 @@ if jq --arg lifecycle "$LIFECYCLE" \
     # which single tool gets the credit.
     | add_bomlens({type: "application", publisher: "SK Telecom", name: "BomLens", version: $toolver}; $pre15)
     | (if $lifecycle != "" and ($pre15 | not) then .metadata.lifecycles = [{phase: $lifecycle}] else . end)
-    | (if ($authors | length) > 0
-       then .metadata.authors = $authors
+    | (if $authorsource == "tool" then [{name: ("BomLens " + $toolver)}] else $authors end) as $auth
+    | (if ($auth | length) > 0
+       then .metadata.authors = $auth
        else (.metadata) |= del(.authors) end)
     | (if $supplier != null and ((.metadata.component | type) == "object")
        then .metadata.component.supplier = $supplier
@@ -278,6 +289,6 @@ fi
 echo "[docmeta] tool=BomLens@${TOOL_VERSION}${LIFECYCLE:+, lifecycle=$LIFECYCLE}${SBOM_AUTHOR:+, author=$SBOM_AUTHOR}${ARTIFACT_SHA256:+, sha256=${ARTIFACT_SHA256%"${ARTIFACT_SHA256#????????}"}…}: $SBOM"
 if [ "$AUTHOR_SOURCE" = "declaration" ]; then
     echo "[docmeta] SBOM author taken from the declaration's document.createdBy: $(printf '%s' "$AUTHORS_JSON" | jq -r 'map(.name) | join(", ")') (set SBOM_AUTHOR or pass --sbom-author to name someone else)"
-elif [ -z "$SBOM_AUTHOR" ]; then
-    echo "[docmeta] no SBOM author declared (set SBOM_AUTHOR or pass --sbom-author to name the entity that generated this SBOM)"
+elif [ "$AUTHOR_SOURCE" = "tool" ]; then
+    echo "[docmeta] no SBOM author declared: BomLens is recorded as the author (set SBOM_AUTHOR, --sbom-author or sbom_author in the config file to name the entity that generated this SBOM)"
 fi

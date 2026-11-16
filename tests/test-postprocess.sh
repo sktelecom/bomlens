@@ -241,15 +241,32 @@ DOC='{"bomFormat":"CycloneDX","specVersion":"1.6","version":1,
 printf '%s' "$DOC" > "$WORK/doc-src.json"
 BOMLENS_VERSION=9.9.9 bash "$LIB/stamp-document-metadata.sh" "$WORK/doc-src.json" SOURCE >/dev/null 2>&1
 ds=$(jq -rc '"\(.metadata.lifecycles)|\(.metadata|has("authors"))|\([.metadata.tools.components[]|"\(.name)@\(.version)"]|join(","))"' "$WORK/doc-src.json")
-[ "$ds" = '[{"phase":"pre-build"}]|false|cdxgen@12.7.0,BomLens@9.9.9' ] \
-    && pass "a source scan records pre-build, drops the generator's authorship claim, and names BomLens" \
+[ "$ds" = '[{"phase":"pre-build"}]|true|cdxgen@12.7.0,BomLens@9.9.9' ] \
+    && pass "a source scan records pre-build, replaces the generator's authorship claim, and names BomLens" \
     || fail "source document metadata: $ds"
+# With no author named, BomLens is recorded as the author and marked as the tool,
+# in place of the generator's own claim (OWASP Foundation above).
+da0=$(jq -rc '"\(.metadata.authors|map(.name)|join(","))|\(.metadata.properties|map(select(.name=="bomlens:sbom-author-source"))|map(.value)|join(","))"' "$WORK/doc-src.json")
+[ "$da0" = 'BomLens 9.9.9|tool' ] \
+    && pass "with no author named, BomLens is the author and the source is marked tool" || fail "default author: $da0"
 # The author is the entity operating the tool, which only the caller knows.
 printf '%s' "$DOC" > "$WORK/doc-auth.json"
 SBOM_AUTHOR="SK Telecom Co., Ltd." BOMLENS_VERSION=9.9.9 bash "$LIB/stamp-document-metadata.sh" "$WORK/doc-auth.json" FIRMWARE >/dev/null 2>&1
 da=$(jq -rc '"\(.metadata.lifecycles[0].phase)|\(.metadata.authors[0].name)"' "$WORK/doc-auth.json")
 [ "$da" = 'post-build|SK Telecom Co., Ltd.' ] \
     && pass "a firmware scan records post-build and the declared author" || fail "declared author: $da"
+[ "$(jq -r '[.metadata.properties[]?|select(.name=="bomlens:sbom-author-source")]|length' "$WORK/doc-auth.json")" = "0" ] \
+    && pass "a named author carries no tool marker" || fail "named author marked as tool"
+# A saved default (sbom_author= in the config file) is read as data, and the
+# option and the variable win over it.
+sed -n '/^# A saved default for the SBOM author/,/^# Docker checks/p' "$ROOT_DIR/scripts/scan-sbom.sh" | sed '$d' | sed '$d' > "$WORK/cfgblock.sh"
+printf 'other=1\nsbom_author = "Example Corp <sbom@example.com>"\n' > "$WORK/bomlens.cfg"
+ca=$(unset SBOM_AUTHOR; BOMLENS_CONFIG="$WORK/bomlens.cfg"; . "$WORK/cfgblock.sh" >/dev/null; printf '%s' "$SBOM_AUTHOR")
+cb=$(SBOM_AUTHOR="From Env"; BOMLENS_CONFIG="$WORK/bomlens.cfg"; . "$WORK/cfgblock.sh" >/dev/null; printf '%s' "$SBOM_AUTHOR")
+cc=$(unset SBOM_AUTHOR; BOMLENS_CONFIG="$WORK/none.cfg"; . "$WORK/cfgblock.sh" >/dev/null; printf '%s' "${SBOM_AUTHOR:-}")
+[ "$ca" = "Example Corp <sbom@example.com>" ] && [ "$cb" = "From Env" ] && [ -z "$cc" ] \
+    && pass "the saved author default is read from the config file and yields to the variable" \
+    || fail "config default: [$ca] [$cb] [$cc]"
 # "Name <email>" records the email too (BSI TR-03183-2 asks the SBOM creator
 # for one); a bracketed value that is not an email stays the name.
 printf '%s' "$DOC" > "$WORK/doc-auth-mail.json"
@@ -280,6 +297,8 @@ sup_case() {  # <name> <value>: prints the product supplier written, then metada
     && pass "--supplier writes the product supplier only, with its URL or email (a name is optional); a bare name warns; blank writes nothing" \
     || fail "product supplier" "$(for c in url mail bare ftp nameless-url nameless-mail none blank; do jq -c '[.metadata.component.supplier, .metadata.supplier]' "$WORK/doc-sup-$c.json"; done)"
 # The SBOM-author rows are not satisfied by the product supplier.
+# (the tool author BomLens records when none is named would satisfy the row, so it is removed here)
+for _f in "$WORK/doc-sup-none.json" "$WORK/doc-sup-url.json"; do jq 'del(.metadata.authors)' "$_f" > "$_f.t" && mv "$_f.t" "$_f"; done
 bash "$LIB/validate-sbom.sh" "$WORK/doc-sup-none.json" "$WORK/doc-sup-none" x >/dev/null 2>&1
 bash "$LIB/validate-sbom.sh" "$WORK/doc-sup-url.json" "$WORK/doc-sup-url" x >/dev/null 2>&1
 [ "$(jq -c '[.checks[] | select(.id == "cisa-sbom-author") | .status]' "$WORK/doc-sup-url_conformance.json")" \

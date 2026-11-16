@@ -2216,8 +2216,8 @@ jq -e '.metadata.authors == [{"name": "Acme AI Lab"}, {"name": "Jane Doe"}]' "$W
     || fail "several declared authors" "$(jq -c '.metadata.authors' "$WORK/decl-author2.json")"
 cp "$WORK/decl.json" "$WORK/decl-author3.json"
 env -u SBOM_AUTHOR AI_DECLARATION_FILE="$DECL_FIX" bash "$LIB/stamp-document-metadata.sh" "$WORK/decl-author3.json" AIBOM > "$WORK/decl-author3.log" 2>&1
-{ jq -e '(.metadata | has("authors") | not)
-         and ([.metadata.properties[] | select(.name == "bomlens:sbom-author-source")] | length == 0)' "$WORK/decl-author3.json" >/dev/null \
+{ jq -e '(.metadata.authors | map(.name) | all(startswith("BomLens ")))
+         and ([.metadata.properties[] | select(.name == "bomlens:sbom-author-source") | .value] == ["tool"])' "$WORK/decl-author3.json" >/dev/null \
   && grep -q "no SBOM author declared" "$WORK/decl-author3.log"; } \
     && pass "a scanned model (AIBOM with --ai-declare) takes no author from the declaration" \
     || fail "AIBOM took the declaration's author" "$(jq -c '.metadata.authors' "$WORK/decl-author3.json")"
