@@ -55,6 +55,7 @@ n=aisbom-model
     && pass "model licence read from aisbom:hf:license" || fail "model licence" "$(check_is $n g7-model-license .detail)"
 [ "$(check_is $n g7-model-version .status)" = "pass" ] && [ "$(check_is $n g7-model-version '.via[0]')" = "aisbom:hf:revision" ] \
     && pass "model version read from aisbom:hf:revision" || fail "model version" "$(check_is $n g7-model-version .detail)"
+n=aisbom-local-file
 [ "$(check_is $n g7-model-hash-value .status)" = "pass" ] \
     && pass "hash comes from the standard field, no property named" || fail "model hash" "$(check_is $n g7-model-hash-value .detail)"
 [ "$(check_is $n g7-model-hash-value '.via // "none"')" = "none" ] \
