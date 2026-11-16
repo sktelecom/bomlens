@@ -38,7 +38,7 @@ on:
         required: false
 
 # Default to read-only; jobs that create or edit the release elevate to
-# contents: write themselves. Nothing in this workflow pushes packages.
+# contents: write themselves. Only publish-runner pushes a package (PyPI).
 permissions:
   contents: read
 
@@ -435,6 +435,107 @@ jobs:
         run: |
           gh release edit "${{ needs.create-release.outputs.version }}" \
             --repo "${{ env.PUBLISH_REPO }}" --draft=false --latest
+
+  # The engine runner (runner/) goes to PyPI as bomlens-runner, with this
+  # release's version and the digests of the images release-gate just checked.
+  # PyPI trusts this repository, this workflow file and the pypi environment
+  # (trusted publishing), so only a run of this file in this repository
+  # publishes: a call from another workflow or repository carries the
+  # caller's identity. Only a final version (MAJOR.MINOR.PATCH) is published.
+  publish-runner:
+    name: Publish the engine runner to PyPI
+    needs: [create-release, release-gate]
+    if: >-
+      github.repository == 'sktelecom/bomlens'
+      && startsWith(github.workflow_ref, 'sktelecom/bomlens/.github/workflows/release.yml@')
+      && (inputs.target_repository || github.repository) == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment:
+      name: pypi
+      url: https://pypi.org/p/bomlens-runner
+    permissions:
+      contents: write   # the release notes
+      id-token: write   # trusted publishing
+    steps:
+      - name: Checkout the release tag
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          # The release's own runner, also when dispatched from a later main.
+          ref: refs/tags/${{ needs.create-release.outputs.version }}
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: "3.12"
+
+      - name: Resolve the release images
+        id: images
+        env:
+          TAG: ${{ needs.create-release.outputs.version }}
+          OWNER: ${{ env.PUBLISH_OWNER }}
+        run: |
+          set -euo pipefail
+          version="${TAG#v}"
+          if ! printf '%s' "$version" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "::notice::$TAG is not a final release, so the runner is not published"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          pinned() {
+            local ref="ghcr.io/${OWNER}/$1:${version}" digest
+            digest="$(docker buildx imagetools inspect "$ref" --format '{{.Manifest.Digest}}')"
+            printf '%s@%s' "$ref" "$digest"
+          }
+          {
+            echo "version=$version"
+            echo "engine=$(pinned bomlens)"
+            echo "deep_license=$(pinned bomlens-deep-license)"
+            echo "deep_cve=$(pinned bomlens-deep-cve)"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Build the package
+        if: steps.images.outputs.skip != 'true'
+        env:
+          VERSION: ${{ steps.images.outputs.version }}
+          ENGINE: ${{ steps.images.outputs.engine }}
+          DEEP_LICENSE: ${{ steps.images.outputs.deep_license }}
+          DEEP_CVE: ${{ steps.images.outputs.deep_cve }}
+        run: bash runner/tools/build.sh "$VERSION" "$ENGINE" "$DEEP_LICENSE" "$DEEP_CVE"
+
+      # PyPI keeps the first upload of a version, so a re-run after the images
+      # were pushed again must not publish notes that name other images.
+      - name: Check a version already on PyPI
+        if: steps.images.outputs.skip != 'true'
+        env:
+          VERSION: ${{ steps.images.outputs.version }}
+          ENGINE: ${{ steps.images.outputs.engine }}
+          DEEP_LICENSE: ${{ steps.images.outputs.deep_license }}
+          DEEP_CVE: ${{ steps.images.outputs.deep_cve }}
+        run: python runner/tools/release_notes.py check "$VERSION" "$ENGINE" "$DEEP_LICENSE" "$DEEP_CVE"
+
+      - name: Publish to PyPI
+        if: steps.images.outputs.skip != 'true'
+        uses: pypa/gh-action-pypi-publish@7245906fb61fa33a13554f9d5fb856fe61758086 # v1.14.3
+        with:
+          packages-dir: runner/dist
+          # A re-run after a successful upload leaves the published files as
+          # they are; the notes read their hashes and images from PyPI.
+          skip-existing: true
+
+      - name: Add the package to the release notes
+        if: steps.images.outputs.skip != 'true'
+        env:
+          GH_TOKEN: ${{ secrets.PUBLISH_TOKEN || github.token }}
+          TAG: ${{ needs.create-release.outputs.version }}
+          VERSION: ${{ steps.images.outputs.version }}
+        run: |
+          set -euo pipefail
+          notes="$(mktemp)"
+          gh release view "$TAG" --repo "${{ env.PUBLISH_REPO }}" --json body --jq .body > "$notes"
+          python runner/tools/release_notes.py notes "$VERSION" --dist runner/dist --body "$notes"
+          gh release edit "$TAG" --repo "${{ env.PUBLISH_REPO }}" --notes-file "$notes"
 
   summary:
     name: Release Summary

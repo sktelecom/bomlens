@@ -15,11 +15,19 @@ The runner of a release knows that release's plan and manifest, so a program tha
 
 ## Installing
 
-Until the package is published, install it from a release tag:
+From the first release that ships the runner, each final release (`MAJOR.MINOR.PATCH`, not a pre-release tag) puts the package on PyPI with the release's version:
 
 ```bash
-pip install "git+https://github.com/sktelecom/bomlens@v1.15.0#subdirectory=runner"
+pip install bomlens-runner==<version>
 ```
+
+Each release's notes list the SHA-256 of the published files and the image digests the package names, so a program can pin both. Before that release, install it from a commit on `main`:
+
+```bash
+pip install "git+https://github.com/sktelecom/bomlens@<commit>#subdirectory=runner"
+```
+
+A package installed from a commit has no release images: give `images` to the command, or `Images.parse(...)` to `RunnerPolicy`.
 
 The command `bomlens-runner` runs one scan from a JSON policy file. A program calls the package instead.
 

@@ -15,11 +15,19 @@ BomLens를 스캔 엔진으로 쓰는 프로그램은 [엔진 계약](engine-con
 
 ## 설치
 
-패키지를 발행하기 전까지는 릴리스 태그에서 설치합니다.
+실행기가 처음 포함되는 릴리스부터, 정식 릴리스(`MAJOR.MINOR.PATCH`, 사전 릴리스 태그 제외)마다 패키지가 릴리스 버전 그대로 PyPI에 올라갑니다.
 
 ```bash
-pip install "git+https://github.com/sktelecom/bomlens@v1.15.0#subdirectory=runner"
+pip install bomlens-runner==<version>
 ```
+
+릴리스 노트마다 발행된 파일의 SHA-256과 패키지에 담긴 이미지 digest를 적어 두므로, 프로그램은 둘 다 고정할 수 있습니다. 그 릴리스 전에는 `main`의 커밋에서 설치합니다.
+
+```bash
+pip install "git+https://github.com/sktelecom/bomlens@<commit>#subdirectory=runner"
+```
+
+커밋에서 설치한 패키지에는 릴리스 이미지가 없습니다. 명령에는 `images`를, `RunnerPolicy`에는 `Images.parse(...)`를 넘깁니다.
 
 `bomlens-runner` 명령은 JSON 정책 파일로 스캔 하나를 실행합니다. 프로그램에서는 패키지를 직접 호출합니다.
 
