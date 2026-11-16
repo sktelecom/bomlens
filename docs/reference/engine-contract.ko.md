@@ -169,6 +169,8 @@ BomLens 이미지를 스캔 엔진으로 쓰는 프로그램은 모든 스캔이
 
 ## 실행 계획
 
+[엔진 실행기](engine-runner.ko.md)는 이 절의 내용을 쿠버네티스에서 대신 실행하는 Python 패키지입니다.
+
 소스 스캔은 컨테이너 두 개로 돕니다. 1단계는 cdxgen 언어 이미지에서 의존성을 해석하고, 2단계는 이 이미지를 `POSTPROCESS` 모드로 실행합니다. 컨테이너를 직접 실행하는 프로그램(Kubernetes Job, 보안 설정을 한 Docker 실행기 등)은 `MODE=PLAN`으로 무엇을 실행할지 BomLens에 묻습니다. 소스를 `/src`에 읽기 전용으로, 출력 폴더를 `/host-output`에 마운트하면 이미지가 그 폴더에 `bomlens-plan.json`을 쓰고 1단계가 마운트할 파일을 `bomlens-plan/`에 복사합니다. 스캔은 하지 않습니다. 형식은 [`schemas/engine-plan-1.json`](https://github.com/sktelecom/bomlens/blob/main/schemas/engine-plan-1.json)입니다.
 
 ```bash

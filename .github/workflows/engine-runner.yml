@@ -1,0 +1,97 @@
+# The engine runner (runner/): the Python package other programs use to run
+# the scan engine on Kubernetes.
+#
+#   unit: its own tests on the oldest and a current Python, no cluster.
+#   kind: the image built from this commit, on a kind cluster, scanned
+#         through the runner (tests/test-engine-runner-kind.sh).
+#
+# Runs on a pull request that touches the runner, or the parts of the image
+# it reads (the plan, the result manifest, the entrypoint), and on dispatch.
+name: Engine runner
+
+on:
+  pull_request:
+    paths:
+      - "runner/**"
+      - "docker/lib/make-plan.sh"
+      - "docker/lib/engine-result.sh"
+      - "docker/lib/source-detect.sh"
+      - "docker/entrypoint.sh"
+      - "schemas/engine-*.json"
+      - "tests/test-engine-runner-kind.sh"
+      - ".github/workflows/engine-runner.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  unit:
+    name: Runner unit tests (Python ${{ matrix.python }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.10", "3.12"]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Run unit tests
+        working-directory: runner/tests
+        run: python -m unittest -v
+
+  kind:
+    name: Runner on a kind cluster
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    needs: [unit]
+    env:
+      KIND_VERSION: v0.29.0
+      KIND_SHA256: c72eda46430f065fb45c5f70e7c957cc9209402ef309294821978677c8fb3284
+      KUBECTL_VERSION: v1.33.1
+      KUBECTL_SHA256: 5de4e9f2266738fd112b721265a0c1cd7f4e5208b670f811861f699474a100a3
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - name: Install kind and kubectl (pinned, checksum verified)
+        run: |
+          mkdir -p "$RUNNER_TEMP/bin"
+          curl -sSfL -o "$RUNNER_TEMP/bin/kind" "https://github.com/kubernetes-sigs/kind/releases/download/${KIND_VERSION}/kind-linux-amd64"
+          echo "${KIND_SHA256}  $RUNNER_TEMP/bin/kind" | sha256sum -c -
+          curl -sSfL -o "$RUNNER_TEMP/bin/kubectl" "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl"
+          echo "${KUBECTL_SHA256}  $RUNNER_TEMP/bin/kubectl" | sha256sum -c -
+          chmod +x "$RUNNER_TEMP/bin/kind" "$RUNNER_TEMP/bin/kubectl"
+          echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+
+      - name: Build the image from this commit
+        uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25 # v5
+        with:
+          context: ./docker
+          platforms: linux/amd64
+          load: true
+          tags: bomlens:runner-test
+          cache-from: type=gha,scope=engine-runner
+          cache-to: type=gha,mode=max,scope=engine-runner
+
+      - name: Run the runner on kind
+        env:
+          BOMLENS_TEST_IMAGE: bomlens:runner-test
+          KIND_WORK_BASE: ${{ runner.temp }}
+        run: bash tests/test-engine-runner-kind.sh

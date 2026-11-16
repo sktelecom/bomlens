@@ -169,6 +169,8 @@ In `IMAGE` mode syft reads the image first, and Trivy reads it again for the lic
 
 ## Execution plan
 
+The [engine runner](engine-runner.md) is a Python package that does what this section describes on Kubernetes.
+
 A source scan runs in two containers: stage 1 resolves the dependencies in a cdxgen language image, stage 2 is this image in `POSTPROCESS` mode. A program that runs the containers itself (a Kubernetes Job, a hardened Docker runner) asks BomLens what to run with `MODE=PLAN`: mount the source read-only at `/src` and an output folder at `/host-output`, and the image writes `bomlens-plan.json` there and copies the files stage 1 mounts into `bomlens-plan/`. Nothing is scanned. The format is [`schemas/engine-plan-1.json`](https://github.com/sktelecom/bomlens/blob/main/schemas/engine-plan-1.json).
 
 ```bash

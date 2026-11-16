@@ -1,0 +1,530 @@
+{
+  "contract": {
+    "name": "bomlens-engine-plan",
+    "version": "1.4.0"
+  },
+  "engine": {
+    "version": null,
+    "image": "ghcr.io/sktelecom/bomlens:1.15.0",
+    "image_digest": "sha256:563fb0be1b188bbd550f504fcd77b3f2f062637d25104c3f9ac99bcfd61f2a51"
+  },
+  "input": {
+    "kind": "source",
+    "detected_ecosystem": "node"
+  },
+  "status": "ok",
+  "reason": null,
+  "detail": null,
+  "output_file": "demo_1.0_bom.json",
+  "input_fingerprint": {
+    "algorithm": "bomlens-input-1",
+    "sha256": null,
+    "reusable": false,
+    "reasons": [
+      "no-lockfile",
+      "registry-resolution"
+    ],
+    "components": [
+      {
+        "kind": "engine",
+        "name": "build-prep.sh",
+        "sha256": "6e8133c0231d481e569fdcd4e22c355a37a37aaed2677c71bf95f2cd592dd4a2"
+      },
+      {
+        "kind": "engine",
+        "name": "identify-conda.py",
+        "sha256": "6e54eae725304bd2ba4727805467e2058fd7f6f36eeca7be97e3cc9c09f689b7"
+      },
+      {
+        "kind": "engine",
+        "name": "make-plan.sh",
+        "sha256": "fd0b1f470e489c9e7fb50a221a7e962c6e1f968392ba5e447773e45e0882a650"
+      },
+      {
+        "kind": "file",
+        "name": ".",
+        "sha256": "db64f68cd1098f6565333e10c40fff4113dae17683add42dce697c5f4ab38dda",
+        "count": 1
+      },
+      {
+        "kind": "image",
+        "name": "bomlens",
+        "sha256": "563fb0be1b188bbd550f504fcd77b3f2f062637d25104c3f9ac99bcfd61f2a51"
+      },
+      {
+        "kind": "image",
+        "name": "stage1",
+        "sha256": "0fb2e022c564589424f8e6704e3417eae573434e5bb43540cc86fceac8a61d84"
+      },
+      {
+        "kind": "setting",
+        "name": "BOMLENS_AI_USAGE_TIMEOUT",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "kind": "setting",
+        "name": "BOMLENS_ANDROID_FULL_GRAPH",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "kind": "setting",
+        "name": "BOMLENS_GRADLE_FULL_GRAPH",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "kind": "setting",
+        "name": "BOMLENS_INCLUDE_DEV_DEPENDENCIES",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "kind": "setting",
+        "name": "BOMLENS_INCLUDE_NON_SHIPPED",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "kind": "setting",
+        "name": "BOMLENS_KEEP_BUILD_OUTPUT",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "kind": "setting",
+        "name": "BOMLENS_MAVEN_FULL_GRAPH",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "kind": "setting",
+        "name": "BOMLENS_NODE_FULL_GRAPH",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "kind": "setting",
+        "name": "BOMLENS_NO_AI_USAGE",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "kind": "setting",
+        "name": "BOMLENS_NO_CARGO_LICENSE",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "kind": "setting",
+        "name": "BOMLENS_NO_COPYRIGHT",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "kind": "setting",
+        "name": "BOMLENS_PHP_FULL_GRAPH",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "kind": "setting",
+        "name": "BOMLENS_PREP_TIMEOUT",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "kind": "setting",
+        "name": "CDX_SPEC_VERSION",
+        "sha256": "ec6c168f4411ec8fa9ab8d47dd25954ce53728404fed0e7a9bc7f29dab38c30d"
+      },
+      {
+        "kind": "setting",
+        "name": "FETCH_LICENSE",
+        "sha256": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b"
+      },
+      {
+        "kind": "setting",
+        "name": "HOST_GOTOOLCHAIN",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "kind": "setting",
+        "name": "PROJECT_NAME",
+        "sha256": "2a97516c354b68848cdbd8f54a226a0a55b21ed138e207ad6c5cbb9c00aa5aea"
+      },
+      {
+        "kind": "setting",
+        "name": "PROJECT_VERSION",
+        "sha256": "d0ff5974b6aa52cf562bea5921840c032a860a91a3512f7fe8f768f6bbe005f6"
+      },
+      {
+        "kind": "setting",
+        "name": "detected_ecosystem",
+        "sha256": "545ea538461003efdc8c81c244531b003f6f26cfccf6c0073b3239fdedf49446"
+      }
+    ]
+  },
+  "stages": [
+    {
+      "id": "generate",
+      "stage": 1,
+      "image": "ghcr.io/cdxgen/cdxgen-alpine-node24:13.5.0",
+      "image_digest": "sha256:0fb2e022c564589424f8e6704e3417eae573434e5bb43540cc86fceac8a61d84",
+      "user": "0:0",
+      "entrypoint": [
+        "sh"
+      ],
+      "args": [
+        "/tmp/build-prep.sh",
+        "/app",
+        "/out/demo_1.0_bom.json",
+        "1.6"
+      ],
+      "workdir": null,
+      "mounts": [
+        {
+          "role": "source",
+          "target": "/app",
+          "mode": "rw"
+        },
+        {
+          "role": "output",
+          "target": "/out",
+          "mode": "rw"
+        },
+        {
+          "role": "plan-file",
+          "source": "bomlens-plan/build-prep.sh",
+          "target": "/tmp/build-prep.sh",
+          "mode": "ro"
+        },
+        {
+          "role": "plan-file",
+          "source": "bomlens-plan/identify-conda.py",
+          "target": "/tmp/identify-conda.py",
+          "mode": "ro"
+        },
+        {
+          "role": "guard-state",
+          "target": "/bomlens-state",
+          "mode": "rw",
+          "optional": true
+        },
+        {
+          "role": "cache-maven",
+          "target": "/tmp/sbomhome/.m2",
+          "mode": "rw",
+          "optional": true
+        },
+        {
+          "role": "maven-settings",
+          "target": "/bomlens-settings/m2/settings.xml",
+          "mode": "ro",
+          "optional": true
+        },
+        {
+          "role": "maven-settings-security",
+          "target": "/bomlens-settings/m2/settings-security.xml",
+          "mode": "ro",
+          "optional": true
+        },
+        {
+          "role": "cache-gradle",
+          "target": "/root/.gradle",
+          "mode": "rw",
+          "optional": true
+        },
+        {
+          "role": "gradle-properties",
+          "target": "/bomlens-settings/gradle/gradle.properties",
+          "mode": "ro",
+          "optional": true
+        },
+        {
+          "role": "gradle-init-script",
+          "target": "/bomlens-settings/gradle/init.gradle",
+          "mode": "ro",
+          "optional": true
+        },
+        {
+          "role": "gradle-init-script-kts",
+          "target": "/bomlens-settings/gradle/init.gradle.kts",
+          "mode": "ro",
+          "optional": true
+        },
+        {
+          "role": "gradle-init",
+          "target": "/bomlens-settings/gradle/init.d",
+          "mode": "ro",
+          "optional": true
+        }
+      ],
+      "input_fingerprint": {
+        "algorithm": "bomlens-input-1",
+        "sha256": null,
+        "reusable": false,
+        "reasons": [
+          "no-lockfile",
+          "registry-resolution"
+        ],
+        "components": [
+          {
+            "kind": "engine",
+            "name": "build-prep.sh",
+            "sha256": "6e8133c0231d481e569fdcd4e22c355a37a37aaed2677c71bf95f2cd592dd4a2"
+          },
+          {
+            "kind": "engine",
+            "name": "identify-conda.py",
+            "sha256": "6e54eae725304bd2ba4727805467e2058fd7f6f36eeca7be97e3cc9c09f689b7"
+          },
+          {
+            "kind": "engine",
+            "name": "make-plan.sh",
+            "sha256": "fd0b1f470e489c9e7fb50a221a7e962c6e1f968392ba5e447773e45e0882a650"
+          },
+          {
+            "kind": "file",
+            "name": ".",
+            "sha256": "db64f68cd1098f6565333e10c40fff4113dae17683add42dce697c5f4ab38dda",
+            "count": 1
+          },
+          {
+            "kind": "image",
+            "name": "bomlens",
+            "sha256": "563fb0be1b188bbd550f504fcd77b3f2f062637d25104c3f9ac99bcfd61f2a51"
+          },
+          {
+            "kind": "image",
+            "name": "stage1",
+            "sha256": "0fb2e022c564589424f8e6704e3417eae573434e5bb43540cc86fceac8a61d84"
+          },
+          {
+            "kind": "setting",
+            "name": "BOMLENS_AI_USAGE_TIMEOUT",
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          {
+            "kind": "setting",
+            "name": "BOMLENS_ANDROID_FULL_GRAPH",
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          {
+            "kind": "setting",
+            "name": "BOMLENS_GRADLE_FULL_GRAPH",
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          {
+            "kind": "setting",
+            "name": "BOMLENS_INCLUDE_DEV_DEPENDENCIES",
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          {
+            "kind": "setting",
+            "name": "BOMLENS_INCLUDE_NON_SHIPPED",
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          {
+            "kind": "setting",
+            "name": "BOMLENS_KEEP_BUILD_OUTPUT",
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          {
+            "kind": "setting",
+            "name": "BOMLENS_MAVEN_FULL_GRAPH",
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          {
+            "kind": "setting",
+            "name": "BOMLENS_NODE_FULL_GRAPH",
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          {
+            "kind": "setting",
+            "name": "BOMLENS_NO_AI_USAGE",
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          {
+            "kind": "setting",
+            "name": "BOMLENS_NO_CARGO_LICENSE",
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          {
+            "kind": "setting",
+            "name": "BOMLENS_NO_COPYRIGHT",
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          {
+            "kind": "setting",
+            "name": "BOMLENS_PHP_FULL_GRAPH",
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          {
+            "kind": "setting",
+            "name": "BOMLENS_PREP_TIMEOUT",
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          {
+            "kind": "setting",
+            "name": "CDX_SPEC_VERSION",
+            "sha256": "ec6c168f4411ec8fa9ab8d47dd25954ce53728404fed0e7a9bc7f29dab38c30d"
+          },
+          {
+            "kind": "setting",
+            "name": "FETCH_LICENSE",
+            "sha256": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b"
+          },
+          {
+            "kind": "setting",
+            "name": "HOST_GOTOOLCHAIN",
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          {
+            "kind": "setting",
+            "name": "PROJECT_NAME",
+            "sha256": "2a97516c354b68848cdbd8f54a226a0a55b21ed138e207ad6c5cbb9c00aa5aea"
+          },
+          {
+            "kind": "setting",
+            "name": "PROJECT_VERSION",
+            "sha256": "d0ff5974b6aa52cf562bea5921840c032a860a91a3512f7fe8f768f6bbe005f6"
+          },
+          {
+            "kind": "setting",
+            "name": "detected_ecosystem",
+            "sha256": "545ea538461003efdc8c81c244531b003f6f26cfccf6c0073b3239fdedf49446"
+          }
+        ]
+      },
+      "on_kill": "If stage 1 is killed before it finishes, it cannot put the source back. With the guard-state mount and BOMLENS_GUARD_ID, run the same image and arguments again with BOMLENS_GUARD_RESTORE_ONLY=1 to restore it",
+      "env": {
+        "HOME": "/tmp/sbomhome",
+        "MAVEN_OPTS": "-Duser.home=/tmp/sbomhome -Dmaven.repo.local=/tmp/sbomhome/.m2/repository",
+        "GOPATH": "/tmp/sbomhome/go",
+        "GOMODCACHE": "/tmp/sbomhome/go/pkg/mod",
+        "GOCACHE": "/tmp/sbomhome/go-build",
+        "FETCH_LICENSE": "true",
+        "PROJECT_NAME": "demo",
+        "PROJECT_VERSION": "1.0"
+      },
+      "env_passthrough": [
+        "BOMLENS_KEEP_BUILD_OUTPUT",
+        "BOMLENS_MAVEN_FULL_GRAPH",
+        "BOMLENS_ANDROID_FULL_GRAPH",
+        "BOMLENS_GRADLE_FULL_GRAPH",
+        "BOMLENS_NODE_FULL_GRAPH",
+        "BOMLENS_PHP_FULL_GRAPH",
+        "BOMLENS_INCLUDE_NON_SHIPPED",
+        "BOMLENS_INCLUDE_DEV_DEPENDENCIES",
+        "BOMLENS_NO_COPYRIGHT",
+        "BOMLENS_NO_CARGO_LICENSE",
+        "BOMLENS_NO_AI_USAGE",
+        "BOMLENS_AI_USAGE_TIMEOUT",
+        "BOMLENS_PREP_TIMEOUT",
+        "HTTP_PROXY",
+        "HTTPS_PROXY",
+        "NO_PROXY",
+        "http_proxy",
+        "https_proxy",
+        "no_proxy",
+        "BOMLENS_EXTRA_CA_CERTS",
+        "GOPROXY",
+        "GOSUMDB",
+        "HOST_UID",
+        "HOST_GID"
+      ],
+      "env_from_caller": {
+        "BOMLENS_GUARD_ID": "a unique id for this scan, used with the guard-state mount"
+      },
+      "network": {
+        "required": true,
+        "purpose": "package registries the project resolves from (npm, PyPI, Maven Central, crates.io, the Go module proxy, ...)"
+      },
+      "resources": {
+        "memory_min": "4g"
+      },
+      "on_exit": "Run stage 2 whatever the exit code; pass it as BOMLENS_STAGE1_EXIT, and the container log as bomlens-stage1.log in the output folder"
+    },
+    {
+      "id": "postprocess",
+      "stage": 2,
+      "image": "ghcr.io/sktelecom/bomlens:1.15.0",
+      "image_digest": "sha256:563fb0be1b188bbd550f504fcd77b3f2f062637d25104c3f9ac99bcfd61f2a51",
+      "user": null,
+      "entrypoint": null,
+      "args": [],
+      "workdir": "/host-output",
+      "mounts": [
+        {
+          "role": "source",
+          "target": "/src",
+          "mode": "ro"
+        },
+        {
+          "role": "output",
+          "target": "/host-output",
+          "mode": "rw"
+        },
+        {
+          "role": "trivy-db",
+          "target": "/trivy-db",
+          "mode": "ro",
+          "optional": true
+        }
+      ],
+      "env": {
+        "MODE": "POSTPROCESS",
+        "SECURITY_ENRICH": "false",
+        "BOMLENS_RUN_INPUT": "demo_1.0_bom.json",
+        "HOST_OUTPUT_DIR": "/host-output",
+        "PROJECT_NAME": "demo",
+        "PROJECT_VERSION": "1.0",
+        "CYCLONEDX_SPEC_VERSION": "1.6",
+        "UPLOAD_ENABLED": "false"
+      },
+      "env_passthrough": [
+        "HOST_UID",
+        "HOST_GID",
+        "SRC_TREE_EXCLUDE",
+        "NVD_API_KEY",
+        "BOMLENS_KEEP_BUILD_OUTPUT",
+        "BOMLENS_MAVEN_FULL_GRAPH",
+        "BOMLENS_ANDROID_FULL_GRAPH",
+        "BOMLENS_GRADLE_FULL_GRAPH",
+        "BOMLENS_NODE_FULL_GRAPH",
+        "BOMLENS_PHP_FULL_GRAPH",
+        "BOMLENS_INCLUDE_NON_SHIPPED",
+        "BOMLENS_INCLUDE_DEV_DEPENDENCIES",
+        "BOMLENS_NO_COPYRIGHT",
+        "BOMLENS_NO_CARGO_LICENSE",
+        "BOMLENS_NO_AI_USAGE",
+        "BOMLENS_AI_USAGE_TIMEOUT",
+        "BOMLENS_PREP_TIMEOUT",
+        "HTTP_PROXY",
+        "HTTPS_PROXY",
+        "NO_PROXY",
+        "http_proxy",
+        "https_proxy",
+        "no_proxy",
+        "BOMLENS_EXTRA_CA_CERTS",
+        "TRIVY_DB_REPOSITORY",
+        "TRIVY_JAVA_DB_REPOSITORY",
+        "TRIVY_SKIP_DB_UPDATE",
+        "TRIVY_SKIP_JAVA_DB_UPDATE",
+        "TRIVY_OFFLINE_SCAN",
+        "TRIVY_USERNAME",
+        "TRIVY_PASSWORD",
+        "TRIVY_REGISTRY_TOKEN",
+        "TRIVY_INSECURE",
+        "BOMLENS_TRIVY_DB_MAX_AGE_DAYS",
+        "BOMLENS_GRYPE_DB_MAX_AGE_DAYS",
+        "GRYPE_DB_UPDATE_URL",
+        "BOMLENS_GO_VULNDB",
+        "BOMLENS_GO_VULNDB_PATH",
+        "BOMLENS_GO_VULNDB_MAX_AGE_DAYS",
+        "BOMLENS_GO_VULNDB_URL",
+        "KEV_URL",
+        "EPSS_API"
+      ],
+      "env_from_stage1": {
+        "BOMLENS_STAGE1_EXIT": "the stage 1 exit code",
+        "BOMLENS_STAGE1_OOM": "true when the stage 1 container was killed for memory",
+        "BOMLENS_STAGE1_LOG": "bomlens-stage1.log (stage 1 output, saved in the output folder)",
+        "BOMLENS_STAGE1_REUSED": "1 when stage 1 did not run and the SBOM, exit code and log of an earlier stage 1 with the same input_fingerprint.sha256 were used"
+      },
+      "network": {
+        "required": false,
+        "purpose": "the Trivy database download when no trivy-db mount holds one, and options that look things up online (--license-registry, --resolve-purl, EPSS/KEV, staleness)"
+      }
+    }
+  ]
+}
