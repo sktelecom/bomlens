@@ -222,7 +222,10 @@ export function Sidebar({
                     <NavList.TrailingVisual>
                       <span className="bl-count" title={note} data-testid={`nav-count-${s.id}`}>
                         {typeof count === "number" ? (
-                          fmt(count)
+                          <>
+                            <span aria-hidden>{fmt(count)}</span>
+                            <span className="bl-visually-hidden">{fmt(count)}</span>
+                          </>
                         ) : said(s.id, count) ? (
                           <>
                             <span aria-hidden>{count}</span>
