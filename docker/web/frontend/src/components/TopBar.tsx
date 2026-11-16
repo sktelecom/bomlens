@@ -407,13 +407,16 @@ function HelpMenu({
               {t("nav.helpDocs")}
               {external}
             </ActionList.LinkItem>
-            <ActionList.LinkItem href={demoUrl()} {...ext}>
-              <ActionList.LeadingVisual>
-                <PlayIcon />
-              </ActionList.LeadingVisual>
-              {t("nav.helpDemo")}
-              {external}
-            </ActionList.LinkItem>
+            {/* Inside the demo this link would open the page the reader is on. */}
+            {!IS_STATIC_DEMO && (
+              <ActionList.LinkItem href={demoUrl()} {...ext}>
+                <ActionList.LeadingVisual>
+                  <PlayIcon />
+                </ActionList.LeadingVisual>
+                {t("nav.helpDemo")}
+                {external}
+              </ActionList.LinkItem>
+            )}
             <ActionList.Divider />
             <ActionList.Item onSelect={() => setShortcuts(true)} data-testid="help-shortcuts">
               <ActionList.LeadingVisual>

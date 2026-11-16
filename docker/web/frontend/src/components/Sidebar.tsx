@@ -52,6 +52,9 @@ interface SidebarProps {
   /** Hide New scan (the read-only demo cannot scan). */
   /** A scan is running or opening: its sections are on the way. */
   loading?: boolean;
+  /** The running image's version, shown at the foot of the expanded pane.
+   *  Absent on a local build, which carries none. */
+  version?: string;
 }
 
 const SECTION_ICON: Record<SectionId, Icon> = {
@@ -83,6 +86,7 @@ export function Sidebar({
   newHref,
   onNewScan,
   loading,
+  version,
 }: SidebarProps) {
   const { t } = useTranslation();
   const fmt = useFormatNumber();
@@ -236,6 +240,11 @@ export function Sidebar({
           </NavList.Group>
         ))}
       </NavList>
+      {version && (
+        <p className="bl-pane-version" data-testid="sidebar-version">
+          BomLens {version}
+        </p>
+      )}
     </div>
   );
 }

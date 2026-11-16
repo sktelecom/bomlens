@@ -55,6 +55,16 @@ test("the menu reports the running version", async ({ page }) => {
   await expect(page.getByTestId("app-version")).toHaveText("Version 1.10.5");
 });
 
+test("the sidebar shows the running version without opening a menu", async ({ page }) => {
+  await open(page, "1.10.5");
+  await expect(page.getByTestId("sidebar-version")).toHaveText("BomLens 1.10.5");
+});
+
+test("a build with no version stamp shows nothing in the sidebar", async ({ page }) => {
+  await open(page, undefined);
+  await expect(page.getByTestId("sidebar-version")).toHaveCount(0);
+});
+
 test("a build with no version stamp says so rather than showing a blank", async ({
   page,
 }) => {
