@@ -207,3 +207,13 @@ test("the help menu in the demo links straight to the issue form", async ({ page
   await expect(item).toHaveAttribute("target", "_blank");
   await expect(page.getByRole("dialog")).toHaveCount(0);
 });
+
+test("the demo names its version in the sidebar and does not link to itself in the help menu", async ({ page }) => {
+  await serveDemoData(page);
+  await page.goto(`${ORIGIN}/#/scan/SpringBootDemo_1.1.0`);
+  await page.locator("main h1").first().waitFor();
+  await expect(page.getByTestId("sidebar-version")).toHaveText(/^BomLens \d+\.\d+\.\d+/);
+  await page.getByTestId("help-menu").click();
+  await expect(page.getByRole("menuitem", { name: /Live demo/ })).toHaveCount(0);
+  await expect(page.getByTestId("help-report")).toBeVisible();
+});

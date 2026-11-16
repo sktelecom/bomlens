@@ -143,6 +143,7 @@ export function AppShell({
           newHref={newHash()}
           onNewScan={onNewScan}
           loading={loadingSections}
+          version={version}
         />
         <main id="main-content" ref={mainRef} tabIndex={-1} className="bl-main animate-fade-in">
           {/* The demo notice opens every screen, inside the page so the top
