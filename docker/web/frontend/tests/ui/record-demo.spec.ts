@@ -18,7 +18,7 @@ import { test, type Page } from "@playwright/test";
  * with an enlarged video.size left the recorded frame only partially painted
  * (the rest blank), and doubling the viewport itself instead changed the
  * page's own layout (more whitespace at the wider width). page.screenshot(),
- * used here, does honor deviceScaleFactor directly, so a 1040x650
+ * used here, does honor deviceScaleFactor directly, so a 1040x900
  * layout is captured at full 2x pixel density with no such tradeoff.
  *
  * Regenerate (same pinned container as the guide screenshots):
@@ -30,7 +30,7 @@ import { test, type Page } from "@playwright/test";
 // Playwright runs from docker/web/frontend, so cwd-relative is stable.
 const IMAGES = path.join(process.cwd(), "..", "..", "..", "docs", "images");
 const W = 1040;
-const H = 650;
+const H = 900;
 
 test.use({
   viewport: { width: W, height: H },
