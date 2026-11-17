@@ -559,6 +559,29 @@ export interface RegulatoryCrosswalk {
   frameworks: CrosswalkFramework[];
 }
 
+/** How complete the result is, as the engine wrote it (`_completeness.json`).
+ *  The grade and the sentences are the engine's: the UI shows them and never
+ *  judges again, so the screen reads the same as the reports. Absent (null) for
+ *  a result produced before the file existed. */
+export type CompletenessGrade = "complete" | "partial" | "unreliable";
+
+export interface CompletenessReason {
+  code: string;
+  grade: CompletenessGrade;
+  detail: string;
+  /** What is wrong, in each language the engine writes. */
+  message: { en: string; ko: string };
+  /** How to fix it. */
+  fix: { en: string; ko: string };
+}
+
+export interface Completeness {
+  grade: CompletenessGrade;
+  gradeLabel: { en: string; ko: string };
+  componentCount: number;
+  reasons: CompletenessReason[];
+}
+
 export interface ConformanceSummary {
   result: string; // "pass" | "fail" | "unknown"
   format?: string;
@@ -784,6 +807,9 @@ export interface DoneEvent {
   sbom: SbomSummary | null;
   security: SecuritySummary | null;
   conformance?: ConformanceSummary | null;
+  /** Result completeness from the engine's `_completeness.json`; null/absent for
+   *  an older result, which then shows the notices it always showed. */
+  completeness?: Completeness | null;
   /** Vulnerability judgements Yocto recorded while building the image (Yocto SPDX
    *  input only; null otherwise). The security panel lists only what is still
    *  unresolved, so these counts are what distinguishes "the build already patched
@@ -1740,6 +1766,8 @@ export interface RecentScan {
   version: string;
   components: number;
   maxSeverity: Severity | null;
+  /** The completeness grade alone; null when the scan has no completeness file. */
+  completeness?: CompletenessGrade | null;
   isAiScan: boolean;
   /**
    * CycloneDX root component type as declared by the SBOM

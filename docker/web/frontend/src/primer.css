@@ -891,6 +891,9 @@ input.bl-visually-hidden:focus + .bl-dz { outline: 2px solid var(--focus-outline
 .bl-ov-notices dt { font-weight: 600; }
 .bl-ov-notices dd { margin: 0 0 var(--base-size-8); }
 .bl-ov-notices .bl-ov-bullets { display: flex; flex-direction: column; gap: var(--base-size-4); margin: 0; }
+/* Completeness reasons (components/CompletenessReasons.tsx), in a Banner on the Overview and Conformance screens. */
+.bl-cmp-reasons { list-style: disc; margin: 0; padding-left: var(--base-size-20); display: flex; flex-direction: column; gap: var(--base-size-8); }
+.bl-cmp-reasons .bl-cmp-fix { display: block; margin-top: var(--base-size-2); }
 
 .bl-ov-prov { display: flex; align-items: center; gap: var(--base-size-8); margin-top: var(--base-size-4); font-size: var(--text-body-size-small); color: var(--fgColor-muted); flex-wrap: wrap; }
 .bl-ov-prov code { padding: 1px var(--base-size-6); border-radius: var(--borderRadius-small); background: var(--bgColor-muted); color: var(--fgColor-default); font-family: var(--fontStack-monospace); overflow-wrap: anywhere; }

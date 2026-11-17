@@ -261,6 +261,7 @@ export function ResultSection({
           results={result.results}
           isSuppliedDocument={Boolean(inputSbomFileName(result))}
           isAiDocument={isAiScan(result)}
+          completeness={result.completeness}
           query={query}
           onQueryChange={onQueryChange}
         />

@@ -7,11 +7,13 @@ import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
 import { type DoneEvent, fileUrl } from "@/lib/api";
+import { gradeLabel, isIncomplete } from "@/lib/completeness";
 import { IS_STATIC_DEMO } from "@/lib/demo";
 import { pipelineStepLabelKey } from "@/lib/pipelineSteps";
 import { inputSbomFileName, isAiScan } from "@/lib/results";
 import { formatBytes } from "@/lib/utils";
 
+import { CompletenessReasons } from "../CompletenessReasons";
 import { ReportProblemBody } from "../ReportProblemDialog";
 
 /** Which body copy explains why cdxgen fell back to a direct-deps-only scan. */
@@ -131,7 +133,7 @@ export function FailureBanner({
 
 interface Notice {
   /** i18n id under `overview.notice.*` for the merged one-line form. */
-  id: "pipeline" | "warnings" | "vendored" | "degraded" | "zero" | "graph" | "scanossUnavailable" | "scanossNoMatch" | "unpinned" | "firmware";
+  id: "completeness" | "pipeline" | "warnings" | "vendored" | "degraded" | "zero" | "graph" | "scanossUnavailable" | "scanossNoMatch" | "unpinned" | "firmware";
   variant: "warning" | "info";
   title: string;
   testId?: string;
@@ -144,7 +146,7 @@ interface Notice {
  * lines name each one and whose "Details" holds the full text of each.
  */
 export function OverviewNotices({ result }: { result: DoneEvent }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const ai = isAiScan(result);
   const sb = result.sbom;
   const hasConformance = Boolean(result.conformance?.checks?.length) && (Boolean(inputSbomFileName(result)) || !ai);
@@ -155,7 +157,21 @@ export function OverviewNotices({ result }: { result: DoneEvent }) {
   // "nothing to worry about" when it almost always means the scan had nothing
   // to read. An AI scan is excluded: a model SBOM legitimately carries no
   // components, the model itself being the document.
-  if (!ai && sb && sb.components === 0)
+  // When the engine wrote a completeness result, its reasons say why and what to
+  // do; they replace the generic zero-components and degraded wording, which is
+  // only for a result from before that file existed.
+  const completeness = result.completeness;
+  const graded = isIncomplete(completeness) && !ai;
+  if (graded)
+    notices.push({
+      id: "completeness",
+      variant: "warning",
+      title: t("completeness.bannerTitle", { grade: gradeLabel(completeness, i18n.language ?? "en") }),
+      testId: "completeness",
+      body: <CompletenessReasons completeness={completeness} />,
+    });
+
+  if (!graded && !ai && sb && sb.components === 0 && !(completeness && !isIncomplete(completeness)))
     notices.push({
       id: "zero",
       variant: "warning",
@@ -243,7 +259,7 @@ export function OverviewNotices({ result }: { result: DoneEvent }) {
 
   // Gated on components > 0: at 0 components the zero-components notice already
   // folds in the degraded cause, so this one steps aside.
-  if (sb?.sbomToolDegraded && sb.components > 0)
+  if (!graded && sb?.sbomToolDegraded && sb.components > 0)
     notices.push({
       id: "degraded",
       variant: "warning",
