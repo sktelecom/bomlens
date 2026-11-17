@@ -55,7 +55,7 @@ Everything runs on a Docker engine (20.10+). The desktop app and web UI manage t
 
 ### Desktop app — no command line (recommended)
 
-Download the installer and double-click it: [BomLens-Setup.exe](https://github.com/sktelecom/bomlens/releases/latest/download/BomLens-Setup.exe) for Windows or [BomLens-Setup.dmg](https://github.com/sktelecom/bomlens/releases/latest/download/BomLens-Setup.dmg) for macOS. It checks Docker, pulls the image, and opens the UI — no console window. The app is unsigned for now; if Windows SmartScreen or macOS blocks it, the [no-CLI quick start](docs/start/no-cli.md) ([한국어](docs/start/no-cli.ko.md)) shows how to proceed. Build details are in [`electron/`](electron/README.md).
+Download the installer and double-click it: [BomLens-Setup.exe](https://github.com/sktelecom/bomlens/releases/latest/download/BomLens-Setup.exe) for Windows or [BomLens-Setup.dmg](https://github.com/sktelecom/bomlens/releases/latest/download/BomLens-Setup.dmg) for macOS. It checks Docker, pulls the image, and opens the UI — no console window. The app is unsigned for now; if Windows SmartScreen or macOS blocks it, the [no-CLI quick start](docs/start/no-cli.md) ([한국어](docs/start/no-cli.ko.md)) shows how to proceed. The installer's signing rules and privacy policy are in the [code signing policy](docs/reference/code-signing-policy.md) ([한국어](docs/reference/code-signing-policy.ko.md)). Build details are in [`electron/`](electron/README.md).
 
 ![BomLens web UI — name a project, pick a scan target, and choose what to generate (SBOM, open-source notice, security report)](docs/images/web-ui-en.png)
 
