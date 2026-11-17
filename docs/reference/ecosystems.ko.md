@@ -155,6 +155,8 @@ Gradle 빌드를 아예 실행할 수 없을 때(Docker 없음, 빌드 실패)�
 
 > 주의: production 필터와 별도로, cdxgen이 개발 패키지(npm, pnpm, yarn, bun)로 표시한 컴포넌트는 운영 의존성 경로에서 닿지 않으면 빠지고, 그 컴포넌트만 필요로 하는 의존성도 함께 빠집니다. production 필터가 읽지 않는 pnpm 워크스페이스도 여기에 해당합니다. 운영 의존성도 쓰는 패키지는 남습니다. `BOMLENS_NODE_FULL_GRAPH=1`이나 `BOMLENS_INCLUDE_DEV_DEPENDENCIES=1`이면 이 컴포넌트들도 그대로 둡니다.
 
+> 참고: `package-lock.json`이 없을 때 npm이 내려받지 못하는 의존성 하나(비공개 `git+https` 주소, 저장소에 없는 패키지, 존재하지 않는 버전) 때문에 결과가 비는 일은 없습니다. BomLens가 그 의존성을 뺀 채로 최대 다섯 번 다시 해석하고, 뺀 의존성마다 실패한 단계 `npm-excluded:이름`으로 기록하므로 결과는 `partial`로 표시되고 이름이 나옵니다. 완전한 결과가 필요하면 그 의존성에 접근할 수 있게 하거나 `package-lock.json`을 커밋하세요.
+
 ---
 
 ## Python
@@ -195,6 +197,8 @@ Gradle 빌드를 아예 실행할 수 없을 때(Docker 없음, 빌드 실패)�
 
 > 주의: cdxgen은 Bundler 그룹을 표시하지 않으므로 BomLens가 스캔 루트의 `Gemfile`을 직접 읽습니다. `development`와 `test` 그룹에만 선언된 gem(`group ... do` 블록 안이나 `group:`, `groups:` 옵션으로 선언)은 빠지고, 그런 gem만 필요로 하는 의존성도 함께 빠집니다. 운영 gem도 필요로 하면 남습니다. `Gemfile`은 보수적으로 읽습니다. 조건문, `gemspec`, `eval_gemfile`, 여러 줄에 걸친 선언처럼 읽지 못하는 줄이 있거나, `Gemfile.lock`에 `Gemfile`에 없는 gem이 있으면 gem을 하나도 빼지 않고 로그에 `Gemfile groups not read`를 남깁니다. 스캔 루트 아래에 다른 `Gemfile`이나 `Gemfile.lock`이 있거나 프로젝트 어디든 `.gemspec` 파일이 있어도 같습니다. 같은 gem을 운영용으로 선언했을 수 있기 때문입니다. 이 검색은 폴더 8단계 깊이까지 내려가며 `vendor`(설치된 gem이 있는 `vendor/bundle` 포함), `node_modules`, `.git`, `.venv`, `venv`는 건너뜁니다. 이들 밖에 더 깊은 폴더가 있어도 gem을 하나도 빼지 않습니다.
 
+> 참고: `optional: true`로 표시한 그룹(`group :avo, optional: true do`)에만 선언된 gem은 Bundler가 요청할 때만 설치하는 그룹이므로 `scope`를 `optional`로 달아 SBOM에 남깁니다. `development`와 `test` 그룹에만 있는 gem은 이전처럼 뺍니다.
+
 ---
 
 ## PHP
@@ -206,6 +210,8 @@ Gradle 빌드를 아예 실행할 수 없을 때(Docker 없음, 빌드 실패)�
 감지 파일: `composer.lock`
 
 > 주의: `composer.lock`이 커밋돼 있지 않으면 BomLens가 스캔 전에 직접 해석합니다(`composer update --no-dev`, `require-dev`와 `config.lock`을 뺀 `composer.json` 사본으로, 플랫폼 요구사항은 무시합니다). Ruby의 `Gemfile.lock`을 처리하는 방식과 같습니다. 스캔이 끝나면 원래 `composer.json`을 되돌려 놓습니다. PHP 버전을 강제하지 않으므로, 프로젝트가 선언한 것보다 새로운 PHP를 요구하는 의존성 버전이 선택될 수 있습니다. cdxgen은 이미 각 composer 컴포넌트에 해석된 스코프를 붙여서 줍니다(`require`는 required, `require-dev`는 optional). BomLens는 Maven과 같은 방식으로 이 정보를 이용해 SBOM을 required 대상으로 걸러냅니다. require와 require-dev를 합친 전체 그래프를 그대로 두려면 `BOMLENS_PHP_FULL_GRAPH=1`을 설정하세요([Docker 이미지 환경 변수](docker-image.ko.md#환경-변수)).
+
+> 참고: `vendor/` 안의 `package-lock.json`(예: 프레임워크의 오류 화면용 파일)은 스캔에서 제외하므로, 그 안의 npm 패키지가 프로젝트의 의존성으로 나타나지 않습니다.
 
 ---
 
@@ -234,6 +240,8 @@ Gradle 빌드를 아예 실행할 수 없을 때(Docker 없음, 빌드 실패)�
 감지 파일: 루트나 그 아래 세 단계 폴더까지의 `*.csproj`, `*.fsproj`, `*.sln`, `*.slnx`. `packages.lock.json`은 있으면 읽습니다
 
 > 주의: 감지에는 프로젝트 또는 솔루션 파일이 필요합니다. `packages.lock.json`은 필수는 아니지만, 커밋해 두면(`dotnet restore --use-lock-file`) 해석된 버전이 고정되어 SBOM을 재현할 수 있습니다.
+
+> 참고: `packages.config`나 `Reference` 항목에서 읽은 .NET Framework 기본 어셈블리(`System`, `System.Core`, `System.Data` 등)는 버전이 없으면 뺍니다. 프레임워크에 포함된 것이고 NuGet 패키지가 아니기 때문입니다. 버전이 있는 `System.*` 패키지는 남습니다.
 
 ---
 

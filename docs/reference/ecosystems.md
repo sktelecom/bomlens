@@ -155,6 +155,8 @@ Detected file: `package.json` + `package-lock.json` (or `yarn.lock`, `pnpm-lock.
 
 > Note: on top of the production filter, a component cdxgen marks as a development package (npm, pnpm, yarn or bun) is dropped when no production dependency path reaches it, together with what only it reaches. This also covers a pnpm workspace, which the production filter does not read. A package a production dependency also uses stays. `BOMLENS_NODE_FULL_GRAPH=1` or `BOMLENS_INCLUDE_DEV_DEPENDENCIES=1` keeps these too.
 
+> Note: with no `package-lock.json`, one dependency npm cannot fetch (a private `git+https` URL, a package missing from the registry, a version that does not exist) no longer empties the result. BomLens resolves again without that dependency, up to five times, and records each one left out as a failed step `npm-excluded:NAME`, so the result reads `partial` and names it. Fix access to that dependency, or commit a `package-lock.json`, for a complete result.
+
 ---
 
 ## Python
@@ -195,6 +197,8 @@ Detected file: `Gemfile.lock`
 
 > Note: cdxgen does not mark Bundler groups, so BomLens reads the `Gemfile` at the scan root itself. A gem declared only in the `development` and `test` groups (in a `group ... do` block or with a `group:` or `groups:` option) is dropped, along with what only those gems need, unless a production gem also needs it. The `Gemfile` is read conservatively: a condition, `gemspec`, `eval_gemfile`, a declaration over several lines or any other line the reader does not recognise, or a `Gemfile.lock` that names a gem the `Gemfile` does not, leaves every gem in place, and the log says `Gemfile groups not read`. So does another `Gemfile` or `Gemfile.lock` below the scan root, or a `.gemspec` file anywhere in the project, since it may declare the same gems for production. That search goes 8 folders deep and skips `vendor` (with the installed gems in `vendor/bundle`), `node_modules`, `.git`, `.venv` and `venv`; a deeper folder outside those also leaves every gem in place.
 
+> Note: a gem declared only in a group marked `optional: true` (`group :avo, optional: true do`) stays in the SBOM with `scope` `optional`, because Bundler installs such a group only when asked. Gems only in the `development` and `test` groups are dropped as before.
+
 ---
 
 ## PHP
@@ -206,6 +210,8 @@ Detected file: `Gemfile.lock`
 Detected file: `composer.lock`
 
 > Note: with no `composer.lock` committed, BomLens resolves one itself (`composer update --no-dev`, on a copy of `composer.json` without `require-dev` and `config.lock`, with platform requirements ignored) before scanning, the same as it does for Ruby's `Gemfile.lock`. Your `composer.json` is put back afterwards. A dependency version that needs a newer PHP than the project declares can be picked, because the PHP version is not enforced. cdxgen already tags each composer component with its resolved scope (`require` becomes required, `require-dev` becomes optional), so BomLens filters the SBOM to the required set, the same way it does for Maven. To keep the full require-plus-require-dev graph instead, set `BOMLENS_PHP_FULL_GRAPH=1` ([Docker image environment variables](docker-image.md#environment-variables)).
+
+> Note: a `package-lock.json` inside `vendor/` (for example a framework's error page) is left out of the scan, so its npm packages do not appear as dependencies of the project.
 
 ---
 
@@ -234,6 +240,8 @@ Detected file: `Cargo.lock`
 Detected files: `*.csproj`, `*.fsproj`, `*.sln` or `*.slnx`, at the root or in folders up to three levels below it. `packages.lock.json` is read when present
 
 > Note: detection needs a project or solution file. `packages.lock.json` is not required, but committing one (`dotnet restore --use-lock-file`) pins the resolved versions so the SBOM is reproducible.
+
+> Note: .NET Framework base assemblies read from `packages.config` or a `Reference` entry (`System`, `System.Core`, `System.Data` and similar) are dropped when they carry no version, since they ship with the framework and are not NuGet packages. A `System.*` package with a version stays.
 
 ---
 

@@ -1,0 +1,10 @@
+{
+  "name": "npm-git-dep",
+  "version": "1.0.0",
+  "dependencies": {
+    "express": "4.19.2",
+    "lodash": "4.17.21",
+    "uuid": "9.0.1",
+    "private-lib": "git+https://git.invalid.example/team/private-lib.git#v1.2.0"
+  }
+}

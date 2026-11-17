@@ -746,6 +746,7 @@ NON_SHIPPED_DIRS="test tests spec fixtures testdata __tests__ e2e example exampl
 NON_SHIPPED_MANIFEST_RE='(^|/)(package\.json|package-lock\.json|npm-shrinkwrap\.json|yarn\.lock|pnpm-lock\.yaml|bun\.lockb?|requirements[^/]*\.txt|pyproject\.toml|poetry\.lock|uv\.lock|Pipfile|Pipfile\.lock|setup\.py|setup\.cfg|environment\.ya?ml|pom\.xml|build\.gradle(\.kts)?|settings\.gradle(\.kts)?|gradle\.lockfile|go\.mod|go\.sum|Cargo\.toml|Cargo\.lock|Gemfile|Gemfile\.lock|[^/]+\.gemspec|composer\.json|composer\.lock|[^/]+\.(cs|fs|vb)proj|packages\.config|packages\.lock\.json|Directory\.Packages\.props|Package\.swift|Package\.resolved|Podfile|Podfile\.lock|conanfile\.txt|conanfile\.py|vcpkg\.json|METADATA|PKG-INFO)$'
 NON_SHIPPED_PATHS=".github/workflows gradle/wrapper"
 NON_SHIPPED_PATH_FILE_RE='(^|/)(\.github/workflows/[^/]+\.ya?ml|gradle/wrapper/[^/]+\.jar)$'
+NON_SHIPPED_FILE_GLOBS="vendor/**/package-lock.json"
 EXCLUDE_NON_SHIPPED=1
 if opted_out "${BOMLENS_INCLUDE_NON_SHIPPED:-}"; then
     EXCLUDE_NON_SHIPPED=""
@@ -1896,8 +1897,94 @@ if [ -f package.json ] && [ -z "$_node_ws_nolock" ] && ! opted_out "${BOMLENS_NO
     _node_by_name=""
     [ -f package-lock.json ] || _node_by_name=1
     _nodeset=$(mktemp)
+    _npm_ok=""
     if prep_step npm-production-set "$PREP_TIMEOUT_DEFAULT" sh -c "cd \"$_npmtmp\" && npm install --omit=dev --package-lock-only --no-audit --no-fund --ignore-scripts" >/dev/null \
        && [ -f "$_npmtmp/package-lock.json" ]; then
+        _npm_ok=1
+    fi
+    # One dependency npm cannot fetch (a private git URL, a package missing from
+    # the registry, a version that does not exist) fails the whole resolve, and
+    # the SBOM then lists nothing. With no committed lock file, resolve again in
+    # the scratch copy without that dependency, up to 5 times, hand cdxgen the
+    # lock file that results (the source-tree guard removes it afterwards) and
+    # name each dependency left out as a failed resolution step
+    # (npm-excluded:NAME), so the result is graded partial and says which.
+    if [ -z "$_npm_ok" ] && [ -n "$_node_by_name" ] && [ ! -f package-lock.json ]; then
+        _npmdrop=$(mktemp).js
+        cat > "$_npmdrop" <<'NPMDROP_JS'
+// Reads npm's error output and removes the direct dependency it names from
+// package.json. Prints the removed names, one per line; nothing when the error
+// names none (then the resolve stops there).
+const fs = require('fs');
+const [pkgPath, errPath] = process.argv.slice(2);
+let pkg, err;
+try { pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8')); err = fs.readFileSync(errPath, 'utf8'); } catch (e) { process.exit(0); }
+const FIELDS = ['dependencies', 'devDependencies', 'optionalDependencies'];
+const declared = new Map();
+for (const f of FIELDS) for (const [n, spec] of Object.entries(pkg[f] || {})) declared.set(n, String(spec));
+const found = new Set();
+const add = raw => {
+  let n = raw;
+  try { n = decodeURIComponent(raw); } catch (e) { /* keep as is */ }
+  if (declared.has(n)) found.add(n);
+};
+let m;
+const re = [
+  /No matching version found for (@?[^\s@]+(?:\/[^\s@]+)?)@/g,                 // ETARGET
+  /GET https?:\/\/[^\s]+?\/(@?[^\s\/]+(?:(?:\/|%2[fF])[^\s\/]+)?) - Not found/g,   // E404
+  /'(@?[^\s'@]+(?:\/[^\s'@]+)?)@[^']*' is not in this registry/g,              // E404
+  /\b404 Not Found - GET https?:\/\/[^\s]+?\/(@?[^\s\/]+(?:(?:\/|%2[fF])[^\s\/]+)?)/g,
+];
+for (const r of re) while ((m = r.exec(err)) !== null) add(m[1]);
+// A git dependency: npm names the repository, not the package, so match it
+// against what each dependency declares. EALLOWGIT also means a git source.
+const isGit = s => /^(git\+|git:|ssh:|github:|gitlab:|bitbucket:|gist:)|\.git(#|$)|^[\w.-]+\/[\w.-]+(#.*)?$/.test(s) && !/^(https?:\/\/[^\s]*\.tgz|file:|link:|npm:|workspace:)/.test(s);
+const repoKey = s => s.replace(/^(git\+)?[a-z]+:\/\//i, '').replace(/^[^@\/]+@/, '').replace(/^(github|gitlab|bitbucket):/, '').replace(/#.*$/, '').replace(/\.git$/, '').replace(/^[^\/:]+[:\/]/, '').toLowerCase();
+const gitDeps = [...declared].filter(([, s]) => isGit(s));
+if (found.size === 0 && gitDeps.length) {
+  for (const [n, s] of gitDeps) { const k = repoKey(s); if (k && err.toLowerCase().includes(k)) found.add(n); }
+  if (found.size === 0 && /EALLOWGIT/.test(err)) for (const [n] of gitDeps) found.add(n);
+}
+if (found.size === 0) process.exit(0);
+for (const f of FIELDS) if (pkg[f]) for (const n of found) delete pkg[f][n];
+fs.writeFileSync(pkgPath, JSON.stringify(pkg, null, 2));
+process.stdout.write([...found].join('\n') + '\n');
+NPMDROP_JS
+        _npm_dropped=""
+        _npmerr=$(mktemp)
+        _npm_try=0
+        while [ "$_npm_try" -lt 5 ]; do
+            _npm_try=$((_npm_try + 1))
+            rm -f "$_npmtmp/package-lock.json"
+            if run_supervised_timeout "$PREP_TIMEOUT_DEFAULT" sh -c "cd \"$_npmtmp\" && npm install --package-lock-only --no-audit --no-fund --ignore-scripts" >/dev/null 2>"$_npmerr" \
+               && [ -f "$_npmtmp/package-lock.json" ]; then
+                _npm_ok=1
+                break
+            fi
+            _npm_names=$(node "$_npmdrop" "$_npmtmp/package.json" "$_npmerr" 2>/dev/null) || _npm_names=""
+            [ -n "$_npm_names" ] || break
+            for _npm_n in $_npm_names; do
+                _npm_dropped="${_npm_dropped:+$_npm_dropped }$_npm_n"
+                log "node: npm could not resolve $_npm_n; resolving again without it"
+            done
+        done
+        if [ -n "$_npm_ok" ] && [ -n "$_npm_dropped" ]; then
+            cp "$_npmtmp/package-lock.json" "$_npmtmp/package-lock.full.json"
+            if prep_step npm-production-set "$PREP_TIMEOUT_DEFAULT" sh -c "cd \"$_npmtmp\" && npm install --omit=dev --package-lock-only --no-audit --no-fund --ignore-scripts" >/dev/null; then
+                unmark_prep_failed npm-production-set
+                cp "$_npmtmp/package-lock.full.json" package-lock.json 2>/dev/null \
+                    || log "node: could not place the resolved lock file; cdxgen resolves on its own"
+                for _npm_n in $_npm_dropped; do mark_prep_failed "npm-excluded:$_npm_n"; done
+                log "node: resolved without: $_npm_dropped"
+            else
+                _npm_ok=""
+            fi
+        elif [ -n "$_npm_ok" ]; then
+            unmark_prep_failed npm-production-set   # the first failure did not repeat
+        fi
+        rm -f "$_npmdrop" "$_npmerr"
+    fi
+    if [ -n "$_npm_ok" ] && [ -f "$_npmtmp/package-lock.json" ]; then
         # Emit name@version for every non-dev node_modules entry in the resolved lockfile.
         node -e '
           const fs=require("fs");
@@ -1985,6 +2072,7 @@ fi
 if [ -n "$EXCLUDE_NON_SHIPPED" ]; then
     for _d in $NON_SHIPPED_DIRS; do set -- "$@" --exclude "**/$_d/**"; done
     for _d in $NON_SHIPPED_PATHS; do set -- "$@" --exclude "**/$_d/**"; done
+    for _d in $NON_SHIPPED_FILE_GLOBS; do set -- "$@" --exclude "**/$_d"; done
 fi
 set -- "$@" "$SRC"
 
@@ -3258,6 +3346,7 @@ const list = s => {
   return out.length ? out : null;
 };
 const stack = [];
+const optNames = new Set();
 const gems = new Map();
 const lines = src.split(/\r?\n/);
 for (let i = 0; i < lines.length; i++) {
@@ -3267,7 +3356,12 @@ for (let i = 0; i < lines.length; i++) {
   let m;
   if (line === 'end') { if (!stack.length) give_up(at); stack.pop(); continue; }
   if ((m = /^group\s*\(?\s*(.+?)\s*\)?\s+do(\s*\|[^|]*\|)?$/.exec(line))) {
-    const g = list(m[1]); if (!g) give_up(at); stack.push(g); continue;
+    // `group :x, optional: true do`: the option is read, any other is not.
+    const optRe = /\s*,\s*(?:optional:\s*true|:optional\s*=>\s*true)\s*$/;
+    const isOpt = optRe.test(m[1]);
+    const g = list(m[1].replace(optRe, '')); if (!g) give_up(at);
+    if (isOpt) for (const n of g) optNames.add(String(n));
+    stack.push(g); continue;
   }
   if (/^(platforms?|source|git|github|path)\b[^{}]*\sdo(\s*\|[^|]*\|)?$/.test(line)) { stack.push([]); continue; }
   if (/^(source|ruby|git_source|plugin)\b/.test(line)) {
@@ -3304,11 +3398,13 @@ if (lockfile && fs.existsSync(lockfile)) {
   }
 }
 const dev = [...gems].filter(([, g]) => [...g].every(x => DEV.has(x))).map(([n]) => n).sort();
-if (dev.length) process.stdout.write(dev.join('\n') + '\n');
+const optional = [...gems].filter(([, g]) => [...g].every(x => optNames.has(x))).map(([n]) => 'optional:' + n).sort();
+const out = dev.concat(optional);
+if (out.length) process.stdout.write(out.join('\n') + '\n');
 GEMDEV_JS
         node "$_gdjs" Gemfile Gemfile.lock > "$_dvgems" || : > "$_dvgems"
         rm -f "$_gdjs"
-        [ -s "$_dvgems" ] && log "ruby: development/test-only gems in Gemfile: $(tr '\n' ' ' < "$_dvgems")"
+        [ -s "$_dvgems" ] && log "ruby: development/test-only gems in Gemfile (optional:NAME = optional group): $(tr '\n' ' ' < "$_dvgems")"
     fi
     _dvflt=$(mktemp).js
     cat > "$_dvflt" <<'DEVFILTER_JS'
@@ -3319,13 +3415,33 @@ const nonShipped = new Set((nonShippedDirs || '').toLowerCase().split(/\s+/).fil
 const say = s => process.stderr.write('[build-prep] dev-marker: ' + s + '\n');
 let bom;
 try { bom = JSON.parse(fs.readFileSync(bomPath, 'utf8')); } catch (e) { process.exit(0); }
+// The gem list holds one name per line; "optional:<name>" is a gem declared
+// only in groups Bundler leaves out unless asked (group ..., optional: true).
+let devGems = new Set();
+const optionalGems = new Set();
+try {
+  for (const l of fs.readFileSync(gemListPath, 'utf8').split('\n').filter(Boolean)) {
+    if (l.startsWith('optional:')) optionalGems.add(l.slice(9)); else devGems.add(l);
+  }
+} catch (e) { /* no Gemfile */ }
+// Optional-group gems stay in the SBOM, marked scope optional (CycloneDX), before
+// the graph checks below so the mark does not depend on a dependency graph.
+if (optionalGems.size > 0 && Array.isArray(bom.components)) {
+  let marked = 0;
+  for (const c of bom.components) {
+    const m = /^pkg:gem\/([^@?#]+)/.exec(c.purl || '');
+    if (m && optionalGems.has(decodeURIComponent(m[1]).toLowerCase()) && (!c.scope || c.scope === 'required')) { c.scope = 'optional'; marked++; }
+  }
+  if (marked > 0) {
+    fs.writeFileSync(bomPath, JSON.stringify(bom, null, 2));
+    say('marked ' + marked + ' gem(s) from optional Gemfile groups as scope optional');
+  }
+}
 if (!Array.isArray(bom.components) || !Array.isArray(bom.dependencies)) process.exit(0);
 const mc = bom.metadata && bom.metadata.component;
 const rootRef = mc && (mc['bom-ref'] || mc.purl);
 const edges = new Map(bom.dependencies.map(d => [d.ref, Array.isArray(d.dependsOn) ? d.dependsOn : []]));
 if (!rootRef || !edges.has(rootRef)) process.exit(0);
-let devGems = new Set();
-try { devGems = new Set(fs.readFileSync(gemListPath, 'utf8').split('\n').filter(Boolean)); } catch (e) { /* no Gemfile */ }
 const purlName = (c, type) => {
   const m = new RegExp('^pkg:' + type + '/([^@?#]+)').exec(c.purl || '');
   try { return m ? decodeURIComponent(m[1]).toLowerCase() : ''; } catch (e) { return ''; }

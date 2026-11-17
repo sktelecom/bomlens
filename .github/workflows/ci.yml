@@ -451,6 +451,12 @@ jobs:
       - name: Android Gradle resolution tests
         run: bash tests/test-android-gradle-resolution.sh
 
+      # No Docker: how npm, Ruby, PHP and .NET sources are read. The one npm
+      # dependency that cannot be fetched, a Gemfile optional group, a vendored
+      # package-lock.json and the .NET base assemblies.
+      - name: Ecosystem resolution tests
+        run: bash tests/test-ecosystem-resolution.sh
+
       # No Docker: reads model files built on the spot (GGUF, safetensors, torch
       # archive, pickle, npz) and asserts the header facts that end up in the
       # SBOM — including that the magic bytes, not the extension, decide the

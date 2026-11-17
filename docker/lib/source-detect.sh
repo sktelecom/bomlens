@@ -206,6 +206,9 @@ NON_SHIPPED_DIRS="test tests spec fixtures testdata __tests__ e2e example exampl
 NON_SHIPPED_MANIFEST_RE='(^|/)(package\.json|package-lock\.json|npm-shrinkwrap\.json|yarn\.lock|pnpm-lock\.yaml|bun\.lockb?|requirements[^/]*\.txt|pyproject\.toml|poetry\.lock|uv\.lock|Pipfile|Pipfile\.lock|setup\.py|setup\.cfg|environment\.ya?ml|pom\.xml|build\.gradle(\.kts)?|settings\.gradle(\.kts)?|gradle\.lockfile|go\.mod|go\.sum|Cargo\.toml|Cargo\.lock|Gemfile|Gemfile\.lock|[^/]+\.gemspec|composer\.json|composer\.lock|[^/]+\.(cs|fs|vb)proj|packages\.config|packages\.lock\.json|Directory\.Packages\.props|Package\.swift|Package\.resolved|Podfile|Podfile\.lock|conanfile\.txt|conanfile\.py|vcpkg\.json|METADATA|PKG-INFO)$'
 NON_SHIPPED_PATHS=".github/workflows gradle/wrapper"
 NON_SHIPPED_PATH_FILE_RE='(^|/)(\.github/workflows/[^/]+\.ya?ml|gradle/wrapper/[^/]+\.jar)$'
+# Lock files vendored inside an installed dependency (a PHP framework's error
+# page ships its own package-lock.json). Only the file goes, not the folder.
+NON_SHIPPED_FILE_GLOBS="vendor/**/package-lock.json"
 
 # Static detection: read the lock file instead of building.
 #
@@ -443,6 +446,7 @@ non_shipped_syft_args() {
     local d out=""
     for d in $NON_SHIPPED_DIRS; do out="$out --exclude ./**/$(non_shipped_any_case "$d")/**"; done
     for d in $NON_SHIPPED_PATHS; do out="$out --exclude ./**/$d/**"; done
+    for d in $NON_SHIPPED_FILE_GLOBS; do out="$out --exclude ./**/$d"; done
     printf '%s' "${out# }"
 }
 
