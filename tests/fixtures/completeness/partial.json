@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "grade": "partial",
+  "gradeLabel": {
+    "en": "Partial",
+    "ko": "부분"
+  },
+  "componentCount": 1,
+  "reasons": [
+    {
+      "code": "lockfile-missing",
+      "grade": "partial",
+      "detail": "package-lock.json",
+      "message": {
+        "en": "A lock file is missing (package-lock.json), so the versions listed may differ from the ones you build with, or some dependencies may not be listed at all.",
+        "ko": "락 파일이 없어(package-lock.json) 나열된 버전이 실제 빌드에 쓰는 버전과 다르거나 일부 의존성이 아예 빠졌을 수 있습니다."
+      },
+      "fix": {
+        "en": "Create the lock file with the package manager (for example npm install, pod install or swift package resolve), keep it in the project folder and scan again.",
+        "ko": "패키지 관리 도구로 락 파일을 만들고(예: npm install, pod install, swift package resolve) 프로젝트 폴더에 둔 뒤 다시 스캔하세요."
+      }
+    }
+  ],
+  "uncheckedEcosystems": []
+}

@@ -918,6 +918,10 @@
         "title": "C/C++ source copied into the project may be missing",
         "short": "Code copied into C/C++ sources is not seen by a normal scan."
       },
+      "completeness": {
+        "title": "The result may be incomplete",
+        "short": "The scan could not read everything. See the reasons and how to fix them."
+      },
       "degraded": {
         "title": "Transitive dependencies were not resolved",
         "short": "The SBOM holds direct dependencies only."
@@ -1006,6 +1010,11 @@
     "componentVersions": "supplied component version filling",
     "upstreamPurl": "upstream source repository purl addition",
     "matchCpe": "NVD CPE index matching"
+  },
+  "completeness": {
+    "bannerTitle": "Result completeness: {{grade}}",
+    "badge": "Result completeness: {{grade}}",
+    "fix": "How to fix:"
   },
   "pipelineNote": {
     "titleScan": "Some data may be incomplete",

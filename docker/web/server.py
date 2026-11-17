@@ -2907,6 +2907,71 @@ def yocto_vex_summary(run_id):
     }
 
 
+COMPLETENESS_GRADES = ("complete", "partial", "unreliable")
+MAX_COMPLETENESS_REASONS = 20  # reasons carried to the UI
+MAX_COMPLETENESS_TEXT = 600    # one sentence (message / fix) in one language
+
+
+def completeness_summary(run_id):
+    """Result completeness the engine wrote (`_completeness.json`), or None.
+
+    The grade and the sentences come from the engine (assess-completeness.sh and
+    completeness-reasons.json); the UI never recomputes them, so the screen and
+    the reports say the same thing. A file that is absent (an older result), of
+    another schemaVersion or malformed gives None, and the UI then shows what it
+    showed before. The file is read through run_file (traversal-safe) and every
+    string is cut to a short single line: it can be derived from a supplier SBOM.
+    """
+    p = run_file(run_id, "_completeness.json")
+    if not p or not os.path.isfile(p):
+        return None
+    try:
+        with open(p) as f:
+            data = json.load(f)
+    except (OSError, json.JSONDecodeError):
+        return None
+    if not isinstance(data, dict) or data.get("schemaVersion") != 1:
+        return None
+    grade = data.get("grade")
+    if grade not in COMPLETENESS_GRADES:
+        return None
+
+    def _text(value, limit):
+        return re.sub(r"[\x00-\x1f\x7f]", " ", str(value if value is not None else ""))[:limit]
+
+    def _pair(value):
+        v = value if isinstance(value, dict) else {}
+        return {"en": _text(v.get("en"), MAX_COMPLETENESS_TEXT),
+                "ko": _text(v.get("ko"), MAX_COMPLETENESS_TEXT)}
+
+    label = data.get("gradeLabel") if isinstance(data.get("gradeLabel"), dict) else {}
+    reasons = []
+    for r in _as_list(data.get("reasons"))[:MAX_COMPLETENESS_REASONS]:
+        if not isinstance(r, dict):
+            continue
+        rgrade = r.get("grade")
+        reasons.append({
+            "code": _text(r.get("code"), 60),
+            "grade": rgrade if rgrade in COMPLETENESS_GRADES else "partial",
+            "detail": _text(r.get("detail"), 200),
+            "message": _pair(r.get("message")),
+            "fix": _pair(r.get("fix")),
+        })
+    count = data.get("componentCount")
+    return {
+        "grade": grade,
+        "gradeLabel": {"en": _text(label.get("en"), 40), "ko": _text(label.get("ko"), 40)},
+        "componentCount": count if isinstance(count, int) and count >= 0 else 0,
+        "reasons": reasons,
+    }
+
+
+def completeness_grade(run_id):
+    """Only the grade, for the Recent list (None when there is no valid file)."""
+    c = completeness_summary(run_id)
+    return c["grade"] if c else None
+
+
 def conformance_summary(run_id):
     """Supplier-SBOM conformance verdict (ANALYZE mode only)."""
     p = run_file(run_id, "_conformance.json")
@@ -3308,12 +3373,16 @@ def list_scans():
         meta_sig = _stat_sig(os.path.join(d, SCANMETA_NAME)) if d else None
         sec_path = run_file(run_id, "_security.json")
         sec_sig = _stat_sig(sec_path) if sec_path else None
+        # The completeness file is written by the same finishing steps, so a row
+        # cached before it landed must not outlive it.
+        cmp_path = run_file(run_id, "_completeness.json")
+        cmp_sig = _stat_sig(cmp_path) if cmp_path else None
         # Keyed by (run_id, bom_path), not run_id alone: the legacy flat layout
         # (OUTPUT_DIR/foo_1.0_bom.json) and the run-subfolder layout
         # (OUTPUT_DIR/foo_1.0/foo_1.0_bom.json) can both exist for the same id
         # at once, and list_scans() lists both -- a run_id-only key would let
         # one overwrite the other's cache slot and serve its row instead.
-        cache_key = (bom_sig, meta_sig, sec_sig)
+        cache_key = (bom_sig, meta_sig, sec_sig, cmp_sig)
         cache_slot = (run_id, bom_path)
         seen_slots.add(cache_slot)
         with _scans_cache_lock:
@@ -3379,6 +3448,9 @@ def list_scans():
             # type falls back to the component type as before.
             "inputSource": (scanmeta(run_id) or {}).get("source"),
             "generatedAt": bom_sig[0] // 1_000_000_000,
+            # Grade only (complete / partial / unreliable); None when the scan
+            # has no completeness file.
+            "completeness": completeness_grade(run_id),
         }
         scans.append(row)
         with _scans_cache_lock:
@@ -3495,6 +3567,9 @@ def scan_detail(run_id):
         "sbom": sbom,
         "security": security_summary(run_id),
         "conformance": conformance_summary(run_id),
+        # What the engine wrote about how complete the result is; None for a
+        # result without the file. Paired with the done-event payload below.
+        "completeness": completeness_summary(run_id),
         # Yocto build-time VEX counts (Yocto SPDX input only); None otherwise.
         "yoctoVex": yocto_vex_summary(run_id),
         # AI compliance profile card (AI SBOMs only); None otherwise. Paired with
@@ -8239,6 +8314,7 @@ class Handler(BaseHTTPRequestHandler):
                 "sbom": sbom_summary(run_id),
                 "security": security_summary(run_id) if env["GENERATE_SECURITY"] == "true" else None,
                 "conformance": conformance_summary(run_id),
+                "completeness": completeness_summary(run_id),
                 # Yocto build-time VEX counts (Yocto SPDX input only); None otherwise.
                 "yoctoVex": yocto_vex_summary(run_id),
                 # AI compliance profile card (AI SBOMs only); None otherwise.

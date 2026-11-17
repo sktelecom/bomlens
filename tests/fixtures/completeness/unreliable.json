@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "grade": "unreliable",
+  "gradeLabel": {
+    "en": "Unreliable",
+    "ko": "신뢰 불가"
+  },
+  "componentCount": 0,
+  "reasons": [
+    {
+      "code": "empty-with-manifests",
+      "grade": "unreliable",
+      "detail": "pom.xml",
+      "message": {
+        "en": "The source declares dependencies (pom.xml) but the scan found no component, so those dependencies were not resolved.",
+        "ko": "소스에 의존성이 선언되어 있지만(pom.xml) 스캔 결과 컴포넌트가 없어 의존성을 해석하지 못했습니다."
+      },
+      "fix": {
+        "en": "Find the cause in the scan log (a lock file that is missing or damaged, a dependency that cannot be downloaded, or a build tool that failed), fix it and scan again.",
+        "ko": "스캔 로그에서 원인(없거나 손상된 락 파일, 내려받을 수 없는 의존성, 실패한 빌드 도구)을 찾아 해결한 뒤 다시 스캔하세요."
+      }
+    }
+  ],
+  "uncheckedEcosystems": []
+}

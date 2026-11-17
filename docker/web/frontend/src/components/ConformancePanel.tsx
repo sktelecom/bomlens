@@ -8,7 +8,8 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 
-import { fileUrl, type ConformanceCheck, type ConformanceSummary, type ResultFile } from "@/lib/api";
+import { type Completeness, fileUrl, type ConformanceCheck, type ConformanceSummary, type ResultFile } from "@/lib/api";
+import { gradeLabel, gradeVariant, isIncomplete } from "@/lib/completeness";
 import {
   checkKind,
   type CheckKind,
@@ -57,6 +58,7 @@ export function ConformancePanel({
   results = [],
   isSuppliedDocument = false,
   isAiDocument = false,
+  completeness = null,
   query,
   onQueryChange,
 }: {
@@ -70,11 +72,13 @@ export function ConformancePanel({
   isSuppliedDocument?: boolean;
   /** `isAiScan(result)`: the empty-result and license warnings do not apply. */
   isAiDocument?: boolean;
+  /** The engine's completeness result; when it is not complete its grade leads the summary and its reasons explain an empty result. */
+  completeness?: Completeness | null;
   /** The tab and the search, as carried in the URL hash. */
   query?: RouteQuery;
   onQueryChange?: (query: RouteQuery) => void;
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { toast } = useToast();
   const checks = useMemo(() => conformance.checks ?? [], [conformance.checks]);
   const tally = useMemo(() => kindTally(checks), [checks]);
@@ -137,6 +141,7 @@ export function ConformancePanel({
       : null;
 
   const quality = resultQuality(conformance, isAiDocument);
+  const incomplete = !isAiDocument && isIncomplete(completeness);
   const pass = conformance.result === "pass";
   const warnPass = pass && (quality.empty || quality.noLicenses);
 
@@ -144,7 +149,7 @@ export function ConformancePanel({
     return (
       <div className="bl-cf bl-cf-notes">
         {actions}
-        <EmptyNotices conformance={conformance} quality={quality} supplied={isSuppliedDocument} />
+        <EmptyNotices conformance={conformance} quality={quality} supplied={isSuppliedDocument} completeness={completeness} />
         <div className="bl-cf-box">
           <Blankslate>
             <Blankslate.Visual>
@@ -202,6 +207,12 @@ export function ConformancePanel({
           <section className="bl-cf-box" aria-labelledby="bl-cf-sum">
             <div className="bl-cf-head">
               <h2 id="bl-cf-sum">{conformance.format || t("nav.conformance")}</h2>
+              {/* A result that is not complete says so before it says "pass". */}
+              {incomplete && (
+                <Label variant={gradeVariant(completeness.grade)} data-testid="conformance-completeness-grade">
+                  {t("completeness.badge", { grade: gradeLabel(completeness, i18n.language ?? "en") })}
+                </Label>
+              )}
               <Label variant={!pass ? "danger" : warnPass ? "attention" : "success"}>
                 {!pass ? t("result.verdictFail") : warnPass ? t("conf.qualityPassWarn") : t("result.verdictPass")}
               </Label>
@@ -212,7 +223,7 @@ export function ConformancePanel({
                   scanned software. */}
               <p className="bl-muted bl-small">{t("g7.panelIntro")}</p>
               <p className="bl-strong">{t("g7.verdictFailed", { count: verdict.mandatoryFailed })}</p>
-              {(quality.empty || quality.noLicenses) && <QualityNote quality={quality} supplied={isSuppliedDocument} />}
+              {(quality.empty || quality.noLicenses) && <QualityNote quality={quality} supplied={isSuppliedDocument} completeness={completeness} />}
             </div>
           </section>
         </div>

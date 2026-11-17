@@ -4,10 +4,12 @@
 import { Banner } from "@primer/react";
 import { useTranslation } from "react-i18next";
 
-import type { ConformanceSummary } from "@/lib/api";
+import type { Completeness, ConformanceSummary } from "@/lib/api";
+import { gradeLabel, isIncomplete } from "@/lib/completeness";
 import type { ResultQuality } from "@/lib/conformance";
 import { pipelineStepLabelKey } from "@/lib/pipelineSteps";
 
+import { CompletenessReasons } from "../CompletenessReasons";
 import "./conformance.css";
 
 function StepList({ steps, more }: { steps: string[]; more: number }) {
@@ -61,8 +63,27 @@ export function PipelineNote({
  * declared anywhere, so a green "pass" never stands alone beside an empty or
  * unlicensed result. A healthy coverage figure is not repeated here.
  */
-export function QualityNote({ quality, supplied }: { quality: ResultQuality; supplied: boolean }) {
-  const { t } = useTranslation();
+export function QualityNote({
+  quality,
+  supplied,
+  completeness,
+}: {
+  quality: ResultQuality;
+  supplied: boolean;
+  /** The engine's completeness result; when it is partial or unreliable its reasons replace the generic empty-result wording. */
+  completeness?: Completeness | null;
+}) {
+  const { t, i18n } = useTranslation();
+  if (quality.empty && isIncomplete(completeness)) {
+    return (
+      <Banner
+        variant="warning"
+        data-testid="conformance-empty-result"
+        title={t("completeness.bannerTitle", { grade: gradeLabel(completeness, i18n.language ?? "en") })}
+        description={<CompletenessReasons completeness={completeness} />}
+      />
+    );
+  }
   if (quality.empty) {
     return (
       <Banner
@@ -92,22 +113,25 @@ export function EmptyNotices({
   conformance,
   quality,
   supplied,
+  completeness,
 }: {
   conformance: ConformanceSummary;
   quality: ResultQuality;
   supplied: boolean;
+  completeness?: Completeness | null;
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const steps = conformance.pipelineStepsFailed ?? [];
   const warnQuality = quality.empty || quality.noLicenses;
   if (steps.length === 0 || !warnQuality) {
     return (
       <>
         <PipelineNote steps={steps} more={conformance.pipelineStepsFailedMore ?? 0} supplied={supplied} />
-        <QualityNote quality={quality} supplied={supplied} />
+        <QualityNote quality={quality} supplied={supplied} completeness={completeness} />
       </>
     );
   }
+  const graded = quality.empty && isIncomplete(completeness);
   return (
     <Banner
       variant="warning"
@@ -122,9 +146,17 @@ export function EmptyNotices({
             {supplied && <span> {t("pipelineNote.supplierHint")}</span>}
           </li>
           <li data-testid={quality.empty ? "conformance-empty-result" : "conformance-no-licenses"}>
-            <span className="bl-strong">{quality.empty ? t("conf.qualityEmptyTitle") : t("conf.qualityLicenseTitle")}</span>
+            <span className="bl-strong">
+              {graded
+                ? t("completeness.bannerTitle", { grade: gradeLabel(completeness!, i18n.language ?? "en") })
+                : quality.empty
+                  ? t("conf.qualityEmptyTitle")
+                  : t("conf.qualityLicenseTitle")}
+            </span>
             <span style={{ display: "block" }}>
-              {quality.empty
+              {graded
+                ? <CompletenessReasons completeness={completeness!} />
+                : quality.empty
                 ? t(supplied ? "conf.qualityEmptyBodySupplied" : "conf.qualityEmptyBody")
                 : t("conf.qualityLicenseBody", quality.license ?? {})}
             </span>

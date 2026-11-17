@@ -134,6 +134,40 @@ test("a zero-component scan does not also claim direct dependencies were found",
   await expect(page.getByText("Direct dependencies only")).toHaveCount(0);
 });
 
+/** An empty result the engine graded unreliable: the sentences are its own. */
+const EMPTY_SOURCE_GRADED = {
+  ...base,
+  mode: "SOURCE",
+  sbom: { components: 0, componentList: [] },
+  completeness: {
+    grade: "unreliable",
+    gradeLabel: { en: "Unreliable", ko: "신뢰 불가" },
+    componentCount: 0,
+    reasons: [
+      {
+        code: "empty-with-manifests",
+        grade: "unreliable",
+        detail: "pom.xml",
+        message: { en: "The source declares dependencies (pom.xml) but the scan found no component.", ko: "소스에 의존성이 선언되어 있지만(pom.xml) 컴포넌트가 없습니다." },
+        fix: { en: "Find the cause in the scan log and scan again.", ko: "스캔 로그에서 원인을 찾아 다시 스캔하세요." },
+      },
+    ],
+  },
+};
+
+test("a graded result shows the engine's reasons instead of the generic zero-components text", async ({ page }) => {
+  await stub(page, { firmware: false, scanoss: false, docker: true }, EMPTY_SOURCE_GRADED);
+  await page.goto("/#/new");
+  await fillAndRun(page);
+
+  const banner = page.getByTestId("completeness");
+  await expect(banner).toBeVisible();
+  await expect(banner).toContainText("Result completeness: Unreliable");
+  await expect(banner).toContainText(/declares dependencies \(pom\.xml\)/);
+  await expect(banner).toContainText(/Find the cause in the scan log/);
+  await expect(page.getByTestId("zero-components")).toHaveCount(0);
+});
+
 test("a scan that found components shows no such warning", async ({ page }) => {
   await stub(page, { firmware: false, scanoss: false, docker: true }, NORMAL_SOURCE);
   await page.goto("/#/new");

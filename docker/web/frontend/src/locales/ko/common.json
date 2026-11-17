@@ -918,6 +918,10 @@
         "title": "프로젝트에 복사된 C/C++ 소스가 빠졌을 수 있습니다",
         "short": "소스에 그대로 복사된 오픈소스는 일반 스캔으로 보이지 않습니다."
       },
+      "completeness": {
+        "title": "결과가 완전하지 않을 수 있습니다",
+        "short": "스캔이 일부를 읽지 못했습니다. 사유와 해결 방법을 확인하세요."
+      },
       "degraded": {
         "title": "전이 의존성을 확인하지 못했습니다",
         "short": "SBOM에는 직접 의존성만 담겼습니다."
@@ -1006,6 +1010,11 @@
     "componentVersions": "제공된 컴포넌트 버전 채우기",
     "upstreamPurl": "상위 소스 저장소 purl 추가",
     "matchCpe": "NVD CPE 색인 대조"
+  },
+  "completeness": {
+    "bannerTitle": "결과 완전성: {{grade}}",
+    "badge": "결과 완전성: {{grade}}",
+    "fix": "해결 방법:"
   },
   "pipelineNote": {
     "titleScan": "일부 데이터가 없을 수 있습니다",

@@ -7460,6 +7460,63 @@ import sys; sys.path.insert(0, '$ROOT_DIR/docker/web')
 import server; print(server.build_android_image(34, lambda l: None))" 2>&1)
 [ "$nc" = "(False, 'no-consent', '')" ] && pass "build_android_image refuses without recorded consent" || fail "no-consent" "$nc"
 
+echo ""
+echo "== completeness_summary carries the engine's grade and sentences =="
+# The engine writes <prefix>_completeness.json; the server only passes it through
+# (done event, /scan detail, Recent list grade) and never judges again. An absent,
+# foreign-schema or malformed file gives None so the UI keeps its old display.
+CMP_OUT="$WORK/cmp-out"; mkdir -p "$CMP_OUT"
+for g in complete partial unreliable; do
+    mkdir -p "$CMP_OUT/cmp-$g"
+    cp "$ROOT_DIR/tests/fixtures/good-cyclonedx.json" "$CMP_OUT/cmp-$g/cmp-${g}_bom.json"
+    cp "$ROOT_DIR/tests/fixtures/completeness/$g.json" "$CMP_OUT/cmp-$g/cmp-${g}_completeness.json"
+done
+mkdir -p "$CMP_OUT/cmp-none" "$CMP_OUT/cmp-bad" "$CMP_OUT/cmp-long"
+cp "$ROOT_DIR/tests/fixtures/good-cyclonedx.json" "$CMP_OUT/cmp-none/cmp-none_bom.json"
+cp "$ROOT_DIR/tests/fixtures/good-cyclonedx.json" "$CMP_OUT/cmp-bad/cmp-bad_bom.json"
+cp "$ROOT_DIR/tests/fixtures/good-cyclonedx.json" "$CMP_OUT/cmp-long/cmp-long_bom.json"
+echo '{"schemaVersion": 2, "grade": "partial", "reasons": []}' > "$CMP_OUT/cmp-bad/cmp-bad_completeness.json"
+if SBOM_OUTPUT_DIR="$CMP_OUT" python3 -I - "$ROOT_DIR" "$CMP_OUT" <<'PY'
+import sys, os, json
+sys.path.insert(0, os.path.join(sys.argv[1], "docker", "web"))
+import server
+out = sys.argv[2]
+for g, code in (("complete", None), ("partial", "lockfile-missing"), ("unreliable", "empty-with-manifests")):
+    fixture = json.load(open(os.path.join(sys.argv[1], "tests/fixtures/completeness", g + ".json")))
+    c = server.completeness_summary("cmp-" + g)
+    assert c["grade"] == g and c["gradeLabel"] == fixture["gradeLabel"], (g, c)
+    assert [r["code"] for r in c["reasons"]] == ([code] if code else []), (g, c["reasons"])
+    # The sentences are the engine's, word for word, in both languages.
+    for got, want in zip(c["reasons"], fixture["reasons"]):
+        assert got["message"] == want["message"] and got["fix"] == want["fix"], (g, got)
+    assert server.scan_detail("cmp-" + g)["completeness"] == c, g
+    row = next(r for r in server.list_scans() if r["id"] == "cmp-" + g)
+    assert row["completeness"] == g, row
+assert server.completeness_summary("cmp-none") is None
+assert server.scan_detail("cmp-none")["completeness"] is None
+assert next(r for r in server.list_scans() if r["id"] == "cmp-none")["completeness"] is None
+assert server.completeness_summary("cmp-bad") is None, "another schemaVersion is not read"
+# Hostile text is cut and flattened; an unknown grade drops the whole file.
+json.dump({"schemaVersion": 1, "grade": "partial", "gradeLabel": {"en": "P"}, "componentCount": 3,
+           "reasons": [{"code": "x", "grade": "weird", "detail": "a\nb" * 200,
+                        "message": {"en": "m" * 5000, "ko": "k\x07"}, "fix": "not-a-dict"}] + [{}] * 40 + ["junk"]},
+          open(os.path.join(out, "cmp-long", "cmp-long_completeness.json"), "w"))
+c = server.completeness_summary("cmp-long")
+assert len(c["reasons"]) == server.MAX_COMPLETENESS_REASONS, len(c["reasons"])
+r = c["reasons"][0]
+assert r["grade"] == "partial" and len(r["detail"]) == 200 and "\n" not in r["detail"], r
+assert len(r["message"]["en"]) == server.MAX_COMPLETENESS_TEXT and r["message"]["ko"] == "k ", r
+assert r["fix"] == {"en": "", "ko": ""}, r
+json.dump({"schemaVersion": 1, "grade": "great", "reasons": []},
+          open(os.path.join(out, "cmp-long", "cmp-long_completeness.json"), "w"))
+assert server.completeness_summary("cmp-long") is None
+PY
+then
+    pass "completeness_summary passes the three grades through done, /scan and the list, and rejects bad files"
+else
+    fail "completeness_summary contract"
+fi
+
 # Scan-target path handling has its own No-Docker suite; run it here so the
 # existing CI step for this file covers it.
 echo ""
