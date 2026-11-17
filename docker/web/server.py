@@ -791,14 +791,18 @@ def scan_target_not_visible(scan_dir):
     for minutes before finding nothing. The wording carries the machine-readable
     code SCAN_TARGET_NOT_VISIBLE and names the folder as the user knows it."""
     real = os.path.realpath(scan_dir)
-    if not any(real == os.path.realpath(root)
-               or real.startswith(os.path.realpath(root) + os.sep)
-               for root in ALLOWED_SCAN_ROOTS):
-        return None
-    try:
-        if os.listdir(real):
-            return None
-    except OSError:
+    inside = False
+    for root in ALLOWED_SCAN_ROOTS:
+        r = os.path.realpath(root)
+        if real == r or real.startswith(r + os.sep):
+            inside = True
+            try:
+                if os.listdir(real):
+                    return None
+            except OSError:
+                return None
+            break
+    if not inside:
         return None
     where = display_path_of(scan_dir)
     return (
