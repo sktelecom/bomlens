@@ -10,10 +10,10 @@ Releases of the Windows installer are signed under the following policy. The fil
 
 ## Team roles
 
-- Committers and reviewers: {{COMMITTERS_AND_REVIEWERS}}
-- Approvers: {{APPROVERS}}
+- Committers and reviewers: [fritzprix](https://github.com/fritzprix), [haksungjang](https://github.com/haksungjang), [SKDEVOCEAN](https://github.com/SKDEVOCEAN)
+- Approvers: [haksungjang](https://github.com/haksungjang)
 
-Committers can change the source without a separate review. Every change from anyone else is reviewed by a team member before it is merged. An approver decides, for each release, whether the installer is signed.
+Committers can change the source without a separate review. Changes proposed by anyone who is not a committer are reviewed by a team member before they are merged. An approver decides, for each release, whether the installer is signed.
 
 ## Privacy policy
 
@@ -37,6 +37,7 @@ BomLens does contact other services, listed below. Where a request carries ident
 - `--resolve-purl` sends the package identifiers found in the SBOM you submitted for checking to deps.dev. Namespaces listed in `PURL_RESOLVE_IGNORE` are left out.
 - `--identify-vendored` sends file fingerprints (hashes) of C and C++ source files to the SCANOSS OSSKB service. The files themselves are not sent. `SCANOSS_API_URL` points to another endpoint.
 - `--model <owner/name>` and `--resolve-models` read model metadata from the Hugging Face hub, and `--model` with a Figshare item reads the item from the Figshare API. The web UI clones a repository address you enter for a source scan.
+- `--upload-target`, `--trusca` and the web UI upload step send the finished SBOM to the Dependency-Track or TRUSCA server whose address (`API_URL`) you give.
 - `--deep-cve`, `--deep-license` and the other opt-in images are pulled from `ghcr.io`. `SECURITY_NVD_VERIFY=true` also queries the NVD API.
 
 For the full option list, see the [CLI reference](cli.md), and for the design behind it, see [Local-first by design](../concepts/local-first.md).

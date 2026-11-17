@@ -10,10 +10,10 @@ Windows 설치 파일의 릴리스는 아래 정책에 따라 서명합니다. �
 
 ## 팀 역할
 
-- Committers and reviewers: {{COMMITTERS_AND_REVIEWERS}}
-- Approvers: {{APPROVERS}}
+- Committers and reviewers: [fritzprix](https://github.com/fritzprix), [haksungjang](https://github.com/haksungjang), [SKDEVOCEAN](https://github.com/SKDEVOCEAN)
+- Approvers: [haksungjang](https://github.com/haksungjang)
 
-Committers는 별도 검토 없이 소스를 바꿀 수 있습니다. 다른 사람이 제안한 변경은 모두 팀원이 검토한 뒤에 병합합니다. Approvers는 릴리스마다 설치 파일에 서명할지 결정합니다.
+Committers는 별도 검토 없이 소스를 바꿀 수 있습니다. Committer가 아닌 사람이 제안한 변경은 팀원이 검토한 뒤에 병합합니다. Approvers는 릴리스마다 설치 파일에 서명할지 결정합니다.
 
 ## 개인정보 정책
 
@@ -37,6 +37,7 @@ BomLens는 사용자의 컴퓨터에서 실행됩니다. BomLens의 어떤 기�
 - `--resolve-purl`은 제출한 SBOM에서 찾은 패키지 식별자를 확인하려고 deps.dev에 보냅니다. `PURL_RESOLVE_IGNORE`에 적은 네임스페이스는 제외합니다.
 - `--identify-vendored`는 C·C++ 소스 파일의 지문(해시)을 SCANOSS OSSKB 서비스에 보냅니다. 파일 자체는 보내지 않습니다. `SCANOSS_API_URL`로 다른 엔드포인트를 지정할 수 있습니다.
 - `--model <owner/name>`과 `--resolve-models`는 Hugging Face 허브에서 모델 메타데이터를 읽고, Figshare 항목을 준 `--model`은 Figshare API에서 항목을 읽습니다. 웹 UI는 소스 스캔용으로 입력한 저장소 주소를 복제합니다.
+- `--upload-target`, `--trusca`와 웹 UI의 외부 전송 단계는 완성된 SBOM을 사용자가 `API_URL`로 지정한 Dependency-Track 또는 TRUSCA 서버로 보냅니다.
 - `--deep-cve`, `--deep-license` 같은 선택 이미지는 `ghcr.io`에서 내려받습니다. `SECURITY_NVD_VERIFY=true`는 NVD API도 조회합니다.
 
 전체 옵션은 [CLI 레퍼런스](cli.ko.md)에, 설계 배경은 [로컬 우선 설계](../concepts/local-first.ko.md)에 있습니다.
