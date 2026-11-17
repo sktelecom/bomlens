@@ -443,6 +443,25 @@ drop_unused_guard_state() {
     GUARD_ID=""
 }
 
+# Manifest-only syft read of a source tree (the fallback when cdxgen cannot run
+# or fails). syft's stderr is kept: it used to be discarded, so a failure said
+# only "syft source scan failed" with nothing to act on. On failure the last
+# lines of syft's own message are printed; on success it stays quiet.
+#   $1 = tree  $2 = output file  $3.. = syft --exclude flags
+syft_source_scan() {
+    local _ss_dir="$1" _ss_out="$2" _ss_err _ss_rc
+    shift 2
+    _ss_err=$(mktemp 2>/dev/null) || _ss_err=/dev/null
+    syft "dir:$_ss_dir" "$@" -o "cyclonedx-json@$CDX_SPEC_VERSION" > "$_ss_out" 2>"$_ss_err"
+    _ss_rc=$?
+    if [ "$_ss_rc" -ne 0 ] && [ -s "$_ss_err" ]; then
+        echo "[WARN] syft exited with code $_ss_rc; its last messages:" >&2
+        tail -8 "$_ss_err" | sed 's/^/[syft]   /' >&2
+    fi
+    if [ "$_ss_err" != /dev/null ]; then rm -f "$_ss_err"; fi
+    return "$_ss_rc"
+}
+
 # generate_sbom_cdxgen: run a cdxgen language image as a SIBLING container (via the
 # mounted host Docker socket) so a web-UI source scan resolves transitive deps,
 # matching the CLI. The sibling reaches the scanned tree by inheriting THIS container's
@@ -932,7 +951,7 @@ case "$SCAN_MODE" in
                 # printed, code ANDROID_SDK_IMAGE_MISSING) instead of falling back.
                 [ "${CDXGEN_FAIL_REASON:-}" != "android-sdk-image" ] || exit 1
                 echo "[WARN] cdxgen path failed; falling back to syft (direct deps only)."
-                syft "dir:$SRC_ROOT" "${SYFT_EXCLUDE[@]}" -o "cyclonedx-json@$CDX_SPEC_VERSION" > "$OUTPUT_FILE" 2>/dev/null \
+                syft_source_scan "$SRC_ROOT" "$OUTPUT_FILE" "${SYFT_EXCLUDE[@]}" \
                     || { echo "[ERROR] syft source scan failed."; exit 1; }
                 apply_node_fallback_quality_gate "$OUTPUT_FILE" "$SRC_ROOT" 2 || exit 1
                 mark_sbom_degraded "$OUTPUT_FILE" "${CDXGEN_FAIL_REASON:-cdxgen-unavailable}"
@@ -951,7 +970,7 @@ case "$SCAN_MODE" in
             if [ "$(detect_lang "$SRC_ROOT")" = "android" ]; then
                 echo "[WARN] Android Gradle project: without a Docker socket and the Android SDK image, a manifest-only read finds none of its Gradle dependencies. The result is incomplete; run the scan where Docker is available."
             fi
-            syft "dir:$SRC_ROOT" "${SYFT_EXCLUDE[@]}" -o "cyclonedx-json@$CDX_SPEC_VERSION" > "$OUTPUT_FILE" 2>/dev/null \
+            syft_source_scan "$SRC_ROOT" "$OUTPUT_FILE" "${SYFT_EXCLUDE[@]}" \
                 || { echo "[ERROR] syft source scan failed."; exit 1; }
             apply_node_fallback_quality_gate "$OUTPUT_FILE" "$SRC_ROOT" 2 || exit 1
             mark_sbom_degraded "$OUTPUT_FILE" "cdxgen-unavailable"
@@ -1291,7 +1310,7 @@ EOF
                 echo "[WARN] stage 1 (cdxgen) did not produce an SBOM (exit ${BOMLENS_STAGE1_EXIT}, ${_s1_reason}); falling back to a manifest-only scan (direct dependencies only)."
             rm -f "$OUTPUT_FILE"
             read -ra _s1_exclude <<< "$(non_shipped_syft_args)"
-            if ! syft "dir:${SOURCE_ROOT:-/src}" "${_s1_exclude[@]}" -o "cyclonedx-json@$CDX_SPEC_VERSION" > "$OUTPUT_FILE" 2>/dev/null \
+            if ! syft_source_scan "${SOURCE_ROOT:-/src}" "$OUTPUT_FILE" "${_s1_exclude[@]}" \
                || ! apply_node_fallback_quality_gate "$OUTPUT_FILE" "${SOURCE_ROOT:-/src}" 2; then
                 rm -f "$OUTPUT_FILE"
                 [ -n "${_BOMLENS_CLI_FALLBACK:-}" ] || \
