@@ -649,6 +649,12 @@ def _scrub_error_text(text):
 _SCAN_ERROR_MAX_CHARS = 500
 
 _ERROR_LINE_RE = re.compile(r"^\[ERROR\]")
+# A scanner [ERROR] line may carry a machine-readable code right after the
+# marker ("[ERROR] ANDROID_SDK_IMAGE_MISSING: ..."), for a program that shows
+# its own dialog instead of the text. Only the codes listed here are passed on,
+# so a log line can never put arbitrary text into the `errorCode` field.
+KNOWN_ERROR_CODES = ("ANDROID_SDK_IMAGE_MISSING", "SCAN_TARGET_NOT_VISIBLE")
+_ERROR_CODE_RE = re.compile(r"^\[ERROR\]\s+([A-Z][A-Z0-9_]+):")
 _RESPONSE_LINE_RE = re.compile(r"(?i)^response:")
 
 
@@ -678,6 +684,7 @@ class _ScanErrorTracker:
     def __init__(self):
         self._blocks = []      # distinct block texts, in first-seen order
         self._current = []     # lines of the block being built, or []
+        self.code = None       # first KNOWN_ERROR_CODES entry seen, or None
 
     def _flush(self):
         if self._current:
@@ -696,6 +703,9 @@ class _ScanErrorTracker:
             return
         if _ERROR_LINE_RE.match(stripped):
             self._flush()
+            m = _ERROR_CODE_RE.match(stripped)
+            if m and m.group(1) in KNOWN_ERROR_CODES and self.code is None:
+                self.code = m.group(1)
             self._current.append(_scrub_error_text(stripped))
             return
         if self._current and line[:1] in (" ", "\t"):
@@ -734,6 +744,56 @@ def safe_scan_dir(rel):
         if (real == r or real.startswith(r + os.sep)) and os.path.isdir(real):
             return real
     return None
+
+
+def picked_scan_root(scan_dir):
+    """The registered scan root (EXTRA_SCAN_ROOTS entry) that holds `scan_dir`,
+    or None. `scan_dir` is a safe_scan_dir() result; both sides are compared
+    resolved, since a mount is recorded as given and on macOS that differs from
+    the real path by /private."""
+    for r in EXTRA_SCAN_ROOTS:
+        base = os.path.realpath(r["path"])
+        if scan_dir == base or scan_dir.startswith(base + os.sep):
+            return r
+    return None
+
+
+def scan_target_not_visible(scan_dir):
+    """The message to stop a scan with when the folder to scan is empty inside
+    this container, else None. A folder the container engine does not share with
+    its VM (Colima mounts only the home folder, Docker Desktop only the folders
+    under File sharing) is mounted as an empty directory, and the scan would run
+    for minutes before finding nothing. The wording carries the machine-readable
+    code SCAN_TARGET_NOT_VISIBLE and names the folder as the user knows it."""
+    try:
+        if os.listdir(scan_dir):
+            return None
+    except OSError:
+        return None
+    where = display_path_of(scan_dir)
+    return (
+        "SCAN_TARGET_NOT_VISIBLE: the folder is empty inside the scanner container: %s\n"
+        "If it is not empty on your machine, Docker cannot see it. The engine shares only some "
+        "folders (Colima: your home folder; Docker Desktop: Settings > Resources > File sharing). "
+        "Move the project under your home folder, or share its location, then scan again.\n"
+        "SCAN_TARGET_NOT_VISIBLE: 스캐너 컨테이너 안에서 폴더가 비어 보입니다: %s\n"
+        "내 컴퓨터에서는 비어 있지 않다면 Docker가 그 폴더를 보지 못하는 것입니다. Docker는 일부 폴더만 "
+        "공유합니다(Colima는 홈 폴더, Docker Desktop은 Settings > Resources > File sharing). "
+        "프로젝트를 홈 폴더 아래로 옮기거나 그 위치를 공유한 뒤 다시 스캔하세요."
+    ) % (where, where)
+
+
+def scan_source_label(source, target):
+    """What to show as the scanned folder for a mounted-folder scan: the path
+    the user picked on their own machine (the added folder's host path plus the
+    sub-folder chosen inside it), never the container path, which has non-ASCII
+    names replaced by dashes. "" when it cannot be resolved honestly."""
+    if source not in ("rootfs-dir", "scan-target-src"):
+        return ""
+    scan_dir = safe_scan_dir(target)
+    if not scan_dir or not picked_scan_root(scan_dir):
+        return ""
+    return display_path_of(scan_dir)
 
 
 # ---------------------------------------------------------------------------
@@ -3344,7 +3404,7 @@ def _public_scan_config(meta):
     if not isinstance(meta, dict):
         return meta
     return {k: v for k, v in meta.items()
-            if k not in ("mode", "ok", "errorMessage", "declarationRefused")}
+            if k not in ("mode", "ok", "errorMessage", "errorCode", "declarationRefused")}
 
 
 def refused_scan_meta(run_id):
@@ -3384,6 +3444,7 @@ def scan_detail(run_id):
             "scanConfig": {"project": run_id, "version": "", **_public_scan_config(meta)},
             "scanWarnings": meta.get("warnings") or [],
             "errorMessage": meta.get("errorMessage"),
+            "errorCode": meta.get("errorCode"),
             "declarationRefused": refused,
         }
     return {
@@ -7130,10 +7191,7 @@ class Handler(BaseHTTPRequestHandler):
             elif source == "current-dir":
                 source_label = os.environ.get("SBOM_UI_HOST_DIR", "")
             elif source in ("rootfs-dir", "scan-target-src"):
-                source_label = next(
-                    (r["hostPath"] for r in EXTRA_SCAN_ROOTS if r["path"] == target),
-                    "",
-                )
+                source_label = scan_source_label(source, target)
 
             # Record how this scan was launched (source + non-secret feature toggles)
             # so the UI can offer "re-scan with the same settings". Saved into the run
@@ -7204,7 +7262,7 @@ class Handler(BaseHTTPRequestHandler):
             except (BrokenPipeError, ConnectionResetError):
                 disconnected[0] = True
 
-        def record_outcome(ok_, error_text=None, warnings=None, refused=None):
+        def record_outcome(ok_, error_text=None, warnings=None, refused=None, error_code=None):
             """Save how this run ended into the run folder's sidecar, for the
             diagnostics summary (GET /diagnostics). Written from a COPY of
             scan_config: the settings echoed back to the browser (`scanConfig`)
@@ -7215,6 +7273,8 @@ class Handler(BaseHTTPRequestHandler):
             meta["ok"] = ok_
             if error_text:
                 meta["errorMessage"] = _scrub_error_text(str(error_text))[:_SCAN_ERROR_MAX_CHARS]
+            if error_code:
+                meta["errorCode"] = error_code
             if warnings:
                 meta["warnings"] = warnings
             if refused:
@@ -7222,15 +7282,18 @@ class Handler(BaseHTTPRequestHandler):
                 meta["declarationRefused"] = refused
             write_scanmeta(run_out, meta)
 
-        def fail(msg, key=None):
+        def fail(msg, key=None, code=None):
             # `key`, when set, names an i18n key the frontend can show as a
             # friendly headline (msg stays available as the collapsible raw
             # detail); every other caller passes only msg, so `key` is null
             # and the frontend falls back to showing msg exactly as before.
-            sse("error", json.dumps({"detail": msg, "key": key}))
-            record_outcome(False, msg)
+            # `code`, when set, is a machine-readable cause from KNOWN_ERROR_CODES
+            # for an app that shows its own guidance; null for every other caller.
+            sse("error", json.dumps({"detail": msg, "key": key, "code": code}))
+            record_outcome(False, msg, error_code=code)
             sse("done", json.dumps({"ok": False, "id": run_id, "results": list_results(run_id),
-                                    "sbom": None, "security": None, "conformance": None}))
+                                    "sbom": None, "security": None, "conformance": None,
+                                    "errorCode": code}))
 
         def _deep_cve_route(mode, sibling_extra):
             """Decide how MODE should carry the opt-in deep_cve request, once the
@@ -7545,6 +7608,9 @@ class Handler(BaseHTTPRequestHandler):
                     fail("Invalid or out-of-bounds directory path (must be a "
                          "folder inside the current folder or a mounted scan "
                          "target)"); return
+                hidden = scan_target_not_visible(scan_dir)
+                if hidden:
+                    fail(hidden, code="SCAN_TARGET_NOT_VISIBLE"); return
                 mode = "ROOTFS"
                 env["MODE"] = "ROOTFS"
                 env["TARGET_DIR"] = scan_dir
@@ -7561,36 +7627,42 @@ class Handler(BaseHTTPRequestHandler):
                 if not scan_dir:
                     fail("Invalid or out-of-bounds directory path (must be a "
                          "picked scan-target folder)"); return
-                # The request only selects WHICH registered scan root to build.
-                # Copy from that root's own recorded path (from EXTRA_SCAN_ROOTS,
-                # set by the desktop app / --mount), never from the request-derived
-                # path — a deep scan always builds the whole picked folder, and
-                # sourcing the server's own record keeps request input out of the
-                # copytree sink.
-                picked = next((r for r in EXTRA_SCAN_ROOTS
-                               if scan_dir == r["path"] or scan_dir.startswith(r["path"] + os.sep)),
-                              None)
+                # Only the folder the user chose is copied: picking a sub-folder
+                # of an added folder must not pull in its siblings. The copy
+                # source is looked up inside the registered root by listing it
+                # (find_scan_entry), so it comes from the filesystem and not from
+                # the request, and copy_scan_target_tree checks containment again
+                # at the sink.
+                picked = picked_scan_root(scan_dir)
                 if picked is None:
                     fail("Deep source scan is only available for an added folder "
                          "(the current folder already scans deep)."); return
+                hidden = scan_target_not_visible(scan_dir)
+                if hidden:
+                    fail(hidden, code="SCAN_TARGET_NOT_VISIBLE"); return
+                picked_real = os.path.realpath(picked["path"])
+                rel_dir = os.path.relpath(scan_dir, picked_real)
+                copy_src = picked_real if rel_dir == "." else find_scan_entry(picked_real, rel_dir)
+                if not copy_src or not os.path.isdir(copy_src):
+                    fail("Invalid or out-of-bounds directory path (must be a "
+                         "picked scan-target folder)"); return
                 cleanup_dir = os.path.join(OUTPUT_DIR, ".srccopy-" + secrets.token_hex(8))
                 sse("log", json.dumps("▶ Preparing a writable copy of %s ..."
-                                      % os.path.basename(picked["path"].rstrip("/"))))
+                                      % os.path.basename(copy_src.rstrip("/"))))
                 try:
-                    copy_scan_target_tree(picked["path"], cleanup_dir)
+                    copy_scan_target_tree(copy_src, cleanup_dir)
                 except (OSError, shutil.Error) as exc:
                     fail("could not prepare the folder for a deep scan: %s" % exc)
                     return
                 mode = "SOURCE"
                 env["MODE"] = "SOURCE"
-                env["SOURCE_ROOT"] = scan_root_of(cleanup_dir)
-                # Same reasoning as the copy above: a deep scan always builds
-                # the whole picked folder, so the hint is looked for there too
-                # (not the request-derived scan_dir) -- both for the same
-                # server's-own-record-over-request-input reason, and because
-                # that is the folder the scan (and so the empty-SBOM outcome)
-                # actually covers.
-                hint = nested_rootfs_hint(picked["path"])
+                # A wrapping directory is only unwrapped for the whole added
+                # folder; a sub-folder the user chose is the project root as is.
+                if rel_dir == ".":
+                    env["SOURCE_ROOT"] = scan_root_of(cleanup_dir)
+                else:
+                    env["SOURCE_ROOT"] = cleanup_dir
+                hint = nested_rootfs_hint(copy_src)
                 if hint:
                     env["NESTED_ROOTFS_HINT"] = hint
 
@@ -8131,6 +8203,9 @@ class Handler(BaseHTTPRequestHandler):
                 # _ScanErrorTracker. None when the run succeeded or nothing
                 # matched the [ERROR] convention.
                 "errorMessage": None if (ok or error_sent) else error_tracker.result(),
+                # Machine-readable form of that failure when the scanner gave one
+                # (KNOWN_ERROR_CODES), so an app can show its own guidance.
+                "errorCode": None if ok else error_tracker.code,
                 # A declaration file was refused: the scan stopped and kept the
                 # SBOM written so far as _bom.refused.json. Names that file and
                 # the reasons the declaration step logged, so the failed-scan
@@ -8144,7 +8219,7 @@ class Handler(BaseHTTPRequestHandler):
             if scan_warnings:
                 # Also echoed to the browser, as it was before the summary existed.
                 scan_config["warnings"] = scan_warnings
-            record_outcome(ok, outcome_error, scan_warnings, done["declarationRefused"])
+            record_outcome(ok, outcome_error, scan_warnings, done["declarationRefused"], done["errorCode"])
             sse("done", json.dumps(done))
         except Exception as exc:  # noqa: BLE001
             # The summary helpers are defended against malformed artifacts, so a
