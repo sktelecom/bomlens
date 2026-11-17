@@ -89,7 +89,7 @@ if ! jq --arg supplied_env "${BOMLENS_SBOM_SUPPLIED:-}" --slurpfile reg "$REGIST
   | ([ .components[]? | recurse(.components[]?) ]) as $comps
   | (prop("bomlens:sbom-empty-with-manifests") | first // null) as $empty
   | (prop("bomlens:sbom-tool-degraded") | first // null) as $degraded
-  | ([ prop("bomlens:pipeline-step-failed")[] | clean(100) | select(. as $s | $R.resolutionSteps | index($s)) ]
+  | ([ prop("bomlens:pipeline-step-failed")[] | clean(100) | select(. as $s | ($R.resolutionSteps | index($s)) or any(($R.resolutionStepPrefixes // [])[]; . as $p | $s | startswith($p))) ]
        | unique | .[0:20]) as $failed
   | (([ prop("bomlens:lockfile-missing")[] | clean(200) ])
        + (if any((.metadata.component.properties // [])[]?; .name == "bomlens:source:versionPinning" and .value == "unpinned")

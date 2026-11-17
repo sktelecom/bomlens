@@ -1,0 +1,19 @@
+source "https://rubygems.org"
+
+gem "rails", "~> 7.1"
+gem "pg"
+
+group :avo, optional: true do
+  gem "avo", "~> 2.0"
+end
+
+group :development, :test do
+  gem "rspec-rails"
+end
+
+group :test do
+  gem "capybara"
+end
+
+gem "puma", group: :production
+gem "pry", group: [:development, :test]

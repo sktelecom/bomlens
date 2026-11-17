@@ -28,6 +28,7 @@
     "swift-package-resolve", "cargo-lockfile", "go-mod-tidy", "bundle-lock",
     "composer-install", "gradle-wrapper-jdk"
   ],
+  "resolutionStepPrefixes": ["npm-excluded:"],
   "reasons": {
     "no-components-supplied": {
       "grade": "unreliable",
