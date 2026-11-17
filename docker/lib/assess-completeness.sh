@@ -83,6 +83,10 @@ if ! jq --slurpfile reg "$REGISTRY" "$(cat "$COVERAGE")"'
        + (if any((.metadata.component.properties // [])[]?; .name == "bomlens:source:versionPinning" and .value == "unpinned")
             and (prop("bomlens:lockfile-missing") | length == 0)
           then ["version ranges without a lock file"] else [] end)) as $nolock
+  | (([ prop("bomlens:lockfile-missing")[] | clean(200) ])
+       + (if any((.metadata.component.properties // [])[]?; .name == "bomlens:source:versionPinning" and .value == "unpinned")
+            and (prop("bomlens:lockfile-missing") | length == 0)
+          then ["락 파일 없이 버전 범위만 선언됨"] else [] end)) as $nolock_ko
   | ([ prop("bomlens:lockfile-corrupt")[] | clean(200) ]) as $corrupt
   | ([ $comps[] | select(vc_unsupported_ecosystem) | vc_purl_type ]
        | group_by(.) | map({ecosystem: .[0], count: length})) as $unsup
@@ -93,7 +97,7 @@ if ! jq --slurpfile reg "$REGISTRY" "$(cat "$COVERAGE")"'
       (if $empty != null then {code: "empty-with-manifests", detail: ($empty | clean(200))} else empty end),
       (if $degraded != null then {code: "tool-degraded", detail: ($degraded | clean(100))} else empty end),
       (if ($failed | length) > 0 then {code: "resolution-failed", detail: ($failed | join(", "))} else empty end),
-      (if ($nolock | length) > 0 then {code: "lockfile-missing", detail: ($nolock | join("; ") | .[0:200])} else empty end),
+      (if ($nolock | length) > 0 then {code: "lockfile-missing", detail: ($nolock | join("; ") | .[0:200]), detailKo: ($nolock_ko | join("; ") | .[0:200])} else empty end),
       (if ($corrupt | length) > 0 then {code: "lockfile-corrupt", detail: ($corrupt | join("; ") | .[0:200])} else empty end),
       (if ($unsup | length) > 0 then {code: "unchecked-ecosystem", detail: ($unsup | map("\(.ecosystem): \(.count)") | join(", "))} else empty end)
     ]
@@ -101,7 +105,7 @@ if ! jq --slurpfile reg "$REGISTRY" "$(cat "$COVERAGE")"'
           | {code: $r.code,
              grade: (if $r.code == "lockfile-corrupt" and ($comps | length) == 0 then "unreliable" else $d.grade end),
              detail: $r.detail,
-             message: {en: ($d.en | sub("\\{detail\\}"; $r.detail)), ko: ($d.ko | sub("\\{detail\\}"; $r.detail))},
+             message: {en: ($d.en | sub("\\{detail\\}"; $r.detail)), ko: ($d.ko | sub("\\{detail\\}"; ($r.detailKo // $r.detail)))},
              fix: {en: $d.fixEn, ko: $d.fixKo}})) as $reasons
   | (if ($reasons | any(.[]; .grade == "unreliable")) then "unreliable"
      elif ($reasons | length) > 0 then "partial" else "complete" end) as $grade

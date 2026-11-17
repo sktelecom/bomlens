@@ -886,6 +886,9 @@ case "$SCAN_MODE" in
         # keeps the old order; the registry license lookup that fills the licenses
         # a lock file lacks is switched on with it, so a reproducible (BYTE_STABLE)
         # or no-license-fetch run builds instead.
+        # Reading a large tree to choose the scan path can take a while; say so
+        # first, so the log is not silent until the next step.
+        echo "[INFO] Detecting the project type in $SRC_ROOT"
         _static_why=""
         case "${DETECTION:-auto}" in
             static) _static_why="requested" ;;
@@ -935,6 +938,17 @@ case "$SCAN_MODE" in
             fi
         else
             echo "[1/2] syft: source dir $SRC_ROOT (manifest-only; docker.sock/CLI/host-path unavailable)"
+            # The web server stops an Android Gradle project whose SDK image is
+            # missing before it starts this run, but only where it can start a
+            # sibling container (it checks docker_capable()); this branch is where
+            # no sibling can run at all (no socket, no CLI, or no host path). There
+            # the Android check cannot apply, so the result is a manifest-only read
+            # that finds no Gradle dependencies. Say so; the degraded marker below
+            # makes every report grade the result as incomplete, instead of
+            # presenting it as a normal scan.
+            if [ "$(detect_lang "$SRC_ROOT")" = "android" ]; then
+                echo "[WARN] Android Gradle project: without a Docker socket and the Android SDK image, a manifest-only read finds none of its Gradle dependencies. The result is incomplete; run the scan where Docker is available."
+            fi
             syft "dir:$SRC_ROOT" "${SYFT_EXCLUDE[@]}" -o "cyclonedx-json@$CDX_SPEC_VERSION" > "$OUTPUT_FILE" 2>/dev/null \
                 || { echo "[ERROR] syft source scan failed."; exit 1; }
             apply_node_fallback_quality_gate "$OUTPUT_FILE" "$SRC_ROOT" 2 || exit 1
@@ -2275,6 +2289,24 @@ if [ "$AI_MODEL_SCAN" = "true" ] || [ "$SCAN_MODE" = "ANALYZE" ] || [ "$RESOLVED
     run_optional_step assess-ai-risk bash "$LIBDIR/assess-ai-risk.sh" "$OUTPUT_FILE"
 fi
 
+# Whether the tree pinned the versions its SBOM reports, and whether a lock file
+# the source needs is missing or unreadable. Source scans only: an image or a
+# firmware carries what is installed, so there is nothing resolved at scan time
+# to warn about. The CLI reaches this file as POSTPROCESS with SOURCE_SCAN set,
+# the web UI as SOURCE; both are the same scan and both need the answer. This
+# runs before the conformance check below so that check, the security, risk and
+# notice reports, and the signing-time re-check all judge completeness from the
+# same recorded facts. Best-effort: an unjudgeable tree records nothing.
+_pin_src=""
+case "$SCAN_MODE" in
+    SOURCE) _pin_src="${SOURCE_ROOT:-/src}" ;;
+    POSTPROCESS) [ "$SOURCE_SCAN" = "true" ] && _pin_src="${SOURCE_ROOT:-/src}" ;;
+esac
+if [ -n "$_pin_src" ] && [ -d "$_pin_src" ]; then
+    bash "$LIBDIR/detect-version-pinning.sh" "$_pin_src" "$OUTPUT_FILE" || true
+    bash "$LIBDIR/detect-lockfile-state.sh" "$_pin_src" "$OUTPUT_FILE" || true
+fi
+
 # Conformance check on the generated SBOM. For AI SBOM modes this is the G7
 # minimum-element checklist (validate-sbom.sh detects the machine-learning-model
 # component and appends those checks — model id/license/card/integrity, datasets,
@@ -2433,18 +2465,6 @@ if [ ! -f "${OUT_PREFIX}_scancode.json" ] && [ -n "$SRC_TREE_DIR" ]; then
     run_optional_step source-file-tree bash "$LIBDIR/source-file-tree.sh" "$SRC_TREE_DIR" "${OUT_PREFIX}_files.json" "${SRC_TREE_EXCLUDE:-}"
 fi
 
-# Whether the tree pinned the versions its SBOM reports. Source scans only: an
-# image or a firmware carries what is installed, so there is nothing resolved at
-# scan time to warn about. The CLI reaches this file as POSTPROCESS with
-# SOURCE_SCAN set, the web UI as SOURCE — both are the same scan and both need
-# the answer. Best-effort: an unjudgeable tree records nothing.
-if [ -n "$SRC_TREE_DIR" ] && { [ "$SCAN_MODE" = "SOURCE" ] \
-   || { [ "$SCAN_MODE" = "POSTPROCESS" ] && [ "${SOURCE_SCAN:-false}" = "true" ]; }; }; then
-    bash "$LIBDIR/detect-version-pinning.sh" "$SRC_TREE_DIR" "$OUTPUT_FILE" || true
-    # A lock file the source needs and does not have, or one that cannot be
-    # read, recorded on the SBOM so every report can say why a result is small.
-    bash "$LIBDIR/detect-lockfile-state.sh" "$SRC_TREE_DIR" "$OUTPUT_FILE" || true
-fi
 # Collect the file tree if any source-having mode produced one (the modes above,
 # or FIRMWARE from scan-firmware.sh).
 [ -f "${OUT_PREFIX}_files.json" ] && ARTIFACTS+=("${OUT_PREFIX}_files.json")

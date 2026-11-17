@@ -14853,13 +14853,14 @@ cp_bom() {  # <case> <properties json array> <components json array>
         components:$c}' > "$CPD/$1/proj_1.0_bom.json"
 }
 cp_lib() { printf '{"type":"library","name":"%s","version":"%s","purl":"%s","bom-ref":"%s"}' "$1" "$2" "$3" "$3"; }
-cp_run() {  # <case> [lang]: detect the lock state of src/, then every report
+cp_run() {  # <case> [lang]: the entrypoint's order: detect the lock state, check conformance, then every report
     ( cd "$CPD/$1" || exit
       export PATH="$CPD/bin:$PATH" SECURITY_ENRICH=false DEEP_CVE=false REPORT_LANG="${2:-en}"
+      bash "$LIB/detect-version-pinning.sh" src proj_1.0_bom.json >/dev/null 2>&1
       bash "$LIB/detect-lockfile-state.sh" src proj_1.0_bom.json >/dev/null 2>&1
+      bash "$LIB/validate-sbom.sh" proj_1.0_bom.json proj_1.0 proj >/dev/null 2>&1
       bash "$LIB/scan-security.sh" proj_1.0_bom.json proj_1.0 proj >/dev/null 2>&1
       bash "$LIB/generate-notice.sh" proj_1.0_bom.json proj_1.0 proj >/dev/null 2>&1
-      bash "$LIB/validate-sbom.sh" proj_1.0_bom.json proj_1.0 proj >/dev/null 2>&1
       bash "$LIB/generate-risk-report.sh" proj_1.0 proj SOURCE >/dev/null 2>&1 )
 }
 # Control: a complete result keeps the clean sentence and carries no notice.
@@ -14981,6 +14982,36 @@ cp_run empty-npm ko
     && ! grep -q "알려진 취약점이 없" "$CPD/empty-npm/proj_1.0_risk-report.md" "$CPD/empty-npm/proj_1.0_risk-report.html" "$CPD/empty-npm/proj_1.0_security.html"; } \
     && pass "completeness/ko: the Korean reports state the result completeness and do not say no vulnerabilities" \
     || fail "completeness/ko: a Korean report lacks the notice or still claims no vulnerabilities"
+
+# The conformance row and every report read one verdict: the entrypoint records
+# the lock-file facts before it checks conformance.
+_ep="$ROOT_DIR/docker/entrypoint.sh"
+_l_pin="$(grep -n 'bash "$LIBDIR/detect-version-pinning.sh"' "$_ep" | head -1 | cut -d: -f1)"
+_l_lock="$(grep -n 'bash "$LIBDIR/detect-lockfile-state.sh"' "$_ep" | head -1 | cut -d: -f1)"
+_l_conf="$(grep -n 'run_optional_step conformance bash "$LIBDIR/validate-sbom.sh"' "$_ep" | head -1 | cut -d: -f1)"
+_l_resign="$(grep -n 'MODE="$CONFORMANCE_MODE" SIGN_FAILED=' "$_ep" | head -1 | cut -d: -f1)"
+{ [ -n "$_l_pin" ] && [ -n "$_l_lock" ] && [ -n "$_l_conf" ] && [ -n "$_l_resign" ] \
+    && [ "$_l_pin" -lt "$_l_conf" ] && [ "$_l_lock" -lt "$_l_conf" ] && [ "$_l_conf" -lt "$_l_resign" ]; } \
+    && pass "completeness/order: entrypoint.sh records the lock-file state before the conformance check" \
+    || fail "completeness/order: step order in entrypoint.sh" "pin=$_l_pin lock=$_l_lock conformance=$_l_conf re-check=$_l_resign"
+_gr_row="$(jq -r '.checks[] | select(.id == "result-completeness") | .status' "$CPD/podfile-nolock/proj_1.0_conformance.json" 2>/dev/null)"
+_gr_rep="$(jq -r '.grade' "$CPD/podfile-nolock/proj_1.0_completeness.json" 2>/dev/null)"
+_gr_all=1
+for _f in proj_1.0_security.md proj_1.0_risk-report.md proj_1.0_NOTICE.txt; do
+    grep -q "Result completeness" "$CPD/podfile-nolock/$_f" || _gr_all=0
+done
+{ [ "$_gr_row" = "warn" ] && [ "$_gr_rep" = "partial" ] && [ "$_gr_all" = "1" ]; } \
+    && pass "completeness/order: with no lock file the conformance row and the three reports all say partial" \
+    || fail "completeness/order: the verdicts differ" "row=$_gr_row grade=$_gr_rep reports-state-it=$_gr_all"
+
+# An unpinned result (ranges, no lock file) is a reason, and the Korean sentence stays Korean.
+cp_bom unpinned-ko '[]' "[$(cp_lib zz-demo-lib 1.0.0 pkg:npm/zz-demo-lib@1.0.0)]"
+printf '{"name":"x","dependencies":{"zz-demo-lib":"^1.0.0"}}' > "$CPD/unpinned-ko/src/package.json"
+cp_run unpinned-ko ko
+jq -e '.reasons[] | select(.code == "lockfile-missing") | (.message.ko | test("락 파일 없이")) and (.message.ko | test("version ranges") | not) and (.message.en | test("version ranges without a lock file"))' \
+    "$CPD/unpinned-ko/proj_1.0_completeness.json" >/dev/null 2>&1 \
+    && pass "completeness/ko: the unpinned reason is Korean in the Korean sentence and English in the English one" \
+    || fail "completeness/ko: the unpinned reason detail is not localized" "$(jq -c '.reasons' "$CPD/unpinned-ko/proj_1.0_completeness.json" 2>&1 | head -c 400)"
 
 # The detector leaves a tree alone when nothing is wrong, and is idempotent.
 cp "$CPD/ok/proj_1.0_bom.json" "$CPD/ok-before.json"
