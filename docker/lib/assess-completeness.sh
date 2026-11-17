@@ -18,7 +18,8 @@
 # Grades
 #   complete    no reason found
 #   partial     the result is usable but does not cover everything
-#   unreliable  the result is empty, or the source declares what the scan did not find
+#   unreliable  the source declares dependencies the scan did not resolve (a project
+#               with nothing to declare and no component is only partial)
 #
 # Inputs, all read from the SBOM, so the verdict is a function of the document
 # and a report run later (or on a copy) cannot disagree with the scan:
@@ -97,7 +98,9 @@ if ! jq --slurpfile reg "$REGISTRY" "$(cat "$COVERAGE")"'
       (if ($unsup | length) > 0 then {code: "unchecked-ecosystem", detail: ($unsup | map("\(.ecosystem): \(.count)") | join(", "))} else empty end)
     ]
     | map(. as $r | ($R.reasons[$r.code]) as $d
-          | {code: $r.code, grade: $d.grade, detail: $r.detail,
+          | {code: $r.code,
+             grade: (if $r.code == "lockfile-corrupt" and ($comps | length) == 0 then "unreliable" else $d.grade end),
+             detail: $r.detail,
              message: {en: ($d.en | sub("\\{detail\\}"; $r.detail)), ko: ($d.ko | sub("\\{detail\\}"; $r.detail))},
              fix: {en: $d.fixEn, ko: $d.fixKo}})) as $reasons
   | (if ($reasons | any(.[]; .grade == "unreliable")) then "unreliable"
