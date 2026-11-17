@@ -2362,7 +2362,7 @@ if [ -f "$CHECK_SH" ]; then
   CS_HID="$WORK/cs-hidden"; mkdir -p "$CS_HID"; : > "$CS_HID/pom.xml"
   CS_OUT="$WORK/check-setup.out"
   env -u SBOM_LANG -u LC_ALL -u LC_MESSAGES -u LANG SBOM_LANG=en DOCKER_STUB_MEMTOTAL=6198534144 UI_PORT=$((49152 + RANDOM % 16000)) bash "$CHECK_SH" "$CS_VIS" > "$CS_OUT" 2>&1
-  grep -q "The scanner container can see this folder: $CS_VIS" "$CS_OUT" \
+  grep -q "The scanner container can see this folder: $(cd "$CS_VIS" && pwd)" "$CS_OUT" \
     && pass "check-setup.sh: a shared folder is reported as visible" || { fail "check-setup.sh visible folder"; cat "$CS_OUT"; }
   env -u SBOM_LANG -u LC_ALL -u LC_MESSAGES -u LANG SBOM_LANG=ko DOCKER_STUB_UNSHARED="$CS_HID" DOCKER_STUB_MEMTOTAL=6198534144 UI_PORT=$((49152 + RANDOM % 16000)) bash "$CHECK_SH" "$CS_HID" > "$CS_OUT" 2>&1
   CS_RC=$?

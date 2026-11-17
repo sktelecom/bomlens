@@ -14910,7 +14910,7 @@ cp_check() {
 cp_bom empty-npm '[{"name":"bomlens:sbom-tool-degraded","value":"cdxgen-unavailable"},{"name":"bomlens:sbom-empty-with-manifests","value":"package.json"}]' '[]'
 printf '{"name":"x","dependencies":{"left-pad":"^1.0.0"}}' > "$CPD/empty-npm/src/package.json"
 cp_run empty-npm
-cp_check empty-npm unreliable "empty-with-manifests,tool-degraded"
+cp_check empty-npm unreliable "empty-with-manifests,tool-degraded,lockfile-missing"
 [ "$(cat "$CPD/empty-npm/proj_1.0_conformance.result")" = "fail" ] \
     && jq -e '.checks[] | select(.id == "result-completeness" and .required == true and .status == "fail")' "$CPD/empty-npm/proj_1.0_conformance.json" >/dev/null 2>&1 \
     && pass "completeness/empty-npm: the conformance check fails instead of passing" \
@@ -14988,7 +14988,7 @@ cp_run empty-npm ko
 _ep="$ROOT_DIR/docker/entrypoint.sh"
 _l_pin="$(grep -n 'bash "$LIBDIR/detect-version-pinning.sh"' "$_ep" | head -1 | cut -d: -f1)"
 _l_lock="$(grep -n 'bash "$LIBDIR/detect-lockfile-state.sh"' "$_ep" | head -1 | cut -d: -f1)"
-_l_conf="$(grep -n 'run_optional_step conformance bash "$LIBDIR/validate-sbom.sh"' "$_ep" | head -1 | cut -d: -f1)"
+_l_conf="$(grep -n 'elif \[ "$CONFORMANCE_GEN_MODE" = "true" \]' "$_ep" | head -1 | cut -d: -f1)"
 _l_resign="$(grep -n 'MODE="$CONFORMANCE_MODE" SIGN_FAILED=' "$_ep" | head -1 | cut -d: -f1)"
 { [ -n "$_l_pin" ] && [ -n "$_l_lock" ] && [ -n "$_l_conf" ] && [ -n "$_l_resign" ] \
     && [ "$_l_pin" -lt "$_l_conf" ] && [ "$_l_lock" -lt "$_l_conf" ] && [ "$_l_conf" -lt "$_l_resign" ]; } \
