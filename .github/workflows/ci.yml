@@ -489,6 +489,9 @@ jobs:
       - name: Web UI server contract tests (upload round-trip)
         run: bash tests/test-web-ui.sh
 
+      - name: Scan target path handling (folder scans, display paths, empty mounts)
+        run: bash tests/test-scan-target-paths.sh
+
       - name: Examples / docs / test-all.sh sync check
         run: bash tests/check-examples-sync.sh
 
