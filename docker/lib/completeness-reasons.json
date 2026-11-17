@@ -29,6 +29,20 @@
     "composer-install"
   ],
   "reasons": {
+    "no-components-supplied": {
+      "grade": "unreliable",
+      "en": "The received SBOM lists no component, so it cannot stand as the SBOM of the delivered software.",
+      "ko": "받은 SBOM에 컴포넌트가 하나도 없어 납품한 소프트웨어의 SBOM으로 인정할 수 없습니다.",
+      "fixEn": "Ask the supplier to send an SBOM that lists the components of the delivered software, or to say why it has none.",
+      "fixKo": "공급사에 납품 소프트웨어의 컴포넌트가 담긴 SBOM을 다시 받거나, 컴포넌트가 없는 사유를 확인하세요."
+    },
+    "unsupported-build-system": {
+      "grade": "unreliable",
+      "en": "The source declares C/C++ package manager dependencies ({detail}), but this scan did not resolve them (vcpkg and Conan manifests are outside what the scanner resolves reliably), so none of them are in this SBOM.",
+      "ko": "소스에 C/C++ 패키지 관리 도구의 의존성이 선언되어 있지만({detail}) 이번 스캔은 해석하지 못해(vcpkg와 Conan 선언 파일은 스캐너가 안정적으로 해석하는 범위 밖입니다) 이 SBOM에 하나도 없습니다.",
+      "fixEn": "Scan with --identify-vendored to identify C/C++ source that is copied into the tree, or list the dependencies in sbom-declared.cdx.json at the project root and scan again.",
+      "fixKo": "--identify-vendored 옵션으로 트리에 복사된 C/C++ 소스를 식별하거나, 프로젝트 최상위 폴더의 sbom-declared.cdx.json에 의존성을 직접 적은 뒤 다시 스캔하세요."
+    },
     "no-components": {
       "grade": "partial",
       "en": "No component was found, so there is nothing to check for vulnerabilities or licenses. If this project should have dependencies, find out why none were found.",

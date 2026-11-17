@@ -23,8 +23,16 @@
 #
 # Inputs, all read from the SBOM, so the verdict is a function of the document
 # and a report run later (or on a copy) cannot disagree with the scan:
-#   no component                                  (no-components)
-#   bomlens:sbom-empty-with-manifests             (empty-with-manifests)
+#   no component                                  (no-components, or
+#                                                 no-components-supplied for a received
+#                                                 SBOM, which is unreliable)
+#   bomlens:sbom-supplied=true, or MODE=ANALYZE in the environment of the run
+#                                                 (a received SBOM; the conformance check
+#                                                 reads the input before it is converted,
+#                                                 so the property alone is not enough)
+#   bomlens:sbom-empty-with-manifests             (empty-with-manifests, or
+#                                                 unsupported-build-system when every
+#                                                 manifest is a vcpkg or Conan one)
 #   bomlens:sbom-tool-degraded                    (tool-degraded)
 #   bomlens:pipeline-step-failed, for the steps that resolve dependencies
 #                                                 (resolution-failed)
@@ -68,7 +76,7 @@ fi
 TMP="$(mktemp)"
 trap 'rm -f "$TMP"' EXIT
 # shellcheck disable=SC2016  # jq program, not shell
-if ! jq --slurpfile reg "$REGISTRY" "$(cat "$COVERAGE")"'
+if ! jq --arg mode "${MODE:-}" --slurpfile reg "$REGISTRY" "$(cat "$COVERAGE")"'
   # Text that comes from the document is cut to a short single line: a supplier
   # SBOM (--analyze) is not trusted, and these strings reach a terminal and HTML.
   def clean($n): (tostring | gsub("\\p{Cc}"; " ") | .[0:$n]);
@@ -91,10 +99,13 @@ if ! jq --slurpfile reg "$REGISTRY" "$(cat "$COVERAGE")"'
   | ([ $comps[] | select(vc_unsupported_ecosystem) | vc_purl_type ]
        | group_by(.) | map({ecosystem: .[0], count: length})) as $unsup
   | ((.metadata.component.type // "") | IN("machine-learning-model", "data")) as $model_root
+  | ((prop("bomlens:sbom-supplied") | first // "") == "true" or $mode == "ANALYZE") as $supplied
+  | ($empty != null and ($empty | split(",") | map(gsub("^\\s+|\\s+$"; "") | split("/") | last)
+        | all(.[]; test("^(vcpkg\\.json|conanfile\\.(txt|py))$")))) as $cpp_only
   | ([
       (if ($comps | length) == 0 and ($empty == null) and ($model_root | not)
-         then {code: "no-components", detail: ""} else empty end),
-      (if $empty != null then {code: "empty-with-manifests", detail: ($empty | clean(200))} else empty end),
+         then {code: (if $supplied then "no-components-supplied" else "no-components" end), detail: ""} else empty end),
+      (if $empty != null then {code: (if $cpp_only then "unsupported-build-system" else "empty-with-manifests" end), detail: ($empty | clean(200))} else empty end),
       (if $degraded != null then {code: "tool-degraded", detail: ($degraded | clean(100))} else empty end),
       (if ($failed | length) > 0 then {code: "resolution-failed", detail: ($failed | join(", "))} else empty end),
       (if ($nolock | length) > 0 then {code: "lockfile-missing", detail: ($nolock | join("; ") | .[0:200]), detailKo: ($nolock_ko | join("; ") | .[0:200])} else empty end),
