@@ -1195,6 +1195,8 @@ case "$1" in
     ps) exit 0 ;;
     run)
         for a in "$@"; do [ "$a" = "/tmp/build-prep.sh" ] && { printf '%s\n' "$@" > "$CLI_ARGV_LOG"; exit 0; }; done
+        # The folder-visibility probe is not a stage.
+        for a in "$@"; do [ "$a" = "/probe-in:ro" ] && exit 0; case "$a" in *:/probe-in:ro) exit 0 ;; esac; done
         # Stage 2: the stub's stage 1 wrote no SBOM, so this is the fallback hand-off.
         printf '%s\n' "$@" > "$CLI_ARGV_LOG.stage2"
         exit 0 ;;
