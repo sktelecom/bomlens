@@ -253,6 +253,30 @@ export function androidBuildArgs(dir, { exists = fs.existsSync } = {}) {
   return ["-v", `${trimmed}:${ANDROID_BUILD_TARGET}:ro`, "-e", `BOMLENS_ANDROID_BUILD_DIR=${ANDROID_BUILD_TARGET}`];
 }
 
+// 설치본의 레시피 폴더(/Applications 등)는 Docker Desktop과 Colima의 기본 공유 목록 밖일 수 있다.
+// 그래서 시작할 때마다 사용자 데이터 폴더(홈 아래)로 최신 내용을 복사하고 그 사본을 붙인다.
+// 복사에 실패하면 빈 문자열을 돌려줘 마운트만 생략한다(앱은 정상 시작, 빌드 기능만 꺼짐).
+export function prepareAndroidBuildDir({
+  source,
+  destRoot,
+  copy = (from, to) => fs.cpSync(from, to, { recursive: true, force: true, dereference: true }),
+  remove = (target) => fs.rmSync(target, { recursive: true, force: true }),
+  exists = fs.existsSync,
+} = {}) {
+  const from = String(source ?? "").trim();
+  const root = String(destRoot ?? "").trim();
+  if (!from || !root) return "";
+  try {
+    if (!exists(path.join(from, "Dockerfile"))) return "";
+    const dest = path.join(root, "android-build");
+    remove(dest);
+    copy(from, dest);
+    return dest;
+  } catch {
+    return "";
+  }
+}
+
 // 설치본은 resources/docker/android, 개발 실행은 저장소의 docker/android에 있다.
 export function defaultAndroidBuildDir({ resourcesPath = process.resourcesPath, packaged = false } = {}) {
   if (packaged && resourcesPath) return path.join(resourcesPath, "docker", "android");

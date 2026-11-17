@@ -37,6 +37,7 @@ import {
   scanMountArgs,
   androidBuildArgs,
   defaultAndroidBuildDir,
+  prepareAndroidBuildDir,
 } from "../lib/container.mjs";
 
 const pkg = createRequire(import.meta.url)("../package.json");
@@ -531,4 +532,52 @@ test("androidBuildArgs mounts the build files read-only only when a Dockerfile i
 test("defaultAndroidBuildDir points into resources when packaged and into the repo otherwise", () => {
   assert.match(defaultAndroidBuildDir({ packaged: true, resourcesPath: "/app/resources" }).replaceAll("\\", "/"), /\/app\/resources\/docker\/android$/);
   assert.match(defaultAndroidBuildDir({ packaged: false }).replaceAll("\\", "/"), /docker\/android$/);
+});
+
+test("prepareAndroidBuildDir copies the recipe under the user data folder and skips on failure", () => {
+  const calls = [];
+  const dest = prepareAndroidBuildDir({
+    source: "/Applications/BomLens.app/Contents/Resources/docker/android",
+    destRoot: "/Users/me/Library/Application Support/BomLens",
+    exists: () => true,
+    remove: (t) => calls.push(["remove", t]),
+    copy: (a, b) => calls.push(["copy", a, b]),
+  });
+  assert.equal(dest.replaceAll("\\", "/"), "/Users/me/Library/Application Support/BomLens/android-build");
+  assert.equal(calls[0][0], "remove");
+  assert.equal(calls[1][0], "copy");
+  const failing = () => {
+    throw new Error("EACCES");
+  };
+  assert.equal(
+    prepareAndroidBuildDir({ source: "/s", destRoot: "/d", exists: () => true, remove: () => {}, copy: failing }),
+    "",
+  );
+  assert.equal(prepareAndroidBuildDir({ source: "/s", destRoot: "/d", exists: () => false }), "");
+  assert.equal(prepareAndroidBuildDir({ source: "", destRoot: "/d" }), "");
+});
+
+test("prepareAndroidBuildDir copies real files over a stale copy", () => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "bomlens-android-"));
+  try {
+    const source = path.join(tmp, "src");
+    const root = path.join(tmp, "user data");
+    fs.mkdirSync(source);
+    fs.mkdirSync(path.join(root, "android-build"), { recursive: true });
+    fs.writeFileSync(path.join(root, "android-build", "stale"), "x");
+    fs.writeFileSync(path.join(source, "Dockerfile"), "FROM scratch\n");
+    const dest = prepareAndroidBuildDir({ source, destRoot: root });
+    assert.equal(fs.readFileSync(path.join(dest, "Dockerfile"), "utf8"), "FROM scratch\n");
+    assert.equal(fs.existsSync(path.join(dest, "stale")), false);
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+});
+
+test("androidBuildArgs keeps Windows paths with a drive letter, spaces and Korean names in one argument", () => {
+  const dir = "C:\\Users\\홍 길동\\AppData\\Roaming\\BomLens\\android-build";
+  const args = androidBuildArgs(dir, { exists: () => true });
+  assert.equal(args[0], "-v");
+  assert.equal(args[1], `${dir}:/opt/bomlens-android-build:ro`);
+  assert.equal(args.length, 4);
 });

@@ -15,6 +15,7 @@ import {
   cleanupOrphans,
   DEFAULT_IMAGE,
   defaultAndroidBuildDir,
+  prepareAndroidBuildDir,
   dockerStatus,
   findFreePort,
   imagePresent,
@@ -335,7 +336,10 @@ async function startup() {
       image: DEFAULT_IMAGE,
       hostPort: port,
       scanMounts: mountableScanMounts(),
-      androidBuildDir: defaultAndroidBuildDir({ packaged: app.isPackaged }),
+      androidBuildDir: prepareAndroidBuildDir({
+        source: defaultAndroidBuildDir({ packaged: app.isPackaged }),
+        destRoot: app.getPath("userData"),
+      }),
     });
     await container.start({ timeoutMs: 90000 });
 
