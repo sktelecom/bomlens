@@ -1339,3 +1339,32 @@ android_api() {
           | grep -oE "[0-9]+" | head -1)
     echo "${api:-$ANDROID_API_DEFAULT}"
 }
+
+# android_sdk_image_missing <image> <api> [build-dir]: the stop for an Android
+# source scan whose SDK image is not here. Printed instead of falling back to a
+# manifest-only scan, which finds no dependencies in a Gradle Android project
+# and would hand back an empty result. The word after [ERROR] is the code
+# ANDROID_SDK_IMAGE_MISSING, which a program showing its own dialog reads; the
+# English and the Korean block each start with it. A build directory that is not
+# on this machine (a CLI archive, the scanner container) is replaced by the
+# repository's own docker/android folder, which docker build reads over the web.
+ANDROID_SDK_IMAGE_MISSING_CODE="ANDROID_SDK_IMAGE_MISSING"
+android_sdk_image_missing() {
+    local img="$1" api="$2" dir="${3:-}" ctx pfx=""
+    if [ -n "$dir" ] && [ -f "$dir/Dockerfile" ]; then
+        ctx="$dir"
+    else
+        ctx="https://github.com/sktelecom/bomlens.git#main:docker/android"
+    fi
+    [ "${CDXGEN_IMAGE_PREFIX:-ghcr.io/cdxgen/}" = "ghcr.io/cdxgen/" ] || pfx=" --build-arg CDXGEN_IMAGE_PREFIX=$CDXGEN_IMAGE_PREFIX"
+    echo "[ERROR] $ANDROID_SDK_IMAGE_MISSING_CODE: Android SDK image not found: $img"
+    echo "        The scan stopped before building. The image is not published (the Android SDK"
+    echo "        terms bar redistribution), so build it once and scan again:"
+    echo "          docker build --build-arg ANDROID_API=$api$pfx -t $img $ctx"
+    echo "        Building it means accepting https://developer.android.com/studio/terms"
+    echo "        An image built elsewhere works too: set ANDROID_IMAGE_PREFIX."
+    echo "[ERROR] $ANDROID_SDK_IMAGE_MISSING_CODE: 안드로이드 SDK 이미지가 없어 스캔을 시작하지 않았습니다: $img"
+    echo "        SDK 약관상 배포할 수 없는 이미지입니다. 한 번 직접 만든 뒤 다시 스캔하세요:"
+    echo "          docker build --build-arg ANDROID_API=$api$pfx -t $img $ctx"
+    echo "        이미지를 만들면 https://developer.android.com/studio/terms 약관에 동의하는 것입니다."
+}

@@ -74,7 +74,8 @@ case "${1:-}" in
   pull)
     # DOCKER_STUB_MISSING_IMAGE names one image that is neither present nor
     # pullable (not published, an offline host).
-    [ -n "${DOCKER_STUB_MISSING_IMAGE:-}" ] && [ "${2:-}" = "$DOCKER_STUB_MISSING_IMAGE" ] && exit 1
+    # (`docker pull -q <image>` carries the image as its third argument.)
+    [ -n "${DOCKER_STUB_MISSING_IMAGE:-}" ] && { [ "${2:-}" = "$DOCKER_STUB_MISSING_IMAGE" ] || [ "${3:-}" = "$DOCKER_STUB_MISSING_IMAGE" ]; } && exit 1
     # DOCKER_STUB_MISSING_PULL names an image that is present but cannot be
     # pulled now (an offline host).
     [ -n "${DOCKER_STUB_MISSING_PULL:-}" ] && [ "${2:-}" = "$DOCKER_STUB_MISSING_PULL" ] && exit 1
@@ -89,6 +90,12 @@ case "${1:-}" in
     exit 0 ;;
   version|rm) exit 0 ;;
   image)
+    # `docker image ls --format '{{.Repository}}'`: DOCKER_STUB_IMAGE_LS lists
+    # the repositories the engine holds (the Android SDK image check reads it).
+    if [ "${2:-}" = "ls" ]; then
+      [ -z "${DOCKER_STUB_IMAGE_LS:-}" ] || printf '%s\n' $DOCKER_STUB_IMAGE_LS
+      exit 0
+    fi
     # DOCKER_STUB_ABSENT_IMAGE names one image that is not present but can be
     # pulled (a first use).
     for a in "$@"; do
@@ -170,6 +177,35 @@ case "${1:-}" in
           echo "[build-prep] gradle-dependencies: Gradle asked for a Java ${DOCKER_STUB_TOOLCHAIN_MISSING##* } toolchain, which this image does not have (java-toolchain-missing=${DOCKER_STUB_TOOLCHAIN_MISSING##* })" ;;
       esac
     fi
+    # The preflight probes (scan-sbom.sh preflight_scan_paths: /probe-in and
+    # /probe-out; check-setup.sh: /probe). DOCKER_STUB_UNSHARED names a path
+    # prefix the engine's VM does not share, as Colima does not share /tmp: a
+    # folder under it is mounted as an empty one, so the probe sees nothing.
+    case "$*" in
+      *":/probe-in:ro"*)
+        pin=""; pout=""; pent=""; prev=""
+        for a in "$@"; do
+          case "$prev" in -v) case "$a" in *:/probe-in:ro) pin="${a%:/probe-in:ro}" ;; *:/probe-out:ro) pout="${a%:/probe-out:ro}" ;; esac ;; esac
+          case "$a" in BOMLENS_PROBE_ENTRY=*) pent="${a#BOMLENS_PROBE_ENTRY=}" ;; esac
+          prev="$a"
+        done
+        hidden() {  # compared as real paths: /var is /private/var on macOS
+          [ -n "${DOCKER_STUB_UNSHARED:-}" ] || return 1
+          local u p; u="$(cd "$DOCKER_STUB_UNSHARED" 2>/dev/null && pwd -P)"; p="$(cd "$1" 2>/dev/null && pwd -P)"
+          case "$p" in "$u"|"$u"/*) return 0 ;; esac; return 1
+        }
+        hidden "$pin" || { [ -z "$pent" ] || [ ! -e "$pin/$pent" ] || echo IN_OK; }
+        hidden "$pout" || { ls -A "$pout" 2>/dev/null | grep -q '^\.bomlens-preflight-' && echo OUT_OK; }
+        echo DONE; exit 0 ;;
+      *":/probe:ro"*)
+        pdir=""; prev=""
+        for a in "$@"; do case "$prev" in -v) pdir="${a%:/probe:ro}" ;; esac; prev="$a"; done
+        if [ -n "${DOCKER_STUB_UNSHARED:-}" ]; then
+          u="$(cd "$DOCKER_STUB_UNSHARED" 2>/dev/null && pwd -P)"; p="$(cd "$pdir" 2>/dev/null && pwd -P)"
+          case "$p" in "$u"|"$u"/*) exit 0 ;; esac
+        fi
+        ls -A "$pdir" 2>/dev/null; exit 0 ;;
+    esac
     # `docker run --rm --entrypoint sh <image> -c 'command -v grype'`: grype
     # is only in the images DOCKER_STUB_GRYPE_IMAGES names.
     case "$*" in
@@ -671,6 +707,64 @@ scan_in "$d" --project Pandroidkts --version 1.0.0 --generate-only
 { in_out "Android source detected" && in_log "bomlens-android-sdk34"; } \
   && pass "Kotlin DSL Android app → Android SDK image" \
   || { fail "Kotlin DSL Android app → Android SDK image" "rc=$RC"; show; }
+
+# --------------------------------------------------------
+section "Preflight: stop before the scan, leave no empty result folder"
+# --------------------------------------------------------
+# A folder the engine does not share (Colima shares only the home folder) is
+# mounted empty: the run stops at once with SCAN_TARGET_NOT_VISIBLE, in English
+# and Korean, instead of failing minutes later, and no folder holding only
+# .scanmeta.json is left behind.
+UNSHARED="$WORK/unshared"; mkdir -p "$UNSHARED/한글 프로젝트"
+printf '{"name":"x","version":"1.0.0","dependencies":{}}' > "$UNSHARED/한글 프로젝트/package.json"
+N=$((N+1)); LOG="$WORK/docker.$N.log"; : > "$LOG"; OUT="$WORK/out.$N"
+( cd "$UNSHARED/한글 프로젝트" && DOCKER_STUB_LOG="$LOG" DOCKER_STUB_UNSHARED="$UNSHARED" bash "$SCAN" --project Hidden --version 1.0 --generate-only ) > "$OUT" 2>&1; RC=$?
+{ [ "$RC" -eq 1 ] && in_out "SCAN_TARGET_NOT_VISIBLE: the folder to scan is not visible" && in_out "컨테이너 안에서 보이지 않습니다" && in_out "한글 프로젝트"; } \
+  && pass "an unshared folder stops the scan with SCAN_TARGET_NOT_VISIBLE (English and Korean, Korean path intact)" \
+  || { fail "unshared folder is refused" "rc=$RC"; show; }
+! grep -q "build-prep" "$LOG" && ! in_out "Generating SBOM" \
+  && pass "no build started for an unshared folder" || { fail "a build started for an unshared folder"; show; }
+[ ! -e "$UNSHARED/한글 프로젝트/Hidden_1.0" ] \
+  && pass "no empty result folder (.scanmeta.json only) is left after the refusal" \
+  || fail "an empty result folder was left" "$(ls -A "$UNSHARED/한글 프로젝트/Hidden_1.0")"
+
+# The same folder is fine once it is visible.
+N=$((N+1)); LOG="$WORK/docker.$N.log"; : > "$LOG"; OUT="$WORK/out.$N"
+( cd "$UNSHARED/한글 프로젝트" && DOCKER_STUB_LOG="$LOG" bash "$SCAN" --project Visible --version 1.0 --generate-only ) > "$OUT" 2>&1; RC=$?
+{ [ "$RC" -eq 0 ] && ! in_out "SCAN_TARGET_NOT_VISIBLE"; } \
+  && pass "a visible folder (Korean and a space in the path) passes the preflight and scans" \
+  || { fail "a visible folder was refused" "rc=$RC"; show; }
+
+# Only the output folder hidden: the same stop, naming the output folder.
+SHARED_PROJ="$(new_proj shared)"; printf '{"name":"x","version":"1.0.0"}' > "$SHARED_PROJ/package.json"
+mkdir -p "$UNSHARED/out"
+N=$((N+1)); LOG="$WORK/docker.$N.log"; : > "$LOG"; OUT="$WORK/out.$N"
+( cd "$SHARED_PROJ" && DOCKER_STUB_LOG="$LOG" DOCKER_STUB_UNSHARED="$UNSHARED" bash "$SCAN" --project HiddenOut --version 1.0 --generate-only --output-dir "$UNSHARED/out" ) > "$OUT" 2>&1; RC=$?
+{ [ "$RC" -eq 1 ] && in_out "SCAN_TARGET_NOT_VISIBLE: the output folder is not visible" && [ ! -e "$UNSHARED/out/HiddenOut_1.0" ]; } \
+  && pass "an unshared output folder is refused the same way, with no empty folder left" \
+  || { fail "unshared output folder not refused" "rc=$RC"; show; }
+
+# A first use shows the download instead of waiting silently.
+d="$(new_proj firstuse)"; printf '{"name":"x","version":"1.0.0"}' > "$d/package.json"
+N=$((N+1)); LOG="$WORK/docker.$N.log"; : > "$LOG"; OUT="$WORK/out.$N"
+( cd "$d" && DOCKER_STUB_LOG="$LOG" DOCKER_STUB_ABSENT_IMAGE="ghcr.io/cdxgen/cdxgen-alpine-node24:13.5.0" bash "$SCAN" --project FirstUse --version 1.0 --detection build --generate-only ) > "$OUT" 2>&1; RC=$?
+{ in_out "First use of" && in_out "내려받습니다" && in_log "docker pull"; } \
+  && pass "an image that is not here is pulled up front with a visible message (English and Korean)" \
+  || { fail "first-use pull message missing" "rc=$RC"; show; }
+
+# Android without its SDK image: stops at once with the code, no fallback, no empty folder.
+d="$(new_proj androidnoimg)"; mkdir -p "$d/app"
+printf 'rootProject.name = "k"\n' > "$d/settings.gradle.kts"
+printf 'android {\n    namespace = "com.example.k"\n    compileSdk = 34\n}\n' > "$d/app/build.gradle.kts"
+N=$((N+1)); LOG="$WORK/docker.$N.log"; : > "$LOG"; OUT="$WORK/out.$N"
+( cd "$d" && DOCKER_STUB_LOG="$LOG" DOCKER_STUB_MISSING_IMAGE="bomlens-android-sdk34:latest" bash "$SCAN" --project AndroidNo --version 1.0 --generate-only ) > "$OUT" 2>&1; RC=$?
+{ [ "$RC" -eq 1 ] && in_out "[ERROR] ANDROID_SDK_IMAGE_MISSING: Android SDK image not found: bomlens-android-sdk34:latest" \
+    && in_out "ANDROID_SDK_IMAGE_MISSING: 안드로이드 SDK 이미지가 없어" && in_out "docker build --build-arg ANDROID_API=34 -t bomlens-android-sdk34:latest"; } \
+  && pass "Android without the SDK image stops at once with ANDROID_SDK_IMAGE_MISSING (English and Korean)" \
+  || { fail "Android missing-image stop" "rc=$RC"; show; }
+! in_out "Generating SBOM" && [ ! -e "$d/AndroidNo_1.0" ] \
+  && pass "the Android stop leaves no empty result folder and starts no build" \
+  || { fail "Android stop left a folder or started a build"; show; }
 
 d="$(new_proj dotnetsub)"; mkdir -p "$d/src/App"
 printf '<Solution />\n' > "$d/App.slnx"
@@ -2181,7 +2275,7 @@ if [ -f "$CHECK_SH" ]; then
     CS_RC=$?
   }
   cs_run 6198534144 SBOM_LANG=en
-  { [ "$CS_RC" -eq 0 ] && grep -q "BomLens setup check" "$CS_OUT" && grep -q "Docker engine memory is enough for Java builds: 6 GB" "$CS_OUT" \
+  { [ "$CS_RC" -eq 0 ] && grep -q "BomLens setup check" "$CS_OUT" && grep -q "Docker engine memory is enough for Java builds: 5.8 GiB" "$CS_OUT" \
       && grep -q "everything is ready" "$CS_OUT"; } \
     && pass "check-setup.sh: a ready environment exits 0 and reports the engine memory (English)" \
     || { fail "check-setup.sh ready case" "rc=$CS_RC"; cat "$CS_OUT"; }
@@ -2199,6 +2293,38 @@ if [ -f "$CHECK_SH" ]; then
   cs_run 6198534144 SBOM_LANG=en DOCKER_STUB_NO_ENGINE=1
   { [ "$CS_RC" -eq 1 ] && grep -q "engine is not running" "$CS_OUT"; } \
     && pass "check-setup.sh: a stopped engine is blocking (exit 1)" || { fail "check-setup.sh stopped-engine case" "rc=$CS_RC"; cat "$CS_OUT"; }
+  # The memory is shown as the engine reports it (3.8 GiB for a 4 GB setting), with the rule.
+  cs_run 4102000000 SBOM_LANG=en
+  { [ "$CS_RC" -eq 0 ] && grep -q "enough for Java builds: 3.8 GiB" "$CS_OUT"; } \
+    && pass "check-setup.sh: engine memory is shown with one decimal (3.8 GiB, not a rounded 4 GB)" \
+    || { fail "check-setup.sh memory decimal" "rc=$CS_RC"; cat "$CS_OUT"; }
+  cs_run 3700000000 SBOM_LANG=en
+  { [ "$CS_RC" -eq 2 ] && grep -q "too little memory.*3.4 GiB" "$CS_OUT" && grep -q "passes from 3.5 GiB" "$CS_OUT"; } \
+    && pass "check-setup.sh: below the documented line the exact figure and the rule are shown" \
+    || { fail "check-setup.sh below-line memory" "rc=$CS_RC"; cat "$CS_OUT"; }
+  # The Android SDK image is a note until it is built, then listed.
+  cs_run 6198534144 SBOM_LANG=en
+  { [ "$CS_RC" -eq 0 ] && grep -q "Android SDK image (for Android Gradle scans) is not built yet" "$CS_OUT" && grep -q "docker build --build-arg ANDROID_API=34" "$CS_OUT"; } \
+    && pass "check-setup.sh: a missing Android SDK image is a note with the build command, not a problem" \
+    || { fail "check-setup.sh android note" "rc=$CS_RC"; cat "$CS_OUT"; }
+  cs_run 6198534144 SBOM_LANG=en DOCKER_STUB_IMAGE_LS="bomlens-android-sdk34 ghcr.io/sktelecom/bomlens"
+  grep -q "Android SDK image is present: bomlens-android-sdk34" "$CS_OUT" \
+    && pass "check-setup.sh: a built Android SDK image is listed" || { fail "check-setup.sh android present"; cat "$CS_OUT"; }
+  cs_run 6198534144 SBOM_LANG=ko
+  grep -q "안드로이드(Gradle) 스캔에 쓰는 SDK 이미지가 아직 없습니다" "$CS_OUT" \
+    && pass "check-setup.sh: the Android note is in Korean too" || { fail "check-setup.sh android Korean"; cat "$CS_OUT"; }
+  # The container must be able to see the folder that is scanned.
+  CS_VIS="$WORK/cs-visible"; mkdir -p "$CS_VIS"; : > "$CS_VIS/pom.xml"
+  CS_HID="$WORK/cs-hidden"; mkdir -p "$CS_HID"; : > "$CS_HID/pom.xml"
+  CS_OUT="$WORK/check-setup.out"
+  env -u SBOM_LANG -u LC_ALL -u LC_MESSAGES -u LANG SBOM_LANG=en DOCKER_STUB_MEMTOTAL=6198534144 UI_PORT=$((49152 + RANDOM % 16000)) bash "$CHECK_SH" "$CS_VIS" > "$CS_OUT" 2>&1
+  grep -q "The scanner container can see this folder: $CS_VIS" "$CS_OUT" \
+    && pass "check-setup.sh: a shared folder is reported as visible" || { fail "check-setup.sh visible folder"; cat "$CS_OUT"; }
+  env -u SBOM_LANG -u LC_ALL -u LC_MESSAGES -u LANG SBOM_LANG=ko DOCKER_STUB_UNSHARED="$CS_HID" DOCKER_STUB_MEMTOTAL=6198534144 UI_PORT=$((49152 + RANDOM % 16000)) bash "$CHECK_SH" "$CS_HID" > "$CS_OUT" 2>&1
+  CS_RC=$?
+  { [ "$CS_RC" -eq 2 ] && grep -q "스캐너 컨테이너가 이 폴더를 보지 못합니다" "$CS_OUT" && grep -q "Colima는 홈 폴더" "$CS_OUT"; } \
+    && pass "check-setup.sh: a folder the container cannot see is a problem, with the fix (Korean)" \
+    || { fail "check-setup.sh hidden folder" "rc=$CS_RC"; cat "$CS_OUT"; }
 fi
 
 # --------------------------------------------------------

@@ -16,6 +16,12 @@ call :cfg_load
 if not defined SBOM_SCANNER_IMAGE set "SBOM_SCANNER_IMAGE=ghcr.io/sktelecom/bomlens:latest"
 set "DOCKER_IMAGE=%SBOM_SCANNER_IMAGE%"
 if not defined UI_PORT set "UI_PORT=8080"
+if not defined ANDROID_IMAGE_PREFIX set "ANDROID_IMAGE_PREFIX=bomlens-android-sdk"
+REM The folder whose visibility inside the container is checked: the first
+REM argument, else the current folder.
+set "SCAN_DIR=%~1"
+if not defined SCAN_DIR set "SCAN_DIR=%CD%"
+set "IMAGE_OK="
 set /a PROBLEMS=0
 
 call :detect_lang
@@ -55,7 +61,8 @@ docker image inspect "%DOCKER_IMAGE%" >nul 2>&1
 if errorlevel 1 goto :image_missing
 call :say M_O_IMAGE
 call :sayval DOCKER_IMAGE
-goto :check_mem_step
+set "IMAGE_OK=1"
+goto :check_android_step
 
 :image_missing
 call :say M_X_NO_IMAGE
@@ -64,6 +71,47 @@ call :say M_PREPULL
 echo   docker pull %DOCKER_IMAGE%
 call :say M_OFFLINE_HINT
 set /a PROBLEMS+=1
+
+REM 3b) Android SDK image. Not published (its SDK terms bar redistribution), so it
+REM is built on this machine, and only Android scans use it: a missing image is a
+REM note, not a problem.
+:check_android_step
+set "ANDROID_IMGS="
+for /f "delims=" %%i in ('docker image ls --format "{{.Repository}}" 2^>nul ^| findstr /R /C:"^%ANDROID_IMAGE_PREFIX%[0-9][0-9]*$"') do set "ANDROID_IMGS=%%i"
+if not defined ANDROID_IMGS goto :android_missing
+call :say M_O_ANDROID
+call :sayval ANDROID_IMGS
+goto :check_share_step
+
+:android_missing
+call :say M_N_ANDROID
+echo   docker build --build-arg ANDROID_API=34 -t %ANDROID_IMAGE_PREFIX%34:latest https://github.com/sktelecom/bomlens.git#main:docker/android
+
+REM 3c) Shared folder: a folder Docker does not share is mounted as an empty one,
+REM and a scan of it would run for minutes and find nothing. Needs the scanner
+REM image to start a container, and a folder that has something in it.
+:check_share_step
+set "HAS_FILES="
+for /f "delims=" %%x in ('dir /b /a "%SCAN_DIR%" 2^>nul') do set "HAS_FILES=1"
+if not defined IMAGE_OK goto :share_skipped
+if not defined HAS_FILES goto :share_skipped
+set "SEEN="
+for /f "delims=" %%x in ('docker run --rm --entrypoint sh -v "%SCAN_DIR%":/probe:ro "%DOCKER_IMAGE%" -c "ls -A /probe" 2^>nul') do set "SEEN=1"
+if not defined SEEN goto :share_hidden
+call :say M_O_SHARE
+call :sayval SCAN_DIR
+goto :check_mem_step
+
+:share_hidden
+call :say M_X_SHARE
+call :sayval SCAN_DIR
+call :say M_SHARE_FIX
+set /a PROBLEMS+=1
+goto :check_mem_step
+
+:share_skipped
+call :say M_S_SHARE
+call :sayval SCAN_DIR
 
 REM 4) Docker engine memory for Maven/Gradle builds. A hint only: an unreadable
 REM value is skipped. docker info prints bytes; the last six digits are dropped
@@ -78,16 +126,20 @@ if "%MEM_BYTES:~7,1%"=="" goto :check_port_step
 set "MEM_MB=%MEM_BYTES:~0,-6%"
 set "MEM_MBN=0"
 set /a "MEM_MBN=%MEM_MB%" 2>nul
-REM Decimal megabytes to GiB, rounded, like check-setup.sh: (MB*1000+2^29)/2^30.
-set /a "MEM_GB=(MEM_MBN*1000+536871)/1073742"
+REM Decimal megabytes to GiB with one decimal, like check-setup.sh (rounding 3.8
+REM up to 4 hid how close to the line the engine was): MB*10000/1074 is tenths.
+set /a "MEM_T=(MEM_MBN*10000+537)/1074"
+set /a "MEM_W=MEM_T/10"
+set /a "MEM_F=MEM_T %% 10"
 if %MEM_MBN% LSS 3758 goto :mem_low
 call :say M_O_MEM
-echo   %MEM_GB% GB
+echo   %MEM_W%.%MEM_F% GiB
 goto :check_port_step
 
 :mem_low
 call :say M_X_MEM
-echo   %MEM_GB% GB
+echo   %MEM_W%.%MEM_F% GiB
+call :say M_MEM_NOTE
 call :say M_MEM_FIX
 set /a PROBLEMS+=1
 
@@ -230,6 +282,12 @@ set "M_O_INSTALLED=[O] Docker is installed"
 set "M_O_ENGINE=[O] Docker engine is running"
 set "M_O_IMAGE=[O] Scanner image is present:"
 set "M_O_MEM=[O] Docker engine memory is enough for Java builds:"
+set "M_O_ANDROID=[O] Android SDK image is present:"
+set "M_N_ANDROID=[-] The Android SDK image (for Android Gradle scans) is not built yet. Only Android projects need it; without it a scan stops at once and says how to build it. To build it ahead of time:"
+set "M_O_SHARE=[O] The scanner container can see this folder:"
+set "M_X_SHARE=[X] The scanner container cannot see this folder (it looks empty inside):"
+set "M_SHARE_FIX=    Docker shares only some folders: Settings, Resources, File sharing on Docker Desktop. Move the project to a shared folder, or share its location."
+set "M_S_SHARE=[-] Skipping the shared-folder check, because this folder is empty or the scanner image is missing:"
 set "M_O_PORT=[O] UI port is available:"
 set "M_X_NO_DOCKER=[X] Docker is not installed, or not on PATH."
 set "M_OPT_RANCHER=    Free on Windows: Rancher Desktop (GUI) https://rancherdesktop.io/"
@@ -241,6 +299,7 @@ set "M_PREPULL=    The first run downloads about 250 MB automatically. To fetch 
 set "M_OFFLINE_HINT=    No network at the venue? See bomlens.settings.example.txt (SBOM_IMAGE_TAR) to install from a file."
 set "M_X_MEM=[X] The Docker engine has too little memory. A Maven or Gradle build needs about 4 GB:"
 set "M_MEM_FIX=    Docker Desktop: Settings, Resources, Memory. With the WSL 2 backend or Rancher Desktop: set memory=4GB in .wslconfig in your user folder, then run wsl --shutdown."
+set "M_MEM_NOTE=    An engine set to 4 GB shows as about 3.8 GiB; this check passes from 3.5 GiB."
 set "M_X_PORT=[X] UI port is already in use or reserved:"
 set "M_PORT_FIX=    sbom-ui.bat will move to the next free port by itself. To pin a port, set UI_PORT in bomlens.settings.txt next to these scripts."
 set "M_ALL_GOOD=Result: everything is ready. You can run sbom-ui.bat"
@@ -257,6 +316,12 @@ set "M_O_INSTALLED=[O] Docker 설치됨"
 set "M_O_ENGINE=[O] Docker 엔진 실행 중"
 set "M_O_IMAGE=[O] 스캐너 이미지 보유:"
 set "M_O_MEM=[O] Docker 엔진 메모리가 Java 빌드에 충분합니다:"
+set "M_O_ANDROID=[O] 안드로이드 SDK 이미지 보유:"
+set "M_N_ANDROID=[-] 안드로이드(Gradle) 스캔에 쓰는 SDK 이미지가 아직 없습니다. 안드로이드 프로젝트를 스캔할 때만 필요하며, 없으면 스캔이 바로 멈추고 만드는 방법을 안내합니다. 미리 만들려면:"
+set "M_O_SHARE=[O] 스캐너 컨테이너가 이 폴더를 볼 수 있습니다:"
+set "M_X_SHARE=[X] 스캐너 컨테이너가 이 폴더를 보지 못합니다(컨테이너 안에서 비어 보임):"
+set "M_SHARE_FIX=    Docker는 일부 폴더만 공유합니다. Docker Desktop은 Settings, Resources, File sharing 입니다. 프로젝트를 공유된 폴더로 옮기거나 그 위치를 공유하세요."
+set "M_S_SHARE=[-] 이 폴더가 비어 있거나 스캐너 이미지가 없어 컨테이너 공유 점검을 건너뜁니다:"
 set "M_O_PORT=[O] UI 포트 사용 가능:"
 set "M_X_NO_DOCKER=[X] Docker가 설치되어 있지 않거나 PATH에 없습니다."
 set "M_OPT_RANCHER=    Windows 무료 옵션: Rancher Desktop (GUI) https://rancherdesktop.io/"
@@ -268,6 +333,7 @@ set "M_PREPULL=    처음 실행할 때 약 250MB를 자동으로 내려받습�
 set "M_OFFLINE_HINT=    현장에 네트워크가 없나요? 파일로 설치하려면 bomlens.settings.example.txt의 SBOM_IMAGE_TAR을 참고하세요."
 set "M_X_MEM=[X] Docker 엔진 메모리가 부족합니다. Maven/Gradle 빌드에는 약 4GB가 필요합니다:"
 set "M_MEM_FIX=    Docker Desktop: Settings, Resources, Memory. WSL 2 백엔드나 Rancher Desktop은 사용자 폴더의 .wslconfig 에 memory=4GB 를 적고 wsl --shutdown 을 실행하세요."
+set "M_MEM_NOTE=    4GB로 설정한 엔진은 약 3.8 GiB로 표시되며, 이 점검은 3.5 GiB부터 통과합니다."
 set "M_X_PORT=[X] UI 포트가 이미 사용 중이거나 예약되어 있습니다:"
 set "M_PORT_FIX=    sbom-ui.bat이 알아서 비어 있는 다음 포트로 옮깁니다. 포트를 고정하려면 스크립트 옆 bomlens.settings.txt에 UI_PORT를 지정하세요."
 set "M_ALL_GOOD=점검 결과: 모두 준비됐습니다. sbom-ui.bat 을 실행해도 좋습니다."

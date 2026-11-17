@@ -1101,6 +1101,68 @@ _pull_optin() {
 # unset SBOM_PULL is never read as empty by that call.
 SBOM_PULL="${SBOM_PULL:-missing}"
 
+# preflight_image_pull <image>: a first use downloads the image, which takes
+# minutes and used to show nothing, because `docker run` pulls it with its
+# output going to the stage log. Pull it here instead, with docker's own
+# progress on the terminal. An image that is here, SBOM_PULL=never, or a pull
+# that fails changes nothing: the scan's own `docker run` decides from there.
+preflight_image_pull() {
+    local img="$1"
+    docker image inspect "$img" >/dev/null 2>&1 && return 0
+    [ "$SBOM_PULL" = "never" ] && return 0
+    echo "[INFO] First use of $img: downloading it now (a few minutes; progress below)."
+    echo "[INFO] 처음 쓰는 이미지($img)를 내려받습니다. 몇 분 걸릴 수 있으며 진행 상황이 아래에 표시됩니다."
+    _pull_optin "$img" || true
+}
+
+# preflight_scan_paths <image> <input dir> <output dir>: stop before the scan
+# when the container cannot see what it must read or write. A folder the
+# container engine does not share with its VM (Colima shares only the home
+# folder; Docker Desktop only the folders under File sharing) is mounted as an
+# empty directory, and the scan used to run for minutes and fail at the very
+# end with "SBOM not found". One short container checks both folders: the input
+# lists something, and a marker file written to the output folder is there. A
+# container that cannot be started, or an image that is not here, is not this
+# check's to report; the scan's own docker run says so.
+preflight_scan_paths() {
+    local img="$1" in_dir="$2" out_dir="$3" marker seen entry="" _e
+    docker image inspect "$img" >/dev/null 2>&1 || return 0
+    marker=".bomlens-preflight-$$"
+    : > "$out_dir/$marker" 2>/dev/null || return 0
+    # One entry of the input folder to look for inside the container. Not the
+    # folder this run writes into when that sits inside the input: the engine
+    # creates the mount point of a folder it cannot see, and an unshared input
+    # would then hold that one entry and look non-empty.
+    while IFS= read -r _e; do
+        [ -n "$_e" ] || continue
+        case "$out_dir/" in "$in_dir/$_e/"*) continue ;; esac
+        entry="$_e"; break
+    done <<EOF_PREFLIGHT
+$(ls -A "$in_dir" 2>/dev/null)
+EOF_PREFLIGHT
+    seen="$("${DOCKER_ENV[@]}" docker run --rm --entrypoint sh \
+        -v "$(hostpath "$in_dir")":/probe-in:ro \
+        -v "$(hostpath "$out_dir")":/probe-out:ro \
+        -e "BOMLENS_PROBE_ENTRY=$entry" \
+        "$img" -c "[ -n \"\$BOMLENS_PROBE_ENTRY\" ] && [ -e \"/probe-in/\$BOMLENS_PROBE_ENTRY\" ] && echo IN_OK; [ -e \"/probe-out/$marker\" ] && echo OUT_OK; echo DONE" 2>/dev/null)" || seen=""
+    rm -f "$out_dir/$marker"
+    # No DONE: the probe did not run (not a sharing problem).
+    case "$seen" in *DONE*) ;; *) return 0 ;; esac
+    if [ -n "$entry" ]; then
+        case "$seen" in *IN_OK*) ;; *) scan_target_not_visible "$in_dir" "the folder to scan" "스캔할 폴더"; echo ""; exit 1 ;; esac
+    fi
+    case "$seen" in *OUT_OK*) ;; *) scan_target_not_visible "$out_dir" "the output folder" "결과를 저장할 폴더"; echo ""; exit 1 ;; esac
+}
+scan_target_not_visible() {  # <host dir> <english role> <korean role>
+    echo "[ERROR] SCAN_TARGET_NOT_VISIBLE: $2 is not visible inside the Docker container: $1"
+    echo "        The Docker engine shares only some folders with its VM (Colima: your home folder;"
+    echo "        Docker Desktop: Settings > Resources > File sharing), so the container sees an empty folder."
+    echo "        Move the project and the output folder under your home folder, or share this location, then run again."
+    echo "[ERROR] SCAN_TARGET_NOT_VISIBLE: $3가 Docker 컨테이너 안에서 보이지 않습니다: $1"
+    echo "        Docker는 일부 폴더만 가상 머신과 공유합니다(Colima는 홈 폴더, Docker Desktop은 Settings > Resources > File sharing)."
+    echo "        프로젝트와 결과 폴더를 홈 폴더 아래로 옮기거나 이 위치를 공유한 뒤 다시 실행하세요."
+}
+
 # SBOM_EXTRA_CA_CERTS: the CA bundle of a proxy that inspects TLS. Checked
 # here, before any container starts, and bind-mounted read-only into each
 # scan container at EXTRA_CA_TARGET (extra_ca_run). BOMLENS_EXTRA_CA_CERTS is that
@@ -1421,7 +1483,7 @@ rm -f "${OUTPUT_HOST_DIR}/${OUTPUT_FILE%_bom.json}_bom.refused.json"
 # in the mounted temp dir on Linux, where the host user cannot rm them; fall back
 # to clearing those via a throwaway container so nothing lingers.
 cleanup() {
-    local d
+    local d _rc=$?
     # RUNNING_CONTAINER_NAME is set only while stage 1 (SOURCE mode) is
     # waiting on its cdxgen container, so a Ctrl+C or `kill` reaching this
     # script here still stops that container instead of leaving it to run
@@ -1444,6 +1506,17 @@ cleanup() {
                 rm -rf -- "/cleanup/$(basename "$d")" >/dev/null 2>&1 || true
         fi
     done
+    # A run that ended in failure leaves no result folder holding nothing but
+    # its own .scanmeta.json: an empty folder reads as a scan that produced
+    # something. Only a folder this run created per-run (not the flat layout,
+    # not the folder the user ran in) and only when .scanmeta.json is all there
+    # is; any artifact, log or file of an earlier run keeps it.
+    if [ "$_rc" -ne 0 ] && [ "${SBOM_OUTPUT_FLAT:-}" != "1" ] && [ -n "${OUTPUT_HOST_DIR:-}" ] \
+       && [ "$OUTPUT_HOST_DIR" != "${SOURCE_DIR:-}" ] && [ -d "$OUTPUT_HOST_DIR" ] \
+       && [ -z "$(find "$OUTPUT_HOST_DIR" -mindepth 1 -not -name .scanmeta.json 2>/dev/null | head -n 1)" ]; then
+        rm -f "$OUTPUT_HOST_DIR/.scanmeta.json" 2>/dev/null || true
+        rmdir "$OUTPUT_HOST_DIR" 2>/dev/null || true
+    fi
     # The folder of the govulncheck copy --reachability hands stage 1
     # (removed right after it, too).
     [ -z "${REACH_TOOLS_DIR:-}" ] || rm -rf -- "$REACH_TOOLS_DIR" 2>/dev/null || true
@@ -3173,21 +3246,13 @@ if [ "$MODE" = "SOURCE" ]; then
         echo "[INFO] Android source detected (compileSdk=$API) -> $CDX_IMG"
         # The image carries an Android SDK platform, which is not open source:
         # Google's SDK terms bar redistributing it, so we do not publish this
-        # image and it is built where it is used. Tell the user how rather than
-        # letting `docker run` fail on a missing image.
+        # image and it is built where it is used. Stop here, before any build,
+        # with the code ANDROID_SDK_IMAGE_MISSING, rather than let `docker run`
+        # fail on a missing image or fall back to a scan that finds nothing.
         if ! docker image inspect "$CDX_IMG" >/dev/null 2>&1 \
            && ! docker pull -q "$CDX_IMG" >/dev/null 2>&1; then
-            echo "[ERROR] Android SDK image not found: $CDX_IMG"
-            echo "        It is not published: the Android SDK inside it is not open source,"
-            echo "        and its terms do not allow us to redistribute it. Build it once:"
+            android_sdk_image_missing "$CDX_IMG" "$API" "$REPO_DIR/docker/android"
             echo ""
-            echo "          docker build --build-arg ANDROID_API=$API \\"
-            [ "$CDXGEN_IMAGE_PREFIX" = "ghcr.io/cdxgen/" ] || echo "            --build-arg CDXGEN_IMAGE_PREFIX=$CDXGEN_IMAGE_PREFIX \\"
-            echo "            -t $CDX_IMG $REPO_DIR/docker/android"
-            echo ""
-            echo "        Building it means accepting Google's SDK terms yourself:"
-            echo "        https://developer.android.com/studio/terms"
-            echo "        To use an image built elsewhere, set ANDROID_IMAGE_PREFIX."
             exit 1
         fi
     else
@@ -3209,6 +3274,11 @@ if [ "$MODE" = "SOURCE" ]; then
             echo "[WARN]   If this is C/C++ embedded source, --identify-vendored finds open source copied in (opt-in image)."
         fi
     fi
+    # Before any build: show the first download, and stop at once when the
+    # container cannot see the folders this run reads and writes.
+    _pf_img="$CDX_IMG"; [ "$DETECTION_USED" = static ] && _pf_img="$POSTPROCESS_IMAGE"
+    preflight_image_pull "$_pf_img"
+    preflight_scan_paths "$_pf_img" "$SCAN_INPUT_DIR" "$OUTPUT_HOST_DIR"
     HOST_GOTOOLCHAIN="${GOTOOLCHAIN:-}"
     STAGE1_FALLBACK_ENV=""; STAGE1_FAILED=""; STAGE1_LOG=""
     if [ "$DETECTION_USED" = static ]; then
