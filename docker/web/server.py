@@ -790,8 +790,13 @@ def scan_target_not_visible(scan_dir):
     under File sharing) is mounted as an empty directory, and the scan would run
     for minutes before finding nothing. The wording carries the machine-readable
     code SCAN_TARGET_NOT_VISIBLE and names the folder as the user knows it."""
+    real = os.path.realpath(scan_dir)
+    if not any(real == os.path.realpath(root)
+               or real.startswith(os.path.realpath(root) + os.sep)
+               for root in ALLOWED_SCAN_ROOTS):
+        return None
     try:
-        if os.listdir(scan_dir):
+        if os.listdir(real):
             return None
     except OSError:
         return None
