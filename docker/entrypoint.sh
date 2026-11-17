@@ -306,9 +306,20 @@ BOMLENS_CANCEL_GRACE="${BOMLENS_CANCEL_GRACE:-30}"
 # waiting on it, empty otherwise. Read by stop_sibling (below), called from
 # the INT/TERM trap generate_sbom_cdxgen sets while it runs.
 SIBLING_CID=""
+# SIBLING_CIDF / SIBLING_NAME: the cidfile and the --name of that sibling.
+# A cancel can arrive before the id was read (the image is still being pulled
+# and no container exists yet, or it exists but the 5-second wait for its
+# cidfile has passed), so stop_sibling falls back to the cidfile, then to the
+# name, and removes the container once it has stopped.
+SIBLING_CIDF=""
+SIBLING_NAME=""
 stop_sibling() {
-    [ -n "$SIBLING_CID" ] || return 0
-    docker stop -t "$BOMLENS_CANCEL_GRACE" "$SIBLING_CID" >/dev/null 2>&1 || true
+    local target="$SIBLING_CID"
+    [ -n "$target" ] || { [ -n "$SIBLING_CIDF" ] && [ -s "$SIBLING_CIDF" ] && target=$(cat "$SIBLING_CIDF" 2>/dev/null); }
+    [ -n "$target" ] || target="$SIBLING_NAME"
+    [ -n "$target" ] || return 0
+    docker stop -t "$BOMLENS_CANCEL_GRACE" "$target" >/dev/null 2>&1 || true
+    docker rm -f "$target" >/dev/null 2>&1 || true
 }
 
 # REACH_TOOLS_DIR: the folder holding the govulncheck copy handed to the
@@ -546,6 +557,12 @@ generate_sbom_cdxgen() {
     local logf cidf rcf; logf=$(mktemp); cidf=$(mktemp); rcf=$(mktemp); rm -f "$cidf"
     local prep_env; read -ra prep_env <<< "$(build_prep_env_args)"
     local sibling_name="bomlens-sib-$$"
+    SIBLING_CIDF="$cidf"; SIBLING_NAME="$sibling_name"
+    # The web UI sets these so it can remove this container by label when the
+    # scan is cancelled (server.py remove_labeled_containers).
+    local label_args=()
+    [ -n "${BOMLENS_OWNER:-}" ] && label_args+=(--label "bomlens.owner=$BOMLENS_OWNER")
+    [ -n "${BOMLENS_RUN_ID:-}" ] && label_args+=(--label "bomlens.run=$BOMLENS_RUN_ID")
     setup_guard_state "$self" "$prep" "$src" "$sibling_name" "$img"
     local guard_env=()
     [ -n "$GUARD_ID" ] && guard_env=(-e "BOMLENS_GUARD_ID=$GUARD_ID")
@@ -584,6 +601,7 @@ generate_sbom_cdxgen() {
         docker run -u 0:0 \
             --name "$sibling_name" \
             --cidfile "$cidf" \
+            "${label_args[@]}" \
             --volumes-from "$self" \
             -e HOME=/tmp/sbomhome \
             -e "MAVEN_OPTS=-Duser.home=/tmp/sbomhome -Dmaven.repo.local=/tmp/sbomhome/.m2/repository" \
@@ -608,14 +626,16 @@ generate_sbom_cdxgen() {
     # The cidfile appears as soon as the container is created, well before it
     # finishes, so a cancel arriving during the run still has a container id
     # to stop.
+    # The traps are set before the wait so a cancel during it also stops the
+    # sibling (by cidfile or name, see stop_sibling).
+    trap 'stop_sibling; remove_reach_tools; exit 130' INT
+    trap 'stop_sibling; remove_reach_tools; exit 143' TERM
     local cid="" _n=0
     while [ -z "$cid" ] && [ "$_n" -lt 50 ] && kill -0 "$pipe_pid" 2>/dev/null; do
         [ -s "$cidf" ] && cid=$(cat "$cidf")
         [ -n "$cid" ] || { sleep 0.1; _n=$((_n + 1)); }
     done
     SIBLING_CID="$cid"
-    trap 'stop_sibling; remove_reach_tools; exit 130' INT
-    trap 'stop_sibling; remove_reach_tools; exit 143' TERM
     wait "$pipe_pid" || true
     drop_unused_guard_state "$sibling_name"
     trap 'exit 130' INT
@@ -626,7 +646,7 @@ generate_sbom_cdxgen() {
     rc=$(cat "$rcf" 2>/dev/null || echo 1)
     rm -f "$rcf"
     remove_reach_tools
-    SIBLING_CID=""
+    SIBLING_CID=""; SIBLING_CIDF=""; SIBLING_NAME=""
     # A registry refused for an untrusted certificate (a proxy that inspects
     # TLS) gets one line naming SBOM_EXTRA_CA_CERTS, failed or not.
     tls_trust_hint "cdxgen" "$logf"

@@ -4216,6 +4216,17 @@ case "$mode" in
             i=$((i + 1))
         done
         ;;
+    silent)
+        # A build that prints nothing: only the heartbeat file shows it runs.
+        # A partial artifact is already in the run folder (the cwd).
+        echo '{"bomFormat":"CycloneDX","components":[]}' > "${PROJECT_NAME}_${PROJECT_VERSION}_bom.json"
+        i=0
+        while [ "$i" -lt 100 ]; do
+            date +%s >> "$STUB_HEARTBEAT"
+            sleep 0.2
+            i=$((i + 1))
+        done
+        ;;
 esac
 STUB
 chmod +x "$WORK/bin/run-scan"
@@ -5057,6 +5068,27 @@ if [ "$hb1" -gt 0 ] && [ "$hb1" = "$hb2" ]; then
     pass "client disconnect terminates the running scan (heartbeat stopped)"
 else
     fail "scan kept running after client disconnect" "heartbeat $hb1 -> $hb2"
+fi
+
+# A scan that prints nothing: the closed tab is still noticed within seconds
+# (the watcher polls the connection), the scan stops, and the run folder with
+# its partial artifact is removed.
+echo silent > "$STUB_MODE_FILE"
+rm -f "$STUB_HEARTBEAT"
+curl -sN --max-time 2 "$BASE2/scan-stream?project=cancelsilent&version=1.0&source=current-dir" >/dev/null 2>&1 || true
+sleep 4
+hb1=$(wc -c < "$STUB_HEARTBEAT" 2>/dev/null || echo 0)
+sleep 1.5
+hb2=$(wc -c < "$STUB_HEARTBEAT" 2>/dev/null || echo 0)
+if [ "$hb1" -gt 0 ] && [ "$hb1" = "$hb2" ]; then
+    pass "client disconnect stops a scan that prints nothing"
+else
+    fail "a silent scan kept running after client disconnect" "heartbeat $hb1 -> $hb2"
+fi
+if [ ! -e "$OUT2/cancelsilent_1.0" ]; then
+    pass "a cancelled scan leaves no result folder"
+else
+    fail "cancelled scan left its run folder" "$(ls -A "$OUT2/cancelsilent_1.0")"
 fi
 
 echo ok > "$STUB_MODE_FILE"
@@ -7515,6 +7547,102 @@ then
     pass "completeness_summary passes the three grades through done, /scan and the list, and rejects bad files"
 else
     fail "completeness_summary contract"
+fi
+
+echo "== cancel cleanup: labelled containers, silent commands, folder discard =="
+# remove_labeled_containers asks docker for containers carrying this UI
+# container's owner label (and the run label) and removes exactly those ids; a
+# silent command is stopped by the watcher; a cancelled run's folder goes but
+# files an earlier scan left stay.
+FAKEDOCKER3="$WORK/fakedockerbin3"; mkdir -p "$FAKEDOCKER3"
+FAKE_DOCKER_LOG3="$WORK/fakedocker3.log"; : > "$FAKE_DOCKER_LOG3"
+cat > "$FAKEDOCKER3/docker" <<'STUB'
+#!/usr/bin/env bash
+echo "docker $*" >> "$FAKE_DOCKER_LOG3"
+case "${1:-}" in
+  ps) echo abc123def456; echo 0123456789ab ;;
+esac
+exit 0
+STUB
+chmod +x "$FAKEDOCKER3/docker"
+if SBOM_OUTPUT_DIR="$OUT" PATH="$FAKEDOCKER3:$PATH" FAKE_DOCKER_LOG3="$FAKE_DOCKER_LOG3" \
+   python3 - "$ROOT_DIR" <<'PY'
+import os, sys, time, tempfile
+sys.path.insert(0, os.path.join(sys.argv[1], "docker", "web"))
+import server
+
+log = lambda: open(os.environ["FAKE_DOCKER_LOG3"]).read()
+owner = server.sibling_owner()
+assert owner, "no owner label"
+n = server.remove_labeled_containers("demo_1.0")
+calls = log()
+assert n == 2, n
+assert "docker ps -aq --filter label=bomlens.owner=%s --filter label=bomlens.run=demo_1.0" % owner in calls, calls
+assert "docker rm -f abc123def456 0123456789ab" in calls, calls
+# a run id that is not a plain name never reaches docker
+open(os.environ["FAKE_DOCKER_LOG3"], "w").close()
+assert server.remove_labeled_containers("../x") == 0 and log() == ""
+
+# silent command: cancel turns true after ~1.5 s, nothing is printed; the
+# watcher stops it well before the command's own 30 s.
+t0 = time.monotonic()
+rc = server._stream_cmd(["sh", "-c", "sleep 30"], lambda l: None,
+                        cancel=lambda: time.monotonic() - t0 > 1.5,
+                        container="silent-container")
+assert time.monotonic() - t0 < 10, time.monotonic() - t0
+assert "docker stop -t %d silent-container" % server.CANCEL_GRACE_SECONDS in log(), log()
+
+# folder discard: new entries go, the earlier scan's file stays
+d = tempfile.mkdtemp(prefix="cx_", dir=server.OUTPUT_DIR)
+open(os.path.join(d, "old_bom.json"), "w").write("{}")
+keep = set(os.listdir(d))
+open(os.path.join(d, "new_bom.json"), "w").write("{}")
+os.makedirs(os.path.join(d, "sub"))
+server.discard_cancelled_run(d, keep)
+assert os.listdir(d) == ["old_bom.json"], os.listdir(d)
+os.remove(os.path.join(d, "old_bom.json"))
+open(os.path.join(d, "x.json"), "w").write("{}")
+server.discard_cancelled_run(d, set())
+assert not os.path.exists(d)
+PY
+then
+    pass "cancel cleanup removes labelled containers, stops silent commands, discards only the run's files"
+else
+    fail "cancel cleanup contract"
+fi
+
+# entrypoint.sh stop_sibling: with no id read yet it falls back to the cidfile,
+# then to the container name, and removes the container after stopping it.
+echo "== entrypoint stop_sibling: id, cidfile or name, then rm -f =="
+SS_FN="$WORK/stop_sibling.sh"
+{
+    echo 'BOMLENS_CANCEL_GRACE=7'
+    sed -n '/^SIBLING_CID=""$/,/^}$/p' "$ROOT_DIR/docker/entrypoint.sh"
+} > "$SS_FN"
+ss_ok=1
+for case_ in id cidfile name; do
+    : > "$FAKE_DOCKER_LOG3"
+    CIDF="$WORK/ss.cid"; rm -f "$CIDF"
+    ( export PATH="$FAKEDOCKER3:$PATH" FAKE_DOCKER_LOG3
+      source "$SS_FN"
+      SIBLING_NAME="bomlens-sib-9"
+      case "$case_" in
+        id) SIBLING_CID="cid-from-wait" ;;
+        cidfile) SIBLING_CIDF="$CIDF"; echo "cid-from-file" > "$CIDF" ;;
+        name) SIBLING_CIDF="$CIDF" ;;
+      esac
+      stop_sibling )
+    case "$case_" in
+        id) want="cid-from-wait" ;;
+        cidfile) want="cid-from-file" ;;
+        name) want="bomlens-sib-9" ;;
+    esac
+    grep -q "docker stop -t 7 $want" "$FAKE_DOCKER_LOG3" && grep -q "docker rm -f $want" "$FAKE_DOCKER_LOG3" || { ss_ok=0; echo "$case_: $(cat "$FAKE_DOCKER_LOG3")"; }
+done
+if [ "$ss_ok" = 1 ]; then
+    pass "stop_sibling stops and removes the sibling by id, cidfile or name"
+else
+    fail "stop_sibling fallback"
 fi
 
 # Scan-target path handling has its own No-Docker suite; run it here so the
