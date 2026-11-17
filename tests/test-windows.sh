@@ -743,6 +743,11 @@ N=$((N+1)); LOG="$WORK/docker.$N.log"; : > "$LOG"; OUT="$WORK/out.$N"
   && pass "a visible folder (Korean and a space in the path) passes the preflight and scans" \
   || { fail "a visible folder was refused" "rc=$RC"; show; }
 
+# Git bash on Windows cannot always create links; these two checks need real ones.
+d="$(new_proj linkprobe)"; ln -s ../x "$d/.probe" 2>/dev/null
+if [ ! -L "$d/.probe" ]; then
+  pass "link entry checks skipped: this shell cannot create symbolic links"
+else
 # A first entry that is a link the container cannot follow (dangling, or out of
 # the mount, like .clang-format -> ../tools/...) is still an entry: not refused.
 d="$(new_proj linkfirst)"; printf '{"name":"x","version":"1.0.0"}' > "$d/package.json"
@@ -759,6 +764,7 @@ N=$((N+1)); LOG="$WORK/docker.$N.log"; : > "$LOG"; OUT="$WORK/out.$N"
 { [ "$RC" -eq 1 ] && in_out "SCAN_TARGET_NOT_VISIBLE: the folder to scan is not visible"; } \
   && pass "an unshared folder holding only a link is still refused" \
   || { fail "an unshared folder with only a link was not refused" "rc=$RC"; show; }
+fi
 
 # A result folder the user made beforehand survives a failed run.
 d="$(new_proj premade)"; printf '{"name":"x","version":"1.0.0"}' > "$d/package.json"
