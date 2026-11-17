@@ -4683,10 +4683,12 @@ co_detail=$(jq -r '.checks[] | select(.id=="purl") | .detail' "$WORK/co_conforma
 # SBOM listing only datasets is legitimate to submit. It is not reported as met
 # either: crediting an empty denominator would rank such a document above one that
 # lists packages and is measured on them. Both checks come back not-applicable,
-# which leaves the coverage fractions and never moves the result. A document with
-# no component and nothing declared is only partial (assess-completeness.sh): it
-# conforms, with a warning row that says nothing was found. Only an empty result
-# whose source declares dependencies fails (second assertion below).
+# which leaves the coverage fractions and never moves the result. A scan's
+# document with no component and nothing declared is only partial
+# (assess-completeness.sh): it conforms, with a warning row that says nothing was
+# found. A received SBOM (MODE=ANALYZE, or bomlens:sbom-supplied) with no
+# component fails, as does an empty result whose source declares dependencies
+# (assertions below).
 jq '.components = []' "$FIX/good-cyclonedx.json" > "$WORK/conf-empty.json"
 bash "$LIB/validate-sbom.sh" "$WORK/conf-empty.json" "$WORK/ce" "supplier" >/dev/null 2>&1
 ce=$(jq -r '"\(.result)/\(.checks[]|select(.id=="name-version")|.naKind // "-")/\(.checks[]|select(.id=="purl")|.naKind // "-")"' "$WORK/ce_conformance.json")
@@ -4694,6 +4696,33 @@ ce=$(jq -r '"\(.result)/\(.checks[]|select(.id=="name-version")|.naKind // "-")/
     && jq -e '.checks[] | select(.id == "result-completeness" and .required == false and .status == "warn")' "$WORK/ce_conformance.json" >/dev/null \
     && pass "an SBOM with no components at all is neither uncovered nor credited; it conforms with a completeness warning" \
     || fail "empty SBOM: result/name-version/purl = $ce, expected pass/not-applicable/not-applicable plus a warning row"
+# A supplier's SBOM with no component is a mandatory failure (MODE=ANALYZE reads the
+# input before conversion; the converted document carries bomlens:sbom-supplied).
+MODE=ANALYZE bash "$LIB/validate-sbom.sh" "$WORK/conf-empty.json" "$WORK/cea" "supplier" >/dev/null 2>&1
+{ [ "$(jq -r .result "$WORK/cea_conformance.json")" = "fail" ] \
+    && [ "$(jq -c '[.checks[] | select(.required and .status == "fail") | .id]' "$WORK/cea_conformance.json")" = '["result-completeness"]' ] \
+    && [ "$(jq -r '.reasons[0].code' "$WORK/cea_completeness.json")" = "no-components-supplied" ] \
+    && jq -e '.reasons[0] | (.message.en | length > 0) and (.fix.ko | length > 0)' "$WORK/cea_completeness.json" >/dev/null; } \
+    && pass "a supplier SBOM with no components fails the conformance check with its reason and fix" \
+    || fail "supplier SBOM with no components did not fail as expected"
+jq '.metadata.properties = [{name:"bomlens:sbom-supplied", value:"true"}]' "$WORK/conf-empty.json" > "$WORK/conf-empty-sup.json"
+bash "$LIB/assess-completeness.sh" "$WORK/conf-empty-sup.json" "$WORK/ces" >/dev/null 2>&1
+[ "$(jq -r '.grade + " " + .reasons[0].code' "$WORK/ces_completeness.json")" = "unreliable no-components-supplied" ] \
+    && pass "the bomlens:sbom-supplied property alone makes an empty received SBOM unreliable" \
+    || fail "bomlens:sbom-supplied empty SBOM verdict: $(cat "$WORK/ces_completeness.json" 2>&1)"
+# C/C++ package manager manifests only (vcpkg, Conan) and no component: unreliable, with the C/C++ reason.
+jq '.components = [] | .metadata.properties = [{name:"bomlens:sbom-empty-with-manifests", value:"vcpkg.json, third_party/conanfile.txt"}]' "$FIX/good-cyclonedx.json" > "$WORK/conf-empty-cpp.json"
+bash "$LIB/validate-sbom.sh" "$WORK/conf-empty-cpp.json" "$WORK/cec" "supplier" >/dev/null 2>&1
+{ [ "$(jq -r '.grade + " " + (.reasons | map(.code) | join(","))' "$WORK/cec_completeness.json")" = "unreliable unsupported-build-system" ] \
+    && [ "$(jq -r '.result' "$WORK/cec_conformance.json")" = "fail" ] \
+    && jq -e '.checks[] | select(.id == "result-completeness") | (.missing | join(" ") | test("identify-vendored")) and (.missing_ko | join(" ") | test("sbom-declared"))' "$WORK/cec_conformance.json" >/dev/null; } \
+    && pass "vcpkg and Conan manifests with no component are unreliable and name the C/C++ reason and its alternatives" \
+    || fail "C/C++ manifest-only verdict: $(cat "$WORK/cec_completeness.json" 2>&1)"
+jq '.metadata.properties = [{name:"bomlens:sbom-empty-with-manifests", value:"vcpkg.json, package.json"}]' "$WORK/conf-empty.json" > "$WORK/conf-empty-mix.json"
+bash "$LIB/assess-completeness.sh" "$WORK/conf-empty-mix.json" "$WORK/cem" >/dev/null 2>&1
+[ "$(jq -r '.reasons[0].code' "$WORK/cem_completeness.json")" = "empty-with-manifests" ] \
+    && pass "a C/C++ manifest beside another kind of manifest keeps the general reason" \
+    || fail "mixed manifests verdict: $(cat "$WORK/cem_completeness.json" 2>&1)"
 jq '.components = [] | .metadata.properties = [{name:"bomlens:sbom-empty-with-manifests", value:"package.json"}]' "$FIX/good-cyclonedx.json" > "$WORK/conf-empty-decl.json"
 bash "$LIB/validate-sbom.sh" "$WORK/conf-empty-decl.json" "$WORK/ced" "supplier" >/dev/null 2>&1
 { [ "$(jq -r .result "$WORK/ced_conformance.json")" = "fail" ] \

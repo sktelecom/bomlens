@@ -1969,6 +1969,11 @@ case "$SCAN_MODE" in
         # stamp-yocto-root.sh above); a received SBOM keeps its own authorship.
         if [ "$YOCTO_SBOM" = true ] && [ "$YOCTO_FROM_BUILD" = true ]; then
             run_optional_step docmeta bash "$LIBDIR/stamp-document-metadata.sh" "$OUTPUT_FILE" YOCTO
+        else
+            # A received SBOM: say so on the converted document, so the
+            # completeness verdict (an empty one is unreliable) reads the same
+            # on a copy of it.
+            mark_document_status "$OUTPUT_FILE" "bomlens:sbom-supplied" "true"
         fi
         ;;
 esac
