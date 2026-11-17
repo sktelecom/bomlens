@@ -7,6 +7,10 @@
 # Runs inside the scanner image and drives /usr/local/bin/run-scan.
 #   GET  /                -> index.html (React SPA)
 #   GET  /capabilities    -> {firmware, docker}: which input types are usable here
+#   GET  /android-sdk-status?api=  -> Android SDK image present / terms accepted / buildable
+#   POST /android-sdk-consent      -> record acceptance of Google's Android SDK terms
+#   GET  /android-sdk-build-stream?api= -> SSE: build the SDK image (needs acceptance)
+#   POST /android-sdk-build-cancel?api= -> cancel a running build
 #   GET  /results         -> JSON list of generated artifacts
 #   GET  /download-all    -> zip of every generated artifact
 #   GET  /file?name=...   -> serve one artifact (path-traversal guarded)
@@ -4930,6 +4934,195 @@ _PULL_LOG_TAIL = 4096
 _pull_lock = threading.Lock()
 _pull_active = set()
 
+# ---- Android SDK image: status, consent, build ----
+#
+# An Android (Gradle) source scan resolves transitive dependencies inside an image
+# that carries the Android SDK. The SDK is not open source and its terms bar
+# redistribution, so no such image is published: it is built on the user's own
+# Docker engine, from the recipe in docker/android, after the user accepts Google's
+# terms. The SDK itself is downloaded from Google by that build; nothing of it is
+# shipped here. The recipe directory reaches this server through
+# BOMLENS_ANDROID_BUILD_DIR (the desktop app and the Windows UI launcher mount it
+# read-only); without it the build is reported as unavailable.
+ANDROID_TERMS_URL = "https://developer.android.com/studio/terms"
+ANDROID_ERROR_CODE = "ANDROID_SDK_IMAGE_MISSING"
+ANDROID_TERMS_FILE = "android-sdk-terms.json"
+_ANDROID_API_MIN, _ANDROID_API_MAX = 21, 99
+_ANDROID_PREFIX_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._/-]*")
+_ANDROID_MIRROR_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:/-]*")
+_ANDROID_STEP_RE = re.compile(r"^#\d+ \[(?:[\w-]+ )?(\d+)/(\d+)\]")
+
+# One build per API level at a time; the value is that build's cancel flag.
+_android_build_lock = threading.Lock()
+_android_build_active = {}
+
+
+def _android_api_default():
+    raw = (os.environ.get("ANDROID_API_DEFAULT") or "34").strip()
+    return int(raw) if raw.isascii() and raw.isdigit() and _ANDROID_API_MIN <= int(raw) <= _ANDROID_API_MAX else 34
+
+
+def parse_android_api(raw):
+    """A compileSdk level from a request or a detection result, or None.
+
+    Digits only, in a plausible range: the value becomes part of an image name and
+    a docker build argument. An empty value means the default level."""
+    raw = str(raw if raw is not None else "").strip()
+    if not raw:
+        return _android_api_default()
+    if not (raw.isascii() and raw.isdigit() and len(raw) <= 3):
+        return None
+    n = int(raw)
+    return n if _ANDROID_API_MIN <= n <= _ANDROID_API_MAX else None
+
+
+def android_image_ref(api):
+    """The local image name for one compileSdk level (same rule as the pipeline:
+    ANDROID_IMAGE_PREFIX + level + :latest). None when the prefix is unusable."""
+    prefix = os.environ.get("ANDROID_IMAGE_PREFIX") or "bomlens-android-sdk"
+    if not _ANDROID_PREFIX_RE.fullmatch(prefix):
+        return None
+    ref = "%s%d:latest" % (prefix, api)
+    return ref if _valid_image_ref(ref) else None
+
+
+def _android_state_dir():
+    """Where per-user state lives: the host-persistent guard-state folder when the
+    launcher mounted it, otherwise a hidden folder in the output directory (which
+    is a host folder too)."""
+    override = os.environ.get("BOMLENS_STATE_DIR", "").strip()
+    if override and os.path.isabs(override):
+        return override
+    if os.path.isdir("/bomlens-state"):
+        return "/bomlens-state"
+    return os.path.join(OUTPUT_DIR, ".bomlens")
+
+
+def android_terms_accepted():
+    try:
+        with open(os.path.join(_android_state_dir(), ANDROID_TERMS_FILE), encoding="utf-8") as fh:
+            data = json.load(fh)
+    except (OSError, ValueError):
+        return False
+    return isinstance(data, dict) and data.get("accepted") is True and data.get("termsUrl") == ANDROID_TERMS_URL
+
+
+def record_android_terms_acceptance():
+    """Write the user's acceptance. Returns False when it could not be saved."""
+    d = _android_state_dir()
+    try:
+        os.makedirs(d, exist_ok=True)
+        final = os.path.join(d, ANDROID_TERMS_FILE)
+        tmp = final + ".tmp"
+        with open(tmp, "w", encoding="utf-8") as fh:
+            json.dump({"accepted": True, "termsUrl": ANDROID_TERMS_URL,
+                       "acceptedAt": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")}, fh)
+        os.replace(tmp, final)
+        return True
+    except OSError:
+        return False
+
+
+def android_build_dir():
+    """The mounted recipe directory when it holds a Dockerfile, else ''.
+
+    The value comes from this server's own environment; it is resolved with
+    realpath and must be an absolute path to a real directory."""
+    raw = os.environ.get("BOMLENS_ANDROID_BUILD_DIR", "").strip()
+    if not raw or not os.path.isabs(raw):
+        return ""
+    real = os.path.realpath(raw)
+    return real if os.path.isfile(os.path.join(real, "Dockerfile")) else ""
+
+
+def android_build_available():
+    return bool(android_build_dir()) and docker_cli_present() and docker_capable()
+
+
+def android_status(api):
+    image = android_image_ref(api)
+    present = bool(image) and _sibling_image_present(image)
+    with _android_build_lock:
+        building = api in _android_build_active
+    return {
+        "api": api,
+        "image": image or "",
+        "present": present,
+        "termsAccepted": android_terms_accepted(),
+        "termsUrl": ANDROID_TERMS_URL,
+        "buildAvailable": android_build_available(),
+        "building": building,
+    }
+
+
+def detect_android_source(root):
+    """The compileSdk level when `root` is an Android Gradle project, else None.
+
+    Uses the pipeline's own detection (source-detect.sh) so the early check here
+    and the scan agree. `root` is a directory this server resolved itself."""
+    script = os.path.join(LIB_DIR, "source-detect.sh")
+    if not root or not os.path.isfile(script) or not shutil.which("bash"):
+        return None
+    try:
+        r = subprocess.run(
+            ["bash", "-c", '. "$1"; [ "$(detect_lang "$2")" = android ] && android_api "$2"', "_", script, root],
+            stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, timeout=60)
+    except (OSError, subprocess.SubprocessError):
+        return None
+    if r.returncode != 0:
+        return None
+    return parse_android_api(r.stdout.decode("utf-8", "replace").strip() or None)
+
+
+def build_android_image(api, on_log, on_progress=None, cancel=None):
+    """Build the Android SDK image for one API level. Returns (ok, reason, detail).
+
+    `reason` is None on success, else one of: no-consent, no-build-files, no-docker,
+    busy, cancelled, disk, dns, proxy, auth, build-failed. Refuses without a saved
+    acceptance of Google's terms, so no caller can build by skipping the check."""
+    if not android_terms_accepted():
+        return False, "no-consent", ""
+    image = android_image_ref(api)
+    ctx = android_build_dir()
+    if not image or not ctx:
+        return False, "no-build-files", ""
+    if not (docker_cli_present() and docker_capable()):
+        return False, "no-docker", ""
+    flag = [False]
+    with _android_build_lock:
+        if api in _android_build_active:
+            return False, "busy", ""
+        _android_build_active[api] = flag
+    tail = []
+    try:
+        args = ["docker", "build", "--progress=plain", "--build-arg", "ANDROID_API=%d" % api]
+        mirror = os.environ.get("CDXGEN_IMAGE_PREFIX", "").strip()
+        if mirror and _ANDROID_MIRROR_RE.fullmatch(mirror):
+            args += ["--build-arg", "CDXGEN_IMAGE_PREFIX=%s" % mirror]
+        args += ["-t", image, ctx]
+
+        def line(text):
+            tail.append(text)
+            if sum(len(x) for x in tail) > _PULL_LOG_TAIL:
+                del tail[0]
+            m = _ANDROID_STEP_RE.match(text)
+            if m and on_progress is not None:
+                on_progress({"phase": "build", "step": int(m.group(1)), "steps": int(m.group(2))})
+            on_log(text)
+
+        code = _stream_cmd(args, line, cancel=lambda: flag[0] or bool(cancel and cancel()))
+    finally:
+        with _android_build_lock:
+            _android_build_active.pop(api, None)
+    if flag[0] or (cancel and cancel()):
+        return False, "cancelled", ""
+    if code == 0 and _sibling_image_present(image):
+        return True, None, ""
+    log_tail = "\n".join(tail)
+    reason = classify_pull_failure(log_tail, "exit")
+    return False, ("build-failed" if reason == "unknown" else reason), _scrub_error_text(log_tail[-600:])
+
+
 # Run folders currently being written. Two scans of the same project+version
 # resolve to the same folder, and the artifacts inside are named from
 # project/version rather than from the folder (entrypoint.sh), so the two
@@ -5605,6 +5798,9 @@ class Handler(BaseHTTPRequestHandler):
                 # Gates GET /advisory and /package-advisories: false means those
                 # two return 403 without ever reaching OSV.dev (air-gapped run).
                 "externalLookup": external_lookup_capable(),
+                # Whether this launch can build the Android SDK image (recipe mounted
+                # and a reachable Docker). Per-level state: GET /android-sdk-status.
+                "androidSdkBuild": android_build_available(),
                 "firmwareImage": FIRMWARE_IMAGE,
                 "aibomImage": AIBOM_IMAGE,
                 "deepCveImage": DEEP_CVE_IMAGE,
@@ -5656,6 +5852,14 @@ class Handler(BaseHTTPRequestHandler):
                 self._send(403, json.dumps({"error": "bad origin"}))
                 return
             self._scan_stream(urllib.parse.parse_qs(parsed.query))
+        elif path == "/android-sdk-status":
+            self._android_sdk_status(urllib.parse.parse_qs(parsed.query))
+        elif path == "/android-sdk-build-stream":
+            # Starts a build, so it gets the same Origin check /scan-stream does.
+            if not _origin_allowed(self.headers.get("Origin")):
+                self._send(403, json.dumps({"error": "bad origin"}))
+                return
+            self._android_sdk_build_stream(urllib.parse.parse_qs(parsed.query))
         elif path == "/image-status":
             self._image_status(urllib.parse.parse_qs(parsed.query))
         elif path == "/pull-stream":
@@ -5680,6 +5884,10 @@ class Handler(BaseHTTPRequestHandler):
             self._upload(urllib.parse.parse_qs(parsed.query))
         elif parsed.path == "/git-cred":
             self._git_cred()
+        elif parsed.path == "/android-sdk-consent":
+            self._android_sdk_consent()
+        elif parsed.path == "/android-sdk-build-cancel":
+            self._android_sdk_build_cancel(urllib.parse.parse_qs(parsed.query))
         elif parsed.path == "/scan-delete":
             self._scan_delete(urllib.parse.parse_qs(parsed.query))
         elif parsed.path == "/vex-verdict":
@@ -6502,6 +6710,87 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Content-Length", str(len(body)))
         self.end_headers()
         self.wfile.write(body)
+
+    # ---- Android SDK image (see the block above build_android_image) ----
+    def _android_api_param(self, qs):
+        api = parse_android_api((qs.get("api") or [""])[0])
+        if api is None:
+            self._send(400, json.dumps({"error": "bad api level"}))
+        return api
+
+    def _android_sdk_status(self, qs):
+        api = self._android_api_param(qs)
+        if api is not None:
+            self._send(200, json.dumps(android_status(api)))
+
+    def _android_sdk_consent(self):
+        """Record that the user accepted Google's Android SDK terms. The body must
+        be {"accept": true, "termsUrl": <the terms URL that was shown>}."""
+        try:
+            n = int(self.headers.get("Content-Length") or "0")
+            body = json.loads(self.rfile.read(n).decode("utf-8")) if 0 < n <= 4096 else None
+        except (ValueError, OSError):
+            body = None
+        if not (isinstance(body, dict) and body.get("accept") is True
+                and body.get("termsUrl") == ANDROID_TERMS_URL):
+            self._send(400, json.dumps({"error": "accept must be true and termsUrl must be the shown terms"}))
+            return
+        if not record_android_terms_acceptance():
+            self._send(500, json.dumps({"error": "could not save the acceptance"}))
+            return
+        self._send(200, json.dumps({"termsAccepted": True, "termsUrl": ANDROID_TERMS_URL}))
+
+    def _android_sdk_build_cancel(self, qs):
+        api = self._android_api_param(qs)
+        if api is None:
+            return
+        with _android_build_lock:
+            flag = _android_build_active.get(api)
+            if flag is not None:
+                flag[0] = True
+        self._send(200, json.dumps({"api": api, "cancelling": flag is not None}))
+
+    def _android_sdk_build_stream(self, qs):
+        api = self._android_api_param(qs)
+        if api is None:
+            return
+        # No acceptance on file: refuse before any stream or build starts.
+        if not android_terms_accepted():
+            self._send(403, json.dumps({"error": "terms not accepted", "code": "ANDROID_SDK_TERMS_REQUIRED",
+                                        "termsUrl": ANDROID_TERMS_URL}))
+            return
+        image = android_image_ref(api) or ""
+
+        self.send_response(200)
+        self.send_header("Content-Type", "text/event-stream; charset=utf-8")
+        self.send_header("Cache-Control", "no-cache")
+        self.end_headers()
+        disconnected = [False]
+
+        def sse(event, payload):
+            try:
+                self.wfile.write(("event: %s\ndata: %s\n\n" % (event, payload)).encode("utf-8"))
+                self.wfile.flush()
+            except (BrokenPipeError, ConnectionResetError):
+                disconnected[0] = True
+
+        if image and _sibling_image_present(image):
+            sse("done", json.dumps({"ok": True, "api": api, "image": image, "alreadyPresent": True}))
+            return
+        sse("log", json.dumps("[ui] building %s ..." % image))
+        # Closing the stream cancels the build, like the pull stream.
+        ok, reason, detail = build_android_image(
+            api,
+            lambda ln: sse("log", json.dumps(ln)),
+            on_progress=lambda snap: sse("progress", json.dumps(snap)),
+            cancel=lambda: disconnected[0],
+        )
+        out = {"ok": ok, "api": api, "image": image}
+        if not ok:
+            out["reason"] = reason
+            if detail:
+                out["detail"] = detail
+        sse("done", json.dumps(out))
 
     # ---- per-feature image: status and pull (SSE) ----
     #
@@ -7598,6 +7887,29 @@ class Handler(BaseHTTPRequestHandler):
                 host_root = host_path_of(env["SOURCE_ROOT"])
                 if host_root:
                     env["SOURCE_ROOT_HOST"] = host_root
+
+            # An Android (Gradle) source needs the Android SDK image to resolve its
+            # transitive dependencies; without it the scan would fall back to a
+            # read that finds no components. Stop here with a structured answer the
+            # UI can act on (build the image after the user accepts the terms)
+            # instead of starting a scan that cannot do its job. The pipeline raises
+            # the same code from its own check for runs that do not come through here.
+            if env.get("MODE") == "SOURCE" and env.get("SOURCE_ROOT") and docker_capable():
+                _api = detect_android_source(env["SOURCE_ROOT"])
+                _img = android_image_ref(_api) if _api is not None else None
+                if _img and not _sibling_image_present(_img):
+                    _msg = ("The Android SDK image %s is not installed. It is built on this computer "
+                            "once, after you accept Google's Android SDK terms." % _img)
+                    sse("error", json.dumps({
+                        "detail": _msg, "key": "androidSdkImageMissing", "code": ANDROID_ERROR_CODE,
+                        "consentRequired": not android_terms_accepted(), "api": _api, "image": _img,
+                        "termsUrl": ANDROID_TERMS_URL, "buildAvailable": android_build_available(),
+                    }))
+                    record_outcome(False, _msg)
+                    sse("done", json.dumps({"ok": False, "id": run_id, "results": list_results(run_id),
+                                            "sbom": None, "security": None, "conformance": None,
+                                            "code": ANDROID_ERROR_CODE}))
+                    return
 
             # The model lookup belongs to the source scan only: any other mode
             # neither passes the flag nor records the setting as on.
