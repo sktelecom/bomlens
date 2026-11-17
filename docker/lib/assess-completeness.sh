@@ -32,7 +32,7 @@
 #                                                 so the property alone is not enough)
 #   bomlens:sbom-empty-with-manifests             (empty-with-manifests, or
 #                                                 unsupported-build-system when every
-#                                                 manifest is a vcpkg or Conan one)
+#                                                 manifest is a vcpkg, Conan or CMake FetchContent one)
 #   bomlens:sbom-tool-degraded                    (tool-degraded)
 #   bomlens:pipeline-step-failed, for the steps that resolve dependencies
 #                                                 (resolution-failed)
@@ -101,7 +101,7 @@ if ! jq --arg mode "${MODE:-}" --slurpfile reg "$REGISTRY" "$(cat "$COVERAGE")"'
   | ((.metadata.component.type // "") | IN("machine-learning-model", "data")) as $model_root
   | ((prop("bomlens:sbom-supplied") | first // "") == "true" or $mode == "ANALYZE") as $supplied
   | ($empty != null and ($empty | split(",") | map(gsub("^\\s+|\\s+$"; "") | split("/") | last)
-        | all(.[]; test("^(vcpkg\\.json|conanfile\\.(txt|py))$")))) as $cpp_only
+        | all(.[]; test("^(vcpkg\\.json|conanfile\\.(txt|py)|CMakeLists\\.txt)$")))) as $cpp_only
   | ([
       (if ($comps | length) == 0 and ($empty == null) and ($model_root | not)
          then {code: (if $supplied then "no-components-supplied" else "no-components" end), detail: ""} else empty end),

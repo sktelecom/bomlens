@@ -374,6 +374,21 @@ source_manifests() {
         [ "$n" -ge "$max" ] && break
     done < <(find "$dir" \( -type d \( "${prune[@]}" \) -prune \) -o -type f -print 2>/dev/null \
              | grep -E "$NON_SHIPPED_MANIFEST_RE" | LC_ALL=C sort)
+    # A CMakeLists.txt that fetches a dependency (FetchContent_Declare) declares
+    # one too. Kept out of NON_SHIPPED_MANIFEST_RE on purpose: that expression is
+    # shared with the fingerprint and the non-shipped folder rules, and every
+    # CMake project has a CMakeLists.txt.
+    if [ "$n" -lt "$max" ]; then
+        while IFS= read -r f; do
+            [ -n "$f" ] || continue
+            grep -qi 'FetchContent_Declare' "$f" 2>/dev/null || continue
+            rel="${f#"$dir"/}"
+            out="$out, $rel"
+            n=$((n + 1))
+            [ "$n" -ge "$max" ] && break
+        done < <(find "$dir" \( -type d \( "${prune[@]}" \) -prune \) -o -type f -name CMakeLists.txt -print 2>/dev/null \
+                 | LC_ALL=C sort)
+    fi
     printf '%s' "${out#, }"
 }
 
