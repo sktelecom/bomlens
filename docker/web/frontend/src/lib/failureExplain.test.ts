@@ -3,12 +3,14 @@
 
 import { describe, expect, it } from "vitest";
 
-import { explainFailure } from "./failureExplain";
+import { explainFailure, failureKeyForCode } from "./failureExplain";
 
 describe("explainFailure", () => {
   it("uses the server's classification first", () => {
     expect(explainFailure([], "x", "run.errorGitNotFoundOrPrivate").causeKey).toBe("run.failGitPrivateCause");
     expect(explainFailure([], "x", "run.errorGitNetwork").fixKey).toBe("run.failGitNetworkFix");
+    expect(explainFailure([], "x", failureKeyForCode("SCAN_TARGET_NOT_VISIBLE")).causeKey).toBe("run.failTargetHiddenCause");
+    expect(failureKeyForCode("OTHER")).toBeUndefined();
   });
 
   it("names the tool and runtime behind exit code 126", () => {

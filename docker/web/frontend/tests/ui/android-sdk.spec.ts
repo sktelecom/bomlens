@@ -139,11 +139,46 @@ test("skipping ends the scan with an explanation and builds nothing", async ({ p
   expect(calls.scans).toBe(1);
 });
 
-test("terms already on file start the build without asking", async ({ page }) => {
+test("terms already on file ask for a start click before any build", async ({ page }) => {
   const calls = await setup(page, { first: missing({ consentRequired: false }) });
-  await expect.poll(() => calls.build).toBe(1);
+  const dialog = page.getByTestId("android-sdk-dialog");
+  await expect(page.getByTestId("android-sdk-confirm")).toContainText("takes time");
+  await expect(page.getByTestId("android-sdk-confirm")).not.toContainText(/\d\s*(GB|minute|min)/i);
+  await page.waitForTimeout(300);
+  expect(calls.build).toBe(0);
   expect(calls.consent).toBe(0);
+  await page.getByRole("button", { name: "Start the build" }).click();
+  await expect(dialog).toHaveCount(0);
+  expect(calls.build).toBe(1);
   await expect.poll(() => calls.scans).toBe(2);
+});
+
+test("the confirm step can be skipped and builds nothing", async ({ page }) => {
+  const calls = await setup(page, { first: missing({ consentRequired: false }) });
+  await expect(page.getByTestId("android-sdk-confirm")).toBeVisible();
+  await page.getByRole("button", { name: "Skip for now" }).click();
+  await expect(page.getByTestId("android-sdk-dialog")).toHaveCount(0);
+  expect(calls.build).toBe(0);
+  expect(calls.scans).toBe(1);
+});
+
+test("focus starts on skip, so Enter does not accept the terms", async ({ page }) => {
+  const calls = await setup(page);
+  await expect(page.getByTestId("android-sdk-dialog")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Skip for now" })).toBeFocused();
+  await page.keyboard.press("Enter");
+  await expect(page.getByTestId("android-sdk-dialog")).toHaveCount(0);
+  expect(calls.consent).toBe(0);
+  expect(calls.build).toBe(0);
+});
+
+test("pressing accept twice opens one build stream", async ({ page }) => {
+  const calls = await setup(page);
+  const accept = page.getByRole("button", { name: "Accept the terms and prepare now" });
+  await accept.dblclick();
+  await expect(page.getByTestId("android-sdk-dialog")).toHaveCount(0);
+  expect(calls.consent).toBe(1);
+  expect(calls.build).toBe(1);
 });
 
 test("a failed build names the reason and shows the detail", async ({ page }) => {
@@ -165,10 +200,29 @@ test("a server that cannot build shows the command instead of a build button", a
   const calls = await setup(page, { first: missing({ buildAvailable: false }) });
   await expect(page.getByTestId("android-sdk-manual")).toBeVisible();
   await expect(page.getByTestId("android-sdk-command")).toHaveText(
-    "docker build --build-arg ANDROID_API=34 -t bomlens-android-sdk34 docker/android",
+    "docker build --build-arg ANDROID_API=34 -t bomlens-android-sdk34 https://github.com/sktelecom/bomlens.git#<release-tag>:docker/android",
   );
   await expect(page.getByRole("button", { name: "Accept the terms and prepare now" })).toHaveCount(0);
   expect(calls.build).toBe(0);
+});
+
+test("the manual command is pinned to the release the server reports", async ({ page }) => {
+  await setup(page, { first: missing({ buildAvailable: false }), capabilities: { version: "1.15.0" } });
+  await expect(page.getByTestId("android-sdk-command")).toHaveText(
+    "docker build --build-arg ANDROID_API=34 -t bomlens-android-sdk34 https://github.com/sktelecom/bomlens.git#v1.15.0:docker/android",
+  );
+});
+
+test("the unreadable-folder code shows plain guidance instead of the generic failure", async ({ page }) => {
+  await setup(page, {
+    first: sse([
+      ["error", { detail: "SCAN_TARGET_NOT_VISIBLE: the folder is empty inside the scanner container: /x", key: null, code: "SCAN_TARGET_NOT_VISIBLE" }],
+      ["done", { ok: false, id: "demo_1.0", results: [], sbom: null, security: null, conformance: null, errorCode: "SCAN_TARGET_NOT_VISIBLE" }],
+    ]),
+  });
+  const failed = page.getByTestId("run-failed");
+  await expect(failed).toContainText("cannot see the folder you selected");
+  await expect(failed).toContainText("Colima");
 });
 
 test("capabilities without androidSdkBuild also hide the build button", async ({ page }) => {

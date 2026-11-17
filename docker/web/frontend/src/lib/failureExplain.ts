@@ -17,6 +17,12 @@ export interface FailureExplanation {
   recognised: boolean;
 }
 
+/** The i18n key a machine-readable failure code is explained by, or undefined
+ *  for a code this screen has no wording for. */
+export function failureKeyForCode(code: string | undefined): string | undefined {
+  return code === "SCAN_TARGET_NOT_VISIBLE" ? "run.errorTargetNotVisible" : undefined;
+}
+
 const TOOLS = /\b(cdxgen|syft|trivy|grype)\b/gi;
 /** Lines before the exit line that still belong to the same failing command. */
 const NEAR = 4;
@@ -48,6 +54,9 @@ export function explainFailure(
   }
   if (key === "run.errorGitNetwork") {
     return { causeKey: "run.failGitNetworkCause", fixKey: "run.failGitNetworkFix", vars: {}, recognised: true };
+  }
+  if (key === "run.errorTargetNotVisible") {
+    return { causeKey: "run.failTargetHiddenCause", fixKey: "run.failTargetHiddenFix", vars: {}, recognised: true };
   }
   // A key this screen does not know: the server's own wording is the cause.
   if (key) return { causeKey: key, fixKey: "run.failGenericFix", vars: {}, recognised: false };

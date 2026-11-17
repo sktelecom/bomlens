@@ -755,12 +755,24 @@ export interface ScanConfig {
 }
 
 export const ANDROID_SDK_IMAGE_MISSING = "ANDROID_SDK_IMAGE_MISSING";
+/** The folder picked for a scan is empty inside the scanner container (the
+ *  container engine does not share it). */
+export const SCAN_TARGET_NOT_VISIBLE = "SCAN_TARGET_NOT_VISIBLE";
+
+/** The machine-readable failure code of a scan event. The server names the field
+ *  `code`; `errorCode` is the older spelling it can still send, so both are read
+ *  and `code` wins. */
+export function errorCodeOf(e: { code?: string | null; errorCode?: string | null } | null | undefined): string | undefined {
+  return e?.code || e?.errorCode || undefined;
+}
 
 export interface DoneEvent {
   ok: boolean;
   /** Machine-readable failure code, when the server has one
    *  (`ANDROID_SDK_IMAGE_MISSING`: the scan was not started). */
   code?: string;
+  /** Older spelling of `code`; read through `errorCodeOf`. */
+  errorCode?: string | null;
   mode?: string;
   /** The run_id (run-folder name) for this scan — used for re-opening
    *  (`loadScan`), the `#/scan/<id>` hash route, and every later /file,
@@ -1085,6 +1097,8 @@ export function pullImage(key: PullImageKey, handlers: PullHandlers): () => void
 /** Extra fields a structured scan `error` event can carry. */
 export interface ScanErrorExtra {
   code?: string;
+  /** Older spelling of `code`; read through `errorCodeOf`. */
+  errorCode?: string | null;
   /** The user has not accepted the Android SDK terms yet. */
   consentRequired?: boolean;
   api?: number;
@@ -1150,11 +1164,15 @@ export interface AndroidSdkBuildHandlers {
 }
 
 /** Build the Android SDK image on this machine. Returns a stop function: closing
- *  the stream cancels the build on the server. A refused stream (403, terms not
- *  accepted) surfaces as a `no-consent` failure, as the browser gives no body. */
+ *  the stream cancels the build on the server. The browser gives an EventSource
+ *  no status or body, so a refused stream (403, terms not accepted) looks the
+ *  same as a dropped connection. When the stream fails without a `done`, the
+ *  status endpoint is asked: terms not on file means `no-consent`, anything else
+ *  is a lost `connection`. */
 export function buildAndroidSdkImage(api: number, handlers: AndroidSdkBuildHandlers): () => void {
   const es = new EventSource(apiUrl(`/android-sdk-build-stream?api=${encodeURIComponent(String(api))}`));
   let finished = false;
+  let stopped = false;
   es.addEventListener("log", (e) => {
     try {
       handlers.onLog?.(String(JSON.parse((e as MessageEvent).data)));
@@ -1185,9 +1203,18 @@ export function buildAndroidSdkImage(api: number, handlers: AndroidSdkBuildHandl
       finish({ ok: false, reason: "unknown" });
     }
   });
-  es.onerror = () => finish({ ok: false, reason: finished ? "unknown" : "connection" });
+  es.onerror = () => {
+    // After a `done` (or a stop) the close is expected.
+    if (finished) return;
+    finished = true;
+    es.close();
+    void fetchAndroidSdkStatus(api).then((s) => {
+      if (!stopped) handlers.onDone({ ok: false, reason: s && !s.termsAccepted ? "no-consent" : "connection" });
+    });
+  };
   return () => {
     finished = true;
+    stopped = true;
     es.close();
   };
 }
@@ -1949,6 +1976,8 @@ export function startScan(params: ScanParams, handlers: ScanHandlers): EventSour
     try {
       const parsed = JSON.parse(data) as { detail?: string; key?: string | null } & ScanErrorExtra;
       const { detail: _detail, key: _key, ...extra } = parsed;
+      const code = errorCodeOf(extra);
+      if (code) extra.code = code;
       handlers.onError(parsed.detail, parsed.key ?? null, Object.keys(extra).length ? extra : undefined);
     } catch {
       handlers.onError(String(data));

@@ -25,6 +25,7 @@ import { ScanRunning } from "./ScanRunning";
 import { ConfirmDialog } from "./ui/dialog";
 import {
   ANDROID_SDK_IMAGE_MISSING,
+  errorCodeOf,
   deleteScan,
   downloadAllUrl,
   fileUrl,
@@ -39,6 +40,7 @@ import {
   type ScanParams,
   type Severity,
 } from "@/lib/api";
+import { failureKeyForCode } from "@/lib/failureExplain";
 import { androidSdkNeed, canReplayScan, type AndroidSdkNeed } from "@/lib/androidSdk";
 import { conformanceReports } from "@/lib/conformance";
 import { IS_STATIC_DEMO } from "@/lib/demo";
@@ -554,7 +556,10 @@ export function NextApp() {
       onDone: (done) => {
         streamRef.current = null;
         // The scan was not started; the dialog already has the answer.
-        if (done.code === ANDROID_SDK_IMAGE_MISSING) return;
+        const doneCode = errorCodeOf(done);
+        if (doneCode === ANDROID_SDK_IMAGE_MISSING) return;
+        const hiddenKey = failureKeyForCode(doneCode);
+        if (hiddenKey) setScanErrorKey((k) => k ?? hiddenKey);
         setResult(done);
         setStatus(done.ok ? "done" : "error");
         void refreshRecent(); // the finished scan is now in history
@@ -579,7 +584,7 @@ export function NextApp() {
         if (message) {
           setLogs((prev) => [...prev, `✖ ${message}`]);
           setScanError(message);
-          setScanErrorKey(key ?? null);
+          setScanErrorKey(key ?? failureKeyForCode(errorCodeOf(extra)) ?? null);
         }
         setStatus((s) => (s === "running" ? "error" : s));
       },
@@ -878,6 +883,7 @@ export function NextApp() {
           <AndroidSdkDialog
             need={androidNeed}
             capabilityBuild={capabilities.androidSdkBuild}
+            version={capabilities.version}
             onReady={androidReady}
             onSkip={androidSkip}
           />

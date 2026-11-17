@@ -46,6 +46,7 @@ const STEP_LABEL_KEY: Record<string, string> = {
   "gradle-packages": "pipelineSteps.gradlePackages",
   "maven-dependency-tree": "pipelineSteps.mavenDependencyTree",
   "maven-dependency-jars": "pipelineSteps.mavenDependencyJars",
+  "maven-dependency-resolve": "pipelineSteps.mavenDependencyResolve",
   "android-release-classpath": "pipelineSteps.androidReleaseClasspath",
   "swift-package-resolve": "pipelineSteps.swiftPackageResolve",
   "npm-production-set": "pipelineSteps.npmProductionSet",
