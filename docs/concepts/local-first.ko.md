@@ -6,7 +6,7 @@ description: BomLens가 왜 로컬에서 동작하도록 설계됐는지, 무엇
 
 ## 분석 대상은 기기 밖으로 나가지 않습니다
 
-BomLens는 SaaS 없이 로컬에서 동작합니다. 분석 대상인 소스 코드, 펌웨어, 전달받은 SBOM은 기본적으로 외부 서비스로 전송되지 않습니다. 스캔은 로컬 Docker 컨테이너 안에서 끝나며, 산출물도 실행한 디렉터리에만 남습니다. 파일에 관한 정보를 내보내는 옵션은 `--identify-vendored` 하나입니다. 파일 원본이 아니라 파일 지문(해시)만 SCANOSS OSSKB 서비스로 보내며, 직접 켜지 않으면 동작하지 않습니다. 무엇이 전송되는지와 자체 엔드포인트를 지정하는 방법은 [내장 오픈소스 식별 (C/C++)](../guides/identify-vendored.ko.md)에 설명돼 있습니다.
+BomLens는 SaaS 없이 로컬에서 동작합니다. 소스 코드, 펌웨어, SBOM, 스캔 결과를 이 프로젝트의 서버로 보내지 않으며 텔레메트리도 없습니다. 스캔은 로컬 Docker 컨테이너 안에서 끝나며, 산출물은 실행한 디렉터리에만 남습니다. 다만 기본으로 공개 서비스에 하는 요청이 있습니다. ghcr.io에서 스캐너 이미지 내려받기, 보안 보고서를 위한 Trivy 취약점 데이터베이스 내려받기, 찾은 CVE 식별자를 FIRST.org(EPSS)와 CISA(KEV)에 조회하기, 그리고 데스크톱 앱이 GitHub releases API로 새 버전 확인하기입니다. 이 요청에는 소스 코드나 SBOM이 담기지 않습니다. osv.dev에 묻는 웹 UI의 CVE·패키지 조회는 누군가 그 화면을 쓸 때만 동작합니다. 컴포넌트 식별자를 보내는 옵션은 직접 켜지 않으면 동작하지 않습니다. `--identify-vendored`는 파일 원본이 아니라 파일 지문(해시)만 SCANOSS OSSKB 서비스로 보내고, `--license-registry`와 `--resolve-purl`은 패키지 식별자를 deps.dev로 보냅니다. 첫 옵션이 무엇을 보내는지와 자체 엔드포인트를 지정하는 방법은 [내장 오픈소스 식별 (C/C++)](../guides/identify-vendored.ko.md)에, 모든 요청의 목록은 [코드 서명 정책](../reference/code-signing-policy.ko.md)에 있습니다.
 
 ## 폐쇄망과 오프라인에서 쓸 수 있습니다
 
