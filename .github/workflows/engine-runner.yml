@@ -1,7 +1,8 @@
 # The engine runner (runner/): the Python package other programs use to run
-# the scan engine on Kubernetes.
+# the scan engine on Kubernetes or Docker.
 #
 #   unit: its own tests on the oldest and a current Python, no cluster.
+#   package: the build release.yml publishes to PyPI, with a made-up release.
 #   kind: the image built from this commit, scanned through the runner on
 #         the runner's Docker daemon (tests/test-engine-runner-docker.sh)
 #         and on a kind cluster (tests/test-engine-runner-kind.sh).
@@ -22,6 +23,7 @@ on:
       - "tests/test-engine-runner-kind.sh"
       - "tests/test-engine-runner-docker.sh"
       - ".github/workflows/engine-runner.yml"
+      - ".github/workflows/release.yml"
   workflow_dispatch:
 
 concurrency:
@@ -52,6 +54,26 @@ jobs:
       - name: Run unit tests
         working-directory: runner/tests
         run: python -m unittest -v
+
+  package:
+    name: Runner package build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: "3.12"
+      # What release.yml's publish-runner builds, with a made-up release.
+      - name: Build and install the package as a release would
+        run: |
+          digest="sha256:$(printf '%064d' 0)"
+          bash runner/tools/build.sh 0.0.1 "ghcr.io/sktelecom/bomlens:0.0.1@$digest" \
+            "ghcr.io/sktelecom/bomlens-deep-license:0.0.1@$digest" "ghcr.io/sktelecom/bomlens-deep-cve:0.0.1@$digest"
 
   kind:
     name: Runner on Docker and a kind cluster
