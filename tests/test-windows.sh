@@ -1928,6 +1928,8 @@ gate_case "--fail-on: no result from the scan exits 5, never 0" 5 "produced no r
 
 gate_case "--fail-on: empty-result met exits 4 and states the count" 4 "--fail-on empty-result: the scan found 0 components" \
   "met${TAB}empty-result${TAB}the scan found 0 components\n" --fail-on empty-result
+gate_case "--fail-on: incomplete-result met exits 4 and states the grade" 4 "--fail-on incomplete-result: the result is partial (lockfile-missing)" \
+  "met${TAB}incomplete-result${TAB}the result is partial (lockfile-missing)\n" --fail-on incomplete-result
 gate_case "--fail-on: license-coverage met exits 4 and shows the measured value" 4 "0% (1/157)" \
   "met${TAB}license-coverage=80${TAB}license coverage is 0% (1/157), below 80%\n" --fail-on license-coverage=80
 gate_case "--fail-on: license-coverage ok exits 0" 0 "none is met" \

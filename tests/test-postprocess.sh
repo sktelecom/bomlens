@@ -13170,6 +13170,19 @@ jq '.components[2].properties = [{"name":"bomlens:licenseConflict","value":"unkn
 bash "$LIB/evaluate-gate.sh" "$GATEDIR/unk.json" "$GATEDIR/unk" license-conflict >/dev/null 2>&1
 grep -q "^ok.*1 component(s) could not be assessed" "$GATEDIR/unk_gate.result" \
     && pass "components whose verdict is unknown are counted in the detail" || fail "unknown license verdicts were not reported" "$(cat "$GATEDIR/unk_gate.result")"
+# incomplete-result reads the completeness verdict assess-completeness.sh wrote.
+printf '%s' '{"grade":"partial","reasons":[{"code":"lockfile-missing"}]}' > "$GATEDIR/icp_completeness.json"
+printf '%s' '{"grade":"unreliable","reasons":[{"code":"lockfile-corrupt"}]}' > "$GATEDIR/icu_completeness.json"
+printf '%s' '{"grade":"complete","reasons":[]}' > "$GATEDIR/icc_completeness.json"
+printf '%s' 'not json' > "$GATEDIR/icx_completeness.json"
+[ "$(gate_status icp clean.json incomplete-result incomplete-result)" = "met" ] \
+    && [ "$(gate_status icp clean.json incomplete-result=unreliable incomplete-result=unreliable)" = "ok" ] \
+    && [ "$(gate_status icu clean.json incomplete-result=unreliable incomplete-result=unreliable)" = "met" ] \
+    && [ "$(gate_status icc clean.json incomplete-result incomplete-result)" = "ok" ] \
+    && [ "$(gate_status icx clean.json incomplete-result incomplete-result)" = "unjudged" ] \
+    && [ "$(gate_status icn clean.json incomplete-result incomplete-result)" = "unjudged" ] \
+    && pass "incomplete-result is met for partial and unreliable, =unreliable only for unreliable, unjudged without a readable verdict" \
+    || fail "incomplete-result judged wrongly" "$(cat "$GATEDIR/icp_gate.result" "$GATEDIR/icu_gate.result" 2>&1)"
 # empty-result and license-coverage read the measurements validate-sbom.sh wrote.
 # A well-formed document that lists nothing (metadata present, no components).
 cat > "$GATEDIR/qe.json" <<'JSON'
@@ -13315,7 +13328,8 @@ cat > "$SUMDIR/a.json" <<'JSON'
 JSON
 bash "$LIB/validate-sbom.sh" "$SUMDIR/a.json" "$SUMDIR/a" P >/dev/null 2>&1
 sum_want=$(printf 'components\t3\nlicensed\t1\nlicensePercent\t33\npurlPercent\t66\nreduced\tsyft fallback\nfailedSteps\tpip-install, composer-install\n')
-[ "$(cat "$SUMDIR/a_summary.result" 2>/dev/null)" = "$sum_want" ] \
+[ "$(head -n 6 "$SUMDIR/a_summary.result" 2>/dev/null)" = "$sum_want" ] \
+    && grep -q "^completeness	partial" "$SUMDIR/a_summary.result" \
     && jq -e '.softwareComponentCount == 3 and .licenseCoverage.declared == 1 and .licenseCoverage.pct == 33' "$SUMDIR/a_conformance.json" >/dev/null \
     && pass "the sidecar carries the same counts as the conformance report, plus the purl share, the reduced analysis and the failed steps" \
     || fail "the summary sidecar differs from the conformance report" "$(cat "$SUMDIR/a_summary.result" 2>&1)"
@@ -13323,9 +13337,17 @@ cat > "$SUMDIR/e.json" <<'JSON'
 {"bomFormat":"CycloneDX","specVersion":"1.6","version":1,"metadata":{"component":{"type":"application","name":"app","version":"1"}},"components":[]}
 JSON
 bash "$LIB/validate-sbom.sh" "$SUMDIR/e.json" "$SUMDIR/e" P >/dev/null 2>&1
-[ "$(cat "$SUMDIR/e_summary.result" 2>/dev/null)" = "$(printf 'components\t0\nlicensed\t0\nlicensePercent\t-\npurlPercent\t-')" ] \
+[ "$(head -n 4 "$SUMDIR/e_summary.result" 2>/dev/null)" = "$(printf 'components\t0\nlicensed\t0\nlicensePercent\t-\npurlPercent\t-')" ] \
     && pass "an empty result is written as zero components with no percentages" \
     || fail "the empty-result sidecar is wrong" "$(cat "$SUMDIR/e_summary.result" 2>&1)"
+
+# An incomplete result (a supplied SBOM with no component) adds its grade, reason codes
+# and one fix sentence per reason to the sidecar; a complete one adds nothing.
+grep -q "^completeness	" "$SUMDIR/e_summary.result" \
+    && grep -q "^completenessReasons	no-components" "$SUMDIR/e_summary.result" \
+    && grep -q "^completenessFix	no-components	" "$SUMDIR/e_summary.result" \
+    && pass "the summary sidecar carries the completeness grade, reason codes and fix" \
+    || fail "the completeness keys are missing from the summary sidecar" "$(cat "$SUMDIR/e_summary.result" 2>&1)"
 
 # The purl share counts the same package set as the conformance report's purl check:
 # a data component is not a package and is left out of the denominator.

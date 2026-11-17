@@ -62,6 +62,14 @@
 #         when there is nothing to measure (no such components); an empty result is
 #         what empty-result is for.
 #
+#     incomplete-result
+#         the result is not complete: the completeness verdict
+#         (assess-completeness.sh, <out_prefix>_completeness.json) grades it
+#         partial or unreliable. Unjudged when that file is missing or unreadable.
+#     incomplete-result=unreliable
+#         the same, but only for the grade unreliable (the source declares
+#         dependencies the scan did not resolve, or a received SBOM lists none).
+#
 # The result file is written in one piece and holds exactly one line per
 # condition asked for, so a reader can tell a complete judgement from a cut-off
 # one.
@@ -73,6 +81,7 @@ RESULT="${OUT_PREFIX}_gate.result"
 PARTIAL="${RESULT}.tmp.$$"
 SECURITY="${OUT_PREFIX}_security.json"
 CONFORMANCE="${OUT_PREFIX}_conformance.json"
+COMPLETENESS="${OUT_PREFIX}_completeness.json"
 
 if [ -z "$SBOM" ] || [ -z "$OUT_PREFIX" ] || [ ! -f "$SBOM" ]; then
     echo "[gate] usage: evaluate-gate.sh <sbom.json> <out_prefix> <conditions>" >&2
@@ -273,6 +282,26 @@ judge_license_coverage() { # <cond> <pct>
     fi
 }
 
+judge_incomplete_result() { # <cond> <any|unreliable>
+    local cond="$1" level="$2" grade codes
+    if [ ! -f "$COMPLETENESS" ]; then
+        emit unjudged "$cond" "no completeness verdict was produced for this scan"; return
+    fi
+    grade="$(jq -r '.grade // empty' "$COMPLETENESS" 2>/dev/null)"
+    case "$grade" in
+        complete|partial|unreliable) ;;
+        *) emit unjudged "$cond" "the completeness verdict could not be read"; return ;;
+    esac
+    codes="$(jq -r '[ .reasons[]?.code ] | join(", ")' "$COMPLETENESS" 2>/dev/null)"
+    if [ "$grade" = "complete" ]; then
+        emit ok "$cond" "the result is complete"
+    elif [ "$level" = "unreliable" ] && [ "$grade" != "unreliable" ]; then
+        emit ok "$cond" "the result is $grade (${codes}), not unreliable"
+    else
+        emit met "$cond" "the result is $grade (${codes})"
+    fi
+}
+
 IFS=',' read -r -a WANTED <<< "$CONDITIONS"
 for cond in "${WANTED[@]}"; do
     [ -n "$cond" ] || continue
@@ -281,6 +310,8 @@ for cond in "${WANTED[@]}"; do
         malicious-package) judge_malicious "$cond" ;;
         license-conflict)  judge_license_conflict "$cond" ;;
         empty-result)      judge_empty_result "$cond" ;;
+        incomplete-result)  judge_incomplete_result "$cond" any ;;
+        incomplete-result=unreliable) judge_incomplete_result "$cond" unreliable ;;
         license-coverage=*) judge_license_coverage "$cond" "${cond#license-coverage=}" ;;
         *) emit unjudged "$cond" "not a known condition" ;;
     esac
