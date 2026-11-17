@@ -7244,6 +7244,199 @@ PY
 sweep_wiring_check 6 scans
 sweep_wiring_check 7 upload
 
+echo "== Android SDK image: status, consent gate, build stream, scan preflight (fake docker) =="
+# A stand-in `docker` on PATH: `image inspect` succeeds only for a name whose marker
+# file exists; `build` prints step lines, then marks the -t name as present, fails
+# (when fakedocker/fail exists) or runs long (when fakedocker/slow exists) so cancel can be tried.
+AND_PORT="$((PORT + 20))"
+AND_BASE="http://127.0.0.1:${AND_PORT}"
+FAKE="$WORK/fakedocker"; mkdir -p "$FAKE/bin" "$FAKE/images" "$WORK/android-recipe" "$WORK/android-state" "$WORK/android-out"
+echo "FROM scratch" > "$WORK/android-recipe/Dockerfile"
+: > "$WORK/fake.sock"
+cat > "$FAKE/bin/docker" <<'FAKEDOCKER'
+#!/bin/bash
+F="$(dirname "$0")/.."
+case "$1" in
+  image) [ -e "$F/images/${3//[\/:]/_}" ]; exit $? ;;
+  build)
+    echo "$*" > "$F/build.args"
+    tgt=""; prev=""
+    for a in "$@"; do [ "$prev" = "-t" ] && tgt="$a"; prev="$a"; done
+    if [ -e "$F/slow" ]; then
+      for i in $(seq 1 100); do echo "#1 [1/2] still working $i"; sleep 0.2; done
+      exit 0
+    fi
+    echo "#1 [1/2] FROM base"; echo "#2 [2/2] RUN sdkmanager"
+    if [ -e "$F/fail" ]; then echo "dial tcp: lookup dl.google.com: no such host"; exit 1; fi
+    : > "$F/images/${tgt//[\/:]/_}"; exit 0 ;;
+esac
+exit 0
+FAKEDOCKER
+chmod +x "$FAKE/bin/docker"
+# An Android project in a git repo: the scan-stream preflight reads it as source.
+ANDREPO="$WORK/android-repo"
+mkdir -p "$ANDREPO/app/src/main"
+printf 'plugins { id("com.android.application") }\nandroid { compileSdk = 35 }\n' > "$ANDREPO/app/build.gradle.kts"
+cp "$ANDREPO/app/build.gradle.kts" "$ANDREPO/build.gradle.kts"
+echo "rootProject.name = \"demo\"" > "$ANDREPO/settings.gradle.kts"
+git init -q "$ANDREPO" && git -C "$ANDREPO" add -A && git -C "$ANDREPO" -c user.email=t@t -c user.name=t commit -q -m android
+
+PATH="$FAKE/bin:$PATH" SBOM_OUTPUT_DIR="$WORK/android-out" UI_PORT="$AND_PORT" SBOM_DOCKER_SOCK="$WORK/fake.sock" \
+    BOMLENS_ANDROID_BUILD_DIR="$WORK/android-recipe" BOMLENS_STATE_DIR="$WORK/android-state" \
+    python3 "$SERVER" > "$WORK/server-android.log" 2>&1 &
+AND_PID=$!
+disown "$AND_PID" 2>/dev/null || true
+and_ready=0
+for _ in $(seq 1 30); do
+    if curl -fsS "$AND_BASE/capabilities" >/dev/null 2>&1; then and_ready=1; break; fi
+    kill -0 "$AND_PID" 2>/dev/null || break
+    sleep 0.3
+done
+if [ "$and_ready" != 1 ]; then
+    fail "android-feature server did not start" "$(tail -5 "$WORK/server-android.log")"
+else
+    and_json() { python3 -c "import sys,json;d=json.load(sys.stdin);print($1)"; }
+    and_sse() { # $1=url -> JSON array of events
+        curl -sN "$1" | python3 -c '
+import sys, json
+events, ev, data = [], None, []
+for line in sys.stdin:
+    line = line.rstrip("\n")
+    if line.startswith("event: "): ev = line[7:]
+    elif line.startswith("data: "): data.append(line[6:])
+    elif line == "" and ev is not None:
+        events.append({"event": ev, "data": json.loads("\n".join(data)) if data else None}); ev, data = None, []
+print(json.dumps(events))'
+    }
+
+    st=$(curl -fsS "$AND_BASE/android-sdk-status?api=34")
+    [ "$(echo "$st" | and_json "d['present'],d['termsAccepted'],d['buildAvailable'],d['image'],d['termsUrl']")" = "False False True bomlens-android-sdk34:latest https://developer.android.com/studio/terms" ] \
+        && pass "android-sdk-status: image absent, terms not accepted, build available, image name and terms URL reported" \
+        || fail "android-sdk-status shape" "$st"
+    [ "$(curl -fsS "$AND_BASE/capabilities" | and_json "d['androidSdkBuild']")" = "True" ] \
+        && pass "capabilities reports androidSdkBuild when the recipe and Docker are reachable" || fail "capabilities androidSdkBuild"
+    # The api level is a request value that ends up in an image name and a build argument.
+    badok=1
+    for bad in abc "../x" 5 100 "34;id" "3 4"; do
+        c=$(curl -s -o /dev/null -w '%{http_code}' -G --data-urlencode "api=$bad" "$AND_BASE/android-sdk-status")
+        [ "$c" = "400" ] || { badok=0; echo "        api=$bad -> $c"; }
+    done
+    [ "$badok" = 1 ] && pass "android-sdk-status rejects non-numeric and out-of-range api levels (400)" || fail "api level validation"
+
+    # No consent on file: the build is refused before a stream or docker call exists.
+    c=$(curl -s -o "$WORK/and-403" -w '%{http_code}' "$AND_BASE/android-sdk-build-stream?api=34")
+    if [ "$c" = "403" ] && [ "$(and_json "d['code']" < "$WORK/and-403")" = "ANDROID_SDK_TERMS_REQUIRED" ] && [ ! -e "$FAKE/build.args" ]; then
+        pass "build is refused (403 ANDROID_SDK_TERMS_REQUIRED) without accepted terms, and docker is never called"
+    else
+        fail "build without consent was not refused" "HTTP $c $(cat "$WORK/and-403")"
+    fi
+
+    # Scan preflight: Android source + no image -> structured error, consent still needed.
+    ev=$(and_sse "$AND_BASE/scan-stream?project=andpre&version=1.0&source=git-url&target=file://$ANDREPO")
+    if echo "$ev" | python3 -c "
+import sys, json
+evs = json.load(sys.stdin)
+e = [x for x in evs if x['event'] == 'error'][0]['data']
+assert e['code'] == 'ANDROID_SDK_IMAGE_MISSING' and e['consentRequired'] is True, e
+assert e['api'] == 35 and e['image'] == 'bomlens-android-sdk35:latest' and e['buildAvailable'] is True, e
+d = [x for x in evs if x['event'] == 'done'][0]['data']
+assert d['ok'] is False and d['code'] == 'ANDROID_SDK_IMAGE_MISSING', d
+"; then
+        pass "an Android source scan without the SDK image returns ANDROID_SDK_IMAGE_MISSING with consentRequired and the detected API level"
+    else
+        fail "scan preflight for a missing Android SDK image" "$ev"
+    fi
+
+    # Consent: the body must accept and name the terms that were shown.
+    c1=$(curl -s -o /dev/null -w '%{http_code}' -X POST -d '{"accept":false,"termsUrl":"https://developer.android.com/studio/terms"}' "$AND_BASE/android-sdk-consent")
+    c2=$(curl -s -o /dev/null -w '%{http_code}' -X POST -d '{"accept":true,"termsUrl":"https://example.com/other"}' "$AND_BASE/android-sdk-consent")
+    c3=$(curl -s -o /dev/null -w '%{http_code}' -X POST -d 'not json' "$AND_BASE/android-sdk-consent")
+    c4=$(curl -s -o /dev/null -w '%{http_code}' -X POST -H "Origin: http://evil.example" -d '{"accept":true,"termsUrl":"https://developer.android.com/studio/terms"}' "$AND_BASE/android-sdk-consent")
+    if [ "$c1$c2$c3$c4" = "400400400403" ] && [ ! -e "$WORK/android-state/android-sdk-terms.json" ]; then
+        pass "consent is refused for accept:false, a different terms URL, a bad body and a cross-site Origin; nothing is recorded"
+    else
+        fail "consent validation" "$c1 $c2 $c3 $c4"
+    fi
+    c=$(curl -s -o /dev/null -w '%{http_code}' -H "Origin: http://evil.example" "$AND_BASE/android-sdk-build-stream?api=34")
+    [ "$c" = "403" ] && pass "a cross-site Origin on the build stream is rejected" || fail "build stream Origin check" "HTTP $c"
+
+    r=$(curl -s -X POST -d '{"accept":true,"termsUrl":"https://developer.android.com/studio/terms"}' "$AND_BASE/android-sdk-consent")
+    if [ "$(echo "$r" | and_json "d['termsAccepted']")" = "True" ] \
+        && python3 -c "import json;d=json.load(open('$WORK/android-state/android-sdk-terms.json'));assert d['accepted'] is True and d['acceptedAt']" \
+        && [ "$(curl -fsS "$AND_BASE/android-sdk-status?api=34" | and_json "d['termsAccepted']")" = "True" ]; then
+        pass "accepting the terms is recorded in the state directory and status then reports it"
+    else
+        fail "consent recording" "$r"
+    fi
+    ev=$(and_sse "$AND_BASE/scan-stream?project=andpre2&version=1.0&source=git-url&target=file://$ANDREPO")
+    [ "$(echo "$ev" | python3 -c "import sys,json;print([x for x in json.load(sys.stdin) if x['event']=='error'][0]['data']['consentRequired'])")" = "False" ] \
+        && pass "after consent the preflight error reports consentRequired:false (build can start)" || fail "consentRequired after consent" "$ev"
+
+    # Build: progress, done ok, the docker arguments, and the status afterwards.
+    ev=$(and_sse "$AND_BASE/android-sdk-build-stream?api=34")
+    if echo "$ev" | python3 -c "
+import sys, json
+evs = json.load(sys.stdin)
+assert any(e['event'] == 'progress' and e['data'] == {'phase': 'build', 'step': 1, 'steps': 2} for e in evs), evs
+d = [e for e in evs if e['event'] == 'done'][0]['data']
+assert d['ok'] is True and d['api'] == 34 and d['image'] == 'bomlens-android-sdk34:latest', d
+" && grep -q -- "--build-arg ANDROID_API=34" "$FAKE/build.args" \
+   && grep -q -- "-t bomlens-android-sdk34:latest .*android-recipe" "$FAKE/build.args"; then
+        pass "the build stream emits progress and done ok, and builds with ANDROID_API, the image tag and the injected recipe directory"
+    else
+        fail "build stream" "$ev $(cat "$FAKE/build.args" 2>/dev/null)"
+    fi
+    [ "$(curl -fsS "$AND_BASE/android-sdk-status?api=34" | and_json "d['present']")" = "True" ] \
+        && pass "status reports the image present after the build" || fail "status after build"
+    ev=$(and_sse "$AND_BASE/android-sdk-build-stream?api=34")
+    [ "$(echo "$ev" | python3 -c "import sys,json;d=[e for e in json.load(sys.stdin) if e['event']=='done'][0]['data'];print(d['ok'],d.get('alreadyPresent'))")" = "True True" ] \
+        && pass "building an image that already exists answers alreadyPresent without rebuilding" || fail "alreadyPresent" "$ev"
+
+    # Failure: the reason is classified.
+    : > "$FAKE/fail"
+    ev=$(and_sse "$AND_BASE/android-sdk-build-stream?api=33")
+    [ "$(echo "$ev" | python3 -c "import sys,json;d=[e for e in json.load(sys.stdin) if e['event']=='done'][0]['data'];print(d['ok'],d['reason'])")" = "False dns" ] \
+        && pass "a failed build reports done ok:false with a classified reason" || fail "build failure reason" "$ev"
+    rm -f "$FAKE/fail"
+
+    # Cancel: POST cancel stops a running build and the stream ends with reason cancelled.
+    : > "$FAKE/slow"; rm -f "$FAKE/build.args"
+    and_sse "$AND_BASE/android-sdk-build-stream?api=32" > "$WORK/and-cancel.json" &
+    CAN_PID=$!
+    for _ in $(seq 1 30); do [ -e "$FAKE/build.args" ] && break; sleep 0.2; done
+    cr=$(curl -s -X POST "$AND_BASE/android-sdk-build-cancel?api=32")
+    wait "$CAN_PID" 2>/dev/null
+    rm -f "$FAKE/slow"
+    if [ "$(echo "$cr" | and_json "d['cancelling']")" = "True" ] \
+        && [ "$(python3 -c "import json;d=[e for e in json.load(open('$WORK/and-cancel.json')) if e['event']=='done'][0]['data'];print(d['ok'],d['reason'])")" = "False cancelled" ]; then
+        pass "cancel stops a running build; the stream ends with reason cancelled"
+    else
+        fail "build cancel" "$cr $(cat "$WORK/and-cancel.json" 2>/dev/null)"
+    fi
+    [ "$(curl -s -X POST "$AND_BASE/android-sdk-build-cancel?api=32" | and_json "d['cancelling']")" = "False" ] \
+        && pass "cancel with no build running reports cancelling:false" || fail "idle cancel"
+fi
+kill "$AND_PID" 2>/dev/null
+
+# The recipe directory is this server's own setting: a relative or Dockerfile-less value gives no build.
+bd=$(cd "$WORK" && SBOM_OUTPUT_DIR="$WORK/android-out" BOMLENS_ANDROID_BUILD_DIR="android-recipe" python3 -I -c "
+import sys; sys.path.insert(0, '$ROOT_DIR/docker/web')
+import server; print(repr(server.android_build_dir()))" 2>&1)
+bd2=$(SBOM_OUTPUT_DIR="$WORK/android-out" BOMLENS_ANDROID_BUILD_DIR="$WORK/nowhere" python3 -I -c "
+import sys; sys.path.insert(0, '$ROOT_DIR/docker/web')
+import server; print(repr(server.android_build_dir()))" 2>&1)
+[ "$bd $bd2" = "'' ''" ] && pass "a relative or Dockerfile-less BOMLENS_ANDROID_BUILD_DIR is not used as a build context" \
+    || fail "android build dir validation" "$bd $bd2"
+# build_android_image refuses on its own, whatever the caller did.
+nb=$(SBOM_OUTPUT_DIR="$WORK/android-out" BOMLENS_STATE_DIR="$WORK/android-state" python3 -I -c "
+import sys; sys.path.insert(0, '$ROOT_DIR/docker/web')
+import server; print(server.build_android_image(34, lambda l: None))" 2>&1)
+[ "$nb" = "(False, 'no-build-files', '')" ] && pass "build_android_image refuses when no recipe directory is injected" || fail "no-build-files" "$nb"
+nc=$(SBOM_OUTPUT_DIR="$WORK/android-out" BOMLENS_STATE_DIR="$WORK/none" BOMLENS_ANDROID_BUILD_DIR="$WORK/android-recipe" python3 -I -c "
+import sys; sys.path.insert(0, '$ROOT_DIR/docker/web')
+import server; print(server.build_android_image(34, lambda l: None))" 2>&1)
+[ "$nc" = "(False, 'no-consent', '')" ] && pass "build_android_image refuses without recorded consent" || fail "no-consent" "$nc"
+
 echo ""
 echo "Results: ${PASS} passed, ${FAIL} failed"
 [ "$FAIL" -eq 0 ]
