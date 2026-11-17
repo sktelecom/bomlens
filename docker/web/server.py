@@ -5078,7 +5078,7 @@ def build_android_image(api, on_log, on_progress=None, cancel=None):
     """Build the Android SDK image for one API level. Returns (ok, reason, detail).
 
     `reason` is None on success, else one of: no-consent, no-build-files, no-docker,
-    busy, cancelled, disk, dns, proxy, auth, build-failed. Refuses without a saved
+    busy, cancelled, sdk-install, disk, dns, proxy, auth, build-failed. Refuses without a saved
     acceptance of Google's terms, so no caller can build by skipping the check."""
     if not android_terms_accepted():
         return False, "no-consent", ""
@@ -5119,7 +5119,9 @@ def build_android_image(api, on_log, on_progress=None, cancel=None):
     if code == 0 and _sibling_image_present(image):
         return True, None, ""
     log_tail = "\n".join(tail)
-    reason = classify_pull_failure(log_tail, "exit")
+    # The Dockerfile names its own SDK-install failure; it wins over the network
+    # classes, since the same log can also hold a lookup error for the cause.
+    reason = "sdk-install" if "sdk-install:" in log_tail else classify_pull_failure(log_tail, "exit")
     return False, ("build-failed" if reason == "unknown" else reason), _scrub_error_text(log_tail[-600:])
 
 
