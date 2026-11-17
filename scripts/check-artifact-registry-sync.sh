@@ -75,6 +75,7 @@ _source.json            :: yes :: yes :: _source\.json
 _input.json             :: yes :: yes :: _input\.json
 _yocto_vex.json         :: yes :: yes :: _yocto_vex\.json
 _security_epss.json     :: yes :: yes :: _security_epss\.json
+_completeness.json      :: no  :: yes :: skip
 _vendored.cdx.json      :: yes :: yes :: _vendored\.cdx\.json
 _ai-profile.json        :: yes :: yes :: _ai-profile
 _ai-profile.md          :: yes :: yes :: _ai-profile

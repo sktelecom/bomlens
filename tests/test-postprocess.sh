@@ -4683,13 +4683,16 @@ co_detail=$(jq -r '.checks[] | select(.id=="purl") | .detail' "$WORK/co_conforma
 # SBOM listing only datasets is legitimate to submit. It is not reported as met
 # either: crediting an empty denominator would rank such a document above one that
 # lists packages and is measured on them. Both checks come back not-applicable,
-# which leaves the coverage fractions and never moves the result.
+# which leaves the coverage fractions. The result is a separate matter: an SBOM
+# with no component is an unreliable result (assess-completeness.sh), so the
+# result-completeness row, and only that row, fails it.
 jq '.components = []' "$FIX/good-cyclonedx.json" > "$WORK/conf-empty.json"
 bash "$LIB/validate-sbom.sh" "$WORK/conf-empty.json" "$WORK/ce" "supplier" >/dev/null 2>&1
 ce=$(jq -r '"\(.result)/\(.checks[]|select(.id=="name-version")|.naKind // "-")/\(.checks[]|select(.id=="purl")|.naKind // "-")"' "$WORK/ce_conformance.json")
-[ "$ce" = "pass/not-applicable/not-applicable" ] \
-    && pass "an SBOM with no components at all is neither uncovered nor credited" \
-    || fail "empty SBOM: result/name-version/purl = $ce, expected pass/not-applicable/not-applicable"
+[ "$ce" = "fail/not-applicable/not-applicable" ] \
+    && [ "$(jq -c '[.checks[] | select(.required and .status == "fail") | .id]' "$WORK/ce_conformance.json")" = '["result-completeness"]' ] \
+    && pass "an SBOM with no components at all is neither uncovered nor credited, and does not pass as a result" \
+    || fail "empty SBOM: result/name-version/purl = $ce, expected fail/not-applicable/not-applicable (failing only result-completeness)"
 ce_detail=$(jq -r '.checks[] | select(.id=="purl") | .detail' "$WORK/ce_conformance.json")
 [ "$ce_detail" = "no packages to measure" ] \
     && pass "the empty-denominator case says why it cannot be measured" || fail "empty detail: '$ce_detail'"
@@ -13183,10 +13186,13 @@ jq '.emptyResult = "no" | .licenseCoverage = {declared:"x",total:"y"}' "$GATEDIR
     && [ "$(gate_status junk qc.json empty-result empty-result)" = "unjudged" ] \
     && [ "$(gate_status junk qc.json license-coverage=80 license-coverage=80)" = "unjudged" ] \
     && pass "an unreadable report, or one with a missing or non-boolean signal, is unjudged" || fail "a broken conformance report was judged"
-# The signals are their own fields: the empty document keeps whatever verdict the checks give it.
-[ "$(cat "$GATEDIR/qe_conformance.result")" = "pass" ] && [ "$(jq -r .result "$GATEDIR/qe_conformance.json")" = "pass" ] \
+# The signals are their own fields: emptyResult is read by the empty-result gate
+# whatever the checks say. The empty document no longer conforms, though: its
+# result is unreliable (no component), so the result-completeness row fails it.
+[ "$(cat "$GATEDIR/qe_conformance.result")" = "fail" ] && [ "$(jq -r .result "$GATEDIR/qe_conformance.json")" = "fail" ] \
     && jq -e '.emptyResult == true and .softwareComponentCount == 0 and .licenseCoverage.pct == null' "$GATEDIR/qe_conformance.json" >/dev/null \
-    && pass "an empty but well-formed document still conforms; emptyResult is a separate field" || fail "the empty document's conformance or signal is wrong" "$(cat "$GATEDIR/qe_conformance.result")"
+    && jq -e '[.checks[] | select(.required and .status == "fail") | .id] == ["result-completeness"]' "$GATEDIR/qe_conformance.json" >/dev/null \
+    && pass "an empty document does not conform (only the result-completeness row fails); emptyResult is a separate field" || fail "the empty document's conformance or signal is wrong" "$(cat "$GATEDIR/qe_conformance.result")"
 # SPDX-JSON and Tag-Value carry the same measurements.
 cat > "$GATEDIR/qs.json" <<'JSON'
 {"spdxVersion":"SPDX-2.3","packages":[{"name":"a","licenseConcluded":"none","licenseDeclared":"NOASSERTION"},{"name":"b","licenseDeclared":"Apache-2.0"}]}
@@ -14814,6 +14820,226 @@ while IFS= read -r line; do
   case "$line" in PASS:*) pass "${line#PASS: }" ;; FAIL:*) fail "${line#FAIL: }" ;; esac
 done <<< "$SELF_OUT"
 rm -rf "$GS"
+
+echo "== completeness: an empty or partial result is said so in every report, never as 'no vulnerabilities' =="
+# The security, risk and NOTICE reports and the conformance check read one verdict
+# (assess-completeness.sh -> <prefix>_completeness.json: complete, partial or
+# unreliable, with reasons). Five inputs the scan cannot resolve, each driven
+# through the real scripts with a stand-in trivy that finds nothing: an empty
+# project with a package.json, a damaged Package.resolved, a Podfile without a
+# Podfile.lock, a Maven dependency that cannot be downloaded, and a CocoaPods-only
+# project (no vulnerability source covers it). Component names are made up so
+# no scanner on the PATH finds anything real in them.
+CPD="$WORK/completeness"
+mkdir -p "$CPD/bin"
+cat > "$CPD/bin/trivy" <<'SH'
+#!/bin/sh
+out=""
+while [ $# -gt 0 ]; do case "$1" in --output) out="$2"; shift ;; esac; shift; done
+echo '{"SchemaVersion":2,"Results":[]}' > "$out"
+SH
+chmod +x "$CPD/bin/trivy"
+cp_bom() {  # <case> <properties json array> <components json array>
+    mkdir -p "$CPD/$1/src"
+    jq -n --argjson p "$2" --argjson c "$3" '{bomFormat:"CycloneDX", specVersion:"1.6", version:1,
+        metadata:{timestamp:"2026-01-01T00:00:00Z", tools:{components:[{type:"application",name:"cdxgen"}]},
+                  component:{type:"application",name:"proj",version:"1.0"}, properties:$p},
+        components:$c}' > "$CPD/$1/proj_1.0_bom.json"
+}
+cp_lib() { printf '{"type":"library","name":"%s","version":"%s","purl":"%s","bom-ref":"%s"}' "$1" "$2" "$3" "$3"; }
+cp_run() {  # <case> [lang]: detect the lock state of src/, then every report
+    ( cd "$CPD/$1" || exit
+      export PATH="$CPD/bin:$PATH" SECURITY_ENRICH=false DEEP_CVE=false REPORT_LANG="${2:-en}"
+      bash "$LIB/detect-lockfile-state.sh" src proj_1.0_bom.json >/dev/null 2>&1
+      bash "$LIB/scan-security.sh" proj_1.0_bom.json proj_1.0 proj >/dev/null 2>&1
+      bash "$LIB/generate-notice.sh" proj_1.0_bom.json proj_1.0 proj >/dev/null 2>&1
+      bash "$LIB/validate-sbom.sh" proj_1.0_bom.json proj_1.0 proj >/dev/null 2>&1
+      bash "$LIB/generate-risk-report.sh" proj_1.0 proj SOURCE >/dev/null 2>&1 )
+}
+# Control: a complete result keeps the clean sentence and carries no notice.
+cp_bom ok '[]' "[$(cp_lib zz-demo-lib 1.0.0 pkg:npm/zz-demo-lib@1.0.0)]"
+printf '{"name":"x","dependencies":{"zz-demo-lib":"1.0.0"}}' > "$CPD/ok/src/package.json"
+printf '{"lockfileVersion":3,"packages":{}}' > "$CPD/ok/src/package-lock.json"
+cp_run ok
+[ "$(jq -r '.grade' "$CPD/ok/proj_1.0_completeness.json" 2>/dev/null)" = "complete" ] \
+    && pass "completeness: a project whose lock file is read and whose result is whole is complete" \
+    || fail "completeness: the control case is not complete" "$(cat "$CPD/ok/proj_1.0_completeness.json" 2>&1)"
+{ grep -q "No known vulnerabilities found" "$CPD/ok/proj_1.0_security.md" \
+    && ! grep -q "Result completeness" "$CPD/ok/proj_1.0_security.md" "$CPD/ok/proj_1.0_risk-report.md" "$CPD/ok/proj_1.0_NOTICE.txt" \
+    && ! jq -e '.checks[] | select(.id == "result-completeness")' "$CPD/ok/proj_1.0_conformance.json" >/dev/null 2>&1; } \
+    && pass "completeness: a complete result is reported as before (clean sentence, no notice, no extra check row)" \
+    || fail "completeness: the complete control case changed"
+
+# <case> <grade> <comma-separated reason codes>
+cp_check() {
+    local c="$1" want_grade="$2" want_codes="$3" d="$CPD/$1"
+    local got
+    got="$(jq -r '[.grade, (.reasons | map(.code) | join(","))] | join(" ")' "$d/proj_1.0_completeness.json" 2>/dev/null)"
+    [ "$got" = "$want_grade $want_codes" ] \
+        && pass "completeness/$c: graded $want_grade with the reasons $want_codes" \
+        || fail "completeness/$c: got [$got], expected [$want_grade $want_codes]"
+    # Each reason carries a code and an English and a Korean sentence, plus the fix.
+    jq -e '.reasons | length > 0 and all(.[]; (.code | length) > 0 and (.message.en | length) > 0 and (.message.ko | length) > 0 and (.fix.en | length) > 0 and (.fix.ko | length) > 0)' \
+        "$d/proj_1.0_completeness.json" >/dev/null 2>&1 \
+        && pass "completeness/$c: every reason has a code, a sentence pair and a fix pair" \
+        || fail "completeness/$c: a reason lacks its code, sentences or fix"
+    local f
+    for f in proj_1.0_security.md proj_1.0_security.html proj_1.0_risk-report.md proj_1.0_risk-report.html proj_1.0_NOTICE.txt proj_1.0_NOTICE.html; do
+        grep -q "Result completeness" "$d/$f" \
+            && pass "completeness/$c: $f states the result completeness" \
+            || fail "completeness/$c: $f does not state the result completeness"
+        grep -q "No known vulnerabilities" "$d/$f" \
+            && fail "completeness/$c: $f still says no known vulnerabilities" \
+            || pass "completeness/$c: $f does not claim that no vulnerabilities exist"
+    done
+    local first
+    first="$(jq -r '.reasons[0].message.en' "$d/proj_1.0_completeness.json" | cut -c1-40)"
+    grep -qF "$first" "$d/proj_1.0_security.md" && grep -q "How to fix" "$d/proj_1.0_risk-report.md" \
+        && pass "completeness/$c: the reports give the reason and how to fix it" \
+        || fail "completeness/$c: the reason or its fix is missing from the reports"
+}
+
+# 1. an empty project with a package.json (cdxgen could not run)
+cp_bom empty-npm '[{"name":"bomlens:sbom-tool-degraded","value":"cdxgen-unavailable"},{"name":"bomlens:sbom-empty-with-manifests","value":"package.json"}]' '[]'
+printf '{"name":"x","dependencies":{"left-pad":"^1.0.0"}}' > "$CPD/empty-npm/src/package.json"
+cp_run empty-npm
+cp_check empty-npm unreliable "empty-with-manifests,tool-degraded"
+[ "$(cat "$CPD/empty-npm/proj_1.0_conformance.result")" = "fail" ] \
+    && jq -e '.checks[] | select(.id == "result-completeness" and .required == true and .status == "fail")' "$CPD/empty-npm/proj_1.0_conformance.json" >/dev/null 2>&1 \
+    && pass "completeness/empty-npm: the conformance check fails instead of passing" \
+    || fail "completeness/empty-npm: the conformance check still passes" "$(cat "$CPD/empty-npm/proj_1.0_conformance.result")"
+! grep -q "remediation plan" "$CPD/empty-npm/proj_1.0_risk-report.md" \
+    && pass "completeness/empty-npm: no remediation plan is asked for when there is no result" \
+    || fail "completeness/empty-npm: the risk report still asks for a remediation plan"
+# The same project with no signal on the SBOM at all: zero components is itself the reason.
+cp_bom empty-bare '[]' '[]'
+cp_run empty-bare
+cp_check empty-bare unreliable "no-components"
+
+# 2. a damaged Package.resolved (the SBOM is empty although the source declares packages)
+cp_bom broken-resolved '[{"name":"bomlens:sbom-empty-with-manifests","value":"Package.swift, Package.resolved"}]' '[]'
+printf '// swift-tools-version:5.5\nlet p = [.package(url: "https://example.invalid/a.git", from: "1.0.0")]\n' > "$CPD/broken-resolved/src/Package.swift"
+printf '{ "pins": [ {' > "$CPD/broken-resolved/src/Package.resolved"
+cp_run broken-resolved
+cp_check broken-resolved unreliable "empty-with-manifests,lockfile-corrupt"
+jq -e '[.metadata.properties[] | select(.name == "bomlens:lockfile-corrupt" and (.value | startswith("Package.resolved")))] | length == 1' \
+    "$CPD/broken-resolved/proj_1.0_bom.json" >/dev/null 2>&1 \
+    && pass "completeness/broken-resolved: the damaged lock file is recorded on the SBOM" \
+    || fail "completeness/broken-resolved: bomlens:lockfile-corrupt was not recorded"
+
+# 3. a Podfile with no Podfile.lock (only a gem was found)
+cp_bom podfile-nolock '[]' "[$(cp_lib zz-demo-gem 1.0.0 pkg:gem/zz-demo-gem@1.0.0)]"
+printf "source 'https://cdn.cocoapods.org'\npod 'ZzDemoPod'\n" > "$CPD/podfile-nolock/src/Podfile"
+cp_run podfile-nolock
+cp_check podfile-nolock partial "lockfile-missing"
+jq -e '[.metadata.properties[] | select(.name == "bomlens:lockfile-missing" and (.value | startswith("Podfile")))] | length == 1' \
+    "$CPD/podfile-nolock/proj_1.0_bom.json" >/dev/null 2>&1 \
+    && pass "completeness/podfile-nolock: the missing lock file is recorded on the SBOM" \
+    || fail "completeness/podfile-nolock: bomlens:lockfile-missing was not recorded"
+jq -e '.checks[] | select(.id == "result-completeness" and .required == false and .status == "warn")' "$CPD/podfile-nolock/proj_1.0_conformance.json" >/dev/null 2>&1 \
+    && pass "completeness/podfile-nolock: a partial result is a warning row, not a failure" \
+    || fail "completeness/podfile-nolock: the conformance row is not a warning"
+
+# 4. a Maven dependency that cannot be downloaded
+cp_bom maven-unresolved '[{"name":"bomlens:pipeline-step-failed","value":"maven-dependency-resolve"}]' \
+    "[$(cp_lib zz-demo-core 6.1.0 pkg:maven/org.example/zz-demo-core@6.1.0),$(cp_lib zz-internal-auth 9.9.9 pkg:maven/com.example.internal/zz-internal-auth@9.9.9)]"
+cp_run maven-unresolved
+cp_check maven-unresolved partial "resolution-failed"
+grep -q "maven-dependency-resolve" "$CPD/maven-unresolved/proj_1.0_risk-report.md" \
+    && pass "completeness/maven-unresolved: the report names the failed resolution step" \
+    || fail "completeness/maven-unresolved: the failed step is not named"
+
+# 5. a CocoaPods-only project: no vulnerability source covers the pods
+cp_bom cocoapods-only '[]' "[$(cp_lib ZzDemoPod 4.6.0 pkg:cocoapods/ZzDemoPod@4.6.0),$(cp_lib ZzOtherPod 3.8.2 pkg:cocoapods/ZzOtherPod@3.8.2)]"
+printf "source 'https://cdn.cocoapods.org'\npod 'ZzDemoPod'\n" > "$CPD/cocoapods-only/src/Podfile"
+printf "PODS:\n  - ZzDemoPod (4.6.0)\n  - ZzOtherPod (3.8.2)\n" > "$CPD/cocoapods-only/src/Podfile.lock"
+cp_run cocoapods-only
+cp_check cocoapods-only partial "unchecked-ecosystem"
+[ "$(jq -r '[.UncheckedComponents.Components[] | select(.Reason == "unsupported-ecosystem")] | length' "$CPD/cocoapods-only/proj_1.0_security.json")" = "2" ] \
+    && [ "$(jq -r '.uncheckedEcosystems[0] | "\(.ecosystem) \(.count)"' "$CPD/cocoapods-only/proj_1.0_completeness.json")" = "cocoapods 2" ] \
+    && pass "completeness/cocoapods-only: the two pods are counted as unchecked, with the ecosystem named" \
+    || fail "completeness/cocoapods-only: the unchecked count or ecosystem is wrong"
+grep -q "package ecosystem with no vulnerability data source" "$CPD/cocoapods-only/proj_1.0_security.md" \
+    && grep -q "package ecosystem with no vulnerability data source" "$CPD/cocoapods-only/proj_1.0_security.html" \
+    && grep -q "package ecosystem with no vulnerability data source" "$CPD/cocoapods-only/proj_1.0_risk-report.md" \
+    && pass "completeness/cocoapods-only: the reports give the reason the pods were not checked" \
+    || fail "completeness/cocoapods-only: the unchecked reason is missing from a report"
+
+# Korean: the reports use the Korean sentence pair and drop the clean sentence.
+cp_run empty-npm ko
+{ grep -q "결과 완전성" "$CPD/empty-npm/proj_1.0_risk-report.md" "$CPD/empty-npm/proj_1.0_risk-report.html" "$CPD/empty-npm/proj_1.0_security.html" \
+    && grep -q "해결 방법" "$CPD/empty-npm/proj_1.0_risk-report.md" \
+    && ! grep -q "알려진 취약점이 없" "$CPD/empty-npm/proj_1.0_risk-report.md" "$CPD/empty-npm/proj_1.0_risk-report.html" "$CPD/empty-npm/proj_1.0_security.html"; } \
+    && pass "completeness/ko: the Korean reports state the result completeness and do not say no vulnerabilities" \
+    || fail "completeness/ko: a Korean report lacks the notice or still claims no vulnerabilities"
+
+# The detector leaves a tree alone when nothing is wrong, and is idempotent.
+cp "$CPD/ok/proj_1.0_bom.json" "$CPD/ok-before.json"
+bash "$LIB/detect-lockfile-state.sh" "$CPD/ok/src" "$CPD/ok/proj_1.0_bom.json" >/dev/null 2>&1
+cmp -s "$CPD/ok-before.json" "$CPD/ok/proj_1.0_bom.json" \
+    && pass "completeness: a tree with its lock files in place leaves the SBOM untouched" \
+    || fail "completeness: the lock-file detector changed an SBOM with nothing to record"
+cp "$CPD/podfile-nolock/proj_1.0_bom.json" "$CPD/pn-once.json"
+bash "$LIB/detect-lockfile-state.sh" "$CPD/podfile-nolock/src" "$CPD/podfile-nolock/proj_1.0_bom.json" >/dev/null 2>&1
+cmp -s "$CPD/pn-once.json" "$CPD/podfile-nolock/proj_1.0_bom.json" \
+    && pass "completeness: running the lock-file detector twice records the property once" \
+    || fail "completeness: the lock-file detector is not idempotent"
+
+# A document that is not CycloneDX gets no verdict (the reports then say nothing about it).
+printf '{"spdxVersion":"SPDX-2.3","SPDXID":"SPDXRef-DOCUMENT","name":"x","packages":[]}' > "$CPD/spdx.json"
+bash "$LIB/assess-completeness.sh" "$CPD/spdx.json" "$CPD/spdx" >/dev/null 2>&1
+[ ! -f "$CPD/spdx_completeness.json" ] \
+    && pass "completeness: an SPDX document is not graded" \
+    || fail "completeness: an SPDX document was graded"
+# Text from the document is cut to one short line before it reaches a report.
+cp_bom hostile '[{"name":"bomlens:sbom-tool-degraded","value":"x\u001b[31m<script>"}]' "[$(cp_lib zz-demo-lib 1.0.0 pkg:npm/zz-demo-lib@1.0.0)]"
+bash "$LIB/assess-completeness.sh" "$CPD/hostile/proj_1.0_bom.json" "$CPD/hostile/proj_1.0" >/dev/null 2>&1
+# shellcheck disable=SC2034  # read by report_completeness_html, sourced below
+( . "$LIB/report-common.sh"; REPORT_LANG=en; COMPLETENESS_FILE="$CPD/hostile/proj_1.0_completeness.json"
+  COMPLETENESS_GRADE=partial; report_completeness_html ) > "$CPD/hostile.html" 2>/dev/null
+{ ! grep -q $'\033' "$CPD/hostile/proj_1.0_completeness.json" && ! grep -q "<script>" "$CPD/hostile.html" && grep -q "&lt;script&gt;" "$CPD/hostile.html"; } \
+    && pass "completeness: control characters are removed and markup is escaped in the notice" \
+    || fail "completeness: untrusted text reached the notice as it was"
+# A source that states version ranges without a lock file (detect-version-pinning.sh) is a missing lock file.
+jq '.metadata.component.properties = [{name:"bomlens:source:versionPinning", value:"unpinned"}]' "$CPD/ok/proj_1.0_bom.json" > "$CPD/unpinned.json"
+bash "$LIB/assess-completeness.sh" "$CPD/unpinned.json" "$CPD/unpinned" >/dev/null 2>&1
+[ "$(jq -r '[.grade, (.reasons | map(.code) | join(","))] | join(" ")' "$CPD/unpinned_completeness.json" 2>/dev/null)" = "partial lockfile-missing" ] \
+    && pass "completeness: bomlens:source:versionPinning=unpinned is read as a missing lock file" \
+    || fail "completeness: the unpinned source is not graded partial"
+
+# The Maven jar-fetch step records an unresolvable dependency whatever else it fetched.
+if [ -n "${_mh_block:-}" ]; then
+    cat > "$WORK/mh-bin/mvn" <<'STUB'
+#!/bin/sh
+args=""
+for a in "$@"; do
+    case "$a" in
+        -DoutputFile=*) [ -z "$MH_LIST" ] || printf '%s\n' "$MH_LIST" >> "${a#-DoutputFile=}"; a="-DoutputFile=LIST" ;;
+    esac
+    args="$args $a"
+done
+echo "${0##*/}$args" >> "$MH_CALLS"
+[ "$MH_FAIL" = error ] && echo "[ERROR] Failed to execute goal on project b"
+[ "$MH_FAIL" = missing ] && echo "[ERROR] Could not find artifact com.example.internal:zz-internal-auth:jar:9.9.9 in central (https://repo.maven.apache.org/maven2)"
+[ "$MH_FAIL" != exit ]
+STUB
+    chmod +x "$WORK/mh-bin/mvn"
+    mkdir -p "$WORK/mh-home/.m2/repository/org/x/y/1.0"; : > "$WORK/mh-home/.m2/repository/org/x/y/1.0/y-1.0.jar"
+    _mh_one='The following files have been resolved:
+   org.x:y:jar:1.0:compile'
+    _mh_out=$(MH_LIST="$_mh_one" _mh_run "$WORK/mh-proj" "" missing)
+    { printf '%s' "$_mh_out" | grep -q "MARK-FAILED maven-dependency-resolve" \
+        && ! printf '%s' "$_mh_out" | grep -q "MARK-FAILED maven-dependency-jars"; } \
+        && pass "completeness/maven: a dependency Maven cannot find is recorded as maven-dependency-resolve although the other jars were fetched" \
+        || fail "completeness/maven: the unresolvable dependency was not recorded" "$_mh_out"
+    _mh_out=$(MH_LIST="$_mh_one" _mh_run "$WORK/mh-proj" "" error)
+    ! printf '%s' "$_mh_out" | grep -q "MARK-FAILED maven-dependency-resolve" \
+        && pass "completeness/maven: an unrelated Maven error is not recorded as an unresolvable dependency" \
+        || fail "completeness/maven: an unrelated error was recorded as unresolvable"
+    rm -rf "$WORK/mh-home/.m2/repository/org"
+else
+    fail "completeness/maven: the Maven block of the jar-fetch test is not available to this section"
+fi
 
 echo ""
 echo "Results: ${PASS} passed, ${FAIL} failed"
