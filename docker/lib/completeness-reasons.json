@@ -38,8 +38,8 @@
     },
     "unsupported-build-system": {
       "grade": "unreliable",
-      "en": "The source declares C/C++ package manager dependencies ({detail}), but this scan did not resolve them (vcpkg and Conan manifests are outside what the scanner resolves reliably), so none of them are in this SBOM.",
-      "ko": "소스에 C/C++ 패키지 관리 도구의 의존성이 선언되어 있지만({detail}) 이번 스캔은 해석하지 못해(vcpkg와 Conan 선언 파일은 스캐너가 안정적으로 해석하는 범위 밖입니다) 이 SBOM에 하나도 없습니다.",
+      "en": "The source declares C/C++ dependencies ({detail}), but this scan did not resolve them (vcpkg, Conan and CMake FetchContent declarations are outside what the scanner resolves reliably), so none of them are in this SBOM.",
+      "ko": "소스에 C/C++ 의존성이 선언되어 있지만({detail}) 이번 스캔은 해석하지 못해(vcpkg, Conan, CMake FetchContent 선언은 스캐너가 안정적으로 해석하는 범위 밖입니다) 이 SBOM에 하나도 없습니다.",
       "fixEn": "Scan with --identify-vendored to identify C/C++ source that is copied into the tree, or list the dependencies in sbom-declared.cdx.json at the project root and scan again.",
       "fixKo": "--identify-vendored 옵션으로 트리에 복사된 C/C++ 소스를 식별하거나, 프로젝트 최상위 폴더의 sbom-declared.cdx.json에 의존성을 직접 적은 뒤 다시 스캔하세요."
     },

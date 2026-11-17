@@ -23,7 +23,7 @@ def vc_no_ecosystem_purl:
 
 # Package ecosystems no advisory source Trivy reads is keyed on. A component
 # with one of these purl types is checked by nothing, whatever its version.
-def vc_unsupported_ecosystem_types: ["cocoapods"];
+def vc_unsupported_ecosystem_types: ["cocoapods", "conan"];
 def vc_unsupported_ecosystem: vc_purl_type | IN(vc_unsupported_ecosystem_types[]);
 
 # A purl that names a source repository or project site. Trivy has no advisory
@@ -102,7 +102,7 @@ def vc_in_scope:
 # Why no check could reach a component, or empty when one could.
 #   no-version     there is no version to compare against an advisory
 #   no-identifier  no purl (or pkg:generic, opkg, yocto), and no CPE the index was asked about
-#   unsupported-ecosystem  a purl of a package ecosystem no advisory source covers (pkg:cocoapods)
+#   unsupported-ecosystem  a purl of a package ecosystem no advisory source covers (pkg:cocoapods, pkg:conan)
 #   repository-purl  a purl that names a source repository (pkg:github, ...) and no
 #                    CPE the index was asked about; Trivy does not query these
 # $yocto_checked: the Yocto build's own CVE check ran (a _yocto_vex.json with

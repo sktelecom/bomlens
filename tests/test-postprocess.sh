@@ -15004,6 +15004,32 @@ grep -q "package ecosystem with no vulnerability data source" "$CPD/cocoapods-on
     && pass "completeness/cocoapods-only: the reports give the reason the pods were not checked" \
     || fail "completeness/cocoapods-only: the unchecked reason is missing from a report"
 
+# 5b. a Conan component is listed as not checked, so a clean result cannot be read as covering it
+cp_bom conan-only '[]' "[$(cp_lib openssl 3.2.1 pkg:conan/openssl@3.2.1)]"
+printf "[requires]\nopenssl/3.2.1\n" > "$CPD/conan-only/src/conanfile.txt"
+cp_run conan-only
+cp_check conan-only partial "unchecked-ecosystem"
+[ "$(jq -r '.uncheckedEcosystems[0] | "\(.ecosystem) \(.count)"' "$CPD/conan-only/proj_1.0_completeness.json")" = "conan 1" ] \
+    && [ "$(jq -r '[.UncheckedComponents.Components[] | select(.Reason == "unsupported-ecosystem")] | length' "$CPD/conan-only/proj_1.0_security.json")" = "1" ] \
+    && pass "completeness/conan-only: the Conan component is counted as unchecked, with the ecosystem named" \
+    || fail "completeness/conan-only: the unchecked count or ecosystem is wrong"
+
+# 5c. CMake FetchContent: only a CMakeLists.txt that declares a fetch counts as a declared dependency
+SMD="$CPD/fetchcontent"
+mkdir -p "$SMD/a" "$SMD/b" "$SMD/c"
+printf 'include(FetchContent)\nFetchContent_Declare(fmt GIT_REPOSITORY https://example.invalid/fmt.git)\n' > "$SMD/a/CMakeLists.txt"
+printf 'project(x)\nadd_executable(x main.c)\n' > "$SMD/b/CMakeLists.txt"
+printf '{"dependencies":{"left-pad":"1.0.0"}}' > "$SMD/c/package.json"
+fc_list="$( . "$LIB/source-detect.sh"; source_manifests "$SMD" 5 )"
+[ "$fc_list" = "c/package.json, a/CMakeLists.txt" ] \
+    && pass "completeness/fetchcontent: a CMakeLists.txt with FetchContent_Declare is listed, a plain one is not, other manifests are unchanged" \
+    || fail "completeness/fetchcontent: manifests listed: [$fc_list]"
+cp_bom cmake-fetch '[{"name":"bomlens:sbom-empty-with-manifests","value":"a/CMakeLists.txt"}]' '[]'
+bash "$LIB/assess-completeness.sh" "$CPD/cmake-fetch/proj_1.0_bom.json" "$CPD/cmake-fetch/proj_1.0" >/dev/null 2>&1
+[ "$(jq -r '.grade + " " + (.reasons | map(.code) | join(","))' "$CPD/cmake-fetch/proj_1.0_completeness.json")" = "unreliable unsupported-build-system" ] \
+    && pass "completeness/fetchcontent: an empty result with only a FetchContent declaration gets the C/C++ reason" \
+    || fail "completeness/fetchcontent: verdict $(cat "$CPD/cmake-fetch/proj_1.0_completeness.json" 2>&1)"
+
 # Korean: the reports use the Korean sentence pair and drop the clean sentence.
 cp_run empty-npm ko
 { grep -q "결과 완전성" "$CPD/empty-npm/proj_1.0_risk-report.md" "$CPD/empty-npm/proj_1.0_risk-report.html" "$CPD/empty-npm/proj_1.0_security.html" \

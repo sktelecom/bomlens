@@ -638,7 +638,7 @@ KEV_COUNT=$(echo "$FINDINGS" | jq '[.[] | select(.kev)] | length')
         echo "${UNCHECKED_N} component(s) could not be checked against a vulnerability database:"
         echo "they have no version, or no package purl that Trivy can query and no CPE that was"
         echo "matched, or they come from a package ecosystem no vulnerability data source covers"
-        echo "(pkg:cocoapods). A clean result does not cover them."
+        echo "(pkg:cocoapods, pkg:conan). A clean result does not cover them."
         if [ -n "${BOMLENS_CPE_INDEX_SKIPPED:-}" ] && echo "$UNCHECKED" | jq -e 'any(.[]; .Reason != "no-version")' >/dev/null 2>&1; then
             echo ""
             echo "$UNCHECKED_NOTE"
@@ -648,7 +648,7 @@ KEV_COUNT=$(echo "$FINDINGS" | jq '[.[] | select(.kev)] | length')
         echo "|-----------|---------|------|--------|"
         echo "$UNCHECKED" | jq -r --argjson max "$UNCHECKED_MAX" 'def cell: tostring | gsub("[|\n]"; " ");
             .[0:$max][] |
-            "| \(.Name | cell) | \(.Version | cell) | \(.PURL | cell) | \({"no-version": "no version", "no-identifier": "no package purl and no matched CPE", "repository-purl": "repository purl (pkg:github, ...), which Trivy does not query", "unsupported-ecosystem": "package ecosystem with no vulnerability data source (pkg:cocoapods)"}[.Reason] // .Reason) |"'
+            "| \(.Name | cell) | \(.Version | cell) | \(.PURL | cell) | \({"no-version": "no version", "no-identifier": "no package purl and no matched CPE", "repository-purl": "repository purl (pkg:github, ...), which Trivy does not query", "unsupported-ecosystem": "package ecosystem with no vulnerability data source (pkg:cocoapods, pkg:conan)"}[.Reason] // .Reason) |"'
         if [ "$UNCHECKED_N" -gt "$UNCHECKED_MAX" ]; then
             echo ""
             echo "… and $((UNCHECKED_N - UNCHECKED_MAX)) more, listed in \`UncheckedComponents\` in \`$(basename "$JSON")\`."
@@ -727,7 +727,7 @@ NO_FIX="$(report_str no_fix)"
 R_NOVER="$(sec_s reason_no_version 'no version')"
 R_NOID="$(sec_s reason_no_identifier 'no package purl and no matched CPE')"
 R_REPO="$(sec_s reason_repository_purl 'repository purl (pkg:github, ...), which Trivy does not query')"
-R_UNSUP="$(sec_s reason_unsupported_ecosystem 'package ecosystem with no vulnerability data source (pkg:cocoapods)')"
+R_UNSUP="$(sec_s reason_unsupported_ecosystem 'package ecosystem with no vulnerability data source (pkg:cocoapods, pkg:conan)')"
 {
     cat <<HTMLHEAD
 <!DOCTYPE html>
@@ -815,7 +815,7 @@ HTMLHEAD
     if [ "${UNCHECKED_N:-0}" -gt 0 ]; then
         report_next_id
         echo "<div class=\"box\"><div class=\"box-head\"><h2 id=\"${REPORT_BOX_ID}\">$(sec_s h2_unchecked 'Components that could not be checked')</h2><span class=\"counter\">$(report_num "$UNCHECKED_N")</span>"
-        echo "<p class=\"meta\">$(sec_s unchecked_intro 'They have no version, or no package purl that Trivy can query and no CPE that was matched, or they come from a package ecosystem no vulnerability data source covers (pkg:cocoapods), so no vulnerability database was asked about them. A clean result does not cover them.')</p>"
+        echo "<p class=\"meta\">$(sec_s unchecked_intro 'They have no version, or no package purl that Trivy can query and no CPE that was matched, or they come from a package ecosystem no vulnerability data source covers (pkg:cocoapods, pkg:conan), so no vulnerability database was asked about them. A clean result does not cover them.')</p>"
         if [ -n "${BOMLENS_CPE_INDEX_SKIPPED:-}" ] && echo "$UNCHECKED" | jq -e 'any(.[]; .Reason != "no-version")' >/dev/null 2>&1; then
             # English is UNCHECKED_NOTE as it is, passed as text and never as a
             # printf format; Korean comes from the catalog, with the BomLens
