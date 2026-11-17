@@ -754,8 +754,13 @@ export interface ScanConfig {
   reachability?: boolean;
 }
 
+export const ANDROID_SDK_IMAGE_MISSING = "ANDROID_SDK_IMAGE_MISSING";
+
 export interface DoneEvent {
   ok: boolean;
+  /** Machine-readable failure code, when the server has one
+   *  (`ANDROID_SDK_IMAGE_MISSING`: the scan was not started). */
+  code?: string;
   mode?: string;
   /** The run_id (run-folder name) for this scan — used for re-opening
    *  (`loadScan`), the `#/scan/<id>` hash route, and every later /file,
@@ -998,7 +1003,7 @@ export interface ScanHandlers {
    *  `message` (the server's raw detail, still shown as a collapsible
    *  "show detail"). Absent for the connection-dropped case (neither arg) and
    *  for any server failure the server could not classify. */
-  onError: (message?: string, key?: string | null) => void;
+  onError: (message?: string, key?: string | null, extra?: ScanErrorExtra) => void;
   /** Optional determinate progress (e.g. the deep CVE NVD check). */
   onProgress?: (p: ScanProgress) => void;
 }
@@ -1077,7 +1082,131 @@ export function pullImage(key: PullImageKey, handlers: PullHandlers): () => void
   };
 }
 
+/** Extra fields a structured scan `error` event can carry. */
+export interface ScanErrorExtra {
+  code?: string;
+  /** The user has not accepted the Android SDK terms yet. */
+  consentRequired?: boolean;
+  api?: number;
+  image?: string;
+  termsUrl?: string;
+  /** This server can build the image itself. */
+  buildAvailable?: boolean;
+}
+
+/** Whether the Android SDK image for an API level is on this machine, and what
+ *  it takes to get it. */
+export interface AndroidSdkStatus {
+  api: number;
+  image: string;
+  present: boolean;
+  termsAccepted: boolean;
+  termsUrl: string;
+  buildAvailable: boolean;
+  building: boolean;
+}
+
+export async function fetchAndroidSdkStatus(api: number): Promise<AndroidSdkStatus | null> {
+  try {
+    const res = await fetch(apiUrl(`/android-sdk-status?api=${encodeURIComponent(String(api))}`));
+    if (!res.ok) return null;
+    return (await res.json()) as AndroidSdkStatus;
+  } catch {
+    return null;
+  }
+}
+
+/** Record that the user accepted the terms they were shown at `termsUrl`. */
+export async function recordAndroidSdkConsent(termsUrl: string): Promise<boolean> {
+  try {
+    const res = await fetch(apiUrl("/android-sdk-consent"), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ accept: true, termsUrl }),
+    });
+    if (!res.ok) return false;
+    const body = (await res.json()) as { termsAccepted?: boolean };
+    return body.termsAccepted === true;
+  } catch {
+    return false;
+  }
+}
+
+export interface AndroidSdkBuildDone {
+  ok: boolean;
+  api?: number;
+  image?: string;
+  alreadyPresent?: boolean;
+  /** no-consent, no-build-files, no-docker, busy, cancelled, disk, dns, proxy,
+   *  auth, build-failed or sdk-install. */
+  reason?: string;
+  detail?: string;
+}
+
+export interface AndroidSdkBuildHandlers {
+  onLog?: (line: string) => void;
+  onProgress?: (p: { step: number; steps: number }) => void;
+  onDone: (d: AndroidSdkBuildDone) => void;
+}
+
+/** Build the Android SDK image on this machine. Returns a stop function: closing
+ *  the stream cancels the build on the server. A refused stream (403, terms not
+ *  accepted) surfaces as a `no-consent` failure, as the browser gives no body. */
+export function buildAndroidSdkImage(api: number, handlers: AndroidSdkBuildHandlers): () => void {
+  const es = new EventSource(apiUrl(`/android-sdk-build-stream?api=${encodeURIComponent(String(api))}`));
+  let finished = false;
+  es.addEventListener("log", (e) => {
+    try {
+      handlers.onLog?.(String(JSON.parse((e as MessageEvent).data)));
+    } catch {
+      /* ignore malformed log */
+    }
+  });
+  es.addEventListener("progress", (e) => {
+    try {
+      const p = JSON.parse((e as MessageEvent).data) as { step?: number; steps?: number };
+      if (typeof p.step === "number" && typeof p.steps === "number") {
+        handlers.onProgress?.({ step: p.step, steps: p.steps });
+      }
+    } catch {
+      /* ignore malformed progress */
+    }
+  });
+  const finish = (d: AndroidSdkBuildDone) => {
+    if (finished) return;
+    finished = true;
+    es.close();
+    handlers.onDone(d);
+  };
+  es.addEventListener("done", (e) => {
+    try {
+      finish(JSON.parse((e as MessageEvent).data));
+    } catch {
+      finish({ ok: false, reason: "unknown" });
+    }
+  });
+  es.onerror = () => finish({ ok: false, reason: finished ? "unknown" : "connection" });
+  return () => {
+    finished = true;
+    es.close();
+  };
+}
+
+/** Ask the server to stop a running build for this API level. */
+export async function cancelAndroidSdkBuild(api: number): Promise<boolean> {
+  try {
+    const res = await fetch(apiUrl(`/android-sdk-build-cancel?api=${encodeURIComponent(String(api))}`), {
+      method: "POST",
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
 export interface Capabilities {
+  /** The server can build the Android SDK image itself (the recipe is mounted). */
+  androidSdkBuild?: boolean;
   /** Firmware input offerable here — tools built into this image OR reachable by
    *  running the firmware image as a sibling container (docker socket). */
   firmware: boolean;
@@ -1818,8 +1947,9 @@ export function startScan(params: ScanParams, handlers: ScanHandlers): EventSour
     const data = (e as MessageEvent).data;
     if (!data) return; // native EventSource error has no data; handled by onerror
     try {
-      const parsed = JSON.parse(data) as { detail?: string; key?: string | null };
-      handlers.onError(parsed.detail, parsed.key ?? null);
+      const parsed = JSON.parse(data) as { detail?: string; key?: string | null } & ScanErrorExtra;
+      const { detail: _detail, key: _key, ...extra } = parsed;
+      handlers.onError(parsed.detail, parsed.key ?? null, Object.keys(extra).length ? extra : undefined);
     } catch {
       handlers.onError(String(data));
     }

@@ -20,9 +20,11 @@ import { ResultSection } from "./ResultSections";
 import { CONFORMANCE_ACTIONS_SLOT } from "./ConformancePanel";
 import { VULN_ACTIONS_SLOT } from "./VulnerabilitiesTable";
 import { ReportProblemDialog } from "./ReportProblemDialog";
+import { AndroidSdkDialog } from "./AndroidSdkDialog";
 import { ScanRunning } from "./ScanRunning";
 import { ConfirmDialog } from "./ui/dialog";
 import {
+  ANDROID_SDK_IMAGE_MISSING,
   deleteScan,
   downloadAllUrl,
   fileUrl,
@@ -37,6 +39,7 @@ import {
   type ScanParams,
   type Severity,
 } from "@/lib/api";
+import { androidSdkNeed, canReplayScan, type AndroidSdkNeed } from "@/lib/androidSdk";
 import { conformanceReports } from "@/lib/conformance";
 import { IS_STATIC_DEMO } from "@/lib/demo";
 import { type LicenseRiskTier } from "@/lib/licenses";
@@ -153,6 +156,13 @@ export function NextApp() {
   // a git clone that failed because the repo is missing or private): an i18n
   // key for a friendlier headline, with scanError kept as the raw detail.
   const [scanErrorKey, setScanErrorKey] = useState<string | null>(null);
+  // The scan did not start because the Android SDK image is missing: the dialog
+  // offers to build it instead of showing a failure.
+  const [androidNeed, setAndroidNeed] = useState<AndroidSdkNeed | null>(null);
+  // Mirrors androidNeed for the stream handlers: the browser also reports the
+  // server's own `error` event through the stream's generic error callback, which
+  // reaches onError with no message right after the structured one.
+  const androidNeedRef = useRef(false);
   const [result, setResult] = useState<DoneEvent | null>(null);
   // The project a live scan was started for: it has no id (and so no entry in
   // the scan list) until it finishes.
@@ -531,6 +541,8 @@ export function NextApp() {
     setLogs([]);
     setScanError(null);
     setScanErrorKey(null);
+    setAndroidNeed(null);
+    androidNeedRef.current = false;
     setResult(null);
     setActiveSection("overview");
     setLiveProject({
@@ -541,6 +553,8 @@ export function NextApp() {
       onLog: (line) => setLogs((prev) => [...prev, line]),
       onDone: (done) => {
         streamRef.current = null;
+        // The scan was not started; the dialog already has the answer.
+        if (done.code === ANDROID_SDK_IMAGE_MISSING) return;
         setResult(done);
         setStatus(done.ok ? "done" : "error");
         void refreshRecent(); // the finished scan is now in history
@@ -553,7 +567,15 @@ export function NextApp() {
           window.history.replaceState(null, "", scanHash(id));
         }
       },
-      onError: (message, key) => {
+      onError: (message, key, extra) => {
+        const need = androidSdkNeed(extra);
+        if (!message && androidNeedRef.current) return;
+        if (need) {
+          androidNeedRef.current = true;
+          setLogs((prev) => [...prev, `✖ ${message ?? ""}`]);
+          setAndroidNeed(need);
+          return;
+        }
         if (message) {
           setLogs((prev) => [...prev, `✖ ${message}`]);
           setScanError(message);
@@ -658,6 +680,24 @@ export function NextApp() {
   // A failed run can be retried as-is only when its params carry no single-use
   // upload token or stashed credential (those are consumed on first use).
   const retryParams = lastParamsRef.current;
+  // The image is in place: run the same scan again, or, when its input was a
+  // one-shot upload, say so and let the user start it again from the form.
+  const androidReady = () => {
+    setAndroidNeed(null);
+    if (retryParams && canReplayScan(retryParams)) {
+      run(retryParams);
+      return;
+    }
+    setScanError(t("androidSdk.builtRerun"));
+    setScanErrorKey(null);
+    setStatus("error");
+  };
+  const androidSkip = () => {
+    setAndroidNeed(null);
+    setScanError(t("androidSdk.skipped"));
+    setScanErrorKey(null);
+    setStatus("error");
+  };
   const canRetry = Boolean(
     retryParams &&
       !retryParams.token &&
@@ -815,6 +855,7 @@ export function NextApp() {
           )}
         </div>
       ) : !result ? (
+        <>
         <ScanRunning
           logs={logs}
           status={status === "error" ? "error" : "running"}
@@ -833,6 +874,15 @@ export function NextApp() {
             setHomeView("new");
           }}
         />
+        {androidNeed && (
+          <AndroidSdkDialog
+            need={androidNeed}
+            capabilityBuild={capabilities.androidSdkBuild}
+            onReady={androidReady}
+            onSkip={androidSkip}
+          />
+        )}
+        </>
       ) : (
         <div
           className={`space-y-6 ${
