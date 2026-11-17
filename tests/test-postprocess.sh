@@ -4683,16 +4683,23 @@ co_detail=$(jq -r '.checks[] | select(.id=="purl") | .detail' "$WORK/co_conforma
 # SBOM listing only datasets is legitimate to submit. It is not reported as met
 # either: crediting an empty denominator would rank such a document above one that
 # lists packages and is measured on them. Both checks come back not-applicable,
-# which leaves the coverage fractions. The result is a separate matter: an SBOM
-# with no component is an unreliable result (assess-completeness.sh), so the
-# result-completeness row, and only that row, fails it.
+# which leaves the coverage fractions and never moves the result. A document with
+# no component and nothing declared is only partial (assess-completeness.sh): it
+# conforms, with a warning row that says nothing was found. Only an empty result
+# whose source declares dependencies fails (second assertion below).
 jq '.components = []' "$FIX/good-cyclonedx.json" > "$WORK/conf-empty.json"
 bash "$LIB/validate-sbom.sh" "$WORK/conf-empty.json" "$WORK/ce" "supplier" >/dev/null 2>&1
 ce=$(jq -r '"\(.result)/\(.checks[]|select(.id=="name-version")|.naKind // "-")/\(.checks[]|select(.id=="purl")|.naKind // "-")"' "$WORK/ce_conformance.json")
-[ "$ce" = "fail/not-applicable/not-applicable" ] \
-    && [ "$(jq -c '[.checks[] | select(.required and .status == "fail") | .id]' "$WORK/ce_conformance.json")" = '["result-completeness"]' ] \
-    && pass "an SBOM with no components at all is neither uncovered nor credited, and does not pass as a result" \
-    || fail "empty SBOM: result/name-version/purl = $ce, expected fail/not-applicable/not-applicable (failing only result-completeness)"
+[ "$ce" = "pass/not-applicable/not-applicable" ] \
+    && jq -e '.checks[] | select(.id == "result-completeness" and .required == false and .status == "warn")' "$WORK/ce_conformance.json" >/dev/null \
+    && pass "an SBOM with no components at all is neither uncovered nor credited; it conforms with a completeness warning" \
+    || fail "empty SBOM: result/name-version/purl = $ce, expected pass/not-applicable/not-applicable plus a warning row"
+jq '.components = [] | .metadata.properties = [{name:"bomlens:sbom-empty-with-manifests", value:"package.json"}]' "$FIX/good-cyclonedx.json" > "$WORK/conf-empty-decl.json"
+bash "$LIB/validate-sbom.sh" "$WORK/conf-empty-decl.json" "$WORK/ced" "supplier" >/dev/null 2>&1
+{ [ "$(jq -r .result "$WORK/ced_conformance.json")" = "fail" ] \
+    && [ "$(jq -c '[.checks[] | select(.required and .status == "fail") | .id]' "$WORK/ced_conformance.json")" = '["result-completeness"]' ]; } \
+    && pass "an empty result whose source declares dependencies fails (result-completeness only)" \
+    || fail "empty result with declared dependencies did not fail as expected"
 ce_detail=$(jq -r '.checks[] | select(.id=="purl") | .detail' "$WORK/ce_conformance.json")
 [ "$ce_detail" = "no packages to measure" ] \
     && pass "the empty-denominator case says why it cannot be measured" || fail "empty detail: '$ce_detail'"
@@ -13186,13 +13193,12 @@ jq '.emptyResult = "no" | .licenseCoverage = {declared:"x",total:"y"}' "$GATEDIR
     && [ "$(gate_status junk qc.json empty-result empty-result)" = "unjudged" ] \
     && [ "$(gate_status junk qc.json license-coverage=80 license-coverage=80)" = "unjudged" ] \
     && pass "an unreadable report, or one with a missing or non-boolean signal, is unjudged" || fail "a broken conformance report was judged"
-# The signals are their own fields: emptyResult is read by the empty-result gate
-# whatever the checks say. The empty document no longer conforms, though: its
-# result is unreliable (no component), so the result-completeness row fails it.
-[ "$(cat "$GATEDIR/qe_conformance.result")" = "fail" ] && [ "$(jq -r .result "$GATEDIR/qe_conformance.json")" = "fail" ] \
+# The signals are their own fields: the empty document keeps whatever verdict the
+# checks give it. With nothing declared it is partial (a warning row), so it conforms.
+[ "$(cat "$GATEDIR/qe_conformance.result")" = "pass" ] && [ "$(jq -r .result "$GATEDIR/qe_conformance.json")" = "pass" ] \
     && jq -e '.emptyResult == true and .softwareComponentCount == 0 and .licenseCoverage.pct == null' "$GATEDIR/qe_conformance.json" >/dev/null \
-    && jq -e '[.checks[] | select(.required and .status == "fail") | .id] == ["result-completeness"]' "$GATEDIR/qe_conformance.json" >/dev/null \
-    && pass "an empty document does not conform (only the result-completeness row fails); emptyResult is a separate field" || fail "the empty document's conformance or signal is wrong" "$(cat "$GATEDIR/qe_conformance.result")"
+    && jq -e '[.checks[] | select(.required and .status == "fail")] | length == 0' "$GATEDIR/qe_conformance.json" >/dev/null \
+    && pass "an empty but well-formed document still conforms; emptyResult is a separate field" || fail "the empty document's conformance or signal is wrong" "$(cat "$GATEDIR/qe_conformance.result")"
 # SPDX-JSON and Tag-Value carry the same measurements.
 cat > "$GATEDIR/qs.json" <<'JSON'
 {"spdxVersion":"SPDX-2.3","packages":[{"name":"a","licenseConcluded":"none","licenseDeclared":"NOASSERTION"},{"name":"b","licenseDeclared":"Apache-2.0"}]}
@@ -14914,7 +14920,10 @@ cp_check empty-npm unreliable "empty-with-manifests,tool-degraded"
 # The same project with no signal on the SBOM at all: zero components is itself the reason.
 cp_bom empty-bare '[]' '[]'
 cp_run empty-bare
-cp_check empty-bare unreliable "no-components"
+cp_check empty-bare partial "no-components"
+[ "$(cat "$CPD/empty-bare/proj_1.0_conformance.result")" = "pass" ] \
+    && pass "completeness/empty-bare: a project with nothing declared conforms, with a warning row" \
+    || fail "completeness/empty-bare: the conformance check failed a project with nothing declared"
 
 # 2. a damaged Package.resolved (the SBOM is empty although the source declares packages)
 cp_bom broken-resolved '[{"name":"bomlens:sbom-empty-with-manifests","value":"Package.swift, Package.resolved"}]' '[]'
