@@ -74,4 +74,10 @@ if (!shipped.includes("--background") || !shipped.includes(".dark")) {
   console.error("check-package: packaged bomlens-tokens.css has no light/dark tokens");
   process.exit(1);
 }
+// The Android SDK image recipe ships as an extra resource next to app.asar, not inside it.
+const androidRecipe = path.join(path.dirname(target), "docker", "android", "Dockerfile");
+if (!fs.existsSync(androidRecipe)) {
+  console.error(`check-package: ${androidRecipe} is missing (extraResources docker/android)`);
+  process.exit(1);
+}
 console.log(`check-package: OK (${REQUIRED.length} files, tokens match) in ${path.relative(appRoot, target)}`);
