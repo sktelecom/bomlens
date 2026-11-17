@@ -10,7 +10,7 @@ Releases of the Windows installer are signed under the following policy. The fil
 
 ## Team roles
 
-- Committers and reviewers: [fritzprix](https://github.com/fritzprix), [haksungjang](https://github.com/haksungjang), [SKDEVOCEAN](https://github.com/SKDEVOCEAN)
+- Committers and reviewers: [haksungjang](https://github.com/haksungjang)
 - Approvers: [haksungjang](https://github.com/haksungjang)
 
 Committers can change the source without a separate review. Changes proposed by anyone who is not a committer are reviewed by a team member before they are merged. An approver decides, for each release, whether the installer is signed.

@@ -10,7 +10,7 @@ Windows 설치 파일의 릴리스는 아래 정책에 따라 서명합니다. �
 
 ## 팀 역할
 
-- Committers and reviewers: [fritzprix](https://github.com/fritzprix), [haksungjang](https://github.com/haksungjang), [SKDEVOCEAN](https://github.com/SKDEVOCEAN)
+- Committers and reviewers: [haksungjang](https://github.com/haksungjang)
 - Approvers: [haksungjang](https://github.com/haksungjang)
 
 Committers는 별도 검토 없이 소스를 바꿀 수 있습니다. Committer가 아닌 사람이 제안한 변경은 팀원이 검토한 뒤에 병합합니다. Approvers는 릴리스마다 설치 파일에 서명할지 결정합니다.
