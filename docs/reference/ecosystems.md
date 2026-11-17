@@ -123,13 +123,17 @@ A `[WARN]` says when the build cannot get what it asks for: a toolchain no image
 
 Detected when the project has a Gradle root (`settings.gradle[.kts]` or `build.gradle[.kts]` at the root) and shows a sign of the Android Gradle plugin: the plugin id in the version catalog (`gradle/libs.versions.toml`), the plugin id or a catalog alias in a build script (root or `app/`), a Kotlin DSL `namespace` declaration, or an `AndroidManifest.xml` a few levels down. A manifest with no Gradle root does not count on its own, which also keeps a .NET MAUI app's `Platforms/Android/AndroidManifest.xml` from being misread as an Android project.
 
-Android needs an SDK platform image BomLens does not publish: the Android SDK it contains is not open source, and Google's terms do not allow redistributing it, so the image is built locally instead. The project's `compileSdk`/`compileSdkVersion` picks the API level (34 if none is found); the scan then looks for `bomlens-android-sdk<API>:latest`, and if it is missing, prints the build command instead of failing on a missing image:
+Android needs an SDK platform image BomLens does not publish: the Android SDK it contains is not open source, and Google's terms do not allow redistributing it, so the image is built locally instead. The highest `compileSdk`/`compileSdkVersion` found picks the API level (34 if none is found). It is read from the root and `app/` build files, from the sources under `build-logic/` and `buildSrc/` (a convention plugin often sets it there), and from the version catalog (a key such as `android-compileSdk`); the scan then looks for `bomlens-android-sdk<API>:latest`, and if it is missing, prints the build command instead of failing on a missing image:
 
 ```bash
 docker build --build-arg ANDROID_API=<API> -t bomlens-android-sdk<API> docker/android
 ```
 
 Building it means accepting Google's SDK terms yourself. Set `ANDROID_IMAGE_PREFIX` to use an image built elsewhere.
+
+The SDK image runs Java 21, so a Gradle wrapper older than 8.5 cannot run in it. The scan says so before it starts and records the failed step `gradle-wrapper-jdk` on the SBOM. Raise `distributionUrl` in `gradle/wrapper/gradle-wrapper.properties` to 8.5 or later, or build the image on an older JDK with `--build-arg BASE_JDK_IMAGE=<cdxgen Java image>` (see `docker/android/Dockerfile`) and scan with that image's `ANDROID_IMAGE_PREFIX`. A build that turns Isolated Projects on in `gradle.properties` is read with the configuration cache on, since Gradle refuses to run it with the cache off.
+
+Where the Gradle build cannot run at all (no Docker, or the build failed), the fallback reads the libraries a version catalog (`gradle/*.versions.toml`) declares and adds them with `bomlens:source=version-catalog`. They are declarations, not what the build uses, so the result stays graded partial.
 
 > Note: images published under `ghcr.io/sktelecom/bomlens-android-sdk<API>` up to v1.9.0 still work for scans on that release line, but nothing new is pushed to them; a current scan needs a locally built image.
 

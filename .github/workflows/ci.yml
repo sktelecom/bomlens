@@ -444,6 +444,13 @@ jobs:
           BOMLENS_CDX_SCHEMA: "1"
         run: bash tests/test-declared-components.sh
 
+      # No Docker: how an Android Gradle project is read around the build. The
+      # highest compileSdk across build files, build-logic and the version
+      # catalog, the libraries a catalog declares, the warning for a Gradle
+      # wrapper that cannot run on Java 21, and the Isolated Projects handling.
+      - name: Android Gradle resolution tests
+        run: bash tests/test-android-gradle-resolution.sh
+
       # No Docker: reads model files built on the spot (GGUF, safetensors, torch
       # archive, pickle, npz) and asserts the header facts that end up in the
       # SBOM — including that the magic bytes, not the extension, decide the

@@ -17,7 +17,16 @@ ARG ANDROID_API=35
 # On a network that reaches only a registry mirror, pass
 # --build-arg CDXGEN_IMAGE_PREFIX=<mirror path>/ (see CDXGEN_IMAGE_PREFIX).
 ARG CDXGEN_IMAGE_PREFIX=ghcr.io/cdxgen/
-FROM ${CDXGEN_IMAGE_PREFIX}cdxgen-temurin-java21:13.5.0@sha256:7c8d39f65c7e2c7a43692785ef50edbb5f6a1d4fd77b5aabae30e650c0ce4275
+# The base is the Java 21 image. A project whose Gradle wrapper is older than 8.5
+# does not run on Java 21; to build the SDK image on an older JDK, pass a full
+# image reference of the same cdxgen release, for example
+#   --build-arg BASE_JDK_IMAGE=ghcr.io/cdxgen/cdxgen-java17:13.5.0@sha256:<digest>
+# (digests: docker/lib/cdxgen-images.json) and tag the result with another
+# ANDROID_IMAGE_PREFIX name, then scan with that ANDROID_IMAGE_PREFIX. The
+# published recipe and the app's automatic build keep the Java 21 base.
+ARG BASE_JDK_IMAGE=
+FROM ${CDXGEN_IMAGE_PREFIX}cdxgen-temurin-java21:13.5.0@sha256:7c8d39f65c7e2c7a43692785ef50edbb5f6a1d4fd77b5aabae30e650c0ce4275 AS base-java21
+FROM ${BASE_JDK_IMAGE:-base-java21}
 
 ARG ANDROID_API=35
 ARG ANDROID_BUILD_TOOLS=${ANDROID_API}.0.0

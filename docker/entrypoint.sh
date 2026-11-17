@@ -485,6 +485,7 @@ generate_sbom_cdxgen() {
             CDXGEN_FAIL_REASON="android-sdk-image"
             return 1
         fi
+        android_wrapper_jdk_check "$src"
     else
         img=$(img_for_lang "$lang" "$src")
         echo "[INFO] Language: $lang -> $img"
@@ -743,6 +744,7 @@ mark_compositions_aggregate() {
                    or ($applied | index("poetry-requirements-partial") != null)
                    or ($failed | index("poetry-graph") != null)
                    or ($failed | index("gradle-packages") != null)
+                   or ($failed | index("gradle-wrapper-jdk") != null)
                    or ($failed | index("maven-dependency-tree") != null)) as $degraded
                 | (([$known[] | select(. as $l | ($applied|index($l)) and (($failed|index($l))|not))] | length) > 0) as $lock_ok
                 | ((.components // []) | length) as $components
@@ -1597,6 +1599,50 @@ elif [ "$SOURCE_SCAN" = "true" ]; then
     if [ -d "$VENDORED_SRC" ]; then
         run_optional_step suggest-vendored bash "$LIBDIR/suggest-vendored.sh" "$OUTPUT_FILE" "$VENDORED_SRC"
     fi
+fi
+
+CATALOG_SRC="${SOURCE_ROOT:-/src}"
+# An Android project whose Gradle wrapper cannot run on the SDK image's Java 21:
+# the scan told so before it started (android_wrapper_jdk_check); record it on
+# the SBOM too, as a failed resolution step, so the result is graded partial and
+# the report names the cause.
+if [ "$SOURCE_SCAN" = "true" ] && [ -d "$CATALOG_SRC" ] && [ -f "$OUTPUT_FILE" ] \
+   && [ "$(detect_lang "$CATALOG_SRC")" = "android" ]; then
+    android_wrapper_jdk_check "$CATALOG_SRC" quiet
+    if [ -n "$ANDROID_WRAPPER_JDK_BAD" ]; then
+        mark_pipeline_warning "$OUTPUT_FILE" "gradle-wrapper-jdk"
+    fi
+fi
+# ========================================================
+# Gradle version catalog (gradle/libs.versions.toml). When the Gradle build did
+# not run (the syft fallback above: no Docker, or cdxgen failed), a project that
+# declares its dependencies in a version catalog comes back with none, because
+# syft reads no catalog. Read the catalog directly and add what it declares,
+# tagged bomlens:source=version-catalog. This is a list of declarations, not of
+# what the build uses, so the result keeps its bomlens:sbom-tool-degraded mark
+# and stays graded partial. Components are added into the document itself (not
+# through merge-sbom.sh, which rewrites the root and drops the document's
+# metadata properties, the degraded mark among them), skipping a purl already
+# there.
+# ========================================================
+if [ "$SOURCE_SCAN" = "true" ] && [ -d "$CATALOG_SRC" ] && [ -f "$OUTPUT_FILE" ] \
+   && ls "$CATALOG_SRC"/gradle/*.versions.toml >/dev/null 2>&1 \
+   && jq -e '(.metadata.properties // []) | any(.name == "bomlens:sbom-tool-degraded")' "$OUTPUT_FILE" >/dev/null 2>&1 \
+   && ! jq -e 'any(.components[]?; (.properties // []) | any(.name == "bomlens:source" and .value == "version-catalog"))' "$OUTPUT_FILE" >/dev/null 2>&1; then
+    CATALOG_SBOM="${OUT_PREFIX}_version-catalog.cdx.json"
+    if bash "$LIBDIR/gradle-version-catalog.sh" "$CATALOG_SRC" "$CATALOG_SBOM" "$PROJECT_VERSION"; then
+        if jq --slurpfile cat "$CATALOG_SBOM" '
+              (([.components[]?.purl] | map(select(. != null))) ) as $have
+              | .components = ((.components // []) + [ $cat[0].components[]? | select(.purl as $p | $have | index($p) | not) ])' \
+              "$OUTPUT_FILE" > "${OUTPUT_FILE}.catalog.tmp" 2>/dev/null; then
+            mv "${OUTPUT_FILE}.catalog.tmp" "$OUTPUT_FILE"
+            echo "[INFO] Version catalog: added $(jq '[.components[]? | select((.properties // []) | any(.name == "bomlens:source" and .value == "version-catalog"))] | length' "$OUTPUT_FILE") declared librar(ies) from gradle/*.versions.toml. They are declarations, not a resolved dependency graph; the result stays marked incomplete."
+        else
+            rm -f "${OUTPUT_FILE}.catalog.tmp"
+            echo "[WARN] Could not add the version catalog libraries; keeping the SBOM as it was." >&2
+        fi
+    fi
+    rm -f "$CATALOG_SBOM"
 fi
 
 # ========================================================

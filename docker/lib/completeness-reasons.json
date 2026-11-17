@@ -26,7 +26,7 @@
     "gradle-dependencies", "gradle-packages", "android-release-classpath",
     "pip-install", "poetry-graph", "npm-production-set", "pnpm-workspace-tree",
     "swift-package-resolve", "cargo-lockfile", "go-mod-tidy", "bundle-lock",
-    "composer-install"
+    "composer-install", "gradle-wrapper-jdk"
   ],
   "reasons": {
     "no-components-supplied": {

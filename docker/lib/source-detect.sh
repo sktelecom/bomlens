@@ -394,7 +394,8 @@ source_manifests() {
 
 # stage1_fail_reason <oom> [log] [exit code]: why stage 1 (cdxgen) gave no
 # SBOM, in the words bomlens:sbom-tool-degraded uses: oom (the container was
-# killed for memory), cdxgen-unavailable (exit 127, the shell's "command not
+# killed for memory, or Gradle reports its build daemon disappeared),
+# cdxgen-unavailable (exit 127, the shell's "command not
 # found": stage 1 never started, or a caller of an unsupported plan says it
 # did not run), disk-space, network, or cdxgen-crash. The CLI and the
 # post-processing step both classify with this.
@@ -404,6 +405,11 @@ stage1_fail_reason() {
     local log="${2:-}"
     if [ -n "$log" ] && [ -f "$log" ]; then
         if grep -qi "no space left on device" "$log"; then echo disk-space; return; fi
+        # Gradle's own report that its build process died. Nothing in the log
+        # says why, and the usual cause is the kernel killing it for memory (the
+        # container's own kill flag is not set when only the daemon, a child, is
+        # killed), so it is reported as oom, which names the memory fix.
+        if grep -qEi "gradle build daemon disappeared unexpectedly|daemon (process )?(was )?killed" "$log"; then echo oom; return; fi
         if grep -qEi "temporary failure in name resolution|could not resolve host|network is unreachable|connection timed out|connect timed out|no route to host|ENOTFOUND|ETIMEDOUT" "$log"; then
             echo network; return
         fi
@@ -1348,11 +1354,63 @@ warn_low_engine_memory_for() {  # warn_low_engine_memory_for <lang> <dir>
     [ -z "$kind" ] || warn_low_engine_memory "$kind"
 }
 
+# android_api <dir>: the SDK level the build needs, the highest compileSdk found.
+# A project that sets it in a convention plugin (build-logic/ or buildSrc/) or in
+# the version catalog (a key such as android-compileSdk) has nothing in its own
+# build files, and a module may use a higher level than the app, so every place
+# is read and the largest value wins: the highest module's SDK must be present
+# for the build to resolve. A value read from another variable (compileSdk =
+# libs.versions.x.get().toInt()) has no number here and is skipped; its number
+# comes from the catalog line.
 android_api() {
-    local d="$1" api
-    api=$(grep -rhoE "compileSdk(Version)?[ =]+[0-9]+" "$d"/build.gradle "$d"/build.gradle.kts "$d"/app/build.gradle "$d"/app/build.gradle.kts 2>/dev/null \
-          | grep -oE "[0-9]+" | head -1)
+    local d="$1" api f sub list
+    local files=()
+    for f in "$d"/build.gradle "$d"/build.gradle.kts "$d"/app/build.gradle "$d"/app/build.gradle.kts \
+             "$d"/gradle/libs.versions.toml; do
+        if [ -f "$f" ]; then files+=("$f"); fi
+    done
+    for sub in build-logic buildSrc; do
+        [ -d "$d/$sub" ] || continue
+        list=$(find "$d/$sub" -maxdepth 8 -type d \( -name build -o -name .gradle -o -name node_modules \) -prune -o \
+                    -type f \( -name '*.kt' -o -name '*.kts' -o -name '*.gradle' \) -print 2>/dev/null | LC_ALL=C sort)
+        while IFS= read -r f; do
+            if [ -n "$f" ]; then files+=("$f"); fi
+        done <<< "$list"
+    done
+    if [ "${#files[@]}" -gt 0 ]; then
+        api=$( {
+            # compileSdk = 34, compileSdkVersion 34, compileSdk(34)
+            grep -hoE 'compileSdk(Version)?[[:space:]]*[=(]?[[:space:]]*[0-9]+' "${files[@]}" 2>/dev/null
+            # compileSdk { version = release(36) }
+            grep -hoE 'version[[:space:]]*=[[:space:]]*release\([0-9]+' "${files[@]}" 2>/dev/null
+            # catalog keys: android-compileSdk = "37", compile_sdk = 35
+            grep -hioE '^[[:space:]]*[A-Za-z0-9_.-]*compile[-_.]?sdk[A-Za-z0-9_.-]*[[:space:]]*=[[:space:]]*"?[0-9]+' "${files[@]}" 2>/dev/null
+        } | grep -oE '[0-9]+$' | awk '$1 >= 1 && $1 <= 999 { if ($1 + 0 > m) m = $1 + 0 } END { if (m) print m }' || true)
+    fi
     echo "${api:-$ANDROID_API_DEFAULT}"
+}
+
+# android_wrapper_jdk_check <dir> [quiet]: tell, before an Android scan starts,
+# that a Gradle wrapper the build runs cannot run on the SDK image's JDK (21:
+# Gradle 8.5 and later). The scan goes on, because the user may know better, but
+# it would fail inside the build with a Gradle error that does not name the
+# cause. Sets ANDROID_WRAPPER_JDK_BAD (the wrapper versions, space separated;
+# empty when every wrapper runs on Java 21); with a second argument it only sets
+# that. entrypoint.sh records the failure on the SBOM as the resolution step
+# gradle-wrapper-jdk (see completeness-reasons.json).
+ANDROID_WRAPPER_JDK_BAD=""
+android_wrapper_jdk_check() {
+    local v
+    ANDROID_WRAPPER_JDK_BAD=""
+    gradle_wrappers "${1:-}"
+    for v in $GRADLE_WRAPPER_VERSIONS; do
+        _gradle_runs_on "$v" 21 || ANDROID_WRAPPER_JDK_BAD="${ANDROID_WRAPPER_JDK_BAD:+$ANDROID_WRAPPER_JDK_BAD }$v"
+    done
+    if [ -z "$ANDROID_WRAPPER_JDK_BAD" ] || [ -n "${2:-}" ]; then return 0; fi
+    echo "[WARN] This project's Gradle wrapper ($ANDROID_WRAPPER_JDK_BAD) does not run on the Java 21 of the Android SDK image (Gradle 8.5 or later does), so the build is likely to fail and the result to fall back to direct dependencies only."
+    echo "[WARN]   Fix: raise distributionUrl in gradle/wrapper/gradle-wrapper.properties to Gradle 8.5 or later, or build the SDK image on an older JDK (docker/android/Dockerfile, build argument BASE_JDK_IMAGE) and scan with its ANDROID_IMAGE_PREFIX."
+    echo "[WARN] 이 프로젝트의 Gradle 래퍼($ANDROID_WRAPPER_JDK_BAD)는 안드로이드 SDK 이미지의 Java 21에서 실행되지 않습니다(Gradle 8.5 이상이어야 함). 빌드가 실패해 직접 의존성만 남을 수 있습니다."
+    echo "[WARN]   해결: gradle/wrapper/gradle-wrapper.properties의 distributionUrl을 Gradle 8.5 이상으로 올리거나, 더 낮은 JDK 기반으로 SDK 이미지를 직접 만들어(docker/android/Dockerfile의 BASE_JDK_IMAGE) 그 ANDROID_IMAGE_PREFIX로 스캔하세요."
 }
 
 # android_sdk_image_missing <image> <api> [build-dir]: the stop for an Android
