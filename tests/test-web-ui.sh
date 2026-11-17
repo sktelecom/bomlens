@@ -7267,6 +7267,7 @@ case "$1" in
       exit 0
     fi
     echo "#1 [1/2] FROM base"; echo "#2 [2/2] RUN sdkmanager"
+    if [ -e "$F/failsdk" ]; then echo "[build] ERROR: sdk-install: Android platform 31 was not installed (sdkmanager failed)"; echo "dial tcp: lookup dl.google.com: no such host"; exit 1; fi
     if [ -e "$F/fail" ]; then echo "dial tcp: lookup dl.google.com: no such host"; exit 1; fi
     : > "$F/images/${tgt//[\/:]/_}"; exit 0 ;;
 esac
@@ -7398,6 +7399,12 @@ assert d['ok'] is True and d['api'] == 34 and d['image'] == 'bomlens-android-sdk
     [ "$(echo "$ev" | python3 -c "import sys,json;d=[e for e in json.load(sys.stdin) if e['event']=='done'][0]['data'];print(d['ok'],d['reason'])")" = "False dns" ] \
         && pass "a failed build reports done ok:false with a classified reason" || fail "build failure reason" "$ev"
     rm -f "$FAKE/fail"
+    # The Dockerfile's own SDK-install failure message is told apart from network failures.
+    : > "$FAKE/failsdk"
+    ev=$(and_sse "$AND_BASE/android-sdk-build-stream?api=31")
+    [ "$(echo "$ev" | python3 -c "import sys,json;d=[e for e in json.load(sys.stdin) if e['event']=='done'][0]['data'];print(d['ok'],d['reason'])")" = "False sdk-install" ] \
+        && pass "an SDK install failure in the build is reported as reason sdk-install" || fail "sdk-install reason" "$ev"
+    rm -f "$FAKE/failsdk"
 
     # Cancel: POST cancel stops a running build and the stream ends with reason cancelled.
     : > "$FAKE/slow"; rm -f "$FAKE/build.args"

@@ -51,10 +51,19 @@ RUN mkdir -p "$ANDROID_HOME/cmdline-tools" \
     && rm /tmp/cmd.zip
 ENV PATH="${PATH}:/opt/android-sdk/cmdline-tools/latest/bin:/opt/android-sdk/platform-tools"
 
+# The build-tools version is a guess (<API>.0.0) and may not exist, so that step may
+# fall back to the platform alone. The platform is what dependency resolution needs:
+# if it is not installed (network, proxy, disk), the build fails here instead of
+# producing an image that cannot resolve anything.
 RUN yes | sdkmanager --licenses >/dev/null 2>&1 || true; \
     sdkmanager "platform-tools" "platforms;android-${ANDROID_API}" "build-tools;${ANDROID_BUILD_TOOLS}" >/dev/null 2>&1 \
       || sdkmanager "platform-tools" "platforms;android-${ANDROID_API}" >/dev/null 2>&1 \
-      || echo "[build] WARN: sdkmanager could not install all packages for API ${ANDROID_API}"
+      || true; \
+    if [ ! -d "${ANDROID_HOME}/platforms/android-${ANDROID_API}" ]; then \
+      echo "[build] ERROR: sdk-install: Android platform ${ANDROID_API} was not installed (sdkmanager failed)"; \
+      sdkmanager "platforms;android-${ANDROID_API}" 2>&1 | tail -n 5; \
+      exit 1; \
+    fi
 
 # cdxgen + gradle come from the base image; scan-sbom.sh mounts build-prep.sh
 WORKDIR /app
