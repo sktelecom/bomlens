@@ -1347,14 +1347,34 @@ android_api() {
 # ANDROID_SDK_IMAGE_MISSING, which a program showing its own dialog reads; the
 # English and the Korean block each start with it. A build directory that is not
 # on this machine (a CLI archive, the scanner container) is replaced by the
-# repository's own docker/android folder, which docker build reads over the web.
+# repository's own docker/android folder, which docker build reads over the web,
+# at the tag of the release this image or CLI belongs to (bomlens_release_tag).
 ANDROID_SDK_IMAGE_MISSING_CODE="ANDROID_SDK_IMAGE_MISSING"
+
+# bomlens_release_tag: the git tag (vX.Y.Z) of the release in use, so a recipe read
+# from GitHub matches it. The version is the BOMLENS_VERSION the image is built
+# with (inside the scanner container), or the one the scanner image on this
+# machine carries (the CLI). Prints nothing when it is not a release (a local
+# build, or latest-<commit> from main); the caller then reads main.
+bomlens_release_tag() {
+    local v="${BOMLENS_VERSION:-}"
+    if [ -z "$v" ] && command -v docker >/dev/null 2>&1; then
+        v="$(docker image inspect --format '{{range .Config.Env}}{{println .}}{{end}}' \
+                "${SBOM_SCANNER_IMAGE:-ghcr.io/sktelecom/bomlens:latest}" 2>/dev/null | sed -n 's/^BOMLENS_VERSION=//p' | head -n 1)"
+    fi
+    v="${v#v}"
+    case "$v" in
+        [0-9]*.[0-9]*.[0-9]*) case "$v" in *[!0-9A-Za-z._-]*) return 0 ;; esac; echo "v$v" ;;
+    esac
+}
+
 android_sdk_image_missing() {
-    local img="$1" api="$2" dir="${3:-}" ctx pfx=""
+    local img="$1" api="$2" dir="${3:-}" ctx pfx="" tag
     if [ -n "$dir" ] && [ -f "$dir/Dockerfile" ]; then
         ctx="$dir"
     else
-        ctx="https://github.com/sktelecom/bomlens.git#main:docker/android"
+        tag="$(bomlens_release_tag)"
+        ctx="https://github.com/sktelecom/bomlens.git#${tag:-main}:docker/android"
     fi
     [ "${CDXGEN_IMAGE_PREFIX:-ghcr.io/cdxgen/}" = "ghcr.io/cdxgen/" ] || pfx=" --build-arg CDXGEN_IMAGE_PREFIX=$CDXGEN_IMAGE_PREFIX"
     echo "[ERROR] $ANDROID_SDK_IMAGE_MISSING_CODE: Android SDK image not found: $img"

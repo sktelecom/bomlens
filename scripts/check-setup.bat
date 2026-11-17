@@ -21,6 +21,9 @@ REM The folder whose visibility inside the container is checked: the first
 REM argument, else the current folder.
 set "SCAN_DIR=%~1"
 if not defined SCAN_DIR set "SCAN_DIR=%CD%"
+REM A full path: docker run -v reads a relative name as a named volume, which is
+REM empty (a false "cannot see this folder") and is left behind.
+for %%I in ("%SCAN_DIR%") do set "SCAN_DIR=%%~fI"
 set "IMAGE_OK="
 set /a PROBLEMS=0
 
@@ -127,8 +130,12 @@ set "MEM_MB=%MEM_BYTES:~0,-6%"
 set "MEM_MBN=0"
 set /a "MEM_MBN=%MEM_MB%" 2>nul
 REM Decimal megabytes to GiB with one decimal, like check-setup.sh (rounding 3.8
-REM up to 4 hid how close to the line the engine was): MB*10000/1074 is tenths.
-set /a "MEM_T=(MEM_MBN*10000+537)/1074"
+REM up to 4 hid how close to the line the engine was): MB*5000/537 is tenths.
+REM Split in quotient and remainder so the product stays inside 32 bits however
+REM much memory the engine reports.
+set /a "MEM_Q=MEM_MBN/537"
+set /a "MEM_R=MEM_MBN %% 537"
+set /a "MEM_T=MEM_Q*5000+(MEM_R*5000+268)/537"
 set /a "MEM_W=MEM_T/10"
 set /a "MEM_F=MEM_T %% 10"
 if %MEM_MBN% LSS 3758 goto :mem_low
