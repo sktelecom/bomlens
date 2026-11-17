@@ -169,7 +169,10 @@ fi
 # --------------------------------------------------------
 LIC_COUNT="N/A"
 if [ -f "$NOTICE" ]; then
-    LIC_COUNT=$(grep -c '^License: ' "$NOTICE" 2>/dev/null || echo 0)
+    # grep -c prints 0 itself when nothing matches (and exits 1), so a second
+    # "echo 0" would put two lines in the report.
+    LIC_COUNT=$(grep -c '^License: ' "$NOTICE" 2>/dev/null || true)
+    LIC_COUNT="${LIC_COUNT:-0}"
 fi
 
 # --------------------------------------------------------
@@ -188,6 +191,12 @@ if [ ! -f "$LIB_DIR/report-common.sh" ]; then
 fi
 # shellcheck source=report-common.sh
 . "$LIB_DIR/report-common.sh"
+# Whether the result can be read as complete (assess-completeness.sh). An empty
+# or partial result must not read as "no known vulnerabilities" or as a plan to
+# prepare, so the sections below say what is missing instead.
+report_completeness_load "$BOM" "$OUT_PREFIX"
+INCOMPLETE=false
+if report_completeness_incomplete; then INCOMPLETE=true; fi
 # The components whose licenses this report counts. For a source or image scan
 # the root component is the scanned project itself, whose own license is not a
 # third-party obligation, so it is left out (as the NOTICE file leaves it out).
@@ -348,6 +357,7 @@ if [ "$REPORT_LANG" = "ko" ]; then
     P_REASON_NO_VERSION=$(kstr risk.unchecked_no_version)
     P_REASON_NO_ID=$(kstr risk.unchecked_no_identifier)
     P_REASON_REPO_PURL=$(kstr risk.unchecked_repository_purl)
+    P_REASON_UNSUP=$(kstr risk.unchecked_unsupported_ecosystem)
     P_VULN_NONE_CHECKED_MD=$(kstr risk.vuln_none_checked_md); P_VULN_NONE_CHECKED_HTML=$(kstr risk.vuln_none_checked_html)
     P_FW_SCOPE_H=$(kstr risk.fw_scope_h)
     P_FW_LABEL=$(kstr risk.fw_scope_label)
@@ -422,12 +432,13 @@ else
     P_UNPINNED_HTML="The source states version ranges and ships no lock file, so the versions in this SBOM are what a fresh install resolves at scan time, not necessarily the versions that were used. The counts below were measured against these versions. To judge a specific environment, scan a manifest that pins exact versions."
     P_UNREACHED_MD="> ${UNREACHED_N} finding(s) are not reachable: govulncheck found that the affected Go code is not called or not in the executable (--reachability). They are not in the counts above; the security report lists them."
     P_UNREACHED_HTML="<b>$(report_num "$UNREACHED_N") finding(s) are not reachable</b>: govulncheck found that the affected Go code is not called or not in the executable (--reachability). They are not in the counts below; the security report lists them."
-    P_UNCHECKED_MD="> ${UNCHECKED_N} component(s) could not be checked: they have no version, or no package purl that Trivy can query and no CPE that was matched, so no vulnerability database was asked about them. The counts above do not cover them."
-    P_UNCHECKED_HTML="<b>$(report_num "$UNCHECKED_N") component(s) could not be checked</b>: they have no version, or no package purl that Trivy can query and no CPE that was matched, so no vulnerability database was asked about them. The counts below do not cover them."
+    P_UNCHECKED_MD="> ${UNCHECKED_N} component(s) could not be checked: they have no version, or no package purl that Trivy can query and no CPE that was matched, or they come from a package ecosystem no vulnerability data source covers, so no vulnerability database was asked about them. The counts above do not cover them."
+    P_UNCHECKED_HTML="<b>$(report_num "$UNCHECKED_N") component(s) could not be checked</b>: they have no version, or no package purl that Trivy can query and no CPE that was matched, or they come from a package ecosystem no vulnerability data source covers, so no vulnerability database was asked about them. The counts below do not cover them."
     P_UNCHECKED_MORE="… and $((UNCHECKED_N - UNCHECKED_LIST_MAX)) more (the security report lists them all)"
     P_REASON_NO_VERSION="no version"
     P_REASON_NO_ID="no package purl and no matched CPE"
     P_REASON_REPO_PURL="repository purl (pkg:github, ...), which Trivy does not query"
+    P_REASON_UNSUP="package ecosystem with no vulnerability data source (pkg:cocoapods)"
     P_VULN_NONE_CHECKED_MD="_No vulnerability was found in the components that were checked. The components that could not be checked are listed above._"
     P_VULN_NONE_CHECKED_HTML="No vulnerability was found in the components that were checked. The components that could not be checked are listed above."
     P_FW_SCOPE_H="Firmware analysis scope"
@@ -544,8 +555,16 @@ P_VULN_NOTE_HTML="<div class=\"box\"><div class=\"box-head\"><p class=\"box-titl
     fi
     echo "## ${S_VULN}. ${P_H2_VULN}"
     echo ""
-    echo "${P_VULN_NOTE_MD}"
-    echo ""
+    if [ "$INCOMPLETE" = "true" ]; then
+        report_completeness_md
+        echo ""
+    fi
+    # The deadlines are advice on findings; with none and an incomplete result
+    # there is nothing to plan for yet.
+    if [ "$INCOMPLETE" != "true" ] || [ "$TOTAL" -gt 0 ]; then
+        echo "${P_VULN_NOTE_MD}"
+        echo ""
+    fi
     echo "| Critical | High | Medium | Low | Unknown | Total |"
     echo "|---:|---:|---:|---:|---:|---:|"
     echo "| ${C} | ${H} | ${M} | ${L} | ${U} | ${TOTAL} |"
@@ -560,9 +579,9 @@ P_VULN_NOTE_HTML="<div class=\"box\"><div class=\"box-head\"><p class=\"box-titl
         echo "${P_UNCHECKED_MD}"
         echo ""
         # shellcheck disable=SC2016
-        echo "$UNCHECKED_TOP" | jq -r --arg nv "$P_REASON_NO_VERSION" --arg ni "$P_REASON_NO_ID" --arg rp "$P_REASON_REPO_PURL" '.[] |
+        echo "$UNCHECKED_TOP" | jq -r --arg nv "$P_REASON_NO_VERSION" --arg ni "$P_REASON_NO_ID" --arg rp "$P_REASON_REPO_PURL" --arg us "$P_REASON_UNSUP" '.[] |
             "- `" + (.name | gsub("`"; "")) + "`" + (if .version != "" then " " + .version else "" end)
-            + " (" + (if .reason == "no-version" then $nv elif .reason == "no-identifier" then $ni elif .reason == "repository-purl" then $rp else .reason end) + ")"'
+            + " (" + (if .reason == "no-version" then $nv elif .reason == "no-identifier" then $ni elif .reason == "repository-purl" then $rp elif .reason == "unsupported-ecosystem" then $us else .reason end) + ")"'
         if [ "$UNCHECKED_N" -gt "$UNCHECKED_LIST_MAX" ]; then echo "- ${P_UNCHECKED_MORE}"; fi
         echo ""
     elif [ "${PRESENCE_ONLY:-0}" -gt 0 ]; then
@@ -589,6 +608,9 @@ P_VULN_NOTE_HTML="<div class=\"box\"><div class=\"box-head\"><p class=\"box-titl
             "| \(.severity) | \(.id) | \(.pkg) | \(.version) | \(.fixed) | \(
               if .severity=="CRITICAL" then $cd elif .severity=="HIGH" then $hd else $pol end
             ) |"'
+    elif [ "$INCOMPLETE" = "true" ]; then
+        echo "_$(report_completeness_no_claim)_"
+        if [ "${UNCHECKED_N:-0}" -gt 0 ]; then echo ""; echo "${P_VULN_NONE_CHECKED_MD}"; fi
     elif [ "${UNCHECKED_N:-0}" -gt 0 ]; then
         echo "${P_VULN_NONE_CHECKED_MD}"
     else
@@ -662,11 +684,18 @@ P_VULN_NOTE_HTML="<div class=\"box\"><div class=\"box-head\"><p class=\"box-titl
     echo ""
     echo "## ${S_NEXT}. ${P_H2_NEXT}"
     echo ""
-    echo "1. ${P_NEXT1_PRE}**${P_NEXT1_BOLD}**${P_NEXT1_POST}"
+    NEXT_N=0
+    if [ "$INCOMPLETE" = "true" ]; then
+        NEXT_N=$((NEXT_N + 1)); echo "${NEXT_N}. $(report_completeness_text .nextStep)"
+    fi
+    if [ "$INCOMPLETE" != "true" ] || [ "$TOTAL" -gt 0 ]; then
+        NEXT_N=$((NEXT_N + 1)); echo "${NEXT_N}. ${P_NEXT1_PRE}**${P_NEXT1_BOLD}**${P_NEXT1_POST}"
+    fi
     if [ "$HAS_CONF" = "true" ]; then
-        echo "2. ${P_NEXT2_CONF}"
-    else
-        echo "2. ${P_NEXT2_SELF_MD}"
+        NEXT_N=$((NEXT_N + 1)); echo "${NEXT_N}. ${P_NEXT2_CONF}"
+    elif [ "$COMPLETENESS_GRADE" != "unreliable" ]; then
+        # An unreliable result is not handed on with the notice as if it were whole.
+        NEXT_N=$((NEXT_N + 1)); echo "${NEXT_N}. ${P_NEXT2_SELF_MD}"
     fi
 } > "$MD"
 
@@ -713,6 +742,9 @@ HTMLHEAD
     echo "<h2>${S_VULN}. ${P_H2_VULN}</h2>"
     # What the counts below do not cover, in one notice above them. The limit
     # of a firmware analysis comes first: it bounds everything else.
+    if [ "$INCOMPLETE" = "true" ]; then
+        report_completeness_html
+    fi
     NOTES=""
     if [ "$FW_SCOPE" = "true" ]; then
         NOTES="${NOTES}<p><b>${P_FW_LABEL}</b> ${FW_SCOPE_TEXT_HTML}"
@@ -725,9 +757,9 @@ HTMLHEAD
     fi
     if [ "${UNCHECKED_N:-0}" -gt 0 ]; then
         # shellcheck disable=SC2016
-        UNCHECKED_LI=$(echo "$UNCHECKED_TOP" | jq -r --arg nv "$P_REASON_NO_VERSION" --arg ni "$P_REASON_NO_ID" --arg rp "$P_REASON_REPO_PURL" '.[] |
+        UNCHECKED_LI=$(echo "$UNCHECKED_TOP" | jq -r --arg nv "$P_REASON_NO_VERSION" --arg ni "$P_REASON_NO_ID" --arg rp "$P_REASON_REPO_PURL" --arg us "$P_REASON_UNSUP" '.[] |
             "<li><code>" + (.name | @html) + "</code>" + (if .version != "" then " " + (.version | @html) else "" end)
-            + " (" + ((if .reason == "no-version" then $nv elif .reason == "no-identifier" then $ni elif .reason == "repository-purl" then $rp else .reason end) | @html) + ")</li>"')
+            + " (" + ((if .reason == "no-version" then $nv elif .reason == "no-identifier" then $ni elif .reason == "repository-purl" then $rp elif .reason == "unsupported-ecosystem" then $us else .reason end) | @html) + ")</li>"')
         if [ "$UNCHECKED_N" -gt "$UNCHECKED_LIST_MAX" ]; then UNCHECKED_LI="${UNCHECKED_LI}
 <li>$(esc "$P_UNCHECKED_MORE")</li>"; fi
         NOTES="${NOTES}<p>${P_UNCHECKED_HTML}</p><ul>
@@ -742,7 +774,9 @@ ${UNCHECKED_LI}
     if [ -n "$NOTES" ]; then
         printf '<div class="banner">%s</div>\n' "$NOTES"
     fi
-    echo "${P_VULN_NOTE_HTML}"
+    if [ "$INCOMPLETE" != "true" ] || [ "$TOTAL" -gt 0 ]; then
+        echo "${P_VULN_NOTE_HTML}"
+    fi
 
     if [ "$TOTAL" -gt 0 ]; then
         # The severity labels sit in the head of the table they count.
@@ -762,7 +796,10 @@ ${UNCHECKED_LI}
         echo "<div class=\"summary\">"
         report_sev_labels "$C" "$H" "$M" "$L" "$U"
         echo "</div>"
-        if [ "${UNCHECKED_N:-0}" -gt 0 ]; then
+        if [ "$INCOMPLETE" = "true" ]; then
+            echo "<p>$(report_completeness_no_claim | jq -Rr '@html')</p>"
+            if [ "${UNCHECKED_N:-0}" -gt 0 ]; then echo "<p>${P_VULN_NONE_CHECKED_HTML}</p>"; fi
+        elif [ "${UNCHECKED_N:-0}" -gt 0 ]; then
             echo "<p>${P_VULN_NONE_CHECKED_HTML}</p>"
         else
             echo "<p>${P_VULN_NONE_HTML}</p>"
@@ -848,10 +885,15 @@ ${UNCHECKED_LI}
 
     echo "<h2>${S_NEXT}. ${P_H2_NEXT}</h2>"
     echo "<ol>"
-    echo " <li>${P_NEXT1_PRE}<b>${P_NEXT1_BOLD}</b>${P_NEXT1_POST}</li>"
+    if [ "$INCOMPLETE" = "true" ]; then
+        echo " <li>$(report_completeness_text .nextStep | jq -Rr '@html')</li>"
+    fi
+    if [ "$INCOMPLETE" != "true" ] || [ "$TOTAL" -gt 0 ]; then
+        echo " <li>${P_NEXT1_PRE}<b>${P_NEXT1_BOLD}</b>${P_NEXT1_POST}</li>"
+    fi
     if [ "$HAS_CONF" = "true" ]; then
         echo " <li>${P_NEXT2_CONF}</li>"
-    else
+    elif [ "$COMPLETENESS_GRADE" != "unreliable" ]; then
         echo " <li>${P_NEXT2_SELF_HTML}</li>"
     fi
     echo "</ol>"

@@ -1551,6 +1551,37 @@ else
 fi
 
 # --------------------------------------------------------
+# Result completeness (assess-completeness.sh), the same verdict the security,
+# risk and NOTICE reports state. Without this row a document with no component,
+# or one the scan could not resolve, passed every check below, because each
+# measures coverage of the components that exist. Added only when the result is
+# not complete, so a complete one carries no extra row. An unreliable result is a
+# mandatory failure (the document cannot stand as the SBOM of what was scanned);
+# a partial one is a warning that lists what is missing and how to fix it.
+# --------------------------------------------------------
+if [ "$FORMAT" = "CycloneDX" ]; then
+    report_completeness_load "$SBOM" "$OUT_PREFIX"
+    if report_completeness_incomplete; then
+        if COMPLETENESS_ROW=$(jq -c '
+            . as $c
+            | [{id: "result-completeness",
+                label: "Result completeness",
+                label_ko: "결과 완전성",
+                required: ($c.grade == "unreliable"),
+                source: "auto",
+                status: (if $c.grade == "unreliable" then "fail" else "warn" end),
+                detail: "\($c.gradeLabel.en): \($c.reasons | map(.code) | join(", "))",
+                detail_ko: "\($c.gradeLabel.ko): \($c.reasons | map(.code) | join(", "))",
+                missing: ($c.reasons | map("\(.message.en) How to fix: \(.fix.en)")),
+                missing_ko: ($c.reasons | map("\(.message.ko) 해결 방법: \(.fix.ko)"))}]' "$COMPLETENESS_FILE" 2>/dev/null); then
+            CHECKS=$(printf '%s\n%s' "$CHECKS" "$COMPLETENESS_ROW" | jq -cs 'add')
+        else
+            echo "[validate] WARN: could not read $COMPLETENESS_FILE; the completeness row is omitted." >&2
+        fi
+    fi
+fi
+
+# --------------------------------------------------------
 # Submission profile: what the supplier has to do next.
 #
 # A firmware, root filesystem or binary SBOM fails the submission for two
@@ -2088,7 +2119,8 @@ if [ "$REPORT_LANG" = "ko" ]; then
     RCHECKS=$(printf '%s' "$CHECKS" | jq -c '
       map((if (.label_ko // "") != "" then .label = .label_ko else . end)
           | (if (.detail_ko // "") != "" then .detail = .detail_ko else . end)
-          | (if (.reviewGuide.how_ko // "") != "" then .reviewGuide.how = .reviewGuide.how_ko else . end))
+          | (if (.reviewGuide.how_ko // "") != "" then .reviewGuide.how = .reviewGuide.how_ko else . end)
+          | (if (.missing_ko // null) != null then .missing = .missing_ko else . end))
     ') || RCHECKS="$CHECKS"
     # Crosswalk: swap the framework display titles and the disclaimer for their
     # Korean wording from the crosswalk file itself (same convention as the G7

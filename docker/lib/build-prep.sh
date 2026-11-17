@@ -1162,6 +1162,13 @@ if [ -f pom.xml ] && [ ! -f build.gradle ] && [ ! -f build.gradle.kts ]; then
             # step, so the result manifest shows it. Some there: the log is enough.
             # A refused pom.xml is already recorded as maven-dependency-tree.
             [ -n "$_mvn_tree_failed" ] || [ "${_mvn_have:-0}" -gt 0 ] || mark_prep_failed maven-dependency-jars
+            # A dependency Maven could not find or download is a missing
+            # component, not only a missing hash, whatever else was fetched:
+            # recorded so the reports say the dependency set is incomplete.
+            if grep -Eq 'Could not (find|transfer) artifact|Could not resolve dependencies|Failed to collect dependencies' "$_mvn_err"; then
+                log "maven: a dependency could not be found or downloaded, so the SBOM may lack it and its transitive dependencies; check the repository address and credentials (settings.xml)"
+                mark_prep_failed maven-dependency-resolve
+            fi
         fi
         rm -f "$_mvn_err" "$_mvn_list"
     fi

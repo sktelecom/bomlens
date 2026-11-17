@@ -57,6 +57,11 @@ fi
 TXT="${OUT_PREFIX}_NOTICE.txt"
 HTML="${OUT_PREFIX}_NOTICE.html"
 
+# Whether the result can be read as complete (assess-completeness.sh).
+report_completeness_load "$SBOM" "$OUT_PREFIX"
+INCOMPLETE=false
+if report_completeness_incomplete; then INCOMPLETE=true; fi
+
 # Normalize a license id/name/expression to an SPDX id for common aliases.
 # The normalize() definition is shared with normalize-sbom.sh via spdx-normalize.jq
 # so the NOTICE and the bom.json the web UI reads group licenses identically.
@@ -305,6 +310,12 @@ done)
     echo "Generated: ${GEN_AT}"
     echo "Total components: ${TOTAL_COMP} · Distinct licenses: ${TOTAL_LIC}"
     echo ""
+    # A notice built from an empty or partial SBOM lists only what was found; it
+    # must not read as the notice of the whole product.
+    if [ "$INCOMPLETE" = "true" ]; then
+        REPORT_LANG=en report_completeness_txt
+        echo ""
+    fi
     echo "This product includes the following open source software."
     echo "Each component lists its source/download location and copyright/attribution."
     echo "================================================================================"
@@ -379,6 +390,10 @@ HTMLHEAD
     report_page_head "$N_TITLE" "$PROJECT_ESC" "$N_VERSION" "" \
         "$(esc "$(report_type_label "${MODE:-}")")" "$(report_time_html "$GEN_AT")" \
         "$(report_str components "$(report_num "$TOTAL_COMP")")" "$N_LICS"
+
+    if [ "$INCOMPLETE" = "true" ]; then
+        report_completeness_html
+    fi
 
     # License review banner (AI behavioral-use / non-commercial). Escaped via @html.
     if [ "$REVIEW_N" -gt 0 ]; then

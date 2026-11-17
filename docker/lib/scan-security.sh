@@ -520,6 +520,12 @@ fi
 # The report lists at most this many; the rest are in _security.json.
 UNCHECKED_MAX=200
 
+# Whether the result can be read as complete (assess-completeness.sh): an empty
+# or partial SBOM must not come out of this report as "no known vulnerabilities".
+report_completeness_load "$SBOM" "$OUT_PREFIX"
+INCOMPLETE=false
+if report_completeness_incomplete; then INCOMPLETE=true; fi
+
 count() { echo "$FINDINGS" | jq "[.[] | select(.severity==\"$1\")] | length"; }
 C=$(count CRITICAL); H=$(count HIGH); M=$(count MEDIUM); L=$(count LOW); U=$(count UNKNOWN)
 TOTAL=$(echo "$FINDINGS" | jq 'length')
@@ -542,6 +548,11 @@ KEV_COUNT=$(echo "$FINDINGS" | jq '[.[] | select(.kev)] | length')
         echo "> The vulnerability scan did not complete, so this report does not reflect the target's actual exposure."
         echo ">"
         echo "> Error: \`${SCAN_ERR}\`"
+        echo ""
+    fi
+    if [ "$INCOMPLETE" = "true" ]; then
+        # The Markdown stays English, as the rest of it does.
+        REPORT_LANG=en report_completeness_md
         echo ""
     fi
     if [ "$ENRICHED" = "true" ]; then
@@ -599,6 +610,8 @@ KEV_COUNT=$(echo "$FINDINGS" | jq '[.[] | select(.kev)] | length')
         echo "_Scan failed — no results were produced._"
     elif [ "${UNCHECKED_N:-0}" -gt 0 ]; then
         echo "_No vulnerability was found in the components that were checked. ${UNCHECKED_N} component(s) could not be checked; they are listed below._"
+    elif [ "$INCOMPLETE" = "true" ]; then
+        echo "_$(REPORT_LANG=en report_completeness_no_claim)_"
     elif [ "${UNREACHED_N:-0}" -gt 0 ]; then
         echo "_No reachable vulnerability was found. ${UNREACHED_N} finding(s) are not reachable; they are listed below._"
     else
@@ -624,7 +637,8 @@ KEV_COUNT=$(echo "$FINDINGS" | jq '[.[] | select(.kev)] | length')
         echo ""
         echo "${UNCHECKED_N} component(s) could not be checked against a vulnerability database:"
         echo "they have no version, or no package purl that Trivy can query and no CPE that was"
-        echo "matched. A clean result does not cover them."
+        echo "matched, or they come from a package ecosystem no vulnerability data source covers"
+        echo "(pkg:cocoapods). A clean result does not cover them."
         if [ -n "${BOMLENS_CPE_INDEX_SKIPPED:-}" ] && echo "$UNCHECKED" | jq -e 'any(.[]; .Reason != "no-version")' >/dev/null 2>&1; then
             echo ""
             echo "$UNCHECKED_NOTE"
@@ -634,7 +648,7 @@ KEV_COUNT=$(echo "$FINDINGS" | jq '[.[] | select(.kev)] | length')
         echo "|-----------|---------|------|--------|"
         echo "$UNCHECKED" | jq -r --argjson max "$UNCHECKED_MAX" 'def cell: tostring | gsub("[|\n]"; " ");
             .[0:$max][] |
-            "| \(.Name | cell) | \(.Version | cell) | \(.PURL | cell) | \({"no-version": "no version", "no-identifier": "no package purl and no matched CPE", "repository-purl": "repository purl (pkg:github, ...), which Trivy does not query"}[.Reason] // .Reason) |"'
+            "| \(.Name | cell) | \(.Version | cell) | \(.PURL | cell) | \({"no-version": "no version", "no-identifier": "no package purl and no matched CPE", "repository-purl": "repository purl (pkg:github, ...), which Trivy does not query", "unsupported-ecosystem": "package ecosystem with no vulnerability data source (pkg:cocoapods)"}[.Reason] // .Reason) |"'
         if [ "$UNCHECKED_N" -gt "$UNCHECKED_MAX" ]; then
             echo ""
             echo "… and $((UNCHECKED_N - UNCHECKED_MAX)) more, listed in \`UncheckedComponents\` in \`$(basename "$JSON")\`."
@@ -713,6 +727,7 @@ NO_FIX="$(report_str no_fix)"
 R_NOVER="$(sec_s reason_no_version 'no version')"
 R_NOID="$(sec_s reason_no_identifier 'no package purl and no matched CPE')"
 R_REPO="$(sec_s reason_repository_purl 'repository purl (pkg:github, ...), which Trivy does not query')"
+R_UNSUP="$(sec_s reason_unsupported_ecosystem 'package ecosystem with no vulnerability data source (pkg:cocoapods)')"
 {
     cat <<HTMLHEAD
 <!DOCTYPE html>
@@ -743,6 +758,10 @@ HTMLHEAD
     fi
     if [ "${KERNEL_TOTAL:-0}" -gt 0 ]; then
         NOTES="${NOTES}<p>$(sec_s kernel_note '<b>%s kernel advisories</b> are listed at the end of this report and are not included in the counts below. Most advisories against a kernel are for subsystems a given device never compiled in, and the SBOM cannot tell which, so counting them here would bury the findings this report exists to show.' "$(report_num "$KERNEL_TOTAL")")</p>"
+    fi
+    if [ "$INCOMPLETE" = "true" ]; then
+        # Its own banner, above the others: it bounds everything they say.
+        report_completeness_html
     fi
     if [ -n "$NOTES" ]; then
         if [ -n "$SCAN_ERR" ]; then echo "<div class=\"banner banner-danger\">${NOTES}</div>"; else echo "<div class=\"banner\">${NOTES}</div>"; fi
@@ -785,6 +804,8 @@ HTMLHEAD
             echo "<p>$(sec_s none_failed 'Scan failed &mdash; no results were produced.')</p>"
         elif [ "${UNCHECKED_N:-0}" -gt 0 ]; then
             echo "<p>$(sec_s none_unchecked 'No vulnerability was found in the components that were checked. %s component(s) could not be checked; they are listed below.' "$(report_num "$UNCHECKED_N")")</p>"
+        elif [ "$INCOMPLETE" = "true" ]; then
+            echo "<p>$(report_completeness_no_claim | jq -Rr '@html')</p>"
         elif [ "${UNREACHED_N:-0}" -gt 0 ]; then
             echo "<p>$(sec_s none_unreached 'No reachable vulnerability was found. %s finding(s) are not reachable; they are listed below.' "$(report_num "$UNREACHED_N")")</p>"
         else
@@ -794,7 +815,7 @@ HTMLHEAD
     if [ "${UNCHECKED_N:-0}" -gt 0 ]; then
         report_next_id
         echo "<div class=\"box\"><div class=\"box-head\"><h2 id=\"${REPORT_BOX_ID}\">$(sec_s h2_unchecked 'Components that could not be checked')</h2><span class=\"counter\">$(report_num "$UNCHECKED_N")</span>"
-        echo "<p class=\"meta\">$(sec_s unchecked_intro 'They have no version, or no package purl that Trivy can query and no CPE that was matched, so no vulnerability database was asked about them. A clean result does not cover them.')</p>"
+        echo "<p class=\"meta\">$(sec_s unchecked_intro 'They have no version, or no package purl that Trivy can query and no CPE that was matched, or they come from a package ecosystem no vulnerability data source covers (pkg:cocoapods), so no vulnerability database was asked about them. A clean result does not cover them.')</p>"
         if [ -n "${BOMLENS_CPE_INDEX_SKIPPED:-}" ] && echo "$UNCHECKED" | jq -e 'any(.[]; .Reason != "no-version")' >/dev/null 2>&1; then
             # English is UNCHECKED_NOTE as it is, passed as text and never as a
             # printf format; Korean comes from the catalog, with the BomLens
@@ -810,10 +831,10 @@ HTMLHEAD
         fi
         echo "</div>"
         echo "<div class=\"table-scroll\"><table aria-labelledby=\"${REPORT_BOX_ID}\"><thead><tr><th>${TH_COMP}</th><th>${TH_VER}</th><th>${TH_PURL}</th><th>${TH_REASON}</th></tr></thead><tbody>"
-        echo "$UNCHECKED" | jq -r --argjson max "$UNCHECKED_MAX" --arg nv "$R_NOVER" --arg ni "$R_NOID" --arg rp "$R_REPO" '.[0:$max][] |
+        echo "$UNCHECKED" | jq -r --argjson max "$UNCHECKED_MAX" --arg nv "$R_NOVER" --arg ni "$R_NOID" --arg rp "$R_REPO" --arg us "$R_UNSUP" '.[0:$max][] |
             "<tr><td class=\"grow\">" + (.Name|tostring|@html) + "</td><td class=\"ver\">" + (.Version|tostring|@html) + "</td>" +
             "<td class=\"purl\">" + (.PURL|tostring|@html) + "</td>" +
-            "<td>" + ({"no-version": $nv, "no-identifier": $ni, "repository-purl": $rp}[.Reason] // .Reason | @html) + "</td></tr>"'
+            "<td>" + ({"no-version": $nv, "no-identifier": $ni, "repository-purl": $rp, "unsupported-ecosystem": $us}[.Reason] // .Reason | @html) + "</td></tr>"'
         echo "</tbody></table></div>"
         if [ "$UNCHECKED_N" -gt "$UNCHECKED_MAX" ]; then
             echo "<p class=\"legend\">$(sec_s unchecked_more '&hellip; and %s more, listed in <code>UncheckedComponents</code> in <code>%s</code>.' "$(report_num "$((UNCHECKED_N - UNCHECKED_MAX))")" "$JSON_FILE_HTML")</p>"

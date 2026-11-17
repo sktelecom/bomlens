@@ -567,3 +567,84 @@ report_time_html() {
             printf '%s' "$iso" ;;
     esac
 }
+
+# ---------------------------------------------------------------------------
+# Result completeness (assess-completeness.sh). One verdict that every report
+# reads, so none of them can call an empty or partial result clean.
+#
+#   report_completeness_load SBOM OUT_PREFIX
+#       (re)writes <out_prefix>_completeness.json from the SBOM and sets
+#       COMPLETENESS_GRADE to complete, partial or unreliable; it is empty when
+#       the document could not be assessed, and a report then says nothing about it.
+#   report_completeness_incomplete
+#       succeeds when the grade is partial or unreliable.
+#   report_completeness_md / report_completeness_html
+#       print the notice (title, headline, one item per reason with its fix) in
+#       REPORT_LANG; nothing when the result is complete. The HTML form is one
+#       banner, danger-coloured when the result is unreliable.
+#   report_completeness_txt
+#       the same notice as plain text lines, for the NOTICE .txt.
+#   report_completeness_no_claim
+#       the sentence a report prints where it used to say "no vulnerabilities".
+# ---------------------------------------------------------------------------
+COMPLETENESS_GRADE=""
+COMPLETENESS_FILE=""
+report_completeness_load() {
+    COMPLETENESS_GRADE=""
+    COMPLETENESS_FILE="${2}_completeness.json"
+    if [ -n "$1" ] && [ -n "$2" ] && [ -f "$1" ]; then
+        bash "$REPORT_LIB_DIR/assess-completeness.sh" "$1" "$2" >/dev/null 2>&1 || true
+    fi
+    [ -f "$COMPLETENESS_FILE" ] || return 0
+    COMPLETENESS_GRADE="$(jq -r '.grade // empty' "$COMPLETENESS_FILE" 2>/dev/null)" || COMPLETENESS_GRADE=""
+    case "$COMPLETENESS_GRADE" in complete|partial|unreliable) ;; *) COMPLETENESS_GRADE="" ;; esac
+}
+report_completeness_incomplete() {
+    [ "$COMPLETENESS_GRADE" = "partial" ] || [ "$COMPLETENESS_GRADE" = "unreliable" ]
+}
+# The registry next to this file holds the wording both the reports and the
+# sidecar take from, so a sentence is written once.
+report_completeness_text() { # <jq path under the registry, e.g. .noClaim>
+    local reg="${BOMLENS_COMPLETENESS_REASONS:-$REPORT_LIB_DIR/completeness-reasons.json}" l="${REPORT_LANG:-en}"
+    [ "$l" = "ko" ] || l="en"
+    jq -r --arg l "$l" "$1[\$l]" "$reg" 2>/dev/null
+}
+report_completeness_no_claim() { report_completeness_text .noClaim; }
+report_completeness_md() {
+    report_completeness_incomplete || return 0
+    local l="${REPORT_LANG:-en}" title fix head
+    [ "$l" = "ko" ] || l="en"
+    title="$(report_completeness_text .labels.title)"; fix="$(report_completeness_text .labels.fix)"
+    head="$(report_completeness_text .headline)"
+    jq -r --arg l "$l" --arg title "$title" --arg fix "$fix" --arg head "$head" '
+        def one: gsub("[\r\n]+"; " ");
+        "> **\($title): \(.gradeLabel[$l])**",
+        ">",
+        "> \($head)",
+        ">",
+        (.reasons[] | "> - \(.message[$l] | one) \($fix): \(.fix[$l] | one)")' "$COMPLETENESS_FILE"
+}
+report_completeness_txt() {
+    report_completeness_incomplete || return 0
+    local l="${REPORT_LANG:-en}" title fix head
+    [ "$l" = "ko" ] || l="en"
+    title="$(report_completeness_text .labels.title)"; fix="$(report_completeness_text .labels.fix)"
+    head="$(report_completeness_text .headline)"
+    jq -r --arg l "$l" --arg title "$title" --arg fix "$fix" --arg head "$head" '
+        def one: gsub("[\r\n]+"; " ");
+        "\($title): \(.gradeLabel[$l]). \($head)",
+        (.reasons[] | "  - \(.message[$l] | one) \($fix): \(.fix[$l] | one)")' "$COMPLETENESS_FILE"
+}
+report_completeness_html() {
+    report_completeness_incomplete || return 0
+    local l="${REPORT_LANG:-en}" cls="banner" title fix head
+    [ "$l" = "ko" ] || l="en"
+    if [ "$COMPLETENESS_GRADE" = "unreliable" ]; then cls="banner banner-danger"; fi
+    title="$(report_completeness_text .labels.title)"; fix="$(report_completeness_text .labels.fix)"
+    head="$(report_completeness_text .headline)"
+    jq -r --arg l "$l" --arg cls "$cls" --arg title "$title" --arg fix "$fix" --arg head "$head" '
+        "<div class=\"\($cls)\"><p class=\"banner-title\">\(($title + ": " + .gradeLabel[$l]) | @html)</p>"
+        + "<p>\($head | @html)</p><ul>"
+        + ([.reasons[] | "<li>\(.message[$l] | @html)<br><b>\($fix | @html):</b> \(.fix[$l] | @html)</li>"] | join(""))
+        + "</ul></div>"' "$COMPLETENESS_FILE"
+}

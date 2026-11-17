@@ -21,6 +21,11 @@ def vc_purl_type:
 def vc_no_ecosystem_purl:
   vc_purl_type | IN("", "generic", "github", "gitlab", "bitbucket", "git", "sourceforge", "gnu", "opkg", "yocto");
 
+# Package ecosystems no advisory source Trivy reads is keyed on. A component
+# with one of these purl types is checked by nothing, whatever its version.
+def vc_unsupported_ecosystem_types: ["cocoapods"];
+def vc_unsupported_ecosystem: vc_purl_type | IN(vc_unsupported_ecosystem_types[]);
+
 # A purl that names a source repository or project site. Trivy has no advisory
 # source keyed on these, so the report words them apart from a component with no
 # purl at all.
@@ -97,6 +102,7 @@ def vc_in_scope:
 # Why no check could reach a component, or empty when one could.
 #   no-version     there is no version to compare against an advisory
 #   no-identifier  no purl (or pkg:generic, opkg, yocto), and no CPE the index was asked about
+#   unsupported-ecosystem  a purl of a package ecosystem no advisory source covers (pkg:cocoapods)
 #   repository-purl  a purl that names a source repository (pkg:github, ...) and no
 #                    CPE the index was asked about; Trivy does not query these
 # $yocto_checked: the Yocto build's own CVE check ran (a _yocto_vex.json with
@@ -111,6 +117,7 @@ def vc_cpe_asked($cpe_matched):
 def vc_unchecked_reason($cpe_matched; $yocto_checked):
   if ($yocto_checked and vc_yocto_component) then empty
   elif (vc_usable_version | not) then "no-version"
+  elif vc_unsupported_ecosystem then "unsupported-ecosystem"
   elif vc_no_ecosystem_purl and ((vc_cpe_asked($cpe_matched) and vc_app_cpe) | not) then (if vc_repository_purl then "repository-purl" else "no-identifier" end)
   else empty end;
 def vc_unchecked_reason($cpe_matched): vc_unchecked_reason($cpe_matched; false);

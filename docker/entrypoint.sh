@@ -205,7 +205,7 @@ KNOWN_ARTIFACT_SUFFIXES=(
     _modelica.cdx.json _cocoapods.cdx.json _conda.cdx.json
     _security_cvebintool.json _security_grype.json _security_yocto.json
     _security_govulndb.json _security_trivy.json _component-versions.template.csv
-    _reachability.cdx.json _bom.refused.json
+    _reachability.cdx.json _bom.refused.json _completeness.json
 )
 # Only a caller that knows about this cleanup runs it at all. An old
 # scan-sbom.sh or server.py (built before this existed) sends neither signal
@@ -2441,6 +2441,9 @@ fi
 if [ -n "$SRC_TREE_DIR" ] && { [ "$SCAN_MODE" = "SOURCE" ] \
    || { [ "$SCAN_MODE" = "POSTPROCESS" ] && [ "${SOURCE_SCAN:-false}" = "true" ]; }; }; then
     bash "$LIBDIR/detect-version-pinning.sh" "$SRC_TREE_DIR" "$OUTPUT_FILE" || true
+    # A lock file the source needs and does not have, or one that cannot be
+    # read, recorded on the SBOM so every report can say why a result is small.
+    bash "$LIBDIR/detect-lockfile-state.sh" "$SRC_TREE_DIR" "$OUTPUT_FILE" || true
 fi
 # Collect the file tree if any source-having mode produced one (the modes above,
 # or FIRMWARE from scan-firmware.sh).
@@ -2480,6 +2483,16 @@ fi
 # vendored all done) and NOTICE/security below can each run for a while —
 # sync now so an interruption in either still leaves a complete, usable BOM.
 sync_artifacts
+
+# Whether this result can be read as complete: one verdict (complete, partial or
+# unreliable, with the reasons) that the notice, the security and risk reports
+# and the conformance check all state, and that the web layer can read without
+# recomputing it. Not a pipeline step: it never marks the SBOM, and a failure
+# only leaves the file out.
+if [ -s "$OUTPUT_FILE" ]; then
+    bash "$LIBDIR/assess-completeness.sh" "$OUTPUT_FILE" "$OUT_PREFIX" >/dev/null || true
+    [ -f "${OUT_PREFIX}_completeness.json" ] && ARTIFACTS+=("${OUT_PREFIX}_completeness.json")
+fi
 
 if [ "${GENERATE_NOTICE:-false}" != "true" ]; then
     er_record generate-notice disabled

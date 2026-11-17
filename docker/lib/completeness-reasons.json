@@ -1,0 +1,82 @@
+{
+  "schemaVersion": 1,
+  "grades": {
+    "complete": { "en": "Complete", "ko": "완전" },
+    "partial": { "en": "Partial", "ko": "부분" },
+    "unreliable": { "en": "Unreliable", "ko": "신뢰 불가" }
+  },
+  "labels": {
+    "title": { "en": "Result completeness", "ko": "결과 완전성" },
+    "fix": { "en": "How to fix", "ko": "해결 방법" }
+  },
+  "headline": {
+    "en": "The result is empty or incomplete. Reasons and how to fix them:",
+    "ko": "결과가 비었거나 불완전합니다. 사유와 해결 방법:"
+  },
+  "noClaim": {
+    "en": "This report cannot say that no vulnerabilities exist, because the result is empty or incomplete. Resolve the reasons above and scan again.",
+    "ko": "결과가 비었거나 불완전하므로 이 보고서는 취약점이 없다고 말할 수 없습니다. 위 사유를 해소한 뒤 다시 스캔하세요."
+  },
+  "nextStep": {
+    "en": "Resolve the reasons listed under result completeness above and scan again. Do not submit this result as evidence that the project has no vulnerabilities.",
+    "ko": "위 결과 완전성에 적힌 사유를 해소한 뒤 다시 스캔하세요. 이 결과를 프로젝트에 취약점이 없다는 근거로 제출하지 마십시오."
+  },
+  "resolutionSteps": [
+    "maven-dependency-tree", "maven-dependency-jars", "maven-dependency-resolve",
+    "gradle-dependencies", "gradle-packages", "android-release-classpath",
+    "pip-install", "poetry-graph", "npm-production-set", "pnpm-workspace-tree",
+    "swift-package-resolve", "cargo-lockfile", "go-mod-tidy", "bundle-lock",
+    "composer-install"
+  ],
+  "reasons": {
+    "no-components": {
+      "grade": "unreliable",
+      "en": "No component was found, so there is nothing to check for vulnerabilities or licenses. This does not mean the project has no dependencies.",
+      "ko": "컴포넌트가 하나도 발견되지 않아 취약점과 라이선스를 확인할 대상이 없습니다. 프로젝트에 의존성이 없다는 뜻이 아닙니다.",
+      "fixEn": "Check that the scanned folder is the project's top-level folder and holds a dependency list or lock file, then scan again.",
+      "fixKo": "스캔한 폴더가 프로젝트 최상위 폴더인지, 의존성 목록 파일이나 락 파일이 있는지 확인한 뒤 다시 스캔하세요."
+    },
+    "empty-with-manifests": {
+      "grade": "unreliable",
+      "en": "The source declares dependencies ({detail}) but the scan found no component, so those dependencies were not resolved.",
+      "ko": "소스에 의존성이 선언되어 있지만({detail}) 스캔 결과 컴포넌트가 없어 의존성을 해석하지 못했습니다.",
+      "fixEn": "Find the cause in the scan log (a lock file that is missing or damaged, a dependency that cannot be downloaded, or a build tool that failed), fix it and scan again.",
+      "fixKo": "스캔 로그에서 원인(없거나 손상된 락 파일, 내려받을 수 없는 의존성, 실패한 빌드 도구)을 찾아 해결한 뒤 다시 스캔하세요."
+    },
+    "tool-degraded": {
+      "grade": "partial",
+      "en": "The scan fell back to a shallower analysis ({detail}), so transitive dependencies and some licenses may be missing.",
+      "ko": "스캔이 더 얕은 분석 방식으로 대체되어({detail}) 전이 의존성과 일부 라이선스가 빠졌을 수 있습니다.",
+      "fixEn": "Fix the cause named in the scan log (memory, disk space, network access or the scanner image) and scan again.",
+      "fixKo": "스캔 로그에 나온 원인(메모리, 디스크 공간, 네트워크 접속, 스캐너 이미지)을 해결한 뒤 다시 스캔하세요."
+    },
+    "resolution-failed": {
+      "grade": "partial",
+      "en": "A step that resolves dependencies failed ({detail}), so some dependencies may be missing or unresolved.",
+      "ko": "의존성을 해석하는 단계가 실패하여({detail}) 일부 의존성이 빠졌거나 해석되지 않았을 수 있습니다.",
+      "fixEn": "Look for the first error in the scan log. Typical causes are a dependency that cannot be downloaded (an internal repository or missing credentials) or a build tool that is not installed. Fix it and scan again.",
+      "fixKo": "스캔 로그에서 첫 번째 오류를 확인하세요. 내려받을 수 없는 의존성(사내 저장소, 인증 정보 누락)이나 설치되지 않은 빌드 도구가 흔한 원인입니다. 해결한 뒤 다시 스캔하세요."
+    },
+    "lockfile-missing": {
+      "grade": "partial",
+      "en": "A lock file is missing ({detail}), so the versions listed may differ from the ones you build with, or some dependencies may not be listed at all.",
+      "ko": "락 파일이 없어({detail}) 나열된 버전이 실제 빌드에 쓰는 버전과 다르거나 일부 의존성이 아예 빠졌을 수 있습니다.",
+      "fixEn": "Create the lock file with the package manager (for example npm install, pod install or swift package resolve), keep it in the project folder and scan again.",
+      "fixKo": "패키지 관리 도구로 락 파일을 만들고(예: npm install, pod install, swift package resolve) 프로젝트 폴더에 둔 뒤 다시 스캔하세요."
+    },
+    "lockfile-corrupt": {
+      "grade": "partial",
+      "en": "A lock file could not be read ({detail}), so the dependencies it lists are not in this SBOM.",
+      "ko": "락 파일을 읽을 수 없어({detail}) 그 파일에 적힌 의존성이 이 SBOM에 없습니다.",
+      "fixEn": "Regenerate the lock file with the package manager, then scan again.",
+      "fixKo": "패키지 관리 도구로 락 파일을 다시 만든 뒤 스캔하세요."
+    },
+    "unchecked-ecosystem": {
+      "grade": "partial",
+      "en": "No vulnerability data source covers these ecosystems, so their components were not checked ({detail}). A result with no vulnerabilities does not cover them.",
+      "ko": "이 생태계(패키지 관리 체계)는 취약점 조회에 쓰는 자료원이 없어 해당 컴포넌트를 확인하지 못했습니다({detail}). 취약점이 없다는 결과는 이 컴포넌트를 포함하지 않습니다.",
+      "fixEn": "Review these dependencies against the project's own security advisories until a data source is available.",
+      "fixKo": "자료원이 지원될 때까지 해당 라이브러리의 보안 공지를 별도로 확인하세요."
+    }
+  }
+}
