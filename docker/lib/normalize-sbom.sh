@@ -113,6 +113,26 @@ NAME_VERSION_DEDUP='(.components) |= (if type=="array" then map(
       else . end
   ) else . end)'
 
+# Always: drop .NET Framework base assemblies read from packages.config or a
+# Reference element. They ship with the framework and are not NuGet packages, but
+# the reader lists them as pkg:nuget/System with no version, which then matches
+# unrelated advisories and cannot be resolved. Closed name list, and only an
+# entry with no version at all: a System.* package that has a version is a real
+# NuGet package and stays.
+DOTNET_BASE_ASSEMBLIES='["System","System.Core","System.Data","System.Data.DataSetExtensions","System.Xml","System.Xml.Linq","System.Web","System.Drawing","System.Configuration","System.Net.Http","System.Numerics","System.Runtime.Serialization","System.ServiceModel","System.Transactions","System.Windows.Forms","System.Management","System.IO.Compression","System.Deployment","System.Security","System.Messaging","System.EnterpriseServices","Microsoft.CSharp"]'
+DOTNET_BASE_FIX='(if (.components | type) == "array" then
+    '"$DOTNET_BASE_ASSEMBLIES"' as $base
+    | def _drop: (.purl // "") as $p | ((.version // "") == "")
+        and ($p | test("^pkg:nuget/[^@?#]+$"))
+        and (($p | sub("^pkg:nuget/"; "") | ascii_downcase) as $n | any($base[]; ascii_downcase == $n));
+    ([ .components[] | select(_drop) | .["bom-ref"] // empty ]) as $refs
+    | .components |= map(select(_drop | not))
+    | if ($refs | length) > 0 and (.dependencies | type) == "array" then
+        .dependencies |= [ .[] | select((.ref // "") as $r | $refs | index($r) | not)
+            | if (.dependsOn | type) == "array" then .dependsOn |= map(select(. as $d | $refs | index($d) | not)) else . end ]
+      else . end
+  else . end)'
+
 # Always: sort components deterministically by purl (fallback name@version).
 SORT_FILTER='(.components) |= (if type=="array" then sort_by(.purl // ((.name // "") + "@" + (.version // ""))) else . end)'
 
@@ -609,6 +629,7 @@ if [ "$MODE" = "--stable" ]; then
         | ${DROP_EMPTY_FILES}
         | ${BINARY_FILE_DEDUP}
         | ${NAME_VERSION_DEDUP}
+        | ${DOTNET_BASE_FIX}
         | ${PYRANGE_DEDUP}
         | ${SWIFT_DUP_FIX}
         | ${PURL_FIX}
@@ -632,7 +653,7 @@ if [ "$MODE" = "--stable" ]; then
         | del(.serialNumber)
     " "$SBOM" > "$TMP"
 else
-    jq -S --argjson vmap "$VMAP_JSON" --argjson compat "$COMPAT_JSON" "${LICENSE_FLAGS_DEF} ${NORMALIZE_DEF} ${NULL_FIX} | ${UNKNOWN_VERSION_FIX} | ${VERSION_EVR_CONTAMINATION_FIX} | ${DROP_EMPTY_FILES} | ${BINARY_FILE_DEDUP} | ${NAME_VERSION_DEDUP} | ${PYRANGE_DEDUP} | ${SWIFT_DUP_FIX} | ${PURL_FIX} | ${VENDORED_CPE_FIX} | ${OS_SRC_FIX} | ${OS_PURL_FORM} | ${LICENSE_FIX} | ${LICENSE_REVIEW_FIX} | ${LICENSE_CLASS_FIX} | ${LICENSE_CONFLICT_FIX} | ${SUPPLIER_FIX} | ${FILENAME_FILTER} | ${SORT_FILTER}" "$SBOM" > "$TMP"
+    jq -S --argjson vmap "$VMAP_JSON" --argjson compat "$COMPAT_JSON" "${LICENSE_FLAGS_DEF} ${NORMALIZE_DEF} ${NULL_FIX} | ${UNKNOWN_VERSION_FIX} | ${VERSION_EVR_CONTAMINATION_FIX} | ${DROP_EMPTY_FILES} | ${BINARY_FILE_DEDUP} | ${NAME_VERSION_DEDUP} | ${DOTNET_BASE_FIX} | ${PYRANGE_DEDUP} | ${SWIFT_DUP_FIX} | ${PURL_FIX} | ${VENDORED_CPE_FIX} | ${OS_SRC_FIX} | ${OS_PURL_FORM} | ${LICENSE_FIX} | ${LICENSE_REVIEW_FIX} | ${LICENSE_CLASS_FIX} | ${LICENSE_CONFLICT_FIX} | ${SUPPLIER_FIX} | ${FILENAME_FILTER} | ${SORT_FILTER}" "$SBOM" > "$TMP"
 fi
 
 mv "$TMP" "$SBOM"
