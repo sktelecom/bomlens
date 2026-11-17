@@ -74,6 +74,9 @@ REM A relative path is made absolute first: Docker would read a bare name as
 REM a named volume. --mount, not -v: a file the engine cannot see stops
 REM docker run instead of turning into an empty folder in the container.
 set "CA_V="
+REM Build files for the Android SDK image, when this bundle carries them (read-only).
+set "ANDROID_V="
+for %%I in ("%~dp0..\docker\android") do if exist "%%~fI\Dockerfile" set "ANDROID_V=-v "%%~fI":/opt/bomlens-android-build:ro -e BOMLENS_ANDROID_BUILD_DIR=/opt/bomlens-android-build"
 if not defined SBOM_EXTRA_CA_CERTS goto :ca_done
 call :check_ca_chars
 if defined BAD_CHAR goto :err_ca_badchar
@@ -169,6 +172,7 @@ docker run --rm -it ^
     -v "%OUTDIR%":/host-output ^
     %MOUNT_V% ^
     %CA_V% ^
+    %ANDROID_V% ^
     -v /var/run/docker.sock:/var/run/docker.sock ^
     -e MODE=UI ^
     -e UI_PORT=8080 ^

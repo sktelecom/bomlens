@@ -29,6 +29,13 @@ extraResources:
     to: NOTICE
   - from: ../THIRD_PARTY_LICENSES.md
     to: THIRD_PARTY_LICENSES.md
+  # Android SDK 이미지의 빌드 파일(Dockerfile). SDK 자체는 담지 않는다. 사용자가 약관에
+  # 동의하면 앱이 이 파일로 자기 PC의 Docker에서 이미지를 만들고, SDK는 그때 구글
+  # 서버에서 직접 내려받는다. 앱은 resources/docker/android를 UI 컨테이너에 읽기 전용으로 붙인다.
+  - from: ../docker/android
+    to: docker/android
+    filter:
+      - Dockerfile
 # 백엔드와 React SPA는 스캐너 Docker 이미지가 서빙하므로 사이드카/프론트 동봉이 없다.
 # 서명·공증은 이 파일이 아니라 CI 시크릿으로만 제어된다(desktop.yml) — Windows는
 # WIN_CSC_LINK/WIN_CSC_KEY_PASSWORD, macOS 서명은 CSC_LINK/CSC_KEY_PASSWORD,

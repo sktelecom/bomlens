@@ -14,6 +14,7 @@ import { createRequire } from "node:module";
 import net from "node:net";
 import os from "node:os";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -239,6 +240,23 @@ export function scanMountArgs(dirs = []) {
   }
   if (scanRoots) args.push("-e", `SBOM_UI_SCAN_ROOTS=${scanRoots}`);
   return args;
+}
+
+// Android SDK 이미지의 빌드 파일(Dockerfile만 든 폴더)을 UI 컨테이너에 읽기 전용으로 붙인다.
+// 서버가 사용자 동의 뒤 호스트 Docker로 이미지를 만들 때 이 폴더를 빌드 컨텍스트로 쓴다.
+// 폴더가 없으면(개발 실행에서 못 찾은 경우 등) 아무것도 붙이지 않고, 서버는 빌드 불가로 답한다.
+export const ANDROID_BUILD_TARGET = "/opt/bomlens-android-build";
+
+export function androidBuildArgs(dir, { exists = fs.existsSync } = {}) {
+  const trimmed = String(dir ?? "").trim();
+  if (!trimmed || !exists(path.join(trimmed, "Dockerfile"))) return [];
+  return ["-v", `${trimmed}:${ANDROID_BUILD_TARGET}:ro`, "-e", `BOMLENS_ANDROID_BUILD_DIR=${ANDROID_BUILD_TARGET}`];
+}
+
+// 설치본은 resources/docker/android, 개발 실행은 저장소의 docker/android에 있다.
+export function defaultAndroidBuildDir({ resourcesPath = process.resourcesPath, packaged = false } = {}) {
+  if (packaged && resourcesPath) return path.join(resourcesPath, "docker", "android");
+  return path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..", "docker", "android");
 }
 
 // 호스트의 Docker 엔진을 컨테이너에 연결하는 마운트. UI 컨테이너가 언어별 cdxgen 이미지를
@@ -521,6 +539,7 @@ export class UiContainer {
     aibomImage = AIBOM_IMAGE,
     deepCveImage = DEEP_CVE_IMAGE,
     scanMounts = [],
+    androidBuildDir = "",
   } = {}) {
     this.image = image;
     this.hostPort = hostPort;
@@ -530,6 +549,7 @@ export class UiContainer {
     this.aibomImage = aibomImage;
     this.deepCveImage = deepCveImage;
     this.scanMounts = scanMounts;
+    this.androidBuildDir = androidBuildDir;
     this.id = null;
   }
 
@@ -555,6 +575,7 @@ export class UiContainer {
       `${hostDir}:/host-output`,
       // 추가 스캔 대상 폴더(읽기 전용) — 웹 UI의 "디렉터리 경로" 입력 선택지가 된다.
       ...scanMountArgs(this.scanMounts),
+      ...androidBuildArgs(this.androidBuildDir),
       "-v",
       engineMount(),
       // 5-P PR 2: entrypoint.sh가 이 경로에서 이전 실행의 가드 기록을 찾는다.

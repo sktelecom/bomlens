@@ -35,6 +35,8 @@ import {
   resolveHostDir,
   versionTagBefore1132,
   scanMountArgs,
+  androidBuildArgs,
+  defaultAndroidBuildDir,
 } from "../lib/container.mjs";
 
 const pkg = createRequire(import.meta.url)("../package.json");
@@ -512,4 +514,21 @@ test("start passes the source-scan image settings to the UI container by name", 
   for (const name of ["CDXGEN_IMAGE_PREFIX", "CDXGEN_JAVA_IMAGE", "SBOM_PULL"]) {
     assert.match(src, new RegExp(`"-e",\\s*"${name}",`), name);
   }
+});
+
+test("androidBuildArgs mounts the build files read-only only when a Dockerfile is there", () => {
+  const present = androidBuildArgs("/res/docker/android", { exists: () => true });
+  assert.deepEqual(present, [
+    "-v",
+    "/res/docker/android:/opt/bomlens-android-build:ro",
+    "-e",
+    "BOMLENS_ANDROID_BUILD_DIR=/opt/bomlens-android-build",
+  ]);
+  assert.deepEqual(androidBuildArgs("/res/docker/android", { exists: () => false }), []);
+  assert.deepEqual(androidBuildArgs("", { exists: () => true }), []);
+});
+
+test("defaultAndroidBuildDir points into resources when packaged and into the repo otherwise", () => {
+  assert.match(defaultAndroidBuildDir({ packaged: true, resourcesPath: "/app/resources" }).replaceAll("\\", "/"), /\/app\/resources\/docker\/android$/);
+  assert.match(defaultAndroidBuildDir({ packaged: false }).replaceAll("\\", "/"), /docker\/android$/);
 });
