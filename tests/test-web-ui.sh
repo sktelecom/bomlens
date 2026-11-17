@@ -7296,7 +7296,7 @@ if [ "$and_ready" != 1 ]; then
 else
     and_json() { python3 -c "import sys,json;d=json.load(sys.stdin);print($1)"; }
     and_sse() { # $1=url -> JSON array of events
-        curl -sN "$1" | python3 -c '
+        curl -sN -H "Sec-Fetch-Site: same-origin" "$1" | python3 -c '
 import sys, json
 events, ev, data = [], None, []
 for line in sys.stdin:
@@ -7323,7 +7323,7 @@ print(json.dumps(events))'
     [ "$badok" = 1 ] && pass "android-sdk-status rejects non-numeric and out-of-range api levels (400)" || fail "api level validation"
 
     # No consent on file: the build is refused before a stream or docker call exists.
-    c=$(curl -s -o "$WORK/and-403" -w '%{http_code}' "$AND_BASE/android-sdk-build-stream?api=34")
+    c=$(curl -s -H "Sec-Fetch-Site: same-origin" -o "$WORK/and-403" -w '%{http_code}' "$AND_BASE/android-sdk-build-stream?api=34")
     if [ "$c" = "403" ] && [ "$(and_json "d['code']" < "$WORK/and-403")" = "ANDROID_SDK_TERMS_REQUIRED" ] && [ ! -e "$FAKE/build.args" ]; then
         pass "build is refused (403 ANDROID_SDK_TERMS_REQUIRED) without accepted terms, and docker is never called"
     else
@@ -7339,7 +7339,7 @@ e = [x for x in evs if x['event'] == 'error'][0]['data']
 assert e['code'] == 'ANDROID_SDK_IMAGE_MISSING' and e['consentRequired'] is True, e
 assert e['api'] == 35 and e['image'] == 'bomlens-android-sdk35:latest' and e['buildAvailable'] is True, e
 d = [x for x in evs if x['event'] == 'done'][0]['data']
-assert d['ok'] is False and d['code'] == 'ANDROID_SDK_IMAGE_MISSING', d
+assert d['ok'] is False and d['code'] == 'ANDROID_SDK_IMAGE_MISSING' and 'errorCode' not in d, d
 "; then
         pass "an Android source scan without the SDK image returns ANDROID_SDK_IMAGE_MISSING with consentRequired and the detected API level"
     else
@@ -7358,6 +7358,20 @@ assert d['ok'] is False and d['code'] == 'ANDROID_SDK_IMAGE_MISSING', d
     fi
     c=$(curl -s -o /dev/null -w '%{http_code}' -H "Origin: http://evil.example" "$AND_BASE/android-sdk-build-stream?api=34")
     [ "$c" = "403" ] && pass "a cross-site Origin on the build stream is rejected" || fail "build stream Origin check" "HTTP $c"
+    # A no-cors cross-site GET (<img src=...>) carries no Origin; Sec-Fetch-Site names it.
+    c1=$(curl -s -o /dev/null -w '%{http_code}' "$AND_BASE/android-sdk-build-stream?api=34")
+    c2=$(curl -s -o /dev/null -w '%{http_code}' -H "Sec-Fetch-Site: cross-site" "$AND_BASE/android-sdk-build-stream?api=34")
+    c3=$(curl -s -o /dev/null -w '%{http_code}' -H "Sec-Fetch-Site: same-site" "$AND_BASE/android-sdk-build-stream?api=34")
+    c4=$(curl -s -o /dev/null -w '%{http_code}' -H "Sec-Fetch-Site: cross-site" -H "Origin: http://127.0.0.1:${AND_PORT}" "$AND_BASE/android-sdk-build-stream?api=34")
+    if [ "$c1$c2$c3$c4" = "403403403403" ]; then
+        pass "the build stream refuses a request with neither Origin nor Sec-Fetch-Site, and any Sec-Fetch-Site other than same-origin or none"
+    else
+        fail "build stream Sec-Fetch-Site rule" "$c1 $c2 $c3 $c4"
+    fi
+    c5=$(curl -s -o /dev/null -w '%{http_code}' -H "Sec-Fetch-Site: cross-site" "$AND_BASE/scan-stream?project=x&version=1&source=git-url&target=file:///nonexistent")
+    c6=$(curl -s -o /dev/null -w '%{http_code}' -H "Sec-Fetch-Site: cross-site" "$AND_BASE/pull-stream?image=x")
+    [ "$c5$c6" = "403403" ] && pass "scan-stream and pull-stream refuse a cross-site Sec-Fetch-Site (a request without the header is still served)" \
+        || fail "scan/pull-stream Sec-Fetch-Site" "$c5 $c6"
 
     r=$(curl -s -X POST -d '{"accept":true,"termsUrl":"https://developer.android.com/studio/terms"}' "$AND_BASE/android-sdk-consent")
     if [ "$(echo "$r" | and_json "d['termsAccepted']")" = "True" ] \
@@ -7409,6 +7423,10 @@ assert d['ok'] is True and d['api'] == 34 and d['image'] == 'bomlens-android-sdk
     and_sse "$AND_BASE/android-sdk-build-stream?api=32" > "$WORK/and-cancel.json" &
     CAN_PID=$!
     for _ in $(seq 1 30); do [ -e "$FAKE/build.args" ] && break; sleep 0.2; done
+    # One build at a time on the whole server: another API level is busy, not a second build.
+    ev=$(and_sse "$AND_BASE/android-sdk-build-stream?api=30")
+    [ "$(echo "$ev" | python3 -c "import sys,json;d=[e for e in json.load(sys.stdin) if e['event']=='done'][0]['data'];print(d['ok'],d['reason'])")" = "False busy" ] \
+        && pass "a build for another API level while one runs is refused as busy (one build server-wide)" || fail "global build limit" "$ev"
     cr=$(curl -s -X POST "$AND_BASE/android-sdk-build-cancel?api=32")
     wait "$CAN_PID" 2>/dev/null
     rm -f "$FAKE/slow"
@@ -7424,14 +7442,14 @@ fi
 kill "$AND_PID" 2>/dev/null
 
 # The recipe directory is this server's own setting: a relative or Dockerfile-less value gives no build.
-bd=$(cd "$WORK" && SBOM_OUTPUT_DIR="$WORK/android-out" BOMLENS_ANDROID_BUILD_DIR="android-recipe" python3 -I -c "
+build_dir=$(cd "$WORK" && SBOM_OUTPUT_DIR="$WORK/android-out" BOMLENS_ANDROID_BUILD_DIR="android-recipe" python3 -I -c "
 import sys; sys.path.insert(0, '$ROOT_DIR/docker/web')
 import server; print(repr(server.android_build_dir()))" 2>&1)
-bd2=$(SBOM_OUTPUT_DIR="$WORK/android-out" BOMLENS_ANDROID_BUILD_DIR="$WORK/nowhere" python3 -I -c "
+build_dir2=$(SBOM_OUTPUT_DIR="$WORK/android-out" BOMLENS_ANDROID_BUILD_DIR="$WORK/nowhere" python3 -I -c "
 import sys; sys.path.insert(0, '$ROOT_DIR/docker/web')
 import server; print(repr(server.android_build_dir()))" 2>&1)
-[ "$bd $bd2" = "'' ''" ] && pass "a relative or Dockerfile-less BOMLENS_ANDROID_BUILD_DIR is not used as a build context" \
-    || fail "android build dir validation" "$bd $bd2"
+[ "$build_dir $build_dir2" = "'' ''" ] && pass "a relative or Dockerfile-less BOMLENS_ANDROID_BUILD_DIR is not used as a build context" \
+    || fail "android build dir validation" "$build_dir $build_dir2"
 # build_android_image refuses on its own, whatever the caller did.
 nb=$(SBOM_OUTPUT_DIR="$WORK/android-out" BOMLENS_STATE_DIR="$WORK/android-state" python3 -I -c "
 import sys; sys.path.insert(0, '$ROOT_DIR/docker/web')
@@ -7441,6 +7459,16 @@ nc=$(SBOM_OUTPUT_DIR="$WORK/android-out" BOMLENS_STATE_DIR="$WORK/none" BOMLENS_
 import sys; sys.path.insert(0, '$ROOT_DIR/docker/web')
 import server; print(server.build_android_image(34, lambda l: None))" 2>&1)
 [ "$nc" = "(False, 'no-consent', '')" ] && pass "build_android_image refuses without recorded consent" || fail "no-consent" "$nc"
+
+# Scan-target path handling has its own No-Docker suite; run it here so the
+# existing CI step for this file covers it.
+echo ""
+echo "== scan-target paths (tests/test-scan-target-paths.sh) =="
+if st_out=$(bash "$ROOT_DIR/tests/test-scan-target-paths.sh" 2>&1); then
+    pass "tests/test-scan-target-paths.sh passes ($(echo "$st_out" | grep -c '^  PASS:') checks)"
+else
+    fail "tests/test-scan-target-paths.sh failed" "$(echo "$st_out" | grep -E 'FAIL|ERROR' | head -5)"
+fi
 
 echo ""
 echo "Results: ${PASS} passed, ${FAIL} failed"
