@@ -194,9 +194,15 @@ case "${1:-}" in
           local u p; u="$(cd "$DOCKER_STUB_UNSHARED" 2>/dev/null && pwd -P)"; p="$(cd "$1" 2>/dev/null && pwd -P)"
           case "$p" in "$u"|"$u"/*) return 0 ;; esac; return 1
         }
-        hidden "$pin" || { [ -z "$pent" ] || [ ! -e "$pin/$pent" ] || echo IN_OK; }
-        hidden "$pout" || { ls -A "$pout" 2>/dev/null | grep -q '^\.bomlens-preflight-' && echo OUT_OK; }
-        echo DONE; exit 0 ;;
+        # Run the probe's own command (the last argument) against the host
+        # folders, an empty one standing in for a folder the VM does not share,
+        # so the stub checks what the script really asks and not a copy of it.
+        pcmd="${!#}"; pempty="$log.probe-empty"; mkdir -p "$pempty"
+        hidden "$pin" && pin="$pempty"
+        hidden "$pout" && pout="$pempty"
+        pcmd="$(printf '%s' "$pcmd" | sed "s#/probe-in#$pin#g; s#/probe-out#$pout#g")"
+        BOMLENS_PROBE_ENTRY="$pent" sh -c "$pcmd"
+        exit 0 ;;
       *":/probe:ro"*)
         pdir=""; prev=""
         for a in "$@"; do case "$prev" in -v) pdir="${a%:/probe:ro}" ;; esac; prev="$a"; done
@@ -204,6 +210,8 @@ case "${1:-}" in
           u="$(cd "$DOCKER_STUB_UNSHARED" 2>/dev/null && pwd -P)"; p="$(cd "$pdir" 2>/dev/null && pwd -P)"
           case "$p" in "$u"|"$u"/*) exit 0 ;; esac
         fi
+        # A name that is not a path is a named volume to docker: empty.
+        case "$pdir" in /*|[A-Za-z]:*) ;; *) exit 0 ;; esac
         ls -A "$pdir" 2>/dev/null; exit 0 ;;
     esac
     # `docker run --rm --entrypoint sh <image> -c 'command -v grype'`: grype
@@ -735,6 +743,32 @@ N=$((N+1)); LOG="$WORK/docker.$N.log"; : > "$LOG"; OUT="$WORK/out.$N"
   && pass "a visible folder (Korean and a space in the path) passes the preflight and scans" \
   || { fail "a visible folder was refused" "rc=$RC"; show; }
 
+# A first entry that is a link the container cannot follow (dangling, or out of
+# the mount, like .clang-format -> ../tools/...) is still an entry: not refused.
+d="$(new_proj linkfirst)"; printf '{"name":"x","version":"1.0.0"}' > "$d/package.json"
+ln -s ../tools/missing-config "$d/.a-link"
+N=$((N+1)); LOG="$WORK/docker.$N.log"; : > "$LOG"; OUT="$WORK/out.$N"
+( cd "$d" && DOCKER_STUB_LOG="$LOG" bash "$SCAN" --project LinkFirst --version 1.0 --generate-only ) > "$OUT" 2>&1; RC=$?
+{ [ "$RC" -eq 0 ] && ! in_out "SCAN_TARGET_NOT_VISIBLE"; } \
+  && pass "a dangling link as the first entry of the folder does not stop the preflight" \
+  || { fail "a dangling first entry was refused" "rc=$RC"; show; }
+# A folder that holds only such a link, in an unshared place, is still refused.
+mkdir -p "$UNSHARED/onlylink"; ln -s ../tools/missing-config "$UNSHARED/onlylink/.a-link"
+N=$((N+1)); LOG="$WORK/docker.$N.log"; : > "$LOG"; OUT="$WORK/out.$N"
+( cd "$UNSHARED/onlylink" && DOCKER_STUB_LOG="$LOG" DOCKER_STUB_UNSHARED="$UNSHARED" bash "$SCAN" --project OnlyLink --version 1.0 --generate-only ) > "$OUT" 2>&1; RC=$?
+{ [ "$RC" -eq 1 ] && in_out "SCAN_TARGET_NOT_VISIBLE: the folder to scan is not visible"; } \
+  && pass "an unshared folder holding only a link is still refused" \
+  || { fail "an unshared folder with only a link was not refused" "rc=$RC"; show; }
+
+# A result folder the user made beforehand survives a failed run.
+d="$(new_proj premade)"; printf '{"name":"x","version":"1.0.0"}' > "$d/package.json"
+mkdir -p "$WORK/premade-out/Premade_1.0"
+N=$((N+1)); LOG="$WORK/docker.$N.log"; : > "$LOG"; OUT="$WORK/out.$N"
+( cd "$d" && DOCKER_STUB_LOG="$LOG" DOCKER_STUB_UNSHARED="$d" bash "$SCAN" --project Premade --version 1.0 --generate-only --output-dir "$WORK/premade-out" ) > "$OUT" 2>&1; RC=$?
+{ [ "$RC" -eq 1 ] && [ -d "$WORK/premade-out/Premade_1.0" ]; } \
+  && pass "an empty result folder the user made beforehand is kept after a failed run" \
+  || { fail "a pre-made result folder was removed or the run did not fail" "rc=$RC"; show; }
+
 # Only the output folder hidden: the same stop, naming the output folder.
 SHARED_PROJ="$(new_proj shared)"; printf '{"name":"x","version":"1.0.0"}' > "$SHARED_PROJ/package.json"
 mkdir -p "$UNSHARED/out"
@@ -765,6 +799,16 @@ N=$((N+1)); LOG="$WORK/docker.$N.log"; : > "$LOG"; OUT="$WORK/out.$N"
 ! in_out "Generating SBOM" && [ ! -e "$d/AndroidNo_1.0" ] \
   && pass "the Android stop leaves no empty result folder and starts no build" \
   || { fail "Android stop left a folder or started a build"; show; }
+# The build command that guidance prints reads the recipe at the release tag of
+# the image in use, not at main; a build that is not a release reads main.
+SRCDET="$REPO/docker/lib/source-detect.sh"
+ctx_rel="$(BOMLENS_VERSION=1.15.0 bash -c ". '$SRCDET'; android_sdk_image_missing bomlens-android-sdk34:latest 34 ''" 2>&1)"
+ctx_tag="$(BOMLENS_VERSION=v1.15.0 bash -c ". '$SRCDET'; android_sdk_image_missing bomlens-android-sdk34:latest 34 ''" 2>&1)"
+ctx_dev="$(BOMLENS_VERSION=latest-abc1234 bash -c ". '$SRCDET'; android_sdk_image_missing bomlens-android-sdk34:latest 34 ''" 2>&1)"
+{ printf '%s' "$ctx_rel" | grep -q 'bomlens.git#v1.15.0:docker/android' && printf '%s' "$ctx_tag" | grep -q 'bomlens.git#v1.15.0:docker/android' \
+    && printf '%s' "$ctx_dev" | grep -q 'bomlens.git#main:docker/android' && ! printf '%s' "$ctx_rel" | grep -q '#main'; } \
+  && pass "the Android SDK build guidance pins the recipe to the release tag (main only when the version is not a release)" \
+  || { fail "the build guidance recipe address is not pinned to the release" "$ctx_rel"; }
 
 d="$(new_proj dotnetsub)"; mkdir -p "$d/src/App"
 printf '<Solution />\n' > "$d/App.slnx"
@@ -2325,6 +2369,12 @@ if [ -f "$CHECK_SH" ]; then
   { [ "$CS_RC" -eq 2 ] && grep -q "스캐너 컨테이너가 이 폴더를 보지 못합니다" "$CS_OUT" && grep -q "Colima는 홈 폴더" "$CS_OUT"; } \
     && pass "check-setup.sh: a folder the container cannot see is a problem, with the fix (Korean)" \
     || { fail "check-setup.sh hidden folder" "rc=$CS_RC"; cat "$CS_OUT"; }
+  # A relative folder argument is turned into a path first: docker would read
+  # it as a named volume and report an empty folder.
+  ( cd "$WORK" && env -u SBOM_LANG -u LC_ALL -u LC_MESSAGES -u LANG SBOM_LANG=en DOCKER_STUB_MEMTOTAL=6198534144 UI_PORT=$((49152 + RANDOM % 16000)) bash "$CHECK_SH" cs-visible ) > "$CS_OUT" 2>&1
+  grep -q "The scanner container can see this folder: $(cd "$CS_VIS" && pwd)" "$CS_OUT" \
+    && pass "check-setup.sh: a relative folder argument is passed to docker as an absolute path" \
+    || { fail "check-setup.sh relative folder"; cat "$CS_OUT"; }
 fi
 
 # --------------------------------------------------------

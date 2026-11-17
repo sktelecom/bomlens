@@ -1129,7 +1129,10 @@ preflight_scan_paths() {
     docker image inspect "$img" >/dev/null 2>&1 || return 0
     marker=".bomlens-preflight-$$"
     : > "$out_dir/$marker" 2>/dev/null || return 0
-    # One entry of the input folder to look for inside the container. Not the
+    # One entry of the input folder to look for inside the container. A link
+    # counts as present even when it dangles or points outside the mount (a
+    # dotfile such as .clang-format -> ../tools/...), so the probe tests -L too.
+    # Not the
     # folder this run writes into when that sits inside the input: the engine
     # creates the mount point of a folder it cannot see, and an unshared input
     # would then hold that one entry and look non-empty.
@@ -1144,7 +1147,7 @@ EOF_PREFLIGHT
         -v "$(hostpath "$in_dir")":/probe-in:ro \
         -v "$(hostpath "$out_dir")":/probe-out:ro \
         -e "BOMLENS_PROBE_ENTRY=$entry" \
-        "$img" -c "[ -n \"\$BOMLENS_PROBE_ENTRY\" ] && [ -e \"/probe-in/\$BOMLENS_PROBE_ENTRY\" ] && echo IN_OK; [ -e \"/probe-out/$marker\" ] && echo OUT_OK; echo DONE" 2>/dev/null)" || seen=""
+        "$img" -c "[ -n \"\$BOMLENS_PROBE_ENTRY\" ] && { [ -e \"/probe-in/\$BOMLENS_PROBE_ENTRY\" ] || [ -L \"/probe-in/\$BOMLENS_PROBE_ENTRY\" ]; } && echo IN_OK; [ -e \"/probe-out/$marker\" ] && echo OUT_OK; echo DONE" 2>/dev/null)" || seen=""
     rm -f "$out_dir/$marker"
     # No DONE: the probe did not run (not a sharing problem).
     case "$seen" in *DONE*) ;; *) return 0 ;; esac
@@ -1439,6 +1442,10 @@ if [ "$SBOM_OUTPUT_FLAT" = "1" ]; then
 else
     OUTPUT_HOST_DIR="$OUTPUT_BASE/$RUN_NAME"
 fi
+# Whether this run creates the result folder: a folder the user made beforehand
+# is not removed by cleanup, even when it is still empty after a failure.
+OUTPUT_DIR_PREEXISTED=0
+[ ! -d "$OUTPUT_HOST_DIR" ] || OUTPUT_DIR_PREEXISTED=1
 mkdir -p "$OUTPUT_HOST_DIR" || { echo "[ERROR] cannot create output dir: $OUTPUT_HOST_DIR"; exit 1; }
 OUTPUT_HOST_DIR="$(cd "$OUTPUT_HOST_DIR" && pwd)"  # absolute, for docker -v
 UPLOAD_VAR="true"; [ "$GENERATE_ONLY" = "true" ] && UPLOAD_VAR="false"
@@ -1513,6 +1520,7 @@ cleanup() {
     # is; any artifact, log or file of an earlier run keeps it.
     if [ "$_rc" -ne 0 ] && [ "${SBOM_OUTPUT_FLAT:-}" != "1" ] && [ -n "${OUTPUT_HOST_DIR:-}" ] \
        && [ "$OUTPUT_HOST_DIR" != "${SOURCE_DIR:-}" ] && [ -d "$OUTPUT_HOST_DIR" ] \
+       && [ "${OUTPUT_DIR_PREEXISTED:-1}" = "0" ] \
        && [ -z "$(find "$OUTPUT_HOST_DIR" -mindepth 1 -not -name .scanmeta.json 2>/dev/null | head -n 1)" ]; then
         rm -f "$OUTPUT_HOST_DIR/.scanmeta.json" 2>/dev/null || true
         rmdir "$OUTPUT_HOST_DIR" 2>/dev/null || true

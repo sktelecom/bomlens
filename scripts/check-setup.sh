@@ -40,7 +40,12 @@ UI_PORT="${UI_PORT:-8080}"
 # engine reports about 3.8 GiB), the same line as scan-sbom.sh's warning.
 MIN_ENGINE_MB=3584
 # The folder whose visibility inside the container is checked.
+# An absolute path: docker run -v reads a name that is not a path as a named
+# volume, which is empty (a false "cannot see this folder") and is left behind.
 SCAN_DIR="${1:-$PWD}"
+if [ -d "$SCAN_DIR" ]; then
+    SCAN_DIR="$(cd "$SCAN_DIR" && pwd)"
+fi
 ANDROID_IMAGE_PREFIX="${ANDROID_IMAGE_PREFIX:-bomlens-android-sdk}"
 
 OK="✅"
