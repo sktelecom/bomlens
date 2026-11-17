@@ -2057,6 +2057,15 @@ if [ "${IS_AI:-false}" != true ] && printf '%s' "$SIGNAL" | jq -e 'has("software
                | select(type == "string") | gsub("\\p{Cc}"; " ") | .[0:200] | "emptyManifests\t\(.)"' "$SBOM" 2>/dev/null | head -n 1
         printf '%s' "$PIPELINE_STEPS_FAILED" | jq -r --argjson more "${PIPELINE_STEPS_FAILED_MORE:-0}" '
             if length > 0 then "failedSteps\t\(map(gsub("\\p{Cc}"; " ") | .[0:100]) | join(", "))\(if $more > 0 then " (and \($more) more)" else "" end)" else empty end' 2>/dev/null
+        # The verdict assess-completeness.sh already wrote (loaded above for a
+        # CycloneDX document): the grade, the reason codes, and one fix sentence per
+        # reason, in English (the CLI prints them). Only an incomplete result is
+        # recorded, so a complete one adds nothing to the file.
+        if [ "${COMPLETENESS_GRADE:-}" = "partial" ] || [ "${COMPLETENESS_GRADE:-}" = "unreliable" ]; then
+            jq -r '"completeness\t\(.grade)",
+                "completenessReasons\t\(.reasons | map(.code) | join(","))",
+                (.reasons[]? | "completenessFix\t\(.code)\t\(.fix.en | gsub("\\p{Cc}"; " "))")' "$COMPLETENESS_FILE" 2>/dev/null
+        fi
     } > "${OUT_PREFIX}_summary.result" 2>/dev/null
 fi
 

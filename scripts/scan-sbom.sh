@@ -432,7 +432,7 @@ while [[ "$#" -gt 0 ]]; do
             case "${2:-}" in
                 vulnerability=critical|vulnerability=high|vulnerability=medium|vulnerability=low)
                     GENERATE_SECURITY="true" ;;
-                malicious-package|license-conflict|empty-result) ;;
+                malicious-package|license-conflict|empty-result|incomplete-result|incomplete-result=unreliable) ;;
                 license-coverage=*)
                     # A whole percentage, 0 to 100, with no default: the threshold is the policy.
                     case "${2#license-coverage=}" in
@@ -441,7 +441,7 @@ while [[ "$#" -gt 0 ]]; do
                     esac ;;
                 *)
                     echo "[ERROR] --fail-on: unknown condition '${2:-}'."
-                    echo "[ERROR] Use one of: vulnerability=critical|high|medium|low, malicious-package, license-conflict, empty-result, license-coverage=<0-100>."; exit 1 ;;
+                    echo "[ERROR] Use one of: vulnerability=critical|high|medium|low, malicious-package, license-conflict, empty-result, incomplete-result[=unreliable], license-coverage=<0-100>."; exit 1 ;;
             esac
             FAIL_ON+=("$2"); shift ;;
         --lang) REPORT_LANG="$2"; shift ;;
@@ -746,6 +746,11 @@ Options:
                                         license given by --license
                            empty-result
                                         the scan found no component
+                           incomplete-result[=unreliable]
+                                        the result is partial or
+                                        unreliable (=unreliable: only
+                                        unreliable), as the completeness
+                                        line of the summary states
                            license-coverage=<0-100>
                                         fewer than that percent of components
                                         declare a license (no default value)
@@ -3995,6 +4000,7 @@ rm -f "$SUMMARY_BUF"
 # measurement (validate-sbom.sh), not from a count made here. Absent (an older
 # image, an AI SBOM) it prints nothing.
 if [ -f "$SUMMARY_RESULT_FILE" ]; then
+    sum_complete=""; sum_complete_reasons=""; sum_complete_fix=""
     sum_components=""; sum_licensed=""; sum_license_pct=""; sum_purl_pct=""; sum_reduced=""; sum_failed=""; sum_empty_manifests=""
     while IFS=$'\t' read -r sum_key sum_val; do
         case "$sum_key" in
@@ -4005,6 +4011,9 @@ if [ -f "$SUMMARY_RESULT_FILE" ]; then
             reduced)        sum_reduced="$sum_val" ;;
             emptyManifests) sum_empty_manifests="$sum_val" ;;
             failedSteps)    sum_failed="$sum_val" ;;
+            completeness)   sum_complete="$sum_val" ;;
+            completenessReasons) sum_complete_reasons="$sum_val" ;;
+            completenessFix) sum_complete_fix="${sum_complete_fix}${sum_val}"$'\n' ;;
         esac
     done < "$SUMMARY_RESULT_FILE"
     case "$sum_components" in
@@ -4036,9 +4045,27 @@ if [ -f "$SUMMARY_RESULT_FILE" ]; then
                     esac
                     echo "[WARN] Reduced analysis: ${sum_why}, so only direct dependencies were identified."
                 fi
-                [ -z "$sum_empty_manifests" ] || [ "${sum_components:-}" != "0" ] || echo "[WARN] No components were found, though these declare dependencies: ${sum_empty_manifests}. Commit a lock file, or check the log above for why resolution failed."
+                if [ -n "$sum_empty_manifests" ] && [ "${sum_components:-}" = "0" ]; then
+                    case ",${sum_complete_reasons}," in
+                        *,lockfile-corrupt,*) echo "[WARN] No components were found, though these declare dependencies: ${sum_empty_manifests}. A lock file is damaged: re-create it with the package manager and scan again." ;;
+                        *,resolution-failed,*) echo "[WARN] No components were found, though these declare dependencies: ${sum_empty_manifests}. Resolution failed at: ${sum_failed:-a dependency step} (see the log above)." ;;
+                        *) echo "[WARN] No components were found, though these declare dependencies: ${sum_empty_manifests}. Commit a lock file, or check the log above for why resolution failed." ;;
+                    esac
+                fi
                 [ -z "$sum_failed" ] || echo "[WARN] Steps that failed: ${sum_failed} (details in the log above)"
             fi
+            ;;
+    esac
+    # The verdict the reports state (assess-completeness.sh). Printed only when the
+    # result is not complete; --fail-on incomplete-result turns it into an exit code.
+    case "$sum_complete" in
+        partial|unreliable)
+            printf '  %-12s %s\n' "Completeness:" "${sum_complete} (${sum_complete_reasons})"
+            while IFS=$'\t' read -r sum_code sum_fix; do
+                [ -n "$sum_code" ] || continue
+                echo "[WARN] ${sum_code}: ${sum_fix}"
+            done <<< "$sum_complete_fix"
+            echo "  To fail a CI run on this, add --fail-on incomplete-result (or incomplete-result=unreliable)."
             ;;
     esac
 fi
