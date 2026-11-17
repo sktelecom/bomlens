@@ -74,6 +74,9 @@ class DockerStub {
             string mem = Environment.GetEnvironmentVariable("DOCKER_STUB_MEMTOTAL");
             if (!string.IsNullOrEmpty(mem)) Console.WriteLine(mem);
         }
+        // The shared-folder probe of check-setup.bat (`docker run ... -v <dir>:/probe:ro ... ls -A /probe`):
+        // a folder the engine can see lists its files, so print one.
+        if (args.Length > 0 && args[0] == "run" && string.Join(" ", args).Contains(":/probe:ro")) Console.WriteLine("pom.xml");
         string pn = null, pv = null, hostout = null, prev = null;
         foreach (string a in args) {
             if (prev == "-v") {
@@ -230,8 +233,8 @@ try {
     }
 
     # -----------------------------------------------------------------------
-    # 4b) 엔진 메모리 항목: 2 GB 엔진은 [X] 한 개와 "2 GB", 6 GB 엔진은 [X] 없이
-    #     "6 GB"(GiB 기준)를 보고하고, 어느 쪽이든 종료 코드는 0 이다(치명적이지 않은 문제).
+    # 4b) 엔진 메모리 항목: 2 GB 엔진은 [X] 한 개와 "1.9 GiB", 6 GB 엔진은 [X] 없이
+    #     "5.8 GiB"를 보고하고, 어느 쪽이든 종료 코드는 0 이다(치명적이지 않은 문제).
     #     ASCII 마커만 단언한다(위 4)와 같은 이유).
     # -----------------------------------------------------------------------
     Section '4b. check-setup.bat 엔진 메모리 (2 GB 경고 / 6 GB 통과)'
@@ -242,8 +245,8 @@ try {
         $r = Invoke-Bat -Bat (Join-Path $script:RepoRoot 'scripts\check-setup.bat') -TimeoutSec 60
         $xLow = [regex]::Matches("$($r.Output)", '(?m)^\[X\]').Count
         if ($r.TimedOut) { Failed 'check-setup.bat(2 GB) 이 끝나지 않았습니다.' }
-        elseif ($r.ExitCode -eq 0 -and $xLow -eq 1 -and "$($r.Output)" -match '(?m)^\s*2 GB') {
-            Pass '2 GB 엔진에서 [X] 1개와 2 GB 를 보고했고 종료 코드는 0 입니다.'
+        elseif ($r.ExitCode -eq 0 -and $xLow -eq 1 -and "$($r.Output)" -match '(?m)^\s*1\.9 GiB') {
+            Pass '2 GB 엔진에서 [X] 1개와 1.9 GiB 를 보고했고 종료 코드는 0 입니다.'
         } else {
             Failed "2 GB 엔진 결과가 다릅니다 (exit=$($r.ExitCode), [X]=$xLow):`n$($r.Output)"
         }
@@ -251,8 +254,8 @@ try {
         $r = Invoke-Bat -Bat (Join-Path $script:RepoRoot 'scripts\check-setup.bat') -TimeoutSec 60
         $xOk = [regex]::Matches("$($r.Output)", '(?m)^\[X\]').Count
         if ($r.TimedOut) { Failed 'check-setup.bat(6 GB) 이 끝나지 않았습니다.' }
-        elseif ($r.ExitCode -eq 0 -and $xOk -eq 0 -and "$($r.Output)" -match '(?m)^\s*6 GB') {
-            Pass '6 GB 엔진에서 [X] 없이 6 GB 를 보고했습니다.'
+        elseif ($r.ExitCode -eq 0 -and $xOk -eq 0 -and "$($r.Output)" -match '(?m)^\s*5\.8 GiB') {
+            Pass '6 GB 엔진에서 [X] 없이 5.8 GiB 를 보고했습니다.'
         } else {
             Failed "6 GB 엔진 결과가 다릅니다 (exit=$($r.ExitCode), [X]=$xOk):`n$($r.Output)"
         }

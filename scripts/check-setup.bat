@@ -130,12 +130,10 @@ set "MEM_MB=%MEM_BYTES:~0,-6%"
 set "MEM_MBN=0"
 set /a "MEM_MBN=%MEM_MB%" 2>nul
 REM Decimal megabytes to GiB with one decimal, like check-setup.sh (rounding 3.8
-REM up to 4 hid how close to the line the engine was): MB*5000/537 is tenths.
-REM Split in quotient and remainder so the product stays inside 32 bits however
-REM much memory the engine reports.
-set /a "MEM_Q=MEM_MBN/537"
-set /a "MEM_R=MEM_MBN %% 537"
-set /a "MEM_T=MEM_Q*5000+(MEM_R*5000+268)/537"
+REM up to 4 hid how close to the line the engine was). A GiB is MB*1000000/2^30
+REM megabytes, so tenths of a GiB are MB*10/1073.74, about (MB*5+268)/537. The
+REM product stays inside 32 bits up to about 400 million MB.
+set /a "MEM_T=(MEM_MBN*5+268)/537"
 set /a "MEM_W=MEM_T/10"
 set /a "MEM_F=MEM_T %% 10"
 if %MEM_MBN% LSS 3758 goto :mem_low
