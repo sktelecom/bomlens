@@ -840,7 +840,9 @@
     "cancelBodyNoName": "This scan is still running. Cancelling stops it, and nothing it found so far is kept.",
     "logRunning": "Running",
     "logDone": "Finished",
-    "logFailed": "Failed"
+    "logFailed": "Failed",
+    "failTargetHiddenCause": "The scanner cannot see the folder you selected.",
+    "failTargetHiddenFix": "Check that Docker shares this folder (Colima shares only your home folder; Docker Desktop shares the folders under Settings > Resources > File sharing) and that the folder is not empty. Move the project under your home folder or share its location, then scan again."
   },
   "overview": {
     "needsAttention": "Needs attention",
@@ -986,6 +988,7 @@
     "gradlePackages": "Gradle package resolution",
     "mavenDependencyTree": "Maven dependency tree resolution",
     "mavenDependencyJars": "Maven dependency jar download (component hashes)",
+    "mavenDependencyResolve": "Maven could not find or download a dependency (the dependency list may be incomplete)",
     "androidReleaseClasspath": "Android release classpath resolution",
     "swiftPackageResolve": "Swift package resolution",
     "npmProductionSet": "npm production dependency resolution",
@@ -1789,8 +1792,8 @@
     "retry": "Try again",
     "close": "Close",
     "failedTitle": "The Android SDK image was not built",
-    "manualIntro": "You can also build it yourself from the folder that contains docker/:",
-    "manualOnly": "This way of running BomLens cannot build the image itself. Build it yourself from the folder that contains docker/, then scan again:",
+    "manualIntro": "You can also build it yourself with this command:",
+    "manualOnly": "This way of running BomLens cannot build the image itself. Build it yourself with the command below, then scan again:",
     "skipped": "The scan did not run because the Android SDK image is not installed. Build it, then scan again.",
     "builtRerun": "The Android SDK image is ready. Start the scan again from the New scan form.",
     "failed": {
@@ -1807,7 +1810,10 @@
       "sdk-install": "The Android SDK could not be installed during the build. The log below says why.",
       "connection": "The connection to the app was lost during the build.",
       "unknown": "The build failed for a reason BomLens does not recognise. The log below says what Docker reported."
-    }
+    },
+    "confirmStart": "BomLens is about to build the image {{image}}. This takes time (several minutes or more) and uses disk space (several gigabytes or more) on this computer. Start it when you are ready, or skip.",
+    "startBuild": "Start the build",
+    "manualTagNote": "This copy of BomLens does not report its release. Replace <release-tag> with the tag of the BomLens release you run (for example vX.Y.Z), as listed on the project's Releases page."
   },
   "image": {
     "ready": "The image for this input is already downloaded.",

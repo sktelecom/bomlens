@@ -11,6 +11,7 @@ import {
   firstStage,
   isAndroidSdkMissing,
   manualBuildCommand,
+  releaseTag,
 } from "./androidSdk";
 
 const EVENT = {
@@ -52,8 +53,8 @@ describe("firstStage", () => {
   it("asks first when the terms are not accepted", () => {
     expect(firstStage(need, true)).toBe("consent");
   });
-  it("builds at once when the terms are on file", () => {
-    expect(firstStage({ ...need, consentRequired: false }, true)).toBe("build");
+  it("asks for a start click when the terms are on file", () => {
+    expect(firstStage({ ...need, consentRequired: false }, true)).toBe("confirm");
   });
   it("only explains when the server cannot build", () => {
     expect(firstStage({ ...need, buildAvailable: false }, true)).toBe("manual");
@@ -63,10 +64,21 @@ describe("firstStage", () => {
 });
 
 describe("helpers", () => {
-  it("prints the manual command", () => {
-    expect(manualBuildCommand(34, "bomlens-android-sdk34")).toBe(
-      "docker build --build-arg ANDROID_API=34 -t bomlens-android-sdk34 docker/android",
+  it("pins the manual command to the release tag", () => {
+    expect(manualBuildCommand(34, "bomlens-android-sdk34", "1.15.0")).toBe(
+      "docker build --build-arg ANDROID_API=34 -t bomlens-android-sdk34 https://github.com/sktelecom/bomlens.git#v1.15.0:docker/android",
     );
+    expect(releaseTag("v1.15.0")).toBe("v1.15.0");
+  });
+  it("leaves a placeholder tag when the release is unknown", () => {
+    for (const v of [undefined, "", "dev", "latest-abc1234"]) {
+      expect(releaseTag(v)).toBeNull();
+      expect(manualBuildCommand(34, "i", v)).toContain("#<release-tag>:docker/android");
+    }
+  });
+  it("reads the older errorCode spelling of the missing-image code", () => {
+    const { code: _c, ...rest } = EVENT;
+    expect(androidSdkNeed({ ...rest, errorCode: "ANDROID_SDK_IMAGE_MISSING" })?.api).toBe(34);
   });
   it("maps reasons to known wording", () => {
     expect(failureReason("dns")).toBe("dns");

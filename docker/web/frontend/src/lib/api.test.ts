@@ -6,7 +6,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   absoluteFileUrl,
   ApiError,
+  buildAndroidSdkImage,
   deleteScan,
+  errorCodeOf,
   describeUploadError,
   downloadAllUrl,
   fileUrl,
@@ -650,6 +652,16 @@ describe("startScan", () => {
     expect(h.errorKeys).toEqual(["run.errorGitNotFoundOrPrivate"]);
   });
 
+  it("reads the code from either field, `code` first", () => {
+    expect(errorCodeOf({ code: "A", errorCode: "B" })).toBe("A");
+    expect(errorCodeOf({ errorCode: "B" })).toBe("B");
+    expect(errorCodeOf({ code: null, errorCode: null })).toBeUndefined();
+    const extras: unknown[] = [];
+    startScan(PARAMS, { ...handlers(), onError: (_m, _k, extra) => extras.push(extra) });
+    FakeEventSource.last!.emit("error", JSON.stringify({ detail: "d", key: null, errorCode: "SCAN_TARGET_NOT_VISIBLE" }));
+    expect(extras).toEqual([{ code: "SCAN_TARGET_NOT_VISIBLE", errorCode: "SCAN_TARGET_NOT_VISIBLE" }]);
+  });
+
   it("ignores a native (data-less) error event", () => {
     const h = handlers();
     startScan(PARAMS, h);
@@ -673,6 +685,44 @@ describe("startScan", () => {
     es.emit("done", JSON.stringify({ ok: true, results: [], sbom: null, security: null }));
     es.onerror!();
     expect(h.errors).toEqual([]);
+  });
+});
+
+describe("buildAndroidSdkImage", () => {
+  const status = (termsAccepted: boolean) => ({ ok: true, json: async () => ({ api: 34, termsAccepted }) });
+  let fetchMock: ReturnType<typeof vi.fn>;
+  beforeEach(() => {
+    vi.stubGlobal("EventSource", FakeEventSource);
+    fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+  });
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("names a refused stream no-consent when the status says the terms are not on file", async () => {
+    fetchMock.mockResolvedValue(status(false));
+    const done: unknown[] = [];
+    buildAndroidSdkImage(34, { onDone: (d) => done.push(d) });
+    FakeEventSource.last!.onerror!();
+    await vi.waitFor(() => expect(done).toEqual([{ ok: false, reason: "no-consent" }]));
+  });
+
+  it("names a dropped stream connection when the terms are on file", async () => {
+    fetchMock.mockResolvedValue(status(true));
+    const done: unknown[] = [];
+    buildAndroidSdkImage(34, { onDone: (d) => done.push(d) });
+    FakeEventSource.last!.onerror!();
+    await vi.waitFor(() => expect(done).toEqual([{ ok: false, reason: "connection" }]));
+  });
+
+  it("reports nothing after the caller stopped the build", async () => {
+    fetchMock.mockResolvedValue(status(true));
+    const done: unknown[] = [];
+    const stop = buildAndroidSdkImage(34, { onDone: (d) => done.push(d) });
+    FakeEventSource.last!.onerror!();
+    stop();
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(done).toEqual([]);
   });
 });
 

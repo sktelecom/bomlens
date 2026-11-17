@@ -840,7 +840,9 @@
     "cancelBodyNoName": "이 스캔이 진행 중입니다. 취소하면 스캔이 멈추고, 지금까지 찾은 내용은 남지 않습니다.",
     "logRunning": "진행 중",
     "logDone": "완료",
-    "logFailed": "실패"
+    "logFailed": "실패",
+    "failTargetHiddenCause": "스캐너가 선택한 폴더를 볼 수 없습니다.",
+    "failTargetHiddenFix": "Docker가 이 폴더를 공유하는지(Colima는 홈 폴더 아래만, Docker Desktop은 Settings > Resources > File sharing의 폴더만 공유합니다)와 폴더가 비어 있지 않은지 확인하세요. 프로젝트를 홈 폴더 아래로 옮기거나 그 위치를 공유한 뒤 다시 스캔하세요."
   },
   "overview": {
     "needsAttention": "주의 필요",
@@ -986,6 +988,7 @@
     "gradlePackages": "Gradle 패키지 해석",
     "mavenDependencyTree": "Maven 의존성 트리 해석",
     "mavenDependencyJars": "Maven 의존성 jar 내려받기(구성요소 해시)",
+    "mavenDependencyResolve": "Maven이 의존성을 찾거나 내려받지 못함(의존성 목록이 불완전할 수 있음)",
     "androidReleaseClasspath": "Android release classpath 해석",
     "swiftPackageResolve": "Swift 패키지 해석",
     "npmProductionSet": "npm 프로덕션 의존성 해석",
@@ -1789,8 +1792,8 @@
     "retry": "다시 시도",
     "close": "닫기",
     "failedTitle": "Android SDK 이미지를 만들지 못했습니다",
-    "manualIntro": "docker/ 폴더가 들어 있는 위치에서 직접 만들 수도 있습니다.",
-    "manualOnly": "이 실행 방식에서는 앱이 직접 만들 수 없습니다. docker/ 폴더가 들어 있는 위치에서 아래 명령으로 직접 만든 뒤 다시 스캔해 주세요.",
+    "manualIntro": "아래 명령으로 직접 만들 수도 있습니다.",
+    "manualOnly": "이 실행 방식에서는 앱이 직접 만들 수 없습니다. 아래 명령으로 직접 만든 뒤 다시 스캔해 주세요.",
     "skipped": "Android SDK 이미지가 설치돼 있지 않아 스캔을 실행하지 않았습니다. 이미지를 만든 뒤 다시 스캔해 주세요.",
     "builtRerun": "Android SDK 이미지가 준비됐습니다. 새 스캔 화면에서 스캔을 다시 시작해 주세요.",
     "failed": {
@@ -1807,7 +1810,10 @@
       "sdk-install": "만드는 중에 Android SDK를 설치하지 못했습니다. 이유는 아래 로그에 있습니다.",
       "connection": "만드는 중에 앱과의 연결이 끊겼습니다.",
       "unknown": "BomLens가 알지 못하는 이유로 실패했습니다. 아래 로그에 Docker가 보고한 내용이 있습니다."
-    }
+    },
+    "confirmStart": "{{image}} 이미지를 만들기 시작하려 합니다. 시간이 걸리고(수 분 이상) 이 컴퓨터의 디스크를 사용합니다(수 GB 이상). 준비되면 시작하고, 아니면 건너뛰세요.",
+    "startBuild": "만들기 시작",
+    "manualTagNote": "이 BomLens는 자신의 릴리스 버전을 알려 주지 않습니다. <release-tag>를 사용 중인 BomLens 릴리스의 태그(예: vX.Y.Z)로 바꿔 주세요. 태그는 프로젝트의 Releases 페이지에 있습니다."
   },
   "image": {
     "ready": "이 입력에 필요한 이미지를 이미 받아 두었습니다.",

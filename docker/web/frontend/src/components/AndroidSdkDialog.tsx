@@ -16,6 +16,7 @@ import {
   failureReason,
   firstStage,
   manualBuildCommand,
+  releaseTag,
   type AndroidSdkNeed,
 } from "@/lib/androidSdk";
 
@@ -24,6 +25,7 @@ import { DialogHeader } from "./ShortcutsDialog";
 
 type Phase =
   | { kind: "consent"; saveFailed?: boolean }
+  | { kind: "confirm" }
   | { kind: "building"; step: number; steps: number }
   | { kind: "failed"; reason: string; detail?: string }
   | { kind: "manual" };
@@ -39,12 +41,15 @@ type Phase =
 export function AndroidSdkDialog({
   need,
   capabilityBuild,
+  version,
   onReady,
   onSkip,
 }: {
   need: AndroidSdkNeed;
   /** `capabilities.androidSdkBuild`; false means this run mode cannot build. */
   capabilityBuild: boolean | undefined;
+  /** `capabilities.version`, to point the manual command at this release. */
+  version?: string;
   /** The image is in place: start the scan again. */
   onReady: () => void;
   /** Leave without the image. */
@@ -53,19 +58,15 @@ export function AndroidSdkDialog({
   const { t } = useTranslation();
   const [phase, setPhase] = useState<Phase>(() => {
     const stage = firstStage(need, capabilityBuild);
-    return stage === "manual"
-      ? { kind: "manual" }
-      : stage === "build"
-        ? { kind: "building", step: 0, steps: 0 }
-        : { kind: "consent" };
+    return stage === "manual" ? { kind: "manual" } : stage === "confirm" ? { kind: "confirm" } : { kind: "consent" };
   });
   const [logs, setLogs] = useState<string[]>([]);
   const stopRef = useRef<(() => void) | null>(null);
-  const startedRef = useRef(false);
   const readyRef = useRef(onReady);
   readyRef.current = onReady;
 
   const startBuild = useCallback(() => {
+    pendingRef.current = true;
     setLogs([]);
     setPhase({ kind: "building", step: 0, steps: 0 });
     stopRef.current = buildAndroidSdkImage(need.api, {
@@ -73,25 +74,30 @@ export function AndroidSdkDialog({
       onProgress: (p) => setPhase({ kind: "building", step: p.step, steps: p.steps }),
       onDone: (d) => {
         stopRef.current = null;
+        pendingRef.current = false;
+        setPending(false);
         if (d.ok) readyRef.current();
         else setPhase({ kind: "failed", reason: failureReason(d.reason), detail: d.detail });
       },
     });
   }, [need.api]);
 
-  // Terms already on file: the build starts at once. The ref keeps a repeated
-  // effect run (development double mount) from opening two streams.
-  useEffect(() => {
-    if (phase.kind !== "building" || startedRef.current) return;
-    startedRef.current = true;
-    // The image may have appeared since the scan asked (a build in another
-    // window); then there is nothing to build.
-    void fetchAndroidSdkStatus(need.api).then((s) => {
-      if (s?.present) readyRef.current();
-      else startBuild();
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  // Set while a click is being handled, so a second press cannot open a second
+  // build stream (the first one's stop function would be lost).
+  const [pending, setPending] = useState(false);
+  const pendingRef = useRef(false);
+
+  // Terms already on file: the start button comes first, since a build takes
+  // time and disk. The image may have appeared since the scan asked (a build in
+  // another window); then there is nothing to build.
+  const begin = async () => {
+    if (pendingRef.current) return;
+    pendingRef.current = true;
+    setPending(true);
+    const s = await fetchAndroidSdkStatus(need.api);
+    if (s?.present) readyRef.current();
+    else startBuild();
+  };
 
   // Closing the dialog while a build runs stops it.
   useEffect(
@@ -102,20 +108,25 @@ export function AndroidSdkDialog({
   );
 
   const accept = async () => {
+    if (pendingRef.current) return;
+    pendingRef.current = true;
+    setPending(true);
     const ok = await recordAndroidSdkConsent(need.termsUrl);
     if (!ok) {
+      pendingRef.current = false;
+      setPending(false);
       setPhase({ kind: "consent", saveFailed: true });
       return;
     }
-    startedRef.current = true;
     startBuild();
   };
 
   const cancelBuild = () => {
     stopRef.current?.();
     stopRef.current = null;
+    pendingRef.current = false;
+    setPending(false);
     void cancelAndroidSdkBuild(need.api);
-    startedRef.current = true;
     setPhase({ kind: "failed", reason: "cancelled" });
   };
 
@@ -126,6 +137,7 @@ export function AndroidSdkDialog({
 
   const title = t("androidSdk.title");
   const building = phase.kind === "building";
+  const tag = releaseTag(version);
 
   return (
     <Dialog
@@ -159,11 +171,22 @@ export function AndroidSdkDialog({
               </>
             )}
 
-            {phase.kind === "building" && (
+            {phase.kind === "confirm" && (
               <>
                 <p style={{ margin: 0 }} className="bl-muted">
                   {t("androidSdk.alreadyAccepted")}
                 </p>
+                <p style={{ margin: 0 }} data-testid="android-sdk-confirm">
+                  {t("androidSdk.confirmStart", { image: need.image })}
+                </p>
+                <p style={{ margin: 0 }} className="bl-muted" data-testid="android-sdk-skip-note">
+                  {t("androidSdk.skipNote")}
+                </p>
+              </>
+            )}
+
+            {phase.kind === "building" && (
+              <>
                 <span role="status" aria-live="polite" className="bl-inline" data-testid="android-sdk-progress">
                   <Spinner size="small" srText={null} />
                   {phase.steps > 0
@@ -197,8 +220,9 @@ export function AndroidSdkDialog({
                   {t("androidSdk.manualIntro")}
                 </p>
                 <code className="bl-code" data-testid="android-sdk-command">
-                  {manualBuildCommand(need.api, need.image)}
+                  {manualBuildCommand(need.api, need.image, version)}
                 </code>
+                {!tag && <p style={{ margin: 0 }} className="bl-muted">{t("androidSdk.manualTagNote")}</p>}
               </>
             )}
 
@@ -208,8 +232,9 @@ export function AndroidSdkDialog({
                   {t("androidSdk.manualOnly")}
                 </p>
                 <code className="bl-code" data-testid="android-sdk-command">
-                  {manualBuildCommand(need.api, need.image)}
+                  {manualBuildCommand(need.api, need.image, version)}
                 </code>
+                {!tag && <p style={{ margin: 0 }} className="bl-muted">{t("androidSdk.manualTagNote")}</p>}
                 <p style={{ margin: 0 }} className="bl-muted">
                   {t("androidSdk.skipNote")}
                 </p>
@@ -221,8 +246,15 @@ export function AndroidSdkDialog({
       footerButtons={[
         ...(phase.kind === "consent"
           ? [
-              { buttonType: "primary" as const, content: t("androidSdk.accept"), onClick: () => void accept(), autoFocus: true },
-              { buttonType: "default" as const, content: t("androidSdk.skip"), onClick: onSkip },
+              // Focus starts on the safe choice: Enter must not accept legal terms.
+              { buttonType: "primary" as const, content: t("androidSdk.accept"), onClick: () => void accept(), disabled: pending },
+              { buttonType: "default" as const, content: t("androidSdk.skip"), onClick: onSkip, autoFocus: true },
+            ]
+          : []),
+        ...(phase.kind === "confirm"
+          ? [
+              { buttonType: "primary" as const, content: t("androidSdk.startBuild"), onClick: () => void begin(), disabled: pending },
+              { buttonType: "default" as const, content: t("androidSdk.skip"), onClick: onSkip, autoFocus: true },
             ]
           : []),
         ...(building ? [{ buttonType: "danger" as const, content: t("androidSdk.cancelBuild"), onClick: cancelBuild }] : []),

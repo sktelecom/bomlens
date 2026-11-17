@@ -24,6 +24,7 @@ describe("pipelineStepLabelKey", () => {
       "bundle-lock",
       "gradle-dependencies",
       "maven-dependency-jars",
+      "maven-dependency-resolve",
       "android-release-classpath",
       "swift-package-resolve",
       "npm-production-set",
