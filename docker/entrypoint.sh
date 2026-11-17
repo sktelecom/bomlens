@@ -481,11 +481,8 @@ generate_sbom_cdxgen() {
         # Not a published image — the Android SDK inside it is not open source
         # and its terms bar redistribution, so it is built where it is used.
         if ! docker image inspect "$img" >/dev/null 2>&1; then
-            echo "[ERROR] Android SDK image not found: $img"
-            echo "        Build it on the host once, then re-run:"
-            echo "          docker build --build-arg ANDROID_API=$api$([ "$CDXGEN_IMAGE_PREFIX" = "ghcr.io/cdxgen/" ] || printf ' --build-arg CDXGEN_IMAGE_PREFIX=%s' "$CDXGEN_IMAGE_PREFIX") -t $img docker/android"
-            echo "        (accepting https://developer.android.com/studio/terms), or set"
-            echo "        ANDROID_IMAGE_PREFIX to an image built elsewhere."
+            android_sdk_image_missing "$img" "$api" ""
+            CDXGEN_FAIL_REASON="android-sdk-image"
             return 1
         fi
     else
@@ -925,6 +922,10 @@ case "$SCAN_MODE" in
             fi
             echo "[1/2] cdxgen: source dir $SRC_ROOT (transitive resolution)"
             if ! generate_sbom_cdxgen "$SRC_ROOT" "$OUTPUT_FILE"; then
+                # No Android SDK image: a manifest-only scan of a Gradle Android
+                # project finds nothing, so stop with the guidance (already
+                # printed, code ANDROID_SDK_IMAGE_MISSING) instead of falling back.
+                [ "${CDXGEN_FAIL_REASON:-}" != "android-sdk-image" ] || exit 1
                 echo "[WARN] cdxgen path failed; falling back to syft (direct deps only)."
                 syft "dir:$SRC_ROOT" "${SYFT_EXCLUDE[@]}" -o "cyclonedx-json@$CDX_SPEC_VERSION" > "$OUTPUT_FILE" 2>/dev/null \
                     || { echo "[ERROR] syft source scan failed."; exit 1; }
