@@ -34,8 +34,10 @@ import json
 import os
 import re
 import secrets
+import select
 import shutil
 import signal
+import socket
 import stat
 import subprocess
 import sys
@@ -4655,6 +4657,11 @@ def run_sibling_scan(image, mode, out_dir, on_log, *, upload_file=None, model_id
     args = [
         "docker", "run", "--rm",
         *(["--name", safe_name] if safe_name else []),
+        # Labels that let the web UI remove this container on a cancel, at scan
+        # end and at its own start (remove_labeled_containers).
+        *(["--label", "%s=%s" % (SIBLING_LABEL_OWNER, sibling_owner())] if sibling_owner() else []),
+        *(["--label", "%s=%s" % (SIBLING_LABEL_RUN, safe_name[len("bomlens-sib-"):])]
+          if safe_name and safe_name.startswith("bomlens-sib-") and sibling_owner() else []),
         # Inherit THIS container's mounts (incl. OUTPUT_DIR) instead of bind-mounting a
         # host path — a Windows drive path cannot be consumed by the in-container CLI.
         "--volumes-from", self_cid,
@@ -5594,6 +5601,112 @@ def _sibling_image_version(image):
     return ""
 
 
+# Containers this web UI starts for a scan carry two labels, so a cancel (and
+# the cleanup at server start and scan end) removes exactly its own and never
+# another run's or another UI container's: bomlens.owner (this container's
+# hostname, unique per UI container) and bomlens.run (the run id).
+SIBLING_LABEL_OWNER = "bomlens.owner"
+SIBLING_LABEL_RUN = "bomlens.run"
+# After a cancel signal, how long the scan script gets to stop its own sibling
+# before the server removes the labelled containers itself.
+CANCEL_FORCE_SECONDS = 8
+
+
+def sibling_owner():
+    """This UI container's label value: its hostname, reduced to the charset
+    a docker label value and the run-scan environment both take."""
+    try:
+        name = socket.gethostname()
+    except OSError:
+        name = ""
+    return re.sub(r"[^A-Za-z0-9_.-]", "", name)[:64]
+
+
+def remove_labeled_containers(run_id=None, timeout=60):
+    """`docker rm -f` every container labelled as started by this UI container
+    (and, with run_id, by that one run). Best-effort: returns the number of ids
+    removed, 0 when docker is absent or nothing matched. Only label matches are
+    removed."""
+    owner = sibling_owner()
+    if not owner or shutil.which("docker") is None:
+        return 0
+    if run_id is not None and not scan_id_ok(run_id):
+        return 0
+    cmd = ["docker", "ps", "-aq", "--filter", "label=%s=%s" % (SIBLING_LABEL_OWNER, owner)]
+    if run_id is not None:
+        cmd += ["--filter", "label=%s=%s" % (SIBLING_LABEL_RUN, run_id)]
+    try:
+        r = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, timeout=timeout)
+        ids = [i for i in r.stdout.decode("utf-8", "replace").split() if re.fullmatch(r"[0-9a-f]{6,64}", i)]
+        if r.returncode != 0 or not ids:
+            return 0
+        subprocess.run(["docker", "rm", "-f"] + ids, stdout=subprocess.DEVNULL,
+                       stderr=subprocess.DEVNULL, timeout=timeout)
+        return len(ids)
+    except (OSError, subprocess.SubprocessError):
+        return 0
+
+
+def discard_cancelled_run(run_out, keep):
+    """Remove what a cancelled scan wrote into its run folder: every entry not
+    in `keep` (the names the folder held before the run), then the folder
+    itself when nothing is left. run_out is a run_dir() result; each entry is
+    checked to stay inside OUTPUT_DIR again before it is removed."""
+    try:
+        names = os.listdir(run_out)
+    except OSError:
+        return
+    for name in names:
+        if name in keep:
+            continue
+        path = os.path.join(run_out, name)
+        if not _path_under(path, OUTPUT_DIR):
+            continue
+        try:
+            if os.path.isdir(path) and not os.path.islink(path):
+                shutil.rmtree(path, ignore_errors=True)
+            else:
+                os.remove(path)
+        except OSError:
+            pass
+    try:
+        os.rmdir(run_out)
+    except OSError:
+        pass
+
+
+def _peer_closed(conn):
+    """True once the client has closed its side of the connection. A scan that
+    prints nothing never writes to the stream, so a closed tab would otherwise
+    go unnoticed until the next output line."""
+    try:
+        readable, _, _ = select.select([conn], [], [], 0)
+        if not readable:
+            return False
+        return conn.recv(1, socket.MSG_PEEK) == b""
+    except (BlockingIOError, InterruptedError):
+        return False
+    except (OSError, ValueError):
+        return True
+
+
+def _cancel_watch(proc, cancel, stop_fn):
+    """Watch `cancel()` once a second while `proc` runs and call stop_fn() the
+    first time it turns true, even when the process prints nothing (a silent
+    image pull or build). Returns the Event that ends the watch."""
+    ended = threading.Event()
+
+    def _run():
+        while not ended.wait(1.0):
+            if proc.poll() is not None:
+                return
+            if cancel():
+                stop_fn()
+                return
+    threading.Thread(target=_run, daemon=True).start()
+    return ended
+
+
 def _stream_cmd(args, on_log, cancel=None, container=None, env=None,
                 on_deepcve_progress=None):
     """Run a command, streaming combined stdout/stderr line-by-line to on_log.
@@ -5608,7 +5721,9 @@ def _stream_cmd(args, on_log, cancel=None, container=None, env=None,
     CANCEL_GRACE_SECONDS grace period, same as every other cancel path) and
     terminate the local docker-run process, escalating to a hard kill if
     either one is still around once that grace period elapses, so a
-    cancelled firmware/AI scan doesn't keep running detached."""
+    cancelled firmware/AI scan doesn't keep running detached. `cancel()` is
+    also polled once a second from a watcher thread, so a command that prints
+    nothing (an image pull) stops as well."""
     try:
         proc = subprocess.Popen(
             args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
@@ -5617,24 +5732,37 @@ def _stream_cmd(args, on_log, cancel=None, container=None, env=None,
     except OSError as exc:
         on_log("[ui] failed to launch: %s" % exc)
         return -1
+    stop_once = threading.Lock()
+    stopped = [False]
+
+    def _stop():
+        with stop_once:
+            if stopped[0]:
+                return
+            stopped[0] = True
+        if container:
+            try:
+                subprocess.run(["docker", "stop", "-t", str(CANCEL_GRACE_SECONDS), container],
+                               stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            except OSError:
+                pass
+        proc.terminate()
+        try:
+            proc.wait(timeout=CANCEL_GRACE_SECONDS)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+
+    watch = _cancel_watch(proc, cancel, _stop) if cancel else None
     for raw in proc.stdout:
         for piece in raw.rstrip("\n").split("\r"):
             if piece:
                 _emit_or_log(piece, on_log, on_deepcve_progress)
         if cancel and cancel():
-            if container:
-                try:
-                    subprocess.run(["docker", "stop", "-t", str(CANCEL_GRACE_SECONDS), container],
-                                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-                except OSError:
-                    pass
-            proc.terminate()
-            try:
-                proc.wait(timeout=CANCEL_GRACE_SECONDS)
-            except subprocess.TimeoutExpired:
-                proc.kill()
+            _stop()
             break
     proc.wait()
+    if watch is not None:
+        watch.set()
     return proc.returncode
 
 
@@ -7298,6 +7426,14 @@ class Handler(BaseHTTPRequestHandler):
         # branch above.
         try:
             os.makedirs(run_out, exist_ok=True)
+            # What the folder held before this run (an earlier scan of the same
+            # project and version), so a cancel removes only this run's files.
+            try:
+                pre_existing = set(os.listdir(run_out))
+            except OSError:
+                pre_existing = set()
+            scan_ended = threading.Event()
+            scan_ok = [False]
 
             # What to show as this scan's provenance when `target` cannot say it.
             # An upload arrives as an opaque token, so the name the user picked is
@@ -7367,10 +7503,15 @@ class Handler(BaseHTTPRequestHandler):
         # the scan loop can stop the subprocess instead of running it to the end.
         disconnected = [False]
 
+        # The watcher thread below pings from a second thread, so writes to the
+        # stream take turns.
+        write_lock = threading.Lock()
+
         def sse(event, payload):
             try:
-                self.wfile.write(("event: %s\ndata: %s\n\n" % (event, payload)).encode("utf-8"))
-                self.wfile.flush()
+                with write_lock:
+                    self.wfile.write(("event: %s\ndata: %s\n\n" % (event, payload)).encode("utf-8"))
+                    self.wfile.flush()
             except (BrokenPipeError, ConnectionResetError):
                 disconnected[0] = True
 
@@ -7378,8 +7519,9 @@ class Handler(BaseHTTPRequestHandler):
             # An SSE comment line: EventSource ignores it, and a write to a
             # closed stream marks the scan as cancelled.
             try:
-                self.wfile.write(b": keepalive\n\n")
-                self.wfile.flush()
+                with write_lock:
+                    self.wfile.write(b": keepalive\n\n")
+                    self.wfile.flush()
             except (BrokenPipeError, ConnectionResetError):
                 disconnected[0] = True
 
@@ -7392,6 +7534,9 @@ class Handler(BaseHTTPRequestHandler):
             meta = dict(scan_config)
             meta["mode"] = mode
             meta["ok"] = ok_
+            if disconnected[0] and not ok_:
+                # The client went away before the scan finished.
+                meta["cancelled"] = True
             if error_text:
                 meta["errorMessage"] = _scrub_error_text(str(error_text))[:_SCAN_ERROR_MAX_CHARS]
             if error_code:
@@ -7467,6 +7612,10 @@ class Handler(BaseHTTPRequestHandler):
             # consistently whether the SSE stream reads it out of run-scan's
             # child (this branch) or a firmware/AI sibling container.
             "BOMLENS_CANCEL_GRACE": str(CANCEL_GRACE_SECONDS),
+            # The labels entrypoint.sh puts on its cdxgen sibling, so a cancel
+            # or the end of this scan removes that container by label.
+            "BOMLENS_OWNER": sibling_owner(),
+            "BOMLENS_RUN_ID": run_id,
             "GENERATE_NOTICE": "true" if g("notice", "true") == "true" else "false",
             # Go reachability marks rows of the security report, so it turns
             # that report on, as the CLI's --reachability does.
@@ -7562,6 +7711,22 @@ class Handler(BaseHTTPRequestHandler):
             _picked = safe_scan_dir(target)
             if _picked and is_yocto_build_dir(_picked):
                 yocto_dir = _picked
+
+        # Notice a closed tab within a second even while the scan prints
+        # nothing, and stop the containers it started (CANCEL_FORCE_SECONDS).
+        def _watch_client():
+            beats = 0
+            while not scan_ended.wait(1.0):
+                if disconnected[0]:
+                    return
+                if _peer_closed(self.connection):
+                    disconnected[0] = True
+                    return
+                beats += 1
+                if beats % 5 == 0:
+                    sse_ping()
+
+        threading.Thread(target=_watch_client, daemon=True).start()
 
         try:
             if yocto_dir is not None:
@@ -8256,6 +8421,23 @@ class Handler(BaseHTTPRequestHandler):
                         stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                         text=True, bufsize=1,
                     )
+
+                    def _stop_run_scan():
+                        # The scan script stops its own sibling on SIGTERM
+                        # (entrypoint.sh); the containers carrying this run's
+                        # label are removed here if it has not finished that
+                        # within CANCEL_FORCE_SECONDS.
+                        proc.terminate()
+                        try:
+                            proc.wait(timeout=CANCEL_FORCE_SECONDS)
+                        except subprocess.TimeoutExpired:
+                            remove_labeled_containers(run_id)
+                            try:
+                                proc.wait(timeout=CANCEL_GRACE_SECONDS)
+                            except subprocess.TimeoutExpired:
+                                proc.kill()
+
+                    _run_watch = _cancel_watch(proc, lambda: disconnected[0], _stop_run_scan)
                     for raw in proc.stdout:
                         for piece in raw.rstrip("\n").split("\r"):
                             if piece:
@@ -8271,13 +8453,10 @@ class Handler(BaseHTTPRequestHandler):
                         # still around once that has had CANCEL_GRACE_SECONDS
                         # to happen, rather than waiting on it indefinitely.
                         if disconnected[0]:
-                            proc.terminate()
-                            try:
-                                proc.wait(timeout=CANCEL_GRACE_SECONDS)
-                            except subprocess.TimeoutExpired:
-                                proc.kill()
+                            _stop_run_scan()
                             break
                     proc.wait()
+                    _run_watch.set()
                     ok = proc.returncode == 0
                 except Exception as exc:  # noqa: BLE001
                     error_sent = True
@@ -8306,6 +8485,7 @@ class Handler(BaseHTTPRequestHandler):
             # summary helpers glob it by suffix. The done event carries id=run_id
             # so the frontend's later /file, /download-all and /scan requests
             # address this scan's folder.
+            scan_ok[0] = ok
             done = {
                 "ok": ok,
                 "mode": mode,
@@ -8371,6 +8551,15 @@ class Handler(BaseHTTPRequestHandler):
             # Free the run folder for the next scan of this project. Every exit
             # passes here: a finished scan, a failure, and a client that closed
             # the stream mid-scan.
+            scan_ended.set()
+            # A container this run started and nobody removed (a cancel that
+            # arrived during an image pull, say) goes now, by its label.
+            remove_labeled_containers(run_id)
+            # A cancelled run keeps nothing: the cancel dialog says what was
+            # found so far is not kept. Files an earlier scan of the same name
+            # left stay.
+            if disconnected[0] and not scan_ok[0]:
+                discard_cancelled_run(run_out, pre_existing)
             with _scan_lock:
                 _scan_active.discard(scan_claimed)
             # Remove uploaded/cloned/extracted trees; keep generated artifacts
@@ -8401,5 +8590,8 @@ class Handler(BaseHTTPRequestHandler):
 
 if __name__ == "__main__":
     os.makedirs(UPLOAD_DIR, exist_ok=True)
+    # Containers an earlier run of this UI left behind (a cancel the server did
+    # not outlive), removed by label.
+    remove_labeled_containers()
     print("[ui] BomLens Web UI listening on 0.0.0.0:%d" % PORT, flush=True)
     ThreadingHTTPServer(("0.0.0.0", PORT), Handler).serve_forever()
