@@ -521,6 +521,31 @@ def _host_allowed(host_header):
     return hostname is not None and hostname.lower() in _ALLOWED_HOSTS
 
 
+def _strict_fetch_origin_ok(headers):
+    """Gate for a GET that starts work (the Android image build). Stricter than
+    _origin_allowed: a no-cors cross-site GET such as <img src=...> carries no
+    Origin, so absence of Origin alone is not accepted.
+
+    Order: Sec-Fetch-Site, when present, must be same-origin or none (browsers
+    set it on every fetch, EventSource included, and a page cannot forge it).
+    Else an Origin must be present and allowed. With neither header (curl, a
+    pre-2020 browser) the request is refused; the app's EventSource always
+    sends one of the two."""
+    site = (headers.get("Sec-Fetch-Site") or "").strip().lower()
+    if site:
+        return site in ("same-origin", "none")
+    origin = headers.get("Origin")
+    return bool(origin) and _origin_allowed(origin)
+
+
+def _fetch_site_ok(headers):
+    """Sec-Fetch-Site, when a browser sends it, must be same-origin or none.
+    A request without it (curl, tests, older browsers) is not judged here, so
+    existing non-browser callers keep working."""
+    site = (headers.get("Sec-Fetch-Site") or "").strip().lower()
+    return not site or site in ("same-origin", "none")
+
+
 def _origin_allowed(origin_header):
     """True for a state-changing request with no Origin (a same-origin
     top-level load, or a non-browser client like curl) or an Origin whose host
@@ -652,7 +677,7 @@ _ERROR_LINE_RE = re.compile(r"^\[ERROR\]")
 # A scanner [ERROR] line may carry a machine-readable code right after the
 # marker ("[ERROR] ANDROID_SDK_IMAGE_MISSING: ..."), for a program that shows
 # its own dialog instead of the text. Only the codes listed here are passed on,
-# so a log line can never put arbitrary text into the `errorCode` field.
+# so a log line can never put arbitrary text into the `code` field.
 KNOWN_ERROR_CODES = ("ANDROID_SDK_IMAGE_MISSING", "SCAN_TARGET_NOT_VISIBLE")
 _ERROR_CODE_RE = re.compile(r"^\[ERROR\]\s+([A-Z][A-Z0-9_]+):")
 _RESPONSE_LINE_RE = re.compile(r"(?i)^response:")
@@ -3444,7 +3469,9 @@ def scan_detail(run_id):
             "scanConfig": {"project": run_id, "version": "", **_public_scan_config(meta)},
             "scanWarnings": meta.get("warnings") or [],
             "errorMessage": meta.get("errorMessage"),
-            "errorCode": meta.get("errorCode"),
+            # The sidecar key stays `errorCode` (older runs wrote it); the
+            # payload field is `code`, like the stream's error and done events.
+            "code": meta.get("errorCode"),
             "declarationRefused": refused,
         }
     return {
@@ -5015,6 +5042,8 @@ _ANDROID_STEP_RE = re.compile(r"^#\d+ \[(?:[\w-]+ )?(\d+)/(\d+)\]")
 
 # One build per API level at a time; the value is that build's cancel flag.
 _android_build_lock = threading.Lock()
+# One Android image build at a time on the whole server: the per-API check
+# alone lets api=21..99 start 79 builds at once.
 _android_build_active = {}
 
 
@@ -5151,7 +5180,7 @@ def build_android_image(api, on_log, on_progress=None, cancel=None):
         return False, "no-docker", ""
     flag = [False]
     with _android_build_lock:
-        if api in _android_build_active:
+        if _android_build_active:
             return False, "busy", ""
         _android_build_active[api] = flag
     tail = []
@@ -5911,21 +5940,25 @@ class Handler(BaseHTTPRequestHandler):
             # requests otherwise skip. Host was already checked above; Origin
             # catches a cross-site page whose browser still sends this
             # server's own address as Host.
-            if not _origin_allowed(self.headers.get("Origin")):
+            if not (_origin_allowed(self.headers.get("Origin")) and _fetch_site_ok(self.headers)):
                 self._send(403, json.dumps({"error": "bad origin"}))
                 return
             self._scan_stream(urllib.parse.parse_qs(parsed.query))
         elif path == "/android-sdk-status":
             self._android_sdk_status(urllib.parse.parse_qs(parsed.query))
         elif path == "/android-sdk-build-stream":
-            # Starts a build, so it gets the same Origin check /scan-stream does.
-            if not _origin_allowed(self.headers.get("Origin")):
+            # Starts a multi-GB build, so Origin-less requests are refused too.
+            if not _strict_fetch_origin_ok(self.headers):
                 self._send(403, json.dumps({"error": "bad origin"}))
                 return
             self._android_sdk_build_stream(urllib.parse.parse_qs(parsed.query))
         elif path == "/image-status":
             self._image_status(urllib.parse.parse_qs(parsed.query))
         elif path == "/pull-stream":
+            # Starts a docker pull, so it gets the /scan-stream checks.
+            if not (_origin_allowed(self.headers.get("Origin")) and _fetch_site_ok(self.headers)):
+                self._send(403, json.dumps({"error": "bad origin"}))
+                return
             self._pull_stream(urllib.parse.parse_qs(parsed.query))
         elif path == "/advisory":
             self._advisory(urllib.parse.parse_qs(parsed.query))
@@ -7293,7 +7326,7 @@ class Handler(BaseHTTPRequestHandler):
             record_outcome(False, msg, error_code=code)
             sse("done", json.dumps({"ok": False, "id": run_id, "results": list_results(run_id),
                                     "sbom": None, "security": None, "conformance": None,
-                                    "errorCode": code}))
+                                    "code": code}))
 
         def _deep_cve_route(mode, sibling_extra):
             """Decide how MODE should carry the opt-in deep_cve request, once the
@@ -7964,7 +7997,13 @@ class Handler(BaseHTTPRequestHandler):
 
             # An Android (Gradle) source needs the Android SDK image to resolve its
             # transitive dependencies; without it the scan would fall back to a
-            # read that finds no components. Stop here with a structured answer the
+            # read that finds no components. Note the condition differs from the
+            # pipeline's own check: this runs whenever the server can reach Docker
+            # (docker_capable), while entrypoint.sh skips its Android check and
+            # falls back to syft when SOURCE_ROOT_HOST is empty. When the host
+            # path is unknown the pipeline would not have stopped, so stopping
+            # here is the stricter answer; it never contradicts a later result,
+            # because no scan has run yet. Stop here with a structured answer the
             # UI can act on (build the image after the user accepts the terms)
             # instead of starting a scan that cannot do its job. The pipeline raises
             # the same code from its own check for runs that do not come through here.
@@ -7979,7 +8018,7 @@ class Handler(BaseHTTPRequestHandler):
                         "consentRequired": not android_terms_accepted(), "api": _api, "image": _img,
                         "termsUrl": ANDROID_TERMS_URL, "buildAvailable": android_build_available(),
                     }))
-                    record_outcome(False, _msg)
+                    record_outcome(False, _msg, error_code=ANDROID_ERROR_CODE)
                     sse("done", json.dumps({"ok": False, "id": run_id, "results": list_results(run_id),
                                             "sbom": None, "security": None, "conformance": None,
                                             "code": ANDROID_ERROR_CODE}))
@@ -8205,7 +8244,7 @@ class Handler(BaseHTTPRequestHandler):
                 "errorMessage": None if (ok or error_sent) else error_tracker.result(),
                 # Machine-readable form of that failure when the scanner gave one
                 # (KNOWN_ERROR_CODES), so an app can show its own guidance.
-                "errorCode": None if ok else error_tracker.code,
+                "code": None if ok else error_tracker.code,
                 # A declaration file was refused: the scan stopped and kept the
                 # SBOM written so far as _bom.refused.json. Names that file and
                 # the reasons the declaration step logged, so the failed-scan
@@ -8219,7 +8258,7 @@ class Handler(BaseHTTPRequestHandler):
             if scan_warnings:
                 # Also echoed to the browser, as it was before the summary existed.
                 scan_config["warnings"] = scan_warnings
-            record_outcome(ok, outcome_error, scan_warnings, done["declarationRefused"], done["errorCode"])
+            record_outcome(ok, outcome_error, scan_warnings, done["declarationRefused"], done["code"])
             sse("done", json.dumps(done))
         except Exception as exc:  # noqa: BLE001
             # The summary helpers are defended against malformed artifacts, so a
