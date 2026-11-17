@@ -123,13 +123,17 @@ cdxgen Java 이미지에는 JDK가 하나씩만 있고, Gradle 빌드에서는 �
 
 Gradle 루트(`settings.gradle[.kts]` 또는 `build.gradle[.kts]`가 루트에 있음)가 있고, Android Gradle 플러그인의 흔적이 함께 있을 때 감지합니다. 버전 카탈로그(`gradle/libs.versions.toml`)의 플러그인 id, 빌드 스크립트(루트 또는 `app/`)의 플러그인 id나 카탈로그 별칭, Kotlin DSL `namespace` 선언, 또는 몇 단계 아래의 `AndroidManifest.xml` 중 하나면 됩니다. Gradle 루트 없이 매니페스트만 있으면 인정하지 않는데, 이 덕분에 .NET MAUI 앱의 `Platforms/Android/AndroidManifest.xml`을 Android 프로젝트로 잘못 읽지 않습니다.
 
-Android는 BomLens가 배포하지 않는 SDK 플랫폼 이미지가 필요합니다. 담긴 Android SDK 자체가 오픈소스가 아니고 구글 약관이 재배포를 허용하지 않아서, 이 이미지는 쓰는 쪽에서 직접 빌드해야 합니다. 프로젝트의 `compileSdk`/`compileSdkVersion`으로 API 레벨을 정하고(못 찾으면 34), `bomlens-android-sdk<API>:latest`를 찾습니다. 이미지가 없으면 이미지 없음으로 실패하는 대신 빌드 명령을 그대로 출력합니다.
+Android는 BomLens가 배포하지 않는 SDK 플랫폼 이미지가 필요합니다. 담긴 Android SDK 자체가 오픈소스가 아니고 구글 약관이 재배포를 허용하지 않아서, 이 이미지는 쓰는 쪽에서 직접 빌드해야 합니다. 찾은 `compileSdk`/`compileSdkVersion` 중 가장 높은 값으로 API 레벨을 정하고(못 찾으면 34), 루트와 `app/`의 빌드 파일, `build-logic/`과 `buildSrc/` 아래 소스(공통 플러그인이 여기서 값을 정하는 경우가 많습니다), 버전 카탈로그(`android-compileSdk` 같은 키)를 모두 읽습니다. `bomlens-android-sdk<API>:latest`를 찾습니다. 이미지가 없으면 이미지 없음으로 실패하는 대신 빌드 명령을 그대로 출력합니다.
 
 ```bash
 docker build --build-arg ANDROID_API=<API> -t bomlens-android-sdk<API> docker/android
 ```
 
 빌드한다는 것은 구글 SDK 약관에 직접 동의한다는 뜻입니다. 다른 곳에서 빌드한 이미지를 쓰려면 `ANDROID_IMAGE_PREFIX`를 설정하세요.
+
+SDK 이미지는 Java 21에서 실행되므로 Gradle 8.5보다 오래된 래퍼는 이 이미지에서 실행되지 않습니다. 스캔을 시작하기 전에 이를 안내하고 SBOM에 실패 단계 `gradle-wrapper-jdk`를 남깁니다. `gradle/wrapper/gradle-wrapper.properties`의 `distributionUrl`을 8.5 이상으로 올리거나, `--build-arg BASE_JDK_IMAGE=<cdxgen Java 이미지>`로 더 낮은 JDK 기반 이미지를 직접 빌드한 뒤(`docker/android/Dockerfile` 참고) 그 이미지의 `ANDROID_IMAGE_PREFIX`로 스캔하세요. `gradle.properties`에서 Isolated Projects를 켠 빌드는 구성 캐시를 끄면 Gradle이 실행을 거부하므로, 구성 캐시를 켠 채로 읽습니다.
+
+Gradle 빌드를 아예 실행할 수 없을 때(Docker 없음, 빌드 실패)는 대체 경로가 버전 카탈로그(`gradle/*.versions.toml`)에 선언된 라이브러리를 읽어 `bomlens:source=version-catalog` 표시와 함께 추가합니다. 빌드가 실제로 쓰는 의존성이 아니라 선언 목록이므로 결과는 계속 부분 등급입니다.
 
 > 참고: v1.9.0까지 배포됐던 `ghcr.io/sktelecom/bomlens-android-sdk<API>` 이미지는 그 릴리스 라인 스캔에는 여전히 쓸 수 있지만, 더는 새로 올라가지 않습니다. 지금 스캔하려면 직접 빌드한 이미지가 필요합니다.
 

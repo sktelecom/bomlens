@@ -1409,9 +1409,30 @@ GRADLE_INIT
     # prep_step's own stderr (the failure text and the java-toolchain-missing
     # marker) is kept to see whether the same failure would repeat, then shown.
     _gr_err="$_gr_dir/err.txt"
+    # The run turns the configuration cache off (see above). A build that has
+    # Isolated Projects on (org.gradle.unsafe.isolated-projects or
+    # org.gradle.isolated-projects in gradle.properties) cannot: Gradle refuses
+    # with "Configuration Cache cannot be disabled", so the option is left out
+    # there. A build that turns Isolated Projects on some other way (the command
+    # line, another properties file) is caught by that same message and the run
+    # is made once more without the option.
+    _gr_cc="--no-configuration-cache"
+    if grep -Eq '^[[:space:]]*org\.gradle\.(unsafe\.)?isolated-projects[[:space:]]*[=:][[:space:]]*true' gradle.properties 2>/dev/null; then
+        _gr_cc=""
+        log "gradle: Isolated Projects is on in gradle.properties; the run keeps the configuration cache on"
+    fi
+    # shellcheck disable=SC2086  # _gr_cc is one option or nothing
     prep_step gradle-dependencies "$PREP_TIMEOUT_GRADLE" ${GRADLEW_SH:+"$GRADLEW_SH"} "$GRADLEW" --no-daemon -q --console=plain \
-        --no-configuration-cache --init-script "$_gr_init" "-Dbomlens.gradle.out=$_gr_out" bomlensRuntime >/dev/null 2>"$_gr_err"
+        $_gr_cc --init-script "$_gr_init" "-Dbomlens.gradle.out=$_gr_out" bomlensRuntime >/dev/null 2>"$_gr_err"
     _gr_rc=$?
+    if [ "$_gr_rc" -ne 0 ] && [ -n "$_gr_cc" ] && grep -q 'Configuration Cache cannot be disabled' "$_gr_err" 2>/dev/null; then
+        cat "$_gr_err" >&2
+        log "gradle: the build requires the configuration cache (Isolated Projects); running again without --no-configuration-cache"
+        unmark_prep_failed gradle-dependencies
+        prep_step gradle-dependencies "$PREP_TIMEOUT_GRADLE" ${GRADLEW_SH:+"$GRADLEW_SH"} "$GRADLEW" --no-daemon -q --console=plain \
+            --init-script "$_gr_init" "-Dbomlens.gradle.out=$_gr_out" bomlensRuntime >/dev/null 2>"$_gr_err"
+        _gr_rc=$?
+    fi
     cat "$_gr_err" >&2
     if [ "$_gr_rc" -eq 0 ]; then
         # Lines: I <included build>, J <build included for plugins only>,

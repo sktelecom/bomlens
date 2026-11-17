@@ -3268,6 +3268,7 @@ if [ "$MODE" = "SOURCE" ]; then
             echo ""
             exit 1
         fi
+        android_wrapper_jdk_check "$SCAN_INPUT_DIR"
     else
         CDX_IMG=$(img_for_lang "$LANG_DET" "$SCAN_INPUT_DIR")
         echo "[INFO] Language: $LANG_DET -> $CDX_IMG"
