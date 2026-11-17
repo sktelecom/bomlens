@@ -68,7 +68,7 @@ A **Read sbom-declared.cdx.json** toggle, on by default under Result quality, ad
 
 An **Outbound license** field takes the SPDX id your project ships under, such as `Apache-2.0` (the UI equivalent of `--license`). Fill it in and the Licenses section reports which dependencies clash with it; leave it empty and that check stays off, which the section says outright. It appears wherever BomLens generates the SBOM, so not for an analyzed supplier SBOM (which carries the supplier's own declaration) or an AI model.
 
-An **SBOM author** field records the organisation or person running the scan on the SBOM's own metadata, not the tool and not whoever wrote the software (the UI equivalent of `--sbom-author`). Leave it empty and the SBOM carries no author. Available for AI-model scans too, since they get a document-metadata stamp the same as any other generated SBOM; hidden for an analyzed supplier SBOM, which the UI did not author.
+An **SBOM author** field records the organisation or person running the scan on the SBOM's own metadata, not the tool and not whoever wrote the software (the UI equivalent of `--sbom-author`). Leave it empty and BomLens is recorded as the author, marked as the tool, with no email. Available for AI-model scans too, since they get a document-metadata stamp the same as any other generated SBOM; hidden for an analyzed supplier SBOM, which the UI did not author.
 
 A **CycloneDX version** choice sets the version the SBOM is written in: 1.6 (the default) or 1.7, the UI equivalent of `--spec-version`. AI model and dataset SBOMs are 1.7 whichever is chosen. Like the SBOM author, it is hidden for an analyzed supplier SBOM, which keeps the version its supplier wrote, and a re-scan keeps the version the earlier scan used.
 

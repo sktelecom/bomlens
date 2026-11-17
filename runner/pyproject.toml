@@ -1,11 +1,11 @@
 [build-system]
-requires = ["setuptools>=69"]
+requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "bomlens-runner"
 dynamic = ["version"]
-description = "Run the BomLens SBOM scan engine on Kubernetes from another program"
+description = "Run the BomLens SBOM scan engine on Kubernetes or Docker from another program"
 readme = "README.md"
 license = "Apache-2.0"
 requires-python = ">=3.10"

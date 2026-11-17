@@ -1128,6 +1128,10 @@ def build(bom, mapping, prefix, declaration, stable):
     if "declaration" in meta_props.get("bomlens:sbom-author-source", []):
         declared_authors = declared_authors or scanned_authors
         scanned_authors = None
+    # BomLens recorded itself because nobody named an author: it is a tool, so
+    # the document is left without a creator rather than crediting the tool.
+    if "tool" in meta_props.get("bomlens:sbom-author-source", []):
+        scanned_authors = None
     if scanned_authors and declared_authors:
         b.annotate(doc_id, "The scan named its author (--sbom-author); the declaration's createdBy was not used.")
     elif declared_authors:

@@ -92,8 +92,8 @@ PAGE = r"""<!DOCTYPE html>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>__TITLE__</title>
 <style>
-:root { --bg:#fff; --panel:#f6f7f9; --line:#d9dce1; --text:#1d2127; --muted:#5a6270; --accent:#ea002c; --ok:#0b6b3a; --warn:#8a5300; --focus:#1a5fd0; }
-@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --bg:#14171c; --panel:#1c2027; --line:#2e343d; --text:#e8eaee; --muted:#9aa3b0; --accent:#ff5a72; --ok:#5fd394; --warn:#f0b35a; --focus:#7aa7ff; } }
+:root { --bg:#fff; --panel:#f6f7f9; --line:#d9dce1; --text:#1d2127; --muted:#5a6270; --accent:#1d4ed8; --ok:#0b6b3a; --warn:#8a5300; --focus:#1a5fd0; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --bg:#14171c; --panel:#1c2027; --line:#2e343d; --text:#e8eaee; --muted:#9aa3b0; --accent:#2563eb; --ok:#5fd394; --warn:#f0b35a; --focus:#7aa7ff; } }
 * { box-sizing: border-box; }
 body { margin:0; background:var(--bg); color:var(--text); font:15px/1.5 system-ui,-apple-system,"Segoe UI","Noto Sans KR",sans-serif; }
 header { padding:20px 24px 12px; border-bottom:1px solid var(--line); display:flex; gap:16px; align-items:baseline; flex-wrap:wrap; }
