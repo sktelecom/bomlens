@@ -11055,7 +11055,7 @@ _bp=$(grep -m1 '^NON_SHIPPED_MANIFEST_RE=' "$PREP"); _sd=$(grep -m1 '^NON_SHIPPE
 [ -n "$_bp" ] && [ "$_bp" = "$_sd" ] \
     && pass "NON_SHIPPED_MANIFEST_RE is the same in build-prep.sh and source-detect.sh" \
     || fail "NON_SHIPPED_MANIFEST_RE differs"
-for _v in NON_SHIPPED_PATHS NON_SHIPPED_PATH_FILE_RE; do
+for _v in NON_SHIPPED_PATHS NON_SHIPPED_PATH_FILE_RE NON_SHIPPED_FILE_GLOBS; do
     _bp=$(grep -m1 "^$_v=" "$PREP"); _sd=$(grep -m1 "^$_v=" "$DETECT")
     [ -n "$_bp" ] && [ "$_bp" = "$_sd" ] \
         && pass "$_v is the same in build-prep.sh and source-detect.sh" \
@@ -11073,7 +11073,7 @@ _list=$(bash -c '. "$1"; non_shipped_manifests "$2"' _ "$DETECT" "$WORK/nswrap" 
     && pass "non_shipped_manifests records the Gradle wrapper jars only" \
     || fail "non_shipped_manifests Gradle wrapper list unexpected" "got [$_list]"
 case "$(bash -c '. "$1"; non_shipped_globs' _ "$DETECT")" in
-    *"**/.github/workflows/**, **/gradle/wrapper/**") pass "non_shipped_globs ends with the workflow and Gradle wrapper paths" ;;
+    *"**/.github/workflows/**, **/gradle/wrapper/**, **/vendor/**/package-lock.json") pass "non_shipped_globs ends with the workflow, Gradle wrapper and vendored lock paths" ;;
     *) fail "non_shipped_globs is missing the Gradle wrapper path" ;;
 esac
 _list=$(bash -c '. "$1"; non_shipped_manifests "$2"' _ "$DETECT" "$NSM" | tr '\n' ' ')

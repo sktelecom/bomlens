@@ -424,6 +424,7 @@ stage1_fail_reason() {
 non_shipped_globs() {
     local d out=""
     for d in $NON_SHIPPED_DIRS $NON_SHIPPED_PATHS; do out="$out, **/$d/**"; done
+    for d in $NON_SHIPPED_FILE_GLOBS; do out="$out, **/$d"; done
     printf '%s' "${out#, }"
 }
 
@@ -461,6 +462,9 @@ non_shipped_manifests() {
         | { grep -Ei "$NON_SHIPPED_PATH_FILE_RE|$re" || true; } \
         | { grep -Ei "$NON_SHIPPED_PATH_FILE_RE|$NON_SHIPPED_MANIFEST_RE" || true; } \
         | LC_ALL=C sort
+    # Lock files under vendor/ (NON_SHIPPED_FILE_GLOBS) are left out too.
+    (cd "$root" 2>/dev/null && find . \( -name node_modules -o -name .git \) -prune -o -type f -name package-lock.json -path '*/vendor/*' -print 2>/dev/null) \
+        | sed 's#^\./##' | LC_ALL=C sort
 }
 
 # static_project_name <root>: the project's own package name, for the two lock
@@ -1406,6 +1410,9 @@ ANDROID_WRAPPER_JDK_BAD=""
 android_wrapper_jdk_check() {
     local v
     ANDROID_WRAPPER_JDK_BAD=""
+    # A different image prefix is an SDK image the user built, possibly on an
+    # older JDK: its Java is not known here, so nothing is said or recorded.
+    [ "$ANDROID_IMAGE_PREFIX" = "bomlens-android-sdk" ] || return 0
     gradle_wrappers "${1:-}"
     for v in $GRADLE_WRAPPER_VERSIONS; do
         _gradle_runs_on "$v" 21 || ANDROID_WRAPPER_JDK_BAD="${ANDROID_WRAPPER_JDK_BAD:+$ANDROID_WRAPPER_JDK_BAD }$v"

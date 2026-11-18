@@ -84,29 +84,49 @@ catalog_rows() {
             m = substr(tbl, RSTART, RLENGTH)
             sub(/^[^{]*\{/, "", m); sub(/\}$/, "", m)
             if (m ~ /(^|[ \t,])ref[ \t]*=/) { v = field("{" m, "ref"); if (v != "") return "@" v }
-            v = field("{" m, "strictly"); if (v == "") v = field("{" m, "require"); if (v == "") v = field("{" m, "prefer")
-            return v
+            return pick("{" m)
         }
         return ""
     }
-    function clean_version(v) { sub(/!!$/, "", v); return v }
+    # The soft version first (prefer), then the required one. A range or a
+    # dynamic version (1.+, latest.release, [1.0,2.0[) is not one version a
+    # vulnerability can be matched to, so it counts as no version.
+    function pick(tbl,    v) {
+        v = field(tbl, "prefer"); if (v == "") v = field(tbl, "require"); if (v == "") v = field(tbl, "strictly")
+        return v
+    }
+    function clean_version(v) {
+        sub(/!!$/, "", v)
+        if (v ~ /[\[\]\(\),+]/ || v ~ /^latest\./) return ""
+        return v
+    }
+    function unq(k) { gsub(/^[ \t]*"|"[ \t]*$/, "", k); return k }
+    # Two passes over each file (it is named twice): the first collects [versions],
+    # the second reads [libraries], so the order of the tables does not matter,
+    # and a key never leaks from one catalog file into another (ver is cleared
+    # at the start of each file by the caller running awk once per file).
+    BEGIN { sq = sprintf("%c", 39) }
+    FNR == 1 { sec = ""; pass = (FNR == NR) ? 1 : 2 }
     /^[ \t]*#/ { next }
     /^[ \t]*\[/ {
-        sec = strip($0); gsub(/[ \t]/, "", sec); next
+        sec = $0; sub(/[ \t]*#.*$/, "", sec); gsub(/[ \t\r]/, "", sec); next
     }
     {
         line = $0
+        # single-quoted TOML strings read like double-quoted ones
+        gsub(sq, "\"", line)
         # drop a trailing comment that follows the closing quote or brace
         sub(/[ \t]+#[^"}]*$/, "", line)
         eq = index(line, "=")
         if (eq == 0) next
-        key = strip(substr(line, 1, eq - 1)); val = strip(substr(line, eq + 1))
+        key = unq(strip(substr(line, 1, eq - 1))); val = strip(substr(line, eq + 1))
         if (sec == "[versions]") {
+            if (pass != 1) next
             if (val ~ /^"/) { v = val; sub(/^"/, "", v); sub(/".*$/, "", v); ver[key] = v }
-            else if (val ~ /^\{/) { v = field(val, "strictly"); if (v == "") v = field(val, "require"); if (v == "") v = field(val, "prefer"); ver[key] = v }
+            else if (val ~ /^\{/) { ver[key] = pick(val) }
             next
         }
-        if (sec != "[libraries]") next
+        if (sec != "[libraries]" || pass != 2) next
         g = ""; a = ""; v = ""
         if (val ~ /^"/) {
             s = val; sub(/^"/, "", s); sub(/".*$/, "", s)
@@ -127,12 +147,15 @@ catalog_rows() {
             }
         }
         if (g != "" && a != "") print g "\t" a "\t" clean_version(v)
-    }' "$@"
+        else print "-\t-\t"   # a line of a form this reader does not follow: counted as skipped
+    }' "$@" "$@"
 }
 
 ROWS="$(mktemp)"
 trap 'rm -f "$ROWS"' EXIT
-catalog_rows "${CATALOGS[@]}" > "$ROWS"
+for f in "${CATALOGS[@]}"; do
+    catalog_rows "$f" >> "$ROWS"
+done
 
 SKIPPED=$(awk -F '\t' '$3 == ""' "$ROWS" | wc -l | tr -d ' ')
 GEN_AT=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
@@ -152,4 +175,4 @@ jq -R -s --arg version "$VERSION" --arg ts "$GEN_AT" --arg spec "$CDX_SPEC_VERSI
 ' "$ROWS" > "$OUTPUT"
 
 N=$(jq '.components | length' "$OUTPUT")
-echo "[catalog] ${#CATALOGS[@]} version catalog file(s): $N librar$([ "$N" = 1 ] && echo y || echo ies) read; $SKIPPED skipped (no version)." >&2
+echo "[catalog] ${#CATALOGS[@]} version catalog file(s): $N librar$([ "$N" = 1 ] && echo y || echo ies) read; $SKIPPED skipped (no single version, or a form not read)." >&2

@@ -48,8 +48,17 @@ check "git URL named in npm's error" \
     "$(drop private-lib 'git+https://git.invalid.example/team/private-lib.git#v1.2.0' "npm error code 128
 npm error command git --no-replace-objects ls-remote https://git.invalid.example/team/private-lib.git")" "private-lib "
 check "express stays" "$(jq -c '.dependencies | keys' "$WORK/package.json")" '["express"]'
-check "EALLOWGIT drops the git dependency" \
-    "$(drop private-lib 'github:acme/private-lib' 'npm error code EALLOWGIT')" "private-lib "
+check "EALLOWGIT drops the git dependency whose source the message names" \
+    "$(drop private-lib 'github:acme/private-lib' 'npm error code EALLOWGIT
+npm error Fetching git+ssh://git@github.com/acme/private-lib.git is not allowed')" "private-lib "
+check "EALLOWGIT without a named source drops nothing" \
+    "$(drop private-lib 'github:acme/private-lib' 'npm error code EALLOWGIT')" ""
+printf '{"dependencies":{"cfg":"acme/config#v2","bad":"git+https://git.corp/team/bad.git"}}\n' > "$WORK/package.json"
+printf '%s\n' "npm error command git ls-remote https://git.corp/team/bad.git" "npm error fatal: could not read Username for https://git.corp: config" > "$WORK/err"
+check "a short repository name elsewhere in the message does not drop another dependency" \
+    "$(node "$WORK/npmdrop.js" "$WORK/package.json" "$WORK/err" | tr '\n' ' ')" "bad "
+check "a development-only dependency is reported as such" \
+    "$(printf '{"devDependencies":{"ghost":"^1.0.0"}}\n' > "$WORK/package.json"; printf '%s\n' 'npm error 404 Not Found - GET https://registry.npmjs.org/ghost - Not found' > "$WORK/err"; node "$WORK/npmdrop.js" "$WORK/package.json" "$WORK/err" | tr '\t' '~' | tr '\n' ' ')" "ghost~dev "
 check "E404 for a scoped package" \
     "$(drop @acme/ghost '^1.0.0' 'npm error 404 Not Found - GET https://registry.npmjs.org/@acme%2fghost - Not found')" "@acme/ghost "
 check "ETARGET" \
@@ -57,6 +66,44 @@ check "ETARGET" \
 check "an unrelated error drops nothing" \
     "$(drop other '1.0.0' 'npm error code ERESOLVE')" ""
 check "...and leaves package.json alone" "$(jq -c '.dependencies | keys' "$WORK/package.json")" '["express","other"]'
+
+echo "== npm: the retry block, with a stub npm =="
+# The block of build-prep.sh that resolves the production set, run on its own
+# against a stub npm that cannot fetch private-lib.
+sed -n '/^NODE_PROD_SET=""$/,/^# --- build the cdxgen argument list/p' "$LIB/build-prep.sh" | sed '$d' > "$WORK/npmblock.sh"
+mkdir -p "$WORK/bin"
+cat > "$WORK/bin/npm" <<'E'
+#!/bin/sh
+if grep -q private-lib package.json; then
+  echo "npm error code 128" >&2
+  echo "npm error command git --no-replace-objects ls-remote https://git.invalid.example/team/private-lib.git" >&2
+  exit 128
+fi
+echo '{"name":"x","lockfileVersion":3,"packages":{"":{},"node_modules/express":{"version":"4.19.2"},"node_modules/lodash":{"version":"4.17.21"}}}' > package-lock.json
+E
+chmod +x "$WORK/bin/npm"
+cat > "$WORK/npmprelude.sh" <<'E'
+log() { echo "[build-prep] $*"; }
+opted_out() { case "$1" in 1|true) return 0 ;; esac; return 1; }
+run_supervised_timeout() { shift; "$@"; }
+PREP_FAILED=""; PREP_APPLIED=""; PREP_TIMEOUT_DEFAULT=900
+prep_step() { _l="$1"; shift 2; PREP_APPLIED="$PREP_APPLIED $_l"; "$@"; _r=$?; [ "$_r" -eq 0 ] || PREP_FAILED="${PREP_FAILED:+$PREP_FAILED }$_l"; return "$_r"; }
+mark_prep_failed() { PREP_FAILED="${PREP_FAILED:+$PREP_FAILED }$1"; }
+unmark_prep_failed() { _n=""; for _x in $PREP_FAILED; do [ "$_x" = "$1" ] || _n="${_n:+$_n }$_x"; done; PREP_FAILED="$_n"; }
+E
+run_npm_block() {  # <dir>
+    ( cd "$1" && PATH="$WORK/bin:$PATH" bash -c '. "$1"; . "$2"; echo "FAILED=[$PREP_FAILED]"; echo "SET=$(cat "$NODE_PROD_SET" 2>/dev/null | tr "\n" " ")"' _ "$WORK/npmprelude.sh" "$WORK/npmblock.sh" 2>/dev/null )
+}
+rm -rf "$WORK/n1"; cp -R "$FIX/npm-git-dep" "$WORK/n1"
+out=$(run_npm_block "$WORK/n1")
+check "no lock file: the dependency is left out and named as a failed step" \
+    "$(echo "$out" | grep '^FAILED=')" "FAILED=[npm-excluded:private-lib]"
+check "...the resolved lock file is handed to cdxgen" "$([ -f "$WORK/n1/package-lock.json" ] && echo placed)" placed
+check "...package.json is untouched" "$(jq -c '.dependencies | keys' "$WORK/n1/package.json")" '["express","lodash","private-lib","uuid"]'
+rm -rf "$WORK/n2"; cp -R "$FIX/npm-git-dep" "$WORK/n2"; : > "$WORK/n2/yarn.lock"
+out=$(run_npm_block "$WORK/n2")
+check "a yarn.lock project is left alone: no lock file placed" "$([ -f "$WORK/n2/package-lock.json" ] && echo placed || echo none)" none
+check "...and nothing is recorded as excluded" "$(echo "$out" | grep '^FAILED=')" "FAILED=[npm-production-set]"
 
 echo "== Ruby: optional group =="
 extract GEMDEV_JS "$WORK/gemdev.js"
@@ -101,6 +148,19 @@ E
 bash "$LIB/normalize-sbom.sh" "$WORK/n.json" >/dev/null 2>&1
 check "versionless System and System.Core go, versioned packages stay" \
     "$(jq -c '[.components[].purl]' "$WORK/n.json")" '["pkg:nuget/Newtonsoft.Json@13.0.3","pkg:nuget/System.Net.Http@4.3.4"]'
+cat > "$WORK/n2.json" <<'E'
+{"bomFormat":"CycloneDX","specVersion":"1.6","version":1,"metadata":{"component":{"type":"application","name":"s"}},
+ "components":[{"type":"library","name":"System","purl":"pkg:nuget/System","bom-ref":"pkg:nuget/System"}]}
+E
+MODE=ANALYZE bash "$LIB/normalize-sbom.sh" "$WORK/n2.json" >/dev/null 2>&1
+check "a supplier SBOM under analysis keeps its versionless entry" "$(jq '.components | length' "$WORK/n2.json")" 1
+cat > "$WORK/n3.json" <<'E'
+{"bomFormat":"CycloneDX","specVersion":"1.6","version":1,"metadata":{"component":{"type":"application","name":"s"}},
+ "components":[{"type":"library","name":"System.Net.Http","purl":"pkg:nuget/System.Net.Http","bom-ref":"x"},
+               {"type":"library","name":"System","purl":"pkg:nuget/System@","bom-ref":"y"}]}
+E
+bash "$LIB/normalize-sbom.sh" "$WORK/n3.json" >/dev/null 2>&1
+check "a real NuGet package name stays; the empty-version form of a base assembly goes" "$(jq -r '[.components[].name] | join(" ")' "$WORK/n3.json")" "System.Net.Http"
 check "the dependency edges to them go too" \
     "$(jq -c '.dependencies' "$WORK/n.json")" '[{"dependsOn":["pkg:nuget/Newtonsoft.Json@13.0.3"],"ref":"app"}]'
 
@@ -114,6 +174,47 @@ E
 bash "$LIB/assess-completeness.sh" "$WORK/c.json" "$WORK/c" >/dev/null 2>&1
 check "resolution-failed names the dependency left out" \
     "$(jq -r '[.. | objects | select(.code? == "resolution-failed") | .detail] | first // ""' "$WORK/c_completeness.json")" "npm-excluded:private-lib"
+
+echo "== Gradle version catalog: table order, two files, ranges, comments =="
+mkdir -p "$WORK/cat/gradle"
+printf '[versions]\nkotlin = "1.9.0"\n' > "$WORK/cat/gradle/a.versions.toml"
+cat > "$WORK/cat/gradle/libs.versions.toml" <<'E'
+[libraries] # the libs
+okhttp = { module = "com.squareup.okhttp3:okhttp", version.ref = "okhttp" }
+k2 = { module = "org.jetbrains.kotlin:kotlin-reflect", version.ref = "kotlin" }
+range = { module = "g:range", version = { strictly = "[1.0, 2.0[", prefer = "1.5" } }
+onlyrange = { module = "g:onlyrange", version = { strictly = "[1.0, 2.0[" } }
+dyn = { module = "g:dyn", version = "1.+" }
+lit = 'g:lit:1.0'
+"quoted.key" = { module = "g:qk", version.ref = "okhttp" }
+
+[versions]
+okhttp = "4.12.0"
+kotlin = "2.0.0"
+E
+bash "$LIB/gradle-version-catalog.sh" "$WORK/cat" "$WORK/cat/out.json" 1.0 >/dev/null 2>&1
+check "libraries before [versions], files kept apart, ranges skipped, comments and quotes read" \
+    "$(jq -r '[.components[].purl] | sort | join(" ")' "$WORK/cat/out.json")" \
+    "pkg:maven/com.squareup.okhttp3/okhttp@4.12.0 pkg:maven/g/lit@1.0 pkg:maven/g/qk@4.12.0 pkg:maven/g/range@1.5 pkg:maven/org.jetbrains.kotlin/kotlin-reflect@2.0.0"
+
+echo "== Android wrapper check and a custom SDK image =="
+check "the default image: an old wrapper is flagged" \
+    "$(ANDROID_IMAGE_PREFIX=bomlens-android-sdk bash -c '. "$1"; android_wrapper_jdk_check "$2" quiet; echo "$ANDROID_WRAPPER_JDK_BAD"' _ "$LIB/source-detect.sh" "$FIX/android-old-wrapper")" "6.5.0"
+check "a custom image prefix: nothing is flagged" \
+    "$(ANDROID_IMAGE_PREFIX=my-android-sdk bash -c '. "$1"; android_wrapper_jdk_check "$2" quiet; echo "$ANDROID_WRAPPER_JDK_BAD"' _ "$LIB/source-detect.sh" "$FIX/android-old-wrapper")" ""
+
+echo "== compositions with an excluded npm dependency =="
+sed -n '/^mark_compositions_aggregate() {$/,/^}$/p' "$ROOT_DIR/docker/entrypoint.sh" > "$WORK/comp-fn.sh"
+cat > "$WORK/comp.json" <<'E'
+{"bomFormat":"CycloneDX","specVersion":"1.6","version":1,
+ "metadata":{"component":{"type":"application","name":"app","bom-ref":"app"},
+   "properties":[{"name":"bomlens:prep-step-applied","value":"npm-production-set"},
+                 {"name":"bomlens:pipeline-step-failed","value":"npm-excluded:private-lib"}]},
+ "components":[{"type":"library","name":"a","bom-ref":"a"},{"type":"library","name":"b","bom-ref":"b"}],
+ "dependencies":[{"ref":"app","dependsOn":["a","b"]}]}
+E
+check "aggregate is incomplete, not complete" \
+    "$(bash -c '. "$1"; SCAN_MODE=SOURCE; mark_compositions_aggregate "$2"; jq -r ".compositions[0].aggregate" "$2"' _ "$WORK/comp-fn.sh" "$WORK/comp.json" 2>/dev/null)" "incomplete"
 
 echo
 echo "passed: $PASS, failed: $FAIL"
