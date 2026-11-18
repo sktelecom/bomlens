@@ -1364,7 +1364,9 @@ EOF
         if [ "$YOCTO_FROM_BUILD" != "true" ]; then
         echo "[1/2] Validating supplier SBOM (conformance, original input)..."
         # Conformance never aborts the pipeline (best-effort report).
-        run_optional_step conformance bash "$LIBDIR/validate-sbom.sh" "$ANALYZE_SBOM" "$OUT_PREFIX" "$PROJECT_NAME"
+        # BOMLENS_SBOM_SUPPLIED: the input is read before conversion, so it has
+        # not been stamped bomlens:sbom-supplied yet (assess-completeness.sh).
+        BOMLENS_SBOM_SUPPLIED=true run_optional_step conformance bash "$LIBDIR/validate-sbom.sh" "$ANALYZE_SBOM" "$OUT_PREFIX" "$PROJECT_NAME"
         fi
         # Describe the document the supplier actually sent, before conversion
         # rewrites it: the format and version it was written in, the tool that
@@ -2517,6 +2519,23 @@ sync_artifacts
 if [ -s "$OUTPUT_FILE" ]; then
     bash "$LIBDIR/assess-completeness.sh" "$OUTPUT_FILE" "$OUT_PREFIX" >/dev/null || true
     [ -f "${OUT_PREFIX}_completeness.json" ] && ARTIFACTS+=("${OUT_PREFIX}_completeness.json")
+    # The CLI's closing summary states this same verdict. validate-sbom.sh wrote
+    # its own earlier from a CycloneDX document only, so redo the completeness keys
+    # from the final file (a received SPDX SBOM is judged here, after conversion).
+    if [ -f "${OUT_PREFIX}_summary.result" ] && [ -f "${OUT_PREFIX}_completeness.json" ]; then
+        _sum_tmp="${OUT_PREFIX}_summary.result.tmp.$$"
+        if grep -v '^completeness' "${OUT_PREFIX}_summary.result" > "$_sum_tmp" 2>/dev/null; then
+            case "$(jq -r '.grade // empty' "${OUT_PREFIX}_completeness.json" 2>/dev/null)" in
+                partial|unreliable)
+                    jq -r '"completeness\t\(.grade)",
+                        "completenessReasons\t\(.reasons | map(.code) | join(","))",
+                        (.reasons[]? | "completenessFix\t\(.code)\t\(.fix.en | gsub("\\p{Cc}"; " "))")' \
+                        "${OUT_PREFIX}_completeness.json" >> "$_sum_tmp" 2>/dev/null || true ;;
+            esac
+            cat "$_sum_tmp" > "${OUT_PREFIX}_summary.result"
+        fi
+        rm -f "$_sum_tmp"
+    fi
 fi
 
 if [ "${GENERATE_NOTICE:-false}" != "true" ]; then

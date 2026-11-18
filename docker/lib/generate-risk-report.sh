@@ -438,7 +438,7 @@ else
     P_REASON_NO_VERSION="no version"
     P_REASON_NO_ID="no package purl and no matched CPE"
     P_REASON_REPO_PURL="repository purl (pkg:github, ...), which Trivy does not query"
-    P_REASON_UNSUP="package ecosystem with no vulnerability data source (pkg:cocoapods, pkg:conan)"
+    P_REASON_UNSUP="package ecosystem with no vulnerability data source (pkg:cocoapods)"
     P_VULN_NONE_CHECKED_MD="_No vulnerability was found in the components that were checked. The components that could not be checked are listed above._"
     P_VULN_NONE_CHECKED_HTML="No vulnerability was found in the components that were checked. The components that could not be checked are listed above."
     P_FW_SCOPE_H="Firmware analysis scope"

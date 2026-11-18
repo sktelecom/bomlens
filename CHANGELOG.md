@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `--fail-on incomplete-result` exits 4 when the result is partial or unreliable (the grade the reports state), and `--fail-on incomplete-result=unreliable` only when it is unreliable. The closing summary now prints the grade, the reason codes and how to fix each, and the advice for a source with no component depends on the reason (a damaged lock file, a failed resolution step). The default exit code is unchanged: an incomplete result still exits 0 unless you ask.
+- CMake `FetchContent_Declare` dependencies are recognised as declared C/C++ dependencies: a source whose only manifests are vcpkg, Conan or CMake FetchContent ones and that resolves no component is graded unreliable, with `--identify-vendored` and `sbom-declared.cdx.json` as the alternatives.
 - When no SBOM author is named, `metadata.authors` records BomLens as the tool that generated the document, with `bomlens:sbom-author-source` set to `tool` (it was left empty). The SPDX 3.0.1 AI document does not credit it as the creator. A default author can be saved as `sbom_author=<name>` in `~/.config/bomlens/config`; `--sbom-author` and `SBOM_AUTHOR` take precedence.
 - The engine runner (`runner/`, the Python package `bomlens-runner`) runs the scan engine on Kubernetes for another program: it runs `MODE=PLAN`, checks the execution plan, runs stage 1 and stage 2 as Jobs (passing stage 1's exit code, out-of-memory state and log to stage 2, and restoring the source after a killed stage 1), checks the result manifest and its outputs, and removes every Job and Pod before it returns. Image scans run as one Job. Every Pod carries `app.kubernetes.io/part-of=bomlens-engine`, `app.kubernetes.io/component` and `bomlens.engine/network` (`none` or `egress`) labels for the cluster's NetworkPolicies, and secret values are referenced from Kubernetes Secrets. See [Engine runner](docs/reference/engine-runner.md). CI runs it on a kind cluster with the image built from the commit.
 - The engine runner's Docker backend (`bomlens_runner.docker`) runs the same containers through the `docker` CLI, for a daemon behind a socket proxy: the workspace and Trivy database as named volumes mounted by subpath or as host folders, values in an owner-only env file removed once the container is created, the recorded mounts and settings checked before start, a log stream that ends while the container runs followed again, removal confirmed, and `bomlens.engine/deadline` and instance labels on every container. The `bomlens-runner` command uses it when the policy has a `docker` object.
@@ -16,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- A supplier SBOM (`--analyze`) that lists no component now fails the conformance check's mandatory result-completeness row, so `--fail-on-conformance` exits 2 for it. A source scan with no component stays a warning.
 - The web UI names the running version at the foot of the left navigation, so the static demo shows which release it is a copy of. The demo's help menu no longer offers a link to itself.
 
 ## [v1.15.0] - 2026-11-15
