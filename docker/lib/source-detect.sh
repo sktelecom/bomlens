@@ -1372,27 +1372,27 @@ warn_low_engine_memory_for() {  # warn_low_engine_memory_for <lang> <dir>
 # comes from the catalog line.
 android_api() {
     local d="$1" api f sub list
-    local files=()
+    local sdk_files=()
     for f in "$d"/build.gradle "$d"/build.gradle.kts "$d"/app/build.gradle "$d"/app/build.gradle.kts \
              "$d"/gradle/libs.versions.toml; do
-        if [ -f "$f" ]; then files+=("$f"); fi
+        if [ -f "$f" ]; then sdk_files+=("$f"); fi
     done
     for sub in build-logic buildSrc; do
         [ -d "$d/$sub" ] || continue
         list=$(find "$d/$sub" -maxdepth 8 -type d \( -name build -o -name .gradle -o -name node_modules \) -prune -o \
                     -type f \( -name '*.kt' -o -name '*.kts' -o -name '*.gradle' \) -print 2>/dev/null | LC_ALL=C sort)
         while IFS= read -r f; do
-            if [ -n "$f" ]; then files+=("$f"); fi
+            if [ -n "$f" ]; then sdk_files+=("$f"); fi
         done <<< "$list"
     done
-    if [ "${#files[@]}" -gt 0 ]; then
+    if [ "${#sdk_files[@]}" -gt 0 ]; then
         api=$( {
             # compileSdk = 34, compileSdkVersion 34, compileSdk(34)
-            grep -hoE 'compileSdk(Version)?[[:space:]]*[=(]?[[:space:]]*[0-9]+' "${files[@]}" 2>/dev/null
+            grep -hoE 'compileSdk(Version)?[[:space:]]*[=(]?[[:space:]]*[0-9]+' "${sdk_files[@]}" 2>/dev/null
             # compileSdk { version = release(36) }
-            grep -hoE 'version[[:space:]]*=[[:space:]]*release\([0-9]+' "${files[@]}" 2>/dev/null
+            grep -hoE 'version[[:space:]]*=[[:space:]]*release\([0-9]+' "${sdk_files[@]}" 2>/dev/null
             # catalog keys: android-compileSdk = "37", compile_sdk = 35
-            grep -hioE '^[[:space:]]*[A-Za-z0-9_.-]*compile[-_.]?sdk[A-Za-z0-9_.-]*[[:space:]]*=[[:space:]]*"?[0-9]+' "${files[@]}" 2>/dev/null
+            grep -hioE '^[[:space:]]*[A-Za-z0-9_.-]*compile[-_.]?sdk[A-Za-z0-9_.-]*[[:space:]]*=[[:space:]]*"?[0-9]+' "${sdk_files[@]}" 2>/dev/null
         } | grep -oE '[0-9]+$' | awk '$1 >= 1 && $1 <= 999 { if ($1 + 0 > m) m = $1 + 0 } END { if (m) print m }' || true)
     fi
     echo "${api:-$ANDROID_API_DEFAULT}"
