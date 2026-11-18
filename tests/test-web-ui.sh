@@ -7586,7 +7586,9 @@ assert server.remove_labeled_containers("../x") == 0 and log() == ""
 # silent command: cancel turns true after ~1.5 s, nothing is printed; the
 # watcher stops it well before the command's own 30 s.
 t0 = time.monotonic()
-rc = server._stream_cmd(["sh", "-c", "sleep 30"], lambda l: None,
+# "; true" keeps the shell from exec-ing sleep, as dash does not on every
+# system: sleep is then a child holding the output pipe open.
+rc = server._stream_cmd(["sh", "-c", "sleep 30; true"], lambda l: None,
                         cancel=lambda: time.monotonic() - t0 > 1.5,
                         container="silent-container")
 assert time.monotonic() - t0 < 10, time.monotonic() - t0
@@ -7660,6 +7662,9 @@ ss_ok=1
 for case_ in id cidfile name pull; do
     : > "$FAKE_DOCKER_LOG3"
     CIDF="$WORK/ss.cid"; rm -f "$CIDF"
+    # The function is sourced from a file built above, and the SIBLING_* values
+    # are read by stop_sibling inside it, not here.
+    # shellcheck disable=SC1090,SC2034
     ( export PATH="$FAKEDOCKER3:$PATH" FAKE_DOCKER_LOG3
       source "$SS_FN"
       SIBLING_NAME="bomlens-sib-9"

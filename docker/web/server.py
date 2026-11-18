@@ -5768,9 +5768,12 @@ def _stream_cmd(args, on_log, cancel=None, container=None, env=None,
     also polled once a second from a watcher thread, so a command that prints
     nothing (an image pull) stops as well."""
     try:
+        # Its own session, so a cancel reaches the command's children too. A
+        # child that keeps the output pipe open (a shell that did not exec its
+        # last command) would otherwise hold the reader until it ended itself.
         proc = subprocess.Popen(
             args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-            text=True, bufsize=1, env=env,
+            text=True, bufsize=1, env=env, start_new_session=True,
         )
     except OSError as exc:
         on_log("[ui] failed to launch: %s" % exc)
@@ -5789,11 +5792,13 @@ def _stream_cmd(args, on_log, cancel=None, container=None, env=None,
                                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             except OSError:
                 pass
-        proc.terminate()
+        _signal_session(proc.pid, signal.SIGTERM)
         try:
             proc.wait(timeout=CANCEL_GRACE_SECONDS)
         except subprocess.TimeoutExpired:
-            proc.kill()
+            pass
+        # Whatever is left in the session goes now, which also closes the pipe.
+        _signal_session(proc.pid, signal.SIGKILL)
 
     watch = _cancel_watch(proc, cancel, _stop) if cancel else None
     for raw in proc.stdout:
