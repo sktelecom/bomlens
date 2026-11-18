@@ -7560,14 +7560,14 @@ cat > "$FAKEDOCKER3/docker" <<'STUB'
 #!/usr/bin/env bash
 echo "docker $*" >> "$FAKE_DOCKER_LOG3"
 case "${1:-}" in
-  ps) echo abc123def456; echo 0123456789ab ;;
+  ps) [ -n "${FAKE_PS_EMPTY:-}" ] || { echo abc123def456; echo 0123456789ab; } ;;
 esac
 exit 0
 STUB
 chmod +x "$FAKEDOCKER3/docker"
 if SBOM_OUTPUT_DIR="$OUT" PATH="$FAKEDOCKER3:$PATH" FAKE_DOCKER_LOG3="$FAKE_DOCKER_LOG3" \
    python3 - "$ROOT_DIR" <<'PY'
-import os, sys, time, tempfile
+import os, sys, time, tempfile, shutil
 sys.path.insert(0, os.path.join(sys.argv[1], "docker", "web"))
 import server
 
@@ -7595,15 +7595,52 @@ assert "docker stop -t %d silent-container" % server.CANCEL_GRACE_SECONDS in log
 # folder discard: new entries go, the earlier scan's file stays
 d = tempfile.mkdtemp(prefix="cx_", dir=server.OUTPUT_DIR)
 open(os.path.join(d, "old_bom.json"), "w").write("{}")
-keep = set(os.listdir(d))
+keep = server.folder_signature(d)
 open(os.path.join(d, "new_bom.json"), "w").write("{}")
 os.makedirs(os.path.join(d, "sub"))
 server.discard_cancelled_run(d, keep)
 assert os.listdir(d) == ["old_bom.json"], os.listdir(d)
 os.remove(os.path.join(d, "old_bom.json"))
 open(os.path.join(d, "x.json"), "w").write("{}")
-server.discard_cancelled_run(d, set())
+server.discard_cancelled_run(d, {})
 assert not os.path.exists(d)
+
+# a re-scan of the same project and version that is cancelled: the earlier
+# scan's files carry the same names, and the run rewrote them (the engine
+# clears them at its start). The rewritten files and the .scanmeta.json go;
+# a file the run never touched stays.
+d = tempfile.mkdtemp(prefix="cx_", dir=server.OUTPUT_DIR)
+for n in ("demo_1.0_bom.json", ".scanmeta.json", "untouched.txt"):
+    open(os.path.join(d, n), "w").write("earlier")
+before = server.folder_signature(d)
+for n in ("demo_1.0_bom.json", ".scanmeta.json"):
+    os.remove(os.path.join(d, n))
+    open(os.path.join(d, n), "w").write("this run, cancelled")
+    st = os.stat(os.path.join(d, n))
+    os.utime(os.path.join(d, n), ns=(st.st_atime_ns, st.st_mtime_ns + 5_000_000_000))
+server.discard_cancelled_run(d, before)
+assert sorted(os.listdir(d)) == ["untouched.txt"], os.listdir(d)
+shutil.rmtree(d)
+
+# the poll-based peer check: a socket pair with the far end closed reads as
+# closed, an open one does not
+import socket as _s
+a, b = _s.socketpair()
+assert server._peer_closed(a) is False
+b.close()
+assert server._peer_closed(a) is True
+a.close()
+
+# bidirectional controls and line separators in completeness text are blanked
+import json as _j
+cdir = tempfile.mkdtemp(prefix="cx_", dir=server.OUTPUT_DIR)
+_ctext = "a\u202eb\u2028c\u0085d\u2066e"
+_cf = os.path.join(cdir, "x_completeness.json")
+open(_cf, "w").write(_j.dumps({"schemaVersion": 1, "grade": "partial", "gradeLabel": {"en": _ctext, "ko": ""},
+                                "reasons": [{"code": "c", "grade": "partial", "detail": _ctext}]}))
+_cs = server.completeness_summary(os.path.basename(cdir))
+assert _cs and _cs["reasons"][0]["detail"] == "a b c d e", _cs
+shutil.rmtree(cdir)
 PY
 then
     pass "cancel cleanup removes labelled containers, stops silent commands, discards only the run's files"
@@ -7620,7 +7657,7 @@ SS_FN="$WORK/stop_sibling.sh"
     sed -n '/^SIBLING_CID=""$/,/^}$/p' "$ROOT_DIR/docker/entrypoint.sh"
 } > "$SS_FN"
 ss_ok=1
-for case_ in id cidfile name; do
+for case_ in id cidfile name pull; do
     : > "$FAKE_DOCKER_LOG3"
     CIDF="$WORK/ss.cid"; rm -f "$CIDF"
     ( export PATH="$FAKEDOCKER3:$PATH" FAKE_DOCKER_LOG3
@@ -7630,17 +7667,32 @@ for case_ in id cidfile name; do
         id) SIBLING_CID="cid-from-wait" ;;
         cidfile) SIBLING_CIDF="$CIDF"; echo "cid-from-file" > "$CIDF" ;;
         name) SIBLING_CIDF="$CIDF" ;;
+        pull)
+          # Cancel while the image is still being pulled: no container, no
+          # cidfile, only the docker run client, which must be ended.
+          export FAKE_PS_EMPTY=1
+          sleep 30 & echo $! > "$WORK/ss.pid"
+          SIBLING_CIDF="$CIDF"; SIBLING_PIDF="$WORK/ss.pid" ;;
       esac
       stop_sibling )
     case "$case_" in
         id) want="cid-from-wait" ;;
         cidfile) want="cid-from-file" ;;
-        name) want="bomlens-sib-9" ;;
+        name) want="abc123def456" ;;
+        pull) want="none" ;;
     esac
-    grep -q "docker stop -t 7 $want" "$FAKE_DOCKER_LOG3" && grep -q "docker rm -f $want" "$FAKE_DOCKER_LOG3" || { ss_ok=0; echo "$case_: $(cat "$FAKE_DOCKER_LOG3")"; }
+    if [ "$case_" = pull ]; then
+        # the client is gone and nothing was stopped or removed
+        if kill -0 "$(cat "$WORK/ss.pid")" 2>/dev/null; then
+            ss_ok=0; echo "pull: the docker run client is still running"; kill "$(cat "$WORK/ss.pid")" 2>/dev/null
+        fi
+        ! grep -q "docker stop\|docker rm" "$FAKE_DOCKER_LOG3" || { ss_ok=0; echo "pull: $(cat "$FAKE_DOCKER_LOG3")"; }
+    else
+        grep -q "docker stop -t 7 $want" "$FAKE_DOCKER_LOG3" && grep -q "docker rm -f $want" "$FAKE_DOCKER_LOG3" || { ss_ok=0; echo "$case_: $(cat "$FAKE_DOCKER_LOG3")"; }
+    fi
 done
 if [ "$ss_ok" = 1 ]; then
-    pass "stop_sibling stops and removes the sibling by id, cidfile or name"
+    pass "stop_sibling stops and removes the sibling by id, cidfile or name, and ends a pull in progress"
 else
     fail "stop_sibling fallback"
 fi

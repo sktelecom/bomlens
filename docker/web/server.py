@@ -2939,7 +2939,11 @@ def completeness_summary(run_id):
         return None
 
     def _text(value, limit):
-        return re.sub(r"[\x00-\x1f\x7f]", " ", str(value if value is not None else ""))[:limit]
+        # One plain line: control characters (C0, DEL, C1), line and paragraph
+        # separators and bidirectional controls become spaces, so text from a
+        # supplier's file cannot reorder what is shown.
+        return re.sub("[\x00-\x1f\x7f-\x9f\u2028\u2029\u200e\u200f\u202a-\u202e\u2066-\u2069]", " ",
+                      str(value if value is not None else ""))[:limit]
 
     def _pair(value):
         v = value if isinstance(value, dict) else {}
@@ -4674,6 +4678,12 @@ def run_sibling_scan(image, mode, out_dir, on_log, *, upload_file=None, model_id
         # cleanup could mistake for stale output. An old server.py never sends
         # this, and an entrypoint.sh built before it existed ignores it.
         "-e", "BOMLENS_ARTIFACT_CLEANUP=1",
+        # So a cdxgen container this sibling starts carries the same labels
+        # (see remove_labeled_containers). Both values are rebuilt here from a
+        # checked hostname and the checked container name.
+        *(["-e", "BOMLENS_OWNER=%s" % sibling_owner()] if sibling_owner() else []),
+        *(["-e", "BOMLENS_RUN_ID=%s" % safe_name[len("bomlens-sib-"):]]
+          if safe_name and safe_name.startswith("bomlens-sib-") else []),
         "-e", "PROJECT_NAME=%s" % _env_flag_value(env.get("PROJECT_NAME", "")),
         "-e", "PROJECT_VERSION=%s" % _env_flag_value(env.get("PROJECT_VERSION", "")),
         # Outbound license (SPDX id) for the license-conflict check. Sanitized the
@@ -5608,8 +5618,11 @@ def _sibling_image_version(image):
 SIBLING_LABEL_OWNER = "bomlens.owner"
 SIBLING_LABEL_RUN = "bomlens.run"
 # After a cancel signal, how long the scan script gets to stop its own sibling
-# before the server removes the labelled containers itself.
-CANCEL_FORCE_SECONDS = 8
+# before the server removes the labelled containers itself. It is past
+# BOMLENS_CANCEL_GRACE on purpose: build-prep.sh restores the user's source
+# folder while the sibling is stopping, and a forced removal must never cut
+# that short.
+CANCEL_FORCE_SECONDS = CANCEL_GRACE_SECONDS + 5
 
 
 def sibling_owner():
@@ -5647,17 +5660,37 @@ def remove_labeled_containers(run_id=None, timeout=60):
         return 0
 
 
-def discard_cancelled_run(run_out, keep):
-    """Remove what a cancelled scan wrote into its run folder: every entry not
-    in `keep` (the names the folder held before the run), then the folder
-    itself when nothing is left. run_out is a run_dir() result; each entry is
-    checked to stay inside OUTPUT_DIR again before it is removed."""
+def folder_signature(run_out):
+    """{name: (inode, mtime_ns, size)} of what a run folder holds. Compared by
+    discard_cancelled_run, so a file an earlier scan left and this run rewrote
+    under the same name counts as this run's."""
+    sig = {}
+    try:
+        names = os.listdir(run_out)
+    except OSError:
+        return sig
+    for name in names:
+        try:
+            st = os.lstat(os.path.join(run_out, name))
+        except OSError:
+            continue
+        sig[name] = (st.st_ino, st.st_mtime_ns, st.st_size if stat.S_ISREG(st.st_mode) else 0)
+    return sig
+
+
+def discard_cancelled_run(run_out, before):
+    """Remove what a cancelled scan wrote into its run folder: every entry that
+    is new or changed against `before` (folder_signature taken before the
+    run), then the folder itself when nothing is left. run_out is a run_dir()
+    result; each entry is checked to stay inside OUTPUT_DIR again before it is
+    removed."""
     try:
         names = os.listdir(run_out)
     except OSError:
         return
+    now = folder_signature(run_out)
     for name in names:
-        if name in keep:
+        if name in before and now.get(name) == before[name]:
             continue
         path = os.path.join(run_out, name)
         if not _path_under(path, OUTPUT_DIR):
@@ -5680,13 +5713,23 @@ def _peer_closed(conn):
     prints nothing never writes to the stream, so a closed tab would otherwise
     go unnoticed until the next output line."""
     try:
-        readable, _, _ = select.select([conn], [], [], 0)
-        if not readable:
-            return False
+        if hasattr(select, "poll"):
+            # poll has no descriptor-number limit, unlike select.
+            poller = select.poll()
+            poller.register(conn.fileno(), select.POLLIN)
+            if not poller.poll(0):
+                return False
+        else:
+            readable, _, _ = select.select([conn], [], [], 0)
+            if not readable:
+                return False
         return conn.recv(1, socket.MSG_PEEK) == b""
     except (BlockingIOError, InterruptedError):
         return False
-    except (OSError, ValueError):
+    except ValueError:
+        # Cannot tell; a wrong "closed" would delete a running scan's folder.
+        return False
+    except OSError:
         return True
 
 
@@ -7428,12 +7471,25 @@ class Handler(BaseHTTPRequestHandler):
             os.makedirs(run_out, exist_ok=True)
             # What the folder held before this run (an earlier scan of the same
             # project and version), so a cancel removes only this run's files.
-            try:
-                pre_existing = set(os.listdir(run_out))
-            except OSError:
-                pre_existing = set()
+            pre_existing = folder_signature(run_out)
             scan_ended = threading.Event()
-            scan_ok = [False]
+            watcher_ref = [None]
+            cancel_state = {"decided": False, "cancelled": False, "ok": False}
+
+            def decide_cancel(ok_):
+                """Fix, once, whether this run was cancelled: the client left
+                before the scan ended and the scan did not finish ok. The
+                watcher is stopped first, so the closing of the stream that
+                follows the done event is never read as a cancel."""
+                scan_ended.set()
+                w = watcher_ref[0]
+                if w is not None and w is not threading.current_thread():
+                    w.join(timeout=3)
+                if not cancel_state["decided"]:
+                    cancel_state["decided"] = True
+                    cancel_state["ok"] = bool(ok_)
+                    cancel_state["cancelled"] = bool(disconnected[0]) and not ok_
+                return cancel_state["cancelled"]
 
             # What to show as this scan's provenance when `target` cannot say it.
             # An upload arrives as an opaque token, so the name the user picked is
@@ -7512,7 +7568,7 @@ class Handler(BaseHTTPRequestHandler):
                 with write_lock:
                     self.wfile.write(("event: %s\ndata: %s\n\n" % (event, payload)).encode("utf-8"))
                     self.wfile.flush()
-            except (BrokenPipeError, ConnectionResetError):
+            except (BrokenPipeError, ConnectionResetError, ValueError):
                 disconnected[0] = True
 
         def sse_ping():
@@ -7522,7 +7578,7 @@ class Handler(BaseHTTPRequestHandler):
                 with write_lock:
                     self.wfile.write(b": keepalive\n\n")
                     self.wfile.flush()
-            except (BrokenPipeError, ConnectionResetError):
+            except (BrokenPipeError, ConnectionResetError, ValueError):
                 disconnected[0] = True
 
         def record_outcome(ok_, error_text=None, warnings=None, refused=None, error_code=None):
@@ -7534,7 +7590,8 @@ class Handler(BaseHTTPRequestHandler):
             meta = dict(scan_config)
             meta["mode"] = mode
             meta["ok"] = ok_
-            if disconnected[0] and not ok_:
+            if (cancel_state["cancelled"] if cancel_state["decided"]
+                    else (disconnected[0] and not ok_)):
                 # The client went away before the scan finished.
                 meta["cancelled"] = True
             if error_text:
@@ -7726,7 +7783,8 @@ class Handler(BaseHTTPRequestHandler):
                 if beats % 5 == 0:
                     sse_ping()
 
-        threading.Thread(target=_watch_client, daemon=True).start()
+        watcher_ref[0] = threading.Thread(target=_watch_client, daemon=True)
+        watcher_ref[0].start()
 
         try:
             if yocto_dir is not None:
@@ -8422,18 +8480,27 @@ class Handler(BaseHTTPRequestHandler):
                         text=True, bufsize=1,
                     )
 
+                    _stop_guard = threading.Lock()
+                    _stop_started = [False]
+
                     def _stop_run_scan():
                         # The scan script stops its own sibling on SIGTERM
-                        # (entrypoint.sh); the containers carrying this run's
-                        # label are removed here if it has not finished that
-                        # within CANCEL_FORCE_SECONDS.
+                        # (entrypoint.sh), which includes build-prep.sh
+                        # restoring the source folder. Only past
+                        # CANCEL_FORCE_SECONDS (beyond BOMLENS_CANCEL_GRACE)
+                        # are the containers carrying this run's label removed
+                        # here, so the restore is never cut short.
+                        with _stop_guard:
+                            if _stop_started[0]:
+                                return
+                            _stop_started[0] = True
                         proc.terminate()
                         try:
                             proc.wait(timeout=CANCEL_FORCE_SECONDS)
                         except subprocess.TimeoutExpired:
                             remove_labeled_containers(run_id)
                             try:
-                                proc.wait(timeout=CANCEL_GRACE_SECONDS)
+                                proc.wait(timeout=5)
                             except subprocess.TimeoutExpired:
                                 proc.kill()
 
@@ -8485,7 +8552,7 @@ class Handler(BaseHTTPRequestHandler):
             # summary helpers glob it by suffix. The done event carries id=run_id
             # so the frontend's later /file, /download-all and /scan requests
             # address this scan's folder.
-            scan_ok[0] = ok
+            decide_cancel(ok)
             done = {
                 "ok": ok,
                 "mode": mode,
@@ -8551,14 +8618,23 @@ class Handler(BaseHTTPRequestHandler):
             # Free the run folder for the next scan of this project. Every exit
             # passes here: a finished scan, a failure, and a client that closed
             # the stream mid-scan.
-            scan_ended.set()
+            decide_cancel(False)
             # A container this run started and nobody removed (a cancel that
-            # arrived during an image pull, say) goes now, by its label.
-            remove_labeled_containers(run_id)
+            # arrived during an image pull, say) goes now, by its label. A
+            # finished scan has none, so the docker call is only for a run
+            # that failed or was cancelled.
+            if cancel_state["cancelled"] or not cancel_state["ok"]:
+                remove_labeled_containers(run_id)
+                if cancel_state["cancelled"]:
+                    # Once more: a container the daemon was creating as the
+                    # first pass ran.
+                    time.sleep(1)
+                    remove_labeled_containers(run_id)
             # A cancelled run keeps nothing: the cancel dialog says what was
-            # found so far is not kept. Files an earlier scan of the same name
-            # left stay.
-            if disconnected[0] and not scan_ok[0]:
+            # found so far is not kept. Entries that are new or changed since
+            # the run began go (a scan of the same name that ran before had
+            # its files cleared by this run's start already); the rest stay.
+            if cancel_state["cancelled"]:
                 discard_cancelled_run(run_out, pre_existing)
             with _scan_lock:
                 _scan_active.discard(scan_claimed)
