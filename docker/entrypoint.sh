@@ -310,13 +310,29 @@ SIBLING_CID=""
 # A cancel can arrive before the id was read (the image is still being pulled
 # and no container exists yet, or it exists but the 5-second wait for its
 # cidfile has passed), so stop_sibling falls back to the cidfile, then to the
-# name, and removes the container once it has stopped.
+# name, and removes the container once it has stopped. The name carries a
+# random part, so it never matches another run's container. SIBLING_PIDF holds
+# the pid of the `docker run` client: it is ended first, so an image pull still
+# in progress stops and no container is created after the cancel.
 SIBLING_CIDF=""
 SIBLING_NAME=""
+SIBLING_PIDF=""
 stop_sibling() {
-    local target="$SIBLING_CID"
-    [ -n "$target" ] || { [ -n "$SIBLING_CIDF" ] && [ -s "$SIBLING_CIDF" ] && target=$(cat "$SIBLING_CIDF" 2>/dev/null); }
-    [ -n "$target" ] || target="$SIBLING_NAME"
+    local target="$SIBLING_CID" _p _try
+    if [ -n "$SIBLING_PIDF" ] && [ -s "$SIBLING_PIDF" ]; then
+        _p=$(cat "$SIBLING_PIDF" 2>/dev/null)
+        [ -z "$_p" ] || kill "$_p" 2>/dev/null || true
+    fi
+    for _try in 1 2; do
+        [ -n "$target" ] || { [ -n "$SIBLING_CIDF" ] && [ -s "$SIBLING_CIDF" ] && target=$(cat "$SIBLING_CIDF" 2>/dev/null); }
+        # A container the daemon created just as the client was ended has no
+        # cidfile entry; look it up by its name.
+        [ -n "$target" ] || [ -z "$SIBLING_NAME" ] \
+            || target=$(docker ps -aq --filter "name=^/${SIBLING_NAME}\$" 2>/dev/null | head -n 1)
+        [ -z "$target" ] || break
+        [ -n "$SIBLING_PIDF" ] || break
+        sleep 1
+    done
     [ -n "$target" ] || return 0
     docker stop -t "$BOMLENS_CANCEL_GRACE" "$target" >/dev/null 2>&1 || true
     docker rm -f "$target" >/dev/null 2>&1 || true
@@ -556,8 +572,9 @@ generate_sbom_cdxgen() {
     # leaving it to run to completion unsupervised.
     local logf cidf rcf; logf=$(mktemp); cidf=$(mktemp); rcf=$(mktemp); rm -f "$cidf"
     local prep_env; read -ra prep_env <<< "$(build_prep_env_args)"
-    local sibling_name="bomlens-sib-$$"
-    SIBLING_CIDF="$cidf"; SIBLING_NAME="$sibling_name"
+    local sibling_name="bomlens-sib-$$-${RANDOM}${RANDOM}"
+    local dpidf; dpidf=$(mktemp)
+    SIBLING_CIDF="$cidf"; SIBLING_NAME="$sibling_name"; SIBLING_PIDF="$dpidf"
     # The web UI sets these so it can remove this container by label when the
     # scan is cancelled (server.py remove_labeled_containers).
     local label_args=()
@@ -597,8 +614,9 @@ generate_sbom_cdxgen() {
             remove_reach_tools
         fi
     fi
+    # The client's pid goes to $dpidf (exec keeps it) for stop_sibling.
     ( if [ -n "$prep_file" ]; then
-        docker run -u 0:0 \
+        bash -c 'echo $$ > "$1"; shift; exec docker "$@"' _ "$dpidf" run -u 0:0 \
             --name "$sibling_name" \
             --cidfile "$cidf" \
             "${label_args[@]}" \
@@ -646,7 +664,7 @@ generate_sbom_cdxgen() {
     rc=$(cat "$rcf" 2>/dev/null || echo 1)
     rm -f "$rcf"
     remove_reach_tools
-    SIBLING_CID=""; SIBLING_CIDF=""; SIBLING_NAME=""
+    SIBLING_CID=""; SIBLING_CIDF=""; SIBLING_NAME=""; SIBLING_PIDF=""; rm -f "$dpidf"
     # A registry refused for an untrusted certificate (a proxy that inspects
     # TLS) gets one line naming SBOM_EXTRA_CA_CERTS, failed or not.
     tls_trust_hint "cdxgen" "$logf"
