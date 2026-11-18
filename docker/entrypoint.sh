@@ -202,7 +202,7 @@ KNOWN_ARTIFACT_SUFFIXES=(
     _yocto_vex.json _security_epss.json _vendored.cdx.json _gate.result
     _ai-profile.json _ai-profile.md _vex.cdx.json
     _bom.spdx3.json _bom.spdx3.json.sig _spdx3-check.json _spdx3-check.md _ai-declaration.template.json
-    _modelica.cdx.json _cocoapods.cdx.json _conda.cdx.json
+    _modelica.cdx.json _cocoapods.cdx.json _conda.cdx.json _version-catalog.cdx.json
     _security_cvebintool.json _security_grype.json _security_yocto.json
     _security_govulndb.json _security_trivy.json _component-versions.template.csv
     _reachability.cdx.json _bom.refused.json _completeness.json
