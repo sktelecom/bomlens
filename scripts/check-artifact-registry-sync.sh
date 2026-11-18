@@ -85,6 +85,7 @@ _vex_imported.json      :: yes :: yes :: _vex_imported\.json
 _modelica.cdx.json      :: no  :: yes :: skip
 _cocoapods.cdx.json     :: no  :: yes :: skip
 _conda.cdx.json         :: no  :: yes :: skip
+_version-catalog.cdx.json :: no :: yes :: skip
 _security_cvebintool.json :: no :: yes :: skip
 _security_grype.json    :: no  :: yes :: skip
 _security_yocto.json    :: no  :: yes :: skip
