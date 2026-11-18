@@ -4686,7 +4686,7 @@ co_detail=$(jq -r '.checks[] | select(.id=="purl") | .detail' "$WORK/co_conforma
 # which leaves the coverage fractions and never moves the result. A scan's
 # document with no component and nothing declared is only partial
 # (assess-completeness.sh): it conforms, with a warning row that says nothing was
-# found. A received SBOM (MODE=ANALYZE, or bomlens:sbom-supplied) with no
+# found. A received SBOM (BOMLENS_SBOM_SUPPLIED, or bomlens:sbom-supplied) with no
 # component fails, as does an empty result whose source declares dependencies
 # (assertions below).
 jq '.components = []' "$FIX/good-cyclonedx.json" > "$WORK/conf-empty.json"
@@ -4696,9 +4696,10 @@ ce=$(jq -r '"\(.result)/\(.checks[]|select(.id=="name-version")|.naKind // "-")/
     && jq -e '.checks[] | select(.id == "result-completeness" and .required == false and .status == "warn")' "$WORK/ce_conformance.json" >/dev/null \
     && pass "an SBOM with no components at all is neither uncovered nor credited; it conforms with a completeness warning" \
     || fail "empty SBOM: result/name-version/purl = $ce, expected pass/not-applicable/not-applicable plus a warning row"
-# A supplier's SBOM with no component is a mandatory failure (MODE=ANALYZE reads the
-# input before conversion; the converted document carries bomlens:sbom-supplied).
-MODE=ANALYZE bash "$LIB/validate-sbom.sh" "$WORK/conf-empty.json" "$WORK/cea" "supplier" >/dev/null 2>&1
+# A supplier's SBOM with no component is a mandatory failure (the --analyze conformance
+# call sets BOMLENS_SBOM_SUPPLIED because it reads the input before conversion; the
+# converted document carries bomlens:sbom-supplied).
+BOMLENS_SBOM_SUPPLIED=true MODE=ANALYZE bash "$LIB/validate-sbom.sh" "$WORK/conf-empty.json" "$WORK/cea" "supplier" >/dev/null 2>&1
 { [ "$(jq -r .result "$WORK/cea_conformance.json")" = "fail" ] \
     && [ "$(jq -c '[.checks[] | select(.required and .status == "fail") | .id]' "$WORK/cea_conformance.json")" = '["result-completeness"]' ] \
     && [ "$(jq -r '.reasons[0].code' "$WORK/cea_completeness.json")" = "no-components-supplied" ] \
@@ -4710,6 +4711,15 @@ bash "$LIB/assess-completeness.sh" "$WORK/conf-empty-sup.json" "$WORK/ces" >/dev
 [ "$(jq -r '.grade + " " + .reasons[0].code' "$WORK/ces_completeness.json")" = "unreliable no-components-supplied" ] \
     && pass "the bomlens:sbom-supplied property alone makes an empty received SBOM unreliable" \
     || fail "bomlens:sbom-supplied empty SBOM verdict: $(cat "$WORK/ces_completeness.json" 2>&1)"
+# The scan mode is not a marker: an empty SBOM generated from a Yocto build directory
+# runs with MODE=ANALYZE but is not a received one, and an empty source scan stays partial.
+jq '.metadata.properties = [{name:"bomlens:scanMode", value:"YOCTO"}]' "$WORK/conf-empty.json" > "$WORK/conf-empty-yocto.json"
+MODE=ANALYZE bash "$LIB/assess-completeness.sh" "$WORK/conf-empty-yocto.json" "$WORK/cey" >/dev/null 2>&1
+MODE=SOURCE bash "$LIB/assess-completeness.sh" "$WORK/conf-empty.json" "$WORK/ceo" >/dev/null 2>&1
+[ "$(jq -r '.grade + " " + .reasons[0].code' "$WORK/cey_completeness.json")" = "partial no-components" ] \
+    && [ "$(jq -r '.grade + " " + .reasons[0].code' "$WORK/ceo_completeness.json")" = "partial no-components" ] \
+    && pass "MODE=ANALYZE alone does not make an empty Yocto-build or source result a received SBOM" \
+    || fail "the scan mode changed the completeness verdict" "$(cat "$WORK/cey_completeness.json" 2>&1)"
 # C/C++ package manager manifests only (vcpkg, Conan) and no component: unreliable, with the C/C++ reason.
 jq '.components = [] | .metadata.properties = [{name:"bomlens:sbom-empty-with-manifests", value:"vcpkg.json, third_party/conanfile.txt"}]' "$FIX/good-cyclonedx.json" > "$WORK/conf-empty-cpp.json"
 bash "$LIB/validate-sbom.sh" "$WORK/conf-empty-cpp.json" "$WORK/cec" "supplier" >/dev/null 2>&1
@@ -13341,10 +13351,10 @@ bash "$LIB/validate-sbom.sh" "$SUMDIR/e.json" "$SUMDIR/e" P >/dev/null 2>&1
     && pass "an empty result is written as zero components with no percentages" \
     || fail "the empty-result sidecar is wrong" "$(cat "$SUMDIR/e_summary.result" 2>&1)"
 
-# An incomplete result (a supplied SBOM with no component) adds its grade, reason codes
+# An incomplete result (a source scan with no component) adds its grade, reason codes
 # and one fix sentence per reason to the sidecar; a complete one adds nothing.
 grep -q "^completeness	" "$SUMDIR/e_summary.result" \
-    && grep -q "^completenessReasons	no-components" "$SUMDIR/e_summary.result" \
+    && grep -qx "completenessReasons	no-components" "$SUMDIR/e_summary.result" \
     && grep -q "^completenessFix	no-components	" "$SUMDIR/e_summary.result" \
     && pass "the summary sidecar carries the completeness grade, reason codes and fix" \
     || fail "the completeness keys are missing from the summary sidecar" "$(cat "$SUMDIR/e_summary.result" 2>&1)"
@@ -15026,15 +15036,15 @@ grep -q "package ecosystem with no vulnerability data source" "$CPD/cocoapods-on
     && pass "completeness/cocoapods-only: the reports give the reason the pods were not checked" \
     || fail "completeness/cocoapods-only: the unchecked reason is missing from a report"
 
-# 5b. a Conan component is listed as not checked, so a clean result cannot be read as covering it
+# 5b. a Conan component is one Trivy queries (pkg:conan has an advisory source), so it is
+# not listed as unchecked and does not make the result partial.
 cp_bom conan-only '[]' "[$(cp_lib openssl 3.2.1 pkg:conan/openssl@3.2.1)]"
 printf "[requires]\nopenssl/3.2.1\n" > "$CPD/conan-only/src/conanfile.txt"
 cp_run conan-only
-cp_check conan-only partial "unchecked-ecosystem"
-[ "$(jq -r '.uncheckedEcosystems[0] | "\(.ecosystem) \(.count)"' "$CPD/conan-only/proj_1.0_completeness.json")" = "conan 1" ] \
-    && [ "$(jq -r '[.UncheckedComponents.Components[] | select(.Reason == "unsupported-ecosystem")] | length' "$CPD/conan-only/proj_1.0_security.json")" = "1" ] \
-    && pass "completeness/conan-only: the Conan component is counted as unchecked, with the ecosystem named" \
-    || fail "completeness/conan-only: the unchecked count or ecosystem is wrong"
+[ "$(jq -r '[.grade, (.reasons | map(.code) | join(","))] | join(" ")' "$CPD/conan-only/proj_1.0_completeness.json")" = "complete " ] \
+    && [ "$(jq -r '[.UncheckedComponents.Components[]? | select(.Reason == "unsupported-ecosystem")] | length' "$CPD/conan-only/proj_1.0_security.json")" = "0" ] \
+    && pass "completeness/conan-only: a resolved Conan component is checked, so the result stays complete" \
+    || fail "completeness/conan-only: a Conan component was treated as unchecked" "$(cat "$CPD/conan-only/proj_1.0_completeness.json" 2>&1)"
 
 # 5c. CMake FetchContent: only a CMakeLists.txt that declares a fetch counts as a declared dependency
 SMD="$CPD/fetchcontent"

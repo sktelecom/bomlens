@@ -928,6 +928,37 @@ unset DOCKER_STUB_SUMMARY_RESULT
   && pass "one licensed component out of many is not reported as none" \
   || { fail "the no-license warning followed the rounded percent" "rc=$RC"; show; }
 
+# The completeness lines: the grade with its exact reason codes, one fix per reason,
+# and the wording that depends on the reason when manifests declare dependencies.
+d="$(new_proj sumcomplete)"; printf '{"name":"a"}' > "$d/package.json"
+export DOCKER_STUB_SUMMARY_RESULT='components\t0\nlicensed\t0\nlicensePercent\t-\npurlPercent\t-\nemptyManifests\tpackage.json\ncompleteness\tunreliable\ncompletenessReasons\tempty-with-manifests,lockfile-corrupt\ncompletenessFix\tempty-with-manifests\tFind the cause in the log.\ncompletenessFix\tlockfile-corrupt\tRegenerate the lock file.\n'
+scan_in "$d" --project Compl --version 5.4.0 --generate-only
+unset DOCKER_STUB_SUMMARY_RESULT
+{ [ "$RC" -eq 0 ] && in_out "Completeness: unreliable (empty-with-manifests,lockfile-corrupt)" \
+    && in_out "[WARN] empty-with-manifests: Find the cause in the log." \
+    && in_out "[WARN] lockfile-corrupt: Regenerate the lock file." \
+    && in_out "A lock file is damaged: re-create it" && ! in_out "Commit a lock file" \
+    && in_out "--fail-on incomplete-result"; } \
+  && pass "closing summary prints the completeness grade, each reason code with its fix, and the lock-file-specific advice" \
+  || { fail "closing summary missed the completeness lines" "rc=$RC"; show; }
+
+d="$(new_proj sumresfail)"; printf '{"name":"a"}' > "$d/package.json"
+export DOCKER_STUB_SUMMARY_RESULT='components\t0\nlicensed\t0\nlicensePercent\t-\npurlPercent\t-\nemptyManifests\tpom.xml\nfailedSteps\tmaven-dependency-resolve\ncompleteness\tpartial\ncompletenessReasons\tresolution-failed\ncompletenessFix\tresolution-failed\tLook for the first error.\n'
+scan_in "$d" --project ResFail --version 5.5.0 --generate-only
+unset DOCKER_STUB_SUMMARY_RESULT
+{ [ "$RC" -eq 0 ] && in_out "Completeness: partial (resolution-failed)" \
+    && in_out "Resolution failed at: maven-dependency-resolve" && ! in_out "Commit a lock file"; } \
+  && pass "closing summary names the failed step when resolution failed" \
+  || { fail "closing summary did not name the failed resolution step" "rc=$RC"; show; }
+
+d="$(new_proj sumcomplete2)"; printf '{"name":"a"}' > "$d/package.json"
+export DOCKER_STUB_SUMMARY_RESULT='components\t5\nlicensed\t5\nlicensePercent\t100\npurlPercent\t100\n'
+scan_in "$d" --project Compl2 --version 5.6.0 --generate-only
+unset DOCKER_STUB_SUMMARY_RESULT
+{ [ "$RC" -eq 0 ] && ! in_out "Completeness:"; } \
+  && pass "a complete result prints no completeness line" \
+  || { fail "a complete result printed a completeness line" "rc=$RC"; show; }
+
 d="$(new_proj sumnone)"; printf '{"name":"a"}' > "$d/package.json"
 scan_in "$d" --project NoFacts --version 5.3.0 --generate-only
 { [ "$RC" -eq 0 ] && { in_out "Analysis Complete" || in_out "Analysis finished"; } && ! in_out "Components:" && ! in_out "identified"; } \
@@ -1930,6 +1961,8 @@ gate_case "--fail-on: empty-result met exits 4 and states the count" 4 "--fail-o
   "met${TAB}empty-result${TAB}the scan found 0 components\n" --fail-on empty-result
 gate_case "--fail-on: incomplete-result met exits 4 and states the grade" 4 "--fail-on incomplete-result: the result is partial (lockfile-missing)" \
   "met${TAB}incomplete-result${TAB}the result is partial (lockfile-missing)\n" --fail-on incomplete-result
+gate_case "--fail-on: incomplete-result=unreliable is accepted and met exits 4" 4 "--fail-on incomplete-result=unreliable: the result is unreliable (no-components-supplied)" \
+  "met${TAB}incomplete-result=unreliable${TAB}the result is unreliable (no-components-supplied)\n" --fail-on incomplete-result=unreliable
 gate_case "--fail-on: license-coverage met exits 4 and shows the measured value" 4 "0% (1/157)" \
   "met${TAB}license-coverage=80${TAB}license coverage is 0% (1/157), below 80%\n" --fail-on license-coverage=80
 gate_case "--fail-on: license-coverage ok exits 0" 0 "none is met" \

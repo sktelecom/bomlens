@@ -26,10 +26,14 @@
 #   no component                                  (no-components, or
 #                                                 no-components-supplied for a received
 #                                                 SBOM, which is unreliable)
-#   bomlens:sbom-supplied=true, or MODE=ANALYZE in the environment of the run
-#                                                 (a received SBOM; the conformance check
-#                                                 reads the input before it is converted,
-#                                                 so the property alone is not enough)
+#   bomlens:sbom-supplied=true                    (a received SBOM; the converted document
+#                                                 carries it). The one caller that reads
+#                                                 the input before it is converted (the
+#                                                 conformance check of --analyze) sets
+#                                                 BOMLENS_SBOM_SUPPLIED=true for that call.
+#                                                 The scan mode is not read: a Yocto build
+#                                                 directory also runs as ANALYZE but its
+#                                                 SBOM is generated here, not received.
 #   bomlens:sbom-empty-with-manifests             (empty-with-manifests, or
 #                                                 unsupported-build-system when every
 #                                                 manifest is a vcpkg, Conan or CMake FetchContent one)
@@ -76,7 +80,7 @@ fi
 TMP="$(mktemp)"
 trap 'rm -f "$TMP"' EXIT
 # shellcheck disable=SC2016  # jq program, not shell
-if ! jq --arg mode "${MODE:-}" --slurpfile reg "$REGISTRY" "$(cat "$COVERAGE")"'
+if ! jq --arg supplied_env "${BOMLENS_SBOM_SUPPLIED:-}" --slurpfile reg "$REGISTRY" "$(cat "$COVERAGE")"'
   # Text that comes from the document is cut to a short single line: a supplier
   # SBOM (--analyze) is not trusted, and these strings reach a terminal and HTML.
   def clean($n): (tostring | gsub("\\p{Cc}"; " ") | .[0:$n]);
@@ -99,7 +103,7 @@ if ! jq --arg mode "${MODE:-}" --slurpfile reg "$REGISTRY" "$(cat "$COVERAGE")"'
   | ([ $comps[] | select(vc_unsupported_ecosystem) | vc_purl_type ]
        | group_by(.) | map({ecosystem: .[0], count: length})) as $unsup
   | ((.metadata.component.type // "") | IN("machine-learning-model", "data")) as $model_root
-  | ((prop("bomlens:sbom-supplied") | first // "") == "true" or $mode == "ANALYZE") as $supplied
+  | ((prop("bomlens:sbom-supplied") | first // "") == "true" or $supplied_env == "true") as $supplied
   | ($empty != null and ($empty | split(",") | map(gsub("^\\s+|\\s+$"; "") | split("/") | last)
         | all(.[]; test("^(vcpkg\\.json|conanfile\\.(txt|py)|CMakeLists\\.txt)$")))) as $cpp_only
   | ([
