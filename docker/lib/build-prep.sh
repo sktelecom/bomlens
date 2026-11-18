@@ -1909,24 +1909,33 @@ if [ -f package.json ] && [ -z "$_node_ws_nolock" ] && ! opted_out "${BOMLENS_NO
     # lock file that results (the source-tree guard removes it afterwards) and
     # name each dependency left out as a failed resolution step
     # (npm-excluded:NAME), so the result is graded partial and says which.
-    if [ -z "$_npm_ok" ] && [ -n "$_node_by_name" ] && [ ! -f package-lock.json ]; then
+    # (yarn, pnpm, bun and npm-shrinkwrap projects are left to cdxgen: their lock
+    # file already pins what npm cannot fetch here, and the production set above
+    # is matched by name against it.)
+    _npm_nolock=1
+    for _npm_lf in package-lock.json npm-shrinkwrap.json yarn.lock pnpm-lock.yaml bun.lock bun.lockb; do
+        [ ! -f "$_npm_lf" ] || _npm_nolock=""
+    done
+    if [ -z "$_npm_ok" ] && [ -n "$_node_by_name" ] && [ -n "$_npm_nolock" ]; then
         _npmdrop=$(mktemp).js
         cat > "$_npmdrop" <<'NPMDROP_JS'
 // Reads npm's error output and removes the direct dependency it names from
-// package.json. Prints the removed names, one per line; nothing when the error
-// names none (then the resolve stops there).
+// package.json. Prints one line per removed name ("name", or "name<TAB>dev" when
+// it was declared only in devDependencies); nothing when the error names none
+// (then the resolve stops there).
 const fs = require('fs');
 const [pkgPath, errPath] = process.argv.slice(2);
 let pkg, err;
 try { pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8')); err = fs.readFileSync(errPath, 'utf8'); } catch (e) { process.exit(0); }
 const FIELDS = ['dependencies', 'devDependencies', 'optionalDependencies'];
+const NAME_RE = /^(@[a-z0-9-~][a-z0-9-._~]*\/)?[a-z0-9-~][a-z0-9-._~]*$/;
 const declared = new Map();
 for (const f of FIELDS) for (const [n, spec] of Object.entries(pkg[f] || {})) declared.set(n, String(spec));
 const found = new Set();
 const add = raw => {
   let n = raw;
   try { n = decodeURIComponent(raw); } catch (e) { /* keep as is */ }
-  if (declared.has(n)) found.add(n);
+  if (declared.has(n) && NAME_RE.test(n)) found.add(n);
 };
 let m;
 const re = [
@@ -1936,53 +1945,94 @@ const re = [
   /\b404 Not Found - GET https?:\/\/[^\s]+?\/(@?[^\s\/]+(?:(?:\/|%2[fF])[^\s\/]+)?)/g,
 ];
 for (const r of re) while ((m = r.exec(err)) !== null) add(m[1]);
-// A git dependency: npm names the repository, not the package, so match it
-// against what each dependency declares. EALLOWGIT also means a git source.
+// A git dependency: npm names the repository, not the package. Both sides are
+// reduced to host/owner/repo and compared whole, so a short repository name
+// that appears elsewhere in the message does not match.
+const HOSTS = { github: 'github.com', gitlab: 'gitlab.com', bitbucket: 'bitbucket.org', gist: 'gist.github.com' };
+const gitKey = raw => {
+  let u = String(raw).trim().toLowerCase().replace(/^git\+/, '').replace(/[.,;:'")\]]+$/, '');
+  let host = '', path = '';
+  let x;
+  if ((x = /^(github|gitlab|bitbucket|gist):(.+)$/.exec(u))) { host = HOSTS[x[1]]; path = x[2]; }
+  else if ((x = /^[a-z]+:\/\/(?:[^@\/]+@)?([^\/:]+)(?::\d+)?\/(.+)$/.exec(u))) { host = x[1]; path = x[2]; }
+  else if ((x = /^(?:[^@\/\s]+@)?([^:\/\s]+):(?!\/)(.+)$/.exec(u))) { host = x[1]; path = x[2]; }
+  else if (/^[\w.-]+\/[\w.-]+(#.*)?$/.test(u)) { host = 'github.com'; path = u; }
+  else return '';
+  path = path.replace(/[#?].*$/, '').replace(/\/+$/, '').replace(/\.git$/, '').replace(/^\/+/, '');
+  return host && path ? host + '/' + path : '';
+};
 const isGit = s => /^(git\+|git:|ssh:|github:|gitlab:|bitbucket:|gist:)|\.git(#|$)|^[\w.-]+\/[\w.-]+(#.*)?$/.test(s) && !/^(https?:\/\/[^\s]*\.tgz|file:|link:|npm:|workspace:)/.test(s);
-const repoKey = s => s.replace(/^(git\+)?[a-z]+:\/\//i, '').replace(/^[^@\/]+@/, '').replace(/^(github|gitlab|bitbucket):/, '').replace(/#.*$/, '').replace(/\.git$/, '').replace(/^[^\/:]+[:\/]/, '').toLowerCase();
-const gitDeps = [...declared].filter(([, s]) => isGit(s));
-if (found.size === 0 && gitDeps.length) {
-  for (const [n, s] of gitDeps) { const k = repoKey(s); if (k && err.toLowerCase().includes(k)) found.add(n); }
-  if (found.size === 0 && /EALLOWGIT/.test(err)) for (const [n] of gitDeps) found.add(n);
+const errKeys = new Set();
+for (const u of err.match(/(?:git\+)?[a-z][a-z0-9+.-]*:\/\/[^\s'"<>]+/gi) || []) errKeys.add(gitKey(u));
+for (const u of err.match(/\b[\w.-]+@[\w.-]+:[\w.\/-]+/g) || []) errKeys.add(gitKey(u));
+errKeys.delete('');
+if (found.size === 0) {
+  // EALLOWGIT or a failed clone: only a dependency whose own source is named.
+  for (const [n, s] of declared) if (isGit(s) && NAME_RE.test(n) && errKeys.has(gitKey(s))) found.add(n);
 }
 if (found.size === 0) process.exit(0);
+const lines = [];
+for (const n of found) {
+  const prod = ['dependencies', 'optionalDependencies'].some(f => pkg[f] && Object.prototype.hasOwnProperty.call(pkg[f], n));
+  lines.push(prod ? n : n + '\tdev');
+}
 for (const f of FIELDS) if (pkg[f]) for (const n of found) delete pkg[f][n];
 fs.writeFileSync(pkgPath, JSON.stringify(pkg, null, 2));
-process.stdout.write([...found].join('\n') + '\n');
+process.stdout.write(lines.join('\n') + '\n');
 NPMDROP_JS
         _npm_dropped=""
         _npmerr=$(mktemp)
+        _npmnames=$(mktemp)
         _npm_try=0
+        _npm_any=""
+        # One time budget for all the attempts (PREP_TIMEOUT_DEFAULT seconds),
+        # each attempt getting what is left.
+        _npm_t0=$(date +%s)
         while [ "$_npm_try" -lt 5 ]; do
             _npm_try=$((_npm_try + 1))
+            _npm_left=$((PREP_TIMEOUT_DEFAULT - ($(date +%s) - _npm_t0)))
+            if [ "$_npm_left" -lt 15 ]; then
+                log "node: out of time for another npm resolve; stopping"
+                break
+            fi
             rm -f "$_npmtmp/package-lock.json"
-            if run_supervised_timeout "$PREP_TIMEOUT_DEFAULT" sh -c "cd \"$_npmtmp\" && npm install --package-lock-only --no-audit --no-fund --ignore-scripts" >/dev/null 2>"$_npmerr" \
+            if run_supervised_timeout "$_npm_left" sh -c "cd \"$_npmtmp\" && npm install --package-lock-only --no-audit --no-fund --ignore-scripts" >/dev/null 2>"$_npmerr" \
                && [ -f "$_npmtmp/package-lock.json" ]; then
                 _npm_ok=1
                 break
             fi
-            _npm_names=$(node "$_npmdrop" "$_npmtmp/package.json" "$_npmerr" 2>/dev/null) || _npm_names=""
-            [ -n "$_npm_names" ] || break
-            for _npm_n in $_npm_names; do
-                _npm_dropped="${_npm_dropped:+$_npm_dropped }$_npm_n"
-                log "node: npm could not resolve $_npm_n; resolving again without it"
-            done
+            node "$_npmdrop" "$_npmtmp/package.json" "$_npmerr" > "$_npmnames" 2>/dev/null || : > "$_npmnames"
+            [ -s "$_npmnames" ] || break
+            while IFS="$(printf '\t')" read -r _npm_n _npm_dev; do
+                [ -n "$_npm_n" ] || continue
+                if [ -n "$_npm_dev" ]; then
+                    log "node: npm could not resolve the development dependency $_npm_n; resolving again without it"
+                else
+                    _npm_dropped="${_npm_dropped:+$_npm_dropped }$_npm_n"
+                    log "node: npm could not resolve $_npm_n; resolving again without it"
+                fi
+                _npm_any=1
+            done < "$_npmnames"
         done
-        if [ -n "$_npm_ok" ] && [ -n "$_npm_dropped" ]; then
+        if [ -n "$_npm_ok" ] && [ -n "${_npm_any:-}" ]; then
             cp "$_npmtmp/package-lock.json" "$_npmtmp/package-lock.full.json"
-            if prep_step npm-production-set "$PREP_TIMEOUT_DEFAULT" sh -c "cd \"$_npmtmp\" && npm install --omit=dev --package-lock-only --no-audit --no-fund --ignore-scripts" >/dev/null; then
+            _npm_pt=$PREP_TIMEOUT_DEFAULT
+            [ "$_npm_pt" -le 300 ] || _npm_pt=300
+            if prep_step npm-production-set "$_npm_pt" sh -c "cd \"$_npmtmp\" && npm install --omit=dev --package-lock-only --no-audit --no-fund --ignore-scripts" >/dev/null; then
                 unmark_prep_failed npm-production-set
                 cp "$_npmtmp/package-lock.full.json" package-lock.json 2>/dev/null \
                     || log "node: could not place the resolved lock file; cdxgen resolves on its own"
+                # A development dependency that could not be fetched does not
+                # ship, so it is logged above but is not a failed step.
                 for _npm_n in $_npm_dropped; do mark_prep_failed "npm-excluded:$_npm_n"; done
-                log "node: resolved without: $_npm_dropped"
+                log "node: resolved without: ${_npm_dropped:-(development dependencies only)}"
             else
                 _npm_ok=""
             fi
         elif [ -n "$_npm_ok" ]; then
             unmark_prep_failed npm-production-set   # the first failure did not repeat
         fi
-        rm -f "$_npmdrop" "$_npmerr"
+        rm -f "$_npmdrop" "$_npmerr" "$_npmnames"
     fi
     if [ -n "$_npm_ok" ] && [ -f "$_npmtmp/package-lock.json" ]; then
         # Emit name@version for every non-dev node_modules entry in the resolved lockfile.
@@ -6207,6 +6257,7 @@ if [ "${rc:-1}" -eq 0 ] && [ -n "$EXCLUDE_NON_SHIPPED" ] && [ -f "$OUT" ] && com
     _re=""
     for _d in $NON_SHIPPED_DIRS; do _globs="$_globs, **/$_d/**"; _re="$_re|$_d"; done
     for _d in $NON_SHIPPED_PATHS; do _globs="$_globs, **/$_d/**"; done
+    for _d in $NON_SHIPPED_FILE_GLOBS; do _globs="$_globs, **/$_d"; done
     _globs="${_globs#, }"
     _re="(^|/)(${_re#|})/"
     _excl=$(mktemp)
@@ -6215,6 +6266,9 @@ if [ "${rc:-1}" -eq 0 ] && [ -n "$EXCLUDE_NON_SHIPPED" ] && [ -f "$OUT" ] && com
         | { grep -Ei "$NON_SHIPPED_PATH_FILE_RE|$_re" || true; } \
         | { grep -Ei "$NON_SHIPPED_PATH_FILE_RE|$NON_SHIPPED_MANIFEST_RE" || true; } \
         | LC_ALL=C sort > "$_excl"
+    # Lock files under vendor/ (NON_SHIPPED_FILE_GLOBS) are left out too.
+    find . \( -name node_modules -o -name .git \) -prune -o -type f -name package-lock.json -path '*/vendor/*' -print 2>/dev/null \
+        | sed 's#^\./##' | LC_ALL=C sort >> "$_excl"
     _js=$(mktemp).js
     cat > "$_js" <<'EXCL_JS'
 const fs = require('fs');

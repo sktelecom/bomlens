@@ -155,7 +155,7 @@ Gradle 빌드를 아예 실행할 수 없을 때(Docker 없음, 빌드 실패)�
 
 > 주의: production 필터와 별도로, cdxgen이 개발 패키지(npm, pnpm, yarn, bun)로 표시한 컴포넌트는 운영 의존성 경로에서 닿지 않으면 빠지고, 그 컴포넌트만 필요로 하는 의존성도 함께 빠집니다. production 필터가 읽지 않는 pnpm 워크스페이스도 여기에 해당합니다. 운영 의존성도 쓰는 패키지는 남습니다. `BOMLENS_NODE_FULL_GRAPH=1`이나 `BOMLENS_INCLUDE_DEV_DEPENDENCIES=1`이면 이 컴포넌트들도 그대로 둡니다.
 
-> 참고: `package-lock.json`이 없을 때 npm이 내려받지 못하는 의존성 하나(비공개 `git+https` 주소, 저장소에 없는 패키지, 존재하지 않는 버전) 때문에 결과가 비는 일은 없습니다. BomLens가 그 의존성을 뺀 채로 최대 다섯 번 다시 해석하고, 뺀 의존성마다 실패한 단계 `npm-excluded:이름`으로 기록하므로 결과는 `partial`로 표시되고 이름이 나옵니다. 완전한 결과가 필요하면 그 의존성에 접근할 수 있게 하거나 `package-lock.json`을 커밋하세요.
+> 참고: lock 파일이 하나도 없을 때(`package-lock.json`, `npm-shrinkwrap.json`, `yarn.lock`, `pnpm-lock.yaml`, `bun.lock`) npm이 내려받지 못하는 의존성 하나(비공개 `git+https` 주소, 저장소에 없는 패키지, 존재하지 않는 버전) 때문에 결과가 비는 일은 없습니다. BomLens가 그 의존성을 뺀 채로 최대 다섯 번 다시 해석하고, 뺀 의존성마다 실패한 단계 `npm-excluded:이름`으로 기록하므로 결과는 `partial`로 표시되고 이름이 나옵니다. 완전한 결과가 필요하면 그 의존성에 접근할 수 있게 하거나 `package-lock.json`을 커밋하세요.
 
 ---
 

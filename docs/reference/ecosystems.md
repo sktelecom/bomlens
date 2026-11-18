@@ -155,7 +155,7 @@ Detected file: `package.json` + `package-lock.json` (or `yarn.lock`, `pnpm-lock.
 
 > Note: on top of the production filter, a component cdxgen marks as a development package (npm, pnpm, yarn or bun) is dropped when no production dependency path reaches it, together with what only it reaches. This also covers a pnpm workspace, which the production filter does not read. A package a production dependency also uses stays. `BOMLENS_NODE_FULL_GRAPH=1` or `BOMLENS_INCLUDE_DEV_DEPENDENCIES=1` keeps these too.
 
-> Note: with no `package-lock.json`, one dependency npm cannot fetch (a private `git+https` URL, a package missing from the registry, a version that does not exist) no longer empties the result. BomLens resolves again without that dependency, up to five times, and records each one left out as a failed step `npm-excluded:NAME`, so the result reads `partial` and names it. Fix access to that dependency, or commit a `package-lock.json`, for a complete result.
+> Note: with no lock file at all (`package-lock.json`, `npm-shrinkwrap.json`, `yarn.lock`, `pnpm-lock.yaml` or `bun.lock`), one dependency npm cannot fetch (a private `git+https` URL, a package missing from the registry, a version that does not exist) no longer empties the result. BomLens resolves again without that dependency, up to five times, and records each one left out as a failed step `npm-excluded:NAME`, so the result reads `partial` and names it. Fix access to that dependency, or commit a `package-lock.json`, for a complete result.
 
 ---
 

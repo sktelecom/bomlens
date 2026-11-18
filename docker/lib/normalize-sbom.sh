@@ -118,13 +118,16 @@ NAME_VERSION_DEDUP='(.components) |= (if type=="array" then map(
 # the reader lists them as pkg:nuget/System with no version, which then matches
 # unrelated advisories and cannot be resolved. Closed name list, and only an
 # entry with no version at all: a System.* package that has a version is a real
-# NuGet package and stays.
-DOTNET_BASE_ASSEMBLIES='["System","System.Core","System.Data","System.Data.DataSetExtensions","System.Xml","System.Xml.Linq","System.Web","System.Drawing","System.Configuration","System.Net.Http","System.Numerics","System.Runtime.Serialization","System.ServiceModel","System.Transactions","System.Windows.Forms","System.Management","System.IO.Compression","System.Deployment","System.Security","System.Messaging","System.EnterpriseServices","Microsoft.CSharp"]'
+# NuGet package and stays. Names that are also real NuGet packages (System.Net.Http,
+# System.IO.Compression, System.Management, System.Security, Microsoft.CSharp)
+# are left out of the list, since a versionless one may be a package whose version
+# the reader could not fill in. Not applied to a supplier SBOM under analysis.
+DOTNET_BASE_ASSEMBLIES='["System","System.Core","System.Data","System.Data.DataSetExtensions","System.Xml","System.Xml.Linq","System.Web","System.Drawing","System.Configuration","System.Numerics","System.Runtime.Serialization","System.ServiceModel","System.Transactions","System.Windows.Forms","System.Deployment","System.Messaging","System.EnterpriseServices"]'
 DOTNET_BASE_FIX='(if (.components | type) == "array" then
     '"$DOTNET_BASE_ASSEMBLIES"' as $base
     | def _drop: (.purl // "") as $p | ((.version // "") == "")
-        and ($p | test("^pkg:nuget/[^@?#]+$"))
-        and (($p | sub("^pkg:nuget/"; "") | ascii_downcase) as $n | any($base[]; ascii_downcase == $n));
+        and ($p | test("^pkg:nuget/[^@?#]+@?$"))
+        and (($p | sub("^pkg:nuget/"; "") | sub("@$"; "") | ascii_downcase) as $n | any($base[]; ascii_downcase == $n));
     ([ .components[] | select(_drop) | .["bom-ref"] // empty ]) as $refs
     | .components |= map(select(_drop | not))
     | if ($refs | length) > 0 and (.dependencies | type) == "array" then
@@ -132,6 +135,10 @@ DOTNET_BASE_FIX='(if (.components | type) == "array" then
             | if (.dependsOn | type) == "array" then .dependsOn |= map(select(. as $d | $refs | index($d) | not)) else . end ]
       else . end
   else . end)'
+
+# A supplier SBOM under analysis (ANALYZE) is judged as delivered: a versionless
+# entry there is a finding of the check, not something to tidy first.
+if [ "$SCAN_MODE" = "ANALYZE" ]; then DOTNET_BASE_FIX='.'; fi
 
 # Always: sort components deterministically by purl (fallback name@version).
 SORT_FILTER='(.components) |= (if type=="array" then sort_by(.purl // ((.name // "") + "@" + (.version // ""))) else . end)'
