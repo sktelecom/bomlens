@@ -2523,8 +2523,8 @@ if [ -s "$OUTPUT_FILE" ]; then
     # its own earlier from a CycloneDX document only, so redo the completeness keys
     # from the final file (a received SPDX SBOM is judged here, after conversion).
     if [ -f "${OUT_PREFIX}_summary.result" ] && [ -f "${OUT_PREFIX}_completeness.json" ]; then
-        _sum_tmp="${OUT_PREFIX}_summary.result.tmp.$$"
-        if grep -v '^completeness' "${OUT_PREFIX}_summary.result" > "$_sum_tmp" 2>/dev/null; then
+        _sum_tmp="$(mktemp 2>/dev/null)" || _sum_tmp=""
+        if [ -n "$_sum_tmp" ] && grep -v '^completeness' "${OUT_PREFIX}_summary.result" > "$_sum_tmp" 2>/dev/null; then
             case "$(jq -r '.grade // empty' "${OUT_PREFIX}_completeness.json" 2>/dev/null)" in
                 partial|unreliable)
                     jq -r '"completeness\t\(.grade)",
