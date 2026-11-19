@@ -20,6 +20,7 @@ import { AiUsageCard } from "./AiUsageCard";
 import { AttentionBox } from "./overview/Attention";
 import { ComparisonBox } from "./overview/Comparison";
 import { FailureBanner, OverviewNotices } from "./overview/Notices";
+import { builtWith } from "@/lib/buildTool";
 import { LicensePanel, RiskyBox, SeverityPanel } from "./overview/Risk";
 import { SectionsBox, YoctoVexNote } from "./overview/Sections";
 import { ResultsList } from "./ResultsList";
@@ -61,6 +62,16 @@ export function OverviewHeaderLines({ result }: { result: DoneEvent }) {
           {result.sbom.detectionSource
             ? t("overview.detectionStaticFrom", { file: result.sbom.detectionSource })
             : t("overview.detectionStatic")}
+        </span>
+      )}
+      {builtWith(result.sbom?.buildToolChoice) && (
+        <span className="bl-ov-prov" data-testid="build-tool-choice">
+          {builtWith(result.sbom?.buildToolChoice) === "maven"
+            ? t("overview.builtWithMaven")
+            : t("overview.builtWithGradle")}
+          {result.sbom?.buildToolChoiceWhy && (
+            <code title={result.sbom.buildToolChoiceWhy}>{result.sbom.buildToolChoiceWhy}</code>
+          )}
         </span>
       )}
     </>

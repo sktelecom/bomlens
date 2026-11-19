@@ -816,7 +816,7 @@ describe("getProjectInfo / scanExists", () => {
   it("asks the server about a folder by source and target, and normalizes the answer", async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
-      json: async () => ({ version: "2.4.1", versionFrom: "pom.xml", hasManifest: true, subProjects: ["a", 3] }),
+      json: async () => ({ version: "2.4.1", versionFrom: "pom.xml", hasManifest: true, subProjects: ["a", 3], buildTools: { maven: true, gradle: "yes" } }),
     });
     vi.stubGlobal("fetch", fetchMock);
     expect(await getProjectInfo("rootfs-dir", "/scan-targets/x/app")).toEqual({
@@ -824,6 +824,7 @@ describe("getProjectInfo / scanExists", () => {
       versionFrom: "pom.xml",
       hasManifest: true,
       subProjects: ["a"],
+      buildTools: { maven: true, gradle: false },
     });
     expect(fetchMock.mock.calls[0][0]).toBe("/project-info?source=rootfs-dir&target=%2Fscan-targets%2Fx%2Fapp");
   });

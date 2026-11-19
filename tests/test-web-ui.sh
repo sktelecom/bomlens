@@ -97,6 +97,18 @@ if echo "$info" | python3 -c "import sys,json;d=json.load(sys.stdin);assert d['h
 else
     fail "/project-info sub-projects" "$info"
 fi
+mkdir -p "$SCANROOT/both" "$SCANROOT/kts" "$SCANROOT/linked"
+echo '<project/>' > "$SCANROOT/both/pom.xml"; echo "" > "$SCANROOT/both/build.gradle"
+echo "" > "$SCANROOT/kts/build.gradle.kts"
+ln -s "$SCANROOT/both/pom.xml" "$SCANROOT/linked/pom.xml"
+bt() { curl -fsS "$BASE/project-info?source=rootfs-dir&target=$SCANROOT/$1" | python3 -c "import sys,json;print(json.dumps(json.load(sys.stdin)['buildTools'],sort_keys=True))"; }
+if [ "$(bt both)" = '{"gradle": true, "maven": true}' ] && [ "$(bt kts)" = '{"gradle": true, "maven": false}' ] \
+   && [ "$(bt proj)" = '{"gradle": false, "maven": true}' ] && [ "$(bt multi)" = '{"gradle": false, "maven": false}' ] \
+   && [ "$(bt linked)" = '{"gradle": false, "maven": false}' ]; then
+    pass "/project-info buildTools reports pom.xml and build.gradle(.kts) directly in the folder, not through a link"
+else
+    fail "/project-info buildTools" "both=$(bt both) kts=$(bt kts) proj=$(bt proj) multi=$(bt multi) linked=$(bt linked)"
+fi
 for bad in "$SCANROOT/escape" "$SCANROOT/../elsewhere" "/etc" "../../etc" "$SCANROOT/nope"; do
     code=$(curl -s -o /dev/null -w '%{http_code}' --get --data-urlencode "target=$bad" --data-urlencode "source=rootfs-dir" "$BASE/project-info")
     [ "$code" = "404" ] || fail "/project-info answered $code for $bad"
@@ -3370,6 +3382,26 @@ else
 fi
 rm -f "$OUT"/det_1.0_* "$OUT"/detbad_1.0_* "$OUT"/detsrc_1.0_*
 
+echo "== build-tool-choice property (sbom_summary) =="
+mkdir -p "$OUT"
+echo '{"bomFormat":"CycloneDX","metadata":{"component":{"name":"btc","version":"1.0"},"properties":[{"name":"bomlens:build-tool-choice","value":"gradle"},{"name":"bomlens:build-tool-choice-why","value":"pom.xml and build.gradle both found; Gradle is the default (--build-tool maven reads pom.xml instead)"}]},"components":[]}' > "$OUT/btc_1.0_bom.json"
+echo '{"bomFormat":"CycloneDX","metadata":{"component":{"name":"btcbad","version":"1.0"},"properties":[{"name":"bomlens:build-tool-choice","value":"<b>x</b>"},{"name":"bomlens:build-tool-choice-why","value":"<img src=x>"}]},"components":[]}' > "$OUT/btcbad_1.0_bom.json"
+if SBOM_OUTPUT_DIR="$OUT" python3 - "$ROOT_DIR" <<'PY'
+import sys, os
+sys.path.insert(0, os.path.join(sys.argv[1], "docker", "web"))
+import server
+s = server.sbom_summary("btc_1.0")
+assert s["buildToolChoice"] == "gradle" and s["buildToolChoiceWhy"].startswith("pom.xml and build.gradle"), s
+b = server.sbom_summary("btcbad_1.0")
+assert b["buildToolChoice"] is None and b["buildToolChoiceWhy"] is None, b
+PY
+then
+    pass "build tool choice surfaced from metadata, only maven or gradle, reason cut to plain characters"
+else
+    fail "build tool choice not surfaced correctly"
+fi
+rm -f "$OUT"/btc_1.0_* "$OUT"/btcbad_1.0_*
+
 echo "== pipeline-step-failed property (sbom_summary) =="
 # mark_pipeline_warning (docker/lib/pipeline-step.sh) appends one
 # bomlens:pipeline-step-failed property per failed best-effort step, so the
@@ -4285,6 +4317,7 @@ echo "[stub] scanning ${PROJECT_NAME} ${PROJECT_VERSION} (mode=$mode)"
   echo "CYCLONEDX_SPEC_VERSION=${CYCLONEDX_SPEC_VERSION:-}"
   echo "REPORT_LANG=${REPORT_LANG:-}"
   echo "DETECTION=${DETECTION:-}"
+  echo "BOMLENS_BUILD_TOOL=${BOMLENS_BUILD_TOOL:-}"
   echo "MODE=${MODE:-}"
   echo "TARGET_FILE=${TARGET_FILE:-}"
   echo "TARGET_DIR=${TARGET_DIR:-}"
@@ -5484,6 +5517,25 @@ if [ "$d1" = build ] && [ "$d2" = auto ] && [ "$d3" = auto ]; then
     pass "detection=build -> DETECTION=build; omitted or anything else -> auto"
 else
     fail "detection did not map to the scan env" "build=$d1 omitted=$d2 other=$d3"
+fi
+echo "== build tool: the form's choice reaches the scan env as one of three literals =="
+bt_env() {
+    rm -f "$WORK/stub-env"
+    sse_events "project=bt$1&version=1.0&source=current-dir$2" >/dev/null
+    sed -n 's/^BOMLENS_BUILD_TOOL=//p' "$WORK/stub-env"
+}
+b1="$(bt_env 1 '&build_tool=maven')"; b2="$(bt_env 2 '&build_tool=gradle')"
+b3="$(bt_env 3 '&build_tool=auto')"; b4="$(bt_env 4 '')"
+if [ "$b1" = maven ] && [ "$b2" = gradle ] && [ "$b3" = auto ] && [ "$b4" = auto ]; then
+    pass "build_tool=maven|gradle|auto (or omitted) -> BOMLENS_BUILD_TOOL"
+else
+    fail "build_tool did not map to the scan env" "maven=$b1 gradle=$b2 auto=$b3 omitted=$b4"
+fi
+bt_code=$(curl -s -o "$WORK/bt-400" -w '%{http_code}' --get --data-urlencode "project=btbad" --data-urlencode "version=1.0" --data-urlencode "source=current-dir" --data-urlencode "build_tool=ant;rm" "$BASE2/scan-stream")
+if [ "$bt_code" = 400 ] && grep -q "invalid build_tool" "$WORK/bt-400"; then
+    pass "an unknown build_tool is rejected with HTTP 400 and a clear message"
+else
+    fail "unknown build_tool answered $bt_code" "$(cat "$WORK/bt-400")"
 fi
 det_cfg="$(python3 -c "import json,glob;print(json.load(open(glob.glob('$OUT2/det1_1.0/.scanmeta.json')[0])).get('detection',''))" 2>/dev/null)"
 [ "$det_cfg" = build ] \

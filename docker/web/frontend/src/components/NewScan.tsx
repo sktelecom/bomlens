@@ -171,6 +171,7 @@ export function NewScan({
     state.analyzeCpeIndex && state.showAnalyzeCpeIndex,
     // On by default, so it counts only when it was turned off.
     state.showDetection && !state.readLockFile,
+    state.showBuildTool && state.buildTool !== "auto",
     state.readDeclaredChanged,
   ].filter(Boolean).length;
   const formatOptionsOn = [

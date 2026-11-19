@@ -27,6 +27,12 @@ import {
   type UploadKind,
   type UsageContext,
 } from "@/lib/api";
+import {
+  buildToolToSend,
+  hasBothBuildTools,
+  normalizeBuildTool,
+  type BuildTool,
+} from "@/lib/buildTool";
 import i18n from "@/lib/i18n";
 import { hasOutboundLicenseField } from "@/lib/licenses";
 import { reachabilityOffered } from "@/lib/reachability";
@@ -204,6 +210,10 @@ export function useScanForm({
   const [readLockFile, setReadLockFile] = useState(
     () => initialConfig?.detection !== "build",
   );
+  // Maven or Gradle for a folder that has both build files (--build-tool).
+  const [buildTool, setBuildTool] = useState<BuildTool>(() =>
+    normalizeBuildTool(initialConfig?.buildTool),
+  );
   const [byteStable, setByteStable] = useState(
     () => initialConfig?.byteStable ?? false,
   );
@@ -342,6 +352,8 @@ export function useScanForm({
   const showAnalyzeCpeIndex = isAnalyze;
   // Only a source tree has a lock file to read in place of a build.
   const showDetection = isSourceScan;
+  // Offered only when the chosen folder holds both pom.xml and build.gradle(.kts).
+  const showBuildTool = isSourceScan && hasBothBuildTools(projectInfo?.buildTools);
   // A declaration file sits at the root of a source tree, or of a Yocto build
   // directory picked with the folder input (the server reads it there).
   const showReadDeclared =
@@ -705,6 +717,7 @@ export function useScanForm({
       byteStable: showByteStable ? byteStable : false,
       analyzeCpeIndex: showAnalyzeCpeIndex ? analyzeCpeIndex : false,
       detection: showDetection && !readLockFile ? "build" : "auto",
+      buildTool: buildToolToSend(showBuildTool, buildTool),
       noComponents: showReadDeclared && !readDeclared,
       conformanceProfile: showConformanceProfile ? conformanceProfile : undefined,
       // Outbound license: only where we generate the SBOM (see showOutboundLicense).
@@ -765,6 +778,7 @@ export function useScanForm({
     byteStable, setByteStable,
     analyzeCpeIndex, setAnalyzeCpeIndex,
     readLockFile, setReadLockFile, showDetection,
+    buildTool, setBuildTool, showBuildTool,
     readDeclared, setReadDeclared, showReadDeclared, readDeclaredChanged,
     conformanceProfile, setConformanceProfile,
     outboundLicense, setOutboundLicense,

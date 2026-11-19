@@ -230,6 +230,8 @@ export interface FolderInfo {
   version: string;
   hasManifest: boolean;
   subProjects: string[];
+  /** Build files directly in the folder; absent when not known. */
+  buildTools?: { maven?: boolean; gradle?: boolean };
 }
 
 /** The version to prefill: one the source itself states (a docker tag, a

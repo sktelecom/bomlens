@@ -30,6 +30,7 @@ import {
 import { demoInstallUrl, demoRunAction, IS_STATIC_DEMO } from "@/lib/demo";
 import { analyzeMinutesEstimate } from "@/lib/analyzeEstimate";
 import { canManageScanFolders, desktopBridge } from "@/lib/desktop";
+import { BUILD_TOOLS, BUILD_TOOL_LABEL_KEY, type BuildTool } from "@/lib/buildTool";
 import { USAGE_LABEL_KEY } from "@/lib/models";
 import { ACCEPT, type ScanFormState } from "@/lib/useScanForm";
 
@@ -641,6 +642,9 @@ export function ScanOptions({ state }: { state: ScanFormState }) {
     readLockFile,
     setReadLockFile,
     showDetection,
+    buildTool,
+    setBuildTool,
+    showBuildTool,
     readDeclared,
     setReadDeclared,
     showReadDeclared,
@@ -731,6 +735,25 @@ export function ScanOptions({ state }: { state: ScanFormState }) {
           onChange={setReadLockFile}
           disabled={busy}
         />
+      )}
+      {showBuildTool && (
+        <FormControl id="build-tool" disabled={busy} className="bl-span2">
+          <FormControl.Label>{t("options.buildTool")}</FormControl.Label>
+          <Select
+            block
+            value={buildTool}
+            onChange={(e) => setBuildTool(e.target.value as BuildTool)}
+            aria-describedby="build-tool-hint"
+            data-testid="build-tool"
+          >
+            {BUILD_TOOLS.map((b) => (
+              <Select.Option key={b} value={b}>
+                {t(BUILD_TOOL_LABEL_KEY[b])}
+              </Select.Option>
+            ))}
+          </Select>
+          <Hint id="build-tool-hint" text={t("options.buildToolHint")} about={t("options.buildTool")} />
+        </FormControl>
       )}
       {showReadDeclared && (
         <Toggle

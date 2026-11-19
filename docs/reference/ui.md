@@ -62,6 +62,8 @@ The top bar's language toggle (한국어 / EN, see [The shell](#the-shell)) also
 
 A **Reproducible output** toggle produces byte-identical SBOMs across runs (the UI equivalent of `--byte-stable`); it is available for source, image and firmware scans, not for SBOM analysis or AI models.
 
+A source folder that holds both a `pom.xml` and a `build.gradle` (or `build.gradle.kts`) shows a **Build tool for Maven and Gradle files** choice with Auto, Maven and Gradle (CLI `--build-tool`). Auto builds with Gradle, as the CLI does, and Maven builds from `pom.xml` instead. The choice is hidden for any other folder. When a scan had to pick one of the two, Overview names the tool it used and the reason.
+
 For SBOM analysis, a **Match against the CPE index** toggle (off by default; the UI equivalent of `--analyze-cpe-index`) also matches the components of an SBOM that BomLens generated, those carrying `bomlens:purlSource=upstream-map`, against the bundled CPE index. Other components are not matched.
 
 A **Read sbom-declared.cdx.json** toggle, on by default under Result quality, adds the components listed in `sbom-declared.cdx.json` at the root of the scanned folder: the folder of a source scan, or a [Yocto build directory](#yocto-build-directory) picked with the Directory input. Any other directory is scanned the same either way, since whether a folder is a Yocto build directory is known only once the scan starts. Turn it off for a scan made before the build outputs the file names exist; for a source scan this is the UI equivalent of `--no-components`. The UI reads only that file name and cannot name another file, as `--components` does. See the [declared components guide](../guides/declared-components.md).
