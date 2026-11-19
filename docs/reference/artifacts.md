@@ -41,6 +41,7 @@ The filename is `{Project}_{Version}_bom.json` (e.g. `MyApp_1.0.0_bom.json`).
 | `bomlens-events.jsonl` | `BOMLENS_EVENTS=file` | progress events, one JSON object per line. See [Engine contract](engine-contract.md#progress-events) |
 | `bomlens-result.json` | always | the run's result manifest: how it ended, each step's outcome, and the role of each output file. See [Engine contract](engine-contract.md) |
 | `{Project}_{Version}_security_epss.json` | whenever the security report is generated | EPSS score and KEV status per vulnerability (null/false when generated offline), used to prioritize the security report |
+| `{Project}_{Version}_completeness.json` | every SBOM scan | how complete the result is (`complete`, `partial` or `unreliable`) and the reasons when it is not. The Overview banner and the reports read it |
 | `{Project}_{Version}_bom.json.sig` | `--sign` | cosign signature (with `--spdx`, a `_bom.spdx.json.sig` is produced too, and an AI scan adds `_bom.spdx3.json.sig`; a draft is signed too, since the signature says where the file came from, not that it is complete) |
 | `{new}_model-diff.json` | `--diff <old.json> <new.json>` | AI-model drift report comparing two already-generated SBOMs: matched model verdict/license/hash changes, plus any component present in only one of the two files. Named after the newer input (`<new>_bom.json` → `<new>_model-diff.json`), not `{Project}_{Version}` — `--diff` takes no project or version of its own |
 

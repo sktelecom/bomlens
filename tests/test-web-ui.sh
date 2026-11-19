@@ -1773,6 +1773,40 @@ printf '{"bomFormat":"CycloneDX","specVersion":"1.6","version":1}\n' > "$WORK/su
 c_json=$(curl -s -o /dev/null -w '%{http_code}' -F "kind=sbom" -F "file=@$WORK/supplier.json" "$BASE/upload?kind=sbom")
 [ "$c_json" = "200" ] && pass "JSON SBOM upload still accepted (200)" || fail ".json as sbom returned $c_json (expected 200)"
 
+# A supplier SBOM that cannot be parsed is refused at upload, each way with its
+# own code, so no scan is spent on it and the screen can say whose problem it is.
+# Only parse failures are refused: a document that parses but breaks the schema
+# (or is not an SBOM at all) is still accepted and judged by the conformance check.
+: > "$WORK/empty.json"
+printf '   \n\t\n' > "$WORK/blank.json"
+printf '{"bomFormat":"CycloneDX","specVersion":"1.6","components":[{"name":"a","version":"1"},{"name":"b' > "$WORK/cut-in-string.json"
+printf '{"bomFormat":"CycloneDX","specVersion":"1.6","components":[{"name":"a","version":"1"},' > "$WORK/cut-after-comma.json"
+printf 'this is a plain text note, not an SBOM\n' > "$WORK/plain.json"
+printf '{"bomFormat": "CycloneDX" "specVersion": "1.6"}\n' > "$WORK/syntax.json"
+printf '{"hello":"world"}\n' > "$WORK/other-json.json"
+printf '{"bomFormat":"CycloneDX","specVersion":"9.9","components":"not-a-list"}\n' > "$WORK/schema-bad.json"
+: > "$WORK/empty.xml"
+up_code() { # file -> "<status> <code>"
+    local st
+    st=$(curl -s -o "$WORK/up-resp.json" -w '%{http_code}' -F "kind=sbom" -F "file=@$1" "$BASE/upload?kind=sbom")
+    echo "$st $(python3 -c "import json;print(json.load(open('$WORK/up-resp.json')).get('code',''))" 2>/dev/null)"
+}
+[ "$(up_code "$WORK/empty.json")" = "422 SBOM_FILE_EMPTY" ] && pass "0-byte .json SBOM refused with SBOM_FILE_EMPTY (422)" || fail "empty .json SBOM not refused as SBOM_FILE_EMPTY" "$(up_code "$WORK/empty.json")"
+[ "$(up_code "$WORK/empty.xml")" = "422 SBOM_FILE_EMPTY" ] && pass "0-byte .xml SBOM refused with SBOM_FILE_EMPTY" || fail "empty .xml SBOM not refused as SBOM_FILE_EMPTY" "$(up_code "$WORK/empty.xml")"
+[ "$(up_code "$WORK/blank.json")" = "422 SBOM_FILE_EMPTY" ] && pass "blank-only .json SBOM refused with SBOM_FILE_EMPTY" || fail "blank .json SBOM not refused as SBOM_FILE_EMPTY" "$(up_code "$WORK/blank.json")"
+[ "$(up_code "$WORK/cut-in-string.json")" = "422 SBOM_JSON_TRUNCATED" ] && pass "JSON cut inside a string refused with SBOM_JSON_TRUNCATED" || fail "JSON cut inside a string not SBOM_JSON_TRUNCATED" "$(up_code "$WORK/cut-in-string.json")"
+[ "$(up_code "$WORK/cut-after-comma.json")" = "422 SBOM_JSON_TRUNCATED" ] && pass "JSON cut after a comma refused with SBOM_JSON_TRUNCATED" || fail "JSON cut after a comma not SBOM_JSON_TRUNCATED" "$(up_code "$WORK/cut-after-comma.json")"
+[ "$(up_code "$WORK/plain.json")" = "422 SBOM_NOT_RECOGNIZED" ] && pass "plain text named .json refused with SBOM_NOT_RECOGNIZED" || fail "plain text .json not SBOM_NOT_RECOGNIZED" "$(up_code "$WORK/plain.json")"
+[ "$(up_code "$WORK/syntax.json")" = "422 SBOM_NOT_RECOGNIZED" ] && pass "JSON with a syntax error in the middle refused with SBOM_NOT_RECOGNIZED" || fail "mid-file JSON syntax error not SBOM_NOT_RECOGNIZED" "$(up_code "$WORK/syntax.json")"
+[ "$(up_code "$WORK/other-json.json" | cut -d' ' -f1)" = "200" ] && pass "valid JSON that is not an SBOM is accepted (judged by the conformance check)" || fail "valid non-SBOM JSON was refused at upload" "$(up_code "$WORK/other-json.json")"
+[ "$(up_code "$WORK/schema-bad.json" | cut -d' ' -f1)" = "200" ] && pass "valid JSON that breaks the CycloneDX schema is accepted (never refused at upload)" || fail "schema-violating JSON was refused at upload" "$(up_code "$WORK/schema-bad.json")"
+# A refused upload leaves nothing behind that a scan could pick up.
+if [ -z "$(find "$OUT/.uploads" -name 'empty.json' 2>/dev/null | head -1)" ] && [ -z "$(find "$OUT/.uploads" -name 'plain.json' 2>/dev/null | head -1)" ]; then
+    pass "a refused SBOM upload leaves no file under .uploads/"
+else
+    fail "a refused SBOM upload left its file under .uploads/"
+fi
+
 # Regression: the filename sanitizer used to be an ASCII-only allowlist
 # (re.sub(r"[^A-Za-z0-9._-]", "_", ...)), so a Korean filename — the common
 # case for this product's users, not an edge case — came back as a run of
@@ -1846,7 +1880,7 @@ fi
 # A Yocto SPDX 2.2 build deploys one <image>.spdx.tar.zst and no document, so
 # that archive is the only SBOM such a build can hand over. It has to be
 # uploadable, while a bare zstd tarball stays out.
-: > "$WORK/core-image-minimal.rootfs.spdx.tar.zst"
+printf "not a real archive" > "$WORK/core-image-minimal.rootfs.spdx.tar.zst"  # content only; an empty file is refused
 : > "$WORK/something.tar.zst"
 zst_tok=$(curl -fsS -F "kind=sbom" -F "file=@$WORK/core-image-minimal.rootfs.spdx.tar.zst" \
     "$BASE/upload?kind=sbom" 2>/dev/null \
@@ -2259,6 +2293,87 @@ else
     fail "kernel advisory separation is wrong (see assertion above)"
 fi
 rm -f "$OUT"/kern_1.0_* "$OUT"/nokern_1.0_*
+
+echo "== security_summary carries the direct dependency behind each finding =="
+cat > "$OUT/intro_1.0_security.json" <<'JSON'
+{"IntroducedBy":{"State":"ok","Max":3},"Results":[{"Vulnerabilities":[
+  {"VulnerabilityID":"CVE-I1","Severity":"HIGH","PkgName":"tomcat-embed-core","InstalledVersion":"10.1.1",
+   "PkgIdentifier":{"PURL":"pkg:maven/org.apache.tomcat.embed/tomcat-embed-core@10.1.1"},
+   "introducedBy":[{"name":"spring-boot-starter-web","version":"3.2.0","purl":"pkg:maven/x/y@1","direct":false},
+                   {"name":"b","version":"","direct":true},{"name":"c"},{"name":"d"},"junk",{"version":"9"}]},
+  {"VulnerabilityID":"CVE-I2","Severity":"LOW","PkgName":"rake","InstalledVersion":"13.0",
+   "PkgIdentifier":{"PURL":"pkg:gem/rake@13.0"}}
+]}]}
+JSON
+cat > "$OUT/intro_1.0_bom.json" <<'JSON'
+{"bomFormat":"CycloneDX","specVersion":"1.6","components":[
+ {"name":"rake","version":"13.0","purl":"pkg:gem/rake@13.0","properties":[{"name":"bomlens:dependency-role","value":"build-tool"}]},
+ {"name":"tomcat-embed-core","version":"10.1.1","purl":"pkg:maven/org.apache.tomcat.embed/tomcat-embed-core@10.1.1"}]}
+JSON
+cat > "$OUT/nograph_1.0_security.json" <<'JSON'
+{"IntroducedBy":{"State":"no-graph","Max":3},"Results":[{"Vulnerabilities":[
+  {"VulnerabilityID":"CVE-N1","Severity":"LOW","PkgName":"zlib","InstalledVersion":"1.2"}]}]}
+JSON
+cat > "$OUT/oldrep_1.0_security.json" <<'JSON'
+{"Results":[{"Vulnerabilities":[
+  {"VulnerabilityID":"CVE-O1","Severity":"LOW","PkgName":"zlib","InstalledVersion":"1.2"}]}]}
+JSON
+if SBOM_OUTPUT_DIR="$OUT" python3 - "$ROOT_DIR" <<'PY'
+import sys, os
+sys.path.insert(0, os.path.join(sys.argv[1], "docker", "web"))
+import server
+sm = server.security_summary("intro_1.0")
+rows = {v["id"]: v for v in sm["vulnerabilities"]}
+by = rows["CVE-I1"]["introducedBy"]
+# At most three, reduced to name, version and direct; entries without a name are dropped.
+assert [e["name"] for e in by] == ["spring-boot-starter-web", "b", "c"], by
+assert by[0] == {"name": "spring-boot-starter-web", "version": "3.2.0"}, by[0]
+assert by[1] == {"name": "b", "direct": True}, by[1]
+assert "purl" not in by[0], by[0]
+assert "introducedBy" not in rows["CVE-I2"], rows["CVE-I2"]
+assert sm["introducedByState"] == "ok", sm.get("introducedByState")
+# The gem the SBOM marks as build tooling is tagged; the app dependency is not.
+assert rows["CVE-I2"].get("buildTool") is True, rows["CVE-I2"]
+assert "buildTool" not in rows["CVE-I1"], rows["CVE-I1"]
+ng = server.security_summary("nograph_1.0")
+assert ng["introducedByState"] == "no-graph", ng
+assert "introducedBy" not in ng["vulnerabilities"][0] and "buildTool" not in ng["vulnerabilities"][0]
+# A report from before the trace carries no state at all.
+assert "introducedByState" not in server.security_summary("oldrep_1.0")
+# An unknown state is not passed through.
+import json, pathlib
+out = pathlib.Path(os.environ["SBOM_OUTPUT_DIR"])
+(out / "badstate_1.0_security.json").write_text(json.dumps({"IntroducedBy": {"State": "<script>"}, "Results": []}))
+assert "introducedByState" not in server.security_summary("badstate_1.0")
+PY
+then
+    pass "security_summary reports introducedBy, its state and the build-tool tag, defensively"
+else
+    fail "security_summary introducedBy handling is wrong (see assertion above)"
+fi
+rm -f "$OUT"/intro_1.0_* "$OUT"/nograph_1.0_* "$OUT"/oldrep_1.0_* "$OUT"/badstate_1.0_*
+
+echo "== pull failure classes and the completeness artifact =="
+if python3 - "$ROOT_DIR" <<'PY'
+import sys, os
+sys.path.insert(0, os.path.join(sys.argv[1], "docker", "web"))
+import server
+c = server.classify_pull_failure
+assert c("Error response from daemon: manifest unknown: manifest unknown") == "notfound"
+assert c("manifest for ghcr.io/x/y:9 not found: manifest unknown") == "notfound"
+# The daemon's one sentence for "missing or refused" stays an auth failure, and a
+# refusal next to a "not found" is still a refusal.
+assert c("pull access denied for x, repository does not exist or may require 'docker login'") == "auth"
+assert c("unauthorized: authentication required\nmanifest unknown") == "auth"
+assert c("dial tcp: lookup registry.example.com: no such host") == "dns"
+assert "x_1.0_completeness.json".endswith(server.ARTIFACT_SUFFIXES)
+assert "SBOM_FILE_EMPTY" in server.KNOWN_ERROR_CODES and "SBOM_JSON_TRUNCATED" in server.KNOWN_ERROR_CODES and "SBOM_NOT_RECOGNIZED" in server.KNOWN_ERROR_CODES
+PY
+then
+    pass "classify_pull_failure separates a missing image from a refused login; _completeness.json is a listed artifact"
+else
+    fail "pull failure classes or the completeness artifact are wrong (see assertion above)"
+fi
 
 echo "== EPSS / KEV enrichment join (security_summary) =="
 # The raw _security.json has no EPSS/KEV; scan-security.sh writes them as a
