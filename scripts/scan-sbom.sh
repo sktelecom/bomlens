@@ -1572,6 +1572,23 @@ remove_earlier_result "${OUTPUT_HOST_DIR}/${OUTPUT_FILE%_bom.json}_conda.cdx.jso
 # this run's: the check after stage 2 reads its presence as this run's refusal.
 remove_earlier_result "${OUTPUT_HOST_DIR}/${OUTPUT_FILE%_bom.json}_bom.refused.json"
 
+# docker run answers 125 (the engine refused the run), 126 (the command in the
+# image could not be run) and 127 (not found) for failures that are Docker's own,
+# not the scan's. They leave this script as 1, the code for a failed scan, so a
+# caller sees one failure code. <rc> <what ran>; returns the code to exit with.
+docker_run_failure_code() {
+    case "$1" in
+        125|126|127)
+            log_error "Docker could not run $2 (docker exit code $1: $(case "$1" in
+                125) echo 'the engine refused to start the container' ;;
+                126) echo 'the command in the image could not be run' ;;
+                *)   echo 'the command was not found in the image' ;;
+            esac)). Run docker info, and check the image and the folders it mounts."
+            return 1 ;;
+    esac
+    return "$1"
+}
+
 # The Docker engine stopped under a running scan (Docker Desktop quit or was
 # restarted, the VM ran out of memory): the client reports it in the container's
 # log, and cdxgen's own failure messages are not the cause. <rc> <log>
@@ -3878,7 +3895,14 @@ EOF
         if [ -n "$STAGE1_FAILED" ] && [ ! -s "$OUTPUT_HOST_DIR/$OUTPUT_FILE" ]; then
             log_error "SBOM generation failed (stage 1), and the manifest-only fallback also failed or was discarded (see the guidance above, if any). Full cdxgen log: $STAGE1_LOG"
         fi
-        exit "$_pp_rc"
+        # What stage 1 wrote has not been post-processed. Keep it under a name no
+        # one reads as a finished SBOM.
+        if [ -f "$OUTPUT_HOST_DIR/$OUTPUT_FILE" ]; then
+            if mv -f "$OUTPUT_HOST_DIR/$OUTPUT_FILE" "$OUTPUT_HOST_DIR/${OUTPUT_FILE%_bom.json}_bom.unprocessed.json" 2>/dev/null; then
+                log_warn "Post-processing did not finish; the SBOM stage 1 wrote is kept as ${OUTPUT_FILE%_bom.json}_bom.unprocessed.json (no notice, security or conformance step ran on it)."
+            fi
+        fi
+        docker_run_failure_code "$_pp_rc" "the post-processing container" || exit $?
     }
     if [ -n "$STAGE1_FAILED" ]; then
         # The fallback reads manifests only. When it found no component, "direct
@@ -4007,11 +4031,15 @@ else
     # this single-container run generates its whole output in one shot, so
     # there is no stage-1 handoff the sweep could mistake for stale output.
     export_scan_secrets
+    _run_rc=0
     # shellcheck disable=SC2046
     eval "$DOCKER_MSYS"docker run --rm $VOL \
         --add-host=host.docker.internal:host-gateway \
         -e MODE="$MODE" -e BOMLENS_ARTIFACT_CLEANUP=1 $ENVV $(pp_env)$(cosign_run)$(vex_run)$(declare_run)$(component_versions_run)$(binary_kb_run)$(components_run)$(gate_run) \
-        "\"$RUN_IMAGE\""
+        "\"$RUN_IMAGE\"" || _run_rc=$?
+    if [ "$_run_rc" -ne 0 ]; then
+        docker_run_failure_code "$_run_rc" "the scan container" || exit $?
+    fi
 fi
 
 # Verify artifacts actually reached the host. When the run folder is outside
