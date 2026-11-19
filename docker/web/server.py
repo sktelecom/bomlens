@@ -287,6 +287,10 @@ ARTIFACT_SUFFIXES = (
     # (entrypoint.sh renames _bom.json so it is not taken for the result). The
     # failed-scan card offers it for viewing and download.
     "_bom.refused.json",
+    # The result-completeness grade and its reasons (assess-completeness.sh):
+    # what the Overview banner and the reports read, so it is listed and
+    # downloaded with the rest of the scan.
+    "_completeness.json",
 )
 
 # Recent-scans sidebar shows the newest N; older scans stay on disk but are not
@@ -684,7 +688,12 @@ _ERROR_LINE_RE = re.compile(r"^\[ERROR\]")
 # The scanner's note that another scan of the same folder is still running. It
 # reaches the result screen as a warning with this code in front.
 _SAME_FOLDER_SCAN_RE = re.compile(r"a previous scan of this folder .* appears to still be running")
-KNOWN_ERROR_CODES = ("ANDROID_SDK_IMAGE_MISSING", "SCAN_TARGET_NOT_VISIBLE")
+KNOWN_ERROR_CODES = (
+    "ANDROID_SDK_IMAGE_MISSING", "SCAN_TARGET_NOT_VISIBLE",
+    # Upload-time refusals of a supplier SBOM that cannot be parsed (the code
+    # travels in the /upload error body, not in a scan log).
+    "SBOM_FILE_EMPTY", "SBOM_JSON_TRUNCATED", "SBOM_NOT_RECOGNIZED",
+)
 _ERROR_CODE_RE = re.compile(r"^\[ERROR\]\s+([A-Z][A-Z0-9_]+):")
 _RESPONSE_LINE_RE = re.compile(r"(?i)^response:")
 
@@ -753,6 +762,65 @@ class _ScanErrorTracker:
         if len(joined) > _SCAN_ERROR_MAX_CHARS:
             joined = "..." + joined[-(_SCAN_ERROR_MAX_CHARS - 3):]
         return joined
+
+
+def check_uploaded_sbom(path, lower_name):
+    """Refuse a supplier SBOM upload that cannot be parsed at all, before a scan
+    is spent on it. Returns None to accept, or (code, message) with a code from
+    KNOWN_ERROR_CODES.
+
+    Only parse failures are refused: a file with no content, a JSON document
+    that stops before it ends, and text that is not JSON. A document that parses
+    but breaks the CycloneDX or SPDX schema (or is some other JSON) is accepted
+    here and judged by the conformance check, as before. A format this check
+    cannot read as JSON (XML, SPDX tag-value, a Yocto archive) is only checked
+    for being empty."""
+    try:
+        size = os.path.getsize(path)
+    except OSError:
+        return None
+    if size == 0:
+        return ("SBOM_FILE_EMPTY", "The uploaded SBOM file is empty (0 bytes).")
+    if not lower_name.endswith(".json"):
+        return None
+    try:
+        with open(path, "rb") as fh:
+            raw = fh.read()
+    except (OSError, MemoryError):
+        return None
+    if raw.startswith((b"\xff\xfe", b"\xfe\xff")):
+        enc = "utf-16"
+    elif raw.startswith(b"\xef\xbb\xbf"):
+        enc = "utf-8-sig"
+    else:
+        enc = "utf-8"
+    try:
+        text = raw.decode(enc)
+    except UnicodeDecodeError:
+        return None  # an encoding this check does not read; the scan decides
+    body = text.strip()
+    if not body:
+        return ("SBOM_FILE_EMPTY", "The uploaded SBOM file has no content (only blank space).")
+    try:
+        json.loads(body)
+    except json.JSONDecodeError as exc:
+        # A cut-off file ends where a value, a closing bracket or a string
+        # should continue: the parser fails at the end, or inside a string that
+        # never closes. Text that does not even start like JSON is a different
+        # file altogether.
+        if body[0] not in "{[":
+            return ("SBOM_NOT_RECOGNIZED",
+                    "The uploaded file is not JSON (it does not start with { or [).")
+        if exc.pos >= len(body) or exc.msg.startswith("Unterminated string"):
+            return ("SBOM_JSON_TRUNCATED",
+                    "The uploaded SBOM ends before the JSON document does "
+                    "(about %d bytes read)." % len(raw))
+        return ("SBOM_NOT_RECOGNIZED",
+                "The uploaded file is not valid JSON (line %d, column %d: %s)."
+                % (exc.lineno, exc.colno, exc.msg))
+    except (RecursionError, MemoryError, ValueError):
+        return None
+    return None
 
 
 def safe_scan_dir(rel):
@@ -1674,6 +1742,63 @@ _KERNEL_PKG_NAMES = ("linux_kernel", "linux-kernel", "kernel", "linux")
 _NVD_SEVERITY_NAMES = {1: "LOW", 2: "MEDIUM", 3: "HIGH", 4: "CRITICAL"}
 
 
+MAX_INTRODUCED_BY = 3  # direct dependencies listed per finding (the report's own cap)
+_INTRODUCED_STATES = ("ok", "no-graph", "too-large", "error")
+_MAX_BUILD_TOOL_SBOM_BYTES = 64 * 1024 * 1024
+
+
+def _introduced_by(v):
+    """The direct dependencies behind one finding (scan-security.sh's introducedBy,
+    nearest first), reduced to name, version and whether the component is itself a
+    direct dependency. Empty for a finding the walk could not connect."""
+    raw = v.get("introducedBy")
+    out = []
+    if not isinstance(raw, list):
+        return out
+    for e in raw[:MAX_INTRODUCED_BY]:
+        if not isinstance(e, dict):
+            continue
+        name = _str_field(e, "name")[:200]
+        if not name:
+            continue
+        item = {"name": name}
+        version = _str_field(e, "version")[:100]
+        if version:
+            item["version"] = version
+        if e.get("direct") is True:
+            item["direct"] = True
+        out.append(item)
+    return out
+
+
+def _build_tool_purls(run_id):
+    """Normalized purls of the components the scan marked as build tooling
+    (bomlens:dependency-role=build-tool: the gems of an iOS project), so a finding
+    in one reads apart from the app's own dependencies. Empty when there are none
+    or the SBOM is not at hand."""
+    p = run_file(run_id, "_bom.json")
+    if not p or not os.path.isfile(p):
+        return set()
+    try:
+        if os.path.getsize(p) > _MAX_BUILD_TOOL_SBOM_BYTES:
+            return set()
+        with open(p, "rb") as f:
+            raw = f.read()
+        # Most SBOMs carry no such component: skip the parse unless the marker is there.
+        if b"bomlens:dependency-role" not in raw:
+            return set()
+        data = json.loads(raw)
+    except (OSError, ValueError, MemoryError):
+        return set()
+    out = set()
+    for c in _dicts(_as_dict(data).get("components")):
+        for prop in _dicts(c.get("properties")):
+            if prop.get("name") == "bomlens:dependency-role" and prop.get("value") == "build-tool":
+                if isinstance(c.get("purl"), str) and c["purl"]:
+                    out.add(_norm_purl(c["purl"]))
+    return out
+
+
 def security_summary(run_id):
     p = run_file(run_id, "_security.json")
     if not p or not os.path.isfile(p):
@@ -1684,6 +1809,7 @@ def security_summary(run_id):
     except (OSError, json.JSONDecodeError):
         return None
     priority = _epss_kev_map(run_id)
+    build_tool = _build_tool_purls(run_id)
     vex_by_purl, vex_by_nv = _vex_verdict_index(run_id)
     recv_by_purl, recv_by_nv, recv_by_cve, recv_source = _vex_received_index(run_id)
     sev = {"CRITICAL": 0, "HIGH": 0, "MEDIUM": 0, "LOW": 0, "UNKNOWN": 0}
@@ -1750,6 +1876,13 @@ def security_summary(run_id):
                 purl = ident.get("PURL") if isinstance(ident, dict) else None
                 if purl:
                     row["purl"] = _norm_purl(purl)
+                    if row["purl"] in build_tool:
+                        row["buildTool"] = True
+                # The direct dependencies that bring this component in; absent
+                # when there are none (see introducedByState for why).
+                intro = _introduced_by(v)
+                if intro:
+                    row["introducedBy"] = intro
                 # EPSS (exploit probability, 0..1) + CISA KEV (actively exploited).
                 epss = pr.get("epss")
                 if isinstance(epss, (int, float)):
@@ -1806,6 +1939,12 @@ def security_summary(run_id):
                 rows.append(row)
     sev["TOTAL"] = sum(sev.values())
     sev["vulnerabilities"] = vulns
+    # Why no finding names the dependency behind it, when that is the case:
+    # scan-security.sh records "no-graph" (the SBOM has no dependency edges) or
+    # "too-large" (the walk was skipped). Only the closed set of states is passed.
+    intro_doc = data.get("IntroducedBy")
+    if isinstance(intro_doc, dict) and intro_doc.get("State") in _INTRODUCED_STATES:
+        sev["introducedByState"] = intro_doc["State"]
     # Reported, but on its own line: a number the reader should see without it
     # moving the severity figures the screen is built around.
     if kernel:
@@ -5322,6 +5461,13 @@ def classify_pull_failure(log_tail="", reason="exit"):
     if re.search(r"proxyconnect|x509|certificate signed by unknown authority"
                  r"|certificate is not trusted|\b403\b|Forbidden|tls: (?:bad|failed)", s, re.I):
         return "proxy"
+    # "manifest unknown" and "not found" name a missing image or tag on a registry
+    # that answered. "pull access denied ... may require 'docker login'" is the
+    # daemon's one sentence for both a missing repository and a refused login, so
+    # it stays "auth" (the message tells the reader to check the name as well).
+    if re.search(r"manifest unknown|manifest for \S+ not found|not found: manifest"
+                 r"|no such image", s, re.I) and not re.search(r"unauthorized|denied", s, re.I):
+        return "notfound"
     if re.search(r"unauthorized|authentication required|pull access denied|denied:", s, re.I):
         return "auth"
     return "unknown"
@@ -6949,6 +7095,12 @@ class Handler(BaseHTTPRequestHandler):
                 "error": "unsupported file type for %s (got %s)" % (kind, safe_fn)
             }))
             return
+        if kind == "sbom":
+            refused = check_uploaded_sbom(tmp_path, lower)
+            if refused:
+                shutil.rmtree(dest_dir, ignore_errors=True)
+                self._send(422, json.dumps({"error": refused[1], "code": refused[0]}))
+                return
         if kind == "sbom" and lower.endswith(".xml"):
             # CycloneDX XML is read (docker/lib/cdx-xml-to-json.py). Any other XML,
             # SPDX RDF/XML in practice, is refused here rather than in the

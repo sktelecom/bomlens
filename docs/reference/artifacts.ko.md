@@ -41,6 +41,7 @@ description: BomLens가 생성하는 산출물 파일 목록과 생성 조건, �
 | `bomlens-events.jsonl` | `BOMLENS_EVENTS=file` | 진행 이벤트, 한 줄에 JSON 객체 하나. [엔진 계약](engine-contract.ko.md#진행-이벤트) 참고 |
 | `bomlens-result.json` | 항상 | 실행 결과 매니페스트. 실행이 어떻게 끝났는지, 단계별 결과, 출력 파일별 역할을 담습니다. [엔진 계약](engine-contract.ko.md) 참고 |
 | `{Project}_{Version}_security_epss.json` | 보안보고서를 생성할 때마다 | 취약점별 EPSS 점수와 KEV 여부(오프라인 생성 시 null/false), 보안보고서 우선순위 산정에 사용 |
+| `{Project}_{Version}_completeness.json` | SBOM 스캔마다 | 결과가 얼마나 완전한지(`complete`, `partial`, `unreliable`)와 완전하지 않은 이유. 개요 화면의 안내와 보고서가 이 파일을 읽습니다 |
 | `{Project}_{Version}_bom.json.sig` | `--sign` | cosign 서명 (`--spdx`와 함께 쓰면 `_bom.spdx.json.sig`도 생성). AI 스캔에는 `_bom.spdx3.json.sig`도 추가되며, 초안도 서명한다. 서명은 파일의 출처를 보증할 뿐 완성 여부를 뜻하지 않는다 |
 | `{new}_model-diff.json` | `--diff <old.json> <new.json>` | 이미 생성한 SBOM 두 개를 비교한 AI 모델 변동 보고서. 매칭된 모델의 판정·라이선스·해시 변화와, 한쪽 파일에만 있는 컴포넌트를 담는다. 새 쪽 입력 파일 이름을 따르며(`<new>_bom.json` → `<new>_model-diff.json`), `{Project}_{Version}`이 아니다 — `--diff`는 프로젝트나 버전을 따로 받지 않는다 |
 
