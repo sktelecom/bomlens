@@ -74,6 +74,30 @@ jobs:
           done <<< "$pins"
           exit "$rc"
 
+  # The input matrix with real scans: small synthetic projects and a received
+  # empty SBOM go through the CLI in the published image, and only the report
+  # files are judged (an incomplete result never reads "No known vulnerabilities
+  # found"; grade and reasons agree in every report). The no-Docker half runs
+  # on every pull request.
+  input-matrix:
+    name: Input matrix (CLI scans)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - name: Pull the published scanner image
+        run: docker pull ghcr.io/sktelecom/bomlens:latest
+
+      - name: Input matrix against the published image
+        env:
+          BOMLENS_MATRIX_DOCKER: "1"
+          SBOM_SCANNER_IMAGE: ghcr.io/sktelecom/bomlens:latest
+        run: bash tests/test-journey-matrix.sh
+
   # Android (AGP) release-scope regression. Resolves the full androidx graph from
   # Google Maven through the published android-sdk image, so it is slow and
   # network-dependent — hence nightly, not per-PR. Guards the build-prep filter
@@ -406,7 +430,7 @@ jobs:
   report-failure:
     name: Open issue on failure
     runs-on: ubuntu-latest
-    needs: [heavy-e2e, published-user-journey, android-scope, doc-links, desktop, spdx3-official]
+    needs: [heavy-e2e, published-user-journey, input-matrix, android-scope, doc-links, desktop, spdx3-official]
     if: failure()
     permissions:
       contents: read
@@ -419,6 +443,7 @@ jobs:
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           HEAVY: ${{ needs.heavy-e2e.result }}
           JOURNEY: ${{ needs.published-user-journey.result }}
+          MATRIX: ${{ needs.input-matrix.result }}
           ANDROID: ${{ needs.android-scope.result }}
           LINKS: ${{ needs.doc-links.result }}
           DESKTOP: ${{ needs.desktop.result }}
@@ -428,6 +453,7 @@ jobs:
           body="Nightly run failed: ${RUN_URL}
           - Heavy E2E: ${HEAVY}
           - Published-image user journey: ${JOURNEY}
+          - Input matrix (CLI scans): ${MATRIX}
           - Android release scope: ${ANDROID}
           - External doc links: ${LINKS}
           - Desktop: ${DESKTOP}
