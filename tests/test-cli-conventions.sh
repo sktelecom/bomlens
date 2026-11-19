@@ -42,6 +42,7 @@ run_cli() {
 }
 
 # --- decision 2: a path-shaped --target that does not exist
+# shellcheck disable=SC2088  # the tilde is meant literally: the script must see it unexpanded
 for t in ./nope ../nope /nope/at/all '~/nope' 'C:/nope'; do
     run_cli --project p --version 1 --target "$t" --generate-only
     if [ "$RC" = 1 ] && grep -q '^\[ERROR\] --target' "$WORK/err"; then
@@ -121,7 +122,7 @@ extract_fn() {
         inside && $0 == "}" { exit }
     ' "$SCRIPT"
 }
-for fn in log_warn log_error docker_run_failure_code engine_stopped_during_scan remove_earlier_result windows_path_too_long; do
+for fn in log_warn log_error wait_with_progress docker_run_failure_code engine_stopped_during_scan remove_earlier_result windows_path_too_long; do
     body="$(extract_fn "$fn")"
     if [ -z "$body" ]; then echo "[ERROR] could not lift $fn out of scan-sbom.sh (was it renamed?)"; exit 1; fi
     eval "$body"
@@ -149,8 +150,25 @@ if [ "$(id -u)" != 0 ]; then
     fi
 fi
 
+sleep 3 & _bg=$!
+out="$(BOMLENS_PROGRESS_SECS=1 wait_with_progress "$_bg" "stage 1 test" 2>&1)"
+wait "$_bg" 2>/dev/null
+if [ "$(printf '%s\n' "$out" | grep -c '^\[INFO\] Still running: stage 1 test')" -ge 1 ]; then
+    pass "a long wait prints one progress line per period"
+else
+    fail "progress line" "out=$out"
+fi
+
+SBOM_OUTPUT_FLAT=1 run_cli --project p --version 1 --target alpine:3.20 --timestamp --generate-only
+if grep -q '^\[WARN\] --timestamp only names the run subfolder' "$WORK/err"; then
+    pass "--timestamp with SBOM_OUTPUT_FLAT=1 warns that it has no effect"
+else
+    fail "timestamp with flat output" "err=$(head -c 300 "$WORK/err")"
+fi
+
 DOCKER_MSYS=""
 if windows_path_too_long "$(printf 'a%.0s' $(seq 1 300))" "x"; then fail "path check off Windows"; else pass "the path length check does nothing off Windows"; fi
+# shellcheck disable=SC2034  # read by the lifted windows_path_too_long
 DOCKER_MSYS="x"; hostpath() { printf '%s' "$1"; }
 long="$(printf 'a%.0s' $(seq 1 300))"
 if out="$(windows_path_too_long "$long" "The --target path" 2>&1)" && printf '%s' "$out" | grep -q 'not a Docker engine problem'; then

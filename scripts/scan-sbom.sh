@@ -1522,6 +1522,9 @@ SCAN_INPUT_DIR="$SOURCE_DIR" # what cdxgen scans (overridden by git clone / zip 
 OUTPUT_BASE="${OUTPUT_BASE:-$(pwd)}"
 RUN_NAME="${SAFE_PROJECT}_${SAFE_VERSION}"
 [ "$TIMESTAMP" = "true" ] && RUN_NAME="${RUN_NAME}_$(date +%Y%m%d-%H%M%S)"
+if [ "$TIMESTAMP" = "true" ] && [ "${SBOM_OUTPUT_FLAT:-}" = "1" ]; then
+    log_warn "--timestamp only names the run subfolder, and SBOM_OUTPUT_FLAT=1 writes no subfolder, so it has no effect: a repeat scan overwrites the earlier files. Unset SBOM_OUTPUT_FLAT to keep each run."
+fi
 if [ "$SBOM_OUTPUT_FLAT" = "1" ]; then
     OUTPUT_HOST_DIR="$OUTPUT_BASE"
 else
@@ -1602,6 +1605,26 @@ docker_run_failure_code() {
             return 1 ;;
     esac
     return "$1"
+}
+
+# wait_with_progress <pid> <what>: waits for a background job like `wait`, and
+# prints one line every BOMLENS_PROGRESS_SECS (default 60) while the job runs, so
+# a long build whose output goes to a log does not leave the terminal silent.
+# One line each time, with no cursor control, so a redirected log reads the same.
+wait_with_progress() {
+    local pid="$1" what="$2" every="${BOMLENS_PROGRESS_SECS:-60}" started tick=0 now
+    case "$every" in ''|*[!0-9]*|0) every=60 ;; esac
+    started=$SECONDS
+    while kill -0 "$pid" 2>/dev/null; do
+        sleep 1
+        tick=$((tick + 1))
+        if [ "$tick" -ge "$every" ]; then
+            tick=0
+            now=$(( (SECONDS - started) / 60 ))
+            echo "[INFO] Still running: $what, $now min elapsed."
+        fi
+    done
+    wait "$pid" || true
 }
 
 # The Docker engine stopped under a running scan (Docker Desktop quit or was
@@ -3603,7 +3626,7 @@ if [ "$MODE" = "SOURCE" ]; then
     # `wait` now returns ITS exit code -- a crash would trip `set -e` right
     # here, aborting the script before any of the failure handling below
     # runs. The real exit code comes from `docker wait` next regardless.
-    wait "$STAGE1_PID" || true
+    wait_with_progress "$STAGE1_PID" "stage 1, dependency resolution in $CDX_IMG (log: $STAGE1_LOG)"
     drop_unused_guard_state "$STAGE1_CONTAINER"
     RUNNING_CONTAINER_NAME=""
     [ -z "$REACH_TOOLS_DIR" ] || rm -rf -- "$REACH_TOOLS_DIR"
