@@ -2800,7 +2800,11 @@ elif [ -n "$TARGET" ]; then
         resolve_release_folder
     fi
     if [ -f "$TARGET" ]; then
-        if [ "$FORCE_FIRMWARE" = "true" ] || is_firmware "$TARGET"; then
+        if [ "$FORCE_FIRMWARE" != "true" ] && is_archive "$TARGET" && is_container_archive "$TARGET"; then
+            # A `docker save` tar is an image: read it as one (syft docker-archive).
+            MODE="IMAGE"
+            TARGET="docker-archive:$TARGET"
+        elif [ "$FORCE_FIRMWARE" = "true" ] || is_firmware "$TARGET"; then
             MODE="FIRMWARE"
         elif is_model_file "$TARGET"; then
             # Reading a weight file with the binary scanner finds nothing, so
