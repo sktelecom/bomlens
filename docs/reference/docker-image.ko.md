@@ -44,6 +44,46 @@ docker pull ghcr.io/sktelecom/bomlens:latest
 
 모든 이미지에는 NVD CPE 인덱스(`cpe_match.sqlite`, 약 146 MB)도 들어 있으며, 이미지를 빌드할 때 NVD 데이터로 만듭니다. 펌웨어, 루트 파일시스템, 바이너리 스캔에서 `--security`를 켜면 패키지 PURL이 없는 컴포넌트의 CPE를 네트워크 없이 이 인덱스와 대조합니다([CVE 대조 방식](../guides/firmware.ko.md#cve-대조-방식) 참고). 인덱스를 만들 때 GitHub에서 NVD 데이터 피드를 복제합니다. GitHub에 접속할 수 없는 환경에서 이미지를 직접 빌드하면 빌드가 이 단계에서 멈추고 `--build-arg SBOM_CPE_INDEX=false`를 안내하며, 이 옵션으로 인덱스를 뺄 수 있습니다. 펌웨어 빌드는 이 옵션을 받지 않으므로 펌웨어 이미지에는 항상 인덱스가 들어갑니다.
 
+## 이미지가 디스크를 얼마나 차지하나요?
+
+스캐너 이미지 `ghcr.io/sktelecom/bomlens`는 압축을 풀면 디스크에서 약 1.4GB입니다. 소스 스캔은 여기에 프로젝트 언어용 이미지를 하나 더 받는데, 이쪽이 훨씬 큽니다. 아래 크기는 `docker/lib/image-sizes.json`에 기록된 cdxgen 태그로 측정한, 디스크에서 차지하는 크기입니다.
+
+| 이미지 | 쓰이는 곳 | 디스크 크기 |
+|--------|-----------|-------------|
+| `bomlens` | 모든 스캔 | 약 1.4GB |
+| `cdxgen-alpine-node24` | Node.js | 약 2.9GB |
+| `cdxgen-debian-golang124` | Go | 약 3.8GB |
+| `cdxgen-java17` | Java 17 toolchain을 쓰는 Java | 약 3.8GB |
+| `cdxgen-debian-rust` | Rust | 약 4.0GB |
+| `cdxgen-debian-ruby34` | Ruby | 약 4.2GB |
+| `cdxgen-debian-php84` | PHP | 약 4.3GB |
+| `cdxgen-python312` | Python | 약 4.9GB |
+| `cdxgen-temurin-java21` | Java(기본) | 약 5.6GB |
+| `bomlens-android-sdk<API>` | Android, 직접 빌드, API 레벨마다 하나 | 약 6.3GB |
+| `cdxgen-debian-dotnet9` | .NET | 약 14.7GB |
+| `cdxgen` | 여러 언어가 섞인 트리 | 약 16GB |
+
+Swift 이미지와 선택형 이미지(`bomlens-firmware`, `bomlens-aibom`, `bomlens-deep-cve`)는 크기가 기록되어 있지 않아 표에 없습니다. AI 모델 스캔은 약 3.5GB를 받습니다([AI 모델 SBOM](../guides/ai-model.ko.md)).
+
+`scan-sbom.sh`는 이미지를 받기 전에 크기를 출력하고, Docker 엔진의 여유 공간이 그 크기에 2GB를 더한 값보다 적으면 여유 공간, 내려받을 크기, 정리 방법을 알리며 멈춥니다. 웹 UI는 경고만 합니다. `BOMLENS_SKIP_DISK_CHECK=1`을 지정하면 이 점검을 건너뜁니다. 여유 공간을 읽지 못하면 경고만 하고 스캔을 계속합니다. `scripts/check-setup.sh`(Windows는 `check-setup.bat`)는 이 컴퓨터의 BomLens 이미지와 크기, 합계, 엔진의 여유 공간을 보여 줍니다.
+
+### 디스크 공간은 어떻게 비우나요?
+
+BomLens가 받은 이미지만 이름으로 골라 지우면 다른 이미지는 그대로 남습니다.
+
+```bash
+docker image ls --format '{{.Repository}}:{{.Tag}}' \
+  | grep -E '^ghcr\.io/(cdxgen/|sktelecom/)|^bomlens-android-sdk' \
+  | xargs docker image rm
+```
+
+`docker image prune -a`는 BomLens 이미지만이 아니라 컨테이너가 쓰지 않는 이미지를 모두 지웁니다. 지운 이미지는 스캔에 필요해지면 다시 받습니다. 스캔 결과는 건드리지 않습니다.
+
+Docker 안에서 이미지를 지워도 엔진의 디스크 파일 크기는 줄지 않아 컴퓨터에 공간이 돌아오지 않을 때가 있습니다. 그럴 때는 디스크를 압축하세요.
+
+- Docker Desktop과 Rancher Desktop: Settings > Resources에서 디스크 크기를 늘리거나 디스크를 압축합니다. Windows에서 엔진의 디스크는 `.vhdx` 파일이며(Rancher Desktop은 `%LOCALAPPDATA%\rancher-desktop\distro-data` 아래 `ext4.vhdx`), 앱을 닫고 관리자 권한으로 `Optimize-VHD`나 `diskpart`로 압축할 수 있습니다.
+- Colima: `colima ssh -- sudo fstrim -av`.
+
 ## 직접 실행
 
 분석 모드는 환경 변수 `MODE`로 지정합니다. 모든 예시는 산출물을 현재 디렉터리에 남기고 업로드는 하지 않습니다(`UPLOAD_ENABLED=false`).

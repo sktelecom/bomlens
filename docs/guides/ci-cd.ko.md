@@ -155,6 +155,17 @@ jobs:
 
 `${GITHUB_REF_NAME#v}`는 태그 `v2.1.0`을 `2.1.0`으로 바꾸며, 자체 `version`이 없는 `first-party` 구성요소가 이 값을 씁니다. `--components`로 파일을 명시했지만, 옵션이 없어도 저장소 루트의 `sbom-declared.cdx.json`은 읽습니다. `--license`에는 SPDX 식별자를 줍니다.
 
+## 러너에는 무엇이 있어야 하나요?
+
+CI 러너는 이미지도 인증 정보도 없는 상태로 시작하므로, 개발자 컴퓨터에는 이미 있는 몇 가지를 따로 준비해야 합니다.
+
+- 디스크 공간. 새 러너에서 처음 스캔하면 스캐너 이미지(디스크에서 약 1.4GB)와 언어별 이미지(3~16GB, [크기](../reference/docker-image.ko.md#이미지가-디스크를-얼마나-차지하나요))를 받습니다. 엔진의 여유 공간이 그 크기에 2GB를 더한 값보다 적으면 스크립트는 받기 전에 멈추며, 종료 코드는 1이고 로그에 수치가 남습니다. `BOMLENS_SKIP_DISK_CHECK=1`로 점검을 끄기보다 러너의 공간을 비우거나 이미지를 캐시하세요. 이 변수는 러너 유형에서 여유 공간을 정확히 읽지 못할 때만 지정합니다.
+- 사내 저장소. Maven과 Gradle은 노트북에서와 같은 파일, 곧 러너 홈 폴더에서 인증 정보를 읽습니다. 스캔 전 단계에서 CI 시크릿으로 `~/.m2/settings.xml`(또는 `~/.gradle/gradle.properties`)을 만들어 두면 BomLens가 이를 읽기 전용으로 스캔에 넘깁니다. [자세한 내용과 확인할 점](java-maven.ko.md#사내-저장소도-되나요)을 보세요.
+- HTTPS를 다시 서명하는 프록시. `SBOM_EXTRA_CA_CERTS`에 사내 CA의 PEM 파일을 지정합니다. `HTTP_PROXY`, `HTTPS_PROXY`, `NO_PROXY`는 같은 이름으로 전달됩니다.
+- `pom.xml`과 `build.gradle`이 함께 있는 폴더. `--build-tool maven`을 주거나 `BOMLENS_BUILD_TOOL=maven`을 지정하지 않으면 Gradle로 읽습니다. 실행마다 같은 결과를 얻으려면 CI에서 도구를 고정하세요.
+- `--target` 오타. 없는 경로(`.`, `/`, `~`, 드라이브 문자로 시작하는 것)는 이미지 이름으로 해석되지 않고 종료 코드 1로 끝나므로, 폴더를 잘못 적은 파이프라인은 실패합니다.
+- 오래 걸리는 빌드. 몇 분 걸리는 단계는 1분마다 `Still running` 줄을 출력하므로, CI 로그가 조용해도 멈춘 것은 아닙니다. 출력이 없는 시간이 길면 작업을 끊는 러너에서도 이 줄이 도움이 됩니다.
+
 ## 러너에 Docker가 없을 때
 
 `scan-sbom.sh`는 컨테이너를 띄우므로 Docker 엔진이 필요합니다. 엔진이 없는 러너(쿠버네티스 러너, `docker:dind`를 쓰지 않는 GitLab 작업)에서는 위 예시를 쓸 수 없습니다. 이때는 스캐너 이미지를 작업 이미지로 그대로 씁니다. lock 파일이 트리 전체를 덮으면(`package-lock.json`, `npm-shrinkwrap.json`, `pnpm-lock.yaml`, `bun.lock`, `gradle.lockfile` 중 하나이고 루트 아래 다른 매니페스트가 없을 때) 이미지 안의 소스 스캔은 Docker 소켓 없이 lock 파일을 그대로 읽고, 빠진 라이선스는 패키지 레지스트리에서 채웁니다. 그런 lock 파일이 없는 트리는 syft가 매니페스트를 읽어 직접 의존성만 나오므로(의존성을 선언했는데 lock 파일이 없는 Node 프로젝트는 안내와 함께 거부됩니다) lock 파일을 커밋하거나 Docker가 있는 러너를 쓰세요.

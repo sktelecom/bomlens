@@ -44,6 +44,46 @@ Tool versions are pinned with `ARG` in `docker/Dockerfile`.
 
 Every image also carries the NVD CPE index (`cpe_match.sqlite`, about 146 MB), built from the NVD data when the image is built. Firmware, root filesystem and binary scans with `--security` match the CPEs of components that have no package PURL against it, with no network (see [How CVEs are matched](../guides/firmware.md#how-cves-are-matched)). Building it clones the NVD data feeds from GitHub. When you build an image yourself where GitHub is not reachable, the build stops at that step and names `--build-arg SBOM_CPE_INDEX=false`, which leaves the index out; a firmware build does not accept it, so the firmware image always has the index.
 
+## How much disk do the images take?
+
+The scanner image `ghcr.io/sktelecom/bomlens` takes about 1.4 GB on disk once unpacked. A source scan then downloads one more image for the project's language, and these are much larger. The sizes below are what each image takes on disk, measured with the cdxgen tag recorded in `docker/lib/image-sizes.json`.
+
+| Image | Used for | Size on disk |
+|-------|----------|--------------|
+| `bomlens` | every scan | about 1.4 GB |
+| `cdxgen-alpine-node24` | Node.js | about 2.9 GB |
+| `cdxgen-debian-golang124` | Go | about 3.8 GB |
+| `cdxgen-java17` | Java with a Java 17 toolchain | about 3.8 GB |
+| `cdxgen-debian-rust` | Rust | about 4.0 GB |
+| `cdxgen-debian-ruby34` | Ruby | about 4.2 GB |
+| `cdxgen-debian-php84` | PHP | about 4.3 GB |
+| `cdxgen-python312` | Python | about 4.9 GB |
+| `cdxgen-temurin-java21` | Java (default) | about 5.6 GB |
+| `bomlens-android-sdk<API>` | Android, built locally, one per API level | about 6.3 GB |
+| `cdxgen-debian-dotnet9` | .NET | about 14.7 GB |
+| `cdxgen` | a tree that mixes languages | about 16 GB |
+
+The Swift image and the opt-in images (`bomlens-firmware`, `bomlens-aibom`, `bomlens-deep-cve`) are not in this table because no size is recorded for them. An AI model scan downloads about 3.5 GB ([AI model SBOM](../guides/ai-model.md)).
+
+Before it downloads an image, `scan-sbom.sh` prints the size and stops when the Docker engine has less free than that size plus 2 GB, naming the free space, the download size and how to clean up. The web UI only warns. `BOMLENS_SKIP_DISK_CHECK=1` skips the check. Free space that cannot be read gives a warning and the scan goes on. `scripts/check-setup.sh` (and `check-setup.bat`) lists the BomLens images on the machine with their sizes, their total and the engine's free space.
+
+### How do I free the space?
+
+Remove only the images BomLens downloaded, by name, so your other images stay:
+
+```bash
+docker image ls --format '{{.Repository}}:{{.Tag}}' \
+  | grep -E '^ghcr\.io/(cdxgen/|sktelecom/)|^bomlens-android-sdk' \
+  | xargs docker image rm
+```
+
+`docker image prune -a` removes every image no container uses, not only BomLens's. The images are downloaded again when a scan needs them. Scan results are not touched.
+
+Deleting images inside Docker does not always give the space back to the computer, because the engine's disk file keeps its size. Compact it afterwards:
+
+- Docker Desktop and Rancher Desktop: raise the disk size in Settings > Resources, or compact the disk. On Windows the engine's disk is a `.vhdx` file (Rancher Desktop keeps `ext4.vhdx` under `%LOCALAPPDATA%\rancher-desktop\distro-data`) that `Optimize-VHD` or `diskpart` can compact, with the app closed and administrator rights.
+- Colima: `colima ssh -- sudo fstrim -av`.
+
 ## Running directly
 
 Select the analysis mode with the `MODE` environment variable. All examples below leave their outputs in the current directory and do not upload anything (`UPLOAD_ENABLED=false`).

@@ -156,6 +156,17 @@ jobs:
 
 `${GITHUB_REF_NAME#v}` turns the tag `v2.1.0` into `2.1.0`, which a `first-party` component without its own `version` takes. `--components` names the file explicitly; without it, `sbom-declared.cdx.json` at the repository root is read anyway. `--license` takes an SPDX identifier.
 
+## What should the runner provide?
+
+A CI runner starts with no images and no credentials, so a few things that are already in place on a developer's computer have to be provided.
+
+- Disk space. The first scan on a fresh runner downloads the scanner image (about 1.4 GB on disk) and a language image (3 to 16 GB, [sizes](../reference/docker-image.md#how-much-disk-do-the-images-take)). The script stops before the download when the engine has less free than that plus 2 GB, and a stop is an exit 1 with the numbers in the log. Free space on the runner, or cache the images, rather than turning the check off with `BOMLENS_SKIP_DISK_CHECK=1`; set it only when the free space cannot be read correctly on your runner type.
+- A private repository. Maven and Gradle read their credentials from the runner's home folder, the same files as on a laptop. Write `~/.m2/settings.xml` (or `~/.gradle/gradle.properties`) from a CI secret in a step before the scan, and BomLens passes it into the scan read-only. [Details and checks](java-maven.md#does-my-private-repository-work).
+- A proxy that re-signs HTTPS. Set `SBOM_EXTRA_CA_CERTS` to the PEM file of the company CA. `HTTP_PROXY`, `HTTPS_PROXY` and `NO_PROXY` are passed on by name.
+- A folder with both `pom.xml` and `build.gradle`. It is read as Gradle unless you pass `--build-tool maven` or set `BOMLENS_BUILD_TOOL=maven`, so pin the tool in CI to get the same result on every run.
+- A typo in `--target`. A path that does not exist (one that starts with `.`, `/`, `~` or a drive letter) exits 1 instead of being read as an image name, so a pipeline with a wrong folder fails.
+- Long builds. A step that takes minutes prints `Still running` once a minute, so a CI log that goes quiet is not a hang. A runner that kills jobs after a period without output is satisfied by it.
+
 ## When the runner has no Docker
 
 `scan-sbom.sh` starts containers, so it needs a Docker engine: a runner without one (a Kubernetes runner, a GitLab job without `docker:dind`) cannot use the examples above. Run the scanner image itself as the job image instead. A source scan inside it needs no Docker socket when a lock file covers the whole tree (a `package-lock.json`, `npm-shrinkwrap.json`, `pnpm-lock.yaml`, `bun.lock` or `gradle.lockfile`, with no other manifest below the root): it reads the lock file as it is and fills the licenses it lacks from the package registry. A tree without such a lock file is read by syft from its manifests, which gives direct dependencies only (a Node project with none is refused with guidance), so commit a lock file or use a runner that has Docker.
