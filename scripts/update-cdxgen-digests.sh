@@ -6,6 +6,10 @@
 # cdxgen image tag in docker/lib/source-detect.sh (CDXGEN_TAG). Reads each
 # image's multi-platform index digest from ghcr.io; nothing is pulled. Run it
 # after bumping CDXGEN_TAG, and commit the result with the bump.
+#
+# The download sizes in docker/lib/image-sizes.json were measured with one tag
+# and change when it does: after a bump, measure the images again (docker image
+# ls) and update that file. The last lines of this script remind you.
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 MAP="$ROOT/docker/lib/cdxgen-images.json"
@@ -26,3 +30,4 @@ for img in $(jq -r '.digests | keys[]' "$MAP"); do
 done
 mv "$tmp" "$MAP"
 trap - EXIT
+echo "Reminder: the image sizes in docker/lib/image-sizes.json were measured with an earlier tag; measure again (docker image ls) and update them in the same commit."

@@ -901,6 +901,10 @@ Environment:
                          the background, bounded; an absent one is pulled as
                          usual. always: block and re-pull every run. never:
                          touch no network; fail if the image is absent
+  BOMLENS_SKIP_DISK_CHECK
+                         Set to 1 to skip the free-disk check before an image
+                         download (default: stop when the Docker engine has
+                         less free than the image's size plus 2 GB)
   SBOM_SCANNER_IMAGE     Override the scanner image
   CDXGEN_IMAGE_PREFIX    Where the cdxgen images come from (language and
                          all-in-one), everything before the image name (default
@@ -1162,6 +1166,34 @@ preflight_image_pull() {
     echo "[INFO] First use of $img: downloading it now (a few minutes; progress below)."
     echo "[INFO] 처음 쓰는 이미지($img)를 내려받습니다. 몇 분 걸릴 수 있으며 진행 상황이 아래에 표시됩니다."
     _pull_optin "$img" || true
+}
+
+# preflight_disk_check <image>...: before the first download, say how much disk
+# the images not here yet take and stop when the engine has less free than that
+# plus 2 GB (disk_check_verdict, source-detect.sh). Free space that cannot be
+# measured only warns. BOMLENS_SKIP_DISK_CHECK=1 skips the stop and the warning.
+preflight_disk_check() {
+    local img rc=0 need_gb free_gb line
+    [ "$SBOM_PULL" = "never" ] && return 0
+    for img in "$@"; do
+        docker image inspect "$img" >/dev/null 2>&1 && continue
+        image_size_note "$img"
+    done
+    disk_check_verdict "$@" || rc=$?
+    need_gb="$(_mb_as_gb "${DISK_NEED_MB:-0}")"
+    case "$rc" in
+        1)
+            free_gb="$(_mb_as_gb "$DISK_FREE_MB")"
+            log_error "Not enough free disk space in the Docker engine: $free_gb GB free, but this scan downloads about $need_gb GB and needs 2 GB more to work in. Nothing was downloaded."
+            log_error "Docker 엔진의 디스크 여유가 부족합니다: 여유 ${free_gb}GB, 이 스캔은 약 ${need_gb}GB를 내려받고 작업 공간 2GB가 더 필요합니다. 아무것도 내려받지 않았습니다."
+            disk_cleanup_hint | while IFS= read -r line; do printf '%s\n' "$line" >&2; done
+            log_error "To scan anyway, set BOMLENS_SKIP_DISK_CHECK=1. / 그래도 스캔하려면 BOMLENS_SKIP_DISK_CHECK=1 을 지정하세요."
+            exit 1 ;;
+        2)
+            log_warn "Could not read the free disk space of the Docker engine; this scan downloads about $need_gb GB. Make sure there is room, or the download fails part way."
+            log_warn "Docker 엔진의 디스크 여유를 읽지 못했습니다. 이 스캔은 약 ${need_gb}GB를 내려받으니 공간을 확인하세요. 모자라면 내려받는 도중 실패합니다." ;;
+    esac
+    return 0
 }
 
 # preflight_scan_paths <image> <input dir> <output dir>: stop before the scan
@@ -3440,7 +3472,7 @@ if [ "$MODE" = "SOURCE" ]; then
         if [ "$LANG_DET" = "mixed" ]; then java_mixed_note "$SCAN_INPUT_DIR"; fi
         if [ "$LANG_DET" = "swift" ]; then
             echo "[INFO] iOS/Swift: SPM (Package.resolved) and CocoaPods (Podfile.lock) are read from the committed lockfiles; commit them for a complete result."
-            log_warn "  UIKit platform and Xcode-driven dependencies require macOS and are NOT resolved in this Linux container."
+            log_warn "  Dependencies that come from the Apple platform (UIKit, Foundation) or from Xcode project settings are not resolved here: this scan runs in a Linux container. They are missing from the result, not zero."
         fi
         if [ "$LANG_DET" = "cpp" ]; then
             log_warn "C/C++: dependencies resolve only via a package manager (Conan/vcpkg)."
@@ -3462,6 +3494,11 @@ if [ "$MODE" = "SOURCE" ]; then
         if [ "$DEEP_CVE" != "true" ] && [ "$DEEP_LICENSE" != "true" ]; then
             ensure_image_fresh "$POSTPROCESS_IMAGE"
         fi
+    fi
+    if [ "$_pf_img" = "$POSTPROCESS_IMAGE" ]; then
+        preflight_disk_check "$_pf_img"
+    else
+        preflight_disk_check "$_pf_img" "$POSTPROCESS_IMAGE"
     fi
     preflight_image_pull "$_pf_img"
     preflight_scan_paths "$_pf_img" "$SCAN_INPUT_DIR" "$OUTPUT_HOST_DIR"
@@ -3716,7 +3753,11 @@ if [ "$MODE" = "SOURCE" ]; then
             cdxgen-unavailable)
                 log_warn "cdxgen could not be started in its image (rc=$STAGE1_RC, command not found); see $STAGE1_LOG. Falling back to a manifest-only scan (direct dependencies only)." ;;
             *)
-                log_warn "cdxgen failed processing the dependency data (rc=$STAGE1_RC); see $STAGE1_LOG for the full log. Falling back to a manifest-only scan (direct dependencies only)." ;;
+                if [ "$STAGE1_RC" -eq 0 ]; then
+                    log_warn "cdxgen finished (exit 0) but wrote no SBOM; see $STAGE1_LOG for the full log. Falling back to a manifest-only scan (direct dependencies only)."
+                else
+                    log_warn "cdxgen failed processing the dependency data (rc=$STAGE1_RC); see $STAGE1_LOG for the full log. Falling back to a manifest-only scan (direct dependencies only)."
+                fi ;;
         esac
         "${DOCKER_ENV[@]}" docker rm -f "$STAGE1_CONTAINER" >/dev/null 2>&1
         rm -f "$OUTPUT_HOST_DIR/$OUTPUT_FILE"
