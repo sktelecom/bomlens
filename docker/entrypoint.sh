@@ -974,15 +974,29 @@ case "$SCAN_MODE" in
         if [ "$_static_ok" = "true" ]; then
             :
         elif [ -S /var/run/docker.sock ] && command -v docker >/dev/null 2>&1 && [ -n "$SOURCE_ROOT_HOST" ]; then
-            # Best-effort low-disk warning: cdxgen pulls/extracts a language image
-            # via the host Docker, which fails if space is tight. We only see this
-            # container's view of the disk (on Docker Desktop it shares the VM
-            # volume), so this is a hint, not a guarantee — the reliable signal is
-            # the out-of-disk detection inside generate_sbom_cdxgen.
-            avail_mb=$(df -Pk "$SRC_ROOT" 2>/dev/null | awk 'NR==2 {print int($4/1024)}')
-            if [ -n "$avail_mb" ] && [ "$avail_mb" -lt 2048 ]; then
-                echo "[WARN] Low disk space (~${avail_mb} MB) — cdxgen may fail to pull its language image; consider 'docker system prune'."
+            # Best-effort low-disk warning for the language image about to be
+            # downloaded: the same size table, free-space measurement and
+            # threshold (image size + 2 GB) as the CLI's check, but only a
+            # warning here, because the scan continues without the image
+            # (syft fallback). The reliable signal stays the out-of-disk
+            # detection inside generate_sbom_cdxgen. BOMLENS_SKIP_DISK_CHECK=1
+            # turns it off.
+            _disk_lang=$(detect_lang "$SRC_ROOT")
+            if [ "$_disk_lang" = "android" ]; then
+                _disk_img="${ANDROID_IMAGE_PREFIX}$(android_api "$SRC_ROOT"):latest"
+            else
+                _disk_img=$(img_for_lang "$_disk_lang" "$SRC_ROOT")
             fi
+            if ! docker image inspect "$_disk_img" >/dev/null 2>&1; then
+                image_size_note "$_disk_img"
+                _disk_rc=0
+                disk_check_verdict "$_disk_img" || _disk_rc=$?
+                case "$_disk_rc" in
+                    1) echo "[WARN] Low disk space: ${DISK_FREE_MB} MB free in the Docker engine, but $_disk_img needs about ${DISK_NEED_MB} MB plus 2 GB to work in; the download may fail. Free space with 'docker image prune -a', or set BOMLENS_SKIP_DISK_CHECK=1 to silence this." ;;
+                    2) echo "[WARN] Could not read the free disk space of the Docker engine; $_disk_img needs about ${DISK_NEED_MB} MB." ;;
+                esac
+            fi
+            unset _disk_lang _disk_img _disk_rc
             echo "[1/2] cdxgen: source dir $SRC_ROOT (transitive resolution)"
             if ! generate_sbom_cdxgen "$SRC_ROOT" "$OUTPUT_FILE"; then
                 # No Android SDK image: a manifest-only scan of a Gradle Android

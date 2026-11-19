@@ -1474,9 +1474,122 @@ android_sdk_image_missing() {
     echo "        terms bar redistribution), so build it once and scan again:"
     echo "          docker build --build-arg ANDROID_API=$api$pfx -t $img $ctx"
     echo "        Building it means accepting https://developer.android.com/studio/terms"
+    echo "        The finished image takes about $(_mb_as_gb "$(image_size_mb bomlens-android-sdk || echo 6300)") GB of disk."
     echo "        An image built elsewhere works too: set ANDROID_IMAGE_PREFIX."
     echo "[ERROR] $ANDROID_SDK_IMAGE_MISSING_CODE: 안드로이드 SDK 이미지가 없어 스캔을 시작하지 않았습니다: $img"
     echo "        SDK 약관상 배포할 수 없는 이미지입니다. 한 번 직접 만든 뒤 다시 스캔하세요:"
     echo "          docker build --build-arg ANDROID_API=$api$pfx -t $img $ctx"
     echo "        이미지를 만들면 https://developer.android.com/studio/terms 약관에 동의하는 것입니다."
+    echo "        만든 이미지는 디스크를 약 $(_mb_as_gb "$(image_size_mb bomlens-android-sdk || echo 6300)")GB 차지합니다."
+}
+
+# ---------------------------------------------------------------------------
+# Image sizes and free disk space in the container engine.
+#
+# A first scan downloads an image of 3 to 16 GB (docker/lib/image-sizes.json),
+# and an engine whose disk is full used to fail after minutes of downloading.
+# image_size_note says what is about to be downloaded; disk_check_verdict
+# compares it with the free space the engine reports. The CLI (scan-sbom.sh)
+# stops before downloading when the space is short, the web UI path
+# (entrypoint.sh) warns, and BOMLENS_SKIP_DISK_CHECK=1 turns both checks off.
+# ---------------------------------------------------------------------------
+DISK_MARGIN_MB=2048   # room left for the scan itself after the download
+
+# image_size_mb <image>: the expected on-disk size in MB of an image listed in
+# image-sizes.json, matched by its name alone (registry, path, tag and digest
+# do not matter, so a mirror finds it too). Prints nothing, returns 1, when the
+# image is not listed.
+image_size_mb() {
+    local name="${1%%@*}" f v
+    name="${name##*/}"; name="${name%%:*}"
+    case "$name" in
+        bomlens-android-sdk[0-9]*) name="bomlens-android-sdk" ;;
+        sbom-generator|sbom-scanner) name="bomlens" ;;
+    esac
+    case "$name" in ''|*[!a-z0-9-]*) return 1 ;; esac
+    f="$(dirname "${BASH_SOURCE[0]}")/image-sizes.json"
+    [ -f "$f" ] || return 1
+    v="$(sed -n "s/^[[:space:]]*\"$name\":[[:space:]]*\([0-9][0-9]*\).*/\1/p" "$f" | head -n 1)"
+    [ -n "$v" ] || return 1
+    echo "$v"
+}
+
+# _mb_as_gb <mb>: 14700 -> 14.7
+_mb_as_gb() {
+    awk -v m="$1" 'BEGIN { printf "%.1f", m / 1000 }'
+}
+
+# image_size_note <image>: two [INFO] lines (English, Korean) saying how much
+# disk the image takes. Prints nothing for an image with no recorded size.
+image_size_note() {
+    local mb gb
+    mb="$(image_size_mb "$1")" || return 0
+    gb="$(_mb_as_gb "$mb")"
+    echo "[INFO] $1 takes about $gb GB of disk once downloaded."
+    echo "[INFO] $1 이미지는 내려받으면 디스크를 약 ${gb}GB 차지합니다."
+}
+
+# _engine_docker <args>: docker, through DOCKER_ENV where scan-sbom.sh defines it.
+_engine_docker() {
+    if declare -p DOCKER_ENV >/dev/null 2>&1 && [ "${#DOCKER_ENV[@]}" -gt 0 ]; then
+        "${DOCKER_ENV[@]}" docker "$@"
+    else
+        docker "$@"
+    fi
+}
+
+# engine_free_mb [<probe image>]: free space, in MB, on the disk the container
+# engine stores images on. The root of a short container shows that disk (on
+# Docker Desktop, Rancher Desktop and Colima the disk of the engine's VM, not
+# the host's). The probe image is the one given when it is here, otherwise any
+# image already here; with none, or one without df, the value is unknown and
+# the function returns 1 with no output. BOMLENS_FAKE_FREE_MB stands in for the
+# measurement (a test hook).
+engine_free_mb() {
+    local probe="${1:-}" out mb
+    if [ -n "${BOMLENS_FAKE_FREE_MB:-}" ]; then
+        case "$BOMLENS_FAKE_FREE_MB" in *[!0-9]*) return 1 ;; esac
+        echo "$BOMLENS_FAKE_FREE_MB"; return 0
+    fi
+    command -v docker >/dev/null 2>&1 || return 1
+    if [ -z "$probe" ] || ! _engine_docker image inspect "$probe" >/dev/null 2>&1; then
+        probe="$(_engine_docker image ls --format '{{.Repository}}:{{.Tag}}' 2>/dev/null | grep -v '<none>' | head -n 1)"
+    fi
+    [ -n "$probe" ] || return 1
+    out="$(_engine_docker run --rm --pull never --entrypoint df "$probe" -Pm / 2>/dev/null)" || return 1
+    mb="$(printf '%s\n' "$out" | tr -d '\r' | awk 'NR==2 {print $4}')"
+    case "$mb" in ''|*[!0-9]*) return 1 ;; esac
+    echo "$mb"
+}
+
+# disk_check_verdict <image>...: compares the free space with the size of the
+# images in the list that are not here yet, plus DISK_MARGIN_MB. Sets
+# DISK_NEED_MB (those images, without the margin) and DISK_FREE_MB.
+#   0  enough room, nothing to download, no recorded size, or the check is off
+#   1  not enough room
+#   2  the free space could not be measured (DISK_NEED_MB is set)
+# BOMLENS_SKIP_DISK_CHECK=1 turns the check off.
+disk_check_verdict() {
+    local img mb free
+    DISK_NEED_MB=0; DISK_FREE_MB=""
+    [ "${BOMLENS_SKIP_DISK_CHECK:-}" = "1" ] && return 0
+    for img in "$@"; do
+        if _engine_docker image inspect "$img" >/dev/null 2>&1; then continue; fi
+        mb="$(image_size_mb "$img")" || continue
+        DISK_NEED_MB=$((DISK_NEED_MB + mb))
+    done
+    [ "$DISK_NEED_MB" -gt 0 ] || return 0
+    free="$(engine_free_mb "${1:-}")" || return 2
+    # shellcheck disable=SC2034  # read by the callers
+    DISK_FREE_MB="$free"
+    [ "$free" -ge $((DISK_NEED_MB + DISK_MARGIN_MB)) ] || return 1
+    return 0
+}
+
+# disk_cleanup_hint: how to free engine disk, in English then Korean.
+disk_cleanup_hint() {
+    echo "Free space with: docker image prune -a   (removes every image no container uses; images are downloaded again when needed)"
+    echo "Docker Desktop and Rancher Desktop: raise the disk size in Settings > Resources, or compact the disk. Colima: colima ssh -- sudo fstrim -av"
+    echo "공간 확보: docker image prune -a   (쓰지 않는 이미지를 모두 지우며, 필요하면 다시 내려받습니다)"
+    echo "Docker Desktop과 Rancher Desktop은 Settings > Resources에서 디스크 크기를 늘리거나 디스크를 압축하세요. Colima는 colima ssh -- sudo fstrim -av 를 실행하세요."
 }

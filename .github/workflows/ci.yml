@@ -387,6 +387,11 @@ jobs:
       - name: CLI conventions tests
         run: bash tests/test-cli-conventions.sh
 
+      # No Docker (a fake docker answers): the image size notes, the free-disk
+      # check that stops a scan before a download, and check-setup's image list.
+      - name: Disk check tests
+        run: bash tests/test-disk-check.sh
+
       # No Docker: guards the firmware unpack fallback chain and the component
       # merge. An identification that found nothing must report nothing, rather
       # than shipping cve-bin-tool's directory-name placeholder as a component.
