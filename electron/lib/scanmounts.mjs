@@ -38,6 +38,26 @@ export function addScanMounts(current, added) {
   return normalize([...(current ?? []), ...(added ?? [])]);
 }
 
+// 폴더를 더하되 상한 때문에 받지 못한 것을 따로 알려 준다(조용히 버리면 사용자가 왜
+// 안 보이는지 알 수 없다). next는 addScanMounts와 같은 결과이고, added는 이번에 새로
+// 들어간 폴더, dropped는 상한을 넘어 빠진 폴더다. 이미 목록에 있는 폴더는 어느 쪽도 아니다.
+export function planScanMounts(current, added) {
+  const have = normalize(current);
+  const next = normalize([...have, ...(added ?? [])]);
+  const wanted = [];
+  for (const entry of added ?? []) {
+    if (typeof entry !== "string") continue;
+    const dir = entry.trim();
+    if (!dir || /[\n\r\0]/.test(dir) || have.includes(dir) || wanted.includes(dir)) continue;
+    wanted.push(dir);
+  }
+  return {
+    next,
+    added: wanted.filter((d) => next.includes(d)),
+    dropped: wanted.filter((d) => !next.includes(d)),
+  };
+}
+
 // 목록에서 폴더 하나를 뺀다. 반환은 새 배열.
 export function removeScanMount(current, dir) {
   return (current ?? []).filter((d) => d !== dir);

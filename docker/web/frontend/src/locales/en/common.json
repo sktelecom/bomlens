@@ -531,7 +531,8 @@
     "vulnColumnsGroup": "Columns",
     "vulnColumnRows": "{{shown}} of {{total}} rows have a value",
     "vulnRefsMore": "{{count}} more",
-    "vulnSeverityChipHint": "Pick a severity to show only those rows. Pick it again to show all."
+    "vulnSeverityChipHint": "Pick a severity to show only those rows. Pick it again to show all.",
+    "warnSameFolderScan": "Another scan of this folder was still running, so this scan left its working files alone. Two scans of one folder may run at once; if the results look incomplete, scan again after the first one has finished."
   },
   "deps": {
     "loading": "Loading dependencies…",
@@ -1012,7 +1013,8 @@
     "declaredService": "The service named in the AI declaration",
     "componentVersions": "supplied component version filling",
     "upstreamPurl": "upstream source repository purl addition",
-    "matchCpe": "NVD CPE index matching"
+    "matchCpe": "NVD CPE index matching",
+    "gradleWrapperJdk": "Gradle wrapper JDK selection"
   },
   "completeness": {
     "bannerTitle": "Result completeness: {{grade}}",
@@ -1763,6 +1765,8 @@
     "colActions": "Actions",
     "searchChip": "“{{query}}”",
     "noMatchHint": "Try a different search or type.",
+    "cancelled": "Cancelled",
+    "cancelledHint": "The scan was cancelled before it finished, so nothing was kept.",
     "loading": "Loading scans…",
     "keptAfterReinstall": "Results stay in this folder after you remove or reinstall the app."
   },

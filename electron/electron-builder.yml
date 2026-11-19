@@ -70,3 +70,5 @@ mac:
 nsis:
   oneClick: false
   allowToChangeInstallationDirectory: true
+  installerSidebar: build/installerSidebar.bmp
+  uninstallerSidebar: build/uninstallerSidebar.bmp

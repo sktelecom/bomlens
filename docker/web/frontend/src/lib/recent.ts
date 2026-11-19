@@ -73,6 +73,16 @@ export function filterRecent(
  */
 export type ScanType = "ai" | "source" | "firmware" | "container" | "rootfs" | "sbom";
 
+const CANCELLED_TYPE: Record<string, ScanType> = {
+  "docker-image": "container",
+  "firmware-upload": "firmware",
+  "ai-model": "ai",
+  "model-upload": "ai",
+  "ai-declare": "ai",
+  "sbom-upload": "sbom",
+  "scan-target-src": "source",
+};
+
 export function scanType(scan: RecentScan): ScanType {
   if (scan.isAiScan) return "ai";
   // A submitted SBOM is the one case the root component type gets wrong: a
@@ -86,6 +96,9 @@ export function scanType(scan: RecentScan): ScanType {
   // label even though the saved input says exactly what was pointed at — so a
   // folder scan sat in the list as "SBOM" and dropped out of every other filter.
   if (scan.inputSource === "rootfs-dir") return "rootfs";
+  // A cancelled scan wrote no SBOM, so there is no component type to read; what
+  // it was pointed at is all there is.
+  if (scan.cancelled) return CANCELLED_TYPE[scan.inputSource ?? ""] ?? "source";
   switch (scan.componentType) {
     // A model can also be the SBOM's own root component rather than an entry in
     // components[], which is what `isAiScan` reads. Both spellings are the same
@@ -208,12 +221,14 @@ export function scanComparison(
   currentId: string,
 ): ScanComparison | null {
   const current = recent.find((s) => s.id === currentId);
-  // A refused run has no SBOM, so it has nothing to compare and is no baseline.
-  if (!current || current.refused) return null;
+  // A refused or cancelled run has no SBOM, so it has nothing to compare and is
+  // no baseline.
+  if (!current || current.refused || current.cancelled) return null;
   const prev = recent
     .filter(
       (s) =>
         !s.refused &&
+        !s.cancelled &&
         s.id !== currentId &&
         s.project === current.project &&
         s.generatedAt < current.generatedAt,

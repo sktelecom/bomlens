@@ -81,8 +81,16 @@
     };
   }
 
+  // The line under the title. "first" (the scanner image is being downloaded for the
+  // first time) is the only time it may say so: a restart after the folder list changed,
+  // or any later start, has the image already and must not read like a first run.
+  function subtitleKind(state, payload) {
+    return state === "pulling" && !(payload && payload.update === true) ? "first" : "start";
+  }
+
   var api = {
     STEP_IDS: STEP_IDS,
+    subtitleKind: subtitleKind,
     stepStates: stepStates,
     failedStep: failedStep,
     failureKey: failureKey,

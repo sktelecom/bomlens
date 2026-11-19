@@ -50,6 +50,13 @@ describe("summarizeRecent", () => {
 });
 
 describe("scanType / presentTypes", () => {
+  it("types a cancelled scan from what it was pointed at, since it wrote no SBOM", () => {
+    expect(scanType(scan({ cancelled: true, inputSource: "scan-target-src" }))).toBe("source");
+    expect(scanType(scan({ cancelled: true, inputSource: "docker-image" }))).toBe("container");
+    expect(scanType(scan({ cancelled: true, inputSource: "firmware-upload" }))).toBe("firmware");
+    expect(scanType(scan({ cancelled: true, inputSource: null }))).toBe("source");
+  });
+
   it("derives the scan kind from isAiScan then componentType", () => {
     expect(scanType(scan({ isAiScan: true }))).toBe("ai");
     expect(scanType(scan({ componentType: "firmware" }))).toBe("firmware");
@@ -201,6 +208,16 @@ describe("scanComparison", () => {
     ];
     expect(scanComparison(withRefused, "cur")?.prev.id).toBe("prev");
     expect(scanComparison(withRefused, "ref")).toBeNull();
+  });
+
+  it("leaves a cancelled run out of the comparison", () => {
+    const withCancelled = [
+      scan({ id: "cur", components: 13, generatedAt: 300 }),
+      scan({ id: "can", components: 0, generatedAt: 200, cancelled: true }),
+      scan({ id: "prev", components: 10, generatedAt: 100 }),
+    ];
+    expect(scanComparison(withCancelled, "cur")?.prev.id).toBe("prev");
+    expect(scanComparison(withCancelled, "can")).toBeNull();
   });
 
   it("reports a drop and an unchanged severity by rank", () => {

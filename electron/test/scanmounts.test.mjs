@@ -8,6 +8,7 @@ import {
   addScanMounts,
   MAX_SCAN_MOUNTS,
   parseScanMounts,
+  planScanMounts,
   removeScanMount,
 } from "../lib/scanmounts.mjs";
 
@@ -45,4 +46,30 @@ test("removeScanMount removes exactly the given path", () => {
   assert.deepEqual(removeScanMount(["/a", "/b"], "/a"), ["/b"]);
   assert.deepEqual(removeScanMount(["/a"], "/nope"), ["/a"]);
   assert.deepEqual(removeScanMount(null, "/a"), []);
+});
+
+test("planScanMounts reports what the cap kept out instead of dropping it silently", () => {
+  const full = Array.from({ length: MAX_SCAN_MOUNTS - 1 }, (_, i) => `/d${i}`);
+  const plan = planScanMounts(full, ["/new1", "/new2", "/new3"]);
+  assert.equal(plan.next.length, MAX_SCAN_MOUNTS);
+  assert.deepEqual(plan.added, ["/new1"]);
+  assert.deepEqual(plan.dropped, ["/new2", "/new3"]);
+  // The result list is what addScanMounts gives.
+  assert.deepEqual(plan.next, addScanMounts(full, ["/new1", "/new2", "/new3"]));
+});
+
+test("planScanMounts on a full list adds nothing and drops every new folder", () => {
+  const full = Array.from({ length: MAX_SCAN_MOUNTS }, (_, i) => `/d${i}`);
+  const plan = planScanMounts(full, ["/x"]);
+  assert.deepEqual(plan.added, []);
+  assert.deepEqual(plan.dropped, ["/x"]);
+  assert.deepEqual(plan.next, full);
+});
+
+test("planScanMounts ignores folders already listed, blanks, duplicates and unusable names", () => {
+  const plan = planScanMounts(["/a"], ["/a", "  ", "/b", "/b", "/bad\nname", 5]);
+  assert.deepEqual(plan.added, ["/b"]);
+  assert.deepEqual(plan.dropped, []);
+  assert.deepEqual(plan.next, ["/a", "/b"]);
+  assert.deepEqual(planScanMounts(null, null), { next: [], added: [], dropped: [] });
 });

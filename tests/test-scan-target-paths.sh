@@ -335,6 +335,60 @@ else
     fail "launch_is_output for a single mount failed"
 fi
 
+echo "== a cancelled scan leaves a record outside its run folder =="
+if SBOM_OUTPUT_DIR="$WORK/out3" python3 -I - "$ROOT_DIR" "$WORK" <<'PY'
+import os, sys
+sys.path.insert(0, os.path.join(sys.argv[1], "docker", "web"))
+import server
+work = sys.argv[2]
+out = os.path.realpath(os.path.join(work, "out3"))
+os.makedirs(out, exist_ok=True)
+cfg = {"project": "demo", "version": "1.0", "source": "scan-target-src", "sourceLabel": "/h/demo", "token": "SECRET"}
+server.write_cancelled_record("demo_1.0", cfg)
+p = server.cancelled_record_path("demo_1.0")
+assert p and p.startswith(os.path.join(out, ".cancelled") + os.sep) and os.path.isfile(p), p
+assert "SECRET" not in open(p).read()
+rows = server.list_scans()
+r = [x for x in rows if x["id"] == "demo_1.0"]
+assert len(r) == 1 and r[0]["cancelled"] is True and r[0]["project"] == "demo" and r[0]["components"] == 0, rows
+# A finished scan of the same name replaces the cancelled row.
+os.makedirs(os.path.join(out, "demo_1.0"))
+open(os.path.join(out, "demo_1.0", "demo_1.0_bom.json"), "w").write('{"bomFormat":"CycloneDX","metadata":{"component":{"name":"demo","version":"1.0"}},"components":[]}')
+rows = server.list_scans()
+r = [x for x in rows if x["id"] == "demo_1.0"]
+assert len(r) == 1 and not r[0].get("cancelled"), r
+# Ids that could leave the folder have no record path; removal of a record works.
+for bad in ("../x", "a/b", "", "x\x00"):
+    assert server.cancelled_record_path(bad) is None, bad
+server.remove_cancelled_record("demo_1.0")
+assert not os.path.exists(p)
+# A hand-placed record with an unsafe name is not listed.
+os.makedirs(os.path.join(out, ".cancelled"), exist_ok=True)
+open(os.path.join(out, ".cancelled", "bad name.json"), "w").write("{}")
+open(os.path.join(out, ".cancelled", "broken.json"), "w").write("{")
+assert all(x["id"] not in ("bad name", "broken") for x in server.list_scans())
+PY
+then
+    pass "cancelled record: written outside the run folder without secrets, listed as cancelled, replaced by a real scan, removable, ids confined"
+else
+    fail "cancelled record checks failed (see assertion above)"
+fi
+
+echo "== the same-folder warning gets a code =="
+if python3 -I - "$ROOT_DIR" <<'PY'
+import os, sys
+sys.path.insert(0, os.path.join(sys.argv[1], "docker", "web"))
+import server
+line = "[WARN] a previous scan of this folder (bomlens-sib-1174) appears to still be running; not touching its leftovers."
+assert server._SAME_FOLDER_SCAN_RE.search(line)
+assert not server._SAME_FOLDER_SCAN_RE.search("[WARN] no package manifest detected")
+PY
+then
+    pass "the scanner's same-folder note is recognized"
+else
+    fail "same-folder warning pattern failed"
+fi
+
 echo ""
 echo "Results: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]

@@ -118,7 +118,24 @@ fi
 code=$(curl -s -o /dev/null -w '%{http_code}' "$BASE/scan-exists?project=&version=1")
 [ "$code" = "400" ] && pass "/scan-exists needs a project and a version" || fail "/scan-exists without a project answered $code"
 
-rm -rf "$OUT/exist_1.0" "$SCANROOT/proj" "$SCANROOT/multi" "$SCANROOT/escape"
+mkdir -p "$OUT/.cancelled"
+echo '{"project":"gone","version":"2.0","source":"scan-target-src","sourceLabel":"/h/gone","cancelledAt":1700000000}' > "$OUT/.cancelled/gone_2.0.json"
+if curl -fsS "$BASE/scans" 2>/dev/null | python3 -c "
+import sys, json
+rows = [r for r in json.load(sys.stdin) if r['id'] == 'gone_2.0']
+assert len(rows) == 1 and rows[0]['cancelled'] is True and rows[0]['components'] == 0 and rows[0]['project'] == 'gone', rows
+" 2>/dev/null; then
+    pass "/scans lists a cancelled scan from its record, with no run folder"
+else
+    fail "/scans cancelled row missing"
+fi
+curl -fsS -X POST "$BASE/scan-delete?id=gone_2.0" >/dev/null 2>&1
+if [ ! -e "$OUT/.cancelled/gone_2.0.json" ]; then
+    pass "deleting a cancelled row removes its record"
+else
+    fail "cancelled record survived scan-delete"
+fi
+rm -rf "$OUT/exist_1.0" "$OUT/.cancelled" "$SCANROOT/proj" "$SCANROOT/multi" "$SCANROOT/escape"
 
 echo "== sibling docker-run dispatch is allowlist-guarded =="
 # Firmware/AI scans hand the job to a dedicated image via a sibling `docker run`.

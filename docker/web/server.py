@@ -681,6 +681,9 @@ _ERROR_LINE_RE = re.compile(r"^\[ERROR\]")
 # marker ("[ERROR] ANDROID_SDK_IMAGE_MISSING: ..."), for a program that shows
 # its own dialog instead of the text. Only the codes listed here are passed on,
 # so a log line can never put arbitrary text into the `code` field.
+# The scanner's note that another scan of the same folder is still running. It
+# reaches the result screen as a warning with this code in front.
+_SAME_FOLDER_SCAN_RE = re.compile(r"a previous scan of this folder .* appears to still be running")
 KNOWN_ERROR_CODES = ("ANDROID_SDK_IMAGE_MISSING", "SCAN_TARGET_NOT_VISIBLE")
 _ERROR_CODE_RE = re.compile(r"^\[ERROR\]\s+([A-Z][A-Z0-9_]+):")
 _RESPONSE_LINE_RE = re.compile(r"(?i)^response:")
@@ -3662,6 +3665,7 @@ def list_scans():
             # Legacy flat layout: id is the {prefix}.
             add_scan(entry[: -len("_bom.json")], full)
 
+    scans.extend(list_cancelled_scans({s["id"] for s in scans}))
     scans.sort(key=lambda s: s["generatedAt"], reverse=True)
     # Drop any cache slot this walk did not encounter -- a scan removed
     # outside the UI (rm -rf on the output folder) has no /scan-delete call
@@ -5852,6 +5856,106 @@ def folder_signature(run_out):
     return sig
 
 
+# A cancelled scan leaves no run folder (discard_cancelled_run), so the list of
+# scans would not know it ever ran. A one-line record per run id is kept apart,
+# in a dot-prefixed folder of the results folder, so the list can say
+# "cancelled" until the entry is dismissed or the scan is run again.
+CANCELLED_DIR = ".cancelled"
+
+
+def cancelled_record_path(run_id):
+    """OUTPUT_DIR/.cancelled/<run_id>.json, resolved strictly inside the
+    .cancelled folder (id allow-list, then realpath containment), or None."""
+    if not scan_id_ok(run_id):
+        return None
+    out = os.path.realpath(OUTPUT_DIR)
+    base = os.path.realpath(os.path.join(out, CANCELLED_DIR))
+    if not base.startswith(out + os.sep):
+        return None
+    path = os.path.realpath(os.path.join(base, run_id + ".json"))
+    if not path.startswith(base + os.sep):
+        return None
+    return path
+
+
+def write_cancelled_record(run_id, config):
+    """Keep what the list needs to show a cancelled scan: what it was called and
+    where it came from. `config` is the scan configuration, which holds no
+    secrets (see write_scanmeta). Best effort: a failure must not matter."""
+    path = cancelled_record_path(run_id)
+    if path is None:
+        return
+    record = {
+        "project": str(config.get("project") or run_id)[:200],
+        "version": str(config.get("version") or "")[:200],
+        "source": str(config.get("source") or "")[:40],
+        "sourceLabel": str(config.get("sourceLabel") or "")[:500],
+        "cancelledAt": int(time.time()),
+    }
+    try:
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        tmp = path + ".tmp"
+        with open(tmp, "w", encoding="utf-8") as f:
+            json.dump(record, f)
+        os.replace(tmp, path)
+    except OSError:
+        pass
+
+
+def remove_cancelled_record(run_id):
+    path = cancelled_record_path(run_id)
+    if path is None:
+        return
+    try:
+        os.remove(path)
+    except OSError:
+        pass
+
+
+def list_cancelled_scans(known_ids):
+    """Rows for the cancelled scans whose id has no scan of its own in the
+    list (a later run of the same name replaces the record)."""
+    rows = []
+    out = os.path.realpath(OUTPUT_DIR)
+    base = os.path.realpath(os.path.join(out, CANCELLED_DIR))
+    if not base.startswith(out + os.sep) or not os.path.isdir(base):
+        return rows
+    try:
+        names = sorted(os.listdir(base))
+    except OSError:
+        return rows
+    for name in names:
+        if not name.endswith(".json"):
+            continue
+        rid = name[: -len(".json")]
+        if rid in known_ids:
+            continue
+        path = cancelled_record_path(rid)
+        if path is None:
+            continue
+        try:
+            with open(path, encoding="utf-8") as f:
+                rec = json.load(f)
+        except (OSError, ValueError):
+            continue
+        if not isinstance(rec, dict):
+            continue
+        at = rec.get("cancelledAt")
+        rows.append({
+            "id": rid,
+            "project": str(rec.get("project") or rid),
+            "version": str(rec.get("version") or ""),
+            "components": 0,
+            "maxSeverity": None,
+            "isAiScan": False,
+            "componentType": None,
+            "inputSource": rec.get("source") or None,
+            "generatedAt": at if isinstance(at, int) else 0,
+            "cancelled": True,
+        })
+    return rows
+
+
 def discard_cancelled_run(run_out, before):
     """Remove what a cancelled scan wrote into its run folder: every entry that
     is new or changed against `before` (folder_signature taken before the
@@ -6513,6 +6617,7 @@ class Handler(BaseHTTPRequestHandler):
                         removed += 1
                     except OSError:
                         pass
+        remove_cancelled_record(sid)
         with _scans_cache_lock:
             # Keyed by (run_id, bom_path), so both layouts' slots for this id
             # are dropped (harmless if only one ever existed).
@@ -7671,6 +7776,9 @@ class Handler(BaseHTTPRequestHandler):
             if token:
                 _active_upload_tokens.add(token)
         scan_claimed = run_id
+        # A scan of this name is running again: the record of an earlier cancel
+        # of it no longer says anything.
+        remove_cancelled_record(run_id)
         # Route through run_dir so the same path-injection barrier the read side
         # uses (scan_id_ok allowlist + realpath boundary) gates makedirs. run_id
         # already derives from the sanitized project/version, but resolving it
@@ -8649,6 +8757,9 @@ class Handler(BaseHTTPRequestHandler):
                     declared_reasons.append(reason)
                 if isinstance(ln, str) and ln.lstrip().startswith("[WARN]"):
                     text = _mask_credentials(ln.strip())
+                    if _SAME_FOLDER_SCAN_RE.search(text):
+                        # A code the screen can show in the reader's language.
+                        text = "SAME_FOLDER_SCAN_RUNNING: " + text
                     if text not in scan_warnings and len(scan_warnings) < MAX_SCAN_WARNINGS:
                         scan_warnings.append(text)
                 error_tracker.feed(ln)
@@ -8856,6 +8967,8 @@ class Handler(BaseHTTPRequestHandler):
             # the run began go (a scan of the same name that ran before had
             # its files cleared by this run's start already); the rest stay.
             if cancel_state["cancelled"]:
+                write_cancelled_record(
+                    run_id, locals().get("scan_config") or {"project": project, "version": version})
                 discard_cancelled_run(run_out, pre_existing)
             with _scan_lock:
                 _scan_active.discard(scan_claimed)
