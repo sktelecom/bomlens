@@ -168,6 +168,173 @@ else
     fail "entrypoint.sh no longer stops on a missing Android SDK image"
 fi
 
+# A sub-folder of the launch folder (/src) is a deep-scan target too. The launch
+# folder stands in at $WORK/launch; the server's SRC_DIR is pointed there.
+LAUNCH="$WORK/launch"
+mkdir -p "$LAUNCH/proj-a" "$LAUNCH/proj b/inner" "$LAUNCH/proj-c" "$LAUNCH/plain/sub" "$WORK/elsewhere/proj-z" "$WORK/out2"
+echo '<project><groupId>g</groupId><version>2.4.1</version><parent><version>9.9.9</version></parent></project>' > "$LAUNCH/proj-a/pom.xml"
+echo '<project/>' > "$LAUNCH/proj b/pom.xml"
+echo '<project/>' > "$WORK/elsewhere/proj-z/pom.xml"
+echo '{"name":"c","version":"0.3.0-rc.1"}' > "$LAUNCH/proj-c/package.json"
+mkdir -p "$LAUNCH/proj-d"; printf '[package]\nname = "d"\nversion = "1.2.3"\n[dependencies]\nversion = "9"\n' > "$LAUNCH/proj-d/Cargo.toml"
+mkdir -p "$LAUNCH/proj-e"; printf 'group = "x"\nversion = "3.1.0"\n' > "$LAUNCH/proj-e/build.gradle"
+ln -s "$WORK/elsewhere" "$LAUNCH/out-link"
+ln -s "$WORK/elsewhere/proj-z" "$LAUNCH/out-proj-link"
+ln -s "$LAUNCH/proj-a" "$LAUNCH/in-link"
+
+echo "== a sub-folder of the launch folder is a deep-scan target =="
+if SBOM_OUTPUT_DIR="$WORK/out2" python3 -I - "$ROOT_DIR" "$LAUNCH" "$WORK" <<'PY'
+import os, sys
+sys.path.insert(0, os.path.join(sys.argv[1], "docker", "web"))
+import server
+launch, work = sys.argv[2], sys.argv[3]
+server.SRC_DIR = launch
+server.ALLOWED_SCAN_ROOTS = [launch]
+server.EXTRA_SCAN_ROOTS = []
+
+# The sub-folder, by relative or absolute-looking path, resolves to itself.
+for given in ("proj-a", "/proj-a", "proj b/inner"):
+    d = server.safe_scan_dir(given)
+    assert d == os.path.realpath(os.path.join(launch, given.lstrip("/"))), (given, d)
+    src, rel = server.deep_copy_source(d)
+    assert src == d and rel == given.lstrip("/"), (given, src, rel)
+
+# Only that folder is copied: no sibling project comes along.
+d = server.safe_scan_dir("proj-a")
+dest = os.path.join(work, "copy-a")
+server.copy_scan_target_tree(server.deep_copy_source(d)[0], dest)
+assert os.listdir(dest) == ["pom.xml"], os.listdir(dest)
+
+# The launch folder itself is the current-dir input, not this one.
+assert server.deep_copy_source(server.safe_scan_dir("")) is None if server.safe_scan_dir("") else True
+assert server.deep_copy_source(os.path.realpath(launch)) is None
+assert server.launch_scan_subdir(os.path.realpath(launch)) is None
+
+# A link to a place outside the launch folder, or a path through one, is refused.
+for bad in ("out-link", "out-link/proj-z", "out-proj-link", "../elsewhere", "proj-a/../../elsewhere",
+            "/../elsewhere", "proj-a\x00", "nope", "%s/elsewhere/proj-z" % work):
+    assert server.safe_scan_dir(bad) is None, bad
+# Another root that is not registered is refused even by absolute path.
+assert server.safe_scan_dir(os.path.join(work, "elsewhere", "proj-z")) is None
+# A link that stays inside the launch folder resolves to its real place, so the
+# copy source is that real folder and not a link.
+d = server.safe_scan_dir("in-link")
+assert d == os.path.realpath(os.path.join(launch, "proj-a")), d
+assert server.deep_copy_source(d)[1] == "proj-a"
+# The listing lookup does not follow a link in the middle of a path.
+base = os.path.realpath(launch)
+assert server.find_scan_entry(base, "out-link/proj-z") is None
+assert server.find_scan_entry(base, "in-link/x") is None
+assert server.find_scan_entry(base, "../elsewhere") is None
+# A directory that is not a registered root and not under the launch folder.
+assert server.deep_copy_source(os.path.join(work, "elsewhere")) is None
+# The label is the host path the user knows, never a bare container path of another root.
+assert server.scan_source_label("scan-target-src", "proj-a") != ""
+assert server.scan_source_label("scan-target-src", "out-link") == ""
+PY
+then
+    pass "launch sub-folder: resolves, copies only itself; .., links out, other roots and the folder itself are refused"
+else
+    fail "launch sub-folder checks failed (see assertion above)"
+fi
+
+echo "== a sub-folder of an added folder and of the launch folder do not mix =="
+if SBOM_OUTPUT_DIR="$WORK/out2" SBOM_UI_SCAN_ROOTS="$WORK/elsewhere|/host/elsewhere" python3 -I - "$ROOT_DIR" "$LAUNCH" "$WORK" <<'PY'
+import os, sys
+sys.path.insert(0, os.path.join(sys.argv[1], "docker", "web"))
+import server
+launch, work = sys.argv[2], sys.argv[3]
+server.SRC_DIR = launch
+server.ALLOWED_SCAN_ROOTS = [launch] + [r["path"] for r in server.EXTRA_SCAN_ROOTS]
+d = server.safe_scan_dir(os.path.join(work, "elsewhere", "proj-z"))
+assert d, "registered root path must resolve"
+src, rel = server.deep_copy_source(d)
+assert rel == "proj-z" and src == d, (src, rel)
+assert server.picked_scan_root(d) is not None
+# The launch folder's link into the registered root resolves, and is then a
+# sub-folder of that root (its own root), not of the launch folder.
+d2 = server.safe_scan_dir("out-proj-link")
+assert d2 == d, (d2, d)
+assert server.scan_source_label("scan-target-src", "out-proj-link") == "/host/elsewhere/proj-z"
+PY
+then
+    pass "added-folder sub-folders keep their own root; a link into one resolves to it"
+else
+    fail "added-folder versus launch-folder resolution failed (see assertion above)"
+fi
+
+echo "== project_info: version from the manifest, sub-projects of a folder with none =="
+if SBOM_OUTPUT_DIR="$WORK/out2" python3 -I - "$ROOT_DIR" "$LAUNCH" "$WORK" <<'PY'
+import os, sys
+sys.path.insert(0, os.path.join(sys.argv[1], "docker", "web"))
+import server
+launch, work = sys.argv[2], sys.argv[3]
+server.SRC_DIR = launch
+server.ALLOWED_SCAN_ROOTS = [launch]
+def info(rel):
+    return server.project_info(server.safe_scan_dir(rel))
+a = info("proj-a")
+assert a["version"] == "2.4.1" and a["versionFrom"] == "pom.xml" and a["hasManifest"], a   # not the parent's
+assert info("proj-c")["version"] == "0.3.0-rc.1"
+assert info("proj-d")["version"] == "1.2.3", info("proj-d")                                 # [package], not [dependencies]
+assert info("proj-e")["version"] == "3.1.0"
+assert info("proj b")["version"] == "" and info("proj b")["hasManifest"] is True
+# The launch folder has no manifest of its own and holds projects: they are listed.
+top = server.project_info(os.path.realpath(launch))
+assert top["hasManifest"] is False, top
+assert top["subProjects"] == ["proj b", "proj-a", "proj-c", "proj-d", "proj-e"], top["subProjects"]  # links and plain/ left out
+# A folder with its own manifest is one project, however many manifests are below it.
+assert info("proj-a")["subProjects"] == []
+# A manifest that is a link, too large, malformed or carries an odd version gives no version.
+os.makedirs(os.path.join(launch, "odd"), exist_ok=True)
+os.symlink(os.path.join(launch, "proj-a", "pom.xml"), os.path.join(launch, "odd", "pom.xml"))
+assert info("odd")["version"] == "", info("odd")
+open(os.path.join(launch, "odd", "package.json"), "w").write('{"version": "1.0; rm -rf /"}')
+os.remove(os.path.join(launch, "odd", "pom.xml"))
+assert info("odd")["version"] == ""
+open(os.path.join(launch, "odd", "package.json"), "w").write('{"version": ')
+assert info("odd")["version"] == ""
+open(os.path.join(launch, "odd", "package.json"), "w").write("x" * (server._PROJECT_INFO_MAX_BYTES + 1))
+assert info("odd")["version"] == ""
+open(os.path.join(launch, "odd", "pom.xml"), "w").write('<!DOCTYPE p [<!ENTITY a "b">]><project><version>1.0</version></project>')
+assert info("odd")["version"] == ""
+PY
+then
+    pass "project_info reads the version from pom.xml/package.json/build.gradle/Cargo.toml and lists sibling projects; links, big, broken and odd files give nothing"
+else
+    fail "project_info checks failed (see assertion above)"
+fi
+
+echo "== results folder differs from the launch folder =="
+if SBOM_OUTPUT_DIR="$WORK/out2" SBOM_UI_HOST_DIR="/home/u/proj" SBOM_UI_OUTPUT_HOST_DIR="/home/u/sbom-output" \
+   python3 -I - "$ROOT_DIR" "$WORK" <<'PY'
+import os, sys
+sys.path.insert(0, os.path.join(sys.argv[1], "docker", "web"))
+import server
+work = sys.argv[2]
+assert server.output_host_dir() == "/home/u/sbom-output"
+assert server.launch_is_output() is False
+assert server.host_path_of(server.OUTPUT_DIR + "/run1") == "/home/u/sbom-output/run1"
+assert server.host_path_of(server.SRC_DIR + "/a/b") == "/home/u/proj/a/b"
+PY
+then
+    pass "output and launch folders map to their own host paths"
+else
+    fail "output host path mapping failed (see assertion above)"
+fi
+if SBOM_OUTPUT_DIR="$WORK/out2" SBOM_UI_HOST_DIR="/home/u/sbom-output" python3 -I - "$ROOT_DIR" <<'PY'
+import os, sys
+sys.path.insert(0, os.path.join(sys.argv[1], "docker", "web"))
+import server
+assert server.output_host_dir() == "/home/u/sbom-output"
+assert server.launch_is_output() is True
+PY
+then
+    pass "a launcher that mounts one folder as both is reported as launch folder = results folder"
+else
+    fail "launch_is_output for a single mount failed"
+fi
+
 echo ""
 echo "Results: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]

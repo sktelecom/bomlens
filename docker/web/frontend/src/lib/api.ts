@@ -1015,6 +1015,9 @@ export interface ScanParams {
    *  `reachability` flag, which also turns the security report on; omitted
    *  (sent false) where the toggle is hidden. */
   reachability?: boolean;
+  /** Keep a finished scan of the same name: the run folder gets a time suffix
+   *  instead of replacing the earlier one. Read server-side as `timestamp`. */
+  timestamp?: boolean;
   /** Optional upload of the generated SBOM. "" leaves the scan generate-only. */
   uploadTarget?: "" | "dependency-track" | "trusca";
   uploadUrl?: string; // upload server base URL (API_URL)
@@ -1311,6 +1314,11 @@ export interface Capabilities {
   aibomImage?: string;
   deepCveImage?: string;
   hostDir?: string; // the host folder the UI was launched from (mounted as /src)
+  /** The host folder the results are kept in. */
+  outputHostDir?: string;
+  /** The launch folder is the results folder itself (the desktop app mounts one
+   *  folder as both), so it is not a project to scan and is never the default. */
+  launchIsOutput?: boolean;
   /** Extra read-only scan targets from `--ui --mount <dir>`: container path
    *  (sent as the rootfs-dir scan target) + host path (shown to the user). */
   scanRoots?: { path: string; hostPath: string }[];
@@ -1800,6 +1808,59 @@ export async function listScans(): Promise<RecentScan[]> {
   }
 }
 
+/** What a folder says about itself (GET /project-info). */
+export interface ProjectInfo {
+  /** The version the folder's manifest states, "" when it states none. */
+  version: string;
+  /** The manifest the version came from. */
+  versionFrom: string;
+  /** The folder has a manifest of its own. */
+  hasManifest: boolean;
+  /** Sub-folders that are projects of their own, listed only for a folder with
+   *  no manifest: scanning it would merge them into one SBOM. */
+  subProjects: string[];
+}
+
+/** Ask the server what the folder to scan says about itself. The folder is
+ *  resolved server-side; null when it cannot be read or the route is absent. */
+export async function getProjectInfo(
+  source: SourceType,
+  target: string,
+  signal?: AbortSignal,
+): Promise<ProjectInfo | null> {
+  if (IS_STATIC_DEMO) return null;
+  try {
+    const qs = new URLSearchParams({ source, target });
+    const res = await fetch(`/project-info?${qs.toString()}`, { signal });
+    if (!res.ok) return null;
+    const j = (await res.json()) as Partial<ProjectInfo>;
+    return {
+      version: typeof j.version === "string" ? j.version : "",
+      versionFrom: typeof j.versionFrom === "string" ? j.versionFrom : "",
+      hasManifest: j.hasManifest === true,
+      subProjects: Array.isArray(j.subProjects) ? j.subProjects.filter((x) => typeof x === "string") : [],
+    };
+  } catch {
+    return null;
+  }
+}
+
+/** Whether a finished scan of this project and version is already in the
+ *  results, so the form can ask before one replaces it. False on any failure:
+ *  not knowing must not stop a scan. */
+export async function scanExists(project: string, version: string): Promise<boolean> {
+  if (IS_STATIC_DEMO) return false;
+  try {
+    const qs = new URLSearchParams({ project, version });
+    const res = await fetch(`/scan-exists?${qs.toString()}`);
+    if (!res.ok) return false;
+    const j = (await res.json()) as { exists?: boolean };
+    return j.exists === true;
+  } catch {
+    return false;
+  }
+}
+
 /** Delete one past scan by run_id (removes its run folder, or legacy {id}_*). */
 export async function deleteScan(id: string): Promise<boolean> {
   if (IS_STATIC_DEMO) return false; // the demo dataset is fixed; the UI hides this
@@ -1959,6 +2020,7 @@ export function startScan(params: ScanParams, handlers: ScanHandlers): EventSour
     usage: params.usage ?? "",
     deep_cve: String(params.deepCve),
     reachability: String(params.reachability ?? false),
+    timestamp: params.timestamp ? "true" : "",
     upload_target: params.uploadTarget ?? "",
     upload_url: params.uploadUrl ?? "",
     upload_cred: params.uploadCred ?? "",

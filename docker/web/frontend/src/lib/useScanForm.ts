@@ -7,12 +7,14 @@
  * upload, git-cred stash, ANALYZE forcing, vendored gating). UI-only; the
  * components render it.
  */
-import { type Dispatch, type SetStateAction, useEffect, useState } from "react";
+import { type Dispatch, type SetStateAction, useEffect, useRef, useState } from "react";
 
 import {
   CONFORMANCE_PROFILES,
   describeUploadError,
   formSourceOf,
+  getProjectInfo,
+  scanExists,
   stashGitCred,
   uploadFile,
   type Capabilities,
@@ -28,7 +30,14 @@ import {
 import i18n from "@/lib/i18n";
 import { hasOutboundLicenseField } from "@/lib/licenses";
 import { reachabilityOffered } from "@/lib/reachability";
-import { DEFAULT_VERSION, parseSbomIdentity, suggestIdentity } from "@/lib/scanDefaults";
+import {
+  type FolderInfo,
+  mergedProjects,
+  parseSbomIdentity,
+  pickVersion,
+  suggestIdentity,
+} from "@/lib/scanDefaults";
+import { chooseInitialRoot, rememberScanRoot } from "@/lib/scanTargetMemory";
 
 export const UPLOAD_KIND: Partial<Record<SourceType, UploadKind>> = {
   "zip-upload": "zip",
@@ -105,6 +114,13 @@ const FIELD_ORDER: Array<keyof FieldErrors> = [
   "project", "version", "target", "gitRef", "exclude", "file", "uploadUrl", "uploadToken", "truscaProjectId",
 ];
 
+/** What the form asks before a scan starts: sub-projects that would be merged
+ *  into one SBOM, and a finished scan of the same name that would be replaced. */
+export interface StartConfirm {
+  merged: string[];
+  overwrite: boolean;
+}
+
 export interface OptionToggle {
   key: string;
   value: boolean;
@@ -142,9 +158,20 @@ export function useScanForm({
   // offers (the folder that was picked), so the seeded form is one the user can
   // see, edit and submit.
   const [source, setSource] = useState<SourceType>(() =>
-    initialConfig ? formSourceOf(initialConfig.source) : "current-dir",
+    initialConfig
+      ? formSourceOf(initialConfig.source)
+      : capabilities.launchIsOutput
+        ? "rootfs-dir"
+        : "current-dir",
   );
   const [target, setTargetRaw] = useState(() => initialConfig?.target ?? "");
+  // Set once the user picks a source or a folder, so the defaults that depend on
+  // what the server reports never override a choice.
+  const userChoseRef = useRef(Boolean(initialConfig));
+  // A question waiting for an answer before the scan starts.
+  const [confirm, setConfirm] = useState<StartConfirm | null>(null);
+  // What the folder to scan says about itself (its version, projects inside it).
+  const [projectInfo, setProjectInfo] = useState<FolderInfo | null>(null);
   // Extra --mount scan targets (capabilities.scanRoots): the rootfs-dir input
   // offers them as base locations. "" = the /src launch folder (classic
   // behavior). A re-scan seeds the *full* container path into `target`
@@ -235,6 +262,8 @@ export function useScanForm({
   const [errors, setErrors] = useState<FieldErrors>({});
   const [uploadError, setUploadError] = useState<UploadErrorInfo | null>(null);
   const [uploading, setUploading] = useState(false);
+  // Asking whether a scan of the same name exists, before the scan starts.
+  const [checking, setChecking] = useState(false);
   // Percentage of the chosen file that has reached the server, or null when no
   // upload is in flight. Only the file upload reports this; the credential
   // stashes below are a few bytes and finish before a bar would be seen.
@@ -264,7 +293,10 @@ export function useScanForm({
   // selected; when on, the form submits "scan-target-src" in place of the
   // rootfs-dir source. The target composition (root + optional subpath) is
   // identical, so only the source string changes.
-  const showDeepSource = activeScanRoot !== "";
+  // A sub-folder typed under the launch folder is offered the same, as is any
+  // folder of an added root.
+  const showDeepSource =
+    activeScanRoot !== "" || (source === "rootfs-dir" && target.trim() !== "");
   const effectiveSource: SourceType =
     showDeepSource && deepSource ? "scan-target-src" : source;
   const isAnalyze = source === "sbom-upload";
@@ -367,7 +399,7 @@ export function useScanForm({
   // A declaration opens questions before any scan; a credential stashed now
   // would sit on the server if they were cancelled, so it is not offered here.
   const showUpload = source !== "ai-declare";
-  const busy = running || uploading;
+  const busy = running || uploading || checking;
 
   /** A user edit owns the field from then on — even when cleared to empty,
    *  so the autofill never fights someone who deliberately blanked it. */
@@ -394,6 +426,7 @@ export function useScanForm({
     setExcludeRaw(v);
   };
   const setScanRoot = (v: string) => {
+    userChoseRef.current = true;
     clearError("target");
     setScanRootRaw(v);
   };
@@ -419,7 +452,55 @@ export function useScanForm({
   // away), so switching source or retyping the target never leaves a stale
   // guess behind. Version is only ever a real value from the source (docker
   // tag, versioned file name, SBOM metadata) — never a made-up "1.0".
-  const hostDir = capabilities.hostDir;
+  const launchIsOutput = capabilities.launchIsOutput === true;
+  // A launch folder that is the results folder is not a project: no name is
+  // taken from it and it is not the default.
+  const hostDir = launchIsOutput ? undefined : capabilities.hostDir;
+
+  // The folder to read project info from: the launch folder, or the added
+  // folder with its sub-path. Only folders on this machine have one.
+  const infoTarget = composeRootfsTarget(activeScanRoot, target);
+  const infoSource: SourceType | null =
+    source === "current-dir" && !launchIsOutput
+      ? "current-dir"
+      : source === "rootfs-dir" && infoTarget
+        ? "rootfs-dir"
+        : null;
+  useEffect(() => {
+    setProjectInfo(null);
+    if (!infoSource) return;
+    const ctl = new AbortController();
+    const timer = window.setTimeout(() => {
+      void getProjectInfo(infoSource, infoSource === "current-dir" ? "" : infoTarget, ctl.signal).then(
+        (info) => {
+          if (!ctl.signal.aborted) setProjectInfo(info);
+        },
+      );
+    }, 250);
+    return () => {
+      window.clearTimeout(timer);
+      ctl.abort();
+    };
+  }, [infoSource, infoTarget]);
+
+  // When the folder the UI started in is the results folder, start on the
+  // folder input with an added folder chosen, and come back to the folder just
+  // added after the app restarts its scanner. Runs once the capabilities are
+  // known, and never over something the user already picked.
+  const rootsKey = scanRoots.map((r) => r.path).join("|");
+  const appliedDefaultRef = useRef("");
+  useEffect(() => {
+    if (userChoseRef.current || !launchIsOutput) return;
+    // Once per set of folders: the choice records what it has seen, so a
+    // second run (React's development double-invoke) must not redo it.
+    if (appliedDefaultRef.current === rootsKey) return;
+    appliedDefaultRef.current = rootsKey;
+    setSource("rootfs-dir");
+    setScanRootRaw(chooseInitialRoot(scanRoots));
+    // scanRoots is read through rootsKey.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [launchIsOutput, rootsKey]);
+
   useEffect(() => {
     if (projectDirty && versionDirty) return;
     let cancelled = false;
@@ -430,7 +511,7 @@ export function useScanForm({
       // default so the required field is satisfied on a first run — but only
       // once a target is actually identified (a suggested project). With no
       // target yet, both fields stay empty rather than showing a lone version.
-      if (!versionDirty) setVersionRaw(s.version || (s.project ? DEFAULT_VERSION : ""));
+      if (!versionDirty) setVersionRaw(pickVersion(s, projectInfo));
     };
     if (source === "sbom-upload" && file) {
       // The SBOM's own metadata beats filename guessing; fall back to the
@@ -458,10 +539,11 @@ export function useScanForm({
       cancelled = true;
     };
   }, [source, target, file, hostDir, projectDirty, versionDirty,
-      activeScanRoot, activeScanRootHost]);
+      activeScanRoot, activeScanRootHost, projectInfo]);
 
   /** Switching source resets the dependent inputs. */
   const changeSource = (s: SourceType) => {
+    userChoseRef.current = true;
     setSource(s);
     setFileRaw(null);
     setTargetRaw("");
@@ -479,7 +561,7 @@ export function useScanForm({
     if (!project.trim()) errs.project = "validation.project";
     if (!version.trim()) errs.version = "validation.version";
     if (isText && !target.trim() && !activeScanRoot)
-      errs.target = "validation.target";
+      errs.target = source === "rootfs-dir" && launchIsOutput ? "validation.targetFolder" : "validation.target";
     if (source === "git-url" && gitRef.trim() && !isValidGitRef(gitRef.trim()))
       errs.gitRef = "validation.gitRef";
     if (showExclude && exclude.split("\n").some((l) => l.trim() && !isValidExcludePath(l.trim().replace(/^(\.\/)+/, "").replace(/\/+$/, ""))))
@@ -504,6 +586,35 @@ export function useScanForm({
       return;
     }
 
+    // Questions that need an answer first. Not knowing the answer (the server
+    // cannot be asked) never stops a scan.
+    setChecking(true);
+    // The folder's answer may still be on its way (it is asked for a moment after
+    // the folder changes), so ask again rather than start without it.
+    const info =
+      projectInfo ??
+      (infoSource
+        ? await getProjectInfo(infoSource, infoSource === "current-dir" ? "" : infoTarget)
+        : null);
+    const merged = infoSource ? mergedProjects(info) : [];
+    const overwrite = await scanExists(project.trim(), version.trim());
+    setChecking(false);
+    if (merged.length > 0 || overwrite) {
+      setConfirm({ merged, overwrite });
+      return;
+    }
+    await start(false);
+  };
+
+  /** The answer to the question above: start the scan (keeping a finished scan
+   *  of the same name when asked to), or drop it. */
+  const answerConfirm = (choice: "go" | "keep" | "cancel") => {
+    setConfirm(null);
+    if (choice !== "cancel") void start(choice === "keep");
+  };
+
+  /** Everything after the checks: upload the file, stash the credentials, run. */
+  const start = async (timestamp: boolean) => {
     let token: string | undefined;
     let cred: string | undefined;
     let scanossCred: string | undefined;
@@ -564,6 +675,7 @@ export function useScanForm({
     }
 
     const effectiveTarget = composeRootfsTarget(activeScanRoot, target);
+    if (activeScanRoot) rememberScanRoot(scanRoots, activeScanRoot);
 
     onRun({
       project: project.trim(),
@@ -609,6 +721,7 @@ export function useScanForm({
       // (sent false) when hidden.
       deepCve: showDeepCve ? deepCve : false,
       reachability: reachabilityOn,
+      timestamp: timestamp || undefined,
       uploadTarget: showUpload && uploadEnabled ? uploadTarget : "",
       uploadUrl: showUpload && uploadEnabled ? uploadUrl.trim() : "",
       uploadCred,
@@ -664,7 +777,7 @@ export function useScanForm({
     uploadUrl, setUploadUrl,
     uploadToken, setUploadToken,
     truscaProjectId, setTruscaProjectId,
-    errors, uploadError, uploading, uploadPercent,
+    errors, uploadError, uploading, checking, uploadPercent,
     busy, uploadKind, textInput, isText, isAnalyze, isAiModel, showVendored,
     showDeepLicense, showDeepCve, showReachability, showByteStable, showAnalyzeCpeIndex, showOutboundLicense,
     showSbomAuthor,
@@ -672,7 +785,7 @@ export function useScanForm({
     showSpecVersion,
     showConformanceProfile,
     showScanOptions, showFormatOptions, showUpload,
-    options, submit,
+    options, submit, confirm, answerConfirm, launchIsOutput,
     capabilities,
   };
 }

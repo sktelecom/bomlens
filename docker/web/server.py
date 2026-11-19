@@ -47,6 +47,7 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
+import xml.etree.ElementTree as ET
 import zipfile
 from collections import OrderedDict
 from datetime import datetime, timezone
@@ -785,6 +786,164 @@ def picked_scan_root(scan_dir):
     return None
 
 
+def launch_scan_subdir(scan_dir):
+    """The path of `scan_dir` below the launch folder (/src), or None when it is
+    the launch folder itself or lies elsewhere. `scan_dir` is a safe_scan_dir()
+    result (already resolved), so a link has been followed and a path that
+    leaves /src through one no longer starts with it."""
+    base = os.path.realpath(SRC_DIR)
+    if scan_dir == base or not scan_dir.startswith(base + os.sep):
+        return None
+    return os.path.relpath(scan_dir, base)
+
+
+def deep_copy_source(scan_dir):
+    """What a deep (build) scan of a picked folder copies: (copy_src, rel_dir),
+    or None when the folder is neither inside an added folder nor a sub-folder
+    of the launch folder. The whole launch folder is the current-dir input, not
+    this one. The copy source is looked up in the folder listing by
+    find_scan_entry, so it comes from the filesystem and not from the request,
+    and no link is followed on the way."""
+    picked = picked_scan_root(scan_dir)
+    if picked is not None:
+        base = os.path.realpath(picked["path"])
+        rel_dir = os.path.relpath(scan_dir, base)
+    else:
+        base = os.path.realpath(SRC_DIR)
+        rel_dir = launch_scan_subdir(scan_dir)
+        if rel_dir is None:
+            return None
+    copy_src = base if rel_dir == "." else find_scan_entry(base, rel_dir)
+    if not copy_src or not os.path.isdir(copy_src):
+        return None
+    return copy_src, rel_dir
+
+
+# Files whose presence makes a folder a project of its own.
+_PROJECT_MANIFESTS = (
+    "pom.xml", "build.gradle", "build.gradle.kts", "settings.gradle",
+    "settings.gradle.kts", "package.json", "go.mod", "Cargo.toml",
+    "requirements.txt", "pyproject.toml", "setup.py", "Pipfile", "Gemfile",
+    "composer.json", "Package.swift", "Podfile", "pubspec.yaml", "mix.exs",
+)
+_PROJECT_MANIFEST_SUFFIXES = (".csproj", ".sln", ".fsproj", ".vbproj", ".xcodeproj")
+_PROJECT_INFO_MAX_BYTES = 1024 * 1024
+_PROJECT_INFO_MAX_SUBS = 20
+_VERSION_OK_RE = re.compile(r"^[0-9A-Za-z][0-9A-Za-z._+-]{0,63}$")
+
+
+def _read_small_file(path):
+    """The text of a regular file of at most _PROJECT_INFO_MAX_BYTES, else None.
+    A link is not followed."""
+    try:
+        if os.path.islink(path) or not os.path.isfile(path):
+            return None
+        if os.path.getsize(path) > _PROJECT_INFO_MAX_BYTES:
+            return None
+        with open(path, encoding="utf-8", errors="replace") as f:
+            return f.read()
+    except OSError:
+        return None
+
+
+def _version_from_pom(text):
+    # A DOCTYPE or entity declaration is not something a pom needs; refusing it
+    # keeps the parser away from entity expansion.
+    if "<!DOCTYPE" in text or "<!ENTITY" in text:
+        return None
+    try:
+        root = ET.fromstring(text)
+    except (ET.ParseError, ValueError):
+        return None
+    for child in list(root):
+        if child.tag.rsplit("}", 1)[-1] == "version":
+            return (child.text or "").strip()
+    return None
+
+
+def _version_from_package_json(text):
+    try:
+        data = json.loads(text)
+    except ValueError:
+        return None
+    v = data.get("version") if isinstance(data, dict) else None
+    return v.strip() if isinstance(v, str) else None
+
+
+_GRADLE_VERSION_RE = re.compile(r"""^version\s*=?\s*["']([^"'$\s]+)["']""", re.MULTILINE)
+
+
+def _version_from_gradle(text):
+    m = _GRADLE_VERSION_RE.search(text)
+    return m.group(1) if m else None
+
+
+_CARGO_VERSION_RE = re.compile(r"""^version\s*=\s*["']([^"']+)["']""")
+
+
+def _version_from_cargo(text):
+    in_package = False
+    for line in text.splitlines():
+        line = line.strip()
+        if line.startswith("["):
+            in_package = line == "[package]"
+        elif in_package:
+            m = _CARGO_VERSION_RE.match(line)
+            if m:
+                return m.group(1)
+    return None
+
+
+# In the order a project's own version is most likely stated.
+_VERSION_SOURCES = (
+    ("pom.xml", _version_from_pom),
+    ("package.json", _version_from_package_json),
+    ("build.gradle.kts", _version_from_gradle),
+    ("build.gradle", _version_from_gradle),
+    ("Cargo.toml", _version_from_cargo),
+)
+
+
+def _has_manifest(directory):
+    try:
+        names = os.listdir(directory)
+    except OSError:
+        return False
+    return any(n in _PROJECT_MANIFESTS or n.endswith(_PROJECT_MANIFEST_SUFFIXES) for n in names)
+
+
+def project_info(scan_dir):
+    """What the folder says about itself, for the New scan form: the version its
+    manifest states (pom.xml, package.json, build.gradle(.kts), Cargo.toml) and,
+    when it has no manifest of its own, the sub-folders that each are a project
+    (scanning the folder would merge them into one SBOM). `scan_dir` is a
+    safe_scan_dir() result; only files directly in it are read, none through a
+    link, and the version must look like a version."""
+    out = {"version": "", "versionFrom": "", "hasManifest": _has_manifest(scan_dir),
+           "subProjects": []}
+    for name, parse in _VERSION_SOURCES:
+        text = _read_small_file(os.path.join(scan_dir, name))
+        if text is None:
+            continue
+        v = parse(text)
+        if v and _VERSION_OK_RE.match(v):
+            out["version"], out["versionFrom"] = v, name
+            break
+    if not out["hasManifest"]:
+        try:
+            entries = sorted(os.scandir(scan_dir), key=lambda e: e.name)
+        except OSError:
+            entries = []
+        for e in entries:
+            if e.name.startswith(".") or e.is_symlink() or not e.is_dir():
+                continue
+            if _has_manifest(e.path):
+                out["subProjects"].append(e.name)
+                if len(out["subProjects"]) >= _PROJECT_INFO_MAX_SUBS:
+                    break
+    return out
+
+
 def scan_target_not_visible(scan_dir):
     """The message to stop a scan with when the folder to scan is empty inside
     this container, else None. A folder the container engine does not share with
@@ -831,7 +990,7 @@ def scan_source_label(source, target):
     if source not in ("rootfs-dir", "scan-target-src"):
         return ""
     scan_dir = safe_scan_dir(target)
-    if not scan_dir or not picked_scan_root(scan_dir):
+    if not scan_dir or not (picked_scan_root(scan_dir) or launch_scan_subdir(scan_dir)):
         return ""
     return display_path_of(scan_dir)
 
@@ -4064,6 +4223,7 @@ def host_path_of(container_path):
     outside the known mounts (the entrypoint then falls back to syft).
     """
     hostdir = os.environ.get("SBOM_UI_HOST_DIR", "")
+    outdir = os.environ.get("SBOM_UI_OUTPUT_HOST_DIR", "") or hostdir
     if not hostdir:
         return ""
     # Normalize backslashes so the posixpath math below joins cleanly on Windows.
@@ -4073,13 +4233,27 @@ def host_path_of(container_path):
     # so its drive form no longer matters). No-op for POSIX host dirs.
     hostdir = hostdir.replace("\\", "/")
     p = os.path.normpath(container_path)
-    for base in (OUTPUT_DIR, SRC_DIR):
+    outdir = outdir.replace("\\", "/")
+    for base, host in ((OUTPUT_DIR, outdir), (SRC_DIR, hostdir)):
         b = os.path.normpath(base)
         if p == b:
-            return hostdir
+            return host
         if p.startswith(b + os.sep):
-            return os.path.join(hostdir, os.path.relpath(p, b))
+            return os.path.join(host, os.path.relpath(p, b))
     return ""
+
+
+def output_host_dir():
+    """The host path of the results folder: SBOM_UI_OUTPUT_HOST_DIR when the
+    launcher set one (the results folder differs from the launch folder), else
+    the launch folder, which the older launchers mount as both."""
+    return os.environ.get("SBOM_UI_OUTPUT_HOST_DIR", "") or os.environ.get("SBOM_UI_HOST_DIR", "")
+
+
+def launch_is_output():
+    """True when the folder the UI was launched in is the results folder."""
+    host = os.environ.get("SBOM_UI_HOST_DIR", "")
+    return bool(host) and host == output_host_dir()
 
 
 def display_path_of(container_path):
@@ -6165,6 +6339,12 @@ class Handler(BaseHTTPRequestHandler):
                 # says nothing rather than inventing a number).
                 "version": os.environ.get("BOMLENS_VERSION", ""),
                 "hostDir": os.environ.get("SBOM_UI_HOST_DIR", ""),
+                # Where the results are kept on the host, and whether that is the
+                # launch folder itself (the desktop app mounts one folder as both).
+                # A launch folder that is the results folder is not a project to
+                # scan, so the form does not default to it.
+                "outputHostDir": output_host_dir(),
+                "launchIsOutput": launch_is_output(),
                 # Extra --mount scan targets the rootfs-dir input can pick
                 # from: container path (what the scan request sends) + host
                 # path (what the user recognizes).
@@ -6189,6 +6369,10 @@ class Handler(BaseHTTPRequestHandler):
             self._spdx3_map()
         elif path == "/file":
             self._serve_file(urllib.parse.parse_qs(parsed.query))
+        elif path == "/project-info":
+            self._project_info(urllib.parse.parse_qs(parsed.query))
+        elif path == "/scan-exists":
+            self._scan_exists(urllib.parse.parse_qs(parsed.query))
         elif path == "/scans":
             self._send(200, json.dumps(list_scans()))
             # After the response: this is the Recent-scans sidebar's own poll,
@@ -6260,6 +6444,42 @@ class Handler(BaseHTTPRequestHandler):
             self._ai_declaration_check(urllib.parse.parse_qs(parsed.query))
         else:
             self._send(404, json.dumps({"error": "not found"}))
+
+    def _project_info(self, qs):
+        """GET /project-info?source=&target= : what the folder to scan says about
+        itself (its version, and sub-folders that are projects of their own).
+        The folder is resolved here, never taken from the request as a path."""
+        if not _origin_allowed(self.headers.get("Origin")):
+            self._send(403, json.dumps({"error": "bad origin"}))
+            return
+        source = (qs.get("source") or [""])[0]
+        target = (qs.get("target") or [""])[0]
+        if source == "current-dir":
+            scan_dir = os.path.realpath(SRC_DIR) if os.path.isdir(SRC_DIR) else None
+        elif source in ("rootfs-dir", "scan-target-src"):
+            scan_dir = safe_scan_dir(target)
+        else:
+            scan_dir = None
+        if not scan_dir:
+            self._send(404, json.dumps({"error": "folder not found"}))
+            return
+        self._send(200, json.dumps(project_info(scan_dir)))
+
+    def _scan_exists(self, qs):
+        """GET /scan-exists?project=&version= : whether a finished scan with the
+        name this project and version would get is already in the results, so
+        the form can ask before it is overwritten (the CLI does overwrite)."""
+        project = (qs.get("project") or [""])[0].strip()
+        version = (qs.get("version") or [""])[0].strip()
+        if not project or not version:
+            self._send(400, json.dumps({"error": "project and version required"}))
+            return
+        rid = output_prefix(project, version)
+        d = run_dir(rid)
+        exists = bool(d and os.path.isdir(d) and glob.glob(os.path.join(d, "*_bom.json")))
+        with _scan_lock:
+            running = rid in _scan_active
+        self._send(200, json.dumps({"exists": exists, "id": rid, "running": running}))
 
     def _scan_delete(self, qs):
         """Delete one past scan. New layout: remove the whole run folder
@@ -7982,19 +8202,15 @@ class Handler(BaseHTTPRequestHandler):
                 # (find_scan_entry), so it comes from the filesystem and not from
                 # the request, and copy_scan_target_tree checks containment again
                 # at the sink.
-                picked = picked_scan_root(scan_dir)
-                if picked is None:
+                found = deep_copy_source(scan_dir)
+                if found is None:
                     fail("Deep source scan is only available for an added folder "
-                         "(the current folder already scans deep)."); return
+                         "or a sub-folder of the current folder (the current folder "
+                         "itself already scans deep)."); return
+                copy_src, rel_dir = found
                 hidden = scan_target_not_visible(scan_dir)
                 if hidden:
                     fail(hidden, code="SCAN_TARGET_NOT_VISIBLE"); return
-                picked_real = os.path.realpath(picked["path"])
-                rel_dir = os.path.relpath(scan_dir, picked_real)
-                copy_src = picked_real if rel_dir == "." else find_scan_entry(picked_real, rel_dir)
-                if not copy_src or not os.path.isdir(copy_src):
-                    fail("Invalid or out-of-bounds directory path (must be a "
-                         "picked scan-target folder)"); return
                 cleanup_dir = os.path.join(OUTPUT_DIR, ".srccopy-" + secrets.token_hex(8))
                 sse("log", json.dumps("▶ Preparing a writable copy of %s ..."
                                       % os.path.basename(copy_src.rstrip("/"))))

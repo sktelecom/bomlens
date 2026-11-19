@@ -22,10 +22,10 @@
     "currentDir": "현재 폴더",
     "currentDirPath": "현재 폴더",
     "currentDirHint": "이 폴더(컨테이너에 /src로 마운트)의 소스를 스캔합니다. 다른 폴더를 스캔하려면 디렉터리 / rootfs를 고르거나 그 폴더에서 BomLens를 시작하세요.",
-    "rootfsDir": "디렉터리 / rootfs",
+    "rootfsDir": "폴더 선택",
     "yoctoBuildDir": "Yocto 빌드 디렉터리",
-    "rootfsPlaceholder": "centos-rootfs/  (현재 폴더 기준 상대경로)",
-    "rootfsHint": "현재 폴더(/src) 하위의 OS rootfs나 임의 하위 폴더를 디렉터리로 스캔합니다. Yocto 빌드 디렉터리는 그렇게 인식해서, 빌드 트리 대신 빌드가 만든 이미지 SBOM을 분석합니다. 폴더 밖 경로는 거부되므로, rootfs를 실행 폴더 하위에 두거나 --mount로 마운트하거나 Docker 이미지 입력을 사용하세요.",
+    "rootfsPlaceholder": "my-project/  (현재 폴더 아래 하위 폴더)",
+    "rootfsHint": "스캔할 폴더를 고릅니다. 프로젝트 폴더는 빌드해서 전체 의존성 트리까지 해석하고, 프로젝트가 여러 개 든 폴더는 하나의 SBOM으로 합칩니다.",
     "scanRoot": "스캔 위치",
     "scanRootCurrent": "현재 폴더 ({{path}})",
     "scanRootCurrentNoPath": "현재 폴더",
@@ -54,7 +54,7 @@
     "firmwareUnavailable": "펌웨어 분석은 Docker가 실행 중이어야 사용할 수 있습니다(펌웨어 이미지를 sibling 컨테이너로 실행합니다).",
     "siblingPullNotice": "처음 실행할 때 전용 이미지를 내려받습니다(용량이 크며 한 번만 받습니다). 이후 실행은 받아 둔 이미지를 재사용합니다.",
     "dockerImage": "Docker 이미지",
-    "dockerHint": "로컬/원격 Docker 이미지를 스캔합니다(Docker 소켓 필요).",
+    "dockerHint": "로컬 또는 원격 Docker 이미지를 스캔합니다(Docker 소켓 필요). 비공개 레지스트리의 이미지는 이 컴퓨터에서 먼저 docker login과 docker pull을 실행한 뒤 이미지 이름을 입력하세요. docker save로 만든 tar 파일은 먼저 docker load -i <파일>.tar로 불러온 뒤 불러온 이름을 입력하세요.",
     "dockerPlaceholder": "nginx:latest",
     "aiModel": "AI 모델 또는 데이터셋",
     "aiModelPlaceholder": "google-bert/bert-base-uncased, datasets/allenai/tulu-3-sft-mixture 또는 figshare.com/articles/.../33412285",
@@ -82,7 +82,10 @@
     "aiDeclare": "모델 정보 직접 입력",
     "aiDeclareHint": "아직 HuggingFace 저장소나 읽을 파일이 없는 모델을 위한 입력입니다. 기반 모델, 학습 데이터, 출시일 같은 질문에 답하면 BomLens가 그 답으로 SBOM과 SPDX 3.0.1 AI 문서를 만듭니다. HuggingFace ID로 적은 기반 모델과 데이터셋은 허브에서 읽어 옵니다.",
     "aiDeclareUnavailable": "모델 정보 직접 입력에는 SPDX 3.0.1 변환기가 필요한데 이 이미지에는 없습니다. 전체 이미지를 쓰거나, HuggingFace나 모델 파일로 스캔하세요.",
-    "dropRefused": "{{name}}은 이 입력에서 받을 수 없는 파일입니다. 받는 형식: {{types}}"
+    "dropRefused": "{{name}}은 이 입력에서 받을 수 없는 파일입니다. 받는 형식: {{types}}",
+    "rootfsAdvanced": "현재 폴더(/src) 하위의 OS rootfs나 임의 하위 폴더를 디렉터리로 스캔합니다. Yocto 빌드 디렉터리는 그렇게 인식해서, 빌드 트리 대신 빌드가 만든 이미지 SBOM을 분석합니다. 폴더 밖 경로는 거부되므로, rootfs를 실행 폴더 하위에 두거나 --mount로 마운트하거나 Docker 이미지 입력을 사용하세요.",
+    "rootfsAdvancedTitle": "고급: OS 루트 파일시스템, /src, Yocto, --mount",
+    "currentDirIsOutput": "이 폴더는 BomLens가 결과를 저장하는 폴더라서 스캔할 프로젝트가 아닙니다. 폴더를 직접 고르세요."
   },
   "options": {
     "notice": "고지문",
@@ -1759,7 +1762,9 @@
     "moreActions": "{{name}} 작업 더 보기",
     "colActions": "작업",
     "searchChip": "“{{query}}”",
-    "noMatchHint": "다른 검색어나 유형을 시도해 보세요."
+    "noMatchHint": "다른 검색어나 유형을 시도해 보세요.",
+    "loading": "스캔 목록을 불러오는 중입니다…",
+    "keptAfterReinstall": "앱을 제거하거나 다시 설치해도 결과는 이 폴더에 그대로 남습니다."
   },
   "validation": {
     "required": "위에 표시된 필수 항목을 채워 주세요.",
@@ -1773,7 +1778,8 @@
     "exclude": "한 줄에 상대 경로 하나를 입력하세요. .., 와일드카드, 역슬래시는 쓸 수 없습니다.",
     "truscaProjectId": "TRUSCA 프로젝트 id를 입력하세요.",
     "requiredList": "필수 항목을 입력하세요: {{fields}}",
-    "formatList": "형식을 확인하세요: {{fields}}"
+    "formatList": "형식을 확인하세요: {{fields}}",
+    "targetFolder": "스캔할 폴더를 고르세요. 목록에 없으면 폴더 추가를 누르세요."
   },
   "provenance": {
     "folder": "스캔한 폴더",
@@ -2566,5 +2572,16 @@
   "filters": {
     "active": "적용 중인 필터",
     "remove": "필터 해제: {{label}}"
+  },
+  "startConfirm": {
+    "titleMerged": "이 폴더에는 프로젝트가 여러 개 있습니다",
+    "titleOverwrite": "같은 이름의 스캔 결과가 이미 있습니다",
+    "titleBoth": "스캔하기 전에 확인하세요",
+    "merged": "이 폴더에는 자체 프로젝트 파일이 없고 프로젝트 {{n}}개({{names}})가 들어 있습니다. 그대로 스캔하면 하나의 SBOM으로 합쳐집니다. 프로젝트 하나만 스캔하려면 그 하위 폴더를 고르세요.",
+    "mergedMore": "외 {{n}}개",
+    "overwrite": "{{name}}의 완료된 스캔 결과가 이미 있습니다. 덮어쓰거나 둘 다 보관할 수 있습니다. 둘 다 보관하면 새 결과는 시각이 붙은 폴더에 저장됩니다.",
+    "keepBoth": "둘 다 보관",
+    "replace": "덮어쓰기",
+    "continue": "그대로 스캔"
   }
 }

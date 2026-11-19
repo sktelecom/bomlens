@@ -79,6 +79,47 @@ else
     fail "/capabilities scanRoots wrong" "$caps"
 fi
 
+echo "== folder info, same-name check and cancelled rows =="
+mkdir -p "$SCANROOT/proj" "$SCANROOT/multi/a" "$SCANROOT/multi/b" "$WORK/elsewhere"
+echo '<project><version>3.2.1</version></project>' > "$SCANROOT/proj/pom.xml"
+echo '{}' > "$SCANROOT/multi/a/package.json"
+echo '{}' > "$SCANROOT/multi/b/package.json"
+ln -s "$WORK/elsewhere" "$SCANROOT/escape"
+info=$(curl -fsS "$BASE/project-info?source=rootfs-dir&target=$SCANROOT/proj" 2>/dev/null)
+if echo "$info" | python3 -c "import sys,json;d=json.load(sys.stdin);assert d['version']=='3.2.1' and d['versionFrom']=='pom.xml' and d['hasManifest'] is True and d['subProjects']==[], d" 2>/dev/null; then
+    pass "/project-info reads the version from the folder's pom.xml"
+else
+    fail "/project-info version" "$info"
+fi
+info=$(curl -fsS "$BASE/project-info?source=rootfs-dir&target=$SCANROOT/multi" 2>/dev/null)
+if echo "$info" | python3 -c "import sys,json;d=json.load(sys.stdin);assert d['hasManifest'] is False and d['subProjects']==['a','b'], d" 2>/dev/null; then
+    pass "/project-info lists the projects a manifest-less folder would merge"
+else
+    fail "/project-info sub-projects" "$info"
+fi
+for bad in "$SCANROOT/escape" "$SCANROOT/../elsewhere" "/etc" "../../etc" "$SCANROOT/nope"; do
+    code=$(curl -s -o /dev/null -w '%{http_code}' --get --data-urlencode "target=$bad" --data-urlencode "source=rootfs-dir" "$BASE/project-info")
+    [ "$code" = "404" ] || fail "/project-info answered $code for $bad"
+done
+pass "/project-info refuses a link out, .., a system path and a missing folder"
+code=$(curl -s -o /dev/null -w '%{http_code}' -H "Origin: http://evil.example" "$BASE/project-info?source=current-dir")
+[ "$code" = "403" ] && pass "/project-info checks the request origin" || fail "/project-info origin check answered $code"
+
+mkdir -p "$OUT/exist_1.0"
+echo '{"bomFormat":"CycloneDX","metadata":{"component":{"name":"exist","version":"1.0"}},"components":[]}' > "$OUT/exist_1.0/exist_1.0_bom.json"
+ex=$(curl -fsS "$BASE/scan-exists?project=exist&version=1.0" 2>/dev/null)
+ne=$(curl -fsS "$BASE/scan-exists?project=nothere&version=1.0" 2>/dev/null)
+if echo "$ex" | python3 -c "import sys,json;assert json.load(sys.stdin)['exists'] is True" 2>/dev/null \
+   && echo "$ne" | python3 -c "import sys,json;assert json.load(sys.stdin)['exists'] is False" 2>/dev/null; then
+    pass "/scan-exists says whether a finished scan of that name is in the results"
+else
+    fail "/scan-exists" "$ex $ne"
+fi
+code=$(curl -s -o /dev/null -w '%{http_code}' "$BASE/scan-exists?project=&version=1")
+[ "$code" = "400" ] && pass "/scan-exists needs a project and a version" || fail "/scan-exists without a project answered $code"
+
+rm -rf "$OUT/exist_1.0" "$SCANROOT/proj" "$SCANROOT/multi" "$SCANROOT/escape"
+
 echo "== sibling docker-run dispatch is allowlist-guarded =="
 # Firmware/AI scans hand the job to a dedicated image via a sibling `docker run`.
 # Every user-influenced value (image ref, MODE, MODEL_ID, project/version env)
@@ -1663,7 +1704,7 @@ fi
 # Guarded by source text rather than the request handler (no scan-target-src
 # integration harness exists yet to drive it end to end).
 if grep -qF 'hint = nested_rootfs_hint(copy_src)' "$ROOT_DIR/docker/web/server.py" \
-   && grep -qF 'find_scan_entry(picked_real, rel_dir)' "$ROOT_DIR/docker/web/server.py"; then
+   && grep -qF 'copy_src = base if rel_dir == "." else find_scan_entry(base, rel_dir)' "$ROOT_DIR/docker/web/server.py"; then
     pass "the deep-scan copy source and nested-rootfs hint come from the listed scan root, not the request path"
 else
     fail "the deep-scan copy source / nested-rootfs hint no longer come from find_scan_entry -- did it regress to the request-derived scan_dir?"

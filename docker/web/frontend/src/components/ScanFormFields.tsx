@@ -297,6 +297,7 @@ export function SourceControls({ state }: { state: ScanFormState }) {
     busy,
     capabilities,
     errors,
+    launchIsOutput,
   } = state;
 
   // Extra --mount scan targets make the rootfs-dir path a subpath inside the
@@ -336,20 +337,45 @@ export function SourceControls({ state }: { state: ScanFormState }) {
             </div>
           )}
           <span className="bl-muted">{t("source.currentDirHint")}</span>
+          {launchIsOutput && (
+            <p className="bl-small bl-flat bl-currentdir-warn" data-testid="current-dir-is-output">
+              {t("source.currentDirIsOutput")}
+            </p>
+          )}
         </div>
       )}
 
       {showScanRoots && (
         <div className="bl-stack-8">
+          {/* In the desktop app adding a folder is the first choice; the list
+              of folders already added follows it. */}
+          {desktopFolders && (
+            <div>
+              <Button
+                size="small"
+                variant={scanRoots.length === 0 ? "primary" : "default"}
+                disabled={busy || mountBusy}
+                loading={mountBusy}
+                onClick={addScanFolder}
+                data-testid="add-scan-folder"
+              >
+                {t("source.addScanFolder")}
+              </Button>
+            </div>
+          )}
           {scanRoots.length > 0 && (
             <FormControl id="scanRoot" disabled={busy || mountBusy}>
               <FormControl.Label>{t("source.scanRoot")}</FormControl.Label>
               <Select block value={scanRoot} onChange={(e) => setScanRoot(e.target.value)}>
-                <Select.Option value="">
-                  {capabilities.hostDir
-                    ? t("source.scanRootCurrent", { path: capabilities.hostDir })
-                    : t("source.scanRootCurrentNoPath")}
-                </Select.Option>
+                {/* A launch folder that is the results folder is not offered as a
+                    place to scan. */}
+                {!launchIsOutput && (
+                  <Select.Option value="">
+                    {capabilities.hostDir
+                      ? t("source.scanRootCurrent", { path: capabilities.hostDir })
+                      : t("source.scanRootCurrentNoPath")}
+                  </Select.Option>
+                )}
                 {scanRoots.map((r) => (
                   <Select.Option key={r.path} value={r.path}>
                     {r.hostPath || r.path}
@@ -357,18 +383,6 @@ export function SourceControls({ state }: { state: ScanFormState }) {
                 ))}
               </Select>
             </FormControl>
-          )}
-          {desktopFolders && (
-            <div>
-              <Button
-                size="small"
-                disabled={busy || mountBusy}
-                loading={mountBusy}
-                onClick={addScanFolder}
-              >
-                {t("source.addScanFolder")}
-              </Button>
-            </div>
           )}
           {desktopFolders && scanRoot !== "" && (
             <Link
@@ -417,6 +431,13 @@ export function SourceControls({ state }: { state: ScanFormState }) {
             <FormControl.Validation variant="error">{t(errors.target)}</FormControl.Validation>
           )}
         </FormControl>
+      )}
+
+      {source === "rootfs-dir" && (
+        <details className="bl-small bl-muted" data-testid="rootfs-advanced">
+          <summary>{t("source.rootfsAdvancedTitle")}</summary>
+          <p className="bl-flat">{t("source.rootfsAdvanced")}</p>
+        </details>
       )}
 
       {source === "git-url" && (
@@ -1056,7 +1077,7 @@ export function ActionNotes({
 /** The run / uploading / scanning button. */
 export function RunButton({ state, running }: { state: ScanFormState; running: boolean }) {
   const { t } = useTranslation();
-  const { submit, busy, uploading } = state;
+  const { submit, busy, uploading, checking } = state;
 
   // The demo shows this form so the range of inputs is visible, but running a
   // scan needs a machine that can build the target. Disable rather than hide:
@@ -1088,7 +1109,7 @@ export function RunButton({ state, running }: { state: ScanFormState; running: b
       disabled={busy}
       data-testid="run-scan"
       leadingVisual={uploading ? UploadIcon : running ? undefined : PlayIcon}
-      loading={running && !uploading}
+      loading={(running && !uploading) || checking}
     >
       {uploading
         ? t("source.uploading")

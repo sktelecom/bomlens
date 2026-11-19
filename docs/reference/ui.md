@@ -10,14 +10,14 @@ Scan from a browser without the CLI. The UI server is built into the scanner ima
 
 **macOS / Linux:**
 ```bash
-cd ~/sbom-output      # output folder (anywhere is fine)
+cd ~/my-project       # the folder the UI scans as "Current folder" (anywhere is fine)
 /path/to/bomlens/scripts/scan-sbom.sh --ui
 # → opens http://localhost:8080 automatically
 ```
 
 **Windows — double-click (no command line):** in the unzipped folder, double-click `scripts\sbom-ui.bat` and a browser opens `http://localhost:8080` shortly after. Docker just needs to be running, and `sbom-ui.bat` works on Rancher Desktop or Docker Desktop (on WSL2, run `scan-sbom.sh --ui` inside WSL).
 
-> The run location is the output base, and it scans that folder's source only when you choose "Current folder" as the scan target. If you use a GitHub URL, an upload, or a Docker image, the run location does not matter. Each scan is saved to its own `{Project}_{Version}/` subfolder; the base defaults and how to change them are in [Where outputs go](cli.md#where-outputs-go).
+> The run location is what "Current folder" scans; results are saved to `~/sbom-output` by default, or to the folder you give with `--output-dir`, so a scan never reads its own results. If you use a GitHub URL, an upload, or a Docker image, the run location does not matter. Each scan is saved to its own `{Project}_{Version}/` subfolder; the base defaults and how to change them are in [Where outputs go](cli.md#where-outputs-go). A sub-folder of the run location can be picked with the Folder input and is scanned like the current folder, with its dependencies resolved.
 
 ## The shell
 
@@ -33,12 +33,12 @@ The **Help** menu (the question-mark icon in the top bar) links to Getting start
 
 ## New scan
 
-The New scan screen reads from top to bottom. First come the source tiles, in rows with the group name on the left: Code (current folder, a directory path, a GitHub URL, a ZIP upload), Artifact (a Docker image, a package or build artifact, a firmware image), SBOM (analyze an existing SBOM) and AI model (generate an ML-BOM from a HuggingFace model, from a model file you upload, or from model information you enter). The arrow keys move between the tiles. Under the tiles is the input for the chosen source, and under that the scan settings in three boxes. Result quality and Output format fold away and show how many of their options differ from the default. External transfer is one row with a switch that opens the server form when it is on. The project name, the version, the two output switches (notice and security report) and the Run scan button are one line pinned to the bottom of the window, so they stay in view however long the page gets. Each output switch has an info button that explains it on the line above, and a switch that BomLens turned on for you says why on that line too.
+The New scan screen reads from top to bottom. First come the source tiles, in rows with the group name on the left: Code (current folder, a chosen folder, a GitHub URL, a ZIP upload), Artifact (a Docker image, a package or build artifact, a firmware image), SBOM (analyze an existing SBOM) and AI model (generate an ML-BOM from a HuggingFace model, from a model file you upload, or from model information you enter). The arrow keys move between the tiles. Under the tiles is the input for the chosen source, and under that the scan settings in three boxes. Result quality and Output format fold away and show how many of their options differ from the default. External transfer is one row with a switch that opens the server form when it is on. The project name, the version, the two output switches (notice and security report) and the Run scan button are one line pinned to the bottom of the window, so they stay in view however long the page gets. Each output switch has an info button that explains it on the line above, and a switch that BomLens turned on for you says why on that line too.
 
 | Scan target | Input method | Backend mode |
 |-------------|--------------|--------------|
 | Current folder | scans the source in the UI's run folder | SOURCE |
-| Directory path | a subfolder under the run folder (e.g. an OS rootfs), a folder mounted with `--ui --mount <dir>`, or — in the desktop app — a folder added with the Add folder button | ROOTFS, or ANALYZE when the folder is a [Yocto build directory](#yocto-build-directory) |
+| Choose folder | a subfolder under the run folder, a folder mounted with `--ui --mount <dir>`, or — in the desktop app — a folder added with the Add folder button. A project folder is scanned like the current folder (dependencies resolved); turn off "Resolve transitive dependencies" for a quick scan of declared packages, or open "Advanced" for OS root filesystems | SOURCE, ROOTFS when dependency resolution is off, or ANALYZE when the folder is a [Yocto build directory](#yocto-build-directory) |
 | GitHub URL | enter the repository URL, and optionally a branch, tag or commit (the default branch when empty) | SOURCE (clone) |
 | ZIP upload | upload a `.zip`/tar file | SOURCE (extract) |
 | Package upload | upload a build artifact — `.jar`, `.war`, `.ear`, `.deb`, `.rpm`, `.whl` | BINARY (a wheel is unpacked and scanned as ROOTFS) |

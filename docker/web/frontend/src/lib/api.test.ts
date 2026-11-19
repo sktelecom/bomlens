@@ -22,6 +22,8 @@ import {
   formSourceOf,
   getCapabilities,
   getDiagnostics,
+  getProjectInfo,
+  scanExists,
   listScans,
   loadScan,
   saveVexVerdict,
@@ -792,5 +794,60 @@ describe("getDiagnostics", () => {
       vi.fn().mockResolvedValue({ ok: true, json: async () => ({ text: 5 }) }),
     );
     expect(await getDiagnostics("x")).toBeNull();
+  });
+});
+
+describe("getProjectInfo / scanExists", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("asks the server about a folder by source and target, and normalizes the answer", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ version: "2.4.1", versionFrom: "pom.xml", hasManifest: true, subProjects: ["a", 3] }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    expect(await getProjectInfo("rootfs-dir", "/scan-targets/x/app")).toEqual({
+      version: "2.4.1",
+      versionFrom: "pom.xml",
+      hasManifest: true,
+      subProjects: ["a"],
+    });
+    expect(fetchMock.mock.calls[0][0]).toBe("/project-info?source=rootfs-dir&target=%2Fscan-targets%2Fx%2Fapp");
+  });
+
+  it("is null when the folder cannot be read or the server is unreachable", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false }));
+    expect(await getProjectInfo("current-dir", "")).toBeNull();
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("down")));
+    expect(await getProjectInfo("current-dir", "")).toBeNull();
+  });
+
+  it("scanExists is true only on an explicit yes, and false when it cannot tell", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ exists: true }) });
+    vi.stubGlobal("fetch", fetchMock);
+    expect(await scanExists("my app", "1.0")).toBe(true);
+    expect(fetchMock.mock.calls[0][0]).toBe("/scan-exists?project=my+app&version=1.0");
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true, json: async () => ({}) }));
+    expect(await scanExists("a", "1")).toBe(false);
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("down")));
+    expect(await scanExists("a", "1")).toBe(false);
+  });
+
+  it("startScan sends timestamp only when the earlier scan is to be kept", () => {
+    const urls: string[] = [];
+    class FakeES {
+      constructor(url: string) {
+        urls.push(url);
+      }
+      addEventListener() {}
+      close() {}
+    }
+    vi.stubGlobal("EventSource", FakeES);
+    const base = { project: "p", version: "1", source: "current-dir", notice: true, security: true, deepLicense: false, identifyVendored: false, byteStable: false, deepCve: false } as ScanParams;
+    const h = { onLog() {}, onDone() {}, onError() {} } as ScanHandlers;
+    startScan(base, h);
+    startScan({ ...base, timestamp: true }, h);
+    expect(new URLSearchParams(urls[0].split("?")[1]).get("timestamp")).toBe("");
+    expect(new URLSearchParams(urls[1].split("?")[1]).get("timestamp")).toBe("true");
   });
 });

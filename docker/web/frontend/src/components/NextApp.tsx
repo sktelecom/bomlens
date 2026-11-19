@@ -191,6 +191,10 @@ export function NextApp() {
   const capabilitiesRef = useRef(capabilities);
   capabilitiesRef.current = capabilities;
   const [recent, setRecent] = useState<RecentScan[]>([]);
+  // The first list request has answered. Until then an empty list is not "no
+  // scans yet", and the first-run screen must not flash before earlier scans
+  // appear.
+  const [recentLoaded, setRecentLoaded] = useState(false);
   // The scan a delete button asked to remove, waiting on the confirm dialog.
   const [pendingDelete, setPendingDelete] = useState<string | null>(null);
   // A finished scan's config, parked here when the user hits "Re-scan" so the
@@ -251,6 +255,7 @@ export function NextApp() {
       .then((list) => {
         recentRef.current = list;
         setRecent(list);
+        setRecentLoaded(true);
       })
       .finally(() => {
         if (recentLoadRef.current === load) recentPendingRef.current = false;
@@ -832,6 +837,8 @@ export function NextApp() {
               scans={recent}
               newHref={newHash()}
               onDelete={setPendingDelete}
+              loading={!recentLoaded}
+              outputDir={capabilities.outputHostDir || capabilities.hostDir}
             />
           ) : homeView === "lookup" ? (
             <ExternalLookup query={sectionQuery} onQueryChange={handleLookupQueryChange} />
