@@ -383,6 +383,10 @@ jobs:
       - name: Input routing unit tests
         run: bash tests/test-input-routing.sh
 
+      # No Docker (a fake docker answers): exit codes and output streams of the CLI.
+      - name: CLI conventions tests
+        run: bash tests/test-cli-conventions.sh
+
       # No Docker: guards the firmware unpack fallback chain and the component
       # merge. An identification that found nothing must report nothing, rather
       # than shipping cve-bin-tool's directory-name placeholder as a component.
