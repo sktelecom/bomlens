@@ -591,6 +591,20 @@ LICENSE_CLASS_FIX='(.components) |= (if type=="array" then map(
     + [{name:"bomlens:licenseClass", value: component_license_class}])
 ) else . end)'
 
+# In an iOS project (Swift Package Manager or CocoaPods components present) the
+# gems a Gemfile.lock lists are the build tooling (fastlane, cocoapods, xcodeproj
+# and what they pull in), not code that ships in the app. Mark them
+# bomlens:dependency-role=build-tool so a report can keep them apart from the
+# app's own dependencies. Nothing is dropped, and a project with no Swift or
+# CocoaPods component is left alone: a Ruby gem there is an ordinary dependency.
+BUILD_TOOL_FIX='(([ (.components // [])[] | (.purl // "") | select(test("^pkg:(swift|cocoapods)/")) ] | length) > 0) as $ios
+  | if $ios and ((.components | type) == "array") then (.components) |= map(
+      if ((.purl // "") | test("^pkg:gem/")) then
+        .properties = (((.properties // []) | map(select(.name != "bomlens:dependency-role")))
+          + [{name:"bomlens:dependency-role", value:"build-tool"}])
+      else . end)
+    else . end'
+
 # Stamp each component with how its license sits against the project's OUTBOUND
 # license (bomlens:licenseConflict + :why), using the rules in license-compat.json.
 # Unlike licenseClass, which labels one component in isolation, a conflict only
@@ -646,6 +660,7 @@ if [ "$MODE" = "--stable" ]; then
         | ${LICENSE_FIX}
         | ${LICENSE_REVIEW_FIX}
         | ${LICENSE_CLASS_FIX}
+        | ${BUILD_TOOL_FIX}
         | ${LICENSE_CONFLICT_FIX}
         | ${SUPPLIER_FIX}
         | ${FILENAME_FILTER}
@@ -660,7 +675,7 @@ if [ "$MODE" = "--stable" ]; then
         | del(.serialNumber)
     " "$SBOM" > "$TMP"
 else
-    jq -S --argjson vmap "$VMAP_JSON" --argjson compat "$COMPAT_JSON" "${LICENSE_FLAGS_DEF} ${NORMALIZE_DEF} ${NULL_FIX} | ${UNKNOWN_VERSION_FIX} | ${VERSION_EVR_CONTAMINATION_FIX} | ${DROP_EMPTY_FILES} | ${BINARY_FILE_DEDUP} | ${NAME_VERSION_DEDUP} | ${DOTNET_BASE_FIX} | ${PYRANGE_DEDUP} | ${SWIFT_DUP_FIX} | ${PURL_FIX} | ${VENDORED_CPE_FIX} | ${OS_SRC_FIX} | ${OS_PURL_FORM} | ${LICENSE_FIX} | ${LICENSE_REVIEW_FIX} | ${LICENSE_CLASS_FIX} | ${LICENSE_CONFLICT_FIX} | ${SUPPLIER_FIX} | ${FILENAME_FILTER} | ${SORT_FILTER}" "$SBOM" > "$TMP"
+    jq -S --argjson vmap "$VMAP_JSON" --argjson compat "$COMPAT_JSON" "${LICENSE_FLAGS_DEF} ${NORMALIZE_DEF} ${NULL_FIX} | ${UNKNOWN_VERSION_FIX} | ${VERSION_EVR_CONTAMINATION_FIX} | ${DROP_EMPTY_FILES} | ${BINARY_FILE_DEDUP} | ${NAME_VERSION_DEDUP} | ${DOTNET_BASE_FIX} | ${PYRANGE_DEDUP} | ${SWIFT_DUP_FIX} | ${PURL_FIX} | ${VENDORED_CPE_FIX} | ${OS_SRC_FIX} | ${OS_PURL_FORM} | ${LICENSE_FIX} | ${LICENSE_REVIEW_FIX} | ${LICENSE_CLASS_FIX} | ${BUILD_TOOL_FIX} | ${LICENSE_CONFLICT_FIX} | ${SUPPLIER_FIX} | ${FILENAME_FILTER} | ${SORT_FILTER}" "$SBOM" > "$TMP"
 fi
 
 mv "$TMP" "$SBOM"
