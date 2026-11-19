@@ -1265,7 +1265,7 @@ if [ "$UI_MODE" = "true" ]; then
     [ -d "${OUTPUT_BASE:-$UI_OUT_DEFAULT}" ] || UI_OUT_FRESH="true"
     # mkdir -p first: an --output-dir that does not exist yet previously relied on
     # docker's own bind-mount auto-create, which cd here would otherwise break.
-    mkdir -p "${OUTPUT_BASE:-$UI_OUT_DEFAULT}" || { echo "[ERROR] cannot create output dir: ${OUTPUT_BASE:-$UI_OUT_DEFAULT}"; exit 1; }
+    mkdir -p "${OUTPUT_BASE:-$UI_OUT_DEFAULT}" || { log_error "cannot create output dir: ${OUTPUT_BASE:-$UI_OUT_DEFAULT}"; exit 1; }
     UI_OUT="$(cd "${OUTPUT_BASE:-$UI_OUT_DEFAULT}" && pwd -P)"
     # Earlier versions kept the results in the current folder. Say once, the first
     # time the results folder is created, that they now go elsewhere.
