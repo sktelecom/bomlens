@@ -3364,6 +3364,14 @@ if [ "$MODE" = "SOURCE" ]; then
     # Before any build: show the first download, and stop at once when the
     # container cannot see the folders this run reads and writes.
     _pf_img="$CDX_IMG"; [ "$DETECTION_USED" = static ] && _pf_img="$POSTPROCESS_IMAGE"
+    # SBOM_PULL=never: both images this scan runs must already be here. Stop now,
+    # before stage 1 runs for minutes and leaves its result in the folder.
+    if [ "$SBOM_PULL" = "never" ]; then
+        ensure_image_fresh "$_pf_img"
+        if [ "$DEEP_CVE" != "true" ] && [ "$DEEP_LICENSE" != "true" ]; then
+            ensure_image_fresh "$POSTPROCESS_IMAGE"
+        fi
+    fi
     preflight_image_pull "$_pf_img"
     preflight_scan_paths "$_pf_img" "$SCAN_INPUT_DIR" "$OUTPUT_HOST_DIR"
     HOST_GOTOOLCHAIN="${GOTOOLCHAIN:-}"
