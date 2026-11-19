@@ -193,6 +193,11 @@ export interface SbomSummary {
    *  file's name in `detectionSource`); absent when it built. */
   detection?: string | null;
   detectionSource?: string | null;
+  /** Which of Maven or Gradle built a folder that has both files
+   *  (bomlens:build-tool-choice) and why (bomlens:build-tool-choice-why, in the
+   *  CLI's English words); absent when the scan made no such choice. */
+  buildToolChoice?: "maven" | "gradle" | null;
+  buildToolChoiceWhy?: string | null;
   /** Best-effort post-process steps that failed during this scan (docker/lib/
    *  pipeline-step.sh's bomlens:pipeline-step-failed property), by step id: a
    *  valid SBOM was still produced, but that step's output may be missing or
@@ -768,6 +773,9 @@ export interface ScanConfig {
   /** "build" when the scan was told not to read a lock file statically; absent
    *  or "auto" otherwise. */
   detection?: string;
+  /** "maven" or "gradle" when the scan was told which tool builds a folder with
+   *  both files; absent or "auto" otherwise. */
+  buildTool?: string;
   /** True when the scan was told not to read sbom-declared.cdx.json (the CLI's
    *  --no-components). Absent on scans that predate the option. */
   noComponents?: boolean;
@@ -986,6 +994,9 @@ export interface ScanParams {
   /** "build" turns off reading a covering lock file instead of building (server
    *  DETECTION); "auto" or omitted leaves it on. Source scans only. */
   detection?: "auto" | "build";
+  /** Which tool builds a folder with both pom.xml and build.gradle (server
+   *  BOMLENS_BUILD_TOOL); sent as `build_tool`, omitted means "auto". */
+  buildTool?: "auto" | "maven" | "gradle";
   /** Leave sbom-declared.cdx.json unread: at the root of a source tree (the
    *  CLI's --no-components) and at the root of a Yocto build directory, which
    *  the web UI reads in place of --components. Sent as `no_components`. */
@@ -1862,6 +1873,9 @@ export interface ProjectInfo {
   /** Sub-folders that are projects of their own, listed only for a folder with
    *  no manifest: scanning it would merge them into one SBOM. */
   subProjects: string[];
+  /** Which build files sit directly in the folder. Both true is when the form
+   *  offers the Maven or Gradle choice. */
+  buildTools: { maven: boolean; gradle: boolean };
 }
 
 /** Ask the server what the folder to scan says about itself. The folder is
@@ -1882,6 +1896,10 @@ export async function getProjectInfo(
       versionFrom: typeof j.versionFrom === "string" ? j.versionFrom : "",
       hasManifest: j.hasManifest === true,
       subProjects: Array.isArray(j.subProjects) ? j.subProjects.filter((x) => typeof x === "string") : [],
+      buildTools: {
+        maven: j.buildTools?.maven === true,
+        gradle: j.buildTools?.gradle === true,
+      },
     };
   } catch {
     return null;
@@ -2053,6 +2071,7 @@ export function startScan(params: ScanParams, handlers: ScanHandlers): EventSour
     byte_stable: String(params.byteStable),
     analyze_cpe_index: String(params.analyzeCpeIndex ?? false),
     detection: params.detection ?? "auto",
+    build_tool: params.buildTool ?? "auto",
     no_components: params.noComponents ? "true" : "",
     conformance_profile: params.conformanceProfile ?? "",
     license: params.license ?? "",

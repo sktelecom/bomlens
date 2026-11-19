@@ -62,6 +62,8 @@ cd ~/my-project       # UI가 "현재 폴더"로 스캔하는 폴더(아무 곳�
 
 **Reproducible output** 토글은 실행마다 바이트 단위로 동일한 SBOM을 만듭니다(CLI `--byte-stable`에 해당). 소스·이미지·펌웨어 스캔에서 쓸 수 있고, SBOM 분석과 AI 모델에는 없습니다.
 
+소스 폴더에 `pom.xml`과 `build.gradle`(또는 `build.gradle.kts`)이 함께 있으면 **Maven과 Gradle 빌드 도구** 선택이 나타납니다. 항목은 자동, Maven, Gradle이고 CLI `--build-tool`에 해당합니다. 자동은 CLI와 같이 Gradle로 빌드하고, Maven을 고르면 `pom.xml`로 빌드합니다. 다른 폴더에서는 이 선택이 보이지 않습니다. 스캔이 두 도구 중 하나를 골라야 했다면 개요에 사용한 도구와 이유를 적습니다.
+
 SBOM 분석에는 **CPE 색인과 대조** 토글이 있습니다(기본은 꺼짐, CLI `--analyze-cpe-index`에 해당). BomLens가 생성한 SBOM에서 `bomlens:purlSource=upstream-map` 속성이 붙은 구성요소를 번들 CPE 색인에도 대조합니다. 나머지 구성요소는 대조하지 않습니다.
 
 결과 품질의 **sbom-declared.cdx.json 읽기** 토글은 기본으로 켜져 있으며, 스캔하는 폴더 최상위의 `sbom-declared.cdx.json`에 적힌 구성요소를 SBOM에 추가합니다. 소스 스캔의 폴더와, 디렉터리 입력으로 고른 [Yocto 빌드 디렉터리](#yocto-빌드-디렉터리)에 적용됩니다. 폴더가 Yocto 빌드 디렉터리인지는 스캔을 시작해야 알 수 있으므로, 그 밖의 디렉터리는 켜든 끄든 같은 결과가 나옵니다. 파일에 적힌 빌드 산출물이 아직 없을 때 하는 스캔이라면 끕니다. 소스 스캔에서는 CLI `--no-components`에 해당합니다. UI는 이 이름의 파일만 읽으며, `--components`처럼 다른 파일을 지정할 수는 없습니다. [선언 구성요소 가이드](../guides/declared-components.ko.md)를 참고하세요.

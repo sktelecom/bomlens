@@ -1013,6 +1013,34 @@ def _has_manifest(directory):
     return any(n in _PROJECT_MANIFESTS or n.endswith(_PROJECT_MANIFEST_SUFFIXES) for n in names)
 
 
+_GRADLE_BUILD_FILES = ("build.gradle", "build.gradle.kts")
+
+
+def _build_tools_in(directory):
+    """Which build tools the folder itself declares: pom.xml for Maven,
+    build.gradle(.kts) for Gradle. Only files directly in it count, and a link
+    does not (the same rule as _read_small_file)."""
+    base = _trusted_path(directory)
+    out = {"maven": False, "gradle": False}
+    if base is None:
+        return out
+    try:
+        names = set(os.listdir(base))
+    except OSError:
+        return out
+
+    def present(name):
+        if name not in names:
+            return False
+        path = _trusted_path(os.path.join(base, name))
+        return (path is not None and path == os.path.join(base, name)
+                and os.path.isfile(path))
+
+    out["maven"] = present("pom.xml")
+    out["gradle"] = any(present(n) for n in _GRADLE_BUILD_FILES)
+    return out
+
+
 def project_info(scan_dir):
     """What the folder says about itself, for the New scan form: the version its
     manifest states (pom.xml, package.json, build.gradle(.kts), Cargo.toml) and,
@@ -1021,9 +1049,10 @@ def project_info(scan_dir):
     safe_scan_dir() result; only files directly in it are read, none through a
     link, and the version must look like a version."""
     out = {"version": "", "versionFrom": "", "hasManifest": _has_manifest(scan_dir),
-           "subProjects": []}
+           "subProjects": [], "buildTools": {"maven": False, "gradle": False}}
     if _trusted_path(scan_dir) is None:
         return out
+    out["buildTools"] = _build_tools_in(scan_dir)
     for name, parse in _VERSION_SOURCES:
         text = _read_small_file(scan_dir, name)
         if text is None:
@@ -3000,6 +3029,20 @@ def sbom_summary(run_id):
         )
         if isinstance(raw, str) and re.fullmatch(r"[A-Za-z0-9._-]{1,64}", raw):
             detection_source = raw
+    # build-tool choice: which of Maven or Gradle a folder with both was built
+    # with (bomlens:build-tool-choice) and the reason in the same words the CLI
+    # prints. Supplier-controlled like the properties above, so the tool is one of
+    # two values and the reason a short line of plain characters.
+    def _meta_prop(name):
+        return next((p.get("value") for p in meta_props if p.get("name") == name), None)
+
+    build_tool_choice = _meta_prop("bomlens:build-tool-choice")
+    build_tool_choice = build_tool_choice if build_tool_choice in ("maven", "gradle") else None
+    build_tool_why = None
+    if build_tool_choice:
+        raw = _meta_prop("bomlens:build-tool-choice-why")
+        if isinstance(raw, str) and re.fullmatch(r"[A-Za-z0-9 .,;:()_/=<>'+-]{1,240}", raw):
+            build_tool_why = raw
     # pipeline-step-failed: set by docker/lib/pipeline-step.sh's
     # mark_pipeline_warning for every best-effort post-process step that
     # failed (normalize, CPE/EOL/malicious enrichment, conformance, notice
@@ -3098,6 +3141,8 @@ def sbom_summary(run_id):
         "sbomToolDegraded": degraded,
         "detection": detection,
         "detectionSource": detection_source,
+        "buildToolChoice": build_tool_choice,
+        "buildToolChoiceWhy": build_tool_why,
         "pipelineStepsFailed": pipeline_steps_failed,
         "pipelineStepsFailedMore": pipeline_steps_failed_more,
         "firmwareScope": _firmware_scope(_as_dict(data.get("metadata"))),
@@ -5091,6 +5136,8 @@ def run_sibling_scan(image, mode, out_dir, on_log, *, upload_file=None, model_id
         "-e", "ANALYZE_CPE_INDEX=%s" % ("true" if env.get("ANALYZE_CPE_INDEX") == "true" else "false"),
         # Go reachability: the scan form's opt-in toggle, read the same way.
         "-e", "REACHABILITY=%s" % ("true" if env.get("REACHABILITY") == "true" else "false"),
+        "-e", "BOMLENS_BUILD_TOOL=%s" % (
+            env.get("BOMLENS_BUILD_TOOL") if env.get("BOMLENS_BUILD_TOOL") in ("maven", "gradle") else "auto"),
     ]
     # Free-form companions to PURL_RESOLVE: a namespace list and a time budget.
     # Passed by name so the value never reaches the argv, like API_KEY above,
@@ -7894,6 +7941,14 @@ class Handler(BaseHTTPRequestHandler):
             self._send(400, json.dumps({"error": "invalid git_ref"}))
             return
 
+        # Which build tool a folder with both pom.xml and build.gradle is built
+        # with (--build-tool on the CLI); only these three literals are accepted.
+        build_tool = g("build_tool", "auto").strip() or "auto"
+        if build_tool not in ("auto", "maven", "gradle"):
+            self._send(400, json.dumps(
+                {"error": "invalid build_tool: use auto, maven or gradle"}))
+            return
+
         # Paths to leave out of a source scan (--exclude on the CLI), one per line.
         scan_exclude, bad_exclude = parse_scan_exclude(g("exclude"))
         if scan_exclude is None:
@@ -8054,6 +8109,7 @@ class Handler(BaseHTTPRequestHandler):
                 # How a source scan finds its dependencies: "build" never reads a
                 # lock file statically, anything else is "auto" (the default).
                 "detection": "build" if g("detection") == "build" else "auto",
+                "buildTool": build_tool,
                 "sbomAuthor": sbom_author,
                 "supplier": supplier,
                 "specVersion": spec_version,
@@ -8218,6 +8274,9 @@ class Handler(BaseHTTPRequestHandler):
             # (entrypoint.sh, DETECTION). "build" is the form's way to turn that off;
             # only these two literals are ever passed on.
             "DETECTION": "build" if g("detection") == "build" else "auto",
+            # Maven or Gradle for a folder that has both; validated above, so only
+            # one of three literals is ever passed on.
+            "BOMLENS_BUILD_TOOL": build_tool,
             # Opt-in deep CVE matching (maven NVD-CPE via grype). Consumed by
             # scan-security.sh in the deep-cve image; a plain boolean from a fixed
             # literal, no user text. SECURITY_NVD_VERIFY stays off (network/NVD key).
